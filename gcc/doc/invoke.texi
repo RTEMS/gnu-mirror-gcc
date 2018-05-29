@@ -596,7 +596,7 @@ Objective-C and Objective-C++ Dialects}.
 @gccoptlist{-mabi=@var{name}  -mbig-endian  -mlittle-endian @gol
 -mgeneral-regs-only @gol
 -mcmodel=tiny  -mcmodel=small  -mcmodel=large @gol
--mstrict-align @gol
+-mstrict-align -mno-strict-align @gol
 -momit-leaf-frame-pointer @gol
 -mtls-dialect=desc  -mtls-dialect=traditional @gol
 -mtls-size=@var{size} @gol
@@ -2908,6 +2908,51 @@ Warn that the implicit declaration of a copy constructor or copy
 assignment operator is deprecated if the class has a user-provided
 copy constructor, copy assignment operator, or destructor, in C++11
 and up.  This warning is enabled by @option{-Wall}.
+
+@item -Wno-init-list-lifetime @r{(C++ and Objective-C++ only)}
+@opindex Winit-list-lifetime
+@opindex Wno-init-list-lifetime
+Do not warn about uses of @code{std::initializer_list} that are likely
+to result in dangling pointers.  Since the underlying array for an
+@code{initializer_list} is handled like a normal C++ temporary object,
+it is easy to inadvertently keep a pointer to the array past the end
+of the array's lifetime.  For example:
+
+@itemize @bullet
+@item
+If a function returns a temporary @code{initializer_list}, or a local
+@code{initializer_list} variable, the array's lifetime ends at the end
+of the return statement, so the value returned has a dangling pointer.
+
+@item
+If a new-expression creates an @code{initializer_list}, the array only
+lives until the end of the enclosing full-expression, so the
+@code{initializer_list} in the heap has a dangling pointer.
+
+@item
+When an @code{initializer_list} variable is assigned from a
+brace-enclosed initializer list, the temporary array created for the
+right side of the assignment only lives until the end of the
+full-expression, so at the next statement the @code{initializer_list}
+variable has a dangling pointer.
+
+@smallexample
+// li's initial underlying array lives as long as li
+std::initializer_list<int> li = @{ 1,2,3 @};
+// assignment changes li to point to a temporary array
+li = @{ 4, 5 @};
+// now the temporary is gone and li has a dangling pointer
+int i = li.begin()[0] // undefined behavior
+@end smallexample
+
+@item
+When a list constructor stores the @code{begin} pointer from the
+@code{initializer_list} argument, this doesn't extend the lifetime of
+the array, so if a class variable is constructed from a temporary
+@code{initializer_list}, the pointer is left dangling by the end of
+the variable declaration statement.
+
+@end itemize
 
 @item -Wliteral-suffix @r{(C++ and Objective-C++ only)}
 @opindex Wliteral-suffix
@@ -10734,6 +10779,31 @@ The size of L1 cache, in kilobytes.
 @item l2-cache-size
 The size of L2 cache, in kilobytes.
 
+@item prefetch-dynamic-strides
+Whether the loop array prefetch pass should issue software prefetch hints
+for strides that are non-constant.  In some cases this may be
+beneficial, though the fact the stride is non-constant may make it
+hard to predict when there is clear benefit to issuing these hints.
+
+Set to 1, the default, if the prefetch hints should be issued for non-constant
+strides.  Set to 0 if prefetch hints should be issued only for strides that
+are known to be constant and below @option{prefetch-minimum-stride}.
+
+@item prefetch-minimum-stride
+Minimum constant stride, in bytes, to start using prefetch hints for.  If
+the stride is less than this threshold, prefetch hints will not be issued.
+
+This setting is useful for processors that have hardware prefetchers, in
+which case there may be conflicts between the hardware prefetchers and
+the software prefetchers.  If the hardware prefetchers have a maximum
+stride they can handle, it should be used here to improve the use of
+software prefetchers.
+
+A value of -1, the default, means we don't have a threshold and therefore
+prefetch hints can be issued for any constant stride.
+
+This setting is only useful for strides that are known and constant.
+
 @item loop-interchange-max-num-stmts
 The maximum number of stmts in a loop to be interchanged.
 
@@ -14594,9 +14664,11 @@ Generate code for the large code model.  This makes no assumptions about
 addresses and sizes of sections.  Programs can be statically linked only.
 
 @item -mstrict-align
+@itemx -mno-strict-align
 @opindex mstrict-align
-Avoid generating memory accesses that may not be aligned on a natural object
-boundary as described in the architecture specification.
+@opindex mno-strict-align
+Avoid or allow generating memory accesses that may not be aligned on a natural
+object boundary as described in the architecture specification.
 
 @item -momit-leaf-frame-pointer
 @itemx -mno-omit-leaf-frame-pointer
@@ -15941,7 +16013,7 @@ The table below lists the supported extensions for each architecture.
 Architectures not mentioned do not support any extensions.
 
 @table @samp
-@itemx armv5te
+@item armv5te
 @itemx armv6
 @itemx armv6j
 @itemx armv6k

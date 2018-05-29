@@ -87,6 +87,7 @@ lvalue_kind (const_tree ref)
     {
     case SAVE_EXPR:
       return clk_none;
+
       /* preincrements and predecrements are valid lvals, provided
 	 what they refer to are valid lvals.  */
     case PREINCREMENT_EXPR:
@@ -94,7 +95,24 @@ lvalue_kind (const_tree ref)
     case TRY_CATCH_EXPR:
     case REALPART_EXPR:
     case IMAGPART_EXPR:
+    case VIEW_CONVERT_EXPR:
       return lvalue_kind (TREE_OPERAND (ref, 0));
+
+    case ARRAY_REF:
+      {
+	tree op1 = TREE_OPERAND (ref, 0);
+	if (TREE_CODE (TREE_TYPE (op1)) == ARRAY_TYPE)
+	  {
+	    op1_lvalue_kind = lvalue_kind (op1);
+	    if (op1_lvalue_kind == clk_class)
+	      /* in the case of an array operand, the result is an lvalue if
+		 that operand is an lvalue and an xvalue otherwise */
+	      op1_lvalue_kind = clk_rvalueref;
+	    return op1_lvalue_kind;
+	  }
+	else
+	  return clk_ordinary;
+      }
 
     case MEMBER_REF:
     case DOTSTAR_EXPR:
@@ -104,6 +122,11 @@ lvalue_kind (const_tree ref)
 	op1_lvalue_kind = lvalue_kind (TREE_OPERAND (ref, 0));
       if (TYPE_PTRMEMFUNC_P (TREE_TYPE (TREE_OPERAND (ref, 1))))
 	op1_lvalue_kind = clk_none;
+      else if (op1_lvalue_kind == clk_class)
+	/* The result of a .* expression whose second operand is a pointer to a
+	   data member is an lvalue if the first operand is an lvalue and an
+	   xvalue otherwise.  */
+	op1_lvalue_kind = clk_rvalueref;
       return op1_lvalue_kind;
 
     case COMPONENT_REF:
@@ -119,6 +142,11 @@ lvalue_kind (const_tree ref)
 	    return lvalue_kind (TREE_OPERAND (ref, 1));
 	}
       op1_lvalue_kind = lvalue_kind (TREE_OPERAND (ref, 0));
+      if (op1_lvalue_kind == clk_class)
+	/* If E1 is an lvalue, then E1.E2 is an lvalue;
+	   otherwise E1.E2 is an xvalue.  */
+	op1_lvalue_kind = clk_rvalueref;
+
       /* Look at the member designator.  */
       if (!op1_lvalue_kind)
 	;
@@ -165,7 +193,6 @@ lvalue_kind (const_tree ref)
       /* FALLTHRU */
     case INDIRECT_REF:
     case ARROW_EXPR:
-    case ARRAY_REF:
     case PARM_DECL:
     case RESULT_DECL:
     case PLACEHOLDER_EXPR:
@@ -203,11 +230,7 @@ lvalue_kind (const_tree ref)
 	     type-dependent expr, that is, but we shouldn't be testing
 	     lvalueness if we can't even tell the types yet!  */
 	  gcc_assert (!type_dependent_expression_p (CONST_CAST_TREE (ref)));
-	  if (CLASS_TYPE_P (TREE_TYPE (ref))
-	      || TREE_CODE (TREE_TYPE (ref)) == ARRAY_TYPE)
-	    return clk_class;
-	  else
-	    return clk_none;
+	  goto default_;
 	}
       op1_lvalue_kind = lvalue_kind (TREE_OPERAND (ref, 1)
 				    ? TREE_OPERAND (ref, 1)
@@ -257,18 +280,14 @@ lvalue_kind (const_tree ref)
     case PAREN_EXPR:
       return lvalue_kind (TREE_OPERAND (ref, 0));
 
-    case VIEW_CONVERT_EXPR:
-      if (location_wrapper_p (ref))
-	return lvalue_kind (TREE_OPERAND (ref, 0));
-      /* Fallthrough.  */
-
     default:
+    default_:
       if (!TREE_TYPE (ref))
 	return clk_none;
       if (CLASS_TYPE_P (TREE_TYPE (ref))
 	  || TREE_CODE (TREE_TYPE (ref)) == ARRAY_TYPE)
 	return clk_class;
-      break;
+      return clk_none;
     }
 
   /* If one operand is not an lvalue at all, then this expression is
@@ -1278,7 +1297,7 @@ cp_build_qualified_type_real (tree type,
   if ((type_quals & TYPE_QUAL_RESTRICT)
       && TREE_CODE (type) != TEMPLATE_TYPE_PARM
       && TREE_CODE (type) != TYPENAME_TYPE
-      && !POINTER_TYPE_P (type))
+      && !INDIRECT_TYPE_P (type))
     {
       bad_quals |= TYPE_QUAL_RESTRICT;
       type_quals &= ~TYPE_QUAL_RESTRICT;

@@ -1,3 +1,385 @@
+2018-05-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/85950
+	* gcc.target/i386/pr85950.c: New test.
+
+2018-05-29  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85883
+	* g++.dg/cpp1z/class-deduction55.C: New test.
+	* g++.dg/cpp1z/class-deduction56.C: New test.
+	* g++.dg/cpp1z/class-deduction57.C: New test.
+
+2018-05-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85952
+	* g++.dg/warn/Wunused-var-33.C: New test.
+
+	PR target/85918
+	* gcc.target/i386/avx512dq-pr85918.c: Add -mprefer-vector-width=512
+	and -fno-vect-cost-model options.  Add aligned(64) attribute to the
+	arrays.  Add suffix 1 to all functions and use 4 iterations rather
+	than N.  Add functions with conversions to and from float.
+	Add new set of functions with 8 iterations and another one
+	with 16 iterations, expect 24 vectorized loops instead of just 4.
+	* gcc.target/i386/avx512dq-pr85918-2.c: New test.
+
+2018-05-29  Javier Miranda  <miranda@adacore.com>
+
+	* gnat.dg/equal2.adb: New testcase.
+
+2018-05-29  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/float_attributes_overflows.adb: New testcase.
+
+2018-05-29  Pascal Obry  <obry@adacore.com>
+
+	* gnat.dg/normalize_pathname.adb: New testcase.
+
+2018-05-29  Tom de Vries  <tom@codesourcery.com>
+
+	* lib/scanasm.exp (scan-assembler-times): Use proc name in error
+	message.
+	* lib/scanipa.exp (scan-ipa-dump-times): Same.
+	* lib/scanrtl.exp (scan-rtl-dump-times): Same.
+	* lib/scantree.exp (scan-tree-dump-times): Same.
+
+2018-05-29  Tom de Vries  <tom@codesourcery.com>
+
+	* lib/scanasm.exp (scan-stack-usage, scan-stack-usage-not)
+	(scan-ada-spec, scan-ada-spec-not, scan-lto-assembler):
+	Use proc name as first argument to dg-scan.
+
+2018-05-29  Tom de Vries  <tom@codesourcery.com>
+
+	* lib/scanasm.exp (scan-hidden, scan-not-hidden): Handle being called
+	with no arguments.
+
+2018-05-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/85934
+	* gcc.target/i386/pr85934.c: New testcase.
+
+2018-05-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/renaming12.adb, gnat.dg/renaming12.ads: New testcase.
+
+2018-05-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/rep_clause6.adb, gnat.dg/rep_clause6.ads: New testcase.
+
+2018-05-28  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/fixedpnt5.adb: New testcase.
+
+2018-05-28  Justin Squirek  <squirek@adacore.com>
+
+	* gnat.dg/array31.adb: New testcase.
+
+2018-05-28  Justin Squirek  <squirek@adacore.com>
+
+	* gnat.dg/warn15-core-main.adb, gnat.dg/warn15-core.ads,
+	gnat.dg/warn15-interfaces.ads, gnat.dg/warn15.ads: New testcase.
+
+2018-05-27  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	* gfortran.dg/data_stmt_pointer.f90: new test.
+
+2018-05-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85918
+	* gcc.target/i386/avx512dq-pr85918.c: New test.
+
+2018-05-25  Jim Wilson  <jimw@sifive.com>
+
+	* gcc.target/riscv/interrupt-1.c: New.
+	* gcc.target/riscv/interrupt-2.c: New.
+	* gcc.target/riscv/interrupt-3.c: New.
+	* gcc.target/riscv/interrupt-4.c: New.
+	* gcc.target/riscv/interrupt-5.c: New.
+
+2018-05-25  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85786
+	* gfortran.dg/pr85786.f90: New test.
+
+2018-05-25  Paul Koning  <ni1d@arrl.net>
+
+	* gcc.c-torture/compile/20151204.c: Skip if pdp11.
+	* gcc.c-torture/compile/pr55921.c: Ditto.
+	* gcc.c-torture/compile/pr60655-1.c: Ditto.
+	* gcc.c-torture/compile/vector-align-1.c: Add max alignment if pdp11.
+
+2018-05-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85832
+	* gcc.target/i386/avx512f-pr85832.c: New test.
+	* gcc.target/i386/avx512vl-pr85832.c: New test.
+	* gcc.target/i386/avx512bw-pr85832.c: New test.
+	* gcc.target/i386/avx512vlbw-pr85832.c: New test.
+
+2018-05-25  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/85720
+	* gcc.dg/tree-ssa/pr85720.c: New test.
+	* gcc.target/i386/avx256-unaligned-store-2.c: Disable loop pattern
+	distribution.
+
+2018-05-25  Martin Liska  <mliska@suse.cz>
+
+	PR testsuite/85911
+	* gcc.dg/tree-prof/update-loopch.c: Do not scan
+	for 'Removing basic block'.
+
+2018-05-25  Patrick Bernardi  <bernardi@adacore.com>
+
+	* gnat.dg/sec_stack1.adb: New testcase.
+
+2018-05-25  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/fixedpnt4.adb: New testcase.
+
+2018-05-25  Javier Miranda  <miranda@adacore.com>
+
+	* gnat.dg/interface7.adb: New testcase.
+
+2018-05-25  Hristian Kirtchev  <kirtchev@adacore.com>
+
+	* gnat.dg/sec_stack2.adb: New testcase.
+
+2018-05-25  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/interface6.adb: New testcase.
+
+2018-05-25  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/static_pred1.adb, gnat.dg/static_pred1.ads: New testcase.
+
+2018-05-25  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* lib/target-supports.exp
+	(check_effective_target_vect_double_cond_arith): Include
+	multiplication and division.
+	* gcc.dg/vect/pr53773.c: Do not expect a scalar tail when using
+	fully-masked loops with a fixed vector length.
+	* gcc.dg/vect/vect-cond-arith-1.c: Add multiplication and division
+	tests.
+	* gcc.target/aarch64/sve/vcond_8.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_9.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_12.c: Add multiplication tests.
+
+2018-05-25  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/div_1.c: New test.
+	* gcc.target/aarch64/sve/div_1_run.c: Likewise.
+	* gcc.target/aarch64/sve/mul_highpart_2.c: Likewise.
+	* gcc.target/aarch64/sve/mul_highpart_2_run.c: Likewise.
+
+2018-05-25  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.dg/vect/bb-slp-div-1.c: New XFAILed test.
+
+2018-05-25  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* lib/target-supports.exp
+	(check_effective_target_vect_double_cond_arith): New proc.
+	* gcc.dg/vect/vect-cond-arith-1.c: New test.
+	* gcc.target/aarch64/sve/vcond_8.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_8_run.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_9.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_9_run.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_12.c: Likewise.
+	* gcc.target/aarch64/sve/vcond_12_run.c: Likewise.
+
+2018-05-25  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/85839
+	* gfortran.dg/f2018_obs.f90: New test case.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85543
+	* gfortran.dg/pr85543.f90: New test.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85780
+	* gfortran.dg/pr85780.f90: New test.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85779
+	* gfortran.dg/pr85779_1.f90: New test.
+	* gfortran.dg/pr85779_2.f90: Ditto.
+	* gfortran.dg/pr85779_3.f90: Ditto.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85895
+
+	* gfortran.dg/coarray_3.f90: Fix invalid testcase.
+	* gfortran.dg/pr85895.f90: New test.
+
+2018-05-24  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/avx512f-vcvtusi2sd64-1.c: Update scan string.
+	* gcc.target/i386/avx512f-vcvtusi2ss64-1.c: Ditto.
+
+2018-05-24  Roger Sayle  <roger@nextmovesoftware.com>
+
+        * gcc.dg/fold-popcount-1.c: New testcase.
+        * gcc.dg/fold-popcount-2.c: New testcase.
+        * gcc.dg/fold-popcount-3.c: New testcase.
+        * gcc.dg/fold-popcount-4.c: New testcase.
+
+2018-05-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85847
+	* g++.dg/cpp0x/new3.C: New test.
+
+2018-05-24  Javier Miranda  <miranda@adacore.com>
+
+	* gnat.dg/discr52.adb: New testcase.
+
+2018-05-24  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/others1.adb: New testcase.
+
+2018-05-24  Justin Squirek  <squirek@adacore.com>
+
+	* gnat.dg/raise_expr.adb: New testcase.
+
+2018-05-24  Hristian Kirtchev  <kirtchev@adacore.com>
+
+	* gnat.dg/formal_containers.adb: New testcase.
+
+2018-05-24  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* gcc.target/i386/pr85345.c: Require ifunc support.
+
+2018-05-24  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.dg/vect/vect-fma-1.c: New test.
+
+2018-05-24  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* gcc.dg/tree-prof/update-loopch.c: Fix dumpfile name in
+	scan-tree-dump*.
+
+2018-05-24  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	PR target/83009
+	* gcc/target/aarch64/store_v2vec_lanes.c: Add extra tests.
+
+2018-05-23  Jozef Lawrynowicz  <jozef.l@somniumtech.com>
+
+	PR target/78849
+	* gcc.target/msp430/msp430.exp: Remove -pedantic-errors from
+	DEFAULT_CFLAGS.
+	* gcc.target/msp430/pr78849.c: New test.
+
+2018-05-23  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/cpp2a/range-for8.C: New test.
+	* g++.dg/cpp2a/range-for9.C: New test.
+	* g++.dg/cpp2a/range-for10.C: New test.
+
+2017-05-23  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* lib/target-supports.exp (check_effective_target_be): New.
+	(check_effective_target_le): New.
+
+2018-05-23  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/cpp2a/range-for1.C: New test.
+	* g++.dg/cpp2a/range-for2.C: New test.
+	* g++.dg/cpp2a/range-for3.C: New test.
+	* g++.dg/cpp2a/range-for4.C: New test.
+	* g++.dg/cpp2a/range-for5.C: New test.
+	* g++.dg/cpp2a/range-for6.C: New test.
+	* g++.dg/cpp2a/range-for7.C: New test.
+
+2018-05-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/cvt-3.c: New test.
+
+2018-05-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/cvt-2.c: New test.
+
+2018-05-23  Alexander Monakov  <amonakov@ispras.ru>
+
+	* gcc.dg/pr79985.c: New testcase.
+
+2018-05-23  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/tree-ssa/ssa-fre-66.c: New testcase.
+
+2018-05-23  Sudakshina Das  <sudi.das@arm.com>
+
+	PR target/84882
+	* gcc.target/aarch64/pr84882.c: New test.
+	* gcc.target/aarch64/target_attr_18.c: Likewise.
+
+2018-05-23  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	PR tree-optimization/85853
+	* gfortran.dg/vect/pr85853.f90: New test.
+
+2018-05-23  Hristian Kirtchev  <kirtchev@adacore.com>
+
+	* gnat.dg/import2.adb: New testcase.
+
+2018-05-23  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/discr51.adb: New testcase.
+
+2018-05-23  Javier Miranda  <miranda@adacore.com>
+
+	* gnat.dg/valid_scalars1.adb: New testcase.
+
+2018-05-23  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/iter1.adb, gnat.dg/iter1.ads: New testcase.
+
+2018-05-23  Hristian Kirtchev  <kirtchev@adacore.com>
+
+	* gnat.dg/elab5.adb, gnat.dg/elab5_pkg.adb, gnat.dg/elab5_pkg.ads: New
+	testcase.
+
+2018-05-23  Hristian Kirtchev  <kirtchev@adacore.com>
+
+	* gnat.dg/elab4.adb, gnat.dg/elab4_pkg.adb, gnat.dg/elab4_pkg.ads: New
+	testcase.
+
+2018-05-23  Bob Duff  <duff@adacore.com>
+
+	* gnat.dg/addr10.adb: New testcase.
+
+2018-05-23  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/85874
+	* gcc.dg/Wstrict-overflow-27.c: New testcase.
+
+2018-05-23  Yury Gribov  <tetra2005@gmail.com>
+
+	PR tree-optimization/85822
+	* c-c++-common/pr85822.c: New test.
+
+2018-05-23  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/tree-ssa/ssa-fre-65.c: New testcase.
+
+2018-05-22  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/85841
+	* gfortran.dg/pr30667.f: Add option "-std=legacy".
+
+2018-05-22  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/85359
+	* gcc.dg/attr-nonstring.c: New test.
+
 2018-05-22  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR target/85345

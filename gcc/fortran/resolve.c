@@ -997,6 +997,10 @@ resolve_common_blocks (gfc_symtree *common_root)
 
   resolve_common_vars (common_root->n.common, true);
 
+  if (!gfc_notify_std (GFC_STD_F2018_OBS, "COMMON block at %L",
+		       &common_root->n.common->where))
+    return;
+
   /* The common name is a global name - in Fortran 2003 also if it has a
      C binding name, since Fortran 2008 only the C binding name is a global
      identifier.  */
@@ -3055,8 +3059,8 @@ update_current_proc_array_outer_dependency (gfc_symbol *sym)
 
   /* If SYM has references to outer arrays, so has the procedure calling
      SYM.  If SYM is a procedure pointer, we can assume the worst.  */
-  if (sym->attr.array_outer_dependency
-      || sym->attr.proc_pointer)
+  if ((sym->attr.array_outer_dependency || sym->attr.proc_pointer)
+      && gfc_current_ns->proc_name)
     gfc_current_ns->proc_name->attr.array_outer_dependency = 1;
 }
 
@@ -9527,6 +9531,7 @@ resolve_sync (gfc_code *code)
     }
 
   /* Check STAT.  */
+  gfc_resolve_expr (code->expr2);
   if (code->expr2
       && (code->expr2->ts.type != BT_INTEGER || code->expr2->rank != 0
 	  || code->expr2->expr_type != EXPR_VARIABLE))
@@ -9534,6 +9539,7 @@ resolve_sync (gfc_code *code)
 	       &code->expr2->where);
 
   /* Check ERRMSG.  */
+  gfc_resolve_expr (code->expr3);
   if (code->expr3
       && (code->expr3->ts.type != BT_CHARACTER || code->expr3->rank != 0
 	  || code->expr3->expr_type != EXPR_VARIABLE))
@@ -9927,6 +9933,9 @@ gfc_resolve_forall (gfc_code *code, gfc_namespace *ns, int forall_save)
   gfc_forall_iterator *fa;
 
   old_nvar = nvar;
+
+  if (!gfc_notify_std (GFC_STD_F2018_OBS, "FORALL construct at %L", &code->loc))
+    return;
 
   /* Start to resolve a FORALL construct   */
   if (forall_save == 0)
@@ -12501,7 +12510,7 @@ resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
       while (curr_arg != NULL)
         {
           /* Skip implicitly typed dummy args here.  */
-	  if (curr_arg->sym->attr.implicit_type == 0)
+	  if (curr_arg->sym && curr_arg->sym->attr.implicit_type == 0)
 	    if (!gfc_verify_c_interop_param (curr_arg->sym))
 	      /* If something is found to fail, record the fact so we
 		 can mark the symbol for the procedure as not being

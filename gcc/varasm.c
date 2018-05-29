@@ -5917,7 +5917,9 @@ assemble_alias (tree decl, tree target)
 # else
       if (!DECL_WEAK (decl))
 	{
-	  if (cgraph_node::get (decl)->ifunc_resolver)
+	  /* NB: ifunc_resolver isn't set when an error is detected.  */
+	  if (TREE_CODE (decl) == FUNCTION_DECL
+	      && lookup_attribute ("ifunc", DECL_ATTRIBUTES (decl)))
 	    error_at (DECL_SOURCE_LOCATION (decl),
 		      "ifunc is not supported in this configuration");
 	  else
@@ -6448,7 +6450,7 @@ default_elf_asm_named_section (const char *name, unsigned int flags,
     {
       if (!(flags & SECTION_DEBUG))
 	*f++ = 'a';
-#if defined (HAVE_GAS_SECTION_EXCLUDE) && HAVE_GAS_SECTION_EXCLUDE == 1
+#if HAVE_GAS_SECTION_EXCLUDE
       if (flags & SECTION_EXCLUDE)
 	*f++ = 'e';
 #endif

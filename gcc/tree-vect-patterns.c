@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "cgraph.h"
 #include "omp-simd-clone.h"
+#include "predict.h"
 
 /* Pattern recognition functions  */
 static gimple *vect_recog_widen_sum_pattern (vec<gimple *> *, tree *,
@@ -231,7 +232,7 @@ vect_reassociating_reduction_p (stmt_vec_info stmt_vinfo)
 {
   return (STMT_VINFO_DEF_TYPE (stmt_vinfo) == vect_reduction_def
 	  ? STMT_VINFO_REDUC_TYPE (stmt_vinfo) != FOLD_LEFT_REDUCTION
-	  : GROUP_FIRST_ELEMENT (stmt_vinfo) != NULL);
+	  : REDUC_GROUP_FIRST_ELEMENT (stmt_vinfo) != NULL);
 }
 
 /* Function vect_recog_dot_prod_pattern
@@ -2674,15 +2675,19 @@ vect_recog_divmod_pattern (vec<gimple *> *stmts,
   if (vectype == NULL_TREE)
     return NULL;
 
-  /* If the target can handle vectorized division or modulo natively,
-     don't attempt to optimize this.  */
-  optab = optab_for_tree_code (rhs_code, vectype, optab_default);
-  if (optab != unknown_optab)
+  if (optimize_bb_for_size_p (gimple_bb (last_stmt)))
     {
-      machine_mode vec_mode = TYPE_MODE (vectype);
-      int icode = (int) optab_handler (optab, vec_mode);
-      if (icode != CODE_FOR_nothing)
-	return NULL;
+      /* If the target can handle vectorized division or modulo natively,
+	 don't attempt to optimize this, since native division is likely
+	 to give smaller code.  */
+      optab = optab_for_tree_code (rhs_code, vectype, optab_default);
+      if (optab != unknown_optab)
+	{
+	  machine_mode vec_mode = TYPE_MODE (vectype);
+	  int icode = (int) optab_handler (optab, vec_mode);
+	  if (icode != CODE_FOR_nothing)
+	    return NULL;
+	}
     }
 
   prec = TYPE_PRECISION (itype);

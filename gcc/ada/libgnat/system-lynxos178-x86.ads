@@ -5,9 +5,9 @@
 --                               S Y S T E M                                --
 --                                                                          --
 --                                 S p e c                                  --
---                       (VxWorks 7.x PPC64 Kernel)                         --
+--                         (LynxOS-178 X86 Version)                         --
 --                                                                          --
---          Copyright (C) 1992-2018, Free Software Foundation, Inc.         --
+--          Copyright (C) 2009-2018, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -33,8 +33,6 @@
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
 --                                                                          --
 ------------------------------------------------------------------------------
-
---  This is the VxWorks 7.x version of this package for PPC64 Kernel
 
 package System is
    pragma Pure;
@@ -62,7 +60,7 @@ package System is
    Max_Mantissa          : constant := 63;
    Fine_Delta            : constant := 2.0 ** (-Max_Mantissa);
 
-   Tick                  : constant := 1.0 / 60.0;
+   Tick                  : constant := 0.01;
 
    --  Storage-related Declarations
 
@@ -71,8 +69,8 @@ package System is
    Null_Address : constant Address;
 
    Storage_Unit : constant := 8;
-   Word_Size    : constant := 64;
-   Memory_Size  : constant := 2 ** 64;
+   Word_Size    : constant := 32;
+   Memory_Size  : constant := 2 ** 32;
 
    --  Address comparison
 
@@ -91,38 +89,36 @@ package System is
    --  Other System-Dependent Declarations
 
    type Bit_Order is (High_Order_First, Low_Order_First);
-   Default_Bit_Order : constant Bit_Order := High_Order_First;
+   Default_Bit_Order : constant Bit_Order := Low_Order_First;
    pragma Warnings (Off, Default_Bit_Order); -- kill constant condition warning
 
    --  Priority-related Declarations (RM D.1)
 
-   --  Ada priorities are mapped to VxWorks priorities using the following
-   --  transformation: 255 - Ada Priority
+   --  17 is the system determined default priority for user applications
+   --  running on LynxOS.
 
-   --  Ada priorities are used as follows:
+   --  The standard (Rm 13.7) requires that Default_Priority has the value:
 
-   --  256        is reserved for the VxWorks kernel
-   --  248 - 255  correspond to hardware interrupt levels 0 .. 7
-   --  247        is a catchall default "interrupt" priority for signals,
-   --             allowing higher priority than normal tasks, but lower than
-   --             hardware priority levels.  Protected Object ceilings can
-   --             override these values.
-   --  246        is used by the Interrupt_Manager task
+   --  (Priority'First + Priority'Last) / 2
 
-   Max_Priority           : constant Positive := 245;
+   --  However, the default priority given by the OS is not the same thing as
+   --  the Ada value Default_Prioirity (previous examples include VxWorks).
+   --  Therefore, we follow a model based on the full range of LynxOS-178
+   --  priorities.
+
+   Max_Priority           : constant Positive := 252;
    Max_Interrupt_Priority : constant Positive := 255;
 
    subtype Any_Priority       is Integer      range   0 .. 255;
-   subtype Priority           is Any_Priority range   0 .. 245;
-   subtype Interrupt_Priority is Any_Priority range 246 .. 255;
+   subtype Priority           is Any_Priority range   0 .. 252;
+   subtype Interrupt_Priority is Any_Priority range 253 .. 255;
 
-   Default_Priority : constant Priority := 122;
+   Default_Priority : constant Priority := 126;
+
+   --  Note that the priority of the environment task is set externally by the
+   --  OS
 
 private
-
-   pragma Linker_Options ("--specs=vxworks-gnat-crtbe-link.spec");
-   --  Pull in crtbegin/crtend objects and register exceptions for ZCX.
-   --  This is commented out by our Makefile for SJLJ runtimes.
 
    type Address is mod Memory_Size;
    Null_Address : constant Address := 0;
@@ -139,7 +135,7 @@ private
 
    Backend_Divide_Checks     : constant Boolean := False;
    Backend_Overflow_Checks   : constant Boolean := True;
-   Command_Line_Args         : constant Boolean := False;
+   Command_Line_Args         : constant Boolean := True;
    Configurable_Run_Time     : constant Boolean := False;
    Denorm                    : constant Boolean := True;
    Duration_32_Bits          : constant Boolean := False;
@@ -159,10 +155,8 @@ private
    Support_Long_Shifts       : constant Boolean := True;
    Always_Compatible_Rep     : constant Boolean := False;
    Suppress_Standard_Library : constant Boolean := False;
-   Use_Ada_Main_Program_Name : constant Boolean := True;
+   Use_Ada_Main_Program_Name : constant Boolean := False;
    Frontend_Exceptions       : constant Boolean := False;
-   ZCX_By_Default            : constant Boolean := True;
-
-   Executable_Extension : constant String := ".out";
+   ZCX_By_Default            : constant Boolean := False;
 
 end System;

@@ -4237,6 +4237,10 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
 #define TYPE_REF_P(NODE)			\
   (TREE_CODE (NODE) == REFERENCE_TYPE)
 
+/* Returns true if NODE is a pointer or a reference.  */
+#define INDIRECT_TYPE_P(NODE)			\
+  (TYPE_PTR_P (NODE) || TYPE_REF_P (NODE))
+
 /* Returns true if NODE is an object type:
 
      [basic.types]
@@ -5230,10 +5234,6 @@ extern GTY(()) vec<tree, va_gc> *keyed_classes;
 
 #else /* NO_DOLLAR_IN_LABEL */
 
-#define AUTO_TEMP_NAME "__tmp_"
-#define TEMP_NAME_P(ID_NODE) \
-  (!strncmp (IDENTIFIER_POINTER (ID_NODE), AUTO_TEMP_NAME, \
-	     sizeof (AUTO_TEMP_NAME) - 1))
 #define VTABLE_NAME "__vt_"
 #define VTABLE_NAME_P(ID_NODE) \
   (!strncmp (IDENTIFIER_POINTER (ID_NODE), VTABLE_NAME, \
@@ -5268,8 +5268,6 @@ extern GTY(()) vec<tree, va_gc> *keyed_classes;
   && IDENTIFIER_POINTER (ID_NODE)[2] == 't' \
   && IDENTIFIER_POINTER (ID_NODE)[3] == JOINER)
 
-#define TEMP_NAME_P(ID_NODE) \
-  (!strncmp (IDENTIFIER_POINTER (ID_NODE), AUTO_TEMP_NAME, sizeof (AUTO_TEMP_NAME)-1))
 #define VFIELD_NAME_P(ID_NODE) \
   (!strncmp (IDENTIFIER_POINTER (ID_NODE), VFIELD_NAME, sizeof(VFIELD_NAME)-1))
 
@@ -6884,6 +6882,7 @@ extern void finish_label_decl			(tree);
 extern cp_expr finish_parenthesized_expr	(cp_expr);
 extern tree force_paren_expr			(tree);
 extern tree maybe_undo_parenthesized_ref	(tree);
+extern tree maybe_strip_ref_conversion		(tree);
 extern tree finish_non_static_data_member       (tree, tree, tree);
 extern tree begin_stmt_expr			(void);
 extern tree finish_stmt_expr_expr		(tree, tree);

@@ -1,3 +1,40 @@
+2018-05-27  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	* decl.c (match_data_constant):  Fortran 2018 allows pointer
+	initialization in a data statement.
+
+2018-05-25  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/85839
+	* match.c (gfc_match_block_data): Call gfc_notify_std to warn about
+	an obsolescent feature in Fortran 2018.
+	(gfc_match_equivalence): Ditto.
+	* resolve.c (resolve_common_blocks): Ditto.
+	(gfc_resolve_forall): Ditto.
+	* symbol.c (gfc_define_st_label): Ditto.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85543
+	* resolve.c (update_current_proc_array_outer_dependency): Avoid NULL
+	pointer dereference.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85780
+	* resolve.c (resolve_fl_procedure): Avoid NULL dereference.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85779
+	* decl.c (gfc_match_derived_decl): Fix NULL point dereference.
+
+2018-05-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85895
+	* resolve.c (resolve_sync): Resolve expression before checking for
+	an error.
+
 2018-05-22  Janus Weil  <janus@gcc.gnu.org>
 
 	PR fortran/85841

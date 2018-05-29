@@ -6831,7 +6831,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 		       "a variable", orig_expr, expr);
 	      return NULL_TREE;
 	    }
-	  if (POINTER_TYPE_P (expr_type))
+	  if (INDIRECT_TYPE_P (expr_type))
 	    {
 	      if (complain & tf_error)
 		error ("%qE is not a valid template argument for %qT "
@@ -17636,6 +17636,17 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
       register_parameter_specializations (oldfn, fn);
 
+      if (oldtmpl)
+	{
+	  /* We might not partially instantiate some parts of the function, so
+	     copy these flags from the original template.  */
+	  language_function *ol = DECL_STRUCT_FUNCTION (oldfn)->language;
+	  current_function_returns_value = ol->returns_value;
+	  current_function_returns_null = ol->returns_null;
+	  current_function_returns_abnormally = ol->returns_abnormally;
+	  current_function_infinite_loop = ol->infinite_loop;
+	}
+
       tsubst_expr (DECL_SAVED_TREE (oldfn), args, complain, r,
 		   /*constexpr*/false);
 
@@ -18433,7 +18444,9 @@ tsubst_copy_and_build (tree t,
 	      /* Unsupported internal function with arguments.  */
 	      gcc_unreachable ();
 	    }
-	else if (TREE_CODE (function) == OFFSET_REF)
+	else if (TREE_CODE (function) == OFFSET_REF
+		 || TREE_CODE (function) == DOTSTAR_EXPR
+		 || TREE_CODE (function) == MEMBER_REF)
 	  ret = build_offset_ref_call_from_tree (function, &call_args,
 						 complain);
 	else if (TREE_CODE (function) == COMPONENT_REF)
@@ -19546,7 +19559,7 @@ fn_type_unification (tree fn,
     {
       /* We're deducing for a call to the result of a template conversion
          function.  The parms we really want are in return_type.  */
-      if (POINTER_TYPE_P (return_type))
+      if (INDIRECT_TYPE_P (return_type))
 	return_type = TREE_TYPE (return_type);
       parms = TYPE_ARG_TYPES (return_type);
     }
@@ -19926,7 +19939,7 @@ uses_deducible_template_parms (tree type)
   /* T*
      T&
      T&&  */
-  if (POINTER_TYPE_P (type))
+  if (INDIRECT_TYPE_P (type))
     return uses_deducible_template_parms (TREE_TYPE (type));
 
   /* T[integer-constant ]
@@ -20943,7 +20956,7 @@ check_cv_quals_for_unify (int strict, tree arg, tree parm)
 	  && (parm_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE)))
 	return 0;
 
-      if ((!POINTER_TYPE_P (arg) && TREE_CODE (arg) != TEMPLATE_TYPE_PARM)
+      if ((!INDIRECT_TYPE_P (arg) && TREE_CODE (arg) != TEMPLATE_TYPE_PARM)
 	  && (parm_quals & TYPE_QUAL_RESTRICT))
 	return 0;
     }
@@ -24469,8 +24482,7 @@ dependent_type_p_r (tree type)
     return (dependent_type_p (TYPE_PTRMEM_CLASS_TYPE (type))
 	    || dependent_type_p (TYPE_PTRMEM_POINTED_TO_TYPE
 					   (type)));
-  else if (TYPE_PTR_P (type)
-	   || TYPE_REF_P (type))
+  else if (INDIRECT_TYPE_P (type))
     return dependent_type_p (TREE_TYPE (type));
   else if (TREE_CODE (type) == FUNCTION_TYPE
 	   || TREE_CODE (type) == METHOD_TYPE)
@@ -25210,6 +25222,7 @@ instantiation_dependent_r (tree *tp, int *walk_subtrees,
 	 TREE_TYPE.  */
     case TREE_LIST:
     case TREE_VEC:
+    case NONTYPE_ARGUMENT_PACK:
       return NULL_TREE;
 
     case TEMPLATE_PARM_INDEX:

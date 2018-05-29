@@ -1032,7 +1032,7 @@ grokbitfield (const cp_declarator *declarator,
     return void_type_node;
 
   if (!INTEGRAL_OR_ENUMERATION_TYPE_P (TREE_TYPE (value))
-      && (POINTER_TYPE_P (value)
+      && (INDIRECT_TYPE_P (value)
           || !dependent_type_p (TREE_TYPE (value))))
     {
       error ("bit-field %qD with non-integral type", value);
@@ -3595,8 +3595,7 @@ start_static_storage_duration_function (unsigned count)
       priority_info_map = splay_tree_new (splay_tree_compare_ints,
 					  /*delete_key_fn=*/0,
 					  /*delete_value_fn=*/
-					  (splay_tree_delete_value_fn)
-					  (void (*) (void)) free);
+					  splay_tree_delete_pointers);
 
       /* We always need to generate functions for the
 	 DEFAULT_INIT_PRIORITY so enter it now.  That way when we walk

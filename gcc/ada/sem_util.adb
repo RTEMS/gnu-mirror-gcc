@@ -184,11 +184,11 @@ package body Sem_Util is
          --  If we are dealing with a synchronized subtype, go to the base
          --  type, whose declaration has the interface list.
 
-         --  Shouldn't this be Declaration_Node???
+         Nod := Declaration_Node (Base_Type (Typ));
 
-         Nod := Parent (Base_Type (Typ));
-
-         if Nkind (Nod) = N_Full_Type_Declaration then
+         if Nkind_In (Nod, N_Full_Type_Declaration,
+                           N_Private_Type_Declaration)
+         then
             return Empty_List;
          end if;
 
@@ -727,7 +727,7 @@ package body Sem_Util is
         and then Scop = Current_Scope
       then
          --  The inherited operation is available at the earliest place after
-         --  the derived type declaration ( RM 7.3.1 (6/1)). This is only
+         --  the derived type declaration (RM 7.3.1 (6/1)). This is only
          --  relevant for type extensions. If the parent operation appears
          --  after the type extension, the operation is not visible.
 
@@ -740,8 +740,8 @@ package body Sem_Util is
             then
                if Sloc (Decl) > Sloc (Par) then
                   Next_E := Next_Entity (Par);
-                  Set_Next_Entity (Par, S);
-                  Set_Next_Entity (S, Next_E);
+                  Link_Entities (Par, S);
+                  Link_Entities (S, Next_E);
                   return;
 
                else
@@ -1365,7 +1365,18 @@ package body Sem_Util is
       --  (the original primitive may have carried one).
 
       Set_Must_Override (Specification (Clone_Body), False);
-      Insert_Before (Bod, Clone_Body);
+
+      --  If the subprogram body is the proper body of a stub, insert the
+      --  subprogram after the stub, i.e. the same declarative region as
+      --  the original sugprogram.
+
+      if Nkind (Parent (Bod)) = N_Subunit then
+         Insert_After (Corresponding_Stub (Parent (Bod)), Clone_Body);
+
+      else
+         Insert_Before (Bod, Clone_Body);
+      end if;
+
       Analyze (Clone_Body);
    end Build_Class_Wide_Clone_Body;
 
@@ -3869,6 +3880,18 @@ package body Sem_Util is
                Result_Seen := True;
                return Abandon;
 
+            --  Warn on infinite recursion if call is to current function
+
+            elsif Nkind (N) = N_Function_Call
+              and then Is_Entity_Name (Name (N))
+              and then Entity (Name (N)) = Subp_Id
+              and then not Is_Potentially_Unevaluated (N)
+            then
+               Error_Msg_NE
+                 ("call to & within its postcondition will lead to infinite "
+                  & "recursion?", N, Subp_Id);
+               return OK;
+
             --  Continue the traversal
 
             else
@@ -5061,15 +5084,7 @@ package body Sem_Util is
    ----------------------------------
 
    function Collect_Primitive_Operations (T : Entity_Id) return Elist_Id is
-      B_Type         : constant Entity_Id := Base_Type (T);
-      B_Decl         : constant Node_Id   := Original_Node (Parent (B_Type));
-      B_Scope        : Entity_Id          := Scope (B_Type);
-      Op_List        : Elist_Id;
-      Formal         : Entity_Id;
-      Is_Prim        : Boolean;
-      Is_Type_In_Pkg : Boolean;
-      Formal_Derived : Boolean := False;
-      Id             : Entity_Id;
+      B_Type : constant Entity_Id := Base_Type (T);
 
       function Match (E : Entity_Id) return Boolean;
       --  True if E's base type is B_Type, or E is of an anonymous access type
@@ -5096,6 +5111,18 @@ package body Sem_Util is
                and then Ekind (Etyp) = E_Incomplete_Type
                and then Full_View (Etyp) = B_Type);
       end Match;
+
+      --  Local variables
+
+      B_Decl         : constant Node_Id := Original_Node (Parent (B_Type));
+      B_Scope        : Entity_Id        := Scope (B_Type);
+      Op_List        : Elist_Id;
+      Eq_Prims_List  : Elist_Id := No_Elist;
+      Formal         : Entity_Id;
+      Is_Prim        : Boolean;
+      Is_Type_In_Pkg : Boolean;
+      Formal_Derived : Boolean := False;
+      Id             : Entity_Id;
 
    --  Start of processing for Collect_Primitive_Operations
 
@@ -5245,6 +5272,22 @@ package body Sem_Util is
 
                   else
                      Append_Elmt (Id, Op_List);
+
+                     --  Save collected equality primitives for later filtering
+                     --  (if we are processing a private type for which we can
+                     --  collect several candidates).
+
+                     if Inherits_From_Tagged_Full_View (T)
+                       and then Chars (Id) = Name_Op_Eq
+                       and then Etype (First_Formal (Id)) =
+                                Etype (Next_Formal (First_Formal (Id)))
+                     then
+                        if No (Eq_Prims_List) then
+                           Eq_Prims_List := New_Elmt_List;
+                        end if;
+
+                        Append_Elmt (Id, Eq_Prims_List);
+                     end if;
                   end if;
                end if;
             end if;
@@ -5262,6 +5305,43 @@ package body Sem_Util is
                Id := First_Entity (System_Aux_Id);
             end if;
          end loop;
+
+         --  Filter collected equality primitives
+
+         if Inherits_From_Tagged_Full_View (T)
+           and then Present (Eq_Prims_List)
+         then
+            declare
+               First  : constant Elmt_Id := First_Elmt (Eq_Prims_List);
+               Second : Elmt_Id;
+
+            begin
+               pragma Assert (No (Next_Elmt (First))
+                 or else No (Next_Elmt (Next_Elmt (First))));
+
+               --  No action needed if we have collected a single equality
+               --  primitive
+
+               if Present (Next_Elmt (First)) then
+                  Second := Next_Elmt (First);
+
+                  if Is_Dispatching_Operation
+                       (Ultimate_Alias (Node (First)))
+                  then
+                     Remove (Op_List, Node (First));
+
+                  elsif Is_Dispatching_Operation
+                          (Ultimate_Alias (Node (Second)))
+                  then
+                     Remove (Op_List, Node (Second));
+
+                  else
+                     pragma Assert (False);
+                     raise Program_Error;
+                  end if;
+               end if;
+            end;
+         end if;
       end if;
 
       return Op_List;
@@ -6635,7 +6715,9 @@ package body Sem_Util is
       while Present (Decl)
         and then not (Nkind (Decl) in N_Declaration
                         or else
-                      Nkind (Decl) in N_Later_Decl_Item)
+                      Nkind (Decl) in N_Later_Decl_Item
+                        or else
+                      Nkind (Decl) = N_Number_Declaration)
       loop
          Decl := Parent (Decl);
       end loop;
@@ -7041,7 +7123,7 @@ package body Sem_Util is
                   null;
 
                else
-                  Set_Next_Entity (Prev, Next_Entity (E));
+                  Link_Entities (Prev, Next_Entity (E));
 
                   if No (Next_Entity (Prev)) then
                      Set_Last_Entity (Current_Scope, Prev);
@@ -12590,6 +12672,20 @@ package body Sem_Util is
       end if;
    end Inherit_Rep_Item_Chain;
 
+   ------------------------------------
+   -- Inherits_From_Tagged_Full_View --
+   ------------------------------------
+
+   function Inherits_From_Tagged_Full_View (Typ : Entity_Id) return Boolean is
+   begin
+      return Is_Private_Type (Typ)
+        and then Present (Full_View (Typ))
+        and then Is_Private_Type (Full_View (Typ))
+        and then not Is_Tagged_Type (Full_View (Typ))
+        and then Present (Underlying_Type (Full_View (Typ)))
+        and then Is_Tagged_Type (Underlying_Type (Full_View (Typ)));
+   end Inherits_From_Tagged_Full_View;
+
    ---------------------------------
    -- Insert_Explicit_Dereference --
    ---------------------------------
@@ -15974,16 +16070,19 @@ package body Sem_Util is
          return True;
 
       --  The volatile object appears as the prefix of attributes Address,
-      --  Alignment, Component_Size, First_Bit, Last_Bit, Position, Size,
-      --  Storage_Size.
+      --  Alignment, Component_Size, First, First_Bit, Last, Last_Bit, Length,
+      --  Position, Size, Storage_Size.
 
       elsif Nkind (Context) = N_Attribute_Reference
         and then Prefix (Context) = Obj_Ref
         and then Nam_In (Attribute_Name (Context), Name_Address,
                                                    Name_Alignment,
                                                    Name_Component_Size,
+                                                   Name_First,
                                                    Name_First_Bit,
+                                                   Name_Last,
                                                    Name_Last_Bit,
+                                                   Name_Length,
                                                    Name_Position,
                                                    Name_Size,
                                                    Name_Storage_Size)
@@ -17190,6 +17289,29 @@ package body Sem_Util is
         and then Ekind (Defining_Entity (N)) /= E_Subprogram_Body;
    end Is_Subprogram_Stub_Without_Prior_Declaration;
 
+   ---------------------------
+   -- Is_Suitable_Primitive --
+   ---------------------------
+
+   function Is_Suitable_Primitive (Subp_Id : Entity_Id) return Boolean is
+   begin
+      --  The Default_Initial_Condition and invariant procedures must not be
+      --  treated as primitive operations even when they apply to a tagged
+      --  type. These routines must not act as targets of dispatching calls
+      --  because they already utilize class-wide-precondition semantics to
+      --  handle inheritance and overriding.
+
+      if Ekind (Subp_Id) = E_Procedure
+        and then (Is_DIC_Procedure (Subp_Id)
+                    or else
+                  Is_Invariant_Procedure (Subp_Id))
+      then
+         return False;
+      end if;
+
+      return True;
+   end Is_Suitable_Primitive;
+
    --------------------------
    -- Is_Suspension_Object --
    --------------------------
@@ -17853,15 +17975,19 @@ package body Sem_Util is
    -----------------------------
 
    procedure Iterate_Call_Parameters (Call : Node_Id) is
-      Formal : Entity_Id := First_Formal (Get_Called_Entity (Call));
       Actual : Node_Id   := First_Actual (Call);
+      Formal : Entity_Id := First_Formal (Get_Called_Entity (Call));
 
    begin
       while Present (Formal) and then Present (Actual) loop
          Handle_Parameter (Formal, Actual);
-         Formal := Next_Formal (Formal);
-         Actual := Next_Actual (Actual);
+
+         Next_Formal (Formal);
+         Next_Actual (Actual);
       end loop;
+
+      pragma Assert (No (Formal));
+      pragma Assert (No (Actual));
    end Iterate_Call_Parameters;
 
    ---------------------------
@@ -18399,12 +18525,13 @@ package body Sem_Util is
               Elaboration_Checks_OK
                 (Target_Id  => Id,
                  Context_Id => Scope (Id)));
+         end if;
 
-         --  Entities do not need to capture their enclosing level. The Ghost
-         --  and SPARK modes in effect are already marked during analysis.
+         --  Mark the status of elaboration warnings in effect. Do not reset
+         --  the status in case the entity is reanalyzed with warnings off.
 
-         else
-            null;
+         if Warnings and then not Is_Elaboration_Warnings_OK_Id (Id) then
+            Set_Is_Elaboration_Warnings_OK_Id (Id, Elab_Warnings);
          end if;
       end Mark_Elaboration_Attributes_Id;
 
@@ -19969,6 +20096,13 @@ package body Sem_Util is
                     Semantic => True)));
             end if;
          end if;
+
+         --  Prev_Entity
+
+         Set_Prev_Entity (Id, Node_Id (
+           Copy_Field_With_Replacement
+             (Field    => Union_Id (Prev_Entity (Id)),
+              Semantic => True)));
 
          --  Next_Entity
 
@@ -22954,92 +23088,43 @@ package body Sem_Util is
       end if;
    end References_Generic_Formal_Type;
 
-   -------------------
-   -- Remove_Entity --
-   -------------------
+   -------------------------------
+   -- Remove_Entity_And_Homonym --
+   -------------------------------
 
-   procedure Remove_Entity (Id : Entity_Id) is
-      Scop    : constant Entity_Id := Scope (Id);
-      Prev_Id : Entity_Id;
-
+   procedure Remove_Entity_And_Homonym (Id : Entity_Id) is
    begin
-      --  Remove the entity from the homonym chain. When the entity is the
-      --  head of the chain, associate the entry in the name table with its
-      --  homonym effectively making it the new head of the chain.
-
-      if Current_Entity (Id) = Id then
-         Set_Name_Entity_Id (Chars (Id), Homonym (Id));
-
-      --  Otherwise link the previous and next homonyms
-
-      else
-         Prev_Id := Current_Entity (Id);
-         if Present (Prev_Id) then
-            while Present (Prev_Id) and then Homonym (Prev_Id) /= Id loop
-               Prev_Id := Homonym (Prev_Id);
-            end loop;
-
-            Set_Homonym (Prev_Id, Homonym (Id));
-         end if;
-      end if;
-
-      --  Remove the entity from the scope entity chain. When the entity is
-      --  the head of the chain, set the next entity as the new head of the
-      --  chain.
-
-      if First_Entity (Scop) = Id then
-         Prev_Id := Empty;
-         Set_First_Entity (Scop, Next_Entity (Id));
-
-      --  Otherwise the entity is either in the middle of the chain or it acts
-      --  as its tail. Traverse and link the previous and next entities.
-
-      else
-         Prev_Id := First_Entity (Scop);
-         while Present (Prev_Id) and then Next_Entity (Prev_Id) /= Id loop
-            Next_Entity (Prev_Id);
-         end loop;
-
-         if Present (Prev_Id) then
-            Set_Next_Entity (Prev_Id, Next_Entity (Id));
-         end if;
-      end if;
-
-      --  Handle the case where the entity acts as the tail of the scope entity
-      --  chain.
-
-      if Last_Entity (Scop) = Id then
-         Set_Last_Entity (Scop, Prev_Id);
-      end if;
-   end Remove_Entity;
+      Remove_Entity (Id);
+      Remove_Homonym (Id);
+   end Remove_Entity_And_Homonym;
 
    --------------------
    -- Remove_Homonym --
    --------------------
 
-   procedure Remove_Homonym (E : Entity_Id) is
-      Prev  : Entity_Id := Empty;
-      H     : Entity_Id;
+   procedure Remove_Homonym (Id : Entity_Id) is
+      Hom  : Entity_Id;
+      Prev : Entity_Id := Empty;
 
    begin
-      if E = Current_Entity (E) then
-         if Present (Homonym (E)) then
-            Set_Current_Entity (Homonym (E));
+      if Id = Current_Entity (Id) then
+         if Present (Homonym (Id)) then
+            Set_Current_Entity (Homonym (Id));
          else
-            Set_Name_Entity_Id (Chars (E), Empty);
+            Set_Name_Entity_Id (Chars (Id), Empty);
          end if;
 
       else
-         H := Current_Entity (E);
-         while Present (H) and then H /= E loop
-            Prev := H;
-            H    := Homonym (H);
+         Hom := Current_Entity (Id);
+         while Present (Hom) and then Hom /= Id loop
+            Prev := Hom;
+            Hom  := Homonym (Hom);
          end loop;
 
-         --  If E is not on the homonym chain, nothing to do
+         --  If Id is not on the homonym chain, nothing to do
 
-         if Present (H) then
-            Set_Homonym (Prev, Homonym (E));
+         if Present (Hom) then
+            Set_Homonym (Prev, Homonym (Id));
          end if;
       end if;
    end Remove_Homonym;
@@ -23077,9 +23162,7 @@ package body Sem_Util is
    --  Start of processing for Remove_Overloaded_Entity
 
    begin
-      --  Remove the entity from both the homonym and scope chains
-
-      Remove_Entity (Id);
+      Remove_Entity_And_Homonym (Id);
 
       --  The entity denotes a primitive subprogram. Remove it from the list of
       --  primitives of the associated controlling type.
@@ -24630,7 +24713,7 @@ package body Sem_Util is
          --  destination scope.
 
          if Present (Last_Entity (To)) then
-            Set_Next_Entity (Last_Entity (To), Id);
+            Link_Entities (Last_Entity (To), Id);
          else
             Set_First_Entity (To, Id);
          end if;

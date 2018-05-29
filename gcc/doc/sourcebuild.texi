@@ -1313,6 +1313,16 @@ By convention, keywords ending in @code{_nocache} can also include options
 specified for the particular test in an earlier @code{dg-options} or
 @code{dg-add-options} directive.
 
+@subsubsection Endianness
+
+@table @code
+@item be
+Target uses big-endian memory order for multi-byte and multi-word data.
+
+@item le
+Target uses little-endian memory order for multi-byte and multi-word data.
+@end table
+
 @subsubsection Data type sizes
 
 @table @code
@@ -1414,6 +1424,11 @@ have different type from the value operands.
 
 @item vect_double
 Target supports hardware vectors of @code{double}.
+
+@item vect_double_cond_arith
+Target supports conditional addition, subtraction, multiplication,
+division, minimum and maximum on vectors of @code{double}, via the
+@code{cond_} optabs.
 
 @item vect_element_align_preferred
 The target's preferred vector alignment is the same as the element

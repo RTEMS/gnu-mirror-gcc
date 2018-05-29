@@ -1008,6 +1008,36 @@
   "<su>mulh\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>"
 )
 
+;; Unpredicated division.
+(define_expand "<optab><mode>3"
+  [(set (match_operand:SVE_SDI 0 "register_operand")
+	(unspec:SVE_SDI
+	  [(match_dup 3)
+	   (SVE_INT_BINARY_SD:SVE_SDI
+	     (match_operand:SVE_SDI 1 "register_operand")
+	     (match_operand:SVE_SDI 2 "register_operand"))]
+	  UNSPEC_MERGE_PTRUE))]
+  "TARGET_SVE"
+  {
+    operands[3] = force_reg (<VPRED>mode, CONSTM1_RTX (<VPRED>mode));
+  }
+)
+
+;; Division predicated with a PTRUE.
+(define_insn "*<optab><mode>3"
+  [(set (match_operand:SVE_SDI 0 "register_operand" "=w, w")
+	(unspec:SVE_SDI
+	  [(match_operand:<VPRED> 1 "register_operand" "Upl, Upl")
+	   (SVE_INT_BINARY_SD:SVE_SDI
+	     (match_operand:SVE_SDI 2 "register_operand" "0, w")
+	     (match_operand:SVE_SDI 3 "aarch64_sve_mul_operand" "w, 0"))]
+	  UNSPEC_MERGE_PTRUE))]
+  "TARGET_SVE"
+  "@
+   <sve_int_op>\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>
+   <sve_int_op>r\t%0.<Vetype>, %1/m, %0.<Vetype>, %2.<Vetype>"
+)
+
 ;; Unpredicated NEG, NOT and POPCOUNT.
 (define_expand "<optab><mode>2"
   [(set (match_operand:SVE_I 0 "register_operand")
@@ -1757,16 +1787,89 @@
   "<maxmin_uns_op>\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>"
 )
 
+;; Predicated integer operations with select.
+(define_expand "cond_<optab><mode>"
+  [(set (match_operand:SVE_I 0 "register_operand")
+	(unspec:SVE_I
+	  [(match_operand:<VPRED> 1 "register_operand")
+	   (SVE_INT_BINARY:SVE_I
+	     (match_operand:SVE_I 2 "register_operand")
+	     (match_operand:SVE_I 3 "register_operand"))
+	   (match_operand:SVE_I 4 "register_operand")]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+{
+  bool commutative_p = (GET_RTX_CLASS (<CODE>) == RTX_COMM_ARITH);
+  aarch64_sve_prepare_conditional_op (operands, 5, commutative_p);
+})
+
+(define_expand "cond_<optab><mode>"
+  [(set (match_operand:SVE_SDI 0 "register_operand")
+	(unspec:SVE_SDI
+	  [(match_operand:<VPRED> 1 "register_operand")
+	   (SVE_INT_BINARY_SD:SVE_SDI
+	     (match_operand:SVE_SDI 2 "register_operand")
+	     (match_operand:SVE_SDI 3 "register_operand"))
+	   (match_operand:SVE_SDI 4 "register_operand")]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+{
+  bool commutative_p = (GET_RTX_CLASS (<CODE>) == RTX_COMM_ARITH);
+  aarch64_sve_prepare_conditional_op (operands, 5, commutative_p);
+})
+
 ;; Predicated integer operations.
-(define_insn "cond_<optab><mode>"
+(define_insn "*cond_<optab><mode>"
   [(set (match_operand:SVE_I 0 "register_operand" "=w")
 	(unspec:SVE_I
 	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
-	   (match_operand:SVE_I 2 "register_operand" "0")
-	   (match_operand:SVE_I 3 "register_operand" "w")]
-	  SVE_COND_INT_OP))]
+	   (SVE_INT_BINARY:SVE_I
+	     (match_operand:SVE_I 2 "register_operand" "0")
+	     (match_operand:SVE_I 3 "register_operand" "w"))
+	   (match_dup 2)]
+	  UNSPEC_SEL))]
   "TARGET_SVE"
   "<sve_int_op>\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>"
+)
+
+(define_insn "*cond_<optab><mode>"
+  [(set (match_operand:SVE_SDI 0 "register_operand" "=w")
+	(unspec:SVE_SDI
+	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
+	   (SVE_INT_BINARY_SD:SVE_SDI
+	     (match_operand:SVE_SDI 2 "register_operand" "0")
+	     (match_operand:SVE_SDI 3 "register_operand" "w"))
+	   (match_dup 2)]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+  "<sve_int_op>\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>"
+)
+
+;; Predicated integer operations with the operands reversed.
+(define_insn "*cond_<optab><mode>"
+  [(set (match_operand:SVE_I 0 "register_operand" "=w")
+	(unspec:SVE_I
+	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
+	   (SVE_INT_BINARY_REV:SVE_I
+	     (match_operand:SVE_I 2 "register_operand" "w")
+	     (match_operand:SVE_I 3 "register_operand" "0"))
+	   (match_dup 3)]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+  "<sve_int_op>r\t%0.<Vetype>, %1/m, %0.<Vetype>, %2.<Vetype>"
+)
+
+(define_insn "*cond_<optab><mode>"
+  [(set (match_operand:SVE_SDI 0 "register_operand" "=w")
+	(unspec:SVE_SDI
+	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
+	   (SVE_INT_BINARY_SD:SVE_SDI
+	     (match_operand:SVE_SDI 2 "register_operand" "w")
+	     (match_operand:SVE_SDI 3 "register_operand" "0"))
+	   (match_dup 3)]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+  "<sve_int_op>r\t%0.<Vetype>, %1/m, %0.<Vetype>, %2.<Vetype>"
 )
 
 ;; Set operand 0 to the last active element in operand 3, or to tied
@@ -2536,16 +2639,53 @@
   }
 )
 
+;; Predicated floating-point operations with select.
+(define_expand "cond_<optab><mode>"
+  [(set (match_operand:SVE_F 0 "register_operand")
+	(unspec:SVE_F
+	  [(match_operand:<VPRED> 1 "register_operand")
+	   (unspec:SVE_F
+	     [(match_dup 1)
+	      (match_operand:SVE_F 2 "register_operand")
+	      (match_operand:SVE_F 3 "register_operand")]
+	     SVE_COND_FP_BINARY)
+	   (match_operand:SVE_F 4 "register_operand")]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+{
+  aarch64_sve_prepare_conditional_op (operands, 5, <commutative>);
+})
+
 ;; Predicated floating-point operations.
-(define_insn "cond_<optab><mode>"
+(define_insn "*cond_<optab><mode>"
   [(set (match_operand:SVE_F 0 "register_operand" "=w")
 	(unspec:SVE_F
 	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
-	   (match_operand:SVE_F 2 "register_operand" "0")
-	   (match_operand:SVE_F 3 "register_operand" "w")]
-	  SVE_COND_FP_OP))]
+	   (unspec:SVE_F
+	     [(match_dup 1)
+	      (match_operand:SVE_F 2 "register_operand" "0")
+	      (match_operand:SVE_F 3 "register_operand" "w")]
+	     SVE_COND_FP_BINARY)
+	   (match_dup 2)]
+	  UNSPEC_SEL))]
   "TARGET_SVE"
   "<sve_fp_op>\t%0.<Vetype>, %1/m, %0.<Vetype>, %3.<Vetype>"
+)
+
+;; Predicated floating-point operations with the operands reversed.
+(define_insn "*cond_<optab><mode>"
+  [(set (match_operand:SVE_F 0 "register_operand" "=w")
+	(unspec:SVE_F
+	  [(match_operand:<VPRED> 1 "register_operand" "Upl")
+	   (unspec:SVE_F
+	     [(match_dup 1)
+	      (match_operand:SVE_F 2 "register_operand" "w")
+	      (match_operand:SVE_F 3 "register_operand" "0")]
+	     SVE_COND_FP_BINARY)
+	   (match_dup 3)]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
+  "<sve_fp_op>r\t%0.<Vetype>, %1/m, %0.<Vetype>, %2.<Vetype>"
 )
 
 ;; Shift an SVE vector left and insert a scalar into element 0.

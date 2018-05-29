@@ -7622,7 +7622,7 @@ build_trivial_dtor_call (tree instance)
       return fold_convert (void_type_node, instance);
     }
 
-  if (POINTER_TYPE_P (TREE_TYPE (instance)))
+  if (INDIRECT_TYPE_P (TREE_TYPE (instance)))
     {
       if (VOID_TYPE_P (TREE_TYPE (TREE_TYPE (instance))))
 	goto no_clobber;
@@ -8217,6 +8217,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       tree type = TREE_TYPE (to);
       tree as_base = CLASSTYPE_AS_BASE (type);
       tree arg = argarray[1];
+      location_t loc = EXPR_LOC_OR_LOC (arg, input_location);
 
       if (is_really_empty_class (type))
 	{
@@ -8226,6 +8227,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	}
       else if (tree_int_cst_equal (TYPE_SIZE (type), TYPE_SIZE (as_base)))
 	{
+	  if (is_std_init_list (type)
+	      && conv_binds_ref_to_prvalue (convs[1]))
+	    warning_at (loc, OPT_Winit_list_lifetime,
+			"assignment from temporary initializer_list does not "
+			"extend the lifetime of the underlying array");
 	  arg = cp_build_fold_indirect_ref (arg);
 	  val = build2 (MODIFY_EXPR, TREE_TYPE (to), to, arg);
 	}
@@ -8511,7 +8517,7 @@ maybe_warn_class_memaccess (location_t loc, tree fndecl,
   unsigned srcidx = !dstidx;
 
   tree dest = (*args)[dstidx];
-  if (!TREE_TYPE (dest) || !POINTER_TYPE_P (TREE_TYPE (dest)))
+  if (!TREE_TYPE (dest) || !INDIRECT_TYPE_P (TREE_TYPE (dest)))
     return;
 
   tree srctype = NULL_TREE;
@@ -8643,7 +8649,7 @@ maybe_warn_class_memaccess (location_t loc, tree fndecl,
     case BUILT_IN_MEMPCPY:
       /* Determine the type of the source object.  */
       srctype = TREE_TYPE ((*args)[srcidx]);
-      if (!srctype || !POINTER_TYPE_P (srctype))
+      if (!srctype || !INDIRECT_TYPE_P (srctype))
 	srctype = void_type_node;
       else
 	srctype = TREE_TYPE (srctype);
@@ -10210,7 +10216,7 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	  tree t = TREE_TYPE (TREE_TYPE (l->fn));
 	  tree f = TREE_TYPE (TREE_TYPE (w->fn));
 
-	  if (TREE_CODE (t) == TREE_CODE (f) && POINTER_TYPE_P (t))
+	  if (TREE_CODE (t) == TREE_CODE (f) && INDIRECT_TYPE_P (t))
 	    {
 	      t = TREE_TYPE (t);
 	      f = TREE_TYPE (f);
@@ -10226,7 +10232,7 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
       else if (warn)
 	{
 	  tree source = source_type (w->convs[0]);
-	  if (POINTER_TYPE_P (source))
+	  if (INDIRECT_TYPE_P (source))
 	    source = TREE_TYPE (source);
 	  if (warning (OPT_Wconversion, "choosing %qD over %qD", w->fn, l->fn)
 	      && warning (OPT_Wconversion, "  for conversion from %qH to %qI",
@@ -11061,7 +11067,9 @@ extend_ref_init_temps_1 (tree decl, tree init, vec<tree, va_gc> **cleanups)
   if (TREE_CODE (sub) != ADDR_EXPR)
     return init;
   /* Deal with binding to a subobject.  */
-  for (p = &TREE_OPERAND (sub, 0); TREE_CODE (*p) == COMPONENT_REF; )
+  for (p = &TREE_OPERAND (sub, 0);
+       (TREE_CODE (*p) == COMPONENT_REF
+	|| TREE_CODE (*p) == ARRAY_REF); )
     p = &TREE_OPERAND (*p, 0);
   if (TREE_CODE (*p) == TARGET_EXPR)
     {

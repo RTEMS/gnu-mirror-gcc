@@ -1,3 +1,122 @@
+2018-05-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (__erased_dtor): Qualify call to __get.
+
+2018-05-27  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/stl_tree.h (_Rb_tree_impl(_Node_allocator&&)): New.
+	(_Rb_tree(const allocator_type&)): Use latter.
+	* include/bits/stl_map.h (map(const allocator_type&)): Likewise.
+	(map(initializer_list<value_type>, const allocator_type&)): Likewise.
+	(map(_InputIterator, _InputIterator, const allocator_type&)): Likewise.
+	* include/bits/stl_multimap.h
+	(multimap(const allocator_type&)): Likewise.
+	(multimap(initializer_list<value_type>, const allocator_type&)):
+	Likewise.
+	(multimap(_InputIterator, _InputIterator, const allocator_type&)):
+	Likewise.
+	* include/bits/stl_set.h (set(const allocator_type&)): Likewise.
+	(set(initializer_list<value_type>, const allocator_type&)): Likewise.
+	(set(_InputIterator, _InputIterator, const allocator_type&)): Likewise.
+	* include/bits/stl_multiset.h
+	(multiset(const allocator_type&)): Likewise.
+	(multiset(initializer_list<value_type>, const allocator_type&)):
+	Likewise.
+	(multiset(_InputIterator, _InputIterator, const allocator_type&)):
+	Likewise.
+
+2018-05-25  François Dumont  <fdumont@gcc.gnu.org>
+
+	PR libstdc++/85768
+	* src/c++11/debug.cc: Remove backtrace usage.
+
+2018-05-24  Maya Rashish  <coypu@sdf.org>
+
+	PR target/85904
+	* crossconfig.m4: Test for aligned_alloc on netbsd.
+	* configure: Regenerate.
+
+2018-05-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/69769
+	PR libstdc++/85886
+	* include/bits/atomic_base.h (__atomic_base::value_type)
+	(__atomic_base::difference_type): Add new typedefs.
+	* include/std/atomic (atomic<bool>::value_type, atomic<T>::value_type)
+	(atomic<T*>::value_type, atomic<T*>::difference_type): Likewise.
+	(atomic<T*>::operator++, atomic<T*>::operator--)
+	(atomic<T*>::operator+=, atomic<T*>::operator-=)
+	(atomic<T*>::fetch_add, atomic<T*>::fetch_sub): Add static assertion
+	to enforce C++17 requirement on pointer arithmetic.
+	(__atomic_val_t, __atomic_diff_t): New alias templates.
+	(atomic_init, atomic_store_explicit, atomic_exchange_explicit)
+	(atomic_compare_exchange_weak_explicit)
+	(atomic_compare_exchange_strong_explicit, atomic_store)
+	(atomic_exchange, atomic_compare_exchange_weak)
+	(atomic_compare_exchange_strong): Use __atomic_val_t to make
+	scalar parameters be non-deduced contexts.
+	(atomic_fetch_add_explicit, atomic_fetch_sub_explicit)
+	(atomic_fetch_add, atomic_fetch_sub): Change first parameter to be
+	atomic instead of __atomic_base, and use __atomic_diff_t for scalar
+	parameters.
+	(atomic_fetch_and_explicit, atomic_fetch_or_explicit)
+	(atomic_fetch_xor_explicit, atomic_fetch_and, atomic_fetch_or)
+	(atomic_fetch_xor): Use __atomic_val_t for scalar parameters.
+	(atomic_fetch_add_explicit, atomic_fetch_sub_explicit)
+	(atomic_fetch_add, atomic_fetch_sub): Remove overloads for atomic
+	address types.
+	* testsuite/29_atomics/atomic/60695.cc: Adjust dg-error lineno.
+	* testsuite/29_atomics/atomic/69769.cc: New test.
+	* testsuite/29_atomics/atomic/nonmembers.cc: New test.
+	* testsuite/29_atomics/atomic/operators/pointer_partial_void.cc:
+	Disable test for C++17 and later.
+	* testsuite/29_atomics/atomic/requirements/typedefs.cc: New test.
+	* testsuite/29_atomics/atomic_integral/nonmembers.cc: New test.
+	* testsuite/29_atomics/atomic_integral/requirements/typedefs.cc: New
+	test.
+
+2018-05-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/fs_path.h (path::__is_encoded_char): Change from class
+	template to alias template.
+	(path::__value_type_is_char): Use remove_const_t.
+	(path:_S_string_from_iter): New helper function.
+	(path::_S_convert(InputIter, __null_terminated))
+	(path::_S_convert_loc(InputIter, __null_terminated, const locale&)):
+	Use _S_string_from_iter.
+	(path::string<_CharT, _Allocator>(const _Allocator&)): Allow sharing
+	rep for COW strings.
+	* include/experimental/bits/fs_path.h (path::__is_encoded_char):
+	Change from class template to alias template.
+	(path::__value_type_is_char): Use remove_const.
+	(path:_S_string_from_iter): New helper function.
+	(path::_S_convert(InputIter, __null_terminated))
+	(path::_S_convert_loc(InputIter, __null_terminated, const locale&)):
+	Use _S_string_from_iter.
+	* testsuite/27_io/filesystem/path/append/source.cc: Test appending
+	wide strings.
+	* testsuite/27_io/filesystem/path/concat/strings.cc: Check for exact
+	string equality, not path equivalence.
+	* testsuite/27_io/filesystem/path/construct/format.cc: Check
+	construction from std::string and std::wstring and input iterators.
+	* testsuite/27_io/filesystem/path/construct/locale.cc: Check
+	construction from iterators.
+	* testsuite/experimental/filesystem/path/concat/strings.cc: Check for
+	exact string equality, not path equivalence.
+	* testsuite/experimental/filesystem/path/construct/locale.cc: Check
+	construction from iterators.
+
+	* include/bits/fs_path.h (path::_M_type): Change default member
+	initializer to _Filename.
+	(path::begin): Create past-the-end iterator for empty path.
+	* src/filesystem/std-path.cc (path::remove_filename()): Remove
+	debugging check.
+	(path::has_relative_path()): Return false for empty filenames.
+	(path::_M_split_cmpts): Set _M_type to _Filename for empty paths.
+	Fix offset of empty final component.
+	* testsuite/27_io/filesystem/path/itr/components.cc: New.
+	* testsuite/27_io/filesystem/path/itr/traversal.cc: Add new inputs.
+
 2018-05-21  Jonathan Wakely  <jwakely@redhat.com>
 
 	Add support for opening file streams from wide character strings.

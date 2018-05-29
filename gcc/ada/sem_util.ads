@@ -1452,6 +1452,12 @@ package Sem_Util is
    --  Inherit the rep item chain of type From_Typ without clobbering any
    --  existing rep items on Typ's chain. Typ is the destination type.
 
+   function Inherits_From_Tagged_Full_View (Typ : Entity_Id) return Boolean;
+   pragma Inline (Inherits_From_Tagged_Full_View);
+   --  Return True if Typ is an untagged private type completed with a
+   --  derivation of an untagged private type declaration whose full view
+   --  is a tagged type.
+
    procedure Insert_Explicit_Dereference (N : Node_Id);
    --  In a context that requires a composite or subprogram type and where a
    --  prefix is an access type, rewrite the access type node N (which is the
@@ -1986,6 +1992,10 @@ package Sem_Util is
    --  Return True if N is a subprogram stub with no prior subprogram
    --  declaration.
 
+   function Is_Suitable_Primitive (Subp_Id : Entity_Id) return Boolean;
+   --  Determine whether arbitrary subprogram Subp_Id may act as a primitive of
+   --  an arbitrary tagged type.
+
    function Is_Suspension_Object (Id : Entity_Id) return Boolean;
    --  Determine whether arbitrary entity Id denotes Suspension_Object defined
    --  in Ada.Synchronous_Task_Control.
@@ -2485,14 +2495,14 @@ package Sem_Util is
    --  Returns True if the expression Expr contains any references to a generic
    --  type. This can only happen within a generic template.
 
-   procedure Remove_Entity (Id : Entity_Id);
+   procedure Remove_Entity_And_Homonym (Id : Entity_Id);
    --  Remove arbitrary entity Id from both the homonym and scope chains. Use
    --  Remove_Overloaded_Entity for overloadable entities. Note: the removal
    --  performed by this routine does not affect the visibility of existing
    --  homonyms.
 
-   procedure Remove_Homonym (E : Entity_Id);
-   --  Removes E from the homonym chain
+   procedure Remove_Homonym (Id : Entity_Id);
+   --  Removes entity Id from the homonym chain
 
    procedure Remove_Overloaded_Entity (Id : Entity_Id);
    --  Remove arbitrary entity Id from the homonym chain, the scope chain and
@@ -2777,7 +2787,7 @@ package Sem_Util is
    --  specified we check only for the given stream operation.
 
    function Unique_Defining_Entity (N : Node_Id) return Entity_Id;
-   --  Return the entity which represents declaration N, so that different
+   --  Return the entity that represents declaration N, so that different
    --  views of the same entity have the same unique defining entity:
    --    * private view and full view of a deferred constant
    --        --> full view
