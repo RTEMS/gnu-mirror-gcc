@@ -200,6 +200,13 @@ int dot_symbols;
    of this machine mode.  */
 scalar_int_mode rs6000_pmode;
 
+/* Note whether we mangled a name whose mangling has changed, and we may need
+   to issue an alias for the old name.  */
+static bool old_name_mangling_p;
+
+/* Generate old manged name, not new name.  */
+static bool generate_old_mangling_p;
+
 /* Width in bits of a pointer.  */
 unsigned rs6000_pointer_size;
 
@@ -1976,6 +1983,11 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_DEFAULT_FP_WIDENING_P
 #define TARGET_DEFAULT_FP_WIDENING_P rs6000_default_fp_widening_p
+
+#if TARGET_ELF && RS6000_WEAK
+#undef TARGET_ASM_GLOBALIZE_DECL_NAME
+#define TARGET_ASM_GLOBALIZE_DECL_NAME rs6000_globalize_decl_name
+#endif
 
 
 /* Processor table.  */
@@ -2836,7 +2848,11 @@ rs6000_debug_reg_global (void)
     default:		abi_str = "unknown";	break;
     }
 
+  fprintf (stderr, DEBUG_FMT_S, "language", lang_hooks.name);
   fprintf (stderr, DEBUG_FMT_S, "abi", abi_str);
+
+  if (rs6000_alias_old_name_mangling)
+    fprintf (stderr, DEBUG_FMT_S, "old name mangling", "true");
 
   if (rs6000_altivec_abi)
     fprintf (stderr, DEBUG_FMT_S, "altivec_abi", "true");
@@ -4637,6 +4653,32 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mfloat128-hardware", "-m64");
 
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
+    }
+
+  /* Enable making an alias by default from the old mangled name to the new
+     name if float128 is supported.  */
+  if (rs6000_alias_old_name_mangling != 0)
+    {
+      bool is_cxx = strncmp (lang_hooks.name,
+			     "GNU C++",
+			     sizeof ("GNU C++")-1) == 0;
+
+      if (rs6000_alias_old_name_mangling < 0)
+	rs6000_alias_old_name_mangling = (TARGET_FLOAT128_TYPE && is_cxx);
+
+      else if (!is_cxx)
+	{
+	  rs6000_alias_old_name_mangling = 0;
+	  error ("%qs is only valid for C++", "-malias-old-name-mangling");
+	}
+
+      else if (!TARGET_FLOAT128_TYPE)
+	{
+	  rs6000_alias_old_name_mangling = 0;
+	  error ("%qs is only valid if %qs is used",
+		 "-malias-old-name-mangling",
+		 "-mfloat128");
+	}
     }
 
   /* Print the options after updating the defaults.  */
@@ -32142,23 +32184,43 @@ rs6000_mangle_type (const_tree type)
   if (type == bool_int_type_node) return "U6__booli";
   if (type == bool_long_long_type_node) return "U6__boolx";
 
-  /* Use a unique name for __float128 rather than trying to use "e" or "g". Use
-     "g" for IBM extended double, no matter whether it is long double (using
-     -mabi=ibmlongdouble) or the distinct __ibm128 type.  */
+  /* Mangle the float128 types.  If generate_old_mangling_p is true, we are
+     generating an alias from the old mangling scheme to the current mangling
+     scheme.  Otherwise, note if we geneated mangling seqeuences that might
+     change.  */
   if (TARGET_FLOAT128_TYPE)
     {
+      const char *old_mangle = (const char *)0;
+      const char *new_mangle = (const char *)0;
+
       if (type == ieee128_float_type_node)
-	return "U10__float128";
+	{
+	  old_mangle = "U10__float128";
+	  new_mangle = "u9__ieee128";
+	}
 
-      if (type == ibm128_float_type_node)
-	return "u8__ibm128";
+      else if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
+	{
+	  old_mangle = (TARGET_IEEEQUAD) ? "U10__float128" : "g";
+	  new_mangle = "u9__ieee128";
+	}
 
-      if (TARGET_LONG_DOUBLE_128 && type == long_double_type_node)
-	return (TARGET_IEEEQUAD) ? "U10__float128" : "g";
+      else if (type == ibm128_float_type_node)
+	old_mangle = new_mangle = "u8__ibm128";
+
+      if (new_mangle)
+	{
+	  if (generate_old_mangling_p || old_mangle == new_mangle)
+	    return old_mangle;
+	  else
+	    {
+	      old_name_mangling_p = true;
+	      return new_mangle;
+	    }
+	}
     }
 
-  /* Mangle IBM extended float long double as `g' (__float128) on
-     powerpc*-linux where long-double-64 previously was the default.  */
+  /* For all other types, use the default mangling.  */
   if (TYPE_MAIN_VARIANT (type) == long_double_type_node
       && TARGET_ELF
       && TARGET_LONG_DOUBLE_128
@@ -38772,6 +38834,41 @@ rs6000_starting_frame_offset (void)
     return 0;
   return RS6000_STARTING_FRAME_OFFSET;
 }
+
+
+/* Implement -malias-old-name-mangling to create an alias for a mangled name
+   where we have changed the mangling.  This is called via the target hook
+   TARGET_ASM_GLOBALIZE_DECL_NAME.  */
+
+#if TARGET_ELF && RS6000_WEAK
+static void
+rs6000_globalize_decl_name (FILE * stream, tree decl)
+{
+  const char *name = XSTR (XEXP (DECL_RTL (decl), 0), 0);
+
+  targetm.asm_out.globalize_label (stream, name);
+
+  if (rs6000_alias_old_name_mangling && old_name_mangling_p
+      && name[0] == '_' && name[1] == 'Z')
+    {
+      tree save_asm_name = DECL_ASSEMBLER_NAME (decl);
+      const char *old_name;
+
+      generate_old_mangling_p = true;
+      lang_hooks.set_decl_assembler_name (decl);
+      old_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
+      SET_DECL_ASSEMBLER_NAME (decl, save_asm_name);
+      generate_old_mangling_p = false;
+
+      if (strcmp (name, old_name) != 0)
+	{
+	  fprintf (stream, "\t.weak %s\n", old_name);
+	  fprintf (stream, "\t.set %s,%s\n", old_name, name);
+	}
+    }
+}
+#endif
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

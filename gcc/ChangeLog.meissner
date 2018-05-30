@@ -1,3 +1,23 @@
+2018-05-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (old_name_mangling_p): New static
+	variables to control generating aliases for C++ mangled names that
+	got changed for IEEE 128-bit floating point.
+	(generate_old_mangling_p): Likewise.
+	(TARGET_ASM_GLOBALIZE_DECL_NAME): Override globalize_decl_name
+	hook.
+	(rs6000_debug_reg_global): Print more debug information.
+	(rs6000_option_override_internal): Add support for
+	-malias-old-name-mangling.
+	(rs6000_mangle_type): Switch to the new mangling for 128-bit
+	floating point.  Add support to generate the old form of the
+	mangling.
+	(rs6000_globalize_decl_name): Add an alias to the old mangling
+	scheme for float128 to the new mangling scheme.
+	* config/rs6000/rs6000.md (-malias-old-name-mangling): New
+	internal switch to control whether aliases are generated to map
+	old float128 mangling to new float128 mangling.
+
 2018-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 260905.
