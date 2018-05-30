@@ -32201,8 +32201,16 @@ rs6000_mangle_type (const_tree type)
 
       else if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
 	{
-	  old_mangle = (TARGET_IEEEQUAD) ? "U10__float128" : "g";
-	  new_mangle = "u9__ieee128";
+	  if (TARGET_IEEEQUAD)
+	    {
+	      old_mangle = "U10__float128";
+	      new_mangle = "u9__ieee128";
+	    }
+	  else
+	    {
+	      old_mangle = "g";
+	      new_mangle = "u8__ibm128";
+	    }
 	}
 
       else if (type == ibm128_float_type_node)
