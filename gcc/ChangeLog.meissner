@@ -1,3 +1,8 @@
+2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Allow
+	-malias-old-name-mangling on LTO and Objective-C++.
+
 2018-05-30  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (old_name_mangling_p): New static

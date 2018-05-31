@@ -4659,9 +4659,9 @@ rs6000_option_override_internal (bool global_init_p)
      name if float128 is supported.  */
   if (rs6000_alias_old_name_mangling != 0)
     {
-      bool is_cxx = strncmp (lang_hooks.name,
-			     "GNU C++",
-			     sizeof ("GNU C++")-1) == 0;
+      bool is_cxx = (lang_GNU_CXX ()
+		     || ! strcmp (lang_hooks.name, "GNU Objective-C++")
+		     || ! strcmp (lang_hooks.name, "GNU GIMPLE"));
 
       if (rs6000_alias_old_name_mangling < 0)
 	rs6000_alias_old_name_mangling = (TARGET_FLOAT128_TYPE && is_cxx);
@@ -4669,7 +4669,7 @@ rs6000_option_override_internal (bool global_init_p)
       else if (!is_cxx)
 	{
 	  rs6000_alias_old_name_mangling = 0;
-	  error ("%qs is only valid for C++", "-malias-old-name-mangling");
+	  error ("%qs is only valid for C++ or LTO", "-malias-old-name-mangling");
 	}
 
       else if (!TARGET_FLOAT128_TYPE)
