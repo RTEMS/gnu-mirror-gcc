@@ -1,3 +1,8 @@
+2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* g++.dg/pr85657.C: Delete, test is no longer valid.
+
 2018-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 260905.

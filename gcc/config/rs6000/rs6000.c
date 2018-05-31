@@ -200,12 +200,14 @@ int dot_symbols;
    of this machine mode.  */
 scalar_int_mode rs6000_pmode;
 
-/* Note whether we mangled a name whose mangling has changed, and we may need
-   to issue an alias for the old name.  */
-static bool old_name_mangling_p;
+/* Note whether IEEE 128-bit floating point was passed or returned, either as
+   the __float128/_Float128 explicit type, or when long double is IEEE 128-bit
+   floating point.  We changed the default C++ mangling for these types and we
+   may want to generate a weak alias to the old mangling.  */
+static bool rs6000_passes_ieee128;
 
 /* Generate old manged name, not new name.  */
-static bool generate_old_mangling_p;
+static bool old_mangling;
 
 /* Width in bits of a pointer.  */
 unsigned rs6000_pointer_size;
@@ -2851,7 +2853,7 @@ rs6000_debug_reg_global (void)
   fprintf (stderr, DEBUG_FMT_S, "language", lang_hooks.name);
   fprintf (stderr, DEBUG_FMT_S, "abi", abi_str);
 
-  if (rs6000_alias_old_name_mangling)
+  if (TARGET_OLD_NAME_MANGLING)
     fprintf (stderr, DEBUG_FMT_S, "old name mangling", "true");
 
   if (rs6000_altivec_abi)
@@ -4655,30 +4657,14 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
     }
 
-  /* Enable making an alias by default from the old mangled name to the new
-     name if float128 is supported.  */
-  if (rs6000_alias_old_name_mangling != 0)
+  /* Enable making an alias by default to map old mangled names to the new
+     names on systems that support float128.  */
+  if (TARGET_OLD_NAME_MANGLING && !TARGET_FLOAT128_TYPE)
     {
-      bool is_cxx = (lang_GNU_CXX ()
-		     || ! strcmp (lang_hooks.name, "GNU Objective-C++")
-		     || ! strcmp (lang_hooks.name, "GNU GIMPLE"));
-
-      if (rs6000_alias_old_name_mangling < 0)
-	rs6000_alias_old_name_mangling = (TARGET_FLOAT128_TYPE && is_cxx);
-
-      else if (!is_cxx)
-	{
-	  rs6000_alias_old_name_mangling = 0;
-	  error ("%qs is only valid for C++ or LTO", "-malias-old-name-mangling");
-	}
-
-      else if (!TARGET_FLOAT128_TYPE)
-	{
-	  rs6000_alias_old_name_mangling = 0;
-	  error ("%qs is only valid if %qs is used",
-		 "-malias-old-name-mangling",
-		 "-mfloat128");
-	}
+      if (TARGET_OLD_NAME_MANGLING < 0)
+	TARGET_OLD_NAME_MANGLING = 0;
+      else
+	error ("%qs needs %qs", "-malias-old-name-mangling", "-mfloat128");
     }
 
   /* Print the options after updating the defaults.  */
@@ -11154,6 +11140,12 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 			  && (TYPE_MAIN_VARIANT (return_type)
 			      == long_double_type_node))))
 		rs6000_passes_long_double = true;
+
+	      /* Note if we passed or return a IEEE 128-bit type.  We changed
+		 the mangling for these types, and we may need to make an alias
+		 with the old mangling.  */
+	      if (TARGET_OLD_NAME_MANGLING && FLOAT128_IEEE_P (return_mode))
+		rs6000_passes_ieee128 = true;
 	    }
 	  if (ALTIVEC_OR_VSX_VECTOR_MODE (return_mode))
 	    rs6000_passes_vector = true;
@@ -11605,6 +11597,12 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 		  || (type != NULL
 		      && TYPE_MAIN_VARIANT (type) == long_double_type_node)))
 	    rs6000_passes_long_double = true;
+
+	  /* Note if we passed or return a IEEE 128-bit type.  We changed the
+	     mangling for these types, and we may need to make an alias with
+	     the old mangling.  */
+	  if (TARGET_OLD_NAME_MANGLING && FLOAT128_IEEE_P (mode))
+	    rs6000_passes_ieee128 = true;
 	}
       if (named && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
 	rs6000_passes_vector = true;
@@ -32184,56 +32182,26 @@ rs6000_mangle_type (const_tree type)
   if (type == bool_int_type_node) return "U6__booli";
   if (type == bool_long_long_type_node) return "U6__boolx";
 
-  /* Mangle the float128 types.  If generate_old_mangling_p is true, we are
-     generating an alias from the old mangling scheme to the current mangling
-     scheme.  Otherwise, note if we geneated mangling seqeuences that might
-     change.  */
-  if (TARGET_FLOAT128_TYPE)
-    {
-      const char *old_mangle = (const char *)0;
-      const char *new_mangle = (const char *)0;
-
-      if (type == ieee128_float_type_node)
-	{
-	  old_mangle = "U10__float128";
-	  new_mangle = "u9__ieee128";
-	}
-
-      else if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
-	{
-	  if (TARGET_IEEEQUAD)
-	    {
-	      old_mangle = "U10__float128";
-	      new_mangle = "u9__ieee128";
-	    }
-	  else
-	    {
-	      old_mangle = "g";
-	      new_mangle = "u8__ibm128";
-	    }
-	}
-
-      else if (type == ibm128_float_type_node)
-	old_mangle = new_mangle = "u8__ibm128";
-
-      if (new_mangle)
-	{
-	  if (generate_old_mangling_p || old_mangle == new_mangle)
-	    return old_mangle;
-	  else
-	    {
-	      old_name_mangling_p = true;
-	      return new_mangle;
-	    }
-	}
-    }
-
-  /* For all other types, use the default mangling.  */
+  /* Mangle IBM extended float long double as `g' (__float128) on
+     powerpc*-linux where long-double-64 previously was the default.  */
   if (TYPE_MAIN_VARIANT (type) == long_double_type_node
       && TARGET_ELF
       && TARGET_LONG_DOUBLE_128
       && !TARGET_IEEEQUAD)
     return "g";
+
+  /* In the past, we used to use the mangling of "U10__float128" for IEEE
+     128-bit floating point.  Depending on -malias-old-name-mangling, we may
+     want to generate an alias to map the old name to the new name..  */
+  if (TARGET_FLOAT128_TYPE)
+    {
+      if (type == ieee128_float_type_node
+	  || (type == long_double_type_node && TARGET_LONG_DOUBLE_128))
+	return old_mangling ? "U10__float128" : "u9__ieee128";
+
+      if (type == ibm128_float_type_node)
+	return "g";
+    }
 
   /* For all other types, use normal C++ mangling.  */
   return NULL;
@@ -38856,17 +38824,17 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 
   targetm.asm_out.globalize_label (stream, name);
 
-  if (rs6000_alias_old_name_mangling && old_name_mangling_p
+  if (TARGET_OLD_NAME_MANGLING && rs6000_passes_ieee128
       && name[0] == '_' && name[1] == 'Z')
     {
       tree save_asm_name = DECL_ASSEMBLER_NAME (decl);
       const char *old_name;
 
-      generate_old_mangling_p = true;
+      old_mangling = true;
       lang_hooks.set_decl_assembler_name (decl);
       old_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
       SET_DECL_ASSEMBLER_NAME (decl, save_asm_name);
-      generate_old_mangling_p = false;
+      old_mangling = false;
 
       if (strcmp (name, old_name) != 0)
 	{

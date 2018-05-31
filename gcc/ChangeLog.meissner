@@ -1,5 +1,24 @@
 2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/85657
+	* config/rs6000/rs6000.c (old_name_mangling_p): Rename static
+	variables.
+	(rs6000_passes_ieee128): Likewise.
+	(generate_old_mangling_p): Likewise.
+	(old_mangling): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_option_override_internal): Don't bother checking for C++
+	or LTO any more.
+	(init_cumulative_args): Note if we pass or return IEEE 128-bit
+	floating point, so we can make an alias to the old mangled name.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_mangle_type): Update to current mangling.
+	(rs6000_globalize_decl_name): Change static variable names.
+	* config/rs6000/rs6000.opt (-malias-old-name-mangling): Change the
+	name of the switch that is set.
+
+2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Allow
 	-malias-old-name-mangling on LTO and Objective-C++.
 
