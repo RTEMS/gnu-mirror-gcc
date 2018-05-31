@@ -1,6 +1,13 @@
 2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/85657
+	* config/rs6000/rs6000.c (rs6000_expand_builtin): Special case the
+	pack/unpack long double/ibm128 functions to use the correct mode
+	(IFmode or TFmode) based on what mode __ibm128 uses.
+
+2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
 	* config/rs6000/rs6000.c (rs6000_init_builtins): Make __ibm128 use
 	the long double type node if -mabi=ibmlongdouble and make
 	__float128 use the long double type node if -mabi=ieeelongdouble.

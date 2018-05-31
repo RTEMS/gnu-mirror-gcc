@@ -16233,6 +16233,38 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	}
       break;
 
+      /* For the pack and unpack long double routines, fix up the builtin so it
+	 uses the correct IBM128 type.  */
+    case MISC_BUILTIN_PACK_TF:
+    case MISC_BUILTIN_PACK_IF:
+      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	{
+	  fcode = MISC_BUILTIN_PACK_TF;
+	  icode = CODE_FOR_packtf;
+	}
+      else
+	{
+	  fcode = MISC_BUILTIN_PACK_IF;
+	  icode = CODE_FOR_packif;
+	}
+      uns_fcode = (size_t)fcode;
+      break;
+
+    case MISC_BUILTIN_UNPACK_TF:
+    case MISC_BUILTIN_UNPACK_IF:
+      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	{
+	  fcode = MISC_BUILTIN_UNPACK_TF;
+	  icode = CODE_FOR_unpacktf;
+	}
+      else
+	{
+	  fcode = MISC_BUILTIN_UNPACK_IF;
+	  icode = CODE_FOR_unpackif;
+	}
+      uns_fcode = (size_t)fcode;
+      break;
+
     default:
       break;
     }
