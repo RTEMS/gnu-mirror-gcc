@@ -1,6 +1,13 @@
 2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/85657
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Make __ibm128 use
+	the long double type node if -mabi=ibmlongdouble and make
+	__float128 use the long double type node if -mabi=ieeelongdouble.
+
+2018-05-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
 	* config/rs6000/rs6000.c (old_name_mangling_p): Rename static
 	variables.
 	(rs6000_passes_ieee128): Likewise.
@@ -14,6 +21,7 @@
 	(rs6000_function_arg_advance_1): Likewise.
 	(rs6000_mangle_type): Update to current mangling.
 	(rs6000_globalize_decl_name): Change static variable names.
+
 	* config/rs6000/rs6000.opt (-malias-old-name-mangling): Change the
 	name of the switch that is set.
 
