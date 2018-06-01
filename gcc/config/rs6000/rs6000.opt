@@ -575,7 +575,7 @@ long rs6000_stack_protector_guard_offset = 0
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
 
+;; -malias-old-name-mangling: implement an alias to map old C++ mangled names
+;; to the new version of the name
 malias-old-name-mangling
 Target Undocumented Var(TARGET_OLD_NAME_MANGLING) Init(-1) Save
-Implement an alias to map old C++ mangled names to the new version of the name
-
