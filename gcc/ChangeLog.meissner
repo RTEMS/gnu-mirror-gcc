@@ -1,4 +1,10 @@
-2018-06-04  Michael Meissner  <meissner@linux.ibm.com>
+2018-06-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Make __ibm128 use
+	the long double type if long double is IBM extended double.  Make
+	__float128 use the long double type if long double is IEEE 128-bit.
+
+2018-06-05  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_passes_ieee128): New boolean to
 	track if we pass or return IEEE 128-bit floating point.
