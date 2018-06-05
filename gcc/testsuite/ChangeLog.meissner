@@ -1,3 +1,12 @@
+2018-06-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* g++.dg/pr85657.C: Only test whether __ibm128 and long double can
+	be used in templates.  Don't check for them in overloaded functions.
+	* gcc.target/powerpc/pr85657-4.c: New tests.
+	* gcc.target/powerpc/pr85657-5.c: Likewise.
+	* gcc.target/powerpc/pr85657-6.c: Likewise.
+
 2018-06-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 261212
