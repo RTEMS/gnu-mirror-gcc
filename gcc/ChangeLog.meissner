@@ -1,3 +1,34 @@
+2018-06-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85358
+	* config/rs6000/rs6000-modes.def (IFmode): Reorder the 128-bit
+	floating point modes so that __ibm128 is not converted to long
+	double when long double is IEEE 128-bit on a ISA 3.0 (power9)
+	system.
+	(KFmode): Likewise.
+	(TFmode): Likewise.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Change tests
+	for long double type size being 128 bits to 127/128 bits.
+	(rs6000_option_override_internal): If long double is IEEE 128-bit,
+	set the long double type size to 127 to force KFmode to be chosen
+	instead of TFmode.
+	(ibm128_float_type_node): On systems without IEEE 128-bit floating
+	point, reset TFmode precision to 128 bits.
+	(create_complex_muldiv): Move higher in the file.
+	(init_float128_ibm): Make sure IBM 128-bit calls the historical
+	complex long double multiply/divide to match previous compilers
+	behaviors.
+	(init_float128_ieee): Remove setting long double complex multiply
+	and divide when long double is IEEE 128-bit, since reworking the
+	modes means we now call the correct function.
+	* config/rs6000/rs6000.h (TARGET_LONG_DOUBLE_128): Deal with
+	rs6000_long_double_type_size being 127 for selecting IEEE 128-bit
+	long double as well as being 128 for selecting IBM 128-bit long
+	double.
+	(RS6000_BTI_ibm128_complex): New tree node for __ibm128 complex
+	type.
+	(ibm128_complex_type_node): Likewise.
+
 2018-06-05  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/85657

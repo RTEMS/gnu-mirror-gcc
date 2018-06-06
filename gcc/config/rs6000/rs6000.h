@@ -537,7 +537,10 @@ extern int rs6000_vector_align[];
 #define TARGET_ALIGN_NATURAL 0
 #endif
 
-#define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size == 128)
+/* When long double is IEEE 128-bit, rs6000_long_double_type_size is 127, and
+   it is 128 when long double is IBM 128-bit.  This allows us to pick the right
+   mode for long double.  */
+#define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size > 64)
 #define TARGET_IEEEQUAD rs6000_ieeequad
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
 #define TARGET_LDBRX (TARGET_POPCNTD || rs6000_cpu == PROCESSOR_CELL)
@@ -863,9 +866,10 @@ extern unsigned char rs6000_recip_bits[];
    words.  */
 #define DOUBLE_TYPE_SIZE 64
 
-/* A C expression for the size in bits of the type `long double' on
-   the target machine.  If you don't define this, the default is two
-   words.  */
+/* A C expression for the size in bits of the type `long double' on the target
+   machine.  If you don't define this, the default is two words.  On PowerPC,
+   this is 64 for -mlong-double-64, 127 for -mabi=ieeelongdouble, and 128 for
+   -mabi=ibmlongdouble.  */
 #define LONG_DOUBLE_TYPE_SIZE rs6000_long_double_type_size
 
 /* Work around rs6000_long_double_type_size dependency in ada/targtyps.c.  */
@@ -2573,6 +2577,7 @@ enum rs6000_builtin_type_index
   RS6000_BTI_void,	         /* void_type_node */
   RS6000_BTI_ieee128_float,	 /* ieee 128-bit floating point */
   RS6000_BTI_ibm128_float,	 /* IBM 128-bit floating point */
+  RS6000_BTI_ibm128_complex,	 /* IBM 128-bit complex floating point */
   RS6000_BTI_const_str,		 /* pointer to const char * */
   RS6000_BTI_MAX
 };
@@ -2625,6 +2630,7 @@ enum rs6000_builtin_type_index
 #define void_type_internal_node		 (rs6000_builtin_types[RS6000_BTI_void])
 #define ieee128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ieee128_float])
 #define ibm128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ibm128_float])
+#define ibm128_complex_type_node	 (rs6000_builtin_types[RS6000_BTI_ibm128_complex])
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
 
 extern GTY(()) tree rs6000_builtin_types[RS6000_BTI_MAX];

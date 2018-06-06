@@ -2888,7 +2888,7 @@ rs6000_debug_reg_global (void)
   fprintf (stderr, DEBUG_FMT_D, "tls_size", rs6000_tls_size);
   fprintf (stderr, DEBUG_FMT_D, "long_double_size",
 	   rs6000_long_double_type_size);
-  if (rs6000_long_double_type_size == 128)
+  if (rs6000_long_double_type_size > 64)
     {
       fprintf (stderr, DEBUG_FMT_S, "long double type",
 	       TARGET_IEEEQUAD ? "IEEE" : "IBM");
@@ -4651,6 +4651,13 @@ rs6000_option_override_internal (bool global_init_p)
 
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
     }
+
+  /* If we want long double to be IEEE 128-bit, reset the long double size to
+     127, so the correct floating point mode is found.  See the file
+     rs6000-modes.def for more details.  */
+  if (TARGET_FLOAT128_TYPE && rs6000_long_double_type_size > 64
+      && TARGET_IEEEQUAD)
+    rs6000_long_double_type_size = 127;
 
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -16409,9 +16416,15 @@ rs6000_init_builtins (void)
 	  TYPE_PRECISION (ibm128_float_type_node) = 128;
 	  SET_TYPE_MODE (ibm128_float_type_node, IFmode);
 	  layout_type (ibm128_float_type_node);
+
+	  ibm128_complex_type_node
+	    = build_complex_type (ibm128_float_type_node, true);
 	}
       else
-	ibm128_float_type_node = long_double_type_node;
+	{
+	  ibm128_float_type_node = long_double_type_node;
+	  ibm128_complex_type_node = complex_long_double_type_node;
+	}
 
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
@@ -16424,6 +16437,10 @@ rs6000_init_builtins (void)
 
   else
     ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
+
+  if (rs6000_long_double_type_size == 128
+      && (!TARGET_FLOAT128_TYPE || !TARGET_IEEEQUAD))
+    TYPE_PRECISION (long_double_type_node) = 128;
 
   /* Initialize the modes for builtin_function_type, mapping a machine mode to
      tree type node.  */
@@ -17778,6 +17795,27 @@ rs6000_common_init_builtins (void)
     }
 }
 
+/* Create a decl for either complex long double multiply or complex long double
+   divide when long double is IBM 128-bit floating point.  We need to use the
+   historical names (__multc3 and __divtc3).  IFmode now has a numerical value
+   higher than KFmode/TFmode, so the compiler would choose __mulic3 and
+   __divic3.  The complex multiply/divide functions are encoded as builtin
+   functions with a complex result and 4 scalar inputs.  */
+
+static void
+create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
+{
+  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
+				      name, NULL_TREE);
+
+  set_builtin_decl (fncode, fndecl, true);
+
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
+
+  return;
+}
+
 /* Set up AIX/Darwin/64-bit Linux quad floating point routines.  */
 static void
 init_float128_ibm (machine_mode mode)
@@ -17788,6 +17826,27 @@ init_float128_ibm (machine_mode mode)
       set_optab_libfunc (sub_optab, mode, "__gcc_qsub");
       set_optab_libfunc (smul_optab, mode, "__gcc_qmul");
       set_optab_libfunc (sdiv_optab, mode, "__gcc_qdiv");
+
+      /* Set up to call __multc3 and __divtc3 under -mabi=ibmlongdouble.  */
+     if (mode == IFmode && !TARGET_IEEEQUAD)
+       {
+	 built_in_function fncode_mul =
+	   (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + ICmode
+				- MIN_MODE_COMPLEX_FLOAT);
+	 built_in_function fncode_div =
+	   (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + ICmode
+				- MIN_MODE_COMPLEX_FLOAT);
+
+	 tree fntype = build_function_type_list (ibm128_complex_type_node,
+						 ibm128_float_type_node,
+						 ibm128_float_type_node,
+						 ibm128_float_type_node,
+						 ibm128_float_type_node,
+						 NULL_TREE);
+
+	 create_complex_muldiv ("__multc3", fncode_mul, fntype);
+	 create_complex_muldiv ("__divtc3", fncode_div, fntype);
+       }
 
       if (!TARGET_HARD_FLOAT)
 	{
@@ -17839,26 +17898,6 @@ init_float128_ibm (machine_mode mode)
     }
 }
 
-/* Create a decl for either complex long double multiply or complex long double
-   divide when long double is IEEE 128-bit floating point.  We can't use
-   __multc3 and __divtc3 because the original long double using IBM extended
-   double used those names.  The complex multiply/divide functions are encoded
-   as builtin functions with a complex result and 4 scalar inputs.  */
-
-static void
-create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
-{
-  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
-				      name, NULL_TREE);
-
-  set_builtin_decl (fncode, fndecl, true);
-
-  if (TARGET_DEBUG_BUILTIN)
-    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
-
-  return;
-}
-
 /* Set up IEEE 128-bit floating point routines.  Use different names if the
    arguments can be passed in a vector register.  The historical PowerPC
    implementation of IEEE 128-bit floating point used _q_<op> for the names, so
@@ -17870,27 +17909,6 @@ init_float128_ieee (machine_mode mode)
 {
   if (FLOAT128_VECTOR_P (mode))
     {
-      /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  */
-     if (mode == TFmode && TARGET_IEEEQUAD)
-       {
-	 built_in_function fncode_mul =
-	   (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
-				- MIN_MODE_COMPLEX_FLOAT);
-	 built_in_function fncode_div =
-	   (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
-				- MIN_MODE_COMPLEX_FLOAT);
-
-	 tree fntype = build_function_type_list (complex_long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 NULL_TREE);
-
-	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
-	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
-       }
-
       set_optab_libfunc (add_optab, mode, "__addkf3");
       set_optab_libfunc (sub_optab, mode, "__subkf3");
       set_optab_libfunc (neg_optab, mode, "__negkf2");
