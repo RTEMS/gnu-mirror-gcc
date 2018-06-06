@@ -15341,12 +15341,18 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
   else if ((fnmask & RS6000_BTM_P9_MISC) == RS6000_BTM_P9_MISC)
     error ("builtin function %qs requires the %qs option", name,
 	   "-mcpu=power9");
+  else if ((fnmask & RS6000_BTM_LDBL128) == RS6000_BTM_LDBL128)
+    {
+      if (!TARGET_HARD_FLOAT)
+	error ("builtin function %qs requires the %qs option", name,
+	       "-mhard-float");
+      else
+	error ("builtin function %qs requires the %qs option", name,
+	       TARGET_IEEEQUAD ? "-mabi=ibmlongdouble" : "-mlong-double-128");
+    }
   else if ((fnmask & RS6000_BTM_HARD_FLOAT) != 0)
     error ("builtin function %qs requires the %qs option", name,
 	   "-mhard-float");
-  else if ((fnmask & RS6000_BTM_LDBL128) == RS6000_BTM_LDBL128)
-    error ("builtin function %qs requires the %qs option", name,
-	   TARGET_IEEEQUAD ? "-mabi=ibmlongdouble" : "-mlong-double-128");
   else if ((fnmask & RS6000_BTM_FLOAT128_HW) != 0)
     error ("builtin function %qs requires ISA 3.0 IEEE 128-bit floating point",
 	   name);
