@@ -30,6 +30,11 @@
 #include "config/rs6000/rs6000-opts.h"
 #endif
 
+/* 128-bit floating point precision values.  */
+#ifndef RS6000_MODES_H
+#include "config/rs6000/rs6000-modes.h"
+#endif
+
 /* Definitions for the object file format.  These are set at
    compile-time.  */
 
@@ -537,9 +542,8 @@ extern int rs6000_vector_align[];
 #define TARGET_ALIGN_NATURAL 0
 #endif
 
-/* When long double is IEEE 128-bit, rs6000_long_double_type_size is 127, and
-   it is 128 when long double is IBM 128-bit.  This allows us to pick the right
-   mode for long double.  */
+/* We use values 126..128 to pick the appropriate long double type (IFmode,
+   KFmode, TFmode).  */
 #define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size > 64)
 #define TARGET_IEEEQUAD rs6000_ieeequad
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
@@ -867,9 +871,7 @@ extern unsigned char rs6000_recip_bits[];
 #define DOUBLE_TYPE_SIZE 64
 
 /* A C expression for the size in bits of the type `long double' on the target
-   machine.  If you don't define this, the default is two words.  On PowerPC,
-   this is 64 for -mlong-double-64, 127 for -mabi=ieeelongdouble, and 128 for
-   -mabi=ibmlongdouble.  */
+   machine.  If you don't define this, the default is two words.  */
 #define LONG_DOUBLE_TYPE_SIZE rs6000_long_double_type_size
 
 /* Work around rs6000_long_double_type_size dependency in ada/targtyps.c.  */

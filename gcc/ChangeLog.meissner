@@ -1,3 +1,29 @@
+2018-06-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-modes.def (toplevel): Include
+	rs6000-modes.h to provide the precision values to use for the
+	128-bit floating point types.
+	(IFmode): Likewise.
+	(KFmode): Likewise.
+	(TFmode): Likewise.
+	* config/rs6000/rs6000-modes.h: Likewise.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Change
+	from upstream merge.
+	(rs6000_invalid_builtin): Likewise.
+	(rs6000_option_override_internal): Set the 128-bit long double
+	precision to be 127 to properly select TFmode.
+	(rs6000_init_builtins): Undo previous change for complex multiply
+	and divide.  Set long double type size to 127 to properly choose
+	TFmode.
+	(create_complex_muldiv): Likewise.
+	(init_float128_ibm): Likewise.
+	(init_float128_ieee): Likewise.
+	* config/rs6000/rs6000.h (toplevel): Include rs6000-modes.h to
+	provide the precision values to use for the 128-bit floating point
+	types.
+	(TARGET_LONG_DOUBLE_128): Delete previous comment.
+	(LONG_DOUBLE_TYPE_SIZE): Likewise.
+
 2018-06-06  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/85358

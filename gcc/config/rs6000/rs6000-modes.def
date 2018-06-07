@@ -21,22 +21,22 @@
 /* We make IFmode (IBM 128-bit floating point) the 128-bit floating point type
    with precision 128 bits so that machine independent parts of the compiler do
    not try to widen IFmode to TFmode on ISA 3.0 (power9) that has hardware
-   support for IEEE 128-bit.
+   support for IEEE 128-bit.  */
 
-   We set the long_double_type_size to 127 when long double is IEEE 128-bit, so
-   that KFmode is chosen for the long double type instead of TFmode/IFmode.  We
-   won't encounter conversion from IEEE 128-bit to IBM 128-bit because we don't
-   have insns to support the IBM 128-bit aritmetic operations.  */
+/* 128-bit floating point precision values.  */
+#ifndef RS6000_MODES_H
+#include "config/rs6000/rs6000-modes.h"
+#endif
 
 /* IBM 128-bit floating point.  */
 FLOAT_MODE (IF, 16, ibm_extended_format);
 
 /* Explicit IEEE 128-bit floating point.  */
-FRACTIONAL_FLOAT_MODE (KF, 127, 16, ieee_quad_format);
+FRACTIONAL_FLOAT_MODE (KF, FLOAT_PRECISION_KFmode, 16, ieee_quad_format);
 
 /* 128-bit floating point.  ABI_V4 uses IEEE quad, AIX/Darwin adjust this in
    rs6000_option_override_internal.  */
-FRACTIONAL_FLOAT_MODE (TF, 126, 16, ieee_quad_format);
+FRACTIONAL_FLOAT_MODE (TF, FLOAT_PRECISION_TFmode, 16, ieee_quad_format);
 
 /* Add any extra modes needed to represent the condition code.
 
