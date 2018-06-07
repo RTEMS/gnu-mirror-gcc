@@ -2579,7 +2579,6 @@ enum rs6000_builtin_type_index
   RS6000_BTI_void,	         /* void_type_node */
   RS6000_BTI_ieee128_float,	 /* ieee 128-bit floating point */
   RS6000_BTI_ibm128_float,	 /* IBM 128-bit floating point */
-  RS6000_BTI_ibm128_complex,	 /* IBM 128-bit complex floating point */
   RS6000_BTI_const_str,		 /* pointer to const char * */
   RS6000_BTI_MAX
 };
@@ -2632,7 +2631,6 @@ enum rs6000_builtin_type_index
 #define void_type_internal_node		 (rs6000_builtin_types[RS6000_BTI_void])
 #define ieee128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ieee128_float])
 #define ibm128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ibm128_float])
-#define ibm128_complex_type_node	 (rs6000_builtin_types[RS6000_BTI_ibm128_complex])
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
 
 extern GTY(()) tree rs6000_builtin_types[RS6000_BTI_MAX];

@@ -23,6 +23,8 @@
 	types.
 	(TARGET_LONG_DOUBLE_128): Delete previous comment.
 	(LONG_DOUBLE_TYPE_SIZE): Likewise.
+	(RS6000_BTI_ibm128_complex): Delete, no lnoger used.
+	(ibm128_complex_type_node): Likewise.
 
 2018-06-06  Michael Meissner  <meissner@linux.ibm.com>
 
