@@ -1285,7 +1285,6 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       break;
 
     case VOID_TYPE:
-    case POINTER_BOUNDS_TYPE:
     case INTEGER_TYPE:
     case REAL_TYPE:
     case FIXED_POINT_TYPE:
@@ -3417,7 +3416,7 @@ print_struct_decl (pretty_printer *pp, const_tree node, int spc,
 		|| TREE_CODE (node) == QUAL_UNION_TYPE))
 	pp_string (pp, "union ");
 
-      dump_generic_node (pp, TYPE_NAME (node), spc, 0, false);
+      dump_generic_node (pp, TYPE_NAME (node), spc, TDF_NONE, false);
     }
 
   /* Print the contents of the structure.  */
@@ -4057,7 +4056,7 @@ dump_function_header (FILE *dump_file, tree fdecl, dump_flags_t flags)
     fprintf (dump_file, ", decl_uid=%d", DECL_UID (fdecl));
   if (node)
     {
-      fprintf (dump_file, ", cgraph_uid=%d", node->uid);
+      fprintf (dump_file, ", cgraph_uid=%d", node->get_uid ());
       fprintf (dump_file, ", symbol_order=%d)%s\n\n", node->order,
                node->frequency == NODE_FREQUENCY_HOT
                ? " (hot)"

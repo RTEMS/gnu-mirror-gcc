@@ -1,3 +1,667 @@
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* tree-cfg.h (debug_function): Fix argument type to match
+        implementation.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* config/powerpcspe/powerpcspe.c (rs6000_xcoff_visibility):
+        Remove usage of MPX-related (and removed) fields.
+	* config/rs6000/rs6000.c (rs6000_xcoff_visibility): Likewise.
+
+2018-06-08  David Malcolm  <dmalcolm@redhat.com>
+
+	* cfg.c (debug): Use TDF_NONE rather than 0.
+	* cfghooks.c (debug): Likewise.
+	* dumpfile.c (DUMP_FILE_INFO): Likewise; also for OPTGROUP.
+	(struct dump_option_value_info): Convert to...
+	(struct kv_pair): ...this template type.
+	(dump_options): Convert to kv_pair<dump_flags_t>; use TDF_NONE
+	rather than 0.
+	(optinfo_verbosity_options): Likewise.
+	(optgroup_options): Convert to kv_pair<optgroup_flags_t>; use
+	OPTGROUP_NONE.
+	(gcc::dump_manager::dump_register): Use optgroup_flags_t rather
+	than int for "optgroup_flags" param.
+	(dump_generic_expr_loc): Use dump_flags_t rather than int for
+	"dump_kind" param.
+	(dump_dec): Likewise.
+	(dump_finish): Use TDF_NONE rather than 0.
+	(gcc::dump_manager::opt_info_enable_passes): Use optgroup_flags_t
+	rather than int for "optgroup_flags" param.  Use TDF_NONE rather
+	than 0.  Update for change to option_ptr.
+	(opt_info_switch_p_1): Convert "optgroup_flags" param from int *
+	to optgroup_flags_t *.  Use TDF_NONE and OPTGROUP_NONE rather than
+	0.  Update for changes to optinfo_verbosity_options and
+	optgroup_options.
+	(opt_info_switch_p): Convert optgroup_flags from int to
+	optgroup_flags_t.
+	(dump_basic_block): Use dump_flags_t rather than int
+	for "dump_kind" param.
+	* dumpfile.h (TDF_ADDRESS, TDF_SLIM, TDF_RAW, TDF_DETAILS,
+	TDF_STATS, TDF_BLOCKS, TDF_VOPS, TDF_LINENO, TDF_UID)
+	TDF_STMTADDR, TDF_GRAPH, TDF_MEMSYMS, TDF_RHS_ONLY, TDF_ASMNAME,
+	TDF_EH, TDF_NOUID, TDF_ALIAS, TDF_ENUMERATE_LOCALS, TDF_CSELIB,
+	TDF_SCEV, TDF_GIMPLE, TDF_FOLDING, MSG_OPTIMIZED_LOCATIONS,
+	MSG_MISSED_OPTIMIZATION, MSG_NOTE, MSG_ALL, TDF_COMPARE_DEBUG,
+	TDF_NONE): Convert from macros to...
+	(enum dump_flag): ...this new enum.
+	(dump_flags_t): Update to use enum.
+	(operator|, operator&, operator~, operator|=, operator&=):
+	Implement for dump_flags_t.
+	(OPTGROUP_NONE, OPTGROUP_IPA, OPTGROUP_LOOP, OPTGROUP_INLINE,
+	OPTGROUP_OMP, OPTGROUP_VEC, OPTGROUP_OTHER, OPTGROUP_ALL):
+	Convert from macros to...
+	(enum optgroup_flag): ...this new enum.
+	(optgroup_flags_t): New typedef.
+	(operator|, operator|=): Implement for optgroup_flags_t.
+	(struct dump_file_info): Convert field "alt_flags" to
+	dump_flags_t.  Convert field "optgroup_flags" to
+	optgroup_flags_t.
+	(dump_basic_block): Use dump_flags_t rather than int for param.
+	(dump_generic_expr_loc): Likewise.
+	(dump_dec): Likewise.
+	(dump_register): Convert param "optgroup_flags" to
+	optgroup_flags_t.
+	(opt_info_enable_passes): Likewise.
+	* early-remat.c (early_remat::dump_edge_list): Use TDF_NONE rather
+	than 0.
+	* gimple-pretty-print.c (debug): Likewise.
+	* gimple-ssa-store-merging.c (bswap_replace): Likewise.
+	(merged_store_group::apply_stores): Likewise.
+	* gimple-ssa-strength-reduction.c (insert_initializers): Likewise.
+	* gimple.c (verify_gimple_pp): Likewise.
+	* graphite-poly.c (print_pbb_body): Likewise.
+	* passes.c (pass_manager::register_one_dump_file): Convert
+	local "optgroup_flags" to optgroup_flags_t.
+	* print-tree.c (print_node): Use TDF_NONE rather than 0.
+	(debug): Likewise.
+	(debug_body): Likewise.
+	* tree-pass.h (struct pass_data): Convert field "optgroup_flags"
+	to optgroup_flags_t.
+	* tree-pretty-print.c (print_struct_decl): Use TDF_NONE rather
+	than 0.
+	* tree-ssa-math-opts.c (convert_mult_to_fma_1): Likewise.
+	(convert_mult_to_fma): Likewise.
+	* tree-ssa-reassoc.c (undistribute_ops_list): Likewise.
+	* tree-ssa-sccvn.c (vn_eliminate): Likewise.
+	* tree-vect-data-refs.c (dump_lower_bound): Convert param
+	"dump_kind" to dump_flags_t.
+
+2018-06-08  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/rs6000.c (min, max): Delete.
+
+2018-06-08  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Delete mention of
+	-mabi=spe and -mabi=no-spe.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-pure-const.c (propagate_pure_const): Use ::get at places
+        where we expect an existing summary.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-inline-analysis.c (simple_edge_hints): Use ::get method.
+	* ipa-inline.h (estimate_edge_growth): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* cgraph.c (function_version_hasher::hash): Use
+	cgraph_node::get_uid ().
+	(function_version_hasher::equal):
+	* cgraph.h (cgraph_node::get_uid): New method.
+	* ipa-inline.c (update_caller_keys): Use
+	cgraph_node::get_uid ().
+	(update_callee_keys): Likewise.
+	* ipa-utils.c (searchc): Likewise.
+	(ipa_reduced_postorder): Likewise.
+	* lto-cgraph.c (input_node): Likewise.
+	* passes.c (is_pass_explicitly_enabled_or_disabled): Likewise.
+	* symbol-summary.h (symtab_insertion): Likewise.
+	(symtab_removal): Likewise.
+	(symtab_duplication): Likewise.
+	* tree-pretty-print.c (dump_function_header): Likewise.
+	* tree-sra.c (convert_callers_for_node): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* cgraph.c (symbol_table::create_edge): Always assign a new
+	unique number.
+	(symbol_table::free_edge): Do not recycle numbers.
+	* cgraph.h (cgraph_edge::get): New method.
+	* symbol-summary.h (symtab_removal): Use it.
+	(symtab_duplication): Likewise.
+	(call_summary::hashable_uid): Remove.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-inline-analysis.c (inline_edge_removal_hook): Remove.
+	(initialize_growth_caches): Remove.
+	(free_growth_caches): Likewise.
+	(do_estimate_edge_time): Use edge_growth_cache.
+	(do_estimate_edge_size): Likewise.
+	(do_estimate_edge_hints): Likewise.
+	* ipa-inline.c (reset_edge_caches): Likewise.
+	(recursive_inlining): Likewise.
+	(inline_small_functions): Likewise.
+	* ipa-inline.h (initialize_growth_caches): Remove.
+	(estimate_edge_size): Likewise.
+	(estimate_edge_time): Likewise.
+	(estimate_edge_hints): Likewise.
+	(reset_edge_growth_cache): Likewise.
+	* symbol-summary.h (call_summary::remove): New method.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-cp.c (class edge_clone_summary): New summary.
+	(grow_edge_clone_vectors): Remove.
+	(ipcp_edge_duplication_hook): Remove.
+	(class edge_clone_summary_t): New call_summary class.
+	(ipcp_edge_removal_hook): Remove.
+	(edge_clone_summary_t::duplicate): New function.
+	(get_next_cgraph_edge_clone): Use edge_clone_summaries.
+	(create_specialized_node): Likewise.
+	(ipcp_driver): Initialize edge_clone_summaries and do not
+	register hooks.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* symbol-summary.h (get): New function.
+	(call_summary::m_initialize_when_cloning): New class member.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* cgraph.c (cgraph_node::remove): Do not recycle uid.
+	* cgraph.h (symbol_table::release_symbol): Do not pass uid.
+	(symbol_table::allocate_cgraph_symbol): Do not set uid.
+	* passes.c (uid_hash_t): Record removed_nodes by their uids.
+	(remove_cgraph_node_from_order): Use the removed_nodes set.
+	(do_per_function_toporder): Likwise.
+	* symbol-summary.h (symtab_insertion): Use cgraph_node::uid
+	instead of summary_uid.
+	(symtab_removal): Likewise.
+	(symtab_duplication): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-cp.c (ipcp_store_bits_results): Use
+	ipcp_transformation_sum.
+	(ipcp_store_vr_results): Likewise.
+	* ipa-prop.c (ipcp_grow_transformations_if_necessary): Renamed
+	to ...
+	(ipcp_transformation_initialize): ... this.
+	(ipa_set_node_agg_value_chain):
+	(ipa_node_params_t::duplicate): Use ipcp_transformation_sum.
+	(write_ipcp_transformation_info): Likewise.
+	(read_ipcp_transformation_info): Likewise.
+	(ipcp_update_bits): Likewise.
+	(ipcp_update_vr): Likewise.
+	(ipcp_transform_function): Likewise.
+	* ipa-prop.h: Rename ipcp_transformation_summary to
+	ipcp_transformation.
+	(class ipcp_transformation_t): New function summary.
+	(ipcp_get_transformation_summary): Use ipcp_transformation_sum.
+	(ipa_get_agg_replacements_for_node): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-pure-const.c (struct funct_state_d): Do it class instead
+	of struct.
+	(class funct_state_summary_t): New function_summary class.
+	(has_function_state): Remove.
+	(get_function_state): Likewise.
+	(set_function_state): Likewise.
+	(add_new_function): Likewise.
+	(funct_state_summary_t::insert): New function.
+	(duplicate_node_data): Remove.
+	(remove_node_data): Remove.
+	(funct_state_summary_t::duplicate): New function.
+	(register_hooks): Create new funct_state_summaries.
+	(pure_const_generate_summary): Use it.
+	(pure_const_write_summary): Likewise.
+	(pure_const_read_summary): Likewise.
+	(propagate_pure_const): Likewise.
+	(propagate_nothrow): Likewise.
+	(dump_malloc_lattice): Likewise.
+	(propagate_malloc): Likewise.
+	(execute): Do not register hooks, just remove summary
+	instead.
+	(pass_ipa_pure_const::pass_ipa_pure_const): Simplify
+	constructor.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-reference.c (remove_node_data): Remove.
+	(duplicate_node_data): Likewise.
+	(class ipa_ref_var_info_summary_t): New class.
+	(class ipa_ref_opt_summary_t): Likewise.
+	(get_reference_vars_info): Use ipa_ref_var_info_summaries.
+	(get_reference_optimization_summary): Use
+	ipa_ref_opt_sum_summaries.
+	(set_reference_vars_info): Remove.
+	(set_reference_optimization_summary): Likewise.
+	(ipa_init): Create summaries.
+	(init_function_info): Use function summary.
+	(ipa_ref_opt_summary_t::duplicate): New function.
+	(ipa_ref_opt_summary_t::remove): New function.
+	(get_read_write_all_from_node): Fix GNU coding style.
+	(propagate): Use function summary.
+	(write_node_summary_p): Fix GNU coding style.
+	(stream_out_bitmap): Likewise.
+	(ipa_reference_read_optimization_summary): Use function summary.
+	(ipa_reference_c_finalize): Do not release hooks.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* ipa-fnsummary.c (dump_ipa_call_summary): Use ::get method.
+	(analyze_function_body): Extract multiple calls of get_create.
+	* ipa-inline-analysis.c (simple_edge_hints): Likewise.
+	* ipa-inline.c (recursive_inlining): Use ::get method.
+	* ipa-inline.h (estimate_edge_growth): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* hsa-common.h (enum hsa_function_kind): Rename HSA_NONE to
+	HSA_INVALID.
+	(hsa_function_summary::hsa_function_summary): Use the new enum
+	value.
+	(hsa_gpu_implementation_p): Use hsa_summaries::get.
+	* hsa-gen.c (hsa_get_host_function): Likewise.
+	(get_brig_function_name): Likewise.
+	* ipa-hsa.c (process_hsa_functions): Likewise.
+	(ipa_hsa_write_summary): Likewise.
+	* symbol-summary.h (symtab_duplication): Use ::get function/
+	(get): New function.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* config/i386/i386.c (ix86_can_inline_p): Use get_create instead
+	of get.
+	* hsa-common.c (hsa_summary_t::link_functions): Likewise.
+	(hsa_register_kernel): Likewise.
+	* hsa-common.h (hsa_gpu_implementation_p): Likewise.
+	* hsa-gen.c (hsa_get_host_function): Likewise.
+	(get_brig_function_name): Likewise.
+	(generate_hsa): Likewise.
+	(pass_gen_hsail::execute): Likewise.
+	* ipa-cp.c (ipcp_cloning_candidate_p): Likewise.
+	(devirtualization_time_bonus): Likewise.
+	(ipcp_propagate_stage): Likewise.
+	* ipa-fnsummary.c (redirect_to_unreachable): Likewise.
+	(edge_set_predicate): Likewise.
+	(evaluate_conditions_for_known_args): Likewise.
+	(evaluate_properties_for_edge): Likewise.
+	(ipa_fn_summary::reset): Likewise.
+	(ipa_fn_summary_t::duplicate): Likewise.
+	(dump_ipa_call_summary): Likewise.
+	(ipa_dump_fn_summary): Likewise.
+	(analyze_function_body): Likewise.
+	(compute_fn_summary): Likewise.
+	(estimate_edge_devirt_benefit): Likewise.
+	(estimate_edge_size_and_time): Likewise.
+	(estimate_calls_size_and_time): Likewise.
+	(estimate_node_size_and_time): Likewise.
+	(inline_update_callee_summaries): Likewise.
+	(remap_edge_change_prob): Likewise.
+	(remap_edge_summaries): Likewise.
+	(ipa_merge_fn_summary_after_inlining): Likewise.
+	(ipa_update_overall_fn_summary): Likewise.
+	(read_ipa_call_summary): Likewise.
+	(inline_read_section): Likewise.
+	(write_ipa_call_summary): Likewise.
+	(ipa_fn_summary_write): Likewise.
+	(ipa_free_fn_summary): Likewise.
+	* ipa-hsa.c (process_hsa_functions): Likewise.
+	(ipa_hsa_write_summary): Likewise.
+	(ipa_hsa_read_section): Likewise.
+	* ipa-icf.c (sem_function::merge): Likewise.
+	* ipa-inline-analysis.c (simple_edge_hints): Likewise.
+	(do_estimate_edge_time): Likewise.
+	(estimate_size_after_inlining): Likewise.
+	(estimate_growth): Likewise.
+	(growth_likely_positive): Likewise.
+	* ipa-inline-transform.c (clone_inlined_nodes): Likewise.
+	(inline_call): Likewise.
+	* ipa-inline.c (caller_growth_limits): Likewise.
+	(can_inline_edge_p): Likewise.
+	(can_inline_edge_by_limits_p): Likewise.
+	(compute_uninlined_call_time): Likewise.
+	(compute_inlined_call_time): Likewise.
+	(want_inline_small_function_p): Likewise.
+	(edge_badness): Likewise.
+	(update_caller_keys): Likewise.
+	(update_callee_keys): Likewise.
+	(recursive_inlining): Likewise.
+	(inline_small_functions): Likewise.
+	(inline_to_all_callers_1): Likewise.
+	(dump_overall_stats): Likewise.
+	(early_inline_small_functions): Likewise.
+	(early_inliner): Likewise.
+	* ipa-inline.h (estimate_edge_growth): Likewise.
+	* ipa-profile.c (ipa_propagate_frequency_1): Likewise.
+	* ipa-prop.c (ipa_make_edge_direct_to_target): Likewise.
+	* ipa-prop.h (IPA_NODE_REF): Likewise.
+	(IPA_EDGE_REF): Likewise.
+	* ipa-pure-const.c (malloc_candidate_p): Likewise.
+	(propagate_malloc): Likewise.
+	* ipa-split.c (execute_split_functions): Likewise.
+	* symbol-summary.h: Rename get to get_create.
+	(get): Likewise.
+	(get_create): Likewise.
+	* tree-sra.c (ipa_sra_preliminary_function_checks): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* symbol-summary.h (release): Move definition out of class
+	declaration.
+	(symtab_removal): Likewise.
+	(symtab_duplication): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* symbol-summary.h (function_summary): Move constructor
+	implementation out of class declaration.
+	(release): Likewise.
+	(symtab_insertion): Likewise.
+	(symtab_removal): Likewise.
+	(symtab_duplication): Likewise.
+	(get): Likewise.
+
+2018-06-08  Martin Liska  <mliska@suse.cz>
+
+	* Makefile.in: Remove support for MPX (macros, related functions,
+	fields in cgraph_node, ...).
+	* builtin-types.def (BT_BND): Likewise.
+	(BT_FN_BND_CONST_PTR): Likewise.
+	(BT_FN_CONST_PTR_BND): Likewise.
+	(BT_FN_VOID_PTR_BND): Likewise.
+	(BT_FN_BND_CONST_PTR_SIZE): Likewise.
+	(BT_FN_VOID_CONST_PTR_BND_CONST_PTR): Likewise.
+	* builtins.c (expand_builtin_memcpy_with_bounds): Likewise.
+	(expand_builtin_mempcpy_with_bounds): Likewise.
+	(expand_builtin_memset_with_bounds): Likewise.
+	(expand_builtin_memset_args): Likewise.
+	(std_expand_builtin_va_start): Likewise.
+	(expand_builtin): Likewise.
+	(expand_builtin_with_bounds): Likewise.
+	* builtins.def (DEF_BUILTIN_CHKP): Likewise.
+	(DEF_LIB_BUILTIN_CHKP): Likewise.
+	(DEF_EXT_LIB_BUILTIN_CHKP): Likewise.
+	(DEF_CHKP_BUILTIN): Likewise.
+	(BUILT_IN_MEMCPY): Likewise.
+	(BUILT_IN_MEMMOVE): Likewise.
+	(BUILT_IN_MEMPCPY): Likewise.
+	(BUILT_IN_MEMSET): Likewise.
+	(BUILT_IN_STPCPY): Likewise.
+	(BUILT_IN_STRCAT): Likewise.
+	(BUILT_IN_STRCHR): Likewise.
+	(BUILT_IN_STRCPY): Likewise.
+	(BUILT_IN_STRLEN): Likewise.
+	(BUILT_IN_MEMCPY_CHK): Likewise.
+	(BUILT_IN_MEMMOVE_CHK): Likewise.
+	(BUILT_IN_MEMPCPY_CHK): Likewise.
+	(BUILT_IN_MEMSET_CHK): Likewise.
+	(BUILT_IN_STPCPY_CHK): Likewise.
+	(BUILT_IN_STRCAT_CHK): Likewise.
+	(BUILT_IN_STRCPY_CHK): Likewise.
+	* calls.c (store_bounds): Likewise.
+	(emit_call_1): Likewise.
+	(special_function_p): Likewise.
+	(maybe_warn_nonstring_arg): Likewise.
+	(initialize_argument_information): Likewise.
+	(finalize_must_preallocate): Likewise.
+	(compute_argument_addresses): Likewise.
+	(expand_call): Likewise.
+	* cfgexpand.c (expand_call_stmt): Likewise.
+	(expand_return): Likewise.
+	(expand_gimple_stmt_1): Likewise.
+	(pass_expand::execute): Likewise.
+	* cgraph.c (cgraph_edge::redirect_call_stmt_to_callee): Likewise.
+	(cgraph_node::remove): Likewise.
+	(cgraph_node::dump): Likewise.
+	(cgraph_node::verify_node): Likewise.
+	* cgraph.h (chkp_function_instrumented_p): Likewise.
+	(symtab_node::get_alias_target): Likewise.
+	(cgraph_node::can_remove_if_no_direct_calls_and_refs_p): Likewise.
+	(cgraph_local_p): Likewise.
+	* cgraphbuild.c (cgraph_edge::rebuild_edges): Likewise.
+	(cgraph_edge::rebuild_references): Likewise.
+	* cgraphunit.c (varpool_node::finalize_decl): Likewise.
+	(walk_polymorphic_call_targets): Likewise.
+	(cgraph_node::expand_thunk): Likewise.
+	(symbol_table::output_weakrefs): Likewise.
+	* common/config/i386/i386-common.c (OPTION_MASK_ISA2_GENERAL_REGS_ONLY_UNSET): Likewise.
+	(ix86_handle_option): Likewise.
+	* config/i386/constraints.md: Likewise.
+	* config/i386/i386-builtin-types.def (BND): Likewise.
+	(VOID): Likewise.
+	(PVOID): Likewise.
+	(ULONG): Likewise.
+	* config/i386/i386-builtin.def (BDESC_END): Likewise.
+	(BDESC_FIRST): Likewise.
+	(BDESC): Likewise.
+	* config/i386/i386-c.c (ix86_target_macros_internal): Likewise.
+	* config/i386/i386-protos.h (ix86_bnd_prefixed_insn_p): Likewise.
+	* config/i386/i386.c (enum reg_class): Likewise.
+	(ix86_target_string): Likewise.
+	(ix86_option_override_internal): Likewise.
+	(ix86_conditional_register_usage): Likewise.
+	(ix86_valid_target_attribute_inner_p): Likewise.
+	(ix86_set_indirect_branch_type): Likewise.
+	(ix86_set_current_function): Likewise.
+	(ix86_function_arg_regno_p): Likewise.
+	(init_cumulative_args): Likewise.
+	(ix86_function_arg_advance): Likewise.
+	(ix86_function_arg): Likewise.
+	(ix86_pass_by_reference): Likewise.
+	(ix86_function_value_regno_p): Likewise.
+	(ix86_function_value_1): Likewise.
+	(ix86_function_value_bounds): Likewise.
+	(ix86_return_in_memory): Likewise.
+	(ix86_setup_incoming_vararg_bounds): Likewise.
+	(ix86_va_start): Likewise.
+	(indirect_thunk_need_prefix): Likewise.
+	(print_reg): Likewise.
+	(ix86_print_operand): Likewise.
+	(ix86_expand_call): Likewise.
+	(ix86_output_function_return): Likewise.
+	(reg_encoded_number): Likewise.
+	(BDESC_VERIFYS): Likewise.
+	(ix86_init_mpx_builtins): Likewise.
+	(ix86_init_builtins): Likewise.
+	(ix86_emit_cmove): Likewise.
+	(ix86_emit_move_max): Likewise.
+	(ix86_expand_builtin): Likewise.
+	(ix86_builtin_mpx_function): Likewise.
+	(ix86_get_arg_address_for_bt): Likewise.
+	(ix86_load_bounds): Likewise.
+	(ix86_store_bounds): Likewise.
+	(ix86_load_returned_bounds): Likewise.
+	(ix86_store_returned_bounds): Likewise.
+	(ix86_class_likely_spilled_p): Likewise.
+	(ix86_hard_regno_mode_ok): Likewise.
+	(x86_order_regs_for_local_alloc): Likewise.
+	(ix86_mitigate_rop): Likewise.
+	(ix86_bnd_prefixed_insn_p): Likewise.
+	(ix86_mpx_bound_mode): Likewise.
+	(ix86_make_bounds_constant): Likewise.
+	(ix86_initialize_bounds): Likewise.
+	(TARGET_LOAD_BOUNDS_FOR_ARG): Likewise.
+	(TARGET_STORE_BOUNDS_FOR_ARG): Likewise.
+	(TARGET_LOAD_RETURNED_BOUNDS): Likewise.
+	(TARGET_STORE_RETURNED_BOUNDS): Likewise.
+	(TARGET_CHKP_BOUND_MODE): Likewise.
+	(TARGET_BUILTIN_CHKP_FUNCTION): Likewise.
+	(TARGET_CHKP_FUNCTION_VALUE_BOUNDS): Likewise.
+	(TARGET_CHKP_MAKE_BOUNDS_CONSTANT): Likewise.
+	(TARGET_CHKP_INITIALIZE_BOUNDS): Likewise.
+	* config/i386/i386.h (TARGET_MPX): Likewise.
+	(TARGET_MPX_P): Likewise.
+	(VALID_BND_REG_MODE): Likewise.
+	(FIRST_BND_REG): Likewise.
+	(LAST_BND_REG): Likewise.
+	(enum reg_class): Likewise.
+	(BND_REG_P): Likewise.
+	(BND_REGNO_P): Likewise.
+	(BNDmode): Likewise.
+	(ADJUST_INSN_LENGTH): Likewise.
+	* config/i386/i386.md: Likewise.
+	* config/i386/i386.opt: Likewise.
+	* config/i386/linux-common.h (LIBMPX_LIBS): Likewise.
+	(defined): Likewise.
+	(LINK_MPX): Likewise.
+	(MPX_SPEC): Likewise.
+	(LIBMPX_SPEC): Likewise.
+	(LIBMPXWRAPPERS_SPEC): Likewise.
+	(CHKP_SPEC): Likewise.
+	* config/i386/predicates.md: Likewise.
+	* dbxout.c (dbxout_type): Likewise.
+	* doc/extend.texi: Likewise.
+	* doc/invoke.texi: Likewise.
+	* doc/md.texi: Likewise.
+	* doc/tm.texi: Likewise.
+	* doc/tm.texi.in: Likewise.
+	* dwarf2out.c (is_base_type): Likewise.
+	(gen_formal_types_die): Likewise.
+	(gen_subprogram_die): Likewise.
+	(gen_type_die_with_usage): Likewise.
+	(gen_decl_die): Likewise.
+	(dwarf2out_late_global_decl): Likewise.
+	* expr.c (expand_assignment): Likewise.
+	(emit_storent_insn): Likewise.
+	(store_expr_with_bounds): Likewise.
+	(store_expr): Likewise.
+	(expand_expr_real_1): Likewise.
+	* expr.h (store_expr_with_bounds): Likewise.
+	* function.c (use_register_for_decl): Likewise.
+	(struct bounds_parm_data): Likewise.
+	(assign_parms_augmented_arg_list): Likewise.
+	(assign_parm_find_entry_rtl): Likewise.
+	(assign_parm_is_stack_parm): Likewise.
+	(assign_parm_load_bounds): Likewise.
+	(assign_bounds): Likewise.
+	(assign_parms): Likewise.
+	(expand_function_start): Likewise.
+	* gcc.c (CHKP_SPEC): Likewise.
+	* gimple-fold.c (gimple_fold_builtin_memory_op): Likewise.
+	* gimple-ssa-warn-restrict.c (builtin_access::builtin_access): Likewise.
+	(wrestrict_dom_walker::check_call): Likewise.
+	* gimple.c (gimple_build_call_from_tree): Likewise.
+	* gimple.h (enum gf_mask): Likewise.
+	(gimple_call_with_bounds_p): Likewise.
+	(gimple_call_set_with_bounds): Likewise.
+	* gimplify.c (gimplify_init_constructor): Likewise.
+	* ipa-cp.c (initialize_node_lattices): Likewise.
+	(propagate_constants_across_call): Likewise.
+	(find_more_scalar_values_for_callers_subset): Likewise.
+	* ipa-hsa.c (process_hsa_functions): Likewise.
+	* ipa-icf-gimple.c (func_checker::compare_gimple_call): Likewise.
+	* ipa-icf.c (sem_function::merge): Likewise.
+	* ipa-inline.c (early_inliner): Likewise.
+	* ipa-pure-const.c (warn_function_noreturn): Likewise.
+	(warn_function_cold): Likewise.
+	(propagate_pure_const): Likewise.
+	* ipa-ref.h (enum GTY): Likewise.
+	* ipa-split.c (find_retbnd): Likewise.
+	(consider_split): Likewise.
+	(split_function): Likewise.
+	* ipa-visibility.c (cgraph_externally_visible_p): Likewise.
+	* ipa.c (walk_polymorphic_call_targets): Likewise.
+	(symbol_table::remove_unreachable_nodes): Likewise.
+	(process_references): Likewise.
+	(cgraph_build_static_cdtor_1): Likewise.
+	* lto-cgraph.c (lto_output_node): Likewise.
+	(output_refs): Likewise.
+	(compute_ltrans_boundary): Likewise.
+	(input_overwrite_node): Likewise.
+	(input_node): Likewise.
+	(input_cgraph_1): Likewise.
+	* params.def (PARAM_CHKP_MAX_CTOR_SIZE): Likewise.
+	* passes.c (pass_manager::execute_early_local_passes): Likewise.
+	(class pass_chkp_instrumentation_passes): Likewise.
+	(make_pass_chkp_instrumentation_passes): Likewise.
+	* passes.def: Likewise.
+	* rtl.h (struct GTY): Likewise.
+	(CALL_EXPR_WITH_BOUNDS_P): Likewise.
+	* stor-layout.c (layout_type): Likewise.
+	* symtab.c: Likewise.
+	* target.def: Likewise.
+	* targhooks.c (default_chkp_bound_type): Likewise.
+	(default_chkp_bound_mode): Likewise.
+	(default_builtin_chkp_function): Likewise.
+	(default_chkp_function_value_bounds): Likewise.
+	(default_chkp_make_bounds_constant): Likewise.
+	(default_chkp_initialize_bounds): Likewise.
+	* targhooks.h (default_chkp_bound_type): Likewise.
+	(default_chkp_bound_mode): Likewise.
+	(default_builtin_chkp_function): Likewise.
+	(default_chkp_function_value_bounds): Likewise.
+	(default_chkp_make_bounds_constant): Likewise.
+	(default_chkp_initialize_bounds): Likewise.
+	* toplev.c (compile_file): Likewise.
+	(process_options): Likewise.
+	* tree-core.h (DEF_BUILTIN): Likewise.
+	(DEF_BUILTIN_CHKP): Likewise.
+	* tree-inline.c (declare_return_variable): Likewise.
+	(remap_gimple_stmt): Likewise.
+	(copy_bb): Likewise.
+	(initialize_inlined_parameters): Likewise.
+	(expand_call_inline): Likewise.
+	* tree-pass.h (make_pass_ipa_chkp_versioning): Likewise.
+	(make_pass_ipa_chkp_early_produce_thunks): Likewise.
+	(make_pass_ipa_chkp_produce_thunks): Likewise.
+	(make_pass_chkp): Likewise.
+	(make_pass_chkp_opt): Likewise.
+	(make_pass_chkp_instrumentation_passes): Likewise.
+	* tree-pretty-print.c (dump_generic_node): Likewise.
+	* tree-ssa-ccp.c (insert_clobber_before_stack_restore): Likewise.
+	* tree-ssa-dce.c (propagate_necessity): Likewise.
+	(eliminate_unnecessary_stmts): Likewise.
+	* tree-ssa-pre.c (create_expression_by_pieces): Likewise.
+	* tree-ssa-sccvn.c (copy_reference_ops_from_call): Likewise.
+	* tree-ssa-sccvn.h: Likewise.
+	* tree-ssa-strlen.c (get_string_length): Likewise.
+	(valid_builtin_call): Likewise.
+	(adjust_last_stmt): Likewise.
+	(handle_builtin_strchr): Likewise.
+	(handle_builtin_strcpy): Likewise.
+	(handle_builtin_stxncpy): Likewise.
+	(handle_builtin_memcpy): Likewise.
+	(handle_builtin_strcat): Likewise.
+	(strlen_check_and_optimize_stmt): Likewise.
+	* tree-stdarg.c (expand_ifn_va_arg_1): Likewise.
+	* tree-streamer-in.c: Likewise.
+	* tree-streamer.c (record_common_node): Likewise.
+	* tree.c (tree_code_size): Likewise.
+	(wide_int_to_tree_1): Likewise.
+	(type_contains_placeholder_1): Likewise.
+	(build_common_tree_nodes): Likewise.
+	* tree.def (POINTER_BOUNDS_TYPE): Likewise.
+	* tree.h (POINTER_BOUNDS_TYPE_P): Likewise.
+	(POINTER_BOUNDS_P): Likewise.
+	(BOUNDED_TYPE_P): Likewise.
+	(BOUNDED_P): Likewise.
+	(CALL_WITH_BOUNDS_P): Likewise.
+	(pointer_bounds_type_node): Likewise.
+	* value-prof.c (gimple_ic): Likewise.
+	* var-tracking.c (vt_add_function_parameters): Likewise.
+	* varasm.c (make_decl_rtl): Likewise.
+	(assemble_start_function): Likewise.
+	(output_constant): Likewise.
+	(maybe_assemble_visibility): Likewise.
+	* varpool.c (ctor_for_folding): Likewise.
+	* chkp-builtins.def: Remove.
+	* ipa-chkp.c: Remove.
+	* ipa-chkp.h: Remove.
+	* rtl-chkp.c: Remove.
+	* rtl-chkp.h: Remove.
+	* tree-chkp-opt.c: Remove.
+	* tree-chkp.c: Remove.
+	* tree-chkp.h: Remove.
+
 2018-06-07  Carl Love  <cel@us.ibm.com>
 
 	* gcc/config/rs6000/vsx.md (vextract_fp_from_shorth,

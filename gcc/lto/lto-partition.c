@@ -115,8 +115,7 @@ add_references_to_partition (ltrans_partition part, symtab_node *node)
        references, too.  */
     else if (is_a <varpool_node *> (ref->referred)
 	     && (dyn_cast <varpool_node *> (ref->referred)
-		 ->ctor_useable_for_folding_p ()
-		 || POINTER_BOUNDS_P (ref->referred->decl))
+		 ->ctor_useable_for_folding_p ())
 	     && !lto_symtab_encoder_in_partition_p (part->encoder, ref->referred))
       {
 	if (!part->initializers_visited)
@@ -172,7 +171,7 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
     {
       struct cgraph_edge *e;
       if (!node->alias && c == SYMBOL_PARTITION)
-        part->insns += ipa_fn_summaries->get (cnode)->size;
+        part->insns += ipa_fn_summaries->get_create (cnode)->size;
 
       /* Add all inline clones and callees that are duplicated.  */
       for (e = cnode->callees; e; e = e->next_callee)
@@ -185,11 +184,6 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
       for (e = cnode->callers; e; e = e->next_caller)
 	if (e->caller->thunk.thunk_p && !e->caller->global.inlined_to)
 	  add_symbol_to_partition_1 (part, e->caller);
-
-      /* Instrumented version is actually the same function.
-	 Therefore put it into the same partition.  */
-      if (cnode->instrumented_version)
-	add_symbol_to_partition_1 (part, cnode->instrumented_version);
     }
 
   add_references_to_partition (part, node);
@@ -297,7 +291,7 @@ undo_partition (ltrans_partition partition, unsigned int n_nodes)
 
       if (!node->alias && (cnode = dyn_cast <cgraph_node *> (node))
           && node->get_partitioning_class () == SYMBOL_PARTITION)
-        partition->insns -= ipa_fn_summaries->get (cnode)->size;
+        partition->insns -= ipa_fn_summaries->get_create (cnode)->size;
       lto_symtab_encoder_delete_node (partition->encoder, node);
       node->aux = (void *)((size_t)node->aux - 1);
     }
@@ -506,12 +500,10 @@ account_reference_p (symtab_node *n1, symtab_node *n2)
 void
 lto_balanced_map (int n_lto_partitions, int max_partition_size)
 {
-  int n_nodes = 0;
   int n_varpool_nodes = 0, varpool_pos = 0, best_varpool_pos = 0;
-  struct cgraph_node **order = XNEWVEC (cgraph_node *, symtab->cgraph_max_uid);
+  auto_vec <cgraph_node *> order (symtab->cgraph_count);
   auto_vec<cgraph_node *> noreorder;
   auto_vec<varpool_node *> varpool_order;
-  int i;
   struct cgraph_node *node;
   int64_t original_total_size, total_size = 0;
   int64_t partition_size;
@@ -519,7 +511,7 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
   int last_visited_node = 0;
   varpool_node *vnode;
   int64_t cost = 0, internal = 0;
-  int best_n_nodes = 0, best_i = 0;
+  unsigned int best_n_nodes = 0, best_i = 0;
   int64_t best_cost = -1, best_internal = 0, best_size = 0;
   int npartitions;
   int current_order = -1;
@@ -527,16 +519,16 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 
   FOR_EACH_VARIABLE (vnode)
     gcc_assert (!vnode->aux);
-    
+
   FOR_EACH_DEFINED_FUNCTION (node)
     if (node->get_partitioning_class () == SYMBOL_PARTITION)
       {
 	if (node->no_reorder)
 	  noreorder.safe_push (node);
 	else
-	  order[n_nodes++] = node;
+	  order.safe_push (node);
 	if (!node->alias)
-	  total_size += ipa_fn_summaries->get (node)->size;
+	  total_size += ipa_fn_summaries->get_create (node)->size;
       }
 
   original_total_size = total_size;
@@ -546,15 +538,15 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
      unit tends to import a lot of global trees defined there.  We should
      get better about minimizing the function bounday, but until that
      things works smoother if we order in source order.  */
-  qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
+  order.qsort (node_cmp);
   noreorder.qsort (node_cmp);
 
   if (symtab->dump_file)
     {
-      for(i = 0; i < n_nodes; i++)
+      for (unsigned i = 0; i < order.length (); i++)
 	fprintf (symtab->dump_file, "Balanced map symbol order:%s:%u\n",
 		 order[i]->name (), order[i]->tp_first_run);
-      for(i = 0; i < (int)noreorder.length(); i++)
+      for (unsigned i = 0; i < noreorder.length (); i++)
 	fprintf (symtab->dump_file, "Balanced map symbol no_reorder:%s:%u\n",
 		 noreorder[i]->name (), noreorder[i]->tp_first_run);
     }
@@ -583,7 +575,7 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 
   auto_vec<symtab_node *> next_nodes;
 
-  for (i = 0; i < n_nodes; i++)
+  for (unsigned i = 0; i < order.length (); i++)
     {
       if (symbol_partitioned_p (order[i]))
 	continue;
@@ -798,9 +790,9 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 		     "Partition insns: %i (want %" PRId64 ")\n",
 		     partition->insns, partition_size);
  	  /* When we are finished, avoid creating empty partition.  */
-	  while (i < n_nodes - 1 && symbol_partitioned_p (order[i + 1]))
+	  while (i < order.length () - 1 && symbol_partitioned_p (order[i + 1]))
 	    i++;
-	  if (i == n_nodes - 1)
+	  if (i == order.length () - 1)
 	    break;
 	  total_size -= partition->insns;
 	  partition = new_partition ("");
@@ -848,8 +840,6 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
   gcc_assert (next_nodes.length () || npartitions != 1 || !best_cost || best_cost == -1);
   add_sorted_nodes (next_nodes, partition);
 
-  free (order);
-
   if (symtab->dump_file)
     {
       fprintf (symtab->dump_file, "\nPartition sizes:\n");
@@ -860,7 +850,7 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 	  ltrans_partition p = ltrans_partitions[i];
 	  fprintf (symtab->dump_file, "partition %d contains %d (%2.2f%%)"
 		   " symbols and %d (%2.2f%%) insns\n", i, p->symbols,
-		   100.0 * p->symbols / n_nodes, p->insns,
+		   100.0 * p->symbols / order.length (), p->insns,
 		   100.0 * p->insns / original_total_size);
 	}
 
@@ -1002,30 +992,6 @@ privatize_symbol_name (symtab_node *node)
 {
   if (!privatize_symbol_name_1 (node, node->decl))
     return false;
-
-  /* We could change name which is a target of transparent alias
-     chain of instrumented function name.  Fix alias chain if so  .*/
-  if (cgraph_node *cnode = dyn_cast <cgraph_node *> (node))
-    {
-      tree iname = NULL_TREE;
-      if (cnode->instrumentation_clone)
-	{
-	  /* If we want to privatize instrumentation clone
-	     then we also need to privatize original function.  */
-	  if (cnode->instrumented_version)
-	    privatize_symbol_name (cnode->instrumented_version);
-	  else
-	    privatize_symbol_name_1 (cnode, cnode->orig_decl);
-	  iname = DECL_ASSEMBLER_NAME (cnode->decl);
-	  TREE_CHAIN (iname) = DECL_ASSEMBLER_NAME (cnode->orig_decl);
-	}
-      else if (cnode->instrumented_version
-	       && cnode->instrumented_version->orig_decl == cnode->decl)
-	{
-	  iname = DECL_ASSEMBLER_NAME (cnode->instrumented_version->decl);
-	  TREE_CHAIN (iname) = DECL_ASSEMBLER_NAME (cnode->decl);
-	}
-    }
 
   return true;
 }
