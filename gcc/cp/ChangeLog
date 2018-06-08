@@ -1,3 +1,33 @@
+2018-06-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85977
+	* pt.c (unify): If ELTTYPE has no deducible template parms, skip
+	deduction from the list elements.
+	(type_unification_real): Check convertibility of list elements.
+
+2018-06-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/86060 - ICE on range for with -std=c++98.
+	* parser.c (cp_parser_init_statement): Don't clobber *decl after
+	pedwarn.
+
+	PR c++/85710 - ICE with -Wmemset-elt-size.
+	* semantics.c (finish_call_expr): Call warn_for_memset here.
+	* parser.c (cp_parser_postfix_expression): Not here.
+	(literal_integer_zerop): No longer static.
+	* pt.c (build_non_dependent_expr): Don't wrap CONST_DECL.
+
+2018-06-05  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85976
+	* tree.c (cp_tree_equal): Handle USING_DECL.
+
+2018-06-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85731 - wrong error with qualified-id in template.
+	* semantics.c (finish_qualified_id_expr): build_qualified_name
+	for unbound names in the current class.
+
 2018-06-04  Jason Merrill  <jason@redhat.com>
 
 	PR c++/61806 - missed SFINAE with partial specialization.

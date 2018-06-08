@@ -1199,7 +1199,7 @@ sem_function::merge (sem_item *alias_item)
 		     "can not create wrapper of stdarg function.\n");
 	}
       else if (ipa_fn_summaries
-	       && ipa_fn_summaries->get (alias)->self_size <= 2)
+	       && ipa_fn_summaries->get_create (alias)->self_size <= 2)
 	{
 	  if (dump_file)
 	    fprintf (dump_file, "Wrapper creation is not "
@@ -1220,8 +1220,7 @@ sem_function::merge (sem_item *alias_item)
 	 are not interposable.  */
       redirect_callers
 	= alias->get_availability () > AVAIL_INTERPOSABLE
-	  && original->get_availability () > AVAIL_INTERPOSABLE
-	  && !alias->instrumented_version;
+	  && original->get_availability () > AVAIL_INTERPOSABLE;
       /* TODO: We can redirect, but we need to produce alias of ORIGINAL
 	 with proper properties.  */
       if (!sem_item::compare_referenced_symbol_properties (NULL, original, alias,

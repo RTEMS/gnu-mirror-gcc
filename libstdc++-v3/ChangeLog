@@ -1,4 +1,91 @@
+2018-06-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ios_base.h (ios::Init::Init(const Init&))
+	(ios::Init::operator=): Define as defaulted.
+	* include/bits/stl_bvector.h (_Bit_reference(const _Bit_reference&)):
+	Likewise.
+	* include/bits/stream_iterator.h (istream_iterator::operator=)
+	(ostream_iterator::operator=): Likewise.
+	* include/bits/streambuf_iterator.h (istreambuf_iterator::operator=)
+	Likewise.
+	* include/std/bitset (bitset::reference::reference(const reference&)):
+	Likewise.
+	* include/std/complex (complex<float>::complex(const complex&))
+	(complex<double>::complex(const complex&))
+	(complex<long double>::complex(const complex&)): Likewise.
+
+2018-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/regex.h (sub_match): Add noexcept to default
+	constructor and length observer.
+	(match_results): Add noexcept to default constructor and observers
+	with no preconditions. Define destructor as defaulted.
+	(operator==, operator!=, swap): Add noexcept.
+	(regex_iterator): Add default member initializers and define default
+	constructor and destructor as defaulted. Add noexcept to equality
+	and dereference operators.
+
+2018-06-07  François Dumont  <fdumont@gcc.gnu.org>
+
+	* src/c++11/debug.cc
+	(_Safe_iterator_base::_M_detach()): Reset state only if needed.
+	(_Safe_iterator_base::_M_detach_single()): Likewise.
+	(_Safe_local_iterator_base::_M_detach()): Reset state only if needed.
+	(_Safe_local_iterator_base::_M_detach_single()): Likewise.
+
+2018-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/shared_ptr_base.h (__shared_count): Remove redundant
+	move of const value.
+
+2018-06-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/86068
+	* include/bits/c++config: Check __cpp_transactional_memory >= 201500L
+	rather than __cpp_transactional_memory >= 201505L.
+
+2018-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/86008
+	* include/bits/quoted_string.h (_Quoted_string<basic_string_view, C>):
+	Define new partial specialization.
+	* include/std/iomanip (quoted(basic_string_view<C,T>, C, C)): Define
+	new overload.
+	(operator<<(basic_ostream<C,T>&, const _Quoted_string<S,C>&)): Use
+	value not reference for iteration.
+	* testsuite/27_io/manipulators/standard/char/quoted.cc: Adjust
+	comment.
+	* testsuite/27_io/manipulators/standard/char/quoted_sv.cc: New test.
+	* testsuite/27_io/manipulators/standard/wchar_t/quoted.cc: Adjust
+	comment.
+
+2018-06-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/type_traits: Fix comment typos.
+
+	* testsuite/27_io/filesystem/operations/read_symlink.cc: XFAIL for
+	mingw* targets.
+	* testsuite/27_io/filesystem/operations/symlink_status.cc: Likewise.
+	* testsuite/experimental/filesystem/operations/read_symlink.cc:
+	Likewise.
+
+2018-06-05  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/stl_tempbuf.h
+	(_Temporary_buffer(_FwdIte, _FwdIte)): Delete, replaced by...
+	(_Temporary_buffer(_FwdIte, size_type)): ...this, new.
+	* include/ext/memory (temporary_buffer<>(_FwdIte, _FwdIte)): Adapt.
+	* include/bits/stl_algo.h (__stable_partition): Adapt.
+	(__inplace_merge): Adapt.
+	(__stable_sort): Adapt.
+
 2018-06-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/85930
+	* include/bits/shared_ptr_base.h [!__cpp_rtti]: Include <typeinfo>
+	unconditionally. Remove redundant declaration.
+	[!__cpp_rtti] (_Sp_make_shared_tag::_S_ti): Fix location of
+	alignment-specifier.
 
 	* include/bits/postypes.h (fpos): Define special members as defaulted.
 

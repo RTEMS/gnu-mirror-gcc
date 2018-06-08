@@ -6614,11 +6614,11 @@ cp_parser_compound_literal_p (cp_parser *parser)
 /* Return true if EXPR is the integer constant zero or a complex constant
    of zero, without any folding, but ignoring location wrappers.  */
 
-static bool
+bool
 literal_integer_zerop (const_tree expr)
 {
-  STRIP_ANY_LOCATION_WRAPPER (expr);
-  return integer_zerop (expr);
+  return (location_wrapper_p (expr)
+	  && integer_zerop (TREE_OPERAND (expr, 0)));
 }
 
 /* Parse a postfix-expression.
@@ -7157,19 +7157,6 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 						     complain);
 		      }
 		  }
-	      }
-
-	    if (TREE_CODE (postfix_expression) == FUNCTION_DECL
-		&& DECL_BUILT_IN_CLASS (postfix_expression) == BUILT_IN_NORMAL
-		&& DECL_FUNCTION_CODE (postfix_expression) == BUILT_IN_MEMSET
-		&& vec_safe_length (args) == 3)
-	      {
-		tree arg0 = (*args)[0];
-		tree arg1 = (*args)[1];
-		tree arg2 = (*args)[2];
-		int literal_mask = ((literal_integer_zerop (arg1) << 1)
-				    | (literal_integer_zerop (arg2) << 2));
-		warn_for_memset (input_location, arg0, arg2, literal_mask);
 	      }
 
 	    if (TREE_CODE (postfix_expression) == COMPONENT_REF)
@@ -12397,12 +12384,9 @@ cp_parser_init_statement (cp_parser *parser, tree *decl)
 	  cp_lexer_consume_token (parser->lexer);
 	  is_range_for = true;
 	  if (cxx_dialect < cxx11)
-	    {
-	      pedwarn (cp_lexer_peek_token (parser->lexer)->location, 0,
-		       "range-based %<for%> loops only available with "
-		       "-std=c++11 or -std=gnu++11");
-	      *decl = error_mark_node;
-	    }
+	    pedwarn (cp_lexer_peek_token (parser->lexer)->location, 0,
+		     "range-based %<for%> loops only available with "
+		     "-std=c++11 or -std=gnu++11");
 	}
       else
 	/* The ';' is not consumed yet because we told
