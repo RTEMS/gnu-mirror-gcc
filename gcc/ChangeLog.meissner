@@ -1,5 +1,15 @@
 2018-06-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	Merge up to 261303.
+	* REVISION: Update subversion id.
+
+2018-06-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 261303.
+	* REVISION: Update subversion id.
+
+2018-06-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-modes.def (toplevel): Include
 	rs6000-modes.h to provide the precision values to use for the
 	128-bit floating point types.

@@ -1,3 +1,203 @@
+2018-06-07  Carl Love  <cel@us.ibm.com>
+
+	* gcc/config/rs6000/vsx.md (vextract_fp_from_shorth,
+	vextract_fp_from_shortl): Add BE support.
+
+2018-06-07  Paul Koning  <ni1d@arrl.net>
+
+	* compare-elim.c (try_merge_compare): Don't merge compare if
+	address contains a side effect.
+	(try_eliminate_compare): Likewise.
+
+2018-06-07  Olga Makhotina  <olga.makhotina@intel.com>
+
+	* config.gcc: Support "tremont".
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect "tremont".
+	* config/i386/i386-c.c (ix86_target_macros_internal): Handle
+	PROCESSOR_TREMONT.
+	* config/i386/i386.c (m_TREMONT): Define.
+	(processor_target_table): Add "tremont".
+	(PTA_TREMONT): Define.
+	(ix86_lea_outperforms): Add TARGET_TREMONT.
+	(get_builtin_code_for_version): Handle PROCESSOR_TREMONT.
+	(fold_builtin_cpu): Add M_INTEL_TREMONT, replace M_INTEL_GOLDMONT
+	and M_INTEL_GOLDMONT_PLUS.
+	(fold_builtin_cpu): Add "tremont".
+	(ix86_add_stmt_cost): Add TARGET_TREMONT.
+	(ix86_option_override_internal): Add "tremont".
+	* config/i386/i386.h (processor_costs): Define TARGET_TREMONT.
+	(processor_type): Add PROCESSOR_TREMONT.
+	* config/i386/x86-tune.def: Add m_TREMONT.
+	* doc/invoke.texi: Add tremont as x86 -march=/-mtune= CPU type.
+
+2018-06-07  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* gcc/config/msp430/msp430.c (msp430_mcu_name): Set the "i" in the
+	symbol defined for msp430i* devices to be lower case.
+
+	gcc/testsuite/gcc.target/msp430/
+	* msp430i-device-symbol.c: New test.
+	* msp430f-device-symbol.c: New test.
+	* msp430.h: New test header file.
+
+2018-06-07  Richard Biener  <rguenther@suse.de>
+
+	* graphite-sese-to-poly.c (extract_affine): Avoid unneded
+	wrapping.  Properly wrap the result of a BIT_NOT_EXPR.
+	Properly wrap signed arithmetic if overflow wraps.
+
+2018-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/69615
+	* tree-ssa-reassoc.c (optimize_range_tests_var_bound): If rhs2 is lhs
+	of a cast from a same precision integral SSA_NAME in a bb dominated
+	by first_bb, retry with rhs2 set to the rhs1 of the cast.  Don't emit
+	cast to utype if rhs2 has already a compatible type.
+
+2018-06-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/85935
+	* graphite-scop-detection.c (find_params_in_bb): Analyze
+	condition operands with respect to the correct loop.  Assert
+	the analysis doesn't fail.
+
+2018-06-04  Carl Love  <cel@us.ibm.com>
+
+	* gcc/config/rs6000/vsx.md (first_match_index_<mode>): Calculate index
+	using natural element order.  Use gen_lshrsi3 instead of gen_ashrsi3
+	as it is slightly cheaper.
+	(first_match_or_eos_index_<mode>):
+	Calculate index using natural element order.
+	(first_match_index_<mode>):
+	Calculate index using natural element order.
+	(first_match_or_eos_index_<mode>):
+	Calculate index using natural order.
+	(define_insn vclzlsbb): Change to define_insn vclzlsbb_<mode>.
+	for BE and LE modes.
+	* gcc/config/rs6000/rs6000-c.c: Rename P9V_BUILTIN_VCLZLSBB,
+	P9V_BUILTIN_VCLZLSBB_V16QI.
+	* gcc/config/rs6000/rs6000-builtin.def: Make VCLZLSBB mode
+	specific.
+
+2018-06-06  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* doc/extend.texi (PowerPC AltiVec Built-in Functions): Adjust
+	indentation and line wrap for many prototypes.  Add missing
+	@smallexample directives around block of prototypes for vec_xl and
+	vec_xst.
+
+2018-06-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_passes_ieee128): New boolean to
+	track if we pass or return IEEE 128-bit floating point.
+	(ieee128_mangling_gcc_8_1): New boolean to say whether to generate
+	C++ mangling that is compatible with GCC 8.1.
+	(TARGET_ASM_GLOBALIZE_DECL_NAME): Override target hook.
+	(init_cumulative_args): Note if we pass or return IEEE 128-bit
+	floating point types.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_mangle_type): Optionally generate mangled names that match
+	what GCC 8.1 generated for IEEE 128-bit floating point types.
+	(rs6000_globalize_decl_name): If we have an external function that
+	passes or returns IEEE 128-bit types, generate a weak reference
+	from the mangled name used in GCC 8.1 to the current mangled
+	name.
+	(rs6000_init_builtins): Make __ibm128 use the long double type if
+	long double is IBM extended double.  Make __float128 use the long
+	double type if long double is IEEE 128-bit.
+
+	PR target/85657
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): New helper
+	macro for __ibm128 built-in functions.
+	(PACK_IF): Add __ibm128 pack/unpack functions.
+	(UNPACK_IF): Likewise.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Do not
+	enable long double built-in functions if long double is IEEE
+	128-bit floating point.
+	(rs6000_invalid_builtin): Update long double built-in function
+	error message.
+	(rs6000_expand_builtin): For PACK_IF and UNPACK_IF built-in
+	functions, adjust the built-in function to use the long double
+	built-in function if __ibm128 and long double are the same type.
+	* doc/extend.texi (PowerPC builtins): Update documention for
+	__builtin_{,un}pack_longdouble.  Add documentation for
+	__builtin_{,un}pack_ibm128.
+
+2018-06-06  Jim Wilson  <jimw@sifive.com>
+
+	* config/riscv/riscv.c (enum riscv_privilege_levels): New.
+	(struct machine_function): New field interrupt_mode.
+	(riscv_handle_type_attribute): New function.  Add forward declaration.
+	(riscv_attribute_table) <interrupt>: Use riscv_handle_type_attribute.
+	(riscv_expand_epilogue): Check interrupt_mode field.
+	(riscv_set_current_function): Check interrupt attribute args and
+	set interrupt_mode field.
+	* config/riscv/riscv.md (UNSPECV_SRET, UNSPECV_URET): New.
+	(riscv_sret, riscv_uret): New.
+	* doc/extend.texi (RISC-V Function Attributes) <interrupt>: Document
+	new arguments to interrupt attribute.
+
+2018-06-06  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR target/63177
+	* /config/rs6000/rs6000.h (ASM_CPU_SPEC): Add support for -mpower9.
+	Don't handle -mcpu=power8 if -mpower9-vector is also used.
+
+2018-06-06  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* config/rs6000/rs6000-builtin.def (VSX_BUILTIN_VEC_LD,
+	VSX_BUILTIN_VEC_ST): Add comment to explain non-traditional uses.
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Remove
+	several redundant entries.
+
+2018-06-06  David Malcolm  <dmalcolm@redhat.com>
+
+	* config/i386/i386-protos.h (ix86_expand_call): Strengthen return
+	type from "rtx" to "rtx_insn *".
+	* config/i386/i386.c (ix86_expand_split_stack_prologue): Likewise
+	for local "call_insn", removing cast.
+	(ix86_expand_call): Likewise, introducing a "call_insn" local.
+
+2018-06-06  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR tree-optimization/86066
+	* gimple-ssa-store-merging.c (process_store): Do not bypass BIT_NOT_EXPR
+	for BIT_INSERT_EXPR stores.
+
+2018-06-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/86062
+	* tree-ssa-sccvn.c (vn_reference_lookup_3): Handle arbitrary
+	component refs ontop
+	of to be offsetted base.
+
+2018-06-06  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* gcc/config/msp430/msp430.c (msp430_attr): Allow interrupt handlers
+	to be static and remove check on interrupt attribute name.
+
+	gcc/testsuite/gcc.target/msp430/
+	* function-attributes-4.c: New test.
+	* static-interrupts.c: New test.
+
+2018-06-05  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* doc/extend.texi (PowerPC AltiVec Built-in Functions): Remove
+	volatile qualifier from vec_lvsl and vec_lvsr argument prototypes.
+
+2018-06-05  Steve Ellcey  <sellcey@cavium.com>
+
+	PR target/79924
+	* config/aarch64/aarch64-protos.h (aarch64_err_no_fpadvsimd): Remove
+	second argument.
+	* config/aarch64/aarch64-protos..c (aarch64_err_no_fpadvsimd):
+	Remove second argument, change how error is called.
+	(aarch64_layout_arg): Remove second argument from
+	aarch64_err_no_fpadvsimd call.
+	(aarch64_init_cumulative_args): Ditto.
+	(aarch64_gimplify_va_arg_expr): Ditto.
+	* config/aarch64/aarch64.md (mov<mode>): Ditto.
+
 2018-06-05  Uros Bizjak  <ubizjak@gmail.com>
 
 	* config/i386/i386.md (simple_return_indirect_internal): New expander.

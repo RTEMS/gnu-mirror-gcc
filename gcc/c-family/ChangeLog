@@ -1,3 +1,14 @@
+2018-06-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/86068
+	* c-cppbuiltin.c (c_cpp_builtins): Fix a typo, set
+	__cpp_transactional_memory to 201500 instead of 210500.
+
+2018-06-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85710 - ICE with -Wmemset-elt-size.
+	* c-warn.c (warn_for_memset): Don't crash on incomplete element type.
+
 2018-06-01  Jason Merrill  <jason@redhat.com>
 
 	* c-cppbuiltin.c (c_cpp_builtins): Bump __cpp_deduction_guides to
