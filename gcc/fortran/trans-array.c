@@ -3583,7 +3583,7 @@ gfc_conv_array_ref (gfc_se * se, gfc_array_ref * ar, gfc_expr *expr,
       gfc_conv_expr_type (&indexse, ar->start[n], gfc_array_index_type);
       gfc_add_block_to_block (&se->pre, &indexse.pre);
 
-      if (gfc_option.rtcheck & GFC_RTCHECK_BOUNDS)
+      if ((gfc_option.rtcheck & GFC_RTCHECK_BOUNDS) && ! expr->no_bounds_check)
 	{
 	  /* Check array bounds.  */
 	  tree cond;
@@ -4304,7 +4304,7 @@ done:
 	}
     }
 
-  /* The rest is just runtime bound checking.  */
+  /* The rest is just runtime bounds checking.  */
   if (gfc_option.rtcheck & GFC_RTCHECK_BOUNDS)
     {
       stmtblock_t block;
@@ -4334,7 +4334,7 @@ done:
 	    continue;
 
 	  /* Catch allocatable lhs in f2003.  */
-	  if (flag_realloc_lhs && ss->is_alloc_lhs)
+	  if (flag_realloc_lhs && ss->no_bounds_check)
 	    continue;
 
 	  expr = ss_info->expr;
@@ -7180,6 +7180,9 @@ gfc_conv_expr_descriptor (gfc_se *se, gfc_expr *expr)
   else
     /* The right-hand side of a pointer assignment mustn't use a temporary.  */
     gcc_assert (!se->direct_byref);
+
+  /* Do we need bounds checking or not?  */
+  ss->no_bounds_check = expr->no_bounds_check;
 
   /* Setup the scalarizing loops and bounds.  */
   gfc_conv_ss_startstride (&loop);

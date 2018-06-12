@@ -1,3 +1,180 @@
+2018-06-12  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Add
+	BUILTIN_VEC_XST entries for pointer to double and long long.
+
+2018-06-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/85990
+	* config/i386/gnu-user.h (TARGET_THREAD_SPLIT_STACK_OFFSET):
+	Update comments.
+	* config/i386/gnu-user64.h (TARGET_THREAD_SPLIT_STACK_OFFSET):
+	Likewise.
+
+2018-06-12  Martin Liska  <mliska@suse.cz>
+
+	* doc/options.texi: Document IntegerRange.
+
+2018-06-12  Martin Liska  <mliska@suse.cz>
+
+	* config/i386/i386.opt: Make MPX-related options as Deprecated.
+	* opt-functions.awk: Handle Deprecated flag.
+	* opts-common.c (decode_cmdline_option): Handle cl_deprecated
+        and report error.
+	(read_cmdline_option): Report warning for a deprecated option.
+	* opts.h (struct cl_option): Add new field cl_deprecated.
+	(CL_ERR_DEPRECATED): New.
+
+2018-06-12  Martin Liska  <mliska@suse.cz>
+
+	* doc/options.texi: Document Deprecated option flag.
+
+2018-06-12  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc-arch.h (arc_extras): New enum.
+	(arc_cpu_t):Add field extra.
+	(arc_cpu_types): Consider the extras.
+	* config/arc/arc-cpus.def: Add extras info.
+	* config/arc/arc-opts.h (processor_type): Consider extra field.
+	* config/arc/arc.c (arc_override_options): Handle extra field.
+
+2018-06-12  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc-arch.h: Update ARC_OPTX macro.
+	* config/arc/arc-options.def (ARC_OPTX): Introduce a new doc
+	field.
+	* config/arc/arc.c (arc_init): Update pic warning.
+	(irq_range): Update irq range parsing warnings.
+	(arc_override_options): Update various warning messages.
+	(arc_handle_aux_attribute): Likewise.
+
+2018-06-12  Robert Suchanek  <robert.suchanek@mips.com>
+
+	* config/mips/i6400.md (i6400_fpu_fadd): Remove frint.
+
+2018-06-12  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* doc/sourcebuild.texi: Document usage of line number 0 in verify
+	compiler messages directives.
+
+2018-06-12  Matthew Fortune  <mfortune@gmail.com>
+
+	* config/mips/mips-cpus.def: New MIPS_CPU for i6500.
+	* config/mips/mips-tables.opt: Regenerate.
+	* config/mips/mips.h (MIPS_ISA_LEVEL_SPEC): Mark i6500 as
+	mips64r6.
+	* doc/invoke.texi: Document -march=i6500.
+
+2018-06-12  Prachi Godbole  <prachi.godbole@imgtec.com>
+
+	* config/mips/i6400.md (i6400_gpmuldiv): Remove cpu_unit.
+	(i6400_gpmul): Add cpu_unit.
+	(i6400_gpdiv): Likewise.
+	(i6400_msa_add_d): Update reservations.
+	(i6400_msa_int_add) Likewise.
+	(i6400_msa_short_logic3) Likewise.
+	(i6400_msa_short_logic2) Likewise.
+	(i6400_msa_short_logic) Likewise.
+	(i6400_msa_move) Likewise.
+	(i6400_msa_cmp) Likewise.
+	(i6400_msa_short_float2) Likewise.
+	(i6400_msa_div_d) Likewise.
+	(i6400_msa_long_logic1) Likewise.
+	(i6400_msa_long_logic2) Likewise.
+	(i6400_msa_mult) Likewise.
+	(i6400_msa_long_float2) Likewise.
+	(i6400_msa_long_float4) Likewise.
+	(i6400_msa_long_float5) Likewise.
+	(i6400_msa_long_float8) Likewise.
+	(i6400_fpu_fadd): Include frint type.
+	(i6400_fpu_store): New define_insn_reservation.
+	(i6400_fpu_load): Likewise.
+	(i6400_fpu_move): Likewise.
+	(i6400_fpu_fcmp): Likewise.
+	(i6400_fpu_fmadd): Likewise.
+	(i6400_int_mult): Include imul3nc type and update reservation.
+	(i6400_int_div): Include idiv3 type and update reservation.
+	(i6400_int_load): Update to check type not move_type.
+	(i6400_int_store): Likewise.
+	(i6400_int_prefetch): Set zero latency.
+
+2018-06-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.c: Document new %@{...} sequence.
+	(LINK_COMMAND_SPEC): Use it for the -L switches.
+	(cpp_unique_options): Use it for the -I switches.
+	(at_file_argbuf): New global variable.
+	(in_at_file): Likewise.
+	(alloc_args): Create at_file_argbuf.
+	(clear_args): Truncate at_file_argbuf.
+	(store_arg): If in_at_file, push the argument onto at_file_argbuf.
+	(open_at_file): New function.
+	(close_at_file): Likewise.
+	(create_at_file): Delete.
+	(do_spec_1) <'i'>: Use open_at_file/close_at_file.
+	<'o'>: Likewise.
+	<'@'>: New case.
+	(validate_switches_from_spec): Deal with %@{...} sequence.
+	(validate_switches): Likewise.
+	(driver::finalize): Call clear_args.
+
+2018-06-11  Rasmus Villemoes  <rasmus.villemoes@prevas.dk>
+
+	* config/vx-common.h (USE_TM_CLONE_REGISTRY): #define to 0.
+
+2018-06-11  Martin Sebor  <msebor@redhat.com>
+
+	* doc/invoke.texi (-Wall): List -Wc++17-compat.
+	(Wno-class-memaccess): Add @opindex.
+	(Wno-templates, Wno-multiple-inheritance): Same.
+	(Wno-virtual-inheritance, Wno-namespaces): Same.
+	(Wno-pedantic, Wno-chkp, Wcoverage-mismatch): Same.
+	(Wno-format-overflow, Wno-format-truncation): Same.
+	(Wno-unused-local-typedefs, Walloc-size-larger-than): Same.
+	(Wno-alloc-size-larger-than, Wframe-larger-than): Same
+	(Wno-stack-usage, Wno-c++-compat, Wno-c++11-compat): Same.
+	(Wno-c++14-compat, Wno-c++17-compat, Wno-openmp-simd): Same.
+	(Wno-unsuffixed-float-constants, Wno-addr-space-convert): Same.
+	(Wno-misspelled-isr): Same.
+
+2018-06-11  Martin Sebor  <msebor@redhat.com>
+
+	* PR tree-optimization/86083
+	* tree-ssa-strlen.c (handle_char_store): Use tree_expr_nonzero_p.
+
+2018-06-11 Zhouyi Zhou <zhouzhouyi@gmail.com>
+
+	* tree-eh.c (lower_eh_constructs_2): Add a comma to comment.
+
+2018-06-11  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/85755
+	* config/rs6000/rs6000.md (*movdi_internal32): Put constraint modifiers
+	on the correct operand.
+	(*movdi_internal64): Ditto.
+
+2018-06-11  Martin Liska  <mliska@suse.cz>
+
+        PR tree-optimization/86089
+	* tree-ssa-strlen.c (get_string_length): Move back removed hunk.
+
+2018-06-11  Julia Koval  <julia.koval@intel.com>
+
+	* config/i386/vaesintrin.h (_mm_aesdec_epi128, _mm_aesdeclast_epi128)
+	_mm_aesenc_epi128, _mm_aesenclast_epi128: Remove.
+	* config/i386/vpclmulqdqintrin.h (_mm_clmulepi64_epi128): Remove.
+
+2018-06-11  Olivier Hainque  <hainque@adacore.com>
+
+	* dwarf2out.c (gen_compile_unit_die): Fallout to DW_LANG_Ada83
+	for Ada with strict dwarf2.
+
+2018-06-08  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR target/85755
+	* config/rs6000/rs6000.c (mem_operand_gpr): Enable PRE_INC and PRE_DEC
+	addresses.
+
 2018-06-08  Jan Hubicka  <hubicka@ucw.cz>
 
 	* dumpfile.c (FIRST_ME_AUTO_NUMBERED_DUMP): Bump to 4.
@@ -5,7 +182,7 @@
 2018-06-08  David Edelsohn  <dje.gcc@gmail.com>
 
 	* config/rs6000/rs6000.c (rs6000_passes_ieee128): Protect with #if
-	TARGET_ELF. 
+	TARGET_ELF.
 
 2018-06-08  Martin Liska  <mliska@suse.cz>
 
