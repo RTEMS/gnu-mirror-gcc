@@ -1,5 +1,10 @@
 2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (copysign<mode>3, IEEE iterator): Rework
+	copysign of float128 on ISA 2.07 to use an explicit
+	clobber/match_scratch, instead of passing in a temporary.
+	(copysign<mode>3_soft): Likewise.
+
 	* config/rs6000/rs6000.c (rs6000_init_libfuncs): Do not re-run the
 	initialization during clone or target pragma/attribute
 	processing.
