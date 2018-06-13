@@ -4,9 +4,19 @@
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O3" } */
 
-union u_ld { long double ld; double d[2]; };
+#if defined(__LONG_DOUBLE_IEEE128__)
+#define LDOUBLE __ibm128
 
-long double
+#elif defined(__LONG_DOUBLE_IBM128__)
+#define LDOUBLE long double
+
+#else
+#error "long double must be IBM 128-bit or IEEE 128-bit"
+#endif
+
+union u_ld { LDOUBLE ld; double d[2]; };
+
+LDOUBLE
 pack (double a, double aa)
 {
   union u_ld u;
@@ -16,7 +26,7 @@ pack (double a, double aa)
 }
 
 double
-unpack_0 (long double x)
+unpack_0 (LDOUBLE x)
 {
   union u_ld u;
   u.ld = x;
@@ -24,7 +34,7 @@ unpack_0 (long double x)
 }
 
 double
-unpack_1 (long double x)
+unpack_1 (LDOUBLE x)
 {
   union u_ld u;
   u.ld = x;

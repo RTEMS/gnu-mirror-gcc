@@ -10,12 +10,22 @@
 /* { dg-final { scan-assembler-not "stxvw4x" } } */
 /* { dg-final { scan-assembler-not "stvx" } } */
 
-/* Insure caller save on long double does not use VSX instructions.  */
+/* Insure caller save on long double/ibm128 does not use VSX instructions.  */
 
-extern long double modify (long double);
+#if defined(__LONG_DOUBLE_IEEE128__)
+#define LDOUBLE __ibm128
+
+#elif defined(__LONG_DOUBLE_IBM128__)
+#define LDOUBLE long double
+
+#else
+#error "long double must be IBM 128-bit or IEEE 128-bit"
+#endif
+
+extern LDOUBLE modify (LDOUBLE);
 
 void
-sum (long double *ptr, long double value, unsigned long n)
+sum (LDOUBLE *ptr, LDOUBLE value, unsigned long n)
 {
   unsigned long i;
 

@@ -3,7 +3,11 @@
 
 void abort ();
 
-typedef __complex float __cfloat128 __attribute__((mode(KC)));
+#ifdef __LONG_DOUBLE_IEEE128__
+typedef __complex long double __cfloat128;
+#else
+typedef __complex float __cfloat128 __attribute__((mode(__KC__)));
+#endif
 
 __cfloat128 divide (__cfloat128 x, __cfloat128 y)
 {

@@ -1,3 +1,22 @@
+2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/divkc3-1.c: If long double is IEEE 128-bit,
+	use __complex long double instead of KC attribute.
+	* gcc.target/powerpc/mulkc3-1.c: Likewise.
+	* gcc.target/powerpc/float128-3.c: Add -mabi=ibmlongdouble to
+	tests that require long double to be IBM extended double.
+	* gcc.target/powerpc/float128-5.c: Likewise.
+	* gcc.target/powerpc/float128-mix.c: Likewise.
+	* gcc.target/powerpc/pack02.c: On systems where long double is
+	IEEE 128-bit, use __ibm128 instead of long double.  Use the ibm128
+	pack/unpack functions instead of the long double pack/unpack
+	functions.
+	* gcc.target/powerpc/pr57150.c: Likewise.
+	* gcc.target/powerpc/pr60203.c: Likewise.
+	* gcc.target/powerpc/pr67808.c: Likewise.
+	* gcc.target/powerpc/pr70117.c: Likewise.
+	* gcc.target/powerpc/tfmode_off.c: Likewise.
+
 2018-06-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 261511.

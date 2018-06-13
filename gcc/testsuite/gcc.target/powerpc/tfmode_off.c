@@ -4,7 +4,15 @@
 /* { dg-require-effective-target longdouble128 } */
 /* { dg-options "-O2 -fno-align-functions -fno-asynchronous-unwind-tables -mtraceback=no -save-temps" } */
 
-typedef float TFmode __attribute__ ((mode (TF)));
+#if defined(__LONG_DOUBLE_IEEE128__)
+#define TFmode __ibm128
+
+#elif defined(__LONG_DOUBLE_IBM128__)
+#define TFmode long double
+
+#else
+#error "long double must be IBM 128-bit or IEEE 128-bit"
+#endif
 
 void w1 (void *x, TFmode y) { *(TFmode *) (x + 32767) = y; }
 void w2 (void *x, TFmode y) { *(TFmode *) (x + 32766) = y; }
