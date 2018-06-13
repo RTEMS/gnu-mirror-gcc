@@ -5,10 +5,6 @@
 	instead of passing in a temporary.
 	(copysign<mode>3_soft): Likewise.
 
-	* config/rs6000/rs6000.c (rs6000_init_libfuncs): Do not re-run the
-	initialization during clone or target pragma/attribute
-	processing.
-
 2018-06-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 261511.

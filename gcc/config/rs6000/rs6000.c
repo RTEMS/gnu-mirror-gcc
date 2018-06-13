@@ -18000,13 +18000,6 @@ init_float128_ieee (machine_mode mode)
 static void
 rs6000_init_libfuncs (void)
 {
-  static bool done_init = false;
-
-  if (done_init)
-    return;
-
-  done_init = true;
-
   /* __float128 support.  */
   if (TARGET_FLOAT128_TYPE)
     {
