@@ -1,3 +1,7 @@
+2018-06-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr70117.c (main): Use isinf, not isinfl.
+
 2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/divkc3-1.c: If long double is IEEE 128-bit,

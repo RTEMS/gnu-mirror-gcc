@@ -35,7 +35,7 @@ main (void)
   LDOUBLE ld;
 
   ld = gl_LDBL_MAX.ld;
-  if (__builtin_isinfl (ld))
+  if (__builtin_isinf (ld))
     __builtin_abort ();
   ld = -gl_LDBL_MAX.ld;
   if (__builtin_isinf (ld))
