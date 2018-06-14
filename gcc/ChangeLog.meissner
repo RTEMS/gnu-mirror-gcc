@@ -1,5 +1,10 @@
 2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (neg<mode>2_internal): Check whether the
+	correct mode is IBM extended.
+
+2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (copysign<mode>3, IEEE iterator): Rework
 	copysign of float128 on ISA 2.07 to use an explicit clobber,
 	instead of passing in a temporary.
