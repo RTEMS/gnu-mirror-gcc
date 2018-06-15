@@ -1,3 +1,8 @@
+2018-06-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (extendtfif2): Add missing 128-bit
+	conversion insn.
+
 2018-06-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (init_float128_ieee): Prevent complex
