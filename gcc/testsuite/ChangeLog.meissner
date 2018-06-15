@@ -3,6 +3,7 @@
 	* gcc.target/powerpc/float128-complex-1.c (float128_complex): If
 	long double is IEEE 128-bit, use __complex long double instead of
 	KC attribute.
+	* gcc.target/powerpc//pr85657-6.c: Fix dg-error syntax.
 
 2018-06-14  Michael Meissner  <meissner@linux.ibm.com>
 
