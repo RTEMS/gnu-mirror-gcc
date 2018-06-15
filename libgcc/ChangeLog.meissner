@@ -1,3 +1,10 @@
+2018-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ibm128 if float128 is available.
+	* config/rs6000/t-float128: Make sure ibm-ldouble.c is compiled
+	with -mno-gnu-attribute.
+
 2018-06-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 261511.

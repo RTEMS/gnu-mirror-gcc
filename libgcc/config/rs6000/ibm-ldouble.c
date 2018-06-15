@@ -101,7 +101,9 @@ __asm__ (".symver __gcc_qadd,_xlqadd@GCC_3.4\n\t"
 static inline IBM128_TYPE
 pack_ldouble (double dh, double dl)
 {
-#if defined (__LONG_DOUBLE_128__) && defined (__LONG_DOUBLE_IBM128__)	\
+#if defined (__FLOAT128__)
+  return __builtin_pack_ibm128 (dh, dl);
+#elif defined (__LONG_DOUBLE_128__) && defined (__LONG_DOUBLE_IBM128__)	\
     && !(defined (_SOFT_FLOAT) || defined (__NO_FPRS__))
   return __builtin_pack_longdouble (dh, dl);
 #else

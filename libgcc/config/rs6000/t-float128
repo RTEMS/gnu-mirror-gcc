@@ -69,6 +69,9 @@ $(fp128_ppc_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
 $(fp128_obj)		 : $(fp128_includes)
 $(fp128_obj)		 : $(srcdir)/config/rs6000/quad-float128.h
 
+# Make sure ibm-ldouble is compiled without attributes
+ibm-ldouble$(objext)	: INTERNAL_CFLAGS += -mno-gnu-attribute
+
 $(fp128_softfp_src) : $(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@)) $(fp128_dep)
 	@src="$(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@))"; \
 	echo "Create $@"; \
