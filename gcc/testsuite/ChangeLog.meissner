@@ -1,3 +1,9 @@
+2018-06-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-complex-1.c (float128_complex): If
+	long double is IEEE 128-bit, use __complex long double instead of
+	KC attribute.
+
 2018-06-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/pr70117.c (main): Use isinf, not isinfl.

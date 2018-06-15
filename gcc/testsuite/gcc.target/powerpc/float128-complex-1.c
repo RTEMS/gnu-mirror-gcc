@@ -33,10 +33,11 @@ extern double_complex cdouble2 (void);
 #endif
 
 #ifndef NO_FLOAT128
-#ifdef __VSX__
-typedef _Complex float __attribute__((mode(KC)))	float128_complex;
+#ifdef __LONG_DOUBLE_IEEE128__
+typedef __complex long double float128_complex;
 #else
-typedef _Complex float __attribute__((mode(TC)))	float128_complex;
+typedef __complex float float128_complex __attribute__((mode(__KC__)));
+#endif
 #endif
 
 extern float128_complex cfloat128_1 (void);
