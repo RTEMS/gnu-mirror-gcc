@@ -38,7 +38,6 @@ typedef __complex long double float128_complex;
 #else
 typedef __complex float float128_complex __attribute__((mode(__KC__)));
 #endif
-#endif
 
 extern float128_complex cfloat128_1 (void);
 extern float128_complex cfloat128_2 (void);
