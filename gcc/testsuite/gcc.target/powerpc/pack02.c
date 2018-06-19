@@ -13,6 +13,24 @@
 #include <stdio.h>
 #endif
 
+#if defined(__LONG_DOUBLE_IEEE128__)
+/* If long double is IEEE 128-bit, we need to use the __ibm128 type instead of
+   long double, and to use the appropriate pack/unpack routines.  We can't use
+   __ibm128 on systems that don't support IEEE 128-bit floating point, because
+   the type is not enabled on those systems.  */
+#define PACK __builtin_pack_ibm128
+#define UNPACK __builtin_unpack_ibm128
+#define LDOUBLE __ibm128
+
+#elif defined(__LONG_DOUBLE_IBM128__)
+#define PACK __builtin_pack_longdouble
+#define UNPACK __builtin_unpack_longdouble
+#define LDOUBLE long double
+
+#else
+#error "long double must be either IBM 128-bit or IEEE 128-bit"
+#endif
+
 int
 main (void)
 {
