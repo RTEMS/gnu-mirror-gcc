@@ -1,3 +1,9 @@
+<ieee128-patch124>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (neg<mode>2_internal): Use the correct
+	mode to check whether the mode is IBM extended.
+
 <ieee128-patch123>
 2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
 
