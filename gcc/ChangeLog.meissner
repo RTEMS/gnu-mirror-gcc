@@ -1,3 +1,10 @@
+<ieee128-patch123>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (init_float128_ieee): Prevent complex
+	multiply and divide external functions from being created more
+	than once.
+
 <ieee128-patch121>
 2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
 
