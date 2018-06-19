@@ -1,3 +1,12 @@
+<ieee128-patch125>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-3.c: Change tests that test for
+	errors in enabling/disable IEEE 128-bit floating point use the
+	-mabi=ibmlongdouble to force long double to be IBM extended.
+	* gcc.target/powerpc/float128-5.c: Likewise.
+	* gcc.target/powerpc/float128-mix.c: Likewise.
+
 <ieee128-patch122>
 2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
 

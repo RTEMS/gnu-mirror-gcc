@@ -1,8 +1,10 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target powerpc_vsx_ok } */
-/* { dg-options "-O2 -mvsx -mno-float128" } */
+/* { dg-options "-O2 -mvsx -mno-float128 -mabi=ibmlongdouble -Wno-psabi" } */
 
-/* Test that we can use #pragma GCC target to enable -mfloat128.  */
+/* Test that we can use #pragma GCC target to enable -mfloat128.  This depends
+   on the long double format being IBM extended double in order to enable or
+   disable IEEE 128-bit floating point.  */
 
 #ifdef __FLOAT128__
 #error "-mno-float128 should disable initially defining __FLOAT128__"

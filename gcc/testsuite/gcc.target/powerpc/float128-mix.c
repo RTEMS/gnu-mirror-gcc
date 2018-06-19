@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target powerpc_vsx_ok } */
-/* { dg-options "-O2 -mvsx" } */
+/* { dg-options "-O2 -mvsx -mabi=ibmlongdouble -Wno-psabi" } */
 
 
 /* Test to make sure that __float128 and long double cannot be combined together.  */
