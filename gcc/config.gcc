@@ -4578,8 +4578,8 @@ case "${target}" in
 		    powerpc64le*:yes:ieee | powerpc64le*:yes:ibm)
 			if test "x$with_advance_toolchain" != x -a \
 			    "x$ld_alt" != x -a \
-			    -d "$with_advance_toolchain/lib64/." -a \
-			    -d "$with_advance_toolchain/lib64/$ld_alt/."; then
+			    -d "/opt/$with_advance_toolchain/lib64/." -a \
+			    -d "/opt/$with_advance_toolchain/lib64/$ld_alt/."; then
 
 			    tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
 			    tmake_file="${tmake_file} rs6000/t-ldouble-linux64le-${with_long_double_format}"
