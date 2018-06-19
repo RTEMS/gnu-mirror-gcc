@@ -34,10 +34,13 @@ extern double_complex cdouble2 (void);
 #endif
 
 #ifndef NO_FLOAT128
-#ifdef __VSX__
-typedef _Complex float __attribute__((mode(KC)))	float128_complex;
+#ifndef __LONG_DOUBLE_IEEE128__
+/* If long double is IBM, we have to use __attribute__ to get to the long
+   double complex type.  If long double is IEEE, we can use the standard
+   _Complex type.  */
+typedef _Complex float __attribute__((__mode__(__KC__))) float128_complex;
 #else
-typedef _Complex float __attribute__((mode(TC)))	float128_complex;
+typedef _Complex long double				 float128_complex;
 #endif
 
 extern float128_complex cfloat128_1 (void);

@@ -3,7 +3,15 @@
 
 void abort ();
 
-typedef __complex float __cfloat128 __attribute__((mode(KC)));
+
+#ifndef __LONG_DOUBLE_IEEE128__
+/* If long double is IBM, we have to use __attribute__ to get to the long
+   double complex type.  If long double is IEEE, we can use the standard
+   _Complex type.  */
+typedef _Complex float __attribute__((mode(__KC__)))	__cfloat128;
+#else
+typedef _Complex long double				__cfloat128;
+#endif
 
 __cfloat128 multiply (__cfloat128 x, __cfloat128 y)
 {

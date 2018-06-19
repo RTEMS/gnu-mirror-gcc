@@ -8,9 +8,12 @@
    __float128 is not enabled .  Test that power8 generates a call to the
    __addkf3 emulation function.  */
 
-#ifdef __LONG_DOUBLE_IEEE128
-typedef double          __attribute__((__mode__(__TF__))) f128_t;
-typedef _Complex double __attribute__((__mode__(__TC__))) f128c_t;
+#ifdef __LONG_DOUBLE_IEEE128__
+/* If long double is IBM, we have to use __attribute__ to get to the long
+   double complex type.  If long double is IEEE, we can use the standard
+   _Complex type.  */
+typedef long double		f128_t;
+typedef long double _Complex	f128c_t;
 
 #else
 typedef double          __attribute__((__mode__(__KF__))) f128_t;
