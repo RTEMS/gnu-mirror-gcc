@@ -1,3 +1,10 @@
+<ieee128-patch121>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (extendtfif2): Add missing 128-bit
+	conversion insn.
+
+<ieee128-patch120>
 2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config.gcc (powerpc64le*-*-*): Only enable IEEE/IBM long double
