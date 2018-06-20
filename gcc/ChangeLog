@@ -1,3 +1,283 @@
+2018-06-20  Chung-Lin Tang <cltang@codesourcery.com>
+	    Thomas Schwinge <thomas@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+
+	* gimplify.c (gimplify_scan_omp_clauses): Add support for
+	OMP_CLAUSE_{IF_PRESENT,FINALIZE}.
+	(gimplify_adjust_omp_clauses): Likewise.
+	(gimplify_oacc_declare_1): Add support for GOMP_MAP_RELEASE, remove
+	support for GOMP_MAP_FORCE_{ALLOC,TO,FROM,TOFROM}.
+	(gimplify_omp_target_update): Update handling of acc update and
+	enter/exit data.
+	* omp-low.c (install_var_field): Remove unused parameter
+	base_pointers_restrict.
+	(scan_sharing_clauses): Remove base_pointers_restrict parameter.
+	Update call to install_var_field. Handle OMP_CLAUSE_{IF_PRESENT,
+	FINALIZE}
+	(omp_target_base_pointers_restrict_p): Delete.
+	(scan_omp_target): Update call to scan_sharing_clauses.
+	* tree-core.h (enum omp_clause_code): Add OMP_CLAUSE_{IF_PRESENT,
+	FINALIZE}.
+	* tree-nested.c (convert_nonlocal_omp_clauses): Handle
+	OMP_CLAUSE_{IF_PRESENT,FINALIZE}.
+	(convert_local_omp_clauses): Likewise.
+	* tree-pretty-print.c (dump_omp_clause): Likewise.
+	* tree.c (omp_clause_num_ops): Add entries for 	OMP_CLAUSE_{IF_PRESENT,
+	FINALIZE}.
+	(omp_clause_code_name): Likewise.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/86194
+	* var-tracking.c (use_narrower_mode_test): Check if shift amount can
+	be narrowed.
+
+	PR tree-optimization/86231
+	* tree-vrp.c (union_ranges): For (  [  )  ] or (   )[   ] range and
+	anti-range don't overwrite *vr0min before using it to compute *vr0max.
+
+2018-06-20  Tom de Vries  <tdevries@suse.de>
+
+	PR tree-optimization/86097
+	* tree-ssa-loop-manip.c (canonicalize_loop_ivs): Also convert *nit to
+	iv type if signedness of iv type is not the same as that of *nit.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	* cfgrtl.c (rtl_verify_edges): Formatting fix.  If bb->preds has any
+	EDGE_EH edges, verify they are all EDGE_EH.
+
+2018-06-20  Maya Rashish  <coypu@sdf.org>
+
+	* ginclude/stddef.h: Limit #include <machine/ansi.h> to NetBSD.
+
+2018-06-20  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-tuning-flags.def (no_ldp_stp_qregs): New.
+	* config/aarch64/aarch64.c (xgene1_tunings): Add
+	AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS to tune_flags.
+	(aarch64_mode_valid_for_sched_fusion_p):
+	Allow 16-byte modes.
+	(aarch64_classify_address): Allow 16-byte modes for load_store_pair_p.
+	* config/aarch64/aarch64-ldpstp.md: Add peepholes for LDP STP of
+	128-bit modes.
+	* config/aarch64/aarch64-simd.md (load_pair<VQ:mode><VQ2:mode>):
+	New pattern.
+	(vec_store_pair<VQ:mode><VQ2:mode>): Likewise.
+	* config/aarch64/iterators.md (VQ2): New mode iterator.
+
+2018-06-20  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (jump_table_cluster::can_be_handled):
+        Change default ratio from 10 to 8.
+
+2018-06-20  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (jump_table_cluster::find_jump_tables):
+        New.
+	(bit_test_cluster::find_bit_tests): Likewise.
+	(switch_decision_tree::analyze_switch_statement): Find clusters.
+	* tree-switch-conversion.h (struct jump_table_cluster): Document
+        hierarchy.
+
+2018-06-20  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (switch_conversion::collect):
+        Record m_uniq property.
+	(switch_conversion::expand): Bail out for special conditions.
+	(group_cluster::~group_cluster): New.
+	(group_cluster::group_cluster): Likewise.
+	(group_cluster::dump): Likewise.
+	(jump_table_cluster::emit): New.
+	(switch_decision_tree::fix_phi_operands_for_edges): New.
+	(struct case_node): Remove struct.
+	(jump_table_cluster::can_be_handled): New.
+	(case_values_threshold): Moved to header.
+	(reset_out_edges_aux): Likewise.
+	(jump_table_cluster::is_beneficial): New.
+	(bit_test_cluster::can_be_handled): Likewise.
+	(add_case_node): Remove.
+	(bit_test_cluster::is_beneficial): New.
+	(case_bit_test::cmp): New.
+	(bit_test_cluster::emit): New.
+	(expand_switch_as_decision_tree_p): Remove.
+	(bit_test_cluster::hoist_edge_and_branch_if_true): New.
+	(fix_phi_operands_for_edge): Likewise.
+	(switch_decision_tree::analyze_switch_statement): New.
+	(compute_cases_per_edge): Move ...
+	(switch_decision_tree::compute_cases_per_edge): ... here.
+	(try_switch_expansion): Likewise.
+	(switch_decision_tree::try_switch_expansion): Likewise.
+	(record_phi_operand_mapping): Likewise.
+	(switch_decision_tree::record_phi_operand_mapping): Likewise.
+	(emit_case_decision_tree): Likewise.
+	(switch_decision_tree::emit): Likewise.
+	(balance_case_nodes): Likewise.
+	(switch_decision_tree::balance_case_nodes): Likewise.
+	(dump_case_nodes): Likewise.
+	(switch_decision_tree::dump_case_nodes): Likewise.
+	(emit_jump): Likewise.
+	(switch_decision_tree::emit_jump): Likewise.
+	(emit_cmp_and_jump_insns): Likewise.
+	(switch_decision_tree::emit_cmp_and_jump_insns): Likewise.
+	(emit_case_nodes): Likewise.
+	(switch_decision_tree::emit_case_nodes): Likewise.
+	(conditional_probability): Remove.
+	* tree-switch-conversion.h (enum cluster_type): New.
+	(PRINT_CASE): New.
+	(struct cluster): Likewise.
+	(cluster::cluster): Likewise.
+	(struct simple_cluster): Likewise.
+	(simple_cluster::simple_cluster): Likewise.
+	(struct group_cluster): Likewise.
+	(struct jump_table_cluster): Likewise.
+	(struct bit_test_cluster): Likewise.
+	(struct min_cluster_item): Likewise.
+	(struct case_tree_node): Likewise.
+	(case_tree_node::case_tree_node): Likewise.
+	(jump_table_cluster::case_values_threshold): Likewise.
+	(struct case_bit_test): Likewise.
+	(struct switch_decision_tree): Likewise.
+	(struct switch_conversion): Likewise.
+	(switch_decision_tree::reset_out_edges_aux): Likewise.
+
+2018-06-20  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (MAX_CASE_BIT_TESTS): Remove.
+	(hoist_edge_and_branch_if_true): Likewise.
+	(expand_switch_using_bit_tests_p): Likewise.
+	(struct case_bit_test): Likewise.
+	(case_bit_test_cmp): Likewise.
+	(emit_case_bit_tests): Likewise.
+	(switch_conversion::switch_conversion): New class.
+	(struct switch_conv_info): Remove old struct.
+	(collect_switch_conv_info): More to ...
+	(switch_conversion::collect): ... this.
+	(check_range): Likewise.
+	(switch_conversion::check_range): Likewise.
+	(check_all_empty_except_final): Likewise.
+	(switch_conversion::check_all_empty_except_final): Likewise.
+	(check_final_bb): Likewise.
+	(switch_conversion::check_final_bb): Likewise.
+	(create_temp_arrays): Likewise.
+	(switch_conversion::create_temp_arrays): Likewise.
+	(free_temp_arrays): Likewise.
+	(gather_default_values): Likewise.
+	(switch_conversion::gather_default_values): Likewise.
+	(build_constructors): Likewise.
+	(switch_conversion::build_constructors): Likewise.
+	(constructor_contains_same_values_p): Likewise.
+	(switch_conversion::contains_same_values_p): Likewise.
+	(array_value_type): Likewise.
+	(switch_conversion::array_value_type): Likewise.
+	(build_one_array): Likewise.
+	(switch_conversion::build_one_array): Likewise.
+	(build_arrays): Likewise.
+	(switch_conversion::build_arrays): Likewise.
+	(gen_def_assigns): Likewise.
+	(switch_conversion::gen_def_assigns): Likewise.
+	(prune_bbs): Likewise.
+	(switch_conversion::prune_bbs): Likewise.
+	(fix_phi_nodes): Likewise.
+	(switch_conversion::fix_phi_nodes): Likewise.
+	(gen_inbound_check): Likewise.
+	(switch_conversion::gen_inbound_check): Likewise.
+	(process_switch): Use the newly created class.
+	(switch_conversion::expand): New.
+	(switch_conversion::~switch_conversion): New.
+	* tree-switch-conversion.h: New file.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vectorizer.h (NUM_PATTERNS, vect_recog_func_ptr): Move to
+	tree-vect-patterns.c.
+	* tree-vect-patterns.c (vect_supportable_direct_optab_p): New function.
+	(vect_recog_dot_prod_pattern): Use it.  Remove the type_in argument.
+	(vect_recog_sad_pattern): Likewise.
+	(vect_recog_widen_sum_pattern): Likewise.
+	(vect_recog_pow_pattern): Likewise.  Check for a null vectype.
+	(vect_recog_widen_shift_pattern): Remove the type_in argument.
+	(vect_recog_rotate_pattern): Likewise.
+	(vect_recog_mult_pattern): Likewise.
+	(vect_recog_vector_vector_shift_pattern): Likewise.
+	(vect_recog_divmod_pattern): Likewise.
+	(vect_recog_mixed_size_cond_pattern): Likewise.
+	(vect_recog_bool_pattern): Likewise.
+	(vect_recog_mask_conversion_pattern): Likewise.
+	(vect_try_gather_scatter_pattern): Likewise.
+	(vect_recog_widen_mult_pattern): Likewise.  Check for a null vectype.
+	(vect_recog_over_widening_pattern): Likewise.
+	(vect_recog_gather_scatter_pattern): Likewise.
+	(vect_recog_func_ptr): Move from tree-vectorizer.h
+	(vect_vect_recog_func_ptrs): Move further down the file.
+	(vect_recog_func): Likewise.  Remove the third argument.
+	(NUM_PATTERNS): Define based on vect_vect_recog_func_ptrs.
+	(vect_pattern_recog_1): Expect the pattern function to do any
+	necessary target tests.  Also expect it to provide a vector type.
+	Remove the type_in handling.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-patterns.c (vect_pattern_detected): New function.
+	(vect_recog_dot_prod_patternm, vect_recog_sad_pattern)
+	(vect_recog_widen_mult_pattern, vect_recog_widen_sum_pattern)
+	(vect_recog_over_widening_pattern, vect_recog_widen_shift_pattern
+	(vect_recog_rotate_pattern, vect_recog_vector_vector_shift_pattern)
+	(vect_recog_mult_pattern, vect_recog_divmod_pattern)
+	(vect_recog_mixed_size_cond_pattern, vect_recog_bool_pattern)
+	(vect_recog_mask_conversion_pattern)
+	(vect_try_gather_scatter_pattern): Likewise.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-patterns.c (vect_get_internal_def): New function.
+	(vect_recog_dot_prod_pattern, vect_recog_sad_pattern)
+	(vect_recog_vector_vector_shift_pattern, check_bool_pattern)
+	(search_type_for_mask_1): Use it.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-patterns.c (vect_recog_dot_prod_pattern): Remove
+	redundant WIDEN_SUM_EXPR handling.
+	(vect_recog_sad_pattern): Likewise.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-patterns.c (vect_recog_dot_prod_pattern): Remove
+	redundant check that the types of a PLUS_EXPR or MULT_EXPR agree.
+	(vect_recog_sad_pattern): Likewise PLUS_EXPR, ABS_EXPR and MINUS_EXPR.
+	(vect_recog_widen_mult_pattern): Likewise MULT_EXPR.
+	(vect_recog_widen_sum_pattern): Likewise PLUS_EXPR.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-stmts.c (vectorizable_call): Make sure that we
+	use the stmt_vec_info of the original bb statement for the
+	new zero assignment, even if the call is part of a pattern.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vectorizer.h (_stmt_vec_info): Note above pattern_def_seq
+	that the sequence is attached to the original statement rather
+	than the pattern statement.
+	* tree-vect-loop.c (vect_determine_vf_for_stmt): Take the
+	PATTERN_DEF_SEQ from the original statement rather than
+	the main pattern statement.
+	* tree-vect-stmts.c (free_stmt_vec_info): Likewise.
+	* tree-vect-patterns.c (vect_recog_dot_prod_pattern): Likewise.
+	(vect_mark_pattern_stmts): Don't copy the PATTERN_DEF_SEQ.
+
+2018-06-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-stmts.c (vect_analyze_stmt): Move the handling of pattern
+	definition statements before the early exit for statements that aren't
+	live or relevant.
+	* tree-vect-loop.c (vect_transform_loop_stmt): New function,
+	split out from...
+	(vect_transform_loop): ...here.  Process pattern definition
+	statements without first checking whether the main pattern
+	statement is live or relevant.
+
 2018-06-19  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* tree-cfgcleanup.c (tree_forwarder_block_p): Do not return false at

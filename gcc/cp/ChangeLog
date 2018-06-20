@@ -1,3 +1,56 @@
+2018-06-20  Chung-Lin Tang <cltang@codesourcery.com>
+	    Thomas Schwinge <thomas@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+
+	* parser.c (cp_parser_omp_clause_name): Add support for finalize
+	and if_present. Make present_or_{copy,copyin,copyout,create} aliases
+	to their non-present_or_* counterparts. Make 'self' an alias to
+	PRAGMA_OACC_CLAUSE_HOST.
+	(cp_parser_oacc_data_clause): Update GOMP mappings for
+	PRAGMA_OACC_CLAUSE_{COPY,COPYIN,COPYOUT,CREATE,DELETE}. Remove
+	PRAGMA_OACC_CLAUSE_{SELF,PRESENT_OR_*}.
+	(cp_parser_oacc_all_clauses): Handle finalize and if_present clauses.
+	Remove support for present_or_* clauses.
+	(OACC_KERNELS_CLAUSE_MASK): Remove PRESENT_OR_* clauses.
+	(OACC_PARALLEL_CLAUSE_MASK): Likewise.
+	(OACC_DECLARE_CLAUSE_MASK): Likewise.
+	(OACC_DATA_CLAUSE_MASK): Likewise.
+	(OACC_ENTER_DATA_CLAUSE_MASK): Remove PRESENT_OR_* clauses.
+	(OACC_EXIT_DATA_CLAUSE_MASK): Add FINALIZE clause.
+	(OACC_UPDATE_CLAUSE_MASK): Remove SELF, add IF_PRESENT.
+	(cp_parser_oacc_declare): Remove PRESENT_OR_* clauses.
+	* pt.c (tsubst_omp_clauses): Handle IF_PRESENT and FINALIZE.
+	* semantics.c (finish_omp_clauses): Handle IF_PRESENT and FINALIZE.
+
+2018-06-20  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/86240
+	* constexpr.c (cxx_eval_constant_expression): Handle ABSU_EXPR.
+	(fold_simple_1): Likewise.
+	* error.c (dump_expr): Likewise.
+
+2018-06-20  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/85634
+	* cp-tree.h (lookup_keep): Drop KEEP parm.
+	(lookup_list_keep): Delete.
+	(maybe_get_fns): Declare.
+	* parser.c (cp_parser_primary_expression): Call lookup_keep here.
+	(cp_parser_template_id): Not here ...
+	* decl.c (cp_finish_decl): ... nor here ...
+	* init.c (build_raw_new_expr): ... nor here ...
+	* pt.c (process_template_parm): ... nor here ...
+	* semantics.c (perform_koenig_lookup): Call lookup_keep.
+	(finish_call_expr): Not here.
+	* tree.c (ovl_cache): Delete.
+	(ovl_make, ovl_copy): No cache.
+	(lookup_keep): Always keep.
+	(lookup_list_keep): Delete.
+	(maybe_get_fns): New, broken out of ...
+	(get_fns): ... here.  Call it.
+	(built_min_nt_loc, build_min, build_min_non_dep): Drop lookup_keep.
+	(build_min_nt_call_vec): Likewise.
+
 2018-06-19  Jason Merrill  <jason@redhat.com>
 
 	* cp-tree.h (CONSTRUCTOR_NO_IMPLICIT_ZERO): Remove.

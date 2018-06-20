@@ -1,3 +1,80 @@
+2018-06-20  Chung-Lin Tang <cltang@codesourcery.com>
+	    Thomas Schwinge <thomas@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+
+	* c-c++-common/goacc/declare-1.c: Update test case to utilize OpenACC
+	2.5 data clause semantics.
+	* c-c++-common/goacc/declare-2.c: Likewise.
+	* c-c++-common/goacc/default-4.c: Likewise.
+	* c-c++-common/goacc/finalize-1.c: New test.
+	* c-c++-common/goacc/kernels-alias-2.c: Update test case to utilize
+	OpenACC 2.5 data clause semantics.
+	* c-c++-common/goacc/kernels-alias.c: Likewise.
+	* c-c++-common/goacc/routine-5.c: Likewise.
+	* c-c++-common/goacc/update-if_present-1.c: New test.
+	* c-c++-common/goacc/update-if_present-2.c: New test.
+	* g++.dg/goacc/template.C: Update test case to utilize OpenACC
+	2.5 data clause semantics.
+	* gfortran.dg/goacc/combined-directives.f90: Likewise.
+	* gfortran.dg/goacc/data-tree.f95: Likewise.
+	* gfortran.dg/goacc/declare-2.f95: Likewise.
+	* gfortran.dg/goacc/default-4.f: Likewise.
+	* gfortran.dg/goacc/enter-exit-data.f95: Likewise.
+	* gfortran.dg/goacc/finalize-1.f: New test.
+	* gfortran.dg/goacc/kernels-alias-2.f95: Update test case to utilize
+	OpenACC 2.5 data clause semantics.
+	* gfortran.dg/goacc/kernels-alias.f95: Likewise.
+	* gfortran.dg/goacc/kernels-tree.f95: Likewise.
+	* gfortran.dg/goacc/nested-function-1.f90: Likewise.
+	* gfortran.dg/goacc/parallel-tree.f95: Likewise.
+	* gfortran.dg/goacc/reduction-promotions.f90: Likewise.
+	* gfortran.dg/goacc/update-if_present-1.f90: New test.
+	* gfortran.dg/goacc/update-if_present-2.f90: New test.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/86210
+	* g++.dg/warn/Wnonnull4.C: New test.
+
+2018-06-20  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/86240
+	* g++.dg/pr86240.C: New test.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/86194
+	* gcc.target/i386/pr86194.c: New test.
+
+	PR tree-optimization/86231
+	* gcc.dg/tree-ssa/vrp119.c: New test.
+	* gcc.c-torture/execute/pr86231.c: New test.
+
+2018-06-20  Tom de Vries  <tdevries@suse.de>
+
+	PR tree-optimization/86097
+	* gcc.dg/autopar/pr86097.c: New test.
+
+2018-06-20  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/85634
+	* g++.dg/lookup/pr85634.C: New.
+
+2018-06-20  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/ldp_stp_q.c: New test.
+	* gcc.target/aarch64/stp_vec_128_1.c: Likewise.
+	* gcc.target/aarch64/ldp_stp_q_disable.c: Likewise.
+
+2018-06-20  Martin Liska  <mliska@suse.cz>
+
+	* gcc.dg/tree-ssa/vrp104.c: Grep just for GIMPLE IL.
+
+2018-06-19  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/48560
+	* gcc.dg/Warray-bounds-28.c: New test.
+
 2018-06-19  Martin Sebor  <msebor@redhat.com>
 
 	PR middle-end/85602
