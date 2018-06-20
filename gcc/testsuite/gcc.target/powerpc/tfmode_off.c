@@ -17,7 +17,6 @@
 #else
 #error "long double must be either IBM 128-bit or IEEE 128-bit"
 #endif
-typedef float TFmode __attribute__ ((mode (TF)));
 
 void w1 (void *x, TFmode y) { *(TFmode *) (x + 32767) = y; }
 void w2 (void *x, TFmode y) { *(TFmode *) (x + 32766) = y; }
