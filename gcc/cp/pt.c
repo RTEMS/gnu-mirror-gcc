@@ -3843,8 +3843,10 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
 	     cap; cap = TREE_CHAIN (cap))
 	  cp_walk_tree (&TREE_VALUE (cap), &find_parameter_packs_r, ppd,
 			ppd->visited);
-	/* Since we defer implicit capture, look in the body as well.  */
+	/* Since we defer implicit capture, look in the parms and body.  */
 	tree fn = lambda_function (t);
+	cp_walk_tree (&TREE_TYPE (fn), &find_parameter_packs_r, ppd,
+		      ppd->visited);
 	cp_walk_tree (&DECL_SAVED_TREE (fn), &find_parameter_packs_r, ppd,
 		      ppd->visited);
 	*walk_subtrees = 0;
@@ -4035,7 +4037,7 @@ make_pack_expansion (tree arg, tsubst_flags_t complain)
    Returns TRUE and emits an error if there were bare parameter packs,
    returns FALSE otherwise.  */
 bool 
-check_for_bare_parameter_packs (tree t)
+check_for_bare_parameter_packs (tree t, location_t loc /* = UNKNOWN_LOCATION */)
 {
   tree parameter_packs = NULL_TREE;
   struct find_parameter_pack_data ppd;
@@ -4059,7 +4061,8 @@ check_for_bare_parameter_packs (tree t)
 
   if (parameter_packs) 
     {
-      location_t loc = EXPR_LOC_OR_LOC (t, input_location);
+      if (loc == UNKNOWN_LOCATION)
+	loc = EXPR_LOC_OR_LOC (t, input_location);
       error_at (loc, "parameter packs not expanded with %<...%>:");
       while (parameter_packs)
         {

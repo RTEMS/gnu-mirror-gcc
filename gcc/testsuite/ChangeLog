@@ -1,3 +1,54 @@
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2018-06-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/86093
+	* c-c++-common/pr86093.c: New test.
+
+2018-06-20  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/85634 - tsubst ICE on unmarked lookup
+	* g++.dg/lookup/pr85634.C: New.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/86210
+	* g++.dg/warn/Wnonnull4.C: New test.
+
+	PR debug/86194
+	* gcc.target/i386/pr86194.c: New test.
+
+	PR tree-optimization/86231
+	* gcc.dg/tree-ssa/vrp119.c: New test.
+	* gcc.c-torture/execute/pr86231.c: New test.
+
+2018-06-19  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/aggr24.adb: New test.
+	* gnat.dg/aggr24_pkg.ad[sb]: New helper.
+
+2018-06-18  Martin Sebor  <msebor@redhat.com>
+
+	PR c/82063
+	* gcc.dg/Walloc-size-larger-than-1.c: New test.
+	* gcc.dg/Walloc-size-larger-than-10.c: New test.
+	* gcc.dg/Walloc-size-larger-than-11.c: New test.
+	* gcc.dg/Walloc-size-larger-than-12.c: New test.
+	* gcc.dg/Walloc-size-larger-than-13.c: New test.
+	* gcc.dg/Walloc-size-larger-than-14.c: New test.
+	* gcc.dg/Walloc-size-larger-than-15.c: New test.
+	* gcc.dg/Walloc-size-larger-than-16.c: New test.
+	* gcc.dg/Walloc-size-larger-than-2.c: New test.
+	* gcc.dg/Walloc-size-larger-than-3.c: New test.
+	* gcc.dg/Walloc-size-larger-than-4.c: New test.
+	* gcc.dg/Walloc-size-larger-than-5.c: New test.
+	* gcc.dg/Walloc-size-larger-than-6.c: New test.
+	* gcc.dg/Walloc-size-larger-than-7.c: New test.
+	* gcc.dg/Walloc-size-larger-than-8.c: New test.
+	* gcc.dg/Walloc-size-larger-than-9.c: New test.
+	* gcc.dg/Walloc-size-larger-than.c: New test.
+
 2018-06-15  Jakub Jelinek  <jakub@redhat.com>
 
 	PR middle-end/85878

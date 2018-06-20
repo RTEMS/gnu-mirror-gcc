@@ -1,3 +1,46 @@
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2018-06-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/86108
+	* bb-reorder.c (create_forwarder_block): Renamed to ...
+	(create_eh_forwarder_block): ... this.  Split OLD_BB after labels and
+	jump from new landing pad to the second part.
+	(sjlj_fix_up_crossing_landing_pad, dw2_fix_up_crossing_landing_pad):
+	Adjust callers.
+
+2018-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/86194
+	* var-tracking.c (use_narrower_mode_test): Check if shift amount can
+	be narrowed.
+
+	PR tree-optimization/86231
+	* tree-vrp.c (union_ranges): For (  [  )  ] or (   )[   ] range and
+	anti-range don't overwrite *vr0min before using it to compute *vr0max.
+
+2018-06-19  Max Filippov  <jcmvbkbc@gmail.com>
+
+	Backport from mainline
+	2018-06-19  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa.md (UNSPEC_FRAME_BLOCKAGE): New unspec
+	constant.
+	(allocate_stack, frame_blockage, *frame_blockage): New patterns.
+
+2018-06-19  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimplify.c (gimplify_init_constructor): Really never clear for an
+	incomplete constructor if CONSTRUCTOR_NO_CLEARING is set.
+
+2018-06-18  Martin Sebor  <msebor@redhat.com>
+
+	PR c/82063
+	* calls.c (alloc_max_size): Correct a logic error/typo.
+	Treat excessive arguments as infinite.  Warn for invalid arguments.
+	* doc/invoke.texi (-Walloc-size-larger-than): Update.
+
 2018-06-16  Jakub Jelinek  <jakub@redhat.com>
 
 	PR middle-end/86095
