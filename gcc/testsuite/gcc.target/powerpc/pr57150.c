@@ -12,8 +12,6 @@
 
 /* Insure caller save on long double does not use VSX instructions.  */
 
-extern long double modify (long double);
-
 #if defined(__LONG_DOUBLE_IEEE128__)
 /* If long double is IEEE 128-bit, we need to use the __ibm128 type instead of
    long double.  We can't use __ibm128 on systems that don't support IEEE
@@ -27,6 +25,8 @@ extern long double modify (long double);
 #else
 #error "long double must be either IBM 128-bit or IEEE 128-bit"
 #endif
+
+extern LDOUBLE modify (LDOUBLE);
 
 void
 sum (LDOUBLE *ptr, LDOUBLE value, unsigned long n)
