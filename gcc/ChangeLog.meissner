@@ -1,3 +1,29 @@
+<ieee128-patch124>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (neg<mode>2_internal): Use the correct
+	mode to check whether the mode is IBM extended.
+
+<ieee128-patch123>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (init_float128_ieee): Prevent complex
+	multiply and divide external functions from being created more
+	than once.
+
+<ieee128-patch121>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (extendtfif2): Add missing 128-bit
+	conversion insn.
+
+<ieee128-patch120>
+2018-06-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc64le*-*-*): Only enable IEEE/IBM long double
+	multilibs if we are building against an Advance Toolchain compiler
+	that has multilib support.
+
 2018-06-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 261823.

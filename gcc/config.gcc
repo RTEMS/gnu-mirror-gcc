@@ -4471,17 +4471,30 @@ case "${target}" in
 		fi
 
 		# Set up the default long double format if the user changed it.
+		ld_alt=""
 		if test x$with_long_double_format = xieee; then
 		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
+		    ld_alt="ibm128"
 
 		elif test x$with_long_double_format = xibm; then
 		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
+		    ld_alt="ieee128"
 		fi
+
+		# If we are building against a special advance toolchain
+		# directory that has multilib support, enable IEEE/IBM long
+		# double multilibs in the compiler.
 
 		case "${target}:${enable_multilib}:${with_long_double_format}" in
 		    powerpc64le*:yes:ieee | powerpc64le*:yes:ibm)
-			tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
-			tmake_file="${tmake_file} rs6000/t-ldouble-linux64le-${with_long_double_format}"
+			if test "x$with_advance_toolchain" != x -a \
+			    "x$ld_alt" != x -a \
+			    -d "/opt/$with_advance_toolchain/lib64/." -a \
+			    -d "/opt/$with_advance_toolchain/lib64/$ld_alt/."; then
+
+			    tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+			    tmake_file="${tmake_file} rs6000/t-ldouble-linux64le-${with_long_double_format}"
+			fi
 			;;
 		    *)
 			:
