@@ -617,8 +617,6 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__RSQRTEF__");
   if (TARGET_FLOAT128_TYPE)
     builtin_define ("__FLOAT128_TYPE__");
-  if (TARGET_LONG_DOUBLE_128 && FLOAT128_IBM_P (TFmode))
-    builtin_define ("__ibm128=long double");
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");
 #endif
@@ -5482,9 +5480,9 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_V4SI, RS6000_BTI_unsigned_V4SI,
     RS6000_BTI_unsigned_V4SI, 0 },
 
-  { P9V_BUILTIN_VEC_VCLZLSBB, P9V_BUILTIN_VCLZLSBB,
+  { P9V_BUILTIN_VEC_VCLZLSBB, P9V_BUILTIN_VCLZLSBB_V16QI,
     RS6000_BTI_INTSI, RS6000_BTI_V16QI, 0, 0 },
-  { P9V_BUILTIN_VEC_VCLZLSBB, P9V_BUILTIN_VCLZLSBB,
+  { P9V_BUILTIN_VEC_VCLZLSBB, P9V_BUILTIN_VCLZLSBB_V16QI,
     RS6000_BTI_INTSI, RS6000_BTI_unsigned_V16QI, 0, 0 },
 
   { P9V_BUILTIN_VEC_VCTZLSBB, P9V_BUILTIN_VCTZLSBB_V16QI,
