@@ -1,3 +1,260 @@
+2018-06-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (cortex-a76): New entry.
+	(cortex-a76.cortex-a55): Likewise.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi (AArch64 Options): Document cortex-a76 and
+	cortex-a76.cortex-a55.
+
+2018-06-27  Jeff Law  <law@redhat.com>
+
+	* config/v850/t-v850 (MULTILIB_OPTIONS): Remove 8byte-align.
+	(MULTILIB_DIRNAMES): Similarly.
+
+2018-06-27  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimple.h (gimple_return_retbnd): Delete.
+	(gimple_return_set_retbnd): Likewise.
+	* cgraphunit.c (cgraph_node::expand_thunk): Remove call to
+	gimple_return_set_retbnd.
+	* gimple-pretty-print.c (dump_gimple_return): Remove call to
+	gimple_return_retbnd and adjust.
+	* tree-inline.h (struct copy_body_data): Remove retbnd field.
+	* tree-inline.c (remap_gimple_stmt): Remove handling of retbnd.
+	Explicitly return NULL in a couple more cases.  Move assertion
+	on debug statements and remove unreachable code.
+	(reset_debug_binding): Do not test id->retbnd.
+	(expand_call_inline): Do not set it.
+
+2018-06-27  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
+
+	* configure.ac: Add --disable-gcov option.
+	* configure: Regenerate.
+	* Makefile.in: Honour @enable_gcov@.
+	* doc/install.texi: Document --disable-gcov.
+
+2018-06-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/arm/arm-cpus.in (cortex-a76): New entry.
+	(cortex-a76.cortex-a55): Likewise.
+	* config/arm/arm-tables.opt: Regenerate.
+	* config/arm/arm-tune.md: Likewise.
+	* config/arm/driver-arm.c (arm_cpu_table): Add Cortex-A76 entry.
+	* doc/invoke.texi (ARM Options): Document cortex-a76 and
+	cortex-a76.cortex-a55.
+
+2018-06-27 Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/85769
+	* config/aarch64/aarch64.md (*movhf_aarch64): Add dup v0.4h pattern.
+
+2018-06-27  Siddhesh Poyarekar  <siddhesh@sourceware.org>
+
+	* config/aarch64/aarch64.h (CALL_USE_REGISTERS): Fix obsolete
+	comment.
+	(EPILOGUE_USES): Likewise.
+
+2018-06-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* tree-inline.c (remap_location): New function extracted from...
+	(copy_edges_for_bb): Add ID parameter.  Remap goto_locus.
+	(copy_phis_for_bb): ...here.  Call remap_location.
+	(copy_cfg_body): Adjust call to copy_edges_for_bb.
+
+2018-06-26  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config/rs6000/rs6000-string.c (expand_block_clear): Don't use
+	unaligned vsx for 16B memset.
+
+2018-06-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/86285
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Do not set
+	ieee128_float_type_node to long_double_type_node unless
+	TARGET_LONG_DOUBLE_128 is set.
+
+2018-06-26  David Malcolm  <dmalcolm@redhat.com>
+
+	* cfgloop.c (get_loop_location): Convert return type from
+	location_t to dump_user_location_t, replacing INSN_LOCATION lookups
+	by implicit construction from rtx_insn *, and using
+	dump_user_location_t::from_function_decl for the fallback case.
+	* cfgloop.h (get_loop_location): Convert return type from
+	location_t to dump_user_location_t.
+	* cgraphunit.c (walk_polymorphic_call_targets): Update call to
+	dump_printf_loc to pass in a dump_location_t rather than a
+	location_t, via the gimple stmt.
+	* coverage.c (get_coverage_counts): Update calls to
+	dump_printf_loc to pass in dump_location_t rather than a
+	location_t.
+	* doc/optinfo.texi (Dump types): Convert example of
+	dump_printf_loc from taking "locus" to taking "insn".  Update
+	description of the "_loc" calls to cover dump_location_t.
+	* dumpfile.c: Include "backend.h", "gimple.h", "rtl.h", and
+	"selftest.h".
+	(dump_user_location_t::dump_user_location_t): New constructors,
+	from gimple *stmt and rtx_insn *.
+	(dump_user_location_t::from_function_decl): New function.
+	(dump_loc): Make static.
+	(dump_gimple_stmt_loc): Convert param "loc" from location_t to
+	const dump_location_t &.
+	(dump_generic_expr_loc): Delete.
+	(dump_printf_loc): Convert param "loc" from location_t to
+	const dump_location_t &.
+	(selftest::test_impl_location): New function.
+	(selftest::dumpfile_c_tests): New function.
+	* dumpfile.h: Include "profile-count.h".
+	(class dump_user_location_t): New class.
+	(struct dump_impl_location_t): New struct.
+	(class dump_location_t): New class.
+	(dump_printf_loc): Convert 2nd param from source_location to
+	const dump_location_t &.
+	(dump_generic_expr_loc): Delete.
+	(dump_gimple_stmt_loc): Convert 2nd param from source_location to
+	const dump_location_t &.
+	* gimple-fold.c (fold_gimple_assign): Update call to
+	dump_printf_loc to pass in a dump_location_t rather than a
+	location_t, via the gimple stmt.
+	(gimple_fold_call): Likewise.
+	* gimple-loop-interchange.cc
+	(loop_cand::analyze_iloop_reduction_var): Update for change to
+	check_reduction_path.
+	(tree_loop_interchange::interchange): Update for change to
+	find_loop_location.
+	* graphite-isl-ast-to-gimple.c (scop_to_isl_ast): Update for
+	change in return-type of find_loop_location.
+	(graphite_regenerate_ast_isl): Likewise.
+	* graphite-optimize-isl.c (optimize_isl): Likewise.
+	* graphite.c (graphite_transform_loops): Likewise.
+	* ipa-devirt.c (ipa_devirt): Update call to dump_printf_loc to
+	pass in a dump_location_t rather than a location_t, via the
+	gimple stmt.
+	* ipa-prop.c (ipa_make_edge_direct_to_target): Likewise.
+	* ipa.c (walk_polymorphic_call_targets): Likewise.
+	* loop-unroll.c (report_unroll): Convert "locus" param from
+	location_t to dump_location_t.
+	(decide_unrolling): Update for change to get_loop_location's
+	return type.
+	* omp-grid.c (struct grid_prop): Convert field "target_loc" from
+	location_t to dump_user_location_t.
+	(grid_find_single_omp_among_assignments_1): Updates calls to
+	dump_printf_loc to pass in a dump_location_t rather than a
+	location_t, via the gimple stmt.
+	(grid_parallel_clauses_gridifiable): Convert "tloc" from
+	location_t to dump_location_t.  Updates calls to dump_printf_loc
+	to pass in a dump_location_t rather than a location_t, via the
+	gimple stmt.
+	(grid_inner_loop_gridifiable_p): Likewise.
+	(grid_dist_follows_simple_pattern): Likewise.
+	(grid_gfor_follows_tiling_pattern): Likewise.
+	(grid_target_follows_gridifiable_pattern): Likewise.
+	(grid_attempt_target_gridification): Convert initialization
+	of local "grid" from memset to zero-initialization; FIXME: does
+	this require C++11?  Update call to dump_printf_loc to pass in a
+	optinfo_location rather than a location_t, via the gimple stmt.
+	* profile.c (read_profile_edge_counts): Updates call to
+	dump_printf_loc to pass in a dump_location_t rather than a
+	location_t
+	(compute_branch_probabilities): Likewise.
+	* selftest-run-tests.c (selftest::run_tests): Call
+	dumpfile_c_tests.
+	* selftest.h (dumpfile_c_tests): New decl.
+	* tree-loop-distribution.c (pass_loop_distribution::execute):
+	Update for change in return type of find_loop_location.
+	* tree-parloops.c (parallelize_loops): Likewise.
+	* tree-ssa-loop-ivcanon.c (try_unroll_loop_completely): Convert
+	"locus" from location_t to dump_user_location_t.
+	(canonicalize_loop_induction_variables): Likewise.
+	* tree-ssa-loop-ivopts.c (tree_ssa_iv_optimize_loop): Update
+	for change in return type of find_loop_location.
+	* tree-ssa-loop-niter.c (number_of_iterations_exit): Update call
+	to dump_printf_loc to pass in a dump_location_t rather than a
+	location_t, via the stmt.
+	* tree-ssa-sccvn.c (eliminate_dom_walker::before_dom_children):
+	Likewise.
+	* tree-vect-loop-manip.c (find_loop_location): Convert return
+	type from source_location to dump_user_location_t.
+	(vect_do_peeling): Update for above change.
+	(vect_loop_versioning): Update for change in type of
+	vect_location.
+	* tree-vect-loop.c (check_reduction_path): Convert "loc" param
+	from location_t to dump_user_location_t.
+	(vect_estimate_min_profitable_iters): Update for change in type
+	of vect_location.
+	* tree-vect-slp.c (vect_print_slp_tree): Convert param "loc" from
+	location_t to dump_location_t.
+	(vect_slp_bb): Update for change in type of vect_location.
+	* tree-vectorizer.c (vect_location): Convert from source_location
+	to dump_user_location_t.
+	(try_vectorize_loop_1): Update for change in vect_location's type.
+	(vectorize_loops): Likewise.
+	(increase_alignment): Likewise.
+	* tree-vectorizer.h (vect_location): Convert from source_location
+	to dump_user_location_t.
+	(find_loop_location): Convert return type from source_location to
+	dump_user_location_t.
+	(check_reduction_path): Convert 1st param from location_t to
+	dump_user_location_t.
+	* value-prof.c (check_counter): Update call to dump_printf_loc to
+	pass in a dump_user_location_t rather than a location_t; update
+	call to error_at for change in type of "locus".
+	(check_ic_target): Update call to dump_printf_loc to
+	pass in a dump_user_location_t rather than a location_t, via the
+	call_stmt.
+
+2018-06-26  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+        * config/s390/s390.h (enum processor_flags): Do not use
+        default tune parameter when -march was specified.
+
+2018-06-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/86314
+	* config/i386/i386.md (setcc + movzbl to xor + setcc peephole2s):
+	Check reg_overlap_mentioned_p in addition to reg_set_p with the same
+	operands.
+
+2018-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/86287
+	PR bootstrap/86316
+	* tree-vect-loop.c (vect_transform_loop_stmt): Fix read-after-free.
+	(vect_analyze_loop): Initialize n_stmts.
+
+2018-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/86271
+	* fold-const.c (fold_convertible_p): Pointer extension
+	isn't valid.
+
+2018-06-26  Alexandre Oliva <aoliva@redhat.com>
+
+	PR debug/86064
+	* dwarf2out.c (loc_list_has_views): Adjust comments.
+	(dw_loc_list): Split single cross-partition range with
+	nonzero locview.
+
+2018-06-25  Jeff Law  <law@redhat.com>
+
+	* common/config/v850/v850-common.c (TARGET_DEFAULT_TARGET_FLAGS): Turn
+	on -mbig-switch by default.
+
+	* config/v850/predicates.md (const_float_1_operand): Fix match_code
+	test.
+	(const_float_0_operand): Remove unused predicate.
+	* config/v850/v850.md (define_constants): Remove UNSPEC_LOOP.
+	(define_c_enum unspec): Add LOOP, RCP and RSQRT constants.
+	(recipsf2): New expander.  Original pattern now called
+	(recipsf2_insn).
+	(recipdf2, recipdf2_insn): Similarly.
+	(rsqrtsf2, rsqrtsf2_insn): Similarly
+	(rsqrtdf2, rsqrtdf2_insn): Similarly
+
+2018-06-26  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* ginclude/stddef.h: Remove an obsolete comment on FreeBSD 5.
+	Simplify logic for FreeBSD (twice).
+
 2018-06-25  Martin Sebor  <msebor@redhat.com>
 
 	PR tree-optimization/86204

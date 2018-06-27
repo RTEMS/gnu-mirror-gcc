@@ -2315,7 +2315,7 @@ vect_analyze_loop (struct loop *loop, loop_vec_info orig_loop_vinfo,
       return NULL;
     }
 
-  unsigned n_stmts;
+  unsigned n_stmts = 0;
   poly_uint64 autodetected_vector_size = 0;
   while (1)
     {
@@ -2731,8 +2731,8 @@ needs_fold_left_reduction_p (tree type, tree_code code,
    reduction operation CODE has a handled computation expression.  */
 
 bool
-check_reduction_path (location_t loc, loop_p loop, gphi *phi, tree loop_arg,
-		      enum tree_code code)
+check_reduction_path (dump_user_location_t loc, loop_p loop, gphi *phi,
+		      tree loop_arg, enum tree_code code)
 {
   auto_vec<std::pair<ssa_op_iter, use_operand_p> > path;
   auto_bitmap visited;
@@ -3750,8 +3750,8 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
   else
     {
       if (LOOP_VINFO_LOOP (loop_vinfo)->force_vectorize)
-	warning_at (vect_location, OPT_Wopenmp_simd, "vectorization "
-		    "did not happen for a simd loop");
+	warning_at (vect_location.get_location_t (), OPT_Wopenmp_simd,
+		    "vectorization did not happen for a simd loop");
 
       if (dump_enabled_p ())
         dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -8342,8 +8342,9 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, gimple *stmt,
 
   /* SLP.  Schedule all the SLP instances when the first SLP stmt is
      reached.  */
-  if (STMT_SLP_TYPE (stmt_info))
+  if (slp_vect_type slptype = STMT_SLP_TYPE (stmt_info))
     {
+
       if (!*slp_scheduled)
 	{
 	  *slp_scheduled = true;
@@ -8354,7 +8355,7 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, gimple *stmt,
 	}
 
       /* Hybrid SLP stmts must be vectorized in addition to SLP.  */
-      if (PURE_SLP_STMT (stmt_info))
+      if (slptype == pure_slp)
 	return;
     }
 
