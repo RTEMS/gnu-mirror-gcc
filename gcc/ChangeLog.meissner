@@ -1,5 +1,9 @@
 2018-06-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE, map the old 'q' builtins into the long double
+	builtin, and not the f128 builtin
+
 	Merge up to 262257.
 	* REVISION: Update subversion id.
 
