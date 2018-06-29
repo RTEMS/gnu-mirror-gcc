@@ -1,3 +1,350 @@
+2018-06-29  Jeff Law  <law@redhat.com>
+
+	* config/v850/v850.c (v850_legitimate_address_p): Handle large
+	displacements for TARGET_V850E2V3 and newer.
+	(TARGET_LRA_P): Remove.  Defaults to LRA now.
+	* config/v850/v850.md (sign23byte_load): Remove.
+	(unsign23byte_load, sign23hword_load, unsign23hword_load): Likewise.
+	(23word_load, 23byte_store, 23hword_store, 23word_store): Likewise.
+
+2018-06-29  Martin Liska  <mliska@suse.cz>
+
+	PR lto/85759
+	* coverage.c (coverage_init): Mangle full path name.
+	* doc/invoke.texi: Document the change.
+	* gcov-io.c (mangle_path): New.
+	* gcov-io.h (mangle_path): Likewise.
+	* gcov.c (mangle_name): Use mangle_path for path mangling.
+
+2018-06-29  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/arm/arm.c (output_move_double): Don't allow STRD instructions
+	if starting source register is not even.
+
+2018-06-29  Martin Liska  <mliska@suse.cz>
+
+        PR tree-optimization/86263
+	* tree-switch-conversion.c (switch_decision_tree::try_switch_expansion):
+        Make edge redirection.
+
+2018-06-29  David Malcolm  <dmalcolm@redhat.com>
+
+	* dumpfile.c (dump_loc): Add indentation based on scope depth.
+	(dump_scope_depth): New variable.
+	(get_dump_scope_depth): New function.
+	(dump_begin_scope): New function.
+	(dump_end_scope): New function.
+	* dumpfile.h (get_dump_scope_depth): New declaration.
+	(dump_begin_scope): New declaration.
+	(dump_end_scope): New declaration.
+	(class auto_dump_scope): New class.
+	(AUTO_DUMP_SCOPE): New macro.
+	* tree-vectorizer.h (DUMP_VECT_SCOPE): Reimplement in terms of
+	AUTO_DUMP_SCOPE.
+
+2018-06-29  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.c (vect_analyze_data_ref_dependences): Assert
+	compute_all_dependences succeeds.
+	* tree-vect-loop.c (vect_get_datarefs_in_loop): Fail early if we
+	exceed --param loop-max-datarefs-for-datadeps.
+
+2018-06-29  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/rs6000/t-rs6000: Append rs6000-modes.h to TM_H.
+
+2018-06-28  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/86348
+	* config/i386/sse.md (*vec_extractv4si_0_zext_sse4): Use
+	alternative 0 in preferred_for_speed attribute.
+
+2018-06-28  Paul Koning  <ni1d@arrl.net>
+
+	* config/pdp11/pdp11-protos.h (pdp11_shift_length): New function.
+	* config/pdp11/pdp11.c (pdp11_shift_length): New function.
+	* config/pdp11/pdp11.h (ADJUST_INSN_LENGTH): Remove.
+	* config/pdp11/pdp11.md: Correct "length" attribute calculation
+	for shift insn patterns.
+
+2018-06-28  David Malcolm  <dmalcolm@redhat.com>
+
+	* cgraph.c (cgraph_node::get_body): Replace assignments to
+	"dump_file" with calls to set_dump_file.
+	* dumpfile.c (alt_dump_file): Make static, and group with...
+	(alt_flags): ...this definition.
+	(dumps_are_enabled): New variable.
+	(refresh_dumps_are_enabled): New function.
+	(set_dump_file): New function.
+	(set_alt_dump_file): New function.
+	(gcc::dump_manager::dump_start): Replace assignments to
+	"dump_file" and "alt_dump_file" with calls to set_dump_file and
+	set_alt_dump_file.
+	(gcc::dump_manager::dump_finish): Likewise.
+	* dumpfile.h (alt_dump_file): Delete decl.
+	(dumps_are_enabled): New variable decl.
+	(set_dump_file): New function decl.
+	(dump_enabled_p): Rewrite in terms of new "dumps_are_enabled"
+	global.
+	* tree-nested.c (lower_nested_functions): Replace assignments to
+	"dump_file" with calls to set_dump_file.
+
+2018-06-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* tree-cfg.c (verify_gimple_in_cfg): Call verify_location on the
+	goto_locus of each outgoing edge of each basic block.
+
+2018-06-28  Richard Biener  <rguenther@suse.de>
+
+	* dwarf2out.c (decl_scope_table): Remove.
+	(push_decl_scope): Likewise.
+	(pop_decl_scope): Likewise.
+	(gen_type_die_for_member): Do not call push/pop_decl_scope.
+	(gen_struct_or_union_type_die): Likewise.
+	(gen_tagged_type_die): Likewise.
+	(dwarf2out_init): Do not initialize decl_scope_table.
+	(dwarf2out_c_finalize): Do not free it.
+
+2018-06-28  Richard Biener  <rguenther@suse.de>
+
+	* dwarf2out.c (gen_subprogram_die): Use is_unit_die when
+	deciding whether to not re-use a DIE.
+
+2018-06-28  Richard Biener  <rguenther@suse.de>
+
+	* dwarf2out.c (gen_subprogram_die): Always re-use DIEs with an
+	DW_AT_abstract_origin attribute.
+
+2018-06-28  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (jump_table_cluster::can_be_handled):
+        Use newly introduced constants.
+	* tree-switch-conversion.h (struct jump_table_cluster):
+        Define max_ratio_for_size and max_ratio_for_speed.
+
+2018-06-28  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (jump_table_cluster::find_jump_tables):
+        Add new checking assert to catch invalid state.
+	(jump_table_cluster::can_be_handled): Handle single case
+        clusters.
+	(jump_table_cluster::is_beneficial): Bail out for such case.
+	(bit_test_cluster::find_bit_tests):
+        Add new checking assert to catch invalid state.
+	(bit_test_cluster::can_be_handled): Handle single case
+        clusters.
+	(bit_test_cluster::is_beneficial): Bail out for such case.
+	(switch_decision_tree::analyze_switch_statement):
+        Fix comment.
+
+2018-06-28  Martin Liska  <mliska@suse.cz>
+
+	* common.opt: Introduce -completion option.
+	* gcc.c (driver_handle_option): Handle it.
+	(driver::main): Print completions if completion
+        is set.
+	* opt-suggestions.c (option_proposer::get_completions):
+        New function.
+	(option_proposer::suggest_completion): Likewise.
+	(option_proposer::find_param_completions): Likewise.
+	(verify_autocompletions): Likewise.
+	(test_completion_valid_options): Likewise.
+	(test_completion_valid_params): Likewise.
+	(in_completion_p): Likewise.
+	(empty_completion_p): Likewise.
+	(test_completion_partial_match): Likewise.
+	(test_completion_garbage): Likewise.
+	(opt_proposer_c_tests): Likewise.
+	* opt-suggestions.h: Declare new functions.
+	* opts.c (common_handle_option): Handle OPT__completion_.
+	* selftest-run-tests.c (selftest::run_tests): Add
+        opt_proposer_c_tests.
+	* selftest.c (assert_str_startswith): New.
+	* selftest.h (assert_str_startswith): Likewise.
+	(opt_proposer_c_tests): New.
+	(ASSERT_STR_STARTSWITH): Likewise.
+
+2018-06-28  Martin Liska  <mliska@suse.cz>
+
+	* Makefile.in: Add opt-suggestions.o.
+	* gcc-main.c: Include opt-suggestions.h.
+	* gcc.c (driver::driver): Likewise.
+	(driver::~driver): Remove m_option_suggestions.
+	(driver::build_option_suggestions): Moved to option_proposer.
+	(driver::suggest_option): Likewise.
+	(driver::handle_unrecognized_options): Use option_proposer.
+	* gcc.h (class driver): Add new memver m_option_proposer.
+	* opt-suggestions.c: New file.
+	* opt-suggestions.h: New file.
+
+2018-06-28  Martin Liska  <mliska@suse.cz>
+
+	* vec.h (class auto_string_vec): New (moved from auto_argvec).
+	(auto_string_vec::~auto_string_vec): Likewise.
+
+2018-06-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* tree-inline.c (remap_gimple_stmt): Force input_location on the new
+	statement if id->reset_location is true.
+	(copy_edges_for_bb): Do not set goto_locus on the new edges if
+	id->reset_location is true.
+	(copy_phis_for_bb): Force input_location on the arguments if
+	id->reset_location is true.
+	(expand_call_inline): Set id->reset_location if DECL_IGNORED_P
+	is set on the function to be inlined.
+	* tree-inline.h (struct copy_body_data): Move remapping_type_depth and
+	prevent_decl_creation_for_types fields up and add reset_location field.
+
+2018-06-27  Stephan Bergmann  <sbergman@redhat.com>
+
+	* doc/invoke.texi (Debugging Options): Add -gsplit-dwarf.
+
+2018-06-27  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* lra-eliminations.c (update_reg_eliminate): Mark all spanning hard
+	registers for Pmode.
+	* lra-lives.c (check_pseudos_live_through_calls): Mark all spanning
+	hard registers for the clobbered pseudo.
+
+2018-06-27  Paul Koning  <ni1d@arrl.net>
+
+	* common/config/pdp11/pdp11-common.c (pdp11_handle_option): Handle
+	mutually exclusive options.
+	* config/pdp11/constraints.md (h): New constraint.
+	(O): Update definition to match shift code generation.
+	(D): New constraint.
+	* config/pdp11/pdp11-modes.def (CCNZ): Define mode.
+	(CCFP): Remove.
+	* config/pdp11/pdp11-protos.h (int_no_side_effect_operand): New
+	function.
+	(output_jump): Change arguments.
+	(pdp11_fixed_cc_regs): New function.
+	(pdp11_cc_mode): Ditto.
+	(pdp11_expand_shift): Ditto.
+	(pdp11_assemble_shift): Ditto.
+	(pdp11_small_shift): Ditto.
+	(pdp11_branch_cost): Remove.
+	* config/pdp11/pdp11.c (pdp11_assemble_integer): Remove comments
+	from output.
+	(pdp11_register_move_cost): Update for CC registers.
+	(pdp11_rtx_costs): Add case for LSHIFTRT.
+	(pdp11_output_jump): Add CCNZ mode conditional branches.
+	(notice_update_cc_on_set): Remove.
+	(pdp11_cc_mode): New function.
+	(simple_memory_operand): Correct pre/post decrement case.
+	(no_side_effect_operand): New function.
+	(pdp11_regno_reg_class): Add CC_REGS class.
+	(pdp11_fixed_cc_regs): New function.
+	(pdp11_small_shift): New function.
+	(pdp11_expand_shift): New function to expand shift insns.
+	(pdp11_assemble_shift): New function to output shifts.
+	(pdp11_branch_cost): Remove.
+	(pdp11_modes_tieable_p): Make QI/HI modes tieable.
+	* config/pdp11/pdp11.h (SIZE_TYPE): Ensure 16-bit type.
+	(WCHAR_TYPE): Ditto.
+	(PTRDIFF_TYPE): Ditto.
+	(ADJUST_INSN_LENGTH): New macro.
+	(FIXED_REGISTERS): Add CC registers.
+	(CALL_USED_REGISTERS): Ditto.
+	(reg_class): Ditto.
+	(REG_CLASS_NAMES): Ditto.
+	(REG_CLASS_CONTENTS): Ditto.
+	(SELECT_CC_MODE): Use new function.
+	(TARGET_FLAGS_REGNUM): New macro.
+	(TARGET_FIXED_CONDITION_CODE_REGS): Ditto.
+	(cc0_reg_rtx): Remove.
+	(CC_STATUS_MDEP): Remove.
+	(CC_STATUS_MDEFP_INIT): Remove.
+	(CC_IN_FPU): Remove.
+	(NOTICE_UPDATE_CC): Remove.
+	(REGISTER_NAMES): Add CC registers.
+	(BRANCH_COST): Change to constant 1.
+	* config/pdp11/pdp11.md: Rewrite for CCmode condition code
+	handling.
+	* config/pdp11/pdp11.opt (mbcopy): Remove.
+	(mbcopy-builtin): Remove.
+	(mbranch-cheap): Remove.
+	(mbranch-expensive): Remove.
+	* config/pdp11/predicates.md (expand_shift_operand): Update to
+	match shift code generation.
+	(ccnz_operator): New predicate.
+	* doc/invoke.texi (PDP-11 Options): Remove deleted options
+	-mbcopy, -mbcopy-builtin, -mbranch-cheap, -mbranch-expensive.
+	Remove non-existent option -mabshi, -mno-abshi.  Document mutually
+	exclusive options.
+	* doc/md.texi (PDP-11): Document new D and h constraints.  Update
+	description of O constraint.
+
+2018-06-27  Jeff Law  <law@redhat.com>
+	    Austin Law  <austinklaw@gmail.com>
+
+	* config/v850/v850.md (addsi3_set_flags): New pattern.
+	(subsi3_set_flags, negsi2_set_flags, andsi3_set_flags): Likewise.
+	(iorsi3_set_flags, xorsi3_set_flags, one_cmplsi2_set_flags): Likewise.
+	(zero_extendhisi2_v850_set_flags): Likewise.
+	(zero_extendqisi2_v850_set_flags): Likewise.
+	(ashlsi3_set_flags, ashlsi3_v850e2_set_flags): Likewise.
+	(lshrsi3_set_flags, lshrsi3_v850e2_set_flags): Likewise.
+	(ashrsi3_set_flags, ashrsi3_v850e2_set_flags): Likewise.
+
+	* config/v850/v850-protos.h (notice_update_cc): Remove.
+	* config/v850/v850.c (v850_compare_op0, v850_compare_op1): Remove.
+	(v850_print_operand): Handle 'D' and "d".
+	(v850_select_cc_mode): Remove ATTRIBUTE_UNUSED for last argument.
+	Add handling of arithmetic/logical operations compared against zero.
+	(v850_gen_float_compare): Remove ATTRIBUTE_UNUSED for last argument.
+	Do not look at v850_compare_op, instead get mode from last argument.
+	(v850_gen_compare): Remove
+	(increment_stack): Use addsi3_clobber_flags to avoid splitting failure
+	after reload for prologue insns.
+	(expand_prologue): Account for CLOBBER of CC_REGNUM in various
+	patterns.
+	(construct_save_jarl): Likewise.
+	(TARGET_FLAGS_REGNUM): Define.
+	* config/v850/v850.h (v850_compare_op0, v850_compare_op1): Remove.
+	(NOTICE_UPDATE_CC): Remove.
+	* config/v850/v850.md (v850_tst1): Use (reg:CCZ CC_REGNUM) rather
+	than cc0.  Conditionalize on reload_completed.
+	(cmpsi_insn, setfcc_insn): Likewise.
+	(tst1 splitter): Turn into define_and_split which sets the flags
+	after reload.
+	(cstoresi4, cbranchsf4, cbranchdf4, cbranchsi4_insn): Likewise.
+	(cbranchsi4, branch_normal, branch_invert): Do not expose cc0 here.
+	(cstoresf4, cstoredf4): Clobber the flags.
+	(cmpsi, cmpsf, cmpdf): Remove expanders.
+	(setf_insn): Remove pattern.
+	(addsi3): Turn into define_and_split which clobbers the flags after
+	reload and a suitable pattern (addsi3_clobber_flags) for use after
+	reload.
+	(subsi3, negsi2, andsi3, iorsi3, xorsi3, one_cmplsi2) Likewise.
+	(ashlsi3, ashlsi3_v850e2, lshrsi3, lsh4si3_v850e2): Likewise.
+	(ashrsi3, ashrsi3_v850e2): Likewise.
+	(bins): Clobber the flags.
+	(movsicc_normal_cc, movsicc_normal, movsicc_tst1): Likewise.
+	(movsicc_tst1_revesed, sasf, swap and rotate patterns): Likewise.
+	(fix_loop_counter, call_internal_short, call_internal_long): Likewise.
+	(call_value_internal_short, call_value_internal_long): Likewise.
+	(callt_save_interrupt, callt_return_interrupt): Likewise.
+	(save_interrupt, return_interrupt): Likewise.
+	(callt_save_all_interrupt, save_all_interrupt): Likewise.
+	(_save_all_interrupt, callt_restore_all_interrupt): Likewise.
+	(restore_all_interrupt, _restore_all_interrupt): Likewise.
+	(All FP comparisons): Only allow after reload has completed.
+	(trfsr): Likewise.
+	(divh, divhu): Tweak output template.
+	(branch_z_normal, branch_z_invert): Remove
+	(branch_nz_normal, branch_nz_invert): Likewise.
+	(extendhisi_insn, extendqisi_insn): Do not clobber flags.
+
+	* config/v850/v850-modes.def (CCZ, CCNZ): Add new modes.
+	* config/v850/v850.c (notice_update_cc): Remove.
+	* config/v850/v850.h  (CC_OVERFLOW_UNUSABLE): Remove
+	(CC_NO_CARRY): Likewise.
+	(NOTICE_UPDATE_CC): Define to nothing.
+	* config/v850/v850.md: Remove block comment on cc0 handling
+	Remove "cc" attribute from all patterns.  Remove cc_status handling
+	from all patterns.  Minor formatting fixes.
+
 2018-06-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
 
 	* config/aarch64/aarch64-cores.def (cortex-a76): New entry.

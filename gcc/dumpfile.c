@@ -40,18 +40,52 @@ along with GCC; see the file COPYING3.  If not see
    (strncmp (whole, part, strlen (part)) ? NULL : whole + strlen (part))
 
 static dump_flags_t pflags;		      /* current dump_flags */
-static dump_flags_t alt_flags;		      /* current opt_info flags */
 
 static void dump_loc (dump_flags_t, FILE *, source_location);
+
+/* Current -fopt-info output stream, if any, and flags.  */
+static FILE *alt_dump_file = NULL;
+static dump_flags_t alt_flags;
+
 static FILE *dump_open_alternate_stream (struct dump_file_info *);
 
 /* These are currently used for communicating between passes.
    However, instead of accessing them directly, the passes can use
    dump_printf () for dumps.  */
 FILE *dump_file = NULL;
-FILE *alt_dump_file = NULL;
 const char *dump_file_name;
 dump_flags_t dump_flags;
+bool dumps_are_enabled = false;
+
+
+/* Update the "dumps_are_enabled" global; to be called whenever dump_file
+   or alt_dump_file change.  */
+
+static void
+refresh_dumps_are_enabled ()
+{
+  dumps_are_enabled = (dump_file || alt_dump_file);
+}
+
+/* Set global "dump_file" to NEW_DUMP_FILE, refreshing the "dumps_are_enabled"
+   global.  */
+
+void
+set_dump_file (FILE *new_dump_file)
+{
+  dump_file = new_dump_file;
+  refresh_dumps_are_enabled ();
+}
+
+/* Set "alt_dump_file" to NEW_ALT_DUMP_FILE, refreshing the "dumps_are_enabled"
+   global.  */
+
+static void
+set_alt_dump_file (FILE *new_alt_dump_file)
+{
+  alt_dump_file = new_alt_dump_file;
+  refresh_dumps_are_enabled ();
+}
 
 #define DUMP_FILE_INFO(suffix, swtch, dkind, num) \
   {suffix, swtch, NULL, NULL, NULL, NULL, NULL, dkind, TDF_NONE, TDF_NONE, \
@@ -419,6 +453,8 @@ dump_loc (dump_flags_t dump_kind, FILE *dfile, source_location loc)
                  DECL_SOURCE_FILE (current_function_decl),
                  DECL_SOURCE_LINE (current_function_decl),
                  DECL_SOURCE_COLUMN (current_function_decl));
+      /* Indentation based on scope depth.  */
+      fprintf (dfile, "%*s", get_dump_scope_depth (), "");
     }
 }
 
@@ -539,6 +575,39 @@ template void dump_dec (dump_flags_t, const poly_uint64 &);
 template void dump_dec (dump_flags_t, const poly_offset_int &);
 template void dump_dec (dump_flags_t, const poly_widest_int &);
 
+/* The current dump scope-nesting depth.  */
+
+static int dump_scope_depth;
+
+/* Get the current dump scope-nesting depth.
+   For use by dump_*_loc (for showing nesting via indentation).  */
+
+unsigned int
+get_dump_scope_depth ()
+{
+  return dump_scope_depth;
+}
+
+/* Push a nested dump scope.
+   Print "=== NAME ===\n" to the dumpfile, if any, and to the -fopt-info
+   destination, if any.
+   Increment the scope depth.  */
+
+void
+dump_begin_scope (const char *name, const dump_location_t &loc)
+{
+  dump_printf_loc (MSG_NOTE, loc, "=== %s ===\n", name);
+  dump_scope_depth++;
+}
+
+/* Pop a nested dump scope.  */
+
+void
+dump_end_scope ()
+{
+  dump_scope_depth--;
+}
+
 /* Start a dump for PHASE. Store user-supplied dump flags in
    *FLAG_PTR.  Return the number of streams opened.  Set globals
    DUMP_FILE, and ALT_DUMP_FILE to point to the opened streams, and
@@ -568,7 +637,7 @@ dump_start (int phase, dump_flags_t *flag_ptr)
         }
       free (name);
       dfi->pstream = stream;
-      dump_file = dfi->pstream;
+      set_dump_file (dfi->pstream);
       /* Initialize current dump flags. */
       pflags = dfi->pflags;
     }
@@ -578,7 +647,7 @@ dump_start (int phase, dump_flags_t *flag_ptr)
     {
       dfi->alt_stream = stream;
       count++;
-      alt_dump_file = dfi->alt_stream;
+      set_alt_dump_file (dfi->alt_stream);
       /* Initialize current -fopt-info flags. */
       alt_flags = dfi->alt_flags;
     }
@@ -609,8 +678,8 @@ dump_finish (int phase)
 
   dfi->alt_stream = NULL;
   dfi->pstream = NULL;
-  dump_file = NULL;
-  alt_dump_file = NULL;
+  set_dump_file (NULL);
+  set_alt_dump_file (NULL);
   dump_flags = TDF_NONE;
   alt_flags = TDF_NONE;
   pflags = TDF_NONE;

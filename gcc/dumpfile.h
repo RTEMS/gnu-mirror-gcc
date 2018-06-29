@@ -445,16 +445,58 @@ extern void dump_bb (FILE *, basic_block, int, dump_flags_t);
 
 /* Global variables used to communicate with passes.  */
 extern FILE *dump_file;
-extern FILE *alt_dump_file;
 extern dump_flags_t dump_flags;
 extern const char *dump_file_name;
+
+extern bool dumps_are_enabled;
+
+extern void set_dump_file (FILE *new_dump_file);
 
 /* Return true if any of the dumps is enabled, false otherwise. */
 static inline bool
 dump_enabled_p (void)
 {
-  return (dump_file || alt_dump_file);
+  return dumps_are_enabled;
 }
+
+/* Managing nested scopes, so that dumps can express the call chain
+   leading to a dump message.  */
+
+extern unsigned int get_dump_scope_depth ();
+extern void dump_begin_scope (const char *name, const dump_location_t &loc);
+extern void dump_end_scope ();
+
+/* Implementation detail of the AUTO_DUMP_SCOPE macro below.
+
+   A RAII-style class intended to make it easy to emit dump
+   information about entering and exiting a collection of nested
+   function calls.  */
+
+class auto_dump_scope
+{
+ public:
+  auto_dump_scope (const char *name, dump_location_t loc)
+  {
+    if (dump_enabled_p ())
+      dump_begin_scope (name, loc);
+  }
+  ~auto_dump_scope ()
+  {
+    if (dump_enabled_p ())
+      dump_end_scope ();
+  }
+};
+
+/* A macro for calling:
+     dump_begin_scope (NAME, LOC);
+   via an RAII object, thus printing "=== MSG ===\n" to the dumpfile etc,
+   and then calling
+     dump_end_scope ();
+   once the object goes out of scope, thus capturing the nesting of
+   the scopes.  */
+
+#define AUTO_DUMP_SCOPE(NAME, LOC) \
+  auto_dump_scope scope (NAME, LOC)
 
 namespace gcc {
 
