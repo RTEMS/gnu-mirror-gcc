@@ -1,3 +1,13 @@
+2018-07-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 262443.
+	* REVISION: Update subversion id.
+
+2018-07-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 262443.
+	* REVISION: Update subversion id.
+
 2018-06-29  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long

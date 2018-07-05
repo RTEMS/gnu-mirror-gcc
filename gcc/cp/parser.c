@@ -21363,7 +21363,7 @@ cp_parser_parameter_declaration_clause (cp_parser* parser)
   else if (token->type == CPP_CLOSE_PAREN)
     /* There are no parameters.  */
     {
-#ifndef NO_IMPLICIT_EXTERN_C
+#ifdef SYSTEM_IMPLICIT_EXTERN_C
       if (in_system_header_at (input_location)
 	  && current_class_type == NULL
 	  && current_lang_name == lang_name_c)
@@ -28377,12 +28377,15 @@ set_and_check_decl_spec_loc (cp_decl_specifier_seq *decl_specs,
       else if (ds == ds_thread)
 	{
 	  bool gnu = token_is__thread (token);
+	  gcc_rich_location richloc (location);
 	  if (gnu != decl_specs->gnu_thread_keyword_p)
-	    error_at (location,
-		      "both %<__thread%> and %<thread_local%> specified");
+	    {
+	      richloc.add_range (decl_specs->locations[ds_thread], false);
+	      error_at (&richloc,
+			"both %<__thread%> and %<thread_local%> specified");
+	    }
 	  else
 	    {
-	      gcc_rich_location richloc (location);
 	      richloc.add_fixit_remove ();
 	      error_at (&richloc, "duplicate %qD", token->u.value);
 	    }

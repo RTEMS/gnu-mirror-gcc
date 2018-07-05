@@ -348,7 +348,7 @@ again:
 
       oprnd_info = (*oprnds_info)[i];
 
-      if (!vect_is_simple_use (oprnd, vinfo, &def_stmt, &dt))
+      if (!vect_is_simple_use (oprnd, vinfo, &dt, &def_stmt))
 	{
 	  if (dump_enabled_p ())
 	    {
@@ -365,11 +365,9 @@ again:
          from the pattern.  Check that all the stmts of the node are in the
          pattern.  */
       if (def_stmt && gimple_bb (def_stmt)
-          && vect_stmt_in_region_p (vinfo, def_stmt)
-          && vinfo_for_stmt (def_stmt)
-          && STMT_VINFO_IN_PATTERN_P (vinfo_for_stmt (def_stmt))
-	  && !STMT_VINFO_RELEVANT (vinfo_for_stmt (def_stmt))
-	  && !STMT_VINFO_LIVE_P (vinfo_for_stmt (def_stmt)))
+	  && vect_stmt_in_region_p (vinfo, def_stmt)
+	  && vinfo_for_stmt (def_stmt)
+	  && is_pattern_stmt_p (vinfo_for_stmt (def_stmt)))
         {
           pattern = true;
           if (!first && !oprnd_info->first_pattern
@@ -398,7 +396,6 @@ again:
 	      return 1;
             }
 
-          def_stmt = STMT_VINFO_RELATED_STMT (vinfo_for_stmt (def_stmt));
           dt = STMT_VINFO_DEF_TYPE (vinfo_for_stmt (def_stmt));
 
           if (dt == vect_unknown_def_type)
@@ -3105,7 +3102,6 @@ vect_mask_constant_operand_p (gimple *stmt, int opnum)
   stmt_vec_info stmt_vinfo = vinfo_for_stmt (stmt);
   enum tree_code code = gimple_expr_code (stmt);
   tree op, vectype;
-  gimple *def_stmt;
   enum vect_def_type dt;
 
   /* For comparison and COND_EXPR type is chosen depending
@@ -3117,8 +3113,7 @@ vect_mask_constant_operand_p (gimple *stmt, int opnum)
       else
 	op = gimple_assign_rhs2 (stmt);
 
-      if (!vect_is_simple_use (op, stmt_vinfo->vinfo, &def_stmt,
-			       &dt, &vectype))
+      if (!vect_is_simple_use (op, stmt_vinfo->vinfo, &dt, &vectype))
 	gcc_unreachable ();
 
       return !vectype || VECTOR_BOOLEAN_TYPE_P (vectype);
@@ -3135,8 +3130,7 @@ vect_mask_constant_operand_p (gimple *stmt, int opnum)
       else
 	op = TREE_OPERAND (cond, 0);
 
-      if (!vect_is_simple_use (op, stmt_vinfo->vinfo, &def_stmt,
-			       &dt, &vectype))
+      if (!vect_is_simple_use (op, stmt_vinfo->vinfo, &dt, &vectype))
 	gcc_unreachable ();
 
       return !vectype || VECTOR_BOOLEAN_TYPE_P (vectype);

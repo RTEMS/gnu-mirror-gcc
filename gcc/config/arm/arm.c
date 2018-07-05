@@ -2952,9 +2952,10 @@ static GTY(()) tree init_optimize;
 static void
 arm_override_options_after_change_1 (struct gcc_options *opts)
 {
-  if (opts->x_align_functions <= 0)
-    opts->x_align_functions = TARGET_THUMB_P (opts->x_target_flags)
-      && opts->x_optimize_size ? 2 : 4;
+  /* -falign-functions without argument: supply one.  */
+  if (opts->x_flag_align_functions && !opts->x_str_align_functions)
+    opts->x_str_align_functions = TARGET_THUMB_P (opts->x_target_flags)
+      && opts->x_optimize_size ? "2" : "4";
 }
 
 /* Implement targetm.override_options_after_change.  */
@@ -31511,8 +31512,8 @@ arm_can_change_mode_class (machine_mode from, machine_mode to,
 {
   if (TARGET_BIG_END
       && !(GET_MODE_SIZE (from) == 16 && GET_MODE_SIZE (to) == 8)
-      && (GET_MODE_SIZE (from) > UNITS_PER_WORD
-	  || GET_MODE_SIZE (to) > UNITS_PER_WORD)
+      && (GET_MODE_UNIT_SIZE (from) > UNITS_PER_WORD
+	  || GET_MODE_UNIT_SIZE (to) > UNITS_PER_WORD)
       && reg_classes_intersect_p (VFP_REGS, rclass))
     return false;
   return true;

@@ -899,6 +899,21 @@ typedef struct _stmt_vec_info {
 
   /* The number of scalar stmt references from active SLP instances.  */
   unsigned int num_slp_uses;
+
+  /* If nonzero, the lhs of the statement could be truncated to this
+     many bits without affecting any users of the result.  */
+  unsigned int min_output_precision;
+
+  /* If nonzero, all non-boolean input operands have the same precision,
+     and they could each be truncated to this many bits without changing
+     the result.  */
+  unsigned int min_input_precision;
+
+  /* If OPERATION_BITS is nonzero, the statement could be performed on
+     an integer with the sign and number of bits given by OPERATION_SIGN
+     and OPERATION_BITS without changing the result.  */
+  unsigned int operation_precision;
+  signop operation_sign;
 } *stmt_vec_info;
 
 /* Information about a gather/scatter call.  */
@@ -1477,10 +1492,10 @@ extern tree get_vectype_for_scalar_type_and_size (tree, poly_uint64);
 extern tree get_mask_type_for_scalar_type (tree);
 extern tree get_same_sized_vectype (tree, tree);
 extern bool vect_get_loop_mask_type (loop_vec_info);
-extern bool vect_is_simple_use (tree, vec_info *, gimple **,
-                                enum vect_def_type *);
-extern bool vect_is_simple_use (tree, vec_info *, gimple **,
-				enum vect_def_type *, tree *);
+extern bool vect_is_simple_use (tree, vec_info *, enum vect_def_type *,
+				gimple ** = NULL);
+extern bool vect_is_simple_use (tree, vec_info *, enum vect_def_type *,
+				tree *, gimple ** = NULL);
 extern bool supportable_widening_operation (enum tree_code, gimple *, tree,
 					    tree, enum tree_code *,
 					    enum tree_code *, int *,

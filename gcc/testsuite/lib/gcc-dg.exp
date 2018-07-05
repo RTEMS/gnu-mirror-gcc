@@ -114,6 +114,23 @@ if [info exists ADDITIONAL_TORTURE_OPTIONS] {
 	[concat $DG_TORTURE_OPTIONS $ADDITIONAL_TORTURE_OPTIONS]
 }
 
+proc dg-final { args } {
+    upvar dg-final-code final-code
+
+    if { [llength $args] > 2 } {
+	error "[lindex $args 0]: too many arguments"
+    }
+    set line [lindex $args 0]
+    set code [lindex $args 1]
+    set directive [lindex $code 0]
+    switch $directive {
+	gdb-test {
+	    set code [linsert $code 1 $line]
+	}
+    }
+    append final-code "$code\n"
+}
+
 global orig_environment_saved
 
 # Deduce generated files from tool flags, return finalcode string
@@ -1046,6 +1063,10 @@ proc dg-line { linenr varname } {
 # Argument 1 is the relative line number or line number variable reference
 #
 proc get-absolute-line { useline line } {
+    if { "$line" == "." } {
+	return $useline
+    }
+
     if { [regsub "^\.\[+-\](\[0-9\]+)$" $line "\\1" num] && $useline != "" } {
 	# Handle relative line specification, .+1 or .-1 etc.
 	set num [expr $useline [string index $line 1] $num]
@@ -1065,7 +1086,7 @@ proc get-absolute-line { useline line } {
     eval set var_defined [info exists $varname]
     if { ! $var_defined } {
 	if { "$useline" != "" } {
-	    error "dg-line var $org_varname used at line $uselinenr, but not defined"
+	    error "dg-line var $org_varname used at line $useline, but not defined"
 	} else {
 	    error "dg-line var $org_varname used, but not defined"
 	}
