@@ -1,5 +1,11 @@
 2018-07-05  Michael Meissner  <meissner@linux.ibm.com>
 
+	* configure.ac (powerpc64*-*-linux*): Combine big and little
+	endian checks.  Add checks to make sure the GLIBC can handle
+	configuration of long double to be IEEE 128-bit before building
+	GCC.
+	* configure: Regenerate.
+
 	Merge up to 262443.
 	* REVISION: Update subversion id.
 

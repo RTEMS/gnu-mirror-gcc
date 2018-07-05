@@ -6031,23 +6031,48 @@ AC_ARG_WITH([long-double-format],
   [AS_HELP_STRING([--with-long-double-format={ieee,ibm}]
 		  [Specify whether PowerPC long double uses IEEE or IBM format])],[
 case "$target:$with_long_double_format" in
-  powerpc64le-*-linux*:ieee | powerpc64le-*-linux*:ibm)
-    :
-    ;;
-  powerpc64-*-linux*:ieee | powerpc64-*-linux*:ibm)
-    # IEEE 128-bit emulation is only built on 64-bit VSX Linux systems
-    case "$with_cpu" in
-      power7 | power8 | power9 | power1*)
+  powerpc64le-*-linux*:ibm | powerpc64-*-linux*:ibm | \
+  powerpc64le-*-linux*:ieee | powerpc64-*-linux*:ieee)
+    # IEEE 128-bit emulation is only built on 64-bit VSX Linux systems.
+    # Little endian 64-bit systems are always VSX, but big endian systems
+    # might default to power4.
+    case "$target:$with_cpu" in
+      powerpc64le-* | *:power7 | *:power8 | *:power9 | *:power1*)
 	:
 	;;
       *)
 	AC_MSG_ERROR([Configuration option --with-long-double-format is only \
 supported if the default cpu is power7 or newer])
 	with_long_double_format=""
-	;;
-      esac
-      ;;
-  xpowerpc64*-*-linux*:*)
+    esac
+
+    if test "x$with_long_double_format" = xieee; then
+      # See if we have a new enough GLIBC to allow using IEEE 128-bit long
+      # double.  We assume the public 2.28 GLIBC and the development version of
+      # the Advance Toolchain (2.27) have all of the missing bits.
+      ieee_minor="28"
+      glibc_ieee="no"
+      atoolchain=""
+      if test "x$with_advance_toolchain" != x \
+	 -a -d "/opt/$with_advance_toolchain/." \
+	 -a -d "/opt/$with_advance_toolchain/bin/." \
+	 -a -d "/opt/$with_advance_toolchain/include/."; then
+
+	ieee_minor="27"
+	atoolchain="Advance Toolchain "
+      fi
+      GCC_GLIBC_VERSION_GTE_IFELSE([2], [$ieee_minor], [glibc_ieee=yes], )
+      if test "x$glibc_ieee" = xyes; then
+	echo "${atoolchain}GLIBC appears to have IEEE long double support" 1>&2
+
+      else
+	AC_MSG_ERROR([Configuration option --with-long-double-format=ieee \
+needs ${atoolchain}GLIBC 2.${ieee_minor} or newer])
+	with_long_double_format=""
+      fi
+    fi
+    ;;
+  powerpc64*-*-linux*:*)
     AC_MSG_ERROR([--with-long-double-format argument should be ibm or ieee])
     with_long_double_format=""
     ;;
