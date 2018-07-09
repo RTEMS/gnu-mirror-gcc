@@ -84,6 +84,7 @@ extern bool rs6000_is_valid_2insn_and (rtx, machine_mode);
 extern void rs6000_emit_2insn_and (machine_mode, rtx *, bool, int);
 extern int registers_ok_for_quad_peep (rtx, rtx);
 extern int mems_ok_for_quad_peep (rtx, rtx);
+extern bool move_valid_p (rtx, rtx);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern bool direct_move_p (rtx, rtx);
 extern bool quad_address_p (rtx, machine_mode, bool);

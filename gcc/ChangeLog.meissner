@@ -1,3 +1,21 @@
+2018-07-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (move_valid_p): Add declaration.
+	* config/rs6000/rs6000.c (move_valid_p): New file to validate a
+	move insn.
+	* config/rs6000/rs6000.md (movsi_internal1): Update moves to call
+	move_valid_p instead of calling a pair of gpc_reg_operand's.
+	(mov<mode>_internal, QHI iterator): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+
 2018-07-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 262524

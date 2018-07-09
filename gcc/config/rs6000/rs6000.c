@@ -7835,6 +7835,36 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* Return true if the operands are valid for a standard move.  */
+
+bool
+move_valid_p (rtx dest, rtx src)
+{
+  machine_mode dest_mode = GET_MODE (dest);
+  machine_mode src_mode = GET_MODE (src);
+
+  /* We need to special case moving SFmode SUBREG's to prevent SUBREGs from
+     being used to move SFmode values to/from GPRs without conversion.  The
+     normal gpc_reg_operand will not allow SUBREG of SFmode, so use
+     register_operand in this case.  */
+  if (!TARGET_ALLOW_SF_SUBREG && dest_mode == SFmode
+      && (SUBREG_P (dest) || SUBREG_P (src)))
+    {
+      if (!register_operand (dest, dest_mode)
+	  && !register_operand (src, src_mode))
+	return false;
+
+      if (!valid_sf_si_move (dest, src, SFmode))
+	return false;
+    }
+
+  else if (!gpc_reg_operand (dest, dest_mode)
+	   && !gpc_reg_operand (src, src_mode))
+    return false;
+
+  return true;
+}
+
 /* Return true if either operand is a general purpose register.  */
 
 bool
