@@ -1,3 +1,123 @@
+2018-07-05  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/86400
+	* tree-ssa-strlen.c (maybe_set_strlen_range): Use type size rather
+	than its domain to compute its the upper bound of a char array.
+
+2018-07-03  Carl Love  <cel@us.ibm.com>
+
+	Backport from trunk
+	2018-07-03  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000-c.c: Map ALTIVEC_BUILTIN_VEC_UNPACKH for
+	float argument to VSX_BUILTIN_DOUBLEH_V4SF.
+	Map ALTIVEC_BUILTIN_VEC_UNPACKL for float argument to
+	VSX_BUILTIN_DOUBLEL_V4SF.
+
+2018-07-04  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64.c (qdf24xx_addrcost_table): New static
+	global.
+	(qdf24xx_tunings) <addr_costs>: Set to qdf24xx_addrcost_table.
+
+2018-07-02  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2018-06-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/86285
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Do not set
+	ieee128_float_type_node to long_double_type_node unless
+	TARGET_LONG_DOUBLE_128 is set.
+
+2018-07-02  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/i386/i386.c (ix86_finalize_stack_frame_flags): Do not overrule
+	-fno-omit-frame-pointer when not optimizing.
+
+2018-06-30  Alexandre Oliva  <aoliva@redhat.com>
+
+	PR debug/86064
+	* dwarf2out.c (loc_list_has_views): Adjust comments.
+	(dw_loc_list): Split single cross-partition range with
+	nonzero locview.
+
+2018-06-29  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Backport from mainline
+	2018-06-22  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Change
+	behavior of vec_pack (vector double, vector double) to match
+	behavior of vec_float2 (vector double, vector double).
+
+2018-06-29  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/rs6000/t-rs6000: Append rs6000-modes.h to TM_H.
+
+2018-06-28  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Backport from mainline
+	2017-05-23  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* doc/sourcebuild.texi (Endianness): New subsubsection.
+
+2018-06-27  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Backport from mainline
+	2018-06-20  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Change
+	behavior of vec_packsu (vector unsigned long long, vector unsigned
+	long long) to match behavior of vec_packs with same signature.
+
+2018-06-26  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backport from trunk
+	2018-06-26  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config/rs6000/rs6000-string.c (expand_block_clear): Don't use
+	unaligned vsx for 16B memset.
+
+2018-06-26  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backport from trunk
+	2018-06-22  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	PR target/86222
+	* config/rs6000/rs6000-string.c (expand_strn_compare): Handle -m32
+	correctly.
+
+2018-06-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2018-05-08  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	* regrename.c (build_def_use): Also kill the chains that include the
+	destination of a REG_CFA_REGISTER note.
+
+2018-06-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2018-05-08  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	*  regcprop.c (copyprop_hardreg_forward_1): Don't propagate into an
+	insn that has a REG_CFA_REGISTER note.
+
+2018-06-26  Robin Dapp  <rdapp@linux.ibm.com>
+
+	* config/s390/s390.h (enum processor_flags): Do not use
+	default tune parameter when -march was specified.
+
+2018-06-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/86314
+	* config/i386/i386.md (setcc + movzbl to xor + setcc peephole2s):
+	Check reg_overlap_mentioned_p in addition to reg_set_p with the same
+	operands.
+
 2018-06-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	Back port from trunk
