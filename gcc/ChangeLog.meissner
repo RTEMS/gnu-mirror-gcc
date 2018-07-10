@@ -1,3 +1,8 @@
+2018-07-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
+	checking for toc fusion until after the code model has been set.
+
 2018-07-09  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-protos.h (move_valid_p): Add declaration.

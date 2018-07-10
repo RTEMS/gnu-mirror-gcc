@@ -4473,28 +4473,6 @@ rs6000_option_override_internal (bool global_init_p)
       && optimize >= 3)
     rs6000_isa_flags |= OPTION_MASK_P8_FUSION_SIGN;
 
-  /* TOC fusion requires 64-bit and medium/large code model.  */
-  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires 64-bit"));
-    }
-
-  if (TARGET_TOC_FUSION && (TARGET_CMODEL == CMODEL_SMALL))
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires medium/large code model"));
-    }
-
-  /* Turn on -mtoc-fusion by default if p8-fusion and 64-bit medium/large code
-     model.  */
-  if (TARGET_P8_FUSION && !TARGET_TOC_FUSION && TARGET_POWERPC64
-      && (TARGET_CMODEL != CMODEL_SMALL)
-      && !(rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION))
-    rs6000_isa_flags |= OPTION_MASK_TOC_FUSION;
-
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
     {
@@ -4792,6 +4770,30 @@ rs6000_option_override_internal (bool global_init_p)
 #ifdef SUB3TARGET_OVERRIDE_OPTIONS
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
+
+  /* TOC fusion requires 64-bit and medium/large code model.  We can't check
+     for medium/large code model until after the SUBTARGET and SUBSUBTARGET
+     options are done.  */
+  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
+	warning (0, N_("-mtoc-fusion requires 64-bit"));
+    }
+
+  if (TARGET_TOC_FUSION && (TARGET_CMODEL == CMODEL_SMALL))
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
+	warning (0, N_("-mtoc-fusion requires medium/large code model"));
+    }
+
+  /* Turn on -mtoc-fusion by default if p8-fusion and 64-bit medium/large code
+     model.  */
+  if (TARGET_P8_FUSION && !TARGET_TOC_FUSION && TARGET_POWERPC64
+      && (TARGET_CMODEL != CMODEL_SMALL)
+      && !(rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION))
+    rs6000_isa_flags |= OPTION_MASK_TOC_FUSION;
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
