@@ -38015,37 +38015,17 @@ emit_fusion_load_store (rtx load_store_reg, rtx addis_reg, rtx offset,
   return;
 }
 
-/* Wrap a TOC address that can be fused to indicate that special fusion
-   processing is needed.  */
-
-rtx
-fusion_wrap_memory_address (rtx old_mem)
-{
-  rtx old_addr = XEXP (old_mem, 0);
-  rtvec v = gen_rtvec (1, old_addr);
-  rtx new_addr = gen_rtx_UNSPEC (Pmode, v, UNSPEC_FUSION_ADDIS);
-  return replace_equiv_address_nv (old_mem, new_addr, false);
-}
-
 /* Given an address, convert it into the addis and load offset parts.  Addresses
    created during the peephole2 process look like:
 	(lo_sum (high (unspec [(sym)] UNSPEC_TOCREL))
-		(unspec [(...)] UNSPEC_TOCREL))
-
-   Addresses created via toc fusion look like:
-	(unspec [(unspec [(...)] UNSPEC_TOCREL)] UNSPEC_FUSION_ADDIS))  */
+		(unspec [(...)] UNSPEC_TOCREL))  */
 
 static void
 fusion_split_address (rtx addr, rtx *p_hi, rtx *p_lo)
 {
   rtx hi, lo;
 
-  if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_FUSION_ADDIS)
-    {
-      lo = XVECEXP (addr, 0, 0);
-      hi = gen_rtx_HIGH (Pmode, lo);
-    }
-  else if (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM)
+  if (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM)
     {
       hi = XEXP (addr, 0);
       lo = XEXP (addr, 1);
@@ -38061,9 +38041,6 @@ fusion_split_address (rtx addr, rtx *p_hi, rtx *p_lo)
    register that we loaded up the addis instruction.  The address that is used
    is the logical address that was formed during peephole2:
 	(lo_sum (high) (low-part))
-
-   Or the address is the TOC address that is wrapped before register allocation:
-	(unspec [(addr) (toc-reg)] UNSPEC_FUSION_ADDIS)
 
    The code is complicated, so we call output_asm_insn directly, and just
    return "".  */

@@ -1,5 +1,13 @@
 2018-07-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (fusion_wrap_memory_address):
+	Delete, no longer used.
+	* config/rs6000/rs6000.c (fusion_wrap_memory_address): Likewise.
+	(fusion_split_address): Remove TOC fusion support.
+	* config/rs6000/rs6000.md (UNSPEC_FUSION_ADDIS): Likewise.
+
+2018-07-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wG constraint): Delete, no longer
 	used due to toc fusion being deleted.
 	* config/rs6000/predicates.md (p9_fusion_reg_operand): Rename from
