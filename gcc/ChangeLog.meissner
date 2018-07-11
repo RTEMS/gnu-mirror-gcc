@@ -1,3 +1,31 @@
+2018-07-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (wG constraint): Delete, no longer
+	used due to toc fusion being deleted.
+	* config/rs6000/predicates.md (p9_fusion_reg_operand): Rename from
+	toc_fusion_or_p9_reg_operand.
+	(toc_fusion_or_p9_reg_operand): Likewise.
+	(toc_fusion_mem_raw): Delete, no longer used.
+	(toc_fusion_mem_wrapped): Likewise.
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Delete TOC fusion
+	support.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Likewise.
+	(rs6000_debug_print_mode): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (TARGET_TOC_FUSION_INT): Likewise.
+	(TARGET_TOC_FUSION_FP): Likewise.
+	* config/rs6000/rs6000.md (toc fusion splitter): Likewise.
+	(toc_fusionload_<mode>): Likewise.
+	(toc_fusionload_di): Likewise.
+	(fusion_gpr_load_<mode>): Rename toc_fusion_or_p9_reg_operand
+	predicate.
+	(power9 fusion splitter): Likewise.
+	* config/rs6000/rs6000.opt (-mtoc-fusion): Delete TOC fusion
+	support.
+
 2018-07-10  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
