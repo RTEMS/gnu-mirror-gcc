@@ -1,5 +1,15 @@
 2018-07-12  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (LADDR_GSTORE): Delete, not currently
+	used.
+	(LADDR_FSTORE): Likewise.
+	(LADDR_VSTORE): Likewise.
+	(large_mov<mode>_store): Change all stores to split the ADDIS and
+	store into separate insns, rather than keeping them in a single
+	insn.
+
+2018-07-12  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wC constraint): Define new
 	constraints for large memory operations, and non-large memory
 	operations.
