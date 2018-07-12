@@ -531,17 +531,11 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
-  enum insn_code fusion_gpr_ld;		/* INSN for fusing gpr ADDIS/loads.  */
-					/* INSNs for fusing addi with loads
-					   or stores for each reg. class.  */					   
-  enum insn_code fusion_addi_ld[(int)N_RELOAD_REG];
-  enum insn_code fusion_addi_st[(int)N_RELOAD_REG];
-					/* INSNs for fusing addis with loads
-					   or stores for each reg. class.  */					   
-  enum insn_code fusion_addis_ld[(int)N_RELOAD_REG];
-  enum insn_code fusion_addis_st[(int)N_RELOAD_REG];
+  enum insn_code large_addr_load;	/* Large address load insn. */
+  enum insn_code large_addr_store;	/* Large address store insn. */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
+  bool large_address_p;			/* Mode supports large addresses.  */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -2375,18 +2369,34 @@ rs6000_debug_print_mode (ssize_t m)
 {
   ssize_t rc;
   int spaces = 0;
-  bool fuse_extra_p;
 
   fprintf (stderr, "Mode: %-5s", GET_MODE_NAME (m));
   for (rc = 0; rc < N_RELOAD_REG; rc++)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
 
+  if (TARGET_LARGE_ADDRESS)
+    {
+      if (reg_addr[m].large_address_p)
+	{
+	  char s = reg_addr[m].large_addr_store != CODE_FOR_nothing ? 's' : '*';
+	  char l = reg_addr[m].large_addr_load != CODE_FOR_nothing ? 'l' : '*';
+
+	  fprintf (stderr, "%*s  Large-addr=%c%c", spaces, "", s, l);
+	  spaces = 0;
+	}
+      else
+	spaces += sizeof ("  Large-addr=sl") - 1;
+    }
+
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
-    fprintf (stderr, "  Reload=%c%c",
-	     (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
-	     (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+    {
+      fprintf (stderr, "%*s  Reload=%c%c", spaces, "",
+	       (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
+	       (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+      spaces = 0;
+    }
   else
     spaces += sizeof ("  Reload=sl") - 1;
 
@@ -2397,73 +2407,6 @@ rs6000_debug_print_mode (ssize_t m)
     }
   else
     spaces += sizeof ("  Upper=y") - 1;
-
-  fuse_extra_p = (reg_addr[m].fusion_gpr_ld != CODE_FOR_nothing);
-  if (!fuse_extra_p)
-    {
-      for (rc = 0; rc < N_RELOAD_REG; rc++)
-	{
-	  if (rc != RELOAD_REG_ANY)
-	    {
-	      if (reg_addr[m].fusion_addi_ld[rc]     != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addi_ld[rc]  != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addi_st[rc]  != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addis_ld[rc] != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addis_st[rc] != CODE_FOR_nothing)
-		{
-		  fuse_extra_p = true;
-		  break;
-		}
-	    }
-	}
-    }
-
-  if (fuse_extra_p)
-    {
-      fprintf (stderr, "%*s  Fuse:", spaces, "");
-      spaces = 0;
-
-      for (rc = 0; rc < N_RELOAD_REG; rc++)
-	{
-	  if (rc != RELOAD_REG_ANY)
-	    {
-	      char load, store;
-
-	      if (reg_addr[m].fusion_addis_ld[rc] != CODE_FOR_nothing)
-		load = 'l';
-	      else if (reg_addr[m].fusion_addi_ld[rc] != CODE_FOR_nothing)
-		load = 'L';
-	      else
-		load = '-';
-
-	      if (reg_addr[m].fusion_addis_st[rc] != CODE_FOR_nothing)
-		store = 's';
-	      else if (reg_addr[m].fusion_addi_st[rc] != CODE_FOR_nothing)
-		store = 'S';
-	      else
-		store = '-';
-
-	      if (load == '-' && store == '-')
-		spaces += 5;
-	      else
-		{
-		  fprintf (stderr, "%*s%c=%c%c", (spaces + 1), "",
-			   reload_reg_map[rc].name[0], load, store);
-		  spaces = 0;
-		}
-	    }
-	}
-
-      if (reg_addr[m].fusion_gpr_ld != CODE_FOR_nothing)
-	{
-	  fprintf (stderr, "%*sP8gpr", (spaces + 1), "");
-	  spaces = 0;
-	}
-      else
-	spaces += sizeof (" P8gpr") - 1;
-    }
-  else
-    spaces += sizeof ("  Fuse: G=ls F=ls v=ls P8gpr") - 1;
 
   if (rs6000_vector_unit[m] != VECTOR_NONE
       || rs6000_vector_mem[m] != VECTOR_NONE)
@@ -3527,117 +3470,33 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	}
     }
 
-  /* Setup the fusion operations.  */
-  if (TARGET_P8_FUSION)
+  /* Note which types support large addresses.  */
+  if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64 && TARGET_VSX
+      && TARGET_CMODEL == CMODEL_MEDIUM)
     {
-      reg_addr[QImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_qi;
-      reg_addr[HImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_hi;
-      reg_addr[SImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_si;
-      if (TARGET_64BIT)
-	reg_addr[DImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_di;
-    }
+      reg_addr[QImode].large_address_p = true;
+      reg_addr[QImode].large_addr_load = CODE_FOR_large_movqi_load;
+      reg_addr[QImode].large_addr_store = CODE_FOR_large_movqi_store;
 
-  if (TARGET_P9_FUSION)
-    {
-      struct fuse_insns {
-	enum machine_mode mode;			/* mode of the fused type.  */
-	enum machine_mode pmode;		/* pointer mode.  */
-	enum rs6000_reload_reg_type rtype;	/* register type.  */
-	enum insn_code load;			/* load insn.  */
-	enum insn_code store;			/* store insn.  */
-      };
+      reg_addr[HImode].large_address_p = true;
+      reg_addr[HImode].large_addr_load = CODE_FOR_large_movhi_load;
+      reg_addr[HImode].large_addr_store = CODE_FOR_large_movhi_store;
 
-      static const struct fuse_insns addis_insns[] = {
-	{ E_SFmode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_sf_load,
-	  CODE_FOR_fusion_vsx_di_sf_store },
+      reg_addr[SImode].large_address_p = true;
+      reg_addr[SImode].large_addr_load = CODE_FOR_large_movsi_load;
+      reg_addr[SImode].large_addr_store = CODE_FOR_large_movsi_store;
 
-	{ E_SFmode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_sf_load,
-	  CODE_FOR_fusion_vsx_si_sf_store },
+      reg_addr[DImode].large_address_p = true;
+      reg_addr[DImode].large_addr_load = CODE_FOR_large_movdi_load;
+      reg_addr[DImode].large_addr_store = CODE_FOR_large_movdi_store;
 
-	{ E_DFmode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_df_load,
-	  CODE_FOR_fusion_vsx_di_df_store },
+      reg_addr[SFmode].large_address_p = true;
+      reg_addr[SFmode].large_addr_load = CODE_FOR_large_movsf_load;
+      reg_addr[SFmode].large_addr_store = CODE_FOR_large_movsf_store;
 
-	{ E_DFmode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_df_load,
-	  CODE_FOR_fusion_vsx_si_df_store },
-
-	{ E_DImode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_di_load,
-	  CODE_FOR_fusion_vsx_di_di_store },
-
-	{ E_DImode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_di_load,
-	  CODE_FOR_fusion_vsx_si_di_store },
-
-	{ E_QImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_qi_load,
-	  CODE_FOR_fusion_gpr_di_qi_store },
-
-	{ E_QImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_qi_load,
-	  CODE_FOR_fusion_gpr_si_qi_store },
-
-	{ E_HImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_hi_load,
-	  CODE_FOR_fusion_gpr_di_hi_store },
-
-	{ E_HImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_hi_load,
-	  CODE_FOR_fusion_gpr_si_hi_store },
-
-	{ E_SImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_si_load,
-	  CODE_FOR_fusion_gpr_di_si_store },
-
-	{ E_SImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_si_load,
-	  CODE_FOR_fusion_gpr_si_si_store },
-
-	{ E_SFmode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_sf_load,
-	  CODE_FOR_fusion_gpr_di_sf_store },
-
-	{ E_SFmode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_sf_load,
-	  CODE_FOR_fusion_gpr_si_sf_store },
-
-	{ E_DImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_di_load,
-	  CODE_FOR_fusion_gpr_di_di_store },
-
-	{ E_DFmode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_df_load,
-	  CODE_FOR_fusion_gpr_di_df_store },
-      };
-
-      machine_mode cur_pmode = Pmode;
-      size_t i;
-
-      for (i = 0; i < ARRAY_SIZE (addis_insns); i++)
-	{
-	  machine_mode xmode = addis_insns[i].mode;
-	  enum rs6000_reload_reg_type rtype = addis_insns[i].rtype;
-
-	  if (addis_insns[i].pmode != cur_pmode)
-	    continue;
-
-	  if (rtype == RELOAD_REG_FPR && !TARGET_HARD_FLOAT)
-	    continue;
-
-	  reg_addr[xmode].fusion_addis_ld[rtype] = addis_insns[i].load;
-	  reg_addr[xmode].fusion_addis_st[rtype] = addis_insns[i].store;
-
-	  if (rtype == RELOAD_REG_FPR && TARGET_P9_VECTOR)
-	    {
-	      reg_addr[xmode].fusion_addis_ld[RELOAD_REG_VMX]
-		= addis_insns[i].load;
-	      reg_addr[xmode].fusion_addis_st[RELOAD_REG_VMX]
-		= addis_insns[i].store;
-	    }
-	}
+      reg_addr[DFmode].large_address_p = true;
+      reg_addr[DFmode].large_addr_load = CODE_FOR_large_movdf_load;
+      reg_addr[DFmode].large_addr_store = CODE_FOR_large_movdf_store;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -4738,6 +4597,29 @@ rs6000_option_override_internal (bool global_init_p)
 #ifdef SUB3TARGET_OVERRIDE_OPTIONS
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
+
+  /* Don't allow -mlarge-address in 32-bit mode, or small code model.  Disallow
+     it in large code model at present, because addresses might not be within
+     32-bits of the TOC address.  Enable it by default on systems with at least
+     load fusion by default.  This test has to be after the subtarget options
+     are set in order to use medium code model.  */
+  if (TARGET_POWERPC64 && TARGET_CMODEL == CMODEL_MEDIUM)
+    {
+      if (!TARGET_LARGE_ADDRESS && TARGET_P8_FUSION
+	  && !(rs6000_isa_flags_explicit & OPTION_MASK_LARGE_ADDRESS))
+	rs6000_isa_flags |= OPTION_MASK_LARGE_ADDRESS;
+    }
+  else if (TARGET_LARGE_ADDRESS)
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_LARGE_ADDRESS;
+      if (rs6000_isa_flags_explicit & OPTION_MASK_LARGE_ADDRESS)
+	{
+	  if (!TARGET_POWERPC64)
+	    error ("%qs requires 64-bit code.", "-mlarge-address");
+	  else
+	    error ("%qs requires %qs", "-mlarge-address", "-mcmodel=medium");
+	}
+    }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
@@ -7781,7 +7663,10 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #endif
 }
 
-/* Return true if the operands are valid for a standard move.  */
+/* Return true if the operands are valid for a standard move.  We don't allow
+   large address moves after register allocation in the standard MOV insn.
+   Instead such moves should be done through an insn that has a base register
+   as a temporary.  */
 
 bool
 move_valid_p (rtx dest, rtx src)
@@ -7808,7 +7693,17 @@ move_valid_p (rtx dest, rtx src)
 	   && !gpc_reg_operand (src, src_mode))
     return false;
 
-  return true;
+  if (!reg_addr[dest_mode].large_address_p || can_create_pseudo_p ())
+    return true;
+
+  if (MEM_P (dest))
+    return !large_address_valid (XEXP (dest, 0), dest_mode);
+
+  else if (MEM_P (src))
+    return !large_address_valid (XEXP (src, 0), src_mode);
+
+  else
+    return true;
 }
 
 /* Return true if either operand is a general purpose register.  */
@@ -7981,6 +7876,11 @@ mem_operand_gpr (rtx op, machine_mode mode)
   int extra;
   rtx addr = XEXP (op, 0);
 
+  /* Don't recognize large addresses, here.  Instead use, the dedicated
+     patterns.  */
+  if (large_address_valid (addr, mode))
+    return false;
+
   /* PR85755: Allow PRE_INC and PRE_DEC addresses.  */
   if (TARGET_UPDATE
       && (GET_CODE (addr) == PRE_INC || GET_CODE (addr) == PRE_DEC)
@@ -8021,6 +7921,11 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  /* Don't recognize large addresses, here.  Instead use, the dedicated
+     patterns.  */
+  if (large_address_valid (addr, mode))
+    return false;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -9511,6 +9416,12 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       if (legitimate_constant_pool_address_p (x, mode,
 					     reg_ok_strict || lra_in_progress))
 	return 1;
+
+      /* We allow large addresses before register allocation for normal memory.
+	 After register allocation, they should be using the special insns that
+	 can allocate a scratch register.  */
+      if (reg_addr[mode].large_address_p && large_address_valid (x, mode))
+	return !reg_ok_strict;
     }
 
   /* For TImode, if we have TImode in VSX registers, only allow register
@@ -18882,6 +18793,12 @@ rs6000_secondary_reload_memory (rtx addr,
 	      extra_cost = 1;
 	      type = "offset";
 	    }
+
+	  else if (large_address_valid (addr, mode))
+	    {
+	      extra_cost = 1;
+	      type = "large address";
+	    }
 	}
 
       /* (plus (plus (reg) (constant)) (reg)) is also generated during
@@ -19296,6 +19213,28 @@ rs6000_secondary_reload (bool in_p,
       done_p = true;
     }
 
+  /* See if we should use the GPR reload helper for large addresses.  If we are
+     loading to a base register, we don't need a reload, since the base
+     register can be used for the upper bits.  */
+  if (!done_p && icode == CODE_FOR_nothing && memory_p && TARGET_POWERPC64
+      && reg_addr[mode].large_address_p
+      && reg_class_to_reg_type[(int)rclass] == GPR_REG_TYPE
+      && GET_MODE_SIZE (mode) <= UNITS_PER_WORD
+      && large_address_valid (XEXP (x, 0), mode))
+    {
+      done_p = true;
+      default_p = false;
+      ret = NO_REGS;
+
+      if (rclass != BASE_REGS || !in_p)
+	{
+	  sri->extra_cost = 1;
+	  sri->icode = (in_p
+			? CODE_FOR_reload_di_load
+			: CODE_FOR_reload_di_store);
+	}
+    }
+
   /* Handle reload of load/stores if we have reload helper functions.  */
   if (!done_p && icode != CODE_FOR_nothing && memory_p)
     {
@@ -19615,6 +19554,10 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
 	    }
 	}
 
+      else if (reg_addr[mode].large_address_p
+	       && large_address_valid (addr, mode))
+	new_addr = split_large_address (addr, scratch);
+
       else if (mode_supports_dq_form (mode) && CONST_INT_P (op1))
 	{
 	  if (((addr_mask & RELOAD_REG_QUAD_OFFSET) == 0)
@@ -19716,6 +19659,8 @@ rs6000_secondary_reload_gpr (rtx reg, rtx mem, rtx scratch, bool store_p)
   enum reg_class rclass;
   rtx addr;
   rtx scratch_or_premodify = scratch;
+  rtx new_mem;
+  machine_mode mode = GET_MODE (reg);
 
   if (TARGET_DEBUG_ADDR)
     {
@@ -19756,9 +19701,16 @@ rs6000_secondary_reload_gpr (rtx reg, rtx mem, rtx scratch, bool store_p)
     }
   gcc_assert (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM);
 
-  rs6000_emit_move (scratch_or_premodify, addr, Pmode);
+  /* Add support for large addresses.  */
+  if (reg_addr[mode].large_address_p && large_address_valid (addr, mode))
+    new_mem = split_large_address (addr, scratch_or_premodify);
+  else
+    {
+      rs6000_emit_move (scratch_or_premodify, addr, Pmode);
+      new_mem = scratch_or_premodify;
+    }
 
-  mem = replace_equiv_address_nv (mem, scratch_or_premodify);
+  mem = replace_equiv_address_nv (mem, new_mem);
 
   /* Now create the move.  */
   if (store_p)
@@ -20449,6 +20401,38 @@ rs6000_init_machine_status (void)
   stack_info.reload_completed = 0;
   return ggc_cleared_alloc<machine_function> ();
 }
+
+/* Return true if an integer constant can be generated with ADDIS and ADDI.  */
+
+static inline bool
+int_is_32bit (unsigned HOST_WIDE_INT v)
+{
+  return ((v + HOST_WIDE_INT_C (0x80000000U)) < HOST_WIDE_INT_C (0x100000000U));
+}
+
+/* Given a large integer, split it into parts for ADDIS and ADDI.  */
+
+static HOST_WIDE_INT
+split_large_integer (HOST_WIDE_INT value, bool hi_p)
+{
+  HOST_WIDE_INT lo, hi;
+
+  gcc_assert (int_is_32bit (value));
+
+  lo = value & HOST_WIDE_INT_C (0xffff);
+  hi = value & ~HOST_WIDE_INT_C (0xffff);
+  if (lo & HOST_WIDE_INT_C (0x8000U))
+    {
+      lo |= ~HOST_WIDE_INT_C (0xffff);
+      hi += HOST_WIDE_INT_C (0x10000);
+      if (hi & HOST_WIDE_INT_C (0x80000000U))
+	hi |= ~HOST_WIDE_INT_C (0xffffffffU);
+      gcc_assert (int_is_32bit (hi));
+    }
+
+  return hi_p ? hi : lo;
+}
+
 
 #define INT_P(X) (GET_CODE (X) == CONST_INT && GET_MODE (X) == VOIDmode)
 
@@ -35832,6 +35816,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
+  { "large-address",		OPTION_MASK_LARGE_ADDRESS,	false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			OPTION_MASK_MFPGPR,		false, true  },
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
@@ -37739,12 +37724,22 @@ fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
 {
   rtx addr;
   rtx base_reg;
+  machine_mode mode = GET_MODE (target);
+  machine_mode inner_mode = mode;
+
+  if (GET_CODE (mem) == ZERO_EXTEND || GET_CODE (mem) == SIGN_EXTEND)
+    inner_mode = GET_MODE (XEXP (mem, 0));
+
+  /* If large addresses are enabled, in theory we don't need the peephole.
+     Turn off the peephole for the types that support large addresses.  */
+  if (reg_addr[inner_mode].large_address_p)
+    return false;
 
   /* Validate arguments.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
     return false;
 
-  if (!base_reg_operand (target, GET_MODE (target)))
+  if (!base_reg_operand (target, mode))
     return false;
 
   if (!fusion_gpr_addis (addis_value, GET_MODE (addis_value)))
@@ -38015,6 +38010,18 @@ emit_fusion_load_store (rtx load_store_reg, rtx addis_reg, rtx offset,
   return;
 }
 
+/* Wrap a TOC address that can be fused to indicate that special fusion
+   processing is needed.  */
+
+rtx
+fusion_wrap_memory_address (rtx old_mem)
+{
+  rtx old_addr = XEXP (old_mem, 0);
+  rtvec v = gen_rtvec (1, old_addr);
+  rtx new_addr = gen_rtx_UNSPEC (Pmode, v, UNSPEC_FUSION_ADDIS);
+  return replace_equiv_address_nv (old_mem, new_addr, false);
+}
+
 /* Given an address, convert it into the addis and load offset parts.  Addresses
    created during the peephole2 process look like:
 	(lo_sum (high (unspec [(sym)] UNSPEC_TOCREL))
@@ -38111,6 +38118,16 @@ fusion_p9_p (rtx addis_reg,		/* register set via addis.  */
 {
   rtx addr, mem, offset;
   machine_mode mode = GET_MODE (src);
+  machine_mode inner_mode = mode;
+
+  if (GET_CODE (src) == ZERO_EXTEND || GET_CODE (src) == SIGN_EXTEND
+      || GET_CODE (src) == FLOAT_EXTEND)
+    inner_mode = GET_MODE (XEXP (src, 0));
+
+  /* If large addresses are enabled, in theory we don't need the peephole.
+     Turn off the peephole for the types that support large addresses.  */
+  if (reg_addr[inner_mode].large_address_p)
+    return false;
 
   /* Validate arguments.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
@@ -38454,6 +38471,200 @@ emit_fusion_p9_store (rtx mem, rtx reg, rtx tmp_reg)
   return "";
 }
 
+
+/* Large address support.  */
+
+/* Emit an insn to load a register from a large address.  Return TRUE if it was
+   successful.  */
+
+bool
+emit_large_address_load (rtx dest, rtx src, machine_mode mode)
+{
+  enum insn_code icode = reg_addr[mode].large_addr_load;
+
+  gcc_assert (MEM_P (src));
+  if (icode != CODE_FOR_nothing && large_address_valid (XEXP (src, 0), mode))
+    {
+      rtx pat = GEN_FCN (icode) (dest, src);
+      if (pat)
+	{
+	  emit_insn (pat);
+	  return true;
+	}
+    }
+
+  return false;
+}
+
+/* Emit an insn to store a register to a large address.  Return TRUE if it was
+   successful.  */
+
+bool
+emit_large_address_store (rtx dest, rtx src, machine_mode mode)
+{
+  enum insn_code icode = reg_addr[mode].large_addr_store;
+
+  gcc_assert (MEM_P (dest));
+  if (icode != CODE_FOR_nothing && large_address_valid (XEXP (dest, 0), mode))
+    {
+      rtx pat = GEN_FCN (icode) (dest, src);
+      if (pat)
+	{
+	  emit_insn (pat);
+	  return true;
+	}
+    }
+
+  return false;
+}
+
+/* Return if an address is a valid large address.  */
+
+bool
+large_address_valid (rtx addr, machine_mode mode)
+{
+  if (!reg_addr[mode].large_address_p)
+    return false;
+
+  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      if (GET_CODE (op0) == UNSPEC
+	  && XINT (op0, 1) == UNSPEC_TOCREL
+	  && CONST_INT_P (op1))
+	{
+	  if (!legitimate_constant_pool_address_p (addr, mode, false))
+	    return false;
+	}
+
+      else
+	{
+	  if (!base_reg_operand (op0, Pmode))
+	    return false;
+
+	  if (satisfies_constraint_I (op1))	/* bottom 16 bits.  */
+	    return false;
+	}
+
+      unsigned HOST_WIDE_INT value = UINTVAL (op1);
+
+      if (!int_is_32bit (value))
+	return false;
+
+      /* Limit any integer offset to support DQ-form loads or stores for
+	 128-bit type.
+
+	 Limit any integer offset to support DS-form loads or stores for 64-bit
+	 types and for SFmode.
+
+	 If the address doesn't match, the compiler will use slower machine
+	 independent methods of loading up the address.  */
+      if ((value & 15) != 0 && GET_MODE_SIZE (mode) == 16)
+	return false;
+      else if ((value & 3) != 0 && (GET_MODE_SIZE (mode) == 8 || mode == SFmode))
+	return false;
+      else
+	return true;
+    }
+
+  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
+    return legitimate_constant_pool_address_p (addr, mode, false);
+
+  return false;
+}
+
+/* Helper function to split_large_address to return the upper and lower parts
+   of a large address.  */
+
+enum rtx_code
+split_large_address_hilo (rtx addr, rtx *p_hi, rtx *p_lo)
+{
+  HOST_WIDE_INT value;
+  rtx hi, lo;
+  enum rtx_code rcode;
+
+  if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
+    {
+      hi = gen_rtx_HIGH (Pmode, addr);
+      lo = addr;
+      rcode = LO_SUM;
+    }
+
+  else if (GET_CODE (addr) == PLUS)
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      gcc_assert (CONST_INT_P (op1) && int_is_32bit (UINTVAL (op1)));
+
+      if (REG_P (op0))
+	{
+	  value = INTVAL (op1);
+	  hi = gen_rtx_PLUS (Pmode, op0,
+			     GEN_INT (split_large_integer (value, true)));
+	  lo = GEN_INT (split_large_integer (value, false));
+	  rcode = PLUS;
+	}
+
+      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
+	{
+	  hi = gen_rtx_HIGH (Pmode, addr);
+	  lo = addr;
+	  rcode = LO_SUM;
+	}
+
+      else
+	gcc_unreachable ();
+    }
+  else
+    gcc_unreachable ();
+
+  *p_hi = hi;
+  *p_lo = lo;
+  return rcode;
+}
+
+/* Split a large address into two insns, one to set the upper bits, and the
+   other to set the lower bits.  Emit the first insn, and return the second
+   insn that can be used as an address.  */
+
+rtx
+split_large_address (rtx addr, rtx tmp_reg)
+{
+  rtx hi, lo;
+  enum rtx_code rcode = split_large_address_hilo (addr, &hi, &lo);
+
+  emit_insn (gen_rtx_SET (tmp_reg, hi));
+  return gen_rtx_fmt_ee (rcode, Pmode, tmp_reg, lo);
+}
+
+/* Output the instructions to implement a large address load/store using a
+   scratch register to build a partial address.  */
+
+void
+output_large_address_load_store (rtx reg,
+				 rtx mem,
+				 rtx tmp_reg,
+				 const char *mnemonic)
+{
+  rtx hi, lo, addr;
+
+  gcc_assert (REG_P (reg) && MEM_P (mem));
+
+  addr = XEXP (mem, 0);
+  (void) split_large_address_hilo (addr, &hi, &lo);
+
+  /* Emit the addis instruction.  */
+  emit_fusion_addis (tmp_reg, hi);
+
+  /* Emit the D-form load instruction.  */
+  emit_fusion_load_store (reg, tmp_reg, lo, mnemonic);
+  return;
+}
+
+
 #ifdef RS6000_GLIBC_ATOMIC_FENV
 /* Function declarations for rs6000_atomic_assign_expand_fenv.  */
 static tree atomic_hold_decl, atomic_clear_decl, atomic_update_decl;

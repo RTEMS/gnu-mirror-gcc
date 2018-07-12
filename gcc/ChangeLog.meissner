@@ -1,3 +1,139 @@
+2018-07-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (wC constraint): Define new
+	constraints for large memory operations, and non-large memory
+	operations.
+	(wN constraint): Likewise.
+	* config/rs6000/predicates.md (s32bit_cint_operand): New predicate
+	for 32-bit signed integer constant.
+	(large_mem_operand): New predicate for large memory.
+	(any_mem_operand): New predicator for normal and large memory.
+	(reg_or_any_mem_operand): New predicate for register or any
+	memory.
+	* config/rs6000/rs6000-protos.h (fusion_wrap_memory_address): New
+	declarations.
+	(emit_large_address_load): Likewise.
+	(emit_large_address_store): Likewise.
+	(large_address_valid): Likewise.
+	(split_large_address_hilo): Likewise.
+	(split_large_address): Likewise.
+	(output_large_address_load_store): Likewise.
+	* config/rs6000/rs6000.c (rs6000_reg_addr): Delete fusion fields
+	that are no longer used.  Add new fields to handle large memory.
+	(rs6000_debug_print_mode): Add support for large memory, and
+	delete old fusion support.
+	(rs6000_init_hard_regno_mode_ok): Drop setting old fusion fields
+	that were never used.  Add support for large addresses.
+	(rs6000_option_override_internal): Add checks for large
+	addresses.
+	(move_valid_p): Add large address support.
+	(mem_operand_gpr): Do not allow large addresses.
+	(mem_operand_ds_form): Likewise.
+	(rs6000_legitimate_address_p): Do not allow large addresses after
+	register allocation has begun.
+	(rs6000_secondary_reload_memory): Add large address support.
+	(rs6000_secondary_reload): Likewise.
+	(rs6000_secondary_reload_inner): Likewise.
+	(rs6000_secondary_reload_gpr): Likewise.
+	(int_is_32bit): New function to return true if an integer is a
+	32-bit integer constant.
+	(split_large_integer): Split a 32-bit integer into 16-bit high and
+	low values.
+	(rs6000_opt_masks): Add -mlarge-address support.
+	(fusion_gpr_load_p): Turn off the peephole if we have large
+	addresses.  Add support for sign/zero extension.
+	(fusion_p9_p): Likewise.
+	(fusion_wrap_memory_address): Add back in again.
+	(emit_large_address_load): New functions for large address
+	support.
+	(emit_large_address_store): Likewise.
+	(large_address_valid): Likewise.
+	(split_large_address_hilo): Likewise.
+	(split_large_address): Likewise.
+	(output_large_address_load_store): Likewise.
+	* config/rs6000/rs6000.md (UNSPEC_FUSION_ADDIS):Add back in
+	again.
+	(UNSPEC_LADDR_LOAD): New unspecs for large address support.
+	(UNSPEC_LADDR_STORE): Likewise.
+	(LADDR): New iterators and attributes for large address support.
+	(LADDR_GLOAD): Likewise.
+	(LADDR_FLOAD): Likewise.
+	(LADDR_VLOAD): Likewise.
+	(LADDR_GSTORE): Likewise.
+	(LADDR_FSTORE): Likewise.
+	(LADDR_VSTORE): Likewise.
+	(large_mov<mode>_load, QHSI iterator): New insns for large address
+	support.
+	(large_mov<mode>_loadu_di, QHSI iterator): Likewise.
+	(large_mov<mode>_loads_di, HSI iterator): Likewise.
+	(large_mov<mode>_store, QHSI iterator): Likewise.
+	(large_movdi_load): Likewise.
+	(large_movdi_load_fp): Likewise.
+	(large_movdi_store): Likewise.
+	(large_mov<mode>_load, SFDF iterator): Likewise.
+	(large_mov<mode>_store, SFDF iterator): Likewise.
+	(large address move splitters): New splitters to convert normal
+	move to a special large address move.
+	(zero_extendqi<mode>2): Use wN constraint instead of m constraint
+	to prevent large addresses.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendhi<mode>): Likewise.
+	(ashdi3_extswsli): Break extswsli into separate insns for register
+	operations and memory operations.  For the memory operations, add
+	large memory support.
+	(ashdi3_extswsli_mem): Likewise.
+	(ashdi3_extswsli_dot): Likewise.
+	(ashdi3_extswsli_dot_mem): Likewise.
+	(ashdi3_extswsli_dot2): Likewise.
+	(ashdi3_extswsli_dot2_mem): Likewise.
+	(extendsfdf2): Add large memory support.
+	(large_extendsfdf): Likewise.
+	(extendsfdf2_fpr): Use wN constraint instead of m to skip large
+	memory.
+	(fix_trunc<mode>si2_stfiwx): Likewise.
+	(floatdidf2_mem): Combine signed/unsigned conversion ops into a
+	single insn.
+	(floatunsdidf2_mem): Likewise.
+	(float<uns>di<mode>2_mem): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatunsdidf2): Combine generator and insn.
+	(floatunsdidf2_fcfidu): Likewise.
+	(movsi_low): Use wN constraint instead of m to skip large memory.
+	(movsi_from_sf): Likewise.
+	(movdi_from_sf_zero_ext): Don't allow large memory.  Also use wN
+	instead of m.
+	(movsf_from_si): Likewise.
+	(mov<mode>_internal, QHI iterator): Use wN constraint instead of
+	m.
+	(movsf_hardfloat): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_softfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	(mov<mode>_64bit_dm): Likewise.
+	(movtd_64bit_nodm): Likewise.
+	(mov<mode>_32bit, FMOVE128_FPR iterator): Likewise.
+	(extenddf<mode>2_fprs, IBM128 iterator): Likewise.
+	(extenddf<mode>2_vsx, IBM128 iterator): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	(high_plus_int): Recognize ADDIS generated by large addresses.
+	(probe_stack_<mode>): Don't allow large memory.
+	(stack_protect_setsi): Likewise.
+	(stack_protect_testsi): Likewise.
+	(<bd>_<mode): Likewise.
+	(<bd>tf_<mode>): Likewise.
+	(crsave): Likewise.
+	(stmw): Likewise.
+	(fusion_gpr_load_<mode>): Remove generator support.
+	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_load): Likewise.
+	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_store): Likewise.
+	(fusion_vsx_<P:mode>_<FPR_FUSION:mode>_load): Likewise.
+	(fusion_vsx_<P:mode>_<FPR_FUSION:mode>_store): Likewise.
+	* config/rs6000/rs6000.opt (-mlarge-address): New switch.
+
 2018-07-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-protos.h (fusion_wrap_memory_address):
