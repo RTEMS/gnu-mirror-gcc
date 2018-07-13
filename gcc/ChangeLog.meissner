@@ -1,5 +1,19 @@
 2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config.gcc (powerpc*-*-*): Add rs6000-addr.o to build.
+	(rs6000*-*-*): Likewise.
+	* config/rs6000/rs6000-addr.c (rs6000_optimize_addresses): New
+	file to add a machine dependent pass to optimize memory
+	addresses.
+	* config/rs6000/rs6000-passes.def (pass_optimize_addresses): Add
+	address optimization pass.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_addresses):
+	Add declaration.
+	* config/rs6000/rs6000.opt (-moptimize-addresses): New switch.
+	* config/rs6000/t-rs6000 (rs6000-addr.o): Add build rules.
+
+2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (GPR_FUSION): Restore old version.
 	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_load): Likewise.
 	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_store): Likewise.
