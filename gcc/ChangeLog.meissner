@@ -1,5 +1,17 @@
 2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (fusion_wrap_memory_address):
+	Delete, no longer used.
+	* config/rs6000/rs6000.c (fusion_wrap_memory_address): Likewise.
+	* config/rs6000/rs6000.md (UNSPEC_FUSION_ADDIS): Likewise.
+	(GPR_FUSION): Delete patterns for power9 gpr fusion that were only
+	used with toc fusion.  Leave the floating point load/store fusion
+	that we recognized by the power9 fusion peepholes.
+	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_load): Likewise.
+	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_store): Likewise.
+
+2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wG constraint): Delete, no longer
 	used.
 	* config/rs6000/predicates.md (p9_fusion_reg_operand): Rename

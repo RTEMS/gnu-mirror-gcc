@@ -37798,18 +37798,6 @@ emit_fusion_load_store (rtx load_store_reg, rtx addis_reg, rtx offset,
   return;
 }
 
-/* Wrap a TOC address that can be fused to indicate that special fusion
-   processing is needed.  */
-
-rtx
-fusion_wrap_memory_address (rtx old_mem)
-{
-  rtx old_addr = XEXP (old_mem, 0);
-  rtvec v = gen_rtvec (1, old_addr);
-  rtx new_addr = gen_rtx_UNSPEC (Pmode, v, UNSPEC_FUSION_ADDIS);
-  return replace_equiv_address_nv (old_mem, new_addr, false);
-}
-
 /* Given an address, convert it into the addis and load offset parts.  Addresses
    created during the peephole2 process look like:
 	(lo_sum (high (unspec [(sym)] UNSPEC_TOCREL))
