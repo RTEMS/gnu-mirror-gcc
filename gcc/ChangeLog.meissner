@@ -1,3 +1,11 @@
+2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (large_mov<mode>_loadu_di): Spacing.
+	(large_mov<mode>_loads_di): Likewise.
+	(zero extend large address splits): Fix the insn generated.
+	(sign extend large address splits): Likewise.
+	(large_extendsfdf): Likewise.
+
 2018-07-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.md (LADDR_GSTORE): Delete, not currently
