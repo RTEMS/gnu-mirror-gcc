@@ -197,7 +197,7 @@ process_toc_refs (struct toc_refs_info *info)
 	  src = copy_rtx (src);
 	}
 
-      else if (MEM_P (src))
+      else
 	{
 	  enum rtx_code scode = UNKNOWN;
 	  machine_mode smode = GET_MODE (src);
@@ -210,18 +210,21 @@ process_toc_refs (struct toc_refs_info *info)
 	      src = XEXP (src, 0);
 	    }
 
-	  addr = get_toc_ref (src, &offset);
-	  gcc_assert (addr);
+	  if (MEM_P (src))
+	    {
+	      addr = get_toc_ref (src, &offset);
+	      gcc_assert (addr);
 
-	  dest = copy_rtx (dest);
-	  src = update_toc_reference (src, info);
+	      dest = copy_rtx (dest);
+	      src = update_toc_reference (src, info);
 
-	  if (scode != UNKNOWN)
-	    src = gen_rtx_fmt_e (scode, smode, src);
+	      if (scode != UNKNOWN)
+		src = gen_rtx_fmt_e (scode, smode, src);
+	    }
+
+	  else
+	    gcc_unreachable ();
 	}
-
-      else
-	gcc_unreachable ();
 
       /* Update the SET insn with the new src and/or dest and delete the old
 	 insn.  */

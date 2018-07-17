@@ -1,3 +1,7 @@
+2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-addr.c (process_toc_refs): Fix thinko.
+
 2018-07-16  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-addr.c: Add initial support for
