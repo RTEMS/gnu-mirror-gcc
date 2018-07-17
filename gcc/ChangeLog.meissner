@@ -1,5 +1,10 @@
 2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c: Rework to support keeping track of
+	multiple base pointers in a basic block.
+
+2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c (toc_refs::add): Move check for
 	different symbol to add.
 	(rs6000_optimize_addresses): Likewise.

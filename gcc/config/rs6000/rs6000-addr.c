@@ -50,12 +50,12 @@
 bool rs6000_optimized_address_p[NUM_MACHINE_MODES];
 
 const unsigned INITIAL_NUM_REFS	= 40;	// # of refs to allocate initially.
+const unsigned NUM_BASE_PTRS	= 3;	// # of base ptrs to save in a block
 
-// Information needed for optimizing TOC references.
-class toc_refs {
- private:
-  HOST_WIDE_INT toc_offset;		// offset to use for the same ref. 
-  rtx_insn **refs;			// insns to be modified.
+// Information for each base pointer
+struct base_ptr {
+  HOST_WIDE_INT offset;			// offset of the symbol
+  rtx_insn **refs;			// insns to be modified
   rtx symbol;				// TOC reference to optimize.
   rtx base_reg;				// common base register used.
   unsigned num_refs;			// number of insns to be modified.
@@ -63,164 +63,86 @@ class toc_refs {
   unsigned num_gpr_reads;		// number of P8 fusion reads.
   unsigned num_writes;			// number of writes to be modified.
   unsigned max_refs;			// refs array size.
+  bool different_offsets_p;		// if different offsets are used.
+};
+
+// Information needed for optimizing TOC references.
+class toc_refs {
+ private:
+  struct base_ptr base[NUM_BASE_PTRS];	// all of the base pointers used
   unsigned total_reads;			// total # of reads to be modified.
   unsigned total_gpr_reads;		// total # of P8 fusion reads.
   unsigned total_writes;		// total # of writes to be modified.
-  bool different_offsets_p;		// if different offsets are used.
 
  public:
   toc_refs ()
   {
-    toc_offset = 0;
-    refs = (rtx_insn **)0;
-    symbol = NULL_RTX;
-    base_reg = NULL_RTX;
-    num_refs = 0;
-    num_reads = 0;
-    num_gpr_reads = 0;
-    num_writes = 0;
-    max_refs = 0;
+    memset ((void *) base, '\0', sizeof (base));
     total_reads = 0;
     total_gpr_reads = 0;
     total_writes = 0;
-    different_offsets_p = false;
   }
 
   ~toc_refs ()
   {
-    if (refs)
-      free ((void *)refs);
+    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+      if (base[i].refs)
+	free ((void *)base[i].refs);
   }
 
   // Reset variables for next basic block, don't reset totals or allocated
   // vector of insns.
-  void reset (void)
+  void reset (size_t num)
   {
-    symbol = NULL_RTX;
-    base_reg = NULL_RTX;
-    num_refs = 0;
-    num_reads = 0;
-    num_gpr_reads = 0;
-    num_writes = 0;
-    different_offsets_p = false;
-    if (refs && max_refs)
-      memset ((void *)refs, '\0', sizeof (rtx_insn *) * max_refs);
+    base[num].symbol = NULL_RTX;
+    base[num].base_reg = NULL_RTX;
+    base[num].num_refs = 0;
+    base[num].different_offsets_p = false;
+    if (base[num].refs && base[num].max_refs)
+      memset ((void *)base[num].refs, '\0',
+	      sizeof (rtx_insn *) * base[num].max_refs);
 
     return;
+  }
+
+  // Reset all of the blocks
+  void reset_all (void)
+  {
+    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+      reset (i);
   }
 
   // Add an INSN to be optimized with ADDR symbol ref and OFFSET offset.
   // load/store.
   void add (rtx_insn *, rtx, HOST_WIDE_INT);
 
-  // Return the current toc reference
-  rtx get_symbol (void)
-  {
-    return symbol;
-  }
-
   // Return the number of insns to be modified
   unsigned get_num_refs (void)
   {
-    return num_refs;
-  }
+    unsigned ret = 0;
+    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+      ret += base[i].num_refs;
 
-  // Update a memory address to use either the new base register and a simple
-  // offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
-  // all of the offsets are the same.
-  rtx update (rtx);
+    return ret;
+  }
 
   // Optimize a set of references that have a TOC reference.
   void process_toc_refs (void);
 
   // Print out final totals
   void print_totals (void);
+
+ private:
+  // Update a memory address to use either the new base register and a simple
+  // offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
+  // all of the offsets are the same.
+  rtx update (rtx, size_t);
+
+  // Optimize a single set of references that have a TOC reference.
+  void process_toc_refs_single (size_t);
 };
 
 
-// Add an INSN to be optimized with ADDR symbol ref and OFFSET offset.
-void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
-{
-  rtx set = single_set (insn);
-  rtx dest = SET_DEST (set);
-
-  // If this is a different symbol, process the current symbols and restart
-  // with the new symbol.
-  if (symbol && !rtx_equal_p (symbol, addr))
-    {
-      if (dump_file)
-	{
-	  rtx symbol2 = XVECEXP (symbol, 0, 0);
-	  rtx addr2 = XVECEXP (addr, 0, 0);
-	  fputs ("\nFound different symbol, flushing opts\n", dump_file);
-	  fprintf (dump_file,
-		   "Old value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
-		   SYMBOL_REF_ANCHOR_P (symbol2),
-		   CONSTANT_POOL_ADDRESS_P (symbol2),
-		   SYMBOL_REF_HAS_BLOCK_INFO_P (symbol2),
-		   (unsigned long) SYMBOL_REF_BLOCK (symbol2));
-	  print_rtl (dump_file, symbol);
-
-	  fprintf (dump_file,
-		   "New value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
-		   SYMBOL_REF_ANCHOR_P (addr2),
-		   CONSTANT_POOL_ADDRESS_P (addr2),
-		   SYMBOL_REF_HAS_BLOCK_INFO_P (addr2),
-		   (unsigned long) SYMBOL_REF_BLOCK (addr2));
-	  print_rtl (dump_file, addr);
-
-	  fputs ("\n", dump_file);
-	}
-
-      process_toc_refs ();
-    }
-
-  if (!refs)
-    {
-      max_refs = INITIAL_NUM_REFS;
-      refs = XNEWVEC (rtx_insn *, max_refs);
-    }
-
-  else if (num_refs >= max_refs)
-    {
-      max_refs *= 2;
-      refs = XRESIZEVEC (rtx_insn *, refs, max_refs);
-    }
-
-  // Remember the toc reference and the offset
-  if (num_refs == 0)
-    {
-      symbol = addr;
-      toc_offset = offset;
-    }
-
-  else if (toc_offset != offset)
-    different_offsets_p = true;
-
-  refs[num_refs++] = insn;
-
-  // Update statistics
-  if (!MEM_P (dest))
-    {
-      machine_mode mode = GET_MODE (dest);
-      num_reads++;
-      total_reads++;
-      if (mode == QImode || mode == HImode || mode == SImode
-	  || mode == DImode)
-	{
-	  num_gpr_reads++;
-	  total_gpr_reads++;
-	}
-    }
-  else
-    {
-      num_writes++;
-      total_writes++;
-    }
-
-  return;
-}
-
 /* Given a memory address, if the value is a TOC reference, return the TOC
    reference part, i.e. (UNSPEC [(...) UNSPEC_TOCREL), and the offset.  If it
    is not a TOC reference, or the offset would not fit in a single D-form
@@ -257,22 +179,142 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 	  : NULL_RTX);
 }
 
+
+// Add an INSN to be optimized with ADDR symbol ref and OFFSET offset.
+void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
+{
+  rtx set = single_set (insn);
+  rtx dest = SET_DEST (set);
+  unsigned base_num = NUM_BASE_PTRS;
+  struct base_ptr *p;
+
+  // See if the base register has already been used
+  for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+    {
+      if (base[i].symbol && rtx_equal_p (base[i].symbol, addr))
+	{
+	  base_num = i;
+	  break;
+	}
+    }
+
+  // If the base register has not been previously used, see if there are any
+  // free slots.
+  if (base_num == NUM_BASE_PTRS)
+    {
+      for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+	if (base[i].num_refs == 0)
+	  {
+	    base_num = i;
+	    break;
+	  }
+    }
+
+  // We have to evict one of the base pointers, evict the one with the most
+  // insns changed.
+  if (base_num == NUM_BASE_PTRS)
+    {
+      unsigned mrefs = base[0].num_refs;
+      base_num = 0;
+      for (size_t i = 1; i < NUM_BASE_PTRS; i++)
+	if (base[i].num_refs > mrefs)
+	  {
+	    mrefs = base[i].num_refs;
+	    base_num = i;
+	  }
+
+      if (dump_file)
+	{
+	  rtx symbol2 = XVECEXP (base[base_num].symbol, 0, 0);
+	  rtx addr2 = XVECEXP (addr, 0, 0);
+	  fputs ("\nFound different symbol, flushing opts\n", dump_file);
+	  fprintf (dump_file,
+		   "Old value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
+		   SYMBOL_REF_ANCHOR_P (symbol2),
+		   CONSTANT_POOL_ADDRESS_P (symbol2),
+		   SYMBOL_REF_HAS_BLOCK_INFO_P (symbol2),
+		   (unsigned long) SYMBOL_REF_BLOCK (symbol2));
+	  print_rtl (dump_file, base[base_num].symbol);
+
+	  fprintf (dump_file,
+		   "New value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
+		   SYMBOL_REF_ANCHOR_P (addr2),
+		   CONSTANT_POOL_ADDRESS_P (addr2),
+		   SYMBOL_REF_HAS_BLOCK_INFO_P (addr2),
+		   (unsigned long) SYMBOL_REF_BLOCK (addr2));
+	  print_rtl (dump_file, addr);
+
+	  fputs ("\n", dump_file);
+	}
+
+      process_toc_refs_single (base_num);
+    }
+
+  p = &base[base_num];
+  if (!p->refs)
+    {
+      p->max_refs = INITIAL_NUM_REFS;
+      p->refs = XNEWVEC (rtx_insn *, p->max_refs);
+    }
+
+  else if (p->num_refs >= p->max_refs)
+    {
+      p->max_refs *= 2;
+      p->refs = XRESIZEVEC (rtx_insn *, p->refs, p->max_refs);
+    }
+
+  // Remember the toc reference and the offset
+  if (p->num_refs == 0)
+    {
+      p->symbol = addr;
+      p->offset = offset;
+    }
+
+  else if (p->offset != offset)
+    p->different_offsets_p = true;
+
+  p->refs[p->num_refs++] = insn;
+
+  // Update statistics
+  if (!MEM_P (dest))
+    {
+      machine_mode mode = GET_MODE (dest);
+      p->num_reads++;
+      total_reads++;
+      if (mode == QImode || mode == HImode || mode == SImode
+	  || mode == DImode)
+	{
+	  p->num_gpr_reads++;
+	  total_gpr_reads++;
+	}
+    }
+  else
+    {
+      p->num_writes++;
+      total_writes++;
+    }
+
+  return;
+}
+
+
 /* Update a memory address to use either the new base register and a simple
    offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
    all of the offsets are the same.  */
 
 rtx
-toc_refs::update (rtx old_mem)
+toc_refs::update (rtx old_mem, size_t base_num)
 {
   HOST_WIDE_INT offset;
   rtx addr = get_toc_ref (old_mem, &offset);
   rtx new_addr;
+  struct base_ptr *p = &base[base_num];
 
   gcc_assert (addr);
 
-  if (different_offsets_p)
+  if (p->different_offsets_p)
     {
-      new_addr = base_reg;
+      new_addr = p->base_reg;
       if (offset != 0)
 	new_addr = gen_rtx_PLUS (Pmode, new_addr, GEN_INT (offset));
     }
@@ -282,27 +324,27 @@ toc_refs::update (rtx old_mem)
       if (offset != 0)
 	addr = gen_rtx_PLUS (Pmode, addr, GEN_INT (offset));
 
-      new_addr = gen_rtx_LO_SUM (Pmode, base_reg, addr);
+      new_addr = gen_rtx_LO_SUM (Pmode, p->base_reg, addr);
     }
 
   return replace_equiv_address (old_mem, new_addr);
 }
 
-/* Optimize a set of references that have a TOC reference.  */
+/* Optimize a set of references that have a TOC reference for a single base
+   register that has been saved.  */
 
 void
-toc_refs::process_toc_refs (void)
+toc_refs::process_toc_refs_single (size_t base_num)
 {
-  unsigned i;
-
+  struct base_ptr *p = &base[base_num];
 
   // If we just have one load/store, it is not worth optimizing.
-  if (num_refs == 1)
+  if (p->num_refs == 1)
     {
       if (dump_file)
 	fputs ("\nSkipping optimization, only 1 toc reference\n", dump_file);
 
-      reset ();
+      reset (base_num);
       return;
     }
 
@@ -310,39 +352,39 @@ toc_refs::process_toc_refs (void)
   // optimizing the references, so that we use P8 fusion for each of the loads.
   // However, if we have a lot of reads in the basic block do the optimization
   // to save on i-cache space.
-  if (TARGET_P8_FUSION && !TARGET_P9_FUSION && num_writes == 0
-      && num_reads == num_gpr_reads && num_reads < 10)
+  if (TARGET_P8_FUSION && !TARGET_P9_FUSION && p->num_writes == 0
+      && p->num_reads == p->num_gpr_reads && p->num_reads < 10)
     {
       if (dump_file)
 	fputs ("\nSkipping optimization, only GPR loads\n", dump_file);
 
-      reset ();
+      reset (base_num);
       return;
     }
 
   // Initialize the single TOC load just before the first use.
-  rtx_insn *first_insn = refs[0];
+  rtx_insn *first_insn = p->refs[0];
   rtx set_base_reg;
   rtx_insn *set_insn;
 
   // Get an unshared toc reference.
-  symbol = copy_rtx (symbol);
+  p->symbol = copy_rtx (p->symbol);
 
   // Set up the base register
-  base_reg = gen_reg_rtx (Pmode);
+  p->base_reg = gen_reg_rtx (Pmode);
 
-  if (different_offsets_p)
-    set_base_reg = gen_rtx_SET (base_reg, symbol);
+  if (p->different_offsets_p)
+    set_base_reg = gen_rtx_SET (p->base_reg, p->symbol);
 
   else
     {
-      rtx high = symbol;
+      rtx high = p->symbol;
 
-      if (toc_offset != 0)
-	high = gen_rtx_PLUS (Pmode, high, GEN_INT (toc_offset));
+      if (p->offset != 0)
+	high = gen_rtx_PLUS (Pmode, high, GEN_INT (p->offset));
 
       high = gen_rtx_HIGH (Pmode, high);
-      set_base_reg = gen_rtx_SET (base_reg, high);
+      set_base_reg = gen_rtx_SET (p->base_reg, high);
     }
 
   set_insn = emit_insn_before (set_base_reg, first_insn);
@@ -351,14 +393,19 @@ toc_refs::process_toc_refs (void)
 
   if (dump_file)
     {
-      fprintf (dump_file,
-	       "\n%u insn(s) to modify, %u reads (%u gpr), %u writes, "
-	       "%s offset",
-	       num_refs,
-	       num_reads,
-	       num_gpr_reads,
-	       num_writes,
-	       different_offsets_p ? "different" : "same");
+      fprintf (dump_file, "\n%u insn(s) to modify", p->num_refs);
+
+      if (p->num_reads)
+	fprintf (dump_file, ", %u read(s)", p->num_reads);
+
+      if (p->num_gpr_reads)
+	fprintf (dump_file, ", %u gpr read(s)", p->num_gpr_reads);
+
+      if (p->num_writes)
+	fprintf (dump_file, ", %u write(s)", p->num_writes);
+
+      if (base_num > 0)
+	fprintf (dump_file, ", base ptr #%u", (unsigned)base_num);
 
       fputs ("\nSymbol:\n", dump_file);
       dump_insn_slim (dump_file, set_insn);
@@ -366,9 +413,9 @@ toc_refs::process_toc_refs (void)
     }
 
   // Update the insns TOC references.
-  for (i = 0; i < num_refs; i++)
+  for (unsigned i = 0; i < p->num_refs; i++)
     {
-      rtx_insn *insn = refs[i];
+      rtx_insn *insn = p->refs[i];
       rtx body = PATTERN (insn);
       rtx dest = SET_DEST (body);
       rtx src = SET_SRC (body);
@@ -379,10 +426,10 @@ toc_refs::process_toc_refs (void)
 
       if (MEM_P (dest))
 	{
-	  addr =  get_toc_ref (dest, &offset);
+	  addr = get_toc_ref (dest, &offset);
 	  gcc_assert (addr);
 
-	  dest = update (dest);
+	  dest = update (dest, base_num);
 	  src = copy_rtx (src);
 	}
 
@@ -405,7 +452,7 @@ toc_refs::process_toc_refs (void)
 	      gcc_assert (addr);
 
 	      dest = copy_rtx (dest);
-	      src = update (src);
+	      src = update (src, base_num);
 
 	      if (scode != UNKNOWN)
 		src = gen_rtx_fmt_e (scode, smode, src);
@@ -434,10 +481,22 @@ toc_refs::process_toc_refs (void)
     }
 
   // Reset fields for the next set of symbols
-  reset ();
+  reset (base_num);
   return;
 }
 
+/* Optimize a set of references that have a TOC reference for a single base
+   register that has been saved.  */
+
+void
+toc_refs::process_toc_refs (void)
+{
+  for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+    if (base[i].num_refs > 0)
+      process_toc_refs_single (i);
+}
+
+
 // Print the final totals
 void
 toc_refs::print_totals (void)
