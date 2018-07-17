@@ -51,22 +51,145 @@ bool rs6000_optimized_address_p[NUM_MACHINE_MODES];
 
 #define INITIAL_NUM_REFS	40	/* # of refs to allocate initially.  */
 
-/* Structure to gather together information used for optimizing TOC
-   references.  */
+/* Information needed for optimizing TOC references.  */
+class toc_refs {
+ private:
+  HOST_WIDE_INT toc_offset;		// offset to use for the same ref. 
+  rtx_insn **refs;			// insns to be modified.
+  rtx symbol;				// TOC reference to optimize.
+  rtx base_reg;				// common base register used.
+  unsigned num_refs;			// number of insns to be modified.
+  unsigned num_reads;			// number of reads to be modified.
+  unsigned num_gpr_reads;		// number of P8 fusion reads.
+  unsigned num_writes;			// number of writes to be modified.
+  unsigned max_refs;			// refs array size.
+  unsigned total_reads;			// total # of reads to be modified.
+  unsigned total_gpr_reads;		// total # of P8 fusion reads.
+  unsigned total_writes;		// total # of writes to be modified.
+  bool different_offsets_p;		// if different offsets are used.
 
-struct toc_refs_info {
-  HOST_WIDE_INT toc_offset;		/* offset to use for the same ref.  */
-  rtx_insn **refs;			/* insns to be modified.  */
-  rtx toc_ref;				/* TOC reference to optimize.  */
-  rtx toc_reg;				/* REG used for ADDIS or base reg. */
-  unsigned num_refs;			/* number of insns to be modified.  */
-  unsigned num_reads;			/* number of reads to be modified.  */
-  unsigned num_writes;			/* number of writes to be modified.  */
-  unsigned max_refs;			/* refs array size.  */
-  bool different_offsets_p;		/* if different offsets are used.  */
+ public:
+  toc_refs ()
+  {
+    toc_offset = 0;
+    refs = (rtx_insn **)0;
+    symbol = NULL_RTX;
+    base_reg = NULL_RTX;
+    num_refs = 0;
+    num_reads = 0;
+    num_gpr_reads = 0;
+    num_writes = 0;
+    max_refs = 0;
+    total_reads = 0;
+    total_gpr_reads = 0;
+    total_writes = 0;
+    different_offsets_p = false;
+  }
+
+  ~toc_refs ()
+  {
+    if (refs)
+      free ((void *)refs);
+  }
+
+  // Reset variables for next basic block, don't reset totals or allocated
+  // vector of insns.
+  void reset (void)
+  {
+    symbol = NULL_RTX;
+    base_reg = NULL_RTX;
+    num_refs = 0;
+    num_reads = 0;
+    num_gpr_reads = 0;
+    num_writes = 0;
+    different_offsets_p = false;
+    if (refs && max_refs)
+      memset ((void *)refs, '\0', sizeof (rtx_insn *) * max_refs);
+
+    return;
+  }
+
+  // Add an INSN to be optimized with ADDR symbol ref and OFFSET offset.
+  // load/store.
+  void add (rtx_insn *, rtx, HOST_WIDE_INT);
+
+  // Return the current toc reference
+  rtx get_symbol (void)
+  {
+    return symbol;
+  }
+
+  // Return the number of insns to be modified
+  unsigned get_num_refs (void)
+  {
+    return num_refs;
+  }
+
+  // Update a memory address to use either the new base register and a simple
+  // offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
+  // all of the offsets are the same.
+  rtx update (rtx);
+
+  // Optimize a set of references that have a TOC reference.
+  void process_toc_refs (void);
+
+  // Print out final totals
+  void print_totals (void);
 };
 
 
+// Add an INSN to be optimized with ADDR symbol ref and OFFSET offset.
+void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
+{
+  rtx set = single_set (insn);
+  rtx dest = SET_DEST (set);
+
+  if (!refs)
+    {
+      max_refs = INITIAL_NUM_REFS;
+      refs = XNEWVEC (rtx_insn *, max_refs);
+    }
+
+  else if (num_refs >= max_refs)
+    {
+      max_refs *= 2;
+      refs = XRESIZEVEC (rtx_insn *, refs, max_refs);
+    }
+
+  // Remember the toc reference and the offset
+  if (num_refs == 0)
+    {
+      symbol = addr;
+      toc_offset = offset;
+    }
+
+  else if (toc_offset != offset)
+    different_offsets_p = true;
+
+  refs[num_refs++] = insn;
+
+  // Update statistics
+  if (!MEM_P (dest))
+    {
+      machine_mode mode = GET_MODE (dest);
+      num_reads++;
+      total_reads++;
+      if (mode == QImode || mode == HImode || mode == SImode
+	  || mode == DImode)
+	{
+	  num_gpr_reads++;
+	  total_gpr_reads++;
+	}
+    }
+  else
+    {
+      num_writes++;
+      total_writes++;
+    }
+
+  return;
+}
+
 /* Given a memory address, if the value is a TOC reference, return the TOC
    reference part, i.e. (UNSPEC [(...) UNSPEC_TOCREL), and the offset.  If it
    is not a TOC reference, or the offset would not fit in a single D-form
@@ -105,8 +228,8 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 /* Update a memory address to use either the new base register and a simple
    offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
    all of the offsets are the same.  */
-static rtx
-update_toc_reference (rtx old_mem, struct toc_refs_info *info)
+rtx
+toc_refs::update (rtx old_mem)
 {
   HOST_WIDE_INT offset;
   rtx addr = get_toc_ref (old_mem, &offset);
@@ -114,9 +237,9 @@ update_toc_reference (rtx old_mem, struct toc_refs_info *info)
 
   gcc_assert (addr);
 
-  if (info->different_offsets_p)
+  if (different_offsets_p)
     {
-      new_addr = info->toc_reg;
+      new_addr = base_reg;
       if (offset != 0)
 	new_addr = gen_rtx_PLUS (Pmode, new_addr, GEN_INT (offset));
     }
@@ -126,60 +249,92 @@ update_toc_reference (rtx old_mem, struct toc_refs_info *info)
       if (offset != 0)
 	addr = gen_rtx_PLUS (Pmode, addr, GEN_INT (offset));
 
-      new_addr = gen_rtx_LO_SUM (Pmode, info->toc_reg, addr);
+      new_addr = gen_rtx_LO_SUM (Pmode, base_reg, addr);
     }
 
   return replace_equiv_address (old_mem, new_addr);
 }
 
 /* Optimize a set of references that have a TOC reference.  */
-static void
-process_toc_refs (struct toc_refs_info *info)
+void
+toc_refs::process_toc_refs (void)
 {
   unsigned i;
 
-  /* Get an unshared toc reference.  */
-  rtx toc_ref = copy_rtx (info->toc_ref);
 
-  /* Initialize the single TOC load just before the first use.  */
-  rtx_insn *first_insn = info->refs[0];
-  rtx set_toc_reg;
+  // If we just have one load/store, it is not worth optimizing.
+  if (num_refs == 1)
+    {
+      if (dump_file)
+	fputs ("\nSkipping optimization, only 1 toc reference\n", dump_file);
+
+      reset ();
+      return;
+    }
+
+  // If we are on a power8, and we just have GPR loads, fall back to not
+  // optimizing the references, so that we use P8 fusion for each of the loads.
+  // However, if we have a lot of reads in the basic block do the optimization
+  // to save on i-cache space.
+  if (TARGET_P8_FUSION && !TARGET_P9_FUSION && num_writes == 0
+      && num_reads == num_gpr_reads && num_reads < 10)
+    {
+      if (dump_file)
+	fputs ("\nSkipping optimization, only GPR loads\n", dump_file);
+
+      reset ();
+      return;
+    }
+
+  // Initialize the single TOC load just before the first use.
+  rtx_insn *first_insn = refs[0];
+  rtx set_base_reg;
   rtx_insn *set_insn;
 
-  info->toc_reg = gen_reg_rtx (Pmode);
+  // Get an unshared toc reference.
+  symbol = copy_rtx (symbol);
 
-  if (info->different_offsets_p)
-    set_toc_reg = gen_rtx_SET (info->toc_reg, toc_ref);
+  // Set up the base register
+  base_reg = gen_reg_rtx (Pmode);
+
+  if (different_offsets_p)
+    set_base_reg = gen_rtx_SET (base_reg, symbol);
 
   else
     {
-      rtx high = gen_rtx_HIGH (Pmode, toc_ref);
+      rtx high = symbol;
 
-      if (info->toc_offset != 0)
-	high = gen_rtx_PLUS (Pmode, high, GEN_INT (info->toc_offset));
+      if (toc_offset != 0)
+	high = gen_rtx_PLUS (Pmode, high, GEN_INT (toc_offset));
 
-      set_toc_reg = gen_rtx_SET (info->toc_reg, high);
+      high = gen_rtx_HIGH (Pmode, high);
+      set_base_reg = gen_rtx_SET (base_reg, high);
     }
 
-  set_insn = emit_insn_before (set_toc_reg, first_insn);
+  set_insn = emit_insn_before (set_base_reg, first_insn);
   set_block_for_insn (set_insn, BLOCK_FOR_INSN (first_insn));
   df_insn_rescan (set_insn);
 
   if (dump_file)
     {
       fprintf (dump_file,
-	       "\n%u insn(s) to modify, %s offset\nSymbol:\n",
-	       info->num_refs+1,
-	       info->different_offsets_p ? "different" : "same");
+	       "\n%u insn(s) to modify, %u reads (%u gpr), %u writes, "
+	       "%s offset",
+	       num_refs,
+	       num_reads,
+	       num_gpr_reads,
+	       num_writes,
+	       different_offsets_p ? "different" : "same");
 
+      fputs ("\nSymbol:\n", dump_file);
       dump_insn_slim (dump_file, set_insn);
       fputs ("\n\nInsns:\n", dump_file);
     }
 
   /* Update the insns TOC references. */
-  for (i = 0; i < info->num_refs; i++)
+  for (i = 0; i < num_refs; i++)
     {
-      rtx_insn *insn = info->refs[i];
+      rtx_insn *insn = refs[i];
       rtx body = PATTERN (insn);
       rtx dest = SET_DEST (body);
       rtx src = SET_SRC (body);
@@ -193,7 +348,7 @@ process_toc_refs (struct toc_refs_info *info)
 	  addr =  get_toc_ref (dest, &offset);
 	  gcc_assert (addr);
 
-	  dest = update_toc_reference (dest, info);
+	  dest = update (dest);
 	  src = copy_rtx (src);
 	}
 
@@ -216,7 +371,7 @@ process_toc_refs (struct toc_refs_info *info)
 	      gcc_assert (addr);
 
 	      dest = copy_rtx (dest);
-	      src = update_toc_reference (src, info);
+	      src = update (src);
 
 	      if (scode != UNKNOWN)
 		src = gen_rtx_fmt_e (scode, smode, src);
@@ -244,30 +399,30 @@ process_toc_refs (struct toc_refs_info *info)
       insn->set_deleted ();
     }
 
-  /* Clear the fields for the nex basic block (except for the allocation
-     holding the addresses).  */
-  info->toc_offset = 0;
-  info->toc_ref = NULL_RTX;
-  info->toc_reg = NULL_RTX;
-  info->num_refs = 0;
-  info->num_reads = 0;
-  info->num_writes = 0;
-  info->different_offsets_p = false;
+  // Reset fields for the next set of symbols
+  reset ();
+  return;
 }
 
-/* Main entry point for this pass.  */
+// Print the final totals
+void
+toc_refs::print_totals (void)
+{
+  fputs ("\n", dump_file);
+  fprintf (dump_file, "Total number of writes = %u\n", total_writes);
+  fprintf (dump_file, "Total number of reads  = %u (%u gprs)\n",
+	   total_reads, total_gpr_reads);
+  fputs ("\n", dump_file);
+  return;
+}
+
+// Main entry point for this pass.
 unsigned int
 rs6000_optimize_addresses (function *fun)
 {
-  struct toc_refs_info info;
+  toc_refs info;
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
-  unsigned num_toc_reads = 0;
-  unsigned num_toc_writes = 0;
-
-  memset ((void *) &info, '\0', sizeof (info));
-  info.max_refs = INITIAL_NUM_REFS;
-  info.refs = XNEWVEC (rtx_insn *, info.max_refs);
 
   /* Dataflow analysis for use-def chains.  */
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
@@ -297,14 +452,7 @@ rs6000_optimize_addresses (function *fun)
 	      rtx addr = NULL_RTX;
 
 	      if (MEM_P (dest))
-		{
-		  addr = get_toc_ref (dest, &offset);
-		  if (addr)
-		    {
-		      num_toc_writes++;
-		      info.num_writes++;
-		    }
-		}
+		addr = get_toc_ref (dest, &offset);
 
 	      else
 		{
@@ -314,56 +462,44 @@ rs6000_optimize_addresses (function *fun)
 		    src = XEXP (src, 0);
 
 		  if (MEM_P (src))
-		    {
-		      addr = get_toc_ref (src, &offset);
-		      if (addr)
-			{
-			  info.num_reads++;
-			  num_toc_reads++;
-			}
-		    }
+		    addr = get_toc_ref (src, &offset);
 		}
 
 	      if (addr)
 		{
-		  if (info.num_refs == 0)
-		    info.toc_offset = offset;
-		  else if (info.toc_offset != offset)
-		    info.different_offsets_p = true;
-
 		  /* If this is a different symbol, process the current symbols
 		     and restart with the new symbol.  */
-		  if (info.toc_ref && !rtx_equal_p (info.toc_ref, addr))
-		    process_toc_refs (&info);
+		  rtx symbol = info.get_symbol ();
+		  if (symbol && !rtx_equal_p (symbol, addr))
+		    {
+		      if (dump_file)
+			{
+			  fputs ("\nFound different symbol, flushing opts\n",
+				 dump_file);
+			  fputs ("Old value:\n", dump_file);
+			  print_rtl (dump_file, symbol);
+			  fputs ("New value:\n", dump_file);
+			  print_rtl (dump_file, addr);
+			  fputs ("\n", dump_file);
+			}
+
+		      info.process_toc_refs ();
+		    }
 
 		  /* Add the references to the list of references to
 		     handle.  */
-		  if (info.num_refs >= info.max_refs)
-		    {
-		      info.max_refs *= 2;
-		      info.refs = XRESIZEVEC (rtx_insn *,
-					      info.refs,
-					      info.max_refs);
-		    }
-
-		  info.refs[info.num_refs++] = insn;
-		  info.toc_ref = addr;
+		  info.add (insn, addr, offset);
 		}
 	    }
 	}
 
       /* Process any symbols that we have queued up.  */
-      if (info.num_refs > 0)
-	process_toc_refs (&info);
+      if (info.get_num_refs () > 0)
+	info.process_toc_refs ();
     }
 
   if (dump_file)
-    {
-      fputs ("\n", dump_file);
-      fprintf (dump_file, "Number of tocrel writes = %u\n", num_toc_writes);
-      fprintf (dump_file, "Number of tocrel reads  = %u\n", num_toc_reads);
-      fputs ("\n", dump_file);
-    }
+    info.print_totals ();
 
   /* Rebuild ud chains.  */
   df_remove_problem (df_chain);
@@ -372,7 +508,6 @@ rs6000_optimize_addresses (function *fun)
   df_chain_add_problem (DF_UD_CHAIN);
   df_analyze ();
 
-  XDELETEVEC (info.refs);
   return 0;
 }
 

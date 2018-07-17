@@ -1,5 +1,13 @@
 2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c: Convert to using a C++ class.
+	* config/rs6000/rs6000.c (rs6000_debug_print_mode): Print whether
+	modes support optimizing addresses.
+	(rs6000_init_hard_regno_mode_ok): Optimize QI, HI, SI, DI, SF, and
+	DF modes.
+
+2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c (process_toc_refs): Fix thinko.
 
 2018-07-16  Michael Meissner  <meissner@linux.ibm.com>

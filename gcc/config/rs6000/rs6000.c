@@ -2383,6 +2383,17 @@ rs6000_debug_print_mode (ssize_t m)
   else
     spaces += sizeof ("  Reload=sl") - 1;
 
+  if (TARGET_OPT_ADDR)
+    {
+      if (rs6000_optimized_address_p[m])
+	{
+	  fprintf (stderr, "%*s opt-addr", spaces, "");
+	  spaces = 0;
+	}
+      else
+	spaces += sizeof (" opt-addr") - 1;
+    }
+
   if (reg_addr[m].scalar_in_vmx_p)
     {
       fprintf (stderr, "%*s  Upper=y", spaces, "");
@@ -3576,8 +3587,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   /* Mark which modes support optimized addresses.  */
   if (TARGET_OPT_ADDR)
     {
+      rs6000_optimized_address_p[QImode] = true;
+      rs6000_optimized_address_p[HImode] = true;
       rs6000_optimized_address_p[SImode] = true;
       rs6000_optimized_address_p[DImode] = true;
+      rs6000_optimized_address_p[SFmode] = true;
+      rs6000_optimized_address_p[DFmode] = true;
     }
 
   if (global_init_p || TARGET_DEBUG_TARGET)
