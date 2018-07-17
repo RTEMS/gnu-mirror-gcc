@@ -3573,6 +3573,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
      use.  */
   rs6000_setup_reg_addr_masks ();
 
+  /* Mark which modes support optimized addresses.  */
+  if (TARGET_OPT_ADDR)
+    {
+      rs6000_optimized_address_p[SImode] = true;
+      rs6000_optimized_address_p[DImode] = true;
+    }
+
   if (global_init_p || TARGET_DEBUG_TARGET)
     {
       if (TARGET_DEBUG_REG)

@@ -1,3 +1,12 @@
+2018-07-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-addr.c: Add initial support for
+	-moptimize-addresses.
+	* config/rs6000/rs6000-protos.h (rs6000_optimized_address_p): New
+	external array.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok):
+	Indicate that SImode and DImode support optimized addresses.
+
 2018-07-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Add rs6000-addr.o to build.
