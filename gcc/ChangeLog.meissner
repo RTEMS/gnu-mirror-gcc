@@ -1,5 +1,11 @@
 2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c (toc_refs::add): Move check for
+	different symbol to add.
+	(rs6000_optimize_addresses): Likewise.
+
+2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c: Convert to using a C++ class.
 	* config/rs6000/rs6000.c (rs6000_debug_print_mode): Print whether
 	modes support optimizing addresses.

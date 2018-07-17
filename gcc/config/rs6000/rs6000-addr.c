@@ -49,9 +49,9 @@
    addresses.  */
 bool rs6000_optimized_address_p[NUM_MACHINE_MODES];
 
-#define INITIAL_NUM_REFS	40	/* # of refs to allocate initially.  */
+const unsigned INITIAL_NUM_REFS	= 40;	// # of refs to allocate initially.
 
-/* Information needed for optimizing TOC references.  */
+// Information needed for optimizing TOC references.
 class toc_refs {
  private:
   HOST_WIDE_INT toc_offset;		// offset to use for the same ref. 
@@ -144,6 +144,37 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
   rtx set = single_set (insn);
   rtx dest = SET_DEST (set);
 
+  // If this is a different symbol, process the current symbols and restart
+  // with the new symbol.
+  if (symbol && !rtx_equal_p (symbol, addr))
+    {
+      if (dump_file)
+	{
+	  rtx symbol2 = XVECEXP (symbol, 0, 0);
+	  rtx addr2 = XVECEXP (addr, 0, 0);
+	  fputs ("\nFound different symbol, flushing opts\n", dump_file);
+	  fprintf (dump_file,
+		   "Old value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
+		   SYMBOL_REF_ANCHOR_P (symbol2),
+		   CONSTANT_POOL_ADDRESS_P (symbol2),
+		   SYMBOL_REF_HAS_BLOCK_INFO_P (symbol2),
+		   (unsigned long) SYMBOL_REF_BLOCK (symbol2));
+	  print_rtl (dump_file, symbol);
+
+	  fprintf (dump_file,
+		   "New value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
+		   SYMBOL_REF_ANCHOR_P (addr2),
+		   CONSTANT_POOL_ADDRESS_P (addr2),
+		   SYMBOL_REF_HAS_BLOCK_INFO_P (addr2),
+		   (unsigned long) SYMBOL_REF_BLOCK (addr2));
+	  print_rtl (dump_file, addr);
+
+	  fputs ("\n", dump_file);
+	}
+
+      process_toc_refs ();
+    }
+
   if (!refs)
     {
       max_refs = INITIAL_NUM_REFS;
@@ -194,6 +225,7 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
    reference part, i.e. (UNSPEC [(...) UNSPEC_TOCREL), and the offset.  If it
    is not a TOC reference, or the offset would not fit in a single D-form
    memory instruction, return NULL.  */
+
 static rtx
 get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 {
@@ -202,7 +234,7 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 
   machine_mode mode = GET_MODE (mem);
 
-  /* If the mode doesn't yet support optimized addresses, skip it.  */
+  // If the mode doesn't yet support optimized addresses, skip it.
   if (!rs6000_optimized_address_p[mode])
     return NULL_RTX;
 
@@ -215,7 +247,7 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
       *p_offset = INTVAL (XEXP (addr, 1));
       addr = XEXP (addr, 0);
 
-      /* Make sure the offset will fit in a single D-form insn.  */
+      // Make sure the offset will fit in a single D-form insn.
       if (!IN_RANGE (*p_offset, -32768 + mode_size, 32767 - mode_size))
 	return NULL_RTX;
     }
@@ -228,6 +260,7 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 /* Update a memory address to use either the new base register and a simple
    offset (if we use the same toc ref with multiple offsets), or a LO_SUM if
    all of the offsets are the same.  */
+
 rtx
 toc_refs::update (rtx old_mem)
 {
@@ -256,6 +289,7 @@ toc_refs::update (rtx old_mem)
 }
 
 /* Optimize a set of references that have a TOC reference.  */
+
 void
 toc_refs::process_toc_refs (void)
 {
@@ -331,7 +365,7 @@ toc_refs::process_toc_refs (void)
       fputs ("\n\nInsns:\n", dump_file);
     }
 
-  /* Update the insns TOC references. */
+  // Update the insns TOC references.
   for (i = 0; i < num_refs; i++)
     {
       rtx_insn *insn = refs[i];
@@ -381,8 +415,8 @@ toc_refs::process_toc_refs (void)
 	    gcc_unreachable ();
 	}
 
-      /* Update the SET insn with the new src and/or dest and delete the old
-	 insn.  */
+      // Update the SET insn with the new src and/or dest and delete the old
+      // insn.
       set = gen_rtx_SET (dest, src);
       new_insn = emit_insn_before (set, insn);
       set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
@@ -424,18 +458,15 @@ rs6000_optimize_addresses (function *fun)
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
 
-  /* Dataflow analysis for use-def chains.  */
+  // Dataflow analysis for use-def chains.
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
   df_chain_add_problem (DF_DU_CHAIN | DF_UD_CHAIN);
   df_analyze ();
   df_set_flags (DF_DEFER_INSN_RESCAN);
 
-  /* Walk the insns to look for the TOC references.  Because we are only
-     optimizing a single ADDIS away, keep this simple and only handle one
-     reference.  If we see another reference, flush out the current references.
-     In general, we will only see one symbol since section anchors are the
-     default.  */
-
+  // Walk the insns to look for the TOC references.  Because we are only
+  // optimizing a single ADDIS away, keep this simple and only handle one
+  // reference.  If we see another reference, flush out the current references.
   FOR_ALL_BB_FN (bb, fun)
     {
       HOST_WIDE_INT offset;
@@ -467,33 +498,13 @@ rs6000_optimize_addresses (function *fun)
 
 	      if (addr)
 		{
-		  /* If this is a different symbol, process the current symbols
-		     and restart with the new symbol.  */
-		  rtx symbol = info.get_symbol ();
-		  if (symbol && !rtx_equal_p (symbol, addr))
-		    {
-		      if (dump_file)
-			{
-			  fputs ("\nFound different symbol, flushing opts\n",
-				 dump_file);
-			  fputs ("Old value:\n", dump_file);
-			  print_rtl (dump_file, symbol);
-			  fputs ("New value:\n", dump_file);
-			  print_rtl (dump_file, addr);
-			  fputs ("\n", dump_file);
-			}
-
-		      info.process_toc_refs ();
-		    }
-
-		  /* Add the references to the list of references to
-		     handle.  */
+		  // Add the references to the list of references to handle.
 		  info.add (insn, addr, offset);
 		}
 	    }
 	}
 
-      /* Process any symbols that we have queued up.  */
+      // Process any symbols that we have queued up.
       if (info.get_num_refs () > 0)
 	info.process_toc_refs ();
     }
@@ -501,7 +512,7 @@ rs6000_optimize_addresses (function *fun)
   if (dump_file)
     info.print_totals ();
 
-  /* Rebuild ud chains.  */
+  // Rebuild ud chains.
   df_remove_problem (df_chain);
   df_process_deferred_rescans ();
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
@@ -514,15 +525,15 @@ rs6000_optimize_addresses (function *fun)
 
 const pass_data pass_data_optimize_addresses =
 {
-  RTL_PASS,			/* type */
-  "addr",			/* name */
-  OPTGROUP_NONE,		/* optinfo_flags */
-  TV_NONE,			/* tv_id */
-  0,				/* properties_required */
-  0,				/* properties_provided */
-  0,				/* properties_destroyed */
-  0,				/* todo_flags_start */
-  TODO_df_finish,		/* todo_flags_finish */
+  RTL_PASS,			// type
+  "addr",			// name
+  OPTGROUP_NONE,		// optinfo_flags
+  TV_NONE,			// tv_id
+  0,				// properties_required
+  0,				// properties_provided
+  0,				// properties_destroyed
+  0,				// todo_flags_start
+  TODO_df_finish,		// todo_flags_finish
 };
 
 class pass_optimize_addresses : public rtl_opt_pass
@@ -532,7 +543,7 @@ public:
     : rtl_opt_pass(pass_data_optimize_addresses, ctxt)
   {}
 
-  /* opt_pass methods: */
+  // opt_pass methods:
   virtual bool gate (function *)
   {
     return (optimize > 0 && TARGET_OPT_ADDR && TARGET_P8_FUSION);
