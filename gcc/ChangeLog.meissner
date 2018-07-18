@@ -1,5 +1,10 @@
 2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c (process_toc_refs_single): Change P8
+	cutoff for GPR reads down to 4 from 10.
+
+2018-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c: Rework to support keeping track of
 	multiple base pointers in a basic block.
 

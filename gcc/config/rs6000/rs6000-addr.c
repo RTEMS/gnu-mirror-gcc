@@ -51,6 +51,7 @@ bool rs6000_optimized_address_p[NUM_MACHINE_MODES];
 
 const unsigned INITIAL_NUM_REFS	= 40;	// # of refs to allocate initially.
 const unsigned NUM_BASE_PTRS	= 3;	// # of base ptrs to save in a block
+const unsigned NUM_P8_READS	= 4;	// cutover point to use base ptrs on P8
 
 // Information for each base pointer
 struct base_ptr {
@@ -353,7 +354,7 @@ toc_refs::process_toc_refs_single (size_t base_num)
   // However, if we have a lot of reads in the basic block do the optimization
   // to save on i-cache space.
   if (TARGET_P8_FUSION && !TARGET_P9_FUSION && p->num_writes == 0
-      && p->num_reads == p->num_gpr_reads && p->num_reads < 10)
+      && p->num_reads == p->num_gpr_reads && p->num_reads < NUM_P8_READS)
     {
       if (dump_file)
 	fputs ("\nSkipping optimization, only GPR loads\n", dump_file);
