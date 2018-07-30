@@ -1,3 +1,14 @@
+2018-07-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (label_ref_operand): New predicate
+	to recognize LABEL_REF.
+	* config/rs6000/rs6000.c (rs6000_output_addr_const_extra): Allow
+	LABEL_REF's inside of UNSPEC_TOCREL's.
+	* config/rs6000/rs6000.md (extendsi<mode>2): Allow reg+reg indexed
+	addressing.
+	(labelref): New insn to optimize loading a label address into
+	registers on a medium code system.
+
 2018-07-27   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 263039

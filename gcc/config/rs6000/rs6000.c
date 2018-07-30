@@ -20807,7 +20807,8 @@ rs6000_output_addr_const_extra (FILE *file, rtx x)
     switch (XINT (x, 1))
       {
       case UNSPEC_TOCREL:
-	gcc_checking_assert (GET_CODE (XVECEXP (x, 0, 0)) == SYMBOL_REF
+	gcc_checking_assert ((GET_CODE (XVECEXP (x, 0, 0)) == SYMBOL_REF
+			      || GET_CODE (XVECEXP (x, 0, 0)) == LABEL_REF)
 			     && REG_P (XVECEXP (x, 0, 1))
 			     && REGNO (XVECEXP (x, 0, 1)) == TOC_REGISTER);
 	output_addr_const (file, XVECEXP (x, 0, 0));

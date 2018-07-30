@@ -1662,6 +1662,10 @@
   return GET_CODE (op) == UNSPEC && XINT (op, 1) == UNSPEC_TOCREL;
 })
 
+;; Match a LABEL_REF operand
+(define_predicate "label_ref_operand"
+  (match_code "label_ref"))
+
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.
 (define_predicate "fusion_gpr_addis"
