@@ -1,3 +1,12 @@
+2018-08-13  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backport from mainline
+	2018-07-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/86324
+	* c-attribs.c (handle_mode_attribute): Call new translate_mode_attribute
+	target hook.
+
 2018-07-27  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 263037.
