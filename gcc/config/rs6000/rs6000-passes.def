@@ -25,3 +25,4 @@ along with GCC; see the file COPYING3.  If not see
  */
 
   INSERT_PASS_BEFORE (pass_cse, 1, pass_analyze_swaps);
+  INSERT_PASS_AFTER (pass_loop2, 1, pass_fix_indexing);

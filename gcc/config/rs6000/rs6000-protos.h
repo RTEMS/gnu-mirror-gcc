@@ -244,6 +244,8 @@ namespace gcc { class context; }
 class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
+extern rtl_opt_pass *make_pass_fix_indexing (gcc::context *);
+
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);

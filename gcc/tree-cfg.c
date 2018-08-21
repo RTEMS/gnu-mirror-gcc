@@ -8236,6 +8236,14 @@ debug_loops (int verbosity)
   print_loops (stderr, verbosity);
 }
 
+/* Kelvin debug function Print on stderr the code of LOOP, at some VERBOSITY level.  */
+
+DEBUG_FUNCTION void
+kelvin_debug_loop (FILE * fp, struct loop *loop, int verbosity)
+{
+  print_loop (fp, loop, 4, verbosity);
+}
+
 /* Print on stderr the code of LOOP, at some VERBOSITY level.  */
 
 DEBUG_FUNCTION void
