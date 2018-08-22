@@ -5331,6 +5331,10 @@ package body Sem_Ch13 is
                Error_Msg_N
                  ("Bit_Order can only be defined for record type", Nam);
 
+            elsif Is_Tagged_Type (U_Ent) and then Is_Derived_Type (U_Ent) then
+               Error_Msg_N
+                 ("Bit_Order cannot be defined for record extensions", Nam);
+
             elsif Duplicate_Clause then
                null;
 
@@ -5344,10 +5348,8 @@ package body Sem_Ch13 is
                   Flag_Non_Static_Expr
                     ("Bit_Order requires static expression!", Expr);
 
-               else
-                  if (Expr_Value (Expr) = 0) /= Bytes_Big_Endian then
-                     Set_Reverse_Bit_Order (Base_Type (U_Ent), True);
-                  end if;
+               elsif (Expr_Value (Expr) = 0) /= Bytes_Big_Endian then
+                  Set_Reverse_Bit_Order (Base_Type (U_Ent), True);
                end if;
             end if;
 
@@ -8763,8 +8765,37 @@ package body Sem_Ch13 is
 
          if Raise_Expression_Present then
             declare
-               Map   : constant Elist_Id := New_Elmt_List;
-               New_V : Entity_Id := Empty;
+               function Reset_Loop_Variable
+                 (N : Node_Id) return Traverse_Result;
+
+               procedure Reset_Loop_Variables is
+                 new Traverse_Proc (Reset_Loop_Variable);
+
+               ------------------------
+               -- Reset_Loop_Variable --
+               ------------------------
+
+               function Reset_Loop_Variable
+                 (N : Node_Id) return Traverse_Result
+               is
+               begin
+                  if Nkind (N) = N_Iterator_Specification then
+                     Set_Defining_Identifier (N,
+                       Make_Defining_Identifier
+                         (Sloc (N), Chars (Defining_Identifier (N))));
+                  end if;
+
+                  return OK;
+               end Reset_Loop_Variable;
+
+               --  Local variables
+
+               Map : constant Elist_Id := New_Elmt_List;
+
+            begin
+               Append_Elmt (Object_Entity, Map);
+               Append_Elmt (Object_Entity_M, Map);
+               Expr_M := New_Copy_Tree (Expr, Map => Map);
 
                --  The unanalyzed expression will be copied and appear in
                --  both functions. Normally expressions do not declare new
@@ -8772,35 +8803,7 @@ package body Sem_Ch13 is
                --  create new entities for their bound variables, to prevent
                --  multiple definitions in gigi.
 
-               function Reset_Loop_Variable (N : Node_Id)
-                 return Traverse_Result;
-
-               procedure Collect_Loop_Variables is
-                 new Traverse_Proc (Reset_Loop_Variable);
-
-               ------------------------
-               -- Reset_Loop_Variable --
-               ------------------------
-
-               function Reset_Loop_Variable (N : Node_Id)
-                 return Traverse_Result
-               is
-               begin
-                  if Nkind (N) = N_Iterator_Specification then
-                     New_V := Make_Defining_Identifier
-                       (Sloc (N), Chars (Defining_Identifier (N)));
-
-                     Set_Defining_Identifier (N, New_V);
-                  end if;
-
-                  return OK;
-               end Reset_Loop_Variable;
-
-            begin
-               Append_Elmt (Object_Entity, Map);
-               Append_Elmt (Object_Entity_M, Map);
-               Expr_M := New_Copy_Tree (Expr, Map => Map);
-               Collect_Loop_Variables (Expr_M);
+               Reset_Loop_Variables (Expr_M);
             end;
          end if;
 
@@ -8853,6 +8856,43 @@ package body Sem_Ch13 is
             --  after type declaration. Insert body itself after freeze node.
 
             Insert_After_And_Analyze (N, FBody);
+
+            --  The defining identifier of a quantified expression carries the
+            --  scope in which the type appears, but when unnesting we need
+            --  to indicate that its proper scope is the constructed predicate
+            --  function. The quantified expressions have been converted into
+            --  loops during analysis and expansion.
+
+            declare
+               function Reset_Quantified_Variable_Scope
+                 (N : Node_Id) return Traverse_Result;
+
+               procedure Reset_Quantified_Variables_Scope is
+                 new Traverse_Proc (Reset_Quantified_Variable_Scope);
+
+               -------------------------------------
+               -- Reset_Quantified_Variable_Scope --
+               -------------------------------------
+
+               function Reset_Quantified_Variable_Scope
+                 (N : Node_Id) return Traverse_Result
+               is
+               begin
+                  if Nkind_In (N, N_Iterator_Specification,
+                                  N_Loop_Parameter_Specification)
+                  then
+                     Set_Scope (Defining_Identifier (N),
+                       Predicate_Function (Typ));
+                  end if;
+
+                  return OK;
+               end Reset_Quantified_Variable_Scope;
+
+            begin
+               if Unnest_Subprogram_Mode then
+                  Reset_Quantified_Variables_Scope (Expr);
+               end if;
+            end;
 
             --  within a generic unit, prevent a double analysis of the body
             --  which will not be marked analyzed yet. This will happen when
@@ -8970,6 +9010,8 @@ package body Sem_Ch13 is
 
                Insert_Before_And_Analyze (N, FDecl);
                Insert_After_And_Analyze  (N, FBody);
+
+               --  Should quantified expressions be handled here as well ???
             end;
          end if;
 

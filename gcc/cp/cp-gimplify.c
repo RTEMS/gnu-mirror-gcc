@@ -793,6 +793,15 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 		ret = GS_ERROR;
 	    }
 	}
+      if (ret != GS_ERROR)
+	{
+	  tree decl = cp_get_callee_fndecl_nofold (*expr_p);
+	  if (decl
+	      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_FRONTEND
+	      && ((int) DECL_FUNCTION_CODE (decl)
+		  == CP_BUILT_IN_IS_CONSTANT_EVALUATED))
+	    *expr_p = boolean_false_node;
+	}
       break;
 
     case RETURN_EXPR:
@@ -1085,6 +1094,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
       if (h)
 	{
 	  *stmt_p = h->to;
+	  TREE_USED (h->to) |= TREE_USED (stmt);
 	  *walk_subtrees = 0;
 	  return NULL;
 	}
@@ -1410,12 +1420,15 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  /* Never mind.  */;
 	else if (wtd->try_block)
 	  {
-	    if (TREE_CODE (wtd->try_block) == MUST_NOT_THROW_EXPR
-		&& warning_at (loc, OPT_Wterminate,
-			       "throw will always call terminate()")
-		&& cxx_dialect >= cxx11
-		&& DECL_DESTRUCTOR_P (current_function_decl))
-	      inform (loc, "in C++11 destructors default to noexcept");
+	    if (TREE_CODE (wtd->try_block) == MUST_NOT_THROW_EXPR)
+	      {
+		auto_diagnostic_group d;
+		if (warning_at (loc, OPT_Wterminate,
+				"throw will always call terminate()")
+		    && cxx_dialect >= cxx11
+		    && DECL_DESTRUCTOR_P (current_function_decl))
+		  inform (loc, "in C++11 destructors default to noexcept");
+	      }
 	  }
 	else
 	  {
@@ -1621,6 +1634,13 @@ cp_maybe_instrument_return (tree fndecl)
 	case STATEMENT_LIST:
 	  {
 	    tree_stmt_iterator i = tsi_last (t);
+	    while (!tsi_end_p (i))
+	      {
+		tree p = tsi_stmt (i);
+		if (TREE_CODE (p) != DEBUG_BEGIN_STMT)
+		  break;
+		tsi_prev (&i);
+	      }
 	    if (!tsi_end_p (i))
 	      {
 		t = tsi_stmt (i);
@@ -2373,21 +2393,26 @@ cp_fold (tree x)
       else
 	x = fold (x);
 
-      if (TREE_NO_WARNING (org_x)
-	  && warn_nonnull_compare
-	  && COMPARISON_CLASS_P (org_x))
+      /* This is only needed for -Wnonnull-compare and only if
+	 TREE_NO_WARNING (org_x), but to avoid that option affecting code
+	 generation, we do it always.  */
+      if (COMPARISON_CLASS_P (org_x))
 	{
 	  if (x == error_mark_node || TREE_CODE (x) == INTEGER_CST)
 	    ;
 	  else if (COMPARISON_CLASS_P (x))
-	    TREE_NO_WARNING (x) = 1;
+	    {
+	      if (TREE_NO_WARNING (org_x) && warn_nonnull_compare)
+		TREE_NO_WARNING (x) = 1;
+	    }
 	  /* Otherwise give up on optimizing these, let GIMPLE folders
 	     optimize those later on.  */
 	  else if (op0 != TREE_OPERAND (org_x, 0)
 		   || op1 != TREE_OPERAND (org_x, 1))
 	    {
 	      x = build2_loc (loc, code, TREE_TYPE (org_x), op0, op1);
-	      TREE_NO_WARNING (x) = 1;
+	      if (TREE_NO_WARNING (org_x) && warn_nonnull_compare)
+		TREE_NO_WARNING (x) = 1;
 	    }
 	  else
 	    x = org_x;
@@ -2469,6 +2494,13 @@ cp_fold (tree x)
 	    && current_function_decl
 	    && DECL_DECLARED_CONSTEXPR_P (current_function_decl))
 	  nw = 1;
+
+	/* Defer folding __builtin_is_constant_evaluated.  */
+	if (callee
+	    && DECL_BUILT_IN_CLASS (callee) == BUILT_IN_FRONTEND
+	    && ((int) DECL_FUNCTION_CODE (callee)
+		== CP_BUILT_IN_IS_CONSTANT_EVALUATED))
+	  break;
 
 	x = copy_node (x);
 

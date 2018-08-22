@@ -2767,6 +2767,7 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
   /* No current ABI uses variable-sized modes to pass a BLKmnode type.  */
   fixed_size_mode mode = as_a <fixed_size_mode> (mode_in);
   fixed_size_mode dst_mode;
+  scalar_int_mode min_mode;
 
   gcc_assert (TYPE_MODE (TREE_TYPE (src)) == BLKmode);
 
@@ -2796,6 +2797,7 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
   n_regs = (bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
   dst_words = XALLOCAVEC (rtx, n_regs);
   bitsize = MIN (TYPE_ALIGN (TREE_TYPE (src)), BITS_PER_WORD);
+  min_mode = smallest_int_mode_for_size (bitsize);
 
   /* Copy the structure BITSIZE bits at a time.  */
   for (bitpos = 0, xbitpos = padding_correction;
@@ -2814,6 +2816,25 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
 
 	  /* Clear the destination before we move anything into it.  */
 	  emit_move_insn (dst_word, CONST0_RTX (word_mode));
+	}
+
+      /* Find the largest integer mode that can be used to copy all or as
+	 many bits as possible of the structure if the target supports larger
+	 copies.  There are too many corner cases here w.r.t to alignments on
+	 the read/writes.  So if there is any padding just use single byte
+	 operations.  */
+      opt_scalar_int_mode mode_iter;
+      if (padding_correction == 0 && !STRICT_ALIGNMENT)
+	{
+	  FOR_EACH_MODE_FROM (mode_iter, min_mode)
+	    {
+	      unsigned int msize = GET_MODE_BITSIZE (mode_iter.require ());
+	      if (msize <= ((bytes * BITS_PER_UNIT) - bitpos)
+		  && msize <= BITS_PER_WORD)
+		bitsize = msize;
+	      else
+		break;
+	    }
 	}
 
       /* We need a new source operand each time bitpos is on a word
@@ -5249,6 +5270,7 @@ expand_assignment (tree to, tree from, bool nontemporal)
 		MEM_VOLATILE_P (to_rtx) = 1;
 	    }
 
+	  gcc_checking_assert (known_ge (bitpos, 0));
 	  if (optimize_bitfield_assignment_op (bitsize, bitpos,
 					       bitregion_start, bitregion_end,
 					       mode1, to_rtx, to, from,
@@ -7025,6 +7047,7 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
 	}
 
       /* Store the value in the bitfield.  */
+      gcc_checking_assert (known_ge (bitpos, 0));
       store_bit_field (target, bitsize, bitpos,
 		       bitregion_start, bitregion_end,
 		       mode, temp, reverse);
@@ -10524,6 +10547,14 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	mode2
 	  = CONSTANT_P (op0) ? TYPE_MODE (TREE_TYPE (tem)) : GET_MODE (op0);
 
+	/* Make sure bitpos is not negative, it can wreak havoc later.  */
+	if (maybe_lt (bitpos, 0))
+	  {
+	    gcc_checking_assert (offset == NULL_TREE);
+	    offset = size_int (bits_to_bytes_round_down (bitpos));
+	    bitpos = num_trailing_bits (bitpos);
+	  }
+
 	/* If we have either an offset, a BLKmode result, or a reference
 	   outside the underlying object, we must force it to memory.
 	   Such a case can occur in Ada if we have unchecked conversion
@@ -10774,6 +10805,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 		&& GET_MODE_CLASS (ext_mode) == MODE_INT)
 	      reversep = TYPE_REVERSE_STORAGE_ORDER (type);
 
+	    gcc_checking_assert (known_ge (bitpos, 0));
 	    op0 = extract_bit_field (op0, bitsize, bitpos, unsignedp,
 				     (modifier == EXPAND_STACK_PARM
 				      ? NULL_RTX : target),
@@ -11271,10 +11303,12 @@ is_aligning_offset (const_tree offset, const_tree exp)
 /* Return the tree node if an ARG corresponds to a string constant or zero
    if it doesn't.  If we return nonzero, set *PTR_OFFSET to the (possibly
    non-constant) offset in bytes within the string that ARG is accessing.
-   The type of the offset is sizetype.  */
+   The type of the offset is sizetype.  If MEM_SIZE is non-zero the storage
+   size of the memory is returned.  If MEM_SIZE is zero, the string is
+   only returned when it is properly zero terminated.  */
 
 tree
-string_constant (tree arg, tree *ptr_offset)
+string_constant (tree arg, tree *ptr_offset, tree *mem_size)
 {
   tree array;
   STRIP_NOPS (arg);
@@ -11294,12 +11328,15 @@ string_constant (tree arg, tree *ptr_offset)
 	  tree idx = TREE_OPERAND (arg, 1);
 	  if (TREE_CODE (idx) != INTEGER_CST)
 	    {
-	      /* Extract the variable index to prevent
-		 get_addr_base_and_unit_offset() from failing due to
-		 it.  Use it later to compute the non-constant offset
+	      /* From a pointer (but not array) argument extract the variable
+		 index to prevent get_addr_base_and_unit_offset() from failing
+		 due to it.  Use it later to compute the non-constant offset
 		 into the string and return it to the caller.  */
 	      varidx = idx;
 	      ref = TREE_OPERAND (arg, 0);
+
+	      if (TREE_CODE (TREE_TYPE (arg)) == ARRAY_TYPE)
+		return NULL_TREE;
 	    }
 	}
       array = get_addr_base_and_unit_offset (ref, &base_off);
@@ -11325,8 +11362,14 @@ string_constant (tree arg, tree *ptr_offset)
 	return NULL_TREE;
 
       tree offset;
-      if (tree str = string_constant (arg0, &offset))
+      if (tree str = string_constant (arg0, &offset, mem_size))
 	{
+	  /* Avoid pointers to arrays (see bug 86622).  */
+	  if (POINTER_TYPE_P (TREE_TYPE (arg))
+	      && TREE_CODE (TREE_TYPE (TREE_TYPE (arg))) == ARRAY_TYPE
+	      && TREE_CODE (TREE_OPERAND (arg0, 0)) == ARRAY_REF)
+	    return NULL_TREE;
+
 	  tree type = TREE_TYPE (arg1);
 	  *ptr_offset = fold_build2 (PLUS_EXPR, type, offset, arg1);
 	  return str;
@@ -11341,21 +11384,26 @@ string_constant (tree arg, tree *ptr_offset)
   tree offset = wide_int_to_tree (sizetype, base_off);
   if (varidx)
     {
-      if (tree eltsize = TYPE_SIZE_UNIT (TREE_TYPE (array)))
-	{
-	  /* Add the scaled variable index to the constant offset.  */
-	  tree eltoff = fold_build2 (MULT_EXPR, TREE_TYPE (offset),
-				     fold_convert (sizetype, varidx),
-				     eltsize);
-	  offset = fold_build2 (PLUS_EXPR, TREE_TYPE (offset), offset, eltoff);
-	}
-      else
+      if (TREE_CODE (TREE_TYPE (array)) != ARRAY_TYPE)
 	return NULL_TREE;
+
+      gcc_assert (TREE_CODE (arg) == ARRAY_REF);
+      tree chartype = TREE_TYPE (TREE_TYPE (TREE_OPERAND (arg, 0)));
+      if (TREE_CODE (chartype) != INTEGER_TYPE)
+	return NULL;
+
+      tree charsize = array_ref_element_size (arg);
+      /* Set the non-constant offset to the non-constant index scaled
+	 by the size of the character type.  */
+      offset = fold_build2 (MULT_EXPR, TREE_TYPE (offset),
+			    fold_convert (sizetype, varidx), charsize);
     }
 
   if (TREE_CODE (array) == STRING_CST)
     {
       *ptr_offset = fold_convert (sizetype, offset);
+      if (mem_size)
+	*mem_size = TYPE_SIZE_UNIT (TREE_TYPE (array));
       return array;
     }
 
@@ -11369,11 +11417,6 @@ string_constant (tree arg, tree *ptr_offset)
     return NULL_TREE;
   if (TREE_CODE (init) == CONSTRUCTOR)
     {
-      if (TREE_CODE (arg) != ARRAY_REF
-	  && TREE_CODE (arg) == COMPONENT_REF
-	  && TREE_CODE (arg) == MEM_REF)
-	return NULL_TREE;
-
       /* Convert the 64-bit constant offset to a wider type to avoid
 	 overflow.  */
       offset_int wioff;
@@ -11389,11 +11432,15 @@ string_constant (tree arg, tree *ptr_offset)
       init = fold_ctor_reference (NULL_TREE, init, base_off, 0, array,
 				  &fieldoff);
       HOST_WIDE_INT cstoff;
-      if (init && base_off.is_constant (&cstoff))
-	{
-	  cstoff = (cstoff - fieldoff) / BITS_PER_UNIT;
-	  offset = build_int_cst (sizetype, cstoff);
-	}
+      if (!base_off.is_constant (&cstoff))
+	return NULL_TREE;
+
+      cstoff = (cstoff - fieldoff) / BITS_PER_UNIT;
+      tree off = build_int_cst (sizetype, cstoff);
+      if (varidx)
+	offset = fold_build2 (PLUS_EXPR, TREE_TYPE (offset), offset, off);
+      else
+	offset = off;
     }
 
   if (!init || TREE_CODE (init) != STRING_CST)
@@ -11411,9 +11458,14 @@ string_constant (tree arg, tree *ptr_offset)
      const char a[4] = "abc\000\000";
      The excess elements contribute to TREE_STRING_LENGTH()
      but not to strlen().  */
-  unsigned HOST_WIDE_INT length
-    = strnlen (TREE_STRING_POINTER (init), TREE_STRING_LENGTH (init));
-  if (compare_tree_int (array_size, length + 1) < 0)
+  unsigned HOST_WIDE_INT charsize
+    = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (init))));
+  unsigned HOST_WIDE_INT length = TREE_STRING_LENGTH (init);
+  length = string_length (TREE_STRING_POINTER (init), charsize,
+			  length / charsize);
+  if (mem_size)
+    *mem_size = TYPE_SIZE_UNIT (TREE_TYPE (init));
+  else if (compare_tree_int (array_size, length + 1) < 0)
     return NULL_TREE;
 
   *ptr_offset = offset;

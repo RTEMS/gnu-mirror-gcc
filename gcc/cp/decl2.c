@@ -764,6 +764,7 @@ finish_static_data_member_decl (tree decl,
 	 t = CP_TYPE_CONTEXT (t))
       if (TYPE_UNNAMED_P (t))
 	{
+	  auto_diagnostic_group d;
 	  if (permerror (DECL_SOURCE_LOCATION (decl),
 			 "static data member %qD in unnamed class", decl))
 	    inform (DECL_SOURCE_LOCATION (TYPE_NAME (t)),
@@ -1490,11 +1491,11 @@ cplus_decl_attributes (tree *decl, tree attributes, int flags)
 	  && DECL_CLASS_SCOPE_P (*decl))
 	error ("%q+D static data member inside of declare target directive",
 	       *decl);
-      else if (!processing_template_decl
-	       && VAR_P (*decl)
-	       && !cp_omp_mappable_type (TREE_TYPE (*decl)))
-	error ("%q+D in declare target directive does not have mappable type",
-	       *decl);
+      else if (VAR_P (*decl)
+	       && (processing_template_decl
+		   || !cp_omp_mappable_type (TREE_TYPE (*decl))))
+	attributes = tree_cons (get_identifier ("omp declare target implicit"),
+				NULL_TREE, attributes);
       else
 	attributes = tree_cons (get_identifier ("omp declare target"),
 				NULL_TREE, attributes);
@@ -4287,6 +4288,7 @@ no_linkage_error (tree decl)
   else if (TYPE_UNNAMED_P (t))
     {
       bool d = false;
+      auto_diagnostic_group grp;
       if (cxx_dialect >= cxx11)
 	d = permerror (DECL_SOURCE_LOCATION (decl), "%q#D, declared using "
 		       "unnamed type, is used but never defined", decl);
@@ -4754,13 +4756,13 @@ c_parse_final_cleanups (void)
 	     inline, with resulting performance improvements.  */
 	  tree ssdf_body;
 
+	  /* Make sure the back end knows about all the variables.  */
+	  write_out_vars (vars);
+
 	  /* Set the line and file, so that it is obviously not from
 	     the source file.  */
 	  input_location = locus_at_end_of_parsing;
 	  ssdf_body = start_static_storage_duration_function (ssdf_count);
-
-	  /* Make sure the back end knows about all the variables.  */
-	  write_out_vars (vars);
 
 	  /* First generate code to do all the initializations.  */
 	  if (vars)
@@ -5208,6 +5210,7 @@ cp_warn_deprecated_use (tree decl, tsubst_flags_t complain)
       && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
       && copy_fn_p (decl))
     {
+      auto_diagnostic_group d;
       /* Don't warn about system library classes (c++/86342).  */
       if (!DECL_IN_SYSTEM_HEADER (decl))
 	warned = warning (OPT_Wdeprecated_copy,

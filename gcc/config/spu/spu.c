@@ -241,7 +241,7 @@ spu_option_override (void)
 
   /* Functions must be 8 byte aligned so we correctly handle dual issue */
   parse_alignment_opts ();
-  if (align_functions_value < 8)
+  if (align_functions.levels[0].get_value () < 8)
     str_align_functions = "8";
 
   spu_hint_dist = 8*4 - spu_max_nops*4;
@@ -2772,7 +2772,9 @@ static void
 spu_sched_init (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		int max_ready ATTRIBUTE_UNUSED)
 {
-  if (align_labels_value > 4 || align_loops_value > 4 || align_jumps_value > 4)
+  if (align_labels.levels[0].get_value () > 4
+      || align_loops.levels[0].get_value () > 4
+      || align_jumps.levels[0].get_value () > 4)
     {
       /* When any block might be at least 8-byte aligned, assume they
          will all be at least 8-byte aligned to make sure dual issue
@@ -7460,6 +7462,9 @@ static const struct attribute_spec spu_attribute_table[] =
 #define TARGET_STATIC_RTX_ALIGNMENT spu_static_rtx_alignment
 #undef TARGET_CONSTANT_ALIGNMENT
 #define TARGET_CONSTANT_ALIGNMENT spu_constant_alignment
+
+#undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
+#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

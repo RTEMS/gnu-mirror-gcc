@@ -1358,6 +1358,7 @@ maybe_diag_incompatible_alias (tree alias, tree target)
 	{
 	  funcptr = build_pointer_type (funcptr);
 
+	  auto_diagnostic_group d;
 	  if (warning_at (DECL_SOURCE_LOCATION (target),
 			  OPT_Wattribute_alias,
 			  "%<ifunc%> resolver for %qD should return %qT",
@@ -1365,12 +1366,16 @@ maybe_diag_incompatible_alias (tree alias, tree target)
 	    inform (DECL_SOURCE_LOCATION (alias),
 		    "resolver indirect function declared here");
 	}
-      else if (warning_at (DECL_SOURCE_LOCATION (alias),
-			   OPT_Wattribute_alias,
-			   "%qD alias between functions of incompatible "
-			   "types %qT and %qT", alias, altype, targtype))
-	inform (DECL_SOURCE_LOCATION (target),
-		"aliased declaration here");
+      else
+	{
+	  auto_diagnostic_group d;
+	  if (warning_at (DECL_SOURCE_LOCATION (alias),
+			    OPT_Wattribute_alias,
+			    "%qD alias between functions of incompatible "
+			    "types %qT and %qT", alias, altype, targtype))
+	    inform (DECL_SOURCE_LOCATION (target),
+		      "aliased declaration here");
+	}
     }
 }
 
@@ -2126,24 +2131,26 @@ cgraph_node::expand (void)
   /* If requested, warn about function definitions where the function will
      return a value (usually of some struct or union type) which itself will
      take up a lot of stack space.  */
-  if (warn_larger_than && !DECL_EXTERNAL (decl) && TREE_TYPE (decl))
+  if (!DECL_EXTERNAL (decl) && TREE_TYPE (decl))
     {
       tree ret_type = TREE_TYPE (TREE_TYPE (decl));
 
       if (ret_type && TYPE_SIZE_UNIT (ret_type)
 	  && TREE_CODE (TYPE_SIZE_UNIT (ret_type)) == INTEGER_CST
 	  && compare_tree_int (TYPE_SIZE_UNIT (ret_type),
-			       larger_than_size) > 0)
+			       warn_larger_than_size) > 0)
 	{
 	  unsigned int size_as_int
 	    = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (ret_type));
 
 	  if (compare_tree_int (TYPE_SIZE_UNIT (ret_type), size_as_int) == 0)
-	    warning (OPT_Wlarger_than_, "size of return value of %q+D is %u bytes",
+	    warning (OPT_Wlarger_than_,
+		     "size of return value of %q+D is %u bytes",
                      decl, size_as_int);
 	  else
-	    warning (OPT_Wlarger_than_, "size of return value of %q+D is larger than %wd bytes",
-                     decl, larger_than_size);
+	    warning (OPT_Wlarger_than_,
+		     "size of return value of %q+D is larger than %wu bytes",
+	             decl, warn_larger_than_size);
 	}
     }
 
@@ -2634,6 +2641,89 @@ symbol_table::compile (void)
     }
 }
 
+/* Earlydebug dump file, flags, and number.  */
+
+static int debuginfo_early_dump_nr;
+static FILE *debuginfo_early_dump_file;
+static dump_flags_t debuginfo_early_dump_flags;
+
+/* Debug dump file, flags, and number.  */
+
+static int debuginfo_dump_nr;
+static FILE *debuginfo_dump_file;
+static dump_flags_t debuginfo_dump_flags;
+
+/* Register the debug and earlydebug dump files.  */
+
+void
+debuginfo_early_init (void)
+{
+  gcc::dump_manager *dumps = g->get_dumps ();
+  debuginfo_early_dump_nr = dumps->dump_register (".earlydebug", "earlydebug",
+						  "earlydebug", DK_tree,
+						  OPTGROUP_NONE,
+						  false);
+  debuginfo_dump_nr = dumps->dump_register (".debug", "debug",
+					     "debug", DK_tree,
+					     OPTGROUP_NONE,
+					     false);
+}
+
+/* Initialize the debug and earlydebug dump files.  */
+
+void
+debuginfo_init (void)
+{
+  gcc::dump_manager *dumps = g->get_dumps ();
+  debuginfo_dump_file = dump_begin (debuginfo_dump_nr, NULL);
+  debuginfo_dump_flags = dumps->get_dump_file_info (debuginfo_dump_nr)->pflags;
+  debuginfo_early_dump_file = dump_begin (debuginfo_early_dump_nr, NULL);
+  debuginfo_early_dump_flags
+    = dumps->get_dump_file_info (debuginfo_early_dump_nr)->pflags;
+}
+
+/* Finalize the debug and earlydebug dump files.  */
+
+void
+debuginfo_fini (void)
+{
+  if (debuginfo_dump_file)
+    dump_end (debuginfo_dump_nr, debuginfo_dump_file);
+  if (debuginfo_early_dump_file)
+    dump_end (debuginfo_early_dump_nr, debuginfo_early_dump_file);
+}
+
+/* Set dump_file to the debug dump file.  */
+
+void
+debuginfo_start (void)
+{
+  set_dump_file (debuginfo_dump_file);
+}
+
+/* Undo setting dump_file to the debug dump file.  */
+
+void
+debuginfo_stop (void)
+{
+  set_dump_file (NULL);
+}
+
+/* Set dump_file to the earlydebug dump file.  */
+
+void
+debuginfo_early_start (void)
+{
+  set_dump_file (debuginfo_early_dump_file);
+}
+
+/* Undo setting dump_file to the earlydebug dump file.  */
+
+void
+debuginfo_early_stop (void)
+{
+  set_dump_file (NULL);
+}
 
 /* Analyze the whole compilation unit once it is parsed completely.  */
 
@@ -2689,7 +2779,9 @@ symbol_table::finalize_compilation_unit (void)
 
       /* Clean up anything that needs cleaning up after initial debug
 	 generation.  */
+      debuginfo_early_start ();
       (*debug_hooks->early_finish) (main_input_filename);
+      debuginfo_early_stop ();
     }
 
   /* Finally drive the pass manager.  */

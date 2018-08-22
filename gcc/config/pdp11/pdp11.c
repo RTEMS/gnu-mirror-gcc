@@ -291,6 +291,9 @@ static bool pdp11_scalar_mode_supported_p (scalar_mode);
 
 #undef TARGET_INVALID_WITHIN_DOLOOP
 #define TARGET_INVALID_WITHIN_DOLOOP hook_constcharptr_const_rtx_insn_null
+
+#undef TARGET_HAVE_SPECULATION_SAFE_VALUE
+#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 /* A helper function to determine if REGNO should be saved in the
    current function's stack frame.  */
@@ -1014,6 +1017,7 @@ pdp11_rtx_costs (rtx x, machine_mode mode, int outer_code,
   const int code = GET_CODE (x);
   const int asize = (mode == QImode) ? 2 : GET_MODE_SIZE (mode);
   rtx src, dest;
+  const char *fmt;
   
   switch (code)
     {
@@ -1035,12 +1039,29 @@ pdp11_rtx_costs (rtx x, machine_mode mode, int outer_code,
       *total = pdp11_addr_cost (x, mode, ADDR_SPACE_GENERIC, speed);
       return true;
     }
+  if (GET_RTX_LENGTH (code) == 0)
+    {
+      if (speed)
+	*total = 0;
+      else
+	*total = 2;
+      return true;
+    }
 
   /* Pick up source and dest.  We don't necessarily use the standard
      recursion in rtx_costs to figure the cost, because that would
      count the destination operand twice for three-operand insns.
      Also, this way we can catch special cases like move of zero, or
      add one.  */
+  fmt = GET_RTX_FORMAT (code);
+  if (fmt[0] != 'e' || (GET_RTX_LENGTH (code) > 1 && fmt[1] != 'e'))
+    {
+      if (speed)
+	*total = 0;
+      else
+	*total = 2;
+      return true;
+    }
   if (GET_RTX_LENGTH (code) > 1)
     src = XEXP (x, 1);
   dest = XEXP (x, 0);
@@ -2437,7 +2458,7 @@ pdp11_output_def (FILE *file, const char *label1, const char *label2)
     }
   else
     {
-      fputs (".set", file);
+      fputs ("\t.set\t", file);
       assemble_name (file, label1);
       putc (',', file);
       assemble_name (file, label2);

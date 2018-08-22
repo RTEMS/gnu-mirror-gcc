@@ -406,12 +406,10 @@
   return FP_REGNO_P (r);
 })
 
-;; Return true if this is a register that can has D-form addressing (GPR and
-;; traditional FPR registers for scalars).  ISA 3.0 (power9) adds D-form
-;; addressing for scalars in Altivec registers.
-;;
-;; If this is a pseudo only allow for GPR fusion in power8.  If we have the
-;; power9 fusion allow the floating point types.
+;; Return true if this is a register that can has D-form addressing (GPR,
+;; traditional FPR registers, and Altivec registers for scalars).  Unlike
+;; power8 fusion, this fusion does not depend on putting the ADDIS instruction
+;; into the GPR register being loaded.
 (define_predicate "p9_fusion_reg_operand"
   (match_code "reg,subreg")
 {

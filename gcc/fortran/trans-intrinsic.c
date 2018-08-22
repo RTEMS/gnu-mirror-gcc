@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "trans.h"
 #include "stringpool.h"
 #include "fold-const.h"
+#include "internal-fn.h"
 #include "tree-nested.h"
 #include "stor-layout.h"
 #include "toplev.h"	/* For rest_of_decl_compilation.  */
@@ -3663,8 +3664,8 @@ conv_intrinsic_random_init (gfc_code *code)
   gfc_add_block_to_block (&block, &se.post);
 
   /* Create the hidden argument.  For non-coarray codes and -fcoarray=single,
-     simply set this to 0.  For -fcoarray=lib, generate a call to 
-     THIS_IMAGE() without arguments.  */ 
+     simply set this to 0.  For -fcoarray=lib, generate a call to
+     THIS_IMAGE() without arguments.  */
   arg3 = build_int_cst (gfc_get_int_type (4), 0);
   if (flag_coarray == GFC_FCOARRAY_LIB)
     {
@@ -3676,7 +3677,7 @@ conv_intrinsic_random_init (gfc_code *code)
   tmp = build_call_expr_loc (input_location, gfor_fndecl_random_init, 3,
 			     arg1, arg2, arg3);
   gfc_add_expr_to_block (&block, tmp);
- 
+
   return gfc_finish_block (&block);
 }
 
@@ -3874,14 +3875,15 @@ gfc_conv_intrinsic_ttynam (gfc_se * se, gfc_expr * expr)
     minmax (a1, a2, a3, ...)
     {
       mvar = a1;
-      if (a2 .op. mvar || isnan (mvar))
-        mvar = a2;
-      if (a3 .op. mvar || isnan (mvar))
-        mvar = a3;
+      mvar = COMP (mvar, a2)
+      mvar = COMP (mvar, a3)
       ...
-      return mvar
+      return mvar;
     }
- */
+    Where COMP is MIN/MAX_EXPR for integral types or when we don't
+    care about NaNs, or IFN_FMIN/MAX when the target has support for
+    fast NaN-honouring min/max.  When neither holds expand a sequence
+    of explicit comparisons.  */
 
 /* TODO: Mismatching types can occur when specific names are used.
    These should be handled during resolution.  */
@@ -3891,7 +3893,6 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
   tree tmp;
   tree mvar;
   tree val;
-  tree thencase;
   tree *args;
   tree type;
   gfc_actual_arglist *argexpr;
@@ -3912,55 +3913,42 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   mvar = gfc_create_var (type, "M");
   gfc_add_modify (&se->pre, mvar, args[0]);
-  for (i = 1, argexpr = argexpr->next; i < nargs; i++)
-    {
-      tree cond, isnan;
 
+  for (i = 1, argexpr = argexpr->next; i < nargs; i++, argexpr = argexpr->next)
+    {
+      tree cond = NULL_TREE;
       val = args[i];
 
       /* Handle absent optional arguments by ignoring the comparison.  */
       if (argexpr->expr->expr_type == EXPR_VARIABLE
 	  && argexpr->expr->symtree->n.sym->attr.optional
 	  && TREE_CODE (val) == INDIRECT_REF)
-	cond = fold_build2_loc (input_location,
+	{
+	  cond = fold_build2_loc (input_location,
 				NE_EXPR, logical_type_node,
 				TREE_OPERAND (val, 0),
 			build_int_cst (TREE_TYPE (TREE_OPERAND (val, 0)), 0));
-      else
-      {
-	cond = NULL_TREE;
-
-	/* Only evaluate the argument once.  */
-	if (!VAR_P (val) && !TREE_CONSTANT (val))
-	  val = gfc_evaluate_now (val, &se->pre);
-      }
-
-      thencase = build2_v (MODIFY_EXPR, mvar, convert (type, val));
-
-      tmp = fold_build2_loc (input_location, op, logical_type_node,
-			     convert (type, val), mvar);
-
-      /* FIXME: When the IEEE_ARITHMETIC module is implemented, the call to
-	 __builtin_isnan might be made dependent on that module being loaded,
-	 to help performance of programs that don't rely on IEEE semantics.  */
-      if (FLOAT_TYPE_P (TREE_TYPE (mvar)))
-	{
-	  isnan = build_call_expr_loc (input_location,
-				       builtin_decl_explicit (BUILT_IN_ISNAN),
-				       1, mvar);
-	  tmp = fold_build2_loc (input_location, TRUTH_OR_EXPR,
-				 logical_type_node, tmp,
-				 fold_convert (logical_type_node, isnan));
 	}
-      tmp = build3_v (COND_EXPR, tmp, thencase,
-		      build_empty_stmt (input_location));
+      else if (!VAR_P (val) && !TREE_CONSTANT (val))
+	/* Only evaluate the argument once.  */
+	val = gfc_evaluate_now (val, &se->pre);
+
+      tree calc;
+      /* For floating point types, the question is what MAX(a, NaN) or
+	 MIN(a, NaN) should return (where "a" is a normal number).
+	 There are valid usecase for returning either one, but the
+	 Fortran standard doesn't specify which one should be chosen.
+	 Also, there is no consensus among other tested compilers.  In
+	 short, it's a mess.  So lets just do whatever is fastest.  */
+      tree_code code = op == GT_EXPR ? MAX_EXPR : MIN_EXPR;
+      calc = fold_build2_loc (input_location, code, type,
+			      convert (type, val), mvar);
+      tmp = build2_v (MODIFY_EXPR, mvar, calc);
 
       if (cond != NULL_TREE)
 	tmp = build3_v (COND_EXPR, cond, tmp,
 			build_empty_stmt (input_location));
-
       gfc_add_expr_to_block (&se->pre, tmp);
-      argexpr = argexpr->next;
     }
   se->expr = mvar;
 }
@@ -7346,13 +7334,14 @@ gfc_conv_intrinsic_transfer (gfc_se * se, gfc_expr * expr)
   tree upper;
   tree lower;
   tree stmt;
+  tree class_ref = NULL_TREE;
   gfc_actual_arglist *arg;
   gfc_se argse;
   gfc_array_info *info;
   stmtblock_t block;
   int n;
   bool scalar_mold;
-  gfc_expr *source_expr, *mold_expr;
+  gfc_expr *source_expr, *mold_expr, *class_expr;
 
   info = NULL;
   if (se->loop)
@@ -7383,7 +7372,24 @@ gfc_conv_intrinsic_transfer (gfc_se * se, gfc_expr * expr)
     {
       gfc_conv_expr_reference (&argse, arg->expr);
       if (arg->expr->ts.type == BT_CLASS)
-	source = gfc_class_data_get (argse.expr);
+	{
+	  tmp = build_fold_indirect_ref_loc (input_location, argse.expr);
+	  if (GFC_CLASS_TYPE_P (TREE_TYPE (tmp)))
+	    source = gfc_class_data_get (tmp);
+	  else
+	    {
+	      /* Array elements are evaluated as a reference to the data.
+		 To obtain the vptr for the element size, the argument
+		 expression must be stripped to the class reference and
+		 re-evaluated. The pre and post blocks are not needed.  */
+	      gcc_assert (arg->expr->expr_type == EXPR_VARIABLE);
+	      source = argse.expr;
+	      class_expr = gfc_find_and_cut_at_last_class_ref (arg->expr);
+	      gfc_init_se (&argse, NULL);
+	      gfc_conv_expr (&argse, class_expr);
+	      class_ref = argse.expr;
+	    }
+	}
       else
 	source = argse.expr;
 
@@ -7395,7 +7401,10 @@ gfc_conv_intrinsic_transfer (gfc_se * se, gfc_expr * expr)
 					 argse.string_length);
 	  break;
 	case BT_CLASS:
-	  tmp = gfc_class_vtab_size_get (argse.expr);
+	  if (class_ref != NULL_TREE)
+	    tmp = gfc_class_vtab_size_get (class_ref);
+	  else
+	    tmp = gfc_class_vtab_size_get (argse.expr);
 	  break;
 	default:
 	  source_type = TREE_TYPE (build_fold_indirect_ref_loc (input_location,

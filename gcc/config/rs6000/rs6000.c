@@ -1807,9 +1807,6 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_INVALID_ARG_FOR_UNPROTOTYPED_FN
 #define TARGET_INVALID_ARG_FOR_UNPROTOTYPED_FN invalid_arg_for_unprototyped_fn
 
-#undef TARGET_ASM_LOOP_ALIGN_MAX_SKIP
-#define TARGET_ASM_LOOP_ALIGN_MAX_SKIP rs6000_loop_align_max_skip
-
 #undef TARGET_MD_ASM_ADJUST
 #define TARGET_MD_ASM_ADJUST rs6000_md_asm_adjust
 
@@ -2382,17 +2379,6 @@ rs6000_debug_print_mode (ssize_t m)
     }
   else
     spaces += sizeof ("  Reload=sl") - 1;
-
-  if (TARGET_OPT_ADDR)
-    {
-      if (rs6000_optimized_address_p[m])
-	{
-	  fprintf (stderr, "%*s opt-addr", spaces, "");
-	  spaces = 0;
-	}
-      else
-	spaces += sizeof (" opt-addr") - 1;
-    }
 
   if (reg_addr[m].scalar_in_vmx_p)
     {
@@ -5056,7 +5042,7 @@ rs6000_builtin_mask_for_load (void)
 }
 
 /* Implement LOOP_ALIGN. */
-int
+align_flags
 rs6000_loop_align (rtx label)
 {
   basic_block bb;
@@ -5064,7 +5050,7 @@ rs6000_loop_align (rtx label)
 
   /* Don't override loop alignment if -falign-loops was specified. */
   if (!can_override_loop_align)
-    return align_loops_log;
+    return align_loops;
 
   bb = BLOCK_FOR_INSN (label);
   ninsns = num_loop_insns(bb->loop_father);
@@ -5076,16 +5062,9 @@ rs6000_loop_align (rtx label)
 	  || rs6000_tune == PROCESSOR_POWER6
 	  || rs6000_tune == PROCESSOR_POWER7
 	  || rs6000_tune == PROCESSOR_POWER8))
-    return 5;
+    return align_flags (5);
   else
-    return align_loops_log;
-}
-
-/* Implement TARGET_LOOP_ALIGN_MAX_SKIP. */
-static int
-rs6000_loop_align_max_skip (rtx_insn *label)
-{
-  return (1 << rs6000_loop_align (label)) - 1;
+    return align_loops;
 }
 
 /* Return true iff, data reference of TYPE can reach vector alignment (16)
@@ -5357,6 +5336,7 @@ rs6000_density_test (rs6000_cost_data *data)
   struct loop *loop = data->loop_info;
   basic_block *bbs = get_loop_body (loop);
   int nbbs = loop->num_nodes;
+  loop_vec_info loop_vinfo = loop_vec_info_for_loop (data->loop_info);
   int vec_cost = data->cost[vect_body], not_vec_cost = 0;
   int i, density_pct;
 
@@ -5368,7 +5348,7 @@ rs6000_density_test (rs6000_cost_data *data)
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *stmt = gsi_stmt (gsi);
-	  stmt_vec_info stmt_info = vinfo_for_stmt (stmt);
+	  stmt_vec_info stmt_info = loop_vinfo->lookup_stmt (stmt);
 
 	  if (!STMT_VINFO_RELEVANT_P (stmt_info)
 	      && !STMT_VINFO_IN_PATTERN_P (stmt_info))
@@ -6648,11 +6628,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	  size_t i;
 
 	  for (i = 0; i < 4; i++)
-	    {
-	      elements[i] = XVECEXP (vals, 0, i);
-	      if (!CONST_INT_P (elements[i]) && !REG_P (elements[i]))
-		elements[i] = copy_to_mode_reg (SImode, elements[i]);
-	    }
+	    elements[i] = force_reg (SImode, XVECEXP (vals, 0, i));
 
 	  emit_insn (gen_vsx_init_v4si (target, elements[0], elements[1],
 					elements[2], elements[3]));
@@ -7358,92 +7334,6 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
   else
     gcc_unreachable ();
  }
-
-/* Helper function for rs6000_split_v4si_init to build up a DImode value from
-   two SImode values.  */
-
-static void
-rs6000_split_v4si_init_di_reg (rtx dest, rtx si1, rtx si2, rtx tmp)
-{
-  const unsigned HOST_WIDE_INT mask_32bit = HOST_WIDE_INT_C (0xffffffff);
-
-  if (CONST_INT_P (si1) && CONST_INT_P (si2))
-    {
-      unsigned HOST_WIDE_INT const1 = (UINTVAL (si1) & mask_32bit) << 32;
-      unsigned HOST_WIDE_INT const2 = UINTVAL (si2) & mask_32bit;
-
-      emit_move_insn (dest, GEN_INT (const1 | const2));
-      return;
-    }
-
-  /* Put si1 into upper 32-bits of dest.  */
-  if (CONST_INT_P (si1))
-    emit_move_insn (dest, GEN_INT ((UINTVAL (si1) & mask_32bit) << 32));
-  else
-    {
-      /* Generate RLDIC.  */
-      rtx si1_di = gen_rtx_REG (DImode, regno_or_subregno (si1));
-      rtx shift_rtx = gen_rtx_ASHIFT (DImode, si1_di, GEN_INT (32));
-      rtx mask_rtx = GEN_INT (mask_32bit << 32);
-      rtx and_rtx = gen_rtx_AND (DImode, shift_rtx, mask_rtx);
-      gcc_assert (!reg_overlap_mentioned_p (dest, si1));
-      emit_insn (gen_rtx_SET (dest, and_rtx));
-    }
-
-  /* Put si2 into the temporary.  */
-  gcc_assert (!reg_overlap_mentioned_p (dest, tmp));
-  if (CONST_INT_P (si2))
-    emit_move_insn (tmp, GEN_INT (UINTVAL (si2) & mask_32bit));
-  else
-    emit_insn (gen_zero_extendsidi2 (tmp, si2));
-
-  /* Combine the two parts.  */
-  emit_insn (gen_iordi3 (dest, dest, tmp));
-  return;
-}
-
-/* Split a V4SI initialization.  */
-
-void
-rs6000_split_v4si_init (rtx operands[])
-{
-  rtx dest = operands[0];
-
-  /* Destination is a GPR, build up the two DImode parts in place.  */
-  if (REG_P (dest) || SUBREG_P (dest))
-    {
-      int d_regno = regno_or_subregno (dest);
-      rtx scalar1 = operands[1];
-      rtx scalar2 = operands[2];
-      rtx scalar3 = operands[3];
-      rtx scalar4 = operands[4];
-      rtx tmp1 = operands[5];
-      rtx tmp2 = operands[6];
-
-      /* Even though we only need one temporary (plus the destination, which
-	 has an early clobber constraint, try to use two temporaries, one for
-	 each double word created.  That way the 2nd insn scheduling pass can
-	 rearrange things so the two parts are done in parallel.  */
-      if (BYTES_BIG_ENDIAN)
-	{
-	  rtx di_lo = gen_rtx_REG (DImode, d_regno);
-	  rtx di_hi = gen_rtx_REG (DImode, d_regno + 1);
-	  rs6000_split_v4si_init_di_reg (di_lo, scalar1, scalar2, tmp1);
-	  rs6000_split_v4si_init_di_reg (di_hi, scalar3, scalar4, tmp2);
-	}
-      else
-	{
-	  rtx di_lo = gen_rtx_REG (DImode, d_regno + 1);
-	  rtx di_hi = gen_rtx_REG (DImode, d_regno);
-	  rs6000_split_v4si_init_di_reg (di_lo, scalar4, scalar3, tmp1);
-	  rs6000_split_v4si_init_di_reg (di_hi, scalar2, scalar1, tmp2);
-	}
-      return;
-    }
-
-  else
-    gcc_unreachable ();
-}
 
 /* Return alignment of TYPE.  Existing alignment is ALIGN.  HOW
    selects whether the alignment is abi mandated, optional, or
@@ -15190,6 +15080,12 @@ rs6000_builtin_valid_without_lhs (enum rs6000_builtins fn_code)
     case ALTIVEC_BUILTIN_STVX_V4SF:
     case ALTIVEC_BUILTIN_STVX_V2DI:
     case ALTIVEC_BUILTIN_STVX_V2DF:
+    case VSX_BUILTIN_STXVW4X_V16QI:
+    case VSX_BUILTIN_STXVW4X_V8HI:
+    case VSX_BUILTIN_STXVW4X_V4SF:
+    case VSX_BUILTIN_STXVW4X_V4SI:
+    case VSX_BUILTIN_STXVD2X_V2DF:
+    case VSX_BUILTIN_STXVD2X_V2DI:
       return true;
     default:
       return false;
@@ -15237,7 +15133,6 @@ fold_mergehl_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_high)
   tree arg1 = gimple_call_arg (stmt, 1);
   tree lhs = gimple_call_lhs (stmt);
   tree lhs_type = TREE_TYPE (lhs);
-  tree lhs_type_type = TREE_TYPE (lhs_type);
   int n_elts = TYPE_VECTOR_SUBPARTS (lhs_type);
   int midpoint = n_elts / 2;
   int offset = 0;
@@ -15245,12 +15140,29 @@ fold_mergehl_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_high)
   if (use_high == 1)
     offset = midpoint;
 
-  tree_vector_builder elts (lhs_type, VECTOR_CST_NELTS (arg0), 1);
+  /* The permute_type will match the lhs for integral types.  For double and
+     float types, the permute type needs to map to the V2 or V4 type that
+     matches size.  */
+  tree permute_type;
+  if (INTEGRAL_TYPE_P (TREE_TYPE (lhs_type)))
+    permute_type = lhs_type;
+  else
+    {
+      if (TREE_TYPE (lhs_type) == TREE_TYPE (V2DF_type_node))
+	permute_type = V2DI_type_node;
+      else if (TREE_TYPE (lhs_type) == TREE_TYPE (V4SF_type_node))
+	permute_type = V4SI_type_node;
+      else
+	gcc_unreachable ();
+    }
+  tree_vector_builder elts (permute_type, VECTOR_CST_NELTS (arg0), 1);
 
   for (int i = 0; i < midpoint; i++)
     {
-      elts.safe_push (build_int_cst (lhs_type_type, offset + i));
-      elts.safe_push (build_int_cst (lhs_type_type, offset + n_elts + i));
+      elts.safe_push (build_int_cst (TREE_TYPE (permute_type),
+				     offset + i));
+      elts.safe_push (build_int_cst (TREE_TYPE (permute_type),
+				     offset + n_elts + i));
     }
 
   tree permute = elts.build ();
@@ -15699,6 +15611,77 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	return true;
       }
 
+    /* unaligned Vector loads.  */
+    case VSX_BUILTIN_LXVW4X_V16QI:
+    case VSX_BUILTIN_LXVW4X_V8HI:
+    case VSX_BUILTIN_LXVW4X_V4SF:
+    case VSX_BUILTIN_LXVW4X_V4SI:
+    case VSX_BUILTIN_LXVD2X_V2DF:
+    case VSX_BUILTIN_LXVD2X_V2DI:
+      {
+	 arg0 = gimple_call_arg (stmt, 0);  // offset
+	 arg1 = gimple_call_arg (stmt, 1);  // address
+	 lhs = gimple_call_lhs (stmt);
+	 location_t loc = gimple_location (stmt);
+	 /* Since arg1 may be cast to a different type, just use ptr_type_node
+	    here instead of trying to enforce TBAA on pointer types.  */
+	 tree arg1_type = ptr_type_node;
+	 tree lhs_type = TREE_TYPE (lhs);
+	 /* In GIMPLE the type of the MEM_REF specifies the alignment.  The
+	   required alignment (power) is 4 bytes regardless of data type.  */
+	 tree align_ltype = build_aligned_type (lhs_type, 4);
+	 /* POINTER_PLUS_EXPR wants the offset to be of type 'sizetype'.  Create
+	    the tree using the value from arg0.  The resulting type will match
+	    the type of arg1.  */
+	 gimple_seq stmts = NULL;
+	 tree temp_offset = gimple_convert (&stmts, loc, sizetype, arg0);
+	 tree temp_addr = gimple_build (&stmts, loc, POINTER_PLUS_EXPR,
+				       arg1_type, arg1, temp_offset);
+	 gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	 /* Use the build2 helper to set up the mem_ref.  The MEM_REF could also
+	    take an offset, but since we've already incorporated the offset
+	    above, here we just pass in a zero.  */
+	 gimple *g;
+	 g = gimple_build_assign (lhs, build2 (MEM_REF, align_ltype, temp_addr,
+						build_int_cst (arg1_type, 0)));
+	 gimple_set_location (g, loc);
+	 gsi_replace (gsi, g, true);
+	 return true;
+      }
+
+    /* unaligned Vector stores.  */
+    case VSX_BUILTIN_STXVW4X_V16QI:
+    case VSX_BUILTIN_STXVW4X_V8HI:
+    case VSX_BUILTIN_STXVW4X_V4SF:
+    case VSX_BUILTIN_STXVW4X_V4SI:
+    case VSX_BUILTIN_STXVD2X_V2DF:
+    case VSX_BUILTIN_STXVD2X_V2DI:
+      {
+	 arg0 = gimple_call_arg (stmt, 0); /* Value to be stored.  */
+	 arg1 = gimple_call_arg (stmt, 1); /* Offset.  */
+	 tree arg2 = gimple_call_arg (stmt, 2); /* Store-to address.  */
+	 location_t loc = gimple_location (stmt);
+	 tree arg0_type = TREE_TYPE (arg0);
+	 /* Use ptr_type_node (no TBAA) for the arg2_type.  */
+	 tree arg2_type = ptr_type_node;
+	 /* In GIMPLE the type of the MEM_REF specifies the alignment.  The
+	    required alignment (power) is 4 bytes regardless of data type.  */
+	 tree align_stype = build_aligned_type (arg0_type, 4);
+	 /* POINTER_PLUS_EXPR wants the offset to be of type 'sizetype'.  Create
+	    the tree using the value from arg1.  */
+	 gimple_seq stmts = NULL;
+	 tree temp_offset = gimple_convert (&stmts, loc, sizetype, arg1);
+	 tree temp_addr = gimple_build (&stmts, loc, POINTER_PLUS_EXPR,
+				       arg2_type, arg2, temp_offset);
+	 gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	 gimple *g;
+	 g = gimple_build_assign (build2 (MEM_REF, align_stype, temp_addr,
+					   build_int_cst (arg2_type, 0)), arg0);
+	 gimple_set_location (g, loc);
+	 gsi_replace (gsi, g, true);
+	 return true;
+      }
+
     /* Vector Fused multiply-add (fma).  */
     case ALTIVEC_BUILTIN_VMADDFP:
     case VSX_BUILTIN_XVMADDDP:
@@ -15804,6 +15787,8 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case VSX_BUILTIN_XXMRGLW_4SI:
     case ALTIVEC_BUILTIN_VMRGLB:
     case VSX_BUILTIN_VEC_MERGEL_V2DI:
+    case VSX_BUILTIN_XXMRGLW_4SF:
+    case VSX_BUILTIN_VEC_MERGEL_V2DF:
 	fold_mergehl_helper (gsi, stmt, 1);
 	return true;
     /* vec_mergeh (integrals).  */
@@ -15812,8 +15797,94 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case VSX_BUILTIN_XXMRGHW_4SI:
     case ALTIVEC_BUILTIN_VMRGHB:
     case VSX_BUILTIN_VEC_MERGEH_V2DI:
+    case VSX_BUILTIN_XXMRGHW_4SF:
+    case VSX_BUILTIN_VEC_MERGEH_V2DF:
 	fold_mergehl_helper (gsi, stmt, 0);
 	return true;
+
+    /* d = vec_pack (a, b) */
+    case P8V_BUILTIN_VPKUDUM:
+    case ALTIVEC_BUILTIN_VPKUHUM:
+    case ALTIVEC_BUILTIN_VPKUWUM:
+      {
+       arg0 = gimple_call_arg (stmt, 0);
+       arg1 = gimple_call_arg (stmt, 1);
+       lhs = gimple_call_lhs (stmt);
+       gimple *g = gimple_build_assign (lhs, VEC_PACK_TRUNC_EXPR, arg0, arg1);
+       gimple_set_location (g, gimple_location (stmt));
+       gsi_replace (gsi, g, true);
+       return true;
+      }
+
+   /* d = vec_unpackh (a) */
+   /* Note that the UNPACK_{HI,LO}_EXPR used in the gimple_build_assign call
+      in this code is sensitive to endian-ness, and needs to be inverted to
+      handle both LE and BE targets.  */
+    case ALTIVEC_BUILTIN_VUPKHSB:
+    case ALTIVEC_BUILTIN_VUPKHSH:
+    case P8V_BUILTIN_VUPKHSW:
+      {
+       arg0 = gimple_call_arg (stmt, 0);
+       lhs = gimple_call_lhs (stmt);
+       if (BYTES_BIG_ENDIAN)
+	 g = gimple_build_assign (lhs, VEC_UNPACK_HI_EXPR, arg0);
+       else
+	 g = gimple_build_assign (lhs, VEC_UNPACK_LO_EXPR, arg0);
+       gimple_set_location (g, gimple_location (stmt));
+       gsi_replace (gsi, g, true);
+       return true;
+      }
+   /* d = vec_unpackl (a) */
+    case ALTIVEC_BUILTIN_VUPKLSB:
+    case ALTIVEC_BUILTIN_VUPKLSH:
+    case P8V_BUILTIN_VUPKLSW:
+      {
+       arg0 = gimple_call_arg (stmt, 0);
+       lhs = gimple_call_lhs (stmt);
+       if (BYTES_BIG_ENDIAN)
+	 g = gimple_build_assign (lhs, VEC_UNPACK_LO_EXPR, arg0);
+       else
+	 g = gimple_build_assign (lhs, VEC_UNPACK_HI_EXPR, arg0);
+       gimple_set_location (g, gimple_location (stmt));
+       gsi_replace (gsi, g, true);
+       return true;
+      }
+    /* There is no gimple type corresponding with pixel, so just return.  */
+    case ALTIVEC_BUILTIN_VUPKHPX:
+    case ALTIVEC_BUILTIN_VUPKLPX:
+      return false;
+
+    /* vec_perm.  */
+    case ALTIVEC_BUILTIN_VPERM_16QI:
+    case ALTIVEC_BUILTIN_VPERM_8HI:
+    case ALTIVEC_BUILTIN_VPERM_4SI:
+    case ALTIVEC_BUILTIN_VPERM_2DI:
+    case ALTIVEC_BUILTIN_VPERM_4SF:
+    case ALTIVEC_BUILTIN_VPERM_2DF:
+      {
+	arg0 = gimple_call_arg (stmt, 0);
+	arg1 = gimple_call_arg (stmt, 1);
+	tree permute = gimple_call_arg (stmt, 2);
+	lhs = gimple_call_lhs (stmt);
+	location_t loc = gimple_location (stmt);
+	gimple_seq stmts = NULL;
+	// convert arg0 and arg1 to match the type of the permute
+	// for the VEC_PERM_EXPR operation.
+	tree permute_type = (TREE_TYPE (permute));
+	tree arg0_ptype = gimple_convert (&stmts, loc, permute_type, arg0);
+	tree arg1_ptype = gimple_convert (&stmts, loc, permute_type, arg1);
+	tree lhs_ptype = gimple_build (&stmts, loc, VEC_PERM_EXPR,
+				      permute_type, arg0_ptype, arg1_ptype,
+				      permute);
+	// Convert the result back to the desired lhs type upon completion.
+	tree temp = gimple_convert (&stmts, loc, TREE_TYPE (lhs), lhs_ptype);
+	gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	g = gimple_build_assign (lhs, temp);
+	gimple_set_location (g, loc);
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
     default:
       if (TARGET_DEBUG_BUILTIN)
 	fprintf (stderr, "gimple builtin intrinsic not matched:%d %s %s\n",
@@ -15957,7 +16028,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 
     case MISC_BUILTIN_SPEC_BARRIER:
       {
-	emit_insn (gen_rs6000_speculation_barrier ());
+	emit_insn (gen_speculation_barrier ());
 	return NULL_RTX;
       }
 
@@ -17625,12 +17696,12 @@ init_float128_ibm (machine_mode mode)
      names.  */
   if (mode == IFmode)
     {
-      set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdtf2");
-      set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddtf2");
-      set_conv_libfunc (trunc_optab, mode, TDmode, "__dpd_trunctftd2");
-      set_conv_libfunc (trunc_optab, SDmode, mode, "__dpd_trunctfsd2");
-      set_conv_libfunc (trunc_optab, DDmode, mode, "__dpd_trunctfdd2");
-      set_conv_libfunc (sext_optab, TDmode, mode, "__dpd_extendtdtf2");
+      set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdtf");
+      set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddtf");
+      set_conv_libfunc (trunc_optab, mode, TDmode, "__dpd_trunctdtf");
+      set_conv_libfunc (trunc_optab, SDmode, mode, "__dpd_trunctfsd");
+      set_conv_libfunc (trunc_optab, DDmode, mode, "__dpd_trunctfdd");
+      set_conv_libfunc (sext_optab, TDmode, mode, "__dpd_extendtftd");
 
       if (TARGET_POWERPC64)
 	{
@@ -17729,12 +17800,12 @@ init_float128_ieee (machine_mode mode)
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
-      set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdkf2");
-      set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddkf2");
-      set_conv_libfunc (trunc_optab, mode, TDmode, "__dpd_trunckftd2");
-      set_conv_libfunc (trunc_optab, SDmode, mode, "__dpd_trunckfsd2");
-      set_conv_libfunc (trunc_optab, DDmode, mode, "__dpd_trunckfdd2");
-      set_conv_libfunc (sext_optab, TDmode, mode, "__dpd_extendtdkf2");
+      set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdkf");
+      set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddkf");
+      set_conv_libfunc (trunc_optab, mode, TDmode, "__dpd_trunctdkf");
+      set_conv_libfunc (trunc_optab, SDmode, mode, "__dpd_trunckfsd");
+      set_conv_libfunc (trunc_optab, DDmode, mode, "__dpd_trunckfdd");
+      set_conv_libfunc (sext_optab, TDmode, mode, "__dpd_extendkftd");
 
       set_conv_libfunc (sfix_optab, SImode, mode, "__fixkfsi");
       set_conv_libfunc (ufix_optab, SImode, mode, "__fixunskfsi");
@@ -20289,6 +20360,9 @@ rs6000_output_function_entry (FILE *file, const char *fname)
 /* Print an operand.  Recognize special options, documented below.  */
 
 #if TARGET_ELF
+/* Access to .sdata2 through r2 (see -msdata=eabi in invoke.texi) is
+   only introduced by the linker, when applying the sda21
+   relocation.  */
 #define SMALL_DATA_RELOC ((rs6000_sdata == SDATA_EABI) ? "sda21" : "sdarel")
 #define SMALL_DATA_REG ((rs6000_sdata == SDATA_EABI) ? 0 : 13)
 #else

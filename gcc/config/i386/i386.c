@@ -75,7 +75,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-iterator.h"
 #include "dbgcnt.h"
 #include "case-cfn-macros.h"
-#include "regrename.h"
 #include "dojump.h"
 #include "fold-const-call.h"
 #include "tree-vrp.h"
@@ -138,7 +137,6 @@ const struct processor_costs *ix86_cost = NULL;
 #define m_NEHALEM (HOST_WIDE_INT_1U<<PROCESSOR_NEHALEM)
 #define m_SANDYBRIDGE (HOST_WIDE_INT_1U<<PROCESSOR_SANDYBRIDGE)
 #define m_HASWELL (HOST_WIDE_INT_1U<<PROCESSOR_HASWELL)
-#define m_CORE_ALL (m_CORE2 | m_NEHALEM  | m_SANDYBRIDGE | m_HASWELL)
 #define m_BONNELL (HOST_WIDE_INT_1U<<PROCESSOR_BONNELL)
 #define m_SILVERMONT (HOST_WIDE_INT_1U<<PROCESSOR_SILVERMONT)
 #define m_KNL (HOST_WIDE_INT_1U<<PROCESSOR_KNL)
@@ -148,6 +146,10 @@ const struct processor_costs *ix86_cost = NULL;
 #define m_CANNONLAKE (HOST_WIDE_INT_1U<<PROCESSOR_CANNONLAKE)
 #define m_ICELAKE_CLIENT (HOST_WIDE_INT_1U<<PROCESSOR_ICELAKE_CLIENT)
 #define m_ICELAKE_SERVER (HOST_WIDE_INT_1U<<PROCESSOR_ICELAKE_SERVER)
+#define m_CORE_AVX512 (m_SKYLAKE_AVX512 | m_CANNONLAKE \
+		       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER)
+#define m_CORE_AVX2 (m_HASWELL | m_SKYLAKE | m_CORE_AVX512)
+#define m_CORE_ALL (m_CORE2 | m_NEHALEM  | m_SANDYBRIDGE | m_CORE_AVX2)
 #define m_GOLDMONT (HOST_WIDE_INT_1U<<PROCESSOR_GOLDMONT)
 #define m_GOLDMONT_PLUS (HOST_WIDE_INT_1U<<PROCESSOR_GOLDMONT_PLUS)
 #define m_TREMONT (HOST_WIDE_INT_1U<<PROCESSOR_TREMONT)
@@ -2632,16 +2634,23 @@ rest_of_insert_endbranch (void)
 		{
 		  rtx call = get_call_rtx_from (insn);
 		  rtx fnaddr = XEXP (call, 0);
+		  tree fndecl = NULL_TREE;
 
 		  /* Also generate ENDBRANCH for non-tail call which
 		     may return via indirect branch.  */
-		  if (MEM_P (fnaddr)
-		      && GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+		  if (GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+		    fndecl = SYMBOL_REF_DECL (XEXP (fnaddr, 0));
+		  if (fndecl == NULL_TREE)
+		    fndecl = MEM_EXPR (fnaddr);
+		  if (fndecl
+		      && TREE_CODE (TREE_TYPE (fndecl)) != FUNCTION_TYPE
+		      && TREE_CODE (TREE_TYPE (fndecl)) != METHOD_TYPE)
+		    fndecl = NULL_TREE;
+		  if (fndecl && TYPE_ARG_TYPES (TREE_TYPE (fndecl)))
 		    {
-		      tree fndecl = SYMBOL_REF_DECL (XEXP (fnaddr, 0));
-		      if (fndecl
-			  && lookup_attribute ("indirect_return",
-					       DECL_ATTRIBUTES (fndecl)))
+		      tree fntype = TREE_TYPE (fndecl);
+		      if (lookup_attribute ("indirect_return",
+					    TYPE_ATTRIBUTES (fntype)))
 			need_endbr = true;
 		    }
 		}
@@ -3123,15 +3132,6 @@ ix86_debug_options (void)
     fputs ("<no options>\n\n", stderr);
 
   return;
-}
-
-/* Return true if T is one of the bytes we should avoid with
-   -mmitigate-rop.  */
-
-static bool
-ix86_rop_should_change_byte_p (int t)
-{
-  return t == 0xc2 || t == 0xc3 || t == 0xca || t == 0xcb;
 }
 
 static const char *stringop_alg_names[] = {
@@ -13271,12 +13271,14 @@ ix86_finalize_stack_frame_flags (void)
 	  recompute_frame_layout_p = true;
 	}
     }
-  else if (crtl->max_used_stack_slot_alignment
-	   > crtl->preferred_stack_boundary)
+  else if (crtl->max_used_stack_slot_alignment >= 128)
     {
-      /* We don't need to realign stack.  But we still need to keep
-	 stack frame properly aligned to satisfy the largest alignment
-	 of stack slots.  */
+      /* We don't need to realign stack.  max_used_stack_alignment is
+	 used to decide how stack frame should be aligned.  This is
+	 independent of any psABIs nor 32-bit vs 64-bit.  It is always
+	 safe to compute max_used_stack_alignment.  We compute it only
+	 if 128-bit aligned load/store may be generated on misaligned
+	 stack slot which will lead to segfault.   */
       if (ix86_find_max_used_stack_alignment (stack_alignment, true))
 	cfun->machine->max_used_stack_alignment
 	  = stack_alignment / BITS_PER_UNIT;
@@ -19766,8 +19768,6 @@ ix86_output_addr_diff_elt (FILE *file, int value, int rel)
   if (TARGET_64BIT || TARGET_VXWORKS_RTP)
     fprintf (file, "%s%s%d-%s%d\n",
 	     directive, LPREFIX, value, LPREFIX, rel);
-  else if (HAVE_AS_GOTOFF_IN_DATA)
-    fprintf (file, ASM_LONG "%s%d@GOTOFF\n", LPREFIX, value);
 #if TARGET_MACHO
   else if (TARGET_MACHO)
     {
@@ -19776,6 +19776,8 @@ ix86_output_addr_diff_elt (FILE *file, int value, int rel)
       putc ('\n', file);
     }
 #endif
+  else if (HAVE_AS_GOTOFF_IN_DATA)
+    fprintf (file, ASM_LONG "%s%d@GOTOFF\n", LPREFIX, value);
   else
     asm_fprintf (file, ASM_LONG "%U%s+[.-%s%d]\n",
 		 GOT_SYMBOL_NAME, LPREFIX, value);
@@ -29098,98 +29100,6 @@ ix86_instantiate_decls (void)
       instantiate_decl_rtl (s->rtl);
 }
 
-/* Return the number used for encoding REG, in the range 0..7.  */
-
-static int
-reg_encoded_number (rtx reg)
-{
-  unsigned regno = REGNO (reg);
-  switch (regno)
-    {
-    case AX_REG:
-      return 0;
-    case CX_REG:
-      return 1;
-    case DX_REG:
-      return 2;
-    case BX_REG:
-      return 3;
-    case SP_REG:
-      return 4;
-    case BP_REG:
-      return 5;
-    case SI_REG:
-      return 6;
-    case DI_REG:
-      return 7;
-    default:
-      break;
-    }
-  if (IN_RANGE (regno, FIRST_STACK_REG, LAST_STACK_REG))
-    return regno - FIRST_STACK_REG;
-  if (IN_RANGE (regno, FIRST_SSE_REG, LAST_SSE_REG))
-    return regno - FIRST_SSE_REG;
-  if (IN_RANGE (regno, FIRST_MMX_REG, LAST_MMX_REG))
-    return regno - FIRST_MMX_REG;
-  if (IN_RANGE (regno, FIRST_REX_SSE_REG, LAST_REX_SSE_REG))
-    return regno - FIRST_REX_SSE_REG;
-  if (IN_RANGE (regno, FIRST_REX_INT_REG, LAST_REX_INT_REG))
-    return regno - FIRST_REX_INT_REG;
-  if (IN_RANGE (regno, FIRST_MASK_REG, LAST_MASK_REG))
-    return regno - FIRST_MASK_REG;
-  return -1;
-}
-
-/* Given an insn INSN with NOPERANDS OPERANDS, return the modr/m byte used
-   in its encoding if it could be relevant for ROP mitigation, otherwise
-   return -1.  If POPNO0 and POPNO1 are nonnull, store the operand numbers
-   used for calculating it into them.  */
-
-static int
-ix86_get_modrm_for_rop (rtx_insn *insn, rtx *operands, int noperands,
-			int *popno0 = 0, int *popno1 = 0)
-{
-  if (asm_noperands (PATTERN (insn)) >= 0)
-    return -1;
-  int has_modrm = get_attr_modrm (insn);
-  if (!has_modrm)
-    return -1;
-  enum attr_modrm_class cls = get_attr_modrm_class (insn);
-  rtx op0, op1;
-  switch (cls)
-    {
-    case MODRM_CLASS_OP02:
-      gcc_assert (noperands >= 3);
-      if (popno0)
-	{
-	  *popno0 = 0;
-	  *popno1 = 2;
-	}
-      op0 = operands[0];
-      op1 = operands[2];
-      break;
-    case MODRM_CLASS_OP01:
-      gcc_assert (noperands >= 2);
-      if (popno0)
-	{
-	  *popno0 = 0;
-	  *popno1 = 1;
-	}
-      op0 = operands[0];
-      op1 = operands[1];
-      break;
-    default:
-      return -1;
-    }
-  if (REG_P (op0) && REG_P (op1))
-    {
-      int enc0 = reg_encoded_number (op0);
-      int enc1 = reg_encoded_number (op1);
-      return 0xc0 + (enc1 << 3) + enc0;
-    }
-  return -1;
-}
-
 /* Check whether x86 address PARTS is a pc-relative address.  */
 
 bool
@@ -40644,7 +40554,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     {
     case SET:
       if (register_operand (SET_DEST (x), VOIDmode)
-	  && reg_or_0_operand (SET_SRC (x), VOIDmode))
+	  && register_operand (SET_SRC (x), VOIDmode))
 	{
 	  *total = ix86_set_reg_reg_cost (GET_MODE (SET_DEST (x)));
 	  return true;
@@ -40671,20 +40581,10 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case CONST:
     case LABEL_REF:
     case SYMBOL_REF:
-      if (TARGET_64BIT && !x86_64_immediate_operand (x, VOIDmode))
-	*total = 3;
-      else if (TARGET_64BIT && !x86_64_zext_immediate_operand (x, VOIDmode))
-	*total = 2;
-      else if (flag_pic && SYMBOLIC_CONST (x)
-	       && !(TARGET_64BIT
-		    && (GET_CODE (x) == LABEL_REF
-			|| (GET_CODE (x) == SYMBOL_REF
-			    && SYMBOL_REF_LOCAL_P (x))))
-	       /* Use 0 cost for CONST to improve its propagation.  */
-	       && (TARGET_64BIT || GET_CODE (x) != CONST))
-	*total = 1;
-      else
+      if (x86_64_immediate_operand (x, VOIDmode))
 	*total = 0;
+     else
+	*total = 1;
       return true;
 
     case CONST_DOUBLE:
@@ -41924,8 +41824,9 @@ ix86_avoid_jump_mispredicts (void)
 
       if (LABEL_P (insn))
 	{
-	  int align = label_to_alignment (insn);
-	  int max_skip = label_to_max_skip (insn);
+	  align_flags alignment = label_to_alignment (insn);
+	  int align = alignment.levels[0].log;
+	  int max_skip = alignment.levels[0].maxskip;
 
 	  if (max_skip > 15)
 	    max_skip = 15;
@@ -42202,215 +42103,6 @@ ix86_seh_fixup_eh_fallthru (void)
     }
 }
 
-/* Given a register number BASE, the lowest of a group of registers, update
-   regsets IN and OUT with the registers that should be avoided in input
-   and output operands respectively when trying to avoid generating a modr/m
-   byte for -mmitigate-rop.  */
-
-static void
-set_rop_modrm_reg_bits (int base, HARD_REG_SET &in, HARD_REG_SET &out)
-{
-  SET_HARD_REG_BIT (out, base);
-  SET_HARD_REG_BIT (out, base + 1);
-  SET_HARD_REG_BIT (in, base + 2);
-  SET_HARD_REG_BIT (in, base + 3);
-}
-
-/* Called if -mmitigate-rop is in effect.  Try to rewrite instructions so
-   that certain encodings of modr/m bytes do not occur.  */
-static void
-ix86_mitigate_rop (void)
-{
-  HARD_REG_SET input_risky;
-  HARD_REG_SET output_risky;
-  HARD_REG_SET inout_risky;
-
-  CLEAR_HARD_REG_SET (output_risky);
-  CLEAR_HARD_REG_SET (input_risky);
-  SET_HARD_REG_BIT (output_risky, AX_REG);
-  SET_HARD_REG_BIT (output_risky, CX_REG);
-  SET_HARD_REG_BIT (input_risky, BX_REG);
-  SET_HARD_REG_BIT (input_risky, DX_REG);
-  set_rop_modrm_reg_bits (FIRST_SSE_REG, input_risky, output_risky);
-  set_rop_modrm_reg_bits (FIRST_REX_INT_REG, input_risky, output_risky);
-  set_rop_modrm_reg_bits (FIRST_REX_SSE_REG, input_risky, output_risky);
-  set_rop_modrm_reg_bits (FIRST_EXT_REX_SSE_REG, input_risky, output_risky);
-  set_rop_modrm_reg_bits (FIRST_MASK_REG, input_risky, output_risky);
-  COPY_HARD_REG_SET (inout_risky, input_risky);
-  IOR_HARD_REG_SET (inout_risky, output_risky);
-
-  df_note_add_problem ();
-  /* Fix up what stack-regs did.  */
-  df_insn_rescan_all ();
-  df_analyze ();
-
-  regrename_init (true);
-  regrename_analyze (NULL);
-
-  auto_vec<du_head_p> cands;
-  
-  for (rtx_insn *insn = get_insns (); insn; insn = NEXT_INSN (insn))
-    {
-      if (!NONDEBUG_INSN_P (insn))
-	continue;
-
-      if (GET_CODE (PATTERN (insn)) == USE
-	  || GET_CODE (PATTERN (insn)) == CLOBBER)
-	continue;
-
-      extract_insn (insn);
-
-      int opno0, opno1;
-      int modrm = ix86_get_modrm_for_rop (insn, recog_data.operand,
-					  recog_data.n_operands, &opno0,
-					  &opno1);
-
-      if (!ix86_rop_should_change_byte_p (modrm))
-	continue;
-
-      insn_rr_info *info = &insn_rr[INSN_UID (insn)];
-
-      /* This happens when regrename has to fail a block.  */
-      if (!info->op_info)
-	continue;
-
-      if (info->op_info[opno0].n_chains != 0)
-	{
-	  gcc_assert (info->op_info[opno0].n_chains == 1);
-	  du_head_p op0c;
-	  op0c = regrename_chain_from_id (info->op_info[opno0].heads[0]->id);
-	  if (op0c->target_data_1 + op0c->target_data_2 == 0
-	      && !op0c->cannot_rename)
-	    cands.safe_push (op0c);
-
-	  op0c->target_data_1++;
-	}
-      if (info->op_info[opno1].n_chains != 0)
-	{
-	  gcc_assert (info->op_info[opno1].n_chains == 1);
-	  du_head_p op1c;
-	  op1c = regrename_chain_from_id (info->op_info[opno1].heads[0]->id);
-	  if (op1c->target_data_1 + op1c->target_data_2 == 0
-	      && !op1c->cannot_rename)
-	    cands.safe_push (op1c);
-
-	  op1c->target_data_2++;
-	}
-    }
-
-  int i;
-  du_head_p head;
-  FOR_EACH_VEC_ELT (cands, i, head)
-    {
-      int old_reg, best_reg;
-      HARD_REG_SET unavailable;
-
-      CLEAR_HARD_REG_SET (unavailable);
-      if (head->target_data_1)
-	IOR_HARD_REG_SET (unavailable, output_risky);
-      if (head->target_data_2)
-	IOR_HARD_REG_SET (unavailable, input_risky);
-
-      int n_uses;
-      reg_class superclass = regrename_find_superclass (head, &n_uses,
-							&unavailable);
-      old_reg = head->regno;
-      best_reg = find_rename_reg (head, superclass, &unavailable,
-				  old_reg, false);
-      bool ok = regrename_do_replace (head, best_reg);
-      gcc_assert (ok);
-      if (dump_file)
-	fprintf (dump_file, "Chain %d renamed as %s in %s\n", head->id,
-		 reg_names[best_reg], reg_class_names[superclass]);
-
-    }
-  
-  regrename_finish ();
-
-  df_analyze ();
-
-  basic_block bb;
-  regset_head live;
-
-  INIT_REG_SET (&live);
-
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      rtx_insn *insn;
-
-      COPY_REG_SET (&live, DF_LR_OUT (bb));
-      df_simulate_initialize_backwards (bb, &live);
-
-      FOR_BB_INSNS_REVERSE (bb, insn)
-	{
-	  if (!NONDEBUG_INSN_P (insn))
-	    continue;
-
-	  df_simulate_one_insn_backwards (bb, insn, &live);
-
-	  if (GET_CODE (PATTERN (insn)) == USE
-	      || GET_CODE (PATTERN (insn)) == CLOBBER)
-	    continue;
-
-	  extract_insn (insn);
-	  constrain_operands_cached (insn, reload_completed);
-	  int opno0, opno1;
-	  int modrm = ix86_get_modrm_for_rop (insn, recog_data.operand,
-					      recog_data.n_operands, &opno0,
-					      &opno1);
-	  if (modrm < 0
-	      || !ix86_rop_should_change_byte_p (modrm)
-	      || opno0 == opno1)
-	    continue;
-
-	  rtx oldreg = recog_data.operand[opno1];
-	  preprocess_constraints (insn);
-	  const operand_alternative *alt = which_op_alt ();
-
-	  int i;
-	  for (i = 0; i < recog_data.n_operands; i++)
-	    if (i != opno1
-		&& alt[i].earlyclobber
-		&& reg_overlap_mentioned_p (recog_data.operand[i],
-					    oldreg))
-	      break;
-
-	  if (i < recog_data.n_operands)
-	    continue;
-
-	  if (dump_file)
-	    fprintf (dump_file,
-		     "attempting to fix modrm byte in insn %d:"
-		     " reg %d class %s", INSN_UID (insn), REGNO (oldreg),
-		     reg_class_names[alt[opno1].cl]);
-
-	  HARD_REG_SET unavailable;
-	  REG_SET_TO_HARD_REG_SET (unavailable, &live);
-	  SET_HARD_REG_BIT (unavailable, REGNO (oldreg));
-	  IOR_COMPL_HARD_REG_SET (unavailable, call_used_reg_set);
-	  IOR_HARD_REG_SET (unavailable, fixed_reg_set);
-	  IOR_HARD_REG_SET (unavailable, output_risky);
-	  IOR_COMPL_HARD_REG_SET (unavailable,
-				  reg_class_contents[alt[opno1].cl]);
-
-	  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-	      if (!TEST_HARD_REG_BIT (unavailable, i))
-		break;
-	  if (i == FIRST_PSEUDO_REGISTER)
-	    {
-	      if (dump_file)
-		fprintf (dump_file, ", none available\n");
-	      continue;
-	    }
-	  if (dump_file)
-	    fprintf (dump_file, " -> %d\n", i);
-	  rtx newreg = gen_rtx_REG (recog_data.operand_mode[opno1], i);
-	  validate_change (insn, recog_data.operand_loc[opno1], newreg, false);
-	  insn = emit_insn_before (gen_move_insn (newreg, oldreg), insn);
-	}
-    }
-}
-
 /* Implement machine specific optimizations.  We implement padding of returns
    for K8 CPUs and pass to avoid 4 jumps in the single 16 byte window.  */
 static void
@@ -42420,9 +42112,6 @@ ix86_reorg (void)
      with old MDEP_REORGS that are not CFG based.  Recompute it now.  */
   compute_bb_for_insn ();
 
-  if (flag_mitigate_rop)
-    ix86_mitigate_rop ();
-  
   if (TARGET_SEH && current_function_has_exception_handlers ())
     ix86_seh_fixup_eh_fallthru ();
 
@@ -45916,8 +45605,8 @@ static const struct attribute_spec ix86_attribute_table[] =
     ix86_handle_fndecl_attribute, NULL },
   { "function_return", 1, 1, true, false, false, false,
     ix86_handle_fndecl_attribute, NULL },
-  { "indirect_return", 0, 0, true, false, false, false,
-    ix86_handle_fndecl_attribute, NULL },
+  { "indirect_return", 0, 0, false, true, true, false,
+    NULL, NULL },
 
   /* End element.  */
   { NULL, 0, 0, false, false, false, false, NULL, NULL }
@@ -46130,6 +45819,42 @@ expand_vselect_vconcat (rtx target, rtx op0, rtx op1,
   XEXP (x, 0) = const0_rtx;
   XEXP (x, 1) = const0_rtx;
   return ok;
+}
+
+/* A subroutine of ix86_expand_vec_perm_builtin_1.  Try to implement D
+   using movss or movsd.  */
+static bool
+expand_vec_perm_movs (struct expand_vec_perm_d *d)
+{
+  machine_mode vmode = d->vmode;
+  unsigned i, nelt = d->nelt;
+  rtx x;
+
+  if (d->one_operand_p)
+    return false;
+
+  if (!(TARGET_SSE && vmode == V4SFmode)
+      && !(TARGET_SSE2 && vmode == V2DFmode))
+    return false;
+
+  /* Only the first element is changed.  */
+  if (d->perm[0] != nelt && d->perm[0] != 0)
+    return false;
+  for (i = 1; i < nelt; ++i)
+    if (d->perm[i] != i + nelt - d->perm[0])
+      return false;
+
+  if (d->testing_p)
+    return true;
+
+  if (d->perm[0] == nelt)
+    x = gen_rtx_VEC_MERGE (vmode, d->op1, d->op0, GEN_INT (1));
+  else
+    x = gen_rtx_VEC_MERGE (vmode, d->op0, d->op1, GEN_INT (1));
+
+  emit_insn (gen_rtx_SET (d->target, x));
+
+  return true;
 }
 
 /* A subroutine of ix86_expand_vec_perm_builtin_1.  Try to implement D
@@ -46873,6 +46598,10 @@ expand_vec_perm_1 (struct expand_vec_perm_d *d)
 	    return true;
 	}
     }
+
+  /* Try movss/movsd instructions.  */
+  if (expand_vec_perm_movs (d))
+    return true;
 
   /* Finally, try the fully general two operand permute.  */
   if (expand_vselect_vconcat (d->target, d->op0, d->op1, d->perm, nelt,

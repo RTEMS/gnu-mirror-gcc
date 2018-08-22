@@ -41,6 +41,7 @@
 #include "stmt.h"
 #include "varasm.h"
 #include "output.h"
+#include "debug.h"
 #include "libfuncs.h"	/* For set_stack_check_libfunc.  */
 #include "tree-iterator.h"
 #include "gimplify.h"
@@ -255,6 +256,12 @@ static tree create_init_temporary (const char *, tree, tree *, Node_Id);
 static const char *extract_encoding (const char *) ATTRIBUTE_UNUSED;
 static const char *decode_name (const char *) ATTRIBUTE_UNUSED;
 
+/* This makes gigi's file_info_ptr visible in this translation unit,
+   so that Sloc_to_locus can look it up when deciding whether to map
+   decls to instances.  */
+
+static struct File_Info_Type *file_map;
+
 /* This is the main program of the back-end.  It sets up all the table
    structures and then generates code.  */
 
@@ -299,6 +306,12 @@ gigi (Node_Id gnat_root,
   List_Headers_Ptr = list_headers_ptr;
 
   type_annotate_only = (gigi_operating_mode == 1);
+
+  if (Generate_SCO_Instance_Table != 0)
+    {
+      file_map = file_info_ptr;
+      maybe_create_decl_to_instance_map (number_file);
+    }
 
   for (i = 0; i < number_file; i++)
     {
@@ -701,6 +714,7 @@ gigi (Node_Id gnat_root,
     }
 
   /* Destroy ourselves.  */
+  file_map = NULL;
   destroy_gnat_decl ();
   destroy_gnat_utils ();
 
@@ -1226,7 +1240,7 @@ Identifier_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p)
      of a discriminated type whose full view can be elaborated statically, to
      avoid problematic conversions to the nominal subtype.  But remove any
      padding from the resulting type.  */
-  if (TREE_CODE (TREE_TYPE (gnu_result)) == FUNCTION_TYPE
+  if (FUNC_OR_METHOD_TYPE_P (TREE_TYPE (gnu_result))
       || Is_Constr_Subt_For_UN_Aliased (gnat_temp_type)
       || (Ekind (gnat_temp) == E_Constant
 	  && Present (Full_View (gnat_temp))
@@ -1730,15 +1744,14 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	 since it can use a special calling convention on some platforms,
 	 which cannot be propagated to the access type.  */
       else if (attribute == Attr_Access
-	       && Nkind (gnat_prefix) == N_Identifier
-	       && is_cplusplus_method (Entity (gnat_prefix)))
+	       && TREE_CODE (TREE_TYPE (gnu_prefix)) == METHOD_TYPE)
 	post_error ("access to C++ constructor or member function not allowed",
 		    gnat_node);
 
       /* For other address attributes applied to a nested function,
 	 find an inner ADDR_EXPR and annotate it so that we can issue
 	 a useful warning with -Wtrampolines.  */
-      else if (TREE_CODE (TREE_TYPE (gnu_prefix)) == FUNCTION_TYPE)
+      else if (FUNC_OR_METHOD_TYPE_P (TREE_TYPE (gnu_prefix)))
 	{
 	  gnu_expr = remove_conversions (gnu_result, false);
 
@@ -3772,7 +3785,7 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
     }
 
   /* Set the line number in the decl to correspond to that of the body.  */
-  if (!Sloc_to_locus (Sloc (gnat_node), &locus))
+  if (!Sloc_to_locus (Sloc (gnat_node), &locus, false, gnu_subprog_decl))
     locus = input_location;
   DECL_SOURCE_LOCATION (gnu_subprog_decl) = locus;
 
@@ -4283,7 +4296,7 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
   Node_Id gnat_actual;
   bool sync;
 
-  gcc_assert (TREE_CODE (gnu_subprog_type) == FUNCTION_TYPE);
+  gcc_assert (FUNC_OR_METHOD_TYPE_P (gnu_subprog_type));
 
   /* If we are calling a stubbed function, raise Program_Error, but Elaborate
      all our args first.  */
@@ -4437,6 +4450,7 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
       const bool suppress_type_conversion
 	= ((Nkind (gnat_actual) == N_Unchecked_Type_Conversion
 	    && (!in_param
+		|| !is_by_ref_formal_parm
 		|| (Is_Composite_Type (Underlying_Type (gnat_formal_type))
 		    && !Is_Constrained (Underlying_Type (gnat_formal_type)))))
 	   || (Nkind (gnat_actual) == N_Type_Conversion
@@ -8743,7 +8757,7 @@ process_freeze_entity (Node_Id gnat_node)
   if (gnu_old
       && ((TREE_CODE (gnu_old) == FUNCTION_DECL
 	   && (kind == E_Function || kind == E_Procedure))
-	  || (TREE_CODE (TREE_TYPE (gnu_old)) == FUNCTION_TYPE
+	  || (FUNC_OR_METHOD_TYPE_P (TREE_TYPE (gnu_old))
 	      && kind == E_Subprogram_Type)))
     return;
 
@@ -9971,12 +9985,14 @@ maybe_implicit_deref (tree exp)
   return exp;
 }
 
-/* Convert SLOC into LOCUS.  Return true if SLOC corresponds to a source code
-   location and false if it doesn't.  If CLEAR_COLUMN is true, set the column
-   information to 0.  */
+/* Convert SLOC into LOCUS.  Return true if SLOC corresponds to a
+   source code location and false if it doesn't.  If CLEAR_COLUMN is
+   true, set the column information to 0.  If DECL is given and SLOC
+   refers to a File with an instance, map DECL to that instance.  */
 
 bool
-Sloc_to_locus (Source_Ptr Sloc, location_t *locus, bool clear_column)
+Sloc_to_locus (Source_Ptr Sloc, location_t *locus, bool clear_column,
+	       const_tree decl)
 {
   if (Sloc == No_Location)
     return false;
@@ -9999,6 +10015,9 @@ Sloc_to_locus (Source_Ptr Sloc, location_t *locus, bool clear_column)
   /* Translate the location.  */
   *locus
     = linemap_position_for_line_and_column (line_table, map, line, column);
+
+  if (file_map && file_map[file - 1].Instance)
+    decl_to_instance_map->put (decl, file_map[file - 1].Instance);
 
   return true;
 }

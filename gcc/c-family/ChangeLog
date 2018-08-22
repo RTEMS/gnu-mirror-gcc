@@ -1,3 +1,195 @@
+2018-08-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/86981, Implement -Wpessimizing-move.
+	* c.opt (Wpessimizing-move): New option.
+
+2018-08-20  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/84889
+	* c-attribs.c (common_handle_aligned_attribute): Add
+	auto_diagnostic_group instance.
+	* c-indentation.c (warn_for_misleading_indentation): Likewise.
+	* c-opts.c (c_common_post_options): Likewise.
+	* c-warn.c (warn_logical_not_parentheses): Likewise.
+	(warn_duplicated_cond_add_or_warn): Likewise.
+	(warn_for_multistatement_macros): Likewise.
+
+2018-08-20  Nathan Sidwell  <nathan@acm.org>
+
+	* c-ada-spec.c (macro_length, dump_ada_macros): Adjust macro parm
+	access.
+
+2018-08-17  Nathan Sidwell  <nathan@acm.org>
+
+	* c-cppbuiltin.c (struct lazy_hex_fp_value_struct): Remove macro
+	field.
+	(laxy_hex_fp_value_count): Make unsigned.
+	(lazy_hex_fp_value): Provided with macro & lazy number.  Directly
+	manipulate the macro.
+	(builtin_defin_with_hex_fp_value): Adjust callback name, use
+	cpp_define_lazily.
+
+2018-08-17  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-format.c (enum format_type): Add gcc_dump_printf_format_type.
+	(gcc_dump_printf_length_specs): New.
+	(gcc_dump_printf_flag_pairs): New.
+	(gcc_dump_printf_flag_specs): New.
+	(gcc_dump_printf_char_table): New.
+	(format_types_orig): Add entry for "gcc_dump_printf".
+	(init_dynamic_diag_info): Set up length_char_specs and
+	conversion_specs for gcc_dump_printf_format_type.
+	(handle_format_attribute): Handle gcc_dump_printf_format_type.
+
+2018-08-17  Nathan Sidwell  <nathan@acm.org>
+
+	* c-ada-spec.c (macro_length, dump_ada_macros): Constify.
+
+	* c-ada-spec.c: Don't #include "cpp-id-data.h"
+	* c-cppbuiltin.c: Likewise.
+
+2018-08-17  Martin Liska  <mliska@suse.cz>
+
+	* c.opt: Remove Warn, Init and Report for options with
+        Ignore/Deprecated flag. Warning is done automatically for
+        Deprecated flags.
+
+2018-08-16  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/70693
+	* c-common.c (selftest::c_family_tests): Call
+	selftest::c_indentation_c_tests.
+	* c-common.h (selftest::c_indentation_c_tests): New decl.
+	* c-indentation.c: Include "selftest.h".
+	(next_tab_stop): Add "tab_width" param, rather than accessing
+	cpp_opts.
+	(get_visual_column): Likewise.  Clarify comment.  Bulletproof
+	against reading past the end of the line.
+	(get_first_nws_vis_column): Add "tab_width" param.
+	(detect_intervening_unindent): Likewise.
+	(should_warn_for_misleading_indentation): Read tab width from
+	cpp_opts and pass around.
+	(selftest::test_next_tab_stop): New test.
+	(selftest::assert_get_visual_column_succeeds): New function.
+	(ASSERT_GET_VISUAL_COLUMN_SUCCEEDS): New macro.
+	(selftest::assert_get_visual_column_fails): New function.
+	(ASSERT_GET_VISUAL_COLUMN_FAILS): New macro.
+	(selftest::test_get_visual_column): New test.
+	(selftest::c_indentation_c_tests): New function.
+
+2018-08-16  Nathan Sidwell  <nathan@acm.org>
+
+	* c-ada-spec.c (count_ada_macro): Use cpp_user_macro_p.
+	(store_ada_macro): Likewise.
+	* c-ppoutput.c (cb_used_define, dump_macro): Likewise.
+	* c-spellcheck.cc (should-suggest_as_macro_p): Likewise,
+
+2018-08-15  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-format.c: Include "selftest-diagnostic.h" and
+	"gcc-rich-location.h".
+	(format_warning_at_char): Pass NULL for new label params of
+	format_warning_va.
+	(class indirection_suffix): New class.
+	(class range_label_for_format_type_mismatch): New class.
+	(format_type_warning): Move logic for generating "*" suffix to
+	class indirection_suffix.  Create "fmt_label" and "param_label"
+	to show their types, and pass them to the
+	format_warning_at_substring calls.
+	(selftest::test_type_mismatch_range_labels): New test.
+	(selftest::c_format_c_tests): Call it.
+
+2018-08-13  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/71625
+	* c-common.c (braced_list_to_string): New function.
+	* c-common.h (braced_list_to_string): Declare it.
+
+2018-08-08  Nathan Sidwell  <nathan@acm.org>
+
+	* c-common.c (try_to_locate_new_include_inertion_point): Use
+	linemap_included_from_linemap.
+	* c-lex.c (fe_file_change): Use linemap_included_from.
+	* c-ppoutput.c (pp_file_change): Likewise.
+
+2018-08-01  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/86650
+	* c-family/c-format.c (gcc_tdiag_char_table): Update comment for "%G".
+	(gcc_cdiag_char_table, gcc_cxxdiag_char_table): Same.
+ 	(init_dynamic_diag_info): Update from "gcall *" to "gimple *".
+ 	* c-format.h (T89_G): Update to be "gimple *" rather than
+ 	"gcall *".
+	(local_gcall_ptr_node): Rename...
+ 	(local_gimple_ptr_node): ...to this.
+
+2018-07-31  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-format.c (PP_FORMAT_CHAR_TABLE): New macro, based on existing
+	table entries for gcc_diag_char_table, and the 'Z' entry from
+	gcc_tdiag_char_table, changing the "chain" entry for 'Z' from
+	&gcc_tdiag_char_table[0] to &gcc_diag_char_table[0].
+	(gcc_diag_char_table): Use PP_FORMAT_CHAR_TABLE, implicitly
+	adding missing "Z" for this table.  Remove erroneous "G" and "K"
+	entries.
+	(gcc_tdiag_char_table): Use PP_FORMAT_CHAR_TABLE.  Remove "v".
+	(gcc_cdiag_char_table): Use PP_FORMAT_CHAR_TABLE.
+	(gcc_cxxdiag_char_table): Use PP_FORMAT_CHAR_TABLE.  Remove "v".
+
+2018-07-31  Richard Earnshaw  <rearnsha@arm.com>
+
+	* c-common.c (speculation_safe_resolve_call): New function.
+	(speculation_safe_resolve_params): New function.
+	(speculation_safe_resolve_return): New function.
+	(resolve_overloaded_builtin): Handle __builtin_speculation_safe_value.
+	* c-cppbuiltin.c (c_cpp_builtins): Add pre-define for
+	__HAVE_SPECULATION_SAFE_VALUE.
+
+2018-07-20  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-common.c (c_cpp_error): Remove redundant "line_table"
+	parameter from call to rich_location::set_range.
+	(maybe_suggest_missing_token_insertion): Likewise.
+
+2018-07-20  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/82063
+	* gcc/c-family/c.opt (-Warray-bounds): Remove redundant -Wall.
+
+2018-07-20  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/82063
+	* c-common.h (c_common_handle_option): Change function argument
+	to HOST_WIDE_INT.
+	* c-opts.c (c_common_init_options): Same.
+	(c_common_handle_option): Same.  Remove special handling of
+	OPT_Walloca_larger_than_ and OPT_Wvla_larger_than_.
+	* c.opt (-Walloc-size-larger-than, -Walloca-larger-than): Change
+	options to take a HOST_WIDE_INT argument and accept a byte-size
+	suffix.  Initialize.
+	(-Wvla-larger-than): Same.
+	(-Wno-alloc-size-larger-than, -Wno-alloca-larger-than): New.
+	(-Wno-vla-larger-than): Same.
+
+2018-07-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-attribs.c (c_common_attribute_table): Add
+	"omp declare target implicit" attribute.
+
+2018-07-12  Richard Biener  <rguenther@suse.de>
+
+	PR c/86453
+	* c-attribs.c (handle_packed_attribute): Do not build a variant
+	type with TYPE_PACKED, instead ignore the attribute if we may
+	not apply to the original type.
+
+2018-07-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/86443
+	* c-omp.c (c_omp_check_loop_iv_r, c_omp_check_loop_iv): Allow declv
+	to contain TREE_LIST for both the original class iterator and the
+	"last" helper var.
+
 2018-07-07  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* c-ada-spec.c (to_ada_name): Remove index parameter.

@@ -427,6 +427,7 @@ GNATRTL_NONTASKING_OBJS= \
   g-htable$(objext) \
   g-io$(objext) \
   g-io_aux$(objext) \
+  g-lists$(objext) \
   g-locfil$(objext) \
   g-mbdira$(objext) \
   g-mbflra$(objext) \
@@ -522,12 +523,20 @@ GNATRTL_NONTASKING_OBJS= \
   s-conca9$(objext) \
   s-crc32$(objext)  \
   s-crtl$(objext)   \
+  s-dfmkio$(objext) \
+  s-dfmopr$(objext) \
+  s-dgmgop$(objext) \
+  s-dlmopr$(objext) \
   s-diflio$(objext) \
+  s-diflmk$(objext) \
+  s-digemk$(objext) \
   s-diinio$(objext) \
+  s-dilomk$(objext) \
   s-dim$(objext)    \
   s-dimkio$(objext) \
   s-dimmks$(objext) \
   s-direio$(objext) \
+  s-dlmkio$(objext) \
   s-dmotpr$(objext) \
   s-dsaser$(objext) \
   s-elaall$(objext) \
@@ -1960,19 +1969,17 @@ endif
 # Cygwin/Mingw32
 ifeq ($(strip $(filter-out cygwin% mingw32% pe,$(target_os))),)
   # Cygwin provides a full Posix environment, and so we use the default
-  # versions of s-memory and g-socthi rather than the Windows-specific
-  # MinGW versions.  Ideally we would use all the default versions for
-  # Cygwin and none of the MinGW versions, but for historical reasons
-  # the Cygwin port has always been a CygMing frankenhybrid and it is
-  # a long-term project to disentangle them.
+  # versions g-socthi rather than the Windows-specific MinGW version.
+  # Ideally we would use all the default versions for Cygwin and none
+  # of the MinGW versions, but for historical reasons the Cygwin port
+  # has always been a CygMing frankenhybrid and it is a long-term project
+  # to disentangle them.
   ifeq ($(strip $(filter-out cygwin%,$(target_os))),)
     LIBGNAT_TARGET_PAIRS = \
-    s-memory.adb<libgnat/s-memory.adb \
     g-socthi.ads<libgnat/g-socthi.ads \
     g-socthi.adb<libgnat/g-socthi.adb
   else
     LIBGNAT_TARGET_PAIRS = \
-    s-memory.adb<libgnat/s-memory__mingw.adb \
     g-socthi.ads<libgnat/g-socthi__mingw.ads \
     g-socthi.adb<libgnat/g-socthi__mingw.adb
   endif
@@ -2763,4 +2770,3 @@ a-tags.o  : a-tags.adb a-tags.ads
 s-memory.o  : s-memory.adb s-memory.ads
 	$(ADAC) -c $(ALL_ADAFLAGS) $(NO_SIBLING_ADAFLAGS) $(ADA_INCLUDES) \
 	  $< $(OUTPUT_OPTION)
-

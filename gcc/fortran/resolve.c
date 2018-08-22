@@ -2509,7 +2509,7 @@ resolve_global_procedure (gfc_symbol *sym, locus *where,
       /* Resolve the gsymbol namespace if needed.  */
       if (!gsym->ns->resolved)
 	{
-	  gfc_dt_list *old_dt_list;
+	  gfc_symbol *old_dt_list;
 
 	  /* Stash away derived types so that the backend_decls do not
 	     get mixed up.  */
@@ -2941,8 +2941,8 @@ is_external_proc (gfc_symbol *sym)
 static int
 pure_stmt_function (gfc_expr *, gfc_symbol *);
 
-static int
-pure_function (gfc_expr *e, const char **name)
+int
+gfc_pure_function (gfc_expr *e, const char **name)
 {
   int pure;
   gfc_component *comp;
@@ -2982,6 +2982,21 @@ pure_function (gfc_expr *e, const char **name)
 }
 
 
+/* Check if the expression is a reference to an implicitly pure function.  */
+
+int
+gfc_implicit_pure_function (gfc_expr *e)
+{
+  gfc_component *comp = gfc_get_proc_ptr_comp (e);
+  if (comp)
+    return gfc_implicit_pure (comp->ts.interface);
+  else if (e->value.function.esym)
+    return gfc_implicit_pure (e->value.function.esym);
+  else
+    return 0;
+}
+
+
 static bool
 impure_stmt_fcn (gfc_expr *e, gfc_symbol *sym,
 		 int *f ATTRIBUTE_UNUSED)
@@ -2996,7 +3011,7 @@ impure_stmt_fcn (gfc_expr *e, gfc_symbol *sym,
 	|| e->symtree->n.sym->attr.proc == PROC_ST_FUNCTION)
     return false;
 
-  return pure_function (e, &name) ? false : true;
+  return gfc_pure_function (e, &name) ? false : true;
 }
 
 
@@ -3012,7 +3027,7 @@ pure_stmt_function (gfc_expr *e, gfc_symbol *sym)
 static bool check_pure_function (gfc_expr *e)
 {
   const char *name = NULL;
-  if (!pure_function (e, &name) && name)
+  if (!gfc_pure_function (e, &name) && name)
     {
       if (forall_flag)
 	{
@@ -3034,7 +3049,8 @@ static bool check_pure_function (gfc_expr *e)
 		     "within a PURE procedure", name, &e->where);
 	  return false;
 	}
-      gfc_unset_implicit_pure (NULL);
+      if (!gfc_implicit_pure_function (e))
+	gfc_unset_implicit_pure (NULL);
     }
   return true;
 }
@@ -3822,6 +3838,41 @@ lookup_uop_fuzzy (const char *op, gfc_symtree *uop)
 }
 
 
+/* Callback finding an impure function as an operand to an .and. or
+   .or.  expression.  Remember the last function warned about to
+   avoid double warnings when recursing.  */
+
+static int
+impure_function_callback (gfc_expr **e, int *walk_subtrees ATTRIBUTE_UNUSED,
+			  void *data)
+{
+  gfc_expr *f = *e;
+  const char *name;
+  static gfc_expr *last = NULL;
+  bool *found = (bool *) data;
+
+  if (f->expr_type == EXPR_FUNCTION)
+    {
+      *found = 1;
+      if (f != last && !gfc_pure_function (f, &name)
+	  && !gfc_implicit_pure_function (f))
+	{
+	  if (name)
+	    gfc_warning (OPT_Wfunction_elimination,
+			 "Impure function %qs at %L might not be evaluated",
+			 name, &f->where);
+	  else
+	    gfc_warning (OPT_Wfunction_elimination,
+			 "Impure function at %L might not be evaluated",
+			 &f->where);
+	}
+      last = f;
+    }
+
+  return 0;
+}
+
+
 /* Resolve an operator expression node.  This can involve replacing the
    operation with a user defined function call.  */
 
@@ -3930,6 +3981,15 @@ resolve_operator (gfc_expr *e)
 	    gfc_convert_type (op1, &e->ts, 2);
 	  else if (op2->ts.kind < e->ts.kind)
 	    gfc_convert_type (op2, &e->ts, 2);
+
+	  if (flag_frontend_optimize &&
+	    (e->value.op.op == INTRINSIC_AND || e->value.op.op == INTRINSIC_OR))
+	    {
+	      /* Warn about short-circuiting
+	         with impure function as second operand.  */
+	      bool op2_f = false;
+	      gfc_expr_walker (&op2, impure_function_callback, &op2_f);
+	    }
 	  break;
 	}
 
@@ -12071,6 +12131,7 @@ resolve_fl_variable_derived (gfc_symbol *sym, int no_init_flag)
      namespace.  14.6.1.3 of the standard and the discussion on
      comp.lang.fortran.  */
   if (sym->ns != sym->ts.u.derived->ns
+      && !sym->ts.u.derived->attr.use_assoc
       && sym->ns->proc_name->attr.if_source != IFSRC_IFBODY)
     {
       gfc_symbol *s;
@@ -13474,16 +13535,19 @@ resolve_typebound_procedures (gfc_symbol* derived)
 static void
 add_dt_to_dt_list (gfc_symbol *derived)
 {
-  gfc_dt_list *dt_list;
-
-  for (dt_list = gfc_derived_types; dt_list; dt_list = dt_list->next)
-    if (derived == dt_list->derived)
-      return;
-
-  dt_list = gfc_get_dt_list ();
-  dt_list->next = gfc_derived_types;
-  dt_list->derived = derived;
-  gfc_derived_types = dt_list;
+  if (!derived->dt_next)
+    {
+      if (gfc_derived_types)
+	{
+	  derived->dt_next = gfc_derived_types->dt_next;
+	  gfc_derived_types->dt_next = derived;
+	}
+      else
+	{
+	  derived->dt_next = derived;
+	}
+      gfc_derived_types = derived;
+    }
 }
 
 
@@ -13937,28 +14001,6 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
     CLASS_DATA (c)->ts.u.derived
                     = gfc_find_dt_in_generic (CLASS_DATA (c)->ts.u.derived);
 
-  if (!sym->attr.is_class && c->ts.type == BT_DERIVED && !sym->attr.vtype
-      && c->attr.pointer && c->ts.u.derived->components == NULL
-      && !c->ts.u.derived->attr.zero_comp)
-    {
-      gfc_error ("The pointer component %qs of %qs at %L is a type "
-                 "that has not been declared", c->name, sym->name,
-                 &c->loc);
-      return false;
-    }
-
-  if (c->ts.type == BT_CLASS && c->attr.class_ok
-      && CLASS_DATA (c)->attr.class_pointer
-      && CLASS_DATA (c)->ts.u.derived->components == NULL
-      && !CLASS_DATA (c)->ts.u.derived->attr.zero_comp
-      && !UNLIMITED_POLY (c))
-    {
-      gfc_error ("The pointer component %qs of %qs at %L is a type "
-                 "that has not been declared", c->name, sym->name,
-                 &c->loc);
-      return false;
-    }
-
   /* If an allocatable component derived type is of the same type as
      the enclosing derived type, we need a vtable generating so that
      the __deallocate procedure is created.  */
@@ -14193,6 +14235,13 @@ resolve_fl_derived (gfc_symbol *sym)
 			  : &gen_dt->generic->sym->declared_at,
 			  &sym->declared_at))
     return false;
+
+  if (sym->components == NULL && !sym->attr.zero_comp)
+    {
+      gfc_error ("Derived type %qs at %L has not been declared",
+		  sym->name, &sym->declared_at);
+      return false;
+    }
 
   /* Resolve the finalizer procedures.  */
   if (!gfc_resolve_finalizers (sym, NULL))

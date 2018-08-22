@@ -1275,11 +1275,13 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
    Set *FLEXP to true if the range of the string lengths has been
    obtained from the upper bound of an array at the end of a struct.
    Such an array may hold a string that's longer than its upper bound
-   due to it being used as a poor-man's flexible array member.  */
+   due to it being used as a poor-man's flexible array member.
+   ELTSIZE is 1 for normal single byte character strings, and 2 or
+   4 for wide characer strings.  ELTSIZE is by default 1.  */
 
 static bool
 get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
-		  int fuzzy, bool *flexp)
+		  int fuzzy, bool *flexp, unsigned eltsize = 1)
 {
   tree var, val = NULL_TREE;
   gimple *def_stmt;
@@ -1300,8 +1302,8 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
 	      tree aop0 = TREE_OPERAND (op, 0);
 	      if (TREE_CODE (aop0) == INDIRECT_REF
 		  && TREE_CODE (TREE_OPERAND (aop0, 0)) == SSA_NAME)
-		return get_range_strlen (TREE_OPERAND (aop0, 0),
-					 length, visited, type, fuzzy, flexp);
+		return get_range_strlen (TREE_OPERAND (aop0, 0), length,
+					 visited, type, fuzzy, flexp, eltsize);
 	    }
 	  else if (TREE_CODE (TREE_OPERAND (op, 0)) == COMPONENT_REF && fuzzy)
 	    {
@@ -1329,13 +1331,13 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
 	    return false;
 	}
       else
-	val = c_strlen (arg, 1);
+	val = c_strlen (arg, 1, eltsize);
 
       if (!val && fuzzy)
 	{
 	  if (TREE_CODE (arg) == ADDR_EXPR)
 	    return get_range_strlen (TREE_OPERAND (arg, 0), length,
-				     visited, type, fuzzy, flexp);
+				     visited, type, fuzzy, flexp, eltsize);
 
 	  if (TREE_CODE (arg) == ARRAY_REF)
 	    {
@@ -1477,7 +1479,8 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
             || gimple_assign_unary_nop_p (def_stmt))
           {
             tree rhs = gimple_assign_rhs1 (def_stmt);
-	    return get_range_strlen (rhs, length, visited, type, fuzzy, flexp);
+	    return get_range_strlen (rhs, length, visited, type, fuzzy, flexp,
+				     eltsize);
           }
 	else if (gimple_assign_rhs_code (def_stmt) == COND_EXPR)
 	  {
@@ -1486,7 +1489,7 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
 
 	    for (unsigned int i = 0; i < 2; i++)
 	      if (!get_range_strlen (ops[i], length, visited, type, fuzzy,
-				     flexp))
+				     flexp, eltsize))
 		{
 		  if (fuzzy == 2)
 		    *maxlen = build_all_ones_cst (size_type_node);
@@ -1513,7 +1516,8 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
             if (arg == gimple_phi_result (def_stmt))
               continue;
 
-	    if (!get_range_strlen (arg, length, visited, type, fuzzy, flexp))
+	    if (!get_range_strlen (arg, length, visited, type, fuzzy, flexp,
+				   eltsize))
 	      {
 		if (fuzzy == 2)
 		  *maxlen = build_all_ones_cst (size_type_node);
@@ -1545,10 +1549,13 @@ get_range_strlen (tree arg, tree length[2], bitmap *visited, int type,
    and false if PHIs and COND_EXPRs are to be handled optimistically,
    if we can determine string length minimum and maximum; it will use
    the minimum from the ones where it can be determined.
-   STRICT false should be only used for warning code.  */
+   STRICT false should be only used for warning code.
+
+   ELTSIZE is 1 for normal single byte character strings, and 2 or
+   4 for wide characer strings.  ELTSIZE is by default 1.  */
 
 bool
-get_range_strlen (tree arg, tree minmaxlen[2], bool strict)
+get_range_strlen (tree arg, tree minmaxlen[2], unsigned eltsize, bool strict)
 {
   bitmap visited = NULL;
 
@@ -1557,7 +1564,7 @@ get_range_strlen (tree arg, tree minmaxlen[2], bool strict)
 
   bool flexarray = false;
   if (!get_range_strlen (arg, minmaxlen, &visited, 1, strict ? 1 : 2,
-			 &flexarray))
+			 &flexarray, eltsize))
     {
       minmaxlen[0] = NULL_TREE;
       minmaxlen[1] = NULL_TREE;
@@ -1657,7 +1664,6 @@ gimple_fold_builtin_strncpy (gimple_stmt_iterator *gsi,
       if (!nonstring)
 	{
 	  tree fndecl = gimple_call_fndecl (stmt);
-	  gcall *call = as_a <gcall *> (stmt);
 
 	  /* Warn about the lack of nul termination: the result is not
 	     a (nul-terminated) string.  */
@@ -1666,11 +1672,11 @@ gimple_fold_builtin_strncpy (gimple_stmt_iterator *gsi,
 	    warning_at (loc, OPT_Wstringop_truncation,
 			"%G%qD destination unchanged after copying no bytes "
 			"from a string of length %E",
-			call, fndecl, slen);
+			stmt, fndecl, slen);
 	  else
 	    warning_at (loc, OPT_Wstringop_truncation,
 			"%G%qD destination unchanged after copying no bytes",
-			call, fndecl);
+			stmt, fndecl);
 	}
 
       replace_call_with_value (gsi, dest);
@@ -1991,7 +1997,7 @@ gimple_fold_builtin_strcat_chk (gimple_stmt_iterator *gsi)
 static bool
 gimple_fold_builtin_strncat (gimple_stmt_iterator *gsi)
 {
-  gcall *stmt = as_a <gcall *> (gsi_stmt (*gsi));
+  gimple *stmt = gsi_stmt (*gsi);
   tree dst = gimple_call_arg (stmt, 0);
   tree src = gimple_call_arg (stmt, 1);
   tree len = gimple_call_arg (stmt, 2);
@@ -3433,23 +3439,13 @@ gimple_fold_builtin_printf (gimple_stmt_iterator *gsi, tree fmt,
 	      && (int) len > 0)
 	    {
 	      char *newstr;
-	      tree offset_node, string_cst;
 
 	      /* Create a NUL-terminated string that's one char shorter
 		 than the original, stripping off the trailing '\n'.  */
-	      newarg = build_string_literal (len, str);
-	      string_cst = string_constant (newarg, &offset_node);
-	      gcc_checking_assert (string_cst
-				   && (TREE_STRING_LENGTH (string_cst)
-				       == (int) len)
-				   && integer_zerop (offset_node)
-				   && (unsigned char)
-				      TREE_STRING_POINTER (string_cst)[len - 1]
-				      == target_newline);
-	      /* build_string_literal creates a new STRING_CST,
-		 modify it in place to avoid double copying.  */
-	      newstr = CONST_CAST (char *, TREE_STRING_POINTER (string_cst));
+	      newstr = xstrdup (str);
 	      newstr[len - 1] = '\0';
+	      newarg = build_string_literal (len, newstr);
+	      free (newstr);
 	      if (fn_puts)
 		{
 		  gcall *repl = gimple_build_call (fn_puts, 1, newarg);
@@ -3511,7 +3507,7 @@ gimple_fold_builtin_strlen (gimple_stmt_iterator *gsi)
   wide_int maxlen;
 
   tree lenrange[2];
-  if (!get_range_strlen (gimple_call_arg (stmt, 0), lenrange, true)
+  if (!get_range_strlen (gimple_call_arg (stmt, 0), lenrange, 1, true)
       && lenrange[0] && TREE_CODE (lenrange[0]) == INTEGER_CST
       && lenrange[1] && TREE_CODE (lenrange[1]) == INTEGER_CST)
     {
@@ -3986,9 +3982,6 @@ bool
 arith_overflowed_p (enum tree_code code, const_tree type,
 		    const_tree arg0, const_tree arg1)
 {
-  typedef FIXED_WIDE_INT (WIDE_INT_MAX_PRECISION * 2) widest2_int;
-  typedef generic_wide_int <wi::extended_tree <WIDE_INT_MAX_PRECISION * 2> >
-    widest2_int_cst;
   widest2_int warg0 = widest2_int_cst (arg0);
   widest2_int warg1 = widest2_int_cst (arg1);
   widest2_int wres;
@@ -4169,7 +4162,8 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
 	  result = fold_builtin_expect (gimple_location (stmt),
 					gimple_call_arg (stmt, 0),
 					gimple_call_arg (stmt, 1),
-					gimple_call_arg (stmt, 2));
+					gimple_call_arg (stmt, 2),
+					NULL_TREE);
 	  break;
 	case IFN_UBSAN_OBJECT_SIZE:
 	  {
