@@ -579,3 +579,7 @@ Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
 moptimize-addresses
 Target Undocumented Mask(OPT_ADDR) Var(rs6000_isa_flags)
 Enable optimizing addresses for systems with fusion.
+
+moptimize-addresses-cse
+Target Undocumented Mask(OPT_ADDR_CSE) Var(rs6000_isa_flags)
+Enable optimizing addresses for systems with fusion (run before CSE).

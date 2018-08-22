@@ -512,7 +512,7 @@ toc_refs::print_totals (void)
 
 // Main entry point for this pass.
 unsigned int
-rs6000_optimize_addresses (function *fun)
+rs6000_optimize_addresses (function *fun, bool ARG_UNUSED (before_cse_p))
 {
   toc_refs info;
   basic_block bb;
@@ -583,10 +583,11 @@ rs6000_optimize_addresses (function *fun)
 }
 
 
-const pass_data pass_data_optimize_addresses =
+// Normal pass, run just before IRA (-moptimize-addresses)
+const pass_data pass_data_optimize_addresses_ira =
 {
   RTL_PASS,			// type
-  "addr",			// name
+  "addr_ira",			// name
   OPTGROUP_NONE,		// optinfo_flags
   TV_NONE,			// tv_id
   0,				// properties_required
@@ -596,34 +597,79 @@ const pass_data pass_data_optimize_addresses =
   TODO_df_finish,		// todo_flags_finish
 };
 
-class pass_optimize_addresses : public rtl_opt_pass
+class pass_optimize_addresses_ira : public rtl_opt_pass
 {
 public:
-  pass_optimize_addresses(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_optimize_addresses, ctxt)
+  pass_optimize_addresses_ira(gcc::context *ctxt)
+    : rtl_opt_pass(pass_data_optimize_addresses_ira, ctxt)
   {}
 
   // opt_pass methods:
   virtual bool gate (function *)
   {
-    return (optimize > 0 && TARGET_OPT_ADDR && TARGET_P8_FUSION);
+    return (optimize > 0 && TARGET_OPT_ADDR);
   }
 
   virtual unsigned int execute (function *fun)
   {
-    return rs6000_optimize_addresses (fun);
+    return rs6000_optimize_addresses (fun, false);
   }
 
   opt_pass *clone ()
   {
-    return new pass_optimize_addresses (m_ctxt);
+    return new pass_optimize_addresses_ira (m_ctxt);
   }
 
-}; // class pass_optimize_addresses
+}; // class pass_optimize_addresses_ira
 
 rtl_opt_pass *
-make_pass_optimize_addresses (gcc::context *ctxt)
+make_pass_optimize_addresses_ira (gcc::context *ctxt)
 {
-  return new pass_optimize_addresses (ctxt);
+  return new pass_optimize_addresses_ira (ctxt);
 }
 
+
+// Experimental pass, run just before CSE (-moptimize-addresses-cse)
+const pass_data pass_data_optimize_addresses_cse =
+{
+  RTL_PASS,			// type
+  "addr_cse",			// name
+  OPTGROUP_NONE,		// optinfo_flags
+  TV_NONE,			// tv_id
+  0,				// properties_required
+  0,				// properties_provided
+  0,				// properties_destroyed
+  0,				// todo_flags_start
+  TODO_df_finish,		// todo_flags_finish
+};
+
+class pass_optimize_addresses_cse : public rtl_opt_pass
+{
+public:
+  pass_optimize_addresses_cse(gcc::context *ctxt)
+    : rtl_opt_pass(pass_data_optimize_addresses_cse, ctxt)
+  {}
+
+  // opt_pass methods:
+  virtual bool gate (function *)
+  {
+    return (optimize > 0 && TARGET_OPT_ADDR_CSE);
+  }
+
+  virtual unsigned int execute (function *fun)
+  {
+    return rs6000_optimize_addresses (fun, true);
+  }
+
+  opt_pass *clone ()
+  {
+    return new pass_optimize_addresses_cse (m_ctxt);
+  }
+
+}; // class pass_optimize_addresses_cse
+
+rtl_opt_pass *
+make_pass_optimize_addresses_cse (gcc::context *ctxt)
+{
+  return new pass_optimize_addresses_cse (ctxt);
+}

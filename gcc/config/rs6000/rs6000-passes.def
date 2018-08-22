@@ -25,4 +25,5 @@ along with GCC; see the file COPYING3.  If not see
  */
 
   INSERT_PASS_BEFORE (pass_cse, 1, pass_analyze_swaps);
-  INSERT_PASS_BEFORE (pass_ira, 1, pass_optimize_addresses);
+  INSERT_PASS_BEFORE (pass_cse, 1, pass_optimize_addresses_cse);
+  INSERT_PASS_BEFORE (pass_ira, 1, pass_optimize_addresses_ira);

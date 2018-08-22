@@ -1,5 +1,26 @@
 2018-08-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c (rs6000_optimize_addresses): Add
+	extra argument to say whether this is before CSE or not.
+	(pass_data_optimize_addresses_ira): Clone passes to provide 2
+	passes, one that runs before CSE, and the other before LRA.
+	(pass_optimize_addresses_ira): Likewise.
+	(make_pass_optimize_addresses_ira): Likewise.
+	(pass_data pass_data_optimize_addresses_cse): Likewise.
+	(pass_optimize_addresses_cs): Likewise.
+	(make_pass_optimize_addresses_cse): Likewise.
+	* config/rs6000/rs6000-passes.def (pass_optimize_addresses_cse):
+	Likewise.
+	(pass_optimize_addresses_ira): Likewise.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_addresses_ira): Likewise.
+	(make_pass_optimize_addresses_cse): Likewise.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok):
+	Likewise.
+	(rs6000_opt_masks): Add -moptimize-addresses{,-cse}.
+	* config/rs6000/rs6000.opt (-moptimize-addresses-cse): New switch.
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add support for
+	-moptimize-addresses{,-cse}.
+
 	Merge up to 263784.
 	* REVISION: Update subversion id.
 
