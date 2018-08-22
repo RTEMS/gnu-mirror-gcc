@@ -1,5 +1,14 @@
 2018-08-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c (class toc_refs): Add field to say
+	whether this is before CSE or not.  Add argument to constructor.
+	(toc_refs::update): If we are being run before CSE, always load
+	the full address into a register and don't create a LO_SUM.
+	(toc_refs::process_toc_refs_single): Likewise.
+	(rs6000_optimize_addresses): Remove ARG_UNUSED.
+
+2018-08-22  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c (rs6000_optimize_addresses): Add
 	extra argument to say whether this is before CSE or not.
 	(pass_data_optimize_addresses_ira): Clone passes to provide 2
@@ -9,6 +18,7 @@
 	(pass_data pass_data_optimize_addresses_cse): Likewise.
 	(pass_optimize_addresses_cs): Likewise.
 	(make_pass_optimize_addresses_cse): Likewise.
+
 	* config/rs6000/rs6000-passes.def (pass_optimize_addresses_cse):
 	Likewise.
 	(pass_optimize_addresses_ira): Likewise.

@@ -74,14 +74,16 @@ class toc_refs {
   unsigned total_reads;			// total # of reads to be modified.
   unsigned total_gpr_reads;		// total # of P8 fusion reads.
   unsigned total_writes;		// total # of writes to be modified.
+  bool before_cse_p;			// if this pass is being run before CSE
 
  public:
-  toc_refs ()
+  toc_refs (bool cse_p)
   {
     memset ((void *) base, '\0', sizeof (base));
     total_reads = 0;
     total_gpr_reads = 0;
     total_writes = 0;
+    before_cse_p = cse_p;
   }
 
   ~toc_refs ()
@@ -157,7 +159,7 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 
   machine_mode mode = GET_MODE (mem);
 
-  // If the mode doesn't yet support optimized addresses, skip it.
+  // If the mode doesn't support optimized addresses, skip it.
   if (!rs6000_optimized_address_p[mode])
     return NULL_RTX;
 
@@ -313,7 +315,7 @@ toc_refs::update (rtx old_mem, size_t base_num)
 
   gcc_assert (addr);
 
-  if (p->different_offsets_p)
+  if (p->different_offsets_p || before_cse_p)
     {
       new_addr = p->base_reg;
       if (offset != 0)
@@ -374,7 +376,7 @@ toc_refs::process_toc_refs_single (size_t base_num)
   // Set up the base register
   p->base_reg = gen_reg_rtx (Pmode);
 
-  if (p->different_offsets_p)
+  if (p->different_offsets_p || before_cse_p)
     set_base_reg = gen_rtx_SET (p->base_reg, p->symbol);
 
   else
@@ -512,9 +514,9 @@ toc_refs::print_totals (void)
 
 // Main entry point for this pass.
 unsigned int
-rs6000_optimize_addresses (function *fun, bool ARG_UNUSED (before_cse_p))
+rs6000_optimize_addresses (function *fun, bool before_cse_p)
 {
-  toc_refs info;
+  toc_refs info (before_cse_p);
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
 
