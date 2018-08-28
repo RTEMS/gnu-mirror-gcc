@@ -505,7 +505,12 @@ void
 toc_refs::print_totals (void)
 {
   fputs ("\n", dump_file);
-  fprintf (dump_file, "Max TOC pointers       = %u\n", (unsigned)max_base);
+  fprintf (dump_file, "Max TOC pointers       = %u\n",
+	   (unsigned)optimize_addr_num);
+
+  fprintf (dump_file, "Max GPR reads allowed  = %u\n",
+	   (unsigned)optimize_addr_fusion_num);
+
   fprintf (dump_file, "Total number of writes = %u\n", total_writes);
   fprintf (dump_file, "Total number of reads  = %u (%u gprs)\n",
 	   total_reads, total_gpr_reads);
