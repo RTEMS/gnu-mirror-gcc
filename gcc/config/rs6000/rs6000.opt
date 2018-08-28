@@ -577,9 +577,17 @@ mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
 
 moptimize-addresses
-Target Undocumented Mask(OPT_ADDR) Var(rs6000_isa_flags)
+Target Undocumented Init(0) Var(optimize_addr_num, 4) Save
 Enable optimizing addresses for systems with fusion.
 
-moptimize-addresses-cse
-Target Undocumented Mask(OPT_ADDR_CSE) Var(rs6000_isa_flags)
-Enable optimizing addresses for systems with fusion (run before CSE).
+moptimize-addresses=
+Target Undocumented RejectNegative Joined UInteger Var(optimize_addr_num)
+Specify how many separate TOC pointers should be saved.
+
+moptimize-addresses-fusion
+Target Undocumented Init(0) Var(optimize_addr_fusion_num, 4) Save
+Number of GPR loads to allow for power8 fusion without saving TOCs.
+
+moptimize-addresses-fusion=
+Target Undocumented RejectNegative Joined UInteger Var(optimize_addr_fusion_num)
+Specify how many separate GPR loads to allow without saving TOCs.

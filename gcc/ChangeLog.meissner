@@ -1,3 +1,37 @@
+2018-08-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-addr.c (class toc_refs): Dynamically
+	allocate the toc save base pointers based on the
+	-moptimize-addresses=n switch.  Delete the option to run optimize
+	addresses before CSE.  Add an option to specify the number of GPR
+	loads to allow for power8 fusion without writes.
+	(toc_refs::add): Likewise.
+	(toc_refs::update): Likewise.
+	(toc_refs::process_toc_refs_single): Likewise.
+	(rs6000_optimize_addresses): Likewise.
+	(pass_data_optimize_addresses): Delete CSE pass, and delete _ira
+	in the pass names.
+	(make_pass_optimize_addresses): Likewise.
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Delete optimize
+	address masks.
+	* config/rs6000/rs6000-passes.def: Delete optimize address before
+	CSE pass and rename the optimize address before IRA pass.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_addresses):
+	Likewise.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Print number
+	of saved TOC pointers in optimize address pass.
+	(rs6000_init_hard_regno_mode_ok): Change test for optimized
+	address pass.
+	(rs6000_opt_masks): Delete optimize address option masks.
+	* config/rs6000/rs6000.opt (-moptimize-addresses): Delete CSE
+	option.  Add support for specifing the number of TOC registers.
+	Add option to specify the number of GPR registers to allow without
+	optimization to allow power8 fusion.
+	(-moptimize-addresses=<n>): Likewise.
+	(-moptimize-addresses-cse): Likewise.
+	(-moptimize-addresses-fusion): Likewise.
+	(-moptimize-addresses-fusion=<n>): Likewise.
+
 2018-08-22  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-addr.c (class toc_refs): Add field to say

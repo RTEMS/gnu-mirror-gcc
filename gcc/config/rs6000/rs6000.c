@@ -2824,6 +2824,9 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (optimize_addr_num)
+    fprintf (stderr, DEBUG_FMT_D, "Optimize addresses", optimize_addr_num);
 }
 
 
@@ -3571,7 +3574,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   rs6000_setup_reg_addr_masks ();
 
   /* Mark which modes support optimized addresses.  */
-  if (TARGET_OPT_ADDR || TARGET_OPT_ADDR_CSE)
+  if (optimize_addr_num)
     {
       rs6000_optimized_address_p[QImode] = true;
       rs6000_optimized_address_p[HImode] = true;
@@ -35716,8 +35719,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
-  { "optimize-addresses",	OPTION_MASK_OPT_ADDR,		false, true  },
-  { "optimize-addresses-cse",	OPTION_MASK_OPT_ADDR_CSE,	false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },

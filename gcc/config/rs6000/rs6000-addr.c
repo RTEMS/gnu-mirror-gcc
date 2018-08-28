@@ -50,8 +50,6 @@
 bool rs6000_optimized_address_p[NUM_MACHINE_MODES];
 
 const unsigned INITIAL_NUM_REFS	= 40;	// # of refs to allocate initially.
-const unsigned NUM_BASE_PTRS	= 3;	// # of base ptrs to save in a block
-const unsigned NUM_P8_READS	= 4;	// cutover point to use base ptrs on P8
 
 // Information for each base pointer
 struct base_ptr {
@@ -63,34 +61,37 @@ struct base_ptr {
   unsigned num_reads;			// number of reads to be modified.
   unsigned num_gpr_reads;		// number of P8 fusion reads.
   unsigned num_writes;			// number of writes to be modified.
-  unsigned max_refs;			// refs array size.
+  size_t max_refs;			// refs array size.
   bool different_offsets_p;		// if different offsets are used.
 };
 
 // Information needed for optimizing TOC references.
 class toc_refs {
  private:
-  struct base_ptr base[NUM_BASE_PTRS];	// all of the base pointers used
+  struct base_ptr *base;		// all of the base pointers used
+  size_t max_base;			// max # of base pointers
   unsigned total_reads;			// total # of reads to be modified.
   unsigned total_gpr_reads;		// total # of P8 fusion reads.
   unsigned total_writes;		// total # of writes to be modified.
-  bool before_cse_p;			// if this pass is being run before CSE
 
  public:
-  toc_refs (bool cse_p)
+  toc_refs (size_t num)
   {
-    memset ((void *) base, '\0', sizeof (base));
+    max_base = num;
+    base = XNEWVEC (struct base_ptr, max_base);
+    memset ((void *) base, '\0', sizeof (struct base_ptr) * max_base);
     total_reads = 0;
     total_gpr_reads = 0;
     total_writes = 0;
-    before_cse_p = cse_p;
   }
 
   ~toc_refs ()
   {
-    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+    for (size_t i = 0; i < max_base; i++)
       if (base[i].refs)
 	free ((void *)base[i].refs);
+
+    free ((void *)base);
   }
 
   // Reset variables for next basic block, don't reset totals or allocated
@@ -111,7 +112,7 @@ class toc_refs {
   // Reset all of the blocks
   void reset_all (void)
   {
-    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+    for (size_t i = 0; i < max_base; i++)
       reset (i);
   }
 
@@ -123,7 +124,7 @@ class toc_refs {
   unsigned get_num_refs (void)
   {
     unsigned ret = 0;
-    for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+    for (size_t i = 0; i < max_base; i++)
       ret += base[i].num_refs;
 
     return ret;
@@ -188,11 +189,11 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
 {
   rtx set = single_set (insn);
   rtx dest = SET_DEST (set);
-  unsigned base_num = NUM_BASE_PTRS;
+  unsigned base_num = max_base;
   struct base_ptr *p;
 
   // See if the base register has already been used
-  for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+  for (size_t i = 0; i < max_base; i++)
     {
       if (base[i].symbol && rtx_equal_p (base[i].symbol, addr))
 	{
@@ -203,9 +204,9 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
 
   // If the base register has not been previously used, see if there are any
   // free slots.
-  if (base_num == NUM_BASE_PTRS)
+  if (base_num == max_base)
     {
-      for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+      for (size_t i = 0; i < max_base; i++)
 	if (base[i].num_refs == 0)
 	  {
 	    base_num = i;
@@ -215,11 +216,11 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
 
   // We have to evict one of the base pointers, evict the one with the most
   // insns changed.
-  if (base_num == NUM_BASE_PTRS)
+  if (base_num == max_base)
     {
       unsigned mrefs = base[0].num_refs;
       base_num = 0;
-      for (size_t i = 1; i < NUM_BASE_PTRS; i++)
+      for (size_t i = 1; i < max_base; i++)
 	if (base[i].num_refs > mrefs)
 	  {
 	    mrefs = base[i].num_refs;
@@ -315,7 +316,7 @@ toc_refs::update (rtx old_mem, size_t base_num)
 
   gcc_assert (addr);
 
-  if (p->different_offsets_p || before_cse_p)
+  if (p->different_offsets_p)
     {
       new_addr = p->base_reg;
       if (offset != 0)
@@ -353,10 +354,9 @@ toc_refs::process_toc_refs_single (size_t base_num)
 
   // If we are on a power8, and we just have GPR loads, fall back to not
   // optimizing the references, so that we use P8 fusion for each of the loads.
-  // However, if we have a lot of reads in the basic block do the optimization
-  // to save on i-cache space.
-  if (TARGET_P8_FUSION && !TARGET_P9_FUSION && p->num_writes == 0
-      && p->num_reads == p->num_gpr_reads && p->num_reads < NUM_P8_READS)
+  if (TARGET_P8_FUSION && p->num_writes == 0 && optimize_addr_num > 0
+      && p->num_reads == p->num_gpr_reads
+      && p->num_reads <= optimize_addr_fusion_num)
     {
       if (dump_file)
 	fputs ("\nSkipping optimization, only GPR loads\n", dump_file);
@@ -376,7 +376,7 @@ toc_refs::process_toc_refs_single (size_t base_num)
   // Set up the base register
   p->base_reg = gen_reg_rtx (Pmode);
 
-  if (p->different_offsets_p || before_cse_p)
+  if (p->different_offsets_p)
     set_base_reg = gen_rtx_SET (p->base_reg, p->symbol);
 
   else
@@ -494,7 +494,7 @@ toc_refs::process_toc_refs_single (size_t base_num)
 void
 toc_refs::process_toc_refs (void)
 {
-  for (size_t i = 0; i < NUM_BASE_PTRS; i++)
+  for (size_t i = 0; i < max_base; i++)
     if (base[i].num_refs > 0)
       process_toc_refs_single (i);
 }
@@ -505,6 +505,7 @@ void
 toc_refs::print_totals (void)
 {
   fputs ("\n", dump_file);
+  fprintf (dump_file, "Max TOC pointers       = %u\n", (unsigned)max_base);
   fprintf (dump_file, "Total number of writes = %u\n", total_writes);
   fprintf (dump_file, "Total number of reads  = %u (%u gprs)\n",
 	   total_reads, total_gpr_reads);
@@ -514,9 +515,9 @@ toc_refs::print_totals (void)
 
 // Main entry point for this pass.
 unsigned int
-rs6000_optimize_addresses (function *fun, bool before_cse_p)
+rs6000_optimize_addresses (function *fun)
 {
-  toc_refs info (before_cse_p);
+  toc_refs info (optimize_addr_num);
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
 
@@ -586,10 +587,10 @@ rs6000_optimize_addresses (function *fun, bool before_cse_p)
 
 
 // Normal pass, run just before IRA (-moptimize-addresses)
-const pass_data pass_data_optimize_addresses_ira =
+const pass_data pass_data_optimize_addresses =
 {
   RTL_PASS,			// type
-  "addr_ira",			// name
+  "addr",			// name
   OPTGROUP_NONE,		// optinfo_flags
   TV_NONE,			// tv_id
   0,				// properties_required
@@ -599,79 +600,36 @@ const pass_data pass_data_optimize_addresses_ira =
   TODO_df_finish,		// todo_flags_finish
 };
 
-class pass_optimize_addresses_ira : public rtl_opt_pass
+class pass_optimize_addresses : public rtl_opt_pass
 {
 public:
-  pass_optimize_addresses_ira(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_optimize_addresses_ira, ctxt)
-  {}
+  pass_optimize_addresses(gcc::context *ctxt)
+    : rtl_opt_pass(pass_data_optimize_addresses, ctxt)
+    {}
 
   // opt_pass methods:
   virtual bool gate (function *)
   {
-    return (optimize > 0 && TARGET_OPT_ADDR);
+    return (optimize > 0
+	    && TARGET_POWERPC64
+	    && TARGET_ELF
+	    && optimize_addr_num > 0);
   }
 
   virtual unsigned int execute (function *fun)
   {
-    return rs6000_optimize_addresses (fun, false);
+    return rs6000_optimize_addresses (fun);
   }
 
   opt_pass *clone ()
   {
-    return new pass_optimize_addresses_ira (m_ctxt);
+    return new pass_optimize_addresses (m_ctxt);
   }
 
-}; // class pass_optimize_addresses_ira
+}; // class pass_optimize_addresses
 
 rtl_opt_pass *
-make_pass_optimize_addresses_ira (gcc::context *ctxt)
+make_pass_optimize_addresses (gcc::context *ctxt)
 {
-  return new pass_optimize_addresses_ira (ctxt);
-}
-
-
-// Experimental pass, run just before CSE (-moptimize-addresses-cse)
-const pass_data pass_data_optimize_addresses_cse =
-{
-  RTL_PASS,			// type
-  "addr_cse",			// name
-  OPTGROUP_NONE,		// optinfo_flags
-  TV_NONE,			// tv_id
-  0,				// properties_required
-  0,				// properties_provided
-  0,				// properties_destroyed
-  0,				// todo_flags_start
-  TODO_df_finish,		// todo_flags_finish
-};
-
-class pass_optimize_addresses_cse : public rtl_opt_pass
-{
-public:
-  pass_optimize_addresses_cse(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_optimize_addresses_cse, ctxt)
-  {}
-
-  // opt_pass methods:
-  virtual bool gate (function *)
-  {
-    return (optimize > 0 && TARGET_OPT_ADDR_CSE);
-  }
-
-  virtual unsigned int execute (function *fun)
-  {
-    return rs6000_optimize_addresses (fun, true);
-  }
-
-  opt_pass *clone ()
-  {
-    return new pass_optimize_addresses_cse (m_ctxt);
-  }
-
-}; // class pass_optimize_addresses_cse
-
-rtl_opt_pass *
-make_pass_optimize_addresses_cse (gcc::context *ctxt)
-{
-  return new pass_optimize_addresses_cse (ctxt);
+  return new pass_optimize_addresses (ctxt);
 }
