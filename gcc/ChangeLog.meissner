@@ -1,3 +1,13 @@
+2018-08-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 263992.
+	* REVISION: Update subversion id.
+
+2018-08-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 263992.
+	* REVISION: Update subversion id.
+
 2018-08-28  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-addr.c (class toc_refs): Dynamically
