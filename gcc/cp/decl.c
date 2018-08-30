@@ -968,7 +968,7 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
       if (same_type_p (TREE_TYPE (f1), r2))
 	{
 	  if (!prototype_p (f2) && DECL_EXTERN_C_P (olddecl)
-	      && (DECL_BUILT_IN (olddecl)
+	      && (fndecl_built_in_p (olddecl)
 #ifdef SYSTEM_IMPLICIT_EXTERN_C
 		  || (DECL_IN_SYSTEM_HEADER (newdecl) && !DECL_CLASS_SCOPE_P (newdecl))
 		  || (DECL_IN_SYSTEM_HEADER (olddecl) && !DECL_CLASS_SCOPE_P (olddecl))
@@ -1208,7 +1208,7 @@ validate_constexpr_redeclaration (tree old_decl, tree new_decl)
     return true;
   if (TREE_CODE (old_decl) == FUNCTION_DECL)
     {
-      if (DECL_BUILT_IN (old_decl))
+      if (fndecl_built_in_p (old_decl))
 	{
 	  /* Hide a built-in declaration.  */
 	  DECL_DECLARED_CONSTEXPR_P (old_decl)
@@ -1442,7 +1442,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 	    {
 	      warning_at (newdecl_loc,
 			  OPT_Wshadow, 
-			  DECL_BUILT_IN (olddecl)
+			  fndecl_built_in_p (olddecl)
 			  ? G_("shadowing built-in function %q#D")
 			  : G_("shadowing library function %q#D"), olddecl);
 	      /* Discard the old built-in function.  */
@@ -1450,7 +1450,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 	    }
 	  /* If the built-in is not ansi, then programs can override
 	     it even globally without an error.  */
-	  else if (! DECL_BUILT_IN (olddecl))
+	  else if (! fndecl_built_in_p (olddecl))
 	    warning_at (newdecl_loc, 0,
 			"library function %q#D redeclared as non-function %q#D",
 			olddecl, newdecl);
@@ -1537,7 +1537,7 @@ next_arg:;
 	      /* Don't really override olddecl for __* prefixed builtins
 		 except for __[^b]*_chk, the compiler might be using those
 		 explicitly.  */
-	      if (DECL_BUILT_IN (olddecl))
+	      if (fndecl_built_in_p (olddecl))
 		{
 		  tree id = DECL_NAME (olddecl);
 		  const char *name = IDENTIFIER_POINTER (id);
@@ -1578,9 +1578,9 @@ next_arg:;
 			    "declaration %q#D", newdecl, olddecl);
 	      else
 		warning (OPT_Wshadow, 
-                         DECL_BUILT_IN (olddecl)
-                         ? G_("shadowing built-in function %q#D")
-                         : G_("shadowing library function %q#D"), olddecl);
+			 fndecl_built_in_p (olddecl)
+			 ? G_("shadowing built-in function %q#D")
+			 : G_("shadowing library function %q#D"), olddecl);
 	    }
 	  else
 	    /* Discard the old built-in function.  */
@@ -2522,7 +2522,7 @@ next_arg:;
       /* If redeclaring a builtin function, it stays built in
 	 if newdecl is a gnu_inline definition, or if newdecl is just
 	 a declaration.  */
-      if (DECL_BUILT_IN (olddecl)
+      if (fndecl_built_in_p (olddecl)
 	  && (new_defines_function ? GNU_INLINE_P (newdecl) : types_match))
 	{
 	  DECL_BUILT_IN_CLASS (newdecl) = DECL_BUILT_IN_CLASS (olddecl);
@@ -3662,6 +3662,8 @@ finish_case_label (location_t loc, tree low_value, tree high_value)
     return error_mark_node;
 
   type = SWITCH_STMT_TYPE (switch_stack->switch_stmt);
+  if (type == error_mark_node)
+    return error_mark_node;
 
   low_value = case_conversion (type, low_value);
   high_value = case_conversion (type, high_value);
@@ -6611,7 +6613,7 @@ make_rtl_for_nonlocal_decl (tree decl, tree init, const char* asmspec)
       else
 	{
 	  if (TREE_CODE (decl) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
+	      && fndecl_built_in_p (decl, BUILT_IN_NORMAL))
 	    set_builtin_user_assembler_name (decl, asmspec);
 	  set_user_assembler_name (decl, asmspec);
 	}
@@ -10737,14 +10739,14 @@ grokdeclarator (const cp_declarator *declarator,
       if (signed_p && unsigned_p)
 	{
 	  gcc_rich_location richloc (declspecs->locations[ds_signed]);
-	  richloc.add_range (declspecs->locations[ds_unsigned], false);
+	  richloc.add_range (declspecs->locations[ds_unsigned]);
 	  error_at (&richloc,
 		    "%<signed%> and %<unsigned%> specified together");
 	}
       else if (long_p && short_p)
 	{
 	  gcc_rich_location richloc (declspecs->locations[ds_long]);
-	  richloc.add_range (declspecs->locations[ds_short], false);
+	  richloc.add_range (declspecs->locations[ds_short]);
 	  error_at (&richloc, "%<long%> and %<short%> specified together");
 	}
       else if (TREE_CODE (type) != INTEGER_TYPE
@@ -10888,7 +10890,7 @@ grokdeclarator (const cp_declarator *declarator,
       if (staticp == 2)
 	{
 	  gcc_rich_location richloc (declspecs->locations[ds_virtual]);
-	  richloc.add_range (declspecs->locations[ds_storage_class], false);
+	  richloc.add_range (declspecs->locations[ds_storage_class]);
 	  error_at (&richloc, "member %qD cannot be declared both %<virtual%> "
 		    "and %<static%>", dname);
 	  storage_class = sc_none;
@@ -10897,7 +10899,7 @@ grokdeclarator (const cp_declarator *declarator,
       if (constexpr_p)
 	{
 	  gcc_rich_location richloc (declspecs->locations[ds_virtual]);
-	  richloc.add_range (declspecs->locations[ds_constexpr], false);
+	  richloc.add_range (declspecs->locations[ds_constexpr]);
 	  error_at (&richloc, "member %qD cannot be declared both %<virtual%> "
 		    "and %<constexpr%>", dname);
 	}
@@ -11246,7 +11248,10 @@ grokdeclarator (const cp_declarator *declarator,
 
 	    /* Handle a late-specified return type.  */
 	    tree late_return_type = declarator->u.function.late_return_type;
-	    if (funcdecl_p)
+	    if (funcdecl_p
+		/* This is the case e.g. for
+		   using T = auto () -> int.  */
+		|| inner_declarator == NULL)
 	      {
 		if (tree auto_node = type_uses_auto (type))
 		  {
@@ -11276,6 +11281,16 @@ grokdeclarator (const cp_declarator *declarator,
 			error ("%qs function with trailing return type has"
 			       " %qT as its type rather than plain %<auto%>",
 			       name, type);
+			return error_mark_node;
+		      }
+		    else if (is_auto (type) && AUTO_IS_DECLTYPE (type))
+		      {
+			if (funcdecl_p)
+			  error ("%qs function with trailing return type has "
+				 "%<decltype(auto)%> as its type rather than "
+				 "plain %<auto%>", name);
+			else
+			  error ("invalid use of %<decltype(auto)%>");
 			return error_mark_node;
 		      }
 		    tree tmpl = CLASS_PLACEHOLDER_TEMPLATE (auto_node);
@@ -11435,7 +11450,7 @@ grokdeclarator (const cp_declarator *declarator,
 		  {
 		    /* Cannot be both friend and virtual.  */
 		    gcc_rich_location richloc (declspecs->locations[ds_virtual]);
-		    richloc.add_range (declspecs->locations[ds_friend], false);
+		    richloc.add_range (declspecs->locations[ds_friend]);
 		    error_at (&richloc, "virtual functions cannot be friends");
 		    friendp = 0;
 		  }
@@ -15683,6 +15698,18 @@ begin_destructor_body (void)
 	    tree stmt = cp_build_modify_expr (input_location, vtbl_ptr,
 					      NOP_EXPR, vtbl,
 					      tf_warning_or_error);
+	    /* If the vptr is shared with some virtual nearly empty base,
+	       don't clear it if not in charge, the dtor of the virtual
+	       nearly empty base will do that later.  */
+	    if (CLASSTYPE_VBASECLASSES (current_class_type)
+		&& CLASSTYPE_PRIMARY_BINFO (current_class_type)
+		&& BINFO_VIRTUAL_P
+			  (CLASSTYPE_PRIMARY_BINFO (current_class_type)))
+	      {
+		stmt = convert_to_void (stmt, ICV_STATEMENT,
+					tf_warning_or_error);
+		stmt = build_if_in_charge (stmt);
+	      }
 	    finish_decl_cleanup (NULL_TREE, stmt);
 	  }
 	else
