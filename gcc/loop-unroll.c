@@ -37,8 +37,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "dumpfile.h"
 
-#include "tree-pretty-print.h"
-
 /* This pass performs loop unrolling.  We only perform this
    optimization on innermost loops (with single exception) because
    the impact on performance is greatest here, and we want to avoid
@@ -275,7 +273,6 @@ decide_unrolling (int flags)
       report_unroll (loop, locus);
     }
 }
-
 
 /* Unroll LOOPS.  */
 void
