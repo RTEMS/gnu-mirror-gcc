@@ -47,8 +47,10 @@
 	(emit_fusion_p9_store): Likewise.
 	* config/rs6000/rs6000.h: Delete comment about power9 fusion that
 	is now deleted.
-	* config/rs6000/rs6000.md (UNSPEC_FUSION_P9): Delete power9 fusion
-	support.
+	* config/rs6000/rs6000.md (UNSPEC_FUSION_P9): Delete, no longer
+	used since power9 fusion support has being deleted.
+	(GPR_FUSION iterator): Likewise.
+	(FPR_FUSION iterator): Likewise.
 	(power9 fusion peephole2's): Likewise.
 	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_load): Likewise.
 	(fusion_gpr_<P:mode>_<GPR_FUSION:mode>_store): Likewise.
