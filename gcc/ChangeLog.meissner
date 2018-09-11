@@ -22,7 +22,7 @@
 	(ISA_2_7_MASKS_SERVER): Add fusion bits back in.
 	(ISA_3_0_MASKS_SERVER): Delete power9 fusion.  Use ISA 2.07 bits
 	without enabling power8 fusion.
-	(POWERPC_MASKS): Likewise.
+	(POWERPC_MASKS): Delete power9 fusion option mask.
 	* config/rs6000/rs6000-protos.h (emit_fusion_load_store): Delete
 	function declarations used with the delete power9 fusion support.
 	(fusion_p9_p): Likewise.
