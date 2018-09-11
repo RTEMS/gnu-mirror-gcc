@@ -2,17 +2,19 @@
 
 	* config/rs6000/constraints.md (wF constraint): Remove
 	documentation for power9 fusion that is being deleted.  Only
-	document its use for power8 fusion.  Power9 fusion never made it
-	into the final power9 machine.  Remove all power9 fusion support.
+	document the wF constraint for power8 fusion.
 	* config/rs6000/predicates.md (p9_fusion_reg_operand): Delete
-	predicates that only supported power9 fusion.
+	predicates that only supported power9 fusion.  Power9 fusion never
+	made it into the final power9 machine.  Remove all power9 fusion
+	support.
 	(fusion_gpr_addis): Drop support to allow fusing offsets where the
-	top 11 bits weren't all 0 or all 1's.
+	top 11 bits weren't all 0 or all 1's which was part of power9
+	fusion.
 	(fusion_gpr_mem_load): Add comment about not allowing SFmode or
-	DFmode in fusion.
+	DFmode in power8 fusion.
 	(fusion_addis_mem_combo_load): Drop power9 fusion support.  Only
 	support power8 fusion.  Add comment about not allowing SFmode or
-	DFmode in fusion.
+	DFmode in power8 fusion.
 	(fusion_offsettable_mem_operand): Delete predicates that only
 	supported power9 fusion.
 	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_NO_FUSION): New
