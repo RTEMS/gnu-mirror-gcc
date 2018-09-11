@@ -24,7 +24,7 @@
 	without enabling power8 fusion.
 	(POWERPC_MASKS): Delete power9 fusion option mask.
 	* config/rs6000/rs6000-protos.h (emit_fusion_load_store): Delete
-	function declarations used with the delete power9 fusion support.
+	function declarations used for power9 fusion support.
 	(fusion_p9_p): Likewise.
 	(expand_fusion_p9_load): Likewise.
 	(expand_fusion_p9_store): Likewise.
