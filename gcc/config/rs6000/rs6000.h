@@ -306,8 +306,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #endif
 
 /* Define the ISA 3.0 flags as 0 if the target assembler does not support
-   Power9 instructions.  Allow -mpower9-fusion, since it does not add new
-   instructions.  Allow -misel, since it predates ISA 3.0 and does
+   Power9 instructions.  Allow -misel, since it predates ISA 3.0 and does
    not require any Power9 features.  */
 
 #ifndef HAVE_AS_POWER9
