@@ -1,3 +1,96 @@
+2018-09-11  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (define_attr "type"): Remove mpxmov, mpxmk,
+	mpxchk, mpxld and mpxst types.
+	(define_attr length_immediate): Remove all processing of mpx types.
+	(define_attr prefix_0f): Ditto.
+	(define_attr memory): Ditto.
+
+2018-09-11  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (fyl2x_extend<mode>xf3_i387): Remove.
+	(log<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate logxf3 insn.
+	(log10<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate log10xf3 insn.
+	(log2<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate log2xf3 insn.
+	(fyl2xp1_extend<mode>xf3_i387): Remove.
+	(log1p<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate log1pxf3 insn.
+	(fxtract_extend<mode>xf3_i387): Remove.
+	(logb<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate logbxf3 insn.
+	(ilogb<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate fxtractxf3_i387 insn.
+	(significand<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate significandxf3 insn.
+
+2018-09-11  Nathan Sidwell  <nathan@acm.org>
+
+	* gcc.c (perror_with_name, pfatal_with_name): Delete.
+	(load_specs): Use fatal_error.
+	(DELETE_IF_ORDINARY, process_command): Use error.
+	(execute, run_attempt): Use fatal_error.
+
+2018-09-11  Andrew Stubbs  <ams@codesourcery.com>
+
+	* diagnostic-core.h (sorry_at): New prototype.
+	* diagnostic.c (sorry_at): New function.
+
+2018-09-11  Aldy Hernandez  <aldyh@redhat.com>
+
+	* tree-vrp.c (extract_range_from_binary_expr_1): Treat all divisions
+	by zero as VR_UNDEFINED.
+
+2018-09-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (<sincos>xf2): Rename from *<sincos>xf2_i387.
+	(*<sincos>_extend<mode>xf2_i387): Remove insn pattern.
+	(<sincos>mode2): New expander.
+	(sincos_extend<mode>xf3_i387): Remove insn pattern.
+	(sincos -> sin, cos splitters): Remove splitter patterns.
+	(sincos<mode>3): Change operand 2 predicate to general_operand.
+	Extend operand 2 to XFmode and generate sincosxf3 insn.
+	(fptanxf4_i387): Change mode of operands 0 and 3 to SFmode.
+	Change operand 3 predicate to const1_operand.
+	(fptan_extend<mode>xf4_i387): Remove insn pattern.
+	(tanxf2): Update operands in the call to fptanxf4_i387.
+	(tan<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate tanxf3 insn.
+	(atan2xf3): Rename from *fpatanxf3_i387.
+	(fpatan_extend<mode>xf3_i387): Remove insn pattern.
+	(atan2xf3): Remove expander.
+	(atan2<mode<3):  Change operand 1 and 2 predicates to general_operand.
+	Extend operands 1 and 2 to XFmode and generate atan2xf3 insn.
+	(atan<mode>2): Change operand 1 predicate to general_operand.
+	Extend operand 1 to XFmode and generate atanxf3 insn.
+
+2018-09-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (x87/SSE constant load splitter): Use
+	memory_operand instead of nonimmediate_operand for input operand
+	predicate.
+
+2018-09-09  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (float partial SSE register stall splitter): Move
+	splitter near its instruction pattern.
+	(float_extend partial SSE register stall splitter): Ditto.
+	(float_truncate partial SSE register stall splitter): Ditto.
+
+2018-09-09  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	PR target/86794
+	* config/mmix/mmix.c (TARGET_HAVE_SPECULATION_SAFE_VALUE): Redefine
+	to speculation_safe_value_not_needed.
+
+	PR target/85666
+	* config/mmix/mmix.c (mmix_assemble_integer): Handle byte-size
+	non-CONST_INT rtx:es using assemble_integer_with_op ".byte".
+	(MMIX_CFUN_NEEDS_SAVED_EH_RETURN_ADDRESS): Don't call
+	leaf_function_p, instead use has_hard_reg_initial_val.
+
 2018-09-09  Nathan Sidwell  <nathan@acm.org>
 
 	* gcc.h (pfatal_with_name): Don't declare here.
