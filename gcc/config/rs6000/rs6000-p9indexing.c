@@ -19,6 +19,66 @@
    along with GCC; see the file COPYING3.  If not see
    <http://www.gnu.org/licenses/>.  */
 
+/* kelvin to-do notes:
+ *
+ * see rs6000-p8swap.c, borrow code from:
+ *
+ *   @line 1478:
+ *    replace_swap_with_copy
+ *    gen_rtx_SET ()
+ *    emit_insn_before ()
+ *    set_block_for_insn ()
+ *    df_insn_rescan ()
+ *    df_insn_delete (insn)
+ *    insn->set_deleted ();
+ *
+ *   @line 1926:
+ *    add_insn_after ()
+ *    df_insn_rescan ()
+ *    remove_insn ()
+ *
+ * Question: how do I create a new register variable?
+ *  see rtvec_alloc (16), which apparently generates code related to a
+ *  gen_rtx_PARALLEL.
+ *
+ * @line 2174, see rtx copy = gen_rtx_SET (new_reg, and_base))
+ *  i think if i just do a gen_rtx_SET (args, ...), it will
+ *  automatically allocate a new register to hold the result.  let's
+ *  try that.
+ *
+ *
+ * what we have:
+ * Looking at insn: 31
+ * ;;   UD chains for insn luid 0 uid 31
+ * ;;     reg 130 { d129(bb 5 insn 7) d121(bb 46 insn 215) d114(bb 15 insn 297) }
+ * ;;      reg 148 { d144(bb 2 insn 2) }
+ * 31: r156:V2DF=[r148:DI+r130:DI]
+ *      REG_DEAD r148:DI
+ * ;;   DU chains for insn luid 0 uid 31
+ * ;;      reg 156 { u44(bb 15 insn 33) }
+ *
+ * this insn is fetching data from memory: (plus:DI (reg/v/f:DI 148 [ x ])
+ *        (reg:DI 130 [ ivtmp.18 ]))
+ * memory is base_reg + index, base_reg: (reg/v/f:DI 148 [ x ])
+ * index: (reg:DI 130 [ ivtmp.18 ])
+ *
+ * what we want:
+ * Looking at insn: 115
+ * ;;   UD chains for insn luid 9 uid 115
+ * ;;      reg 130 { d109(bb 4 insn 113) }
+ * 115: r172:V2DF=[r130:DI+0x10]
+ * ;;   DU chains for insn luid 9 uid 115
+ * ;;      reg 172 { u-1(bb 4 insn 117) }
+ *
+ * this insn is fetching data from memory: (plus:DI (reg/v/f:DI 130 [ basex ])
+ *        (const_int 16 [0x10]))
+ * memory is base_reg + index, base_reg: (reg/v/f:DI 130 [ basex ])
+ * index: (const_int 16 [0x10])
+ *
+ */
+
+
+
 #define IN_TARGET_CODE 1
 
 #include "config.h"
@@ -43,6 +103,8 @@
 #include "print-rtl.h"
 #include "tree-pretty-print.h"
 
+#include "genrtl.h"
+
 /* This pass transforms array indexing expressions from a form that
    favors selection of X-form instructions into a form that favors
    selection of D-form instructions.
@@ -57,6 +119,7 @@ class indexing_web_entry : public web_entry_base
 {
  public:
   rtx_insn *insn;		/* Pointer to the insn */
+  basic_block bb;		/* Pointer to the enclosing basic block */
 
   unsigned int is_indexed_array_load : 1;
   unsigned int is_indexed_array_store : 1;
@@ -152,13 +215,26 @@ static char *place_int (char *buf, unsigned int val) {
   int last_digit = 31;
   tbuf[last_digit--] = '\0';
 
-  while (val) {
-    tbuf[last_digit--] = '0' + (val % 10);
-    val /= 10;
+  unsigned int orig_val = val;
+
+  if (val == 0)
+    tbuf [last_digit] = '0';
+  else {
+    while (val) {
+      tbuf[last_digit--] = '0' + (val % 10);
+      val /= 10;
+    }
+    last_digit++;
   }
-  last_digit++;
+
+  fprintf (dump_file, "place_int ([%s], %u), with tbuf + last_digit: [%s]\n",
+	   buf, orig_val, tbuf + last_digit);
 
   strcpy (buf, tbuf + last_digit);
+
+  fprintf (dump_file, "after appendage, buf [%s], extend length: %d\n",
+	   buf, (int) strlen (tbuf + last_digit));
+
   return buf + strlen (tbuf + last_digit);
 }
 
@@ -171,7 +247,7 @@ help_canonize (int count, struct df_link *def_link) {
     fatal ("too many defs in help_canonize");
 
   while (def_link != NULL) {
-    ids[i] = DF_REF_ID (def_link->ref);
+    ids[i++] = DF_REF_ID (def_link->ref);
     def_link = def_link->next;
   }
 
@@ -189,8 +265,13 @@ help_canonize (int count, struct df_link *def_link) {
   char buf[1024];
   char *cp = buf;
   for (int i = 0; i < count; i++) {
+    *cp = '\0';			/* not needed: helps debug.  */
     cp = place_int (cp, ids[i]);
     *cp++ = ':';
+
+    /* following is for debugging, shouldn't be necessary in real loop.  */
+    *cp = '\0';
+    fprintf (dump_file, "help_canonize, buf is [%s]\n", buf);
   }
   cp--;
   *cp = '\0';
@@ -246,24 +327,367 @@ insert_into_equivalence_class (unsigned int uid,
 }
 
 static void
-dump_equivalences () {
+fixup_equivalences (indexing_web_entry *insn_entry) {
+
+#define MY_LARGEST_EQUIVALENCE_CLASS	32
+  unsigned int num_elements = 0;
+  unsigned int insn_numbers [MY_LARGEST_EQUIVALENCE_CLASS];
+
+  for (int i = 0; i < num_equivalences; i++)
+    {
+      struct equivalence_member *em = equivalence_classes[i];
+      struct equivalence_member *em2 = em;
+
+      for (num_elements = 0; em != NULL; em = em->next) {
+	insn_numbers [num_elements++] = em->uid;
+	if (num_elements >= MY_LARGEST_EQUIVALENCE_CLASS)
+	  fatal ("too many insns in equivalence class");
+      }
+
+      /* No fixup desired if there's only one element in equivalence class.  */
+      if (num_elements <= 1) continue;
+
+      /* Within the equivalence class, we must find the insn that
+	 dominates all others.  Any insn that is not in a domination
+	 relationship with this insn must be removed from the class.  */
+      unsigned int the_dominator = insn_numbers [0];
+ 
+      for (unsigned int j = 1; j < num_elements; j++) {
+	if (dominated_by_p (CDI_DOMINATORS,
+			    insn_entry [the_dominator].bb,
+			    insn_entry [insn_numbers [j]].bb)) {
+	  the_dominator = insn_numbers[j];
+	}
+      }
+
+      /* the_dominator dominates all but those that it is not "comparable"
+	 to.  Remove non-comparables.  */
+
+      unsigned int excluded [MY_LARGEST_EQUIVALENCE_CLASS];
+      int num_excluded = 0;
+
+      for (unsigned int j = 0; j < num_elements - 1; j++)
+	if (!dominated_by_p (CDI_DOMINATORS,
+			     insn_entry [insn_numbers [j]].bb,
+			     insn_entry [the_dominator].bb))
+	  excluded [num_excluded++] = insn_numbers [j];
+
+      /* So many exclusions that there's nothing left to optimized.  */
+      if (num_elements - num_excluded <= 1) continue;
+
+      long long int dominator_delta = 0;
+      rtx derived_ptr_reg = gen_reg_rtx (Pmode);
+
+      /* first, output the dominator insn.  */
+      for (em = em2; em != NULL; em = em->next)
+	{
+	  if (em->uid == the_dominator) {
+
+	    dominator_delta = em->index_delta + em->base_delta;
+
+	    /* Code works for both 32-bit and 64-bit targets.  */
+	    rtx_insn *insn = insn_entry [em->uid].insn;
+	    rtx body = PATTERN (insn);
+	    rtx base_reg, index_reg;
+	    rtx addr, mem;
+	    rtx new_init_expr;
+	    rtx new_delta_expr = NULL;
+	    bool is_load;
+
+	    if (dump_file) {
+	      fprintf (dump_file, "Replacing originating insn %d: ",
+		       INSN_UID (insn));
+
+	      print_inline_rtx (dump_file, insn, 2);
+	      fprintf (dump_file, "\n");
+	    }
+
+	    gcc_assert (GET_CODE (body) == SET);
+
+
+	    if (GET_CODE (SET_SRC (body)) == MEM)
+	      {
+		/* originating instruction is a load */
+		mem = SET_SRC (body);
+		addr = XEXP (SET_SRC (body), 0);
+		is_load = true;
+	      }
+	    else
+	      { /* originating instruction is a store */
+		gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
+		mem = SET_DEST (body);
+		addr = XEXP (SET_DEST (body), 0);
+		is_load = false;
+	      }
+
+	    /*
+	    fprintf (dump_file, "The original mem expression is ");
+	    print_rtl (dump_file, mem);
+	    fprintf (dump_file, "\n");
+	    fprintf (dump_file, "The original addr expression is ");
+	    print_rtl (dump_file, addr);
+	    fprintf (dump_file, "\n");
+	    */
+
+	    enum rtx_code code = GET_CODE (addr);
+	    gcc_assert ((code == PLUS) || (code == MINUS));
+	    base_reg = XEXP (addr, 0);
+	    index_reg = XEXP (addr, 1);
+
+	    if (code == PLUS)
+	      new_init_expr = gen_rtx_PLUS (Pmode, base_reg, index_reg);
+	    else
+	      new_init_expr = gen_rtx_MINUS (Pmode, base_reg, index_reg);
+
+	    new_init_expr = gen_rtx_SET (derived_ptr_reg, new_init_expr);
+
+	    rtx_insn *new_insn = emit_insn_before (new_init_expr, insn);
+	    set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
+	    INSN_CODE (new_insn) = -1; /* force re-recogniition. */
+	    df_insn_rescan (new_insn);
+
+	    if (dump_file) {
+	      fprintf (dump_file, "with %d: ", INSN_UID (new_insn));
+	      print_inline_rtx (dump_file, new_insn, 2);
+	      fprintf (dump_file, "\n");
+	    }
+
+	    if (dominator_delta)
+	      {
+		rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominator_delta);
+		new_delta_expr = gen_rtx_PLUS (Pmode, derived_ptr_reg, ci);
+		new_delta_expr = gen_rtx_SET (derived_ptr_reg, new_delta_expr);
+		new_insn = emit_insn_before (new_delta_expr, insn);
+		set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
+		INSN_CODE (new_insn) = -1; /* force re-recognition.  */
+		df_insn_rescan (new_insn);
+
+		if (dump_file) {
+		  fprintf (dump_file, "and with %d: ", INSN_UID (new_insn));
+		  print_inline_rtx (dump_file, new_insn, 2);
+		  fprintf (dump_file, "\n");
+		}
+	      }
+
+	    rtx new_mem = replace_equiv_address (mem, derived_ptr_reg, false);
+
+	    fprintf (dump_file, " after back from replace_equiv_address\n");
+	    print_rtl (dump_file, new_mem);
+	    fprintf (dump_file, "\n");
+
+	    rtx new_expr;
+	    if (is_load)
+	      new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
+	    else
+	      new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
+
+	    new_insn = emit_insn_before (new_expr, insn);
+	    set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
+	    INSN_CODE (new_insn) = -1;
+	    df_insn_rescan (new_insn);
+
+	    if (dump_file) {
+	      fprintf (dump_file, "and with %d: ", INSN_UID (new_insn));
+	      print_inline_rtx (dump_file, new_insn, 2);
+	      fprintf (dump_file, "\n");
+	    }
+
+	    df_insn_delete (insn);
+	    remove_insn (insn);
+	    insn->set_deleted ();
+
+	  }
+	}
+
+      /* next, output the other insns.  */
+      for (em = em2; em != NULL; em = em->next)
+	{
+	  if (em->uid != the_dominator) {
+
+	    bool dont_replace = false;
+	    for (int j = 0; j < num_excluded; j++) {
+	      if (excluded [j] == em->uid)
+		dont_replace = true;
+	    }
+	    if (dont_replace) {
+	      fprintf (dump_file, "not replacing insn %d\n", em->uid);
+	    } else {
+
+	      long long int dominated_delta = em->index_delta + em->base_delta;
+	      dominated_delta -= dominator_delta;
+
+	      /* Code works for both 32-bit and 64-bit targets.  */
+	      rtx_insn *insn = insn_entry [em->uid].insn;
+	      rtx body = PATTERN (insn);
+	      rtx addr, mem;
+	      bool is_load;
+
+	      if (dump_file) {
+		fprintf (dump_file, "Replacing propagating insn %d: ",
+			 INSN_UID (insn));
+		print_inline_rtx (dump_file, insn, 2);
+		fprintf (dump_file, "\n");
+	      }
+
+	      gcc_assert (GET_CODE (body) == SET);
+
+	      if (GET_CODE (SET_SRC (body)) == MEM)
+		{
+		  /* propagating instruction is a load */
+		  mem = SET_SRC (body);
+		  addr = XEXP (SET_SRC (body), 0);
+		  is_load = true;
+		}
+	      else
+		{ /* propagating instruction is a store */
+		  gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
+		  mem = SET_DEST (body);
+		  addr = XEXP (SET_DEST (body), 0);
+		  is_load = false;
+		}
+
+	      rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominated_delta);
+	      rtx addr_expr = gen_rtx_PLUS (Pmode, derived_ptr_reg, ci);
+	      rtx new_mem = replace_equiv_address (mem, addr_expr, false);
+
+	      fprintf (dump_file, " after replace_equiv_address, new_mem: ");
+	      print_rtl (dump_file, new_mem);
+	      fprintf (dump_file, "\n");
+
+	      rtx new_expr;
+	      if (is_load)
+		new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
+	      else
+		new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
+
+	      rtx_insn *new_insn = emit_insn_before (new_expr, insn);
+	      set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
+	      INSN_CODE (new_insn) = -1;
+	      df_insn_rescan (new_insn);
+
+	      if (dump_file) {
+		fprintf (dump_file, "with %d: ", INSN_UID (new_insn));
+		print_inline_rtx (dump_file, new_insn, 2);
+		fprintf (dump_file, "\n");
+	      }
+
+	      df_insn_delete (insn);
+	      remove_insn (insn);
+	      insn->set_deleted ();
+	    }
+	  }
+	}
+    }
+}
+
+
+static void
+dump_equivalences (indexing_web_entry *insn_entry) {
 
   if (dump_file)
     {
+#define LARGEST_EQUIVALENCE_CLASS	32
+      unsigned int num_elements = 0;
+      unsigned int insn_numbers [LARGEST_EQUIVALENCE_CLASS];
+
       for (int i = 0; i < num_equivalences; i++)
 	{
 	  struct equivalence_member *em = equivalence_classes[i];
+	  struct equivalence_member *em2 = em;
 
 	  fprintf (dump_file, "Equivalence class %d:\n", i);
 	  fprintf (dump_file, "  index_defs: %s, base_defs: %s\n",
 		   em->index_defs, em->base_defs);
-	  while (em != NULL)
+	  for (num_elements = 0; em != NULL; em = em->next) {
+	    insn_numbers [num_elements++] = em->uid;
+	    if (num_elements >= LARGEST_EQUIVALENCE_CLASS)
+	      fatal ("too many insns in equivalence class");
+	  }
+
+	  /* Within the equivalence class, we must find the insn that
+	     dominates all the others.  Any insn that is not in a
+	     domination relationship with this insn must be excluded
+	     from the class.  */
+	  /* Bubble the dominating insn to the end of the array.  */
+
+	  unsigned int the_dominator = insn_numbers [0];
+
+
+	  for (unsigned int j = 1; j < num_elements; j++) {
+
+	    /*
+	    fprintf (dump_file, "checking domination of %d vs %d\n",
+		     the_dominator, insn_numbers[j]);
+	    */
+	    if (dominated_by_p (CDI_DOMINATORS,
+				insn_entry [the_dominator].bb,
+				insn_entry [insn_numbers [j]].bb)) {
+	      the_dominator = insn_numbers[j];
+	      /*
+	      fprintf (dump_file, "they are out of order, so updating\n");
+	      */
+	    }
+	    /*
+	    else
+	      fprintf (dump_file, "they are in order, so not updating\n");
+	    */
+	  }
+	  /* insn_numbers [num_elements - 1] holds candidate class dominator,
+	     but I haven't compared with every other element, and
+	     some may not be comparable.  If any elements are not
+	     comparable, remove them from the equivalence class.  */
+	  for (unsigned int j = 0; j < num_elements - 1; j++)
+	    if (!dominated_by_p (CDI_DOMINATORS,
+				 insn_entry [insn_numbers [j]].bb,
+				 insn_entry [the_dominator].bb))
+	      {
+		fprintf (dump_file,
+			 " removing insn %d from equivalence class\n",
+			 insn_numbers [j]);
+	      }
+
+	  fprintf (dump_file, "  The insn that dominates all others is %d\n",
+		   the_dominator);
+
+	  long long int dominator_delta = 0;
+
+	  /* first, output the dominator insn.  */
+	  for (em = em2; em != NULL; em = em->next)
 	    {
-	      fprintf (dump_file,
-		       "  insn: %u, index: %d, index_delta: %lld, base: %d, base_delta: %lld\n",
-		       em->uid, em->index_originator, em->index_delta,
-		       em->base_originator, em->base_delta);
-	      em = em->next;
+	      if (em->uid == the_dominator) {
+
+		fprintf (dump_file,
+			 "  insn: %u, index: %d, index_delta: %lld, "
+			 "base: %d, base_delta: %lld\n",
+			 em->uid, em->index_originator, em->index_delta,
+			 em->base_originator, em->base_delta);
+
+		fprintf (dump_file, "Replace this insn with:\n");
+		fprintf (dump_file, " derived_ptr = r%d (base) + r%d (index);\n",
+			 em->base_originator, em->index_originator);
+		dominator_delta = em->index_delta + em->base_delta;
+
+		if (dominator_delta)
+		  fprintf (dump_file, " derived_ptr += %lld;\n",
+			   dominator_delta);
+		fprintf (dump_file, "Mem [derived_ptr]\n");
+	      }
+	    }
+
+	  /* next, output the other insns.  */
+	  for (em = em2; em != NULL; em = em->next)
+	    {
+	      if (em->uid != the_dominator) {
+		fprintf (dump_file,
+			 "  insn: %u, index: %d, index_delta: %lld, "
+			 "base: %d, base_delta: %lld\n",
+			 em->uid, em->index_originator, em->index_delta,
+			 em->base_originator, em->base_delta);
+
+		fprintf (dump_file, "Replace this insn with:\n");
+		fprintf (dump_file, "Mem [derived_ptr + %lld];\n",
+			 em->base_delta + em->index_delta - dominator_delta);
+	      }
 	    }
 	}
     }
@@ -512,6 +936,8 @@ rs6000_fix_indexing (function *fun)
   struct loop *loop;
   int verbosity = 3;
 
+  calculate_dominance_info (CDI_DOMINATORS);
+
 #define TELL_ME_WHAT_I_AM_DEALING_WITH
 #ifdef TELL_ME_WHAT_I_AM_DEALING_WITH
   if (dump_file) {
@@ -659,6 +1085,7 @@ rs6000_fix_indexing (function *fun)
       unsigned int uid = INSN_UID (insn);
 
       insn_entry[uid].insn = insn;
+      insn_entry[uid].bb = BLOCK_FOR_INSN (insn);
       /* fill in additional insn_entry details later.  */
 
       if (dump_file) {
@@ -1032,7 +1459,40 @@ rs6000_fix_indexing (function *fun)
     }
   }
 
-  dump_equivalences ();
+  dump_equivalences (insn_entry);
+  fixup_equivalences (insn_entry);
+
+  if (dump_file) {
+    /* let's see if i have dominator information here */
+    for (int i = 0; i < num_equivalences; i++) {
+      struct equivalence_member *em = equivalence_classes[i];
+      fprintf (dump_file, "Domination within class %d:\n", i);
+      fprintf (dump_file, "  index_defs: %s, base_defs: %s\n",
+	       em->index_defs, em->base_defs);
+      while (em != NULL) {
+	/* em represents a member of this equivalence class */
+	rtx_insn *insn = insn_entry [em->uid].insn;
+	basic_block insn_bb = BLOCK_FOR_INSN (insn);
+	for (struct equivalence_member *inner_em = em;
+	     inner_em != NULL; inner_em = inner_em->next) {
+	  rtx_insn *inner_insn = insn_entry [inner_em->uid].insn;
+	  basic_block inner_insn_bb = BLOCK_FOR_INSN (inner_insn);
+	  if (dominated_by_p (CDI_DOMINATORS, insn_bb, inner_insn_bb))
+	    fprintf (dump_file, "insn %d dominated by insn %d\n",
+		     em->uid, inner_em->uid);
+	  else if (dominated_by_p (CDI_DOMINATORS, inner_insn_bb, insn_bb))
+	    fprintf (dump_file, "insn %d dominated by insn %d\n",
+		     inner_em->uid, em->uid);
+	  else
+	    fprintf (dump_file, "no domination between insn %d and insn %d\n",
+		     em->uid, inner_em->uid);
+	}
+	em = em->next;
+      }
+    }
+  }
+
+  free_dominance_info (CDI_DOMINATORS);
 
   return 0;
 }  // anon namespace

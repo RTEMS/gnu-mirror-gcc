@@ -297,6 +297,29 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
 				     bool no_emit ATTRIBUTE_UNUSED)
 {
 #ifndef POINTERS_EXTEND_UNSIGNED
+
+  if (dump_file) {
+    fprintf (dump_file, "convert_memory_address_addr_space_1\n");
+    fprintf (dump_file, " x: ");
+    print_rtl (dump_file, x);
+    fprintf (dump_file, "\n");
+    fprintf (dump_file, " to_mode: %d, VOIDMode: %d\n", (int) to_mode, VOIDmode);
+    fprintf (dump_file, " in case you're curious, V2DFmode: %d\n", E_V2DFmode);
+    fprintf (dump_file, " GET_MODE (x): %d\n", GET_MODE (x));
+  }
+  /* kelvin finds that following gcc_assert is failing because
+   *
+   * x: (mem:v2DF (reg:DI 191) [0 S16 A8])
+   *
+   * i'm guessing that 61 means V2DF.
+   *
+   * what is 10?
+   *
+   * where did to_mode come from?
+   *
+   *  GET_MODE (x): 61, to_mode: 10, VOIDmode: 0.
+   */
+
   gcc_assert (GET_MODE (x) == to_mode || GET_MODE (x) == VOIDmode);
   return x;
 #else /* defined(POINTERS_EXTEND_UNSIGNED) */
@@ -413,22 +436,50 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
   rtx oldx = x;
   scalar_int_mode address_mode = targetm.addr_space.address_mode (as);
 
+  if (dump_file) {
+    fprintf (dump_file, "memory_address_addr_space is calling ");
+    fprintf (dump_file, "convert_memory_address_addr_space with to_mode %d\n",
+	     (int) address_mode);
+    fprintf (dump_file, " x: ");
+    print_rtl (dump_file, x);
+    fprintf (dump_file, "\n");
+  }
+
   x = convert_memory_address_addr_space (address_mode, x, as);
+
+  if (dump_file) {
+    fprintf (dump_file, "Back from convert_memory_address_addr_space, x:\n");
+    print_rtl (dump_file, x);
+    fprintf (dump_file, "\n");
+  }
+
 
   /* By passing constant addresses through registers
      we get a chance to cse them.  */
-  if (! cse_not_expected && CONSTANT_P (x) && CONSTANT_ADDRESS_P (x))
+  if (! cse_not_expected && CONSTANT_P (x) && CONSTANT_ADDRESS_P (x)) {
     x = force_reg (address_mode, x);
 
+    if (dump_file) {	/* kelvin bracketed this else if clause */
+      fprintf (dump_file, "did top force_reg!, x: ");
+      print_rtl (dump_file, x);
+      fprintf (dump_file, "\n");
+    }
+  }
   /* We get better cse by rejecting indirect addressing at this stage.
      Let the combiner create indirect addresses where appropriate.
      For now, generate the code so that the subexpressions useful to share
      are visible.  But not if cse won't be done!  */
   else
     {
-      if (! cse_not_expected && !REG_P (x))
+      if (! cse_not_expected && !REG_P (x)) {
 	x = break_out_memory_refs (x);
 
+	if (dump_file) {	/* kelvin bracketed this else if clause */
+	  fprintf (dump_file, "did break_out_memory_refs, x: ");
+	  print_rtl (dump_file, x);
+	  fprintf (dump_file, "\n");
+	}
+      }
       /* At this point, any valid address is accepted.  */
       if (memory_address_addr_space_p (mode, x, as))
 	goto done;
@@ -438,6 +489,12 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
       if (memory_address_addr_space_p (mode, oldx, as))
 	{
 	  x = oldx;
+
+	  if (dump_file) {
+	    fprintf (dump_file, "x got oldx, x: ");
+	    print_rtl (dump_file, x);
+	    fprintf (dump_file, "\n");
+	  }
 	  goto done;
 	}
 
@@ -448,6 +505,13 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
       {
 	rtx orig_x = x;
 	x = targetm.addr_space.legitimize_address (x, oldx, mode, as);
+
+	if (dump_file) {
+	  fprintf (dump_file, "legitimize is illegitimate, new x: ");
+	  print_rtl (dump_file, x);
+	  fprintf (dump_file, "\n");
+	}
+
 	if (orig_x != x && memory_address_addr_space_p (mode, x, as))
 	  goto done;
       }
@@ -476,20 +540,46 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
 	      else
 		x = y;
 	    }
+
+	  if (dump_file) {
+	    fprintf (dump_file, "dealing with PLUS, x:: ");
+	    print_rtl (dump_file, x);
+	    fprintf (dump_file, "\n");
+	  }
+
 	}
 
-      else if (GET_CODE (x) == MULT || GET_CODE (x) == MINUS)
+      else if (GET_CODE (x) == MULT || GET_CODE (x) == MINUS) {
 	x = force_operand (x, NULL_RTX);
 
+	if (dump_file) {	/* kelvin bracketed this else if clause */
+	  fprintf (dump_file, "MULT/MINUS, force_operand, x: ");
+	  print_rtl (dump_file, x);
+	  fprintf (dump_file, "\n");
+	}
+      }
       /* If we have a register that's an invalid address,
 	 it must be a hard reg of the wrong class.  Copy it to a pseudo.  */
-      else if (REG_P (x))
+      else if (REG_P (x)) {
 	x = copy_to_reg (x);
 
+	if (dump_file) {	/* kelvin bracketed this else if clause */
+	  fprintf (dump_file, "just did copy_to_reg!, x: ");
+	  print_rtl (dump_file, x);
+	  fprintf (dump_file, "\n");
+	}
+      }
       /* Last resort: copy the value to a register, since
 	 the register is a valid address.  */
-      else
+      else {
 	x = force_reg (address_mode, x);
+
+	if (dump_file) {	/* kelvin bracketed this else if clause */
+	  fprintf (dump_file, "just did force_reg!, x: ");
+	  print_rtl (dump_file, x);
+	  fprintf (dump_file, "\n");
+	}
+      }
     }
 
  done:
@@ -497,6 +587,15 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
   gcc_assert (memory_address_addr_space_p (mode, x, as));
   /* If we didn't change the address, we are done.  Otherwise, mark
      a reg as a pointer if we have REG or REG + CONST_INT.  */
+
+  if (dump_file) {
+    fprintf (dump_file, "kelvin is unhappy!\n");
+    fprintf (dump_file, "  address space is: %d\n", as);
+    fprintf (dump_file, "  my addr is: ");
+    print_rtl (dump_file, x);
+    fprintf (dump_file, "\n  why would anyone think this is a PLUS?\n");
+  }
+
   if (oldx == x)
     return x;
   else if (REG_P (x))
@@ -509,6 +608,14 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
   /* OLDX may have been the address on a temporary.  Update the address
      to indicate that X is now used.  */
   update_temp_slot_address (oldx, x);
+
+  if (dump_file) {
+    fprintf (dump_file, "kelvin after update_temp_slot_address\n");
+    fprintf (dump_file, "  address space is: %d\n", as);
+    fprintf (dump_file, "  my addr is: ");
+    print_rtl (dump_file, x);
+    fprintf (dump_file, "\n  why would anyone think this is a PLUS?\n");
+  }
 
   return x;
 }

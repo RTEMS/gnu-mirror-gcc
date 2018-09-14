@@ -1096,8 +1096,23 @@ update_temp_slot_address (rtx old_rtx, rtx new_rtx)
 {
   struct temp_slot *p;
 
+  if (dump_file) {
+    fprintf (dump_file, "kelvin says update_temp_slot_address is screwing me\n");
+    /* wrong: by the time i get here, the new-rtx already has
+       incorrect value.  */
+    fprintf (dump_file, "old_rtx: ");
+    print_rtl (dump_file, old_rtx);
+    fprintf (dump_file, "\nnew_rtx: ");
+    print_rtl (dump_file, new_rtx);
+    fprintf (dump_file, "\n");
+  }
+
   if (rtx_equal_p (old_rtx, new_rtx))
     return;
+
+  if (dump_file) {
+    fprintf (dump_file, "kelvin says !rtx_equal_p\n");
+  }
 
   p = find_temp_slot_from_address (old_rtx);
 
@@ -1132,6 +1147,10 @@ update_temp_slot_address (rtx old_rtx, rtx new_rtx)
 
       return;
     }
+
+  if (dump_file) {
+    fprintf (dump_file, "kelvin trying to insert_temp_slot_address\n");
+  }
 
   /* Otherwise add an alias for the temp's address.  */
   insert_temp_slot_address (new_rtx, p);
