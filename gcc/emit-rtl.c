@@ -2553,12 +2553,6 @@ replace_equiv_address (rtx memref, rtx addr, bool inplace)
   /* change_address_1 copies the memory attribute structure without change
      and that's exactly what we want here.  */
   update_temp_slot_address (XEXP (memref, 0), addr);
-
-  if (dump_file) {
-    fprintf (dump_file, "kelvin says replace_equiv_address is looking at\n");
-    print_rtl (dump_file, addr);
-  }
-
   return change_address_1 (memref, VOIDmode, addr, 1, inplace);
 }
 
