@@ -400,18 +400,54 @@ pass_web::execute (function *fun)
 	{
 	  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
 	  df_ref def, use;
-	  FOR_EACH_INSN_INFO_USE (use, insn_info)
-	    if (DF_REF_REGNO (use) >= FIRST_PSEUDO_REGISTER)
+	  FOR_EACH_INSN_INFO_USE (use, insn_info) {
+	    if (DF_REF_REGNO (use) >= FIRST_PSEUDO_REGISTER) {
+	      if (dump_file) {
+		/* Apparently, in this phase, the only pseudo registers
+		   that are supposed to be here are the results of "splits",
+		   and my newly introduced pseudo register does not fit the
+		   bill.  */
+		fprintf (dump_file, "A: kelvin web @insn %d, "
+			 "uses def %d from insn %d\n",
+			 INSN_UID (insn), DF_REF_ID (use),
+			 INSN_UID (DF_REF_INSN (use)));
+	      }
 	      replace_ref (use, entry_register (use_entry + DF_REF_ID (use),
 						use, used));
-	  FOR_EACH_INSN_INFO_EQ_USE (use, insn_info)
-	    if (DF_REF_REGNO (use) >= FIRST_PSEUDO_REGISTER)
+	    }
+	  }
+	  FOR_EACH_INSN_INFO_EQ_USE (use, insn_info) {
+	    if (DF_REF_REGNO (use) >= FIRST_PSEUDO_REGISTER) {
+	      if (dump_file) {
+		/* Apparently, in this phase, the only pseudo registers
+		   that are supposed to be here are the results of "splits",
+		   and my newly introduced pseudo register does not fit the
+		   bill.  */
+		fprintf (dump_file, "A: kelvin web @insn %d, "
+			 "uses def %d from insn %d\n",
+			 INSN_UID (insn), DF_REF_ID (use),
+			 INSN_UID (DF_REF_INSN (use)));
+	      }
 	      replace_ref (use, entry_register (use_entry + DF_REF_ID (use),
 						use, used));
-	  FOR_EACH_INSN_INFO_DEF (def, insn_info)
-	    if (DF_REF_REGNO (def) >= FIRST_PSEUDO_REGISTER)
+	    }
+	  }
+	  FOR_EACH_INSN_INFO_DEF (def, insn_info) {
+	    if (dump_file) {
+	      /* Apparently, in this phase, the only pseudo registers
+		 that are supposed to be here are the results of "splits",
+		 and my newly introduced pseudo register does not fit the
+		 bill.  */
+	      fprintf (dump_file, "C: kelvin web @insn %d uses "
+		       "def %d from insn %d\n",
+		       INSN_UID (DF_REF_INSN (def)), DF_REF_ID (def),
+		       INSN_UID (insn));
+	    }
+	    if (DF_REF_REGNO (def) >= FIRST_PSEUDO_REGISTER) {
 	      replace_ref (def, entry_register (def_entry + DF_REF_ID (def),
 						def, used));
+	    }
+	  }
 	}
 
   free (def_entry);

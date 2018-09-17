@@ -1483,6 +1483,11 @@ rs6000_fix_indexing (function *fun)
   dump_equivalences (insn_entry);
   fixup_equivalences (insn_entry);
 
+  /* kelvin experimented as of 9/17/2018.  does this make subsequent
+   * passes happier?  The answer is no.
+   * df_insn_rescan_all ();
+   */
+
 #ifdef NOT_NEEDED
   if (dump_file) {
     /* let's see if i have dominator information here */
@@ -1531,7 +1536,7 @@ const pass_data pass_data_fix_indexing =
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  0, /* todo_flags_finish */
+  TODO_df_finish, /* todo_flags_finish */
 };
 
 class pass_fix_indexing : public rtl_opt_pass
