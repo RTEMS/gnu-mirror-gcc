@@ -469,7 +469,12 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 		}
 	      }
 
+	    /* I don't want the full generality of:
+
 	    rtx new_mem = replace_equiv_address (mem, derived_ptr_reg, false);
+	    */
+	    rtx new_mem = gen_rtx_MEM (GET_MODE (mem), derived_ptr_reg);
+	    MEM_COPY_ATTRIBUTES (new_mem, mem);
 
 	    fprintf (dump_file, " after back from replace_equiv_address\n");
 	    print_rtl (dump_file, new_mem);
@@ -519,7 +524,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	      /* Code works for both 32-bit and 64-bit targets.  */
 	      rtx_insn *insn = insn_entry [em->uid].insn;
 	      rtx body = PATTERN (insn);
-	      rtx addr, mem;
+	      rtx mem;
 	      bool is_load;
 
 	      if (dump_file) {
@@ -535,25 +540,41 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 		{
 		  /* propagating instruction is a load */
 		  mem = SET_SRC (body);
-		  addr = XEXP (SET_SRC (body), 0);
 		  is_load = true;
 		}
 	      else
 		{ /* propagating instruction is a store */
 		  gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
 		  mem = SET_DEST (body);
-		  addr = XEXP (SET_DEST (body), 0);
 		  is_load = false;
 		}
 
+	      /* In an earlier revision of this code, I had:
+
+ 		 rtx new_mem = replace_equiv_address (mem, addr_expr, false);
+
+		 But I found that replace_equiv_address does not
+		 work for me, because it is calling force_reg () on my
+		 CONST_INT subexpression, and it is not even emitting
+		 the code to load the CONST_INT into the
+		 pseudo-register that it puts forward to replace the
+		 CONST_INT.  apparently, there are some assumptions in
+		 the implementation of replace_equiv_address that are
+		 not valid when it is invoked from this context.
+
+		 so instead, i borrowed some of the code that
+		 replace_equiv_address uses to copy attribute info...
+	      */
 	      rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominated_delta);
 	      rtx addr_expr = gen_rtx_PLUS (Pmode, derived_ptr_reg, ci);
-	      rtx new_mem = replace_equiv_address (mem, addr_expr, false);
+	      rtx new_mem = gen_rtx_MEM (GET_MODE (mem), addr_expr);
+	      MEM_COPY_ATTRIBUTES (new_mem, mem);
 
+#ifdef NO_NOISE
 	      fprintf (dump_file, " after replace_equiv_address, new_mem: ");
 	      print_rtl (dump_file, new_mem);
 	      fprintf (dump_file, "\n");
-
+#endif
 	      rtx new_expr;
 	      if (is_load)
 		new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
@@ -1462,6 +1483,7 @@ rs6000_fix_indexing (function *fun)
   dump_equivalences (insn_entry);
   fixup_equivalences (insn_entry);
 
+#ifdef NOT_NEEDED
   if (dump_file) {
     /* let's see if i have dominator information here */
     for (int i = 0; i < num_equivalences; i++) {
@@ -1491,6 +1513,7 @@ rs6000_fix_indexing (function *fun)
       }
     }
   }
+#endif
 
   free_dominance_info (CDI_DOMINATORS);
 

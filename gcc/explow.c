@@ -614,7 +614,7 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
     fprintf (dump_file, "  address space is: %d\n", as);
     fprintf (dump_file, "  my addr is: ");
     print_rtl (dump_file, x);
-    fprintf (dump_file, "\n  why would anyone think this is a PLUS?\n");
+    fprintf (dump_file, "\n");
   }
 
   return x;
