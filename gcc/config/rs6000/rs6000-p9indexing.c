@@ -19,68 +19,6 @@
    along with GCC; see the file COPYING3.  If not see
    <http://www.gnu.org/licenses/>.  */
 
-/* kelvin to-do notes:
- *
- * see rs6000-p8swap.c, borrow code from:
- *
- *   @line 1478:
- *    replace_swap_with_copy
- *    gen_rtx_SET ()
- *    emit_insn_before ()
- *    set_block_for_insn ()
- *    df_insn_rescan ()
- *    df_insn_delete (insn)
- *    insn->set_deleted ();
- *
- *   @line 1926:
- *    add_insn_after ()
- *    df_insn_rescan ()
- *    remove_insn ()
- *
- * Question: how do I create a new register variable?
- *  see rtvec_alloc (16), which apparently generates code related to a
- *  gen_rtx_PARALLEL.
- *
- * @line 2174, see rtx copy = gen_rtx_SET (new_reg, and_base))
- *  i think if i just do a gen_rtx_SET (args, ...), it will
- *  automatically allocate a new register to hold the result.  let's
- *  try that.
- *
- *
- * what we have:
- * Looking at insn: 31
- * ;;   UD chains for insn luid 0 uid 31
- * ;;     reg 130 { d129(bb 5 insn 7) d121(bb 46 insn 215) d114(bb 15 insn 297) }
- * ;;      reg 148 { d144(bb 2 insn 2) }
- * 31: r156:V2DF=[r148:DI+r130:DI]
- *      REG_DEAD r148:DI
- * ;;   DU chains for insn luid 0 uid 31
- * ;;      reg 156 { u44(bb 15 insn 33) }
- *
- * this insn is fetching data from memory: (plus:DI (reg/v/f:DI 148 [ x ])
- *        (reg:DI 130 [ ivtmp.18 ]))
- * memory is base_reg + index, base_reg: (reg/v/f:DI 148 [ x ])
- * index: (reg:DI 130 [ ivtmp.18 ])
- *
- * what we want:
- * Looking at insn: 115
- * ;;   UD chains for insn luid 9 uid 115
- * ;;      reg 130 { d109(bb 4 insn 113) }
- * 115: r172:V2DF=[r130:DI+0x10]
- * ;;   DU chains for insn luid 9 uid 115
- * ;;      reg 172 { u-1(bb 4 insn 117) }
- *
- * this insn is fetching data from memory: (plus:DI (reg/v/f:DI 130 [ basex ])
- *        (const_int 16 [0x10]))
- * memory is base_reg + index, base_reg: (reg/v/f:DI 130 [ basex ])
- * index: (const_int 16 [0x10])
- *
- */
-
-
-
-#define IN_TARGET_CODE 1
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -120,16 +58,11 @@ class indexing_web_entry : public web_entry_base
  public:
   rtx_insn *insn;		/* Pointer to the insn */
   basic_block bb;		/* Pointer to the enclosing basic block */
-
-  unsigned int is_indexed_array_load : 1;
-  unsigned int is_indexed_array_store : 1;
-  unsigned int defines_array_base: 1;
-  unsigned int defines_array_index: 1;
-  /* probably have many more fields to add here.  */
 };
 
 /* Print on FILE the indexes for the predecessors of basic_block BB.  */
 
+#ifdef REMOVE_ME
 static void
 print_pred_bbs (FILE *file, basic_block bb)
 {
@@ -152,6 +85,7 @@ print_succ_bbs (FILE *file, basic_block bb)
   FOR_EACH_EDGE (e, ei, bb->succs)
     fprintf (file, "bb_%d ", e->dest->index);
 }
+#endif
 
 struct equivalence_member {
   struct equivalence_member *next;
@@ -215,8 +149,6 @@ static char *place_int (char *buf, unsigned int val) {
   int last_digit = 31;
   tbuf[last_digit--] = '\0';
 
-  unsigned int orig_val = val;
-
   if (val == 0)
     tbuf [last_digit] = '0';
   else {
@@ -226,15 +158,7 @@ static char *place_int (char *buf, unsigned int val) {
     }
     last_digit++;
   }
-
-  fprintf (dump_file, "place_int ([%s], %u), with tbuf + last_digit: [%s]\n",
-	   buf, orig_val, tbuf + last_digit);
-
   strcpy (buf, tbuf + last_digit);
-
-  fprintf (dump_file, "after appendage, buf [%s], extend length: %d\n",
-	   buf, (int) strlen (tbuf + last_digit));
-
   return buf + strlen (tbuf + last_digit);
 }
 
@@ -243,6 +167,7 @@ help_canonize (int count, struct df_link *def_link) {
   int ids[16];
   int i = 0;
 
+  /* FIXME: KELVIN TO REPLACE ARBITRARY RESTRICTION OF 16.  */
   if (count > 16)
     fatal ("too many defs in help_canonize");
 
@@ -268,10 +193,6 @@ help_canonize (int count, struct df_link *def_link) {
     *cp = '\0';			/* not needed: helps debug.  */
     cp = place_int (cp, ids[i]);
     *cp++ = ':';
-
-    /* following is for debugging, shouldn't be necessary in real loop.  */
-    *cp = '\0';
-    fprintf (dump_file, "help_canonize, buf is [%s]\n", buf);
   }
   cp--;
   *cp = '\0';
@@ -329,6 +250,7 @@ insert_into_equivalence_class (unsigned int uid,
 static void
 fixup_equivalences (indexing_web_entry *insn_entry) {
 
+  /* FIXME: USE ALLOCA */
 #define MY_LARGEST_EQUIVALENCE_CLASS	32
   unsigned int num_elements = 0;
   unsigned int insn_numbers [MY_LARGEST_EQUIVALENCE_CLASS];
@@ -351,7 +273,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	 dominates all others.  Any insn that is not in a domination
 	 relationship with this insn must be removed from the class.  */
       unsigned int the_dominator = insn_numbers [0];
- 
+
       for (unsigned int j = 1; j < num_elements; j++) {
 	if (dominated_by_p (CDI_DOMINATORS,
 			    insn_entry [the_dominator].bb,
@@ -363,6 +285,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
       /* the_dominator dominates all but those that it is not "comparable"
 	 to.  Remove non-comparables.  */
 
+      /* FIXME: USE ALLOCA */
       unsigned int excluded [MY_LARGEST_EQUIVALENCE_CLASS];
       int num_excluded = 0;
 
@@ -379,6 +302,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
       rtx derived_ptr_reg = gen_reg_rtx (Pmode);
 
       /* first, output the dominator insn.  */
+      int originating_insn = 0;
       for (em = em2; em != NULL; em = em->next)
 	{
 	  if (em->uid == the_dominator) {
@@ -394,17 +318,15 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	    rtx new_delta_expr = NULL;
 	    bool is_load;
 
+	    originating_insn = INSN_UID (insn);
 	    if (dump_file) {
 	      fprintf (dump_file, "Replacing originating insn %d: ",
-		       INSN_UID (insn));
-
+		       originating_insn);
 	      print_inline_rtx (dump_file, insn, 2);
 	      fprintf (dump_file, "\n");
 	    }
 
 	    gcc_assert (GET_CODE (body) == SET);
-
-
 	    if (GET_CODE (SET_SRC (body)) == MEM)
 	      {
 		/* originating instruction is a load */
@@ -420,15 +342,6 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 		is_load = false;
 	      }
 
-	    /*
-	    fprintf (dump_file, "The original mem expression is ");
-	    print_rtl (dump_file, mem);
-	    fprintf (dump_file, "\n");
-	    fprintf (dump_file, "The original addr expression is ");
-	    print_rtl (dump_file, addr);
-	    fprintf (dump_file, "\n");
-	    */
-
 	    enum rtx_code code = GET_CODE (addr);
 	    gcc_assert ((code == PLUS) || (code == MINUS));
 	    base_reg = XEXP (addr, 0);
@@ -438,7 +351,6 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	      new_init_expr = gen_rtx_PLUS (Pmode, base_reg, index_reg);
 	    else
 	      new_init_expr = gen_rtx_MINUS (Pmode, base_reg, index_reg);
-
 	    new_init_expr = gen_rtx_SET (derived_ptr_reg, new_init_expr);
 
 	    rtx_insn *new_insn = emit_insn_before (new_init_expr, insn);
@@ -447,7 +359,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	    df_insn_rescan (new_insn);
 
 	    if (dump_file) {
-	      fprintf (dump_file, "with %d: ", INSN_UID (new_insn));
+	      fprintf (dump_file, "with insn %d: ", INSN_UID (new_insn));
 	      print_inline_rtx (dump_file, new_insn, 2);
 	      fprintf (dump_file, "\n");
 	    }
@@ -463,22 +375,15 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 		df_insn_rescan (new_insn);
 
 		if (dump_file) {
-		  fprintf (dump_file, "and with %d: ", INSN_UID (new_insn));
+		  fprintf (dump_file, "and with insn %d: ",
+			   INSN_UID (new_insn));
 		  print_inline_rtx (dump_file, new_insn, 2);
 		  fprintf (dump_file, "\n");
 		}
 	      }
 
-	    /* I don't want the full generality of:
-
-	    rtx new_mem = replace_equiv_address (mem, derived_ptr_reg, false);
-	    */
 	    rtx new_mem = gen_rtx_MEM (GET_MODE (mem), derived_ptr_reg);
 	    MEM_COPY_ATTRIBUTES (new_mem, mem);
-
-	    fprintf (dump_file, " after back from replace_equiv_address\n");
-	    print_rtl (dump_file, new_mem);
-	    fprintf (dump_file, "\n");
 
 	    rtx new_expr;
 	    if (is_load)
@@ -492,7 +397,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	    df_insn_rescan (new_insn);
 
 	    if (dump_file) {
-	      fprintf (dump_file, "and with %d: ", INSN_UID (new_insn));
+	      fprintf (dump_file, "and with insn %d: ", INSN_UID (new_insn));
 	      print_inline_rtx (dump_file, new_insn, 2);
 	      fprintf (dump_file, "\n");
 	    }
@@ -500,7 +405,6 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	    df_insn_delete (insn);
 	    remove_insn (insn);
 	    insn->set_deleted ();
-
 	  }
 	}
 
@@ -514,14 +418,18 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	      if (excluded [j] == em->uid)
 		dont_replace = true;
 	    }
+
 	    if (dont_replace) {
-	      fprintf (dump_file, "not replacing insn %d\n", em->uid);
+	      fprintf (dump_file,
+		       "Not replacing insn %d from equivalence class\n",
+		       em->uid);
+	      fprintf (dump_file, " as it is not dominated by originating insn %d\n",
+		       originating_insn);
 	    } else {
 
 	      long long int dominated_delta = em->index_delta + em->base_delta;
 	      dominated_delta -= dominator_delta;
 
-	      /* Code works for both 32-bit and 64-bit targets.  */
 	      rtx_insn *insn = insn_entry [em->uid].insn;
 	      rtx body = PATTERN (insn);
 	      rtx mem;
@@ -549,32 +457,11 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 		  is_load = false;
 		}
 
-	      /* In an earlier revision of this code, I had:
-
- 		 rtx new_mem = replace_equiv_address (mem, addr_expr, false);
-
-		 But I found that replace_equiv_address does not
-		 work for me, because it is calling force_reg () on my
-		 CONST_INT subexpression, and it is not even emitting
-		 the code to load the CONST_INT into the
-		 pseudo-register that it puts forward to replace the
-		 CONST_INT.  apparently, there are some assumptions in
-		 the implementation of replace_equiv_address that are
-		 not valid when it is invoked from this context.
-
-		 so instead, i borrowed some of the code that
-		 replace_equiv_address uses to copy attribute info...
-	      */
 	      rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominated_delta);
 	      rtx addr_expr = gen_rtx_PLUS (Pmode, derived_ptr_reg, ci);
 	      rtx new_mem = gen_rtx_MEM (GET_MODE (mem), addr_expr);
 	      MEM_COPY_ATTRIBUTES (new_mem, mem);
 
-#ifdef NO_NOISE
-	      fprintf (dump_file, " after replace_equiv_address, new_mem: ");
-	      print_rtl (dump_file, new_mem);
-	      fprintf (dump_file, "\n");
-#endif
 	      rtx new_expr;
 	      if (is_load)
 		new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
@@ -587,7 +474,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
 	      df_insn_rescan (new_insn);
 
 	      if (dump_file) {
-		fprintf (dump_file, "with %d: ", INSN_UID (new_insn));
+		fprintf (dump_file, "with insn %d: ", INSN_UID (new_insn));
 		print_inline_rtx (dump_file, new_insn, 2);
 		fprintf (dump_file, "\n");
 	      }
@@ -601,7 +488,7 @@ fixup_equivalences (indexing_web_entry *insn_entry) {
     }
 }
 
-
+#ifdef TO_REMOVE
 static void
 dump_equivalences (indexing_web_entry *insn_entry) {
 
@@ -713,10 +600,9 @@ dump_equivalences (indexing_web_entry *insn_entry) {
 	}
     }
 }
+#endif
 
-
-/* Return non-zero if an only if use represents a compile-time
-   constant.  */
+/* Return non-zero if an only if use represents a compile-time constant.  */
 static int
 represents_constant_p (df_ref use)
 {
@@ -727,13 +613,7 @@ represents_constant_p (df_ref use)
      is an originating use.  */
   if (!def_link || !def_link->ref
       || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next)
-    {
-      if (dump_file) {
-	fprintf (dump_file,
-		 " represents_constant_p returns false (bad defs)\n");
-      }
-      return false;
-    }
+    return false;
   else
     {
       rtx def_insn = DF_REF_INSN (def_link->ref);
@@ -748,29 +628,14 @@ represents_constant_p (df_ref use)
 	  df_ref inner_use;
 	  FOR_EACH_INSN_INFO_USE (inner_use, inner_insn_info)
 	    {
-	      if (!represents_constant_p (inner_use)) {
-		if (dump_file) {
-		  fprintf (dump_file,
-			   " represents_constant_p returns false"
-			   " (one def non-constant)\n");
-		}
+	      if (!represents_constant_p (inner_use))
 		return false;
-	      }
 	    }
 	  /* There were multiple defs but they are all constant.  */
-	  if (dump_file) {
-	    fprintf (dump_file,
-		     " represents_constant_p returns true (defs constant)\n");
-	  }
 	  return true;
 	}
-      else {			/* treat unrecognized codes as not constant */
-	if (dump_file) {
-	  fprintf (dump_file,
-		   " represents_constant_p returns false (unrecognized code)\n");
-	}
+      else			/* treat unrecognized codes as not constant */
 	return false;
-      }
     }
 }
 
@@ -798,7 +663,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
   rtx def_insn = DF_REF_INSN (def_link->ref);
   unsigned uid2 = INSN_UID (def_insn);
 
-  if (dump_file) {
+  if (dump_file && (dump_flags & TDF_DETAILS)) {
     fprintf (dump_file,
 	     " find_true_originator looking at insn %d\n",
 	     uid2);
@@ -830,12 +695,12 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 		 is an originating use.  */
 	      if (!def_link || !def_link->ref
 		  || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next) {
-		if (dump_file)
+		if (dump_file && (dump_flags & TDF_DETAILS))
 		  fprintf (dump_file, "Treat this as an originating use\n");
 		result = uid2;
 	      }
 	      else {
-		if (dump_file)
+		if (dump_file && (dump_flags & TDF_DETAILS))
 		  fprintf (dump_file, "Recursing on the single used def\n");
 		result = find_true_originator (def_link, adjustment);
 	      }
@@ -862,11 +727,9 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 	    else if ((GET_CODE (op1) != CONST_INT)
 		     && (GET_CODE (op2) == CONST_INT))
 	      *adjustment += INTVAL (op2);
-	    else
-	      {
-		fprintf (dump_file,
-			 " punting, PLUS arguments don't fit expectations\n");
-	      }
+	    else if (dump_file && (dump_flags & TDF_DETAILS))
+	      fprintf (dump_file,
+		       " punting, PLUS arguments don't fit expectations\n");
 	  }
 	else if (source_code == MINUS)
 	  {
@@ -883,9 +746,8 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 	  }
 	else if (source_code != REG)
 	  {
-	    /* I've seen, for example, ashift operators with a single
-	       non-constant use and an int constant argument.  */
-	    if (dump_file)
+	    /* We don't handle ashift, for example.  */
+	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      fprintf (dump_file,
 		       " punt, SET subexpresion is unhappy with code %s\n",
 		       GET_RTX_NAME(source_code));
@@ -902,7 +764,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
     }
   else
     {
-      if (dump_file)
+      if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file,
 		 " punt, because this is not a SET insn\n");
       return -1;
@@ -954,13 +816,14 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 unsigned int
 rs6000_fix_indexing (function *fun)
 {
+#ifdef REMOVE_ME
   struct loop *loop;
   int verbosity = 3;
+#endif
 
   calculate_dominance_info (CDI_DOMINATORS);
 
-#define TELL_ME_WHAT_I_AM_DEALING_WITH
-#ifdef TELL_ME_WHAT_I_AM_DEALING_WITH
+#ifdef REMOVE_ME
   if (dump_file) {
     fprintf (dump_file, "Kelvin is fixing indices\n");
     print_rtx_function (dump_file, fun, true);
@@ -972,7 +835,7 @@ rs6000_fix_indexing (function *fun)
      did, this code might be useful.  */
   FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
     {
-      if (dump_file) {
+      if (dump_file && (dump_flags & TDF_DETAILS)) {
 	fprintf (dump_file,
 		 "Kelvin examining loop: %d\n", loop->num);
 	if (loop->header)
@@ -991,38 +854,35 @@ rs6000_fix_indexing (function *fun)
         print_generic_expr (dump_file, loop->nb_iterations);
         fprintf (dump_file, ")\n");
 
-        if (verbosity >= 1) {
-          basic_block bb;
-          fprintf (dump_file, "These are the blocks that comprise my loop\n");
-          FOR_EACH_BB_FN (bb, cfun) {
-            if (bb->loop_father == loop) {
-              fprintf (dump_file, "bb_%d (preds = {", bb->index);
-              print_pred_bbs (dump_file, bb);
-              fprintf (dump_file, "}, succs = {");
-              print_succ_bbs (dump_file, bb);
-              fprintf (dump_file, "})\n");
+	basic_block bb;
+	fprintf (dump_file, "These are the blocks that comprise my loop\n");
+	FOR_EACH_BB_FN (bb, cfun) {
+	  if (bb->loop_father == loop) {
+	    fprintf (dump_file, "bb_%d (preds = {", bb->index);
+	    print_pred_bbs (dump_file, bb);
+	    fprintf (dump_file, "}, succs = {");
+	    print_succ_bbs (dump_file, bb);
+	    fprintf (dump_file, "})\n");
 
-              fprintf (dump_file, "insns = {");
+	    fprintf (dump_file, "insns = {");
 
-              rtx_insn *last = BB_END (bb);
-              if (last)
-                last = NEXT_INSN (last);
-              for (rtx_insn *insn = BB_HEAD (bb);
-                   insn != last; insn = NEXT_INSN (insn)) {
-                /*
+	    rtx_insn *last = BB_END (bb);
+	    if (last)
+	      last = NEXT_INSN (last);
+	    for (rtx_insn *insn = BB_HEAD (bb);
+		 insn != last; insn = NEXT_INSN (insn)) {
+	      /*
                 df_dump_insn_top (insn, dump_file);
                 dump_insn_slim (dump_file, insn);
                 df_dump_insn_bottom (insn, dump_file);
 
                 probably borrow some code from rs6000-swaps...
-                */
-                dump_bb (dump_file, bb, 4, TDF_VOPS|TDF_MEMSYMS);
-              }
-              fprintf (dump_file, "}\n\n");
-            }
+	      */
+	      dump_bb (dump_file, bb, 4, TDF_VOPS|TDF_MEMSYMS);
+	    }
+	    fprintf (dump_file, "}\n\n");
           }
         }
-
       }
     }
 #endif
@@ -1097,431 +957,243 @@ rs6000_fix_indexing (function *fun)
 
 
   /* Walk the insns to gather basic data.  */
-  FOR_ALL_BB_FN (bb, fun) {
-    if (dump_file) {
-      fprintf (dump_file, "Scrutinizing bb %d\n", bb->index);
-    }
-    FOR_BB_INSNS_SAFE (bb, insn, curr_insn)
+  FOR_ALL_BB_FN (bb, fun)
     {
-      unsigned int uid = INSN_UID (insn);
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "Scrutinizing bb %d\n", bb->index);
 
-      insn_entry[uid].insn = insn;
-      insn_entry[uid].bb = BLOCK_FOR_INSN (insn);
-      /* fill in additional insn_entry details later.  */
+      FOR_BB_INSNS_SAFE (bb, insn, curr_insn)
+	{
+	  unsigned int uid = INSN_UID (insn);
 
-      if (dump_file) {
-	fprintf (dump_file, "\nLooking at insn: %d\n", uid);
-	df_dump_insn_top (insn, dump_file);
-	dump_insn_slim (dump_file, insn);
-	df_dump_insn_bottom (insn, dump_file);
-      }
+	  insn_entry[uid].insn = insn;
+	  insn_entry[uid].bb = BLOCK_FOR_INSN (insn);
 
-      /*
-       * first, look for all memory[base + index] expressions.
-       * then group these by base.
-       * then for all instructions in each group, scrutinize the index
-       * definition. Partition this group according to the origin
-       * variable upon which the the definitions of i are based.
-       *
-       * how do we define "origin variable"?
-       *
-       *  if i has multiple definitions, it is its own origin
-       *  variable.  Likewise, if i has a single definition and the
-       *  definition is NOT the sum or difference of a constant value
-       *  and some other variable, the i is its own origin variable.
-       *
-       *  Otherwise, i has the same origin variable as the expression
-       *  that represents its definition.
-       *
-       * After we've created these partitions, for each partition
-       * whose size is greater than 1:
-       *
-       *  1. introduce derived_ptr = base + origin_variable
-       *     immediately following the instruction that defines
-       *     origin_variable.
-       *
-       *  2. for each member of the partition, replace the expression
-       *     memory [base + index] with derived_ptr [constant], where
-       *     constant is the sum of all constant values added to the
-       *     origin variable to represent this particular value of i.
-       */
-
-      if (NONDEBUG_INSN_P (insn)) {
-	rtx body = PATTERN (insn);
-	if ((GET_CODE (body) == SET) && (GET_CODE (SET_SRC (body)) == MEM)) {
-	  rtx mem = XEXP (SET_SRC (body), 0);
-	  /* kelvin says we can't always expect  a base reg here.  The
-	     following insn causes a core dump on the following line.
-	     KELVIN TO DO:
-	       look at rs6000-p8swap.c to see what they test before
-	       indexing into XEXP (mem, 0).
-
-            It looks like I need to GET_CODE
-	  */
-	  /*
-	    (cinsn 78 (set (reg/f:DI <48>)
-	                   (mem/u/c:DI (unspec:DI
-                            [(symbol_ref/u:DI ("*.LC0") [flags 0x2])
-                              (reg:DI 2)
-                            ] UNSPEC_TOCREL) [4  S8 A8])) "ddot-c.c":22
-                      (expr_list:REG_EQUAL (symbol_ref:DI
-                       ("opt_value") [flags 0xc0]
-                       <var_decl 0x78d156da0750 opt_value>)))
-	  */
-	  /* rtx base_reg = XEXP (mem, 0); */
-
-	  if (dump_file) {
-	    fprintf (dump_file, " this insn is fetching data from memory: ");
-	    print_inline_rtx (dump_file, mem, 2);
-	    /*
-	    fprintf (dump_file, "\n with base: ");
-	    print_inline_rtx (dump_file, base_reg, 2);
-	    */
-	    fprintf (dump_file, "\n");
+	  if (dump_file && (dump_flags & TDF_DETAILS)) {
+	    fprintf (dump_file, "\nLooking at insn: %d\n", uid);
+	    df_dump_insn_top (insn, dump_file);
+	    dump_insn_slim (dump_file, insn);
+	    df_dump_insn_bottom (insn, dump_file);
 	  }
-	  enum rtx_code code = GET_CODE (mem);
-	  if ((code == PLUS) || (code == MINUS)) {
-	    rtx base_reg = XEXP (mem,0);
-	    rtx index_reg = XEXP (mem, 1);
 
-	    if (dump_file) {
-	      fprintf (dump_file, " memory is base_reg + index, ");
-	      fprintf (dump_file, "base_reg: ");
-	      print_inline_rtx (dump_file, base_reg, 2);
-	      fprintf (dump_file, "\n index: ");
-	      print_inline_rtx (dump_file, index_reg, 2);
-	      fprintf (dump_file, "\n");
-	    }
+	  /*
+	   * first, look for all memory[base + index] expressions.
+	   * then group these by base.
+	   * then for all instructions in each group, scrutinize the index
+	   * definition. Partition this group according to the origin
+	   * variable upon which the the definitions of i are based.
+	   *
+	   * how do we define "origin variable"?
+	   *
+	   *  if i has multiple definitions, it is its own origin
+	   *  variable.  Likewise, if i has a single definition and the
+	   *  definition is NOT the sum or difference of a constant value
+	   *  and some other variable, the i is its own origin variable.
+	   *
+	   *  Otherwise, i has the same origin variable as the expression
+	   *  that represents its definition.
+	   *
+	   * After we've created these partitions, for each partition
+	   * whose size is greater than 1:
+	   *
+	   *  1. introduce derived_ptr = base + origin_variable
+	   *     immediately following the instruction that defines
+	   *     origin_variable.
+	   *
+	   *  2. for each member of the partition, replace the expression
+	   *     memory [base + index] with derived_ptr [constant], where
+	   *     constant is the sum of all constant values added to the
+	   *     origin variable to represent this particular value of i.
+	   */
 
-	    if (REG_P (base_reg) && REG_P (index_reg)) {
-	      int base_originator = -1;
-	      unsigned long long int base_offset = 0;
-	      const char *base_defs = NULL;
-	      int index_originator = -1;
-	      unsigned long long int index_offset = 0;
-	      const char *index_defs = NULL;
+	  if (NONDEBUG_INSN_P (insn)) {
+	    rtx body = PATTERN (insn);
+	    if ((GET_CODE (body) == SET) && (GET_CODE (SET_SRC (body)) == MEM)) {
+	      rtx mem = XEXP (SET_SRC (body), 0);
 
-	      struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-	      /* Since insn is known to represent a sum or difference,
-		 this insn is likely to use at least two input variables.  */
-	      df_ref use;
-	      FOR_EACH_INSN_INFO_USE (use, insn_info)
-	      {
-		/* not used yet:
-		   struct df_link *def_link = DF_REF_CHAIN (use);
-		*/
-		if (rtx_equal_p (DF_REF_REG (use), base_reg)) {
-		  if (dump_file) {
-		    fprintf (dump_file, "Found use corresponding to base_reg\n");
-		    df_ref_debug (use, dump_file);
-		  }
-		  struct df_link *def_link = DF_REF_CHAIN (use);
+	      if (dump_file && (dump_flags & TDF_DETAILS)) {
+		fprintf (dump_file, " this insn is fetching data from memory: ");
+		print_inline_rtx (dump_file, mem, 2);
+		fprintf (dump_file, "\n");
+	      }
+	      enum rtx_code code = GET_CODE (mem);
+	      if ((code == PLUS) || (code == MINUS)) {
+		rtx base_reg = XEXP (mem,0);
+		rtx index_reg = XEXP (mem, 1);
 
-		  /* If there is no definition, or the definition
-		     is artificial, or there are multiple
-		     definitions, this is an originating use.  */
-		  if (!def_link || !def_link->ref
-		      || DF_REF_IS_ARTIFICIAL (def_link->ref)
-		      || def_link->next) {
-		    if (dump_file) {
-		      fprintf (dump_file, "This use is originating!\n\n");
-		    }
-		    base_originator = uid;
-		    base_offset = 0;
-		    base_defs = canonize (def_link);
-		  }
-		  else {
-		    if (dump_file) {
-		      fprintf (dump_file, "This use may be propagating\n\n");
-		    }
-		    /* There's only one definition.  Let's dig deeper.  */
-		    long long int delta = 0;
-		    int uid2 = find_true_originator (def_link, &delta);
-		    if (uid2 > 0) {
-		      base_originator = uid2;
-		      base_offset = delta;
-		      rtx_insn *insn2 = insn_entry[uid2].insn;
-		      struct df_insn_info *insn_info2 = DF_INSN_INFO_GET (insn2);
-		      df_ref use2;
-		      use2 = DF_INSN_INFO_USES (insn_info2);
-		      if (use2) {
-			if (DF_REF_NEXT_LOC (use2))
-			  fatal ("true originator should have only one use");
-			base_defs = canonize (DF_REF_CHAIN (use2));
-		      }
-		      else
-			base_defs = CONSTANT_DEFINITION;
-
-		    }
-		    if (dump_file) {
-		      fprintf (dump_file,
-			       " propagates from insn %d, delta: %lld\n\n",
-			       uid2, delta);
-
-		    }
-		  }
-		}
-		else if (rtx_equal_p (DF_REF_REG (use), index_reg)) {
-		  if (dump_file) {
-		    fprintf (dump_file,
-			     "Found use corresponding to index_reg\n");
-		    df_ref_debug (use, dump_file);
-		  }
-		  struct df_link *def_link = DF_REF_CHAIN (use);
-
-		  /* If there is no definition, or the definition
-		     is artificial, or there are multiple
-		     definitions, this is an originating use.  */
-		  if (!def_link || !def_link->ref
-		      || DF_REF_IS_ARTIFICIAL (def_link->ref)
-		      || def_link->next) {
-		    if (dump_file) {
-		      fprintf (dump_file, "This use is originating!\n\n");
-		    }
-		    index_originator = uid;
-		    index_offset = 0;
-		    index_defs = canonize (def_link);
-		  }
-		  else {
-		    if (dump_file) {
-		      fprintf (dump_file, "This use may be propagating\n\n");
-		    }
-		    /* There's only one definition.  Let's dig deeper.  */
-		    long long int delta = 0;
-		    int uid2 = find_true_originator (def_link, &delta);
-		    if (uid2 > 0) {
-		      index_originator = uid2;
-		      index_offset = delta;
-		      rtx_insn *insn2 = insn_entry[uid2].insn;
-		      struct df_insn_info *insn_info2 = DF_INSN_INFO_GET (insn2);
-		      df_ref use2;
-		      use2 = DF_INSN_INFO_USES (insn_info2);
-		      if (use2) {
-			if (DF_REF_NEXT_LOC (use2))
-			  fatal ("true originator should have only one use");
-			index_defs = canonize (DF_REF_CHAIN (use2));
-		      }
-		      else
-			index_defs = CONSTANT_DEFINITION;
-		    }
-		    if (dump_file) {
-		      fprintf (dump_file,
-			       " propagates from insn %d, delta %lld\n\n",
-			       uid2, delta);
-
-		    }
-		  }
+		if (dump_file && (dump_flags & TDF_DETAILS)) {
+		  fprintf (dump_file, " memory is base + index, ");
+		  fprintf (dump_file, "base: ");
+		  print_inline_rtx (dump_file, base_reg, 2);
+		  fprintf (dump_file, "\n index: ");
+		  print_inline_rtx (dump_file, index_reg, 2);
+		  fprintf (dump_file, "\n");
 		}
 
-		if ((index_originator > 0) && (base_originator > 0))
-		  {
-		    insert_into_equivalence_class (uid, index_defs, base_defs,
-						   index_originator, index_offset,
-						   base_originator, base_offset);
-		  }
+		if (REG_P (base_reg) && REG_P (index_reg)) {
+		  int base_originator = -1;
+		  unsigned long long int base_offset = 0;
+		  const char *base_defs = NULL;
+		  int index_originator = -1;
+		  unsigned long long int index_offset = 0;
+		  const char *index_defs = NULL;
+
+		  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
+		  /* Since insn is known to represent a sum or difference,
+		     this insn is likely to use at least two input variables.  */
+		  df_ref use;
+		  FOR_EACH_INSN_INFO_USE (use, insn_info)
+		    {
+		      /* not used yet:
+			 struct df_link *def_link = DF_REF_CHAIN (use);
+		      */
+		      if (rtx_equal_p (DF_REF_REG (use), base_reg)) {
+			if (dump_file && (dump_flags & TDF_DETAILS)) {
+			  fprintf (dump_file,
+				   "Found use corresponding to base_reg\n");
+			  df_ref_debug (use, dump_file);
+			}
+			struct df_link *def_link = DF_REF_CHAIN (use);
+
+			/* If there is no definition, or the definition
+			   is artificial, or there are multiple
+			   definitions, this is an originating use.  */
+			if (!def_link || !def_link->ref
+			    || DF_REF_IS_ARTIFICIAL (def_link->ref)
+			    || def_link->next) {
+			  if (dump_file && (dump_flags & TDF_DETAILS))
+			    fprintf (dump_file, "Use is originating!\n");
+			  base_originator = uid;
+			  base_offset = 0;
+			  base_defs = canonize (def_link);
+			}
+			else
+			  {
+			    if (dump_file && (dump_flags & TDF_DETAILS))
+			      fprintf (dump_file, "Use may be propagating\n");
+			    /* There's only one definition.  Dig deeper.  */
+			    long long int delta = 0;
+			    int uid2 = find_true_originator (def_link, &delta);
+			    if (uid2 > 0) {
+			      base_originator = uid2;
+			      base_offset = delta;
+			      rtx_insn *insn2 = insn_entry[uid2].insn;
+			      struct df_insn_info *insn_info2 =
+				DF_INSN_INFO_GET (insn2);
+			      df_ref use2;
+			      use2 = DF_INSN_INFO_USES (insn_info2);
+			      if (use2)
+				{
+				  if (DF_REF_NEXT_LOC (use2))
+				    fatal ("expect one use for true originator");
+				  base_defs = canonize (DF_REF_CHAIN (use2));
+				}
+			      else
+				base_defs = CONSTANT_DEFINITION;
+
+			    }
+			    if (dump_file && (dump_flags & TDF_DETAILS)) {
+			      fprintf (dump_file,
+				       " propagates from originating insn %d,"
+				       " with delta: %lld\n", uid2, delta);
+			    }
+			  }
+		      }
+		      else if (rtx_equal_p (DF_REF_REG (use), index_reg))
+			{
+			  if (dump_file && (dump_flags & TDF_DETAILS)) {
+			    fprintf (dump_file,
+				     "Found use corresponding to index\n");
+			    df_ref_debug (use, dump_file);
+			  }
+			  struct df_link *def_link = DF_REF_CHAIN (use);
+
+			  /* If there is no definition, or the definition
+			     is artificial, or there are multiple
+			     definitions, this is an originating use.  */
+			  if (!def_link || !def_link->ref
+			      || DF_REF_IS_ARTIFICIAL (def_link->ref)
+			      || def_link->next) {
+			    if (dump_file && (dump_flags & TDF_DETAILS))
+			      fprintf (dump_file, "Use is originating!\n");
+			    index_originator = uid;
+			    index_offset = 0;
+			    index_defs = canonize (def_link);
+			  }
+			  else {
+			    if (dump_file && (dump_flags & TDF_DETAILS))
+			      fprintf (dump_file, "Use may be propagating\n");
+			    /* There's only one definition.  Dig deeper.  */
+			    long long int delta = 0;
+			    int uid2 = find_true_originator (def_link, &delta);
+			    if (uid2 > 0) {
+			      index_originator = uid2;
+			      index_offset = delta;
+			      rtx_insn *insn2 = insn_entry[uid2].insn;
+			      struct df_insn_info *insn_info2 =
+				DF_INSN_INFO_GET (insn2);
+			      df_ref use2;
+			      use2 = DF_INSN_INFO_USES (insn_info2);
+			      if (use2) {
+				if (DF_REF_NEXT_LOC (use2))
+				  fatal ("expect one use for true originator");
+				index_defs = canonize (DF_REF_CHAIN (use2));
+			      }
+			      else
+				index_defs = CONSTANT_DEFINITION;
+			    }
+			    if (dump_file && (dump_flags & TDF_DETAILS)) {
+			      fprintf (dump_file,
+				       " propagates from originating insn %d,"
+				       " with delta %lld\n", uid2, delta);
+			    }
+			  }
+			}
+
+		      if ((index_originator > 0) && (base_originator > 0))
+			insert_into_equivalence_class (uid, index_defs,
+						       base_defs,
+						       index_originator,
+						       index_offset,
+						       base_originator,
+						       base_offset);
+		    }
+		}
 	      }
 
-	      /* Figure out where this input variable is defined.  */
-	      /* not yet used
-	      struct df_link *def_link = DF_REF_CHAIN (use);
-	      */
-	      /* If there is no definition or the definition is artificial or
-		 there are multiple definitions, punt.  */
-	      /*
-		This code not yet assimilated.
+	      if ((GET_CODE (body) == SET)
+		  && (GET_CODE (SET_DEST (body)) == MEM))
+		{
+		  rtx mem = XEXP (SET_DEST (body), 0);
+		  /*  rtx base_reg = XEXP (mem, 0); */
+		  /* unused at the moment: rtx index = XEXP (mem, 1); */
+		  if (dump_file && (dump_flags & TDF_DETAILS)) {
+		    fprintf (dump_file,
+			     " this insn is storing data to memory: ");
+		    print_inline_rtx (dump_file, mem, 2);
+		    fprintf (dump_file, "\n");
+		  }
 
-	      if (!def_link || !def_link->ref
-		  || DF_REF_IS_ARTIFICIAL (def_link->ref)
-		  || def_link->next)
-		return false;
-	      rtx def_insn = DF_REF_INSN (def_link->ref);
-	      unsigned uid2 = INSN_UID (def_insn);
-	      */
-	    }
+		  /* FIXME: kelvin needs to copy load code into store
+		     context  */
 
-	  }
-
-	  if ((GET_CODE (body) == SET) && (GET_CODE (SET_DEST (body)) == MEM)) {
-	    rtx mem = XEXP (SET_DEST (body), 0);
-	    /*  rtx base_reg = XEXP (mem, 0); */
-	    /* unused at the moment: rtx index = XEXP (mem, 1); */
-	    if (dump_file) {
-	      fprintf (dump_file, " this insn is storing data to memory: ");
-	      print_inline_rtx (dump_file, mem, 2);
-	      /*
-		fprintf (dump_file, "\n with base: ");
-		print_inline_rtx (dump_file, base_reg, 2);
-	      */
-	      fprintf (dump_file, "\n");
+		}
 	    }
 	  }
+	  else if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file,
+		     " punting because base or index not registers\n");
 	}
-      }
-      else {
-	if (dump_file)
-	  fprintf (dump_file, " punting because base or index not registers\n");
-      }
 
-
-      if (NONDEBUG_INSN_P (insn))
-	{
-	  /* Kelvin observes it looks like i'm iterating over uses of
-             the value defined by this insn.  I'm really more
-             interested in looking at definitions of the value used by
-             this instruction.  */
-
-
-	  /* Walk the uses and defs to see if we mention vector regs.
-	     Record any constraints on optimization of such mentions.  */
-	  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-	  df_ref mention;
-	  FOR_EACH_INSN_INFO_USE (mention, insn_info)
-	    {
-	      /* We use DF_REF_REAL_REG here to get inside any subregs.  */
-	      /*
-	      machine_mode mode = GET_MODE (DF_REF_REAL_REG (mention));
-	      */
-#ifdef NOT_YET_READY
-	      /* If a use gets its value from a call insn, it will be
-		 a hard register and will look like (reg:V4SI 3 3).
-		 The df analysis creates two mentions for GPR3 and GPR4,
-		 both DImode.  We must recognize this and treat it as a
-		 vector mention to ensure the call is unioned with this
-		 use.  */
-	      if (mode == DImode && DF_REF_INSN_INFO (mention))
-		{
-		  rtx feeder = DF_REF_INSN (mention);
-		  /* FIXME:  It is pretty hard to get from the df mention
-		     to the mode of the use in the insn.  We arbitrarily
-		     pick a vector mode here, even though the use might
-		     be a real DImode.  We can be too conservative
-		     (create a web larger than necessary) because of
-		     this, so consider eventually fixing this.  */
-		  if (GET_CODE (feeder) == CALL_INSN)
-		    mode = V4SImode;
-		}
-
-	      if (ALTIVEC_OR_VSX_VECTOR_MODE (mode) || mode == TImode)
-		{
-		  insn_entry[uid].is_relevant = 1;
-		  if (mode == TImode || mode == V1TImode
-		      || FLOAT128_VECTOR_P (mode))
-		    insn_entry[uid].is_128_int = 1;
-		  if (DF_REF_INSN_INFO (mention))
-		    insn_entry[uid].contains_subreg
-		      = !rtx_equal_p (DF_REF_REG (mention),
-				      DF_REF_REAL_REG (mention));
-		  union_defs (insn_entry, insn, mention);
-		}
-#endif
-	    }
-	  FOR_EACH_INSN_INFO_DEF (mention, insn_info)
-	    {
-	      /* We use DF_REF_REAL_REG here to get inside any subregs.  */
-	      /*
-	      machine_mode mode = GET_MODE (DF_REF_REAL_REG (mention));
-	      */
-
-#ifdef NOT_YET_READY
-	      /* If we're loading up a hard vector register for a call,
-		 it looks like (set (reg:V4SI 9 9) (...)).  The df
-		 analysis creates two mentions for GPR9 and GPR10, both
-		 DImode.  So relying on the mode from the mentions
-		 isn't sufficient to ensure we union the call into the
-		 web with the parameter setup code.  */
-	      if (mode == DImode && GET_CODE (insn) == SET
-		  && ALTIVEC_OR_VSX_VECTOR_MODE (GET_MODE (SET_DEST (insn))))
-		mode = GET_MODE (SET_DEST (insn));
-
-	      if (ALTIVEC_OR_VSX_VECTOR_MODE (mode) || mode == TImode)
-		{
-		  insn_entry[uid].is_relevant = 1;
-		  if (mode == TImode || mode == V1TImode
-		      || FLOAT128_VECTOR_P (mode))
-		    insn_entry[uid].is_128_int = 1;
-		  if (DF_REF_INSN_INFO (mention))
-		    insn_entry[uid].contains_subreg
-		      = !rtx_equal_p (DF_REF_REG (mention),
-				      DF_REF_REAL_REG (mention));
-		  /* REG_FUNCTION_VALUE_P is not valid for subregs. */
-		  else if (REG_FUNCTION_VALUE_P (DF_REF_REG (mention)))
-		    insn_entry[uid].is_live_out = 1;
-		  union_uses (insn_entry, insn, mention);
-		}
-#endif
-	    }
-
-#ifdef NOT_YET_READY
-	  if (insn_entry[uid].is_relevant)
-	    {
-	      /* Determine if this is a load or store.  */
-	      insn_entry[uid].is_load = insn_is_load_p (insn);
-	      insn_entry[uid].is_store = insn_is_store_p (insn);
-
-	      /* Determine if this is a doubleword swap.  If not,
-		 determine whether it can legally be swapped.  */
-	      if (insn_is_swap_p (insn))
-		insn_entry[uid].is_swap = 1;
-	      else
-		{
-		  unsigned int special = SH_NONE;
-		  insn_entry[uid].is_swappable
-		    = insn_is_swappable_p (insn_entry, insn, &special);
-		  if (special != SH_NONE && insn_entry[uid].contains_subreg)
-		    insn_entry[uid].is_swappable = 0;
-		  else if (special != SH_NONE)
-		    insn_entry[uid].special_handling = special;
-		  else if (insn_entry[uid].contains_subreg)
-		    insn_entry[uid].special_handling = SH_SUBREG;
-		}
-	    }
-#endif
-	}
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "\n");
     }
-  }
 
+#ifdef TO_REMOVE
   dump_equivalences (insn_entry);
-  fixup_equivalences (insn_entry);
-
-  /* kelvin experimented as of 9/17/2018.  does this make subsequent
-   * passes happier?  The answer is no.
-   * df_insn_rescan_all ();
-   */
-
-#ifdef NOT_NEEDED
-  if (dump_file) {
-    /* let's see if i have dominator information here */
-    for (int i = 0; i < num_equivalences; i++) {
-      struct equivalence_member *em = equivalence_classes[i];
-      fprintf (dump_file, "Domination within class %d:\n", i);
-      fprintf (dump_file, "  index_defs: %s, base_defs: %s\n",
-	       em->index_defs, em->base_defs);
-      while (em != NULL) {
-	/* em represents a member of this equivalence class */
-	rtx_insn *insn = insn_entry [em->uid].insn;
-	basic_block insn_bb = BLOCK_FOR_INSN (insn);
-	for (struct equivalence_member *inner_em = em;
-	     inner_em != NULL; inner_em = inner_em->next) {
-	  rtx_insn *inner_insn = insn_entry [inner_em->uid].insn;
-	  basic_block inner_insn_bb = BLOCK_FOR_INSN (inner_insn);
-	  if (dominated_by_p (CDI_DOMINATORS, insn_bb, inner_insn_bb))
-	    fprintf (dump_file, "insn %d dominated by insn %d\n",
-		     em->uid, inner_em->uid);
-	  else if (dominated_by_p (CDI_DOMINATORS, inner_insn_bb, insn_bb))
-	    fprintf (dump_file, "insn %d dominated by insn %d\n",
-		     inner_em->uid, em->uid);
-	  else
-	    fprintf (dump_file, "no domination between insn %d and insn %d\n",
-		     em->uid, inner_em->uid);
-	}
-	em = em->next;
-      }
-    }
-  }
 #endif
-
+  fixup_equivalences (insn_entry);
   free_dominance_info (CDI_DOMINATORS);
-
   return 0;
 }  // anon namespace
 
