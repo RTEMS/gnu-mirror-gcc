@@ -43,8 +43,6 @@
 
 #include "genrtl.h"
 
-#define UNDER_CONSTRUCTION
-
 /* This pass transforms array indexing expressions from a form that
    favors selection of X-form instructions into a form that favors
    selection of D-form instructions.
@@ -107,8 +105,6 @@ static int count_links (struct df_link *def_link)
   if (def_link == NULL) return 0;
   else return 1 + count_links (def_link->next);
 }
-
-#ifdef UNDER_CONSTRUCTION
 
 static int max_use_links = 0;
 
@@ -254,8 +250,6 @@ find_defs (indexing_web_entry *insn_entry, rtx_insn *insn,
     }
 }
 
-#endif
-
 /* Return non-zero if an only if use represents a compile-time constant.  */
 static int
 represents_constant_p (df_ref use)
@@ -398,7 +392,6 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
    represent instructions created during this optimization pass.  */
 static unsigned int max_uid_at_start;
 
-#ifdef UNDER_CONSTRUCTION
 static bool
 in_use_list (struct df_link *list, struct df_link *element)
 {
@@ -411,7 +404,6 @@ in_use_list (struct df_link *list, struct df_link *element)
   /* Got to end of list without finding element.  */
   return false;
 }
-
 
 /* Return true iff the instruction represented by uid_1 is in the same
    equivalence class as the instruction represented by uid_2.  */
@@ -464,21 +456,6 @@ equivalent_p (indexing_web_entry *insn_entry,
     }
 }
 
-
-/*
-   Multiple calls to insert_into_equivalence_class are replaced
-   with a single call to build_equivalene_classes.
-
-   Note that all the information passed into the original
-   insert_into_equivalence_class function is available in the
-   indexing_web_entry.  In this revised implementation, I will not
-   instantiate a new equivalence_member.  Instead, I need to update
-   the insn_entry info.
-
-   initially, every insn_entry has equivalence_class -1.  for each
-   insn that is_relevant, I see if I can combine it with any preceding
-   insn.
-*/
 static void
 build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 {
@@ -742,8 +719,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	}
     }
 }
-#endif
-
 
 /* Main entry point for this pass.
 
@@ -904,7 +879,6 @@ rs6000_fix_indexing (function *fun)
 	   *     constant is the sum of all constant values added to the
 	   *     origin variable to represent this particular value of i.
 	   */
-
 	  if (NONDEBUG_INSN_P (insn))
 	    {
 	      rtx body = PATTERN (insn);
@@ -1008,10 +982,8 @@ rs6000_fix_indexing (function *fun)
 				  insn_entry[uid].is_originating = true;
 				  insn_entry[uid].original_base_use = uid;
 				  insn_entry[uid].base_delta = 0;
-#ifdef UNDER_CONSTRUCTION
 				  insn_entry[uid].base_equivalence_hash =
 				    equivalence_hash (def_link);
-#endif
 				}
 			      else
 				{
@@ -1030,7 +1002,6 @@ rs6000_fix_indexing (function *fun)
 				      insn_entry[uid].original_base_use = uid2;
 				      insn_entry[uid].base_delta =
 					delta;
-#ifdef UNDER_CONSTRUCTION
 
 				      rtx_insn *insn2 =
 					insn_entry[uid2].insn;
@@ -1053,9 +1024,7 @@ rs6000_fix_indexing (function *fun)
 				      else
 					insn_entry[uid].base_equivalence_hash =
 					  equivalence_hash (NULL);
-#endif
 				    }
-				  /* kelvin keep code */
 				  if (dump_file
 				      && (dump_flags & TDF_DETAILS))
 				    {
@@ -1095,10 +1064,8 @@ rs6000_fix_indexing (function *fun)
 				  insn_entry[uid].is_originating = true;
 				  insn_entry[uid].original_index_use = uid;
 				  insn_entry[uid].index_delta = 0;
-#ifdef UNDER_CONSTRUCTION
 				  insn_entry[uid].index_equivalence_hash =
 				    equivalence_hash (def_link);
-#endif
 				}
 			      else
 				{
@@ -1119,7 +1086,6 @@ rs6000_fix_indexing (function *fun)
 				      insn_entry[uid].index_delta =
 					delta;
 				    }
-#ifdef UNDER_CONSTRUCTION
 
 				  rtx_insn *insn2 =
 				    insn_entry[uid2].insn;
@@ -1142,8 +1108,7 @@ rs6000_fix_indexing (function *fun)
 				  else
 				    insn_entry[uid].index_equivalence_hash =
 				      equivalence_hash (NULL);
-#endif
-				  /* kelvin keep code */
+
 				  if (dump_file
 				      && (dump_flags & TDF_DETAILS))
 				    {
