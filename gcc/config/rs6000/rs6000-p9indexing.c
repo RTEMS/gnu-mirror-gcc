@@ -61,7 +61,7 @@ class indexing_web_entry : public web_entry_base
   rtx_insn *insn;		/* Pointer to the insn */
   basic_block bb;		/* Pointer to the enclosing basic block */
 
-  /* If this insn is relevant, it is a load or store to a memory
+  /* If this insn is relevant, it is a load or store with a memory
      address that is comprised of a base pointer (e.g. the address of
      an array or array slice) and an index expression (e.g. an index
      within the array).  The base_originator and index_originator
@@ -94,113 +94,18 @@ class indexing_web_entry : public web_entry_base
   unsigned int is_load: 1;
   unsigned int is_store: 1;
   unsigned int is_originating: 1;
-
-
 };
 
-static void fatal (const char *msg) {
-
+static void fatal (const char *msg)
+{
   fprintf (stderr, "Fatal error: %s\n", msg);
   exit (-1);
 }
 
-#define MAX_DEFS_SPACE 4096
-static char defs_buf[MAX_DEFS_SPACE];
-static char *next_buf_space = defs_buf;
-
-static int count_links (struct df_link *def_link) {
+static int count_links (struct df_link *def_link)
+{
   if (def_link == NULL) return 0;
   else return 1 + count_links (def_link->next);
-}
-
-static const char *empty_string = "";
-
-#define CONSTANT_DEFINITION empty_string
-
-static const char *
-preserve (const char *defs) {
-  char *cp;
-
-  for (cp = defs_buf; cp < next_buf_space; cp += strlen (cp) + 1) {
-    if (!strcmp (cp, defs))
-      return cp;
-  }
-  next_buf_space += strlen (defs) + 1;
-  if (next_buf_space > &defs_buf[MAX_DEFS_SPACE])
-    fatal ("string buffer space overflowed");
-  strcpy (cp, defs);
-  return cp;
-}
-
-/* bytes required to represent 32-bit int, including null terminator
-   or separator.  */
-#define MAX_DEF_ID_LENGTH  11
-
-/* note to self: place_int stays around, even after we remove
-   canonize and help_canonize.  */
-static char *place_int (char *buf, unsigned int val) {
-  char tbuf [MAX_DEF_ID_LENGTH];
-  int last_digit = MAX_DEF_ID_LENGTH - 1;
-  tbuf[last_digit--] = '\0';
-
-  if (val == 0)
-    tbuf [last_digit] = '0';
-  else {
-    while (val) {
-      tbuf[last_digit--] = '0' + (val % 10);
-      val /= 10;
-    }
-    last_digit++;
-  }
-  strcpy (buf, tbuf + last_digit);
-  return buf + strlen (tbuf + last_digit);
-}
-
-static const char *
-help_canonize (int count, struct df_link *def_link) {
-  int ids[16];
-  int i = 0;
-
-  /* FIXME: KELVIN TO REPLACE ARBITRARY RESTRICTION OF 16.  */
-  if (count > 16)
-    fatal ("too many defs in help_canonize");
-
-  while (def_link != NULL) {
-    ids[i++] = DF_REF_ID (def_link->ref);
-    def_link = def_link->next;
-  }
-
-  /* bubble sort to put ids in ascending order. */
-  for (int end = count - 1; end > 0; end--) {
-    for (int j = 0; j < end; j++) {
-      if (ids[j] > ids[j+1]) {
-	int swap = ids[j];
-	ids[j] = ids[j+1];
-	ids[j+1] = swap;
-      }
-    }  /* ids[end] has largest entry in ids[0..end]  */
-  }
-
-  char buf[1024];
-  char *cp = buf;
-  for (int i = 0; i < count; i++) {
-    *cp = '\0';			/* not needed: helps debug.  */
-    cp = place_int (cp, ids[i]);
-    *cp++ = ':';
-  }
-  cp--;
-  *cp = '\0';
-
-  return preserve (buf);
-}
-
-static const char *
-canonize (struct df_link *def_link)
-{
-
-  /* prototyping: don't worry about efficiency for the moment.  */
-  int count = count_links (def_link);
-  return help_canonize (count, def_link);
 }
 
 #ifdef UNDER_CONSTRUCTION
@@ -262,8 +167,6 @@ find_defs (indexing_web_entry *insn_entry, rtx_insn *insn,
   else
     mem = NULL;
   /* else, this insn is neither load nor store.  */
-
-  fprintf (dump_file, "find_defs on uid: %d\n", uid);
 
   if (mem != NULL)
     {
@@ -415,14 +318,6 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
   rtx def_insn = DF_REF_INSN (def_link->ref);
   unsigned uid2 = INSN_UID (def_insn);
 
-  if (dump_file && (dump_flags & TDF_DETAILS)) {
-    fprintf (dump_file,
-	     " find_true_originator looking at insn %d\n",
-	     uid2);
-    print_inline_rtx (dump_file, def_insn, 2);
-    fprintf (dump_file, "\n");
-  }
-
   rtx inner_body = PATTERN (def_insn);
   if (GET_CODE (inner_body) == SET)
     {
@@ -446,16 +341,10 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 		 artificial, or there are multiple definitions, this
 		 is an originating use.  */
 	      if (!def_link || !def_link->ref
-		  || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next) {
-		if (dump_file && (dump_flags & TDF_DETAILS))
-		  fprintf (dump_file, "Treat this as an originating use\n");
+		  || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next)
 		result = uid2;
-	      }
-	      else {
-		if (dump_file && (dump_flags & TDF_DETAILS))
-		  fprintf (dump_file, "Recursing on the single used def\n");
+	      else
 		result = find_true_originator (def_link, adjustment);
-	      }
 	    }
 	}
 
@@ -479,9 +368,6 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 	    else if ((GET_CODE (op1) != CONST_INT)
 		     && (GET_CODE (op2) == CONST_INT))
 	      *adjustment += INTVAL (op2);
-	    else if (dump_file && (dump_flags & TDF_DETAILS))
-	      fprintf (dump_file,
-		       " punting, PLUS arguments don't fit expectations\n");
 	  }
 	else if (source_code == MINUS)
 	  {
@@ -490,21 +376,11 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 
 	    if ((GET_CODE (op1) != CONST_INT) && (GET_CODE (op2) == CONST_INT))
 	      *adjustment -= INTVAL (op1);
-	    else
-	      {
-		fprintf (dump_file,
-			 " punting, MINUS arguments don't fit expectations\n");
-	      }
 	  }
 	else if (source_code != REG)
-	  {
 	    /* We don't handle ashift, for example.  */
-	    if (dump_file && (dump_flags & TDF_DETAILS))
-	      fprintf (dump_file,
-		       " punt, SET subexpresion is unhappy with code %s\n",
-		       GET_RTX_NAME(source_code));
 	    return uid2;
-	  }
+
 	/* else, this is a register copy expression: no impact on
 	   adjustment.  */
 	return result;
@@ -515,130 +391,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 	return uid2;
     }
   else
-    {
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	fprintf (dump_file,
-		 " punt, because this is not a SET insn\n");
-      return -1;
-    }
-}
-
-/* this code to be tossed eventually.  just want to confirm that I can
-   recompute base_def and index_def info.  */
-void
-dump_recomputed_defs (indexing_web_entry *insn_entry, rtx_insn *insn)
-{
-  unsigned int uid = INSN_UID (insn);
-  rtx body = PATTERN (insn);
-  rtx mem;
-  if ((GET_CODE (body) == SET) && (GET_CODE (SET_SRC (body)) == MEM))
-    mem = XEXP (SET_SRC (body), 0);
-  else if ((GET_CODE (body) == SET) && (GET_CODE (SET_DEST (body)) == MEM))
-    mem = XEXP (SET_DEST (body), 0);
-  else
-    mem = NULL;
-  /* else, this insn is neither load nor store.  */
-
-  fprintf (dump_file, "Recomputing defs for insn %d\n", uid);
-
-  if (mem != NULL)
-    {
-      enum rtx_code code = GET_CODE (mem);
-      if ((code == PLUS) || (code == MINUS))
-	{
-	  rtx base_reg = XEXP (mem, 0);
-	  rtx index_reg = XEXP (mem, 1);
-
-	  if (REG_P (base_reg) && REG_P (index_reg))
-	    {
-	      struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-	      df_ref use;
-	      FOR_EACH_INSN_INFO_USE (use, insn_info)
-		{
-		  if (rtx_equal_p (DF_REF_REG (use), base_reg))
-		    {
-		      struct df_link *def_link = DF_REF_CHAIN (use);
-		      /* if there is no def, or the def is artificial,
-			 or there are multiple defs, this is an originating
-			 use.  */
-		      if (!def_link || !def_link->ref
-			  || DF_REF_IS_ARTIFICIAL (def_link->ref)
-			  || def_link->next)
-			fprintf (dump_file,
-				 " for originating base, def: %s\n",
-				 canonize (def_link));
-		      else
-			{
-			  /* long long int delta = 0; */
-			  /* unsigned int uid2 =
-			     find_true_originator (def_link, &delta);
-			  */
-			  /* kelvin has cached uid2.  */
-			  unsigned int uid2 =
-			    insn_entry[uid].original_base_use;
-			  df_ref use2;
-			  if (uid2 > 0)
-			    {
-			      fprintf (dump_file,
-				       " for propagating base %d, def: ",
-				       uid2);
-			      rtx_insn *insn2 = insn_entry[uid2].insn;
-			      struct df_insn_info *insn_info2 =
-				DF_INSN_INFO_GET (insn2);
-			      use2 = DF_INSN_INFO_USES (insn_info2);
-			      if (use2)
-				fprintf (dump_file, "%s\n",
-					 canonize (DF_REF_CHAIN (use2)));
-			      else
-				fprintf (dump_file, "%s\n",
-					 CONSTANT_DEFINITION);
-			    }
-			}
-		    }
-		  else if (rtx_equal_p (DF_REF_REG (use), index_reg))
-		    {
-		      struct df_link *def_link = DF_REF_CHAIN (use);
-		      /* if there is no def, or the def is artificial,
-			 or there are multiple defs, this is an originating
-			 use.  */
-		      if (!def_link || !def_link->ref
-			  || DF_REF_IS_ARTIFICIAL (def_link->ref)
-			  || def_link->next)
-			fprintf (dump_file,
-				 " recomputed originating index def: %s\n",
-				 canonize (def_link));
-		      else
-			{
-			  /* kelvin has cached uid2.  */
-			  /* long long int delta = 0; */
-			  /* unsigned int uid2 =
-			     find_true_originator (def_link, &delta);
-			  */
-			  unsigned int uid2 =
-			    insn_entry[uid].original_index_use;
-			  df_ref use2;
-			  if (uid2 > 0)
-			    {
-			      fprintf (dump_file,
-				       " for propagating index %d, def: ",
-				       uid2);
-			      rtx_insn *insn2 = insn_entry[uid2].insn;
-			      struct df_insn_info *insn_info2 =
-				DF_INSN_INFO_GET (insn2);
-			      use2 = DF_INSN_INFO_USES (insn_info2);
-			      if (use2)
-				fprintf (dump_file, "%s\n",
-					 canonize (DF_REF_CHAIN (use2)));
-			      else
-				fprintf (dump_file, "%s\n",
-					 CONSTANT_DEFINITION);
-			    }
-			}
-		    }
-		}
-	    }
-	}
-    }
+    return -1;
 }
 
 /* The size of the insn_entry array.  Note that this array does not
@@ -649,22 +402,12 @@ static unsigned int max_uid_at_start;
 static bool
 in_use_list (struct df_link *list, struct df_link *element)
 {
-
-  fprintf (dump_file, "in_use_list(looking for id %d)\n",
-	   DF_REF_ID (element->ref));
-
   while (list != NULL)
     {
-      fprintf (dump_file, " comparing with list entry id %d\n",
-	       DF_REF_ID (list->ref));
-
       if (element->ref == list->ref)
 	return true;
       list = list->next;
     }
-
-  fprintf (dump_file, "returning false from in_use_list\n");
-
   /* Got to end of list without finding element.  */
   return false;
 }
@@ -676,16 +419,6 @@ static bool
 equivalent_p (indexing_web_entry *insn_entry,
 	      unsigned int uid_1, unsigned int uid_2)
 {
-  fprintf (dump_file, "testing presumed non-equivalence of %d and %d\n",
-	   uid_1, uid_2);
-  fprintf (dump_file, "uid_1, base_hash %d, index_hash %d\n",
-	   insn_entry[uid_1].base_equivalence_hash,
-	   insn_entry[uid_1].index_equivalence_hash);
-  fprintf (dump_file, "uid_2, base_hash %d, index_hash %d\n",
-	   insn_entry[uid_2].base_equivalence_hash,
-	   insn_entry[uid_2].index_equivalence_hash);
-  fflush (dump_file);
-
   if ((insn_entry[uid_1].base_equivalence_hash !=
        insn_entry[uid_2].base_equivalence_hash) ||
       (insn_entry[uid_1].index_equivalence_hash !=
@@ -708,20 +441,12 @@ equivalent_p (indexing_web_entry *insn_entry,
       int base_count_2 = count_links (insn2_base_defs);
       int index_count_2 = count_links (insn2_index_defs);
 
-      fprintf (dump_file, "base_count_1: %d, index_count_1: %d\n",
-	       base_count_1, index_count_1);
-      fprintf (dump_file, "base_count_2: %d, index_count_2: %d\n",
-	       base_count_2, index_count_2);
-
       if ((base_count_1 != base_count_2) || (index_count_1 != index_count_2))
 	return false;
 
       /* Counts are the same.  Make sure elements match.   */
       while (insn1_base_defs != NULL)
 	{
-	  fprintf (dump_file, "checking insn1_base_defs\n");
-	  fflush (dump_file);
-
 	  if (!in_use_list (insn2_base_defs, insn1_base_defs))
 	    return false;
 	  insn1_base_defs = insn1_base_defs->next;
@@ -729,17 +454,12 @@ equivalent_p (indexing_web_entry *insn_entry,
       /* base patterns match, but stil need to consider index matches.  */
       while (insn1_index_defs != NULL)
 	{
-	  fprintf (dump_file, "checking insn1_index_defs\n");
-	  fflush (dump_file);
-
 	  if (!in_use_list (insn2_index_defs, insn1_index_defs))
 	    return false;
 	  insn1_index_defs = insn1_index_defs->next;
 	}
       /* If nothing above causes match to fail, the two instructions
 	 are equivalent.  */
-
-      fprintf (dump_file, "the instructions are equivalent!\n");
       return true;
     }
 }
@@ -766,27 +486,16 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
   unsigned int *equivalence_hash =
     (unsigned int *) alloca (max_uid_at_start * sizeof (unsigned int));
 
-  fprintf (dump_file, "initializing %d slots of equivalence_hash\n",
-	   max_uid_at_start);
-
   for (i = 0; i < max_uid_at_start; i++)
     equivalence_hash [i] = UINT_MAX;
 
-
   for (unsigned int uid = 0; uid < max_uid_at_start; uid++)
     {
-
-      fprintf (dump_file, "reexamining insn %d, which is%s relevant\n",
-	       uid, (insn_entry [uid].is_relevant? "": " not"));
-      fflush (dump_file);
-
       if (insn_entry [uid].is_relevant)
 	{
 	  int hash = ((insn_entry [uid].base_equivalence_hash +
 		       insn_entry [uid].index_equivalence_hash)
 		      % max_uid_at_start);
-	  fprintf (dump_file, "hash is %d\n", hash);
-	  fflush (dump_file);
 
 	  if (equivalence_hash [hash] == UINT_MAX)
 	    {			/* first mention of this class */
@@ -795,22 +504,10 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	    }
 	  else
 	    {
-
-	      fprintf (dump_file, "conflict in hash table, hash is %d\n",
-		       hash);
-	      fflush (dump_file);
-
 	      while ((equivalence_hash [hash] != UINT_MAX)
 		     && !equivalent_p (insn_entry, uid,
 				       equivalence_hash [hash]))
-		{
-		  fprintf (dump_file, " in my loop, hash: %d\n", hash);
-		  fflush (dump_file);
-		  hash = (hash + 1) % max_uid_at_start;
-		}
-
-	      fprintf (dump_file, " after my loop, hash is %d\n", hash);
-	      fflush (dump_file);
+		hash = (hash + 1) % max_uid_at_start;
 
 	      /* either we have found an equivalent instruction, or
 		 the equivalence class does not yet exist.  */
@@ -819,19 +516,15 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		  insn_entry [uid].equivalent_sibling =
 		    equivalence_hash [hash];
 		  equivalence_hash [hash] = uid;
-		  fprintf (dump_file, "adding to existing class\n");
 		}
 	      else		/* Equivalence class doesn't yet exist.  */
 		{
 		  equivalence_hash [hash] = uid;
 		  insn_entry [uid].equivalent_sibling = UINT_MAX;
-		  fprintf (dump_file, "creating new class\n");
 		}
 	    }
 	}
     }
-
-  fprintf (dump_file, "having built equivalence classes, let's fix them up\n");
 
   for (unsigned int i = 0; i < max_uid_at_start; i++)
     {
@@ -840,7 +533,8 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	  unsigned int the_dominator = equivalence_hash [i];
 	  unsigned int uid;
 
-	  fprintf (dump_file, "Equivalence class consists of\n");
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "Equivalence class consists of\n");
 
 	  for (uid = the_dominator; uid != UINT_MAX;
 	       uid = insn_entry [uid].equivalent_sibling)
@@ -850,7 +544,8 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 				  insn_entry [uid].bb))
 		the_dominator = uid;
 
-	      fprintf (dump_file, "  member: %d\n", uid);
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		fprintf (dump_file, "  member: %d\n", uid);
 	    }
 
 	  int size_of_equivalence = 0;
@@ -894,7 +589,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	      rtx addr, mem;
 	      rtx new_init_expr;
 	      rtx new_delta_expr = NULL;
-	      bool is_load;
 
 	      if (dump_file)
 		{
@@ -910,14 +604,12 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		  /* originating instruction is a load */
 		  mem = SET_SRC (body);
 		  addr = XEXP (SET_SRC (body), 0);
-		  is_load = true;
 		}
 	      else
 		{ /* originating instruction is a store */
 		  gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
 		  mem = SET_DEST (body);
 		  addr = XEXP (SET_DEST (body), 0);
-		  is_load = false;
 		}
 
 	      enum rtx_code code = GET_CODE (addr);
@@ -966,7 +658,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	      MEM_COPY_ATTRIBUTES (new_mem, mem);
 
 	      rtx new_expr;
-	      if (is_load)
+	      if (insn_entry [the_dominator].is_load)
 		new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
 	      else
 		new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
@@ -1001,7 +693,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		      rtx_insn *insn = insn_entry [uid].insn;
 		      rtx body = PATTERN (insn);
 		      rtx mem;
-		      bool is_load;
 
 		      if (dump_file) {
 			fprintf (dump_file, "Replacing propagating insn %d: ",
@@ -1012,18 +703,10 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 
 		      gcc_assert (GET_CODE (body) == SET);
 
-		      if (GET_CODE (SET_SRC (body)) == MEM)
-			{
-			  /* propagating instruction is a load */
-			  mem = SET_SRC (body);
-			  is_load = true;
-			}
+		      if (GET_CODE (SET_SRC (body)) == MEM) /* load */
+			mem = SET_SRC (body);
 		      else
-			{ /* propagating instruction is a store */
-			  gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
-			  mem = SET_DEST (body);
-			  is_load = false;
-			}
+			mem = SET_DEST (body); /* store */
 
 		      rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominated_delta);
 		      rtx addr_expr = gen_rtx_PLUS (Pmode,
@@ -1032,7 +715,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		      MEM_COPY_ATTRIBUTES (new_mem, mem);
 
 		      rtx new_expr;
-		      if (is_load)
+		      if (insn_entry [uid].is_load)
 			new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
 		      else
 			new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
@@ -1124,12 +807,6 @@ rs6000_fix_indexing (function *fun)
   max_uid_at_start = get_max_uid ();
   insn_entry = XCNEWVEC (indexing_web_entry, max_uid_at_start);
 
-  /* Kelvin says we shouldn't need a pre-pass to recombine lvx and
-     stvx patterns so we don't lose info.  */
-
-  /* I'm also thinking I don't need the insn_entry data structure to
-     represent "webs of insns".  */
-
   /* I'm looking for patterns such as the following:
 
       ;; Note that reg/v/f:DI <27> gets its value here, but do we
@@ -1190,9 +867,6 @@ rs6000_fix_indexing (function *fun)
 	  insn_entry[uid].insn = insn;
 	  insn_entry[uid].bb = BLOCK_FOR_INSN (insn);
 	  insn_entry[uid].is_relevant = false;
-	  insn_entry[uid].is_load = false;
-	  insn_entry[uid].is_store = false;
-	  insn_entry[uid].is_originating = false;
 
 	  if (dump_file && (dump_flags & TDF_DETAILS)) {
 	    fprintf (dump_file, "\nLooking at insn: %d\n", uid);
@@ -1240,6 +914,7 @@ rs6000_fix_indexing (function *fun)
 		{
 		  mem = XEXP (SET_SRC (body), 0);
 		  insn_entry[uid].is_load = true;
+		  insn_entry[uid].is_store = false;
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    {
 		      fprintf (dump_file,
@@ -1252,6 +927,7 @@ rs6000_fix_indexing (function *fun)
 		       && (GET_CODE (SET_DEST (body)) == MEM))
 		{
 		  mem = XEXP (SET_DEST (body), 0);
+		  insn_entry[uid].is_load = false;
 		  insn_entry[uid].is_store = true;
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    {
