@@ -133,7 +133,7 @@
    already in a register.  In some cases, this mask may be a constant
    that we can discover with ud-chains, in which case the above
    transformation is ok.  However, the common usage here is for the
-   mask to be produced by an UNSPEC_LVSL, in which case the mask 
+   mask to be produced by an UNSPEC_LVSL, in which case the mask
    cannot be known at compile time.  In such a case we would have to
    generate several instructions to compute M' as above at run time,
    and a cost model is needed again.
