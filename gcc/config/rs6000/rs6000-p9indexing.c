@@ -94,12 +94,6 @@ class indexing_web_entry : public web_entry_base
   unsigned int is_originating: 1;
 };
 
-static void fatal (const char *msg)
-{
-  fprintf (stderr, "Fatal error: %s\n", msg);
-  exit (-1);
-}
-
 static int count_links (struct df_link *def_link)
 {
   if (def_link == NULL) return 0;
@@ -156,9 +150,9 @@ find_defs (indexing_web_entry *insn_entry, rtx_insn *insn,
   unsigned int uid = INSN_UID (insn);
   rtx body = PATTERN (insn);
   rtx mem;
-  if ((GET_CODE (body) == SET) && (GET_CODE (SET_SRC (body)) == MEM))
+  if ((GET_CODE (body) == SET) && MEM_P (SET_SRC (body)))
     mem = XEXP (SET_SRC (body), 0);
-  else if ((GET_CODE (body) == SET) && (GET_CODE (SET_DEST (body)) == MEM))
+  else if ((GET_CODE (body) == SET) && MEM_P (SET_DEST (body)))
     mem = XEXP (SET_DEST (body), 0);
   else
     mem = NULL;
@@ -190,11 +184,6 @@ find_defs (indexing_web_entry *insn_entry, rtx_insn *insn,
 			*insn_base = def_link;
 		      else
 			{
-			  /* long long int delta = 0; */
-			  /* unsigned int uid2 =
-			     find_true_originator (def_link, &delta);
-			  */
-			  /* kelvin has cached uid2.  */
 			  unsigned int uid2 =
 			    insn_entry[uid].original_base_use;
 			  df_ref use2;
@@ -223,11 +212,6 @@ find_defs (indexing_web_entry *insn_entry, rtx_insn *insn,
 			*insn_index = def_link;
 		      else
 			{
-			  /* kelvin has cached uid2.  */
-			  /* long long int delta = 0; */
-			  /* unsigned int uid2 =
-			     find_true_originator (def_link, &delta);
-			  */
 			  unsigned int uid2 =
 			    insn_entry[uid].original_index_use;
 			  df_ref use2;
@@ -553,12 +537,49 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		}
 	    }
 
-	  if (size_of_equivalence > 1)
+	  int replacement_count = size_of_equivalence;
+	  /* Confirm that everything in the equivalence class is
+	     eligible for representation as a d-form insn.  Otherwise,
+	     remove additional entries from the equivalence class.  */
+	  long long int dominator_delta =
+	    (insn_entry [the_dominator].base_delta
+	     + insn_entry [the_dominator].index_delta);
+	  for (uid = equivalence_hash [i]; uid != UINT_MAX;
+	       uid = insn_entry [uid].equivalent_sibling)
+	    {
+	      if (uid != the_dominator)
+		{
+		  long long int dominated_delta =
+		    (insn_entry [uid].base_delta
+		     + insn_entry [uid].index_delta);
+		  dominated_delta -= dominator_delta;
+
+		  rtx_insn *insn = insn_entry [uid].insn;
+		  rtx body = PATTERN (insn);
+		  rtx mem;
+
+		  gcc_assert (GET_CODE (body) == SET);
+
+		  if (MEM_P (SET_SRC (body))) /* load */
+		    {
+		      mem = SET_SRC (body);
+		      if (!rs6000_target_supports_dform_offset_p
+			  (false, GET_MODE (mem), dominated_delta))
+			replacement_count--;
+		    }
+		  else
+		    {
+		      mem = SET_DEST (body); /* store */
+		      if (!rs6000_target_supports_dform_offset_p
+			  (false, GET_MODE (mem), dominated_delta))
+			replacement_count--;
+		    }
+		}
+	    }
+
+	  if (replacement_count > 1)
 	    {
 	      /* First, fix up the_dominator instruction.  */
-	      long long int dominator_delta =
-		(insn_entry [the_dominator].base_delta
-		 + insn_entry [the_dominator].index_delta);
 	      rtx derived_ptr_reg = gen_reg_rtx (Pmode);
 	      rtx_insn *insn = insn_entry [the_dominator].insn;
 	      rtx body = PATTERN (insn);
@@ -576,7 +597,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		}
 
 	      gcc_assert (GET_CODE (body) == SET);
-	      if (GET_CODE (SET_SRC (body)) == MEM)
+	      if (MEM_P (SET_SRC (body)))
 		{
 		  /* originating instruction is a load */
 		  mem = SET_SRC (body);
@@ -584,7 +605,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		}
 	      else
 		{ /* originating instruction is a store */
-		  gcc_assert (GET_CODE (SET_DEST (body)) == MEM);
+		  gcc_assert (MEM_P (SET_DEST (body)));
 		  mem = SET_DEST (body);
 		  addr = XEXP (SET_DEST (body), 0);
 		}
@@ -611,29 +632,12 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		fprintf (dump_file, "\n");
 	      }
 
-	      if (dominator_delta)
-		{
-		  rtx ci = gen_rtx_raw_CONST_INT (Pmode, dominator_delta);
-		  new_delta_expr = gen_rtx_PLUS (Pmode, derived_ptr_reg, ci);
-		  new_delta_expr =
-		    gen_rtx_SET (derived_ptr_reg, new_delta_expr);
-		  new_insn = emit_insn_before (new_delta_expr, insn);
-		  set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
-		  INSN_CODE (new_insn) = -1; /* force re-recognition.  */
-		  df_insn_rescan (new_insn);
-
-		  if (dump_file)
-		    {
-		      fprintf (dump_file, "and with insn %d: ",
-			       INSN_UID (new_insn));
-		      print_inline_rtx (dump_file, new_insn, 2);
-		      fprintf (dump_file, "\n");
-		    }
-		}
+	      /* If dominator_delta != 0, we need to make adjustments
+		 for dominator_delta in the D-form constant offsets
+		 associated with the propagating instructions.  */
 
 	      rtx new_mem = gen_rtx_MEM (GET_MODE (mem), derived_ptr_reg);
 	      MEM_COPY_ATTRIBUTES (new_mem, mem);
-
 	      rtx new_expr;
 	      if (insn_entry [the_dominator].is_load)
 		new_expr = gen_rtx_SET (SET_DEST (body), new_mem);
@@ -680,7 +684,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 
 		      gcc_assert (GET_CODE (body) == SET);
 
-		      if (GET_CODE (SET_SRC (body)) == MEM) /* load */
+		      if (MEM_P (SET_SRC (body))) /* load */
 			mem = SET_SRC (body);
 		      else
 			mem = SET_DEST (body); /* store */
@@ -702,12 +706,30 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		      INSN_CODE (new_insn) = -1;
 		      df_insn_rescan (new_insn);
 
-		      if (dump_file) {
-			fprintf (dump_file,
-				 "with insn %d: ", INSN_UID (new_insn));
-			print_inline_rtx (dump_file, new_insn, 2);
-			fprintf (dump_file, "\n");
-		      }
+kelvin deliberate syntax error - put an invocation of validate_change here.  confirm consistency with replacement_count...  and maybe rs6000_legitimate_address_p too.  
+
+
+		      if (dump_file)
+			{
+			  extern bool
+			    rs6000_legitimate_address_p (machine_mode,
+							 rtx, bool);
+
+			  fprintf (dump_file,
+				   "with insn %d: ", INSN_UID (new_insn));
+			  print_inline_rtx (dump_file, new_insn, 2);
+			  fprintf (dump_file, "\n");
+
+			  /* TARGET_LEGITIMATE_ADDRESS_P is defined to
+			     be rs6000_legitimate_address_p.  */
+
+			  /* This pass occurs before reload, so our
+			     inquiry uses the non-strict variant.  */
+			  if (!rs6000_legitimate_address_p (GET_MODE (mem),
+							    new_mem, false))
+			    fprintf (dump_file,
+				     "Oops!  Not unstrictly legit address\n");
+			}
 
 		      df_insn_delete (insn);
 		      remove_insn (insn);
@@ -715,7 +737,11 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		    }
 		}
 	    }
-
+	  else if (dump_file)
+	    {
+	      fprintf (dump_file,
+		       "Abandoning dform optimization: too few dform insns\n");
+	    }
 	}
     }
 }
@@ -883,8 +909,7 @@ rs6000_fix_indexing (function *fun)
 	    {
 	      rtx body = PATTERN (insn);
 	      rtx mem;
-	      if ((GET_CODE (body) == SET)
-		  && (GET_CODE (SET_SRC (body)) == MEM))
+	      if ((GET_CODE (body) == SET) && MEM_P (SET_SRC (body)))
 		{
 		  mem = XEXP (SET_SRC (body), 0);
 		  insn_entry[uid].is_load = true;
@@ -897,8 +922,7 @@ rs6000_fix_indexing (function *fun)
 		      fprintf (dump_file, "\n");
 		    }
 		}
-	      else if ((GET_CODE (body) == SET)
-		       && (GET_CODE (SET_DEST (body)) == MEM))
+	      else if ((GET_CODE (body) == SET) && MEM_P (SET_DEST (body)))
 		{
 		  mem = XEXP (SET_DEST (body), 0);
 		  insn_entry[uid].is_load = false;
@@ -1011,10 +1035,9 @@ rs6000_fix_indexing (function *fun)
 					DF_INSN_INFO_USES (insn_info2);
 				      if (use2)
 					{
-					  if (DF_REF_NEXT_LOC (use2))
-					    fatal ("expect one use "
-						   "for true originator");
-
+					  /* Expect one use for true
+					     originator.  */
+					  gcc_assert (!DF_REF_NEXT_LOC (use2));
 					  struct df_link *def_link =
 					    DF_REF_CHAIN (use2);
 					  insn_entry[uid].
@@ -1095,10 +1118,9 @@ rs6000_fix_indexing (function *fun)
 				    DF_INSN_INFO_USES (insn_info2);
 				  if (use2)
 				    {
-				      if (DF_REF_NEXT_LOC (use2))
-					fatal ("expect one use "
-					       "for true originator");
-
+				      /* Expect one use for true
+					 originator.  */
+				      gcc_assert (!(DF_REF_NEXT_LOC (use2)));
 				      struct df_link *def_link =
 					DF_REF_CHAIN (use2);
 				      insn_entry[uid].

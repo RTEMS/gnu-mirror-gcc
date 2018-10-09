@@ -9157,7 +9157,7 @@ rs6000_debug_legitimize_reload_address (rtx x, machine_mode mode,
    32-bit DImode, TImode, TFmode, TDmode), indexed addressing cannot be used
    because adjacent memory cells are accessed by adding word-sized offsets
    during assembly output.  */
-static bool
+bool
 rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 {
   bool reg_offset_p = reg_offset_addressing_ok_p (mode);
@@ -9261,6 +9261,162 @@ rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
   debug_rtx (x);
 
   return ret;
+}
+
+/* This function provides an approximation of which d-form addressing
+   expressions are valid on any given target configuration.  This
+   approximation guides optimization choices.  Secondary validation
+   of the addressing mode is performed before code generation.
+
+   Return true iff target has instructions to perform a memory
+   operation at the specified BYTE_OFFSET from an address held
+   in a general purpose register.  if IS_STORE is true, test for
+   availability of a store instruction.  Otherwise, test for
+   availability of a load instruction.  */
+bool
+rs6000_target_supports_dform_offset_p (boolean is_store, machine_mode mode,
+				       host_wide_int byte_offset)
+{
+  const int max_16bit_signed = (0x7fffffff);
+  const int min_16bit_signed = -1 - max_16bit_signed;
+
+  /* available d-form instructions with P1 (the original Power architecture):
+
+     lbz RT,D(RA) - load byte and zero d-form
+     lhz RT,D(RA) - load half word and zero d-form
+     lha RT,D(RA) - load half word algebraic d-form
+     lwz RT,D(RA) - load word and zero d-form
+     lfs FRT,D(RA) - load floating-point single d-form
+     lfd FRT,D(RA) - load floating-point double d-form
+
+     stb RS,D(RA) - store byte d-form
+     sth RS,D(RA) - store half word d-form
+     stfs FRS,D(RA) - store floating point single d-form
+     stfd FRS,D(RA) - store floating point double d-form
+  */
+
+  /* available d-form instructions with PPC (prior to v2.00):
+     (option mpowerpc "existed in the past" but is now "always on"
+
+     lwa RT,DS(RA) - load word algebraic ds-form (2 bottom bits zero)
+     ld RT,DS(RA) - load double word ds-form (2 bottom bits zero)
+
+     std RS,DS(RA) - store double word ds-form (2 bottom bits zero)
+
+     Consider lwa redundant with insn available in prior processors.
+  */
+  switch (mode)
+    {
+    case E_QImode:
+    case E_HImode:
+    case E_SImode:
+      if ((byte_offset >= min_16bit_signed)
+	  && (byte_offset <= max_16bit_signed))
+	return true;
+
+    case E_DImode:
+      if ((byte_offset >= min_16bit_signed)
+	  && (byte_offset <= max_16bit_signed)
+	  && ((byte_offset & 0x03) == 0))
+	return true;
+
+    default:
+      /* fall through to see if other instructions will work.  */
+    }
+
+  /*  available d-form instructionw with v2.03:
+
+     lq RTp,DQ(RA) - load quadword dq-form (4 bottom bits zero)
+
+     stq RSp,DS(RA) - store quadword ds-form (2 bottom bits zero)
+
+     These instructions are not recommended for general use as they
+     are expected to be very inefficient.  Their design was apparently
+     motivated by a need to support atomic quad-word access, which is
+     difficult to implement even in hardware on some architectures.
+     Furthermore, the design of these instructions apparently does the
+     "wrong" thing with regards to swapping of double words on load
+     and store for little-endian targets.
+
+     Therefore, this routine assumes v2.03 does NOT support quadword
+     d-form addressing.
+  */
+
+  /* available d-form instructions with v2.05
+
+     (There are some floating-point load and store double-pair
+      instructions.  Consider them "not available".  There are
+      described as phasing out, which means they are expected
+      to have poor performance.)
+   */
+
+  /* available d-form instructions with 3.0
+
+     lxsd VRT,DS(RA) - Load VSX scalar double word ds-form (2 bottom bits zero)
+     lxssp VRT,DS(RA) - Load VSX scalar single precision ds-form
+                        (bottom 2 bits zero)
+     lxv XT,DQ(RA) - Load VSX Vector dq-form (4 bottom bits zero)
+                     (Works on little endian for any element type, but
+		      does not preserve lanes.)
+
+     stxsd VRS,DS(RA) - Store VSX scalar double-word DS form
+                        (bottom 2 bits zero)
+     stxssp VRS,DS(RA) - Store VSX scalar single precision DS-form
+                         (bottom 2 bits zero)
+     stxv XS,DQ(RA) - Store VSX vector dq-form (4 bottom bits zero)
+                      (Works on little endian for any element type,
+		       but doesn not preserve lanes.)
+
+     lxv and stxv load/store to/from any VSX register, including
+     registers that overlay with floating point and altivec register
+     sets.
+
+  */
+  if (rs6000_isa_flags & OPTION_MASK_MODULO)
+    {			/* ISA 3.0 */
+      switch (mode) {
+      case E_V16QImode:
+      case E_V8HImode:
+      case E_V4SFmode:
+      case E_V4SImode:
+      case E_V2DFmode:
+      case E_V2DImode:
+      case E_V1TImode:
+      case E_TImode:
+
+      case E_KFmode:		/* ieee 754 128-bit floating point */
+      case E_IFmode:		/* IBM extended 128-bit double */
+      case E_TFmode:		/* 128-bit double (form depends on
+				   gcc command line, which may be
+				   either -mabi=ieeelongdouble (KF)
+				   or -mabi=ibmlongdouble (IF). */
+	/* All 128-bit loads and stores are handled by lxv and stxv.  */
+	if ((byte_offset >= min_16bit_signed)
+	    && (byte_offset <= max_16bit_signed)
+	    && ((byte_offset & 0x0f) == 0))
+	  return true;
+	else
+	  break;
+
+      case E_DFmode:
+      case E_SFmode:
+	/* E_DFmode handled by lxsd and stxsd insns.  E_SFmode handled
+	   by lxssp and stxssp insn.  */
+	if ((byte_offset >= min_16bit_signed)
+	    && (byte_offset <= max_16bit_signed)
+	    && ((byte_offset & 0x03) == 0))
+	  return true;
+	else
+	  break;
+
+      default:
+	/* fall through to see if other instructions will work.  */
+      }
+    }
+
+  /* Add modeling support for newly introduced instructions here.  */
+
+  return false;
 }
 
 /* Implement TARGET_MODE_DEPENDENT_ADDRESS_P.  */

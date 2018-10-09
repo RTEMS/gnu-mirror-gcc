@@ -47,6 +47,8 @@ extern bool legitimate_constant_pool_address_p (const_rtx, machine_mode,
 extern bool legitimate_indirect_address_p (rtx, int);
 extern bool legitimate_indexed_address_p (rtx, int);
 extern bool avoiding_indexed_address_p (machine_mode);
+extern bool rs6000_target_supports_dform_offset_p (boolean, machine_mode,
+						   host_wide_int);
 
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);
