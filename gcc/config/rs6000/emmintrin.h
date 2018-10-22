@@ -85,7 +85,7 @@ typedef double __m128d __attribute__ ((__vector_size__ (16), __may_alias__));
 typedef long long __m128i_u __attribute__ ((__vector_size__ (16), __may_alias__, __aligned__ (1)));
 typedef double __m128d_u __attribute__ ((__vector_size__ (16), __may_alias__, __aligned__ (1)));
 
-/* Define two value permute mask */
+/* Define two value permute mask.  */
 #define _MM_SHUFFLE2(x,y) (((x) << 1) | (y))
 
 /* Create a vector with element 0 as F and the rest zero.  */
@@ -201,7 +201,7 @@ _mm_store_pd (double *__P, __m128d __A)
 extern __inline void __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_storeu_pd (double *__P, __m128d __A)
 {
-  *(__m128d *)__P = __A;
+  *(__m128d_u *)__P = __A;
 }
 
 /* Stores the lower DPFP value.  */
@@ -1228,7 +1228,7 @@ _mm_loadl_pd (__m128d __A, double const *__B)
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_movemask_pd (__m128d  __A)
 {
-  __vector __m64 result;
+  __vector unsigned long long result;
   static const __vector unsigned int perm_mask =
     {
 #ifdef __LITTLE_ENDIAN__
@@ -1238,8 +1238,9 @@ _mm_movemask_pd (__m128d  __A)
 #endif
     };
 
-  result = (__vector __m64) vec_vbpermq ((__vector unsigned char) __A,
-					 (__vector unsigned char) perm_mask);
+  result = ((__vector unsigned long long)
+	    vec_vbpermq ((__vector unsigned char) __A,
+			 (__vector unsigned char) perm_mask));
 
 #ifdef __LITTLE_ENDIAN__
   return result[1];
@@ -2012,7 +2013,7 @@ _mm_min_epu8 (__m128i __A, __m128i __B)
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_movemask_epi8 (__m128i __A)
 {
-  __vector __m64 result;
+  __vector unsigned long long result;
   static const __vector unsigned char perm_mask =
     {
 #ifdef __LITTLE_ENDIAN__
@@ -2024,8 +2025,9 @@ _mm_movemask_epi8 (__m128i __A)
 #endif
     };
 
-  result = (__vector __m64) vec_vbpermq ((__vector unsigned char) __A,
-					 (__vector unsigned char) perm_mask);
+  result = ((__vector unsigned long long)
+	    vec_vbpermq ((__vector unsigned char) __A,
+			 (__vector unsigned char) perm_mask));
 
 #ifdef __LITTLE_ENDIAN__
   return result[1];
@@ -2175,7 +2177,7 @@ _mm_maskmoveu_si128 (__m128i __A, __m128i __B, char *__C)
 {
   __v2du hibit = { 0x7f7f7f7f7f7f7f7fUL, 0x7f7f7f7f7f7f7f7fUL};
   __v16qu mask, tmp;
-  __m128i *p = (__m128i*)__C;
+  __m128i_u *p = (__m128i_u*)__C;
 
   tmp = (__v16qu)_mm_loadu_si128(p);
   mask = (__v16qu)vec_cmpgt ((__v16qu)__B, (__v16qu)hibit);

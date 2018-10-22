@@ -1,3 +1,253 @@
+2018-10-22  Yury Gribov  <tetra2005@gmail.com>
+
+	PR tree-optimization/87633
+	* g++.dg/pr87633.C: New test.
+
+2018-10-22  Marek Polacek  <polacek@redhat.com>
+
+	PR testsuite/87694
+	* g++.dg/concepts/memfun-err.C: Make it a compile test.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/tree-ssa/evrp12.c: New testcase.
+	* gcc.dg/predict-6.c: Adjust.
+	* gcc.dg/tree-ssa/vrp33.c: Disable EVRP.
+	* gcc.dg/tree-ssa/vrp02.c: Likewise.
+	* gcc.dg/tree-ssa/cunroll-9.c: Likewise.
+
+2018-10-22  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/87686
+	* g++.dg/tree-ssa/pr87686.C: New test.
+
+2018-10-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.target/i386/i386.exp: Use g++-dg-runtest to iterate
+	properly -std= options.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/graphite/scop-4.c: Avoid out-of-bound access.
+
+2018-10-22  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/sso14.adb: New test.
+	* gnat.dg/sso15.adb: Likewise.
+
+2018-10-22  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/warn19.ad[sb]: New test.
+	* gnat.dg/warn19_pkg.ads: New helper.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/87640
+	* gcc.dg/torture/pr87640.c: New testcase.
+
+2018-10-22  Ilya Leoshkevich  <iii@linux.ibm.com>
+
+	* gcc.target/s390/litpool-int.c: New test.
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-andn-di-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-andn-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-andn-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-andn-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-andn-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-andn-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512vl-andn-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-andn-si-ymm-1.c: Likewise.
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-and-di-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-and-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-and-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-and-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-and-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-and-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-and-si-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-or-di-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-or-si-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-xor-di-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-xor-si-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512vl-and-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-and-si-ymm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-or-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-or-si-ymm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-xor-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-xor-si-ymm-1.c: Likewise.
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-add-di-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-add-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-add-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-add-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-add-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-add-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-add-si-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-sub-di-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-sub-si-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-sub-si-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-sub-si-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-sub-si-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-sub-si-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512vl-add-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-add-si-ymm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-sub-si-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-sub-si-ymm-1.c: Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx-1.c (__builtin_ia32_vfmsubpd512_mask): New.
+	(__builtin_ia32_vfmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfmsubps512_mask): Likewise.
+	(__builtin_ia32_vfmsubps512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddpd512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddps512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddps512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubps512_maskz): Likewise.
+	* testsuite/gcc.target/i386/sse-13.c
+	(__builtin_ia32_vfmsubpd512_mask): Likewise.
+	(__builtin_ia32_vfmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfmsubps512_mask): Likewise.
+	(__builtin_ia32_vfmsubps512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddpd512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddps512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddps512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubps512_maskz): Likewise.
+	* testsuite/gcc.target/i386/sse-23.c
+	(__builtin_ia32_vfmsubpd512_mask): Likewise.
+	(__builtin_ia32_vfmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfmsubps512_mask): Likewise.
+	(__builtin_ia32_vfmsubps512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddpd512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmaddps512_mask3): Likewise.
+	(__builtin_ia32_vfnmaddps512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubpd512_maskz): Likewise.
+	(__builtin_ia32_vfnmsubps512_maskz): Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-fnmsub-df-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-7.c: Likewise.
+	* gcc.target/i386/avx512f-fnmsub-sf-zmm-8.c: Likewise.
+	* gcc.target/i386/avx512vl-fnmsub-sf-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-fnmsub-sf-ymm-1.c: Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-fnmadd-df-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-7.c: Likewise.
+	* gcc.target/i386/avx512f-fnmadd-sf-zmm-8.c: Likewise.
+	* gcc.target/i386/avx512vl-fnmadd-sf-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-fnmadd-sf-ymm-1.c: Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-fmsub-df-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-7.c: Likewise.
+	* gcc.target/i386/avx512f-fmsub-sf-zmm-8.c: Likewise.
+	* gcc.target/i386/avx512vl-fmsub-sf-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-fmsub-sf-ymm-1.c: Likewise.
+
+2018-10-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/71880
+	* gfortran.dg/deferred_character_31.f90 : New test.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-mul-df-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-mul-sf-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-mul-sf-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-mul-sf-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-mul-sf-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-mul-sf-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512f-mul-sf-zmm-6.c: Likewise.
+	* gcc.target/i386/avx512vl-mul-sf-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-mul-sf-ymm-1.c: Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/87662
+	* gcc.target/i386/pr87662.c
+
+2018-10-20  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* gcc.target/i386/avx512f-div-df-zmm-1.c: New test.
+	* gcc.target/i386/avx512f-div-sf-zmm-1.c: Likewise.
+	* gcc.target/i386/avx512f-div-sf-zmm-2.c: Likewise.
+	* gcc.target/i386/avx512f-div-sf-zmm-3.c: Likewise.
+	* gcc.target/i386/avx512f-div-sf-zmm-4.c: Likewise.
+	* gcc.target/i386/avx512f-div-sf-zmm-5.c: Likewise.
+	* gcc.target/i386/avx512vl-div-sf-xmm-1.c: Likewise.
+	* gcc.target/i386/avx512vl-div-sf-ymm-1.c: Likewise.
+
+2018-10-20  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/*.C: Use target c++17 instead of explicit dg-options.
+	* lib/g++-dg.exp: Don't test C++11 by default.  Add C++17 to
+	the list of default stds to test.
+
+2018-10-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/87647
+	* gcc.c-torture/compile/pr87647.c: New test.
+
+2018-10-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/85488
+	PR middle-end/87649
+	* c-c++-common/gomp/doacross-2.c: New test.
+	* c-c++-common/gomp/sink-3.c: Expect another error during error
+	recovery.
+
 2018-10-19  Segher Boessenkool  <segher@kernel.crashing.org>
 
 	* gcc.target/powerpc/safe-indirect-jump-2.c: Do not check assigned CR

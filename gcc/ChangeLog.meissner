@@ -1,5 +1,15 @@
 2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	Merge up to 265400.
+	* REVISION: Update subversion id.
+
+2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 265400.
+	* REVISION: Update subversion id.
+
+2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (TARGET_MANGLE_DECL_ASSEMBLER_NAME): On
 	Fortran, override the built-in long double math function names if
 	the long double type is IEEE 128-bit instead of IBM long double.

@@ -1,3 +1,479 @@
+2018-10-22  Yury Gribov  <tetra2005@gmail.com>
+
+	PR tree-optimization/87633
+	* match.pd: Do not generate unordered integer comparisons.
+
+2018-10-22  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/87600
+	* combine.c: Add include of expr.h.
+	(cant_combine_insn_p): Do not combine moves from any hard non-fixed
+	register to a pseudo.
+	(make_more_copies): New function, add a copy to a new pseudo after
+	the moves from hard registers into pseudos.
+	(rest_of_handle_combine): Declare rebuild_jump_labels_after_combine
+	later.  Call make_more_copies.
+
+2018-10-22  Andrew Stubbs  <ams@codesourcery.com>
+
+	* lra-constraints.c (process_alt_operands): New local array,
+	matching_early_clobber.  Check matching_early_clobber before
+	decrementing reject, and set matching_early_clobber after.
+
+2018-10-22  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/87598
+	* config/rs6000/rs6000.c (print_operand_address): For unexpected RTL
+	call output_addr_const and hope for the best.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	* gimple-ssa-evrp-analyze.c
+	(evrp_range_analyzer::record_ranges_from_incoming_edge): Be
+	smarter about what ranges to use.
+	* tree-vrp.c (add_assert_info): Dump here.
+	(register_edge_assert_for_2): Instead of here at multiple but
+	not all places.
+
+	* gcc.dg/tree-ssa/evrp12.c: New testcase.
+	* gcc.dg/predict-6.c: Adjust.
+	* gcc.dg/tree-ssa/vrp33.c: Disable EVRP.
+	* gcc.dg/tree-ssa/vrp02.c: Likewise.
+	* gcc.dg/tree-ssa/cunroll-9.c: Likewise.
+
+2018-10-22  Steven Bosscher <steven@gcc.gnu.org>
+	Richard Biener  <rguenther@suse.de>
+
+	* bitmap.h: Update data structure documentation, including a
+	description of bitmap views as either linked-lists or splay trees.
+	(struct bitmap_element_def): Update comments for splay tree bitmaps.
+	(struct bitmap_head_def): Likewise.
+	(bitmap_list_view, bitmap_tree_view): New prototypes.
+	(bitmap_initialize_stat): Initialize a bitmap_head's indx and
+	tree_form fields.
+	(bmp_iter_set_init): Assert the iterated bitmaps are in list form.
+	(bmp_iter_and_init, bmp_iter_and_compl_init): Likewise.
+	* bitmap.c (bitmap_elem_to_freelist): Unregister overhead of a
+	released bitmap element here.
+	(bitmap_element_free): Remove.
+	(bitmap_elt_clear_from): Work on splay tree bitmaps.
+	(bitmap_list_link_element): Renamed from bitmap_element_link.  Move
+	this function similar ones such that linked-list bitmap implementation
+	functions are grouped.
+	(bitmap_list_unlink_element): Renamed from bitmap_element_unlink,
+	and moved for grouping.
+	(bitmap_list_insert_element_after): Renamed from
+	bitmap_elt_insert_after, and moved for grouping.
+	(bitmap_list_find_element): New function spliced from bitmap_find_bit.
+	(bitmap_tree_link_left, bitmap_tree_link_right,
+	bitmap_tree_rotate_left, bitmap_tree_rotate_right, bitmap_tree_splay,
+	bitmap_tree_link_element, bitmap_tree_unlink_element,
+	bitmap_tree_find_element): New functions for splay-tree bitmap
+	implementation.
+	(bitmap_element_link, bitmap_element_unlink, bitmap_elt_insert_after):
+	Renamed and moved, see above entries.
+	(bitmap_tree_listify_from): New function to convert part of a splay
+	tree bitmap to a linked-list bitmap.
+	(bitmap_list_view): Convert a splay tree bitmap to linked-list form.
+	(bitmap_tree_view): Convert a linked-list bitmap to splay tree form.
+	(bitmap_find_bit): Remove.
+	(bitmap_clear, bitmap_clear_bit, bitmap_set_bit,
+	bitmap_single_bit_set_p, bitmap_first_set_bit, bitmap_last_set_bit):
+	Handle splay tree bitmaps.
+	(bitmap_copy, bitmap_count_bits, bitmap_and, bitmap_and_into,
+	bitmap_elt_copy, bitmap_and_compl, bitmap_and_compl_into,
+	bitmap_compl_and_into, bitmap_elt_ior, bitmap_ior, bitmap_ior_into,
+	bitmap_xor, bitmap_xor_into, bitmap_equal_p, bitmap_intersect_p,
+	bitmap_intersect_compl_p, bitmap_ior_and_compl,
+	bitmap_ior_and_compl_into, bitmap_set_range, bitmap_clear_range,
+	bitmap_hash): Reject trying to act on splay tree bitmaps.  Make
+	corresponding changes to use linked-list specific bitmap_element
+	manipulation functions as applicable for efficiency.
+	(bitmap_tree_to_vec): New function.
+	(debug_bitmap_elt_file): New function split out from ...
+	(debug_bitmap_file): ... here.  Handle splay tree bitmaps.
+	(bitmap_print): Likewise.
+
+	PR tree-optimization/63155
+	* tree-ssa-propagate.c (ssa_prop_init): Use tree-view for the
+	SSA edge worklists.
+	* tree-ssa-coalesce.c (coalesce_ssa_name): Populate used_in_copies
+	in tree-view.
+
+2018-10-22  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/87686
+	Revert
+	2018-08-29  Martin Liska  <mliska@suse.cz>
+
+	* tree-switch-conversion.c (switch_conversion::expand):
+	Strenghten assumption about gswitch statements.
+
+2018-10-22  Martin Liska  <mliska@suse.cz>
+
+	* ipa-icf.c (sem_item::compare_attributes): Remove.
+	(sem_item::compare_referenced_symbol_properties): Use
+	attribute_list_equal instead.
+	(sem_function::equals_wpa): Likewise.
+	* ipa-icf.h: Remove compare_attributes.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/87682
+	* mem-stats.h (mem_usage::operator==): Fix pasto.
+
+2018-10-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/87640
+	* tree-vrp.c (set_value_range_with_overflow): Decompose
+	incomplete result.
+	(extract_range_from_binary_expr_1): Adjust.
+
+2018-10-22  Martin Jambor  <mjambor@suse.cz>
+
+	* tree-eh.h (stmt_could_throw_p): Add function parameter.
+	(stmt_can_throw_external): Likewise.
+	(stmt_can_throw_internal): Likewise.
+	* tree-eh.c (lower_eh_constructs_2): Pass cfun to stmt_could_throw_p.
+	(lower_eh_constructs_2): Likewise.
+	(stmt_could_throw_p): Add fun parameter, use it instead of cfun.
+	(stmt_can_throw_external): Likewise.
+	(stmt_can_throw_internal): Likewise.
+	(maybe_clean_eh_stmt_fn): Pass cfun to stmt_could_throw_p.
+	(maybe_clean_or_replace_eh_stmt): Pass cfun to stmt_could_throw_p.
+	(maybe_duplicate_eh_stmt_fn): Pass new_fun to stmt_could_throw_p.
+	(maybe_duplicate_eh_stmt): Pass cfun to stmt_could_throw_p.
+	(pass_lower_eh_dispatch::execute): Pass cfun to
+	stmt_can_throw_external.
+	(cleanup_empty_eh): Likewise.
+	(verify_eh_edges): Pass cfun to stmt_could_throw_p.
+	* cgraph.c (cgraph_edge::set_call_stmt): Pass a function to
+	stmt_can_throw_external instead of pushing it to cfun.
+	(symbol_table::create_edge): Likewise.
+	* gimple-fold.c (fold_builtin_atomic_compare_exchange): Pass cfun to
+	stmt_can_throw_internal.
+	* gimple-ssa-evrp.c (evrp_dom_walker::before_dom_children): Pass cfun
+	to stmt_could_throw_p.
+	* gimple-ssa-store-merging.c (handled_load): Pass cfun to
+	stmt_can_throw_internal.
+	(pass_store_merging::execute): Likewise.
+	* gimple-ssa-strength-reduction.c
+	(find_candidates_dom_walker::before_dom_children): Pass cfun to
+	stmt_could_throw_p.
+	* gimplify-me.c (gimple_regimplify_operands): Pass cfun to
+	stmt_can_throw_internal.
+	* ipa-pure-const.c (check_call): Pass cfun to stmt_could_throw_p and
+	to stmt_can_throw_external.
+	(check_stmt): Pass cfun to stmt_could_throw_p.
+	(check_stmt): Pass cfun to stmt_can_throw_external.
+	(pass_nothrow::execute): Likewise.
+	* trans-mem.c (expand_call_tm): Pass cfun to stmt_can_throw_internal.
+	* tree-cfg.c (is_ctrl_altering_stmt): Pass cfun to
+	stmt_can_throw_internal.
+	(verify_gimple_in_cfg): Pass cfun to stmt_could_throw_p.
+	(stmt_can_terminate_bb_p): Pass cfun to stmt_can_throw_external.
+	(gimple_purge_dead_eh_edges): Pass cfun to stmt_can_throw_internal.
+	* tree-complex.c (expand_complex_libcall): Pass cfun to
+	stmt_could_throw_p and to stmt_can_throw_internal.
+	(expand_complex_multiplication): Pass cfun to stmt_can_throw_internal.
+	* tree-inline.c (copy_edges_for_bb): Likewise.
+	(maybe_move_debug_stmts_to_successors): Likewise.
+	* tree-outof-ssa.c (ssa_is_replaceable_p): Pass cfun to
+	stmt_could_throw_p.
+	* tree-parloops.c (oacc_entry_exit_ok_1): Likewise.
+	* tree-sra.c (scan_function): Pass cfun to stmt_can_throw_external.
+	* tree-ssa-alias.c (stmt_kills_ref_p): Pass cfun to
+	stmt_can_throw_internal.
+	* tree-ssa-ccp.c (optimize_atomic_bit_test_and): Likewise.
+	* tree-ssa-dce.c (mark_stmt_if_obviously_necessary): Pass cfun to
+	stmt_could_throw_p.
+	(mark_aliased_reaching_defs_necessary_1): Pass cfun to
+	stmt_can_throw_internal.
+	* tree-ssa-forwprop.c (pass_forwprop::execute): Likewise.
+	* tree-ssa-loop-im.c (movement_possibility): Pass cfun to
+	stmt_could_throw_p.
+	* tree-ssa-loop-ivopts.c (find_givs_in_stmt_scev): Likewise.
+	(add_autoinc_candidates): Pass cfun to stmt_can_throw_internal.
+	* tree-ssa-math-opts.c (pass_cse_reciprocals::execute): Likewise.
+	(convert_mult_to_fma_1): Likewise.
+	(convert_to_divmod): Likewise.
+	* tree-ssa-phiprop.c (propagate_with_phi): Likewise.
+	* tree-ssa-pre.c (compute_avail): Pass cfun to stmt_could_throw_p.
+	* tree-ssa-propagate.c
+	(substitute_and_fold_dom_walker::before_dom_children): Likewise.
+	* tree-ssa-reassoc.c (suitable_cond_bb): Likewise.
+	(maybe_optimize_range_tests): Likewise.
+	(linearize_expr_tree): Likewise.
+	(reassociate_bb): Likewise.
+	* tree-ssa-sccvn.c (copy_reference_ops_from_call): Likewise.
+	* tree-ssa-scopedtables.c (hashable_expr_equal_p): Likewise.
+	* tree-ssa-strlen.c (adjust_last_stmt): Likewise.
+	(handle_char_store): Likewise.
+	* tree-vect-data-refs.c (vect_find_stmt_data_reference): Pass cfun to
+	stmt_can_throw_internal.
+	* tree-vect-patterns.c (check_bool_pattern): Pass cfun to
+	stmt_could_throw_p.
+	* tree-vect-stmts.c (vect_finish_stmt_generation_1): Likewise.
+	(vectorizable_call): Pass cfun to stmt_can_throw_internal.
+	(vectorizable_simd_clone_call): Likewise.
+	* value-prof.c (gimple_ic): Pass cfun to stmt_could_throw_p.
+	(gimple_stringop_fixed_value): Likewise.
+
+2018-10-22  Ilya Leoshkevich  <iii@linux.ibm.com>
+
+	* config/s390/s390.c (s390_loadrelative_operand_p): Accept
+	literal pool references.
+	(s390_check_qrst_address): Adapt to the new behavior of
+	s390_loadrelative_operand_p ().
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/sse.md (*andnot<mode>3_bcst): New.
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/sse.md (*<code><mode>3_bcst): New.
+
+2018-10-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/sse.md (avx512bcst): Updated for V4SI, V2DI, V8SI,
+	V4DI, V16SI and V8DI.
+	(*sub<mode>3<mask_name>_bcst): New.
+	(*add<mode>3<mask_name>_bcst): Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/avx512fintrin.h (_mm512_fnmsub_round_pd): Use
+	__builtin_ia32_vfnmsubpd512_mask.
+	(_mm512_mask_fnmsub_round_pd): Likewise.
+	(_mm512_fnmsub_pd): Likewise.
+	(_mm512_mask_fnmsub_pd): Likewise.
+	(_mm512_maskz_fnmsub_round_pd): Use
+	__builtin_ia32_vfnmsubpd512_maskz.
+	(_mm512_maskz_fnmsub_pd): Likewise.
+	(_mm512_fnmsub_round_ps): Use __builtin_ia32_vfnmsubps512_mask.
+	(_mm512_mask_fnmsub_round_ps): Likewise.
+	(_mm512_fnmsub_ps): Likewise.
+	(_mm512_mask_fnmsub_ps): Likewise.
+	(_mm512_maskz_fnmsub_round_ps): Use
+	__builtin_ia32_vfnmsubps512_maskz.
+	(_mm512_maskz_fnmsub_ps): Likewise.
+	* config/i386/avx512vlintrin.h (_mm256_mask_fnmsub_pd): Use
+	__builtin_ia32_vfnmsubpd256_mask.
+	(_mm256_maskz_fnmsub_pd): Use __builtin_ia32_vfnmsubpd256_maskz.
+	(_mm_mask_fnmsub_pd): Use __builtin_ia32_vfmaddpd128_mask
+	(_mm_maskz_fnmsub_pd): Use __builtin_ia32_vfnmsubpd128_maskz.
+	(_mm256_mask_fnmsub_ps): Use __builtin_ia32_vfnmsubps256_mask.
+	(_mm256_mask_fnmsub_ps): Use __builtin_ia32_vfnmsubps256_mask.
+	(_mm256_maskz_fnmsub_ps): Use __builtin_ia32_vfnmsubps256_maskz.
+	(_mm_mask_fnmsub_ps): Use __builtin_ia32_vfnmsubps128_mask.
+	(_mm_maskz_fnmsub_ps): Use __builtin_ia32_vfnmsubps128_maskz.
+	* config/i386/fmaintrin.h (_mm_fnmsub_pd): Use
+	__builtin_ia32_vfnmsubpd.
+	(_mm256_fnmsub_pd): Use __builtin_ia32_vfnmsubpd256.
+	(_mm_fnmsub_ps): Use __builtin_ia32_vfnmsubps.
+	(_mm256_fnmsub_ps): Use __builtin_ia32_vfnmsubps256.
+	(_mm_fnmsub_sd): Use __builtin_ia32_vfnmsubsd3.
+	(_mm_fnmsub_ss): Use __builtin_ia32_vfnmsubss3.
+	* config/i386/i386-builtin.def: Add
+	__builtin_ia32_vfnmsubpd256_mask,
+	__builtin_ia32_vfnmsubpd256_maskz,
+	__builtin_ia32_vfnmsubpd128_mask,
+	__builtin_ia32_vfnmsubpd128_maskz,
+	__builtin_ia32_vfnmsubps256_mask,
+	__builtin_ia32_vfnmsubps256_maskz,
+	__builtin_ia32_vfnmsubps128_mask,
+	__builtin_ia32_vfnmsubps128_maskz,
+	__builtin_ia32_vfnmsubpd512_mask,
+	__builtin_ia32_vfnmsubpd512_maskz,
+	__builtin_ia32_vfnmsubps512_mask,
+	__builtin_ia32_vfnmsubps512_maskz, __builtin_ia32_vfnmsubss3,
+	__builtin_ia32_vfnmsubsd3, __builtin_ia32_vfnmsubps,
+	__builtin_ia32_vfnmsubpd, __builtin_ia32_vfnmsubps256 and.
+	__builtin_ia32_vfnmsubpd256.
+	* config/i386/sse.md (fma4i_fnmsub_<mode>): New.
+	(<avx512>_fnmsub_<mode>_maskz<round_expand_name>): Likewise.
+	(*<sd_mask_codefor>fma_fnmsub_<mode><sd_maskz_name>_bcst_1):
+	Likewise.
+	(*<sd_mask_codefor>fma_fnmsub_<mode><sd_maskz_name>_bcst_2):
+	Likewise.
+	(*<sd_mask_codefor>fma_fnmsub_<mode><sd_maskz_name>_bcst_3):
+	Likewise.
+	(fmai_vmfnmsub_<mode><round_name>): Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/avx512fintrin.h (_mm512_fnmadd_round_pd): Use
+	__builtin_ia32_vfnmaddpd512_mask.
+	(_mm512_mask_fnmadd_round_pd): Likewise.
+	(_mm512_fnmadd_pd): Likewise.
+	(_mm512_mask_fnmadd_pd): Likewise.
+	(_mm512_maskz_fnmadd_round_pd): Use
+	__builtin_ia32_vfnmaddpd512_maskz.
+	(_mm512_maskz_fnmadd_pd): Likewise.
+	(_mm512_fnmadd_round_ps): Use __builtin_ia32_vfnmaddps512_mask.
+	(_mm512_mask_fnmadd_round_ps): Likewise.
+	(_mm512_fnmadd_ps): Likewise.
+	(_mm512_mask_fnmadd_ps): Likewise.
+	(_mm512_maskz_fnmadd_round_ps): Use
+	__builtin_ia32_vfnmaddps512_maskz.
+	(_mm512_maskz_fnmadd_ps): Likewise.
+	* config/i386/avx512vlintrin.h (_mm256_mask_fnmadd_pd): Use
+	__builtin_ia32_vfnmaddpd256_mask.
+	(_mm256_maskz_fnmadd_pd): Use __builtin_ia32_vfnmaddpd256_maskz.
+	(_mm_mask_fnmadd_pd): Use __builtin_ia32_vfmaddpd128_mask
+	(_mm_maskz_fnmadd_pd): Use __builtin_ia32_vfnmaddpd128_maskz.
+	(_mm256_mask_fnmadd_ps): Use __builtin_ia32_vfnmaddps256_mask.
+	(_mm256_mask_fnmadd_ps): Use __builtin_ia32_vfnmaddps256_mask.
+	(_mm256_maskz_fnmadd_ps): Use __builtin_ia32_vfnmaddps256_maskz.
+	(_mm_mask_fnmadd_ps): Use __builtin_ia32_vfnmaddps128_mask.
+	(_mm_maskz_fnmadd_ps): Use __builtin_ia32_vfnmaddps128_maskz.
+	* config/i386/fmaintrin.h (_mm_fnmadd_pd): Use
+	__builtin_ia32_vfnmaddpd.
+	(_mm256_fnmadd_pd): Use __builtin_ia32_vfnmaddpd256.
+	(_mm_fnmadd_ps): Use __builtin_ia32_vfnmaddps.
+	(_mm256_fnmadd_ps): Use __builtin_ia32_vfnmaddps256.
+	(_mm_fnmadd_sd): Use __builtin_ia32_vfnmaddsd3.
+	(_mm_fnmadd_ss): Use __builtin_ia32_vfnmaddss3.
+	* config/i386/i386-builtin.def: Add
+	__builtin_ia32_vfnmaddpd256_mask,
+	__builtin_ia32_vfnmaddpd256_maskz,
+	__builtin_ia32_vfnmaddpd128_mask,
+	__builtin_ia32_vfnmaddpd128_maskz,
+	__builtin_ia32_vfnmaddps256_mask,
+	__builtin_ia32_vfnmaddps256_maskz,
+	__builtin_ia32_vfnmaddps128_mask,
+	__builtin_ia32_vfnmaddps128_maskz,
+	__builtin_ia32_vfnmaddpd512_mask,
+	__builtin_ia32_vfnmaddpd512_maskz,
+	__builtin_ia32_vfnmaddps512_mask,
+	__builtin_ia32_vfnmaddps512_maskz, __builtin_ia32_vfnmaddss3,
+	__builtin_ia32_vfnmaddsd3, __builtin_ia32_vfnmaddps,
+	__builtin_ia32_vfnmaddpd, __builtin_ia32_vfnmaddps256 and.
+	__builtin_ia32_vfnmaddpd256.
+	* config/i386/sse.md (fma4i_fnmadd_<mode>): New.
+	(<avx512>_fnmadd_<mode>_maskz<round_expand_name>): Likewise.
+	(*<sd_mask_codefor>fma_fnmadd_<mode><sd_maskz_name>_bcst_1):
+	Likewise.
+	(*<sd_mask_codefor>fma_fnmadd_<mode><sd_maskz_name>_bcst_2):
+	Likewise.
+	(*<sd_mask_codefor>fma_fnmadd_<mode><sd_maskz_name>_bcst_3):
+	Likewise.
+	(fmai_vmfnmadd_<mode><round_name>): Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/avx512fintrin.h (_mm512_fmsub_round_pd): Use
+	__builtin_ia32_vfmsubpd512_mask.
+	(_mm512_mask_fmsub_round_pd): Likewise.
+	(_mm512_fmsub_pd): Likewise.
+	(_mm512_mask_fmsub_pd): Likewise.
+	(_mm512_maskz_fmsub_round_pd): Use
+	__builtin_ia32_vfmsubpd512_maskz.
+	(_mm512_maskz_fmsub_pd): Likewise.
+	(_mm512_fmsub_round_ps): Use __builtin_ia32_vfmsubps512_mask.
+	(_mm512_mask_fmsub_round_ps): Likewise.
+	(_mm512_fmsub_ps): Likewise.
+	(_mm512_mask_fmsub_ps): Likewise.
+	(_mm512_maskz_fmsub_round_ps): Use
+	__builtin_ia32_vfmsubps512_maskz.
+	(_mm512_maskz_fmsub_ps): Likewise.
+	* config/i386/avx512vlintrin.h (_mm256_mask_fmsub_pd): Use
+	__builtin_ia32_vfmsubpd256_mask.
+	(_mm256_maskz_fmsub_pd): Use __builtin_ia32_vfmsubpd256_maskz.
+	(_mm_mask_fmsub_pd): Use __builtin_ia32_vfmaddpd128_mask
+	(_mm_maskz_fmsub_pd): Use __builtin_ia32_vfmsubpd128_maskz.
+	(_mm256_mask_fmsub_ps): Use __builtin_ia32_vfmsubps256_mask.
+	(_mm256_mask_fmsub_ps): Use __builtin_ia32_vfmsubps256_mask.
+	(_mm256_maskz_fmsub_ps): Use __builtin_ia32_vfmsubps256_maskz.
+	(_mm_mask_fmsub_ps): Use __builtin_ia32_vfmsubps128_mask.
+	(_mm_maskz_fmsub_ps): Use __builtin_ia32_vfmsubps128_maskz.
+	* config/i386/fmaintrin.h (_mm_fmsub_pd): Use
+	__builtin_ia32_vfmsubpd.
+	(_mm256_fmsub_pd): Use __builtin_ia32_vfmsubpd256.
+	(_mm_fmsub_ps): Use __builtin_ia32_vfmsubps.
+	(_mm256_fmsub_ps): Use __builtin_ia32_vfmsubps256.
+	(_mm_fmsub_sd): Use __builtin_ia32_vfmsubsd3.
+	(_mm_fmsub_ss): Use __builtin_ia32_vfmsubss3.
+	* config/i386/i386-builtin.def: Add
+	__builtin_ia32_vfmsubpd256_mask,
+	__builtin_ia32_vfmsubpd256_maskz,
+	__builtin_ia32_vfmsubpd128_mask,
+	__builtin_ia32_vfmsubpd128_maskz,
+	__builtin_ia32_vfmsubps256_mask,
+	__builtin_ia32_vfmsubps256_maskz,
+	__builtin_ia32_vfmsubps128_mask,
+	__builtin_ia32_vfmsubps128_maskz,
+	__builtin_ia32_vfmsubpd512_mask,
+	__builtin_ia32_vfmsubpd512_maskz,
+	__builtin_ia32_vfmsubps512_mask,
+	__builtin_ia32_vfmsubps512_maskz, __builtin_ia32_vfmsubss3,
+	__builtin_ia32_vfmsubsd3, __builtin_ia32_vfmsubps,
+	__builtin_ia32_vfmsubpd, __builtin_ia32_vfmsubps256 and.
+	__builtin_ia32_vfmsubpd256.
+	* config/i386/sse.md (fma4i_fmsub_<mode>): New.
+	(<avx512>_fmsub_<mode>_maskz<round_expand_name>): Likewise.
+	(*<sd_mask_codefor>fma_fmsub_<mode><sd_maskz_name>_bcst_1):
+	Likewise.
+	(*<sd_mask_codefor>fma_fmsub_<mode><sd_maskz_name>_bcst_2):
+	Likewise.
+	(*<sd_mask_codefor>fma_fmsub_<mode><sd_maskz_name>_bcst_3):
+	Likewise.
+	(fmai_vmfmsub_<mode><round_name>): Likewise.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* config/i386/sse.md (*<plusminus_insn><mode>3<mask_name>_bcst_1):
+	Remove plus.  Renamed to ...
+	(*sub<mode>3<mask_name>_bcst): This.
+	(*add<mode>3<mask_name>_bcst_2): Renamede to ...
+	(*add<mode>3<mask_name>_bcst): This.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/sse.md (*mul<mode>3<mask_name>_bcst): New.
+
+2018-10-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/87662
+	* i386/avx512vlintrin.h (_mm256_or_epi32): New.
+	(_mm_or_epi32): Likewise.
+	(_mm256_xor_epi32): Likewise.
+	(_mm_xor_epi32): Likewise.
+	(_mm256_or_epi64): Likewise.
+	(_mm_or_epi64): Likewise.
+	(_mm256_xor_epi64): Likewise.
+	(_mm_xor_epi64): Likewise.
+
+2018-10-20  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/72782
+	* config/i386/sse.md (*<avx512>_div<mode>3<mask_name>_bcst): New.
+
+2018-10-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/87647
+	* varasm.c (decode_addr_const): Handle COMPOUND_LITERAL_EXPR.
+
+2018-10-20  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* doc/ux.texi: Move @section directly after @node.
+
+2018-10-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/85488
+	PR middle-end/87649
+	* omp-low.c (check_omp_nesting_restrictions): Diagnose ordered without
+	depend closely nested inside of loop with ordered clause with
+	a parameter.
+
 2018-10-19  David Malcolm  <dmalcolm@redhat.com>
 
 	* Makefile.in (TEXI_GCCINT_FILES): Add ux.texi.
