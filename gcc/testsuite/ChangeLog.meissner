@@ -1,5 +1,7 @@
 2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/ppc-fortran/ieee128-math.f90: New test.
+
 	Merge up to 265400.
 
 2018-10-19   Michael Meissner  <meissner@linux.ibm.com>
