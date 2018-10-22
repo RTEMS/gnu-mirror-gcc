@@ -1981,6 +1981,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P
 #define TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P hook_bool_void_true
+
+#undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
+#define TARGET_MANGLE_DECL_ASSEMBLER_NAME rs6000_mangle_decl_assembler_name
 
 
 /* Processor table.  */
@@ -38963,6 +38966,104 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
     }
 }
 #endif
+
+
+/* Switch Fortran long double library function names from <foo>l to <foo>f128
+   if the default long double type is IEEE 128-bit.  With the C and C++
+   languages, the standard math.h include file switches the names on systems
+   that support long double at IEEE 128-bit, but we don't have similar support
+   for Fortran.  */
+
+/* Map of the math functions that need to be handled.  */
+#define MATH_MAP(BASE) \
+  { BASE "l", BASE "f128", sizeof (BASE "l") - 1 }
+
+#define MATH_MAP_C(BASE)						\
+  { BASE "l", BASE "f128", sizeof (BASE "l") - 1 },			\
+  { "c" BASE "l", "c" BASE "f128", sizeof (BASE "l") - 1 }
+
+struct math_map_type {
+  const char *const l_name;	/* name with "l" suffix.  */
+  const char *const f128_name;	/* name with "f128" suffix.  */
+  const size_t length;		/* length of the name with "l" suffix. */
+};
+
+static const struct math_map_type math_map_funcs[] = {
+  MATH_MAP_C("acos"),
+  MATH_MAP_C("acosh"),
+  MATH_MAP_C("asin"),
+  MATH_MAP_C("asinh"),
+  MATH_MAP_C("atan"),
+  MATH_MAP_C("atanh"),
+  MATH_MAP_C("atan2"),
+  MATH_MAP_C("cos"),
+  MATH_MAP_C("cosh"),
+  MATH_MAP_C("exp"),
+  MATH_MAP_C("log"),
+  MATH_MAP_C("log10"),
+  MATH_MAP_C("sin"),
+  MATH_MAP_C("sinh"),
+  MATH_MAP_C("sqrt"),
+  MATH_MAP_C("tan"),
+  MATH_MAP_C("tanh"),
+
+  MATH_MAP("j0"),
+  MATH_MAP("j1"),
+  MATH_MAP("jn"),
+  MATH_MAP("y0"),
+  MATH_MAP("y1"),
+  MATH_MAP("yn"),
+  MATH_MAP("erf"),
+  MATH_MAP("erfc"),
+  MATH_MAP("tgamma"),
+  MATH_MAP("lgamma"),
+  MATH_MAP("hypot"),
+
+  MATH_MAP("cabs"),
+  MATH_MAP("copysign"),
+  MATH_MAP("cpow"),
+  MATH_MAP("fabs"),
+  MATH_MAP("fmod"),
+  MATH_MAP("frexp"),
+  MATH_MAP("logb"),
+  MATH_MAP("llround"),
+  MATH_MAP("lround"),
+  MATH_MAP("iround"),
+  MATH_MAP("nextafter"),
+  MATH_MAP("pow"),
+  MATH_MAP("remainder"),
+  MATH_MAP("rint"),
+  MATH_MAP("round"),
+  MATH_MAP("scalbn"),
+  MATH_MAP("trunc"),
+};
+
+static tree
+rs6000_mangle_decl_assembler_name (tree decl, tree id)
+{
+  if (TREE_CODE (decl) != FUNCTION_DECL
+      || !DECL_IS_BUILTIN (decl)
+      || !lang_GNU_Fortran ()
+      || !TARGET_LONG_DOUBLE_128
+      || !TARGET_IEEEQUAD)
+    return id;
+
+  size_t len = IDENTIFIER_LENGTH (id);
+  const char *name = IDENTIFIER_POINTER (id);
+
+  if (name[len-1] == 'l')
+    {
+      for (size_t i = 0; i < ARRAY_SIZE (math_map_funcs); i++)
+	if (math_map_funcs[i].length == len
+	    && strcmp (name, math_map_funcs[i].l_name) == 0)
+	  {
+	    id = get_identifier (math_map_funcs[i].f128_name);
+	    break;
+	  }
+    }
+
+  return id;
+}
 
 
 struct gcc_target targetm = TARGET_INITIALIZER;
