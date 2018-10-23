@@ -11,7 +11,7 @@
 void foo (__float128 *p, long double *q)
 {
   *p = __builtin_sinf128 (*p);
-  *q = __builtin_sinl    (*q);
+  *q = __builtin_sinl (*q);
 }
 
 /* { dg-final { scan-assembler-times {\mbl sinf128\M} 2 } } */
