@@ -1982,14 +1982,6 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P
 #define TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P hook_bool_void_true
 
-/* On 64-bit Linux and Freebsd systems, possibly switch the long double
-   library function names from <foo>l to <foo>f128 if the default long double
-   type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
-   math.h include file switches the names on systems that support long double
-   at IEEE 128-bit, but that doesn't work if the user uses __builtin_<foo>l
-   directly or if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME
-   hook to change this name.  */
-
 #undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
 #define TARGET_MANGLE_DECL_ASSEMBLER_NAME rs6000_mangle_decl_assembler_name
 
@@ -38976,19 +38968,20 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 #endif
 
 
-/* On 64-bit Linux and Freebsd systems, possibly switch the long double
-   library function names from <foo>l to <foo>f128 if the default long double
-   type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
-   math.h include file switches the names on systems that support long double
-   at IEEE 128-bit, but that doesn't work if the user uses __builtin_<foo>l
-   directly or if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME
-   hook to change this name.  */
+/* On 64-bit Linux and Freebsd systems, possibly switch the long double library
+   function names from <foo>l to <foo>f128 if the default long double type is
+   IEEE 128-bit.  Typically, with the C and C++ languages, the standard math.h
+   include file switches the names on systems that support long double at IEEE
+   128-bit, but that doesn't work if the user uses __builtin_<foo>l directly or
+   if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to
+   change this name.  We only do this if the default is long double is not IEEE
+   128-bit, and the user asked for IEEE 128-bit.  */
 
 static tree
 rs6000_mangle_decl_assembler_name (tree decl, tree id)
 {
-  if (TREE_CODE (decl) == FUNCTION_DECL && DECL_IS_BUILTIN (decl)
-      && TARGET_LONG_DOUBLE_128 && TARGET_IEEEQUAD)
+  if (!TARGET_IEEEQUAD_DEFAULT && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+      && TREE_CODE (decl) == FUNCTION_DECL && DECL_IS_BUILTIN (decl) )
     {
       size_t len = IDENTIFIER_LENGTH (id);
       const char *name = IDENTIFIER_POINTER (id);
@@ -38996,7 +38989,8 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
       if (name[len-1] == 'l')
 	{
 	  bool has_long_double_p = false;
-	  machine_mode ret_mode = TYPE_MODE (TREE_TYPE (decl));
+	  tree type = TREE_TYPE (decl);
+	  machine_mode ret_mode = TYPE_MODE (type);
 
 	  /* See if the function returns long double or long double
 	     complex.  */
@@ -39005,13 +38999,13 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 	  else
 	    {
 	      function_args_iterator args_iter;
-	      tree type;
+	      tree arg;
 
 	      /* See if we have a long double or long double complex
 		 argument.  */
-	      FOREACH_FUNCTION_ARGS(TREE_TYPE (decl), type, args_iter)
+	      FOREACH_FUNCTION_ARGS (type, arg, args_iter)
 		{
-		  machine_mode arg_mode = TYPE_MODE (type);
+		  machine_mode arg_mode = TYPE_MODE (arg);
 		  if (arg_mode == TFmode || arg_mode == TCmode)
 		    {
 		      has_long_double_p = true;
@@ -39020,36 +39014,13 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 		}
 	    }
 
+	  /* If we have long double, change the name.  */
 	  if (has_long_double_p)
 	    {
 	      char *name2 = (char *) alloca (len + 4);
 	      memcpy (name2, name, len-1);
 	      strcpy (name2 + len - 1, "f128");
 	      id = get_identifier (name2);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	    }
 	}
     }
