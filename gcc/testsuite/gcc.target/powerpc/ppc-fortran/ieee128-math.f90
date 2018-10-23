@@ -1,4 +1,4 @@
-! { dg-do run { target { powerpc*-*-linux* } } }
+! { dg-do compile { target { powerpc*-*-linux* } } }
 ! { dg-require-effective-target ppc_float128_sw }
 ! { dg-require-effective-target vsx_hw }
 ! { dg-options "-mmvsx -mabi=ieeelongdouble -mfloat128-type" }
