@@ -8,9 +8,11 @@
    __builtin_<math>f128 function does not interfere with the __builtin_<math>l
    function.  */
 
-void foo (__float128 *p, long double *q)
+extern __float128 sinf128 (__float128);
+
+void foo (__float128 *p, long double *q, long double *r)
 {
-  *p = __builtin_sinf128 (*p);
+  *p = sinf128 (*p);
   *q = __builtin_sinl (*q);
 }
 
