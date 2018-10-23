@@ -38986,14 +38986,14 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
       size_t len = IDENTIFIER_LENGTH (id);
       const char *name = IDENTIFIER_POINTER (id);
 
-      if (name[len-1] == 'l')
+      if (name[len - 1] == 'l')
 	{
 	  bool has_long_double_p = false;
 	  tree type = TREE_TYPE (decl);
 	  machine_mode ret_mode = TYPE_MODE (type);
 
-	  /* See if the function returns long double or long double
-	     complex.  */
+	  /* See if the function returns a IEEE 128-bit floating point type or
+	     complex type.  */
 	  if (ret_mode == TFmode || ret_mode == TCmode)
 	    has_long_double_p = true;
 	  else
@@ -39001,8 +39001,8 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 	      function_args_iterator args_iter;
 	      tree arg;
 
-	      /* See if we have a long double or long double complex
-		 argument.  */
+	      /* See if the function passes a IEEE 128-bit floating point type
+		 or complex type.  */
 	      FOREACH_FUNCTION_ARGS (type, arg, args_iter)
 		{
 		  machine_mode arg_mode = TYPE_MODE (arg);
@@ -39018,7 +39018,7 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 	  if (has_long_double_p)
 	    {
 	      char *name2 = (char *) alloca (len + 4);
-	      memcpy (name2, name, len-1);
+	      memcpy (name2, name, len - 1);
 	      strcpy (name2 + len - 1, "f128");
 	      id = get_identifier (name2);
 	    }
