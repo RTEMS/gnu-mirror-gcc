@@ -1,7 +1,7 @@
 ! { dg-do compile { target { powerpc*-*-linux* } } }
 ! { dg-require-effective-target ppc_float128_sw }
 ! { dg-require-effective-target vsx_hw }
-! { dg-options "-mmvsx -mabi=ieeelongdouble -mfloat128-type" }
+! { dg-options "-mvsx -mabi=ieeelongdouble -mfloat128" }
 ! { dg-excess-errors "expect error due to switching long double type" }
 ! Since the error message is not associated with a particular line
 ! number, we cannot use the dg-error directive and cannot specify a
