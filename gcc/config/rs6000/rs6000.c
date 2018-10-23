@@ -38971,7 +38971,7 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
    function names from <foo>l to <foo>f128 if the default long double type is
    IEEE 128-bit.  Typically, with the C and C++ languages, the standard math.h
-   include file switches the names on systems that support long double at IEEE
+   include file switches the names on systems that support long double as IEEE
    128-bit, but that doesn't work if the user uses __builtin_<foo>l directly or
    if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to
    change this name.  We only do this if the default is long double is not IEEE
