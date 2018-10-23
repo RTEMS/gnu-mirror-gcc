@@ -1984,15 +1984,14 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 /* On 64-bit Linux and Freebsd systems, possibly switch Fortran long double
    library function names from <foo>l to <foo>f128 if the default long double
-   type is IEEE 128-bit.  With the C and C++ languages, the standard math.h
-   include file switches the names on systems that support long double at IEEE
-   128-bit, but we don't have similar support for Fortran.  Use the
-   TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change this name.  */
+   type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
+   math.h include file switches the names on systems that support long double
+   at IEEE 128-bit, but that doesn't work if the user uses __builtin_<foo>l
+   directly or if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME
+   hook to change this name.  */
 
-#ifdef ELFv2_ABI_CHECK
 #undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
 #define TARGET_MANGLE_DECL_ASSEMBLER_NAME rs6000_mangle_decl_assembler_name
-#endif	/* ELFv2_ABI_CHECK  */
 
 
 /* Processor table.  */
@@ -38977,82 +38976,86 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 #endif
 
 
-#ifdef ELFv2_ABI_CHECK
-
 /* On 64-bit Linux and Freebsd systems, possibly switch Fortran long double
    library function names from <foo>l to <foo>f128 if the default long double
-   type is IEEE 128-bit.  With the C and C++ languages, the standard math.h
-   include file switches the names on systems that support long double at IEEE
-   128-bit, but we don't have similar support for Fortran.  */
-
-struct math_map_type {
-  const char *const l_name;	/* name with "l" suffix.  */
-  const char *const f128_name;	/* name with "f128" suffix.  */
-  const size_t length;		/* length of the name with "l" suffix. */
-};
-
-/* Macros required by fortran/mathbuiltins.def:
-
-   DEFINE_MATH_BUILTIN (CODE, NAME, ARGTYPE)
-   NAME	  The name of the builtin
-   SNAME  The name of the builtin as a string
-   ARGTYPE The type of the arguments.  See f95-lang.c
-
-   Use DEFINE_MATH_BUILTIN_C if the complex versions of the builtin are
-   also available.
-
-   OTHER_BUILTIN (CODE, NAME, PROTOTYPE_TYPE, CONST)
-   For floating-point builtins that do not directly correspond to a
-   Fortran intrinsic. This is used to map the different variants (float,
-   double and long double) and to build the quad-precision decls.  */
-
-#undef DEFINE_MATH_BUILTIN
-#undef DEFINE_MATH_BUILTIN_C
-#undef OTHER_BUILTIN
-
-#define DEFINE_MATH_BUILTIN(CODE, NAME, ARGTYPE) \
-  { NAME "l", NAME "f128", sizeof (NAME "l") - 1 },
-
-#define DEFINE_MATH_BUILTIN_C(CODE, NAME, ARGTYPE) \
-  { NAME "l", NAME "f128", sizeof (NAME "l") - 1 }, \
-  { "c" NAME "l", "c" NAME "f128", sizeof (NAME "l") - 1 }, \
-
-#define OTHER_BUILTIN(CODE, NAME, PROTOTYPE_TYPE, CONST) \
-  { NAME "l", NAME "f128", sizeof (NAME "l") - 1 },
-
-static const struct math_map_type math_map_funcs[] = {
-#include "fortran/mathbuiltins.def"
-};
-
-#undef DEFINE_MATH_BUILTIN
-#undef DEFINE_MATH_BUILTIN_C
-#undef OTHER_BUILTIN
+   type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
+   math.h include file switches the names on systems that support long double
+   at IEEE 128-bit, but that doesn't work if the user uses __builtin_<foo>l
+   directly or if they use Fortran.  Use the TARGET_MANGLE_DECL_ASSEMBLER_NAME
+   hook to change this name.  */
 
 static tree
 rs6000_mangle_decl_assembler_name (tree decl, tree id)
 {
   if (TREE_CODE (decl) == FUNCTION_DECL && DECL_IS_BUILTIN (decl)
-      && TARGET_LONG_DOUBLE_128 && TARGET_IEEEQUAD && lang_GNU_Fortran ())
+      && TARGET_LONG_DOUBLE_128 && TARGET_IEEEQUAD)
     {
       size_t len = IDENTIFIER_LENGTH (id);
       const char *name = IDENTIFIER_POINTER (id);
 
       if (name[len-1] == 'l')
 	{
-	  for (size_t i = 0; i < ARRAY_SIZE (math_map_funcs); i++)
-	    if (math_map_funcs[i].length == len
-		&& strcmp (name, math_map_funcs[i].l_name) == 0)
-	      {
-		id = get_identifier (math_map_funcs[i].f128_name);
-		break;
-	      }
+	  bool has_long_double_p = false;
+	  machine_mode ret_mode = TYPE_MODE (TREE_TYPE (decl));
+
+	  /* See if the function returns long double or long double
+	     complex.  */
+	  if (ret_mode == TFmode || ret_mode == TCmode)
+	    has_long_double_p = true;
+	  else
+	    {
+	      function_args_iterator args_iter;
+	      tree type;
+
+	      /* See if we have a long double or long double complex
+		 argument.  */
+	      FOREACH_FUNCTION_ARGS(TREE_TYPE (decl), type, args_iter)
+		{
+		  machine_mode arg_mode = TYPE_MODE (type);
+		  if (arg_mode == TFmode || arg_mode == TCmode)
+		    {
+		      has_long_double_p = true;
+		      break;
+		    }
+		}
+	    }
+
+	  if (has_long_double_p)
+	    {
+	      char *name2 = (char *) alloca (len + 4);
+	      memcpy (name2, name, len-1);
+	      strcpy (name2 + len - 1, "f128");
+	      id = get_identifier (name2);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	    }
 	}
     }
 
   return id;
 }
-
-#endif	/* ELFv2_ABI_CHECK  */
 
 
 struct gcc_target targetm = TARGET_INITIALIZER;

@@ -1,9 +1,17 @@
+2018-10-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (TARGET_MANGLE_DECL_ASSEMBLER_NAME):
+	Remove #ifdef.
+	(rs6000_builtin_vectorization_cost): Rewrite.
+
 2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (TARGET_MANGLE_DECL_ASSEMBLER_NAME): Only
 	do the mangling on 64-bit systems.
 	(rs6000_mangle_decl_assembler_name): Rewrite to use the fortran
 	mathbuiltins.def instead of having a hardwired list of functions.
+
+2018-10-22  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 265400.
 	* REVISION: Update subversion id.
