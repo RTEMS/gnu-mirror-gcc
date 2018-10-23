@@ -1982,7 +1982,7 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P
 #define TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P hook_bool_void_true
 
-/* On 64-bit Linux and Freebsd systems, possibly switch Fortran long double
+/* On 64-bit Linux and Freebsd systems, possibly switch the long double
    library function names from <foo>l to <foo>f128 if the default long double
    type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
    math.h include file switches the names on systems that support long double
@@ -38976,7 +38976,7 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 #endif
 
 
-/* On 64-bit Linux and Freebsd systems, possibly switch Fortran long double
+/* On 64-bit Linux and Freebsd systems, possibly switch the long double
    library function names from <foo>l to <foo>f128 if the default long double
    type is IEEE 128-bit.  Typically, with the C and C++ languages, the standard
    math.h include file switches the names on systems that support long double
