@@ -36,12 +36,19 @@
 #include "output.h"
 #include "tree-pass.h"
 #include "rtx-vector-builder.h"
-
 #include "cfgloop.h"
+
+#include "insn-config.h"
+#include "recog.h"
+
 #include "print-rtl.h"
 #include "tree-pretty-print.h"
 
 #include "genrtl.h"
+
+extern bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
+
+
 
 /* This pass transforms array indexing expressions from a form that
    favors selection of X-form instructions into a form that favors
@@ -62,13 +69,19 @@ class indexing_web_entry : public web_entry_base
   /* If this insn is relevant, it is a load or store with a memory
      address that is comprised of a base pointer (e.g. the address of
      an array or array slice) and an index expression (e.g. an index
-     within the array).  The base_originator and index_originator
+     within the array).  The original_base_use and original_index_use
      fields represent the numbers of the instructions that define the
      base and index values which are summed together with a constant
      value to determine the value of this instruction's memory
      address.  */
   unsigned int original_base_use;
   unsigned int original_index_use;
+
+  /* If this insn is relevant, the register assigned by insn
+     original_base_use is original_base_reg.  The insn assigned by insn
+     original_index_use is original_index_reg.  */
+  unsigned int original_base_reg;
+  unsigned int original_index_reg;
 
   /* If this insn is_relevant, this is the constant that is added to
      the originating expression to calculate the value of this insn's
@@ -130,8 +143,14 @@ help_hash (int count, struct df_link *def_link) {
   int result = 0;
   for (int i = 0; i < count; i++)
     {
-      result <<= 6;
-      result |= ids[i];
+      result = (result << 6) | ((result & 0xf000000) >> 28);
+      result += ids[i];
+
+      /* kelvin debugging */
+      if (dump_file)
+	fprintf (dump_file, "calculating hash 0x%x, after adding in 0x%x\n",
+		 result, ids[i]);
+
     }
   return result;
 }
@@ -272,29 +291,30 @@ represents_constant_p (df_ref use)
 }
 
 
-/* An originator represents the first point at which my value is
-   derived from potentially more than one input definition, or the
-   point at which my value is defined by an algebraic expression
-   involving only constants,
+/* An originator represents the first point at which the value of
+   DEF_LINK is derived from potentially more than one input
+   definition, or the point at which DEF_LINK's value is defined by an
+   algebraic expression involving only constants,
 
-   If my value depends on a constant combined with a single variable
-   or a simple propagation of a single variable, I continue my search
-   for the originator by examining the origin of the source variable's
-   value.
+   If DEF_LINK's value depends on a constant combined with a single
+   variable or a simple propagation of a single variable, continue
+   the search for the originator by examining the origin of the source
+   variable's value.
 
    The value of *ADJUSTMENT is overwritten with the constant value that is
    added to the originator expression to obtain the value intended to
    be represented by DEF_LINK.  In the case that find_true_originator
    returns -1, the value held in *ADJUSTMENT is undefined.
 
-   Returns -1 if there is no true originator.  In general, the search
+   Returns -1 if there is no single true originator.  In general, the search
    for an originator expression only spans SET operations that are
-   based on simple algebraic expressions.  */
+   based on simple algebraic expressions, each of which involves no
+   more than one variable input.  */
 static int
 find_true_originator (struct df_link *def_link, long long int *adjustment)
 {
   rtx def_insn = DF_REF_INSN (def_link->ref);
-  unsigned uid2 = INSN_UID (def_insn);
+  unsigned uid = INSN_UID (def_insn);
 
   rtx inner_body = PATTERN (def_insn);
   if (GET_CODE (inner_body) == SET)
@@ -303,7 +323,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
       df_ref inner_use;
 
       /* We're only happy with multiple uses if all but one represent
-	 constant values.  */
+	 constant values.  Below, we assure that  */
       int non_constant_uses = 0;
       int result = 0;
       FOR_EACH_INSN_INFO_USE (inner_use, inner_insn_info)
@@ -320,19 +340,26 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 		 is an originating use.  */
 	      if (!def_link || !def_link->ref
 		  || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next)
-		result = uid2;
+		result = uid;
 	      else
 		result = find_true_originator (def_link, adjustment);
 	    }
 	}
 
+      /* If non_constant_uses > 1, the value of result is not well
+	 defined because it is overwritten during multiple iterations
+	 of the above loop.  But in the case that non_constant_uses >
+	 1, we do not make use of the result value.  */
       if (non_constant_uses == 1) {
 
-	/* If my SET looks like PLUS or MINUS CONST_INT, or if it's a
-	   simple register copy, this is what I want.  Anything else is
-	   a problem that I'm not ready to deal with.  Maybe I can
-	   prepare myself to deal with other scenarios that are seen
-	   to exist in common practice.  */
+	/* If my SET looks like a simple register copy, or if it looks
+	   like PLUS or MINUS of a constant and a register, this is
+	   what we optimize.  Otherwise, punt.  */
+
+	if (result == -1)
+	  /* Doing constant arithmetic with unknown originator is not
+	     useful.  */
+	  return uid;
 
 	rtx source_expr = SET_SRC (inner_body);
 	int source_code = GET_CODE (source_expr);
@@ -354,21 +381,28 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 
 	    if ((GET_CODE (op1) != CONST_INT) && (GET_CODE (op2) == CONST_INT))
 	      *adjustment -= INTVAL (op1);
+	    else		/* assumption is that *adjustment is
+				   added to a positive variable
+				   expression, so don't optimize this
+				   rare condition.  */
+	      result = uid;
 	  }
 	else if (source_code != REG)
-	    /* We don't handle ashift, for example.  */
-	    return uid2;
-
+	    /* We don't handle ashift, UNSPEC, etc..  */
+	    result = uid;
 	/* else, this is a register copy expression: no impact on
 	   adjustment.  */
+
 	return result;
       }
-      else if (non_constant_uses > 1) /* Too many non-constant inputs */
-	return uid2;
-      else			/* All definition uses are constant. */
-	return uid2;
+      else
+	return uid;		      /* Same behavior if there are
+					 too many non-constant inputs,
+					 or if all inputs are
+					 constant.  */
     }
-  else
+  else				/* This is not a SET operation, so it
+				   does not serve as a true originator. */
     return -1;
 }
 
@@ -381,10 +415,22 @@ in_use_list (struct df_link *list, struct df_link *element)
 {
   while (list != NULL)
     {
+      /* kelvin debugging.  */
+      if (dump_file) {
+	fprintf (dump_file, " against definition %d\n",
+		 DF_REF_ID(list->ref));
+      }
+
       if (element->ref == list->ref)
 	return true;
       list = list->next;
     }
+
+  /* kelvin debugging.  */
+  if (dump_file) {
+    fprintf (dump_file, " No joy!\n");
+  }
+
   /* Got to end of list without finding element.  */
   return false;
 }
@@ -395,6 +441,18 @@ static bool
 equivalent_p (indexing_web_entry *insn_entry,
 	      unsigned int uid_1, unsigned int uid_2)
 {
+  /* kelvin debugging */
+  if (dump_file) {
+    fprintf (dump_file, "testing equivalence of insn %d and insn %d\n",
+	     uid_1, uid_2);
+    fprintf (dump_file, " uid %d base_hash: %d, index_hash: %d\n", uid_1,
+	     insn_entry[uid_1].base_equivalence_hash,
+	     insn_entry[uid_1].index_equivalence_hash);
+    fprintf (dump_file, " uid %d base_hash: %d, index_hash: %d\n", uid_2,
+	     insn_entry[uid_2].base_equivalence_hash,
+	     insn_entry[uid_2].index_equivalence_hash);
+  }
+
   if ((insn_entry[uid_1].base_equivalence_hash !=
        insn_entry[uid_2].base_equivalence_hash) ||
       (insn_entry[uid_1].index_equivalence_hash !=
@@ -420,9 +478,22 @@ equivalent_p (indexing_web_entry *insn_entry,
       if ((base_count_1 != base_count_2) || (index_count_1 != index_count_2))
 	return false;
 
+      /* kelvin debugging.  */
+      if (dump_file) {
+	fprintf (dump_file, "base_count: %d, index_count: %d\n",
+		 base_count_1, index_count_1);
+      }
+
       /* Counts are the same.  Make sure elements match.   */
       while (insn1_base_defs != NULL)
 	{
+
+	  /* kelvin debugging.  */
+	  if (dump_file) {
+	    fprintf (dump_file, "checking base definition %d\n",
+		     DF_REF_ID(insn1_base_defs->ref));
+	  }
+
 	  if (!in_use_list (insn2_base_defs, insn1_base_defs))
 	    return false;
 	  insn1_base_defs = insn1_base_defs->next;
@@ -430,13 +501,50 @@ equivalent_p (indexing_web_entry *insn_entry,
       /* base patterns match, but stil need to consider index matches.  */
       while (insn1_index_defs != NULL)
 	{
+	  /* kelvin debugging.  */
+	  if (dump_file) {
+	    fprintf (dump_file, "checking index definition %d\n",
+		     DF_REF_ID(insn1_index_defs->ref));
+	  }
+
 	  if (!in_use_list (insn2_index_defs, insn1_index_defs))
 	    return false;
 	  insn1_index_defs = insn1_index_defs->next;
 	}
       /* If nothing above causes match to fail, the two instructions
 	 are equivalent.  */
-      return true;
+
+      /* After all this, kelvin is pretty sure the only time we return
+	 true is if insn2_index_defs has the same originator as
+	 insn1_index_defs and insn1_base_defs has the same originator
+	 as ins2_base_defs.  */
+
+      if (dump_file) {
+	fprintf (dump_file, "equivalent_p preparing to return true,");
+	fprintf (dump_file, " but only if regs match\n");
+	fprintf (dump_file,
+		 " insn %d, base_originator: %d, index_originator: %d\n",
+		 uid_1, insn_entry [uid_1].original_base_use,
+		 insn_entry [uid_1].original_index_use);
+	fprintf (dump_file, "           base_reg: %d, index_reg: %d\n",
+		 insn_entry [uid_1].original_base_reg,
+		 insn_entry [uid_1].original_index_reg);
+	fprintf (dump_file,
+		 " insn %d, base_originator: %d, index_originator: %d\n",
+		 uid_2, insn_entry [uid_2].original_base_use,
+		 insn_entry [uid_2].original_index_use);
+	fprintf (dump_file, "           base_reg: %d, index_reg: %d\n",
+		 insn_entry [uid_2].original_base_reg,
+		 insn_entry [uid_2].original_index_reg);
+      }
+      if (insn_entry [uid_1].original_base_reg
+	  != insn_entry [uid_2].original_base_reg)
+	return false;
+      else if (insn_entry [uid_1].original_index_reg
+	  != insn_entry [uid_2].original_index_reg)
+	return false;
+      else
+	return true;
     }
 }
 
@@ -450,6 +558,10 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
   for (i = 0; i < max_uid_at_start; i++)
     equivalence_hash [i] = UINT_MAX;
 
+  /* kelvin debugging */
+  if (dump_file)
+    fprintf (dump_file, "build_and_fixup_equivalence_classes\n");
+
   for (unsigned int uid = 0; uid < max_uid_at_start; uid++)
     {
       if (insn_entry [uid].is_relevant)
@@ -457,6 +569,13 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	  int hash = ((insn_entry [uid].base_equivalence_hash +
 		       insn_entry [uid].index_equivalence_hash)
 		      % max_uid_at_start);
+
+	  /* kelvin debugging */
+	  if (dump_file)
+	    fprintf (dump_file,
+		     "insn %d relevant, base: %d, index: %d, compound: %d\n",
+		     uid, insn_entry [uid].base_equivalence_hash,
+		     insn_entry [uid].index_equivalence_hash, hash);
 
 	  if (equivalence_hash [hash] == UINT_MAX)
 	    {			/* first mention of this class */
@@ -469,6 +588,11 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		     && !equivalent_p (insn_entry, uid,
 				       equivalence_hash [hash]))
 		hash = (hash + 1) % max_uid_at_start;
+
+	      /* kelvin debugging */
+	      if (dump_file)
+		fprintf (dump_file,
+			 " settling on hash table slot %d\n", hash);
 
 	      /* either we have found an equivalent instruction, or
 		 the equivalence class does not yet exist.  */
@@ -586,12 +710,12 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	      rtx base_reg, index_reg;
 	      rtx addr, mem;
 	      rtx new_init_expr;
-	      rtx new_delta_expr = NULL;
+	      /* not used: rtx new_delta_expr = NULL; */
 
 	      if (dump_file)
 		{
-		  fprintf (dump_file, "Replacing originating insn %d: ",
-			   the_dominator);
+		  fprintf (dump_file, "Endeavoring to replace "
+			   "originating insn %d: ", the_dominator);
 		  print_inline_rtx (dump_file, insn, 2);
 		  fprintf (dump_file, "\n");
 		}
@@ -644,22 +768,24 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	      else
 		new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
 
-	      new_insn = emit_insn_before (new_expr, insn);
-	      set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
-	      INSN_CODE (new_insn) = -1;
-	      df_insn_rescan (new_insn);
-
-	      if (dump_file)
+	      if (!validate_change (insn, &PATTERN(insn), new_expr, false))
+		{	/* proposed change was rejected */
+		  if (dump_file)
+		    {
+		      fprintf (dump_file,
+			       "Proposed dform optimization was"
+			       " rejected by validate_change\n");
+		      print_inline_rtx (dump_file, new_insn, 2);
+		      fprintf (dump_file, "\n");
+		    }
+		}
+	      else if (dump_file)
 		{
 		  fprintf (dump_file, "and with insn %d: ",
-			   INSN_UID (new_insn));
-		  print_inline_rtx (dump_file, new_insn, 2);
+			   INSN_UID (insn));
+		  print_inline_rtx (dump_file, insn, 2);
 		  fprintf (dump_file, "\n");
 		}
-
-	      df_insn_delete (insn);
-	      remove_insn (insn);
-	      insn->set_deleted ();
 
 	      for (uid = equivalence_hash [i]; uid != UINT_MAX;
 		   uid = insn_entry [uid].equivalent_sibling)
@@ -676,8 +802,8 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		      rtx mem;
 
 		      if (dump_file) {
-			fprintf (dump_file, "Replacing propagating insn %d: ",
-				 uid);
+			fprintf (dump_file, "Endeavoring to replace "
+				 "propagating insn %d: ", uid);
 			print_inline_rtx (dump_file, insn, 2);
 			fprintf (dump_file, "\n");
 		      }
@@ -701,39 +827,25 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		      else
 			new_expr = gen_rtx_SET (new_mem, SET_SRC (body));
 
-		      rtx_insn *new_insn = emit_insn_before (new_expr, insn);
-		      set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
-		      INSN_CODE (new_insn) = -1;
-		      df_insn_rescan (new_insn);
-
-kelvin deliberate syntax error - put an invocation of validate_change here.  confirm consistency with replacement_count...  and maybe rs6000_legitimate_address_p too.  
-
-
-		      if (dump_file)
-			{
-			  extern bool
-			    rs6000_legitimate_address_p (machine_mode,
-							 rtx, bool);
-
-			  fprintf (dump_file,
-				   "with insn %d: ", INSN_UID (new_insn));
-			  print_inline_rtx (dump_file, new_insn, 2);
-			  fprintf (dump_file, "\n");
-
-			  /* TARGET_LEGITIMATE_ADDRESS_P is defined to
-			     be rs6000_legitimate_address_p.  */
-
-			  /* This pass occurs before reload, so our
-			     inquiry uses the non-strict variant.  */
-			  if (!rs6000_legitimate_address_p (GET_MODE (mem),
-							    new_mem, false))
-			    fprintf (dump_file,
-				     "Oops!  Not unstrictly legit address\n");
+		      if (!validate_change (insn, &PATTERN(insn),
+					    new_expr, false))
+			{	/* proposed change was rejected */
+			  if (dump_file)
+			    {
+			      fprintf (dump_file,
+				       "Proposed dform optimization was"
+				       " rejected by validate_change\n");
+			      print_inline_rtx (dump_file, new_expr, 2);
+			      fprintf (dump_file, "\n");
+			    }
 			}
-
-		      df_insn_delete (insn);
-		      remove_insn (insn);
-		      insn->set_deleted ();
+		      else if (dump_file)
+			{
+			  fprintf (dump_file,
+				   "with insn %d: ", INSN_UID (insn));
+			  print_inline_rtx (dump_file, insn, 2);
+			  fprintf (dump_file, "\n");
+			}
 		    }
 		}
 	    }
@@ -976,6 +1088,13 @@ rs6000_fix_indexing (function *fun)
 		      /* Since insn is known to represent a sum or
 			 difference, this insn is likely to use at
 			 least two input variables.  */
+
+		      int num_base_defs = 0;
+		      int num_index_defs = 0;
+		      bool base_is_relevant = false;
+		      bool index_is_relevant = false;
+		      bool base_is_originating = false;
+		      bool index_is_originating = false;
 		      df_ref use;
 		      FOR_EACH_INSN_INFO_USE (use, insn_info)
 			{
@@ -989,6 +1108,7 @@ rs6000_fix_indexing (function *fun)
 				  df_ref_debug (use, dump_file);
 				}
 			      struct df_link *def_link = DF_REF_CHAIN (use);
+			      num_base_defs++;
 
 			      /* If there is no definition, or the definition
 				 is artificial, or there are multiple
@@ -1002,64 +1122,106 @@ rs6000_fix_indexing (function *fun)
 				    fprintf (dump_file,
 					     "Use is originating!\n");
 
-				  insn_entry[uid].is_relevant = true;
-				  insn_entry[uid].is_originating = true;
+				  base_is_relevant = true;
+				  base_is_originating = true;
+				  insn_entry[uid].original_base_reg
+				    = REGNO (base_reg);
 				  insn_entry[uid].original_base_use = uid;
 				  insn_entry[uid].base_delta = 0;
+
+				  /* kelvin debug */
+				  if (dump_file)
+				    fprintf (dump_file,
+					     "hashing for insn %d base\n",
+					     uid);
+
 				  insn_entry[uid].base_equivalence_hash =
 				    equivalence_hash (def_link);
 				}
 			      else
 				{
-				  if (dump_file
-				      && (dump_flags & TDF_DETAILS))
-				    fprintf (dump_file,
-					     "Use may be propagating\n");
 				  /* Only one definition.  Dig deeper.  */
 				  long long int delta = 0;
 				  int uid2 =
 				    find_true_originator (def_link, &delta);
+
+				  if (dump_file && (dump_flags & TDF_DETAILS))
+				    fprintf (dump_file,
+					     "Use may propagate from %d\n",
+					     uid2);
+
 				  if (uid2 > 0)
 				    {
-				      insn_entry[uid].is_relevant = true;
-				      insn_entry[uid].is_originating = false;
-				      insn_entry[uid].original_base_use = uid2;
-				      insn_entry[uid].base_delta =
-					delta;
-
-				      rtx_insn *insn2 =
-					insn_entry[uid2].insn;
+				      rtx_insn *insn2 =	insn_entry[uid2].insn;
 				      struct df_insn_info *insn_info2 =
 					DF_INSN_INFO_GET (insn2);
-				      df_ref use2 =
-					DF_INSN_INFO_USES (insn_info2);
-				      if (use2)
-					{
-					  /* Expect one use for true
-					     originator.  */
-					  gcc_assert (!DF_REF_NEXT_LOC (use2));
-					  struct df_link *def_link =
-					    DF_REF_CHAIN (use2);
-					  insn_entry[uid].
-					    base_equivalence_hash =
-					    equivalence_hash (def_link);
-					}
+
+				      df_ref use2;
+				      if (insn_info2)
+					use2 = DF_INSN_INFO_USES (insn_info2);
 				      else
-					insn_entry[uid].base_equivalence_hash =
-					  equivalence_hash (NULL);
-				    }
-				  if (dump_file
-				      && (dump_flags & TDF_DETAILS))
-				    {
-				      fprintf (dump_file,
-					       " propagates from originating"
-					       " insn %d with delta: %lld\n",
-					       uid2, delta);
+					use2 = NULL;
+
+				      if (!use2 || !DF_REF_NEXT_LOC (use2))
+					{
+					  base_is_originating = false;
+
+					  rtx body = PATTERN (insn2);
+					  gcc_assert (GET_CODE (body) == SET);
+					  gcc_assert (REG_P (SET_DEST (body)));
+
+					  insn_entry[uid].original_base_reg
+					    = REGNO (SET_DEST (body));
+					  insn_entry[uid].original_base_use
+					    = uid2;
+					  insn_entry[uid].base_delta = delta;
+
+					  if (use2)
+					    {
+					      struct df_link *def_link =
+						DF_REF_CHAIN (use2);
+
+					      /* kelvin debug */
+					      if (dump_file)
+						fprintf (dump_file,
+							 "hashing for insn %d base\n",
+							 uid2);
+
+					      base_is_relevant = true;
+					      insn_entry[uid].
+						base_equivalence_hash =
+						equivalence_hash (def_link);
+					    }
+					  /* else, base is not relevant.  */
+					  /*
+					  else
+					    {
+					    insn_entry[uid].
+					      base_equivalence_hash =
+					      equivalence_hash (NULL);
+					  */
+
+					  if (dump_file
+					      && (dump_flags & TDF_DETAILS))
+					    {
+					      fprintf (dump_file,
+						       " propagates from"
+						       " originating insn %d"
+						       " with delta: %lld\n",
+						       uid2, delta);
+					    }
+					}
+				      else if (dump_file
+					       && (dump_flags & TDF_DETAILS))
+					    {
+					      fprintf (dump_file,
+						       " Dependencies are too"
+						       " complicated for this"
+						       " optimization\n");
+					    }
+
 				    }
 				}
-
-			      /* kevin needs to fix up index case like
-				 he did for base case.  */
 			    }
 			  else if (rtx_equal_p (DF_REF_REG (use), index_reg))
 			    {
@@ -1071,6 +1233,7 @@ rs6000_fix_indexing (function *fun)
 				  df_ref_debug (use, dump_file);
 				}
 			      struct df_link *def_link = DF_REF_CHAIN (use);
+			      num_index_defs++;
 
 			      /* If there is no definition, or the definition
 				 is artificial, or there are multiple
@@ -1083,64 +1246,147 @@ rs6000_fix_indexing (function *fun)
 				      && (dump_flags & TDF_DETAILS))
 				    fprintf (dump_file,
 					     "Use is originating!\n");
-				  insn_entry[uid].is_relevant = true;
-				  insn_entry[uid].is_originating = true;
+
+				  index_is_relevant = true;
+				  index_is_originating = true;
+
+				  insn_entry[uid].original_index_reg
+				    = REGNO (index_reg);
 				  insn_entry[uid].original_index_use = uid;
 				  insn_entry[uid].index_delta = 0;
+
+				  /* kelvin debug */
+				  if (dump_file)
+				    fprintf (dump_file,
+					     "hashing for insn %d index\n",
+					     uid);
+
 				  insn_entry[uid].index_equivalence_hash =
 				    equivalence_hash (def_link);
 				}
 			      else
 				{
-				  if (dump_file
-				      && (dump_flags & TDF_DETAILS))
-				    fprintf (dump_file,
-					   "Use may be propagating\n");
 				  /* Only one definition.  Dig deeper.  */
 				  long long int delta = 0;
 				  int uid2 =
 				    find_true_originator (def_link, &delta);
 
+				  if (dump_file && (dump_flags & TDF_DETAILS))
+				    fprintf (dump_file,
+					     "Use may propagate from %d\n",
+					     uid2);
+
 				  if (uid2 > 0)
 				    {
-				      insn_entry[uid].is_relevant = true;
-				      insn_entry[uid].is_originating = false;
-				      insn_entry[uid].original_index_use = uid2;
-				      insn_entry[uid].index_delta =
-					delta;
-				    }
+				      rtx_insn *insn2 = insn_entry[uid2].insn;
+				      struct df_insn_info *insn_info2 =
+					DF_INSN_INFO_GET (insn2);
 
-				  rtx_insn *insn2 =
-				    insn_entry[uid2].insn;
-				  struct df_insn_info *insn_info2 =
-				    DF_INSN_INFO_GET (insn2);
-				  df_ref use2 =
-				    DF_INSN_INFO_USES (insn_info2);
-				  if (use2)
-				    {
-				      /* Expect one use for true
-					 originator.  */
-				      gcc_assert (!(DF_REF_NEXT_LOC (use2)));
-				      struct df_link *def_link =
-					DF_REF_CHAIN (use2);
-				      insn_entry[uid].
-					index_equivalence_hash =
-					equivalence_hash (def_link);
-				    }
-				  else
-				    insn_entry[uid].index_equivalence_hash =
-				      equivalence_hash (NULL);
+				      df_ref use2;
+				      if (insn_info2)
+					use2 = DF_INSN_INFO_USES (insn_info2);
+				      else
+					use2 = NULL;
 
-				  if (dump_file
-				      && (dump_flags & TDF_DETAILS))
-				    {
-				      fprintf (dump_file,
-					       " propagates from originating"
-					       " insn %d, with delta %lld\n",
-					       uid2, delta);
+				      if (!use2 || !DF_REF_NEXT_LOC (use2))
+					{
+					  index_is_originating = false;
+
+					  rtx body = PATTERN (insn2);
+					  gcc_assert (GET_CODE (body) == SET);
+					  gcc_assert (REG_P (SET_DEST (body)));
+
+					  insn_entry[uid].original_index_reg
+					    = REGNO (SET_DEST(body));
+					  insn_entry[uid].original_index_use
+					    = uid2;
+					  insn_entry[uid].index_delta = delta;
+
+					  if (use2)
+					    {
+					      struct df_link *def_link =
+						DF_REF_CHAIN (use2);
+
+					      /* kelvin debug */
+					      if (dump_file)
+						fprintf (dump_file,
+							 "hashing for insn %d index\n",
+							 uid2);
+
+					      index_is_relevant = true;
+					      insn_entry[uid].
+						index_equivalence_hash =
+						equivalence_hash (def_link);
+					    }
+					  /* else, index is not relevant.  */
+					  /*
+					  else
+					    insn_entry[uid].
+					      index_equivalence_hash =
+					      equivalence_hash (NULL);
+					  */
+
+					  if (dump_file
+					      && (dump_flags & TDF_DETAILS))
+					    {
+					      fprintf (dump_file,
+						       " propagates from"
+						       " originating insn %d"
+						       ", with delta %lld\n",
+						       uid2, delta);
+					    }
+					}
+				      else if (dump_file
+					       && (dump_flags & TDF_DETAILS))
+					{
+					  fprintf (dump_file,
+						   " Dependencies are too"
+						   " complicated for this"
+						   " optimization\n");
+					}
 				    }
 				}
 			    }
+			}
+
+		      /* This insn is only relevant if there is
+			 exactly one definition of base and one
+			 definition of index and they are both
+			 considered to be relevant.  */
+		      if ((num_base_defs == 1) && (num_index_defs == 1) &&
+			  base_is_relevant && index_is_relevant)
+			{
+			  insn_entry[uid].is_relevant = true;
+			  insn_entry[uid].is_originating =
+			    (base_is_originating && index_is_originating);
+			}
+		      else if (dump_file)
+			{
+			  fprintf (dump_file,
+				   "Rejecting dform optimization of insn %d\n",
+				   uid);
+
+			  if (num_base_defs != 1)
+			    fprintf (dump_file,
+				     "Too %s (%d) base definitions\n",
+				     (num_base_defs > 1)? "many": "few",
+				     num_base_defs);
+
+			  if (num_index_defs != 1)
+			    fprintf (dump_file,
+				     "Too %s (%d) index definitions\n",
+				     (num_index_defs > 1)? "many": "few",
+				     num_index_defs);
+
+			  if (!base_is_relevant)
+			    fprintf (dump_file,
+				     "The available base definition is "
+				     "not relevant\n");
+
+			  if (!index_is_relevant)
+			    fprintf (dump_file,
+				     "The available index definition is "
+				     "not relevant\n");
 			}
 		    }
 		  else if (dump_file && (dump_flags & TDF_DETAILS))

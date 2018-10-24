@@ -42,13 +42,14 @@ extern bool mem_operand_gpr (rtx, machine_mode);
 extern bool mem_operand_ds_form (rtx, machine_mode);
 extern bool toc_relative_expr_p (const_rtx, bool, const_rtx *, const_rtx *);
 extern void validate_condition_mode (enum rtx_code, machine_mode);
+extern bool rs6000_legitimate_address_p (machine_mode, rtx, bool);
 extern bool legitimate_constant_pool_address_p (const_rtx, machine_mode,
 						bool);
 extern bool legitimate_indirect_address_p (rtx, int);
 extern bool legitimate_indexed_address_p (rtx, int);
 extern bool avoiding_indexed_address_p (machine_mode);
-extern bool rs6000_target_supports_dform_offset_p (boolean, machine_mode,
-						   host_wide_int);
+extern bool rs6000_target_supports_dform_offset_p (bool, machine_mode,
+						   HOST_WIDE_INT);
 
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);

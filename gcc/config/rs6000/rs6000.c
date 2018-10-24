@@ -1326,7 +1326,8 @@ static const struct rs6000_builtin_info_type rs6000_builtin_info[] =
 static tree (*rs6000_veclib_handler) (combined_fn, tree, tree);
 
 
-static bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
+/* kelvin says this was static.  */
+bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
 static struct machine_function * rs6000_init_machine_status (void);
 static int rs6000_ra_ever_killed (void);
 static tree rs6000_handle_longcall_attribute (tree *, tree, tree, int, bool *);
@@ -9182,12 +9183,16 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
   if (quad_offset_p)
     {
+      if (dump_file) {
+	fprintf (dump_file, "checking quad_address_p, x: ");
+	print_inline_rtx (dump_file, x, 2);
+	fprintf (dump_file, "\n");
+      }
       if (quad_address_p (x, mode, reg_ok_strict))
 	return 1;
     }
   else if (virtual_stack_registers_memory_p (x))
     return 1;
-
   else if (reg_offset_p)
     {
       if (legitimate_small_data_p (mode, x))
@@ -9196,6 +9201,10 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 					     reg_ok_strict || lra_in_progress))
 	return 1;
     }
+
+  if (dump_file) {
+    fprintf (dump_file, "checking TImode\n");
+  }
 
   /* For TImode, if we have TImode in VSX registers, only allow register
      indirect addresses.  This will allow the values to go in either GPRs
@@ -9217,6 +9226,11 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	  || XEXP (x, 0) == arg_pointer_rtx)
       && GET_CODE (XEXP (x, 1)) == CONST_INT)
     return 1;
+
+  if (dump_file) {
+    fprintf (dump_file, "attempting rs6000_legitimate_offset_address_p\n");
+  }
+
   if (rs6000_legitimate_offset_address_p (mode, x, reg_ok_strict, false))
     return 1;
   if (!FLOAT128_2REG_P (mode)
@@ -9245,7 +9259,8 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 }
 
 /* Debug version of rs6000_legitimate_address_p.  */
-static bool
+/* kelvin says this was static */
+bool
 rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
 				   bool reg_ok_strict)
 {
@@ -9259,6 +9274,19 @@ rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
 	   (reload_completed ? "after" : "before"),
 	   GET_RTX_NAME (GET_CODE (x)));
   debug_rtx (x);
+
+  if (dump_file) {
+    fprintf (dump_file,
+	     "\nrs6000_legitimate_address_p: return = %s, mode = %s, "
+	     "strict = %d, reload = %s, code = %s\n",
+	     ret ? "true" : "false",
+	     GET_MODE_NAME (mode),
+	     reg_ok_strict,
+	     (reload_completed ? "after" : "before"),
+	     GET_RTX_NAME (GET_CODE (x)));
+    print_inline_rtx (dump_file, x, 2);
+    fprintf (dump_file, "\n");
+  }
 
   return ret;
 }
@@ -9274,8 +9302,9 @@ rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
    availability of a store instruction.  Otherwise, test for
    availability of a load instruction.  */
 bool
-rs6000_target_supports_dform_offset_p (boolean is_store, machine_mode mode,
-				       host_wide_int byte_offset)
+rs6000_target_supports_dform_offset_p (bool is_store __attribute__((unused)),
+				       machine_mode mode,
+				       HOST_WIDE_INT byte_offset)
 {
   const int max_16bit_signed = (0x7fffffff);
   const int min_16bit_signed = -1 - max_16bit_signed;
@@ -9313,15 +9342,20 @@ rs6000_target_supports_dform_offset_p (boolean is_store, machine_mode mode,
       if ((byte_offset >= min_16bit_signed)
 	  && (byte_offset <= max_16bit_signed))
 	return true;
+      else
+	break;
 
     case E_DImode:
       if ((byte_offset >= min_16bit_signed)
 	  && (byte_offset <= max_16bit_signed)
 	  && ((byte_offset & 0x03) == 0))
 	return true;
+      else
+	break;
 
     default:
-      /* fall through to see if other instructions will work.  */
+      ;	   /* Fall through to see if other instructions will work.  */
+
     }
 
   /*  available d-form instructionw with v2.03:
@@ -9374,44 +9408,45 @@ rs6000_target_supports_dform_offset_p (boolean is_store, machine_mode mode,
   */
   if (rs6000_isa_flags & OPTION_MASK_MODULO)
     {			/* ISA 3.0 */
-      switch (mode) {
-      case E_V16QImode:
-      case E_V8HImode:
-      case E_V4SFmode:
-      case E_V4SImode:
-      case E_V2DFmode:
-      case E_V2DImode:
-      case E_V1TImode:
-      case E_TImode:
+      switch (mode)
+	{
+	case E_V16QImode:
+	case E_V8HImode:
+	case E_V4SFmode:
+	case E_V4SImode:
+	case E_V2DFmode:
+	case E_V2DImode:
+	case E_V1TImode:
+	case E_TImode:
 
-      case E_KFmode:		/* ieee 754 128-bit floating point */
-      case E_IFmode:		/* IBM extended 128-bit double */
-      case E_TFmode:		/* 128-bit double (form depends on
+	case E_KFmode:		/* ieee 754 128-bit floating point */
+	case E_IFmode:		/* IBM extended 128-bit double */
+	case E_TFmode:		/* 128-bit double (form depends on
 				   gcc command line, which may be
 				   either -mabi=ieeelongdouble (KF)
 				   or -mabi=ibmlongdouble (IF). */
-	/* All 128-bit loads and stores are handled by lxv and stxv.  */
-	if ((byte_offset >= min_16bit_signed)
-	    && (byte_offset <= max_16bit_signed)
-	    && ((byte_offset & 0x0f) == 0))
-	  return true;
-	else
-	  break;
+	  /* All 128-bit loads and stores are handled by lxv and stxv.  */
+	  if ((byte_offset >= min_16bit_signed)
+	      && (byte_offset <= max_16bit_signed)
+	      && ((byte_offset & 0x0f) == 0))
+	    return true;
+	  else
+	    break;
 
-      case E_DFmode:
-      case E_SFmode:
-	/* E_DFmode handled by lxsd and stxsd insns.  E_SFmode handled
-	   by lxssp and stxssp insn.  */
-	if ((byte_offset >= min_16bit_signed)
-	    && (byte_offset <= max_16bit_signed)
-	    && ((byte_offset & 0x03) == 0))
-	  return true;
-	else
-	  break;
+	case E_DFmode:
+	case E_SFmode:
+	  /* E_DFmode handled by lxsd and stxsd insns.  E_SFmode handled
+	     by lxssp and stxssp insn.  */
+	  if ((byte_offset >= min_16bit_signed)
+	      && (byte_offset <= max_16bit_signed)
+	      && ((byte_offset & 0x03) == 0))
+	    return true;
+	  else
+	    break;
 
-      default:
-	/* fall through to see if other instructions will work.  */
-      }
+	default:
+	  ; /* fall through to see if other instructions will work.  */
+	}
     }
 
   /* Add modeling support for newly introduced instructions here.  */
