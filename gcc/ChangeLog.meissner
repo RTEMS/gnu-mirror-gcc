@@ -1,5 +1,15 @@
 2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (easy_fp_direct_move_constant): Add
+	support for SFmode.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Add support to load
+	up SFmode values into a GPR and moving them to a either a VSX
+	register using the double format or a GPR register using the
+	single format.
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Likewise.
+
+2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wG constraint): New constraint for
 	floating point constants that can be loaded quickly in a GPR and
 	transfered over to a vector register quickly.

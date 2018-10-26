@@ -612,6 +612,19 @@
   if (mode == DFmode)
     return num_insns_constant (op, mode) <= 2;
 
+  /* For SFmode, we have to convert the value to double on the assumption we
+     are moving it to a VSX register.  */
+  if (mode == SFmode)
+    {
+      int endian = (WORDS_BIG_ENDIAN == 0);
+      long l[2];
+      HOST_WIDE_INT val;
+      REAL_VALUE_TO_TARGET_DOUBLE (*CONST_DOUBLE_REAL_VALUE (op), l);
+      val = ((HOST_WIDE_INT)(unsigned long)l[endian] << 32
+	     | ((HOST_WIDE_INT)(unsigned long)l[1 - endian]));
+      return num_insns_constant (GEN_INT (val), DImode) <= 2;
+    }
+
   return 0;
 })
 

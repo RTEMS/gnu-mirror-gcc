@@ -10114,11 +10114,27 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
     case E_DFmode:
     case E_DDmode:
-    case E_SFmode:
     case E_SDmode:
       if (CONSTANT_P (operands[1])
 	  && ! easy_fp_constant (operands[1], mode))
 	operands[1] = force_const_mem (mode, operands[1]);
+      break;
+
+    case E_SFmode:
+      if (CONSTANT_P (operands[1]))
+	{
+	  /* Special case moving a SF constant to a VSX register by moving the
+	     DF value instead of the SF value.  */
+	  if (easy_fp_direct_move_constant (operands[1], mode)
+	      && !int_reg_operand_not_pseudo (operands[0], mode))
+	    {
+	      emit_insn (gen_movsf_const_direct_move (operands[0],
+						      operands[1]));
+	      return;
+	    }
+	  else if (! easy_fp_constant (operands[1], mode))
+	    operands[1] = force_const_mem (SFmode, operands[1]);
+	}
       break;
 
     case E_V16QImode:
