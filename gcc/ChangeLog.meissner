@@ -1,5 +1,12 @@
 2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Always
+	allocate a scratch register due to loop unrolling where things
+	might move between the GPR registers and VSX registers in the
+	later stages.
+
+2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (easy_fp_direct_move_constant): Add
 	support for SFmode.
 	* config/rs6000/rs6000.c (rs6000_emit_move): Add support to load
