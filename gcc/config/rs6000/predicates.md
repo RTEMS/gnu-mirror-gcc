@@ -599,6 +599,22 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
+;; Return 1 if a floating point constant can be loaded up into a 64-bit GPR
+;; register, and moved to a floating point register.  This assumes the direct
+;; move instruction (MTVSRD) is reasonably fast (true on power9, not true on
+;; power8).  Don't allow 0.0, since that is easy to create with an XOR.
+(define_predicate "easy_fp_direct_move_constant"
+  (match_code "const_double")
+{
+  if (!TARGET_P9_VECTOR || !TARGET_POWERPC64 || op == CONST0_RTX (mode))
+    return 0;
+
+  if (mode == DFmode)
+    return num_insns_constant (op, mode) <= 2;
+
+  return 0;
+})
+
 ;; Return 1 if operand is a CONST_DOUBLE that can be set in a register
 ;; with no more than one instruction per word.
 (define_predicate "easy_fp_constant"
@@ -632,10 +648,12 @@
 
   switch (mode)
     {
+    case E_DFmode:
+      return easy_fp_direct_move_constant (op, mode);
+
     case E_KFmode:
     case E_IFmode:
     case E_TFmode:
-    case E_DFmode:
     case E_SFmode:
       return 0;
 

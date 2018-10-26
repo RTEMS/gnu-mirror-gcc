@@ -1,3 +1,20 @@
+2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (wG constraint): New constraint for
+	floating point constants that can be loaded quickly in a GPR and
+	transfered over to a vector register quickly.
+	* config/rs6000/predicates.md (easy_fp_direct_move_constant): New
+	predicate to determine which constants can be loaded without
+	loading them from memory.
+	(easy_fp_constant): If easy_fp_mtvsrd_constant is true, the
+	constant is easy.
+	* config/rs6000/rs6000.md (movdf constant splitter): Use
+	int_reg_operand instead of extra code to make sure we are
+	splitting loading up constants to GPRs.
+	(mov<mode>_hardfloat64): Add support for loading FP constants into
+	GPRs and using direct move to move them over.
+	* doc/md.texi (PowerPC constraints): Document wG constraint.
+
 2018-10-26   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 265537

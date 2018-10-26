@@ -157,6 +157,10 @@
   "Memory operand suitable for power9 fusion load/stores"
   (match_operand 0 "fusion_addis_mem_combo_load"))
 
+(define_constraint "wG"
+  "FP constant that can be loaded in a GPR and moved to a VSX register."
+  (match_operand 0 "easy_fp_direct_move_constant"))
+
 (define_register_constraint "wH" "rs6000_constraints[RS6000_CONSTRAINT_wH]"
   "Altivec register to hold 32-bit integers or NO_REGS.")
 
