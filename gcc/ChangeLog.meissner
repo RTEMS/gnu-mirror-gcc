@@ -1,5 +1,10 @@
 2018-10-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Delete
+	loading up GPRs.
+
+2018-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT): New unspec for
 	moving SFmode constants from GPRs to VSX registers.
 	(movsf constant splitter): Use int_reg_operand.
