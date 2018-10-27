@@ -1,3 +1,16 @@
+2018-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT): New unspec for
+	moving SFmode constants from GPRs to VSX registers.
+	(movsf constant splitter): Use int_reg_operand.
+	(movsf_hardfloat): Don't allow moving SFmode constants that are
+	generated in the GPR registers to be used in the general move.
+	(movsf_const_direct_move): Rework.
+	(movsf_const_direct_move_internal): New insn to move SFmode
+	constants from GPRs to VSX registers after splitting.
+	(movsf_const_store): Optimize creating a SFmode constant and
+	storing it not to move the constant to the VSX registers.
+
 2018-10-26  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.md (movsf_const_direct_move): Always
