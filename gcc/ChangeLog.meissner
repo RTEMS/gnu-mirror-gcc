@@ -1,5 +1,11 @@
 2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT_MEM): Delete.
+	(movsf_const_direct_move): Rework again, and move before movsf.
+	(movsf_const_internal): Likewise.
+
+2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT): Split into 2
 	separate unspecs.
 	(UNSPEC_SF_CONSTANT_VSX): Likewise.
