@@ -606,7 +606,7 @@
 (define_predicate "easy_fp_direct_move_constant"
   (match_code "const_double")
 {
-  if (!TARGET_P9_VECTOR || !TARGET_POWERPC64 || op == CONST0_RTX (mode))
+  if (!TARGET_DIRECT_MOVE_FP_CONSTANT || op == CONST0_RTX (mode))
     return 0;
 
   if (mode == DFmode)

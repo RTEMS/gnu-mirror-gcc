@@ -478,6 +478,12 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
+/* Whether to create DF/SFmode constants in GPR registers and use direct move
+   to move the constants over to the VSX registers.  While it only needs 64-bit
+   code and direct move, the power8 direct move is too slow to be useful, so
+   require ISA 3.0.  */
+#define TARGET_DIRECT_MOVE_FP_CONSTANT	(TARGET_POWERPC64 && TARGET_P9_VECTOR)
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */

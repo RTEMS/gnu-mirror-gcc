@@ -1,5 +1,18 @@
 2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (easy_fp_direct_move_constant): Use
+	TARGET_DIRECT_MOVE_FP_CONSTANT.
+	* config/rs6000/rs6000.h (TARGET_DIRECT_MOVE_FP_CONSTANT): New
+	macro to say whether we should optimize loading up floating point
+	constants by loading them in the GPRs and using direct move to
+	transfer them over.
+	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT_VSX): Delete.
+	(movsf_const_direct_move): Use TARGET_DIRECT_MOVE_FP_CONSTANT.
+	Use p8_mtvsrd_sf to do the direct move.
+	(movsf_const_internal): Delete, no longer used.
+
+2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (UNSPEC_SF_CONSTANT_MEM): Delete.
 	(movsf_const_direct_move): Rework again, and move before movsf.
 	(movsf_const_internal): Likewise.
