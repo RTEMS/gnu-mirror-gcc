@@ -1,5 +1,12 @@
 2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Rework move
+	to GPR and memory.
+	(movsf_const_internal1): Likewise.
+	(movsf_const_internal2): Likewise.
+
+2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movsf_const_direct_move): Re-add
 	support for loading up GPRs.  Add support for storing constants to
 	memory.
