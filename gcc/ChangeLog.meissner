@@ -1,5 +1,12 @@
 2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_emit_move): Don't bother testing
+	if the destination of moving a SFmode constant is not a GPR.
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Churn, churn,
+	churn.  Combine vsx, gpr, memory cases.
+
+2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (easy_fp_direct_move_constant): Use
 	TARGET_DIRECT_MOVE_FP_CONSTANT.
 	* config/rs6000/rs6000.h (TARGET_DIRECT_MOVE_FP_CONSTANT): New

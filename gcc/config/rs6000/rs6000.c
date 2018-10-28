@@ -10124,9 +10124,9 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       if (CONSTANT_P (operands[1]))
 	{
 	  /* Special case moving a SF constant to a VSX register by moving the
-	     DF value instead of the SF value.  */
-	  if (easy_fp_direct_move_constant (operands[1], mode)
-	      && !int_reg_operand_not_pseudo (operands[0], mode))
+	     DF value to a GPR and then doing a direct move to the VSX
+	     register.  */
+	  if (easy_fp_direct_move_constant (operands[1], mode))
 	    {
 	      emit_insn (gen_movsf_const_direct_move (operands[0],
 						      operands[1]));
