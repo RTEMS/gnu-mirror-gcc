@@ -1,5 +1,11 @@
 2018-10-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (easy_fp_direct_move_constant):
+	Disable SFmode constants.
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Likewise.
+
+2018-10-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (UNSPEC_SF_CONST_MEM): New unspecs.
 	(UNSPEC_SF_CONST_GPR): Likewise.
 	(movsf_const_direct_move): Rework yet again, don't alais results,

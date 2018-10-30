@@ -614,7 +614,7 @@
 
   /* For SFmode, we have to convert the value to double on the assumption we
      are moving it to a VSX register.  */
-  if (mode == SFmode)
+  if (0 && mode == SFmode)
     {
       int endian = (WORDS_BIG_ENDIAN == 0);
       long l[2];
