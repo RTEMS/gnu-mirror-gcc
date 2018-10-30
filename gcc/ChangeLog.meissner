@@ -1,5 +1,10 @@
 2018-10-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsf_const_direct_move): Add support
+	for loading up GPRs (but don't do the memory optimization).
+
+2018-10-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (UNSPEC_SF_CONST_MEM): Delete optimizing
 	SF constants for stores.
 	(movsf_const_mem): Likewise.
