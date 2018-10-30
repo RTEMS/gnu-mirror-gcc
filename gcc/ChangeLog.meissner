@@ -1,3 +1,12 @@
+2018-10-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (UNSPEC_SF_CONST_MEM): New unspecs.
+	(UNSPEC_SF_CONST_GPR): Likewise.
+	(movsf_const_direct_move): Rework yet again, don't alais results,
+	use helper functions instead.
+	(movsf_const_mem): Likewise.
+	(movsf_const_gpr): Likewise.
+
 2018-10-28  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_move): Don't bother testing
