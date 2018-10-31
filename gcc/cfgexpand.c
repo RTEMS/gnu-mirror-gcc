@@ -1155,6 +1155,20 @@ expand_stack_vars (bool (*pred) (size_t), struct stack_vars_data *data)
 	      if (repr_decl == NULL_TREE)
 		repr_decl = stack_vars[i].decl;
 	      data->asan_decl_vec.safe_push (repr_decl);
+
+	      /* Make sure a representative is unpoison if another
+		 variable in the partition is handled by
+		 use-after-scope sanitization.  */
+	      if (asan_handled_variables != NULL
+		  && !asan_handled_variables->contains (repr_decl))
+		{
+		  for (j = i; j != EOC; j = stack_vars[j].next)
+		    if (asan_handled_variables->contains (stack_vars[j].decl))
+		      break;
+		  if (j != EOC)
+		    asan_handled_variables->add (repr_decl);
+		}
+
 	      data->asan_alignb = MAX (data->asan_alignb, alignb);
 	      if (data->asan_base == NULL)
 		data->asan_base = gen_reg_rtx (Pmode);
@@ -1660,7 +1674,12 @@ expand_one_var (tree var, bool toplevel, bool really_expand)
       /* Reject variables which cover more than half of the address-space.  */
       if (really_expand)
 	{
-	  error ("size of variable %q+D is too large", var);
+	  if (DECL_NONLOCAL_FRAME (var))
+	    error_at (DECL_SOURCE_LOCATION (current_function_decl),
+		      "total size of local objects is too large");
+	  else
+	    error_at (DECL_SOURCE_LOCATION (var),
+		      "size of variable %q+D is too large", var);
 	  expand_one_error_var (var);
 	}
     }
@@ -2476,6 +2495,13 @@ expand_gimple_cond (basic_block bb, gcond *stmt)
 	    }
 	}
     }
+
+  /* Optimize (x % C1) == C2 or (x % C1) != C2 if it is beneficial
+     into (x - C2) * C3 < C4.  */
+  if ((code == EQ_EXPR || code == NE_EXPR)
+      && TREE_CODE (op0) == SSA_NAME
+      && TREE_CODE (op1) == INTEGER_CST)
+    code = maybe_optimize_mod_cmp (code, &op0, &op1);
 
   last2 = last = get_last_insn ();
 
@@ -5810,6 +5836,8 @@ expand_gimple_basic_block (basic_block bb, bool disable_tail_calls)
     last = PREV_INSN (last);
   if (JUMP_TABLE_DATA_P (last))
     last = PREV_INSN (PREV_INSN (last));
+  if (BARRIER_P (last))
+    last = PREV_INSN (last);
   BB_END (bb) = last;
 
   update_bb_for_insn (bb);

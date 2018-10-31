@@ -1,3 +1,13 @@
+2018-10-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 265537.
+	* REVISION: Update subversion id.
+
+2018-10-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 265537.
+	* REVISION: Update subversion id.
+
 2018-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (wF constraint): Remove
