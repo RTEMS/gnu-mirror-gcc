@@ -381,6 +381,7 @@
    UNSPEC_VSX_SIEXPDP
    UNSPEC_VSX_SIEXPQP
    UNSPEC_VSX_SCMPEXPDP
+   UNSPEC_VSX_SCMPEXPQP
    UNSPEC_VSX_STSTDC
    UNSPEC_VSX_VEXTRACT_FP_FROM_SHORTH
    UNSPEC_VSX_VEXTRACT_FP_FROM_SHORTL
@@ -3265,7 +3266,7 @@
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
    stfd%U0%X0 %1,%0
-   stxsd%U0x %x1,%y0
+   stxsdx %x1,%y0
    stxsd %1,%0"
   [(set_attr "type" "fpstore")])
 
@@ -4558,6 +4559,34 @@
 	 (match_operand:SI 3 "zero_constant" "j")))]
   "TARGET_P9_VECTOR"
   "xscmpexpdp %0,%x1,%x2"
+  [(set_attr "type" "fpcompare")])
+
+;; VSX Scalar Compare Exponents Quad-Precision
+(define_expand "xscmpexpqp_<code>_<mode>"
+  [(set (match_dup 3)
+	(compare:CCFP
+	 (unspec:IEEE128
+	  [(match_operand:IEEE128 1 "vsx_register_operand" "v")
+	   (match_operand:IEEE128 2 "vsx_register_operand" "v")]
+	  UNSPEC_VSX_SCMPEXPQP)
+	 (const_int 0)))
+   (set (match_operand:SI 0 "register_operand" "=r")
+	(CMP_TEST:SI (match_dup 3)
+		     (const_int 0)))]
+  "TARGET_P9_VECTOR"
+{
+  operands[3] = gen_reg_rtx (CCFPmode);
+})
+
+(define_insn "*xscmpexpqp"
+  [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
+	(compare:CCFP
+	 (unspec:IEEE128 [(match_operand:IEEE128 1 "altivec_register_operand" "v")
+		          (match_operand:IEEE128 2 "altivec_register_operand" "v")]
+	  UNSPEC_VSX_SCMPEXPQP)
+	 (match_operand:SI 3 "zero_constant" "j")))]
+  "TARGET_P9_VECTOR"
+  "xscmpexpqp %0,%1,%2"
   [(set_attr "type" "fpcompare")])
 
 ;; VSX Scalar Test Data Class Quad-Precision

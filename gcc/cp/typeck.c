@@ -63,6 +63,8 @@ static tree lookup_destructor (tree, tree, tree, tsubst_flags_t);
 static void error_args_num (location_t, tree, bool);
 static int convert_arguments (tree, vec<tree, va_gc> **, tree, int,
                               tsubst_flags_t);
+static bool is_std_move_p (tree);
+static bool is_std_forward_p (tree);
 
 /* Do `exp = require_complete_type (exp);' to make sure exp
    does not have an incomplete type.  (That includes void types.)
@@ -2706,15 +2708,51 @@ check_template_keyword (tree decl)
 }
 
 /* Record that an access failure occurred on BASETYPE_PATH attempting
-   to access FIELD_DECL.  */
+   to access DECL, where DIAG_DECL should be used for diagnostics.  */
 
 void
 access_failure_info::record_access_failure (tree basetype_path,
-					    tree field_decl)
+					    tree decl, tree diag_decl)
 {
   m_was_inaccessible = true;
   m_basetype_path = basetype_path;
-  m_field_decl = field_decl;
+  m_decl = decl;
+  m_diag_decl = diag_decl;
+}
+
+/* If an access failure was recorded, then attempt to locate an
+   accessor function for the pertinent field.
+   Otherwise, return NULL_TREE.  */
+
+tree
+access_failure_info::get_any_accessor (bool const_p) const
+{
+  if (!was_inaccessible_p ())
+    return NULL_TREE;
+
+  tree accessor
+    = locate_field_accessor (m_basetype_path, m_diag_decl, const_p);
+  if (!accessor)
+    return NULL_TREE;
+
+  /* The accessor must itself be accessible for it to be a reasonable
+     suggestion.  */
+  if (!accessible_p (m_basetype_path, accessor, true))
+    return NULL_TREE;
+
+  return accessor;
+}
+
+/* Add a fix-it hint to RICHLOC suggesting the use of ACCESSOR_DECL, by
+   replacing the primary location in RICHLOC with "accessor()".  */
+
+void
+access_failure_info::add_fixit_hint (rich_location *richloc,
+				     tree accessor_decl)
+{
+  pretty_printer pp;
+  pp_printf (&pp, "%s()", IDENTIFIER_POINTER (DECL_NAME (accessor_decl)));
+  richloc->add_fixit_replace (pp_formatted_text (&pp));
 }
 
 /* If an access failure was recorded, then attempt to locate an
@@ -2724,25 +2762,84 @@ access_failure_info::record_access_failure (tree basetype_path,
 void
 access_failure_info::maybe_suggest_accessor (bool const_p) const
 {
-  if (!m_was_inaccessible)
+  tree accessor = get_any_accessor (const_p);
+  if (accessor == NULL_TREE)
     return;
-
-  tree accessor
-    = locate_field_accessor (m_basetype_path, m_field_decl, const_p);
-  if (!accessor)
-    return;
-
-  /* The accessor must itself be accessible for it to be a reasonable
-     suggestion.  */
-  if (!accessible_p (m_basetype_path, accessor, true))
-    return;
-
   rich_location richloc (line_table, input_location);
-  pretty_printer pp;
-  pp_printf (&pp, "%s()", IDENTIFIER_POINTER (DECL_NAME (accessor)));
-  richloc.add_fixit_replace (pp_formatted_text (&pp));
+  add_fixit_hint (&richloc, accessor);
   inform (&richloc, "field %q#D can be accessed via %q#D",
-	  m_field_decl, accessor);
+	  m_diag_decl, accessor);
+}
+
+/* Subroutine of finish_class_member_access_expr.
+   Issue an error about NAME not being a member of ACCESS_PATH (or
+   OBJECT_TYPE), potentially providing a fix-it hint for misspelled
+   names.  */
+
+static void
+complain_about_unrecognized_member (tree access_path, tree name,
+				    tree object_type)
+{
+  /* Attempt to provide a hint about misspelled names.  */
+  tree guessed_id = lookup_member_fuzzy (access_path, name,
+					 /*want_type=*/false);
+  if (guessed_id == NULL_TREE)
+    {
+      /* No hint.  */
+      error ("%q#T has no member named %qE",
+	     TREE_CODE (access_path) == TREE_BINFO
+	     ? TREE_TYPE (access_path) : object_type, name);
+      return;
+    }
+
+  location_t bogus_component_loc = input_location;
+  gcc_rich_location rich_loc (bogus_component_loc);
+
+  /* Check that the guessed name is accessible along access_path.  */
+  access_failure_info afi;
+  lookup_member (access_path, guessed_id, /*protect=*/1,
+		 /*want_type=*/false, /*complain=*/false,
+		 &afi);
+  if (afi.was_inaccessible_p ())
+    {
+      tree accessor = afi.get_any_accessor (TYPE_READONLY (object_type));
+      if (accessor)
+	{
+	  /* The guessed name isn't directly accessible, but can be accessed
+	     via an accessor member function.  */
+	  afi.add_fixit_hint (&rich_loc, accessor);
+	  error_at (&rich_loc,
+		    "%q#T has no member named %qE;"
+		    " did you mean %q#D? (accessible via %q#D)",
+		    TREE_CODE (access_path) == TREE_BINFO
+		    ? TREE_TYPE (access_path) : object_type,
+		    name, afi.get_diag_decl (), accessor);
+	}
+      else
+	{
+	  /* The guessed name isn't directly accessible, and no accessor
+	     member function could be found.  */
+	  error_at (&rich_loc,
+		    "%q#T has no member named %qE;"
+		    " did you mean %q#D? (not accessible from this context)",
+		    TREE_CODE (access_path) == TREE_BINFO
+		    ? TREE_TYPE (access_path) : object_type,
+		    name, afi.get_diag_decl ());
+	  complain_about_access (afi.get_decl (), afi.get_diag_decl (), false);
+	}
+    }
+  else
+    {
+      /* The guessed name is directly accessible; suggest it.  */
+      rich_loc.add_fixit_misspelled_id (bogus_component_loc,
+					guessed_id);
+      error_at (&rich_loc,
+		"%q#T has no member named %qE;"
+		" did you mean %qE?",
+		TREE_CODE (access_path) == TREE_BINFO
+		? TREE_TYPE (access_path) : object_type,
+		name, guessed_id);
+    }
 }
 
 /* This function is called by the parser to process a class member
@@ -2938,27 +3035,8 @@ finish_class_member_access_expr (cp_expr object, tree name, bool template_p,
 		/* Try again at instantiation time.  */
 		goto dependent;
 	      if (complain & tf_error)
-		{
-		  tree guessed_id = lookup_member_fuzzy (access_path, name,
-							 /*want_type=*/false);
-		  if (guessed_id)
-		    {
-		      location_t bogus_component_loc = input_location;
-		      gcc_rich_location rich_loc (bogus_component_loc);
-		      rich_loc.add_fixit_misspelled_id (bogus_component_loc,
-							guessed_id);
-		      error_at (&rich_loc,
-				"%q#T has no member named %qE;"
-				" did you mean %qE?",
-				TREE_CODE (access_path) == TREE_BINFO
-				? TREE_TYPE (access_path) : object_type,
-				name, guessed_id);
-		    }
-		  else
-		    error ("%q#T has no member named %qE",
-			   TREE_CODE (access_path) == TREE_BINFO
-			   ? TREE_TYPE (access_path) : object_type, name);
-		}
+		complain_about_unrecognized_member (access_path, name,
+						    object_type);
 	      return error_mark_node;
 	    }
 	  if (member == error_mark_node)
@@ -8818,23 +8896,9 @@ convert_for_assignment (tree type, tree rhs,
 						   parmnum, complain, flags);
 		}
 	      else if (fndecl)
-		{
-		  auto_diagnostic_group d;
-		  location_t loc = cp_expr_location (rhs);
-		  range_label_for_type_mismatch rhs_label (rhstype, type);
-		  range_label *label = &rhs_label;
-		  if (loc == UNKNOWN_LOCATION)
-		    {
-		      loc = input_location;
-		      label = NULL;
-		    }
-		  gcc_rich_location richloc (loc, label);
-		  error_at (&richloc,
-			    "cannot convert %qH to %qI",
-			    rhstype, type);
-		  inform (get_fndecl_argument_location (fndecl, parmnum),
-			  "  initializing argument %P of %qD", parmnum, fndecl);
-		}
+		complain_about_bad_argument (cp_expr_location (rhs),
+					     rhstype, type,
+					     fndecl, parmnum);
 	      else
 		switch (errtype)
 		  {
@@ -9071,6 +9135,15 @@ maybe_warn_about_returning_address_of_local (tree retval)
       STRIP_NOPS (whats_returned);
     }
 
+  /* As a special case, we handle a call to std::move or std::forward.  */
+  if (TREE_CODE (whats_returned) == CALL_EXPR
+      && (is_std_move_p (whats_returned)
+	  || is_std_forward_p (whats_returned)))
+    {
+      tree arg = CALL_EXPR_ARG (whats_returned, 0);
+      return maybe_warn_about_returning_address_of_local (arg);
+    }
+
   if (TREE_CODE (whats_returned) != ADDR_EXPR)
     return false;
   whats_returned = TREE_OPERAND (whats_returned, 0);
@@ -9099,6 +9172,22 @@ maybe_warn_about_returning_address_of_local (tree retval)
       && !(TREE_STATIC (whats_returned)
 	   || TREE_PUBLIC (whats_returned)))
     {
+      if (VAR_P (whats_returned)
+	  && DECL_DECOMPOSITION_P (whats_returned)
+	  && DECL_DECOMP_BASE (whats_returned)
+	  && DECL_HAS_VALUE_EXPR_P (whats_returned))
+	{
+	  /* When returning address of a structured binding, if the structured
+	     binding is not a reference, continue normally, if it is a
+	     reference, recurse on the initializer of the structured
+	     binding.  */
+	  tree base = DECL_DECOMP_BASE (whats_returned);
+	  if (TYPE_REF_P (TREE_TYPE (base)))
+	    {
+	      tree init = DECL_INITIAL (base);
+	      return maybe_warn_about_returning_address_of_local (init);
+	    }
+	}
       bool w = false;
       auto_diagnostic_group d;
       if (TYPE_REF_P (valtype))
@@ -9134,6 +9223,23 @@ decl_in_std_namespace_p (tree decl)
 {
   return (decl != NULL_TREE
 	  && DECL_NAMESPACE_STD_P (decl_namespace_context (decl)));
+}
+
+/* Returns true if FN, a CALL_EXPR, is a call to std::forward.  */
+
+static bool
+is_std_forward_p (tree fn)
+{
+  /* std::forward only takes one argument.  */
+  if (call_expr_nargs (fn) != 1)
+    return false;
+
+  tree fndecl = cp_get_callee_fndecl_nofold (fn);
+  if (!decl_in_std_namespace_p (fndecl))
+    return false;
+
+  tree name = DECL_NAME (fndecl);
+  return name && id_equal (name, "forward");
 }
 
 /* Returns true if FN, a CALL_EXPR, is a call to std::move.  */
@@ -9180,14 +9286,15 @@ can_do_nrvo_p (tree retval, tree functype)
 }
 
 /* Returns true if we should treat RETVAL, an expression being returned,
-   as if it were designated by an rvalue.  See [class.copy.elision].  */
+   as if it were designated by an rvalue.  See [class.copy.elision].
+   PARM_P is true if a function parameter is OK in this context.  */
 
-static bool
-treat_lvalue_as_rvalue_p (tree retval)
+bool
+treat_lvalue_as_rvalue_p (tree retval, bool parm_ok)
 {
   return ((cxx_dialect != cxx98)
 	  && ((VAR_P (retval) && !DECL_HAS_VALUE_EXPR_P (retval))
-	      || TREE_CODE (retval) == PARM_DECL)
+	      || (parm_ok && TREE_CODE (retval) == PARM_DECL))
 	  && DECL_CONTEXT (retval) == current_function_decl
 	  && !TREE_STATIC (retval));
 }
@@ -9240,7 +9347,7 @@ maybe_warn_pessimizing_move (tree retval, tree functype)
 	    }
 	  /* Warn if the move is redundant.  It is redundant when we would
 	     do maybe-rvalue overload resolution even without std::move.  */
-	  else if (treat_lvalue_as_rvalue_p (arg))
+	  else if (treat_lvalue_as_rvalue_p (arg, /*parm_ok*/true))
 	    {
 	      auto_diagnostic_group d;
 	      if (warning_at (loc, OPT_Wredundant_move,
@@ -9525,7 +9632,7 @@ check_return_expr (tree retval, bool *no_warning)
          Note that these conditions are similar to, but not as strict as,
 	 the conditions for the named return value optimization.  */
       bool converted = false;
-      if (treat_lvalue_as_rvalue_p (retval)
+      if (treat_lvalue_as_rvalue_p (retval, /*parm_ok*/true)
 	  /* This is only interesting for class type.  */
 	  && CLASS_TYPE_P (functype))
 	{

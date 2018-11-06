@@ -44,6 +44,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "gimplify.h"
 #include "gimple-iterator.h"
 #include "gimplify-me.h"
+#include "gimple-fold.h"
 #include "tree-cfg.h"
 #include "cfgloop.h"
 #include "alloc-pool.h"
@@ -439,25 +440,63 @@ switch_conversion::build_constructors ()
     }
 }
 
-/* If all values in the constructor vector are the same, return the value.
-   Otherwise return NULL_TREE.  Not supposed to be called for empty
-   vectors.  */
+/* If all values in the constructor vector are products of a linear function
+   a * x + b, then return true.  When true, COEFF_A and COEFF_B and
+   coefficients of the linear function.  Note that equal values are special
+   case of a linear function with a and b equal to zero.  */
 
-tree
-switch_conversion::contains_same_values_p (vec<constructor_elt, va_gc> *vec)
+bool
+switch_conversion::contains_linear_function_p (vec<constructor_elt, va_gc> *vec,
+					       wide_int *coeff_a,
+					       wide_int *coeff_b)
 {
   unsigned int i;
-  tree prev = NULL_TREE;
   constructor_elt *elt;
 
+  gcc_assert (vec->length () >= 2);
+
+  /* Let's try to find any linear function a * x + y that can apply to
+     given values. 'a' can be calculated as follows:
+
+     a = (y2 - y1) / (x2 - x1) where x2 - x1 = 1 (consecutive case indices)
+     a = y2 - y1
+
+     and
+
+     b = y2 - a * x2
+
+  */
+
+  tree elt0 = (*vec)[0].value;
+  tree elt1 = (*vec)[1].value;
+
+  if (TREE_CODE (elt0) != INTEGER_CST || TREE_CODE (elt1) != INTEGER_CST)
+    return false;
+
+  wide_int range_min = wi::to_wide (fold_convert (TREE_TYPE (elt0),
+						  m_range_min));
+  wide_int y1 = wi::to_wide (elt0);
+  wide_int y2 = wi::to_wide (elt1);
+  wide_int a = y2 - y1;
+  wide_int b = y2 - a * (range_min + 1);
+
+  /* Verify that all values fulfill the linear function.  */
   FOR_EACH_VEC_SAFE_ELT (vec, i, elt)
     {
-      if (!prev)
-	prev = elt->value;
-      else if (!operand_equal_p (elt->value, prev, OEP_ONLY_CONST))
-	return NULL_TREE;
+      if (TREE_CODE (elt->value) != INTEGER_CST)
+	return false;
+
+      wide_int value = wi::to_wide (elt->value);
+      if (a * range_min + b != value)
+	return false;
+
+      ++range_min;
     }
-  return prev;
+
+  *coeff_a = a;
+  *coeff_b = b;
+
+  return true;
 }
 
 /* Return type which should be used for array elements, either TYPE's
@@ -551,7 +590,7 @@ void
 switch_conversion::build_one_array (int num, tree arr_index_type,
 				    gphi *phi, tree tidx)
 {
-  tree name, cst;
+  tree name;
   gimple *load;
   gimple_stmt_iterator gsi = gsi_for_stmt (m_switch);
   location_t loc = gimple_location (m_switch);
@@ -561,9 +600,27 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
   name = copy_ssa_name (PHI_RESULT (phi));
   m_target_inbound_names[num] = name;
 
-  cst = contains_same_values_p (m_constructors[num]);
-  if (cst)
-    load = gimple_build_assign (name, cst);
+  wide_int coeff_a, coeff_b;
+  bool linear_p = contains_linear_function_p (m_constructors[num], &coeff_a,
+					      &coeff_b);
+  if (linear_p)
+    {
+      if (dump_file && coeff_a.to_uhwi () > 0)
+	fprintf (dump_file, "Linear transformation with A = %" PRId64
+		 " and B = %" PRId64 "\n", coeff_a.to_shwi (),
+		 coeff_b.to_shwi ());
+
+      tree t = unsigned_type_for (TREE_TYPE (m_index_expr));
+      gimple_seq seq = NULL;
+      tree tmp = gimple_convert (&seq, t, m_index_expr);
+      tree tmp2 = gimple_build (&seq, MULT_EXPR, t,
+				wide_int_to_tree (t, coeff_a), tmp);
+      tree tmp3 = gimple_build (&seq, PLUS_EXPR, t, tmp2,
+				wide_int_to_tree (t, coeff_b));
+      tree tmp4 = gimple_convert (&seq, TREE_TYPE (name), tmp3);
+      gsi_insert_seq_before (&gsi, seq, GSI_SAME_STMT);
+      load = gimple_build_assign (name, tmp4);
+    }
   else
     {
       tree array_type, ctor, decl, value_type, fetch, default_type;
@@ -913,7 +970,14 @@ switch_conversion::expand (gswitch *swtch)
   /* Group case labels so that we get the right results from the heuristics
      that decide on the code generation approach for this switch.  */
   m_cfg_altered |= group_case_labels_stmt (swtch);
-  gcc_assert (gimple_switch_num_labels (swtch) >= 2);
+
+  /* If this switch is now a degenerate case with only a default label,
+     there is nothing left for us to do.  */
+  if (gimple_switch_num_labels (swtch) < 2)
+    {
+      m_reason = "switch is a degenerate case";
+      return;
+    }
 
   collect (swtch);
 
@@ -1914,6 +1978,7 @@ switch_decision_tree::balance_case_nodes (case_tree_node **head,
       int ranges = 0;
       case_tree_node **npp;
       case_tree_node *left;
+      profile_probability prob = profile_probability::never ();
 
       /* Count the number of entries on branch.  Also count the ranges.  */
 
@@ -1923,6 +1988,7 @@ switch_decision_tree::balance_case_nodes (case_tree_node **head,
 	    ranges++;
 
 	  i++;
+	  prob += np->m_c->m_prob;
 	  np = np->m_right;
 	}
 
@@ -1931,39 +1997,35 @@ switch_decision_tree::balance_case_nodes (case_tree_node **head,
 	  /* Split this list if it is long enough for that to help.  */
 	  npp = head;
 	  left = *npp;
+	  profile_probability pivot_prob = prob.apply_scale (1, 2);
 
-	  /* If there are just three nodes, split at the middle one.  */
-	  if (i == 3)
-	    npp = &(*npp)->m_right;
-	  else
+	  /* Find the place in the list that bisects the list's total cost,
+	     where ranges count as 2.  */
+	  while (1)
 	    {
-	      /* Find the place in the list that bisects the list's total cost,
-		 where ranges count as 2.
-		 Here I gets half the total cost.  */
-	      i = (i + ranges + 1) / 2;
-	      while (1)
-		{
-		  /* Skip nodes while their cost does not reach that amount.  */
-		  if (!tree_int_cst_equal ((*npp)->m_c->get_low (),
-					   (*npp)->m_c->get_high ()))
-		    i--;
-		  i--;
-		  if (i <= 0)
-		    break;
-		  npp = &(*npp)->m_right;
-		}
+	      /* Skip nodes while their probability does not reach
+		 that amount.  */
+	      prob -= (*npp)->m_c->m_prob;
+	      if ((prob.initialized_p () && prob < pivot_prob)
+		  || ! (*npp)->m_right)
+		break;
+	      npp = &(*npp)->m_right;
 	    }
-	  *head = np = *npp;
-	  *npp = 0;
+
+	  np = *npp;
+ 	  *npp = 0;
+	  *head = np;
 	  np->m_parent = parent;
-	  np->m_left = left;
+	  np->m_left = left == np ? NULL : left;
 
 	  /* Optimize each of the two split parts.  */
 	  balance_case_nodes (&np->m_left, np);
 	  balance_case_nodes (&np->m_right, np);
 	  np->m_c->m_subtree_prob = np->m_c->m_prob;
-	  np->m_c->m_subtree_prob += np->m_left->m_c->m_subtree_prob;
-	  np->m_c->m_subtree_prob += np->m_right->m_c->m_subtree_prob;
+	  if (np->m_left)
+	    np->m_c->m_subtree_prob += np->m_left->m_c->m_subtree_prob;
+	  if (np->m_right)
+	    np->m_c->m_subtree_prob += np->m_right->m_c->m_subtree_prob;
 	}
       else
 	{
@@ -2421,8 +2483,13 @@ pass_lower_switch<O0>::execute (function *fun)
   FOR_EACH_BB_FN (bb, fun)
     {
       gimple *stmt = last_stmt (bb);
-      if (stmt && gimple_code (stmt) == GIMPLE_SWITCH)
-	switch_statements.safe_push (stmt);
+      gswitch *swtch;
+      if (stmt && (swtch = dyn_cast<gswitch *> (stmt)))
+	{
+	  if (!O0)
+	    group_case_labels_stmt (swtch);
+	  switch_statements.safe_push (swtch);
+	}
     }
 
   for (unsigned i = 0; i < switch_statements.length (); i++)

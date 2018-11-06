@@ -755,8 +755,8 @@ layout_decl (tree decl, unsigned int known_align)
     DECL_SIZE_UNIT (decl) = variable_size (DECL_SIZE_UNIT (decl));
 
   /* If requested, warn about definitions of large data objects.  */
-  if ((code == VAR_DECL || code == PARM_DECL)
-      && ! DECL_EXTERNAL (decl))
+  if ((code == PARM_DECL || (code == VAR_DECL && !DECL_NONLOCAL_FRAME (decl)))
+      && !DECL_EXTERNAL (decl))
     {
       tree size = DECL_SIZE_UNIT (decl);
 
@@ -1686,14 +1686,21 @@ place_field (record_layout_info rli, tree field)
     {
       rli->bitpos = size_binop (PLUS_EXPR, rli->bitpos, DECL_SIZE (field));
 
-      /* If we ended a bitfield before the full length of the type then
-	 pad the struct out to the full length of the last type.  */
-      if ((DECL_CHAIN (field) == NULL
-	   || TREE_CODE (DECL_CHAIN (field)) != FIELD_DECL)
-	  && DECL_BIT_FIELD_TYPE (field)
+      /* If FIELD is the last field and doesn't end at the full length
+	 of the type then pad the struct out to the full length of the
+	 last type.  */
+      if (DECL_BIT_FIELD_TYPE (field)
 	  && !integer_zerop (DECL_SIZE (field)))
-	rli->bitpos = size_binop (PLUS_EXPR, rli->bitpos,
-				  bitsize_int (rli->remaining_in_alignment));
+	{
+	  /* We have to scan, because non-field DECLS are also here.  */
+	  tree probe = field;
+	  while ((probe = DECL_CHAIN (probe)))
+	    if (TREE_CODE (probe) == FIELD_DECL)
+	      break;
+	  if (!probe)
+	    rli->bitpos = size_binop (PLUS_EXPR, rli->bitpos,
+				      bitsize_int (rli->remaining_in_alignment));
+	}
 
       normalize_rli (rli);
     }

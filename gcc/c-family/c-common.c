@@ -214,6 +214,10 @@ int flag_isoc99;
 
 int flag_isoc11;
 
+/* Nonzero means use the ISO C2X dialect of C.  */
+
+int flag_isoc2x;
+
 /* Nonzero means that we have builtin functions, and main is an int.  */
 
 int flag_hosted = 1;
@@ -3289,7 +3293,7 @@ c_common_truthvalue_conversion (location_t location, tree expr)
  	tree inner = TREE_OPERAND (expr, 0);
 	if (decl_with_nonnull_addr_p (inner))
 	  {
-	    /* Common Ada/Pascal programmer's mistake.  */
+	    /* Common Ada programmer's mistake.  */
 	    warning_at (location,
 			OPT_Waddress,
 			"the address of %qD will always evaluate as %<true%>",
@@ -6068,7 +6072,7 @@ c_parse_error (const char *gmsgid, enum cpp_ttype token_type,
    message, or 0 if none.  */
 
 static int
-c_option_controlling_cpp_error (int reason)
+c_option_controlling_cpp_diagnostic (enum cpp_warning_reason reason)
 {
   const struct cpp_reason_option_codes_t *entry;
 
@@ -6080,7 +6084,7 @@ c_option_controlling_cpp_error (int reason)
   return 0;
 }
 
-/* Callback from cpp_error for PFILE to print diagnostics from the
+/* Callback from cpp_diagnostic for PFILE to print diagnostics from the
    preprocessor.  The diagnostic is of type LEVEL, with REASON set
    to the reason code if LEVEL is represents a warning, at location
    RICHLOC unless this is after lexing and the compiler's location
@@ -6089,9 +6093,11 @@ c_option_controlling_cpp_error (int reason)
    otherwise.  */
 
 bool
-c_cpp_error (cpp_reader *pfile ATTRIBUTE_UNUSED, int level, int reason,
-	     rich_location *richloc,
-	     const char *msg, va_list *ap)
+c_cpp_diagnostic (cpp_reader *pfile ATTRIBUTE_UNUSED,
+		  enum cpp_diagnostic_level level,
+		  enum cpp_warning_reason reason,
+		  rich_location *richloc,
+		  const char *msg, va_list *ap)
 {
   diagnostic_info diagnostic;
   diagnostic_t dlevel;
@@ -6134,8 +6140,9 @@ c_cpp_error (cpp_reader *pfile ATTRIBUTE_UNUSED, int level, int reason,
     richloc->set_range (0, input_location, SHOW_RANGE_WITH_CARET);
   diagnostic_set_info_translated (&diagnostic, msg, ap,
 				  richloc, dlevel);
-  diagnostic_override_option_index (&diagnostic,
-                                    c_option_controlling_cpp_error (reason));
+  diagnostic_override_option_index
+    (&diagnostic,
+     c_option_controlling_cpp_diagnostic (reason));
   ret = diagnostic_report_diagnostic (global_dc, &diagnostic);
   if (level == CPP_DL_WARNING_SYSHDR)
     global_dc->dc_warn_system_headers = save_warn_system_headers;
@@ -6423,6 +6430,28 @@ complete_array_type (tree *ptype, tree initial_value, bool do_default)
 
   *ptype = type;
   return failure;
+}
+
+/* INIT is an constructor of a structure with a flexible array member.
+   Complete the flexible array member with a domain based on it's value.  */
+void
+complete_flexible_array_elts (tree init)
+{
+  tree elt, type;
+
+  if (init == NULL_TREE || TREE_CODE (init) != CONSTRUCTOR)
+    return;
+
+  if (vec_safe_is_empty (CONSTRUCTOR_ELTS (init)))
+    return;
+
+  elt = CONSTRUCTOR_ELTS (init)->last ().value;
+  type = TREE_TYPE (elt);
+  if (TREE_CODE (type) == ARRAY_TYPE
+      && TYPE_SIZE (type) == NULL_TREE)
+    complete_array_type (&TREE_TYPE (elt), elt, false);
+  else
+    complete_flexible_array_elts (elt);
 }
 
 /* Like c_mark_addressable but don't check register qualifier.  */
@@ -7443,8 +7472,11 @@ vector_types_compatible_elements_p (tree t1, tree t2)
 
   enum tree_code c1 = TREE_CODE (t1), c2 = TREE_CODE (t2);
 
-  gcc_assert ((c1 == INTEGER_TYPE || c1 == REAL_TYPE || c1 == FIXED_POINT_TYPE)
-	      && (c2 == INTEGER_TYPE || c2 == REAL_TYPE
+  gcc_assert ((INTEGRAL_TYPE_P (t1)
+	       || c1 == REAL_TYPE
+	       || c1 == FIXED_POINT_TYPE)
+	      && (INTEGRAL_TYPE_P (t2)
+		  || c2 == REAL_TYPE
 		  || c2 == FIXED_POINT_TYPE));
 
   t1 = c_common_signed_type (t1);
@@ -7454,7 +7486,7 @@ vector_types_compatible_elements_p (tree t1, tree t2)
   if (t1 == t2)
     return true;
   if (opaque && c1 == c2
-      && (c1 == INTEGER_TYPE || c1 == REAL_TYPE)
+      && (INTEGRAL_TYPE_P (t1) || c1 == REAL_TYPE)
       && TYPE_PRECISION (t1) == TYPE_PRECISION (t2))
     return true;
   return false;
@@ -8542,39 +8574,28 @@ maybe_add_include_fixit (rich_location *richloc, const char *header,
 }
 
 /* Attempt to convert a braced array initializer list CTOR for array
-   TYPE into a STRING_CST for convenience and efficiency.  When non-null,
-   use EVAL to attempt to evalue constants (used by C++).  Return
-   the converted string on success or null on failure.  */
+   TYPE into a STRING_CST for convenience and efficiency.  Return
+   the converted string on success or the original ctor on failure.  */
 
 tree
-braced_list_to_string (tree type, tree ctor, tree (*eval)(tree, tree))
+braced_list_to_string (tree type, tree ctor)
 {
-  unsigned HOST_WIDE_INT nelts = CONSTRUCTOR_NELTS (ctor);
+  if (!tree_fits_uhwi_p (TYPE_SIZE_UNIT (type)))
+    return ctor;
 
   /* If the array has an explicit bound, use it to constrain the size
      of the string.  If it doesn't, be sure to create a string that's
      as long as implied by the index of the last zero specified via
      a designator, as in:
        const char a[] = { [7] = 0 };  */
-  unsigned HOST_WIDE_INT maxelts = HOST_WIDE_INT_M1U;
-  if (tree size = TYPE_SIZE_UNIT (type))
-    {
-      if (tree_fits_uhwi_p (size))
-	{
-	  maxelts = tree_to_uhwi (size);
-	  maxelts /= tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (type)));
+  unsigned HOST_WIDE_INT maxelts = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+  maxelts /= tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (type)));
 
-	  /* Avoid converting initializers for zero-length arrays.  */
-	  if (!maxelts)
-	    return NULL_TREE;
-	}
-    }
-  else if (!nelts)
-    /* Avoid handling the undefined/erroneous case of an empty
-       initializer for an arrays with unspecified bound.  */
-    return NULL_TREE;
+  /* Avoid converting initializers for zero-length arrays.  */
+  if (!maxelts)
+    return ctor;
 
-  tree eltype = TREE_TYPE (type);
+  unsigned HOST_WIDE_INT nelts = CONSTRUCTOR_NELTS (ctor);
 
   auto_vec<char> str;
   str.reserve (nelts + 1);
@@ -8584,19 +8605,21 @@ braced_list_to_string (tree type, tree ctor, tree (*eval)(tree, tree))
 
   FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), i, index, value)
     {
-      unsigned HOST_WIDE_INT idx = index ? tree_to_uhwi (index) : i;
+      unsigned HOST_WIDE_INT idx = i;
+      if (index)
+	{
+	  if (!tree_fits_uhwi_p (index))
+	    return ctor;
+	  idx = tree_to_uhwi (index);
+	}
 
       /* auto_vec is limited to UINT_MAX elements.  */
       if (idx > UINT_MAX)
-	return NULL_TREE;
+	return ctor;
 
-      /* Attempt to evaluate constants.  */
-      if (eval)
-	value = eval (eltype, value);
-
-      /* Avoid non-constant initializers.  */
+     /* Avoid non-constant initializers.  */
      if (!tree_fits_shwi_p (value))
-	return NULL_TREE;
+	return ctor;
 
       /* Skip over embedded nuls except the last one (initializer
 	 elements are in ascending order of indices).  */
@@ -8604,11 +8627,14 @@ braced_list_to_string (tree type, tree ctor, tree (*eval)(tree, tree))
       if (!val && i + 1 < nelts)
 	continue;
 
+      if (idx < str.length())
+	return ctor;
+
       /* Bail if the CTOR has a block of more than 256 embedded nuls
 	 due to implicitly initialized elements.  */
       unsigned nchars = (idx - str.length ()) + 1;
       if (nchars > 256)
-	return NULL_TREE;
+	return ctor;
 
       if (nchars > 1)
 	{
@@ -8616,18 +8642,17 @@ braced_list_to_string (tree type, tree ctor, tree (*eval)(tree, tree))
 	  str.quick_grow_cleared (idx);
 	}
 
-      if (idx > maxelts)
-	return NULL_TREE;
+      if (idx >= maxelts)
+	return ctor;
 
       str.safe_insert (idx, val);
     }
 
-  if (!nelts)
-    /* Append a nul for the empty initializer { }.  */
+  /* Append a nul string termination.  */
+  if (str.length () < maxelts)
     str.safe_push (0);
 
-  /* Build a STRING_CST with the same type as the array, which
-     may be an array of unknown bound.  */
+  /* Build a STRING_CST with the same type as the array.  */
   tree res = build_string (str.length (), str.begin ());
   TREE_TYPE (res) = type;
   return res;

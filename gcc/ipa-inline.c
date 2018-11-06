@@ -430,9 +430,9 @@ can_inline_edge_by_limits_p (struct cgraph_edge *e, bool report,
       ipa_fn_summary *caller_info = ipa_fn_summaries->get (caller);
       ipa_fn_summary *callee_info = ipa_fn_summaries->get (callee);
 
-     /* Until GCC 4.9 we did not check the semantics alterning flags
-	bellow and inline across optimization boundry.
-	Enabling checks bellow breaks several packages by refusing
+     /* Until GCC 4.9 we did not check the semantics-altering flags
+	below and inlined across optimization boundaries.
+	Enabling checks below breaks several packages by refusing
 	to inline library always_inline functions. See PR65873.
 	Disable the check for early inlining for now until better solution
 	is found.  */
@@ -2219,10 +2219,11 @@ inline_to_all_callers_1 (struct cgraph_node *node, void *data,
 
       if (dump_file)
 	{
+	  cgraph_node *ultimate = node->ultimate_alias_target ();
 	  fprintf (dump_file,
 		   "\nInlining %s size %i.\n",
-		   node->name (),
-		   ipa_fn_summaries->get (node)->size);
+		   ultimate->name (),
+		   ipa_fn_summaries->get (ultimate)->size);
 	  fprintf (dump_file,
 		   " Called once from %s %i insns.\n",
 		   node->callers->caller->name (),

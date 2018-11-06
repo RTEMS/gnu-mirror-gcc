@@ -421,6 +421,15 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef ptrdiff_t					difference_type;
       typedef _Alloc					allocator_type;
 
+    private:
+#if __cplusplus >= 201103L
+      static constexpr bool __use_relocate =
+	noexcept(std::__relocate_object_a(
+			std::addressof(*std::declval<pointer>()),
+			std::addressof(*std::declval<pointer>()),
+			std::declval<_Tp_alloc_type&>()));
+#endif
+
     protected:
       using _Base::_M_allocate;
       using _Base::_M_deallocate;
@@ -1667,11 +1676,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	{ _Alloc_traits::destroy(_M_this->_M_impl, _M_ptr()); }
 
 	value_type&
-	_M_val() { return *reinterpret_cast<_Tp*>(&__buf); }
+	_M_val() { return *_M_ptr(); }
 
       private:
-	pointer
-	_M_ptr() { return pointer_traits<pointer>::pointer_to(_M_val()); }
+	_Tp*
+	_M_ptr() { return reinterpret_cast<_Tp*>(&__buf); }
 
 	vector* _M_this;
 	typename aligned_storage<sizeof(_Tp), alignof(_Tp)>::type __buf;
@@ -1726,7 +1735,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       static size_type
       _S_max_size(const _Tp_alloc_type& __a) _GLIBCXX_NOEXCEPT
       {
-	const size_t __diffmax = __gnu_cxx::__numeric_traits<ptrdiff_t>::__max;
+	// std::distance(begin(), end()) cannot be greater than PTRDIFF_MAX,
+	// and realistically we can't store more than PTRDIFF_MAX/sizeof(T)
+	// (even if std::allocator_traits::max_size says we can).
+	const size_t __diffmax
+	  = __gnu_cxx::__numeric_traits<ptrdiff_t>::__max / sizeof(_Tp);
 	const size_t __allocmax = _Alloc_traits::max_size(__a);
 	return (std::min)(__diffmax, __allocmax);
       }

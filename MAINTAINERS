@@ -150,6 +150,7 @@ BRIG (HSAIL) front end	Pekka Jääskeläinen	<pekka.jaaskelainen@parmance.com>
 BRIG (HSAIL) front end 	Martin Jambor		<mjambor@suse.cz>
 c++			Jason Merrill		<jason@redhat.com>
 c++			Nathan Sidwell		<nathan@acm.org>
+D front end		Iain Buclaw		<ibuclaw@gdcproject.org>
 go			Ian Lance Taylor	<ian@airs.com>
 objective-c/c++		Mike Stump		<mikestump@comcast.net>
 objective-c/c++		Iain Sandoe		<iain@codesourcery.com>
@@ -165,6 +166,7 @@ libdecnumber		Ben Elliston		<bje@gnu.org>
 libgcc			Ian Lance Taylor	<ian@airs.com>
 libgo			Ian Lance Taylor	<ian@airs.com>
 libgomp			Jakub Jelinek		<jakub@redhat.com>
+libgomp (OpenACC)	Thomas Schwinge		<thomas@codesourcery.com>
 libiberty		Ian Lance Taylor	<ian@airs.com>
 libitm			Torvald Riegel		<triegel@redhat.com>
 libobjc			Nicola Pero		<nicola.pero@meta-innovation.com>
@@ -174,6 +176,7 @@ libquadmath		Jakub Jelinek		<jakub@redhat.com>
 libvtv			Caroline Tice		<cmtice@google.com>
 libhsail-rt		Pekka Jääskeläinen	<pekka.jaaskelainen@parmance.com>
 libhsail-rt		Martin Jambor		<mjambor@suse.cz>
+libphobos		Iain Buclaw		<ibuclaw@gdcproject.org>
 line map		Dodji Seketeli		<dodji@redhat.com>
 soft-fp			Joseph Myers		<joseph@codesourcery.com>
 scheduler (+ haifa)	Jim Wilson		<wilson@tuliptree.org>
@@ -234,8 +237,9 @@ instruction combiner	Segher Boessenkool	<segher@kernel.crashing.org>
 auto-vectorizer		Richard Biener		<rguenther@suse.de>
 auto-vectorizer		Zdenek Dvorak		<ook@ucw.cz>
 loop infrastructure	Zdenek Dvorak		<ook@ucw.cz>
-loop ivopts		Bin Cheng		<amker@gcc.gnu.org>
-loop optimizer		Bin Cheng		<amker@gcc.gnu.org>
+loop ivopts		Bin Cheng		<bin.cheng@linux.alibaba.com>
+loop optimizer		Bin Cheng		<bin.cheng@linux.alibaba.com>
+OpenACC			Thomas Schwinge		<thomas@codesourcery.com>
 OpenMP			Jakub Jelinek		<jakub@redhat.com>
 testsuite		Rainer Orth		<ro@CeBiTec.Uni-Bielefeld.DE>
 testsuite		Mike Stump		<mikestump@comcast.net>
@@ -328,7 +332,6 @@ Joel Brobecker					<brobecker@gnat.com>
 Dave Brolley					<brolley@redhat.com>
 Julian Brown					<julian@codesourcery.com>
 Christian Bruel					<christian.bruel@st.com>
-Iain Buclaw					<ibuclaw@gdcproject.org>
 Kevin Buettner					<kevinb@redhat.com>
 Adam Butcher					<adam@jessamine.co.uk>
 Andrew Cagney					<cagney@gnu.org>
@@ -395,7 +398,7 @@ Matthew Gretton-Dann				<matthew.gretton-dann@arm.com>
 Yury Gribov					<tetra2005@gmail.com>
 Jon Grimm					<jgrimm2@us.ibm.com>
 Laurent Guerby					<laurent@guerby.net>
-Xuepeng Guo					<terry.guo@arm.com>
+Xuepeng Guo					<terry.xpguo@gmail.com>
 Wei Guozhi					<carrot@google.com>
 Mostafa Hagog					<hagog@gcc.gnu.org>
 Andrew Haley		                        <aph@redhat.com>
@@ -462,6 +465,7 @@ Georg-Johann Lay				<avr@gjlay.de>
 Vlad Lazar					<vlad.lazar@arm.com>
 Marc Lehmann					<pcg@goof.com>
 James Lemke					<jim@lemke.org>
+Ilya Leoshkevich				<iii@linux.ibm.com>
 Kriang Lerdsuwanakij				<lerdsuwa@users.sourceforge.net>
 Renlin Li					<renlin.li@arm.com>
 Xinliang David Li				<davidxl@google.com>
@@ -478,6 +482,7 @@ H.J. Lu						<hjl.tools@gmail.com>
 Christophe Lyon					<christophe.lyon@st.com>
 Luis Machado					<luisgpm@br.ibm.com>
 Ziga Mahkovec					<ziga.mahkovec@klika.si>
+Matthew Malcomson				<matthew.malcomson@arm.com>
 Mikhail Maltsev					<maltsevm@gmail.com>
 Jose E. Marchesi				<jose.marchesi@oracle.com>
 Patrick Marlier					<patrick.marlier@gmail.com>
@@ -580,6 +585,7 @@ Gabriele Svelto					<gabriele.svelto@st.com>
 Toma Tabacu					<toma.tabacu@imgtec.com>
 Sriraman Tallam					<tmsriram@google.com>
 Samuel Tardieu					<sam@rfc1149.net>
+Sam Tebbs					<sam.tebbs@arm.com>
 Dinar Temirbulatov				<dtemirbulatov@gmail.com>
 Kresten Krab Thorup				<krab@gcc.gnu.org>
 Kai Tietz					<ktietz70@googlemail.com>
