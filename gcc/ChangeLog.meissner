@@ -1,5 +1,13 @@
 2018-11-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c (get_toc_ref): Don't optimize
+	references to the constant pool.
+	(toc_refs::add): If we have exhuasted the number of base pointers,
+	don't optimize any new base pointers.
+	(toc_refs::process_toc_refs_single): Silence warning.
+
+2018-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wF constraint): Only document the
 	wF constraint for power8 fusion.  Remove documentation for power9
 	fusion.

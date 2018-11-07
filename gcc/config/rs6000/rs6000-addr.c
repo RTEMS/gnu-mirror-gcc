@@ -167,9 +167,15 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 	return NULL_RTX;
     }
 
-  return ((GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-	  ? addr
-	  : NULL_RTX);
+  if (GET_CODE (addr) != UNSPEC || XINT (addr, 1) != UNSPEC_TOCREL)
+    return NULL_RTX;
+
+  /* Don't optimize the constant pool addresses on the assumption there is just
+     one reference to a constant.  */
+  if (CONSTANT_POOL_ADDRESS_P (XVECEXP (addr, 0, 0)))
+    return NULL_RTX;
+
+  return addr;
 }
 
 
@@ -201,46 +207,12 @@ void toc_refs::add (rtx_insn *insn, rtx addr, HOST_WIDE_INT offset)
 	    base_num = i;
 	    break;
 	  }
-    }
 
-  // We have to evict one of the base pointers, evict the one with the most
-  // insns changed.
-  if (base_num == max_base)
-    {
-      unsigned mrefs = base[0].num_refs;
-      base_num = 0;
-      for (size_t i = 1; i < max_base; i++)
-	if (base[i].num_refs > mrefs)
-	  {
-	    mrefs = base[i].num_refs;
-	    base_num = i;
-	  }
-
-      if (dump_file)
-	{
-	  rtx symbol2 = XVECEXP (base[base_num].symbol, 0, 0);
-	  rtx addr2 = XVECEXP (addr, 0, 0);
-	  fputs ("\nFound different symbol, flushing opts\n", dump_file);
-	  fprintf (dump_file,
-		   "Old value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
-		   SYMBOL_REF_ANCHOR_P (symbol2),
-		   CONSTANT_POOL_ADDRESS_P (symbol2),
-		   SYMBOL_REF_HAS_BLOCK_INFO_P (symbol2),
-		   (unsigned long) SYMBOL_REF_BLOCK (symbol2));
-	  print_rtl (dump_file, base[base_num].symbol);
-
-	  fprintf (dump_file,
-		   "New value, anchor = %d, pool = %d, block = %d (0x%lx):\n",
-		   SYMBOL_REF_ANCHOR_P (addr2),
-		   CONSTANT_POOL_ADDRESS_P (addr2),
-		   SYMBOL_REF_HAS_BLOCK_INFO_P (addr2),
-		   (unsigned long) SYMBOL_REF_BLOCK (addr2));
-	  print_rtl (dump_file, addr);
-
-	  fputs ("\n", dump_file);
-	}
-
-      process_toc_refs_single (base_num);
+      // If we have exhausted all of the base registers, don't optimize any new
+      // base registers.  In theory with section anchors, there should only be
+      // one base register used.
+      if (base_num == max_base)
+	return;
     }
 
   p = &base[base_num];
@@ -345,7 +317,7 @@ toc_refs::process_toc_refs_single (size_t base_num)
   // optimizing the references, so that we use P8 fusion for each of the loads.
   if (TARGET_P8_FUSION && p->num_writes == 0 && optimize_addr_num > 0
       && p->num_reads == p->num_gpr_reads
-      && p->num_reads <= optimize_addr_fusion_num)
+      && p->num_reads <= (unsigned)optimize_addr_fusion_num)
     {
       if (dump_file)
 	fputs ("\nSkipping optimization, only GPR loads\n", dump_file);
