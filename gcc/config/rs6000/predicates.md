@@ -1649,9 +1649,9 @@
   if ((value & (HOST_WIDE_INT)0xffff0000) == 0)
     return 0;
 
-  /* Power8 currently will only do the fusion if the top 11 bits of the addis
-     value are all 1's or 0's.  */
-  return (IN_RANGE (value >> 16, -32, 31));
+  /* Power8 only does the fusion if the top 12 bits of the addis value are all
+     1's or 0's.  */
+  return (IN_RANGE (value >> 16, -16, 15));
 })
 
 ;; Match the second insn (lbz, lhz, lwz, ld) in fusing the combination of addis
@@ -1719,7 +1719,7 @@
 ;; memory field with both the addis and the memory offset.  Sign extension
 ;; is not handled here, since lha and lwa are not fused.
 (define_predicate "fusion_addis_mem_combo_load"
-  (match_code "mem,zero_extend,float_extend")
+  (match_code "mem,zero_extend")
 {
   rtx addr, base, offset;
 
