@@ -1,5 +1,18 @@
 2018-11-06  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-addr.c: New file.
+	* config/rs6000/rs6000-passes.def: Add optimize addresses pass.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_addresses):
+	Add declaration.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add debugging
+	for optimize addresses pass.
+	* config/rs6000/rs6000.opt (-moptimize-addresses): New switches
+	for optimizing addresses.
+	(-moptimize-addresses=<n>): Likewise.
+	(-moptimize-address-fusion=<n>): Likewise.
+	* config/rs6000/t-rs6000 (rs6000-addr.o): Add compilation rule.
+	* config.gcc (powerpc*, rs6000*): Add rs6000-addr.o.
+
 	Merge up to 265537.
 	* REVISION: Update subversion id.
 
