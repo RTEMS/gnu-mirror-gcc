@@ -1,5 +1,16 @@
 2018-11-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (fusion_gpr_addis): ADDIS for power8
+	must have the top 12 bits all 0/-1, not 11 bits.
+	(fusion_addis_mem_combo_load): Don't allow FLOAT_EXTEND.
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_NO_FUSION): Delete.
+	(ISA_2_7_MASKS_SERVER): Define without power8 fusion.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Set
+	power8 fusion only if we are tuning for power8.
+	* config/rs6000/rs6000.opt (-mpower9-fusion): Delete.
+
+2018-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-addr.c (get_toc_ref): Don't optimize
 	references to the constant pool.
 	(toc_refs::add): If we have exhuasted the number of base pointers,

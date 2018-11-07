@@ -4166,13 +4166,11 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= OPTION_MASK_SAVE_TOC_INDIRECT;
 
   /* Enable power8 fusion if we are tuning for power8, even if we aren't
-     generating power8 instructions.  The power9 cpu does not set the power8
-     fusion option mask, so if you tune for power9 it will not add fusion
-     support.  */
+     generating power8 instructions.  Power9 does not optimize power8 fusion
+     cases.  */
   if (!(rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION))
     {
-      if (processor_target_table[tune_index].target_enable
-	  & OPTION_MASK_P8_FUSION)
+      if (processor_target_table[tune_index].processor == PROCESSOR_POWER8)
 	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
       else
 	rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
