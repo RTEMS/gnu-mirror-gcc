@@ -153,7 +153,6 @@ get_toc_ref (rtx mem, HOST_WIDE_INT *p_offset)
 {
   gcc_assert (MEM_P (mem));
 
-  machine_mode mode = GET_MODE (mem);
   rtx addr = XEXP (mem, 0);
   *p_offset = 0;
 
