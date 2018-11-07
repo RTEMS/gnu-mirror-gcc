@@ -44,9 +44,10 @@
 				 | OPTION_MASK_ALTIVEC			\
 				 | OPTION_MASK_VSX)
 
-/* For now, don't provide an embedded version of ISA 2.07.  */
-#define ISA_2_7_MASKS_SERVER	(ISA_2_6_MASKS_SERVER			\
-				 | OPTION_MASK_P8_FUSION		\
+/* For now, don't provide an embedded version of ISA 2.07.  Power9 does not
+   support power8 fusion.  Provide a version of the masks with fusion set and
+   one without.  */
+#define ISA_2_7_MASKS_NO_FUSION	(ISA_2_6_MASKS_SERVER			\
 				 | OPTION_MASK_P8_VECTOR		\
 				 | OPTION_MASK_CRYPTO			\
 				 | OPTION_MASK_DIRECT_MOVE		\
@@ -55,12 +56,15 @@
 				 | OPTION_MASK_QUAD_MEMORY		\
 				 | OPTION_MASK_QUAD_MEMORY_ATOMIC)
 
+#define ISA_2_7_MASKS_SERVER	(ISA_2_7_MASKS_NO_FUSION		\
+  				 | OPTION_MASK_P8_FUSION)
+
 /* Add ISEL back into ISA 3.0, since it is supposed to be a win.  Do not add
-   FLOAT128_HW here until we are ready to make -mfloat128 on by default.  */
-#define ISA_3_0_MASKS_SERVER	(ISA_2_7_MASKS_SERVER			\
+   FLOAT128_HW here until we are ready to make -mfloat128 on by default.
+   Power9 did not support power8 fusion, so disable it by default.  */
+#define ISA_3_0_MASKS_SERVER	(ISA_2_7_MASKS_NO_FUSION		\
 				 | OPTION_MASK_ISEL			\
 				 | OPTION_MASK_MODULO			\
-				 | OPTION_MASK_P9_FUSION		\
 				 | OPTION_MASK_P9_MINMAX		\
 				 | OPTION_MASK_P9_MISC			\
 				 | OPTION_MASK_P9_VECTOR)
@@ -121,7 +125,6 @@
 				 | OPTION_MASK_NO_UPDATE		\
 				 | OPTION_MASK_P8_FUSION		\
 				 | OPTION_MASK_P8_VECTOR		\
-				 | OPTION_MASK_P9_FUSION		\
 				 | OPTION_MASK_P9_MINMAX		\
 				 | OPTION_MASK_P9_MISC			\
 				 | OPTION_MASK_P9_VECTOR		\
