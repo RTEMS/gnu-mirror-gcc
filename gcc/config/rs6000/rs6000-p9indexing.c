@@ -304,17 +304,16 @@ represents_constant_p (df_ref use)
    The value of *ADJUSTMENT is overwritten with the constant value that is
    added to the originator expression to obtain the value intended to
    be represented by DEF_LINK.  In the case that find_true_originator
-   returns -1, the value held in *ADJUSTMENT is undefined.
+   returns NULL, the value held in *ADJUSTMENT is undefined.
 
-   Returns -1 if there is no single true originator.  In general, the search
+   Returns NULL if there is no single true originator.  In general, the search
    for an originator expression only spans SET operations that are
    based on simple algebraic expressions, each of which involves no
    more than one variable input.  */
-static int
+static rtx
 find_true_originator (struct df_link *def_link, long long int *adjustment)
 {
   rtx def_insn = DF_REF_INSN (def_link->ref);
-  unsigned uid = INSN_UID (def_insn);
 
   rtx inner_body = PATTERN (def_insn);
   if (GET_CODE (inner_body) == SET)
@@ -325,7 +324,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
       /* We're only happy with multiple uses if all but one represent
 	 constant values.  Below, we assure that  */
       int non_constant_uses = 0;
-      int result = 0;
+      rtx result = NULL;
       FOR_EACH_INSN_INFO_USE (inner_use, inner_insn_info)
 	{
 	  if (!represents_constant_p (inner_use))
@@ -340,7 +339,7 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 		 is an originating use.  */
 	      if (!def_link || !def_link->ref
 		  || DF_REF_IS_ARTIFICIAL (def_link->ref) || def_link->next)
-		result = uid;
+		result = def_insn;
 	      else
 		result = find_true_originator (def_link, adjustment);
 	    }
@@ -356,10 +355,10 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 	   like PLUS or MINUS of a constant and a register, this is
 	   what we optimize.  Otherwise, punt.  */
 
-	if (result == -1)
+	if (result == NULL)
 	  /* Doing constant arithmetic with unknown originator is not
 	     useful.  */
-	  return uid;
+	  return def_insn;
 
 	rtx source_expr = SET_SRC (inner_body);
 	int source_code = GET_CODE (source_expr);
@@ -385,25 +384,25 @@ find_true_originator (struct df_link *def_link, long long int *adjustment)
 				   added to a positive variable
 				   expression, so don't optimize this
 				   rare condition.  */
-	      result = uid;
+	      result = def_insn;
 	  }
 	else if (source_code != REG)
 	    /* We don't handle ashift, UNSPEC, etc..  */
-	    result = uid;
+	    result = def_insn;
 	/* else, this is a register copy expression: no impact on
 	   adjustment.  */
 
 	return result;
       }
       else
-	return uid;		      /* Same behavior if there are
-					 too many non-constant inputs,
-					 or if all inputs are
-					 constant.  */
+	return def_insn;	/* Same behavior if there are
+				   too many non-constant inputs,
+				   or if all inputs are
+				   constant.  */
     }
   else				/* This is not a SET operation, so it
 				   does not serve as a true originator. */
-    return -1;
+    return NULL;
 }
 
 /* The size of the insn_entry array.  Note that this array does not
@@ -548,6 +547,24 @@ equivalent_p (indexing_web_entry *insn_entry,
     }
 }
 
+/* Return true iff instruction I2 dominates instruction I1.  */
+static bool
+insn_dominated_by_p (rtx_insn *i1, rtx_insn *i2)
+{
+  basic_block bb1 = BLOCK_FOR_INSN (i1);
+  basic_block bb2 = BLOCK_FOR_INSN (i2);
+
+  if (bb1 == bb2)
+    {
+      for (rtx_insn *i = i2; BLOCK_FOR_INSN (i) == bb1; i = NEXT_INSN (i))
+	if (i == i1)
+	  return true;
+      return false;
+    }
+  else
+    return dominated_by_p (CDI_DOMINATORS, bb1, bb2);
+}
+
 static void
 build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 {
@@ -613,7 +630,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 
   for (unsigned int i = 0; i < max_uid_at_start; i++)
     {
-      if (equivalence_hash [i] != UINT_MAX)
+      while (equivalence_hash [i] != UINT_MAX)
 	{
 	  unsigned int the_dominator = equivalence_hash [i];
 	  unsigned int uid;
@@ -624,38 +641,57 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	  for (uid = the_dominator; uid != UINT_MAX;
 	       uid = insn_entry [uid].equivalent_sibling)
 	    {
-	      if (dominated_by_p (CDI_DOMINATORS,
-				  insn_entry [the_dominator].bb,
-				  insn_entry [uid].bb))
-		the_dominator = uid;
+	      if (insn_dominated_by_p (insn_entry [the_dominator].insn,
+				       insn_entry [uid].insn))
+		{
+		  /* strictly debugging.  */
+		  if (dump_file)
+		    fprintf (dump_file, "<insn %d dominates current "
+			     "dominator %d, swap>\n", uid, the_dominator);
+
+		  the_dominator = uid;
+		}
 
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		fprintf (dump_file, "  member: %d\n", uid);
 	    }
 
+	  int removed_partition = UINT_MAX;
 	  int size_of_equivalence = 0;
 	  unsigned int preceding_uid = UINT_MAX;
+	  unsigned int next_uid;
+
 	  /* Having found a dominator, remove from this equivalence
 	     class any element that is not dominated by the_dominator.  */
-	  for (uid = equivalence_hash [i]; uid != UINT_MAX;
-	       uid = insn_entry [uid].equivalent_sibling)
+	  for (uid = equivalence_hash [i]; uid != UINT_MAX; uid = next_uid)
 	    {
-	      if (!dominated_by_p (CDI_DOMINATORS,
-				   insn_entry [uid].bb,
-				   insn_entry [the_dominator].bb))
+	      next_uid = insn_entry [uid].equivalent_sibling;
+	      if (!insn_dominated_by_p (insn_entry [uid].insn,
+					insn_entry [the_dominator].insn))
 		{
 		  /* insn uid thinks its in this equivalence class,
 		     but it's not dominated by the_dominator, so
 		     remove it.  */
-		  unsigned int next_uid = insn_entry [uid].equivalent_sibling;
-		  insn_entry [uid].equivalent_sibling = UINT_MAX;
+		  insn_entry [uid].equivalent_sibling = removed_partition;
+		  removed_partition = uid;
+
+		  /* strictly debugging.  */
+		  if (dump_file)
+		    fprintf (dump_file, "<insn %d not dominated, removing>\n",
+			     uid);
+
 		  if (preceding_uid == UINT_MAX)
-		    equivalence_hash [i] = UINT_MAX;
+		    equivalence_hash [i] = next_uid;
 		  else
 		    insn_entry [preceding_uid].equivalent_sibling = next_uid;
 		}
 	      else
 		{
+		  /* strictly debugging */
+		  if (dump_file)
+		    fprintf (dump_file, "<insn %d is dominated by insn %d, "
+			     "not removing>\n", uid, the_dominator);
+
 		  size_of_equivalence++;
 		  preceding_uid = uid;
 		}
@@ -854,6 +890,18 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	      fprintf (dump_file,
 		       "Abandoning dform optimization: too few dform insns\n");
 	    }
+
+	  /* if (removed_partition !- UINT_MAX), need to reprocess the
+	     contents of the removed_partition.  There may be
+	     additional opportunity to optimize within the set of
+	     insns that were not dominated by the selected dominator.
+
+	     Each time through this loop, at least one dominator and
+	     any instructions it dominates are "processed".  Anything
+	     not dominated by the selected dominator remains in the
+	     "removed partition".  The "removed partition" gets
+	     smaller on each iteration, assuring eventual termination.  */
+	  equivalence_hash [i] = removed_partition;
 	}
     }
 }
@@ -919,6 +967,11 @@ rs6000_fix_indexing (function *fun)
   */
   max_uid_at_start = get_max_uid ();
   insn_entry = XCNEWVEC (indexing_web_entry, max_uid_at_start);
+
+  if (dump_file) {
+    fprintf (dump_file, "Creating insn_entry array with %d entries\n",
+	     max_uid_at_start);
+  }
 
   /* I'm looking for patterns such as the following:
 
@@ -1142,17 +1195,19 @@ rs6000_fix_indexing (function *fun)
 				{
 				  /* Only one definition.  Dig deeper.  */
 				  long long int delta = 0;
-				  int uid2 =
+				  rtx insn2 =
 				    find_true_originator (def_link, &delta);
 
-				  if (dump_file && (dump_flags & TDF_DETAILS))
-				    fprintf (dump_file,
-					     "Use may propagate from %d\n",
-					     uid2);
-
-				  if (uid2 > 0)
+				  if (insn2)
 				    {
-				      rtx_insn *insn2 =	insn_entry[uid2].insn;
+				      unsigned uid2 = INSN_UID (insn2);
+
+				      if (dump_file
+					  && (dump_flags & TDF_DETAILS))
+					fprintf (dump_file,
+						 "Use may propagate from %d\n",
+						 uid2);
+
 				      struct df_insn_info *insn_info2 =
 					DF_INSN_INFO_GET (insn2);
 
@@ -1268,17 +1323,19 @@ rs6000_fix_indexing (function *fun)
 				{
 				  /* Only one definition.  Dig deeper.  */
 				  long long int delta = 0;
-				  int uid2 =
+				  rtx insn2 =
 				    find_true_originator (def_link, &delta);
 
-				  if (dump_file && (dump_flags & TDF_DETAILS))
-				    fprintf (dump_file,
-					     "Use may propagate from %d\n",
-					     uid2);
-
-				  if (uid2 > 0)
+				  if (insn2)
 				    {
-				      rtx_insn *insn2 = insn_entry[uid2].insn;
+				      unsigned int uid2 = INSN_UID (insn2);
+
+				      if (dump_file
+					  && (dump_flags & TDF_DETAILS))
+					fprintf (dump_file,
+						 "Use may propagate from %d\n",
+						 uid2);
+
 				      struct df_insn_info *insn_info2 =
 					DF_INSN_INFO_GET (insn2);
 
