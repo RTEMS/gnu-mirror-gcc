@@ -145,12 +145,6 @@ help_hash (int count, struct df_link *def_link) {
     {
       result = (result << 6) | ((result & 0xf000000) >> 28);
       result += ids[i];
-
-      /* kelvin debugging */
-      if (dump_file)
-	fprintf (dump_file, "calculating hash 0x%x, after adding in 0x%x\n",
-		 result, ids[i]);
-
     }
   return result;
 }
@@ -414,22 +408,10 @@ in_use_list (struct df_link *list, struct df_link *element)
 {
   while (list != NULL)
     {
-      /* kelvin debugging.  */
-      if (dump_file) {
-	fprintf (dump_file, " against definition %d\n",
-		 DF_REF_ID(list->ref));
-      }
-
       if (element->ref == list->ref)
 	return true;
       list = list->next;
     }
-
-  /* kelvin debugging.  */
-  if (dump_file) {
-    fprintf (dump_file, " No joy!\n");
-  }
-
   /* Got to end of list without finding element.  */
   return false;
 }
@@ -440,18 +422,6 @@ static bool
 equivalent_p (indexing_web_entry *insn_entry,
 	      unsigned int uid_1, unsigned int uid_2)
 {
-  /* kelvin debugging */
-  if (dump_file) {
-    fprintf (dump_file, "testing equivalence of insn %d and insn %d\n",
-	     uid_1, uid_2);
-    fprintf (dump_file, " uid %d base_hash: %d, index_hash: %d\n", uid_1,
-	     insn_entry[uid_1].base_equivalence_hash,
-	     insn_entry[uid_1].index_equivalence_hash);
-    fprintf (dump_file, " uid %d base_hash: %d, index_hash: %d\n", uid_2,
-	     insn_entry[uid_2].base_equivalence_hash,
-	     insn_entry[uid_2].index_equivalence_hash);
-  }
-
   if ((insn_entry[uid_1].base_equivalence_hash !=
        insn_entry[uid_2].base_equivalence_hash) ||
       (insn_entry[uid_1].index_equivalence_hash !=
@@ -477,22 +447,9 @@ equivalent_p (indexing_web_entry *insn_entry,
       if ((base_count_1 != base_count_2) || (index_count_1 != index_count_2))
 	return false;
 
-      /* kelvin debugging.  */
-      if (dump_file) {
-	fprintf (dump_file, "base_count: %d, index_count: %d\n",
-		 base_count_1, index_count_1);
-      }
-
       /* Counts are the same.  Make sure elements match.   */
       while (insn1_base_defs != NULL)
 	{
-
-	  /* kelvin debugging.  */
-	  if (dump_file) {
-	    fprintf (dump_file, "checking base definition %d\n",
-		     DF_REF_ID(insn1_base_defs->ref));
-	  }
-
 	  if (!in_use_list (insn2_base_defs, insn1_base_defs))
 	    return false;
 	  insn1_base_defs = insn1_base_defs->next;
@@ -500,12 +457,6 @@ equivalent_p (indexing_web_entry *insn_entry,
       /* base patterns match, but stil need to consider index matches.  */
       while (insn1_index_defs != NULL)
 	{
-	  /* kelvin debugging.  */
-	  if (dump_file) {
-	    fprintf (dump_file, "checking index definition %d\n",
-		     DF_REF_ID(insn1_index_defs->ref));
-	  }
-
 	  if (!in_use_list (insn2_index_defs, insn1_index_defs))
 	    return false;
 	  insn1_index_defs = insn1_index_defs->next;
@@ -575,10 +526,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
   for (i = 0; i < max_uid_at_start; i++)
     equivalence_hash [i] = UINT_MAX;
 
-  /* kelvin debugging */
-  if (dump_file)
-    fprintf (dump_file, "build_and_fixup_equivalence_classes\n");
-
   for (unsigned int uid = 0; uid < max_uid_at_start; uid++)
     {
       if (insn_entry [uid].is_relevant)
@@ -586,13 +533,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	  int hash = ((insn_entry [uid].base_equivalence_hash +
 		       insn_entry [uid].index_equivalence_hash)
 		      % max_uid_at_start);
-
-	  /* kelvin debugging */
-	  if (dump_file)
-	    fprintf (dump_file,
-		     "insn %d relevant, base: %d, index: %d, compound: %d\n",
-		     uid, insn_entry [uid].base_equivalence_hash,
-		     insn_entry [uid].index_equivalence_hash, hash);
 
 	  if (equivalence_hash [hash] == UINT_MAX)
 	    {			/* first mention of this class */
@@ -605,11 +545,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		     && !equivalent_p (insn_entry, uid,
 				       equivalence_hash [hash]))
 		hash = (hash + 1) % max_uid_at_start;
-
-	      /* kelvin debugging */
-	      if (dump_file)
-		fprintf (dump_file,
-			 " settling on hash table slot %d\n", hash);
 
 	      /* either we have found an equivalent instruction, or
 		 the equivalence class does not yet exist.  */
@@ -643,14 +578,7 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 	    {
 	      if (insn_dominated_by_p (insn_entry [the_dominator].insn,
 				       insn_entry [uid].insn))
-		{
-		  /* strictly debugging.  */
-		  if (dump_file)
-		    fprintf (dump_file, "<insn %d dominates current "
-			     "dominator %d, swap>\n", uid, the_dominator);
-
-		  the_dominator = uid;
-		}
+		the_dominator = uid;
 
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		fprintf (dump_file, "  member: %d\n", uid);
@@ -674,12 +602,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		     remove it.  */
 		  insn_entry [uid].equivalent_sibling = removed_partition;
 		  removed_partition = uid;
-
-		  /* strictly debugging.  */
-		  if (dump_file)
-		    fprintf (dump_file, "<insn %d not dominated, removing>\n",
-			     uid);
-
 		  if (preceding_uid == UINT_MAX)
 		    equivalence_hash [i] = next_uid;
 		  else
@@ -687,11 +609,6 @@ build_and_fixup_equivalence_classes (indexing_web_entry *insn_entry)
 		}
 	      else
 		{
-		  /* strictly debugging */
-		  if (dump_file)
-		    fprintf (dump_file, "<insn %d is dominated by insn %d, "
-			     "not removing>\n", uid, the_dominator);
-
 		  size_of_equivalence++;
 		  preceding_uid = uid;
 		}
@@ -1181,13 +1098,6 @@ rs6000_fix_indexing (function *fun)
 				    = REGNO (base_reg);
 				  insn_entry[uid].original_base_use = uid;
 				  insn_entry[uid].base_delta = 0;
-
-				  /* kelvin debug */
-				  if (dump_file)
-				    fprintf (dump_file,
-					     "hashing for insn %d base\n",
-					     uid);
-
 				  insn_entry[uid].base_equivalence_hash =
 				    equivalence_hash (def_link);
 				}
@@ -1235,13 +1145,6 @@ rs6000_fix_indexing (function *fun)
 					    {
 					      struct df_link *def_link =
 						DF_REF_CHAIN (use2);
-
-					      /* kelvin debug */
-					      if (dump_file)
-						fprintf (dump_file,
-							 "hashing for insn %d base\n",
-							 uid2);
-
 					      base_is_relevant = true;
 					      insn_entry[uid].
 						base_equivalence_hash =
@@ -1309,13 +1212,6 @@ rs6000_fix_indexing (function *fun)
 				    = REGNO (index_reg);
 				  insn_entry[uid].original_index_use = uid;
 				  insn_entry[uid].index_delta = 0;
-
-				  /* kelvin debug */
-				  if (dump_file)
-				    fprintf (dump_file,
-					     "hashing for insn %d index\n",
-					     uid);
-
 				  insn_entry[uid].index_equivalence_hash =
 				    equivalence_hash (def_link);
 				}
@@ -1363,13 +1259,6 @@ rs6000_fix_indexing (function *fun)
 					    {
 					      struct df_link *def_link =
 						DF_REF_CHAIN (use2);
-
-					      /* kelvin debug */
-					      if (dump_file)
-						fprintf (dump_file,
-							 "hashing for insn %d index\n",
-							 uid2);
-
 					      index_is_relevant = true;
 					      insn_entry[uid].
 						index_equivalence_hash =
