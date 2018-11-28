@@ -1,5 +1,10 @@
 2018-11-28   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c: Undo previous changes.
+	* config/rs6000/rs6000.md: Likewise.
+
+2018-11-28   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_rtx_costs): Make SET of a
 	CONST_INT cost non-zero.
 	(rs6000_force_indexed_or_indirect_mem): For reg+const, change the
