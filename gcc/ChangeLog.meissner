@@ -1,4 +1,17 @@
 2018-11-28   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_rtx_costs): Make SET of a
+	CONST_INT cost non-zero.
+	(rs6000_force_indexed_or_indirect_mem): For reg+const, change the
+	address to move the const into a gpr and do indexed load/store.
+	* config/rs6000/rs6000.md (INT_XFORM): New iterator.
+	(FP_XFORM): New iterator.
+	(Fv2 attribute): Add IEEE 128-bit cases.
+	(fix_trunc<FP_XFORM:mode><INT_XFORM:mode>2_store): New combination
+	optimization.
+	(fixuns_trunc<FP_XFORM:mode><INT_XFORM:mode>2_store): Likewise.
+
+2018-11-28   Michael Meissner  <meissner@linux.ibm.com>
+
 	Clone branch subversion id 266557
 

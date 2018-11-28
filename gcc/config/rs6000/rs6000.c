@@ -33973,10 +33973,18 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 
   switch (code)
     {
-      /* On the RS/6000, if it is valid in the insn, it is free.  */
+      /* On the RS/6000, if it is valid in the insn, it is free.  However, use
+	 the actual cost for a normal SET, so that CSE will attempt to reuse
+	 the same constant loaded into different insns.  */
     case CONST_INT:
-      if (((outer_code == SET
-	    || outer_code == PLUS
+      if (outer_code == SET)
+	{
+	  int cost = num_insns_constant_wide (INTVAL (x));
+	  *total = COSTS_N_INSNS (cost);
+	  return true;
+	}
+
+      if (((outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
 	       || satisfies_constraint_L (x)))
@@ -37313,7 +37321,26 @@ rs6000_force_indexed_or_indirect_mem (rtx x)
 	  addr = reg;
 	}
 
-      x = replace_equiv_address (x, force_reg (Pmode, addr));
+      /* If the address is of the form reg+constant, push the constant to a new
+	 register, and create an indexed form instead of using an indirect
+	 form.  This would allow CSE to recognize the same constant used in
+	 separate addresses.  */
+      if (GET_CODE (addr) == PLUS
+	  && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
+	  && CONSTANT_P (XEXP (addr, 1)))
+	{
+	  rtx addr0 = XEXP (addr, 0);
+	  rtx addr1 = copy_to_mode_reg (Pmode, XEXP (addr, 1));
+	  addr = gen_rtx_PLUS (Pmode, addr0, addr1);
+	  REG_POINTER (addr0) = 1;
+	}
+      else
+	{
+	  addr = force_reg (Pmode, addr);
+	  REG_POINTER (addr) = 1;
+	}
+
+      x = replace_equiv_address (x, addr);
     }
 
   return x;
