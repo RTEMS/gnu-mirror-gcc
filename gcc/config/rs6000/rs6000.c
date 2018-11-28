@@ -37313,7 +37313,22 @@ rs6000_force_indexed_or_indirect_mem (rtx x)
 	  addr = reg;
 	}
 
-      x = replace_equiv_address (x, force_reg (Pmode, addr));
+      /* If the address is of the form reg+constant, push the constant to a new
+	 register, and create an indexed form instead of using an indirect
+	 form.  This would allow CSE to recognize the same constant used in
+	 separate addresses.  */
+      if (GET_CODE (addr) == PLUS
+	  && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
+	  && CONSTANT_P (XEXP (addr, 1)))
+	{
+	  rtx addr0 = XEXP (addr, 0);
+	  rtx addr1 = force_reg (Pmode, XEXP (addr, 1));
+	  addr = gen_rtx_PLUS (Pmode, addr0, addr1);
+	}
+      else
+	addr = force_reg (Pmode, addr);
+
+      x = replace_equiv_address (x, addr);
     }
 
   return x;
