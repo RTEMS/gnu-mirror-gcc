@@ -1,5 +1,11 @@
 2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-xform.c (fix_memory): Fix up thinkos with
+	using force_reg.  Add register notes for moving the constant to a
+	register.
+
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_rtx_costs): If -mset-const, set
 	the cost for copying an integer constant to a register to be
 	non-zero.
