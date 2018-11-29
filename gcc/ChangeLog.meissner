@@ -1,5 +1,12 @@
 2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_rtx_costs): If -mset-const, set
+	the cost for copying an integer constant to a register to be
+	non-zero.
+	* config/rs6000/rs6000.opt (-mset-const): New switch.
+
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config.gcc (powerpc*, rs6000*): Add rs6000-xform.o.
 	* config/rs6000/predicates.md (reg_or_indexed_operand): Allow
 	normal memory before register allocation.  Fix up spacing.
@@ -9,6 +16,7 @@
 	* config/rs6000/rs6000-xform.c: New file.
 	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add debugging
 	for -mopt-xform.
+
 	* config/rs6000/rs6000.md (xform_memory attribute): New
 	attribute.
 	(lfiwax): Set xform_memory attribute.  Eliminate call to

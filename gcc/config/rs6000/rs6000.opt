@@ -570,3 +570,7 @@ Do not generate optimize x-form addresses.
 moptimize-xform
 Target Undocumented RejectNegative InverseMask(NO_OPT_XFORM, OPT_XFORM) Var(rs6000_isa_flags)
 Optimize x-form addresses
+
+mset-const
+Target Undocumented Mask(SET_CONST) Var(rs6000_isa_flags)
+Set costs for moving constants to register to be 1.

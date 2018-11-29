@@ -33978,8 +33978,17 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
     {
       /* On the RS/6000, if it is valid in the insn, it is free.  */
     case CONST_INT:
-      if (((outer_code == SET
-	    || outer_code == PLUS
+      /* Set the cost for a SET to be non-zero, so that CSE will try to reuse
+	 the same register for multiple uses.  This shows up for instance where
+	 you need to use x-form (reg+reg) addression and the same offset is
+	 used over and over again.  */
+      if (outer_code == SET)
+	{
+	  *total = (TARGET_SET_CONST) ? num_insns_constant (x, mode) : 0;
+	  return true;
+	}
+
+      if (((outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
 	       || satisfies_constraint_L (x)))
