@@ -1,3 +1,11 @@
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (load_up_addr_constant): New function.
+	(rs6000_force_indexed_or_indirect_mem): If the address is of the
+	form reg+int, put the integer constant into a register, and use
+	indexed addressing, instead of putting the whole address into a
+	register and using indirect addressing.
+
 2018-11-29   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 266557
