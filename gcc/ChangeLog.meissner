@@ -1,3 +1,33 @@
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*, rs6000*): Add rs6000-xform.o.
+	* config/rs6000/predicates.md (reg_or_indexed_operand): Allow
+	normal memory before register allocation.  Fix up spacing.
+	* config/rs6000/rs6000-passes.def: Add pass_optimize_xform.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_xform): Add
+	declaration.
+	* config/rs6000/rs6000-xform.c: New file.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add debugging
+	for -mopt-xform.
+	* config/rs6000/rs6000.md (xform_memory attribute): New
+	attribute.
+	(lfiwax): Set xform_memory attribute.  Eliminate call to
+	rs6000_force_indexed_or_indirect.
+	(floatsi<mode>2_lfiwax): Likewise.
+	(floatsi<mode>2_lfiwax_mem): Likewise.
+	(lfiwzx): Likewise.
+	(floatunssi<mode>2_lfiwzx): Likewise.
+	(floatunssi<mode>2_lfiwzx_mem):  Likewise.
+	(floatuns<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(fix_trunc<mode>si2): Likewise.
+	(fixuns_trunc<mode>si2_stfiwx): Likewise.
+	rs6000_force_indexed_or_indirect.  Set xform_memory attribute.
+	(fix<uns>_trunc<SFDF:mode><QHSI:mode>2_mem): Likewise.
+	(float_<mode>si2_hw): Likewise.
+	(floatuns_<mode>si2_hw): Likewise.
+	* config/rs6000/rs6000.opt (-mno-optimize-xform): New switch.
+	* config/rs6000/t-rs6000 (rs6000-xform.o): Add build rule.
+
 2018-11-28  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_force_indexed_or_indirect_mem):

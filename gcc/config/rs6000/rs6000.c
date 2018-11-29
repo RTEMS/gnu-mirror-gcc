@@ -2829,6 +2829,9 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  fprintf (stderr, DEBUG_FMT_S, "Optimize x-form addresses",
+	   tf[!!TARGET_OPT_XFORM]);
 }
 
 

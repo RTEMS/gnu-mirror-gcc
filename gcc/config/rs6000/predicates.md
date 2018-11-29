@@ -801,16 +801,23 @@
 })
 
 ;; Like indexed_or_indirect_operand, but also allow a GPR register if direct
-;; moves are supported.
+;; moves are supported.  Before register allocation allow any memory operation.
+;; During and after register allocation only allow strict indexed or indirect
+;; addressing.
 (define_predicate "reg_or_indexed_operand"
   (match_code "mem,reg,subreg")
 {
   if (MEM_P (op))
-    return indexed_or_indirect_operand (op, mode);
+    {
+      if (reload_in_progress || reload_completed)
+	return indexed_or_indirect_operand (op, mode);
+      else
+	return memory_operand (op, mode);
+    }
   else if (TARGET_DIRECT_MOVE)
     return register_operand (op, mode);
-  return
-    0;
+
+  return 0;
 })
 
 ;; Return 1 if the operand is an indexed or indirect memory operand with an
