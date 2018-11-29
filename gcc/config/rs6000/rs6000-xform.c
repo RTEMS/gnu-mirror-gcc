@@ -141,19 +141,11 @@ xform_opts::fix_memory (rtx mem, rtx_insn *insn)
 	}
 
       addr = gen_rtx_PLUS (Pmode, addr0, last_constant_reg);
-    }
-  else
-    {
-      rtx reg = gen_reg_rtx (Pmode);
-      rtx new_pattern = gen_rtx_SET (reg, addr);
-      rtx_insn *new_insn = emit_insn_before (new_pattern, insn);
-      set_block_for_insn (new_insn, BLOCK_FOR_INSN (insn));
-      df_insn_rescan (new_insn);
-      set_unique_reg_note (new_insn, REG_EQUAL, addr);
-      addr = reg;
+      return replace_equiv_address (mem, addr);
     }
 
-  return replace_equiv_address (mem, addr);
+  /* Otherwise, just let LRA/reload create an address.  */
+  return NULL_RTX;
 }
 
 

@@ -1,5 +1,10 @@
 2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-xform.c (fix_memory): Only optimize
+	reg+const, let reload handle the other addresses.
+
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-xform.c (fix_memory): Fix up thinkos with
 	using force_reg.  Add register notes for moving the constant to a
 	register.
