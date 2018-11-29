@@ -1,5 +1,13 @@
 2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (floatsi<mode>2_lfiwax): If not
+	-mno-opt-xform, call rs6000_force_indexed_or_indirect_mem.
+	(floatunssi<mode>2): Likewise.
+	(fix_trunc<mode>si2_stfiwx): Likewise.
+	(fixuns_trunc<mode>si2_stfiwx): Likewise.
+
+2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-xform.c (fix_memory): Only optimize
 	reg+const, let reload handle the other addresses.
 
