@@ -1,5 +1,12 @@
 2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (MAX_ADDR_CONSTANTS): Delete.
+	(load_up_addr_constant): Delete.
+	(rs6000_force_indexed_or_indirect_mem): Just use force_reg to
+	create a new insn with a constant.
+
+2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (MAX_ADDR_CONSTANTS): Set # insns to
 	search back to 20.
 	(load_up_addr_constant): Stop looking for constants at calls.

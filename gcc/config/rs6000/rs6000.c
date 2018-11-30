@@ -37281,58 +37281,6 @@ rs6000_allocate_stack_temp (machine_mode mode,
   return stack;
 }
 
-/* Load up a constant used for addressing into a register.  Look to see if we
-   have loaded up the same constant earlier in the same basic block and reused
-   that.  This comes up if we need X-FORM (reg+reg) addressing, and the address
-   is of the form reg+constant.  CSE doesn't tend to reguard these constants as
-   being common because RTX_COSTS returns 0 for integer constants within an
-   instruction stream, and it feels it is cheaper just to do a separate LI
-   instruction if needed.  */
-
-#ifndef MAX_ADDR_CONSTANTS
-#define MAX_ADDR_CONSTANTS	20	/* # insns to search.  */
-#endif
-
-static rtx
-load_up_addr_constant (rtx cst)
-{
-  rtx_insn *last_insn = get_last_insn_anywhere ();
-  rtx_insn *prev_insn = (rtx_insn *)0;
-  rtx_insn *cur_insn  = last_insn;
-  int insn_count = MAX_ADDR_CONSTANTS;
-  enum rtx_code ccode = GET_CODE (cst);
-
-  while (cur_insn && --insn_count >= 0)
-    {
-      /* Stop at the beginning of the current basic block.  */
-      if (BARRIER_P (cur_insn) || LABEL_P (cur_insn)
-	  || CALL_P (cur_insn) || JUMP_TABLE_DATA_P (cur_insn))
-	break;
-
-      if (NONJUMP_INSN_P (cur_insn) && GET_CODE (PATTERN (cur_insn)) == SET)
-	{
-	  rtx set = PATTERN (cur_insn);
-	  rtx dest = SET_DEST (set);
-	  rtx src = SET_SRC (set);
-
-	  if (REG_P (dest)
-	      && GET_CODE (src) == ccode
-	      && rtx_equal_p (src, cst)
-	      && (!prev_insn
-		  || !reg_set_between_p (dest, prev_insn, last_insn)))
-	    return dest;
-	}
-
-      prev_insn = cur_insn;
-      cur_insn = PREV_INSN (cur_insn);
-    }
-
-  rtx reg = gen_reg_rtx (Pmode);
-  rtx insn = emit_move_insn (reg, cst);
-  set_unique_reg_note (insn, REG_EQUAL, cst);
-  return reg;
-}
-
 /* Given a memory reference, if it is not a reg or reg+reg addressing,
    convert to such a form to deal with memory reference instructions
    like STFIWX and LDBRX that only take reg+reg addressing.  */
@@ -37372,7 +37320,7 @@ rs6000_force_indexed_or_indirect_mem (rtx x)
 	  && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
 	  && CONSTANT_P (XEXP (addr, 1)))
 	{
-	  rtx reg = load_up_addr_constant (XEXP (addr, 1));
+	  rtx reg = force_reg (Pmode, XEXP (addr, 1));
 	  addr = gen_rtx_PLUS (Pmode, XEXP (addr, 0), reg);
 	}
       else
