@@ -37290,7 +37290,7 @@ rs6000_allocate_stack_temp (machine_mode mode,
    instruction if needed.  */
 
 #ifndef MAX_ADDR_CONSTANTS
-#define MAX_ADDR_CONSTANTS	10	/* # insns to search.  */
+#define MAX_ADDR_CONSTANTS	20	/* # insns to search.  */
 #endif
 
 static rtx
@@ -37306,7 +37306,7 @@ load_up_addr_constant (rtx cst)
     {
       /* Stop at the beginning of the current basic block.  */
       if (BARRIER_P (cur_insn) || LABEL_P (cur_insn)
-	  || JUMP_TABLE_DATA_P (cur_insn))
+	  || CALL_P (cur_insn) || JUMP_TABLE_DATA_P (cur_insn))
 	break;
 
       if (NONJUMP_INSN_P (cur_insn) && GET_CODE (PATTERN (cur_insn)) == SET)
