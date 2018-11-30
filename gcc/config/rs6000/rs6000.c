@@ -37290,7 +37290,7 @@ rs6000_allocate_stack_temp (machine_mode mode,
    instruction if needed.  */
 
 #ifndef MAX_ADDR_CONSTANTS
-#define MAX_ADDR_CONSTANTS	20	/* # insns to search.  */
+#define MAX_ADDR_CONSTANTS	10	/* # insns to search.  */
 #endif
 
 static rtx

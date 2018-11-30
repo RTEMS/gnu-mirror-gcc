@@ -1,3 +1,8 @@
+2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (MAX_ADDR_CONSTANTS): Set # insns to
+	search down to 10.
+
 2018-11-29  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (load_up_addr_constant): New function.
