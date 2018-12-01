@@ -1,5 +1,15 @@
 2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_rtx_costs): The new HACK insn has
+	cost 1.
+	(rs6000_force_indexed_or_indirect_mem): Push constant offset to a
+	hack insn that makes the offsets optimizable.
+	* config/rs6000/rs6000.md (UNSPEC_HACK): New unspec.
+	(hack<mode>2): New insn to allow integer constants for offsets to
+	be optimized.
+
+2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (MAX_ADDR_CONSTANTS): Delete.
 	(load_up_addr_constant): Delete.
 	(rs6000_force_indexed_or_indirect_mem): Just use force_reg to
