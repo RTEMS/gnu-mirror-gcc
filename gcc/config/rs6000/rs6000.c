@@ -34272,10 +34272,6 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  *total = rs6000_cost->fp;
 	  return true;
 
-	case UNSPEC_HACK:
-	  *total = COSTS_N_INSNS (1);
-	  return true;
-
 	default:
 	  break;
 	}
@@ -37322,16 +37318,9 @@ rs6000_force_indexed_or_indirect_mem (rtx x)
 	 addressing.  */
       if (GET_CODE (addr) == PLUS
 	  && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
-	  && satisfies_constraint_I (XEXP (addr, 1)))
+	  && CONSTANT_P (XEXP (addr, 1)))
 	{
-	  rtx reg = gen_reg_rtx (Pmode);
-	  rtx cst = XEXP (addr, 1);
-	  rtx pattern = ((TARGET_POWERPC64)
-			 ? gen_hackdi2 (reg, cst)
-			 : gen_hacksi2 (reg, cst));
-
-	  rtx insn = emit_insn (pattern);
-	  set_unique_reg_note (insn, REG_EQUAL, cst);
+	  rtx reg = force_reg (Pmode, XEXP (addr, 1));
 	  addr = gen_rtx_PLUS (Pmode, XEXP (addr, 0), reg);
 	}
       else
