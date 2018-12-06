@@ -1,12 +1,39 @@
-2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
+2018-12-06  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/rs6000.c (rs6000_rtx_costs): The new HACK insn has
-	cost 1.
-	(rs6000_force_indexed_or_indirect_mem): Push constant offset to a
-	hack insn that makes the offsets optimizable.
-	* config/rs6000/rs6000.md (UNSPEC_HACK): New unspec.
-	(hack<mode>2): New insn to allow integer constants for offsets to
-	be optimized.
+	* config.gcc (powerpc*-*-*, rs6000*-*-*): Add rs6000-xform.o.
+	* config/rs6000/predicates.md (reg_or_indexed_operand): Before
+	register allocation, allow any memory operation unless we are not
+	running the optimize xform pass.
+	* config/rs6000/rs6000-passes.def: Add xform optimization.
+	* config/rs6000/rs6000-protos.h (make_pass_optimize_xform): Add
+	declaration.
+	* config/rs6000/rs6000-xform.c: New target pass to optimize x-form
+	addresses.
+	* config/rs6000/rs6000.c (rs6000_opt_masks): Add -moptimize-xform.
+	(rs6000_force_indexed_or_indirect_mem): Only push signed 16-bit
+	constants, and set REG_EQUAL note.
+	* config/rs6000/rs6000.md (xform_memory attribute): New
+	attribute.
+	(lfiwax): Set the xform_memory attribute.
+	(floatsi<mode>2_lfiwax): If the optimize xform pass is enabled,
+	don't call rs6000_force_indexed_or_indirect_mem.  Set the
+	xform_memory attribute.
+	(floatsi<mode>2_lfiwax_mem): Set the xform_memory attribute.
+	(lfiwzx): Likewise.
+	(floatunssi<mode>2_lfiwzx): If the optimize xform pass is enabled,
+	don't call rs6000_force_indexed_or_indirect_mem.  Set the
+	xform_memory attribute.
+	(floatunssi<mode>2_lfiwzx_mem): Set the xform_memory attribute.
+	(floatuns<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(fix_trunc<mode>si2_stfiwx): If the optimize xform pass is
+	enabled, don't call rs6000_force_indexed_or_indirect_mem.  Set the
+	xform_memory attribute.
+	(fix<uns>_trunc<SFDF:mode><QHSI:mode>2_mem): Set the xform_memory
+	attribute.
+	(float_<mode>si2_hw): Set the xform_memory attribute.
+	(floatuns_<mode>si2_hw): Set the xform_memory attribute.
+	* config/rs6000/rs6000.opt (-moptimize-xform): New debug switch.
+	* config/rs6000/t-rs6000: Build rs6000-xform.o.
 
 2018-11-30  Michael Meissner  <meissner@linux.ibm.com>
 

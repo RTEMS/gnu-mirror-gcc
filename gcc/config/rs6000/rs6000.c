@@ -35992,6 +35992,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
+  { "optimize-xform",		OPTION_MASK_NO_OPT_XFORM,	true,  false },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
@@ -37318,9 +37319,12 @@ rs6000_force_indexed_or_indirect_mem (rtx x)
 	 addressing.  */
       if (GET_CODE (addr) == PLUS
 	  && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
-	  && CONSTANT_P (XEXP (addr, 1)))
+	  && satisfies_constraint_I (XEXP (addr, 1)))
 	{
-	  rtx reg = force_reg (Pmode, XEXP (addr, 1));
+	  rtx reg = gen_reg_rtx (Pmode);
+	  rtx cst = XEXP (addr, 1);
+	  rtx insn = emit_move_insn (reg, cst);
+	  set_unique_reg_note (insn, REG_EQUAL, cst);
 	  addr = gen_rtx_PLUS (Pmode, XEXP (addr, 0), reg);
 	}
       else

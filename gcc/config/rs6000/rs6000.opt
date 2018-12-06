@@ -562,3 +562,11 @@ long rs6000_stack_protector_guard_offset = 0
 ;; branches via the CTR.
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
+
+mno-optimize-xform
+Target Undocumented RejectNegative Mask(NO_OPT_XFORM) Var(rs6000_isa_flags)
+Do not generate optimize x-form addresses.
+
+moptimize-xform
+Target Undocumented RejectNegative InverseMask(NO_OPT_XFORM, OPT_XFORM) Var(rs6000_isa_flags)
+Optimize x-form addresses
