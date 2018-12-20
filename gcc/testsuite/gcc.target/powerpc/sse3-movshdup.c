@@ -1,6 +1,5 @@
 /* { dg-do run } */
 /* { dg-options "-O3 -mpower8-vector -Wno-psabi" } */
-/* { dg-require-effective-target lp64 } */
 /* { dg-require-effective-target p8vector_hw } */
 
 #ifndef CHECK_H
@@ -65,7 +64,8 @@ static float vals[] =
     9.32,  8.41, 7.50, 6.59, -5.68, -4.77, -3.86, -2.95
   };
 
-static void
+//static
+void
 TEST (void)
 {
   int i;
