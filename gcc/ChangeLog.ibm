@@ -1,3 +1,8 @@
+2019-01-07  Paul Clarke  <pc@us.ibm.com>
+
+	* config/rs6000/emmintrin.h (_MM_SHUFFLE2): Remove duplicate
+	definition.
+
 2018-12-20  Paul Clarke  <pc@us.ibm.com>
 
 	Backport from trunk
