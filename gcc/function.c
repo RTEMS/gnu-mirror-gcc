@@ -6576,8 +6576,9 @@ match_asm_constraints_1 (rtx_insn *insn, rtx *p_sets, int noutputs)
       /* Only do the transformation for pseudos.  */
       if (! REG_P (output)
 	  || rtx_equal_p (output, input)
-	  || (GET_MODE (input) != VOIDmode
-	      && GET_MODE (input) != GET_MODE (output)))
+	  || !(REG_P (input) || SUBREG_P (input)
+	       || MEM_P (input) || CONSTANT_P (input))
+	  || !general_operand (input, GET_MODE (output)))
 	continue;
 
       /* We can't do anything if the output is also used as input,
@@ -6603,7 +6604,7 @@ match_asm_constraints_1 (rtx_insn *insn, rtx *p_sets, int noutputs)
       output_matched[match] = true;
 
       start_sequence ();
-      emit_move_insn (output, input);
+      emit_move_insn (output, copy_rtx (input));
       insns = get_insns ();
       end_sequence ();
       emit_insn_before (insns, insn);

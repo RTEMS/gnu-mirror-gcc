@@ -4895,6 +4895,13 @@ rs6000_option_override_internal (bool global_init_p)
       else
 	rs6000_long_double_type_size = RS6000_DEFAULT_LONG_DOUBLE_SIZE;
     }
+  else if (global_options_set.x_rs6000_ieeequad)
+    {
+      if (global_options.x_rs6000_ieeequad)
+	error ("%qs requires %qs", "-mabi=ieeelongdouble", "-mlong-double-128");
+      else
+	error ("%qs requires %qs", "-mabi=ibmlongdouble", "-mlong-double-128");
+    }
 
   /* Set -mabi=ieeelongdouble on some old targets.  In the future, power server
      systems will also set long double to be IEEE 128-bit.  AIX and Darwin
@@ -4906,18 +4913,25 @@ rs6000_option_override_internal (bool global_init_p)
   if (!global_options_set.x_rs6000_ieeequad)
     rs6000_ieeequad = TARGET_IEEEQUAD_DEFAULT;
 
-  else if (!TARGET_IEEEQUAD_MULTILIB
-	   && rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT
-	   && TARGET_LONG_DOUBLE_128)
+  else
     {
-      static bool warned_change_long_double;
-      if (!warned_change_long_double)
+      if (global_options.x_rs6000_ieeequad
+	  && (!TARGET_POPCNTD || !TARGET_VSX))
+	error ("%qs requires full ISA 2.06 support", "-mabi=ieeelongdouble");
+
+      if (!TARGET_IEEEQUAD_MULTILIB
+	  && rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT
+	  && TARGET_LONG_DOUBLE_128)
 	{
-	  warned_change_long_double = true;
-	  if (TARGET_IEEEQUAD)
-	    warning (OPT_Wpsabi, "Using IEEE extended precision long double");
-	  else
-	    warning (OPT_Wpsabi, "Using IBM extended precision long double");
+	  static bool warned_change_long_double;
+	  if (!warned_change_long_double)
+	    {
+	      warned_change_long_double = true;
+	      if (TARGET_IEEEQUAD)
+		warning (OPT_Wpsabi, "Using IEEE extended precision long double");
+	      else
+		warning (OPT_Wpsabi, "Using IBM extended precision long double");
+	    }
 	}
     }
 
@@ -8615,6 +8629,13 @@ mem_operand_gpr (rtx op, machine_mode mode)
   int extra;
   rtx addr = XEXP (op, 0);
 
+  /* PR85755: Allow PRE_INC and PRE_DEC addresses.  */
+  if (TARGET_UPDATE
+      && (GET_CODE (addr) == PRE_INC || GET_CODE (addr) == PRE_DEC)
+      && mode_supports_pre_incdec_p (mode)
+      && legitimate_indirect_address_p (XEXP (addr, 0), false))
+    return true;
+
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
@@ -8883,7 +8904,9 @@ toc_relative_expr_p (const_rtx op, bool strict)
     }
 
   return (GET_CODE (tocrel_base) == UNSPEC
-	  && XINT (tocrel_base, 1) == UNSPEC_TOCREL);
+	  && XINT (tocrel_base, 1) == UNSPEC_TOCREL
+	  && REG_P (XVECEXP (tocrel_base, 0, 1))
+	  && REGNO (XVECEXP (tocrel_base, 0, 1)) == TOC_REGISTER);
 }
 
 /* Return true if X is a constant pool address, and also for cmodel=medium
@@ -11652,12 +11675,12 @@ rs6000_discover_homogeneous_aggregate (machine_mode mode, const_tree type,
 
       if (field_count > 0)
 	{
-	  int n_regs = (SCALAR_FLOAT_MODE_P (field_mode) ?
-			(GET_MODE_SIZE (field_mode) + 7) >> 3 : 1);
+	  int reg_size = ALTIVEC_OR_VSX_VECTOR_MODE (field_mode) ? 16 : 8;
+	  int field_size = ROUND_UP (GET_MODE_SIZE (field_mode), reg_size);
 
 	  /* The ELFv2 ABI allows homogeneous aggregates to occupy
 	     up to AGGR_ARG_NUM_REG registers.  */
-	  if (field_count * n_regs <= AGGR_ARG_NUM_REG)
+	  if (field_count * field_size <= AGGR_ARG_NUM_REG * reg_size)
 	    {
 	      if (elt_mode)
 		*elt_mode = field_mode;
@@ -14184,6 +14207,7 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 
       tree copy = build_call_expr (builtin_decl_implicit (BUILT_IN_MEMCPY),
 				   3, dest_addr, addr, size_int (rsize * 4));
+      TREE_ADDRESSABLE (tmp) = 1;
 
       gimplify_and_add (copy, pre_p);
       addr = dest_addr;
@@ -23383,7 +23407,7 @@ rs6000_output_move_128bit (rtx operands[])
 	}
 
       else if (TARGET_ALTIVEC && src_vmx_p
-	       && altivec_indexed_or_indirect_operand (src, mode))
+	       && altivec_indexed_or_indirect_operand (dest, mode))
 	return "stvx %1,%y0";
 
       else if (TARGET_VSX && src_vsx_p)
@@ -27885,6 +27909,12 @@ static bool
 rs6000_function_ok_for_sibcall (tree decl, tree exp)
 {
   tree fntype;
+
+  /* The sibcall epilogue may clobber the static chain register.
+     ??? We could work harder and avoid that, but it's probably
+     not worth the hassle in practice.  */
+  if (CALL_EXPR_STATIC_CHAIN (exp))
+    return false;
 
   if (decl)
     fntype = TREE_TYPE (decl);

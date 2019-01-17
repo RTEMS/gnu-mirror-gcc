@@ -2439,7 +2439,7 @@
 	 (match_operand:VSX_D 1 "memory_operand" "m,m")
 	 (parallel [(match_operand:QI 2 "const_0_to_1_operand" "n,n")])))
    (clobber (match_scratch:P 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)"
+  "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)"
   "#"
   "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
@@ -4035,7 +4035,7 @@
 	  (match_operand:DI 2 "register_operand" "+r")]
 	 UNSPEC_STXVL))]
   "TARGET_P9_VECTOR && TARGET_64BIT"
-  "sldi %2,%2\;stxvl %x0,%1,%2"
+  "sldi %2,%2,56\;stxvl %x0,%1,%2"
   [(set_attr "length" "8")
    (set_attr "type" "vecstore")])
 

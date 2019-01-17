@@ -334,6 +334,27 @@
 	* gcc.target/powerpc/mmx-packuswb-1.c: Likewise. Also, add
 	ommitted "-mpower8-vector" to dg-options.
 
+2018-11-14  Paul A. Clarke  <pc@us.ibm.com>
+
+	Backport from mainline
+	* gcc.target/powerpc/mmx-packuswb-1.c: Add -mpower8-vector to
+	dg-options.
+
+2018-10-22  Paul A. Clarke  <pc@us.ibm.com>
+
+	* gcc.target/powerpc/sse3-check.h: New file.
+	* gcc.target/powerpc/sse3-addsubps.c: New file.
+	* gcc.target/powerpc/sse3-addsubpd.c: New file.
+	* gcc.target/powerpc/sse3-haddps.c: New file.
+	* gcc.target/powerpc/sse3-hsubps.c: New file.
+	* gcc.target/powerpc/sse3-haddpd.c: New file.
+	* gcc.target/powerpc/sse3-hsubpd.c: New file.
+	* gcc.target/powerpc/sse3-lddqu.c: New file.
+	* gcc.target/powerpc/sse3-movsldup.c: New file.
+	* gcc.target/powerpc/sse3-movshdup.c: New file.
+	* gcc.target/powerpc/sse3-movddup.c: New file.
+	* gcc.target/powerpc/pr37191.c: New file.
+
 2018-07-15  Bill Schmidt  <wschmidt@linux.ibm.com>
 
 	Backport from mainline

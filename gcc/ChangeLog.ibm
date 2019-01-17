@@ -1,3 +1,8 @@
+2019-01-16  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to 267986.
+	* REVISION: Update subversion id.
+
 2019-01-07  Paul Clarke  <pc@us.ibm.com>
 
 	* config/rs6000/emmintrin.h (_MM_SHUFFLE2): Remove duplicate
@@ -119,10 +124,15 @@
 	* config/rs6000/xmmintrin.h (_mm_set_ps, _mm_max_ps): Handle (quiet)
 	NaN inputs correctly.
 
+2018-10-22  Paul A. Clarke  <pc@us.ibm.com>
+
+	* config/rs6000/pmmintrin.h: New file.
+	* config.gcc (powerpc*-*-*): Add pmmintrin.h to extra_headers.
+
 2018-09-14  Carl Love  <cel@us.ibm.com>
 
 	Backport from mainline
-        2018-09-14  Carl Love  <cel@us.ibm.com>
+	2018-09-14  Carl Love  <cel@us.ibm.com>
 	* config/rs6000/emmintrin.h: Add _MM_SHUFFLE2.
 	* config/rs6000/xmmintrin.h: Add _MM_SHUFFLE.
 
@@ -151,6 +161,13 @@
 	Cast vec_cmpeq result to correct type.
 	* config/rs6000/mmintrin.h (_mm_cmpgt_pi32 [_ARCH_PWR9]):
 	Cast vec_cmpgt result to correct type.
+
+2018-04-23  Paul A. Clarke  <pc@us.ibm.com>
+
+	PR target/83402
+	* config/rs6000/emmintrin.h (_mm_slli_epi{16,32,64}):
+	Ensure that vec_splat_s32 is only called with 0 <= shift < 16.
+	Ensure negative shifts result in {0}.
 
 2018-04-23  Peter Bergner  <bergner@vnet.ibm.com>
 

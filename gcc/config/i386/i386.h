@@ -759,8 +759,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY \
- (TARGET_64BIT && ix86_abi == MS_ABI ? 128 : BITS_PER_WORD)
+#define STACK_BOUNDARY (TARGET_64BIT_MS_ABI ? 128 : BITS_PER_WORD)
 
 /* Stack boundary of the main function guaranteed by OS.  */
 #define MAIN_STACK_BOUNDARY (TARGET_64BIT ? 128 : 32)
@@ -1557,10 +1556,10 @@ enum reg_class
 #define FIRST_FLOAT_REG FIRST_STACK_REG
 #define STACK_TOP_P(X) (REG_P (X) && REGNO (X) == FIRST_FLOAT_REG)
 
-#define SSE_REGNO(N) \
-  ((N) < 8 ? FIRST_SSE_REG + (N) \
-         : (N) <= LAST_REX_SSE_REG ? (FIRST_REX_SSE_REG + (N) - 8) \
-                                   : (FIRST_EXT_REX_SSE_REG + (N) - 16))
+#define GET_SSE_REGNO(N)			\
+  ((N) < 8 ? FIRST_SSE_REG + (N)		\
+   : (N) < 16 ? FIRST_REX_SSE_REG + (N) - 8	\
+   : FIRST_EXT_REX_SSE_REG + (N) - 16)
 
 /* The class value for index registers, and the one for base regs.  */
 

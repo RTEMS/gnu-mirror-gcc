@@ -7888,6 +7888,9 @@ add_expr (const_tree t, inchash::hash &hstate, unsigned int flags)
       for (i = 0; i < TREE_VEC_LENGTH (t); ++i)
 	inchash::add_expr (TREE_VEC_ELT (t, i), hstate, flags);
       return;
+    case IDENTIFIER_NODE:
+      hstate.add_object (IDENTIFIER_HASH_VALUE (t));
+      return;
     case FUNCTION_DECL:
       /* When referring to a built-in FUNCTION_DECL, use the __builtin__ form.
 	 Otherwise nodes that compare equal according to operand_equal_p might
@@ -10306,8 +10309,7 @@ build_common_tree_nodes (bool signed_char)
       TYPE_SIZE (int_n_trees[i].signed_type) = bitsize_int (int_n_data[i].bitsize);
       TYPE_SIZE (int_n_trees[i].unsigned_type) = bitsize_int (int_n_data[i].bitsize);
 
-      if (int_n_data[i].bitsize > LONG_LONG_TYPE_SIZE
-	  && int_n_enabled_p[i])
+      if (int_n_enabled_p[i])
 	{
 	  integer_types[itk_intN_0 + i * 2] = int_n_trees[i].signed_type;
 	  integer_types[itk_unsigned_intN_0 + i * 2] = int_n_trees[i].unsigned_type;

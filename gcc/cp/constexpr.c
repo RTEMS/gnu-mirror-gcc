@@ -1158,8 +1158,14 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
   bool dummy1 = false, dummy2 = false;
   for (i = 0; i < nargs; ++i)
     {
-      args[i] = cxx_eval_constant_expression (&new_ctx, CALL_EXPR_ARG (t, i),
-					      false, &dummy1, &dummy2);
+      args[i] = CALL_EXPR_ARG (t, i);
+      /* If builtin_valid_in_constant_expr_p is true,
+	 potential_constant_expression_1 has not recursed into the arguments
+	 of the builtin, verify it here.  */
+      if (!builtin_valid_in_constant_expr_p (fun)
+	  || potential_constant_expression (args[i]))
+	args[i] = cxx_eval_constant_expression (&new_ctx, args[i], false,
+						&dummy1, &dummy2);
       if (bi_const_p)
 	/* For __built_in_constant_p, fold all expressions with constant values
 	   even if they aren't C++ constant-expressions.  */
@@ -2837,7 +2843,6 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
   unsigned HOST_WIDE_INT max = tree_to_uhwi (array_type_nelts_top (atype));
   verify_ctor_sanity (ctx, atype);
   vec<constructor_elt, va_gc> **p = &CONSTRUCTOR_ELTS (ctx->ctor);
-  vec_alloc (*p, max + 1);
   bool pre_init = false;
   unsigned HOST_WIDE_INT i;
 
@@ -2892,6 +2897,9 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
 	{
 	  /* Initializing an element using value or default initialization
 	     we just pre-built above.  */
+	  if (init == void_node)
+	    /* Trivial default-init, don't do anything to the CONSTRUCTOR.  */
+	    return ctx->ctor;
 	  eltinit = cxx_eval_constant_expression (&new_ctx, init, lval,
 						  non_constant_p, overflow_p);
 	  reuse = i == 0;
@@ -2930,13 +2938,14 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
 	{
 	  if (new_ctx.ctor != ctx->ctor)
 	    eltinit = new_ctx.ctor;
-	  for (i = 1; i < max; ++i)
-	    {
-	      idx = build_int_cst (size_type_node, i);
-	      CONSTRUCTOR_APPEND_ELT (*p, idx, unshare_constructor (eltinit));
-	    }
+	  tree range = build2 (RANGE_EXPR, size_type_node,
+			       build_int_cst (size_type_node, 1),
+			       build_int_cst (size_type_node, max - 1));
+	  CONSTRUCTOR_APPEND_ELT (*p, range, unshare_constructor (eltinit));
 	  break;
 	}
+      else if (i == 0)
+	vec_safe_reserve (*p, max);
     }
 
   if (!*non_constant_p)

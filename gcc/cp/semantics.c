@@ -1429,11 +1429,11 @@ finish_compound_stmt (tree stmt)
 /* Finish an asm-statement, whose components are a STRING, some
    OUTPUT_OPERANDS, some INPUT_OPERANDS, some CLOBBERS and some
    LABELS.  Also note whether the asm-statement should be
-   considered volatile.  */
+   considered volatile, and whether it is asm inline.  */
 
 tree
 finish_asm_stmt (int volatile_p, tree string, tree output_operands,
-		 tree input_operands, tree clobbers, tree labels)
+		 tree input_operands, tree clobbers, tree labels, bool inline_p)
 {
   tree r;
   tree t;
@@ -1483,6 +1483,21 @@ finish_asm_stmt (int volatile_p, tree string, tree output_operands,
 		      && C_TYPE_FIELDS_READONLY (TREE_TYPE (operand)))))
 	    cxx_readonly_error (operand, lv_asm);
 
+	  tree *op = &operand;
+	  while (TREE_CODE (*op) == COMPOUND_EXPR)
+	    op = &TREE_OPERAND (*op, 1);
+	  switch (TREE_CODE (*op))
+	    {
+	    case PREINCREMENT_EXPR:
+	    case PREDECREMENT_EXPR:
+	    case MODIFY_EXPR:
+	      *op = genericize_compound_lvalue (*op);
+	      op = &TREE_OPERAND (*op, 1);
+	      break;
+	    default:
+	      break;
+	    }
+
 	  constraint = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (t)));
 	  oconstraints[i] = constraint;
 
@@ -1491,7 +1506,7 @@ finish_asm_stmt (int volatile_p, tree string, tree output_operands,
 	    {
 	      /* If the operand is going to end up in memory,
 		 mark it addressable.  */
-	      if (!allows_reg && !cxx_mark_addressable (operand))
+	      if (!allows_reg && !cxx_mark_addressable (*op))
 		operand = error_mark_node;
 	    }
 	  else
@@ -1533,7 +1548,23 @@ finish_asm_stmt (int volatile_p, tree string, tree output_operands,
 		  /* Strip the nops as we allow this case.  FIXME, this really
 		     should be rejected or made deprecated.  */
 		  STRIP_NOPS (operand);
-		  if (!cxx_mark_addressable (operand))
+
+		  tree *op = &operand;
+		  while (TREE_CODE (*op) == COMPOUND_EXPR)
+		    op = &TREE_OPERAND (*op, 1);
+		  switch (TREE_CODE (*op))
+		    {
+		    case PREINCREMENT_EXPR:
+		    case PREDECREMENT_EXPR:
+		    case MODIFY_EXPR:
+		      *op = genericize_compound_lvalue (*op);
+		      op = &TREE_OPERAND (*op, 1);
+		      break;
+		    default:
+		      break;
+		    }
+
+		  if (!cxx_mark_addressable (*op))
 		    operand = error_mark_node;
 		}
 	      else if (!allows_reg && !allows_mem)
@@ -1556,6 +1587,7 @@ finish_asm_stmt (int volatile_p, tree string, tree output_operands,
 		  output_operands, input_operands,
 		  clobbers, labels);
   ASM_VOLATILE_P (r) = volatile_p || noutputs == 0;
+  ASM_INLINE_P (r) = inline_p;
   r = maybe_cleanup_point_expr_void (r);
   return add_stmt (r);
 }
@@ -5607,7 +5639,11 @@ finish_omp_reduction_clause (tree c, bool *need_default_ctor, bool *need_dtor)
       return false;
     }
   else if (processing_template_decl)
-    return false;
+    {
+      if (OMP_CLAUSE_REDUCTION_PLACEHOLDER (c) == error_mark_node)
+	return true;
+      return false;
+    }
 
   tree id = OMP_CLAUSE_REDUCTION_PLACEHOLDER (c);
 
@@ -7336,7 +7372,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 
 	  if (VAR_P (t) && CP_DECL_THREAD_LOCAL_P (t))
 	    share_name = "threadprivate";
-	  else switch (cxx_omp_predetermined_sharing (t))
+	  else switch (cxx_omp_predetermined_sharing_1 (t))
 	    {
 	    case OMP_CLAUSE_DEFAULT_UNSPECIFIED:
 	      break;

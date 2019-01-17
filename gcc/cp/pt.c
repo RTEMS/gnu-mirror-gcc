@@ -4864,7 +4864,7 @@ static void
 fixed_parameter_pack_p_1 (tree parm, struct find_parameter_pack_data *ppd)
 {
   /* A type parm can't refer to another parm.  */
-  if (TREE_CODE (parm) == TYPE_DECL)
+  if (TREE_CODE (parm) == TYPE_DECL || parm == error_mark_node)
     return;
   else if (TREE_CODE (parm) == PARM_DECL)
     {
@@ -15804,6 +15804,12 @@ tsubst_decomp_names (tree decl, tree pattern_decl, tree args,
       DECL_HAS_VALUE_EXPR_P (decl2) = 1;
       if (VAR_P (decl3))
 	DECL_TEMPLATE_INSTANTIATED (decl3) = 1;
+      else
+	{
+	  gcc_assert (errorcount);
+	  decl = error_mark_node;
+	  continue;
+	}
       maybe_push_decl (decl3);
       if (error_operand_p (decl3))
 	decl = error_mark_node;
@@ -16153,7 +16159,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 	tree labels = tsubst_copy_asm_operands (ASM_LABELS (t), args,
 						complain, in_decl);
 	tmp = finish_asm_stmt (ASM_VOLATILE_P (t), string, outputs, inputs,
-			       clobbers, labels);
+			       clobbers, labels, ASM_INLINE_P (t));
 	tree asm_expr = tmp;
 	if (TREE_CODE (asm_expr) == CLEANUP_POINT_EXPR)
 	  asm_expr = TREE_OPERAND (asm_expr, 0);
@@ -16792,14 +16798,14 @@ tsubst_copy_and_build (tree t,
 	if (targs)
 	  targs = tsubst_template_args (targs, args, complain, in_decl);
 	if (targs == error_mark_node)
-	  return error_mark_node;
+	  RETURN (error_mark_node);
 
 	if (TREE_CODE (templ) == SCOPE_REF)
 	  {
 	    tree name = TREE_OPERAND (templ, 1);
 	    tree tid = lookup_template_function (name, targs);
 	    TREE_OPERAND (templ, 1) = tid;
-	    return templ;
+	    RETURN (templ);
 	  }
 
 	if (variable_template_p (templ))
@@ -16864,6 +16870,8 @@ tsubst_copy_and_build (tree t,
       {
 	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
 	tree op0 = RECUR (TREE_OPERAND (t, 0));
+	if (op0 == error_mark_node)
+	  RETURN (error_mark_node);
 	RETURN (build1 (CONVERT_EXPR, type, op0));
       }
 
@@ -17011,7 +17019,7 @@ tsubst_copy_and_build (tree t,
       {
 	tree op0 = RECUR (TREE_OPERAND (t, 0));
 	tree op1 = RECUR (TREE_OPERAND (t, 1));
-	return fold_build_pointer_plus (op0, op1);
+	RETURN (fold_build_pointer_plus (op0, op1));
       }
 
     case SCOPE_REF:
@@ -19234,6 +19242,24 @@ try_array_deduction (tree tparms, tree targs, tree parm)
 			  /*nondeduced*/false, array_deduction_r);
 }
 
+/* Returns how many levels of { } INIT contains.  */
+
+static int
+braced_init_depth (tree init)
+{
+  if (!init || !BRACE_ENCLOSED_INITIALIZER_P (init))
+    return 0;
+  unsigned i; tree val;
+  unsigned max = 0;
+  FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (init), i, val)
+    {
+      unsigned elt_d = braced_init_depth (val);
+      if (elt_d > max)
+	max = elt_d;
+    }
+  return max + 1;
+}
+
 /* Most parms like fn_type_unification.
 
    If SUBR is 1, we're being called recursively (to unify the
@@ -19469,6 +19495,10 @@ type_unification_real (tree tparms,
 	    ++ia;
 
 	    if (uses_template_parms (parm))
+	      continue;
+	    /* Workaround for c++/80290: avoid combinatorial explosion on
+	       deeply nested braced init-lists.  */
+	    if (braced_init_depth (arg) > 2)
 	      continue;
 	    if (check_non_deducible_conversion (parm, arg, strict, flags,
 						explain_p))
