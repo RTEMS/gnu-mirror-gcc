@@ -1,3 +1,8 @@
+2019-01-16  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to 268000.
+	* REVISION: Update subversion id.
+
 2018-12-20  Paul Clarke  <pc@us.ibm.com>
 
 	Backport from trunk
@@ -106,6 +111,11 @@
 	265531
 	2018-10-26  Paul A. Clarke  <pc@us.ibm.com>
 	* config/rs6000/xmmintrin.h (_mm_extract_pi16): Fix for big-endian.
+
+2018-10-19  Paul A. Clarke  <pc@us.ibm.com>
+
+	* config.gcc (powerpc*-*-*): Add pmmintrin.h to extra_headers.
+	* config/rs6000/pmmintrin.h: New file.
 
 2018-08-13  Peter Bergner  <bergner@linux.ibm.com>
 

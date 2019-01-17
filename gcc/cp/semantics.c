@@ -1461,11 +1461,11 @@ finish_compound_stmt (tree stmt)
 /* Finish an asm-statement, whose components are a STRING, some
    OUTPUT_OPERANDS, some INPUT_OPERANDS, some CLOBBERS and some
    LABELS.  Also note whether the asm-statement should be
-   considered volatile.  */
+   considered volatile, and whether it is asm inline.  */
 
 tree
 finish_asm_stmt (int volatile_p, tree string, tree output_operands,
-		 tree input_operands, tree clobbers, tree labels)
+		 tree input_operands, tree clobbers, tree labels, bool inline_p)
 {
   tree r;
   tree t;
@@ -1619,6 +1619,7 @@ finish_asm_stmt (int volatile_p, tree string, tree output_operands,
 		  output_operands, input_operands,
 		  clobbers, labels);
   ASM_VOLATILE_P (r) = volatile_p || noutputs == 0;
+  ASM_INLINE_P (r) = inline_p;
   r = maybe_cleanup_point_expr_void (r);
   return add_stmt (r);
 }
@@ -2704,13 +2705,14 @@ finish_unary_op_expr (location_t op_loc, enum tree_code code, cp_expr expr,
   /* TODO: build_x_unary_op doesn't always honor the location.  */
   result.set_location (combined_loc);
 
-  tree result_ovl, expr_ovl;
+  if (result == error_mark_node)
+    return result;
 
   if (!(complain & tf_warning))
     return result;
 
-  result_ovl = result;
-  expr_ovl = expr;
+  tree result_ovl = result;
+  tree expr_ovl = expr;
 
   if (!processing_template_decl)
     expr_ovl = cp_fully_fold (expr_ovl);
@@ -3783,9 +3785,10 @@ finish_id_expression (tree id_expression,
 	    return error_mark_node;
 
 	  if (!template_arg_p
-	      && TREE_CODE (first_fn) == FUNCTION_DECL
-	      && DECL_FUNCTION_MEMBER_P (first_fn)
-	      && !shared_member_p (decl))
+	      && (TREE_CODE (first_fn) == USING_DECL
+		  || (TREE_CODE (first_fn) == FUNCTION_DECL
+		      && DECL_FUNCTION_MEMBER_P (first_fn)
+		      && !shared_member_p (decl))))
 	    {
 	      /* A set of member functions.  */
 	      decl = maybe_dummy_object (DECL_CONTEXT (first_fn), 0);
