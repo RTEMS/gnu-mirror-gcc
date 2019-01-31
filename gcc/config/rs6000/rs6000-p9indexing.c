@@ -46,10 +46,6 @@
 
 #include "genrtl.h"
 
-extern bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
-
-
-
 /* This pass transforms array indexing expressions from a form that
    favors selection of X-form instructions into a form that favors
    selection of D-form instructions.

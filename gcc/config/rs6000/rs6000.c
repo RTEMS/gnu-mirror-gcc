@@ -1326,8 +1326,7 @@ static const struct rs6000_builtin_info_type rs6000_builtin_info[] =
 static tree (*rs6000_veclib_handler) (combined_fn, tree, tree);
 
 
-/* kelvin says this was static.  */
-bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
+static bool rs6000_debug_legitimate_address_p (machine_mode, rtx, bool);
 static struct machine_function * rs6000_init_machine_status (void);
 static int rs6000_ra_ever_killed (void);
 static tree rs6000_handle_longcall_attribute (tree *, tree, tree, int, bool *);
@@ -9158,7 +9157,7 @@ rs6000_debug_legitimize_reload_address (rtx x, machine_mode mode,
    32-bit DImode, TImode, TFmode, TDmode), indexed addressing cannot be used
    because adjacent memory cells are accessed by adding word-sized offsets
    during assembly output.  */
-bool
+static bool
 rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 {
   bool reg_offset_p = reg_offset_addressing_ok_p (mode);
@@ -9183,16 +9182,12 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
   if (quad_offset_p)
     {
-      if (dump_file) {
-	fprintf (dump_file, "checking quad_address_p, x: ");
-	print_inline_rtx (dump_file, x, 2);
-	fprintf (dump_file, "\n");
-      }
       if (quad_address_p (x, mode, reg_ok_strict))
 	return 1;
     }
   else if (virtual_stack_registers_memory_p (x))
     return 1;
+
   else if (reg_offset_p)
     {
       if (legitimate_small_data_p (mode, x))
@@ -9201,10 +9196,6 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 					     reg_ok_strict || lra_in_progress))
 	return 1;
     }
-
-  if (dump_file) {
-    fprintf (dump_file, "checking TImode\n");
-  }
 
   /* For TImode, if we have TImode in VSX registers, only allow register
      indirect addresses.  This will allow the values to go in either GPRs
@@ -9226,11 +9217,6 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	  || XEXP (x, 0) == arg_pointer_rtx)
       && GET_CODE (XEXP (x, 1)) == CONST_INT)
     return 1;
-
-  if (dump_file) {
-    fprintf (dump_file, "attempting rs6000_legitimate_offset_address_p\n");
-  }
-
   if (rs6000_legitimate_offset_address_p (mode, x, reg_ok_strict, false))
     return 1;
   if (!FLOAT128_2REG_P (mode)
@@ -9259,8 +9245,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 }
 
 /* Debug version of rs6000_legitimate_address_p.  */
-/* kelvin says this was static */
-bool
+static bool
 rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
 				   bool reg_ok_strict)
 {
@@ -9274,19 +9259,6 @@ rs6000_debug_legitimate_address_p (machine_mode mode, rtx x,
 	   (reload_completed ? "after" : "before"),
 	   GET_RTX_NAME (GET_CODE (x)));
   debug_rtx (x);
-
-  if (dump_file) {
-    fprintf (dump_file,
-	     "\nrs6000_legitimate_address_p: return = %s, mode = %s, "
-	     "strict = %d, reload = %s, code = %s\n",
-	     ret ? "true" : "false",
-	     GET_MODE_NAME (mode),
-	     reg_ok_strict,
-	     (reload_completed ? "after" : "before"),
-	     GET_RTX_NAME (GET_CODE (x)));
-    print_inline_rtx (dump_file, x, 2);
-    fprintf (dump_file, "\n");
-  }
 
   return ret;
 }

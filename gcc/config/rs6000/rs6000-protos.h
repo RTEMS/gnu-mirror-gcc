@@ -42,7 +42,6 @@ extern bool mem_operand_gpr (rtx, machine_mode);
 extern bool mem_operand_ds_form (rtx, machine_mode);
 extern bool toc_relative_expr_p (const_rtx, bool, const_rtx *, const_rtx *);
 extern void validate_condition_mode (enum rtx_code, machine_mode);
-extern bool rs6000_legitimate_address_p (machine_mode, rtx, bool);
 extern bool legitimate_constant_pool_address_p (const_rtx, machine_mode,
 						bool);
 extern bool legitimate_indirect_address_p (rtx, int);
