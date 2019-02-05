@@ -1,3 +1,17 @@
+2019-02-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/89213
+	* config/rs6000/altivec.md (UNSPEC_VECTOR_SHIFT): New unspec.
+	(VSHIFT_MODE): New mode iterator.
+	(vshift_code): New code iterator.
+	(vshift_attr): New code attribute.
+	(altivec_<mode>_<vshift_attr>_const): New pattern to optimize
+	vector long long/int shifts by a constant.
+	(altivec_<mode>_shift_const): New helper insn to load up a
+	constant used by the shift operation.
+	* config/rs6000/predicates.md (vector_shift_constant): New
+	predicate.
+
 2019-02-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 268555

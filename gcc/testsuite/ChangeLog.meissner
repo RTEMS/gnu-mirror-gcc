@@ -1,3 +1,8 @@
+2019-02-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/89213
+	* gcc.target/powerpc/pr89213.c: New test.
+
 2019-02-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 268555
