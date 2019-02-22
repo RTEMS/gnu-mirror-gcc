@@ -807,7 +807,7 @@ static const struct tune_params thunderx2t99_tunings =
   (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
 };
 
-static const struct tune_params ares_tunings =
+static const struct tune_params neoversen1_tunings =
 {
   &cortexa57_extra_costs,
   &generic_addrcost_table,
