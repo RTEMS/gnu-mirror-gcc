@@ -1,3 +1,101 @@
+2019-03-01  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/89517
+	* config/aarch64/aarch64-option-extensions.def (fp, simd, crypto,
+	fp16): Collapse line.
+
+2019-03-01  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2019-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/89539
+	* dwarf2out.c (output_comdat_type_unit): Add ATTRIBUTE_UNUSED to
+	early_lto_debug argument.
+
+	2019-02-27  Richard Biener  <rguenther@suse.de>
+
+	PR debug/88878
+	* dwarf2out.c (use_debug_types): Disable when in_lto_p.
+
+	2019-02-27  Richard Biener  <rguenther@suse.de>
+
+	PR debug/88878
+	* dwarf2out.c (output_comdat_type_unit): Add early_lto_debug
+	parameter, prefix section name with .gnu.debuglto_ if true.
+	(dwarf2out_finish): Pass false to output_comdat_type_unit.
+	(dwarf2out_early_finish): Pass true to output_comdat_type_unit.
+
+	2019-02-27  Richard Biener  <rguenther@suse.de>
+
+	PR debug/89514
+	* dwarf2out.c (size_of_die): Key on AT_ref (a)->comdat_type_p
+	rather than on use_debug_types, doing what output_die does.
+	(value_format): Likewise.
+
+2019-02-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR tree-optimization/89536
+	* tree-ssa-dom.c (edge_info::derive_equivalences) <BIT_NOT_EXPR>: Test
+	only whether bit #0 of the value is 0 instead of the entire value.
+
+2019-02-28  Li Jia He  <helijia@linux.ibm.com>
+
+	Backport from trunk
+	2019-02-20  Li Jia He  <helijia@linux.ibm.com>
+
+	PR target/88100
+	* gcc/config/rs6000/rs6000.c (rs6000_gimple_fold_builtin)
+	<case ALTIVEC_BUILTIN_VSPLTISB, ALTIVEC_BUILTIN_VSPLTISH,
+	ALTIVEC_BUILTIN_VSPLTISW>: Don't convert the operand before
+	range checking it.
+
+2019-02-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/89397
+	* config/i386/i386.c (ix86_atomic_assign_expand_fenv): Check
+	TARGET_SSE in addition to TARGET_SSE_MATH.
+
+	(ix86_excess_precision): Ditto.
+	(ix86_float_exceptions_rounding_supported_p): Ditto.
+	(use_rsqrt_p): Ditto.
+	* config/i386/sse.md (rsqrt<mode>2): Ditto.
+
+2019-02-27  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2019-02-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/89361
+	* config/s390/s390.c (s390_indirect_branch_attrvalue,
+	s390_indirect_branch_settings): Define unconditionally.
+	(s390_set_current_function): Likewise, but guard the whole body except
+	the s390_indirect_branch_settings call with
+	#if S390_USE_TARGET_ATTRIBUTE.
+	(TARGET_SET_CURRENT_FUNCTION): Redefine unconditionally.
+
+2019-02-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	Backport from mainline
+	2019-02-19  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* rtlanal.c (get_initial_register_offset): Fall back to the estimate
+	as long as the epilogue isn't completed.
+
+2019-02-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* tree-ssa-dom.c (edge_info::derive_equivalences) <BIT_IOR_EXPR>: Fix
+	and move around comment.
+	<BIT_AND_EXPR>: Likewise.
+	<BIT_NOT_EXPR>: Add specific handling for boolean types.
+
+2019-02-24  Alan Modra  <amodra@gmail.com>
+
+	PR target/89271
+	* config/rs6000/rs6000.md (<bd>_<mode> split): Check for an int
+	output reg on add insn.
+	(<bd>tf_<mode> split): Likewise.  Match predicates with insn.
+
 2019-02-22  Jakub Jelinek  <jakub@redhat.com>
 
 	* BASE-VER: Set to 8.3.1.
