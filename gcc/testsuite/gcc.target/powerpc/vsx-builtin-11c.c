@@ -40,22 +40,22 @@ vector int s30 (vector int v, int x)
 }
 
 /* Test for vector residing in memory.  */
-vector int ms3 (vector int *vp)
+vector int ms3  (vector int *vp, int x)
 {
   return vec_insert (x, *vp, 3);
 }
 
-vector int ms1(vector int *vp)
+vector int ms1 (vector int *vp, int x)
 {
   return vec_insert (x, *vp, 1);
 }
 
-vector int ms21(vector int *vp)
+vector int ms21 (vector int *vp, int x)
 {
   return vec_insert (x, *vp, 21);
 }
 
-vector int ms30(vector int *vp)
+vector int ms30 (vector int *vp, int x)
 {
   return vec_insert (x, *vp, 30);
 }
@@ -64,14 +64,14 @@ vector int ms30(vector int *vp)
 
 /* Test for variable selector and vector residing in register.  */
 __attribute__((noinline))
-vector int ci (vector int v, int i)
+vector int ci (vector int v, int i, int x)
 {
   return vec_insert (x, v, i);
 }
 
 /* Test for variable selector and vector residing in memory.  */
 __attribute__((noinline))
-vector int mci(vector int *vp, int i)
+vector int mci(vector int *vp, int i, int x)
 {
   return vec_insert (x, *vp, i);
 }
@@ -90,7 +90,7 @@ int main (int argc, int *argv[]) {
     abort ();
 
   sv = s21 (sv, CONST0);
-  if (sv [1] != CONST01)
+  if (sv [1] != CONST0)
     abort ();
 
   sv = s30 (sv, CONST1);
@@ -141,7 +141,7 @@ int main (int argc, int *argv[]) {
   if (sv [1] != CONST2)
     abort ();
 
-  sv = mci (&sv, 16, CONST3;
+  sv = mci (&sv, 16, CONST3);
   if (sv [0] != CONST3)
     abort ();
 

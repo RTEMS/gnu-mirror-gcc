@@ -81,7 +81,7 @@ int main (int argc, char *argv[]) {
   vector float dv = { CONST0, CONST1, CONST2, CONST3 };
   float d;
 
-  dv = e0 (dv, CONT3);
+  dv = e0 (dv, CONST3);
   if (dv [0] != CONST3)
     abort ();
 

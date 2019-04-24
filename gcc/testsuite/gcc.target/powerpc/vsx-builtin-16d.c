@@ -115,7 +115,7 @@ int main (int argc, char *argv[]) {
   if (cv [0] != CONST4)
     abort ();
 
-  cv = mc9 (&cv, CONSTE);
+  cv = mc9 (&cv, CONST3);
   if (cv [9] != CONST3)
     abort ();
 

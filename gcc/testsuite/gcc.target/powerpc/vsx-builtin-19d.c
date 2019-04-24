@@ -51,7 +51,7 @@ me3 (vector unsigned long long int *vp, unsigned long long int x)
 /* Test the same with variable indices.  */
 
 /* Test for variable selector and vector residing in register.  */
-__attribute__((noinline), unsigned long long int x)
+__attribute__((noinline))
 vector unsigned long long int
 ei (vector unsigned long long int v, int i, unsigned long long int x)
 {
@@ -59,6 +59,7 @@ ei (vector unsigned long long int v, int i, unsigned long long int x)
 }
 
 /* Test for variable selector and vector residing in memory.  */
+__attribute__((noinline))
 vector unsigned long long int
 mei (vector unsigned long long int *vp, int i, unsigned long long int x)
 {

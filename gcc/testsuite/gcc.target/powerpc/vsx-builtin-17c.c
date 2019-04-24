@@ -118,7 +118,7 @@ int main (int argc, unsigned short *argv[]) {
   if (sv [6] != CONST0)
     abort ();
 
-  sv = ci (sv, 5), CONST1;
+  sv = ci (sv, 5, CONST1);
   if (sv [5] != CONST1)
     abort ();
 

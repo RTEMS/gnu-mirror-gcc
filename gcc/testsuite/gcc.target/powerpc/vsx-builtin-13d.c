@@ -8,17 +8,7 @@
 
 #include <altivec.h>
 
-/* Define this after PR89424 is addressed.  */
-#undef PR89424
-
-/* Define this after PR89626 is addressed.  */
-#undef PR89626
-
-#ifdef PR89626
-#define SIGNED
-#else
 #define SIGNED signed
-#endif
 
 extern void abort (void);
 
@@ -54,7 +44,6 @@ vector SIGNED __int128 me3 (vector SIGNED __int128 *vp, SIGNED __int128 x)
 
 /* Test the same with variable indices.  */
 
-#ifdef PR89424
 /* Test for variable selector and vector residing in register.  */
 __attribute__((noinline))
 vector SIGNED __int128
@@ -70,7 +59,6 @@ mei (vector SIGNED __int128 *vp, int i, SIGNED __int128 x)
 {
   return vec_insert (x, *vp, i);
 }
-#endif
 
 int main (int argc, char *argv[]) {
   vector SIGNED __int128 dv = { CONST0 };
@@ -92,7 +80,6 @@ int main (int argc, char *argv[]) {
   if (dv [0] != CONST3)
     abort ();
 
-#ifdef PR89424
   dv = ei (dv, 0, CONST1);
   if (dv [0] != CONST1)
     abort ();
@@ -102,7 +89,7 @@ int main (int argc, char *argv[]) {
     abort ();
 
   dv = ei (dv, 2, CONST3);
-  if (dv [0] != CONST0, CONST3)
+  if (dv [0] != CONST3)
     abort ();
 
   dv = ei (dv, 3, CONST1);
@@ -124,7 +111,5 @@ int main (int argc, char *argv[]) {
   dv = mei (&dv, 3, CONST2);
   if (dv [0] != CONST2)
     abort ();
-#endif
-
   return 0;
 }

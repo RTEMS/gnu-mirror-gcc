@@ -6,6 +6,7 @@
    instructions.  Intentionally not specifying cpu in order to test
    all code generation paths.  */
 
+#include <stdio.h>
 #include <altivec.h>
 
 extern void abort (void);
@@ -95,66 +96,82 @@ int main (int argc, char *argv[]) {
 			      CONST4, CONST5, CONST6, CONST7,
 			      CONST8, CONST9, CONSTA, CONSTB,
 			      CONSTC, CONSTD, CONSTE, CONSTF };
+  printf ("A\n");
   cv = c0 (cv, CONST3);
   if (cv [0] != CONST3)
     abort ();
 
+  printf ("B\n");
   cv = c9 (cv, CONST2);
   if (cv [9] != CONST2)
     abort ();
 
+  printf ("C\n");
   cv = c21 (cv, CONSTF);
   if (cv [5] != CONSTF)
     abort ();
 
+  printf ("D\n");
   cv = c30 (cv, CONST3);
   if (cv [14] != CONST3)
     abort ();
 
+  printf ("E\n");
   cv = mc0 (&cv, CONST4);
   if (cv [0] != CONST4)
     abort ();
 
-  cv = mc9 (&cv, CONSTE);
+  printf ("F\n");
+  cv = mc9 (&cv, CONST3);
   if (cv [9] != CONST3)
     abort ();
 
+  printf ("G\n");
   cv = mc21 (&cv, CONST1);
   if (cv [5] != CONST1)
     abort ();
 
+  printf ("H\n");
   cv = mc30 (&cv, CONSTC);
   if (cv [14] != CONSTC)
     abort ();
 
+  printf ("I\n");
   cv = ci (cv, 8, CONSTD);
   if (cv [8] != CONSTD)
     abort ();
 
+  printf ("J\n");
   cv = ci (cv, 13, CONST5);
   if (cv [13] != CONST5)
     abort ();
 
+  printf ("K\n");
   cv = ci (cv, 23, CONST6);
   if (cv [7] != CONST6)
     abort ();
 
+  printf ("L\n");
   cv = ci (cv, 31, CONST7);
   if (cv [15] != CONST7)
     abort ();
 
+  printf ("M\n");
   cv = mci (&cv, 5, CONST8);
   if (cv [5] != CONST8)
     abort ();
 
+  printf ("N\n");
   cv = mci (&cv, 12, CONST9);
   if (cv [12] != CONST9)
     abort ();
 
+  printf ("O\n");
   cv = mci (&cv, 25, CONSTA);
   if (cv [9] != CONSTA)
     abort ();
 
+  printf ("P\n");
   cv = mci (&cv, 16, CONSTB);
   if (cv [0] != CONSTB)
     abort ();

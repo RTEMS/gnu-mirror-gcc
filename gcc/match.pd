@@ -4963,11 +4963,6 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (BIT_FIELD_REF @0 @1 @2))
 
 (simplify
- (BIT_FIELD_REF @0 @1 integer_zerop)
- (if (tree_int_cst_equal (@1, TYPE_SIZE (TREE_TYPE (@0))))
-  (view_convert @0)))
-
-(simplify
  (BIT_FIELD_REF @0 @1 @2)
  (switch
   (if (TREE_CODE (TREE_TYPE (@0)) == COMPLEX_TYPE

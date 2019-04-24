@@ -30,12 +30,12 @@ vector long long int e3 (vector long long int v, long long int x)
 }
 
 /* Test for vector residing in memory.  */
-vector long long int me0 (vector long long int *vp)
+vector long long int me0 (vector long long int *vp, long long int x)
 {
   return vec_insert (x, *vp, 0);
 }
 
-vector long long int me3 (vector long long int *vp)
+vector long long int me3 (vector long long int *vp, long long int x)
 {
   return vec_insert (x, *vp, 3);
 }

@@ -8,9 +8,6 @@
 
 #include <altivec.h>
 
-/* Define this after PR89424 is addressed.  */
-#undef PR89424
-
 extern void abort (void);
 
 #define CONST0		(((unsigned __int128) 31415926539) << 60)
@@ -24,7 +21,7 @@ extern void abort (void);
 /* Test for vector residing in register.  */
 vector unsigned __int128 e0 (vector unsigned __int128 v, unsigned __int128 x)
 {
-  return __builtin_vec_extract (v, 0);
+  return vec_insert (x, v, 0);
 }
 
 vector unsigned __int128 e3 (vector unsigned __int128 v, unsigned __int128 x)
@@ -47,7 +44,6 @@ me3 (vector unsigned __int128 *vp, unsigned __int128 x)
 
 /* Test the same with variable indices.  */
 
-#ifdef PR89424
 /* Test for variable selector and vector residing in register.  */
 __attribute__((noinline))
 vector unsigned __int128
@@ -63,7 +59,6 @@ mei (vector unsigned __int128 *vp, int i, unsigned __int128 x)
 {
   return vec_insert (x, *vp, i);
 }
-#endif
 
 int main (int argc, char *argv[]) {
   vector unsigned __int128 dv = { CONST0 };
@@ -84,7 +79,6 @@ int main (int argc, char *argv[]) {
   if (dv [0] != CONST3)
     abort ();
 
-#ifdef PR89424
   dv = ei (dv, 0, CONST0);
   if (dv [0] != CONST0)
     abort ();
@@ -116,7 +110,6 @@ int main (int argc, char *argv[]) {
   dv = mei (&dv, 3, CONST3);
   if (dv [0] != CONST3)
     abort ();
-#endif
 
   return 0;
 }

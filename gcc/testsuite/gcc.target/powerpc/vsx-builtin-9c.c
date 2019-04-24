@@ -121,7 +121,7 @@ int main (int argc, char *argv[]) {
     abort ();
 
   cv = mc21 (&cv, CONST7);
-  if (cv [5] != CONST57)
+  if (cv [5] != CONST7)
     abort ();
 
   cv = mc30 (&cv, CONST2);

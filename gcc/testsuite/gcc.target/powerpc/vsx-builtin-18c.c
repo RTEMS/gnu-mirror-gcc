@@ -63,14 +63,14 @@ vector unsigned int ms30(vector unsigned int *vp, unsigned int x)
 /* Test the same with variable indices.  */
 
 /* Test for variable selector and vector residing in register.  */
-__attribute__((noinline), unsigned int x)
+__attribute__((noinline))
 vector unsigned int ci (vector unsigned int v, int i, unsigned int x)
 {
   return vec_insert (x, v, i);
 }
 
 /* Test for variable selector and vector residing in memory.  */
-__attribute__((noinline), unsigned int x)
+__attribute__((noinline))
 vector unsigned int mci(vector unsigned int *vp, int i, unsigned int x)
 {
   return vec_insert (x, *vp, i);

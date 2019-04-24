@@ -83,6 +83,40 @@ set_auto_n_ushort (vector unsigned short a, int n, unsigned short x)
   return vec_insert (x, a, n);
 }
 
+__attribute ((noinline))
+unsigned __int128
+get_auto_n_uint128 (vector unsigned __int128 a, int n)
+{
+  return vec_extract (a, n);
+}
+
+__attribute ((noinline))
+unsigned long long int
+get_auto_n_ulong (vector unsigned long long int a, int n)
+{
+  return vec_extract (a, n);
+}
+
+__attribute ((noinline))
+unsigned int
+get_auto_n_uint (vector unsigned int a, int n)
+{
+  return vec_extract (a, n);
+}
+
+__attribute ((noinline))
+unsigned char
+get_auto_n_uchar (vector unsigned char a, int n)
+{
+  return vec_extract (a, n);
+}
+
+__attribute ((noinline))
+unsigned short
+get_auto_n_ushort (vector unsigned short a, int n)
+{
+  return vec_extract (a, n);
+}
 
 int check_uint128_element (int i, unsigned __int128 entry)
 {
@@ -92,7 +126,7 @@ int check_uint128_element (int i, unsigned __int128 entry)
 		    | 0x0706050403020100ULL));
 }
 
-int get_uint128_element (int i)
+unsigned __int128 get_uint128_element (int i)
 {
   return ((((unsigned __int128) 0xffeeddccbbaa9988ULL) << 64)
 	  | 0x0706050403020100ULL);
@@ -217,14 +251,14 @@ unsigned short get_ushort_element (int i)
 {
   switch (i % 8)
     {
-    case 0: return (entry == 0x9988);
-    case 1: return (entry == 0x8877);
-    case 2: return (entry == 0x7766);
-    case 3: return (entry == 0x6655);
-    case 4: return (entry == 0x5544);
-    case 5: return (entry == 0x4433);
-    case 6: return (entry == 0x3322);
-    case 7: return (entry == 0x2211);
+    case 0: return 0x9988;
+    case 1: return 0x8877;
+    case 2: return 0x7766;
+    case 3: return 0x6655;
+    case 4: return 0x5544;
+    case 5: return 0x4433;
+    case 6: return 0x3322;
+    case 7: return 0x2211;
     }
 }
 
@@ -233,8 +267,8 @@ init_auto_uint128 (vector unsigned __int128 a)
 {
   int i;
   for (i = 0; i < 32; i += 3)
-    a = set_auto_n_uint128 (get_uint128_element (i), a, i);
-  return a
+    a = set_auto_n_uint128 (a, i, get_uint128_element (i));
+  return a;
 }
 
 void do_auto_uint128 (vector unsigned __int128 a)
@@ -246,14 +280,14 @@ void do_auto_uint128 (vector unsigned __int128 a)
       c = get_auto_n_uint128 (a, i);
       if (!check_uint128_element (i, c)) abort ();
     }
- }
+}
 
 vector unsigned long long int
 init_auto_ulong (vector unsigned long long int a)
 {
   int i;
   for (i = 0; i < 32; i += 3)
-    a = set_auto_n_ulong (get_ulong_element (i), a, i);
+    a = set_auto_n_ulong (a, i, get_ulong_element (i));
   return a;
 }
 
@@ -272,7 +306,7 @@ vector unsigned int init_auto_uint (vector unsigned int a)
 {
   int i;
   for (i = 0; i < 32; i += 3)
-    a = set_uint_element (get_auto_n_uint (i), a, i);
+    a = set_auto_n_uint (a, i, get_uint_element (i));
   return a;
 }
 
@@ -287,11 +321,11 @@ void do_auto_uint (vector unsigned int a)
     }
  }
 
-void init_auto_ushort ( vector unsigned short a )
+vector unsigned short init_auto_ushort ( vector unsigned short a )
 {
   int i;
   for (i = 0; i < 32; i += 3)
-    a = set_auto_n_ushort (get_ushort_element (i), a, i);
+    a = set_auto_n_ushort (a, i, get_ushort_element (i));
   return a;
 }
 
@@ -306,15 +340,15 @@ void do_auto_ushort (vector unsigned short a)
     }
 }
 
-void init_auto_uchar (vector unsigned char a)
+vector unsigned char init_auto_uchar (vector unsigned char a)
 {
   int i;
   for (i = 0; i < 32; i += 3)
-    a = set_auto_n_uchar (get_uchar_element (i), a, i);
+    a = set_auto_n_uchar (a, i, get_uchar_element (i));
   return a;
 }
 
-void do_auto_uchar ( vector unsigned char a )
+void do_auto_uchar (vector unsigned char a)
 {
   int i;
   unsigned char c;

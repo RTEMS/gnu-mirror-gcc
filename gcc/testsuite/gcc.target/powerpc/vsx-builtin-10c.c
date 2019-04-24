@@ -100,7 +100,7 @@ int main (int argc, short *argv[]) {
     abort ();
 
   sv = s30 (sv, CONST2);
-  if (sv [6] != CONST6)
+  if (sv [6] != CONST2)
     abort ();
 
   sv = ms3 (&sv, CONST5);
