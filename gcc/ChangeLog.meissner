@@ -1,3 +1,13 @@
+2019-06-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Delete
+	enabling -mprefixed-addr and -mpcrel by default.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Make
+	-mpcrel and -mprefixed-addr act like other swtiches (i.e. using
+	-mpcrel automatically sets -mcpu=future and -mprefixed-addr, and
+	-mprefixed-addr automatically sets just -mcpu=future).  Clean up
+	some thinkos in reporting errors for -mpcrel and -mprefixed-addr.
+
 2019-06-06   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 272002
