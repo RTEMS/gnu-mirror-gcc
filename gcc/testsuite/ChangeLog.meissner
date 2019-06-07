@@ -1,4 +1,4 @@
-2019-06-06  Michael Meissner  <meissner@linux.ibm.com>
+2019-06-07  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/localentry-1.c: Add -mpcrel option.
 	* gcc.target/powerpc/localentry-detect-1.c: Explicitly set and
