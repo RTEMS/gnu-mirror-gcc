@@ -3896,15 +3896,8 @@ rs6000_option_override_internal (bool global_init_p)
   ignore_masks = rs6000_disable_incompatible_switches ();
 
   /* For the newer switches (vsx, dfp, etc.) set some of the older options,
-     unless the user explicitly used the -mno-<option> to disable the code.  At
-     present -mfuture does not enable prefixed address or pc-relative support,
-     so if those are specified, enable the necessary additional bits.  */
-  if (TARGET_PCREL)
-    rs6000_isa_flags |= ((ISA_FUTURE_MASKS_SERVER
-			  | OPTION_MASK_PREFIXED_ADDR) & ~ignore_masks);
-  else if (TARGET_PREFIXED_ADDR)
-    rs6000_isa_flags |= (ISA_FUTURE_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
+     unless the user explicitly used the -mno-<option> to disable the code.  */
+  if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
     rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_P9_MINMAX)
     {
@@ -4255,7 +4248,7 @@ rs6000_option_override_internal (bool global_init_p)
   /* -mpcrel requires prefixed load/store addressing.  */
   if (TARGET_PCREL && !TARGET_PREFIXED_ADDR)
     {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_PREFIXED_ADDR) != 0)
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
 
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
@@ -4264,7 +4257,7 @@ rs6000_option_override_internal (bool global_init_p)
   /* -mprefixed-addr (and hence -mpcrel) requires -mcpu=future.  */
   if (TARGET_PREFIXED_ADDR && !TARGET_FUTURE)
     {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_FUTURE) != 0)
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs", "-mprefixed-addr", "-mcpu=future");
 
       rs6000_isa_flags &= ~(OPTION_MASK_PCREL | OPTION_MASK_PREFIXED_ADDR);

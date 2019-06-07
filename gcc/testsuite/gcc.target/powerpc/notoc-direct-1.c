@@ -1,11 +1,10 @@
 /* { dg-do compile } */
-/* { dg-options "-mdejagnu-cpu=future -O2 -mpcrel" } */
+/* { dg-options "-mdejagnu-cpu=future -O2" } */
 /* { dg-require-effective-target powerpc_elfv2 } */
 /* { dg-require-effective-target powerpc_future_ok } */
 
-/* Test that calls generated from PC-relative code are annotated with @notoc.
-   At present, -mcpu=future does not enable pc-relative mode.  Enable it here
-   explicitly until it is turned on by default.  */
+/* Test that calls generated from PC-relative code are
+   annotated with @notoc.  */
 
 extern int yy0 (int);
 extern void yy1 (int);

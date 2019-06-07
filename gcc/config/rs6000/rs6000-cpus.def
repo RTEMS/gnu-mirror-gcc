@@ -77,7 +77,9 @@
 
 /* Support for a future processor's features.  */
 #define ISA_FUTURE_MASKS_SERVER	(ISA_3_0_MASKS_SERVER			\
-				 | OPTION_MASK_FUTURE)			\
+				 | OPTION_MASK_FUTURE			\
+				 | OPTION_MASK_PCREL			\
+				 | OPTION_MASK_PREFIXED_ADDR)
 
 /* Flags that need to be turned off if -mno-future.  */
 #define OTHER_FUTURE_MASKS	(OPTION_MASK_PCREL			\
