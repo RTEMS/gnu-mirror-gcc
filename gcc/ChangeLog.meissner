@@ -1,3 +1,24 @@
+2019-06-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/90822
+	* config/rs6000/rs6000.md (UNSPEC_LFIWAX): Delete.
+	(UNSPEC_LFIWZX): Delete.
+	(lfiwax): Delete, no longer used.
+	(floatsi<mode>2_lfiwax): Rewrite.  Pretend that we support a
+	direct SImode -> SFmode/DFmode conversion until after reload.
+	Then convert it into sign extension and FP conversion.
+	(floatsi<mode>2_lfiwax_mem): Delete, no longer used.
+	(lfiwzx): Delete, no longer used.
+	(floatunssi<mode>2_lfiwzx): Rewrite.  Pretend that we support a
+	direct unsigned SImode -> SFmode/DFmode conversion until after
+	reload.
+	(floatunssi<mode>2_lfiwzx_mem): Delete.
+	(fix_trunc<mode>si2_stfiwx): If we allocate a stack slot on older
+	machines, force the address to be indexed.
+	(round32<mode>2_fprs): Generate the sign extend directly instead
+	of using the LFIWAX pattern.  If we allocate a stack slot on older
+	machines, force the address to be indexed.
+
 2019-06-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 272163
