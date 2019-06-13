@@ -1,3 +1,19 @@
+2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (UNSPEC_LFIWAX): Restore.
+	(UNSPEC_LFIWZX): Restore.
+	(lfiwax): Restore, update comment.
+	(lfiwzx): Restore.
+	(floatsi<mode>2_lfiwax): Use wr for VUPKLSW+SPLAT case, since
+	there is no 32-bit splitter for it.  On 32-bit systems, use
+	lfiwax and instead of extendsidi2.
+	(floatunssi<mode>2_lfiwzx): On 32-bit systems, use lfiwzx instead
+	of zero_extendsidi2.
+	(round32<mode>2_fprs): On 32-bit systems, use lfiwax instead of
+	extendsidi2.
+	(round32u<mode>2_fprs): On 32-bit systems, use lfiwzx instead of
+	zero_extendsidi2.
+
 2019-06-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/90822
