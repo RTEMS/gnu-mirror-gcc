@@ -1,6 +1,15 @@
 2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/90822
+	* config/rs6000/rs6000.md (lfiwax): Add support to do sign extend
+	in altivec register on power8.
+	(floatsi<mode>2_lfiwax): Undo last changes, and apply various
+	fixes.
+	(floatunssi<mode>2_lfiwzx): Likewise.
+
+2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/90822
 	* config/rs6000/rs6000.md (floatsi<mode>2_lfiwax): Rewrite to be a
 	define_expand.  Either do normal sign extend or generate lfiwax
 	directly based on the machine.
