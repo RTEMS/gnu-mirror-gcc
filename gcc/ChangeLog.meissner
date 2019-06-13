@@ -1,65 +1,22 @@
 2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/90822
-	* config/rs6000/rs6000.md (lfiwax): Add support to do sign extend
-	in altivec register on power8.
-	(floatsi<mode>2_lfiwax): Undo last changes, and apply various
-	fixes.
-	(floatunssi<mode>2_lfiwzx): Likewise.
-
-2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/90822
-	* config/rs6000/rs6000.md (floatsi<mode>2_lfiwax): Rewrite to be a
-	define_expand.  Either do normal sign extend or generate lfiwax
-	directly based on the machine.
-	(floatunssi<mode>2_lfiwax): Rewrite to be a define_expand.  Either
-	do normal zero extend or generate lfiwzx directly based on the
-	machine.
-	(fix_trunc<mode>si2): Eliminate call to
-	rs6000_force_indexed_or_indirect_mem in last patch.
-	(round32<mode>2_fprs): Eliminate call to
-	rs6000_force_indexed_or_indirect_mem in last patch.  Always call
-	lfiwax/lfiwzx directly.
-	(roundu32<mode>2_fprs): Likewise.
-
-2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/90822
-	* config/rs6000/rs6000.md (UNSPEC_LFIWAX): Restore.
-	(UNSPEC_LFIWZX): Restore.
-	(lfiwax): Restore, update comment.
-	(lfiwzx): Restore.
-	(floatsi<mode>2_lfiwax): Use wr for VUPKLSW+SPLAT case, since
-	there is no 32-bit splitter for it.  On 32-bit systems, use
-	lfiwax and instead of extendsidi2.
-	(floatunssi<mode>2_lfiwzx): On 32-bit systems, use lfiwzx instead
-	of zero_extendsidi2.
-	(round32<mode>2_fprs): On 32-bit systems, use lfiwax instead of
-	extendsidi2.
-	(round32u<mode>2_fprs): On 32-bit systems, use lfiwzx instead of
-	zero_extendsidi2.
-
-2019-06-12  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/90822
-	* config/rs6000/rs6000.md (UNSPEC_LFIWAX): Delete.
-	(UNSPEC_LFIWZX): Delete.
-	(lfiwax): Delete, no longer used.
-	(floatsi<mode>2_lfiwax): Rewrite.  Pretend that we support a
-	direct SImode -> SFmode/DFmode conversion until after reload.
-	Then convert it into sign extension and FP conversion.
+	* config/rs6000/rs6000.md (lfiwax): Update comment.  Add
+	vupkhsw/xxspltd or vupklsw/xxspltd split support to sign extend
+	SImode on ISA 2.07 systems.
+	(floatsi<mode>2_lfiwax): Rewrite.  Do not split the insn until
+	after register allocation so that we should always get lfiwax
+	generated instead of doing a gpr load and direct move.  On 64-bit
+	systems that allow SImode in vector registers, split to do a
+	sign_extend instead of lfiwax.
 	(floatsi<mode>2_lfiwax_mem): Delete, no longer used.
-	(lfiwzx): Delete, no longer used.
-	(floatunssi<mode>2_lfiwzx): Rewrite.  Pretend that we support a
-	direct unsigned SImode -> SFmode/DFmode conversion until after
-	reload.
-	(floatunssi<mode>2_lfiwzx_mem): Delete.
-	(fix_trunc<mode>si2_stfiwx): If we allocate a stack slot on older
-	machines, force the address to be indexed.
-	(round32<mode>2_fprs): Generate the sign extend directly instead
-	of using the LFIWAX pattern.  If we allocate a stack slot on older
-	machines, force the address to be indexed.
+	(lfiwzx): Move so this is next to lfiwax.
+	(floatunssi<mode>2_lfiwax): Rewrite.  Do not split the insn until
+	after register allocation so that we should always get lfiwzx
+	generated instead of doing a gpr load and direct move.  On 64-bit
+	systems that allow SImode in vector registers, split to do a
+	zero_extend instead of lfiwzx.
+	(floatunssi<mode>2_lfiwzx_mem): Delete, no longer used.
 
 2019-06-11   Michael Meissner  <meissner@linux.ibm.com>
 
