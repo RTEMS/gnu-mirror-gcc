@@ -19,7 +19,7 @@
 	(fix_trunc<mode>si2): Eliminate call to
 	rs6000_force_indexeced_or_indirect_mem in last patch.
 	(round32<mode>2_fprs): Eliminate call to
-	rs6000_force_indexeced_or_indirect_mem in last patch.  Always call
+	rs6000_force_indexed_or_indirect_mem in last patch.  Always call
 	lfiwax/lfiwzx directly.
 	(roundu32<mode>2_fprs): Likewise.
 
