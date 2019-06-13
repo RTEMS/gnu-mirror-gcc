@@ -1,5 +1,22 @@
 2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/90822
+	* config/rs6000/rs6000.md (floatsi<mode>2_lfiwax): Rewrite to be a
+	define_expand.  Either do normal sign extend or generate lfiwax
+	directly based on the machine.
+	(floatunssi<mode>2_lfiwax): Rewrite to be a define_expand.  Either
+	do normal zero extend or generate lfiwzx directly based on the
+	machine.
+	(fix_trunc<mode>si2): Eliminate call to
+	rs6000_force_indexeced_or_indirect_mem in last patch.
+	(round32<mode>2_fprs): Eliminate call to
+	rs6000_force_indexeced_or_indirect_mem in last patch.  Always call
+	lfiwax/lfiwzx directly.
+	(roundu32<mode>2_fprs): Likewise.
+
+2019-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/90822
 	* config/rs6000/rs6000.md (UNSPEC_LFIWAX): Restore.
 	(UNSPEC_LFIWZX): Restore.
 	(lfiwax): Restore, update comment.
