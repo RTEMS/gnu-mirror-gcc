@@ -1,3 +1,8 @@
+2019-06-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/90822
+	* gcc.target/powerpc/pr81348.c: Use -O2 instead of -Og.
+
 2019-06-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 272163
