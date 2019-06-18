@@ -1,4 +1,13 @@
 2019-06-18   Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/90822
+	* config/rs6000/rs6000.md (floatsi<mode>2_lfiwax): Add non-VSX
+	alternative.
+	(floatsi<mode>2_lfiwax_mem): Add non-VSX alternative.
+	(floatunssi<mode>2_lfiwzx): Add non-VSX alternative.
+	(floatunssi<mode>2_lfiwzx_mem): Add non-VSX alternative.
+
+2019-06-18   Michael Meissner  <meissner@linux.ibm.com>
+
 	Clone branch subversion id 272432
 
