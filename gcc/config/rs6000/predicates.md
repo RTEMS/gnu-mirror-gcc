@@ -1645,21 +1645,57 @@
       op = op0;
     }
 
-  return LABEL_REF_P (op) || SYMBOL_REF_PCREL_P (op);
+  if (LABEL_REF_P (op))
+    return true;
+
+  return (TARGET_CMODEL == CMODEL_MEDIUM && SYMBOL_REF_P (op)
+	  && SYMBOL_REF_LOCAL_P (op));
 })
 
-;; Return 1 if op is a prefixed memory operand
+;; Return true if the operand is an external symbol whose address can be loaded
+;; into a register either via PADDI (if the symbol is in the main program) or
+;; PLD GOT address (if the symbol is defined in a shared library).
+
+(define_predicate "pcrel_external_address"
+  (match_code "symbol_ref,const")
+{
+  if (!TARGET_PCREL || TARGET_CMODEL != CMODEL_MEDIUM)
+    return false;
+
+  /* Discard any CONST's.  */
+  if (GET_CODE (op) == CONST)
+    op = XEXP (op, 0);
+
+  /* Validate offset.  */
+  if (GET_CODE (op) == PLUS)
+    {
+      rtx op0 = XEXP (op, 0);
+      rtx op1 = XEXP (op, 1);
+
+      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
+	return false;
+
+      op = op0;
+    }
+
+  return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
+})
+
+;; Return 1 if op is a prefixed memory operand.
 (define_predicate "prefixed_mem_operand"
   (match_code "mem")
 {
   return rs6000_prefixed_address (XEXP (op, 0), GET_MODE (op));
 })
 
-;; Return 1 if op is a memory operand that is not a prefixed memory
-;; operand.
-(define_predicate "non_prefixed_mem_operand"
-  (and (match_operand 0 "memory_operand")
-       (not (match_operand 0 "prefixed_mem_operand"))))
+;; Return 1 if op is a memory operand to an external variable when we
+;; support pc-relative addressing and the PCREL_OPT relocation to
+;; optimize references to it.
+(define_predicate "pcrel_external_mem_operand"
+  (match_code "mem")
+{
+  return pcrel_external_address (XEXP (op, 0), Pmode);
+})
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.
