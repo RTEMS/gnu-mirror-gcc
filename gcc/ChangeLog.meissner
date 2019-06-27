@@ -2,7 +2,7 @@
 
 	* config/rs6000/predicates.md (cint34_operand): Update
 	SIGNED_34BIT_OFFSET_P call.
-	(pcrel_address): Update SIGNED_34BIT_OFFSET_P.
+	(pcrel_address): Update SIGNED_34BIT_OFFSET_P call.
 	* config/rs6000/rs6000.c (rs6000_prefixed_address): Update
 	SIGNED_16BIT_OFFSET_P and SIGNED_34BIT_OFFSET_P calls.
 	* config/rs6000/rs6000.h (SIGNED_16BIT_OFFSET_P): Remove EXTRA
