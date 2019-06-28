@@ -1626,10 +1626,9 @@
 (define_predicate "pcrel_address"
   (match_code "label_ref,symbol_ref,const")
 {
-  if (!TARGET_PCREL)
+  if (!rs6000_pcrel_p (cfun))
     return false;
 
-  /* Discard any CONST's.  */
   if (GET_CODE (op) == CONST)
     op = XEXP (op, 0);
 
@@ -1648,21 +1647,23 @@
   if (LABEL_REF_P (op))
     return true;
 
-  return (TARGET_CMODEL == CMODEL_MEDIUM && SYMBOL_REF_P (op)
-	  && SYMBOL_REF_LOCAL_P (op));
+  return (SYMBOL_REF_P (op) && SYMBOL_REF_LOCAL_P (op));
 })
 
 ;; Return true if the operand is an external symbol whose address can be loaded
-;; into a register either via PADDI (if the symbol is in the main program) or
-;; PLD GOT address (if the symbol is defined in a shared library).
+;; into a register using:
+;;	PLA reg,label@pcrel@got
+;;
+;; The linker will either optimize this to either a PADDI if the label is
+;; defined locally in another module or a PLD of the address if the label is
+;; defined in another module.
 
 (define_predicate "pcrel_external_address"
   (match_code "symbol_ref,const")
 {
-  if (!TARGET_PCREL || TARGET_CMODEL != CMODEL_MEDIUM)
+  if (!rs6000_pcrel_p (cfun))
     return false;
 
-  /* Discard any CONST's.  */
   if (GET_CODE (op) == CONST)
     op = XEXP (op, 0);
 
