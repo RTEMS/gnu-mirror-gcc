@@ -1,5 +1,24 @@
 2019-06-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-logue.c (create_TOC_reference): Move debug
+	statements to create_data_reference.  Add gcc_assert to make sure
+	we are using TOCs and not pc-relative addressing.
+	(create_data_reference): New function, create either a TOC style
+	reference or a pc-relative reference to local symbols.
+	* config/rs6000/rs6000-protos.h (create_data_reference): Add
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_legitimize_address): Call
+	create_data_reference instead of create_TOC_reference.
+	(use_toc_or_pc_relative_ref): Rename from use_toc_relative_ref and
+	add support for pc-relative addressing.
+	(rs6000_emit_move): Call use_toc_or_pc_relative_ref and
+	create_data_reference instead of use_toc_relative_ref and
+	create_TOC_reference.
+	* config/rs6000/rs6000.md (cmp<mode>_internal2): Call
+	create_data_reference instead of create_TOC_reference.
+
+2019-06-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_address):  Use
 	SYMBOL_REF_LOCAL_P to determine if a label is local.
 	(pcrel_external_address): New predicate.

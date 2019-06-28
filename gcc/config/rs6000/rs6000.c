@@ -8084,7 +8084,7 @@ rs6000_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 	   && SYMBOL_REF_P (x)
 	   && constant_pool_expr_p (x)
 	   && ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (get_pool_constant (x), Pmode))
-    return create_TOC_reference (x, NULL_RTX);
+    return create_data_reference (x, NULL_RTX);
   else
     return x;
 }
@@ -8696,19 +8696,21 @@ rs6000_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
   return TARGET_ELF && tls_referenced_p (x);
 }
 
-/* Return true iff the given SYMBOL_REF refers to a constant pool entry
-   that we have put in the TOC, or for cmodel=medium, if the SYMBOL_REF
-   can be addressed relative to the toc pointer.  */
+/* Return true iff the given SYMBOL_REF refers to a constant pool entry that we
+   have put in the TOC or is referenced via a pc-relative reference.  In
+   addition, for cmodel=medium, if the SYMBOL_REF can be addressed relative to
+   the either toc pointer or via a pc-relative reference.  */
 
 static bool
-use_toc_relative_ref (rtx sym, machine_mode mode)
+use_toc_or_pc_relative_ref (rtx sym, machine_mode mode)
 {
   return ((constant_pool_expr_p (sym)
 	   && ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (get_pool_constant (sym),
 					       get_pool_mode (sym)))
 	  || (TARGET_CMODEL == CMODEL_MEDIUM
 	      && SYMBOL_REF_LOCAL_P (sym)
-	      && GET_MODE_SIZE (mode) <= POWERPC64_TOC_POINTER_ALIGNMENT));
+	      && (TARGET_PCREL
+		  || GET_MODE_SIZE (mode) <= POWERPC64_TOC_POINTER_ALIGNMENT)));
 }
 
 /* TARGET_LEGITIMATE_ADDRESS_P recognizes an RTL expression
@@ -9810,8 +9812,8 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	 reference to it.  */
       if (TARGET_TOC
 	  && SYMBOL_REF_P (operands[1])
-	  && use_toc_relative_ref (operands[1], mode))
-	operands[1] = create_TOC_reference (operands[1], operands[0]);
+	  && use_toc_or_pc_relative_ref (operands[1], mode))
+	operands[1] = create_data_reference (operands[1], operands[0]);
       else if (mode == Pmode
 	       && CONSTANT_P (operands[1])
 	       && GET_CODE (operands[1]) != HIGH
@@ -9864,11 +9866,11 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
 	  if (TARGET_TOC
 	      && SYMBOL_REF_P (XEXP (operands[1], 0))
-	      && use_toc_relative_ref (XEXP (operands[1], 0), mode))
+	      && use_toc_or_pc_relative_ref (XEXP (operands[1], 0), mode))
 	    {
-	      rtx tocref = create_TOC_reference (XEXP (operands[1], 0),
-						 operands[0]);
-	      operands[1] = gen_const_mem (mode, tocref);
+	      rtx dataref = create_data_reference (XEXP (operands[1], 0),
+						   operands[0]);
+	      operands[1] = gen_const_mem (mode, dataref);
 	      set_mem_alias_set (operands[1], get_TOC_alias_set ());
 	    }
 	}

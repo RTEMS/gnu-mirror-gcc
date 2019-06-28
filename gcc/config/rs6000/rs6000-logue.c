@@ -1406,23 +1406,13 @@ uses_TOC (void)
 }
 #endif
 
+/* Create a TOC style reference for a symbol.  */
 rtx
 create_TOC_reference (rtx symbol, rtx largetoc_reg)
 {
   rtx tocrel, tocreg, hi;
 
-  if (TARGET_DEBUG_ADDR)
-    {
-      if (SYMBOL_REF_P (symbol))
-	fprintf (stderr, "\ncreate_TOC_reference, (symbol_ref %s)\n",
-		 XSTR (symbol, 0));
-      else
-	{
-	  fprintf (stderr, "\ncreate_TOC_reference, code %s:\n",
-		   GET_RTX_NAME (GET_CODE (symbol)));
-	  debug_rtx (symbol);
-	}
-    }
+  gcc_assert (TARGET_TOC && !TARGET_PCREL);
 
   if (!can_create_pseudo_p ())
     df_set_regs_ever_live (TOC_REGISTER, true);
@@ -1439,6 +1429,39 @@ create_TOC_reference (rtx symbol, rtx largetoc_reg)
       hi = largetoc_reg;
     }
   return gen_rtx_LO_SUM (Pmode, hi, tocrel);
+}
+
+/* Create either a TOC reference to a locally defined item or a pc-relative
+   reference, depending on the ABI.  */
+rtx
+create_data_reference (rtx symbol, rtx largetoc_reg)
+{
+  if (TARGET_DEBUG_ADDR)
+    {
+      const char *toc_or_pcrel = (TARGET_PCREL) ? "pc-relative" : "TOC";
+
+      if (SYMBOL_REF_P (symbol))
+	fprintf (stderr, "\ncreate_data_reference, abi %s, (symbol_ref %s)\n",
+		 toc_or_pcrel, XSTR (symbol, 0));
+      else
+	{
+	  fprintf (stderr, "\ncreate_data_reference, abi %s, code %s:\n",
+		   toc_or_pcrel, GET_RTX_NAME (GET_CODE (symbol)));
+	  debug_rtx (symbol);
+	}
+    }
+
+  /* We don't have to do anything special for pc-relative references.  The
+     SYMBOL_REF bits sayss whether the label is local where we can use
+     pc-relative addressing, or if we have to load the address from the GOT
+     section to use it on external addresses.  */
+  if (TARGET_PCREL)
+    {
+      gcc_assert (TARGET_CMODEL == CMODEL_MEDIUM);
+      return symbol;
+    }
+
+  return create_TOC_reference (symbol, largetoc_reg);
 }
 
 /* Issue assembly directives that create a reference to the given DWARF
