@@ -7731,7 +7731,6 @@ constant_pool_expr_p (rtx op)
 	  && ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (get_pool_constant (base), Pmode));
 }
 
-
 /* Create a TOC style reference for a SYMBOL.  If LARGETOC_REG is non-null, use
    that as the register to hold the high part of the TOC address.  */
 rtx
