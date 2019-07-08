@@ -1,3 +1,31 @@
+2019-07-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-internal.h (create_TOC_reference): Delete
+	declaration.
+	* config/rs6000/rs6000-logue.c (create_TOC_reference): Move
+	function back to rs6000.c.
+	* config/rs6000/rs6000-protos.h (create_data_reference): New
+	declaration.
+	(get_data_alias_set): Rename get_TOC_alias_set to
+	get_data_alias_set.
+	(get_TOC_alias_set): Likewise.
+	* config/rs6000/rs6000.c (create_TOC_reference): Move function
+	back to rs6000.c.  Add check that pc-relative support is not
+	enabled.
+	(create_data_reference): New function.
+	(rs6000_legitimize_address): Use create_data_reference instead of
+	create_TOC_reference.
+	(rs6000_legitimize_tls_address_aix): Likewise.
+	(use_toc_or_pc_relative_ref): Rename use_toc_relative_ref to
+	use_toc_or_pc_relative_ref.
+	(use_toc_relative_ref): Likewise.
+	(rs6000_emit_move): Add pc-relative support.
+	(get_data_alias_set): Rename get_TOC_alias_set to
+	get_data_alias_set.
+	(get_TOC_alias_set): Likewise.
+	* config/rs6000/rs6000.md (cmp<mode>_internal2): Add pc-relative
+	support.
+
 2019-07-08   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 273241
