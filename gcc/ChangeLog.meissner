@@ -1,5 +1,27 @@
 2019-07-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (get_data_alias_set): Rename
+	get_TOC_alias_set for use with both TOC & pc-relative addressing.
+	* config/rs6000/rs6000.c (create_TOC_reference): Add gcc_assert.
+	(rs6000_legitimize_address): Add check for not pc-relative in TOC
+	support.
+	(rs6000_legitimize_tls_address_aix): Call get_data_alias_set
+	instead of get_TOC_alias_set.
+	(use_toc_relative_ref): Add check for SYMBOL_REF and not
+	pc-relative to simplify callers.  Make tests easier to
+	understand.
+	(use_pc_relative_ref): New helper function.
+	(rs6000_emit_move): Add basic support for pc-relative addressing.
+	Call get_data_alias_set instead of get_TOC_alias_set.
+	(data_alias_set): Rename static variable.
+	(get_data_alias_set): Rename get_TOC_alias_set since it is now
+	used for both TOC and pc-relative addressing.
+	* config/rs6000/rs6000.md (cmp<mode>_internal2): Add support for
+	pc-relative addressing.  Call get_data_alias_set instead of
+	get_TOC_alias_set.
+
+2019-07-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-internal.h (create_TOC_reference): Delete.
 	* config/rs6000/rs6000-logue.c (create_TOC_reference): Move
 	function from rs6000-logue.c back to rs6000.c.

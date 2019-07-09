@@ -189,7 +189,7 @@ extern void rs6000_gen_section_name (char **, const char *, const char *);
 extern void output_function_profiler (FILE *, int);
 extern void output_profile_hook  (int);
 extern int rs6000_trampoline_size (void);
-extern alias_set_type get_TOC_alias_set (void);
+extern alias_set_type get_data_alias_set (void);
 extern void rs6000_emit_prologue (void);
 extern void rs6000_emit_load_toc_table (int);
 extern unsigned int rs6000_dbx_register_number (unsigned int, unsigned int);
