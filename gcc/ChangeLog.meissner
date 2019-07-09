@@ -1,5 +1,21 @@
 2019-07-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (cint34_operand): Update
+	SIGNED_34BIT_OFFSET_P call.
+	(pcrel_address): Update SIGNED_34BIT_OFFSET_P call.
+	(pcrel_external_address): Update SIGNED_34BIT_OFFSET_P call.
+	* config/rs6000/rs6000.c (rs6000_prefixed_address): Update
+	SIGNED_16BIT_OFFSET_P and SIGNED_34BIT_OFFSET_P calls.
+	* config/rs6000/rs6000.h (SIGNED_16BIT_OFFSET_P): Remove EXTRA
+	argument.
+	(SIGNED_34BIT_OFFSET_P): Remove EXTRA argument.
+	(SIGNED_16BIT_OFFSET_EXTRA_P): New macro, like
+	SIGNED_16BIT_OFFSET_P with an EXTRA argument.
+	(SIGNED_34BIT_OFFSET_EXTRA_P): New macro, like
+	SIGNED_34BIT_OFFSET_P with an EXTRA argument.
+
+2019-07-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (get_data_alias_set): Rename
 	get_TOC_alias_set for use with both TOC & pc-relative addressing.
 	* config/rs6000/rs6000.c (create_TOC_reference): Add gcc_assert.
