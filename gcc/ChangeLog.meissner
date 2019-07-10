@@ -1,3 +1,13 @@
+<pcrel-trunk04.patch008b>
+2019-07-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (prefixed_mem_operand): Call
+	rs6000_prefixed_address_mode instead of rs6000_prefixed_address.
+	* config/rs6000/rs6000-protos.h (rs6000_prefixed_address_mode):
+	Rename fucntion from rs6000_prefixed_address.
+	* config/rs6000/rs6000.c (rs6000_prefixed_address_mode): Rename
+	fucntion from rs6000_prefixed_address.
+
 <pcrel-trunk04.patch007b>
 2019-07-10  Michael Meissner  <meissner@linux.ibm.com>
 
