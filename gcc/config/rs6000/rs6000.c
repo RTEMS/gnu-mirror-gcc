@@ -7740,6 +7740,8 @@ create_TOC_reference (rtx symbol, rtx largetoc_reg)
 {
   rtx tocrel, tocreg, hi;
 
+  gcc_assert (TARGET_TOC && !TARGET_PCREL);
+
   if (TARGET_DEBUG_ADDR)
     {
       if (SYMBOL_REF_P (symbol))
@@ -7785,7 +7787,7 @@ bool
 toc_relative_expr_p (const_rtx op, bool strict, const_rtx *tocrel_base_ret,
 		     const_rtx *tocrel_offset_ret)
 {
-  if (!TARGET_TOC)
+  if (!TARGET_TOC || TARGET_PCREL)
     return false;
 
   if (TARGET_CMODEL != CMODEL_SMALL)
@@ -8137,7 +8139,7 @@ rs6000_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 	emit_insn (gen_macho_high (reg, x));
       return gen_rtx_LO_SUM (Pmode, reg, x);
     }
-  else if (TARGET_TOC
+  else if (TARGET_TOC && !TARGET_PCREL
 	   && SYMBOL_REF_P (x)
 	   && constant_pool_expr_p (x)
 	   && ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (get_pool_constant (x), Pmode))
@@ -9865,10 +9867,18 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       /* If this is a SYMBOL_REF that refers to a constant pool entry,
 	 and we have put it in the TOC, we just need to make a TOC-relative
 	 reference to it.  */
-      if (TARGET_TOC
+      if (TARGET_TOC && !TARGET_PCREL
 	  && SYMBOL_REF_P (operands[1])
 	  && use_toc_relative_ref (operands[1], mode))
 	operands[1] = create_TOC_reference (operands[1], operands[0]);
+
+      /* If this is a SYMBOL_REF that we refer to via pc-relative addressing,
+	 we don't have to do any special for it.  */
+      else if (TARGET_PCREL && SYMBOL_REF_P (operands[1])
+	       && TARGET_CMODEL == CMODEL_MEDIUM
+	       && SYMBOL_REF_LOCAL_P (operands[1]))
+	;
+
       else if (mode == Pmode
 	       && CONSTANT_P (operands[1])
 	       && GET_CODE (operands[1]) != HIGH
@@ -9919,7 +9929,7 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
 	  operands[1] = force_const_mem (mode, operands[1]);
 
-	  if (TARGET_TOC
+	  if (TARGET_TOC && !TARGET_PCREL
 	      && SYMBOL_REF_P (XEXP (operands[1], 0))
 	      && use_toc_relative_ref (XEXP (operands[1], 0), mode))
 	    {
@@ -9928,6 +9938,11 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	      operands[1] = gen_const_mem (mode, tocref);
 	      set_mem_alias_set (operands[1], get_TOC_alias_set ());
 	    }
+
+	  else if (TARGET_PCREL && SYMBOL_REF_P (XEXP (operands[1], 0))
+		   && TARGET_CMODEL == CMODEL_MEDIUM
+		   && SYMBOL_REF_LOCAL_P (XEXP (operands[1], 0)))
+	    set_mem_alias_set (operands[1], get_pc_relative_alias_set ());
 	}
       break;
 
@@ -23732,14 +23747,26 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
 }
 
-static GTY(()) alias_set_type set = -1;
+/* Alias set for constants accessed via the TOC.  */
+static GTY(()) alias_set_type TOC_alias_set = -1;
 
 alias_set_type
 get_TOC_alias_set (void)
 {
-  if (set == -1)
-    set = new_alias_set ();
-  return set;
+  if (TOC_alias_set == -1)
+    TOC_alias_set = new_alias_set ();
+  return TOC_alias_set;
+}
+
+/* Alias set for constants accessed via the pc-relative addressing.  */
+static GTY(()) alias_set_type pc_relative_alias_set = -1;
+
+alias_set_type
+get_pc_relative_alias_set (void)
+{
+  if (pc_relative_alias_set == -1)
+    pc_relative_alias_set = new_alias_set ();
+  return pc_relative_alias_set;
 }
 
 /* Return the internal arg pointer used for function incoming

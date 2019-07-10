@@ -1,4 +1,21 @@
-<pcrel-trunk04.patch005, already applied to the trunk>
+<pcrel-trunk04.patch006c>
+2019-07-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (get_pc_relative_alias_set): New
+	declaration.
+	* config/rs6000/rs6000.c (create_TOC_reference): Add gcc_assert.
+	(toc_relative_expr_p): Add pc-relative check.
+	(rs6000_legitimize_address): Add pc-relative check in TOC code.
+	(rs6000_emit_move): Add support for loading up the addresses and
+	constants with pc-relative addressing.
+	(TOC_alias_set): Rename static variable from 'set'.
+	(get_TOC_alias_set): Use TOC_alias_set.
+	(pc_relative_alias_set): New static variable.
+	(get_pc_relative_alias_set): New function.
+	* config/rs6000/rs6000.md (cmp<mode>_internal2): Add support for
+	pc-relative addressing.
+
+<pcrel-trunk04.patch005b, already applied to the trunk>
 2019-07-09  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-internal.h (create_TOC_reference): Delete.
