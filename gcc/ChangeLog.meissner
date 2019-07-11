@@ -1,3 +1,27 @@
+<pcrel-trunk04.patch009b>
+2019-07-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (enum rs6000_offset_format): New
+	enumeration to describe the addressing offset format.
+	(reg_to_offset_format): New declaration.
+	(rs6000_prefixed_address_format): New declaration.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add default
+	address offset format field.
+	(mode_supports_prefixed_address_p): Move function higher.
+	(initialize_offset_formats): New function to determine the default
+	address format for each mode.
+	(rs6000_init_hard_regno_mode_ok): Initialize the address formats
+	for each mode.
+	(quad_address_p): Add support for prefixed instructions.
+	(mem_operand_gpr): Add support for prefixed instructions.
+	(mem_operand_ds_form): Add support for prefixed instructions.
+	(rs6000_prefixed_address_format): New function to validate an
+	address given an address format.
+	(rs6000_prefixed_address_mode): Rewrite to used saved default
+	address mode format.
+	(reg_to_offset_format): New function to determine what address
+	format to use for a particular register.
+
 <pcrel-trunk04.patch008b>
 2019-07-10  Michael Meissner  <meissner@linux.ibm.com>
 

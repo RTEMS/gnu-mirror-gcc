@@ -154,6 +154,18 @@ extern align_flags rs6000_loop_align (rtx);
 extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
+
+/* Enumeration to describe the offsettable address formats of PowerPC memory
+   instructions.  */
+enum rs6000_offset_format {
+  OFFSET_FORMAT_NONE,		/* No offset format is available.  */
+  OFFSET_FORMAT_D,		/* All 16-bits are available.  */
+  OFFSET_FORMAT_DS,		/* Bottom 2 bits must be 0.  */
+  OFFSET_FORMAT_DQ		/* Bottom 4 bits must be 0.  */
+};
+
+extern enum rs6000_offset_format reg_to_offset_format (rtx, machine_mode, bool);
+extern bool rs6000_prefixed_address_format (rtx, enum rs6000_offset_format);
 extern bool rs6000_prefixed_address_mode (rtx, machine_mode);
 #endif /* RTX_CODE */
 

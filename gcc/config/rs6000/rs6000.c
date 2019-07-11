@@ -459,6 +459,7 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  enum rs6000_offset_format offset_format;	/* Format of offset insn.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
 };
@@ -496,6 +497,17 @@ mode_supports_dq_form (machine_mode mode)
 {
   return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
 	  != 0);
+}
+
+/* Helper function to return whether a MODE can do prefixed loads/stores.
+   VOIDmode is used when we are loading the pc-relative address into a base
+   register, but we are not using it as part of a memory operation.  As modes
+   add support for prefixed memory, they will be added here.  */
+
+static bool
+mode_supports_prefixed_address_p (machine_mode mode)
+{
+  return mode == VOIDmode;
 }
 
 /* Given that there exists at least one variable that is set (produced)
@@ -2702,6 +2714,92 @@ rs6000_debug_reg_global (void)
 }
 
 
+/* Initiailize the table of offset address formats.  Unfortunately we do not
+   know the context of the use, so we have to return the address form to model
+   the expected usage.  */
+static void
+initialize_offset_formats (void)
+{
+  /* Set offset format for some types based on the switches.  */
+  enum rs6000_offset_format format_gpr_64bit
+    = (TARGET_POWERPC64) ? OFFSET_FORMAT_DS : OFFSET_FORMAT_D;
+  enum rs6000_offset_format format_gpr_128bit
+    = (TARGET_QUAD_MEMORY) ? OFFSET_FORMAT_DQ : format_gpr_64bit;
+  enum rs6000_offset_format format_fpr_64bit
+    = (TARGET_SOFT_FLOAT) ? OFFSET_FORMAT_D : format_gpr_64bit;
+  enum rs6000_offset_format format_vector
+    = (TARGET_P9_VECTOR) ? OFFSET_FORMAT_DQ : OFFSET_FORMAT_NONE;
+  enum rs6000_offset_format format_tf
+    = (TARGET_IEEEQUAD) ? format_vector : format_fpr_64bit;
+
+  for (ssize_t m = 0; m < NUM_MACHINE_MODES; m++)
+    reg_addr[m].offset_format = OFFSET_FORMAT_NONE;
+
+  /* Small integers.  */
+  reg_addr[E_QImode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_HImode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CQImode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CHImode].offset_format = OFFSET_FORMAT_D;
+
+  /* Note, LWA needs ds-form, not d-form, but we set up SImode for the normal
+     load/store.  The Y constraint will prevent the a LWA with odd offset.  */
+  reg_addr[E_SImode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CSImode].offset_format = OFFSET_FORMAT_D;
+
+  /* While DImode can be loaded into a FPR register with LFD (d-form), the
+     normal use is to use a GPR (ds-form in 64-bit).  */
+  reg_addr[E_DImode].offset_format = format_gpr_64bit;
+  reg_addr[E_CDImode].offset_format = format_gpr_64bit;
+
+  /* Condition registers (uses LWZ/STW).  */
+  reg_addr[E_CCmode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CCUNSmode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CCFPmode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_CCEQmode].offset_format = OFFSET_FORMAT_D;
+
+  /* 128-bit integers.  */
+  if (TARGET_POWERPC64)
+    {
+      reg_addr[E_TImode].offset_format = format_vector;
+      reg_addr[E_PTImode].offset_format = format_gpr_128bit;
+      reg_addr[E_CTImode].offset_format = format_vector;
+      reg_addr[E_CPTImode].offset_format = format_gpr_128bit;
+    }
+
+  /* Scalar floating point.  While SFmode and DFmode need a ds-form load to be
+     loaded into an Altivec register, use d-form for the FPR registers.  The wY
+     constraint will prevent odd Altivec load/stores.  For SDmode, there isn't
+     an offsettable mode that can be used to load it into a FPR register.  */
+  reg_addr[E_SFmode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_SCmode].offset_format = OFFSET_FORMAT_D;
+  reg_addr[E_DFmode].offset_format = format_fpr_64bit;
+  reg_addr[E_DCmode].offset_format = format_fpr_64bit;
+  reg_addr[E_TFmode].offset_format = format_tf;
+  reg_addr[E_TCmode].offset_format = format_tf;
+  reg_addr[E_IFmode].offset_format = format_fpr_64bit;
+  reg_addr[E_ICmode].offset_format = format_fpr_64bit;
+  reg_addr[E_KFmode].offset_format = format_vector;
+  reg_addr[E_KCmode].offset_format = format_vector;
+  reg_addr[E_DDmode].offset_format = format_fpr_64bit;
+  reg_addr[E_TDmode].offset_format = format_fpr_64bit;
+
+  /* Vectors.  */
+  reg_addr[E_V16QImode].offset_format = format_vector;
+  reg_addr[E_V8HImode].offset_format = format_vector;
+  reg_addr[E_V4SImode].offset_format = format_vector;
+  reg_addr[E_V2DImode].offset_format = format_vector;
+  reg_addr[E_V1TImode].offset_format = format_vector;
+  reg_addr[E_V4SFmode].offset_format = format_vector;
+  reg_addr[E_V2DFmode].offset_format = format_vector;
+
+  /* VOIDmode and BLKmode get the most pessimistic format.  */
+  reg_addr[E_VOIDmode].offset_format = OFFSET_FORMAT_DQ;
+  reg_addr[E_BLKmode].offset_format = OFFSET_FORMAT_DQ;
+
+  return;
+}
+
+
 /* Update the addr mask bits in reg_addr to help secondary reload and go if
    legitimate address support to figure out the appropriate addressing to
    use.  */
@@ -3237,6 +3335,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	    }
 	}
     }
+
+  /* Initial the mapping of mode to offset formats.  */
+  initialize_offset_formats ();
 
   /* Precalculate HARD_REGNO_NREGS.  */
   for (r = 0; HARD_REGISTER_NUM_P (r); ++r)
@@ -7407,6 +7508,14 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
   if (VECTOR_MODE_P (mode) && !mode_supports_dq_form (mode))
     return false;
 
+  /* Is this a valid prefixed address?  If the bottom four bits of the offset
+     are non-zero, we could use a prefixed instruction (which does not have the
+     DQ-form constraint that the traditional instruction had) instead of
+     forcing the unaligned offset to a GPR.  */
+  if (mode_supports_prefixed_address_p (mode)
+      && rs6000_prefixed_address_format (addr, OFFSET_FORMAT_DQ))
+    return true;
+
   if (GET_CODE (addr) != PLUS)
     return false;
 
@@ -7508,6 +7617,14 @@ mem_operand_gpr (rtx op, machine_mode mode)
       && legitimate_indirect_address_p (XEXP (addr, 0), false))
     return true;
 
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (mode_supports_prefixed_address_p (mode)
+      && rs6000_prefixed_address_format (XEXP (op, 0), OFFSET_FORMAT_DS))
+    return true;
+
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
@@ -7541,6 +7658,14 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (mode_supports_prefixed_address_p (mode)
+      && rs6000_prefixed_address_format (XEXP (op, 0), OFFSET_FORMAT_DS))
+    return true;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -21499,24 +21624,14 @@ rs6000_pltseq_template (rtx *operands, int which)
 }
 #endif
 
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
-
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
-{
-  return mode == VOIDmode;
-}
-
-/* Function to return true if ADDR is a valid prefixed memory address that uses
-   mode MODE.  */
+
+/* Return true if ADDR is a valid prefixed memory address and the traditional
+   form of the instruction uses the address format FORM.  */
 
 bool
-rs6000_prefixed_address_mode (rtx addr, machine_mode mode)
+rs6000_prefixed_address_format (rtx addr, enum rs6000_offset_format format)
 {
-  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+  if (!TARGET_PREFIXED_ADDR)
     return false;
 
   /* Check for PC-relative addresses.  */
@@ -21541,27 +21656,109 @@ rs6000_prefixed_address_mode (rtx addr, machine_mode mode)
       if (!SIGNED_16BIT_OFFSET_P (value))
 	return true;
 
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
+      switch (format)
+	{
+	default:
+	  gcc_unreachable ();
 
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
+	case OFFSET_FORMAT_D:		/* All 16-bits are available.  */
+	  return false;
 
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
+	case OFFSET_FORMAT_DS:		/* Bottom 2 bits must be 0.  */
+	  return (value & 3) != 0;
 
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
+	case OFFSET_FORMAT_NONE:
+	case OFFSET_FORMAT_DQ:		/* Bottom 4 bits must be 0.  */
+	  return (value & 15) != 0;
+	}
     }
 
   return false;
+}
+
+/* Return true if ADDR is a valid prefixed memory address that uses mode
+   MODE.  */
+
+bool
+rs6000_prefixed_address_mode (rtx addr, machine_mode mode)
+{
+  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+    return false;
+
+  return rs6000_prefixed_address_format (addr, reg_addr[mode].offset_format);
+}
+
+
+/* For a given hard register and whether it is being sign extended, return the
+   address format (d-form, ds-form, dq-form).  */
+
+enum rs6000_offset_format
+reg_to_offset_format (rtx reg, machine_mode mode, bool sign_extend_p)
+{
+  unsigned int msize = GET_MODE_SIZE (mode);
+  bool altivec_reg = false;
+  enum rs6000_reg_type rtype = register_to_reg_type (reg, &altivec_reg);
+  enum rs6000_offset_format format = OFFSET_FORMAT_NONE;
+
+  /* LWA (SImode -> DImode) is ds-form, but normal LWZ is d-form.  */
+  if (mode == SImode && sign_extend_p)
+    return OFFSET_FORMAT_DS;
+
+  switch (rtype)
+    {
+      /* If the register hasn't been allocated yet, use the default format.  */
+    case NO_REG_TYPE:
+    case PSEUDO_REG_TYPE:
+      format = reg_addr[mode].offset_format;
+      break;
+
+      /* LHZ, LWZ, etc. are d-form, LD is ds-format, LQ is dq-form.  */
+    case GPR_REG_TYPE:
+      if (msize < 8)
+	format = OFFSET_FORMAT_D;
+
+      else if (msize == 8)
+	format = TARGET_POWERPC64 ? OFFSET_FORMAT_DS : OFFSET_FORMAT_D;
+
+      else if (TARGET_QUAD_MEMORY)
+	format = OFFSET_FORMAT_DQ;
+
+      else
+	format = TARGET_POWERPC64 ? OFFSET_FORMAT_DS : OFFSET_FORMAT_D;
+
+      break;
+
+      /* LFD, LFS are d-form, vector types are dq-form.  */
+    case FPR_REG_TYPE:
+      format = (msize < 16) ? OFFSET_FORMAT_D : OFFSET_FORMAT_DQ;
+      break;
+
+      /* LXSSD, LXSD, etc. are ds-form, vector types are dq-form.  */
+    case ALTIVEC_REG_TYPE:
+      format = (msize < 16) ? OFFSET_FORMAT_DS : OFFSET_FORMAT_DQ;
+      break;
+
+      /* LFD, LFS are d-form, LXSSD, LXSD are ds-form, and vector types are
+	 dq-form.  */
+    case VSX_REG_TYPE:
+      if (msize >= 16)
+	format = OFFSET_FORMAT_DQ;
+
+      else if (altivec_reg)
+	format = OFFSET_FORMAT_DS;
+
+      else
+	format = OFFSET_FORMAT_D;
+      break;
+
+      /* SPR, CRs don't have offsettable memory.  */
+    default:
+    case SPR_REG_TYPE:
+    case CR_REG_TYPE:
+      gcc_unreachable ();
+    }
+
+  return format;
 }
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
