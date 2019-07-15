@@ -54,6 +54,14 @@
 #define TARGET_AIX_OS 0
 #endif
 
+/* Turn off TOC support if pc-relative addressing is used.  However, do not
+   turn on TARGET_NO_TOC if we have pc-relative addressing.  The places that
+   check TARGET_NO_TOC are mostly for 32-bit ELF systems using elf_high and
+   elf_low, and we do not want to generate those instructions if we have
+   pc-relative support.  */
+#define TARGET_TOC    (TARGET_HAS_TOC && !TARGET_PCREL)
+#define TARGET_NO_TOC (!TARGET_HAS_TOC && !TARGET_PCREL)
+
 /* Control whether function entry points use a "dot" symbol when
    ABI_AIX.  */
 #define DOT_SYMBOLS 1

@@ -4333,6 +4333,16 @@ rs6000_option_override_internal (bool global_init_p)
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
 
+  /* -mpcrel requires -mcmodel=medium, but we can't check TARGET_CMODEL until
+      after the subtarget override options are done.  */
+  if (TARGET_PCREL && TARGET_CMODEL != CMODEL_MEDIUM)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
+	error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
+
+      rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+    }
+
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -7743,6 +7753,8 @@ rtx
 create_TOC_reference (rtx symbol, rtx largetoc_reg)
 {
   rtx tocrel, tocreg, hi;
+
+  gcc_assert (TARGET_TOC);
 
   if (TARGET_DEBUG_ADDR)
     {
@@ -23736,14 +23748,14 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
 }
 
-static GTY(()) alias_set_type set = -1;
+static GTY(()) alias_set_type TOC_alias_set = -1;
 
 alias_set_type
 get_TOC_alias_set (void)
 {
-  if (set == -1)
-    set = new_alias_set ();
-  return set;
+  if (TOC_alias_set == -1)
+    TOC_alias_set = new_alias_set ();
+  return TOC_alias_set;
 }
 
 /* Return the internal arg pointer used for function incoming
