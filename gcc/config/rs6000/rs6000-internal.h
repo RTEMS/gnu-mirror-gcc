@@ -22,6 +22,134 @@
 #ifndef GCC_RS6000_INTERNAL_H
 #define GCC_RS6000_INTERNAL_H
 
+/* Value is TRUE if register/mode pair is acceptable.  */
+extern bool rs6000_hard_regno_mode_ok_p
+  [NUM_MACHINE_MODES][FIRST_PSEUDO_REGISTER];
+
+/* Simplfy register classes into simpler classifications.  We assume
+   GPR_REG_TYPE - FPR_REG_TYPE are ordered so that we can use a simple range
+   check for standard register classes (gpr/floating/altivec/vsx) and
+   floating/vector classes (float/altivec/vsx).  */
+
+enum rs6000_reg_type {
+  NO_REG_TYPE,
+  PSEUDO_REG_TYPE,
+  GPR_REG_TYPE,
+  VSX_REG_TYPE,
+  ALTIVEC_REG_TYPE,
+  FPR_REG_TYPE,
+  SPR_REG_TYPE,
+  CR_REG_TYPE
+};
+
+/* Map register class to register type.  */
+extern enum rs6000_reg_type reg_class_to_reg_type[N_REG_CLASSES];
+
+/* First/last register type for the 'normal' register types (i.e. general
+   purpose, floating point, altivec, and VSX registers).  */
+#define IS_STD_REG_TYPE(RTYPE) IN_RANGE(RTYPE, GPR_REG_TYPE, FPR_REG_TYPE)
+
+#define IS_FP_VECT_REG_TYPE(RTYPE) IN_RANGE(RTYPE, VSX_REG_TYPE, FPR_REG_TYPE)
+
+
+/* Register classes we care about in secondary reload or go if legitimate
+   address.  We only need to worry about GPR, FPR, and Altivec registers here,
+   along an ANY field that is the OR of the 3 register classes.  */
+
+enum rs6000_reload_reg_type {
+  RELOAD_REG_GPR,			/* General purpose registers.  */
+  RELOAD_REG_FPR,			/* Traditional floating point regs.  */
+  RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
+  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
+  N_RELOAD_REG
+};
+
+/* For setting up register classes, loop through the 3 register classes mapping
+   into real registers, and skip the ANY class, which is just an OR of the
+   bits.  */
+#define FIRST_RELOAD_REG_CLASS	RELOAD_REG_GPR
+#define LAST_RELOAD_REG_CLASS	RELOAD_REG_VMX
+
+/* Map reload register type to a register in the register class.  */
+struct reload_reg_map_type {
+  const char *name;			/* Register class name.  */
+  int reg;				/* Register in the register class.  */
+};
+
+extern const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG];
+
+/* Mask bits for each register class, indexed per mode.  Historically the
+   compiler has been more restrictive which types can do PRE_MODIFY instead of
+   PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
+typedef unsigned char addr_mask_type;
+
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* quad offset is limited.  */
+
+/* Register type masks based on the type, of valid addressing modes.  */
+struct rs6000_reg_addr {
+  enum insn_code reload_load;		/* INSN to reload for loading. */
+  enum insn_code reload_store;		/* INSN to reload for storing.  */
+  enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
+  enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
+  enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
+  bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
+};
+
+extern struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
+
+/* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
+static inline bool
+mode_supports_pre_incdec_p (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_INCDEC)
+	  != 0);
+}
+
+/* Helper function to say whether a mode supports PRE_MODIFY.  */
+static inline bool
+mode_supports_pre_modify_p (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_MODIFY)
+	  != 0);
+}
+
+/* Return true if we have D-form addressing in altivec registers.  */
+static inline bool
+mode_supports_vmx_dform (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
+}
+
+/* Return true if we have D-form addressing in VSX registers.  This addressing
+   is more limited than normal d-form addressing in that the offset must be
+   aligned on a 16-byte boundary.  */
+static inline bool
+mode_supports_dq_form (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
+	  != 0);
+}
+
+/* Helper function to return whether a MODE can do prefixed loads/stores.
+   VOIDmode is used when we are loading the pc-relative address into a base
+   register, but we are not using it as part of a memory operation.  As modes
+   add support for prefixed memory, they will be added here.  */
+
+static inline bool
+mode_supports_prefixed_address_p (machine_mode mode)
+{
+  return mode == VOIDmode;
+}
+
+
 /* Structure used to define the rs6000 stack */
 typedef struct rs6000_stack {
   int reload_completed;		/* stack info won't change from here on */
