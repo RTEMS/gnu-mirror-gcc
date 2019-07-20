@@ -1,3 +1,46 @@
+2019-07-20  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-internal.h (rs6000_hard_regno_mode_ok_p):
+	Move various declarations relating to addressing and register
+	allocation to rs6000-internal.h from rs6000.c so that in the
+	future we can move things out of rs6000.c.  Make the static arrays
+	global, and define them in rs6000.c.
+	(enum rs6000_reg_type): Likewise.
+	(reg_class_to_reg_type): Likewise.
+	(IS_STD_REG_TYPE): Likewise.
+	(IS_FP_VECT_REG_TYPE): Likewise.
+	(enum rs6000_reload_reg_type): Likewise.
+	(FIRST_RELOAD_REG_CLASS): Likewise.
+	(LAST_RELOAD_REG_CLASS): Likewise.
+	(struct reload_reg_map_type): Likewise.
+	(reload_reg_map): Likewise.
+	(RELOAD_REG_* macros): Likewise.
+	(struct rs6000_reg_addr): Likewise.
+	(reg_addr): Likewise.
+	(mode_supports_pre_incdec_): Likewise.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_vmx_dform): Likewise.
+	(mode_supports_dq_form): Likewise.
+	(mode_supports_prefixed_address_p): Likewise.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_p): Likewise.
+	(enum rs6000_reg_type): Likewise.
+	(reg_class_to_reg_type): Likewise.
+	(IS_STD_REG_TYPE): Likewise.
+	(IS_FP_VECT_REG_TYPE): Likewise.
+	(enum rs6000_reload_reg_type): Likewise.
+	(FIRST_RELOAD_REG_CLASS): Likewise.
+	(LAST_RELOAD_REG_CLASS): Likewise.
+	(struct reload_reg_map_type): Likewise.
+	(reload_reg_map): Likewise.
+	(RELOAD_REG_* macros): Likewise.
+	(struct rs6000_reg_addr): Likewise.
+	(reg_addr): Likewise.
+	(mode_supports_pre_incdec_): Likewise.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_vmx_dform): Likewise.
+	(mode_supports_dq_form): Likewise.
+	(mode_supports_prefixed_address_p): Likewise.
+
 2019-07-20   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 273616
