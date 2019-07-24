@@ -410,6 +410,17 @@ mode_supports_dq_form (machine_mode mode)
 	  != 0);
 }
 
+/* Helper function to return whether a MODE can do prefixed loads/stores.
+   VOIDmode is used when we are loading the pc-relative address into a base
+   register, but we are not using it as part of a memory operation.  As modes
+   add support for prefixed memory, they will be added here.  */
+
+static bool
+mode_supports_prefixed_address_p (machine_mode mode)
+{
+  return mode == VOIDmode;
+}
+
 /* Given that there exists at least one variable that is set (produced)
    by OUT_INSN and read (consumed) by IN_INSN, return true iff
    IN_INSN represents one or more memory store operations and none of
@@ -7332,6 +7343,8 @@ direct_move_p (rtx op0, rtx op1)
 bool
 quad_address_p (rtx addr, machine_mode mode, bool strict)
 {
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
   rtx op0, op1;
 
   if (GET_MODE_SIZE (mode) != 16)
@@ -7342,6 +7355,14 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
 
   if (VECTOR_MODE_P (mode) && !mode_supports_dq_form (mode))
     return false;
+
+  /* Is this a valid prefixed address?  If the bottom four bits of the offset
+     are non-zero, we could use a prefixed instruction (which does not have the
+     DQ-form constraint that the traditional instruction had) instead of
+     forcing the unaligned offset to a GPR.  */
+  if (TARGET_PREFIXED_ADDR && mode_supports_prefixed_address_p (mode)
+      && addr_validate_p (addr, INSN_FORM_DQ, addr_flags))
+    return true;
 
   if (GET_CODE (addr) != PLUS)
     return false;
@@ -7433,6 +7454,8 @@ address_offset (rtx op)
 bool
 mem_operand_gpr (rtx op, machine_mode mode)
 {
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
@@ -7442,6 +7465,14 @@ mem_operand_gpr (rtx op, machine_mode mode)
       && (GET_CODE (addr) == PRE_INC || GET_CODE (addr) == PRE_DEC)
       && mode_supports_pre_incdec_p (mode)
       && legitimate_indirect_address_p (XEXP (addr, 0), false))
+    return true;
+
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (TARGET_PREFIXED_ADDR && mode_supports_prefixed_address_p (mode)
+      && addr_validate_p (addr, INSN_FORM_DS, addr_flags))
     return true;
 
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
@@ -7474,9 +7505,19 @@ mem_operand_gpr (rtx op, machine_mode mode)
 bool
 mem_operand_ds_form (rtx op, machine_mode mode)
 {
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (TARGET_PREFIXED_ADDR && mode_supports_prefixed_address_p (mode)
+      && addr_validate_p (addr, INSN_FORM_DS, addr_flags))
+    return true;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -13174,29 +13215,24 @@ print_operand (FILE *file, rtx x, int code)
 void
 print_operand_address (FILE *file, rtx x)
 {
+  addr_validate_info pcrel_info;
+  const unsigned pcrel_flags = (ADDR_VALIDATE_PCREL_LOCAL
+				| ADDR_VALIDATE_PCREL_EXT);
+
   if (REG_P (x))
     fprintf (file, "0(%s)", reg_names[ REGNO (x) ]);
 
   /* Is it a pc-relative address?  */
-  else if (pcrel_address (x, Pmode))
+  else if (addr_validate_p (x, INSN_FORM_PREFIXED, pcrel_flags, &pcrel_info))
     {
-      HOST_WIDE_INT offset;
+      output_addr_const (file, pcrel_info.base_addr);
 
-      if (GET_CODE (x) == CONST)
-	x = XEXP (x, 0);
+      if (pcrel_info.offset)
+	fprintf (file, "%+" PRId64, pcrel_info.offset);
 
-      if (GET_CODE (x) == PLUS)
-	{
-	  offset = INTVAL (XEXP (x, 1));
-	  x = XEXP (x, 0);
-	}
-      else
-	offset = 0;
-
-      output_addr_const (file, x);
-
-      if (offset)
-	fprintf (file, "%+" PRId64, offset);
+      if (SYMBOL_REF_P (pcrel_info.base_addr)
+	  && !SYMBOL_REF_LOCAL_P (pcrel_info.base_addr))
+	fputs ("@got", file);
 
       fputs ("@pcrel", file);
     }
@@ -13683,16 +13719,118 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
+
+/* Decode a rs6000 address (ADDR) if it is an offset instruction.  Use
+   INFO_FORM to determine whether it is a normal instruction or a prefixed
+   instruction, and FLAGS to determine what type of offset instruction is
+   desired.  Return the base address into the rtx pointed to by P_BASE.
+   Optionally return the information about the address into the structure
+   pointed to with P_INFO.  */
 
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
-
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
+bool
+addr_validate_p (rtx addr,
+		 enum INSN_FORM insn_form,
+		 unsigned flags,
+		 addr_validate_info *p_info)
 {
-  return mode == VOIDmode;
+  HOST_WIDE_INT offset = 0;
+  rtx base_addr = NULL_RTX;
+  unsigned addr_flags = 0;
+
+  if (p_info)
+    memset ((void *) p_info, '\0', sizeof (addr_validate_info));
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  /* Single register.  */
+  if (REG_P (addr) || SUBREG_P (addr))
+    {
+      addr_flags = ADDR_VALIDATE_REG_SINGLE;
+      base_addr = addr;
+    }
+
+  /* Register + offset.  */
+  else if (GET_CODE (addr) == PLUS
+	   && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    {
+      base_addr = XEXP (addr, 0);
+      offset = INTVAL (XEXP (addr, 1));
+      bool prefixed_p;
+
+      /* Prefixed instructions can only access 34-bits.  Fail if the value
+	 is larger than that.  */
+      if (!SIGNED_34BIT_OFFSET_P (offset))
+	return false;
+
+      /* Determine if the offset requires the instruction to be prefixed,
+	 either because it is too large, or because it doesn't meet the
+	 requirements for DS instruction encoding or DQ instruction
+	 encoding.  */
+      if (!SIGNED_16BIT_OFFSET_P (offset))
+	prefixed_p = true;
+
+      else if (insn_form == INSN_FORM_DS)
+	prefixed_p = (offset & 3) != 0;
+
+      else if (insn_form == INSN_FORM_DQ)
+	prefixed_p = (offset & 15) != 0;
+
+      else
+	prefixed_p = false;
+
+      addr_flags = (prefixed_p
+		    ? ADDR_VALIDATE_REG_34BIT
+		    : ADDR_VALIDATE_REG_16BIT);
+    }
+
+  else if (!TARGET_PCREL)
+    return false;
+
+  /* Pc-relative symbols/labels without offsets.  */
+  else if (SYMBOL_REF_P (addr))
+    {
+      base_addr = addr;
+      addr_flags = (SYMBOL_REF_LOCAL_P (addr)
+		    ? ADDR_VALIDATE_PCREL_LOCAL
+		    : ADDR_VALIDATE_PCREL_EXT);
+    }
+
+  else if (LABEL_REF_P (addr))
+    {
+      base_addr = addr;
+      addr_flags = ADDR_VALIDATE_PCREL_LOCAL;
+    }
+
+  /* Pc-relative symbols with offsets.  */
+  else if (GET_CODE (addr) == PLUS
+	   && SYMBOL_REF_P (XEXP (addr, 0))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    {
+      base_addr = XEXP (addr, 0);
+      offset = INTVAL (XEXP (addr, 1));
+      addr_flags = (SYMBOL_REF_LOCAL_P (base_addr)
+		    ? ADDR_VALIDATE_PCREL_LOCAL
+		    : ADDR_VALIDATE_PCREL_EXT);
+    }
+
+  else
+    return false;
+
+  /* See if the address type matches what the user wanted.  */
+  if ((flags & addr_flags) == 0)
+    return false;
+
+  /* Return information to caller if desired.  */
+  if (p_info)
+    {
+      p_info->base_addr = base_addr;
+      p_info->offset = offset;
+      p_info->flags = addr_flags;
+    }
+
+  return true;
 }
 
 /* Function to return true if ADDR is a valid prefixed memory address that uses
@@ -13701,52 +13839,13 @@ mode_supports_prefixed_address_p (machine_mode mode)
 bool
 rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
 {
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
+
   if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
     return false;
 
-  /* Check for PC-relative addresses.  */
-  if (pcrel_address (addr, Pmode))
-    return true;
-
-  /* Check for prefixed memory addresses that have a large numeric offset,
-     or an offset that can't be used for a DS/DQ-form memory operation.  */
-  if (GET_CODE (addr) == PLUS)
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      if (!base_reg_operand (op0, Pmode) || !CONST_INT_P (op1))
-	return false;
-
-      HOST_WIDE_INT value = INTVAL (op1);
-      if (!SIGNED_34BIT_OFFSET_P (value))
-	return false;
-
-      /* Offset larger than 16-bits?  */
-      if (!SIGNED_16BIT_OFFSET_P (value))
-	return true;
-
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
-
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
-
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
-
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
-    }
-
-  return false;
+  return addr_validate_p (addr, reg_addr[mode].default_insn_form, addr_flags);
 }
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO

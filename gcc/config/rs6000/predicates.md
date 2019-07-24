@@ -921,6 +921,8 @@
 (define_predicate "lwa_operand"
   (match_code "reg,subreg,mem")
 {
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
   rtx inner, addr, offset;
 
   inner = op;
@@ -933,6 +935,13 @@
     return false;
 
   addr = XEXP (inner, 0);
+
+  /* The LWA instruction uses the DS-form format where the bottom two bits of
+     the offset must be 0.  The prefixed PLWA does not have this
+     restriction.  */
+  if (TARGET_PREFIXED_ADDR && addr_validate_p (addr, INSN_FORM_DS, addr_flags))
+    return true;
+
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
@@ -1630,28 +1639,10 @@
 (define_predicate "pcrel_address"
   (match_code "label_ref,symbol_ref,const")
 {
-  if (!rs6000_pcrel_p (cfun))
+  if (!TARGET_PCREL)
     return false;
 
-  if (GET_CODE (op) == CONST)
-    op = XEXP (op, 0);
-
-  /* Validate offset.  */
-  if (GET_CODE (op) == PLUS)
-    {
-      rtx op0 = XEXP (op, 0);
-      rtx op1 = XEXP (op, 1);
-
-      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
-	return false;
-
-      op = op0;
-    }
-
-  if (LABEL_REF_P (op))
-    return true;
-
-  return (SYMBOL_REF_P (op) && SYMBOL_REF_LOCAL_P (op));
+  return addr_validate_p (op, INSN_FORM_PREFIXED, ADDR_VALIDATE_PCREL_LOCAL);
 })
 
 ;; Return true if the operand is an external symbol whose address can be loaded
@@ -1665,25 +1656,10 @@
 (define_predicate "pcrel_external_address"
   (match_code "symbol_ref,const")
 {
-  if (!rs6000_pcrel_p (cfun))
+  if (!TARGET_PCREL)
     return false;
 
-  if (GET_CODE (op) == CONST)
-    op = XEXP (op, 0);
-
-  /* Validate offset.  */
-  if (GET_CODE (op) == PLUS)
-    {
-      rtx op0 = XEXP (op, 0);
-      rtx op1 = XEXP (op, 1);
-
-      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
-	return false;
-
-      op = op0;
-    }
-
-  return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
+  return addr_validate_p (op, INSN_FORM_PREFIXED, ADDR_VALIDATE_PCREL_EXT);
 })
 
 ;; Return 1 if op is a prefixed memory operand.
@@ -1699,7 +1675,11 @@
 (define_predicate "pcrel_external_mem_operand"
   (match_code "mem")
 {
-  return pcrel_external_address (XEXP (op, 0), Pmode);
+  if (!TARGET_PCREL)
+    return false;
+
+  rtx addr = XEXP (op, 0);
+  return addr_validate_p (addr, INSN_FORM_PREFIXED, ADDR_VALIDATE_PCREL_EXT);
 })
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to

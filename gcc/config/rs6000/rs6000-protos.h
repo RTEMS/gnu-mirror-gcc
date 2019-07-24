@@ -48,6 +48,25 @@ extern bool legitimate_indexed_address_p (rtx, int);
 extern bool avoiding_indexed_address_p (machine_mode);
 extern rtx rs6000_force_indexed_or_indirect_mem (rtx x);
 
+/* Information structure optionally returned by addr_validate_p to break out
+   the base, offset, etc.  */
+
+typedef struct {
+  rtx base_addr;		/* Register, symbol_ref, or label_ref.  */
+  HOST_WIDE_INT offset;		/* Numeric offset.  */
+  unsigned flags;		/* Flags indicate the address type.  */
+} addr_validate_info;
+
+/* Mask flags for addr_validate_p to say what kind of address offset we are
+   looking for.  */
+static const unsigned ADDR_VALIDATE_REG_SINGLE	= 0x01;	/* single register.  */
+static const unsigned ADDR_VALIDATE_REG_16BIT	= 0x02;	/* reg + 16 bit.  */
+static const unsigned ADDR_VALIDATE_REG_34BIT	= 0x04;	/* reg + 34 bit.  */
+static const unsigned ADDR_VALIDATE_PCREL_LOCAL	= 0x08;	/* local pcrel sym.  */
+static const unsigned ADDR_VALIDATE_PCREL_EXT	= 0x10;	/* ext. pcrel sym.  */
+
+extern bool addr_validate_p (rtx, enum INSN_FORM, unsigned,
+			     addr_validate_info * = (addr_validate_info *)0);
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);
 extern rtx gen_easy_altivec_constant (rtx);

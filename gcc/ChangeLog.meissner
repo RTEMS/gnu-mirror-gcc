@@ -1,5 +1,34 @@
 2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (lwa_operand): If we have prefixed
+	addresses, allow sign extend SImode to have odd offsets.
+	(pcrel_address): Rewrite to use addr_validate_p.
+	(pcrel_external_address): Rewrite to use addr_validate_p.
+	(pcrel_external_mem_operand): Rewrite to use addr_validate_p.
+	* config/rs6000/rs6000-protos.h (addr_validate_info): New
+	structure for addr_validate_p to return information.
+	(ADDR_VALIDATE_REG_SINGLE): New mask for addr_validate_p.
+	(ADDR_VALIDATE_REG_16BIT): New mask for addr_validate_p.
+	(ADDR_VALIDATE_REG_34BIT): New mask for addr_validate_p.
+	(ADDR_VALIDATE_REG_PCREL_LOCAL): New mask for addr_validate_p.
+	(ADDR_VALIDATE_REG_PCREL_EXT): New mask for addr_validate_p.
+	(addr_validate_p): New declaration.
+	* config/rs6000/rs6000.c (mode_supports_prefixed_address_p): Move
+	higher in the file.
+	(quad_address_p): Add checks to see if we can use prefixed
+	addresses without worrying about DQ alignment constraints.
+	(mem_operand_gpr): Add checks to see if we can use prefixed
+	addresses without worrying about DS alignment constraints.
+	(mem_operand_ds_form): Add checks to see if we can use prefixed
+	addresses without worrying about DQ alignment constraints.
+	(print_operand_address): Use addr_validate_p to detect pc-relative
+	addresses, and to crack them into the symbol and offset.
+	(addr_validate_p): New function to validate addresses and
+	optionally return the cracked information.
+	(rs6000_prefixed_address_mode_p): Rewrite to use addr_validate_p.
+
+2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add default
 	insn format field.
 	(rs6000_debug_print_mode): If -mdebug=reg, print the default
