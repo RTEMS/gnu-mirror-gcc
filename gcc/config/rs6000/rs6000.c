@@ -370,6 +370,7 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  enum INSN_FORM default_insn_form;	/* Default format for offsets.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
 };
@@ -2118,6 +2119,38 @@ rs6000_debug_print_mode (ssize_t m)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
 
+  switch (reg_addr[m].default_insn_form)
+    {
+    default:
+    case INSN_FORM_UNKNOWN:
+      fputs ("  form=?", stderr);
+      spaces++;
+      break;
+
+    case INSN_FORM_D:
+      fputs ("  form=d", stderr);
+      spaces++;
+      break;
+
+    case INSN_FORM_DS:
+      fputs ("  form=ds", stderr);
+      break;
+
+    case INSN_FORM_DQ:
+      fputs ("  form=dq", stderr);
+      break;
+
+    case INSN_FORM_X:
+      fputs ("  form=x", stderr);
+      spaces++;
+      break;
+
+    case INSN_FORM_PREFIXED:
+      fputs ("  form=p", stderr);
+      spaces++;
+      break;
+    }
+
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
     {
@@ -2528,6 +2561,33 @@ rs6000_debug_reg_global (void)
 }
 
 
+/* Map an addr_mask into an instruction format.  The main use for INSN_FORM is
+   to determine if offsets are valid.  */
+
+static enum INSN_FORM
+addr_mask_to_insn_form (addr_mask_type mask)
+{
+  if ((mask & RELOAD_REG_VALID) == 0)
+    return INSN_FORM_UNKNOWN;
+
+  else if ((mask & RELOAD_REG_OFFSET) != 0)
+    {
+      if ((mask & RELOAD_REG_QUAD_OFFSET) != 0)
+	return INSN_FORM_DQ;
+
+      if ((mask & RELOAD_REG_DS_OFFSET) != 0)
+	return INSN_FORM_DS;
+
+      else
+	return INSN_FORM_D;
+    }
+
+  else if ((mask & RELOAD_REG_INDEXED) != 0)
+    return INSN_FORM_X;
+
+  return INSN_FORM_UNKNOWN;
+}
+
 /* Update the addr mask bits in reg_addr to help secondary reload and go if
    legitimate address support to figure out the appropriate addressing to
    use.  */
@@ -2536,7 +2596,7 @@ static void
 rs6000_setup_reg_addr_masks (void)
 {
   ssize_t rc, reg, m, nregs;
-  addr_mask_type any_addr_mask, addr_mask;
+  addr_mask_type any_addr_mask, addr_mask, default_mask;
 
   for (m = 0; m < NUM_MACHINE_MODES; ++m)
     {
@@ -2686,6 +2746,26 @@ rs6000_setup_reg_addr_masks (void)
 	}
 
       reg_addr[m].addr_mask[RELOAD_REG_ANY] = any_addr_mask;
+
+      /* Figure out the default insn format that is used for offsettable memory
+	 instructions.  For scalar floating point use the FPR addressing, for
+	 vector use either FPR or Altivec registers, and otherwise use
+	 GPRs.  */
+      if (ALTIVEC_OR_VSX_VECTOR_MODE (m2))
+	{
+	  if ((reg_addr[m].addr_mask[RELOAD_REG_FPR] & RELOAD_REG_VALID) != 0)
+	    default_mask = reg_addr[m].addr_mask[RELOAD_REG_FPR];
+	  else
+	    default_mask = reg_addr[m].addr_mask[RELOAD_REG_VMX];
+	}
+
+      else if ((SCALAR_FLOAT_MODE_P (m2) && msize <= 8) || float_2reg_p)
+	default_mask = reg_addr[m].addr_mask[RELOAD_REG_FPR];
+
+      else
+	default_mask = reg_addr[m].addr_mask[RELOAD_REG_GPR];
+
+      reg_addr[m].default_insn_form = addr_mask_to_insn_form (default_mask);
     }
 }
 
