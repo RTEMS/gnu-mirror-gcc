@@ -1,3 +1,15 @@
+2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (addr_mask_type): Make the type unsigned
+	short to accomidate RELOAD_REG_DS_OFFSET.
+	(RELOAD_REG_DS_OFFSET): New mask to identify instructions using
+	the DS instruction format.
+	(rs6000_setup_reg_addr_masks): Set the RELOAD_REG_DS_OFFSET mask
+	if the instruction would need to use a DS instruction format for a
+	register class.  Split up processing for vectors between vector
+	registers and GPRs.  Treat floating point modes that take two
+	registers like DF/SF mode.
+
 2019-07-24   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 273769
