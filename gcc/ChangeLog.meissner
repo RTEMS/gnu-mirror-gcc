@@ -67,7 +67,7 @@
 	(mem_operand_gpr): Add checks to see if we can use prefixed
 	addresses without worrying about DS alignment constraints.
 	(mem_operand_ds_form): Add checks to see if we can use prefixed
-	addresses without worrying about DQ alignment constraints.
+	addresses without worrying about DS alignment constraints.
 	(print_operand_address): Use addr_validate_p to detect pc-relative
 	addresses, and to crack them into the symbol and offset.
 	(addr_validate_p): New function to validate addresses and
