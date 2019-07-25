@@ -1,5 +1,12 @@
 2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_emit_move): Add support to load
+	up addresses if we have pc-relative support.
+	* config/rs6000/rs6000.md (pcrel_addr): New insn.
+	(pcrel_ext_addr): New insn.
+
+2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (lwa_operand): If we have prefixed
 	addresses, allow sign extend SImode to have odd offsets.
 	(pcrel_address): Rewrite to use addr_validate_p.
