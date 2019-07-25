@@ -1,3 +1,12 @@
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (prefixed_mem_operand): Rename
+	rs6000_prefixed_address_mode_p to prefixed_addr_mode_p.
+	* config/rs6000/rs6000-protos.h (prefixed_addr_mode_p): Rename
+	from rs6000_prefixed_address_mode_p.
+	* config/rs6000/rs6000.c (prefixed_addr_mode_p): Rename from
+	rs6000_prefixed_address_mode_p.
+
 2019-07-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_move): Add support to load

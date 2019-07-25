@@ -13851,7 +13851,7 @@ addr_validate_p (rtx addr,
    mode MODE.  */
 
 bool
-rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
+prefixed_addr_mode_p (rtx addr, machine_mode mode)
 {
   const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
 			       | ADDR_VALIDATE_PCREL_LOCAL);
