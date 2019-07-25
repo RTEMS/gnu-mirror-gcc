@@ -1,5 +1,41 @@
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for
+	PADDI.
+	(non_add_cint_operand): Add support for PADDI.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add field to
+	say whether a mode supports using prefixed memory instructions.
+	(mode_supports_prefixed_address_p): Make static inline.  Use the
+	prefixed_memory_p to say whether a give mode supports prefixed
+	memory instructions.
+	(rs6000_hard_regno_mode_ok_uncached): Allow for larger vector
+	types in the future.
+	(rs6000_init_hard_regno_mode_ok): Set VOIDmode and DImode as the
+	modes that support prefixed memory.
+	(num_insns_constant_gpr): Use SIGNED_16BIT_OFFSET_P macro.  If we
+	support prefixed memory instructions, know that we can load up
+	34-bit constants directly in one instruction.
+	(quad_address_p): Allow for larger vector types in the future.
+	(rs6000_legitimate_offset_address_p): Add support for larger
+	offsets if we have prefixed addressing.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.  Do not allow update forms of addressing if the offset
+	is larger than 16 bits, since prefixed memory instructions don't
+	have update addressing formats.
+	(rs6000_mode_dependent_address): Add support for 34 bit offsets if
+	we have prefixed addressing.
+	(rs6000_rtx_costs): Allow adds with 34-bit values which show up if
+	we have prefixed addressing.
+	(rs6000_num_insns): New function.
+	(rs6000_insn_cost): When using the instruction length, count
+	prefixed instructions as one instruction instead of three.
+	* config/rs6000/rs6000.md (add<mode>, GPR iterator): Add support
+	for the PADDI instruction if we have prefixed addressing.
+	(movdi_internal64): Add support to load up 34 bit constants if we
+	have prefixed addressing.
+
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-prefixed.c: New file.
 	* config/rs6000/rs6000-protos.h (prefixed_addr_reg_p): Add
 	declaration.

@@ -839,7 +839,8 @@
 (define_predicate "add_operand"
   (if_then_else (match_code "const_int")
     (match_test "satisfies_constraint_I (op)
-		 || satisfies_constraint_L (op)")
+		 || satisfies_constraint_L (op)
+		 || satisfies_constraint_eI (op)")
     (match_operand 0 "gpc_reg_operand")))
 
 ;; Return 1 if the operand is either a non-special register, or 0, or -1.
@@ -852,7 +853,8 @@
 (define_predicate "non_add_cint_operand"
   (and (match_code "const_int")
        (match_test "!satisfies_constraint_I (op)
-		    && !satisfies_constraint_L (op)")))
+		    && !satisfies_constraint_L (op)
+		    && !satisfies_constraint_eI (op)")))
 
 ;; Return 1 if the operand is a constant that can be used as the operand
 ;; of an AND, OR or XOR.

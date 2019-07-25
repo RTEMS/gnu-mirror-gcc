@@ -373,6 +373,7 @@ struct rs6000_reg_addr {
   enum INSN_FORM default_insn_form;	/* Default format for offsets.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
+  bool prefixed_memory_p;		/* We can use prefixed memory.  */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -415,10 +416,10 @@ mode_supports_dq_form (machine_mode mode)
    register, but we are not using it as part of a memory operation.  As modes
    add support for prefixed memory, they will be added here.  */
 
-static bool
+static inline bool
 mode_supports_prefixed_address_p (machine_mode mode)
 {
-  return mode == VOIDmode;
+  return reg_addr[mode].prefixed_memory_p;
 }
 
 /* Given that there exists at least one variable that is set (produced)
@@ -1838,7 +1839,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
       if (ALTIVEC_REGNO_P (regno))
 	{
-	  if (GET_MODE_SIZE (mode) != 16 && !reg_addr[mode].scalar_in_vmx_p)
+	  if (GET_MODE_SIZE (mode) < 16 && !reg_addr[mode].scalar_in_vmx_p)
 	    return 0;
 
 	  return ALTIVEC_REGNO_P (last_regno);
@@ -2855,6 +2856,15 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   gcc_assert ((int)NO_REGS == 0);
   memset ((void *) &rs6000_constraints[0], '\0', sizeof (rs6000_constraints));
+
+  /* Set whether prefixed memory is allowed for a given mode.  VOIDmode means
+     we can use PLI (PADDI) to load up a pc-relative address.  Other modes mean
+     we support prefixed loads and stores of that mode.  */
+  if (TARGET_PREFIXED_ADDR)
+    {
+      reg_addr[E_VOIDmode].prefixed_memory_p = true;
+      reg_addr[E_DImode].prefixed_memory_p = true;
+    }
 
   /* The VSX hardware allows native alignment for vectors, but control whether the compiler
      believes it can use native alignment or still uses 128-bit alignment.  */
@@ -5627,12 +5637,16 @@ static int
 num_insns_constant_gpr (HOST_WIDE_INT value)
 {
   /* signed constant loadable with addi */
-  if (((unsigned HOST_WIDE_INT) value + 0x8000) < 0x10000)
+  if (SIGNED_16BIT_OFFSET_P (value))
     return 1;
 
   /* constant loadable with addis */
   else if ((value & 0xffff) == 0
 	   && (value >> 31 == -1 || value >> 31 == 0))
+    return 1;
+
+  /* PADDI can support up to 34 bit signed integers.  */
+  else if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (value))
     return 1;
 
   else if (TARGET_POWERPC64)
@@ -7347,7 +7361,8 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
 			       | ADDR_VALIDATE_PCREL_LOCAL);
   rtx op0, op1;
 
-  if (GET_MODE_SIZE (mode) != 16)
+
+  if (GET_MODE_SIZE (mode) < 16)
     return false;
 
   if (legitimate_indirect_address_p (addr, strict))
@@ -7888,8 +7903,10 @@ rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
       break;
     }
 
-  offset += 0x8000;
-  return offset < 0x10000 - extra;
+  if (TARGET_PREFIXED_ADDR)
+    return SIGNED_34BIT_OFFSET_EXTRA_P (offset, extra);
+  else
+    return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
 }
 
 bool
@@ -8786,6 +8803,10 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       && mode_supports_pre_incdec_p (mode)
       && legitimate_indirect_address_p (XEXP (x, 0), reg_ok_strict))
     return 1;
+  /* Handle prefixed addresses (pc-relative or 34-bit offset).  */
+  if (prefixed_addr_mode_p (x, mode))
+    return 1;
+
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
   if (quad_offset_p)
     {
@@ -8836,11 +8857,13 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       && !avoiding_indexed_address_p (mode)
       && legitimate_indexed_address_p (x, reg_ok_strict))
     return 1;
+  /* There is no prefixed version of the load/store with update.  */
   if (TARGET_UPDATE && GET_CODE (x) == PRE_MODIFY
       && mode_supports_pre_modify_p (mode)
       && legitimate_indirect_address_p (XEXP (x, 0), reg_ok_strict)
-      && (rs6000_legitimate_offset_address_p (mode, XEXP (x, 1),
-					      reg_ok_strict, false)
+      && ((rs6000_legitimate_offset_address_p (mode, XEXP (x, 1),
+					       reg_ok_strict, false)
+	   && !prefixed_addr_mode_p (XEXP (x, 1), mode))
 	  || (!avoiding_indexed_address_p (mode)
 	      && legitimate_indexed_address_p (XEXP (x, 1), reg_ok_strict)))
       && rtx_equal_p (XEXP (XEXP (x, 1), 0), XEXP (x, 0)))
@@ -8906,8 +8929,12 @@ rs6000_mode_dependent_address (const_rtx addr)
 	  && XEXP (addr, 0) != arg_pointer_rtx
 	  && CONST_INT_P (XEXP (addr, 1)))
 	{
-	  unsigned HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
-	  return val + 0x8000 >= 0x10000 - (TARGET_POWERPC64 ? 8 : 12);
+	  HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
+	  HOST_WIDE_INT extra = TARGET_POWERPC64 ? 8 : 12;
+	  if (TARGET_PREFIXED_ADDR)
+	    return !SIGNED_34BIT_OFFSET_EXTRA_P (val, extra);
+	  else
+	    return !SIGNED_16BIT_OFFSET_EXTRA_P (val, extra);
 	}
       break;
 
@@ -20890,7 +20917,8 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    || outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
-	       || satisfies_constraint_L (x)))
+	       || satisfies_constraint_L (x)
+	       || satisfies_constraint_eI (x)))
 	  || (outer_code == AND
 	      && (satisfies_constraint_K (x)
 		  || (mode == SImode
@@ -21270,6 +21298,42 @@ rs6000_debug_rtx_costs (rtx x, machine_mode mode, int outer_code,
   return ret;
 }
 
+/* How many real instructions are generated for this insn?  This is slightly
+   different from the length attribute, in that the length attribute counts the
+   number of bytes.  With prefixed instructions, we don't want to count a
+   prefixed instruction (length 12 bytes including possible NOP) as taking 3
+   instructions, but just one.  */
+
+static int
+rs6000_num_insns (rtx_insn *insn)
+{
+  /* Try to figure it out based on the length and whether there are prefixed
+     instructions.  While prefixed instructions are only 8 bytes, we have to
+     use 12 as the size of the first prefixed instruction in case the
+     instruction needs to be aligned.  Back to back prefixed instructions would
+     only take 20 bytes, since it is guaranteed that one of the prefixed
+     instructions does not need the alignment.  */
+  int length = get_attr_length (insn);
+
+  if (length >= 12 && TARGET_PREFIXED_ADDR
+      && get_attr_prefixed (insn) == PREFIXED_YES)
+    {
+      /* Single prefixed instruction.  */
+      if (length == 12)
+	return 1;
+
+      /* A normal instruction and a prefixed instruction (16) or two back
+	 to back prefixed instructions (20).  */
+      if (length == 16 || length == 20)
+	return 2;
+
+      /* Guess for larger instruction sizes.  */
+      return 2 + (length - 20) / 4;
+    }
+
+  return length / 4;
+}
+
 static int
 rs6000_insn_cost (rtx_insn *insn, bool speed)
 {
@@ -21283,7 +21347,7 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (cost > 0)
     return cost;
 
-  int n = get_attr_length (insn) / 4;
+  int n = rs6000_num_insns (insn);
   enum attr_type type = get_attr_type (insn);
 
   switch (type)
