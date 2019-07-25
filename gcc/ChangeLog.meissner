@@ -6,16 +6,20 @@
 	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add field to
 	say whether a mode supports using prefixed memory instructions.
 	(mode_supports_prefixed_address_p): Make static inline.  Use the
-	prefixed_memory_p to say whether a give mode supports prefixed
-	memory instructions.
+	prefixed_memory_p field in reg_addr to say whether a give mode
+	supports prefixed memory instructions.
 	(rs6000_hard_regno_mode_ok_uncached): Allow for larger vector
 	types in the future.
-	(rs6000_init_hard_regno_mode_ok): Set VOIDmode and DImode as the
-	modes that support prefixed memory.
+	(rs6000_debug_print_mode): If -mdebug=reg, print which modes
+	support prefixed addressing.
+	(rs6000_setup_reg_addr_masks): Mark all scalar types that support
+	offset addressing to be able support prefixed addressing.
 	(num_insns_constant_gpr): Use SIGNED_16BIT_OFFSET_P macro.  If we
 	support prefixed memory instructions, know that we can load up
 	34-bit constants directly in one instruction.
 	(quad_address_p): Allow for larger vector types in the future.
+	(mem_operand_gpr): Use SIGNED_16BIT_FFSET_EXTRA_P macro.
+	(mem_operand_ds_form): Use SIGNED_16BIT_FFSET_EXTRA_P macro.
 	(rs6000_legitimate_offset_address_p): Add support for larger
 	offsets if we have prefixed addressing.
 	(rs6000_legitimate_address_p): Add support for prefixed
@@ -31,8 +35,16 @@
 	prefixed instructions as one instruction instead of three.
 	* config/rs6000/rs6000.md (add<mode>, GPR iterator): Add support
 	for the PADDI instruction if we have prefixed addressing.
+	(movsi_internal1): Add support to load up 16 bit constants
+	directly if have prefixed addressing.
+	(movsi splitter): Don't split if we have prefixed addressing.
 	(movdi_internal64): Add support to load up 34 bit constants if we
 	have prefixed addressing.
+	(movdi splitter): Add comment.
+	(stack_protect_setdi): Add support for either address being a
+	prefixed address.
+	(stack_protect_testdi): Add support for either address being a
+	prefixed address.
 
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
