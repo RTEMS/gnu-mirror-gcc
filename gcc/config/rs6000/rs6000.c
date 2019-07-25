@@ -353,7 +353,7 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
 typedef unsigned short addr_mask_type;
 
-#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register.  */
 #define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
 #define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
 #define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
