@@ -108,9 +108,13 @@ prefixed_load_p (rtx_insn *insn)
 
   /* If we are doing a sign extend operation on SImode (i.e. LWA), override the
      mode to be DImode so the DS instruction format is used.  */
-  if (mode == SImode && sign_p
-      && IN_RANGE (reg_or_subregno (reg), FIRST_GPR_REGNO, LAST_GPR_REGNO))
-    mode = DImode;
+  if (mode == SImode && sign_p)
+    {
+      unsigned r = reg_or_subregno (reg);
+      if (r >= FIRST_PSEUDO_REGISTER
+	  || IN_RANGE (r, FIRST_GPR_REGNO, LAST_GPR_REGNO))
+	mode = DImode;
+    }
 
   rtx addr = XEXP (mem, 0);
   return prefixed_addr_reg_p (addr, reg, mode);
