@@ -1,5 +1,10 @@
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (future_cost): New cost structure.
+	(rs6000_option_override_internal): Use future cost structure.
+
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (add_operand): Add support for
 	PADDI.
 	(non_add_cint_operand): Add support for PADDI.
@@ -33,6 +38,7 @@
 	(rs6000_num_insns): New function.
 	(rs6000_insn_cost): When using the instruction length, count
 	prefixed instructions as one instruction instead of three.
+
 	* config/rs6000/rs6000.md (add<mode>, GPR iterator): Add support
 	for the PADDI instruction if we have prefixed addressing.
 	(movsi_internal1): Add support to load up 16 bit constants
