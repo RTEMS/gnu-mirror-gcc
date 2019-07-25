@@ -1,5 +1,12 @@
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (pcrel_external_address): Update
+	comment.
+	(prefixed_mem_operand): Move lower in the file so the pcrel_*
+	predicates are all grouped together.
+
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (prefixed_mem_operand): Rename
 	rs6000_prefixed_address_mode_p to prefixed_addr_mode_p.
 	* config/rs6000/rs6000-protos.h (prefixed_addr_mode_p): Rename

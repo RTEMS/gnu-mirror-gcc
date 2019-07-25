@@ -1647,11 +1647,11 @@
 
 ;; Return true if the operand is an external symbol whose address can be loaded
 ;; into a register using:
-;;	PLA reg,label@pcrel@got
+;;	PLD reg,label@pcrel@got
 ;;
 ;; The linker will either optimize this to either a PADDI if the label is
 ;; defined locally in another module or a PLD of the address if the label is
-;; defined in another module.
+;; defined in a shared library.
 
 (define_predicate "pcrel_external_address"
   (match_code "symbol_ref,const")
@@ -1660,13 +1660,6 @@
     return false;
 
   return addr_validate_p (op, INSN_FORM_PREFIXED, ADDR_VALIDATE_PCREL_EXT);
-})
-
-;; Return 1 if op is a prefixed memory operand.
-(define_predicate "prefixed_mem_operand"
-  (match_code "mem")
-{
-  return prefixed_addr_mode_p (XEXP (op, 0), GET_MODE (op));
 })
 
 ;; Return 1 if op is a memory operand to an external variable when we
@@ -1680,6 +1673,13 @@
 
   rtx addr = XEXP (op, 0);
   return addr_validate_p (addr, INSN_FORM_PREFIXED, ADDR_VALIDATE_PCREL_EXT);
+})
+
+;; Return 1 if op is a prefixed memory operand.
+(define_predicate "prefixed_mem_operand"
+  (match_code "mem")
+{
+  return prefixed_addr_mode_p (XEXP (op, 0), GET_MODE (op));
 })
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
