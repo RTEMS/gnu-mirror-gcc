@@ -1,5 +1,29 @@
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-prefixed.c: New file.
+	* config/rs6000/rs6000-protos.h (prefixed_addr_reg_p): Add
+	declaration.
+	(prefixed_load_p): Add declaration.
+	(prefixed_store_p): Add declaration.
+	(prefixed_paddi_p): Add declaration.
+	(rs6000_asm_output_opcode): Add declaration.
+	(rs6000_final_prescan_insn): Update calling signature.
+	* config/rs6000/rs6000.c (prefixed_addr_reg_p): New function.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): New target hook.
+	(ASM_OUTPUT_OPCODE): New target hook.
+	* config/rs6000/rs6000.md (prefixed attribute): New RTL attribute.
+	(prefixed_length attribute): New RTL attribute.
+	(non_prefixed_length attribute): New RTL attribute.
+	(length attribute): Set length based on prefixed, prefixed_length,
+	and non_prefixed_length attributes.
+	(pcrel_addr): Update to use prefixed RTL attribute.
+	(pcrel_ext_addr): Update to use prefixed RTL attribute.
+	* config/rs6000/t-rs6000: Add rs6000-prefixed.o build rules.
+	* config.gcc (powerpc*-*-*): Add rs6000-prefixed.c.
+	(rs6000*-*-*): Add rs6000-prefixed.c.
+
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_external_address): Update
 	comment.
 	(prefixed_mem_operand): Move lower in the file so the pcrel_*

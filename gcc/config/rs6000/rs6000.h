@@ -2557,3 +2557,24 @@ typedef struct GTY(()) machine_function
   IN_RANGE ((VALUE),							\
 	    -(HOST_WIDE_INT_1 << 33),					\
 	    (HOST_WIDE_INT_1 << 33) - 1 - (EXTRA))
+
+/* Define this if some processing needs to be done before outputting the
+   assembler code.  On the PowerPC, we remember if the current insn is a normal
+   prefixed insn where we need to emit a 'p' before the insn.  */
+#define FINAL_PRESCAN_INSN(INSN, OPERANDS, NOPERANDS)			\
+do									\
+  {									\
+    if (TARGET_PREFIXED_ADDR)						\
+      rs6000_final_prescan_insn (INSN);					\
+  }									\
+while (0)
+
+/* Do anything special before emitting an opcode.  We use it to emit a 'p' for
+   prefixed insns that is set in FINAL_PRESCAN_INSN.  */
+#define ASM_OUTPUT_OPCODE(STREAM, OPCODE)				\
+  do									\
+    {									\
+     if (TARGET_PREFIXED_ADDR)						\
+       rs6000_asm_output_opcode (STREAM, OPCODE);			\
+    }									\
+  while (0)

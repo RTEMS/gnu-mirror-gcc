@@ -13861,6 +13861,58 @@ prefixed_addr_mode_p (rtx addr, machine_mode mode)
 
   return addr_validate_p (addr, reg_addr[mode].default_insn_form, addr_flags);
 }
+
+/* Return whether a memory address (ADDR) is a prefixed instruction when it is
+   loading or storing a given hard register (REG) with a machine mode (MODE).
+   Usually the mode is the mode of the memory operation, but in the case of
+   LWA, it is DImode instead of SImode to force using the DS instruction
+   format.
+
+   The physical register can determine whether a particular operation can use
+   the tradtional encodeing or it needs a prefixed encoding.  For example, LFD
+   is uses the D instruction encoding, while LXSD uses the DS instruction
+   encoding.  */
+
+bool
+prefixed_addr_reg_p (rtx addr, rtx reg, machine_mode mode)
+{
+  enum INSN_FORM insn_form;
+
+  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+    return false;
+
+  unsigned int r = reg_or_subregno (reg);
+
+  /* If we have a pseudo, use the default instruction format.  */
+  if (r >= FIRST_PSEUDO_REGISTER)
+    insn_form = reg_addr[mode].default_insn_form;
+
+  else
+    {
+      addr_mask_type mask = 0;
+
+      /* If we have a hard register, use the address mask from the reload
+	 register class to create the instruction format.  */
+      if (IN_RANGE (r, FIRST_GPR_REGNO, LAST_GPR_REGNO))
+	mask = reg_addr[mode].addr_mask[RELOAD_REG_GPR];
+
+      else if (IN_RANGE (r, FIRST_FPR_REGNO, LAST_FPR_REGNO))
+	mask = reg_addr[mode].addr_mask[RELOAD_REG_FPR];
+
+      else if (IN_RANGE (r, FIRST_ALTIVEC_REGNO, LAST_ALTIVEC_REGNO))
+	mask = reg_addr[mode].addr_mask[RELOAD_REG_VMX];
+
+      else
+	gcc_unreachable ();
+
+      insn_form = addr_mask_to_insn_form (mask);
+    }
+
+  const unsigned addr_flags = (ADDR_VALIDATE_REG_34BIT
+			       | ADDR_VALIDATE_PCREL_LOCAL);
+
+  return addr_validate_p (addr, insn_form, addr_flags);
+}
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
 /* Emit an assembler directive to set symbol visibility for DECL to
