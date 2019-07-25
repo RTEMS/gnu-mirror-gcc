@@ -1,5 +1,12 @@
 2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/future.md: New file, clone from power9.md and
+	change cpu=future.  Place holder until future scheduling is done.
+	* config/rs6000/rs6000.md (toplevel): Include future.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add future.md.
+
+2019-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (future_cost): New cost structure.
 	(rs6000_option_override_internal): Use future cost structure.
 
