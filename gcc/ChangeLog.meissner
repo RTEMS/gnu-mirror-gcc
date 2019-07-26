@@ -45,7 +45,6 @@
 	(rs6000_num_insns): New function.
 	(rs6000_insn_cost): When using the instruction length, count
 	prefixed instructions as one instruction instead of three.
-
 	* config/rs6000/rs6000.md (add<mode>, GPR iterator): Add support
 	for the PADDI instruction if we have prefixed addressing.
 	(movsi_internal1): Add support to load up 16 bit constants
