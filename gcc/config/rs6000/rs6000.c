@@ -2808,14 +2808,12 @@ rs6000_setup_reg_addr_masks (void)
 
       reg_addr[m].default_insn_form = addr_mask_to_insn_form (default_mask);
 
-      /* Set the prefixed memory support for any scalar mode that has offset
-	 addressing and is held in a single register in its default
-	 register.  */
+      /* Set the prefixed memory support for any mode that has offset
+	 addressing.  */
 
       const addr_mask_type omask = (RELOAD_REG_VALID | RELOAD_REG_OFFSET);
 
-      if (TARGET_PREFIXED_ADDR && msize <= 8
-	  && (default_mask & (omask | RELOAD_REG_MULTIPLE)) == omask)
+      if (TARGET_PREFIXED_ADDR && (default_mask & omask) == omask)
 	reg_addr[m].prefixed_memory_p = true;
     }
 }

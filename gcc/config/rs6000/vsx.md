@@ -1149,10 +1149,30 @@
                "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
-   (set_attr "length"
-               "*,         *,         *,         8,         *,         8,
-                8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *")
+   (set (attr "non_prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "8")]
+	      (const_string "*")))
+
+   (set (attr "prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "20")]
+	      (const_string "*")))
+
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
@@ -3199,7 +3219,12 @@
 					   operands[3], <VSX_D:VS_scalar>mode);
 }
   [(set_attr "type" "fpload,load")
-   (set_attr "length" "8")])
+   (set (attr "prefixed")
+	(if_then_else (match_operand 1 "prefixed_mem_operand")
+		      (const_string "yes")
+		      (const_string "no")))
+   (set_attr "non_prefixed_length" "8")
+   (set_attr "prefixed_length" "16")])
 
 ;; Optimize storing a single scalar element that is the right location to
 ;; memory
@@ -3294,6 +3319,8 @@
 }
   [(set_attr "type" "fpload,fpload,fpload,load")
    (set_attr "length" "8")
+   (set_attr "non_prefixed_length" "8")
+   (set_attr "prefixed_length" "16")
    (set_attr "isa" "*,p7v,p9v,*")])
 
 ;; Variable V4SF extract
