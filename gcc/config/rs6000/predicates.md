@@ -775,6 +775,13 @@
   return indexed_or_indirect_address (op, mode);
 })
 
+;; Return 1 if the operand uses a single register for the address.
+(define_predicate "one_reg_memory_operand"
+  (match_code "mem")
+{
+  return REG_P (XEXP (op, 0));
+})
+
 ;; Like indexed_or_indirect_operand, but also allow a GPR register if direct
 ;; moves are supported.
 (define_predicate "reg_or_indexed_operand"

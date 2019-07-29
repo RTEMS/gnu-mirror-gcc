@@ -1,5 +1,35 @@
 2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/pcrel.md: New file.
+	* config/rs6000/predicates.md (one_reg_memory_operand): New
+	predicate.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Add
+	-mpcrel-opt.
+	(OTHER_FUTURE_MASKS): Add -mpcrel-opt.
+	(POWERPC_MASKS): Add -mpcrel-opt.
+	* config/rs6000/rs6000-passes.def (pass_pcrel_opt): Add pass.
+	* config/rs6000/rs6000-pcrel.c: New file.
+	* config/rs6000/rs6000-prefixed.c (pcrel_opt_label_num): New
+	static to support -mpcrel-opt.
+	(rs6000_final_prescan_insn): Add support for -mpcrel-opt.
+	(rs6000_asm_output_opcode): Add support for -mpcrel-opt.
+	* config/rs6000/rs6000-protos.h (rs6000_final_prescan_insn):
+	Update calling signature.
+	(make_pass_pcrel_opt): New declaration.
+	(rs6000_option_override_internal): Add checks for -mpcrel-opt.
+	(rs6000_opt_masks): Add -mpcrel-opt.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): Update call to
+	rs6000_final_prescan_insn.
+	* config/rs6000/rs6000.md (pcrel_opt): New RTL attribute.
+	(toplevel): Include pcrel.md.
+	* config/rs6000/rs6000.opt (-mpcrel-opt): New option.
+	* config/rs6000/t-rs6000 (rs6000-pcrel.o): Add build rules.
+	(MD_INCLUDES): Add pcrel.md.
+	* config.gcc (powerpc*-*-*): Add rs6000-pcrel.c.
+	(rs6000*-*-*): Add rs6000-pcrel.c.
+
+2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/ppc-auxv.h (PPC_PLATFORM_FUTURE): Allocate
 	'future' PowerPC platform.
 	(PPC_FEATURE2_ARCH_3_1): New HWCAP2 bit for ISA 3.1.

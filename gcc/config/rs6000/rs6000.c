@@ -4174,7 +4174,17 @@ rs6000_option_override_internal (bool global_init_p)
       if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
 
-      rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+      rs6000_isa_flags &= ~(OPTION_MASK_PCREL
+			    | OPTION_MASK_PCREL_OPT);
+    }
+
+  /* Check -mfuture debug switches.  */
+  if (!TARGET_PCREL && TARGET_PCREL_OPT)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL_OPT) != 0)
+	error ("%qs requires %qs", "-mpcrel-opt", "-mpcrel");
+
+      rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
     }
 
   /* Print the options after updating the defaults.  */
@@ -4315,7 +4325,8 @@ rs6000_option_override_internal (bool global_init_p)
       if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
 
-      rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+      rs6000_isa_flags &= ~(OPTION_MASK_PCREL
+			    | OPTION_MASK_PCREL_OPT);
     }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -23129,6 +23140,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
+  { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },

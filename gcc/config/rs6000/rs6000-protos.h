@@ -260,7 +260,7 @@ extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *, const char *);
-void rs6000_final_prescan_insn (rtx_insn *);
+void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
 #endif
 
 extern unsigned char rs6000_class_max_nregs[][LIM_REG_CLASSES];
@@ -272,6 +272,7 @@ extern bool rs6000_linux_float_exceptions_rounding_supported_p (void);
 namespace gcc { class context; }
 class rtl_opt_pass;
 
+extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
