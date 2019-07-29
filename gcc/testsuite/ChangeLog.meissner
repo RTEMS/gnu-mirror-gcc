@@ -1,5 +1,13 @@
 2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc/testsuite/gcc.target/powerpc/prefix-odd-memory.c: New test.
+	* gcc/testsuite/gcc.target/powerpc/paddi-1.c: New test.
+	* gcc/testsuite/gcc.target/powerpc/paddi-2.c: New test.
+	* gcc/testsuite/gcc.target/powerpc/paddi-3.c: New test.
+	* gcc/testsuite/gcc.target/powerpc/prefix-premodify.c: New test.
+
+2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc/testsuite/gcc.target/powerpc/prefix-large.h: New set of
 	tests to test prefixed addressing on 'future' system with
 	pc-relative addreses.
