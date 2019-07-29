@@ -1,5 +1,10 @@
 2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Enable
+	prefixed addressing by default on 'future' systems.
+
+2019-07-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_setup_reg_addr_masks): Enable
 	prefixed addressing for any mode that supports offset addressing
 	in its default mode.
