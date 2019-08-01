@@ -1,5 +1,11 @@
 2019-07-31  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/future.md: New file.
+	* config/rs6000/rs6000.md (top level): Include future.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add future.md
+
+2019-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (future_cost): Add separate cost
 	structure for a 'future' machine.
 	(rs6000_option_override_internal): If -mcpu=future, use the future
