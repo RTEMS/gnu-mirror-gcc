@@ -1079,6 +1079,27 @@ struct processor_costs power9_cost = {
   COSTS_N_INSNS (3),	/* SF->DF convert */
 };
 
+/* Instruction costs on FUTURE processors.  At present, this is a place holder,
+   until more accurate information can be provided.  */
+static const
+struct processor_costs future_cost = {
+  COSTS_N_INSNS (3),	/* mulsi */
+  COSTS_N_INSNS (3),	/* mulsi_const */
+  COSTS_N_INSNS (3),	/* mulsi_const9 */
+  COSTS_N_INSNS (3),	/* muldi */
+  COSTS_N_INSNS (8),	/* divsi */
+  COSTS_N_INSNS (12),	/* divdi */
+  COSTS_N_INSNS (3),	/* fp */
+  COSTS_N_INSNS (3),	/* dmul */
+  COSTS_N_INSNS (13),	/* sdiv */
+  COSTS_N_INSNS (18),	/* ddiv */
+  128,			/* cache line size */
+  32,			/* l1 cache */
+  512,			/* l2 cache */
+  8,			/* prefetch streams */
+  COSTS_N_INSNS (3),	/* SF->DF convert */
+};
+
 /* Instruction costs on POWER A2 processors.  */
 static const
 struct processor_costs ppca2_cost = {
@@ -4487,8 +4508,11 @@ rs6000_option_override_internal (bool global_init_p)
 	break;
 
       case PROCESSOR_POWER9:
-      case PROCESSOR_FUTURE:
 	rs6000_cost = &power9_cost;
+	break;
+
+      case PROCESSOR_FUTURE:
+	rs6000_cost = &future_cost;
 	break;
 
       case PROCESSOR_PPCA2:

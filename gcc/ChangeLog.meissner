@@ -1,3 +1,10 @@
+2019-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (future_cost): Add separate cost
+	structure for a 'future' machine.
+	(rs6000_option_override_internal): If -mcpu=future, use the future
+	costs instead of power9.
+
 2019-07-31   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 273953
