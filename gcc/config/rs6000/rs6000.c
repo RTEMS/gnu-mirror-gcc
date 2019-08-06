@@ -373,6 +373,7 @@ struct rs6000_reg_addr {
   enum insn_form insn_form[(int)N_RELOAD_REG]; /* Register insn format.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
+  bool prefixed_memory_p;		/* We can use prefixed memory.  */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -410,6 +411,15 @@ mode_supports_dq_form (machine_mode mode)
 	  != 0);
 }
 
+/* Helper function to return whether a MODE can do prefixed loads/stores.  */
+
+static inline bool
+mode_supports_prefixed_address_p (machine_mode mode)
+{
+  return reg_addr[mode].prefixed_memory_p;
+}
+
+
 /* Given that there exists at least one variable that is set (produced)
    by OUT_INSN and read (consumed) by IN_INSN, return true iff
    IN_INSN represents one or more memory store operations and none of
@@ -3356,6 +3366,11 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   /* Update the instruction formats.  */
   setup_insn_form ();
+
+  /* Don't enable prefixed addressing on normal modes until all of the support
+     is in place.  Temporarily special case VOIDmode to be used to load up
+     pc-relative addresses.  */
+  reg_addr[VOIDmode].prefixed_memory_p = true;
 
   if (global_init_p || TARGET_DEBUG_TARGET)
     {
@@ -13755,17 +13770,6 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
-
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
-
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
-{
-  return mode == VOIDmode;
-}
 
 /* Function to return true if ADDR is a valid prefixed memory address that uses
    mode MODE.  */

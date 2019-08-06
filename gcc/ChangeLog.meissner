@@ -1,5 +1,15 @@
 2019-08-06  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add a field to
+	say whether the mode supports using prefixed addresses.
+	(mode_supports_prefixed_address_p): Move function higher in the
+	file.  Change the test to use the prefixed memory field in struct
+	rs6000_reg_addr.
+	(rs6000_init_hard_regno_mode_ok): Initialize VOIDmode to support
+	prefixed addresses.
+
+2019-08-06  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (reg_to_insn_form): New
 	declaration.
 	* config/rs6000/rs6000.c (rs6000_reg_addr): Add fields for
@@ -10,6 +20,7 @@
 	(rs6000_init_hard_regno_mode_ok): Call setup_insn_form.
 	(reg_to_insn_form): New function to figure out the instruction
 	format for a register of a given mode.
+
 	* config/rs6000/rs6000.md (enum insn_form): New enumaration of the
 	instruction format.
 
