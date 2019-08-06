@@ -369,6 +369,8 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  enum insn_form default_insn_form;	/* Default format for offsets.  */
+  enum insn_form insn_form[(int)N_RELOAD_REG]; /* Register insn format.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
 };
@@ -2053,6 +2055,28 @@ rs6000_debug_vector_unit (enum rs6000_vector v)
   return ret;
 }
 
+/* Return a character that can be printed out to describe an instruction
+   format.  */
+
+DEBUG_FUNCTION char
+rs6000_debug_insn_form (enum insn_form iform)
+{
+  char ret;
+
+  switch (iform)
+    {
+    case INSN_FORM_UNKNOWN:  ret = '-'; break;
+    case INSN_FORM_D:        ret = 'd'; break;
+    case INSN_FORM_DS:       ret = 's'; break;
+    case INSN_FORM_DQ:       ret = 'q'; break;
+    case INSN_FORM_X:        ret = 'x'; break;
+    case INSN_FORM_PREFIXED: ret = 'p'; break;
+    default:                 ret = '?'; break;
+    }
+
+  return ret;
+}
+
 /* Inner function printing just the address mask for a particular reload
    register class.  */
 DEBUG_FUNCTION char *
@@ -2114,6 +2138,12 @@ rs6000_debug_print_mode (ssize_t m)
   for (rc = 0; rc < N_RELOAD_REG; rc++)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
+
+  fprintf (stderr, "  Format: %c:%c%c%c",
+          rs6000_debug_insn_form (reg_addr[m].default_insn_form),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_GPR]),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_FPR]),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_VMX]));
 
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
@@ -2668,6 +2698,149 @@ rs6000_setup_reg_addr_masks (void)
     }
 }
 
+/* Set up the instruction format for each mode and register type from the
+   addr_mask.  */
+
+static void
+setup_insn_form (void)
+{
+  for (ssize_t m = 0; m < NUM_MACHINE_MODES; ++m)
+    {
+      machine_mode scalar_mode = (machine_mode) m;
+
+      /* Convert complex and IBM double double/_Decimal128 into their scalar
+	 parts that the registers will be split into for doing load or
+	 store.  */
+      if (COMPLEX_MODE_P (scalar_mode))
+	scalar_mode = GET_MODE_INNER (scalar_mode);
+
+      if (FLOAT128_2REG_P (scalar_mode))
+	scalar_mode = DFmode;
+
+      for (ssize_t rc = FIRST_RELOAD_REG_CLASS; rc <= LAST_RELOAD_REG_CLASS; rc++)
+	{
+	  machine_mode single_reg_mode = scalar_mode;
+	  size_t msize = GET_MODE_SIZE (scalar_mode);
+	  addr_mask_type addr_mask = reg_addr[scalar_mode].addr_mask[rc];
+	  enum insn_form iform = INSN_FORM_UNKNOWN;
+
+	  /* Is the mode permitted in the GPR/FPR/Altivec registers?  */
+	  if ((addr_mask & RELOAD_REG_VALID) != 0)
+	    {
+	      /* The addr_mask does not have the offsettable or indexed bits
+		 set for modes that are split into multiple registers (like
+		 IFmode).  It doesn't need this set, since typically by time it
+		 is used in secondary reload, the modes are split into
+		 component parts.
+
+		 The instruction format however can be used earlier in the
+		 compilation, so we need to setup what kind of instruction can
+		 be generated for the modes that are split.  */
+	      if ((addr_mask & (RELOAD_REG_MULTIPLE
+				| RELOAD_REG_OFFSET
+				| RELOAD_REG_INDEXED)) == RELOAD_REG_MULTIPLE)
+		{
+		  /* Multiple register types in GPRs depend on whether we can
+		     use DImode in a single register or SImode.  */
+		  if (rc == RELOAD_REG_GPR)
+		    {
+		      if (TARGET_POWERPC64)
+			{
+			  gcc_assert ((msize % 8) == 0);
+			  single_reg_mode = DImode;
+			}
+
+		      else
+			{
+			  gcc_assert ((msize % 4) == 0);
+			  single_reg_mode = SImode;
+			}
+		    }
+
+		  /* Multiple VSX vector sized data items will use a single
+		     vector type as an instruction format.  */
+		  else if (TARGET_VSX)
+		    {
+		      gcc_assert ((rc == RELOAD_REG_FPR)
+				  || (rc == RELOAD_REG_VMX));
+
+		      if ((msize % 16) == 0)
+			single_reg_mode = V2DImode;
+		    }
+
+		  /* Multiple Altivec vector sized data items will use a single
+		     vector type as an instruction format.  */
+		  else if (TARGET_ALTIVEC && rc == RELOAD_REG_VMX
+			   && (msize % 16) == 0
+			   && VECTOR_MODE_P (single_reg_mode))
+		    single_reg_mode = V4SImode;
+
+		  /* If we only have the traditional floating point unit, use
+		     DFmode as the base type.  */
+		  else if (!TARGET_VSX && TARGET_HARD_FLOAT
+			   && rc == RELOAD_REG_FPR && (msize % 8) == 0)
+		    single_reg_mode = DFmode;
+
+		  /* Get the information for the register mode used after
+		     splitting.  */
+		  addr_mask = reg_addr[single_reg_mode].addr_mask[rc];
+		  msize = GET_MODE_SIZE (single_reg_mode);
+		}
+
+	      /* Figure out the instruction format of each mode.
+
+		 For offsettable addresses that aren't specifically quad mode,
+		 see if the default form is D or DS.  GPR 64-bit offsettable
+		 addresses are DS format.  Likewise, all Altivec offsettable
+		 adddresses are DS format.  */
+	      if ((addr_mask & RELOAD_REG_OFFSET) != 0)
+		{
+		  if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+		    iform = INSN_FORM_DQ;
+
+		  else if (rc == RELOAD_REG_VMX
+			   || (rc == RELOAD_REG_GPR && TARGET_POWERPC64
+			       && (msize >= 8)))
+		    iform = INSN_FORM_DS;
+
+		  else
+		    iform = INSN_FORM_D;
+		}
+
+	      else if ((addr_mask & RELOAD_REG_INDEXED) != 0)
+		iform = INSN_FORM_X;
+	    }
+
+	  reg_addr[m].insn_form[rc] = iform;
+	}
+
+      /* Figure out the default insn format that is used for offsettable memory
+	 instructions.  For scalar floating point use the FPR addressing, for
+	 vectors and IEEE 128-bit use a suitable vector register type, and
+	 otherwise use GPRs.  */
+      ssize_t def_rc;
+      if (TARGET_VSX
+	  && (VECTOR_MODE_P (scalar_mode) || FLOAT128_IEEE_P (scalar_mode)))
+	{
+	  if ((reg_addr[m].addr_mask[RELOAD_REG_FPR] & RELOAD_REG_VALID) != 0)
+	    def_rc = RELOAD_REG_FPR;
+	  else
+	    def_rc = RELOAD_REG_VMX;
+	}
+
+      else if (TARGET_ALTIVEC && !TARGET_VSX && VECTOR_MODE_P (scalar_mode))
+	def_rc = RELOAD_REG_VMX;
+
+      else if (TARGET_HARD_FLOAT && SCALAR_FLOAT_MODE_P (scalar_mode))
+	def_rc = RELOAD_REG_FPR;
+
+      else
+	def_rc = RELOAD_REG_GPR;
+
+      reg_addr[m].default_insn_form = reg_addr[m].insn_form[def_rc];
+    }
+}
+
 
 /* Initialize the various global tables that are based on register size.  */
 static void
@@ -3180,6 +3353,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
      legitimate address support to figure out the appropriate addressing to
      use.  */
   rs6000_setup_reg_addr_masks ();
+
+  /* Update the instruction formats.  */
+  setup_insn_form ();
 
   if (global_init_p || TARGET_DEBUG_TARGET)
     {
@@ -13643,6 +13819,59 @@ rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
     }
 
   return false;
+}
+
+/* Given a register and a mode, return the instruction format for that
+   register.  If the register is a pseudo register, use the default format.
+   Otherwise if it is hard register, look to see exactly what type of
+   addressing is used.  */
+
+enum insn_form
+reg_to_insn_form (rtx reg, machine_mode mode)
+{
+  enum insn_form iform;
+
+  /* Handle UNSPECs, such as the special UNSPEC_SF_FROM_SI and
+     UNSPEC_SI_FROM_SF UNSPECs, which are used to hide SF/SI interactions.
+     Look at the first argument, and if it is a register, use that.  */
+  if (GET_CODE (reg) == UNSPEC || GET_CODE (reg) == UNSPEC_VOLATILE)
+    {
+      rtx op0 = XVECEXP (reg, 0, 0);
+      if (REG_P (op0) || SUBREG_P (op0))
+	reg = op0;
+    }
+
+  /* If it isn't a register, use the defaults.  */
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    iform = reg_addr[mode].default_insn_form;
+
+  else
+    {
+      unsigned int r = reg_or_subregno (reg);
+
+      /* If we have a pseudo, use the default instruction format.  */
+      if (r >= FIRST_PSEUDO_REGISTER)
+	iform = reg_addr[mode].default_insn_form;
+
+      /* If we have a hard register, use the address format of that hard
+	 register.  */
+      else
+	{
+	  if (IN_RANGE (r, FIRST_GPR_REGNO, LAST_GPR_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_GPR];
+
+	  else if (IN_RANGE (r, FIRST_FPR_REGNO, LAST_FPR_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_FPR];
+
+	  else if (IN_RANGE (r, FIRST_ALTIVEC_REGNO, LAST_ALTIVEC_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_VMX];
+
+	  else
+	    gcc_unreachable ();
+	}
+    }
+
+  return iform;
 }
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO

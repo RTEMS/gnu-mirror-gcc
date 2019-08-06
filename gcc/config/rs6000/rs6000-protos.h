@@ -47,6 +47,7 @@ extern bool legitimate_indirect_address_p (rtx, int);
 extern bool legitimate_indexed_address_p (rtx, int);
 extern bool avoiding_indexed_address_p (machine_mode);
 extern rtx rs6000_force_indexed_or_indirect_mem (rtx x);
+extern enum insn_form reg_to_insn_form (rtx, machine_mode);
 
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);
