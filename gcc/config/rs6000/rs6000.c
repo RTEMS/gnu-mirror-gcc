@@ -21369,6 +21369,42 @@ rs6000_debug_rtx_costs (rtx x, machine_mode mode, int outer_code,
   return ret;
 }
 
+/* How many real instructions are generated for this insn?  This is slightly
+   different from the length attribute, in that the length attribute counts the
+   number of bytes.  With prefixed instructions, we don't want to count a
+   prefixed instruction (length 12 bytes including possible NOP) as taking 3
+   instructions, but just one.  */
+
+static int
+rs6000_num_insns (rtx_insn *insn)
+{
+  /* Try to figure it out based on the length and whether there are prefixed
+     instructions.  While prefixed instructions are only 8 bytes, we have to
+     use 12 as the size of the first prefixed instruction in case the
+     instruction needs to be aligned.  Back to back prefixed instructions would
+     only take 20 bytes, since it is guaranteed that one of the prefixed
+     instructions does not need the alignment.  */
+  int length = get_attr_length (insn);
+
+  if (length >= 12 && TARGET_PREFIXED_ADDR
+      && get_attr_prefixed (insn) == PREFIXED_YES)
+    {
+      /* Single prefixed instruction.  */
+      if (length == 12)
+	return 1;
+
+      /* A normal instruction and a prefixed instruction (16) or two back
+	 to back prefixed instructions (20).  */
+      if (length == 16 || length == 20)
+	return 2;
+
+      /* Guess for larger instruction sizes.  */
+      return 2 + (length - 20) / 4;
+    }
+
+  return length / 4;
+}
+
 static int
 rs6000_insn_cost (rtx_insn *insn, bool speed)
 {
@@ -21382,7 +21418,7 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (cost > 0)
     return cost;
 
-  int n = get_attr_length (insn) / 4;
+  int n = rs6000_num_insns (insn);
   enum attr_type type = get_attr_type (insn);
 
   switch (type)

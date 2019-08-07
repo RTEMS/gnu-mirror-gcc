@@ -1,5 +1,12 @@
 2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_num_insns): New function.
+	(rs6000_insn_cost): Use rs6000_num_insns to treat prefixed
+	load/store instructions with the same case as non-prefixed
+	instructions.
+
+2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (add_operand): Add support for the
 	PADDI instruction.
 	(non_add_cint_operand): Add support for the PADDI instruction.
