@@ -1,5 +1,10 @@
 2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Enable
+	pc-relative support by default on 'future' systems.
+
+2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_num_insns): New function.
 	(rs6000_insn_cost): Use rs6000_num_insns to treat prefixed
 	load/store instructions with the same case as non-prefixed
