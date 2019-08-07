@@ -1,5 +1,46 @@
 2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for the
+	PADDI instruction.
+	(non_add_cint_operand): Add support for the PADDI instruction.
+	(lwa_operand): Add support for the prefixed PLWA instruction.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached):
+	Only treat modes < 16 bytes as scalars.
+	(rs6000_debug_print_mode): Print whether the mode supports
+	prefixed addressing.
+	(setup_insn_form): Enable prefixed addressing for all modes whose
+	default instruction form includes offset addressing.
+	(num_insns_constant_gpr): Add support for the PADDI instruction.
+	(quad_address_p): Add support for prefixed addressing.
+	(mem_operand_gpr): Add support for prefixed addressing.
+	(mem_operand_ds_form): Add support for prefixed addressing.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addressing.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addressing.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addressing.
+	(rs6000_rtx_costs): Make PADDI cost the same as ADDI or ADDIS.
+	* config/rs6000/rs6000.md (add<mode>3): Add support for PADDI.
+	(movsi_internal1): Add support for prefixed addressing, and using
+	PADDI to load up large integers.
+	(movsi splitter): Do not split up a PADDI instruction.
+	(mov<mode>_64bit_dm): Add support for prefixed addressing.
+	(movtd_64bit_nodm): Add support for prefixed addressing.
+	(movdi_internal64): Add support for prefixed addressing, and using
+	PADDI to load up large integers.
+	(movdi splitter): Update comment about PADDI.
+	(stack_protect_setdi): Add support for prefixed addressing.
+	(stack_protect_testdi): Add support for prefixed addressing.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed addressing.
+	(vsx_extract_<P:mode>_<VSX_D:mode>_load): Add support for prefixed
+	addressing.
+	(vsx_extract_<P:mode>_<VSX_D:mode>_load): Add support for prefixed
+	addressing.
+
+2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-prefixed.c: New file.
 	* config/rs6000/rs6000-protos.h (rs6000_final_prescan_insn):
 	Update calling signature.

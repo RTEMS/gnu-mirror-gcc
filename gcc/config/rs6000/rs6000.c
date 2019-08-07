@@ -1828,7 +1828,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
       if (ALTIVEC_REGNO_P (regno))
 	{
-	  if (GET_MODE_SIZE (mode) != 16 && !reg_addr[mode].scalar_in_vmx_p)
+	  if (GET_MODE_SIZE (mode) < 16 && !reg_addr[mode].scalar_in_vmx_p)
 	    return 0;
 
 	  return ALTIVEC_REGNO_P (last_regno);
@@ -2145,6 +2145,11 @@ rs6000_debug_print_mode (ssize_t m)
           rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_GPR]),
           rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_FPR]),
           rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_VMX]));
+
+  if (reg_addr[m].prefixed_memory_p)
+    fprintf (stderr, "  Prefix");
+  else
+    spaces += sizeof ("  Prefix") - 1;
 
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
@@ -2838,11 +2843,16 @@ setup_insn_form (void)
       else
 	def_rc = RELOAD_REG_GPR;
 
-      reg_addr[m].default_insn_form = reg_addr[m].insn_form[def_rc];
+      enum insn_form def_iform = reg_addr[m].insn_form[def_rc];
+      reg_addr[m].default_insn_form = def_iform;
 
-      /* Don't enable prefixed memory support until all of the infrastructure
-	 changes are in.  */
-      reg_addr[m].prefixed_memory_p = false;
+      /* Only modes that support offset addressing by default can be
+	 prefixed.  */
+      reg_addr[m].prefixed_memory_p = (TARGET_PREFIXED_ADDR
+				       && (def_iform == INSN_FORM_D
+					   || def_iform == INSN_FORM_DS
+					   || def_iform == INSN_FORM_DQ));
+
     }
 }
 
@@ -5693,12 +5703,16 @@ static int
 num_insns_constant_gpr (HOST_WIDE_INT value)
 {
   /* signed constant loadable with addi */
-  if (((unsigned HOST_WIDE_INT) value + 0x8000) < 0x10000)
+  if (SIGNED_16BIT_OFFSET_P (value))
     return 1;
 
   /* constant loadable with addis */
   else if ((value & 0xffff) == 0
 	   && (value >> 31 == -1 || value >> 31 == 0))
+    return 1;
+
+  /* PADDI can support up to 34 bit signed integers.  */
+  else if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (value))
     return 1;
 
   else if (TARGET_POWERPC64)
@@ -7411,7 +7425,7 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
 {
   rtx op0, op1;
 
-  if (GET_MODE_SIZE (mode) != 16)
+  if (GET_MODE_SIZE (mode) < 16)
     return false;
 
   if (legitimate_indirect_address_p (addr, strict))
@@ -7419,6 +7433,13 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
 
   if (VECTOR_MODE_P (mode) && !mode_supports_dq_form (mode))
     return false;
+
+  /* Is this a valid prefixed address?  If the bottom four bits of the offset
+     are non-zero, we could use a prefixed instruction (which does not have the
+     DQ-form constraint that the traditional instruction had) instead of
+     forcing the unaligned offset to a GPR.  */
+  if (prefixed_local_addr_p (addr, mode, INSN_FORM_DQ))
+    return true;
 
   if (GET_CODE (addr) != PLUS)
     return false;
@@ -7521,6 +7542,13 @@ mem_operand_gpr (rtx op, machine_mode mode)
       && legitimate_indirect_address_p (XEXP (addr, 0), false))
     return true;
 
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (prefixed_local_addr_p (addr, mode, INSN_FORM_DS))
+    return true;
+
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
@@ -7542,7 +7570,7 @@ mem_operand_gpr (rtx op, machine_mode mode)
        causes a wrap, so test only the low 16 bits.  */
     offset = ((offset & 0xffff) ^ 0x8000) - 0x8000;
 
-  return offset + 0x8000 < 0x10000u - extra;
+  return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
 }
 
 /* As above, but for DS-FORM VSX insns.  Unlike mem_operand_gpr,
@@ -7554,6 +7582,13 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  /* Allow prefixed instructions if supported.  If the bottom two bits of the
+     offset are non-zero, we could use a prefixed instruction (which does not
+     have the DS-form constraint that the traditional instruction had) instead
+     of forcing the unaligned offset to a GPR.  */
+  if (prefixed_local_addr_p (addr, mode, INSN_FORM_DS))
+    return true;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -7575,7 +7610,7 @@ mem_operand_ds_form (rtx op, machine_mode mode)
        causes a wrap, so test only the low 16 bits.  */
     offset = ((offset & 0xffff) ^ 0x8000) - 0x8000;
 
-  return offset + 0x8000 < 0x10000u - extra;
+  return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
 }
 
 /* Subroutines of rs6000_legitimize_address and rs6000_legitimate_address_p.  */
@@ -7924,8 +7959,10 @@ rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
       break;
     }
 
-  offset += 0x8000;
-  return offset < 0x10000 - extra;
+  if (TARGET_PREFIXED_ADDR)
+    return SIGNED_34BIT_OFFSET_EXTRA_P (offset, extra);
+  else
+    return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
 }
 
 bool
@@ -8822,6 +8859,11 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       && mode_supports_pre_incdec_p (mode)
       && legitimate_indirect_address_p (XEXP (x, 0), reg_ok_strict))
     return 1;
+
+  /* Handle prefixed addresses (pc-relative or 34-bit offset).  */
+  if (prefixed_local_addr_p (x, mode, INSN_FORM_UNKNOWN))
+    return 1;
+
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
   if (quad_offset_p)
     {
@@ -8880,7 +8922,10 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	  || (!avoiding_indexed_address_p (mode)
 	      && legitimate_indexed_address_p (XEXP (x, 1), reg_ok_strict)))
       && rtx_equal_p (XEXP (XEXP (x, 1), 0), XEXP (x, 0)))
-    return 1;
+    {
+      /* There is no prefixed version of the load/store with update.  */
+      return !prefixed_local_addr_p (XEXP (x, 1), mode, INSN_FORM_UNKNOWN);
+    }
   if (reg_offset_p && !quad_offset_p
       && legitimate_lo_sum_address_p (mode, x, reg_ok_strict))
     return 1;
@@ -8942,8 +8987,12 @@ rs6000_mode_dependent_address (const_rtx addr)
 	  && XEXP (addr, 0) != arg_pointer_rtx
 	  && CONST_INT_P (XEXP (addr, 1)))
 	{
-	  unsigned HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
-	  return val + 0x8000 >= 0x10000 - (TARGET_POWERPC64 ? 8 : 12);
+	  HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
+	  HOST_WIDE_INT extra = TARGET_POWERPC64 ? 8 : 12;
+	  if (TARGET_PREFIXED_ADDR)
+	    return !SIGNED_34BIT_OFFSET_EXTRA_P (val, extra);
+	  else
+	    return !SIGNED_16BIT_OFFSET_EXTRA_P (val, extra);
 	}
       break;
 
@@ -20939,7 +20988,8 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    || outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
-	       || satisfies_constraint_L (x)))
+	       || satisfies_constraint_L (x)
+	       || satisfies_constraint_eI (x)))
 	  || (outer_code == AND
 	      && (satisfies_constraint_K (x)
 		  || (mode == SImode
