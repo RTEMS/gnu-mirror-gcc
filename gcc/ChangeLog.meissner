@@ -1,4 +1,34 @@
 2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (pcrel_address): Rewrite to use
+	pcrel_addr_p.
+	(pcrel_external_address): Rewrite to use pcrel_addr_p.
+	(prefixed_mem_operand): Rewrite to use prefixed_local_addr_p.
+	(pcrel_external_mem_operand): Rewrite to use pcrel_addr_p.
+	* config/rs6000/rs6000-protos.h (reg_to_insn_form): New
+	declaration.
+	(pcrel_info_type): New declaration.
+	(PCREL_NULL): New macro.
+	(pcrel_addr_p): New declaration.
+	(rs6000_prefixed_address_mode_p): Delete.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add fields for
+	instruction format and prefixed memory support.
+	(rs6000_debug_insn_form): New debug function.
+	(rs6000_debug_print_mode): Print instruction formats.
+	(setup_insn_form): New function.
+	(rs6000_init_hard_regno_mode_ok): Call setup_insn_form.
+	(print_operand_address): Call pcrel_addr_p instead of
+	pcrel_address.  Add support for external pc-relative labels.
+	(mode_supports_prefixed_address_p): Delete.
+	(rs6000_prefixed_address_mode_p): Delete, replace with
+	prefixed_local_addr_p.
+	(prefixed_local_addr_p): Replace rs6000_prefixed_address_mode_p.
+	Add argument to specify the instruction format.
+	(pcrel_addr_p): New function.
+	(reg_to_insn_form): New function.
+	* config/rs6000/rs6000.md (enum insn_form): New enumeration.
+
+2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
+
 	Clone branch subversion id 274171
 

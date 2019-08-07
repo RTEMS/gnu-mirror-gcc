@@ -369,8 +369,11 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  enum insn_form default_insn_form;	/* Default format for offsets.  */
+  enum insn_form insn_form[(int)N_RELOAD_REG]; /* Register insn format.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
+  bool prefixed_memory_p;		/* We can use prefixed memory.  */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -2053,6 +2056,28 @@ rs6000_debug_vector_unit (enum rs6000_vector v)
   return ret;
 }
 
+/* Return a character that can be printed out to describe an instruction
+   format.  */
+
+DEBUG_FUNCTION char
+rs6000_debug_insn_form (enum insn_form iform)
+{
+  char ret;
+
+  switch (iform)
+    {
+    case INSN_FORM_UNKNOWN:  ret = '-'; break;
+    case INSN_FORM_D:        ret = 'd'; break;
+    case INSN_FORM_DS:       ret = 's'; break;
+    case INSN_FORM_DQ:       ret = 'q'; break;
+    case INSN_FORM_X:        ret = 'x'; break;
+    case INSN_FORM_PREFIXED: ret = 'p'; break;
+    default:                 ret = '?'; break;
+    }
+
+  return ret;
+}
+
 /* Inner function printing just the address mask for a particular reload
    register class.  */
 DEBUG_FUNCTION char *
@@ -2114,6 +2139,12 @@ rs6000_debug_print_mode (ssize_t m)
   for (rc = 0; rc < N_RELOAD_REG; rc++)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
+
+  fprintf (stderr, "  Format: %c:%c%c%c",
+          rs6000_debug_insn_form (reg_addr[m].default_insn_form),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_GPR]),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_FPR]),
+          rs6000_debug_insn_form (reg_addr[m].insn_form[RELOAD_REG_VMX]));
 
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
@@ -2668,6 +2699,153 @@ rs6000_setup_reg_addr_masks (void)
     }
 }
 
+/* Set up the instruction format for each mode and register type from the
+   addr_mask.  */
+
+static void
+setup_insn_form (void)
+{
+  for (ssize_t m = 0; m < NUM_MACHINE_MODES; ++m)
+    {
+      machine_mode scalar_mode = (machine_mode) m;
+
+      /* Convert complex and IBM double double/_Decimal128 into their scalar
+	 parts that the registers will be split into for doing load or
+	 store.  */
+      if (COMPLEX_MODE_P (scalar_mode))
+	scalar_mode = GET_MODE_INNER (scalar_mode);
+
+      if (FLOAT128_2REG_P (scalar_mode))
+	scalar_mode = DFmode;
+
+      for (ssize_t rc = FIRST_RELOAD_REG_CLASS; rc <= LAST_RELOAD_REG_CLASS; rc++)
+	{
+	  machine_mode single_reg_mode = scalar_mode;
+	  size_t msize = GET_MODE_SIZE (scalar_mode);
+	  addr_mask_type addr_mask = reg_addr[scalar_mode].addr_mask[rc];
+	  enum insn_form iform = INSN_FORM_UNKNOWN;
+
+	  /* Is the mode permitted in the GPR/FPR/Altivec registers?  */
+	  if ((addr_mask & RELOAD_REG_VALID) != 0)
+	    {
+	      /* The addr_mask does not have the offsettable or indexed bits
+		 set for modes that are split into multiple registers (like
+		 IFmode).  It doesn't need this set, since typically by time it
+		 is used in secondary reload, the modes are split into
+		 component parts.
+
+		 The instruction format however can be used earlier in the
+		 compilation, so we need to setup what kind of instruction can
+		 be generated for the modes that are split.  */
+	      if ((addr_mask & (RELOAD_REG_MULTIPLE
+				| RELOAD_REG_OFFSET
+				| RELOAD_REG_INDEXED)) == RELOAD_REG_MULTIPLE)
+		{
+		  /* Multiple register types in GPRs depend on whether we can
+		     use DImode in a single register or SImode.  */
+		  if (rc == RELOAD_REG_GPR)
+		    {
+		      if (TARGET_POWERPC64)
+			{
+			  gcc_assert ((msize % 8) == 0);
+			  single_reg_mode = DImode;
+			}
+
+		      else
+			{
+			  gcc_assert ((msize % 4) == 0);
+			  single_reg_mode = SImode;
+			}
+		    }
+
+		  /* Multiple VSX vector sized data items will use a single
+		     vector type as an instruction format.  */
+		  else if (TARGET_VSX)
+		    {
+		      gcc_assert ((rc == RELOAD_REG_FPR)
+				  || (rc == RELOAD_REG_VMX));
+
+		      if ((msize % 16) == 0)
+			single_reg_mode = V2DImode;
+		    }
+
+		  /* Multiple Altivec vector sized data items will use a single
+		     vector type as an instruction format.  */
+		  else if (TARGET_ALTIVEC && rc == RELOAD_REG_VMX
+			   && (msize % 16) == 0
+			   && VECTOR_MODE_P (single_reg_mode))
+		    single_reg_mode = V4SImode;
+
+		  /* If we only have the traditional floating point unit, use
+		     DFmode as the base type.  */
+		  else if (!TARGET_VSX && TARGET_HARD_FLOAT
+			   && rc == RELOAD_REG_FPR && (msize % 8) == 0)
+		    single_reg_mode = DFmode;
+
+		  /* Get the information for the register mode used after
+		     splitting.  */
+		  addr_mask = reg_addr[single_reg_mode].addr_mask[rc];
+		  msize = GET_MODE_SIZE (single_reg_mode);
+		}
+
+	      /* Figure out the instruction format of each mode.
+
+		 For offsettable addresses that aren't specifically quad mode,
+		 see if the default form is D or DS.  GPR 64-bit offsettable
+		 addresses are DS format.  Likewise, all Altivec offsettable
+		 adddresses are DS format.  */
+	      if ((addr_mask & RELOAD_REG_OFFSET) != 0)
+		{
+		  if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+		    iform = INSN_FORM_DQ;
+
+		  else if (rc == RELOAD_REG_VMX
+			   || (rc == RELOAD_REG_GPR && TARGET_POWERPC64
+			       && (msize >= 8)))
+		    iform = INSN_FORM_DS;
+
+		  else
+		    iform = INSN_FORM_D;
+		}
+
+	      else if ((addr_mask & RELOAD_REG_INDEXED) != 0)
+		iform = INSN_FORM_X;
+	    }
+
+	  reg_addr[m].insn_form[rc] = iform;
+	}
+
+      /* Figure out the default insn format that is used for offsettable memory
+	 instructions.  For scalar floating point use the FPR addressing, for
+	 vectors and IEEE 128-bit use a suitable vector register type, and
+	 otherwise use GPRs.  */
+      ssize_t def_rc;
+      if (TARGET_VSX
+	  && (VECTOR_MODE_P (scalar_mode) || FLOAT128_IEEE_P (scalar_mode)))
+	{
+	  if ((reg_addr[m].addr_mask[RELOAD_REG_FPR] & RELOAD_REG_VALID) != 0)
+	    def_rc = RELOAD_REG_FPR;
+	  else
+	    def_rc = RELOAD_REG_VMX;
+	}
+
+      else if (TARGET_ALTIVEC && !TARGET_VSX && VECTOR_MODE_P (scalar_mode))
+	def_rc = RELOAD_REG_VMX;
+
+      else if (TARGET_HARD_FLOAT && SCALAR_FLOAT_MODE_P (scalar_mode))
+	def_rc = RELOAD_REG_FPR;
+
+      else
+	def_rc = RELOAD_REG_GPR;
+
+      reg_addr[m].default_insn_form = reg_addr[m].insn_form[def_rc];
+
+      /* Don't enable prefixed memory support until all of the infrastructure
+	 changes are in.  */
+      reg_addr[m].prefixed_memory_p = false;
+    }
+}
+
 
 /* Initialize the various global tables that are based on register size.  */
 static void
@@ -3180,6 +3358,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
      legitimate address support to figure out the appropriate addressing to
      use.  */
   rs6000_setup_reg_addr_masks ();
+
+  /* Update the instruction formats.  */
+  setup_insn_form ();
 
   if (global_init_p || TARGET_DEBUG_TARGET)
     {
@@ -13070,29 +13251,21 @@ print_operand (FILE *file, rtx x, int code)
 void
 print_operand_address (FILE *file, rtx x)
 {
+  pcrel_info_type pcrel_info;
+
   if (REG_P (x))
     fprintf (file, "0(%s)", reg_names[ REGNO (x) ]);
 
   /* Is it a pc-relative address?  */
-  else if (pcrel_address (x, Pmode))
+  else if (pcrel_addr_p (x, true, true, &pcrel_info))
     {
-      HOST_WIDE_INT offset;
+      output_addr_const (file, pcrel_info.base_addr);
 
-      if (GET_CODE (x) == CONST)
-	x = XEXP (x, 0);
+      if (pcrel_info.offset)
+	fprintf (file, "%+" PRId64, pcrel_info.offset);
 
-      if (GET_CODE (x) == PLUS)
-	{
-	  offset = INTVAL (XEXP (x, 1));
-	  x = XEXP (x, 0);
-	}
-      else
-	offset = 0;
-
-      output_addr_const (file, x);
-
-      if (offset)
-	fprintf (file, "%+" PRId64, offset);
+      if (pcrel_info.external_p)
+	fputs ("@got", file);
 
       fputs ("@pcrel", file);
     }
@@ -13579,70 +13752,204 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
+
+/* Return true if the address ADDR is a prefixed address either with a large
+   offset, an offset that does not fit in the normal instruction form, or a
+   pc-relative address to a local symbol.
 
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
+   MODE is the mode of the memory.
 
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
-{
-  return mode == VOIDmode;
-}
-
-/* Function to return true if ADDR is a valid prefixed memory address that uses
-   mode MODE.  */
+   IFORM is used to determine if the traditional address is either DS format or
+   DQ format and the bottom bits of the offset are non-zero.  */
 
 bool
-rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
+prefixed_local_addr_p (rtx addr, machine_mode mode, enum insn_form iform)
 {
-  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+  if (!reg_addr[mode].prefixed_memory_p)
     return false;
 
-  /* Check for PC-relative addresses.  */
-  if (pcrel_address (addr, Pmode))
-    return true;
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
 
-  /* Check for prefixed memory addresses that have a large numeric offset,
-     or an offset that can't be used for a DS/DQ-form memory operation.  */
-  if (GET_CODE (addr) == PLUS)
+  /* Single register, not prefixed.  */
+  if (REG_P (addr) || SUBREG_P (addr))
+    return false;
+
+  /* Register + offset.  */
+  else if (GET_CODE (addr) == PLUS
+	   && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
+	   && CONST_INT_P (XEXP (addr, 1)))
     {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
+      HOST_WIDE_INT offset = INTVAL (XEXP (addr, 1));
 
-      if (!base_reg_operand (op0, Pmode) || !CONST_INT_P (op1))
+      /* Prefixed instructions can only access 34-bits.  Fail if the value
+	 is larger than that.  */
+      if (!SIGNED_34BIT_OFFSET_P (offset))
 	return false;
 
-      HOST_WIDE_INT value = INTVAL (op1);
-      if (!SIGNED_34BIT_OFFSET_P (value))
-	return false;
+      /* For small offsets see whether it might be a DS or DQ instruction where
+	 the bottom bits non-zero.  This would require using a prefixed
+	 address.  If the offset is larger than 16 bits, then the instruction
+	 must be prefixed.  */
+      if (SIGNED_16BIT_OFFSET_P (offset))
+	{
+	  /* Use default if we don't know the precise instruction format.  */
+	  if (iform == INSN_FORM_UNKNOWN)
+	    iform = reg_addr[mode].default_insn_form;
 
-      /* Offset larger than 16-bits?  */
-      if (!SIGNED_16BIT_OFFSET_P (value))
-	return true;
+	  if (iform == INSN_FORM_DS)
+	    return (offset & 3) != 0;
 
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
+	  else if (iform == INSN_FORM_DQ)
+	    return (offset & 15) != 0;
 
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
+	  else if (iform != INSN_FORM_PREFIXED)
+	    return false;
+	}
 
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
-
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
+      return true;
     }
 
-  return false;
+  else if (!TARGET_PCREL)
+    return false;
+
+  if (GET_CODE (addr) == PLUS)
+    {
+      rtx op1 = XEXP (addr, 1);
+
+      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
+	return false;
+
+      addr = XEXP (addr, 0);
+    }
+
+  /* Local pc-relative symbols/labels.  */
+  return (LABEL_REF_P (addr)
+	  || (SYMBOL_REF_P (addr) && SYMBOL_REF_LOCAL_P (addr)));
+}
+
+/* Return true if the address ADDR is a prefixed address that is a pc-relative
+   reference either to a local symbol or to an external symbol.  We break apart
+   the address and return the parts.  LOCAL_SYMBOL_P and EXTERNAL_SYMBOL_P says
+   whether local and external pc-relative symbols are allowed.  P_INFO points
+   to a structure that returns the broken out component parts if desired.  */
+
+bool
+pcrel_addr_p (rtx addr,
+	      bool local_symbol_p,
+	      bool external_symbol_p,
+	      pcrel_info_type *p_info)
+{
+  rtx base_addr = NULL_RTX;
+  HOST_WIDE_INT offset = 0;
+  bool was_external_p = false;
+
+  if (p_info)
+    {
+      p_info->base_addr = NULL_RTX;
+      p_info->offset = 0;
+      p_info->external_p = false;
+    }
+
+  if (!TARGET_PCREL)
+    return false;
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  /* Pc-relative symbols/labels without offsets.  */
+  if (SYMBOL_REF_P (addr))
+    {
+      base_addr = addr;
+      was_external_p = !SYMBOL_REF_LOCAL_P (addr);
+    }
+
+  else if (LABEL_REF_P (addr))
+    base_addr = addr;
+
+  /* Pc-relative symbols with offsets.  */
+  else if (GET_CODE (addr) == PLUS
+	   && SYMBOL_REF_P (XEXP (addr, 0))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    {
+      base_addr = XEXP (addr, 0);
+      offset = INTVAL (XEXP (addr, 1));
+      was_external_p = !SYMBOL_REF_LOCAL_P (base_addr);
+
+      if (!SIGNED_34BIT_OFFSET_P (offset))
+	return false;
+    }
+
+  else
+    return false;
+
+  if (was_external_p && !external_symbol_p)
+    return false;
+
+  if (!was_external_p && !local_symbol_p)
+    return false;
+
+  if (p_info)
+    {
+      p_info->base_addr = base_addr;
+      p_info->offset = offset;
+      p_info->external_p = was_external_p;
+    }
+
+  return true;
+}
+
+/* Given a register and a mode, return the instruction format for that
+   register.  If the register is a pseudo register, use the default format.
+   Otherwise if it is hard register, look to see exactly what type of
+   addressing is used.  */
+
+enum insn_form
+reg_to_insn_form (rtx reg, machine_mode mode)
+{
+  enum insn_form iform;
+
+  /* Handle UNSPECs, such as the special UNSPEC_SF_FROM_SI and
+     UNSPEC_SI_FROM_SF UNSPECs, which are used to hide SF/SI interactions.
+     Look at the first argument, and if it is a register, use that.  */
+  if (GET_CODE (reg) == UNSPEC || GET_CODE (reg) == UNSPEC_VOLATILE)
+    {
+      rtx op0 = XVECEXP (reg, 0, 0);
+      if (REG_P (op0) || SUBREG_P (op0))
+	reg = op0;
+    }
+
+  /* If it isn't a register, use the defaults.  */
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    iform = reg_addr[mode].default_insn_form;
+
+  else
+    {
+      unsigned int r = reg_or_subregno (reg);
+
+      /* If we have a pseudo, use the default instruction format.  */
+      if (r >= FIRST_PSEUDO_REGISTER)
+	iform = reg_addr[mode].default_insn_form;
+
+      /* If we have a hard register, use the address format of that hard
+	 register.  */
+      else
+	{
+	  if (IN_RANGE (r, FIRST_GPR_REGNO, LAST_GPR_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_GPR];
+
+	  else if (IN_RANGE (r, FIRST_FPR_REGNO, LAST_FPR_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_FPR];
+
+	  else if (IN_RANGE (r, FIRST_ALTIVEC_REGNO, LAST_ALTIVEC_REGNO))
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_VMX];
+
+	  else
+	    gcc_unreachable ();
+	}
+    }
+
+  return iform;
 }
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
