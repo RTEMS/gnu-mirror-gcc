@@ -93,6 +93,9 @@
 #define PPC_FEATURE2_SCV            0x00100000
 #define PPC_FEATURE2_HTM_NO_SUSPEND 0x00080000
 
+/* These are not yet official.  */
+#define PPC_FEATURE2_ARCH_3_1       0x00040000
+#define PPC_FEATURE2_MMA            0x00020000
 
 /* Thread Control Block (TCB) offsets of the AT_PLATFORM, AT_HWCAP and
    AT_HWCAP2 values.  These must match the values defined in GLIBC.  */
