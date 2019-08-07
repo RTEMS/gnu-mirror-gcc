@@ -46,13 +46,39 @@
    instruction is printed out.  */
 static bool next_insn_prefixed_p;
 
+/* Numeric label that is the address of the GOT load instruction + 8 that we
+   link the R_PPC64_PCREL_OPT relocation to for on the next instruction.  */
+static unsigned int pcrel_opt_label_num;
+
 /* Define FINAL_PRESCAN_INSN if some processing needs to be done before
    outputting the assembler code.  On the PowerPC, we remember if the current
-   insn is a prefixed insn where we need to emit a 'p' before the insn.  */
+   insn is a prefixed insn where we need to emit a 'p' before the insn.
+
+   In addition, if the insn is part of a pc-relative reference to an external
+   label optimization, this is recorded also.  */
 void
-rs6000_final_prescan_insn (rtx_insn *insn)
+rs6000_final_prescan_insn (rtx_insn *insn, rtx operands[], int noperands)
 {
   next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
+
+  enum attr_pcrel_opt pcrel_attr = get_attr_pcrel_opt (insn);
+
+  /* For the load and store instructions that are tied to a GOT pointer, we
+     know that operand 3 constains a marker for loads and operand 2 contains
+     the marker for stores.  If it is non-zero, it is the numeric label where
+     we load the address + 8.  */
+  if (pcrel_attr == PCREL_OPT_LOAD)
+    {
+      gcc_assert (noperands >= 3);
+      pcrel_opt_label_num = INTVAL (operands[3]);
+    }
+  else if (pcrel_attr == PCREL_OPT_STORE)
+    {
+      gcc_assert (noperands >= 2);
+      pcrel_opt_label_num = INTVAL (operands[2]);
+    }
+  else
+    pcrel_opt_label_num = 0;
   return;
 }
 
@@ -64,6 +90,13 @@ rs6000_final_prescan_insn (rtx_insn *insn)
 void
 rs6000_asm_output_opcode (FILE *stream, const char *)
 {
+  if (pcrel_opt_label_num)
+    {
+      fprintf (stream, ".reloc .Lpcrel%u-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%u-8)\n\t",
+	       pcrel_opt_label_num, pcrel_opt_label_num);
+      pcrel_opt_label_num = 0;
+    }
+
   if (next_insn_prefixed_p)
     {
       next_insn_prefixed_p = false;

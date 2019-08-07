@@ -2580,7 +2580,7 @@ typedef struct GTY(()) machine_function
 do									\
   {									\
     if (TARGET_PREFIXED_ADDR)						\
-      rs6000_final_prescan_insn (INSN);					\
+      rs6000_final_prescan_insn (INSN, OPERANDS, NOPERANDS);		\
   }									\
 while (0)
 
