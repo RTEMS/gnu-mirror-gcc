@@ -9825,6 +9825,21 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	  return;
 	}
 
+      /* Handle pc-relative addresses, either external symbols or internal
+	 within the function.  */
+      if (TARGET_PCREL)
+	{
+	  rtx base;
+	  HOST_WIDE_INT offset;
+	  bool ext_p;
+
+	  if (pcrel_local_or_ext_addr_p (operands[1], &base, &offset, &ext_p))
+	    {
+	      emit_insn (gen_rtx_SET (operands[0], operands[1]));
+	      return;
+	    }
+	}
+
       if (DEFAULT_ABI == ABI_V4
 	  && mode == Pmode && mode == SImode
 	  && flag_pic == 1 && got_operand (operands[1], mode))
@@ -13261,29 +13276,23 @@ print_operand (FILE *file, rtx x, int code)
 void
 print_operand_address (FILE *file, rtx x)
 {
+  rtx base_addr;
+  HOST_WIDE_INT offset;
+  bool external_p;
+
   if (REG_P (x))
     fprintf (file, "0(%s)", reg_names[ REGNO (x) ]);
 
   /* Is it a pc-relative address?  */
-  else if (pcrel_address (x, Pmode))
+  else if (pcrel_local_or_ext_addr_p (x, &base_addr, &offset, &external_p))
     {
-      HOST_WIDE_INT offset;
-
-      if (GET_CODE (x) == CONST)
-	x = XEXP (x, 0);
-
-      if (GET_CODE (x) == PLUS)
-	{
-	  offset = INTVAL (XEXP (x, 1));
-	  x = XEXP (x, 0);
-	}
-      else
-	offset = 0;
-
-      output_addr_const (file, x);
+      output_addr_const (file, base_addr);
 
       if (offset)
 	fprintf (file, "%+" PRId64, offset);
+
+      if (external_p)
+	fputs ("@got", file);
 
       fputs ("@pcrel", file);
     }
@@ -13770,6 +13779,134 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
+
+/* Return true if the address ADDR is a prefixed address either with a large
+   offset, an offset that does not fit in the normal instruction form, or a
+   pc-relative address to a local symbol.
+
+   Use INFO_FORM to determine if the traditional address is either DS format or
+   DQ format and the bottom bits of the offset are non-zero.  */
+
+bool
+prefixed_local_addr_p (rtx addr, enum insn_form iform)
+{
+  if (!TARGET_PREFIXED_ADDR)
+    return false;
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  /* Single register, not prefixed.  */
+  if (REG_P (addr) || SUBREG_P (addr))
+    return false;
+
+  /* Register + offset.  */
+  else if (GET_CODE (addr) == PLUS
+	   && (REG_P (XEXP (addr, 0)) || SUBREG_P (XEXP (addr, 0)))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    {
+      HOST_WIDE_INT offset = INTVAL (XEXP (addr, 1));
+
+      /* Prefixed instructions can only access 34-bits.  Fail if the value
+	 is larger than that.  */
+      if (!SIGNED_34BIT_OFFSET_P (offset))
+	return false;
+
+      /* For small offsets see whether it might be a DS or DQ instruction where
+	 the bottom bits non-zero.  This would require using a prefixed
+	 address.  If the offset is larger than 16-bit, then the instruction
+	 must be prefixed.  */
+      if (SIGNED_16BIT_OFFSET_P (offset))
+	{
+	  if (iform == INSN_FORM_DS)
+	    return (offset & 3) != 0;
+
+	  else if (iform == INSN_FORM_DQ)
+	    return (offset & 15) != 0;
+
+	  else if (iform != INSN_FORM_PREFIXED)
+	    return false;
+	}
+
+      return true;
+    }
+
+  else if (!TARGET_PCREL)
+    return false;
+
+  /* Pc-relative symbols/labels without offsets.  */
+  else if (SYMBOL_REF_P (addr) && SYMBOL_REF_LOCAL_P (addr))
+    return true;
+
+  else if (LABEL_REF_P (addr))
+    return true;
+
+  /* Pc-relative symbols with offsets.  */
+  else if (GET_CODE (addr) == PLUS
+	   && SYMBOL_REF_P (XEXP (addr, 0))
+	   && SYMBOL_REF_LOCAL_P (XEXP (addr, 0))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    return SIGNED_34BIT_OFFSET_P (INTVAL (XEXP (addr, 1)));
+
+  return false;
+}
+
+/* Return true if the address ADDR is a prefixed address that is a pc-relative
+   reference either to a local symbol or to an external symbol.  We break apart
+   the address and return the parts.  */
+
+bool
+pcrel_local_or_ext_addr_p (rtx addr,
+			   rtx *p_base,
+			   HOST_WIDE_INT *p_offset,
+			   bool *p_external)
+{
+  rtx base_addr = NULL_RTX;
+  HOST_WIDE_INT offset = 0;
+  bool was_external_p = false;
+
+  *p_base = NULL_RTX;
+  *p_offset = 0;
+  *p_external = false;
+
+  if (!TARGET_PCREL)
+    return false;
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  /* Pc-relative symbols/labels without offsets.  */
+  if (SYMBOL_REF_P (addr))
+    {
+      base_addr = addr;
+      was_external_p = !SYMBOL_REF_LOCAL_P (addr);
+    }
+
+  else if (LABEL_REF_P (addr))
+    base_addr = addr;
+
+  /* Pc-relative symbols with offsets.  */
+  else if (GET_CODE (addr) == PLUS
+	   && SYMBOL_REF_P (XEXP (addr, 0))
+	   && CONST_INT_P (XEXP (addr, 1)))
+    {
+      base_addr = XEXP (addr, 0);
+      offset = INTVAL (XEXP (addr, 1));
+      was_external_p = !SYMBOL_REF_LOCAL_P (base_addr);
+
+      if (!SIGNED_34BIT_OFFSET_P (offset))
+	return false;
+    }
+
+  else
+    return false;
+
+  *p_base = base_addr;
+  *p_offset = offset;
+  *p_external = was_external_p;
+
+  return true;
+}
 
 /* Function to return true if ADDR is a valid prefixed memory address that uses
    mode MODE.  */
@@ -13777,52 +13914,10 @@ rs6000_pltseq_template (rtx *operands, int which)
 bool
 rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
 {
-  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+  if (!mode_supports_prefixed_address_p (mode))
     return false;
 
-  /* Check for PC-relative addresses.  */
-  if (pcrel_address (addr, Pmode))
-    return true;
-
-  /* Check for prefixed memory addresses that have a large numeric offset,
-     or an offset that can't be used for a DS/DQ-form memory operation.  */
-  if (GET_CODE (addr) == PLUS)
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      if (!base_reg_operand (op0, Pmode) || !CONST_INT_P (op1))
-	return false;
-
-      HOST_WIDE_INT value = INTVAL (op1);
-      if (!SIGNED_34BIT_OFFSET_P (value))
-	return false;
-
-      /* Offset larger than 16-bits?  */
-      if (!SIGNED_16BIT_OFFSET_P (value))
-	return true;
-
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
-
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
-
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
-
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
-    }
-
-  return false;
+  return prefixed_local_addr_p (addr, reg_addr[mode].default_insn_form);
 }
 
 /* Given a register and a mode, return the instruction format for that

@@ -933,6 +933,13 @@
     return false;
 
   addr = XEXP (inner, 0);
+
+  /* The LWA instruction uses the DS-form format where the bottom two bits of
+     the offset must be 0.  The prefixed PLWA does not have this
+     restriction.  */
+  if (prefixed_local_addr_p (addr, INSN_FORM_DS))
+    return true;
+
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
@@ -1626,32 +1633,21 @@
   return GET_CODE (op) == UNSPEC && XINT (op, 1) == UNSPEC_TOCREL;
 })
 
-;; Return true if the operand is a pc-relative address.
+;; Return true if the operand is a pc-relative address to a local symbol.
 (define_predicate "pcrel_address"
   (match_code "label_ref,symbol_ref,const")
 {
-  if (!rs6000_pcrel_p (cfun))
+  rtx base;
+  HOST_WIDE_INT offset;
+  bool external_p;
+
+  if (!TARGET_PCREL)
     return false;
 
-  if (GET_CODE (op) == CONST)
-    op = XEXP (op, 0);
+  if (!pcrel_local_or_ext_addr_p (op, &base, &offset, &external_p))
+    return false;
 
-  /* Validate offset.  */
-  if (GET_CODE (op) == PLUS)
-    {
-      rtx op0 = XEXP (op, 0);
-      rtx op1 = XEXP (op, 1);
-
-      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
-	return false;
-
-      op = op0;
-    }
-
-  if (LABEL_REF_P (op))
-    return true;
-
-  return (SYMBOL_REF_P (op) && SYMBOL_REF_LOCAL_P (op));
+  return !external_p;
 })
 
 ;; Return true if the operand is an external symbol whose address can be loaded
@@ -1665,32 +1661,17 @@
 (define_predicate "pcrel_external_address"
   (match_code "symbol_ref,const")
 {
-  if (!rs6000_pcrel_p (cfun))
+  rtx base;
+  HOST_WIDE_INT offset;
+  bool external_p;
+
+  if (!TARGET_PCREL)
     return false;
 
-  if (GET_CODE (op) == CONST)
-    op = XEXP (op, 0);
+  if (!pcrel_local_or_ext_addr_p (op, &base, &offset, &external_p))
+    return false;
 
-  /* Validate offset.  */
-  if (GET_CODE (op) == PLUS)
-    {
-      rtx op0 = XEXP (op, 0);
-      rtx op1 = XEXP (op, 1);
-
-      if (!CONST_INT_P (op1) || !SIGNED_34BIT_OFFSET_P (INTVAL (op1)))
-	return false;
-
-      op = op0;
-    }
-
-  return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
-})
-
-;; Return 1 if op is a prefixed memory operand.
-(define_predicate "prefixed_mem_operand"
-  (match_code "mem")
-{
-  return rs6000_prefixed_address_mode_p (XEXP (op, 0), GET_MODE (op));
+  return external_p;
 })
 
 ;; Return 1 if op is a memory operand to an external variable when we
@@ -1700,6 +1681,13 @@
   (match_code "mem")
 {
   return pcrel_external_address (XEXP (op, 0), Pmode);
+})
+
+;; Return 1 if op is a prefixed memory operand.
+(define_predicate "prefixed_mem_operand"
+  (match_code "mem")
+{
+  return rs6000_prefixed_address_mode_p (XEXP (op, 0), GET_MODE (op));
 })
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
