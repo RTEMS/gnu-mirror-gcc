@@ -1,5 +1,28 @@
 2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-prefixed.c: New file.
+	* config/rs6000/rs6000-protos.h (rs6000_final_prescan_insn):
+	Update calling signature.
+	(prefixed_load_p): New function.
+	(prefixed_store_p): New function.
+	(prefixed_paddi_p): New function.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Add support for
+	loading up pc-relatve addresses.
+	* config/rs6000/rs6000.h (FINAL_SCAN_INSN): New target hook.
+	(ASM_OUTPUT_OUTPUT): New target hook.
+	* config/rs6000/rs6000.md (prefixed attribute): New attribute.
+	(prefixed_length attribute): New attribute.
+	(non_prefixed_length attribute): New attribute.
+	(length attribute): Calculate length in terms of the prefixed,
+	prefixed_length, and non_prefixed_length attributes.
+	(pcrel_addr): New insn for pc-relative support.
+	(pcrel_ext_addr): New insn for pc-relative support.
+	* config/rs6000/t-rs6000 (rs6000-prefixed.o): Add build rule.
+	* config.gcc (powerpc*-*-*): Add rs6000-prefixed.c.
+	(rs6000*-*-*): Add rs6000-prefixed.c.
+
+2019-08-07   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_address): Rewrite to use
 	pcrel_addr_p.
 	(pcrel_external_address): Rewrite to use pcrel_addr_p.

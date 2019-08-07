@@ -9815,6 +9815,17 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	  return;
 	}
 
+      /* Handle pc-relative addresses, either external symbols or internal
+	 within the function.  */
+      if (TARGET_PCREL)
+	{
+	  if (pcrel_addr_p (operands[1], true, true, PCREL_NULL))
+	    {
+	      emit_insn (gen_rtx_SET (operands[0], operands[1]));
+	      return;
+	    }
+	}
+
       if (DEFAULT_ABI == ABI_V4
 	  && mode == Pmode && mode == SImode
 	  && flag_pic == 1 && got_operand (operands[1], mode))

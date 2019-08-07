@@ -245,7 +245,14 @@ extern void rs6000_d_target_versions (void);
 const char * rs6000_xcoff_strip_dollar (const char *);
 #endif
 
-void rs6000_final_prescan_insn (rtx_insn *, rtx *operand, int num_operands);
+/* Declare functions in rs6000-prefixed.c  */
+#ifdef RTX_CODE
+extern bool prefixed_load_p (rtx_insn *);
+extern bool prefixed_store_p (rtx_insn *);
+extern bool prefixed_paddi_p (rtx_insn *);
+extern void rs6000_asm_output_opcode (FILE *, const char *);
+void rs6000_final_prescan_insn (rtx_insn *);
+#endif
 
 extern unsigned char rs6000_class_max_nregs[][LIM_REG_CLASSES];
 extern unsigned char rs6000_hard_regno_nregs[][FIRST_PSEUDO_REGISTER];
