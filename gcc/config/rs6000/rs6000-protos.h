@@ -47,7 +47,9 @@ extern bool legitimate_indirect_address_p (rtx, int);
 extern bool legitimate_indexed_address_p (rtx, int);
 extern bool avoiding_indexed_address_p (machine_mode);
 extern rtx rs6000_force_indexed_or_indirect_mem (rtx x);
-
+extern enum insn_form reg_to_insn_form (rtx, machine_mode);
+extern bool prefixed_local_addr_p (rtx, machine_mode, enum insn_form);
+extern bool pcrel_local_or_external_p (rtx, rtx *, HOST_WIDE_INT *, bool *);
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);
 extern rtx gen_easy_altivec_constant (rtx);
@@ -154,7 +156,6 @@ extern align_flags rs6000_loop_align (rtx);
 extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
-extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
