@@ -25,4 +25,12 @@ along with GCC; see the file COPYING3.  If not see
  */
 
   INSERT_PASS_BEFORE (pass_cse, 1, pass_analyze_swaps);
+
+/* The pcrel_opt pass must be the final pass before final.  This pass combines
+   references to external pc-relative variables with their use.  There must be
+   only one reference to the external pointer loaded in order to do the
+   optimization.  Otherwise we load up the addresses (either via PADDI if the
+   label is local or via a PLD from the got section if it is defined in another
+   module) and the value as a base pointer.  */
+
   INSERT_PASS_BEFORE (pass_final, 1, pass_pcrel_opt);
