@@ -27629,9 +27629,19 @@ cp_parser_constructor_declarator_p (cp_parser *parser, cp_parser_flags flags,
 	  parser->num_template_parameter_lists = 0;
 
 	  /* Look for the type-specifier.  It's not optional, but its typename
-	     might be.  */
+	     might be.  Unless this is a friend declaration; we don't want to
+	     treat
+
+	       friend S (T::fn)(int);
+
+	     as a constructor, but with P0634, we might assume a type when
+	     looking for the type-specifier.  It is actually a function named
+	     `T::fn' that takes one parameter (of type `int') and returns a
+	     value of type `S'.  Constructors can be friends, but they must
+	     use a qualified name.  */
 	  cp_parser_type_specifier (parser,
-				    (flags & ~CP_PARSER_FLAGS_OPTIONAL),
+				    (friend_p ? CP_PARSER_FLAGS_NONE
+				     : (flags & ~CP_PARSER_FLAGS_OPTIONAL)),
 				    /*decl_specs=*/NULL,
 				    /*is_declarator=*/true,
 				    /*declares_class_or_enum=*/NULL,
@@ -27901,7 +27911,10 @@ cp_parser_template_declaration_after_parameters (cp_parser* parser,
 	    {
 	      tree parm_list = TREE_VEC_ELT (parameter_list, 0);
 	      tree parm = INNERMOST_TEMPLATE_PARMS (parm_list);
-	      if (CLASS_TYPE_P (TREE_TYPE (parm)))
+	      if (TREE_CODE (parm) != PARM_DECL)
+		ok = false;
+	      else if (MAYBE_CLASS_TYPE_P (TREE_TYPE (parm))
+		       && !TEMPLATE_PARM_PARAMETER_PACK (DECL_INITIAL (parm)))
 		/* OK, C++20 string literal operator template.  We don't need
 		   to warn in lower dialects here because we will have already
 		   warned about the template parameter.  */;
@@ -27915,7 +27928,7 @@ cp_parser_template_declaration_after_parameters (cp_parser* parser,
 	      tree type = INNERMOST_TEMPLATE_PARMS (parm_type);
 	      tree parm_list = TREE_VEC_ELT (parameter_list, 1);
 	      tree parm = INNERMOST_TEMPLATE_PARMS (parm_list);
-	      if (parm == error_mark_node
+	      if (TREE_CODE (parm) != PARM_DECL
 		  || TREE_TYPE (parm) != TREE_TYPE (type)
 		  || !TEMPLATE_PARM_PARAMETER_PACK (DECL_INITIAL (parm)))
 		ok = false;

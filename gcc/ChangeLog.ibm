@@ -1,3 +1,8 @@
+2019-08-12   Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to 274322.
+	* REVISION: Update subversion id.
+
 2019-05-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 270883
