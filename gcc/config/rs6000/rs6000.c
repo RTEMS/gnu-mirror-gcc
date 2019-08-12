@@ -8613,7 +8613,8 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
     return rs6000_legitimize_tls_address_aix (addr, model);
 
   dest = gen_reg_rtx (Pmode);
-  if (model == TLS_MODEL_LOCAL_EXEC && rs6000_tls_size == 16)
+  if (model == TLS_MODEL_LOCAL_EXEC
+      && (rs6000_tls_size == 16 || rs6000_pcrel_p (cfun)))
     {
       rtx tlsreg;
 
@@ -8660,7 +8661,9 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	 them in the .got section.  So use a pointer to the .got section,
 	 not one to secondary TOC sections used by 64-bit -mminimal-toc,
 	 or to secondary GOT sections used by 32-bit -fPIC.  */
-      if (TARGET_64BIT)
+      if (rs6000_pcrel_p (cfun))
+	got = const0_rtx;
+      else if (TARGET_64BIT)
 	got = gen_rtx_REG (Pmode, 2);
       else
 	{
@@ -8735,7 +8738,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	  rtx uns = gen_rtx_UNSPEC (Pmode, vec, UNSPEC_TLS_GET_ADDR);
 	  set_unique_reg_note (get_last_insn (), REG_EQUAL, uns);
 
-	  if (rs6000_tls_size == 16)
+	  if (rs6000_tls_size == 16 || rs6000_pcrel_p (cfun))
 	    {
 	      if (TARGET_64BIT)
 		insn = gen_tls_dtprel_64 (dest, tmp1, addr);
@@ -8776,7 +8779,14 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	  else
 	    insn = gen_tls_got_tprel_32 (tmp2, got, addr);
 	  emit_insn (insn);
-	  if (TARGET_64BIT)
+	  if (rs6000_pcrel_p (cfun))
+	    {
+	      if (TARGET_64BIT)
+		insn = gen_tls_tls_pcrel_64 (dest, tmp2, addr);
+	      else
+		insn = gen_tls_tls_pcrel_32 (dest, tmp2, addr);
+	    }
+	  else if (TARGET_64BIT)
 	    insn = gen_tls_tls_64 (dest, tmp2, addr);
 	  else
 	    insn = gen_tls_tls_32 (dest, tmp2, addr);
