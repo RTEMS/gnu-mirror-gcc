@@ -1,3 +1,7 @@
+2019-08-13  Peter Bergner  <bergner@linux.ibm.com>
+
+	* REVISION: Change format to "[ibm/gcc-X-branch revision rev#]"
+
 2019-03-04  Peter Bergner  <bergner@linux.ibm.com>
 
 	Merge up to 269365.
