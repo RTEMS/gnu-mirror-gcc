@@ -1,3 +1,8 @@
+2019-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (reg_to_insn_form): Don't die if the
+	register is the argument pointer or a SPR, etc.
+
 2019-08-12  Alan Modra  <amodra@gmail.com>
 
         * config/rs6000/predicates.md (unspec_tls): Allow const0_rtx for got
