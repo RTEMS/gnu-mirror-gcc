@@ -14018,17 +14018,19 @@ reg_to_insn_form (rtx reg, machine_mode mode)
 	 register.  */
       else
 	{
-	  if (IN_RANGE (r, FIRST_GPR_REGNO, LAST_GPR_REGNO))
+	  if (INT_REGNO_P (r))
 	    iform = reg_addr[mode].insn_form[RELOAD_REG_GPR];
 
-	  else if (IN_RANGE (r, FIRST_FPR_REGNO, LAST_FPR_REGNO))
+	  else if (FP_REGNO_P (r))
 	    iform = reg_addr[mode].insn_form[RELOAD_REG_FPR];
 
-	  else if (IN_RANGE (r, FIRST_ALTIVEC_REGNO, LAST_ALTIVEC_REGNO))
+	  else if (ALTIVEC_REGNO_P (r))
 	    iform = reg_addr[mode].insn_form[RELOAD_REG_VMX];
 
+	  /* For anything else (SPR, CA, etc.) assume the GPR registers will be
+	     used to load or store the value.  */
 	  else
-	    gcc_unreachable ();
+	    iform = reg_addr[mode].insn_form[RELOAD_REG_GPR];
 	}
     }
 
