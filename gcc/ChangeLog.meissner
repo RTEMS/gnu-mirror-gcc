@@ -1,3 +1,8 @@
+2019-08-15  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mpcrel and -mno-tls-markers check.
+
 2019-08-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (reg_to_insn_form): Don't die if the

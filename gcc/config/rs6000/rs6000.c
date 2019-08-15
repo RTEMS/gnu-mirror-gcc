@@ -4216,6 +4216,16 @@ rs6000_option_override_internal (bool global_init_p)
 			    | OPTION_MASK_PCREL_OPT);
     }
 
+  /* -mpcrel requires tls marker support.  */
+  if (TARGET_PCREL && !TARGET_TLS_MARKERS)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
+	error ("%qs requires %qs", "-mpcrel", "-mtls-markers");
+
+      rs6000_isa_flags &= ~(OPTION_MASK_PCREL
+			    | OPTION_MASK_PCREL_OPT);
+    }
+
   /* Check -mfuture debug switches.  */
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     {
