@@ -325,7 +325,6 @@ enum rs6000_reload_reg_type {
   RELOAD_REG_GPR,			/* General purpose registers.  */
   RELOAD_REG_FPR,			/* Traditional floating point regs.  */
   RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
-  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
   N_RELOAD_REG
 };
 
@@ -345,7 +344,6 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
   { "Gpr",	FIRST_GPR_REGNO },	/* RELOAD_REG_GPR.  */
   { "Fpr",	FIRST_FPR_REGNO },	/* RELOAD_REG_FPR.  */
   { "VMX",	FIRST_ALTIVEC_REGNO },	/* RELOAD_REG_VMX.  */
-  { "Any",	-1 },			/* RELOAD_REG_ANY.  */
 };
 
 /* Register type masks based on the type, of valid addressing modes.  */
@@ -356,6 +354,7 @@ struct rs6000_reg_addr {
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
+  addr_mask_type any_addr_mask;		/* OR of GPR, FPR, Altivec masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
 };
 
@@ -365,16 +364,14 @@ static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 static inline bool
 mode_supports_pre_incdec_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_PRE_INCDEC)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & ADDR_MASK_PRE_INCDEC) != 0);
 }
 
 /* Helper function to say whether a mode supports PRE_MODIFY.  */
 static inline bool
 mode_supports_pre_modify_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_PRE_MODIFY)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & ADDR_MASK_PRE_MODIFY) != 0);
 }
 
 /* Return true if we have D-form addressing in altivec registers.  */
@@ -390,8 +387,7 @@ mode_supports_vmx_dform (machine_mode mode)
 static inline bool
 mode_supports_dq_form (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_OFFSET_DQ)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & ADDR_MASK_OFFSET_DQ) != 0);
 }
 
 /* Given that there exists at least one variable that is set (produced)
@@ -2103,6 +2099,9 @@ rs6000_debug_print_mode (ssize_t m)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
 
+  fprintf (stderr, " Any: %s",
+	   rs6000_debug_addr_mask (reg_addr[m].any_addr_mask, true));
+
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
     {
@@ -2652,7 +2651,7 @@ rs6000_setup_reg_addr_masks (void)
 	  any_addr_mask |= addr_mask;
 	}
 
-      reg_addr[m].addr_mask[RELOAD_REG_ANY] = any_addr_mask;
+      reg_addr[m].any_addr_mask = any_addr_mask;
     }
 }
 
@@ -10761,8 +10760,7 @@ rs6000_secondary_reload_memory (rtx addr,
      class to use, settle on defaults to use.  */
   else if (rclass == NO_REGS)
     {
-      addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_ANY]
-		   & ~ADDR_MASK_AND_M16);
+      addr_mask = (reg_addr[mode].any_addr_mask & ~ADDR_MASK_AND_M16);
 
       if ((addr_mask & ADDR_MASK_MULTIPLE) != 0)
 	addr_mask &= ~(ADDR_MASK_INDEXED

@@ -1,5 +1,21 @@
 2019-08-16  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (enum rs6000_reload_reg_type): Delete
+	RELOAD_REG_ANY element.
+	(reload_reg_map): Delete RELOAD_REG_ANY element.
+	(struct rs6000_reg_addr): Add any_addr_mask field.
+	(mode_supports_pre_incdec_p): Use the any_addr_mask field instead
+	of addr_mask[RELOAD_REG_ANY].
+	(mode_supports_pre_modify_p): Use the any_addr_mask field instead
+	of addr_mask[RELOAD_REG_ANY].
+	(mode_supports_dq_form):  Use the any_addr_mask field instead of
+	addr_mask[RELOAD_REG_ANY].
+	(rs6000_debug_print_mode): Print the any_addr_mask field.
+	(rs6000_setup_reg_addr_masks): Set the any_addr_mask field.
+	(rs6000_secondary_reload_memory): Use the any_addr_mask field.
+
+2019-08-16  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (addr_mask_type): Move to rs6000.h.
 	(RELOAD_REG_*): Delete, move to using ADDR_MASK_* defined in
 	rs6000.md.
