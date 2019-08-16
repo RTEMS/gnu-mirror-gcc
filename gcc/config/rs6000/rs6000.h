@@ -2572,3 +2572,9 @@ typedef struct GTY(()) machine_function
   IN_RANGE ((VALUE),							\
 	    -(HOST_WIDE_INT_1 << 33),					\
 	    (HOST_WIDE_INT_1 << 33) - 1 - (EXTRA))
+
+/* Address masks are used to describe the addressing mode formats for a
+   particular mode.  Each of the 3 register classes that involve loads or
+   stores (GPR, FPR, Altivec) have an addr_mask for the mode.  */
+typedef unsigned int addr_mask_type;
+

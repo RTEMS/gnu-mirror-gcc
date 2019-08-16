@@ -1,3 +1,31 @@
+2019-08-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (addr_mask_type): Move to rs6000.h.
+	(RELOAD_REG_*): Delete, move to using ADDR_MASK_* defined in
+	rs6000.md.
+	(mode_supports_pre_incdec_p): Use ADDR_MASK_PRE_INCDEC.
+	(mode_supports_pre_modify_p): Use ADDR_MASK_PRE_MODIFY.
+	(mode_supports_vmx_dform): Use ADDR_MASK_OFFSET.
+	(mode_supports_dq_form): Use ADDR_MASK_OFFSET_DQ.
+	(rs6000_debug_addr_mask): Use ADDR_MASK_* instead of RELOAD_REG_*
+	mask names.  Add support for printing that the mode uses DS form
+	instructions.
+	(rs6000_setup_reg_addr_masks): Use ADDR_MASK_* instead of
+	RELOAD_REG_* mask names.
+	(xxspltib_constant_p): Use ADDR_MASK_VALID.
+	(rs6000_adjust_vec_address): Use ADDR_MASK_INDEXED and
+	ADDR_MASK_OFFSET.
+	(rs6000_secondary_reload_toc_costs): Use ADDR_MASK_OFFSET.
+	(rs6000_secondary_reload_memory): Use ADDR_MASK_* instead of
+	RELOAD_REG_* masks.
+	(rs6000_secondary_reload_inner): Use ADDR_MASK_* instead of
+	RELOAD_REG_* masks.
+	(rs6000_preferred_reload_class): Use ADDR_MASK_VALID.
+	* config/rs6000/rs6000.h (addr_mask_type): Move type here from
+	rs6000.c.
+	* config/rs6000/rs6000.md (ADDR_MASK_*): Define the address masks
+	here as constants.
+
 2019-08-16   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 274580

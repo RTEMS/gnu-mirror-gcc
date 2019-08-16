@@ -348,20 +348,6 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
   { "Any",	-1 },			/* RELOAD_REG_ANY.  */
 };
 
-/* Mask bits for each register class, indexed per mode.  Historically the
-   compiler has been more restrictive which types can do PRE_MODIFY instead of
-   PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned char addr_mask_type;
-
-#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
-
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
   enum insn_code reload_load;		/* INSN to reload for loading. */
@@ -379,7 +365,7 @@ static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 static inline bool
 mode_supports_pre_incdec_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_INCDEC)
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_PRE_INCDEC)
 	  != 0);
 }
 
@@ -387,7 +373,7 @@ mode_supports_pre_incdec_p (machine_mode mode)
 static inline bool
 mode_supports_pre_modify_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_MODIFY)
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_PRE_MODIFY)
 	  != 0);
 }
 
@@ -395,7 +381,7 @@ mode_supports_pre_modify_p (machine_mode mode)
 static inline bool
 mode_supports_vmx_dform (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & ADDR_MASK_OFFSET) != 0);
 }
 
 /* Return true if we have D-form addressing in VSX registers.  This addressing
@@ -404,7 +390,7 @@ mode_supports_vmx_dform (machine_mode mode)
 static inline bool
 mode_supports_dq_form (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & ADDR_MASK_OFFSET_DQ)
 	  != 0);
 }
 
@@ -2061,39 +2047,41 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
   static char ret[8];
   char *p = ret;
 
-  if ((mask & RELOAD_REG_VALID) != 0)
+  if ((mask & ADDR_MASK_VALID) != 0)
     *p++ = 'v';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_MULTIPLE) != 0)
+  if ((mask & ADDR_MASK_MULTIPLE) != 0)
     *p++ = 'm';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_INDEXED) != 0)
+  if ((mask & ADDR_MASK_INDEXED) != 0)
     *p++ = 'i';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_QUAD_OFFSET) != 0)
+  if ((mask & ADDR_MASK_OFFSET_DQ) != 0)
     *p++ = 'O';
-  else if ((mask & RELOAD_REG_OFFSET) != 0)
+  else if ((mask & ADDR_MASK_OFFSET_DS) != 0)
+    *p++ = 's';
+  else if ((mask & ADDR_MASK_OFFSET) != 0)
     *p++ = 'o';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_PRE_INCDEC) != 0)
+  if ((mask & ADDR_MASK_PRE_INCDEC) != 0)
     *p++ = '+';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_PRE_MODIFY) != 0)
+  if ((mask & ADDR_MASK_PRE_MODIFY) != 0)
     *p++ = '+';
   else if (keep_spaces)
     *p++ = ' ';
 
-  if ((mask & RELOAD_REG_AND_M16) != 0)
+  if ((mask & ADDR_MASK_AND_M16) != 0)
     *p++ = '&';
   else if (keep_spaces)
     *p++ = ' ';
@@ -2569,18 +2557,18 @@ rs6000_setup_reg_addr_masks (void)
 					  || rc == RELOAD_REG_VMX));
 
 	      nregs = rs6000_hard_regno_nregs[m][reg];
-	      addr_mask |= RELOAD_REG_VALID;
+	      addr_mask |= ADDR_MASK_VALID;
 
 	      /* Indicate if the mode takes more than 1 physical register.  If
 		 it takes a single register, indicate it can do REG+REG
 		 addressing.  Small integers in VSX registers can only do
 		 REG+REG addressing.  */
 	      if (small_int_vsx_p)
-		addr_mask |= RELOAD_REG_INDEXED;
+		addr_mask |= ADDR_MASK_INDEXED;
 	      else if (nregs > 1 || m == BLKmode || complex_p)
-		addr_mask |= RELOAD_REG_MULTIPLE;
+		addr_mask |= ADDR_MASK_MULTIPLE;
 	      else
-		addr_mask |= RELOAD_REG_INDEXED;
+		addr_mask |= ADDR_MASK_INDEXED;
 
 	      /* Figure out if we can do PRE_INC, PRE_DEC, or PRE_MODIFY
 		 addressing.  If we allow scalars into Altivec registers,
@@ -2604,7 +2592,7 @@ rs6000_setup_reg_addr_masks (void)
 		  && (m != E_SFmode || !TARGET_P8_VECTOR)
 		  && !small_int_vsx_p)
 		{
-		  addr_mask |= RELOAD_REG_PRE_INCDEC;
+		  addr_mask |= ADDR_MASK_PRE_INCDEC;
 
 		  /* PRE_MODIFY is more restricted than PRE_INC/PRE_DEC in that
 		     we don't allow PRE_MODIFY for some multi-register
@@ -2612,18 +2600,18 @@ rs6000_setup_reg_addr_masks (void)
 		  switch (m)
 		    {
 		    default:
-		      addr_mask |= RELOAD_REG_PRE_MODIFY;
+		      addr_mask |= ADDR_MASK_PRE_MODIFY;
 		      break;
 
 		    case E_DImode:
 		      if (TARGET_POWERPC64)
-			addr_mask |= RELOAD_REG_PRE_MODIFY;
+			addr_mask |= ADDR_MASK_PRE_MODIFY;
 		      break;
 
 		    case E_DFmode:
 		    case E_DDmode:
 		      if (TARGET_HARD_FLOAT)
-			addr_mask |= RELOAD_REG_PRE_MODIFY;
+			addr_mask |= ADDR_MASK_PRE_MODIFY;
 		      break;
 		    }
 		}
@@ -2638,7 +2626,7 @@ rs6000_setup_reg_addr_masks (void)
 		  || ((msize == 8 || m2 == SFmode)
 		      && (rc == RELOAD_REG_FPR
 			  || (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)))))
-	    addr_mask |= RELOAD_REG_OFFSET;
+	    addr_mask |= ADDR_MASK_OFFSET;
 
 	  /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
 	     instructions are enabled.  The offset for 128-bit VSX registers is
@@ -2649,16 +2637,16 @@ rs6000_setup_reg_addr_masks (void)
 		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
 		       || (m2 == TImode && TARGET_VSX)))
 	    {
-	      addr_mask |= RELOAD_REG_OFFSET;
+	      addr_mask |= ADDR_MASK_OFFSET;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
-		addr_mask |= RELOAD_REG_QUAD_OFFSET;
+		addr_mask |= ADDR_MASK_OFFSET_DQ;
 	    }
 
 	  /* VMX registers can do (REG & -16) and ((REG+REG) & -16)
 	     addressing on 128-bit types.  */
 	  if (rc == RELOAD_REG_VMX && msize == 16
-	      && (addr_mask & RELOAD_REG_VALID) != 0)
-	    addr_mask |= RELOAD_REG_AND_M16;
+	      && (addr_mask & ADDR_MASK_VALID) != 0)
+	    addr_mask |= ADDR_MASK_AND_M16;
 
 	  reg_addr[m].addr_mask[rc] = addr_mask;
 	  any_addr_mask |= addr_mask;
@@ -6043,7 +6031,7 @@ xxspltib_constant_p (rtx op,
 
       if (!IN_RANGE (value, -1, 0))
 	{
-	  if (!(reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_VALID))
+	  if (!(reg_addr[mode].addr_mask[RELOAD_REG_VMX] & ADDR_MASK_VALID))
 	    return false;
 
 	  if (EASY_VECTOR_15 (value))
@@ -6812,9 +6800,9 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	gcc_unreachable ();
 
       if (REG_P (op1) || SUBREG_P (op1))
-	valid_addr_p = (addr_mask & RELOAD_REG_INDEXED) != 0;
+	valid_addr_p = (addr_mask & ADDR_MASK_INDEXED) != 0;
       else
-	valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+	valid_addr_p = (addr_mask & ADDR_MASK_OFFSET) != 0;
     }
 
   else if (REG_P (new_addr) || SUBREG_P (new_addr))
@@ -10729,7 +10717,7 @@ rs6000_secondary_reload_toc_costs (addr_mask_type addr_mask)
   int ret;
 
   if (TARGET_CMODEL != CMODEL_SMALL)
-    ret = ((addr_mask & RELOAD_REG_OFFSET) == 0) ? 1 : 2;
+    ret = ((addr_mask & ADDR_MASK_OFFSET) == 0) ? 1 : 2;
 
   else
     ret = (TARGET_MINIMAL_TOC) ? 6 : 3;
@@ -10767,26 +10755,26 @@ rs6000_secondary_reload_memory (rtx addr,
   /* For the combined VSX_REGS, turn off Altivec AND -16.  */
   else if (rclass == VSX_REGS)
     addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_VMX]
-		 & ~RELOAD_REG_AND_M16);
+		 & ~ADDR_MASK_AND_M16);
 
   /* If the register allocator hasn't made up its mind yet on the register
      class to use, settle on defaults to use.  */
   else if (rclass == NO_REGS)
     {
       addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_ANY]
-		   & ~RELOAD_REG_AND_M16);
+		   & ~ADDR_MASK_AND_M16);
 
-      if ((addr_mask & RELOAD_REG_MULTIPLE) != 0)
-	addr_mask &= ~(RELOAD_REG_INDEXED
-		       | RELOAD_REG_PRE_INCDEC
-		       | RELOAD_REG_PRE_MODIFY);
+      if ((addr_mask & ADDR_MASK_MULTIPLE) != 0)
+	addr_mask &= ~(ADDR_MASK_INDEXED
+		       | ADDR_MASK_PRE_INCDEC
+		       | ADDR_MASK_PRE_MODIFY);
     }
 
   else
     addr_mask = 0;
 
   /* If the register isn't valid in this register class, just return now.  */
-  if ((addr_mask & RELOAD_REG_VALID) == 0)
+  if ((addr_mask & ADDR_MASK_VALID) == 0)
     {
       if (TARGET_DEBUG_ADDR)
 	{
@@ -10814,7 +10802,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	  extra_cost = -1;
 	}
 
-      else if ((addr_mask & RELOAD_REG_PRE_INCDEC) == 0)
+      else if ((addr_mask & ADDR_MASK_PRE_INCDEC) == 0)
 	{
 	  extra_cost = 1;
 	  type = "update";
@@ -10832,7 +10820,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	  extra_cost = -1;
 	}
 
-      else if ((addr_mask & RELOAD_REG_PRE_MODIFY) == 0)
+      else if ((addr_mask & ADDR_MASK_PRE_MODIFY) == 0)
 	{
 	  extra_cost = 1;
 	  type = "update";
@@ -10889,7 +10877,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	 push_reload processing, so handle it now.  */
       if (GET_CODE (plus_arg0) == PLUS && CONST_INT_P (plus_arg1))
 	{
-	  if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+	  if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	    {
 	      extra_cost = 1;
 	      type = "offset";
@@ -10900,7 +10888,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	 push_reload processing, so handle it now.  */
       else if (GET_CODE (plus_arg0) == PLUS && REG_P (plus_arg1))
 	{
-	  if ((addr_mask & RELOAD_REG_INDEXED) == 0)
+	  if ((addr_mask & ADDR_MASK_INDEXED) == 0)
 	    {
 	      extra_cost = 1;
 	      type = "indexed #2";
@@ -10915,7 +10903,7 @@ rs6000_secondary_reload_memory (rtx addr,
 
       else if (int_reg_operand (plus_arg1, GET_MODE (plus_arg1)))
 	{
-	  if ((addr_mask & RELOAD_REG_INDEXED) == 0
+	  if ((addr_mask & ADDR_MASK_INDEXED) == 0
 	      || !legitimate_indexed_address_p (addr, false))
 	    {
 	      extra_cost = 1;
@@ -10923,7 +10911,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	    }
 	}
 
-      else if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0
+      else if ((addr_mask & ADDR_MASK_OFFSET_DQ) != 0
 	       && CONST_INT_P (plus_arg1))
 	{
 	  if (!quad_address_offset_p (INTVAL (plus_arg1)))
@@ -10936,7 +10924,7 @@ rs6000_secondary_reload_memory (rtx addr,
       /* Make sure the register class can handle offset addresses.  */
       else if (rs6000_legitimate_offset_address_p (mode, addr, false, true))
 	{
-	  if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+	  if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	    {
 	      extra_cost = 1;
 	      type = "offset #2";
@@ -10953,7 +10941,7 @@ rs6000_secondary_reload_memory (rtx addr,
 
     case LO_SUM:
       /* Quad offsets are restricted and can't handle normal addresses.  */
-      if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+      if ((addr_mask & ADDR_MASK_OFFSET_DQ) != 0)
 	{
 	  extra_cost = -1;
 	  type = "vector d-form lo_sum";
@@ -10965,7 +10953,7 @@ rs6000_secondary_reload_memory (rtx addr,
 	  extra_cost = -1;
 	}
 
-      if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+      if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	{
 	  extra_cost = 1;
 	  type = "lo_sum";
@@ -10976,7 +10964,7 @@ rs6000_secondary_reload_memory (rtx addr,
     case CONST:
     case SYMBOL_REF:
     case LABEL_REF:
-      if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+      if ((addr_mask & ADDR_MASK_OFFSET_DQ) != 0)
 	{
 	  extra_cost = -1;
 	  type = "vector d-form lo_sum #2";
@@ -10997,13 +10985,13 @@ rs6000_secondary_reload_memory (rtx addr,
 	  extra_cost = -1;
 	}
 
-      else if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+      else if ((addr_mask & ADDR_MASK_OFFSET_DQ) != 0)
 	{
 	  extra_cost = -1;
 	  type = "vector d-form lo_sum #3";
 	}
 
-      else if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+      else if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	{
 	  extra_cost = 1;
 	  type = "toc reference";
@@ -11527,7 +11515,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
     rs6000_secondary_reload_fail (__LINE__, reg, mem, scratch, store_p);
 
   /* Make sure the mode is valid in this register class.  */
-  if ((addr_mask & RELOAD_REG_VALID) == 0)
+  if ((addr_mask & ADDR_MASK_VALID) == 0)
     rs6000_secondary_reload_fail (__LINE__, reg, mem, scratch, store_p);
 
   if (TARGET_DEBUG_ADDR)
@@ -11545,7 +11533,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
       if (!base_reg_operand (op_reg, Pmode))
 	rs6000_secondary_reload_fail (__LINE__, reg, mem, scratch, store_p);
 
-      if ((addr_mask & RELOAD_REG_PRE_INCDEC) == 0)
+      if ((addr_mask & ADDR_MASK_PRE_INCDEC) == 0)
 	{
 	  int delta = GET_MODE_SIZE (mode);
 	  if (GET_CODE (addr) == PRE_DEC)
@@ -11563,7 +11551,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
 	  || !rtx_equal_p (op0, XEXP (op1, 0)))
 	rs6000_secondary_reload_fail (__LINE__, reg, mem, scratch, store_p);
 
-      if ((addr_mask & RELOAD_REG_PRE_MODIFY) == 0)
+      if ((addr_mask & ADDR_MASK_PRE_MODIFY) == 0)
 	{
 	  emit_insn (gen_rtx_SET (op0, op1));
 	  new_addr = reg;
@@ -11575,7 +11563,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
     case AND:
       op0 = XEXP (addr, 0);
       op1 = XEXP (addr, 1);
-      if ((addr_mask & RELOAD_REG_AND_M16) == 0)
+      if ((addr_mask & ADDR_MASK_AND_M16) == 0)
 	{
 	  if (REG_P (op0) || SUBREG_P (op0))
 	    op_reg = op0;
@@ -11617,7 +11605,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
 
       else if (int_reg_operand (op1, Pmode))
 	{
-	  if ((addr_mask & RELOAD_REG_INDEXED) == 0)
+	  if ((addr_mask & ADDR_MASK_INDEXED) == 0)
 	    {
 	      emit_insn (gen_rtx_SET (scratch, addr));
 	      new_addr = scratch;
@@ -11626,7 +11614,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
 
       else if (mode_supports_dq_form (mode) && CONST_INT_P (op1))
 	{
-	  if (((addr_mask & RELOAD_REG_QUAD_OFFSET) == 0)
+	  if (((addr_mask & ADDR_MASK_OFFSET_DQ) == 0)
 	      || !quad_address_p (addr, mode, false))
 	    {
 	      emit_insn (gen_rtx_SET (scratch, addr));
@@ -11637,7 +11625,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
       /* Make sure the register class can handle offset addresses.  */
       else if (rs6000_legitimate_offset_address_p (mode, addr, false, true))
 	{
-	  if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+	  if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	    {
 	      emit_insn (gen_rtx_SET (scratch, addr));
 	      new_addr = scratch;
@@ -11657,7 +11645,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
 
       else if (int_reg_operand (op1, Pmode))
 	{
-	  if ((addr_mask & RELOAD_REG_INDEXED) == 0)
+	  if ((addr_mask & ADDR_MASK_INDEXED) == 0)
 	    {
 	      emit_insn (gen_rtx_SET (scratch, addr));
 	      new_addr = scratch;
@@ -11674,7 +11662,7 @@ rs6000_secondary_reload_inner (rtx reg, rtx mem, rtx scratch, bool store_p)
       /* Make sure the register class can handle offset addresses.  */
       else if (legitimate_lo_sum_address_p (mode, addr, false))
 	{
-	  if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+	  if ((addr_mask & ADDR_MASK_OFFSET) == 0)
 	    {
 	      emit_insn (gen_rtx_SET (scratch, addr));
 	      new_addr = scratch;
@@ -11794,11 +11782,11 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
   /* If a mode can't go in FPR/ALTIVEC/VSX registers, don't return a preferred
      reload class for it.  */
   if ((rclass == ALTIVEC_REGS || rclass == VSX_REGS)
-      && (reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_VALID) == 0)
+      && (reg_addr[mode].addr_mask[RELOAD_REG_VMX] & ADDR_MASK_VALID) == 0)
     return NO_REGS;
 
   if ((rclass == FLOAT_REGS || rclass == VSX_REGS)
-      && (reg_addr[mode].addr_mask[RELOAD_REG_FPR] & RELOAD_REG_VALID) == 0)
+      && (reg_addr[mode].addr_mask[RELOAD_REG_FPR] & ADDR_MASK_VALID) == 0)
     return NO_REGS;
 
   /* For VSX, see if we should prefer FLOAT_REGS or ALTIVEC_REGS.  Do not allow
