@@ -1,5 +1,24 @@
 2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (FIRST_RELOAD_REG_CLASS): Delete.
+	(LAST_RELOAD_REG_CLASS): Delete.
+	(rs6000_hard_regno_mode_ok_uncached): Don't allow V1TImode in
+	Altivec registers on pre-altivec systems.
+	(mode_uses_full_vector_reg): New helper function.
+	(setup_reg_addr_masks_pre_incdec): New helper function for address
+	masks.
+	(setup_reg_addr_masks_gpr): New helper function for address
+	masks.
+	(setup_reg_addr_masks_fpr): New helper function for address
+	masks.
+	(setup_reg_addr_masks_altivec): New helper function for address
+	masks.
+	(rs6000_setup_reg_addr_masks): Push the code into the helper
+	functions that figures out the masks for each reload register
+	class.
+
+2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (addr_mask_type): Move here from
 	rs6000.c.  Grow size to accomidate DS instruction format in the
 	future.
