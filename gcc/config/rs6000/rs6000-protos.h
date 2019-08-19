@@ -23,6 +23,43 @@
 
 /* Declare functions in rs6000.c */
 
+/* Address masks are used to describe the addressing mode formats for a
+   particular mode.  Each of the 3 register classes that involve loads or
+   stores (GPR, FPR, Altivec) have an addr_mask for the mode.
+
+   There is also the notion of a default address mask that is used to guide
+   address formation.  For example, SImode might only support reg+reg
+   addressing in the floating point and Altivec registers, but it supports
+   offsettable memory and pre-increment/decrement/modify in the GPRs.
+
+   Loads and stores with an offset for traditional instructions (16-bit
+   offsets) have 3 sub-formats, based on how many bits of the 16-bit offset are
+   used:
+
+	D format:  All 16-bits are used;
+	DS format: The bottom 2 bits of the offset must be 0;
+	DQ format: The bottom 4 bits of the offset must be 0.
+
+   We only add bits for whether traditional offset addressing is DS or DQ.  D
+   form is assumed if those bits are not set.
+
+   Prefixed addressing can only be used with modes that have some form of
+   offset addressing.  DS format and DQ format do not apply to prefixed
+   addressing.  */
+
+typedef unsigned short addr_mask_type;
+
+#define ADDR_MASK_DEFAULT     0		/* Use default addr_mask.  */
+#define ADDR_MASK_VALID       0x001	/* Mode is valid in reg class.  */
+#define ADDR_MASK_MULTIPLE    0x002	/* Mode uses multiple registers.  */
+#define ADDR_MASK_INDEXED     0x004	/* reg+reg addressing.  */
+#define ADDR_MASK_OFFSET      0x008	/* reg+offset addressing.  */
+#define ADDR_MASK_OFFSET_DS   0x010	/* reg+offset, DS format.  */
+#define ADDR_MASK_OFFSET_DQ   0x020	/* reg+offset, DQ format.  */
+#define ADDR_MASK_PRE_INCDEC  0x040	/* fixed size pre-inc/pre-dec.  */
+#define ADDR_MASK_PRE_MODIFY  0x080	/* variable size pre-inc/pre-dec.  */
+#define ADDR_MASK_AND_M16     0x100	/* Ignore bottom 4 bits.  */
+
 #ifdef RTX_CODE
 
 #ifdef TREE_CODE

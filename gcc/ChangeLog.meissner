@@ -1,3 +1,37 @@
+2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (addr_mask_type): Move here from
+	rs6000.c.  Grow size to accomidate DS instruction format in the
+	future.
+	(ADDR_MASK_*): New macros.
+	* config/rs6000/rs6000.c (addr_mask_type): move to
+	rs6000-protos.h.
+	(RELOAD_REG_*): Delete macros.
+	(mode_supports_pre_incdec_p): Rename RELOAD_REG_PRE_INCDEC to
+	ADDR_MASK_PRE_INCDEC.
+	(mode_supports_pre_modify_p): Rename RELOAD_REG_PRE_MODIFY to
+	ADDR_MASK_PRE_MODIFY.
+	(mode_supports_vmx_dform): Rename RELOAD_REG_OFFSET to
+	ADDR_MASK_OFFSET.
+	(mode_supports_dq_form): Rename RELOAD_REG_QUAD_OFFSET to
+	ADDR_MASK_OFFSET_DQ.
+	(rs6000_debug_addr_mask): Rename RELOAD_REG_* macros to
+	ADDR_MASK_* macros.
+	(rs6000_setup_reg_addr_masks): Rename RELOAD_REG_* macros to
+	ADDR_MASK_* macros.
+	(xxspltib_constant_p): Rename RELOAD_REG_VALID to
+	ADDR_MASK_VALID.
+	(rs6000_adjust_vec_address): Rename RELOAD_REG_INDEXED to
+	ADDR_MASK_INDEXED.  Rename RELOAD_REG_OFFSET to ADDR_MASK_OFFSET.
+	(rs6000_secondary_reload_toc_costs): Rename RELOAD_REG_AND_M16 to
+	ADDR_MASK_AND_M16.
+	(rs6000_secondary_reload_memory): Rename RELOAD_REG_* macros to
+	ADDR_MASK_* macros.
+	(rs6000_secondary_reload_inner): Rename RELOAD_REG_* macros to
+	ADDR_MASK_* macros.
+	(rs6000_preferred_reload_class): Rename RELOAD_REG_VALID to
+	ADDR_MASK_VALID.
+
 2019-08-19   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 274633
