@@ -1,16 +1,5 @@
 2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/rs6000.c (FIRST_RELOAD_REG_CLASS): Delete.
-	(LAST_RELOAD_REG_CLASS): Delete.
-	(setup_reg_addr_masks_incdec): New helper function.
-	(setup_reg_addr_masks_gpr): New helper function.
-	(setup_reg_addr_masks_fpr): New helper function.
-	(setup_reg_addr_masks_altivec): New helper function.
-	(rs6000_setup_reg_addr_masks): Move setting up the address masks
-	to separate functions for GPRs, FPRs, and Altivec registers.
-
-2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
-
 	* config/rs6000/rs6000-protos.h (addr_mask_type): Move here from
 	rs6000.c.  Grow size to accomidate DS instruction format in the
 	future.
