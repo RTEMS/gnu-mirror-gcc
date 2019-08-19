@@ -2058,6 +2058,10 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 
   if ((mask & ADDR_MASK_OFFSET_DQ) != 0)
     *p++ = 'O';
+  /* Temporarily, only print out 's' for prefixed addresses, so that it is
+     easier to diff the -mdebug=reg output for older targets.  */
+  else if ((mask & ADDR_MASK_OFFSET_DS) != 0 && TARGET_PREFIXED_ADDR)
+    *p++ = 's';
   else if ((mask & ADDR_MASK_OFFSET) != 0)
     *p++ = 'o';
   else if (keep_spaces)

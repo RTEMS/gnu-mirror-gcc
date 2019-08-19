@@ -1,5 +1,11 @@
 2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_debug_addr_mask): If we have
+	prefixed addresses, print if the mode needs DS format
+	instructions.
+
+2019-08-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (FIRST_RELOAD_REG_CLASS): Delete.
 	(LAST_RELOAD_REG_CLASS): Delete.
 	(rs6000_hard_regno_mode_ok_uncached): Don't allow V1TImode in
