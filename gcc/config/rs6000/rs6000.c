@@ -2695,9 +2695,13 @@ setup_reg_addr_masks_fpr (machine_mode mode)
 
       /* It is weird that previous versions of GCC supported pre increment,
 	 etc. forms of addressing for SDmode, when you could only use an
-	 indexed instruction, but allow it for now.  */
+	 indexed instruction, but allow it for now.  Previous versions of GCC
+	 also set the indexed flag for SDmode, even though there was no direct
+	 instruction to load it.  */
       else if (mode_inner == SDmode)
-	addr_mask |= ADDR_MASK_PRE_INCDEC | ADDR_MASK_PRE_MODIFY;
+	addr_mask |= (ADDR_MASK_INDEXED
+		      | ADDR_MASK_PRE_INCDEC
+		      | ADDR_MASK_PRE_MODIFY);
 
       /* FPR registers can do REG+OFFSET addresssing for vectors if ISA 3.0
 	 instructions are enabled.  The offset for 128-bit VSX registers is
