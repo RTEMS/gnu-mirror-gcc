@@ -1,5 +1,25 @@
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): On
+	'future' systems, enable prefixed addressing by default.
+	(TARGET_PCREL_DEFAULT): On 'future' systems, enable pc-relative
+	addressing by default.
+	* config/rs6000/rs6000-cpus.def (FUTURE_ADDRESS_MASKS): New macro
+	of 'future' addressing masks.
+	(OTHER_FUTURE_MASKS): Use FUTURE_ADDRESS_MASKS.
+	* config/rs6000/rs6000.c (TARGET_PREFIXED_ADDR_DEFAULT): If not
+	defined, don't enable prefixed addressing on 'future' systems.
+	(TARGET_PCREL_DEFAULT): If not defined, don't enable pc-relative
+	addressing on 'future' systems.
+	(rs6000_debug_reg_global): Print TARGET_PREFIXED_ADDR_DEFAULT and
+	TARGET_PCREL_DEFAULT.
+	(rs6000_option_override_internal): Add checks for 32-bit systems
+	and non ELFv2 systems trying to enable prefixed addressing.  If
+	the target OS tm.h says it is safe to do, enable prefixed and
+	pc-relative addressing.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (add_operand): Add support for the
 	PADDI instruction.
 	(non_add_cint_operand): Add support for the PADDI instruction.
