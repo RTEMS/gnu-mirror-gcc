@@ -1,3 +1,45 @@
+2019-08-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (pcrel_local_address): Rename
+	pcrel_address to pcrel_local_address.
+	(pcrel_ext_address): Rename pcrel_external_address to
+	pcrel_ext_address.
+	(prefixed_mem_operand): Delete.
+	(pcrel_external_mem_operand): Delete.
+	* config/rs6000/rs6000-protos.h (rs6000_prefixed_address_mode_p):
+	Delete.
+	(trad_insn_type): New enumeration.
+	(prefixed_local_addr_p): New declaration.
+	* config/rs6000/rs6000.c (RELOAD_REG_ANY): Delete enum element.
+	(reload_reg_map): Delete RELOAD_REG_ANY element.
+	(addr_mask_type): Grow type to unsigned short.
+	(RELOAD_REG_*): Add RELOAD_REG_DS_OFFSET mask.
+	(struct rs6000_reg_addr): Add any_addr_mask and default_addr_mask
+	fields.
+	(mode_supports_pre_incdec_p): Use reg_addr[m].any_addr_mask
+	field.
+	(mode_supports_pre_modify_p): Use reg_addr[m].any_addr_mask
+	field.
+	(mode_supports_dq_form): Use reg_addr[m].any_addr_mask field.
+	(rs6000_debug_addr_mask): Print out DS mask bit if -mcpu=future.
+	(rs6000_debug_print_mode): Print the any_addr_mask and
+	default_addr_mask fields.
+	(rs6000_setup_reg_addr_masks): Mark where an offset instruction
+	will need to use a DS offset.  Set up the any_addr_mask and
+	default_addr_mask fields.
+	(rs6000_emit_move): Emit code to load up pc-relative addresses if
+	-mpcrel.
+	(rs6000_secondary_reload_memory): Use any_addr_mask field.
+	(print_operand_address): Handle both local and external
+	pc-relative symbols.
+	(mode_supports_prefixed_address_p): Delete.
+	(rs6000_prefixed_address_mode_p): Delete.
+	(addr_mask_to_trad_insn): New function.
+	(prefixed_local_addr_p): New function that replaces the
+	rs6000_prefixed_address_mode_p function.
+	* config/rs6000/rs6000.md (pcrel_local_addr): New insn.
+	(pcrel_ext_addr): New insn.
+
 2019-08-23   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 274861

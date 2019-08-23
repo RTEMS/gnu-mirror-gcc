@@ -1626,8 +1626,8 @@
   return GET_CODE (op) == UNSPEC && XINT (op, 1) == UNSPEC_TOCREL;
 })
 
-;; Return true if the operand is a pc-relative address.
-(define_predicate "pcrel_address"
+;; Return true if the operand is a pc-relative address to a local label.
+(define_predicate "pcrel_local_address"
   (match_code "label_ref,symbol_ref,const")
 {
   if (!rs6000_pcrel_p (cfun))
@@ -1662,7 +1662,7 @@
 ;; defined locally in another module or a PLD of the address if the label is
 ;; defined in another module.
 
-(define_predicate "pcrel_external_address"
+(define_predicate "pcrel_ext_address"
   (match_code "symbol_ref,const")
 {
   if (!rs6000_pcrel_p (cfun))
@@ -1684,22 +1684,6 @@
     }
 
   return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
-})
-
-;; Return 1 if op is a prefixed memory operand.
-(define_predicate "prefixed_mem_operand"
-  (match_code "mem")
-{
-  return rs6000_prefixed_address_mode_p (XEXP (op, 0), GET_MODE (op));
-})
-
-;; Return 1 if op is a memory operand to an external variable when we
-;; support pc-relative addressing and the PCREL_OPT relocation to
-;; optimize references to it.
-(define_predicate "pcrel_external_mem_operand"
-  (match_code "mem")
-{
-  return pcrel_external_address (XEXP (op, 0), Pmode);
 })
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to

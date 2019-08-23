@@ -325,7 +325,6 @@ enum rs6000_reload_reg_type {
   RELOAD_REG_GPR,			/* General purpose registers.  */
   RELOAD_REG_FPR,			/* Traditional floating point regs.  */
   RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
-  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
   N_RELOAD_REG
 };
 
@@ -345,22 +344,22 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
   { "Gpr",	FIRST_GPR_REGNO },	/* RELOAD_REG_GPR.  */
   { "Fpr",	FIRST_FPR_REGNO },	/* RELOAD_REG_FPR.  */
   { "VMX",	FIRST_ALTIVEC_REGNO },	/* RELOAD_REG_VMX.  */
-  { "Any",	-1 },			/* RELOAD_REG_ANY.  */
 };
 
 /* Mask bits for each register class, indexed per mode.  Historically the
    compiler has been more restrictive which types can do PRE_MODIFY instead of
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned char addr_mask_type;
+typedef unsigned short addr_mask_type;
 
-#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* DQ offset (bottom 4 bits 0).  */
+#define RELOAD_REG_DS_OFFSET	0x100	/* DS offset (bottom 2 bits 0).  */
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
@@ -370,6 +369,8 @@ struct rs6000_reg_addr {
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
+  addr_mask_type any_addr_mask;		/* OR of GPR/FPR/VMX addr_masks.  */
+  addr_mask_type default_addr_mask;	/* Default addr_mask to use.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
 };
 
@@ -379,16 +380,14 @@ static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 static inline bool
 mode_supports_pre_incdec_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_INCDEC)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & RELOAD_REG_PRE_INCDEC) != 0);
 }
 
 /* Helper function to say whether a mode supports PRE_MODIFY.  */
 static inline bool
 mode_supports_pre_modify_p (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_MODIFY)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & RELOAD_REG_PRE_MODIFY) != 0);
 }
 
 /* Return true if we have D-form addressing in altivec registers.  */
@@ -404,8 +403,7 @@ mode_supports_vmx_dform (machine_mode mode)
 static inline bool
 mode_supports_dq_form (machine_mode mode)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
-	  != 0);
+  return ((reg_addr[mode].any_addr_mask & RELOAD_REG_QUAD_OFFSET) != 0);
 }
 
 /* Given that there exists at least one variable that is set (produced)
@@ -2078,6 +2076,9 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 
   if ((mask & RELOAD_REG_QUAD_OFFSET) != 0)
     *p++ = 'O';
+  /* To simplify comparing addr_masks, don't print DS for older machines.  */
+  else if ((mask & RELOAD_REG_DS_OFFSET) != 0 && TARGET_PREFIXED_ADDR)
+    *p++ = 's';
   else if ((mask & RELOAD_REG_OFFSET) != 0)
     *p++ = 'o';
   else if (keep_spaces)
@@ -2114,6 +2115,12 @@ rs6000_debug_print_mode (ssize_t m)
   for (rc = 0; rc < N_RELOAD_REG; rc++)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
+
+  fprintf (stderr, " Any: %s",
+	   rs6000_debug_addr_mask (reg_addr[m].any_addr_mask, true));
+
+  fprintf (stderr, " Default: %s",
+	   rs6000_debug_addr_mask (reg_addr[m].default_addr_mask, true));
 
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
@@ -2660,11 +2667,74 @@ rs6000_setup_reg_addr_masks (void)
 	      && (addr_mask & RELOAD_REG_VALID) != 0)
 	    addr_mask |= RELOAD_REG_AND_M16;
 
+	  /* 64-bit and larger values on GPRs need DS format instructions.  All
+	     non-vector offset instructions in Altivec registers need the DS
+	     format instructions.  */
+	  const addr_mask_type quad_flags = (RELOAD_REG_OFFSET
+					     | RELOAD_REG_QUAD_OFFSET);
+
+	  if ((addr_mask & quad_flags) == RELOAD_REG_OFFSET
+	      && ((rc == RELOAD_REG_GPR && msize >= 8 && TARGET_POWERPC64)
+		  || (rc == RELOAD_REG_VMX)))
+	    addr_mask |= RELOAD_REG_DS_OFFSET;
+
 	  reg_addr[m].addr_mask[rc] = addr_mask;
-	  any_addr_mask |= addr_mask;
+	  any_addr_mask |= (addr_mask & ~RELOAD_REG_AND_M16);
 	}
 
-      reg_addr[m].addr_mask[RELOAD_REG_ANY] = any_addr_mask;
+      reg_addr[m].any_addr_mask = any_addr_mask;
+
+      /* Figure out what the default reload register set that should be used
+	 for each mode, that should mirror the expected usage (i.e. vectors in
+	 vector registers, ints in GPRs, etc).  Fall back to GPRs as a last
+	 resort if the mode isn't valid in the vector/floating point registers.
+	 In the case of vectors and FP, we want to test the reload register
+	 classes in the order of epxected use or in terms of functionality (the
+	 FPRs offer offsettable loads/stores in earlier ISAs).  */
+
+      int def_rc;
+      int rc_order[2];
+      int rc_max = 0;
+
+      /* IEEE 128-bit hardware floating point insns use Altivec registers.  */
+      if (TARGET_FLOAT128_HW && FLOAT128_IEEE_P (m))
+	rc_order[rc_max++] = RELOAD_REG_VMX;
+
+      /* Normal vectors and software IEEE 128-bit can use either floating point
+	 registers or Altivec registers.  */
+      else if (TARGET_VSX && (VECTOR_MODE_P (m) || FLOAT128_IEEE_P (m)))
+	{
+	  rc_order[rc_max++] = RELOAD_REG_FPR;
+	  rc_order[rc_max++] = RELOAD_REG_VMX;
+	}
+
+      /* Altivec only vectors use the Altivec registers.  */
+      else if (TARGET_ALTIVEC && !TARGET_VSX && VECTOR_MODE_P (m))
+	rc_order[rc_max++] = RELOAD_REG_VMX;
+
+      /* For scalar binary/decimal floating point, prefer FPRs over altivec
+	 registers.  */
+      else if (TARGET_HARD_FLOAT && SCALAR_FLOAT_MODE_P (m))
+	{
+	  rc_order[rc_max++] = RELOAD_REG_FPR;
+	  rc_order[rc_max++] = RELOAD_REG_VMX;
+	}
+
+      /* Default to GPRs if neither FPRs or Altivec registers is valid and
+	 preferred.  */
+      def_rc = RELOAD_REG_GPR;
+      for (int i = 0; i < rc_max; i++)
+	{
+	  int rc_num = rc_order[i];
+	  if ((reg_addr[m].addr_mask[rc_num] & RELOAD_REG_VALID) != 0)
+	    {
+	      def_rc = rc_num;
+	      break;
+	    }
+	}
+
+      reg_addr[m].default_addr_mask = (reg_addr[m].addr_mask[def_rc]
+				       & ~RELOAD_REG_AND_M16);
     }
 }
 
@@ -9634,6 +9704,21 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	  return;
 	}
 
+      /* Handle loading up pc-relative addresses.  */
+      if (TARGET_PCREL && mode == E_DImode)
+	{
+	  if (pcrel_local_address (operands[1], Pmode))
+	    {
+	      emit_insn (gen_pcrel_local_addr (operands[0], operands[1]));
+	      return;
+	    }
+	  else if (pcrel_ext_address (operands[1], Pmode))
+	    {
+	      emit_insn (gen_pcrel_ext_addr (operands[0], operands[1]));
+	      return;
+	    }
+	}
+
       if (DEFAULT_ABI == ABI_V4
 	  && mode == Pmode && mode == SImode
 	  && flag_pic == 1 && got_operand (operands[1], mode))
@@ -10770,11 +10855,10 @@ rs6000_secondary_reload_memory (rtx addr,
 		 & ~RELOAD_REG_AND_M16);
 
   /* If the register allocator hasn't made up its mind yet on the register
-     class to use, settle on defaults to use.  */
+     class to use, use the default address mask bits.  */
   else if (rclass == NO_REGS)
     {
-      addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_ANY]
-		   & ~RELOAD_REG_AND_M16);
+      addr_mask = reg_addr[mode].default_addr_mask;
 
       if ((addr_mask & RELOAD_REG_MULTIPLE) != 0)
 	addr_mask &= ~(RELOAD_REG_INDEXED
@@ -13074,7 +13158,7 @@ print_operand_address (FILE *file, rtx x)
     fprintf (file, "0(%s)", reg_names[ REGNO (x) ]);
 
   /* Is it a pc-relative address?  */
-  else if (pcrel_address (x, Pmode))
+  else if (pcrel_local_address (x, Pmode) || pcrel_ext_address (x, Pmode))
     {
       HOST_WIDE_INT offset;
 
@@ -13093,6 +13177,9 @@ print_operand_address (FILE *file, rtx x)
 
       if (offset)
 	fprintf (file, "%+" PRId64, offset);
+
+      if (SYMBOL_REF_P (x) && !SYMBOL_REF_LOCAL_P (x))
+	fputs ("@got", file);
 
       fputs ("@pcrel", file);
     }
@@ -13579,29 +13666,68 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
+
+/* Helper function to take a MODE and an ADDR_MASK and turn it into the
+   traditional instruction format (D/DS/DQ).  */
 
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
-
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
+static trad_insn_type
+addr_mask_to_trad_insn (machine_mode mode, addr_mask_type addr_mask)
 {
-  return mode == VOIDmode;
+  const addr_mask_type flags = RELOAD_REG_MULTIPLE | RELOAD_REG_OFFSET;
+
+  /* If the mode does not support offset addressing directly, but it has
+     multiple registers, see if we can figure out a type that after splitting
+     the load/store, will be used (i.e. for a vector, use the element, for IBM
+     long double or TDmode use DFmode, etc.).  This is typically needed in the
+     early RTL stages before register allocation has been done.  */
+  if ((addr_mask & flags) == RELOAD_REG_MULTIPLE)
+    {
+      machine_mode inner = word_mode;
+
+      if (COMPLEX_MODE_P (mode))
+	{
+	  inner = GET_MODE_INNER (mode);
+	  if ((reg_addr[inner].default_addr_mask & RELOAD_REG_OFFSET) == 0)
+	    inner = word_mode;
+	}
+
+      if (FLOAT128_2REG_P (mode))
+	{
+	  inner = DFmode;
+	  if ((reg_addr[inner].default_addr_mask & RELOAD_REG_OFFSET) == 0)
+	    inner = word_mode;
+	}
+
+      addr_mask = reg_addr[inner].default_addr_mask;
+    }
+
+  if ((addr_mask & RELOAD_REG_OFFSET) == 0)
+    return TRAD_INSN_INVALID;
+
+  if ((addr_mask & RELOAD_REG_QUAD_OFFSET) != 0)
+    return TRAD_INSN_DQ;
+
+  if ((addr_mask & RELOAD_REG_DS_OFFSET) != 0)
+    return TRAD_INSN_DS;
+
+  return TRAD_INSN_D;
 }
 
 /* Function to return true if ADDR is a valid prefixed memory address that uses
-   mode MODE.  */
+   mode MODE, and the traditional instruction uses the TRAD_INSN format.  */
 
 bool
-rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
+prefixed_local_addr_p (rtx addr,
+		       machine_mode mode,
+		       trad_insn_type trad_insn)
 {
-  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
+  /* Don't allow SDmode, because it only can be loaded into FPRs using LFIWZX
+     instruction.  */
+  if (!TARGET_PREFIXED_ADDR || mode == E_SDmode)
     return false;
 
-  /* Check for PC-relative addresses.  */
-  if (pcrel_address (addr, Pmode))
+  /* Check for local PC-relative addresses.  */
+  if (pcrel_local_address (addr, Pmode))
     return true;
 
   /* Check for prefixed memory addresses that have a large numeric offset,
@@ -13622,24 +13748,16 @@ rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
       if (!SIGNED_16BIT_OFFSET_P (value))
 	return true;
 
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
+      /* If needed, figure out the traditional instruction format.  */
+      if (trad_insn == TRAD_INSN_DEFAULT)
+	trad_insn
+	  = addr_mask_to_trad_insn (mode, reg_addr[mode].default_addr_mask);
 
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
+      if (trad_insn == TRAD_INSN_DS)
+	return (value & 3) != 0;
 
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
-
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
+      if (trad_insn == TRAD_INSN_DQ)
+	return (value & 15) != 0;
     }
 
   return false;

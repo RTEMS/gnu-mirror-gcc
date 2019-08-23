@@ -154,7 +154,22 @@ extern align_flags rs6000_loop_align (rtx);
 extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
-extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
+
+/* Enumeration giving the type of traditional addressing that would be used to
+   decide whether an instruction uses prefixed memory or not.  If the
+   traditional instruction uses the DS instruction format, and the bottom 2
+   bits of the offset are not 0, the traditional instruction cannot be used,
+   but a prefixed instruction can be used.  */
+
+typedef enum {
+  TRAD_INSN_DEFAULT,	/* Use the default for the mode.  */
+  TRAD_INSN_D,		/* Insn uses D format (all 16 bits).  */
+  TRAD_INSN_DS,		/* Insn uses DS format (bottom 2 bits clear).  */
+  TRAD_INSN_DQ,		/* Insn uses DQ format (bottom 4 bits clear).  */
+  TRAD_INSN_INVALID	/* Insn does not have an offsettable form.  */
+} trad_insn_type;
+
+extern bool prefixed_local_addr_p (rtx, machine_mode, trad_insn_type);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
