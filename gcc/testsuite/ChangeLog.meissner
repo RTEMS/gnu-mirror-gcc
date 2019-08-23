@@ -1,4 +1,8 @@
 2019-08-23   Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/pcrel-opt-di.c: New test for -mpcrel-opt.
+
+2019-08-23   Michael Meissner  <meissner@linux.ibm.com>
+
 	Clone branch subversion id 274861
 

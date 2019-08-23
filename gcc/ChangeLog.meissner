@@ -1,5 +1,31 @@
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config.gcc (powerpc*-*-*): Add rs6000-pcrel.c.
+	(rs6000*-*-*): Add rs6000-pcrel.c.
+	* config/rs6000/pcrel.md: New file.
+	* config/rs6000/predicates.md (one_reg_memory_operand): New
+	predicate.
+	(pcrel_ext_mem_operand): New predicate.
+	* config/rs6000/rs6000-cpus.def (ADDRESSING_FUTURE_MASKS): Add
+	-mpcrel-opt.
+	(POWERPC_MASKS): Add -mpcrel-opt.
+	* config/rs6000/rs6000-passes.def: Add pcrel optimization pass.
+	* config/rs6000/rs6000-pcrel.c: New file.
+	* config/rs6000/rs6000-protos.h (make_pass_pcrel_opt): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mpcrel-opt support.
+	(pcrel_opt_label_num): New state static flag.
+	(rs6000_final_prescan_insn): Add -mpcrel-opt support.
+	(rs6000_asm_output_opcode): Add -mpcrel-opt support.
+	(rs6000_opt_masks): Add -mpcrel-opt.
+	* config/rs6000/rs6000.md: Include pcrel.md.
+	(pcrel_opt RTL attribute): New RTL attribute.
+	* config/rs6000/t-rs6000 (rs6000-pcrel.o): Add build rules.
+	(MD_INCLUDES): Add pcrel.md.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (ep constraint): New constraint.
 	* config/rs6000/predicates.md (non_pcrel_mem_operand): New
 	predicate.
