@@ -1706,6 +1706,33 @@
 				 TRAD_INSN_DEFAULT);
 })
 
+;; Return 1 if op is a memory operand that does not contain a pc-relative
+;; address.
+(define_predicate "non_pcrel_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  return (!pcrel_local_address (XEXP (op, 0), Pmode)
+	  && !pcrel_ext_address (XEXP (op, 0), Pmode));
+})
+
+;; Return 1 if op is a register or a memory operand that does not contain a
+;; pc-relatve address.
+(define_predicate "reg_or_non_pcrel_operand"
+  (match_code "reg,subreg,mem")
+{
+  if (REG_P (op) || SUBREG_P (op))
+    return true;
+
+  if (!memory_operand (op, mode))
+    return false;
+
+  return (!pcrel_local_address (XEXP (op, 0), Pmode)
+	  && !pcrel_ext_address (XEXP (op, 0), Pmode));
+})
+
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.
 (define_predicate "fusion_gpr_addis"

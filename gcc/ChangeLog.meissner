@@ -1,5 +1,20 @@
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (ep constraint): New constraint.
+	* config/rs6000/predicates.md (non_pcrel_mem_operand): New
+	predicate.
+	(reg_or_non_pcrel_operand): New predicate.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Don't allow pc-relative memory addresses.
+	(vsx_extract_v4sf_var): Don't allow pc-relative memory addresses.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Don't allow
+	pc-relative memory addresses.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Don't allow pc-relative
+	memory addresses.
+	* doc/md.texi (PowerPC Constraints): Document ep constraint.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): On
 	'future' systems, enable prefixed addressing by default.
 	(TARGET_PCREL_DEFAULT): On 'future' systems, enable pc-relative
