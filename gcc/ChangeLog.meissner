@@ -1,5 +1,48 @@
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
+	declaration.
+	(prefixed_store_p): New declaration.
+	(prefixed_paddi_p): New declaration.
+	(rs6000_asm_output_opcode): New declaration.
+	(rs6000_final_prescan_insn): New declaration.
+	* config/rs6000/rs6000.c (addr_mask_to_trad_insn): Rework to deal
+	with things like _Complex __ibm128.
+	(reg_to_trad_insn): New helper function.
+	(prefixed_load_p): New function for prefixed memory.
+	(prefixed_store_p): New function for prefixed memory.
+	(prefixed_paddi_p): New function for prefixed memory.
+	(next_insn_prefixed_p): New state static flag.
+	(rs6000_final_prescan_insn): New function for prefixed memory.
+	(rs6000_asm_output_opcode): New function for prifixed memory.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): New target hook.
+	(ASM_OUTPUT_OPCODE): New target hook.
+	* config/rs6000/rs6000.md (prefixed RTL attribute): New attribute
+	for prefixed memory support.
+	(prefixed_length RTL attribute): New attribute for prefixed memory
+	support.
+	(non_prefixed_length RTL attribute): New attribute for prefixed
+	memory support.
+	(length RTL attribute): Use prefixed, prefixed_length, and
+	non_prefixed_lengths to set the default instruction length.
+	(pcrel_local_addr): Change to use the prefixed attribute.
+	(pcrel_ext_addr): Change to use the prefixed attribute.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (FIRST_RELOAD_REG_CLASS): Delete.
+	(LAST_RELOAD_REG_CLASS): Delete.
+	(mode_uses_full_vector_reg): New helper function.
+	(setup_reg_addr_masks_pre_incdec): New helper function.
+	(setup_reg_addr_masks_gpr): New helper function.
+	(setup_reg_addr_masks_fpr): New helper function.
+	(setup_reg_addr_masks_altivec): New helper function.
+	(rs6000_setup_reg_addr_masks): Move most of the code into the 3
+	specific helper functions that deals with the specific address
+	masks for GPRs, FPRs, and traditional Altivec registers.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_local_address): Rename
 	pcrel_address to pcrel_local_address.
 	(pcrel_ext_address): Rename pcrel_external_address to

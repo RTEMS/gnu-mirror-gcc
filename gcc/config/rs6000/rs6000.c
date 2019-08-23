@@ -13827,23 +13827,23 @@ addr_mask_to_trad_insn (machine_mode mode, addr_mask_type addr_mask)
      early RTL stages before register allocation has been done.  */
   if ((addr_mask & flags) == RELOAD_REG_MULTIPLE)
     {
-      machine_mode inner = word_mode;
+      machine_mode mode2 = mode;
 
-      if (COMPLEX_MODE_P (mode))
+      if (COMPLEX_MODE_P (mode2))
 	{
-	  inner = GET_MODE_INNER (mode);
-	  if ((reg_addr[inner].default_addr_mask & RELOAD_REG_OFFSET) == 0)
-	    inner = word_mode;
+	  machine_mode inner = GET_MODE_INNER (mode);
+	  if ((reg_addr[inner].default_addr_mask & RELOAD_REG_OFFSET) != 0)
+	    mode2 = inner;
 	}
 
-      if (FLOAT128_2REG_P (mode))
+      if (FLOAT128_2REG_P (mode2))
 	{
-	  inner = DFmode;
-	  if ((reg_addr[inner].default_addr_mask & RELOAD_REG_OFFSET) == 0)
-	    inner = word_mode;
+	  if ((reg_addr[E_DFmode].default_addr_mask & RELOAD_REG_OFFSET) != 0)
+	    mode = DFmode;
 	}
 
-      addr_mask = reg_addr[inner].default_addr_mask;
+      if (mode != mode2)
+	addr_mask = reg_addr[mode2].default_addr_mask;
     }
 
   if ((addr_mask & RELOAD_REG_OFFSET) == 0)
@@ -13856,6 +13856,49 @@ addr_mask_to_trad_insn (machine_mode mode, addr_mask_type addr_mask)
     return TRAD_INSN_DS;
 
   return TRAD_INSN_D;
+}
+
+/* Helper function to take a REG and a MODE and turn it into the traditional
+   instruction format (D/DS/DQ) used for offset memory.  */
+
+static trad_insn_type
+reg_to_trad_insn (rtx reg, machine_mode mode)
+{
+  addr_mask_type addr_mask;
+
+  /* If it isn't a register, use the defaults.  */
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    addr_mask = reg_addr[mode].default_addr_mask;
+
+  else
+    {
+      unsigned int r = reg_or_subregno (reg);
+
+      /* If we have a pseudo, use the default instruction format.  */
+      if (r >= FIRST_PSEUDO_REGISTER)
+	addr_mask = reg_addr[mode].default_addr_mask;
+
+      /* If we have a hard register, use the addr_mask of that hard
+	 register's reload register class.  */
+      else
+	{
+	  if (INT_REGNO_P (r))
+	    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_GPR];
+
+	  else if (FP_REGNO_P (r))
+	    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_FPR];
+
+	  else if (ALTIVEC_REGNO_P (r))
+	    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_VMX];
+
+	  /* Assume things like SPRs, CR, etc. will be loaded through the GPR
+	     registers.  */
+	  else
+	    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_GPR];
+	}
+    }
+
+  return addr_mask_to_trad_insn (mode, addr_mask);
 }
 
 /* Function to return true if ADDR is a valid prefixed memory address that uses
@@ -13907,6 +13950,139 @@ prefixed_local_addr_p (rtx addr,
 
   return false;
 }
+
+/* Whether a load instruction is a prefixed instruction.  This is called from
+   the prefixed attribute processing.  */
+
+bool
+prefixed_load_p (rtx_insn *insn)
+{
+  /* Validate the insn to make sure it is a normal load insn.  */
+  extract_insn_cached (insn);
+  if (recog_data.n_operands < 2)
+    return false;
+
+  rtx reg = recog_data.operand[0];
+  rtx mem = recog_data.operand[1];
+
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return false;
+
+  if (!MEM_P (mem))
+    return false;
+
+  /* LWA uses the DS format instead of the D format that LWZ uses.  */
+  trad_insn_type trad_insn;
+  machine_mode reg_mode = GET_MODE (reg);
+  machine_mode mem_mode = GET_MODE (mem);
+
+  if (mem_mode == SImode && reg_mode == DImode
+      && get_attr_sign_extend (insn) == SIGN_EXTEND_YES)
+    trad_insn = TRAD_INSN_DS;
+
+  else
+    trad_insn = reg_to_trad_insn (reg, mem_mode);
+
+  return prefixed_local_addr_p (XEXP (mem, 0), mem_mode, trad_insn);
+}
+
+/* Whether a store instruction is a prefixed instruction.  This is called from
+   the prefixed attribute processing.  */
+
+bool
+prefixed_store_p (rtx_insn *insn)
+{
+  /* Validate the insn to make sure it is a normal store insn.  */
+  extract_insn_cached (insn);
+  if (recog_data.n_operands < 2)
+    return false;
+
+  rtx mem = recog_data.operand[0];
+  rtx reg = recog_data.operand[1];
+
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return false;
+
+  if (!MEM_P (mem))
+    return false;
+
+  machine_mode mem_mode = GET_MODE (mem);
+  trad_insn_type trad_insn = reg_to_trad_insn (reg, mem_mode);
+  return prefixed_local_addr_p (XEXP (mem, 0), mem_mode, trad_insn);
+}
+
+/* Whether a load immediate or add instruction is a prefixed instruction.  This
+   is called from the prefixed attribute processing.  */
+
+bool
+prefixed_paddi_p (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  if (!set)
+    return false;
+
+  rtx dest = SET_DEST (set);
+  rtx src = SET_SRC (set);
+
+  if (!REG_P (dest) && !SUBREG_P (dest))
+    return false;
+
+  /* Is this a load immediate that can't be done with a simple ADDI or
+     ADDIS?  */
+  if (CONST_INT_P (src))
+    return (satisfies_constraint_eI (src)
+	    && !satisfies_constraint_I (src)
+	    && !satisfies_constraint_L (src));
+
+  /* Is this a PADDI instruction that can't be done with a simple ADDI or
+     ADDIS?  */
+  if (GET_CODE (src) == PLUS)
+    {
+      rtx op1 = XEXP (src, 1);
+
+      return (CONST_INT_P (op1)
+	      && satisfies_constraint_eI (op1)
+	      && !satisfies_constraint_I (op1)
+	      && !satisfies_constraint_L (op1));
+    }
+
+  /* If not, is it a load of a pc-relative address?  */
+  if (!TARGET_PCREL || GET_MODE (dest) != Pmode)
+    return false;
+
+  if (!SYMBOL_REF_P (src) && !LABEL_REF_P (src) && GET_CODE (src) != CONST)
+    return false;
+
+  return (pcrel_local_address (src, Pmode) || pcrel_ext_address (src, Pmode));
+}
+
+
+/* Whether the next instruction needs a 'p' prefix issued before the
+   instruction is printed out.  */
+static bool next_insn_prefixed_p;
+
+/* Define FINAL_PRESCAN_INSN if some processing needs to be done before
+   outputting the assembler code.  On the PowerPC, we remember if the current
+   insn is a prefixed insn where we need to emit a 'p' before the insn.  */
+void
+rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
+{
+  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
+  return;
+}
+
+/* Define ASM_OUTPUT_OPCODE to do anything special before emitting an opcode.
+   We use it to emit a 'p' for prefixed insns that is set in
+   FINAL_PRESCAN_INSN.  */
+void
+rs6000_asm_output_opcode (FILE *stream)
+{
+  if (next_insn_prefixed_p)
+    fputc ('p', stream);
+
+  return;
+}
+
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
 /* Emit an assembler directive to set symbol visibility for DECL to
