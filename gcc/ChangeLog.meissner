@@ -1,4 +1,4 @@
-2019-08-22  Michael Meissner  <meissner@linux.ibm.com>
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (pcrel_local_address): Rename
 	pcrel_address to pcrel_local_address.
