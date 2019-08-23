@@ -1,5 +1,54 @@
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for the
+	PADDI instruction.
+	(non_add_cint_operand): Add support for the PADDI instruction.
+	(lwa_operand): Add support for the PLWA instruction.
+	(non_prefixed_mem_operand): New predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	the PADDI instruction.
+	(rs6000_adjust_vec_address): Add support for optimizing prefixed
+	and pc-relative extracts with constant extraction elements.  Add a
+	failure when we use pc-relative addressing and non-constant
+	extraction elements.  Use SIGNED_16BIT_OFFSET_P.
+	(quad_address_p): Add support for prefixed memory instructions.
+	(mem_operand_gpr): Add support for prefixed memory instructions.
+	Use SIGNED_16BIT_OFFSET_EXTRA_P.
+	(mem_operand_ds_form): Add support for prefixed memory
+	instructions.  Use SIGNED_16BIT_OFFSET_EXTRA_P.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	memory instructions.
+	(rs6000_legitimate_address_p): Add support for prefixed memory
+	instructions.
+	(rs6000_mode_dependent_address): Add support for prefixed memory
+	instructions.
+	(make_memory_non_prefixed): New function.
+	(prefixed_paddi_p): Fix thinkos in last patch.
+	(rs6000_rtx_costs): Add support for the PADDI instruction.
+	(rs6000_num_insns): Don't treat prefixed instructions as being
+	slower because they have a larger length.
+	(rs6000_insn_cost): Call rs6000_num_insns.
+	* config/rs6000/rs6000.md (add<mode>3): Add support for the PADDI
+	instruction.
+	(movsi_low): Add support for the PADDI instruction.
+	(movsi const int splitter): Add support for the PADDI
+	instruction.
+	(mov<mode>_64bit_dm): Add support for prefixed memory
+	instructions. Split alternatives that had merged loading a
+	constant with register moves.
+	(movtd_64bit_nodm): Add support for prefixed memory instructions.
+	(movdi_internal64): Add support for prefixed memory instructions.
+	(movdi const int splitter): Add comment.
+	(mov<mode>_ppc64): Add support for prefixed memory instructions.
+	(stack_protect_setdi): Do not allow prefixed instructions.
+	(stack_protect_testdi): Do not allow prefixed instructions.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed memory instructions.
+
+2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
 	declaration.
 	(prefixed_store_p): New declaration.

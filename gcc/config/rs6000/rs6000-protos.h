@@ -170,6 +170,7 @@ typedef enum {
 } trad_insn_type;
 
 extern bool prefixed_local_addr_p (rtx, machine_mode, trad_insn_type);
+extern rtx make_memory_non_prefixed (rtx);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);

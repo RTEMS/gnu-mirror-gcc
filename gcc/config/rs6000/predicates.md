@@ -839,7 +839,8 @@
 (define_predicate "add_operand"
   (if_then_else (match_code "const_int")
     (match_test "satisfies_constraint_I (op)
-		 || satisfies_constraint_L (op)")
+		 || satisfies_constraint_L (op)
+		 || satisfies_constraint_eI (op)")
     (match_operand 0 "gpc_reg_operand")))
 
 ;; Return 1 if the operand is either a non-special register, or 0, or -1.
@@ -852,7 +853,8 @@
 (define_predicate "non_add_cint_operand"
   (and (match_code "const_int")
        (match_test "!satisfies_constraint_I (op)
-		    && !satisfies_constraint_L (op)")))
+		    && !satisfies_constraint_L (op)
+		    && !satisfies_constraint_eI (op)")))
 
 ;; Return 1 if the operand is a constant that can be used as the operand
 ;; of an AND, OR or XOR.
@@ -933,6 +935,13 @@
     return false;
 
   addr = XEXP (inner, 0);
+
+  /* The LWA instruction uses the DS-form format where the bottom two bits of
+     the offset must be 0.  The prefixed PLWA does not have this
+     restriction.  */
+  if (prefixed_local_addr_p (addr, mode, TRAD_INSN_DS))
+    return true;
+
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
@@ -1684,6 +1693,17 @@
     }
 
   return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
+})
+
+;; Return 1 if op is a memory operand that is not prefixed.
+(define_predicate "non_prefixed_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  return !prefixed_local_addr_p (XEXP (op, 0), GET_MODE (op),
+				 TRAD_INSN_DEFAULT);
 })
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
