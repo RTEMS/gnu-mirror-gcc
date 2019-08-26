@@ -4415,7 +4415,7 @@ rs6000_option_override_internal (bool global_init_p)
 	  if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	    error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
 
-	  rs6000_isa_flags &= ~(OPTION_MASK_PCREL | OPTION_MASK_PCREL_OPT);
+	  rs6000_isa_flags &= ~OPTION_MASK_PCREL;
 	}
 
       /* Enable defaults if desired.  */
@@ -4429,11 +4429,7 @@ rs6000_option_override_internal (bool global_init_p)
 
 	  if (!explicit_pcrel && TARGET_PCREL_DEFAULT
 	      && TARGET_CMODEL == CMODEL_MEDIUM)
-	    {
-	      rs6000_isa_flags |= OPTION_MASK_PCREL;
-	      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL_OPT) == 0)
-		rs6000_isa_flags |= OPTION_MASK_PCREL_OPT;
-	    }
+	    rs6000_isa_flags |= OPTION_MASK_PCREL;
 	}
     }
 
@@ -4455,15 +4451,6 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
 
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
-    }
-
-  /* Check -mfuture debug switches.  */
-  if (!TARGET_PCREL && TARGET_PCREL_OPT)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL_OPT) != 0)
-	error ("%qs requires %qs", "-mpcrel-opt", "-mpcrel");
-
-      rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
     }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -14257,40 +14244,13 @@ prefixed_paddi_p (rtx_insn *insn)
    instruction is printed out.  */
 static bool next_insn_prefixed_p;
 
-/* Numeric label that is the address of the GOT load instruction + 8 that we
-   link the R_PPC64_PCREL_OPT relocation to for on the next instruction.  */
-static unsigned int pcrel_opt_label_num;
-
 /* Define FINAL_PRESCAN_INSN if some processing needs to be done before
    outputting the assembler code.  On the PowerPC, we remember if the current
-   insn is a prefixed insn where we need to emit a 'p' before the insn.
-
-   In addition, if the insn is part of a pc-relative reference to an external
-   label optimization, this is recorded also.  */
+   insn is a prefixed insn where we need to emit a 'p' before the insn.  */
 void
-rs6000_final_prescan_insn (rtx_insn *insn, rtx operands[], int noperands)
+rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
   next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
-
-  enum attr_pcrel_opt pcrel_attr = get_attr_pcrel_opt (insn);
-
-  /* For the load and store instructions that are tied to a GOT pointer, we
-     know that operand 3 contains a marker for loads and operand 2 contains
-     the marker for stores.  If it is non-zero, it is the numeric label where
-     we load the address + 8.  */
-  if (pcrel_attr == PCREL_OPT_LOAD)
-    {
-      gcc_assert (noperands >= 3);
-      pcrel_opt_label_num = INTVAL (operands[3]);
-    }
-  else if (pcrel_attr == PCREL_OPT_STORE)
-    {
-      gcc_assert (noperands >= 2);
-      pcrel_opt_label_num = INTVAL (operands[2]);
-    }
-  else
-    pcrel_opt_label_num = 0;
-
   return;
 }
 
@@ -14300,13 +14260,6 @@ rs6000_final_prescan_insn (rtx_insn *insn, rtx operands[], int noperands)
 void
 rs6000_asm_output_opcode (FILE *stream)
 {
-  if (pcrel_opt_label_num)
-    {
-      fprintf (stream, ".reloc .Lpcrel%u-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%u-8)\n\t",
-	       pcrel_opt_label_num, pcrel_opt_label_num);
-      pcrel_opt_label_num = 0;
-    }
-
   if (next_insn_prefixed_p)
     fputc ('p', stream);
 
@@ -23469,7 +23422,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
-  { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },

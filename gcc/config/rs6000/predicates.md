@@ -775,13 +775,6 @@
   return indexed_or_indirect_address (op, mode);
 })
 
-;; Return 1 if the operand uses a single register for the address.
-(define_predicate "one_reg_memory_operand"
-  (match_code "mem")
-{
-  return REG_P (XEXP (op, 0));
-})
-
 ;; Like indexed_or_indirect_operand, but also allow a GPR register if direct
 ;; moves are supported.
 (define_predicate "reg_or_indexed_operand"
@@ -1700,15 +1693,6 @@
     }
 
   return (SYMBOL_REF_P (op) && !SYMBOL_REF_LOCAL_P (op));
-})
-
-;; Return 1 if op is a memory operand to an external variable when we
-;; support pc-relative addressing and the PCREL_OPT relocation to
-;; optimize references to it.
-(define_predicate "pcrel_ext_mem_operand"
-  (match_code "mem")
-{
-  return pcrel_ext_address (XEXP (op, 0), Pmode);
 })
 
 ;; Return 1 if op is a memory operand that is not prefixed.
