@@ -1,3 +1,7 @@
+2019-08-26  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-pcrel.c: Update comment.
+
 2019-08-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Add rs6000-pcrel.c.
