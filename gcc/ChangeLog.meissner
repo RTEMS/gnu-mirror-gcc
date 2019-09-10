@@ -1,3 +1,33 @@
+2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (pcrel_local_address): Rename
+	pcrel_address to pcrel_local_address.  Re-implement it using the
+	classify_offset_addr function.
+	(pcrel_external_address): Re-implement using the
+	classify_offset_addr function.  Adhere to the ABI and limit
+	external addresses to not having an offset.
+	(prefixed_mem_operand): Delete predicate which is now unused.
+	(pcrel_external_mem_operand): Delete predicate which is now
+	unused.
+	(pcrel_local_or_external_address): New predicate.
+	* config/rs6000/rs6000-protos.h (classify_offset_addr): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Add code to load up
+	local or external pc-relative references into a register.
+	(print_operand_address): Use pcrel_local_or_external_address
+	instead of pcrel_address.  Add support for external pc-relative
+	addresses.
+	(mode_supports_prefixed_address_p): Delete function which is now
+	unused.
+	(rs6000_prefixed_address_mode_p): Delete function which is now
+	unused.
+	* config/rs6000/rs6000.md (insn_form): New enumaration for
+	instruction format.
+	(pcrel_local_addr): New insn to load up local pc-relative
+	addresses.
+	(pcrel_extern_addr): New insn to load up external pc-relative
+	addresses.
+
 2019-09-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 275548

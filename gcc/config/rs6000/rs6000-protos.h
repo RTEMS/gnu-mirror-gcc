@@ -155,6 +155,7 @@ extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
 extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
+extern enum insn_form classify_offset_addr (rtx, machine_mode, enum insn_form);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
