@@ -156,6 +156,11 @@ extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
 extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
 extern enum insn_form classify_offset_addr (rtx, machine_mode, enum insn_form);
+extern bool prefixed_load_p (rtx_insn *);
+extern bool prefixed_store_p (rtx_insn *);
+extern bool prefixed_paddi_p (rtx_insn *);
+extern void rs6000_asm_output_opcode (FILE *);
+extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
@@ -234,8 +239,6 @@ extern void rs6000_d_target_versions (void);
 #ifdef NO_DOLLAR_IN_LABEL
 const char * rs6000_xcoff_strip_dollar (const char *);
 #endif
-
-void rs6000_final_prescan_insn (rtx_insn *, rtx *operand, int num_operands);
 
 extern unsigned char rs6000_class_max_nregs[][LIM_REG_CLASSES];
 extern unsigned char rs6000_hard_regno_nregs[][FIRST_PSEUDO_REGISTER];

@@ -1,5 +1,37 @@
 2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
+	declaration.
+	(prefixed_store_p): New decalaration.
+	(prefixed_paddi_p): New declaration.
+	(rs6000_asm_output_opcode): New declaration.
+	(rs6000_final_prescan_insn): Update calling signature.
+	* config/rs6000/rs6000.c (reg_to_insn_form): New helper function
+	to return the insn_form for memory to a register type.
+	(prefixed_load_p): New function to return if a load is prefixed.
+	(prefixed_store_p): New function to return if a store is
+	prefixed.
+	(prefixed_paddi_p): New function to return if a load immediate or
+	add insn is prefixed.
+	(next_insn_prefixed_p): New state variable for prefixed
+	instructions.
+	(rs6000_final_prescan_insn): New function, determine if the next
+	instruction is prefixed.
+	(rs6000_asm_output_opcode): New function, print leading 'p' for
+	prefixed instructions.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): New target hook.
+	(ASM_OUTPUT_OPCODE): New target hook.
+	* config/rs6000/rs6000.md (prefixed insn attribute): New insn
+	attribute for prefixed instructions.
+	(prefixed_length insn attribute): New insn attribute.
+	(non_prefixed_length insn attribute): New insn attribute.
+	(length insn attribute): Set length based on whether the insn is
+	prefixed or not.
+	(pcrel_local_addr): Explicitly set the prefixed attribute.
+	(pcrel_extern_addr): Explicitly set the prefixed attribute.
+
+2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_local_address): Rename
 	pcrel_address to pcrel_local_address.  Re-implement it using the
 	classify_offset_addr function.
