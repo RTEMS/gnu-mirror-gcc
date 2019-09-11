@@ -1,5 +1,21 @@
 2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint.
+	* config/rs6000/predicates.md (non_pcrel_mem_operand): New
+	predicate.
+	(reg_or_non_pcrel_operand): New predicate.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
+	for pc-relative addresses.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Don't allow pc-relative addresses with variable extracts.
+	(vsx_extract_v4sf_var): Don't allow pc-relative addresses with
+	variable extracts.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Don't allow
+	pc-relative addresses with variable extracts.
+	* doc/md.texi (PowerPC constraints): Document em constraint.
+
+2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
 	predicate.
 	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New

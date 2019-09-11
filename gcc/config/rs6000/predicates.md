@@ -1680,6 +1680,39 @@
           && addr_type != INSN_FORM_PCREL_LOCAL);
 })
 
+;; Return 1 if op is a memory operand that does not contain a pc-relative
+;; address.
+(define_predicate "non_pcrel_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form addr_type
+    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
+
+  return (addr_type != INSN_FORM_PCREL_LOCAL
+          || addr_type == INSN_FORM_PCREL_EXTERNAL);
+})
+
+;; Return 1 if op is a register or a memory operand that does not contain a
+;; pc-relatve address.
+(define_predicate "reg_or_non_pcrel_operand"
+  (match_code "reg,subreg,mem")
+{
+  if (REG_P (op) || SUBREG_P (op))
+    return true;
+
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form addr_type
+    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
+
+  return (addr_type != INSN_FORM_PCREL_LOCAL
+          || addr_type == INSN_FORM_PCREL_EXTERNAL);
+})
+
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.

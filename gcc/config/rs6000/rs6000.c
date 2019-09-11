@@ -6849,7 +6849,9 @@ rs6000_adjust_vec_address (rtx scalar_reg,
       else
 	gcc_unreachable ();
 
-      if (REG_P (op1) || SUBREG_P (op1))
+      if (pcrel_p)
+	valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+      else if (REG_P (op1) || SUBREG_P (op1))
 	valid_addr_p = (addr_mask & RELOAD_REG_INDEXED) != 0;
       else
 	valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
