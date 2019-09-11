@@ -160,6 +160,7 @@ extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
+extern rtx make_memory_non_prefixed (rtx);
 
 /* Return true if the address is a prefixed instruction that can be directly
    used in a memory instruction (i.e. using numeric offset or a pc-relative

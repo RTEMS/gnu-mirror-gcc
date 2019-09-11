@@ -1,5 +1,55 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em): New constraint.
+	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
+	predicate.
+	(non_pcrel_mem_operand): New predicate.
+	(reg_or_non_pcrel_operand): New predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
+	for extracting a vector element from a prefixed address.
+	(quad_address_p): Add support for prefixed addresses.
+	(mem_operand_gpr): Add support for prefixed addresses.  Use the
+	SIGNED_16BIT_OFFSET_EXTRA_P macro.
+	(mem_operand_ds_form): Add support for prefixed addresses.  Use
+	the SIGNED_16BIT_OFFSET_EXTRA_P macro.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addresses.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addresses.
+	(rs6000_num_insns): New helper function.
+	(rs6000_insn_cost): Don't count prefixed instructions as being
+	slower than non-prefixed instructions due to the larger size.
+	(make_memory_non_prefixed): New function.
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add support for
+	prefixed addresses.
+	(movtd_64bit_nodm): Add support for prefixed addresses.
+	(stack_protect_setdi): Do not allow prefixed addresses in the main
+	insn.  Allow indexed stores if the memory would have been
+	prefixed.
+	(stack_protect_testdi): Do not allow prefixed addresses in the
+	main insn.  Allow indexed stores if the memory would have been
+	prefixed.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed addresses.
+	(vsx_extract_<mode>_var, VSX_D iterator): Do not optimize
+	extracting from a vector in memory addressed with a prefixed
+	address.
+	(vsx_extract_v4sf_var): Do not optimize extracting from a vector
+	in memory addressed with a prefixed address.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not optimize
+	extracting from a vector in memory addressed with a prefixed
+	address.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not optimize
+	extracting from a vector in memory addressed with a prefixed
+	address.
+	* doc/md.texi (PowerPC constraints): Document 'em' constraint.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Split alternative
 	that combined setting a GPR to 0.0 and loading up a GPR from
 	memory.  Change length to 8 instead of 12 for some alternatives.
