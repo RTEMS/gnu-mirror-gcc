@@ -98,6 +98,16 @@
 #endif
 #endif
 
+/* Set up the defaults for whether prefixed addressing is used, and if it is
+   used, whether we want to turn on pc-relative support by default.  */
+#ifndef TARGET_PREFIXED_ADDR_DEFAULT
+#define TARGET_PREFIXED_ADDR_DEFAULT	0
+#endif
+
+#ifndef TARGET_PCREL_DEFAULT
+#define TARGET_PCREL_DEFAULT		0
+#endif
+
 /* Support targetm.vectorize.builtin_mask_for_load.  */
 GTY(()) tree altivec_builtin_mask_for_load;
 
@@ -2522,6 +2532,14 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (TARGET_FUTURE)
+    {
+      fprintf (stderr, DEBUG_FMT_D, "TARGET_PREFIXED_ADDR_DEFAULT",
+	       TARGET_PREFIXED_ADDR_DEFAULT);
+      fprintf (stderr, DEBUG_FMT_D, "TARGET_PCREL_DEFAULT",
+	       TARGET_PCREL_DEFAULT);
+    }
 }
 
 
@@ -4002,26 +4020,6 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
     }
 
-  /* -mprefixed-addr (and hence -mpcrel) requires -mcpu=future.  */
-  if (TARGET_PREFIXED_ADDR && !TARGET_FUTURE)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
-	error ("%qs requires %qs", "-mpcrel", "-mcpu=future");
-      else if ((rs6000_isa_flags_explicit & OPTION_MASK_PREFIXED_ADDR) != 0)
-	error ("%qs requires %qs", "-mprefixed-addr", "-mcpu=future");
-
-      rs6000_isa_flags &= ~(OPTION_MASK_PCREL | OPTION_MASK_PREFIXED_ADDR);
-    }
-
-  /* -mpcrel requires prefixed load/store addressing.  */
-  if (TARGET_PCREL && !TARGET_PREFIXED_ADDR)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
-	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
-
-      rs6000_isa_flags &= ~OPTION_MASK_PCREL;
-    }
-
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags);
@@ -4153,12 +4151,89 @@ rs6000_option_override_internal (bool global_init_p)
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
 
-  /* -mpcrel requires -mcmodel=medium, but we can't check TARGET_CMODEL until
-      after the subtarget override options are done.  */
-  if (TARGET_PCREL && TARGET_CMODEL != CMODEL_MEDIUM)
+  /* Enable prefixed addressing and pc-relative addressing on 64-bit ELF v2
+     systems if the OS tm.h file says that it is supported and the user did not
+     explicitly use -mprefixed-addr or -mpcrel.  At the present time, only
+     64-bit Linux enables this.
+
+     Pc-relative support also requires the medium code model.
+
+     However, we can't check for ELFv2 or -mcmodel=medium until after the
+     subtarget macros are run.
+
+     If prefixed addressing is disabled by default, and the user does -mpcrel,
+     don't force them to also specify -mprefixed-addr.  */
+  if (TARGET_FUTURE)
+    {
+      bool explicit_prefixed = ((rs6000_isa_flags_explicit
+				 & OPTION_MASK_PREFIXED_ADDR) != 0);
+      bool explicit_pcrel = ((rs6000_isa_flags_explicit
+			      & OPTION_MASK_PCREL) != 0);
+
+      /* Prefixed addressing requires 64-bit registers.  */
+      if (!TARGET_POWERPC64)
+	{
+	  if (TARGET_PCREL && explicit_pcrel)
+	    error ("%qs requires %qs", "-mpcrel", "-m64");
+
+	  else if (TARGET_PREFIXED_ADDR && explicit_prefixed)
+	    error ("%qs requires %qs", "-mprefixed-addr", "-m64");
+
+	  rs6000_isa_flags &= ~ADDRESSING_FUTURE_MASKS;
+	}
+
+      /* Only ELFv2 currently supports prefixed/pcrel addressing.  */
+      else if (rs6000_current_abi != ABI_ELFv2)
+	{
+	  if (TARGET_PCREL && explicit_pcrel)
+	    error ("%qs requires %qs", "-mpcrel", "-mabi=elfv2");
+
+	  else if (TARGET_PREFIXED_ADDR && explicit_prefixed)
+	    error ("%qs requires %qs", "-mprefixed-addr", "-mabi=elfv2");
+
+	  rs6000_isa_flags &= ~ADDRESSING_FUTURE_MASKS;
+	}
+
+      /* Pc-relative requires the medium code model.  */
+      else if (TARGET_PCREL && TARGET_CMODEL != CMODEL_MEDIUM)
+	{
+	  if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
+	    error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
+
+	  rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+	}
+
+      /* Enable defaults if desired.  */
+      else
+	{
+	  if (!explicit_prefixed
+	      && (TARGET_PREFIXED_ADDR_DEFAULT
+		  || TARGET_PCREL
+		  || TARGET_PCREL_DEFAULT))
+	    rs6000_isa_flags |= OPTION_MASK_PREFIXED_ADDR;
+
+	  if (!explicit_pcrel && TARGET_PCREL_DEFAULT
+	      && TARGET_CMODEL == CMODEL_MEDIUM)
+	    rs6000_isa_flags |= OPTION_MASK_PCREL;
+	}
+    }
+
+  /* -mprefixed-addr (and hence -mpcrel) requires -mcpu=future.  */
+  if (TARGET_PREFIXED_ADDR && !TARGET_FUTURE)
     {
       if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
-	error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
+	error ("%qs requires %qs", "-mpcrel", "-mcpu=future");
+      else if ((rs6000_isa_flags_explicit & OPTION_MASK_PREFIXED_ADDR) != 0)
+	error ("%qs requires %qs", "-mprefixed-addr", "-mcpu=future");
+
+      rs6000_isa_flags &= ~(OPTION_MASK_PCREL | OPTION_MASK_PREFIXED_ADDR);
+    }
+
+  /* -mpcrel requires prefixed load/store addressing.  */
+  if (TARGET_PCREL && !TARGET_PREFIXED_ADDR)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
+	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
 
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
     }
