@@ -1,5 +1,44 @@
 2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
+	predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Optimize
+	pc-relative addresses involving constant element numbers.  Add an
+	abort for pc-relative addresses with non-constant element
+	numbers.
+	(quad_address_p): Do not restrict the offset to DQ-form
+	instructions if we have prefixed addresses.
+	(mem_operand_gpr): Do not restrict the offset to DS-form
+	instructions if we have prefixed addresses.  Use the
+	SIGNED_16BIT_OFFSET_EXTRA_P macro.
+	(mem_operand_ds_form): Do not restrict the offset to DS-form
+	instructions if we have prefixed addresses.  Use the
+	SIGNED_16BIT_OFFSET_EXTRA_P macro.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addresses with 34-bit offsets.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addresses.
+	(rs6000_num_insns): New helper function for prefixed
+	instructions.
+	(rs6000_insn_cost): Count prefixed instructions like non-prefixed
+	instructions.
+	(make_memory_non_prefixed): New function.
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add prefixed
+	instruction support.
+	(movtd_64bit_nodm): Add prefixed instruction support.
+	(stack_protect_setdi): Rework to prevent prefixed memory addresses
+	from being generated.
+	(stack_protect_testdi): Rework to prevent prefixed memory
+	addresses from being generated.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add prefixed memory
+	support.
+
+2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
 	declaration.
 	(prefixed_store_p): New decalaration.
