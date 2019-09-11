@@ -1,3 +1,14 @@
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Use
+	SIGNED_16BIT_OFFSET_P macro.  Add support for using the PADDI
+	instruction.
+	(rs6000_rtx_costs): Add support for using PADDI for large
+	constants.
+	* config/rs6000/rs6000.md (movdi_internal64): Add alternative to
+	load up 34-bit constants with PADDI.
+	(movdi CONST_INT_P splitter): Update comment.
+
 2019-09-10  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (em constraint): New constraint.
