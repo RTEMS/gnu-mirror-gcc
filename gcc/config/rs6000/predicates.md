@@ -839,8 +839,7 @@
 (define_predicate "add_operand"
   (if_then_else (match_code "const_int")
     (match_test "satisfies_constraint_I (op)
-		 || satisfies_constraint_L (op)
-		 || satisfies_constraint_eI (op)")
+		 || satisfies_constraint_L (op)")
     (match_operand 0 "gpc_reg_operand")))
 
 ;; Return 1 if the operand is either a non-special register, or 0, or -1.
@@ -933,13 +932,6 @@
     return false;
 
   addr = XEXP (inner, 0);
-
-  /* The LWA instruction uses the DS-form format where the bottom two bits of
-     the offset must be 0.  The prefixed PLWA does not have this
-     restriction.  */
-  if (TARGET_PREFIXED_ADDR && address_is_prefixed (addr, DImode, INSN_FORM_DS))
-    return true;
-
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
@@ -1816,41 +1808,4 @@
   (match_code "label_ref,symbol_ref,const")
 {
   return address_is_pcrel_local_or_external (op, mode, INSN_FORM_DEFAULT);
-})
-
-;; Return 1 if op is a memory operand that is not prefixed.
-(define_predicate "non_prefixed_mem_operand"
-  (match_code "mem")
-{
-  if (!memory_operand (op, mode))
-    return false;
-
-  return !address_is_prefixed (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
-})
-
-;; Return 1 if op is a memory operand that does not contain a pc-relative
-;; address.
-(define_predicate "non_pcrel_mem_operand"
-  (match_code "mem")
-{
-  if (!memory_operand (op, mode))
-    return false;
-
-  rtx addr = XEXP (op, 0);
-  return address_is_pcrel_local_or_external (addr, mode, INSN_FORM_DEFAULT);
-})
-
-;; Return 1 if op is a register or a memory operand that does not contain a
-;; pc-relatve address.
-(define_predicate "reg_or_non_pcrel_operand"
-  (match_code "reg,subreg,mem")
-{
-  if (REG_P (op) || SUBREG_P (op))
-    return true;
-
-  if (!memory_operand (op, mode))
-    return false;
-
-  rtx addr = XEXP (op, 0);
-  return !address_is_pcrel_local_or_external (addr, mode, INSN_FORM_DEFAULT);
 })
