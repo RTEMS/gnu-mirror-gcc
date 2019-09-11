@@ -24684,6 +24684,201 @@ address_to_insn_form (rtx addr, machine_mode mode, enum insn_form non_prefixed)
 
   return INSN_FORM_BAD;
 }
+
+/* Helper function to take a REG and a MODE and turn it into the non-prefixed
+   instruction format (D/DS/DQ) used for offset memory.  */
+
+static enum insn_form
+reg_to_insn_form (rtx reg, machine_mode mode)
+{
+  /* If it isn't a register, use the defaults.  */
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return INSN_FORM_DEFAULT;
+
+  unsigned int r = reg_or_subregno (reg);
+
+  /* If we have a pseudo, use the default instruction format.  */
+  if (r >= FIRST_PSEUDO_REGISTER)
+    return INSN_FORM_DEFAULT;
+
+  /* If we have a hard register, use the addr_mask of that hard register's
+     reload register class.  */
+  unsigned size = GET_MODE_SIZE (mode);
+
+  /* FPR registers use D-mode for scalars, and DQ-mode for vectors.  */
+  if (FP_REGNO_P (r))
+    {
+      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
+	return INSN_FORM_D;
+
+      else if (size < 8)
+	return INSN_FORM_X;
+
+      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+	return INSN_FORM_DQ;
+
+      else
+	return INSN_FORM_DEFAULT;
+    }
+
+  /* Altivec registers use DS-mode for scalars, and DQ-mode for vectors.  */
+  else if (ALTIVEC_REGNO_P (r))
+    {
+      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
+	return INSN_FORM_DS;
+
+      else if (size < 8)
+	return INSN_FORM_X;
+
+      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+	return INSN_FORM_DQ;
+
+      else
+	return INSN_FORM_DEFAULT;
+    }
+
+  /* GPR registers use DS-mode for 64-bit items on 64-bit systems, and D-mode
+     otherwise.  Assume that any other register, such as LR, CRs, etc. will go
+     through the GPR registers for memory operations.  */
+  else if (TARGET_POWERPC64 && size >= 8)
+    return INSN_FORM_DS;
+
+  return INSN_FORM_D;
+}
+
+
+/* Whether a load instruction is a prefixed instruction.  This is called from
+   the prefixed attribute processing.  */
+
+bool
+prefixed_load_p (rtx_insn *insn)
+{
+  /* Validate the insn to make sure it is a normal load insn.  */
+  extract_insn_cached (insn);
+  if (recog_data.n_operands < 2)
+    return false;
+
+  rtx reg = recog_data.operand[0];
+  rtx mem = recog_data.operand[1];
+
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return false;
+
+  if (!MEM_P (mem))
+    return false;
+
+  /* LWA uses the DS format instead of the D format that LWZ uses.  */
+  enum insn_form default_addr;
+  machine_mode reg_mode = GET_MODE (reg);
+  machine_mode mem_mode = GET_MODE (mem);
+
+  if (mem_mode == SImode && reg_mode == DImode
+      && get_attr_sign_extend (insn) == SIGN_EXTEND_YES)
+    default_addr = INSN_FORM_DS;
+
+  else
+    default_addr = reg_to_insn_form (reg, mem_mode);
+
+  return address_is_prefixed (XEXP (mem, 0), mem_mode, default_addr);
+}
+
+/* Whether a store instruction is a prefixed instruction.  This is called from
+   the prefixed attribute processing.  */
+
+bool
+prefixed_store_p (rtx_insn *insn)
+{
+  /* Validate the insn to make sure it is a normal store insn.  */
+  extract_insn_cached (insn);
+  if (recog_data.n_operands < 2)
+    return false;
+
+  rtx mem = recog_data.operand[0];
+  rtx reg = recog_data.operand[1];
+
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return false;
+
+  if (!MEM_P (mem))
+    return false;
+
+  machine_mode mem_mode = GET_MODE (mem);
+  enum insn_form default_addr = reg_to_insn_form (reg, mem_mode);
+  return address_is_prefixed (XEXP (mem, 0), mem_mode, default_addr);
+}
+
+/* Whether a load immediate or add instruction is a prefixed instruction.  This
+   is called from the prefixed attribute processing.  */
+
+bool
+prefixed_paddi_p (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  if (!set)
+    return false;
+
+  rtx dest = SET_DEST (set);
+  rtx src = SET_SRC (set);
+
+  if (!REG_P (dest) && !SUBREG_P (dest))
+    return false;
+
+  /* Is this a load immediate that can't be done with a simple ADDI or
+     ADDIS?  */
+  if (CONST_INT_P (src))
+    return (satisfies_constraint_eI (src)
+	    && !satisfies_constraint_I (src)
+	    && !satisfies_constraint_L (src));
+
+  /* Is this a PADDI instruction that can't be done with a simple ADDI or
+     ADDIS?  */
+  if (GET_CODE (src) == PLUS)
+    {
+      rtx op1 = XEXP (src, 1);
+
+      return (CONST_INT_P (op1)
+	      && satisfies_constraint_eI (op1)
+	      && !satisfies_constraint_I (op1)
+	      && !satisfies_constraint_L (op1));
+    }
+
+  /* If not, is it a load of a pc-relative address?  */
+  if (!TARGET_PCREL || GET_MODE (dest) != Pmode)
+    return false;
+
+  if (!SYMBOL_REF_P (src) && !LABEL_REF_P (src) && GET_CODE (src) != CONST)
+    return false;
+
+  return address_is_pcrel_local_or_external (src, Pmode, INSN_FORM_DEFAULT);
+}
+
+
+/* Whether the next instruction needs a 'p' prefix issued before the
+   instruction is printed out.  */
+static bool next_insn_prefixed_p;
+
+/* Define FINAL_PRESCAN_INSN if some processing needs to be done before
+   outputting the assembler code.  On the PowerPC, we remember if the current
+   insn is a prefixed insn where we need to emit a 'p' before the insn.  */
+void
+rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
+{
+  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
+  return;
+}
+
+/* Define ASM_OUTPUT_OPCODE to do anything special before emitting an opcode.
+   We use it to emit a 'p' for prefixed insns that were scanned in
+   FINAL_PRESCAN_INSN.  */
+void
+rs6000_asm_output_opcode (FILE *stream)
+{
+  if (next_insn_prefixed_p)
+    fputc ('p', stream);
+
+  return;
+}
+
 
 #ifdef HAVE_GAS_HIDDEN
 # define USE_HIDDEN_LINKONCE 1

@@ -155,6 +155,11 @@ extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
 extern enum insn_form address_to_insn_form (rtx, machine_mode, enum insn_form);
+extern bool prefixed_load_p (rtx_insn *);
+extern bool prefixed_store_p (rtx_insn *);
+extern bool prefixed_paddi_p (rtx_insn *);
+extern void rs6000_asm_output_opcode (FILE *);
+extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
 
 /* Return true if the address is a prefixed instruction that can be directly
    used in a memory instruction (i.e. using numeric offset or a pc-relative
@@ -261,8 +266,6 @@ extern void rs6000_d_target_versions (void);
 #ifdef NO_DOLLAR_IN_LABEL
 const char * rs6000_xcoff_strip_dollar (const char *);
 #endif
-
-void rs6000_final_prescan_insn (rtx_insn *, rtx *operand, int num_operands);
 
 extern unsigned char rs6000_class_max_nregs[][LIM_REG_CLASSES];
 extern unsigned char rs6000_hard_regno_nregs[][FIRST_PSEUDO_REGISTER];

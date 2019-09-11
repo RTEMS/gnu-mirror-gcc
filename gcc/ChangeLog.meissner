@@ -1,5 +1,37 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
+	declaration.
+	(prefixed_store_p): New declaration.
+	(prefixed_paddi_p): New declaration.
+	(rs6000_asm_output_opcode): New declaration.
+	(rs6000_final_prescan_insn): Update calling signature.
+	* config/rs6000/rs6000.c (reg_to_insn_form): New function,
+	identify the insn_form of a hard register.
+	(prefixed_load_p): New function, return true if insn is a prefixed
+	load.
+	(prefixed_store_p): New function, return true if insn is a
+	prefixed store.
+	(prefixed_paddi_p): New function, return true if insn is a prefixed
+	add or load immediate.
+	(next_insn_prefixed_p): New global state variable.
+	(rs6000_final_prescan_insn): New function, record if insn is
+	prefixed.
+	(rs6000_asm_output_opcode): New function, emit leading 'p' if insn
+	is prefixed.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): New target hook.
+	(ASM_OUTPUT_OPCODE): New target hook.
+	* config/rs6000/rs6000.md (prefixed insn attribute): New insn
+	attribute that says if the insn is prefixed.
+	(prefixed_length insn attribute): New insn attribute.
+	(non_prefixed_length insn attribute): New insn attribute.
+	(length insn attribute): Set length based on whether the prefixed
+	attribute is set.
+	(pcrel_local_addr): Update insn to use the prefixed attribute.
+	(pcrel_extern_addr): Update insn to use the prefixed attribute.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (pcrel_address): Delete old
 	predicate, and re-implement with a new name.
 	(pcrel_external_address): Delete old predicate, and re-implement.
