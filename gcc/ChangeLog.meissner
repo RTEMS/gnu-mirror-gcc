@@ -1,5 +1,13 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for using
+	PADDI to add 34-bit constants.
+	(lwa_operand): Use prefixed addressing if the offset is odd.
+	* config/rs6000/rs6000.md (add<mode>, GPR iterator): Add support
+	for using PADDI to add 34-bit constants.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movsi_internal1): Add support to use
 	PADDI to load up 32-bit SImode integer constants.
 	(movsi constant int splitter): Don't split loading up the constant
