@@ -4,8 +4,6 @@
 	* config/rs6000/predicates.md (non_pcrel_mem_operand): New
 	predicate.
 	(reg_or_non_pcrel_operand): New predicate.
-	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
-	for pc-relative addresses.
 	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
 	Don't allow pc-relative addresses with variable extracts.
 	(vsx_extract_v4sf_var): Don't allow pc-relative addresses with

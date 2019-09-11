@@ -1666,6 +1666,20 @@
           || addr_type == INSN_FORM_PCREL_LOCAL);
 })
 
+;; Return 1 if op is a memory operand that is not prefixed.
+(define_predicate "non_prefixed_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form addr_type
+    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
+
+  return (addr_type != INSN_FORM_PREFIXED
+          && addr_type != INSN_FORM_PCREL_LOCAL);
+})
+
 
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.
