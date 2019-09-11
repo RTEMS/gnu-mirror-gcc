@@ -23,15 +23,13 @@
 
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/constraints.md (em): New constraint.
 	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
 	predicate.
-	(non_pcrel_mem_operand): New predicate.
-	(reg_or_non_pcrel_operand): New predicate.
 	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
 	declaration.
-	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
-	for extracting a vector element from a prefixed address.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add an
+	error message about bug in variable extract of vector elements
+	from memory if the address is prefixed.
 	(quad_address_p): Add support for prefixed addresses.
 	(mem_operand_gpr): Add support for prefixed addresses.  Use the
 	SIGNED_16BIT_OFFSET_EXTRA_P macro.
@@ -58,18 +56,6 @@
 	prefixed.
 	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
 	prefixed addresses.
-	(vsx_extract_<mode>_var, VSX_D iterator): Do not optimize
-	extracting from a vector in memory addressed with a prefixed
-	address.
-	(vsx_extract_v4sf_var): Do not optimize extracting from a vector
-	in memory addressed with a prefixed address.
-	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not optimize
-	extracting from a vector in memory addressed with a prefixed
-	address.
-	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not optimize
-	extracting from a vector in memory addressed with a prefixed
-	address.
-	* doc/md.texi (PowerPC constraints): Document 'em' constraint.
 
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 

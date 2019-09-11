@@ -1809,3 +1809,13 @@
 {
   return address_is_pcrel_local_or_external (op, mode, INSN_FORM_DEFAULT);
 })
+
+;; Return 1 if op is a memory operand that is not prefixed.
+(define_predicate "non_prefixed_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  return !address_is_prefixed (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
+})
