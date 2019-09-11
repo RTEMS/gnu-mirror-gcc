@@ -1,5 +1,12 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsi_internal1):  Add support for
+	using PADDI to load up 32-bit constants in one instruction.
+	(movsi CONST_INT splitter): Don't split 32-bit loads if we have
+	the PADDI instruction.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (num_insns_constant_gpr): Use
 	SIGNED_16BIT_OFFSET_P macro.  Add support for using the PADDI
 	instruction.
