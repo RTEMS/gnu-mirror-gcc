@@ -1,5 +1,15 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for
+	PADDI.
+	(non_add_cint_operand): Use add_operand instead of duplicating the
+	tests.
+	(lwa_operand): Add support for using PLWA.
+	* config/rs6000/rs6000.md (add<mode>3, GPR iterator): Add support
+	for PADDI.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movsi_internal1):  Add support for
 	using PADDI to load up 32-bit constants in one instruction.
 	(movsi CONST_INT splitter): Don't split 32-bit loads if we have
