@@ -1,5 +1,13 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	using PADDI to load 34-bit constants.
+	(rs6000_rtx_costs): Treat PADDI like ADDI and ADDIS.
+	* config/rs6000/rs6000.md (movdi_internal64): Add support to use
+	PADDI to load up 34-bit integer constants.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (em): New constraint.
 	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
 	predicate.
