@@ -154,35 +154,7 @@ extern align_flags rs6000_loop_align (rtx);
 extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
-extern enum insn_form address_to_insn_form (rtx, machine_mode, enum insn_form);
-
-/* Return true if the address is a prefixed instruction that can be directly
-   used in a memory instruction (i.e. using numeric offset or a pc-relative
-   reference to a local symbol).  References to external pc-relative symbols
-   aren't allowed, because to use an external address, GCC has to load the
-   address into a register and then issue a separate load or store.  */
-
-static inline bool
-address_is_prefixed (rtx addr,
-		     machine_mode mode,
-		     enum insn_form non_prefixed)
-{
-  enum insn_form iform = address_to_insn_form (addr, mode, non_prefixed);
-  return (iform == INSN_FORM_PREFIXED_NUMERIC
-	  || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Return true if the address is a pc-relative address that refers to either a
-   local symbol/label or an external symbol.  */
-
-static inline bool
-address_is_pcrel_local_or_external (rtx addr,
-				    machine_mode mode,
-				    enum insn_form non_prefixed)
-{
-  enum insn_form iform = address_to_insn_form (addr, mode, non_prefixed);
-  return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
+extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
