@@ -1,5 +1,11 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Split alternative
+	that combined setting a GPR to 0.0 and loading up a GPR from
+	memory.  Change length to 8 instead of 12 for some alternatives.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
 	declaration.
 	(prefixed_store_p): New declaration.
