@@ -1,3 +1,33 @@
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (pcrel_address): Delete old
+	predicate, and re-implement with a new name.
+	(pcrel_external_address): Delete old predicate, and re-implement.
+	(prefixed_mem_operand): Delete old predicate.
+	(pcrel_external_mem_operand): Delete.
+	(pcrel_local_address): New predicate to replace pcrel_address.
+	(pcrel_external_address): New implementation.
+	(pcrel_local_or_external_address): New predicate.
+	* config/rs6000/rs6000-protos.h (rs6000_prefixed_address_mode_p):
+	Delete.
+	(address_to_insn_form): New declaration.
+	(address_is_prefixed): New static inline helper function.
+	(address_is_pcrel_local_or_external): New static inline helper
+	function.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Load up pc-relative
+	local or external addresses.
+	(print_operand_address): Use pcrel_local_or_external_address and
+	add support for pc-relative external addresses.
+	(mode_supports_prefixed_address_p): Delete, no longer used.
+	(rs6000_prefixed_address_mode_p): Delete, replace with
+	address_to_insn_form.
+	(address_to_insn_form): New function to figure out the instruction
+	format of an address.
+	* config/rs6000/rs6000.md (enum insn_form): New enumaration.
+	(pcrel_local_addr): New insn to load local pc-relative addresses.
+	(pcrel_extern_addr): New insn to load external pc-relative
+	addresses.
+
 2019-09-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 275653
