@@ -839,7 +839,8 @@
 (define_predicate "add_operand"
   (if_then_else (match_code "const_int")
     (match_test "satisfies_constraint_I (op)
-		 || satisfies_constraint_L (op)")
+		 || satisfies_constraint_L (op)
+		 || satisfies_constraint_eI (op)")
     (match_operand 0 "gpc_reg_operand")))
 
 ;; Return 1 if the operand is either a non-special register, or 0, or -1.
@@ -932,6 +933,13 @@
     return false;
 
   addr = XEXP (inner, 0);
+
+  /* The LWA instruction uses the DS-form format where the bottom two bits of
+     the offset must be 0.  The prefixed PLWA does not have this
+     restriction.  */
+  if (TARGET_PREFIXED_ADDR && address_is_prefixed (addr, DImode, INSN_FORM_DS))
+    return true;
+
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
