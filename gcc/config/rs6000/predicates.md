@@ -937,13 +937,8 @@
   /* The LWA instruction uses the DS-form format where the bottom two bits of
      the offset must be 0.  The prefixed PLWA does not have this
      restriction.  */
-  if (TARGET_PREFIXED_ADDR)
-    {
-      enum insn_form addr_type = classify_offset_addr (addr, DImode, INSN_FORM_DS);
-      if (addr_type == INSN_FORM_PREFIXED
-          || addr_type == INSN_FORM_PCREL_LOCAL)
-	return true;
-    }
+  if (TARGET_PREFIXED_ADDR && address_is_prefixed (addr, DImode, INSN_FORM_DS))
+    return true;
 
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
@@ -1642,10 +1637,8 @@
 (define_predicate "pcrel_local_address"
   (match_code "label_ref,symbol_ref,const")
 {
-  enum insn_form addr_type
-    = classify_offset_addr (op, mode, INSN_FORM_DEFAULT);
-
-  return addr_type == INSN_FORM_PCREL_LOCAL;
+  enum insn_form iform = address_to_insn_form (op, mode, INSN_FORM_DEFAULT);
+  return iform == INSN_FORM_PCREL_LOCAL;
 })
 
 ;; Return true if the operand is an external symbol whose address can be loaded
@@ -1657,12 +1650,10 @@
 ;; defined in another module.
 
 (define_predicate "pcrel_external_address"
-  (match_code "symbol_ref")
+  (match_code "symbol_ref,const")
 {
-  enum insn_form addr_type
-    = classify_offset_addr (op, mode, INSN_FORM_DEFAULT);
-
-  return addr_type == INSN_FORM_PCREL_EXTERNAL;
+  enum insn_form iform = address_to_insn_form (op, mode, INSN_FORM_DEFAULT);
+  return iform == INSN_FORM_PCREL_EXTERNAL;
 })
 
 ;; Return true if the address is pc-relative and the symbol is either local or
@@ -1671,11 +1662,7 @@
 (define_predicate "pcrel_local_or_external_address"
   (match_code "label_ref,symbol_ref,const")
 {
-  enum insn_form addr_type
-    = classify_offset_addr (op, mode, INSN_FORM_DEFAULT);
-
-  return (addr_type == INSN_FORM_PCREL_EXTERNAL
-          || addr_type == INSN_FORM_PCREL_LOCAL);
+  return address_is_pcrel_local_or_external (op, mode, INSN_FORM_DEFAULT);
 })
 
 ;; Return 1 if op is a memory operand that is not prefixed.
@@ -1685,11 +1672,7 @@
   if (!memory_operand (op, mode))
     return false;
 
-  enum insn_form addr_type
-    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
-
-  return (addr_type != INSN_FORM_PREFIXED
-          && addr_type != INSN_FORM_PCREL_LOCAL);
+  return !address_is_prefixed (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
 })
 
 ;; Return 1 if op is a memory operand that does not contain a pc-relative
@@ -1700,11 +1683,8 @@
   if (!memory_operand (op, mode))
     return false;
 
-  enum insn_form addr_type
-    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
-
-  return (addr_type != INSN_FORM_PCREL_LOCAL
-          || addr_type == INSN_FORM_PCREL_EXTERNAL);
+  rtx addr = XEXP (op, 0);
+  return address_is_pcrel_local_or_external (addr, mode, INSN_FORM_DEFAULT);
 })
 
 ;; Return 1 if op is a register or a memory operand that does not contain a
@@ -1718,11 +1698,8 @@
   if (!memory_operand (op, mode))
     return false;
 
-  enum insn_form addr_type
-    = classify_offset_addr (XEXP (op, 0), mode, INSN_FORM_DEFAULT);
-
-  return (addr_type != INSN_FORM_PCREL_LOCAL
-          || addr_type == INSN_FORM_PCREL_EXTERNAL);
+  rtx addr = XEXP (op, 0);
+  return !address_is_pcrel_local_or_external (addr, mode, INSN_FORM_DEFAULT);
 })
 
 

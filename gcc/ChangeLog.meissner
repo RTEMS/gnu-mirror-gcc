@@ -1,5 +1,35 @@
 2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (lwa_operand): Use
+	address_is_prefixed.
+	(pcrel_local_address): Simplify.
+	(pcrel_external_address): Simplify.
+	(pcrel_local_or_external_address): Simplify.
+	(non_prefixed_mem_operand): Simplify.
+	(non_pcrel_mem_operand): Simplify.
+	(reg_or_non_pcrel_mem_operand): Simplify.
+	* config/rs6000/rs6000-protos.h (address_to_insn_form): Rename
+	classify_offset_addr.
+	(address_is_prefixed): New helper function.
+	(address_is_pcrel_local_or_external): New helper function.
+	* config/rs6000/rs6000.c (quad_address_p): Use
+	address_is_prefixed.
+	(mem_operand_gpr): Use address_is_prefixed.
+	(mem_operand_ds_form): Use address_is_prefixed.
+	(rs6000_legitimate_address_p): Use address_is_prefixed.
+	(address_to_insn_form): Rename classify_offset_addr.  Add support
+	for recognizing X-form, LO_SUM and update addresses.  Rework
+	D/DS/DQ addresses.
+	(reg_to_insn_form): Rework.
+	(prefixed_load_p): Use address_is_prefixed.
+	(prefixed_store_p): Use address_is_prefixed.
+	(prefixed_paddi_p): Use address_is_pcrel_local_or_external.
+	(make_memory_non_prefixed): Use address_is_prefixed.
+	* config/rs6000/rs6000.md (insn_form): Add x-form, update form.
+	Rename base to base_reg.  Add LO_SUM.
+
+2019-09-11  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (add_operand): Add support for
 	PADDI.
 	(non_add_cint_operand): Use add_operand instead of duplicating the

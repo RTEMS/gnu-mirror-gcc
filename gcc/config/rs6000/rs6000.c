@@ -7287,8 +7287,7 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
      are non-zero, we could use a prefixed instruction (which does not have the
      DQ-form constraint that the traditional instruction had) instead of
      forcing the unaligned offset to a GPR.  */
-  enum insn_form addr_type = classify_offset_addr (addr, mode, INSN_FORM_DQ);
-  if (addr_type == INSN_FORM_PREFIXED || addr_type == INSN_FORM_PCREL_LOCAL)
+  if (address_is_prefixed (addr, mode, INSN_FORM_DQ))
     return true;
 
   if (GET_CODE (addr) != PLUS)
@@ -7396,8 +7395,7 @@ mem_operand_gpr (rtx op, machine_mode mode)
      offset are non-zero, we could use a prefixed instruction (which does not
      have the DS-form constraint that the traditional instruction had) instead
      of forcing the unaligned offset to a GPR.  */
-  enum insn_form addr_type = classify_offset_addr (addr, mode, INSN_FORM_DS);
-  if (addr_type == INSN_FORM_PREFIXED || addr_type == INSN_FORM_PCREL_LOCAL)
+  if (address_is_prefixed (addr, mode, INSN_FORM_DS))
     return true;
 
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
@@ -7438,8 +7436,7 @@ mem_operand_ds_form (rtx op, machine_mode mode)
      offset are non-zero, we could use a prefixed instruction (which does not
      have the DS-form constraint that the traditional instruction had) instead
      of forcing the unaligned offset to a GPR.  */
-  enum insn_form addr_type = classify_offset_addr (addr, mode, INSN_FORM_DS);
-  if (addr_type == INSN_FORM_PREFIXED || addr_type == INSN_FORM_PCREL_LOCAL)
+  if (address_is_prefixed (addr, mode, INSN_FORM_DS))
     return true;
 
   if (!offsettable_address_p (false, mode, addr))
@@ -8713,9 +8710,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
     return 1;
 
   /* Handle prefixed addresses (pc-relative or 34-bit offset).  */
-  enum insn_form addr_type
-    = classify_offset_addr (x, mode, INSN_FORM_DEFAULT);
-  if (addr_type == INSN_FORM_PREFIXED || addr_type == INSN_FORM_PCREL_LOCAL)
+  if (address_is_prefixed (x, mode, INSN_FORM_DEFAULT))
     return 1;
 
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
@@ -8779,10 +8774,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
     {
       /* There is no prefixed version of the load/store with update.  */
       rtx addr = XEXP (x, 1);
-      enum insn_form addr_type
-	= classify_offset_addr (addr, mode, INSN_FORM_DEFAULT);
-      return (addr_type != INSN_FORM_PREFIXED
-	      && addr_type != INSN_FORM_PCREL_LOCAL);
+      return !address_is_prefixed (addr, mode, INSN_FORM_DEFAULT);
     }
   if (reg_offset_p && !quad_offset_p
       && legitimate_lo_sum_address_p (mode, x, reg_ok_strict))
@@ -24695,16 +24687,19 @@ rs6000_pcrel_p (struct function *fn)
 
 
 /* Given an address (ADDR), a mode (MODE), and a default insn_form for
-   non-prefixed addresses (NON_PREFIXED), return the insn_form for an offset
-   address.  We don't worry about other forms of addressing, such as update
-   forms, or X-form.  */
+   non-prefixed addresses (NON_PREFIXED), return the insn_form for the
+   address.  */
 
 enum insn_form
-classify_offset_addr (rtx addr, machine_mode mode, enum insn_form non_prefixed)
+address_to_insn_form (rtx addr, machine_mode mode, enum insn_form non_prefixed)
 {
   /* Single register is easy.  */
   if (REG_P (addr) || SUBREG_P (addr))
-    return INSN_FORM_BASE;
+    return INSN_FORM_BASE_REG;
+
+  /* Deal with update forms.  */
+  if (GET_RTX_CLASS (GET_CODE (addr)) == RTX_AUTOINC)
+    return INSN_FORM_UPDATE;
 
   if (GET_CODE (addr) == CONST)
     addr = XEXP (addr, 0);
@@ -24722,11 +24717,18 @@ classify_offset_addr (rtx addr, machine_mode mode, enum insn_form non_prefixed)
       return INSN_FORM_PCREL_LOCAL;
     }
 
+  /* Check whether this is an offsettable address.  */
+  if (GET_CODE (addr) == LO_SUM)
+    return INSN_FORM_LO_SUM;
+
   if (GET_CODE (addr) != PLUS)
     return INSN_FORM_BAD;
 
   rtx op0 = XEXP (addr, 0);
   rtx op1 = XEXP (addr, 1);
+
+  if (REG_P (op1) || SUBREG_P (op1))
+    return INSN_FORM_X;
 
   if (!CONST_INT_P (op1))
     return INSN_FORM_BAD;
@@ -24735,13 +24737,12 @@ classify_offset_addr (rtx addr, machine_mode mode, enum insn_form non_prefixed)
   if (!SIGNED_34BIT_OFFSET_P (offset))
     return INSN_FORM_BAD;
 
-  /* Pc-relative addresses do not allow an index register.  Do not allow
-     external symbols with an offset, since the ABI says that isn't allowed.
-     Assume labels are always just local.  */
+  /* Pc-relative addresses do not allow an index register.  Assume labels are
+     always just local.  */
   if (TARGET_PCREL && (SYMBOL_REF_P (op0) || LABEL_REF_P (op0)))
     {
       if (SYMBOL_REF_P (op0) && !SYMBOL_REF_LOCAL_P (op0))
-	return INSN_FORM_BAD;
+	return INSN_FORM_PCREL_EXTERNAL;
 
       return INSN_FORM_PCREL_LOCAL;
     }
@@ -24751,7 +24752,9 @@ classify_offset_addr (rtx addr, machine_mode mode, enum insn_form non_prefixed)
     return INSN_FORM_BAD;
 
   if (!SIGNED_16BIT_OFFSET_P (offset))
-    return TARGET_PREFIXED_ADDR ? INSN_FORM_PREFIXED : INSN_FORM_BAD;
+    return (TARGET_PREFIXED_ADDR
+	    ? INSN_FORM_PREFIXED_NUMERIC
+	    : INSN_FORM_BAD);
 
   /* 16-bit offset, see what default instruction format to use.  */
   if (non_prefixed == INSN_FORM_DEFAULT)
@@ -24771,103 +24774,99 @@ classify_offset_addr (rtx addr, machine_mode mode, enum insn_form non_prefixed)
 	non_prefixed = INSN_FORM_D;
     }
 
-  if (non_prefixed == INSN_FORM_D)
-    return INSN_FORM_D;
-
-  else if (non_prefixed == INSN_FORM_DS)
+  /* Classify the D/DS/DQ-form addresses.  */
+  switch (non_prefixed)
     {
+    case INSN_FORM_D:
+      return INSN_FORM_D;
+
+    case INSN_FORM_DS:
       if ((offset & 3) == 0)
 	return INSN_FORM_DS;
 
       else if (TARGET_PREFIXED_ADDR)
-	return INSN_FORM_PREFIXED;
+	return INSN_FORM_PREFIXED_NUMERIC;
 
       else
 	return INSN_FORM_BAD;
-    }
 
-  else if (non_prefixed == INSN_FORM_DQ)
-    {
+    case INSN_FORM_DQ:
       if ((offset & 15) == 0)
 	return INSN_FORM_DQ;
 
       else if (TARGET_PREFIXED_ADDR)
-	return INSN_FORM_PREFIXED;
+	return INSN_FORM_PREFIXED_NUMERIC;
 
       else
 	return INSN_FORM_BAD;
+
+    default:
+      break;
     }
 
   return INSN_FORM_BAD;
 }
 
 
-/* Helper function to take a REG and a MODE and turn it into the traditional
+/* Helper function to take a REG and a MODE and turn it into the non-prefixed
    instruction format (D/DS/DQ) used for offset memory.  */
 
 static enum insn_form
 reg_to_insn_form (rtx reg, machine_mode mode)
 {
   /* If it isn't a register, use the defaults.  */
-  if (REG_P (reg) || SUBREG_P (reg))
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return INSN_FORM_DEFAULT;
+
+  unsigned int r = reg_or_subregno (reg);
+
+  /* If we have a pseudo, use the default instruction format.  */
+  if (r >= FIRST_PSEUDO_REGISTER)
+    return INSN_FORM_DEFAULT;
+
+  /* If we have a hard register, use the addr_mask of that hard register's
+     reload register class.  */
+  unsigned size = GET_MODE_SIZE (mode);
+
+  /* FPR registers use D-mode for scalars, and DQ-mode for vectors.  */
+  if (FP_REGNO_P (r))
     {
-      unsigned int r = reg_or_subregno (reg);
+      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
+	return INSN_FORM_D;
 
-      /* If we have a pseudo, use the default instruction format.  */
-      if (r >= FIRST_PSEUDO_REGISTER)
-	return INSN_FORM_DEFAULT;
+      else if (size < 8)
+	return INSN_FORM_X;
 
-      /* If we have a hard register, use the addr_mask of that hard
-	 register's reload register class.  */
+      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+	return INSN_FORM_DQ;
+
       else
-	{
-	  unsigned size = GET_MODE_SIZE (mode);
-
-	  /* FPR registers use D-mode for scalars, and DQ-mode for vectors.  */
-	  if (FP_REGNO_P (r))
-	    {
-	      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
-		return INSN_FORM_D;
-
-	      else if (TARGET_VSX && size >= 16
-		       && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
-		return INSN_FORM_DQ;
-
-	      else
-		return INSN_FORM_DEFAULT;
-	    }
-
-	  /* Altivec registers use DS-mode for scalars, and DQ-mode for
-	     vectors.  */
-	  else if (ALTIVEC_REGNO_P (r))
-	    {
-	      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
-		return INSN_FORM_DS;
-
-	      else if (TARGET_VSX && size >= 16
-		       && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
-		return INSN_FORM_DQ;
-
-	      else
-		return INSN_FORM_DEFAULT;
-	    }
-
-	  /* GPR registers use DS-mode for 64-bit items on 64-bit systems, and
-	     D-mode otherwise.  Assume that any other register, such as LR,
-	     CRs, etc. will go through the GPR registers for memory
-	     operations.  */
-	  else
-	    {
-	      if (TARGET_POWERPC64 && size >= 8)
-		return INSN_FORM_DS;
-
-	      else
-		return INSN_FORM_D;
-	    }
-	}
+	return INSN_FORM_DEFAULT;
     }
 
-  return INSN_FORM_DEFAULT;
+  /* Altivec registers use DS-mode for scalars, and DQ-mode for vectors.  */
+  else if (ALTIVEC_REGNO_P (r))
+    {
+      if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
+	return INSN_FORM_DS;
+
+      else if (size < 8)
+	return INSN_FORM_X;
+
+      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+	return INSN_FORM_DQ;
+
+      else
+	return INSN_FORM_DEFAULT;
+    }
+
+  /* GPR registers use DS-mode for 64-bit items on 64-bit systems, and D-mode
+     otherwise.  Assume that any other register, such as LR, CRs, etc. will go
+     through the GPR registers for memory operations.  */
+  else if (TARGET_POWERPC64 && size >= 8)
+    return INSN_FORM_DS;
+
+  return INSN_FORM_D;
 }
 
 
@@ -24892,7 +24891,7 @@ prefixed_load_p (rtx_insn *insn)
     return false;
 
   /* LWA uses the DS format instead of the D format that LWZ uses.  */
-  enum insn_form default_addr, addr_type;
+  enum insn_form default_addr;
   machine_mode reg_mode = GET_MODE (reg);
   machine_mode mem_mode = GET_MODE (mem);
 
@@ -24903,9 +24902,7 @@ prefixed_load_p (rtx_insn *insn)
   else
     default_addr = reg_to_insn_form (reg, mem_mode);
 
-  addr_type = classify_offset_addr (XEXP (mem, 0), mem_mode, default_addr);
-  return (addr_type == INSN_FORM_PREFIXED
-	  || addr_type == INSN_FORM_PCREL_LOCAL);
+  return address_is_prefixed (XEXP (mem, 0), mem_mode, default_addr);
 }
 
 /* Whether a store instruction is a prefixed instruction.  This is called from
@@ -24930,11 +24927,7 @@ prefixed_store_p (rtx_insn *insn)
 
   machine_mode mem_mode = GET_MODE (mem);
   enum insn_form default_addr = reg_to_insn_form (reg, mem_mode);
-  enum insn_form addr_type
-    = classify_offset_addr (XEXP (mem, 0), mem_mode, default_addr);
-
-  return (addr_type == INSN_FORM_PREFIXED
-	  || addr_type == INSN_FORM_PCREL_LOCAL);
+  return address_is_prefixed (XEXP (mem, 0), mem_mode, default_addr);
 }
 
 /* Whether a load immediate or add instruction is a prefixed instruction.  This
@@ -24979,9 +24972,7 @@ prefixed_paddi_p (rtx_insn *insn)
   if (!SYMBOL_REF_P (src) && !LABEL_REF_P (src) && GET_CODE (src) != CONST)
     return false;
 
-  enum insn_form addr_type = classify_offset_addr (src, Pmode, INSN_FORM_DEFAULT);
-  return (addr_type == INSN_FORM_PCREL_LOCAL
-	  || addr_type == INSN_FORM_PCREL_EXTERNAL);
+  return address_is_pcrel_local_or_external (src, Pmode, INSN_FORM_DEFAULT);
 }
 
 
@@ -25022,10 +25013,7 @@ make_memory_non_prefixed (rtx mem)
   gcc_assert (MEM_P (mem));
 
   rtx old_addr = XEXP (mem, 0);
-  enum insn_form addr_type
-    = classify_offset_addr (old_addr, GET_MODE (mem), INSN_FORM_DEFAULT);
-
-  if (addr_type == INSN_FORM_PREFIXED || addr_type == INSN_FORM_PCREL_LOCAL)
+  if (address_is_prefixed (old_addr, GET_MODE (mem), INSN_FORM_DEFAULT))
     {
       rtx new_addr;
 
