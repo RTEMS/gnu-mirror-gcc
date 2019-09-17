@@ -1810,3 +1810,18 @@
   enum insn_form iform = address_to_insn_form (op, mode, NON_PREFIXED_DEFAULT);
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
 })
+
+;; Return 1 if op is a memory operand that is not prefixed.
+(define_predicate "non_prefixed_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_PREFIXED_NUMERIC
+          && iform != INSN_FORM_PCREL_LOCAL
+          && iform != INSN_FORM_BAD);
+})

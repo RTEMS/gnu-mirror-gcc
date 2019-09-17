@@ -1,5 +1,39 @@
 2019-09-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
+	predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add
+	temporary check for pc-relative addresses.
+	(quad_address_p): Add support for prefixed addresses.
+	(mem_operand_gpr): Add support for prefixed addresses.  Use
+	SIGNED_16BIT_OFFSET_EXTRA_P to validate 16-bit address.
+	(mem_operand_ds_form): Add support for prefixed addresses.  Use
+	SIGNED_16BIT_OFFSET_EXTRA_P to validate 16-bit address.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addresses.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addresses.
+	(rs6000_num_insns): New helper function.
+	(rs6000_insn_cost): Don't count prefixed instructions as being
+	more expensive that non-prefixed instructions due to the length
+	being bigger.
+	(make_memory_non_prefixed): New function.
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add support for
+	prefixed addresses.
+	(movtd_64bit_nodm): Add support for prefixed addresses.
+	(stack_protect_setdi): Make sure the addresses are not prefixed
+	during expansion.  Allow using indexed loads and stores.
+	(stack_protect_testdi): Make sure the addresses are not prefixed
+	during expansion.  Allow using indexed loads and stores.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed addresses.
+
+2019-09-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Split the
 	alternatives for loading 0.0 to a GPR and loading a 128-bit
 	floating point type to a GPR.
