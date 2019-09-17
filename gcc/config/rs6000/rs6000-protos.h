@@ -154,7 +154,41 @@ extern align_flags rs6000_loop_align (rtx);
 extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_pcrel_p (struct function *);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
-extern bool rs6000_prefixed_address_mode_p (rtx, machine_mode);
+
+/* Different PowerPC instruction formats that are used by GCC.  There are
+   various other instruction formats used by the PowerPC, but the these formats
+   are not currently used.  */
+
+enum insn_form {
+  INSN_FORM_BAD,		/* Bad instruction format.  */
+  INSN_FORM_BASE_REG,		/* Base register only.  */
+  INSN_FORM_D,			/* Base register + 16-bit numeric offset.  */
+  INSN_FORM_DS,			/* Base register + 14-bit offset + 00.  */
+  INSN_FORM_DQ,			/* Base register + 12-bit offset + 0000.  */
+  INSN_FORM_X,			/* Base register + index register.  */
+  INSN_FORM_UPDATE,		/* Address udpates base register.  */
+  INSN_FORM_LO_SUM,		/* Special offset instruction.  */
+  INSN_FORM_PREFIXED_NUMERIC,	/* Base register + 34 bit numeric offset.  */
+  INSN_FORM_PCREL_LOCAL,	/* Pc-relative local symbol.  */
+  INSN_FORM_PCREL_EXTERNAL	/* Pc-relative external symbol.  */
+};
+
+/* Instruction format for the non-prefixed version of an offsettable
+   instruction.  This is used to determine if a 16-bit offset is valid to be
+   used with a non-prefixed (traditional) instruction or if the bottom bits of
+   the offset cannot be used with a DS or DQ instruction format, and GCC has to
+   use a prefixed instruction for the load or store.  */
+
+enum non_prefixed {
+  NON_PREFIXED_DEFAULT,		/* Use the default.  */
+  NON_PREFIXED_D,		/* All 16-bits are valid.  */
+  NON_PREFIXED_DS,		/* Bottom 2 bits must be 0.  */
+  NON_PREFIXED_DQ,		/* Bottom 4 bits must be 0.  */
+  NON_PREFIXED_X		/* No offset memory form exists.  */
+};
+
+extern enum insn_form address_to_insn_form (rtx, machine_mode,
+					    enum non_prefixed);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
