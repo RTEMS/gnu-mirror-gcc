@@ -17,8 +17,9 @@
 
 2019-09-17  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/predicates.md (non_prefixed_mem_operand): New
-	predicate.
+	* config/rs6000/predicates.md (lwa_operand): Add support for
+	prefixed addresses.
+	(non_prefixed_mem_operand): New predicate.
 	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
 	declaration.
 	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add
