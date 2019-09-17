@@ -11,10 +11,11 @@
 	(prefixed_store_p): New declaration.
 	(prefixed_paddi_p): New declaration.
 	(rs6000_asm_output_opcode): New declaration.
-	(rs6000_final_prescan_insn): Update calling signature.
+	(rs6000_final_prescan_insn): Move declaration and update calling
+	signature.
+	(address_is_prefixed): New helper inline function.
 	* config/rs6000/rs6000.c (rs6000_emit_move): Support loading
 	pc-relative addresses.
-	(address_is_prefixed): New helper function.
 	(reg_to_non_prefixed): New function to identify what the
 	non-prefixed memory instruction format is for a register.
 	(prefixed_load_p): New function to identify prefixed loads.
