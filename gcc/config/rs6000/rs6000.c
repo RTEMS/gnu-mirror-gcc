@@ -5522,16 +5522,12 @@ static int
 num_insns_constant_gpr (HOST_WIDE_INT value)
 {
   /* signed constant loadable with addi */
-  if (SIGNED_16BIT_OFFSET_P (value))
+  if (((unsigned HOST_WIDE_INT) value + 0x8000) < 0x10000)
     return 1;
 
   /* constant loadable with addis */
   else if ((value & 0xffff) == 0
 	   && (value >> 31 == -1 || value >> 31 == 0))
-    return 1;
-
-  /* PADDI can support up to 34 bit signed integers.  */
-  else if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (value))
     return 1;
 
   else if (TARGET_POWERPC64)
@@ -6864,14 +6860,6 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
      systems.  */
   if (MEM_P (src))
     {
-      /* Currently, using pc-relative addresses in variable extracts generates
-	 incorrect code (it wants to use the same register to hold the address
-	 that the variable offset is generated in).  Give an error until this
-	 can be fixed.  */
-      if (pcrel_local_address (XEXP (src, 0), Pmode))
-	error ("Using vector extracts on pc-relative addresses is currently "
-	       "broken");
-
       int num_elements = GET_MODE_NUNITS (mode);
       rtx num_ele_m1 = GEN_INT (num_elements - 1);
 
@@ -7261,13 +7249,6 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
   if (VECTOR_MODE_P (mode) && !mode_supports_dq_form (mode))
     return false;
 
-  /* Is this a valid prefixed address?  If the bottom four bits of the offset
-     are non-zero, we could use a prefixed instruction (which does not have the
-     DQ-form constraint that the traditional instruction had) instead of
-     forcing the unaligned offset to a GPR.  */
-  if (address_is_prefixed (addr, mode, NON_PREFIXED_DQ))
-    return true;
-
   if (GET_CODE (addr) != PLUS)
     return false;
 
@@ -7369,13 +7350,6 @@ mem_operand_gpr (rtx op, machine_mode mode)
       && legitimate_indirect_address_p (XEXP (addr, 0), false))
     return true;
 
-  /* Allow prefixed instructions if supported.  If the bottom two bits of the
-     offset are non-zero, we could use a prefixed instruction (which does not
-     have the DS-form constraint that the traditional instruction had) instead
-     of forcing the unaligned offset to a GPR.  */
-  if (address_is_prefixed (addr, mode, NON_PREFIXED_DS))
-    return true;
-
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
@@ -7397,7 +7371,7 @@ mem_operand_gpr (rtx op, machine_mode mode)
        causes a wrap, so test only the low 16 bits.  */
     offset = ((offset & 0xffff) ^ 0x8000) - 0x8000;
 
-  return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
+  return offset + 0x8000 < 0x10000u - extra;
 }
 
 /* As above, but for DS-FORM VSX insns.  Unlike mem_operand_gpr,
@@ -7409,13 +7383,6 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
-
-  /* Allow prefixed instructions if supported.  If the bottom two bits of the
-     offset are non-zero, we could use a prefixed instruction (which does not
-     have the DS-form constraint that the traditional instruction had) instead
-     of forcing the unaligned offset to a GPR.  */
-  if (address_is_prefixed (addr, mode, NON_PREFIXED_DS))
-    return true;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -7437,7 +7404,7 @@ mem_operand_ds_form (rtx op, machine_mode mode)
        causes a wrap, so test only the low 16 bits.  */
     offset = ((offset & 0xffff) ^ 0x8000) - 0x8000;
 
-  return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
+  return offset + 0x8000 < 0x10000u - extra;
 }
 
 /* Subroutines of rs6000_legitimize_address and rs6000_legitimate_address_p.  */
@@ -7786,10 +7753,8 @@ rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
       break;
     }
 
-  if (TARGET_PREFIXED_ADDR)
-    return SIGNED_34BIT_OFFSET_EXTRA_P (offset, extra);
-  else
-    return SIGNED_16BIT_OFFSET_EXTRA_P (offset, extra);
+  offset += 0x8000;
+  return offset < 0x10000 - extra;
 }
 
 bool
@@ -8686,11 +8651,6 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       && mode_supports_pre_incdec_p (mode)
       && legitimate_indirect_address_p (XEXP (x, 0), reg_ok_strict))
     return 1;
-
-  /* Handle prefixed addresses (pc-relative or 34-bit offset).  */
-  if (address_is_prefixed (x, mode, NON_PREFIXED_DEFAULT))
-    return 1;
-
   /* Handle restricted vector d-form offsets in ISA 3.0.  */
   if (quad_offset_p)
     {
@@ -8749,11 +8709,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	  || (!avoiding_indexed_address_p (mode)
 	      && legitimate_indexed_address_p (XEXP (x, 1), reg_ok_strict)))
       && rtx_equal_p (XEXP (XEXP (x, 1), 0), XEXP (x, 0)))
-    {
-      /* There is no prefixed version of the load/store with update.  */
-      rtx addr = XEXP (x, 1);
-      return !address_is_prefixed (addr, mode, NON_PREFIXED_DEFAULT);
-    }
+    return 1;
   if (reg_offset_p && !quad_offset_p
       && legitimate_lo_sum_address_p (mode, x, reg_ok_strict))
     return 1;
@@ -8815,12 +8771,8 @@ rs6000_mode_dependent_address (const_rtx addr)
 	  && XEXP (addr, 0) != arg_pointer_rtx
 	  && CONST_INT_P (XEXP (addr, 1)))
 	{
-	  HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
-	  HOST_WIDE_INT extra = TARGET_POWERPC64 ? 8 : 12;
-	  if (TARGET_PREFIXED_ADDR)
-	    return !SIGNED_34BIT_OFFSET_EXTRA_P (val, extra);
-	  else
-	    return !SIGNED_16BIT_OFFSET_EXTRA_P (val, extra);
+	  unsigned HOST_WIDE_INT val = INTVAL (XEXP (addr, 1));
+	  return val + 0x8000 >= 0x10000 - (TARGET_POWERPC64 ? 8 : 12);
 	}
       break;
 
@@ -20628,8 +20580,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    || outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
-	       || satisfies_constraint_L (x)
-	       || satisfies_constraint_eI (x)))
+	       || satisfies_constraint_L (x)))
 	  || (outer_code == AND
 	      && (satisfies_constraint_K (x)
 		  || (mode == SImode
@@ -20997,42 +20948,6 @@ rs6000_debug_rtx_costs (rtx x, machine_mode mode, int outer_code,
   return ret;
 }
 
-/* How many real instructions are generated for this insn?  This is slightly
-   different from the length attribute, in that the length attribute counts the
-   number of bytes.  With prefixed instructions, we don't want to count a
-   prefixed instruction (length 12 bytes including possible NOP) as taking 3
-   instructions, but just one.  */
-
-static int
-rs6000_num_insns (rtx_insn *insn)
-{
-  /* Try to figure it out based on the length and whether there are prefixed
-     instructions.  While prefixed instructions are only 8 bytes, we have to
-     use 12 as the size of the first prefixed instruction in case the
-     instruction needs to be aligned.  Back to back prefixed instructions would
-     only take 20 bytes, since it is guaranteed that one of the prefixed
-     instructions does not need the alignment.  */
-  int length = get_attr_length (insn);
-
-  if (length >= 12 && TARGET_PREFIXED_ADDR
-      && get_attr_prefixed (insn) == PREFIXED_YES)
-    {
-      /* Single prefixed instruction.  */
-      if (length == 12)
-	return 1;
-
-      /* A normal instruction and a prefixed instruction (16) or two back
-	 to back prefixed instructions (20).  */
-      if (length == 16 || length == 20)
-	return 2;
-
-      /* Guess for larger instruction sizes.  */
-      return 2 + (length - 20) / 4;
-    }
-
-  return length / 4;
-}
-
 static int
 rs6000_insn_cost (rtx_insn *insn, bool speed)
 {
@@ -21046,7 +20961,7 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (cost > 0)
     return cost;
 
-  int n = rs6000_num_insns (insn);
+  int n = get_attr_length (insn) / 4;
   enum attr_type type = get_attr_type (insn);
 
   switch (type)
@@ -24962,34 +24877,6 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Make a memory address non-prefixed if it is prefixed.  */
-
-rtx
-make_memory_non_prefixed (rtx mem)
-{
-  gcc_assert (MEM_P (mem));
-
-  rtx old_addr = XEXP (mem, 0);
-  if (address_is_prefixed (old_addr, GET_MODE (mem), NON_PREFIXED_DEFAULT))
-    {
-      rtx new_addr;
-
-      if (GET_CODE (old_addr) == PLUS
-	  && (REG_P (XEXP (old_addr, 0)) || SUBREG_P (XEXP (old_addr, 0)))
-	  && CONST_INT_P (XEXP (old_addr, 1)))
-	{
-	  rtx tmp_reg = force_reg (Pmode, XEXP (old_addr, 1));
-	  new_addr = gen_rtx_PLUS (Pmode, XEXP (old_addr, 0), tmp_reg);
-	}
-      else
-	new_addr = force_reg (Pmode, old_addr);
-
-      mem = change_address (mem, VOIDmode, new_addr);
-    }
-
-  return mem;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
