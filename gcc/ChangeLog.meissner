@@ -1,5 +1,56 @@
 2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	non pc-relative memory.
+	* config/rs6000/predicates.md (lwa_operand): Allow odd offsets if
+	we have prefixed addressing.
+	(non_prefixed_memory): New predicate.
+	(non_pcrel_memory): New predicate.
+	(reg_or_non_pcrel_memory): New predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Optimize
+	pc-relative addresses with constant offsets.  Signal an error if
+	we have a pc-relative address and a variable offset.
+	(rs6000_split_vec_extract_var): Signal an error if we have a
+	pc-relative address and a variable offset.
+	(quad_address_p): Add support for prefixed addresses.
+	(mem_operand_gpr): Add support for prefixed addresses.
+	(mem_operand_ds_form): Add support for prefixed addresses.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addresses.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addresses.
+	(rs6000_num_insns): New helper function.
+	(rs6000_insn_cost): Treat prefixed instructions as having the same
+	cost as non prefixed instructions, even though the prefixed
+	instructions are larger.
+	(make_memory_non_prefixed): New function to make a non-prefixed
+	memory operand.
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add support for
+	prefixed addresses.
+	(movtd_64bit_nodm): Add support for prefixed addresses.
+	(stack_protect_setdi): Convert prefixed addresses to non-prefixed
+	addresses.  Allow for indexed addressing as well as offsettable.
+	(stack_protect_testdi): Convert prefixed addresses to non-prefixed
+	addresses.  Allow for indexed addressing as well as offsettable.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed addresses.
+	(vsx_extract_<mode>_var, VSX_D iterator): Do not allow a vector in
+	memory with a prefixed address to combine with variable offsets.
+	(vsx_extract_v4sf_var): Do not allow a vector in memory with a
+	prefixed address to combine with variable offsets.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not allow a
+	vector in memory with a prefixed address to combine with variable
+	offsets.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not allow a vector in
+	memory with a prefixed address to combine with variable offsets.
+	* doc/md.texi (PowerPC constraints): Document 'em' constraint.
+
+2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Split the
 	alternatives for loading 0.0 to a GPR and loading a 128-bit
 	floating point type to a GPR.
