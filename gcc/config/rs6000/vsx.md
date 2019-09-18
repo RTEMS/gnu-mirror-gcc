@@ -1149,10 +1149,30 @@
                "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
-   (set_attr "length"
-               "*,         *,         *,         8,         *,         8,
-                8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *")
+   (set (attr "non_prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "8")]
+	      (const_string "*")))
+
+   (set (attr "prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "20")]
+	      (const_string "*")))
+
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
