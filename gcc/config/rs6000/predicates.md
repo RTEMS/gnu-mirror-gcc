@@ -1833,3 +1833,32 @@
           && iform != INSN_FORM_PCREL_LOCAL
           && iform != INSN_FORM_BAD);
 })
+
+;; Return 1 if op is a memory operand that uses a pc-relative address to a
+;; locals ymbol.
+(define_predicate "pcrel_local_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return iform == INSN_FORM_PCREL_LOCAL;
+})
+
+;; Return 1 if op is a memory operand that is not pc-relative.
+(define_predicate "non_pcrel_mem_operand"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_PCREL_EXTERNAL
+          && iform != INSN_FORM_PCREL_LOCAL
+          && iform != INSN_FORM_BAD);
+})

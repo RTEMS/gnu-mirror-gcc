@@ -3342,6 +3342,12 @@ Constant whose negation is a signed 16-bit constant
 
 @item eI
 Signed 34-bit integer constant if prefixed instructions are supported.
+ 
+@item em
+A memory operand that does not include a pc-relative address.
+ 
+@item eM
+A memory operand that uses a pc-relative address to a local symbol.
 
 @item G
 Floating point constant that can be loaded into a register with one

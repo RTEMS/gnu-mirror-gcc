@@ -3248,19 +3248,21 @@
 
 ;; Variable V2DI/V2DF extract
 (define_insn_and_split "vsx_extract_<mode>_var"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v,wa,r")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "input_operand" "v,m,m")
-			     (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-			    UNSPEC_VSX_EXTRACT))
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v,war,war")
+	(unspec:<VS_scalar>
+	  [(match_operand:VSX_D 1 "input_operand" "v,em,eM")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	  UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,&b,&b"))
-   (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
+   (clobber (match_scratch:V2DI 4 "=&v,X,X"))
+   (clobber (match_scratch:DI 5 "=X,X,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   rs6000_split_vec_extract_var (operands[0], operands[1], operands[2],
-				operands[3], operands[4]);
+				operands[3], operands[4], operands[5]);
   DONE;
 })
 
@@ -3318,19 +3320,21 @@
 
 ;; Variable V4SF extract
 (define_insn_and_split "vsx_extract_v4sf_var"
-  [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,wa,?r")
-	(unspec:SF [(match_operand:V4SF 1 "input_operand" "v,m,m")
-		    (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-		   UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=r,&b,&b"))
-   (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
+  [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,wa,?r,wa,?r")
+	(unspec:SF
+	 [(match_operand:V4SF 1 "input_operand" "v,em,em,eM,eM")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r,r,r")]
+	 UNSPEC_VSX_EXTRACT))
+   (clobber (match_scratch:DI 3 "=r,&b,&b,&b,&b"))
+   (clobber (match_scratch:V2DI 4 "=&v,X,X,X,X"))
+   (clobber (match_scratch:DI 5 "=X,X,X,&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   rs6000_split_vec_extract_var (operands[0], operands[1], operands[2],
-				operands[3], operands[4]);
+				operands[3], operands[4], operands[5]);
   DONE;
 })
 
@@ -3680,33 +3684,35 @@
 
 ;; Variable V16QI/V8HI/V4SI extract
 (define_insn_and_split "vsx_extract_<mode>_var"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r,r")
 	(unspec:<VS_scalar>
-	 [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
-	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	 [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,em,eM")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r,r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=r,r,&b"))
-   (clobber (match_scratch:V2DI 4 "=X,&v,X"))]
+   (clobber (match_scratch:DI 3 "=r,r,&b,&b"))
+   (clobber (match_scratch:V2DI 4 "=X,&v,X,X"))
+   (clobber (match_scratch:DI 5 "=X,X,X,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   rs6000_split_vec_extract_var (operands[0], operands[1], operands[2],
-				operands[3], operands[4]);
+				operands[3], operands[4], operands[5]);
   DONE;
 }
-  [(set_attr "isa" "p9v,*,*")])
+  [(set_attr "isa" "p9v,*,*,fut")])
 
 (define_insn_and_split "*vsx_extract_<mode>_<VS_scalar>mode_var"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r,r")
 	(zero_extend:<VS_scalar>
 	 (unspec:<VSX_EXTRACT_I:VS_scalar>
-	  [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
-	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	  [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,em,eM")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r,r")]
 	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=r,r,&b"))
-   (clobber (match_scratch:V2DI 4 "=X,&v,X"))]
+   (clobber (match_scratch:DI 3 "=r,r,&b,&b"))
+   (clobber (match_scratch:V2DI 4 "=X,&v,X,X"))
+   (clobber (match_scratch:DI 5 "=X,X,X,&b"))]
   "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
@@ -3715,10 +3721,11 @@
   machine_mode smode = <VS_scalar>mode;
   rs6000_split_vec_extract_var (gen_rtx_REG (smode, REGNO (operands[0])),
 				operands[1], operands[2],
-				operands[3], operands[4]);
+				operands[3], operands[4],
+				operands[5]);
   DONE;
 }
-  [(set_attr "isa" "p9v,*,*")])
+  [(set_attr "isa" "p9v,*,*,fut")])
 
 ;; VSX_EXTRACT optimizations
 ;; Optimize double d = (double) vec_extract (vi, <n>)

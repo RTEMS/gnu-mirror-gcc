@@ -6969,7 +6969,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
 void
 rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
-			      rtx tmp_altivec)
+			      rtx tmp_altivec, rtx tmp_gpr2)
 {
   machine_mode mode = GET_MODE (src);
   machine_mode scalar_mode = GET_MODE_INNER (GET_MODE (src));
@@ -6983,13 +6983,18 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
      systems.  */
   if (MEM_P (src))
     {
-      /* Currently, using pc-relative addresses in variable extracts generates
-	 incorrect code (it wants to use the same register to hold the address
-	 that the variable offset is generated in).  Give an error until this
-	 can be fixed.  */
-      if (pcrel_local_address (XEXP (src, 0), Pmode))
-	error ("Using vector extracts on pc-relative addresses is currently "
-	       "broken");
+      rtx addr = XEXP (src, 0);
+
+      /* If the vector's address is a pc-relative address, we need a second GPR
+	 register to load up the address to the vector, since pc-relative
+	 addresses do not allow indexing.  */
+      if (pcrel_local_address (addr, mode))
+	{
+	  gcc_assert (REG_P (tmp_gpr) && REG_P (tmp_gpr2)
+		      && REGNO (tmp_gpr) != REGNO (tmp_gpr2));
+	  emit_move_insn (tmp_gpr2, addr);
+	  src = change_address (src, mode, tmp_gpr2);
+	}
 
       int num_elements = GET_MODE_NUNITS (mode);
       rtx num_ele_m1 = GEN_INT (num_elements - 1);
