@@ -1,5 +1,31 @@
 2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	non pc-relative memory.
+	(eM constraint): New constraint for local pc-relative memory.
+	* config/rs6000/predicates.md (pcrel_local_mem_operand): New
+	predicate to match local pc-relative references.
+	(non_pcrel_mem_operand): New predicate to match non pc-relative
+	memory.
+	* config/rs6000/rs6000-protos.h (rs6000_split_vec_extract_var):
+	Adjust calling signature.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Fix
+	problem with doing a variable vector extract where the vector's
+	address was a pc-relative address by adding a second scratch
+	register, just for that case.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Add second scratch register if the vector address is pc-relative.
+	(vsx_extract_v4sf_var): Add second scratch register if the vector
+	address is pc-relative.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Add second
+	scratch register if the vector address is pc-relative.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Add second scratch
+	register if the vector address is pc-relative.
+	* doc/md.texi (PowerPC constraints): Document the em and eM
+	constraints.
+
+2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add
 	optimizations for adjusting prefixed and pc-relative addresses
 	with a constant element offset.  Add an abort if we have a
