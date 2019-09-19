@@ -1,7 +1,9 @@
 2019-09-19  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/rs6000.c (reg_to_non_prefixed): 128-bit integers
-	in vector registers should use DQ instruction formats.
+	* config/rs6000/rs6000.c (address_to_insn_form): Assume all
+	vectors need DQ instruction formats, but 128-bit integers do not.
+	(reg_to_non_prefixed): 128-bit integers in vector registers should
+	use DQ instruction formats.
 
 2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
 

@@ -24887,8 +24887,9 @@ address_to_insn_form (rtx addr,
       if (TARGET_POWERPC64 && size >= 8 && GET_MODE_CLASS (mode) == MODE_INT)
 	non_prefixed_insn = NON_PREFIXED_DS;
 
-      else if (TARGET_VSX && size >= 16
-	       && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+      /* TImode is problematical here, since its normal expected use is GPR
+	 registers, where it doesn't require DQ mode.  */
+      else if (TARGET_VSX && size >= 16 && VECTOR_MODE_P (mode))
 	non_prefixed_insn = NON_PREFIXED_DQ;
 
       else
