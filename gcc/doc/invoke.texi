@@ -1042,7 +1042,7 @@ See RS/6000 and PowerPC Options.
 -mfloat128  -mno-float128  -mfloat128-hardware  -mno-float128-hardware @gol
 -mgnu-attribute  -mno-gnu-attribute @gol
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg} @gol
--mstack-protector-guard-offset=@var{offset} @gol
+-mstack-protector-guard-offset=@var{offset} -moutline-atomics @gol
 -mlra  -mno-lra}
 
 @emph{RX Options}
@@ -13954,6 +13954,19 @@ This option only has an effect if @option{-ffast-math} or
 @option{-funsafe-math-optimizations} is used as well.  Enabling this reduces
 precision of division results to about 16 bits for
 single precision and to 32 bits for double precision.
+
+@item -moutline-atomics
+@itemx -mno-outline-atomics
+Enable or disable calls to out-of-line helpers to implement atomic operations.
+These helpers will, at runtime, determine if the LSE instructions from
+ARMv8.1-A can be used; if not, they will use the load/store-exclusive
+instructions that are present in the base ARMv8.0 ISA.
+
+This option is only applicable when compiling for the base ARMv8.0
+instruction set.  If using a later revision, e.g. @option{-march=armv8.1-a}
+or @option{-march=armv8-a+lse}, the ARMv8.1-Atomics instructions will be
+used directly.  The same applies when using @option{-mcpu=} when the
+selected cpu supports the @samp{lse} feature.
 
 @item -march=@var{name}
 @opindex march
