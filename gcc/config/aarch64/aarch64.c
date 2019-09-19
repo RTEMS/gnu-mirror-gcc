@@ -1191,10 +1191,33 @@ emit_set_insn (rtx x, rtx y)
 rtx
 aarch64_gen_compare_reg (RTX_CODE code, rtx x, rtx y)
 {
-  machine_mode mode = SELECT_CC_MODE (code, x, y);
-  rtx cc_reg = gen_rtx_REG (mode, CC_REGNUM);
+  machine_mode cmp_mode = GET_MODE (x);
+  machine_mode cc_mode;
+  rtx cc_reg;
 
-  emit_set_insn (cc_reg, gen_rtx_COMPARE (mode, x, y));
+  if (cmp_mode == TImode)
+    {
+      gcc_assert (code == NE);
+
+      cc_mode = CCmode;
+      cc_reg = gen_rtx_REG (cc_mode, CC_REGNUM);
+
+      rtx x_lo = operand_subword (x, 0, 0, TImode);
+      rtx y_lo = operand_subword (y, 0, 0, TImode);
+      emit_set_insn (cc_reg, gen_rtx_COMPARE (cc_mode, x_lo, y_lo));
+
+      rtx x_hi = operand_subword (x, 1, 0, TImode);
+      rtx y_hi = operand_subword (y, 1, 0, TImode);
+      emit_insn (gen_ccmpdi (cc_reg, cc_reg, x_hi, y_hi,
+			     gen_rtx_EQ (cc_mode, cc_reg, const0_rtx),
+			     GEN_INT (AARCH64_EQ)));
+    }
+  else
+    {
+      cc_mode = SELECT_CC_MODE (code, x, y);
+      cc_reg = gen_rtx_REG (cc_mode, CC_REGNUM);
+      emit_set_insn (cc_reg, gen_rtx_COMPARE (cc_mode, x, y));
+    }
   return cc_reg;
 }
 
@@ -11839,6 +11862,14 @@ aarch64_emit_load_exclusive (machine_mode mode, rtx rval,
 {
   rtx (*gen) (rtx, rtx, rtx);
 
+  if (mode == TImode)
+    {
+      emit_insn (gen_aarch64_load_exclusive_pair
+		 (gen_lowpart (DImode, rval), gen_highpart (DImode, rval),
+		  mem, model_rtx));
+      return;
+    }
+
   switch (mode)
     {
     case QImode: gen = gen_aarch64_load_exclusiveqi; break;
@@ -11856,9 +11887,17 @@ aarch64_emit_load_exclusive (machine_mode mode, rtx rval,
 
 static void
 aarch64_emit_store_exclusive (machine_mode mode, rtx bval,
-			      rtx rval, rtx mem, rtx model_rtx)
+			      rtx mem, rtx rval, rtx model_rtx)
 {
   rtx (*gen) (rtx, rtx, rtx, rtx);
+
+  if (mode == TImode)
+    {
+      emit_insn (gen_aarch64_store_exclusive_pair
+		 (bval, mem, operand_subword (rval, 0, 0, TImode),
+		  operand_subword (rval, 1, 0, TImode), model_rtx));
+      return;
+    }
 
   switch (mode)
     {
@@ -11870,7 +11909,7 @@ aarch64_emit_store_exclusive (machine_mode mode, rtx bval,
       gcc_unreachable ();
     }
 
-  emit_insn (gen (bval, rval, mem, model_rtx));
+  emit_insn (gen (bval, mem, rval, model_rtx));
 }
 
 /* Mark the previous jump instruction as unlikely.  */
@@ -11898,7 +11937,8 @@ aarch64_expand_compare_and_swap (rtx operands[])
     gen_aarch64_compare_and_swapqi,
     gen_aarch64_compare_and_swaphi,
     gen_aarch64_compare_and_swapsi,
-    gen_aarch64_compare_and_swapdi
+    gen_aarch64_compare_and_swapdi,
+    gen_aarch64_compare_and_swapti
   };
   typedef rtx (*gen_lse_fn) (rtx, rtx, rtx, rtx);
   const gen_lse_fn atomic_cas[] =
@@ -11906,7 +11946,8 @@ aarch64_expand_compare_and_swap (rtx operands[])
     gen_aarch64_compare_and_swapqi_lse,
     gen_aarch64_compare_and_swaphi_lse,
     gen_aarch64_compare_and_swapsi_lse,
-    gen_aarch64_compare_and_swapdi_lse
+    gen_aarch64_compare_and_swapdi_lse,
+    gen_aarch64_compare_and_swapti_lse
   };
 
   bval = operands[0];
@@ -11939,6 +11980,7 @@ aarch64_expand_compare_and_swap (rtx operands[])
     case HImode: idx = 1; break;
     case SImode: idx = 2; break;
     case DImode: idx = 3; break;
+    case TImode: idx = 4; break;
     default:
       gcc_unreachable ();
     }
@@ -11965,6 +12007,7 @@ aarch64_expand_compare_and_swap (rtx operands[])
 	case HImode: code = CODE_FOR_aarch64_compare_and_swaphi; break;
 	case SImode: code = CODE_FOR_aarch64_compare_and_swapsi; break;
 	case DImode: code = CODE_FOR_aarch64_compare_and_swapdi; break;
+	case TImode: code = CODE_FOR_aarch64_compare_and_swapti; break;
 	default:
 	  gcc_unreachable ();
 	}
@@ -12033,7 +12076,7 @@ aarch64_split_compare_and_swap (rtx operands[])
 	CBNZ	scratch, .label1
     .label2:
 	CMP	rval, 0.  */
-  bool strong_zero_p = !is_weak && oldval == const0_rtx;
+  bool strong_zero_p = !is_weak && oldval == const0_rtx && mode != TImode;
 
   label1 = NULL;
   if (!is_weak)
