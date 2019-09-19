@@ -24949,7 +24949,8 @@ reg_to_non_prefixed (rtx reg, machine_mode mode)
 
   unsigned size = GET_MODE_SIZE (mode);
 
-  /* FPR registers use D-mode for scalars, and DQ-mode for vectors.  */
+  /* FPR registers use D-mode for scalars, and DQ-mode for vectors and 128-bit
+     integers.  */
   if (FP_REGNO_P (r))
     {
       if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
@@ -24958,14 +24959,16 @@ reg_to_non_prefixed (rtx reg, machine_mode mode)
       else if (size < 8)
 	return NON_PREFIXED_X;
 
-      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+      else if (TARGET_VSX && size >= 16
+	       && (VECTOR_MODE_P (mode) || mode == TImode || mode == CTImode))
 	return NON_PREFIXED_DQ;
 
       else
 	return NON_PREFIXED_DEFAULT;
     }
 
-  /* Altivec registers use DS-mode for scalars, and DQ-mode for vectors.  */
+  /* Altivec registers use DS-mode for scalars, and DQ-mode for vectors and
+     128-bit integers.  */
   else if (ALTIVEC_REGNO_P (r))
     {
       if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
@@ -24974,7 +24977,8 @@ reg_to_non_prefixed (rtx reg, machine_mode mode)
       else if (size < 8)
 	return NON_PREFIXED_X;
 
-      else if (TARGET_VSX && size >= 16 && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
+      else if (TARGET_VSX && size >= 16
+	       && (VECTOR_MODE_P (mode) || mode == TImode || mode == CTImode))
 	return NON_PREFIXED_DQ;
 
       else

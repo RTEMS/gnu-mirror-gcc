@@ -1,3 +1,8 @@
+2019-09-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): 128-bit integers
+	in vector registers should use DQ instruction formats.
+
 2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
