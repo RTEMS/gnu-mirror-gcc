@@ -255,18 +255,6 @@ struct qty_table_elem
 /* The table of all qtys, indexed by qty number.  */
 static struct qty_table_elem *qty_table;
 
-/* For machines that have a CC0, we do not record its value in the hash
-   table since its use is guaranteed to be the insn immediately following
-   its definition and any other insn is presumed to invalidate it.
-
-   Instead, we store below the current and last value assigned to CC0.
-   If it should happen to be a constant, it is stored in preference
-   to the actual assigned value.  In case it is a constant, we store
-   the mode in which the constant should be interpreted.  */
-
-static rtx this_insn_cc0, prev_insn_cc0;
-static machine_mode this_insn_cc0_mode;
-
 /* Insn being scanned.  */
 
 static rtx_insn *this_insn;
@@ -348,9 +336,8 @@ static bool cse_jumps_altered;
    to put in the note.  */
 static bool recorded_label_ref;
 
-/* canon_hash stores 1 in do_not_record
-   if it notices a reference to CC0, PC, or some other volatile
-   subexpression.  */
+/* canon_hash stores 1 in do_not_record if it notices a reference to PC or
+   some other volatile subexpression.  */
 
 static int do_not_record;
 
@@ -854,8 +841,6 @@ new_basic_block (void)
 	  free_element_chain = first;
 	}
     }
-
-  prev_insn_cc0 = 0;
 }
 
 /* Say that register REG contains a quantity in mode MODE not in any
@@ -2901,9 +2886,9 @@ canon_reg (rtx x, rtx_insn *insn)
    what values are being compared.
 
    *PARG1 and *PARG2 are updated to contain the rtx representing the values
-   actually being compared.  For example, if *PARG1 was (cc0) and *PARG2
-   was (const_int 0), *PARG1 and *PARG2 will be set to the objects that were
-   compared to produce cc0.
+   actually being compared.  For example, if *PARG1 was (reg:CC CC_REG) and
+   *PARG2 was (const_int 0), *PARG1 and *PARG2 will be set to the objects that
+   were compared to produce (reg:CC CC_REG).
 
    The return value is the comparison operator and is either the code of
    A or the code corresponding to the inverse of the comparison.  */
@@ -2935,10 +2920,7 @@ find_comparison_args (enum rtx_code code, rtx *parg1, rtx *parg2,
 	  x = 0;
 	}
 
-      /* If arg1 is a COMPARE, extract the comparison arguments from it.
-	 On machines with CC0, this is the only case that can occur, since
-	 fold_rtx will return the COMPARE or item being compared with zero
-	 when given CC0.  */
+      /* If arg1 is a COMPARE, extract the comparison arguments from it.  */
 
       if (GET_CODE (arg1) == COMPARE && arg2 == const0_rtx)
 	x = arg1;
@@ -3875,10 +3857,7 @@ record_jump_equiv (rtx_insn *insn, bool taken)
   op0 = fold_rtx (XEXP (XEXP (SET_SRC (set), 0), 0), insn);
   op1 = fold_rtx (XEXP (XEXP (SET_SRC (set), 0), 1), insn);
 
-  /* On a cc0 target the cc0-setter and cc0-user may end up in different
-     blocks.  When that happens the tracking of the cc0-setter via
-     PREV_INSN_CC0 is spoiled.  That means that fold_rtx may return
-     NULL_RTX.  In those cases, there's nothing to record.  */
+  /* If fold_rtx returns NULL_RTX, there's nothing to record.  */
   if (op0 == NULL_RTX || op1 == NULL_RTX)
     return;
 
@@ -4520,9 +4499,6 @@ cse_insn (rtx_insn *insn)
     sets = XALLOCAVEC (struct set, XVECLEN (x, 0));
 
   this_insn = insn;
-  /* Records what this insn does to set CC0.  */
-  this_insn_cc0 = 0;
-  this_insn_cc0_mode = VOIDmode;
 
   /* Find all regs explicitly clobbered in this insn,
      to ensure they are not replaced with any other regs
@@ -6592,10 +6568,6 @@ cse_extended_basic_block (struct cse_basic_block_data *ebb_data)
 	  bool taken = (next_bb == BRANCH_EDGE (bb)->dest);
 	  record_jump_equiv (insn, taken);
 	}
-
-      /* Clear the CC0-tracking related insns, they can't provide
-	 useful information across basic block boundaries.  */
-      prev_insn_cc0 = 0;
     }
 
   gcc_assert (next_qty <= max_qty);
