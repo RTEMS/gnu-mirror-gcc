@@ -33,12 +33,6 @@ along with GCC; see the file COPYING3.  If not see
    small number of quadruplets of insns A, B, C and D for which
    there's high likelihood of success.
 
-   LOG_LINKS does not have links for use of the CC0.  They don't
-   need to, because the insn that sets the CC0 is always immediately
-   before the insn that tests it.  So we always regard a branch
-   insn as having a logical link to the preceding insn.  The same is true
-   for an insn explicitly using CC0.
-
    We check (with modified_between_p) to avoid combining in such a way
    as to move a computation to a place where its value would be different.
 
@@ -64,16 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 
    To simplify substitution, we combine only when the earlier insn(s)
    consist of only a single assignment.  To simplify updating afterward,
-   we never combine when a subroutine call appears in the middle.
-
-   Since we do not represent assignments to CC0 explicitly except when that
-   is all an insn does, there is no LOG_LINKS entry in an insn that uses
-   the condition code for the insn that set the condition code.
-   Fortunately, these two insns must be consecutive.
-   Therefore, every JUMP_INSN is taken to have an implicit logical link
-   to the preceding insn.  This is not quite right, since non-jumps can
-   also use the condition code; but in practice such insns would not
-   combine anyway.  */
+   we never combine when a subroutine call appears in the middle.  */
 
 #include "config.h"
 #include "system.h"
@@ -549,8 +534,8 @@ combine_split_insns (rtx pattern, rtx_insn *insn)
 }
 
 /* This is used by find_single_use to locate an rtx in LOC that
-   contains exactly one use of DEST, which is typically either a REG
-   or CC0.  It returns a pointer to the innermost rtx expression
+   contains exactly one use of DEST, which is typically a REG.
+   It returns a pointer to the innermost rtx expression
    containing DEST.  Appearances of DEST that are being used to
    totally replace it are not counted.  */
 
@@ -1111,9 +1096,7 @@ create_log_links (void)
 /* Walk the LOG_LINKS of insn B to see if we find a reference to A.  Return
    true if we found a LOG_LINK that proves that A feeds B.  This only works
    if there are no instructions between A and B which could have a link
-   depending on A, since in that case we would not record a link for B.
-   We also check the implicit dependency created by a cc0 setter/user
-   pair.  */
+   depending on A, since in that case we would not record a link for B.  */
 
 static bool
 insn_a_feeds_b (rtx_insn *a, rtx_insn *b)
@@ -1770,7 +1753,7 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
   else if (next_active_insn (insn) != i3)
     all_adjacent = false;
     
-  /* Can combine only if previous insn is a SET of a REG, a SUBREG or CC0.
+  /* Can combine only if previous insn is a SET of a REG or a SUBREG,
      or a PARALLEL consisting of such a SET and CLOBBERs.
 
      If INSN has CLOBBER parallel parts, ignore them for our processing.
@@ -1949,7 +1932,7 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
       || (DF_INSN_LUID (insn) < last_call_luid && ! CONSTANT_P (src)))
     return 0;
 
-  /* DEST must either be a REG or CC0.  */
+  /* DEST must be a REG.  */
   if (REG_P (dest))
     {
       /* If register alignment is being enforced for multi-word items in all
@@ -3164,7 +3147,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 
   subst_insn = i3;
 
-  /* Many machines that don't use CC0 have insns that can both perform an
+  /* Many machines have insns that can both perform an
      arithmetic operation and set the condition code.  These operations will
      be represented as a PARALLEL with the first element of the vector
      being a COMPARE of an arithmetic operation with the constant zero.
@@ -3901,7 +3884,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
      eliminate the copy.
 
      We cannot do this if the destination of the first assignment is a
-     condition code register or cc0.  We eliminate this case by making sure
+     condition code register.  We eliminate this case by making sure
      the SET_DEST and SET_SRC have the same mode.
 
      We cannot do this if the destination of the second assignment is
@@ -3995,8 +3978,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       rtx set0 = XVECEXP (newpat, 0, 0);
       rtx set1 = XVECEXP (newpat, 0, 1);
 
-      /* Normally, it doesn't matter which of the two is done first,
-	 but the one that references cc0 can't be the second, and
+      /* Normally, it doesn't matter which of the two is done first, but
 	 one which uses any regs/memory set in between i2 and i3 can't
 	 be first.  The PARALLEL might also have been pre-existing in i3,
 	 so we need to make sure that we won't wrongly hoist a SET to i2
@@ -6731,9 +6713,8 @@ simplify_set (rtx x)
       SUBST (SET_SRC (x), src);
     }
 
-  /* If we are setting CC0 or if the source is a COMPARE, look for the use of
-     the comparison result and try to simplify it unless we already have used
-     undobuf.other_insn.  */
+  /* If the source is a COMPARE, look for the use of the comparison result
+     and try to simplify it unless we already have used undobuf.other_insn.  */
   if ((GET_MODE_CLASS (mode) == MODE_CC || GET_CODE (src) == COMPARE)
       && (cc_use = find_single_use (dest, subst_insn, &other_insn)) != 0
       && (undobuf.other_insn == 0 || other_insn == undobuf.other_insn)
@@ -14479,7 +14460,6 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 		    {
 		      rtx set = single_set (tem_insn);
 		      rtx inner_dest = 0;
-		      rtx_insn *cc0_setter = NULL;
 
 		      if (set != 0)
 			for (inner_dest = SET_DEST (set);
@@ -14520,23 +14500,6 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 			  SET_INSN_DELETED (tem_insn);
 			  if (tem_insn == i2)
 			    i2 = NULL;
-
-			  /* Delete the setter too.  */
-			  if (cc0_setter)
-			    {
-			      PATTERN (cc0_setter) = pc_rtx;
-			      old_notes = REG_NOTES (cc0_setter);
-			      REG_NOTES (cc0_setter) = NULL;
-
-			      distribute_notes (old_notes, cc0_setter,
-						cc0_setter, NULL,
-						NULL_RTX, NULL_RTX, NULL_RTX);
-			      distribute_links (LOG_LINKS (cc0_setter));
-
-			      SET_INSN_DELETED (cc0_setter);
-			      if (cc0_setter == i2)
-				i2 = NULL;
-			    }
 			}
 		      else
 			{
