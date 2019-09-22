@@ -1122,8 +1122,6 @@ insn_a_feeds_b (rtx_insn *a, rtx_insn *b)
   FOR_EACH_LOG_LINK (links, b)
     if (links->insn == a)
       return true;
-  if (HAVE_cc0 && sets_cc0_p (a))
-    return true;
   return false;
 }
 
@@ -1136,7 +1134,6 @@ static int
 combine_instructions (rtx_insn *f, unsigned int nregs)
 {
   rtx_insn *insn, *next;
-  rtx_insn *prev;
   struct insn_link *links, *nextlinks;
   rtx_insn *first;
   basic_block last_bb;
@@ -1312,31 +1309,6 @@ combine_instructions (rtx_insn *f, unsigned int nregs)
 		      goto retry;
 		    }
 	      }
-
-	  /* Try to combine a jump insn that uses CC0
-	     with a preceding insn that sets CC0, and maybe with its
-	     logical predecessor as well.
-	     This is how we make decrement-and-branch insns.
-	     We need this special code because data flow connections
-	     via CC0 do not get entered in LOG_LINKS.  */
-
-	  if (HAVE_cc0
-	      && JUMP_P (insn)
-	      && (prev = prev_nonnote_insn (insn)) != 0
-	      && NONJUMP_INSN_P (prev)
-	      && sets_cc0_p (PATTERN (prev)))
-	    {
-	      if ((next = try_combine (insn, prev, NULL, NULL,
-				       &new_direct_jump_p,
-				       last_combined_insn)) != 0)
-		goto retry;
-
-	      FOR_EACH_LOG_LINK (nextlinks, prev)
-		  if ((next = try_combine (insn, prev, nextlinks->insn,
-					   NULL, &new_direct_jump_p,
-					   last_combined_insn)) != 0)
-		    goto retry;
-	    }
 
 	  /* Try combining an insn with two different insns whose results it
 	     uses.  */
@@ -2083,23 +2055,6 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
 		  && reg_overlap_mentioned_p (XEXP (link, 0), PATTERN (succ2)))
 	      || reg_overlap_mentioned_p (XEXP (link, 0), PATTERN (i3))))
 	return 0;
-
-  /* Don't combine an insn that follows a CC0-setting insn.
-     An insn that uses CC0 must not be separated from the one that sets it.
-     We do, however, allow I2 to follow a CC0-setting insn if that insn
-     is passed as I1; in that case it will be deleted also.
-     We also allow combining in this case if all the insns are adjacent
-     because that would leave the two CC0 insns adjacent as well.
-     It would be more logical to test whether CC0 occurs inside I1 or I2,
-     but that would be much slower, and this ought to be equivalent.  */
-
-  if (HAVE_cc0)
-    {
-      p = prev_nonnote_insn (insn);
-      if (p && p != pred && NONJUMP_INSN_P (p) && sets_cc0_p (PATTERN (p))
-	  && ! all_adjacent)
-	return 0;
-    }
 
   /* If we get here, we have passed all the tests and the combination is
      to be allowed.  */
@@ -2969,7 +2924,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
      This undoes a previous combination and allows us to match a branch-and-
      decrement insn.  */
 
-  if (!HAVE_cc0 && i1 == 0
+  if (i1 == 0
       && is_parallel_of_n_reg_sets (PATTERN (i2), 2)
       && (GET_MODE_CLASS (GET_MODE (SET_DEST (XVECEXP (PATTERN (i2), 0, 0))))
 	  == MODE_CC)
@@ -3001,7 +2956,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
   /* If I2 is a PARALLEL of two SETs of REGs (and perhaps some CLOBBERs),
      make those two SETs separate I1 and I2 insns, and make an I0 that is
      the original I1.  */
-  if (!HAVE_cc0 && i0 == 0
+  if (i0 == 0
       && is_parallel_of_n_reg_sets (PATTERN (i2), 2)
       && can_split_parallel_of_n_reg_sets (i2, 2)
       && !reg_used_between_p (SET_DEST (XVECEXP (PATTERN (i2), 0, 0)), i2, i3)
@@ -3220,7 +3175,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
      needed, and make the PARALLEL by just replacing I2DEST in I3SRC with
      I2SRC.  Later we will make the PARALLEL that contains I2.  */
 
-  if (!HAVE_cc0 && i1 == 0 && added_sets_2 && GET_CODE (PATTERN (i3)) == SET
+  if (i1 == 0 && added_sets_2 && GET_CODE (PATTERN (i3)) == SET
       && GET_CODE (SET_SRC (PATTERN (i3))) == COMPARE
       && CONST_INT_P (XEXP (SET_SRC (PATTERN (i3)), 1))
       && rtx_equal_p (XEXP (SET_SRC (PATTERN (i3)), 0), i2dest))
@@ -3760,7 +3715,6 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	 are set between I2 and I3.  */
       if (insn_code_number < 0
           && (split = find_split_point (&newpat, i3, false)) != 0
-	  && (!HAVE_cc0 || REG_P (i2dest))
 	  /* We need I2DEST in the proper mode.  If it is a hard register
 	     or the only use of a pseudo, we can change its mode.
 	     Make sure we don't change a hard register to have a mode that
@@ -4131,19 +4085,6 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 					     &new_other_notes);
 
       if (other_code_number < 0 && ! check_asm_operands (other_pat))
-	{
-	  undo_all ();
-	  return 0;
-	}
-    }
-
-  /* If I2 is the CC0 setter and I3 is the CC0 user then check whether
-     they are adjacent to each other or not.  */
-  if (HAVE_cc0)
-    {
-      rtx_insn *p = prev_nonnote_insn (i3);
-      if (p && p != i2 && NONJUMP_INSN_P (p) && newi2pat
-	  && sets_cc0_p (newi2pat))
 	{
 	  undo_all ();
 	  return 0;
@@ -6870,7 +6811,7 @@ simplify_set (rtx x)
 	 a hard register, just build new versions with the proper mode.  If it
 	 is a pseudo, we lose unless it is only time we set the pseudo, in
 	 which case we can safely change its mode.  */
-      if (!HAVE_cc0 && compare_mode != GET_MODE (dest))
+      if (compare_mode != GET_MODE (dest))
 	{
 	  if (can_change_dest_mode (dest, 0, compare_mode))
 	    {

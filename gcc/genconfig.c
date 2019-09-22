@@ -32,7 +32,6 @@ along with GCC; see the file COPYING3.  If not see
 static int max_recog_operands;  /* Largest operand number seen.  */
 static int max_dup_operands;    /* Largest number of match_dup in any insn.  */
 static int max_clobbers_per_insn;
-static int have_cc0_flag;
 static int have_cmove_flag;
 static int have_cond_exec_flag;
 static int have_lo_sum_flag;
@@ -323,11 +322,6 @@ main (int argc, const char **argv)
   printf ("#ifndef MAX_INSNS_PER_SPLIT\n");
   printf ("#define MAX_INSNS_PER_SPLIT %d\n", max_insns_per_split);
   printf ("#endif\n");
-
-  if (have_cc0_flag)
-    printf ("#define HAVE_cc0 1\n");
-  else
-    printf ("#define HAVE_cc0 0\n");
 
   if (have_cmove_flag)
     printf ("#define HAVE_conditional_move 1\n");

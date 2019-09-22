@@ -4574,15 +4574,6 @@ find_reloads (rtx_insn *insn, int replace, int ind_levels, int live_known,
 	    rld[j].in = 0;
 	  }
 
-  /* If we made any reloads for addresses, see if they violate a
-     "no input reloads" requirement for this insn.  But loads that we
-     do after the insn (such as for output addresses) are fine.  */
-  if (HAVE_cc0 && no_input_reloads)
-    for (i = 0; i < n_reloads; i++)
-      gcc_assert (rld[i].in == 0
-		  || rld[i].when_needed == RELOAD_FOR_OUTADDR_ADDRESS
-		  || rld[i].when_needed == RELOAD_FOR_OUTPUT_ADDRESS);
-
   /* Compute reload_mode and reload_nregs.  */
   for (i = 0; i < n_reloads; i++)
     {

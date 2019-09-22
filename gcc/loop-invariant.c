@@ -1094,14 +1094,6 @@ find_invariant_insn (rtx_insn *insn, bool always_reached, bool always_executed)
   bool simple = true;
   struct invariant *inv;
 
-  /* We can't move a CC0 setter without the user.  */
-  if (HAVE_cc0 && sets_cc0_p (insn))
-    return;
-
-  /* Jumps have control flow side-effects.  */
-  if (JUMP_P (insn))
-    return;
-
   set = single_set (insn);
   if (!set)
     return;

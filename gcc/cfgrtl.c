@@ -887,18 +887,6 @@ rtl_merge_blocks (basic_block a, basic_block b)
 
       del_first = a_end;
 
-      /* If this was a conditional jump, we need to also delete
-	 the insn that set cc0.  */
-      if (HAVE_cc0 && only_sets_cc0_p (prev))
-	{
-	  rtx_insn *tmp = prev;
-
-	  prev = prev_nonnote_insn (prev);
-	  if (!prev)
-	    prev = BB_HEAD (a);
-	  del_first = tmp;
-	}
-
       a_end = PREV_INSN (del_first);
     }
   else if (BARRIER_P (NEXT_INSN (a_end)))
@@ -1797,11 +1785,6 @@ rtl_tidy_fallthru_edge (edge e)
 	  reorder_insns (label, label, PREV_INSN (q));
 	  delete_insn (table);
 	}
-
-      /* If this was a conditional jump, we need to also delete
-	 the insn that set cc0.  */
-      if (HAVE_cc0 && any_condjump_p (q) && only_sets_cc0_p (PREV_INSN (q)))
-	q = PREV_INSN (q);
 
       q = PREV_INSN (q);
     }

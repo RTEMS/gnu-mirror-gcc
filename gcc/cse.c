@@ -265,7 +265,7 @@ static struct qty_table_elem *qty_table;
    the mode in which the constant should be interpreted.  */
 
 static rtx this_insn_cc0, prev_insn_cc0;
-static machine_mode this_insn_cc0_mode, prev_insn_cc0_mode;
+static machine_mode this_insn_cc0_mode;
 
 /* Insn being scanned.  */
 
@@ -592,7 +592,7 @@ static struct cse_reg_info * get_cse_reg_info (unsigned int regno);
 
 static void flush_hash_table (void);
 static bool insn_live_p (rtx_insn *, int *);
-static bool set_live_p (rtx, rtx_insn *, int *);
+static bool set_live_p (rtx, int *);
 static void cse_change_cc_mode_insn (rtx_insn *, rtx);
 static void cse_change_cc_mode_insns (rtx_insn *, rtx_insn *, rtx);
 static machine_mode cse_cc_succs (basic_block, basic_block, rtx, rtx,
@@ -6544,19 +6544,6 @@ cse_extended_basic_block (struct cse_basic_block_data *ebb_data)
 	      if (INSN_P (insn) && !recorded_label_ref
 		  && check_for_label_ref (insn))
 		recorded_label_ref = true;
-
-	      if (HAVE_cc0 && NONDEBUG_INSN_P (insn))
-		{
-		  /* If this insn is not the last insn in the basic
-		     block, it will be PREV_INSN(insn) in the next
-		     iteration.  If we recorded any CC0-related
-		     information for this insn, remember it.  */
-		  if (insn != BB_END (bb))
-		    {
-		      prev_insn_cc0 = this_insn_cc0;
-		      prev_insn_cc0_mode = this_insn_cc0_mode;
-		    }
-		}
 	    }
 	}
 
@@ -6859,8 +6846,7 @@ is_dead_reg (const_rtx x, int *counts)
 
 /* Return true if set is live.  */
 static bool
-set_live_p (rtx set, rtx_insn *insn ATTRIBUTE_UNUSED, /* Only used with HAVE_cc0.  */
-	    int *counts)
+set_live_p (rtx set, int *counts)
 {
   if (set_noop_p (set))
     return false;
@@ -6881,7 +6867,7 @@ insn_live_p (rtx_insn *insn, int *counts)
   if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn))
     return true;
   else if (GET_CODE (PATTERN (insn)) == SET)
-    return set_live_p (PATTERN (insn), insn, counts);
+    return set_live_p (PATTERN (insn), counts);
   else if (GET_CODE (PATTERN (insn)) == PARALLEL)
     {
       for (i = XVECLEN (PATTERN (insn), 0) - 1; i >= 0; i--)
@@ -6890,7 +6876,7 @@ insn_live_p (rtx_insn *insn, int *counts)
 
 	  if (GET_CODE (elt) == SET)
 	    {
-	      if (set_live_p (elt, insn, counts))
+	      if (set_live_p (elt, counts))
 		return true;
 	    }
 	  else if (GET_CODE (elt) != CLOBBER && GET_CODE (elt) != USE)

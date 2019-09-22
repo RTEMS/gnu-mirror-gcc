@@ -1060,9 +1060,6 @@ steal_delay_list_from_target (rtx_insn *insn, rtx condition, rtx_sequence *seq,
       if (insn_references_resource_p (trial, sets, false)
 	  || insn_sets_resource_p (trial, needed, false)
 	  || insn_sets_resource_p (trial, sets, false)
-	  /* If TRIAL sets CC0, we can't copy it, so we can't steal this
-	     delay list.  */
-	  || (HAVE_cc0 && find_reg_note (trial, REG_CC_USER, NULL_RTX))
 	  /* If TRIAL is from the fallthrough code of an annulled branch insn
 	     in SEQ, we cannot use it.  */
 	  || (INSN_ANNULLED_BRANCH_P (seq->insn (0))
@@ -1171,9 +1168,7 @@ steal_delay_list_from_fallthrough (rtx_insn *insn, rtx condition,
 	 of CC0.  */
       if (insn_references_resource_p (trial, sets, false)
 	  || insn_sets_resource_p (trial, needed, false)
-	  || insn_sets_resource_p (trial, sets, false)
-	  || (HAVE_cc0 && sets_cc0_p (PATTERN (trial))))
-
+	  || insn_sets_resource_p (trial, sets, false))
 	break;
 
       /* If this insn was already done, we don't need it.  */
@@ -1263,7 +1258,6 @@ try_merge_delay_insns (rtx_insn *insn, rtx_insn *thread)
 
       if (GET_CODE (next_to_match) == GET_CODE (trial)
 	  /* We can't share an insn that sets cc0.  */
-	  && (!HAVE_cc0 || ! sets_cc0_p (pat))
 	  && ! insn_references_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, &needed, true)
@@ -1333,7 +1327,6 @@ try_merge_delay_insns (rtx_insn *insn, rtx_insn *thread)
 	  if (! insn_references_resource_p (dtrial, &set, true)
 	      && ! insn_sets_resource_p (dtrial, &set, true)
 	      && ! insn_sets_resource_p (dtrial, &needed, true)
-	      && (!HAVE_cc0 || ! sets_cc0_p (PATTERN (dtrial)))
 	      && rtx_equal_p (PATTERN (next_to_match), PATTERN (dtrial))
 	      /* Check that DTRIAL and NEXT_TO_MATCH does not reference a 
 	         resource modified between them (only dtrial is checked because
@@ -2132,7 +2125,6 @@ fill_simple_delay_slots (int non_jumps_p)
 		  && ! insn_references_resource_p (trial, &set, true)
 		  && ! insn_sets_resource_p (trial, &set, true)
 		  && ! insn_sets_resource_p (trial, &needed, true)
-		  && !HAVE_cc0
 		  && ! (maybe_never && may_trap_or_fault_p (pat))
 		  && (trial = try_split (pat, trial, 0))
 		  && eligible_for_delay (insn, slots_filled, trial, flags)
@@ -3348,14 +3340,7 @@ relax_delay_slots (rtx_insn *first)
 	  && !INSN_ANNULLED_BRANCH_P (delay_jump_insn)
 	  && !condjump_in_parallel_p (delay_jump_insn)
 	  && prev_active_insn (as_a<rtx_insn *> (target_label)) == insn
-	  && !BARRIER_P (prev_nonnote_insn (as_a<rtx_insn *> (target_label)))
-	  /* If the last insn in the delay slot sets CC0 for some insn,
-	     various code assumes that it is in a delay slot.  We could
-	     put it back where it belonged and delete the register notes,
-	     but it doesn't seem worthwhile in this uncommon case.  */
-	  && (!HAVE_cc0
-	      || ! find_reg_note (XVECEXP (pat, 0, XVECLEN (pat, 0) - 1),
-				  REG_CC_USER, NULL_RTX)))
+	  && !BARRIER_P (prev_nonnote_insn (as_a<rtx_insn *> (target_label))))
 	{
 	  rtx_insn *after;
 	  int i;
