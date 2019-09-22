@@ -4320,15 +4320,7 @@ variable contains the RTL expressions on which the condition code is
 currently based, and several standard flags.
 
 Sometimes additional machine-specific flags must be defined in the machine
-description header file.  It can also add additional machine-specific
-information by defining @code{CC_STATUS_MDEP}.
-
-@defmac CC_STATUS_MDEP
-C code for a data type which is used for declaring the @code{mdep}
-component of @code{cc_status}.  It defaults to @code{int}.
-
-This macro is not used on machines that do not use @code{cc0}.
-@end defmac
+description header file.
 
 @node MODE_CC Condition Codes
 @subsection Representation of condition codes using registers

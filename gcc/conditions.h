@@ -36,17 +36,9 @@ along with GCC; see the file COPYING3.  If not see
    were set in a nonstandard manner.  The output of jump instructions
    uses these flags to compensate and produce the standard result
    with the nonstandard condition codes.  Standard flags are defined here.
-   The tm.h file can also define other machine-dependent flags.
+   The tm.h file can also define other machine-dependent flags.  */
 
-   cc_status also contains a machine-dependent component `mdep'
-   whose type, `CC_STATUS_MDEP', may be defined as a macro in the
-   tm.h file.  */
-
-#ifndef CC_STATUS_MDEP
-#define CC_STATUS_MDEP int
-#endif
-
-struct CC_STATUS {int flags; rtx value1, value2; CC_STATUS_MDEP mdep;};
+struct CC_STATUS {int flags; rtx value1, value2;};
 
 /* While outputting an insn as assembler code,
    this is the status BEFORE that insn.  */
