@@ -2355,15 +2355,6 @@ There is only one expression object of code @code{cc0}; it is the
 value of the variable @code{cc0_rtx}.  Any attempt to create an
 expression of code @code{cc0} will return @code{cc0_rtx}.
 
-Instructions can set the condition code implicitly.  On many machines,
-nearly all instructions set the condition code based on the value that
-they compute or store.  It is not necessary to record these actions
-explicitly in the RTL because the machine description includes a
-prescription for recognizing the instructions that do so (by means of
-the macro @code{NOTICE_UPDATE_CC}).  @xref{Condition Code}.  Only
-instructions whose sole purpose is to set the condition code, and
-instructions that use the condition code, need mention @code{(cc0)}.
-
 On some machines, the condition code register is given a register number
 and a @code{reg} is used instead of @code{(cc0)}.  This is usually the
 preferable approach if only a small subset of instructions modify the
@@ -3420,8 +3411,6 @@ whose elements are the operands needed to output the resulting
 assembler code---often @code{reg}, @code{mem} or constant expressions.
 This would not be well-formed RTL at any other stage in compilation,
 but it is OK then because no further optimization remains to be done.
-However, the definition of the macro @code{NOTICE_UPDATE_CC}, if
-any, must deal with such insns if you define any peephole optimizations.
 
 @findex cond_exec
 @item (cond_exec [@var{cond} @var{expr}])

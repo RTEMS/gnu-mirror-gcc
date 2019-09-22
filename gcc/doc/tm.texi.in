@@ -4339,43 +4339,6 @@ define this macro to initialize it.
 This macro is not used on machines that do not use @code{cc0}.
 @end defmac
 
-@defmac NOTICE_UPDATE_CC (@var{exp}, @var{insn})
-A C compound statement to set the components of @code{cc_status}
-appropriately for an insn @var{insn} whose body is @var{exp}.  It is
-this macro's responsibility to recognize insns that set the condition
-code as a byproduct of other activity as well as those that explicitly
-set @code{(cc0)}.
-
-This macro is not used on machines that do not use @code{cc0}.
-
-If there are insns that do not set the condition code but do alter
-other machine registers, this macro must check to see whether they
-invalidate the expressions that the condition code is recorded as
-reflecting.  For example, on the 68000, insns that store in address
-registers do not set the condition code, which means that usually
-@code{NOTICE_UPDATE_CC} can leave @code{cc_status} unaltered for such
-insns.  But suppose that the previous insn set the condition code
-based on location @samp{a4@@(102)} and the current insn stores a new
-value in @samp{a4}.  Although the condition code is not changed by
-this, it will no longer be true that it reflects the contents of
-@samp{a4@@(102)}.  Therefore, @code{NOTICE_UPDATE_CC} must alter
-@code{cc_status} in this case to say that nothing is known about the
-condition code value.
-
-The definition of @code{NOTICE_UPDATE_CC} must be prepared to deal
-with the results of peephole optimization: insns whose patterns are
-@code{parallel} RTXs containing various @code{reg}, @code{mem} or
-constants which are just the operands.  The RTL structure of these
-insns is not sufficient to indicate what the insns actually do.  What
-@code{NOTICE_UPDATE_CC} should do when it sees one is just to run
-@code{CC_STATUS_INIT}.
-
-A possible definition of @code{NOTICE_UPDATE_CC} is to call a function
-that looks at an attribute (@pxref{Insn Attributes}) named, for example,
-@samp{cc}.  This avoids having detailed information about patterns in
-two places, the @file{md} file and in @code{NOTICE_UPDATE_CC}.
-@end defmac
-
 @node MODE_CC Condition Codes
 @subsection Representation of condition codes using registers
 @findex CCmode
