@@ -5312,7 +5312,6 @@ subst_reg_equivs (rtx ad, rtx_insn *insn)
     case SYMBOL_REF:
     case LABEL_REF:
     case PC:
-    case CC0:
       return ad;
 
     case REG:
@@ -6610,8 +6609,7 @@ reg_overlap_mentioned_for_reload_p (rtx x, rtx in)
     }
   else if (MEM_P (x))
     return refers_to_mem_for_reload_p (in);
-  else if (GET_CODE (x) == SCRATCH || GET_CODE (x) == PC
-	   || GET_CODE (x) == CC0)
+  else if (GET_CODE (x) == SCRATCH || GET_CODE (x) == PC)
     return reg_mentioned_p (x, in);
   else
     {

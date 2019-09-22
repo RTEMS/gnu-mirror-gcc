@@ -926,7 +926,6 @@ oprs_unchanged_p (const_rtx x, const rtx_insn *insn, int avail_p)
       return 0;
 
     case PC:
-    case CC0: /*FIXME*/
     case CONST:
     CASE_CONST_ANY:
     case SYMBOL_REF:

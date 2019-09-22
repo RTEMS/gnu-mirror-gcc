@@ -2448,7 +2448,6 @@ hash_rtx_cb (const_rtx x, machine_mode mode,
     case PRE_MODIFY:
     case POST_MODIFY:
     case PC:
-    case CC0:
     case CALL:
     case UNSPEC_VOLATILE:
       if (do_not_record_p) {
@@ -2633,7 +2632,6 @@ exp_equiv_p (const_rtx x, const_rtx y, int validate, bool for_gcse)
   switch (code)
     {
     case PC:
-    case CC0:
     CASE_CONST_UNIQUE:
       return x == y;
 
@@ -2848,7 +2846,6 @@ canon_reg (rtx x, rtx_insn *insn)
   switch (code)
     {
     case PC:
-    case CC0:
     case CONST:
     CASE_CONST_ANY:
     case SYMBOL_REF:
@@ -3174,9 +3171,6 @@ fold_rtx (rtx x, rtx_insn *insn)
     case EXPR_LIST:
       return x;
 
-    case CC0:
-      return prev_insn_cc0;
-
     case ASM_OPERANDS:
       if (insn)
 	{
@@ -3225,30 +3219,6 @@ fold_rtx (rtx x, rtx_insn *insn)
 	  case SYMBOL_REF:
 	  case LABEL_REF:
 	    const_arg = folded_arg;
-	    break;
-
-	  case CC0:
-	    /* The cc0-user and cc0-setter may be in different blocks if
-	       the cc0-setter potentially traps.  In that case PREV_INSN_CC0
-	       will have been cleared as we exited the block with the
-	       setter.
-
-	       While we could potentially track cc0 in this case, it just
-	       doesn't seem to be worth it given that cc0 targets are not
-	       terribly common or important these days and trapping math
-	       is rarely used.  The combination of those two conditions
-	       necessary to trip this situation is exceedingly rare in the
-	       real world.  */
-	    if (!prev_insn_cc0)
-	      {
-		const_arg = NULL_RTX;
-	      }
-	    else
-	      {
-		folded_arg = prev_insn_cc0;
-		mode_arg = prev_insn_cc0_mode;
-		const_arg = equiv_constant (folded_arg);
-	      }
 	    break;
 
 	  default:
@@ -6781,7 +6751,6 @@ count_reg_usage (rtx x, int *counts, rtx dest, int incr)
       return;
 
     case PC:
-    case CC0:
     case CONST:
     CASE_CONST_ANY:
     case SYMBOL_REF:

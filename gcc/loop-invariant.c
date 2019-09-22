@@ -212,7 +212,6 @@ check_maybe_invariant (rtx x)
       return true;
 
     case PC:
-    case CC0:
     case UNSPEC_VOLATILE:
     case CALL:
       return false;

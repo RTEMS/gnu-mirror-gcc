@@ -1104,7 +1104,6 @@ record_address_regs (machine_mode mode, addr_space_t as, rtx x,
     {
     case CONST_INT:
     case CONST:
-    case CC0:
     case PC:
     case SYMBOL_REF:
     case LABEL_REF:

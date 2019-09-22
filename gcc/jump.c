@@ -1094,7 +1094,6 @@ mark_jump_label_1 (rtx x, rtx_insn *insn, bool in_mem, bool is_target)
   switch (code)
     {
     case PC:
-    case CC0:
     case REG:
     case CLOBBER:
     case CALL:
@@ -1764,7 +1763,6 @@ rtx_renumbered_equal_p (const_rtx x, const_rtx y)
   switch (code)
     {
     case PC:
-    case CC0:
     case ADDR_VEC:
     case ADDR_DIFF_VEC:
     CASE_CONST_UNIQUE:

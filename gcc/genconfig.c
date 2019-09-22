@@ -105,11 +105,6 @@ walk_insn_part (rtx part, int recog_p, int non_pc_set_src)
 	max_recog_operands = XINT (part, 0);
       return;
 
-    case CC0:
-      if (recog_p)
-	have_cc0_flag = 1;
-      return;
-
     case LO_SUM:
       if (recog_p)
 	have_lo_sum_flag = 1;

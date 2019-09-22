@@ -68,7 +68,6 @@ cleanup_auto_inc_dec (rtx src, machine_mode mem_mode ATTRIBUTE_UNUSED)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case SCRATCH:
       /* SCRATCH must be shared because they represent distinct values.  */
       return x;

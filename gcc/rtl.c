@@ -295,7 +295,6 @@ copy_rtx (rtx orig)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:
@@ -388,7 +387,6 @@ shallow_copy_rtx (const_rtx orig MEM_STAT_DECL)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:

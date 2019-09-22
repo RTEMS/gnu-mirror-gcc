@@ -1012,7 +1012,7 @@ mark_referenced_regs (rtx *loc, refmarker_fn *mark, void *arg)
       loc = &SET_DEST (*loc);
       code = GET_CODE (*loc);
       if ((code == REG && REGNO (*loc) < FIRST_PSEUDO_REGISTER)
-	  || code == PC || code == CC0
+	  || code == PC
 	  || (code == SUBREG && REG_P (SUBREG_REG (*loc))
 	      && REGNO (SUBREG_REG (*loc)) < FIRST_PSEUDO_REGISTER
 	      /* If we're setting only part of a multi-word register,

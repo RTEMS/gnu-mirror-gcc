@@ -990,7 +990,6 @@ count_occurrences (const_rtx x, const_rtx find, int count_dest)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
       return 0;
 
     case EXPR_LIST:
@@ -1084,7 +1083,6 @@ reg_mentioned_p (const_rtx reg, const_rtx in)
       /* These codes have no constituent expressions
 	 and are unique.  */
     case SCRATCH:
-    case CC0:
     case PC:
       return 0;
 
@@ -1167,11 +1165,10 @@ reg_referenced_p (const_rtx x, const_rtx body)
       if (reg_overlap_mentioned_p (x, SET_SRC (body)))
 	return 1;
 
-      /* If the destination is anything other than CC0, PC, a REG or a SUBREG
+      /* If the destination is anything other than PC, a REG or a SUBREG
 	 of a REG that occupies all of the REG, the insn references X if
 	 it is mentioned in the destination.  */
-      if (GET_CODE (SET_DEST (body)) != CC0
-	  && GET_CODE (SET_DEST (body)) != PC
+      if (GET_CODE (SET_DEST (body)) != PC
 	  && !REG_P (SET_DEST (body))
 	  && ! (GET_CODE (SET_DEST (body)) == SUBREG
 		&& REG_P (SUBREG_REG (SET_DEST (body)))
@@ -1318,7 +1315,6 @@ modified_between_p (const_rtx x, const rtx_insn *start, const rtx_insn *end)
       return 0;
 
     case PC:
-    case CC0:
       return 1;
 
     case MEM:
@@ -1373,7 +1369,6 @@ modified_in_p (const_rtx x, const_rtx insn)
       return 0;
 
     case PC:
-    case CC0:
       return 1;
 
     case MEM:
@@ -1876,7 +1871,6 @@ reg_overlap_mentioned_p (const_rtx x, const_rtx in)
 
     case SCRATCH:
     case PC:
-    case CC0:
       return reg_mentioned_p (x, in);
 
     case PARALLEL:
@@ -1902,7 +1896,7 @@ reg_overlap_mentioned_p (const_rtx x, const_rtx in)
    ignored by note_stores, but passed to FUN.
 
    FUN receives three arguments:
-   1. the REG, MEM, CC0 or PC being stored in or clobbered,
+   1. the REG, MEM or PC being stored in or clobbered,
    2. the SET or CLOBBER rtx that does the store,
    3. the pointer DATA provided to note_stores.
 
@@ -2618,7 +2612,6 @@ volatile_insn_p (const_rtx x)
     case SYMBOL_REF:
     case CONST:
     CASE_CONST_ANY:
-    case CC0:
     case PC:
     case REG:
     case SCRATCH:
@@ -2679,7 +2672,6 @@ volatile_refs_p (const_rtx x)
     case SYMBOL_REF:
     case CONST:
     CASE_CONST_ANY:
-    case CC0:
     case PC:
     case REG:
     case SCRATCH:
@@ -2739,7 +2731,6 @@ side_effects_p (const_rtx x)
     case SYMBOL_REF:
     case CONST:
     CASE_CONST_ANY:
-    case CC0:
     case PC:
     case REG:
     case SCRATCH:
@@ -2827,7 +2818,6 @@ may_trap_p_1 (const_rtx x, unsigned flags)
     case LABEL_REF:
     case CONST:
     case PC:
-    case CC0:
     case REG:
     case SCRATCH:
       return 0;

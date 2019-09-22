@@ -2846,7 +2846,6 @@ verify_rtx_sharing (rtx orig, rtx insn)
     case LABEL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:
@@ -3099,7 +3098,6 @@ repeat:
     case LABEL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:
@@ -3222,7 +3220,6 @@ repeat:
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
       return;
@@ -5682,7 +5679,6 @@ copy_insn_1 (rtx orig)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
       return orig;

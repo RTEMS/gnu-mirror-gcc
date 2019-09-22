@@ -3077,7 +3077,6 @@ equiv_init_movable_p (rtx x, int regno)
     case SET:
       return equiv_init_movable_p (SET_SRC (x), regno);
 
-    case CC0:
     case CLOBBER:
       return 0;
 
@@ -3162,7 +3161,6 @@ memref_referenced_p (rtx memref, rtx x, bool read_p)
     case SYMBOL_REF:
     CASE_CONST_ANY:
     case PC:
-    case CC0:
     case HIGH:
     case LO_SUM:
       return false;
@@ -4439,9 +4437,6 @@ rtx_moveable_p (rtx *loc, enum op_type type)
 
     case PC:
       return type == OP_IN;
-
-    case CC0:
-      return false;
 
     case REG:
       if (x == frame_pointer_rtx)

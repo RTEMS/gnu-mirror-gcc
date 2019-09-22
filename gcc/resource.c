@@ -246,10 +246,6 @@ mark_referenced_resources (rtx x, struct resources *res,
       mark_referenced_resources (XEXP (x, 0), res, false);
       return;
 
-    case CC0:
-      res->cc = 1;
-      return;
-
     case UNSPEC_VOLATILE:
     case TRAP_IF:
     case ASM_INPUT:
@@ -641,11 +637,6 @@ mark_set_resources (rtx x, struct resources *res, int in_dest,
     case PC:
     case DEBUG_INSN:
       /* These don't set any resources.  */
-      return;
-
-    case CC0:
-      if (in_dest)
-	res->cc = 1;
       return;
 
     case CALL_INSN:

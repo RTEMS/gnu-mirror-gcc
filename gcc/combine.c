@@ -574,12 +574,11 @@ find_single_use_1 (rtx dest, rtx *loc)
       return 0;
 
     case SET:
-      /* If the destination is anything other than CC0, PC, a REG or a SUBREG
+      /* If the destination is anything other than PC, a REG or a SUBREG
 	 of a REG that occupies all of the REG, the insn uses DEST if
 	 it is mentioned in the destination or the source.  Otherwise, we
 	 need just check the source.  */
-      if (GET_CODE (SET_DEST (x)) != CC0
-	  && GET_CODE (SET_DEST (x)) != PC
+      if (GET_CODE (SET_DEST (x)) != PC
 	  && !REG_P (SET_DEST (x))
 	  && ! (GET_CODE (SET_DEST (x)) == SUBREG
 		&& REG_P (SUBREG_REG (SET_DEST (x)))
@@ -2005,7 +2004,7 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
 						  GET_MODE (src)))))
 	return 0;
     }
-  else if (GET_CODE (dest) != CC0)
+  else
     return 0;
 
 
@@ -5452,9 +5451,7 @@ subst (rtx x, rtx from, rtx to, int in_dest, int in_cond, int unique_copy)
 	{
 	  rtx dest = SET_DEST (XVECEXP (x, 0, i));
 
-	  if (!REG_P (dest)
-	      && GET_CODE (dest) != CC0
-	      && GET_CODE (dest) != PC)
+	  if (!REG_P (dest) && GET_CODE (dest) != PC)
 	    {
 	      new_rtx = subst (dest, from, to, 0, 0, unique_copy);
 
@@ -5472,13 +5469,12 @@ subst (rtx x, rtx from, rtx to, int in_dest, int in_cond, int unique_copy)
       len = GET_RTX_LENGTH (code);
       fmt = GET_RTX_FORMAT (code);
 
-      /* We don't need to process a SET_DEST that is a register, CC0,
-	 or PC, so set up to skip this common case.  All other cases
-	 where we want to suppress replacing something inside a
-	 SET_SRC are handled via the IN_DEST operand.  */
+      /* We don't need to process a SET_DEST that is a register or PC, so
+	 set up to skip this common case.  All other cases where we want
+	 to suppress replacing something inside a SET_SRC are handled via
+	 the IN_DEST operand.  */
       if (code == SET
 	  && (REG_P (SET_DEST (x))
-	      || GET_CODE (SET_DEST (x)) == CC0
 	      || GET_CODE (SET_DEST (x)) == PC))
 	fmt = "ie";
 
@@ -13871,9 +13867,6 @@ mark_used_regs_combine (rtx x)
     case ADDR_VEC:
     case ADDR_DIFF_VEC:
     case ASM_INPUT:
-    /* CC0 must die in the insn after it is set, so we don't need to take
-       special note of it here.  */
-    case CC0:
       return;
 
     case CLOBBER:

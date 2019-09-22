@@ -1382,7 +1382,6 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
       return cselib_hash_rtx (XEXP (x, 0), create, memmode);
 
     case PC:
-    case CC0:
     case CALL:
     case UNSPEC_VOLATILE:
       return 0;
@@ -1822,7 +1821,6 @@ cselib_expand_value_rtx_1 (rtx orig, struct expand_value_data *evd,
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case SCRATCH:
       /* SCRATCH must be shared because they represent distinct values.  */
       return orig;
