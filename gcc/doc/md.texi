@@ -7829,15 +7829,8 @@ works better when different sets of comparison operators are supported
 by different kinds of conditional branches (e.g.@: integer vs.@:
 floating-point), or by conditional branches with respect to conditional stores.
 
-Two separate insns are always used if the machine description represents
-a condition code register using the legacy RTL expression @code{(cc0)},
-and on most machines that use a separate condition code register
-(@pxref{Condition Code}).  For machines that use @code{(cc0)}, in
-fact, the set and use of the condition code must be separate and
-adjacent@footnote{@code{note} insns can separate them, though.}, thus
-allowing flags in @code{cc_status} to be used (@pxref{Condition Code}) and
-so that the comparison and branch insns could be located from each other
-by using the functions @code{prev_cc0_setter} and @code{next_cc0_user}.
+Two separate insns are always used on most machines that use a separate
+condition code register (@pxref{Condition Code}).
 
 Even in this case having a single entry point for conditional branches
 is advantageous, because it handles equally well the case where a single

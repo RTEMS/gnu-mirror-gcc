@@ -76,8 +76,8 @@ REG_NOTE (UNUSED)
    insns, but we permit putting a cc0-setting insn in the delay slot
    of a branch as long as only one copy of the insn exists.  In that
    case, these notes point from one to the other to allow code
-   generation to determine what any require information and to
-   properly update CC_STATUS.  These notes are INSN_LISTs.  */
+   generation to determine what any require information.  These notes
+   are INSN_LISTs.  */
 REG_NOTE (CC_SETTER)
 REG_NOTE (CC_USER)
 

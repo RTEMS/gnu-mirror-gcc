@@ -6339,23 +6339,8 @@ specified already in the compare instruction.  In this case, you are not
 interested in most macros in this section.
 
 @menu
-* CC0 Condition Codes::      Old style representation of condition codes.
 * MODE_CC Condition Codes::  Modern representation of condition codes.
 @end menu
-
-@node CC0 Condition Codes
-@subsection Representation of condition codes using @code{(cc0)}
-@findex cc0
-
-@findex cc_status
-The file @file{conditions.h} defines a variable @code{cc_status} to
-describe how the condition code was computed (in case the interpretation of
-the condition code depends on the instruction that it was set by).  This
-variable contains the RTL expressions on which the condition code is
-currently based, and several standard flags.
-
-Sometimes additional machine-specific flags must be defined in the machine
-description header file.
 
 @node MODE_CC Condition Codes
 @subsection Representation of condition codes using registers
