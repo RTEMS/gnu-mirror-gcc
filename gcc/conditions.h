@@ -46,10 +46,6 @@ along with GCC; see the file COPYING3.  If not see
 #define CC_STATUS_MDEP int
 #endif
 
-#ifndef CC_STATUS_MDEP_INIT
-#define CC_STATUS_MDEP_INIT 0
-#endif
-
 struct CC_STATUS {int flags; rtx value1, value2; CC_STATUS_MDEP mdep;};
 
 /* While outputting an insn as assembler code,
@@ -112,7 +108,6 @@ extern CC_STATUS cc_status;
 /* FIXME: We want to get rid of these ifndefs.  */
 #ifndef CC_STATUS_INIT
 #define CC_STATUS_INIT  \
- (cc_status.flags = 0, cc_status.value1 = 0, cc_status.value2 = 0,  \
-  CC_STATUS_MDEP_INIT)
+ (cc_status.flags = 0, cc_status.value1 = 0, cc_status.value2 = 0)
 #endif
 #endif /* GCC_CONDITIONS_H */

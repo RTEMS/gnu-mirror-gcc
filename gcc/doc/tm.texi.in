@@ -4330,15 +4330,6 @@ component of @code{cc_status}.  It defaults to @code{int}.
 This macro is not used on machines that do not use @code{cc0}.
 @end defmac
 
-@defmac CC_STATUS_MDEP_INIT
-A C expression to initialize the @code{mdep} field to ``empty''.
-The default definition does nothing, since most machines don't use
-the field anyway.  If you want to use the field, you should probably
-define this macro to initialize it.
-
-This macro is not used on machines that do not use @code{cc0}.
-@end defmac
-
 @node MODE_CC Condition Codes
 @subsection Representation of condition codes using registers
 @findex CCmode
