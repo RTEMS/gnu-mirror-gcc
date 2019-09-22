@@ -5302,8 +5302,7 @@ simplify_relational_operation (enum rtx_code code, machine_mode mode,
     return simplify_gen_relational (code, mode, VOIDmode,
 				    XEXP (op0, 0), XEXP (op0, 1));
 
-  if (GET_MODE_CLASS (cmp_mode) == MODE_CC
-      || CC0_P (op0))
+  if (GET_MODE_CLASS (cmp_mode) == MODE_CC)
     return NULL_RTX;
 
   trueop0 = avoid_constant_pool_reference (op0);
@@ -5668,7 +5667,7 @@ simplify_const_relational_operation (enum rtx_code code,
 
   /* We can't simplify MODE_CC values since we don't know what the
      actual comparison is.  */
-  if (GET_MODE_CLASS (GET_MODE (op0)) == MODE_CC || CC0_P (op0))
+  if (GET_MODE_CLASS (GET_MODE (op0)) == MODE_CC)
     return 0;
 
   /* Make sure the constant is second.  */

@@ -400,7 +400,7 @@ reversed_comparison_code_parts (enum rtx_code code, const_rtx arg0,
       break;
     }
 
-  if (GET_MODE_CLASS (mode) == MODE_CC || CC0_P (arg0))
+  if (GET_MODE_CLASS (mode) == MODE_CC)
     {
       /* Try to search for the comparison to determine the real mode.
          This code is expensive, but with sane machine description it

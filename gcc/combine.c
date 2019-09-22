@@ -6181,8 +6181,7 @@ combine_simplify_rtx (rtx x, machine_mode op0_mode, int in_dest,
       /* If the first operand is a condition code, we can't do anything
 	 with it.  */
       if (GET_CODE (XEXP (x, 0)) == COMPARE
-	  || (GET_MODE_CLASS (GET_MODE (XEXP (x, 0))) != MODE_CC
-	      && ! CC0_P (XEXP (x, 0))))
+	  || GET_MODE_CLASS (GET_MODE (XEXP (x, 0))) != MODE_CC)
 	{
 	  rtx op0 = XEXP (x, 0);
 	  rtx op1 = XEXP (x, 1);
@@ -6798,9 +6797,7 @@ simplify_set (rtx x)
   /* If we are setting CC0 or if the source is a COMPARE, look for the use of
      the comparison result and try to simplify it unless we already have used
      undobuf.other_insn.  */
-  if ((GET_MODE_CLASS (mode) == MODE_CC
-       || GET_CODE (src) == COMPARE
-       || CC0_P (dest))
+  if ((GET_MODE_CLASS (mode) == MODE_CC || GET_CODE (src) == COMPARE)
       && (cc_use = find_single_use (dest, subst_insn, &other_insn)) != 0
       && (undobuf.other_insn == 0 || other_insn == undobuf.other_insn)
       && COMPARISON_P (*cc_use)
@@ -12190,7 +12187,6 @@ simplify_comparison (enum rtx_code code, rtx *pop0, rtx *pop1)
 	  /* We can't do anything if OP0 is a condition code value, rather
 	     than an actual data value.  */
 	  if (const_op != 0
-	      || CC0_P (XEXP (op0, 0))
 	      || GET_MODE_CLASS (GET_MODE (XEXP (op0, 0))) == MODE_CC)
 	    break;
 

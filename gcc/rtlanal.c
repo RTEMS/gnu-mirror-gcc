@@ -5728,10 +5728,6 @@ canonicalize_condition (rtx_insn *insn, rtx cond, int reverse,
 	}
     }
 
-  /* Never return CC0; return zero instead.  */
-  if (CC0_P (op0))
-    return 0;
-
   /* We promised to return a comparison.  */
   rtx ret = gen_rtx_fmt_ee (code, VOIDmode, op0, op1);
   if (COMPARISON_P (ret))

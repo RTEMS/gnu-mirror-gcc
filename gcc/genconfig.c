@@ -330,17 +330,9 @@ main (int argc, const char **argv)
   printf ("#endif\n");
 
   if (have_cc0_flag)
-    {
-      printf ("#define HAVE_cc0 1\n");
-      printf ("#define CC0_P(X) ((X) == cc0_rtx)\n");
-    }
+    printf ("#define HAVE_cc0 1\n");
   else
-    {
-      /* We output CC0_P this way to make sure that X is declared
-	 somewhere.  */
-      printf ("#define HAVE_cc0 0\n");
-      printf ("#define CC0_P(X) ((X) ? 0 : 0)\n");
-    }
+    printf ("#define HAVE_cc0 0\n");
 
   if (have_cmove_flag)
     printf ("#define HAVE_conditional_move 1\n");
