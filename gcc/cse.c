@@ -5653,21 +5653,6 @@ cse_insn (rtx_insn *insn)
 	      sets[i].rtl = 0;
 	    }
 	}
-
-      /* If setting CC0, record what it was set to, or a constant, if it
-	 is equivalent to a constant.  If it is being set to a floating-point
-	 value, make a COMPARE with the appropriate constant of 0.  If we
-	 don't do this, later code can interpret this as a test against
-	 const0_rtx, which can cause problems if we try to put it into an
-	 insn as a floating-point operand.  */
-      if (dest == cc0_rtx)
-	{
-	  this_insn_cc0 = src_const && mode != VOIDmode ? src_const : src;
-	  this_insn_cc0_mode = mode;
-	  if (FLOAT_MODE_P (mode))
-	    this_insn_cc0 = gen_rtx_COMPARE (VOIDmode, this_insn_cc0,
-					     CONST0_RTX (mode));
-	}
     }
 
   /* Now enter all non-volatile source expressions in the hash table
@@ -6592,21 +6577,6 @@ cse_extended_basic_block (struct cse_basic_block_data *ebb_data)
 
 	      if (HAVE_cc0 && NONDEBUG_INSN_P (insn))
 		{
-		  /* If the previous insn sets CC0 and this insn no
-		     longer references CC0, delete the previous insn.
-		     Here we use fact that nothing expects CC0 to be
-		     valid over an insn, which is true until the final
-		     pass.  */
-		  rtx_insn *prev_insn;
-		  rtx tem;
-
-		  prev_insn = prev_nonnote_nondebug_insn (insn);
-		  if (prev_insn && NONJUMP_INSN_P (prev_insn)
-		      && (tem = single_set (prev_insn)) != NULL_RTX
-		      && SET_DEST (tem) == cc0_rtx
-		      && ! reg_mentioned_p (cc0_rtx, PATTERN (insn)))
-		    delete_insn (prev_insn);
-
 		  /* If this insn is not the last insn in the basic
 		     block, it will be PREV_INSN(insn) in the next
 		     iteration.  If we recorded any CC0-related
@@ -6923,20 +6893,13 @@ static bool
 set_live_p (rtx set, rtx_insn *insn ATTRIBUTE_UNUSED, /* Only used with HAVE_cc0.  */
 	    int *counts)
 {
-  rtx_insn *tem;
-
   if (set_noop_p (set))
-    ;
-
-  else if (GET_CODE (SET_DEST (set)) == CC0
-	   && !side_effects_p (SET_SRC (set))
-	   && ((tem = next_nonnote_nondebug_insn (insn)) == NULL_RTX
-	       || !INSN_P (tem)
-	       || !reg_referenced_p (cc0_rtx, PATTERN (tem))))
     return false;
-  else if (!is_dead_reg (SET_DEST (set), counts)
-	   || side_effects_p (SET_SRC (set)))
+
+  if (!is_dead_reg (SET_DEST (set), counts)
+      || side_effects_p (SET_SRC (set)))
     return true;
+
   return false;
 }
 

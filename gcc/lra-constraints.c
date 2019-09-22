@@ -3960,11 +3960,6 @@ curr_insn_transform (bool check_only_p)
   if (CALL_P (curr_insn))
     no_output_reloads_p = true;
 
-  if (HAVE_cc0 && reg_referenced_p (cc0_rtx, PATTERN (curr_insn)))
-    no_input_reloads_p = true;
-  if (HAVE_cc0 && reg_set_p (cc0_rtx, PATTERN (curr_insn)))
-    no_output_reloads_p = true;
-
   n_operands = curr_static_id->n_operands;
   n_alternatives = curr_static_id->n_alternatives;
 

@@ -1038,21 +1038,14 @@ sets_cc0_p (const_rtx x)
   if (INSN_P (x))
     x = PATTERN (x);
 
-  if (GET_CODE (x) == SET && SET_DEST (x) == cc0_rtx)
-    return 1;
   if (GET_CODE (x) == PARALLEL)
     {
       int i;
       int sets_cc0 = 0;
       int other_things = 0;
       for (i = XVECLEN (x, 0) - 1; i >= 0; i--)
-	{
-	  if (GET_CODE (XVECEXP (x, 0, i)) == SET
-	      && SET_DEST (XVECEXP (x, 0, i)) == cc0_rtx)
-	    sets_cc0 = 1;
-	  else if (GET_CODE (XVECEXP (x, 0, i)) == SET)
-	    other_things = 1;
-	}
+	if (GET_CODE (XVECEXP (x, 0, i)) == SET)
+	  other_things = 1;
       return ! sets_cc0 ? 0 : other_things ? -1 : 1;
     }
   return 0;

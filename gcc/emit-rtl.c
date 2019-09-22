@@ -123,7 +123,6 @@ rtx const_int_rtx[MAX_SAVED_CONST_INT * 2 + 1];
 rtx pc_rtx;
 rtx ret_rtx;
 rtx simple_return_rtx;
-rtx cc0_rtx;
 
 /* Marker used for denoting an INSN, which should never be accessed (i.e.,
    this pointer should normally never be dereferenced), but is required to be
@@ -3738,9 +3737,6 @@ next_cc0_user (rtx_insn *insn)
   if (insn && NONJUMP_INSN_P (insn) && GET_CODE (PATTERN (insn)) == SEQUENCE)
     insn = as_a <rtx_sequence *> (PATTERN (insn))->insn (0);
 
-  if (insn && INSN_P (insn) && reg_mentioned_p (cc0_rtx, PATTERN (insn)))
-    return insn;
-
   return 0;
 }
 
@@ -6411,7 +6407,6 @@ init_emit_once (void)
   pc_rtx = gen_rtx_fmt_ (PC, VOIDmode);
   ret_rtx = gen_rtx_fmt_ (RETURN, VOIDmode);
   simple_return_rtx = gen_rtx_fmt_ (SIMPLE_RETURN, VOIDmode);
-  cc0_rtx = gen_rtx_fmt_ (CC0, VOIDmode);
   invalid_insn_rtx = gen_rtx_INSN (VOIDmode,
 				   /*prev_insn=*/NULL,
 				   /*next_insn=*/NULL,

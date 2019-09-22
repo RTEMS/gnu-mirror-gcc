@@ -3658,7 +3658,6 @@ extern GTY(()) rtx const_tiny_rtx[4][(int) MAX_MACHINE_MODE];
 #define CONSTM1_RTX(MODE) (const_tiny_rtx[3][(int) (MODE)])
 
 extern GTY(()) rtx pc_rtx;
-extern GTY(()) rtx cc0_rtx;
 extern GTY(()) rtx ret_rtx;
 extern GTY(()) rtx simple_return_rtx;
 extern GTY(()) rtx_insn *invalid_insn_rtx;

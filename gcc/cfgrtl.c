@@ -1041,7 +1041,7 @@ edge
 try_redirect_by_replacing_jump (edge e, basic_block target, bool in_cfglayout)
 {
   basic_block src = e->src;
-  rtx_insn *insn = BB_END (src), *kill_from;
+  rtx_insn *insn = BB_END (src);
   rtx set;
   int fallthru = 0;
 
@@ -1078,13 +1078,6 @@ try_redirect_by_replacing_jump (edge e, basic_block target, bool in_cfglayout)
   if (!set || side_effects_p (set))
     return NULL;
 
-  /* In case we zap a conditional jump, we'll need to kill
-     the cc0 setter too.  */
-  kill_from = insn;
-  if (HAVE_cc0 && reg_mentioned_p (cc0_rtx, PATTERN (insn))
-      && only_sets_cc0_p (PREV_INSN (insn)))
-    kill_from = PREV_INSN (insn);
-
   /* See if we can create the fallthru edge.  */
   if (in_cfglayout || can_fallthru (src, target))
     {
@@ -1095,12 +1088,11 @@ try_redirect_by_replacing_jump (edge e, basic_block target, bool in_cfglayout)
       /* Selectively unlink whole insn chain.  */
       if (in_cfglayout)
 	{
-	  delete_insn_chain (kill_from, BB_END (src), false);
+	  delete_insn_chain (insn, BB_END (src), false);
 	  remove_barriers_from_footer (src);
 	}
       else
-	delete_insn_chain (kill_from, PREV_INSN (BB_HEAD (target)),
-			   false);
+	delete_insn_chain (insn, PREV_INSN (BB_HEAD (target)), false);
     }
 
   /* If this already is simplejump, redirect it.  */
@@ -1139,7 +1131,7 @@ try_redirect_by_replacing_jump (edge e, basic_block target, bool in_cfglayout)
 		 INSN_UID (insn), INSN_UID (BB_END (src)));
 
 
-      delete_insn_chain (kill_from, insn, false);
+      delete_insn_chain (insn, insn, false);
 
       /* Recognize a tablejump that we are converting to a
 	 simple jump and remove its associated CODE_LABEL

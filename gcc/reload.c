@@ -2697,11 +2697,6 @@ find_reloads (rtx_insn *insn, int replace, int ind_levels, int live_known,
   if (JUMP_P (insn) || CALL_P (insn))
     no_output_reloads = 1;
 
-  if (HAVE_cc0 && reg_referenced_p (cc0_rtx, PATTERN (insn)))
-    no_input_reloads = 1;
-  if (HAVE_cc0 && reg_set_p (cc0_rtx, PATTERN (insn)))
-    no_output_reloads = 1;
-
   /* The eliminated forms of any secondary memory locations are per-insn, so
      clear them out here.  */
 

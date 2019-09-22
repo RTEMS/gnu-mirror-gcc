@@ -2073,10 +2073,6 @@ dead_or_set_p (const rtx_insn *insn, const_rtx x)
   unsigned int regno, end_regno;
   unsigned int i;
 
-  /* Can't use cc0_rtx below since this file is used by genattrtab.c.  */
-  if (GET_CODE (x) == CC0)
-    return 1;
-
   gcc_assert (REG_P (x));
 
   regno = REGNO (x);
@@ -5543,22 +5539,6 @@ canonicalize_condition (rtx_insn *insn, rtx cond, int reverse,
     {
       /* Set nonzero when we find something of interest.  */
       rtx x = 0;
-
-      /* If comparison with cc0, import actual comparison from compare
-	 insn.  */
-      if (op0 == cc0_rtx)
-	{
-	  if ((prev = prev_nonnote_insn (prev)) == 0
-	      || !NONJUMP_INSN_P (prev)
-	      || (set = single_set (prev)) == 0
-	      || SET_DEST (set) != cc0_rtx)
-	    return 0;
-
-	  op0 = SET_SRC (set);
-	  op1 = CONST0_RTX (GET_MODE (op0));
-	  if (earliest)
-	    *earliest = prev;
-	}
 
       /* If this is a COMPARE, pick up the two things being compared.  */
       if (GET_CODE (op0) == COMPARE)

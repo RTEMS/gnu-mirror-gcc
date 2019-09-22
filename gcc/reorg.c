@@ -155,21 +155,6 @@ skip_consecutive_labels (rtx label_or_return)
 
   return label;
 }
-
-/* INSN uses CC0 and is being moved into a delay slot.  Set up REG_CC_SETTER
-   and REG_CC_USER notes so we can find it.  */
-
-static void
-link_cc0_insns (rtx_insn *insn)
-{
-  rtx user = next_nonnote_insn (insn);
-
-  if (NONJUMP_INSN_P (user) && GET_CODE (PATTERN (user)) == SEQUENCE)
-    user = XVECEXP (PATTERN (user), 0, 0);
-
-  add_reg_note (user, REG_CC_SETTER, insn);
-  add_reg_note (insn, REG_CC_USER, user);
-}
 
 /* Insns which have delay slots that have not yet been filled.  */
 
@@ -646,43 +631,6 @@ delete_from_delay_slot (rtx_insn *insn)
 static void
 delete_scheduled_jump (rtx_insn *insn)
 {
-  /* Delete the insn that sets cc0 for us.  On machines without cc0, we could
-     delete the insn that sets the condition code, but it is hard to find it.
-     Since this case is rare anyway, don't bother trying; there would likely
-     be other insns that became dead anyway, which we wouldn't know to
-     delete.  */
-
-  if (HAVE_cc0 && reg_mentioned_p (cc0_rtx, insn))
-    {
-      rtx note = find_reg_note (insn, REG_CC_SETTER, NULL_RTX);
-
-      /* If a reg-note was found, it points to an insn to set CC0.  This
-	 insn is in the delay list of some other insn.  So delete it from
-	 the delay list it was in.  */
-      if (note)
-	{
-	  if (! FIND_REG_INC_NOTE (XEXP (note, 0), NULL_RTX)
-	      && sets_cc0_p (PATTERN (XEXP (note, 0))) == 1)
-	    delete_from_delay_slot (as_a <rtx_insn *> (XEXP (note, 0)));
-	}
-      else
-	{
-	  /* The insn setting CC0 is our previous insn, but it may be in
-	     a delay slot.  It will be the last insn in the delay slot, if
-	     it is.  */
-	  rtx_insn *trial = previous_insn (insn);
-	  if (NOTE_P (trial))
-	    trial = prev_nonnote_insn (trial);
-	  if (sets_cc0_p (PATTERN (trial)) != 1
-	      || FIND_REG_INC_NOTE (trial, NULL_RTX))
-	    return;
-	  if (PREV_INSN (NEXT_INSN (trial)) == trial)
-	    delete_related_insns (trial);
-	  else
-	    delete_from_delay_slot (trial);
-	}
-    }
-
   delete_related_insns (insn);
 }
 
@@ -1562,7 +1510,6 @@ redundant_insn (rtx insn, rtx_insn *target, const vec<rtx_insn *> &delay_list)
     target_main = XVECEXP (PATTERN (target), 0, 0);
 
   if (resource_conflicts_p (&needed, &set)
-      || (HAVE_cc0 && reg_mentioned_p (cc0_rtx, ipat))
       /* The insn requiring the delay may not set anything needed or set by
 	 INSN.  */
       || insn_sets_resource_p (target_main, &needed, true)
@@ -2052,7 +1999,6 @@ fill_simple_delay_slots (int non_jumps_p)
 					     true)
 		  && ! insn_sets_resource_p (trial, &needed, true)
 		  /* Can't separate set of cc0 from its use.  */
-		  && (!HAVE_cc0 || ! (reg_mentioned_p (cc0_rtx, pat) && ! sets_cc0_p (pat)))
 		  && ! can_throw_internal (trial))
 		{
 		  trial = try_split (pat, trial, 1);
@@ -2186,7 +2132,7 @@ fill_simple_delay_slots (int non_jumps_p)
 		  && ! insn_references_resource_p (trial, &set, true)
 		  && ! insn_sets_resource_p (trial, &set, true)
 		  && ! insn_sets_resource_p (trial, &needed, true)
-		  && (!HAVE_cc0 && ! (reg_mentioned_p (cc0_rtx, pat) && ! sets_cc0_p (pat)))
+		  && !HAVE_cc0
 		  && ! (maybe_never && may_trap_or_fault_p (pat))
 		  && (trial = try_split (pat, trial, 0))
 		  && eligible_for_delay (insn, slots_filled, trial, flags)
@@ -2194,8 +2140,6 @@ fill_simple_delay_slots (int non_jumps_p)
 		{
 		  next_trial = next_nonnote_insn (trial);
 		  add_to_delay_list (trial, &delay_list);
-		  if (HAVE_cc0 && reg_mentioned_p (cc0_rtx, pat))
-		    link_cc0_insns (trial);
 
 		  delete_related_insns (trial);
 		  if (slots_to_fill == ++slots_filled)
@@ -2232,7 +2176,6 @@ fill_simple_delay_slots (int non_jumps_p)
 	      && ! insn_references_resource_p (next_trial, &set, true)
 	      && ! insn_sets_resource_p (next_trial, &set, true)
 	      && ! insn_sets_resource_p (next_trial, &needed, true)
-	      && (!HAVE_cc0 || ! reg_mentioned_p (cc0_rtx, PATTERN (next_trial)))
 	      && ! (maybe_never && may_trap_or_fault_p (PATTERN (next_trial)))
 	      && (next_trial = try_split (PATTERN (next_trial), next_trial, 0))
 	      && eligible_for_delay (insn, slots_filled, next_trial, flags)
@@ -2457,18 +2400,6 @@ fill_slots_from_thread (rtx_jump_insn *insn, rtx condition,
       if (! insn_references_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, filter_flags ? &fset : &set, true)
 	  && ! insn_sets_resource_p (trial, &needed, true)
-	  /* If we're handling sets to the flags register specially, we
-	     only allow an insn into a delay-slot, if it either:
-	     - doesn't set the flags register,
-	     - the "set" of the flags register isn't used (clobbered),
-	     - insns between the delay-slot insn and the trial-insn
-	     as accounted in "set", have not affected the flags register.  */
-	  && (! filter_flags
-	      || ! insn_sets_resource_p (trial, &flags_res, true)
-	      || find_regno_note (trial, REG_UNUSED, targetm.flags_regnum)
-	      || ! TEST_HARD_REG_BIT (set.regs, targetm.flags_regnum))
-	  && (!HAVE_cc0 || (! (reg_mentioned_p (cc0_rtx, pat)
-			      && (! own_thread || ! sets_cc0_p (pat)))))
 	  && ! can_throw_internal (trial))
 	{
 	  rtx_insn *prior_insn;
@@ -2542,9 +2473,6 @@ fill_slots_from_thread (rtx_jump_insn *insn, rtx condition,
 
 		  must_annul = 1;
 		winner:
-
-		  if (HAVE_cc0 && reg_mentioned_p (cc0_rtx, pat))
-		    link_cc0_insns (trial);
 
 		  /* If we own this thread, delete the insn.  If this is the
 		     destination of a branch, show that a basic block status
@@ -3092,27 +3020,6 @@ static void
 delete_computation (rtx_insn *insn)
 {
   rtx note, next;
-
-  if (HAVE_cc0 && reg_referenced_p (cc0_rtx, PATTERN (insn)))
-    {
-      rtx_insn *prev = prev_nonnote_insn (insn);
-      /* We assume that at this stage
-	 CC's are always set explicitly
-	 and always immediately before the jump that
-	 will use them.  So if the previous insn
-	 exists to set the CC's, delete it
-	 (unless it performs auto-increments, etc.).  */
-      if (prev && NONJUMP_INSN_P (prev)
-	  && sets_cc0_p (PATTERN (prev)))
-	{
-	  if (sets_cc0_p (PATTERN (prev)) > 0
-	      && ! side_effects_p (PATTERN (prev)))
-	    delete_computation (prev);
-	  else
-	    /* Otherwise, show that cc0 won't be used.  */
-	    add_reg_note (prev, REG_UNUSED, cc0_rtx);
-	}
-    }
 
   for (note = REG_NOTES (insn); note; note = next)
     {
