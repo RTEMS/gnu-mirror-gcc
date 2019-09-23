@@ -1,10 +1,28 @@
 2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
+	prefixed addressing by default.
+	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Only
+	enable -mprefixed-addr and -mpcrel if the OS tm.h says to enable
+	it.
+	(ADDRESSING_FUTURE_MASKS): New mask macro.
+	(OTHER_FUTURE_MASKS): Use ADDRESSING_FUTURE_MASKS.
+	* config/rs6000/rs6000.c (TARGET_PREFIXED_ADDR_DEFAULT): Do not
+	enable -mprefixed-addr unless the OS tm.h says to.
+	(TARGET_PCREL_DEFAULT): Do not enable -mpcrel unless the OS tm.h
+	says to.
+	(rs6000_option_override_internal): Do not enable -mprefixed-addr
+	or -mpcrel unless the OS tm.h says to enable it.  Add more checks
+	for -mcpu=future.
+
+2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (add_operand): Add support for
 	PADDI.
 	* config/rs6000/rs6000.md (add<mode>3): Add support for PADDI.
 
-2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
+2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.md (movsi_internal1): Add support to load
 	up 32-bit SImode integer constants with PADDI.
