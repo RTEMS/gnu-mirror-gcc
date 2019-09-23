@@ -189,6 +189,30 @@ enum non_prefixed {
 
 extern enum insn_form address_to_insn_form (rtx, machine_mode,
 					    enum non_prefixed);
+extern bool prefixed_load_p (rtx_insn *);
+extern bool prefixed_store_p (rtx_insn *);
+extern bool prefixed_paddi_p (rtx_insn *);
+extern void rs6000_asm_output_opcode (FILE *);
+extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
+
+/* Return true if the address is a prefixed instruction that can be directly
+   used in a memory instruction (i.e. using numeric offset or a PC-relative
+   reference to a local symbol).
+
+   References to external PC-relative symbols aren't allowed, because GCC has
+   to load the address into a register and then issue a separate load or
+   store.  */
+
+static inline bool
+address_is_prefixed (rtx addr,
+		     machine_mode mode,
+		     enum non_prefixed non_prefixed_insn)
+{
+  enum insn_form iform = address_to_insn_form (addr, mode,
+					       non_prefixed_insn);
+  return (iform == INSN_FORM_PREFIXED_NUMERIC
+	  || iform == INSN_FORM_PCREL_LOCAL);
+}
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
@@ -267,8 +291,6 @@ extern void rs6000_d_target_versions (void);
 #ifdef NO_DOLLAR_IN_LABEL
 const char * rs6000_xcoff_strip_dollar (const char *);
 #endif
-
-void rs6000_final_prescan_insn (rtx_insn *, rtx *operand, int num_operands);
 
 extern unsigned char rs6000_class_max_nregs[][LIM_REG_CLASSES];
 extern unsigned char rs6000_hard_regno_nregs[][FIRST_PSEUDO_REGISTER];
