@@ -88,17 +88,7 @@ along with GCC; see the file COPYING3.  If not see
    making the various individual schedules work well together.  It is
    especially tuned to handle the control flow interactions of branch
    insns.  It does nothing for insns with delay slots that do not
-   branch.
-
-   On machines that use CC0, we are very conservative.  We will not make
-   a copy of an insn involving CC0 since we want to maintain a 1-1
-   correspondence between the insn that sets and uses CC0.  The insns are
-   allowed to be separated by placing an insn that sets CC0 (but not an insn
-   that uses CC0; we could do this, but it doesn't seem worthwhile) in a
-   delay slot.  In that case, we point each insn at the other with REG_CC_USER
-   and REG_CC_SETTER notes.  Note that these restrictions affect very few
-   machines because most RISC machines with delay slots will not use CC0
-   (the RT is the only known exception at this point).  */
+   branch.  */
 
 #include "config.h"
 #include "system.h"
@@ -330,8 +320,7 @@ insn_references_resource_p (rtx insn, struct resources *res,
 
 /* Return TRUE if INSN modifies resources that are marked in RES.
    INCLUDE_DELAYED_EFFECTS is set if the actions of that routine should be
-   included.   CC0 is only modified if it is explicitly set; see comments
-   in front of mark_set_resources for details.  */
+   included.   */
 
 static int
 insn_sets_resource_p (rtx insn, struct resources *res,
@@ -625,8 +614,7 @@ delete_from_delay_slot (rtx_insn *insn)
   return trial;
 }
 
-/* Delete INSN, a JUMP_INSN.  If it is a conditional jump, we must track down
-   the insn that sets CC0 for it and delete it too.  */
+/* Delete INSN, a JUMP_INSN.  */
 
 static void
 delete_scheduled_jump (rtx_insn *insn)
@@ -3003,10 +2991,7 @@ delete_prior_computation (rtx note, rtx_insn *insn)
 
    Look at all our REG_DEAD notes.  If a previous insn does nothing other
    than set a register that dies in this insn, we can delete that insn
-   as well.
-
-   On machines with CC0, if CC0 is used in this insn, we may be able to
-   delete the insn that set it.  */
+   as well.  */
 
 static void
 delete_computation (rtx_insn *insn)

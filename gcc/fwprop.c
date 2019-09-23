@@ -1321,7 +1321,7 @@ forward_propagate_and_simplify (df_ref use, rtx_insn *def_insn, rtx def_set)
   if (!use_set && asm_use < 0 && !DEBUG_INSN_P (use_insn))
     return false;
 
-  /* Do not propagate into PC, CC0, etc.  */
+  /* Do not propagate into PC etc.  */
   if (use_set && GET_MODE (SET_DEST (use_set)) == VOIDmode)
     return false;
 

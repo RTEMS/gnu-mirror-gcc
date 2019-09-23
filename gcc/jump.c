@@ -1008,48 +1008,6 @@ jump_to_label_p (const rtx_insn *insn)
   return (JUMP_P (insn)
 	  && JUMP_LABEL (insn) != NULL && !ANY_RETURN_P (JUMP_LABEL (insn)));
 }
-
-/* Return nonzero if X is an RTX that only sets the condition codes
-   and has no side effects.  */
-
-int
-only_sets_cc0_p (const_rtx x)
-{
-  if (! x)
-    return 0;
-
-  if (INSN_P (x))
-    x = PATTERN (x);
-
-  return sets_cc0_p (x) == 1 && ! side_effects_p (x);
-}
-
-/* Return 1 if X is an RTX that does nothing but set the condition codes
-   and CLOBBER or USE registers.
-   Return -1 if X does explicitly set the condition codes,
-   but also does other things.  */
-
-int
-sets_cc0_p (const_rtx x)
-{
-  if (! x)
-    return 0;
-
-  if (INSN_P (x))
-    x = PATTERN (x);
-
-  if (GET_CODE (x) == PARALLEL)
-    {
-      int i;
-      int sets_cc0 = 0;
-      int other_things = 0;
-      for (i = XVECLEN (x, 0) - 1; i >= 0; i--)
-	if (GET_CODE (XVECEXP (x, 0, i)) == SET)
-	  other_things = 1;
-      return ! sets_cc0 ? 0 : other_things ? -1 : 1;
-    }
-  return 0;
-}
 
 /* Find all CODE_LABELs referred to in X, and increment their use
    counts.  If INSN is a JUMP_INSN and there is at least one

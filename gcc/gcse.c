@@ -2030,16 +2030,15 @@ insert_insn_end_basic_block (struct gcse_expr *expr, basic_block bb)
   while (NEXT_INSN (pat_end) != NULL_RTX)
     pat_end = NEXT_INSN (pat_end);
 
-  /* If the last insn is a jump, insert EXPR in front [taking care to
-     handle cc0, etc. properly].  Similarly we need to care trapping
-     instructions in presence of non-call exceptions.  */
+  /* If the last insn is a jump, insert EXPR in front.  Similarly we need to
+     take care of trapping instructions in presence of non-call exceptions.  */
 
   if (JUMP_P (insn)
       || (NONJUMP_INSN_P (insn)
 	  && (!single_succ_p (bb)
 	      || single_succ_edge (bb)->flags & EDGE_ABNORMAL)))
     {
-      /* FIXME: What if something in cc0/jump uses value set in new insn?  */
+      /* FIXME: What if something in jump uses value set in new insn?  */
       new_insn = emit_insn_before_noloc (pat, insn, bb);
     }
 

@@ -2045,8 +2045,8 @@ note_uses (rtx *pbody, void (*fun) (rtx *, void *), void *data)
 }
 
 /* Return nonzero if X's old contents don't survive after INSN.
-   This will be true if X is (cc0) or if X is a register and
-   X dies in INSN or because INSN entirely sets X.
+   This will be true if X is a register and X dies in INSN or because
+   INSN entirely sets X.
 
    "Entirely set" means set directly and not through a SUBREG, or
    ZERO_EXTRACT, so no trace of the old contents remains.
@@ -2366,8 +2366,6 @@ alloc_reg_note (enum reg_note kind, rtx datum, rtx list)
   gcc_checking_assert (!int_reg_note_p (kind));
   switch (kind)
     {
-    case REG_CC_SETTER:
-    case REG_CC_USER:
     case REG_LABEL_TARGET:
     case REG_LABEL_OPERAND:
     case REG_TM:
@@ -5467,7 +5465,7 @@ seq_cost (const rtx_insn *seq, bool speed)
    canonical form to simplify testing by callers.  Specifically:
 
    (1) The code will always be a comparison operation (EQ, NE, GT, etc.).
-   (2) Both operands will be machine operands; (cc0) will have been replaced.
+   (2) Both operands will be machine operands.
    (3) If an operand is a constant, it will be the second operand.
    (4) (LE x const) will be replaced with (LT x <const+1>) and similarly
        for GE, GEU, and LEU.

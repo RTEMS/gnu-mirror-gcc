@@ -603,13 +603,7 @@ find_dead_or_set_registers (rtx_insn *target, struct resources *res,
    set by the called routine.
 
    If IN_DEST is nonzero, it means we are inside a SET.  Otherwise,
-   objects are being referenced instead of set.
-
-   We never mark the insn as modifying the condition code unless it explicitly
-   SETs CC0 even though this is not totally correct.  The reason for this is
-   that we require a SET of CC0 to immediately precede the reference to CC0.
-   So if some other insn sets CC0 as a side-effect, we know it cannot affect
-   our computation and thus may be placed in a delay slot.  */
+   objects are being referenced instead of set.  */
 
 void
 mark_set_resources (rtx x, struct resources *res, int in_dest,

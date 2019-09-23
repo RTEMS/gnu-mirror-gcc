@@ -3991,8 +3991,6 @@ extern int simplejump_p (const rtx_insn *);
 extern int returnjump_p (const rtx_insn *);
 extern int eh_returnjump_p (rtx_insn *);
 extern int onlyjump_p (const rtx_insn *);
-extern int only_sets_cc0_p (const_rtx);
-extern int sets_cc0_p (const_rtx);
 extern int invert_jump_1 (rtx_jump_insn *, rtx);
 extern int invert_jump (rtx_jump_insn *, rtx, int);
 extern int rtx_renumbered_equal_p (const_rtx, const_rtx);

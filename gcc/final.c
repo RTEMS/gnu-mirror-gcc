@@ -93,7 +93,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbxout.h"
 #endif
 
-/* Most ports that aren't using cc0 don't need to define CC_STATUS_INIT.
+/* Most ports don't need to define CC_STATUS_INIT.
    So define a null default for it to save conditionalization later.  */
 #ifndef CC_STATUS_INIT
 #define CC_STATUS_INIT

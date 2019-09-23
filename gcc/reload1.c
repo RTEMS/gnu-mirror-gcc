@@ -7849,7 +7849,7 @@ do_input_reload (class insn_chain *chain, struct reload *rl, int j)
 /* Do output reloading for reload RL, which is for the insn described by
    CHAIN and has the number J.
    ??? At some point we need to support handling output reloads of
-   JUMP_INSNs or insns that set cc0.  */
+   JUMP_INSNs.  */
 static void
 do_output_reload (class insn_chain *chain, struct reload *rl, int j)
 {
