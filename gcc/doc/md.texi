@@ -6911,7 +6911,7 @@ such as
   [(set (pc)
         (if_then_else (match_operator
                          0 "comparison_operator"
-                         [(cc0) (const_int 0)])
+                         [(reg:CC CC_REG) (const_int 0)])
                       (return)
                       (pc)))]
   "@var{condition}"
@@ -8024,7 +8024,7 @@ the operations as far as possible.  For instance,
 @cindex @code{compare}, canonicalization of
 @item
 For the @code{compare} operator, a constant is always the second operand
-if the first argument is a condition code register or @code{(cc0)}.
+if the first argument is a condition code register.
 
 @item
 For instructions that inherently set a condition code register, the

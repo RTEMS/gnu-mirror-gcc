@@ -6301,21 +6301,16 @@ or target-specific sections.
 @section Condition Code Status
 @cindex condition code status
 
-The macros in this section can be split in two families, according to the
-two ways of representing condition codes in GCC.
-
-The first representation is the so called @code{(cc0)} representation
-(@pxref{Jump Patterns}), where all instructions can have an implicit
-clobber of the condition codes.  The second is the condition code
-register representation, which provides better schedulability for
+Condition codes in GCC are represented as registers,
+which provides better schedulability for
 architectures that do have a condition code register, but on which
 most instructions do not affect it.  The latter category includes
 most RISC machines.
 
-The implicit clobbering poses a strong restriction on the placement of
+Implicit clobbering would pose a strong restriction on the placement of
 the definition and use of the condition code.  In the past the definition
 and use were always adjacent.  However, recent changes to support trapping
-arithmatic may result in the definition and user being in different blocks.
+arithmetic may result in the definition and user being in different blocks.
 Thus, there may be a @code{NOTE_INSN_BASIC_BLOCK} between them.  Additionally,
 the definition may be the source of exception handling edges.
 
@@ -6326,8 +6321,7 @@ three instructions earlier than the conditional branch.  The instruction
 scheduler cannot perform this optimization if it is not permitted to
 separate the definition and use of the condition code register.
 
-For this reason, it is possible and suggested to use a register to
-represent the condition code for new ports.  If there is a specific
+If there is a specific
 condition code register in the machine, use a hard register.  If the
 condition code or comparison result can be placed in any general register,
 or if there are multiple condition registers, use a pseudo register.
@@ -6456,7 +6450,7 @@ like:
 @end defmac
 
 @deftypefn {Target Hook} bool TARGET_FIXED_CONDITION_CODE_REGS (unsigned int *@var{p1}, unsigned int *@var{p2})
-On targets which do not use @code{(cc0)}, and which use a hard
+On targets which use a hard
 register rather than a pseudo-register to hold condition codes, the
 regular CSE passes are often not able to identify cases in which the
 hard register is set to a common value.  Use this hook to enable a
@@ -11456,8 +11450,7 @@ for cross-profiling.
 
 A C expression for the maximum number of instructions to execute via
 conditional execution instructions instead of a branch.  A value of
-@code{BRANCH_COST}+1 is the default if the machine does not use cc0, and
-1 if it does use cc0.
+@code{BRANCH_COST}+1 is the default.
 @end defmac
 
 @defmac IFCVT_MODIFY_TESTS (@var{ce_info}, @var{true_expr}, @var{false_expr})
