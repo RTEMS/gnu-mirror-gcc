@@ -1,3 +1,10 @@
+2019-09-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (movsi_internal1): Add support to load
+	up 32-bit SImode integer constants with PADDI.
+	(movsi integer constant splitter): Do not split constant if PADDI
+	can load it up directly.
+
 2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
