@@ -13078,8 +13078,8 @@ print_operand_address (FILE *file, rtx x)
   if (REG_P (x))
     fprintf (file, "0(%s)", reg_names[ REGNO (x) ]);
 
-  /* Is it a pc-relative address?  */
-  else if (pcrel_address (x, Pmode))
+  /* Is it a PC-relative address?  */
+  else if (TARGET_PCREL && pcrel_local_or_external_address (x, VOIDmode))
     {
       HOST_WIDE_INT offset;
 
@@ -13099,7 +13099,10 @@ print_operand_address (FILE *file, rtx x)
       if (offset)
 	fprintf (file, "%+" PRId64, offset);
 
-      fputs ("@pcrel", file);
+      if (SYMBOL_REF_P (x) && !SYMBOL_REF_LOCAL_P (x))
+	fprintf (file, "@got");
+
+      fprintf (file, "@pcrel");
     }
   else if (SYMBOL_REF_P (x) || GET_CODE (x) == CONST
 	   || GET_CODE (x) == LABEL_REF)
@@ -13584,71 +13587,6 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 #endif
-
-/* Helper function to return whether a MODE can do prefixed loads/stores.
-   VOIDmode is used when we are loading the pc-relative address into a base
-   register, but we are not using it as part of a memory operation.  As modes
-   add support for prefixed memory, they will be added here.  */
-
-static bool
-mode_supports_prefixed_address_p (machine_mode mode)
-{
-  return mode == VOIDmode;
-}
-
-/* Function to return true if ADDR is a valid prefixed memory address that uses
-   mode MODE.  */
-
-bool
-rs6000_prefixed_address_mode_p (rtx addr, machine_mode mode)
-{
-  if (!TARGET_PREFIXED_ADDR || !mode_supports_prefixed_address_p (mode))
-    return false;
-
-  /* Check for PC-relative addresses.  */
-  if (pcrel_address (addr, Pmode))
-    return true;
-
-  /* Check for prefixed memory addresses that have a large numeric offset,
-     or an offset that can't be used for a DS/DQ-form memory operation.  */
-  if (GET_CODE (addr) == PLUS)
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      if (!base_reg_operand (op0, Pmode) || !CONST_INT_P (op1))
-	return false;
-
-      HOST_WIDE_INT value = INTVAL (op1);
-      if (!SIGNED_34BIT_OFFSET_P (value))
-	return false;
-
-      /* Offset larger than 16-bits?  */
-      if (!SIGNED_16BIT_OFFSET_P (value))
-	return true;
-
-      /* DQ instruction (bottom 4 bits must be 0) for vectors.  */
-      HOST_WIDE_INT mask;
-      if (GET_MODE_SIZE (mode) >= 16)
-	mask = 15;
-
-      /* DS instruction (bottom 2 bits must be 0).  For 32-bit integers, we
-	 need to use DS instructions if we are sign-extending the value with
-	 LWA.  For 32-bit floating point, we need DS instructions to load and
-	 store values to the traditional Altivec registers.  */
-      else if (GET_MODE_SIZE (mode) >= 4)
-	mask = 3;
-
-      /* QImode/HImode has no restrictions.  */
-      else
-	return true;
-
-      /* Return true if we must use a prefixed instruction.  */
-      return (value & mask) != 0;
-    }
-
-  return false;
-}
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
 /* Emit an assembler directive to set symbol visibility for DECL to
@@ -24613,6 +24551,167 @@ rs6000_pcrel_p (struct function *fn)
   return rs6000_fndecl_pcrel_p (fn->decl);
 }
 
+
+/* Given an address (ADDR), a mode (MODE), and what the format of the
+   non-prefixed address (NON_PREFIXED_FORM) is, return the instruction format
+   for the address.  */
+
+enum insn_form
+address_to_insn_form (rtx addr,
+		      machine_mode mode,
+		      enum non_prefixed non_prefixed_form)
+{
+  /* Single register is easy.  */
+  if (REG_P (addr) || SUBREG_P (addr))
+    return INSN_FORM_BASE_REG;
+
+  /* If the non prefixed instruction format doesn't support offset addressing,
+     make sure only indexed addressing is allowed.
+
+     We special case SDmode so that the register allocator does not try to move
+     SDmode through GPR registers, but instead uses the 32-bit integer load and
+     store instructions for the floating point registers.  */
+  if (non_prefixed_form == NON_PREFIXED_X || (mode == SDmode && TARGET_DFP))
+    {
+      if (GET_CODE (addr) != PLUS)
+	return INSN_FORM_BAD;
+
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+      if (!REG_P (op0) && !SUBREG_P (op0))
+	return INSN_FORM_BAD;
+
+      if (!REG_P (op1) && !SUBREG_P (op1))
+	return INSN_FORM_BAD;
+
+      return INSN_FORM_X;
+    }
+
+  /* Deal with update forms.  */
+  if (GET_RTX_CLASS (GET_CODE (addr)) == RTX_AUTOINC)
+    return INSN_FORM_UPDATE;
+
+  /* Handle PC-relative symbols and labels.  Check for both local and external
+     symbols.  Assume labels are always local.  */
+  if (TARGET_PCREL)
+    {
+      if (SYMBOL_REF_P (addr) && !SYMBOL_REF_LOCAL_P (addr))
+	return INSN_FORM_PCREL_EXTERNAL;
+
+      if (SYMBOL_REF_P (addr) || LABEL_REF_P (addr))
+	return INSN_FORM_PCREL_LOCAL;
+    }
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  /* Recognize LO_SUM addresses used with TOC and 32-bit addressing.  */
+  if (GET_CODE (addr) == LO_SUM)
+    return INSN_FORM_LO_SUM;
+
+  /* Everything below must be an offset address of some form.  */
+  if (GET_CODE (addr) != PLUS)
+    return INSN_FORM_BAD;
+
+  rtx op0 = XEXP (addr, 0);
+  rtx op1 = XEXP (addr, 1);
+
+  /* Check for indexed addresses.  */
+  if (REG_P (op1) || SUBREG_P (op1))
+    {
+      if (REG_P (op0) || SUBREG_P (op0))
+	return INSN_FORM_X;
+
+      return INSN_FORM_BAD;
+    }
+
+  if (!CONST_INT_P (op1))
+    return INSN_FORM_BAD;
+
+  HOST_WIDE_INT offset = INTVAL (op1);
+  if (!SIGNED_34BIT_OFFSET_P (offset))
+    return INSN_FORM_BAD;
+
+  /* Check for local and external PC-relative addresses.  Labels are always
+     local.  */
+  if (TARGET_PCREL)
+    {
+      if (SYMBOL_REF_P (op0) && !SYMBOL_REF_LOCAL_P (op0))
+	return INSN_FORM_PCREL_EXTERNAL;
+
+      if (SYMBOL_REF_P (op0) || LABEL_REF_P (op0))
+	return INSN_FORM_PCREL_LOCAL;
+    }
+
+  /* If it isn't PC-relative, the address must use a base register.  */
+  if (!REG_P (op0) && !SUBREG_P (op0))
+    return INSN_FORM_BAD;
+
+  /* Large offsets must be prefixed.  */
+  if (!SIGNED_16BIT_OFFSET_P (offset))
+    {
+      if (TARGET_PREFIXED_ADDR)
+	return INSN_FORM_PREFIXED_NUMERIC;
+
+      return INSN_FORM_BAD;
+    }
+
+  /* We have a 16-bit offset, see what default instruction format to use.  */
+  if (non_prefixed_form == NON_PREFIXED_DEFAULT)
+    {
+      unsigned size = GET_MODE_SIZE (mode);
+
+      /* On 64-bit systems, assume 64-bit integers need to use DS form
+	 addresses (for LD/STD).  VSX vectors need to use DQ form addresses
+	 (for LXV and STXV).  */
+      if (TARGET_POWERPC64 && size >= 8 && GET_MODE_CLASS (mode) == MODE_INT)
+	non_prefixed_form = NON_PREFIXED_DS;
+
+      else if (TARGET_VSX && size >= 16
+	       && (VECTOR_MODE_P (mode) || FLOAT128_VECTOR_P (mode)))
+	non_prefixed_form = NON_PREFIXED_DQ;
+
+      else
+	non_prefixed_form = NON_PREFIXED_D;
+    }
+
+  /* Classify the D/DS/DQ-form addresses.  */
+  switch (non_prefixed_form)
+    {
+      /* Instruction format D, all 16 bits are valid.  */
+    case NON_PREFIXED_D:
+      return INSN_FORM_D;
+
+      /* Instruction format DS, bottom 2 bits must be 0.  */
+    case NON_PREFIXED_DS:
+      if ((offset & 3) == 0)
+	return INSN_FORM_DS;
+
+      else if (TARGET_PREFIXED_ADDR)
+	return INSN_FORM_PREFIXED_NUMERIC;
+
+      else
+	return INSN_FORM_BAD;
+
+      /* Instruction format DQ, bottom 4 bits must be 0.  */
+    case NON_PREFIXED_DQ:
+      if ((offset & 15) == 0)
+	return INSN_FORM_DQ;
+
+      else if (TARGET_PREFIXED_ADDR)
+	return INSN_FORM_PREFIXED_NUMERIC;
+
+      else
+	return INSN_FORM_BAD;
+
+    default:
+      break;
+    }
+
+  return INSN_FORM_BAD;
+}
+
+
 #ifdef HAVE_GAS_HIDDEN
 # define USE_HIDDEN_LINKONCE 1
 #else
