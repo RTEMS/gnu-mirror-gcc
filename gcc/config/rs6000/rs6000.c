@@ -25157,7 +25157,7 @@ void
 rs6000_asm_output_opcode (FILE *stream)
 {
   if (next_insn_prefixed_p)
-    fputc ('p', stream);
+    fprintf (stream, "p");
 
   return;
 }
