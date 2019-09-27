@@ -70,9 +70,18 @@ VECTOR_MODES (INT, 16);       /* V16QI V8HI  V4SI V2DI */
 VECTOR_MODE (INT, TI, 1);     /*                  V1TI */
 VECTOR_MODES (FLOAT, 16);     /*       V8HF  V4SF V2DF */
 
-/* Two VMX/VSX vectors (for permute, select, concat, etc.)  */
-VECTOR_MODES (INT, 32);       /* V32QI V16HI V8SI V4DI */
+/* Two VMX/VSX vectors (for permute, select, concat, vector pairs, etc.).  */
+VECTOR_MODES (INT, 32);       /* V32QI V16HI V8SI V4DI V2TI */
 VECTOR_MODES (FLOAT, 32);     /*       V16HF V8SF V4DF */
+
+/* Four FPR vectors for the MMA instructions.  We only use V4TImode for the MMA
+   instructions.  */
+VECTOR_MODES (INT, 64);       /* V4TI */
+
+/* Define, but don't use the larger integer modes.  We need an integer mode
+   defined that is the same size as V2TImode and V4TImode.  */
+INT_MODE (OI, 32);
+INT_MODE (XI, 64);
 
 /* Replacement for TImode that only is allowed in GPRs.  We also use PTImode
    for quad memory atomic operations to force getting an even/odd register

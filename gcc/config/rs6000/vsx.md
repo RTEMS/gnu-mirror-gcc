@@ -1149,10 +1149,30 @@
                "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
-   (set_attr "length"
-               "*,         *,         *,         8,         *,         8,
-                8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *")
+   (set (attr "non_prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "8")]
+	      (const_string "*")))
+
+   (set (attr "prefixed_length")
+	(cond [(and (eq_attr "alternative" "4")		;; MTVSRDD
+		    (match_test "TARGET_P9_VECTOR"))
+	       (const_string "4")
+
+	       (eq_attr "alternative" "3,4")		;; GPR <-> VSX
+	       (const_string "8")
+
+	       (eq_attr "alternative" "5,6,7,8")	;; GPR load/store
+	       (const_string "20")]
+	      (const_string "*")))
+
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
@@ -3235,9 +3255,10 @@
 ;; Variable V2DI/V2DF extract
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v,wa,r")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "input_operand" "v,m,m")
-			     (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-			    UNSPEC_VSX_EXTRACT))
+	(unspec:<VS_scalar>
+	 [(match_operand:VSX_D 1 "reg_or_non_pcrel_memory" "v,em,em")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,&b,&b"))
    (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
@@ -3305,9 +3326,10 @@
 ;; Variable V4SF extract
 (define_insn_and_split "vsx_extract_v4sf_var"
   [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,wa,?r")
-	(unspec:SF [(match_operand:V4SF 1 "input_operand" "v,m,m")
-		    (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-		   UNSPEC_VSX_EXTRACT))
+	(unspec:SF
+	 [(match_operand:V4SF 1 "reg_or_non_pcrel_memory" "v,em,em")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,&b,&b"))
    (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
   "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
@@ -3668,7 +3690,7 @@
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
 	(unspec:<VS_scalar>
-	 [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
+	 [(match_operand:VSX_EXTRACT_I 1 "reg_or_non_pcrel_memory" "v,v,em")
 	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,r,&b"))
@@ -3688,7 +3710,7 @@
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
 	(zero_extend:<VS_scalar>
 	 (unspec:<VSX_EXTRACT_I:VS_scalar>
-	  [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
+	  [(match_operand:VSX_EXTRACT_I 1 "reg_or_non_pcrel_memory" "v,v,em")
 	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	  UNSPEC_VSX_EXTRACT)))
    (clobber (match_scratch:DI 3 "=r,r,&b"))
@@ -5544,3 +5566,68 @@
   operands[SFBOOL_TMP_VSX_DI] = gen_rtx_REG (DImode, regno_tmp_vsx);
   operands[SFBOOL_MTVSR_D_V4SF] = gen_rtx_REG (V4SFmode, regno_mtvsr_d);
 })
+
+
+;; We need to define an OImode move pattern, even though we don't enable it,
+;; because the machine independent parts of the compiler at times uses the
+;; large integer modes.
+;;
+;; If we enable movoi, the compiler will try and use it.  Unfortunately, if it
+;; is enabled, it will cause problems on little endian systems with code that
+;; uses the vector_size attribute, due to endian issues.
+(define_expand "movoi"
+  [(set (match_operand:OI 0 "nonimmediate_operand")
+	(match_operand:OI 1 "input_operand"))]
+  "0"
+{
+  gcc_unreachable ();
+})
+
+;; Vector pair support.  V2TImode is only defined for vector registers.
+(define_expand "movv2ti"
+  [(set (match_operand:V2TI 0 "nonimmediate_operand")
+	(match_operand:V2TI 1 "input_operand"))]
+  "TARGET_FUTURE"
+{
+  if (!gpc_reg_operand (operands[0], V2TImode)
+      && !gpc_reg_operand (operands[1], V2TImode))
+    operands[1] = force_reg (V2TImode, operands[1]);
+})
+
+(define_insn_and_split "*movv2ti_vector_pair"
+  [(set (match_operand:V2TI 0 "nonimmediate_operand" "=wa,m,wa")
+	(match_operand:V2TI 1 "input_operand" "m,wa,wa"))]
+  "TARGET_VECTOR_256BIT
+   && (gpc_reg_operand (operands[0], V2TImode)
+       || gpc_reg_operand (operands[1], V2TImode))"
+  "@
+   lxvp%X1 %x0,%1
+   stxvp%X0 %x1,%0
+   #"
+  "&& reload_completed && !MEM_P (operands[0]) && !MEM_P (operands[1])"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "length" "*,*,8")])
+
+;; We define move patterns in case we do not have the vector pair instructions
+;; enabled, so that the __vector_pair keyword can be used.
+(define_insn_and_split "*movv2ti_no_vector_pair"
+  [(set (match_operand:V2TI 0 "nonimmediate_operand" "=wa,o,wa")
+	(match_operand:V2TI 1 "input_operand" "o,wa,wa"))]
+  "TARGET_FUTURE && !TARGET_VECTOR_256BIT
+   && (gpc_reg_operand (operands[0], V2TImode)
+       || gpc_reg_operand (operands[1], V2TImode))"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "prefixed_length" "16,16,8")
+   (set_attr "non_prefixed_length" "8")])

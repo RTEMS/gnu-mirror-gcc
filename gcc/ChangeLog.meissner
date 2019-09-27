@@ -1,3 +1,292 @@
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-string.c (expand_block_move): Test for
+	-mefficient-unaligned-vsx before generating vector pair
+	instructions.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-string.c (expand_block_move): Use vector
+	pair memory instructions to move 32 bytes or more.  If we have
+	prefixed addressing, but are not generating vector paired
+	instructions, generate offsettable vector loads and stores.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/mma.md (VQUAD iterator): Delete.
+	(mov<mode>, VQUAD iterator): Delete.
+	(movxi): New insn.
+	(movv4ti): New generator.
+	(movv4ti_vector_pair): New insn if vector pair instructions are
+	enabled.
+	(movv4ti_no_vector_pair): New insn if vector pair instructions are
+	not enabled.
+	* config/rs6000/rs6000.c (rs6000_setup_reg_addr_masks): Rework
+	support for vector pair and vector quad.
+	(rs6000_init_hard_regno_mode_ok): Delete OImode/XImode reload
+	hooks.
+	(reg_offset_addressing_ok_p): Delete OImode/XImode cases.
+	(rs6000_emit_move): Delete OImode/XImode cases.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE_P): Update comment.
+	(VECTOR_QUAD_MODE_P): Update comment.
+	* config/rs6000/rs6000.md (RELOAD iterator): Drop OImode and
+	XImode.
+	* config/rs6000/vsx.md (VPAIR iterator): Delete.
+	(mov<mode>, VPAIR iterator): Delete.
+	(movoi): New insn.
+	(movv2ti): New generator.
+	(movv2ti_vector_pair): New insn if vector pair instructions are
+	enabled.
+	(movv2ti_no_vector_pair): New insn if vector pair instructions are
+	not enabled.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/mma.md (VQUAD iterator): Enable XImode only if we
+	have vector pair support.  Only enable V4TImode if we have
+	'future' support.
+	(mov<mode>, VQUAD iterator): Remove condition on the generator.
+	Use 'd' instead of 'wa' for the register constraints.
+	(movv4ti_no_vector_pair): New insn when vector pair instructions
+	are not enabled.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Enable
+	__vector_pair and __vector_quad with just -mcpu=future, don't
+	require the explicit vector pair support.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Enable
+	vector pair instructions by default.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached): Use
+	VECTOR_{PAIR,QUAD}_MODE_P macros.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE_P): New macro.
+	(VECTOR_QUAD_MODE_P): New macro.
+	* config/rs6000/vsx.md (VPAIR iterator): Enable OImode only if we
+	have vector pair support.  Only enable V2TImode if we have
+	'future' support.
+	(movv2ti_no_vector_pair): New insn when vector pair instructions
+	are not enabled.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/mma.md: New file.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Define
+	__VECTOR_PAIR__ and __VECTOR_QUAD__ if -mvector-256bit.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Enable the
+	__vector_pair and __vector_quad keywords if -mvector-256bit.
+	* config/rs6000/rs6000-cpus.def (OTHER_FUTURE_MASKS): Add
+	-mvector-256bit.
+	(POWERPC_MASKS): Add -mvector-256bit.
+	* config/rs6000/rs6000-modes.def: Add modes for vector pair and
+	vector quad.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached): Add
+	modes for vector pair and vector quad.
+	(rs6000_debug_reg_global): Print information for vector pair and
+	vector quad modes.  Print the endian configuration bits.  Print
+	the block move and block size limits.
+	(rs6000_setup_reg_addr_masks): Set up for vector pair and vector
+	quads.
+	(rs6000_init_hard_regno_mode_ok): Set up for vector pair and
+	vector quads.
+	(rs6000_option_override_internal): Bump up default memcpy size if
+	we have vector pairs.
+	(rs6000_adjust_vec_address): Optimize large numeric prefixed
+	operations.
+	(quad_address_p): Add support for vector pair and vector quad.
+	(reg_offset_addressing_ok_p): Likewise.
+	(avoiding_indexed_address_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_prefixed_reload_class): Restrict vector pair to VSX
+	registers.  Restrict vector quads to FPR registers.
+	(rs6000_split_multireg_move): Add support for vector pairs and
+	vector quads.
+	(rs6000_opt_masks): Add -mvector-256bit.
+	* config/rs6000/rs6000.h (ALTIVEC_OR_VSX_VECTOR_MODE): Add vector
+	pair and vector quad modes.
+	(vector_pair_type_node): New type node for vector pair.
+	(vector_quad_type_node): New type node for vector quad.
+	* config/rs6000/rs6000.md: Include mma.md.
+	(RELOAD): Add vector pair and vector quad modes.
+	* config/rs6000/rs6000.opt (-mvector-256bit): New option.
+	* config/rs6000/vsx.md (VPAIR iterator): New mode iterator for
+	vector pair modes.
+	(mov<mode>, VPAIR iterator): Add support for vector pair moves.
+
+pcrel-trunk17.patch008
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01134.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
+	prefixed addressing by default.
+	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Only
+	enable -mprefixed-addr and -mpcrel if the OS tm.h says to enable
+	it.
+	(ADDRESSING_FUTURE_MASKS): New mask macro.
+	(OTHER_FUTURE_MASKS): Use ADDRESSING_FUTURE_MASKS.
+	* config/rs6000/rs6000.c (TARGET_PREFIXED_ADDR_DEFAULT): Do not
+	enable -mprefixed-addr unless the OS tm.h says to.
+	(TARGET_PCREL_DEFAULT): Do not enable -mpcrel unless the OS tm.h
+	says to.
+	(rs6000_option_override_internal): Do not enable -mprefixed-addr
+	or -mpcrel unless the OS tm.h says to enable it.  Add more checks
+	for -mcpu=future.
+
+pcrel-trunk17.patch007
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01133.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (add_operand): Add support for
+	PADDI.
+	* config/rs6000/rs6000.md (add<mode>3): Add support for PADDI.
+
+pcrel-trunk17.patch006
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01132.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (movsi_internal1): Add support to load
+	up 32-bit SImode integer constants with PADDI.
+	(movsi integer constant splitter): Do not split constant if PADDI
+	can load it up directly.
+
+pcrel-trunk17.patch005
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01131.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	PADDI to load up and/or add 34-bit integer constants.
+	(rs6000_rtx_costs): Treat constants loaded up with PADDI with the
+	same cost as normal 16-bit constants.
+	* config/rs6000/rs6000.md (movdi_internal64): Add support to load
+	up 34-bit integer constants with PADDI.
+	(movdi integer constant splitter): Add comment about PADDI.
+
+pcrel-trunk17.patch004
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01130.html
+2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	non PC-relative memory.
+	* config/rs6000/predicates.md (lwa_operand): Allow odd offsets if
+	we have prefixed addressing.
+	(non_prefixed_memory): New predicate.
+	(non_pcrel_memory): New predicate.
+	(reg_or_non_pcrel_memory): New predicate.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Optimize
+	PC-relative addresses with constant offsets.  Signal an error if
+	we have a PC-relative address and a variable offset.
+	(rs6000_split_vec_extract_var): Signal an error if we have a
+	PC-relative address and a variable offset.
+	(quad_address_p): Add support for prefixed addresses.
+	(mem_operand_gpr): Add support for prefixed addresses.
+	(mem_operand_ds_form): Add support for prefixed addresses.
+	(rs6000_legitimate_offset_address_p): Add support for prefixed
+	addresses.
+	(rs6000_legitimate_address_p): Add support for prefixed
+	addresses.
+	(rs6000_mode_dependent_address): Add support for prefixed
+	addresses.
+	(rs6000_num_insns): New helper function.
+	(rs6000_insn_cost): Treat prefixed instructions as having the same
+	cost as non prefixed instructions, even though the prefixed
+	instructions are larger.
+	(make_memory_non_prefixed): New function to make a non-prefixed
+	memory operand.
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add support for
+	prefixed addresses.
+	(movtd_64bit_nodm): Add support for prefixed addresses.
+	(stack_protect_setdi): Convert prefixed addresses to non-prefixed
+	addresses.  Allow for indexed addressing as well as offsettable.
+	(stack_protect_testdi): Convert prefixed addresses to non-prefixed
+	addresses.  Allow for indexed addressing as well as offsettable.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	prefixed addresses.
+	(vsx_extract_<mode>_var, VSX_D iterator): Do not allow a vector in
+	memory with a prefixed address to combine with variable offsets.
+	(vsx_extract_v4sf_var): Do not allow a vector in memory with a
+	prefixed address to combine with variable offsets.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not allow a
+	vector in memory with a prefixed address to combine with variable
+	offsets.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not allow a vector in
+	memory with a prefixed address to combine with variable offsets.
+	* doc/md.texi (PowerPC constraints): Document 'em' constraint.
+
+pcrel-trunk17.patch003
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01128.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Split the
+	alternatives for loading 0.0 to a GPR and loading a 128-bit
+	floating point type to a GPR.
+
+pcrel-trunk17.patch002
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01127.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (prefixed_load_p): New
+	declaration.
+	(prefixed_store_p): New declaration.
+	(prefixed_paddi_p): New declaration.
+	(rs6000_asm_output_opcode): New declaration.
+	(rs6000_final_prescan_insn): Move declaration and update calling
+	signature.
+	(address_is_prefixed): New helper inline function.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Support loading
+	PC-relative addresses.
+	(reg_to_non_prefixed): New function to identify what the
+	non-prefixed memory instruction format is for a register.
+	(prefixed_load_p): New function to identify prefixed loads.
+	(prefixed_store_p): New function to identify prefixed stores.
+	(prefixed_paddi_p): New function to identify prefixed load
+	immediates.
+	(next_insn_prefixed_p): New static state variable.
+	(rs6000_final_prescan_insn): New function to determine if an insn
+	uses a prefixed instruction.
+	(rs6000_asm_output_opcode): New function to emit 'p' in front of a
+	prefixed instruction.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): New target hook.
+	(ASM_OUTPUT_OPCODE): New target hook.
+	* config/rs6000/rs6000.md (prefixed): New insn attribute for
+	prefixed instructions.
+	(prefixed_length): New insn attribute for the size of prefixed
+	instructions.
+	(non_prefixed_length): New insn attribute for the size of
+	non-prefixed instructions.
+	(pcrel_local_addr): New insn to load up a local PC-relative
+	address.
+	(pcrel_extern_addr): New insn to load up an external PC-relative
+	address.
+
+pcrel-trunk17.patch001
+https://gcc.gnu.org/ml/gcc-patches/2019-09/msg01349.html
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (pcrel_address): Delete predicate.
+	(pcrel_local_address): Replace pcrel_address predicate, use the
+	new function address_to_insn_form.
+	(pcrel_external_address): Replace with new implementation using
+	address_to_insn_form..
+	(prefixed_mem_operand): Delete predicate which is now unused.
+	(pcrel_external_mem_operand): Delete predicate which is now
+	unused.
+	* config/rs6000/rs6000-protos.h (enum insn_form): New
+	enumeration.
+	(enum non_prefixed): New enumeration.
+	(address_to_insn_form): New declaration.
+	* config/rs6000/rs6000.c (print_operand_address): Check for either
+	PC-relative local symbols or PC-relative external symbols.
+	(mode_supports_prefixed_address_p): Delete, no longer used.
+	(rs6000_prefixed_address_mode_p): Delete, no longer used.
+	(address_to_insn_form): New function to decode an address format.
+
 2019-09-27   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 276184
