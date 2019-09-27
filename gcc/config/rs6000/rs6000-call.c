@@ -6617,6 +6617,21 @@ rs6000_init_builtins (void)
   else
     ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
 
+  /* Vector paired and vector quad support.  Right now, C++ -fconcepts doesn't
+     like the new keywords.  */
+  if (TARGET_VECTOR_256BIT && !lang_GNU_CXX ())
+    {
+      vector_pair_type_node = rs6000_vector_type ("__vector_pair",
+						  unsigned_intTI_type_node, 2);
+      lang_hooks.types.register_builtin_type (vector_pair_type_node,
+					      "__vector_pair");
+
+      vector_quad_type_node = rs6000_vector_type ("__vector_quad",
+						  unsigned_intTI_type_node, 4);
+      lang_hooks.types.register_builtin_type (vector_quad_type_node,
+					      "__vector_quad");
+    }
+
   /* Initialize the modes for builtin_function_type, mapping a machine mode to
      tree type node.  */
   builtin_mode_to_type[QImode][0] = integer_type_node;

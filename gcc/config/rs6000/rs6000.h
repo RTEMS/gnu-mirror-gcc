@@ -1057,7 +1057,8 @@ enum data_align { align_abi, align_opt, align_both };
 
 #define ALTIVEC_OR_VSX_VECTOR_MODE(MODE)				\
   (ALTIVEC_VECTOR_MODE (MODE) || VSX_VECTOR_MODE (MODE)			\
-   || (MODE) == V2DImode || (MODE) == V1TImode)
+   || (MODE) == V2DImode || (MODE) == V1TImode || (MODE) == V2TImode	\
+   || (MODE) == V4TImode)
 
 /* Post-reload, we can't use any new AltiVec registers, as we already
    emitted the vrsave mask.  */
@@ -2427,6 +2428,8 @@ enum rs6000_builtin_type_index
   RS6000_BTI_ieee128_float,	 /* ieee 128-bit floating point */
   RS6000_BTI_ibm128_float,	 /* IBM 128-bit floating point */
   RS6000_BTI_const_str,		 /* pointer to const char * */
+  RS6000_BTI_vector_pair,	 /* unsigned 256-bit types (vector pair).  */
+  RS6000_BTI_vector_quad,	 /* unsigned 512-bit types (mma).  */
   RS6000_BTI_MAX
 };
 
@@ -2479,6 +2482,8 @@ enum rs6000_builtin_type_index
 #define ieee128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ieee128_float])
 #define ibm128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ibm128_float])
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
+#define vector_pair_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_pair])
+#define vector_quad_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_quad])
 
 extern GTY(()) tree rs6000_builtin_types[RS6000_BTI_MAX];
 extern GTY(()) tree rs6000_builtin_decls[RS6000_BUILTIN_COUNT];

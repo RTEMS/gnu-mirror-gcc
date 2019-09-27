@@ -1820,6 +1820,17 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (COMPLEX_MODE_P (mode))
     mode = GET_MODE_INNER (mode);
 
+  /* V2TImode/OImode is for vector pairs and needs even/odd VSX register pairs.
+     Only allow V2TImode/OImode in vector registers.  */
+  if (mode == V2TImode || mode == OImode)
+    return (TARGET_FUTURE && VSX_REGNO_P (regno) && (regno & 1) == 0);
+
+  /* V4TImode/XImode is for MMA accumulators.  Don't allow V4TImode to go into
+     Altivec registers, because the MMA instructions only use the traditional
+     FPR registers.  */
+  if (mode == V4TImode || mode == XImode)
+    return (TARGET_FUTURE && FP_REGNO_P (regno) && (regno & 3) == 0);
+
   /* PTImode can only go in GPRs.  Quad word memory operations require even/odd
      register combinations, and use PTImode where we need to deal with quad
      word memory operations.  Don't allow quad words in the argument or frame
@@ -1845,7 +1856,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
       if (ALTIVEC_REGNO_P (regno))
 	{
-	  if (GET_MODE_SIZE (mode) != 16 && !reg_addr[mode].scalar_in_vmx_p)
+	  if (GET_MODE_SIZE (mode) < 16 && !reg_addr[mode].scalar_in_vmx_p)
 	    return 0;
 
 	  return ALTIVEC_REGNO_P (last_regno);
@@ -2219,6 +2230,9 @@ rs6000_debug_reg_global (void)
     V2DFmode,
     V8SFmode,
     V4DFmode,
+    V4TImode,
+    OImode,
+    XImode,
     CCmode,
     CCUNSmode,
     CCEQmode,
@@ -2543,6 +2557,26 @@ rs6000_debug_reg_global (void)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
 
+  fprintf (stderr, DEBUG_FMT_D, "BITS_BIG_ENDIAN", BITS_BIG_ENDIAN);
+  fprintf (stderr, DEBUG_FMT_D, "BYTES_BIG_ENDIAN", BYTES_BIG_ENDIAN);
+  fprintf (stderr, DEBUG_FMT_D, "WORDS_BIG_ENDIAN", WORDS_BIG_ENDIAN);
+#ifdef REG_WORDS_BIG_ENDIAN
+  fprintf (stderr, DEBUG_FMT_D, "REG_WORDS_BIG_ENDIAN", REG_WORDS_BIG_ENDIAN);
+#endif
+#ifdef FLOAT_WORDS_BIG_ENDIAN
+  fprintf (stderr, DEBUG_FMT_D, "FLOAT_WORDS_BIG_ENDIAN",
+	   FLOAT_WORDS_BIG_ENDIAN);
+#endif
+
+  fprintf (stderr, DEBUG_FMT_D, "block move inline limit",
+	   rs6000_block_move_inline_limit);
+  fprintf (stderr, DEBUG_FMT_D, "block compare inline limit",
+	   rs6000_block_compare_inline_limit);
+  fprintf (stderr, DEBUG_FMT_D, "block compare inline loop limit",
+	   rs6000_block_compare_inline_loop_limit);
+  fprintf (stderr, DEBUG_FMT_D, "string compare inline limit",
+	   rs6000_string_compare_inline_limit);
+
   if (TARGET_FUTURE)
     {
       fprintf (stderr, DEBUG_FMT_D, "TARGET_PREFIXED_ADDR_DEFAULT",
@@ -2673,7 +2707,7 @@ rs6000_setup_reg_addr_masks (void)
 	     only 12-bits.  While GPRs can handle the full offset range, VSX
 	     registers can only handle the restricted range.  */
 	  else if ((addr_mask != 0) && !indexed_only_p
-		   && msize == 16 && TARGET_P9_VECTOR
+		   && msize >= 16 && TARGET_P9_VECTOR
 		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
 		       || (m2 == TImode && TARGET_VSX)))
 	    {
@@ -2883,6 +2917,22 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_align[TImode] = align64;
     }
 
+  /* Add support for vector pairs and vector quad registers.  */
+  if (TARGET_FUTURE)
+    {
+      static const unsigned int vmodes[]
+	= { E_V2TImode, E_V4TImode, OImode, XImode };
+
+      for (size_t i = 0; i < ARRAY_SIZE (vmodes); i++)
+	{
+	  unsigned int vmode = vmodes[i];
+
+	  rs6000_vector_unit[vmode] = VECTOR_NONE;
+	  rs6000_vector_mem[vmode] = VECTOR_VSX;
+	  rs6000_vector_align[vmode] = 128;
+	}
+    }
+
   /* Register class constraints for the constraints that depend on compile
      switches. When the VSX code was added, different constraints were added
      based on the type (DFmode, V2DFmode, V4SFmode).  For the vector types, all
@@ -3013,6 +3063,18 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 		{
 		  reg_addr[TFmode].reload_gpr_vsx = CODE_FOR_reload_gpr_from_vsxtf;
 		  reg_addr[TFmode].reload_vsx_gpr = CODE_FOR_reload_vsx_from_gprtf;
+		}
+
+	      if (TARGET_FUTURE)
+		{
+		  reg_addr[V2TImode].reload_store = CODE_FOR_reload_v2ti_di_store;
+		  reg_addr[V2TImode].reload_load  = CODE_FOR_reload_v2ti_di_load;
+		  reg_addr[V4TImode].reload_store = CODE_FOR_reload_v4ti_di_store;
+		  reg_addr[V4TImode].reload_load  = CODE_FOR_reload_v4ti_di_load;
+		  reg_addr[OImode].reload_store   = CODE_FOR_reload_oi_di_store;
+		  reg_addr[OImode].reload_load    = CODE_FOR_reload_oi_di_load;
+		  reg_addr[XImode].reload_store   = CODE_FOR_reload_xi_di_store;
+		  reg_addr[XImode].reload_load    = CODE_FOR_reload_xi_di_load;
 		}
 	    }
 	}
@@ -4043,9 +4105,14 @@ rs6000_option_override_internal (bool global_init_p)
 	  || rs6000_tune == PROCESSOR_PPCE6500))
     rs6000_block_move_inline_limit = 128;
 
+  /* Bump up the block move limit if we have vector pairs.  */
+  if (TARGET_VECTOR_256BIT && rs6000_block_move_inline_limit < 128
+      && !global_options_set.x_rs6000_block_move_inline_limit)
+    rs6000_block_move_inline_limit = 128;
+
   /* store_one_arg depends on expand_block_move to handle at least the
      size of reg_parm_stack_space.  */
-  if (rs6000_block_move_inline_limit < (TARGET_POWERPC64 ? 64 : 32))
+  else if (rs6000_block_move_inline_limit < (TARGET_POWERPC64 ? 64 : 32))
     rs6000_block_move_inline_limit = (TARGET_POWERPC64 ? 64 : 32);
 
   if (global_init_p)
@@ -6865,8 +6932,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
 
-	  if (IN_RANGE (offset, -32768, 32767)
-	      && (scalar_size < 8 || (offset & 0x3) == 0))
+	  if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (offset))
+	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  else if (SIGNED_16BIT_OFFSET_P (offset)
+		   && (scalar_size < 8 || (offset & 0x3) == 0))
 	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
 	  else
 	    {
@@ -7366,7 +7436,7 @@ quad_address_p (rtx addr, machine_mode mode, bool strict)
 {
   rtx op0, op1;
 
-  if (GET_MODE_SIZE (mode) != 16)
+  if (GET_MODE_SIZE (mode) < 16)
     return false;
 
   if (legitimate_indirect_address_p (addr, strict))
@@ -7580,6 +7650,14 @@ reg_offset_addressing_ok_p (machine_mode mode)
       if (VECTOR_MEM_ALTIVEC_OR_VSX_P (mode))
 	return mode_supports_dq_form (mode);
       break;
+
+      /* The vector pair/quad types support offset addressing if the underlying
+	 vectors supports offset addressing.  */
+    case E_V2TImode:
+    case E_V4TImode:
+    case E_OImode:
+    case E_XImode:
+      return TARGET_P9_VECTOR;
 
     case E_SDmode:
       /* If we can do direct load/stores of SDmode, restrict it to reg+reg
@@ -7927,8 +8005,14 @@ legitimate_indexed_address_p (rtx x, int strict)
 bool
 avoiding_indexed_address_p (machine_mode mode)
 {
-  /* Avoid indexed addressing for modes that have non-indexed
-     load/store instruction forms.  */
+  unsigned int msize = GET_MODE_SIZE (mode);
+
+  /* Avoid indexed addressing for modes that have non-indexed load/store
+     instruction forms.  On the future system, vector pairs have an indexed
+     form, but quad vectors don't.  */
+  if (msize > 16)
+    return (!TARGET_VECTOR_256BIT || msize != 32);
+
   return (TARGET_AVOID_XFORM && VECTOR_MEM_NONE_P (mode));
 }
 
@@ -9785,6 +9869,14 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       if (CONSTANT_P (operands[1])
 	  && !easy_vector_constant (operands[1], mode))
 	operands[1] = force_const_mem (mode, operands[1]);
+      break;
+
+      /* In theory, vector pair/quad should not have constants.  */
+    case E_OImode:
+    case E_XImode:
+    case E_V2TImode:
+    case E_V4TImode:
+      gcc_assert (!CONSTANT_P (operands[1]));
       break;
 
     case E_SImode:
@@ -12061,8 +12153,20 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
       return NO_REGS;
     }
 
-  if (GET_MODE_CLASS (mode) == MODE_INT && rclass == GEN_OR_FLOAT_REGS)
-    return GENERAL_REGS;
+  /* For the vector pair (V2TImode) and vector quad (V4TImode) modes, prefer
+     their natural register (VSX or FPR) rather than GPR registers.  For other
+     integer types, prefer the GPR registers.  */
+  if (rclass == GEN_OR_FLOAT_REGS)
+    {
+      if (mode == V2TImode || mode == OImode)
+	return VSX_REGS;
+
+      if (mode == V4TImode || mode == XImode)
+	return FLOAT_REGS;
+
+      if (GET_MODE_CLASS (mode) == MODE_INT)
+	return GENERAL_REGS;
+    }
 
   return rclass;
 }
@@ -15741,7 +15845,24 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   reg = REG_P (dst) ? REGNO (dst) : REGNO (src);
   mode = GET_MODE (dst);
   nregs = hard_regno_nregs (reg, mode);
-  if (FP_REGNO_P (reg))
+  /* If we have a quad vector register for MMA, and this is a load or store,
+     see if we can use vector paired load/stores.  */
+  if (mode == V4TImode && TARGET_VECTOR_256BIT && (MEM_P (dst) || MEM_P (src)))
+    {
+      reg_mode = V2TImode;;
+      nregs /= hard_regno_nregs (reg, reg_mode);
+    }
+
+  /* If we have a vector pair/quad mode, split it into two/four separate
+     vectors.  */
+  else if (mode == V4TImode || mode == V2TImode || mode == OImode
+	   || mode == XImode)
+    {
+      reg_mode = V1TImode;
+      nregs /= hard_regno_nregs (reg, reg_mode);
+    }
+
+  else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
 	(TARGET_HARD_FLOAT ? DFmode : SFmode);
   else if (ALTIVEC_REGNO_P (reg))
@@ -15783,6 +15904,50 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	}
 
       return;
+    }
+
+  /* For __vector_pair (V2TImode/OImode) and __vector_quad (V4TImode/XImode) we
+     have to load or store the registers so that things are properly swapped in
+     little endian mode.  This means the last register gets the first memory
+     location.  */
+  if (!WORDS_BIG_ENDIAN && (mode == V2TImode || mode == OImode
+			    || mode == V4TImode || mode == XImode))
+    {
+      if (MEM_P (dst))
+	{
+	  unsigned offset = 0;
+	  unsigned size = GET_MODE_SIZE (reg_mode);
+
+	  for (int i = nregs - 1; i >= 0; i--)
+	    {
+	      rtx dst2 = adjust_address (dst, reg_mode, offset);
+	      rtx src2 = simplify_gen_subreg (reg_mode, src, mode, i * size);
+	      offset += size;
+
+	      emit_insn (gen_rtx_SET (dst2, src2));
+	    }
+
+	  return;
+	}
+
+      if (MEM_P (src))
+	{
+	  unsigned offset = 0;
+	  unsigned size = GET_MODE_SIZE (reg_mode);
+
+	  for (int i = nregs - 1; i >= 0; i--)
+	    {
+	      rtx dst2 = simplify_gen_subreg (reg_mode, dst, mode, i * size);
+	      rtx src2 = adjust_address (src, reg_mode, offset);
+	      offset += size;
+
+	      emit_insn (gen_rtx_SET (dst2, src2));
+	    }
+
+	  return;
+	}
+
+      /* Register -> register moves can use common code.  */
     }
 
   if (REG_P (src) && REG_P (dst) && (REGNO (src) < REGNO (dst)))
@@ -22910,6 +23075,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
+  { "vector-256bit",		OPTION_MASK_VECTOR_256BIT,	false, true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS

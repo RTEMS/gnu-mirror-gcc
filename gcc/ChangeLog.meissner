@@ -1,5 +1,50 @@
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/mma.md: New file.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Define
+	__VECTOR_PAIR__ and __VECTOR_QUAD__ if -mvector-256bit.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Enable the
+	__vector_pair and __vector_quad keywords if -mvector-256bit.
+	* config/rs6000/rs6000-cpus.def (OTHER_FUTURE_MASKS): Add
+	-mvector-256bit.
+	(POWERPC_MASKS): Add -mvector-256bit.
+	* config/rs6000/rs6000-modes.def: Add modes for vector pair and
+	vector quad.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached): Add
+	modes for vector pair and vector quad.
+	(rs6000_debug_reg_global): Print information for vector pair and
+	vector quad modes.  Print the endian configuration bits.  Print
+	the block move and block size limits.
+	(rs6000_setup_reg_addr_masks): Set up for vector pair and vector
+	quads.
+	(rs6000_init_hard_regno_mode_ok): Set up for vector pair and
+	vector quads.
+	(rs6000_option_override_internal): Bump up default memcpy size if
+	we have vector pairs.
+	(rs6000_adjust_vec_address): Optimize large numeric prefixed
+	operations.
+	(quad_address_p): Add support for vector pair and vector quad.
+	(reg_offset_addressing_ok_p): Likewise.
+	(avoiding_indexed_address_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_prefixed_reload_class): Restrict vector pair to VSX
+	registers.  Restrict vector quads to FPR registers.
+	(rs6000_split_multireg_move): Add support for vector pairs and
+	vector quads.
+	(rs6000_opt_masks): Add -mvector-256bit.
+	* config/rs6000/rs6000.h (ALTIVEC_OR_VSX_VECTOR_MODE): Add vector
+	pair and vector quad modes.
+	(vector_pair_type_node): New type node for vector pair.
+	(vector_quad_type_node): New type node for vector quad.
+	* config/rs6000/rs6000.md: Include mma.md.
+	(RELOAD): Add vector pair and vector quad modes.
+	* config/rs6000/rs6000.opt (-mvector-256bit): New option.
+	* config/rs6000/vsx.md (VPAIR iterator): New mode iterator for
+	vector pair modes.
+	(mov<mode>, VPAIR iterator): Add support for vector pair moves.
+
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	Merge up to subversion id 276184.
 	* REVISION: Update merge id.
 

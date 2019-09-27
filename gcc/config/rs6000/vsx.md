@@ -5566,3 +5566,38 @@
   operands[SFBOOL_TMP_VSX_DI] = gen_rtx_REG (DImode, regno_tmp_vsx);
   operands[SFBOOL_MTVSR_D_V4SF] = gen_rtx_REG (V4SFmode, regno_mtvsr_d);
 })
+
+
+;; Iterator for the modes used for vector pairs
+(define_mode_iterator VPAIR	[V2TI OI])
+
+;; Vector pair support.  V2TImode/OImode is only defined for vector registers.
+(define_expand "mov<mode>"
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand")
+	(match_operand:VPAIR 1 "input_operand"))]
+  "TARGET_VECTOR_256BIT"
+{
+  if (!gpc_reg_operand (operands[0], <MODE>mode)
+      && !gpc_reg_operand (operands[1], <MODE>mode))
+    operands[1] = force_reg (<MODE>mode, operands[1]);
+})
+
+(define_insn_and_split "*mov<mode>"
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa")
+	(match_operand:VPAIR 1 "input_operand" "m,wa,wa"))]
+  "TARGET_VECTOR_256BIT
+   && (gpc_reg_operand (operands[0], <MODE>mode)
+       || gpc_reg_operand (operands[1], <MODE>mode))"
+  "@
+   lxvp%X1 %x0,%1
+   stxvp%X0 %x1,%0
+   #"
+  "&& reload_completed && !MEM_P (operands[0]) && !MEM_P (operands[1])"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "length" "*,*,8")])
+

@@ -586,6 +586,14 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
   if ((flags & OPTION_MASK_FLOAT128_HW) != 0)
     rs6000_define_or_undefine_macro (define_p, "__FLOAT128_HARDWARE__");
 
+  /* OPTION_MASK_VECTOR_256BIT can be turned on if -mcpu=future is used or
+     via the target attribute/pragma.  */
+  if ((flags & OPTION_MASK_VECTOR_256BIT) != 0)
+    {
+      rs6000_define_or_undefine_macro (define_p, "__VECTOR_PAIR__");
+      rs6000_define_or_undefine_macro (define_p, "__VECTOR_QUAD__");
+    }
+
   /* options from the builtin masks.  */
   /* Note that RS6000_BTM_CELL is enabled only if (rs6000_cpu ==
      PROCESSOR_CELL) (e.g. -mcpu=cell).  */
