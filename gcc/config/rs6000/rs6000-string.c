@@ -2762,7 +2762,7 @@ expand_block_move (rtx operands[])
 	 generate a vector paired instruction, if we have prefixed addressing,
 	 use the normal vector load/store, but on earlier systems, only use the
 	 Altivec instructions due to various issues.  */
-      if (TARGET_VECTOR_256BIT && bytes >= 32)
+      if (TARGET_VECTOR_256BIT && bytes >= 32 && TARGET_EFFICIENT_UNALIGNED_VSX)
 	{
 	  move_bytes = 32;
 	  mode = V2TImode;

@@ -1,6 +1,13 @@
 <patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-string.c (expand_block_move): Test for
+	-mefficient-unaligned-vsx before generating vector pair
+	instructions.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-string.c (expand_block_move): Use vector
 	pair memory instructions to move 32 bytes or more.  If we have
 	prefixed addressing, but are not generating vector paired
