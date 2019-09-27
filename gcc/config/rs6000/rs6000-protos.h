@@ -302,6 +302,7 @@ extern bool rs6000_linux_float_exceptions_rounding_supported_p (void);
 namespace gcc { class context; }
 class rtl_opt_pass;
 
+extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
