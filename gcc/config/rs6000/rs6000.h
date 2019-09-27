@@ -2574,8 +2574,16 @@ while (0)
     }									\
   while (0)
 
-/* Return true for modes used with vector pair modes.  */
+/* Return true for modes used with vector pair modes.  While we only use
+   V2TImode for the explicit vector pair type, we need to enable OImode to be
+   available for register allocation.  We disable the movoi pattern, but it can
+   break programs using vector_size(32) and LTO if OImode does not have any
+   registers it can be allocated from.  */
 #define VECTOR_PAIR_MODE_P(MODE) ((MODE) == OImode || (MODE) == V2TImode)
 
-/* Return true for modes used with vector quad modes.  */
+/* Return true for modes used with vector quad modes.  While we only use
+   V4TImode for the explicit vector quad type, we need to enable XImode to be
+   available for register allocation.  We disable the movxi pattern, but it can
+   break programs using vector_size(32) and LTO if XImode does not have any
+   registers it can be allocated from.  */
 #define VECTOR_QUAD_MODE_P(MODE) ((MODE) == XImode || (MODE) == V4TImode)

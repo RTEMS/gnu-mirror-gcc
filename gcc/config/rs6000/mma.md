@@ -19,35 +19,38 @@
 ;; along with GCC; see the file COPYING3.  If not see
 ;; <http://www.gnu.org/licenses/>.
 
-;; Iterator for the modes used for vector pairs.  We don't define XImode unless
-;; we have vector pair instructions enabled, because it will cause
-;; gcc.c-torture/execute/pr65427.c to fail (due to use of vector_size(32) and
-;; endianess issues).  We do define V4TI mode even if vector pairs are not
-;; enabled, so that the __vector_quad keyword can be used.
-
-(define_mode_iterator VQUAD	[(V4TI "TARGET_FUTURE")
-				 (XI   "TARGET_VECTOR_256BIT")])
-
-;; Vector quad.  Vector quad mode is only defined for FPR registers, because
-;; the MMA instructions that use vector quad mode only uses FPR registers.
-;; TBD, check the ordering for the loads or stores.
-;; Iterator for the modes used for vector pairs
-(define_expand "mov<mode>"
-  [(set (match_operand:VQUAD 0 "nonimmediate_operand")
-	(match_operand:VQUAD 1 "input_operand"))]
-  ""
+;; We need to define an XImode move pattern, even though we don't enable it,
+;; because the machine independent parts of the compiler at times uses the
+;; large integer modes.
+;;
+;; If we enable movxi, the compiler will try and use it.  Unfortunately, if it
+;; is enabled, it will cause problems on little endian systems with code that
+;; uses the vector_size attribute, due to endian issues.
+(define_expand "movxi"
+  [(set (match_operand:XI 0 "nonimmediate_operand")
+	(match_operand:XI 1 "input_operand"))]
+  "0"
 {
-  if (!gpc_reg_operand (operands[0], <MODE>mode)
-      && !gpc_reg_operand (operands[1], <MODE>mode))
-    operands[1] = force_reg (<MODE>mode, operands[1]);
+  gcc_unreachable ();
 })
 
-(define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VQUAD 0 "nonimmediate_operand" "=d,o,d")
-	(match_operand:VQUAD 1 "input_operand" "o,d,d"))]
+;; Vector pair support.  V2TImode is only defined for vector registers.
+(define_expand "movv4ti"
+  [(set (match_operand:V4TI 0 "nonimmediate_operand")
+	(match_operand:V4TI 1 "input_operand"))]
+  "TARGET_FUTURE"
+{
+  if (!gpc_reg_operand (operands[0], V4TImode)
+      && !gpc_reg_operand (operands[1], V4TImode))
+    operands[1] = force_reg (V4TImode, operands[1]);
+})
+
+(define_insn_and_split "*movv4ti_vector_pair"
+  [(set (match_operand:V4TI 0 "nonimmediate_operand" "=d,m,d")
+	(match_operand:V4TI 1 "input_operand" "m,d,d"))]
   "TARGET_VECTOR_256BIT
-   && (gpc_reg_operand (operands[0], <MODE>mode)
-       || gpc_reg_operand (operands[1], <MODE>mode))"
+   && (gpc_reg_operand (operands[0], V4TImode)
+       || gpc_reg_operand (operands[1], V4TImode))"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -56,9 +59,11 @@
   DONE;
 }
   [(set_attr "type" "vecload,vecstore,veclogical")
-   (set_attr "prefixed_length" "16")
+   (set_attr "prefixed_length" "20")
    (set_attr "non_prefixed_length" "8,8,16")])
 
+;; We define move patterns in case we do not have the vector pair instructions
+;; enabled, so that the __vector_pair keyword can be used.
 (define_insn_and_split "*movv4ti_no_vector_pair"
   [(set (match_operand:V4TI 0 "nonimmediate_operand" "=d,o,d")
 	(match_operand:V4TI 1 "input_operand" "o,d,d"))]
@@ -75,5 +80,3 @@
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "prefixed_length" "36,36,16")
    (set_attr "non_prefixed_length" "16")])
-
-

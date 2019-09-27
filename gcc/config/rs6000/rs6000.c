@@ -2659,6 +2659,8 @@ rs6000_setup_reg_addr_masks (void)
 		  && msize <= 8
 		  && !VECTOR_MODE_P (m2)
 		  && !FLOAT128_VECTOR_P (m2)
+		  && !VECTOR_PAIR_MODE_P (m2)
+		  && !VECTOR_QUAD_MODE_P (m2)
 		  && !complex_p
 		  && (m != E_DFmode || !TARGET_VSX)
 		  && (m != E_SFmode || !TARGET_P8_VECTOR)
@@ -2705,11 +2707,25 @@ rs6000_setup_reg_addr_masks (void)
 	     only 12-bits.  While GPRs can handle the full offset range, VSX
 	     registers can only handle the restricted range.  */
 	  else if ((addr_mask != 0) && !indexed_only_p
-		   && msize >= 16 && TARGET_P9_VECTOR
+		   && msize == 16 && TARGET_P9_VECTOR
 		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
 		       || (m2 == TImode && TARGET_VSX)))
 	    {
 	      addr_mask |= RELOAD_REG_OFFSET;
+	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
+		addr_mask |= RELOAD_REG_QUAD_OFFSET;
+	    }
+
+	  /* Vector pairs can do both indexed and offset loads if the
+	     instructions are enabled, otherwise they can only do offset loads
+	     since it will be broken into two vector moves.  Vector quads can
+	     only do offset loads.  */
+	  else if ((addr_mask != 0) && TARGET_FUTURE
+		   && (VECTOR_PAIR_MODE_P (m2) || VECTOR_QUAD_MODE_P (m2)))
+	    {
+	      addr_mask |= RELOAD_REG_OFFSET;
+	      if (VECTOR_PAIR_MODE_P (m2) && TARGET_VECTOR_256BIT)
+		addr_mask |= RELOAD_REG_INDEXED;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		addr_mask |= RELOAD_REG_QUAD_OFFSET;
 	    }
@@ -3065,10 +3081,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 		  reg_addr[V2TImode].reload_load  = CODE_FOR_reload_v2ti_di_load;
 		  reg_addr[V4TImode].reload_store = CODE_FOR_reload_v4ti_di_store;
 		  reg_addr[V4TImode].reload_load  = CODE_FOR_reload_v4ti_di_load;
-		  reg_addr[OImode].reload_store   = CODE_FOR_reload_oi_di_store;
-		  reg_addr[OImode].reload_load    = CODE_FOR_reload_oi_di_load;
-		  reg_addr[XImode].reload_store   = CODE_FOR_reload_xi_di_store;
-		  reg_addr[XImode].reload_load    = CODE_FOR_reload_xi_di_load;
 		}
 	    }
 	}
@@ -7649,8 +7661,6 @@ reg_offset_addressing_ok_p (machine_mode mode)
 	 vectors supports offset addressing.  */
     case E_V2TImode:
     case E_V4TImode:
-    case E_OImode:
-    case E_XImode:
       return TARGET_P9_VECTOR;
 
     case E_SDmode:
@@ -9866,8 +9876,6 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       break;
 
       /* In theory, vector pair/quad should not have constants.  */
-    case E_OImode:
-    case E_XImode:
     case E_V2TImode:
     case E_V4TImode:
       gcc_assert (!CONSTANT_P (operands[1]));
