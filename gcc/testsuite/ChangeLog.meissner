@@ -1,8 +1,13 @@
-2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc/testsuite/gcc.target/powerpc/prefix-large.h: New set of
-	tests to test prefixed addressing on 'future' system with
-	pc-relative addreses.
+	Merge up to subversion id 276184.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel.h: New set of
+	tests to test prefixed addressing on 'future' system with pc
+	relative addressing.
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel-dd.c: New test.
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel-df.c: New test.
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel-di.c: New test.
@@ -18,7 +23,8 @@
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel-usi.c: New test.
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel-v2df.c: New test.
 
-2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc/testsuite/gcc.target/powerpc/prefix-large.h: New set of
 	tests to test prefixed addressing on 'future' system with large
@@ -38,6 +44,7 @@
 	* gcc/testsuite/gcc.target/powerpc/prefix-large-usi.c: New test.
 	* gcc/testsuite/gcc.target/powerpc/prefix-large-v2df.c: New test.
 
+<patch not submitted to the FSF>
 2019-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc/testsuite/gcc.target/powerpc/prefix-odd-memory.c: New test.

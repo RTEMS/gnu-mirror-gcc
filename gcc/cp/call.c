@@ -7382,8 +7382,7 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
 	    tree type = TREE_TYPE (ref_type);
 	    cp_lvalue_kind lvalue = lvalue_kind (expr);
 
-	    gcc_assert (same_type_ignoring_top_level_qualifiers_p
-			(type, next_conversion (convs)->type));
+	    gcc_assert (similar_type_p (type, next_conversion (convs)->type));
 	    if (!CP_TYPE_CONST_NON_VOLATILE_P (type)
 		&& !TYPE_REF_IS_RVALUE (ref_type))
 	      {
@@ -9106,12 +9105,14 @@ maybe_warn_class_memaccess (location_t loc, tree fndecl,
 }
 
 /* Build and return a call to FN, using NARGS arguments in ARGARRAY.
+   If FN is the result of resolving an overloaded target built-in,
+   ORIG_FNDECL is the original function decl, otherwise it is null.
    This function performs no overload resolution, conversion, or other
    high-level operations.  */
 
 tree
 build_cxx_call (tree fn, int nargs, tree *argarray,
-		tsubst_flags_t complain)
+		tsubst_flags_t complain, tree orig_fndecl)
 {
   tree fndecl;
 
@@ -9121,11 +9122,13 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
   SET_EXPR_LOCATION (fn, loc);
 
   fndecl = get_callee_fndecl (fn);
+  if (!orig_fndecl)
+    orig_fndecl = fndecl;
 
   /* Check that arguments to builtin functions match the expectations.  */
   if (fndecl
       && !processing_template_decl
-      && fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
+      && fndecl_built_in_p (fndecl))
     {
       int i;
 
@@ -9135,7 +9138,7 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 	argarray[i] = maybe_constant_value (argarray[i]);
 
       if (!check_builtin_function_arguments (EXPR_LOCATION (fn), vNULL, fndecl,
-					     nargs, argarray))
+					     orig_fndecl, nargs, argarray))
 	return error_mark_node;
     }
 
