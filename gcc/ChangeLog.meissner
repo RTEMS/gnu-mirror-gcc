@@ -1,3 +1,32 @@
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/mma.md (VQUAD iterator): Enable XImode only if we
+	have vector pair support.  Only enable V4TImode if we have
+	'future' support.
+	(mov<mode>, VQUAD iterator): Remove condition on the generator.
+	Use 'd' instead of 'wa' for the register constraints.
+	(movv4ti_no_vector_pair): New insn when vector pair instructions
+	are not enabled.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Enable
+	__vector_pair and __vector_quad with just -mcpu=future, don't
+	require the explicit vector pair support.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Enable
+	vector pair instructions by default.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached): Use
+	VECTOR_{PAIR,QUAD}_MODE_P macros.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE_P): New macro.
+	(VECTOR_QUAD_MODE_P): New macro.
+	* config/rs6000/vsx.md (VPAIR iterator): Enable OImode only if we
+	have vector pair support.  Only enable V2TImode if we have
+	'future' support.
+	(movv2ti_no_vector_pair): New insn when vector pair instructions
+	are not enabled.
+
+<patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/mma.md: New file.

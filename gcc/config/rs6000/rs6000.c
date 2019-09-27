@@ -1820,15 +1820,13 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (COMPLEX_MODE_P (mode))
     mode = GET_MODE_INNER (mode);
 
-  /* V2TImode/OImode is for vector pairs and needs even/odd VSX register pairs.
-     Only allow V2TImode/OImode in vector registers.  */
-  if (mode == V2TImode || mode == OImode)
+  /* Vector pair modes needs even/odd VSX register pairs.  Only allow
+     vector registers.  */
+  if (VECTOR_PAIR_MODE_P (mode))
     return (TARGET_FUTURE && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
-  /* V4TImode/XImode is for MMA accumulators.  Don't allow V4TImode to go into
-     Altivec registers, because the MMA instructions only use the traditional
-     FPR registers.  */
-  if (mode == V4TImode || mode == XImode)
+  /* MMA accumulator modes need FPR registers divisible by 4.  */
+  if (VECTOR_QUAD_MODE_P (mode))
     return (TARGET_FUTURE && FP_REGNO_P (regno) && (regno & 3) == 0);
 
   /* PTImode can only go in GPRs.  Quad word memory operations require even/odd
@@ -2920,17 +2918,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   /* Add support for vector pairs and vector quad registers.  */
   if (TARGET_FUTURE)
     {
-      static const unsigned int vmodes[]
-	= { E_V2TImode, E_V4TImode, OImode, XImode };
-
-      for (size_t i = 0; i < ARRAY_SIZE (vmodes); i++)
-	{
-	  unsigned int vmode = vmodes[i];
-
-	  rs6000_vector_unit[vmode] = VECTOR_NONE;
-	  rs6000_vector_mem[vmode] = VECTOR_VSX;
-	  rs6000_vector_align[vmode] = 128;
-	}
+      for (m = 0; m < NUM_MACHINE_MODES; ++m)
+	if (VECTOR_PAIR_MODE_P (m) || VECTOR_QUAD_MODE_P (m))
+	  {
+	    rs6000_vector_unit[m] = VECTOR_NONE;
+	    rs6000_vector_mem[m] = VECTOR_VSX;
+	    rs6000_vector_align[m] = 128;
+	  }
     }
 
   /* Register class constraints for the constraints that depend on compile
@@ -12158,10 +12152,10 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
      integer types, prefer the GPR registers.  */
   if (rclass == GEN_OR_FLOAT_REGS)
     {
-      if (mode == V2TImode || mode == OImode)
+      if (VECTOR_PAIR_MODE_P (mode))
 	return VSX_REGS;
 
-      if (mode == V4TImode || mode == XImode)
+      if (VECTOR_QUAD_MODE_P (mode))
 	return FLOAT_REGS;
 
       if (GET_MODE_CLASS (mode) == MODE_INT)
@@ -15855,13 +15849,11 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   /* If we have a vector pair/quad mode, split it into two/four separate
      vectors.  */
-  else if (mode == V4TImode || mode == V2TImode || mode == OImode
-	   || mode == XImode)
+  else if (VECTOR_PAIR_MODE_P (mode) || VECTOR_QUAD_MODE_P (mode))
     {
       reg_mode = V1TImode;
       nregs /= hard_regno_nregs (reg, reg_mode);
     }
-
   else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
 	(TARGET_HARD_FLOAT ? DFmode : SFmode);
@@ -15906,12 +15898,11 @@ rs6000_split_multireg_move (rtx dst, rtx src)
       return;
     }
 
-  /* For __vector_pair (V2TImode/OImode) and __vector_quad (V4TImode/XImode) we
-     have to load or store the registers so that things are properly swapped in
-     little endian mode.  This means the last register gets the first memory
-     location.  */
-  if (!WORDS_BIG_ENDIAN && (mode == V2TImode || mode == OImode
-			    || mode == V4TImode || mode == XImode))
+  /* For __vector_pair and __vector_quad modes we have to load or store the
+     registers so that things are properly swapped in little endian mode.  This
+     means the last register gets the first memory location.  */
+  if (!WORDS_BIG_ENDIAN
+      && (VECTOR_PAIR_MODE_P (mode) || VECTOR_QUAD_MODE_P (mode)))
     {
       if (MEM_P (dst))
 	{

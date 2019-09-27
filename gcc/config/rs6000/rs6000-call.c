@@ -6619,7 +6619,7 @@ rs6000_init_builtins (void)
 
   /* Vector paired and vector quad support.  Right now, C++ -fconcepts doesn't
      like the new keywords.  */
-  if (TARGET_VECTOR_256BIT && !lang_GNU_CXX ())
+  if (TARGET_FUTURE && !lang_GNU_CXX ())
     {
       vector_pair_type_node = rs6000_vector_type ("__vector_pair",
 						  unsigned_intTI_type_node, 2);

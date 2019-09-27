@@ -2573,3 +2573,9 @@ while (0)
        rs6000_asm_output_opcode (STREAM);				\
     }									\
   while (0)
+
+/* Return true for modes used with vector pair modes.  */
+#define VECTOR_PAIR_MODE_P(MODE) ((MODE) == OImode || (MODE) == V2TImode)
+
+/* Return true for modes used with vector quad modes.  */
+#define VECTOR_QUAD_MODE_P(MODE) ((MODE) == XImode || (MODE) == V4TImode)

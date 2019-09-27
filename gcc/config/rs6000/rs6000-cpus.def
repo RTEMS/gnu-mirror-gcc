@@ -79,7 +79,8 @@
    addressing bits are not added here.  Instead, rs6000.c adds them if the OS
    tm.h says that it supports the addressing modes.  */
 #define ISA_FUTURE_MASKS_SERVER	(ISA_3_0_MASKS_SERVER			\
-				 | OPTION_MASK_FUTURE)
+				 | OPTION_MASK_FUTURE			\
+				 | OPTION_MASK_VECTOR_256BIT)
 
 /* Addressing related flags on a future processor.  These flags are broken out
    because not all targets will support either pc-relative addressing, or even

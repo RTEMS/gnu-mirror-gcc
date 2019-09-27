@@ -5568,14 +5568,20 @@
 })
 
 
-;; Iterator for the modes used for vector pairs
-(define_mode_iterator VPAIR	[V2TI OI])
+;; Iterator for the modes used for vector pairs.  We don't define OImode unless
+;; we have vector pair instructions enabled, because it will cause
+;; gcc.c-torture/execute/pr65427.c to fail (due to use of vector_size(32) and
+;; endianess issues).  We do define V2TI mode even if vector pairs are not
+;; enabled, so that the __vector_pair keyword can be used.
+
+(define_mode_iterator VPAIR	[(V2TI "TARGET_FUTURE")
+				 (OI   "TARGET_VECTOR_256BIT")])
 
 ;; Vector pair support.  V2TImode/OImode is only defined for vector registers.
 (define_expand "mov<mode>"
   [(set (match_operand:VPAIR 0 "nonimmediate_operand")
 	(match_operand:VPAIR 1 "input_operand"))]
-  "TARGET_VECTOR_256BIT"
+  ""
 {
   if (!gpc_reg_operand (operands[0], <MODE>mode)
       && !gpc_reg_operand (operands[1], <MODE>mode))
@@ -5585,9 +5591,8 @@
 (define_insn_and_split "*mov<mode>"
   [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa")
 	(match_operand:VPAIR 1 "input_operand" "m,wa,wa"))]
-  "TARGET_VECTOR_256BIT
-   && (gpc_reg_operand (operands[0], <MODE>mode)
-       || gpc_reg_operand (operands[1], <MODE>mode))"
+  "(gpc_reg_operand (operands[0], <MODE>mode)
+    || gpc_reg_operand (operands[1], <MODE>mode))"
   "@
    lxvp%X1 %x0,%1
    stxvp%X0 %x1,%0
@@ -5600,4 +5605,21 @@
 }
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "length" "*,*,8")])
+
+(define_insn_and_split "*movv2ti_no_vector_pair"
+  [(set (match_operand:V2TI 0 "nonimmediate_operand" "=wa,o,wa")
+	(match_operand:V2TI 1 "input_operand" "o,wa,wa"))]
+  "TARGET_FUTURE && !TARGET_VECTOR_256BIT
+   && (gpc_reg_operand (operands[0], V2TImode)
+       || gpc_reg_operand (operands[1], V2TImode))"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "prefixed_length" "16,16,8")
+   (set_attr "non_prefixed_length" "8")])
 
