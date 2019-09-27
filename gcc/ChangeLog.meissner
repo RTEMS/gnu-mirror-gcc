@@ -1,6 +1,16 @@
 <patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (bswaphi2_reg): Generate BRH on 'future'
+	systems.
+	(bswapsi2_reg): Generate BRW on 'future' systems.
+	(bswapdi2): Rename bswapdi2_xxbrd to bswapdi2_hw.
+	(bswapdi2_hw): Rename from bswapdi2_xxbrd.  Generate BRD on
+	'future' systems.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-string.c (expand_block_move): Test for
 	-mefficient-unaligned-vsx before generating vector pair
 	instructions.

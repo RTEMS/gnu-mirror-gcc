@@ -1,6 +1,12 @@
 <patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/bswap-br-1.c: New test for 'future' bswap
+	instructions.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel.h: New set of
 	tests to test prefixed addressing on 'future' system with pc
 	relative addressing.
