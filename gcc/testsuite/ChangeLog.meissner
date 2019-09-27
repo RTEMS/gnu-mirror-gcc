@@ -1,3 +1,9 @@
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/bswap-br-1.c: New test for 'future' bswap
+	instructions.
+
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to subversion id 276184.
