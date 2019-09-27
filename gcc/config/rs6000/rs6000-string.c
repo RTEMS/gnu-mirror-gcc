@@ -2758,9 +2758,24 @@ expand_block_move (rtx operands[])
       machine_mode mode = BLKmode;
       rtx src, dest;
 
-      /* Altivec first, since it will be faster than a string move
-	 when it applies, and usually not significantly larger.  */
-      if (TARGET_ALTIVEC && bytes >= 16 && align >= 128)
+      /* See if we can generate a vector paired instruction.  If we can't
+	 generate a vector paired instruction, if we have prefixed addressing,
+	 use the normal vector load/store, but on earlier systems, only use the
+	 Altivec instructions due to various issues.  */
+      if (TARGET_VECTOR_256BIT && bytes >= 32)
+	{
+	  move_bytes = 32;
+	  mode = V2TImode;
+	  gen_func.mov = gen_movv2ti;
+	}
+      else if (TARGET_PREFIXED_ADDR && bytes >= 16
+	       && TARGET_EFFICIENT_UNALIGNED_VSX)
+	{
+	  move_bytes = 16;
+	  mode = V1TImode;
+	  gen_func.mov = gen_movv1ti;
+	}
+      else if (TARGET_ALTIVEC && bytes >= 16 && align >= 128)
 	{
 	  move_bytes = 16;
 	  mode = V4SImode;

@@ -1,6 +1,14 @@
 <patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-string.c (expand_block_move): Use vector
+	pair memory instructions to move 32 bytes or more.  If we have
+	prefixed addressing, but are not generating vector paired
+	instructions, generate offsettable vector loads and stores.
+
+<patch not submitted to the FSF>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/mma.md (VQUAD iterator): Delete.
 	(mov<mode>, VQUAD iterator): Delete.
 	(movxi): New insn.
