@@ -3376,6 +3376,9 @@ is not.
 @item em
 A memory operand that does not contain a PC-relative address.
 
+@item eM
+A memory operand that does not contain a prefixed address.
+
 @item es
 A ``stable'' memory operand; that is, one which does not include any
 automodification of the base register.  This used to be useful when
