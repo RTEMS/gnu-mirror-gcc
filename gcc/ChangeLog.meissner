@@ -1,3 +1,13 @@
+<patch will be part of the next patch submission>
+2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eM constraint): New constraint.
+	* config/rs6000/rs6000.md (stack_protect_setdi): Use eM constraint
+	to prevent prefixed address with large stack frames.
+	(stack_protect_testdi): Use eM constraint to prevent prefixed
+	address with large stack frames.
+	* doc/md.texi (PowerPC constraints): Document eM constraint.
+
 <patch not submitted to the FSF>
 2019-09-27  Michael Meissner  <meissner@linux.ibm.com>
 
