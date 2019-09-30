@@ -839,7 +839,8 @@
 (define_predicate "add_operand"
   (if_then_else (match_code "const_int")
     (match_test "satisfies_constraint_I (op)
-		 || satisfies_constraint_L (op)")
+		 || satisfies_constraint_L (op)
+		 || satisfies_constraint_eI (op)")
     (match_operand 0 "gpc_reg_operand")))
 
 ;; Return 1 if the operand is either a non-special register, or 0, or -1.
@@ -932,6 +933,14 @@
     return false;
 
   addr = XEXP (inner, 0);
+
+  /* The LWA instruction uses the DS-form format where the bottom two bits of
+     the offset must be 0.  The prefixed PLWA does not have this
+     restriction.  */
+  if (TARGET_PREFIXED_ADDR
+      && address_is_prefixed (addr, DImode, NON_PREFIXED_DS))
+    return true;
+
   if (GET_CODE (addr) == PRE_INC
       || GET_CODE (addr) == PRE_DEC
       || (GET_CODE (addr) == PRE_MODIFY
@@ -1807,3 +1816,43 @@
 (define_predicate "pcrel_local_or_external_address"
   (ior (match_operand 0 "pcrel_local_address")
        (match_operand 0 "pcrel_external_address")))
+
+;; Return 1 if op is a memory operand that is not prefixed.
+(define_predicate "non_prefixed_memory"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_PREFIXED_NUMERIC
+          && iform != INSN_FORM_PCREL_LOCAL
+          && iform != INSN_FORM_BAD);
+})
+
+(define_predicate "non_pcrel_memory"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_PCREL_EXTERNAL
+          && iform != INSN_FORM_PCREL_LOCAL
+          && iform != INSN_FORM_BAD);
+})
+
+;; Return 1 if op is either a register operand or a memory operand that does
+;; not use a PC-relative address.
+(define_predicate "reg_or_non_pcrel_memory"
+  (match_code "reg,subreg,mem")
+{
+  if (REG_P (op) || SUBREG_P (op))
+    return register_operand (op, mode);
+
+  return non_pcrel_memory (op, mode);
+})

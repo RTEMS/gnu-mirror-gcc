@@ -57,6 +57,7 @@
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Add support for
 	prefixed addresses.
 	(movtd_64bit_nodm): Add support for prefixed addresses.
+	(mov<mode>_ppc64): Add support for prefixed addresses.
 	(stack_protect_setdi): Convert prefixed addresses to non-prefixed
 	addresses.  Allow for indexed addressing as well as offsettable.
 	(stack_protect_testdi): Convert prefixed addresses to non-prefixed
