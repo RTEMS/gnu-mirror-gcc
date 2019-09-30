@@ -87,6 +87,7 @@
    prefixed addressing, and we want to clear all of the addressing bits
    on targets that cannot support prefixed/pcrel addressing.  */
 #define ADDRESSING_FUTURE_MASKS	(OPTION_MASK_PCREL			\
+				 | OPTION_MASK_PCREL_OPT		\
 				 | OPTION_MASK_PREFIXED_ADDR)
 
 /* Flags that need to be turned off if -mno-future.  */
@@ -146,6 +147,7 @@
 				 | OPTION_MASK_P9_MISC			\
 				 | OPTION_MASK_P9_VECTOR		\
 				 | OPTION_MASK_PCREL			\
+				 | OPTION_MASK_PCREL_OPT		\
 				 | OPTION_MASK_POPCNTB			\
 				 | OPTION_MASK_POPCNTD			\
 				 | OPTION_MASK_POWERPC64		\
