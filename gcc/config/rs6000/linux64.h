@@ -640,3 +640,11 @@ extern int dot_symbols;
    enabling the __float128 keyword.  */
 #undef	TARGET_FLOAT128_ENABLE_TYPE
 #define TARGET_FLOAT128_ENABLE_TYPE 1
+
+/* Enable support for pc-relative and numeric prefixed addressing on the
+   'future' system.  */
+#undef  TARGET_PREFIXED_ADDR_DEFAULT
+#define TARGET_PREFIXED_ADDR_DEFAULT	1
+
+#undef  TARGET_PCREL_DEFAULT
+#define TARGET_PCREL_DEFAULT		1
