@@ -1807,30 +1807,3 @@
 (define_predicate "pcrel_local_or_external_address"
   (ior (match_operand 0 "pcrel_local_address")
        (match_operand 0 "pcrel_external_address")))
-
-;; Return 1 if op is a memory operand that is not prefixed.
-(define_predicate "non_prefixed_memory"
-  (match_code "mem")
-{
-  if (!memory_operand (op, mode))
-    return false;
-
-  return !address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
-})
-
-(define_predicate "non_pcrel_memory"
-  (match_code "mem")
-{
-  if (!memory_operand (op, mode))
-    return false;
-
-  return !pcrel_local_or_external_address (XEXP (op, 0), Pmode);
-})
-
-;; Return 1 if op is either a register operand or a memory operand that does
-;; not use a PC-relative address.
-(define_predicate "reg_or_non_pcrel_memory"
-  (match_code "reg,subreg,mem")
-{
-  return (gpc_reg_operand (op, mode) || non_pcrel_memory (op, mode));
-})
