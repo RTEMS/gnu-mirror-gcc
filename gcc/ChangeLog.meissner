@@ -1,5 +1,13 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (lwa_operand): Add support for
+	prefixed instructions.
+	(non_prefixed_memory): New predicate.
+	(non_pcrel_memory): New predicate.
+	(reg_or_non_pcrel_memory): New predicate.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_insn_cost): Do not make prefixed
 	instructions cost more because they are larger in size.
 
