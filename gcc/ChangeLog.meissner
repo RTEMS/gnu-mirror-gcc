@@ -1,5 +1,10 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Make sure the
+	instruction length is correct for prefixed loads and stores.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (lwa_operand): Add support for
 	prefixed instructions.
 	(non_prefixed_memory): New predicate.
