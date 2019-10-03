@@ -20972,14 +20972,38 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (recog_memoized (insn) < 0)
     return 0;
 
-  if (!speed)
-    return get_attr_length (insn);
+  if (speed)
+    {
+      int cost = get_attr_cost (insn);
+      if (cost > 0)
+	return cost;
+    }
 
-  int cost = get_attr_cost (insn);
-  if (cost > 0)
-    return cost;
+  int cost;
+  int length = get_attr_length (insn);
+  int n = length / 4;
 
-  int n = get_attr_length (insn) / 4;
+  /* How many real instructions are generated for this insn?  This is slightly
+     different from the length attribute, in that the length attribute counts
+     the number of bytes.  With prefixed instructions, we don't want to count a
+     prefixed instruction (length 12 bytes including possible NOP) as taking 3
+     instructions, but just one.  */
+  if (length >= 12 && get_attr_prefixed (insn) == PREFIXED_YES)
+    {
+      /* Single prefixed instruction.  */
+      if (length == 12)
+	n = 1;
+
+      /* A normal instruction and a prefixed instruction (16) or two back
+	 to back prefixed instructions (20).  */
+      else if (length == 16 || length == 20)
+	n = 2;
+
+      /* Guess for larger instruction sizes.  */
+      else
+	n = 2 + (length - 20) / 4;
+    }
+
   enum attr_type type = get_attr_type (insn);
 
   switch (type)

@@ -1,5 +1,10 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_insn_cost): Do not make prefixed
+	instructions cost more because they are larger in size.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Set prefixed and
 	non-prefixed length.
 	(movtd_64bit_nodm): Set prefixed and non-prefixed length.
