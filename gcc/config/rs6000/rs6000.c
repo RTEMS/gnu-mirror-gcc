@@ -24972,6 +24972,34 @@ prefixed_paddi_p (rtx_insn *insn)
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
 }
 
+/* Make a memory address non-prefixed if it is prefixed.  */
+
+rtx
+make_memory_non_prefixed (rtx mem)
+{
+  gcc_assert (MEM_P (mem));
+
+  rtx old_addr = XEXP (mem, 0);
+  if (address_is_prefixed (old_addr, GET_MODE (mem), NON_PREFIXED_DEFAULT))
+    {
+      rtx new_addr;
+
+      if (GET_CODE (old_addr) == PLUS
+	  && (REG_P (XEXP (old_addr, 0)) || SUBREG_P (XEXP (old_addr, 0)))
+	  && CONST_INT_P (XEXP (old_addr, 1)))
+	{
+	  rtx tmp_reg = force_reg (Pmode, XEXP (old_addr, 1));
+	  new_addr = gen_rtx_PLUS (Pmode, XEXP (old_addr, 0), tmp_reg);
+	}
+      else
+	new_addr = force_reg (Pmode, old_addr);
+
+      mem = change_address (mem, VOIDmode, new_addr);
+    }
+
+  return mem;
+}
+
 /* Whether the next instruction needs a 'p' prefix issued before the
    instruction is printed out.  */
 static bool next_insn_prefixed_p;
