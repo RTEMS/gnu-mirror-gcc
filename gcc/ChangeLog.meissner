@@ -1,5 +1,11 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (non_prefixed_memory): New predicate.
+	(non_pcrel_memory): New predicate.
+	(reg_or_non_pcrel_memory): New predicate.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_num_insns): New function that
 	attempts to convert the instruction length to number of
 	instructions.
