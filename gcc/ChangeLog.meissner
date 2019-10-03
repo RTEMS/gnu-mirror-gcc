@@ -1,5 +1,15 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	PADDI to load up and/or add 34-bit integer constants.
+	(rs6000_rtx_costs): Treat constants loaded up with PADDI with the
+	same cost as normal 16-bit constants.
+	* config/rs6000/rs6000.md (movdi_internal64): Add support to load
+	up 34-bit integer constants with PADDI.
+	(movdi integer constant splitter): Add comment about PADDI.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
 	for extracting the element of vector with a PC-relative address.
 	* config/rs6000/rs6000.md (pcrel_add_local_addr): New insn to add
