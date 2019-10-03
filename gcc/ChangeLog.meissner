@@ -1,25 +1,5 @@
 2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/predicates.md (non_prefixed_memory): New predicate.
-	(non_pcrel_memory): New predicate.
-	(reg_or_non_pcrel_memory): New predicate.
-
-2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000.c (rs6000_num_insns): New function that
-	attempts to convert the instruction length to number of
-	instructions.
-	(rs6000_insn_cost): Call rs6000_num_insns instead of just dividing
-	the instruction length by 4.
-
-2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Set prefixed and
-	non-prefixed length.
-	(movtd_64bit_nodm): Set prefixed and non-prefixed length.
-
-2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
-
 	* config/rs6000/rs6000.c (quad_address_p): Add check for prefixed
 	addresses.
 	(mem_operand_gpr): Add check for prefixed addresses.
