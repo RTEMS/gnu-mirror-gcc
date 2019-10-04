@@ -6617,6 +6617,19 @@ rs6000_init_builtins (void)
   else
     ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
 
+  /* Vector paired and vector quad support.  */
+  if (TARGET_FUTURE)
+    {
+      vector_pair_type_node = rs6000_vector_type ("__vector_pair",
+						  ieee128_float_type_node, 2);
+
+      vector_quad_type_node = rs6000_vector_type ("__vector_quad",
+						  ieee128_float_type_node, 4);
+
+      TREE_NO_WARNING (vector_pair_type_node) = true;
+      TREE_NO_WARNING (vector_quad_type_node) = true;
+    }
+
   /* Initialize the modes for builtin_function_type, mapping a machine mode to
      tree type node.  */
   builtin_mode_to_type[QImode][0] = integer_type_node;
