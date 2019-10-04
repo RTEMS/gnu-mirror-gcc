@@ -1,3 +1,102 @@
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
+	prefixed addressing by default.
+	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Only
+	enable -mprefixed-addr and -mpcrel if the OS tm.h says to enable
+	it.
+	(ADDRESSING_FUTURE_MASKS): New mask macro.
+	(OTHER_FUTURE_MASKS): Use ADDRESSING_FUTURE_MASKS.
+	* config/rs6000/rs6000.c (TARGET_PREFIXED_ADDR_DEFAULT): Do not
+	enable -mprefixed-addr unless the OS tm.h says to.
+	(TARGET_PCREL_DEFAULT): Do not enable -mpcrel unless the OS tm.h
+	says to.
+	(rs6000_option_override_internal): Do not enable -mprefixed-addr
+	or -mpcrel unless the OS tm.h says to enable it.  Add more checks
+	for -mcpu=future.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (add_operand): Add support for
+	PADDI.
+	* config/rs6000/rs6000.md (add<mode>3): Add support for PADDI.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (movsi_internal1): Add support to load
+	up 32-bit SImode integer constants with PADDI.
+	(movsi integer constant splitter): Do not split constant if PADDI
+	can load it up directly.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	PADDI to load up and/or add 34-bit integer constants.
+	(rs6000_rtx_costs): Treat constants loaded up with PADDI with the
+	same cost as normal 16-bit constants.
+	* config/rs6000/rs6000.md (movdi_internal64): Add support to load
+	up 34-bit integer constants with PADDI.
+	(movdi integer constant splitter): Add comment about PADDI.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
+	for extracting the element of vector with a PC-relative address.
+	* config/rs6000/rs6000.md (pcrel_add_local_addr): New insn to add
+	an address to a register.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Make sure the
+	instruction length is correct for prefixed loads and stores.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (em constraint): New constraint.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (make_memory_non_prefixed): New function
+	to return a traditional non-prefixed instruction.
+	* config/rs6000/rs6000.md (stack_protect_setdi): Make sure both
+	memory operands are not	prefixed.
+	(stack_protect_testdi): Make sure both memory operands are not
+	prefixed.
+	* doc/md.texi (PowerPC constraints): Document the em constraint.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (lwa_operand): Add support for
+	prefixed instructions.
+	(non_prefixed_memory): New predicate.
+	(non_pcrel_memory): New predicate.
+	(reg_or_non_pcrel_memory): New predicate.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_insn_cost): Do not make prefixed
+	instructions cost more because they are larger in size.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Set prefixed and
+	non-prefixed length.
+	(movtd_64bit_nodm): Set prefixed and non-prefixed length.
+	(mov<mode>_ppc64): Set prefixed and non-prefixed length.
+
+2019-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (quad_address_p): Add check for prefixed
+	addresses.
+	(mem_operand_gpr): Add check for prefixed addresses.
+	(mem_operand_ds_form): Add check for prefixed addresses.
+	(rs6000_legitimate_offset_address_p): If we support prefixed
+	addresses, check for a 34-bit offset instead of 16-bit.
+	(rs6000_legitimate_address_p): Add check for prefixed addresses.
+	Do not allow load/store with update if the address is prefixed.
+	(rs6000_mode_dependent_address):  If we support prefixed
+	addresses, check for a 34-bit offset instead of 16-bit.
+
 2019-10-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 276606

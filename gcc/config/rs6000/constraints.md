@@ -210,6 +210,11 @@ several times, or that might not access it at all."
   (and (match_code "mem")
        (match_test "GET_RTX_CLASS (GET_CODE (XEXP (op, 0))) != RTX_AUTOINC")))
 
+(define_memory_constraint "em"
+  "A memory operand that does not contain a PC-relative reference."
+  (and (match_code "mem")
+       (match_test "non_pcrel_memory (op, mode)")))
+
 (define_memory_constraint "Q"
   "Memory operand that is an offset from a register (it is usually better
 to use @samp{m} or @samp{es} in @code{asm} statements)"

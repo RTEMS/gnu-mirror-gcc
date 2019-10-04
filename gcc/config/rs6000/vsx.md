@@ -1149,9 +1149,13 @@
                "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
-   (set_attr "length"
+   (set_attr "non_prefixed_length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
+                *,         20,        8,         *,         *")
+   (set_attr "prefixed_length"
+               "*,         *,         *,         8,         *,         20,
+                20,        20,        20,        8,         *,         *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
