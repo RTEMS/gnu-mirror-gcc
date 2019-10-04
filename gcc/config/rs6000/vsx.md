@@ -5644,8 +5644,8 @@
   [(set (match_operand:V2KF 0 "nonimmediate_operand" "=wa,o,wa")
 	(match_operand:V2KF 1 "input_operand" "o,wa,wa"))]
   "TARGET_FUTURE && !TARGET_VECTOR_256BIT
-   && (gpc_reg_operand (operands[0], V2TImode)
-       || gpc_reg_operand (operands[1], V2TImode))"
+   && (gpc_reg_operand (operands[0], V2KFmode)
+       || gpc_reg_operand (operands[1], V2KFmode))"
   "#"
   "&& reload_completed"
   [(const_int 0)]

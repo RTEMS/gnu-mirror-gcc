@@ -2,6 +2,11 @@
 
 2019-10-04  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/mma.md: Update a comment.
+	* config/rs6000/vsx.md (movv2kf_no_vector_pair): Fix test.
+
+2019-10-04  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/mma.md (movv4kf): Use V4KFmode as the vector quad
 	mode, not V4TImode.  Rename mov<name>_vector_pair to just
 	mov<name>.

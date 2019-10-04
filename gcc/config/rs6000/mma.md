@@ -34,7 +34,7 @@
   gcc_unreachable ();
 })
 
-;; Vector pair support.  V2TImode is only defined for vector registers.
+;; Vector quad support.  V4KFmode is only defined for vector registers.
 (define_expand "movv4kf"
   [(set (match_operand:V4KF 0 "nonimmediate_operand")
 	(match_operand:V4KF 1 "input_operand"))]
