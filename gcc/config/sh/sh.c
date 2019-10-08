@@ -713,7 +713,7 @@ got_mode_name:;
     {
       if (tokens[i] == "strict")
 	ret.strict = true;
-      else if (tokens[i].find ("gbr-offset=") == 0)
+      else if (!tokens[i].compare (0, strlen ("gbr-offset="), "gbr-offset="))
 	{
 	  std::string offset_str = tokens[i].substr (strlen ("gbr-offset="));
 	  ret.tcb_gbr_offset = integral_argument (offset_str.c_str ());
@@ -10814,12 +10814,6 @@ sh_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
 	  emit_insn (gen_add2_insn (scratch0, GEN_INT (vcall_offset)));
 	  offset_addr = scratch0;
 	}
-      else if (scratch0 != scratch1)
-	{
-	  emit_move_insn (scratch1, GEN_INT (vcall_offset));
-	  emit_insn (gen_add2_insn (scratch0, scratch1));
-	  offset_addr = scratch0;
-	}
       else
 	gcc_unreachable (); /* FIXME */
       emit_load_ptr (scratch0, offset_addr);
@@ -12014,9 +12008,11 @@ sh_extending_set_of_reg::use_as_extended_reg (rtx_insn* use_at_insn) const
 	rtx r = gen_reg_rtx (SImode);
 	rtx_insn* i0;
 	if (from_mode == QImode)
-	  i0 = emit_insn_after (gen_extendqisi2 (r, set_src), insn);
+	  i0 = sh_check_add_incdec_notes (
+			emit_insn_after (gen_extendqisi2 (r, set_src), insn));
 	else if (from_mode == HImode)
-	  i0 = emit_insn_after (gen_extendhisi2 (r, set_src), insn);
+	  i0 = sh_check_add_incdec_notes (
+			emit_insn_after (gen_extendhisi2 (r, set_src), insn));
 	else
 	  gcc_unreachable ();
 

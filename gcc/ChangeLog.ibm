@@ -1,8 +1,13 @@
+2019-10-08  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to 276707.
+	* REVISION: Update subversion id.
+
 2019-03-22  Backport from mainline
 
-        2019-03-22  Bill Schmidt  <wschmidt@linux.ibm.com>
+	2019-03-22  Bill Schmidt  <wschmidt@linux.ibm.com>
 
-        * config/rs6000/mmintrin.h (_mm_sub_pi32): Fix typo.
+	* config/rs6000/mmintrin.h (_mm_sub_pi32): Fix typo.
 
 2019-01-16  Peter Bergner  <bergner@linux.ibm.com>
 

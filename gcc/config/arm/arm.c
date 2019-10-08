@@ -3001,7 +3001,8 @@ arm_option_override_internal (struct gcc_options *opts,
 
   /* Thumb2 inline assembly code should always use unified syntax.
      This will apply to ARM and Thumb1 eventually.  */
-  opts->x_inline_asm_unified = TARGET_THUMB2_P (opts->x_target_flags);
+  if (TARGET_THUMB2_P (opts->x_target_flags))
+    opts->x_inline_asm_unified = true;
 
 #ifdef SUBTARGET_OVERRIDE_INTERNAL_OPTIONS
   SUBTARGET_OVERRIDE_INTERNAL_OPTIONS;
@@ -8711,11 +8712,16 @@ static bool
 arm_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
   rtx base, offset;
+  split_const (x, &base, &offset);
 
-  if (ARM_OFFSETS_MUST_BE_WITHIN_SECTIONS_P)
+  if (SYMBOL_REF_P (base))
     {
-      split_const (x, &base, &offset);
-      if (GET_CODE (base) == SYMBOL_REF
+      /* Function symbols cannot have an offset due to the Thumb bit.  */
+      if ((SYMBOL_REF_FLAGS (base) & SYMBOL_FLAG_FUNCTION)
+	  && INTVAL (offset) != 0)
+	return true;
+
+      if (ARM_OFFSETS_MUST_BE_WITHIN_SECTIONS_P
 	  && !offset_within_block_p (base, INTVAL (offset)))
 	return true;
     }
@@ -11695,8 +11701,7 @@ neon_valid_immediate (rtx op, machine_mode mode, int inverse,
   else
     {
       n_elts = 1;
-      if (mode == VOIDmode)
-	mode = DImode;
+      gcc_assert (mode != VOIDmode);
     }
 
   innersize = GET_MODE_UNIT_SIZE (mode);

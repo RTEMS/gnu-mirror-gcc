@@ -2547,7 +2547,7 @@ expand_builtin_int_roundingfn (tree exp, rtx target)
   tree arg;
 
   if (!validate_arglist (exp, REAL_TYPE, VOID_TYPE))
-    gcc_unreachable ();
+    return NULL_RTX;
 
   arg = CALL_EXPR_ARG (exp, 0);
 
@@ -2683,7 +2683,7 @@ expand_builtin_int_roundingfn_2 (tree exp, rtx target)
   enum built_in_function fallback_fn = BUILT_IN_NONE;
 
   if (!validate_arglist (exp, REAL_TYPE, VOID_TYPE))
-     gcc_unreachable ();
+    return NULL_RTX;
 
   arg = CALL_EXPR_ARG (exp, 0);
 
@@ -9815,6 +9815,9 @@ maybe_emit_sprintf_chk_warning (tree exp, enum built_in_function fcode)
 static void
 maybe_emit_free_warning (tree exp)
 {
+  if (call_expr_nargs (exp) != 1)
+    return;
+
   tree arg = CALL_EXPR_ARG (exp, 0);
 
   STRIP_NOPS (arg);
