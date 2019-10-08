@@ -1,5 +1,10 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Make sure the
+	instruction length is correct for prefixed loads and stores.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (em constraint): New constraint.
 	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
 	declaration.
