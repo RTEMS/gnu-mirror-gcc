@@ -1,5 +1,12 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (lwa_operand): Allow using PLWA to
+	generate sign extend with odd offsets.
+	(non_prefixed_memory): New predicate.
+	(reg_or_non_prefixed_memory): New predicate.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_insn_cost): Do not make prefixed
 	instructions cost more because they are larger in size.
 
