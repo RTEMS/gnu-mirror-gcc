@@ -1,5 +1,67 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/mma.md: New file for vector quad support.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Define
+	__VECTOR_PAIR__ and __VECTOR_QUAD__ if the vector pair and vector
+	quad support is enabled.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Initialize
+	the __vector_pair and __vector_quad keywords for C.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Add
+	-mvector-256bit.
+	(OTHER_FUTURE_MASKS): Add -mvector-256bit.
+	(POWERPC_MASKS): Add -mvector-256bit.
+	* config/rs6000/rs6000-modes.def (int vector pair modes): Update
+	comments.
+	(floating point vector pair modes): Add modes.
+	(int vector quad modes): Add modes.
+	(OImode): Add 256-bit integer mode.
+	(XImode): Add 512-bit integer mode.
+	* config/rs6000/rs6000.c (rs6000_hard_regno_mode_ok_uncached): Add
+	support for vector pair and vector quad modes.
+	(rs6000_debug_reg_global): Print information about V4TImode,
+	OImode, and XImode if -mdebug=reg.  Print the endian configuration
+	macros.  Print the block move and compare configuration
+	variables.
+	(rs6000_setup_reg_addr_masks): Setup vector pair and vector quad
+	modes.
+	(rs6000_init_hard_regno_mode_ok): Setup vector pair and vector
+	quad modes.  Add reload handlers for vector pair and vector quad
+	modes.
+	(rs6000_option_override_internal): Bump up block move limit if we
+	support loading and storing vector pairs.
+	(quad_address_p): Add support for vector pair and vector quad modes.
+	(reg_offset_addressing_ok_p): Add support for vector pair and
+	vector quad modes.
+	(avoiding_indexed_address_p): Add support for vector pairs.
+	(rs6000_emit_move): Assert that vector pair and vector constant
+	modes don't allow moves of a constant.
+	(rs6000_preferred_reload_class): Vector pairs are limited to VSX
+	register, and vector quads are limited to FPR registers.
+	(rs6000_split_multireg_move): Add support for vector pair and
+	vector quad modes.
+	(rs6000_opt_masks): Add -mvector-256bit.
+	* config/rs6000/rs6000.h (ALTIVEC_OR_VSX_VECTOR_MODE): Add support
+	for vector pair and vector quad modes.
+	(enum rs6000_builtin_type_index): Add support for vector pair and
+	vector quad modes.
+	(vector_pair_type_node): New global type for vector pair mode.
+	(vector_quad_type_node): New global type for vector quad mode.
+	(VECTOR_PAIR_MODE_P): New macro to check if this is a vector
+	pair.
+	(VECTOR_QUAD_MODE_P): New macro to check if this is a vector
+	quad.
+	* config/rs6000/rs6000.md: Include mma.md.
+	(RELOAD iterator): Add V2TImode and V4TImode.
+	* config/rs6000/rs6000.opt (-mvector-256bit): New switch.
+	* config/rs6000/vsx.md (OImode): Dummy OImode move.
+	(movv2ti): New generator for V2TImode.
+	(movv2ti_vector_pair): New move insn for -mvector-256bit.
+	(movv2ti_no_vector_pair): New move insn for -mno-vector-256bit.
+
+==================== pcrel-trunk21 patches below ====================
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
 	prefixed addressing by default.
 	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.

@@ -577,3 +577,7 @@ Generate (do not generate) prefixed memory instructions.
 mpcrel
 Target Report Mask(PCREL) Var(rs6000_isa_flags)
 Generate (do not generate) pc-relative memory addressing.
+
+mvector-256bit
+Target Report Mask(VECTOR_256BIT) Var(rs6000_isa_flags)
+Generate (do not generate) paired vector loads and stores.
