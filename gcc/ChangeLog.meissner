@@ -1,5 +1,12 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Set prefixed and
+	non-prefixed length.
+	(movtd_64bit_nodm): Set prefixed and non-prefixed length.
+	(mov<mode>_ppc64): Set prefixed and non-prefixed length.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (quad_address_p): Add check for prefixed
 	addresses.
 	(mem_operand_gpr): Add check for prefixed addresses.
