@@ -1,5 +1,12 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-string.c (expand_block_move): Use vector
+	pair instructions if they are available for block moves.  If
+	prefixed addresses are supported, use standard vector offsettable
+	loads/stores.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/mma.md: New file for vector quad support.
 	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Define
 	__VECTOR_PAIR__ and __VECTOR_QUAD__ if the vector pair and vector
