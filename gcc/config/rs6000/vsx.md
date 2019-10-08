@@ -1149,9 +1149,13 @@
                "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
-   (set_attr "length"
+   (set_attr "non_prefixed_length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
+                *,         20,        8,         *,         *")
+   (set_attr "prefixed_length"
+               "*,         *,         *,         8,         *,         20,
+                20,        20,        20,        8,         *,         *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
@@ -3235,9 +3239,10 @@
 ;; Variable V2DI/V2DF extract
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v,wa,r")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "input_operand" "v,m,m")
-			     (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-			    UNSPEC_VSX_EXTRACT))
+	(unspec:<VS_scalar>
+	 [(match_operand:VSX_D 1 "reg_or_non_prefixed_memory" "v,em,em")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,&b,&b"))
    (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
@@ -3305,9 +3310,10 @@
 ;; Variable V4SF extract
 (define_insn_and_split "vsx_extract_v4sf_var"
   [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,wa,?r")
-	(unspec:SF [(match_operand:V4SF 1 "input_operand" "v,m,m")
-		    (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
-		   UNSPEC_VSX_EXTRACT))
+	(unspec:SF
+	 [(match_operand:V4SF 1 "reg_or_non_prefixed_memory" "v,em,em")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
+	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,&b,&b"))
    (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
   "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
@@ -3668,7 +3674,7 @@
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
 	(unspec:<VS_scalar>
-	 [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
+	 [(match_operand:VSX_EXTRACT_I 1 "reg_or_non_prefixed_memory" "v,v,em")
 	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	 UNSPEC_VSX_EXTRACT))
    (clobber (match_scratch:DI 3 "=r,r,&b"))
@@ -3688,7 +3694,7 @@
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r,r")
 	(zero_extend:<VS_scalar>
 	 (unspec:<VSX_EXTRACT_I:VS_scalar>
-	  [(match_operand:VSX_EXTRACT_I 1 "input_operand" "v,v,m")
+	  [(match_operand:VSX_EXTRACT_I 1 "reg_or_non_prefixed_memory" "v,v,em")
 	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	  UNSPEC_VSX_EXTRACT)))
    (clobber (match_scratch:DI 3 "=r,r,&b"))
