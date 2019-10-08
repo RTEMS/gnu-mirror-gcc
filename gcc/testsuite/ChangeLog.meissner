@@ -1,5 +1,11 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/pcrel-opt-di.c: New tests for PCREL_OPT.
+	* gcc.target/powerpc/pcrel-opt-di2.c: Likewise.
+	* gcc.target/powerpc/pcrel-opt-di3.c: Likewise.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc/testsuite/gcc.target/powerpc/prefix-pcrel.h: New set of
 	tests to test prefixed addressing on 'future' system with
 	PC-relative tests.

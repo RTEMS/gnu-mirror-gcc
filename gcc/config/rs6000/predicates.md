@@ -775,6 +775,13 @@
   return indexed_or_indirect_address (op, mode);
 })
 
+;; Return 1 if the operand uses a single register for the address.
+(define_predicate "one_reg_memory_operand"
+  (match_code "mem")
+{
+  return REG_P (XEXP (op, 0));
+})
+
 ;; Like indexed_or_indirect_operand, but also allow a GPR register if direct
 ;; moves are supported.
 (define_predicate "reg_or_indexed_operand"
@@ -986,9 +993,9 @@
   if (CONST_INT_P (op))
     return 1;
   if (XINT (op, 1) == UNSPEC_TLSGD)
-    return REG_P (XVECEXP (op, 0, 1));
+    return REG_P (XVECEXP (op, 0, 1)) || XVECEXP (op, 0, 1) == const0_rtx;
   if (XINT (op, 1) == UNSPEC_TLSLD)
-    return REG_P (XVECEXP (op, 0, 0));
+    return REG_P (XVECEXP (op, 0, 0)) || XVECEXP (op, 0, 0) == const0_rtx;
   return 0;
 })
 
@@ -1808,6 +1815,15 @@
 {
   enum insn_form iform = address_to_insn_form (op, mode, NON_PREFIXED_DEFAULT);
   return iform == INSN_FORM_PCREL_EXTERNAL;
+})
+
+;; Return 1 if op is a memory operand to an external variable when we
+;; support pc-relative addressing and the PCREL_OPT relocation to
+;; optimize references to it.
+(define_predicate "pcrel_external_memory"
+  (match_code "mem")
+{
+  return pcrel_external_address (XEXP (op, 0), Pmode);
 })
 
 ;; Return true if the address is PC-relative and the symbol is either local or

@@ -47,6 +47,10 @@ rs6000-call.o: $(srcdir)/config/rs6000/rs6000-call.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+rs6000-pcrel.o: $(srcdir)/config/rs6000/rs6000-pcrel.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
 $(srcdir)/config/rs6000/rs6000-tables.opt: $(srcdir)/config/rs6000/genopt.sh \
   $(srcdir)/config/rs6000/rs6000-cpus.def
 	$(SHELL) $(srcdir)/config/rs6000/genopt.sh $(srcdir)/config/rs6000 > \
@@ -79,6 +83,7 @@ MD_INCLUDES = $(srcdir)/config/rs6000/rs64.md \
 	$(srcdir)/config/rs6000/predicates.md \
 	$(srcdir)/config/rs6000/constraints.md \
 	$(srcdir)/config/rs6000/darwin.md \
+	$(srcdir)/config/rs6000/pcrel.md \
 	$(srcdir)/config/rs6000/sync.md \
 	$(srcdir)/config/rs6000/vector.md \
 	$(srcdir)/config/rs6000/vsx.md \
