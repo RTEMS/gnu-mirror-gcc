@@ -1,5 +1,18 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint.
+	* config/rs6000/rs6000-protos.h (make_memory_non_prefixed): New
+	declaration.
+	* config/rs6000/rs6000.c (make_memory_non_prefixed): New function
+	to return a traditional non-prefixed instruction.
+	* config/rs6000/rs6000.md (stack_protect_setdi): Make sure both
+	memory operands are not	prefixed.
+	(stack_protect_testdi): Make sure both memory operands are not
+	prefixed.
+	* doc/md.texi (PowerPC constraints): Document the em constraint.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (lwa_operand): Allow using PLWA to
 	generate sign extend with odd offsets.
 	(non_prefixed_memory): New predicate.
