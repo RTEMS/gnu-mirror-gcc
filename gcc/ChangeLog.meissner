@@ -1,5 +1,22 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
+	for optimizing PC-relative addresses with a constant element
+	number.  Assert that PC-relative vectors do not have variable
+	element numbers.  Add support for prefixed addresses with 34-bit
+	offsets.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Do not allow combining prefixed memory with a variable vector
+	extract.
+	(vsx_extract_v4sf_var): Do not allow combining prefixed memory
+	with a variable vector extract.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not allow
+	combining prefixed memory with a variable vector extract.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not allow combining
+	prefixed memory with a variable vector extract.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Make sure the
 	instruction length is correct for prefixed loads and stores.
 

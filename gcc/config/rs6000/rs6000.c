@@ -6701,6 +6701,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   rtx element_offset;
   rtx new_addr;
   bool valid_addr_p;
+  bool pcrel_p = pcrel_local_address (addr, Pmode);
 
   /* Vector addresses should not have PRE_INC, PRE_DEC, or PRE_MODIFY.  */
   gcc_assert (GET_RTX_CLASS (GET_CODE (addr)) != RTX_AUTOINC);
@@ -6738,6 +6739,38 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   else if (REG_P (addr) || SUBREG_P (addr))
     new_addr = gen_rtx_PLUS (Pmode, addr, element_offset);
 
+  /* Optimize PC-relative addresses with a constant offset.  */
+  else if (pcrel_p && CONST_INT_P (element_offset))
+    {
+      rtx addr2 = addr;
+      HOST_WIDE_INT offset = INTVAL (element_offset);
+
+      if (GET_CODE (addr2) == CONST)
+	addr2 = XEXP (addr2, 0);
+
+      if (GET_CODE (addr2) == PLUS)
+	{
+	  offset += INTVAL (XEXP (addr2, 1));
+	  addr2 = XEXP (addr2, 0);
+	}
+
+      gcc_assert (SIGNED_34BIT_OFFSET_P (offset));
+      if (offset)
+	{
+	  addr2 = gen_rtx_PLUS (Pmode, addr2, GEN_INT (offset));
+	  new_addr = gen_rtx_CONST (Pmode, addr2);
+	}
+      else
+	new_addr = addr2;
+    }
+
+  /* With only one temporary base register, we can't support a PC-relative
+     address added to a variable offset.  This is because the PADDI instruction
+     requires RA to be 0 when doing a PC-relative add (i.e. no register to add
+     to).  */
+  else if (pcrel_p)
+    gcc_unreachable ();
+
   /* Optimize D-FORM addresses with constant offset with a constant element, to
      include the element offset in the address directly.  */
   else if (GET_CODE (addr) == PLUS)
@@ -6752,8 +6785,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
 
-	  if (IN_RANGE (offset, -32768, 32767)
-	      && (scalar_size < 8 || (offset & 0x3) == 0))
+	  if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (offset))
+	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  else if (SIGNED_16BIT_OFFSET_P (offset)
+		   && (scalar_size < 8 || (offset & 0x3) == 0))
 	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
 	  else
 	    {
@@ -6801,11 +6837,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
       new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
     }
 
-  /* If we have a PLUS, we need to see whether the particular register class
-     allows for D-FORM or X-FORM addressing.  */
-  if (GET_CODE (new_addr) == PLUS)
+  /* If we have a PLUS or a PC-relative address without the PLUS, we need to
+     see whether the particular register class allows for D-FORM or X-FORM
+     addressing.  */
+  if (GET_CODE (new_addr) == PLUS || pcrel_p)
     {
-      rtx op1 = XEXP (new_addr, 1);
       addr_mask_type addr_mask;
       unsigned int scalar_regno = reg_or_subregno (scalar_reg);
 
@@ -6822,10 +6858,16 @@ rs6000_adjust_vec_address (rtx scalar_reg,
       else
 	gcc_unreachable ();
 
-      if (REG_P (op1) || SUBREG_P (op1))
-	valid_addr_p = (addr_mask & RELOAD_REG_INDEXED) != 0;
-      else
+      if (pcrel_p)
 	valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+      else
+	{
+	  rtx op1 = XEXP (new_addr, 1);
+	  if (REG_P (op1) || SUBREG_P (op1))
+	    valid_addr_p = (addr_mask & RELOAD_REG_INDEXED) != 0;
+	  else
+	    valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+	}
     }
 
   else if (REG_P (new_addr) || SUBREG_P (new_addr))
