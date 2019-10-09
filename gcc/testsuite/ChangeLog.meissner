@@ -1,5 +1,11 @@
 2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/pcrel-opt-di.c: Update test.
+	* gcc.target/powerpc/pcrel-opt-di2.c: Update test.
+	* gcc.target/powerpc/pcrel-opt-di3.c: Update test.
+
+2019-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-pcrel-dd.c: Update PC-relative
 	addressing tests.
 	* gcc.target/powerpc/prefix-pcrel-df.c: Likewise.

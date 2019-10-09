@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-require-effective-target powerpc_future_ok } */
+/* { dg-require-effective-target powerpc_pcrel_ok } */
 /* { dg-options "-mdejagnu-cpu=future -O2" } */
 
 /* Verify that we do not generate PCREL_OPT relocations if the resulting

@@ -1,6 +1,5 @@
 /* { dg-do compile } */
-/* { dg-require-effective-target powerpc_elfv2 } */
-/* { dg-require-effective-target powerpc_future_ok } */
+/* { dg-require-effective-target powerpc_pcrel_ok } */
 /* { dg-options "-mdejagnu-cpu=future -O2" } */
 
 /* Determine if the pc-relative optimization using the R_PPC64_PCREL_OPT
