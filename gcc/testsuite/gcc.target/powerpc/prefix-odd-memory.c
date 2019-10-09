@@ -1,5 +1,5 @@
-/* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
-/* { dg-require-effective-target powerpc_future_ok } */
+/* { dg-do compile } */
+/* { dg-require-effective-target powerpc_prefixed_addr_ok } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
 /* Tests whether we can generate a prefixed load/store operation for addresses

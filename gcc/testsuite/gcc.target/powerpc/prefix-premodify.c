@@ -1,5 +1,5 @@
-/* { dg-do compile { target { powerpc*-*-* } } } */
-/* { dg-require-effective-target powerpc_future_ok } */
+/* { dg-do compile } */
+/* { dg-require-effective-target powerpc_prefixed_addr_ok } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
 /* Make sure that we don't try to generate a prefixed form of the load and
