@@ -13271,7 +13271,10 @@ print_operand_address (FILE *file, rtx x)
       if (SYMBOL_REF_P (x) && !SYMBOL_REF_LOCAL_P (x))
 	fprintf (file, "@got");
 
-      fprintf (file, "@pcrel");
+      /* Specifically add (0),1 to catch uses where a @pcrel was added to a an
+	 address with a base register, since the hardware does not support
+	 adding a base register to a PC-relative address.  */
+      fprintf (file, "@pcrel(0),1");
     }
   else if (SYMBOL_REF_P (x) || GET_CODE (x) == CONST
 	   || GET_CODE (x) == LABEL_REF)
