@@ -1,7 +1,6 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/predicates.md (prefixed_mem_operand): New
-	predicate.
+	* config/rs6000/predicates.md (prefixed_memory): New predicate.
 	* config/rs6000/rs6000.md (stack_protect_setdi): Deal with either
 	address being a prefixed load/store.
 	(stack_protect_testdi): Deal with either address being a prefixed
