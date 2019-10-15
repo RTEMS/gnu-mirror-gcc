@@ -1822,3 +1822,24 @@
 {
   return address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
 })
+
+;; Return true if the operand is a memory address that does not use a prefixed
+;; address.
+(define_predicate "non_prefixed_memory"
+  (match_code "mem")
+{
+  /* If the operand is not a valid memory operand even if it is not prefixed,
+     do not return true.  */
+  if (!memory_operand (op, mode))
+    return false;
+
+  return !address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+})
+
+;; Return true if the operand is either a register or it is a non-prefixed
+;; memory operand.
+(define_predicate "reg_or_non_prefixed_memory"
+  (match_code "reg,subreg,mem")
+{
+  return gpc_reg_operand (op, mode) || non_prefixed_memory (op, mode);
+})

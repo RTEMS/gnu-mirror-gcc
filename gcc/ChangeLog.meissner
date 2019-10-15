@@ -1,5 +1,27 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	non-prefixed memory.
+	* config/rs6000/predicates.md (non_prefixed_memory): New
+	predicate.
+	(reg_or_non_prefixed_memory): New predicate.
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
+	for optimizing extracting a constant vector element from a vector
+	that uses a prefixed address.  If the element number is variable
+	and the address uses a prefixed address, abort.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Do not allow combining prefixed memory with a variable vector
+	extract.
+	(vsx_extract_v4sf_var): Do not allow combining prefixed memory
+	with a variable vector extract.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Do not allow
+	combining prefixed memory with a variable vector extract.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Do not allow combining
+	prefixed memory with a variable vector extract.
+	* doc/md.texi (PowerPC constraints): Document the em constraint.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (prefixed_memory): New predicate.
 	* config/rs6000/rs6000.md (stack_protect_setdi): Deal with either
 	address being a prefixed load/store.
