@@ -1,5 +1,14 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (prefixed_mem_operand): New
+	predicate.
+	* config/rs6000/rs6000.md (stack_protect_setdi): Deal with either
+	address being a prefixed load/store.
+	(stack_protect_testdi): Deal with either address being a prefixed
+	load.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (lwa_operand): If the bottom two
 	bits of the offset for the memory address are non-zero, use PLWA
 	if prefixed instructions are available.
