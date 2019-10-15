@@ -1,5 +1,15 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Reformat.
+	(movtd_64bit_nodm): Reformat.
+	(mov<mode>_32bit): Reformat.
+	(mov<mode>_softfloat): Reformat.
+	(FMOVE128_GPR splitter): Reformat.
+	(DIFD splitter): Reformat.
+	(TI2 splitter): Reformat.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_insn_cost): Use num_insns insn
 	attribute if it exists, rather than the insn size.  If we use the
 	insn size, adjust the size to remove the extra size that prefixed
