@@ -1,5 +1,11 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (lwa_operand): If the bottom two
+	bits of the offset for the memory address are non-zero, use PLWA
+	if prefixed instructions are available.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_64bit_dm): Reformat.
 	(movtd_64bit_nodm): Reformat.
 	(mov<mode>_32bit): Reformat.
