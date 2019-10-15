@@ -20973,14 +20973,32 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (recog_memoized (insn) < 0)
     return 0;
 
+  /* If we are optimizing for size, just use the length.  */
   if (!speed)
     return get_attr_length (insn);
 
+  /* Use the cost if provided.  */
   int cost = get_attr_cost (insn);
   if (cost > 0)
     return cost;
 
-  int n = get_attr_length (insn) / 4;
+  /* If the insn tells us how many insns there are, use that.  Otherwise use
+     the length/4.  Adjust the insn length to remove the extra size that
+     prefixed instructions take.  */
+  int n = get_attr_num_insns (insn);
+  if (n == 0)
+    {
+      int length = get_attr_length (insn);
+      if (get_attr_prefixed (insn) == PREFIXED_YES)
+	{
+	  int adjust = 0;
+	  ADJUST_INSN_LENGTH (insn, adjust);
+	  length -= adjust;
+	}
+
+      n = length / 4;
+    }
+
   enum attr_type type = get_attr_type (insn);
 
   switch (type)
