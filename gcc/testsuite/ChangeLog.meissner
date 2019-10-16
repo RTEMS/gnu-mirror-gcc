@@ -1,3 +1,15 @@
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-premodify.c: New test to make sure we
+	do not generate PRE_INC, PRE_DEC, or PRE_MODIFY on prefixed loads
+	or stores.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-odd-memory.c: New test to make sure
+	prefixed instructions are generated if an offset would not be
+	legal for the non-prefixed DS/DQ instructions.
+
 2019-10-15   Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/paddi-1.c: New test to test using PLI to

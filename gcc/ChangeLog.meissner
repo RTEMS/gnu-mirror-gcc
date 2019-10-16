@@ -1,11 +1,5 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc.target/powerpc/prefix-odd-memory.c: New test to make sure
-	prefixed instructions are generated if an offset would not be
-	legal for the non-prefixed DS/DQ instructions.
-
-2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
-
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
 	prefixed addressing by default.
 	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.
