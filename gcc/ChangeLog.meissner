@@ -1,5 +1,10 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (print_operand_address): Add (0),1 to
+	@pcrel to catch errant usage.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable
 	prefixed addressing by default.
 	(TARGET_PCREL_DEFAULT): Enable pc-relative addressing by default.
