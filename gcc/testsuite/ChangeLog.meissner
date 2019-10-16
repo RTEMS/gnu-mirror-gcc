@@ -1,5 +1,14 @@
 2019-10-15   Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/paddi-1.c: New test to test using PLI to
+	load up a large DImode constant.
+	* gcc.target/powerpc/paddi-2.c: New test to test using PLI to
+	load up a large SImode constant.
+	* gcc.target/powerpc/paddi-3.c: New test to test using PADDI to
+	add a large DImode constant.
+
+2019-10-15   Michael Meissner  <meissner@linux.ibm.com>
+
 	* lib/target-supports.exp
 	(check_effective_target_powerpc_future_ok): Do not require 64-bit
 	or Linux support before doing the test.  Use a 32-bit constant in
