@@ -5524,12 +5524,16 @@ static int
 num_insns_constant_gpr (HOST_WIDE_INT value)
 {
   /* signed constant loadable with addi */
-  if (((unsigned HOST_WIDE_INT) value + 0x8000) < 0x10000)
+  if (SIGNED_16BIT_OFFSET_P (value))
     return 1;
 
   /* constant loadable with addis */
   else if ((value & 0xffff) == 0
 	   && (value >> 31 == -1 || value >> 31 == 0))
+    return 1;
+
+  /* PADDI can support up to 34 bit signed integers.  */
+  else if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (value))
     return 1;
 
   else if (TARGET_POWERPC64)
@@ -20641,7 +20645,8 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    || outer_code == PLUS
 	    || outer_code == MINUS)
 	   && (satisfies_constraint_I (x)
-	       || satisfies_constraint_L (x)))
+	       || satisfies_constraint_L (x)
+	       || satisfies_constraint_eI (x)))
 	  || (outer_code == AND
 	      && (satisfies_constraint_K (x)
 		  || (mode == SImode

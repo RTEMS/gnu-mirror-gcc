@@ -1,5 +1,15 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add support for
+	PADDI to load up and/or add 34-bit integer constants.
+	(rs6000_rtx_costs): Treat constants loaded up with PADDI with the
+	same cost as normal 16-bit constants.
+	* config/rs6000/rs6000.md (movdi_internal64): Add support to load
+	up 34-bit integer constants with PADDI.
+	(movdi integer constant splitter): Add comment about PADDI.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (em constraint): New constraint for
 	non-prefixed memory.
 	* config/rs6000/predicates.md (non_prefixed_memory): New
