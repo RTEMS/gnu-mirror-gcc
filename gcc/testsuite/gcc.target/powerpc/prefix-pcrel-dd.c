@@ -3,9 +3,9 @@
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
 /* Tests for prefixed instructions testing whether pc-relative prefixed
-   instructions are generated for DFmode.  */
+   instructions are generated for SImode.  */
 
-#define TYPE double
+#define TYPE _Decimal64
 
 #include "prefix-pcrel.h"
 

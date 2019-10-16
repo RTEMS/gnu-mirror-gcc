@@ -3,11 +3,11 @@
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
 /* Tests for prefixed instructions testing whether pc-relative prefixed
-   instructions are generated for DFmode.  */
+   instructions are generated for unsigned DImode.  */
 
-#define TYPE double
+#define TYPE unsigned long
 
 #include "prefix-pcrel.h"
 
-/* { dg-final { scan-assembler-times {\mplfd\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mpstfd\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mpld\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mpstd\M} 2 } } */
