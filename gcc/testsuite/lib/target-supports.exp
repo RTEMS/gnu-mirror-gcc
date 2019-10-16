@@ -5307,22 +5307,60 @@ proc check_effective_target_powerpc_p9modulo_ok { } {
     }
 }
 
-# Return 1 if this is a PowerPC target supporting -mfuture.
-# Limit this to 64-bit linux systems for now until other
-# targets support FUTURE.
+# Return 1 if this is a PowerPC target supporting -mcpu=future.
 
 proc check_effective_target_powerpc_future_ok { } {
-    if { ([istarget powerpc64*-*-linux*]) } {
+    if { ([istarget powerpc*-*-*]) } {
 	return [check_no_compiler_messages powerpc_future_ok object {
 	    int main (void) {
 		long e;
-		asm ("pli %0,%1" : "=r" (e) : "n" (0x12345));
+		asm ("pli %0,%1" : "=r" (e) : "n" (0x1234));
 		return e;
 	    }
 	} "-mfuture"]
     } else {
 	return 0
     }
+}
+
+# Return 1 if this is a PowerPC target supporting -mcpu=future.  The compiler
+# must support large numeric prefixed addresses by default when -mfuture is
+# used.  We test loading up a large constant to verify that the full 34-bit
+# offset for prefixed instructions is supported and we check for a prefixed
+# load as well.
+
+proc check_effective_target_powerpc_prefixed_addr_ok { } {
+    if { ([istarget powerpc*-*-*]) } {
+	return [check_no_compiler_messages powerpc_prefixed_addr_ok object {
+	    int main (void) {
+		extern long l[];
+		long e, e2;
+		asm ("pli %0,%1" : "=r" (e) : "n" (0x12345678));
+		asm ("pld %0,0x12345678(%1)" : "=r" (e2) : "r" (& l[0]));
+		return e - e2;
+	    }
+	} "-mfuture"]
+    } else {
+	return 0
+    }
+}
+
+# Return 1 if this is a PowerPC target supporting -mfuture.  The compiler must
+# support PC-relative addressing when -mcpu=future is used to pass this test.
+
+proc check_effective_target_powerpc_pcrel_ok { } {
+    if { ([istarget powerpc*-*-*]) } {
+	return [check_no_compiler_messages powerpc_pcrel_ok object {
+	      int main (void) {
+		  static int s __attribute__((__used__));
+		  int e;
+		  asm ("plwa %0,s@pcrel(0),1" : "=r" (e));
+		  return e;
+	      }
+	  } "-mfuture"]
+      } else {
+	  return 0
+      }
 }
 
 # Return 1 if this is a PowerPC target supporting -mfloat128 via either
@@ -7223,6 +7261,7 @@ proc is-effective-target { arg } {
 	  "named_sections" { set selected [check_named_sections_available] }
 	  "gc_sections"    { set selected [check_gc_sections_available] }
 	  "cxa_atexit"     { set selected [check_cxa_atexit_available] }
+	  "powerpc_future_hw" { set selected [check_powerpc_future_hw_available] }
 	  default          { error "unknown effective target keyword `$arg'" }
 	}
     }

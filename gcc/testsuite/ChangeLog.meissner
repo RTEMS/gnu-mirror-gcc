@@ -1,3 +1,16 @@
+2019-10-15   Michael Meissner  <meissner@linux.ibm.com>
+
+	* lib/target-supports.exp
+	(check_effective_target_powerpc_future_ok): Do not require 64-bit
+	or Linux support before doing the test.  Use a 32-bit constant in
+	PLI.
+	(check_effective_target_powerpc_prefixed_addr_ok): New effective
+	target test to see if prefixed memory instructions are supported.
+	(check_effective_target_powerpc_pcrel_ok): New effective target
+	test to test whether PC-relative addressing is supported.
+	(is-effective-target): Add test for the PowerPC 'future' hardware
+	support.
+
 2019-10-14   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 276973
