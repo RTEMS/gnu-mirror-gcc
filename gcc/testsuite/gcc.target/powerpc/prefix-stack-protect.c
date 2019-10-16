@@ -2,7 +2,7 @@
 /* { dg-require-effective-target powerpc_prefixed_addr_ok } */
 /* { dg-options "-O2 -mdejagnu-cpu=future -fstack-protect-strong" } */
 
-/* Test that we can handle large stack frames with -mprefixed-addr.  */
+/* Test that we can handle large stack frames with -fstack-protect-strong.  */
 
 extern long foo (char *);
 
