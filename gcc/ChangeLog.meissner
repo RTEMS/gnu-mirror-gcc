@@ -1,5 +1,11 @@
 2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Add support for
+	PADDI.
+	* config/rs6000/rs6000.md (add<mode>3): Add support for PADDI.
+
+2019-10-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movsi_internal1): Add support to load
 	up 32-bit SImode integer constants with PADDI.
 	(movsi integer constant splitter): Do not split constant if PADDI
