@@ -1892,9 +1892,13 @@ gfc_get_symbol_decl (gfc_symbol * sym)
   if (sym->attr.associate_var)
     GFC_DECL_ASSOCIATE_VAR_P (decl) = 1;
 
+  /* We no longer mark __def_init as read-only so it does not take up
+     space in the read-only section and dan go into the BSS instead,
+     see PR 84487.  Marking this as artificial means that OpenMP will
+     treat this as predetermined shared.  */
   if (sym->attr.vtab
       || (sym->name[0] == '_' && gfc_str_startswith (sym->name, "__def_init")))
-    TREE_READONLY (decl) = 1;
+    DECL_ARTIFICIAL (decl) = 1;
 
   return decl;
 }
@@ -5862,9 +5866,11 @@ generate_local_decl (gfc_symbol * sym)
 	    }
 	  else if (warn_unused_dummy_argument)
 	    {
-	      gfc_warning (OPT_Wunused_dummy_argument,
-			   "Unused dummy argument %qs at %L", sym->name,
-			   &sym->declared_at);
+	      if (!sym->attr.artificial)
+		gfc_warning (OPT_Wunused_dummy_argument,
+			     "Unused dummy argument %qs at %L", sym->name,
+			     &sym->declared_at);
+
 	      if (sym->backend_decl != NULL_TREE)
 		TREE_NO_WARNING(sym->backend_decl) = 1;
 	    }
@@ -5956,7 +5962,14 @@ generate_local_decl (gfc_symbol * sym)
 
       if (sym->ns && sym->ns->construct_entities)
 	{
-	  if (sym->attr.referenced)
+	  /* Construction of the intrinsic modules within a BLOCK
+	     construct, where ONLY and RENAMED entities are included,
+	     seems to be bogus.  This is a workaround that can be removed
+	     if someone ever takes on the task to creating full-fledge
+	     modules.  See PR 69455.  */
+	  if (sym->attr.referenced
+	      && sym->from_intmod != INTMOD_ISO_C_BINDING
+	      && sym->from_intmod != INTMOD_ISO_FORTRAN_ENV)
 	    gfc_get_symbol_decl (sym);
 	  sym->mark = 1;
 	}
