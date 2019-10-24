@@ -2315,6 +2315,8 @@ process_alt_operands (int only_alternative)
 		  break;
 
 		reg:
+		  if (mode == BLKmode)
+		    break;
 		  this_alternative = reg_class_subunion[this_alternative][cl];
 		  IOR_HARD_REG_SET (this_alternative_set,
 				    reg_class_contents[cl]);
@@ -2325,8 +2327,6 @@ process_alt_operands (int only_alternative)
 		      IOR_HARD_REG_SET (this_costly_alternative_set,
 					reg_class_contents[cl]);
 		    }
-		  if (mode == BLKmode)
-		    break;
 		  winreg = true;
 		  if (REG_P (op))
 		    {
@@ -5767,6 +5767,9 @@ invariant_p (const_rtx x)
   enum rtx_code code;
   int i, j;
 
+  if (side_effects_p (x))
+    return false;
+
   code = GET_CODE (x);
   mode = GET_MODE (x);
   if (code == SUBREG)
@@ -6293,6 +6296,7 @@ inherit_in_ebb (rtx_insn *head, rtx_insn *tail)
 			add_to_hard_reg_set (&s, PSEUDO_REGNO_MODE (dst_regno),
 					     reg_renumber[dst_regno]);
 		      AND_COMPL_HARD_REG_SET (live_hard_regs, s);
+		      AND_COMPL_HARD_REG_SET (potential_reload_hard_regs, s);
 		    }
 		  /* We should invalidate potential inheritance or
 		     splitting for the current insn usages to the next

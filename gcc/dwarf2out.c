@@ -9343,7 +9343,6 @@ size_of_die (dw_die_ref die)
 	  }
 	  break;
 	case dw_val_class_loc_list:
-	case dw_val_class_view_list:
 	  if (dwarf_split_debug_info && dwarf_version >= 5)
 	    {
 	      gcc_assert (AT_loc_list (a)->num_assigned);
@@ -9351,6 +9350,9 @@ size_of_die (dw_die_ref die)
 	    }
           else
             size += DWARF_OFFSET_SIZE;
+	  break;
+	case dw_val_class_view_list:
+	  size += DWARF_OFFSET_SIZE;
 	  break;
 	case dw_val_class_range_list:
 	  if (value_format (a) == DW_FORM_rnglistx)
@@ -9725,12 +9727,12 @@ value_format (dw_attr_node *a)
 	  gcc_unreachable ();
 	}
     case dw_val_class_loc_list:
-    case dw_val_class_view_list:
       if (dwarf_split_debug_info
 	  && dwarf_version >= 5
 	  && AT_loc_list (a)->num_assigned)
 	return DW_FORM_loclistx;
       /* FALLTHRU */
+    case dw_val_class_view_list:
     case dw_val_class_range_list:
       /* For range lists in DWARF 5, use DW_FORM_rnglistx from .debug_info.dwo
 	 but in .debug_info use DW_FORM_sec_offset, which is shorter if we
@@ -17891,6 +17893,8 @@ resolve_args_picking_1 (dw_loc_descr_ref loc, unsigned initial_frame_offset,
 	case DW_OP_push_object_address:
 	case DW_OP_call_frame_cfa:
 	case DW_OP_GNU_variable_value:
+	case DW_OP_GNU_addr_index:
+	case DW_OP_GNU_const_index:
 	  ++frame_offset_;
 	  break;
 
@@ -19673,6 +19677,9 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
 
     case HIGH:
     case CONST_FIXED:
+    case MINUS:
+    case SIGN_EXTEND:
+    case ZERO_EXTEND:
       return false;
 
     case MEM:
@@ -22214,19 +22221,18 @@ gen_formal_parameter_die (tree node, tree origin, bool emit_name_p,
       /* If the contexts differ, we may not be talking about the same
 	 thing.
 	 ???  When in LTO the DIE parent is the "abstract" copy and the
-	 context_die is the specification "copy".  But this whole block
-	 should eventually be no longer needed.  */
-      if (parm_die && parm_die->die_parent != context_die && !in_lto_p)
+	 context_die is the specification "copy".  */
+      if (parm_die
+	  && parm_die->die_parent != context_die
+	  && (parm_die->die_parent->die_tag != DW_TAG_GNU_formal_parameter_pack
+	      || parm_die->die_parent->die_parent != context_die)
+	  && !in_lto_p)
 	{
-	  if (!DECL_ABSTRACT_P (node))
-	    {
-	      /* This can happen when creating an inlined instance, in
-		 which case we need to create a new DIE that will get
-		 annotated with DW_AT_abstract_origin.  */
-	      parm_die = NULL;
-	    }
-	  else
-	    gcc_unreachable ();
+	  gcc_assert (!DECL_ABSTRACT_P (node));
+	  /* This can happen when creating a concrete instance, in
+	     which case we need to create a new DIE that will get
+	     annotated with DW_AT_abstract_origin.  */
+	  parm_die = NULL;
 	}
 
       if (parm_die && parm_die->die_parent == NULL)
@@ -26585,16 +26591,12 @@ dwarf2out_late_global_decl (tree decl)
     {
       dw_die_ref die = lookup_decl_die (decl);
 
-      /* We may have to generate early debug late for LTO in case debug
+      /* We may have to generate full debug late for LTO in case debug
          was not enabled at compile-time or the target doesn't support
 	 the LTO early debug scheme.  */
       if (! die && in_lto_p)
-	{
-	  dwarf2out_decl (decl);
-	  die = lookup_decl_die (decl);
-	}
-
-      if (die)
+	dwarf2out_decl (decl);
+      else if (die)
 	{
 	  /* We get called via the symtab code invoking late_global_decl
 	     for symbols that are optimized out.

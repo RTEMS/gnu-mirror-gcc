@@ -342,39 +342,45 @@ gfc_get_label_decl (gfc_st_label * lp)
     }
 }
 
+/* Return the name of an identifier.  */
+
+static const char *
+sym_identifier (gfc_symbol *sym)
+{
+  if (sym->attr.is_main_program && strcmp (sym->name, "main") == 0)
+    return "MAIN__";
+  else
+    return sym->name;
+}
 
 /* Convert a gfc_symbol to an identifier of the same name.  */
 
 static tree
 gfc_sym_identifier (gfc_symbol * sym)
 {
-  if (sym->attr.is_main_program && strcmp (sym->name, "main") == 0)
-    return (get_identifier ("MAIN__"));
-  else
-    return (get_identifier (sym->name));
+  return get_identifier (sym_identifier (sym));
 }
 
+/* Construct mangled name from symbol name.   */
 
-/* Construct mangled name from symbol name.  */
-
-static tree
-gfc_sym_mangled_identifier (gfc_symbol * sym)
+static const char *
+mangled_identifier (gfc_symbol *sym)
 {
-  char name[GFC_MAX_MANGLED_SYMBOL_LEN + 1];
-
+  static char name[GFC_MAX_MANGLED_SYMBOL_LEN + 1];
   /* Prevent the mangling of identifiers that have an assigned
      binding label (mainly those that are bind(c)).  */
+
   if (sym->attr.is_bind_c == 1 && sym->binding_label)
-    return get_identifier (sym->binding_label);
+    return sym->binding_label;
 
   if (!sym->fn_result_spec)
     {
       if (sym->module == NULL)
-	return gfc_sym_identifier (sym);
+	return sym_identifier (sym);
       else
 	{
 	  snprintf (name, sizeof name, "__%s_MOD_%s", sym->module, sym->name);
-	  return get_identifier (name);
+	  return name;
 	}
     }
   else
@@ -389,17 +395,40 @@ gfc_sym_mangled_identifier (gfc_symbol * sym)
 		    sym->ns->proc_name->module,
 		    sym->ns->proc_name->name,
 		    sym->name);
-	  return get_identifier (name);
+	  return name;
 	}
       else
 	{
 	  snprintf (name, sizeof name, "__%s_PROC_%s",
 		    sym->ns->proc_name->name, sym->name);
-	  return get_identifier (name);
+	  return name;
 	}
     }
 }
 
+/* Get mangled identifier, adding the symbol to the global table if
+   it is not yet already there.  */
+
+static tree
+gfc_sym_mangled_identifier (gfc_symbol * sym)
+{
+  tree result;
+  gfc_gsymbol *gsym;
+  const char *name;
+
+  name = mangled_identifier (sym);
+  result = get_identifier (name);
+
+  gsym = gfc_find_gsymbol (gfc_gsym_root, name);
+  if (gsym == NULL)
+    {
+      gsym = gfc_get_gsymbol (name, false);
+      gsym->ns = sym->ns;
+      gsym->sym_name = sym->name;
+    }
+
+  return result;
+}
 
 /* Construct mangled function name from symbol name.  */
 
@@ -839,7 +868,7 @@ gfc_get_module_backend_decl (gfc_symbol *sym)
 	{
 	  if (!gsym)
 	    {
-	      gsym = gfc_get_gsymbol (sym->module);
+	      gsym = gfc_get_gsymbol (sym->module, false);
 	      gsym->type = GSYM_MODULE;
 	      gsym->ns = gfc_get_namespace (NULL, 0);
 	    }
@@ -1865,7 +1894,7 @@ gfc_get_symbol_decl (gfc_symbol * sym)
 
   if (sym->attr.vtab
       || (sym->name[0] == '_' && strncmp ("__def_init", sym->name, 10) == 0))
-    TREE_READONLY (decl) = 1;
+    DECL_ARTIFICIAL (decl) = 1;
 
   return decl;
 }
@@ -1904,6 +1933,22 @@ get_proc_pointer_decl (gfc_symbol *sym)
 {
   tree decl;
   tree attributes;
+
+  if (sym->module || sym->fn_result_spec)
+    {
+      const char *name;
+      gfc_gsymbol *gsym;
+
+      name = mangled_identifier (sym);
+      gsym = gfc_find_gsymbol (gfc_gsym_root, name);
+      if (gsym != NULL)
+	{
+	  gfc_symbol *s;
+	  gfc_find_symbol (sym->name, gsym->ns, 0, &s);
+	  if (s && s->backend_decl)
+	    return s->backend_decl;
+	}
+    }
 
   decl = sym->backend_decl;
   if (decl)
@@ -2002,9 +2047,22 @@ gfc_get_extern_function_decl (gfc_symbol * sym, gfc_actual_arglist *actual_args)
     return get_proc_pointer_decl (sym);
 
   /* See if this is an external procedure from the same file.  If so,
-     return the backend_decl.  */
-  gsym =  gfc_find_gsymbol (gfc_gsym_root, sym->binding_label
-					   ? sym->binding_label : sym->name);
+     return the backend_decl.  If we are looking at a BIND(C)
+     procedure and the symbol is not BIND(C), or vice versa, we
+     haven't found the right procedure.  */
+
+  if (sym->binding_label)
+    {
+      gsym = gfc_find_gsymbol (gfc_gsym_root, sym->binding_label);
+      if (gsym && !gsym->bind_c)
+	gsym = NULL;
+    }
+  else
+    {
+      gsym = gfc_find_gsymbol (gfc_gsym_root, sym->name);
+      if (gsym && gsym->bind_c)
+	gsym = NULL;
+    }
 
   if (gsym && !gsym->defined)
     gsym = NULL;
@@ -2499,6 +2557,17 @@ create_function_arglist (gfc_symbol * sym)
 	  DECL_ARG_TYPE (length) = len_type;
 	  TREE_READONLY (length) = 1;
 	  gfc_finish_decl (length);
+
+	  /* Marking the length DECL_HIDDEN_STRING_LENGTH will lead
+	     to tail calls being disabled.  Only do that if we
+	     potentially have broken callers.  */
+	  if (flag_tail_call_workaround
+	      && f->sym->ts.u.cl
+	      && f->sym->ts.u.cl->length
+	      && f->sym->ts.u.cl->length->expr_type == EXPR_CONSTANT
+	      && (flag_tail_call_workaround == 2
+		  || f->sym->ns->implicit_interface_calls))
+	    DECL_HIDDEN_STRING_LENGTH (length) = 1;
 
 	  /* Remember the passed value.  */
           if (!f->sym->ts.u.cl ||  f->sym->ts.u.cl->passed_length)
@@ -5655,9 +5724,11 @@ generate_local_decl (gfc_symbol * sym)
 	    }
 	  else if (warn_unused_dummy_argument)
 	    {
-	      gfc_warning (OPT_Wunused_dummy_argument,
-			   "Unused dummy argument %qs at %L", sym->name,
-			   &sym->declared_at);
+	      if (!sym->attr.artificial)
+		gfc_warning (OPT_Wunused_dummy_argument,
+			     "Unused dummy argument %qs at %L", sym->name,
+			     &sym->declared_at);
+
 	      if (sym->backend_decl != NULL_TREE)
 		TREE_NO_WARNING(sym->backend_decl) = 1;
 	    }
@@ -5749,7 +5820,14 @@ generate_local_decl (gfc_symbol * sym)
 
       if (sym->ns && sym->ns->construct_entities)
 	{
-	  if (sym->attr.referenced)
+	  /* Construction of the intrinsic modules within a BLOCK
+	     construct, where ONLY and RENAMED entities are included,
+	     seems to be bogus.  This is a workaround that can be removed
+	     if someone ever takes on the task to creating full-fledge
+	     modules.  See PR 69455.  */
+	  if (sym->attr.referenced
+	      && sym->from_intmod != INTMOD_ISO_C_BINDING
+	      && sym->from_intmod != INTMOD_ISO_FORTRAN_ENV)
 	    gfc_get_symbol_decl (sym);
 	  sym->mark = 1;
 	}

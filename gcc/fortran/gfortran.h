@@ -1080,6 +1080,7 @@ typedef struct gfc_component
   struct gfc_typebound_proc *tb;
   /* When allocatable/pointer and in a coarray the associated token.  */
   tree caf_token;
+  bool finalized;
 }
 gfc_component;
 
@@ -1856,6 +1857,9 @@ typedef struct gfc_namespace
 
   /* Set to 1 for !$ACC ROUTINE namespaces.  */
   unsigned oacc_routine:1;
+
+  /* Set to 1 if there are any calls to procedures with implicit interface.  */
+  unsigned implicit_interface_calls:1;
 }
 gfc_namespace;
 
@@ -1883,6 +1887,7 @@ typedef struct gfc_gsymbol
   enum gfc_symbol_type type;
 
   int defined, used;
+  bool bind_c;
   locus where;
   gfc_namespace *ns;
 }
@@ -3059,7 +3064,7 @@ void gfc_enforce_clean_symbol_state (void);
 void gfc_free_dt_list (void);
 
 
-gfc_gsymbol *gfc_get_gsymbol (const char *);
+gfc_gsymbol *gfc_get_gsymbol (const char *, bool bind_c);
 gfc_gsymbol *gfc_find_gsymbol (gfc_gsymbol *, const char *);
 gfc_gsymbol *gfc_find_case_gsymbol (gfc_gsymbol *, const char *);
 
