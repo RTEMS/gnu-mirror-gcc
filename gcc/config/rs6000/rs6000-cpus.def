@@ -75,15 +75,21 @@
 				 | OPTION_MASK_P8_VECTOR		\
 				 | OPTION_MASK_P9_VECTOR)
 
-/* Support for a future processor's features.  Do not enable -mpcrel until it
-   is fully functional.  */
+/* Support for a future processor's features.  The prefixed and pc-relative
+   addressing bits are not added here.  Instead, rs6000.c adds them if the OS
+   tm.h says that it supports the addressing modes.  */
 #define ISA_FUTURE_MASKS_SERVER	(ISA_3_0_MASKS_SERVER			\
-				 | OPTION_MASK_FUTURE			\
+				 | OPTION_MASK_FUTURE)
+
+/* Addressing related flags on a future processor.  These flags are broken out
+   because not all targets will support either pc-relative addressing, or even
+   prefixed addressing, and we want to clear all of the addressing bits
+   on targets that cannot support prefixed/pcrel addressing.  */
+#define ADDRESSING_FUTURE_MASKS	(OPTION_MASK_PCREL			\
 				 | OPTION_MASK_PREFIXED_ADDR)
 
 /* Flags that need to be turned off if -mno-future.  */
-#define OTHER_FUTURE_MASKS	(OPTION_MASK_PCREL			\
-				 | OPTION_MASK_PREFIXED_ADDR)
+#define OTHER_FUTURE_MASKS	ADDRESSING_FUTURE_MASKS
 
 /* Flags that need to be turned off if -mno-power9-vector.  */
 #define OTHER_P9_VECTOR_MASKS	(OPTION_MASK_FLOAT128_HW		\
