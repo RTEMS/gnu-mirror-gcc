@@ -1,5 +1,23 @@
 2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/pcrel-opt.c (pcrel_opt::do_pcrel_opt_load): Add
+	support to do the PCREL_OPT optimization with sign, zero, and
+	float extension.
+	* config/rs6000/rs6000.md (pcrel_opt_ldsi_sext<mode>): New insns
+	for applying the PCREL_OPT optimization to SImode sign extension.
+	(pcrel_opt_ldhi_sext<mode>): New insns for applying the PCREL_OPT
+	optimization to HImode sign extension.
+	(pcrel_opt_ldsi_zext<mode>): New insns for applying the PCREL_OPT
+	optimization to SImode zero extension.
+	(pcrel_opt_ldhi_zext<mode>): New insns for applying the PCREL_OPT
+	optimization to HImode zero extension.
+	(pcrel_opt_ldqi_zext<mode>): New insns for applying the PCREL_OPT
+	optimization to QImode zero extension.
+	(pcrel_opt_ldsf_extend): New insns for applying the PCREL_OPT
+	optimization to SFmode float extension.
+
+2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/pcrel-opt.c: New file to implement the PCREL_OPT
 	optimization as a new pass.
 	* config/rs6000/rs6000-passes.def: Add comment for the analyze

@@ -223,6 +223,27 @@ pcrel_opt::do_pcrel_opt_load (rtx_insn *got_insn,	// insn loading GOT
   rtx mem_inner = mem;
   unsigned int reg_regno = reg_or_subregno (reg);
 
+  // LWA is a DS format instruction, but LWZ is a D format instruction.  We use
+  // DImode for the mode to force checking whether the bottom 2 bits are 0.
+  // However FPR and vector registers uses the LFIWAX instruction which is
+  // indexed only.
+  if (GET_CODE (mem) == SIGN_EXTEND && GET_MODE (XEXP (mem, 0)) == SImode)
+    {
+      if (!INT_REGNO_P (reg_regno))
+	return false;
+
+      mem_inner = XEXP (mem, 0);
+      mem_mode = DImode;
+    }
+
+  else if (GET_CODE (mem) == SIGN_EXTEND
+	   || GET_CODE (mem) == ZERO_EXTEND
+	   || GET_CODE (mem) == FLOAT_EXTEND)
+    {
+      mem_inner = XEXP (mem, 0);
+      mem_mode = GET_MODE (mem_inner);
+    }
+
   if (!MEM_P (mem_inner))
     return false;
 
@@ -275,8 +296,9 @@ pcrel_opt::do_pcrel_opt_load (rtx_insn *got_insn,	// insn loading GOT
       return false;
     }
 
-  // Update the load insn.  Add an explicit clobber of the GOT register just in
-  // case something runs after this pass.
+  // Update the load insn.  If the mem had a sign/zero/float extend, add that
+  // also after doing the UNSPEC.  Add an explicit clobber of the GOT register
+  // just in case something runs after this pass.
   //
   // (parallel [(set (reg)
   //                 (unspec:<MODE> [(mem (got)
@@ -287,6 +309,9 @@ pcrel_opt::do_pcrel_opt_load (rtx_insn *got_insn,	// insn loading GOT
   rtvec v_load = gen_rtvec (2, mem_inner, label_num);
   rtx new_load = gen_rtx_UNSPEC (GET_MODE (mem_inner), v_load,
 				 UNSPEC_PCREL_OPT_LD_RELOC);
+
+  if (GET_CODE (mem) != GET_CODE (mem_inner))
+    new_load = gen_rtx_fmt_e (GET_CODE (mem), reg_mode, new_load);
 
   rtx old_load_set = PATTERN (load_insn);
   rtx new_load_set = gen_rtx_SET (reg, new_load);
@@ -484,11 +509,21 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
     {
       reg = SET_DEST (load_set);
       mem = SET_SRC (load_set);
-      if (!MEM_P (mem))
-	return;
+      switch (GET_CODE (mem))
+	{
+	case MEM:
+	  break;
 
-      if (!REG_P (reg) && !SUBREG_P (reg))
-	return;
+	case SIGN_EXTEND:
+	case ZERO_EXTEND:
+	case FLOAT_EXTEND:
+	  if (!MEM_P (XEXP (mem, 0)))
+	    return;
+	  break;
+
+	default:
+	  return;
+	}
 
       // If there were any stores in the insns between loading the GOT address
       // and doing the load, turn off the optimization.
@@ -497,6 +532,9 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
     }
 
   else
+    return;
+
+  if (!REG_P (reg) && !SUBREG_P (reg))
     return;
 
   machine_mode mode = GET_MODE (reg);
