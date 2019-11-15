@@ -4213,7 +4213,7 @@ rs6000_option_override_internal (bool global_init_p)
 	  if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	    error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
 
-	  rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+	  rs6000_isa_flags &= ~(OPTION_MASK_PCREL | OPTION_MASK_PCREL_OPT);
 	}
 
       /* Enable defaults if desired.  */
@@ -4227,7 +4227,8 @@ rs6000_option_override_internal (bool global_init_p)
 
 	  if (!explicit_pcrel && TARGET_PCREL_DEFAULT
 	      && TARGET_CMODEL == CMODEL_MEDIUM)
-	    rs6000_isa_flags |= OPTION_MASK_PCREL;
+	    rs6000_isa_flags |= (OPTION_MASK_PCREL
+				 | OPTION_MASK_PCREL_OPT);
 	}
     }
 
@@ -4248,7 +4249,17 @@ rs6000_option_override_internal (bool global_init_p)
       if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs", "-mpcrel", "-mprefixed-addr");
 
-      rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+      rs6000_isa_flags &= ~(OPTION_MASK_PCREL
+			    | OPTION_MASK_PCREL_OPT);
+    }
+
+  /* Check -mfuture debug switches.  */
+  if (!TARGET_PCREL && TARGET_PCREL_OPT)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL_OPT) != 0)
+	error ("%qs requires %qs", "-mpcrel-opt", "-mpcrel");
+
+      rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
     }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -8379,7 +8390,9 @@ rs6000_delegitimize_address (rtx orig_x)
 {
   rtx x, y, offset;
 
-  if (GET_CODE (orig_x) == UNSPEC && XINT (orig_x, 1) == UNSPEC_FUSION_GPR)
+  if (GET_CODE (orig_x) == UNSPEC
+      && (XINT (orig_x, 1) == UNSPEC_FUSION_GPR
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_GOT))
     orig_x = XVECEXP (orig_x, 0, 0);
 
   orig_x = delegitimize_mem_from_attrs (orig_x);
@@ -13014,6 +13027,19 @@ print_operand (FILE *file, rtx x, int code)
 	output_operand_lossage ("invalid %%R value");
       else
 	fprintf (file, "%d", 128 >> (REGNO (x) - CR0_REGNO));
+      return;
+
+    case 'r':
+      /* X is a label number for the PCREL_OPT optimization.  Emit the .reloc
+	 to enable this optimization, unless the value is 0.  */
+      gcc_assert (CONST_INT_P (x));
+      if (UINTVAL (x) != 0)
+	{
+	  unsigned int label_num = UINTVAL (x);
+	  fprintf (file,
+		   ".reloc .Lpcrel%u-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%u-8)\n\t",
+		   label_num, label_num);
+	}
       return;
 
     case 's':
@@ -22950,6 +22976,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
+  { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
@@ -24911,8 +24938,32 @@ address_to_insn_form (rtx addr,
      local.  */
   if (TARGET_PCREL)
     {
+      /* Special case the PCREL_OPT optimization to only allow offsets that can
+	 fit in the worst case instruction format.  This test is done before
+	 register allocation, so we might miss an occasionally offset that
+	 could have been used in some cases (for example, a SImode that isn't
+	 sign extended or a floating point scalar that is loaded into the
+	 traditional FPR registers instead of the traditional Altivec
+	 registers).  */
       if (SYMBOL_REF_P (op0) && !SYMBOL_REF_LOCAL_P (op0))
-	return INSN_FORM_PCREL_EXTERNAL;
+	{
+	  if (non_prefixed_format == NON_PREFIXED_PCREL_OPT)
+	    {
+	      if (!SIGNED_16BIT_OFFSET_P (offset))
+		return INSN_FORM_BAD;
+
+	      unsigned int size = GET_MODE_SIZE (mode);
+	      if (size >= 16 && (offset & 0xf) != 0)
+		return INSN_FORM_BAD;
+
+	      /* SImode might be sign extended (DS format).  SFmode and DFmode
+		 might be loaded into Altivec registers (DS format).  */
+	      if (size >= 4 && (offset & 0x2) != 0)
+		return INSN_FORM_BAD;
+	    }
+
+	  return INSN_FORM_PCREL_EXTERNAL;
+	}
 
       if (SYMBOL_REF_P (op0) || LABEL_REF_P (op0))
 	return INSN_FORM_PCREL_LOCAL;
@@ -24948,6 +24999,24 @@ address_to_insn_form (rtx addr,
       else if (TARGET_VSX && size >= 16
 	       && (VECTOR_MODE_P (mode) || FLOAT128_VECTOR_P (mode)))
 	non_prefixed_format = NON_PREFIXED_DQ;
+
+      else
+	non_prefixed_format = NON_PREFIXED_D;
+    }
+
+  /* If we are validating the load or store off of the external pointer, be
+     stricter in terms of the offset allowed.  */
+  else if (non_prefixed_format == NON_PREFIXED_PCREL_OPT)
+    {
+      unsigned int size = GET_MODE_SIZE (mode);
+
+      if (size >= 16 && (offset & 0xf) != 0)
+	non_prefixed_format = NON_PREFIXED_DQ;
+
+      /* SImode might be sign extended (DS format).  SFmode and DFmode might be
+	 loaded into Altivec registers (DS format).  */
+      else if (size >= 4 && (offset & 0x2) != 0)
+	non_prefixed_format = NON_PREFIXED_DS;
 
       else
 	non_prefixed_format = NON_PREFIXED_D;
@@ -24992,7 +25061,7 @@ address_to_insn_form (rtx addr,
 /* Helper function to take a REG and a MODE and turn it into the non-prefixed
    instruction format (D/DS/DQ) used for offset memory.  */
 
-static enum non_prefixed_form
+enum non_prefixed_form
 reg_to_non_prefixed (rtx reg, machine_mode mode)
 {
   /* If it isn't a register, use the defaults.  */
@@ -25199,7 +25268,14 @@ void
 rs6000_asm_output_opcode (FILE *stream)
 {
   if (next_insn_prefixed_p)
-    fprintf (stream, "p");
+    {
+      fprintf (stream, "p");
+
+      /* Reset flag in case there are separate insn lines in the sequence, so
+	 the 'p' is only emited for the first line.  This shows up in
+	 pcrel_opt_ld_got.  */
+      next_insn_prefixed_p = false;
+    }
 
   return;
 }
