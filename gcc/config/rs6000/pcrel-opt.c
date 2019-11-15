@@ -19,8 +19,8 @@
 
 /* This file implements a RTL pass that looks for pc-relative loads of the
    address of an external variable using the PCREL_GOT relocation and a single
-   load that uses that GOT pointer.  If that is found we create the PCREL_OPT
-   relocation to possibly convert:
+   load/store that uses that GOT pointer.  If that is found we create the
+   PCREL_OPT relocation to possibly convert:
 
 	pld b,var@pcrel@got(0),1
 
@@ -98,8 +98,8 @@ const pass_data pass_data_pcrel_opt =
   TODO_df_finish,		// todo_flags_finish
 };
 
-// Maximum number of insns to scan between the load address and the load that
-// uses that address.
+// Maximum number of insns to scan between the load address and the load or
+// store that uses that address.
 const int MAX_PCREL_OPT_INSNS	= 10;
 
 /* Next PCREL_OPT label number.  */
@@ -119,11 +119,16 @@ private:
   // Optimize a particular PC-relative load
   bool do_pcrel_opt_load (rtx_insn *, rtx_insn *);
 
+  // Optimize a particular PC-relative store
+  bool do_pcrel_opt_store (rtx_insn *, rtx_insn *);
+
   // Various counters
   struct {
     unsigned long gots;
     unsigned long loads;
     unsigned long load_separation[MAX_PCREL_OPT_INSNS+1];
+    unsigned long stores;
+    unsigned long store_separation[MAX_PCREL_OPT_INSNS+1];
   } counters;
 
 public:
@@ -340,6 +345,154 @@ pcrel_opt::do_pcrel_opt_load (rtx_insn *got_insn,	// insn loading GOT
 }
 
 
+// Optimize a PC-relative load address to be used in a store.
+
+// If the sequence of insns is safe to use the PCREL_OPT optimization (i.e. no
+// additional references to the address register, the address register dies at
+// the load, and no references to the load), convert insns of the form:
+//
+//	(set (reg:DI addr)
+//	     (symbol_ref:DI "ext_symbol"))
+//
+//	...
+//
+//	(set (mem:<MODE> (reg:DI addr))
+//	     (reg:<MODE> value))
+//
+// into:
+//
+//	(parallel [(set (reg:DI addr)
+//                      (unspec:DI [(symbol_ref:DI "ext_symbol")
+//                                  (const_int label_num)]
+//                                 UNSPEC_PCREL_OPT_ST_GOT))
+//                 (use (reg:<MODE> value))])
+//
+//	...
+//
+//	(parallel [(set (mem:<MODE> (reg:DI addr))
+//                      (unspec:<MODE> [(reg:<MODE>)
+//                                      (const_int label_num)]
+//                                     UNSPEC_PCREL_OPT_ST_RELOC))
+//                 (clobber (reg:DI addr))])
+//
+//
+// The UNSPEC_PCREL_OPT_ST_GOT insn will generate the load address plus a
+// definition of a label (.Lpcrel<n>), while the UNSPEC_PCREL_OPT_ST_RELOC insn
+// will generate the .reloc to tell the linker to tie the load address and load
+// using that address together.
+//
+//	pld b,ext_symbol@got@pcrel(0),1
+// .Lpcrel1:
+//
+//	...
+//
+//	.reloc .Lpcrel1-8,R_PPC64_PCREL_OPT,.-(.Lpcrel1-8)
+//	stw r,0(b)
+//
+// If ext_symbol is defined in another object file in the main program and we
+// are linking the main program, the linker will convert the above instructions
+// to:
+//
+//	pstwz r,ext_symbol@got@pcrel(0),1
+//
+//	...
+//
+//	nop
+//
+// Return the number of insns between the load of the GOT address and the
+// actual load or 0 if the load of the GOT address could not be combined with a
+// load with the PCREL_OPT optimization (i.e. if the load of the GOT address
+// was adjacent to the load that uses that GOT address, 1 would be returned)..
+//
+// Return true if the PCREL_OPT store optimization succeeded.
+
+bool
+pcrel_opt::do_pcrel_opt_store (rtx_insn *got_insn,	// insn loading GOT
+			       rtx_insn *store_insn)	// insn using GOT
+{
+  rtx got_set = PATTERN (got_insn);
+  rtx got = SET_DEST (got_set);
+  rtx got_addr = SET_SRC (got_set);
+  rtx store_set = single_set (store_insn);
+  rtx mem = SET_DEST (store_set);
+  rtx reg = SET_SRC (store_set);
+  machine_mode mem_mode = GET_MODE (mem);
+
+  // If this is LFIWAX or similar instructions that are indexed only, we can't
+  // do the optimization.
+  enum non_prefixed_form non_prefixed = reg_to_non_prefixed (reg, mem_mode);
+  if (non_prefixed == NON_PREFIXED_X)
+    return false;
+
+  // The optimization will only work on non-prefixed offsettable loads.
+  rtx addr = XEXP (mem, 0);
+  enum insn_form iform = address_to_insn_form (addr, mem_mode, non_prefixed);
+  if (iform != INSN_FORM_BASE_REG
+      && iform != INSN_FORM_D
+      && iform != INSN_FORM_DS
+      && iform != INSN_FORM_DQ)
+    return false;
+
+  // Allocate a new PC-relative label, and update the GOT insn.
+
+  ++pcrel_opt_next_num;
+  rtx label_num = GEN_INT (pcrel_opt_next_num);
+  rtvec v_got = gen_rtvec (2, got_addr, label_num);
+  rtx got_unspec = gen_rtx_UNSPEC (Pmode, v_got, UNSPEC_PCREL_OPT_ST_GOT);
+  rtx got_new_set = gen_rtx_SET (got, got_unspec);
+  rtx got_use = gen_rtx_USE (VOIDmode, reg);
+
+  PATTERN (got_insn)
+    = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, got_new_set, got_use));
+
+  // Revalidate the insn, backing out of the optimization if the insn is not
+  // supported.
+  INSN_CODE (got_insn) = recog (PATTERN (got_insn), got_insn, 0);
+  if (INSN_CODE (got_insn) < 0)
+    {
+      PATTERN (got_insn) = got_set;
+      INSN_CODE (got_insn) = recog (PATTERN (got_insn), got_insn, 0);
+      return false;
+    }
+
+  // Update the store insn.  Add an explicit clobber of the GOT register just
+  // in case something runs after this pass.
+  //
+  // (parallel [(set (mem (got)
+  //                 (unspec:<MODE> [(reg)
+  //                                 (const_int label_num)]
+  //                                UNSPEC_PCREL_OPT_ST_RELOC))
+  //            (clobber (reg:DI got))])
+
+  rtvec v_store = gen_rtvec (2, reg, label_num);
+  rtx new_store = gen_rtx_UNSPEC (mem_mode, v_store,
+				  UNSPEC_PCREL_OPT_ST_RELOC);
+
+  rtx old_store_set = PATTERN (store_insn);
+  rtx new_store_set = gen_rtx_SET (mem, new_store);
+  rtx store_clobber = gen_rtx_CLOBBER (VOIDmode, got);
+
+  PATTERN (store_insn)
+    = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, new_store_set, store_clobber));
+
+  // Revalidate the insn, backing out of the optimization if the insn is not
+  // supported.
+
+  INSN_CODE (store_insn) = recog (PATTERN (store_insn), store_insn, 0);
+  if (INSN_CODE (store_insn) < 0)
+    {
+      PATTERN (got_insn) = got_set;
+      INSN_CODE (got_insn) = recog (PATTERN (got_insn), got_insn, 0);
+
+      PATTERN (store_insn) = old_store_set;
+      INSN_CODE (store_insn) = recog (PATTERN (store_insn), store_insn, 0);
+      return false;
+    }
+
+  return true;
+}
+
+
 /* Given an insn, find the next insn in the basic block.  Stop if we find a the
    end of a basic block, such as a label, call or jump, and return NULL.  */
 
@@ -434,7 +587,8 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
 		{
 		  rtx src = SET_SRC (set);
 		  if (GET_CODE (src) == UNSPEC
-		      && XINT (src, 1) == UNSPEC_PCREL_OPT_LD_GOT)
+		      && (XINT (src, 1) == UNSPEC_PCREL_OPT_LD_GOT
+			  || XINT (src, 1) == UNSPEC_PCREL_OPT_ST_GOT))
 		    {
 		      is_load = is_store = false;
 		      break;
@@ -495,10 +649,10 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
   if (!reg_referenced_p (got, PATTERN (insn)) || !dead_or_set_p (insn, got))
     return;
 
-  // If the last insn is not a load, we can't do the optimization.  If it is a
-  // load, get the register and memory.
-  rtx load_set = single_set (insn);
-  if (!load_set)
+  // If the last insn is not a load or store, we can't do the optimization.
+  // If it is a load or store, get the register and memory.
+  rtx load_store_set = single_set (insn);
+  if (!load_store_set)
     return;
 
   rtx reg = NULL_RTX;
@@ -507,8 +661,8 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
   // Get register and memory, and validate it.
   if (is_load)
     {
-      reg = SET_DEST (load_set);
-      mem = SET_SRC (load_set);
+      reg = SET_DEST (load_store_set);
+      mem = SET_SRC (load_store_set);
       switch (GET_CODE (mem))
 	{
 	case MEM:
@@ -528,6 +682,19 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
       // If there were any stores in the insns between loading the GOT address
       // and doing the load, turn off the optimization.
       if (had_store)
+	return;
+    }
+
+  else if (is_store)
+    {
+      reg = SET_SRC (load_store_set);
+      mem = SET_DEST (load_store_set);
+      if (!MEM_P (mem))
+	return;
+
+      // If there were any loads in the insns between loading the GOT address
+      // and doing the store, turn off the optimization.
+      if (had_load)
 	return;
     }
 
@@ -554,19 +721,29 @@ pcrel_opt::do_pcrel_opt_got_addr (rtx_insn *got_insn)
   if (mode == TFmode && !TARGET_IEEEQUAD)
     return;
 
-  // If the register being loaded was used or set between the load of the GOT
-  // address and the load using the GOT address, we can't do the optimization.
+  // If the register being loaded or stored was used or set between the load of
+  // the GOT address and the load or store using the address, we can't do the
+  // optimization.
   if (reg_used_between_p (reg, got_insn, insn)
       || reg_set_between_p (reg, got_insn, insn))
     return;
 
-  // Process the load in detail
+  // Process the load or store in detail
   if (is_load)
     {
       if (do_pcrel_opt_load (got_insn, insn))
 	{
 	  counters.loads++;
 	  counters.load_separation[num_insns-1]++;
+	}
+    }
+
+  else
+    {
+      if (do_pcrel_opt_store (got_insn, insn))
+	{
+	  counters.stores++;
+	  counters.store_separation[num_insns-1]++;
 	}
     }
 
@@ -592,7 +769,7 @@ pcrel_opt::do_pcrel_opt_pass (function *fun)
   df_set_flags (DF_DEFER_INSN_RESCAN | DF_LR_RUN_DCE);
 
   // Look at each basic block to see if there is a load of an external
-  // variable's GOT address, and a single load using that GOT address.
+  // variable's GOT address, and a single load/store using that GOT address.
   FOR_ALL_BB_FN (bb, fun)
     {
       FOR_BB_INSNS_SAFE (bb, insn, curr_insn)
@@ -645,6 +822,30 @@ pcrel_opt::do_pcrel_opt_pass (function *fun)
 			     counters.load_separation[i]);
 		}
 	    }
+
+	  if (!counters.stores)
+	    fprintf (dump_file,
+		     "No PCREL_OPT store optimizations were done\n");
+
+	  else
+	    {
+	      fprintf (dump_file, "# of PCREL_OPT stores = %lu\n",
+		       counters.stores);
+
+	      fprintf (dump_file, "# of adjacent PCREL_OPT stores = %lu\n",
+		       counters.store_separation[0]);
+
+	      for (int i = 1; i < MAX_PCREL_OPT_INSNS; i++)
+		{
+		  if (counters.store_separation[i])
+		    fprintf (dump_file,
+			     "# of PCREL_OPT stores separated by "
+			     "%d insn%s = %lu\n",
+			     i, (i == 1) ? "" : "s",
+			     counters.store_separation[i]);
+		}
+	    }
+
 	}
 
       fprintf (dump_file, "\n");
