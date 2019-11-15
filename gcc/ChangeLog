@@ -1,3 +1,51 @@
+2019-11-15  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* passes.c (skip_pass): Set epilogue_completed if skipping the
+	pro_and_epilogue pass.
+
+2019-11-15  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* passes.c (should_skip_pass_p): Always run "dfinish".
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	* ipa-inline.c (inline_small_functions): Move assignment
+	to next before call destroying edge.
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92039
+	PR tree-optimization/91975
+	* tree-ssa-loop-ivcanon.c (constant_after_peeling): Revert
+	previous change, treat invariants consistently as non-constant.
+	(tree_estimate_loop_size): Ternary ops with just the first op
+	constant are not optimized away.
+
+2019-11-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimplify.c (gimplify_call_expr): Don't call
+	omp_resolve_declare_variant after gimplification.
+	* omp-general.c (omp_context_selector_matches): For isa that might
+	match in some other function, defer if in declare simd function.
+	(omp_context_compute_score): Don't look for " score" in construct
+	trait set.  Set *score to -1 if it can't ever match.
+	(omp_resolve_declare_variant): If any variants need to be deferred,
+	don't punt immediately, but compute scores of all variants and if
+	ther eis a score winner that doesn't need to be deferred, return that.
+
+2019-11-15  Luo Xiong Hu  <luoxhu@linux.ibm.com>
+
+	* ipa-comdats.c: Fix comments typo.
+	* ipa-profile.c: Fix comments typo.
+	* tree-profile.c (gimple_gen_ic_profiler): Use the new variable
+	__gcov_indirect_call.counters and __gcov_indirect_call.callee.
+	(gimple_gen_ic_func_profiler): Likewise.
+	(pass_ipa_tree_profile::gate): Fix comments typo.
+
+2019-11-15  Xiong Hu Luo  <luoxhu@linux.ibm.com>
+
+	* ipa-inline.c (inline_small_functions): Update iterator of next.
+
 2019-11-14  Kwok Cheung Yeung  <kcy@codesourcery.com>
 
 	* lra-spills.c (assign_spill_hard_regs): Check that the spill
