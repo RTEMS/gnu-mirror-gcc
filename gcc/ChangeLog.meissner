@@ -1,3 +1,13 @@
+2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 278275.
+	* REVISION: Update subversion id.
+
+2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 278275.
+	* REVISION: Update subversion id.
+
 2019-11-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/linux64.h (TARGET_PREFIXED_ADDR_DEFAULT): Enable

@@ -39,7 +39,6 @@ enum value_range_kind
 
 class GTY((for_user)) value_range
 {
-  friend void range_tests ();
 public:
   value_range ();
   value_range (tree, tree, value_range_kind = VR_RANGE);
@@ -83,8 +82,8 @@ public:
   void dump () const;
 
   static bool supports_type_p (tree);
-  value_range normalize_symbolics () const;
-  value_range normalize_addresses () const;
+  void normalize_symbolics ();
+  void normalize_addresses ();
 
   static const unsigned int m_max_pairs = 2;
   bool contains_p (tree) const;
