@@ -1,3 +1,106 @@
+2019-11-15  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/m68k/linux.h (MUSL_DYNAMIC_LINKER): Define.
+
+2019-11-15  Nick Clifton  <nickc@redhat.com>
+	    Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/65649
+	* config/microblaze/microblaze.c (print_operand): Print value as long.
+
+2019-11-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-inline.c (edge_badness, inline_small_functions): Revert
+	accidental commit.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.h (FIXED_REGISTERS): Unfix frame pointer.
+	(CALL_USED_REGISTERS): Make frame pointer callee-saved.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.c (MAX_NORMAL_SGPR_COUNT, MAX_NORMAL_VGPR_COUNT): New.
+	(gcn_conditional_register_usage): Use constants in place of hard-coded
+	values.
+	(gcn_hsa_declare_function_name): Set lower bound for number of
+	SGPRs/VGPRs in non-leaf kernels to MAX_NORMAL_SGPR_COUNT and
+	MAX_NORMAL_VGPR_COUNT.
+
+2019-11-15  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-utils.h (ipa_remove_useless_jump_functions): Remove stray
+	declaration.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.c (default_requested_args): New.
+	(gcn_parse_amdgpu_hsa_kernel_attribute): Initialize requested args
+	set with default_requested_args.
+	(gcn_conditional_register_usage): Limit register usage of non-kernel
+	functions.  Reassign fixed registers if a non-standard set of args is
+	requested.
+	* config/gcn/gcn.h (FIXED_REGISTERS): Fix registers according to ABI.
+
+2019-11-15  Feng Xue  <fxue@os.amperecomputing.com>
+
+	PR ipa/92528
+	* ipa-prop.c (update_jump_functions_after_inlining): Invalidate
+	aggregate jump function when inlined-to caller has no edge summary.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.c (gcn_init_cumulative_args): Call reinit_regs.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.c (gcn_expand_prologue): Remove initialization and
+	prologue use of v0.
+	(print_operand_address): Use v1 for zero vector offset.
+
+2019-11-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/92515
+	* tree-vect-stmts.c (vectorizable_shift): Record incompatible op1
+	types when converting a vector/scalar shift into a vector/vector one,
+	using tree_nop_conversion_p instead of useless_type_conversion_p.
+	Move the conversion code to the transform block.
+
+2019-11-15  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* read-rtl-function.c
+	(function_reader::add_fixup_source_location): Take additional
+	parameter of a column.
+	(function_reader::maybe_read_location): Optionally parse column
+	information and pass to add_fixup_source_location.
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92512
+	* tree-vect-loop.c (check_reduction_path): Fix operand index
+	computability check.  Add check for second use in COND_EXPRs.
+
+2019-11-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/92515
+	* config/rs6000/rs6000-call.c (rs6000_gimple_fold_builtin): Use
+	VIEW_CONVERT_EXPR to reinterpret vectors as different types.
+
+2019-11-15  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* config/gcn/gcn.c (gcn_regno_reg_class): Return VCC_CONDITIONAL_REG
+	register class for VCC_LO and VCC_HI.
+	(gcn_spill_class): Use SGPR_REGS to spill registers in
+	VCC_CONDITIONAL_REG.
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92324
+	* tree-vect-loop.c (vect_create_epilog_for_reduction): Fix
+	singedness of SLP reduction epilouge operations.  Also reduce
+	the vector width for SLP reductions before doing elementwise
+	operations if possible.
+
 2019-11-15  Matthew Malcomson  <matthew.malcomson@arm.com>
 
 	* passes.c (skip_pass): Set epilogue_completed if skipping the

@@ -1,5 +1,15 @@
 2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
+	Merge up to 278331.
+	* REVISION: Update subversion id.
+
+2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 278331.
+	* REVISION: Update subversion id.
+
+2019-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/pcrel-opt.c: Update comments saying we support the
 	PCREL_OPT optimization for both loads and stores.
 	(class pcrel_opt): Add do_pcrel_opt_store declaration.  Add

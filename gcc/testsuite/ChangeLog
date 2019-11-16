@@ -1,3 +1,35 @@
+2019-11-15  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c2x-attr-deprecated-4.c, gcc.dg/c2x-attr-fallthrough-4.c,
+	gcc.dg/c2x-attr-maybe_unused-4.c: New tests.
+
+2019-11-15  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* g++.dg/warn/Walways-true-1.C: Check locations too.
+	* g++.dg/warn/Walways-true-2.C: Likewise.
+	* g++.dg/warn/Walways-true-3.C: Likewise.
+	* g++.dg/warn/Waddress-1.C: Check additional location.
+
+2019-11-15  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c2x-attr-maybe_unused-1.c,
+	gcc.dg/c2x-attr-maybe_unused-2.c,
+	gcc.dg/c2x-attr-maybe_unused-3.c: New tests.
+
+2019-11-15  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* gcc.dg/rtl/aarch64/rtl-handle-column-numbers.c: New test.
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92512
+	* gcc.dg/torture/pr92512.c: New testcase.
+
+2019-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92324
+	* gcc.dg/vect/pr92324-4.c: New testcase.
+
 2019-11-15  Paul Thomas  <pault@gcc.gnu.org>
 
 	PR fortran/69654

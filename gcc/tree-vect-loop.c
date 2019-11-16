@@ -2813,9 +2813,11 @@ pop:
 	  /* The following make sure we can compute the operand index
 	     easily plus it mostly disallows chaining via COND_EXPR condition
 	     operands.  */
-	  || (gimple_assign_rhs1 (use_stmt) != op
-	      && gimple_assign_rhs2 (use_stmt) != op
-	      && gimple_assign_rhs3 (use_stmt) != op))
+	  || (gimple_assign_rhs1_ptr (use_stmt) != path[i].second->use
+	      && (gimple_num_ops (use_stmt) <= 2
+		  || gimple_assign_rhs2_ptr (use_stmt) != path[i].second->use)
+	      && (gimple_num_ops (use_stmt) <= 3
+		  || gimple_assign_rhs3_ptr (use_stmt) != path[i].second->use)))
 	{
 	  fail = true;
 	  break;
@@ -2828,7 +2830,18 @@ pop:
       FOR_EACH_IMM_USE_STMT (op_use_stmt, imm_iter, op)
 	if (!is_gimple_debug (op_use_stmt)
 	    && flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt)))
-	  cnt++;
+	  {
+	    /* We want to allow x + x but not x < 1 ? x : 2.  */
+	    if (is_gimple_assign (op_use_stmt)
+		&& gimple_assign_rhs_code (op_use_stmt) == COND_EXPR)
+	      {
+		use_operand_p use_p;
+		FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
+		  cnt++;
+	      }
+	    else
+	      cnt++;
+	  }
       if (cnt != 1)
 	{
 	  fail = true;
@@ -4930,6 +4943,8 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
       bool reduce_with_shift;
       tree vec_temp;
 
+      gcc_assert (slp_reduc || new_phis.length () == 1);
+
       /* See if the target wants to do the final (shift) reduction
 	 in a vector mode of smaller size and first reduce upper/lower
 	 halves against each other.  */
@@ -4937,6 +4952,21 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
       tree stype = TREE_TYPE (vectype);
       unsigned nunits = TYPE_VECTOR_SUBPARTS (vectype).to_constant ();
       unsigned nunits1 = nunits;
+      if ((mode1 = targetm.vectorize.split_reduction (mode)) != mode
+	  && new_phis.length () == 1)
+	{
+	  nunits1 = GET_MODE_NUNITS (mode1).to_constant ();
+	  /* For SLP reductions we have to make sure lanes match up, but
+	     since we're doing individual element final reduction reducing
+	     vector width here is even more important.
+	     ???  We can also separate lanes with permutes, for the common
+	     case of power-of-two group-size odd/even extracts would work.  */
+	  if (slp_reduc && nunits != nunits1)
+	    {
+	      nunits1 = least_common_multiple (nunits1, group_size);
+	      gcc_assert (exact_log2 (nunits1) != -1 && nunits1 <= nunits);
+	    }
+	}
       if (!slp_reduc
 	  && (mode1 = targetm.vectorize.split_reduction (mode)) != mode)
 	nunits1 = GET_MODE_NUNITS (mode1).to_constant ();
@@ -4958,7 +4988,6 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
       new_temp = new_phi_result;
       while (nunits > nunits1)
 	{
-	  gcc_assert (!slp_reduc);
 	  nunits /= 2;
 	  vectype1 = get_related_vectype_for_scalar_type (TYPE_MODE (vectype),
 							  stype, nunits);
@@ -5113,6 +5142,8 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
 
 	  int vec_size_in_bits = tree_to_uhwi (TYPE_SIZE (vectype1));
 	  int element_bitsize = tree_to_uhwi (bitsize);
+	  tree compute_type = TREE_TYPE (vectype);
+	  gimple_seq stmts = NULL;
           FOR_EACH_VEC_ELT (new_phis, i, new_phi)
             {
               int bit_offset;
@@ -5120,12 +5151,8 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
                 vec_temp = PHI_RESULT (new_phi);
               else
                 vec_temp = gimple_assign_lhs (new_phi);
-              tree rhs = build3 (BIT_FIELD_REF, scalar_type, vec_temp, bitsize,
-				 bitsize_zero_node);
-              epilog_stmt = gimple_build_assign (new_scalar_dest, rhs);
-              new_temp = make_ssa_name (new_scalar_dest, epilog_stmt);
-              gimple_assign_set_lhs (epilog_stmt, new_temp);
-              gsi_insert_before (&exit_gsi, epilog_stmt, GSI_SAME_STMT);
+	      new_temp = gimple_build (&stmts, BIT_FIELD_REF, compute_type,
+				       vec_temp, bitsize, bitsize_zero_node);
 
               /* In SLP we don't need to apply reduction operation, so we just
                  collect s' values in SCALAR_RESULTS.  */
@@ -5137,14 +5164,9 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
                    bit_offset += element_bitsize)
                 {
                   tree bitpos = bitsize_int (bit_offset);
-                  tree rhs = build3 (BIT_FIELD_REF, scalar_type, vec_temp,
-                                     bitsize, bitpos);
-
-                  epilog_stmt = gimple_build_assign (new_scalar_dest, rhs);
-                  new_name = make_ssa_name (new_scalar_dest, epilog_stmt);
-                  gimple_assign_set_lhs (epilog_stmt, new_name);
-                  gsi_insert_before (&exit_gsi, epilog_stmt, GSI_SAME_STMT);
-
+		  new_name = gimple_build (&stmts, BIT_FIELD_REF,
+					   compute_type, vec_temp,
+					   bitsize, bitpos);
                   if (slp_reduc)
                     {
                       /* In SLP we don't need to apply reduction operation, so 
@@ -5153,13 +5175,8 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
                       scalar_results.safe_push (new_name);
                     }
                   else
-                    {
-		      epilog_stmt = gimple_build_assign (new_scalar_dest, code,
-							 new_name, new_temp);
-                      new_temp = make_ssa_name (new_scalar_dest, epilog_stmt);
-                      gimple_assign_set_lhs (epilog_stmt, new_temp);
-                      gsi_insert_before (&exit_gsi, epilog_stmt, GSI_SAME_STMT);
-                    }
+		    new_temp = gimple_build (&stmts, code, compute_type,
+					     new_name, new_temp);
                 }
             }
 
@@ -5170,24 +5187,28 @@ vect_create_epilog_for_reduction (stmt_vec_info stmt_info,
           if (slp_reduc)
             {
               tree res, first_res, new_res;
-	      gimple *new_stmt;
             
               /* Reduce multiple scalar results in case of SLP unrolling.  */
               for (j = group_size; scalar_results.iterate (j, &res);
                    j++)
                 {
                   first_res = scalar_results[j % group_size];
-		  new_stmt = gimple_build_assign (new_scalar_dest, code,
-						  first_res, res);
-                  new_res = make_ssa_name (new_scalar_dest, new_stmt);
-                  gimple_assign_set_lhs (new_stmt, new_res);
-                  gsi_insert_before (&exit_gsi, new_stmt, GSI_SAME_STMT);
+		  new_res = gimple_build (&stmts, code, compute_type,
+					  first_res, res);
                   scalar_results[j % group_size] = new_res;
                 }
+	      for (k = 0; k < group_size; k++)
+		scalar_results[k] = gimple_convert (&stmts, scalar_type,
+						    scalar_results[k]);
             }
           else
-            /* Not SLP - we have one scalar to keep in SCALAR_RESULTS.  */
-            scalar_results.safe_push (new_temp);
+	    {
+	      /* Not SLP - we have one scalar to keep in SCALAR_RESULTS.  */
+	      new_temp = gimple_convert (&stmts, scalar_type, new_temp);
+	      scalar_results.safe_push (new_temp);
+	    }
+
+	  gsi_insert_seq_before (&exit_gsi, stmts, GSI_SAME_STMT);
         }
 
       if ((STMT_VINFO_REDUC_TYPE (reduc_info) == INTEGER_INDUC_COND_REDUCTION)
