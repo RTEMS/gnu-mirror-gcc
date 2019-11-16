@@ -39,4 +39,4 @@ store_double (double a)
   ext[0] = (TYPE) a;		/* No PCREL_OPT (STXIBZX is indexed).  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  2 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  2 } } */

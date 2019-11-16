@@ -39,4 +39,4 @@ get_double (void)
   return (double) ext[0];	/* No PCREL_OPT (LXSIHZX is indexed).  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  2 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  2 } } */

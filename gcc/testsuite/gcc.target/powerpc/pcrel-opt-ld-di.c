@@ -40,4 +40,4 @@ get_double (void)
   return (double) ext[0];	/* PCREL_OPT relocation.  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  3 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  3 } } */

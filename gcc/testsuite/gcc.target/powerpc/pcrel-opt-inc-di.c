@@ -16,4 +16,4 @@ inc (void)
   ext++;		/* No PCREL_OPT (use address twice).  */
 }
 
-/* { dg-final { scan-assembler-none {\m[.]reloc.*R_PPC64_PCREL_OPT} } } */
+/* { dg-final { scan-assembler-none "R_PPC64_PCREL_OPT" } } */

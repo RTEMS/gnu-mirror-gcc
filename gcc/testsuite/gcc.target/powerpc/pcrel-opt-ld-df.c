@@ -33,4 +33,4 @@ get_variable (unsigned long n)
   return ext[n];		/* No PCREL_OPT (load is indexed).  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  2 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  2 } } */

@@ -40,4 +40,4 @@ store_double (double a)
   ext[0] = (TYPE) a;		/* PCREL_OPT relocation.  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  3 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  3 } } */
