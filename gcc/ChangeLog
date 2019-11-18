@@ -1,3 +1,204 @@
+2019-11-18  Giuliano Belinassi  <giuliano.belinassi@usp.br>
+
+	* cfgloop.c (get_loop_body_in_custom_order): New.
+	* cfgloop.h (get_loop_body_in_custom_order): New prototype.
+	* tree-loop-distribution.c (class loop_distribution): New.
+	(bb_top_order_cmp): Remove.
+	(bb_top_order_cmp_r): New.
+	(create_rdg_vertices): Move into class loop_distribution.
+	(stmts_from_loop): Same as above.
+	(update_for_merge): Same as above.
+	(partition_merge_into): Same as above.
+	(get_data_dependence): Same as above.
+	(data_dep_in_cycle_p): Same as above.
+	(update_type_for_merge): Same as above.
+	(build_rdg_partition_for-vertex): Same as above.
+	(classify_builtin_ldst): Same as above.
+	(classify_partition): Same as above.
+	(share_memory_accesses): Same as above.
+	(rdg_build_partitions): Same as above.
+	(pg_add_dependence_edges): Same as above.
+	(build_partition_graph): Same as above.
+	(merge_dep_scc_partitions): Same as above.
+	(break_alias_scc_partitions): Same as above.
+	(finalize_partitions): Same as above.
+	(distribute_loop): Same as above.
+	(bb_top_order_init): New method
+	(bb_top_order_destroy): New method.
+	(get_bb_top_order_index_size): New method.
+	(get_bb_top_order_index_index): New method.
+	(get_bb_top_order_index_index): New method.
+	(loop_distribution::execute): New method.
+	(pass_loop_distribution::execute): Instantiate loop_distribution.
+
+2019-11-18  Jan Hubicka  <jh@suse.cz>
+
+	PR ipa/92508
+	* ipa-inline.c (inline_small_functions): Add new edges after reseting
+	caches.
+	* ipa-inline-analysis.c (do_estimate_edge_time): Fix sanity check.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* doc/sourcebuild.texi (vect_check_ptrs): Document.
+	* optabs.def (check_raw_ptrs_optab, check_war_ptrs_optab): New optabs.
+	* doc/md.texi: Document them.
+	* internal-fn.def (IFN_CHECK_RAW_PTRS, IFN_CHECK_WAR_PTRS): New
+	internal functions.
+	* internal-fn.h (internal_check_ptrs_fn_supported_p): Declare.
+	* internal-fn.c (check_ptrs_direct): New macro.
+	(expand_check_ptrs_optab_fn): Likewise.
+	(direct_check_ptrs_optab_supported_p): Likewise.
+	(internal_check_ptrs_fn_supported_p): New fuction.
+	* tree-data-ref.c: Include internal-fn.h.
+	(create_ifn_alias_checks): New function.
+	(create_intersect_range_checks): Use it.
+	* config/aarch64/iterators.md (SVE2_WHILE_PTR): New int iterator.
+	(optab, cmp_op): Handle it.
+	(raw_war, unspec): New int attributes.
+	* config/aarch64/aarch64.md (UNSPEC_WHILERW, UNSPEC_WHILE_WR): New
+	constants.
+	* config/aarch64/predicates.md (aarch64_bytes_per_sve_vector_operand):
+	New predicate.
+	* config/aarch64/aarch64-sve2.md (check_<raw_war>_ptrs<mode>): New
+	expander.
+	(@aarch64_sve2_while<cmp_op><GPI:mode><PRED_ALL:mode>_ptest): New
+	pattern.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree.c (build_vector_from_ctor): Directly return a zero vector for
+	empty constructors.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* cse.c (cse_insn): Delete no-op register moves too.
+	* simplify-rtx.c (comparison_to_mask): Handle unsigned comparisons.
+	Take a second comparison to control the value for NE.
+	(mask_to_comparison): Handle unsigned comparisons.
+	(simplify_logical_relational_operation): Likewise.  Update call
+	to comparison_to_mask.  Handle AND if !HONOR_NANs.
+	(simplify_binary_operation_1): Call the above for AND too.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* fold-const.c (native_encode_vector): Turn into a wrapper function,
+	splitting the main code out into...
+	(native_encode_vector_part): ...this new function.
+	(native_decode_vector_tree): New function.
+	(fold_view_convert_vector_encoding): Likewise.
+	(fold_view_convert_expr): Use it for converting VECTOR_CSTs
+	to VECTOR_TYPEs.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-data-ref.c (create_intersect_range_checks_index): If the
+	alias pair describes simple WAW and WAR dependencies, just check
+	whether the first B access overlaps later A accesses.
+	(create_waw_or_war_checks): New function that performs the same
+	optimization on addresses.
+	(create_intersect_range_checks): Call it.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* lra-constraints.c (valid_address_p): Take the operand and a
+	constraint as argument.  If the operand is a MEM and the constraint
+	is a memory constraint, check whether the eliminated form of the
+	MEM already satisfies the constraint.
+	(process_address_1): Update calls accordingly.
+
+2019-11-18  Tom Tromey  <tromey@adacore.com>
+
+	* doc/tm.texi: Rebuild.
+	* doc/tm.texi.in (Misc): Don't document MODIFY_JNI_METHOD_CALL.
+	* config/i386/cygming.h (MODIFY_JNI_METHOD_CALL): Don't define.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92516
+	* tree-vect-slp.c (vect_analyze_slp_instance): Add bst_map
+	argument, hoist bst_map creation/destruction to ...
+	(vect_analyze_slp): ... here, forming a true graph with
+	SLP instances being the entries.
+	(vect_detect_hybrid_slp_stmts): Remove wrapper.
+	(vect_detect_hybrid_slp): Use one visited set for all
+	graph entries.
+	(vect_slp_analyze_node_operations): Simplify visited/lvisited
+	to hash-sets of slp_tree.
+	(vect_slp_analyze_operations): Likewise.
+	(vect_bb_slp_scalar_cost): Remove wrapper.
+	(vect_bb_vectorization_profitable_p): Use one visited set for
+	all graph entries.
+	(vect_schedule_slp_instance): Elide bst_map use.
+	(vect_schedule_slp): Likewise.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.c (vect_analyze_slp_instance): When a CTOR
+	was vectorized with just external refs fail.
+
+2019-11-18  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/92525
+	* ipa-icf.c (sem_function::init): Unset m_checker
+	at the end of the function.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92558
+	* tree-vect-loop.c (vect_create_epilog_for_reduction): When
+	reducting the width of a reduction vector def update new_phis.
+
+2019-11-18  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* configure.ac (gcc_cv_target_ldbl128): Set for powerpc*-*-linux-musl*
+	and s390*-*-linux-musl* targets.
+	* configure: Regenerate.
+
+2019-11-18  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/s390/linux.h (MUSL_DYNAMIC_LINKER32): Define.
+	(MUSL_DYNAMIC_LINKER64): Define.
+
+2019-11-18  Martin Liska  <mliska@suse.cz>
+
+	* dbgcnt.c (dbg_cnt_set_limit_by_name): Provide error
+	message for an unknown counter.
+	(dbg_cnt_process_single_pair): Support 0 as minimum value.
+	(dbg_cnt_process_opt): Remove unreachable code.
+
+2019-11-18  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/92529
+	* ipa-icf-gimple.c (func_checker::compare_gimple_assign):
+	Compare LHS types of NOP_EXPR.
+
+2019-11-18  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* run-rtl-passes.c (run_rtl_passes): Accept and handle empty
+	"initial_pass_name" argument -- by running "*clean_state" pass.
+	Also free the "initial_pass_name" when done.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/92462
+	* alias.c (find_base_term): Restrict the look through ANDs.
+	(find_base_value): Likewise.
+
+2019-11-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	Add support for AVR devices from the 0-series.
+
+	PR target/92545
+	* config/avr/avr-arch.h (avr_mcu_t) <flash_pm_offset>: New field.
+	* config/avr/avr-devices.c (avr_mcu_types): Adjust initializers.
+	* config/avr/avr-mcus.def (AVR_MCU): Add respective field.
+	* config/avr/specs.h (LINK_SPEC) <%(link_pm_base_address)>: Add.
+	* config/avr/gen-avr-mmcu-specs.c (print_mcu)
+	<*cpp, *cpp_mcu, *cpp_avrlibc, *link_pm_base_address>: Emit code
+	for spec definitions.
+	* doc/avr-mmcu.texi: Regenerate.
+
 2019-11-18  Hongtao Liu  <hongtao.liu@intel.com>
 
 	PR target/92448

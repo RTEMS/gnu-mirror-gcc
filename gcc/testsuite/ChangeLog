@@ -1,3 +1,98 @@
+2019-11-18  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c11-attr-syntax-1.c, gcc.dg/c11-attr-syntax-2.c,
+	gcc.dg/c11-attr-syntax-3.c, gcc.dg/c2x-attr-syntax-4.c: New tests.
+	* gcc.dg/c2x-attr-deprecated-1.c: Also test struct [[deprecated]].
+	* gcc.dg/c2x-attr-fallthrough-1.c: Also test [[__fallthrough__]].
+
+2019-11-18  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/91962 - ICE with reference binding and qualification conversion.
+	* g++.dg/cpp0x/ref-bind7.C: New test.
+
+2019-11-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/92528
+	* g++.dg/ipa/pr92528.C: New test.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* lib/target-supports.exp (check_effective_target_vect_check_ptrs):
+	New procedure.
+	* gcc.dg/vect/vect-alias-check-14.c: Expect IFN_CHECK_WAR to be
+	used, if available.
+	* gcc.dg/vect/vect-alias-check-15.c: Likewise.
+	* gcc.dg/vect/vect-alias-check-16.c: Likewise IFN_CHECK_RAW.
+	* gcc.target/aarch64/sve2/whilerw_1.c: New test.
+	* gcc.target/aarch64/sve2/whilewr_1.c: Likewise.
+	* gcc.target/aarch64/sve2/whilewr_2.c: Likewise.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/acle/asm/ptest_pmore.c: New test.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/acle/general/temporaries_1.c: New test.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/vect-alias-check-8.c: Expect WAR/WAW checks to be used.
+	* gcc.dg/vect/vect-alias-check-14.c: Likewise.
+	* gcc.dg/vect/vect-alias-check-15.c: Likewise.
+	* gcc.dg/vect/vect-alias-check-18.c: Likewise.
+	* gcc.dg/vect/vect-alias-check-19.c: Likewise.
+	* gcc.target/aarch64/sve/var_stride_1.c: Update expected sequence.
+	* gcc.target/aarch64/sve/var_stride_2.c: Likewise.
+	* gcc.target/aarch64/sve/var_stride_3.c: Likewise.
+	* gcc.target/aarch64/sve/var_stride_5.c: Likewise.
+
+2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_f16.c: Remove XFAIL.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_f32.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_f64.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_s16.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_s32.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_s64.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_u16.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_u32.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/ld1rq_u64.c: Likewise.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92516
+	* g++.dg/vect/slp-pr92516.cc: New testcase.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/vect/vect-ctor-1.c: New testcase.
+
+2019-11-18  Martin Liska  <mliska@suse.cz>
+
+	* gcc.dg/ipa/ipa-icf-36.c: Remove 'all-all-all'.
+	* gcc.dg/ipa/ipa-icf-37.c: Likewise.
+
+2019-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92558
+	* gcc.dg/vect/pr92558.c: New testcase.
+
+2019-11-18  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/92529
+	* gcc.dg/ipa/pr92529.c: New test.
+
+2019-11-18  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* gcc.dg/rtl/aarch64/unspecified-pass-error.c: New test.
+
+2019-11-18  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* lib/target-supports.exp
+	(check_effective_target_arm_vfp_ok_nocache): Fix typo in option
+	name.
+
 2019-11-17  Jeff Law  <law@redhat.com>
 
 	* gcc.dg/complex-6.c: Do not run dump scan tests for rx target.
