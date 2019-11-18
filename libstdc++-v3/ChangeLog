@@ -1,3 +1,45 @@
+2019-11-16  Edward Smith-Rowland  <3dw4rd@verizon.net>
+
+	Repair the <tuple> part of C++20 p1032 Misc constexpr bits.
+	* include/bits/uses_allocator.h (__uses_alloc0::_Sink::operaror=)
+	(__use_alloc(const _Alloc&)) : Constexpr.
+
+2019-11-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/string_view (basic_string_view(It, End)): Add range
+	constructor and deduction guide from P1391R4.
+	* testsuite/21_strings/basic_string_view/cons/char/range.cc: New test.
+
+	* include/bits/regex.h (match_results): Specialize __enable_view_impl.
+	* include/bits/stl_set.h (set): Likewise.
+	* include/bits/unordered_set.h (unordered_set, unordered_multiset):
+	Likewise.
+	* include/debug/multiset.h (__debug::multiset): Likewise.
+	* include/debug/set.h (__debug::set): Likewise.
+	* include/debug/unordered_set (__debug::unordered_set)
+	(__debug::unordered_multiset): Likewise.
+	* include/std/ranges (ranges::view, ranges::enable_view)
+	(ranges::view_interface, ranges::subrange, ranges::empty_view)
+	(ranges::single_view, ranges::views::single, ranges::iota_view)
+	(ranges::views::iota): Define for C++20.
+	* testsuite/std/ranges/empty_view.cc: New test.
+	* testsuite/std/ranges/iota_view.cc: New test.
+	* testsuite/std/ranges/single_view.cc: New test.
+	* testsuite/std/ranges/view.cc: New test.
+
+2019-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges: Revert accidentally committed changes.
+
+	* include/std/thread (jthread::jthread()): Use nostopstate constant.
+	(jthread::jthread(Callable&&, Args&&...)): Use helper function to
+	create std::thread instead of indirection through a lambda. Use
+	remove_cvref_t instead of decay_t.
+	(jthread::joinable(), jthread::get_id(), jthread::native_handle())
+	(jthread::hardware_concurrency()): Add nodiscard attribute.
+	(swap(jthread&. jthread&)): Define hidden friend.
+	(jthread::_S_create): New helper function for constructor.
+
 2019-11-15  Edward Smith-Rowland  <3dw4rd@verizon.net>
 
 	Implement the <tuple> part of C++20 p1032 Misc constexpr bits.
