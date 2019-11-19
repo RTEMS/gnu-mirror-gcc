@@ -33,4 +33,4 @@ store_variable (TYPE a, unsigned long n)
   ext[n] = a;			/* No PCREL_OPT (store is indexed).  */
 }
 
-/* { dg-final { scan-assembler-times {\m[.]reloc.*R_PPC64_PCREL_OPT}  2 } } */
+/* { dg-final { scan-assembler-times "R_PPC64_PCREL_OPT"  2 } } */
