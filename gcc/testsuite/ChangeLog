@@ -1,3 +1,123 @@
+2019-11-20  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* g++.dg/warn/multiple-sign-compare-warn-1.C: New.
+
+2019-11-20  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c2x-attr-deprecated-2.c, gcc.dg/c2x-attr-fallthrough-2.c,
+	gcc.dg/c2x-attr-maybe_unused-2.c: Expect errors for invalid uses
+	of standard attributes on types.  Add more tests of invalid uses
+	on types.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92414
+	* g++.dg/cpp2a/constexpr-dtor4.C: New test.
+
+2019-11-19  Dragan Mladjenovic  <dmladjenovic@wavecomp.com>
+
+	* gcc.target/mips/msa-ds.c: New test.
+
+2019-11-19  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Revert:
+	2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Revert:
+	2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/acle/asm/ptest_pmore.c: New test.
+
+2019-11-15  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/89913
+	* g++.dg/cpp2a/pr89913.C: New test.
+
+2019-11-19  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/92078
+	* g++.dg/cpp2a/concepts-pr92078.C: New.
+	* g++.dg/cpp2a/concepts-requires18.C: Update diagnostics.
+
+2019-11-19  Andrew Stubbs  <ams@codesourcery.com>
+
+	* gcc.dg/tree-ssa/loop-1.c: Change amdgcn assembler scan.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92581
+	* gcc.dg/vect/vect-cond-reduc-5.c: New testcase.
+
+2019-11-19  Dennis Zhang  <dennis.zhang@arm.com>
+
+	* gcc.target/aarch64/acle/memtag_1.c: New test.
+	* gcc.target/aarch64/acle/memtag_2.c: New test.
+	* gcc.target/aarch64/acle/memtag_3.c: New test.
+
+2019-11-19  Richard Henderson  <richard.henderson@linaro.org>
+
+	* testsuite/gcc.target/arm/asm-flag-3.c: Skip for thumb1.
+	* testsuite/gcc.target/arm/asm-flag-5.c: Likewise.
+	* testsuite/gcc.target/arm/asm-flag-6.c: Likewise.
+	* testsuite/gcc.target/arm/asm-flag-4.c: New test.
+
+	* testsuite/gcc.target/aarch64/asm-flag-6.c: Use %w for
+	asm inputs to cmp instruction for ILP32.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/92549
+	* gcc.target/i386/pr92549.c: New test.
+
+	PR middle-end/91450
+	* gcc.c-torture/execute/pr91450-1.c: New test.
+	* gcc.c-torture/execute/pr91450-2.c: New test.
+
+	PR c++/92504
+	* g++.dg/gomp/pr92504.C: New test.
+
+	PR tree-optimization/92557
+	* gcc.dg/gomp/pr92557.c: New test.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92554
+	* gcc.dg/vect/pr92554.c: New testcase.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92555
+	* gcc.dg/vect/pr92555.c: New testcase.
+
+2019-11-19  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c2x-attr-fallthrough-5.c, gcc.dg/c2x-attr-syntax-5.c: New
+	tests.
+	* gcc.dg/c2x-attr-deprecated-2.c, gcc.dg/c2x-attr-deprecated-4.c,
+	gcc.dg/c2x-attr-fallthrough-2.c, gcc.dg/c2x-attr-maybe_unused-2.c,
+	gcc.dg/c2x-attr-maybe_unused-4.c: Expect errors in place of some
+	warnings.
+
+2019-11-18  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* g++.dg/cpp0x/addressof2.C: Test locations too.
+	* g++.dg/cpp0x/rv-lvalue-req.C: Likewise.
+	* g++.dg/expr/crash2.C: Likewise.
+	* g++.dg/expr/lval1.C: Likewise.
+	* g++.dg/expr/unary2.C: Likewise.
+	* g++.dg/ext/lvaddr.C: Likewise.
+	* g++.dg/ext/lvalue1.C: Likewise.
+	* g++.dg/tree-ssa/pr20280.C: Likewise.
+	* g++.dg/warn/Wplacement-new-size.C: Likewise.
+	* g++.old-deja/g++.brendan/alignof.C: Likewise.
+	* g++.old-deja/g++.brendan/sizeof2.C: Likewise.
+	* g++.old-deja/g++.law/temps1.C: Likewise.
+
+2019-11-18  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/92493
+	* gcc.dg/pr92493.c: New test.
+
 2019-11-18  Joseph Myers  <joseph@codesourcery.com>
 
 	* gcc.dg/c11-attr-syntax-1.c, gcc.dg/c11-attr-syntax-2.c,

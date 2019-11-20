@@ -4516,8 +4516,34 @@ void
 c_warn_unused_attributes (tree attrs)
 {
   for (tree t = attrs; t != NULL_TREE; t = TREE_CHAIN (t))
-    warning (OPT_Wattributes, "%qE attribute ignored",
-	     get_attribute_name (t));
+    if (get_attribute_namespace (t) == NULL_TREE)
+      /* The specifications of standard attributes mean this is a
+	 constraint violation.  */
+      pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored",
+	       get_attribute_name (t));
+    else
+      warning (OPT_Wattributes, "%qE attribute ignored",
+	       get_attribute_name (t));
+}
+
+/* Warn for standard attributes being applied to a type that is not
+   being defined, where that is a constraint violation, and return a
+   list of attributes with them removed.  */
+
+tree
+c_warn_type_attributes (tree attrs)
+{
+  tree *attr_ptr = &attrs;
+  while (*attr_ptr)
+    if (get_attribute_namespace (*attr_ptr) == NULL_TREE)
+      {
+	pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored",
+		 get_attribute_name (*attr_ptr));
+	*attr_ptr = TREE_CHAIN (*attr_ptr);
+      }
+    else
+      attr_ptr = &TREE_CHAIN (*attr_ptr);
+  return attrs;
 }
 
 /* Called when a declaration is seen that contains no names to declare.
@@ -4877,6 +4903,7 @@ groktypename (struct c_type_name *type_name, tree *expr,
 			 DEPRECATED_NORMAL);
 
   /* Apply attributes.  */
+  attrs = c_warn_type_attributes (attrs);
   decl_attributes (&type, attrs, 0);
 
   return type;
@@ -6289,10 +6316,13 @@ grokdeclarator (const struct c_declarator *declarator,
 	    if (cxx11_attribute_p (attrs) && inner_decl->kind == cdk_id)
 	      returned_attrs = chainon (returned_attrs, attrs);
 	    else
-	      returned_attrs = decl_attributes (&type,
-						chainon (returned_attrs,
-							 attrs),
-						attr_flags);
+	      {
+		attrs = c_warn_type_attributes (attrs);
+		returned_attrs = decl_attributes (&type,
+						  chainon (returned_attrs,
+							   attrs),
+						  attr_flags);
+	      }
 	    break;
 	  }
 	case cdk_array:
@@ -11670,6 +11700,7 @@ finish_declspecs (struct c_declspecs *specs)
     }
   if (specs->type != NULL)
     {
+      specs->postfix_attrs = c_warn_type_attributes (specs->postfix_attrs);
       decl_attributes (&specs->type, specs->postfix_attrs, 0);
       specs->postfix_attrs = NULL_TREE;
     }

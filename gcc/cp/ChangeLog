@@ -1,3 +1,60 @@
+2019-11-20  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* cvt.c (ocp_convert): Use additional warning sentinel.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92414
+	* constexpr.c (cxx_eval_outermost_constant_expr): If DECL_INITIAL
+	on object is erroneous, return t without trying to evaluate
+	a constexpr dtor.
+
+2019-11-12  Jason Merrill  <jason@redhat.com>
+
+	* call.c (same_fn_or_template): Change to cand_parms_match.
+	(joust): Adjust.
+	(print_z_candidate): Mark rewritten/reversed candidates.
+	(build_new_op_1): Warn about recursive call with reversed arguments.
+
+2019-11-15  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/89913
+	* pt.c (get_underlying_template): Exit loop if the original type
+	of the alias is null.
+
+2019-11-19  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/92078
+	* pt.c (maybe_new_partial_specialization): Apply access to newly
+	created partial specializations. Update comment style.
+
+2019-11-19  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/92078
+	* pt.c (maybe_new_partial_specialization): Apply access to newly
+	created partial specializations. Update comment style.
+
+2019-11-19  Andrew Sutton  <asutton@lock3software.com>
+
+	PR c++/92403
+	Suppress diagnostics substituting into a requires-expression.
+	* pt.c (tsubst_copy_and_build): Perform the first substitution without
+	diagnostics and a second only if tsubst_requries_expr returns an error.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92504
+	* semantics.c (handle_omp_for_class_iterator): Don't call
+	cp_fully_fold on cond.
+
+2019-11-18  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* typeck.c (cp_build_addr_expr_1): Use cp_expr_loc_or_input_loc
+	in three places.
+	(cxx_sizeof_expr): Use it in one additional place.
+	(cxx_alignof_expr): Likewise.
+	(lvalue_or_else): Likewise.
+
 2019-11-18  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/91962 - ICE with reference binding and qualification conversion.

@@ -1,3 +1,164 @@
+2019-11-19  Pat Haugen  <pthaugen@us.ibm.com>
+
+	* config/rs6000/rs6000.c (move_to_end_of_ready): New, factored out
+	from common code.
+	(power6_sched_reorder2): Factored out from rs6000_sched_reorder2,
+	call new function.
+	(power9_sched_reorder2): Call new function.
+	(rs6000_sched_reorder2): Likewise.
+
+2019-11-18  Jan Hubicka  <jh@suse.cz>
+
+	* ipa-fnsummary.c (estimate_edge_size_and_time): Drop parameter PROB.
+	(estimate_calls_size_and_time): Update.
+
+2019-11-18  Jan Hubicka  <jh@suse.cz>
+
+	* ipa-inline.c (inlining_speedup): New function.
+	(edge_badness): Use it.
+
+2019-11-19  Zoran Jovanovic <zoran.jovanovic@mips.com>
+			Dragan Mladjenovic  <dmladjenovic@wavecomp.com>
+
+	* config/mips/mips-msa.md (msa_<msabr>_<msafmt_f>, msa_<msabr>_v_<msafmt_f>):
+	Mark as not having "likely" version.
+	* config/mips/mips.md (insn_count): The simd_div instruction with
+	TARGET_CHECK_ZERO_DIV consists of 3 instructions.
+	(can_delay): Exclude simd_branch.
+	(defile_delay *): Add simd_branch instructions.
+	They have one regular delay slot.
+
+2019-11-19  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Revert:
+	2019-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* cse.c (cse_insn): Delete no-op register moves too.
+	* simplify-rtx.c (comparison_to_mask): Handle unsigned comparisons.
+	Take a second comparison to control the value for NE.
+	(mask_to_comparison): Handle unsigned comparisons.
+	(simplify_logical_relational_operation): Likewise.  Update call
+	to comparison_to_mask.  Handle AND if !HONOR_NANs.
+	(simplify_binary_operation_1): Call the above for AND too.
+
+2019-11-19  Martin Liska  <mliska@suse.cz>
+
+	* toplev.c (general_init): Move the call...
+	(toplev::main): ... here as we need init_options_struct
+	being called.
+
+2019-11-19  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/79262
+	* config/aarch64/aarch64.c (generic_vector_cost): Adjust
+	vec_to_scalar_cost.
+
+2019-11-19  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config/arm/arm-cpus.in (armv7): Set tune to Cortex-A53.
+	(armv7-a): Likewise.
+	(armv7ve): Likewise.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92581
+	* tree-vect-loop.c (vect_create_epilog_for_reduction): For
+	condition reduction chains gather all conditions involved
+	for computing the index reduction vector.
+
+2019-11-19  Dennis Zhang  <dennis.zhang@arm.com>
+
+	* config/aarch64/aarch64-builtins.c (enum aarch64_builtins): Add
+	AARCH64_MEMTAG_BUILTIN_START, AARCH64_MEMTAG_BUILTIN_IRG,
+	AARCH64_MEMTAG_BUILTIN_GMI, AARCH64_MEMTAG_BUILTIN_SUBP,
+	AARCH64_MEMTAG_BUILTIN_INC_TAG, AARCH64_MEMTAG_BUILTIN_SET_TAG,
+	AARCH64_MEMTAG_BUILTIN_GET_TAG, and AARCH64_MEMTAG_BUILTIN_END.
+	(aarch64_init_memtag_builtins): New.
+	(AARCH64_INIT_MEMTAG_BUILTINS_DECL): New macro.
+	(aarch64_general_init_builtins): Call aarch64_init_memtag_builtins.
+	(aarch64_expand_builtin_memtag): New.
+	(aarch64_general_expand_builtin): Call aarch64_expand_builtin_memtag.
+	(AARCH64_BUILTIN_SUBCODE): New macro.
+	(aarch64_resolve_overloaded_memtag): New.
+	(aarch64_resolve_overloaded_builtin_general): New. Call
+	aarch64_resolve_overloaded_memtag to handle overloaded MTE builtins.
+	* config/aarch64/aarch64-c.c (aarch64_update_cpp_builtins): Define
+	__ARM_FEATURE_MEMORY_TAGGING when enabled.
+	(aarch64_resolve_overloaded_builtin): Call
+	aarch64_resolve_overloaded_builtin_general.
+	* config/aarch64/aarch64-protos.h
+	(aarch64_resolve_overloaded_builtin_general): New declaration.
+	* config/aarch64/aarch64.h (AARCH64_ISA_MEMTAG): New macro.
+	(TARGET_MEMTAG): Likewise.
+	* config/aarch64/aarch64.md (UNSPEC_GEN_TAG): New unspec.
+	(UNSPEC_GEN_TAG_RND, and UNSPEC_TAG_SPACE): Likewise.
+	(irg, gmi, subp, addg, ldg, stg): New instructions.
+	* config/aarch64/arm_acle.h (__arm_mte_create_random_tag): New macro.
+	(__arm_mte_exclude_tag, __arm_mte_ptrdiff): Likewise.
+	(__arm_mte_increment_tag, __arm_mte_set_tag): Likewise.
+	(__arm_mte_get_tag): Likewise.
+	* config/aarch64/predicates.md (aarch64_memtag_tag_offset): New.
+	(aarch64_granule16_uimm6, aarch64_granule16_simm9): New.
+	* config/arm/types.md (memtag): New.
+	* doc/invoke.texi (-memtag): Update description.
+
+2019-11-19  Richard Henderson  <richard.henderson@linaro.org>
+
+	* config/arm/arm-c.c (arm_cpu_builtins): Use def_or_undef_macro
+	to define __GCC_ASM_FLAG_OUTPUTS__.
+	* config/arm/arm.c (thumb1_md_asm_adjust): New function.
+	(arm_option_params_internal): Swap out targetm.md_asm_adjust
+	depending on TARGET_THUMB1.
+	* doc/extend.texi (FlagOutputOperands): Document thumb1 restriction.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/92549
+	* config/i386/i386.md (peephole2 for *swap<mode>): New peephole2.
+
+	PR middle-end/91450
+	* internal-fn.c (expand_mul_overflow): For s1 * s2 -> ur, if one
+	operand is negative and one non-negative, compare the non-negative
+	one against 0 rather than comparing s1 & s2 against 0.  Otherwise,
+	don't compare (s1 & s2) == 0, but compare separately both s1 == 0
+	and s2 == 0, unless one of them is known to be negative.  Remove
+	tem2 variable, use tem where tem2 has been used before.
+
+2019-11-19  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* doc/invoke.texi (-gno-internal-reset-location-views): Fix typo.
+
+2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/92557
+	* omp-low.c (omp_clause_aligned_alignment): Punt if TYPE_MODE is not
+	vmode rather than asserting it always is.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92554
+	* tree-vect-loop.c (vect_create_epilog_for_reduction): Look
+	for the actual condition stmt and deal with sign-changes.
+
+2019-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/92555
+	* tree-vect-loop.c (vect_update_vf_for_slp): Also scan PHIs
+	for non-SLP stmts.
+
+2019-11-19  Martin Liska  <mliska@suse.cz>
+
+	PR bootstrap/92540
+	* config/riscv/riscv.c (riscv_address_insns): Initialize
+	addr in order to remove boostrap -Wmaybe-uninitialized
+	error.
+
+2019-11-18  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/92493
+	* gimple-ssa-sprintf.c (get_origin_and_offset): Remove spurious
+	assignment.
+
 2019-11-18  Giuliano Belinassi  <giuliano.belinassi@usp.br>
 
 	* cfgloop.c (get_loop_body_in_custom_order): New.

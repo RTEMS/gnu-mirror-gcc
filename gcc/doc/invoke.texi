@@ -8175,7 +8175,7 @@ consumers are not expected to support this extended format, and they
 would be rendered unable to decode location lists using it.
 
 @item -ginternal-reset-location-views
-@itemx -gnointernal-reset-location-views
+@itemx -gno-internal-reset-location-views
 @opindex ginternal-reset-location-views
 @opindex gno-internal-reset-location-views
 Attempt to determine location views that can be omitted from location
@@ -16280,9 +16280,8 @@ Enable the Armv8.5-a Random Number instructions.  This option is only to
 enable the extension at the assembler level and does not affect code
 generation.
 @item memtag
-Enable the Armv8.5-a Memory Tagging Extensions.  This option is only to
-enable the extension at the assembler level and does not affect code
-generation.
+Enable the Armv8.5-a Memory Tagging Extensions.
+Use of this option with architectures prior to Armv8.5-A is not supported.
 @item sb
 Enable the Armv8-a Speculation Barrier instruction.  This option is only to
 enable the extension at the assembler level and does not affect code
