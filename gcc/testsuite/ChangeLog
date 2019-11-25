@@ -1,3 +1,247 @@
+2019-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91355
+	* g++.dg/torture/pr91355.C: New test.
+
+	Backported from mainline
+	2019-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/90840
+	* gcc.c-torture/compile/pr90840.c: New test.
+
+	PR target/90867
+	* gcc.target/i386/pr90867.c: New test.
+
+	PR c/90898
+	* gcc.dg/pr90898.c: New test.
+
+	2019-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/91450
+	* gcc.c-torture/execute/pr91450-1.c: New test.
+	* gcc.c-torture/execute/pr91450-2.c: New test.
+
+	2019-11-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92384
+	* g++.dg/torture/pr92384.C: New test.
+
+	2019-10-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/92296
+	* c-c++-common/cpp/pr92296-1.c: New test.
+	* c-c++-common/cpp/pr92296-2.c: New test.
+
+	2019-10-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92201
+	* g++.dg/other/pr92201.C: New test.
+
+	2019-10-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/92056
+	* gcc.c-torture/compile/pr92056.c: New test.
+
+	2019-10-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/91974
+	* g++.dg/cpp1z/eval-order5.C: New test.
+
+	2019-09-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91665
+	* gcc.dg/vect/pr91665.c: New test.
+
+	2019-09-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/91001
+	PR middle-end/91105
+	PR middle-end/91106
+	* gcc.c-torture/compile/pr91001.c: New test.
+
+	2019-09-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/91623
+	* gcc.target/i386/pr91623.c: New test.
+
+	2019-08-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/91401
+	* c-c++-common/gomp/pr91401-1.c: New test.
+	* c-c++-common/gomp/pr91401-2.c: New test.
+
+2019-11-20  Peter Bergner <bergner@linux.ibm.com>
+
+	Backport from mainline
+	2019-11-13  David Edelsohn  <dje.gcc@gmail.com>
+
+	* gcc.target/powerpc/pr92090.c: Limit -mbig to powerpc64le-*-*.
+	* gcc.target/powerpc/pr92090-2.c: Likewise.
+
+	2019-11-07  Peter Bergner <bergner@linux.ibm.com>
+
+	PR other/92090
+	* gcc.target/powerpc/pr92090-2.c: New test.
+
+	2019-11-07  Peter Bergner <bergner@linux.ibm.com>
+
+	PR other/92090
+	* gcc.target/powerpc/pr92090.c: New test.
+
+2019-11-08  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.c-torture/compile/20191108-1.c: New test.
+	* gcc.target/sparc/overflow-1.c: Add -fno-pie to the options.
+	* gcc.target/sparc/overflow-2.c: Likewise.
+	* gcc.target/sparc/overflow-3.c: Likewise.
+	* gcc.target/sparc/overflow-4.c: Likewise.
+	* gcc.target/sparc/overflow-5.c: Likewise.
+
+2019-11-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-06-20  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* obj-c++.dg/stubify-1.mm: Adjust options and scan-asm checks.
+	* obj-c++.dg/stubify-2.mm: Likewise.
+	* objc.dg/stubify-1.m: Likewise.
+	* objc.dg/stubify-2.m: Likewise.
+
+2019-11-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/79274
+	* g++.dg/tls/pr77285-2.C: XFAIL test for Darwin.
+
+2019-11-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.dg/pr90760.c: Require alias support.
+
+2019-11-01  Delia Burduv  <Delia.Burduv@arm.com>
+
+	Backport from trunk
+	2019-02-20  Andre Vieira <andre.simoesdiasvieira@arm.com>
+
+	PR target/86487
+	* gcc.target/arm/pr86487.c: New.
+
+2019-10-31  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-10-22  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.dg/Wnonnull.c: Provide prototypes for strlen and memcpy.
+	Use __SIZE_TYPE__ instead of size_t.
+
+	Backport from mainline.
+	2019-10-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.dg/Wnonnull.c: Add attributed function declarations for
+	memcpy and strlen for Darwin.
+
+2019-10-31  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-10-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.target/i386/indirect-thunk-1.c: Allow 'l' or 'L' in
+	indirection label prefix, for Darwin.
+	* gcc.target/i386/indirect-thunk-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-5.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-6.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-4.c: Likewise.
+	* gcc.target/i386/pr32219-2.c: Likewise.
+	* gcc.target/i386/pr32219-3.c: Likewise.
+	* gcc.target/i386/pr32219-4.c: Likewise.
+	* gcc.target/i386/pr32219-7.c: Likewise.
+	* gcc.target/i386/pr32219-8.c: Likewise.
+	* gcc.target/i386/ret-thunk-14.c: Likewise.
+	* gcc.target/i386/ret-thunk-15.c: Likewise.
+	* gcc.target/i386/ret-thunk-9.c: Likewise.
+
+2019-10-31  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-08-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* obj-c++.dg/stubify-1.mm: Rename symbol stub option.
+	* obj-c++.dg/stubify-2.mm: Likewise.
+	* objc.dg/stubify-1.m: Likewise.
+	* objc.dg/stubify-2.m: Likewise.
+
+2019-10-31  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-05-15  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* lib/target-supports.exp 
+	(check_effective_target_powerpc_p8vector_ok): No support for Darwin.
+	(check_effective_target_powerpc_p9vector_ok): Likewise.
+	(check_effective_target_powerpc_float128_sw_ok): Likewise.
+	(check_effective_target_powerpc_float128_hw_ok): Likewise.
+	(check_effective_target_powerpc_vsx_ok): Likewise.
+	* gcc.target/powerpc/bfp/bfp.exp: Don't try to run this for Darwin.
+	* gcc.target/powerpc/dfp/dfp.exp: Likewise.
+
+2019-10-30  Dragan Mladjenovic  <dmladjenovic@wavecomp.com>
+
+	Backport from mainline
+	2019-07-09  Dragan Mladjenovic  <dmladjenovic@wavecomp.com>
+
+	* gcc.target/mips/cfgcleanup-jalr1.c: New test.
+	* gcc.target/mips/cfgcleanup-jalr2.c: New test.
+	* gcc.target/mips/cfgcleanup-jalr3.c: New test.
+
+2019-10-28  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.c-torture/compile/pr72802.c: Skip for Darwin.
+
+2019-10-28  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	Backport from mainline
+	PR target/70010
+	* gcc.target/powerpc/pr70010.c: Add -Wno-psabi and -mvsx.
+
+2019-10-28  Peter Bergner <bergner@linux.ibm.com>
+	    Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR target/70010
+	* gcc.target/powerpc/pr70010.c: New test.
+	* gcc.target/powerpc/pr70010-1.c: New test.
+	* gcc.target/powerpc/pr70010-3.c: New test.
+	* gcc.target/powerpc/pr70010-4.c: New test.
+
+2019-10-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from mainline
+	PR fortran/86248
+	* gfortran.dg/char_result_19.f90 : New test.
+	* gfortran.dg/char_result_mod_19.f90 : Module for the new test.
+
+2019-10-25  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backport from mainline
+	2019-05-08  Mihail Ionescu  <mihail.ionescu@arm.com>
+	   Richard Earnshaw  <rearnsha@arm.com>
+	PR target/88167
+	* gcc.target/arm/pr88167-1.c: New test.
+	* gcc.target/arm/pr88167-2.c: New test.
+
 2019-10-23  Richard Biener  <rguenther@suse.de>
 
 	Backport from mainline

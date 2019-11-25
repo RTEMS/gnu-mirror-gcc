@@ -1,3 +1,81 @@
+2019-10-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2019-06-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/is_nothrow_invocable/value.cc: Test converting to
+	void.
+	* testsuite/experimental/names.cc: Do not run for C++98 mode. Do not
+	include Library Fundamentals or Networking headers in C++11 mode.
+
+	Backport from mainline
+	2019-10-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/memoryfwd.h (uses_allocator): Do not declare for C++98.
+	* testsuite/17_intro/names.cc: Check uses_allocator in C++98.
+
+	Backport from mainline
+	2019-10-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92143
+	* libsupc++/new_opa.cc (operator new) [__APPLE__]: Increase alignment
+	to at least sizeof(void*).
+
+	Backport from mainline
+	2019-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/Makefile.am (doc-html-docbook-regenerate): New target.
+	(${docbook_outdir}/html): Do not create unused 'html/ext' directory.
+	* doc/Makefile.in: Regenerate.
+	* doc/xml/manual/documentation_hacking.xml: Document new target.
+	* doc/html/*: Regenerate.
+
+	* doc/xml/manual/allocator.xml: Use archived copy of CUJ article.
+
+	Backport from mainline
+	2019-05-31  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/allocator.xml: Move hoard.org back to http.
+
+	Backport from mainline
+	2019-10-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92059
+	* include/tr2/dynamic_bitset (__dynamic_bitset_base): Define all
+	special member functions as defaulted. Add noexcept to most members.
+	(__dynamic_bitset_base(size_t, unsigned long long, const _Alloc&)):
+	Mask off unwanted bits in the __val parameter. Avoid undefined left
+	shifts.
+	(__dynamic_bitset_base::_M_assign): Remove.
+	(__dynamic_bitset_base::_M_do_reset): Use std::fill.
+	(__dynamic_bitset_base::_M_are_all_aux): Avoid integer promotion when
+	block_type has lower rank than int.
+	(dynamic_bitset): Add noexcept to most members. Use injected-class-name
+	in return types and parameter types.
+	(dynamic_bitset::_M_Nb): Add default member initializer.
+	(dynamic_bitset(), dynamic_bitset(const dynamic_bitset&)): Define as
+	defaulted.
+	(dynamic_bitset(dynamic_bitset&&)): Clear source object after move.
+	(dynamic_bitset::operator=(const dynamic_bitset&)): Define as
+	defaulted.
+	(dynamic_bitset::operator=(dynamic_bitset&&)): Add noexcept-specifier.
+	Define without using swap, to propagate allocator correctly.
+	(dynamic_bitset(const char*, const _Alloc&)): Use strlen.
+	(dynamic_bitset::_M_do_sanitize, dynamic_bitset::_M_do_fill): Use
+	casts to avoid unwanted integer promotions.
+	(dynamic_bitset::_M_copy_from_ptr): Rearrange template parameters and
+	add default template arguments and default argument to simplify usage.
+	(dynamic_bitset::_M_copy_from_string): Adjust call to _M_copy_from_ptr.
+	(operator==(const dynamic_bitset&, const dynamic_bitset&))
+	(operator<(const dynamic_bitset&, const dynamic_bitset&)): Use _M_Nb.
+	* include/tr2/dynamic_bitset.tcc (dynamic_bitset::_M_copy_from_ptr):
+	Adjust template parameters to match declaration.
+	* testsuite/tr2/dynamic_bitset/cmp.cc: New test.
+	* testsuite/tr2/dynamic_bitset/cons.cc: New test.
+	* testsuite/tr2/dynamic_bitset/copy.cc: New test.
+	* testsuite/tr2/dynamic_bitset/move.cc: New test.
+	* testsuite/tr2/dynamic_bitset/pr92059.cc: New test.
+
 2019-09-11  Jonathan Wakely  <jwakely@redhat.com>
 
 	* python/libstdcxx/v6/xmethods.py (SharedPtrUseCountWorker.__call__):

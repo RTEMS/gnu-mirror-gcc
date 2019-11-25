@@ -1,3 +1,23 @@
+2019-11-10  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/92113
+	* trans-decl.c (gfc_get_symbol_decl): If __def_init actually
+	contains a value, put it into  the read-only section.
+
+2019-10-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from mainline
+	PR fortran/86248
+	* resolve.c (flag_fn_result_spec): Correct a typo before the
+	function declaration.
+	* trans-decl.c (gfc_sym_identifier): Boost the length of 'name'
+	to allow for all variants. Simplify the code by using a pointer
+	to the symbol's proc_name and taking the return out of each of
+	the conditional branches. Allow symbols with fn_result_spec set
+	that do not come from a procedure namespace and have a module
+	name to go through the non-fn_result_spec branch.
+
 2019-10-18  Steven G. Kargl  <kargl@gcc.gnu.org>
 
 	PR fortran/69455

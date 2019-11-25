@@ -1,3 +1,8 @@
+2019-11-25  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to 278620.
+	* REVISION: Update subversion id.
+
 2019-08-13  Peter Bergner  <bergner@linux.ibm.com>
 
 	* REVISION: Change format to "[ibm/gcc-X-branch revision rev#]"
