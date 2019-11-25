@@ -1,4 +1,4 @@
-2019-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2019-11-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (add_operand): Allow constants that
 	satisfy the eI constraint.
