@@ -1,5 +1,11 @@
 2019-11-26  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsi_internal): Logically align the
+	columns of constraints and attributes to make it easier to add new
+	patterns in the middle.
+
+2019-11-26  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movdi_internal64): Logically align the
 	columns of constraints and attributes to make it easier to add new
 	patterns in the middle.
