@@ -1,5 +1,13 @@
 2019-11-27   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsi_internal): Add alternative to
+	use PADDI (PLI) to load up 32-bit constants when -mcpu=future is
+	used.
+	(movsi splitter): Don't split load of SImode constant if it can be
+	done in a single instruction.
+
+2019-11-27   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (num_insns_constant_gpr): Use
 	SIGNED_16BIT_OFFSET_P for range test.  Know that PADDI (PLI) can
 	load up to 34-bit constants in a single instruction when
