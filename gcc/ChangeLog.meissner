@@ -1,4 +1,16 @@
 2019-11-27   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Use
+	SIGNED_16BIT_OFFSET_P for range test.  Know that PADDI (PLI) can
+	load up to 34-bit constants in a single instruction when
+	-mcpu=future is used.
+	(rs6000_rtx_costs): Treat PADDIs as a single instruction in terms
+	of cost.
+	* config/rs6000/rs6000.md (movdi_internal64): Add alternative to
+	use PADDI (PLI) to load up 34-bit constants when -mcpu=future is
+	used.
+
+2019-11-27   Michael Meissner  <meissner@linux.ibm.com>
+
 	Clone branch subversion id 278789
 
