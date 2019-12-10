@@ -6766,9 +6766,17 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
 
-	  if (IN_RANGE (offset, -32768, 32767)
+	  /* 16-bit offset.  */
+	  if (SIGNED_16BIT_OFFSET_P (offset)
 	      && (scalar_size < 8 || (offset & 0x3) == 0))
 	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  /* 34-bit offset if we have prefixed addresses.  */
+	  else if (TARGET_PREFIXED_ADDR && SIGNED_34BIT_OFFSET_P (offset))
+	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  /* Offset overflowed, move offset to the temporary (which will likely
+	     be split), and do X-FORM addressing.  */
 	  else
 	    {
 	      emit_move_insn (base_tmp, offset_rtx);
