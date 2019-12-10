@@ -202,6 +202,16 @@
 
 ;; Memory constraints
 
+(define_memory_constraint "em"
+  "A memory operand that does not contain a prefixed address."
+  (and (match_code "mem")
+       (match_operand 0 "non_prefixed_memory")))
+
+(define_memory_constraint "ep"
+  "A memory operand that does contains a prefixed address."
+  (and (match_code "mem")
+       (match_operand 0 "prefixed_memory")))
+
 (define_memory_constraint "es"
   "A ``stable'' memory operand; that is, one which does not include any
 automodification of the base register.  Unlike @samp{m}, this constraint

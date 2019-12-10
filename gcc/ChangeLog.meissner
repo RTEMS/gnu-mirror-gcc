@@ -1,3 +1,12 @@
+2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	non-prefixed memory operands.
+	(ep constraint): New constraint for prefixed memory operands.
+	* config/rs6000/predicates.md (non_prefixed_memory): New predicate
+	for non-prefixed memory operands.
+	* doc/md.texi (PowerPC constraints): Document em and ep constraints.
+
 2019-12-09  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (add_operand): Allow eI constants.

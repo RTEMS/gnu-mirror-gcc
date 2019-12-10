@@ -1846,3 +1846,17 @@
 {
   return address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
 })
+
+;; Return true if the operand is a valid memory address that does not use a
+;; prefixed address.
+(define_predicate "non_prefixed_memory"
+  (match_code "mem")
+{
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_BAD
+          && iform != INSN_FORM_PREFIXED_NUMERIC
+	  && iform != INSN_FORM_PCREL_LOCAL
+	  && iform != INSN_FORM_PCREL_EXTERNAL);
+})
