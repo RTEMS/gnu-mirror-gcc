@@ -1,10 +1,5 @@
 2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
-	for the offset being 34-bits when -mcpu=future is used.
-
-2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
-
 	* config/rs6000/rs6000-protos.h (rs6000_split_vec_extract_var):
 	Update calling signature.
 	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add
