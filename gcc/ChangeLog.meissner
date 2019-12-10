@@ -1,29 +1,3 @@
-2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/constraint.md (em constraint): New constraint for
-	non-prefixed memory.
-	* config/rs6000/rs6000-protos.h (rs6000_split_vec_extract_var):
-	Adjust signature.
-	* config/rs6000/rs6000.c (rs6000_reg_to_addr_mask): New helper
-	function.
-	(rs6000_adjust_vec_address): Add support for prefixed addresses
-	that use large numeric offsets.  Move a PC-relative address into a
-	temporary before calculating the final address.
-	(rs6000_split_vec_extract_var): Add a new temporary to load
-	PC-relative addresses into.
-	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
-	Add support for vector extracts using prefixed addresses needing
-	an extra temporary base register.
-	(vsx_extract_v4sf_var): Add support for vector extracts using
-	prefixed addresses needing an extra temporary base register.
-	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Add support for
-	vector extracts using prefixed addresses needing an extra
-	temporary base register.
-	(vsx_extract_<mode>_<VS_scalar>mode_var): Add support for vector
-	extracts using prefixed addresses needing an extra temporary base
-	register.
-	* doc/md.texi (PowerPC constraints): Document the em constraint.
-
 2019-12-09  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (add_operand): Allow eI constants.
