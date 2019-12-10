@@ -1,5 +1,11 @@
 2019-12-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (add_operand): Allow eI constants.
+	* config/rs6000/rs6000.md (add<mode>3): Add alternative to
+	generate PADDI for 34-bit constants if -mcpu=future.
+
+2019-12-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (movsi_internal1): Add alternative to
 	use PLI to load up 34-bit constants if -mcpu=future.
 
