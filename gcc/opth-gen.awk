@@ -119,6 +119,41 @@ print "#endif"
 print "#endif"
 print ""
 
+print "#if !defined(IN_LIBGCC2) && !defined(IN_TARGET_LIBS) && !defined(IN_RTS)"
+print "#ifndef GENERATOR_FILE"
+print "static inline bool gcc_options_check (gcc_options *ptr1, gcc_options *ptr2)"
+print "{"
+print "  bool result = true;"
+
+# all these options are mentioned in PR92860
+checked_options["flag_merge_constants"]++
+checked_options["param_max_fields_for_field_sensitive"]++
+checked_options["flag_omit_frame_pointer"]++
+checked_options["unroll_only_small_loops"]++
+
+for (i = 0; i < n_opts; i++) {
+	name = var_name(flags[i]);
+	if (name == "")
+		continue;
+
+	if (name in checked_options)
+		continue;
+	checked_options[name]++
+
+	print "  if (ptr1->x_" name " != ptr2->x_" name ")"
+	print "  {"
+	print "    if (result)"
+	print "      fprintf (stderr, \"Error: global_options are modified in local context:\\n\");"
+	print "    fprintf (stderr, \"  " name " (%ld/%ld)\\n\", (long int)ptr1->x_" name ", (long int)ptr2->x_" name ");"
+	print "    result = false;"
+	print "  }"
+}
+
+print "  return result;"
+print "}"
+print "#endif"
+print "#endif"
+
 # All of the optimization switches gathered together so they can be saved and restored.
 # This will allow attribute((cold)) to turn on space optimization.
 
