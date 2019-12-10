@@ -4448,6 +4448,7 @@ handle_optimize_attribute (tree *node, tree name, tree args,
 
       /* If we previously had some optimization options, use them as the
 	 default.  */
+      gcc_options saved_global_options = global_options;
       if (old_opts)
 	cl_optimization_restore (&global_options,
 				 TREE_OPTIMIZATION (old_opts));
@@ -4459,6 +4460,8 @@ handle_optimize_attribute (tree *node, tree name, tree args,
 
       /* Restore current options.  */
       cl_optimization_restore (&global_options, &cur_opts);
+      if (flag_checking)
+	gcc_assert (gcc_options_check (&saved_global_options, &global_options));
     }
 
   return NULL_TREE;

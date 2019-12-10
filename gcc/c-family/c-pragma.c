@@ -1003,6 +1003,7 @@ struct GTY(()) opt_stack {
   tree target_strings;
   tree optimize_binary;
   tree optimize_strings;
+  gcc_options saved_global_options;
 };
 
 static GTY(()) struct opt_stack * options_stack;
@@ -1028,6 +1029,7 @@ handle_pragma_push_options (cpp_reader *ARG_UNUSED(dummy))
   options_stack = p;
 
   /* Save optimization and target flags in binary format.  */
+  p->saved_global_options = global_options;
   p->optimize_binary = build_optimization_node (&global_options);
   p->target_binary = build_target_option_node (&global_options);
 
@@ -1079,6 +1081,8 @@ handle_pragma_pop_options (cpp_reader *ARG_UNUSED(dummy))
 				      p->optimize_binary);
       optimization_current_node = p->optimize_binary;
     }
+  if (flag_checking)
+    gcc_assert (gcc_options_check (&p->saved_global_options, &global_options));
 
   current_target_pragma = p->target_strings;
   current_optimize_pragma = p->optimize_strings;
