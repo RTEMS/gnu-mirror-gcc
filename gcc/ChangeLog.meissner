@@ -1,5 +1,13 @@
 2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_reg_to_addr_mask): New helper
+	function.
+	(rs6000_adjust_vec_address): Add support for folding a constant
+	offset of a vector extract of a vector accessed with PC-relative
+	addressing into the offset of the load.
+
+2019-12-10  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
 	for the offset being 34-bits when -mcpu=future is used.
 
