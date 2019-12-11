@@ -40,7 +40,7 @@ struct foo *dec_store (struct foo *p, unsigned int *q)
 }
 
 /* { dg-final { scan-assembler-times {\mlwz\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mstwz\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mstw\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mpaddi\M}  4 } } */
 /* { dg-final { scan-assembler-times {\mplwz\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mpstw\M}   2 } } */
