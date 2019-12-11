@@ -1,11 +1,11 @@
 2019-12-11  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc.target/powerpc/prefixed-add.c: New test for -mcpu=future
+	* gcc.target/powerpc/prefix-add.c: New test for -mcpu=future
 	generating PADDI for large constant adds.
-	* gcc.target/powerpc/prefixed-load-di.c: New test for -mcpu=future
-	generating PLI to load up large DImode constants.
-	* gcc.target/powerpc/prefixed-load-si.c: New test for -mcpu=future
-	generating PLI to load up large SImode constants.
+	* gcc.target/powerpc/prefix-di-constant.c: New test for
+	-mcpu=future generating PLI to load up large DImode constants.
+	* gcc.target/powerpc/prefix-si-constant.c: New test for
+	-mcpu=future generating PLI to load up large SImode constants.
 
 2019-12-11  Michael Meissner  <meissner@linux.ibm.com>
 
