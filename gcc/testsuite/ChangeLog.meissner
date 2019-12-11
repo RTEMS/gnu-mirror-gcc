@@ -1,7 +1,7 @@
 2019-12-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/prefix-no-premodify.c: Make sure we do not
-	generate the non-existant PLWZU instruction if -mcpu=future.
+	generate the non-existent PLWZU instruction if -mcpu=future.
 
 2019-12-11  Michael Meissner  <meissner@linux.ibm.com>
 
