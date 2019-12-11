@@ -45,6 +45,6 @@ struct foo *dec_store (struct foo *p, unsigned int *q)
 /* { dg-final { scan-assembler-times {\mplwz\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mpstw\M}   2 } } */
 /* { dg-final { scan-assembler-not   {\mplwzu\M}    } } */
-/* { dg-final { scan-assembler-not   {\mpstwzu\M}   } } */
+/* { dg-final { scan-assembler-not   {\mpstwu\M}    } } */
 /* { dg-final { scan-assembler-not   {\maddis\M}    } } */
 /* { dg-final { scan-assembler-not   {\maddi\M}     } } */
