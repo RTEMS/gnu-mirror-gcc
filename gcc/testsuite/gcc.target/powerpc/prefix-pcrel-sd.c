@@ -14,4 +14,4 @@
 #include "prefix-pcrel.h"
 
 /* { dg-final { scan-assembler-times {[@]pcrel} 3 } } */
-/* { dg-final { scan-assembler-times {\mmpla\M} 3 } } */
+/* { dg-final { scan-assembler-times {\mpla\M}  3 } } */
