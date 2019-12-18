@@ -3,8 +3,8 @@
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add
 	assertion to make sure that we don't load an address into a
 	temporary that is already used.
-	(rs6000_split_vec_extract_var): Do not overwrite the element in
-	order to mask it.  Use the base register temporary instead.
+	(rs6000_split_vec_extract_var): Do not overwrite the element when
+	masking it.  Use the base register temporary instead.
 
 2019-12-18   Michael Meissner  <meissner@linux.ibm.com>
 
