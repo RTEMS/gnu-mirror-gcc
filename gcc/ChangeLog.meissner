@@ -1,5 +1,19 @@
 2019-12-17   Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (em constraint): New constraint for
+	a valid memory address that is not prefixed.
+	(ep constraint): New constraint for a valid memory address that is
+	prefixed.
+	* config/rs6000/predicates.md (prefixed_memory): Add more comments
+	about the memory addresses that are allowed.  Rewrite the code to be
+	similar to non_prefixed_memory.
+	(non_prefixed_memory): New predicate to return true for
+	traditional memory addresses that are not prefixed.
+	* doc/md.texi (PowerPC constraints): Document the em and ep
+	constraints.
+
+2019-12-17   Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (cint34_operand): Use
 	SIGNED_INTEGER_34BIT_P macro.
 	* config/rs6000/rs6000.c (num_insns_constant_gpr): Use the

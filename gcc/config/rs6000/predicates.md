@@ -1840,9 +1840,47 @@
   (ior (match_operand 0 "pcrel_local_address")
        (match_operand 0 "pcrel_external_address")))
 
-;; Return true if the operand is a memory address that uses a prefixed address.
+;; Return true if the operand is a valid memory address that uses a prefixed
+;; address (large numeric offset or a PC-relative reference to a local
+;; symbol/label).
+;;
+;; Memory operands that contain an address that uses a reference to an external
+;; symbol do not return true.  External references can only be loaded into a
+;; GPR.  They cannot be used in a normal memory reference.
 (define_predicate "prefixed_memory"
   (match_code "mem")
 {
-  return address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+  if (!memory_operand (op, mode))
+    return false;
+
+  if (pcrel_external_address (XEXP (op, 0), Pmode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform == INSN_FORM_PREFIXED_NUMERIC
+	  || iform == INSN_FORM_PCREL_LOCAL);
+})
+
+;; Return true if the operand is a valid memory address that does not use a
+;; prefixed address.  Return true for a tradiational address format (indirect,
+;; X-FORM, D-FORM, DS-FORM, DQ-FORM, or update).
+;;
+;; As with the prefixed_memory predicate, memory operands with an address that
+;; contain a reference to an external symbol do not return true.
+(define_predicate "non_prefixed_memory"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  if (pcrel_external_address (XEXP (op, 0), Pmode))
+    return false;
+
+  enum insn_form iform
+    = address_to_insn_form (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
+
+  return (iform != INSN_FORM_PREFIXED_NUMERIC
+	  && iform != INSN_FORM_PCREL_LOCAL);
 })
