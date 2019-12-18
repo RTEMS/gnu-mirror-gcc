@@ -6757,6 +6757,8 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
       else
 	{
+	  /* If we are called from rs6000_split_vec_extract_var, base_tmp may
+	     be the same as element.  */
 	  if (TARGET_POWERPC64)
 	    emit_insn (gen_ashldi3 (base_tmp, element, GEN_INT (byte_shift)));
 	  else
@@ -6825,6 +6827,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
 	  else
 	    {
+	      /* Make sure base_tmp is not the same as element_offset.  This
+		 can happen if the element number is variable and the address
+		 is not a simple address.  Otherwise we lose the offset, and
+		 double the address.  */
+	      gcc_assert (!reg_mentioned_p (base_tmp, element_offset));
 	      emit_move_insn (base_tmp, op1);
 	      emit_insn (gen_add2_insn (base_tmp, element_offset));
 	    }
@@ -6835,6 +6842,10 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
   else
     {
+      /* Make sure base_tmp is not the same as element_offset.  This can happen
+	 if the element number is variable and the address is not a simple
+	 address.  Otherwise we lose the offset, and double the address.  */
+      gcc_assert (!reg_mentioned_p (base_tmp, element_offset));
       emit_move_insn (base_tmp, addr);
       new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
     }
@@ -6902,9 +6913,10 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
       int num_elements = GET_MODE_NUNITS (mode);
       rtx num_ele_m1 = GEN_INT (num_elements - 1);
 
-      emit_insn (gen_anddi3 (element, element, num_ele_m1));
+      /* Make sure the element number is in bounds.  */
       gcc_assert (REG_P (tmp_gpr));
-      emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, element,
+      emit_insn (gen_anddi3 (tmp_gpr, element, num_ele_m1));
+      emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, tmp_gpr,
 						       tmp_gpr, scalar_mode));
       return;
     }
