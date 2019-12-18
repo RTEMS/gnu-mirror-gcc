@@ -6885,7 +6885,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
 void
 rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
-			      rtx tmp_altivec)
+			      rtx tmp_altivec, rtx tmp_prefixed)
 {
   machine_mode mode = GET_MODE (src);
   machine_mode scalar_mode = GET_MODE_INNER (GET_MODE (src));
@@ -6901,6 +6901,16 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
     {
       int num_elements = GET_MODE_NUNITS (mode);
       rtx num_ele_m1 = GEN_INT (num_elements - 1);
+
+      /* If we have a prefixed address, we need to load the address into a
+	 separate register and then add the variable offset to that
+	 address.  */
+      if (prefixed_memory (src, mode))
+	{
+	  gcc_assert (REG_P (tmp_prefixed));
+	  rs6000_emit_move (tmp_prefixed, XEXP (src, 0), Pmode);
+	  src = change_address (src, mode, tmp_prefixed);
+	}
 
       emit_insn (gen_anddi3 (element, element, num_ele_m1));
       gcc_assert (REG_P (tmp_gpr));

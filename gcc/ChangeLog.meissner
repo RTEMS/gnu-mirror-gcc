@@ -1,3 +1,37 @@
+2019-12-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_split_vec_extract_var):
+	Update calling signature.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add
+	additional tmp base register argument.  If the memory is prefixed,
+	put the address into the new tmp base register.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Add new temporary for loading up the address of prefixed memory
+	operands.
+	(vsx_extract_v4sf_var): Add new temporary for loading up the
+	address of prefixed memory operands.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Add new
+	temporary for loading up the address of prefixed memory operands.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Add new temporary for
+	loading up the address of prefixed memory operands.
+
+2019-12-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_split_vec_extract_var):
+	Update calling signature.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Add
+	additional tmp base register argument.  If the memory is prefixed,
+	put the address into the new tmp base register.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Add new temporary for loading up the address of prefixed memory
+	operands.
+	(vsx_extract_v4sf_var): Add new temporary for loading up the
+	address of prefixed memory operands.
+	(vsx_extract_<mode>_var, VSX_EXTRACT_I iterator): Add new
+	temporary for loading up the address of prefixed memory operands.
+	(vsx_extract_<mode>_<VS_scalar>mode_var): Add new temporary for
+	loading up the address of prefixed memory operands.
+
 2019-12-17   Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (em constraint): New constraint for
