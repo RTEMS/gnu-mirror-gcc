@@ -6792,9 +6792,17 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
 
-	  if (IN_RANGE (offset, -32768, 32767)
+	  /* 16-bit offset.  */
+	  if (SIGNED_INTEGER_16BIT_P (offset)
 	      && (scalar_size < 8 || (offset & 0x3) == 0))
 	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  /* 34-bit offset if we have prefixed addresses.  */
+	  else if (TARGET_PREFIXED_ADDR && SIGNED_INTEGER_34BIT_P (offset))
+	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
+
+	  /* Offset overflowed, move offset to the temporary (which will likely
+	     be split), and do X-FORM addressing.  */
 	  else
 	    {
 	      emit_move_insn (base_tmp, offset_rtx);
@@ -6824,6 +6832,12 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	      gcc_assert (insn != NULL_RTX);
 	      emit_insn (insn);
 	    }
+
+	  /* Make sure we don't overwrite the temporary if the element being
+	     extracted is variable, and we've put the offset into base_tmp
+	     previously.  */
+	  else if (rtx_equal_p (base_tmp, element_offset))
+	    emit_insn (gen_add2_insn (base_tmp, op1));
 
 	  else
 	    {
