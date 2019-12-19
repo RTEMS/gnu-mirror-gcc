@@ -1,5 +1,15 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
+	Only handle registers.  Move memory support to other insns.  Call
+	rs6000_split_extract_var_reg.
+	(vsx_extract_di_var_mem): New insn, split off from
+	vsx_extract_<mode>_var to extract DImode from a vector in memory.
+	(vsx_extract_df_var_mem): New insn, split off from
+	vsx_extract_<mode>_var to extract DFmode from a vector in memory.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h
 	(rs6000_split_vec_extract_var_reg): New declaration.
 	(rs6000_split_vec_extract_var_mem): New declaration.
