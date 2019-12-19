@@ -75,15 +75,22 @@
 				 | OPTION_MASK_P8_VECTOR		\
 				 | OPTION_MASK_P9_VECTOR)
 
-/* Support for a future processor's features.  Do not enable -mpcrel until it
-   is fully functional.  */
+/* Support for a future processor's features.  The prefixed and pc-relative
+   addressing bits are not added here.  Instead, they are added if the target
+   OS tm.h says that it supports the addressing modes by default when
+   -mcpu=future is used.  */
 #define ISA_FUTURE_MASKS_SERVER	(ISA_3_0_MASKS_SERVER			\
-				 | OPTION_MASK_FUTURE			\
+				 | OPTION_MASK_FUTURE)
+
+/* Addressing related flags on a future processor.  These are options that need
+   to be cleared if the target OS is not capable of supporting prefixed
+   addressing at all (such as 32-bit mode or if the object file format is not
+   ELF v2).  */
+#define ADDRESSING_FUTURE_MASKS	(OPTION_MASK_PCREL			\
 				 | OPTION_MASK_PREFIXED_ADDR)
 
 /* Flags that need to be turned off if -mno-future.  */
-#define OTHER_FUTURE_MASKS	(OPTION_MASK_PCREL			\
-				 | OPTION_MASK_PREFIXED_ADDR)
+#define OTHER_FUTURE_MASKS	ADDRESSING_FUTURE_MASKS
 
 /* Flags that need to be turned off if -mno-power9-vector.  */
 #define OTHER_P9_VECTOR_MASKS	(OPTION_MASK_FLOAT128_HW		\

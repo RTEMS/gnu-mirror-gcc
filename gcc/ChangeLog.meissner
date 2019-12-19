@@ -1,5 +1,29 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/linux64.h (PREFIXED_ADDR_SUPPORTED_BY_OS): Set to
+	1 to enable prefixed addressing if -mcpu=future.
+	(PCREL_SUPPORTED_BY_OS): Set to 1 to enable PC-relative addressing
+	if -mcpu=future.
+	* config/rs6000/rs6000-cpus.h (ISA_FUTURE_MASKS_SERVER): Do not
+	enable -mprefixed-addr or -mpcrel by default.
+	(ADDRESSING_FUTURE_MASKS): New macro.
+	(OTHER_FUTURE_MASKS): Use ADDRESSING_FUTURE_MASKS.
+	* config/rs6000/rs6000.c (PREFIXED_ADDR_SUPPORTED_BY_OS): Disable
+	prefixed addressing unless the target OS tm.h says we should
+	enable it.
+	(PCREL_SUPPORTED_BY_OS): Disable PC-relative addressing unless the
+	target OS tm.h says we should enable it.
+	(rs6000_debug_reg_global): Print whether prefixed addressing and
+	PC-relative addressing is enabled by default if -mcpu=future.
+	(rs6000_option_override_internal): Move setting prefixed
+	addressing and PC-relative addressing after the sub-target option
+	handling is done.  Only enable prefixed addressing or PC-relative
+	address on -mcpu=future system if the target OS says to enable
+	it.  Disallow prefixed addressing on 32-bit systems or if the
+	target object file is not ELF v2.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_reg_to_addr_mask): New helper
 	function to identify the address mask of a hard register.
 	(rs6000_adjust_vec_address): If we have a PC-relative address and
