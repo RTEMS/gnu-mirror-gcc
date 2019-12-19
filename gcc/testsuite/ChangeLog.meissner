@@ -1,5 +1,16 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/vec-extract-pcrel-si.c: New test for
+	vec_extract from a PC-relative address.
+	* gcc.target/powerpc/vec-extract-pcrel-di.c: New test for
+	vec_extract from a PC-relative address.
+	* gcc.target/powerpc/vec-extract-pcrel-sf.c: New test for
+	vec_extract from a PC-relative address.
+	* gcc.target/powerpc/vec-extract-pcrel-df.c: New test for
+	vec_extract from a PC-relative address.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-stack-protect.c: New test to make sure
 	-fstack-protect-strong works with prefixed addressing.
 
