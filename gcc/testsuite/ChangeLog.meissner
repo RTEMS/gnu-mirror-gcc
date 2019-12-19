@@ -1,5 +1,44 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-pcrel.h: New set of tests to test
+	prefixed addressing on 'future' system with PC-relative addresses
+	for various types.
+	* gcc.target/powerpc/prefix-pcrel-dd.c: New test for prefixed
+	loads/stores with PC-relative addresses for the _Decimal64 type.
+	* gcc.target/powerpc/prefix-pcrel-df.c: New test for prefixed
+	loads/stores with PC-relative addresses for the double type.
+	* gcc.target/powerpc/prefix-pcrel-di.c: New test for prefixed
+	loads/stores with PC-relative addresses for the long type.
+	* gcc.target/powerpc/prefix-pcrel-hi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the short type.
+	* gcc.target/powerpc/prefix-pcrel-kf.c: New test for prefixed
+	loads/stores with PC-relative addresses for the __float128 type.
+	* gcc.target/powerpc/prefix-pcrel-qi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the signed char type.
+	* gcc.target/powerpc/prefix-pcrel-sd.c: New test for prefixed
+	loads/stores with PC-relative addresses for the _Decimal32 type.
+	* gcc.target/powerpc/prefix-pcrel-sf.c: New test for prefixed
+	loads/stores with PC-relative addresses for the float type.
+	* gcc.target/powerpc/prefix-pcrel-si.c: New test for prefixed
+	loads/stores with PC-relative addresses for the int type.
+	* gcc.target/powerpc/prefix-pcrel-udi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the unsigned long
+	type.
+	* gcc.target/powerpc/prefix-pcrel-uhi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the unsigned short
+	type.
+	* gcc.target/powerpc/prefix-pcrel-uqi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the unsigned char
+	type.
+	* gcc.target/powerpc/prefix-pcrel-usi.c: New test for prefixed
+	loads/stores with PC-relative addresses for the unsigned int
+	type.
+	* gcc.target/powerpc/prefix-pcrel-v2df.c: New test for prefixed
+	loads/stores with PC-relative addresses for the vector double
+	type.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-large.h: New set of tests to test
 	prefixed addressing on 'future' system with large numeric offsets
 	for various types.
