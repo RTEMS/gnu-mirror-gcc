@@ -3247,51 +3247,19 @@
 
 ;; Variable V2DI/V2DF extract
 (define_insn_and_split "vsx_extract_<mode>_var"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "gpc_reg_operand" "v")
-			     (match_operand:DI 2 "gpc_reg_operand" "r")]
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=v,wa,r")
+	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "input_operand" "v,m,m")
+			     (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 			    UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=r"))
-   (clobber (match_scratch:V2DI 4 "=&v"))]
+   (clobber (match_scratch:DI 3 "=r,&b,&b"))
+   (clobber (match_scratch:V2DI 4 "=&v,X,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
-  rs6000_split_vec_extract_var_reg (operands[0], operands[1], operands[2],
-				    operands[3], operands[4]);
-  DONE;
-})
-
-(define_insn_and_split "*vsx_extract_di_var_mem"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,wa")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "memory_operand" "YZ,m")
-			     (match_operand:DI 2 "gpc_reg_operand" "r,r")]
-			    UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  rs6000_split_vec_extract_var_mem (operands[0], operands[1], operands[2],
-				    operands[3]);
-  DONE;
-})
-
-(define_insn_and_split "*vsx_extract_df_var_mem"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=wa,r")
-	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "memory_operand" "m,YZ")
-			     (match_operand:DI 2 "gpc_reg_operand" "r,r")]
-			    UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  rs6000_split_vec_extract_var_mem (operands[0], operands[1], operands[2],
-				    operands[3]);
+  rs6000_split_vec_extract_var (operands[0], operands[1], operands[2],
+				operands[3], operands[4]);
   DONE;
 })
 
