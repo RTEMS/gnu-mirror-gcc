@@ -1,5 +1,10 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-stack-protect.c: New test to make sure
+	-fstack-protect-strong works with prefixed addressing.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-pcrel.h: New set of tests to test
 	prefixed addressing on 'future' system with PC-relative addresses
 	for various types.
