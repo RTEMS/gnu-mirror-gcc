@@ -1,5 +1,19 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h
+	(rs6000_split_vec_extract_var_reg): New declaration.
+	(rs6000_split_vec_extract_var_mem): New declaration.
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var_reg): Split
+	the parts that handle doing a variable vector extract from a
+	register from a variable vector extract from memory.
+	(rs6000_split_vec_extract_var_mem): Split the parts that handle
+	doing a variable vector extract from memory from a variable
+	vector extract from a register.
+	(rs6000_split_vec_extract_var): Decide whether we are extracting
+	from a register or from memory.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add support
 	for the offset being 34-bits when -mcpu=future is used.
 

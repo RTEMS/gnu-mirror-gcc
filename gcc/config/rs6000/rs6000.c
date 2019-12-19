@@ -6906,11 +6906,12 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   return change_address (mem, scalar_mode, new_addr);
 }
 
-/* Split a variable vec_extract operation into the component instructions.  */
+/* Split a variable vec_extract operation from a register into the component
+   instructions.  */
 
 void
-rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
-			      rtx tmp_altivec)
+rs6000_split_vec_extract_var_reg (rtx dest, rtx src, rtx element, rtx tmp_gpr,
+				  rtx tmp_altivec)
 {
   machine_mode mode = GET_MODE (src);
   machine_mode scalar_mode = GET_MODE_INNER (GET_MODE (src));
@@ -6919,23 +6920,7 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
 
   gcc_assert (byte_shift >= 0);
 
-  /* If we are given a memory address, optimize to load just the element.  We
-     don't have to adjust the vector element number on little endian
-     systems.  */
-  if (MEM_P (src))
-    {
-      int num_elements = GET_MODE_NUNITS (mode);
-      rtx num_ele_m1 = GEN_INT (num_elements - 1);
-
-      /* Make sure the element number is in bounds.  */
-      gcc_assert (REG_P (tmp_gpr));
-      emit_insn (gen_anddi3 (tmp_gpr, element, num_ele_m1));
-      emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, tmp_gpr,
-						       tmp_gpr, scalar_mode));
-      return;
-    }
-
-  else if (REG_P (src) || SUBREG_P (src))
+  if (REG_P (src) || SUBREG_P (src))
     {
       int num_elements = GET_MODE_NUNITS (mode);
       int bits_in_element = mode_to_bits (GET_MODE_INNER (mode));
@@ -7087,6 +7072,46 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
   else
     gcc_unreachable ();
  }
+
+/* Split a variable vec_extract operation from memory into the component
+   instructions.  */
+
+void
+rs6000_split_vec_extract_var_mem (rtx dest, rtx src, rtx element, rtx tmp_gpr)
+{
+  machine_mode mode = GET_MODE (src);
+  machine_mode scalar_mode = GET_MODE_INNER (GET_MODE (src));
+  unsigned scalar_size = GET_MODE_SIZE (scalar_mode);
+  int byte_shift = exact_log2 (scalar_size);
+
+  gcc_assert (byte_shift >= 0);
+  gcc_assert (MEM_P (src));
+
+  /* Optimize the load to load just one element.  We don't have to adjust the
+     vector element number on little endian systems.  */
+  int num_elements = GET_MODE_NUNITS (mode);
+  rtx num_ele_m1 = GEN_INT (num_elements - 1);
+
+  /* Make sure the element number is in bounds.  */
+  gcc_assert (REG_P (tmp_gpr));
+  emit_insn (gen_anddi3 (tmp_gpr, element, num_ele_m1));
+  emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, tmp_gpr, tmp_gpr,
+						   scalar_mode));
+}
+
+/* Split a variable vec_extract operation from either a register or from memory
+   into the component instructions.  */
+
+void
+rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
+			      rtx tmp_altivec)
+{
+  if (MEM_P (src))
+    rs6000_split_vec_extract_var_mem (dest, src, element, tmp_gpr);
+  else
+    rs6000_split_vec_extract_var_reg (dest, src, element, tmp_gpr,
+				      tmp_altivec);
+}
 
 /* Return alignment of TYPE.  Existing alignment is ALIGN.  HOW
    selects whether the alignment is abi mandated, optional, or
