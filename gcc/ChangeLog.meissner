@@ -1,5 +1,12 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (Q constraint): Update
+	documentation.
+	* doc/md.tet (PowerPC constraints): Update 'Q' constraint
+	documentation.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/vsx.md (vsx_extract_<mode>_var, VSX_D iterator):
 	Use 'Q' for memory constraints because we need to do an X-FORM
 	load with the variable index.
