@@ -6722,6 +6722,30 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
     }
 }
 
+/* Helper function to return an address mask based on a physical register.  */
+
+static addr_mask_type
+rs6000_reg_to_addr_mask (rtx reg, machine_mode mode)
+{
+  unsigned int r = reg_or_subregno (reg);
+  addr_mask_type addr_mask;
+
+  gcc_assert (HARD_REGISTER_NUM_P (r));
+  if (INT_REGNO_P (r))
+    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_GPR];
+
+  else if (FP_REGNO_P (r))
+    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_FPR];
+
+  else if (ALTIVEC_REGNO_P (r))
+    addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_VMX];
+
+  else
+    gcc_unreachable ();
+
+  return addr_mask;
+}
+
 /* Adjust a memory address (MEM) of a vector type to point to a scalar field
    within the vector (ELEMENT) with a mode (SCALAR_MODE).  Use a base register
    temporary (BASE_TMP) to fixup the address.  Return the new memory address
@@ -6854,6 +6878,51 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	}
     }
 
+  /* For references to local static variables, try to fold a constant offset
+     into the address.  */
+  else if (pcrel_local_address (addr, Pmode) && CONST_INT_P (element_offset))
+    {
+      if (GET_CODE (addr) == CONST)
+	addr = XEXP (addr, 0);
+
+      if (GET_CODE (addr) == PLUS)
+	{
+	  rtx op0 = XEXP (addr, 0);
+	  rtx op1 = XEXP (addr, 1);
+	  if (CONST_INT_P (op1))
+	    {
+	      HOST_WIDE_INT offset
+		= INTVAL (XEXP (addr, 1)) + INTVAL (element_offset);
+
+	      if (offset == 0)
+		new_addr = op0;
+
+	      else if (SIGNED_INTEGER_34BIT_P (offset))
+		{
+		  rtx plus = gen_rtx_PLUS (Pmode, op0, GEN_INT (offset));
+		  new_addr = gen_rtx_CONST (Pmode, plus);
+		}
+
+	      else
+		{
+		  emit_move_insn (base_tmp, addr);
+		  new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
+		}
+	    }
+	  else
+	    {
+	      emit_move_insn (base_tmp, addr);
+	      new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
+	    }
+	}
+
+      else
+	{
+	  rtx plus = gen_rtx_PLUS (Pmode, addr, element_offset);
+	  new_addr = gen_rtx_CONST (Pmode, plus);
+	}
+    }
+
   else
     {
       /* Make sure base_tmp is not the same as element_offset.  This can happen
@@ -6869,21 +6938,8 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   if (GET_CODE (new_addr) == PLUS)
     {
       rtx op1 = XEXP (new_addr, 1);
-      addr_mask_type addr_mask;
-      unsigned int scalar_regno = reg_or_subregno (scalar_reg);
-
-      gcc_assert (HARD_REGISTER_NUM_P (scalar_regno));
-      if (INT_REGNO_P (scalar_regno))
-	addr_mask = reg_addr[scalar_mode].addr_mask[RELOAD_REG_GPR];
-
-      else if (FP_REGNO_P (scalar_regno))
-	addr_mask = reg_addr[scalar_mode].addr_mask[RELOAD_REG_FPR];
-
-      else if (ALTIVEC_REGNO_P (scalar_regno))
-	addr_mask = reg_addr[scalar_mode].addr_mask[RELOAD_REG_VMX];
-
-      else
-	gcc_unreachable ();
+      addr_mask_type addr_mask
+	= rs6000_reg_to_addr_mask (scalar_reg, scalar_mode);
 
       if (REG_P (op1) || SUBREG_P (op1))
 	valid_addr_p = (addr_mask & RELOAD_REG_INDEXED) != 0;
@@ -6891,8 +6947,20 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
     }
 
+  /* An address that is a single register is always valid for either indexed or
+     offsettable loads.  */
   else if (REG_P (new_addr) || SUBREG_P (new_addr))
     valid_addr_p = true;
+
+  /* If we have a PC-relative address, check if offsetable loads are
+     allowed.  */
+  else if (pcrel_local_address (new_addr, Pmode))
+    {
+      addr_mask_type addr_mask
+	= rs6000_reg_to_addr_mask (scalar_reg, scalar_mode);
+
+      valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+    }
 
   else
     valid_addr_p = false;

@@ -1,5 +1,13 @@
 2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_reg_to_addr_mask): New helper
+	function to identify the address mask of a hard register.
+	(rs6000_adjust_vec_address): If we have a PC-relative address and
+	a constant vector element number, fold the element number into the
+	PC-relative address.
+
+2019-12-19  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (Q constraint): Update
 	documentation.
 	* doc/md.tet (PowerPC constraints): Update 'Q' constraint
