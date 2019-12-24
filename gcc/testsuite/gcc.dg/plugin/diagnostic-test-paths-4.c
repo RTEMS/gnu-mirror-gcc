@@ -29,8 +29,6 @@ void test (void)
 }
 
 /* { dg-begin-multiline-output "" }
-   NN |   fprintf(stderr, "LOG: %s", msg);
-      |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   'test': events 1-2
     |
     |   NN | {
