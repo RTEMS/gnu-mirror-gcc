@@ -289,7 +289,7 @@ proc dg-additional-files { args } {
 # source files registered with dg-additional-sources.  SOURCE is the
 # name of the test case.
 
-proc dg-additional-files-options { options source } {
+proc dg-additional-files-options { options source type } {
     global additional_sources
     global additional_sources_used
     global additional_files
@@ -305,6 +305,9 @@ proc dg-additional-files-options { options source } {
 	set to_download [concat $to_download $additional_sources]
 	set additional_sources_used "$additional_sources"
 	set additional_sources ""
+	switch $type {
+	    executable { lappend options "additional_flags=-dumpdir ./" }
+	}
     }
     if { $additional_files != "" } then { 
 	regsub -all "^| " $additional_files " [file dirname $source]/" additional_files
