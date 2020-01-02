@@ -20,8 +20,6 @@ void test_1 (void *ptr, int a, int b)
 }
 
 /* { dg-begin-multiline-output "" }
-   NN |   free (ptr);
-      |   ^~~~~~~~~~
   'test_1': event 1
     |
     |   NN |     calls_free_1 (ptr);
@@ -90,8 +88,6 @@ void test_2 (void *ptr, int a, int b)
 }
 
 /* { dg-begin-multiline-output "" }
-   NN |   free (ptr);
-      |   ^~~~~~~~~~
   'test_2': event 1
     |
     |   NN |       calls_free_2 (ptr);
@@ -147,16 +143,11 @@ void test_3 (void *ptr)
 /* { dg-begin-multiline-output "" }
    NN |   free (ptr);
       |   ^~~~~~~~~~
-  'test_3': events 1-2
-    |
-    |   NN |   free (ptr);
-    |      |   ^~~~~~~~~~
-    |      |   |
-    |      |   (1) first 'free' here
-    |   NN |   called_by_test_3 ();
-    |   NN |   free (ptr);
-    |      |   ~~~~~~~~~~
-    |      |   |
-    |      |   (2) second 'free' here; first 'free' was at (1)
-    |
+      |   |
+      |   (1) first 'free' here
+   NN |   called_by_test_3 ();
+   NN |   free (ptr);
+      |   ~~~~~~~~~~
+      |   |
+      |   (2) second 'free' here; first 'free' was at (1)
   { dg-end-multiline-output "" } */

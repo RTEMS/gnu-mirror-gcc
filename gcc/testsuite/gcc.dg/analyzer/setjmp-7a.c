@@ -37,8 +37,6 @@ void outer (void)
 }
 
 /* { dg-begin-multiline-output "" }
-   NN |   longjmp (env, 1);
-      |   ^~~~~~~~~~~~~~~~
   'outer': event 1
     |
     |   NN | void outer (void)

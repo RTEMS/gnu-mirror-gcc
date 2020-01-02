@@ -46,8 +46,6 @@ void test (int i)
 
 /* double-'free'.  */
 /* { dg-begin-multiline-output "" }
-   NN |   free (ptr);
-      |   ^~~~~~~~~~
   'test': events 1-2
     |
     |   NN | void test (int i)
