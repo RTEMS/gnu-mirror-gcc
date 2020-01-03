@@ -140,7 +140,8 @@
 
 ;; Classification of each insn.
 ;; branch	conditional branch
-;; jump		unconditional jump
+;; jump		unconditional direct jump
+;; jalr		unconditional indirect jump
 ;; call		unconditional call
 ;; load		load instruction(s)
 ;; fpload	floating point load
@@ -168,7 +169,7 @@
 ;; nop		no operation
 ;; ghost	an instruction that produces no real code
 (define_attr "type"
-  "unknown,branch,jump,call,load,fpload,store,fpstore,
+  "unknown,branch,jump,jalr,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost"
   (cond [(eq_attr "got" "load") (const_string "load")
@@ -204,10 +205,21 @@
 ;; Length of instruction in bytes.
 (define_attr "length" ""
    (cond [
+	  ;; Branches further than +/- 1 MiB require three instructions.
 	  ;; Branches further than +/- 4 KiB require two instructions.
 	  (eq_attr "type" "branch")
 	  (if_then_else (and (le (minus (match_dup 0) (pc)) (const_int 4088))
 				  (le (minus (pc) (match_dup 0)) (const_int 4092)))
+	  (const_int 4)
+	  (if_then_else (and (le (minus (match_dup 0) (pc)) (const_int 1048568))
+				  (le (minus (pc) (match_dup 0)) (const_int 1048572)))
+	  (const_int 8)
+	  (const_int 12)))
+
+	  ;; Jumps further than +/- 1 MiB require two instructions.
+	  (eq_attr "type" "jump")
+	  (if_then_else (and (le (minus (match_dup 0) (pc)) (const_int 1048568))
+				  (le (minus (pc) (match_dup 0)) (const_int 1048572)))
 	  (const_int 4)
 	  (const_int 8))
 
@@ -1876,9 +1888,15 @@
 			 [(match_operand:X 2 "register_operand" "r")
 			  (match_operand:X 3 "reg_or_0_operand" "rJ")])
 	 (label_ref (match_operand 0 "" ""))
-	 (pc)))]
+	 (pc)))
+   (clobber (match_scratch:X 4 "=r"))]
   ""
-  "b%C1\t%2,%z3,%0"
+{
+  if (get_attr_length (insn) == 12)
+    return "b%N1\t%2,%z3,1f; jump\t%l0,%4; 1:";
+
+  return "b%C1\t%2,%z3,%l0";
+}
   [(set_attr "type" "branch")
    (set_attr "mode" "none")])
 
@@ -1921,7 +1939,21 @@
   [(set (pc)
 	(if_then_else (match_operand 0)
 		      (label_ref (match_operand 1))
-		      (pc)))])
+		      (pc)))]
+  ""
+{
+  emit_jump_insn (
+    gen_rtx_PARALLEL (VOIDmode,
+      gen_rtvec (2,
+	gen_rtx_SET (pc_rtx,
+	  gen_rtx_IF_THEN_ELSE (VOIDmode,
+	    operands[0],
+	    gen_rtx_LABEL_REF (VOIDmode, operands[1]),
+	    pc_rtx)),
+	gen_rtx_CLOBBER (VOIDmode, gen_rtx_SCRATCH (Pmode)))));
+
+  DONE;
+})
 
 (define_expand "cbranch<mode>4"
   [(set (pc)
@@ -1967,11 +1999,13 @@
   "reload_completed"
   [(set (match_dup 4)
 	(ashift:X (match_dup 2) (match_dup 3)))
-   (set (pc)
+   (parallel
+     [(set (pc)
 	(if_then_else
 	    (match_op_dup 0 [(match_dup 4) (const_int 0)])
 	    (label_ref (match_operand 1))
-	    (pc)))]
+	    (pc)))
+      (clobber (match_dup 4))])]
 {
   int shift = GET_MODE_BITSIZE (<MODE>mode) - 1 - INTVAL (operands[3]);
   operands[3] = GEN_INT (shift);
@@ -1998,11 +2032,13 @@
   "reload_completed"
   [(set (match_dup 4)
 	(ashift:X (match_dup 2) (match_dup 3)))
-   (set (pc)
+   (parallel
+     [(set (pc)
 	(if_then_else
 	    (match_op_dup 0 [(match_dup 4) (const_int 0)])
 	    (label_ref (match_operand 1))
-	    (pc)))]
+	    (pc)))
+      (clobber (match_dup 4))])]
 {
   operands[3] = GEN_INT (GET_MODE_BITSIZE (<MODE>mode) - INTVAL (operands[3]));
 })
@@ -2151,11 +2187,19 @@
 
 ;; Unconditional branches.
 
-(define_insn "jump"
-  [(set (pc)
-	(label_ref (match_operand 0 "" "")))]
+(define_expand "jump"
+  [(set (pc) (label_ref (match_operand 0)))]
+  "")
+
+(define_insn "*jump"
+  [(set (pc) (label_ref (match_operand 0 "" "")))]
   ""
-  "j\t%l0"
+{
+  if (get_attr_length (insn) == 8)
+    return "call\t%l0";
+
+  return "j\t%l0";
+}
   [(set_attr "type"	"jump")
    (set_attr "mode"	"none")])
 
@@ -2175,7 +2219,7 @@
   [(set (pc) (match_operand:P 0 "register_operand" "l"))]
   ""
   "jr\t%0"
-  [(set_attr "type" "jump")
+  [(set_attr "type" "jalr")
    (set_attr "mode" "none")])
 
 (define_expand "tablejump"
@@ -2200,7 +2244,7 @@
    (use (label_ref (match_operand 1 "" "")))]
   ""
   "jr\t%0"
-  [(set_attr "type" "jump")
+  [(set_attr "type" "jalr")
    (set_attr "mode" "none")])
 
 ;;
@@ -2260,7 +2304,7 @@
 {
   return riscv_output_return ();
 }
-  [(set_attr "type"	"jump")
+  [(set_attr "type"	"jalr")
    (set_attr "mode"	"none")])
 
 ;; Normal return.
@@ -2270,7 +2314,7 @@
    (use (match_operand 0 "pmode_register_operand" ""))]
   ""
   "jr\t%0"
-  [(set_attr "type"	"jump")
+  [(set_attr "type"	"jalr")
    (set_attr "mode"	"none")])
 
 ;; This is used in compiling the unwind routines.
