@@ -1,3 +1,14 @@
+2020-01-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add
+	gcc_assert tests to make sure the temporary register is safe to
+	use.  If the element number is variable, make sure it does not go
+	beyond the number of elements in the vector.  Simplify testing for
+	illegal address offsets.
+	(rs6000_split_vec_extract_var): Move the code for restricting the
+	variable element number for vectors in memory to the
+	rs6000_adjust_vec_address function.
+
 2020-01-03   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 279866

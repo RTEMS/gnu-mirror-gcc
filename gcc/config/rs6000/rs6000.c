@@ -6732,7 +6732,11 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 /* Adjust a memory address (MEM) of a vector type to point to a scalar field
    within the vector (ELEMENT) with a mode (SCALAR_MODE).  Use a base register
    temporary (BASE_TMP) to fixup the address.  Return the new memory address
-   that is valid for reads or writes to a given register (SCALAR_REG).  */
+   that is valid for reads or writes to a given register (SCALAR_REG).
+
+   The base register temporary cannot overlap with either the destination
+   register or with any registers used in the memory address.  It is used as a
+   temporary to build up the addresses.  */
 
 rtx
 rs6000_adjust_vec_address (rtx scalar_reg,
@@ -6756,21 +6760,31 @@ rs6000_adjust_vec_address (rtx scalar_reg,
     element_offset = GEN_INT (INTVAL (element) * scalar_size);
   else
     {
+      /* Mask the element to make sure the element number is between 0 and the
+	 maximum number of elements - 1 so that we don't address outside the
+	 vector.  */
+      int num_elements = GET_MODE_NUNITS (GET_MODE (mem));
+      rtx num_ele_m1 = GEN_INT (num_elements - 1);
+
+      if (TARGET_POWERPC64)
+	emit_insn (gen_anddi3 (base_tmp, element, num_ele_m1));
+      else
+	emit_insn (gen_andsi3 (base_tmp, element, num_ele_m1));
+
+      /* Shift the element to get the byte offset.  */
       int byte_shift = exact_log2 (scalar_size);
       gcc_assert (byte_shift >= 0);
 
-      if (byte_shift == 0)
-	element_offset = element;
-
-      else
+      if (byte_shift > 0)
 	{
 	  if (TARGET_POWERPC64)
-	    emit_insn (gen_ashldi3 (base_tmp, element, GEN_INT (byte_shift)));
+	    emit_insn (gen_ashldi3 (base_tmp, base_tmp, GEN_INT (byte_shift)));
 	  else
-	    emit_insn (gen_ashlsi3 (base_tmp, element, GEN_INT (byte_shift)));
+	    emit_insn (gen_ashlsi3 (base_tmp, base_tmp, GEN_INT (byte_shift)));
 
-	  element_offset = base_tmp;
 	}
+
+      element_offset = base_tmp;
     }
 
   /* Create the new address pointing to the element within the vector.  If we
@@ -6796,12 +6810,15 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	{
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
+	  new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
 
-	  if (IN_RANGE (offset, -32768, 32767)
-	      && (scalar_size < 8 || (offset & 0x3) == 0))
-	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
-	  else
+	  enum insn_form iform = address_to_insn_form (new_addr, scalar_mode,
+						       NON_PREFIXED_DEFAULT);
+
+	  /* If the address isn't valid, change REG+OFFSET into REG+REG.  */
+	  if (iform == INSN_FORM_BAD)
 	    {
+	      gcc_assert (!reg_mentioned_p (base_tmp, op0));
 	      emit_move_insn (base_tmp, offset_rtx);
 	      new_addr = gen_rtx_PLUS (Pmode, op0, base_tmp);
 	    }
@@ -6832,6 +6849,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
 	  else
 	    {
+	      gcc_assert (!reg_mentioned_p (base_tmp, element_offset));
 	      emit_move_insn (base_tmp, op1);
 	      emit_insn (gen_add2_insn (base_tmp, element_offset));
 	    }
@@ -6842,6 +6860,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 
   else
     {
+      gcc_assert (!reg_mentioned_p (base_tmp, element_offset));
       emit_move_insn (base_tmp, addr);
       new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
     }
@@ -6906,13 +6925,9 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
      systems.  */
   if (MEM_P (src))
     {
-      int num_elements = GET_MODE_NUNITS (mode);
-      rtx num_ele_m1 = GEN_INT (num_elements - 1);
-
-      emit_insn (gen_anddi3 (element, element, num_ele_m1));
-      gcc_assert (REG_P (tmp_gpr));
-      emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, element,
-						       tmp_gpr, scalar_mode));
+      rtx mem = rs6000_adjust_vec_address (dest, src, element, tmp_gpr,
+					   scalar_mode);
+      emit_move_insn (dest, mem);
       return;
     }
 
