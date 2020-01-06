@@ -6832,9 +6832,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	  HOST_WIDE_INT offset = INTVAL (op1) + INTVAL (element_offset);
 	  rtx offset_rtx = GEN_INT (offset);
 
-	  /* 16-bit offset.  */
-	  if (SIGNED_INTEGER_16BIT_P (offset)
-	      && (scalar_size < 8 || (offset & 0x3) == 0))
+	  enum insn_form iform = address_to_insn_form (new_addr, scalar_mode,
+						       NON_PREFIXED_DEFAULT);
+
+	  /* If the address isn't valid, change REG+OFFSET into REG+REG.  */
+	  if (iform == INSN_FORM_BAD)
 	    new_addr = gen_rtx_PLUS (Pmode, op0, offset_rtx);
 
 	  /* 34-bit offset if we have prefixed addresses.  */
