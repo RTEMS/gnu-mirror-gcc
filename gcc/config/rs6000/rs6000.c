@@ -6837,6 +6837,63 @@ adjust_vec_address_plus (rtx addr,
   return new_addr;
 }
 
+/* Helper function update PC-relative addresses when we are adjusting a memory
+   address (ADDR) to a vector to point to a scalar field within the vector with
+   a constant offset (ELEMENT_OFFSET).  If the address is not valid, we can
+   use the base register temporary (BASE_TMP) to form the address.  */
+
+static rtx
+adjust_vec_address_pcrel (rtx addr, rtx element_offset, rtx base_tmp)
+{
+  rtx new_addr = NULL;
+
+  gcc_assert (CONST_INT_P (element_offset));
+
+  if (GET_CODE (addr) == CONST)
+    addr = XEXP (addr, 0);
+
+  if (GET_CODE (addr) == PLUS)
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      if (CONST_INT_P (op1))
+	{
+	  HOST_WIDE_INT offset
+	    = INTVAL (XEXP (addr, 1)) + INTVAL (element_offset);
+
+	  if (offset == 0)
+	    new_addr = op0;
+
+	  else if (SIGNED_INTEGER_34BIT_P (offset))
+	    {
+	      rtx plus = gen_rtx_PLUS (Pmode, op0, GEN_INT (offset));
+	      new_addr = gen_rtx_CONST (Pmode, plus);
+	    }
+
+	  else
+	    {
+	      emit_move_insn (base_tmp, addr);
+	      new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
+	    }
+	}
+
+      else
+	{
+	  emit_move_insn (base_tmp, addr);
+	  new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
+	}
+    }
+
+  else
+    {
+      rtx plus = gen_rtx_PLUS (Pmode, addr, element_offset);
+      new_addr = gen_rtx_CONST (Pmode, plus);
+    }
+
+  return new_addr;
+}
+
 /* Adjust a memory address (MEM) of a vector type to point to a scalar field
    within the vector (ELEMENT) with a mode (SCALAR_MODE).  Use a base register
    temporary (BASE_TMP) to fixup the address.  Return the new memory address
@@ -6902,6 +6959,11 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   else if (REG_P (addr) || SUBREG_P (addr))
     new_addr = gen_rtx_PLUS (Pmode, addr, element_offset);
 
+  /* For references to local static variables, fold a constant offset into the
+     address.  */
+  else if (pcrel_local_address (addr, Pmode) && CONST_INT_P (element_offset))
+    new_addr = adjust_vec_address_pcrel (addr, element_offset, base_tmp);
+
   /* Optimize D_FORM and X_FORM addresses to possibly fold the constant into
      the address.  */
   else if (GET_CODE (addr) == PLUS)
@@ -6932,6 +6994,16 @@ rs6000_adjust_vec_address (rtx scalar_reg,
      offsettable loads.  */
   else if (REG_P (new_addr) || SUBREG_P (new_addr))
     valid_addr_p = true;
+
+  /* If we have a PC-relative address, check if offsetable loads are
+     allowed.  */
+  else if (pcrel_local_address (new_addr, Pmode))
+    {
+      addr_mask_type addr_mask
+	= hard_reg_and_mode_to_addr_mask (scalar_reg, scalar_mode);
+
+      valid_addr_p = (addr_mask & RELOAD_REG_OFFSET) != 0;
+    }
 
   else
     valid_addr_p = false;

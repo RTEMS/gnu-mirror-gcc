@@ -1,5 +1,14 @@
 2020-01-06  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (adjust_vec_address_pcrel): New helper
+	function to optimize adjusting a vector address to an element
+	offset where the address is PC-relative.
+	(rs6000_adjust_vec_address): If the address of the vector is
+	PC-relative and the offset of the element is constant, fold the
+	element offset into the PC-relative address.
+
+2020-01-06  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (adjust_vec_address_plus): New helper
 	function to optimize adjusting a vector address to an element
 	offset where the address involves a PLUS.
