@@ -6787,21 +6787,25 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	 single base register.  All insns should use the 'Q' constraint.  */
       gcc_assert (REG_P (addr) || SUBREG_P (addr));
 
+      /* Mask the element to make sure the element number is between 0 and the
+	 maximum number of elements - 1 so that we don't generate an address
+	 outside the vector.  */
+      rtx num_ele_m1 = GEN_INT (GET_MODE_NUNITS (GET_MODE (mem)) - 1);
+      rtx and_op = gen_rtx_AND (Pmode, element, num_ele_m1);
+      emit_insn (gen_rtx_SET (base_tmp, and_op));
+
+      /* Shift the element to get the byte offset.  */
       int byte_shift = exact_log2 (scalar_size);
       gcc_assert (byte_shift >= 0);
 
-      if (byte_shift == 0)
-	element_offset = element;
-
-      else
+      if (byte_shift > 0)
 	{
-	  if (TARGET_POWERPC64)
-	    emit_insn (gen_ashldi3 (base_tmp, element, GEN_INT (byte_shift)));
-	  else
-	    emit_insn (gen_ashlsi3 (base_tmp, element, GEN_INT (byte_shift)));
-
-	  element_offset = base_tmp;
+	  rtx shift_op
+	    = gen_rtx_ASHIFT (Pmode, base_tmp, GEN_INT (byte_shift));
+	  emit_insn (gen_rtx_SET (base_tmp, shift_op));
 	}
+
+      element_offset = base_tmp;
     }
 
   /* Create the new address pointing to the element within the vector.  If we
@@ -6938,13 +6942,9 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
      systems.  */
   if (MEM_P (src))
     {
-      int num_elements = GET_MODE_NUNITS (mode);
-      rtx num_ele_m1 = GEN_INT (num_elements - 1);
-
-      emit_insn (gen_anddi3 (element, element, num_ele_m1));
-      gcc_assert (REG_P (tmp_gpr));
-      emit_move_insn (dest, rs6000_adjust_vec_address (dest, src, element,
-						       tmp_gpr, scalar_mode));
+      rtx mem = rs6000_adjust_vec_address (dest, src, element, tmp_gpr,
+					   scalar_mode);
+      emit_move_insn (dest, mem);
       return;
     }
 

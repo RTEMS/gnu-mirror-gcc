@@ -1,5 +1,12 @@
 2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Move the
+	code to compute the offset of a vector extract from memory here
+	from rs6000_split_vec_extract_var.  Simplify generating the byte
+	offset for variable elements.
+
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Fix thinko.
 	Check if the variable element address is a register, not the
 	variable element offset.
