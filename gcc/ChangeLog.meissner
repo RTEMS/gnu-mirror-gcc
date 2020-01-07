@@ -1,3 +1,8 @@
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add
+	assertions to insure we don't overwrite a temporary register.
+
 2020-01-07   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 279964
