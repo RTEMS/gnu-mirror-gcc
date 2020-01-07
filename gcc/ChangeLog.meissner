@@ -1,5 +1,10 @@
 2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Simplify
+	creating a vector address by switching the order of the adds.
+
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (get_vector_offset): New helper function
 	to calculate the byte offset within a vector of an element.
 	(rs6000_adjust_vec_address): Use get_vector_offset to calculate
