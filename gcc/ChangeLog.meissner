@@ -1,5 +1,11 @@
 2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Fix thinko.
+	Check if the variable element address is a register, not the
+	variable element offset.
+
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add
 	assertions to insure we don't overwrite a temporary register.
 

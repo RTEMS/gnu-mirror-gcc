@@ -6785,7 +6785,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
     {
       /* If the element number is variable, make sure the address is just a
 	 single base register.  All insns should use the 'Q' constraint.  */
-      gcc_assert (REG_P (element) || SUBREG_P (element));
+      gcc_assert (REG_P (addr) || SUBREG_P (addr));
 
       int byte_shift = exact_log2 (scalar_size);
       gcc_assert (byte_shift >= 0);
