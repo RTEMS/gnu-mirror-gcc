@@ -6833,6 +6833,7 @@ rs6000_adjust_vec_address (rtx scalar_reg,
     {
       rtx op0 = XEXP (addr, 0);
       rtx op1 = XEXP (addr, 1);
+      rtx insn;
 
       gcc_assert (REG_P (op0) || SUBREG_P (op0));
       if (CONST_INT_P (op1) && CONST_INT_P (element_offset))
@@ -6859,11 +6860,41 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	}
       else
 	{
-	  /* If we don't have a D-FORM address with a constant offset, first
-	     add the two elements in the current address.  Then add the
-	     offset.  */
-	  emit_insn (gen_rtx_SET (base_tmp, addr));
-	  new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
+	  bool op1_reg_p = (REG_P (op1) || SUBREG_P (op1));
+	  bool ele_reg_p = (REG_P (element_offset) || SUBREG_P (element_offset));
+
+	  /* Note, ADDI requires the register being added to be a base
+	     register.  If the register was R0, load it up into the temporary
+	     and do the add.  */
+	  if (op1_reg_p
+	      && (ele_reg_p || reg_or_subregno (op1) != FIRST_GPR_REGNO))
+	    {
+	      insn = gen_add3_insn (base_tmp, op1, element_offset);
+	      gcc_assert (insn != NULL_RTX);
+	      emit_insn (insn);
+	    }
+
+	  else if (ele_reg_p
+		   && reg_or_subregno (element_offset) != FIRST_GPR_REGNO)
+	    {
+	      insn = gen_add3_insn (base_tmp, element_offset, op1);
+	      gcc_assert (insn != NULL_RTX);
+	      emit_insn (insn);
+	    }
+
+	  /* Make sure we don't overwrite the temporary if the element being
+	     extracted is variable, and we've put the offset into base_tmp
+	     previously.  */
+	  else if (reg_mentioned_p (base_tmp, element_offset))
+	    emit_insn (gen_add2_insn (base_tmp, op1));
+
+	  else
+	    {
+	      emit_move_insn (base_tmp, op1);
+	      emit_insn (gen_add2_insn (base_tmp, element_offset));
+	    }
+
+	  new_addr = gen_rtx_PLUS (Pmode, op0, base_tmp);
 	}
     }
 
