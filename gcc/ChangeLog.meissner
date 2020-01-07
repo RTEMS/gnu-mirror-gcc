@@ -1,5 +1,13 @@
 2020-01-06  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (adjust_vec_address_plus): New helper
+	function to optimize adjusting a vector address to an element
+	offset where the address involves a PLUS.
+	(rs6000_adjust_vec_address): Move code that handles the PLUS
+	conversion to adjust_vec_address_plus and call it.
+
+2020-01-06  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Use
 	address_to_insn_form to validate the new address with a constant
 	offset instead of just blindly checking the offset.
