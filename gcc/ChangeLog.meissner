@@ -1,5 +1,19 @@
 2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): Add forward
+	declaration.
+	(hard_reg_and_mode_to_addr_mask): Delete, no longer used.
+	(adjust_vec_address_pcrel): New helper function to optimize
+	adjusting vector addresses where the vector's address is
+	PC-relative, and the element offset is constant.
+	(rs6000_adjust_vec_address): Rework calculating the address of the
+	scalar element, using reg_to_non_prefixed and address_to_insn_form
+	to validate the address.  Add optimization to adjust vector
+	addresses where the vector's address is PC-relative, and the
+	element number is constant.
+
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Simplify
 	creating a vector address by switching the order of the adds.
 
