@@ -1,5 +1,13 @@
 2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
 
+	Revert this patch.
+	2020-01-07  Luo Xiong Hu  <luoxhu@linux.ibm.com>
+
+	* ipa-inline-analysis.c (estimate_growth): Fix typo.
+	* ipa-inline.c (caller_growth_limits): Use OR instead of AND.
+
+2020-01-07  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Move the
 	code to compute the offset of a vector extract from memory here
 	from rs6000_split_vec_extract_var.  Simplify generating the byte
