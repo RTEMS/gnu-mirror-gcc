@@ -1,5 +1,13 @@
 2020-01-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (adjust_vec_address_pcrel): New helper
+	function optimize adjusting a PC-relative vector address with a
+	constant offset.
+	(rs6000_adjust_vec_address): Optimize adjusting vectors with
+	PC-relative addresses and a constant offset.
+
+2020-01-08  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (reg_to_non_prefixed): Add forward
 	declaration.
 	(hard_reg_and_mode_to_addr_mask): Delete, no longer used.
