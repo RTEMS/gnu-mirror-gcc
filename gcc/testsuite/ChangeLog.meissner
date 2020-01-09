@@ -1,5 +1,44 @@
 2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-large.h: New set of tests to test
+	prefixed addressing on 'future' system with large numeric offsets
+	for various types.
+	* gcc.target/powerpc/prefix-large-dd.c: New test for prefixed
+	loads/stores with large offsets for the _Decimal64 type.
+	* gcc.target/powerpc/prefix-large-df.c: New test for prefixed
+	loads/stores with large offsets for the double type.
+	* gcc.target/powerpc/prefix-large-di.c: New test for prefixed
+	loads/stores with large offsets for the long type.
+	* gcc.target/powerpc/prefix-large-hi.c: New test for prefixed
+	loads/stores with large offsets for the short type.
+	* gcc.target/powerpc/prefix-large-kf.c: New test for prefixed
+	loads/stores with large offsets for the __float128 type.
+	* gcc.target/powerpc/prefix-large-qi.c: New test for prefixed
+	loads/stores with large offsets for the signed char type.
+	* gcc.target/powerpc/prefix-large-sd.c: New test for prefixed
+	loads/stores with large offsets for the _Decimal32 type.
+	* gcc.target/powerpc/prefix-large-sf.c: New test for prefixed
+	loads/stores with large offsets for the float type.
+	* gcc.target/powerpc/prefix-large-si.c: New test for prefixed
+	loads/stores with large offsets for the int type.
+	* gcc.target/powerpc/prefix-large-udi.c: New test for prefixed
+	loads/stores with large offsets for the unsigned long type.
+	* gcc.target/powerpc/prefix-large-uhi.c: New test for prefixed
+	loads/stores with large offsets for the unsigned short type.
+	* gcc.target/powerpc/prefix-large-uqi.c: New test for prefixed
+	loads/stores with large offsets for the unsigned char type.
+	* gcc.target/powerpc/prefix-large-usi.c: New test for prefixed
+	loads/stores with large offsets for the unsigned int type.
+	* gcc.target/powerpc/prefix-large-v2df.c: New test for prefixed
+	loads/stores with large offsets for the vector double type.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-no-premodify.c: Make sure we do not
+	generate the non-existent PLWZU instruction if -mcpu=future.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-ds-dq.c: New test to verify that we
 	generate the prefix load/store instructions for traditional
 	instructions with an offset that doesn't match DS/DQ
