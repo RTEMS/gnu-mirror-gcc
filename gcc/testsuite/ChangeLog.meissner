@@ -1,5 +1,17 @@
 2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/vec-extract-large-si.c: New test for
+	vec_extract from a vector unsigned int in memory with a large
+	offset.
+	* gcc.target/powerpc/vec-extract-large-di.c: New test for
+	vec_extract from a vector long in memory with a large offset.
+	* gcc.target/powerpc/vec-extract-large-sf.c: New test for
+	vec_extract from a vector float in memory with a large offset.
+	* gcc.target/powerpc/vec-extract-large-df.c: New test for
+	vec_extract from a vector double in memory with a large offset.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/vec-extract-pcrel-si.c: New test for
 	vec_extract from a PC-relative address.
 	* gcc.target/powerpc/vec-extract-pcrel-di.c: New test for
