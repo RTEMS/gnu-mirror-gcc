@@ -1,3 +1,62 @@
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/linux64.h (PREFIXED_ADDR_SUPPORTED_BY_OS): Set to
+	1 to enable prefixed addressing if -mcpu=future.
+	(PCREL_SUPPORTED_BY_OS): Set to 1 to enable PC-relative addressing
+	if -mcpu=future.
+	* config/rs6000/rs6000-cpus.h (ISA_FUTURE_MASKS_SERVER): Do not
+	enable -mprefixed-addr or -mpcrel by default.
+	(ADDRESSING_FUTURE_MASKS): New macro.
+	(OTHER_FUTURE_MASKS): Use ADDRESSING_FUTURE_MASKS.
+	* config/rs6000/rs6000.c (PREFIXED_ADDR_SUPPORTED_BY_OS): Disable
+	prefixed addressing unless the target OS tm.h says we should
+	enable it.
+	(PCREL_SUPPORTED_BY_OS): Disable PC-relative addressing unless the
+	target OS tm.h says we should enable it.
+	(rs6000_debug_reg_global): Print whether prefixed addressing and
+	PC-relative addressing is enabled by default if -mcpu=future.
+	(rs6000_option_override_internal): Move setting prefixed
+	addressing and PC-relative addressing after the sub-target option
+	handling is done.  Only enable prefixed addressing or PC-relative
+	address on -mcpu=future system if the target OS says to enable
+	it.  Disallow prefixed addressing on 32-bit systems or if the
+	target object file is not ELF v2.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (adjust_vec_address_pcrel): New helper
+	function to adjust PC-relative vector addresses.
+	(rs6000_adjust_vec_address): Call adjust_vec_address_pcrel to
+	handle vectors with PC-relative addresses.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): Add forward
+	reference.
+	(hard_reg_and_mode_to_addr_mask): Delete, no longer used.
+	(rs6000_adjust_vec_address): If the original vector address
+	was REG+REG or REG+OFFSET and the element is not zero, do the add
+	of the elements in the original address before adding the offset
+	for the vector element.  Use address_to_insn_form to validate the
+	address using the register being loaded, rather than guessing
+	whether the address is a DS-FORM or DQ-FORM address.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (get_vector_offset): New helper function
+	to calculate the offset in memory from the start of a vector of a
+	particular element.  Add code to keep the element number in
+	bounces if the element number is variable.
+	(rs6000_adjust_vec_address): Move calculation of offset of the
+	vector element to get_vector_offset.
+	(rs6000_split_vec_extract_var): Do not do the initial AND of
+	element here, move the code to get_vector_offset.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_adjust_vec_address): Add some
+	gcc_asserts.
+
 2020-01-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 280068

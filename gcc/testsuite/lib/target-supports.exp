@@ -2161,6 +2161,23 @@ proc check_p9modulo_hw_available { } {
     }]
 }
 
+# Return 1 if the target generates PC-relative instructions automatically
+proc check_effective_target_powerpc_pcrel { } {
+    return [check_no_messages_and_pattern powerpc_pcrel \
+	{\mpld\M.*[@]pcrel} assembly {
+	    static long s;
+	    long *p = &s;
+	    long foo (void) { return s; }
+	} {-O2 -mcpu=future}]
+}
+
+# Return 1 if the target generates prefixed instructions automatically
+proc check_effective_target_powerpc_prefixed_addr { } {
+    return [check_no_messages_and_pattern powerpc_prefixed_addr \
+	{\mpld\M} assembly {
+	    long foo (long *p) { return p[0x12345]; }
+	} {-O2 -mcpu=future}]
+}
 
 # Return 1 if the target supports executing FUTURE instructions, 0 otherwise.
 # Cache the result.  It is assumed that if a simulator does not support the
