@@ -1,5 +1,14 @@
 2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-add.c: New test for -mcpu=future
+	generating PADDI for large constant adds.
+	* gcc.target/powerpc/prefix-di-constant.c: New test for
+	-mcpu=future generating PLI to load up large DImode constants.
+	* gcc.target/powerpc/prefix-si-constant.c: New test for
+	-mcpu=future generating PLI to load up large SImode constants.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* lib/target-supports.exp (check_effective_target_powerpc_pcrel):
 	New target for PowerPC -mcpu=future support.
 	(check_effective_target_powerpc_prefixed_addr): New target for
