@@ -1,5 +1,12 @@
 2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-ds-dq.c: New test to verify that we
+	generate the prefix load/store instructions for traditional
+	instructions with an offset that doesn't match DS/DQ
+	requirements.
+
+2020-01-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-add.c: New test for -mcpu=future
 	generating PADDI for large constant adds.
 	* gcc.target/powerpc/prefix-di-constant.c: New test for
