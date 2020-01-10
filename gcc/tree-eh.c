@@ -52,6 +52,9 @@ along with GCC; see the file COPYING3.  If not see
    i.e. in hash tables. This is a structure to do this. */
 typedef union {tree *tp; tree t; gimple *g;} treemple;
 
+/* Outer clean up region cache.  */
+hash_map<eh_region, eh_region> *outer_clean_up_cache;
+
 /* Misc functions used in this file.  */
 
 /* Remember and lookup EH landing pad data for arbitrary statements.
@@ -1634,8 +1637,20 @@ decide_copy_try_finally (int ndests, bool may_throw, gimple_seq finally)
 static bool
 cleanup_is_dead_in (eh_region reg)
 {
+  eh_region orig = reg;
   while (reg && reg->type == ERT_CLEANUP)
-    reg = reg->outer;
+    {
+      eh_region *slot = outer_clean_up_cache->get (reg);
+      if (slot)
+	{
+	  reg = *slot;
+	  break;
+	}
+      reg = reg->outer;
+    }
+
+  if (reg != NULL)
+    outer_clean_up_cache->put (orig, reg);
   return (reg && reg->type == ERT_MUST_NOT_THROW);
 }
 
@@ -2173,6 +2188,7 @@ public:
 unsigned int
 pass_lower_eh::execute (function *fun)
 {
+  outer_clean_up_cache = new hash_map<eh_region, eh_region> ();
   struct leh_state null_state;
   gimple_seq bodyp;
 
@@ -2209,6 +2225,8 @@ pass_lower_eh::execute (function *fun)
       && !DECL_FUNCTION_PERSONALITY (current_function_decl))
     DECL_FUNCTION_PERSONALITY (current_function_decl)
       = lang_hooks.eh_personality ();
+
+  delete outer_clean_up_cache;
 
   return 0;
 }
