@@ -219,6 +219,33 @@ namespace ranges
 				 std::move(__pred), std::move(__proj));
     }
 
+  template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Tp, typename _Proj = identity>
+    requires indirect_binary_predicate<ranges::equal_to,
+				       projected<_Iter, _Proj>,
+				       const _Tp*>
+    constexpr iter_difference_t<_Iter>
+    count(_Iter __first, _Sent __last, const _Tp& __value, _Proj __proj = {})
+    {
+      iter_difference_t<_Iter> __n = 0;
+      for (; __first != __last; ++__first)
+	if (std::__invoke(__proj, *__first) == __value)
+	  ++__n;
+      return __n;
+    }
+
+  template<input_range _Range, typename _Tp, typename _Proj = identity>
+    requires indirect_binary_predicate<ranges::equal_to,
+				       projected<iterator_t<_Range>, _Proj>,
+				       const _Tp*>
+    constexpr range_difference_t<_Range>
+    count(_Range&& __r, const _Tp& __value, _Proj __proj = {})
+    {
+      return ranges::count(ranges::begin(__r), ranges::end(__r),
+			   __value, std::move(__proj));
+    }
+
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
