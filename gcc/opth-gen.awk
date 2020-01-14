@@ -130,6 +130,10 @@ for (i = 0; i < n_opts; i++) {
 	if (name == "")
 		continue;
 
+	# provide temporary exceptions for options we know to make troubles
+	if (name == "flag_merge_constants" || name == "param_max_fields_for_field_sensitive" || name == "flag_omit_frame_pointer")
+	  continue;
+
 	print "  if (ptr1->x_" name " != ptr2->x_" name ")"
 	print "  {"
 	print "    if (result)"
