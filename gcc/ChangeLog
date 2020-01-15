@@ -1,3 +1,40 @@
+2020-01-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* BASE-VER: Bump to 10.0.1.
+
+2020-01-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/93247
+	* tree-vect-loop.c (update_epilogue_loop_vinfo): Check the access
+	type of the stmt that we're going to vectorize.
+
+2020-01-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-vect-slp.c (vectorize_slp_instance_root_stmt): Use a
+	VIEW_CONVERT_EXPR if the vectorized constructor has a diffeent
+	type from the lhs.
+
+2020-01-15  Martin Liska  <mliska@suse.cz>
+
+	* ipa-profile.c (ipa_profile_read_edge_summary): Do not allow
+	2 calls of streamer_read_hwi in a function call.
+
+2020-01-15  Richard Biener  <rguenther@suse.de>
+
+	* alias.c (record_alias_subset): Avoid redundant work when
+	subset is already recorded.
+
+2020-01-14  David Malcolm  <dmalcolm@redhat.com>
+
+	* doc/invoke.texi (-fdiagnostics-show-cwe): Add note that some of
+	the analyzer options provide CWE identifiers.
+
+2020-01-14  David Malcolm  <dmalcolm@redhat.com>
+
+	* tree-diagnostic-path.cc (path_summary::event_range::print):
+	When testing for UNKNOWN_LOCATION, look through ad-hoc wrappers
+	using get_pure_location.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/rs6000/rs6000.c (rs6000_elf_end_indicate_exec_stack): New.
