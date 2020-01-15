@@ -92,10 +92,11 @@ merge_topn_values_set (gcov_type *counters)
   /* First value is number of total executions of the profiler.  */
   gcov_type all = gcov_get_counter_ignore_scaling (-1);
   counters[0] += all;
+  all = counters[0];
   ++counters;
 
-  /* Read all part values.  */
-  gcov_type read_counters[2 * GCOV_TOPN_VALUES];
+  /* Read all part values.  Make the buffer twice bigger.  */
+  gcov_type read_counters[2 * 2 * GCOV_TOPN_VALUES] = {};
 
   for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
     {
@@ -109,32 +110,44 @@ merge_topn_values_set (gcov_type *counters)
       return;
     }
 
+  /* Merge both couters into read_counter which has sufficient size.  */
   for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    for (unsigned j = 0; j < GCOV_TOPN_VALUES; j++)
+      {
+	if (read_counters[2 * j] == counters[2 * i])
+	  {
+	    read_counters[2 * j + 1] += counters[2 * i + 1];
+	    break;
+	  }
+	else if (read_counters[2 * j + 1] == 0)
+	  {
+	    read_counters[2 * j] += counters[2 * i];
+	    read_counters[2 * j + 1] += counters[2 * i + 1];
+	    break;
+	  }
+      }
+
+  /* Prune both halves of the read_counters.  */
+  prune_topn_counter (read_counters, all);
+  prune_topn_counter (read_counters + 2 * GCOV_TOPN_VALUES, all);
+
+  /* Copy back merged values.  */
+  memset (counters, 0, GCOV_TOPN_VALUES_COUNTERS * sizeof (counters[0]));
+  unsigned index = 0;
+  for (unsigned i = 0; i < 2 * GCOV_TOPN_VALUES; i++)
     {
-      if (read_counters[2 * i + 1] == 0)
-	return;
-
-      unsigned j;
-      for (j = 0; j < GCOV_TOPN_VALUES; j++)
+      if (read_counters[2 * i + 1] > 0)
 	{
-	  if (counters[2 * j] == read_counters[2 * i])
+	  /* We haven't found an empty slot, bail out.  */
+	  if (index == GCOV_TOPN_VALUES)
 	    {
-	      counters[2 * j + 1] += read_counters[2 * i + 1];
-	      break;
+	      counters[1] = -1;
+	      return;
 	    }
-	  else if (counters[2 * j + 1] == 0)
-	    {
-	      counters[2 * j] += read_counters[2 * i];
-	      counters[2 * j + 1] += read_counters[2 * i + 1];
-	      break;
-	    }
-	}
 
-      /* We haven't found a slot, bail out.  */
-      if (j == GCOV_TOPN_VALUES)
-	{
-	  counters[1] = -1;
-	  return;
+	  counters[2 * index] = read_counters[2 * i];
+	  counters[2 * index + 1] = read_counters[2 * i + 1];
+	  index++;
 	}
     }
 }

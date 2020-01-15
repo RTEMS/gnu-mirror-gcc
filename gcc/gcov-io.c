@@ -587,6 +587,31 @@ mangle_path (char const *base)
   return buffer;
 }
 
+/* Prune TOP N value COUNTERS.  */
+
+void
+prune_topn_counter (gcov_type *counters, gcov_type all)
+{
+  if (counters[1] == -1)
+    return;
+
+  // TODO
+#if 0
+  fprintf (stderr, "prune_topn_counter for all=%d\n", all);
+  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    fprintf (stderr, "%d:%d:%d\n", i, counters[2 * i], counters[2 * i + 1]);
+#endif
+
+  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    {
+      if (counters[2 * i + 1] < all)
+	{
+	  counters[2 * i] = 0;
+	  counters[2 * i + 1] = 0;
+	}
+    }
+}
+
 /* We need to expose the below function when compiling for gcov-tool.  */
 
 #if !IN_LIBGCOV || defined (IN_GCOV_TOOL)
