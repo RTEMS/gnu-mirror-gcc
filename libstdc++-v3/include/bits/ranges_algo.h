@@ -418,6 +418,56 @@ namespace ranges
 			    std::move(__proj1), std::move(__proj2));
     }
 
+  template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   class _Pred = ranges::equal_to,
+	   class _Proj1 = identity, class _Proj2 = identity>
+    requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
+    constexpr subrange<_Iter1>
+    find_end(_Iter1 __first1, _Sent1 __last1,
+	     _Iter2 __first2, _Sent2 __last2,
+	     _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      if (__first2 == __last2)
+	return {__last1, __last1};
+
+      auto __res_first = __last1;
+      auto __res_last = __last1;
+      for (;;)
+	{
+	  auto __new_range = ranges::search(__first1, __last1,
+					    __first2, __last2,
+					    __pred, __proj1, __proj2);
+	  auto __new_res_first = ranges::begin(__new_range);
+	  auto __new_res_last = ranges::end(__new_range);
+	  if (__new_res_first == __last1)
+	    return {__res_first, __res_last};
+	  else
+	    {
+	      __res_first = __new_res_first;
+	      __res_last = __new_res_last;
+	      __first1 = __res_first;
+	      ++__first1;
+	    }
+	}
+    }
+
+  template<forward_range _Range1, forward_range _Range2,
+	   class _Pred = ranges::equal_to,
+	   class _Proj1 = identity, class _Proj2 = identity>
+    requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
+				   _Pred, _Proj1, _Proj2>
+    constexpr safe_subrange_t<_Range1>
+    find_end(_Range1&& __r1, _Range2&& __r2,
+	     _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::find_end(ranges::begin(__r1), ranges::end(__r1),
+			      ranges::begin(__r2), ranges::end(__r2),
+			      std::move(__pred),
+			      std::move(__proj1), std::move(__proj2));
+    }
+
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
