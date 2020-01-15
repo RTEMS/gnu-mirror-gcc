@@ -494,20 +494,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   namespace ranges::__detail
   {
-#if __SIZEOF_INT128__
-    using __max_diff_type = __int128;
-    using __max_size_type = unsigned __int128;
-#else
-    using __max_diff_type = long long;
-    using __max_size_type = unsigned long long;
-#endif
+    class __max_diff_type;
+    class __max_size_type;
 
     template<typename _Tp>
       concept __is_integer_like = integral<_Tp>
+#if __SIZEOF_INT128__
+	|| same_as<_Tp, __int128> || same_as<_Tp, unsigned __int128>
+#endif
 	|| same_as<_Tp, __max_diff_type> || same_as<_Tp, __max_size_type>;
 
     template<typename _Tp>
       concept __is_signed_integer_like = signed_integral<_Tp>
+#if __SIZEOF_INT128__
+	|| same_as<_Tp, __int128>
+#endif
 	|| same_as<_Tp, __max_diff_type>;
 
   } // namespace ranges::__detail

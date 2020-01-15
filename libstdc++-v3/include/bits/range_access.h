@@ -347,6 +347,522 @@ namespace ranges
 
   namespace __detail
   {
+    class __max_size_type
+    {
+    public:
+      __max_size_type() = default;
+
+      template<integral _Tp>
+	constexpr
+	__max_size_type(_Tp __i) noexcept
+	: _M_val(__i), _M_msb(__i < 0)
+	{ }
+
+      template<int __dummy = 0>
+	constexpr explicit
+	__max_size_type(const __max_diff_type& __d) noexcept
+	: __max_size_type(__d._M_rep)
+	{ }
+
+      template<integral _Tp>
+	constexpr explicit operator _Tp() const noexcept
+	{ return _M_val; }
+
+      constexpr explicit
+      operator bool() const noexcept { return _M_val != 0 || _M_msb != 0; }
+
+      constexpr __max_size_type
+      operator+() const noexcept { return *this; }
+
+      constexpr __max_size_type
+      operator~() const noexcept
+      { return __max_size_type{~_M_val, !_M_msb}; }
+
+      constexpr __max_size_type
+      operator-() const noexcept
+      { return operator~() + 1; }
+
+      constexpr __max_size_type&
+      operator+=(const __max_size_type& __r) noexcept
+      {
+	const auto __sum = _M_val + __r._M_val;
+	const bool __overflow = (__sum < _M_val);
+	_M_msb = _M_msb ^ __r._M_msb ^ __overflow;
+	_M_val = __sum;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator-=(const __max_size_type& __r) noexcept
+      { return *this += -__r; }
+
+      constexpr __max_size_type&
+      operator*=(const __max_size_type& __r) noexcept
+      {
+	const bool __lsb = _M_val % 2;
+	*this >>= 1;
+
+	auto __rcopy = __r;
+	const bool __rlsb = __rcopy._M_val % 2;
+	__rcopy >>= 1;
+
+	auto __res = 2 * _M_val * __rcopy._M_val;
+	__res += _M_val * __rlsb;
+	__res += __rcopy._M_val * __lsb;
+	_M_val = __res;
+	*this <<= 1;
+	*this += __rlsb * __lsb;
+
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator/=(const __max_size_type& __r) noexcept
+      {
+	__glibcxx_assert(__r != 0);
+
+	if (_M_msb && __r._M_msb)
+	  {
+	    _M_val = (_M_val >= __r._M_val);
+	    _M_msb = 0;
+	  }
+	else if (!_M_msb && __r._M_msb)
+	  _M_val = 0;
+	else if (!_M_msb && !__r._M_msb)
+	  _M_val /= __r._M_val;
+	else if (_M_msb && !__r._M_msb)
+	  {
+	    const auto __orig = *this;
+	    *this >>= 1;
+	    _M_val /= __r._M_val;
+	    *this <<= 1;
+	    if (__orig - *this * __r >= __r)
+	      _M_val++;
+	  }
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator%=(const __max_size_type& __r) noexcept
+      {
+	*this = *this - (*this / __r) * __r;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator<<=(const __max_size_type& __r) noexcept
+      {
+	constexpr auto __bits = sizeof(__rep) * __CHAR_BIT__;
+	__glibcxx_assert(__r._M_val < __bits);
+	__glibcxx_assert(__r._M_msb == 0);
+	if (_M_val & (__rep(1) << __bits - __r._M_val))
+	  _M_msb = 1;
+	else
+	  _M_msb = 0;
+	_M_val <<= __r._M_val;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator>>=(const __max_size_type& __r) noexcept
+      {
+	constexpr auto __bits = sizeof(__rep) * __CHAR_BIT__;
+	__glibcxx_assert(__r._M_val < __bits);
+	__glibcxx_assert(__r._M_msb == 0);
+
+	_M_val >>= __r._M_val;
+	if (_M_msb && __r._M_val != 0)
+	  {
+	    _M_val |= __rep(1) << (__bits - __r._M_val);
+	    _M_msb = 0;
+	  }
+
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator&=(const __max_size_type& __r) noexcept
+      {
+	_M_val &= __r._M_val;
+	_M_msb &= __r._M_msb;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator|=(const __max_size_type& __r) noexcept
+      {
+	_M_val |= __r._M_val;
+	_M_msb |= __r._M_msb;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator^=(const __max_size_type& __r) noexcept
+      {
+	_M_val ^= __r._M_val;
+	_M_msb ^= __r._M_msb;
+	return *this;
+      }
+
+      friend constexpr __max_size_type
+      operator+(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l += __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator-(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l -= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator*(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l *= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator/(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l /= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator%(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l %= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator<<(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l <<= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator>>(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l >>= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator&(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l &= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator|(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l |= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator^(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l ^= __r;
+	return __l;
+      }
+
+      friend constexpr bool
+      operator==(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      { return __l._M_val == __r._M_val && __l._M_msb == __r._M_msb; }
+
+      friend constexpr bool
+      operator!=(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      { return !(__l == __r); }
+
+      friend constexpr bool
+      operator<(const __max_size_type& __l, const __max_size_type& __r) noexcept
+      {
+	if (__l._M_msb == __r._M_msb)
+	  return __l._M_val < __r._M_val;
+	else
+	  return __r._M_msb;
+      }
+
+      friend constexpr bool
+      operator>(const __max_size_type& __l, const __max_size_type& __r) noexcept
+      { return __r < __l; }
+
+      friend constexpr bool
+      operator<=(const __max_size_type& __l, const __max_size_type& __r) noexcept
+      { return !(__l > __r); }
+
+      friend constexpr bool
+      operator>=(const __max_size_type& __l, const __max_size_type& __r) noexcept
+      { return __r <= __l; }
+
+#ifdef __SIZEOF_INT128__
+      using __rep = unsigned __int128;
+#else
+      using __rep = unsigned long long;
+#endif
+    private:
+      __rep _M_val = 0;
+      unsigned _M_msb : 1 = 0;
+
+      constexpr explicit
+      __max_size_type(__rep __val, int __msb) noexcept
+      : _M_val(__val), _M_msb(__msb)
+      { }
+
+      friend class __max_diff_type;
+    };
+
+    class __max_diff_type
+    {
+    public:
+      __max_diff_type() = default;
+
+      template<integral _Tp>
+	constexpr
+	__max_diff_type(_Tp __i) noexcept
+	: _M_rep(__i)
+	{ }
+
+      constexpr explicit
+      __max_diff_type(const __max_size_type& __d) noexcept
+      : _M_rep(__d)
+      { }
+
+      template<integral _Tp>
+	constexpr explicit operator _Tp() const noexcept
+	{ return static_cast<_Tp>(_M_rep); }
+
+      constexpr explicit
+      operator bool() const noexcept { return _M_rep != 0; }
+
+      constexpr __max_diff_type
+      operator+() const noexcept { return *this; }
+
+      constexpr __max_diff_type
+      operator-() const noexcept
+      { return __max_diff_type(-_M_rep); }
+
+      constexpr __max_diff_type
+      operator~() const noexcept
+      { return __max_diff_type(~_M_rep); }
+
+      constexpr __max_diff_type&
+      operator+=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep += __r._M_rep;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator-=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep -= __r._M_rep;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator*=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep *= __r._M_rep;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator/=(const __max_diff_type& __r) noexcept
+      {
+	const auto __neg = *this < 0;
+	const auto __rneg = __r < 0;
+	if (!__neg && !__rneg)
+	  _M_rep = _M_rep / __r._M_rep;
+	else if (__neg && __rneg)
+	  _M_rep = -_M_rep / -__r._M_rep;
+	else
+	  {
+	    auto __rcopy = __r;
+	    if (__neg)
+	      _M_rep = -_M_rep;
+	    if (__rneg)
+	      __rcopy = -__rcopy;
+	    _M_rep = -(_M_rep / __rcopy._M_rep);
+	  }
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator%=(const __max_diff_type& __r) noexcept
+      {
+	*this = *this - (*this / __r) * __r;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator<<=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep.operator<<=(__r._M_rep);
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator>>=(const __max_diff_type& __r) noexcept
+      {
+	const auto __msb = _M_rep._M_msb;
+	_M_rep >>= __r._M_rep;
+	_M_rep._M_msb |= __msb;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator&=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep &= __r._M_rep;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator|=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep |= __r._M_rep;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator^=(const __max_diff_type& __r) noexcept
+      {
+	_M_rep ^= __r._M_rep;
+	return *this;
+      }
+
+      friend constexpr __max_diff_type
+      operator+(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l += __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator-(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l -= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator*(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l *= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator/(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l /= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator%(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l %= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator<<(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l <<= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator>>(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l >>= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator&(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l &= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator|(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l |= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator^(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l ^= __r;
+	return __l;
+      }
+
+      friend constexpr bool
+      operator==(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      {
+	return __l._M_rep == __r._M_rep;
+      }
+
+      friend constexpr bool
+      operator!=(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      { return !(__l == __r); }
+
+      constexpr bool
+      operator<(const __max_diff_type& __r) const noexcept
+      {
+	const auto __lsign = _M_rep._M_msb;
+	const auto __rsign = __r._M_rep._M_msb;
+	if (__lsign ^ __rsign)
+	  return __lsign;
+	else
+	  return _M_rep < __r._M_rep;
+      }
+
+      friend constexpr bool
+      operator>(const __max_diff_type& __l, const __max_diff_type& __r) noexcept
+      { return __r < __l; }
+
+      friend constexpr bool
+      operator<=(const __max_diff_type& __l, const __max_diff_type& __r) noexcept
+      { return !(__r < __l); }
+
+      friend constexpr bool
+      operator>=(const __max_diff_type& __l, const __max_diff_type& __r) noexcept
+      { return !(__l < __r); }
+
+    private:
+      __max_size_type _M_rep = 0;
+
+      friend class __max_size_type;
+    };
+
+    static_assert(sizeof(__max_diff_type) == sizeof(__max_size_type));
+
+    constexpr __max_size_type
+    __to_unsigned_like(__max_size_type __t) noexcept
+    { return __t; }
+
+    constexpr __max_size_type
+    __to_unsigned_like(__max_diff_type __t) noexcept
+    { return __max_size_type(__t); }
+
     template<integral _Tp>
       constexpr make_unsigned_t<_Tp>
       __to_unsigned_like(_Tp __t) noexcept
