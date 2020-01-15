@@ -494,7 +494,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   namespace ranges::__detail
   {
-#if __SIZEOF_INT128__
+#ifdef _GLIBCXX_INTEGER_LIKE_TYPES
+    class __max_diff_type;
+    class __max_size_type;
+#elif __SIZEOF_INT128__
     using __max_diff_type = __int128;
     using __max_size_type = unsigned __int128;
 #else

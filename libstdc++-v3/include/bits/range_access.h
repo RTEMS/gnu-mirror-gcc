@@ -347,6 +347,428 @@ namespace ranges
 
   namespace __detail
   {
+#ifdef _GLIBCXX_INTEGER_LIKE_TYPES
+    class __max_diff_type
+    {
+    public:
+      __max_diff_type() = default;
+
+      template<signed_integral _Tp>
+	constexpr
+	__max_diff_type(_Tp __i) noexcept
+	: _M_val(__i < 0 ? rep(~__i) + rep(1) : __i), _M_sign_bit(__i < 0)
+	{ }
+
+      template<unsigned_integral _Tp>
+	constexpr
+	__max_diff_type(_Tp __i) noexcept
+	: _M_val(__i), _M_sign_bit(false)
+	{ }
+
+      template<signed_integral _Tp>
+	constexpr explicit operator _Tp() const noexcept
+	{
+	  _Tp __val = _M_val % (sizeof(_Tp) * __CHAR_BIT__);
+	  if (_M_sign_bit)
+	    return -__val;
+	  else
+	    return __val;
+	}
+
+      template<unsigned_integral _Tp>
+	constexpr explicit operator _Tp() const noexcept
+	{ return _M_val; }
+
+      constexpr explicit
+      operator bool() const noexcept { return _M_val != 0; }
+
+      constexpr __max_diff_type
+      operator+() const noexcept { return *this; }
+
+      constexpr __max_diff_type
+      operator-() const noexcept
+      { return __max_diff_type{_M_val, !_M_sign_bit}; }
+
+      constexpr __max_diff_type
+      operator~() const noexcept
+      { return __max_diff_type{~_M_val, !_M_sign_bit}; }
+
+      constexpr __max_diff_type&
+      operator+=(const __max_diff_type& __r) noexcept
+      {
+	if (_M_sign_bit == __r._M_sign_bit)
+	  _M_val += __r._M_val;
+	else if (_M_val >= __r._M_val)
+	  _M_val -= __r._M_val;
+	else
+	  {
+	    _M_val = __r._M_val - _M_val;
+	    _M_sign_bit = !_M_sign_bit;
+	  }
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator-=(const __max_diff_type& __r) noexcept
+      {
+	auto __rneg = __r;
+	__rneg._M_sign_bit = !__r._M_sign_bit;
+	return *this += __rneg;
+      }
+
+      constexpr __max_diff_type&
+      operator*=(const __max_diff_type& __r) noexcept
+      {
+	_M_val *= __r._M_val;
+	_M_sign_bit = (_M_sign_bit != __r._M_sign_bit);
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator/=(const __max_diff_type& __r) noexcept
+      {
+	_M_val /= __r._M_val;
+	_M_sign_bit = (_M_sign_bit != __r._M_sign_bit);
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator%=(const __max_diff_type& __r) noexcept
+      {
+	_M_val /= __r._M_val;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator<<=(const __max_diff_type& __r) noexcept
+      {
+	__glibcxx_assert(__r._M_val < numeric_limits<rep>::digits);
+	__glibcxx_assert(!__r._M_sign_bit);
+	_M_val <<= __r._M_val;
+	return *this;
+      }
+
+      constexpr __max_diff_type&
+      operator>>=(const __max_diff_type& __r) noexcept
+      {
+	__glibcxx_assert(__r._M_val < numeric_limits<rep>::digits);
+	__glibcxx_assert(!__r._M_sign_bit);
+	_M_val >>= __r._M_val;
+	return *this;
+      }
+
+      friend constexpr __max_diff_type
+      operator+(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l += __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator-(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l -= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator*(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l *= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator/(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l /= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator%(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l %= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator<<(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l <<= __r;
+	return __l;
+      }
+
+      friend constexpr __max_diff_type
+      operator>>(__max_diff_type __l, const __max_diff_type& __r) noexcept
+      {
+	__l >>= __r;
+	return __l;
+      }
+
+      // TODO & | ^
+
+      friend constexpr bool
+      operator==(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      {
+	return __l._M_val == __r._M_val && __l._M_sign_bit == __r._M_sign_bit;
+      }
+
+      friend constexpr bool
+      operator!=(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      { return !(__l == __r); }
+
+      friend constexpr bool
+      operator<(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      {
+	if (__l._M_sign_bit)
+	  {
+	    if (__r._M_sign_bit)
+	      return __l._M_val > __r._M_val;
+	    else
+	      return true;
+	  }
+	else if (__r._M_sign_bit)
+	  return false;
+	return __l._M_val < __r._M_val;
+      }
+
+      friend constexpr bool
+      operator>(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      { return __r < __l; }
+
+      friend constexpr bool
+      operator<=(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      { return !(__r < __l); }
+
+      friend constexpr bool
+      operator>=(const __max_diff_type& __l, const __max_diff_type& __r)
+      noexcept
+      { return !(__l < __r); }
+
+    private:
+#ifdef __SIZEOF_INT128__
+      using rep = unsigned __int128;
+#else
+      using rep = unsigned long long;
+#endif
+      rep _M_val = 0;
+      bool _M_sign_bit = false;
+
+      constexpr explicit
+      __max_diff_type(rep __val, bool __sb) noexcept
+      : _M_val(__val), _M_sign_bit(__sb)
+      { }
+
+      friend class __max_size_type;
+    };
+
+    class __max_size_type
+    {
+    public:
+      __max_size_type() = default;
+
+      template<integral _Tp>
+	constexpr
+	__max_size_type(_Tp __i) noexcept
+	: _M_val(__i), _M_msb(0)
+	{ }
+
+      constexpr explicit
+      __max_size_type(const __max_diff_type& __d)
+      : _M_val(__d._M_val), _M_msb(__d._M_sign_bit)
+      { }
+
+      template<integral _Tp>
+	constexpr explicit operator _Tp() const noexcept
+	{ return _M_val; }
+
+      constexpr explicit
+      operator bool() const noexcept { return _M_val != 0; }
+
+      constexpr __max_size_type
+      operator+() const noexcept { return *this; }
+
+      constexpr __max_size_type
+      operator-() const noexcept
+      { return __max_size_type{_M_val, !_M_sign_bit}; }
+
+      constexpr __max_size_type
+      operator~() const noexcept
+      { return __max_size_type{~_M_val, !_M_sign_bit}; }
+
+      constexpr __max_size_type&
+      operator+=(const __max_size_type& __r) noexcept
+      {
+	if (_M_sign_bit == __r._M_sign_bit)
+	  _M_val += __r._M_val;
+	else if (_M_val >= __r._M_val)
+	  _M_val -= __r._M_val;
+	else
+	  {
+	    _M_val = __r._M_val - _M_val;
+	    _M_sign_bit = !_M_sign_bit;
+	  }
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator-=(const __max_size_type& __r) noexcept
+      {
+	auto __rneg = __r;
+	__rneg._M_sign_bit = !__r._M_sign_bit;
+	return *this += __rneg;
+      }
+
+      constexpr __max_size_type&
+      operator*=(const __max_size_type& __r) noexcept
+      {
+	_M_val *= __r._M_val;
+	_M_sign_bit ^= __r._M_sign_bit;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator/=(const __max_size_type& __r) noexcept
+      {
+	_M_val /= __r._M_val;
+	_M_sign_bit ^= __r._M_sign_bit;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator%=(const __max_size_type& __r) noexcept
+      {
+	_M_val /= __r._M_val;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator<<=(const __max_size_type& __r) noexcept
+      {
+	__glibcxx_assert(__r._M_val < numeric_limits<rep>::digits);
+	__glibcxx_assert(__r._M_sign_bit == 0);
+	_M_val <<= __r._M_val;
+	return *this;
+      }
+
+      constexpr __max_size_type&
+      operator>>=(const __max_size_type& __r) noexcept
+      {
+	__glibcxx_assert(__r._M_val < numeric_limits<rep>::digits);
+	__glibcxx_assert(__r._M_sign_bit == 0);
+	_M_val >>= __r._M_val;
+	return *this;
+      }
+
+      friend constexpr __max_size_type
+      operator+(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l += __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator-(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l -= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator*(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l *= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator/(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l /= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator%(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l %= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator<<(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l <<= __r;
+	return __l;
+      }
+
+      friend constexpr __max_size_type
+      operator>>(__max_size_type __l, const __max_size_type& __r) noexcept
+      {
+	__l >>= __r;
+	return __l;
+      }
+
+      // TODO & | ^ > <= >=
+
+      friend constexpr bool
+      operator==(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      {
+	return __l._M_val == __r._M_val && __l._M_msb == __r._M_msb;
+      }
+
+      friend constexpr bool
+      operator!=(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      { return !(__l == __r); }
+
+      friend constexpr bool
+      operator<(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      {
+	if (__l._M_msb == __r._M_msb)
+	  return __l._M_val < __r._M_val;
+	else
+	  return __r._M_msb;
+      }
+
+      friend constexpr bool
+      operator>(const __max_size_type& __l, const __max_size_type& __r)
+      noexcept
+      { return __r < __l; }
+
+    private:
+#ifdef __SIZEOF_INT128__
+      using rep = unsigned __int128;
+#else
+      using rep = unsigned long long;
+#endif
+      rep _M_val = 0;
+      unsigned _M_msb : 1;
+
+      constexpr explicit
+      __max_size_type(rep __val, int __sb) noexcept
+      : _M_val(__val), _M_sig_bit(__sb)
+      { }
+    };
+
+    constexpr __max_size_type
+    __to_unsigned_like(__max_size_type __t) noexcept
+    { return __t; }
+
+    constexpr __max_size_type
+    __to_unsigned_like(__max_diff_type __t) noexcept
+    { return __max_size_type(__t); }
+
+#endif // _GLIBCXX_INTEGER_LIKE_TYPES
+
     template<integral _Tp>
       constexpr make_unsigned_t<_Tp>
       __to_unsigned_like(_Tp __t) noexcept
