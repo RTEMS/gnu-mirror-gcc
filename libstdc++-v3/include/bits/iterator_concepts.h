@@ -507,10 +507,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     template<typename _Tp>
       concept __is_integer_like = integral<_Tp>
+#if defined _GLIBCXX_INTEGER_LIKE_TYPES && __SIZEOF_INT128__
+	|| same_as<_Tp, __int128> || same_as<_Tp, unsigned __int128>
+#endif
 	|| same_as<_Tp, __max_diff_type> || same_as<_Tp, __max_size_type>;
 
     template<typename _Tp>
       concept __is_signed_integer_like = signed_integral<_Tp>
+#if defined _GLIBCXX_INTEGER_LIKE_TYPES && __SIZEOF_INT128__
+	|| same_as<_Tp, __int128>
+#endif
 	|| same_as<_Tp, __max_diff_type>;
 
   } // namespace ranges::__detail
