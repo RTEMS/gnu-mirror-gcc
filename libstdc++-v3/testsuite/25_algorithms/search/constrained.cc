@@ -72,6 +72,12 @@ test02()
 
   static_assert(std::get<0>(ranges::search(x, w, {}, &X::i)) == x+0);
   static_assert(std::get<1>(ranges::search(x, w, {}, &X::i)) == x+1);
+
+  static_assert(std::get<0>(ranges::search(x, x+6, w, w, {}, &X::i)) == x+0);
+  static_assert(std::get<1>(ranges::search(x, x+6, w, w, {}, &X::i)) == x+0);
+
+  static_assert(std::get<0>(ranges::search(x, x, w, w+1, {}, &X::i)) == x+0);
+  static_assert(std::get<1>(ranges::search(x, x, w, w+1, {}, &X::i)) == x+0);
 }
 
 int

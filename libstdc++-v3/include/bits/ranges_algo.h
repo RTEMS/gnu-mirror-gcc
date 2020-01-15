@@ -369,6 +369,9 @@ namespace ranges
     search(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
 	   _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
     {
+      if (__first1 == __last1 || __first2 == __last2)
+	return {__first1, __first1};
+
       for (;;)
 	{
 	  for (;;)
