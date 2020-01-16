@@ -628,8 +628,8 @@ namespace ranges
       concept __advanceable = __decrementable<_It> && totally_ordered<_It>
 	&& requires( _It __i, const _It __j, const __iota_diff_t<_It> __n)
 	{
-	  { __i += __n } -> same_as<_It&>;
-	  { __i -= __n } -> same_as<_It&>;
+	  { __i += (_It)__n } -> same_as<_It&>;
+	  { __i -= (_It)__n } -> same_as<_It&>;
 	  _It(__j + __n);
 	  _It(__n + __j);
 	  _It(__j - __n);
