@@ -536,7 +536,7 @@ static const struct tune_params generic_tunings =
   &generic_approx_modes,
   4, /* memmov_cost  */
   2, /* issue_rate  */
-  (AARCH64_FUSE_AES_AESMC), /* fusible_ops  */
+  (AARCH64_FUSE_AES_AESMC | AARCH64_FUSE_CMP_BRANCH), /* fusible_ops  */
   8,	/* function_align.  */
   8,	/* jump_align.  */
   4,	/* loop_align.  */
@@ -817,7 +817,7 @@ static const struct tune_params neoversen1_tunings =
   &generic_approx_modes,
   4, /* memmov_cost  */
   3, /* issue_rate  */
-  AARCH64_FUSE_AES_AESMC, /* fusible_ops  */
+  (AARCH64_FUSE_AES_AESMC | AARCH64_FUSE_CMP_BRANCH), /* fusible_ops  */
   32,	/* function_align.  */
   4,	/* jump_align.  */
   32,	/* loop_align.  */
