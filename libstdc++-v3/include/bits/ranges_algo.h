@@ -418,6 +418,66 @@ namespace ranges
 			    std::move(__proj1), std::move(__proj2));
     }
 
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent, class _Tp,
+	   class _Pred = ranges::equal_to, class _Proj = identity>
+    requires indirectly_comparable<_Iter, const _Tp*, _Pred, _Proj>
+    constexpr subrange<_Iter>
+    search_n(_Iter __first, _Sent __last, iter_difference_t<_Iter> __count,
+	     const _Tp& __value, _Pred __pred = {}, _Proj __proj = {})
+    {
+      if (__count <= 0)
+	return {__first, __first};
+
+      auto __value_comp = [&] <typename _Rp> (_Rp&& __arg) {
+	  return std::__invoke(__pred, std::forward<_Rp>(__arg), __value);
+      };
+      if (__count == 1)
+	{
+	  __first = ranges::find_if(std::move(__first), __last,
+				    std::move(__value_comp), std::move(__proj));
+	  if (__first == __last)
+	    return {__last, __last};
+	  else
+	    {
+	      __last = __first;
+	      ++__last;
+	      return {__first, __last};
+	    }
+	}
+
+      __first = ranges::find_if(__first, __last, __value_comp, __proj);
+      while (__first != __last)
+	{
+	  auto __n = __count;
+	  auto __i = __first;
+	  ++__i;
+	  while (__i != __last && __n != 1
+		 && std::__invoke(__pred, __value, std::__invoke(__proj, *__i)))
+	    {
+	      ++__i;
+	      --__n;
+	    }
+	  if (__n == 1)
+	    return {__first, __i};
+	  if (__i == __last)
+	    return {__last, __last};
+	  __first = ranges::find_if(__first, __last, __value_comp, __proj);
+	}
+      return {__last, __last};
+    }
+
+  template<forward_range _Range, class _Tp,
+	   class _Pred = ranges::equal_to, class _Proj = identity>
+    requires indirectly_comparable<iterator_t<_Range>, const _Tp*, _Pred, _Proj>
+    constexpr safe_subrange_t<_Range>
+    search_n(_Range&& __r, range_difference_t<_Range> __count,
+	     const _Tp& __value, _Pred __pred = {}, _Proj __proj = {})
+    {
+      return ranges::search_n(ranges::begin(__r), ranges::end(__r),
+			      std::move(__count), __value,
+			      std::move(__pred), std::move(__proj));
+    }
+
   template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
 	   class _Pred = ranges::equal_to,
