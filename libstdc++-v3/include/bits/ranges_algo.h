@@ -512,13 +512,14 @@ namespace ranges
 	if (__first == __last)
 	  return __last;
 	auto __next = __first;
+	auto __proj_first = std::__invoke(__proj, *__first);
 	while (++__next != __last)
 	  {
-	    if (std::__invoke(__pred,
-			      std::__invoke(__proj, *__first),
-			      std::__invoke(__proj, *__next)))
+	    auto __proj_next = std::__invoke(__proj, *__next);
+	    if (std::__invoke(__pred, std::move(__proj_first), __proj_next))
 	      return __first;
 	    __first = __next;
+	    __proj_first = std::move(__proj_next);
 	  }
 	return __last;
       }

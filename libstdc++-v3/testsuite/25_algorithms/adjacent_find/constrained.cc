@@ -59,10 +59,25 @@ test02()
   static_assert(ranges::adjacent_find(y, {}, &X::i) == y+5);
 }
 
+void
+test03()
+{
+  static int proj_counter;
+  auto my_proj = [] (int x)
+  {
+    proj_counter++;
+    return x;
+  };
+  int x[] = { 1, 2, 3, 4, 4 };
+  ranges::adjacent_find(x, {}, my_proj);
+  VERIFY( proj_counter == 5 );
+}
+
 int
 main()
 {
   test01();
   test02();
+  test03();
 }
 
