@@ -617,6 +617,80 @@ namespace ranges
 				      std::move(__proj1), std::move(__proj2));
       }
 
+    template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	     input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	     class _Pred = ranges::equal_to,
+	     class _Proj1 = identity, class _Proj2 = identity>
+      requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
+      constexpr bool
+      equal(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
+	    _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	// TODO: implement more specializations to at least have parity with
+	// std::equal.
+	constexpr bool __sized_iters
+	  = (std::sized_sentinel_for<_Sent1, _Iter1>
+	     && std::sized_sentinel_for<_Sent2, _Iter2>);
+	if constexpr (__sized_iters)
+	  {
+	    auto __d1 = std::distance(__first1, __last1);
+	    auto __d2 = std::distance(__first2, __last2);
+	    if (__d1 != __d2)
+	      return false;
+
+	    using _ValueType1 = iterator_traits<_Iter1>::value_type;
+	    using _ValueType2 = iterator_traits<_Iter2>::value_type;
+	    constexpr bool __simple
+	      = ((is_integral_v<_ValueType1> || is_pointer_v<_ValueType1>)
+		 && is_same_v<_ValueType1, _ValueType2>
+		 && is_pointer_v<_Iter1>
+		 && is_pointer_v<_Iter2>
+		 && is_same_v<_Pred, ranges::equal_to>
+		 && is_same_v<_Proj1, identity>
+		 && is_same_v<_Proj2, identity>);
+	    if constexpr (__simple)
+	      {
+		if (const size_t __len = (__last1 - __first1))
+		  return !std::__memcmp(__first1, __first2, __len);
+		return true;
+	      }
+	    else
+	      {
+		for (; __first1 != __last1; ++__first1, (void)++__first2)
+		  if (!std::__invoke(__pred,
+				     std::__invoke(__proj1, *__first1),
+				     std::__invoke(__proj2, *__first2)))
+		    return false;
+		return true;
+	      }
+	  }
+	else
+	  {
+	    for (; __first1 != __last1 && __first2 != __last2;
+		 ++__first1, (void)++__first2)
+	      if (!std::__invoke(__pred,
+				 std::__invoke(__proj1, *__first1),
+				 std::__invoke(__proj2, *__first2)))
+		return false;
+	    return __first1 == __last1 && __first2 == __last2;
+	  }
+      }
+
+    template<input_range _Range1, input_range _Range2,
+	     class _Pred = ranges::equal_to,
+	     class _Proj1 = identity, class _Proj2 = identity>
+      requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
+				     _Pred, _Proj1, _Proj2>
+      constexpr bool
+      equal(_Range1&& __r1, _Range2&& __r2,
+	    _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	return ranges::equal(ranges::begin(__r1), ranges::end(__r1),
+			     ranges::begin(__r2), ranges::end(__r2),
+			     std::move(__pred),
+			     std::move(__proj1), std::move(__proj2));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
