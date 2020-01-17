@@ -535,6 +535,88 @@ namespace ranges
 				     std::move(__pred), std::move(__proj));
       }
 
+    template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	     forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	     class _Proj1 = identity, class _Proj2 = identity,
+	     indirect_equivalence_relation<projected<_Iter1, _Proj1>,
+					   projected<_Iter2, _Proj2>> _Pred
+	       = ranges::equal_to>
+      constexpr bool
+      is_permutation(_Iter1 __first1, _Sent1 __last1,
+		     _Iter2 __first2, _Sent2 __last2, _Pred __pred = {},
+		     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	constexpr bool __sized_iters
+	  = (std::sized_sentinel_for<_Sent1, _Iter1>
+	     && std::sized_sentinel_for<_Sent2, _Iter2>);
+	if constexpr (__sized_iters)
+	  {
+	    auto __d1 = std::distance(__first1, __last1);
+	    auto __d2 = std::distance(__first2, __last2);
+	    if (__d1 != __d2)
+	      return false;
+	  }
+
+	// Efficiently compare identical prefixes:  O(N) if sequences
+	// have the same elements in the same order.
+	for (; __first1 != __last1 && __first2 != __last2;
+	     ++__first1, (void)++__first2)
+	  if (!std::__invoke(__pred,
+			     std::__invoke(__proj1, *__first1),
+			     std::__invoke(__proj2, *__first2)))
+	      break;
+
+	if constexpr (__sized_iters)
+	  {
+	    if (__first1 == __last1)
+	      return true;
+	  }
+	else
+	  {
+	    auto __d1 = std::distance(__first1, __last1);
+	    auto __d2 = std::distance(__first2, __last2);
+	    if (__d1 == 0 && __d2 == 0)
+	      return true;
+	    if (__d1 != __d2)
+	      return false;
+	  }
+
+	for (auto __scan = __first1; __scan != __last1; ++__scan)
+	  {
+	    auto __proj_scan = std::__invoke(__proj1, *__scan);
+	    auto __comp_scan = [&] <typename _Tp> (_Tp&& __arg) {
+	      return std::__invoke(__pred, __proj_scan,
+				   std::forward<_Tp>(__arg));
+	    };
+	    if (__scan != ranges::find_if(__first1, __scan,
+					  __comp_scan, __proj1))
+	      continue; // We've seen this one before.
+
+	    auto __matches = ranges::count_if(__first2, __last2,
+					      __comp_scan, __proj2);
+	    if (__matches == 0
+		|| ranges::count_if(__scan, __last1,
+				    __comp_scan, __proj1) != __matches)
+	      return false;
+	  }
+	return true;
+      }
+
+    template<forward_range _Range1, forward_range _Range2,
+	     class _Proj1 = identity, class _Proj2 = identity,
+	     indirect_equivalence_relation<
+	       projected<iterator_t<_Range1>, _Proj1>,
+	       projected<iterator_t<_Range2>, _Proj2>> _Pred = ranges::equal_to>
+      constexpr bool
+      is_permutation(_Range1&& __r1, _Range2&& __r2, _Pred __pred = {},
+		     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	return ranges::is_permutation(ranges::begin(__r1), ranges::end(__r1),
+				      ranges::begin(__r2), ranges::end(__r2),
+				      std::move(__pred),
+				      std::move(__proj1), std::move(__proj2));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
