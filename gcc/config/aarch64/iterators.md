@@ -122,6 +122,9 @@
 ;; Quad vector with only 2 element modes.
 (define_mode_iterator VQ_2E [V2DI V2DF])
 
+;; BFmode vector modes.
+(define_mode_iterator VBF [V4BF V8BF])
+
 ;; This mode iterator allows :P to be used for patterns that operate on
 ;; addresses in different modes.  In LP64, only DI will match, while in
 ;; ILP32, either can match.
@@ -799,6 +802,9 @@
     UNSPEC_USUBLT	; Used in aarch64-sve2.md.
     UNSPEC_USUBWB	; Used in aarch64-sve2.md.
     UNSPEC_USUBWT	; Used in aarch64-sve2.md.
+    UNSPEC_USDOT	; Used in aarch64-simd.md.
+    UNSPEC_SUDOT	; Used in aarch64-simd.md.
+    UNSPEC_BFDOT	; Used in aarch64-simd.md.
 ])
 
 ;; ------------------------------------------------------------------
@@ -1449,6 +1455,9 @@
 ;; Register suffix for DOTPROD input types from the return type.
 (define_mode_attr Vdottype [(V2SI "8b") (V4SI "16b")])
 
+;; Register suffix for BFDOT input types from the return type.
+(define_mode_attr Vbfdottype [(V2SF "4h") (V4SF "8h")])
+
 ;; Sum of lengths of instructions needed to move vector registers of a mode.
 (define_mode_attr insn_count [(OI "8") (CI "12") (XI "16")])
 
@@ -1459,9 +1468,14 @@
 ;; Width of 2nd and 3rd arguments to fp16 vector multiply add/sub
 (define_mode_attr VFMLA_W [(V2SF "V4HF") (V4SF "V8HF")])
 
+;; Width of 2nd and 3rd arguments to bf16 vector multiply add/sub
+(define_mode_attr VBFMLA_W [(V2SF "V4BF") (V4SF "V8BF")])
+
 (define_mode_attr VFMLA_SEL_W [(V2SF "V2HF") (V4SF "V4HF")])
 
 (define_mode_attr f16quad [(V2SF "") (V4SF "q")])
+
+(define_mode_attr isquadop [(V8QI "") (V16QI "q") (V4BF "") (V8BF "q")])
 
 (define_code_attr f16mac [(plus "a") (minus "s")])
 
@@ -2044,6 +2058,8 @@
 (define_int_iterator BSL_DUP [1 2])
 
 (define_int_iterator DOTPROD [UNSPEC_SDOT UNSPEC_UDOT])
+
+(define_int_iterator DOTPROD_I8MM [UNSPEC_USDOT UNSPEC_SUDOT])
 
 (define_int_iterator ADDSUBHN [UNSPEC_ADDHN UNSPEC_RADDHN
 			       UNSPEC_SUBHN UNSPEC_RSUBHN])
@@ -2738,6 +2754,7 @@
 		      (UNSPEC_URSHL  "ur") (UNSPEC_SRSHL  "sr")
 		      (UNSPEC_UQRSHL  "u") (UNSPEC_SQRSHL  "s")
 		      (UNSPEC_SDOT "s") (UNSPEC_UDOT "u")
+		      (UNSPEC_USDOT "us") (UNSPEC_SUDOT "su")
 ])
 
 (define_int_attr r [(UNSPEC_SQDMULH "") (UNSPEC_SQRDMULH "r")

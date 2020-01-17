@@ -1,3 +1,9 @@
+2020-01-16  Mihail-Calin Ionescu  <mihail.ionescu@arm.com>
+2020-01-16  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* config/arm/t-arm: Check return value of gcc rather than lack of
+	output.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/ia64/lib1funcs.S: Add .note.GNU-stack section on
