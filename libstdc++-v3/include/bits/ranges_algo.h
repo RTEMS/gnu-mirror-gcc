@@ -500,6 +500,39 @@ namespace ranges
 			      std::move(__proj1), std::move(__proj2));
     }
 
+    template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     class _Proj = identity,
+	     indirect_binary_predicate<projected<_Iter, _Proj>,
+				       projected<_Iter, _Proj>> _Pred
+	       = ranges::equal_to>
+      constexpr _Iter
+      adjacent_find(_Iter __first, _Sent __last,
+		    _Pred __pred = {}, _Proj __proj = {})
+      {
+	if (__first == __last)
+	  return __last;
+	auto __next = __first;
+	while (++__next != __last)
+	  {
+	    if (std::__invoke(__pred,
+			      std::__invoke(__proj, *__first),
+			      std::__invoke(__proj, *__next)))
+	      return __first;
+	    __first = __next;
+	  }
+	return __last;
+      }
+
+    template<forward_range _Range, class _Proj = identity,
+	     indirect_binary_predicate<
+	       projected<iterator_t<_Range>, _Proj>,
+	       projected<iterator_t<_Range>, _Proj>> _Pred = ranges::equal_to>
+      constexpr safe_iterator_t<_Range>
+      adjacent_find(_Range&& __r, _Pred __pred = {}, _Proj __proj = {})
+      {
+	return ranges::adjacent_find(ranges::begin(__r), ranges::end(__r),
+				     std::move(__pred), std::move(__proj));
+      }
 
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
