@@ -106,7 +106,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       else
 #endif
 	return __builtin_memmove(__dst, __src, sizeof(_Tp) * __num);
-      return __dst;
     }
 
   /*
