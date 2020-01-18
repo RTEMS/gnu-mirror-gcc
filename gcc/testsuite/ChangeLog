@@ -178,51 +178,6 @@
 	PR c++/93228
 	* g++.dg/cpp1y/attr-deprecated-3.C: New test.
 
-2020-01-17  Paolo Carlini  <paolo.carlini@oracle.com>
-
-	PR c++/92542
-	* g++.dg/pr92542.C: New.
-
-2020-01-17  Mihail-Calin Ionescu <mihail.ionescu@arm.com>
-	    Sudakshina Das  <sudi.das@arm.com>
-
-	* gcc.target/arm/armv8_1m-shift-imm_1.c: New test.
-
-2020-01-17  Mihail-Calin Ionescu <mihail.ionescu@arm.com>
-	    Sudakshina Das  <sudi.das@arm.com>
-
-	* gcc.target/arm/armv8_1m-shift-reg_1.c: New test.
-
-2020-01-17  Jonathan Wakely  <jwakely@redhat.com>
-
-	PR testsuite/93227
-	* g++.dg/cpp0x/std-layout1.C: Use -Wno-deprecated-declarations for
-	C++20, due to std::is_pod being deprecated.
-
-2020-01-17  Matthew Malcomson  <matthew.malcomson@arm.com>
-
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_f16.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_f32.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_f64.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_s16.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_s32.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_s64.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_s8.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_u16.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_u32.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_u64.c: New test.
-	* gcc.target/aarch64/sve/acle/asm/ld1ro_u8.c: New test.
-
-2020-01-17  Matthew Malcomson  <matthew.malcomson@arm.com>
-
-	* gcc.target/aarch64/pragma_cpp_predefs_2.c: Check for f64mm
-	predef.
-
-2020-01-17  Jakub Jelinek  <jakub@redhat.com>
-
-	PR c++/93228
-	* g++.dg/cpp1y/attr-deprecated-3.C: New test.
-
 2020-01-17  Richard Sandiford  <richard.sandiford@arm.com>
 
 	* g++.target/aarch64/sve/acle/general-c++/gimplify_1.C: New test.
