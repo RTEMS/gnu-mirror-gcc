@@ -522,8 +522,8 @@ namespace ranges
 	     _Iter2 __first2, _Sent2 __last2,
 	     _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
     {
-      if constexpr (std::bidirectional_iterator<_Iter1>
-		    && std::bidirectional_iterator<_Iter2>)
+      if constexpr (bidirectional_iterator<_Iter1>
+		    && bidirectional_iterator<_Iter2>)
 	{
 	  auto __rresult
 	    = ranges::search(reverse_iterator<_Iter1>(__last1),
@@ -607,8 +607,8 @@ namespace ranges
 		     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
       {
 	constexpr bool __sized_iters
-	  = (std::sized_sentinel_for<_Sent1, _Iter1>
-	     && std::sized_sentinel_for<_Sent2, _Iter2>);
+	  = (sized_sentinel_for<_Sent1, _Iter1>
+	     && sized_sentinel_for<_Sent2, _Iter2>);
 	if constexpr (__sized_iters)
 	  {
 	    auto __d1 = std::distance(__first1, __last1);
@@ -689,8 +689,8 @@ namespace ranges
 	// TODO: implement more specializations to at least have parity with
 	// std::equal.
 	constexpr bool __sized_iters
-	  = (std::sized_sentinel_for<_Sent1, _Iter1>
-	     && std::sized_sentinel_for<_Sent2, _Iter2>);
+	  = (sized_sentinel_for<_Sent1, _Iter1>
+	     && sized_sentinel_for<_Sent2, _Iter2>);
 	if constexpr (__sized_iters)
 	  {
 	    auto __d1 = std::distance(__first1, __last1);
