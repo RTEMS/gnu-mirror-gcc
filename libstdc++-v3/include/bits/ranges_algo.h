@@ -221,8 +221,8 @@ namespace ranges
 
   template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
     constexpr _Iter1
     find_first_of(_Iter1 __first1, _Sent1 __last1,
@@ -239,8 +239,8 @@ namespace ranges
     }
 
   template<input_range _Range1, forward_range _Range2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
 				   _Pred, _Proj1, _Proj2>
     constexpr safe_iterator_t<_Range1>
@@ -362,8 +362,8 @@ namespace ranges
 
   template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
     constexpr subrange<_Iter1>
     search(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
@@ -404,8 +404,8 @@ namespace ranges
     }
 
   template<forward_range _Range1, forward_range _Range2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
 				   _Pred, _Proj1, _Proj2>
     constexpr safe_subrange_t<_Range1>
@@ -418,8 +418,8 @@ namespace ranges
 			    std::move(__proj1), std::move(__proj2));
     }
 
-  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent, class _Tp,
-	   class _Pred = ranges::equal_to, class _Proj = identity>
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent, typename _Tp,
+	   typename _Pred = ranges::equal_to, typename _Proj = identity>
     requires indirectly_comparable<_Iter, const _Tp*, _Pred, _Proj>
     constexpr subrange<_Iter>
     search_n(_Iter __first, _Sent __last, iter_difference_t<_Iter> __count,
@@ -466,8 +466,8 @@ namespace ranges
       return {__last, __last};
     }
 
-  template<forward_range _Range, class _Tp,
-	   class _Pred = ranges::equal_to, class _Proj = identity>
+  template<forward_range _Range, typename _Tp,
+	   typename _Pred = ranges::equal_to, typename _Proj = identity>
     requires indirectly_comparable<iterator_t<_Range>, const _Tp*, _Pred, _Proj>
     constexpr safe_subrange_t<_Range>
     search_n(_Range&& __r, range_difference_t<_Range> __count,
@@ -480,8 +480,8 @@ namespace ranges
 
   template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
     constexpr subrange<_Iter1>
     __find_end(_Iter1 __first1, _Sent1 __last1,
@@ -514,8 +514,8 @@ namespace ranges
 
   template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	   forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
     constexpr subrange<_Iter1>
     find_end(_Iter1 __first1, _Sent1 __last1,
@@ -546,8 +546,8 @@ namespace ranges
     }
 
   template<forward_range _Range1, forward_range _Range2,
-	   class _Pred = ranges::equal_to,
-	   class _Proj1 = identity, class _Proj2 = identity>
+	   typename _Pred = ranges::equal_to,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
     requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
 				   _Pred, _Proj1, _Proj2>
     constexpr safe_subrange_t<_Range1>
@@ -561,7 +561,7 @@ namespace ranges
     }
 
     template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
-	     class _Proj = identity,
+	     typename _Proj = identity,
 	     indirect_binary_predicate<projected<_Iter, _Proj>,
 				       projected<_Iter, _Proj>> _Pred
 	       = ranges::equal_to>
@@ -584,7 +584,7 @@ namespace ranges
 	return __last;
       }
 
-    template<forward_range _Range, class _Proj = identity,
+    template<forward_range _Range, typename _Proj = identity,
 	     indirect_binary_predicate<
 	       projected<iterator_t<_Range>, _Proj>,
 	       projected<iterator_t<_Range>, _Proj>> _Pred = ranges::equal_to>
@@ -597,7 +597,7 @@ namespace ranges
 
     template<forward_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	     forward_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	     class _Proj1 = identity, class _Proj2 = identity,
+	     typename _Proj1 = identity, typename _Proj2 = identity,
 	     indirect_equivalence_relation<projected<_Iter1, _Proj1>,
 					   projected<_Iter2, _Proj2>> _Pred
 	       = ranges::equal_to>
@@ -663,7 +663,7 @@ namespace ranges
       }
 
     template<forward_range _Range1, forward_range _Range2,
-	     class _Proj1 = identity, class _Proj2 = identity,
+	     typename _Proj1 = identity, typename _Proj2 = identity,
 	     indirect_equivalence_relation<
 	       projected<iterator_t<_Range1>, _Proj1>,
 	       projected<iterator_t<_Range2>, _Proj2>> _Pred = ranges::equal_to>
@@ -679,8 +679,8 @@ namespace ranges
 
     template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	     input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	     class _Pred = ranges::equal_to,
-	     class _Proj1 = identity, class _Proj2 = identity>
+	     typename _Pred = ranges::equal_to,
+	     typename _Proj1 = identity, typename _Proj2 = identity>
       requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
       constexpr bool
       equal(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
@@ -737,8 +737,8 @@ namespace ranges
       }
 
     template<input_range _Range1, input_range _Range2,
-	     class _Pred = ranges::equal_to,
-	     class _Proj1 = identity, class _Proj2 = identity>
+	     typename _Pred = ranges::equal_to,
+	     typename _Proj1 = identity, typename _Proj2 = identity>
       requires indirectly_comparable<iterator_t<_Range1>, iterator_t<_Range2>,
 				     _Pred, _Proj1, _Proj2>
       constexpr bool
