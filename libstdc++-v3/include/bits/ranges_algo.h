@@ -772,6 +772,79 @@ namespace ranges
 			     std::move(__proj1), std::move(__proj2));
       }
 
+    template<typename _Iter, typename _Out>
+    struct copy_result
+    {
+      [[no_unique_address]] _Iter in;
+      [[no_unique_address]] _Out out;
+
+      template<typename _Iter2, typename _Out2>
+	requires convertible_to<const _Iter&, _Iter2>
+	  && convertible_to<const _Out&, _Out2>
+	operator copy_result<_Iter2, _Out2>() const &
+	{
+	  return {in, out};
+	}
+
+      template<typename _Iter2, typename _Out2>
+	requires convertible_to<_Iter, _Iter2>
+	  && convertible_to<_Out, _Out2>
+	operator copy_result<_Iter2, _Out2>() &&
+	{
+	  return {std::move(in), std::move(out)};
+	}
+    };
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out>
+      requires indirectly_copyable<_Iter, _Out>
+      constexpr copy_result<_Iter, _Out>
+      copy(_Iter __first, _Sent __last, _Out __result)
+      {
+	// TODO: implement more specializations to be at least on par with
+	// std::copy.
+	if constexpr (sized_sentinel_for<_Sent, _Iter>)
+	  {
+	    using _ValueTypeI = iterator_traits<_Iter>::value_type;
+	    using _ValueTypeO = iterator_traits<_Out>::value_type;
+	    constexpr bool __use_memmove
+	      = (is_trivially_copyable_v<_ValueTypeI>
+		 && is_same_v<_ValueTypeI, _ValueTypeO>
+		 && is_pointer_v<_Iter>
+		 && is_pointer_v<_Out>);
+
+	    if constexpr (__use_memmove)
+	      {
+		static_assert(is_copy_assignable_v<_ValueTypeI>);
+		auto __num = __last - __first;
+		if (__num)
+		  std::__memmove<false>(__result, __first, __num);
+		return {__first + __num, __result + __num};
+	      }
+	    else
+	      {
+		for (auto __n = __last - __first; __n > 0; --__n)
+		  *__result++ = *__first++;
+		return {__last, __result};
+	      }
+	  }
+	else
+	  {
+	    while (__first != __last)
+	      *__result++ = *__first++;
+	    return {__last, __result};
+	  }
+      }
+
+    template<input_range _Range, weakly_incrementable _Out>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+      constexpr copy_result<safe_iterator_t<_Range>, _Out>
+      copy(_Range&& __r, _Out __result)
+      {
+	return ranges::copy(ranges::begin(__r), ranges::end(__r),
+			    std::move(__result));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
