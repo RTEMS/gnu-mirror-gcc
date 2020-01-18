@@ -49,7 +49,7 @@ test01()
 
   int y[] = { {2}, {2}, {8}, {2}, {2}, {2}, {5} };
   test_range<int, forward_iterator_wrapper> ry(y);
-  auto res3 = ranges::search_n(ry, 2, 3);
+  auto res3 = ranges::search_n(ry, 3, 2);
   VERIFY( *res3.begin() == 2 && *res3.end() == 5 );
 }
 

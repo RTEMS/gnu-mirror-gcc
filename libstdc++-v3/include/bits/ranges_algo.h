@@ -445,25 +445,46 @@ namespace ranges
 	    }
 	}
 
-      __first = ranges::find_if(__first, __last, __value_comp, __proj);
-      while (__first != __last)
+      if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-	  auto __n = __count;
-	  auto __i = __first;
-	  ++__i;
-	  while (__i != __last && __n != 1
-		 && std::__invoke(__pred, __value, std::__invoke(__proj, *__i)))
+	  auto __tail_size = __last - __first;
+	  auto __remainder = __count;
+
+	  while (__remainder <= __tail_size)
 	    {
-	      ++__i;
-	      --__n;
+	      __first += __remainder;
+	      __tail_size -= __remainder;
+	      auto __backtrack = __first;
+	      while (__value_comp(std::__invoke(__proj, *--__backtrack)))
+		{
+		  if (--__remainder == 0)
+		    return {__first - __count, __first};
+		}
 	    }
-	  if (__n == 1)
-	    return {__first, __i};
-	  if (__i == __last)
-	    return {__last, __last};
-	  __first = ranges::find_if(__first, __last, __value_comp, __proj);
+	  return {__last, __last};
 	}
-      return {__last, __last};
+      else
+	{
+	  __first = ranges::find_if(__first, __last, __value_comp, __proj);
+	  while (__first != __last)
+	    {
+	      auto __n = __count;
+	      auto __i = __first;
+	      ++__i;
+	      while (__i != __last && __n != 1
+		     && __value_comp(std::__invoke(__proj, *__i)))
+		{
+		  ++__i;
+		  --__n;
+		}
+	      if (__n == 1)
+		return {__first, __i};
+	      if (__i == __last)
+		return {__last, __last};
+	      __first = ranges::find_if(++__i, __last, __value_comp, __proj);
+	    }
+	  return {__last, __last};
+	}
     }
 
   template<forward_range _Range, typename _Tp,
