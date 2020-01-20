@@ -968,6 +968,96 @@ namespace ranges
 				   ranges::begin(__r2), ranges::end(__r2));
       }
 
+    template<typename _Iter, typename _Out>
+    using unary_transform_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out,
+	     copy_constructible _F, typename _Proj = identity>
+      requires writable<_Out, indirect_result_t<_F&, projected<_Iter, _Proj>>>
+      constexpr unary_transform_result<_Iter, _Out>
+      transform(_Iter __first1, _Sent __last1, _Out __result,
+		_F __op, _Proj __proj = {})
+      {
+	for (; __first1 != __last1; ++__first1, (void)++__result)
+	  *__result = std::__invoke(__op, std::__invoke(__proj, *__first1));
+	return {__first1, __result};
+      }
+
+    template<input_range _Range, weakly_incrementable _Out,
+	     copy_constructible _F, typename _Proj = identity>
+      requires writable<_Out,
+			indirect_result_t<_F&, projected<iterator_t<_Range>,
+							_Proj>>>
+      constexpr unary_transform_result<safe_iterator_t<_Range>, _Out>
+      transform(_Range&& __r, _Out __result, _F __op, _Proj __proj = {})
+      {
+	return ranges::transform(ranges::begin(__r), ranges::end(__r),
+				 std::move(__result),
+				 std::move(__op), std::move(__proj));
+      }
+
+    template<typename _Iter1, typename _Iter2, typename _Out>
+    struct binary_transform_result {
+      [[no_unique_address]] _Iter1 in1;
+      [[no_unique_address]] _Iter2 in2;
+      [[no_unique_address]] _Out  out;
+
+      template<typename _IIter1, typename _IIter2, typename _OOut>
+	requires convertible_to<const _Iter1&, _IIter1> &&
+	  && convertible_to<const _Iter2&, _IIter2>
+	  && convertible_to<const _Out&, _OOut>
+	operator binary_transform_result<_IIter1, _IIter2, _OOut>() const & {
+	  return {in1, in2, out};
+	}
+
+      template<typename _IIter1, typename _IIter2, typename _OOut>
+	requires convertible_to<_Iter1, _IIter1>
+	  && convertible_to<_Iter2, _IIter2>
+	  && convertible_to<_Out, _OOut>
+	operator binary_transform_result<_IIter1, _IIter2, _OOut>() && {
+	  return {std::move(in1), std::move(in2), std::move(out)};
+	}
+    };
+
+    template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	     input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	     weakly_incrementable _Out, copy_constructible _F,
+	     typename _Proj1 = identity, typename _Proj2 = identity>
+      requires writable<_Out, indirect_result_t<_F&, projected<_Iter1, _Proj1>,
+					     projected<_Iter2, _Proj2>>>
+      constexpr binary_transform_result<_Iter1, _Iter2, _Out>
+      transform(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
+		_Out __result, _F __binary_op,
+		_Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	for (; __first1 != __last1 && __first2 != __last2;
+	     ++__first1, (void)++__first2, ++__result)
+	  *__result = std::__invoke(__binary_op,
+				    std::__invoke(__proj1, *__first1),
+				    std::__invoke(__proj2, *__first2));
+	return {__first1, __first2, __result};
+      }
+
+    template<input_range _Range1, input_range _Range2,
+	     weakly_incrementable _Out, copy_constructible _F,
+	     typename _Proj1 = identity, typename _Proj2 = identity>
+      requires writable<_Out, indirect_result_t<_F&,
+						projected<iterator_t<_Range1>,
+							  _Proj1>,
+						projected<iterator_t<_Range2>,
+							  _Proj2>>>
+      constexpr binary_transform_result<safe_iterator_t<_Range1>,
+					safe_iterator_t<_Range2>, _Out>
+      transform(_Range1&& __r1, _Range2&& __r2, _Out __result,
+		_F __binary_op, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+      {
+	return ranges::transform(ranges::begin(__r1), ranges::end(__r1),
+				 ranges::begin(__r2), ranges::end(__r2),
+				 std::move(__result), std::move(__binary_op),
+				 std::move(__proj1), std::move(__proj2));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
