@@ -1187,6 +1187,69 @@ namespace ranges
 				       __new_value, std::move(__proj));
       }
 
+    template<typename _Tp, output_iterator<const _Tp&> _Out>
+      constexpr _Out
+      fill_n(_Out __first, iter_difference_t<_Out> __n, const _Tp& __value)
+      {
+	// TODO: implement more specializations to be at least on par with
+	// std::fill_n
+	if (__n <= 0)
+	  return __first;
+
+	if constexpr (is_pointer_v<_Out> && __is_byte<_Tp>::__value)
+	  {
+	    __builtin_memset(__first, static_cast<unsigned char>(__value), __n);
+	    return __first + __n;
+	  }
+	else if constexpr (is_scalar_v<_Tp>)
+	  {
+	    const auto __tmp = __value;
+	    for (; __n > 0; --__n, (void)++__first)
+	      *__first = __tmp;
+	    return __first;
+	  }
+	else
+	  {
+	    for (; __n > 0; --__n, (void)++__first)
+	      *__first = __value;
+	    return __first;
+	  }
+      }
+
+    template<typename _Tp,
+	     output_iterator<const _Tp&> _Out, sentinel_for<_Out> _Sent>
+      constexpr _Out
+      fill(_Out __first, _Sent __last, const _Tp& __value)
+      {
+	// TODO: implement more specializations to be at least on par with
+	// std::fill
+	if constexpr (sized_sentinel_for<_Sent, _Out>)
+	  {
+	    const auto __len = __last - __first;
+	    return ranges::fill_n(__first, __len, __value);
+	  }
+	else if constexpr (is_scalar_v<_Tp>)
+	  {
+	    const auto __tmp = __value;
+	    for (; __first != __last; ++__first)
+	      *__first = __tmp;
+	    return __first;
+	  }
+	else
+	  {
+	    for (; __first != __last; ++__first)
+	      *__first = __value;
+	    return __first;
+	  }
+      }
+
+    template<typename _Tp, output_range<const _Tp&> _Range>
+      constexpr safe_iterator_t<_Range>
+      fill(_Range&& __r, const _Tp& __value)
+      {
+	return ranges::fill(ranges::begin(__r), ranges::end(__r), __value);
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
