@@ -1058,6 +1058,63 @@ namespace ranges
 				 std::move(__proj1), std::move(__proj2));
       }
 
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     typename _Tp1, typename _Tp2, typename _Proj = identity>
+      requires writable<_Iter, const _Tp2&> &&
+	       indirect_binary_predicate<ranges::equal_to,
+					 projected<_Iter, _Proj>, const _Tp1*>
+      constexpr _Iter
+      replace(_Iter __first, _Sent __last,
+	      const _Tp1& __old_value, const _Tp2& __new_value,
+	      _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first)
+	  if (std::__invoke(__proj, *__first) == __old_value)
+	    *__first = __new_value;
+	return __first;
+      }
+
+    template<input_range _Range,
+	     typename _Tp1, typename _Tp2, typename _Proj = identity>
+      requires writable<iterator_t<_Range>, const _Tp2&> &&
+	       indirect_binary_predicate<ranges::equal_to,
+					 projected<iterator_t<_Range>, _Proj>,
+						   const _Tp1*>
+      constexpr safe_iterator_t<_Range>
+      replace(_Range&& __r,
+	      const _Tp1& __old_value, const _Tp2& __new_value,
+	      _Proj __proj = {})
+      {
+	return ranges::replace(ranges::begin(__r), ranges::end(__r),
+			       __old_value, __new_value, std::move(__proj));
+      }
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     typename _Tp, typename _Proj = identity,
+	     indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+      requires writable<_Iter, const _Tp&>
+      constexpr _Iter
+      replace_if(_Iter __first, _Sent __last,
+		 _Pred __pred, const _Tp& __new_value, _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first)
+	  if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	    *__first = __new_value;
+	return __first;
+      }
+
+    template<input_range _Range, typename _Tp, typename _Proj = identity,
+	     indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+      requires writable<iterator_t<_Range>, const _Tp&>
+      constexpr safe_iterator_t<_Range>
+      replace_if(_Range&& __r,
+		 _Pred __pred, const _Tp& __new_value, _Proj __proj = {})
+      {
+	return ranges::replace_if(ranges::begin(__r), ranges::end(__r),
+				  std::move(__pred), __new_value,
+				  std::move(__proj));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
