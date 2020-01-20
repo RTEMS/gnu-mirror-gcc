@@ -1115,6 +1115,78 @@ namespace ranges
 				  std::move(__proj));
       }
 
+    template<typename _Iter, typename _Out>
+    using replace_copy_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     typename _Tp1, typename _Tp2, output_iterator<const _Tp2&> _Out,
+	     typename _Proj = identity>
+      requires indirectly_copyable<_Iter, _Out>
+	&& indirect_binary_predicate<ranges::equal_to,
+				     projected<_Iter, _Proj>, const _Tp1*>
+      constexpr replace_copy_result<_Iter, _Out>
+      replace_copy(_Iter __first, _Sent __last, _Out __result,
+		   const _Tp1& __old_value, const _Tp2& __new_value,
+		   _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first, (void)++__result)
+	  if (std::__invoke(__proj, *__first) == __old_value)
+	    *__result = __new_value;
+	  else
+	    *__result = *__first;
+	return {__first, __result};
+      }
+
+    template<input_range _Range, typename _Tp1, typename _Tp2,
+	     output_iterator<const _Tp2&> _Out, typename _Proj = identity>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+	&& indirect_binary_predicate<ranges::equal_to,
+				     projected<iterator_t<_Range>, _Proj>,
+				     const _Tp1*>
+      constexpr replace_copy_result<safe_iterator_t<_Range>, _Out>
+      replace_copy(_Range&& __r, _Out __result,
+		   const _Tp1& __old_value, const _Tp2& __new_value,
+		   _Proj __proj = {})
+      {
+	return ranges::replace_copy(ranges::begin(__r), ranges::end(__r),
+				    std::move(__result), __old_value,
+				    __new_value, std::move(__proj));
+      }
+
+    template<typename _Iter, typename _Out>
+    using replace_copy_if_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     typename _Tp, output_iterator<const _Tp&> _Out,
+	     typename _Proj = identity,
+	     indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+      requires indirectly_copyable<_Iter, _Out>
+      constexpr replace_copy_if_result<_Iter, _Out>
+      replace_copy_if(_Iter __first, _Sent __last, _Out __result,
+		      _Pred __pred, const _Tp& __new_value, _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first, (void)++__result)
+	  if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	    *__result = __new_value;
+	  else
+	    *__result = *__first;
+	return {__first, __result};
+      }
+
+    template<input_range _Range,
+	     typename _Tp, output_iterator<const _Tp&> _Out,
+	     typename _Proj = identity,
+	     indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+      constexpr replace_copy_if_result<safe_iterator_t<_Range>, _Out>
+      replace_copy_if(_Range&& __r, _Out __result,
+		      _Pred __pred, const _Tp& __new_value, _Proj __proj = {})
+      {
+	return ranges::replace_copy_if(ranges::begin(__r), ranges::end(__r),
+				       std::move(__result), std::move(__pred),
+				       __new_value, std::move(__proj));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
