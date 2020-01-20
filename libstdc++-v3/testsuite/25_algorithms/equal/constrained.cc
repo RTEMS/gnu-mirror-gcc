@@ -41,7 +41,7 @@ test01()
   int w[] = { {1}, {1}, {1}, {1}, {1} };
 
   VERIFY( ranges::equal(w, w+4, w+1, w+5) );
-  VERIFY( ranges::equal(w, w+5, w, w+5, std::greater<int>(),
+  VERIFY( ranges::equal(w, w+5, w, w+5, ranges::greater{},
 			[] (int a) { return a+1; }) );
 
   test_container<int, forward_iterator_wrapper> cx(x), cy(y);
@@ -71,9 +71,20 @@ test02()
   static_assert(!ranges::equal(x, y, {}, &X::i, &X::i));
 }
 
+void
+test03()
+{
+  std::vector<int> x = { {2}, {2}, {6}, {8}, {10}, {11} };
+  std::vector<int> y = { {2}, {2}, {6}, {8}, {10}, {11} };
+  std::vector<int> z = { {2}, {2}, {6}, {8}, {10}, {12} };
+  VERIFY( ranges::equal(x, y) );
+  VERIFY( !ranges::equal(x, z) );
+}
+
 int
 main()
 {
   test01();
   test02();
+  test03();
 }
