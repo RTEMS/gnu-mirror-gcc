@@ -547,10 +547,10 @@ namespace ranges
 		    && bidirectional_iterator<_Iter2>)
 	{
 	  auto __rresult
-	    = ranges::search(reverse_iterator<_Iter1>(__last1),
-			     reverse_iterator<_Iter1>(__first1),
-			     reverse_iterator<_Iter2>(__last2),
-			     reverse_iterator<_Iter2>(__first2),
+	    = ranges::search(reverse_iterator<_Iter1>{__last1},
+			     reverse_iterator<_Iter1>{__first1},
+			     reverse_iterator<_Iter2>{__last2},
+			     reverse_iterator<_Iter2>{__first2},
 			     std::move(__pred),
 			     std::move(__proj1), std::move(__proj2));
 	  auto __result_first = ranges::end(__rresult).base();
@@ -700,8 +700,7 @@ namespace ranges
 
     template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
 	     input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
-	     typename _Pred = ranges::equal_to,
-	     typename _Proj1 = identity, typename _Proj2 = identity>
+	     typename _Pred, typename _Proj1, typename _Proj2>
       requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
       constexpr bool
       __equal(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
@@ -812,7 +811,7 @@ namespace ranges
 	}
     };
 
-    template<class _Iter, class _Out>
+    template<typename _Iter, typename _Out>
     using move_result = copy_result<_Iter, _Out>;
 
     template<bool _IsMove,
@@ -942,7 +941,7 @@ namespace ranges
 			    std::move(__result));
       }
 
-    template<class _Iter1, class _Iter2>
+    template<typename _Iter1, typename _Iter2>
     using swap_ranges_result = mismatch_result<_Iter1, _Iter2>;
 
     template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
