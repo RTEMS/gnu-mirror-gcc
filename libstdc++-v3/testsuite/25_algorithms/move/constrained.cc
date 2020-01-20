@@ -30,14 +30,42 @@ using __gnu_test::bidirectional_iterator_wrapper;
 
 namespace ranges = std::ranges;
 
+struct X
+{
+  int i;
+  int moved = 0;
+
+  constexpr X(int a) : i(a) { }
+
+  constexpr X(const X&) = delete;
+  constexpr X& operator=(const X&) = delete;
+
+  constexpr X(X&& other)
+  {
+    *this = std::move(other);
+  }
+
+  constexpr X&
+  operator=(X&& other)
+  {
+    other.moved++;
+    i = other.i;
+    return *this;
+  }
+
+  friend constexpr bool
+  operator==(const X& a, const X& b)
+  { return a.i == b.i; }
+};
+
 void
 test01()
 {
     {
-      int x[7] = { 1, 2, 3, 4, 5, 6, 7 };
-      int y[7] = { 0 };
-      int z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-      auto [in, out] = ranges::copy(x, y);
+      X x[7] = { 1, 2, 3, 4, 5, 6, 7 };
+      X y[7] = { 0, 0, 0, 0, 0, 0, 0 };
+      X z[7] = { 1, 2, 3, 4, 5, 6, 7 };
+      auto [in, out] = ranges::move(x, y);
       VERIFY( ranges::equal(x, y) && in == x+7 && out == y+7 );
       VERIFY( ranges::equal(x, z) );
     }
@@ -48,7 +76,7 @@ test01()
       int z[3] = { 1, 2, 3 };
       test_container<int, forward_iterator_wrapper> cx(x);
       test_container<char, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::copy(x, y);
+      auto [in, out] = ranges::move(x, y);
       VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
@@ -59,112 +87,62 @@ test01()
       int z[3] = { 1, 2, 3 };
       test_range<char, forward_iterator_wrapper> cx(x);
       test_range<int, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::copy(x, y);
+      auto [in, out] = ranges::move(x, y);
       VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
 }
 
-struct X
-{
-  int i;
-  constexpr X (int a) : i(a) { }
-};
-
 void
 test02()
 {
-  int x[] = { {2}, {2}, {6}, {8}, {10} };
+  X x[] = { {2}, {2}, {6}, {8}, {10} };
   X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
-  int z[] = { {2}, {2}, {6}, {8}, {10} };
-  auto [in, out] = ranges::copy(x, y);
-  VERIFY( ranges::equal(x, x+5, y, y+5, {}, {}, &X::i) );
+  X z[] = { {2}, {2}, {6}, {8}, {10} };
+  auto [in, out] = ranges::move(x, y);
+  VERIFY( ranges::equal(x, x+5, y, y+5) );
   VERIFY( in == x+5 );
   VERIFY( out == y+5 );
   VERIFY( y[5].i == 2 );
   VERIFY( ranges::equal(x, z) );
+  VERIFY( ranges::count(x, 1, &X::moved) == 5 );
+  VERIFY( ranges::count(y, 0, &X::moved) == 6 );
 }
 
 constexpr bool
 test03()
 {
   bool ok = true;
-  int x[] = { {2}, {2}, {6}, {8}, {10} };
+  X x[] = { {2}, {2}, {6}, {8}, {10} };
   X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
-  int z[] = { {2}, {2}, {6}, {8}, {10} };
-  auto [in, out] = ranges::copy(x, y);
-  ok &= ranges::equal(x, x+5, y, y+5, {}, {}, &X::i);
+  X z[] = { {2}, {2}, {6}, {8}, {10} };
+  auto [in, out] = ranges::move(x, y);
+  ok &= ranges::equal(x, x+5, y, y+5);
   ok &= (in == x+5);
   ok &= (out == y+5);
   ok &= (y[5].i == 2);
   ok &= ranges::equal(x, z);
+  ok &= ranges::count(x, 1, &X::moved) == 5;
+  ok &= ranges::count(y, 0, &X::moved) == 6;
   return ok;
 }
-
-struct Y
-{
-  int i;
-  int moved = 0;
-
-  constexpr Y(int a) : i(a) { }
-
-  constexpr Y(const Y&) = delete;
-  constexpr Y& operator=(const Y&) = delete;
-
-  constexpr Y(Y&& other)
-  {
-    *this = std::move(other);
-  }
-
-  constexpr Y&
-  operator=(Y&& other)
-  {
-    other.moved++;
-    i = other.i;
-    return *this;
-  }
-
-  friend constexpr bool
-  operator==(const Y& a, const Y& b)
-  { return a.i == b.i; }
-};
 
 void
 test04()
 {
-  Y x[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  Y y[7] = { 0, 0, 0, 0, 0, 0, 0 };
-  Y z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(x)},
-				std::move_sentinel{ranges::end(x)},
+  X x[] = { {2}, {2}, {6}, {8}, {10} };
+  X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
+  X z[] = { {2}, {2}, {6}, {8}, {10} };
+  auto [in, out] = ranges::move(std::move_iterator{ranges::begin(x)},
+				std::move_iterator{ranges::end(x)},
 				ranges::begin(y));
-  VERIFY( ranges::equal(x, y) && in.base() == x+7 && out == y+7 );
+  VERIFY( ranges::equal(x, x+5, y, y+5) );
+  VERIFY( in.base() == x+5 );
+  VERIFY( out == y+5 );
+  VERIFY( y[5].i == 2 );
   VERIFY( ranges::equal(x, z) );
-  for (const auto& v : x)
-    VERIFY( v.moved == 1 );
-  for (const auto& v : y)
-    VERIFY( v.moved == 0 );
-}
-
-constexpr bool
-test05()
-{
-  bool ok = true;
-  Y x[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  Y y[7] = { 0, 0, 0, 0, 0, 0, 0 };
-  Y z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(x)},
-				std::move_sentinel{ranges::end(x)},
-				ranges::begin(y));
-  ok &= ranges::equal(x, y);
-  ok &= in.base() == x+7;
-  ok &= out == y+7;
-  ok &= ranges::equal(x, z);
-  for (const auto& v : x)
-    ok &= v.moved == 1;
-  for (const auto& v : y)
-    ok &= v.moved == 0;
-  return ok;
+  VERIFY( ranges::count(x, 1, &X::moved) == 5 );
+  VERIFY( ranges::count(y, 0, &X::moved) == 6 );
 }
 
 int
@@ -174,6 +152,6 @@ main()
   test02();
   static_assert(test03());
   test04();
-  static_assert(test05());
 }
+
 

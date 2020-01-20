@@ -812,14 +812,22 @@ namespace ranges
 	}
     };
 
-    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+    template<class _Iter, class _Out>
+    using move_result = copy_result<_Iter, _Out>;
+
+    template<bool _IsMove,
+	     input_iterator _Iter, sentinel_for<_Iter> _Sent,
 	     weakly_incrementable _Out>
-      requires indirectly_copyable<_Iter, _Out>
-      constexpr copy_result<_Iter, _Out>
-      copy(_Iter __first, _Sent __last, _Out __result)
+      requires (_IsMove
+		? indirectly_movable<_Iter, _Out>
+		: indirectly_copyable<_Iter, _Out>)
+      constexpr conditional_t<_IsMove,
+			      move_result<_Iter, _Out>,
+			      copy_result<_Iter, _Out>>
+      __copy_or_move(_Iter __first, _Sent __last, _Out __result)
       {
 	// TODO: implement more specializations to be at least on par with
-	// std::copy.
+	// std::copy/std::move.
 	if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	  {
 	    using _ValueTypeI = iterator_traits<_Iter>::value_type;
@@ -832,24 +840,70 @@ namespace ranges
 
 	    if constexpr (__use_memmove)
 	      {
-		static_assert(is_copy_assignable_v<_ValueTypeI>);
+		static_assert(_IsMove
+			      ? is_move_assignable_v<_ValueTypeI>
+			      : is_copy_assignable_v<_ValueTypeI>);
 		auto __num = __last - __first;
 		if (__num)
-		  std::__memmove<false>(__result, __first, __num);
+		  std::__memmove<_IsMove>(__result, __first, __num);
 		return {__first + __num, __result + __num};
 	      }
 	    else
 	      {
 		for (auto __n = __last - __first; __n > 0; --__n)
-		  *__result++ = *__first++;
-		return {__last, __result};
+		  {
+		    if constexpr (_IsMove)
+		      *__result = std::move(*__first);
+		    else
+		      *__result = *__first;
+		    __first++;
+		    __result++;
+		  }
+		return {__first, __result};
 	      }
 	  }
 	else
 	  {
 	    while (__first != __last)
-	      *__result++ = *__first++;
-	    return {__last, __result};
+	      {
+		if constexpr (_IsMove)
+		  *__result = std::move(*__first);
+		else
+		  *__result = *__first;
+		__first++;
+		__result++;
+	      }
+	    return {__first, __result};
+	  }
+      }
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out>
+      requires indirectly_copyable<_Iter, _Out>
+      constexpr copy_result<_Iter, _Out>
+      copy(_Iter __first, _Sent __last, _Out __result)
+      {
+	constexpr bool __move_iterator_p = __is_move_iterator<_Iter>::__value;
+	if constexpr (__move_iterator_p)
+	  {
+	    auto __first_base = __first.base();
+	    auto __last_base = __last.base();
+	    auto [__in,__out]
+	      = ranges::__copy_or_move<true>(std::__niter_base(__first_base),
+					     std::__niter_base(__last_base),
+					     std::__niter_base(__result));
+	    auto __wrapped_in = std::__niter_wrap(__first_base, __in);
+	    auto __wrapped_out = std::__niter_wrap(__result, __out);
+	    return {move_iterator{__wrapped_in}, __wrapped_out};
+	  }
+	else
+	  {
+	    auto [__in,__out]
+	      = ranges::__copy_or_move<false>(std::__niter_base(__first),
+					      std::__niter_base(__last),
+					      std::__niter_base(__result));
+	    return {std::__niter_wrap(__first, __in),
+		    std::__niter_wrap(__result, __out)};
 	  }
       }
 
@@ -859,6 +913,32 @@ namespace ranges
       copy(_Range&& __r, _Out __result)
       {
 	return ranges::copy(ranges::begin(__r), ranges::end(__r),
+			    std::move(__result));
+      }
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out>
+      requires indirectly_movable<_Iter, _Out>
+      constexpr move_result<_Iter, _Out>
+      move(_Iter __first, _Sent __last, _Out __result)
+      {
+	if constexpr (__is_move_iterator<_Iter>::__value)
+	  return ranges::copy(__first, __last, __result);
+	else
+	  {
+	    auto [__in, __out]
+	      = ranges::copy(move_iterator<_Iter>{__first},
+			     move_sentinel<_Sent>{__last}, __result);
+	    return {__in.base(), __out};
+	  }
+      }
+
+    template<input_range _Range, weakly_incrementable _Out>
+      requires indirectly_movable<iterator_t<_Range>, _Out>
+      constexpr move_result<safe_iterator_t<_Range>, _Out>
+      move(_Range&& __r, _Out __result)
+      {
+	return ranges::move(ranges::begin(__r), ranges::end(__r),
 			    std::move(__result));
       }
 
