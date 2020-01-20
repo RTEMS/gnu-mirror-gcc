@@ -942,6 +942,32 @@ namespace ranges
 			    std::move(__result));
       }
 
+    template<class _Iter1, class _Iter2>
+    using swap_ranges_result = mismatch_result<_Iter1, _Iter2>;
+
+    template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	     input_iterator _Iter2, sentinel_for<_Iter2> _Sent2>
+      requires indirectly_swappable<_Iter1, _Iter2>
+      constexpr swap_ranges_result<_Iter1, _Iter2>
+      swap_ranges(_Iter1 __first1, _Sent1 __last1,
+		  _Iter2 __first2, _Sent2 __last2)
+      {
+	for (; __first1 != __last1 && __first2 != __last2;
+	     ++__first1, (void)++__first2)
+	  std::swap(*__first1, *__first2);
+	return {__first1, __first2};
+      }
+
+    template<input_range _Range1, input_range _Range2>
+      requires indirectly_swappable<iterator_t<_Range1>, iterator_t<_Range2>>
+      constexpr swap_ranges_result<safe_iterator_t<_Range1>,
+				   safe_iterator_t<_Range2>>
+      swap_ranges(_Range1&& __r1, _Range2&& __r2)
+      {
+	return ranges::swap_ranges(ranges::begin(__r1), ranges::end(__r1),
+				   ranges::begin(__r2), ranges::end(__r2));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
