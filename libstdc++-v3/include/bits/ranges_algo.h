@@ -1250,6 +1250,36 @@ namespace ranges
 	return ranges::fill(ranges::begin(__r), ranges::end(__r), __value);
       }
 
+    template<input_or_output_iterator _Out, copy_constructible _F>
+      requires invocable<_F&> && writable<_Out, invoke_result_t<_F&>>
+      constexpr _Out
+      generate_n(_Out __first, iter_difference_t<_Out> __n, _F __gen)
+      {
+	for (; __n > 0; --__n, (void)++__first)
+	  *__first = std::__invoke(__gen);
+	return __first;
+      }
+
+    template<input_or_output_iterator _Out, sentinel_for<_Out> _Sent,
+	     copy_constructible _F>
+      requires invocable<_F&> && writable<_Out, invoke_result_t<_F&>>
+      constexpr _Out
+      generate(_Out __first, _Sent __last, _F __gen)
+      {
+	for (; __first != __last; ++__first)
+	  *__first = std::__invoke(__gen);
+	return __first;
+      }
+
+    template<typename _Range, copy_constructible _F>
+      requires invocable<_F&> && output_range<_Range, invoke_result_t<_F&>>
+      constexpr safe_iterator_t<_Range>
+      generate(_Range&& __r, _F __gen)
+      {
+	return ranges::generate(ranges::begin(__r), ranges::end(__r),
+				std::move(__gen));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
