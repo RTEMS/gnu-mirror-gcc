@@ -1337,6 +1337,76 @@ namespace ranges
 			      __value, std::move(__proj));
       }
 
+    template<class _Iter, class _Out>
+    using remove_copy_if_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out, class _Proj = identity,
+	     indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+      requires indirectly_copyable<_Iter, _Out>
+      constexpr remove_copy_if_result<_Iter, _Out>
+      remove_copy_if(_Iter __first, _Sent __last, _Out __result,
+		     _Pred __pred, _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first)
+	  if (!std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	    {
+	      *__result = *__first;
+	      ++__result;
+	    }
+	return {__last, __result};
+      }
+
+    template<input_range _Range, weakly_incrementable _Out,
+	     class _Proj = identity,
+	     indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+      constexpr remove_copy_if_result<safe_iterator_t<_Range>, _Out>
+      remove_copy_if(_Range&& __r, _Out __result,
+		     _Pred __pred, _Proj __proj = {})
+      {
+	return ranges::remove_copy_if(ranges::begin(__r), ranges::end(__r),
+				      __result,
+				      std::move(__pred), std::move(__proj));
+      }
+
+    template<class _Iter, class _Out>
+    using remove_copy_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out, class _Tp, class _Proj = identity>
+      requires indirectly_copyable<_Iter, _Out>
+	&& indirect_binary_predicate<ranges::equal_to,
+				     projected<_Iter, _Proj>,
+				     const _Tp*>
+      constexpr remove_copy_result<_Iter, _Out>
+      remove_copy(_Iter __first, _Sent __last, _Out __result,
+		  const _Tp& __value, _Proj __proj = {})
+      {
+	for (; __first != __last; ++__first)
+	  if (!(std::__invoke(__proj, *__first) == __value))
+	    {
+	      *__result = *__first;
+	      ++__result;
+	    }
+	return {__last, __result};
+      }
+
+    template<input_range _Range, weakly_incrementable _Out,
+	     class _Tp, class _Proj = identity>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+	&& indirect_binary_predicate<ranges::equal_to,
+				     projected<iterator_t<_Range>, _Proj>,
+				     const _Tp*>
+      constexpr remove_copy_result<safe_iterator_t<_Range>, _Out>
+      remove_copy(_Range&& __r, _Out __result,
+		  const _Tp& __value, _Proj __proj = {})
+      {
+	return ranges::remove_copy(ranges::begin(__r), ranges::end(__r),
+				   __result, __value, std::move(__proj));
+
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
