@@ -1279,6 +1279,64 @@ namespace ranges
 				std::move(__gen));
       }
 
+    template<permutable _Iter, sentinel_for<_Iter> _Sent, class _Proj = identity,
+	     indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+      constexpr subrange<_Iter>
+      remove_if(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
+      {
+	__first = ranges::find_if(__first, __last, __pred, __proj);
+	if (__first == __last)
+	  return {__first, __last};
+
+	auto __result = __first;
+	++__first;
+	for (; __first != __last; ++__first)
+	  if (!std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	    {
+	      *__result = std::move(*__first);
+	      ++__result;
+	    }
+
+	return {__result, __last};
+      }
+
+    template<forward_range _Range, class _Proj = identity,
+	     indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+      requires permutable<iterator_t<_Range>>
+      constexpr safe_subrange_t<_Range>
+      remove_if(_Range&& __r, _Pred __pred, _Proj __proj = {})
+      {
+	return ranges::remove_if(ranges::begin(__r), ranges::end(__r),
+				 std::move(__pred), std::move(__proj));
+      }
+
+    template<permutable _Iter, sentinel_for<_Iter> _Sent,
+	     class _Tp, class _Proj = identity>
+      requires indirect_binary_predicate<ranges::equal_to,
+					 projected<_Iter, _Proj>,
+					 const _Tp*>
+      constexpr subrange<_Iter>
+      remove(_Iter __first, _Sent __last, const _Tp& __value, _Proj __proj = {})
+      {
+	auto __pred = [&] (auto&& __arg) {
+	  return std::forward<decltype(__arg)>(__arg) == __value;
+	};
+	return ranges::remove_if(__first, __last,
+				 std::move(__pred), std::move(__proj));
+      }
+
+    template<forward_range _Range, class _Tp, class _Proj = identity>
+      requires permutable<iterator_t<_Range>> &&
+	       indirect_binary_predicate<ranges::equal_to,
+					 projected<iterator_t<_Range>, _Proj>,
+					 const _Tp*>
+      constexpr safe_subrange_t<_Range>
+      remove(_Range&& __r, const _Tp& __value, _Proj __proj = {})
+      {
+	return ranges::remove(ranges::begin(__r), ranges::end(__r),
+			      __value, std::move(__proj));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
