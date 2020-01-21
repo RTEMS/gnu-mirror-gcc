@@ -138,7 +138,7 @@ namespace ranges
     {
       for (; __first != __last; ++__first)
 	std::__invoke(__f, std::__invoke(__proj, *__first));
-      return { __last, std::move(__f) };
+      return { __first, std::move(__f) };
     }
 
   template<input_range _Range, typename _Proj = identity,
@@ -235,7 +235,7 @@ namespace ranges
 			    std::__invoke(__proj1, *__first1),
 			    std::__invoke(__proj2, *__iter)))
 	    return __first1;
-      return __last1;
+      return __first1;
     }
 
   template<input_range _Range1, forward_range _Range2,
@@ -377,7 +377,7 @@ namespace ranges
 	  for (;;)
 	    {
 	      if (__first1 == __last1)
-		return {__last1, __last1};
+		return {__first1, __first1};
 	      if (std::__invoke(__pred,
 				std::__invoke(__proj1, *__first1),
 				std::__invoke(__proj2, *__first2)))
@@ -391,7 +391,7 @@ namespace ranges
 	      if (++__cur2 == __last2)
 		return {__first1, ++__cur1};
 	      if (++__cur1 == __last1)
-		return {__last1, __last1};
+		return {__cur1, __cur1};
 	      if (!std::__invoke(__pred,
 				 std::__invoke(__proj1, *__cur1),
 				 std::__invoke(__proj2, *__cur2)))
@@ -436,12 +436,11 @@ namespace ranges
 	  __first = ranges::find_if(std::move(__first), __last,
 				    std::move(__value_comp), std::move(__proj));
 	  if (__first == __last)
-	    return {__last, __last};
+	    return {__first, __first};
 	  else
 	    {
-	      __last = __first;
-	      ++__last;
-	      return {__first, __last};
+	      auto __end = __first;
+	      return {__first, ++__end};
 	    }
 	}
 
@@ -461,7 +460,8 @@ namespace ranges
 		    return {__first - __count, __first};
 		}
 	    }
-	  return {__last, __last};
+	  auto __i = __first + __tail_size;
+	  return {__i, __i};
 	}
       else
 	{
@@ -480,10 +480,10 @@ namespace ranges
 	      if (__n == 1)
 		return {__first, __i};
 	      if (__i == __last)
-		return {__last, __last};
+		return {__i, __i};
 	      __first = ranges::find_if(++__i, __last, __value_comp, __proj);
 	    }
-	  return {__last, __last};
+	  return {__first, __first};
 	}
     }
 
@@ -509,11 +509,11 @@ namespace ranges
 	       _Iter2 __first2, _Sent2 __last2,
 	       _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
     {
+      auto __i = ranges::next(__first1, __last1);
       if (__first2 == __last2)
-	return {__last1, __last1};
+	return {__i, __i};
 
-      auto __res_first = __last1;
-      auto __res_last = __last1;
+      auto __res_first = __i, __res_last = __i;
       for (;;)
 	{
 	  auto __new_range = ranges::search(__first1, __last1,
@@ -546,17 +546,19 @@ namespace ranges
       if constexpr (bidirectional_iterator<_Iter1>
 		    && bidirectional_iterator<_Iter2>)
 	{
+	  auto __i1 = ranges::next(__first1, __last1);
+	  auto __i2 = ranges::next(__first2, __last2);
 	  auto __rresult
-	    = ranges::search(reverse_iterator<_Iter1>{__last1},
+	    = ranges::search(reverse_iterator<_Iter1>{__i1},
 			     reverse_iterator<_Iter1>{__first1},
-			     reverse_iterator<_Iter2>{__last2},
+			     reverse_iterator<_Iter2>{__i2},
 			     reverse_iterator<_Iter2>{__first2},
 			     std::move(__pred),
 			     std::move(__proj1), std::move(__proj2));
 	  auto __result_first = ranges::end(__rresult).base();
 	  auto __result_last = ranges::begin(__rresult).base();
 	  if (__result_last == __first1)
-	    return {__last1, __last1};
+	    return {__i1, __i1};
 	  else
 	    return {__result_first, __result_last};
 	}
@@ -591,7 +593,7 @@ namespace ranges
 		    _Pred __pred = {}, _Proj __proj = {})
       {
 	if (__first == __last)
-	  return __last;
+	  return __first;
 	auto __next = __first;
 	auto __proj_first = std::__invoke(__proj, *__first);
 	while (++__next != __last)
@@ -602,7 +604,7 @@ namespace ranges
 	    __first = __next;
 	    __proj_first = std::move(__proj_next);
 	  }
-	return __last;
+	return __next;
       }
 
     template<forward_range _Range, typename _Proj = identity,
@@ -632,8 +634,8 @@ namespace ranges
 	     && sized_sentinel_for<_Sent2, _Iter2>);
 	if constexpr (__sized_iters)
 	  {
-	    auto __d1 = std::distance(__first1, __last1);
-	    auto __d2 = std::distance(__first2, __last2);
+	    auto __d1 = ranges::distance(__first1, __last1);
+	    auto __d2 = ranges::distance(__first2, __last2);
 	    if (__d1 != __d2)
 	      return false;
 	  }
@@ -654,8 +656,8 @@ namespace ranges
 	  }
 	else
 	  {
-	    auto __d1 = std::distance(__first1, __last1);
-	    auto __d2 = std::distance(__first2, __last2);
+	    auto __d1 = ranges::distance(__first1, __last1);
+	    auto __d2 = ranges::distance(__first2, __last2);
 	    if (__d1 == 0 && __d2 == 0)
 	      return true;
 	    if (__d1 != __d2)
@@ -1286,7 +1288,7 @@ namespace ranges
       {
 	__first = ranges::find_if(__first, __last, __pred, __proj);
 	if (__first == __last)
-	  return {__first, __last};
+	  return {__first, __first};
 
 	auto __result = __first;
 	++__first;
@@ -1297,7 +1299,7 @@ namespace ranges
 	      ++__result;
 	    }
 
-	return {__result, __last};
+	return {__result, __first};
       }
 
     template<forward_range _Range, class _Proj = identity,
@@ -1354,7 +1356,7 @@ namespace ranges
 	      *__result = *__first;
 	      ++__result;
 	    }
-	return {__last, __result};
+	return {__first, __result};
       }
 
     template<input_range _Range, weakly_incrementable _Out,
@@ -1389,7 +1391,7 @@ namespace ranges
 	      *__result = *__first;
 	      ++__result;
 	    }
-	return {__last, __result};
+	return {__first, __result};
       }
 
     template<input_range _Range, weakly_incrementable _Out,
@@ -1415,7 +1417,7 @@ namespace ranges
       {
 	__first = ranges::adjacent_find(__first, __last, __comp, __proj);
 	if (__first == __last)
-	  return {__last, __last};
+	  return {__first, __first};
 
 	auto __dest = __first;
 	++__first;
@@ -1424,7 +1426,7 @@ namespace ranges
 			     std::__invoke(__proj, *__dest),
 			     std::__invoke(__proj, *__first)))
 	    *++__dest = std::move(*__first);
-	return {++__dest, __last};
+	return {++__dest, __first};
       }
 
     template<forward_range _Range, class _Proj = identity,
@@ -1455,7 +1457,7 @@ namespace ranges
 		  _Comp __comp = {}, _Proj __proj = {})
       {
 	if (__first == __last)
-	  return {__last, __result};
+	  return {__first, __result};
 
 	if constexpr (forward_iterator<_Iter>)
 	  {
@@ -1469,7 +1471,7 @@ namespace ranges
 		  __first = __next;
 		  *++__result = *__first;
 		}
-	    return {__last, ++__result};
+	    return {__next, ++__result};
 	  }
 	else if constexpr (input_iterator<_Out>
 			   && same_as<iter_value_t<_Iter>, iter_value_t<_Out>>)
@@ -1480,7 +1482,7 @@ namespace ranges
 				 std::__invoke(__proj, *__result),
 				 std::__invoke(__proj, *__first)))
 		  *++__result = *__first;
-	    return {__last, ++__result};
+	    return {__first, ++__result};
 	  }
 	else // indirectly_copyable_storable<_Iter, _Out>
 	  {
@@ -1496,7 +1498,7 @@ namespace ranges
 		    *++__result = __value;
 		  }
 	      }
-	    return {__last, ++__result};
+	    return {__first, ++__result};
 	  }
       }
 

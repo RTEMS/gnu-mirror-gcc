@@ -51,6 +51,9 @@ test01()
   test_range<int, forward_iterator_wrapper> ry(y);
   auto res3 = ranges::search_n(ry, 3, 2);
   VERIFY( *res3.begin() == 2 && *res3.end() == 5 );
+
+  auto res4 = ranges::search_n(ry, 1, 8);
+  VERIFY( res4.begin().ptr == y+2 && res4.end().ptr == y+3 );
 }
 
 void

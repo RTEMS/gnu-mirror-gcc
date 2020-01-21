@@ -70,7 +70,7 @@ test04()
 {
   X x[8] = { {0}, {1}, {0}, {1}, {0}, {0}, {1}, {1} };
   const int y[4] = { 0, 0, 0, 0 };
-  test_container<X, forward_iterator_wrapper> c(x);
+  test_range<X, forward_iterator_wrapper> c(x);
   auto res = ranges::remove_if(c, [] (int a) { return a == 1; }, &X::i);
   VERIFY( res.begin().ptr == x+4 && res.end().ptr == x+8 );
   VERIFY( ranges::equal(x, x+4, y, y+4, {}, &X::i) );

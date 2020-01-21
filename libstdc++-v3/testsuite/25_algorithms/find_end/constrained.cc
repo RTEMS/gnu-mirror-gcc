@@ -26,6 +26,7 @@ using __gnu_test::test_container;
 using __gnu_test::test_range;
 using __gnu_test::input_iterator_wrapper;
 using __gnu_test::forward_iterator_wrapper;
+using __gnu_test::bidirectional_iterator_wrapper;
 
 namespace ranges = std::ranges;
 
@@ -48,6 +49,15 @@ test01()
 
   {
     test_range<X, forward_iterator_wrapper> r(x);
+    auto res = ranges::find_end(r, y, {}, &X::i, &X::i);
+    VERIFY( std::get<0>(res)->i == 10 && std::get<1>(res) == ranges::end(r) );
+    res = ranges::find_end(r, r, {}, &X::i, &X::i);
+    VERIFY( std::get<0>(res) == ranges::begin(r)
+	    && std::get<1>(res) == ranges::end(r) );
+  }
+
+  {
+    test_range<X, bidirectional_iterator_wrapper> r(x);
     auto res = ranges::find_end(r, y, {}, &X::i, &X::i);
     VERIFY( std::get<0>(res)->i == 10 && std::get<1>(res) == ranges::end(r) );
     res = ranges::find_end(r, r, {}, &X::i, &X::i);
