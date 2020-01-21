@@ -580,15 +580,17 @@ cpp_init_builtins (cpp_reader *pfile, int hosted)
     _cpp_define_builtin (pfile, "__OBJC__ 1");
 
   /* These two behave as macros for #ifdef, but are evaluated
-     specially inside #if.  */
-  _cpp_define_builtin (pfile, "__has_include __has_include");
-  _cpp_define_builtin (pfile, "__has_include_next __has_include_next");
-  pfile->spec_nodes.n__has_include
-    = cpp_lookup (pfile, DSC("__has_include"));
-  pfile->spec_nodes.n__has_include->flags |= NODE_DIAGNOSTIC;
-  pfile->spec_nodes.n__has_include_next
-    = cpp_lookup (pfile, DSC("__has_include_next"));
-  pfile->spec_nodes.n__has_include_next->flags |= NODE_DIAGNOSTIC;
+     specially inside #if.  The indirection to the foo__ names is to
+     preserve compatibility with the original implementation, which
+     some sources came to rely upon.  */
+  _cpp_define_builtin (pfile, "__has_include __has_include__");
+  _cpp_define_builtin (pfile, "__has_include_next __has_include_next__");
+  pfile->spec_nodes.n__has_include__
+    = cpp_lookup (pfile, DSC("__has_include__"));
+  pfile->spec_nodes.n__has_include__->flags |= NODE_DIAGNOSTIC;
+  pfile->spec_nodes.n__has_include_next__
+    = cpp_lookup (pfile, DSC("__has_include_next__"));
+  pfile->spec_nodes.n__has_include_next__->flags |= NODE_DIAGNOSTIC;
 }
 
 /* Sanity-checks are dependent on command-line options, so it is

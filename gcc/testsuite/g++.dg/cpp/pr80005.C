@@ -8,6 +8,8 @@
 #if !__has_include (<vector>)
 #error "Header 'vector' could not be found"
 #endif
+// this #define tokenizes X in the regular context, not the
+// include-name context.
 #define F(X) __has_include (X)
 #if !F (<vector>)
 #error "Header 'vector' could not be found" // { dg-error "not be found" }

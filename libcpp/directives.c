@@ -595,10 +595,12 @@ lex_macro_node (cpp_reader *pfile, bool is_def_or_undef)
     {
       cpp_hashnode *node = token->val.node.node;
 
-      if (is_def_or_undef
-	  && (node == pfile->spec_nodes.n_defined
-	      || node == pfile->spec_nodes.n__has_include
-	      || node == pfile->spec_nodes.n__has_include_next))
+      /* For backwards compatibility reasons we indirect __has_include
+         through to __has_include__, and permitted users to {,un}def
+         the former but not the latter.  There's no harm in also
+         permitting them to {,un}def the latter.  It is only special
+         when evaluated inside a preprocessor conditional.  */
+      if (is_def_or_undef && node == pfile->spec_nodes.n_defined)
 	cpp_error (pfile, CPP_DL_ERROR,
 		   "\"%s\" cannot be used as a macro name",
 		   NODE_NAME (node));

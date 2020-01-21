@@ -565,8 +565,8 @@ _cpp_scan_out_logical_line (cpp_reader *pfile, cpp_macro *macro,
 		  continue;
 		}
 	      else if (pfile->state.in_expression
-		       && (node == pfile->spec_nodes.n__has_include
-			|| node == pfile->spec_nodes.n__has_include_next))
+		       && (node == pfile->spec_nodes.n__has_include__
+			|| node == pfile->spec_nodes.n__has_include_next__))
 		{
 		  lex_state = ls_has_include;
 		  continue;

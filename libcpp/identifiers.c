@@ -72,7 +72,7 @@ _cpp_init_hashtable (cpp_reader *pfile, cpp_hash_table *table)
   s->n__VA_ARGS__->flags |= NODE_DIAGNOSTIC;
   s->n__VA_OPT__        = cpp_lookup (pfile, DSC("__VA_OPT__"));
   s->n__VA_OPT__->flags |= NODE_DIAGNOSTIC;
-  /* __has_include{,_next} are inited in cpp_init_builtins.  */
+  /* __has_include{,_next}__ are inited in cpp_init_builtins.  */
 }
 
 /* Tear down the identifier hash table.  */

@@ -1159,9 +1159,9 @@ eval_token (cpp_reader *pfile, const cpp_token *token,
     case CPP_NAME:
       if (token->val.node.node == pfile->spec_nodes.n_defined)
 	return parse_defined (pfile);
-      else if (token->val.node.node == pfile->spec_nodes.n__has_include)
+      else if (token->val.node.node == pfile->spec_nodes.n__has_include__)
 	return parse_has_include (pfile, token->val.node.node, IT_INCLUDE);
-      else if (token->val.node.node == pfile->spec_nodes.n__has_include_next)
+      else if (token->val.node.node == pfile->spec_nodes.n__has_include_next__)
 	return parse_has_include (pfile, token->val.node.node, IT_INCLUDE_NEXT);
       else if (CPP_OPTION (pfile, cplusplus)
 	       && (token->val.node.node == pfile->spec_nodes.n_true
