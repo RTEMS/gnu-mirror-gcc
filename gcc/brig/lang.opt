@@ -26,10 +26,10 @@ Language
 BRIG
 
 -dump
-BRIG Separate Alias(d)
+Common Separate Alias(d)
 
 -dump=
-BRIG Joined Alias(d)
+Common Joined Alias(d)
 
 fassume-phsa
 BRIG Report Var(flag_assume_phsa) Init(1) Optimization
@@ -41,6 +41,6 @@ BRIG Joined Separate
 ; Not documented
 
 -output=
-BRIG Driver Joined Alias(o) MissingArgError(missing filename after %qs)
+Common Driver Joined Alias(o) MissingArgError(missing filename after %qs)
 
 ; This comment is to ensure we retain the blank line above.

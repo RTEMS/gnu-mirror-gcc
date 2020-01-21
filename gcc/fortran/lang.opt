@@ -49,10 +49,10 @@ Fortran Joined Alias(D)
 Fortran Alias(M)
 
 -dump
-Fortran Separate Alias(d)
+Common Separate Alias(d)
 
 -dump=
-Fortran Joined Alias(d)
+Common Joined Alias(d)
 
 -include-barrier
 Fortran Alias(I, -)
@@ -82,10 +82,10 @@ Fortran Alias(P)
 Fortran Alias(nostdinc)
 
 -output
-Fortran Separate Alias(o)
+Common Separate Alias(o)
 
 -output=
-Fortran Joined Alias(o)
+Common Joined Alias(o)
 
 -preprocess
 Fortran Undocumented Alias(E)
@@ -106,7 +106,7 @@ Fortran Joined Alias(U)
 Fortran Alias(MM)
 
 -verbose
-Fortran Alias(v)
+Common Alias(v)
 
 -write-dependencies
 Fortran NoDriverArg Separate Alias(MD)
@@ -366,7 +366,7 @@ Fortran Negative(cpp)
 Disable preprocessing.
 
 d
-Fortran Joined
+Common Joined
 ; Documented in common.opt
 
 fallow-argument-mismatch
@@ -839,7 +839,7 @@ Fortran
 ; Documented in C
 
 o
-Fortran Joined Separate
+Common Joined Separate
 ; Documented in common.opt
 
 static-libgfortran
@@ -879,7 +879,7 @@ Fortran
 ; Documented in C
 
 v
-Fortran
+Common
 ; Documented in C
 
 ; This comment is to ensure we retain the blank line above.

@@ -90,7 +90,7 @@ Go Var(go_debug_optimization) Init(0)
 Emit optimization diagnostics.
 
 o
-Go Joined Separate
+Common Joined Separate
 ; Documented in common.opt
 
 ; This comment is to ensure we retain the blank line above.

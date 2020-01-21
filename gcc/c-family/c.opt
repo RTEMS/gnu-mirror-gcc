@@ -61,10 +61,10 @@ C ObjC C++ ObjC++ Joined Alias(D) MissingArgError(macro name missing after %qs)
 C ObjC C++ ObjC++ Alias(M)
 
 -dump
-C ObjC C++ ObjC++ Separate Alias(d)
+Common Separate Alias(d)
 
 -dump=
-C ObjC C++ ObjC++ Joined Alias(d)
+Common Joined Alias(d)
 
 -imacros
 C ObjC C++ ObjC++ Separate Alias(imacros) MissingArgError(missing filename after %qs)
@@ -127,13 +127,13 @@ C ObjC C++ ObjC++ Alias(P)
 C ObjC C++ ObjC++ Alias(nostdinc)
 
 -no-warnings
-C ObjC C++ ObjC++ Alias(w)
+Common Alias(w)
 
 -output
-C ObjC C++ ObjC++ Separate Alias(o)
+Common Separate Alias(o)
 
 -output=
-C ObjC C++ ObjC++ Joined Alias(o)
+Common Joined Alias(o)
 
 -output-pch=
 C ObjC C++ ObjC++ Joined Separate
@@ -169,7 +169,7 @@ C ObjC C++ ObjC++ Joined Alias(U) MissingArgError(macro name missing after %qs)
 C ObjC C++ ObjC++ Alias(MM)
 
 -verbose
-Common C ObjC C++ ObjC++ Alias(v)
+Common Alias(v)
 
 -write-dependencies
 C ObjC C++ ObjC++ NoDriverArg Separate Alias(MD) MissingArgError(missing filename after %qs)
@@ -1296,7 +1296,7 @@ C ObjC C++ ObjC++
 A synonym for -std=c89 (for C) or -std=c++98 (for C++).
 
 d
-C ObjC C++ ObjC++ Joined
+Common Joined
 ; Documented in common.opt.  FIXME - what about -dI, -dD, -dN and -dD?
 
 fabi-compat-version=
@@ -2018,7 +2018,7 @@ C++ ObjC++
 Do not search standard system include directories for C++.
 
 o
-C ObjC C++ ObjC++ Joined Separate
+Common Joined Separate
 ; Documented in common.opt
 
 pedantic
@@ -2223,11 +2223,11 @@ C ObjC C++ ObjC++ Var(flag_undef)
 Do not predefine system-specific and GCC-specific macros.
 
 v
-C ObjC C++ ObjC++
+Common
 ; Documented in common.opt
 
 w
-C ObjC C++ ObjC++
+Common
 ; Documented in common.opt
 
 ; This comment is to ensure we retain the blank line above.

@@ -167,7 +167,7 @@ Driver
 Do link the standard D startup files in the compilation.
 
 -verbose
-D Alias(v)
+Common Alias(v)
 
 fall-instantiations
 D
@@ -362,5 +362,5 @@ Driver
 Link the standard D library dynamically in the compilation.
 
 v
-D
+Common
 ; Documented in C
