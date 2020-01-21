@@ -127,7 +127,7 @@ D
 ; Documented in common.opt
 
 Werror
-D
+Common
 ; Documented in common.opt
 
 Wpsabi

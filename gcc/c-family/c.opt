@@ -550,7 +550,7 @@ C ObjC Var(warn_enum_conversion) Init(0) Warning LangEnabledBy(C ObjC,Wextra)
 Warn about implicit conversion of enum types.
 
 Werror
-C ObjC C++ ObjC++
+Common
 ; Documented in common.opt
 
 Werror-implicit-function-declaration
@@ -558,7 +558,7 @@ C ObjC RejectNegative Warning Alias(Werror=, implicit-function-declaration)
 This switch is deprecated; use -Werror=implicit-function-declaration instead.
 
 Wextra
-C ObjC C++ ObjC++ Warning
+Common Warning
 ; in common.opt
 
 Wextra-semi
@@ -677,7 +677,7 @@ C ObjC C++ ObjC++ Var(warn_double_promotion) Warning
 Warn about implicit conversions from \"float\" to \"double\".
 
 Wexpansion-to-defined
-C ObjC C++ ObjC++ CPP(warn_expansion_to_defined) CppReason(CPP_W_EXPANSION_TO_DEFINED) Var(cpp_warn_expansion_to_defined) Init(0) Warning EnabledBy(Wextra || Wpedantic)
+C ObjC C++ ObjC++ CPP(warn_expansion_to_defined) CppReason(CPP_W_EXPANSION_TO_DEFINED) Var(cpp_warn_expansion_to_defined) Init(0) Warning LangEnabledBy(Wextra || Wpedantic)
 Warn if \"defined\" is used outside #if.
 
 Wimplicit-function-declaration
@@ -752,7 +752,7 @@ C ObjC C++ ObjC++ Var(warn_memset_elt_size) Warning LangEnabledBy(C ObjC C++ Obj
 Warn about suspicious calls to memset where the third argument contains the number of elements not multiplied by the element size.
 
 Wmisleading-indentation
-C C++ Common Var(warn_misleading_indentation) Warning LangEnabledBy(C C++,Wall)
+C C++ Var(warn_misleading_indentation) Warning LangEnabledBy(C C++,Wall)
 Warn when the indentation of the code does not reflect the block structure.
 
 Wmismatched-tags
@@ -1204,7 +1204,7 @@ C ObjC C++ ObjC++ LangEnabledBy(C ObjC C++ ObjC++,Wall)
 ; documented in common.opt
 
 Wunused-local-typedefs
-C ObjC C++ ObjC++ Var(warn_unused_local_typedefs) Warning EnabledBy(Wunused)
+C ObjC C++ ObjC++ Var(warn_unused_local_typedefs) Warning LangEnabledBy(Wunused)
 Warn when typedefs locally defined in a function are not used.
 
 Wunused-macros

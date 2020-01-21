@@ -562,7 +562,7 @@ Common Var(warn_cast_align,2) Warning
 Warn about pointer casts which increase alignment.
 
 Wcpp
-Common Var(warn_cpp) Init(1) Warning
+Var(warn_cpp) Init(1) Warning
 Warn when a #warning directive is encountered.
 
 Wattribute-warning
@@ -570,7 +570,7 @@ Common Var(warn_attribute_warning) Init(1) Warning
 Warn about uses of __attribute__((warning)) declarations.
 
 Wdeprecated
-Common Var(warn_deprecated) Init(1) Warning
+Var(warn_deprecated) Init(1) Warning
 Warn if a deprecated compiler feature, class, method, or field is used.
 
 Wdeprecated-declarations
@@ -667,7 +667,7 @@ Common Var(warn_padded) Warning
 Warn when padding is required to align structure members.
 
 Wpedantic
-Common Var(pedantic) Init(0) Warning
+Var(pedantic) Init(0) Warning
 Issue warnings needed for strict compliance to the standard.
 
 Wreturn-local-addr
@@ -705,19 +705,19 @@ Common Joined RejectNegative Host_Wide_Int ByteSize Var(warn_stack_usage) Warnin
 -Wstack-usage=<byte-size>	Warn if stack usage might exceed <byte-size>.
 
 Wstrict-aliasing
-Common Warning
+Warning
 Warn about code which might break strict aliasing rules.
 
 Wstrict-aliasing=
-Common Joined RejectNegative UInteger Var(warn_strict_aliasing) Warning
+Joined RejectNegative UInteger Var(warn_strict_aliasing) Warning
 Warn about code which might break strict aliasing rules.
 
 Wstrict-overflow
-Common Warning
+Warning
 Warn about optimizations that assume that signed overflow is undefined.
 
 Wstrict-overflow=
-Common Joined RejectNegative UInteger Var(warn_strict_overflow) Warning
+Joined RejectNegative UInteger Var(warn_strict_overflow) Warning
 Warn about optimizations that assume that signed overflow is undefined.
 
 Wsuggest-attribute=cold
@@ -754,7 +754,7 @@ Warn about statements between switch's controlling expression and the first
 case.
 
 Wsystem-headers
-Common Var(warn_system_headers) Warning
+Var(warn_system_headers) Warning
 Do not suppress warnings from system headers.
 
 Wtrampolines
@@ -766,11 +766,11 @@ Common Var(warn_type_limits) Warning EnabledBy(Wextra)
 Warn if a comparison is always true or always false due to the limited range of the data type.
 
 Wuninitialized
-Common Var(warn_uninitialized) Warning EnabledBy(Wextra)
+Var(warn_uninitialized) Warning EnabledBy(Wextra)
 Warn about uninitialized automatic variables.
 
 Wmaybe-uninitialized
-Common Var(warn_maybe_uninitialized) Warning EnabledBy(Wuninitialized)
+Var(warn_maybe_uninitialized) Warning LangEnabledBy(Wuninitialized)
 Warn about maybe uninitialized automatic variables.
 
 Wunreachable-code
@@ -778,35 +778,35 @@ Common Ignore Warning
 Does nothing. Preserved for backward compatibility.
 
 Wunused
-Common Var(warn_unused) Init(0) Warning
+Var(warn_unused) Init(0) Warning
 Enable all -Wunused- warnings.
 
 Wunused-but-set-parameter
-Common Var(warn_unused_but_set_parameter) Warning EnabledBy(Wunused && Wextra)
+Common Var(warn_unused_but_set_parameter) Warning LangEnabledBy(Wunused && Wextra)
 Warn when a function parameter is only set, otherwise unused.
 
 Wunused-but-set-variable
-Common Var(warn_unused_but_set_variable) Warning EnabledBy(Wunused)
+Common Var(warn_unused_but_set_variable) Warning LangEnabledBy(Wunused)
 Warn when a variable is only set, otherwise unused.
 
 Wunused-function
-Common Var(warn_unused_function) Warning EnabledBy(Wunused)
+Common Var(warn_unused_function) Warning LangEnabledBy(Wunused)
 Warn when a function is unused.
 
 Wunused-label
-Common Var(warn_unused_label) Warning EnabledBy(Wunused)
+Common Var(warn_unused_label) Warning LangEnabledBy(Wunused)
 Warn when a label is unused.
 
 Wunused-parameter
-Common Var(warn_unused_parameter) Warning EnabledBy(Wunused && Wextra)
+Common Var(warn_unused_parameter) Warning LangEnabledBy(Wunused && Wextra)
 Warn when a function parameter is unused.
 
 Wunused-value
-Common Var(warn_unused_value) Warning EnabledBy(Wunused)
+Common Var(warn_unused_value) Warning LangEnabledBy(Wunused)
 Warn when an expression value is unused.
 
 Wunused-variable
-Common Var(warn_unused_variable) Warning EnabledBy(Wunused)
+Var(warn_unused_variable) Warning LangEnabledBy(Wunused)
 Warn when a variable is unused.
 
 Wcoverage-mismatch

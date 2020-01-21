@@ -86,7 +86,7 @@ function nth_arg(n, s)
 }
 
 # Return a bitmask of CL_* values for option flags FLAGS.
-function switch_flags (flags)
+function switch_flags (flags, name)
 {
 	result = "0"
 	for (j = 0; j < n_langs; j++) {
@@ -94,6 +94,8 @@ function switch_flags (flags)
 		gsub ( "\\+", "\\+", regex )
 		result = result test_flag(regex, flags, " | " macros[j])
 	}
+#	if (result ~ "CL_" && flags ~ "Common")
+#	  print "#error -" name " combines CL_COMMON and some FE flags: " flags
 	result = result \
 	  test_flag("Common", flags, " | CL_COMMON") \
 	  test_flag("Target", flags, " | CL_TARGET") \

@@ -401,7 +401,7 @@ for (i = 0; i < n_opts; i++) {
 	       alias_data, back_chain[i], len)
 	printf(" /* .neg_idx = */ %d,\n", idx)
 	condition = opt_args("Condition", flags[i])
-	cl_flags = switch_flags(flags[i])
+	cl_flags = switch_flags(flags[i], opts[i])
 	cl_bit_fields = switch_bit_fields(flags[i])
 	cl_zero_bit_fields = switch_bit_fields("")
 	if (condition != "")
