@@ -1241,6 +1241,17 @@ jobserver_active_p (void)
 	  && is_valid_fd (wfd));
 }
 
+/* Prune invalid characters that can't be in name due to Makefile syntax.  */
+
+static void
+prune_filename_for_make (char *filename)
+{
+  unsigned length = strlen (filename);
+  for (unsigned i = 0; i < length; i++)
+    if (filename[i] == '#')
+      filename[i] = '_';
+}
+
 /* Execute gcc. ARGC is the number of arguments. ARGV contains the arguments. */
 
 static void
@@ -1780,6 +1791,7 @@ cont:
 	  obstack_grow (&env_obstack, input_name, strlen (input_name) - 2);
 	  obstack_grow (&env_obstack, ".ltrans.o", sizeof (".ltrans.o"));
 	  output_name = XOBFINISH (&env_obstack, char *);
+	  prune_filename_for_make (output_name);
 
 	  /* Adjust the dumpbase if the linker output file was seen.  */
 	  if (linker_output)
