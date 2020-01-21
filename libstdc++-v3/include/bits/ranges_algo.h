@@ -1407,6 +1407,38 @@ namespace ranges
 
       }
 
+    template<permutable _Iter, sentinel_for<_Iter> _Sent, class _Proj = identity,
+	     indirect_equivalence_relation<
+	       projected<_Iter, _Proj>> _Comp = ranges::equal_to>
+      constexpr subrange<_Iter>
+      unique(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+      {
+	__first = ranges::adjacent_find(__first, __last, __comp, __proj);
+	if (__first == __last)
+	  return {__last, __last};
+
+	auto __dest = __first;
+	++__first;
+	while (++__first != __last)
+	  if (!std::__invoke(__comp,
+			     std::__invoke(__proj, *__dest),
+			     std::__invoke(__proj, *__first)))
+	    *++__dest = std::move(*__first);
+	return {++__dest, __last};
+      }
+
+    template<forward_range _Range, class _Proj = identity,
+	     indirect_equivalence_relation<
+	       projected<iterator_t<_Range>, _Proj>> _Comp = ranges::equal_to>
+      requires permutable<iterator_t<_Range>>
+      constexpr safe_subrange_t<_Range>
+      unique(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+      {
+	return ranges::unique(ranges::begin(__r), ranges::end(__r),
+			      std::move(__comp), std::move(__proj));
+      }
+
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
