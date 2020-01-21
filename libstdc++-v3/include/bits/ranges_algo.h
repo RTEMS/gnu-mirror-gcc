@@ -953,7 +953,7 @@ namespace ranges
       {
 	for (; __first1 != __last1 && __first2 != __last2;
 	     ++__first1, (void)++__first2)
-	  std::swap(*__first1, *__first2);
+	  ranges::iter_swap(__first1, __first2);
 	return {__first1, __first2};
       }
 
