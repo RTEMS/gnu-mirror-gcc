@@ -1438,6 +1438,85 @@ namespace ranges
 			      std::move(__comp), std::move(__proj));
       }
 
+    template<class _Iter, class _Out>
+    using unique_copy_result = copy_result<_Iter, _Out>;
+
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     weakly_incrementable _Out, class _Proj = identity,
+	     indirect_equivalence_relation<
+	       projected<_Iter, _Proj>> _Comp = ranges::equal_to>
+      requires indirectly_copyable<_Iter, _Out>
+	&& (forward_iterator<_Iter>
+	    || (input_iterator<_Out>
+		&& same_as<iter_value_t<_Iter>, iter_value_t<_Out>>)
+	    || indirectly_copyable_storable<_Iter, _Out>)
+      constexpr unique_copy_result<_Iter, _Out>
+      unique_copy(_Iter __first, _Sent __last, _Out __result,
+		  _Comp __comp = {}, _Proj __proj = {})
+      {
+	if (__first == __last)
+	  return {__last, __result};
+
+	if constexpr (forward_iterator<_Iter>)
+	  {
+	    auto __next = __first;
+	    *__result = *__next;
+	    while (++__next != __last)
+	      if (!std::__invoke(__comp,
+				 std::__invoke(__proj, *__first),
+				 std::__invoke(__proj, *__next)))
+		{
+		  __first = __next;
+		  *++__result = *__first;
+		}
+	    return {__last, ++__result};
+	  }
+	else if constexpr (input_iterator<_Out>
+			   && same_as<iter_value_t<_Iter>, iter_value_t<_Out>>)
+	  {
+	    *__result = *__first;
+	    while (++__first != __last)
+	      if (!std::__invoke(__comp,
+				 std::__invoke(__proj, *__result),
+				 std::__invoke(__proj, *__first)))
+		  *++__result = *__first;
+	    return {__last, ++__result};
+	  }
+	else // indirectly_copyable_storable<_Iter, _Out>
+	  {
+	    auto __value = *__first;
+	    *__result = __value;
+	    while (++__first != __last)
+	      {
+		if (!std::__invoke(__comp,
+				   std::__invoke(__proj, *__first),
+				   std::__invoke(__proj, __value)))
+		  {
+		    __value = *__first;
+		    *++__result = __value;
+		  }
+	      }
+	    return {__last, ++__result};
+	  }
+      }
+
+    template<input_range _Range,
+	     weakly_incrementable _Out, class _Proj = identity,
+	     indirect_equivalence_relation<
+	       projected<iterator_t<_Range>, _Proj>> _Comp = ranges::equal_to>
+      requires indirectly_copyable<iterator_t<_Range>, _Out>
+	&& (forward_iterator<iterator_t<_Range>>
+	    || (input_iterator<_Out>
+		&& same_as<range_value_t<_Range>, iter_value_t<_Out>>)
+	    || indirectly_copyable_storable<iterator_t<_Range>, _Out>)
+      constexpr unique_copy_result<safe_iterator_t<_Range>, _Out>
+      unique_copy(_Range&& __r, _Out __result,
+		  _Comp __comp = {}, _Proj __proj = {})
+      {
+	return ranges::unique_copy(ranges::begin(__r), ranges::end(__r),
+				   std::move(__result),
+				   std::move(__comp), std::move(__proj));
+      }
 
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
