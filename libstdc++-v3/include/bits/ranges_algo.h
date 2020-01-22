@@ -1565,6 +1565,35 @@ namespace ranges
       return ranges::reverse(ranges::begin(__r), ranges::end(__r));
     }
 
+  template<typename _Iter, typename _Out>
+  using reverse_copy_result = copy_result<_Iter, _Out>;
+
+  template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   weakly_incrementable _Out>
+    requires indirectly_copyable<_Iter, _Out>
+    constexpr reverse_copy_result<_Iter, _Out>
+    reverse_copy(_Iter __first, _Sent __last, _Out __result)
+    {
+      auto __i = ranges::next(__first, __last);
+      auto __tail = __i;
+      while (__first != __tail)
+	{
+	  --__tail;
+	  *__result = *__tail;
+	  ++__result;
+	}
+      return {__i, __result};
+    }
+
+  template<bidirectional_range _Range, weakly_incrementable _Out>
+    requires indirectly_copyable<iterator_t<_Range>, _Out>
+    constexpr reverse_copy_result<safe_iterator_t<_Range>, _Out>
+    reverse_copy(_Range&& __r, _Out __result)
+    {
+      return ranges::reverse_copy(ranges::begin(__r), ranges::end(__r),
+				  std::move(__result));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
