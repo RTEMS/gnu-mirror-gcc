@@ -138,7 +138,7 @@ namespace ranges
     {
       for (; __first != __last; ++__first)
 	std::__invoke(__f, std::__invoke(__proj, *__first));
-      return { __first, std::move(__f) };
+      return { std::move(__first), std::move(__f) };
     }
 
   template<input_range _Range, typename _Proj = identity,
@@ -342,7 +342,7 @@ namespace ranges
 	++__first1;
 	++__first2;
       }
-      return { __first1, __first2 };
+      return { std::move(__first1), std::move(__first2) };
     }
 
   template<input_range _Range1, input_range _Range2,
@@ -767,10 +767,10 @@ namespace ranges
     equal(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
 	  _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
     {
-      return ranges::__equal(std::__niter_base(__first1),
-			     std::__niter_base(__last1),
-			     std::__niter_base(__first2),
-			     std::__niter_base(__last2),
+      return ranges::__equal(std::__niter_base(std::move(__first1)),
+			     std::__niter_base(std::move(__last1)),
+			     std::__niter_base(std::move(__first2)),
+			     std::__niter_base(std::move(__last2)),
 			     std::move(__pred),
 			     std::move(__proj1), std::move(__proj2));
     }
@@ -982,7 +982,7 @@ namespace ranges
     {
       for (; __first1 != __last1; ++__first1, (void)++__result)
 	*__result = std::__invoke(__op, std::__invoke(__proj, *__first1));
-      return {__first1, __result};
+      return {std::move(__first1), __result};
     }
 
   template<input_range _Range, weakly_incrementable _Out,
@@ -1037,7 +1037,7 @@ namespace ranges
 	*__result = std::__invoke(__binary_op,
 				  std::__invoke(__proj1, *__first1),
 				  std::__invoke(__proj2, *__first2));
-      return {__first1, __first2, __result};
+      return {std::move(__first1), std::move(__first2), __result};
     }
 
   template<input_range _Range1, input_range _Range2,
@@ -1101,7 +1101,7 @@ namespace ranges
       for (; __first != __last; ++__first)
 	if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
 	  *__first = __new_value;
-      return __first;
+      return std::move(__first);
     }
 
   template<input_range _Range, typename _Tp, typename _Proj = identity,
@@ -1457,7 +1457,7 @@ namespace ranges
 		_Comp __comp = {}, _Proj __proj = {})
     {
       if (__first == __last)
-	return {__first, __result};
+	return {std::move(__first), std::move(__result)};
 
       // TODO: perform a closer comparison with reference implementations
       if constexpr (forward_iterator<_Iter>)
@@ -1472,7 +1472,7 @@ namespace ranges
 		__first = __next;
 		*++__result = *__first;
 	      }
-	  return {__next, ++__result};
+	  return {__next, std::move(++__result)};
 	}
       else if constexpr (input_iterator<_Out>
 			 && same_as<iter_value_t<_Iter>, iter_value_t<_Out>>)
@@ -1483,7 +1483,7 @@ namespace ranges
 			       std::__invoke(__proj, *__result),
 			       std::__invoke(__proj, *__first)))
 		*++__result = *__first;
-	  return {__first, ++__result};
+	  return {std::move(__first), std::move(++__result)};
 	}
       else // indirectly_copyable_storable<_Iter, _Out>
 	{
@@ -1499,7 +1499,7 @@ namespace ranges
 		  *++__result = __value;
 		}
 	    }
-	  return {__first, ++__result};
+	  return {std::move(__first), std::move(++__result)};
 	}
     }
 
