@@ -1520,6 +1520,50 @@ namespace ranges
 				   std::move(__comp), std::move(__proj));
       }
 
+    template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent>
+      requires permutable<_Iter>
+      constexpr _Iter
+      reverse(_Iter __first, _Sent __last)
+      {
+	auto __i = ranges::next(__first, __last);
+	auto __tail = __i;
+
+	if constexpr (random_access_iterator<_Iter>)
+	  {
+	    if (__first != __last)
+	      {
+		--__tail;
+		while (__first < __tail)
+		  {
+		    ranges::iter_swap(__first, __tail);
+		    ++__first;
+		    --__tail;
+		  }
+	      }
+	    return __i;
+	  }
+	else
+	  {
+	    for (;;)
+	      if (__first == __tail || __first == --__tail)
+		break;
+	      else
+		{
+		  ranges::iter_swap(__first, __tail);
+		  ++__first;
+		}
+	    return __i;
+	  }
+      }
+
+    template<bidirectional_range _Range>
+      requires permutable<iterator_t<_Range>>
+      constexpr safe_iterator_t<_Range>
+      reverse(_Range&& __r)
+      {
+	return ranges::reverse(ranges::begin(__r), ranges::end(__r));
+      }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
