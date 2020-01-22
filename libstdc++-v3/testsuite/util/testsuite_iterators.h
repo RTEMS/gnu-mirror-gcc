@@ -654,12 +654,33 @@ namespace __gnu_test
       { return iter -= n; }
     };
 
+  template<bool active>
+  struct disable_copy { };
+
+  template<>
+  struct disable_copy<true>
+  {
+    disable_copy() noexcept = default;
+
+    disable_copy(disable_copy&&) noexcept = default;
+    disable_copy&
+    operator=(disable_copy&&) noexcept = default;
+
+    disable_copy(const disable_copy&) noexcept = delete;
+    disable_copy&
+    operator=(const disable_copy&) noexcept = delete;
+  };
+
+  template<>
+  struct disable_copy<false> { };
+
   // A type meeting the minimum std::range requirements
   template<typename T, template<typename> class Iter>
     class test_range
     {
       // Adds default constructor to Iter<T> if needed
-      struct iterator : Iter<T>
+      // and removes copyability if the iterator is not a forward iterator
+      struct iterator : Iter<T>, disable_copy<!std::forward_iterator<Iter<T>>>
       {
 	using Iter<T>::Iter;
 
