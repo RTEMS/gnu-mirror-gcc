@@ -25,8 +25,8 @@
 using __gnu_test::test_container;
 using __gnu_test::test_range;
 using __gnu_test::input_iterator_wrapper;
+using __gnu_test::output_iterator_wrapper;
 using __gnu_test::forward_iterator_wrapper;
-using __gnu_test::bidirectional_iterator_wrapper;
 
 namespace ranges = std::ranges;
 
@@ -48,8 +48,8 @@ test01()
       int z[3] = { 1, 2, 3 };
       test_container<int, forward_iterator_wrapper> cx(x);
       test_container<char, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::copy(x, y);
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
+      auto [in, out] = ranges::copy(cx, ranges::begin(cy));
+      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
 
@@ -57,10 +57,10 @@ test01()
       char x[3] = { 1, 2, 3 };
       int y[4] = { 0 };
       int z[3] = { 1, 2, 3 };
-      test_range<char, forward_iterator_wrapper> cx(x);
-      test_range<int, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::copy(x, y);
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
+      test_range<char, input_iterator_wrapper> rx(x);
+      test_range<int, output_iterator_wrapper> ry(y);
+      auto [in, out] = ranges::copy(rx, ranges::begin(ry));
+      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
 }
@@ -135,10 +135,11 @@ test04()
   Y x[7] = { 1, 2, 3, 4, 5, 6, 7 };
   Y y[7] = { 0, 0, 0, 0, 0, 0, 0 };
   Y z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(x)},
-				std::move_sentinel{ranges::end(x)},
+  test_range<Y, input_iterator_wrapper> rx(x);
+  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(rx)},
+				std::move_sentinel{ranges::end(rx)},
 				ranges::begin(y));
-  VERIFY( ranges::equal(x, y) && in.base() == x+7 && out == y+7 );
+  VERIFY( ranges::equal(x, y) && std::move(in).base().ptr == x+7 && out == y+7 );
   VERIFY( ranges::equal(x, z) );
   for (const auto& v : x)
     VERIFY( v.moved == 1 );

@@ -816,16 +816,14 @@ namespace ranges
   template<typename _Iter, typename _Out>
   using move_result = copy_result<_Iter, _Out>;
 
-  template<bool _IsMove,
-	   input_iterator _Iter, sentinel_for<_Iter> _Sent,
-	   weakly_incrementable _Out>
+  template<bool _IsMove, typename _Iter, typename _Sent, typename _Out>
     requires (_IsMove
-	      ? indirectly_movable<_Iter, _Out>
-	      : indirectly_copyable<_Iter, _Out>)
+	      ? indirectly_movable<remove_reference_t<_Iter>, _Out>
+	      : indirectly_copyable<remove_reference_t<_Iter>, _Out>)
     constexpr conditional_t<_IsMove,
-			    move_result<_Iter, _Out>,
-			    copy_result<_Iter, _Out>>
-    __copy_or_move(_Iter __first, _Sent __last, _Out __result)
+			    move_result<remove_reference_t<_Iter>, _Out>,
+			    copy_result<remove_reference_t<_Iter>, _Out>>
+    __copy_or_move(_Iter&& __first, _Sent __last, _Out __result)
     {
       // TODO: implement more specializations to be at least on par with
       // std::copy/std::move.
@@ -860,7 +858,7 @@ namespace ranges
 		  __first++;
 		  __result++;
 		}
-	      return {__first, __result};
+	      return {std::move(__first), std::move(__result)};
 	    }
 	}
       else
@@ -874,7 +872,7 @@ namespace ranges
 	      __first++;
 	      __result++;
 	    }
-	  return {__first, __result};
+	  return {std::move(__first), std::move(__result)};
 	}
     }
 
@@ -887,24 +885,24 @@ namespace ranges
       constexpr bool __move_iterator_p = __is_move_iterator<_Iter>::__value;
       if constexpr (__move_iterator_p)
 	{
-	  auto __first_base = __first.base();
-	  auto __last_base = __last.base();
+	  auto __first_base = std::move(__first).base();
+	  auto __last_base = std::move(__last).base();
 	  auto [__in,__out]
-	    = ranges::__copy_or_move<true>(std::__niter_base(__first_base),
-					   std::__niter_base(__last_base),
-					   std::__niter_base(__result));
-	  auto __wrapped_in = std::__niter_wrap(__first_base, __in);
-	  auto __wrapped_out = std::__niter_wrap(__result, __out);
-	  return {move_iterator{__wrapped_in}, __wrapped_out};
+	    = ranges::__copy_or_move<true>(std::__niter_base(std::move(__first_base)),
+					   std::__niter_base(std::move(__last_base)),
+					   std::__niter_base(std::move(__result)));
+	  auto __wrapped_in = std::__niter_wrap(__first_base, std::move(__in));
+	  auto __wrapped_out = std::__niter_wrap(__result, std::move(__out));
+	  return {move_iterator{std::move(__wrapped_in)}, std::move(__wrapped_out)};
 	}
       else
 	{
 	  auto [__in,__out]
-	    = ranges::__copy_or_move<false>(std::__niter_base(__first),
-					    std::__niter_base(__last),
-					    std::__niter_base(__result));
-	  return {std::__niter_wrap(__first, __in),
-		  std::__niter_wrap(__result, __out)};
+	    = ranges::__copy_or_move<false>(std::__niter_base(std::move(__first)),
+					    std::__niter_base(std::move(__last)),
+					    std::__niter_base(std::move(__result)));
+	  return {std::__niter_wrap(std::move(__first), std::move(__in)),
+		  std::__niter_wrap(std::move(__result), std::move(__out))};
 	}
     }
 
@@ -924,13 +922,15 @@ namespace ranges
     move(_Iter __first, _Sent __last, _Out __result)
     {
       if constexpr (__is_move_iterator<_Iter>::__value)
-	return ranges::copy(__first, __last, __result);
+	return ranges::copy(std::move(__first), std::move(__last),
+			    std::move(__result));
       else
 	{
 	  auto [__in, __out]
-	    = ranges::copy(move_iterator<_Iter>{__first},
-			   move_sentinel<_Sent>{__last}, __result);
-	  return {__in.base(), __out};
+	    = ranges::copy(move_iterator<_Iter>{std::move(__first)},
+			   move_sentinel<_Sent>{std::move(__last)},
+			   std::move(__result));
+	  return {std::move(__in).base(), std::move(__out)};
 	}
     }
 

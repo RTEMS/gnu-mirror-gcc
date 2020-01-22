@@ -25,8 +25,8 @@
 using __gnu_test::test_container;
 using __gnu_test::test_range;
 using __gnu_test::input_iterator_wrapper;
+using __gnu_test::output_iterator_wrapper;
 using __gnu_test::forward_iterator_wrapper;
-using __gnu_test::bidirectional_iterator_wrapper;
 
 namespace ranges = std::ranges;
 
@@ -76,8 +76,8 @@ test01()
       int z[3] = { 1, 2, 3 };
       test_container<int, forward_iterator_wrapper> cx(x);
       test_container<char, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::move(x, y);
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
+      auto [in, out] = ranges::move(cx, cy.begin());
+      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
 
@@ -85,10 +85,10 @@ test01()
       char x[3] = { 1, 2, 3 };
       int y[4] = { 0 };
       int z[3] = { 1, 2, 3 };
-      test_range<char, forward_iterator_wrapper> cx(x);
-      test_range<int, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::move(x, y);
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in == x+3 && out == y+3 );
+      test_range<char, input_iterator_wrapper> cx(x);
+      test_range<int, output_iterator_wrapper> cy(y);
+      auto [in, out] = ranges::move(cx, ranges::begin(cy));
+      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
       VERIFY( ranges::equal(x, z) );
     }
 }
@@ -133,11 +133,12 @@ test04()
   X x[] = { {2}, {2}, {6}, {8}, {10} };
   X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
   X z[] = { {2}, {2}, {6}, {8}, {10} };
-  auto [in, out] = ranges::move(std::move_iterator{ranges::begin(x)},
-				std::move_iterator{ranges::end(x)},
+  test_range<X, input_iterator_wrapper> rx(x);
+  auto [in, out] = ranges::move(std::move_iterator{ranges::begin(rx)},
+				std::move_sentinel{ranges::end(rx)},
 				ranges::begin(y));
   VERIFY( ranges::equal(x, x+5, y, y+5) );
-  VERIFY( in.base() == x+5 );
+  VERIFY( std::move(in).base().ptr == x+5 );
   VERIFY( out == y+5 );
   VERIFY( y[5].i == 2 );
   VERIFY( ranges::equal(x, z) );
