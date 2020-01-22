@@ -25,6 +25,7 @@
 using __gnu_test::test_container;
 using __gnu_test::test_range;
 using __gnu_test::input_iterator_wrapper;
+using __gnu_test::output_iterator_wrapper;
 using __gnu_test::forward_iterator_wrapper;
 
 namespace ranges = std::ranges;
@@ -80,12 +81,13 @@ test01()
     {
       X x[6] = { {2}, {2}, {6}, {8}, {10}, {11} };
       X y[6];
-      X z[6] = { {7}, {7}, {6}, {8}, {10}, {11} };
-      test_range<X, forward_iterator_wrapper> cx(x), cy(y), cz(z);
+      const X z[6] = { {7}, {7}, {6}, {8}, {10}, {11} };
+      test_range<X, input_iterator_wrapper> cx(x);
+      test_range<X, output_iterator_wrapper> cy(y);
       auto [in, out] = ranges::replace_copy_if(cx, cy.begin(),
 					       is_two_p, X{7}, &X::i);
       VERIFY( in == cx.end() && out == cy.end() );
-      VERIFY( ranges::equal(cy, cz) );
+      VERIFY( ranges::equal(y, z) );
     }
 }
 

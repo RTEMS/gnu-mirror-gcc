@@ -1135,7 +1135,7 @@ namespace ranges
 	  *__result = __new_value;
 	else
 	  *__result = *__first;
-      return {__first, __result};
+      return {std::move(__first), std::move(__result)};
     }
 
   template<input_range _Range, typename _Tp1, typename _Tp2,
@@ -1171,7 +1171,7 @@ namespace ranges
 	  *__result = __new_value;
 	else
 	  *__result = *__first;
-      return {__first, __result};
+      return {std::move(__first), std::move(__result)};
     }
 
   template<input_range _Range,
