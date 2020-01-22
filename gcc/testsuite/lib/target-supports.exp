@@ -698,7 +698,6 @@ proc check_profiling_available { test_what } {
 	     || [istarget avr-*-*]
 	     || [istarget bfin-*-*]
 	     || [istarget cris-*-*]
-	     || [istarget crisv32-*-*]
 	     || [istarget csky-*-elf]
 	     || [istarget fido-*-elf]
 	     || [istarget h8300-*-*]
@@ -7263,7 +7262,7 @@ proc check_effective_target_sync_int_long { } {
 	     || [istarget hppa*-*linux*]
 	     || [istarget s390*-*-*] 
 	     || [istarget powerpc*-*-*]
-	     || [istarget crisv32-*-*] || [istarget cris-*-*]
+	     || [istarget cris-*-*]
 	     || ([istarget sparc*-*-*] && [check_effective_target_sparc_v9])
 	     || ([istarget arc*-*-*] && [check_effective_target_arc_atomic])
 	     || [check_effective_target_mips_llsc] }}]
@@ -7286,7 +7285,7 @@ proc check_effective_target_sync_char_short { } {
 	     || [istarget hppa*-*linux*]
 	     || [istarget s390*-*-*] 
 	     || [istarget powerpc*-*-*]
-	     || [istarget crisv32-*-*] || [istarget cris-*-*]
+	     || [istarget cris-*-*]
 	     || ([istarget sparc*-*-*] && [check_effective_target_sparc_v9])
 	     || ([istarget arc*-*-*] && [check_effective_target_arc_atomic])
 	     || [check_effective_target_mips_llsc] }}]
