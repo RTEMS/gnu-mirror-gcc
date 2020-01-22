@@ -78,8 +78,9 @@ test01()
       int w[3] = { 2, 4, 6 };
       test_container<int, forward_iterator_wrapper> cx(x);
       test_container<int, forward_iterator_wrapper> cy(y);
-      auto [x_iter, y_iter] = ranges::swap_ranges(x, y);
-      VERIFY( ranges::equal(y, y+3, z, z+3) && x_iter == x+3 && y_iter == y+3 );
+      auto [x_iter, y_iter] = ranges::swap_ranges(cx, cy);
+      VERIFY( ranges::equal(y, y+3, z, z+3) );
+      VERIFY( x_iter.ptr == x+3 && y_iter.ptr == y+3 );
       VERIFY( y[3] == 0 );
       VERIFY( ranges::equal(x, w) );
     }
@@ -91,8 +92,9 @@ test01()
       int w[3] = { 2, 4, 6 };
       test_range<int, input_iterator_wrapper> cx(x);
       test_range<int, input_iterator_wrapper> cy(y);
-      auto [y_iter, x_iter] = ranges::swap_ranges(y, x);
-      VERIFY( ranges::equal(y, y+3, z, z+3) && x_iter == x+3 && y_iter == y+3 );
+      auto [y_iter, x_iter] = ranges::swap_ranges(cy, cx);
+      VERIFY( ranges::equal(y, y+3, z, z+3) );
+      VERIFY( x_iter.ptr == x+3 && y_iter.ptr == y+3 );
       VERIFY( y[3] == 0 );
       VERIFY( ranges::equal(x, w) );
     }
