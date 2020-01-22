@@ -1356,7 +1356,7 @@ namespace ranges
 	    *__result = *__first;
 	    ++__result;
 	  }
-      return {__first, __result};
+      return {std::move(__first), std::move(__result)};
     }
 
   template<input_range _Range, weakly_incrementable _Out,
@@ -1368,7 +1368,7 @@ namespace ranges
 		   _Pred __pred, _Proj __proj = {})
     {
       return ranges::remove_copy_if(ranges::begin(__r), ranges::end(__r),
-				    __result,
+				    std::move(__result),
 				    std::move(__pred), std::move(__proj));
     }
 
@@ -1391,7 +1391,7 @@ namespace ranges
 	    *__result = *__first;
 	    ++__result;
 	  }
-      return {__first, __result};
+      return {std::move(__first), std::move(__result)};
     }
 
   template<input_range _Range, weakly_incrementable _Out,
@@ -1405,7 +1405,8 @@ namespace ranges
 		const _Tp& __value, _Proj __proj = {})
     {
       return ranges::remove_copy(ranges::begin(__r), ranges::end(__r),
-				 __result, __value, std::move(__proj));
+				 std::move(__result), __value,
+				 std::move(__proj));
 
     }
 
