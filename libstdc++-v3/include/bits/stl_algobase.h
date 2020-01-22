@@ -334,10 +334,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   // remove the __normal_iterator wrapper. See copy, fill, ...
   template<typename _Iterator>
     _GLIBCXX20_CONSTEXPR
-    inline _Iterator
-    __niter_base(_Iterator __it)
+    inline _Iterator&&
+    __niter_base(_Iterator&& __it)
     _GLIBCXX_NOEXCEPT_IF(std::is_nothrow_copy_constructible<_Iterator>::value)
-    { return __it; }
+    { return std::forward<_Iterator>(__it); }
 
   // Reverse the __niter_base transformation to get a
   // __normal_iterator back again (this assumes that __normal_iterator

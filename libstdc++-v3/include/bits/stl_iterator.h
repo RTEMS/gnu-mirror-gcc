@@ -1166,16 +1166,27 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       explicit _GLIBCXX17_CONSTEXPR
       move_iterator(iterator_type __i)
-      : _M_current(__i) { }
+      : _M_current(std::move(__i)) { }
 
       template<typename _Iter>
 	_GLIBCXX17_CONSTEXPR
 	move_iterator(const move_iterator<_Iter>& __i)
 	: _M_current(__i.base()) { }
 
+#if __cplusplus > 201703L
+      constexpr iterator_type
+      base() const &
+      requires copyable<iterator_type>
+      { return _M_current; }
+
+      constexpr iterator_type
+      base() &&
+      { return std::move(_M_current); }
+#else
       _GLIBCXX17_CONSTEXPR iterator_type
       base() const
       { return _M_current; }
+#endif
 
       _GLIBCXX17_CONSTEXPR reference
       operator*() const
