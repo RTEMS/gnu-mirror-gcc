@@ -25,6 +25,7 @@
 using __gnu_test::test_container;
 using __gnu_test::test_range;
 using __gnu_test::input_iterator_wrapper;
+using __gnu_test::output_iterator_wrapper;
 using __gnu_test::forward_iterator_wrapper;
 
 namespace ranges = std::ranges;
@@ -59,11 +60,11 @@ test01()
       X y[7] = { {3}, {5}, {7}, {9}, {11}, {12}, {0} };
       int z[7] = { {0}, {0}, {0}, {0}, {0}, {0}, {0} };
       test_range<X, input_iterator_wrapper> rx(x), ry(y);
-      test_range<int, forward_iterator_wrapper> rz(z);
+      test_range<int, output_iterator_wrapper> rz(z);
       auto [in, out]
 	= ranges::transform(rx, rz.begin(), [] (int a) { return a+1; }, &X::i);
-      VERIFY( ranges::equal(ry, rz, {}, &X::i) );
-      VERIFY( in == rx.end() && ++out == rz.end() );
+      VERIFY( ranges::equal(ry, z, {}, &X::i) );
+      VERIFY( in == rx.end() && out.ptr == z+6 );
     }
 }
 
@@ -119,11 +120,11 @@ test03()
       int w[6];
       test_range<X, input_iterator_wrapper> rx(x);
       test_range<int, input_iterator_wrapper> ry(y), rz(z);
-      test_range<int, forward_iterator_wrapper> rw(w);
+      test_range<int, output_iterator_wrapper> rw(w);
       auto [in1, in2, out]
 	= ranges::transform(rx, ry, rw.begin(), std::plus<>{}, &X::i);
-      VERIFY( in1 == rx.end() && ++in2 == ry.end() && out == rw.end() );
-      VERIFY( ranges::equal(rw, rz) );
+      VERIFY( in1 == rx.end() && ++in2 == ry.end() && out.ptr == w+6 );
+      VERIFY( ranges::equal(w, rz) );
     }
 }
 

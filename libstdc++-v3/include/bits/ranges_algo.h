@@ -982,7 +982,7 @@ namespace ranges
     {
       for (; __first1 != __last1; ++__first1, (void)++__result)
 	*__result = std::__invoke(__op, std::__invoke(__proj, *__first1));
-      return {std::move(__first1), __result};
+      return {std::move(__first1), std::move(__result)};
     }
 
   template<input_range _Range, weakly_incrementable _Out,
@@ -1037,7 +1037,7 @@ namespace ranges
 	*__result = std::__invoke(__binary_op,
 				  std::__invoke(__proj1, *__first1),
 				  std::__invoke(__proj2, *__first2));
-      return {std::move(__first1), std::move(__first2), __result};
+      return {std::move(__first1), std::move(__first2), std::move(__result)};
     }
 
   template<input_range _Range1, input_range _Range2,
