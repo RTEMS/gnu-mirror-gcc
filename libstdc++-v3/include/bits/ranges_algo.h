@@ -816,21 +816,23 @@ namespace ranges
   template<typename _Iter, typename _Out>
   using move_result = copy_result<_Iter, _Out>;
 
-  template<bool _IsMove, typename _Iter, typename _Sent, typename _Out>
+  template<bool _IsMove,
+	   input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   weakly_incrementable _Out>
     requires (_IsMove
-	      ? indirectly_movable<remove_reference_t<_Iter>, _Out>
-	      : indirectly_copyable<remove_reference_t<_Iter>, _Out>)
+	      ? indirectly_movable<_Iter, _Out>
+	      : indirectly_copyable<_Iter, _Out>)
     constexpr conditional_t<_IsMove,
-			    move_result<remove_reference_t<_Iter>, _Out>,
-			    copy_result<remove_reference_t<_Iter>, _Out>>
-    __copy_or_move(_Iter&& __first, _Sent __last, _Out __result)
+			    move_result<_Iter, _Out>,
+			    copy_result<_Iter, _Out>>
+    __copy_or_move(_Iter __first, _Sent __last, _Out __result)
     {
       // TODO: implement more specializations to be at least on par with
       // std::copy/std::move.
       if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-	  using _ValueTypeI = iterator_traits<_Iter>::value_type;
-	  using _ValueTypeO = iterator_traits<_Out>::value_type;
+	  using _ValueTypeI = iter_value_t<_Iter>;
+	  using _ValueTypeO = iter_value_t<_Out>;
 	  constexpr bool __use_memmove
 	    = (is_trivially_copyable_v<_ValueTypeI>
 	       && is_same_v<_ValueTypeI, _ValueTypeO>
