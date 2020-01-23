@@ -216,6 +216,10 @@ get_exec_counts (unsigned cfg_checksum, unsigned lineno_checksum)
 	  num_edges++;
     }
 
+  if (dump_file)
+    fprintf (dump_file, "get_exec_counts:%s:0x%x:0x%x\n", 
+	     cgraph_node::get (current_function_decl)->name (), cfg_checksum,
+	     lineno_checksum);
   counts = get_coverage_counts (GCOV_COUNTER_ARCS, cfg_checksum,
 				lineno_checksum, num_edges);
   if (!counts)
