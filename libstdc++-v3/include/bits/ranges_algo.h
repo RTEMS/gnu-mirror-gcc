@@ -857,8 +857,8 @@ namespace ranges
 		    *__result = std::move(*__first);
 		  else
 		    *__result = *__first;
-		  __first++;
-		  __result++;
+		  ++__first;
+		  ++__result;
 		}
 	      return {std::move(__first), std::move(__result)};
 	    }
@@ -871,8 +871,8 @@ namespace ranges
 		*__result = std::move(*__first);
 	      else
 		*__result = *__first;
-	      __first++;
-	      __result++;
+	      ++__first;
+	      ++__result;
 	    }
 	  return {std::move(__first), std::move(__result)};
 	}
