@@ -272,6 +272,9 @@ GCOV_COUNTERS
 /* Total number of single value counters.  */
 #define GCOV_TOPN_VALUES_COUNTERS (2 * GCOV_TOPN_VALUES + 1)
 
+/* Constant used for an invalid TOPN counter.  */
+#define GCOV_TOPN_INVALID ((gcov_type)0x8000000000000000LL)
+
 /* Convert a counter index to a tag.  */
 #define GCOV_TAG_FOR_COUNTER(COUNT)				\
 	(GCOV_TAG_COUNTER_BASE + ((gcov_unsigned_t)(COUNT) << 17))

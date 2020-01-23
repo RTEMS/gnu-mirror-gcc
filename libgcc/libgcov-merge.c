@@ -103,9 +103,9 @@ merge_topn_values_set (gcov_type *counters)
       read_counters[2 * i + 1] = gcov_get_counter_ignore_scaling (-1);
     }
 
-  if (read_counters[1] == -1)
+  if (read_counters[1] == GCOV_TOPN_INVALID)
     {
-      counters[1] = -1;
+      counters[1] = GCOV_TOPN_INVALID;
       return;
     }
 
@@ -133,7 +133,7 @@ merge_topn_values_set (gcov_type *counters)
       /* We haven't found a slot, bail out.  */
       if (j == GCOV_TOPN_VALUES)
 	{
-	  counters[1] = -1;
+	  counters[1] = GCOV_TOPN_INVALID;
 	  return;
 	}
     }

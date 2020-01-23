@@ -765,8 +765,8 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 static void
 sort_hist_values (histogram_value hist)
 {
-  /* counters[2] equal to -1 means that all counters are invalidated.  */
-  if (hist->hvalue.counters[2] == -1)
+  /* counters[2] equal to GCOV_TOPN_INVALID means that all counters are invalidated.  */
+  if (hist->hvalue.counters[2] == GCOV_TOPN_INVALID)
     return;
 
   gcc_assert (hist->type == HIST_TYPE_TOPN_VALUES
@@ -865,7 +865,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	  || hist->type == HIST_TYPE_INDIR_CALL)
 	{
 	  /* Each count value is multiplied by GCOV_TOPN_VALUES.  */
-	  if (hist->hvalue.counters[2] != -1)
+	  if (hist->hvalue.counters[2] != GCOV_TOPN_INVALID)
 	    for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
 	      hist->hvalue.counters[2 * i + 2]
 		= RDIV (hist->hvalue.counters[2 * i + 2], GCOV_TOPN_VALUES);

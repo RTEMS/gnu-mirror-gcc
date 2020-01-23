@@ -723,7 +723,7 @@ get_nth_most_common_value (gimple *stmt, const char *counter_type,
 			   histogram_value hist, gcov_type *value,
 			   gcov_type *count, gcov_type *all, unsigned n)
 {
-  if (hist->hvalue.counters[2] == -1)
+  if (hist->hvalue.counters[2] == GCOV_TOPN_INVALID)
     return false;
 
   gcc_assert (n < GCOV_TOPN_VALUES);

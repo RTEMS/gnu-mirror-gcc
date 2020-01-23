@@ -219,7 +219,7 @@ static struct gcov_fn_buffer *fn_buffer;
 static void
 prune_topn_counter (gcov_type *counters, gcov_type all)
 {
-  if (counters[1] == -1)
+  if (counters[1] == GCOV_TOPN_INVALID)
     return;
 
   for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
