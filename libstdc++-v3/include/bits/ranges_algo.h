@@ -33,11 +33,13 @@
 #if __cplusplus > 201703L
 
 #include <compare>
+#include <cmath>
 #include <iterator>
 // #include <bits/range_concepts.h>
 #include <ranges>
 #include <bits/invoke.h>
 #include <bits/cpp_type_traits.h> // __is_byte
+#include <bits/random.h> // concept uniform_random_bit_generator
 
 #if __cpp_lib_concepts
 namespace std _GLIBCXX_VISIBILITY(default)
@@ -1947,6 +1949,29 @@ namespace ranges
 				 std::move(__middle),
 				 ranges::end(__r),
 				 std::move(__result));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Gen>
+    requires permutable<_Iter>
+      && uniform_random_bit_generator<remove_reference_t<_Gen>>
+    _Iter
+    shuffle(_Iter __first, _Sent __last, _Gen&& __g)
+    {
+      auto __lasti = ranges::next(__first, __last);
+      // TODO: is it worth reimplementing this one?
+      std::shuffle(std::move(__first), __lasti, std::forward<_Gen>(__g));
+      return __lasti;
+    }
+
+  template<random_access_range _Range, typename _Gen>
+    requires permutable<iterator_t<_Range>>
+      && uniform_random_bit_generator<remove_reference_t<_Gen>>
+    safe_iterator_t<_Range>
+    shuffle(_Range&& __r, _Gen&& __g)
+    {
+      return ranges::shuffle(ranges::begin(__r), ranges::end(__r),
+			     std::forward<_Gen>(__g));
     }
 
 } // namespace ranges
