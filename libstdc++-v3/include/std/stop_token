@@ -36,8 +36,10 @@
 #ifdef _GLIBCXX_HAS_GTHREADS
 # define __cpp_lib_jthread 201907L
 # include <bits/gthr.h>
+# if __has_include(<semaphore>)
+#  include <semaphore>
+# endif
 #endif
-
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -98,12 +100,43 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     template<typename _Callback>
       friend class stop_callback;
 
+#ifndef __cpp_lib_semaphore
+    // TODO: replace this with a real implementation of std::binary_semaphore
+    struct binary_semaphore
+    {
+      explicit binary_semaphore(int __d) : _M_counter(__d > 0) { }
+
+      void release() { _M_counter.fetch_add(1, memory_order::release); }
+
+      void acquire()
+      {
+	int __old = 1;
+	while (_M_counter.compare_exchange_weak(__old, 0,
+						memory_order::acquire,
+						memory_order::relaxed))
+	  {
+	    __old = 1;
+	    if constexpr (__has_builtin(__builtin_ia32_pause))
+	      __builtin_ia32_pause();
+#ifdef _GLIBCXX_USE_SCHED_YIELD
+	    else
+	      __gthread_yield();
+#endif
+	  }
+      }
+
+      atomic<int> _M_counter;
+    };
+#endif
+
     struct _Stop_cb
     {
       using __cb_type = void(_Stop_cb*) noexcept;
       __cb_type* _M_callback;
       _Stop_cb* _M_prev = nullptr;
       _Stop_cb* _M_next = nullptr;
+      bool* _M_destroyed = nullptr;
+      binary_semaphore _M_done{0};
 
       [[__gnu__::__nonnull__]]
       explicit
@@ -124,6 +157,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       std::atomic<value_type> _M_owners{1};
       std::atomic<value_type> _M_value{_S_ssrc_counter_inc};
       _Stop_cb* _M_head = nullptr;
+#if _GLIBCXX_HAS_GTHREADS
+      __gthread_t _M_requester;
+#endif
 
       _Stop_state_t() = default;
 
@@ -196,6 +232,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  }
 	while (!_M_try_lock_and_stop(__old));
 
+#if _GLIBCXX_HAS_GTHREADS
+	_M_requester = __gthread_self();
+#endif
+
 	while (_M_head)
 	  {
 	    bool __last_cb;
@@ -212,12 +252,20 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    // Allow other callbacks to be unregistered while __cb runs.
 	    _M_unlock();
 
+	    bool __destroyed = false;
+	    __cb->_M_destroyed = &__destroyed;
+
 	    // run callback
-	    // TODO: synchronize with owning stop_callback's destructor
 	    __cb->_M_run();
 
-	    // TODO: check if __cb is still accessible, might be destroyed
-	    __cb->_M_prev = __cb->_M_next = nullptr;
+	    if (!__destroyed)
+	      {
+		__cb->_M_destroyed = nullptr;
+#if _GLIBCXX_HAS_GTHREADS
+		// synchronize with destructor of stop_callback that owns *__cb
+		__cb->_M_done.release();
+#endif
+	      }
 
 	    // Avoid relocking if we already know there are no more callbacks.
 	    if (__last_cb)
@@ -245,7 +293,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	    if (__old < _S_ssrc_counter_inc) // no stop_source owns *this
 	      // No need to register callback if no stop request can be made.
-	      return true;
+	      // Returning false also means the stop_callback does not share
+	      // ownership of this state, but that's not observable.
+	      return false;
 	  }
 	while (!_M_try_lock(__old));
 
@@ -259,6 +309,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
         return true;
       }
 
+      // Called by ~stop_callback just before destroying *__cb.
       [[__gnu__::__nonnull__]]
       void
       _M_remove_callback(_Stop_cb* __cb)
@@ -284,8 +335,23 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	_M_unlock();
 
-	// Callback is not in the list, so must be currently executing.
-	// TODO: synchronize with completion of callback
+	// Callback is not in the list, so must have been removed by a call to
+	// _M_request_stop.
+
+#if _GLIBCXX_HAS_GTHREADS
+	// Despite appearances there is no data race on _M_requester. The only
+	// write to it happens before the callback is removed from the list,
+	// and removing it from the list happens before this read.
+	if (_M_requester != __gthread_self())
+	  {
+	    // Synchronize with completion of callback.
+	    __cb->_M_done.acquire();
+	    // Safe for ~stop_callback to destroy *__cb now.
+	    return;
+	  }
+#endif
+	if (__cb->_M_destroyed)
+	  *__cb->_M_destroyed = true;
       }
 
       // Try to obtain the lock.
