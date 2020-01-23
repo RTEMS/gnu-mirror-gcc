@@ -890,21 +890,22 @@ namespace ranges
 	  auto __first_base = std::move(__first).base();
 	  auto __last_base = std::move(__last).base();
 	  auto [__in,__out]
-	    = ranges::__copy_or_move<true>(std::__niter_base(std::move(__first_base)),
-					   std::__niter_base(std::move(__last_base)),
-					   std::__niter_base(std::move(__result)));
+	    = ranges::__copy_or_move<true>(__niter_base(std::move(__first_base)),
+					   __niter_base(std::move(__last_base)),
+					   __niter_base(std::move(__result)));
 	  auto __wrapped_in = std::__niter_wrap(__first_base, std::move(__in));
 	  auto __wrapped_out = std::__niter_wrap(__result, std::move(__out));
-	  return {move_iterator{std::move(__wrapped_in)}, std::move(__wrapped_out)};
+	  return {move_iterator{std::move(__wrapped_in)},
+		  std::move(__wrapped_out)};
 	}
       else
 	{
 	  auto [__in,__out]
-	    = ranges::__copy_or_move<false>(std::__niter_base(std::move(__first)),
-					    std::__niter_base(std::move(__last)),
-					    std::__niter_base(std::move(__result)));
-	  return {std::__niter_wrap(std::move(__first), std::move(__in)),
-		  std::__niter_wrap(std::move(__result), std::move(__out))};
+	    = ranges::__copy_or_move<false>(__niter_base(std::move(__first)),
+					    __niter_base(std::move(__last)),
+					    __niter_base(std::move(__result)));
+	  return {__niter_wrap(std::move(__first), std::move(__in)),
+		  __niter_wrap(std::move(__result), std::move(__out))};
 	}
     }
 
