@@ -2033,6 +2033,40 @@ namespace ranges
 				 std::move(__comp), std::move(__proj));
     }
 
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   class _Comp = ranges::less, class _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr _Iter
+    partial_sort(_Iter __first, _Iter __middle, _Sent __last,
+		 _Comp __comp = {}, _Proj __proj = {})
+    {
+      // TODO: is it worth reimplementing std::partial_sort here?
+      auto __lasti = ranges::next(__first, __last);
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      std::partial_sort(std::move(__first), std::move(__middle), __lasti,
+			std::move(__proj_comp));
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   class _Comp = ranges::less, class _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr safe_iterator_t<_Range>
+    partial_sort(_Range&& __r, iterator_t<_Range> __middle,
+		 _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::partial_sort(ranges::begin(__r),
+				  std::move(__middle),
+				  ranges::end(__r),
+				  std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
