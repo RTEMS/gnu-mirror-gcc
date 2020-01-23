@@ -2003,6 +2003,36 @@ namespace ranges
 			  std::move(__comp), std::move(__proj));
     }
 
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    _Iter
+    stable_sort(_Iter __first, _Sent __last,
+		_Comp __comp = {}, _Proj __proj = {})
+    {
+      // TODO: is it worth reimplementing std::stable_sort here?
+      auto __lasti = ranges::next(__first, __last);
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      std::stable_sort(std::move(__first), __lasti, std::move(__proj_comp));
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    safe_iterator_t<_Range>
+    stable_sort(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::stable_sort(ranges::begin(__r), ranges::end(__r),
+				 std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
