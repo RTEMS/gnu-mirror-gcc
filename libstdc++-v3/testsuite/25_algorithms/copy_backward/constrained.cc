@@ -25,9 +25,7 @@
 
 using __gnu_test::test_container;
 using __gnu_test::test_range;
-using __gnu_test::input_iterator_wrapper;
-using __gnu_test::output_iterator_wrapper;
-using __gnu_test::forward_iterator_wrapper;
+using __gnu_test::bidirectional_iterator_wrapper;
 
 namespace ranges = std::ranges;
 
@@ -38,8 +36,8 @@ test01()
       int x[7] = { 1, 2, 3, 4, 5, 6, 7 };
       int y[7] = { 0 };
       int z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-      auto [in, out] = ranges::copy(x, y);
-      VERIFY( ranges::equal(x, y) && in == x+7 && out == y+7 );
+      auto [in, out] = ranges::copy_backward(x, ranges::end(y));
+      VERIFY( ranges::equal(x, y) && in == x+7 && out == y);
       VERIFY( ranges::equal(x, z) );
     }
 
@@ -47,21 +45,10 @@ test01()
       int x[3] = { 1, 2, 3 };
       char y[4] = { 0 };
       int z[3] = { 1, 2, 3 };
-      test_container<int, forward_iterator_wrapper> cx(x);
-      test_container<char, forward_iterator_wrapper> cy(y);
-      auto [in, out] = ranges::copy(cx, ranges::begin(cy));
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
-      VERIFY( ranges::equal(x, z) );
-    }
-
-    {
-      char x[3] = { 1, 2, 3 };
-      int y[4] = { 0 };
-      int z[3] = { 1, 2, 3 };
-      test_range<char, input_iterator_wrapper> rx(x);
-      test_range<int, output_iterator_wrapper> ry(y);
-      auto [in, out] = ranges::copy(rx, ranges::begin(ry));
-      VERIFY( ranges::equal(x, x+3, y, y+3) && in.ptr == x+3 && out.ptr == y+3 );
+      test_container<int, bidirectional_iterator_wrapper> cx(x);
+      test_container<char, bidirectional_iterator_wrapper> cy(y);
+      auto [in, out] = ranges::copy_backward(cx, ranges::end(cy));
+      VERIFY( ranges::equal(x, x+3, y+1, y+4) && in.ptr == x+3 && out.ptr == y+1 );
       VERIFY( ranges::equal(x, z) );
     }
 
@@ -69,9 +56,9 @@ test01()
       std::vector<char> x = {1,2,3};
       std::vector<int> y(3);
       const int z[3] = { 1, 2, 3 };
-      auto [in, out] = ranges::copy(x, ranges::begin(y));
+      auto [in, out] = ranges::copy_backward(x, ranges::end(y));
       VERIFY( in.base() == x.data()+3 );
-      VERIFY( out.base() == y.data()+3 );
+      VERIFY( out.base() == y.data() );
       VERIFY( ranges::equal(y, z) && ranges::equal(x, z) );
     }
 
@@ -80,9 +67,9 @@ test01()
       std::vector<int> x = {1,2,3};
       std::vector<int> y(3);
       const int z[3] = { 1, 2, 3 };
-      auto [in, out] = ranges::copy(x, ranges::begin(y));
+      auto [in, out] = ranges::copy_backward(x, ranges::end(y));
       VERIFY( in.base() == x.data()+3 );
-      VERIFY( out.base() == y.data()+3 );
+      VERIFY( out.base() == y.data() );
       VERIFY( ranges::equal(y, z) && ranges::equal(x, z) );
     }
 
@@ -90,11 +77,11 @@ test01()
       std::vector<int> x = {1,2,3};
       std::vector<int> y(3);
       const int z[3] = { 1, 2, 3 };
-      auto [in,out] = ranges::copy(make_reverse_iterator(x.end()),
-				   make_reverse_iterator(x.begin()),
-				   make_reverse_iterator(y.end()));
+      auto [in,out] = ranges::copy_backward(make_reverse_iterator(x.end()),
+					    make_reverse_iterator(x.begin()),
+					    make_reverse_iterator(y.begin()));
       VERIFY( in.base().base() == x.data()+3 );
-      VERIFY( out.base().base() == y.data() );
+      VERIFY( out.base().base() == y.data()+3 );
       VERIFY( ranges::equal(y, z) && ranges::equal(x, z) );
     }
 
@@ -102,50 +89,33 @@ test01()
       std::vector<char> x = {1,2,3};
       std::vector<int> y(3);
       const int z[3] = { 1, 2, 3 };
-      auto [in,out] = ranges::copy(make_reverse_iterator(x.end()),
-				   make_reverse_iterator(x.begin()),
-				   make_reverse_iterator(y.end()));
+      auto [in,out] = ranges::copy_backward(make_reverse_iterator(x.end()),
+					    make_reverse_iterator(x.begin()),
+					    make_reverse_iterator(y.begin()));
       VERIFY( in.base().base() == x.data()+3 );
-      VERIFY( out.base().base() == y.data() );
+      VERIFY( out.base().base() == y.data()+3 );
       VERIFY( ranges::equal(y, z) && ranges::equal(x, z) );
     }
-}
-
-struct X
-{
-  int i;
-  constexpr X (int a) : i(a) { }
-};
-
-void
-test02()
-{
-  int x[] = { {2}, {2}, {6}, {8}, {10} };
-  X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
-  int z[] = { {2}, {2}, {6}, {8}, {10} };
-  auto [in, out] = ranges::copy(x, y);
-  VERIFY( ranges::equal(x, x+5, y, y+5, {}, {}, &X::i) );
-  VERIFY( in == x+5 );
-  VERIFY( out == y+5 );
-  VERIFY( y[5].i == 2 );
-  VERIFY( ranges::equal(x, z) );
 }
 
 constexpr bool
-test03()
+test02()
 {
   bool ok = true;
   int x[] = { {2}, {2}, {6}, {8}, {10} };
-  X y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
-  int z[] = { {2}, {2}, {6}, {8}, {10} };
-  auto [in, out] = ranges::copy(x, y);
-  ok &= ranges::equal(x, x+5, y, y+5, {}, {}, &X::i);
+  int y[] = { {2}, {6}, {8}, {10}, {11}, {2} };
+  const int z[] = { {2}, {2}, {6}, {8}, {10} };
+  auto [in, out] = ranges::copy_backward(x, ranges::end(y));
+  ok &= ranges::equal(x, x+5, y+1, y+6);
   ok &= (in == x+5);
-  ok &= (out == y+5);
-  ok &= (y[5].i == 2);
+  ok &= (out == y+1);
+  ok &= (y[0] == 2);
   ok &= ranges::equal(x, z);
   return ok;
 }
+
+/*  move_iterators are always input_iterators and therefore do not model
+ *  bidirectional_iterator, so I think the following tests are rightly invalid.
 
 struct Y
 {
@@ -176,16 +146,16 @@ struct Y
 };
 
 void
-test04()
+test02()
 {
   Y x[7] = { 1, 2, 3, 4, 5, 6, 7 };
   Y y[7] = { 0, 0, 0, 0, 0, 0, 0 };
   Y z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  test_range<Y, input_iterator_wrapper> rx(x);
-  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(rx)},
-				std::move_sentinel{ranges::end(rx)},
-				ranges::begin(y));
-  VERIFY( ranges::equal(x, y) && std::move(in).base().ptr == x+7 && out == y+7 );
+  test_range<Y, bidirectional_iterator_wrapper> rx(x);
+  auto [in, out] = ranges::copy_backward(std::move_iterator{ranges::begin(rx)},
+					 std::move_sentinel{ranges::end(rx)},
+					 ranges::end(y));
+  VERIFY( ranges::equal(x, y) && std::move(in).base().ptr == x+7 && out == y );
   VERIFY( ranges::equal(x, z) );
   for (const auto& v : x)
     VERIFY( v.moved == 1 );
@@ -194,18 +164,18 @@ test04()
 }
 
 constexpr bool
-test05()
+test03()
 {
   bool ok = true;
   Y x[7] = { 1, 2, 3, 4, 5, 6, 7 };
   Y y[7] = { 0, 0, 0, 0, 0, 0, 0 };
   Y z[7] = { 1, 2, 3, 4, 5, 6, 7 };
-  auto [in, out] = ranges::copy(std::move_iterator{ranges::begin(x)},
-				std::move_sentinel{ranges::end(x)},
-				ranges::begin(y));
+  auto [in, out] = ranges::copy_backward(std::move_iterator{ranges::begin(x)},
+					 std::move_sentinel{ranges::end(x)},
+					 ranges::end(y));
   ok &= ranges::equal(x, y);
   ok &= in.base() == x+7;
-  ok &= out == y+7;
+  ok &= out == y;
   ok &= ranges::equal(x, z);
   for (const auto& v : x)
     ok &= v.moved == 1;
@@ -213,13 +183,11 @@ test05()
     ok &= v.moved == 0;
   return ok;
 }
+*/
 
 int
 main()
 {
   test01();
-  test02();
-  static_assert(test03());
-  test04();
-  static_assert(test05());
+  static_assert(test02());
 }

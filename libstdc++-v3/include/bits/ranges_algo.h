@@ -45,6 +45,31 @@ namespace std _GLIBCXX_VISIBILITY(default)
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 namespace ranges
 {
+  namespace __detail
+  {
+    template<typename _Tp>
+    constexpr inline bool __is_normal_iterator = false;
+
+    template<typename _Iterator, typename _Container>
+    constexpr inline bool
+      __is_normal_iterator<__gnu_cxx::__normal_iterator<_Iterator, _Container>>
+      = true;
+
+    template<typename _Tp>
+    constexpr inline bool __is_reverse_iterator = false;
+
+    template<typename _Iterator>
+    constexpr inline bool
+      __is_reverse_iterator<reverse_iterator<_Iterator>> = true;
+
+    template<typename _Tp>
+    constexpr inline bool __is_move_iterator = false;
+
+    template<typename _Iterator>
+    constexpr inline bool
+      __is_move_iterator<move_iterator<_Iterator>> = true;
+  }
+
   template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Proj = identity,
 	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
@@ -816,6 +841,23 @@ namespace ranges
   template<typename _Iter, typename _Out>
   using move_result = copy_result<_Iter, _Out>;
 
+  template<typename _Iter1, typename _Iter2>
+  using move_backward_result = copy_result<_Iter1, _Iter2>;
+
+  template<typename _Iter1, typename _Iter2>
+  using copy_backward_result = copy_result<_Iter1, _Iter2>;
+
+  template<bool _IsMove,
+	   bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   bidirectional_iterator _Out>
+    requires (_IsMove
+	      ? indirectly_movable<_Iter, _Out>
+	      : indirectly_copyable<_Iter, _Out>)
+    constexpr conditional_t<_IsMove,
+			    move_backward_result<_Iter, _Out>,
+			    copy_backward_result<_Iter, _Out>>
+    __copy_or_move_backward(_Iter __first, _Sent __last, _Out __result);
+
   template<bool _IsMove,
 	   input_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   weakly_incrementable _Out>
@@ -829,7 +871,40 @@ namespace ranges
     {
       // TODO: implement more specializations to be at least on par with
       // std::copy/std::move.
-      if constexpr (sized_sentinel_for<_Sent, _Iter>)
+      constexpr bool __normal_iterator_p
+	= (__detail::__is_normal_iterator<_Iter>
+	   || __detail::__is_normal_iterator<_Out>);
+      constexpr bool __reverse_p
+	= (__detail::__is_reverse_iterator<_Iter>
+	   && __detail::__is_reverse_iterator<_Out>);
+      constexpr bool __move_iterator_p = __detail::__is_move_iterator<_Iter>;
+      if constexpr (__move_iterator_p)
+	{
+	  auto [__in, __out]
+	    = ranges::__copy_or_move<true>(std::move(__first).base(),
+					   std::move(__last).base(),
+					   std::move(__result));
+	  return {move_iterator{std::move(__in)}, std::move(__out)};
+	}
+      else if constexpr (__reverse_p)
+	{
+	  auto [__in,__out]
+	    = ranges::__copy_or_move_backward<_IsMove>(__last.base(),
+						       __first.base(),
+						       __result.base());
+	  return {reverse_iterator{std::move(__in)},
+		  reverse_iterator{std::move(__out)}};
+	}
+      else if constexpr (__normal_iterator_p)
+	{
+	  auto [__in,__out]
+	    = ranges::__copy_or_move<_IsMove> (std::__niter_base(__first),
+					       std::__niter_base(__last),
+					       std::__niter_base(__result));
+	  return {std::__niter_wrap(__first, std::move(__in)),
+		  std::__niter_wrap(__result, std::move(__out))};
+	}
+      else if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
 	  using _ValueTypeI = iter_value_t<_Iter>;
 	  using _ValueTypeO = iter_value_t<_Out>;
@@ -884,29 +959,9 @@ namespace ranges
     constexpr copy_result<_Iter, _Out>
     copy(_Iter __first, _Sent __last, _Out __result)
     {
-      constexpr bool __move_iterator_p = __is_move_iterator<_Iter>::__value;
-      if constexpr (__move_iterator_p)
-	{
-	  auto __first_base = std::move(__first).base();
-	  auto __last_base = std::move(__last).base();
-	  auto [__in,__out]
-	    = ranges::__copy_or_move<true>(__niter_base(std::move(__first_base)),
-					   __niter_base(std::move(__last_base)),
-					   __niter_base(std::move(__result)));
-	  auto __wrapped_in = std::__niter_wrap(__first_base, std::move(__in));
-	  auto __wrapped_out = std::__niter_wrap(__result, std::move(__out));
-	  return {move_iterator{std::move(__wrapped_in)},
-		  std::move(__wrapped_out)};
-	}
-      else
-	{
-	  auto [__in,__out]
-	    = ranges::__copy_or_move<false>(__niter_base(std::move(__first)),
-					    __niter_base(std::move(__last)),
-					    __niter_base(std::move(__result)));
-	  return {__niter_wrap(std::move(__first), std::move(__in)),
-		  __niter_wrap(std::move(__result), std::move(__out))};
-	}
+      return ranges::__copy_or_move<false>(std::move(__first),
+					   std::move(__last),
+					   std::move(__result));
     }
 
   template<input_range _Range, weakly_incrementable _Out>
@@ -924,17 +979,9 @@ namespace ranges
     constexpr move_result<_Iter, _Out>
     move(_Iter __first, _Sent __last, _Out __result)
     {
-      if constexpr (__is_move_iterator<_Iter>::__value)
-	return ranges::copy(std::move(__first), std::move(__last),
-			    std::move(__result));
-      else
-	{
-	  auto [__in, __out]
-	    = ranges::copy(move_iterator<_Iter>{std::move(__first)},
-			   move_sentinel<_Sent>{std::move(__last)},
-			   std::move(__result));
-	  return {std::move(__in).base(), std::move(__out)};
-	}
+      return ranges::__copy_or_move<true>(std::move(__first),
+					  std::move(__last),
+					  std::move(__result));
     }
 
   template<input_range _Range, weakly_incrementable _Out>
@@ -944,6 +991,138 @@ namespace ranges
     {
       return ranges::move(ranges::begin(__r), ranges::end(__r),
 			  std::move(__result));
+    }
+
+  template<bool _IsMove,
+	   bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   bidirectional_iterator _Out>
+    requires (_IsMove
+	      ? indirectly_movable<_Iter, _Out>
+	      : indirectly_copyable<_Iter, _Out>)
+    constexpr conditional_t<_IsMove,
+			    move_backward_result<_Iter, _Out>,
+			    copy_backward_result<_Iter, _Out>>
+    __copy_or_move_backward(_Iter __first, _Sent __last, _Out __result)
+    {
+      // TODO: implement more specializations to be at least on par with
+      // std::copy_backward/std::move_backward.
+      constexpr bool __normal_iterator_p
+	= (__detail::__is_normal_iterator<_Iter>
+	   || __detail::__is_normal_iterator<_Out>);
+      constexpr bool __reverse_p
+	= (__detail::__is_reverse_iterator<_Iter>
+	   && __detail::__is_reverse_iterator<_Out>);
+      if constexpr (__reverse_p)
+	{
+	  auto [__in,__out]
+	    = ranges::__copy_or_move<_IsMove>(__last.base(),
+					      __first.base(),
+					      __result.base());
+	  return {reverse_iterator{std::move(__in)},
+		  reverse_iterator{std::move(__out)}};
+	}
+      else if constexpr (__normal_iterator_p)
+	{
+	  auto [__in,__out]
+	    = ranges::__copy_or_move_backward<_IsMove>
+	      (std::__niter_base(__first),
+	       std::__niter_base(__last),
+	       std::__niter_base(__result));
+	  return {std::__niter_wrap(__first, std::move(__in)),
+		  std::__niter_wrap(__result, std::move(__out))};
+	}
+      else if constexpr (sized_sentinel_for<_Sent, _Iter>)
+	{
+	  using _ValueTypeI = iter_value_t<_Iter>;
+	  using _ValueTypeO = iter_value_t<_Out>;
+	  constexpr bool __use_memmove
+	    = (is_trivially_copyable_v<_ValueTypeI>
+	       && is_same_v<_ValueTypeI, _ValueTypeO>
+	       && is_pointer_v<_Iter>
+	       && is_pointer_v<_Out>);
+	  if constexpr (__use_memmove)
+	    {
+	      static_assert(_IsMove
+			    ? is_move_assignable_v<_ValueTypeI>
+			    : is_copy_assignable_v<_ValueTypeI>);
+	      auto __num = __last - __first;
+	      if (__num)
+		std::__memmove<_IsMove>(__result - __num, __first, __num);
+	      return {__first + __num, __result - __num};
+	    }
+	  else
+	    {
+	      auto __lasti = ranges::next(__first, __last);
+	      auto __tail = __lasti;
+
+	      for (auto __n = __last - __first; __n > 0; --__n)
+		{
+		  --__tail;
+		  --__result;
+		  if constexpr (_IsMove)
+		    *__result = std::move(*__tail);
+		  else
+		    *__result = *__tail;
+		}
+	      return {std::move(__lasti), std::move(__result)};
+	    }
+	}
+      else
+	{
+	  auto __lasti = ranges::next(__first, __last);
+	  auto __tail = __lasti;
+
+	  while (__first != __tail)
+	    {
+	      --__tail;
+	      --__result;
+	      if constexpr (_IsMove)
+		*__result = std::move(*__tail);
+	      else
+		*__result = *__tail;
+	    }
+	  return {std::move(__lasti), std::move(__result)};
+	}
+    }
+
+  template<bidirectional_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   bidirectional_iterator _Iter2>
+    requires indirectly_copyable<_Iter1, _Iter2>
+    constexpr copy_backward_result<_Iter1, _Iter2>
+    copy_backward(_Iter1 __first, _Sent1 __last, _Iter2 __result)
+    {
+      return ranges::__copy_or_move_backward<false>(std::move(__first),
+						    std::move(__last),
+						    std::move(__result));
+    }
+
+  template<bidirectional_range _Range, bidirectional_iterator _Iter>
+    requires indirectly_copyable<iterator_t<_Range>, _Iter>
+    constexpr copy_backward_result<safe_iterator_t<_Range>, _Iter>
+    copy_backward(_Range&& __r, _Iter __result)
+    {
+      return ranges::copy_backward(ranges::begin(__r), ranges::end(__r),
+				   std::move(__result));
+    }
+
+  template<bidirectional_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   bidirectional_iterator _Iter2>
+    requires indirectly_movable<_Iter1, _Iter2>
+    constexpr move_backward_result<_Iter1, _Iter2>
+    move_backward(_Iter1 __first, _Sent1 __last, _Iter2 __result)
+    {
+      return ranges::__copy_or_move_backward<true>(std::move(__first),
+						   std::move(__last),
+						   std::move(__result));
+    }
+
+  template<bidirectional_range _Range, bidirectional_iterator _Iter>
+    requires indirectly_movable<iterator_t<_Range>, _Iter>
+    constexpr move_backward_result<safe_iterator_t<_Range>, _Iter>
+    move_backward(_Range&& __r, _Iter __result)
+    {
+      return ranges::move_backward(ranges::begin(__r), ranges::end(__r),
+				   std::move(__result));
     }
 
   template<typename _Iter1, typename _Iter2>
