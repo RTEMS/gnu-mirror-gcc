@@ -1910,10 +1910,10 @@ namespace ranges
 	}
     }
 
-  template<forward_range R>
-    requires permutable<iterator_t<R>>
-    constexpr safe_subrange_t<R>
-    rotate(R&& __r, iterator_t<R> __middle)
+  template<forward_range _Range>
+    requires permutable<iterator_t<_Range>>
+    constexpr safe_subrange_t<_Range>
+    rotate(_Range&& __r, iterator_t<_Range> __middle)
     {
       return ranges::rotate(ranges::begin(__r),
 			    std::move(__middle),
@@ -1923,11 +1923,11 @@ namespace ranges
   template<typename _Iter, typename _Out>
   using rotate_copy_result = copy_result<_Iter, _Out>;
 
-  template<forward_iterator _Iter, sentinel_for<_Iter> S,
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   weakly_incrementable _Out>
     requires indirectly_copyable<_Iter, _Out>
     constexpr rotate_copy_result<_Iter, _Out>
-    rotate_copy(_Iter __first, _Iter __middle, S __last, _Out __result)
+    rotate_copy(_Iter __first, _Iter __middle, _Sent __last, _Out __result)
     {
       auto __copy1 = ranges::copy(__middle,
 				  std::move(__last),
