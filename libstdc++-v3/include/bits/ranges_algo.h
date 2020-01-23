@@ -1920,6 +1920,35 @@ namespace ranges
 			    ranges::end(__r));
     }
 
+  template<typename _Iter, typename _Out>
+  using rotate_copy_result = copy_result<_Iter, _Out>;
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> S,
+	   weakly_incrementable _Out>
+    requires indirectly_copyable<_Iter, _Out>
+    constexpr rotate_copy_result<_Iter, _Out>
+    rotate_copy(_Iter __first, _Iter __middle, S __last, _Out __result)
+    {
+      auto __copy1 = ranges::copy(__middle,
+				  std::move(__last),
+				  std::move(__result));
+      auto __copy2 = ranges::copy(std::move(__first),
+				  std::move(__middle),
+				  std::move(__copy1.out));
+      return { std::move(__copy1.in), std::move(__copy2.out) };
+    }
+
+  template<forward_range _Range, weakly_incrementable _Out>
+    requires indirectly_copyable<iterator_t<_Range>, _Out>
+    constexpr rotate_copy_result<safe_iterator_t<_Range>, _Out>
+    rotate_copy(_Range&& __r, iterator_t<_Range> __middle, _Out __result)
+    {
+      return ranges::rotate_copy(ranges::begin(__r),
+				 std::move(__middle),
+				 ranges::end(__r),
+				 std::move(__result));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
