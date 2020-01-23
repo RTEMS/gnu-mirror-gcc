@@ -1777,6 +1777,149 @@ namespace ranges
 				  std::move(__result));
     }
 
+  template<permutable _Iter, sentinel_for<_Iter> _Sent>
+    constexpr subrange<_Iter>
+    rotate(_Iter __first, _Iter __middle, _Sent __last)
+    {
+      auto __lasti = ranges::next(__first, __last);
+      if (__first == __middle)
+	return {__lasti, __lasti};
+      if (__last == __middle)
+	return {std::move(__first), std::move(__lasti)};
+
+      if constexpr (random_access_iterator<_Iter>)
+	{
+	  auto __n = __lasti - __first;
+	  auto __k = __middle - __first;
+
+	  if (__k == __n - __k)
+	    {
+	      ranges::swap_ranges(__first, __middle, __middle, __middle + __k);
+	      return {std::move(__middle), std::move(__lasti)};
+	    }
+
+	  auto __p = __first;
+	  auto __ret = __first + (__lasti - __middle);
+
+	  for (;;)
+	    {
+	      if (__k < __n - __k)
+		{
+		  // TODO: is_pod is deprecated, but this condition is true to
+		  // the STL implementation.
+		  if constexpr (__is_pod(iter_value_t<_Iter>))
+		    if (__k == 1)
+		      {
+			auto __t = std::move(*__p);
+			ranges::move(__p + 1, __p + __n, __p);
+			*(__p + __n - 1) = std::move(__t);
+			return {std::move(__ret), std::move(__lasti)};
+		      }
+		  auto __q = __p + __k;
+		  for (decltype(__n) __i = 0; __i < __n - __k; ++ __i)
+		    {
+		      ranges::iter_swap(__p, __q);
+		      ++__p;
+		      ++__q;
+		    }
+		  __n %= __k;
+		  if (__n == 0)
+		    return {std::move(__ret), std::move(__lasti)};
+		  ranges::swap(__n, __k);
+		  __k = __n - __k;
+		}
+	      else
+		{
+		  __k = __n - __k;
+		  // TODO: is_pod is deprecated, but this condition is true to
+		  // the STL implementation.
+		  if constexpr (__is_pod(iter_value_t<_Iter>))
+		    if (__k == 1)
+		      {
+			auto __t = std::move(*(__p + __n - 1));
+			ranges::move_backward(__p, __p + __n - 1, __p + __n);
+			*__p = std::move(__t);
+			return {std::move(__ret), std::move(__lasti)};
+		      }
+		  auto __q = __p + __n;
+		  __p = __q - __k;
+		  for (decltype(__n) __i = 0; __i < __n - __k; ++ __i)
+		    {
+		      --__p;
+		      --__q;
+		      ranges::iter_swap(__p, __q);
+		    }
+		  __n %= __k;
+		  if (__n == 0)
+		    return {std::move(__ret), std::move(__lasti)};
+		  std::swap(__n, __k);
+		}
+	    }
+	}
+      else if constexpr (bidirectional_iterator<_Iter>)
+	{
+	  auto __tail = __lasti;
+
+	  ranges::reverse(__first, __middle);
+	  ranges::reverse(__middle, __tail);
+
+	  while (__first != __middle && __middle != __tail)
+	    {
+	      ranges::iter_swap(__first, --__tail);
+	      ++__first;
+	    }
+
+	  if (__first == __middle)
+	    {
+	      ranges::reverse(__middle, __tail);
+	      return {std::move(__tail), std::move(__lasti)};
+	    }
+	  else
+	    {
+	      ranges::reverse(__first, __middle);
+	      return {std::move(__first), std::move(__lasti)};
+	    }
+	}
+      else
+	{
+	  auto __first2 = __middle;
+	  do
+	    {
+	      ranges::iter_swap(__first, __first2);
+	      ++__first;
+	      ++__first2;
+	      if (__first == __middle)
+		__middle = __first2;
+	    } while (__first2 != __last);
+
+	  auto __ret = __first;
+
+	  __first2 = __middle;
+
+	  while (__first2 != __last)
+	    {
+	      ranges::iter_swap(__first, __first2);
+	      ++__first;
+	      ++__first2;
+	      if (__first == __middle)
+		__middle = __first2;
+	      else if (__first2 == __last)
+		__first2 = __middle;
+	    }
+	  return {std::move(__ret), std::move(__lasti)};
+	}
+    }
+
+  template<forward_range R>
+    requires permutable<iterator_t<R>>
+    constexpr safe_subrange_t<R>
+    rotate(R&& __r, iterator_t<R> __middle)
+    {
+      return ranges::rotate(ranges::begin(__r),
+			    std::move(__middle),
+			    ranges::end(__r));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
