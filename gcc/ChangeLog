@@ -145,8 +145,6 @@
 	COMDAT group function labels in .data.rel.ro.local section.
 	* config/pa/pa32-linux.h (TARGET_ASM_SELECT_RTX_SECTION): Define.
 
-2020-01-01  John David Anglin  <danglin@gcc.gnu.org>
-
 	PR target/93111
 	* config/pa/pa.md (scc): Use ordered_comparison_operator instead of
 	comparison_operator in B and S integer comparisons.  Likewise, use
@@ -167,6 +165,10 @@
 
 2019-12-20  Jakub Jelinek  <jakub@redhat.com>
 
+	PR fortran/92756
+	* omp-low.c (check_omp_nesting_restrictions): If lang_GNU_Fortran,
+	diagnose teams not closely nested inside of target.
+
 	Backported from mainline
 	2019-12-14  Jakub Jelinek  <jakub@redhat.com>
 
@@ -175,8 +177,6 @@
 	lto_symtab_encoder_iterator with lsei_start_function_in_partition and
 	lsei_next_function_in_partition instead of walking all cgraph nodes
 	in encoder.
-
-	2019-12-14  Jakub Jelinek  <jakub@redhat.com>
 
 	PR tree-optimization/92930
 	* ipa-pure-const.c (special_builtin_state): Don't handle
