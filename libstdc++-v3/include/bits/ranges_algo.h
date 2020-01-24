@@ -2508,10 +2508,97 @@ namespace ranges
 				     std::move(__pred), std::move(__proj));
     }
 
+  template<typename _Iter1, typename _Iter2, typename _Out>
+  using merge_result = binary_transform_result<_Iter1, _Iter2, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   weakly_incrementable _Out, typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<_Iter1, _Iter2, _Out, _Comp, _Proj1, _Proj2>
+    constexpr merge_result<_Iter1, _Iter2, _Out>
+    merge(_Iter1 __first1, _Sent1 __last1,
+	  _Iter2 __first2, _Sent2 __last2, _Out __result,
+	  _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	{
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj2, *__first2),
+			    std::__invoke(__proj1, *__first1)))
+	    {
+	      *__result = *__first2;
+	      ++__first2;
+	    }
+	  else
+	    {
+	      *__result = *__first1;
+	      ++__first1;
+	    }
+	  ++__result;
+	}
+      auto __copy1 = ranges::copy(std::move(__first1), std::move(__last1),
+				  std::move(__result));
+      auto __copy2 = ranges::copy(std::move(__first2), std::move(__last2),
+				  std::move(__copy1.out));
+      return { std::move(__copy1.in), std::move(__copy2.in),
+	       std::move(__copy2.out) };
+    }
+
+  template<input_range _Range1, input_range _Range2, weakly_incrementable _Out,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<iterator_t<_Range1>, iterator_t<_Range2>, _Out,
+		       _Comp, _Proj1, _Proj2>
+    constexpr merge_result<safe_iterator_t<_Range1>,
+			   safe_iterator_t<_Range2>,
+			   _Out>
+    merge(_Range1&& __r1, _Range2&& __r2, _Out __result,
+	  _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::merge(ranges::begin(__r1), ranges::end(__r1),
+			   ranges::begin(__r2), ranges::end(__r2),
+			   std::move(__result), std::move(__comp),
+			   std::move(__proj1), std::move(__proj2));
+    }
+
+  template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less,
+	   typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    _Iter
+    inplace_merge(_Iter __first, _Iter __middle, _Sent __last,
+		  _Comp __comp = {}, _Proj __proj = {})
+    {
+      // TODO: is it worth reimplementing std::inplace_merge here?
+      auto __lasti = ranges::next(__first, __last);
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      std::inplace_merge(std::move(__first), std::move(__middle), __lasti,
+			 std::move(__proj_comp));
+      return __lasti;
+    }
+
+  template<bidirectional_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    safe_iterator_t<_Range>
+    inplace_merge(_Range&& __r, iterator_t<_Range> __middle,
+		  _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::inplace_merge(ranges::begin(__r), std::move(__middle),
+				   ranges::end(__r),
+				   std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
 #endif // concepts
 #endif // C++20
 #endif // _RANGES_ALGO_H
-
