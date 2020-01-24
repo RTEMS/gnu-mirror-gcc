@@ -2290,6 +2290,224 @@ namespace ranges
 				   std::move(__comp), std::move(__proj));
     }
 
+  template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    constexpr bool
+    is_partitioned(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
+    {
+      __first = ranges::find_if_not(std::move(__first), __last, __pred, __proj);
+      if (__first == __last)
+	return true;
+      ++__first;
+      return ranges::none_of(std::move(__first), std::move(__last),
+			     std::move(__pred), std::move(__proj));
+    }
+
+  template<input_range _Range, typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    constexpr bool
+    is_partitioned(_Range&& __r, _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::is_partitioned(ranges::begin(__r), ranges::end(__r),
+				    std::move(__pred), std::move(__proj));
+    }
+
+  template<permutable _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    constexpr subrange<_Iter>
+    partition(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
+    {
+      if constexpr (bidirectional_iterator<_Iter>)
+	{
+	  auto __lasti = ranges::next(__first, __last);
+	  auto __tail = __lasti;
+	  for (;;)
+	    {
+	      for (;;)
+		if (__first == __tail)
+		  return {std::move(__first), std::move(__lasti)};
+		else if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+		  ++__first;
+		else
+		  break;
+	      --__tail;
+	      for (;;)
+		if (__first == __tail)
+		  return {std::move(__first), std::move(__lasti)};
+		else if (!(bool)std::__invoke(__pred,
+					      std::__invoke(__proj, *__tail)))
+		  --__tail;
+		else
+		  break;
+	      ranges::iter_swap(__first, __tail);
+	      ++__first;
+	    }
+	}
+      else
+	{
+	  if (__first == __last)
+	    return {std::move(__first), std::move(__first)};
+
+	  while (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	    if (++__first == __last)
+	      return {std::move(__first), std::move(__first)};
+
+	  auto __next = __first;
+	  while (++__next != __last)
+	    if (std::__invoke(__pred, std::__invoke(__proj, *__next)))
+	      {
+		ranges::iter_swap(__first, __next);
+		++__first;
+	      }
+
+	  return {std::move(__first), std::move(__next)};
+	}
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    requires permutable<iterator_t<_Range>>
+    constexpr safe_subrange_t<_Range>
+    partition(_Range&& __r, _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::partition(ranges::begin(__r), ranges::end(__r),
+			       std::move(__pred), std::move(__proj));
+    }
+
+  template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    requires permutable<_Iter>
+    subrange<_Iter>
+    stable_partition(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
+    {
+      // TODO: is it worth reimplementing std::stable_partition here?
+      auto __lasti = ranges::next(__first, __last);
+      auto __proj_comp = [&] (auto&& __arg) {
+	using _Tp = decltype(__arg);
+	return std::__invoke(__pred,
+			     std::__invoke(__proj, std::forward<_Tp>(__arg)));
+      };
+      auto __middle = std::stable_partition(std::move(__first),
+					    std::move(__lasti),
+					    std::move(__proj_comp));
+      return {__middle, __lasti};
+    }
+
+  template<bidirectional_range _Range, typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    requires permutable<iterator_t<_Range>>
+    safe_subrange_t<_Range>
+    stable_partition(_Range&& __r, _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::stable_partition(ranges::begin(__r), ranges::end(__r),
+				      std::move(__pred), std::move(__proj));
+    }
+
+  template<typename _Iter, typename _Out1, typename _O2>
+  struct partition_copy_result
+  {
+    [[no_unique_address]] _Iter  in;
+    [[no_unique_address]] _Out1 out1;
+    [[no_unique_address]] _O2 out2;
+
+    template<typename _IIter, typename _OOut1, typename _OOut2>
+      requires convertible_to<const _Iter&, _IIter>
+	&& convertible_to<const _Out1&, _OOut1>
+	&& convertible_to<const _O2&, _OOut2>
+      operator partition_copy_result<_IIter, _OOut1, _OOut2>() const &
+      {
+	return {in, out1, out2};
+      }
+
+    template<typename _IIter, typename _OOut1, typename _OOut2>
+      requires convertible_to<_Iter, _IIter>
+	&& convertible_to<_Out1, _OOut1>
+	&& convertible_to<_O2, _OOut2>
+      operator partition_copy_result<_IIter, _OOut1, _OOut2>() &&
+      {
+	return {std::move(in), std::move(out1), std::move(out2)};
+      }
+  };
+
+  template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   weakly_incrementable _Out1, weakly_incrementable _O2,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    requires indirectly_copyable<_Iter, _Out1>
+      && indirectly_copyable<_Iter, _O2>
+    constexpr partition_copy_result<_Iter, _Out1, _O2>
+    partition_copy(_Iter __first, _Sent __last,
+		   _Out1 __out_true, _O2 __out_false,
+		   _Pred __pred, _Proj __proj = {})
+    {
+      for (; __first != __last; ++__first)
+	if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	  {
+	    *__out_true = *__first;
+	    ++__out_true;
+	  }
+	else
+	  {
+	    *__out_false = *__first;
+	    ++__out_false;
+	  }
+
+      return {std::move(__first), std::move(__out_true), std::move(__out_false)};
+    }
+
+  template<input_range _Range, weakly_incrementable _Out1,
+	   weakly_incrementable _O2,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    requires indirectly_copyable<iterator_t<_Range>, _Out1>
+      && indirectly_copyable<iterator_t<_Range>, _O2>
+    constexpr partition_copy_result<safe_iterator_t<_Range>, _Out1, _O2>
+    partition_copy(_Range&& __r, _Out1 out_true, _O2 out_false,
+		   _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::partition_copy(ranges::begin(__r), ranges::end(__r),
+				    std::move(out_true), std::move(out_false),
+				    std::move(__pred), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    constexpr _Iter
+    partition_point(_Iter __first, _Sent __last,
+		    _Pred __pred, _Proj __proj = {})
+    {
+      auto __len = ranges::distance(__first, __last);
+
+      while (__len > 0)
+	{
+	  auto __half = __len / 2;
+	  auto __middle = __first;
+	  ranges::advance(__middle, __half);
+	  if (std::__invoke(__pred, std::__invoke(__proj, *__middle)))
+	    {
+	      __first = __middle;
+	      ++__first;
+	      __len = __len - __half - 1;
+	    }
+	  else
+	    __len = __half;
+	}
+      return __first;
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    constexpr safe_iterator_t<_Range>
+    partition_point(_Range&& __r, _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::partition_point(ranges::begin(__r), ranges::end(__r),
+				     std::move(__pred), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
