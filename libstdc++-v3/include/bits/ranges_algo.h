@@ -2385,15 +2385,15 @@ namespace ranges
     {
       // TODO: is it worth reimplementing std::stable_partition here?
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __arg) {
+      auto __proj_pred = [&] (auto&& __arg) {
 	using _Tp = decltype(__arg);
 	return std::__invoke(__pred,
 			     std::__invoke(__proj, std::forward<_Tp>(__arg)));
       };
       auto __middle = std::stable_partition(std::move(__first),
-					    std::move(__lasti),
-					    std::move(__proj_comp));
-      return {__middle, __lasti};
+					    __lasti,
+					    std::move(__proj_pred));
+      return {std::move(__middle), std::move(__lasti)};
     }
 
   template<bidirectional_range _Range, typename _Proj = identity,
