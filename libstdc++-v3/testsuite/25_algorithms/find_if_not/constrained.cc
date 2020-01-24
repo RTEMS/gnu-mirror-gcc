@@ -51,6 +51,8 @@ test01()
   test_range<X, input_iterator_wrapper> r(x);
   auto res3 = ranges::find_if_not(r, [] (int i) { return i <= 10; }, &X::i);
   VERIFY( res3 != ranges::end(r) && res3->i == 11 );
+
+  r.bounds.first = x;
   res3 = ranges::find_if_not(r, [] (int i) { return i != 9; }, &X::i);
   VERIFY( res3 == ranges::end(r) );
 }

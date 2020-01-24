@@ -60,6 +60,7 @@ test01()
   VERIFY( res3 != ranges::end(r) && res3->i == 8 );
 
   test_range<X, forward_iterator_wrapper> s2(w+3, w+4);
+  r.bounds.first = x;
   res3 = ranges::find_first_of(r, s2, {}, &X::i, &X::i);
   VERIFY( res3 == ranges::end(r) );
 }

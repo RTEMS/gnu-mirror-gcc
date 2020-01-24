@@ -67,6 +67,8 @@ test01()
 
   test_range<X, input_iterator_wrapper> r(x);
   VERIFY( ranges::all_of(r, NotZero<int>{}, &X::i) );
+
+  r.bounds.first = x;
   VERIFY( ranges::all_of(r, NotZero<X* const>{}, [](X& x) { return &x; }) );
 }
 

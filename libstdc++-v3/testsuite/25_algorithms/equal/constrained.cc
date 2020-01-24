@@ -53,7 +53,13 @@ test01()
   test_range<int, input_iterator_wrapper> rx(x), ry(y);
   test_range<X, input_iterator_wrapper> rz(z);
   VERIFY( ranges::equal(rx, ry) );
+
+  rx.bounds.first = x;
+  ry.bounds.first = y;
   VERIFY( !ranges::equal(rx, ry, {}, {}, [] (int a) { return a+1; }) );
+
+  rx.bounds.first = x;
+  rz.bounds.first = z;
   VERIFY( !ranges::equal(rx, rz, {}, {}, &X::i) );
 }
 

@@ -77,6 +77,9 @@ test01()
       test_range<int, input_iterator_wrapper> rx(x), ry(y);
       auto res = ranges::replace_if(rx, is_two_p, 7);
       VERIFY( res == rx.end() );
+
+      rx.bounds.first = x;
+      ry.bounds.first = y;
       VERIFY( ranges::equal(rx, ry) );
     }
 }

@@ -50,8 +50,11 @@ test01()
   test_range<X, input_iterator_wrapper> rb(xb);
   auto res3 = ranges::mismatch(ra, rb, {}, &X::i, &X::i);
   VERIFY( res3.in1->i == 4 && res3.in2->i == 3 );
-  res3 = ranges::mismatch(ra, ra, {}, &X::i, &X::i);
-  VERIFY( res3.in1 == ranges::end(ra) && res3.in2 == ranges::end(ra) );
+
+  test_range<X, input_iterator_wrapper> ra2(xa);
+  ra.bounds.first = xa;
+  res3 = ranges::mismatch(ra, ra2, {}, &X::i, &X::i);
+  VERIFY( res3.in1 == ranges::end(ra) && res3.in2 == ranges::end(ra2) );
 }
 
 struct Y { int i; int j; };

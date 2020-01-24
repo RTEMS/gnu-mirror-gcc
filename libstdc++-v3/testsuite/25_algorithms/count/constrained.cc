@@ -51,6 +51,8 @@ test01()
   test_range<X, input_iterator_wrapper> r(x);
   res = ranges::count(r, 2, &X::i);
   VERIFY( res == 3 );
+
+  r.bounds.first = x;
   res = ranges::count(r, 9, &X::i);
   VERIFY( res == 0 );
 }
