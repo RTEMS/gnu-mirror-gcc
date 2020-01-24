@@ -4966,7 +4966,7 @@ process_command (unsigned int decoded_options_count,
 	      : ((temp = strrchr (obase + 1, '.'))
 		 && (xlen = strlen (temp))
 		 && (strcmp (temp, ".exe") == 0
-#if HAVE_TARGET_EXECUTABLE_SUFFIX
+#if defined(HAVE_TARGET_EXECUTABLE_SUFFIX)
 		     || strcmp (temp, TARGET_EXECUTABLE_SUFFIX) == 0
 #endif
 		     || strcmp (obase, "a.out") == 0)))

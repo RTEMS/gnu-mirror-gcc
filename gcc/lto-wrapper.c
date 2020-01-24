@@ -53,6 +53,13 @@ along with GCC; see the file COPYING3.  If not see
    driver to lto-wrapper.  */
 #define OFFLOAD_TARGET_NAMES_ENV	"OFFLOAD_TARGET_NAMES"
 
+/* By default there is no special suffix for target executables.  */
+#ifdef TARGET_EXECUTABLE_SUFFIX
+#define HAVE_TARGET_EXECUTABLE_SUFFIX
+#else
+#define TARGET_EXECUTABLE_SUFFIX ""
+#endif
+
 enum lto_mode_d {
   LTO_MODE_NONE,			/* Not doing LTO.  */
   LTO_MODE_LTO,				/* Normal LTO.  */
@@ -1509,7 +1516,7 @@ run_gcc (unsigned argc, char *argv[])
 	  if ((temp = strrchr (obase + 1, '.'))
 	      && (xlen = strlen (temp))
 	      && (strcmp (temp, ".exe") == 0
-#if HAVE_TARGET_EXECUTABLE_SUFFIX
+#if defined(HAVE_TARGET_EXECUTABLE_SUFFIX)
 		  || strcmp (temp, TARGET_EXECUTABLE_SUFFIX) == 0
 #endif
 		  || strcmp (obase, "a.out") == 0))
