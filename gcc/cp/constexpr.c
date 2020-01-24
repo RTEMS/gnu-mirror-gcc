@@ -1293,6 +1293,7 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
   for (i = 0; i < nargs; ++i)
     {
       tree arg = CALL_EXPR_ARG (t, i);
+      tree oarg = arg;
 
       /* To handle string built-ins we need to pass ADDR_EXPR<STRING_CST> since
 	 expand_builtin doesn't know how to look in the values table.  */
@@ -1327,6 +1328,8 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	    arg = braced_lists_to_strings (TREE_TYPE (arg), arg);
 	  if (TREE_CODE (arg) == STRING_CST)
 	    arg = build_address (arg);
+	  else
+	    arg = oarg;
 	}
 
       args[i] = arg;
@@ -6595,7 +6598,7 @@ maybe_constant_value (tree t, tree decl, bool manifestly_const_eval)
   if (cv_cache == NULL)
     cv_cache = hash_map<tree, tree>::create_ggc (101);
   if (tree *cached = cv_cache->get (t))
-    return *cached;
+    return unshare_expr_without_location (*cached);
 
   r = cxx_eval_outermost_constant_expr (t, true, true, false, false, decl);
   gcc_checking_assert (r == t

@@ -10427,19 +10427,15 @@ any_template_parm_r (tree t, void *data)
     }									\
   while (0)
 
+  /* A mention of a member alias/typedef is a use of all of its template
+     arguments, including those from the enclosing class, so we don't use
+     alias_template_specialization_p here.  */
+  if (TYPE_P (t) && typedef_variant_p (t))
+    if (tree tinfo = TYPE_ALIAS_TEMPLATE_INFO (t))
+      WALK_SUBTREE (TI_ARGS (tinfo));
+
   switch (TREE_CODE (t))
     {
-    case RECORD_TYPE:
-    case UNION_TYPE:
-    case ENUMERAL_TYPE:
-      /* Search for template parameters in type aliases.  */
-      if (tree ats = alias_template_specialization_p (t, nt_opaque))
-	{
-	  tree tinfo = TYPE_ALIAS_TEMPLATE_INFO (ats);
-	  WALK_SUBTREE (TI_ARGS (tinfo));
-        }
-      break;
-
     case TEMPLATE_TYPE_PARM:
       /* Type constraints of a placeholder type may contain parameters.  */
       if (is_auto (t))
@@ -10472,6 +10468,8 @@ any_template_parm_r (tree t, void *data)
 	tree cparms = ftpi->ctx_parms;
 	while (TMPL_PARMS_DEPTH (dparms) > ftpi->max_depth)
 	  dparms = TREE_CHAIN (dparms);
+	while (TMPL_PARMS_DEPTH (cparms) > TMPL_PARMS_DEPTH (dparms))
+	  cparms = TREE_CHAIN (cparms);
 	while (dparms
 	       && (TREE_TYPE (TREE_VALUE (dparms))
 		   != TREE_TYPE (TREE_VALUE (cparms))))
@@ -16423,6 +16421,14 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 		  return op;
 		}
 	    }
+	  /* force_paren_expr can also create a VIEW_CONVERT_EXPR.  */
+	  else if (code == VIEW_CONVERT_EXPR && REF_PARENTHESIZED_P (t))
+	    {
+	      op = tsubst_copy (op, args, complain, in_decl);
+	      op = build1 (code, TREE_TYPE (op), op);
+	      REF_PARENTHESIZED_P (op) = true;
+	      return op;
+	    }
 	  /* We shouldn't see any other uses of these in templates.  */
 	  gcc_unreachable ();
 	}
@@ -18751,6 +18757,36 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
        cap = TREE_CHAIN (cap))
     {
       tree ofield = TREE_PURPOSE (cap);
+      tree init = TREE_VALUE (cap);
+      if (PACK_EXPANSION_P (init))
+	init = tsubst_pack_expansion (init, args, complain, in_decl);
+      else
+	init = tsubst_copy_and_build (init, args, complain, in_decl,
+				      /*fn*/false, /*constexpr*/false);
+
+      if (init == error_mark_node)
+	return error_mark_node;
+
+      if (init && TREE_CODE (init) == TREE_LIST)
+	init = build_x_compound_expr_from_list (init, ELK_INIT, complain);
+
+      if (!processing_template_decl
+	  && init && TREE_CODE (init) != TREE_VEC
+	  && variably_modified_type_p (TREE_TYPE (init), NULL_TREE))
+	{
+	  /* For a VLA, simply tsubsting the field type won't work, we need to
+	     go through add_capture again.  XXX do we want to do this for all
+	     captures?  */
+	  tree name = (get_identifier
+		       (IDENTIFIER_POINTER (DECL_NAME (ofield)) + 2));
+	  tree ftype = TREE_TYPE (ofield);
+	  bool by_ref = (TYPE_REF_P (ftype)
+			 || (TREE_CODE (ftype) == DECLTYPE_TYPE
+			     && DECLTYPE_FOR_REF_CAPTURE (ftype)));
+	  add_capture (r, name, init, by_ref, !DECL_NORMAL_CAPTURE_P (ofield));
+	  continue;
+	}
+
       if (PACK_EXPANSION_P (ofield))
 	ofield = PACK_EXPANSION_PATTERN (ofield);
       tree field = tsubst_decl (ofield, args, complain);
@@ -18764,13 +18800,6 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
       if (field == error_mark_node)
 	return error_mark_node;
-
-      tree init = TREE_VALUE (cap);
-      if (PACK_EXPANSION_P (init))
-	init = tsubst_pack_expansion (init, args, complain, in_decl);
-      else
-	init = tsubst_copy_and_build (init, args, complain, in_decl,
-				      /*fn*/false, /*constexpr*/false);
 
       if (TREE_CODE (field) == TREE_VEC)
 	{
