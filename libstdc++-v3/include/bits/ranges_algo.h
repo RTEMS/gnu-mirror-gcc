@@ -2067,6 +2067,65 @@ namespace ranges
 				  std::move(__comp), std::move(__proj));
     }
 
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>> Comp
+	     = ranges::less>
+    constexpr _Iter
+    is_sorted_until(_Iter __first, _Sent __last,
+		    Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return __first;
+
+      auto __next = __first;
+      for (++__next; __next != __last; __first = __next, (void)++__next)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj, *__next),
+			  std::__invoke(__proj, *__first)))
+	  return __next;
+      return __next;
+    }
+
+  template<forward_range _R, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_R>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_R>
+    is_sorted_until(_R&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::is_sorted_until(ranges::begin(__r), ranges::end(__r),
+				     std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     Comp = ranges::less>
+    constexpr bool
+    is_sorted(_Iter __first, _Sent __last, Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return true;
+
+      auto __next = __first;
+      for (++__next; __next != __last; __first = __next, (void)++__next)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj, *__next),
+			  std::__invoke(__proj, *__first)))
+	  return false;
+      return true;
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr bool
+    is_sorted(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::is_sorted(ranges::begin(__r), ranges::end(__r),
+			       std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
