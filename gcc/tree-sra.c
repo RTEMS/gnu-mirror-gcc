@@ -99,6 +99,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "builtins.h"
 #include "tree-sra.h"
+#include "langhooks.h"
 
 
 /* Enumeration of all aggregate reductions we can do.  */
@@ -130,11 +131,16 @@ struct assign_link;
 
 struct access
 {
-  /* Values returned by  `get_ref_base_and_extent' for each component reference
-     If EXPR isn't a component reference  just set `BASE = EXPR', `OFFSET = 0',
-     `SIZE = TREE_SIZE (TREE_TYPE (expr))'.  */
+  /* Offset, size and base are values returned by `get_ref_base_and_extent' for
+     each component reference If EXPR isn't a component reference just set
+     `BASE = EXPR', `OFFSET = 0', `SIZE = TREE_SIZE (TREE_TYPE (expr))'.  */
   HOST_WIDE_INT offset;
   HOST_WIDE_INT size;
+
+  /* If reg_acc_type is non-NULL, this is the size of the actual egister type
+     the access represented before it was extended to cover padding.  Otherwise
+     must be equal to size.  */
+  HOST_WIDE_INT reg_size;
   tree base;
 
   /* Expression.  It is context dependent so do not use it to create new
@@ -143,6 +149,12 @@ struct access
   tree expr;
   /* Type.  */
   tree type;
+
+  /* If non-NULL, this is the type that should be actually extracted or
+     inserted from/to the replacement decl when replacing accesses to the
+     individual field itself (as opposed to accesses created as part of
+     replacing aggregate copies which should use TYPE).  */
+  tree reg_acc_type;
 
   /* The statement this access belongs to.  */
   gimple *stmt;
@@ -391,10 +403,17 @@ dump_access (FILE *f, struct access *access, bool grp)
   print_generic_expr (f, access->base);
   fprintf (f, "', offset = " HOST_WIDE_INT_PRINT_DEC, access->offset);
   fprintf (f, ", size = " HOST_WIDE_INT_PRINT_DEC, access->size);
+  if (access->reg_size != access->size)
+    fprintf (f, ", reg_size = " HOST_WIDE_INT_PRINT_DEC, access->reg_size);
   fprintf (f, ", expr = ");
   print_generic_expr (f, access->expr);
   fprintf (f, ", type = ");
   print_generic_expr (f, access->type);
+  if (access->reg_acc_type)
+    {
+      fprintf (f, ", reg_acc_type = ");
+      print_generic_expr (f, access->type);
+    }
   fprintf (f, ", reverse = %d", access->reverse);
   if (grp)
     fprintf (f, ", grp_read = %d, grp_write = %d, grp_assignment_read = %d, "
@@ -481,18 +500,27 @@ get_base_access_vector (tree base)
   return base_access_vec->get (base);
 }
 
+/* Return ACCESS's size or reg_size depending on REG.  */
+
+static HOST_WIDE_INT
+acc_size (struct access *access, bool reg)
+{
+  return reg ? access->reg_size : access->size;
+}
+
 /* Find an access with required OFFSET and SIZE in a subtree of accesses rooted
    in ACCESS.  Return NULL if it cannot be found.  */
 
 static struct access *
 find_access_in_subtree (struct access *access, HOST_WIDE_INT offset,
-			HOST_WIDE_INT size)
+			HOST_WIDE_INT size, bool reg)
 {
-  while (access && (access->offset != offset || access->size != size))
+  while (access && (access->offset != offset
+		    || acc_size (access, reg) != size))
     {
       struct access *child = access->first_child;
 
-      while (child && (child->offset + child->size <= offset))
+      while (child && (child->offset + acc_size (child, reg) <= offset))
 	child = child->next_sibling;
       access = child;
     }
@@ -503,7 +531,7 @@ find_access_in_subtree (struct access *access, HOST_WIDE_INT offset,
   if (access)
     while (access->first_child
 	   && access->first_child->offset == offset
-	   && access->first_child->size == size)
+	   && acc_size (access->first_child, reg) == size)
       access = access->first_child;
 
   return access;
@@ -539,7 +567,7 @@ get_var_base_offset_size_access (tree base, HOST_WIDE_INT offset,
   if (!access)
     return NULL;
 
-  return find_access_in_subtree (access, offset, size);
+  return find_access_in_subtree (access, offset, size, true);
 }
 
 /* Add LINK to the linked list of assign links of RACC.  */
@@ -868,6 +896,7 @@ create_access_1 (tree base, HOST_WIDE_INT offset, HOST_WIDE_INT size)
   access->base = base;
   access->offset = offset;
   access->size = size;
+  access->reg_size = size;
 
   base_access_vec->get_or_insert (base).safe_push (access);
 
@@ -1667,6 +1696,7 @@ build_ref_for_model (location_t loc, tree base, HOST_WIDE_INT offset,
     {
       tree res;
       if (model->grp_same_access_path
+	  && !model->reg_acc_type
 	  && !TREE_THIS_VOLATILE (base)
 	  && (TYPE_ADDR_SPACE (TREE_TYPE (base))
 	      == TYPE_ADDR_SPACE (TREE_TYPE (model->expr)))
@@ -2256,6 +2286,26 @@ get_access_replacement (struct access *access)
   return access->replacement_decl;
 }
 
+/* Like above except in cases when ACCESS has non-NULL reg_acc_type, in which
+   case also construct BIT_FIELD_REF into the replacement of the corresponding
+   type (with location LOC).  */
+
+static tree
+get_reg_access_replacement (location_t loc, struct access *access)
+{
+  tree repl = get_access_replacement (access);
+  if (!access->reg_acc_type)
+    return repl;
+  HOST_WIDE_INT sz = access->reg_size;
+  if (INTEGRAL_TYPE_P (access->reg_acc_type))
+    {
+      gcc_assert (TYPE_PRECISION (access->reg_acc_type) <= sz);
+      sz = TYPE_PRECISION (access->reg_acc_type);
+    }
+  return build3_loc (loc, BIT_FIELD_REF, access->reg_acc_type, repl,
+		     bitsize_int (sz),  bitsize_int (0));
+}
+
 
 /* Build a subtree of accesses rooted in *ACCESS, and move the pointer in the
    linked list along the way.  Stop when *ACCESS is NULL or the access pointed
@@ -2339,7 +2389,12 @@ verify_sra_access_forest (struct access *root)
       gcc_assert (offset == access->offset);
       gcc_assert (access->grp_unscalarizable_region
 		  || size == max_size);
-      gcc_assert (max_size == access->size);
+      if (access->reg_acc_type)
+	gcc_assert (max_size == access->reg_size
+		    && max_size < access->size);
+      else
+	gcc_assert (max_size == access->size
+		    && max_size == access->reg_size);
       gcc_assert (reverse == access->reverse);
 
       if (access->first_child)
@@ -2403,6 +2458,39 @@ expr_with_var_bounded_array_refs_p (tree expr)
       expr = TREE_OPERAND (expr, 0);
     }
   return false;
+}
+
+static void
+upgrade_integral_size_to_prec (struct access *access)
+{
+  /* Always create access replacements that cover the whole access.
+     For integral types this means the precision has to match.
+     Avoid assumptions based on the integral type kind, too.  */
+  if (INTEGRAL_TYPE_P (access->type)
+      && (TREE_CODE (access->type) != INTEGER_TYPE
+	  || TYPE_PRECISION (access->type) != access->size)
+      /* But leave bitfield accesses alone.  */
+      && (TREE_CODE (access->expr) != COMPONENT_REF
+	  || !DECL_BIT_FIELD (TREE_OPERAND (access->expr, 1))))
+    {
+      tree rt = access->type;
+      gcc_assert ((access->offset % BITS_PER_UNIT) == 0
+		  && (access->size % BITS_PER_UNIT) == 0);
+      access->type = build_nonstandard_integer_type (access->size,
+						   TYPE_UNSIGNED (rt));
+      access->expr = build_ref_for_offset (UNKNOWN_LOCATION, access->base,
+					 access->offset, access->reverse,
+					 access->type, NULL, false);
+
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file, "Changing the type of a replacement for ");
+	  print_generic_expr (dump_file, access->base);
+	  fprintf (dump_file, " offset: %u, size: %u ",
+		   (unsigned) access->offset, (unsigned) access->size);
+	  fprintf (dump_file, " to an integer.\n");
+	}
+    }
 }
 
 /* Analyze the subtree of accesses rooted in ROOT, scheduling replacements when
@@ -2488,6 +2576,15 @@ analyze_access_subtree (struct access *root, struct access *parent,
 	hole = true;
     }
 
+  if (!totally && root->reg_acc_type)
+    {
+      /* If total scalarization did not eventually succeed, let's undo any
+	 futile attempts to cover padding.  */
+      root->type = root->reg_acc_type;
+      root->size = root->reg_size;
+      root->reg_acc_type = NULL_TREE;
+    }
+
   if (allow_replacements && scalar && !root->first_child
       && (totally || !root->grp_total_scalarization)
       && (totally
@@ -2495,34 +2592,9 @@ analyze_access_subtree (struct access *root, struct access *parent,
 	  || ((root->grp_scalar_read || root->grp_assignment_read)
 	      && (root->grp_scalar_write || root->grp_assignment_write))))
     {
-      /* Always create access replacements that cover the whole access.
-         For integral types this means the precision has to match.
-	 Avoid assumptions based on the integral type kind, too.  */
-      if (INTEGRAL_TYPE_P (root->type)
-	  && (TREE_CODE (root->type) != INTEGER_TYPE
-	      || TYPE_PRECISION (root->type) != root->size)
-	  /* But leave bitfield accesses alone.  */
-	  && (TREE_CODE (root->expr) != COMPONENT_REF
-	      || !DECL_BIT_FIELD (TREE_OPERAND (root->expr, 1))))
-	{
-	  tree rt = root->type;
-	  gcc_assert ((root->offset % BITS_PER_UNIT) == 0
-		      && (root->size % BITS_PER_UNIT) == 0);
-	  root->type = build_nonstandard_integer_type (root->size,
-						       TYPE_UNSIGNED (rt));
-	  root->expr = build_ref_for_offset (UNKNOWN_LOCATION, root->base,
-					     root->offset, root->reverse,
-					     root->type, NULL, false);
-
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    {
-	      fprintf (dump_file, "Changing the type of a replacement for ");
-	      print_generic_expr (dump_file, root->base);
-	      fprintf (dump_file, " offset: %u, size: %u ",
-		       (unsigned) root->offset, (unsigned) root->size);
-	      fprintf (dump_file, " to an integer.\n");
-	    }
-	}
+      upgrade_integral_size_to_prec (root);
+      if (root->reg_acc_type && root->grp_write)
+	root->grp_partial_lhs = 1;
 
       root->grp_to_be_replaced = 1;
       root->replacement_decl = create_access_replacement (root);
@@ -2554,7 +2626,7 @@ analyze_access_subtree (struct access *root, struct access *parent,
 	root->grp_total_scalarization = 0;
     }
 
-  if (!hole || totally)
+  if (!hole)
     root->grp_covered = 1;
   else if (root->grp_write || comes_initialized_p (root->base))
     root->grp_unscalarized_data = 1; /* not covered and written to */
@@ -2636,6 +2708,8 @@ create_artificial_child_access (struct access *parent, struct access *model,
   access->expr = expr;
   access->offset = new_offset;
   access->size = model->size;
+  gcc_assert (model->size == model->reg_size);
+  access->reg_size = model->reg_size;
   access->type = model->type;
   access->parent = parent;
   access->grp_read = set_grp_read;
@@ -2966,6 +3040,7 @@ create_total_scalarization_access (struct access *parent, HOST_WIDE_INT pos,
   access->base = parent->base;
   access->offset = pos;
   access->size = size;
+  access->reg_size = size;
   access->expr = expr;
   access->type = type;
   access->parent = parent;
@@ -3013,6 +3088,137 @@ create_total_access_and_reshape (struct access *parent, HOST_WIDE_INT pos,
 	a->parent = new_acc;
     }
   return new_acc;
+}
+
+/* Given SIZE return the integer type to represent that many bits or NULL if
+   there is no suitable one.  */
+
+static tree
+sra_type_for_size (HOST_WIDE_INT size)
+{
+  tree type = lang_hooks.types.type_for_size (size, 1);
+  scalar_int_mode mode;
+  if (type
+      && is_a <scalar_int_mode> (TYPE_MODE (type), &mode)
+      && GET_MODE_BITSIZE (mode) == size)
+    return type;
+  else
+    return NULL_TREE;
+}
+
+/* Create a series of accesses to cover padding from FROM to TO anch chain them
+   between LAST_PTR and NEXT_CHILD.  Return the pointer to the last created
+   one.  */
+
+static struct access *
+fill_padding_with_accesses (struct access *parent, HOST_WIDE_INT from,
+			    HOST_WIDE_INT to, struct access **last_ptr,
+			    struct access *next_child)
+{
+  struct access *access = NULL;
+
+  gcc_assert (from < to);
+  do
+    {
+      HOST_WIDE_INT diff = to - from;
+      gcc_assert (diff >= BITS_PER_UNIT);
+      HOST_WIDE_INT stsz = 1 << floor_log2 (diff);
+      tree type;
+
+      while (true)
+	{
+	  type = sra_type_for_size (stsz);
+	  if (type)
+	    break;
+	  stsz /= 2;
+	  gcc_checking_assert (stsz >= BITS_PER_UNIT);
+	}
+
+      do {
+	tree expr = build_ref_for_offset (UNKNOWN_LOCATION, parent->base,
+					  from, parent->reverse, type, NULL,
+					  false);
+	access = create_total_scalarization_access (parent, from, stsz, type,
+						    expr, last_ptr, next_child);
+	access->grp_no_warning = 1;
+	from += stsz;
+      }
+      while (to - from >= stsz);
+      gcc_assert (from <= to);
+    }
+  while (from < to);
+  return access;
+}
+
+/* Check whether any padding between FROM and TO must be filled during
+   total scalarization and if so, extend *LAST_SIBLING, create additional
+   artificial accesses under PARENT or both to fill it.  Set *LAST_SIBLING to
+   the last created access and set its next_sibling to NEXT_CHILD.  */
+
+static void
+total_scalarization_fill_padding (struct access *parent,
+				  struct access **last_sibling,
+				  HOST_WIDE_INT from, HOST_WIDE_INT to,
+				  struct access *next_child)
+{
+  if (constant_decl_p (parent->base))
+    return;
+
+  gcc_assert (from <= to);
+  if (from == to)
+    return;
+
+  if (struct access *ls = *last_sibling)
+    {
+      /* First, perform any upgrades to full integers we would have done
+	 anyway.  */
+      upgrade_integral_size_to_prec (ls);
+
+      HOST_WIDE_INT lastpos = ls->offset;
+      HOST_WIDE_INT lastsize = ls->size;
+      if (is_gimple_reg_type (ls->type)
+	  && pow2_or_zerop (lastsize))
+	{
+	  /* The last field was a reaonably sized register, let's try to
+	     enlarge as much as we can so that it is still naturally
+	     aligned.  */
+	  HOST_WIDE_INT blocksize = lastsize;
+	  tree type = NULL_TREE;
+
+	  while (true)
+	    {
+	      HOST_WIDE_INT b2 = blocksize * 2;
+	      if (lastpos + b2 > to
+		  || (lastpos % b2) != 0)
+		break;
+	      tree t2 = sra_type_for_size (b2);
+	      if (!t2)
+		break;
+
+	      blocksize = b2;
+	      type = t2;
+	    }
+
+	  if (blocksize != lastsize)
+	    {
+	      ls->reg_acc_type = ls->type;
+	      ls->type = type;
+	      ls->size = blocksize;
+	      from = lastpos + blocksize;
+	    }
+
+	  if (from == to)
+	    return;
+	}
+    }
+
+  struct access **last_ptr;
+  if (*last_sibling)
+    last_ptr = &(*last_sibling)->next_sibling;
+  else
+    last_ptr = &parent->first_child;
+  *last_sibling = fill_padding_with_accesses (parent, from, to, last_ptr,
+					      next_child);
 }
 
 static bool totally_scalarize_subtree (struct access *root);
@@ -3073,10 +3279,17 @@ total_should_skip_creating_access (struct access *parent,
 				   HOST_WIDE_INT size)
 {
   struct access *next_child;
+  HOST_WIDE_INT covered;
   if (!*last_seen_sibling)
-    next_child = parent->first_child;
+    {
+      next_child = parent->first_child;
+      covered = parent->offset;
+    }
   else
-    next_child = (*last_seen_sibling)->next_sibling;
+    {
+      next_child = (*last_seen_sibling)->next_sibling;
+      covered = (*last_seen_sibling)->offset + (*last_seen_sibling)->size;
+    }
 
   /* First, traverse the chain of siblings until it points to an access with
      offset at least equal to POS.  Check all skipped accesses whether they
@@ -3085,9 +3298,15 @@ total_should_skip_creating_access (struct access *parent,
     {
       if (next_child->offset + next_child->size > pos)
 	return TOTAL_FLD_FAILED;
+      total_scalarization_fill_padding (parent, last_seen_sibling, covered,
+					next_child->offset, next_child);
+      covered = next_child->offset + next_child->size;
       *last_seen_sibling = next_child;
       next_child = next_child->next_sibling;
     }
+
+  total_scalarization_fill_padding (parent, last_seen_sibling, covered, pos,
+				    next_child);
 
   /* Now check whether next_child has exactly the right POS and SIZE and if so,
      whether it can represent what we need and can be totally scalarized
@@ -3273,6 +3492,34 @@ totally_scalarize_subtree (struct access *root)
     }
 
  out:
+  /* Even though there is nothing in the type, there can still be accesses here
+     in the IL.  */
+
+  HOST_WIDE_INT covered;
+  struct access *next_child;
+
+  if (last_seen_sibling)
+    {
+      covered = last_seen_sibling->offset + last_seen_sibling->size;
+      next_child = last_seen_sibling->next_sibling;
+    }
+  else
+    {
+      covered = root->offset;
+      next_child = root->first_child;
+    }
+
+  while (next_child)
+    {
+      total_scalarization_fill_padding (root, &last_seen_sibling, covered,
+					next_child->offset, next_child);
+      covered = next_child->offset + next_child->size;
+      last_seen_sibling = next_child;
+      next_child = next_child->next_sibling;
+    }
+
+  total_scalarization_fill_padding (root, &last_seen_sibling, covered,
+				    root->offset + root->size, NULL);
   return true;
 }
 
@@ -3655,7 +3902,7 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
 
   if (access->grp_to_be_replaced)
     {
-      tree repl = get_access_replacement (access);
+      tree repl = get_reg_access_replacement (loc, access);
       /* If we replace a non-register typed access simply use the original
          access expression to extract the scalar component afterwards.
 	 This happens if scalarizing a function return value or parameter
@@ -3666,7 +3913,9 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
          be accessed as a different type too, potentially creating a need for
          type conversion (see PR42196) and when scalarized unions are involved
          in assembler statements (see PR42398).  */
-      if (!useless_type_conversion_p (type, access->type))
+      tree reg_acc_type
+	= access->reg_acc_type ? access->reg_acc_type : access->type;
+      if (!useless_type_conversion_p (type, reg_acc_type))
 	{
 	  tree ref;
 
@@ -3806,7 +4055,8 @@ load_assign_lhs_subreplacements (struct access *lacc,
 	  gassign *stmt;
 	  tree rhs;
 
-	  racc = find_access_in_subtree (sad->top_racc, offset, lacc->size);
+	  racc = find_access_in_subtree (sad->top_racc, offset, lacc->size,
+					 false);
 	  if (racc && racc->grp_to_be_replaced)
 	    {
 	      rhs = get_access_replacement (racc);
@@ -3857,7 +4107,7 @@ load_assign_lhs_subreplacements (struct access *lacc,
 	      tree drhs;
 	      struct access *racc = find_access_in_subtree (sad->top_racc,
 							    offset,
-							    lacc->size);
+							    lacc->size, false);
 
 	      if (racc && racc->grp_to_be_replaced)
 		{
@@ -4010,7 +4260,7 @@ sra_modify_assign (gimple *stmt, gimple_stmt_iterator *gsi)
   loc = gimple_location (stmt);
   if (lacc && lacc->grp_to_be_replaced)
     {
-      lhs = get_access_replacement (lacc);
+      lhs = get_reg_access_replacement (loc, lacc);
       gimple_assign_set_lhs (stmt, lhs);
       modify_this_stmt = true;
       if (lacc->grp_partial_lhs)
@@ -4020,7 +4270,7 @@ sra_modify_assign (gimple *stmt, gimple_stmt_iterator *gsi)
 
   if (racc && racc->grp_to_be_replaced)
     {
-      rhs = get_access_replacement (racc);
+      rhs = get_reg_access_replacement (loc, racc);
       modify_this_stmt = true;
       if (racc->grp_partial_lhs)
 	force_gimple_rhs = true;
@@ -4060,7 +4310,8 @@ sra_modify_assign (gimple *stmt, gimple_stmt_iterator *gsi)
 	      rhs = fold_build1_loc (loc, VIEW_CONVERT_EXPR, TREE_TYPE (lhs),
 				     rhs);
 	      if (is_gimple_reg_type (TREE_TYPE (lhs))
-		  && TREE_CODE (lhs) != SSA_NAME)
+		  && (TREE_CODE (lhs) != SSA_NAME
+		      || (racc && racc->reg_acc_type)))
 		force_gimple_rhs = true;
 	    }
 	}

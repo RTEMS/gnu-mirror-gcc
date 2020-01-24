@@ -1,3 +1,35 @@
+2020-01-24  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/92486
+	* tree-sra.c: Include langhooks.h
+	(struct access): New fields reg_size and reg_acc_type.
+	(dump_access): Print new fields.
+	(acc_size): New function.
+	(find_access_in_subtree): Use it, new parameter reg.
+	(get_var_base_offset_size_access): Pass true to
+	find_access_in_subtree.
+	(create_access_1): Initialize reg_size.
+	(create_artificial_child_access): Likewise.
+	(create_total_scalarization_access): Likewise.
+	(build_ref_for_model): Do not use model expr if reg_acc_size is
+	non-NULL.
+	(get_reg_access_replacement): New function.
+	(verify_sra_access_forest): Adjust verification for presence of
+	extended accesses covering padding.
+	(analyze_access_subtree): Undo extension over padding if total
+	scalarization failed, set grp_partial_lhs if we are going to introduce
+	a partial store to the new replacement, do not ignore holes when
+	totally scalarizing.
+	(sra_type_for_size): New function.
+	(total_scalarization_fill_padding): Likewise.
+	(total_should_skip_creating_access): Use it.
+	(totally_scalarize_subtree): Likewise.
+	(sra_modify_expr): Use get_reg_access_replacement instead of
+	get_access_replacement, adjust for reg_acc_type.
+	(sra_modify_assign): Likewise.
+	(load_assign_lhs_subreplacements): Pass false to
+	find_access_in_subtree.
+
 2020-01-27  Martin Liska  <mliska@suse.cz>
 
 	PR driver/91220
