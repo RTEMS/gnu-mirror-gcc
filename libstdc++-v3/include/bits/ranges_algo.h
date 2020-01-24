@@ -2126,6 +2126,170 @@ namespace ranges
 			       std::move(__comp), std::move(__proj));
     }
 
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*, projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Iter
+    lower_bound(_Iter __first, _Sent __last,
+		const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __len = ranges::distance(__first, __last);
+
+      while (__len > 0)
+	{
+	  auto __half = __len / 2;
+	  auto __middle = __first;
+	  ranges::advance(__middle, __half);
+	  if (std::__invoke(__comp, std::__invoke(__proj, *__middle), __value))
+	    {
+	      __first = __middle;
+	      ++__first;
+	      __len = __len - __half - 1;
+	    }
+	  else
+	    __len = __half;
+	}
+      return __first;
+    }
+
+  template<forward_range _Range, typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*,
+				      projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_Range>
+    lower_bound(_Range&& __r,
+		const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::lower_bound(ranges::begin(__r), ranges::end(__r),
+				 __value,
+				 std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*, projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Iter
+    upper_bound(_Iter __first, _Sent __last,
+		const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __len = ranges::distance(__first, __last);
+
+      while (__len > 0)
+	{
+	  auto __half = __len / 2;
+	  auto __middle = __first;
+	  ranges::advance(__middle, __half);
+	  if (std::__invoke(__comp, __value, std::__invoke(__proj, *__middle)))
+	    __len = __half;
+	  else
+	    {
+	      __first = __middle;
+	      ++__first;
+	      __len = __len - __half - 1;
+	    }
+	}
+      return __first;
+    }
+
+  template<forward_range _Range, typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*,
+				      projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_Range>
+    upper_bound(_Range&& __r,
+		const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::upper_bound(ranges::begin(__r), ranges::end(__r),
+				 __value,
+				 std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*, projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr subrange<_Iter>
+    equal_range(_Iter __first, _Sent __last,
+		const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __len = ranges::distance(__first, __last);
+
+      while (__len > 0)
+	{
+	  auto __half = __len / 2;
+	  auto __middle = __first;
+	  ranges::advance(__middle, __half);
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__middle),
+			    __value))
+	    {
+	      __first = __middle;
+	      ++__first;
+	      __len = __len - __half - 1;
+	    }
+	  else if (std::__invoke(__comp,
+				 __value,
+				 std::__invoke(__proj, *__middle)))
+	    __len = __half;
+	  else
+	    {
+	      auto __left
+		= ranges::lower_bound(__first, __middle,
+				      __value, __comp, __proj);
+	      ranges::advance(__first, __len);
+	      auto __right
+		= ranges::upper_bound(++__middle, __first,
+				      __value, __comp, __proj);
+	      return {__left, __right};
+	    }
+	}
+      return {__first, __first};
+    }
+
+  template<forward_range _Range,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*,
+				      projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_subrange_t<_Range>
+    equal_range(_Range&& __r, const _Tp& __value,
+		_Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::equal_range(ranges::begin(__r), ranges::end(__r),
+				 __value,
+				 std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*, projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr bool
+    binary_search(_Iter __first, _Sent __last,
+		  const _Tp& __value, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __i = ranges::lower_bound(__first, __last, __value, __comp, __proj);
+      if (__i == __last)
+	return false;
+      return !std::__invoke(__comp, __value, std::__invoke(__proj, *__i));
+    }
+
+  template<forward_range _Range,
+	   typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<const _Tp*,
+				      projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr bool
+    binary_search(_Range&& __r, const _Tp& __value, _Comp __comp = {},
+		  _Proj __proj = {})
+    {
+      return ranges::binary_search(ranges::begin(__r), ranges::end(__r),
+				   __value,
+				   std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
