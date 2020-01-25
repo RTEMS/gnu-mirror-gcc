@@ -1978,6 +1978,174 @@ namespace ranges
 	   typename _Comp = ranges::less, typename _Proj = identity>
     requires sortable<_Iter, _Comp, _Proj>
     constexpr _Iter
+    push_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      auto __lasti = ranges::next(__first, __last);
+      std::push_heap(__first, __lasti, __proj_comp);
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr safe_iterator_t<_Range>
+    push_heap(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::push_heap(ranges::begin(__r), ranges::end(__r),
+			       std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr _Iter
+    pop_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      auto __lasti = ranges::next(__first, __last);
+      std::pop_heap(__first, __lasti, __proj_comp);
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr safe_iterator_t<_Range>
+    pop_heap(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::pop_heap(ranges::begin(__r), ranges::end(__r),
+			       std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr _Iter
+    make_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      auto __lasti = ranges::next(__first, __last);
+      std::make_heap(__first, __lasti, __proj_comp);
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr safe_iterator_t<_Range>
+    make_heap(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::make_heap(ranges::begin(__r), ranges::end(__r),
+			       std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr _Iter
+    sort_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+      auto __lasti = ranges::next(__first, __last);
+      std::sort_heap(__first, __lasti, __proj_comp);
+      return __lasti;
+    }
+
+  template<random_access_range _Range,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr safe_iterator_t<_Range>
+    sort_heap(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::sort_heap(ranges::begin(__r), ranges::end(__r),
+			       std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Iter
+    is_heap_until(_Iter __first, _Sent __last,
+		  _Comp __comp = {}, _Proj __proj = {})
+    {
+      iter_difference_t<_Iter> __n = ranges::distance(__first, __last);
+      iter_difference_t<_Iter> __parent = 0, __child = 1;
+      for (; __child < __n; ++__child)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj, *(__first + __parent)),
+			  std::__invoke(__proj, *(__first + __child))))
+	  return __first + __child;
+	else if ((__child & 1) == 0)
+	  ++__parent;
+
+      return __first + __n;
+    }
+
+  template<random_access_range _Range,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_Range>
+    is_heap_until(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::is_heap_until(ranges::begin(__r), ranges::end(__r),
+				   std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr bool
+    is_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return (__last
+	      == ranges::is_heap_until(__first, __last,
+				       std::move(__comp),
+				       std::move(__proj)));
+    }
+
+  template<random_access_range _Range,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr bool
+    is_heap(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::is_heap(ranges::begin(__r), ranges::end(__r),
+			     std::move(__comp), std::move(__proj));
+    }
+
+  template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr _Iter
     sort(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
       // TODO: is it worth reimplementing std::sort here?
