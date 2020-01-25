@@ -2596,6 +2596,123 @@ namespace ranges
 				   std::move(__comp), std::move(__proj));
     }
 
+  template<typename _Iter>
+  struct next_permutation_result {
+    bool found;
+    _Iter in;
+  };
+
+  template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr next_permutation_result<_Iter>
+    next_permutation(_Iter __first, _Sent __last,
+		     _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return {false, std::move(__first)};
+
+      auto __i = __first;
+      ++__i;
+      if (__i == __last)
+	return {false, std::move(__i)};
+
+      auto __lasti = ranges::next(__first, __last);
+      __i = __lasti;
+      --__i;
+
+      for (;;)
+	{
+	  auto __ii = __i;
+	  --__i;
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__i),
+			    std::__invoke(__proj, *__ii)))
+	    {
+	      auto __j = __lasti;
+	      while (!std::__invoke(__comp,
+				    std::__invoke(__proj, *__i),
+				    std::__invoke(__proj, *--__j)))
+		;
+	      ranges::iter_swap(__i, __j);
+	      ranges::reverse(__ii, __last);
+	      return {true, std::move(__lasti)};
+	    }
+	  if (__i == __first)
+	    {
+	      ranges::reverse(__first, __last);
+	      return {false, std::move(__lasti)};
+	    }
+	}
+    }
+
+  template<bidirectional_range _Range, typename _Comp = ranges::less,
+	   typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr next_permutation_result<safe_iterator_t<_Range>>
+    next_permutation(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::next_permutation(ranges::begin(__r), ranges::end(__r),
+				      std::move(__comp), std::move(__proj));
+    }
+
+  template<typename _Iter>
+  using prev_permutation_result = next_permutation_result<_Iter>;
+
+  template<bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Comp = ranges::less, typename _Proj = identity>
+    requires sortable<_Iter, _Comp, _Proj>
+    constexpr prev_permutation_result<_Iter>
+    prev_permutation(_Iter __first, _Sent __last,
+		     _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return {false, std::move(__first)};
+
+      auto __i = __first;
+      ++__i;
+      if (__i == __last)
+	return {false, std::move(__i)};
+
+      auto __lasti = ranges::next(__first, __last);
+      __i = __lasti;
+      --__i;
+
+      for (;;)
+	{
+	  auto __ii = __i;
+	  --__i;
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__ii),
+			    std::__invoke(__proj, *__i)))
+	    {
+	      auto __j = __lasti;
+	      while (!std::__invoke(__comp,
+				    std::__invoke(__proj, *--__j),
+				    std::__invoke(__proj, *__i)))
+		;
+	      ranges::iter_swap(__i, __j);
+	      ranges::reverse(__ii, __last);
+	      return {true, std::move(__lasti)};
+	    }
+	  if (__i == __first)
+	    {
+	      ranges::reverse(__first, __last);
+	      return {false, std::move(__lasti)};
+	    }
+	}
+    }
+
+  template<bidirectional_range _Range, typename _Comp = ranges::less,
+	   typename _Proj = identity>
+    requires sortable<iterator_t<_Range>, _Comp, _Proj>
+    constexpr prev_permutation_result<safe_iterator_t<_Range>>
+    prev_permutation(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::prev_permutation(ranges::begin(__r), ranges::end(__r),
+				      std::move(__comp), std::move(__proj));
+    }
+
 } // namespace ranges
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
