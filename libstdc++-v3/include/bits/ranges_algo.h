@@ -2235,6 +2235,76 @@ namespace ranges
 				  std::move(__comp), std::move(__proj));
     }
 
+  template<class _Iter, class _Out>
+  using partial_sort_copy_result = copy_result<_Iter, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   random_access_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires indirectly_copyable<_Iter1, _Iter2>
+      && sortable<_Iter2, _Comp, _Proj2>
+      && indirect_strict_weak_order<_Comp,
+				    projected<_Iter1, _Proj1>,
+				    projected<_Iter2, _Proj2>>
+    constexpr partial_sort_copy_result<_Iter1, _Iter2>
+    partial_sort_copy(_Iter1 __first, _Sent1 __last,
+		      _Iter2 __result_first, _Sent2 __result_last,
+		      _Comp __comp = {},
+		      _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      if (__result_first == __result_last)
+	{
+	  // TODO: Eliminating the variable __lasti triggers an ICE.
+	  auto __lasti = ranges::next(std::move(__first),
+				      std::move(__last));
+	  return {std::move(__lasti), std::move(__result_first)};
+	}
+
+      auto __result_real_last = __result_first;
+      while (__first != __last && __result_real_last != __result_last)
+	{
+	  *__result_real_last = *__first;
+	  ++__result_real_last;
+	  ++__first;
+	}
+
+      ranges::make_heap(__result_first, __result_real_last, __comp, __proj2);
+      for (; __first != __last; ++__first)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj1, *__first),
+			  std::__invoke(__proj2, *__result_first)))
+	  {
+	    ranges::pop_heap(__result_first, __result_real_last,
+			     __comp, __proj2);
+	    *(__result_real_last-1) = *__first;
+	    ranges::push_heap(__result_first, __result_real_last,
+			      __comp, __proj2);
+	  }
+      ranges::sort_heap(__result_first, __result_real_last, __comp, __proj2);
+
+      return {std::move(__first), std::move(__result_real_last)};
+    }
+
+  template<input_range _Range1, random_access_range _Range2,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires indirectly_copyable<iterator_t<_Range1>, iterator_t<_Range2>>
+      && sortable<iterator_t<_Range2>, _Comp, _Proj2>
+      && indirect_strict_weak_order<_Comp,
+				    projected<iterator_t<_Range1>, _Proj1>,
+				    projected<iterator_t<_Range2>, _Proj2>>
+    constexpr partial_sort_copy_result<safe_iterator_t<_Range1>,
+				       safe_iterator_t<_Range2>>
+    partial_sort_copy(_Range1&& __r, _Range2&& __out, _Comp __comp = {},
+		      _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::partial_sort_copy(ranges::begin(__r), ranges::end(__r),
+				       ranges::begin(__out), ranges::end(__out),
+				       std::move(__comp),
+				       std::move(__proj1), std::move(__proj2));
+    }
+
   template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Proj = identity,
 	   indirect_strict_weak_order<projected<_Iter, _Proj>> Comp
