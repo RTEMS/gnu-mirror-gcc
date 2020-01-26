@@ -2873,6 +2873,276 @@ namespace ranges
 				   std::move(__comp), std::move(__proj));
     }
 
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   typename _Proj1 = identity, typename _Proj2 = identity,
+	   indirect_strict_weak_order<projected<_Iter1, _Proj1>,
+				      projected<_Iter2, _Proj2>>
+	     _Comp = ranges::less>
+    constexpr bool
+    includes(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
+	     _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj2, *__first2),
+			  std::__invoke(__proj1, *__first1)))
+	  return false;
+	else if (std::__invoke(__comp,
+			       std::__invoke(__proj1, *__first1),
+			       std::__invoke(__proj2, *__first2)))
+	  ++__first1;
+	else
+	  {
+	    ++__first1;
+	    ++__first2;
+	  }
+
+      return __first2 == __last2;
+    }
+
+  template<input_range _Range1, input_range _Range2, typename _Proj1 = identity,
+	   typename _Proj2 = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range1>, _Proj1>,
+				      projected<iterator_t<_Range2>, _Proj2>>
+	     _Comp = ranges::less>
+    constexpr bool
+    includes(_Range1&& __r1, _Range2&& __r2, _Comp __comp = {},
+	     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::includes(ranges::begin(__r1), ranges::end(__r1),
+			      ranges::begin(__r2), ranges::end(__r2),
+			      std::move(__comp),
+			      std::move(__proj1), std::move(__proj2));
+    }
+
+  template<typename _Iter1, typename _Iter2, typename _Out>
+  using set_union_result = binary_transform_result<_Iter1, _Iter2, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   weakly_incrementable _Out, typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<_Iter1, _Iter2, _Out, _Comp, _Proj1, _Proj2>
+    constexpr set_union_result<_Iter1, _Iter2, _Out>
+    set_union(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
+	      _Out __result, _Comp __comp = {},
+	      _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	{
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj1, *__first1),
+			    std::__invoke(__proj2, *__first2)))
+	    {
+	      *__result = *__first1;
+	      ++__first1;
+	    }
+	  else if (std::__invoke(__comp,
+				 std::__invoke(__proj2, *__first2),
+				 std::__invoke(__proj1, *__first1)))
+	    {
+	      *__result = *__first2;
+	      ++__first2;
+	    }
+	  else
+	    {
+	      *__result = *__first1;
+	      ++__first1;
+	      ++__first2;
+	    }
+	  ++__result;
+	}
+      auto __copy1 = ranges::copy(std::move(__first1), std::move(__last1),
+				  std::move(__result));
+      auto __copy2 = ranges::copy(std::move(__first2), std::move(__last2),
+				  std::move(__copy1.out));
+      return {std::move(__copy1.in), std::move(__copy2.in),
+	      std::move(__copy2.out)};
+    }
+
+  template<input_range _Range1, input_range _Range2, weakly_incrementable _Out,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<iterator_t<_Range1>, iterator_t<_Range2>, _Out,
+		       _Comp, _Proj1, _Proj2>
+    constexpr set_union_result<safe_iterator_t<_Range1>,
+			       safe_iterator_t<_Range2>, _Out>
+    set_union(_Range1&& __r1, _Range2&& __r2, _Out __result, _Comp __comp = {},
+	      _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::set_union(ranges::begin(__r1), ranges::end(__r1),
+			       ranges::begin(__r2), ranges::end(__r2),
+			       std::move(__result), std::move(__comp),
+			       std::move(__proj1), std::move(__proj2));
+    }
+
+  template<typename _Iter1, typename _Iter2, typename _Out>
+  using set_intersection_result = binary_transform_result<_Iter1, _Iter2, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   weakly_incrementable _Out, typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<_Iter1, _Iter2, _Out, _Comp, _Proj1, _Proj2>
+    constexpr set_intersection_result<_Iter1, _Iter2, _Out>
+    set_intersection(_Iter1 __first1, _Sent1 __last1,
+		     _Iter2 __first2, _Sent2 __last2, _Out __result,
+		     _Comp __comp = {},
+		     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj1, *__first1),
+			  std::__invoke(__proj2, *__first2)))
+	  ++__first1;
+	else if (std::__invoke(__comp,
+			       std::__invoke(__proj2, *__first2),
+			       std::__invoke(__proj1, *__first1)))
+	  ++__first2;
+	else
+	  {
+	    *__result = *__first1;
+	    ++__first1;
+	    ++__first2;
+	    ++__result;
+	  }
+      // TODO: Eliminating these variables triggers an ICE.
+      auto __last1i = ranges::next(std::move(__first1), std::move(__last1));
+      auto __last2i = ranges::next(std::move(__first2), std::move(__last2));
+      return {std::move(__last1i), std::move(__last2i), std::move(__result)};
+    }
+
+  template<input_range _Range1, input_range _Range2, weakly_incrementable _Out,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<iterator_t<_Range1>, iterator_t<_Range2>, _Out,
+		       _Comp, _Proj1, _Proj2>
+    constexpr set_intersection_result<safe_iterator_t<_Range1>,
+				      safe_iterator_t<_Range2>, _Out>
+    set_intersection(_Range1&& __r1, _Range2&& __r2, _Out __result,
+		     _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::set_intersection(ranges::begin(__r1), ranges::end(__r1),
+				      ranges::begin(__r2), ranges::end(__r2),
+				      std::move(__result), std::move(__comp),
+				      std::move(__proj1), std::move(__proj2));
+    }
+
+  template<typename _Iter, typename _Out>
+  using set_difference_result = copy_result<_Iter, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   weakly_incrementable _Out, typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<_Iter1, _Iter2, _Out, _Comp, _Proj1, _Proj2>
+    constexpr set_difference_result<_Iter1, _Out>
+    set_difference(_Iter1 __first1, _Sent1 __last1,
+		   _Iter2 __first2, _Sent2 __last2, _Out __result,
+		   _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj1, *__first1),
+			  std::__invoke(__proj2, *__first2)))
+	  {
+	    *__result = *__first1;
+	    ++__first1;
+	    ++__result;
+	  }
+	else if (std::__invoke(__comp,
+			       std::__invoke(__proj2, *__first2),
+			       std::__invoke(__proj1, *__first1)))
+	  ++__first2;
+	else
+	  {
+	    ++__first1;
+	    ++__first2;
+	  }
+      return ranges::copy(std::move(__first1), std::move(__last1),
+			  std::move(__result));
+    }
+
+  template<input_range _Range1, input_range _Range2, weakly_incrementable _Out,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<iterator_t<_Range1>, iterator_t<_Range2>, _Out,
+		       _Comp, _Proj1, _Proj2>
+    constexpr set_difference_result<safe_iterator_t<_Range1>, _Out>
+    set_difference(_Range1&& __r1, _Range2&& __r2, _Out __result,
+		   _Comp __comp = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return ranges::set_difference(ranges::begin(__r1), ranges::end(__r1),
+				    ranges::begin(__r2), ranges::end(__r2),
+				    std::move(__result), std::move(__comp),
+				    std::move(__proj1), std::move(__proj2));
+    }
+
+  template<typename _Iter1, typename _Iter2, typename _Out>
+  using set_symmetric_difference_result
+    = binary_transform_result<_Iter1, _Iter2, _Out>;
+
+  template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
+	   input_iterator _Iter2, sentinel_for<_Iter2> _Sent2,
+	   weakly_incrementable _Out, typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<_Iter1, _Iter2, _Out, _Comp, _Proj1, _Proj2>
+    constexpr set_symmetric_difference_result<_Iter1, _Iter2, _Out>
+    set_symmetric_difference(_Iter1 __first1, _Sent1 __last1,
+			     _Iter2 __first2, _Sent2 __last2,
+			     _Out __result, _Comp __comp = {},
+			     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      while (__first1 != __last1 && __first2 != __last2)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj1, *__first1),
+			  std::__invoke(__proj2, *__first2)))
+	  {
+	    *__result = *__first1;
+	    ++__first1;
+	    ++__result;
+	  }
+	else if (std::__invoke(__comp,
+			       std::__invoke(__proj2, *__first2),
+			       std::__invoke(__proj1, *__first1)))
+	  {
+	    *__result = *__first2;
+	    ++__first2;
+	    ++__result;
+	  }
+	else
+	  {
+	    ++__first1;
+	    ++__first2;
+	  }
+      auto __copy1 = ranges::copy(std::move(__first1), std::move(__last1),
+				  std::move(__result));
+      auto __copy2 = ranges::copy(std::move(__first2), std::move(__last2),
+				  std::move(__copy1.out));
+      return {std::move(__copy1.in), std::move(__copy2.in),
+	      std::move(__copy2.out)};
+    }
+
+  template<input_range _Range1, input_range _Range2, weakly_incrementable _Out,
+	   typename _Comp = ranges::less,
+	   typename _Proj1 = identity, typename _Proj2 = identity>
+    requires mergeable<iterator_t<_Range1>, iterator_t<_Range2>, _Out,
+		       _Comp, _Proj1, _Proj2>
+    constexpr set_symmetric_difference_result<safe_iterator_t<_Range1>,
+					      safe_iterator_t<_Range2>,
+					      _Out>
+    set_symmetric_difference(_Range1&& __r1, _Range2&& __r2, _Out __result,
+			     _Comp __comp = {},
+			     _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+    {
+      return (ranges::set_symmetric_difference
+	      (ranges::begin(__r1), ranges::end(__r1),
+	       ranges::begin(__r2), ranges::end(__r2),
+	       std::move(__result), std::move(__comp),
+	       std::move(__proj1), std::move(__proj2)));
+    }
+
   template<typename _Iter>
   struct next_permutation_result {
     bool found;
