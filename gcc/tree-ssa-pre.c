@@ -2827,6 +2827,18 @@ create_expression_by_pieces (basic_block block, pre_expr expr,
 	  if (!folded)
 	    return NULL_TREE;
 	  name = make_temp_ssa_name (exprtype, NULL, "pretmp");
+	  if (CONVERT_EXPR_P (folded)
+	      && !is_gimple_val (TREE_OPERAND (folded, 0)))
+	    {
+	      tree name2
+		= make_temp_ssa_name (TREE_TYPE (TREE_OPERAND (folded, 0)),
+				      NULL, "pretmp");
+	      newstmt = gimple_build_assign (name2, TREE_OPERAND (folded, 0));
+	      gimple_set_location (newstmt, expr->loc);
+	      gimple_seq_add_stmt_without_update (&forced_stmts, newstmt);
+	      gimple_set_vuse (newstmt, BB_LIVE_VOP_ON_EXIT (block));
+	      TREE_OPERAND (folded, 0) = name2;
+	    }
 	  newstmt = gimple_build_assign (name, folded);
 	  gimple_set_location (newstmt, expr->loc);
 	  gimple_seq_add_stmt_without_update (&forced_stmts, newstmt);
