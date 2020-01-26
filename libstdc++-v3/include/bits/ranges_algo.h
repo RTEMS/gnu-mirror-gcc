@@ -70,6 +70,29 @@ namespace ranges
     template<typename _Iterator>
     constexpr inline bool
       __is_move_iterator<move_iterator<_Iterator>> = true;
+
+    template<typename _Comp, typename _Proj>
+    constexpr auto
+    __make_comp_proj(_Comp& __comp, _Proj& __proj)
+    {
+      return [&] (auto&& __lhs, auto&& __rhs) -> decltype(auto) {
+	using _TL = decltype(__lhs);
+	using _TR = decltype(__rhs);
+	return std::__invoke(__comp,
+			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
+			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
+      };
+    }
+
+    template<typename _Pred, typename _Proj>
+    constexpr auto
+    __make_pred_proj(_Pred& __pred, _Proj& __proj)
+    {
+      return [&] <typename _Tp> (_Tp&& __arg) -> decltype(auto) {
+	return std::__invoke(__pred,
+			     std::__invoke(__proj, std::forward<_Tp>(__arg)));
+      };
+    }
   }
 
   template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
@@ -1982,15 +2005,9 @@ namespace ranges
     constexpr _Iter
     push_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       auto __lasti = ranges::next(__first, __last);
-      std::push_heap(__first, __lasti, __proj_comp);
+      std::push_heap(__first, __lasti,
+		     __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2010,15 +2027,9 @@ namespace ranges
     constexpr _Iter
     pop_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       auto __lasti = ranges::next(__first, __last);
-      std::pop_heap(__first, __lasti, __proj_comp);
+      std::pop_heap(__first, __lasti,
+		    __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2038,15 +2049,9 @@ namespace ranges
     constexpr _Iter
     make_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       auto __lasti = ranges::next(__first, __last);
-      std::make_heap(__first, __lasti, __proj_comp);
+      std::make_heap(__first, __lasti,
+		     __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2066,15 +2071,9 @@ namespace ranges
     constexpr _Iter
     sort_heap(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       auto __lasti = ranges::next(__first, __last);
-      std::sort_heap(__first, __lasti, __proj_comp);
+      std::sort_heap(__first, __lasti,
+		     __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2152,14 +2151,8 @@ namespace ranges
     {
       // TODO: is it worth reimplementing std::sort here?
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
-      std::sort(std::move(__first), __lasti, std::move(__proj_comp));
+      std::sort(std::move(__first), __lasti,
+		__detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2182,14 +2175,8 @@ namespace ranges
     {
       // TODO: is it worth reimplementing std::stable_sort here?
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
-      std::stable_sort(std::move(__first), __lasti, std::move(__proj_comp));
+      std::stable_sort(std::move(__first), __lasti,
+		       __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2379,15 +2366,8 @@ namespace ranges
 		_Comp __comp = {}, _Proj __proj = {})
     {
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       std::nth_element(std::move(__first), std::move(__nth), __lasti,
-		       __proj_comp);
+		       __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
@@ -2662,14 +2642,9 @@ namespace ranges
     {
       // TODO: is it worth reimplementing std::stable_partition here?
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_pred = [&] (auto&& __arg) {
-	using _Tp = decltype(__arg);
-	return std::__invoke(__pred,
-			     std::__invoke(__proj, std::forward<_Tp>(__arg)));
-      };
-      auto __middle = std::stable_partition(std::move(__first),
-					    __lasti,
-					    std::move(__proj_pred));
+      auto __middle
+	= std::stable_partition(std::move(__first), __lasti,
+				__detail::__make_pred_proj(__pred, __proj));
       return {std::move(__middle), std::move(__lasti)};
     }
 
@@ -2849,15 +2824,8 @@ namespace ranges
     {
       // TODO: is it worth reimplementing std::inplace_merge here?
       auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
       std::inplace_merge(std::move(__first), std::move(__middle), __lasti,
-			 std::move(__proj_comp));
+			 __detail::__make_comp_proj(__comp, __proj));
       return __lasti;
     }
 
