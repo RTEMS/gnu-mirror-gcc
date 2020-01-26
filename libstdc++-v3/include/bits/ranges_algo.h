@@ -2208,18 +2208,23 @@ namespace ranges
     partial_sort(_Iter __first, _Iter __middle, _Sent __last,
 		 _Comp __comp = {}, _Proj __proj = {})
     {
-      // TODO: is it worth reimplementing std::partial_sort here?
-      auto __lasti = ranges::next(__first, __last);
-      auto __proj_comp = [&] (auto&& __lhs, auto&& __rhs) {
-	using _TL = decltype(__lhs);
-	using _TR = decltype(__rhs);
-	return std::__invoke(__comp,
-			     std::__invoke(__proj, std::forward<_TL>(__lhs)),
-			     std::__invoke(__proj, std::forward<_TR>(__rhs)));
-      };
-      std::partial_sort(std::move(__first), std::move(__middle), __lasti,
-			std::move(__proj_comp));
-      return __lasti;
+      if (__first == __middle)
+	return ranges::next(__first, __last);
+
+      ranges::make_heap(__first, __middle, __comp, __proj);
+      auto __i = __middle;
+      for (; __i != __last; ++__i)
+	if (std::__invoke(__comp,
+			  std::__invoke(__proj, *__i),
+			  std::__invoke(__proj, *__first)))
+	  {
+	    ranges::pop_heap(__first, __middle, __comp, __proj);
+	    ranges::iter_swap(__middle-1, __i);
+	    ranges::push_heap(__first, __middle, __comp, __proj);
+	  }
+      ranges::sort_heap(__first, __middle, __comp, __proj);
+
+      return __i;
     }
 
   template<random_access_range _Range,
