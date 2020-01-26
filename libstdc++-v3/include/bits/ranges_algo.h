@@ -1465,7 +1465,8 @@ namespace ranges
 			      std::move(__gen));
     }
 
-  template<permutable _Iter, sentinel_for<_Iter> _Sent, class _Proj = identity,
+  template<permutable _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
 	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
     constexpr subrange<_Iter>
     remove_if(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
@@ -1486,7 +1487,7 @@ namespace ranges
       return {__result, __first};
     }
 
-  template<forward_range _Range, class _Proj = identity,
+  template<forward_range _Range, typename _Proj = identity,
 	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
     requires permutable<iterator_t<_Range>>
     constexpr safe_subrange_t<_Range>
@@ -1497,7 +1498,7 @@ namespace ranges
     }
 
   template<permutable _Iter, sentinel_for<_Iter> _Sent,
-	   class _Tp, class _Proj = identity>
+	   typename _Tp, typename _Proj = identity>
     requires indirect_binary_predicate<ranges::equal_to,
 				       projected<_Iter, _Proj>,
 				       const _Tp*>
@@ -1511,7 +1512,7 @@ namespace ranges
 			       std::move(__pred), std::move(__proj));
     }
 
-  template<forward_range _Range, class _Tp, class _Proj = identity>
+  template<forward_range _Range, typename _Tp, typename _Proj = identity>
     requires permutable<iterator_t<_Range>> &&
 	     indirect_binary_predicate<ranges::equal_to,
 				       projected<iterator_t<_Range>, _Proj>,
@@ -1523,11 +1524,11 @@ namespace ranges
 			    __value, std::move(__proj));
     }
 
-  template<class _Iter, class _Out>
+  template<typename _Iter, typename _Out>
   using remove_copy_if_result = copy_result<_Iter, _Out>;
 
   template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
-	   weakly_incrementable _Out, class _Proj = identity,
+	   weakly_incrementable _Out, typename _Proj = identity,
 	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
     requires indirectly_copyable<_Iter, _Out>
     constexpr remove_copy_if_result<_Iter, _Out>
@@ -1544,7 +1545,7 @@ namespace ranges
     }
 
   template<input_range _Range, weakly_incrementable _Out,
-	   class _Proj = identity,
+	   typename _Proj = identity,
 	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
     requires indirectly_copyable<iterator_t<_Range>, _Out>
     constexpr remove_copy_if_result<safe_iterator_t<_Range>, _Out>
@@ -1556,11 +1557,11 @@ namespace ranges
 				    std::move(__pred), std::move(__proj));
     }
 
-  template<class _Iter, class _Out>
+  template<typename _Iter, typename _Out>
   using remove_copy_result = copy_result<_Iter, _Out>;
 
   template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
-	   weakly_incrementable _Out, class _Tp, class _Proj = identity>
+	   weakly_incrementable _Out, typename _Tp, typename _Proj = identity>
     requires indirectly_copyable<_Iter, _Out>
       && indirect_binary_predicate<ranges::equal_to,
 				   projected<_Iter, _Proj>,
@@ -1579,7 +1580,7 @@ namespace ranges
     }
 
   template<input_range _Range, weakly_incrementable _Out,
-	   class _Tp, class _Proj = identity>
+	   typename _Tp, typename _Proj = identity>
     requires indirectly_copyable<iterator_t<_Range>, _Out>
       && indirect_binary_predicate<ranges::equal_to,
 				   projected<iterator_t<_Range>, _Proj>,
@@ -1594,7 +1595,8 @@ namespace ranges
 
     }
 
-  template<permutable _Iter, sentinel_for<_Iter> _Sent, class _Proj = identity,
+  template<permutable _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
 	   indirect_equivalence_relation<
 	     projected<_Iter, _Proj>> _Comp = ranges::equal_to>
     constexpr subrange<_Iter>
@@ -1614,7 +1616,7 @@ namespace ranges
       return {++__dest, __first};
     }
 
-  template<forward_range _Range, class _Proj = identity,
+  template<forward_range _Range, typename _Proj = identity,
 	   indirect_equivalence_relation<
 	     projected<iterator_t<_Range>, _Proj>> _Comp = ranges::equal_to>
     requires permutable<iterator_t<_Range>>
@@ -1625,11 +1627,11 @@ namespace ranges
 			    std::move(__comp), std::move(__proj));
     }
 
-  template<class _Iter, class _Out>
+  template<typename _Iter, typename _Out>
   using unique_copy_result = copy_result<_Iter, _Out>;
 
   template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
-	   weakly_incrementable _Out, class _Proj = identity,
+	   weakly_incrementable _Out, typename _Proj = identity,
 	   indirect_equivalence_relation<
 	     projected<_Iter, _Proj>> _Comp = ranges::equal_to>
     requires indirectly_copyable<_Iter, _Out>
@@ -1689,7 +1691,7 @@ namespace ranges
     }
 
   template<input_range _Range,
-	   weakly_incrementable _Out, class _Proj = identity,
+	   weakly_incrementable _Out, typename _Proj = identity,
 	   indirect_equivalence_relation<
 	     projected<iterator_t<_Range>, _Proj>> _Comp = ranges::equal_to>
     requires indirectly_copyable<iterator_t<_Range>, _Out>
@@ -2202,7 +2204,7 @@ namespace ranges
     }
 
   template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
-	   class _Comp = ranges::less, class _Proj = identity>
+	   typename _Comp = ranges::less, typename _Proj = identity>
     requires sortable<_Iter, _Comp, _Proj>
     constexpr _Iter
     partial_sort(_Iter __first, _Iter __middle, _Sent __last,
@@ -2228,7 +2230,7 @@ namespace ranges
     }
 
   template<random_access_range _Range,
-	   class _Comp = ranges::less, class _Proj = identity>
+	   typename _Comp = ranges::less, typename _Proj = identity>
     requires sortable<iterator_t<_Range>, _Comp, _Proj>
     constexpr safe_iterator_t<_Range>
     partial_sort(_Range&& __r, iterator_t<_Range> __middle,
@@ -2240,7 +2242,7 @@ namespace ranges
 				  std::move(__comp), std::move(__proj));
     }
 
-  template<class _Iter, class _Out>
+  template<typename _Iter, typename _Out>
   using partial_sort_copy_result = copy_result<_Iter, _Out>;
 
   template<input_iterator _Iter1, sentinel_for<_Iter1> _Sent1,
@@ -2312,11 +2314,11 @@ namespace ranges
 
   template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Proj = identity,
-	   indirect_strict_weak_order<projected<_Iter, _Proj>> Comp
-	     = ranges::less>
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
     constexpr _Iter
     is_sorted_until(_Iter __first, _Sent __last,
-		    Comp __comp = {}, _Proj __proj = {})
+		    _Comp __comp = {}, _Proj __proj = {})
     {
       if (__first == __last)
 	return __first;
@@ -2343,9 +2345,9 @@ namespace ranges
   template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Proj = identity,
 	   indirect_strict_weak_order<projected<_Iter, _Proj>>
-	     Comp = ranges::less>
+	     _Comp = ranges::less>
     constexpr bool
-    is_sorted(_Iter __first, _Sent __last, Comp __comp = {}, _Proj __proj = {})
+    is_sorted(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
       if (__first == __last)
 	return true;
