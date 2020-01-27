@@ -47,8 +47,9 @@ test01()
 	= {&v2[0], &v2[0] + size};
 
       std::ranlux48_base g1(size), g2(size + 1);
-      ranges::shuffle(c, g1);
-      ranges::shuffle(ranges::begin(r), ranges::end(r), g2);
+      VERIFY( ranges::shuffle(c, g1) == c.end() );
+      VERIFY( ranges::shuffle(ranges::begin(r), ranges::end(r), g2)
+	      == ranges::end(r) );
 
       if (size >= 10)
 	{
