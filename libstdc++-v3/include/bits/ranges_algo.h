@@ -3111,6 +3111,273 @@ namespace ranges
 	       std::move(__proj1), std::move(__proj2)));
     }
 
+  template<typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr const _Tp&
+    min(const _Tp& __a, const _Tp& __b, _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (std::__invoke(std::move(__comp),
+			std::__invoke(__proj, __b),
+			std::__invoke(__proj, __a)))
+	return __b;
+      else
+	return __a;
+    }
+
+  template<input_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    requires indirectly_copyable_storable<iterator_t<_Range>,
+					  range_value_t<_Range>*>
+    constexpr range_value_t<_Range>
+    min(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __first = ranges::begin(__r);
+      auto __last = ranges::end(__r);
+      __glibcxx_assert(__first != __last);
+      auto __result = *__first;
+      while (++__first != __last)
+	{
+	  auto __tmp = *__first;
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, __tmp),
+			    std::__invoke(__proj, __result)))
+	    __result = std::move(__tmp);
+	}
+      return __result;
+    }
+
+  template<copyable _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Tp
+    min(initializer_list<_Tp> __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::min(ranges::subrange(__r),
+			 std::move(__comp), std::move(__proj));
+    }
+
+  template<typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr const _Tp&
+    max(const _Tp& __a, const _Tp& __b, _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (std::__invoke(std::move(__comp),
+			std::__invoke(__proj, __a),
+			std::__invoke(__proj, __b)))
+	return __b;
+      else
+	return __a;
+    }
+
+  template<input_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    requires indirectly_copyable_storable<iterator_t<_Range>,
+					  range_value_t<_Range>*>
+    constexpr range_value_t<_Range>
+    max(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __first = ranges::begin(__r);
+      auto __last = ranges::end(__r);
+      __glibcxx_assert(__first != __last);
+      auto __result = *__first;
+      while (++__first != __last)
+	{
+	  auto __tmp = *__first;
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, __result),
+			    std::__invoke(__proj, __tmp)))
+	    __result = std::move(__tmp);
+	}
+      return __result;
+    }
+
+  template<copyable _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Tp
+    max(initializer_list<_Tp> __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::max(ranges::subrange(__r),
+			 std::move(__comp), std::move(__proj));
+    }
+
+  template<typename _Tp>
+  struct minmax_result {
+    [[no_unique_address]] _Tp min;
+    [[no_unique_address]] _Tp max;
+
+    template<typename _Tp2>
+      requires convertible_to<const _Tp&, _Tp2>
+      operator minmax_result<_Tp2>() const & {
+	return {min, max};
+      }
+
+    template<typename _Tp2>
+      requires convertible_to<_Tp, _Tp2>
+      operator minmax_result<_Tp2>() && {
+	return {std::move(min), std::move(max)};
+      }
+  };
+
+  template<typename _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr minmax_result<const _Tp&>
+    minmax(const _Tp& __a, const _Tp& __b, _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (std::__invoke(std::move(__comp),
+			std::__invoke(__proj, __b),
+			std::__invoke(__proj, __a)))
+	return {__b, __a};
+      else
+	return {__a, __b};
+    }
+
+  template<input_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    requires indirectly_copyable_storable<iterator_t<_Range>,
+    range_value_t<_Range>*>
+    constexpr minmax_result<range_value_t<_Range>>
+    minmax(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      auto __first = ranges::begin(__r);
+      auto __last = ranges::end(__r);
+      __glibcxx_assert(__first != __last);
+      minmax_result<range_value_t<_Range>> __result = {*__first, *__first};
+      while (++__first != __last)
+	{
+	  auto __tmp = *__first;
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, __tmp),
+			    std::__invoke(__proj, __result.min)))
+	    __result.min = std::move(__tmp);
+	  if (!std::__invoke(__comp,
+			     std::__invoke(__proj, __tmp),
+			     std::__invoke(__proj, __result.max)))
+	    __result.max = std::move(__tmp);
+	}
+      return __result;
+    }
+
+  template<copyable _Tp, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<const _Tp*, _Proj>>
+	     _Comp = ranges::less>
+    constexpr minmax_result<_Tp>
+    minmax(initializer_list<_Tp> __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::minmax(ranges::subrange(__r),
+			    std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Iter
+    min_element(_Iter __first, _Sent __last,
+		_Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return __first;
+
+      auto __i = __first;
+      while (++__i != __last)
+	{
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__i),
+			    std::__invoke(__proj, *__first)))
+	    __first = __i;
+	}
+      return __first;
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_Range>
+    min_element(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::min_element(ranges::begin(__r), ranges::end(__r),
+				 std::move(__comp), std::move(__proj));
+    }
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr _Iter
+    max_element(_Iter __first, _Sent __last,
+		_Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return __first;
+
+      auto __i = __first;
+      while (++__i != __last)
+	{
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__first),
+			    std::__invoke(__proj, *__i)))
+	    __first = __i;
+	}
+      return __first;
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr safe_iterator_t<_Range>
+    max_element(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::max_element(ranges::begin(__r), ranges::end(__r),
+				 std::move(__comp), std::move(__proj));
+    }
+
+  template<typename _Iter>
+  using minmax_element_result = minmax_result<_Iter>;
+
+  template<forward_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   typename _Proj = identity,
+	   indirect_strict_weak_order<projected<_Iter, _Proj>>
+	     _Comp = ranges::less>
+    constexpr minmax_element_result<_Iter>
+    minmax_element(_Iter __first, _Sent __last,
+		   _Comp __comp = {}, _Proj __proj = {})
+    {
+      if (__first == __last)
+	return {__first, __first};
+
+      minmax_element_result<_Iter> __result = {__first, __first};
+      auto __i = __first;
+      while (++__i != __last)
+	{
+	  if (std::__invoke(__comp,
+			    std::__invoke(__proj, *__i),
+			    std::__invoke(__proj, *__result.min)))
+	    __result.min = __i;
+	  if (!std::__invoke(__comp,
+			     std::__invoke(__proj, *__i),
+			     std::__invoke(__proj, *__result.max)))
+	    __result.max = __i;
+	}
+      return __result;
+    }
+
+  template<forward_range _Range, typename _Proj = identity,
+	   indirect_strict_weak_order<projected<iterator_t<_Range>, _Proj>>
+	     _Comp = ranges::less>
+    constexpr minmax_element_result<safe_iterator_t<_Range>>
+    minmax_element(_Range&& __r, _Comp __comp = {}, _Proj __proj = {})
+    {
+      return ranges::minmax_element(ranges::begin(__r), ranges::end(__r),
+				    std::move(__comp), std::move(__proj));
+    }
+
   template<typename _Iter>
   struct next_permutation_result {
     bool found;
