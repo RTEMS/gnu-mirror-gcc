@@ -142,6 +142,20 @@ namespace __gnu_test
 
     output_iterator_wrapper&
     operator=(const output_iterator_wrapper&) = default;
+
+    output_iterator_wrapper(output_iterator_wrapper&& other)
+    {
+      *this = std::move(other);
+    }
+
+    output_iterator_wrapper&
+    operator=(output_iterator_wrapper&& other)
+    {
+      *this = other;
+      if (this != &other)
+	other.ptr = nullptr;
+      return *this;
+    }
 #endif
 
     WritableObject<T>
@@ -224,6 +238,20 @@ namespace __gnu_test
 
     input_iterator_wrapper&
     operator=(const input_iterator_wrapper&) = default;
+
+    input_iterator_wrapper(input_iterator_wrapper&& other)
+    {
+      *this = std::move(other);
+    }
+
+    input_iterator_wrapper&
+    operator=(input_iterator_wrapper&& other)
+    {
+      *this = other;
+      if (this != &other)
+	other.ptr = nullptr;
+      return *this;
+    }
 #endif
 
     bool
