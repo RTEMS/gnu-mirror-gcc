@@ -557,27 +557,28 @@ namespace ranges
     constexpr subrange<_Iter1>
     __find_end(_Iter1 __first1, _Sent1 __last1,
 	       _Iter2 __first2, _Sent2 __last2,
-	       _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+	       _Pred __pred, _Proj1 __proj1, _Proj2 __proj2)
     {
       auto __i = ranges::next(__first1, __last1);
       if (__first2 == __last2)
 	return {__i, __i};
 
-      auto __res_first = __i, __res_last = __i;
+      auto __result_begin = __i;
+      auto __result_end = __i;
       for (;;)
 	{
 	  auto __new_range = ranges::search(__first1, __last1,
 					    __first2, __last2,
 					    __pred, __proj1, __proj2);
-	  auto __new_res_first = ranges::begin(__new_range);
-	  auto __new_res_last = ranges::end(__new_range);
-	  if (__new_res_first == __last1)
-	    return {__res_first, __res_last};
+	  auto __new_result_begin = ranges::begin(__new_range);
+	  auto __new_result_end = ranges::end(__new_range);
+	  if (__new_result_begin == __last1)
+	    return {__result_begin, __result_end};
 	  else
 	    {
-	      __res_first = __new_res_first;
-	      __res_last = __new_res_last;
-	      __first1 = __res_first;
+	      __result_begin = __new_result_begin;
+	      __result_end = __new_result_end;
+	      __first1 = __result_begin;
 	      ++__first1;
 	    }
 	}
@@ -756,7 +757,7 @@ namespace ranges
     requires indirectly_comparable<_Iter1, _Iter2, _Pred, _Proj1, _Proj2>
     constexpr bool
     __equal(_Iter1 __first1, _Sent1 __last1, _Iter2 __first2, _Sent2 __last2,
-	    _Pred __pred = {}, _Proj1 __proj1 = {}, _Proj2 __proj2 = {})
+	    _Pred __pred, _Proj1 __proj1, _Proj2 __proj2)
     {
       // TODO: implement more specializations to at least have parity with
       // std::equal.
@@ -765,8 +766,8 @@ namespace ranges
 	   && sized_sentinel_for<_Sent2, _Iter2>);
       if constexpr (__sized_iters)
 	{
-	  auto __d1 = std::distance(__first1, __last1);
-	  auto __d2 = std::distance(__first2, __last2);
+	  auto __d1 = ranges::distance(__first1, __last1);
+	  auto __d2 = ranges::distance(__first2, __last2);
 	  if (__d1 != __d2)
 	    return false;
 
