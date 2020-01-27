@@ -1018,6 +1018,56 @@ namespace ranges
 			  std::move(__result));
     }
 
+  template<typename _Iter, typename _Out>
+  using copy_n_result = copy_result<_Iter, _Out>;
+
+  template<input_iterator _Iter, weakly_incrementable _Out>
+    requires indirectly_copyable<_Iter, _Out>
+    constexpr copy_n_result<_Iter, _Out>
+    copy_n(_Iter __first, iter_difference_t<_Iter> __n, _Out __result)
+    {
+      if constexpr (random_access_iterator<_Iter>)
+	return ranges::copy(__first, __first + __n, std::move(__result));
+      else
+	{
+	  for (; __n > 0; --__n, (void)++__result, (void)++__first)
+	    *__result = *__first;
+	  return {std::move(__first), std::move(__result)};
+	}
+    }
+
+  template<typename _Iter, typename _Out>
+  using copy_if_result = copy_result<_Iter, _Out>;
+
+  template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	   weakly_incrementable _Out, typename _Proj = identity,
+	   indirect_unary_predicate<projected<_Iter, _Proj>> _Pred>
+    requires indirectly_copyable<_Iter, _Out>
+    constexpr copy_if_result<_Iter, _Out>
+    copy_if(_Iter __first, _Sent __last, _Out __result,
+	    _Pred __pred, _Proj __proj = {})
+    {
+      for (; __first != __last; ++__first)
+	if (std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	  {
+	    *__result = *__first;
+	    ++__result;
+	  }
+      return {std::move(__first), std::move(__result)};
+    }
+
+  template<input_range _Range, weakly_incrementable _Out,
+	   typename _Proj = identity,
+	   indirect_unary_predicate<projected<iterator_t<_Range>, _Proj>> _Pred>
+    requires indirectly_copyable<iterator_t<_Range>, _Out>
+    constexpr copy_if_result<safe_iterator_t<_Range>, _Out>
+    copy_if(_Range&& __r, _Out __result, _Pred __pred, _Proj __proj = {})
+    {
+      return ranges::copy_if(ranges::begin(__r), ranges::end(__r),
+			     std::move(__result),
+			     std::move(__pred), std::move(__proj));
+    }
+
   template<bool _IsMove,
 	   bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   bidirectional_iterator _Out>
