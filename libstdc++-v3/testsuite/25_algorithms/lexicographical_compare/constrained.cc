@@ -33,11 +33,13 @@ void
 test01()
 {
   int x[] = {1, 2, 3, 4, 5};
-  int y[] = {1, 2, 3, 5};
-  int z[] = {1, 2, 3, 4, 5, 6};
+  char y[] = {1, 2, 3, 5};
+  long z[] = {1, 2, 3, 4, 5, 6};
 
     {
-      test_range<int, input_iterator_wrapper> rx(x), ry(y), rz(z);
+      test_range<int, input_iterator_wrapper> rx(x);
+      test_range<char, input_iterator_wrapper> ry(y);
+      test_range<long, input_iterator_wrapper> rz(z);
 
       VERIFY( ranges::lexicographical_compare(rx, ry) );
       rx.bounds.first = x;
@@ -45,7 +47,9 @@ test01()
       VERIFY( !ranges::lexicographical_compare(ry, rx) );
     }
 
-  test_range<int, forward_iterator_wrapper> rx(x), ry(y), rz(z);
+  test_range<int, forward_iterator_wrapper> rx(x);
+  test_range<char, forward_iterator_wrapper> ry(y);
+  test_range<long, forward_iterator_wrapper> rz(z);
 
   VERIFY( ranges::lexicographical_compare(rx, rz) );
   VERIFY( !ranges::lexicographical_compare(rz, rx) );
