@@ -28,6 +28,7 @@
 // test_container, which is given two pointers to T and an iterator type.
 
 #include <testsuite_hooks.h>
+#include <testsuite_rvalref.h>
 #include <bits/stl_iterator_base_types.h>
 
 #if __cplusplus >= 201103L
@@ -658,18 +659,7 @@ namespace __gnu_test
   struct disable_copy { };
 
   template<>
-  struct disable_copy<true>
-  {
-    disable_copy() noexcept = default;
-
-    disable_copy(disable_copy&&) noexcept = default;
-    disable_copy&
-    operator=(disable_copy&&) noexcept = default;
-
-    disable_copy(const disable_copy&) noexcept = delete;
-    disable_copy&
-    operator=(const disable_copy&) noexcept = delete;
-  };
+  struct disable_copy<true> : __gnu_test::rvalstruct { };
 
   template<>
   struct disable_copy<false> { };
