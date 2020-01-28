@@ -771,8 +771,8 @@ namespace ranges
 	  if (__d1 != __d2)
 	    return false;
 
-	  using _ValueType1 = iterator_traits<_Iter1>::value_type;
-	  using _ValueType2 = iterator_traits<_Iter2>::value_type;
+	  using _ValueType1 = iter_value_t<_Iter1>;
+	  using _ValueType2 = iter_value_t<_Iter2>;
 	  constexpr bool __use_memcmp
 	    = ((is_integral_v<_ValueType1> || is_pointer_v<_ValueType1>)
 	       && is_same_v<_ValueType1, _ValueType2>
