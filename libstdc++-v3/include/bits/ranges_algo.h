@@ -75,7 +75,7 @@ namespace ranges
     constexpr auto
     __make_comp_proj(_Comp& __comp, _Proj& __proj)
     {
-      return [&] (auto&& __lhs, auto&& __rhs) -> decltype(auto) {
+      return [&] (auto&& __lhs, auto&& __rhs) -> bool {
 	using _TL = decltype(__lhs);
 	using _TR = decltype(__rhs);
 	return std::__invoke(__comp,
@@ -88,7 +88,7 @@ namespace ranges
     constexpr auto
     __make_pred_proj(_Pred& __pred, _Proj& __proj)
     {
-      return [&] <typename _Tp> (_Tp&& __arg) -> decltype(auto) {
+      return [&] <typename _Tp> (_Tp&& __arg) -> bool {
 	return std::__invoke(__pred,
 			     std::__invoke(__proj, std::forward<_Tp>(__arg)));
       };
