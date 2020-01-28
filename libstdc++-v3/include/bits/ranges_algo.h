@@ -102,7 +102,7 @@ namespace ranges
     all_of(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
     {
       for (; __first != __last; ++__first)
-	if (!std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	if (!(bool)std::__invoke(__pred, std::__invoke(__proj, *__first)))
 	  return false;
       return true;
     }
@@ -442,9 +442,9 @@ namespace ranges
 		return {__first1, ++__cur1};
 	      if (++__cur1 == __last1)
 		return {__cur1, __cur1};
-	      if (!std::__invoke(__pred,
-				 std::__invoke(__proj1, *__cur1),
-				 std::__invoke(__proj2, *__cur2)))
+	      if (!(bool)std::__invoke(__pred,
+				       std::__invoke(__proj1, *__cur1),
+				       std::__invoke(__proj2, *__cur2)))
 		{
 		  ++__first1;
 		  break;
@@ -695,9 +695,9 @@ namespace ranges
       // have the same elements in the same order.
       for (; __first1 != __last1 && __first2 != __last2;
 	   ++__first1, (void)++__first2)
-	if (!std::__invoke(__pred,
-			   std::__invoke(__proj1, *__first1),
-			   std::__invoke(__proj2, *__first2)))
+	if (!(bool)std::__invoke(__pred,
+				 std::__invoke(__proj1, *__first1),
+				 std::__invoke(__proj2, *__first2)))
 	    break;
 
       if constexpr (__sized_iters)
@@ -790,9 +790,9 @@ namespace ranges
 	  else
 	    {
 	      for (; __first1 != __last1; ++__first1, (void)++__first2)
-		if (!std::__invoke(__pred,
-				   std::__invoke(__proj1, *__first1),
-				   std::__invoke(__proj2, *__first2)))
+		if (!(bool)std::__invoke(__pred,
+					 std::__invoke(__proj1, *__first1),
+					 std::__invoke(__proj2, *__first2)))
 		  return false;
 	      return true;
 	    }
@@ -801,9 +801,9 @@ namespace ranges
 	{
 	  for (; __first1 != __last1 && __first2 != __last2;
 	       ++__first1, (void)++__first2)
-	    if (!std::__invoke(__pred,
-			       std::__invoke(__proj1, *__first1),
-			       std::__invoke(__proj2, *__first2)))
+	    if (!(bool)std::__invoke(__pred,
+				     std::__invoke(__proj1, *__first1),
+				     std::__invoke(__proj2, *__first2)))
 	      return false;
 	  return __first1 == __last1 && __first2 == __last2;
 	}
@@ -1552,7 +1552,7 @@ namespace ranges
       auto __result = __first;
       ++__first;
       for (; __first != __last; ++__first)
-	if (!std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	if (!(bool)std::__invoke(__pred, std::__invoke(__proj, *__first)))
 	  {
 	    *__result = std::move(*__first);
 	    ++__result;
@@ -1610,7 +1610,7 @@ namespace ranges
 		   _Pred __pred, _Proj __proj = {})
     {
       for (; __first != __last; ++__first)
-	if (!std::__invoke(__pred, std::__invoke(__proj, *__first)))
+	if (!(bool)std::__invoke(__pred, std::__invoke(__proj, *__first)))
 	  {
 	    *__result = *__first;
 	    ++__result;
@@ -1683,9 +1683,9 @@ namespace ranges
       auto __dest = __first;
       ++__first;
       while (++__first != __last)
-	if (!std::__invoke(__comp,
-			   std::__invoke(__proj, *__dest),
-			   std::__invoke(__proj, *__first)))
+	if (!(bool)std::__invoke(__comp,
+				 std::__invoke(__proj, *__dest),
+				 std::__invoke(__proj, *__first)))
 	  *++__dest = std::move(*__first);
       return {++__dest, __first};
     }
@@ -1726,9 +1726,9 @@ namespace ranges
 	  auto __next = __first;
 	  *__result = *__next;
 	  while (++__next != __last)
-	    if (!std::__invoke(__comp,
-			       std::__invoke(__proj, *__first),
-			       std::__invoke(__proj, *__next)))
+	    if (!(bool)std::__invoke(__comp,
+				     std::__invoke(__proj, *__first),
+				     std::__invoke(__proj, *__next)))
 	      {
 		__first = __next;
 		*++__result = *__first;
@@ -1740,9 +1740,9 @@ namespace ranges
 	{
 	  *__result = *__first;
 	  while (++__first != __last)
-	    if (!std::__invoke(__comp,
-			       std::__invoke(__proj, *__result),
-			       std::__invoke(__proj, *__first)))
+	    if (!(bool)std::__invoke(__comp,
+				     std::__invoke(__proj, *__result),
+				     std::__invoke(__proj, *__first)))
 		*++__result = *__first;
 	  return {std::move(__first), std::move(++__result)};
 	}
@@ -1752,9 +1752,9 @@ namespace ranges
 	  *__result = __value;
 	  while (++__first != __last)
 	    {
-	      if (!std::__invoke(__comp,
-				 std::__invoke(__proj, *__first),
-				 std::__invoke(__proj, __value)))
+	      if (!(bool)std::__invoke(__comp,
+				       std::__invoke(__proj, *__first),
+				       std::__invoke(__proj, __value)))
 		{
 		  __value = *__first;
 		  *++__result = __value;
@@ -2581,7 +2581,7 @@ namespace ranges
       auto __i = ranges::lower_bound(__first, __last, __value, __comp, __proj);
       if (__i == __last)
 	return false;
-      return !std::__invoke(__comp, __value, std::__invoke(__proj, *__i));
+      return !(bool)std::__invoke(__comp, __value, std::__invoke(__proj, *__i));
     }
 
   template<forward_range _Range,
@@ -3307,9 +3307,9 @@ namespace ranges
 			    std::__invoke(__proj, __tmp),
 			    std::__invoke(__proj, __result.min)))
 	    __result.min = std::move(__tmp);
-	  if (!std::__invoke(__comp,
-			     std::__invoke(__proj, __tmp),
-			     std::__invoke(__proj, __result.max)))
+	  if (!(bool)std::__invoke(__comp,
+				   std::__invoke(__proj, __tmp),
+				   std::__invoke(__proj, __result.max)))
 	    __result.max = std::move(__tmp);
 	}
       return __result;
@@ -3411,9 +3411,9 @@ namespace ranges
 			    std::__invoke(__proj, *__i),
 			    std::__invoke(__proj, *__result.min)))
 	    __result.min = __i;
-	  if (!std::__invoke(__comp,
-			     std::__invoke(__proj, *__i),
-			     std::__invoke(__proj, *__result.max)))
+	  if (!(bool)std::__invoke(__comp,
+				   std::__invoke(__proj, *__i),
+				   std::__invoke(__proj, *__result.max)))
 	    __result.max = __i;
 	}
       return __result;
@@ -3570,9 +3570,9 @@ namespace ranges
 			    std::__invoke(__proj, *__ii)))
 	    {
 	      auto __j = __lasti;
-	      while (!std::__invoke(__comp,
-				    std::__invoke(__proj, *__i),
-				    std::__invoke(__proj, *--__j)))
+	      while (!(bool)std::__invoke(__comp,
+					  std::__invoke(__proj, *__i),
+					  std::__invoke(__proj, *--__j)))
 		;
 	      ranges::iter_swap(__i, __j);
 	      ranges::reverse(__ii, __last);
@@ -3627,9 +3627,9 @@ namespace ranges
 			    std::__invoke(__proj, *__i)))
 	    {
 	      auto __j = __lasti;
-	      while (!std::__invoke(__comp,
-				    std::__invoke(__proj, *--__j),
-				    std::__invoke(__proj, *__i)))
+	      while (!(bool)std::__invoke(__comp,
+					  std::__invoke(__proj, *--__j),
+					  std::__invoke(__proj, *__i)))
 		;
 	      ranges::iter_swap(__i, __j);
 	      ranges::reverse(__ii, __last);
