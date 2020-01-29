@@ -2036,7 +2036,6 @@ namespace ranges
     shuffle(_Iter __first, _Sent __last, _Gen&& __g)
     {
       auto __lasti = ranges::next(__first, __last);
-      // TODO: is it worth reimplementing this one?
       std::shuffle(std::move(__first), __lasti, std::forward<_Gen>(__g));
       return __lasti;
     }
@@ -2202,7 +2201,6 @@ namespace ranges
     constexpr _Iter
     sort(_Iter __first, _Sent __last, _Comp __comp = {}, _Proj __proj = {})
     {
-      // TODO: is it worth reimplementing std::sort here?
       auto __lasti = ranges::next(__first, __last);
       std::sort(std::move(__first), __lasti,
 		__detail::__make_comp_proj(__comp, __proj));
@@ -2226,7 +2224,6 @@ namespace ranges
     stable_sort(_Iter __first, _Sent __last,
 		_Comp __comp = {}, _Proj __proj = {})
     {
-      // TODO: is it worth reimplementing std::stable_sort here?
       auto __lasti = ranges::next(__first, __last);
       std::stable_sort(std::move(__first), __lasti,
 		       __detail::__make_comp_proj(__comp, __proj));
@@ -2693,7 +2690,6 @@ namespace ranges
     subrange<_Iter>
     stable_partition(_Iter __first, _Sent __last, _Pred __pred, _Proj __proj = {})
     {
-      // TODO: is it worth reimplementing std::stable_partition here?
       auto __lasti = ranges::next(__first, __last);
       auto __middle
 	= std::stable_partition(std::move(__first), __lasti,
@@ -2875,7 +2871,6 @@ namespace ranges
     inplace_merge(_Iter __first, _Iter __middle, _Sent __last,
 		  _Comp __comp = {}, _Proj __proj = {})
     {
-      // TODO: is it worth reimplementing std::inplace_merge here?
       auto __lasti = ranges::next(__first, __last);
       std::inplace_merge(std::move(__first), std::move(__middle), __lasti,
 			 __detail::__make_comp_proj(__comp, __proj));
