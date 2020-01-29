@@ -2027,6 +2027,7 @@ namespace ranges
 				 std::move(__result));
     }
 
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
   template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Gen>
     requires permutable<_Iter>
@@ -2049,6 +2050,7 @@ namespace ranges
       return ranges::shuffle(ranges::begin(__r), ranges::end(__r),
 			     std::forward<_Gen>(__g));
     }
+#endif
 
   template<random_access_iterator _Iter, sentinel_for<_Iter> _Sent,
 	   typename _Comp = ranges::less, typename _Proj = identity>
