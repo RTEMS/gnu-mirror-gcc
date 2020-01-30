@@ -1,4 +1,46 @@
+2020-01-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90546
+	* call.c (build_user_type_conversion_1): Allow a template conversion
+	returning an rvalue reference to bind directly to an lvalue.
+
+	PR c++/90731
+	* decl.c (grokdeclarator): Propagate eh spec from typedef.
+
+2020-01-28  Martin Liska  <mliska@suse.cz>
+
+	PR c++/92440
+	* pt.c (redeclare_class_template): Group couple of
+	errors and inform messages with auto_diagnostic_group.
+
+2020-01-28  Martin Liska  <mliska@suse.cz>
+
+	PR c++/92440
+	* pt.c (redeclare_class_template): Use inform
+	for the second location.
+
+2020-01-27  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90966
+	* pt.c (tsubst_copy) [STRING_CST]: Don't use fold_convert.
+
+2020-01-27  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/93443
+	* coroutines.cc (morph_fn_to_coro): Check the ramp return
+	value when it is constructed from the 'get return object'.
+
+2020-01-27  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/91826
+	* name-lookup.c (is_ancestor): Allow CHILD to be a namespace alias.
+
 2020-01-26  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90992
+	* except.c (maybe_noexcept_warning): Check DECL_IN_SYSTEM_HEADER and
+	temporarily enable -Wsystem-headers.  Change second warning to
+	conditional inform.
 
 	PR c++/90997
 	* semantics.c (finish_call_expr): Don't call

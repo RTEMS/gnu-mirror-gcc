@@ -1,3 +1,171 @@
+2020-01-28  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/91461
+	* gcc.target/i386/avx256-unaligned-store-2.c: Don't check
+	vmovups.
+	* gcc.target/i386/avx256-unaligned-store-3.c: Likewise.
+	* gcc.target/i386/pieces-memcpy-4.c: Likewise.
+	* gcc.target/i386/pieces-memcpy-5.c: Likewise.
+	* gcc.target/i386/pieces-memcpy-6.c: Likewise.
+	* gcc.target/i386/pieces-strcpy-2.c: Likewise.
+	* gcc.target/i386/pr90980-1.c: Likewise.
+	* gcc.target/i386/pr87317-4.c: Check "\tvmovd\t" instead of
+	"vmovd" to avoid matching "vmovdqu".
+	* gcc.target/i386/pr87317-5.c: Likewise.
+	* gcc.target/i386/pr87317-7.c: Likewise.
+	* gcc.target/i386/pr91461-1.c: New test.
+	* gcc.target/i386/pr91461-2.c: Likewise.
+	* gcc.target/i386/pr91461-3.c: Likewise.
+	* gcc.target/i386/pr91461-4.c: Likewise.
+	* gcc.target/i386/pr91461-5.c: Likewise.
+
+2020-01-28  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/plugin/diagnostic_plugin_test_metadata.c: Update for
+	renaming of warning_at overload to warning_meta.
+	* gcc.dg/plugin/diagnostic_plugin_test_paths.c: Likewise.
+
+2020-01-28  Tobias Burnus  <tobias@codesourcery.com>
+	    Julian Brown  <julian@codesourcery.com>
+
+	* gfortran.dg/goacc/mapping-tests-2.f90: New test.
+	* gfortran.dg/goacc/subarrays.f95: Expect rejection of non-contiguous
+	array.
+
+2020-01-28  Julian Brown  <julian@codesourcery.com>
+
+	* gfortran.dg/goacc/deep-copy-2.f90: Move test here (from libgomp
+	testsuite). Make a compilation test, and expect rejection of mixed
+	component/non-component accesses.
+	* gfortran.dg/goacc/mapping-tests-1.f90: New test.
+
+2020-01-28  Tobias Burnus  <tobias@codesourcery.com>
+	    Julian Brown  <julian@codesourcery.com>
+
+	* gfortran.dg/goacc/strided-alloc-ptr.f90: New test.
+
+2020-01-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/93439
+	* gfortran.dg/graphite/pr93439.f90: New testcase.
+
+2020-01-28  Sahahb Vahedi  <shahab@synopsys.com>
+
+	* gcc.target/arc/code-density-flag.c: New test
+
+2020-01-28  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93464
+	* gfortran.dg/goacc/pr93464.f90: New.
+
+2020-01-28  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/93434
+	* gcc.c-torture/execute/pr93434.c: New test.
+
+2020-01-28  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR testsuite/93460
+	* gcc.dg/torture/pr93170.c: Add -Wpsabi.
+
+2020-01-28  Martin Liska  <mliska@suse.cz>
+
+	PR c++/92440
+	* g++.dg/template/pr92440.C: New test.
+	* g++.dg/cpp0x/vt-34314.C: Update error to note.
+	* g++.dg/template/pr59930-2.C: Likewise.
+	* g++.old-deja/g++.pt/redecl1.C: Likewise.
+
+2020-01-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/93418
+	* gcc.target/i386/avx2-pr93418.c: New test.
+
+	PR tree-optimization/93454
+	* gcc.dg/pr93454.c: New test.
+
+2020-01-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93451
+	* gcc.dg/analyzer/torture/pr93451.c: New test.
+
+2020-01-27  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	* gcc.target/arm/armv8_2-fp16-move-1.c: Update following load/store
+	optimisation.
+
+2020-01-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93349
+	* gcc.dg/analyzer/torture/pr93349.c: New test.
+
+2020-01-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93291
+	* gcc.dg/analyzer/pattern-test-2.c: Remove include of stdlib.h.
+	(test_2): Rewrite to explicitly perform a bitwise-or of two
+	boolean conditions.
+	(test_3): New function, to test bitwise-and.
+
+2020-01-27  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR testsuite/71727
+	* gcc.target/aarch64/pr71727.c: Add -fcommon.
+
+2020-01-27  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/analyzer/sigsetjmp-5.c: New test.
+	* gcc.dg/analyzer/sigsetjmp-6.c: New test.
+
+2020-01-27  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/91171
+	* gcc.dg/graphite/scop-21.c: un-XFAIL.
+
+2020-01-27  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* gcc.target/arc/interrupt-6.c: Update test.
+
+2020-01-27  Claudiu Zissulescu  <claziss@synopsys.com>
+	    Petro Karashchenko  <petro.karashchenko@ring.com>
+
+	* gcc.target/arc/uncached-3.c: New test.
+	* gcc.target/arc/uncached-4.c: Likewise.
+	* gcc.target/arc/uncached-5.c: Likewise.
+	* gcc.target/arc/uncached-6.c: Likewise.
+	* gcc.target/arc/uncached-7.c: Likewise.
+	* gcc.target/arc/uncached-8.c: Likewise.
+	* gcc.target/arc/arc.exp (ll64): New predicate.
+
+2020-01-27  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/torture/pr93170.c: New test.
+
+2020-01-27  Martin Liska  <mliska@suse.cz>
+
+	PR target/93274
+	* gcc.target/i386/pr81213.c: Adjust to not expect
+	a globally unique name.
+
+2020-01-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/93397
+	* gcc.dg/torture/pr93397.c: New testcase.
+
+2020-01-27  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/85781
+	* gfortran.dg/bind_c_char_2.f90: New.
+	* gfortran.dg/bind_c_char_3.f90: New.
+	* gfortran.dg/bind_c_char_4.f90: New.
+	* gfortran.dg/bind_c_char_5.f90: New.
+
+2020-01-26  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* gcc.target/i386/pr91298-1.c: xfail on Solaris/x86 with native
+	assembler.
+	* gcc.target/i386/pr91298-2.c: Likewise.
+
 2020-01-26  Jakub Jelinek  <jakub@redhat.com>
 
 	PR target/93412
