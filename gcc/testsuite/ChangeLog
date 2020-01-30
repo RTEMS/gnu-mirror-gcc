@@ -1,3 +1,126 @@
+2020-01-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR lto/93384
+	* gcc.dg/lto/pr93384_0.c: New test.
+	* gcc.dg/lto/pr93384_1.c: New file.
+
+	PR middle-end/93505
+	* gcc.c-torture/compile/pr93505.c: New test.
+
+2020-01-30  Jeff Law  <law@redhat.com
+
+	* gcc.dg/tree-ssa/ssa-dse-26.c: Make existing dg-final scan
+	conditional on !c6x.  Add dg-final scan pattern for c6x.
+
+2020-01-30  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/92323
+	* gcc.dg/Warray-bounds-57.c: New test.
+
+2020-01-30  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93450
+	* gcc.dg/analyzer/torture/pr93450.c: New test.
+
+2020-01-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/93494
+	* gcc.c-torture/execute/pr93494.c: New test.
+
+2020-01-30  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/90338
+	* g++.dg/pr90338.C: New.
+
+2020-01-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/91824
+	* gcc.target/i386/pr91824-2.c: New test.
+
+	PR target/91824
+	* gcc.target/i386/pr91824-1.c: New test.
+
+2020-01-30  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	* g++.dg/coroutines/co-await-syntax-09-convert.C: New test.
+
+2020-01-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/92706
+	* gcc.dg/tree-ssa/pr92706-1.c: Require int128 effective target.
+
+2020-01-29  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/88092
+	* g++.dg/cpp2a/nontype-class31.C: New test.
+
+2020-01-29  Jeff Law  <law@redhat.com
+
+	PR tree-optimization/89689
+	* gcc.dg/pr89689.c: New test.
+
+2020-01-29  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/91754 - Fix template arguments comparison with class NTTP.
+	* g++.dg/cpp2a/nontype-class30.C: New test.
+
+2020-01-29  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/92948 - Fix class NTTP with template arguments.
+	* g++.dg/cpp2a/nontype-class28.C: New test.
+	* g++.dg/cpp2a/nontype-class29.C: New test.
+
+2020-01-29  Joel Hutton  <Joel.Hutton@arm.com>
+
+	PR target/93221
+	* gcc.target/aarch64/pr93221.c: New test.
+
+2020-01-29  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/92706
+	* gcc.dg/tree-ssa/pr92706-1.c: New test.
+
+2020-01-29  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/92706
+	* gcc.dg/tree-ssa/pr92706-2.c: New test.
+	* gcc.dg/guality/pr59776.c: Xfail tests for s2.g.
+
+2020-01-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* gcc.dg/tree-prof/indir-call-prof-2.c: New testcase.
+
+2020-01-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR testsuite/93393
+	* gcc.dg/torture/pr93133.c: XFAIL for powerpc*-*-*.
+
+2020-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/91118
+	* g++.dg/gomp/pr91118-1.C: New test.
+	* g++.dg/gomp/pr91118-2.C: New test.
+
+	PR fortran/93463
+	* gfortran.dg/goacc/pr93463.f90: New test.
+
+2020-01-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/93428
+	* gcc.dg/torture/pr93428.c: New testcase.
+
+2020-01-28  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/93437
+	* g++.dg/warn/Wstringop-overflow-5.C: New test.a
+
+2020-01-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* g++.dg/tree-prof/indir-call-prof.C: Update template.
+	* gcc.dg/tree-prof/crossmodule-indircall-1.c: Add more targets.
+	* gcc.dg/tree-prof/crossmodule-indircall-1a.c: Add more targets.
+	* gcc.dg/tree-prof/indir-call-prof.c: Update template.
+
 2020-01-28  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR target/91461
@@ -869,7 +992,7 @@
 	* gcc.target/i386/pr93319-1a.c: Don't include <stdio.h>.
 	(test1): Replace printf with __builtin_printf.
 
-2020-01-21  Bin Cheng  <bin.linux@linux.alibaba.com>
+2020-01-21  Bin Cheng  <bin.cheng@linux.alibaba.com>
 
 	* g++.dg/coroutines/co-await-void_type.C: New test.
 
