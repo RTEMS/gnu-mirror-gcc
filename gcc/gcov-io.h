@@ -164,6 +164,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #ifndef GCC_GCOV_IO_H
 #define GCC_GCOV_IO_H
 
+struct gcov_kvp;
+
+struct gcov_kvp
+{
+  gcov_type value;
+  gcov_type count;
+  struct gcov_kvp *next;
+};
+
 #ifndef IN_LIBGCOV
 /* About the host */
 
@@ -270,7 +279,7 @@ GCOV_COUNTERS
 #define GCOV_TOPN_VALUES 4
 
 /* Total number of single value counters.  */
-#define GCOV_TOPN_VALUES_COUNTERS (2 * GCOV_TOPN_VALUES + 1)
+#define GCOV_TOPN_VALUES_COUNTERS 3
 
 /* Convert a counter index to a tag.  */
 #define GCOV_TAG_FOR_COUNTER(COUNT)				\
