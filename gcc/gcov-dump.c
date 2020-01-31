@@ -443,9 +443,9 @@ tag_counters (const char *filename ATTRIBUTE_UNUSED,
 
 	  if (ix == 0)
 	    {
-	      printf ("\n");
-	      print_prefix (filename, depth, gcov_position ());
-	      printf (VALUE_PADDING_PREFIX VALUE_PREFIX, ix);
+	      printf (":");
+//	      print_prefix (filename, depth, gcov_position ());
+//	      printf (VALUE_PADDING_PREFIX VALUE_PREFIX, ix);
 	    }
 
 	  count = gcov_read_counter ();
