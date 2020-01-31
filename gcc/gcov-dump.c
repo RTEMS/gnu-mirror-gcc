@@ -441,7 +441,7 @@ tag_counters (const char *filename ATTRIBUTE_UNUSED,
 	{
 	  gcov_type count;
 
-	  if (!(ix & 7))
+	  if (ix == 0)
 	    {
 	      printf ("\n");
 	      print_prefix (filename, depth, gcov_position ());
