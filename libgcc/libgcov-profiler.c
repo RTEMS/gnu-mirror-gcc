@@ -111,51 +111,7 @@ static inline void
 __gcov_topn_values_profiler_body (gcov_type *counters, gcov_type value,
 				  int use_atomic)
 {
-  counters[0]++;
-
-  struct gcov_kvp *prev_node = NULL;
-  struct gcov_kvp *minimal_node = NULL;
-  struct gcov_kvp *current_node  = (struct gcov_kvp *)counters[2];
-
-  while (current_node)
-    {
-      if (current_node->value == value)
-	{
-	  current_node->count += 1;
-	  return;
-	}
-
-      if (minimal_node == NULL
-	  || current_node->count < minimal_node->count)
-	minimal_node = current_node;
-
-      prev_node = current_node;
-      current_node = current_node->next;
-    }
-
-  if (counters[1] == GCOV_TOPN_MAXIMUM_TRACKED_VALUES)
-    {
-      if (--minimal_node->count <= 0)
-	{
-	  minimal_node->value = value;
-	  minimal_node->count = 1;
-	}
-    }
-  else
-    {
-      /* Increment number of nodes.  */
-      counters[1]++;
-
-      struct gcov_kvp *new_node
-	= (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
-      new_node->value = value;
-      new_node->count = 1;
-
-      if (!counters[2])
-	counters[2] = (intptr_t)new_node;
-      else if (prev_node && !prev_node->next)
-	prev_node->next = new_node;
-    }
+  gcov_topn_add_value (counters, value, 1, use_atomic);
 }
 
 #ifdef L_gcov_topn_values_profiler

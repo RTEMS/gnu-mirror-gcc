@@ -107,59 +107,12 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
 
   counters[0] += all;
 
-  struct gcov_kvp *root = (struct gcov_kvp *)counters[2];
   for (unsigned i = 0; i < n; i++)
     {
       gcov_type value = gcov_get_counter_target ();
       gcov_type count = gcov_get_counter_ignore_scaling (-1);
 
-      int done = 0;
-      struct gcov_kvp *prev = NULL;
-      struct gcov_kvp *minimal_node = NULL;
-      for (struct gcov_kvp *node = root; node != NULL; node = node->next)
-	{
-	  if (node->value == value)
-	    {
-	      node->count += count;
-	      done = 1;
-	      break;
-	    }
-
-	  if (minimal_node == NULL
-	      || node->count < minimal_node->count)
-	    minimal_node = node;
-
-	  prev = node;
-	}
-
-      if (done)
-	continue;
-
-      if (counters[1] == GCOV_TOPN_MAXIMUM_TRACKED_VALUES)
-	{
-	  if (--minimal_node->count <= 0)
-	    {
-	      minimal_node->value = value;
-	      minimal_node->count = count;
-	    }
-	}
-      else
-	{
-	  counters[1]++;
-
-	  struct gcov_kvp *new_node
-	    = (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
-	  new_node->value = value;
-	  new_node->count = count;
-
-	  if (!counters[2])
-	    {
-	      counters[2] = (intptr_t)new_node;
-	      root = new_node;
-	    }
-	  else if (prev && !prev->next)
-	    prev->next = new_node;
-	}
+      gcov_topn_add_value (counters, value, count, 0);
     }
 }
 #endif /* L_gcov_merge_topn */
