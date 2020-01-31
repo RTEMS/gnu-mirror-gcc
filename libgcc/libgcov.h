@@ -367,6 +367,76 @@ gcov_get_counter_target (void)
 #endif
 }
 
+static inline void
+gcov_counter_add (gcov_type *counter, gcov_type value, int use_atomic)
+{
+  if (use_atomic)
+    __atomic_fetch_add (counter, value, __ATOMIC_RELAXED);
+  else
+    *counter += value;
+}
+
+static inline void
+gcov_counter_set_if_null (gcov_type *counter, struct gcov_kvp *node,
+			  int use_atomic)
+{
+  if (use_atomic)
+    __sync_val_compare_and_swap (counter, NULL, (intptr_t)node);
+  else
+    *counter = (intptr_t)node;
+}
+
+static inline void
+gcov_topn_add_value (gcov_type *counters, gcov_type value, gcov_type count,
+		     int use_atomic)
+{
+  gcov_counter_add (&counters[0], 1, use_atomic);
+
+  struct gcov_kvp *prev_node = NULL;
+  struct gcov_kvp *minimal_node = NULL;
+  struct gcov_kvp *current_node  = (struct gcov_kvp *)counters[2];
+
+  while (current_node)
+    {
+      if (current_node->value == value)
+	{
+	  gcov_counter_add (&current_node->count, count, use_atomic);
+	  return;
+	}
+
+      if (minimal_node == NULL
+	  || current_node->count < minimal_node->count)
+	minimal_node = current_node;
+
+      prev_node = current_node;
+      current_node = current_node->next;
+    }
+
+  if (counters[1] == GCOV_TOPN_MAXIMUM_TRACKED_VALUES)
+    {
+      if (--minimal_node->count < count)
+	{
+	  minimal_node->value = value;
+	  minimal_node->count = count;
+	}
+    }
+  else
+    {
+      /* Increment number of nodes.  */
+      gcov_counter_add (&counters[1], 1, use_atomic);
+
+      struct gcov_kvp *new_node
+	= (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
+      new_node->value = value;
+      new_node->count = count;
+
+      if (!counters[2])
+	gcov_counter_set_if_null (&counters[2], new_node, use_atomic);
+      else if (prev_node && !prev_node->next)
+	gcov_counter_set_if_null ((gcov_type *)&prev_node->next, new_node, use_atomic);
+    }
+}
+
 #endif /* !inhibit_libc */
 
 #endif /* GCC_LIBGCOV_H */
