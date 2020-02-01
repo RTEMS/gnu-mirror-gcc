@@ -86,64 +86,110 @@ __gcov_merge_time_profile (gcov_type *counters, unsigned n_counters)
 
 #ifdef L_gcov_merge_topn
 
+/* To merging of TOPN profiles.
+
+   counters[0] is the number of executions
+   for i in 0 ... TOPN-1
+     counters[2 * i + 1] is target
+     counters[2 * i + 2] is corresponding hitrate counter.
+
+   Because we prune counters only those with probability >= 1/TOPN are
+   present now.
+
+   We use sign of counters[0] to track whether the number of different
+   targets exceeds TOPN and sign of counters[2 * i + 2] to track whether given
+   value was having probability at least 1/TOPN in each run.  */
 static void
 merge_topn_values_set (gcov_type *counters)
 {
   /* First value is number of total executions of the profiler.  */
-  gcov_type all = gcov_get_counter_ignore_scaling (-1);
-  counters[0] += all;
-  ++counters;
+  gcov_type all = gcov_get_counter ();
 
-  /* Read all part values.  */
-  gcov_type read_counters[2 * GCOV_TOPN_VALUES];
-
-  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+  /* Early returns (needed for logic tracking sign bits below).
+     If there is nothing to merge in, return early.  */
+  if (all == 0)
     {
-      read_counters[2 * i] = gcov_get_counter_target ();
-      read_counters[2 * i + 1] = gcov_get_counter_ignore_scaling (-1);
-    }
-
-  if (read_counters[1] == -1)
-    {
-      counters[1] = -1;
+      for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+	{
+	  gcov_get_counter_target ();
+	  gcov_get_counter ();
+	}
       return;
     }
 
+  /* Counter is not trained at all; copy data.  */
+  if (!counters[0])
+    {
+      counters[0] = all;
+      ++counters;
+      for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+	{
+	  counters[2 * i] = gcov_get_counter_target ();
+	  counters[2 * i + 1] = gcov_get_counter ();
+	}
+      return;
+    }
+
+  /* Negative value mans that counters is missing some of values.  */
+  if (all < 0)
+    counters[0] = -counters[0];
+  counters[0] += all;
+  ++counters;
+
+  char updated[GCOV_TOPN_VALUES];
+  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    updated[i] = 0;
+
   for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
     {
-      if (read_counters[2 * i + 1] == 0)
+      gcov_type read_value = gcov_get_counter_target ();
+      gcov_type read_cnt = gcov_get_counter ();
+
+      if (read_cnt == 0)
 	continue;
 
       unsigned j;
-      int slot = -1;
+      int slot = 0;
 
       for (j = 0; j < GCOV_TOPN_VALUES; j++)
 	{
-	  if (counters[2 * j] == read_counters[2 * i])
+	  if (counters[2 * j] == read_value)
 	    {
-	      counters[2 * j + 1] += read_counters[2 * i + 1];
+	      /* Negative value means that counter was not present in every
+		 run.  */
+	      if (read_cnt < 0)
+		counters[2 * j + 1] = -counters[2 * j + 1];
+	      counters[2 * j + 1] += read_cnt;
+	      updated[j] = 1;
 	      break;
 	    }
-	  else if (counters[2 * j + 1] == 0)
+	  /* Look for least probable counter.  At this moment already some
+	     of counters may be negative.  */
+	  if (abs (counters[2 * j + 1]) < abs (counters[2 * slot + 1]))
 	    slot = j;
 	}
 
       if (j == GCOV_TOPN_VALUES)
 	{
-	  if (slot > 0)
+	  /* Counter is full.  Throw away least frequent values but
+	     mark that some values gone missing.  */
+	  if (counters[2 * slot + 1] && counters[-1] > 0)
+	    counters[-1] = -counters[-1];
+	  if (abs (counters[2 * slot + 1]) < abs (read_cnt))
 	    {
-	      /* If we found empty slot, add the value.  */
-	      counters[2 * slot] = read_counters[2 * i];
-	      counters[2 * slot + 1] = read_counters[2 * i + 1];
-	    }
-	  else
-	    {
-	      /* We haven't found a slot, bail out.  */
-	      counters[1] = -1;
-	      return;
+	      counters[2 * slot] = read_value;
+	      counters[2 * slot + 1] = read_cnt;
+	      /* Mark that the value was not present in every run.  */
+	      if (counters[2 * slot + 1] > 0)
+		counters[2 * slot + 1] = -counters[2 * slot + 1];
 	    }
 	}
     }
+  /* Finally all values which was not present in read counters must be
+     marked as not present in all runs.  */
+  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    if (!updated[i] && counters[2 * i + 1] > 0)
+      counters[2 * i + 1] = -counters[2 * i + 1];
 }
 
 /* The profile merging function for choosing the most common value.
