@@ -1,0 +1,187 @@
+[TARGET_ALTIVEC]
+  math vf __builtin_altivec_vmaddfp (vf, vf, vf);
+    VMADDFP fmav4sf4 {}
+  vss __builtin_altivec_vmhaddshs (vss, vss, vss);
+    VMHADDSHS altivec_vmhaddshs {}
+  vss __builtin_altivec_vmhraddshs (vss, vss, vss);
+    VMHRADDSHS altivec_vmhraddshs {}
+  const vss __builtin_altivec_vmladduhm (vss, vss, vss);
+    VMLADDUHM fmav8hi4 {}
+  const vui __builtin_altivec_vmsumubm (vuc, vuc, vui);
+    VMSUMUBM altivec_vmsumubm {}
+  const vsi __builtin_altivec_vmsummbm (vsc, vuc, vsi);
+    VMSUMMBM altivec_vmsummbm {}
+  const vui __builtin_altivec_vmsumuhm (vus, vus, vui);
+    VMSUMUHM altivec_vmsumuhm {}
+  const vsi __builtin_altivec_vmsumshm (vss, vss, vsi);
+    VMSUMSHM altivec_vmsumshm {}
+  vui __builtin_altivec_vmsumuhs (vus, vus, vui);
+    VMSUMUHS altivec_vmsumuhs {}
+  vsi __builtin_altivec_vmsumshs (vss, vss, vsi);
+    VMSUMSHS altivec_vmsumshs {}
+  math vf __builtin_altivec_vnmsubfp (vf, vf, vf);
+    VNMSUBFP nfmsv4sf4 {}
+  const vsq __builtin_altivec_vperm_1ti (vsq, vsq, vuc);
+    VPERM_1TI altivec_vperm_v1ti {}
+  const vf __builtin_altivec_vperm_4sf (vf, vf, vuc);
+    VPERM_4SF altivec_vperm_v4sf {}
+  const vsi __builtin_altivec_vperm_4si (vsi, vsi, vuc);
+    VPERM_4SI altivec_vperm_v4si {}
+  const vss __builtin_altivec_vperm_8hi (vss, vss, vuc);
+    VPERM_8HI altivec_vperm_v8hi {}
+  const vsc __builtin_altivec_vperm_16qi (vsc, vsc, vuc);
+    VPERM_16QI altivec_vperm_v16qi {}
+  const vuq __builtin_altivec_vperm_1ti_uns (vuq, vuq, vuc);
+    VPERM_1TI_UNS altivec_vperm_v1ti_uns {}
+  const vui __builtin_altivec_vperm_4si_uns (vui, vui, vuc);
+    VPERM_4SI_UNS altivec_vperm_v4si_uns {}
+  const vus __builtin_altivec_vperm_8hi_uns (vus, vus, vuc);
+    VPERM_8HI_UNS altivec_vperm_v8hi_uns {}
+  const vuc __builtin_altivec_vperm_16qi_uns (vuc, vuc, vuc);
+    VPERM_16QI_UNS altivec_vperm_v16qi_uns {}
+  const vf __builtin_altivec_vsel_4sf (vf, vf, vbi);
+    VSEL_4SF_B vector_select_v4sf {}
+  const vf __builtin_altivec_vsel_4sf (vf, vf, vui);
+    VSEL_4SF_U vector_select_v4sf {}
+  const vsi __builtin_altivec_vsel_4si (vsi, vsi, vbi);
+    VSEL_4SI_B vector_select_v4si {}
+  const vsi __builtin_altivec_vsel_4si (vsi, vsi, vui);
+    VSEL_4SI_U vector_select_v4si {}
+  const vui __builtin_altivec_vsel_4si (vui, vui, vbi);
+    VSEL_4SI_UB vector_select_v4si {}
+  const vui __builtin_altivec_vsel_4si (vui, vui, vui);
+    VSEL_4SI_UU vector_select_v4si {}
+  const vbi __builtin_altivec_vsel_4si (vbi, vbi, vbi);
+    VSEL_4SI_BB vector_select_v4si {}
+  const vbi __builtin_altivec_vsel_4si (vbi, vbi, vui);
+    VSEL_4SI_BU vector_select_v4si {}
+  const vss __builtin_altivec_vsel_8hi (vss, vss, vbs);
+    VSEL_8HI_B vector_select_v8hi {}
+  const vss __builtin_altivec_vsel_8hi (vss, vss, vus);
+    VSEL_8HI_U vector_select_v8hi {}
+  const vus __builtin_altivec_vsel_8hi (vus, vus, vbs);
+    VSEL_8HI_UB vector_select_v8hi {}
+  const vus __builtin_altivec_vsel_8hi (vus, vus, vus);
+    VSEL_8HI_UU vector_select_v8hi {}
+  const vbs __builtin_altivec_vsel_8hi (vbs, vbs, vbs);
+    VSEL_8HI_BB vector_select_v8hi {}
+  const vbs __builtin_altivec_vsel_8hi (vbs, vbs, vus);
+    VSEL_8HI_BU vector_select_v8hi {}
+  const vsc __builtin_altivec_vsel_16qi (vsc, vsc, vbc);
+    VSEL_16QI_B vector_select_v16qi {}
+  const vsc __builtin_altivec_vsel_16qi (vsc, vsc, vuc);
+    VSEL_16QI_U vector_select_v16qi {}
+  const vuc __builtin_altivec_vsel_16qi (vuc, vuc, vbc);
+    VSEL_16QI_UB vector_select_v16qi {}
+  const vuc __builtin_altivec_vsel_16qi (vuc, vuc, vuc);
+    VSEL_16QI_UU vector_select_v16qi {}
+  const vbc __builtin_altivec_vsel_16qi (vbc, vbc, vbc);
+    VSEL_16QI_BB vector_select_v16qi {}
+  const vbc __builtin_altivec_vsel_16qi (vbc, vbc, vuc);
+    VSEL_16QI_BU vector_select_v16qi {}
+  const vsq __builtin_altivec_vsel_1ti (vsq, vsq, vuq);
+    VSEL_1TI vector_select_v1ti {}
+  const vui __builtin_altivec_vsel_4si_uns (vui, vui, vui);
+    VSEL_4SI_UNS vector_select_v4si_uns {}
+  const vus __builtin_altivec_vsel_8hi_uns (vus, vus, vus);
+    VSEL_8HI_UNS vector_select_v8hi_uns {}
+  const vuc __builtin_altivec_vsel_16qi_uns (vuc, vuc, vuc);
+    VSEL_16QI_UNS vector_select_v16qi_uns {}
+  const vsc __builtin_altivec_vsldoi_16qi (vsc, vsc, const int<4>);
+    VSLDOI_16QI altivec_vsldoi_v16qi {}
+  const vuc __builtin_altivec_vsldoi_16qi (vuc, vuc, const int<4>);
+    VSLDOI_16QI_U altivec_vsldoi_v16qi {}
+  const vbc __builtin_altivec_vsldoi_16qi (vbc, vbc, const int<4>);
+    VSLDOI_16QI_B altivec_vsldoi_v16qi {}
+  const vss __builtin_altivec_vsldoi_8hi (vss, vss, const int<4>);
+    VSLDOI_8HI altivec_vsldoi_v8hi {}
+  const vus __builtin_altivec_vsldoi_8hi (vus, vus, const int<4>);
+    VSLDOI_8HI_U altivec_vsldoi_v8hi {}
+  const vbs __builtin_altivec_vsldoi_8hi (vbs, vbs, const int<4>);
+    VSLDOI_8HI_B altivec_vsldoi_v8hi {}
+  const vp __builtin_altivec_vsldoi_8hi (vp, vp, const int<4>);
+    VSLDOI_8HI_P altivec_vsldoi_v8hi {}
+  const vsi __builtin_altivec_vsldoi_4si (vsi, vsi, const int<4>);
+    VSLDOI_4SI altivec_vsldoi_v4si {}
+  const vui __builtin_altivec_vsldoi_4si (vui, vui, const int<4>);
+    VSLDOI_4SI_U altivec_vsldoi_v4si {}
+  const vbi __builtin_altivec_vsldoi_4si (vbi, vbi, const int<4>);
+    VSLDOI_4SI_B altivec_vsldoi_v4si {}
+  const vuq __builtin_altivec_vsel_1ti_uns (vuq, vuq, vuq);
+    VSEL_1TI_UNS vector_select_v1ti_uns {}
+  const vf __builtin_altivec_vsldoi_4sf (vf, vf, const int<4>);
+    VSLDOI_4SF altivec_vsldoi_v4sf {}
+  void __builtin_altivec_dst (void *, const int, const int<2>);
+    DST altivec_dst {}
+  void __builtin_altivec_dstt (void *, const int, const int<2>);
+    DSTT altivec_dstt {}
+  void __builtin_altivec_dstst (void *, const int, const int<2>);
+    DSTST altivec_dstst {}
+  void __builtin_altivec_dststt (void *, const int, const int<2>);
+    DSTSTT altivec_dststt {}
+  const vsc __builtin_altivec_vaddubm (vsc, vsc);
+    VADDUBM addv16qi3 {}
+  const vuc __builtin_altivec_vaddubm (vuc, vuc);
+    VADDUBM_U addv16qi3 {}
+  const vss __builtin_altivec_vadduhm (vss, vss);
+    VADDUHM addv8hi3 {}
+  const vus __builtin_altivec_vadduhm (vus, vus);
+    VADDUHM_U addv8hi3 {}
+  const vsi __builtin_altivec_vadduwm (vsi, vsi);
+    VADDUWM addv4si3 {}
+  const vui __builtin_altivec_vadduwm (vui, vui);
+    VADDUWM_U addv4si3 {}
+  const vf __builtin_altivec_vaddfp (vf, vf);
+    VADDFP addv4sf3 {}
+  const vsi __builtin_altivec_vaddcuw (vsi, vsi);
+    VADDCUW altivec_vaddcuw {}
+  const vui __builtin_altivec_vaddcuw (vui, vui);
+    VADDCUW_U altivec_vaddcuw {}
+  const vuc __builtin_altivec_vaddubs (vuc, vuc);
+    VADDUBS altivec_vaddubs {}
+  const vsc __builtin_altivec_vaddsbs (vsc, vsc);
+    VADDSBS altivec_vaddsbs {}
+  const vus __builtin_altivec_vadduhs (vus, vus);
+    VADDUHS altivec_vadduhs {}
+  const vss __builtin_altivec_vaddshs (vss, vss);
+    VADDSHS altivec_vaddshs {}
+  const vui __builtin_altivec_vadduws (vui, vui);
+    VADDUWS altivec_vadduws {}
+  const vsi __builtin_altivec_vaddsws (vsi, vsi);
+    VADDSWS altivec_vaddsws {}
+  const vbc __builtin_altivec_vand_v16qi_uns (vbc, vbc);
+    VAND_V16QI_UNS_B andv16qi3 {}
+  const vuc __builtin_altivec_vand_v16qi_uns (vuc, vuc);
+    VAND_V16QI_UNS andv16qi3 {}
+  const vbc __builtin_altivec_vand_v16qi (vbc, vbc);
+    VAND_V16QI_B andv16qi3 {}
+  const vsc __builtin_altivec_vand_v16qi (vsc, vsc);
+    VAND_V16QI andv16qi3 {}
+  const vsc __builtin_altivec_abs_v16qi (vsc);
+    ABS_V16QI absv16qi2 {abs}
+  const vss __builtin_altivec_abs_v8hi (vss);
+    ABS_V8HI absv8hi2 {abs}
+
+[VSX]
+  const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
+    VPERM_2DF altivec_vperm_v2df {}
+  const vsll __builtin_altivec_vperm_2di (vsll, vsll, vuc);
+    VPERM_2DI altivec_vperm_v2di {}
+  const vull __builtin_altivec_vperm_2di_uns (vull, vull, vuc);
+    VPERM_2DI_UNS altivec_vperm_v2di_uns {}
+  const vd __builtin_altivec_vsel_2df (vd, vd, vbll);
+    VSEL_2DF_B vector_select_v2df {}
+  const vd __builtin_altivec_vsel_2df (vd, vd, vull);
+    VSEL_2DF_U vector_select_v2df {}
+  const vsll __builtin_altivec_vsel_2di (vsll, vsll, vsll, vbll);
+    VSEL_2DI_B vector_select_v2di {}
+  const vull __builtin_altivec_vsel_2di_uns (vull, vull, vull);
+    VSEL_2DI_UNS vector_select_v2di_uns {}
+  const vsll __builtin_altivec_vsldoi_2di (vsll, vsll, const int<4>);
+    VSLDOI_2DI altivec_vsldoi_v2di {}
+  const vull __builtin_altivec_vsldoi_2di (vull, vull, const int<4>);
+    VSLDOI_2DI_U altivec_vsldoi_v2di {}
+  const vbll __builtin_altivec_vsldoi_2di (vbll, vbll, const int<4>);
+    VSLDOI_2DI_B altivec_vsldoi_v2di {}
+  const vd __builtin_altivec_vsldoi_2df (vd, vd, const int<4>);
+    VSLDOI_2DF altivec_vsldoi_v2df {}

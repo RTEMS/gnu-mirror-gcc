@@ -1,0 +1,5 @@
+[VEC_ABS, vec_abs, __builtin_vec_abs]
+  vsc __builtin_vec_abs (vsc);
+    ABS_V16QI
+  vss __builtin_vec_abs (vss);
+    ABS_V8HI
