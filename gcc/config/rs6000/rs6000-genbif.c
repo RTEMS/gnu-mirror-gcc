@@ -156,7 +156,23 @@ enum void_status {
   VOID_OK
 };
 
+/* Stanzas are groupings of built-in functions and overloads by some
+   common feature/attribute.  These definitions are for built-in function
+   stanzas.  */
+#define MAXBIFSTANZAS 256
+static char *bif_stanzas[MAXBIFSTANZAS];
 static int num_bif_stanzas;
+static int curr_bif_stanza;
+
+/* Function modifiers provide special handling for const, pure, and math
+   functions.  These are mutually exclusive, and therefore kept separate
+   from other bif attributes.  */
+enum fnkinds {
+  FNK_NONE,
+  FNK_CONST,
+  FNK_PURE,
+  FNK_MATH
+};
 
 /* Legal base types for an argument or return type.  */
 enum basetype {
@@ -199,7 +215,54 @@ struct typeinfo {
   int val2;
 };
 
+/* A list of argument types.  */
+struct typelist {
+  typeinfo info;
+  typelist *next;
+};
+
+/* Attributes of a builtin function.  */
+struct attrinfo {
+  char isinit;
+  char isset;
+  char isext;
+  char isnosoft;
+  char isldv;
+  char isstv;
+  char isreve;
+  char isabs;
+  char ispred;
+  char ishtm;
+};
+
+/* Fields associated with a function prototype (bif or overload).  */
+struct prototype {
+  typeinfo rettype;
+  char *bifname;
+  int nargs;
+  typelist *args;
+  int restr_opnd;
+  restriction restr;
+  int restr_val1;
+  int restr_val2;
+};
+
+/* Data associated with a builtin function, and a table of such data.  */
+#define MAXBIFS 16384
+struct bifdata {
+  int stanza;
+  fnkinds kind;
+  prototype proto;
+  char *idname;
+  char *patname;
+  attrinfo attrs;
+  char *fndecl;
+};
+
+static bifdata bifs[MAXBIFS];
 static int num_bifs;
+static int curr_bif;
+
 static int num_ovld_stanzas;
 static int num_ovlds;
 
@@ -747,11 +810,419 @@ match_type (typeinfo *typedata, int voidok)
   return match_basetype (typedata);
 }
 
+/* Parse the argument list, returning 1 if success or 0 if any
+   malformation is found.  */
+static int
+parse_bif_args (prototype *protoptr)
+{
+  typelist **argptr = &protoptr->args;
+  int *nargs = &protoptr->nargs;
+  int *restr_opnd = &protoptr->restr_opnd;
+  restriction *restr = &protoptr->restr;
+  int *val1 = &protoptr->restr_val1;
+  int *val2 = &protoptr->restr_val2;
+
+  int success;
+  *nargs = 0;
+
+  /* Start the argument list.  */
+  consume_whitespace ();
+  if (linebuf[pos] != '(')
+    {
+      (*diag) ("missing '(' at column %d.\n", pos + 1);
+      return 0;
+    }
+  safe_inc_pos ();
+
+  do {
+    consume_whitespace ();
+    int oldpos = pos;
+    typelist *argentry = (typelist *) malloc (sizeof (typelist));
+    memset (argentry, 0, sizeof (*argentry));
+    typeinfo *argtype = &argentry->info;
+    success = match_type (argtype, VOID_NOTOK);
+    if (success)
+      {
+	if (argtype->restr)
+	  {
+	    if (*restr_opnd)
+	      {
+		(*diag) ("More than one restricted operand\n");
+		return 0;
+	      }
+	    *restr_opnd = *nargs;
+	    *restr = argtype->restr;
+	    *val1 = argtype->val1;
+	    *val2 = argtype->val2;
+	  }
+	(*nargs)++;
+	*argptr = argentry;
+	argptr = &argentry->next;
+	consume_whitespace ();
+	if (linebuf[pos] == ',')
+	  safe_inc_pos ();
+	else if (linebuf[pos] != ')')
+	  {
+	    (*diag) ("arg not followed by ',' or ')' at column %d.\n",
+		     pos + 1);
+	    return 0;
+	  }
+
+#ifdef DEBUG
+	(*diag) ("argument type: isvoid = %d, isconst = %d, isvector = %d, \
+issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, ispointer = %d, \
+base = %d, restr = %d, val1 = %d, val2 = %d, pos = %d.\n",
+		 argtype->isvoid, argtype->isconst, argtype->isvector,
+		 argtype->issigned, argtype->isunsigned, argtype->isbool,
+		 argtype->ispixel, argtype->ispointer, argtype->base,
+		 argtype->restr, argtype->val1, argtype->val2, pos + 1);
+#endif
+      }
+    else
+      {
+	free (argentry);
+	*argptr = NULL;
+	pos = oldpos;
+	if (linebuf[pos] != ')')
+	  {
+	    (*diag) ("badly terminated arg list at column %d.\n", pos + 1);
+	    return 0;
+	  }
+	safe_inc_pos ();
+      }
+  } while (success);
+
+  return 1;
+}
+
+/* Parse the attribute list, returning 1 if success or 0 if any
+   malformation is found.  */
+static int
+parse_bif_attrs (attrinfo *attrptr)
+{
+  consume_whitespace ();
+  if (linebuf[pos] != '{')
+    {
+      (*diag) ("missing attribute set at column %d.\n", pos + 1);
+      return 0;
+    }
+  safe_inc_pos ();
+
+  memset (attrptr, 0, sizeof (*attrptr));
+  char *attrname = NULL;
+
+  do {
+    consume_whitespace ();
+    int oldpos = pos;
+    attrname = match_identifier ();
+    if (attrname)
+      {
+	if (!strcmp (attrname, "init"))
+	  attrptr->isinit = 1;
+	else if (!strcmp (attrname, "set"))
+	  attrptr->isset = 1;
+	else if (!strcmp (attrname, "ext"))
+	  attrptr->isext = 1;
+	else if (!strcmp (attrname, "nosoft"))
+	  attrptr->isnosoft = 1;
+	else if (!strcmp (attrname, "ldv"))
+	  attrptr->isldv = 1;
+	else if (!strcmp (attrname, "stv"))
+	  attrptr->isstv = 1;
+	else if (!strcmp (attrname, "reve"))
+	  attrptr->isreve = 1;
+	else if (!strcmp (attrname, "abs"))
+	  attrptr->isabs = 1;
+	else if (!strcmp (attrname, "pred"))
+	  attrptr->ispred = 1;
+	else if (!strcmp (attrname, "htm"))
+	  attrptr->ishtm = 1;
+	else
+	  {
+	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
+	    return 0;
+	  }
+
+	consume_whitespace ();
+	if (linebuf[pos] == ',')
+	  safe_inc_pos ();
+	else if (linebuf[pos] != '}')
+	  {
+	    (*diag) ("arg not followed by ',' or '}' at column %d.\n",
+		     pos + 1);
+	    return 0;
+	  }
+      }
+    else
+      {
+	pos = oldpos;
+	if (linebuf[pos] != '}')
+	  {
+	    (*diag) ("badly terminated attr set at column %d.\n", pos + 1);
+	    return 0;
+	  }
+	safe_inc_pos ();
+      }
+  } while (attrname);
+
+#ifdef DEBUG
+  (*diag) ("attribute set: init = %d, set = %d, ext = %d, \
+nosoft = %d, ldv = %d, stv = %d, reve = %d, abs = %d, pred = %d, \
+htm = %d.\n",
+	   attrptr->isinit, attrptr->isset, attrptr->isext, attrptr->isnosoft,
+	   attrptr->isldv, attrptr->isstv, attrptr->isreve, attrptr->isabs,
+	   attrptr->ispred, attrptr->ishtm);
+#endif
+
+  return 1;
+}
+
+/* Parse a function prototype.  This code is shared by the bif and overload
+   file processing.  Return 1 for success, 0 for failure.  */
+static int
+parse_prototype (prototype *protoptr)
+{
+  typeinfo *ret_type = &protoptr->rettype;
+  char **bifname = &protoptr->bifname;
+
+  /* Get the return type.  */
+  consume_whitespace ();
+  int oldpos = pos;
+  int success = match_type (ret_type, VOID_OK);
+  if (!success)
+    {
+      (*diag) ("missing or badly formed return type at column %d.\n",
+	       oldpos + 1);
+      return 0;
+    }
+
+#ifdef DEBUG
+  (*diag) ("return type: isvoid = %d, isconst = %d, isvector = %d, \
+issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, ispointer = %d, \
+base = %d, restr = %d, val1 = %d, val2 = %d, pos = %d.\n",
+	   ret_type->isvoid, ret_type->isconst, ret_type->isvector,
+	   ret_type->issigned, ret_type->isunsigned, ret_type->isbool,
+	   ret_type->ispixel, ret_type->ispointer, ret_type->base,
+	   ret_type->restr, ret_type->val1, ret_type->val2, pos + 1);
+#endif
+
+  /* Get the bif name.  */
+  consume_whitespace ();
+  oldpos = pos;
+  *bifname = match_identifier ();
+  if (!*bifname)
+    {
+      (*diag) ("missing function name at column %d.\n", oldpos + 1);
+      return 0;
+    }
+
+#ifdef DEBUG
+  (*diag) ("function name is '%s'.\n", *bifname);
+#endif
+
+  /* Process arguments.  */
+  if (!parse_bif_args (protoptr))
+    return 0;
+
+  /* Process terminating semicolon.  */
+  consume_whitespace ();
+  if (linebuf[pos] != ';')
+    {
+      (*diag) ("missing semicolon at column %d.\n", pos + 1);
+      return 0;
+    }
+  safe_inc_pos ();
+  consume_whitespace ();
+  if (linebuf[pos] != '\n')
+    {
+      (*diag) ("garbage at end of line at column %d.\n", pos + 1);
+      return 0;
+    }
+
+  return 1;
+}
+
+/* Parse a two-line entry for a built-in function.  Return 1 for
+   success, 2 for end-of-stanza, and 5 for a parsing error.  */
+static int
+parse_bif_entry ()
+{
+  /* Check for end of stanza.  */
+  pos = 0;
+  consume_whitespace ();
+  if (linebuf[pos] == '[')
+    return 2;
+
+  /* Allocate an entry in the bif table.  */
+  if (num_bifs >= MAXBIFS - 1)
+    {
+      (*diag) ("too many built-in functions.\n");
+      return 5;
+    }
+
+  curr_bif = num_bifs++;
+  bifs[curr_bif].stanza = curr_bif_stanza;
+
+  /* Read the first token and see if it is a function modifier.  */
+  consume_whitespace ();
+  int oldpos = pos;
+  char *token = match_identifier ();
+  if (!token)
+    {
+      (*diag) ("malformed entry at column %d\n", pos + 1);
+      return 5;
+    }
+
+  if (!strcmp (token, "const"))
+    bifs[curr_bif].kind = FNK_CONST;
+  else if (!strcmp (token, "pure"))
+    bifs[curr_bif].kind = FNK_PURE;
+  else if (!strcmp (token, "math"))
+    bifs[curr_bif].kind = FNK_MATH;
+  else
+    {
+      /* No function modifier, so push the token back.  */
+      pos = oldpos;
+      bifs[curr_bif].kind = FNK_NONE;
+    }
+
+  if (!parse_prototype (&bifs[curr_bif].proto))
+    return 5;
+
+  /* Now process line 2.  First up is the builtin id.  */
+  if (!advance_line (bif_file))
+    {
+      (*diag) ("unexpected EOF.\n");
+      return 5;
+    }
+
+  pos = 0;
+  consume_whitespace ();
+  oldpos = pos;
+  bifs[curr_bif].idname = match_identifier ();
+  if (!bifs[curr_bif].idname)
+    {
+      (*diag) ("missing builtin id at column %d.\n", pos + 1);
+      return 5;
+    }
+
+#ifdef DEBUG
+  (*diag) ("ID name is '%s'.\n", bifs[curr_bif].idname);
+#endif
+
+  /* Save the ID in a lookup structure.  */
+  if (!rbt_insert (&bif_rbt, bifs[curr_bif].idname))
+    {
+      (*diag) ("duplicate function ID '%s' at column %d.\n",
+	       bifs[curr_bif].idname, oldpos + 1);
+      return 5;
+    }
+
+  /* Now the pattern name.  */
+  consume_whitespace ();
+  bifs[curr_bif].patname = match_identifier ();
+  if (!bifs[curr_bif].patname)
+    {
+      (*diag) ("missing pattern name at column %d.\n", pos + 1);
+      return 5;
+    }
+
+#ifdef DEBUG
+  (*diag) ("pattern name is '%s'.\n", bifs[curr_bif].patname);
+#endif
+
+  /* Process attributes.  */
+  if (!parse_bif_attrs (&bifs[curr_bif].attrs))
+    return 5;
+
+  return 1;
+}
+
+/* Parse one stanza of the input BIF file.  linebuf already contains the
+   first line to parse.  Return 1 for success, 0 for EOF, 5 for failure.  */
+static int
+parse_bif_stanza ()
+{
+  /* Parse the stanza header.  */
+  pos = 0;
+  consume_whitespace ();
+
+  if (linebuf[pos] != '[')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 5;
+    }
+  safe_inc_pos ();
+
+  char *stanza_name = match_identifier ();
+  if (!stanza_name)
+    {
+      (*diag) ("no identifier found in stanza header.\n");
+      return 5;
+    }
+
+  /* Add the identifier to a table and set the number to be recorded
+     with subsequent bif entries.  */
+  if (num_bif_stanzas >= MAXBIFSTANZAS)
+    {
+      (*diag) ("too many stanza headers.\n");
+      return 5;
+    }
+
+  curr_bif_stanza = num_bif_stanzas;
+  bif_stanzas[num_bif_stanzas++] = stanza_name;
+
+  if (linebuf[pos] != ']')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 5;
+    }
+  safe_inc_pos ();
+
+  consume_whitespace ();
+  if (linebuf[pos] != '\n' && pos != LINELEN - 1)
+    {
+      (*diag) ("garbage after stanza header.\n");
+      return 5;
+    }
+
+  int result = 1;
+
+  while (result != 2) /* end of stanza  */
+    {
+      int result;
+      if (!advance_line (bif_file))
+	return 0;
+
+      result = parse_bif_entry();
+      if (!result) /* EOF */
+	return 0;
+      else if (result > 2)
+	return 5;
+    }
+
+  return 1;
+}
+
 /* Parse the built-in file.  Return 1 for success, 5 for a parsing failure.  */
 static int
 parse_bif ()
 {
-  return 1;
+  int result;
+  diag = &bif_diag;
+  while (1)
+    {
+      if (!advance_line (bif_file))
+	return 1;
+
+      /* Parse a stanza beginning at this line.  */
+      result = parse_bif_stanza ();
+      if (result != 1)
+	break;
+    }
+  if (result == 0)
+    return 1;
+  return result;
 }
 
 /* Parse the overload file.  Return 1 for success, 6 for a parsing error.  */
