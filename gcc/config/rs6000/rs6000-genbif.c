@@ -311,6 +311,52 @@ static rbt_strings bif_rbt;
 static rbt_strings ovld_rbt;
 static rbt_strings fntype_rbt;
 
+/* Mapping from type tokens to type node names.  */
+struct typemap
+{
+  const char *key;
+  const char *value;
+};
+
+/* This table must be kept in alphabetical order, as we use binary
+   search for table lookups in map_token_to_type_node.  */
+#define TYPE_MAP_SIZE 32
+static typemap type_map[TYPE_MAP_SIZE] =
+  {
+    { "df",	"double" },
+    { "di",	"intDI" },
+    { "hi",	"intHI" },
+    { "pv",	"ptr" },
+    { "qi",	"intQI" },
+    { "sf",	"float" },
+    { "si",	"intSI" },
+    { "tf",	"long_double" },
+    { "ti",	"intTI" },
+    { "udi",	"unsigned_intDI" },
+    { "uhi",	"unsigned_intHI" },
+    { "uqi",	"unsigned_intQI" },
+    { "usi",	"unsigned_intSI" },
+    { "uti",	"unsigned_intTI" },
+    { "uv16qi",	"unsigned_V16QI" },
+    { "uv1ti",	"unsigned_V1TI" },
+    { "uv2di",	"unsigned_V2DI" },
+    { "uv4si",	"unsigned_V4SI" },
+    { "uv8hi",	"unsigned_V8HI" },
+    { "v",	"void" },
+    { "v16qi",	"V16QI" },
+    { "v1ti",	"V1TI" },
+    { "v2df",	"V2DF" },
+    { "v2di",	"V2DI" },
+    { "v4sf",	"V4SF" },
+    { "v4si",	"V4SI" },
+    { "v8hi",	"V8HI" },
+    { "vb16qi",	"bool_V16QI" },
+    { "vb2di",	"bool_V2DI" },
+    { "vb4si",	"bool_V4SI" },
+    { "vb8hi",	"bool_V8HI" },
+    { "vp8hi",	"pixel_V8HI" },
+  };
+
 /* Pointer to a diagnostic function.  */
 void (*diag) (const char *, ...) __attribute__ ((format (printf, 1, 2)))
   = NULL;
@@ -1761,6 +1807,80 @@ write_extern_fntype (char *str)
   fprintf (header_file, "extern tree %s;\n", str);
 }
 
+void
+write_fntype (char *str)
+{
+  fprintf (init_file, "tree %s;\n", str);
+}
+
+/* Look up TOK in the type map and return the corresponding string used
+   to build the type node.  */
+static const char *
+map_token_to_type_node (char *tok)
+{
+  int low = 0;
+  int high = TYPE_MAP_SIZE - 1;
+  int mid = (low + high) >> 1;
+  int cmp;
+
+  while ((cmp = strcmp (type_map[mid].key, tok)) && low < high)
+    {
+      if (cmp < 0)
+	low = (low == mid ? mid + 1 : mid);
+      else
+	high = (high == mid ? mid - 1: mid);
+      mid = (low + high) >> 1;
+    }
+
+  if (low > high)
+    {
+      (*diag) ("token '%s' doesn't appear in the type map!\n", tok);
+      exit (EC_INTERR);
+    }
+
+  return type_map[mid].value;
+}
+
+/* Write the type node corresponding to TOK.  */
+static void
+write_type_node (char *tok)
+{
+  const char *str = map_token_to_type_node (tok);
+  fprintf (init_file, "%s_type_node", str);
+}
+
+/* Write an initializer for a function type identified by STR.  */
+void
+write_fntype_init (char *str)
+{
+  char *tok;
+
+  /* Avoid side effects of strtok on the original string by using a copy.  */
+  char *buf = (char *) malloc (strlen (str) + 1);
+  strcpy (buf, str);
+
+  fprintf (init_file, "  %s\n    = build_function_type_list (", buf);
+  tok = strtok (buf, "_");
+  write_type_node (tok);
+  tok = strtok (0, "_");
+  assert (tok);
+  assert (!strcmp (tok, "ftype"));
+
+  tok = strtok (0, "_");
+  if (tok)
+    fprintf (init_file, ",\n\t\t\t\t");
+
+  /* Note:  A function with no arguments ends with '_ftype_v'.  */
+  while (tok && strcmp (tok, "v"))
+    {
+      write_type_node (tok);
+      tok = strtok (0, "_");
+      fprintf (init_file, ",\n\t\t\t\t");
+    }
+  fprintf (init_file, "NULL_TREE);\n");
+  free (buf);
+}
+
 /* Write everything to the header file (rs6000-bif.h).  */
 static int
 write_header_file ()
@@ -1784,10 +1904,257 @@ write_header_file ()
   return 1;
 }
 
+/* Write code to initialize the built-in function table.  */
+static void
+write_init_bif_table ()
+{
+  int last_stanza = -1;
+
+  for (int i = 0; i <= curr_bif; i++)
+    {
+      if (last_stanza != bifs[i].stanza)
+	{
+	  if (last_stanza != -1)
+	    fprintf (init_file, "    }\n");
+	  fprintf (init_file, "  if (%s)\n    {\n",
+		   bif_stanzas[bifs[i].stanza]);
+	  last_stanza = bifs[i].stanza;
+	}
+      fprintf (init_file,
+	       "      rs6000_builtin_info_x[RS6000_BIF_%s].bifname"
+	       "\n        = \"%s\";\n",
+	       bifs[i].idname, bifs[i].proto.bifname);
+      fprintf (init_file,
+	       "      rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
+	       "\n        = %s;\n",
+	       bifs[i].idname, bifs[i].fndecl);
+      fprintf (init_file,
+	       "      rs6000_builtin_info_x[RS6000_BIF_%s].icode"
+	       "\n        = CODE_FOR_%s;\n",
+	       bifs[i].idname, bifs[i].patname);
+      fprintf (init_file,
+	       "      rs6000_builtin_info_x[RS6000_BIF_%s].bifattrs"
+	       "\n        = 0",
+	       bifs[i].idname);
+      if (bifs[i].kind == FNK_CONST)
+	fprintf (init_file, " | bif_const_bit");
+      else if (bifs[i].kind == FNK_PURE)
+	fprintf (init_file, " | bif_pure_bit");
+      else if (bifs[i].kind == FNK_MATH)
+	fprintf (init_file, " | bif_round_bit");
+      if (bifs[i].attrs.isinit)
+	fprintf (init_file, " | bif_init_bit");
+      if (bifs[i].attrs.isset)
+	fprintf (init_file, " | bif_set_bit");
+      if (bifs[i].attrs.isext)
+	fprintf (init_file, " | bif_ext_bit");
+      if (bifs[i].attrs.isnosoft)
+	fprintf (init_file, " | bif_nosoft_bit");
+      if (bifs[i].attrs.isldv)
+	fprintf (init_file, " | bif_ldv_bit");
+      if (bifs[i].attrs.isstv)
+	fprintf (init_file, " | bif_stv_bit");
+      if (bifs[i].attrs.isreve)
+	fprintf (init_file, " | bif_reve_bit");
+      if (bifs[i].attrs.isabs)
+	fprintf (init_file, " | bif_abs_bit");
+      if (bifs[i].attrs.ispred)
+	fprintf (init_file, " | bif_pred_bit");
+      if (bifs[i].attrs.ishtm)
+	fprintf (init_file, " | bif_htm_bit");
+      fprintf (init_file, ";\n");
+      fprintf (init_file,
+	       "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
+	       "\n        = %d;\n",
+	       bifs[i].idname, bifs[i].proto.restr_opnd);
+      if (bifs[i].proto.restr_opnd)
+	{
+	  const char *res
+	    = (bifs[i].proto.restr == RES_BITS ? "RES_BITS"
+	       : (bifs[i].proto.restr == RES_RANGE ? "RES_RANGE"
+		  : (bifs[i].proto.restr == RES_VALUES ? "RES_VALUES"
+		     : "ERROR")));
+	  fprintf (init_file,
+		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr"
+		   "\n        = %s;\n",
+		   bifs[i].idname, res);
+	  fprintf (init_file,
+		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1"
+		   "\n        = %d;\n",
+		   bifs[i].idname, bifs[i].proto.restr_val1);
+	  fprintf (init_file,
+		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2"
+		   "\n        = %d;\n",
+		   bifs[i].idname, bifs[i].proto.restr_val2);
+	}
+      fprintf (init_file, "\n");
+
+      fprintf (init_file,
+	       "      bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",
+	       bifs[i].idname);
+      fprintf (init_file,
+	       "      hash = rs6000_bif_hasher::hash (bifaddr);\n");
+      fprintf (init_file,
+	       "      slot = bif_hash.find_slot_with_hash (\n");
+      fprintf (init_file,
+	       "               \"%s\", hash, INSERT\n",
+	       bifs[i].proto.bifname);
+      fprintf (init_file,
+	       "             );\n");
+      fprintf (init_file,
+	       "      *slot = bifaddr;\n\n");
+
+      fprintf (init_file,
+	       "#ifdef NEW_BUILTINS_ARE_LIVE\n");
+      fprintf (init_file,
+	       "      rs6000_builtin_decls[(int)RS6000_BIF_%s]\n",
+	       bifs[i].idname);
+      fprintf (init_file,
+	       "        = add_builtin_function (\"%s\",\n",
+	       bifs[i].proto.bifname);
+      fprintf (init_file,
+	       "                                %s,\n",
+	       bifs[i].fndecl);
+      fprintf (init_file,
+	       "                                (int)RS6000_BIF_%s, NULL,"
+	       " NULL_TREE);\n",
+	       bifs[i].idname);
+      fprintf (init_file,
+	       "#endif\n");
+
+      if (i < curr_bif)
+	fprintf (init_file, "\n");
+    }
+  fprintf (init_file, "    }\n\n");
+}
+
+/* Write code to initialize the overload table.  */
+static void
+write_init_ovld_table ()
+{
+  fprintf (init_file, "  int base = RS6000_BIF_MAX;\n\n");
+
+  for (int i = 0; i <= curr_ovld; i++)
+    {
+      fprintf (init_file,
+	       "  rs6000_overload_info[RS6000_OVLD_%s - base].bifname"
+	       "\n    = \"%s\";\n",
+	       ovlds[i].idname, ovlds[i].proto.bifname);
+      fprintf (init_file,
+	       "  rs6000_overload_info[RS6000_OVLD_%s - base].bifid"
+	       "\n    = RS6000_BIF_%s;\n",
+	       ovlds[i].idname, ovlds[i].idname);
+      fprintf (init_file,
+	       "  rs6000_overload_info[RS6000_OVLD_%s - base].fntype"
+	       "\n    = %s;\n",
+	       ovlds[i].idname, ovlds[i].fndecl);
+      fprintf (init_file,
+	       "  rs6000_overload_info[RS6000_OVLD_%s - base].next"
+	       "\n    = ", ovlds[i].idname);
+      if (i < curr_ovld
+	  && !strcmp (ovlds[i+1].proto.bifname, ovlds[i].proto.bifname))
+	fprintf (init_file,
+		 "&rs6000_overload_info[RS6000_OVLD_%s - base];\n",
+		 ovlds[i+1].idname);
+      else
+	fprintf (init_file, "NULL;\n");
+
+      if (i == 0 || ovlds[i].stanza != ovlds[i-1].stanza)
+	{
+	  fprintf (init_file, "\n");
+
+	  fprintf (init_file,
+		   "  ovldaddr = &rs6000_overload_info"
+		   "[RS6000_OVLD_%s - base];\n",
+		   ovlds[i].idname);
+	  fprintf (init_file,
+		   "  hash = rs6000_ovld_hasher::hash (ovldaddr);\n");
+	  fprintf (init_file,
+		   "  oslot = ovld_hash.find_slot_with_hash (\n");
+	  fprintf (init_file,
+		   "            \"%s\", hash, INSERT\n",
+		   ovlds[i].proto.bifname);
+	  fprintf (init_file,
+		   "         );\n");
+	  fprintf (init_file,
+		   "  *oslot = ovldaddr;\n");
+	}
+
+      if (i < curr_ovld)
+	fprintf (init_file, "\n");
+    }
+}
+
 /* Write everything to the initialization file (rs6000-bif.c).  */
 static int
 write_init_file ()
 {
+  write_autogenerated_header (init_file);
+
+  fprintf (init_file, "#include \"config.h\"\n");
+  fprintf (init_file, "#include \"system.h\"\n");
+  fprintf (init_file, "#include \"coretypes.h\"\n");
+  fprintf (init_file, "#include \"backend.h\"\n");
+  fprintf (init_file, "#include \"rtl.h\"\n");
+  fprintf (init_file, "#include \"tree.h\"\n");
+  fprintf (init_file, "#include \"insn-codes.h\"\n");
+  fprintf (init_file, "#include \"rs6000-bif.h\"\n");
+  fprintf (init_file, "\n");
+
+  fprintf (init_file,
+	   "bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");
+  fprintf (init_file,
+	   "ovlddata rs6000_overload_info[RS6000_OVLD_MAX"
+	   " - RS6000_BIF_MAX];\n\n");
+
+  rbt_inorder_callback (&fntype_rbt, fntype_rbt.rbt_root, write_fntype);
+  fprintf (init_file, "\n");
+
+  fprintf (init_file, "hashval_t\n");
+  fprintf (init_file, "rs6000_bif_hasher::hash (bifdata *bd)\n");
+  fprintf (init_file, "{\n");
+  fprintf (init_file, "  return htab_hash_string (bd->bifname);\n");
+  fprintf (init_file, "}\n\n");
+
+  fprintf (init_file, "bool\n");
+  fprintf (init_file,
+	   "rs6000_bif_hasher::equal (bifdata *bd, const char *name)\n");
+  fprintf (init_file, "{\n");
+  fprintf (init_file, "  return bd && name && !strcmp (bd->bifname, name);\n");
+  fprintf (init_file, "}\n\n");
+
+  fprintf (init_file, "hash_table<rs6000_bif_hasher> bif_hash (1024);\n\n");
+
+  fprintf (init_file, "hashval_t\n");
+  fprintf (init_file, "rs6000_ovld_hasher::hash (ovlddata *od)\n");
+  fprintf (init_file, "{\n");
+  fprintf (init_file, "  return htab_hash_string (od->bifname);\n");
+  fprintf (init_file, "}\n\n");
+
+  fprintf (init_file, "bool\n");
+  fprintf (init_file,
+	   "rs6000_ovld_hasher::equal (ovlddata *od, const char *name)\n");
+  fprintf (init_file, "{\n");
+  fprintf (init_file, "  return od && name && !strcmp (od->bifname, name);\n");
+  fprintf (init_file, "}\n\n");
+
+  fprintf (init_file, "hash_table<rs6000_ovld_hasher> ovld_hash (512);\n\n");
+
+  fprintf (init_file, "void\n");
+  fprintf (init_file, "rs6000_autoinit_builtins ()\n");
+  fprintf (init_file, "{\n");
+  fprintf (init_file, "  bifdata **slot;\n");
+  fprintf (init_file, "  bifdata *bifaddr;\n");
+  fprintf (init_file, "  hashval_t hash;\n");
+  fprintf (init_file, "  ovlddata **oslot;\n");
+  fprintf (init_file, "  ovlddata *ovldaddr;\n\n");
+  rbt_inorder_callback (&fntype_rbt, fntype_rbt.rbt_root, write_fntype_init);
+  fprintf (init_file, "\n");
+
+  write_init_bif_table ();
+  write_init_ovld_table ();
+
+  fprintf (init_file, "}\n");
   return 1;
 }
 
