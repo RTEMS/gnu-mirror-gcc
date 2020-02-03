@@ -768,11 +768,11 @@ sort_hist_values (histogram_value hist)
   gcc_assert (hist->type == HIST_TYPE_TOPN_VALUES
 	      || hist->type == HIST_TYPE_INDIR_CALL);
 
-  unsigned counters = hist->hvalue.counters[1];
-  for (unsigned i = 0; i < counters - 1; i++)
+  int counters = hist->hvalue.counters[1];
+  for (int i = 0; i < counters - 1; i++)
     {
       bool swapped = false;
-      for (unsigned j = 0; j < counters - 1 - i; j++)
+      for (int j = 0; j < counters - 1 - i; j++)
 	{
 	  gcov_type *p = &hist->hvalue.counters[2 * j + 2];
 	  if (p[1] < p[3] || (p[1] == p[3] && p[0] < p[2]))
@@ -842,12 +842,19 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 
       if (topn_p)
 	{
-	  unsigned total_size = 2 + 2 * act_count[t][1];	  
+	  unsigned total_size;
+	  if (act_count[t])
+	    total_size = 2 + 2 * act_count[t][1];
+	  else
+	    total_size = 2;
 	  gimple_add_histogram_value (cfun, stmt, hist);
 	  hist->n_counters = total_size;
 	  hist->hvalue.counters = XNEWVEC (gcov_type, hist->n_counters);
 	  for (j = 0; j < hist->n_counters; j++)
-	    hist->hvalue.counters[j] = act_count[t][j];
+	    if (act_count[t])
+	      hist->hvalue.counters[j] = act_count[t][j];
+	    else
+	      hist->hvalue.counters[j] = 0;
 	  act_count[t] += hist->n_counters;
 	  sort_hist_values (hist);
 	}

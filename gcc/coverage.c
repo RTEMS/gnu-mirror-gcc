@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "auto-profile.h"
 #include "profile.h"
+#include "value-prof.h"
 
 #include "gcov-io.c"
 
@@ -344,9 +345,11 @@ get_coverage_counts (unsigned counter, unsigned cfg_checksum,
 	 can do about it.  */
       return NULL;
     }
-  
+ 
+  int a = GCOV_COUNTER_V_INDIR;
   if (entry->cfg_checksum != cfg_checksum
-      || (counter != (GCOV_COUNTER_V_TOPN  + 1)
+      || (counter != (GCOV_COUNTER_V_INDIR)
+	  && counter != (GCOV_COUNTER_V_TOPN)
 	  && entry->n_counts != n_counts))
     {
       static int warned = 0;
