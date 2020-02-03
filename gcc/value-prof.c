@@ -387,12 +387,30 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	default:
 	  gcc_unreachable ();
 	}
-      new_val->hvalue.counters = XNEWVAR (gcov_type,
-					  sizeof (*new_val->hvalue.counters)
-					  * ncounters);
-      new_val->n_counters = ncounters;
-      for (i = 0; i < ncounters; i++)
-	new_val->hvalue.counters[i] = streamer_read_gcov_count (ib);
+
+      if (type == HIST_TYPE_INDIR_CALL || type == HIST_TYPE_TOPN_VALUES)
+	{
+	  gcov_type total = streamer_read_gcov_count (ib);
+	  gcov_type ncounters = streamer_read_gcov_count (ib);
+	  new_val->hvalue.counters = XNEWVAR (gcov_type,
+					      sizeof (*new_val->hvalue.counters)
+					      * (2 + 2 * ncounters));
+	  new_val->hvalue.counters[0] = total;
+	  new_val->hvalue.counters[1] = ncounters;
+	  new_val->n_counters = 2 + 2 * ncounters;
+	  for (i = 0; i < 2 * ncounters; i++)
+	    new_val->hvalue.counters[2 + i] = streamer_read_gcov_count (ib);
+	}
+      else
+	{
+	  new_val->hvalue.counters = XNEWVAR (gcov_type,
+					      sizeof (*new_val->hvalue.counters)
+					      * ncounters);
+	  new_val->n_counters = ncounters;
+	  for (i = 0; i < ncounters; i++)
+	    new_val->hvalue.counters[i] = streamer_read_gcov_count (ib);
+	}
+
       if (!next_p)
 	gimple_add_histogram_value (cfun, stmt, new_val);
       else
