@@ -265,14 +265,15 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 		    ? "Top N value counter" : "Indirect call counter"));
 	  if (hist->hvalue.counters)
 	    {
-	      fprintf (dump_file, " all: %" PRId64 ", values: ",
-		       (int64_t) hist->hvalue.counters[0]);
-	      for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+	      unsigned count = hist->hvalue.counters[1];
+	      fprintf (dump_file, " all: %" PRId64 ", %" PRId64 " values: ",
+		       (int64_t) hist->hvalue.counters[0], (int64_t) count);
+	      for (unsigned i = 0; i < count; i++)
 		{
 		  fprintf (dump_file, "[%" PRId64 ":%" PRId64 "]",
-			   (int64_t) hist->hvalue.counters[2 * i + 1],
-			   (int64_t) hist->hvalue.counters[2 * i + 2]);
-		  if (i != GCOV_TOPN_VALUES - 1)
+			   (int64_t) hist->hvalue.counters[2 * i + 2],
+			   (int64_t) hist->hvalue.counters[2 * i + 3]);
+		  if (i != count - 1)
 		    fprintf (dump_file, ", ");
 		}
 	      fprintf (dump_file, ".\n");
@@ -726,18 +727,17 @@ get_nth_most_common_value (gimple *stmt, const char *counter_type,
 			   histogram_value hist, gcov_type *value,
 			   gcov_type *count, gcov_type *all, unsigned n)
 {
-  if (hist->hvalue.counters[2] == -1)
+  unsigned counters = hist->hvalue.counters[1];
+  if (n >= counters)
     return false;
-
-  gcc_assert (n < GCOV_TOPN_VALUES);
 
   *count = 0;
   *value = 0;
 
   gcov_type read_all = hist->hvalue.counters[0];
 
-  gcov_type v = hist->hvalue.counters[2 * n + 1];
-  gcov_type c = hist->hvalue.counters[2 * n + 2];
+  gcov_type v = hist->hvalue.counters[2 * n + 2];
+  gcov_type c = hist->hvalue.counters[2 * n + 3];
 
   /* Indirect calls can't be verified.  */
   if (stmt

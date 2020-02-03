@@ -376,14 +376,17 @@ gcov_counter_add (gcov_type *counter, gcov_type value, int use_atomic)
     *counter += value;
 }
 
-static inline void
+static inline int
 gcov_counter_set_if_null (gcov_type *counter, struct gcov_kvp *node,
 			  int use_atomic)
 {
   if (use_atomic)
-    __sync_val_compare_and_swap (counter, NULL, (intptr_t)node);
+    return !__sync_val_compare_and_swap (counter, NULL, (intptr_t)node);
   else
-    *counter = (intptr_t)node;
+    {
+      *counter = (intptr_t)node;
+      return 1;
+    }
 }
 
 static inline void
@@ -422,18 +425,20 @@ gcov_topn_add_value (gcov_type *counters, gcov_type value, gcov_type count,
     }
   else
     {
-      /* Increment number of nodes.  */
-      gcov_counter_add (&counters[1], 1, use_atomic);
-
       struct gcov_kvp *new_node
 	= (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
       new_node->value = value;
       new_node->count = count;
 
+      int success = 0;
       if (!counters[2])
-	gcov_counter_set_if_null (&counters[2], new_node, use_atomic);
+	success = gcov_counter_set_if_null (&counters[2], new_node, use_atomic);
       else if (prev_node && !prev_node->next)
-	gcov_counter_set_if_null ((gcov_type *)&prev_node->next, new_node, use_atomic);
+	success = gcov_counter_set_if_null ((gcov_type *)&prev_node->next, new_node, use_atomic);
+
+      /* Increment number of nodes.  */
+      if (success)
+	gcov_counter_add (&counters[1], 1, use_atomic);
     }
 }
 

@@ -301,29 +301,17 @@ merge_one_data (const char *filename,
           if (!merge)
             continue;
 
-	  if (merge == __gcov_merge_topn)
-	    for (unsigned i = 0; i < ci_ptr->num / GCOV_TOPN_VALUES_COUNTERS;
-		 i++)
-	      {
-		tag = gcov_read_unsigned ();
-		length = gcov_read_unsigned ();
-		if (tag != GCOV_TAG_FOR_COUNTER (t_ix))
-		    goto read_mismatch;
-		(*merge) (ci_ptr->values + i * GCOV_TOPN_VALUES_COUNTERS, GCOV_TOPN_VALUES_COUNTERS);
-	      }
-	  else
-	    {
-	      tag = gcov_read_unsigned ();
-	      length = gcov_read_unsigned ();
-	      if (tag != GCOV_TAG_FOR_COUNTER (t_ix)
-		  || length != GCOV_TAG_COUNTER_LENGTH (ci_ptr->num))
-		goto read_mismatch;
-	      (*merge) (ci_ptr->values, ci_ptr->num);
-	    }
+	  tag = gcov_read_unsigned ();
+	  length = gcov_read_unsigned ();
+	  if (tag != GCOV_TAG_FOR_COUNTER (t_ix)
+	      || (length != GCOV_TAG_COUNTER_LENGTH (ci_ptr->num)
+		  && t_ix != GCOV_COUNTER_V_TOPN + 1))
+	    goto read_mismatch;
+	  (*merge) (ci_ptr->values, ci_ptr->num);
 	  ci_ptr++;
-        }
+	}
       if ((error = gcov_is_error ()))
-        goto read_error;
+	goto read_error;
     }
 
   if (tag)
@@ -404,16 +392,20 @@ write_one_data (const struct gcov_info *gi_ptr,
 
 	  if (gi_ptr->merge[t_ix] == __gcov_merge_topn)
 	    {
-	      // TODO
-	      gcc_assert (n_counts % 3 == 0);
-	      for (unsigned i = 0; i < (n_counts / 3); i++)
+	      unsigned counters = n_counts / GCOV_TOPN_VALUES_COUNTERS;
+	      gcc_assert (n_counts % GCOV_TOPN_VALUES_COUNTERS == 0);
+	      unsigned pair_total = 0;
+	      for (unsigned i = 0; i < counters; i++)
+		pair_total += ci_ptr->values[GCOV_TOPN_VALUES_COUNTERS * i + 1];
+	      gcov_write_tag_length (GCOV_TAG_FOR_COUNTER (t_ix),
+				     GCOV_TAG_COUNTER_LENGTH (2 * counters + 2 * pair_total));
+
+	      for (unsigned i = 0; i < counters; i++)
 		{
-		  gcov_type pair_count = ci_ptr->values[3 * i + 1];
-		  gcov_write_tag_length (GCOV_TAG_FOR_COUNTER (t_ix),
-					 GCOV_TAG_COUNTER_LENGTH (2 + 2 * pair_count));
-		  gcov_write_counter (ci_ptr->values[3 * i]);
+		  gcov_type pair_count = ci_ptr->values[GCOV_TOPN_VALUES_COUNTERS * i + 1];
+		  gcov_write_counter (ci_ptr->values[GCOV_TOPN_VALUES_COUNTERS * i]);
 		  gcov_write_counter (pair_count);
-		  for (struct gcov_kvp *node = (struct gcov_kvp *)ci_ptr->values[3 * i + 2];
+		  for (struct gcov_kvp *node = (struct gcov_kvp *)ci_ptr->values[GCOV_TOPN_VALUES_COUNTERS * i + 2];
 		       node != NULL; node = node->next)
 		    {
 		      gcov_write_counter (node->value);

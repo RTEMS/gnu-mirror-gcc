@@ -99,20 +99,23 @@ __gcov_merge_time_profile (gcov_type *counters, unsigned n_counters)
 void
 __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
 {
-  gcc_assert (n_counters == GCOV_TOPN_VALUES_COUNTERS);
+  gcc_assert (!(n_counters % GCOV_TOPN_VALUES_COUNTERS));
 
-  /* First value is number of total executions of the profiler.  */
-  gcov_type all = gcov_get_counter_ignore_scaling (-1);
-  gcov_type n = gcov_get_counter_ignore_scaling (-1);
-
-  counters[0] += all;
-
-  for (unsigned i = 0; i < n; i++)
+  for (unsigned i = 0; i < (n_counters / GCOV_TOPN_VALUES_COUNTERS); i++)
     {
-      gcov_type value = gcov_get_counter_target ();
-      gcov_type count = gcov_get_counter_ignore_scaling (-1);
+      /* First value is number of total executions of the profiler.  */
+      gcov_type all = gcov_get_counter_ignore_scaling (-1);
+      gcov_type n = gcov_get_counter_ignore_scaling (-1);
 
-      gcov_topn_add_value (counters, value, count, 0);
+      counters[GCOV_TOPN_VALUES_COUNTERS * i] += all;
+
+      for (unsigned j = 0; j < n; j++)
+	{
+	  gcov_type value = gcov_get_counter_target ();
+	  gcov_type count = gcov_get_counter_ignore_scaling (-1);
+
+	  gcov_topn_add_value (counters + GCOV_TOPN_VALUES_COUNTERS * i, value, count, 0);
+	}
     }
 }
 #endif /* L_gcov_merge_topn */

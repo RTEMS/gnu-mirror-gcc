@@ -345,7 +345,9 @@ get_coverage_counts (unsigned counter, unsigned cfg_checksum,
       return NULL;
     }
   
-  if (entry->cfg_checksum != cfg_checksum || entry->n_counts != n_counts)
+  if (entry->cfg_checksum != cfg_checksum
+      || (counter != (GCOV_COUNTER_V_TOPN  + 1)
+	  && entry->n_counts != n_counts))
     {
       static int warned = 0;
       bool warning_printed = false;
