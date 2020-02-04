@@ -218,7 +218,7 @@ allocate_filename_struct (struct gcov_filename *gf)
 
   {
     /* Check if the level of dirs to strip off specified. */
-    char *tmp = getenv("GCOV_PREFIX_STRIP");
+    char *tmp = getenv ("GCOV_PREFIX_STRIP_COMPONENTS");
     if (tmp)
       {
         strip = atoi (tmp);
@@ -228,6 +228,7 @@ allocate_filename_struct (struct gcov_filename *gf)
       }
   }
   gf->strip = strip;
+  gf->strip_prefix = getenv ("GCOV_PREFIX_STRIP");
 
   /* Get file name relocation prefix.  Non-absolute values are ignored. */
   gcov_prefix = getenv("GCOV_PREFIX");
@@ -239,7 +240,7 @@ allocate_filename_struct (struct gcov_filename *gf)
 
   /* If no prefix was specified and a prefix stip, then we assume
      relative.  */
-  if (!prefix_length && gf->strip)
+  if (!prefix_length && (gf->strip || gf->strip_prefix))
     {
       gcov_prefix = ".";
       prefix_length = 1;
@@ -286,6 +287,8 @@ gcov_exit_open_gcda_file (struct gcov_info *gi_ptr,
             level--;
           }
     }
+  else if (gf->strip_prefix && strstr (fname, gf->strip_prefix) == fname)
+    fname += strlen (gf->strip_prefix);
 
   /* Update complete filename with stripped original. */
   if (gf->prefix)

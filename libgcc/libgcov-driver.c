@@ -76,6 +76,7 @@ struct gcov_filename
 {
   char *filename;  /* filename buffer */
   int strip; /* leading chars to strip from filename */
+  char *strip_prefix; /* leading path prefix that should be stripped */
   char *prefix; /* prefix string */
 };
 
