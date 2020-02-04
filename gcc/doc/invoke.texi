@@ -31091,6 +31091,8 @@ for any cases where this rule is relaxed.
 @item Each of the following options must be the same when building and using
 the precompiled header:
 
+@item Address space layout randomization (ASLR) is disabled.
+
 @gccoptlist{-fexceptions}
 
 @item
