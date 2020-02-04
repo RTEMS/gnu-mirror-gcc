@@ -1788,7 +1788,7 @@ s390_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
       if (*code == EQ)
 	new_code = reversed_comparison_code_parts (GET_CODE (*op0),
 						   XEXP (*op0, 0),
-						   XEXP (*op1, 0), NULL);
+						   XEXP (*op0, 1), NULL);
       else
 	new_code = GET_CODE (*op0);
 
@@ -15974,13 +15974,19 @@ s390_support_vector_misalignment (machine_mode mode ATTRIBUTE_UNUSED,
 static HOST_WIDE_INT
 s390_vector_alignment (const_tree type)
 {
+  tree size = TYPE_SIZE (type);
+
   if (!TARGET_VX_ABI)
     return default_vector_alignment (type);
 
   if (TYPE_USER_ALIGN (type))
     return TYPE_ALIGN (type);
 
-  return MIN (64, tree_to_shwi (TYPE_SIZE (type)));
+  if (tree_fits_uhwi_p (size)
+      && tree_to_uhwi (size) < BIGGEST_ALIGNMENT)
+    return tree_to_uhwi (size);
+
+  return BIGGEST_ALIGNMENT;
 }
 
 /* Implement TARGET_CONSTANT_ALIGNMENT.  Alignment on even addresses for

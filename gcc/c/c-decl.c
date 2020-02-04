@@ -3044,7 +3044,7 @@ pushdecl (tree x)
      unless they have initializers (which generate code).  */
   if (current_function_decl
       && (!VAR_OR_FUNCTION_DECL_P (x)
-	  || DECL_INITIAL (x) || !DECL_EXTERNAL (x)))
+	  || DECL_INITIAL (x) || !TREE_PUBLIC (x)))
     DECL_CONTEXT (x) = current_function_decl;
 
   /* Anonymous decls are just inserted in the scope.  */
@@ -5584,39 +5584,6 @@ check_compound_literal_type (location_t loc, struct c_type_name *type_name)
           || type_name->specs->typespec_kind == ctsk_tagfirstref))
     warning_at (loc, OPT_Wc___compat,
 		"defining a type in a compound literal is invalid in C++");
-}
-
-/* Determine whether TYPE is a structure with a flexible array member,
-   or a union containing such a structure (possibly recursively).  */
-
-static bool
-flexible_array_type_p (tree type)
-{
-  tree x;
-  switch (TREE_CODE (type))
-    {
-    case RECORD_TYPE:
-      x = TYPE_FIELDS (type);
-      if (x == NULL_TREE)
-	return false;
-      while (DECL_CHAIN (x) != NULL_TREE)
-	x = DECL_CHAIN (x);
-      if (TREE_CODE (TREE_TYPE (x)) == ARRAY_TYPE
-	  && TYPE_SIZE (TREE_TYPE (x)) == NULL_TREE
-	  && TYPE_DOMAIN (TREE_TYPE (x)) != NULL_TREE
-	  && TYPE_MAX_VALUE (TYPE_DOMAIN (TREE_TYPE (x))) == NULL_TREE)
-	return true;
-      return false;
-    case UNION_TYPE:
-      for (x = TYPE_FIELDS (type); x != NULL_TREE; x = DECL_CHAIN (x))
-	{
-	  if (flexible_array_type_p (TREE_TYPE (x)))
-	    return true;
-	}
-      return false;
-    default:
-    return false;
-  }
 }
 
 /* Performs sanity checks on the TYPE and WIDTH of the bit-field NAME,
@@ -9968,6 +9935,20 @@ identifier_global_value	(tree t)
   struct c_binding *b;
 
   for (b = I_SYMBOL_BINDING (t); b; b = b->shadowed)
+    if (B_IN_FILE_SCOPE (b) || B_IN_EXTERNAL_SCOPE (b))
+      return b->decl;
+
+  return NULL_TREE;
+}
+
+/* Return the global value of tag T as a symbol.  */
+
+tree
+identifier_global_tag (tree t)
+{
+  struct c_binding *b;
+
+  for (b = I_TAG_BINDING (t); b; b = b->shadowed)
     if (B_IN_FILE_SCOPE (b) || B_IN_EXTERNAL_SCOPE (b))
       return b->decl;
 

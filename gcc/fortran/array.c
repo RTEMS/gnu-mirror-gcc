@@ -837,10 +837,6 @@ gfc_set_array_spec (gfc_symbol *sym, gfc_array_spec *as, locus *error_loc)
 
   if (as->corank)
     {
-      /* The "sym" has no corank (checked via gfc_add_codimension). Thus
-	 the codimension is simply added.  */
-      gcc_assert (as->rank == 0 && sym->as->corank == 0);
-
       sym->as->cotype = as->cotype;
       sym->as->corank = as->corank;
       /* Check F2018:C822.  */
@@ -869,7 +865,7 @@ gfc_set_array_spec (gfc_symbol *sym, gfc_array_spec *as, locus *error_loc)
       if (sym->as->rank + sym->as->corank > GFC_MAX_DIMENSIONS)
 	goto too_many;
 
-      for (i = 0; i < sym->as->corank; i++)
+      for (i = sym->as->corank - 1; i >= 0; i--)
 	{
 	  sym->as->lower[as->rank + i] = sym->as->lower[i];
 	  sym->as->upper[as->rank + i] = sym->as->upper[i];

@@ -10121,22 +10121,11 @@ uses_template_parms (tree t)
 		   || uses_template_parms (TREE_CHAIN (t)));
   else if (TREE_CODE (t) == TYPE_DECL)
     dependent_p = dependent_type_p (TREE_TYPE (t));
-  else if (DECL_P (t)
-	   || EXPR_P (t)
-	   || TREE_CODE (t) == TEMPLATE_PARM_INDEX
-	   || TREE_CODE (t) == OVERLOAD
-	   || BASELINK_P (t)
-	   || identifier_p (t)
-	   || TREE_CODE (t) == TRAIT_EXPR
-	   || TREE_CODE (t) == CONSTRUCTOR
-	   || CONSTANT_CLASS_P (t))
+  else if (t == error_mark_node)
+    dependent_p = false;
+  else
     dependent_p = (type_dependent_expression_p (t)
 		   || value_dependent_expression_p (t));
-  else
-    {
-      gcc_assert (t == error_mark_node);
-      dependent_p = false;
-    }
 
   processing_template_decl = saved_processing_template_decl;
 
@@ -14756,6 +14745,71 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	if (t == void_list_node)
 	  return t;
 
+	if ((TREE_PURPOSE (t) && PACK_EXPANSION_P (TREE_PURPOSE (t)))
+	    || (TREE_VALUE (t) && PACK_EXPANSION_P (TREE_VALUE (t))))
+	  {
+	    /* We have pack expansions, so expand those and
+	       create a new list out of it.  */
+
+	    /* Expand the argument expressions.  */
+	    tree purposevec = NULL_TREE;
+	    if (TREE_PURPOSE (t))
+	      purposevec = tsubst_pack_expansion (TREE_PURPOSE (t), args,
+						  complain, in_decl);
+	    if (purposevec == error_mark_node)
+	      return error_mark_node;
+
+	    tree valuevec = NULL_TREE;
+	    if (TREE_VALUE (t))
+	      valuevec = tsubst_pack_expansion (TREE_VALUE (t), args,
+						complain, in_decl);
+	    if (valuevec == error_mark_node)
+	      return error_mark_node;
+
+	    /* Build the rest of the list.  */
+	    tree chain = TREE_CHAIN (t);
+	    if (chain && chain != void_type_node)
+	      chain = tsubst (chain, args, complain, in_decl);
+	    if (chain == error_mark_node)
+	      return error_mark_node;
+
+	    /* Determine the number of arguments.  */
+	    int len = -1;
+	    if (purposevec && TREE_CODE (purposevec) == TREE_VEC)
+	      {
+		len = TREE_VEC_LENGTH (purposevec);
+		gcc_assert (!valuevec || len == TREE_VEC_LENGTH (valuevec));
+	      }
+	    else if (TREE_CODE (valuevec) == TREE_VEC)
+	      len = TREE_VEC_LENGTH (valuevec);
+	    else
+	      {
+		/* Since we only performed a partial substitution into
+		   the argument pack, we only RETURN (a single list
+		   node.  */
+		if (purposevec == TREE_PURPOSE (t)
+		    && valuevec == TREE_VALUE (t)
+		    && chain == TREE_CHAIN (t))
+		  return t;
+
+		return tree_cons (purposevec, valuevec, chain);
+	      }
+
+	    /* Convert the argument vectors into a TREE_LIST.  */
+	    for (int i = len; i-- > 0; )
+	      {
+		purpose = (purposevec ? TREE_VEC_ELT (purposevec, i)
+			   : NULL_TREE);
+		value = (valuevec ? TREE_VEC_ELT (valuevec, i)
+			 : NULL_TREE);
+
+		/* Build the list (backwards).  */
+		chain = hash_tree_cons (purpose, value, chain);
+	      }
+
+	    return chain;
+	  }
+
 	purpose = TREE_PURPOSE (t);
 	if (purpose)
 	  {
@@ -16133,13 +16187,24 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case INTEGER_CST:
     case REAL_CST:
-    case STRING_CST:
     case COMPLEX_CST:
       {
 	/* Instantiate any typedefs in the type.  */
 	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
 	r = fold_convert (type, t);
 	gcc_assert (TREE_CODE (r) == code);
+	return r;
+      }
+
+    case STRING_CST:
+      {
+	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	r = t;
+	if (type != TREE_TYPE (t))
+	  {
+	    r = copy_node (t);
+	    TREE_TYPE (r) = type;
+	  }
 	return r;
       }
 
@@ -19529,13 +19594,8 @@ tsubst_copy_and_build (tree t,
       {
 	tree type1 = tsubst (TRAIT_EXPR_TYPE1 (t), args,
 			     complain, in_decl);
-
-	tree type2 = TRAIT_EXPR_TYPE2 (t);
-	if (type2 && TREE_CODE (type2) == TREE_LIST)
-	  type2 = RECUR (type2);
-	else if (type2)
-	  type2 = tsubst (type2, args, complain, in_decl);
-	
+	tree type2 = tsubst (TRAIT_EXPR_TYPE2 (t), args,
+			     complain, in_decl);
 	RETURN (finish_trait_expr (TRAIT_EXPR_KIND (t), type1, type2));
       }
 
@@ -20575,7 +20635,7 @@ static bool
 deducible_expression (tree expr)
 {
   /* Strip implicit conversions.  */
-  while (CONVERT_EXPR_P (expr))
+  while (CONVERT_EXPR_P (expr) || TREE_CODE (expr) == VIEW_CONVERT_EXPR)
     expr = TREE_OPERAND (expr, 0);
   return (TREE_CODE (expr) == TEMPLATE_PARM_INDEX);
 }
@@ -22045,8 +22105,9 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
   /* I don't think this will do the right thing with respect to types.
      But the only case I've seen it in so far has been array bounds, where
      signedness is the only information lost, and I think that will be
-     okay.  */
-  while (CONVERT_EXPR_P (parm))
+     okay.  VIEW_CONVERT_EXPR can appear with class NTTP, thanks to
+     finish_id_expression_1, and are also OK.  */
+  while (CONVERT_EXPR_P (parm) || TREE_CODE (parm) == VIEW_CONVERT_EXPR)
     parm = TREE_OPERAND (parm, 0);
 
   if (arg == error_mark_node)

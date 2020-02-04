@@ -1419,6 +1419,28 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t,
 	    arg = adjust_temp_type (type, arg);
 	  if (!TREE_CONSTANT (arg))
 	    *non_constant_args = true;
+
+	  /* For virtual calls, adjust the this argument, so that it is
+	     the object on which the method is called, rather than
+	     one of its bases.  */
+	  if (i == 0 && DECL_VIRTUAL_P (fun))
+	    {
+	      tree addr = arg;
+	      STRIP_NOPS (addr);
+	      if (TREE_CODE (addr) == ADDR_EXPR)
+		{
+		  tree obj = TREE_OPERAND (addr, 0);
+		  while (TREE_CODE (obj) == COMPONENT_REF
+			 && DECL_FIELD_IS_BASE (TREE_OPERAND (obj, 1))
+			 && !same_type_ignoring_top_level_qualifiers_p
+					(TREE_TYPE (obj), DECL_CONTEXT (fun)))
+		    obj = TREE_OPERAND (obj, 0);
+		  if (obj != TREE_OPERAND (addr, 0))
+		    arg = build_fold_addr_expr_with_type (obj,
+							  TREE_TYPE (arg));
+		}
+	    }
+
 	  *p = build_tree_list (parms, arg);
 	  p = &TREE_CHAIN (*p);
 	}
@@ -2703,7 +2725,10 @@ cxx_eval_component_reference (const constexpr_ctx *ctx, tree t,
 	  : field == part)
 	{
 	  if (value)
-	    return value;
+	    {
+	      STRIP_ANY_LOCATION_WRAPPER (value);
+	      return value;
+	    }
 	  else
 	    /* We're in the middle of initializing it.  */
 	    break;
@@ -2793,6 +2818,7 @@ cxx_eval_bit_field_ref (const constexpr_ctx *ctx, tree t,
   FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (whole), i, field, value)
     {
       tree bitpos = bit_position (field);
+      STRIP_ANY_LOCATION_WRAPPER (value);
       if (bitpos == start && DECL_SIZE (field) == TREE_OPERAND (t, 1))
 	return value;
       if (TREE_CODE (TREE_TYPE (field)) == INTEGER_TYPE
@@ -5120,6 +5146,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	tree obj = OBJ_TYPE_REF_OBJECT (t);
 	obj = cxx_eval_constant_expression (ctx, obj, lval, non_constant_p,
 					    overflow_p);
+	STRIP_NOPS (obj);
 	/* We expect something in the form of &x.D.2103.D.2094; get x. */
 	if (TREE_CODE (obj) != ADDR_EXPR
 	    || !DECL_P (get_base_address (TREE_OPERAND (obj, 0))))
@@ -5555,7 +5582,7 @@ maybe_constant_value (tree t, tree decl, bool manifestly_const_eval)
   if (cv_cache == NULL)
     cv_cache = hash_map<tree, tree>::create_ggc (101);
   if (tree *cached = cv_cache->get (t))
-    return *cached;
+    return unshare_expr_without_location (*cached);
 
   r = cxx_eval_outermost_constant_expr (t, true, true, false, decl);
   gcc_checking_assert (r == t
@@ -5921,6 +5948,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case LABEL_DECL:
     case LABEL_EXPR:
     case CASE_LABEL_EXPR:
+    case PREDICT_EXPR:
     case CONST_DECL:
     case SIZEOF_EXPR:
     case ALIGNOF_EXPR:
@@ -6755,7 +6783,6 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 
     case CLEANUP_STMT:
     case EMPTY_CLASS_EXPR:
-    case PREDICT_EXPR:
       return false;
 
     case GOTO_EXPR:

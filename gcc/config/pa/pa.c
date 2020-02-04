@@ -206,6 +206,7 @@ static bool pa_hard_regno_mode_ok (unsigned int, machine_mode);
 static bool pa_modes_tieable_p (machine_mode, machine_mode);
 static bool pa_can_change_mode_class (machine_mode, machine_mode, reg_class_t);
 static HOST_WIDE_INT pa_starting_frame_offset (void);
+static section* pa_elf_select_rtx_section(machine_mode, rtx, unsigned HOST_WIDE_INT) ATTRIBUTE_UNUSED;
 
 /* The following extra sections are only used for SOM.  */
 static GTY(()) section *som_readonly_data_section;
@@ -7856,7 +7857,7 @@ pa_attr_length_call (rtx_insn *insn, int sibcall)
 
   /* 64-bit plabel sequence.  */
   else if (TARGET_64BIT && !local_call)
-    length += sibcall ? 28 : 24;
+    length += 24;
 
   /* non-pic long absolute branch sequence.  */
   else if ((TARGET_LONG_ABS_CALL || local_call) && !flag_pic)
@@ -7928,38 +7929,24 @@ pa_output_call (rtx_insn *insn, rtx call_dest, int sibcall)
 	  xoperands[0] = pa_get_deferred_plabel (call_dest);
 	  xoperands[1] = gen_label_rtx ();
 
-	  /* If this isn't a sibcall, we put the load of %r27 into the
-	     delay slot.  We can't do this in a sibcall as we don't
-	     have a second call-clobbered scratch register available.
-	     We don't need to do anything when generating fast indirect
-	     calls.  */
-	  if (seq_length != 0 && !sibcall)
+	  /* Put the load of %r27 into the delay slot.  We don't need to
+	     do anything when generating fast indirect calls.  */
+	  if (seq_length != 0)
 	    {
 	      final_scan_insn (NEXT_INSN (insn), asm_out_file,
 			       optimize, 0, NULL);
 
 	      /* Now delete the delay insn.  */
 	      SET_INSN_DELETED (NEXT_INSN (insn));
-	      seq_length = 0;
 	    }
 
 	  output_asm_insn ("addil LT'%0,%%r27", xoperands);
 	  output_asm_insn ("ldd RT'%0(%%r1),%%r1", xoperands);
 	  output_asm_insn ("ldd 0(%%r1),%%r1", xoperands);
-
-	  if (sibcall)
-	    {
-	      output_asm_insn ("ldd 24(%%r1),%%r27", xoperands);
-	      output_asm_insn ("ldd 16(%%r1),%%r1", xoperands);
-	      output_asm_insn ("bve (%%r1)", xoperands);
-	    }
-	  else
-	    {
-	      output_asm_insn ("ldd 16(%%r1),%%r2", xoperands);
-	      output_asm_insn ("bve,l (%%r2),%%r2", xoperands);
-	      output_asm_insn ("ldd 24(%%r1),%%r27", xoperands);
-	      seq_length = 1;
-	    }
+	  output_asm_insn ("ldd 16(%%r1),%%r2", xoperands);
+	  output_asm_insn ("bve,l (%%r2),%%r2", xoperands);
+	  output_asm_insn ("ldd 24(%%r1),%%r27", xoperands);
+	  seq_length = 1;
 	}
       else
 	{
@@ -9859,6 +9846,26 @@ pa_select_section (tree exp, int reloc,
     return som_one_only_data_section;
   else
     return data_section;
+}
+
+/* Implement pa_elf_select_rtx_section.  If X is a function label operand
+   and the function is in a COMDAT group, place the plabel reference in the
+   .data.rel.ro.local section.  The linker ignores references to symbols in
+   discarded sections from this section.  */
+   
+static section *
+pa_elf_select_rtx_section (machine_mode mode, rtx x,
+			   unsigned HOST_WIDE_INT align)
+{
+  if (function_label_operand (x, VOIDmode))
+    {
+      tree decl = SYMBOL_REF_DECL (x);
+
+      if (!decl || (DECL_P (decl) && DECL_COMDAT_GROUP (decl)))
+	return get_named_section (NULL, ".data.rel.ro.local", 1);
+    }
+
+  return default_elf_select_rtx_section (mode, x, align);
 }
 
 /* Implement pa_reloc_rw_mask.  */

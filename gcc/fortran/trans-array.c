@@ -537,9 +537,10 @@ gfc_conv_shift_descriptor_lbound (stmtblock_t* block, tree desc,
 
 void
 gfc_get_descriptor_offsets_for_info (const_tree desc_type, tree *data_off,
-				     tree *dtype_off, tree *dim_off,
-				     tree *dim_size, tree *stride_suboff,
-				     tree *lower_suboff, tree *upper_suboff)
+				     tree *dtype_off, tree *span_off,
+				     tree *dim_off, tree *dim_size,
+				     tree *stride_suboff, tree *lower_suboff,
+				     tree *upper_suboff)
 {
   tree field;
   tree type;
@@ -549,6 +550,8 @@ gfc_get_descriptor_offsets_for_info (const_tree desc_type, tree *data_off,
   *data_off = byte_position (field);
   field = gfc_advance_chain (TYPE_FIELDS (type), DTYPE_FIELD);
   *dtype_off = byte_position (field);
+  field = gfc_advance_chain (TYPE_FIELDS (type), SPAN_FIELD);
+  *span_off = byte_position (field);
   field = gfc_advance_chain (TYPE_FIELDS (type), DIMENSION_FIELD);
   *dim_off = byte_position (field);
   type = TREE_TYPE (TREE_TYPE (field));
@@ -8027,7 +8030,7 @@ gfc_conv_array_parameter (gfc_se * se, gfc_expr * expr, bool g77,
 	  /* The components shall be deallocated before their containing entity.  */
 	  gfc_prepend_expr_to_block (&se->post, tmp);
 	}
-      if (expr->ts.type == BT_CHARACTER)
+      if (expr->ts.type == BT_CHARACTER && expr->expr_type != EXPR_FUNCTION)
 	se->string_length = expr->ts.u.cl->backend_decl;
       if (size)
 	array_parameter_size (se->expr, expr, size);
