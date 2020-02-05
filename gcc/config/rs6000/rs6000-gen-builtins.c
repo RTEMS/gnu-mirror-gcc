@@ -32,11 +32,14 @@ along with GCC; see the file COPYING3.  If not see
    identifying the target mask for which the group of functions is
    permitted, with the mask in square brackets.  This is the only
    information allowed on the stanza header line, other than
-   whitespace.  Following the stanza header are two lines for each
-   function: the prototype line and the attributes line.  The
-   prototype line has this format, where the square brackets
-   indicate optional information and angle brackets indicate
-   required information:
+   whitespace.  For now, only an identifier is allowed within the
+   square brackets, but we could easily extend this to allow any
+   C expression.
+
+   Following the stanza header are two lines for each function: the
+   prototype line and the attributes line.  The prototype line has
+   this format, where the square brackets indicate optional
+   information and angle brackets indicate required information:
 
      [kind] <return-type> <bif-name> (<argument-list>);
 
@@ -61,37 +64,39 @@ along with GCC; see the file COPYING3.  If not see
 
    Attributes are strings, such as these:
 
-     init    Process as a vec_init function
-     set     Process as a vec_set function
-     ext     Process as a vec_extract function
-     nosoft  Not valid with -msoft-float
-     ldv     Needs special handling for vec_ld semantics
-     stv     Needs special handling for vec_st semantics
-     reve    Needs special handling for element reversal
-     abs     Needs special handling for absolute value
-     pred    Needs special handling for comparison predicates
-     htm     Needs special handling for transactional memory
+     init     Process as a vec_init function
+     set      Process as a vec_set function
+     extract  Process as a vec_extract function
+     nosoft   Not valid with -msoft-float
+     ldvec    Needs special handling for vec_ld semantics
+     stvec    Needs special handling for vec_st semantics
+     reve     Needs special handling for element reversal
+     abs      Needs special handling for absolute value
+     pred     Needs special handling for comparison predicates
+     htm      Needs special handling for transactional memory
 
    An example stanza might look like this:
 
 [TARGET_ALTIVEC]
-  const vector signed char __builtin_altivec_abs_v16qi (vector signed char);
+  const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
-  const vector signed short __builtin_altivec_abs_v8hi (vector signed short);
+  const vss __builtin_altivec_abs_v8hi (vss);
     ABS_V8HI absv8hi2 {abs}
 
+   Here "vsc" and "vss" are shorthand for "vector signed char" and
+   "vector signed short" to shorten line lengths and improve readability.
    Note the use of indentation, which is recommended but not required.
 
    The overload file has more complex stanza headers.  Here the stanza
    represents all functions with the same overloaded function name:
 
-     [<overload-id>, <external-name>, <internal-name>]
+     [<overload-id>, <abi-name>, <builtin-name>]
 
    Here the square brackets are part of the syntax, <overload-id> is a
    unique internal identifier for the overload that will be used as part
-   of an enumeration of all overloaded functions; <external-name> is the
-   name that will appear as a #define in altivec.h; and <internal-name>
-   is the name that is overloaded in the back end.
+   of an enumeration of all overloaded functions; <abi-name> is the name
+   that will appear as a #define in altivec.h; and <builtin-name> is the
+   name that is overloaded in the back end.
 
    Each function entry again has two lines.  The first line is again a
    prototype line (this time without [kind]):
@@ -105,15 +110,17 @@ along with GCC; see the file COPYING3.  If not see
    An example stanza might look like this:
 
 [VEC_ABS, vec_abs, __builtin_vec_abs]
-  vector signed char __builtin_vec_abs (vector signed char);
+  vsc __builtin_vec_abs (vsc);
     ABS_V16QI
-  vector signed short __builtin_vec_abs (vector signed short);
+  vss __builtin_vec_abs (vss);
     ABS_V8HI
 
-  Blank lines may be used as desired in these files.  If it's desirable,
+  Blank lines may be used as desired in these files between the lines as
+  defined above; that is, you can introduce as many extra newlines as you
+  like after a required newline, but nowhere else.  If it's desirable,
   C-style comments are allowable provided that the file is run through
   the preprocessor by the build system prior to feeding it to this
-  program.  */
+  program.  This is not yet implemented.  */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -225,10 +232,10 @@ struct typelist {
 struct attrinfo {
   char isinit;
   char isset;
-  char isext;
+  char isextract;
   char isnosoft;
-  char isldv;
-  char isstv;
+  char isldvec;
+  char isstvec;
   char isreve;
   char isabs;
   char ispred;
@@ -989,14 +996,14 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->isinit = 1;
 	else if (!strcmp (attrname, "set"))
 	  attrptr->isset = 1;
-	else if (!strcmp (attrname, "ext"))
-	  attrptr->isext = 1;
+	else if (!strcmp (attrname, "extract"))
+	  attrptr->isextract = 1;
 	else if (!strcmp (attrname, "nosoft"))
 	  attrptr->isnosoft = 1;
-	else if (!strcmp (attrname, "ldv"))
-	  attrptr->isldv = 1;
-	else if (!strcmp (attrname, "stv"))
-	  attrptr->isstv = 1;
+	else if (!strcmp (attrname, "ldvec"))
+	  attrptr->isldvec = 1;
+	else if (!strcmp (attrname, "stvec"))
+	  attrptr->isstvec = 1;
 	else if (!strcmp (attrname, "reve"))
 	  attrptr->isreve = 1;
 	else if (!strcmp (attrname, "abs"))
@@ -1034,12 +1041,12 @@ parse_bif_attrs (attrinfo *attrptr)
   } while (attrname);
 
 #ifdef DEBUG
-  (*diag) ("attribute set: init = %d, set = %d, ext = %d, \
-nosoft = %d, ldv = %d, stv = %d, reve = %d, abs = %d, pred = %d, \
+  (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
+nosoft = %d, ldvec = %d, stvec = %d, reve = %d, abs = %d, pred = %d, \
 htm = %d.\n",
-	   attrptr->isinit, attrptr->isset, attrptr->isext, attrptr->isnosoft,
-	   attrptr->isldv, attrptr->isstv, attrptr->isreve, attrptr->isabs,
-	   attrptr->ispred, attrptr->ishtm);
+	   attrptr->isinit, attrptr->isset, attrptr->isextract,
+	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
+	   attrptr->isreve, attrptr->isabs, attrptr->ispred, attrptr->ishtm);
 #endif
 
   return 1;
@@ -1716,10 +1723,10 @@ write_decls ()
   fprintf (header_file, "#define bif_round_bit\t(0x0000004)\n");
   fprintf (header_file, "#define bif_init_bit\t(0x0000008)\n");
   fprintf (header_file, "#define bif_set_bit\t(0x0000010)\n");
-  fprintf (header_file, "#define bif_ext_bit\t(0x0000020)\n");
+  fprintf (header_file, "#define bif_extract_bit\t(0x0000020)\n");
   fprintf (header_file, "#define bif_nosoft_bit\t(0x0000040)\n");
-  fprintf (header_file, "#define bif_ldv_bit\t(0x0000080)\n");
-  fprintf (header_file, "#define bif_stv_bit\t(0x0000100)\n");
+  fprintf (header_file, "#define bif_ldvec_bit\t(0x0000080)\n");
+  fprintf (header_file, "#define bif_stvec_bit\t(0x0000100)\n");
   fprintf (header_file, "#define bif_reve_bit\t(0x0000200)\n");
   fprintf (header_file, "#define bif_abs_bit\t(0x0000400)\n");
   fprintf (header_file, "#define bif_pred_bit\t(0x0000800)\n");
@@ -1734,13 +1741,13 @@ write_decls ()
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_extract(x)\t((x).bifattrs & bif_ext_bit)\n");
+	   "#define bif_is_extract(x)\t((x).bifattrs & bif_extract_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_nosoft(x)\t((x).bifattrs & bif_nosoft_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_ldv(x)\t\t((x).bifattrs & bif_ldv_bit)\n");
+	   "#define bif_is_ldvec(x)\t\t((x).bifattrs & bif_ldvec_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_stv(x)\t\t((x).bifattrs & bif_stv_bit)\n");
+	   "#define bif_is_stvec(x)\t\t((x).bifattrs & bif_stvec_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_reve(x)\t\t((x).bifattrs & bif_reve_bit)\n");
   fprintf (header_file,
@@ -1946,14 +1953,14 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_init_bit");
       if (bifs[i].attrs.isset)
 	fprintf (init_file, " | bif_set_bit");
-      if (bifs[i].attrs.isext)
-	fprintf (init_file, " | bif_ext_bit");
+      if (bifs[i].attrs.isextract)
+	fprintf (init_file, " | bif_extract_bit");
       if (bifs[i].attrs.isnosoft)
 	fprintf (init_file, " | bif_nosoft_bit");
-      if (bifs[i].attrs.isldv)
-	fprintf (init_file, " | bif_ldv_bit");
-      if (bifs[i].attrs.isstv)
-	fprintf (init_file, " | bif_stv_bit");
+      if (bifs[i].attrs.isldvec)
+	fprintf (init_file, " | bif_ldvec_bit");
+      if (bifs[i].attrs.isstvec)
+	fprintf (init_file, " | bif_stvec_bit");
       if (bifs[i].attrs.isreve)
 	fprintf (init_file, " | bif_reve_bit");
       if (bifs[i].attrs.isabs)
