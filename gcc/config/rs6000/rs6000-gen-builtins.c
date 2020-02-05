@@ -22,8 +22,8 @@ along with GCC; see the file COPYING3.  If not see
    recognition code for Power targets, based on text files that
    describe the built-in functions and vector overloads:
 
-     rs6000-bif.def       Table of built-in functions
-     rs6000-overload.def  Table of overload functions
+     rs6000-builtin-new.def     Table of built-in functions
+     rs6000-overload.def        Table of overload functions
 
    Both files group similar functions together in "stanzas," as
    described below.
@@ -1881,7 +1881,7 @@ write_fntype_init (char *str)
   free (buf);
 }
 
-/* Write everything to the header file (rs6000-bif.h).  */
+/* Write everything to the header file (rs6000-builtins.h).  */
 static int
 write_header_file ()
 {
@@ -2085,7 +2085,7 @@ write_init_ovld_table ()
     }
 }
 
-/* Write everything to the initialization file (rs6000-bif.c).  */
+/* Write everything to the initialization file (rs6000-builtins.c).  */
 static int
 write_init_file ()
 {
@@ -2098,7 +2098,7 @@ write_init_file ()
   fprintf (init_file, "#include \"rtl.h\"\n");
   fprintf (init_file, "#include \"tree.h\"\n");
   fprintf (init_file, "#include \"insn-codes.h\"\n");
-  fprintf (init_file, "#include \"rs6000-bif.h\"\n");
+  fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
 
   fprintf (init_file,
