@@ -562,7 +562,7 @@ Objective-C and Objective-C++ Dialects}.
 -fprofile-abs-path @gol
 -fprofile-dir=@var{path}  -fprofile-generate  -fprofile-generate=@var{path} @gol
 -fprofile-note=@var{path}  -fprofile-update=@var{method} @gol
--fprofile-filter-files=@var{regex}  -fprofile-exclude-files=@var{regex} @gol
+-fprofile-filter-files=@var{regex}  -fprofile-exclude-files=@var{regex} -fprofile-reproducibly @gol
 -fsanitize=@var{style}  -fsanitize-recover  -fsanitize-recover=@var{style} @gol
 -fasan-shadow-offset=@var{number}  -fsanitize-sections=@var{s1},@var{s2},... @gol
 -fsanitize-undefined-trap-on-error  -fbounds-check @gol
@@ -13323,6 +13323,16 @@ all the regular expressions (separated by a semi-colon).
 
 For example, @option{-fprofile-exclude-files=/usr/*} will prevent instrumentation
 of all files that are located in @file{/usr/} folder.
+
+Enable only profile based optimizations (PGO) that do not depend on order of training runs.
+
+The PGO optimizations depend on a run-time profile that is always merged after
+each training run.  The merged profile can end up being different based on
+sequence of these training runs.  Using the option, the compiler will use
+only the profile information which cannot be changed by order of training runs.
+
+@item -fprofile-reproducible
+@opindex fprofile-reproducible
 
 @item -fsanitize=address
 @opindex fsanitize=address

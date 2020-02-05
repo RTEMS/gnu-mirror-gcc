@@ -2168,6 +2168,10 @@ fprofile-exclude-files=
 Common Joined RejectNegative Var(flag_profile_exclude_files)
 Instrument only functions from files where names do not match all the regular expressions (separated by a semi-colon).
 
+fprofile-reproducible
+Common Report Var(flag_profile_reproducible)
+Enable only profile based optimizations that do not depend on order of training runs.
+
 Enum
 Name(profile_update) Type(enum profile_update) UnknownError(unknown profile update method %qs)
 
