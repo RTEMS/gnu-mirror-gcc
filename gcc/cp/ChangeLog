@@ -1,3 +1,18 @@
+2020-01-27  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/91826
+	* name-lookup.c (is_ancestor): Allow CHILD to be a namespace alias.
+
+2020-01-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92852 - ICE with generic lambda and reference var.
+	* constexpr.c (maybe_constant_value): Likewise.
+
+2019-12-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92859 - ADL and bit-field.
+	* name-lookup.c: Use unlowered_expr_type.
+
 2019-11-21  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from mainline

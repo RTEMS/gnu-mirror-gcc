@@ -1,3 +1,141 @@
+2020-01-23  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backport:
+	2019-04-16  Dominique d'Humieres  <dominiq@gcc.gnu.org>
+
+	* g++.dg/lto/pr89358_0.C: Replace dg-* with dg-lto-*.
+
+2020-01-22  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline:
+	2020-01-22  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c/93348
+	* gcc.c-torture/compile/pr93348-1.c: New test.
+
+2020-01-15  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline:
+	2020-01-15  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c/93072
+	* gcc.dg/inline-42.c, gcc.dg/inline-43.c: New tests.
+
+2020-01-15  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2020-01-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.dg/darwin-version-1.c: Adjust test to use different
+	options for Darwin4-9 and Darwin10+.
+
+2020-01-15  Martin Liska  <mliska@suse.cz>
+
+	Backport from mainline
+	2019-04-14  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR lto/89358
+	* g++.dg/lto/pr89358_0.C: New testcase.
+	* g++.dg/lto/pr89358_1.C: New testcase.
+
+2020-01-14  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline:
+	2020-01-13  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c/93241
+	* gcc.dg/c11-static-assert-10.c, gcc.dg/c99-const-expr-15.c: New
+	tests.
+
+2020-01-13  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline:
+	2019-12-09  Joseph Myers  <joseph@codesourcery.com>
+
+	PR middle-end/91226
+	* gcc.dg/dfp/bid-non-canonical-d128-1.c,
+	gcc.dg/dfp/bid-non-canonical-d128-2.c,
+	gcc.dg/dfp/bid-non-canonical-d128-3.c,
+	gcc.dg/dfp/bid-non-canonical-d128-4.c,
+	gcc.dg/dfp/bid-non-canonical-d32-1.c,
+	gcc.dg/dfp/bid-non-canonical-d32-2.c,
+	gcc.dg/dfp/bid-non-canonical-d64-1.c,
+	gcc.dg/dfp/bid-non-canonical-d64-2.c: New tests.
+
+2020-01-10  Martin Jambor  <mjambor@suse.cz>
+
+	Backport from mainline
+	2019-12-17  Martin Jambor  <mjambor@suse.cz>
+
+        PR ipa/92971
+        * gcc.dg/ipa/ipcp-agg-12.c: New test.
+
+2020-01-10  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from mainline
+	2020-01-09  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/84135
+	* gfortran.dg/coarray/codimension_3.f90: New.
+
+2019-12-30  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/92961
+	* gfortran.dg/arith_divide_2.f90: New test.
+
+2019-12-20  Roman Zhuykov  <zhroma@ispras.ru>
+
+	* gcc.dg/pr92951-1.c: Rename to ...
+	* gcc.dg/pr92591-1.c: ... this.
+	* gcc.dg/pr92951-2.c: Rename to ...
+	* gcc.dg/pr92591-2.c: ... this.
+
+2019-12-20  Roman Zhuykov  <zhroma@ispras.ru>
+
+	Backport from mainline
+	2019-12-13  Roman Zhuykov  <zhroma@ispras.ru>
+
+	PR rtl-optimization/92591
+	* gcc.dg/pr92951-1.c: New test.
+	* gcc.dg/pr92951-2.c: New test.
+
+2019-12-17  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backport from mainline
+	2019-12-16  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR target/92950
+	* gcc.target/s390/vector/pr92950.c: New test.
+
+2019-11-29  Harald Anlauf  <anlauf@gmx.de>
+
+	Backport from mainline
+	PR fortran/92629
+	* gfortran.dg/pr92629.f90: New testcase.
+
+2019-11-29 Tobias Burnus  <tobias@codesourcery.com>
+
+	Backport from mainline
+	2019-11-29 Tobias Burnus  <tobias@codesourcery.com>
+
+	PR ipa/84963
+	* gfortran.dg/goacc/pr84963.f90: Use dg-additional-options not
+	dg-options as otherwise -fopenacc is not used.
+
+2019-11-26  Jerry DeLisle  <jvdelisle@gcc.ngu.org>
+
+	Backport from trunk
+	PR fortran/92100
+	gfortran.dg/streamio_18.f90: New test.
+
+2019-11-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+	Harald Anlauf <anlauf@gmx.de>
+
+	Backport from trunk
+	PR fortran/92569
+	* gfortran.dg/eof_6.f90: New test.
+
 2019-11-21  Jakub Jelinek  <jakub@redhat.com>
 
 	PR tree-optimization/91355
@@ -1071,7 +1209,7 @@
 	Backport fom mainline
 	2019-06-21  Jeff Law  <law@redhat.com>
 
-        PR tree-optimization/90949
+	PR tree-optimization/90949
 	* gcc.c-torture/execute/pr90949.c: New test.
 
 2019-06-21  Thomas Koenig  <tkoenig@gcc.gnu.org>
