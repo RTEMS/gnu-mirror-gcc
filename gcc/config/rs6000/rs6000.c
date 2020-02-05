@@ -24943,9 +24943,13 @@ reg_to_non_prefixed (rtx reg, machine_mode mode)
     }
 
   /* Altivec registers use DS-mode for scalars, and DQ-mode for vectors, IEEE
-     128-bit floating point, and 128-bit integers.  */
+     128-bit floating point, and 128-bit integers.  Before power9, only indexed
+     addressing was available.  */
   else if (ALTIVEC_REGNO_P (r))
     {
+      if (!TARGET_P9_VECTOR)
+	return NON_PREFIXED_X;
+
       if (mode == SFmode || size == 8 || FLOAT128_2REG_P (mode))
 	return NON_PREFIXED_DS;
 

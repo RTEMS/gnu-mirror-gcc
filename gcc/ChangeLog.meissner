@@ -1,0 +1,7 @@
+2020-02-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/93569
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): Before ISA 3.0
+	we only had X-FORM (reg+reg) addressing in the traditional Altivec
+	registers.
+
