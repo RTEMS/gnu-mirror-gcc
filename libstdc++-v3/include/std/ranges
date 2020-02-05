@@ -2609,8 +2609,7 @@ namespace views
 	    const auto __end = ranges::end(_M_parent->_M_base);
 	    if (_M_current == __end)
 	      return *this;
-	    const auto __pbegin = ranges::begin(_M_parent->_M_pattern);
-	    const auto __pend = ranges::end(_M_parent->_M_pattern);
+	    const auto [__pbegin, __pend] = subrange{_M_parent->_M_pattern};
 	    if (__pbegin == __pend)
 	      ++_M_current;
 	    else
@@ -2660,13 +2659,7 @@ namespace views
 	  constexpr bool
 	  __at_end() const
 	  {
-	    // XXX: the spec says
-	    // auto [__pcur, __pend] = subrange{_M_i._M_parent->_M_pattern};
-	    // but a subrange cannot be decomposed with a structured binding
-	    auto& __pattern = _M_i._M_parent->_M_pattern;
-	    auto __pcur = ranges::begin(__pattern);
-	    auto __pend = ranges::end(__pattern);
-
+	    auto [__pcur, __pend] = subrange{_M_i._M_parent->_M_pattern};
 	    auto __end = ranges::end(_M_i._M_parent->_M_base);
 	    if constexpr (__detail::__tiny_range<_Pattern>)
 	      {
@@ -3353,6 +3346,22 @@ namespace views
   } // namespace views
 
 } // namespace ranges
+
+  namespace views = ranges::views;
+
+  template<typename _Iter, typename _Sent, ranges::subrange_kind _Kind>
+    struct tuple_size<ranges::subrange<_Iter, _Sent, _Kind>>
+    : integral_constant<size_t, 2>
+    { };
+
+  template<typename _Iter, typename _Sent, ranges::subrange_kind _Kind>
+    struct tuple_element<0, ranges::subrange<_Iter, _Sent, _Kind>>
+    { using type = _Iter; };
+
+  template<typename _Iter, typename _Sent, ranges::subrange_kind _Kind>
+    struct tuple_element<1, ranges::subrange<_Iter, _Sent, _Kind>>
+    { using type = _Sent; };
+
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 #endif // library concepts
