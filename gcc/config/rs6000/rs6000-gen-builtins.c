@@ -1703,7 +1703,6 @@ write_decls ()
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
   fprintf (header_file, "  tree fntype;\n");
-  fprintf (header_file, "  HOST_WIDE_INT mask;\n");
   fprintf (header_file, "  insn_code icode;\n");
   fprintf (header_file, "  int  bifattrs;\n");
   fprintf (header_file, "  int  restr_opnd;\n");
@@ -1712,28 +1711,21 @@ write_decls ()
   fprintf (header_file, "  int  restr_val2;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file, "#define bif_const_bit\t(0x0000001)\n");
-  fprintf (header_file, "#define bif_pure_bit\t(0x0000002)\n");
-  fprintf (header_file, "#define bif_round_bit\t(0x0000004)\n");
-  fprintf (header_file, "#define bif_init_bit\t(0x0000008)\n");
-  fprintf (header_file, "#define bif_set_bit\t(0x0000010)\n");
-  fprintf (header_file, "#define bif_extract_bit\t(0x0000020)\n");
-  fprintf (header_file, "#define bif_nosoft_bit\t(0x0000040)\n");
-  fprintf (header_file, "#define bif_ldvec_bit\t(0x0000080)\n");
-  fprintf (header_file, "#define bif_stvec_bit\t(0x0000100)\n");
-  fprintf (header_file, "#define bif_reve_bit\t(0x0000200)\n");
-  fprintf (header_file, "#define bif_abs_bit\t(0x0000400)\n");
-  fprintf (header_file, "#define bif_pred_bit\t(0x0000800)\n");
-  fprintf (header_file, "#define bif_htm_bit\t(0x0001000)\n");
+  fprintf (header_file, "#define bif_init_bit\t(0x00000001)\n");
+  fprintf (header_file, "#define bif_set_bit\t(0x00000002)\n");
+  fprintf (header_file, "#define bif_extract_bit\t(0x00000004)\n");
+  fprintf (header_file, "#define bif_nosoft_bit\t(0x00000008)\n");
+  fprintf (header_file, "#define bif_ldvec_bit\t(0x00000010)\n");
+  fprintf (header_file, "#define bif_stvec_bit\t(0x00000020)\n");
+  fprintf (header_file, "#define bif_reve_bit\t(0x00000040)\n");
+  fprintf (header_file, "#define bif_abs_bit\t(0x00000080)\n");
+  fprintf (header_file, "#define bif_pred_bit\t(0x00000100)\n");
+  fprintf (header_file, "#define bif_htm_bit\t(0x00000200)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
-	   "#define bif_is_const(x)\t\t((x).bifattrs & bif_const_bit)\n");
-  fprintf (header_file,
-	   "#define bif_is_pure(x)\t\t((x).bifattrs & bif_pure_bit)\n");
-  fprintf (header_file,
-	   "#define bif_has_rounding(x)\t((x).bifattrs & bif_round_bit)\n");
-  fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_set(x)\t\t((x).bifattrs & bif_set_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_extract(x)\t((x).bifattrs & bif_extract_bit)\n");
   fprintf (header_file,
@@ -1923,23 +1915,13 @@ write_init_bif_table ()
 	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
       fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].mask"
-	       "\n    = %s;\n",
-	       bifs[i].idname, bif_mask);
-      fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].icode"
 	       "\n    = CODE_FOR_%s;\n",
 	       bifs[i].idname, bifs[i].patname);
       fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].bifattrs"
-	       "\n     = 0",
+	       "\n    = 0",
 	       bifs[i].idname);
-      if (bifs[i].kind == FNK_CONST)
-	fprintf (init_file, " | bif_const_bit");
-      else if (bifs[i].kind == FNK_PURE)
-	fprintf (init_file, " | bif_pure_bit");
-      else if (bifs[i].kind == FNK_MATH)
-	fprintf (init_file, " | bif_round_bit");
       if (bifs[i].attrs.isinit)
 	fprintf (init_file, " | bif_init_bit");
       if (bifs[i].attrs.isset)
