@@ -1,5 +1,23 @@
 2020-02-05  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/93230
+	* config/rs6000/vsx.md (FL_CONSTRAINT): New mode attribute.
+	(vsx_ext_<VSX_EXTRACT_I:VS_scalar>_fl_<FL_CONV:mode>): IEEE
+	128-bit floating point requires Altivec registers.
+	(vsx_ext_<VSX_EXTRACT_I:VS_scalar>_ufl_<FL_CONV:mode>): IEEE
+	128-bit floating point requires Altivec registers.
+	(vsx_ext_si_fl_<mode>_load): Optimize doing a vec_extract of a
+	vector int from memory and converting it to floating point.
+	(vsx_ext_<VSX_EXTRACT_I2:VS_scalar>_fl_<FL_CONV:mode>_load):
+	Optimize doing a vec_extract of a vector short and vector signed
+	char from memory and converting it to floating point.
+	(vsx_ext_<VSX_EXTRACT_I:VS_scalar>_ufl_<FL_CONV:mode>_load):
+	Optimize doing a vec_extract of a vector unsigned int, vector
+	unsigned short, and vector unsigned char from memory and
+	converting it to floating point.
+
+2020-02-05  Michael Meissner  <meissner@linux.ibm.com>
+
 	PR target/93569
 	* config/rs6000/rs6000.c (reg_to_non_prefixed): Before ISA 3.0
 	we only had X-FORM (reg+reg) addressing in the traditional Altivec

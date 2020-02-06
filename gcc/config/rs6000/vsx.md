@@ -252,6 +252,12 @@
 			       (TF "TARGET_FLOAT128_HW
 				    && FLOAT128_IEEE_P (TFmode)")])
 
+;; Mode attribute to give the constraint for doing a float conversion
+(define_mode_attr FL_CONSTRAINT [(SF "wa")
+				 (DF "wa")
+				 (TF "v")
+				 (KF "v")])
+
 ;; Iterator for the 2 short vector types to do a splat from an integer
 (define_mode_iterator VSX_SPLAT_I [V16QI V8HI])
 
@@ -3825,7 +3831,7 @@
 ;; 128-bit hardware types) and <vtype> is vector char, vector unsigned char,
 ;; vector short or vector unsigned short.
 (define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I:VS_scalar>_fl_<FL_CONV:mode>"
-  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=wa")
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:FL_CONSTRAINT>")
 	(float:FL_CONV
 	 (vec_select:<VSX_EXTRACT_I:VS_scalar>
 	  (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "v")
@@ -3850,7 +3856,7 @@
   [(set_attr "isa" "<FL_CONV:VSisa>")])
 
 (define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I:VS_scalar>_ufl_<FL_CONV:mode>"
-  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=wa")
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:FL_CONSTRAINT>")
 	(unsigned_float:FL_CONV
 	 (vec_select:<VSX_EXTRACT_I:VS_scalar>
 	  (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "v")
@@ -3871,6 +3877,88 @@
   operands[4] = gen_rtx_REG (DImode, REGNO (operands[3]));
 }
   [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize extracting a V4SI vector from memory and converting it to a
+;; hardware floating point type with sign.
+(define_insn_and_split "*vsx_ext_si_fl_<mode>_load"
+  [(set (match_operand:FL_CONV 0 "vsx_register_operand" "=<FL_CONSTRAINT>")
+	(float:FL_CONV
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_VSX"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 4)))]
+{
+  unsigned int r = reg_or_subregno (operands[0]);
+  rtx reg = gen_rtx_REG (SImode, r);
+  operands[4] = gen_rtx_REG (DImode, r);
+  operands[5] = rs6000_adjust_vec_address (reg, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "length" "8")
+   (set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize extracting a V8HI/V16QI vector from memory and converting it to a
+;; hardware floating point type with sign extension.
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I2:VS_scalar>_fl_<FL_CONV:mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:FL_CONSTRAINT>")
+	(float:FL_CONV
+	 (vec_select:<VSX_EXTRACT_I2:VS_scalar>
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_int_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:<VSX_EXTRACT_I2:VS_scalar> 4 "=v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(match_dup 5))
+   (set (match_dup 6)
+	(sign_extend:DI (match_dup 4)))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 6)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I2:VS_scalar>mode;
+  operands[5] = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
+					   operands[3], smode);
+
+  operands[6] = gen_rtx_REG (DImode, reg_or_subregno (operands[4]));
+}
+  [(set_attr "length" "12")
+   (set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize extracting a V4SI/V8HI/V16QI vector from memory and converting it
+;; to a hardware floating point type with zero extension.
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I:VS_scalar>_ufl_<FL_CONV:mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:FL_CONSTRAINT>")
+	(unsigned_float:FL_CONV
+	 (vec_select:<VSX_EXTRACT_I:VS_scalar>
+	  (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_int_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 4)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I:VS_scalar>mode;
+  rtx reg = gen_rtx_REG (smode, reg_or_subregno (operands[4]));
+  operands[5] = rs6000_adjust_vec_address (reg, operands[1], operands[2],
+					   operands[3], smode);
+
+}
+  [(set_attr "length" "8")
+   (set_attr "isa" "<FL_CONV:VSisa>")])
 
 ;; V4SI/V8HI/V16QI set operation on ISA 3.0
 (define_insn "vsx_set_<mode>_p9"
