@@ -1627,8 +1627,8 @@ namespace views
 	    requires random_access_range<_Base>
 	  { return !(__x < __y); }
 
-#ifdef __cpp_lib_threeway_comparison
-	  friend constexpr compare_three_way_result_t<iterator_t<_Base>>
+#ifdef __cpp_lib_three_way_comparison
+	  friend constexpr auto
 	  operator<=>(const _Iterator& __x, const _Iterator& __y)
 	    requires random_access_range<_Base>
 	      && three_way_comparable<iterator_t<_Base>>
@@ -3293,8 +3293,8 @@ namespace views
 	  requires random_access_range<_Base>
 	{ return !(__x._M_current > __y._M_current); }
 
-#ifdef __cpp_lib_threeway_comparison
-	friend constexpr compare_three_way_result_t<iterator_t<_Base>>
+#ifdef __cpp_lib_three_way_comparison
+	friend constexpr auto
 	operator<=>(const _Iterator& __x, const _Iterator& __y)
 	  requires random_access_range<_Base>
 	    && three_way_comparable<iterator_t<_Base>>
