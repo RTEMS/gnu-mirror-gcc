@@ -957,115 +957,118 @@ namespace __detail
 
 namespace views
 {
-  template<typename _Callable>
-    struct _RangeAdaptorClosure;
+  namespace __adaptor
+  {
+    template<typename _Callable>
+      struct _RangeAdaptorClosure;
 
-  template<typename _Callable>
-    struct _RangeAdaptor
-    {
-    protected:
-      [[no_unique_address]]
-	conditional_t<!is_default_constructible_v<_Callable>,
-		      _Callable, __detail::_Empty> _M_callable;
+    template<typename _Callable>
+      struct _RangeAdaptor
+      {
+      protected:
+	[[no_unique_address]]
+	  conditional_t<!is_default_constructible_v<_Callable>,
+			_Callable, __detail::_Empty> _M_callable;
 
-    public:
-      constexpr
-      _RangeAdaptor(const _Callable& = {})
-	requires is_default_constructible_v<_Callable>
-      { }
+      public:
+	constexpr
+	_RangeAdaptor(const _Callable& = {})
+	  requires is_default_constructible_v<_Callable>
+	{ }
 
-      constexpr
-      _RangeAdaptor(_Callable __callable)
-	requires (!is_default_constructible_v<_Callable>)
-	: _M_callable(std::move(__callable))
-      { }
+	constexpr
+	_RangeAdaptor(_Callable __callable)
+	  requires (!is_default_constructible_v<_Callable>)
+	  : _M_callable(std::move(__callable))
+	{ }
 
-      template<typename... _Args>
-	requires (sizeof...(_Args) >= 1)
-	constexpr auto
-	operator()(_Args&&... __args) const
-	{
-	  if constexpr (is_invocable_v<_Callable, _Args...>)
-	    {
-	      static_assert(sizeof...(_Args) != 1,
-			    "a _RangeAdaptor that accepts only one argument "
-			    "should be defined as a _RangeAdaptorClosure");
-	      return _Callable{}(std::forward<_Args>(__args)...);
-	    }
-	  else
-	    {
-	      auto __closure = [__args...] <typename _Range> (_Range&& __r) {
-		return _Callable{}(std::forward<_Range>(__r), __args...);
-	      };
-	      using _ClosureType = decltype(__closure);
-	      return _RangeAdaptorClosure<_ClosureType>(std::move(__closure));
-	    }
-	}
-    };
+	template<typename... _Args>
+	  requires (sizeof...(_Args) >= 1)
+	  constexpr auto
+	  operator()(_Args&&... __args) const
+	  {
+	    if constexpr (is_invocable_v<_Callable, _Args...>)
+	      {
+		static_assert(sizeof...(_Args) != 1,
+			      "a _RangeAdaptor that accepts only one argument "
+			      "should be defined as a _RangeAdaptorClosure");
+		return _Callable{}(std::forward<_Args>(__args)...);
+	      }
+	    else
+	      {
+		auto __closure = [__args...] <typename _Range> (_Range&& __r) {
+		  return _Callable{}(std::forward<_Range>(__r), __args...);
+		};
+		using _ClosureType = decltype(__closure);
+		return _RangeAdaptorClosure<_ClosureType>(std::move(__closure));
+	      }
+	  }
+      };
 
-  template<typename _Callable>
-    struct _RangeAdaptorClosure : public _RangeAdaptor<_Callable>
-    {
-      using _RangeAdaptor<_Callable>::_RangeAdaptor;
+    template<typename _Callable>
+      struct _RangeAdaptorClosure : public _RangeAdaptor<_Callable>
+      {
+	using _RangeAdaptor<_Callable>::_RangeAdaptor;
 
-      template<viewable_range _Range>
-	requires requires { declval<_Callable>()(declval<_Range>()); }
-	constexpr auto
-	operator()(_Range&& __r) const
-	{
-	  if constexpr (is_default_constructible_v<_Callable>)
-	    return _Callable{}(std::forward<_Range>(__r));
-	  else
-	    return this->_M_callable(std::forward<_Range>(__r));
-	}
+	template<viewable_range _Range>
+	  requires requires { declval<_Callable>()(declval<_Range>()); }
+	  constexpr auto
+	  operator()(_Range&& __r) const
+	  {
+	    if constexpr (is_default_constructible_v<_Callable>)
+	      return _Callable{}(std::forward<_Range>(__r));
+	    else
+	      return this->_M_callable(std::forward<_Range>(__r));
+	  }
 
-      template<viewable_range _Range>
-	requires requires { declval<_Callable>()(declval<_Range>()); }
-	friend constexpr auto
-	operator|(_Range&& __r, const _RangeAdaptorClosure& __o)
-	{ return __o(std::forward<_Range>(__r)); }
+	template<viewable_range _Range>
+	  requires requires { declval<_Callable>()(declval<_Range>()); }
+	  friend constexpr auto
+	  operator|(_Range&& __r, const _RangeAdaptorClosure& __o)
+	  { return __o(std::forward<_Range>(__r)); }
 
-      template<typename _Tp>
-	friend constexpr auto
-	operator|(const _RangeAdaptorClosure<_Tp>& __x,
-		  const _RangeAdaptorClosure& __y)
-	{
-	  if constexpr (is_default_constructible_v<_Tp>
-			&& is_default_constructible_v<_Callable>)
-	    {
-	      auto __closure = [] <typename _Up> (_Up&& __e) {
-		return std::forward<_Up>(__e) | decltype(__x){} | decltype(__y){};
-	      };
-	      return _RangeAdaptorClosure<decltype(__closure)>(__closure);
-	    }
-	  else if constexpr (is_default_constructible_v<_Tp>
-			     && !is_default_constructible_v<_Callable>)
-	    {
-	      auto __closure = [__y] <typename _Up> (_Up&& __e) {
-		return std::forward<_Up>(__e) | decltype(__x){} | __y;
-	      };
-	      return _RangeAdaptorClosure<decltype(__closure)>(__closure);
-	    }
-	  else if constexpr (!is_default_constructible_v<_Tp>
-			     && is_default_constructible_v<_Callable>)
-	    {
-	      auto __closure = [__x] <typename _Up> (_Up&& __e) {
-		return std::forward<_Up>(__e) | __x | decltype(__y){};
-	      };
-	      return _RangeAdaptorClosure<decltype(__closure)>(__closure);
-	    }
-	  else
-	    {
-	      auto __closure = [__x, __y] <typename _Up> (_Up&& __e) {
-		return std::forward<_Up>(__e) | __x | __y;
-	      };
-	      return _RangeAdaptorClosure<decltype(__closure)>(__closure);
-	    }
-	}
-    };
+	template<typename _Tp>
+	  friend constexpr auto
+	  operator|(const _RangeAdaptorClosure<_Tp>& __x,
+		    const _RangeAdaptorClosure& __y)
+	  {
+	    if constexpr (is_default_constructible_v<_Tp>
+			  && is_default_constructible_v<_Callable>)
+	      {
+		auto __closure = [] <typename _Up> (_Up&& __e) {
+		  return std::forward<_Up>(__e) | decltype(__x){} | decltype(__y){};
+		};
+		return _RangeAdaptorClosure<decltype(__closure)>(__closure);
+	      }
+	    else if constexpr (is_default_constructible_v<_Tp>
+			       && !is_default_constructible_v<_Callable>)
+	      {
+		auto __closure = [__y] <typename _Up> (_Up&& __e) {
+		  return std::forward<_Up>(__e) | decltype(__x){} | __y;
+		};
+		return _RangeAdaptorClosure<decltype(__closure)>(__closure);
+	      }
+	    else if constexpr (!is_default_constructible_v<_Tp>
+			       && is_default_constructible_v<_Callable>)
+	      {
+		auto __closure = [__x] <typename _Up> (_Up&& __e) {
+		  return std::forward<_Up>(__e) | __x | decltype(__y){};
+		};
+		return _RangeAdaptorClosure<decltype(__closure)>(__closure);
+	      }
+	    else
+	      {
+		auto __closure = [__x, __y] <typename _Up> (_Up&& __e) {
+		  return std::forward<_Up>(__e) | __x | __y;
+		};
+		return _RangeAdaptorClosure<decltype(__closure)>(__closure);
+	      }
+	  }
+      };
 
-  template<typename _Callable>
-    _RangeAdaptorClosure(_Callable) -> _RangeAdaptorClosure<_Callable>;
+    template<typename _Callable>
+      _RangeAdaptorClosure(_Callable) -> _RangeAdaptorClosure<_Callable>;
+  } // namespace __adaptor
 } // namespace views
 
   template<range _Range> requires is_object_v<_Range>
@@ -1122,7 +1125,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptorClosure all
+    inline constexpr __adaptor::_RangeAdaptorClosure all
       = [] <viewable_range _Range> (_Range&& __r)
       {
 	if constexpr (view<decay_t<_Range>>)
@@ -1449,7 +1452,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor filter
+    inline constexpr __adaptor::_RangeAdaptor filter
       = [] <viewable_range _Range, typename _Pred> (_Range&& __r, _Pred&& __p)
       {
 	return filter_view{std::forward<_Range>(__r), std::forward<_Pred>(__p)};
@@ -1788,7 +1791,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor transform
+    inline constexpr __adaptor::_RangeAdaptor transform
       = [] <viewable_range _Range, typename _Fp> (_Range&& __r, _Fp&& __f)
       {
 	return transform_view{std::forward<_Range>(__r), std::forward<_Fp>(__f)};
@@ -1927,7 +1930,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor take
+    inline constexpr __adaptor::_RangeAdaptor take
       = [] <viewable_range _Range, typename _Tp> (_Range&& __r, _Tp&& __n)
       {
 	return take_view{std::forward<_Range>(__r), std::forward<_Tp>(__n)};
@@ -2019,7 +2022,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor take_while
+    inline constexpr __adaptor::_RangeAdaptor take_while
       = [] <viewable_range _Range, typename _Pred> (_Range&& __r, _Pred&& __p)
       {
 	return take_while_view{std::forward<_Range>(__r), std::forward<_Pred>(__p)};
@@ -2096,7 +2099,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor drop
+    inline constexpr __adaptor::_RangeAdaptor drop
       = [] <viewable_range _Range, typename _Tp> (_Range&& __r, _Tp&& __n)
       {
 	return drop_view{std::forward<_Range>(__r), std::forward<_Tp>(__n)};
@@ -2150,7 +2153,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor drop_while
+    inline constexpr __adaptor::_RangeAdaptor drop_while
       = [] <viewable_range _Range, typename _Pred> (_Range&& __r, _Pred&& __p)
       {
 	return drop_while_view{std::forward<_Range>(__r),
@@ -2474,7 +2477,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptorClosure join
+    inline constexpr __adaptor::_RangeAdaptorClosure join
       = [] <viewable_range _Range> (_Range&& __r)
       {
 	return join_view{std::forward<_Range>(__r)};
@@ -2865,7 +2868,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptor split
+    inline constexpr __adaptor::_RangeAdaptor split
       = [] <viewable_range _Range, typename _Fp> (_Range&& __r, _Fp&& __f)
       {
 	return split_view{std::forward<_Range>(__r), std::forward<_Fp>(__f)};
@@ -2976,7 +2979,7 @@ namespace views
 
   namespace views
   {
-    inline constexpr _RangeAdaptorClosure common
+    inline constexpr __adaptor::_RangeAdaptorClosure common
       = [] <viewable_range _Range> (_Range&& __r)
       {
 	if constexpr (common_range<_Range>
@@ -3076,7 +3079,7 @@ namespace views
 	inline constexpr bool __is_reverse_view<reverse_view<_Vp>> = true;
     }
 
-    inline constexpr _RangeAdaptorClosure reverse
+    inline constexpr __adaptor::_RangeAdaptorClosure reverse
       = [] <viewable_range _Range> (_Range&& __r)
       {
 	using _Tp = remove_cvref_t<_Range>;
@@ -3335,14 +3338,14 @@ namespace views
   namespace views
   {
     template<size_t _Nm>
-    inline constexpr _RangeAdaptorClosure elements
+    inline constexpr __adaptor::_RangeAdaptorClosure elements
       = [] <viewable_range _Range> (_Range&& __r)
       {
 	return elements_view<all_view<_Range>, _Nm>{std::forward<_Range>(__r)};
       };
 
-    inline constexpr _RangeAdaptorClosure keys = elements<0>;
-    inline constexpr _RangeAdaptorClosure values = elements<1>;
+    inline constexpr __adaptor::_RangeAdaptorClosure keys = elements<0>;
+    inline constexpr __adaptor::_RangeAdaptorClosure values = elements<1>;
   } // namespace views
 
 } // namespace ranges
