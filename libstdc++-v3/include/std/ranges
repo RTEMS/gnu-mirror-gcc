@@ -38,12 +38,13 @@
 
 #if __cpp_lib_concepts
 
+#include <bits/refwrap.h>
 #include <compare>
-#include <functional> // std::ref
 #include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <optional>
+#include <tuple>
 
 /**
  * @defgroup ranges Ranges
@@ -1089,7 +1090,7 @@ namespace views
 	  && requires { _S_fun(declval<_Tp>()); }
 	constexpr
 	ref_view(_Tp&& __t)
-	  : _M_r(addressof(static_cast<_Range&>(std::forward<_Tp>(__t))))
+	  : _M_r(std::__addressof(static_cast<_Range&>(std::forward<_Tp>(__t))))
 	{ }
 
       constexpr _Range&
@@ -1296,7 +1297,7 @@ namespace views
 	constexpr
 	_Iterator(filter_view& __parent, iterator_t<_Vp> __current)
 	  : _M_current(std::move(__current)),
-	    _M_parent(addressof(__parent))
+	    _M_parent(std::__addressof(__parent))
 	{ }
 
 	constexpr iterator_t<_Vp>
@@ -1344,7 +1345,7 @@ namespace views
 	{
 	  do
 	    --_M_current;
-	  while (!invoke(*_M_parent->_M_pred, *_M_current));
+	  while (!std::__invoke(*_M_parent->_M_pred, *_M_current));
 	  return *this;
 	}
 
@@ -1501,7 +1502,8 @@ namespace views
 
 	  static constexpr decltype(auto)
 	  __iter_move(const _Iterator& __i = {})
-	    noexcept(noexcept(invoke(*__i._M_parent->_M_fun, *__i._M_current)))
+	    noexcept(noexcept(std::__invoke(*__i._M_parent->_M_fun,
+					    *__i._M_current)))
 	  {
 	    if constexpr (is_lvalue_reference_v<decltype(*__i)>)
 	      return std::move(*__i);
@@ -1523,7 +1525,8 @@ namespace views
 
 	  constexpr
 	  _Iterator(_Parent& __parent, iterator_t<_Base> __current)
-	    : _M_current(std::move(__current)), _M_parent(addressof(__parent))
+	    : _M_current(std::move(__current)),
+	      _M_parent(std::__addressof(__parent))
 	  { }
 
 	  constexpr
@@ -1544,7 +1547,7 @@ namespace views
 
 	  constexpr decltype(auto)
 	  operator*() const
-	  { return invoke(*_M_parent->_M_fun, *_M_current); }
+	  { return std::__invoke(*_M_parent->_M_fun, *_M_current); }
 
 	  constexpr _Iterator&
 	  operator++()
@@ -1597,7 +1600,7 @@ namespace views
 	  constexpr decltype(auto)
 	  operator[](difference_type __n) const
 	    requires random_access_range<_Base>
-	  { return invoke(*_M_parent->_M_fun, _M_current[__n]); }
+	  { return std::__invoke(*_M_parent->_M_fun, _M_current[__n]); }
 
 	  friend constexpr bool
 	  operator==(const _Iterator& __x, const _Iterator& __y)
@@ -1970,7 +1973,7 @@ namespace views
 
 	  friend constexpr bool
 	  operator==(const iterator_t<_Base>& __x, const _Sentinel& __y)
-	  { return __y._M_end == __x || !invoke(*__y._M_pred, *__x); }
+	  { return __y._M_end == __x || !std::__invoke(*__y._M_pred, *__x); }
 	};
 
       _Vp _M_base;
@@ -2008,12 +2011,12 @@ namespace views
       constexpr auto
       end() requires (!__detail::__simple_view<_Vp>)
       { return _Sentinel<false>(ranges::end(_M_base),
-				addressof(*_M_pred)); }
+				std::__addressof(*_M_pred)); }
 
       constexpr auto
       end() const requires range<const _Vp>
       { return _Sentinel<true>(ranges::end(_M_base),
-			       addressof(*_M_pred)); }
+			       std::__addressof(*_M_pred)); }
     };
 
   template<typename _Range, typename _Pred>
@@ -2263,7 +2266,8 @@ namespace views
 	  // iterator_t<_Base> here, a possible defect in the spec?
 	  constexpr
 	  _Iterator(_Parent& __parent, iterator_t<_Base> __outer)
-	    : _M_outer(std::move(__outer)), _M_parent(addressof(__parent))
+	    : _M_outer(std::move(__outer)),
+	      _M_parent(std::__addressof(__parent))
 	  { _M_satisfy(); }
 
 	  constexpr
@@ -2592,7 +2596,8 @@ namespace views
 	  constexpr
 	  _OuterIter(_Parent& __parent, iterator_t<_Base> __current)
 	    requires forward_range<_Base>
-	    : _M_parent(addressof(__parent)), _M_current(std::move(__current))
+	    : _M_parent(std::__addressof(__parent)),
+	      _M_current(std::move(__current))
 	  { }
 
 	  constexpr
@@ -3109,7 +3114,8 @@ namespace views
 	requires _Nm < tuple_size_v<_Tp>;
 	typename tuple_element_t<_Nm, _Tp>;
 	// XXX: we applied P3323 here
-	{ get<_Nm>(__t) } -> convertible_to<const tuple_element_t<_Nm, _Tp>&>;
+	{ std::get<_Nm>(__t) }
+	  -> convertible_to<const tuple_element_t<_Nm, _Tp>&>;
       };
   }
 
@@ -3201,7 +3207,7 @@ namespace views
 
 	constexpr decltype(auto)
 	  operator*() const
-	{ return get<_Nm>(*_M_current); }
+	{ return std::get<_Nm>(*_M_current); }
 
 	constexpr _Iterator&
 	operator++()
@@ -3256,7 +3262,7 @@ namespace views
 	constexpr decltype(auto)
 	operator[](difference_type __n) const
 	  requires random_access_range<_Base>
-	{ return get<_Nm>(*(_M_current + __n)); }
+	{ return std::get<_Nm>(*(_M_current + __n)); }
 
 	friend constexpr bool
 	operator==(const _Iterator& __x, const _Iterator& __y)
