@@ -157,6 +157,8 @@
     VAND_V16QI_B andv16qi3 {}
   const vsc __builtin_altivec_vand_v16qi (vsc, vsc);
     VAND_V16QI andv16qi3 {}
+  const vbs __builtin_altivec_vand_v8hi (vbs, vbs);
+    VAND_V8HI_UNS andv8hi3 {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);
