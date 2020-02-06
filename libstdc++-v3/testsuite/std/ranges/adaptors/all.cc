@@ -61,27 +61,25 @@ test03()
   auto even = [] (int i) { return i%2==0; };
   auto odd = [] (int i) { return i%2==1; };
   auto square = [] (int i) { return i*i; };
-  int count = 0;
+  int sum = 0;
   for (auto v : (ints
 		 | (views::all
 		    | (views::filter(even)
 		    | (views::filter(odd) | views::all)))
 		 | views::transform(square)))
-    count++;
-  return count == 0;
+    sum += v;
+  return sum == 0;
 }
 
 constexpr bool
 test04()
 {
-  auto even = [] (int i) { return i%2==0; };
   auto odd = [] (int i) { return i%2==1; };
   auto square = [] (int i) { return i*i; };
   auto increment = [] (int i) { return i+1; };
   auto small = [] (int i) { return i<30; };
   auto non_negative = [] (int i) { return i>=0; };
   auto negative = [] (int i) { return i<0; };
-  int count = 0;
   return ranges::equal(views::iota(-5)
 		       | views::drop_while(negative)
 		       | views::take_while(non_negative)
