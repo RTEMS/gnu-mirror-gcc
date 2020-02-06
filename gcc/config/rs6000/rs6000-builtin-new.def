@@ -1,4 +1,4 @@
-[TARGET_ALTIVEC]
+[MASK_ALTIVEC]
   math vf __builtin_altivec_vmaddfp (vf, vf, vf);
     VMADDFP fmav4sf4 {}
   vss __builtin_altivec_vmhaddshs (vss, vss, vss);
@@ -164,7 +164,7 @@
   const vss __builtin_altivec_abs_v8hi (vss);
     ABS_V8HI absv8hi2 {abs}
 
-[VSX]
+[MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
     VPERM_2DF altivec_vperm_v2df {}
   const vsll __builtin_altivec_vperm_2di (vsll, vsll, vuc);

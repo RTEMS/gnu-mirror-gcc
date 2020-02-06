@@ -29,12 +29,10 @@ along with GCC; see the file COPYING3.  If not see
    described below.
 
    Each stanza in the built-in function file starts with a line
-   identifying the target mask for which the group of functions is
+   identifying the option mask for which the group of functions is
    permitted, with the mask in square brackets.  This is the only
    information allowed on the stanza header line, other than
-   whitespace.  For now, only an identifier is allowed within the
-   square brackets, but we could easily extend this to allow any
-   C expression.
+   whitespace.
 
    Following the stanza header are two lines for each function: the
    prototype line and the attributes line.  The prototype line has
@@ -1710,6 +1708,7 @@ write_decls ()
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
   fprintf (header_file, "  tree fntype;\n");
+  fprintf (header_file, "  HOST_WIDE_INT mask;\n");
   fprintf (header_file, "  insn_code icode;\n");
   fprintf (header_file, "  int  bifattrs;\n");
   fprintf (header_file, "  int  restr_opnd;\n");
@@ -1919,29 +1918,25 @@ write_init_bif_table ()
 
   for (int i = 0; i <= curr_bif; i++)
     {
-      if (last_stanza != bifs[i].stanza)
-	{
-	  if (last_stanza != -1)
-	    fprintf (init_file, "    }\n");
-	  fprintf (init_file, "  if (%s)\n    {\n",
-		   bif_stanzas[bifs[i].stanza]);
-	  last_stanza = bifs[i].stanza;
-	}
       fprintf (init_file,
-	       "      rs6000_builtin_info_x[RS6000_BIF_%s].bifname"
-	       "\n        = \"%s\";\n",
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].bifname"
+	       "\n    = \"%s\";\n",
 	       bifs[i].idname, bifs[i].proto.bifname);
       fprintf (init_file,
-	       "      rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
-	       "\n        = %s;\n",
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
+	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
       fprintf (init_file,
-	       "      rs6000_builtin_info_x[RS6000_BIF_%s].icode"
-	       "\n        = CODE_FOR_%s;\n",
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].mask"
+	       "\n    = %s;\n",
+	       bifs[i].idname, bif_stanzas[bifs[i].stanza]);
+      fprintf (init_file,
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].icode"
+	       "\n    = CODE_FOR_%s;\n",
 	       bifs[i].idname, bifs[i].patname);
       fprintf (init_file,
-	       "      rs6000_builtin_info_x[RS6000_BIF_%s].bifattrs"
-	       "\n        = 0",
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].bifattrs"
+	       "\n     = 0",
 	       bifs[i].idname);
       if (bifs[i].kind == FNK_CONST)
 	fprintf (init_file, " | bif_const_bit");
@@ -1971,8 +1966,8 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_htm_bit");
       fprintf (init_file, ";\n");
       fprintf (init_file,
-	       "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
-	       "\n        = %d;\n",
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
+	       "\n    = %d;\n",
 	       bifs[i].idname, bifs[i].proto.restr_opnd);
       if (bifs[i].proto.restr_opnd)
 	{
@@ -1982,76 +1977,72 @@ write_init_bif_table ()
 		  : (bifs[i].proto.restr == RES_VALUES ? "RES_VALUES"
 		     : "ERROR")));
 	  fprintf (init_file,
-		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr"
-		   "\n        = %s;\n",
+		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr"
+		   "\n    = %s;\n",
 		   bifs[i].idname, res);
 	  fprintf (init_file,
-		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1"
-		   "\n        = %d;\n",
+		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1"
+		   "\n    = %d;\n",
 		   bifs[i].idname, bifs[i].proto.restr_val1);
 	  fprintf (init_file,
-		   "      rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2"
-		   "\n        = %d;\n",
+		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2"
+		   "\n    = %d;\n",
 		   bifs[i].idname, bifs[i].proto.restr_val2);
 	}
       fprintf (init_file, "\n");
 
       fprintf (init_file,
-	       "      bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",
+	       "  bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",
 	       bifs[i].idname);
       fprintf (init_file,
-	       "      hash = rs6000_bif_hasher::hash (bifaddr);\n");
+	       "  hash = rs6000_bif_hasher::hash (bifaddr);\n");
       fprintf (init_file,
-	       "      slot = bif_hash.find_slot_with_hash (\n");
+	       "  slot = bif_hash.find_slot_with_hash (\n");
       fprintf (init_file,
-	       "               \"%s\", hash, INSERT\n",
+	       "           \"%s\", hash, INSERT\n",
 	       bifs[i].proto.bifname);
       fprintf (init_file,
-	       "             );\n");
+	       "         );\n");
       fprintf (init_file,
-	       "      *slot = bifaddr;\n\n");
+	       "  *slot = bifaddr;\n\n");
 
       fprintf (init_file,
 	       "#ifdef NEW_BUILTINS_ARE_LIVE\n");
       fprintf (init_file,
-	       "      rs6000_builtin_decls[(int)RS6000_BIF_%s] = t\n",
+	       "  rs6000_builtin_decls[(int)RS6000_BIF_%s] = t\n",
 	       bifs[i].idname);
       fprintf (init_file,
-	       "        = add_builtin_function (\"%s\",\n",
+	       "    = add_builtin_function (\"%s\",\n",
 	       bifs[i].proto.bifname);
       fprintf (init_file,
-	       "                                %s,\n",
+	       "                            %s,\n",
 	       bifs[i].fndecl);
       fprintf (init_file,
-	       "                                (int)RS6000_BIF_%s, NULL,"
+	       "                            (int)RS6000_BIF_%s, NULL,"
 	       " NULL_TREE);\n",
 	       bifs[i].idname);
       if (bifs[i].kind == FNK_CONST)
 	{
-	  fprintf (init_file, "      TREE_READONLY (t) = 1;\n");
-	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	  fprintf (init_file, "  TREE_READONLY (t) = 1;\n");
+	  fprintf (init_file, "  TREE_NOTHROW (t) = 1;\n");
 	}
       else if (bifs[i].kind == FNK_PURE)
 	{
-	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
-	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	  fprintf (init_file, "  DECL_PURE_P (t) = 1;\n");
+	  fprintf (init_file, "  TREE_NOTHROW (t) = 1;\n");
 	}
       else if (bifs[i].kind == FNK_MATH)
 	{
-	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
-	  fprintf (init_file, "      if (flag_rounding_math)\n");
-	  fprintf (init_file, "        {\n");
-	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
-	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
-	  fprintf (init_file, "        }\n");
+	  fprintf (init_file, "  TREE_NOTHROW (t) = 1;\n");
+	  fprintf (init_file, "  if (flag_rounding_math)\n");
+	  fprintf (init_file, "    {\n");
+	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
+	  fprintf (init_file, "      DECL_IS_NOVOPS (t) = 1;\n");
+	  fprintf (init_file, "    }\n");
 	}
       fprintf (init_file,
-	       "#endif\n");
-
-      if (i < curr_bif)
-	fprintf (init_file, "\n");
+	       "#endif\n\n");
     }
-  fprintf (init_file, "    }\n\n");
 }
 
 /* Write code to initialize the overload table.  */
@@ -2169,7 +2160,9 @@ write_init_file ()
   fprintf (init_file, "void\n");
   fprintf (init_file, "rs6000_autoinit_builtins ()\n");
   fprintf (init_file, "{\n");
+  fprintf (init_file, "#ifdef NEW_BUILTINS_ARE_LIVE\n");
   fprintf (init_file, "  tree t;\n");
+  fprintf (init_file, "#endif\n");
   fprintf (init_file, "  bifdata **slot;\n");
   fprintf (init_file, "  bifdata *bifaddr;\n");
   fprintf (init_file, "  hashval_t hash;\n");
