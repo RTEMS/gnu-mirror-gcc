@@ -2014,7 +2014,7 @@ write_init_bif_table ()
       fprintf (init_file,
 	       "#ifdef NEW_BUILTINS_ARE_LIVE\n");
       fprintf (init_file,
-	       "      rs6000_builtin_decls[(int)RS6000_BIF_%s]\n",
+	       "      rs6000_builtin_decls[(int)RS6000_BIF_%s] = t\n",
 	       bifs[i].idname);
       fprintf (init_file,
 	       "        = add_builtin_function (\"%s\",\n",
@@ -2026,6 +2026,25 @@ write_init_bif_table ()
 	       "                                (int)RS6000_BIF_%s, NULL,"
 	       " NULL_TREE);\n",
 	       bifs[i].idname);
+      if (bifs[i].kind == FNK_CONST)
+	{
+	  fprintf (init_file, "      TREE_READONLY (t) = 1;\n");
+	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	}
+      else if (bifs[i].kind == FNK_PURE)
+	{
+	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
+	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	}
+      else if (bifs[i].kind == FNK_MATH)
+	{
+	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	  fprintf (init_file, "      if (flag_rounding_math)\n");
+	  fprintf (init_file, "        {\n");
+	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
+	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
+	  fprintf (init_file, "        }\n");
+	}
       fprintf (init_file,
 	       "#endif\n");
 
@@ -2150,6 +2169,7 @@ write_init_file ()
   fprintf (init_file, "void\n");
   fprintf (init_file, "rs6000_autoinit_builtins ()\n");
   fprintf (init_file, "{\n");
+  fprintf (init_file, "  tree t;\n");
   fprintf (init_file, "  bifdata **slot;\n");
   fprintf (init_file, "  bifdata *bifaddr;\n");
   fprintf (init_file, "  hashval_t hash;\n");
