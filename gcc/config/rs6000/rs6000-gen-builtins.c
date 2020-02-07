@@ -1901,8 +1901,6 @@ write_header_file ()
 static void
 write_init_bif_table ()
 {
-  int last_stanza = -1;
-
   for (int i = 0; i <= curr_bif; i++)
     {
       const char *bif_mask = bif_stanzas[bifs[i].stanza];
