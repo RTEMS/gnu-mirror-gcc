@@ -3911,7 +3911,10 @@ darwin_rs6000_override_options (void)
   if (flag_mkernel)
     {
       rs6000_default_long_calls = 1;
-      rs6000_isa_flags |= OPTION_MASK_SOFT_FLOAT;
+
+      /* Allow a kext author to do -mkernel -mhard-float.  */
+      if (! (rs6000_isa_flags_explicit & OPTION_MASK_SOFT_FLOAT))
+        rs6000_isa_flags |= OPTION_MASK_SOFT_FLOAT;
     }
 
   /* Make -m64 imply -maltivec.  Darwin's 64-bit ABI includes
@@ -8634,6 +8637,101 @@ address_offset (rtx op)
   return NULL_RTX;
 }
 
+/* This tests that a lo_sum {constant, symbol, symbol+offset} is valid for
+   the mode.  If we can't find (or don't know) the alignment of the symbol
+   we assume (optimistically) that it's sufficiently aligned [??? maybe we
+   should be pessimistic].  Offsets are validated in the same way as for
+   reg + offset.  */
+static bool
+darwin_rs6000_legitimate_lo_sum_const_p (rtx x, machine_mode mode)
+{
+  if (GET_CODE (x) == CONST)
+    x = XEXP (x, 0);
+
+  if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_MACHOPIC_OFFSET)
+    x =  XVECEXP (x, 0, 0);
+
+  rtx sym = NULL_RTX;
+  unsigned HOST_WIDE_INT offset = 0;
+
+  if (GET_CODE (x) == PLUS)
+    {
+      sym = XEXP (x, 0);
+      if (! SYMBOL_REF_P (sym))
+	return false;
+      if (!CONST_INT_P (XEXP (x, 1)))
+	return false;
+      offset = INTVAL (XEXP (x, 1));
+    }
+  else if (SYMBOL_REF_P (x))
+    sym = x;
+  else if (CONST_INT_P (x))
+    offset = INTVAL (x);
+  else if (GET_CODE (x) == LABEL_REF)
+    offset = 0; // We assume code labels are Pmode aligned
+  else
+    return false; // not sure what we have here.
+
+  /* If we don't know the alignment of the thing to which the symbol refers,
+     we assume optimistically it is "enough".
+     ??? maybe we should be pessimistic instead.  */
+  unsigned align = 0;
+
+  if (sym)
+    {
+      tree decl = SYMBOL_REF_DECL (sym);
+#if TARGET_MACHO
+      if (MACHO_SYMBOL_INDIRECTION_P (sym))
+      /* The decl in an indirection symbol is the original one, which might
+	 be less aligned than the indirection.  Our indirections are always
+	 pointer-aligned.  */
+	;
+      else
+#endif
+      if (decl && DECL_ALIGN (decl))
+	align = DECL_ALIGN_UNIT (decl);
+   }
+
+  unsigned int extra = 0;
+  switch (mode)
+    {
+    case DFmode:
+    case DDmode:
+    case DImode:
+      /* If we are using VSX scalar loads, restrict ourselves to reg+reg
+	 addressing.  */
+      if (VECTOR_MEM_VSX_P (mode))
+	return false;
+
+      if (!TARGET_POWERPC64)
+	extra = 4;
+      else if ((offset & 3) || (align & 3))
+	return false;
+      break;
+
+    case TFmode:
+    case IFmode:
+    case KFmode:
+    case TDmode:
+    case TImode:
+    case PTImode:
+      extra = 8;
+      if (!TARGET_POWERPC64)
+	extra = 12;
+      else if ((offset & 3) || (align & 3))
+	return false;
+      break;
+
+    default:
+      break;
+    }
+
+  /* We only care if the access(es) would cause a change to the high part.  */
+  offset = ((offset & 0xffff) ^ 0x8000) - 0x8000;
+  return IN_RANGE (offset, -(HOST_WIDE_INT_1 << 15),
+                            (HOST_WIDE_INT_1 << 15) - 1 - extra);
+}
+
 /* Return true if the MEM operand is a memory operand suitable for use
    with a (full width, possibly multiple) gpr load/store.  On
    powerpc64 this means the offset must be divisible by 4.
@@ -8668,7 +8766,13 @@ mem_operand_gpr (rtx op, machine_mode mode)
       && legitimate_indirect_address_p (XEXP (addr, 0), false))
     return true;
 
-  /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
+  /* We need to look through Mach-O PIC unspecs to determine if a lo_sum is
+     really OK.  Doing this early avoids teaching all the other machinery
+     about them.  */
+  if (TARGET_MACHO && GET_CODE (addr) == LO_SUM)
+    return darwin_rs6000_legitimate_lo_sum_const_p (XEXP (addr, 1), mode);
+
+  /* Only allow offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
 
@@ -24097,7 +24201,7 @@ print_operand (FILE *file, rtx x, int code)
 	{
 	  const char *name = XSTR (x, 0);
 #if TARGET_MACHO
-	  if (darwin_emit_branch_islands
+	  if (darwin_symbol_stubs
 	      && MACHOPIC_INDIRECT
 	      && machopic_classify_symbol (x) == MACHOPIC_UNDEFINED_FUNCTION)
 	    name = machopic_indirection_name (x, /*stub_p=*/true);
@@ -36029,7 +36133,7 @@ output_call (rtx_insn *insn, rtx *operands, int dest_operand_number,
 	     int cookie_operand_number)
 {
   static char buf[256];
-  if (darwin_emit_branch_islands
+  if (darwin_symbol_stubs
       && GET_CODE (operands[dest_operand_number]) == SYMBOL_REF
       && (INTVAL (operands[cookie_operand_number]) & CALL_LONG))
     {

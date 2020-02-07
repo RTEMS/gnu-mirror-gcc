@@ -1,3 +1,344 @@
+2019-11-14  Release Manager
+
+	* GCC 7.5.0 released.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_indirection_name): Rework the
+	function to emit linker-visible symbols only for indirections
+	in the data section.  Clean up the code and update comments.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-09  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (darwin_override_options): Make the check for
+	Objective-C ABI version more specific for 64bit code.
+
+	Backport from mainline
+	2019-10-06  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (darwin_override_options): Adjust objective-c
+	ABI version error messages to avoid punctuation and contracted
+	negations.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-07-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h (REAL_LIBGCC_SPEC): Adjust for earlier Darwin.
+	(STARTFILE_SPEC): Split crt3 into a separate spec.
+	(DARWIN_EXTRA_SPECS): Add crt2 and crt3 spec.
+	(DARWIN_CRT2_SPEC): New.
+	(DARWIN_CRT3_SPEC): New.
+	(MIN_LD64_OMIT_STUBS): Revise to 62.1.
+	* config/rs6000/darwin.h (DARWIN_CRT2_SPEC): Revise conditions.
+	(DARWIN_CRT3_SPEC): New.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-27  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/rs6000/darwin.h (ENDFILE_SPEC): Correct whitespace in the
+	spec.
+
+	Backport from mainline
+	2019-06-25  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/rs6000/darwin.h (ENDFILE_SPEC): New.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (darwin_emit_unwind_label): New default to false.
+	(darwin_override_options): Set darwin_emit_unwind_label as needed.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-08-13 Iain Sandoe <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_indirect_call_target): Rename symbol stub
+	flag.
+	(darwin_override_options): Likewise.
+	* config/darwin.h: Likewise.
+	* config/darwin.opt: Likewise.
+	* config/i386/i386.c (output_pic_addr_const): Likewise.
+	* config/rs6000/darwin.h: Likewise.
+	* config/rs6000/rs6000.c (rs6000_call_darwin_1): Likewise.
+	* config/i386/darwin.h (TARGET_MACHO_PICSYM_STUBS): Rename to ...
+	... this TARGET_MACHO_SYMBOL_STUBS.
+	(FUNCTION_PROFILER):Likewise.
+	* config/i386/i386.h: Likewise.
+
+	Backport from mainline
+	2019-06-16  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_indirect_call_target): Use renamed
+	darwin_picsymbol_stubs to decide on output.
+	(darwin_override_options): Handle darwin_picsymbol_stubs.
+	* config/darwin.h (MIN_LD64_OMIT_STUBS): New.
+	(LD64_VERSION): Revise default.
+	* config/darwin.opt: (mpic-symbol-stubs): New option.
+	(darwin_picsymbol_stubs): New variable.
+	* config/i386/darwin.h (TARGET_MACHO_BRANCH_ISLANDS):
+	rename to TARGET_MACHO_PICSYM_STUBS.
+	* config/i386/i386.c (output_pic_addr_const): Likewise.
+	* config/i386/i386.h Likewise.
+	* config/rs6000/darwin.h: Likewise.
+	* config/rs6000/rs6000.c (rs6000_call_darwin_1): Use renamed
+	darwin_picsymbol_stubs.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-28  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config.gcc (powerpc-*-darwin*, powerpc64-*-darwin*): Remove
+	override on extra_headers.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-27  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/rs6000/rs6000.c (darwin_rs6000_override_options): Honour
+	user-specified float mode choice for kernel mode code.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-23  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/rs6000/darwin.h: Handle GCC target pragma.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-17  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/65342
+	* config/rs6000/darwin.md (movdi_low, movsi_low_st): Delete.
+	(movdi_low_st): Delete.
+	* config/rs6000/rs6000.c
+	(darwin_rs6000_legitimate_lo_sum_const_p): New.
+	(mem_operand_gpr): Validate Mach-O LO_SUM cases separately.
+	* config/rs6000/rs6000.md (movsi_low): Delete.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-12  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/67183
+	* config/darwin.c (machopic_indirection): New field to flag
+	non-lazy-symbol-pointers in the data section.
+	(machopic_indirection_name): Compute if an indirection should
+	appear in the data section.
+	(machopic_output_data_section_indirection): New callback split
+	from machopic_output_indirection.
+	(machopic_output_stub_indirection): Likewise.
+	(machopic_output_indirection): Retain the code for non-lazy
+	symbol pointers in their regular section.
+	(machopic_finish): Use the new callbacks to order the indirection
+	output.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-12  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin-protos.h (machopic_finish): Delete.
+	* config/darwin.c (machopic_finish): Make static.
+
+	Backport from mainline
+	2019-10-09  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_indirect_data_reference): Set flag to
+	indicate that the new symbol is an indirection.
+	(machopic_indirect_call_target): Likewise.
+	* config/darwin.h (MACHO_SYMBOL_FLAG_INDIRECTION): New.
+	(MACHO_SYMBOL_INDIRECTION_P): New.
+	(MACHO_SYMBOL_FLAG_STATIC): Adjust bit number.
+
+	Backport from mainline
+	2019-10-08  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_indirect_data_reference): Check for
+	required indirections before making direct access to defined
+	values.
+	(machopic_output_indirection): Place the indirected pointes for
+	required indirections into the non-lazy symbol pointers section.
+	(darwin_encode_section_info):
+	* config/darwin.h (MACHO_SYMBOL_FLAG_MUST_INDIRECT): New.
+	(MACHO_SYMBOL_MUST_INDIRECT_P): New.
+
+	Backport from mainline
+	2019-10-07  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_output_indirection): Don't put
+	hidden symbol indirections into the .data section, use the
+	non-lazy symbol pointers section as normal.
+	(darwin_encode_section_info): Record if a symbol is hidden.
+	* config/darwin.h (MACHO_SYMBOL_FLAG_HIDDEN_VIS): New.
+	(MACHO_SYMBOL_HIDDEN_VIS_P): New.
+
+	Backport from mainline
+	2019-10-07  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_symbol_defined_p): Use symbol flag
+	predicates instead of accessing bits directly.
+	(machopic_indirect_call_target): Likewise.
+	(machopic_output_indirection): Likewise.
+	(darwin_encode_section_info): Improve description.  Use renamed
+	symbol flags.  Use predicate macros for variables and functions.
+	* config/darwin.h:
+	Rename MACHO_SYMBOL_VARIABLE to MACHO_SYMBOL_FLAG_VARIABLE.
+	Rename MACHO_SYMBOL_DEFINED to MACHO_SYMBOL_FLAG_DEFINED.
+	Rename MACHO_SYMBOL_STATIC to MACHO_SYMBOL_FLAG_STATIC.
+	(MACHO_SYMBOL_VARIABLE_P): New.
+	(MACHO_SYMBOL_DEFINED_P):New.
+	(MACHO_SYMBOL_STATIC_P): New.
+	* config/i386/darwin.h (MACHO_SYMBOL_FLAG_VARIABLE): Delete.
+	(SYMBOL_FLAG_SUBT_DEP): New.
+	* config/rs6000/darwin.h (SYMBOL_FLAG_SUBT_DEP): New.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/59888
+	* config/darwin.c (darwin_rodata_section): Add relocation flag,
+	choose const_data section for constants with relocations.
+	(machopic_select_section): Pass relocation flag to
+	darwin_rodata_section ().
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-09-21  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.c (machopic_legitimize_pic_address): Check
+	for lra, rather than reload.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-10-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/87243
+	* config/darwin-driver.c (maybe_get_sysroot_from_sdkroot): New.
+	(darwin_driver_init): Use the sysroot provided by SDKROOT when that
+	is available and the user has not set one on the command line.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-07-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h (DRIVER_SELF_SPECS): Remove the linker cases.
+	(RDYNAMIC): Rename to, DARWIN_RDYNAMIC.
+	(DARWIN_PIE_SPEC, DARWIN_NOPIE_SPEC): Adjust to remove the Xlinker
+	clauses.
+	(LINK_COMMAND_SPEC_A): Add DARWIN_RDYNAMIC, DARWIN_PIE_SPEC and
+	DARWIN_NOPIE_SPEC.
+
+	Backport from mainline
+	2019-06-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h (DRIVER_SELF_SPECS): Add RDYNAMIC, DARWIN_PIE_SPEC
+	and DARWIN_NOPIE_SPEC.
+	(RDYNAMIC): New, modified from DARWIN_EXPORT_DYNAMIC.
+	(DARWIN_PIE_SPEC): Collate from darwin.h and darwin9.h.
+	(DARWIN_NOPIE_SPEC): Collate from darwin10.h.
+	(DARWIN_NOCOMPACT_UNWIND): New from darwin10.h
+	(DARWIN_EXPORT_DYNAMIC): Delete.
+	* config/darwin10.h (LINK_GCC_C_SEQUENCE_SPEC): Move no_compact_unwind
+	and pie options processing to  darwin.h.
+	* config/darwin9.h (DARWIN_PIE_SPEC): Move pie processing to darwin.h
+
+2019-10-25  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backport from mainline
+	2019-05-08  Mihail Ionescu  <mihail.ionescu@arm.com>
+	    Richard Earnshaw  <rearnsha@arm.com>
+	PR target/88167
+	* config/arm/arm.c (thumb1_prologue_unused_call_clobbered_lo_regs): New
+	function.
+	(thumb1_epilogue_unused_call_clobbered_lo_regs): New function.
+	(thumb1_compute_save_core_reg_mask): Don't force a spare work
+	register if both the epilogue and prologue can use call-clobbered
+	regs.
+	(thumb1_unexpanded_epilogue): Use
+	thumb1_epilogue_unused_call_clobbered_lo_regs.  Reverse the logic for
+	picking temporaries for restoring high regs to match that of the
+	prologue where possible.
+	(thumb1_expand_prologue): Add any usable call-clobbered low registers to
+	the list of work registers.  Detect if the return address is still live
+	at the end of the prologue and avoid using it for a work register if so.
+	If the return address is not live, add LR to the list of pushable regs
+	after the first pass.
+
+2019-10-24  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2019-10-17  Richard Biener  <rguenther@suse.de>
+
+	PR debug/91887
+	* dwarf2out.c (gen_formal_parameter_die): Also try to match
+	context_die against a DW_TAG_GNU_formal_parameter_pack parent.
+
+	2019-09-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/91812
+	* tree-ssa-phiprop.c (propagate_with_phi): Do not replace
+	volatile loads.
+
+2019-10-23  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR tree-optimization/92131
+	* tree-vrp.c (extract_range_from_plus_minus_expr): If the resulting
+	range would be symbolic, drop to varying for any explicit overflow
+	in the constant part or if neither range is a singleton.
+
+2019-10-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backport from trunk
+	2019-10-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/86040
+	* config/avr/avr.c (avr_out_lpm): Do not shortcut-return.
+
+2019-10-17  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2019-03-15  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/89721
+	* lra-constraints (invariant_p): Return false if side_effects_p holds.
+
+2019-10-17  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backport from mainline
+	2019-05-03  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/89400
+	* config/arm/arm.md (unaligned_loadsi): Add variant for thumb1.
+	Restrict 'all' variant to 32-bit configurations.
+	(unaligned_loadhiu): Likewise.
+	(unaligned_storehi): Likewise.
+	(unaligned_storesi): Likewise.
+	(unaligned_loadhis): Disable when compiling for thumb1.
+
 2019-10-16  Peter Bergner  <bergner@linux.ibm.com>
 
 	Backport from mainline

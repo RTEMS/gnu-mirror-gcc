@@ -358,44 +358,37 @@ gfc_sym_identifier (gfc_symbol * sym)
 static const char *
 mangled_identifier (gfc_symbol *sym)
 {
-  static char name[GFC_MAX_MANGLED_SYMBOL_LEN + 1];
+  gfc_symbol *proc = sym->ns->proc_name;
+  static char name[3*GFC_MAX_MANGLED_SYMBOL_LEN + 14];
   /* Prevent the mangling of identifiers that have an assigned
      binding label (mainly those that are bind(c)).  */
 
   if (sym->attr.is_bind_c == 1 && sym->binding_label)
     return sym->binding_label;
 
-  if (!sym->fn_result_spec)
+  if (!sym->fn_result_spec
+      || (sym->module && !(proc && proc->attr.flavor == FL_PROCEDURE)))
     {
       if (sym->module == NULL)
 	return sym_identifier (sym);
       else
-	{
-	  snprintf (name, sizeof name, "__%s_MOD_%s", sym->module, sym->name);
-	  return name;
-	}
+	snprintf (name, sizeof name, "__%s_MOD_%s", sym->module, sym->name);
     }
   else
     {
       /* This is an entity that is actually local to a module procedure
 	 that appears in the result specification expression.  Since
 	 sym->module will be a zero length string, we use ns->proc_name
-	 instead. */
-      if (sym->ns->proc_name && sym->ns->proc_name->module)
-	{
-	  snprintf (name, sizeof name, "__%s_MOD__%s_PROC_%s",
-		    sym->ns->proc_name->module,
-		    sym->ns->proc_name->name,
-		    sym->name);
-	  return name;
-	}
+	 to provide the module name instead. */
+      if (proc && proc->module)
+	snprintf (name, sizeof name, "__%s_MOD__%s_PROC_%s",
+		  proc->module, proc->name, sym->name);
       else
-	{
-	  snprintf (name, sizeof name, "__%s_PROC_%s",
-		    sym->ns->proc_name->name, sym->name);
-	  return name;
-	}
+	snprintf (name, sizeof name, "__%s_PROC_%s",
+		  proc->name, sym->name);
     }
+
+  return name;
 }
 
 /* Get mangled identifier, adding the symbol to the global table if
@@ -5662,7 +5655,14 @@ generate_local_decl (gfc_symbol * sym)
 
       if (sym->ns && sym->ns->construct_entities)
 	{
-	  if (sym->attr.referenced)
+	  /* Construction of the intrinsic modules within a BLOCK
+	     construct, where ONLY and RENAMED entities are included,
+	     seems to be bogus.  This is a workaround that can be removed
+	     if someone ever takes on the task to creating full-fledge
+	     modules.  See PR 69455.  */
+	  if (sym->attr.referenced
+	      && sym->from_intmod != INTMOD_ISO_C_BINDING
+	      && sym->from_intmod != INTMOD_ISO_FORTRAN_ENV)
 	    gfc_get_symbol_decl (sym);
 	  sym->mark = 1;
 	}

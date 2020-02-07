@@ -1,3 +1,132 @@
+2019-11-14  Release Manager
+
+	* GCC 7.5.0 released.
+
+2019-11-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/79274
+	* g++.dg/tls/pr77285-2.C: XFAIL test for Darwin.
+
+2019-11-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline
+	2019-06-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.dg/pr90760.c: Require alias support.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-10-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.target/i386/indirect-thunk-1.c: Allow 'l' or 'L' in
+	indirection label prefix, for Darwin.
+	* gcc.target/i386/indirect-thunk-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-5.c: Likewise.
+	* gcc.target/i386/indirect-thunk-attr-6.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-extern-4.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-1.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-2.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-3.c: Likewise.
+	* gcc.target/i386/indirect-thunk-inline-4.c: Likewise.
+	* gcc.target/i386/pr32219-2.c: Likewise.
+	* gcc.target/i386/pr32219-3.c: Likewise.
+	* gcc.target/i386/pr32219-4.c: Likewise.
+	* gcc.target/i386/pr32219-7.c: Likewise.
+	* gcc.target/i386/pr32219-8.c: Likewise.
+	* gcc.target/i386/ret-thunk-14.c: Likewise.
+	* gcc.target/i386/ret-thunk-15.c: Likewise.
+	* gcc.target/i386/ret-thunk-9.c: Likewise.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-08-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* obj-c++.dg/stubify-1.mm: Rename symbol stub option.
+	* obj-c++.dg/stubify-2.mm: Likewise.
+	* objc.dg/stubify-1.m: Likewise.
+	* objc.dg/stubify-2.m: Likewise.
+
+2019-11-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backport from mainline.
+	2019-05-15  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* lib/target-supports.exp 
+	(check_effective_target_powerpc_p8vector_ok): No support for Darwin.
+	(check_effective_target_powerpc_p9vector_ok): Likewise.
+	(check_effective_target_powerpc_float128_sw_ok): Likewise.
+	(check_effective_target_powerpc_float128_hw_ok): Likewise.
+	(check_effective_target_powerpc_vsx_ok): Likewise.
+	* gcc.target/powerpc/bfp/bfp.exp: Don't try to run this for Darwin.
+	* gcc.target/powerpc/dfp/dfp.exp: Likewise.
+
+2019-10-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.c-torture/compile/pr72802.c: Skip for Darwin.
+
+2019-10-29  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from mainline
+	PR fortran/86248
+	* gfortran.dg/char_result_19.f90 : New test.
+	* gfortran.dg/char_result_mod_19.f90 : Module for the new test.
+
+2019-10-26  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/rs6000/darwin.h (ASM_OUTPUT_MAX_SKIP_ALIGN):Guard
+	against out of range max skip or log values.
+
+2019-10-25  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backport from mainline
+	2019-05-08  Mihail Ionescu  <mihail.ionescu@arm.com>
+	   Richard Earnshaw  <rearnsha@arm.com>
+	PR target/88167
+	* gcc.target/arm/pr88167-1.c: New test.
+	* gcc.target/arm/pr88167-2.c: New test.
+
+2019-10-24  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2019-10-17  Richard Biener  <rguenther@suse.de>
+
+	PR debug/91887
+	* g++.dg/debug/dwarf2/pr91887.C: New testcase.
+
+	2019-09-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/91812
+	* gcc.dg/torture/pr91812.c: New testcase.
+
+2019-10-23  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.c-torture/execute/20191023-1.c: New test.
+
+2019-10-18  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/69455
+	* gfortran.dg/pr69455_1.f90: New test.
+	* gfortran.dg/pr69455_2.f90: Ditto.
+
+2019-10-17  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	Backport from mainline
+	2019-10-15  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/92093
+	* gcc.target/powerpc/pr91275.c: Fix type and endian issues.
+
 2019-10-07  Bill Schmidt  <wschmidt@linux.ibm.com>
 
 	Backport from mainline

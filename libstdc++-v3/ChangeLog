@@ -1,3 +1,32 @@
+2019-11-14  Release Manager
+
+	* GCC 7.5.0 released.
+
+2019-10-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2019-10-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92143
+	* libsupc++/new_opa.cc (operator new) [__APPLE__]: Increase alignment
+	to at least sizeof(void*).
+
+	Backport from mainline
+	2019-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/Makefile.am (doc-html-docbook-regenerate): New target.
+	(${docbook_outdir}/html): Do not create unused 'html/ext' directory.
+	* doc/Makefile.in: Regenerate.
+	* doc/xml/manual/documentation_hacking.xml: Document new target.
+	* doc/html/*: Regenerate.
+
+	* doc/xml/manual/allocator.xml: Use archived copy of CUJ article.
+
+	Backport from mainline
+	2019-05-31  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/allocator.xml: Move hoard.org back to http.
+
 2019-09-11  Jonathan Wakely  <jwakely@redhat.com>
 
 	* python/libstdcxx/v6/xmethods.py (SharedPtrUseCountWorker.__call__):
