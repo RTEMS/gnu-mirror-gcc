@@ -1886,7 +1886,7 @@ write_header_file ()
   fprintf (header_file, "#include \"rtl.h\"\n");
   fprintf (header_file, "#include \"tree.h\"\n");
   fprintf (header_file, "\n");
-  fprintf (header_file, "#undef NEW_BUILTINS_ARE_LIVE\n\n");
+  fprintf (header_file, "extern int new_builtins_are_live;\n\n");
 
   write_decls ();
 
@@ -1985,18 +1985,18 @@ write_init_bif_table ()
 	       "  *slot = bifaddr;\n\n");
 
       fprintf (init_file,
-	       "#ifdef NEW_BUILTINS_ARE_LIVE\n");
+	       "  if (new_builtins_are_live &&\n");
       if (strcmp (bif_mask, "MASK_ALTIVEC")
 	  && strcmp (bif_mask, "MASK_VSX"))
 	fprintf (init_file,
-		 "  if ((%s & builtin_mask) != %s)\n",
+		 "      (%s & builtin_mask) != %s)\n",
 		 bif_mask, bif_mask);
       else
 	{
 	  fprintf (init_file,
-		   "  if (TARGET_EXTRA_BUILTINS\n");
+		   "      (TARGET_EXTRA_BUILTINS\n");
 	  fprintf (init_file,
-		   "      || (%s & builtin_mask) == %s)\n",
+		   "       || (%s & builtin_mask) == %s))\n",
 		   bif_mask, bif_mask);
 	}
       fprintf (init_file, "    {\n");
@@ -2010,9 +2010,11 @@ write_init_bif_table ()
 	       "                                %s,\n",
 	       bifs[i].fndecl);
       fprintf (init_file,
-	       "                                (int)RS6000_BIF_%s, NULL,"
-	       " NULL_TREE);\n",
+	       "                                (int)RS6000_BIF_%s,"
+	       " BUILT_IN_MD,\n",
 	       bifs[i].idname);
+      fprintf (init_file,
+	       "                                NULL, NULL_TREE);\n");
       if (bifs[i].kind == FNK_CONST)
 	{
 	  fprintf (init_file, "      TREE_READONLY (t) = 1;\n");
@@ -2033,7 +2035,6 @@ write_init_bif_table ()
 	  fprintf (init_file, "        }\n");
 	}
       fprintf (init_file, "    }\n");
-      fprintf (init_file, "#endif\n\n");
     }
 }
 
@@ -2106,9 +2107,12 @@ write_init_file ()
   fprintf (init_file, "#include \"backend.h\"\n");
   fprintf (init_file, "#include \"rtl.h\"\n");
   fprintf (init_file, "#include \"tree.h\"\n");
+  fprintf (init_file, "#include \"langhooks.h\"\n");
   fprintf (init_file, "#include \"insn-codes.h\"\n");
   fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
+
+  fprintf (init_file, "int new_builtins_are_live = 0;\n\n");
 
   fprintf (init_file,
 	   "bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");
@@ -2152,11 +2156,9 @@ write_init_file ()
   fprintf (init_file, "void\n");
   fprintf (init_file, "rs6000_autoinit_builtins ()\n");
   fprintf (init_file, "{\n");
-  fprintf (init_file, "#ifdef NEW_BUILTINS_ARE_LIVE\n");
   fprintf (init_file, "  tree t;\n");
   fprintf (init_file,
 	   "  HOST_WIDE_INT builtin_mask = rs6000_builtin_mask;\n");
-  fprintf (init_file, "#endif\n");
   fprintf (init_file, "  bifdata **slot;\n");
   fprintf (init_file, "  bifdata *bifaddr;\n");
   fprintf (init_file, "  hashval_t hash;\n");
