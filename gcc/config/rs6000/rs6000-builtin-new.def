@@ -177,10 +177,78 @@
     VANDC_V16QI_UNS andcv16qi3 {}
   const vsc __builtin_altivec_vandc_v16qi (vsc, vsc);
     VANDC_V16QI andcv16qi3 {}
-  const vbs __builtin_valtivec_vandc_v8hi_uns (vbs, vbs);
+  const vbs __builtin_altivec_vandc_v8hi_uns (vbs, vbs);
     VANDC_V8HI_UNS_B andcv8hi3 {}
-  const vus __builtin_valtivec_vandc_v8hi_uns (vus, vus);
+  const vus __builtin_altivec_vandc_v8hi_uns (vus, vus);
     VANDC_V8HI_UNS andcv8hi3 {}
+  const vss __builtin_altivec_vandc_v8hi (vss, vss);
+    VANDC_V8HI andcv8hi3 {}
+  const vbs __builtin_altivec_vandc_v4si_uns (vbs, vbs);
+    VANDC_V4SI_UNS_B andcv4si3 {}
+  const vus __builtin_altivec_vandc_v4si_uns (vus, vus);
+    VANDC_V4SI_UNS andcv4si3 {}
+  const vsi __builtin_altivec_vandc_v4si (vsi, vsi);
+    VANDC_V4SI andcv4si3 {}
+  const vf __builtin_altivec_vandc_v4sf (vf, vf);
+    VANDC_V4SF andcv4sf3 {}
+  const vuc __builtin_altivec_vavgub (vuc, vuc);
+    VAVGUB uavgv16qi3_ceil {}
+  const vsc __builtin_altivec_vavgsb (vsc, vsc);
+    VAVGSB avgv16qi3_ceil {}
+  const vus __builtin_altivec_vavguh (vus, vus);
+    VAVGUH uavgv8hi3_ceil {}
+  const vss __builtin_altivec_vavgsh (vss, vss);
+    VAVGSH avgv8hi3_ceil {}
+  const vui __builtin_altivec_vavguw (vui, vui);
+    VAVGUW uavgv4si3_ceil {}
+  const vsi __builtin_altivec_vavgsw (vsi, vsi);
+    VAVGSW avgv4si3_ceil {}
+  const vf __builtin_altivec_vcfux (vui, const int<5>);
+    VCFUX altivec_vcfux {}
+  const vf __builtin_altivec_vcfsx (vsi, const int<5>);
+    VCFSX altivec_vcfsx {}
+  const vsi __builtin_altivec_vcmpbfp (vf, vf);
+    VCMPBFP altivec_vcmpbfp {}
+  const vbc __builtin_altivec_vcmpequb (vuc, vuc);
+    VCMPEQUB vector_eqv16qi {}
+  const vbc __builtin_altivec_vcmpequb (vsc, vsc);
+    VCMPEQUB_S vector_eqv16qi {}
+  const vbc __builtin_altivec_vcmpequb (vbc, vbc);
+    VCMPEQUB_B vector_eqv16qi {}
+  const vbs __builtin_altivec_vcmpequh (vbs, vbs);
+    VCMPEQUH_B vector_eqv8hi {}
+  const vbs __builtin_altivec_vcmpequh (vss, vss);
+    VCMPEQUH_S vector_eqv8hi {}
+  const vbs __builtin_altivec_vcmpequh (vus, vus);
+    VCMPEQUH vector_eqv8hi {}
+  const vbi __builtin_altivec_vcmpequw (vbi, vbi);
+    VCMPEQUW_B vector_eqv4si {}
+  const vbi __builtin_altivec_vcmpequw (vsi, vsi);
+    VCMPEQUW_S vector_eqv4si {}
+  const vbi __builtin_altivec_vcmpequw (vui, vui);
+    VCMPEQUW vector_eqv4si {}
+  const vbi __builtin_altivec_vcmpeqfp (vf, vf);
+    VCMPEQFP vector_eqv4sf {}
+  const vbi __builtin_altivec_vcmpgefp (vf, vf);
+    VCMPGEFP vector_gev4sf {}
+  const vbc __builtin_altivec_vcmpgtub (vuc, vuc);
+    VCMPGTUB vector_gtuv16qi {}
+  const vbc __builtin_altivec_vcmpgtsb (vsc, vsc);
+    VCMPGTSB vector_gtv16qi {}
+  const vbs __builtin_altivec_vcmpgtuh (vus, vus);
+    VCMPGTUH vector_gtuv8hi {}
+  const vbs __builtin_altivec_vcmpgtsh (vss, vss);
+    VCMPGTSH vector_gtv8hi {}
+  const vbi __builtin_altivec_vcmpgtuw (vui, vui);
+    VCMPGTUW vector_gtuv4si {}
+  const vbi __builtin_altivec_vcmpgtsw (vsi, vsi);
+    VCMPGTSW vector_gtv4si {}
+  const vbi __builtin_altivec_vcmpgtfp (vf, vf);
+    VCMPGTFP vector_gtv4sf {}
+  const vsi __builtin_altivec_vctsxs (vf, const int<5>);
+    VCTSXS altivec_vctsxs {}
+  const vui __builtin_altivec_vctuxs (vf, const int<5>);
+    VCTUXS altivec_vctuxs {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);
@@ -217,3 +285,11 @@
     VAND_V2DI andv2di3 {}
   const vd __builtin_altivec_vand_v2df (vd, vd);
     VAND_V2DF andv2df3 {}
+  const vbll __builtin_altivec_vandc_v2di_uns (vbll, vbll);
+    VANDC_V2DI_UNS_B andcv2di3 {}
+  const vull __builtin_altivec_vandc_v2di_uns (vull, vull);
+    VANDC_V2DI_UNS andcv2di3 {}
+  const vsll __builtin_altivec_vandc_v2di (vsll, vsll);
+    VANDC_V2DI andcv2di3 {}
+  const vd __builtin_altivec_vandc_v2df (vd, vd);
+    VANDC_V2DF andcv2df3 {}

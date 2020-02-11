@@ -746,18 +746,21 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
 
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SF,
     RS6000_BTI_V4SF, RS6000_BTI_V4SF, RS6000_BTI_V4SF, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SF,
     RS6000_BTI_V4SF, RS6000_BTI_V4SF, RS6000_BTI_bool_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SF,
     RS6000_BTI_V4SF, RS6000_BTI_bool_V4SI, RS6000_BTI_V4SF, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DF,
     RS6000_BTI_V2DF, RS6000_BTI_V2DF, RS6000_BTI_V2DF, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DF,
     RS6000_BTI_V2DF, RS6000_BTI_V2DF, RS6000_BTI_bool_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DF,
     RS6000_BTI_V2DF, RS6000_BTI_bool_V2DI, RS6000_BTI_V2DF, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_bool_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI,
@@ -766,18 +769,21 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_bool_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI_UNS,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI_UNS,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_bool_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V2DI_UNS,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI_UNS,
     RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_bool_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI_UNS,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V4SI_UNS,
@@ -786,6 +792,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V8HI_UNS,
     RS6000_BTI_bool_V8HI, RS6000_BTI_bool_V8HI, RS6000_BTI_bool_V8HI, 0 },
+  /* Next two deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V8HI,
     RS6000_BTI_V8HI, RS6000_BTI_bool_V8HI, RS6000_BTI_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_ANDC, ALTIVEC_BUILTIN_VANDC_V8HI,
@@ -11538,9 +11545,13 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
   size_t i;
   rtx ret;
   bool success;
-  HOST_WIDE_INT mask = rs6000_builtin_info[uns_fcode].mask;
+  HOST_WIDE_INT mask = (new_builtins_are_live
+			? rs6000_builtin_info_x[uns_fcode].mask
+			: rs6000_builtin_info[uns_fcode].mask);
   bool func_valid_p = ((rs6000_builtin_mask & mask) == mask);
-  enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
+  enum insn_code icode = (new_builtins_are_live
+			  ? rs6000_builtin_info_x[uns_fcode].icode
+			  : rs6000_builtin_info[uns_fcode].icode);
 
   /* We have two different modes (KFmode, TFmode) that are the IEEE 128-bit
      floating point type, depending on whether long double is the IBM extended
@@ -11571,7 +11582,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       case CODE_FOR_xststdcqp_kf:	icode = CODE_FOR_xststdcqp_tf;	break;
       }
 
-  if (TARGET_DEBUG_BUILTIN)
+  if (!new_builtins_are_live && TARGET_DEBUG_BUILTIN)
     {
       const char *name1 = rs6000_builtin_info[uns_fcode].name;
       const char *name2 = (icode != CODE_FOR_nothing)
@@ -11608,193 +11619,269 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       return expand_call (exp, target, ignore);
     }
 
-  switch (fcode)
+  if (new_builtins_are_live)
     {
-    case RS6000_BUILTIN_RECIP:
-      return rs6000_expand_binop_builtin (CODE_FOR_recipdf3, exp, target);
+      bifdata *bifaddr = &rs6000_builtin_info_x[uns_fcode];
+      if (bifaddr->icode == CODE_FOR_nothing)
+	return 0;
 
-    case RS6000_BUILTIN_RECIPF:
-      return rs6000_expand_binop_builtin (CODE_FOR_recipsf3, exp, target);
+      /* #### Insert special handling here.  */
 
-    case RS6000_BUILTIN_RSQRTF:
-      return rs6000_expand_unop_builtin (CODE_FOR_rsqrtsf2, exp, target);
+      rtx pat;
+      const int MAX_BUILTIN_ARGS = 5;
+      tree arg[MAX_BUILTIN_ARGS];
+      rtx op[MAX_BUILTIN_ARGS];
+      machine_mode mode[MAX_BUILTIN_ARGS + 1];
 
-    case RS6000_BUILTIN_RSQRT:
-      return rs6000_expand_unop_builtin (CODE_FOR_rsqrtdf2, exp, target);
+      int nargs = bifaddr->nargs;
+      gcc_assert (nargs <= MAX_BUILTIN_ARGS);
 
-    case POWER7_BUILTIN_BPERMD:
-      return rs6000_expand_binop_builtin (((TARGET_64BIT)
-					   ? CODE_FOR_bpermd_di
-					   : CODE_FOR_bpermd_si), exp, target);
+      mode[0] = insn_data[bifaddr->icode].operand[0].mode;
+      for (int i = 0; i < nargs; i++)
+	{
+	  arg[i] = CALL_EXPR_ARG (exp, i);
+	  if (arg[i] == error_mark_node)
+	    return const0_rtx;
+	  op[i] = expand_normal (arg[i]);
+	  mode[i+1] = insn_data[bifaddr->icode].operand[i+1].mode;
+	}
 
-    case RS6000_BUILTIN_GET_TB:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_get_timebase,
-					   target);
+      if (target == 0
+	  || GET_MODE (target) != mode[0]
+	  || !(*insn_data[bifaddr->icode].operand[0].predicate) (target,
+								 mode[0]))
+	target = gen_reg_rtx (mode[0]);
 
-    case RS6000_BUILTIN_MFTB:
-      return rs6000_expand_zeroop_builtin (((TARGET_64BIT)
-					    ? CODE_FOR_rs6000_mftb_di
-					    : CODE_FOR_rs6000_mftb_si),
-					   target);
+      for (int i = 0; i < nargs; i++)
+	if (! (*insn_data[bifaddr->icode].operand[i+1].predicate) (op[i],
+								   mode[i+1]))
+	  op[i] = copy_to_mode_reg (mode[i+1], op[i]);
 
-    case RS6000_BUILTIN_MFFS:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffs, target);
+      switch (nargs)
+	{
+	default:
+	  gcc_assert (MAX_BUILTIN_ARGS == 5);
+	  gcc_unreachable ();
+	case 0:
+	  pat = GEN_FCN (icode) (target);
+	  break;
+	case 1:
+	  pat = GEN_FCN (icode) (target, op[0]);
+	  break;
+	case 2:
+	  pat = GEN_FCN (icode) (target, op[0], op[1]);
+	  break;
+	case 3:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2]);
+	  break;
+	case 4:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3]);
+	  break;
+	case 5:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3], op[4]);
+	  break;
+	}
 
-    case RS6000_BUILTIN_MTFSB0:
-      return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb0, exp);
+      if (!pat)
+	return 0;
+      emit_insn (pat);
 
-    case RS6000_BUILTIN_MTFSB1:
-      return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb1, exp);
+      return target;
+    }
+  else
+    {
+      switch (fcode)
+	{
+	case RS6000_BUILTIN_RECIP:
+	  return rs6000_expand_binop_builtin (CODE_FOR_recipdf3, exp, target);
 
-    case RS6000_BUILTIN_SET_FPSCR_RN:
-      return rs6000_expand_set_fpscr_rn_builtin (CODE_FOR_rs6000_set_fpscr_rn,
+	case RS6000_BUILTIN_RECIPF:
+	  return rs6000_expand_binop_builtin (CODE_FOR_recipsf3, exp, target);
+
+	case RS6000_BUILTIN_RSQRTF:
+	  return rs6000_expand_unop_builtin (CODE_FOR_rsqrtsf2, exp, target);
+
+	case RS6000_BUILTIN_RSQRT:
+	  return rs6000_expand_unop_builtin (CODE_FOR_rsqrtdf2, exp, target);
+
+	case POWER7_BUILTIN_BPERMD:
+	  return rs6000_expand_binop_builtin (((TARGET_64BIT)
+					       ? CODE_FOR_bpermd_di
+					       : CODE_FOR_bpermd_si),
+					      exp, target);
+
+	case RS6000_BUILTIN_GET_TB:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_get_timebase,
+					       target);
+
+	case RS6000_BUILTIN_MFTB:
+	  return rs6000_expand_zeroop_builtin (((TARGET_64BIT)
+						? CODE_FOR_rs6000_mftb_di
+						: CODE_FOR_rs6000_mftb_si),
+					       target);
+
+	case RS6000_BUILTIN_MFFS:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffs, target);
+
+	case RS6000_BUILTIN_MTFSB0:
+	  return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb0, exp);
+
+	case RS6000_BUILTIN_MTFSB1:
+	  return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb1, exp);
+
+	case RS6000_BUILTIN_SET_FPSCR_RN:
+	  return rs6000_expand_set_fpscr_rn_builtin
+	    (CODE_FOR_rs6000_set_fpscr_rn, exp);
+
+	case RS6000_BUILTIN_SET_FPSCR_DRN:
+	  return
+	    rs6000_expand_set_fpscr_drn_builtin (CODE_FOR_rs6000_set_fpscr_drn,
 						 exp);
 
-    case RS6000_BUILTIN_SET_FPSCR_DRN:
-      return
-        rs6000_expand_set_fpscr_drn_builtin (CODE_FOR_rs6000_set_fpscr_drn,
-					     exp);
+	case RS6000_BUILTIN_MFFSL:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffsl, target);
 
-    case RS6000_BUILTIN_MFFSL:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffsl, target);
+	case RS6000_BUILTIN_MTFSF:
+	  return rs6000_expand_mtfsf_builtin (CODE_FOR_rs6000_mtfsf, exp);
 
-    case RS6000_BUILTIN_MTFSF:
-      return rs6000_expand_mtfsf_builtin (CODE_FOR_rs6000_mtfsf, exp);
+	case RS6000_BUILTIN_CPU_INIT:
+	case RS6000_BUILTIN_CPU_IS:
+	case RS6000_BUILTIN_CPU_SUPPORTS:
+	  return cpu_expand_builtin (fcode, exp, target);
 
-    case RS6000_BUILTIN_CPU_INIT:
-    case RS6000_BUILTIN_CPU_IS:
-    case RS6000_BUILTIN_CPU_SUPPORTS:
-      return cpu_expand_builtin (fcode, exp, target);
-
-    case MISC_BUILTIN_SPEC_BARRIER:
-      {
-	emit_insn (gen_speculation_barrier ());
-	return NULL_RTX;
-      }
-
-    case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
-    case ALTIVEC_BUILTIN_MASK_FOR_STORE:
-      {
-	int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
-		     : (int) CODE_FOR_altivec_lvsl_direct);
-	machine_mode tmode = insn_data[icode2].operand[0].mode;
-	machine_mode mode = insn_data[icode2].operand[1].mode;
-	tree arg;
-	rtx op, addr, pat;
-
-	gcc_assert (TARGET_ALTIVEC);
-
-	arg = CALL_EXPR_ARG (exp, 0);
-	gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg)));
-	op = expand_expr (arg, NULL_RTX, Pmode, EXPAND_NORMAL);
-	addr = memory_address (mode, op);
-	if (fcode == ALTIVEC_BUILTIN_MASK_FOR_STORE)
-	  op = addr;
-	else
+	case MISC_BUILTIN_SPEC_BARRIER:
 	  {
-	    /* For the load case need to negate the address.  */
-	    op = gen_reg_rtx (GET_MODE (addr));
-	    emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
+	    emit_insn (gen_speculation_barrier ());
+	    return NULL_RTX;
 	  }
-	op = gen_rtx_MEM (mode, op);
 
-	if (target == 0
-	    || GET_MODE (target) != tmode
-	    || ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
-	  target = gen_reg_rtx (tmode);
+	case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
+	case ALTIVEC_BUILTIN_MASK_FOR_STORE:
+	  {
+	    int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
+			  : (int) CODE_FOR_altivec_lvsl_direct);
+	    machine_mode tmode = insn_data[icode2].operand[0].mode;
+	    machine_mode mode = insn_data[icode2].operand[1].mode;
+	    tree arg;
+	    rtx op, addr, pat;
 
-	pat = GEN_FCN (icode2) (target, op);
-	if (!pat)
-	  return 0;
-	emit_insn (pat);
+	    gcc_assert (TARGET_ALTIVEC);
 
-	return target;
-      }
+	    arg = CALL_EXPR_ARG (exp, 0);
+	    gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg)));
+	    op = expand_expr (arg, NULL_RTX, Pmode, EXPAND_NORMAL);
+	    addr = memory_address (mode, op);
+	    if (fcode == ALTIVEC_BUILTIN_MASK_FOR_STORE)
+	      op = addr;
+	    else
+	      {
+		/* For the load case need to negate the address.  */
+		op = gen_reg_rtx (GET_MODE (addr));
+		emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr),
+							 addr)));
+	      }
+	    op = gen_rtx_MEM (mode, op);
 
-    case ALTIVEC_BUILTIN_VCFUX:
-    case ALTIVEC_BUILTIN_VCFSX:
-    case ALTIVEC_BUILTIN_VCTUXS:
-    case ALTIVEC_BUILTIN_VCTSXS:
-  /* FIXME: There's got to be a nicer way to handle this case than
-     constructing a new CALL_EXPR.  */
-      if (call_expr_nargs (exp) == 1)
-	{
-	  exp = build_call_nary (TREE_TYPE (exp), CALL_EXPR_FN (exp),
-				 2, CALL_EXPR_ARG (exp, 0), integer_zero_node);
+	    if (target == 0
+		|| GET_MODE (target) != tmode
+		|| ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
+	      target = gen_reg_rtx (tmode);
+
+	    pat = GEN_FCN (icode2) (target, op);
+	    if (!pat)
+	      return 0;
+	    emit_insn (pat);
+
+	    return target;
+	  }
+
+	case ALTIVEC_BUILTIN_VCFUX:
+	case ALTIVEC_BUILTIN_VCFSX:
+	case ALTIVEC_BUILTIN_VCTUXS:
+	case ALTIVEC_BUILTIN_VCTSXS:
+	  /* FIXME: There's got to be a nicer way to handle this case than
+	     constructing a new CALL_EXPR.  */
+	  if (call_expr_nargs (exp) == 1)
+	    {
+	      exp = build_call_nary (TREE_TYPE (exp), CALL_EXPR_FN (exp),
+				     2, CALL_EXPR_ARG (exp, 0),
+				     integer_zero_node);
+	    }
+	  break;
+
+	  /* For the pack and unpack int128 routines, fix up the builtin so it
+	     uses the correct IBM128 type.  */
+	case MISC_BUILTIN_PACK_IF:
+	  if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	    {
+	      icode = CODE_FOR_packtf;
+	      fcode = MISC_BUILTIN_PACK_TF;
+	      uns_fcode = (size_t)fcode;
+	    }
+	  break;
+
+	case MISC_BUILTIN_UNPACK_IF:
+	  if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	    {
+	      icode = CODE_FOR_unpacktf;
+	      fcode = MISC_BUILTIN_UNPACK_TF;
+	      uns_fcode = (size_t)fcode;
+	    }
+	  break;
+
+	default:
+	  break;
 	}
-      break;
 
-      /* For the pack and unpack int128 routines, fix up the builtin so it
-	 uses the correct IBM128 type.  */
-    case MISC_BUILTIN_PACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+      if (TARGET_ALTIVEC)
 	{
-	  icode = CODE_FOR_packtf;
-	  fcode = MISC_BUILTIN_PACK_TF;
-	  uns_fcode = (size_t)fcode;
-	}
-      break;
+	  ret = altivec_expand_builtin (exp, target, &success);
 
-    case MISC_BUILTIN_UNPACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	  if (success)
+	    return ret;
+	}
+      if (TARGET_HTM)
 	{
-	  icode = CODE_FOR_unpacktf;
-	  fcode = MISC_BUILTIN_UNPACK_TF;
-	  uns_fcode = (size_t)fcode;
-	}
-      break;
+	  ret = htm_expand_builtin (exp, target, &success);
 
-    default:
-      break;
+	  if (success)
+	    return ret;
+	}
+
+      unsigned attr = (rs6000_builtin_info[uns_fcode].attr
+		       & RS6000_BTC_TYPE_MASK);
+      /* RS6000_BTC_SPECIAL represents no-operand operators.  */
+      gcc_assert (attr == RS6000_BTC_UNARY
+		  || attr == RS6000_BTC_BINARY
+		  || attr == RS6000_BTC_TERNARY
+		  || attr == RS6000_BTC_SPECIAL);
+
+      /* Handle simple unary operations.  */
+      d = bdesc_1arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_1arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_unop_builtin (icode, exp, target);
+
+      /* Handle simple binary operations.  */
+      d = bdesc_2arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_2arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_binop_builtin (icode, exp, target);
+
+      /* Handle simple ternary operations.  */
+      d = bdesc_3arg;
+      for (i = 0; i < ARRAY_SIZE  (bdesc_3arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_ternop_builtin (icode, exp, target);
+
+      /* Handle simple no-argument operations. */
+      d = bdesc_0arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_0arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_zeroop_builtin (icode, target);
+
+      gcc_unreachable ();
     }
-
-  if (TARGET_ALTIVEC)
-    {
-      ret = altivec_expand_builtin (exp, target, &success);
-
-      if (success)
-	return ret;
-    }
-  if (TARGET_HTM)
-    {
-      ret = htm_expand_builtin (exp, target, &success);
-
-      if (success)
-	return ret;
-    }  
-
-  unsigned attr = rs6000_builtin_info[uns_fcode].attr & RS6000_BTC_TYPE_MASK;
-  /* RS6000_BTC_SPECIAL represents no-operand operators.  */
-  gcc_assert (attr == RS6000_BTC_UNARY
-	      || attr == RS6000_BTC_BINARY
-	      || attr == RS6000_BTC_TERNARY
-	      || attr == RS6000_BTC_SPECIAL);
-  
-  /* Handle simple unary operations.  */
-  d = bdesc_1arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_1arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_unop_builtin (icode, exp, target);
-
-  /* Handle simple binary operations.  */
-  d = bdesc_2arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_2arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_binop_builtin (icode, exp, target);
-
-  /* Handle simple ternary operations.  */
-  d = bdesc_3arg;
-  for (i = 0; i < ARRAY_SIZE  (bdesc_3arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_ternop_builtin (icode, exp, target);
-
-  /* Handle simple no-argument operations. */
-  d = bdesc_0arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_0arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_zeroop_builtin (icode, target);
-
-  gcc_unreachable ();
 }
 
 /* Create a builtin vector type with a name.  Taking care not to give
@@ -12000,92 +12087,103 @@ rs6000_init_builtins (void)
   /* Create Altivec and VSX builtins on machines with at least the
      general purpose extensions (970 and newer) to allow the use of
      the target attribute.  */
-  if (TARGET_EXTRA_BUILTINS)
-    altivec_init_builtins ();
-  if (TARGET_HTM)
-    htm_init_builtins ();
+  if (!new_builtins_are_live)
+    {
+      if (TARGET_EXTRA_BUILTINS)
+	altivec_init_builtins ();
+      if (TARGET_HTM)
+	htm_init_builtins ();
 
-  if (TARGET_EXTRA_BUILTINS)
-    rs6000_common_init_builtins ();
+      if (TARGET_EXTRA_BUILTINS)
+	rs6000_common_init_builtins ();
 
-  ftype = builtin_function_type (DFmode, DFmode, DFmode, VOIDmode,
-				 RS6000_BUILTIN_RECIP, "__builtin_recipdiv");
-  def_builtin ("__builtin_recipdiv", ftype, RS6000_BUILTIN_RECIP);
+      ftype = builtin_function_type (DFmode, DFmode, DFmode, VOIDmode,
+				     RS6000_BUILTIN_RECIP,
+				     "__builtin_recipdiv");
+      def_builtin ("__builtin_recipdiv", ftype, RS6000_BUILTIN_RECIP);
 
-  ftype = builtin_function_type (SFmode, SFmode, SFmode, VOIDmode,
-				 RS6000_BUILTIN_RECIPF, "__builtin_recipdivf");
-  def_builtin ("__builtin_recipdivf", ftype, RS6000_BUILTIN_RECIPF);
+      ftype = builtin_function_type (SFmode, SFmode, SFmode, VOIDmode,
+				     RS6000_BUILTIN_RECIPF,
+				     "__builtin_recipdivf");
+      def_builtin ("__builtin_recipdivf", ftype, RS6000_BUILTIN_RECIPF);
 
-  ftype = builtin_function_type (DFmode, DFmode, VOIDmode, VOIDmode,
-				 RS6000_BUILTIN_RSQRT, "__builtin_rsqrt");
-  def_builtin ("__builtin_rsqrt", ftype, RS6000_BUILTIN_RSQRT);
+      ftype = builtin_function_type (DFmode, DFmode, VOIDmode, VOIDmode,
+				     RS6000_BUILTIN_RSQRT, "__builtin_rsqrt");
+      def_builtin ("__builtin_rsqrt", ftype, RS6000_BUILTIN_RSQRT);
 
-  ftype = builtin_function_type (SFmode, SFmode, VOIDmode, VOIDmode,
-				 RS6000_BUILTIN_RSQRTF, "__builtin_rsqrtf");
-  def_builtin ("__builtin_rsqrtf", ftype, RS6000_BUILTIN_RSQRTF);
+      ftype = builtin_function_type (SFmode, SFmode, VOIDmode, VOIDmode,
+				     RS6000_BUILTIN_RSQRTF,
+				     "__builtin_rsqrtf");
+      def_builtin ("__builtin_rsqrtf", ftype, RS6000_BUILTIN_RSQRTF);
 
-  mode = (TARGET_64BIT) ? DImode : SImode;
-  ftype = builtin_function_type (mode, mode, mode, VOIDmode,
-				 POWER7_BUILTIN_BPERMD, "__builtin_bpermd");
-  def_builtin ("__builtin_bpermd", ftype, POWER7_BUILTIN_BPERMD);
+      mode = (TARGET_64BIT) ? DImode : SImode;
+      ftype = builtin_function_type (mode, mode, mode, VOIDmode,
+				     POWER7_BUILTIN_BPERMD,
+				     "__builtin_bpermd");
+      def_builtin ("__builtin_bpermd", ftype, POWER7_BUILTIN_BPERMD);
 
-  ftype = build_function_type_list (unsigned_intDI_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_ppc_get_timebase", ftype, RS6000_BUILTIN_GET_TB);
+      ftype = build_function_type_list (unsigned_intDI_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_ppc_get_timebase", ftype, RS6000_BUILTIN_GET_TB);
 
-  if (TARGET_64BIT)
-    ftype = build_function_type_list (unsigned_intDI_type_node,
-				      NULL_TREE);
-  else
-    ftype = build_function_type_list (unsigned_intSI_type_node,
-				      NULL_TREE);
-  def_builtin ("__builtin_ppc_mftb", ftype, RS6000_BUILTIN_MFTB);
+      if (TARGET_64BIT)
+	ftype = build_function_type_list (unsigned_intDI_type_node,
+					  NULL_TREE);
+      else
+	ftype = build_function_type_list (unsigned_intSI_type_node,
+					  NULL_TREE);
+      def_builtin ("__builtin_ppc_mftb", ftype, RS6000_BUILTIN_MFTB);
 
-  ftype = build_function_type_list (double_type_node, NULL_TREE);
-  def_builtin ("__builtin_mffs", ftype, RS6000_BUILTIN_MFFS);
+      ftype = build_function_type_list (double_type_node, NULL_TREE);
+      def_builtin ("__builtin_mffs", ftype, RS6000_BUILTIN_MFFS);
 
-  ftype = build_function_type_list (double_type_node, NULL_TREE);
-  def_builtin ("__builtin_mffsl", ftype, RS6000_BUILTIN_MFFSL);
+      ftype = build_function_type_list (double_type_node, NULL_TREE);
+      def_builtin ("__builtin_mffsl", ftype, RS6000_BUILTIN_MFFSL);
 
-  ftype = build_function_type_list (void_type_node,
-				    intSI_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_mtfsb0", ftype, RS6000_BUILTIN_MTFSB0);
+      ftype = build_function_type_list (void_type_node,
+					intSI_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_mtfsb0", ftype, RS6000_BUILTIN_MTFSB0);
 
-  ftype = build_function_type_list (void_type_node,
-				    intSI_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_mtfsb1", ftype, RS6000_BUILTIN_MTFSB1);
+      ftype = build_function_type_list (void_type_node,
+					intSI_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_mtfsb1", ftype, RS6000_BUILTIN_MTFSB1);
 
-  ftype = build_function_type_list (void_type_node,
-				    intDI_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_set_fpscr_rn", ftype, RS6000_BUILTIN_SET_FPSCR_RN);
+      ftype = build_function_type_list (void_type_node,
+					intDI_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_set_fpscr_rn", ftype,
+		   RS6000_BUILTIN_SET_FPSCR_RN);
 
-  ftype = build_function_type_list (void_type_node,
-				    intDI_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_set_fpscr_drn", ftype, RS6000_BUILTIN_SET_FPSCR_DRN);
+      ftype = build_function_type_list (void_type_node,
+					intDI_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_set_fpscr_drn", ftype,
+		   RS6000_BUILTIN_SET_FPSCR_DRN);
 
-  ftype = build_function_type_list (void_type_node,
-				    intSI_type_node, double_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_mtfsf", ftype, RS6000_BUILTIN_MTFSF);
+      ftype = build_function_type_list (void_type_node,
+					intSI_type_node, double_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_mtfsf", ftype, RS6000_BUILTIN_MTFSF);
 
-  ftype = build_function_type_list (void_type_node, NULL_TREE);
-  def_builtin ("__builtin_cpu_init", ftype, RS6000_BUILTIN_CPU_INIT);
-  def_builtin ("__builtin_ppc_speculation_barrier", ftype,
-	       MISC_BUILTIN_SPEC_BARRIER);
+      ftype = build_function_type_list (void_type_node, NULL_TREE);
+      def_builtin ("__builtin_cpu_init", ftype, RS6000_BUILTIN_CPU_INIT);
+      def_builtin ("__builtin_ppc_speculation_barrier", ftype,
+		   MISC_BUILTIN_SPEC_BARRIER);
 
-  ftype = build_function_type_list (bool_int_type_node, const_ptr_type_node,
-				    NULL_TREE);
-  def_builtin ("__builtin_cpu_is", ftype, RS6000_BUILTIN_CPU_IS);
-  def_builtin ("__builtin_cpu_supports", ftype, RS6000_BUILTIN_CPU_SUPPORTS);
+      ftype = build_function_type_list (bool_int_type_node,
+					const_ptr_type_node,
+					NULL_TREE);
+      def_builtin ("__builtin_cpu_is", ftype, RS6000_BUILTIN_CPU_IS);
+      def_builtin ("__builtin_cpu_supports", ftype,
+		   RS6000_BUILTIN_CPU_SUPPORTS);
 
-  /* AIX libm provides clog as __clog.  */
-  if (TARGET_XCOFF &&
-      (tdecl = builtin_decl_explicit (BUILT_IN_CLOG)) != NULL_TREE)
-    set_user_assembler_name (tdecl, "__clog");
+      /* AIX libm provides clog as __clog.  */
+      if (TARGET_XCOFF &&
+	  (tdecl = builtin_decl_explicit (BUILT_IN_CLOG)) != NULL_TREE)
+	set_user_assembler_name (tdecl, "__clog");
+    }
 
 #ifdef SUBTARGET_INIT_BUILTINS
   SUBTARGET_INIT_BUILTINS;

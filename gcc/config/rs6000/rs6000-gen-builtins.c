@@ -1702,8 +1702,10 @@ write_decls ()
   fprintf (header_file, "struct bifdata\n");
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
+  fprintf (header_file, "  HOST_WIDE_INT mask;\n");
   fprintf (header_file, "  tree fntype;\n");
   fprintf (header_file, "  insn_code icode;\n");
+  fprintf (header_file, "  int  nargs;\n");
   fprintf (header_file, "  int  bifattrs;\n");
   fprintf (header_file, "  int  restr_opnd;\n");
   fprintf (header_file, "  restriction restr;\n");
@@ -1909,9 +1911,17 @@ write_init_bif_table ()
 	       "\n    = \"%s\";\n",
 	       bifs[i].idname, bifs[i].proto.bifname);
       fprintf (init_file,
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].mask"
+	       "\n    = %s;\n",
+	       bifs[i].idname, bif_mask);
+      fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
 	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
+      fprintf (init_file,
+	       "  rs6000_builtin_info_x[RS6000_BIF_%s].nargs"
+	       "\n    = %d;\n",
+	       bifs[i].idname, bifs[i].proto.nargs);
       fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].icode"
 	       "\n    = CODE_FOR_%s;\n",
