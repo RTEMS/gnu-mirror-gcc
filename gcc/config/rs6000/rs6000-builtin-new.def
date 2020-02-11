@@ -311,6 +311,44 @@
     VMINUB uminv16qi3 {}
   const vsc __builtin_altivec_vminsb (vsc, vsc);
     VMINSB sminv16qi3 {}
+  const vus __builtin_altivec_vminuh (vus, vus);
+    VMINUH uminv8hi3 {}
+  const vss __builtin_altivec_vminsh (vss, vss);
+    VMINSH sminv8hi3 {}
+  const vui __builtin_altivec_vminuw (vui, vui);
+    VMINUW uminv4si3 {}
+  const vsi __builtin_altivec_vminsw (vsi, vsi);
+    VMINSW sminv4si3 {}
+  const vf __builtin_altivec_vminfp (vf, vf);
+    VMINFP sminv4sf3 {}
+  const vus __builtin_altivec_vmuleub (vuc, vuc);
+    VMULEUB vec_widen_umult_even_v16qi {}
+  const vss __builtin_altivec_vmulesb (vsc, vsc);
+    VMULESB vec_widen_smult_even_v16qi {}
+  const vui __builtin_altivec_vmuleuh (vus, vus);
+    VMULEUH vec_widen_umult_even_v8hi {}
+  const vsi __builtin_altivec_vmulesh (vss, vss);
+    VMULESH vec_widen_smult_even_v8hi {}
+  const vus __builtin_altivec_vmuloub (vuc, vuc);
+    VMULOUB vec_widen_umult_odd_v16qi {}
+  const vss __builtin_altivec_vmulosb (vsc, vsc);
+    VMULOSB vec_widen_smult_odd_v16qi {}
+  const vui __builtin_altivec_vmulouh (vus, vus);
+    VMULOUH vec_widen_umult_odd_v8hi {}
+  const vsi __builtin_altivec_vmulosh (vss, vss);
+    VMULOSH vec_widen_smult_odd_v8hi {}
+  const vuc __builtin_altivec_vnor_v16qi_uns (vuc, vuc);
+    VNOR_V16QI_UNS norv16qi3 {}
+  const vbc __builtin_altivec_vnor_v16qi_uns (vbc, vbc);
+    VNOR_V16QI_UNS_B norv16qi3 {}
+  const vsc __builtin_altivec_vnor_v16qi (vsc, vsc);
+    VNOR_V16QI norv16qi3 {}
+  const vus __builtin_altivec_vnor_v8hi_uns (vus, vus);
+    VNOR_V8HI_UNS norv8hi3 {}
+  const vbs __builtin_altivec_vnor_v8hi_uns (vbs, vbs);
+    VNOR_V8HI_UNS_B norv8hi3 {}
+  const vss __builtin_altivec_vnor_v8hi (vss, vss);
+    VNOR_V8HI norv8hi3 {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);
@@ -355,3 +393,11 @@
     VANDC_V2DI andcv2di3 {}
   const vd __builtin_altivec_vandc_v2df (vd, vd);
     VANDC_V2DF andcv2df3 {}
+  const vull __builtin_altivec_vmuleuw (vui, vui);
+    VMULEUW vec_widen_umult_even_v4si {}
+  const vsll __builtin_altivec_vmulesw (vsi, vsi);
+    VMULESW vec_widen_smult_even_v4si {}
+  const vull __builtin_altivec_vmulouw (vui, vui);
+    VMULOUW vec_widen_umult_odd_v4si {}
+  const vsll __builtin_altivec_vmulosw (vsi, vsi);
+    VMULOSW vec_widen_smult_odd_v4si {}
