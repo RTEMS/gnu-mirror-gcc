@@ -11655,6 +11655,34 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  mode[i+1] = insn_data[bifaddr->icode].operand[i+1].mode;
 	}
 
+      /* Check for restricted constant arguments.  */
+      switch (bifaddr->restr)
+	{
+	default:
+	case RES_NONE:
+	  break;
+	case RES_BITS:
+	  {
+	    size_t mask = (1 << bifaddr->restr_val1) - 1;
+	    tree restr_arg = arg[bifaddr->restr_opnd];
+	    STRIP_NOPS (restr_arg);
+	    if (TREE_CODE (restr_arg) != INTEGER_CST
+		|| TREE_INT_CST_LOW (restr_arg) & ~mask)
+	      {
+		error ("argument %d must be a %d-bit unsigned literal",
+		       bifaddr->restr_opnd + 1, bifaddr->restr_val1);
+		return CONST0_RTX (mode[0]);
+	      }
+	    break;
+	  }
+	case RES_RANGE:
+	  break;
+	case RES_VALUES:
+	  break;
+	}
+
+      /* #### Insert more special handling here.  */
+
       if (target == 0
 	  || GET_MODE (target) != mode[0]
 	  || !(*insn_data[bifaddr->icode].operand[0].predicate) (target,
