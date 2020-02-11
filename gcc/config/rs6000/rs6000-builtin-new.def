@@ -249,6 +249,68 @@
     VCTSXS altivec_vctsxs {}
   const vui __builtin_altivec_vctuxs (vf, const int<5>);
     VCTUXS altivec_vctuxs {}
+  const vuc __builtin_altivec_vmaxub (vuc, vuc);
+    VMAXUB umaxv16qi3 {}
+  const vsc __builtin_altivec_vmaxsb (vsc, vsc);
+    VMAXSB smaxv16qi3 {}
+  const vus __builtin_altivec_vmaxuh (vus, vus);
+    VMAXUH umaxv8hi3 {}
+  const vss __builtin_altivec_vmaxsh (vss, vss);
+    VMAXSH smaxv8hi3 {}
+  const vui __builtin_altivec_vmaxuw (vui, vui);
+    VMAXUW umaxv4si3 {}
+  const vsi __builtin_altivec_vmaxsw (vsi, vsi);
+    VMAXSW smaxv4si3 {}
+  const vf __builtin_altivec_vmaxfp (vf, vf);
+    VMAXFP smaxv4sf3 {}
+  const vbc __builtin_altivec_vmrghb (vbc, vbc);
+    VMRGHB_B altivec_vmrghb {}
+  const vsc __builtin_altivec_vmrghb (vsc, vsc);
+    VMRGHB altivec_vmrghb {}
+  const vuc __builtin_altivec_vmrghb (vuc, vuc);
+    VMRGHB_U altivec_vmrghb {}
+  const vbs __builtin_altivec_vmrghh (vbs, vbs);
+    VMRGHH_B altivec_vmrghh {}
+  const vp __builtin_altivec_vmrghh (vp, vp);
+    VMRGHH_P altivec_vmrghh {}
+  const vss __builtin_altivec_vmrghh (vss, vss);
+    VMRGHH altivec_vmrghh {}
+  const vus __builtin_altivec_vmrghh (vus, vus);
+    VMRGHH_U altivec_vmrghh {}
+  const vf __builtin_altivec_vmrghw (vf, vf);
+    VMRGHW_F altivec_vmrghw {}
+  const vbi __builtin_altivec_vmrghw (vbi, vbi);
+    VMRGHW_B altivec_vmrghw {}
+  const vsi __builtin_altivec_vmrghw (vsi, vsi);
+    VMRGHW altivec_vmrghw {}
+  const vui __builtin_altivec_vmrghw (vui, vui);
+    VMRGHW_U altivec_vmrghw {}
+  const vbc __builtin_altivec_vmrglb (vbc, vbc);
+    VMRGLB_B altivec_vmrglb {}
+  const vsc __builtin_altivec_vmrglb (vsc, vsc);
+    VMRGLB altivec_vmrglb {}
+  const vuc __builtin_altivec_vmrglb (vuc, vuc);
+    VMRGLB_U altivec_vmrglb {}
+  const vbs __builtin_altivec_vmrglh (vbs, vbs);
+    VMRGLH_B altivec_vmrglh {}
+  const vp __builtin_altivec_vmrglh (vp, vp);
+    VMRGLH_P altivec_vmrglh {}
+  const vss __builtin_altivec_vmrglh (vss, vss);
+    VMRGLH altivec_vmrglh {}
+  const vus __builtin_altivec_vmrglh (vus, vus);
+    VMRGLH_U altivec_vmrglh {}
+  const vf __builtin_altivec_vmrglw (vf, vf);
+    VMRGLW_F altivec_vmrglw {}
+  const vbi __builtin_altivec_vmrglw (vbi, vbi);
+    VMRGLW_B altivec_vmrglw {}
+  const vsi __builtin_altivec_vmrglw (vsi, vsi);
+    VMRGLW altivec_vmrglw {}
+  const vui __builtin_altivec_vmrglw (vui, vui);
+    VMRGLW_U altivec_vmrglw {}
+  const vuc __builtin_altivec_vminub (vuc, vuc);
+    VMINUB uminv16qi3 {}
+  const vsc __builtin_altivec_vminsb (vsc, vsc);
+    VMINSB sminv16qi3 {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);
