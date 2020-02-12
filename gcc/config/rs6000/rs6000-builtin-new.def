@@ -349,6 +349,88 @@
     VNOR_V8HI_UNS_B norv8hi3 {}
   const vss __builtin_altivec_vnor_v8hi (vss, vss);
     VNOR_V8HI norv8hi3 {}
+  const vui __builtin_altivec_vnor_v4si_uns (vui, vui);
+    VNOR_V4SI_UNS norv4si3 {}
+  const vbi __builtin_altivec_vnor_v4si_uns (vbi, vbi);
+    VNOR_V4SI_UNS_B norv4si3 {}
+  const vsi __builtin_altivec_vnor_v4si (vsi, vsi);
+    VNOR_V4SI norv4si3 {}
+  const vf __builtin_altivec_vnor_v4sf (vf, vf);
+    VNOR_V4SF norv4sf3 {}
+  const vbc __builtin_altivec_vor_v16qi_uns (vbc, vbc);
+    VOR_V16QI_UNS_B iorv16qi3 {}
+  const vuc __builtin_altivec_vor_v16qi_uns (vuc, vuc);
+    VOR_V16QI_UNS iorv16qi3 {}
+  const vsc __builtin_altivec_vor_v16qi (vsc, vsc);
+    VOR_V16QI iorv16qi3 {}
+  const vbs __builtin_altivec_vor_v8hi_uns (vbs, vbs);
+    VOR_V8HI_UNS_B iorv8hi3 {}
+  const vus __builtin_altivec_vor_v8hi_uns (vus, vus);
+    VOR_V8HI_UNS iorv8hi3 {}
+  const vss __builtin_altivec_vor_v8hi (vss, vss);
+    VOR_V8HI iorv8hi3 {}
+  const vbi __builtin_altivec_vor_v4si_uns (vbi, vbi);
+    VOR_V4SI_UNS_B iorv4si3 {}
+  const vui __builtin_altivec_vor_v4si_uns (vui, vui);
+    VOR_V4SI_UNS iorv4si3 {}
+  const vsi __builtin_altivec_vor_v4si (vsi, vsi);
+    VOR_V4SI iorv4si3 {}
+  const vf __builtin_altivec_vor_v4sf (vf, vf);
+    VOR_V4SF iorv4sf3 {}
+  const vsc __builtin_altivec_vpkuhum (vss, vss);
+    VPKUHUM altivec_vpkuhum {}
+  const vuc __builtin_altivec_vpkuhum (vus, vus);
+    VPKUHUM_U altivec_vpkuhum {}
+  const vbc __builtin_altivec_vpkuhum (vbs, vbs);
+    VPKUHUM_B altivec_vpkuhum {}
+  const vss __builtin_altivec_vpkuwum (vsi, vsi);
+    VPKUWUM altivec_vpkuwum {}
+  const vus __builtin_altivec_vpkuwum (vui, vui);
+    VPKUWUM_U altivec_vpkuwum {}
+  const vbs __builtin_altivec_vpkuwum (vbi, vbi);
+    VPKUWUM_B altivec_vpkuwum {}
+  const vp __builtin_altivec_vpkpx (vui, vui);
+    VPKPX altivec_vpkpx {}
+  const vsc __builtin_altivec_vpkshss (vss, vss);
+    VPKSHSS altivec_vpkshss {}
+  const vsi __builtin_altivec_vpkswss (vsi, vsi);
+    VPKSWSS altivec_vpkswss {}
+  const vuc __builtin_altivec_vpkuhus (vus, vus);
+    VPKUHUS altivec_vpkuhus {}
+  const vuc __builtin_altivec_vpkshus (vss, vss);
+    VPKSHUS altivec_vpkshus {}
+  const vus __builtin_altivec_vpkuwus (vui, vui);
+    VPKUWUS altivec_vpkuwus {}
+  const vus __builtin_altivec_vpkswus (vsi, vsi);
+    VPKSWUS altivec_vpkswus {}
+  const vf __builtin_altivec_vrecipdivfp (vf, vf);
+    VRECIPFP recipv4sf3 {}
+  const vsc __builtin_altivec_vrlb (vsc, vuc);
+    VRLB vrotlv16qi3 {}
+  const vuc __builtin_altivec_vrlb (vuc, vuc);
+    VRLB_U vrotlv16qi3 {}
+  const vss __builtin_altivec_vrlh (vss, vus);
+    VRLH vrotlv8hi3 {}
+  const vus __builtin_altivec_vrlh (vus, vus);
+    VRLH_U vrotlv8hi3 {}
+  const vsi __builtin_altivec_vrlw (vsi, vui);
+    VRLW vrotlv4si3 {}
+  const vui __builtin_altivec_vrlw (vui, vui);
+    VRLW_U vrotlv4si3 {}
+  const vsc __builtin_altivec_vslb (vsc, vuc);
+    VSLB vashlv16qi3 {}
+  const vuc __builtin_altivec_vslb (vuc, vuc);
+    VSLB_U vashlv16qi3 {}
+  const vss __builtin_altivec_vslh (vss, vus);
+    VSLH vashlv8hi3 {}
+  const vus __builtin_altivec_vslh (vus, vus);
+    VSLH_U vashlv8hi3 {}
+  const vsi __builtin_altivec_vslw (vsi, vui);
+    VSLW vashlv4si3 {}
+  const vui __builtin_altivec_vslw (vui, vui);
+    VSLW_U vashlv4si3 {}
+  const vsi __builtin_altivec_vsl (vsi, vuc);
+    VSL_VSI altivec_vsl {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);
@@ -393,6 +475,24 @@
     VANDC_V2DI andcv2di3 {}
   const vd __builtin_altivec_vandc_v2df (vd, vd);
     VANDC_V2DF andcv2df3 {}
+  const vull __builtin_altivec_vnor_v2di_uns (vull, vull);
+    VNOR_V2DI_UNS norv2di3 {}
+  const vbll __builtin_altivec_vnor_v2di_uns (vbll, vbll);
+    VNOR_V2DI_UNS_B norv2di3 {}
+  const vsll __builtin_altivec_vnor_v2di (vsll, vsll);
+    VNOR_V2DI norv2di3 {}
+  const vd __builtin_altivec_vnor_v2df (vd, vd);
+    VNOR_V2DF norv2df3 {}
+  const vull __builtin_altivec_vor_v2di_uns (vull, vull);
+    VOR_V2DI_UNS iorv2di3 {}
+  const vbll __builtin_altivec_vor_v2di_uns (vbll, vbll);
+    VOR_V2DI_UNS_B iorv2di3 {}
+  const vsll __builtin_altivec_vor_v2di (vsll, vsll);
+    VOR_V2DI iorv2di3 {}
+  const vd __builtin_altivec_vor_v2df (vd, vd);
+    VOR_V2DF iorv2df3 {}
+
+[MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
     VMULEUW vec_widen_umult_even_v4si {}
   const vsll __builtin_altivec_vmulesw (vsi, vsi);
