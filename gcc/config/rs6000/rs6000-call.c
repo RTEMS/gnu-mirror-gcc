@@ -11651,6 +11651,19 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (bifaddr->icode == CODE_FOR_nothing)
 	return 0;
 
+      if (bifaddr->bifattrs & bif_nosoft_bit
+	  && rs6000_isa_flags & OPTION_MASK_SOFT_FLOAT)
+	{
+	  error ("%<%s%> not supported with %<-msoft-float%>",
+		 bifaddr->bifname);
+	  return const0_rtx;
+	}
+
+      if (bifaddr->bifattrs & bif_no32bit_bit && TARGET_32BIT)
+	fatal_error (input_location,
+		     "%<%s%> is not supported in 32-bit mode",
+		     bifaddr->bifname);
+
       /* #### Insert special handling here.  */
 
       rtx pat;
@@ -11693,9 +11706,54 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	    break;
 	  }
 	case RES_RANGE:
-	  break;
+	  {
+	    tree restr_arg = arg[bifaddr->restr_opnd];
+	    STRIP_NOPS (restr_arg);
+	    if (TREE_CODE (restr_arg) != INTEGER_CST
+		|| !IN_RANGE (tree_to_shwi (restr_arg),
+			      bifaddr->restr_val1, bifaddr->restr_val2))
+	      {
+		error ("argument %d must be a literal between %d and %d,"
+		       " inclusive",
+		       bifaddr->restr_opnd + 1, bifaddr->restr_val1,
+		       bifaddr->restr_val2);
+		return CONST0_RTX (mode[0]);
+	      }
+	    break;
+	  }
+	case RES_VAR_RANGE:
+	  {
+	    tree restr_arg = arg[bifaddr->restr_opnd];
+	    STRIP_NOPS (restr_arg);
+	    if (TREE_CODE (restr_arg) == INTEGER_CST
+		&& !IN_RANGE (tree_to_shwi (restr_arg),
+			      bifaddr->restr_val1,
+			      bifaddr->restr_val2))
+	      {
+		error ("argument %d must be a variable or a literal between "
+		       "%d and %d, inclusive",
+		       bifaddr->restr_opnd + 1, bifaddr->restr_val1,
+		       bifaddr->restr_val2);
+		return CONST0_RTX (mode[0]);
+	      }
+	    break;
+	  }
 	case RES_VALUES:
-	  break;
+	  {
+	    tree restr_arg = arg[bifaddr->restr_opnd];
+	    STRIP_NOPS (restr_arg);
+	    if (TREE_CODE (restr_arg) != INTEGER_CST
+		|| (tree_to_shwi (restr_arg) != bifaddr->restr_val1
+		    && tree_to_shwi (restr_arg) != bifaddr->restr_val2))
+	      {
+		error ("argument %d must be either a literal %d or a "
+		       "literal %d",
+		       bifaddr->restr_opnd + 1, bifaddr->restr_val1,
+		       bifaddr->restr_val2);
+		return CONST0_RTX (mode[0]);
+	      }
+	    break;
+	  }
 	}
 
       /* #### Insert more special handling here.  */

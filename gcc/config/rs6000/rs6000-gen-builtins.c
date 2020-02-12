@@ -72,6 +72,7 @@ along with GCC; see the file COPYING3.  If not see
      abs      Needs special handling for absolute value
      pred     Needs special handling for comparison predicates
      htm      Needs special handling for transactional memory
+     no32bit  Not valid for TARGET_32BIT
 
    An example stanza might look like this:
 
@@ -195,12 +196,14 @@ enum basetype {
    that the integer is restricted to val1 bits, interpreted as signed or
    unsigned depending on whether the type is signed or unsigned.  RES_RANGE
    indicates that the integer is restricted to values between val1 and val2,
-   inclusive.  RES_VALUES indicates that the integer must have one of the
-   values val1 or val2.  */
+   inclusive.  RES_VAR_RANGE is like RES_RANGE, but the argument may be
+   variable, so it can only be checked if it is constant.  RES_VALUES
+   indicates that the integer must have one of the values val1 or val2.  */
 enum restriction {
   RES_NONE,
   RES_BITS,
   RES_RANGE,
+  RES_VAR_RANGE,
   RES_VALUES
 };
 
@@ -238,6 +241,7 @@ struct attrinfo {
   char isabs;
   char ispred;
   char ishtm;
+  char isno32bit;
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
@@ -532,9 +536,15 @@ match_basetype (typeinfo *typedata)
      <x>   restricts the constant to x bits, interpreted as signed or
 	   unsigned according to the argument type
      <x,y> restricts the constant to the inclusive range [x,y]
+     [x,y] restricts the constant to the inclusive range [x,y],
+	   but only applies if the argument is constant.
      {x,y} restricts the constant to one of two values, x or y.
 
-   Here x and y are integer tokens.  Return 1 for success, else 0.  */
+   Here x and y are integer tokens.  Note that the "const" token is a
+   lie when the restriction is [x,y], but this simplifies the parsing
+   significantly and is hopefully forgivable.
+
+   Return 1 for success, else 0.  */
 static int
 match_const_restriction (typeinfo *typedata)
 {
@@ -582,9 +592,8 @@ match_const_restriction (typeinfo *typedata)
 	}
       safe_inc_pos ();
     }
-  else
+  else if (linebuf[pos] == '{')
     {
-      assert (linebuf[pos] == '{');
       safe_inc_pos ();
       oldpos = pos;
       int x = match_integer ();
@@ -613,6 +622,43 @@ match_const_restriction (typeinfo *typedata)
 
       consume_whitespace ();
       if (linebuf[pos] != '}')
+	{
+	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+    }
+  else
+    {
+      assert (linebuf[pos] == '[');
+      safe_inc_pos ();
+      oldpos = pos;
+      int x = match_integer ();
+      if (x == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      consume_whitespace ();
+      if (linebuf[pos] != ',')
+	{
+	  (*diag) ("missing comma at column %d.\n", pos + 1);
+	  return 0;
+	}
+      consume_whitespace ();
+      oldpos = pos;
+      int y = match_integer ();
+      if (y == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      typedata->restr = RES_VAR_RANGE;
+      typedata->val1 = x;
+      typedata->val2 = y;
+
+      consume_whitespace ();
+      if (linebuf[pos] != ']')
 	{
 	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
 	  return 0;
@@ -1010,6 +1056,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->ispred = 1;
 	else if (!strcmp (attrname, "htm"))
 	  attrptr->ishtm = 1;
+	else if (!strcmp (attrname, "no32bit"))
+	  attrptr->isno32bit = 1;
 	else
 	  {
 	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
@@ -1041,10 +1089,11 @@ parse_bif_attrs (attrinfo *attrptr)
 #ifdef DEBUG
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
 nosoft = %d, ldvec = %d, stvec = %d, reve = %d, abs = %d, pred = %d, \
-htm = %d.\n",
+htm = %d, no32bit = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
-	   attrptr->isreve, attrptr->isabs, attrptr->ispred, attrptr->ishtm);
+	   attrptr->isreve, attrptr->isabs, attrptr->ispred, attrptr->ishtm,
+	   attrptr->isno32bit);
 #endif
 
   return 1;
@@ -1696,6 +1745,7 @@ write_decls ()
   fprintf (header_file, "  RES_NONE,\n");
   fprintf (header_file, "  RES_BITS,\n");
   fprintf (header_file, "  RES_RANGE,\n");
+  fprintf (header_file, "  RES_VAR_RANGE,\n");
   fprintf (header_file, "  RES_VALUES\n");
   fprintf (header_file, "};\n\n");
 
@@ -1723,6 +1773,7 @@ write_decls ()
   fprintf (header_file, "#define bif_abs_bit\t(0x00000080)\n");
   fprintf (header_file, "#define bif_pred_bit\t(0x00000100)\n");
   fprintf (header_file, "#define bif_htm_bit\t(0x00000200)\n");
+  fprintf (header_file, "#define bif_no32bit_bit\t(0x00000400)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -1744,6 +1795,8 @@ write_decls ()
 	   "#define bif_is_predicate(x)\t((x).bifattrs & bif_pred_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_htm(x)\t\t((x).bifattrs & bif_htm_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_no32bit(x)\t\t((x).bifattrs & bif_no32bit_bit)\n");
   fprintf (header_file, "\n");
 
   /* #### Note that the _x is added for now to avoid conflict with
@@ -1950,6 +2003,8 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_pred_bit");
       if (bifs[i].attrs.ishtm)
 	fprintf (init_file, " | bif_htm_bit");
+      if (bifs[i].attrs.isno32bit)
+	fprintf (init_file, " | bif_no32bit_bit");
       fprintf (init_file, ";\n");
       fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
@@ -1961,7 +2016,8 @@ write_init_bif_table ()
 	    = (bifs[i].proto.restr == RES_BITS ? "RES_BITS"
 	       : (bifs[i].proto.restr == RES_RANGE ? "RES_RANGE"
 		  : (bifs[i].proto.restr == RES_VALUES ? "RES_VALUES"
-		     : "ERROR")));
+		     : (bifs[i].proto.restr == RES_VAR_RANGE ? "RES_VAR_RANGE"
+			: "ERROR"))));
 	  fprintf (init_file,
 		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr"
 		   "\n    = %s;\n",
