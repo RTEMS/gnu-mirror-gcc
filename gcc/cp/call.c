@@ -4172,8 +4172,9 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
       if (complain & tf_error)
 	{
 	  auto_diagnostic_group d;
-	  error ("conversion from %qH to %qI is ambiguous",
-		 fromtype, totype);
+	  error_at (cp_expr_loc_or_input_loc (expr),
+		    "conversion from %qH to %qI is ambiguous",
+		    fromtype, totype);
 	  print_z_candidates (location_of (expr), candidates);
 	}
 
@@ -10179,7 +10180,6 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	 the two.  */
       if (DECL_CONSTRUCTOR_P (fn)
 	  && !(flags & LOOKUP_ONLYCONVERTING)
-	  && !cp_unevaluated_operand
 	  && cxx_dialect >= cxx2a
 	  && CP_AGGREGATE_TYPE_P (basetype)
 	  && !user_args->is_empty ())
@@ -10194,6 +10194,8 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	  else
 	    {
 	      ctor = digest_init (basetype, ctor, complain);
+	      if (ctor == error_mark_node)
+		return error_mark_node;
 	      ctor = build2 (INIT_EXPR, TREE_TYPE (instance), instance, ctor);
 	      TREE_SIDE_EFFECTS (ctor) = true;
 	      return ctor;

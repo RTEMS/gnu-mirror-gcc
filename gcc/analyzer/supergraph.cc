@@ -56,6 +56,18 @@ along with GCC; see the file COPYING3.  If not see
 
 namespace ana {
 
+/* Get the function of the ultimate alias target being called at EDGE,
+   if any.  */
+
+static function *
+get_ultimate_function_for_cgraph_edge (cgraph_edge *edge)
+{
+  cgraph_node *ultimate_node = edge->callee->ultimate_alias_target ();
+  if (!ultimate_node)
+    return NULL;
+  return ultimate_node->get_fun ();
+}
+
 /* Get the cgraph_edge, but only if there's an underlying function body.  */
 
 cgraph_edge *
@@ -69,7 +81,7 @@ supergraph_call_edge (function *fun, gimple *stmt)
     return NULL;
   if (!edge->callee)
     return NULL; /* e.g. for a function pointer.  */
-  if (!edge->callee->get_fun ())
+  if (!get_ultimate_function_for_cgraph_edge (edge))
     return NULL;
   return edge;
 }
@@ -178,8 +190,10 @@ supergraph::supergraph (logger *logger)
 	{
 	  cgraph_edge *edge = (*iter).first;
 	  supernode *caller_prev_supernode = (*iter).second;
-	  basic_block callee_cfg_block
-	    = ENTRY_BLOCK_PTR_FOR_FN (edge->callee->get_fun ());
+	  function* callee_fn = get_ultimate_function_for_cgraph_edge (edge);
+	  if (!callee_fn || !callee_fn->cfg)
+	    continue;
+	  basic_block callee_cfg_block = ENTRY_BLOCK_PTR_FOR_FN (callee_fn);
 	  supernode *callee_supernode
 	    = *m_bb_to_initial_node.get (callee_cfg_block);
 	  call_superedge *sedge
@@ -199,8 +213,10 @@ supergraph::supergraph (logger *logger)
 	{
 	  cgraph_edge *edge = (*iter).first;
 	  supernode *caller_next_supernode = (*iter).second;
-	  basic_block callee_cfg_block
-	    = EXIT_BLOCK_PTR_FOR_FN (edge->callee->get_fun ());
+	  function* callee_fn = get_ultimate_function_for_cgraph_edge (edge);
+	  if (!callee_fn || !callee_fn->cfg)
+	    continue;
+	  basic_block callee_cfg_block = EXIT_BLOCK_PTR_FOR_FN (callee_fn);
 	  supernode *callee_supernode
 	    = *m_bb_to_initial_node.get (callee_cfg_block);
 	  return_superedge *sedge
@@ -437,7 +453,7 @@ supernode::dump_dot (graphviz_out *gv, const dump_args_t &args) const
   gv->println("style=\"solid\";");
   gv->println("color=\"black\";");
   gv->println("fillcolor=\"lightgrey\";");
-  gv->println("label=\"sn: %i\";", m_index);
+  gv->println("label=\"sn: %i (bb: %i)\";", m_index, m_bb->index);
 
   pretty_printer *pp = gv->get_pp ();
 
@@ -840,7 +856,7 @@ callgraph_superedge::dump_label_to_pp (pretty_printer *pp,
 function *
 callgraph_superedge::get_callee_function () const
 {
-  return m_cedge->callee->get_fun ();
+  return get_ultimate_function_for_cgraph_edge (m_cedge);
 }
 
 /* Get the calling function at this interprocedural call/return edge.  */

@@ -1,3 +1,70 @@
+2020-02-13  Frederik Harwath  <frederik@codesourcery.com>
+
+	PR libgomp/93481
+	* plugin/plugin-nvptx.c: Remove GOMP_OFFLOAD_async_run stub.
+	* target.c (gomp_load_plugin_for_device): Make "async_run" loading
+	optional.
+	(gomp_target_task_fn): Assert "devicep->async_run_func".
+	(clear_unsupported_flags): New function to remove unsupported flags
+	(right now only GOMP_TARGET_FLAG_NOWAIT) that can be be ignored.
+	(GOMP_target_ext): Apply clear_unsupported_flags to flags.
+	* testsuite/libgomp.c/target-33.c:
+	Remove xfail for offload_target_nvptx.
+	* testsuite/libgomp.c/target-34.c: Likewise.
+
+2020-02-10  Frederik Harwath  <frederik@codesourcery.com>
+
+	* testsuite/libgomp.c/target-33.c: Add xfail for execution on
+	offload_target_nvptx, cf. https://gcc.gnu.org/PR81688.
+	* testsuite/libgomp.c/target-34.c: Likewise.
+	* testsuite/libgomp.c/target-link-1.c: Add xfail for
+	offload_target_nvptx, cf. https://gcc.gnu.org/PR81689.
+
+2020-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* testsuite/libgomp.c/target-38.c: New test.
+
+2020-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgomp/93515
+	* testsuite/libgomp.c-c++-common/pr93515.c: New test.
+
+2020-02-05  Tobias Burnus  <tobias@codesourcery.com>
+
+	* testsuite/lib/libgomp.exp
+	(check_effective_target_offload_target_nvptx): Pass flags as 'options'
+	and not as 'source' argument to libgomp_target_compile.
+
+2020-02-03  Andrew Stubbs  <ams@codesourcery.com>
+
+	* plugin/plugin-gcn.c (EF_AMDGPU_MACH_AMDGCN_GFX801): Remove.
+	(gcn_gfx801_s): Remove.
+	(isa_hsa_name): Remove gfx801.
+	(isa_gcc_name): Remove gfx801/carizzo.
+	(isa_code): Remove gfx801.
+
+2020-02-03  Julian Brown  <julian@codesourcery.com>
+	    Tobias Burnus  <tobias@codesourcery.com>
+
+	* libgomp.texi (OpenACC Runtime Library Routines): Document *_async
+	and *_finalize variants; document acc_attach and acc_detach; update
+	references from OpenACC 2.0 to 2.6.
+	* openacc.f90 (openacc_version): Update to 201711.
+	* openacc_lib.h (openacc_version): Update to 201711.
+	* testsuite/libgomp.oacc-fortran/openacc_version-1.f: Update expected
+	openacc_version to 201711.
+	* testsuite/libgomp.oacc-fortran/openacc_version-2.f90: Likewise.
+
+2020-01-31  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* plugin/plugin-gcn.c (struct hsa_kernel_description): Add sgpr_count
+	and vgpr_count fields.
+	(struct kernel_info): Add a field for a hsa_kernel_description.
+	(run_kernel): Reduce the number of threads/workers if the requested
+	number would require too many VGPRs.
+	(init_basic_kernel_info): Initialize description field with
+	the hsa_kernel_description entry for the kernel.
+
 2020-01-29  Tobias Burnus  <tobias@codesourcery.com>
 
 	PR bootstrap/93409

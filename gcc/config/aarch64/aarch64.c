@@ -1656,6 +1656,7 @@ aarch64_classify_vector_mode (machine_mode mode)
     case E_VNx8HImode:
     case E_VNx4SImode:
     case E_VNx2DImode:
+    case E_VNx8BFmode:
     case E_VNx8HFmode:
     case E_VNx4SFmode:
     case E_VNx2DFmode:
@@ -1666,6 +1667,7 @@ aarch64_classify_vector_mode (machine_mode mode)
     case E_VNx16HImode:
     case E_VNx8SImode:
     case E_VNx4DImode:
+    case E_VNx16BFmode:
     case E_VNx16HFmode:
     case E_VNx8SFmode:
     case E_VNx4DFmode:
@@ -1674,6 +1676,7 @@ aarch64_classify_vector_mode (machine_mode mode)
     case E_VNx24HImode:
     case E_VNx12SImode:
     case E_VNx6DImode:
+    case E_VNx24BFmode:
     case E_VNx24HFmode:
     case E_VNx12SFmode:
     case E_VNx6DFmode:
@@ -1682,6 +1685,7 @@ aarch64_classify_vector_mode (machine_mode mode)
     case E_VNx32HImode:
     case E_VNx16SImode:
     case E_VNx8DImode:
+    case E_VNx32BFmode:
     case E_VNx32HFmode:
     case E_VNx16SFmode:
     case E_VNx8DFmode:
@@ -7891,6 +7895,30 @@ aarch64_movw_imm (HOST_WIDE_INT val, scalar_int_mode mode)
 	  || (val & (((HOST_WIDE_INT) 0xffff) << 16)) == val);
 }
 
+/* Test whether:
+
+     X = (X & AND_VAL) | IOR_VAL;
+
+   can be implemented using:
+
+     MOVK X, #(IOR_VAL >> shift), LSL #shift
+
+   Return the shift if so, otherwise return -1.  */
+int
+aarch64_movk_shift (const wide_int_ref &and_val,
+		    const wide_int_ref &ior_val)
+{
+  unsigned int precision = and_val.get_precision ();
+  unsigned HOST_WIDE_INT mask = 0xffff;
+  for (unsigned int shift = 0; shift < precision; shift += 16)
+    {
+      if (and_val == ~mask && (ior_val & mask) == ior_val)
+	return shift;
+      mask <<= 16;
+    }
+  return -1;
+}
+
 /* VAL is a value with the inner mode of MODE.  Replicate it to fill a
    64-bit (DImode) integer.  */
 
@@ -11477,6 +11505,13 @@ aarch64_rtx_costs (rtx x, machine_mode mode, int outer ATTRIBUTE_UNUSED,
 	    *cost += extra_cost->alu.clz;
 	}
 
+      return false;
+
+    case CTZ:
+      *cost = COSTS_N_INSNS (2);
+
+      if (speed)
+	*cost += extra_cost->alu.clz + extra_cost->alu.rev;
       return false;
 
     case COMPARE:
@@ -16109,8 +16144,10 @@ aarch64_full_sve_mode (scalar_mode mode)
       return VNx4SFmode;
     case E_HFmode:
       return VNx8HFmode;
+    case E_BFmode:
+      return VNx8BFmode;
     case E_DImode:
-	return VNx2DImode;
+      return VNx2DImode;
     case E_SImode:
       return VNx4SImode;
     case E_HImode:

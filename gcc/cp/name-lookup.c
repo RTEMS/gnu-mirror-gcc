@@ -2321,12 +2321,14 @@ update_local_overload (cxx_binding *binding, tree newval)
 static bool
 matching_fn_p (tree one, tree two)
 {
+  if (TREE_CODE (one) != TREE_CODE (two))
+    return false;
+
   if (!compparms (TYPE_ARG_TYPES (TREE_TYPE (one)),
 		  TYPE_ARG_TYPES (TREE_TYPE (two))))
     return false;
 
-  if (TREE_CODE (one) == TEMPLATE_DECL
-      && TREE_CODE (two) == TEMPLATE_DECL)
+  if (TREE_CODE (one) == TEMPLATE_DECL)
     {
       /* Compare template parms.  */
       if (!comp_template_parms (DECL_TEMPLATE_PARMS (one),
@@ -7624,10 +7626,10 @@ maybe_save_operator_binding (tree e)
 
   if (!fns && (fns = op_unqualified_lookup (fnname)))
     {
-      tree fn = get_first_fn (fns);
-      if (DECL_CLASS_SCOPE_P (fn))
-	/* We don't need to remember class-scope functions, normal unqualified
-	   lookup will find them again.  */
+      tree d = is_overloaded_fn (fns) ? get_first_fn (fns) : fns;
+      if (DECL_P (d) && DECL_CLASS_SCOPE_P (d))
+	/* We don't need to remember class-scope functions or declarations,
+	   normal unqualified lookup will find them again.  */
 	return;
 
       bindings = tree_cons (fnname, fns, bindings);

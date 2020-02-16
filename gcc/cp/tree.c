@@ -1135,6 +1135,15 @@ build_array_of_n_type (tree elt, int n)
   return build_cplus_array_type (elt, build_index_type (size_int (n - 1)));
 }
 
+/* True iff T is an array of unknown bound.  */
+
+bool
+array_of_unknown_bound_p (const_tree t)
+{
+  return (TREE_CODE (t) == ARRAY_TYPE
+	  && !TYPE_DOMAIN (t));
+}
+
 /* True iff T is an N3639 array of runtime bound (VLA).  These were approved
    for C++14 but then removed.  This should only be used for N3639
    specifically; code wondering more generally if something is a VLA should use
@@ -4918,6 +4927,11 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
     }							\
   while (0)
 
+  if (TYPE_P (*tp))
+    /* Walk into template args without looking through typedefs.  */
+    if (tree ti = TYPE_TEMPLATE_INFO_MAYBE_ALIAS (*tp))
+      WALK_SUBTREE (TI_ARGS (ti));
+
   /* Not one of the easy cases.  We must explicitly go through the
      children.  */
   result = NULL_TREE;
@@ -5008,6 +5022,11 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
 	  WALK_SUBTREE (TREE_OPERAND (*tp, i));
       }
       *walk_subtrees_p = 0;
+      break;
+
+    case CONSTRUCTOR:
+      if (COMPOUND_LITERAL_P (*tp))
+	WALK_SUBTREE (TREE_TYPE (*tp));
       break;
 
     case TRAIT_EXPR:
@@ -5247,6 +5266,10 @@ decl_linkage (tree decl)
   if (TREE_CODE (decl) == FIELD_DECL)
     return lk_none;
 
+  /* Things in local scope do not have linkage.  */
+  if (decl_function_context (decl))
+    return lk_none;
+
   /* Things that are TREE_PUBLIC have external linkage.  */
   if (TREE_PUBLIC (decl))
     return lk_external;
@@ -5265,11 +5288,6 @@ decl_linkage (tree decl)
      type.  */
   if (TREE_CODE (decl) == CONST_DECL)
     return decl_linkage (TYPE_NAME (DECL_CONTEXT (decl)));
-
-  /* Things in local scope do not have linkage, if they don't have
-     TREE_PUBLIC set.  */
-  if (decl_function_context (decl))
-    return lk_none;
 
   /* Members of the anonymous namespace also have TREE_PUBLIC unset, but
      are considered to have external linkage for language purposes, as do

@@ -684,10 +684,10 @@ for_each_state_change (const program_state &src_state,
 		       state_change_visitor *visitor)
 {
   gcc_assert (src_state.m_checker_states.length ()
-	      == ext_state.m_checkers.length ());
+	      == ext_state.get_num_checkers ());
   gcc_assert (dst_state.m_checker_states.length ()
-	      == ext_state.m_checkers.length ());
-  for (unsigned i = 0; i < ext_state.m_checkers.length (); i++)
+	      == ext_state.get_num_checkers ());
+  for (unsigned i = 0; i < ext_state.get_num_checkers (); i++)
     {
       const state_machine &sm = ext_state.get_sm (i);
       const sm_state_map &src_smap = *src_state.m_checker_states[i];
@@ -965,6 +965,12 @@ diagnostic_manager::prune_for_sm_diagnostic (checker_path *path,
 					     tree var,
 					     state_machine::state_t state) const
 {
+  /* If we have a constant (such as NULL), assume its state is also
+     constant, so as not to attempt to get its lvalue whilst tracking the
+     origin of the state.  */
+  if (var && CONSTANT_CLASS_P (var))
+    var = NULL_TREE;
+
   int idx = path->num_events () - 1;
   while (idx >= 0 && idx < (signed)path->num_events ())
     {
@@ -1086,6 +1092,15 @@ diagnostic_manager::prune_for_sm_diagnostic (checker_path *path,
 			  pretty_printer pp;
 			  pp_gimple_stmt_1 (&pp, phi, 0, (dump_flags_t)0);
 			  log ("  phi: %s", pp_formatted_text (&pp));
+			}
+		      /* If we've chosen a bad exploded_path, then the
+			 phi arg might be a constant.  Fail gracefully for
+			 this case.  */
+		      if (CONSTANT_CLASS_P (var))
+			{
+			  log ("new var is a constant (bad path?);"
+			       " setting var to NULL");
+			  var = NULL;
 			}
 		    }
 		}

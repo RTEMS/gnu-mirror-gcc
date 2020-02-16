@@ -9464,9 +9464,13 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 				  == POINTER_TYPE))))
 		    omp_firstprivatize_variable (outer_ctx, decl);
 		  else
-		    omp_add_variable (outer_ctx, decl,
-				      GOVD_SEEN | GOVD_SHARED);
-		  omp_notice_variable (outer_ctx, decl, true);
+		    {
+		      omp_add_variable (outer_ctx, decl,
+					GOVD_SEEN | GOVD_SHARED);
+		      if (outer_ctx->outer_context)
+			omp_notice_variable (outer_ctx->outer_context, decl,
+					     true);
+		    }
 		}
 	    }
 	  if (outer_ctx)
@@ -9901,6 +9905,22 @@ gimplify_adjust_omp_clauses_1 (splay_tree_node n, void *data)
 	{
 	  error ("%<_Atomic%> %qD in implicit %<map%> clause", decl);
 	  return 0;
+	}
+      if (VAR_P (decl)
+	  && DECL_IN_CONSTANT_POOL (decl)
+          && !lookup_attribute ("omp declare target",
+				DECL_ATTRIBUTES (decl)))
+	{
+	  tree id = get_identifier ("omp declare target");
+	  DECL_ATTRIBUTES (decl)
+	    = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (decl));
+	  varpool_node *node = varpool_node::get (decl);
+	  if (node)
+	    {
+	      node->offloadable = 1;
+	      if (ENABLE_OFFLOADING)
+		g->have_offload = true;
+	    }
 	}
     }
   else if (flags & GOVD_SHARED)

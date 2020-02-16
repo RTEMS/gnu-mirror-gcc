@@ -73,6 +73,25 @@ dump_tree (pretty_printer *pp, tree t)
   dump_generic_node (pp, t, 0, TDF_SLIM, 0);
 }
 
+/* Equivalent to pp_printf (pp, "%qT", t), to avoid nesting pp_printf
+   calls within other pp_printf calls.
+
+   default_tree_printer handles 'T' and some other codes by calling
+     dump_generic_node (pp, t, 0, TDF_SLIM, 0);
+   dump_generic_node calls pp_printf in various places, leading to
+   garbled output.
+
+   Ideally pp_printf could be made to be reentrant, but in the meantime
+   this function provides a workaround.  */
+
+static void
+print_quoted_type (pretty_printer *pp, tree t)
+{
+  pp_begin_quote (pp, pp_show_color (pp));
+  dump_generic_node (pp, t, 0, TDF_SLIM, 0);
+  pp_end_quote (pp, pp_show_color (pp));
+}
+
 /* Dump this path_var to PP (which must support %E for trees).
 
    Express the stack depth using an "@DEPTH" suffix, so e.g. given
@@ -319,7 +338,9 @@ svalue::print (const region_model &model,
   if (m_type)
     {
       gcc_assert (TYPE_P (m_type));
-      pp_printf (pp, "type: %qT, ", m_type);
+      pp_string (pp, "type: ");
+      print_quoted_type (pp, m_type);
+      pp_string (pp, ", ");
     }
 
   /* vfunc.  */
@@ -667,10 +688,10 @@ constant_svalue::eval_condition (constant_svalue *lhs,
   gcc_assert (CONSTANT_CLASS_P (rhs_const));
 
   /* Check for comparable types.  */
-  if (TREE_TYPE (lhs_const) == TREE_TYPE (rhs_const))
+  if (types_compatible_p (TREE_TYPE (lhs_const), TREE_TYPE (rhs_const)))
     {
       tree comparison
-	= fold_build2 (op, boolean_type_node, lhs_const, rhs_const);
+	= fold_binary (op, boolean_type_node, lhs_const, rhs_const);
       if (comparison == boolean_true_node)
 	return tristate (tristate::TS_TRUE);
       if (comparison == boolean_false_node)
@@ -1282,7 +1303,8 @@ region::dump_to_pp (const region_model &model,
     }
   if (m_type)
     {
-      pp_printf (pp, "%s type: %qT", field_prefix, m_type);
+      pp_printf (pp, "%s type: ", field_prefix);
+      print_quoted_type (pp, m_type);
       pp_newline (pp);
     }
 
@@ -1332,7 +1354,9 @@ region::dump_child_label (const region_model &model,
 	pp_string (pp, "active ");
       else
 	pp_string (pp, "inactive ");
-      pp_printf (pp, "view as %qT: ", child->get_type ());
+      pp_string (pp, "view as ");
+      print_quoted_type (pp, child->get_type ());
+      pp_string (pp, ": ");
     }
 }
 
@@ -1463,7 +1487,10 @@ region::print_fields (const region_model &model ATTRIBUTE_UNUSED,
   m_sval_id.print (pp);
 
   if (m_type)
-    pp_printf (pp, ", type: %qT", m_type);
+    {
+      pp_printf (pp, ", type: ");
+      print_quoted_type (pp, m_type);
+    }
 }
 
 /* Determine if a pointer to this region must be non-NULL.
@@ -2624,27 +2651,45 @@ stack_region::can_merge_p (const stack_region *stack_region_a,
   stack_region *merged_stack
     = merged_model->get_region <stack_region> (rid_merged_stack);
 
-  for (unsigned i = 0; i < stack_region_a->get_num_frames (); i++)
-    {
-      region_id rid_a = stack_region_a->get_frame_rid (i);
-      frame_region *frame_a = merger->get_region_a <frame_region> (rid_a);
+  /* First, create all frames in the merged model, without populating them.
+     The merging code assumes that all frames in the merged model already exist,
+     so we have to do this first to handle the case in which a local in an
+     older frame points at a local in a more recent frame.  */
+    for (unsigned i = 0; i < stack_region_a->get_num_frames (); i++)
+      {
+	region_id rid_a = stack_region_a->get_frame_rid (i);
+	frame_region *frame_a = merger->get_region_a <frame_region> (rid_a);
 
-      region_id rid_b = stack_region_b->get_frame_rid (i);
-      frame_region *frame_b = merger->get_region_b <frame_region> (rid_b);
+	region_id rid_b = stack_region_b->get_frame_rid (i);
+	frame_region *frame_b = merger->get_region_b <frame_region> (rid_b);
 
-      if (frame_a->get_function () != frame_b->get_function ())
-	return false;
-      frame_region *merged_frame = new frame_region (rid_merged_stack,
-						     frame_a->get_function (),
-						     frame_a->get_depth ());
-      region_id rid_merged_frame = merged_model->add_region (merged_frame);
-      merged_stack->push_frame (rid_merged_frame);
+	if (frame_a->get_function () != frame_b->get_function ())
+	  return false;
 
-      if (!map_region::can_merge_p (frame_a, frame_b,
-				    merged_frame, rid_merged_frame,
-				    merger))
-	return false;
-    }
+	frame_region *merged_frame = new frame_region (rid_merged_stack,
+						       frame_a->get_function (),
+						       frame_a->get_depth ());
+	region_id rid_merged_frame = merged_model->add_region (merged_frame);
+	merged_stack->push_frame (rid_merged_frame);
+      }
+
+    /* Now populate the frames we created.  */
+    for (unsigned i = 0; i < stack_region_a->get_num_frames (); i++)
+      {
+	region_id rid_a = stack_region_a->get_frame_rid (i);
+	frame_region *frame_a = merger->get_region_a <frame_region> (rid_a);
+
+	region_id rid_b = stack_region_b->get_frame_rid (i);
+	frame_region *frame_b = merger->get_region_b <frame_region> (rid_b);
+
+	region_id rid_merged_frame = merged_stack->get_frame_rid (i);
+	frame_region *merged_frame
+	  = merged_model->get_region <frame_region> (rid_merged_frame);
+	if (!map_region::can_merge_p (frame_a, frame_b,
+				      merged_frame, rid_merged_frame,
+				      merger))
+	  return false;
+      }
 
   return true;
 }
@@ -4070,9 +4115,9 @@ region_model::on_assignment (const gassign *assign, region_model_context *ctxt)
 	if (tree rhs1_cst = maybe_get_constant (rhs1_sid))
 	  if (tree rhs2_cst = maybe_get_constant (rhs2_sid))
 	    {
-	      tree result = fold_build2 (op, TREE_TYPE (lhs),
+	      tree result = fold_binary (op, TREE_TYPE (lhs),
 					 rhs1_cst, rhs2_cst);
-	      if (CONSTANT_CLASS_P (result))
+	      if (result && CONSTANT_CLASS_P (result))
 		{
 		  svalue_id result_sid
 		    = get_or_create_constant_svalue (result);
@@ -4145,7 +4190,7 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	{
 	  region_id frame_rid = get_current_frame_id ();
 	  region_id new_rid
-	    = add_region (new symbolic_region (frame_rid, false));
+	    = add_region (new symbolic_region (frame_rid, NULL_TREE, false));
 	  if (!lhs_rid.null_p ())
 	    {
 	      svalue_id ptr_sid
@@ -4550,7 +4595,8 @@ region_model::on_longjmp (const gcall *longjmp_call, const gcall *setjmp_call,
    where RHS is for the appropriate edge.  */
 
 void
-region_model::handle_phi (tree lhs, tree rhs, bool is_back_edge,
+region_model::handle_phi (const gphi *phi,
+			  tree lhs, tree rhs, bool is_back_edge,
 			  region_model_context *ctxt)
 {
   /* For now, don't bother tracking the .MEM SSA names.  */
@@ -4575,6 +4621,9 @@ region_model::handle_phi (tree lhs, tree rhs, bool is_back_edge,
     }
   else
     set_value (get_lvalue (lhs, ctxt), rhs_sid, ctxt);
+
+  if (ctxt)
+    ctxt->on_phi (phi, rhs);
 }
 
 /* Implementation of region_model::get_lvalue; the latter adds type-checking.
@@ -4592,6 +4641,8 @@ region_model::get_lvalue_1 (path_var pv, region_model_context *ctxt)
   switch (TREE_CODE (expr))
     {
     default:
+      internal_error ("unhandled tree code in region_model::get_lvalue_1: %qs",
+		      get_tree_code_name (TREE_CODE (expr)));
       gcc_unreachable ();
 
     case ARRAY_REF:
@@ -4609,6 +4660,14 @@ region_model::get_lvalue_1 (path_var pv, region_model_context *ctxt)
 	array_region *array_reg = get_region<array_region> (array_rid);
 	return array_reg->get_element (this, array_rid, index_sid, ctxt);
       }
+      break;
+
+    case BIT_FIELD_REF:
+      {
+	/* For now, create a view, as if a cast, ignoring the bit positions.  */
+	tree obj = TREE_OPERAND (expr, 0);
+	return get_or_create_view (get_lvalue (obj, ctxt), TREE_TYPE (expr));
+      };
       break;
 
     case MEM_REF:
@@ -4668,6 +4727,19 @@ region_model::get_lvalue_1 (path_var pv, region_model_context *ctxt)
       }
       break;
 
+    case CONST_DECL:
+      {
+	tree cst_type = TREE_TYPE (expr);
+	region_id cst_rid = add_region_for_type (m_root_rid, cst_type);
+	if (tree value = DECL_INITIAL (expr))
+	  {
+	    svalue_id sid = get_rvalue (value, ctxt);
+	    get_region (cst_rid)->set_value (*this, cst_rid, sid, ctxt);
+	  }
+	return cst_rid;
+      }
+      break;
+
     case STRING_CST:
       {
 	tree cst_type = TREE_TYPE (expr);
@@ -4683,8 +4755,12 @@ region_model::get_lvalue_1 (path_var pv, region_model_context *ctxt)
 
 /* Assert that SRC_TYPE can be converted to DST_TYPE as a no-op.  */
 
-#define ASSERT_COMPAT_TYPES(SRC_TYPE, DST_TYPE) \
-  gcc_checking_assert (useless_type_conversion_p ((SRC_TYPE), (DST_TYPE)))
+static void
+assert_compat_types (tree src_type, tree dst_type)
+{
+  if (src_type && dst_type && !VOID_TYPE_P (dst_type))
+    gcc_checking_assert (useless_type_conversion_p (src_type, dst_type));
+}
 
 /* Get the id of the region for PV within this region_model,
    emitting any diagnostics to CTXT.  */
@@ -4696,7 +4772,7 @@ region_model::get_lvalue (path_var pv, region_model_context *ctxt)
     return region_id::null ();
 
   region_id result_rid = get_lvalue_1 (pv, ctxt);
-  ASSERT_COMPAT_TYPES (get_region (result_rid)->get_type (),
+  assert_compat_types (get_region (result_rid)->get_type (),
 		       TREE_TYPE (pv.m_tree));
   return result_rid;
 }
@@ -4777,7 +4853,7 @@ region_model::get_rvalue (path_var pv, region_model_context *ctxt)
     return svalue_id::null ();
   svalue_id result_sid = get_rvalue_1 (pv, ctxt);
 
-  ASSERT_COMPAT_TYPES (get_svalue (result_sid)->get_type (),
+  assert_compat_types (get_svalue (result_sid)->get_type (),
 		       TREE_TYPE (pv.m_tree));
 
   return result_sid;
@@ -4951,7 +5027,7 @@ region_model::maybe_cast_1 (tree dst_type, svalue_id sid)
     return sid;
 
   if (POINTER_TYPE_P (dst_type)
-      && POINTER_TYPE_P (src_type))
+      || POINTER_TYPE_P (src_type))
     {
       /* Pointer to region.  */
       if (region_svalue *ptr_sval = sval->dyn_cast_region_svalue ())
@@ -5091,7 +5167,7 @@ region_model::deref_rvalue (svalue_id ptr_sid, region_model_context *ctxt)
 	   We don't know if it on the heap, stack, or a global,
 	   so use the root region as parent.  */
 	region_id new_rid
-	  = add_region (new symbolic_region (m_root_rid, false));
+	  = add_region (new symbolic_region (m_root_rid, NULL_TREE, false));
 
 	/* We need to write the region back into the pointer,
 	   or we'll get a new, different region each time.
@@ -5144,6 +5220,15 @@ region_model::eval_condition (svalue_id lhs_sid,
 			      enum tree_code op,
 			      svalue_id rhs_sid) const
 {
+  svalue *lhs = get_svalue (lhs_sid);
+  svalue *rhs = get_svalue (rhs_sid);
+
+  /* For now, make no attempt to capture constraints on floating-point
+     values.  */
+  if ((lhs->get_type () && FLOAT_TYPE_P (lhs->get_type ()))
+      || (rhs->get_type () && FLOAT_TYPE_P (rhs->get_type ())))
+    return tristate::unknown ();
+
   tristate ts = eval_condition_without_cm (lhs_sid, op, rhs_sid);
 
   if (ts.is_known ())
@@ -5173,6 +5258,12 @@ region_model::eval_condition_without_cm (svalue_id lhs_sid,
   /* See what we know based on the values.  */
   if (lhs && rhs)
     {
+      /* For now, make no attempt to capture constraints on floating-point
+	 values.  */
+      if ((lhs->get_type () && FLOAT_TYPE_P (lhs->get_type ()))
+	  || (rhs->get_type () && FLOAT_TYPE_P (rhs->get_type ())))
+	return tristate::unknown ();
+
       if (lhs == rhs)
 	{
 	  /* If we have the same svalue, then we have equality
@@ -5252,6 +5343,11 @@ bool
 region_model::add_constraint (tree lhs, enum tree_code op, tree rhs,
 			      region_model_context *ctxt)
 {
+  /* For now, make no attempt to capture constraints on floating-point
+     values.  */
+  if (FLOAT_TYPE_P (TREE_TYPE (lhs)) || FLOAT_TYPE_P (TREE_TYPE (rhs)))
+    return true;
+
   svalue_id lhs_sid = get_rvalue (lhs, ctxt);
   svalue_id rhs_sid = get_rvalue (rhs, ctxt);
 
@@ -5385,6 +5481,11 @@ region_model::eval_condition (tree lhs,
 			      tree rhs,
 			      region_model_context *ctxt)
 {
+  /* For now, make no attempt to model constraints on floating-point
+     values.  */
+  if (FLOAT_TYPE_P (TREE_TYPE (lhs)) || FLOAT_TYPE_P (TREE_TYPE (rhs)))
+    return tristate::unknown ();
+
   return eval_condition (get_rvalue (lhs, ctxt), op, get_rvalue (rhs, ctxt));
 }
 
@@ -5408,7 +5509,7 @@ region_model::add_new_malloc_region ()
 {
   region_id heap_rid
     = get_root_region ()->ensure_heap_region (this);
-  return add_region (new symbolic_region (heap_rid, true));
+  return add_region (new symbolic_region (heap_rid, NULL_TREE, true));
 }
 
 /* Attempt to return a tree that represents SID, or return NULL_TREE.
@@ -5537,7 +5638,7 @@ region_model::update_for_phis (const supernode *snode,
 
       /* Update next_state based on phi.  */
       bool is_back_edge = last_cfg_superedge->back_edge_p ();
-      handle_phi (lhs, src, is_back_edge, ctxt);
+      handle_phi (phi, lhs, src, is_back_edge, ctxt);
     }
 }
 
@@ -5651,12 +5752,15 @@ region_model::update_for_return_superedge (const return_superedge &return_edge,
   svalue_id result_sid = pop_frame (true, &stats, ctxt);
   // TODO: do something with the stats?
 
+  if (result_sid.null_p ())
+    return;
+
   /* Set the result of the call, within the caller frame.  */
   const gcall *call_stmt = return_edge.get_call_stmt ();
   tree lhs = gimple_call_lhs (call_stmt);
   if (lhs)
     set_value (get_lvalue (lhs, ctxt), result_sid, ctxt);
-  else if (!result_sid.null_p ())
+  else
     {
       /* This could be a leak; try purging again, but this time,
 	 don't special-case the result_sid.  */
@@ -5939,7 +6043,8 @@ make_region_for_type (region_id parent_rid, tree type)
   if (INTEGRAL_TYPE_P (type)
       || SCALAR_FLOAT_TYPE_P (type)
       || POINTER_TYPE_P (type)
-      || TREE_CODE (type) == COMPLEX_TYPE)
+      || TREE_CODE (type) == COMPLEX_TYPE
+      || TREE_CODE (type) == VECTOR_TYPE)
     return new primitive_region (parent_rid, type);
 
   if (TREE_CODE (type) == RECORD_TYPE)
@@ -5955,8 +6060,8 @@ make_region_for_type (region_id parent_rid, tree type)
     return new function_region (parent_rid, type);
 
   /* If we have a void *, make a new symbolic region.  */
-  if (type == void_type_node)
-    return new symbolic_region (parent_rid, false);
+  if (VOID_TYPE_P (type))
+    return new symbolic_region (parent_rid, type, false);
 
   gcc_unreachable ();
 }
@@ -6571,7 +6676,10 @@ region_model::get_fndecl_for_call (const gcall *call,
       if (code)
 	{
 	  tree fn_decl = code->get_tree_for_child_region (fn_rid);
-	  return fn_decl;
+	  const cgraph_node *ultimate_node
+	    = cgraph_node::get (fn_decl)->ultimate_alias_target ();
+	  if (ultimate_node)
+	    return ultimate_node->decl;
 	}
     }
 
@@ -7696,6 +7804,11 @@ test_state_merging ()
 		       integer_type_node);
   tree addr_of_a = build1 (ADDR_EXPR, ptr_type_node, a);
 
+  /* Param "q", a pointer.  */
+  tree q = build_decl (UNKNOWN_LOCATION, PARM_DECL,
+		       get_identifier ("q"),
+		       ptr_type_node);
+
   {
     region_model model0;
     region_model model1;
@@ -7965,6 +8078,60 @@ test_state_merging ()
     /* They should be mergeable, and the result should be the same.  */
     region_model merged;
     ASSERT_TRUE (model0.can_merge_with_p (model1, &merged));
+  }
+
+  /* Verify that we can merge a model in which a local in an older stack
+     frame points to a local in a more recent stack frame.  */
+  {
+    region_model model0;
+    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    region_id q_in_first_frame = model0.get_lvalue (q, NULL);
+
+    /* Push a second frame.  */
+    region_id rid_2nd_frame
+      = model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+
+    /* Have a pointer in the older frame point to a local in the
+       more recent frame.  */
+    svalue_id sid_ptr = model0.get_rvalue (addr_of_a, NULL);
+    model0.set_value (q_in_first_frame, sid_ptr, NULL);
+
+    /* Verify that it's pointing at the newer frame.  */
+    region_id rid_pointee
+      = model0.get_svalue (sid_ptr)->dyn_cast_region_svalue ()->get_pointee ();
+    ASSERT_EQ (model0.get_region (rid_pointee)->get_parent (), rid_2nd_frame);
+
+    model0.canonicalize (NULL);
+
+    region_model model1 (model0);
+    ASSERT_EQ (model0, model1);
+
+    /* They should be mergeable, and the result should be the same
+       (after canonicalization, at least).  */
+    region_model merged;
+    ASSERT_TRUE (model0.can_merge_with_p (model1, &merged));
+    merged.canonicalize (NULL);
+    ASSERT_EQ (model0, merged);
+  }
+
+  /* Verify that we can merge a model in which a local points to a global.  */
+  {
+    region_model model0;
+    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.set_value (model0.get_lvalue (q, NULL),
+		      model0.get_rvalue (addr_of_y, NULL), NULL);
+
+    model0.canonicalize (NULL);
+
+    region_model model1 (model0);
+    ASSERT_EQ (model0, model1);
+
+    /* They should be mergeable, and the result should be the same
+       (after canonicalization, at least).  */
+    region_model merged;
+    ASSERT_TRUE (model0.can_merge_with_p (model1, &merged));
+    merged.canonicalize (NULL);
+    ASSERT_EQ (model0, merged);
   }
 }
 

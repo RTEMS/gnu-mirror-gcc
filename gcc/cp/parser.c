@@ -14901,11 +14901,8 @@ cp_parser_decltype (cp_parser *parser)
     }
 
   if (!expr)
-    {
-      /* Build auto.  */
-      expr = make_decltype_auto ();
-      AUTO_IS_DECLTYPE (expr) = true;
-    }
+    /* Build auto.  */
+    expr = make_decltype_auto ();
   else
     expr = finish_decltype_type (expr, id_expression_or_member_access_p,
 				 tf_warning_or_error);
@@ -23311,6 +23308,9 @@ cp_parser_initializer_list (cp_parser* parser, bool* non_constant_p,
   /* Assume all of the expressions are constant.  */
   *non_constant_p = false;
 
+  unsigned nelts = 0;
+  int suppress = suppress_location_wrappers;
+
   /* Parse the rest of the list.  */
   while (true)
     {
@@ -23450,6 +23450,19 @@ cp_parser_initializer_list (cp_parser* parser, bool* non_constant_p,
       if (token->type == CPP_CLOSE_BRACE)
 	break;
 
+      /* Suppress location wrappers in a long initializer to save memory
+	 (14179).  The cutoff is chosen arbitrarily.  */
+      const unsigned loc_max = 256;
+      unsigned incr = 1;
+      if (TREE_CODE (initializer) == CONSTRUCTOR)
+	/* Look one level down because it's easy.  Looking deeper would require
+	   passing down a nelts pointer, and I don't think multi-level massive
+	   initializers are common enough to justify this.  */
+	incr = CONSTRUCTOR_NELTS (initializer);
+      nelts += incr;
+      if (nelts >= loc_max && (nelts - incr) < loc_max)
+	++suppress_location_wrappers;
+
       /* Consume the `,' token.  */
       cp_lexer_consume_token (parser->lexer);
     }
@@ -23478,6 +23491,8 @@ cp_parser_initializer_list (cp_parser* parser, bool* non_constant_p,
 	if (designator && TREE_CODE (designator) == IDENTIFIER_NODE)
 	  IDENTIFIER_MARKED (designator) = 0;
     }
+
+  suppress_location_wrappers = suppress;
 
   *designated = first_designator != NULL_TREE;
   return v;
@@ -26705,7 +26720,7 @@ cp_parser_std_attribute (cp_parser *parser, tree attr_ns)
 				   "with scoped attribute token");
       attr_ns = attr_id;
 
-      token = cp_lexer_consume_token (parser->lexer);
+      token = cp_lexer_peek_token (parser->lexer);
       if (token->type == CPP_NAME)
 	attr_id = token->u.value;
       else if (token->type == CPP_KEYWORD)
@@ -26718,6 +26733,7 @@ cp_parser_std_attribute (cp_parser *parser, tree attr_ns)
 		    "expected an identifier for the attribute name");
 	  return error_mark_node;
 	}
+      cp_lexer_consume_token (parser->lexer);
 
       attr_ns = canonicalize_attr_name (attr_ns);
       attr_id = canonicalize_attr_name (attr_id);
@@ -27460,7 +27476,7 @@ cp_parser_constraint_primary_expression (cp_parser *parser, bool lambda_p)
       return e;
     }
 
-  cp_parser_parse_tentatively (parser);
+  cp_lexer_save_tokens (parser->lexer);
   cp_id_kind idk;
   location_t loc = input_location;
   cp_expr expr = cp_parser_primary_expression (parser,
@@ -27476,19 +27492,16 @@ cp_parser_constraint_primary_expression (cp_parser *parser, bool lambda_p)
       /* The primary-expression could be part of an unenclosed non-logical
 	 compound expression.  */
       pce = cp_parser_constraint_requires_parens (parser, lambda_p);
-      if (pce != pce_ok)
-	cp_parser_simulate_error (parser);
-      else
-	expr = finish_constraint_primary_expr (expr);
     }
-  if (cp_parser_parse_definitely (parser))
-    return expr;
-  if (expr == error_mark_node)
-    return error_mark_node;
+  if (pce == pce_ok)
+    {
+      cp_lexer_commit_tokens (parser->lexer);
+      return finish_constraint_primary_expr (expr);
+    }
 
   /* Retry the parse at a lower precedence. If that succeeds, diagnose the
      error, but return the expression as if it were valid.  */
-  gcc_assert (pce != pce_ok);
+  cp_lexer_rollback_tokens (parser->lexer);
   cp_parser_parse_tentatively (parser);
   if (pce == pce_maybe_operator)
     expr = cp_parser_assignment_expression (parser, NULL, false, false);

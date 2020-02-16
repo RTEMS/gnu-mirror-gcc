@@ -41,7 +41,7 @@
 (define_expand "movmisalign<mode>"
   [(set (match_operand:VALL 0 "nonimmediate_operand")
         (match_operand:VALL 1 "general_operand"))]
-  "TARGET_SIMD"
+  "TARGET_SIMD && !STRICT_ALIGNMENT"
 {
   /* This pattern is not permitted to fail during expansion: if both arguments
      are non-registers (e.g. memory := constant, which can be created by the
@@ -2472,6 +2472,17 @@
  "TARGET_SIMD"
  "add<VDQV:vp>\\t%<Vetype>0, %1.<Vtype>"
   [(set_attr "type" "neon_reduc_add<q>")]
+)
+
+;; ADDV with result zero-extended to SI/DImode (for popcount).
+(define_insn "aarch64_zero_extend<GPI:mode>_reduc_plus_<VDQV_E:mode>"
+ [(set (match_operand:GPI 0 "register_operand" "=w")
+       (zero_extend:GPI
+	(unspec:<VDQV_E:VEL> [(match_operand:VDQV_E 1 "register_operand" "w")]
+			     UNSPEC_ADDV)))]
+ "TARGET_SIMD"
+ "add<VDQV_E:vp>\\t%<VDQV_E:Vetype>0, %1.<VDQV_E:Vtype>"
+  [(set_attr "type" "neon_reduc_add<VDQV_E:q>")]
 )
 
 (define_insn "aarch64_reduc_plus_internalv2si"
@@ -7133,4 +7144,55 @@
   return "bfdot\t%0.<VDQSF:Vtype>, %2.<VDQSF:Vbfdottype>, %3.2h[%4]";
 }
   [(set_attr "type" "neon_dot<VDQSF:q>")]
+)
+
+;; bfmmla
+(define_insn "aarch64_bfmmlaqv4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=w")
+        (plus:V4SF (match_operand:V4SF 1 "register_operand" "0")
+                   (unspec:V4SF [(match_operand:V8BF 2 "register_operand" "w")
+                                 (match_operand:V8BF 3 "register_operand" "w")]
+                    UNSPEC_BFMMLA)))]
+  "TARGET_BF16_SIMD"
+  "bfmmla\\t%0.4s, %2.8h, %3.8h"
+  [(set_attr "type" "neon_fp_mla_s_q")]
+)
+
+;; bfmlal<bt>
+(define_insn "aarch64_bfmlal<bt>v4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=w")
+        (plus: V4SF (match_operand:V4SF 1 "register_operand" "0")
+                    (unspec:V4SF [(match_operand:V8BF 2 "register_operand" "w")
+                                  (match_operand:V8BF 3 "register_operand" "w")]
+                     BF_MLA)))]
+  "TARGET_BF16_SIMD"
+  "bfmlal<bt>\\t%0.4s, %2.8h, %3.8h"
+  [(set_attr "type" "neon_fp_mla_s_q")]
+)
+
+(define_insn "aarch64_bfmlal<bt>_lane<q>v4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=w")
+        (plus: V4SF (match_operand:V4SF 1 "register_operand" "0")
+                    (unspec:V4SF [(match_operand:V8BF 2 "register_operand" "w")
+                                  (match_operand:VBF 3 "register_operand" "w")
+                                  (match_operand:SI 4 "const_int_operand" "n")]
+                     BF_MLA)))]
+  "TARGET_BF16_SIMD"
+{
+  operands[4] = aarch64_endian_lane_rtx (<MODE>mode, INTVAL (operands[4]));
+  return "bfmlal<bt>\\t%0.4s, %2.8h, %3.h[%4]";
+}
+  [(set_attr "type" "neon_fp_mla_s_scalar_q")]
+)
+
+;; 8-bit integer matrix multiply-accumulate
+(define_insn "aarch64_simd_<sur>mmlav16qi"
+  [(set (match_operand:V4SI 0 "register_operand" "=w")
+	(plus:V4SI
+	 (unspec:V4SI [(match_operand:V16QI 2 "register_operand" "w")
+		       (match_operand:V16QI 3 "register_operand" "w")] MATMUL)
+	 (match_operand:V4SI 1 "register_operand" "0")))]
+  "TARGET_I8MM"
+  "<sur>mmla\\t%0.4s, %2.16b, %3.16b"
+  [(set_attr "type" "neon_mla_s_q")]
 )

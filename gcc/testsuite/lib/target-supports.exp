@@ -260,7 +260,8 @@ proc check_runtime {prop args} {
 proc check_configured_with { pattern } {
     global tool
 
-    set gcc_output [${tool}_target_compile "-v" "" "none" ""]
+    set options [list "additional_flags=-v"]
+    set gcc_output [${tool}_target_compile "" "" "none" $options]
     if { [ regexp "Configured with: \[^\n\]*$pattern" $gcc_output ] } {
         verbose "Matched: $pattern" 2
         return 1
@@ -504,7 +505,8 @@ proc check_gc_sections_available { } {
 	}
 
 	# Check if the ld used by gcc supports --gc-sections.
-	set gcc_ld [lindex [${tool}_target_compile "-print-prog-name=ld" "" "none" ""] 0]
+	set options [list "additional_flags=-print-prog-name=ld"]
+	set gcc_ld [lindex [${tool}_target_compile "" "" "none" $options] 0]
 	set ld_output [remote_exec host "$gcc_ld" "--help"]
 	if { [ string first "--gc-sections" $ld_output ] >= 0 } {
 	    return 1
@@ -2242,6 +2244,25 @@ proc check_ppc_float128_hw_available { } {
 
 		    __asm__ ("xsaddqp %0,%1,%2" : "+v" (w) : "v" (x), "v" (y));
 		    return ((z != 3.0q) || (z != w));
+		}
+	    } $options
+	}
+    }]
+}
+
+# See if the __ieee128 keyword is understood.
+proc check_effective_target_ppc_ieee128_ok { } {
+    return [check_cached_effective_target ppc_ieee128_ok {
+	# disable on AIX.
+	if { [istarget *-*-aix*] } {
+	    expr 0
+	} else {
+	    set options "-mfloat128"
+	    check_runtime_nocache ppc_ieee128_ok {
+		int main()
+		{
+		  __ieee128 a;
+		  return 0;
 		}
 	    } $options
 	}
@@ -8566,7 +8587,8 @@ proc check_effective_target_gas { } {
 
     if {![info exists use_gas_saved]} {
 	# Check if the as used by gcc is GNU as.
-	set gcc_as [lindex [${tool}_target_compile "-print-prog-name=as" "" "none" ""] 0]
+	set options [list "additional_flags=-print-prog-name=as"]
+	set gcc_as [lindex [${tool}_target_compile "" "" "none" $options] 0]
 	# Provide /dev/null as input, otherwise gas times out reading from
 	# stdin.
 	set status [remote_exec host "$gcc_as" "-v /dev/null"]
@@ -8588,7 +8610,8 @@ proc check_effective_target_gld { } {
 
     if {![info exists use_gld_saved]} {
 	# Check if the ld used by gcc is GNU ld.
-	set gcc_ld [lindex [${tool}_target_compile "-print-prog-name=ld" "" "none" ""] 0]
+	set options [list "additional_flags=-print-prog-name=ld"]
+	set gcc_ld [lindex [${tool}_target_compile "" "" "none" $options] 0]
 	set status [remote_exec host "$gcc_ld" "--version"]
 	set ld_output [lindex $status 1]
 	if { [ string first "GNU" $ld_output ] >= 0 } {
@@ -8783,7 +8806,7 @@ proc check_effective_target_c++2a_only { } {
     if ![check_effective_target_c++] {
 	return 0
     }
-    if [check-flags { { } { } { -std=c++2a -std=gnu++2a } }] {
+    if [check-flags { { } { } { -std=c++2a -std=gnu++2a -std=c++20 -std=gnu++20 } }] {
 	return 1
     }
     if { $cxx_default == "c++20" && [check-flags { { } { } { } { -std=* } }] } {
@@ -8795,9 +8818,12 @@ proc check_effective_target_c++2a { } {
     return [check_effective_target_c++2a_only]
 }
 
-# Check for C++ Concepts TS support, i.e. -fconcepts flag.
+# Check for C++ Concepts support, i.e. -fconcepts flag.
 proc check_effective_target_concepts { } {
-    return [check-flags { "" { } { -fconcepts -std=*2a } }]
+    if [check_effective_target_c++2a] {
+	return 1
+    }
+    return [check-flags { "" { } { -fconcepts } }]
 }
 
 # Return 1 if expensive testcases should be run.
@@ -8996,7 +9022,7 @@ proc check_effective_target_aarch64_tiny { } {
 # various architecture extensions via the .arch_extension pseudo-op.
 
 foreach { aarch64_ext } { "fp" "simd" "crypto" "crc" "lse" "dotprod" "sve"
-			  "f64mm" } {
+			  "i8mm" "f32mm" "f64mm" "bf16" } {
     eval [string map [list FUNC $aarch64_ext] {
 	proc check_effective_target_aarch64_asm_FUNC_ok { } {
 	  if { [istarget aarch64*-*-*] } {

@@ -3524,8 +3524,15 @@ tree
 process_outer_var_ref (tree decl, tsubst_flags_t complain, bool odr_use)
 {
   if (cp_unevaluated_operand)
-    /* It's not a use (3.2) if we're in an unevaluated context.  */
-    return decl;
+    {
+      tree type = TREE_TYPE (decl);
+      if (!dependent_type_p (type)
+	  && variably_modified_type_p (type, NULL_TREE))
+	/* VLAs are used even in unevaluated context.  */;
+      else
+	/* It's not a use (3.2) if we're in an unevaluated context.  */
+	return decl;
+    }
   if (decl == error_mark_node)
     return decl;
 
@@ -10382,7 +10389,8 @@ cp_build_vec_convert (tree arg, location_t loc, tree type,
 
   tree ret = NULL_TREE;
   if (!type_dependent_expression_p (arg) && !dependent_type_p (type))
-    ret = c_build_vec_convert (cp_expr_loc_or_input_loc (arg), arg,
+    ret = c_build_vec_convert (cp_expr_loc_or_input_loc (arg),
+			       decay_conversion (arg, complain),
 			       loc, type, (complain & tf_error) != 0);
 
   if (!processing_template_decl)

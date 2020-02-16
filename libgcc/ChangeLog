@@ -1,3 +1,46 @@
+2020-02-12  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR libstdc++/79193
+	PR libstdc++/88999
+
+	* configure: Regenerated.
+
+2020-02-10  Jeff Law  <law@redhat.com>
+
+	* config/frv/frvbegin.c: Use right flags for .ctors and .dtors
+	sections.
+	* config/frv/frvend.c: Similarly.
+
+2020-02-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR libgcc/85334
+	* config/i386/shadow-stack-unwind.h (_Unwind_Frames_Increment):
+	New.
+
+2020-02-10  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/93615
+	* unwind-arm-common.inc: Replace uses of gnu_Unwind_Find_got with
+	_Unwind_gnu_Find_got.
+	* unwind-pe.h: Likewise.
+
+2020-02-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/93615
+	* config/arm/unwind-arm.h (gnu_Unwind_Find_got): Rename to ...
+	(_Unwind_gnu_Find_got): ... this.  Use __asm instead of asm.  Remove
+	trailing :s in asm.  Formatting fixes.
+	(_Unwind_decode_typeinfo_ptr): Adjust caller.
+
+2020-01-31  Sandra Loosemore  <sandra@codesourcery.com>
+
+	nios2: Support for GOT-relative DW_EH_PE_datarel encoding.
+
+	* config.host [nios2-*-linux*] (tmake_file, tm_file): Adjust.
+	* config/nios2-elf-lib.h: New.
+	* unwind-dw2-fde-dip.c (_Unwind_IteratePhdrCallback): Use existing
+	code for finding GOT base for nios2.
+
 2020-01-27  Martin Liska  <mliska@suse.cz>
 
 	PR gcov-profile/93403

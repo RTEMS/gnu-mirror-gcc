@@ -1,3 +1,308 @@
+2020-02-15  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93710 - poor diagnostic for array initializer.
+	* call.c (build_user_type_conversion_1): Use cp_expr_loc_or_input_loc
+	for an error call.
+
+2020-02-15  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92556
+	* pt.c (any_template_parm_r): Look into lambda body.
+
+	PR c++/92583
+	* pt.c (any_template_parm_r): Remove CONSTRUCTOR handling.
+
+2020-02-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/61414
+	* class.c (enum_min_precision): Change prec type from int to int &.
+
+	PR libstdc++/92906
+	* cp-tree.h (enum cp_tree_index): Add CPTI_FALLBACK_DFLOAT32_TYPE,
+	CPTI_FALLBACK_DFLOAT64_TYPE and CPTI_FALLBACK_DFLOAT128_TYPE.
+	(fallback_dfloat32_type, fallback_dfloat64_type,
+	fallback_dfloat128_type): Define.
+	* mangle.c (write_builtin_type): Handle fallback_dfloat*_type like
+	dfloat*_type_node.
+	* rtti.c (emit_support_tinfos): Emit DFP typeinfos even when dfp
+	is disabled for compatibility.
+
+2020-02-13  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93713
+	* name-lookup.c (matching_fn_p): A function does not match a
+	template.
+
+	PR c++/93643
+	PR c++/91476
+	* tree.c (decl_linkage): Always lk_none for locals.
+
+2020-02-12  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92583
+	PR c++/92654
+	* tree.c (cp_walk_subtrees): Walk CONSTRUCTOR types here.
+	* pt.c (find_parameter_packs_r): Not here.
+
+2020-02-12 Iain Sandoe <iain@sandoe.co.uk>
+
+	* coroutines.cc (build_actor_fn): Implement deallocation function
+	selection per n4849, dcl.fct.def.coroutine bullet 12.
+	(morph_fn_to_coro): Implement allocation function selection per
+	n4849, dcl.fct.def.coroutine bullets 9 and 10.
+
+2020-02-12  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93684 - ICE-on-invalid with broken attribute.
+	* parser.c (cp_parser_std_attribute): Peek a token first before
+	consuming it.
+
+2020-02-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93675
+	* class.c (add_implicitly_declared_members): Use do_friend.
+	* method.c (implicitly_declare_fn): Fix friend handling.
+	(decl_remember_implicit_trigger_p): New.
+	(synthesize_method): Use it.
+	* decl2.c (mark_used): Use it.
+
+2020-02-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93650
+	PR c++/90691
+	* constexpr.c (maybe_constant_value): Correct earlier change.
+	(cxx_eval_binary_expression) [SPACESHIP_EXPR]: Pass lval through.
+	* method.c (genericize_spaceship): Wrap result in TARGET_EXPR.
+
+2020-02-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/69448
+	PR c++/80471
+	* type-utils.h (find_type_usage): Refactor to take a tree * and to
+	return a tree *, and update documentation accordingly.
+	* pt.c (make_auto_1): Set AUTO_IS_DECLTYPE when building a
+	decltype(auto) node.
+	(make_constrained_decltype_auto): No need to explicitly set
+	AUTO_IS_DECLTYPE anymore.
+	(splice_late_return_type): Use find_type_usage to find and
+	replace a possibly nested auto node instead of using is_auto.
+	Check test for is_auto into an assert when deciding whether
+	to late_return_type.
+	(type_uses_auto): Adjust the call to find_type_usage.
+	* parser.c (cp_parser_decltype): No need to explicitly set
+	AUTO_IS_DECLTYPE anymore.
+
+	* error.c (dump_decl) [CONCEPT_DECL]: Use dump_simple_decl.
+	(dump_simple_decl): Handle standard concept definitions as well as
+	variable concept definitions.
+
+2020-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/93641
+	* error.c (dump_decl_name): Fix up last argument to strncmp.
+
+2020-02-10  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93618
+	* tree.c (array_of_unknown_bound_p): New.
+	* init.c (perform_member_init): Do nothing for flexible arrays.
+
+2020-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93633
+	* constexpr.c (cxx_eval_constant_expression): If obj is heap var with
+	ARRAY_TYPE, use the element type.  Punt if objtype after that is not
+	a class type.
+
+2020-02-08  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90691
+	* expr.c (fold_for_warn): Call maybe_constant_value.
+	* constexpr.c (struct constexpr_ctx): Add uid_sensitive bit-field.
+	(maybe_constant_value): Add uid_sensitive parm.
+	(get_fundef_copy): Don't copy if it's true.
+	(cxx_eval_call_expression): Don't instantiate if it's true.
+	(cxx_eval_outermost_constant_expr): Likewise.
+
+	PR c++/92852
+	* constexpr.c (maybe_constant_value): Don't unshare if the cached
+	value is the same as the argument.
+
+	* typeck.c (maybe_warn_about_returning_address_of_local): Add
+	location parameter.
+
+	* typeck2.c (process_init_constructor): Also clear TREE_SIDE_EFFECTS
+	if appropriate.
+
+2020-02-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93549
+	* constexpr.c (find_array_ctor_elt): If last element has no index,
+	for flag_checking verify all elts have no index.  If i is within the
+	elts, return it directly, if it is right after the last elt, append
+	if NULL index, otherwise force indexes on all elts.
+	(cxx_eval_store_expression): Allow cep->index to be NULL.
+
+2020-02-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/92947 - Paren init of aggregates in unevaluated context.
+	* call.c (build_new_method_call_1): Don't check
+	cp_unevaluated_operand.  Check the return value of digest_init.
+
+2020-02-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92654
+	* tree.c (cp_walk_subtrees): Walk into type template arguments.
+	* cp-tree.h (TYPE_TEMPLATE_INFO_MAYBE_ALIAS): Use typedef_variant_p
+	instead of TYPE_ALIAS_P.
+	* pt.c (push_template_decl_real): Likewise.
+	(find_parameter_packs_r): Likewise.  Remove dead code.
+	* error.c (find_typenames_r): Remove dead code.
+
+2020-02-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92517
+	* parser.c (cp_parser_constraint_primary_expression): Do the main
+	parse non-tentatively.
+
+2020-02-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93597 - ICE with lambda in operator function.
+	* name-lookup.c (maybe_save_operator_binding): Check is_overloaded_fn.
+
+2020-02-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93140
+	* pt.c (tsubst_decl) [PARM_DECL]: Check cp_unevaluated_operand in
+	handling of TREE_CHAIN for empty pack.
+
+2020-02-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93557
+	* semantics.c (cp_build_vec_convert): Call decay_conversion on arg
+	prior to passing it to c_build_vec_convert.
+
+2020-02-05  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93559 - ICE with CONSTRUCTOR flags verification.
+	* decl.c (reshape_init_array_1): Don't reuse a CONSTRUCTOR with
+	TREE_SIDE_EFFECTS.
+
+2020-02-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92593
+	* decl.c (grokdeclarator): Reject field of current class type even
+	in a template.
+
+2020-02-05  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	* coroutines.cc (maybe_promote_captured_temps): Increase the index
+	number for temporary variables' name.
+
+2020-02-05  Jun Ma <JunMa@linux.alibaba.com>
+
+	* coroutines.cc (build_co_await): Call convert_from_reference
+	to wrap co_await_expr with indirect_ref which avoid
+	reference/non-reference type confusion.
+
+	(co_await_expander):  Sink to call_expr if await_resume
+	is wrapped by indirect_ref.
+
+2020-02-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93551
+	* constraint.cc (satisfy_declaration_constraints): Check return
+	value of push_tinst_level.
+
+	PR c++/90951
+	* constexpr.c (cxx_eval_array_reference): {}-initialize missing
+	elements instead of value-initializing them.
+
+	PR c++/86917
+	* init.c (perform_member_init): Simplify.
+	* constexpr.c (cx_check_missing_mem_inits): Allow uninitialized
+	flexarray.
+	(cxx_eval_vec_init_1): Handle CONSTRUCTOR.
+
+2020-02-04  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* coroutines.cc (find_promise_type): Delete unused forward
+	declaration.
+	(struct coroutine_info): Add a bool for no promise type error.
+	(coro_promise_type_found_p): Only emit the error for a missing
+	promise once in each affected coroutine.
+
+2020-02-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/66477
+	* constexpr.c (cxx_eval_constant_expression) [PARM_DECL]: Don't
+	defer loading the value of a reference.
+
+2020-02-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91953
+	* constexpr.c (potential_constant_expression_1) [PARM_DECL]: Allow
+	empty class type.
+	[COMPONENT_REF]: A member function reference doesn't use the object
+	as an rvalue.
+
+2020-02-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/93458
+	* coroutines.cc (struct coroutine_info): Add a bool flag to note
+	that we emitted an error for a bad function return type.
+	(get_coroutine_info): Tolerate an unset info table in case of
+	missing traits.
+	(find_coro_traits_template_decl): In case of error or if we didn't
+	find a type template, note we emitted the error and suppress
+	duplicates.
+	(find_coro_handle_template_decl): Likewise.
+	(instantiate_coro_traits): Only check for error_mark_node in the
+	return from lookup_qualified_name. 
+	(coro_promise_type_found_p): Reorder initialization so that we check
+	for the traits and their usability before allocation of the info
+	table.  Check for a suitable return type and emit a diagnostic for
+	here instead of relying on the lookup machinery.  This allows the
+	error to have a better location, and means we can suppress multiple
+	copies.
+	(coro_function_valid_p): Re-check for a valid promise (and thus the
+	traits) before proceeding.  Tolerate missing info as a fatal error.
+
+2020-02-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/88256
+	* cp-gimplify.c (predeclare_vla): New.
+	(cp_genericize_r) [NOP_EXPR]: Call it.
+
+2020-02-03  Jun Ma <JunMa@linux.alibaba.com>
+
+	* coroutines.cc (transform_await_wrapper): Set actor funcion as
+	new context of label_decl.
+	(build_actor_fn): Fill new field of await_xform_data.
+
+2020-02-02  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93530 - ICE on invalid alignas in a template.
+	* decl.c (grokdeclarator): Call cplus_decl_attributes instead of
+	decl_attributes.
+
+2020-01-31  Jason Merrill  <jason@redhat.com>
+
+	PR c++/86216
+	* semantics.c (process_outer_var_ref): Capture VLAs even in
+	unevaluated context.
+
+	PR c++/14179
+	* decl.c (reshape_init_array_1): Reuse a single CONSTRUCTOR with
+	non-aggregate elements.
+	(reshape_init_array): Add first_initializer_p parm.
+	(reshape_init_r): Change first_initializer_p from bool to tree.
+	(reshape_init): Pass init to it.
+
+	PR c++/14179
+	* parser.c (cp_parser_initializer_list): Suppress location wrappers
+	after 256 elements.
+
 2020-01-29  Jason Merrill  <jason@redhat.com>
 
 	PR c++/82521
