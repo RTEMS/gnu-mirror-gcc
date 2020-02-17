@@ -1973,9 +1973,12 @@ propagate_malloc (void)
 		       node->dump_name ());
 
 	    bool malloc_decl_p = DECL_IS_MALLOC (node->decl);
-	    node->set_malloc_flag (true);
-	    if (!malloc_decl_p && warn_suggest_attribute_malloc)
-		warn_function_malloc (node->decl);
+	    if (!VOID_TYPE_P (TREE_TYPE (TREE_TYPE (node->decl))))
+	      {
+		node->set_malloc_flag (true);
+		if (!malloc_decl_p && warn_suggest_attribute_malloc)
+		  warn_function_malloc (node->decl);
+	      }
 	  }
       }
 
