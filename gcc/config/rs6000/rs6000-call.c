@@ -11664,6 +11664,9 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 		     "%<%s%> is not supported in 32-bit mode",
 		     bifaddr->bifname);
 
+      if (bifaddr->bifattrs & bif_cpu_bit)
+	return cpu_expand_builtin (fcode, exp, target);
+
       /* #### Insert special handling here.  */
 
       rtx pat;
