@@ -1,4 +1,12 @@
+[MASK_POWER8]
+  void __builtin_ppc_speculation_barrier ();
+    SPECBARR speculation_barrier {}
+
 [MASK_ALTIVEC]
+  vuc __builtin_altivec_mask_for_load (long long, void *);
+    MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
+  vuc __builtin_altivec_mask_for_store (long long, void *);
+    MASK_FOR_STORE altivec_lvsr_direct {ldstmask}
   math vf __builtin_altivec_vmaddfp (vf, vf, vf);
     VMADDFP fmav4sf4 {}
   vss __builtin_altivec_vmhaddshs (vss, vss, vss);
@@ -431,6 +439,12 @@
     VSLW_U vashlv4si3 {}
   const vsi __builtin_altivec_vsl (vsi, vuc);
     VSL_VSI altivec_vsl {}
+  const vui __builtin_altivec_vsl (vui, vuc);
+    VSL_VUI altivec_vsl {}
+  const vss __builtin_altivec_vsl (vss, vuc);
+    VSL_VSS altivec_vsl {}
+  const vus __builtin_altivec_vsl (vus, vuc);
+    VSL_VUS altivec_vsl {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {abs}
   const vss __builtin_altivec_abs_v8hi (vss);

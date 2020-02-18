@@ -2236,12 +2236,14 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_unsigned_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_unsigned_V16QI, 0 },
+  /* Following 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V16QI, 0 },
+  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
     RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_SLL, ALTIVEC_BUILTIN_VSL,
@@ -11552,6 +11554,46 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   return false;
 }
 
+/* Expand ALTIVEC_BUILTIN_MASK_FOR_LOAD/STORE.  */
+rtx
+rs6000_expand_ldst_mask (rtx target, rs6000_builtins fcode, tree arg0)
+{
+  int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
+		: (int) CODE_FOR_altivec_lvsl_direct);
+  machine_mode tmode = insn_data[icode2].operand[0].mode;
+  machine_mode mode = insn_data[icode2].operand[1].mode;
+  rtx op, addr, pat;
+
+  gcc_assert (TARGET_ALTIVEC);
+
+  gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg0)));
+  op = expand_expr (arg0, NULL_RTX, Pmode, EXPAND_NORMAL);
+  addr = memory_address (mode, op);
+  if (fcode == ALTIVEC_BUILTIN_MASK_FOR_STORE)
+    op = addr;
+  else
+    {
+      gcc_assert (fcode == ALTIVEC_BUILTIN_MASK_FOR_LOAD);
+      /* For the load case need to negate the address.  */
+      op = gen_reg_rtx (GET_MODE (addr));
+      emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr),
+					       addr)));
+    }
+  op = gen_rtx_MEM (mode, op);
+
+  if (target == 0
+      || GET_MODE (target) != tmode
+      || ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
+    target = gen_reg_rtx (tmode);
+
+  pat = GEN_FCN (icode2) (target, op);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
+
+  return target;
+}
+
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
    (and in mode MODE if that's convenient).
@@ -11564,6 +11606,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 		       int ignore ATTRIBUTE_UNUSED)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+  /* #### This needs to be rs6000_builtins_x now.  */
   enum rs6000_builtins fcode
     = (enum rs6000_builtins) DECL_MD_FUNCTION_CODE (fndecl);
   size_t uns_fcode = (size_t)fcode;
@@ -11651,7 +11694,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (bifaddr->icode == CODE_FOR_nothing)
 	return 0;
 
-      if (bifaddr->bifattrs & bif_nosoft_bit
+      if (bif_is_nosoft (*bifaddr)
 	  && rs6000_isa_flags & OPTION_MASK_SOFT_FLOAT)
 	{
 	  error ("%<%s%> not supported with %<-msoft-float%>",
@@ -11659,12 +11702,12 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  return const0_rtx;
 	}
 
-      if (bifaddr->bifattrs & bif_no32bit_bit && TARGET_32BIT)
+      if (bif_is_no32bit (*bifaddr) && TARGET_32BIT)
 	fatal_error (input_location,
 		     "%<%s%> is not supported in 32-bit mode",
 		     bifaddr->bifname);
 
-      if (bifaddr->bifattrs & bif_cpu_bit)
+      if (bif_is_cpu (*bifaddr))
 	return cpu_expand_builtin (fcode, exp, target);
 
       /* #### Insert special handling here.  */
@@ -11758,6 +11801,9 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	    break;
 	  }
 	}
+
+      if (bif_is_ldstmask (*bifaddr))
+	return rs6000_expand_ldst_mask (target, fcode, arg[0]);
 
       /* #### Insert more special handling here.  */
 

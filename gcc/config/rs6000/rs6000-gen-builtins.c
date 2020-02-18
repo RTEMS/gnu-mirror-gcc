@@ -74,6 +74,7 @@ along with GCC; see the file COPYING3.  If not see
      htm      Needs special handling for transactional memory
      no32bit  Not valid for TARGET_32BIT
      cpu      This is a "cpu_is" or "cpu_supports" builtin
+     ldstmask Altivec mask for load or store
 
    An example stanza might look like this:
 
@@ -244,6 +245,7 @@ struct attrinfo {
   char ishtm;
   char isno32bit;
   char iscpu;
+  char isldstmask;
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
@@ -1062,6 +1064,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->isno32bit = 1;
 	else if (!strcmp (attrname, "cpu"))
 	  attrptr->iscpu = 1;
+	else if (!strcmp (attrname, "ldstmask"))
+	  attrptr->isldstmask = 1;
 	else
 	  {
 	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
@@ -1093,11 +1097,11 @@ parse_bif_attrs (attrinfo *attrptr)
 #ifdef DEBUG
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
 nosoft = %d, ldvec = %d, stvec = %d, reve = %d, abs = %d, pred = %d, \
-htm = %d, no32bit = %d, cpu = %d.\n",
+htm = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
 	   attrptr->isreve, attrptr->isabs, attrptr->ispred, attrptr->ishtm,
-	   attrptr->isno32bit, attrptr->iscpu);
+	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask);
 #endif
 
   return 1;
@@ -1767,18 +1771,19 @@ write_decls ()
   fprintf (header_file, "  int  restr_val2;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file, "#define bif_init_bit\t(0x00000001)\n");
-  fprintf (header_file, "#define bif_set_bit\t(0x00000002)\n");
-  fprintf (header_file, "#define bif_extract_bit\t(0x00000004)\n");
-  fprintf (header_file, "#define bif_nosoft_bit\t(0x00000008)\n");
-  fprintf (header_file, "#define bif_ldvec_bit\t(0x00000010)\n");
-  fprintf (header_file, "#define bif_stvec_bit\t(0x00000020)\n");
-  fprintf (header_file, "#define bif_reve_bit\t(0x00000040)\n");
-  fprintf (header_file, "#define bif_abs_bit\t(0x00000080)\n");
-  fprintf (header_file, "#define bif_pred_bit\t(0x00000100)\n");
-  fprintf (header_file, "#define bif_htm_bit\t(0x00000200)\n");
-  fprintf (header_file, "#define bif_no32bit_bit\t(0x00000400)\n");
-  fprintf (header_file, "#define bif_cpu_bit\t(0x00000800)\n");
+  fprintf (header_file, "#define bif_init_bit\t\t(0x00000001)\n");
+  fprintf (header_file, "#define bif_set_bit\t\t(0x00000002)\n");
+  fprintf (header_file, "#define bif_extract_bit\t\t(0x00000004)\n");
+  fprintf (header_file, "#define bif_nosoft_bit\t\t(0x00000008)\n");
+  fprintf (header_file, "#define bif_ldvec_bit\t\t(0x00000010)\n");
+  fprintf (header_file, "#define bif_stvec_bit\t\t(0x00000020)\n");
+  fprintf (header_file, "#define bif_reve_bit\t\t(0x00000040)\n");
+  fprintf (header_file, "#define bif_abs_bit\t\t(0x00000080)\n");
+  fprintf (header_file, "#define bif_pred_bit\t\t(0x00000100)\n");
+  fprintf (header_file, "#define bif_htm_bit\t\t(0x00000200)\n");
+  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00000400)\n");
+  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00000800)\n");
+  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00001000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -1801,9 +1806,12 @@ write_decls ()
   fprintf (header_file,
 	   "#define bif_is_htm(x)\t\t((x).bifattrs & bif_htm_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_no32bit(x)\t\t((x).bifattrs & bif_no32bit_bit)\n");
+	   "#define bif_is_no32bit(x)\t((x).bifattrs & bif_no32bit_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_cpu(x)\t\t((x).bifattrs & bif_cpu_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_ldstmask(x)\t((x).bifattrs "
+	   "& bif_ldstmask_bit)\n");
   fprintf (header_file, "\n");
 
   /* #### Note that the _x is added for now to avoid conflict with
@@ -2014,6 +2022,8 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_no32bit_bit");
       if (bifs[i].attrs.iscpu)
 	fprintf (init_file, " | bif_cpu_bit");
+      if (bifs[i].attrs.isldstmask)
+	fprintf (init_file, " | bif_ldstmask_bit");
       fprintf (init_file, ";\n");
       fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
