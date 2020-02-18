@@ -9266,6 +9266,90 @@ altivec_expand_stv_builtin (enum insn_code icode, tree exp)
   return NULL_RTX;
 }
 
+static rtx
+stv_expand_builtin (insn_code icode, rtx *op,
+		    machine_mode tmode, machine_mode smode)
+{
+  rtx pat, addr, rawaddr;
+  op[2] = copy_to_mode_reg (Pmode, op[2]);
+
+  /* For STVX, express the RTL accurately by ANDing the address with -16.
+     STVXL and STVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_stvx_v2df
+      || icode == CODE_FOR_altivec_stvx_v2di
+      || icode == CODE_FOR_altivec_stvx_v4sf
+      || icode == CODE_FOR_altivec_stvx_v4si
+      || icode == CODE_FOR_altivec_stvx_v8hi
+      || icode == CODE_FOR_altivec_stvx_v16qi)
+    {
+      if (op[1] == const0_rtx)
+	rawaddr = op[2];
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[2], op[1]);
+	}
+
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (tmode, addr);
+      op[0] = copy_to_mode_reg (tmode, op[0]);
+      emit_insn (gen_rtx_SET (addr, op[0]));
+    }
+  else
+    {
+      if (! (*insn_data[icode].operand[1].predicate) (op[0], smode))
+	op[0] = copy_to_mode_reg (smode, op[0]);
+
+      if (op[1] == const0_rtx)
+	addr = gen_rtx_MEM (tmode, op[2]);
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op[2], op[1]));
+	}
+
+      pat = GEN_FCN (icode) (addr, op[0]);
+      if (pat)
+	emit_insn (pat);
+    }
+
+  return NULL_RTX;
+}
+
+static insn_code
+elemrev_icode (rs6000_builtins fcode)
+{
+  switch (fcode)
+    {
+    default:
+      gcc_unreachable ();
+    case VSX_BUILTIN_ST_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v1ti
+	      : CODE_FOR_vsx_st_elemrev_v1ti);
+    case VSX_BUILTIN_ST_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2df
+	      : CODE_FOR_vsx_st_elemrev_v2df);
+    case VSX_BUILTIN_ST_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2di
+	      : CODE_FOR_vsx_st_elemrev_v2di);
+    case VSX_BUILTIN_ST_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4sf
+	      : CODE_FOR_vsx_st_elemrev_v4sf);
+    case VSX_BUILTIN_ST_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4si
+	      : CODE_FOR_vsx_st_elemrev_v4si);
+    case VSX_BUILTIN_ST_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v8hi
+	      : CODE_FOR_vsx_st_elemrev_v8hi);
+    case VSX_BUILTIN_ST_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v16qi
+	      : CODE_FOR_vsx_st_elemrev_v16qi);
+    }
+  gcc_unreachable ();
+  return (insn_code) 0;
+}
+
 /* Return the appropriate SPR number associated with the given builtin.  */
 static inline HOST_WIDE_INT
 htm_spr_num (enum rs6000_builtins code)
@@ -11612,7 +11696,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 		       int ignore ATTRIBUTE_UNUSED)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
-  /* #### This needs to be rs6000_builtins_x now.  */
+  /* #### This needs to be rs6000_builtins_x now.  Parallel fcodex for now?  */
   enum rs6000_builtins fcode
     = (enum rs6000_builtins) DECL_MD_FUNCTION_CODE (fndecl);
   size_t uns_fcode = (size_t)fcode;
@@ -11811,6 +11895,28 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (bif_is_ldstmask (*bifaddr))
 	return rs6000_expand_ldst_mask (target, fcode, arg[0]);
 
+      if (bif_is_stvec (*bifaddr))
+	{
+	  if (bif_is_reve (*bifaddr))
+	    icode = elemrev_icode (fcode);
+	  return stv_expand_builtin (icode, op, mode[0], mode[1]);
+	}
+
+      if (fcode == MISC_BUILTIN_PACK_IF
+	  && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	{
+	  icode = CODE_FOR_packtf;
+	  fcode = MISC_BUILTIN_PACK_TF;
+	  uns_fcode = (size_t)fcode;
+	}
+      else if (fcode == MISC_BUILTIN_UNPACK_IF
+	       && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	{
+	  icode = CODE_FOR_unpacktf;
+	  fcode = MISC_BUILTIN_UNPACK_TF;
+	  uns_fcode = (size_t)fcode;
+	}
+
       /* #### Insert more special handling here.  */
 
       if (target == 0
@@ -11966,6 +12072,9 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	case ALTIVEC_BUILTIN_VCFSX:
 	case ALTIVEC_BUILTIN_VCTUXS:
 	case ALTIVEC_BUILTIN_VCTSXS:
+	  /* #### Replace this nonsense with a separate built-in for the
+	     vectorizer to use, which I believe is the only way we get
+	     into this situation.  */
 	  /* FIXME: There's got to be a nicer way to handle this case than
 	     constructing a new CALL_EXPR.  */
 	  if (call_expr_nargs (exp) == 1)

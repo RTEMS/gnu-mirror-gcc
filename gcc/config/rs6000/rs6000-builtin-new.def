@@ -1,7 +1,3 @@
-[MASK_POWER8]
-  void __builtin_ppc_speculation_barrier ();
-    SPECBARR speculation_barrier {}
-
 [MASK_ALTIVEC]
   vuc __builtin_altivec_mask_for_load (long long, void *);
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
@@ -611,3 +607,5 @@
     VMULOUW vec_widen_umult_odd_v4si {}
   const vsll __builtin_altivec_vmulosw (vsi, vsi);
     VMULOSW vec_widen_smult_odd_v4si {}
+  void __builtin_ppc_speculation_barrier ();
+    SPECBARR speculation_barrier {}
