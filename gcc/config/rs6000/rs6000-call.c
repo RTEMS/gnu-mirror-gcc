@@ -9160,6 +9160,60 @@ altivec_expand_lv_builtin (enum insn_code icode, tree exp, rtx target, bool blk)
 }
 
 static rtx
+ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
+{
+  rtx pat, addr;
+  bool blk = (icode == CODE_FOR_altivec_lvlx
+	      || icode == CODE_FOR_altivec_lvlxl
+	      || icode == CODE_FOR_altivec_lvrx
+	      || icode == CODE_FOR_altivec_lvrxl);
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  /* For LVX, express the RTL accurately by ANDing the address with -16.
+     LVXL and LVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_lvx_v1ti
+      || icode == CODE_FOR_altivec_lvx_v2df
+      || icode == CODE_FOR_altivec_lvx_v2di
+      || icode == CODE_FOR_altivec_lvx_v4sf
+      || icode == CODE_FOR_altivec_lvx_v4si
+      || icode == CODE_FOR_altivec_lvx_v8hi
+      || icode == CODE_FOR_altivec_lvx_v16qi)
+    {
+      rtx rawaddr;
+      if (op[0] == const0_rtx)
+	rawaddr = op[1];
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[1], op[0]);
+	}
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (blk ? BLKmode : tmode, addr);
+
+      emit_insn (gen_rtx_SET (target, addr));
+    }
+  else
+    {
+      if (op[0] == const0_rtx)
+	addr = gen_rtx_MEM (blk ? BLKmode : tmode, op[1]);
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  addr = gen_rtx_MEM (blk ? BLKmode : tmode,
+			      gen_rtx_PLUS (Pmode, op[1], op[0]));
+	}
+
+      pat = GEN_FCN (icode) (target, addr);
+      if (! pat)
+	return 0;
+      emit_insn (pat);
+    }
+
+  return target;
+}
+
+static rtx
 altivec_expand_stxvl_builtin (enum insn_code icode, tree exp)
 {
   rtx pat;
@@ -9345,6 +9399,27 @@ elemrev_icode (rs6000_builtins fcode)
     case VSX_BUILTIN_ST_ELEMREV_V16QI:
       return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v16qi
 	      : CODE_FOR_vsx_st_elemrev_v16qi);
+    case VSX_BUILTIN_LD_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2df
+	      : CODE_FOR_vsx_ld_elemrev_v2df);
+    case VSX_BUILTIN_LD_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v1ti
+	      : CODE_FOR_vsx_ld_elemrev_v1ti);
+    case VSX_BUILTIN_LD_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2di
+	      : CODE_FOR_vsx_ld_elemrev_v2di);
+    case VSX_BUILTIN_LD_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4sf
+	      : CODE_FOR_vsx_ld_elemrev_v4sf);
+    case VSX_BUILTIN_LD_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4si
+	      : CODE_FOR_vsx_ld_elemrev_v4si);
+    case VSX_BUILTIN_LD_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v8hi
+	      : CODE_FOR_vsx_ld_elemrev_v8hi);
+    case VSX_BUILTIN_LD_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v16qi
+	      : CODE_FOR_vsx_ld_elemrev_v16qi);
     }
   gcc_unreachable ();
   return (insn_code) 0;
@@ -11912,6 +11987,13 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  if (bif_is_reve (*bifaddr))
 	    icode = elemrev_icode (fcode);
 	  return stv_expand_builtin (icode, op, mode[0], mode[1]);
+	}
+
+      if (bif_is_ldvec (*bifaddr))
+	{
+	  if (bif_is_reve (*bifaddr))
+	    icode = elemrev_icode (fcode);
+	  return ldv_expand_builtin (target, icode, op, mode[0]);
 	}
 
       if (fcode == MISC_BUILTIN_PACK_IF
