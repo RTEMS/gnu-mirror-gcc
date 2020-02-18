@@ -526,9 +526,9 @@
   const vui __builtin_altivec_vsraw (vui, vui);
     VSRAW_U vashrv4si3 {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
-    ABS_V16QI absv16qi2 {abs}
+    ABS_V16QI absv16qi2 {}
   const vss __builtin_altivec_abs_v8hi (vss);
-    ABS_V8HI absv8hi2 {abs}
+    ABS_V8HI absv8hi2 {}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);

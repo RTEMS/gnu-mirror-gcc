@@ -69,7 +69,6 @@ along with GCC; see the file COPYING3.  If not see
      ldvec    Needs special handling for vec_ld semantics
      stvec    Needs special handling for vec_st semantics
      reve     Needs special handling for element reversal
-     abs      Needs special handling for absolute value
      pred     Needs special handling for comparison predicates
      htm      Needs special handling for transactional memory
      no32bit  Not valid for TARGET_32BIT
@@ -80,9 +79,9 @@ along with GCC; see the file COPYING3.  If not see
 
 [TARGET_ALTIVEC]
   const vsc __builtin_altivec_abs_v16qi (vsc);
-    ABS_V16QI absv16qi2 {abs}
+    ABS_V16QI absv16qi2 {}
   const vss __builtin_altivec_abs_v8hi (vss);
-    ABS_V8HI absv8hi2 {abs}
+    ABS_V8HI absv8hi2 {}
 
    Here "vsc" and "vss" are shorthand for "vector signed char" and
    "vector signed short" to shorten line lengths and improve readability.
@@ -240,7 +239,6 @@ struct attrinfo {
   char isldvec;
   char isstvec;
   char isreve;
-  char isabs;
   char ispred;
   char ishtm;
   char isno32bit;
@@ -1054,8 +1052,6 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->isstvec = 1;
 	else if (!strcmp (attrname, "reve"))
 	  attrptr->isreve = 1;
-	else if (!strcmp (attrname, "abs"))
-	  attrptr->isabs = 1;
 	else if (!strcmp (attrname, "pred"))
 	  attrptr->ispred = 1;
 	else if (!strcmp (attrname, "htm"))
@@ -1096,11 +1092,11 @@ parse_bif_attrs (attrinfo *attrptr)
 
 #ifdef DEBUG
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
-nosoft = %d, ldvec = %d, stvec = %d, reve = %d, abs = %d, pred = %d, \
+nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, \
 htm = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
-	   attrptr->isreve, attrptr->isabs, attrptr->ispred, attrptr->ishtm,
+	   attrptr->isreve, attrptr->ispred, attrptr->ishtm,
 	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask);
 #endif
 
@@ -1778,12 +1774,11 @@ write_decls ()
   fprintf (header_file, "#define bif_ldvec_bit\t\t(0x00000010)\n");
   fprintf (header_file, "#define bif_stvec_bit\t\t(0x00000020)\n");
   fprintf (header_file, "#define bif_reve_bit\t\t(0x00000040)\n");
-  fprintf (header_file, "#define bif_abs_bit\t\t(0x00000080)\n");
-  fprintf (header_file, "#define bif_pred_bit\t\t(0x00000100)\n");
-  fprintf (header_file, "#define bif_htm_bit\t\t(0x00000200)\n");
-  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00000400)\n");
-  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00000800)\n");
-  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00001000)\n");
+  fprintf (header_file, "#define bif_pred_bit\t\t(0x00000080)\n");
+  fprintf (header_file, "#define bif_htm_bit\t\t(0x00000100)\n");
+  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00000200)\n");
+  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00000400)\n");
+  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00000800)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -1799,8 +1794,6 @@ write_decls ()
 	   "#define bif_is_stvec(x)\t\t((x).bifattrs & bif_stvec_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_reve(x)\t\t((x).bifattrs & bif_reve_bit)\n");
-  fprintf (header_file,
-	   "#define bif_is_abs(x)\t\t((x).bifattrs & bif_abs_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_predicate(x)\t((x).bifattrs & bif_pred_bit)\n");
   fprintf (header_file,
@@ -2012,8 +2005,6 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_stvec_bit");
       if (bifs[i].attrs.isreve)
 	fprintf (init_file, " | bif_reve_bit");
-      if (bifs[i].attrs.isabs)
-	fprintf (init_file, " | bif_abs_bit");
       if (bifs[i].attrs.ispred)
 	fprintf (init_file, " | bif_pred_bit");
       if (bifs[i].attrs.ishtm)

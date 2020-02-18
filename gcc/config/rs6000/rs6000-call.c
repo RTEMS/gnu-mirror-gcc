@@ -11800,7 +11800,19 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (bif_is_cpu (*bifaddr))
 	return cpu_expand_builtin (fcode, exp, target);
 
-      /* #### Insert special handling here.  */
+      if (bif_is_init (*bifaddr))
+	return altivec_expand_vec_init_builtin (TREE_TYPE (exp), exp, target);
+
+      if (bif_is_set (*bifaddr))
+	return altivec_expand_vec_set_builtin (exp);
+
+      if (bif_is_extract (*bifaddr))
+	return altivec_expand_vec_ext_builtin (exp, target);
+
+      if (bif_is_predicate (*bifaddr))
+	return altivec_expand_predicate_builtin (icode, exp, target);
+
+      /* #### Insert more special handling here.  */
 
       rtx pat;
       const int MAX_BUILTIN_ARGS = 5;
