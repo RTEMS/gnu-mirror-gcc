@@ -71,6 +71,8 @@ along with GCC; see the file COPYING3.  If not see
      reve     Needs special handling for element reversal
      pred     Needs special handling for comparison predicates
      htm      Needs special handling for transactional memory
+     htmspr   HTM function using an SPR
+     htmcr    HTM function using a CR
      no32bit  Not valid for TARGET_32BIT
      cpu      This is a "cpu_is" or "cpu_supports" builtin
      ldstmask Altivec mask for load or store
@@ -241,6 +243,8 @@ struct attrinfo {
   char isreve;
   char ispred;
   char ishtm;
+  char ishtmspr;
+  char ishtmcr;
   char isno32bit;
   char iscpu;
   char isldstmask;
@@ -1056,6 +1060,10 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->ispred = 1;
 	else if (!strcmp (attrname, "htm"))
 	  attrptr->ishtm = 1;
+	else if (!strcmp (attrname, "htmspr"))
+	  attrptr->ishtmspr = 1;
+	else if (!strcmp (attrname, "htmcr"))
+	  attrptr->ishtmcr = 1;
 	else if (!strcmp (attrname, "no32bit"))
 	  attrptr->isno32bit = 1;
 	else if (!strcmp (attrname, "cpu"))
@@ -1092,12 +1100,13 @@ parse_bif_attrs (attrinfo *attrptr)
 
 #ifdef DEBUG
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
-nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, \
-htm = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
+nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, \
+htmspr = %d, htmcr = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
-	   attrptr->isreve, attrptr->ispred, attrptr->ishtm,
-	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask);
+	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
+	   attrptr->ishtmcr, attrptr->isno32bit, attrptr->iscpu,
+	   attrptr->isldstmask);
 #endif
 
   return 1;
@@ -1776,9 +1785,11 @@ write_decls ()
   fprintf (header_file, "#define bif_reve_bit\t\t(0x00000040)\n");
   fprintf (header_file, "#define bif_pred_bit\t\t(0x00000080)\n");
   fprintf (header_file, "#define bif_htm_bit\t\t(0x00000100)\n");
-  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00000200)\n");
-  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00000400)\n");
-  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00000800)\n");
+  fprintf (header_file, "#define bif_htmspr_bit\t\t(0x00000200)\n");
+  fprintf (header_file, "#define bif_htmcr_bit\t\t(0x00000400)\n");
+  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00000800)\n");
+  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00001000)\n");
+  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00002000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -1798,6 +1809,10 @@ write_decls ()
 	   "#define bif_is_predicate(x)\t((x).bifattrs & bif_pred_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_htm(x)\t\t((x).bifattrs & bif_htm_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_htmspr(x)\t\t((x).bifattrs & bif_htmspr_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_htmcr(x)\t\t((x).bifattrs & bif_htmcr_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_no32bit(x)\t((x).bifattrs & bif_no32bit_bit)\n");
   fprintf (header_file,
@@ -2009,6 +2024,10 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_pred_bit");
       if (bifs[i].attrs.ishtm)
 	fprintf (init_file, " | bif_htm_bit");
+      if (bifs[i].attrs.ishtmspr)
+	fprintf (init_file, " | bif_htmspr_bit");
+      if (bifs[i].attrs.ishtmcr)
+	fprintf (init_file, " | bif_htmcr_bit");
       if (bifs[i].attrs.isno32bit)
 	fprintf (init_file, " | bif_no32bit_bit");
       if (bifs[i].attrs.iscpu)
