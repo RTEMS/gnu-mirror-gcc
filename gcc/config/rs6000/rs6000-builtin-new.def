@@ -539,10 +539,110 @@
     VSR_VSC altivec_vsr {}
   const vuc __builtin_altivec_vsr (vuc, vuc);
     VSR_VUC altivec_vsr {}
-  const vsc __builtin_altivec_abs_v16qi (vsc);
-    ABS_V16QI absv16qi2 {}
+  const vf __builtin_altivec_vsro (vf, vsc);
+    VSRO_VF altivec_vsro {}
+  const vf __builtin_altivec_vsro (vf, vuc);
+    VSRO_VF_U altivec_vsro {}
+  const vsi __builtin_altivec_vsro (vsi, vsc);
+    VSRO_VSI altivec_vsro {}
+  const vsi __builtin_altivec_vsro (vsi, vuc);
+    VSRO_VSI_U altivec_vsro {}
+  const vui __builtin_altivec_vsro (vui, vsc);
+    VSRO_VUI altivec_vsro {}
+  const vui __builtin_altivec_vsro (vui, vuc);
+    VSRO_VUI_U altivec_vsro {}
+  const vss __builtin_altivec_vsro (vss, vsc);
+    VSRO_VSS altivec_vsro {}
+  const vss __builtin_altivec_vsro (vss, vuc);
+    VSRO_VSS_U altivec_vsro {}
+  const vus __builtin_altivec_vsro (vus, vsc);
+    VSRO_VUS altivec_vsro {}
+  const vus __builtin_altivec_vsro (vus, vuc);
+    VSRO_VUS_U altivec_vsro {}
+  const vp __builtin_altivec_vsro (vp, vsc);
+    VSRO_VP altivec_vsro {}
+  const vp __builtin_altivec_vsro (vp, vuc);
+    VSRO_VP_U altivec_vsro {}
+  const vsc __builtin_altivec_vsro (vsc, vsc);
+    VSRO_VSC altivec_vsro {}
+  const vsc __builtin_altivec_vsro (vsc, vuc);
+    VSRO_VSC_U altivec_vsro {}
+  const vuc __builtin_altivec_vsro (vuc, vsc);
+    VSRO_VUC altivec_vsro {}
+  const vuc __builtin_altivec_vsro (vuc, vuc);
+    VSRO_VUC_U altivec_vsro {}
+  const vsc __builtin_altivec_vsububm (vsc, vsc);
+    VSUBUBM subv16qi3 {}
+  const vuc __builtin_altivec_vsububm (vuc, vuc);
+    VSUBUBM_U subv16qi3 {}
+  const vss __builtin_altivec_vsubuhm (vss, vss);
+    VSUBUHM subv8hi3 {}
+  const vus __builtin_altivec_vsubuhm (vus, vus);
+    VSUBUHM_U subv8hi3 {}
+  const vsi __builtin_altivec_vsubuwm (vsi, vsi);
+    VSUBUWM subv4si3 {}
+  const vui __builtin_altivec_vsubuwm (vui, vui);
+    VSUBUWM_U subv4si3 {}
+  const vf __builtin_altivec_vsubfp (vf, vf);
+    VSUBFP subv4sf3 {}
+  const vsi __builtin_altivec_vsubcuw (vsi, vsi);
+    VSUBCUW altivec_vsubcuw {}
+  const vui __builtin_altivec_vsubcuw (vui, vui);
+    VSUBCUW_U altivec_vsubcuw {}
+  const vuc __builtin_altivec_vsububs (vuc, vuc);
+    VSUBUBS altivec_vsububs {}
+  const vsc __builtin_altivec_vsubsbs (vsc, vsc);
+    VSUBSBS altivec_vsubsbs {}
+  const vus __builtin_altivec_vsubuhs (vus, vus);
+    VSUBUHS altivec_vsubuhs {}
+  const vss __builtin_altivec_vsubshs (vss, vss);
+    VSUBSHS altivec_vsubshs {}
+  const vui __builtin_altivec_vsubuws (vui, vui);
+    VSUBUWS altivec_vsubuws {}
+  const vsi __builtin_altivec_vsubsws (vsi, vsi);
+    VSUBSWS altivec_vsubsws {}
+  const vui __builtin_altivec_vsum4ubs (vuc, vui);
+    VSUM4UBS altivec_vsum4ubs {}
+  const vsi __builtin_altivec_vsum4sbs (vsc, vsi);
+    VSUM4SBS altivec_vsum4sbs {}
+  const vsi __builtin_altivec_vsum4shs (vss, vsi);
+    VSUM4SHS altivec_vsum4shs {}
+  const vsi __builtin_altivec_vsum2sws (vsi, vsi);
+    VSUM2SWS altivec_vsum2sws {}
+  const vsi __builtin_altivec_vsumsws (vsi, vsi);
+    VSUMSWS altivec_vsumsws {}
+  const vsi __builtin_altivec_vsumsws_be (vsi, vsi);
+    VSUMSWS_BE altivec_vsumsws_direct {}
+  const vbc __builtin_altivec_vxor_v16qi_uns (vbc, vbc);
+    VXOR_V16QI_UNS_B xorv16qi3 {}
+  const vuc __builtin_altivec_vxor_v16qi_uns (vuc, vuc);
+    VXOR_V16QI_UNS xorv16qi3 {}
+  const vsc __builtin_altivec_vxor_v16qi (vsc, vsc);
+    VXOR_V16QI xorv16qi3 {}
+  const vbs __builtin_altivec_vxor_v8hi_uns (vbs, vbs);
+    VXOR_V8HI_UNS_B xorv8hi3 {}
+  const vus __builtin_altivec_vxor_v8hi_uns (vus, vus);
+    VXOR_V8HI_UNS xorv8hi3 {}
+  const vss __builtin_altivec_vxor_v8hi (vss, vss);
+    VXOR_V8HI xorv8hi3 {}
+  const vbi __builtin_altivec_vxor_v4si_uns (vbi, vbi);
+    VXOR_V4SI_UNS_B xorv4si3 {}
+  const vui __builtin_altivec_vxor_v4si_uns (vui, vui);
+    VXOR_V4SI_UNS xorv4si3 {}
+  const vsi __builtin_altivec_vxor_v4si (vsi, vsi);
+    VXOR_V4SI xorv4si3 {}
+  const vf __builtin_altivec_vxor_v2di (vf, vf);
+    VXOR_V4SF xorv4sf3 {}
+  const vf __builtin_altivec_copysignfp (vf, vf);
+    COPYSIGN_V4SF vector_copysignv4sf3 {}
+  const vsi __builtin_altivec_abs_v4si (vsi);
+    ABS_V4SI absv4si2 {}
   const vss __builtin_altivec_abs_v8hi (vss);
     ABS_V8HI absv8hi2 {}
+  const vf __builtin_altivec_abs_v4sf (vf);
+    ABS_V4SF absv4sf2 {}
+  const vsc __builtin_altivec_abs_v16qi (vsc);
+    ABS_V16QI absv16qi2 {}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
@@ -611,6 +711,22 @@
     VSLO_VULL_S altivec_vslo {}
   const vull __builtin_altivec_vslo (vull, vuc);
     VSLO_VULL_U altivec_vslo {}
+  const vsll __builtin_altivec_vsro (vsll, vsc);
+    VSRO_VSLL altivec_vsro {}
+  const vsll __builtin_altivec_vsro (vsll, vuc);
+    VSRO_VSLL_U altivec_vsro {}
+  const vull __builtin_altivec_vsro (vull, vsc);
+    VSRO_VULL altivec_vsro {}
+  const vull __builtin_altivec_vsro (vull, vuc);
+    VSRO_VULL_U altivec_vsro {}
+  const vull __builtin_altivec_vxor_v2di_uns (vull, vull);
+    VXOR_V2DI_UNS xorv2di3 {}
+  const vbll __builtin_altivec_vxor_v2di_uns (vbll, vbll);
+    VXOR_V2DI_UNS_B xorv2di3 {}
+  const vsll __builtin_altivec_vxor_v2di (vsll, vsll);
+    VXOR_V2DI xorv2di3 {}
+  const vd __builtin_altivec_vxor_v2df (vd, vd);
+    VXOR_V2DF xorv2df3 {}
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
