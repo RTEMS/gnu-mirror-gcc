@@ -525,6 +525,20 @@
     VSRAW vashrv4si3 {}
   const vui __builtin_altivec_vsraw (vui, vui);
     VSRAW_U vashrv4si3 {}
+  const vsi __builtin_altivec_vsr (vsi, vuc);
+    VSR_VSI altivec_vsr {}
+  const vui __builtin_altivec_vsr (vui, vuc);
+    VSR_VUI altivec_vsr {}
+  const vss __builtin_altivec_vsr (vss, vuc);
+    VSR_VSS altivec_vsr {}
+  const vus __builtin_altivec_vsr (vus, vuc);
+    VSR_VUS altivec_vsr {}
+  const vp __builtin_altivec_vsr (vp, vuc);
+    VSR_VP altivec_vsr {}
+  const vsc __builtin_altivec_vsr (vsc, vuc);
+    VSR_VSC altivec_vsr {}
+  const vuc __builtin_altivec_vsr (vuc, vuc);
+    VSR_VUC altivec_vsr {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {}
   const vss __builtin_altivec_abs_v8hi (vss);
