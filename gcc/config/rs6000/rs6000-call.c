@@ -12014,9 +12014,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
   if (new_builtins_are_live)
     {
       bifdata *bifaddr = &rs6000_builtin_info_x[uns_fcode];
-      /* #### ???  */
-      if (bifaddr->icode == CODE_FOR_nothing)
-	return 0;
 
       if (bif_is_nosoft (*bifaddr)
 	  && rs6000_isa_flags & OPTION_MASK_SOFT_FLOAT)
@@ -12049,8 +12046,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (bif_is_htm (*bifaddr))
 	return new_htm_expand_builtin (bifaddr, fcode, exp, target);
 
-      /* #### Insert more special handling here.  */
-
       rtx pat;
       const int MAX_BUILTIN_ARGS = 5;
       tree arg[MAX_BUILTIN_ARGS];
@@ -12060,14 +12055,14 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       int nargs = bifaddr->nargs;
       gcc_assert (nargs <= MAX_BUILTIN_ARGS);
 
-      mode[0] = insn_data[bifaddr->icode].operand[0].mode;
+      mode[0] = insn_data[icode].operand[0].mode;
       for (int i = 0; i < nargs; i++)
 	{
 	  arg[i] = CALL_EXPR_ARG (exp, i);
 	  if (arg[i] == error_mark_node)
 	    return const0_rtx;
 	  op[i] = expand_normal (arg[i]);
-	  mode[i+1] = insn_data[bifaddr->icode].operand[i+1].mode;
+	  mode[i+1] = insn_data[icode].operand[i+1].mode;
 	}
 
       /* Check for restricted constant arguments.  */
@@ -12173,17 +12168,13 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  uns_fcode = (size_t)fcode;
 	}
 
-      /* #### Insert more special handling here.  */
-
       if (target == 0
 	  || GET_MODE (target) != mode[0]
-	  || !(*insn_data[bifaddr->icode].operand[0].predicate) (target,
-								 mode[0]))
+	  || !(*insn_data[icode].operand[0].predicate) (target, mode[0]))
 	target = gen_reg_rtx (mode[0]);
 
       for (int i = 0; i < nargs; i++)
-	if (! (*insn_data[bifaddr->icode].operand[i+1].predicate) (op[i],
-								   mode[i+1]))
+	if (! (*insn_data[icode].operand[i+1].predicate) (op[i], mode[i+1]))
 	  op[i] = copy_to_mode_reg (mode[i+1], op[i]);
 
       switch (nargs)
