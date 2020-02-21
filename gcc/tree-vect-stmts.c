@@ -1168,9 +1168,8 @@ vect_get_store_cost (stmt_vec_info stmt_info, int ncopies,
    access scheme chosen.  */
 
 static void
-vect_model_load_cost (stmt_vec_info stmt_info, unsigned ncopies,
+vect_model_load_cost (stmt_vec_info stmt_info, unsigned ncopies, poly_uint64 vf,
 		      vect_memory_access_type memory_access_type,
-		      slp_instance instance,
 		      slp_tree slp_node,
 		      stmt_vector_for_cost *cost_vec)
 {
@@ -1192,10 +1191,7 @@ vect_model_load_cost (stmt_vec_info stmt_info, unsigned ncopies,
       unsigned n_perms;
       unsigned assumed_nunits
 	= vect_nunits_for_cost (STMT_VINFO_VECTYPE (first_stmt_info));
-      unsigned slp_vf = (ncopies * assumed_nunits) / instance->group_size; 
-      vect_transform_slp_perm_load (slp_node, vNULL, NULL,
-				    slp_vf, instance, true,
-				    &n_perms);
+      vect_transform_slp_perm_load (slp_node, vNULL, NULL, vf, true, &n_perms);
       inside_cost += record_stmt_cost (cost_vec, n_perms, vec_perm,
 				       first_stmt_info, 0, vect_body);
       /* And adjust the number of loads performed.  This handles
@@ -8740,8 +8736,8 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 				  memory_access_type, &gs_info, mask);
 
       STMT_VINFO_TYPE (stmt_info) = load_vec_info_type;
-      vect_model_load_cost (stmt_info, ncopies, memory_access_type,
-			    slp_node_instance, slp_node, cost_vec);
+      vect_model_load_cost (stmt_info, ncopies, vf, memory_access_type,
+			    slp_node, cost_vec);
       return true;
     }
 
@@ -9058,7 +9054,7 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	{
 	  unsigned n_perms;
 	  vect_transform_slp_perm_load (slp_node, dr_chain, gsi, vf,
-					slp_node_instance, false, &n_perms);
+					false, &n_perms);
 	}
       return true;
     }
@@ -9108,8 +9104,13 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	     unpermuted sequence.  In other cases we need to load the
 	     whole group, not only the number of vector stmts the
 	     permutation result fits in.  */
+	  /* ???  There is no such thing as a common group size, implement
+	     the stuff below in other ways.  */
+	  unsigned inst_group_size
+	    = SLP_TREE_SCALAR_STMTS
+		(SLP_INSTANCE_TREE (slp_node_instance)).length ();
 	  if (slp_perm
-	      && (group_size != SLP_INSTANCE_GROUP_SIZE (slp_node_instance)
+	      && (group_size != inst_group_size
 		  || !multiple_p (nunits, group_size)))
 	    {
 	      /* We don't yet generate such SLP_TREE_LOAD_PERMUTATIONs for
@@ -9123,7 +9124,7 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	    {
 	      vec_num = SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node);
 	      group_gap_adj
-		= group_size - SLP_INSTANCE_GROUP_SIZE (slp_node_instance);
+		= group_size - inst_group_size;
 	    }
     	}
       else
@@ -9765,8 +9766,7 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
         {
 	  unsigned n_perms;
           if (!vect_transform_slp_perm_load (slp_node, dr_chain, gsi, vf,
-                                             slp_node_instance, false,
-					     &n_perms))
+                                             false, &n_perms))
             {
               dr_chain.release ();
               return false;
