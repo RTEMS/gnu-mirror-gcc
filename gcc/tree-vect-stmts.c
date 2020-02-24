@@ -8681,7 +8681,44 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	}
 
       if (slp && SLP_TREE_LOAD_PERMUTATION (slp_node).exists ())
-	slp_perm = true;
+	{
+	  slp_perm = true;
+
+	  if (!loop_vinfo)
+	    {
+	      /* In BB vectorization we may not actually use a loaded vector
+		 accessing elements in excess of DR_GROUP_SIZE.  */
+	      stmt_vec_info group_info = SLP_TREE_SCALAR_STMTS (slp_node)[0];
+	      group_info = DR_GROUP_FIRST_ELEMENT (group_info);
+	      unsigned HOST_WIDE_INT nunits;
+	      unsigned j, k, maxk = 0;
+	      FOR_EACH_VEC_ELT (SLP_TREE_LOAD_PERMUTATION (slp_node), j, k)
+		if (k > maxk)
+		  maxk = k;
+	      tree vectype = STMT_VINFO_VECTYPE (group_info);
+	      if (!TYPE_VECTOR_SUBPARTS (vectype).is_constant (&nunits)
+		  || maxk >= (DR_GROUP_SIZE (group_info) & ~(nunits - 1)))
+		{
+		  if (dump_enabled_p ())
+		    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				     "BB vectorization with gaps at the end of "
+				     "a load is not supported\n");
+		  return false;
+		}
+	    }
+
+	  auto_vec<tree> tem;
+	  unsigned n_perms;
+	  if (!vect_transform_slp_perm_load (slp_node, tem, NULL, vf,
+					     true, &n_perms))
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION,
+				 vect_location,
+				 "unsupported load permutation\n");
+	      return false;
+	    }
+	}
 
       /* Invalidate assumptions made by dependence analysis when vectorization
 	 on the unrolled body effectively re-orders stmts.  */
@@ -9765,12 +9802,9 @@ vectorizable_load (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
       if (slp_perm)
         {
 	  unsigned n_perms;
-          if (!vect_transform_slp_perm_load (slp_node, dr_chain, gsi, vf,
-                                             false, &n_perms))
-            {
-              dr_chain.release ();
-              return false;
-            }
+	  bool ok = vect_transform_slp_perm_load (slp_node, dr_chain, gsi, vf,
+						  false, &n_perms);
+	  gcc_assert (ok);
         }
       else
         {
