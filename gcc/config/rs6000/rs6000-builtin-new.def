@@ -3,7 +3,7 @@
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
   vuc __builtin_altivec_mask_for_store (long long, void *);
     MASK_FOR_STORE altivec_lvsr_direct {ldstmask}
-  math vf __builtin_altivec_vmaddfp (vf, vf, vf);
+  fpmath vf __builtin_altivec_vmaddfp (vf, vf, vf);
     VMADDFP fmav4sf4 {}
   vss __builtin_altivec_vmhaddshs (vss, vss, vss);
     VMHADDSHS altivec_vmhaddshs {}
@@ -23,7 +23,7 @@
     VMSUMUHS altivec_vmsumuhs {}
   vsi __builtin_altivec_vmsumshs (vss, vss, vsi);
     VMSUMSHS altivec_vmsumshs {}
-  math vf __builtin_altivec_vnmsubfp (vf, vf, vf);
+  fpmath vf __builtin_altivec_vnmsubfp (vf, vf, vf);
     VNMSUBFP nfmsv4sf4 {}
   const vsq __builtin_altivec_vperm_1ti (vsq, vsq, vuc);
     VPERM_1TI altivec_vperm_v1ti {}

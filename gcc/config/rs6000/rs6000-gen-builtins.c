@@ -41,7 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 
      [kind] <return-type> <bif-name> (<argument-list>);
 
-   Here [kind] can be one of "const", "pure", or "math";
+   Here [kind] can be one of "const", "pure", or "fpmath";
    <return-type> is a legal type for a built-in function result;
    <bif-name> is the name by which the function can be called;
    and <argument-list> is a comma-separated list of legal types
@@ -173,14 +173,14 @@ static char *bif_stanzas[MAXBIFSTANZAS];
 static int num_bif_stanzas;
 static int curr_bif_stanza;
 
-/* Function modifiers provide special handling for const, pure, and math
+/* Function modifiers provide special handling for const, pure, and fpmath
    functions.  These are mutually exclusive, and therefore kept separate
    from other bif attributes.  */
 enum fnkinds {
   FNK_NONE,
   FNK_CONST,
   FNK_PURE,
-  FNK_MATH
+  FNK_FPMATH
 };
 
 /* Legal base types for an argument or return type.  */
@@ -1384,8 +1384,8 @@ parse_bif_entry ()
     bifs[curr_bif].kind = FNK_CONST;
   else if (!strcmp (token, "pure"))
     bifs[curr_bif].kind = FNK_PURE;
-  else if (!strcmp (token, "math"))
-    bifs[curr_bif].kind = FNK_MATH;
+  else if (!strcmp (token, "fpmath"))
+    bifs[curr_bif].kind = FNK_FPMATH;
   else
     {
       /* No function modifier, so push the token back.  */
@@ -2118,7 +2118,7 @@ write_init_bif_table ()
 	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
 	}
-      else if (bifs[i].kind == FNK_MATH)
+      else if (bifs[i].kind == FNK_FPMATH)
 	{
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
 	  fprintf (init_file, "      if (flag_rounding_math)\n");
