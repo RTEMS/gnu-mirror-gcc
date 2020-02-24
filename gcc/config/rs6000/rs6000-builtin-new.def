@@ -643,6 +643,12 @@
     ABS_V4SF absv4sf2 {}
   const vsc __builtin_altivec_abs_v16qi (vsc);
     ABS_V16QI absv16qi2 {}
+  const vsi __builtin_altivec_abss_v4si (vsi);
+    ABSS_V4SI altivec_abss_v4si {}
+  const vss __builtin_altivec_abss_v8hi (vss);
+    ABSS_V8HI altivec_abss_v8hi {}
+  const vsc __builtin_altivec_abss_v16qi (vsc);
+    ABSS_V16QI altivec_abss_v16qi {}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
@@ -727,6 +733,8 @@
     VXOR_V2DI xorv2di3 {}
   const vd __builtin_altivec_vxor_v2df (vd, vd);
     VXOR_V2DF xorv2df3 {}
+  const vsll __builtin_altivec_nabs_v2di (vsll);
+    NABS_V2DI nabsv2di2 {}
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
