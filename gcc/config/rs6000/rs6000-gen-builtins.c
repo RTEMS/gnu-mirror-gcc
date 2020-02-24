@@ -196,12 +196,12 @@ enum basetype {
 };
 
 /* Ways in which a const int value can be restricted.  RES_BITS indicates
-   that the integer is restricted to val1 bits, interpreted as signed or
-   unsigned depending on whether the type is signed or unsigned.  RES_RANGE
-   indicates that the integer is restricted to values between val1 and val2,
-   inclusive.  RES_VAR_RANGE is like RES_RANGE, but the argument may be
-   variable, so it can only be checked if it is constant.  RES_VALUES
-   indicates that the integer must have one of the values val1 or val2.  */
+   that the integer is restricted to val1 bits, interpreted as an unsigned
+   number.  RES_RANGE indicates that the integer is restricted to values
+   between val1 and val2, inclusive.  RES_VAR_RANGE is like RES_RANGE, but
+   the argument may be variable, so it can only be checked if it is constant.
+   RES_VALUES indicates that the integer must have one of the values val1
+   or val2.  */
 enum restriction {
   RES_NONE,
   RES_BITS,
@@ -539,8 +539,7 @@ match_basetype (typeinfo *typedata)
 /* A const int argument may be restricted to certain values.  This is
    indicated by one of the following occurring after the "int' token:
 
-     <x>   restricts the constant to x bits, interpreted as signed or
-	   unsigned according to the argument type
+     <x>   restricts the constant to x bits, interpreted as unsigned
      <x,y> restricts the constant to the inclusive range [x,y]
      [x,y] restricts the constant to the inclusive range [x,y],
 	   but only applies if the argument is constant.
@@ -975,7 +974,7 @@ parse_bif_args (prototype *protoptr)
 		(*diag) ("More than one restricted operand\n");
 		return 0;
 	      }
-	    *restr_opnd = *nargs;
+	    *restr_opnd = *nargs + 1;
 	    *restr = argtype->restr;
 	    *val1 = argtype->val1;
 	    *val2 = argtype->val2;

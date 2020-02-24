@@ -649,6 +649,38 @@
     ABSS_V8HI altivec_abss_v8hi {}
   const vsc __builtin_altivec_abss_v16qi (vsc);
     ABSS_V16QI altivec_abss_v16qi {}
+  const vsi __builtin_altivec_nabs_v4si (vsi);
+    NABS_V4SI nabsv4si2 {}
+  const vss __builtin_altivec_nabs_v8hi (vss);
+    NABS_V8HI nabsv8hi2 {}
+  const vsc __builtin_altivec_nabs_v16qi (vsc);
+    NABS_V16QI nabsv16qi2 {}
+  const vf __builtin_altivec_nabs_v4sf (vf);
+    NABS_V4SF vsx_nabsv4sf2 {}
+  fpmath vf __builtin_altivec_vexptefp (vf);
+    VEXPTEFP altivec_vexptefp {}
+  fpmath vf __builtin_altivec_vlogefp (vf);
+    VLOGEFP altivec_vlogefp {}
+  fpmath vf __builtin_altivec_vrefp (vf);
+    VREFP rev4sf2 {}
+  fpmath vf __builtin_altivec_vrfim (vf);
+    VRFIM vector_floorv4sf2 {}
+  fpmath vf __builtin_altivec_vrfin (vf);
+    VRFIN altivec_vrfin {}
+  fpmath vf __builtin_altivec_vrfip (vf);
+    VRFIP vector_ceilv4sf2 {}
+  fpmath vf __builtin_altivec_vrfiz (vf);
+    VRFIZ vector_btruncv4sf2 {}
+  fpmath vf __builtin_altivec_vrsqrtfp (vf);
+    VRSQRTFP rsqrtv4sf2 {}
+  fpmath vf __builtin_altivec_vrsqrtefp (vf);
+    VRSQRTEFP rsqrtev4sf2 {}
+  const vsc __builtin_altivec_vspltisb (const int<-16,15>);
+    VSPLTISB altivec_vspltisb {}
+  const vss __builtin_altivec_vspltish (const int<-16,15>);
+    VSPLTISH altivec_vspltish {}
+  const vsi __builtin_altivec_vspltisw (const int<-16,15>);
+    VSPLTISW altivec_vspltisw {}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
@@ -735,6 +767,8 @@
     VXOR_V2DF xorv2df3 {}
   const vsll __builtin_altivec_nabs_v2di (vsll);
     NABS_V2DI nabsv2di2 {}
+  const vd __builtin_altivec_nabs_v2df (vd);
+    NABS_V2DF vsx_nabsv2df2 {}
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
