@@ -797,6 +797,26 @@
     LVSL altivec_lvsl {ldvec}
   pure vuc __builtin_altivec_lvsl (signed long long, signed char *);
     LVSL_S altivec_lvsl {ldvec}
+  pure vuc __builtin_altivec_lvsr (signed long long, unsigned char *);
+    LVSR altivec_lvsr {ldvec}
+  pure vuc __builtin_altivec_lvsr (signed long long, signed char *);
+    LVSR_S altivec_lvsr {ldvec}
+  pure vsc __builtin_altivec_lvebx (signed long long, signed char *);
+    LVEBX altivec_lvebx {ldvec}
+  pure vuc __builtin_altivec_lvebx (signed long long, unsigned char *);
+    LVEBX_U altivec_lvebx {ldvec}
+  pure vss __builtin_altivec_lvehx (signed long long, signed short *);
+    LVEHX altivec_lvehx {ldvec}
+  pure vus __builtin_altivec_lvehx (signed long long, unsigned short *);
+    LVEHX_U altivec_lvehx {ldvec}
+  pure vf __builtin_altivec_lvewx (signed long long, float *);
+    LVEWX_F altivec_lvewx {ldvec}
+  pure vsi __builtin_altivec_lvewx (signed long long, signed int *);
+    LVEWX altivec_lvewx {ldvec}
+  pure vui __builtin_altivec_lvewx (signed long long, unsigned int *);
+    LVEWX_U altivec_lvewx {ldvec}
+  pure vsi __builtin_altivec_lvxl (signed long long, signed int *);
+    LVXL altivec_lvxl_v4si {ldvec}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
@@ -893,6 +913,20 @@
     VREVE_V2DI_U altivec_vrevev2di2 {}
   const vd __builtin_altivec_vreve_v2df (vd);
     VREVE_V2DF altivec_vrevev2df2 {}
+  pure vd __builtin_altivec_lvxl_v2df (signed long long, vd *);
+    LVXL_V2DF altivec_lvxl_v2df {ldvec}
+  pure vd __builtin_altivec_lvxl_v2df (signed long long, double *);
+    LVXL_V2DF_D altivec_lvxl_v2df {ldvec}
+  pure vsll __builtin_altivec_lvxl_v2di (signed long long, vsll *);
+    LVXL_V2DI_VSLL altivec_lvxl_v2di {ldvec}
+  pure vsll __builtin_altivec_lvxl_v2di (signed long long, signed long long *);
+    LVXL_V2DI_SLL altivec_lvxl_v2di {ldvec}
+  pure vull __builtin_altivec_lvxl_v2di (signed long long, vull *);
+    LVXL_V2DI_VULL altivec_lvxl_v2di {ldvec}
+  pure vull __builtin_altivec_lvxl_v2di (signed long long, unsigned long long *);
+    LVXL_V2DI_ULL altivec_lvxl_v2di {ldvec}
+  pure vbll __builtin_altivec_lvxl_v2di (signed long long, vbll *);
+    LVXL_V2DI_VBLL altivec_lvxl_v2di {ldvec}
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);

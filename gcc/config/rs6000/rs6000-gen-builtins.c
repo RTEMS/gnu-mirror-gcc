@@ -487,6 +487,17 @@ match_integer ()
   return x;
 }
 
+static inline void
+handle_pointer (typeinfo *typedata)
+{
+  consume_whitespace ();
+  if (linebuf[pos] == '*')
+    {
+      typedata->ispointer = 1;
+      safe_inc_pos ();
+    }
+}
+
 /* Match one of the allowable base types.  Consumes one token unless the
    token is "long", which must be paired with a second "long".  Optionally
    consumes a following '*' token for pointers.  Return 1 for success,
@@ -534,13 +545,7 @@ match_basetype (typeinfo *typedata)
       return 0;
     }
 
-  consume_whitespace ();
-  if (linebuf[pos] == '*')
-    {
-      typedata->ispointer = 1;
-      safe_inc_pos ();
-    }
-
+  handle_pointer (typedata);
   return 1;
 }
 
@@ -730,8 +735,8 @@ match_type (typeinfo *typedata, int voidok)
      We don't support a <basetype> of "bool", "long double", or "_Float16",
      but will add these if builtins require it.  "signed" and "unsigned"
      only apply to integral base types.  The optional * indicates a pointer
-     type, which can be used with any scalar base type, but is treated for
-     type signature purposes as a pointer to void.  */
+     type, which can be used with any base type, but is treated for type
+     signature purposes as a pointer to void.  */
 
   consume_whitespace ();
   memset (typedata, 0, sizeof(*typedata));
@@ -750,6 +755,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->issigned = 1;
       typedata->base = BT_CHAR;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vuc"))
@@ -757,6 +763,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isunsigned = 1;
       typedata->base = BT_CHAR;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vbc"))
@@ -764,6 +771,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isbool = 1;
       typedata->base = BT_CHAR;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vss"))
@@ -771,6 +779,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->issigned = 1;
       typedata->base = BT_SHORT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vus"))
@@ -778,6 +787,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isunsigned = 1;
       typedata->base = BT_SHORT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vbs"))
@@ -785,6 +795,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isbool = 1;
       typedata->base = BT_SHORT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vsi"))
@@ -792,6 +803,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->issigned = 1;
       typedata->base = BT_INT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vui"))
@@ -799,6 +811,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isunsigned = 1;
       typedata->base = BT_INT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vbi"))
@@ -806,6 +819,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isbool = 1;
       typedata->base = BT_INT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vsll"))
@@ -813,6 +827,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->issigned = 1;
       typedata->base = BT_LONGLONG;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vull"))
@@ -820,6 +835,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isunsigned = 1;
       typedata->base = BT_LONGLONG;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vbll"))
@@ -827,6 +843,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isbool = 1;
       typedata->base = BT_LONGLONG;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vsq"))
@@ -834,6 +851,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->issigned = 1;
       typedata->base = BT_INT128;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vuq"))
@@ -841,6 +859,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isunsigned = 1;
       typedata->base = BT_INT128;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vbq"))
@@ -848,6 +867,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->isbool = 1;
       typedata->base = BT_INT128;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vp"))
@@ -855,18 +875,21 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->ispixel = 1;
       typedata->base = BT_SHORT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vf"))
     {
       typedata->isvector = 1;
       typedata->base = BT_FLOAT;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "vd"))
     {
       typedata->isvector = 1;
       typedata->base = BT_DOUBLE;
+      handle_pointer (typedata);
       return 1;
     }
   else if (!strcmp (token, "signed"))
