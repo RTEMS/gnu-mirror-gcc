@@ -488,8 +488,9 @@ match_integer ()
 }
 
 /* Match one of the allowable base types.  Consumes one token unless the
-   token is "long", which must be paired with a second "long".  Return 1
-   for success, 0 for failure.  */
+   token is "long", which must be paired with a second "long".  Optionally
+   consumes a following '*' token for pointers.  Return 1 for success,
+   0 for failure.  */
 static int
 match_basetype (typeinfo *typedata)
 {
@@ -531,6 +532,13 @@ match_basetype (typeinfo *typedata)
     {
       (*diag) ("unrecognized base type at column %d\n", oldpos + 1);
       return 0;
+    }
+
+  consume_whitespace ();
+  if (linebuf[pos] == '*')
+    {
+      typedata->ispointer = 1;
+      safe_inc_pos ();
     }
 
   return 1;
@@ -722,7 +730,8 @@ match_type (typeinfo *typedata, int voidok)
      We don't support a <basetype> of "bool", "long double", or "_Float16",
      but will add these if builtins require it.  "signed" and "unsigned"
      only apply to integral base types.  The optional * indicates a pointer
-     type, and can currently only be used with void.  */
+     type, which can be used with any scalar base type, but is treated for
+     type signature purposes as a pointer to void.  */
 
   consume_whitespace ();
   memset (typedata, 0, sizeof(*typedata));
@@ -1259,17 +1268,20 @@ construct_fntype_id (prototype *protoptr)
 	{
 	  assert (argptr);
 	  buf[bufi++] = '_';
-	  if (argptr->info.isunsigned)
-	    buf[bufi++] = 'u';
 	  if (argptr->info.ispointer)
 	    {
 	      buf[bufi++] = 'p';
 	      buf[bufi++] = 'v';
 	    }
-	  else if (argptr->info.isvector)
-	    complete_vector_type (&argptr->info, buf, &bufi);
 	  else
-	    complete_base_type (&argptr->info, buf, &bufi);
+	    {
+	      if (argptr->info.isunsigned)
+		buf[bufi++] = 'u';
+	      if (argptr->info.isvector)
+		complete_vector_type (&argptr->info, buf, &bufi);
+	      else
+		complete_base_type (&argptr->info, buf, &bufi);
+	    }
 	  argptr = argptr->next;
 	}
       assert (!argptr);
