@@ -3419,6 +3419,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { ALTIVEC_BUILTIN_VEC_ST, ALTIVEC_BUILTIN_STVX_V2DI,
     RS6000_BTI_void, RS6000_BTI_bool_V2DI, RS6000_BTI_INTSI,
     ~RS6000_BTI_long_long },
+  /* Next 1 deprecated, not in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_ST, ALTIVEC_BUILTIN_STVX_V2DI,
     RS6000_BTI_void, RS6000_BTI_bool_V2DI, RS6000_BTI_INTSI,
     ~RS6000_BTI_unsigned_long_long },

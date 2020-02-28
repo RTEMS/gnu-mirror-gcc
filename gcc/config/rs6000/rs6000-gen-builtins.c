@@ -119,10 +119,8 @@ along with GCC; see the file COPYING3.  If not see
 
   Blank lines may be used as desired in these files between the lines as
   defined above; that is, you can introduce as many extra newlines as you
-  like after a required newline, but nowhere else.  If it's desirable,
-  C-style comments are allowable provided that the file is run through
-  the preprocessor by the build system prior to feeding it to this
-  program.  This is not yet implemented.  */
+  like after a required newline, but nowhere else.  Lines beginning with
+  a semicolon are also treated as blank lines.  */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -407,7 +405,7 @@ consume_whitespace ()
   return;
 }
 
-/* Get the next nonblank line, returning 0 on EOF, 1 otherwise.  */
+/* Get the next nonblank, noncomment line, returning 0 on EOF, 1 otherwise.  */
 static int
 advance_line (FILE *file)
 {
@@ -419,7 +417,7 @@ advance_line (FILE *file)
       line++;
       pos = 0;
       consume_whitespace ();
-      if (linebuf[pos] != '\n')
+      if (linebuf[pos] != '\n' && linebuf[pos] != ';')
 	return 1;
     }
 }
