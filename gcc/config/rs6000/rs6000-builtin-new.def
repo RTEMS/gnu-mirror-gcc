@@ -1141,6 +1141,188 @@
     STVXL_V4SI_BUI altivec_stvxl_v4si {stvec}
   void __builtin_altivec_stvxl_v4si (vbi, signed long long, signed int *);
     STVXL_V4SI_BSI altivec_stvxl_v4si {stvec}
+  void __builtin_altivec_stvxl_v8hi (vss, signed long long, vss *);
+    STVXL_V8HI_VSS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vss, signed long long, signed short *);
+    STVXL_V8HI_SS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vus, signed long long, vus *);
+    STVXL_V8HI_VUS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vus, signed long long, unsigned short *);
+    STVXL_V8HI_US altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vbs, signed long long, vbs *);
+    STVXL_V8HI_VBS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vbs, signed long long, unsigned short *);
+    STVXL_V8HI_BUS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vbs, signed long long, signed short *);
+    STVXL_V8HI_BSS altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v8hi (vp, signed long long, vp *);
+    STVXL_V8HI_VP altivec_stvxl_v8hi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vsc, signed long long, vsc *);
+    STVXL_V16QI_VSC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vsc, signed long long, signed char *);
+    STVXL_V16QI_SC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vuc, signed long long, vuc *);
+    STVXL_V16QI_VUC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vuc, signed long long, unsigned char *);
+    STVXL_V16QI_UC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vbc, signed long long, vbc *);
+    STVXL_V16QI_VBC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vbc, signed long long, unsigned char *);
+    STVXL_V16QI_BUC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvxl_v16qi (vbc, signed long long, signed char *);
+    STVXL_V16QI_BSC altivec_stvxl_v16qi {stvec}
+  void __builtin_altivec_stvlx (vf, signed long long, vf *);
+    STVLX_VF altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vf, signed long long, float *);
+    STVLX_F altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vbi, signed long long, vbi *);
+    STVLX_VBI altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vsi, signed long long, vsi *);
+    STVLX_VSI altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vsi, signed long long, signed int *);
+    STVLX_SI altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vui, signed long long, vui *);
+    STVLX_VUI altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vui, signed long long, unsigned int *);
+    STVLX_UI altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vbs, signed long long, vbs *);
+    STVLX_VBS altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vp, signed long long, vp *);
+    STVLX_VP altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vss, signed long long, vss *);
+    STVLX_VSS altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vss, signed long long, signed short *);
+    STVLX_SS altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vus, signed long long, vus *);
+    STVLX_VUS altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vus, signed long long, unsigned short *);
+    STVLX_US altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vbc, signed long long, vbc *);
+    STVLX_VBC altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vsc, signed long long, vsc *);
+    STVLX_VSC altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vsc, signed long long, signed char *);
+    STVLX_SC altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vuc, signed long long, vuc *);
+    STVLX_VUC altivec_stvlx {stvec}
+  void __builtin_altivec_stvlx (vuc, signed long long, unsigned char *);
+    STVLX_UC altivec_stvlx {stvec}
+  void __builtin_altivec_stvlxl (vf, signed long long, vf *);
+    STVLXL_VF altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vf, signed long long, float *);
+    STVLXL_F altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vbi, signed long long, vbi *);
+    STVLXL_VBI altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vsi, signed long long, vsi *);
+    STVLXL_VSI altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vsi, signed long long, signed int *);
+    STVLXL_SI altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vui, signed long long, vui *);
+    STVLXL_VUI altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vui, signed long long, unsigned int *);
+    STVLXL_UI altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vbs, signed long long, vbs *);
+    STVLXL_VBS altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vp, signed long long, vp *);
+    STVLXL_VP altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vss, signed long long, vss *);
+    STVLXL_VSS altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vss, signed long long, signed short *);
+    STVLXL_SS altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vus, signed long long, vus *);
+    STVLXL_VUS altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vus, signed long long, unsigned short *);
+    STVLXL_US altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vbc, signed long long, vbc *);
+    STVLXL_VBC altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vsc, signed long long, vsc *);
+    STVLXL_VSC altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vsc, signed long long, signed char *);
+    STVLXL_SC altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vuc, signed long long, vuc *);
+    STVLXL_VUC altivec_stvlxl {stvec}
+  void __builtin_altivec_stvlxl (vuc, signed long long, unsigned char *);
+    STVLXL_UC altivec_stvlxl {stvec}
+  void __builtin_altivec_stvrx (vf, signed long long, vf *);
+    STVRX_VF altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vf, signed long long, float *);
+    STVRX_F altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vbi, signed long long, vbi *);
+    STVRX_VBI altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vsi, signed long long, vsi *);
+    STVRX_VSI altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vsi, signed long long, signed int *);
+    STVRX_SI altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vui, signed long long, vui *);
+    STVRX_VUI altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vui, signed long long, unsigned int *);
+    STVRX_UI altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vbs, signed long long, vbs *);
+    STVRX_VBS altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vp, signed long long, vp *);
+    STVRX_VP altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vss, signed long long, vss *);
+    STVRX_VSS altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vss, signed long long, signed short *);
+    STVRX_SS altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vus, signed long long, vus *);
+    STVRX_VUS altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vus, signed long long, unsigned short *);
+    STVRX_US altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vbc, signed long long, vbc *);
+    STVRX_VBC altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vsc, signed long long, vsc *);
+    STVRX_VSC altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vsc, signed long long, signed char *);
+    STVRX_SC altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vuc, signed long long, vuc *);
+    STVRX_VUC altivec_stvrx {stvec}
+  void __builtin_altivec_stvrx (vuc, signed long long, unsigned char *);
+    STVRX_UC altivec_stvrx {stvec}
+  void __builtin_altivec_stvrxl (vf, signed long long, vf *);
+    STVRXL_VF altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vf, signed long long, float *);
+    STVRXL_F altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vbi, signed long long, vbi *);
+    STVRXL_VBI altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vsi, signed long long, vsi *);
+    STVRXL_VSI altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vsi, signed long long, signed int *);
+    STVRXL_SI altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vui, signed long long, vui *);
+    STVRXL_VUI altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vui, signed long long, unsigned int *);
+    STVRXL_UI altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vbs, signed long long, vbs *);
+    STVRXL_VBS altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vp, signed long long, vp *);
+    STVRXL_VP altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vss, signed long long, vss *);
+    STVRXL_VSS altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vss, signed long long, signed short *);
+    STVRXL_SS altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vus, signed long long, vus *);
+    STVRXL_VUS altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vus, signed long long, unsigned short *);
+    STVRXL_US altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vbc, signed long long, vbc *);
+    STVRXL_VBC altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vsc, signed long long, vsc *);
+    STVRXL_VSC altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vsc, signed long long, signed char *);
+    STVRXL_SC altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vuc, signed long long, vuc *);
+    STVRXL_VUC altivec_stvrxl {stvec}
+  void __builtin_altivec_stvrxl (vuc, signed long long, unsigned char *);
+    STVRXL_UC altivec_stvrxl {stvec}
+  vsi __builtin_vec_init_v4si (signed int, signed int, signed int, signed int);
+    VEC_INIT_V4SI nothing {init}
+  vss __builtin_vec_init_v8hi (signed short, signed short, signed short, signed short, signed short, signed short, signed short, signed short);
+    VEC_INIT_V8HI nothing {init}
+  vsc __builtin_vec_init_v16qi (signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char);
+    VEC_INIT_V16QI nothing {init}
+  vf __builtin_vec_init_v4sf (float, float, float, float);
+    VEC_INIT_V4SF nothing {init}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
