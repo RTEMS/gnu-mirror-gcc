@@ -9208,8 +9208,10 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
 	  tree t1 = make_tree (type, op1);
 	  tree comparison = build2 (code == MIN_EXPR ? LE_EXPR : GE_EXPR,
 				    type, t0, t1);
-	  return expand_vec_cond_expr (type, comparison, t0, t1,
+	  temp = expand_vec_cond_expr (type, comparison, t0, t1,
 				       original_target);
+	  gcc_assert (temp);
+	  return temp;
 	}
 
       /* At this point, a MEM target is no longer useful; we will get better
@@ -9801,6 +9803,7 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
 
     case VEC_COND_EXPR:
       target = expand_vec_cond_expr (type, treeop0, treeop1, treeop2, target);
+      gcc_assert (target);
       return target;
 
     case VEC_DUPLICATE_EXPR:
@@ -12145,8 +12148,10 @@ do_store_flag (sepops ops, rtx target, machine_mode mode)
 	{
 	  tree if_true = constant_boolean_node (true, ops->type);
 	  tree if_false = constant_boolean_node (false, ops->type);
-	  return expand_vec_cond_expr (ops->type, ifexp, if_true,
-				       if_false, target);
+	  rtx temp = expand_vec_cond_expr (ops->type, ifexp, if_true,
+					   if_false, target);
+	  gcc_assert (temp);
+	  return temp;
 	}
     }
 
