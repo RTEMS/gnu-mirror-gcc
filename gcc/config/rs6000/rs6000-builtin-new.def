@@ -1539,17 +1539,41 @@
   void __builtin_altivec_stvrxl (vuc, signed long long, unsigned char *);
     STVRXL_UC altivec_stvrxl {stvec}
 
-  vsi __builtin_vec_init_v4si (signed int, signed int, signed int, signed int);
+  const vsi __builtin_vec_init_v4si (signed int, signed int, signed int, signed int);
     VEC_INIT_V4SI nothing {init}
 
-  vss __builtin_vec_init_v8hi (signed short, signed short, signed short, signed short, signed short, signed short, signed short, signed short);
+  const vss __builtin_vec_init_v8hi (signed short, signed short, signed short, signed short, signed short, signed short, signed short, signed short);
     VEC_INIT_V8HI nothing {init}
 
-  vsc __builtin_vec_init_v16qi (signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char);
+  const vsc __builtin_vec_init_v16qi (signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char, signed char);
     VEC_INIT_V16QI nothing {init}
 
-  vf __builtin_vec_init_v4sf (float, float, float, float);
+  const vf __builtin_vec_init_v4sf (float, float, float, float);
     VEC_INIT_V4SF nothing {init}
+
+  const vsi __builtin_vec_set_v4si (vsi, signed int, signed int);
+    VEC_SET_V4SI nothing {set}
+
+  const vss __builtin_vec_set_v8hi (vss, signed short, signed int);
+    VEC_SET_V8HI nothing {set}
+
+  const vsc __builtin_vec_set_v16qi (vsc, signed char, signed int);
+    VEC_SET_V16QI nothing {set}
+
+  const vf __builtin_vec_set_v4sf (vf, float, signed int);
+    VEC_SET_V4SF nothing {set}
+
+  const signed int __builtin_vec_ext_v4si (vsi, signed int);
+    VEC_EXT_V4SI nothing {extract}
+
+  const signed short __builtin_vec_ext_v8hi (vss, signed int);
+    VEC_EXT_V8HI nothing {extract}
+
+  const signed char __builtin_vec_ext_v16qi (vsc, signed int);
+    VEC_EXT_V16QI nothing {extract}
+
+  const float __builtin_vec_ext_v4sf (vf, signed int);
+    VEC_EXT_V4SF nothing {extract}
 
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
@@ -1739,6 +1763,9 @@
     STVXL_V2DI_VULL altivec_stvxl_v2di {stvec}
   void __builtin_altivec_stvxl_v2di (vbll, signed long long, vbll *);
     STVXL_V2DI_VBLL altivec_stvxl_v2di {stvec}
+
+  const vf __builtin_vsx_xvmaddsp (vf, vf, vf);
+    XVMADDSP fmav4sf4 {}
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
