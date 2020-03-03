@@ -1567,16 +1567,16 @@
   const vf __builtin_vec_init_v4sf (float, float, float, float);
     VEC_INIT_V4SF nothing {init}
 
-  const vsi __builtin_vec_set_v4si (vsi, signed int, signed int);
+  const vsi __builtin_vec_set_v4si (vsi, signed int, const int<2>);
     VEC_SET_V4SI nothing {set}
 
-  const vss __builtin_vec_set_v8hi (vss, signed short, signed int);
+  const vss __builtin_vec_set_v8hi (vss, signed short, const int<3>);
     VEC_SET_V8HI nothing {set}
 
-  const vsc __builtin_vec_set_v16qi (vsc, signed char, signed int);
+  const vsc __builtin_vec_set_v16qi (vsc, signed char, const int<4>);
     VEC_SET_V16QI nothing {set}
 
-  const vf __builtin_vec_set_v4sf (vf, float, signed int);
+  const vf __builtin_vec_set_v4sf (vf, float, const int<2>);
     VEC_SET_V4SF nothing {set}
 
   const signed int __builtin_vec_ext_v4si (vsi, signed int);
@@ -1841,6 +1841,49 @@
   const vuc __builtin_vsx_xxsel_16qi_uns (vuc, vuc, vuc);
     XXSEL_16QI_UNS vector_select_v16qi_uns {}
 
+  const vsq __builtin_vsx_xxpermdi_1ti (vsq, vsq, const int<1>);
+    XXPERMDI_1TI_S vsx_xxpermdi_v1ti {}
+  const vuq __builtin_vsx_xxpermdi_1ti (vuq, vuq, const int<1>);
+    XXPERMDI_1TI_U vsx_xxpermdi_v1ti {}
+
+  const vd __builtin_vsx_xxpermdi_2df (vd, vd, const int<1>);
+    XXPERMDI_2DF vsx_xxpermdi_v2df {}
+
+  const vsll __builtin_vsx_xxpermdi_2di (vsll, vsll, const int<1>);
+    XXPERMDI_2DI_S vsx_xxpermdi_v2di {}
+  const vull __builtin_vsx_xxpermdi_2di (vull, vull, const int<1>);
+    XXPERMDI_2DI_U vsx_xxpermdi_v2di {}
+
+  const vf __builtin_vsx_xxpermdi_4sf (vf, vf, const int<1>);
+    XXPERMDI_4SF vsx_xxpermdi_v4sf {}
+
+  const vsi __builtin_vsx_xxpermdi_4si (vsi, vsi, const int<1>);
+    XXPERMDI_4SI_S vsx_xxpermdi_v4si {}
+  const vui __builtin_vsx_xxpermdi_4si (vui, vui, const int<1>);
+    XXPERMDI_4SI_U vsx_xxpermdi_v4si {}
+
+  const vss __builtin_vsx_xxpermdi_8hi (vss, vss, const int<1>);
+    XXPERMDI_8HI_S vsx_xxpermdi_v8hi {}
+  const vus __builtin_vsx_xxpermdi_8hi (vus, vus, const int<1>);
+    XXPERMDI_8HI_U vsx_xxpermdi_v8hi {}
+
+  const vsc __builtin_vsx_xxpermdi_16qi (vsc, vsc, const int<1>);
+    XXPERMDI_16QI_S vsx_xxpermdi_v16qi {}
+  const vuc __builtin_vsx_xxpermdi_16qi (vuc, vuc, const int<1>);
+    XXPERMDI_16QI_U vsx_xxpermdi_v16qi {}
+
+  const vsq __builtin_vsx_set_1ti (vsq, signed __int128, const int<0,0>);
+    SET_1TI_S vsx_set_v1ti {set}
+  const vuq __builtin_vsx_set_1ti (vuq, unsigned __int128, const int<0,0>);
+    SET_1TI_U vsx_set_v1ti {set}
+
+  const vd __builtin_vsx_set_2df (vd, double, const int<0,1>);
+    SET_2DF vsx_set_v2df {set}
+
+  const vsll __builtin_vsx_set_2di (vsll, signed long long, const int<0,1>);
+    SET_2DI_S vsx_set_v2di {set}
+  const vull __builtin_vsx_set_2di (vull, unsigned long long, const int<0,1>);
+    SET_2DI_U vsx_set_v2di {set}
 
 
 [MASK_P8_VECTOR]
