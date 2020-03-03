@@ -129,6 +129,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 #include "rbtree.h"
 
 /* Used as a sentinel for range constraints on integer fields.  No field can
@@ -2310,6 +2311,22 @@ write_defines_file ()
   return 1;
 }
 
+/* Close and delete output files after any failure, so that subsequent
+   build dependencies will fail.  */
+static void
+delete_output_files ()
+{
+  /* Depending on whence we're called, some of these may already be
+     closed.  Don't check for errors.  */
+  fclose (header_file);
+  fclose (init_file);
+  fclose (defines_file);
+
+  unlink (header_path);
+  unlink (init_path);
+  unlink (defines_path);
+}
+
 /* Main program to convert flat files into built-in initialization code.  */
 int
 main (int argc, const char **argv)
@@ -2383,6 +2400,7 @@ main (int argc, const char **argv)
   if (parse_bif () != 1)
     {
       fprintf (stderr, "Parsing of '%s' failed, aborting.\n", bif_path);
+      delete_output_files ();
       exit (EC_PARSEBIF);
     }
   fclose (bif_file);
@@ -2400,6 +2418,7 @@ main (int argc, const char **argv)
   if (parse_ovld () != 1)
     {
       fprintf (stderr, "Parsing of '%s' failed, aborting.\n", ovld_path);
+      delete_output_files ();
       exit (EC_PARSEOVLD);
     }
   fclose (ovld_file);
@@ -2414,12 +2433,14 @@ main (int argc, const char **argv)
   if (!write_header_file ())
     {
       fprintf (stderr, "Output to '%s' failed, aborting.\n", header_path);
+      delete_output_files ();
       exit (EC_WRITEHDR);
     }
   fclose (header_file);
   if (!write_init_file ())
     {
       fprintf (stderr, "Output to '%s' failed, aborting.\n", init_path);
+      delete_output_files ();
       exit (EC_WRITEINIT);
     }
   fclose (init_file);
@@ -2428,6 +2449,7 @@ main (int argc, const char **argv)
   if (!write_defines_file ())
     {
       fprintf (stderr, "Output to '%s' failed, aborting.\n", defines_path);
+      delete_output_files ();
       exit (EC_WRITEDEFINES);
     }
   fclose (defines_file);
