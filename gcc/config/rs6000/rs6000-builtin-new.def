@@ -40,20 +40,28 @@
 
   const vsq __builtin_altivec_vperm_1ti (vsq, vsq, vuc);
     VPERM_1TI altivec_vperm_v1ti {}
+
   const vf __builtin_altivec_vperm_4sf (vf, vf, vuc);
     VPERM_4SF altivec_vperm_v4sf {}
+
   const vsi __builtin_altivec_vperm_4si (vsi, vsi, vuc);
     VPERM_4SI altivec_vperm_v4si {}
+
   const vss __builtin_altivec_vperm_8hi (vss, vss, vuc);
     VPERM_8HI altivec_vperm_v8hi {}
+
   const vsc __builtin_altivec_vperm_16qi (vsc, vsc, vuc);
     VPERM_16QI altivec_vperm_v16qi {}
+
   const vuq __builtin_altivec_vperm_1ti_uns (vuq, vuq, vuc);
     VPERM_1TI_UNS altivec_vperm_v1ti_uns {}
+
   const vui __builtin_altivec_vperm_4si_uns (vui, vui, vuc);
     VPERM_4SI_UNS altivec_vperm_v4si_uns {}
+
   const vus __builtin_altivec_vperm_8hi_uns (vus, vus, vuc);
     VPERM_8HI_UNS altivec_vperm_v8hi_uns {}
+
   const vuc __builtin_altivec_vperm_16qi_uns (vuc, vuc, vuc);
     VPERM_16QI_UNS altivec_vperm_v16qi_uns {}
 
@@ -61,6 +69,7 @@
     VSEL_4SF_B vector_select_v4sf {}
   const vf __builtin_altivec_vsel_4sf (vf, vf, vui);
     VSEL_4SF_U vector_select_v4sf {}
+
   const vsi __builtin_altivec_vsel_4si (vsi, vsi, vbi);
     VSEL_4SI_B vector_select_v4si {}
   const vsi __builtin_altivec_vsel_4si (vsi, vsi, vui);
@@ -73,6 +82,7 @@
     VSEL_4SI_BB vector_select_v4si {}
   const vbi __builtin_altivec_vsel_4si (vbi, vbi, vui);
     VSEL_4SI_BU vector_select_v4si {}
+
   const vss __builtin_altivec_vsel_8hi (vss, vss, vbs);
     VSEL_8HI_B vector_select_v8hi {}
   const vss __builtin_altivec_vsel_8hi (vss, vss, vus);
@@ -85,6 +95,7 @@
     VSEL_8HI_BB vector_select_v8hi {}
   const vbs __builtin_altivec_vsel_8hi (vbs, vbs, vus);
     VSEL_8HI_BU vector_select_v8hi {}
+
   const vsc __builtin_altivec_vsel_16qi (vsc, vsc, vbc);
     VSEL_16QI_B vector_select_v16qi {}
   const vsc __builtin_altivec_vsel_16qi (vsc, vsc, vuc);
@@ -97,14 +108,19 @@
     VSEL_16QI_BB vector_select_v16qi {}
   const vbc __builtin_altivec_vsel_16qi (vbc, vbc, vuc);
     VSEL_16QI_BU vector_select_v16qi {}
+
   const vsq __builtin_altivec_vsel_1ti (vsq, vsq, vuq);
     VSEL_1TI vector_select_v1ti {}
+
   const vui __builtin_altivec_vsel_4si_uns (vui, vui, vui);
     VSEL_4SI_UNS vector_select_v4si_uns {}
+
   const vus __builtin_altivec_vsel_8hi_uns (vus, vus, vus);
     VSEL_8HI_UNS vector_select_v8hi_uns {}
+
   const vuc __builtin_altivec_vsel_16qi_uns (vuc, vuc, vuc);
     VSEL_16QI_UNS vector_select_v16qi_uns {}
+
   const vuq __builtin_altivec_vsel_1ti_uns (vuq, vuq, vuq);
     VSEL_1TI_UNS vector_select_v1ti_uns {}
 
@@ -1575,6 +1591,7 @@
   const float __builtin_vec_ext_v4sf (vf, signed int);
     VEC_EXT_V4SF nothing {extract}
 
+
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
     VPERM_2DF altivec_vperm_v2df {}
@@ -1766,6 +1783,65 @@
 
   const vf __builtin_vsx_xvmaddsp (vf, vf, vf);
     XVMADDSP fmav4sf4 {}
+
+  const vf __builtin_vsx_xvmsubsp (vf, vf, vf);
+    XVMSUBSP fmsv4sf4 {}
+
+  const vf __builtin_vsx_xvnmaddsp (vf, vf, vf);
+    XVNMADDSP nfmav4sf4 {}
+
+  const vf __builtin_vsx_xvnmsubsp (vf, vf, vf);
+    XVNMSUBSP nfmsv4sf4 {}
+
+  const vd __builtin_vsx_xvmadddp (vd, vd, vd);
+    XVMADDDP fmav2df4 {}
+
+  const vd __builtin_vsx_xvmsubdp (vd, vd, vd);
+    XVMSUBDP fmsv2df4 {}
+
+  const vd __builtin_vsx_xvnmadddp (vd, vd, vd);
+    XVNMADDDP nfmav2df4 {}
+
+  const vd __builtin_vsx_xvnmsubdp (vd, vd, vd);
+    XVNMSUBDP nfmsv2df4 {}
+
+  const vsq __builtin_vsx_xxsel_1ti (vsq, vsq, vsq);
+    XXSEL_1TI vector_select_v1ti {}
+
+  const vsll __builtin_vsx_xxsel_2di (vsll, vsll, vsll);
+    XXSEL_2DI vector_select_v2di {}
+
+  const vd __builtin_vsx_xxsel_2df (vd, vd, vd);
+    XXSEL_2DF vector_select_v2df {}
+
+  const vf __builtin_vsx_xxsel_4sf (vf, vf, vf);
+    XXSEL_4SF vector_select_v4sf {}
+
+  const vsi __builtin_vsx_xxsel_4si (vsi, vsi, vsi);
+    XXSEL_4SI vector_select_v4si {}
+
+  const vss __builtin_vsx_xxsel_8hi (vss, vss, vss);
+    XXSEL_8HI vector_select_v8hi {}
+
+  const vsc __builtin_vsx_xxsel_16qi (vsc, vsc, vsc);
+    XXSEL_16QI vector_select_v16qi {}
+
+  const vuq __builtin_vsx_xxsel_1ti_uns (vuq, vuq, vuq);
+    XXSEL_1TI_UNS vector_select_v1ti_uns {}
+
+  const vull __builtin_vsx_xxsel_2di_uns (vull, vull, vull);
+    XXSEL_2DI_UNS vector_select_v2di_uns {}
+
+  const vui __builtin_vsx_xxsel_4si_uns (vui, vui, vui);
+    XXSEL_4SI_UNS vector_select_v4si_uns {}
+
+  const vus __builtin_vsx_xxsel_8hi_uns (vus, vus, vus);
+    XXSEL_8HI_UNS vector_select_v8hi_uns {}
+
+  const vuc __builtin_vsx_xxsel_16qi_uns (vuc, vuc, vuc);
+    XXSEL_16QI_UNS vector_select_v16qi_uns {}
+
+
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
