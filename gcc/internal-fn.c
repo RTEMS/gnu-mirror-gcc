@@ -2584,6 +2584,44 @@ expand_VEC_CONVERT (internal_fn, gcall *)
   gcc_unreachable ();
 }
 
+// TODO: write comments
+
+static void
+expand_VEC_COND_LT (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_VEC_COND_LE (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_VEC_COND_GT (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_VEC_COND_GE (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_VEC_COND_EQ (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_VEC_COND_NE (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
 /* Expand the IFN_UNIQUE function according to its first argument.  */
 
 static void

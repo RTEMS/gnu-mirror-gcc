@@ -944,7 +944,16 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
     }
 
   if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), TREE_CODE (a)))
-    return;
+    {
+      if (a_is_comparison)
+	{
+	  a = gimplify_build2 (gsi, TREE_CODE (a), TREE_TYPE (a), a1, a2);
+	  gimple_assign_set_rhs1 (stmt, a);
+	  update_stmt (stmt);
+	  return;
+	}
+      gcc_assert (TREE_CODE (a) == SSA_NAME);
+    }
 
   /* Handle vector boolean types with bitmasks.  If there is a comparison
      and we can expand the comparison into the vector boolean bitmask,

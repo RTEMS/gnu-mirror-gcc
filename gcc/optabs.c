@@ -5852,6 +5852,8 @@ expand_vec_cond_expr (tree vec_cond_type, tree op0, tree op1, tree op2,
   tree op0a, op0b;
   enum tree_code tcode;
 
+  gcc_assert (TREE_CODE (op0) == SSA_NAME || TREE_CODE (op0) == VECTOR_CST);
+
   if (COMPARISON_CLASS_P (op0))
     {
       op0a = TREE_OPERAND (op0, 0);
