@@ -2233,6 +2233,95 @@ expand_vector_operations (void)
   return cfg_changed ? TODO_cleanup_cfg : 0;
 }
 
+static enum internal_fn
+get_internal_fn_for_cond_expr (tree_code code)
+{
+  switch (code)
+    {
+    case LT_EXPR:
+      return IFN_VEC_COND_LT;
+    case LE_EXPR:
+      return IFN_VEC_COND_LE;
+    case GT_EXPR:
+      return IFN_VEC_COND_GT;
+    case GE_EXPR:
+      return IFN_VEC_COND_GE;
+    case EQ_EXPR:
+      return IFN_VEC_COND_EQ;
+    case NE_EXPR:
+      return IFN_VEC_COND_NE;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Process one statement.  If we identify a vector operation, expand it.  */
+
+static void
+gimple_lower_vec_cond_expr (gimple_stmt_iterator *gsi)
+{
+  tree lhs, rhs1, rhs2, rhs3, type, compute_type = NULL_TREE;
+  enum tree_code code;
+  optab op = unknown_optab;
+  enum gimple_rhs_class rhs_class;
+  tree new_rhs;
+
+  /* Only consider code == GIMPLE_ASSIGN. */
+  gassign *stmt = dyn_cast <gassign *> (gsi_stmt (*gsi));
+  if (!stmt)
+    return;
+
+  code = gimple_assign_rhs_code (stmt);
+  rhs1 = gimple_assign_rhs1 (stmt);
+  rhs2 = gimple_assign_rhs2 (stmt);
+  rhs3 = gimple_assign_rhs3 (stmt);
+  rhs_class = get_gimple_rhs_class (code);
+  lhs = gimple_assign_lhs (stmt);
+
+  if (code == VEC_COND_EXPR)
+    {
+      if (TREE_CODE (rhs1) == SSA_NAME)
+	{
+	  gimple *def_stmt = SSA_NAME_DEF_STMT (rhs1);
+	  tree_code code = gimple_assign_rhs_code (def_stmt);
+
+	  gimple *g
+	    = gimple_build_call_internal (get_internal_fn_for_cond_expr (code),
+					  4, gimple_assign_rhs1 (def_stmt),
+					  gimple_assign_rhs2 (def_stmt),
+					  rhs2, rhs3);
+	  gimple_set_lhs (g, lhs);
+	  gsi_replace (gsi, g, false);
+	}
+    }
+}
+
+
+static unsigned int
+gimple_expand_vec_cond_expr (void)
+{
+  gimple_stmt_iterator gsi;
+  basic_block bb;
+  bool cfg_changed = false;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple_lower_vec_cond_expr (&gsi);
+	  /* ???  If we do not cleanup EH then we will ICE in
+	     verification.  But in reality we have created wrong-code
+	     as we did not properly transition EH info and edges to
+	     the piecewise computations.  */
+	  if (maybe_clean_eh_stmt (gsi_stmt (gsi))
+	      && gimple_purge_dead_eh_edges (bb))
+	    cfg_changed = true;
+	}
+    }
+
+  return cfg_changed ? TODO_cleanup_cfg : 0;
+}
+
 namespace {
 
 const pass_data pass_data_lower_vector =
@@ -2314,6 +2403,49 @@ gimple_opt_pass *
 make_pass_lower_vector_ssa (gcc::context *ctxt)
 {
   return new pass_lower_vector_ssa (ctxt);
+}
+
+namespace {
+
+const pass_data pass_data_gimple_isel =
+{
+  GIMPLE_PASS, /* type */
+  "isel", /* name */
+  OPTGROUP_VEC, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  PROP_cfg, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa, /* todo_flags_finish */
+};
+
+class pass_gimple_isel : public gimple_opt_pass
+{
+public:
+  pass_gimple_isel (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_gimple_isel, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual bool gate (function *)
+    {
+      return true;
+    }
+
+  virtual unsigned int execute (function *)
+    {
+      return gimple_expand_vec_cond_expr ();
+    }
+
+}; // class pass_gimple_isel
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_gimple_isel (gcc::context *ctxt)
+{
+  return new pass_gimple_isel (ctxt);
 }
 
 #include "gt-tree-vect-generic.h"
