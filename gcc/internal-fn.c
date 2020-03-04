@@ -107,6 +107,7 @@ init_internal_fns ()
 #define mask_store_direct { 3, 2, false }
 #define store_lanes_direct { 0, 0, false }
 #define mask_store_lanes_direct { 0, 0, false }
+#define vec_cond_mask_direct { 0, 0, false }
 #define scatter_store_direct { 3, 1, false }
 #define unary_direct { 0, 0, true }
 #define binary_direct { 0, 0, true }
@@ -2544,6 +2545,16 @@ expand_mask_store_optab_fn (internal_fn, gcall *stmt, convert_optab optab)
 
 #define expand_mask_store_lanes_optab_fn expand_mask_store_optab_fn
 
+// TODO: add comment
+
+static void
+expand_vec_cond_mask_optab_fn (internal_fn, gcall *stmt, convert_optab optab)
+{
+  gcc_unreachable ();
+}
+
+#define expand_vec_cond_mask_optab_fn expand_vec_cond_mask_optab_fn
+
 static void
 expand_ABNORMAL_DISPATCHER (internal_fn, gcall *)
 {
@@ -3125,6 +3136,7 @@ multi_vector_optab_supported_p (convert_optab optab, tree_pair types,
 #define direct_mask_store_optab_supported_p direct_optab_supported_p
 #define direct_store_lanes_optab_supported_p multi_vector_optab_supported_p
 #define direct_mask_store_lanes_optab_supported_p multi_vector_optab_supported_p
+#define direct_vec_cond_mask_optab_supported_p multi_vector_optab_supported_p
 #define direct_scatter_store_optab_supported_p convert_optab_supported_p
 #define direct_while_optab_supported_p convert_optab_supported_p
 #define direct_fold_extract_optab_supported_p direct_optab_supported_p
