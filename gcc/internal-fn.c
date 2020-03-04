@@ -2550,6 +2550,12 @@ expand_mask_store_optab_fn (internal_fn, gcall *stmt, convert_optab optab)
 static void
 expand_vec_cond_mask_optab_fn (internal_fn, gcall *stmt, convert_optab optab)
 {
+  tree lhs = gimple_call_lhs (stmt);
+  tree mask = gimple_call_arg (stmt, 0);
+  tree type = TREE_TYPE (lhs);
+  insn_code icode = convert_optab_handler (optab, TYPE_MODE (type),
+					   TYPE_MODE (TREE_TYPE (mask)));
+
   gcc_unreachable ();
 }
 
