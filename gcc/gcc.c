@@ -235,6 +235,12 @@ static int verbose_only_flag;
 
 static int print_subprocess_help;
 
+/* argc and argv provided to the driver.  Necessary to keep for when
+   -frecord-gcc-switches-format=driver is given.  */
+
+static unsigned int driver_gcc_argc;
+static const char **driver_gcc_argv;
+
 /* Linker suffix passed to -fuse-ld=... */
 static const char *use_ld;
 
@@ -3724,6 +3730,28 @@ set_source_date_epoch_envvar ()
   setenv ("SOURCE_DATE_EPOCH", source_date_epoch, 0);
 }
 
+/* Set GCC_DRIVER_COMMAND_LINE enviromental variable that is later
+   used by -frecord-gcc-switches option.  */
+
+static void
+set_driver_command_line_envvar ()
+{
+  unsigned int length = 0;
+  for (unsigned int i = 0; i < driver_gcc_argc; i++)
+    length += strlen (driver_gcc_argv[i]) + 1;
+
+  char *buffer = (char *)xmalloc (length);
+  char *ptr = buffer;
+  for (unsigned int i = 0; i < driver_gcc_argc; i++)
+    {
+      unsigned l = sprintf (ptr, i == 0 ? "%s" : " %s", driver_gcc_argv[i]);
+      ptr += l;
+    }
+
+  setenv ("GCC_DRIVER_COMMAND_LINE", buffer, 0);
+  free (buffer);
+}
+
 /* Handle an option DECODED that is unknown to the option-processing
    machinery.  */
 
@@ -4295,6 +4323,8 @@ driver_handle_option (struct gcc_options *opts,
 	 handled by specs.  */
       break;
     }
+
+  set_driver_command_line_envvar ();
 
   if (do_save)
     save_switch (decoded->canonical_option[0],
@@ -7387,6 +7417,7 @@ driver::main (int argc, char **argv)
 
   set_progname (argv[0]);
   expand_at_files (&argc, &argv);
+  set_commandline (argc, const_cast <const char **> (argv));
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
   build_multilib_strings ();
@@ -7428,6 +7459,15 @@ driver::set_progname (const char *argv0) const
   progname = p;
 
   xmalloc_set_program_name (progname);
+}
+
+/* Keep the command line for -frecord-gcc-switches-format=driver.  */
+
+void
+driver::set_commandline (int argc, const char **argv) const
+{
+  driver_gcc_argc = argc;
+  driver_gcc_argv = argv;
 }
 
 /* Expand any @ files within the command-line args,

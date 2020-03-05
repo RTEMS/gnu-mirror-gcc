@@ -465,6 +465,12 @@ extern void parse_options_from_collect_gcc_options (const char *, obstack *,
 
 extern void prepend_xassembler_to_collect_as_options (const char *, obstack *);
 
+extern char *get_producer_string (const char *language_string,
+				  cl_decoded_option *options,
+				  unsigned int options_count);
+
+extern const char *get_driver_command_line ();
+
 /* Set OPTION in OPTS to VALUE if the option is not set in OPTS_SET.  */
 
 #define SET_OPTION_IF_UNSET(OPTS, OPTS_SET, OPTION, VALUE) \
