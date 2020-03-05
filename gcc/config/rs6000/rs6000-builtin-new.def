@@ -1885,6 +1885,141 @@
   const vull __builtin_vsx_set_2di (vull, unsigned long long, const int<0,1>);
     SET_2DI_U vsx_set_v2di {set}
 
+  const vsll __builtin_vsx_xxsldwi_2di (vsll, vsll, const int<5>);
+    XXSLDWI_2DI_S vsx_xxsldwi_v2di {}
+  const vull __builtin_vsx_xxsldwi_2di (vull, vull, const int<5>);
+    XXSLDWI_2DI_U vsx_xxsldwi_v2di {}
+
+  const vd __builtin_vsx_xxsldwi_2df (vd, vd, const int<5>);
+    XXSLDWI_2DF vsx_xxsldwi_v2df {}
+
+  const vf __builtin_vsx_xxsldwi_4sf (vf, vf, const int<5>);
+    XXSLDWI_4SF vsx_xxsldwi_v4sf {}
+
+  const vsi __builtin_vsx_xxsldwi_4si (vsi, vsi, const int<5>);
+    XXSLDWI_4SI_S vsx_xxsldwi_v4si {}
+  const vui __builtin_vsx_xxsldwi_4si (vui, vui, const int<5>);
+    XXSLDWI_4SI_U vsx_xxsldwi_v4si {}
+
+  const vss __builtin_vsx_xxsldwi_8hi (vss, vss, const int<5>);
+    XXSLDWI_8HI_S vsx_xxsldwi_v8hi {}
+  const vus __builtin_vsx_xxsldwi_8hi (vus, vus, const int<5>);
+    XXSLDWI_8HI_U vsx_xxsldwi_v8hi {}
+
+  const vsc __builtin_vsx_xxsldwi_16qi (vsc, vsc, const int<5>);
+    XXSLDWI_16QI_S vsx_xxsldwi_v16qi {}
+  const vuc __builtin_vsx_xxsldwi_16qi (vuc, vuc, const int<5>);
+    XXSLDWI_16QI_U vsx_xxsldwi_v16qi {}
+
+  fpmath vd __builtin_vsx_xvadddp (vd, vd);
+    XVADDDP addv2df3 {}
+
+  fpmath vd __builtin_vsx_xvsubdp (vd, vd);
+    XVSUBDP subv2df3 {}
+
+  fpmath vd __builtin_vsx_xvmuldp (vd, vd);
+    XVMULDP mulv2df3 {}
+
+  fpmath vf __builtin_vsx_xvdivdp (vf, vf);
+    XVDIVDP divv2df3 {}
+
+  fpmath vd __builtin_vsx_xvrecipdivdp (vd, vd);
+    RECIP_V2DF recipv2df3 {}
+
+  const vd __builtin_vsx_xvmindp (vd, vd);
+    XVMINDP sminv2df3 {}
+
+  const vd __builtin_vsx_xvmaxdp (vd, vd);
+    XVMAXDP smaxv2df3 {}
+
+  const unsigned int __builtin_vsx_xvtdivdp_fe (vd, vd);
+    XVTDIVDP_FE vsx_tdivv2df3_fe {}
+
+  const unsigned int __builtin_vsx_xvtdivdp_fg (vd, vd);
+    XVTDIVDP_FG vsx_tdivv2df3_fg {}
+
+  const vbll __builtin_vsx_xvcmpeqdp (vd, vd);
+    XVCMPEQDP vector_eqv2df {}
+
+  const vbll __builtin_vsx_xvcmpgtdp (vd, vd);
+    XVCMPGTDP vector_gtv2df {}
+
+  const vbll __builtin_vsx_xvcmpgedp (vd, vd);
+    XVCMPGEDP vector_gev2df {}
+
+  fpmath vf __builtin_vsx_xvaddsp (vf, vf);
+    XVADDSP addv4sf3 {}
+
+  fpmath vf __builtin_vsx_xvsubsp (vf, vf);
+    XVSUBSP subv4sf3 {}
+
+  fpmath vf __builtin_vsx_xvmulsp (vf, vf);
+    XVMULSP mulv4sf3 {}
+
+  fpmath vf __builtin_vsx_xvdivsp (vf, vf);
+    XVDIVSP divv4sf3 {}
+
+  fpmath vf __builtin_vsx_xvrecipdivsp (vf, vf);
+    RECIP_V4SF recipv4sf3 {}
+
+  const vf __builtin_vsx_xvminsp (vf, vf);
+    XVMINSP sminv4sf3 {}
+
+  const vf __builtin_vsx_xvmaxsp (vf, vf);
+    XVMAXSP smaxv4sf3 {}
+
+  const unsigned int __builtin_vsx_xvtdivsp_fe (vf, vf);
+    XVTDIVSP_FE vsx_tdivv4sf3_fe {}
+
+  const unsigned int __builtin_vsx_xvtdivsp_fg (vf, vf);
+    XVTDIVSP_FG vsx_tdivv4sf3_fg {}
+
+  const vbi __builtin_vsx_xvcmpeqsp (vf, vf);
+    XVCMPEQSP vector_eqv4sf {}
+
+  const vbi __builtin_vsx_xvcmpgtsp (vf, vf);
+    XVCMPGTSP vector_gtv4sf {}
+
+  const vbi __builtin_vsx_xvcmpgesp (vf, vf);
+    XVCMPGESP vector_gev4sf {}
+
+  const double __builtin_vsx_xsmindp (double, double);
+    XSMINDP smindf3 {}
+
+  const double __builtin_vsx_xsmaxdp (double, double);
+    XSMAXDP smaxdf3 {}
+
+  const unsigned int __builtin_vsx_xstdivdp_fe (vd, vd);
+    XSTDIVDP_FE vsx_tdivdf3_fe {}
+
+  const unsigned int __builtin_vsx_xstdivdp_fg (vd, vd);
+    XSTDIVDP_FG vsx_tdivdf3_fg {}
+
+  const vd __builtin_vsx_cpsgndp (vd, vd);
+    CPSGNDP vector_copysignv2df3 {}
+
+  const vf __builtin_vsx_cpsgnsp (vf, vf);
+    CPSGNSP vector_copysignv4sf3 {}
+
+  const vd __builtin_vsx_concat_2df (double, double);
+    CONCAT_2DF vsx_concat_v2df {}
+
+  const vull __builtin_vsx_concat_2di (unsigned long long, unsigned long long);
+    CONCAT_2DI_U vsx_concat_v2di {}
+  const vsll __builtin_vsx_concat_2di (signed long long, signed long long);
+    CONCAT_2DI_S vsx_concat_v2di {}
+
+  const vd __builtin_vsx_splat_2df (double);
+    SPLAT_2DF vsx_splat_v2df {}
+
+  const vull __builtin_vsx_splat_2di (unsigned long long);
+    SPLAT_2DI_U vsx_splat_v2di {}
+  const vsll __builtin_vsx_splat_2di (signed long long);
+    SPLAT_2DI_S vsx_splat_v2di {}
+
+  const vf __builtin_vsx_xxmrghw (vf, vf);
+    XXMRGHW_4SF vsx_xxmrghw_v4sf {}
+
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
