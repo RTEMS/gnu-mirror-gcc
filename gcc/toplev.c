@@ -871,16 +871,7 @@ init_asm_output (const char *name)
       if (flag_record_gcc_switches)
 	{
 	  if (targetm.asm_out.record_gcc_switches)
-	    {
-	      /* Let the target know that we are about to start recording.  */
-	      targetm.asm_out.record_gcc_switches (SWITCH_TYPE_DESCRIPTIVE,
-						   NULL);
-	      /* Now record the switches.  */
-	      print_switch_values (targetm.asm_out.record_gcc_switches);
-	      /* Let the target know that the recording is over.  */
-	      targetm.asm_out.record_gcc_switches (SWITCH_TYPE_DESCRIPTIVE,
-						   NULL);
-	    }
+	    targetm.asm_out.record_gcc_switches ();
 	  else
 	    inform (UNKNOWN_LOCATION,
 		    "%<-frecord-gcc-switches%> is not supported by "

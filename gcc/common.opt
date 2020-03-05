@@ -2246,7 +2246,7 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 ; records information in the assembler output file as comments, so
 ; they never reach the object file.
 frecord-gcc-switches
-Common Report Var(flag_record_gcc_switches)
+Common Driver Report Var(flag_record_gcc_switches)
 Record gcc command line switches in the object file.
 
 freg-struct-return

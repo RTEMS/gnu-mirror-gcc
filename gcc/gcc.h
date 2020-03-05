@@ -37,6 +37,7 @@ class driver
 
  private:
   void set_progname (const char *argv0) const;
+  void set_commandline (int argc, const char **argv) const;
   void expand_at_files (int *argc, char ***argv) const;
   void decode_argv (int argc, const char **argv);
   void global_initializations ();
