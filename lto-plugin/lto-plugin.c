@@ -90,6 +90,8 @@ along with this program; see the file COPYING3.  If not see
 
 #define LTO_SECTION_PREFIX	".gnu.lto_.symtab"
 #define LTO_SECTION_PREFIX_LEN	(sizeof (LTO_SECTION_PREFIX) - 1)
+#define LTO_LTO_PREFIX		".gnu.lto_.lto"
+#define LTO_LTO_PREFIX_LEN	(sizeof (LTO_LTO_PREFIX) - 1)
 #define OFFLOAD_SECTION		".gnu.offload_lto_.opts"
 #define OFFLOAD_SECTION_LEN	(sizeof (OFFLOAD_SECTION) - 1)
 
@@ -154,12 +156,12 @@ enum symbol_style
 static char *arguments_file_name;
 static ld_plugin_register_claim_file register_claim_file;
 static ld_plugin_register_all_symbols_read register_all_symbols_read;
-static ld_plugin_get_symbols get_symbols, get_symbols_v2;
+static ld_plugin_get_symbols get_symbols, get_symbols_v2, get_symbols_v4;
 static ld_plugin_register_cleanup register_cleanup;
 static ld_plugin_add_input_file add_input_file;
 static ld_plugin_add_input_library add_input_library;
 static ld_plugin_message message;
-static ld_plugin_add_symbols add_symbols;
+static ld_plugin_add_symbols add_symbols, add_symbols_v2;
 
 static struct plugin_file_info *claimed_files = NULL;
 static unsigned int num_claimed_files = 0;
@@ -221,6 +223,20 @@ check_1 (int gate, enum ld_plugin_level level, const char *text)
     }
 }
 
+/* Structure that represents LTO ELF section with information
+   about the format.  */
+
+struct lto_section
+ {
+   int16_t major_version;
+   int16_t minor_version;
+   unsigned char slim_object: 1;
+   unsigned char compression: 4;
+   int32_t reserved0: 27;
+};
+
+struct lto_section lto_header;
+
 /* This little wrapper allows check to be called with a non-integer
    first argument, such as a pointer that must be non-NULL.  We can't
    use c99 bool type to coerce it into range, so we explicitly test.  */
@@ -250,6 +266,13 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
       LDPV_PROTECTED,
       LDPV_INTERNAL,
       LDPV_HIDDEN
+    };
+
+  enum ld_plugin_symbol_type symbol_types[] =
+    {
+      LDST_UNKNOWN,
+      LDST_FUNCTION,
+      LDST_VARIABLE,
     };
 
   switch (sym_style)
@@ -295,6 +318,19 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
   check (t <= 3, LDPL_FATAL, "invalid symbol visibility found");
   entry->visibility = translate_visibility[t];
   p++;
+
+  /* Symbol type was added in GCC 10.1 (LTO version 9.0).  */
+  if (lto_header.major_version >= 9)
+    {
+      t = *p;
+      check (t <= 3, LDPL_FATAL, "invalid symbol type found");
+      entry->symbol_type = symbol_types[t];
+      p++;
+      entry->section_flags = *p;
+      p++;
+    }
+
+  entry->unused = 0;
 
   memcpy (&entry->size, p, sizeof (uint64_t));
   p += 8;
@@ -431,7 +467,7 @@ finish_conflict_resolution (struct plugin_symtab *symtab,
 
   for (i = 0; i < symtab->nsyms; i++)
     { 
-      int resolution = LDPR_UNKNOWN;
+      char resolution = LDPR_UNKNOWN;
 
       if (symtab->aux[i].next_conflict == -1)
 	continue;
@@ -473,6 +509,19 @@ free_symtab (struct plugin_symtab *symtab)
   symtab->aux = NULL;
 }
 
+/* Clear new flags symbol_type and section_flags
+   from symbol table entries.  */
+
+static void
+clear_new_symtab_flags (struct plugin_symtab *out)
+{
+  for (unsigned i = 0; i < out->nsyms; i++)
+    {
+      out->syms[i].symbol_type = 0;
+      out->syms[i].section_flags = 0;
+    }
+}
+
 /*  Writes the relocations to disk. */
 
 static void
@@ -495,10 +544,16 @@ write_resolution (void)
 
       /* Version 2 of API supports IRONLY_EXP resolution that is
          accepted by GCC-4.7 and newer.  */
-      if (get_symbols_v2)
-        get_symbols_v2 (info->handle, symtab->nsyms, syms);
+      if (get_symbols_v4)
+	get_symbols_v4 (info->handle, symtab->nsyms, syms);
       else
-        get_symbols (info->handle, symtab->nsyms, syms);
+	{
+	  clear_new_symtab_flags (symtab);
+	  if (get_symbols_v2)
+	    get_symbols_v2 (info->handle, symtab->nsyms, syms);
+	  else
+	    get_symbols (info->handle, symtab->nsyms, syms);
+	}
 
       finish_conflict_resolution (symtab, &info->conflicts);
 
@@ -951,7 +1006,20 @@ process_symtab (void *data, const char *name, off_t offset, off_t length)
 {
   struct plugin_objfile *obj = (struct plugin_objfile *)data;
   char *s;
-  char *secdatastart, *secdata;
+  char *secdatastart = NULL, *secdata;
+
+  if (strncmp (name, LTO_LTO_PREFIX, LTO_LTO_PREFIX_LEN) == 0)
+    {
+      if (offset != lseek (obj->file->fd, offset, SEEK_SET))
+	goto err;
+
+      ssize_t got = read (obj->file->fd, &lto_header,
+			  sizeof (struct lto_section));
+      if (got != sizeof (struct lto_section))
+	goto err;
+
+      return 1;
+    }
 
   if (strncmp (name, LTO_SECTION_PREFIX, LTO_SECTION_PREFIX_LEN) != 0)
     return 1;
@@ -1080,8 +1148,15 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
 
   if (obj.found > 0)
     {
-      status = add_symbols (file->handle, lto_file.symtab.nsyms,
-			    lto_file.symtab.syms);
+      if (add_symbols_v2)
+	status = add_symbols_v2 (file->handle, lto_file.symtab.nsyms,
+				 lto_file.symtab.syms);
+      else
+	{
+	  clear_new_symtab_flags (&lto_file.symtab);
+	  status = add_symbols (file->handle, lto_file.symtab.nsyms,
+				lto_file.symtab.syms);
+	}
       check (status == LDPS_OK, LDPL_FATAL, "could not add symbols");
 
       num_claimed_files++;
@@ -1242,11 +1317,17 @@ onload (struct ld_plugin_tv *tv)
 	case LDPT_REGISTER_CLAIM_FILE_HOOK:
 	  register_claim_file = p->tv_u.tv_register_claim_file;
 	  break;
+	case LDPT_ADD_SYMBOLS_V2:
+	  add_symbols_v2 = p->tv_u.tv_add_symbols;
+	  break;
 	case LDPT_ADD_SYMBOLS:
 	  add_symbols = p->tv_u.tv_add_symbols;
 	  break;
 	case LDPT_REGISTER_ALL_SYMBOLS_READ_HOOK:
 	  register_all_symbols_read = p->tv_u.tv_register_all_symbols_read;
+	  break;
+	case LDPT_GET_SYMBOLS_V4:
+	  get_symbols_v4 = p->tv_u.tv_get_symbols;
 	  break;
 	case LDPT_GET_SYMBOLS_V2:
 	  get_symbols_v2 = p->tv_u.tv_get_symbols;
