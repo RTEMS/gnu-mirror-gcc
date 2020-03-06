@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "print-tree.h"
 #include "tree-dfa.h"
 #include "file-prefix-map.h" /* remap_debug_filename()  */
+#include "output.h"
 
 
 static void lto_write_tree (struct output_block*, tree, bool);
@@ -2773,6 +2774,17 @@ write_symbol (struct streamer_tree_cache_d *cache,
   lto_write_data (&c, 1);
   c = (unsigned char) visibility;
   lto_write_data (&c, 1);
+  c = ((unsigned char) TREE_CODE (t) == VAR_DECL
+       ? GCCST_VARIABLE : GCCST_FUNCTION);
+  lto_write_data (&c, 1);
+  unsigned char section_flags = 0;
+  if (TREE_CODE (t) == VAR_DECL)
+    {
+      section *s = get_variable_section (t, false);
+      if (s->common.flags & SECTION_BSS)
+	section_flags |= GCCSSS_BSS;
+    }
+  lto_write_data (&section_flags, 1);
   lto_write_data (&size, 8);
   lto_write_data (&slot_num, 4);
 }
