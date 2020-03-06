@@ -2773,6 +2773,8 @@ write_symbol (struct streamer_tree_cache_d *cache,
   lto_write_data (&c, 1);
   c = (unsigned char) visibility;
   lto_write_data (&c, 1);
+  c = (unsigned char) TREE_CODE (t) == VAR_DECL ? GCCST_VARIABLE : GCCST_FUNCTION;
+  lto_write_data (&c, 1);
   lto_write_data (&size, 8);
   lto_write_data (&slot_num, 4);
 }
