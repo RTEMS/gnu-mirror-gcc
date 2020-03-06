@@ -90,6 +90,8 @@ along with this program; see the file COPYING3.  If not see
 
 #define LTO_SECTION_PREFIX	".gnu.lto_.symtab"
 #define LTO_SECTION_PREFIX_LEN	(sizeof (LTO_SECTION_PREFIX) - 1)
+#define LTO_LTO_PREFIX		".gnu.lto_.lto"
+#define LTO_LTO_PREFIX_LEN	(sizeof (LTO_LTO_PREFIX) - 1)
 #define OFFLOAD_SECTION		".gnu.offload_lto_.opts"
 #define OFFLOAD_SECTION_LEN	(sizeof (OFFLOAD_SECTION) - 1)
 
@@ -221,6 +223,20 @@ check_1 (int gate, enum ld_plugin_level level, const char *text)
     }
 }
 
+/* Structure that represents LTO ELF section with information
+   about the format.  */
+
+struct lto_section
+ {
+   int16_t major_version;
+   int16_t minor_version;
+   unsigned char slim_object: 1;
+   unsigned char compression: 4;
+   int32_t reserved0: 27;
+};
+
+struct lto_section lto_header;
+
 /* This little wrapper allows check to be called with a non-integer
    first argument, such as a pointer that must be non-NULL.  We can't
    use c99 bool type to coerce it into range, so we explicitly test.  */
@@ -250,6 +266,14 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
       LDPV_PROTECTED,
       LDPV_INTERNAL,
       LDPV_HIDDEN
+    };
+
+  enum ld_plugin_symbol_type symbol_types[] =
+    {
+      LDST_UNKNOWN,
+      LDST_FUNCTION,
+      LDST_VARIABLE_DATA,
+      LDST_VARIABLE_BSS
     };
 
   switch (sym_style)
@@ -295,6 +319,15 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
   check (t <= 3, LDPL_FATAL, "invalid symbol visibility found");
   entry->visibility = translate_visibility[t];
   p++;
+
+  /* Symbol type was added in GCC 10.1 (LTO version 9.0).  */
+  if (lto_header.major_version >= 9)
+    {
+      t = *p;
+      check (t <= 3, LDPL_FATAL, "invalid symbol type found");
+      entry->symbol_type = symbol_types[t];
+      p++;
+    }
 
   memcpy (&entry->size, p, sizeof (uint64_t));
   p += 8;
@@ -951,7 +984,20 @@ process_symtab (void *data, const char *name, off_t offset, off_t length)
 {
   struct plugin_objfile *obj = (struct plugin_objfile *)data;
   char *s;
-  char *secdatastart, *secdata;
+  char *secdatastart = NULL, *secdata;
+
+  if (strncmp (name, LTO_LTO_PREFIX, LTO_LTO_PREFIX_LEN) == 0)
+    {
+      if (offset != lseek (obj->file->fd, offset, SEEK_SET))
+	goto err;
+
+      ssize_t got = read (obj->file->fd, &lto_header,
+			  sizeof (struct lto_section));
+      if (got != sizeof (struct lto_section))
+	goto err;
+
+      return 1;
+    }
 
   if (strncmp (name, LTO_SECTION_PREFIX, LTO_SECTION_PREFIX_LEN) != 0)
     return 1;
