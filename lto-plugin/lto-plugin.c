@@ -252,6 +252,14 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
       LDPV_HIDDEN
     };
 
+  enum ld_plugin_symbol_type symbol_types[] =
+    {
+      LDST_UNKNOWN,
+      LDST_FUNCTION,
+      LDST_VARIABLE_DATA,
+      LDST_VARIABLE_BSS
+    };
+
   switch (sym_style)
     {
     case ss_win32:
@@ -294,6 +302,11 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
   t = *p;
   check (t <= 3, LDPL_FATAL, "invalid symbol visibility found");
   entry->visibility = translate_visibility[t];
+  p++;
+
+  t = *p;
+  check (t <= 3, LDPL_FATAL, "invalid symbol type found");
+  entry->symbol_type = symbol_types[t];
   p++;
 
   memcpy (&entry->size, p, sizeof (uint64_t));
