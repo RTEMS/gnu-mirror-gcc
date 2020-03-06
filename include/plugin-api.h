@@ -94,6 +94,21 @@ struct ld_plugin_symbol
   int resolution;
 };
 
+/* A symbol belonging to an input file managed by the plugin library
+   (version 2).  */
+
+struct ld_plugin_symbol_v2
+{
+  char *name;
+  char *version;
+  int def;
+  int visibility;
+  uint64_t size;
+  char *comdat_key;
+  int resolution;
+  int symbol_type;
+};
+
 /* An object's section.  */
 
 struct ld_plugin_section
@@ -121,6 +136,16 @@ enum ld_plugin_symbol_visibility
   LDPV_PROTECTED,
   LDPV_INTERNAL,
   LDPV_HIDDEN
+};
+
+/* The type of the symbol.  */
+
+enum ld_plugin_symbol_type
+{
+  LDST_UNKNOWN,
+  LDST_FUNCTION,
+  LDST_VARIABLE_DATA,
+  LDST_VARIABLE_BSS
 };
 
 /* How a symbol is resolved.  */
@@ -210,6 +235,12 @@ enum ld_plugin_status
 (*ld_plugin_add_symbols) (void *handle, int nsyms,
                           const struct ld_plugin_symbol *syms);
 
+typedef
+enum ld_plugin_status
+(*ld_plugin_add_symbols_v2) (void *handle, int nsyms,
+			     const struct ld_plugin_symbol_v2 *syms);
+
+
 /* The linker's interface for getting the input file information with
    an open (possibly re-opened) file descriptor.  */
 
@@ -234,6 +265,11 @@ typedef
 enum ld_plugin_status
 (*ld_plugin_get_symbols) (const void *handle, int nsyms,
                           struct ld_plugin_symbol *syms);
+
+typedef
+enum ld_plugin_status
+(*ld_plugin_get_symbols_v2) (const void *handle, int nsyms,
+			     struct ld_plugin_symbol_v2 *syms);
 
 /* The linker's interface for adding a compiled input file.  */
 
@@ -431,7 +467,9 @@ enum ld_plugin_tag
   LDPT_GET_INPUT_SECTION_ALIGNMENT = 29,
   LDPT_GET_INPUT_SECTION_SIZE = 30,
   LDPT_REGISTER_NEW_INPUT_HOOK = 31,
-  LDPT_GET_WRAP_SYMBOLS = 32
+  LDPT_GET_WRAP_SYMBOLS = 32,
+  LDPT_GET_SYMBOLS_V4 = 33,
+  LDPT_ADD_SYMBOLS_V2 = 34,
 };
 
 /* The plugin transfer vector.  */
@@ -447,7 +485,9 @@ struct ld_plugin_tv
     ld_plugin_register_all_symbols_read tv_register_all_symbols_read;
     ld_plugin_register_cleanup tv_register_cleanup;
     ld_plugin_add_symbols tv_add_symbols;
+    ld_plugin_add_symbols_v2 tv_add_symbols_v2;
     ld_plugin_get_symbols tv_get_symbols;
+    ld_plugin_get_symbols_v2 tv_get_symbols_v4;
     ld_plugin_add_input_file tv_add_input_file;
     ld_plugin_message tv_message;
     ld_plugin_get_input_file tv_get_input_file;
