@@ -54,7 +54,8 @@ const char *lto_section_name[LTO_N_SECTION_TYPES] =
   "mode_table",
   "hsa",
   "lto",
-  "ipa_sra"
+  "ipa_sra",
+  "ext_symtab"
 };
 
 /* Hooks so that the ipa passes can call into the lto front end to get
