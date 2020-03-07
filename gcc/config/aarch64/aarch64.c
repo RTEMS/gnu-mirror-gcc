@@ -1246,6 +1246,9 @@ static const struct attribute_spec aarch64_attribute_table[] =
        affects_type_identity, handler, exclude } */
   { "aarch64_vector_pcs", 0, 0, false, true,  true,  true,
 			  handle_aarch64_vector_pcs_attribute, NULL },
+  { "arm_sve_vector_bits", 1, 1, false, true,  false, true,
+			  aarch64_sve::handle_arm_sve_vector_bits_attribute,
+			  NULL },
   { "SVE type",		  3, 3, false, true,  false, true,  NULL, NULL },
   { "SVE sizeless type",  0, 0, false, true,  false, true,  NULL, NULL },
   { NULL,                 0, 0, false, false, false, false, NULL, NULL }
@@ -21968,6 +21971,14 @@ aarch64_invalid_binary_op (int op ATTRIBUTE_UNUSED, const_tree type1,
   if (element_mode (type1) == BFmode
       || element_mode (type2) == BFmode)
     return N_("operation not permitted on type %<bfloat16_t%>");
+
+  if (VECTOR_TYPE_P (type1)
+      && VECTOR_TYPE_P (type2)
+      && !TYPE_INDIVISIBLE_P (type1)
+      && !TYPE_INDIVISIBLE_P (type2)
+      && (aarch64_sve::builtin_type_p (type1)
+	  != aarch64_sve::builtin_type_p (type2)))
+    return N_("cannot combine GNU and SVE vectors in a binary operation");
 
   /* Operation allowed.  */
   return NULL;
