@@ -2020,6 +2020,153 @@
   const vf __builtin_vsx_xxmrghw (vf, vf);
     XXMRGHW_4SF vsx_xxmrghw_v4sf {}
 
+  const vui __builtin_vsx_xxmrghw_4si (vui, vui);
+    XXMRGHW_4SI_U vsx_xxmrghw_v4si {}
+  const vsi __builtin_vsx_xxmrghw_4si (vsi, vsi);
+    XXMRGHW_4SI_S vsx_xxmrghw_v4si {}
+
+  const vf __builtin_vsx_xxmrglw (vf, vf);
+    XXMRGLW_4SF vsx_xxmrglw_v4sf {}
+
+  const vui __builtin_vsx_xxmrglw_4si (vui, vui);
+    XXMRGLW_4SI_U vsx_xxmrglw_v4si {}
+  const vsi __builtin_vsx_xxmrglw_4si (vsi, vsi);
+    XXMRGLW_4SI_S vsx_xxmrglw_v4si {}
+
+  const vd __builtin_vsx_mergel_2df (vd, vd);
+    VEC_MERGEL_V2DF vsx_mergel_v2df {}
+
+  const vsll __builtin_vsx_mergel_2di (vsll, vsll);
+    VEC_MERGEL_V2DI_S vsx_mergel_v2di {}
+  const vull __builtin_vsx_mergel_2di (vull, vull);
+    VEC_MERGEL_V2DI_U vsx_mergel_v2di {}
+  const vbll __builtin_vsx_mergel_2di (vbll, vbll);
+    VEC_MERGEL_V2DI_B vsx_mergel_v2di {}
+
+  const vd __builtin_vsx_mergeh_2df (vd, vd);
+    VEC_MERGEH_V2DF vsx_mergeh_v2df {}
+
+  const vsll __builtin_vsx_mergeh_2di (vsll, vsll);
+    VEC_MERGEH_V2DI_S vsx_mergeh_v2di {}
+  const vull __builtin_vsx_mergeh_2di (vull, vull);
+    VEC_MERGEH_V2DI_U vsx_mergeh_v2di {}
+  const vbll __builtin_vsx_mergeh_2di (vbll, vbll);
+    VEC_MERGEH_V2DI_B vsx_mergeh_v2di {}
+
+  const vd __builtin_vsx_xxspltd_2df (vd, const int<1>);
+    XXSPLTD_V2DF vsx_xxspltd_v2df {}
+
+  const vsll __builtin_vsx_xxspltd_2di (vsll, const int<1>);
+    XXSPLTD_V2DI_S vsx_xxspltd_v2di {}
+  const vull __builtin_vsx_xxspltd_2di (vull, const int<1>);
+    XXSPLTD_V2DI_U vsx_xxspltd_v2di {}
+  const vbll __builtin_vsx_xxspltd_2di (vbll, const int<1>);
+    XXSPLTD_V2DI_B vsx_xxspltd_v2di {}
+
+  const vsll __builtin_vsx_div_2di (vsll, vsll);
+    DIV_V2DI vsx_div_v2di {}
+
+  const vull __builtin_vsx_div_2di (vull, vull);
+    UDIV_V2DI vsx_udiv_v2di {}
+
+  const vsll __builtin_vsx_mul_2di (vsll, vsll);
+    MUL_V2DI_S vsx_mul_v2di {}
+  const vull __builtin_vsx_mul_2di (vull, vull);
+    MUL_V2DI_U vsx_mul_v2di {}
+
+  const vd __builtin_vsx_xvcvsxddp_scale (vsll, const int);
+    XVCVSXDDP_SCALE vsx_xvcvsxddp_scale {}
+
+  const vd __builtin_vsx_xvcvuxddp_scale (vull, const int);
+    XVCVUXDDP_SCALE vsx_xvcvuxddp_scale {}
+
+  const vsll __builtin_vsx_xvcvdpsxds_scale (vd, const int);
+    XVCVDPSXDS_SCALE vsx_xvcvdpsxds_scale {}
+
+  const vull __builtin_vsx_xvcvdpuxds_scale (vd, const int);
+    XVCVDPUXDS_SCALE vsx_xvcvdpuxds_scale {}
+
+  const vbc __builtin_vsx_cmpge_16qi (vsc, vsc);
+    CMPGE_16QI vector_nltv16qi {}
+
+  const vbs __builtin_vsx_cmpge_8hi (vss, vss);
+    CMPGE_8HI vector_nltv8hi {}
+
+  const vbi __builtin_vsx_cmpge_4si (vsi, vsi);
+    CMPGE_4SI vector_nltv4si {}
+
+  const vbll __builtin_vsx_cmpge_2di (vsll, vsll);
+    CMPGE_2DI vector_nltv2di {}
+
+  const vbc __builtin_vsx_cmpge_u16qi (vuc, vuc);
+    CMPGE_U16QI vector_nltuv16qi {}
+
+  const vbs __builtin_vsx_cmpge_u8hi (vus, vus);
+    CMPGE_U8HI vector_nltuv8hi {}
+
+  const vbi __builtin_vsx_cmpge_u4si (vui, vui);
+    CMPGE_U4SI vector_nltuv4si {}
+
+  const vbll __builtin_vsx_cmpge_u2di (vull, vull);
+    CMPGE_U2DI vector_nltuv2di {}
+
+  const vbc __builtin_vsx_cmple_16qi (vsc, vsc);
+    CMPLE_16QI vector_ngtv16qi {}
+
+  const vbs __builtin_vsx_cmple_8hi (vss, vss);
+    CMPLE_8HI vector_ngtv8hi {}
+
+  const vbi __builtin_vsx_cmple_4si (vsi, vsi);
+    CMPLE_4SI vector_ngtv4si {}
+
+  const vbll __builtin_vsx_cmple_2di (vsll, vsll);
+    CMPLE_2DI vector_ngtv2di {}
+
+  const vbc __builtin_vsx_cmple_u16qi (vuc, vuc);
+    CMPLE_U16QI vector_ngtuv16qi {}
+
+  const vbs __builtin_vsx_cmple_u8hi (vus, vus);
+    CMPLE_U8HI vector_ngtuv8hi {}
+
+  const vbi __builtin_vsx_cmple_u4si (vui, vui);
+    CMPLE_U4SI vector_ngtuv4si {}
+
+  const vbll __builtin_vsx_cmple_u2di (vull, vull);
+    CMPLE_U2DI vector_ngtuv2di {}
+
+  const vd __builtin_vsx_xvabsdp (vd);
+    XVABSDP absv2df2 {}
+
+  const vd __builtin_vsx_xvnabsdp (vd);
+    XVNABSDP vsx_nabsv2df2 {}
+
+  const vf __builtin_vsx_xvabssp (vf);
+    XVABSSP absv4sf2 {}
+
+  const vf __builtin_vsx_xvnabssp (vf);
+    XVNABSSP vsx_nabsv4sf2 {}
+
+  const vd __builtin_vsx_xvnegdp (vd);
+    XVNEGDP negv2df2 {}
+
+  const vd __builtin_xvsqrtdp (vd);
+    XVSQRTDP sqrtv2df2 {}
+
+  const vd __builtin_vsx_xvrsqrtdp (vd);
+    RSQRT_2DF rsqrtv2df2 {}
+
+  const vd __builtin_vsx_xvrsqrtedp (vd);
+    XVRSQRTEDP rsqrtev2df2 {}
+
+  const unsigned int __builtin_vsx_xvtsqrtdp_fe (vd);
+    XVTSQRTDP_FE vsx_tsqrtv2df2_fe {}
+
+  const unsigned int __builtin_vsx_xvtsqrtdp_fg (vd);
+    XVTSQRTDP_FG vsx_tsqrtv2df2_fg {}
+
+  const vd __builtin_vsx_xvredp (vd);
+    XVREDP vsx_frev2df2 {}
+
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
