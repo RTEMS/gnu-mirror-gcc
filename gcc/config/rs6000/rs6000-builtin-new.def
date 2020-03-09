@@ -2338,7 +2338,7 @@
     DOUBLEE_V4SF doubleev4sf2 {}
 
   const vd __builtin_vsx_uns_doublee_v4si (vui);
-    UNS_DOUBLEE_V4SI unsdoubleev4si2
+    UNS_DOUBLEE_V4SI unsdoubleev4si2 {}
 
   const vd __builtin_vsx_doubleo_v4si (vsi);
     DOUBLEO_V4SI doubleov4si2 {}
@@ -2347,7 +2347,7 @@
     DOUBLEO_V4SF doubleov4sf2 {}
 
   const vd __builtin_vsx_uns_doubleo_v4si (vui);
-    UNS_DOUBLEO_V4SI unsdoubleov4si2
+    UNS_DOUBLEO_V4SI unsdoubleov4si2 {}
 
   const vd __builtin_vsx_doubleh_v4si (vsi);
     DOUBLEH_V4SI doublehv4si2 {}
@@ -2356,7 +2356,7 @@
     DOUBLEH_V4SF doublehv4sf2 {}
 
   const vd __builtin_vsx_uns_doubleh_v4si (vui);
-    UNS_DOUBLEH_V4SI unsdoublehv4si2
+    UNS_DOUBLEH_V4SI unsdoublehv4si2 {}
 
   const vd __builtin_vsx_doublel_v4si (vsi);
     DOUBLEL_V4SI doublelv4si2 {}
@@ -2365,7 +2365,7 @@
     DOUBLEL_V4SF doublelv4sf2 {}
 
   const vd __builtin_vsx_uns_doublel_v4si (vui);
-    UNS_DOUBLEL_V4SI unsdoublelv4si2
+    UNS_DOUBLEL_V4SI unsdoublelv4si2 {}
 
   const vsi __builtin_vsx_vsigned_v4sf (vf);
     VEC_VSIGNED_V4SF vsx_xvcvspsxws {}
