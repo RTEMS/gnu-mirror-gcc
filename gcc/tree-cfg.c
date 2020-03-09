@@ -4199,6 +4199,13 @@ verify_gimple_assign_ternary (gassign *stmt)
 	  debug_generic_expr (rhs1_type);
 	  return true;
 	}
+      else if (TREE_CODE_CLASS (TREE_CODE (rhs1)) == tcc_comparison)
+	{
+	  error ("the first argument of %<VEC_COND_EXPR%> cannot be "
+	 "a %<GENERIC%> tree comparison expression");
+	  debug_generic_expr (rhs1);
+	  return true;
+	}
       /* Fallthrough.  */
     case COND_EXPR:
       if (!is_gimple_val (rhs1)
