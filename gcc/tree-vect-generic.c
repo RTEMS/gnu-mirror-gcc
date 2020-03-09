@@ -694,12 +694,14 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 	  if (addend == NULL_TREE
 	      && expand_vec_cond_expr_p (type, type, LT_EXPR))
 	    {
-	      tree zero, cst, cond, mask_type;
-	      gimple *stmt;
+	      tree zero, cst, mask_type, mask;
+	      gimple *stmt, *cond;
 
 	      mask_type = truth_type_for (type);
 	      zero = build_zero_cst (type);
-	      cond = build2 (LT_EXPR, mask_type, op0, zero);
+	      mask = make_ssa_name (mask_type);
+	      cond = gimple_build_assign (mask, LT_EXPR, op0, zero);
+	      gsi_insert_before (gsi, cond, GSI_SAME_STMT);
 	      tree_vector_builder vec (type, nunits, 1);
 	      for (i = 0; i < nunits; i++)
 		vec.quick_push (build_int_cst (TREE_TYPE (type),
@@ -707,8 +709,8 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 						<< shifts[i]) - 1));
 	      cst = vec.build ();
 	      addend = make_ssa_name (type);
-	      stmt = gimple_build_assign (addend, VEC_COND_EXPR, cond,
-					  cst, zero);
+	      stmt
+		= gimple_build_assign (addend, VEC_COND_EXPR, mask, cst, zero);
 	      gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
 	    }
 	}
@@ -964,7 +966,17 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
     }
 
   if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), TREE_CODE (a)))
-    return;
+    {
+      if (a_is_comparison)
+	{
+	  a = gimplify_build2 (gsi, TREE_CODE (a), TREE_TYPE (a), a1, a2);
+	  gimple_assign_set_rhs1 (stmt, a);
+	  update_stmt (stmt);
+	  return;
+	}
+      gcc_assert (TREE_CODE (a) == SSA_NAME || TREE_CODE (a) == VECTOR_CST);
+      return;
+    }
 
   /* Handle vector boolean types with bitmasks.  If there is a comparison
      and we can expand the comparison into the vector boolean bitmask,
