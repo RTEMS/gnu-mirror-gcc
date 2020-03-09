@@ -3136,6 +3136,10 @@ pass_forwprop::execute (function *fun)
 		    if (code == COND_EXPR
 			|| code == VEC_COND_EXPR)
 		      {
+			/* Do not propagate into VEC_COND_EXPRs.  */
+			if (code == VEC_COND_EXPR)
+			  break;
+
 			/* In this case the entire COND_EXPR is in rhs1. */
 			if (forward_propagate_into_cond (&gsi))
 			  {

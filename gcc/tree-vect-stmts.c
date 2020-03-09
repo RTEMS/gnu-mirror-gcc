@@ -9936,8 +9936,8 @@ vectorizable_condition (vec_info *vinfo,
 	{
 	  vec_cond_rhs = vec_oprnds1[i];
 	  if (bitop1 == NOP_EXPR)
-	    vec_compare = build2 (cond_code, vec_cmp_type,
-				  vec_cond_lhs, vec_cond_rhs);
+	    vec_compare = gimplify_build2 (gsi, cond_code, vec_cmp_type,
+					   vec_cond_lhs, vec_cond_rhs);
 	  else
 	    {
 	      new_temp = make_ssa_name (vec_cmp_type);
