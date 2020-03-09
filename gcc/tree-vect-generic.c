@@ -2224,6 +2224,133 @@ expand_vector_operations (void)
   return cfg_changed ? TODO_cleanup_cfg : 0;
 }
 
+/* Expand all VEC_COND_EXPR gimple assignments into calls to internal
+   function based on type of selected expansion.  */
+
+static gimple *
+gimple_expand_vec_cond_expr (gimple_stmt_iterator *gsi)
+{
+  tree lhs, op0a, op0b;
+  enum tree_code code;
+  enum tree_code tcode;
+  machine_mode cmp_op_mode;
+  bool unsignedp;
+  enum insn_code icode;
+
+  /* Only consider code == GIMPLE_ASSIGN. */
+  gassign *stmt = dyn_cast <gassign *> (gsi_stmt (*gsi));
+  if (!stmt)
+    return NULL;
+
+  code = gimple_assign_rhs_code (stmt);
+  if (code != VEC_COND_EXPR)
+    return NULL;
+
+  tree op0 = gimple_assign_rhs1 (stmt);
+  tree op1 = gimple_assign_rhs2 (stmt);
+  tree op2 = gimple_assign_rhs3 (stmt);
+  lhs = gimple_assign_lhs (stmt);
+  machine_mode mode = TYPE_MODE (TREE_TYPE (lhs));
+
+  if (COMPARISON_CLASS_P (op0))
+    {
+      op0a = TREE_OPERAND (op0, 0);
+      op0b = TREE_OPERAND (op0, 1);
+      tcode = TREE_CODE (op0);
+    }
+  else
+    {
+      gcc_assert (VECTOR_BOOLEAN_TYPE_P (TREE_TYPE (op0)));
+      if (get_vcond_mask_icode (mode, TYPE_MODE (TREE_TYPE (op0)))
+	  != CODE_FOR_nothing)
+	return gimple_build_call_internal (IFN_VCOND_MASK, 3, op0, op1, op2);
+      /* Fake op0 < 0.  */
+      else
+	{
+	  gcc_assert (GET_MODE_CLASS (TYPE_MODE (TREE_TYPE (op0)))
+		      == MODE_VECTOR_INT);
+	  op0a = op0;
+	  op0b = build_zero_cst (TREE_TYPE (op0));
+	  tcode = LT_EXPR;
+	}
+    }
+  cmp_op_mode = TYPE_MODE (TREE_TYPE (op0a));
+  unsignedp = TYPE_UNSIGNED (TREE_TYPE (op0a));
+
+
+  gcc_assert (known_eq (GET_MODE_SIZE (mode), GET_MODE_SIZE (cmp_op_mode))
+	      && known_eq (GET_MODE_NUNITS (mode),
+			   GET_MODE_NUNITS (cmp_op_mode)));
+
+  icode = get_vcond_icode (mode, cmp_op_mode, unsignedp);
+  if (icode == CODE_FOR_nothing)
+    {
+      if (tcode == LT_EXPR
+	  && op0a == op0
+	  && TREE_CODE (op0) == VECTOR_CST)
+	{
+	  /* A VEC_COND_EXPR condition could be folded from EQ_EXPR/NE_EXPR
+	     into a constant when only get_vcond_eq_icode is supported.
+	     Verify < 0 and != 0 behave the same and change it to NE_EXPR.  */
+	  unsigned HOST_WIDE_INT nelts;
+	  if (!VECTOR_CST_NELTS (op0).is_constant (&nelts))
+	    {
+	      if (VECTOR_CST_STEPPED_P (op0))
+		gcc_unreachable ();
+	      nelts = vector_cst_encoded_nelts (op0);
+	    }
+	  for (unsigned int i = 0; i < nelts; ++i)
+	    if (tree_int_cst_sgn (vector_cst_elt (op0, i)) == 1)
+	      gcc_unreachable ();
+	  tcode = NE_EXPR;
+	}
+      if (tcode == EQ_EXPR || tcode == NE_EXPR)
+	{
+	  tree tcode_tree = build_int_cst (integer_type_node, tcode);
+	  return gimple_build_call_internal (IFN_VCONDEQ, 5, op0a, op0b, op1,
+					     op2, tcode_tree);
+	}
+    }
+
+  gcc_assert (icode != CODE_FOR_nothing);
+  tree tcode_tree = build_int_cst (integer_type_node, tcode);
+  return gimple_build_call_internal (unsignedp ? IFN_VCONDU : IFN_VCOND,
+				     5, op0a, op0b, op1, op2, tcode_tree);
+}
+
+/* Iterate all gimple statements and try to expand VEC_COND_EXPR assignments.  */
+
+static unsigned int
+gimple_expand_vec_cond_exprs (void)
+{
+  gimple_stmt_iterator gsi;
+  basic_block bb;
+  bool cfg_changed = false;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple *g = gimple_expand_vec_cond_expr (&gsi);
+	  if (g != NULL)
+	    {
+	      tree lhs = gimple_assign_lhs (gsi_stmt (gsi));
+	      gimple_set_lhs (g, lhs);
+	      gsi_replace (&gsi, g, false);
+	    }
+	  /* ???  If we do not cleanup EH then we will ICE in
+	     verification.  But in reality we have created wrong-code
+	     as we did not properly transition EH info and edges to
+	     the piecewise computations.  */
+	  if (maybe_clean_eh_stmt (gsi_stmt (gsi))
+	      && gimple_purge_dead_eh_edges (bb))
+	    cfg_changed = true;
+	}
+    }
+
+  return cfg_changed ? TODO_cleanup_cfg : 0;
+}
+
 namespace {
 
 const pass_data pass_data_lower_vector =
@@ -2305,6 +2432,49 @@ gimple_opt_pass *
 make_pass_lower_vector_ssa (gcc::context *ctxt)
 {
   return new pass_lower_vector_ssa (ctxt);
+}
+
+namespace {
+
+const pass_data pass_data_gimple_isel =
+{
+  GIMPLE_PASS, /* type */
+  "isel", /* name */
+  OPTGROUP_VEC, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  PROP_cfg, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa, /* todo_flags_finish */
+};
+
+class pass_gimple_isel : public gimple_opt_pass
+{
+public:
+  pass_gimple_isel (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_gimple_isel, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual bool gate (function *)
+    {
+      return true;
+    }
+
+  virtual unsigned int execute (function *)
+    {
+      return gimple_expand_vec_cond_exprs ();
+    }
+
+}; // class pass_gimple_isel
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_gimple_isel (gcc::context *ctxt)
+{
+  return new pass_gimple_isel (ctxt);
 }
 
 #include "gt-tree-vect-generic.h"
