@@ -2167,6 +2167,230 @@
   const vd __builtin_vsx_xvredp (vd);
     XVREDP vsx_frev2df2 {}
 
+  const vf __builtin_vsx_xvnegsp (vf);
+    XVNEGSP negv4sf2 {}
+
+  const vf __builtin_vsx_xvsqrtsp (vf);
+    XVSQRTSP sqrtv4sf2 {}
+
+  const vf __builtin_vsx_xvrsqrtsp (vf);
+    RSQRT_4SF rsqrtv4sf2 {}
+
+  const vf __builtin_vsx_xvrsqrtesp (vf);
+    XVRSQRTESP rsqrtev4sf2 {}
+
+  const unsigned int __builtin_vsx_xvtsqrtsp_fe (vf);
+    XVTSQRTSP_FE vsx_tsqrtv4sf2_fe {}
+
+  const unsigned int __builtin_vsx_xvtsqrtsp_fg (vf);
+    XVTSQRTSP_FG vsx_tsqrtv4sf2_fg {}
+
+  const vf __builtin_vsx_xvresp (vf);
+    XVRESP vsx_frev4sf2 {}
+
+  const vf __builtin_vsx_xscvdpsp (vd);
+    XSCVDPSP vsx_xscvdpsp {}
+
+  const vd __builtin_vsx_xscvspdp (vf);
+    XSCVSPDP vsx_xscvspdp {}
+
+  const vf __builtin_vsx_xscvdpsp (vd);
+    XVCVDPSP vsx_xvcvdpsp {}
+
+  const vd __builtin_vsx_xvcvspdp (vf);
+    XVCVSPDP vsx_xvcvspdp {}
+
+  const unsigned int __builtin_vsx_xstsqrtdp_fe (vd);
+    XSTSQRTDP_FE vsx_tsqrtdf2_fe {}
+
+  const unsigned int __builtin_vsx_xstsqrtdp_fg (vd);
+    XSTSQRTDP_FG vsx_tsqrtdf2_fg {}
+
+  const vsll __builtin_vsx_xvcvdpsxds (vd);
+    XVCVDPSXDS vsx_fix_truncv2dfv2di2 {}
+
+  const vull __builtin_vsx_xvcvdpuxds (vd);
+    XVCVDPUXDS vsx_fixuns_truncv2dfv2di2 {}
+
+; Redundant with previous entry
+  const vull __builtin_vsx_xvcvdpuxds_uns (vd);
+    XVCVDPUXDS_UNS vsx_fixuns_truncv2dfv2di2 {}
+
+  const vd __builtin_vsx_xvcvsxddp (vsll);
+    XVCVSXDDP vsx_floatv2div2df2 {}
+
+  const vd __builtin_vsx_xvcvuxddp (vull);
+    XVCVUXDDP vsx_floatunsv2div2df2 {}
+
+; Redundant with previous entry
+  const vd __builtin_vsx_xvcvuxddp_uns (vull);
+    XVCVUXDDP_UNS vsx_floatunsv2div2df2 {}
+
+  const vsi __builtin_vsx_xvcvspsxws (vf);
+    XVCVSPSXWS vsx_fix_truncv4sfv4si2 {}
+
+  const vui __builtin_vsx_xvcvspuxws (vf);
+    XVCVSPUXWS vsx_fixuns_truncv4sfv4si2 {}
+
+  const vf __builtin_vsx_xvcvsxwsp (vsi);
+    XVCVSXWSP vsx_floatv4siv4sf2 {}
+
+  const vf __builtin_vsx_xvcvuxwdp (vui);
+    XVCVUXWSP vsx_floatunsv4siv4sf2 {}
+
+  const vsll __builtin_vsx_xvcvdpsxws (vd);
+    XVCVDPSXWS vsx_xvcvdpsxws {}
+
+  const vull __builtin_vsx_xvcvdpuxws (vd);
+    XVCVDPUXWS vsx_xvcvdpuxws {}
+
+  const vd __builtin_vsx_xvcvsxwdp (vsll);
+    XVCVSXWDP vsx_xvcvsxwdp {}
+
+  const vd __builtin_vsx_xvcvuxwdp (vsll);
+    XVCVUXWDP vsx_xvcvuxwdp {}
+
+  const vd __builtin_vsx_xvrdpi (vd);
+    XVRDPI vsx_xvrdpi {}
+
+  const vd __builtin_vsx_xvrdpic (vd);
+    XVRDPIC vsx_xvrdpic {}
+
+  const vd __builtin_vsx_xvrdpim (vd);
+    XVRDPIM vsx_floorv2df2 {}
+
+  const vd __builtin_vsx_xvrdpip (vd);
+    XVRDPIP vsx_ceilv2df2 {}
+
+  const vd __builtin_vsx_xvrdpiz (vd);
+    XVRDPIZ vsx_btruncv2df2 {}
+
+  const vsll __builtin_vsx_xvcvspsxds (vf);
+    XVCVSPSXDS vsx_xvcvspsxds {}
+
+  const vull __builtin_vsx_xvcvspuxds (vf);
+    XVCVSPUXDS vsx_xvcvspuxds {}
+
+  const vf __builtin_vsx_xvcvsxdsp (vsll);
+    XVCVSXDSP vsx_xvcvsxdsp {}
+
+  const vf __builtin_vsx_xvcvuxdsp (vull);
+    XVCVUXDSP vsx_xvcvuxdsp {}
+
+  const vf __builtin_vsx_xvcvsxwsp (vsi);
+    XVCVSXWSP_V4SF vsx_xvcvsxwdp {}
+
+  const vf __builtin_vsx_xvcvuxwdp (vui);
+    XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
+
+  const vf __builtin_vsx_floate_v2di (vsll);
+    FLOATE_V2DI floatev2di {}
+
+  const vf __builtin_vsx_floate_v2df (vd);
+    FLOATE_V2DF floatev2df {}
+
+  const vf __builtin_vsx_floato_v2di (vsll);
+    FLOATO_V2DI floatov2di {}
+
+  const vf __builtin_vsx_floato_v2df (vd);
+    FLOATO_V2DF floatov2df {}
+
+  const vf __builtin_vsx_uns_floato_v2di (vull);
+    UNS_FLOATO_V2DI unsfloatov2di {}
+
+  const vf __builtin_vsx_uns_floate_v2di (vull);
+    UNS_FLOATE_V2DI unsfloatev2di {}
+
+  const vf __builtin_vsx_xvrspi (vf);
+    XVRSPI vsx_xvrspi {}
+
+  const vf __builtin_vsx_xvrspic (vf);
+    XVRSPIC vsx_xvrspic {}
+
+  const vf __builtin_vsx_xvrspim (vf);
+    XVRSPIM vsx_floorv4sf2 {}
+
+  const vf __builtin_vsx_xvrspip (vf);
+    XVRSPIP vsx_ceilv4sf2 {}
+
+  const vf __builtin_vsx_xvrspiz (vf);
+    XVRSPIZ vsx_btruncv4sf2 {}
+
+  const vd __builtin_vsx_xsrdpi (vd);
+    XSRDPI vsx_xsrdpi {}
+
+  const vd __builtin_vsx_xsrdpic (vd);
+    XSRDPIC vsx_xsrdpic {}
+
+  const vd __builtin_vsx_xsrdpim (vd);
+    XSRDPIM vsx_xsrdpim {}
+
+  const vd __builtin_vsx_xsrdpip (vd);
+    XSRDPIP vsx_xsrdpip {}
+
+  const vd __builtin_vsx_xsrdpiz (vd);
+    XSRDPIZ vsx_xsrdpiz {}
+
+  const vd __builtin_vsx_doublee_v4si (vsi);
+    DOUBLEE_V4SI doubleev4si2 {}
+
+  const vd __builtin_vsx_doublee_v4sf (vf);
+    DOUBLEE_V4SF doubleev4sf2 {}
+
+  const vd __builtin_vsx_uns_doublee_v4si (vui);
+    UNS_DOUBLEE_V4SI unsdoubleev4si2
+
+  const vd __builtin_vsx_doubleo_v4si (vsi);
+    DOUBLEO_V4SI doubleov4si2 {}
+
+  const vd __builtin_vsx_doubleo_v4sf (vf);
+    DOUBLEO_V4SF doubleov4sf2 {}
+
+  const vd __builtin_vsx_uns_doubleo_v4si (vui);
+    UNS_DOUBLEO_V4SI unsdoubleov4si2
+
+  const vd __builtin_vsx_doubleh_v4si (vsi);
+    DOUBLEH_V4SI doublehv4si2 {}
+
+  const vd __builtin_vsx_doubleh_v4sf (vf);
+    DOUBLEH_V4SF doublehv4sf2 {}
+
+  const vd __builtin_vsx_uns_doubleh_v4si (vui);
+    UNS_DOUBLEH_V4SI unsdoublehv4si2
+
+  const vd __builtin_vsx_doublel_v4si (vsi);
+    DOUBLEL_V4SI doublelv4si2 {}
+
+  const vd __builtin_vsx_doublel_v4sf (vf);
+    DOUBLEL_V4SF doublelv4sf2 {}
+
+  const vd __builtin_vsx_uns_doublel_v4si (vui);
+    UNS_DOUBLEL_V4SI unsdoublelv4si2
+
+  const vsi __builtin_vsx_vsigned_v4sf (vf);
+    VEC_VSIGNED_V4SF vsx_xvcvspsxws {}
+
+  const vsll __builtin_vsx_vsigned_v2df (vd);
+    VEC_VSIGNED_V2DF vsx_xvcvdpsxds {}
+
+  const vsll __builtin_vsx_vsignede_v2df (vd);
+    VEC_VSIGNEDE_V2DF vsignede_v2df {}
+
+  const vsll __builtin_vsx_vsignedo_v2df (vd);
+    VEC_VSIGNEDO_V2DF vsignedo_v2df {}
+
+  const vui __builtin_vsx_vunsigned_v4sf (vf);
+    VEC_VUNSIGNED_V4SF vsx_xvcvspsxws {}
+
+  const vull __builtin_vsx_vunsigned_v2df (vd);
+    VEC_VUNSIGNED_V2DF vsx_xvcvdpsxds {}
+
+  const vull __builtin_vsx_vunsignede_v2df (vd);
+    VEC_VUNSIGNEDE_V2DF vunsignede_v2df {}
+
+  const vull __builtin_vsx_vunsignedo_v2df (vd);
+    VEC_VUNSIGNEDO_V2DF vunsignedo_v2df {}
+
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);
