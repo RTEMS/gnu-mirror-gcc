@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 				   UNSIGNED_OPTAB, TYPE)
      DEF_INTERNAL_FLT_FN (NAME, FLAGS, OPTAB, TYPE)
      DEF_INTERNAL_INT_FN (NAME, FLAGS, OPTAB, TYPE)
+     DEF_INTERNAL_OPTAB_CAN_FAIL (OPTAB)
 
    where NAME is the name of the function, FLAGS is a set of
    ECF_* flags and FNSPEC is a string describing functions fnspec.
@@ -86,7 +87,10 @@ along with GCC; see the file COPYING3.  If not see
 
    where STMT is the statement that performs the call.  These are generated
    automatically for optab functions and call out to a function or macro
-   called expand_<TYPE>_optab_fn.  */
+   called expand_<TYPE>_optab_fn.
+
+   DEF_INTERNAL_OPTAB_CAN_FAIL defines tables that are used for GIMPLE
+   instruction selection and do not map directly to instructions.  */
 
 #ifndef DEF_INTERNAL_FN
 #define DEF_INTERNAL_FN(CODE, FLAGS, FNSPEC)
@@ -118,6 +122,10 @@ along with GCC; see the file COPYING3.  If not see
   DEF_INTERNAL_OPTAB_FN (NAME, FLAGS, OPTAB, TYPE)
 #endif
 
+#ifndef DEF_INTERNAL_OPTAB_CAN_FAIL
+#define DEF_INTERNAL_OPTAB_CAN_FAIL(OPTAB)
+#endif
+
 DEF_INTERNAL_OPTAB_FN (MASK_LOAD, ECF_PURE, maskload, mask_load)
 DEF_INTERNAL_OPTAB_FN (LOAD_LANES, ECF_CONST, vec_load_lanes, load_lanes)
 DEF_INTERNAL_OPTAB_FN (MASK_LOAD_LANES, ECF_PURE,
@@ -135,6 +143,16 @@ DEF_INTERNAL_OPTAB_FN (MASK_STORE, 0, maskstore, mask_store)
 DEF_INTERNAL_OPTAB_FN (STORE_LANES, ECF_CONST, vec_store_lanes, store_lanes)
 DEF_INTERNAL_OPTAB_FN (MASK_STORE_LANES, 0,
 		       vec_mask_store_lanes, mask_store_lanes)
+
+DEF_INTERNAL_OPTAB_FN (VCOND, 0, vcond, vec_cond)
+DEF_INTERNAL_OPTAB_FN (VCONDU, 0, vcondu, vec_condu)
+DEF_INTERNAL_OPTAB_FN (VCONDEQ, 0, vcondeq, vec_condeq)
+DEF_INTERNAL_OPTAB_FN (VCOND_MASK, 0, vcond_mask, vec_cond_mask)
+
+DEF_INTERNAL_OPTAB_CAN_FAIL (vcond)
+DEF_INTERNAL_OPTAB_CAN_FAIL (vcondu)
+DEF_INTERNAL_OPTAB_CAN_FAIL (vcondeq)
+DEF_INTERNAL_OPTAB_CAN_FAIL (vcond_mask)
 
 DEF_INTERNAL_OPTAB_FN (WHILE_ULT, ECF_CONST | ECF_NOTHROW, while_ult, while)
 DEF_INTERNAL_OPTAB_FN (CHECK_RAW_PTRS, ECF_CONST | ECF_NOTHROW,
@@ -380,4 +398,5 @@ DEF_INTERNAL_FN (NOP, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 #undef DEF_INTERNAL_FLT_FLOATN_FN
 #undef DEF_INTERNAL_SIGNED_OPTAB_FN
 #undef DEF_INTERNAL_OPTAB_FN
+#undef DEF_INTERNAL_OPTAB_CAN_FAIL
 #undef DEF_INTERNAL_FN

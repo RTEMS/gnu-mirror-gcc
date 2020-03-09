@@ -857,6 +857,9 @@ main (int argc, const char **argv)
 
 #define DEF_INTERNAL_OPTAB_FN(NAME, FLAGS, OPTAB, TYPE) \
   nofail_optabs[OPTAB##_optab] = true;
+
+#define DEF_INTERNAL_OPTAB_CAN_FAIL(OPTAB) \
+  nofail_optabs[OPTAB##_optab] = false;
 #include "internal-fn.def"
 
   /* Assign sequential codes to all entries in the machine description
