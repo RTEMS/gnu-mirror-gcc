@@ -111,7 +111,8 @@ struct plugin_symtab
 {
   int nsyms;
   struct sym_aux *aux;
-  struct ld_plugin_symbol *syms;
+  struct ld_plugin_symbol_v2 *syms;
+  struct ld_plugin_symbol *syms_v1;
   unsigned long long id;
 };
 
@@ -157,11 +158,13 @@ static char *arguments_file_name;
 static ld_plugin_register_claim_file register_claim_file;
 static ld_plugin_register_all_symbols_read register_all_symbols_read;
 static ld_plugin_get_symbols get_symbols, get_symbols_v2;
+static ld_plugin_get_symbols_v2 get_symbols_v4;
 static ld_plugin_register_cleanup register_cleanup;
 static ld_plugin_add_input_file add_input_file;
 static ld_plugin_add_input_library add_input_library;
 static ld_plugin_message message;
 static ld_plugin_add_symbols add_symbols;
+static ld_plugin_add_symbols_v2 add_symbols_v2;
 
 static struct plugin_file_info *claimed_files = NULL;
 static unsigned int num_claimed_files = 0;
@@ -247,7 +250,7 @@ struct lto_section lto_header;
    Returns the address of the next entry. */
 
 static char *
-parse_table_entry (char *p, struct ld_plugin_symbol *entry, 
+parse_table_entry (char *p, struct ld_plugin_symbol_v2 *entry,
 		   struct sym_aux *aux)
 {
   unsigned char t;
@@ -349,14 +352,14 @@ static void
 translate (char *data, char *end, struct plugin_symtab *out)
 {
   struct sym_aux *aux;
-  struct ld_plugin_symbol *syms = NULL;
+  struct ld_plugin_symbol_v2 *syms = NULL;
   int n, len;
 
   /* This overestimates the output buffer sizes, but at least 
      the algorithm is O(1) now. */
 
   len = (end - data)/8 + out->nsyms + 1;
-  syms = xrealloc (out->syms, len * sizeof (struct ld_plugin_symbol));
+  syms = xrealloc (out->syms, len * sizeof (struct ld_plugin_symbol_v2));
   aux = xrealloc (out->aux, len * sizeof (struct sym_aux));
   
   for (n = out->nsyms; data < end; n++) 
@@ -370,6 +373,32 @@ translate (char *data, char *end, struct plugin_symtab *out)
   out->nsyms = n;
   out->syms = syms;
   out->aux = aux;
+}
+
+/* Copy syms to syms_v1.  */
+static void
+fill_up_older_syms (struct plugin_symtab *out)
+{
+  if (out->syms_v1)
+    return;
+
+  struct ld_plugin_symbol *syms
+    = xrealloc (out->syms_v1, out->nsyms * sizeof (struct ld_plugin_symbol));
+  for (unsigned i = 0; i < out->nsyms; i++)
+    {
+      struct ld_plugin_symbol *old = &syms[i];
+      struct ld_plugin_symbol_v2 *new = &out->syms[i];
+
+      old->name = new->name;
+      old->version = new->version;
+      old->def = new->def;
+      old->visibility = new->visibility;
+      old->size = new->size;
+      old->comdat_key = new->comdat_key;
+      old->resolution = new->resolution;
+    }
+
+  out->syms_v1 = syms;
 }
 
 /* Free all memory that is no longer needed after writing the symbol
@@ -386,12 +415,18 @@ free_1 (struct plugin_file_info *files, unsigned num_files)
       unsigned int j;
       for (j = 0; j < symtab->nsyms; j++)
 	{
-	  struct ld_plugin_symbol *s = &symtab->syms[j];
+	  struct ld_plugin_symbol_v2 *s = &symtab->syms[j];
 	  free (s->name);
 	  free (s->comdat_key);
 	}
       free (symtab->syms);
       symtab->syms = NULL;
+
+      if (symtab->syms_v1 != NULL)
+	{
+	  free (symtab->syms_v1);
+	  symtab->syms_v1 = NULL;
+	}
     }
 }
 
@@ -524,14 +559,19 @@ write_resolution (void)
     {
       struct plugin_file_info *info = &claimed_files[i];
       struct plugin_symtab *symtab = &info->symtab;
-      struct ld_plugin_symbol *syms = symtab->syms;
 
       /* Version 2 of API supports IRONLY_EXP resolution that is
          accepted by GCC-4.7 and newer.  */
-      if (get_symbols_v2)
-        get_symbols_v2 (info->handle, symtab->nsyms, syms);
+      if (get_symbols_v4)
+	get_symbols_v4 (info->handle, symtab->nsyms, symtab->syms);
       else
-        get_symbols (info->handle, symtab->nsyms, syms);
+	{
+	  fill_up_older_syms (symtab);
+	  if (get_symbols_v2)
+	    get_symbols_v2 (info->handle, symtab->nsyms, symtab->syms_v1);
+	  else
+	    get_symbols (info->handle, symtab->nsyms, symtab->syms_v1);
+	}
 
       finish_conflict_resolution (symtab, &info->conflicts);
 
@@ -860,8 +900,8 @@ cleanup_handler (void)
 
 static int eq_sym (const void *a, const void *b)
 {
-  const struct ld_plugin_symbol *as = (const struct ld_plugin_symbol *)a;
-  const struct ld_plugin_symbol *bs = (const struct ld_plugin_symbol *)b;
+  const struct ld_plugin_symbol_v2 *as = (const struct ld_plugin_symbol_v2 *)a;
+  const struct ld_plugin_symbol_v2 *bs = (const struct ld_plugin_symbol_v2 *)b;
 
   return !strcmp (as->name, bs->name);
 }
@@ -870,14 +910,14 @@ static int eq_sym (const void *a, const void *b)
 
 static hashval_t hash_sym (const void *a)
 {
-  const struct ld_plugin_symbol *as = (const struct ld_plugin_symbol *)a;
+  const struct ld_plugin_symbol_v2 *as = (const struct ld_plugin_symbol_v2 *)a;
 
   return htab_hash_string (as->name);
 }
 
 /* Determine how strong a symbol is */
 
-static int symbol_strength (struct ld_plugin_symbol *s)
+static int symbol_strength (struct ld_plugin_symbol_v2 *s)
 {
   switch (s->def) 
     { 
@@ -918,14 +958,14 @@ resolve_conflicts (struct plugin_symtab *t, struct plugin_symtab *conflicts)
   int outlen;
 
   outlen = t->nsyms;
-  conflicts->syms = xmalloc (sizeof (struct ld_plugin_symbol) * outlen);
+  conflicts->syms = xmalloc (sizeof (struct ld_plugin_symbol_v2) * outlen);
   conflicts->aux = xmalloc (sizeof (struct sym_aux) * outlen);
 
   /* Move all duplicate symbols into the auxiliary conflicts table. */
   out = 0;
   for (i = 0; i < t->nsyms; i++) 
     {
-      struct ld_plugin_symbol *s = &t->syms[i];
+      struct ld_plugin_symbol_v2 *s = &t->syms[i];
       struct sym_aux *aux = &t->aux[i];
       void **slot;
 
@@ -933,13 +973,14 @@ resolve_conflicts (struct plugin_symtab *t, struct plugin_symtab *conflicts)
       if (*slot != NULL)
 	{
 	  int cnf;
-	  struct ld_plugin_symbol *orig = (struct ld_plugin_symbol *)*slot;
+	  struct ld_plugin_symbol_v2
+	    *orig = (struct ld_plugin_symbol_v2 *)*slot;
 	  struct sym_aux *orig_aux = &t->aux[orig - t->syms];
 
 	  /* Always let the linker resolve the strongest symbol */
 	  if (symbol_strength (orig) < symbol_strength (s)) 
 	    {
-	      SWAP (struct ld_plugin_symbol, *orig, *s);
+	      SWAP (struct ld_plugin_symbol_v2, *orig, *s);
 	      SWAP (uint32_t, orig_aux->slot, aux->slot);
 	      SWAP (unsigned long long, orig_aux->id, aux->id);
 	      /* Don't swap conflict chain pointer */
@@ -1126,8 +1167,16 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
 
   if (obj.found > 0)
     {
-      status = add_symbols (file->handle, lto_file.symtab.nsyms,
-			    lto_file.symtab.syms);
+      if (add_symbols_v2)
+	status = add_symbols_v2 (file->handle, lto_file.symtab.nsyms,
+				 lto_file.symtab.syms);
+      else
+	{
+	  fill_up_older_syms (&lto_file.symtab);
+	  status = add_symbols (file->handle, lto_file.symtab.nsyms,
+				lto_file.symtab.syms_v1);
+	}
+
       check (status == LDPS_OK, LDPL_FATAL, "could not add symbols");
 
       num_claimed_files++;
@@ -1288,11 +1337,17 @@ onload (struct ld_plugin_tv *tv)
 	case LDPT_REGISTER_CLAIM_FILE_HOOK:
 	  register_claim_file = p->tv_u.tv_register_claim_file;
 	  break;
+	case LDPT_ADD_SYMBOLS_V2:
+	  add_symbols_v2 = p->tv_u.tv_add_symbols_v2;
+	  break;
 	case LDPT_ADD_SYMBOLS:
 	  add_symbols = p->tv_u.tv_add_symbols;
 	  break;
 	case LDPT_REGISTER_ALL_SYMBOLS_READ_HOOK:
 	  register_all_symbols_read = p->tv_u.tv_register_all_symbols_read;
+	  break;
+	case LDPT_GET_SYMBOLS_V4:
+	  get_symbols_v4 = p->tv_u.tv_get_symbols_v4;
 	  break;
 	case LDPT_GET_SYMBOLS_V2:
 	  get_symbols_v2 = p->tv_u.tv_get_symbols;
