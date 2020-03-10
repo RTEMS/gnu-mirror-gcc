@@ -2391,6 +2391,69 @@
   const vull __builtin_vsx_vunsignedo_v2df (vd);
     VEC_VUNSIGNEDO_V2DF vunsignedo_v2df {}
 
+; These predicates aren't used in the ALL or ANY interfaces; they appear
+; to return vectors rather than an integer as other predicates do.
+  const vui __builtin_vsx_xvcmpeqsp_p (vf);
+    XVCMPEQSP_P vector_eq_v4sf_p {}
+
+  const vui __builtin_vsx_xvcmpgesp_p (vf);
+    XVCMPGESP_P vector_ge_v4sf_p {}
+
+  const vui __builtin_vsx_xvcmpgtsp_p (vf);
+    XVCMPGTSP_P vector_gt_v4sf_p {}
+
+  const vull __builtin_vsx_xvcmpeqdp_p (vd);
+    XVCMPEQDP_P vector_eq_v2df_p {}
+
+  const vull __builtin_vsx_xvcmpgedp_p (vd);
+    XVCMPGEDP_P vector_ge_v2df_p {}
+
+  const vull __builtin_vsx_xvcmpgtdp_p (vd);
+    XVCMPGTDP_P vector_gt_v2df_p {}
+
+; There is apparent intent in rs6000-builtin.def to have RS6000_BTC_SPECIAL
+; processing for LXSDX, LXVDSX, and STXSDX, but there are no def_builtin calls
+; for any of them.  At some point, we may want to add a set of built-ins for
+; whichever vector types make sense for these.
+
+  pure vsq __builtin_vsx_lxvd2x_v1ti (signed long long, signed __int128 *);
+    LXVD2X_V1TI_SS vsx_load_v1ti {ldvec}
+  pure vsq __builtin_vsx_lxvd2x_v1ti (signed long long, vsq *);
+    LXVD2X_V1TI_SV vsx_load_v1ti {ldvec}
+  pure vuq __builtin_vsx_lxvd2x_v1ti (signed long long, unsigned __int128 *);
+    LXVD2X_V1TI_US vsx_load_v1ti {ldvec}
+; Following one does not appear in rs60000-builtini.def, probable oversight.
+  pure vuq __builtin_vsx_lxvd2x_v1ti (signed long long, vuq *);
+    LXVD2X_V1TI_UV vsx_load_v1ti {ldvec}
+
+  pure vd __builtin_vsx_lxvd2x_v2df (signed long long, vd *);
+    LXVD2X_V2DF_V vsx_load_v2df {ldvec}
+  pure vd __builtin_vsx_lxvd2x_v2df (signed long long, double *);
+    LXVD2X_V2DF_S vsx_load_v2df {ldvec}
+
+  pure vsll __builtin_vsx_lxvd2x_v2di (signed long long, vsll *);
+    LXVD2X_V2DI_SV vsx_load_v2di {ldvec}
+  pure vsll __builtin_vsx_lxvd2x_v2di (signed long long, signed long long *);
+    LXVD2X_V2DI_SS vsx_load_v2di {ldvec}
+  pure vull __builtin_vsx_lxvd2x_v2di (signed long long, vull *);
+    LXVD2X_V2DI_UV vsx_load_v2di {ldvec}
+  pure vull __builtin_vsx_lxvd2x_v2di (signed long long, unsigned long long *);
+    LXVD2X_V2DI_US vsx_load_v2di {ldvec}
+
+  pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, vf *);
+    LXVW4X_V4SF_V vsx_load_v4sf {ldvec}
+  pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, float *);
+    LXVW4X_V4SF_S vsx_load_v4sf {ldvec}
+
+  pure vsi __builtin_vsx_lxvw4x_v4si (signed long long, vsi *);
+    LXVW4X_V4SI_SV vsx_load_v4si {ldvec}
+  pure vsi __builtin_vsx_lxvw4x_v4si (signed long long, signed int *);
+    LXVW4X_V4SI_SS vsx_load_v4si {ldvec}
+  pure vui __builtin_vsx_lxvw4x_v4si (signed long long, vui *);
+    LXVW4X_V4SI_UV vsx_load_v4si {ldvec}
+  pure vui __builtin_vsx_lxvw4x_v4si (signed long long, unsigned int *);
+    LXVW4X_V4SI_US vsx_load_v4si {ldvec}
+
 
 [MASK_P8_VECTOR]
   const vull __builtin_altivec_vmuleuw (vui, vui);

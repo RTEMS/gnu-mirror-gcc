@@ -2829,6 +2829,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_V2DI, 0 },
   { VSX_BUILTIN_VEC_XL, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_long_long, 0 },
+  /* Next 1 redundant, not in rs6000-builtin-new.def.  */
   { VSX_BUILTIN_VEC_XL, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_INTDI, 0 },
   { VSX_BUILTIN_VEC_XL, VSX_BUILTIN_LXVD2X_V2DI,
@@ -2837,6 +2838,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { VSX_BUILTIN_VEC_XL, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI,
     ~RS6000_BTI_unsigned_long_long, 0 },
+  /* Next 1 redundant, not in rs6000-builtin-new.def.  */
   { VSX_BUILTIN_VEC_XL, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTDI, 0 },
 
