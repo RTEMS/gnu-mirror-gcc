@@ -1483,10 +1483,17 @@ structural_comptypes (tree t1, tree t2, int strict)
 bool
 comptypes (tree t1, tree t2, int strict)
 {
+  gcc_checking_assert (t1 && t2);
+
+  /* TYPE_ARGUMENT_PACKS are not really types.  */
+  gcc_checking_assert (TREE_CODE (t1) != TYPE_ARGUMENT_PACK
+		       && TREE_CODE (t2) != TYPE_ARGUMENT_PACK);
+
   if (strict == COMPARE_STRICT && comparing_specializations
       && (t1 != TYPE_CANONICAL (t1) || t2 != TYPE_CANONICAL (t2)))
     /* If comparing_specializations, treat dependent aliases as distinct.  */
     strict = COMPARE_STRUCTURAL;
+
   if (strict == COMPARE_STRICT)
     {
       if (t1 == t2)
@@ -6325,6 +6332,7 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
       tree stripped_arg = tree_strip_any_location_wrapper (arg);
       if (TREE_CODE (stripped_arg) == FUNCTION_DECL
 	  && DECL_IMMEDIATE_FUNCTION_P (stripped_arg)
+	  && cp_unevaluated_operand == 0
 	  && (current_function_decl == NULL_TREE
 	      || !DECL_IMMEDIATE_FUNCTION_P (current_function_decl)))
 	{
@@ -7383,7 +7391,7 @@ build_static_cast_1 (location_t loc, tree type, tree expr, bool c_cast_p,
   if (TYPE_REF_P (type)
       && TYPE_REF_IS_RVALUE (type)
       && (clk = real_lvalue_p (expr))
-      && reference_related_p (TREE_TYPE (type), intype)
+      && reference_compatible_p (TREE_TYPE (type), intype)
       && (c_cast_p || at_least_as_qualified_p (TREE_TYPE (type), intype)))
     {
       if (processing_template_decl)

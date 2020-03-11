@@ -117,13 +117,13 @@ struct conversion {
     /* The next conversion in the chain.  Since the conversions are
        arranged from outermost to innermost, the NEXT conversion will
        actually be performed before this conversion.  This variant is
-       used only when KIND is neither ck_identity, ck_ambig nor
+       used only when KIND is neither ck_identity, ck_aggr, ck_ambig nor
        ck_list.  Please use the next_conversion function instead
        of using this field directly.  */
     conversion *next;
     /* The expression at the beginning of the conversion chain.  This
-       variant is used only if KIND is ck_identity or ck_ambig.  You can
-       use conv_get_original_expr to get this expression.  */
+       variant is used only if KIND is ck_identity, ck_aggr, or ck_ambig.
+       You can use conv_get_original_expr to get this expression.  */
     tree expr;
     /* The array of conversions for an initializer_list, so this
        variant is used only when KIN D is ck_list.  */
@@ -204,7 +204,6 @@ static struct z_candidate *add_candidate
 	 conversion **, tree, tree, int, struct rejection_reason *, int);
 static tree source_type (conversion *);
 static void add_warning (struct z_candidate *, struct z_candidate *);
-static bool reference_compatible_p (tree, tree);
 static conversion *direct_reference_binding (tree, conversion *);
 static bool promoted_arithmetic_type_p (tree);
 static conversion *conditional_conversion (tree, tree, tsubst_flags_t);
@@ -861,7 +860,8 @@ next_conversion (conversion *conv)
   if (conv == NULL
       || conv->kind == ck_identity
       || conv->kind == ck_ambig
-      || conv->kind == ck_list)
+      || conv->kind == ck_list
+      || conv->kind == ck_aggr)
     return NULL;
   return conv->u.next;
 }
@@ -1030,7 +1030,7 @@ build_aggr_conv (tree type, tree ctor, int flags, tsubst_flags_t complain)
   c->rank = cr_exact;
   c->user_conv_p = true;
   c->check_narrowing = true;
-  c->u.next = NULL;
+  c->u.expr = ctor;
   return c;
 }
 
@@ -1083,7 +1083,7 @@ build_array_conv (tree type, tree ctor, int flags, tsubst_flags_t complain)
   c->rank = rank;
   c->user_conv_p = user;
   c->bad_p = bad;
-  c->u.next = build_identity_conv (TREE_TYPE (ctor), ctor);
+  c->u.expr = ctor;
   return c;
 }
 
@@ -1129,7 +1129,7 @@ build_complex_conv (tree type, tree ctor, int flags,
   c->rank = rank;
   c->user_conv_p = user;
   c->bad_p = bad;
-  c->u.next = NULL;
+  c->u.expr = ctor;
   return c;
 }
 
@@ -1553,7 +1553,7 @@ reference_related_p (tree t1, tree t2)
 
 /* Returns nonzero if T1 is reference-compatible with T2.  */
 
-static bool
+bool
 reference_compatible_p (tree t1, tree t2)
 {
   /* [dcl.init.ref]
@@ -4083,6 +4083,10 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 
       for (cand = candidates; cand != old_candidates; cand = cand->next)
 	{
+	  if (cand->viable == 0)
+	    /* Already rejected, don't change to -1.  */
+	    continue;
+
 	  tree rettype = TREE_TYPE (TREE_TYPE (cand->fn));
 	  conversion *ics
 	    = implicit_conversion (totype,
@@ -7373,6 +7377,16 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
   if (issue_conversion_warnings && (complain & tf_warning))
     conversion_null_warnings (totype, expr, fn, argnum);
 
+  /* Creating &TARGET_EXPR<> in a template breaks when substituting,
+     and creating a CALL_EXPR in a template breaks in finish_call_expr
+     so use an IMPLICIT_CONV_EXPR for this conversion.  We would have
+     created such codes e.g. when calling a user-defined conversion
+     function.  */
+  if (processing_template_decl
+      && convs->kind != ck_identity
+      && (CLASS_TYPE_P (totype) || CLASS_TYPE_P (TREE_TYPE (expr))))
+    return build1 (IMPLICIT_CONV_EXPR, totype, expr);
+
   switch (convs->kind)
     {
     case ck_user:
@@ -7726,15 +7740,18 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
 	      {
 		/* If the reference is volatile or non-const, we
 		   cannot create a temporary.  */
-		if (lvalue & clk_bitfield)
-		  error_at (loc, "cannot bind bit-field %qE to %qT",
-			    expr, ref_type);
-		else if (lvalue & clk_packed)
-		  error_at (loc, "cannot bind packed field %qE to %qT",
-			    expr, ref_type);
-		else
-		  error_at (loc, "cannot bind rvalue %qE to %qT",
-			    expr, ref_type);
+		if (complain & tf_error)
+		  {
+		    if (lvalue & clk_bitfield)
+		      error_at (loc, "cannot bind bit-field %qE to %qT",
+				expr, ref_type);
+		    else if (lvalue & clk_packed)
+		      error_at (loc, "cannot bind packed field %qE to %qT",
+				expr, ref_type);
+		    else
+		      error_at (loc, "cannot bind rvalue %qE to %qT",
+				expr, ref_type);
+		  }
 		return error_mark_node;
 	      }
 	    /* If the source is a packed field, and we must use a copy
@@ -7756,6 +7773,14 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
 		expr = convert_bitfield_to_declared_type (expr);
 		expr = fold_convert (type, expr);
 	      }
+
+	    /* Creating &TARGET_EXPR<> in a template would break when
+	       tsubsting the expression, so use an IMPLICIT_CONV_EXPR
+	       instead.  This can happen even when there's no class
+	       involved, e.g., when converting an integer to a reference
+	       type.  */
+	    if (processing_template_decl)
+	      return build1 (IMPLICIT_CONV_EXPR, totype, expr);
 	    expr = build_target_expr_with_type (expr, type, complain);
 	  }
 
@@ -8425,6 +8450,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	current_function_returns_abnormally = 1;
       if (TREE_CODE (fn) == FUNCTION_DECL
 	  && DECL_IMMEDIATE_FUNCTION_P (fn)
+	  && cp_unevaluated_operand == 0
 	  && (current_function_decl == NULL_TREE
 	      || !DECL_IMMEDIATE_FUNCTION_P (current_function_decl))
 	  && (current_binding_level->kind != sk_function_parms
@@ -9061,6 +9087,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       tree fndecl = STRIP_TEMPLATE (TREE_OPERAND (fn, 0));
       if (TREE_CODE (fndecl) == FUNCTION_DECL
 	  && DECL_IMMEDIATE_FUNCTION_P (fndecl)
+	  && cp_unevaluated_operand == 0
 	  && (current_function_decl == NULL_TREE
 	      || !DECL_IMMEDIATE_FUNCTION_P (current_function_decl))
 	  && (current_binding_level->kind != sk_function_parms
@@ -10498,7 +10525,7 @@ static tree
 conv_get_original_expr (conversion *c)
 {
   for (; c; c = next_conversion (c))
-    if (c->kind == ck_identity || c->kind == ck_ambig)
+    if (c->kind == ck_identity || c->kind == ck_ambig || c->kind == ck_aggr)
       return c->u.expr;
   return NULL_TREE;
 }

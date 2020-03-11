@@ -97,6 +97,11 @@
 ; an IT block in their expansion which is not a short IT.
 (define_attr "enabled_for_short_it" "no,yes" (const_string "yes"))
 
+; Mark an instruction sequence as the required way of loading a
+; constant when -mpure-code is enabled (which implies
+; arm_disable_literal_pool)
+(define_attr "required_for_purecode" "no,yes" (const_string "no"))
+
 ;; Operand number of an input operand that is shifted.  Zero if the
 ;; given instruction does not shift one of its input operands.
 (define_attr "shift" "" (const_int 0))
@@ -228,6 +233,10 @@
 
 	  (and (eq_attr "enabled_for_short_it" "no")
 	       (match_test "arm_restrict_it"))
+	  (const_string "no")
+
+	  (and (eq_attr "required_for_purecode" "yes")
+	       (not (match_test "arm_disable_literal_pool")))
 	  (const_string "no")
 
 	  (eq_attr "arch_enabled" "no")
@@ -4399,7 +4408,7 @@
                    (match_operand:SI 2 "reg_or_int_operand")))]
   "TARGET_32BIT"
   "
-  if (TARGET_HAVE_MVE)
+  if (TARGET_HAVE_MVE && !BYTES_BIG_ENDIAN)
     {
       if (!reg_or_int_operand (operands[2], SImode))
         operands[2] = force_reg (SImode, operands[2]);
@@ -4443,7 +4452,7 @@
   "TARGET_32BIT"
   "
   /* Armv8.1-M Mainline double shifts are not expanded.  */
-  if (TARGET_HAVE_MVE
+  if (TARGET_HAVE_MVE && !BYTES_BIG_ENDIAN
       && arm_reg_or_long_shift_imm (operands[2], GET_MODE (operands[2])))
     {
       if (!reg_overlap_mentioned_p(operands[0], operands[1]))
@@ -4478,7 +4487,7 @@
   "TARGET_32BIT"
   "
   /* Armv8.1-M Mainline double shifts are not expanded.  */
-  if (TARGET_HAVE_MVE
+  if (TARGET_HAVE_MVE && !BYTES_BIG_ENDIAN
     && long_shift_imm (operands[2], GET_MODE (operands[2])))
     {
       if (!reg_overlap_mentioned_p(operands[0], operands[1]))

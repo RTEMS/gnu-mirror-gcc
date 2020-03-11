@@ -1,14 +1,138 @@
+2020-03-08  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93581
+	* resolve.c (gfc_resolve_ref): Modify array refs to be elements
+	if the ref chain ends in INQUIRY_LEN.
+	* trans-array.c (gfc_get_dataptr_offset): Provide the offsets
+	for INQUIRY_RE and INQUIRY_IM.
+
+2020-03-05 Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93792
+	* decl.c (variable_decl): If param and initializer check
+	for BOZ, if found,  output an error, set m to MATCH_ERROR
+	and goto cleanup.
+
+2020-03-02  Andrew Benson  <abensonca@gmail.com>
+
+	PR fortran/93486
+	* module.c: Increase size of variables used to read module names
+	when loading interfaces from module files to permit cases where
+	the name is the concatenation of a module and submodule name.
+	* gfortran.dg/pr93486.f90: New test.
+
+2020-03-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/92976
+	* match.c (select_type_set_tmp): If the selector array spec has
+	explicit bounds, make the temporary's bounds deferred.
+
+2020-03-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/92959
+	* trans-intrinsic.c (gfc_conv_associated): Eliminate
+	'nonzero_charlen' and move the chunk to evaluate zero character
+	length until after the argument evaluation so that the string
+	length can be used.
+
+2020-02-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/92785
+	* trans-expr.c (gfc_conv_intrinsic_to_class): Renormalise non-
+	variable expressions to be unity lbound based.
+
+2020-02-25  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	* simplify.c (degrees_f): Remove unused code.
+
+2020-02-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR translation/93864
+	* intrinsic.texi (CO_BROADCAST): Fix typo, paramter -> parameter.
+	* trans-array.c (gfc_allocate_pdt_comp, gfc_deallocate_pdt_comp,
+	gfc_check_pdt_dummy): Fix comment typo paramter -> parameter.
+
+2020-02-24  Mark Eggleston  <mark.eggleston@codethink.com>
+	    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93835
+	* decl.c (gfc_match_data) : Check whether the data expression
+	is a derived type and is a constructor. If a BOZ constant
+	is encountered in the constructor output an error and return
+	MATCH_ERROR.
+
+2020-02-24  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93604
+	* decl.c (gfc_match_data) : Check whether the data expression
+	is a derived type and is a constructor. If a BOZ constant
+	is encountered in the constructor output an error and return
+	MATCH_ERROR.
+
+2020-02-24  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93552
+	* match.c (match_exit_cycle): With OpenACC, check the kernels loop
+	directive and tile clause as well.
+
+2020-02-23  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/93889
+	* interface.c (compare_parameter): Fix error message.
+
+2020-02-23  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/93890
+	* interface.c: Replace "can not" by "cannot" and remove trailing
+	space.
+
+2020-02-20  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93825
+	* openmp.c (resolve_oacc_loop_blocks): Move call to
+	resolve_oacc_nested_loops from here ...
+	(resolve_oacc_loop): ... to here.
+
+2020-02-18  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/93714
+	* expr.c (gfc_check_pointer_assign): Move check for
+	matching character length to after checking the lvalue
+	attributes for target or pointer.
+
+2020-02-18  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93601
+	* match.c (gfc_match_assignment) : Reject assignment if
+	the lhs stype is BT_CLASS and the rhs type is BT_BOZ.
+
+2020-02-18  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93603
+	* match.c (gfc_match_associate) : If target expression
+	has the type BT_BOZ output an error and goto
+	assocListError.
+
+2020-02-18  Steven G. Kargl  <kargl@gcc.gnu.org>
+	    Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/93580
+	* primary.c (gfc_match_varspec): If the symbol following %
+	is re or im and the primary expression type is not BT_COMPLEX
+	issue an error. If the symbol is len and the primary
+	expression type is not BT_CHARACTER is an error.
+
 2020-02-10  Andrew Benson  <abensonca@gmail.com>
 
-        PR fortran/83113
-        * array.c: Do not attempt to set the array spec for a submodule
-        function symbol (as it has already been set in the corresponding
-        module procedure interface).
-        * symbol.c: Do not reject duplicate POINTER, ALLOCATABLE, or
-        DIMENSION attributes in declarations of a submodule function.
-        * gfortran.h: Add a macro that tests for a module procedure in a
-        submodule.
-        * gfortran.dg/pr83113.f90: New test.
+	PR fortran/83113
+	* array.c: Do not attempt to set the array spec for a submodule
+	function symbol (as it has already been set in the corresponding
+	module procedure interface).
+	* symbol.c: Do not reject duplicate POINTER, ALLOCATABLE, or
+	DIMENSION attributes in declarations of a submodule function.
+	* gfortran.h: Add a macro that tests for a module procedure in a
+	submodule.
+	* gfortran.dg/pr83113.f90: New test.
 
 2020-02-03  Julian Brown  <julian@codesourcery.com>
 	    Tobias Burnus  <tobias@codesourcery.com>

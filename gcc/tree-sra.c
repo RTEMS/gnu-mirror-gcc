@@ -926,6 +926,8 @@ create_access (tree expr, gimple *stmt, bool write)
       size = max_size;
       unscalarizable_region = true;
     }
+  if (size == 0)
+    return NULL;
   if (size < 0)
     {
       disqualify_candidate (base, "Encountered an unconstrained access.");
@@ -958,6 +960,9 @@ scalarizable_type_p (tree type, bool const_decl)
   if (type_contains_placeholder_p (type))
     return false;
 
+  bool have_predecessor_field = false;
+  HOST_WIDE_INT prev_pos = 0;
+
   switch (TREE_CODE (type))
   {
   case RECORD_TYPE:
@@ -965,6 +970,17 @@ scalarizable_type_p (tree type, bool const_decl)
       if (TREE_CODE (fld) == FIELD_DECL)
 	{
 	  tree ft = TREE_TYPE (fld);
+
+	  if (zerop (DECL_SIZE (fld)))
+	    continue;
+
+	  HOST_WIDE_INT pos = int_bit_position (fld);
+	  if (have_predecessor_field
+	      && pos <= prev_pos)
+	    return false;
+
+	  have_predecessor_field = true;
+	  prev_pos = pos;
 
 	  if (DECL_BIT_FIELD (fld))
 	    return false;
@@ -2339,7 +2355,8 @@ verify_sra_access_forest (struct access *root)
       gcc_assert (offset == access->offset);
       gcc_assert (access->grp_unscalarizable_region
 		  || size == max_size);
-      gcc_assert (max_size == access->size);
+      gcc_assert (!is_gimple_reg_type (access->type)
+		  || max_size == access->size);
       gcc_assert (reverse == access->reverse);
 
       if (access->first_child)
@@ -3629,7 +3646,8 @@ get_access_for_expr (tree expr)
 	return NULL;
     }
 
-  if (!bitmap_bit_p (candidate_bitmap, DECL_UID (base)))
+  if (max_size == 0
+      || !bitmap_bit_p (candidate_bitmap, DECL_UID (base)))
     return NULL;
 
   return get_var_base_offset_size_access (base, offset, max_size);

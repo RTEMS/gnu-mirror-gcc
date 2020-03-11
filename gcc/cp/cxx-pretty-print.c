@@ -1214,12 +1214,14 @@ cxx_pretty_printer::expression (tree t)
       {
 	tree args = ARGUMENT_PACK_ARGS (t);
 	int i, len = TREE_VEC_LENGTH (args);
+	pp_cxx_left_brace (this);
 	for (i = 0; i < len; ++i)
 	  {
 	    if (i > 0)
 	      pp_cxx_separate_with (this, ',');
 	    expression (TREE_VEC_ELT (args, i));
 	  }
+	pp_cxx_right_brace (this);
       }
       break;
 
@@ -1358,7 +1360,7 @@ cxx_pretty_printer::simple_type_specifier (tree t)
     case TYPENAME_TYPE:
       pp_cxx_ws_string (this, "typename");
       pp_cxx_nested_name_specifier (this, TYPE_CONTEXT (t));
-      pp_cxx_unqualified_id (this, TYPE_NAME (t));
+      pp_cxx_unqualified_id (this, TYPENAME_TYPE_FULLNAME (t));
       break;
 
     default:
@@ -1837,6 +1839,21 @@ cxx_pretty_printer::type_id (tree t)
     case TYPE_PACK_EXPANSION:
       type_id (PACK_EXPANSION_PATTERN (t));
       pp_cxx_ws_string (this, "...");
+      break;
+
+    case TYPE_ARGUMENT_PACK:
+      {
+	tree args = ARGUMENT_PACK_ARGS (t);
+	int len = TREE_VEC_LENGTH (args);
+	pp_cxx_left_brace (this);
+	for (int i = 0; i < len; ++i)
+	  {
+	    if (i > 0)
+	      pp_cxx_separate_with (this, ',');
+	    type_id (TREE_VEC_ELT (args, i));
+	  }
+	pp_cxx_right_brace (this);
+      }
       break;
 
     default:

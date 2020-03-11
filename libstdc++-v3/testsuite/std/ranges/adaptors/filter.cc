@@ -25,6 +25,8 @@
 
 using __gnu_test::test_range;
 using __gnu_test::bidirectional_iterator_wrapper;
+using __gnu_test::forward_iterator_wrapper;
+using __gnu_test::random_access_iterator_wrapper;
 
 namespace ranges = std::ranges;
 namespace views = std::ranges::views;
@@ -43,9 +45,11 @@ test01()
   static_assert(!ranges::sized_range<R>);
   static_assert(ranges::bidirectional_range<R>);
   static_assert(!ranges::random_access_range<R>);
-  static_assert(ranges::range<ranges::all_view<R>>);
+  static_assert(ranges::range<views::all_t<R>>);
   VERIFY( ranges::equal(v, (int[]){1,3,5}) );
   VERIFY( ranges::equal(v | views::reverse, (int[]){5,3,1}) );
+  VERIFY( v.pred()(3) == true );
+  VERIFY( v.pred()(4) == false );
 }
 
 void
@@ -87,6 +91,38 @@ test04()
 			(int[]){0}) );
 }
 
+// The following tests that filter_view::begin caches its result.
+
+template<template<typename> typename wrapper>
+struct test_view : ranges::view_base
+{
+  bool begin_already_called = false;
+  static inline int x[] = {1,2,3,4,5};
+  test_range<int, wrapper> rx{x};
+
+  auto
+  begin()
+  {
+    if (begin_already_called)
+      x[0] = 10;
+    begin_already_called = true;
+    return rx.begin();
+  }
+
+  auto
+  end()
+  { return rx.end(); }
+};
+
+template<template<typename> typename wrapper>
+void
+test05()
+{
+  auto v = test_view<wrapper>{} | views::filter([] (int i) { return i%2 == 0; });
+  VERIFY( ranges::equal(v, (int[]){2,4}) );
+  VERIFY( ranges::equal(v, (int[]){2,4}) );
+}
+
 int
 main()
 {
@@ -94,4 +130,6 @@ main()
   test02();
   test03();
   test04();
+  test05<forward_iterator_wrapper>();
+  test05<random_access_iterator_wrapper>();
 }

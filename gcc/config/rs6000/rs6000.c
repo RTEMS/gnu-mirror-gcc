@@ -3968,7 +3968,7 @@ rs6000_option_override_internal (bool global_init_p)
       if (!TARGET_VSX)
 	{
 	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
-	    error ("%qs requires VSX support", "%<-mfloat128%>");
+	    error ("%qs requires VSX support", "-mfloat128");
 
 	  TARGET_FLOAT128_TYPE = 0;
 	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_KEYWORD
@@ -4363,11 +4363,6 @@ rs6000_option_override_internal (bool global_init_p)
 		  str_align_loops = "16";
 		}
 	    }
-
-	  if (flag_align_jumps && !str_align_jumps)
-	    str_align_jumps = "16";
-	  if (flag_align_loops && !str_align_loops)
-	    str_align_loops = "16";
 	}
 
       /* Arrange to save and restore machine status around nested functions.  */
@@ -8808,7 +8803,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
   bool quad_offset_p = mode_supports_dq_form (mode);
 
   /* If this is an unaligned stvx/ldvx type address, discard the outer AND.  */
-  if (VECTOR_MEM_ALTIVEC_P (mode)
+  if (VECTOR_MEM_ALTIVEC_OR_VSX_P (mode)
       && GET_CODE (x) == AND
       && CONST_INT_P (XEXP (x, 1))
       && INTVAL (XEXP (x, 1)) == -16)
@@ -14836,7 +14831,11 @@ rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (rtx_equal_p (op0, true_cond) && rtx_equal_p (op1, false_cond))
     ;
 
-  else if (rtx_equal_p (op1, true_cond) && rtx_equal_p (op0, false_cond))
+  /* Only when NaNs and signed-zeros are not in effect, smax could be
+     used for `op0 < op1 ? op1 : op0`, and smin could be used for
+     `op0 > op1 ? op1 : op0`.  */
+  else if (rtx_equal_p (op1, true_cond) && rtx_equal_p (op0, false_cond)
+	   && !HONOR_NANS (compare_mode) && !HONOR_SIGNED_ZEROS (compare_mode))
     max_p = !max_p;
 
   else
@@ -23649,6 +23648,7 @@ rs6000_disable_incompatible_switches (void)
     { OPTION_MASK_P9_VECTOR,	OTHER_P9_VECTOR_MASKS,	"power9-vector"	},
     { OPTION_MASK_P8_VECTOR,	OTHER_P8_VECTOR_MASKS,	"power8-vector"	},
     { OPTION_MASK_VSX,		OTHER_VSX_VECTOR_MASKS,	"vsx"		},
+    { OPTION_MASK_ALTIVEC,	OTHER_ALTIVEC_MASKS,	"altivec"	},
   };
 
   for (i = 0; i < ARRAY_SIZE (flags); i++)

@@ -88,7 +88,7 @@ namespace ranges
 
     template<__detail::__nothrow_input_range _Range>
       requires destructible<range_value_t<_Range>>
-      constexpr safe_iterator_t<_Range>
+      constexpr borrowed_iterator_t<_Range>
       operator()(_Range&& __r) const noexcept;
   };
 
@@ -159,7 +159,7 @@ namespace ranges
 
     template<__detail::__nothrow_forward_range _Range>
       requires default_initializable<range_value_t<_Range>>
-      safe_iterator_t<_Range>
+      borrowed_iterator_t<_Range>
       operator()(_Range&& __r) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r));
@@ -217,7 +217,7 @@ namespace ranges
 
     template<__detail::__nothrow_forward_range _Range>
       requires default_initializable<range_value_t<_Range>>
-      safe_iterator_t<_Range>
+      borrowed_iterator_t<_Range>
       operator()(_Range&& __r) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r));
@@ -253,7 +253,7 @@ namespace ranges
     uninitialized_value_construct_n;
 
   template<typename _Iter, typename _Out>
-    using uninitialized_copy_result = copy_result<_Iter, _Out>;
+    using uninitialized_copy_result = in_out_result<_Iter, _Out>;
 
   struct __uninitialized_copy_fn
   {
@@ -269,12 +269,13 @@ namespace ranges
 	if constexpr (sized_sentinel_for<_ISent, _Iter>
 		      && sized_sentinel_for<_OSent, _Out>
 		      && is_trivial_v<_OutType>
-		      && is_nothrow_assignable_v<_OutType,
+		      && is_nothrow_assignable_v<_OutType&,
 						 iter_reference_t<_Iter>>)
 	  {
-	    auto __d1 = ranges::distance(__ifirst, __ilast);
-	    auto __d2 = ranges::distance(__ofirst, __olast);
-	    return ranges::copy_n(__ifirst, std::min(__d1, __d2), __ofirst);
+	    auto __d1 = __ilast - __ifirst;
+	    auto __d2 = __olast - __ofirst;
+	    return ranges::copy_n(std::move(__ifirst), std::min(__d1, __d2),
+				  __ofirst);
 	  }
 	else
 	  {
@@ -283,15 +284,15 @@ namespace ranges
 		 ++__ofirst, (void)++__ifirst)
 	      ::new (__detail::__voidify(*__ofirst)) _OutType(*__ifirst);
 	    __guard.release();
-	    return {__ifirst, __ofirst};
+	    return {std::move(__ifirst), __ofirst};
 	  }
       }
 
     template<input_range _IRange, __detail::__nothrow_forward_range _ORange>
       requires constructible_from<range_value_t<_ORange>,
 				  range_reference_t<_IRange>>
-      uninitialized_copy_result<safe_iterator_t<_IRange>,
-				safe_iterator_t<_ORange>>
+      uninitialized_copy_result<borrowed_iterator_t<_IRange>,
+				borrowed_iterator_t<_ORange>>
       operator()(_IRange&& __inr, _ORange&& __outr) const
       {
 	return (*this)(ranges::begin(__inr), ranges::end(__inr),
@@ -302,7 +303,7 @@ namespace ranges
   inline constexpr __uninitialized_copy_fn uninitialized_copy{};
 
   template<typename _Iter, typename _Out>
-    using uninitialized_copy_n_result = uninitialized_copy_result<_Iter, _Out>;
+    using uninitialized_copy_n_result = in_out_result<_Iter, _Out>;
 
   struct __uninitialized_copy_n_fn
   {
@@ -316,11 +317,12 @@ namespace ranges
 	using _OutType = remove_reference_t<iter_reference_t<_Out>>;
 	if constexpr (sized_sentinel_for<_Sent, _Out>
 		      && is_trivial_v<_OutType>
-		      && is_nothrow_assignable_v<_OutType,
+		      && is_nothrow_assignable_v<_OutType&,
 						 iter_reference_t<_Iter>>)
 	  {
-	    auto __d = ranges::distance(__ofirst, __olast);
-	    return ranges::copy_n(__ifirst, std::min(__n, __d), __ofirst);
+	    auto __d = __olast - __ofirst;
+	    return ranges::copy_n(std::move(__ifirst), std::min(__n, __d),
+				  __ofirst);
 	  }
 	else
 	  {
@@ -329,7 +331,7 @@ namespace ranges
 		 ++__ofirst, (void)++__ifirst, (void)--__n)
 	      ::new (__detail::__voidify(*__ofirst)) _OutType(*__ifirst);
 	    __guard.release();
-	    return {__ifirst, __ofirst};
+	    return {std::move(__ifirst), __ofirst};
 	  }
       }
   };
@@ -337,7 +339,7 @@ namespace ranges
   inline constexpr __uninitialized_copy_n_fn uninitialized_copy_n{};
 
   template<typename _Iter, typename _Out>
-    using uninitialized_move_result = uninitialized_copy_result<_Iter, _Out>;
+    using uninitialized_move_result = in_out_result<_Iter, _Out>;
 
   struct __uninitialized_move_fn
   {
@@ -354,13 +356,15 @@ namespace ranges
 	if constexpr (sized_sentinel_for<_ISent, _Iter>
 		      && sized_sentinel_for<_OSent, _Out>
 		      && is_trivial_v<_OutType>
-		      && is_nothrow_assignable_v<_OutType,
+		      && is_nothrow_assignable_v<_OutType&,
 						 iter_rvalue_reference_t<_Iter>>)
 	  {
-	    auto __d1 = ranges::distance(__ifirst, __ilast);
-	    auto __d2 = ranges::distance(__ofirst, __olast);
-	    return ranges::copy_n(std::make_move_iterator(__ifirst),
-				  std::min(__d1, __d2), __ofirst);
+	    auto __d1 = __ilast - __ifirst;
+	    auto __d2 = __olast - __ofirst;
+	    auto [__in, __out]
+	      = ranges::copy_n(std::make_move_iterator(std::move(__ifirst)),
+			       std::min(__d1, __d2), __ofirst);
+	    return {std::move(__in).base(), __out};
 	  }
 	else
 	  {
@@ -370,15 +374,15 @@ namespace ranges
 	      ::new (__detail::__voidify(*__ofirst))
 		    _OutType(ranges::iter_move(__ifirst));
 	    __guard.release();
-	    return {__ifirst, __ofirst};
+	    return {std::move(__ifirst), __ofirst};
 	  }
       }
 
     template<input_range _IRange, __detail::__nothrow_forward_range _ORange>
       requires constructible_from<range_value_t<_ORange>,
 	       range_rvalue_reference_t<_IRange>>
-      uninitialized_move_result<safe_iterator_t<_IRange>,
-				safe_iterator_t<_ORange>>
+      uninitialized_move_result<borrowed_iterator_t<_IRange>,
+				borrowed_iterator_t<_ORange>>
       operator()(_IRange&& __inr, _ORange&& __outr) const
       {
 	return (*this)(ranges::begin(__inr), ranges::end(__inr),
@@ -389,7 +393,7 @@ namespace ranges
   inline constexpr __uninitialized_move_fn uninitialized_move{};
 
   template<typename _Iter, typename _Out>
-    using uninitialized_move_n_result = uninitialized_copy_result<_Iter, _Out>;
+    using uninitialized_move_n_result = in_out_result<_Iter, _Out>;
 
   struct __uninitialized_move_n_fn
   {
@@ -404,12 +408,14 @@ namespace ranges
 	using _OutType = remove_reference_t<iter_reference_t<_Out>>;
 	if constexpr (sized_sentinel_for<_Sent, _Out>
 		      && is_trivial_v<_OutType>
-		      && is_nothrow_assignable_v<_OutType,
+		      && is_nothrow_assignable_v<_OutType&,
 						 iter_rvalue_reference_t<_Iter>>)
 	  {
-	    auto __d = ranges::distance(__ofirst, __olast);
-	    return ranges::copy_n(std::make_move_iterator(__ifirst),
-				  std::min(__n, __d), __ofirst);
+	    auto __d = __olast - __ofirst;
+	    auto [__in, __out]
+	      = ranges::copy_n(std::make_move_iterator(std::move(__ifirst)),
+			       std::min(__n, __d), __ofirst);
+	    return {std::move(__in).base(), __out};
 	  }
 	else
 	  {
@@ -419,7 +425,7 @@ namespace ranges
 	      ::new (__detail::__voidify(*__ofirst))
 		    _OutType(ranges::iter_move(__ifirst));
 	    __guard.release();
-	    return {__ifirst, __ofirst};
+	    return {std::move(__ifirst), __ofirst};
 	  }
       }
   };
@@ -436,7 +442,7 @@ namespace ranges
       {
 	using _ValueType = remove_reference_t<iter_reference_t<_Iter>>;
 	if constexpr (is_trivial_v<_ValueType>
-		      && is_nothrow_assignable_v<_ValueType, const _Tp&>)
+		      && is_nothrow_assignable_v<_ValueType&, const _Tp&>)
 	  return ranges::fill(__first, __last, __x);
 	else
 	  {
@@ -450,7 +456,7 @@ namespace ranges
 
     template<__detail::__nothrow_forward_range _Range, typename _Tp>
       requires constructible_from<range_value_t<_Range>, const _Tp&>
-      safe_iterator_t<_Range>
+      borrowed_iterator_t<_Range>
       operator()(_Range&& __r, const _Tp& __x) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r), __x);
@@ -469,7 +475,7 @@ namespace ranges
       {
 	using _ValueType = remove_reference_t<iter_reference_t<_Iter>>;
 	if constexpr (is_trivial_v<_ValueType>
-		      && is_nothrow_assignable_v<_ValueType, const _Tp&>)
+		      && is_nothrow_assignable_v<_ValueType&, const _Tp&>)
 	  return ranges::fill_n(__first, __n, __x);
 	else
 	  {
@@ -520,7 +526,7 @@ namespace ranges
     __destroy_fn::operator()(_Iter __first, _Sent __last) const noexcept
     {
       if constexpr (is_trivially_destructible_v<iter_value_t<_Iter>>)
-	return ranges::next(__first, __last);
+	return ranges::next(std::move(__first), __last);
       else
 	{
 	  for (; __first != __last; ++__first)
@@ -531,7 +537,7 @@ namespace ranges
 
   template<__detail::__nothrow_input_range _Range>
     requires destructible<range_value_t<_Range>>
-    constexpr safe_iterator_t<_Range>
+    constexpr borrowed_iterator_t<_Range>
     __destroy_fn::operator()(_Range&& __r) const noexcept
     {
       return (*this)(ranges::begin(__r), ranges::end(__r));
@@ -545,7 +551,7 @@ namespace ranges
       operator()(_Iter __first, iter_difference_t<_Iter> __n) const noexcept
       {
 	if constexpr (is_trivially_destructible_v<iter_value_t<_Iter>>)
-	  return ranges::next(__first, __n);
+	  return ranges::next(std::move(__first), __n);
 	else
 	  {
 	    for (; __n > 0; ++__first, (void)--__n)

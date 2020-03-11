@@ -84,6 +84,21 @@ state_machine::get_state_name (state_t s) const
   return m_state_names[s];
 }
 
+/* Get the state with name NAME, which must exist.
+   This is purely intended for use in selftests.  */
+
+state_machine::state_t
+state_machine::get_state_by_name (const char *name)
+{
+  unsigned i;
+  const char *iter_name;
+  FOR_EACH_VEC_ELT (m_state_names, i, iter_name)
+    if (!strcmp (name, iter_name))
+      return i;
+  /* Name not found.  */
+  gcc_unreachable ();
+}
+
 /* Assert that S is a valid state for this state_machine.  */
 
 void
@@ -111,7 +126,10 @@ make_checkers (auto_delete_vec <state_machine> &out, logger *logger)
 {
   out.safe_push (make_malloc_state_machine (logger));
   out.safe_push (make_fileptr_state_machine (logger));
-  out.safe_push (make_taint_state_machine (logger));
+  /* The "taint" checker must be explicitly enabled (as it currently
+     leads to state explosions that stop the other checkers working).  */
+  if (flag_analyzer_checker)
+    out.safe_push (make_taint_state_machine (logger));
   out.safe_push (make_sensitive_state_machine (logger));
   out.safe_push (make_signal_state_machine (logger));
 

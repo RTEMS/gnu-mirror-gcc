@@ -342,6 +342,7 @@ arm_set_sat_qualifiers[SIMD_MAX_BUILTIN_ARGS]
 #define v4bf_UP  E_V4BFmode
 #define v2si_UP  E_V2SImode
 #define v2sf_UP  E_V2SFmode
+#define v2bf_UP  E_V2BFmode
 #define di_UP    E_DImode
 #define v16qi_UP E_V16QImode
 #define v8hi_UP  E_V8HImode
@@ -405,6 +406,9 @@ typedef struct {
 #define VAR12(T, N, A, B, C, D, E, F, G, H, I, J, K, L) \
   VAR11 (T, N, A, B, C, D, E, F, G, H, I, J, K) \
   VAR1 (T, N, L)
+#define VAR13(T, N, A, B, C, D, E, F, G, H, I, J, K, L, M) \
+  VAR12 (T, N, A, B, C, D, E, F, G, H, I, J, K, L) \
+  VAR1 (T, N, M)
 
 /* The builtin data can be found in arm_neon_builtins.def, arm_vfp_builtins.def
    and arm_acle_builtins.def.  The entries in arm_neon_builtins.def require
@@ -780,6 +784,7 @@ const char *arm_scalar_builtin_types[] = {
   "__builtin_neon_oi",
   "__builtin_neon_ci",
   "__builtin_neon_xi",
+  "__builtin_neon_bf",
   NULL
 };
 
@@ -1037,6 +1042,7 @@ arm_init_simd_builtin_types (void)
   arm_simd_types[Float32x4_t].eltype = float_type_node;
 
   /* Init Bfloat vector types with underlying __bf16 scalar type.  */
+  arm_simd_types[Bfloat16x2_t].eltype = arm_bf16_type_node;
   arm_simd_types[Bfloat16x4_t].eltype = arm_bf16_type_node;
   arm_simd_types[Bfloat16x8_t].eltype = arm_bf16_type_node;
 
@@ -1096,7 +1102,8 @@ arm_init_simd_builtin_scalar_types (void)
 					     "__builtin_neon_df");
   (*lang_hooks.types.register_builtin_type) (intTI_type_node,
 					     "__builtin_neon_ti");
-
+  (*lang_hooks.types.register_builtin_type) (arm_bf16_type_node,
+                                             "__builtin_neon_bf");
   /* Unsigned integer types for various mode sizes.  */
   (*lang_hooks.types.register_builtin_type) (unsigned_intQI_type_node,
 					     "__builtin_neon_uqi");

@@ -496,11 +496,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     : public iterator<output_iterator_tag, void, void, void, void>
     {
     protected:
+#if __cplusplus <= 201703L
       _Container* container;
+#else
+      _Container* container = nullptr;
+#endif
 
     public:
       /// A nested typedef for the type of whatever container you used.
       typedef _Container          container_type;
+#if __cplusplus > 201703L
+      using difference_type = ptrdiff_t;
+#endif
+
+#if __cplusplus > 201703L
+      constexpr back_insert_iterator() noexcept = default;
+#endif
 
       /// The only way to create this %iterator is with a container.
       explicit
@@ -588,11 +599,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     : public iterator<output_iterator_tag, void, void, void, void>
     {
     protected:
+#if __cplusplus <= 201703L
       _Container* container;
+#else
+      _Container* container = nullptr;
+#endif
 
     public:
       /// A nested typedef for the type of whatever container you used.
       typedef _Container          container_type;
+#if __cplusplus > 201703L
+      using difference_type = ptrdiff_t;
+#endif
+
+#if __cplusplus > 201703L
+      constexpr front_insert_iterator() noexcept = default;
+#endif
 
       /// The only way to create this %iterator is with a container.
       explicit front_insert_iterator(_Container& __x)
@@ -1426,7 +1448,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /// An iterator/sentinel adaptor for representing a non-common range.
   template<input_or_output_iterator _It, sentinel_for<_It> _Sent>
-    requires (!same_as<_It, _Sent>)
+    requires (!same_as<_It, _Sent>) && copyable<_It>
   class common_iterator
   {
     template<typename _Tp, typename _Up>

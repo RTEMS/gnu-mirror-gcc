@@ -6062,6 +6062,13 @@ reshape_init_array_1 (tree elt_type, tree max_index, reshape_iter *d,
       else if (last_nonzero < nelts - 1)
 	nelts = last_nonzero + 1;
 
+      /* Sharing a stripped constructor can get in the way of
+	 overload resolution.  E.g., initializing a class from
+	 {{0}} might be invalid while initializing the same class
+	 from {{}} might be valid.  */
+      if (reuse)
+	new_init = unshare_constructor (new_init);
+
       vec_safe_truncate (CONSTRUCTOR_ELTS (new_init), nelts);
     }
 
@@ -10276,13 +10283,12 @@ compute_array_index_type_loc (location_t name_loc, tree name, tree size,
 	   NOP_EXPR with TREE_SIDE_EFFECTS; don't fold in that case.  */;
       else
 	{
-	  size = instantiate_non_dependent_expr_sfinae (size, complain);
 	  size = build_converted_constant_expr (size_type_node, size, complain);
 	  /* Pedantically a constant expression is required here and so
 	     __builtin_is_constant_evaluated () should fold to true if it
 	     is successfully folded into a constant.  */
-	  size = maybe_constant_value (size, NULL_TREE,
-				       /*manifestly_const_eval=*/true);
+	  size = fold_non_dependent_expr (size, complain,
+					  /*manifestly_const_eval=*/true);
 
 	  if (!TREE_CONSTANT (size))
 	    size = origsize;
@@ -10338,9 +10344,14 @@ compute_array_index_type_loc (location_t name_loc, tree name, tree size,
 	    pedwarn (loc, OPT_Wpedantic,
 		     "size of array is not an integral constant-expression");
 	}
-      /* Use the folded result for VLAs, too; it will have resolved
-	 SIZEOF_EXPR.  */
-      size = folded;
+      if (TREE_CONSTANT (size) && !TREE_CONSTANT (folded))
+	/* We might have lost the TREE_CONSTANT flag e.g. when we are
+	   folding a conversion from a pointer to integral type.  In that
+	   case issue an error below and don't treat this as a VLA.  */;
+      else
+	/* Use the folded result for VLAs, too; it will have resolved
+	   SIZEOF_EXPR.  */
+	size = folded;
     }
 
   /* Normally, the array-bound will be a constant.  */
@@ -11251,7 +11262,7 @@ grokdeclarator (const cp_declarator *declarator,
   if (constinit_p && typedef_p)
     {
       error_at (declspecs->locations[ds_constinit],
-		"%<constinit%> cannot appear in a typedef declaration");
+		"%qs cannot appear in a typedef declaration", "constinit");
       return error_mark_node;
     }
 
@@ -17602,10 +17613,8 @@ build_explicit_specifier (tree expr, tsubst_flags_t complain)
     /* Wait for instantiation, tsubst_function_decl will handle it.  */
     return expr;
 
-  expr = instantiate_non_dependent_expr_sfinae (expr, complain);
-  /* Don't let convert_like_real create more template codes.  */
-  processing_template_decl_sentinel s;
   expr = build_converted_constant_bool_expr (expr, complain);
+  expr = instantiate_non_dependent_expr_sfinae (expr, complain);
   expr = cxx_constant_value (expr);
   return expr;
 }

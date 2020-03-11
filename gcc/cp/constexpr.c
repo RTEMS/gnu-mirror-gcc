@@ -831,6 +831,9 @@ cx_check_missing_mem_inits (tree ctype, tree body, bool complain)
 	    /* A flexible array can't be intialized here, so don't complain
 	       that it isn't.  */
 	    continue;
+	  if (DECL_SIZE (field) && integer_zerop (DECL_SIZE (field)))
+	    /* An empty field doesn't need an initializer.  */
+	    continue;
 	  ftype = strip_array_types (ftype);
 	  if (type_has_constexpr_default_constructor (ftype))
 	    {
@@ -2474,7 +2477,8 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 						     /*lval*/false,
 						     non_constant_p,
 						     overflow_p);
-	      TREE_READONLY (e) = true;
+	      if (TREE_CODE (e) == CONSTRUCTOR && !*non_constant_p)
+		TREE_READONLY (e) = true;
 	    }
 
 	  /* Forget the saved values of the callee's SAVE_EXPRs and
@@ -2602,16 +2606,14 @@ reduced_constant_expression_p (tree t)
 	     element.  */
 	  if (!reduced_constant_expression_p (val))
 	    return false;
+	  /* Empty class field may or may not have an initializer.  */
+	  for (; field && idx != field;
+	       field = next_initializable_field (DECL_CHAIN (field)))
+	    if (!is_really_empty_class (TREE_TYPE (field),
+					/*ignore_vptr*/false))
+	      return false;
 	  if (field)
-	    {
-	      /* Empty class field may or may not have an initializer.  */
-	      for (; idx != field;
-		   field = next_initializable_field (DECL_CHAIN (field)))
-		if (!is_really_empty_class (TREE_TYPE (field),
-					    /*ignore_vptr*/false))
-		  return false;
-	      field = next_initializable_field (DECL_CHAIN (field));
-	    }
+	    field = next_initializable_field (DECL_CHAIN (field));
 	}
       /* There could be a non-empty field at the end.  */
       for (; field; field = next_initializable_field (DECL_CHAIN (field)))
@@ -4382,6 +4384,22 @@ maybe_simplify_trivial_copy (tree &target, tree &init)
     }
 }
 
+/* Returns true if REF, which is a COMPONENT_REF, has any fields
+   of constant type.  This does not check for 'mutable', so the
+   caller is expected to be mindful of that.  */
+
+static bool
+cref_has_const_field (tree ref)
+{
+  while (TREE_CODE (ref) == COMPONENT_REF)
+    {
+      if (CP_TYPE_CONST_P (TREE_TYPE (TREE_OPERAND (ref, 1))))
+       return true;
+      ref = TREE_OPERAND (ref, 0);
+    }
+  return false;
+}
+
 /* Return true if we are modifying something that is const during constant
    expression evaluation.  CODE is the code of the statement, OBJ is the
    object in question, MUTABLE_P is true if one of the subobjects were
@@ -4399,7 +4417,23 @@ modifying_const_object_p (tree_code code, tree obj, bool mutable_p)
   if (mutable_p)
     return false;
 
-  return (TREE_READONLY (obj) || CP_TYPE_CONST_P (TREE_TYPE (obj)));
+  if (TREE_READONLY (obj))
+    return true;
+
+  if (CP_TYPE_CONST_P (TREE_TYPE (obj)))
+    {
+      /* Although a COMPONENT_REF may have a const type, we should
+	 only consider it modifying a const object when any of the
+	 field components is const.  This can happen when using
+	 constructs such as const_cast<const T &>(m), making something
+	 const even though it wasn't declared const.  */
+      if (TREE_CODE (obj) == COMPONENT_REF)
+	return cref_has_const_field (obj);
+      else
+	return true;
+    }
+
+  return false;
 }
 
 /* Evaluate an INIT_EXPR or MODIFY_EXPR.  */
@@ -4756,6 +4790,14 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
     }
   else
     *valp = init;
+
+  /* After initialization, 'const' semantics apply to the value of the
+     object.  Make a note of this fact by marking the CONSTRUCTOR
+     TREE_READONLY.  */
+  if (TREE_CODE (t) == INIT_EXPR
+      && TREE_CODE (*valp) == CONSTRUCTOR
+      && TYPE_READONLY (type))
+    TREE_READONLY (*valp) = true;
 
   /* Update TREE_CONSTANT and TREE_SIDE_EFFECTS on enclosing
      CONSTRUCTORs, if any.  */
@@ -5475,9 +5517,10 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
       r = cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 1),
 					false,
 					non_constant_p, overflow_p);
-      if (!*non_constant_p)
-	/* Adjust the type of the result to the type of the temporary.  */
-	r = adjust_temp_type (TREE_TYPE (t), r);
+      if (*non_constant_p)
+	break;
+      /* Adjust the type of the result to the type of the temporary.  */
+      r = adjust_temp_type (TREE_TYPE (t), r);
       if (TARGET_EXPR_CLEANUP (t) && !CLEANUP_EH_ONLY (t))
 	ctx->global->cleanups->safe_push (TARGET_EXPR_CLEANUP (t));
       r = unshare_constructor (r);
@@ -5529,6 +5572,8 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	{
 	  r = cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 0), false,
 					    non_constant_p, overflow_p);
+	  if (*non_constant_p)
+	    break;
 	  ctx->global->values.put (t, r);
 	  if (ctx->save_exprs)
 	    ctx->save_exprs->safe_push (t);
@@ -5725,6 +5770,8 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
     case MAX_EXPR:
     case LSHIFT_EXPR:
     case RSHIFT_EXPR:
+    case LROTATE_EXPR:
+    case RROTATE_EXPR:
     case BIT_IOR_EXPR:
     case BIT_XOR_EXPR:
     case BIT_AND_EXPR:
@@ -7848,6 +7895,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case MAX_EXPR:
     case LSHIFT_EXPR:
     case RSHIFT_EXPR:
+    case LROTATE_EXPR:
+    case RROTATE_EXPR:
     case BIT_IOR_EXPR:
     case BIT_XOR_EXPR:
     case BIT_AND_EXPR:

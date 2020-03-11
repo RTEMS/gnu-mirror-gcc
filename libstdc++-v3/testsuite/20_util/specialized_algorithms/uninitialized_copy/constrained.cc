@@ -31,6 +31,9 @@
 
 using __gnu_test::test_input_range;
 using __gnu_test::test_forward_range;
+using __gnu_test::test_range;
+using __gnu_test::test_sized_range_sized_sent;
+using __gnu_test::input_iterator_wrapper_nocopy;
 
 namespace ranges = std::ranges;
 
@@ -47,7 +50,7 @@ test01(const std::vector<T> &ix)
       auto buffer = std::unique_ptr<char[]>(new char[sizeof(T)*size]);
       std::span<T> rx((T *)buffer.get(), size);
 
-      ranges::uninitialized_copy_result res = {ix.cbegin(), rx.cbegin()};
+      ranges::uninitialized_copy_result res = {ix.begin(), rx.begin()};
       if (k == 0)
 	res = ranges::uninitialized_copy(ix.begin(), ix.end(),
 					 rx.begin(), rx.end());
@@ -58,33 +61,33 @@ test01(const std::vector<T> &ix)
 					   rx.begin(), rx.end());
       else if (k == 3)
 	res = ranges::uninitialized_copy(ix.begin(), ix.end(),
-					 rx.cbegin(), rx.cend());
+					 rx.begin(), rx.end());
       else if (k == 4)
 	res = ranges::uninitialized_copy(ix, std::as_const(rx));
       else if (k == 5)
 	res = ranges::uninitialized_copy_n(ix.begin(), size,
-					   rx.cbegin(), rx.cend());
+					   rx.begin(), rx.end());
       else if (k == 6)
 	res = ranges::uninitialized_copy_n(ix.begin(), size/2,
-					   rx.cbegin(), rx.cend());
+					   rx.begin(), rx.end());
       else if (k == 7)
 	res = ranges::uninitialized_copy_n(ix.begin(), size,
-					   rx.cbegin(), rx.cbegin()+size/2);
+					   rx.begin(), rx.begin()+size/2);
       else
 	__builtin_abort();
 
       if (k == 6 || k == 7)
 	{
-	  VERIFY( ranges::distance(ix.cbegin(), res.in) == size/2 );
-	  VERIFY( ranges::distance(rx.cbegin(), res.out) == size/2 );
+	  VERIFY( ranges::distance(ix.begin(), res.in) == size/2 );
+	  VERIFY( ranges::distance(rx.begin(), res.out) == size/2 );
 	  VERIFY( ranges::equal(ix.begin(), ix.begin()+size/2,
 				rx.begin(), rx.begin()+size/2) );
 	  ranges::destroy(rx.begin(), rx.begin()+size/2);
 	}
       else
 	{
-	  VERIFY( res.in == ix.cend() );
-	  VERIFY( res.out == rx.cend() );
+	  VERIFY( res.in == ix.end() );
+	  VERIFY( res.out == rx.end() );
 	  VERIFY( ranges::equal(ix, rx) );
 	  ranges::destroy(rx);
 	}
@@ -147,6 +150,28 @@ test02()
     {
       VERIFY( X::copy_construct_count == X::limit );
       VERIFY( X::destruct_count == X::limit );
+    }
+}
+
+void
+test03()
+{
+  // LWG 3355
+    {
+      int x[3] = {0};
+      int y[3];
+      test_sized_range_sized_sent<int, input_iterator_wrapper_nocopy> rx(x);
+      ranges::uninitialized_copy(rx, y);
+      ranges::uninitialized_copy_n(rx.begin(), 3, y, y+3);
+    }
+
+    {
+      int x[3] = {0};
+      int y[3];
+      test_range<int, input_iterator_wrapper_nocopy> rx(x);
+      test_forward_range<int> ry(y);
+      ranges::uninitialized_copy(rx, y);
+      ranges::uninitialized_copy_n(rx.begin(), 3, ry.begin(), ry.end());
     }
 }
 

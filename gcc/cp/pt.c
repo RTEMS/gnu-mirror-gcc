@@ -7068,26 +7068,6 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
       else if (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
 	       || cxx_dialect >= cxx17)
 	{
-	  /* Calling build_converted_constant_expr might create a call to
-	     a conversion function with a value-dependent argument, which
-	     could invoke taking the address of a temporary representing
-	     the result of the conversion.  */
-	  if (!same_type_ignoring_top_level_qualifiers_p (type, expr_type)
-	      && ((COMPOUND_LITERAL_P (expr)
-		   && CONSTRUCTOR_IS_DEPENDENT (expr)
-		   && MAYBE_CLASS_TYPE_P (expr_type)
-		   && TYPE_HAS_CONVERSION (expr_type))
-		  /* Similarly, converting e.g. an integer to a class
-		     involves a constructor call.  convert_like would
-		     create a TARGET_EXPR, but in a template we can't
-		     use AGGR_INIT_EXPR, and the TARGET_EXPR would lead
-		     to a bogus error.  */
-		  || (val_dep_p && MAYBE_CLASS_TYPE_P (type))))
-	    {
-	      expr = build1 (IMPLICIT_CONV_EXPR, type, expr);
-	      IMPLICIT_CONV_EXPR_NONTYPE_ARG (expr) = true;
-	      return expr;
-	    }
 	  /* C++17: A template-argument for a non-type template-parameter shall
 	     be a converted constant expression (8.20) of the type of the
 	     template-parameter.  */
@@ -7096,6 +7076,11 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	    /* Make sure we return NULL_TREE only if we have really issued
 	       an error, as described above.  */
 	    return (complain & tf_error) ? NULL_TREE : error_mark_node;
+	  else if (TREE_CODE (expr) == IMPLICIT_CONV_EXPR)
+	    {
+	      IMPLICIT_CONV_EXPR_NONTYPE_ARG (expr) = true;
+	      return expr;
+	    }
 	  expr = maybe_constant_value (expr, NULL_TREE,
 				       /*manifestly_const_eval=*/true);
 	  expr = convert_from_reference (expr);
@@ -7958,7 +7943,7 @@ template_template_parm_bindings_ok_p (tree tparms, tree targs)
 /* Since type attributes aren't mangled, we need to strip them from
    template type arguments.  */
 
-static tree
+tree
 canonicalize_type_argument (tree arg, tsubst_flags_t complain)
 {
   if (!arg || arg == error_mark_node || arg == TYPE_CANONICAL (arg))
@@ -8999,25 +8984,8 @@ template_args_equal (tree ot, tree nt, bool partial_order /* = false */)
 				    PACK_EXPANSION_PATTERN (nt))
 	    && template_args_equal (PACK_EXPANSION_EXTRA_ARGS (ot),
 				    PACK_EXPANSION_EXTRA_ARGS (nt)));
-  else if (ARGUMENT_PACK_P (ot))
-    {
-      int i, len;
-      tree opack, npack;
-
-      if (!ARGUMENT_PACK_P (nt))
-	return 0;
-
-      opack = ARGUMENT_PACK_ARGS (ot);
-      npack = ARGUMENT_PACK_ARGS (nt);
-      len = TREE_VEC_LENGTH (opack);
-      if (TREE_VEC_LENGTH (npack) != len)
-	return 0;
-      for (i = 0; i < len; ++i)
-	if (!template_args_equal (TREE_VEC_ELT (opack, i),
-				  TREE_VEC_ELT (npack, i)))
-	  return 0;
-      return 1;
-    }
+  else if (ARGUMENT_PACK_P (ot) || ARGUMENT_PACK_P (nt))
+    return cp_tree_equal (ot, nt);
   else if (ot && TREE_CODE (ot) == ARGUMENT_PACK_SELECT)
     gcc_unreachable ();
   else if (TYPE_P (nt))
@@ -15074,12 +15042,6 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	int levels;
 	tree arg = NULL_TREE;
 
-	/* Early in template argument deduction substitution, we don't
-	   want to reduce the level of 'auto', or it will be confused
-	   with a normal template parm in subsequent deduction.  */
-	if (is_auto (t) && (complain & tf_partial))
-	  return t;
-
 	r = NULL_TREE;
 
 	gcc_assert (TREE_VEC_LENGTH (args) > 0);
@@ -15208,6 +15170,14 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	  /* This can happen during the attempted tsubst'ing in
 	     unify.  This means that we don't yet have any information
 	     about the template parameter in question.  */
+	  return t;
+
+	/* Early in template argument deduction substitution, we don't
+	   want to reduce the level of 'auto', or it will be confused
+	   with a normal template parm in subsequent deduction.
+	   Similarly, don't reduce the level of template parameters to
+	   avoid mismatches when deducing their types.  */
+	if (complain & tf_partial)
 	  return t;
 
 	/* If we get here, we must have been looking at a parm for a
@@ -25127,14 +25097,14 @@ maybe_instantiate_noexcept (tree fn, tsubst_flags_t complain)
       TREE_TYPE (fn) = build_exception_variant (fntype, spec);
       if (orig_fn)
 	TREE_TYPE (orig_fn) = TREE_TYPE (fn);
+    }
 
-      FOR_EACH_CLONE (clone, fn)
-	{
-	  if (TREE_TYPE (clone) == fntype)
-	    TREE_TYPE (clone) = TREE_TYPE (fn);
-	  else
-	    TREE_TYPE (clone) = build_exception_variant (TREE_TYPE (clone), spec);
-	}
+  FOR_EACH_CLONE (clone, fn)
+    {
+      if (TREE_TYPE (clone) == fntype)
+	TREE_TYPE (clone) = TREE_TYPE (fn);
+      else
+	TREE_TYPE (clone) = build_exception_variant (TREE_TYPE (clone), spec);
     }
 
   return true;
@@ -26718,6 +26688,11 @@ type_dependent_expression_p (tree expression)
       if (TREE_CODE (expression) == SCOPE_REF)
 	return false;
 
+      /* CO_AWAIT/YIELD_EXPR with unknown type is always dependent.  */
+      if (TREE_CODE (expression) == CO_AWAIT_EXPR
+	  || TREE_CODE (expression) == CO_YIELD_EXPR)
+	return true;
+
       if (BASELINK_P (expression))
 	{
 	  if (BASELINK_OPTYPE (expression)
@@ -28207,7 +28182,7 @@ maybe_aggr_guide (tree tmpl, tree init, vec<tree,va_gc> *args)
   tsubst_flags_t complain = tf_none;
 
   tree parms = NULL_TREE;
-  if (TREE_CODE (init) == CONSTRUCTOR)
+  if (BRACE_ENCLOSED_INITIALIZER_P (init))
     {
       init = reshape_init (type, init, complain);
       if (init == error_mark_node)

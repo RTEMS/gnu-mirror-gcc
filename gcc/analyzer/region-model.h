@@ -844,6 +844,7 @@ public:
 
   virtual enum region_kind get_kind () const = 0;
   virtual map_region *dyn_cast_map_region () { return NULL; }
+  virtual array_region *dyn_cast_array_region () { return NULL; }
   virtual const symbolic_region *dyn_cast_symbolic_region () const
   { return NULL; }
 
@@ -891,7 +892,7 @@ public:
   region_id get_view (tree type, region_model *model) const;
   bool is_view_p () const { return m_is_view; }
 
-  void validate (const region_model *model) const;
+  virtual void validate (const region_model &model) const;
 
   bool non_null_p (const region_model &model) const;
 
@@ -978,7 +979,8 @@ public:
 
   region_id get_or_create (region_model *model,
 			   region_id this_rid,
-			   tree expr, tree type);
+			   tree expr, tree type,
+			   region_model_context *ctxt);
   void unbind (tree expr);
   region_id *get (tree expr);
 
@@ -1013,6 +1015,7 @@ public:
 		     region_id this_rid,
 		     pretty_printer *pp) const
     OVERRIDE;
+  void validate (const region_model &model) const FINAL OVERRIDE;
 
  private:
   /* Mapping from tree to child region.  */
@@ -1352,6 +1355,7 @@ public:
   /* region vfuncs.  */
   region *clone () const FINAL OVERRIDE;
   enum region_kind get_kind () const FINAL OVERRIDE { return RK_ARRAY; }
+  array_region *dyn_cast_array_region () { return this; }
 
   region_id get_element (region_model *model,
 			 region_id this_rid,
@@ -1374,7 +1378,8 @@ public:
 
   region_id get_or_create (region_model *model,
 			   region_id this_rid,
-			   key_t key, tree type);
+			   key_t key, tree type,
+			   region_model_context *ctxt);
 //  void unbind (int expr);
   region_id *get (key_t key);
 
@@ -1394,8 +1399,10 @@ public:
 		     region_id this_rid,
 		     pretty_printer *pp) const
     OVERRIDE;
+  void validate (const region_model &model) const FINAL OVERRIDE;
 
   static key_t key_from_constant (tree cst);
+  tree constant_from_key (key_t key);
 
  private:
   static int key_cmp (const void *, const void *);
@@ -1459,6 +1466,8 @@ public:
 
   svalue_id get_value_by_name (tree identifier,
 			       const region_model &model) const;
+
+  void validate (const region_model &model) const FINAL OVERRIDE;
 
  private:
   void add_to_hash (inchash::hash &hstate) const FINAL OVERRIDE;
@@ -1574,6 +1583,8 @@ public:
 
   svalue_id get_value_by_name (tree identifier,
 			       const region_model &model) const;
+
+  void validate (const region_model &model) const FINAL OVERRIDE;
 
 private:
   void add_to_hash (inchash::hash &hstate) const FINAL OVERRIDE;
@@ -1719,7 +1730,8 @@ class region_model
 
   region_id add_region (region *r);
 
-  region_id add_region_for_type (region_id parent_rid, tree type);
+  region_id add_region_for_type (region_id parent_rid, tree type,
+				 region_model_context *ctxt);
 
   svalue *get_svalue (svalue_id sval_id) const;
   region *get_region (region_id rid) const;
@@ -1740,16 +1752,19 @@ class region_model
 
   svalue_id get_or_create_ptr_svalue (tree ptr_type, region_id id);
   svalue_id get_or_create_constant_svalue (tree cst_expr);
-  svalue_id get_svalue_for_fndecl (tree ptr_type, tree fndecl);
-  svalue_id get_svalue_for_label (tree ptr_type, tree label);
+  svalue_id get_svalue_for_fndecl (tree ptr_type, tree fndecl,
+				   region_model_context *ctxt);
+  svalue_id get_svalue_for_label (tree ptr_type, tree label,
+				  region_model_context *ctxt);
 
-  region_id get_region_for_fndecl (tree fndecl);
-  region_id get_region_for_label (tree label);
+  region_id get_region_for_fndecl (tree fndecl, region_model_context *ctxt);
+  region_id get_region_for_label (tree label, region_model_context *ctxt);
 
   svalue_id maybe_cast (tree type, svalue_id sid, region_model_context *ctxt);
   svalue_id maybe_cast_1 (tree type, svalue_id sid);
 
-  region_id get_field_region (region_id rid, tree field);
+  region_id get_field_region (region_id rid, tree field,
+			      region_model_context *ctxt);
 
   region_id deref_rvalue (svalue_id ptr_sid, region_model_context *ctxt);
   region_id deref_rvalue (tree ptr, region_model_context *ctxt);
@@ -1826,7 +1841,8 @@ class region_model
 					     svalue_id ptr_sid,
 					     svalue_id offset_sid,
 					     region_model_context *ctxt);
-  region_id get_or_create_view (region_id raw_rid, tree type);
+  region_id get_or_create_view (region_id raw_rid, tree type,
+				region_model_context *ctxt);
 
   tree get_fndecl_for_call (const gcall *call,
 			    region_model_context *ctxt);
@@ -1835,10 +1851,22 @@ class region_model
   region_id get_lvalue_1 (path_var pv, region_model_context *ctxt);
   svalue_id get_rvalue_1 (path_var pv, region_model_context *ctxt);
 
+  region_id make_region_for_unexpected_tree_code (region_model_context *ctxt,
+						  tree t,
+						  const dump_location_t &loc);
+
   void add_any_constraints_from_ssa_def_stmt (tree lhs,
 					      enum tree_code op,
 					      tree rhs,
 					      region_model_context *ctxt);
+  void add_any_constraints_from_gassign (enum tree_code op,
+					 tree rhs,
+					 const gassign *assign,
+					 region_model_context *ctxt);
+  void add_any_constraints_from_gcall (enum tree_code op,
+				       tree rhs,
+				       const gcall *call,
+				       region_model_context *ctxt);
 
   void update_for_call_superedge (const call_superedge &call_edge,
 				  region_model_context *ctxt);
@@ -1937,6 +1965,59 @@ class region_model_context
   /* Hooks for clients to be notified when a phi node is handled,
      where RHS is the pertinent argument.  */
   virtual void on_phi (const gphi *phi, tree rhs) = 0;
+
+  /* Hooks for clients to be notified when the region model doesn't
+     know how to handle the tree code of T at LOC.  */
+  virtual void on_unexpected_tree_code (tree t,
+					const dump_location_t &loc) = 0;
+};
+
+/* A subclass of region_model_context for determining if operations fail
+   e.g. "can we generate a region for the lvalue of EXPR?".  */
+
+class tentative_region_model_context : public region_model_context
+{
+public:
+  tentative_region_model_context () : m_num_unexpected_codes (0) {}
+
+  void warn (pending_diagnostic *) FINAL OVERRIDE {}
+  void remap_svalue_ids (const svalue_id_map &) FINAL OVERRIDE {}
+  int on_svalue_purge (svalue_id, const svalue_id_map &) FINAL OVERRIDE
+  {
+    return 0;
+  }
+  logger *get_logger () FINAL OVERRIDE { return NULL; }
+  void on_inherited_svalue (svalue_id parent_sid ATTRIBUTE_UNUSED,
+			    svalue_id child_sid  ATTRIBUTE_UNUSED)
+    FINAL OVERRIDE
+  {
+  }
+  void on_cast (svalue_id src_sid ATTRIBUTE_UNUSED,
+		svalue_id dst_sid ATTRIBUTE_UNUSED) FINAL OVERRIDE
+  {
+  }
+  void on_condition (tree lhs ATTRIBUTE_UNUSED,
+		     enum tree_code op ATTRIBUTE_UNUSED,
+		     tree rhs ATTRIBUTE_UNUSED) FINAL OVERRIDE
+  {
+  }
+  void on_unknown_change (svalue_id sid ATTRIBUTE_UNUSED) FINAL OVERRIDE
+  {
+  }
+  void on_phi (const gphi *phi ATTRIBUTE_UNUSED,
+	       tree rhs ATTRIBUTE_UNUSED) FINAL OVERRIDE
+  {
+  }
+  void on_unexpected_tree_code (tree, const dump_location_t &)
+    FINAL OVERRIDE
+  {
+    m_num_unexpected_codes++;
+  }
+
+  bool had_errors_p () const { return m_num_unexpected_codes > 0; }
+
+private:
+  int m_num_unexpected_codes;
 };
 
 /* A bundle of data for use when attempting to merge two region_model
@@ -2116,6 +2197,13 @@ public:
   void on_phi (const gphi *phi ATTRIBUTE_UNUSED,
 	       tree rhs ATTRIBUTE_UNUSED) FINAL OVERRIDE
   {
+  }
+
+  void on_unexpected_tree_code (tree t, const dump_location_t &)
+    FINAL OVERRIDE
+  {
+    internal_error ("unhandled tree code: %qs",
+		    get_tree_code_name (TREE_CODE (t)));
   }
 
 private:

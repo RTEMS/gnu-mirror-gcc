@@ -32,7 +32,6 @@
 
 #if __cplusplus > 201703L
 
-#include <cmath>
 #include <compare>
 #include <iterator>
 // #include <bits/range_concepts.h>
@@ -105,9 +104,7 @@ namespace ranges
 	    using _ValueType2 = iter_value_t<_Iter2>;
 	    constexpr bool __use_memcmp
 	      = ((is_integral_v<_ValueType1> || is_pointer_v<_ValueType1>)
-		 && is_same_v<_ValueType1, _ValueType2>
-		 && is_pointer_v<_Iter1>
-		 && is_pointer_v<_Iter2>
+		 && __memcmpable<_Iter1, _Iter2>::__value
 		 && is_same_v<_Pred, ranges::equal_to>
 		 && is_same_v<_Proj1, identity>
 		 && is_same_v<_Proj2, identity>);
@@ -158,7 +155,7 @@ namespace ranges
   inline constexpr __equal_fn equal{};
 
   template<typename _Iter, typename _Out>
-    struct copy_result
+    struct in_out_result
     {
       [[no_unique_address]] _Iter in;
       [[no_unique_address]] _Out out;
@@ -166,24 +163,29 @@ namespace ranges
       template<typename _Iter2, typename _Out2>
 	requires convertible_to<const _Iter&, _Iter2>
 	  && convertible_to<const _Out&, _Out2>
-	operator copy_result<_Iter2, _Out2>() const &
+	constexpr
+	operator in_out_result<_Iter2, _Out2>() const &
 	{ return {in, out}; }
 
       template<typename _Iter2, typename _Out2>
 	requires convertible_to<_Iter, _Iter2>
 	  && convertible_to<_Out, _Out2>
-	operator copy_result<_Iter2, _Out2>() &&
+	constexpr
+	operator in_out_result<_Iter2, _Out2>() &&
 	{ return {std::move(in), std::move(out)}; }
     };
 
   template<typename _Iter, typename _Out>
-    using move_result = copy_result<_Iter, _Out>;
+    using copy_result = in_out_result<_Iter, _Out>;
+
+  template<typename _Iter, typename _Out>
+    using move_result = in_out_result<_Iter, _Out>;
 
   template<typename _Iter1, typename _Iter2>
-    using move_backward_result = copy_result<_Iter1, _Iter2>;
+    using move_backward_result = in_out_result<_Iter1, _Iter2>;
 
   template<typename _Iter1, typename _Iter2>
-    using copy_backward_result = copy_result<_Iter1, _Iter2>;
+    using copy_backward_result = in_out_result<_Iter1, _Iter2>;
 
   template<bool _IsMove,
 	   bidirectional_iterator _Iter, sentinel_for<_Iter> _Sent,
@@ -244,37 +246,34 @@ namespace ranges
 	}
       else if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-	  using _ValueTypeI = iter_value_t<_Iter>;
-	  using _ValueTypeO = iter_value_t<_Out>;
-	  constexpr bool __use_memmove
-	    = (is_trivially_copyable_v<_ValueTypeI>
-	       && is_same_v<_ValueTypeI, _ValueTypeO>
-	       && is_pointer_v<_Iter>
-	       && is_pointer_v<_Out>);
-
-	  if constexpr (__use_memmove)
+#ifdef __cpp_lib_is_constant_evaluated
+	  if (!std::is_constant_evaluated())
+#endif
 	    {
-	      static_assert(_IsMove
-			    ? is_move_assignable_v<_ValueTypeI>
-			    : is_copy_assignable_v<_ValueTypeI>);
-	      auto __num = __last - __first;
-	      if (__num)
-		std::__memmove<_IsMove>(__result, __first, __num);
-	      return {__first + __num, __result + __num};
-	    }
-	  else
-	    {
-	      for (auto __n = __last - __first; __n > 0; --__n)
+	      if constexpr (__memcpyable<_Iter, _Out>::__value)
 		{
-		  if constexpr (_IsMove)
-		    *__result = std::move(*__first);
-		  else
-		    *__result = *__first;
-		  ++__first;
-		  ++__result;
+		  using _ValueTypeI = iter_value_t<_Iter>;
+		  static_assert(_IsMove
+		      ? is_move_assignable_v<_ValueTypeI>
+		      : is_copy_assignable_v<_ValueTypeI>);
+		  auto __num = __last - __first;
+		  if (__num)
+		    __builtin_memmove(__result, __first,
+			sizeof(_ValueTypeI) * __num);
+		  return {__first + __num, __result + __num};
 		}
-	      return {std::move(__first), std::move(__result)};
 	    }
+
+	  for (auto __n = __last - __first; __n > 0; --__n)
+	    {
+	      if constexpr (_IsMove)
+		*__result = std::move(*__first);
+	      else
+		*__result = *__first;
+	      ++__first;
+	      ++__result;
+	    }
+	  return {std::move(__first), std::move(__result)};
 	}
       else
 	{
@@ -306,7 +305,7 @@ namespace ranges
 
     template<input_range _Range, weakly_incrementable _Out>
       requires indirectly_copyable<iterator_t<_Range>, _Out>
-      constexpr copy_result<safe_iterator_t<_Range>, _Out>
+      constexpr copy_result<borrowed_iterator_t<_Range>, _Out>
       operator()(_Range&& __r, _Out __result) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r),
@@ -331,7 +330,7 @@ namespace ranges
 
     template<input_range _Range, weakly_incrementable _Out>
       requires indirectly_movable<iterator_t<_Range>, _Out>
-      constexpr move_result<safe_iterator_t<_Range>, _Out>
+      constexpr move_result<borrowed_iterator_t<_Range>, _Out>
       operator()(_Range&& __r, _Out __result) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r),
@@ -381,39 +380,37 @@ namespace ranges
 	}
       else if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-	  using _ValueTypeI = iter_value_t<_Iter>;
-	  using _ValueTypeO = iter_value_t<_Out>;
-	  constexpr bool __use_memmove
-	    = (is_trivially_copyable_v<_ValueTypeI>
-	       && is_same_v<_ValueTypeI, _ValueTypeO>
-	       && is_pointer_v<_Iter>
-	       && is_pointer_v<_Out>);
-	  if constexpr (__use_memmove)
+#ifdef __cpp_lib_is_constant_evaluated
+	  if (!std::is_constant_evaluated())
+#endif
 	    {
-	      static_assert(_IsMove
-			    ? is_move_assignable_v<_ValueTypeI>
-			    : is_copy_assignable_v<_ValueTypeI>);
-	      auto __num = __last - __first;
-	      if (__num)
-		std::__memmove<_IsMove>(__result - __num, __first, __num);
-	      return {__first + __num, __result - __num};
-	    }
-	  else
-	    {
-	      auto __lasti = ranges::next(__first, __last);
-	      auto __tail = __lasti;
-
-	      for (auto __n = __last - __first; __n > 0; --__n)
+	      if constexpr (__memcpyable<_Out, _Iter>::__value)
 		{
-		  --__tail;
-		  --__result;
-		  if constexpr (_IsMove)
-		    *__result = std::move(*__tail);
-		  else
-		    *__result = *__tail;
+		  using _ValueTypeI = iter_value_t<_Iter>;
+		  static_assert(_IsMove
+		      ? is_move_assignable_v<_ValueTypeI>
+		      : is_copy_assignable_v<_ValueTypeI>);
+		  auto __num = __last - __first;
+		  if (__num)
+		    __builtin_memmove(__result - __num, __first,
+				      sizeof(_ValueTypeI) * __num);
+		  return {__first + __num, __result - __num};
 		}
-	      return {std::move(__lasti), std::move(__result)};
 	    }
+
+	  auto __lasti = ranges::next(__first, __last);
+	  auto __tail = __lasti;
+
+	  for (auto __n = __last - __first; __n > 0; --__n)
+	    {
+	      --__tail;
+	      --__result;
+	      if constexpr (_IsMove)
+		*__result = std::move(*__tail);
+	      else
+		*__result = *__tail;
+	    }
+	  return {std::move(__lasti), std::move(__result)};
 	}
       else
 	{
@@ -448,7 +445,7 @@ namespace ranges
 
     template<bidirectional_range _Range, bidirectional_iterator _Iter>
       requires indirectly_copyable<iterator_t<_Range>, _Iter>
-      constexpr copy_backward_result<safe_iterator_t<_Range>, _Iter>
+      constexpr copy_backward_result<borrowed_iterator_t<_Range>, _Iter>
       operator()(_Range&& __r, _Iter __result) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r),
@@ -473,7 +470,7 @@ namespace ranges
 
     template<bidirectional_range _Range, bidirectional_iterator _Iter>
       requires indirectly_movable<iterator_t<_Range>, _Iter>
-      constexpr move_backward_result<safe_iterator_t<_Range>, _Iter>
+      constexpr move_backward_result<borrowed_iterator_t<_Range>, _Iter>
       operator()(_Range&& __r, _Iter __result) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r),
@@ -484,7 +481,7 @@ namespace ranges
   inline constexpr __move_backward_fn move_backward{};
 
   template<typename _Iter, typename _Out>
-    using copy_n_result = copy_result<_Iter, _Out>;
+    using copy_n_result = in_out_result<_Iter, _Out>;
 
   struct __copy_n_fn
   {
@@ -519,8 +516,11 @@ namespace ranges
 	if (__n <= 0)
 	  return __first;
 
-	// TODO: is __is_byte the best condition?
-	if constexpr (is_pointer_v<_Out> && __is_byte<_Tp>::__value)
+	// TODO: Generalize this optimization to contiguous iterators.
+	if constexpr (is_pointer_v<_Out>
+		      // Note that __is_byte already implies !is_volatile.
+		      && __is_byte<remove_pointer_t<_Out>>::__value
+		      && integral<_Tp>)
 	  {
 	    __builtin_memset(__first, static_cast<unsigned char>(__value), __n);
 	    return __first + __n;
@@ -573,7 +573,7 @@ namespace ranges
       }
 
     template<typename _Tp, output_range<const _Tp&> _Range>
-      constexpr safe_iterator_t<_Range>
+      constexpr borrowed_iterator_t<_Range>
       operator()(_Range&& __r, const _Tp& __value) const
       {
 	return (*this)(ranges::begin(__r), ranges::end(__r), __value);
