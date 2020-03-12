@@ -3922,15 +3922,19 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V2DF, RS6000_BTI_INTSI, ~RS6000_BTI_double, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_V2DI, 0 },
+  /* This is highly questionable, V2DI mapping to V1TI???  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_INTTI, 0 },
+  /* Next one deprecated, not in rs6000-builtin.def.  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_long_long, 0 },
+  /* This is highly questionable, V2DI mapping to V1TI???  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTTI, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI,
     ~RS6000_BTI_unsigned_V2DI, 0 },
+  /* Next one deprecated, not in rs6000-builtin.def.  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_long_long, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
@@ -3945,6 +3949,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_V4SI, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVW4X_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_INTSI, 0 },
+  /* Next 1 deprecated, not in rs6000-builtin-new.def.  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVW4X_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_long, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVW4X_V4SI,
@@ -3952,6 +3957,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     ~RS6000_BTI_unsigned_V4SI, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVW4X_V4SI,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTSI, 0 },
+  /* Next 1 deprecated, not in rs6000-builtin-new.def.  */
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVW4X_V4SI,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI,
     ~RS6000_BTI_unsigned_long, 0 },

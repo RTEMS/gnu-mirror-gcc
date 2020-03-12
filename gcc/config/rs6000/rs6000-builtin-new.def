@@ -1,3 +1,66 @@
+; General problem to solve:  def_builtin accepts one built-in name
+; (such as __builtin_altivec_vsel_4sf) mapping to one builtin ID
+; (such as VSEL_4SF).  But in practice we have a builtin name being
+; associated with different type signatures, which seems to require
+; having different builtin IDs associated with each type signature
+; in order to support proper overload type handling.  How can this
+; be resolved?
+;
+; Classes of this problem:
+;
+; (1) Different vector types for one or more parameters and/or
+; return value.  Example:
+;
+;   const vf __builtin_altivec_vsel_4sf (vf, vf, vbi);
+;     VSEL_4SF_B vector_select_v4sf {}
+;   const vf __builtin_altivec_vsel_4sf (vf, vf, vui);
+;     VSEL_4SF_U vector_select_v4sf {}
+;
+; (2) Different pointer types for one or more parameters.  Example:
+;
+;   pure vuc __builtin_altivec_lvsl (signed long long, unsigned char *);
+;     LVSL altivec_lvsl {ldvec}
+;   pure vuc __builtin_altivec_lvsl (signed long long, signed char *);
+;     LVSL_S altivec_lvsl {ldvec}
+;
+; (3) Scalar types differing only in signedness.  Example:
+;
+;   const vsq __builtin_vsx_set_1ti (vsq, signed __int128, const int<0,0>);
+;     SET_1TI_S vsx_set_v1ti {set}
+;   const vuq __builtin_vsx_set_1ti (vuq, unsigned __int128, const int<0,0>);
+;     SET_1TI_U vsx_set_v1ti {set}
+;
+; I believe that case (1) is handled by it being legal to supply
+; different vector types than expected without problem, but I need
+; to verify that.  This would mean supplying an arbitrary vector type
+; in each position for each builtin.
+;
+; Essentially what's going on is that if rs6000_overloaded_builtin_p(d->code)
+; is true, builtins with vector arguments use "opaque_V4SI_type_node" for
+; their type, which maps to "opaque" in the signature string.  Otherwise
+; the mode from the icode is used to build the function type a la:
+;
+; 	  type = builtin_function_type (insn_data[icode].operand[0].mode,
+;					insn_data[icode].operand[1].mode,
+;					insn_data[icode].operand[2].mode,
+;					insn_data[icode].operand[3].mode,
+;					d->code, d->name);
+;
+; builtin_function_type itself uses the modes together with hardcoded (!)
+; information on which parameters are unsigned to create a type, using
+; builtin_mode_to_type[][].  The key here is that the modes come from
+; the insn_code, but the signedness comes from the builtin ID.  Yeesh.
+; This is not something I understood when building the design.  Time to
+; think about how to fix this next time I have project time.
+
+; Case (2) appears to be handled by using the type "void *" for such
+; parameters.
+;
+; I don't have a good theory for case (3), but I expect it has something
+; to do with the "unsigned" array that gets set for various builtins.
+; Is this a run-time override?
+
+
 [MASK_ALTIVEC]
   vuc __builtin_altivec_mask_for_load (long long, void *);
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
@@ -759,6 +822,7 @@
 
   const vsi __builtin_altivec_vsumsws (vsi, vsi);
     VSUMSWS altivec_vsumsws {}
+
   const vsi __builtin_altivec_vsumsws_be (vsi, vsi);
     VSUMSWS_BE altivec_vsumsws_direct {}
 
@@ -766,6 +830,7 @@
     VXOR_V16QI_UNS_B xorv16qi3 {}
   const vuc __builtin_altivec_vxor_v16qi_uns (vuc, vuc);
     VXOR_V16QI_UNS xorv16qi3 {}
+
   const vsc __builtin_altivec_vxor_v16qi (vsc, vsc);
     VXOR_V16QI xorv16qi3 {}
 
@@ -773,6 +838,7 @@
     VXOR_V8HI_UNS_B xorv8hi3 {}
   const vus __builtin_altivec_vxor_v8hi_uns (vus, vus);
     VXOR_V8HI_UNS xorv8hi3 {}
+
   const vss __builtin_altivec_vxor_v8hi (vss, vss);
     VXOR_V8HI xorv8hi3 {}
 
@@ -780,6 +846,7 @@
     VXOR_V4SI_UNS_B xorv4si3 {}
   const vui __builtin_altivec_vxor_v4si_uns (vui, vui);
     VXOR_V4SI_UNS xorv4si3 {}
+
   const vsi __builtin_altivec_vxor_v4si (vsi, vsi);
     VXOR_V4SI xorv4si3 {}
 
@@ -1595,8 +1662,10 @@
 [MASK_VSX]
   const vd __builtin_altivec_vperm_2df (vd, vd, vuc);
     VPERM_2DF altivec_vperm_v2df {}
+
   const vsll __builtin_altivec_vperm_2di (vsll, vsll, vuc);
     VPERM_2DI altivec_vperm_v2di {}
+
   const vull __builtin_altivec_vperm_2di_uns (vull, vull, vuc);
     VPERM_2DI_UNS altivec_vperm_v2di_uns {}
 
@@ -1604,8 +1673,10 @@
     VSEL_2DF_B vector_select_v2df {}
   const vd __builtin_altivec_vsel_2df (vd, vd, vull);
     VSEL_2DF_U vector_select_v2df {}
+
   const vsll __builtin_altivec_vsel_2di (vsll, vsll, vsll, vbll);
     VSEL_2DI_B vector_select_v2di {}
+
   const vull __builtin_altivec_vsel_2di_uns (vull, vull, vull);
     VSEL_2DI_UNS vector_select_v2di_uns {}
 
@@ -1615,6 +1686,7 @@
     VSLDOI_2DI_U altivec_vsldoi_v2di {}
   const vbll __builtin_altivec_vsldoi_2di (vbll, vbll, const int<4>);
     VSLDOI_2DI_B altivec_vsldoi_v2di {}
+
   const vd __builtin_altivec_vsldoi_2df (vd, vd, const int<4>);
     VSLDOI_2DF altivec_vsldoi_v2df {}
 
@@ -2439,6 +2511,8 @@
     LXVD2X_V2DI_UV vsx_load_v2di {ldvec}
   pure vull __builtin_vsx_lxvd2x_v2di (signed long long, unsigned long long *);
     LXVD2X_V2DI_US vsx_load_v2di {ldvec}
+  pure vbll __builtin_vsx_lxvd2x_v2di (signed long long, vbll *);
+    LXVD2X_V2DI_B vsx_load_v2di {ldvec}
 
   pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, vf *);
     LXVW4X_V4SF_V vsx_load_v4sf {ldvec}
@@ -2453,6 +2527,21 @@
     LXVW4X_V4SI_UV vsx_load_v4si {ldvec}
   pure vui __builtin_vsx_lxvw4x_v4si (signed long long, unsigned int *);
     LXVW4X_V4SI_US vsx_load_v4si {ldvec}
+  pure vbi __builtin_vsx_lxvw4x_v4si (signed long long, vbi *);
+    LXVW4X_V4SI_B vsx_load_v4si {ldvec}
+
+  pure vss __builtin_vsx_lxvw4x_v8hi (signed long long, vss *);
+    LXVW4X_V8HI_SV vsx_load_v8hi {ldvec}
+  pure vss __builtin_vsx_lxvw4x_v8hi (signed long long, signed short *);
+    LXVW4X_V8HI_SS vsx_load_v8hi {ldvec}
+  pure vus __builtin_vsx_lxvw4x_v8hi (signed long long, vus *);
+    LXVW4X_V8HI_UV vsx_load_v8hi {ldvec}
+  pure vus __builtin_vsx_lxvw4x_v8hi (signed long long, unsigned short *);
+    LXVW4X_V8HI_US vsx_load_v8hi {ldvec}
+  pure vbs __builtin_vsx_lxvw4x_v8hi (signed long long, vbs *);
+    LXVW4X_V8HI_B vsx_load_v8hi {ldvec}
+  pure vp __builtin_vsx_lxvw4x_v8hi (signed long long, vp *);
+    LXVW4X_V8HI_P vsx_load_v8hi {ldvec}
 
 
 [MASK_P8_VECTOR]
