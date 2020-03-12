@@ -90,6 +90,8 @@ along with this program; see the file COPYING3.  If not see
 
 #define LTO_SECTION_PREFIX	".gnu.lto_.symtab"
 #define LTO_SECTION_PREFIX_LEN	(sizeof (LTO_SECTION_PREFIX) - 1)
+#define LTO_LTO_PREFIX         ".gnu.lto_.lto"
+#define LTO_LTO_PREFIX_LEN     (sizeof (LTO_LTO_PREFIX) - 1)
 #define OFFLOAD_SECTION		".gnu.offload_lto_.opts"
 #define OFFLOAD_SECTION_LEN	(sizeof (OFFLOAD_SECTION) - 1)
 
@@ -1010,6 +1012,52 @@ process_offload_section (void *data, const char *name, off_t offset, off_t len)
   return 1;
 }
 
+/* Structure that represents LTO ELF section with information
+   about the format.  */
+
+struct lto_section
+ {
+   int16_t major_version;
+   int16_t minor_version;
+   unsigned char slim_object: 1;
+   unsigned char compression: 4;
+   int32_t reserved0: 27;
+};
+
+struct lto_section lto_header;
+
+
+/* Find and parse .lto section of an object file.  */
+
+static int
+process_lto_section (void *data, const char *name, off_t offset, off_t len)
+{
+  struct plugin_objfile *obj = (struct plugin_objfile *)data;
+  if (strncmp (name, LTO_LTO_PREFIX, LTO_LTO_PREFIX_LEN) == 0)
+    {
+      if (offset != lseek (obj->file->fd, offset, SEEK_SET))
+	goto err;
+
+      ssize_t got = read (obj->file->fd, &lto_header,
+			  sizeof (struct lto_section));
+      if (got != sizeof (struct lto_section))
+	goto err;
+
+      fprintf (stderr, "read version %d.%d\n", lto_header.major_version,
+	       lto_header.minor_version);
+
+      return 0;
+    }
+
+  return 1;
+
+err:
+  if (message)
+    message (LDPL_FATAL, "%s: corrupt object file", obj->file->name);
+  obj->found = 0;
+  return 0;
+}
+
 /* Callback used by gold to check if the plugin will claim FILE. Writes
    the result in CLAIMED. */
 
@@ -1055,8 +1103,13 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
   if (!obj.objfile && !err)
     goto err;
 
-  if (obj.objfile)
-    errmsg = simple_object_find_sections (obj.objfile, process_symtab, &obj, &err);
+   if (obj.objfile)
+    {
+      errmsg = simple_object_find_sections (obj.objfile, process_symtab, &obj, &err);
+
+      if (!errmsg)
+	errmsg = simple_object_find_sections (obj.objfile, process_lto_section, &obj, &err);
+    }
 
   if (!obj.objfile || errmsg)
     {
