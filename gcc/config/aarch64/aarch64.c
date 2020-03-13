@@ -15893,9 +15893,8 @@ aapcs_vfp_sub_candidate (const_tree type, machine_mode *modep)
   machine_mode mode;
   HOST_WIDE_INT size;
 
-  /* SVE types (and types containing SVE types) must be handled
-     before calling this function.  */
-  gcc_assert (!aarch64_sve::builtin_type_p (type));
+  if (aarch64_sve::builtin_type_p (type))
+    return -1;
 
   switch (TREE_CODE (type))
     {
