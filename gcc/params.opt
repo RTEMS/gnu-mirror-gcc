@@ -363,7 +363,7 @@ Common Joined UInteger Var(param_max_lto_streaming_parallelism) Init(32) Integer
 maximal number of LTO partitions streamed in parallel.
 
 -param=lto-min-partition=
-Common Joined UInteger Var(param_min_partition_size) Init(10000) Param
+Common Joined UInteger Var(param_min_partition_size) Init(75000) Param
 Minimal size of a partition for LTO (in estimated instructions).
 
 -param=lto-partitions=
