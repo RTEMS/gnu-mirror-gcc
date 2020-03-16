@@ -691,12 +691,14 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 	  if (addend == NULL_TREE
 	      && expand_vec_cond_expr_p (type, type, LT_EXPR))
 	    {
-	      tree zero, cst, cond, mask_type;
-	      gimple *stmt;
+	      tree zero, cst, mask_type, mask;
+	      gimple *stmt, *cond;
 
 	      mask_type = truth_type_for (type);
 	      zero = build_zero_cst (type);
-	      cond = build2 (LT_EXPR, mask_type, op0, zero);
+	      mask = make_ssa_name (mask_type);
+	      cond = gimple_build_assign (mask, LT_EXPR, op0, zero);
+	      gsi_insert_before (gsi, cond, GSI_SAME_STMT);
 	      tree_vector_builder vec (type, nunits, 1);
 	      for (i = 0; i < nunits; i++)
 		vec.quick_push (build_int_cst (TREE_TYPE (type),
@@ -704,7 +706,7 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 						<< shifts[i]) - 1));
 	      cst = vec.build ();
 	      addend = make_ssa_name (type);
-	      stmt = gimple_build_assign (addend, VEC_COND_EXPR, cond,
+	      stmt = gimple_build_assign (addend, VEC_COND_EXPR, mask,
 					  cst, zero);
 	      gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
 	    }
@@ -944,7 +946,17 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
     }
 
   if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), TREE_CODE (a)))
-    return;
+    {
+      if (a_is_comparison)
+	{
+	  a = gimplify_build2 (gsi, TREE_CODE (a), TREE_TYPE (a), a1, a2);
+	  gimple_assign_set_rhs1 (stmt, a);
+	  update_stmt (stmt);
+	  return;
+	}
+      gcc_assert (TREE_CODE (a) == SSA_NAME || TREE_CODE (a) == VECTOR_CST);
+      return;
+    }
 
   /* Handle vector boolean types with bitmasks.  If there is a comparison
      and we can expand the comparison into the vector boolean bitmask,
@@ -2252,13 +2264,18 @@ gimple_expand_vec_cond_expr (gimple_stmt_iterator *gsi)
   lhs = gimple_assign_lhs (stmt);
   machine_mode mode = TYPE_MODE (TREE_TYPE (lhs));
 
-  if (COMPARISON_CLASS_P (op0))
+  gcc_assert (!COMPARISON_CLASS_P (op0));
+  if (TREE_CODE (op0) == SSA_NAME)
     {
-      op0a = TREE_OPERAND (op0, 0);
-      op0b = TREE_OPERAND (op0, 1);
-      tcode = TREE_CODE (op0);
+      gimple *def_stmt = SSA_NAME_DEF_STMT (op0);
+      op0a = gimple_assign_rhs1 (def_stmt);
+      op0b = gimple_assign_rhs2 (def_stmt);
+      tcode = gimple_assign_rhs_code (def_stmt);
     }
   else
+    tcode = TREE_CODE (op0);
+
+  if (TREE_CODE_CLASS (tcode) != tcc_comparison)
     {
       gcc_assert (VECTOR_BOOLEAN_TYPE_P (TREE_TYPE (op0)));
       if (get_vcond_mask_icode (mode, TYPE_MODE (TREE_TYPE (op0)))
