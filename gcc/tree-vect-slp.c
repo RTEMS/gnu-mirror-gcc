@@ -2796,6 +2796,69 @@ vect_slp_convert_to_external (vec_info *vinfo, slp_tree node,
   return true;
 }
 
+/* Compute the prologue cost for invariant or constant operands represented
+   by NODE.  */
+
+static void
+vect_prologue_cost_for_slp (vec_info *vinfo,
+			    slp_tree node,
+			    stmt_vector_for_cost *cost_vec)
+{
+  tree op = SLP_TREE_SCALAR_OPS (node)[0];
+
+  /* Without looking at the actual initializer a vector of
+     constants can be implemented as load from the constant pool.
+     When all elements are the same we can use a splat.  */
+  tree vectype = get_vectype_for_scalar_type (vinfo, TREE_TYPE (op), node);
+  unsigned group_size = SLP_TREE_SCALAR_OPS (node).length ();
+  unsigned num_vects_to_check;
+  unsigned HOST_WIDE_INT const_nunits;
+  unsigned nelt_limit;
+  if (TYPE_VECTOR_SUBPARTS (vectype).is_constant (&const_nunits)
+      && ! multiple_p (const_nunits, group_size))
+    {
+      num_vects_to_check = SLP_TREE_NUMBER_OF_VEC_STMTS (node);
+      nelt_limit = const_nunits;
+    }
+  else
+    {
+      /* If either the vector has variable length or the vectors
+	 are composed of repeated whole groups we only need to
+	 cost construction once.  All vectors will be the same.  */
+      num_vects_to_check = 1;
+      nelt_limit = group_size;
+    }
+  tree elt = NULL_TREE;
+  unsigned nelt = 0;
+  for (unsigned j = 0; j < num_vects_to_check * nelt_limit; ++j)
+    {
+      unsigned si = j % group_size;
+      if (nelt == 0)
+	elt = SLP_TREE_SCALAR_OPS (node)[si];
+      /* ???  We're just tracking whether all operands of a single
+	 vector initializer are the same, ideally we'd check if
+	 we emitted the same one already.  */
+      /* ???  Instead cost invariants/externals via
+	 vect_slp_analyze_node_operations.  */
+      else if (elt != SLP_TREE_SCALAR_OPS (node)[si])
+	elt = NULL_TREE;
+      nelt++;
+      if (nelt == nelt_limit)
+	{
+	  /* ???  We need to pass down stmt_info for a vector type
+	     even if it points to the wrong stmt.  But here we don't
+	     have one so we should amend things to record a vector
+	     type directly.  */
+	  record_stmt_cost (cost_vec, 1,
+			    SLP_TREE_DEF_TYPE (node)
+			    ? (elt ? scalar_to_vec : vec_construct)
+			    : vector_load,
+			    vectype, 0, vect_prologue);
+	  nelt = 0;
+	}
+    }
+}
+
 /* Analyze statements contained in SLP tree NODE after recursively analyzing
    the subtree.  NODE_INSTANCE contains NODE and VINFO contains INSTANCE.
 
@@ -2811,9 +2874,6 @@ vect_slp_analyze_node_operations (vec_info *vinfo, slp_tree node,
   int i, j;
   slp_tree child;
 
-  if (SLP_TREE_DEF_TYPE (node) != vect_internal_def)
-    return true;
-
   /* If we already analyzed the exact same set of scalar stmts we're done.
      We share the generated vector stmts for those.
      The SLP graph is acyclic so not caching whether we failed or succeeded
@@ -2822,6 +2882,13 @@ vect_slp_analyze_node_operations (vec_info *vinfo, slp_tree node,
   if (visited.contains (node)
       || lvisited.add (node))
     return true;
+
+  if (SLP_TREE_DEF_TYPE (node) != vect_internal_def)
+    {
+      /* Assume we can code-generate all invariants, but cost them.  */
+      vect_prologue_cost_for_slp (vinfo, node, cost_vec);
+      return true;
+    }
 
   FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
     if (!vect_slp_analyze_node_operations (vinfo, child, node_instance,
