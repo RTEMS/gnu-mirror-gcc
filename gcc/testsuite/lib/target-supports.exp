@@ -1022,6 +1022,16 @@ proc check_effective_target_fgnu_tm {} {
     } "-fgnu-tm"]
 }
 
+# Return 1 if compilation with -Wa,--noexecstack is error-free for trivial
+# code, 0 otherwise.
+
+proc check_effective_target_wa_noexecstack {} {
+    return [check_no_compiler_messages wa_noexecstack object {
+	void foo (void) { }
+    } "-Wa,--noexecstack"]
+}
+
+
 # Return 1 if the target supports mmap, 0 otherwise.
 
 proc check_effective_target_mmap {} {
