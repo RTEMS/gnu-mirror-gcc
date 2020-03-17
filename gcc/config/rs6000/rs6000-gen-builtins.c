@@ -219,6 +219,7 @@ struct typeinfo {
   char isbool;
   char ispixel;
   char ispointer;
+  char isopaque;
   basetype base;
   restriction restr;
   int val1;
@@ -334,12 +335,17 @@ struct typemap
 
 /* This table must be kept in alphabetical order, as we use binary
    search for table lookups in map_token_to_type_node.  */
-#define TYPE_MAP_SIZE 32
+#define TYPE_MAP_SIZE 33
 static typemap type_map[TYPE_MAP_SIZE] =
   {
+    { "bv16qi",	"bool_V16QI" },
+    { "bv2di",	"bool_V2DI" },
+    { "bv4si",	"bool_V4SI" },
+    { "bv8hi",	"bool_V8HI" },
     { "df",	"double" },
     { "di",	"intDI" },
     { "hi",	"intHI" },
+    { "opaque", "opaque_V4SI" },
     { "pv",	"ptr" },
     { "qi",	"intQI" },
     { "sf",	"float" },
@@ -364,10 +370,6 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "v4sf",	"V4SF" },
     { "v4si",	"V4SI" },
     { "v8hi",	"V8HI" },
-    { "vb16qi",	"bool_V16QI" },
-    { "vb2di",	"bool_V2DI" },
-    { "vb4si",	"bool_V4SI" },
-    { "vb8hi",	"bool_V8HI" },
     { "vp8hi",	"pixel_V8HI" },
   };
 
@@ -729,6 +731,7 @@ match_type (typeinfo *typedata, int voidok)
        vp	vector pixel
        vf	vector float
        vd	vector double
+       vop	opaque vector (matches all vectors)
 
      For simplicity, We don't support "short int" and "long long int".
      We don't support a <basetype> of "bool", "long double", or "_Float16",
@@ -889,6 +892,11 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->base = BT_DOUBLE;
       handle_pointer (typedata);
+      return 1;
+    }
+  else if (!strcmp (token, "vop"))
+    {
+      typedata->isopaque = 1;
       return 1;
     }
   else if (!strcmp (token, "signed"))
@@ -1146,6 +1154,8 @@ htmspr = %d, htmcr = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
 static void
 complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
 {
+  if (typeptr->isbool)
+    buf[(*bufi)++] = 'b';
   buf[(*bufi)++] = 'v';
   if (typeptr->ispixel)
     {
@@ -1154,8 +1164,6 @@ complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
     }
   else
     {
-      if (typeptr->isbool)
-	buf[(*bufi)++] = 'b';
       switch (typeptr->base)
 	{
 	case BT_CHAR:
@@ -1236,8 +1244,8 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
 }
 
 /* Build a function type descriptor identifier from the return type
-   and argument types, and store it if it does not already exist.
-   Return the identifier.  */
+   and argument types described by PROTOPTR, and store it if it does
+   not already exist.  Return the identifier.  */
 static char *
 construct_fntype_id (prototype *protoptr)
 {
@@ -1253,7 +1261,7 @@ construct_fntype_id (prototype *protoptr)
      terminating null.  Thus for a function with N arguments, we
      need at most 8N+14 characters for N>0, otherwise 16.
      ----
-       *Worst case is vb16qi for "vector bool char".  */
+       *Worst case is bv16qi for "vector bool char".  */
   int len = protoptr->nargs ? (protoptr->nargs + 1) * 8 + 6 : 16;
   char *buf = (char *) malloc (len);
   int bufi = 0;
@@ -1267,12 +1275,20 @@ construct_fntype_id (prototype *protoptr)
     buf[bufi++] = 'v';
   else
     {
-      if (protoptr->rettype.isunsigned)
-	buf[bufi++] = 'u';
-      if (protoptr->rettype.isvector)
-	complete_vector_type (&protoptr->rettype, buf, &bufi);
+      if (protoptr->rettype.isopaque)
+	{
+	  memcpy (&buf[bufi], "opaque", 6);
+	  bufi += 6;
+	}
       else
-	complete_base_type (&protoptr->rettype, buf, &bufi);
+	{
+	  if (protoptr->rettype.isunsigned)
+	    buf[bufi++] = 'u';
+	  if (protoptr->rettype.isvector)
+	    complete_vector_type (&protoptr->rettype, buf, &bufi);
+	  else
+	    complete_base_type (&protoptr->rettype, buf, &bufi);
+	}
     }
 
   memcpy (&buf[bufi], "_ftype", 6);
@@ -1297,12 +1313,20 @@ construct_fntype_id (prototype *protoptr)
 	    }
 	  else
 	    {
-	      if (argptr->info.isunsigned)
-		buf[bufi++] = 'u';
-	      if (argptr->info.isvector)
-		complete_vector_type (&argptr->info, buf, &bufi);
+	      if (argptr->info.isopaque)
+		{
+		  memcpy (&buf[bufi], "opaque", 6);
+		  bufi += 6;
+		}
 	      else
-		complete_base_type (&argptr->info, buf, &bufi);
+		{
+		  if (argptr->info.isunsigned)
+		    buf[bufi++] = 'u';
+		  if (argptr->info.isvector)
+		    complete_vector_type (&argptr->info, buf, &bufi);
+		  else
+		    complete_base_type (&argptr->info, buf, &bufi);
+		}
 	    }
 	  argptr = argptr->next;
 	}
@@ -2160,7 +2184,7 @@ write_init_bif_table ()
 	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
 	  fprintf (init_file, "        }\n");
 	}
-      fprintf (init_file, "    }\n");
+      fprintf (init_file, "    }\n\n");
     }
 }
 
