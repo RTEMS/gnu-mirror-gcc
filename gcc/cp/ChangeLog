@@ -1,3 +1,204 @@
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92909
+	* pt.c (find_parameter_packs_r): [DECL_EXPR]: Walk
+	DECL_ORIGINAL_TYPE of a typedef.
+
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92068
+	* pt.c (process_partial_specialization): Error rather than crash on
+	extra pack expansion.
+
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93248
+	* pt.c (build_deduction_guide): Clear cp_unevaluated_operand for
+	substituting DECL_ARGUMENTS.
+
+2020-03-12  Release Manager
+
+	* GCC 9.3.0 released.
+
+2020-03-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/88395
+	PR c++/93551
+	* constraint.cc (constraints_satisfied_p): Use push_tinst_level.
+
+2020-03-05  Martin Sebor  <msebor@redhat.com>
+
+	Backport from trunk.
+	2020-02-21  Martin Sebor  <msebor@redhat.com>
+
+	PR gcov-profile/93753
+	* class.c (check_flexarrays): Tighten up a test for potential members
+	of anonymous structs or unions.
+
+2020-03-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90338
+	* pt.c (invalid_nontype_parm_type_p): Check complain for non-literal
+	and mutable errors.
+
+2020-03-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91607
+	* constexpr.c (constexpr_call_hasher::equal): Use
+	same_type_ignoring_top_level_qualifiers_p.
+
+2020-03-04  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/90938
+	* tree.c (type_initializer_zero_p): Fail for structs initialized
+	with non-structs.
+
+2020-03-04  Marek Polacek  <polacek@redhat.com>
+
+	Backported from mainline
+	2020-01-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93299 - ICE in tsubst_copy with parenthesized expression.
+	* pt.c (tsubst_copy): Handle a REF_PARENTHESIZED_P VIEW_CONVERT_EXPR.
+
+2020-03-04  Marek Polacek  <polacek@redhat.com>
+
+	Backported from mainline
+	2020-02-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/93676 - value-init crash in template.
+	* init.c (build_new_1): Don't call build_vec_init in a template.
+
+2020-03-04  Jason Merrill  <jason@redhat.com>
+	    Marek Polacek  <polacek@redhat.com>
+
+	PR c++/90505 - mismatch in template argument deduction.
+	* pt.c (tsubst): Don't reduce the template level of template
+	parameters when tf_partial.
+
+2020-03-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90432
+	* init.c (perform_member_init): Don't do aggregate initialization of
+	empty field.
+	* constexpr.c (cx_check_missing_mem_inits): Don't enforce
+	initialization of empty field.
+
+2020-03-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90997
+	* semantics.c (finish_call_expr): Don't call
+	instantiate_non_dependent_expr before warn_for_memset.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/86917
+	* constexpr.c (cxx_eval_vec_init_1): Handle CONSTRUCTOR.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91953
+	* constexpr.c (potential_constant_expression_1) [PARM_DECL]: Allow
+	empty class type.
+	[COMPONENT_REF]: A member function reference doesn't use the object
+	as an rvalue.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/88256
+	* cp-gimplify.c (predeclare_vla): New.
+	(cp_genericize_r) [NOP_EXPR]: Call it.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93442
+	* parser.c (cp_parser_lambda_expression): Clear in_discarded_stmt.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90732 - ICE with VLA capture and generic lambda.
+	* pt.c (tsubst_lambda_expr): Repeat add_capture for VLAs.
+
+2020-03-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90333
+	PR c++/89640
+	PR c++/60503
+	* parser.c (cp_parser_type_specifier_seq): Don't parse attributes in
+	a trailing return type.
+	(cp_parser_lambda_declarator_opt): Parse C++11 attributes before
+	parens.
+
+2020-02-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/92745 - bogus error when initializing array of vectors.
+	* decl.c (reshape_init_r): For a nested compound literal, do
+	call reshape_init_{class,array,vector}.
+
+2020-02-26  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90951
+	* constexpr.c (cxx_eval_array_reference): {}-initialize missing
+	elements instead of value-initializing them.
+
+2020-02-26  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93140
+	* pt.c (tsubst_decl) [PARM_DECL]: Check cp_unevaluated_operand in
+	handling of TREE_CHAIN for empty pack.
+
+2020-02-26  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92852
+	* constexpr.c (maybe_constant_value): Don't unshare if the cached
+	value is the same as the argument.
+
+2020-02-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/61414
+	* class.c (enum_min_precision): Change prec type from int to int &.
+
+2020-02-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-02-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93557
+	* semantics.c (cp_build_vec_convert): Call decay_conversion on arg
+	prior to passing it to c_build_vec_convert.
+
+	2020-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/91118
+	* cp-gimplify.c (cxx_omp_predetermined_sharing): Return
+	OMP_CLAUSE_DEFAULT_SHARED for typeinfo decls.
+
+2020-01-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90546
+	* call.c (build_user_type_conversion_1): Allow a template conversion
+	returning an rvalue reference to bind directly to an lvalue.
+
+	PR c++/90731
+	* decl.c (grokdeclarator): Propagate eh spec from typedef.
+
+	PR c++/90966
+	* pt.c (tsubst_copy) [STRING_CST]: Don't use fold_convert.
+
+	PR c++/93279 - ICE with lambda in member operator.
+	* name-lookup.c (maybe_save_operator_binding): Don't remember
+	class-scope bindings.
+
+2020-01-27  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/91826
+	* name-lookup.c (is_ancestor): Allow CHILD to be a namespace alias.
+
+2020-01-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92852 - ICE with generic lambda and reference var.
+	* constexpr.c (maybe_constant_value): Likewise.
+
 2020-01-22  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from mainline

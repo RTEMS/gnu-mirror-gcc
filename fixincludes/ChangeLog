@@ -1,3 +1,14 @@
+2020-03-12  Release Manager
+
+	* GCC 9.3.0 released.
+
+2020-02-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2020-02-13  Matheus Castanho  <msc@linux.ibm.com>
+
+	* fixinc.in: Skip machine_name fix on powerpc*-*-linux*.
+
 2020-01-01  John David Anglin  <danglin@gcc.gnu.org>
 
 	Backport from mainline
