@@ -4441,10 +4441,14 @@ handle_optimize_attribute (tree *node, tree name, tree args,
   else
     {
       struct cl_optimization cur_opts;
+      struct cl_target_option cur_target_opts;
       tree old_opts = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (*node);
 
-      /* Save current options.  */
+      /* Save current options for both optimization and target.  We need
+	 to save target optimization because there can be interaction
+	 in between both these types of options.  */
       cl_optimization_save (&cur_opts, &global_options);
+      cl_target_option_save (&cur_target_opts, &global_options);
 
       /* If we previously had some optimization options, use them as the
 	 default.  */
@@ -4458,8 +4462,9 @@ handle_optimize_attribute (tree *node, tree name, tree args,
       DECL_FUNCTION_SPECIFIC_OPTIMIZATION (*node)
 	= build_optimization_node (&global_options);
 
-      /* Restore current options.  */
+      /* Restore current options for both optimization and target.  */
       cl_optimization_restore (&global_options, &cur_opts);
+      cl_target_option_restore (&global_options, &cur_target_opts);
       if (flag_checking)
 	gcc_assert (gcc_options_check (&saved_global_options, &global_options));
     }
