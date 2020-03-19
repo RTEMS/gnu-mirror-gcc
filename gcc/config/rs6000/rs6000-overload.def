@@ -1,0 +1,57 @@
+; Overloaded built-in functions for PowerPC.
+; Copyright (C) 2020 Free Software Foundation, Inc.
+; Contributed by Bill Schmidt, IBM <wschmidt@linux.ibm.com>
+;
+; This file is part of GCC.
+;
+; GCC is free software; you can redistribute it and/or modify it under
+; the terms of the GNU General Public License as published by the Free
+; Software Foundation; either version 3, or (at your option) any later
+; version.
+;
+; GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+; WARRANTY; without even the implied warranty of MERCHANTABILITY or
+; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+; for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with GCC; see the file COPYING3.  If not see
+; <http://www.gnu.org/licenses/>.  */
+
+
+; Overloaded built-in functions in this file are organized into "stanzas",
+; where all built-ins in a given stanza have the same overloaded function
+; name:
+;
+;   [<overload-id>, <abi-name>, <builtin-name>]
+;
+; Here the square brackets are part of the syntax, <overload-id> is a
+; unique internal identifier for the overload that will be used as part
+; of an enumeration of all overloaded functions; <abi-name> is the name
+; that will appear as a #define in altivec.h; and <builtin-name> is the
+; name that is overloaded in the back end.
+;
+; Each function entry has two lines.  The first line is a prototype line.
+; See rs6000-builtin-new.def for a description of the prototype line.
+; A prototype line in the file differs in that it doesn't have an
+; optional [kind] token:
+;
+;   <return-type> <internal-name> (<argument-list>);
+;
+; The second line contains only one token: the <bif-id> that this
+; particular instance of the overloaded function maps to.  It must
+; match a token that appears in rs6000-builtin-new.def.
+;
+; Blank lines may be used as desired in this file between the lines as
+; defined above; that is, you can introduce as many extra newlines as you
+; like after a required newline, but nowhere else.  Lines beginning with
+; a semicolon are also treated as blank lines.
+
+
+
+[VEC_ABS, vec_abs, __builtin_vec_abs]
+  vsc __builtin_vec_abs (vsc);
+    ABS_V16QI
+
+  vss __builtin_vec_abs (vss);
+    ABS_V8HI
