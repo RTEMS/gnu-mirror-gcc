@@ -329,6 +329,47 @@ handle_pointer (typeinfo *typedata)
 static int
 match_basetype (typeinfo *typedata)
 {
+  consume_whitespace ();
+  int oldpos = pos;
+  char *token = match_identifier ();
+  if (!token)
+    {
+      (*diag) ("missing base type in return type at column %d\n", pos + 1);
+      return 0;
+    }
+
+  if (!strcmp (token, "char"))
+    typedata->base = BT_CHAR;
+  else if (!strcmp (token, "short"))
+    typedata->base = BT_SHORT;
+  else if (!strcmp (token, "int"))
+    typedata->base = BT_INT;
+  else if (!strcmp (token, "long"))
+    {
+      consume_whitespace ();
+      char *mustbelong = match_identifier ();
+      if (!mustbelong || strcmp (mustbelong, "long"))
+	{
+	  (*diag) ("incomplete 'long long' at column %d\n", oldpos + 1);
+	  return 0;
+	}
+      typedata->base = BT_LONGLONG;
+    }
+  else if (!strcmp (token, "float"))
+    typedata->base = BT_FLOAT;
+  else if (!strcmp (token, "double"))
+    typedata->base = BT_DOUBLE;
+  else if (!strcmp (token, "__int128"))
+    typedata->base = BT_INT128;
+  else if (!strcmp (token, "_Float128"))
+    typedata->base = BT_FLOAT128;
+  else
+    {
+      (*diag) ("unrecognized base type at column %d\n", oldpos + 1);
+      return 0;
+    }
+
+  handle_pointer (typedata);
   return 1;
 }
 
