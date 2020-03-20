@@ -277,8 +277,31 @@ struct bifdata {
 static bifdata bifs[MAXBIFS];
 static int num_bifs;
 static int curr_bif;
+
+/* Stanzas are groupings of built-in functions and overloads by some
+   common feature/attribute.  These definitions are for overload stanzas.  */
+struct ovld_stanza {
+  char *stanza_id;
+  char *extern_name;
+  char *intern_name;
+};
+
+#define MAXOVLDSTANZAS 256
+static ovld_stanza ovld_stanzas[MAXOVLDSTANZAS];
 static int num_ovld_stanzas;
+static int curr_ovld_stanza;
+
+#define MAXOVLDS 16384
+struct ovlddata {
+  int stanza;
+  prototype proto;
+  char *idname;
+  char *fndecl;
+};
+
+static ovlddata ovlds[MAXOVLDS];
 static int num_ovlds;
+static int curr_ovld;
 
 /* Exit codes for the shell.  */
 enum exit_codes {
@@ -1323,11 +1346,194 @@ parse_bif ()
   return result;
 }
 
+/* Parse one two-line entry in the overload file.  Return 0 for EOF, 1 for
+   success, 2 for end-of-stanza, and 6 for a parsing failure.  */
+static int
+parse_ovld_entry ()
+{
+  /* Check for end of stanza.  */
+  pos = 0;
+  consume_whitespace ();
+  if (linebuf[pos] == '[')
+    return 2;
+
+  /* Allocate an entry in the overload table.  */
+  if (num_ovlds >= MAXOVLDS - 1)
+    {
+      (*diag) ("too many overloads.\n");
+      return 6;
+    }
+
+  curr_ovld = num_ovlds++;
+  ovlds[curr_ovld].stanza = curr_ovld_stanza;
+
+  if (!parse_prototype (&ovlds[curr_ovld].proto))
+    return 6;
+
+  /* Now process line 2, which just contains the builtin id.  */
+  if (!advance_line (ovld_file))
+    {
+      (*diag) ("unexpected EOF.\n");
+      return 0;
+    }
+
+  pos = 0;
+  consume_whitespace ();
+  int oldpos = pos;
+  char *id = match_identifier ();
+  ovlds[curr_ovld].idname = id;
+  if (!id)
+    {
+      (*diag) ("missing overload id at column %d.\n", pos + 1);
+      return 6;
+    }
+
+#ifdef DEBUG
+  (*diag) ("ID name is '%s'.\n", id);
+#endif
+
+  /* The builtin id has to match one from the bif file.  */
+  if (!rbt_find (&bif_rbt, id))
+    {
+      (*diag) ("builtin ID '%s' not found in bif file.\n", id);
+      return 6;
+    }
+
+  /* Save the ID in a lookup structure.  */
+  if (!rbt_insert (&ovld_rbt, id))
+    {
+      (*diag) ("duplicate function ID '%s' at column %d.\n", id, oldpos + 1);
+      return 6;
+    }
+
+  consume_whitespace ();
+  if (linebuf[pos] != '\n')
+    {
+      (*diag) ("garbage at end of line at column %d.\n", pos + 1);
+      return 6;
+    }
+  return 1;
+}
+
+/* Parse one stanza of the input overload file.  linebuf already contains the
+   first line to parse.  Return 1 for success, 0 for EOF, 6 for failure.  */
+static int
+parse_ovld_stanza ()
+{
+  /* Parse the stanza header.  */
+  pos = 0;
+  consume_whitespace ();
+
+  if (linebuf[pos] != '[')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 6;
+    }
+  safe_inc_pos ();
+
+  char *stanza_name = match_identifier ();
+  if (!stanza_name)
+    {
+      (*diag) ("no identifier found in stanza header.\n");
+      return 6;
+    }
+
+  /* Add the identifier to a table and set the number to be recorded
+     with subsequent overload entries.  */
+  if (num_ovld_stanzas >= MAXOVLDSTANZAS)
+    {
+      (*diag) ("too many stanza headers.\n");
+      return 6;
+    }
+
+  curr_ovld_stanza = num_ovld_stanzas++;
+  ovld_stanza *stanza = &ovld_stanzas[curr_ovld_stanza];
+  stanza->stanza_id = stanza_name;
+
+  consume_whitespace ();
+  if (linebuf[pos] != ',')
+    {
+      (*diag) ("missing comma at column %d.\n", pos + 1);
+      return 6;
+    }
+  safe_inc_pos ();
+
+  consume_whitespace ();
+  stanza->extern_name = match_identifier ();
+  if (!stanza->extern_name)
+    {
+      (*diag) ("missing external name at column %d.\n", pos + 1);
+      return 6;
+    }
+
+  consume_whitespace ();
+  if (linebuf[pos] != ',')
+    {
+      (*diag) ("missing comma at column %d.\n", pos + 1);
+      return 6;
+    }
+  safe_inc_pos ();
+
+  consume_whitespace ();
+  stanza->intern_name = match_identifier ();
+  if (!stanza->intern_name)
+    {
+      (*diag) ("missing internal name at column %d.\n", pos + 1);
+      return 6;
+    }
+
+  if (linebuf[pos] != ']')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 6;
+    }
+  safe_inc_pos ();
+
+  consume_whitespace ();
+  if (linebuf[pos] != '\n' && pos != LINELEN - 1)
+    {
+      (*diag) ("garbage after stanza header.\n");
+      return 6;
+    }
+
+  int result = 1;
+
+  while (result != 2) /* end of stanza  */
+    {
+      int result;
+      if (!advance_line (ovld_file))
+	return 0;
+
+      result = parse_ovld_entry ();
+      if (!result) /* EOF */
+	return 0;
+      else if (result > 2)
+	return 6;
+    }
+
+  return 1;
+}
+
 /* Parse the overload file.  Return 1 for success, 6 for a parsing error.  */
 static int
 parse_ovld ()
 {
-  return 1;
+  int result;
+  diag = &ovld_diag;
+  while (1)
+    {
+      /* Read ahead one line and check for EOF.  */
+      if (!advance_line (ovld_file))
+	return 1;
+
+      /* Parse a stanza beginning at this line.  */
+      result = parse_ovld_stanza ();
+      if (result != 1)
+	break;
+    }
+  if (result == 0)
+    return 1;
+  return result;
 }
 
 /* Write everything to the header file (rs6000-builtins.h).  */
