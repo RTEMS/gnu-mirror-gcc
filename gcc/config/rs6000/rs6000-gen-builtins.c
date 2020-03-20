@@ -1103,6 +1103,197 @@ htmspr = %d, htmcr = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
   return 1;
 }
 
+/* Convert a vector type into a mode string.  */
+static void
+complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
+{
+  if (typeptr->isbool)
+    buf[(*bufi)++] = 'b';
+  buf[(*bufi)++] = 'v';
+  if (typeptr->ispixel)
+    {
+      memcpy (&buf[*bufi], "p8hi", 4);
+      *bufi += 4;
+    }
+  else
+    {
+      switch (typeptr->base)
+	{
+	case BT_CHAR:
+	  memcpy (&buf[*bufi], "16qi", 4);
+	  *bufi += 4;
+	  break;
+	case BT_SHORT:
+	  memcpy (&buf[*bufi], "8hi", 3);
+	  *bufi += 3;
+	  break;
+	case BT_INT:
+	  memcpy (&buf[*bufi], "4si", 3);
+	  *bufi += 3;
+	  break;
+	case BT_LONGLONG:
+	  memcpy (&buf[*bufi], "2di", 3);
+	  *bufi += 3;
+	  break;
+	case BT_FLOAT:
+	  memcpy (&buf[*bufi], "4sf", 3);
+	  *bufi += 3;
+	  break;
+	case BT_DOUBLE:
+	  memcpy (&buf[*bufi], "2df", 3);
+	  *bufi += 3;
+	  break;
+	case BT_INT128:
+	  memcpy (&buf[*bufi], "1ti", 3);
+	  *bufi += 3;
+	  break;
+	case BT_FLOAT128:
+	  memcpy (&buf[*bufi], "1tf", 3);
+	  *bufi += 3;
+	  break;
+	default:
+	  (*diag) ("unhandled basetype %d.\n", typeptr->base);
+	  exit (EC_INTERR);
+	}
+    }
+}
+
+/* Convert a base type into a mode string.  */
+static void
+complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
+{
+  switch (typeptr->base)
+    {
+    case BT_CHAR:
+      memcpy (&buf[*bufi], "qi", 2);
+      break;
+    case BT_SHORT:
+      memcpy (&buf[*bufi], "hi", 2);
+      break;
+    case BT_INT:
+      memcpy (&buf[*bufi], "si", 2);
+      break;
+    case BT_LONGLONG:
+      memcpy (&buf[*bufi], "di", 2);
+      break;
+    case BT_FLOAT:
+      memcpy (&buf[*bufi], "sf", 2);
+      break;
+    case BT_DOUBLE:
+      memcpy (&buf[*bufi], "df", 2);
+      break;
+    case BT_INT128:
+      memcpy (&buf[*bufi], "ti", 2);
+      break;
+    case BT_FLOAT128:
+      memcpy (&buf[*bufi], "tf", 2);
+      break;
+    default:
+      (*diag) ("unhandled basetype %d.\n", typeptr->base);
+      exit (EC_INTERR);
+    }
+
+  *bufi += 2;
+}
+
+/* Build a function type descriptor identifier from the return type
+   and argument types described by PROTOPTR, and store it if it does
+   not already exist.  Return the identifier.  */
+static char *
+construct_fntype_id (prototype *protoptr)
+{
+  /* Determine the maximum space for a function type descriptor id.
+     Each type requires at most 8 characters (6 for the mode*, 1 for
+     the optional 'u' preceding the mode, and 1 for an underscore
+     following the mode).  We also need 5 characters for the string
+     "ftype" that separates the return mode from the argument modes.
+     The last argument doesn't need a trailing underscore, but we
+     count that as the one trailing "ftype" instead.  For the special
+     case of zero arguments, we need 8 for the return type and 7
+     for "ftype_v".  Finally, we need one character for the
+     terminating null.  Thus for a function with N arguments, we
+     need at most 8N+14 characters for N>0, otherwise 16.
+     ----
+       *Worst case is bv16qi for "vector bool char".  */
+  int len = protoptr->nargs ? (protoptr->nargs + 1) * 8 + 6 : 16;
+  char *buf = (char *) malloc (len);
+  int bufi = 0;
+
+  if (protoptr->rettype.ispointer)
+    {
+      assert (protoptr->rettype.isvoid);
+      buf[bufi++] = 'p';
+    }
+  if (protoptr->rettype.isvoid)
+    buf[bufi++] = 'v';
+  else
+    {
+      if (protoptr->rettype.isopaque)
+	{
+	  memcpy (&buf[bufi], "opaque", 6);
+	  bufi += 6;
+	}
+      else
+	{
+	  if (protoptr->rettype.isunsigned)
+	    buf[bufi++] = 'u';
+	  if (protoptr->rettype.isvector)
+	    complete_vector_type (&protoptr->rettype, buf, &bufi);
+	  else
+	    complete_base_type (&protoptr->rettype, buf, &bufi);
+	}
+    }
+
+  memcpy (&buf[bufi], "_ftype", 6);
+  bufi += 6;
+
+  if (!protoptr->nargs)
+    {
+      memcpy (&buf[bufi], "_v", 2);
+      bufi += 2;
+    }
+  else
+    {
+      typelist *argptr = protoptr->args;
+      for (int i = 0; i < protoptr->nargs; i++)
+	{
+	  assert (argptr);
+	  buf[bufi++] = '_';
+	  if (argptr->info.ispointer)
+	    {
+	      buf[bufi++] = 'p';
+	      buf[bufi++] = 'v';
+	    }
+	  else
+	    {
+	      if (argptr->info.isopaque)
+		{
+		  memcpy (&buf[bufi], "opaque", 6);
+		  bufi += 6;
+		}
+	      else
+		{
+		  if (argptr->info.isunsigned)
+		    buf[bufi++] = 'u';
+		  if (argptr->info.isvector)
+		    complete_vector_type (&argptr->info, buf, &bufi);
+		  else
+		    complete_base_type (&argptr->info, buf, &bufi);
+		}
+	    }
+	  argptr = argptr->next;
+	}
+      assert (!argptr);
+      }
+
+  buf[bufi] = '\0';
+
+  /* Ignore return value, as duplicates are expected.  */
+  (void) rbt_insert (&fntype_rbt, buf);
+
+  return buf;
+}
+
 /* Parse a function prototype.  This code is shared by the bif and overload
    file processing.  Return 1 for success, 0 for failure.  */
 static int
@@ -1214,6 +1405,10 @@ parse_bif_entry ()
 
   if (!parse_prototype (&bifs[curr_bif].proto))
     return 5;
+
+  /* Build a function type descriptor identifier from the return type
+     and argument types, and store it if it does not already exist.  */
+  bifs[curr_bif].fndecl = construct_fntype_id (&bifs[curr_bif].proto);
 
   /* Now process line 2.  First up is the builtin id.  */
   if (!advance_line (bif_file))
@@ -1369,6 +1564,10 @@ parse_ovld_entry ()
 
   if (!parse_prototype (&ovlds[curr_ovld].proto))
     return 6;
+
+  /* Build a function type descriptor identifier from the return type
+     and argument types, and store it if it does not already exist.  */
+  ovlds[curr_ovld].fndecl = construct_fntype_id (&ovlds[curr_ovld].proto);
 
   /* Now process line 2, which just contains the builtin id.  */
   if (!advance_line (ovld_file))
