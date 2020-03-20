@@ -1364,13 +1364,13 @@
     XSRDPIC vsx_xsrdpic {}
 
   const vd __builtin_vsx_xsrdpim (vd);
-    XSRDPIM vsx_xsrdpim {}
+    XSRDPIM floordf2 {}
 
   const vd __builtin_vsx_xsrdpip (vd);
-    XSRDPIP vsx_xsrdpip {}
+    XSRDPIP ceildf2 {}
 
   const vd __builtin_vsx_xsrdpiz (vd);
-    XSRDPIZ vsx_xsrdpiz {}
+    XSRDPIZ btruncdf2 {}
 
   const unsigned int __builtin_vsx_xstdivdp_fe (vd, vd);
     XSTDIVDP_FE vsx_tdivdf3_fe {}
