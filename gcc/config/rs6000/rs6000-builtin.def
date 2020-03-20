@@ -1570,8 +1570,10 @@ BU_VSX_3 (XXPERMDI_4SF,       "xxpermdi_4sf",   CONST, 	vsx_xxpermdi_v4sf)
 BU_VSX_3 (XXPERMDI_4SI,       "xxpermdi_4si",   CONST, 	vsx_xxpermdi_v4si)
 BU_VSX_3 (XXPERMDI_8HI,       "xxpermdi_8hi",   CONST, 	vsx_xxpermdi_v8hi)
 BU_VSX_3 (XXPERMDI_16QI,      "xxpermdi_16qi",  CONST, 	vsx_xxpermdi_v16qi)
+/* Following one needs an _UNS version.  */
 BU_VSX_3 (SET_1TI,            "set_1ti",        CONST, 	vsx_set_v1ti)
 BU_VSX_3 (SET_2DF,            "set_2df",        CONST, 	vsx_set_v2df)
+/* Following one needs an _UNS version.  */
 BU_VSX_3 (SET_2DI,            "set_2di",        CONST, 	vsx_set_v2di)
 BU_VSX_3 (XXSLDWI_2DI,        "xxsldwi_2di",    CONST, 	vsx_xxsldwi_v2di)
 BU_VSX_3 (XXSLDWI_2DF,        "xxsldwi_2df",    CONST, 	vsx_xxsldwi_v2df)
@@ -1615,8 +1617,11 @@ BU_VSX_2 (CPSGNDP,	      "cpsgndp",	CONST,	vector_copysignv2df3)
 BU_VSX_2 (CPSGNSP,	      "cpsgnsp",	CONST,	vector_copysignv4sf3)
 
 BU_VSX_2 (CONCAT_2DF,	      "concat_2df",	CONST,	vsx_concat_v2df)
+/* Following one needs an _UNS version.  */
 BU_VSX_2 (CONCAT_2DI,	      "concat_2di",	CONST,	vsx_concat_v2di)
+/* Following two should be unary functions?!  */
 BU_VSX_2 (SPLAT_2DF,	      "splat_2df",	CONST,	vsx_splat_v2df)
+/* Following one also needs an _UNS version.  */
 BU_VSX_2 (SPLAT_2DI,	      "splat_2di",	CONST,	vsx_splat_v2di)
 BU_VSX_2 (XXMRGHW_4SF,	      "xxmrghw",	CONST,	vsx_xxmrghw_v4sf)
 BU_VSX_2 (XXMRGHW_4SI,	      "xxmrghw_4si",	CONST,	vsx_xxmrghw_v4si)
