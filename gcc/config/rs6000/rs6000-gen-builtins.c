@@ -164,7 +164,23 @@ enum void_status {
   VOID_OK
 };
 
+/* Stanzas are groupings of built-in functions and overloads by some
+   common feature/attribute.  These definitions are for built-in function
+   stanzas.  */
+#define MAXBIFSTANZAS 256
+static char *bif_stanzas[MAXBIFSTANZAS];
 static int num_bif_stanzas;
+static int curr_bif_stanza;
+
+/* Function modifiers provide special handling for const, pure, and fpmath
+   functions.  These are mutually exclusive, and therefore kept separate
+   from other bif attributes.  */
+enum fnkinds {
+  FNK_NONE,
+  FNK_CONST,
+  FNK_PURE,
+  FNK_FPMATH
+};
 
 /* Legal base types for an argument or return type.  */
 enum basetype {
@@ -210,7 +226,57 @@ struct typeinfo {
   int val2;
 };
 
+/* A list of argument types.  */
+struct typelist {
+  typeinfo info;
+  typelist *next;
+};
+
+/* Attributes of a builtin function.  */
+struct attrinfo {
+  char isinit;
+  char isset;
+  char isextract;
+  char isnosoft;
+  char isldvec;
+  char isstvec;
+  char isreve;
+  char ispred;
+  char ishtm;
+  char ishtmspr;
+  char ishtmcr;
+  char isno32bit;
+  char iscpu;
+  char isldstmask;
+};
+
+/* Fields associated with a function prototype (bif or overload).  */
+struct prototype {
+  typeinfo rettype;
+  char *bifname;
+  int nargs;
+  typelist *args;
+  int restr_opnd;
+  restriction restr;
+  int restr_val1;
+  int restr_val2;
+};
+
+/* Data associated with a builtin function, and a table of such data.  */
+#define MAXBIFS 16384
+struct bifdata {
+  int stanza;
+  fnkinds kind;
+  prototype proto;
+  char *idname;
+  char *patname;
+  attrinfo attrs;
+  char *fndecl;
+};
+
+static bifdata bifs[MAXBIFS];
 static int num_bifs;
+static int curr_bif;
 static int num_ovld_stanzas;
 static int num_ovlds;
 
@@ -837,11 +903,198 @@ match_type (typeinfo *typedata, int voidok)
   return match_basetype (typedata);
 }
 
+/* Parse the attribute list, returning 1 if success or 0 if any
+   malformation is found.  */
+static int
+parse_bif_attrs (attrinfo *attrptr)
+{
+  return 1;
+}
+
+/* Parse a function prototype.  This code is shared by the bif and overload
+   file processing.  Return 1 for success, 0 for failure.  */
+static int
+parse_prototype (prototype *protoptr)
+{
+  return 1;
+}
+
+/* Parse a two-line entry for a built-in function.  Return 1 for
+   success, 2 for end-of-stanza, and 5 for a parsing error.  */
+static int
+parse_bif_entry ()
+{
+  /* Check for end of stanza.  */
+  pos = 0;
+  consume_whitespace ();
+  if (linebuf[pos] == '[')
+    return 2;
+
+  /* Allocate an entry in the bif table.  */
+  if (num_bifs >= MAXBIFS - 1)
+    {
+      (*diag) ("too many built-in functions.\n");
+      return 5;
+    }
+
+  curr_bif = num_bifs++;
+  bifs[curr_bif].stanza = curr_bif_stanza;
+
+  /* Read the first token and see if it is a function modifier.  */
+  consume_whitespace ();
+  int oldpos = pos;
+  char *token = match_identifier ();
+  if (!token)
+    {
+      (*diag) ("malformed entry at column %d\n", pos + 1);
+      return 5;
+    }
+
+  if (!strcmp (token, "const"))
+    bifs[curr_bif].kind = FNK_CONST;
+  else if (!strcmp (token, "pure"))
+    bifs[curr_bif].kind = FNK_PURE;
+  else if (!strcmp (token, "fpmath"))
+    bifs[curr_bif].kind = FNK_FPMATH;
+  else
+    {
+      /* No function modifier, so push the token back.  */
+      pos = oldpos;
+      bifs[curr_bif].kind = FNK_NONE;
+    }
+
+  if (!parse_prototype (&bifs[curr_bif].proto))
+    return 5;
+
+  /* Now process line 2.  First up is the builtin id.  */
+  if (!advance_line (bif_file))
+    {
+      (*diag) ("unexpected EOF.\n");
+      return 5;
+    }
+
+  pos = 0;
+  consume_whitespace ();
+  oldpos = pos;
+  bifs[curr_bif].idname = match_identifier ();
+  if (!bifs[curr_bif].idname)
+    {
+      (*diag) ("missing builtin id at column %d.\n", pos + 1);
+      return 5;
+    }
+
+#ifdef DEBUG
+  (*diag) ("ID name is '%s'.\n", bifs[curr_bif].idname);
+#endif
+
+  /* Save the ID in a lookup structure.  */
+  if (!rbt_insert (&bif_rbt, bifs[curr_bif].idname))
+    {
+      (*diag) ("duplicate function ID '%s' at column %d.\n",
+	       bifs[curr_bif].idname, oldpos + 1);
+      return 5;
+    }
+
+  /* Now the pattern name.  */
+  consume_whitespace ();
+  bifs[curr_bif].patname = match_identifier ();
+  if (!bifs[curr_bif].patname)
+    {
+      (*diag) ("missing pattern name at column %d.\n", pos + 1);
+      return 5;
+    }
+
+#ifdef DEBUG
+  (*diag) ("pattern name is '%s'.\n", bifs[curr_bif].patname);
+#endif
+
+  /* Process attributes.  */
+  if (!parse_bif_attrs (&bifs[curr_bif].attrs))
+    return 5;
+
+  return 1;
+}
+
+/* Parse one stanza of the input BIF file.  linebuf already contains the
+   first line to parse.  Return 1 for success, 0 for EOF, 5 for failure.  */
+static int
+parse_bif_stanza ()
+{
+  /* Parse the stanza header.  */
+  pos = 0;
+  consume_whitespace ();
+
+  if (linebuf[pos] != '[')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 5;
+    }
+  safe_inc_pos ();
+
+  char *stanza_name = match_identifier ();
+  if (!stanza_name)
+    {
+      (*diag) ("no identifier found in stanza header.\n");
+      return 5;
+    }
+
+  /* Add the identifier to a table and set the number to be recorded
+     with subsequent bif entries.  */
+  if (num_bif_stanzas >= MAXBIFSTANZAS)
+    {
+      (*diag) ("too many stanza headers.\n");
+      return 5;
+    }
+
+  curr_bif_stanza = num_bif_stanzas;
+  bif_stanzas[num_bif_stanzas++] = stanza_name;
+
+  if (linebuf[pos] != ']')
+    {
+      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      return 5;
+    }
+  safe_inc_pos ();
+
+  consume_whitespace ();
+  if (linebuf[pos] != '\n' && pos != LINELEN - 1)
+    {
+      (*diag) ("garbage after stanza header.\n");
+      return 5;
+    }
+
+  int result = 1;
+
+  while (result != 2) /* end of stanza  */
+    {
+      if (!advance_line (bif_file))
+	return 0;
+      result = parse_bif_entry ();
+      if (!result) /* EOF */
+	return 0;
+      else if (result > 2)
+	return 5;
+    }
+
+  return 1;
+}
+
 /* Parse the built-in file.  Return 1 for success, 5 for a parsing failure.  */
 static int
 parse_bif ()
 {
-  return 1;
+  int result;
+  diag = &bif_diag;
+  if (!advance_line (bif_file))
+    return 1;
+
+  do
+    result = parse_bif_stanza ();
+  while (result == 1);
+
+  if (result == 0)
+    return 1;
+  return result;
 }
 
 /* Parse the overload file.  Return 1 for success, 6 for a parsing error.  */
