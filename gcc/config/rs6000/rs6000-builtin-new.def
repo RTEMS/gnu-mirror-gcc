@@ -1226,6 +1226,32 @@
   const vf __builtin_vsx_floato_v2di (vsll);
     FLOATO_V2DI floatov2di {}
 
+; #### For the following, currently the pattern is selected differently
+; depending on big-endian (e.g., vsx_load_v1ti) versus little-endian
+; (e.g, vsx_ld_elemrev_v1ti).  We need to move the choice into a separate
+; pattern for each of these instead.  Right now I only list the little-
+; endian pattern here.  TBD.
+  pure vsq __builtin_vsx_ld_elemrev_v1ti (signed long long, void *);
+    LD_ELEMREV_V1TI vsx_ld_elemrev_v1ti {ldvec}
+
+  pure vd __builtin_vsx_ld_elemrev_v2df (signed long long, void *);
+    LD_ELEMREV_V2DF vsx_ld_elemrev_v2df {ldvec}
+
+  pure vsll __builtin_vsx_ld_elemrev_v2di (signed long long, void *);
+    LD_ELEMREV_V2DI vsx_ld_elemrev_v2di {ldvec}
+
+  pure vf __builtin_vsx_ld_elemrev_v4sf (signed long long, void *);
+    LD_ELEMREV_V4SF vsx_ld_elemrev_v4sf {ldvec}
+
+  pure vsi __builtin_vsx_ld_elemrev_v4si (signed long long, void *);
+    LD_ELEMREV_V4SI vsx_ld_elemrev_v4si {ldvec}
+
+  pure vss __builtin_vsx_ld_elemrev_v8hi (signed long long, void *);
+    LD_ELEMREV_V8HI vsx_ld_elemrev_v8hi {ldvec}
+
+  pure vsc __builtin_vsx_ld_elemrev_v16qi (signed long long, void *);
+    LD_ELEMREV_V16QI vsx_ld_elemrev_v16qi {ldvec}
+
 ; There is apparent intent in rs6000-builtin.def to have RS6000_BTC_SPECIAL
 ; processing for LXSDX, LXVDSX, and STXSDX, but there are no def_builtin calls
 ; for any of them.  At some point, we may want to add a set of built-ins for
@@ -1291,6 +1317,32 @@
   const vull __builtin_vsx_splat_2di_uns (unsigned long long);
     SPLAT_2DI_UNS vsx_splat_v2di {}
 
+; #### For the following, currently the pattern is selected differently
+; depending on big-endian (e.g., vsx_store_v1ti) versus little-endian
+; (e.g, vsx_st_elemrev_v1ti).  We need to move the choice into a separate
+; pattern for each of these instead.  Right now I only list the little-
+; endian pattern here.  TBD.
+  void __builtin_vsx_st_elemrev_v1ti (vsq, signed long long, void *);
+    ST_ELEMREV_V1TI vsx_st_elemrev_v1ti {stvec}
+
+  void __builtin_vsx_st_elemrev_v2df (vd, signed long long, void *);
+    ST_ELEMREV_V2DF vsx_st_elemrev_v2df {stvec}
+
+  void __builtin_vsx_st_elemrev_v2di (vsll, signed long long, void *);
+    ST_ELEMREV_V2DI vsx_st_elemrev_v2di {stvec}
+
+  void __builtin_vsx_st_elemrev_v4sf (vf, signed long long, void *);
+    ST_ELEMREV_V4SF vsx_st_elemrev_v4sf {stvec}
+
+  void __builtin_vsx_st_elemrev_v4si (vsi, signed long long, void *);
+    ST_ELEMREV_V4SI vsx_st_elemrev_v4si {stvec}
+
+  void __builtin_vsx_st_elemrev_v8hi (vss, signed long long, void *);
+    ST_ELEMREV_V8HI vsx_st_elemrev_v8hi {stvec}
+
+  void __builtin_vsx_st_elemrev_v16qi (vsc, signed long long, void *);
+    ST_ELEMREV_V16QI vsx_st_elemrev_v16qi {stvec}
+
   void __builtin_vsx_stxvd2x_v1ti (vsq, signed long long, void *);
     STXVD2X_V1TI vsx_store_v1ti {stvec}
 
@@ -1299,6 +1351,18 @@
 
   void __builtin_vsx_stxvd2x_v2di (vsll, signed long long, void *);
     STXVD2X_V2DI vsx_store_v2di {stvec}
+
+  void __builtin_vsx_stxvw4x_v4sf (vf, signed long long, void *);
+    STXVW4X_V4SF vsx_store_v4sf {stvec}
+
+  void __builtin_vsx_stxvw4x_v4si (vsi, signed long long, void *);
+    STXVW4X_V4SI vsx_store_v4si {stvec}
+
+  void __builtin_vsx_stxvw4x_v8hi (vss, signed long long, void *);
+    STXVW4X_V8HI vsx_store_v8hi {stvec}
+
+  void __builtin_vsx_stxvw4x_v16qi (vsc, signed long long, void *);
+    STXVW4X_V16QI vsx_store_v16qi {stvec}
 
   const vull __builtin_vsx_udiv_2di (vull, vull);
     UDIV_V2DI vsx_udiv_v2di {}
@@ -1320,6 +1384,33 @@
 
   const vf __builtin_vsx_uns_floato_v2di (vull);
     UNS_FLOATO_V2DI unsfloatov2di {}
+
+  const signed __int128 __builtin_vsx_vec_ext_v1ti (vsq, signed int);
+    VEC_EXT_V1TI nothing {extract}
+
+  const double __builtin_vsx_vec_ext_v2df (vd, signed int);
+    VEC_EXT_V2DF nothing {extract}
+
+  const signed long long __builtin_vsx_vec_ext_v2di (vsll, signed int);
+    VEC_EXT_V2DI nothing {extract}
+
+  const vsq __builtin_vsx_vec_init_v1ti (signed __int128);
+    VEC_INIT_V1TI nothing {init}
+
+  const vd __builtin_vsx_vec_init_v2df (double, double);
+    VEC_INIT_V2DF nothing {init}
+
+  const vsll __builtin_vsx_vec_init_v2di (signed long long, signed long long);
+    VEC_INIT_V2DI nothing {init}
+
+  const vsq __builtin_vsx_vec_set_v1ti (vsq, signed __int128, const int<0,0>);
+    VEC_SET_V1TI nothing {set}
+
+  const vd __builtin_vsx_vec_set_v2df (vd, double, const int<1>);
+    VEC_SET_V2DF nothing {set}
+
+  const vsll __builtin_vsx_vec_set_v2di (vsll, signed long long, const int<1>);
+    VEC_SET_V2DI nothing {set}
 
   const vsll __builtin_vsx_vsigned_v2df (vd);
     VEC_VSIGNED_V2DF vsx_xvcvdpsxds {}
