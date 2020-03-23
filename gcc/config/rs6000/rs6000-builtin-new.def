@@ -1542,7 +1542,7 @@
 
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
-  const vui __builtin_vsx_xvcmpgtsp_p (vf);
+  const vui __builtin_vsx_xvcmpgtsp_p (vf, vf);
     XVCMPGTSP_P vector_gt_v4sf_p {}
 
   const vsll __builtin_vsx_xvcvdpsxds (vd);
@@ -2018,6 +2018,12 @@
   const vsq __builtin_altivec_vaddcuq (vsq, vsq);
     VADDCUQ altivec_vaddcuq {}
 
+  const vsq __builtin_altivec_vaddecuq (vsq, vsq, vsq);
+    VADDECUQ altivec_vaddecuq {}
+
+  const vuq __builtin_altivec_vaddeuqm (vuq, vuq, vuq);
+    VADDEUQM altivec_vaddeuqm {}
+
   const vsll __builtin_altivec_vaddudm (vsll, vsll);
     VADDUDM addv2di3 {}
 
@@ -2029,6 +2035,24 @@
 
   const vuc __builtin_altivec_vbpermq2 (vuc, vuc);
     VBPERMQ2 altivec_vbpermq2 {}
+
+  const vbll __builtin_altivec_vcmpequd (vsll, vsll);
+    VCMPEQUD vector_eqv2di {}
+
+  const int __builtin_altivec_vcmpequd_p (int, vsll, vsll);
+    VCMPEQUD_P vector_eq_v2di_p {}
+
+  const vbll __builtin_altivec_vcmpgtsd (vsll, vsll);
+    VCMPGTSD vector_gtv2di {}
+
+  const int __builtin_altivec_vcmpgtsd_p (int, vsll, vsll);
+    VCMPGTSD_P vector_gt_v2di_p {}
+
+  const vbll __builtin_altivec_vcmpgtud (vull, vull);
+    VCMPGTUD vector_gtuv2di {}
+
+  const int __builtin_altivec_vcmpgtud_p (vull, vull);
+    VCMPGTUD_P vector_gtu_v2di_p {}
 
   const vsll __builtin_altivec_vmaxsd (vsll, vsll);
     VMAXSD smaxv2di3 {}
@@ -2077,6 +2101,9 @@
 
   const vull __builtin_altivec_vmulouw (vui, vui);
     VMULOUW vec_widen_umult_odd_v4si {}
+
+  const vsc __builtin_altivec_vpermxor (vsc, vsc, vsc);
+    VPERMXOR altivec_vpermxor {}
 
   const vsi __builtin_altivec_vpksdss (vsll, vsll);
     VPKSDSS altivec_vpksdss {}
@@ -2141,6 +2168,12 @@
   const vuq __builtin_altivec_vsubcuq (vuq, vuq);
     VSUBCUQ altivec_vsubcuq {}
 
+  const vsq __builtin_altivec_vsubecuq (vsq, vsq, vsq);
+    VSUBECUQ altivec_vsubecuq {}
+
+  const vuq __builtin_altivec_vsubeuqm (vuq, vuq, vuq);
+    VSUBEUQM altivec_vsubeuqm {}
+
   const vull __builtin_altivec_vsubudm (vull, vull);
     VSUBUDM subv2di3 {}
 
@@ -2194,3 +2227,76 @@
 
   const double __builtin_vsx_xscvspdpn (vf);
     XSCVSPDPN vsx_xscvspdpn {}
+
+
+; Power9 vector builtins.
+[MASK_P9_VECTOR]
+  const vus __builtin_altivec_convert_4f32_8i16 (vf, vf);
+    CONVERT_4F32_8I16 convert_4f32_8i16 {}
+
+  const unsigned int __builtin_altivec_first_match_index_v16qi (vsc, vsc);
+    VFIRSTMATCHINDEX_V16QI first_match_index_v16qi {}
+
+  const unsigned int __builtin_altivec_first_match_index_v8hi (vss, vss);
+    VFIRSTMATCHINDEX_V8HI first_match_index_v8hi {}
+
+  const unsigned int __builtin_altivec_first_match_index_v4si (vsi, vsi);
+    VFIRSTMATCHINDEX_V4SI first_match_index_v4si {}
+
+  const unsigned int __builtin_altivec_first_match_or_eos_index_v16qi (vsc, vsc);
+    VFIRSTMATCHOREOSINDEX_V16QI first_match_or_eos_index_v16qi {}
+
+  const unsigned int __builtin_altivec_first_match_or_eos_index_v8hi (vss, vss);
+    VFIRSTMATCHOREOSINDEX_V8HI first_match_or_eos_index_v8hi {}
+
+  const unsigned int __builtin_altivec_first_match_or_eos_index_v4si (vsi, vsi);
+    VFIRSTMATCHOREOSINDEX_V4SI first_match_or_eos_index_v4si {}
+
+  const unsigned int __builtin_altivec_first_mismatch_index_v16qi (vsc, vsc);
+    VFIRSTMISMATCHINDEX_V16QI first_mismatch_index_v16qi {}
+
+  const unsigned int __builtin_altivec_first_mismatch_index_v8hi (vss, vss);
+    VFIRSTMISMATCHINDEX_V8HI first_mismatch_index_v8hi {}
+
+  const unsigned int __builtin_altivec_first_mismatch_index_v4si (vsi, vsi);
+    VFIRSTMISMATCHINDEX_V4SI first_mismatch_index_v4si {}
+
+  const unsigned int __builtin_altivec_first_mismatch_or_eos_index_v16qi (vsc, vsc);
+    VFIRSTMISMATCHOREOSINDEX_V16QI first_mismatch_or_eos_index_v16qi {}
+
+  const unsigned int __builtin_altivec_first_mismatch_or_eos_index_v8hi (vss, vss);
+    VFIRSTMISMATCHOREOSINDEX_V8HI first_mismatch_or_eos_index_v8hi {}
+
+  const unsigned int __builtin_altivec_first_mismatch_or_eos_index_v4si (vsi, vsi);
+    VFIRSTMISMATCHOREOSINDEX_V4SI first_mismatch_or_eos_index_v4si {}
+
+  const vuc __builtin_altivec_vadub (vuc, vuc);
+    VADUB vaduv16qi3 {}
+
+  const vus __builtin_altivec_vaduh (vus, vus);
+    VADUH vaduv8hi3 {}
+
+  const vui __builtin_altivec_vaduw (vui, vui);
+    VADUW vaduv4si3 {}
+
+  const vull __builtin_altivec_vbpermd (vull, vuc);
+    VBPERMD altivec_vbpermd {}
+
+  const vull __builtiin_altivec_vrldmi (vull, vull, vull);
+    VRLDMI altivec_vrldmi {}
+
+  const vull __builtin_altivec_vrldnm (vull, vull);
+    VRLDNM altivec_vrldnm {}
+
+  const vui __builtin_altivec_vrlwmi (vui, vui, vui);
+    VRLWMI altivec_vrlwmi {}
+
+  const vui __builtin_altivec_vrlwnm (vui, vui);
+    VRLWNM altivec_vrlwnm {}
+
+  const vuc __builtin_altivec_vslv (vuc, vuc);
+    VSLV vslv {}
+
+  const vuc __builtin_altivec_vsrv (vuc, vuc);
+    VSRV vsrv {}
+
