@@ -87,23 +87,28 @@ struct ld_plugin_symbol
 {
   char *name;
   char *version;
-  /* This is for compatibility with older ABIs.  The older ABI defined
-     only 'def' field.  */
-#ifdef __BIG_ENDIAN__
-  char unused;
-  char section_kind;
-  char symbol_type;
-  char def;
-#else
-  char def;
-  char symbol_type;
-  char section_kind;
-  char unused;
-#endif
+  int def;
   int visibility;
   uint64_t size;
   char *comdat_key;
   int resolution;
+};
+
+/* A symbol belonging to an input file managed by the plugin library
+   (version 2).  */
+
+struct ld_plugin_symbol_v2
+{
+  char *name;
+  char *version;
+  int def;
+  int visibility;
+  uint64_t size;
+  char *comdat_key;
+  int resolution;
+  char symbol_type;
+  char section_kind;
+  uint16_t unused;
 };
 
 /* An object's section.  */
@@ -236,6 +241,14 @@ typedef
 enum ld_plugin_status
 (*ld_plugin_add_symbols) (void *handle, int nsyms,
                           const struct ld_plugin_symbol *syms);
+
+/* The linker's interface for adding symbols from a claimed input file
+   (version 2).  */
+
+typedef
+enum ld_plugin_status
+(*ld_plugin_add_symbols_v2) (void *handle, int nsyms,
+			     const struct ld_plugin_symbol_v2 *syms);
 
 /* The linker's interface for getting the input file information with
    an open (possibly re-opened) file descriptor.  */
@@ -475,6 +488,7 @@ struct ld_plugin_tv
     ld_plugin_register_all_symbols_read tv_register_all_symbols_read;
     ld_plugin_register_cleanup tv_register_cleanup;
     ld_plugin_add_symbols tv_add_symbols;
+    ld_plugin_add_symbols_v2 tv_add_symbols_v2;
     ld_plugin_get_symbols tv_get_symbols;
     ld_plugin_add_input_file tv_add_input_file;
     ld_plugin_message tv_message;

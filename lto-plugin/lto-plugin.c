@@ -114,6 +114,7 @@ struct plugin_symtab
   int nsyms;
   struct sym_aux *aux;
   struct ld_plugin_symbol *syms;
+  struct ld_plugin_symbol_v2 *syms_v2;
   unsigned long long id;
 };
 
@@ -163,7 +164,8 @@ static ld_plugin_register_cleanup register_cleanup;
 static ld_plugin_add_input_file add_input_file;
 static ld_plugin_add_input_library add_input_library;
 static ld_plugin_message message;
-static ld_plugin_add_symbols add_symbols, add_symbols_v2;
+static ld_plugin_add_symbols add_symbols;
+static ld_plugin_add_symbols_v2 add_symbols_v2;
 
 static struct plugin_file_info *claimed_files = NULL;
 static unsigned int num_claimed_files = 0;
@@ -290,8 +292,6 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
   else
     entry->comdat_key = xstrdup (entry->comdat_key);
 
-  entry->unused = entry->section_kind = entry->symbol_type = 0;
-
   t = *p;
   check (t <= 4, LDPL_FATAL, "invalid symbol kind found");
   entry->def = translate_kind[t];
@@ -320,7 +320,7 @@ parse_table_entry (char *p, struct ld_plugin_symbol *entry,
    Returns the address of the next entry. */
 
 static char *
-parse_table_entry_extension (char *p, struct ld_plugin_symbol *entry)
+parse_table_entry_extension (char *p, struct ld_plugin_symbol_v2 *entry)
 {
   unsigned char t;
   enum ld_plugin_symbol_type symbol_types[] =
@@ -384,9 +384,15 @@ parse_symtab_extension (char *data, char *end, struct plugin_symtab *out)
      - section_kind
      .  */
 
+  out->syms_v2 = xrealloc (out->syms_v2,
+			   out->nsyms * sizeof (struct ld_plugin_symbol_v2));
+  memset (out->syms_v2, 0, out->nsyms * sizeof (struct ld_plugin_symbol_v2));
+
   if (version == 1)
-    for (i = 0; i < out->nsyms; i++)
-      data = parse_table_entry_extension (data, &out->syms[i]);
+    {
+      for (i = 0; i < out->nsyms; i++)
+	data = parse_table_entry_extension (data, &out->syms_v2[i]);
+    }
 }
 
 /* Free all memory that is no longer needed after writing the symbol
@@ -409,6 +415,11 @@ free_1 (struct plugin_file_info *files, unsigned num_files)
 	}
       free (symtab->syms);
       symtab->syms = NULL;
+      if (symtab->syms_v2)
+	{
+	  free (symtab->syms_v2);
+	  symtab->syms_v2 = NULL;
+	}
     }
 }
 
@@ -519,6 +530,11 @@ free_symtab (struct plugin_symtab *symtab)
 {
   free (symtab->syms);
   symtab->syms = NULL;
+  if (symtab->syms_v2)
+    {
+      free (symtab->syms_v2);
+      symtab->syms_v2 = NULL;
+    }
   free (symtab->aux);
   symtab->aux = NULL;
 }
@@ -1193,8 +1209,24 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
   if (obj.found > 0)
     {
       if (add_symbols_v2)
-	status = add_symbols_v2 (file->handle, lto_file.symtab.nsyms,
-				 lto_file.symtab.syms);
+	{
+	  /* Merge symtab::syms and symtab::syms_v2 data.  */
+	  for (unsigned int i = 0; i < lto_file.symtab.nsyms; i++)
+	    {
+	      struct ld_plugin_symbol *old = &lto_file.symtab.syms[i];
+	      struct ld_plugin_symbol_v2 *new = &lto_file.symtab.syms_v2[i];
+	      new->name = old->name;
+	      new->version = old->version;
+	      new->def = old->def;
+	      new->visibility = old->visibility;
+	      new->size = old->size;
+	      new->comdat_key = old->comdat_key;
+	      new->resolution = old->resolution;
+	    }
+
+	  status = add_symbols_v2 (file->handle, lto_file.symtab.nsyms,
+				   lto_file.symtab.syms_v2);
+	}
       else
 	status = add_symbols (file->handle, lto_file.symtab.nsyms,
 			      lto_file.symtab.syms);
@@ -1359,7 +1391,7 @@ onload (struct ld_plugin_tv *tv)
 	  register_claim_file = p->tv_u.tv_register_claim_file;
 	  break;
 	case LDPT_ADD_SYMBOLS_V2:
-	  add_symbols_v2 = p->tv_u.tv_add_symbols;
+	  add_symbols_v2 = p->tv_u.tv_add_symbols_v2;
 	  break;
 	case LDPT_ADD_SYMBOLS:
 	  add_symbols = p->tv_u.tv_add_symbols;
