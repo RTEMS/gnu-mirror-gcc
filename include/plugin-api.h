@@ -89,16 +89,18 @@ struct ld_plugin_symbol
   char *version;
   /* This is for compatibility with older ABIs.  The older ABI defined
      only 'def' field.  */
-#ifdef __BIG_ENDIAN__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
   char unused;
   char section_kind;
   char symbol_type;
   char def;
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  char def;
+  char symbol_type;
+  char section_kind;
+  char unused;
 #else
-  char def;
-  char symbol_type;
-  char section_kind;
-  char unused;
+#error "Could not detect architecture endianess"
 #endif
   int visibility;
   uint64_t size;
