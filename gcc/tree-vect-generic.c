@@ -2248,6 +2248,7 @@ gimple_expand_vec_cond_expr (gimple_stmt_iterator *gsi)
   machine_mode cmp_op_mode;
   bool unsignedp;
   enum insn_code icode;
+  imm_use_iterator imm_iter;
 
   /* Only consider code == GIMPLE_ASSIGN. */
   gassign *stmt = dyn_cast <gassign *> (gsi_stmt (*gsi));
@@ -2267,10 +2268,31 @@ gimple_expand_vec_cond_expr (gimple_stmt_iterator *gsi)
   gcc_assert (!COMPARISON_CLASS_P (op0));
   if (TREE_CODE (op0) == SSA_NAME)
     {
+      unsigned int used_vec_cond_exprs = 0;
+      gimple *use_stmt;
+      FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, op0)
+	{
+	  gassign *assign = dyn_cast<gassign *> (use_stmt);
+	  if (assign != NULL
+	      && gimple_assign_rhs_code (assign) == VEC_COND_EXPR
+	      && gimple_assign_rhs1 (assign) == op0)
+	    used_vec_cond_exprs++;
+	}
+
       gimple *def_stmt = SSA_NAME_DEF_STMT (op0);
       op0a = gimple_assign_rhs1 (def_stmt);
       op0b = gimple_assign_rhs2 (def_stmt);
       tcode = gimple_assign_rhs_code (def_stmt);
+
+      tree op0a_type = TREE_TYPE (op0a);
+      if (used_vec_cond_exprs >= 2
+	  && (get_vcond_mask_icode (mode, TYPE_MODE (op0a_type))
+	      != CODE_FOR_nothing)
+	  && expand_vec_cmp_expr_p (op0a_type, TREE_TYPE (lhs), tcode))
+	{
+	  /* Keep the SSA name and use vcond_mask.  */
+	  tcode = TREE_CODE (op0);
+	}
     }
   else
     tcode = TREE_CODE (op0);
