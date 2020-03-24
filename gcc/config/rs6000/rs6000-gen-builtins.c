@@ -29,9 +29,19 @@ along with GCC; see the file COPYING3.  If not see
    described below.
 
    Each stanza in the built-in function file starts with a line
-   identifying the option mask for which the group of functions is
-   permitted, with the mask in square brackets.  This is the only
-   information allowed on the stanza header line, other than
+   identifying the option mask(s) for which the group of functions
+   is permitted, with the mask information in square brackets.  For
+   example, this could be
+
+     [MASK_ALTIVEC]
+
+   or it could be
+
+     [(MASK_P9_VECTOR | MASK_POWERPC64)]
+
+   Note that parentheses must be used around expressions that are not
+   simple masks to get correct behavior.  The bracketed mask expression
+   is the only information allowed on the stanza header line, other than
    whitespace.
 
    Following the stanza header are two lines for each function: the
@@ -486,6 +496,28 @@ match_integer ()
   int x;
   sscanf (buf, "%d", &x);
   return x;
+}
+
+static char *
+match_to_right_bracket ()
+{
+  int lastpos = pos - 1;
+  while (linebuf[lastpos + 1] != ']')
+    if (++lastpos >= LINELEN - 1)
+      {
+	(*diag) ("linie length overrun.\n");
+	exit (EC_INTERR);
+      }
+
+  if (lastpos < pos)
+    return 0;
+
+  char *buf = (char *) malloc (lastpos - pos + 2);
+  memcpy (buf, &linebuf[pos], lastpos - pos + 1);
+  buf[lastpos - pos + 1] = '\0';
+
+  pos = lastpos + 1;
+  return buf;
 }
 
 static inline void
@@ -1522,10 +1554,10 @@ parse_bif_stanza ()
     }
   safe_inc_pos ();
 
-  char *stanza_name = match_identifier ();
+  char *stanza_name = match_to_right_bracket ();
   if (!stanza_name)
     {
-      (*diag) ("no identifier found in stanza header.\n");
+      (*diag) ("no expression found in stanza header.\n");
       return 5;
     }
 
@@ -2138,16 +2170,17 @@ write_init_bif_table ()
 	       "  if (new_builtins_are_live &&\n");
       if (strcmp (bif_mask, "MASK_ALTIVEC")
 	  && strcmp (bif_mask, "MASK_VSX"))
-	fprintf (init_file,
-		 "      (%s & builtin_mask) != %s)\n",
-		 bif_mask, bif_mask);
+	{
+	  fprintf (init_file, "      (%s & builtin_mask)\n", bif_mask);
+	  fprintf (init_file, "        == %s)\n", bif_mask);
+	}
       else
 	{
 	  fprintf (init_file,
 		   "      (TARGET_EXTRA_BUILTINS\n");
 	  fprintf (init_file,
-		   "       || (%s & builtin_mask) == %s))\n",
-		   bif_mask, bif_mask);
+		   "       || (%s & builtin_mask)\n", bif_mask);
+	  fprintf (init_file, "           == %s))\n", bif_mask);
 	}
       fprintf (init_file, "    {\n");
       fprintf (init_file,

@@ -2300,3 +2300,17 @@
   const vuc __builtin_altivec_vsrv (vuc, vuc);
     VSRV vsrv {}
 
+
+; These things need some review to see whether they really require
+; MASK_POWERPC64.  For xsxexpdp, this seems to be fine for 32-bit,
+; because the result will always fit in 32 bits and the return
+; value is SImode; but the pattern currently requires TARGET_64BIT.
+; On the other hand, xsssigdp has a result that doesn't fit in
+; 32 bits, and the return value is DImode, so it seems that
+; TARGET_64BIT (actually TARGET_POWERPC64) is justified.  TBD. ####
+[(MASK_P9_VECTOR | MASK_POWERPC64)]
+  const unsigned int __builtin_vsx_scalar_extract_exp (double);
+    VSEEDP xsxexpdp {}
+
+  const unsigned long long __builtin_vsx_scalar_extract_sig (double);
+    VSESDP xsxsigdp {}

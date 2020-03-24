@@ -1801,12 +1801,12 @@ BU_VSX_X (ST_ELEMREV_V4SF,    "st_elemrev_v4sf",  MEM)
 BU_VSX_X (ST_ELEMREV_V4SI,    "st_elemrev_v4si",  MEM)
 BU_VSX_X (ST_ELEMREV_V8HI,    "st_elemrev_v8hi",  MEM)
 BU_VSX_X (ST_ELEMREV_V16QI,   "st_elemrev_v16qi", MEM)
-; #### Following builtins appear to be orphaned with no implementation.
-; They are all marked as requiring special handling, but there is no
-; special handling for them.  For now I am not sure we really miss
-; anything by not having these; they all have regular float counterparts
-; and there is little utility in forcing these with builtins.  No plan
-; to put them in rs6000-builtins-new.def.
+/* #### Following builtins appear to be orphaned with no implementation.
+   They are all marked as requiring special handling, but there is no
+   special handling for them.  For now I am not sure we really miss
+   anything by not having these; they all have regular float counterparts
+   and there is little utility in forcing these with builtins.  No plan
+   to put them in rs6000-builtins-new.def.  */
 BU_VSX_X (XSABSDP,	      "xsabsdp",	CONST)
 BU_VSX_X (XSADDDP,	      "xsadddp",	FP)
 BU_VSX_X (XSCMPODP,	      "xscmpodp",	FP)
@@ -1831,7 +1831,7 @@ BU_VSX_X (XSNMADDMDP,	      "xsnmaddmdp",	FP)
 BU_VSX_X (XSNMSUBADP,	      "xsnmsubadp",	FP)
 BU_VSX_X (XSNMSUBMDP,	      "xsnmsubmdp",	FP)
 BU_VSX_X (XSSUBDP,	      "xssubdp",	FP)
-; #### End orphaned builtins.
+/* #### End orphaned builtins.  */
 BU_VSX_X (VEC_INIT_V1TI,      "vec_init_v1ti",	CONST)
 BU_VSX_X (VEC_INIT_V2DF,      "vec_init_v2df",	CONST)
 BU_VSX_X (VEC_INIT_V2DI,      "vec_init_v2di",	CONST)
