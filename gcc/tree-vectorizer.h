@@ -118,6 +118,15 @@ typedef struct _slp_tree *slp_tree;
 /* A computation tree of an SLP instance.  Each node corresponds to a group of
    stmts to be packed in a SIMD stmt.  */
 struct _slp_tree {
+  _slp_tree();
+  ~_slp_tree();
+
+  enum kind { SLP_OTHER, SLP_CPERM };
+  kind classify ();
+
+  /* Number of (scalar) lanes produced by this node.  */
+  unsigned n_lanes ();
+
   /* Nodes that contain def-stmts of this node statements operands.  */
   vec<slp_tree> children;
 
@@ -129,7 +138,12 @@ struct _slp_tree {
   /* Load permutation relative to the stores, NULL if there is no
      permutation.  */
   vec<unsigned> load_permutation;
+  /* Lane permutation of the operands scalar lanes encoded as pairs
+     of { operand number, lane number }.  The number of elements
+     denotes the number of output lanes.  */
+  vec<std::pair<unsigned, unsigned> > lane_permutation;
 
+  tree vectype;
   /* Vectorized stmt/s.  */
   vec<stmt_vec_info> vec_stmts;
   /* Number of vector stmts that are created to replace the group of scalar
@@ -143,10 +157,10 @@ struct _slp_tree {
   /* The maximum number of vector elements for the subtree rooted
      at this node.  */
   poly_uint64 max_nunits;
-  /* Whether the scalar computations use two different operators.  */
-  bool two_operators;
   /* The DEF type of this node.  */
   enum vect_def_type def_type;
+  /* The operation of this node.  */
+  enum tree_code code;
 };
 
 
@@ -184,8 +198,10 @@ public:
 #define SLP_TREE_VEC_STMTS(S)                    (S)->vec_stmts
 #define SLP_TREE_NUMBER_OF_VEC_STMTS(S)          (S)->vec_stmts_size
 #define SLP_TREE_LOAD_PERMUTATION(S)             (S)->load_permutation
-#define SLP_TREE_TWO_OPERATORS(S)		 (S)->two_operators
+#define SLP_TREE_LANE_PERMUTATION(S)             (S)->lane_permutation
 #define SLP_TREE_DEF_TYPE(S)			 (S)->def_type
+#define SLP_TREE_CODE(S)			 (S)->code
+#define SLP_TREE_VECTYPE(S)			 (S)->vectype
 
 /* Key for map that records association between
    scalar conditions and corresponding loop mask, and

@@ -842,14 +842,6 @@ vect_model_simple_cost (vec_info *,
 	prologue_cost += record_stmt_cost (cost_vec, 1, scalar_to_vec,
 					   stmt_info, 0, vect_prologue);
 
-  /* Adjust for two-operator SLP nodes.  */
-  if (node && SLP_TREE_TWO_OPERATORS (node))
-    {
-      ncopies *= 2;
-      inside_cost += record_stmt_cost (cost_vec, ncopies, vec_perm,
-				       stmt_info, 0, vect_body);
-    }
-
   /* Pass the inside-of-loop statements to the target-specific cost model.  */
   inside_cost += record_stmt_cost (cost_vec, ncopies, kind,
 				   stmt_info, 0, vect_body);
@@ -10729,7 +10721,7 @@ can_vectorize_live_stmts (loop_vec_info loop_vinfo,
       unsigned int i;
       FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (slp_node), i, slp_stmt_info)
 	{
-	  if (STMT_VINFO_LIVE_P (slp_stmt_info)
+	  if (slp_stmt_info && STMT_VINFO_LIVE_P (slp_stmt_info)
 	      && !vectorizable_live_operation (loop_vinfo,
 					       slp_stmt_info, gsi, slp_node,
 					       slp_node_instance, i,
