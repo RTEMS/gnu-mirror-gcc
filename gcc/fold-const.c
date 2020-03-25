@@ -8523,7 +8523,12 @@ build_fold_addr_expr_with_type_loc (location_t loc, tree t, tree ptrtype)
     }
   else if (TREE_CODE (t) == MEM_REF
 	   && integer_zerop (TREE_OPERAND (t, 1)))
-    return TREE_OPERAND (t, 0);
+    {
+      t = TREE_OPERAND (t, 0);
+
+      if (TREE_TYPE (t) != ptrtype)
+	t = fold_convert_loc (loc, ptrtype, t);
+    }
   else if (TREE_CODE (t) == MEM_REF
 	   && TREE_CODE (TREE_OPERAND (t, 0)) == INTEGER_CST)
     return fold_binary (POINTER_PLUS_EXPR, ptrtype,
@@ -10279,7 +10284,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	  if (!base)
 	    return NULL_TREE;
 	  return fold_build2 (MEM_REF, type,
-			      build_fold_addr_expr (base),
+			      build1 (ADDR_EXPR, TREE_TYPE (arg0), base),
 			      int_const_binop (PLUS_EXPR, arg1,
 					       size_int (coffset)));
 	}

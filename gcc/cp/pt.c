@@ -3916,10 +3916,18 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
       return NULL_TREE;
 
     case DECL_EXPR:
-      /* Ignore the declaration of a capture proxy for a parameter pack.  */
-      if (is_capture_proxy (DECL_EXPR_DECL (t)))
-	*walk_subtrees = 0;
-      return NULL_TREE;
+      {
+	tree decl = DECL_EXPR_DECL (t);
+	/* Ignore the declaration of a capture proxy for a parameter pack.  */
+	if (is_capture_proxy (decl))
+	  *walk_subtrees = 0;
+	if (is_typedef_decl (decl))
+	  /* Since we stop at typedefs above, we need to look through them at
+	     the point of the DECL_EXPR.  */
+	  cp_walk_tree (&DECL_ORIGINAL_TYPE (decl),
+			&find_parameter_packs_r, ppd, ppd->visited);
+	return NULL_TREE;
+      }
 
     case TEMPLATE_DECL:
       if (!DECL_TEMPLATE_TEMPLATE_PARM_P (t))
@@ -5030,6 +5038,14 @@ process_partial_specialization (tree decl)
       return decl;
     }
 
+  else if (nargs > DECL_NTPARMS (maintmpl))
+    {
+      error ("too many arguments for partial specialization %qT", type);
+      inform (DECL_SOURCE_LOCATION (maintmpl), "primary template here");
+      /* Avoid crash below.  */
+      return decl;
+    }
+
   /* If we aren't in a dependent class, we can actually try deduction.  */
   else if (tpd.level == 1
 	   /* FIXME we should be able to handle a partial specialization of a
@@ -5056,7 +5072,6 @@ process_partial_specialization (tree decl)
 
      Also, we verify that pack expansions only occur at the
      end of the argument list.  */
-  gcc_assert (nargs == DECL_NTPARMS (maintmpl));
   tpd2.parms = 0;
   for (i = 0; i < nargs; ++i)
     {
@@ -9667,7 +9682,7 @@ lookup_template_class_1 (tree d1, tree arglist, tree in_decl, tree context,
       if (entry)
 	return entry->spec;
 
-      /* If the the template's constraints are not satisfied,
+      /* If the template's constraints are not satisfied,
          then we cannot form a valid type.
 
          Note that the check is deferred until after the hash
@@ -10416,6 +10431,7 @@ any_template_parm_r (tree t, void *data)
       WALK_SUBTREE (TREE_OPERAND (t, 1));
       break;
 
+    case TEMPLATE_PARM_INDEX:
     case PARM_DECL:
       /* A parameter or constraint variable may also depend on a template
 	 parameter without explicitly naming it.  */
@@ -15673,7 +15689,7 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	    else if (TYPENAME_IS_CLASS_P (t) && !CLASS_TYPE_P (f))
 	      {
 		if (complain & tf_error)
-		  error ("%qT resolves to %qT, which is is not a class type",
+		  error ("%qT resolves to %qT, which is not a class type",
 			 t, f);
 		else
 		  return error_mark_node;
@@ -17840,7 +17856,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
     case RANGE_FOR_STMT:
       {
 	/* Construct another range_for, if this is not a final
-	   substitution (for inside inside a generic lambda of a
+	   substitution (for inside a generic lambda of a
 	   template).  Otherwise convert to a regular for.  */
         tree decl, expr;
         stmt = (processing_template_decl
@@ -28071,10 +28087,13 @@ build_deduction_guide (tree type, tree ctor, tree outer_args, tsubst_flags_t com
 				     complain, ctor);
 	  if (fparms == error_mark_node)
 	    ok = false;
-	  fargs = tsubst (fargs, tsubst_args, complain, ctor);
 	  if (ci)
 	    ci = tsubst_constraint_info (ci, tsubst_args, complain, ctor);
 
+	  /* Parms are to have DECL_CHAIN tsubsted, which would be skipped if
+	     cp_unevaluated_operand.  */
+	  cp_evaluated ev;
+	  fargs = tsubst (fargs, tsubst_args, complain, ctor);
 	  current_template_parms = save_parms;
 	}
 
@@ -29060,7 +29079,7 @@ append_type_to_template_for_access_check_1 (tree t,
 }
 
 /* Append TYPE_DECL to the template TEMPL.
-   TEMPL is either a class type, a FUNCTION_DECL or a a TEMPLATE_DECL.
+   TEMPL is either a class type, a FUNCTION_DECL or a TEMPLATE_DECL.
    At TEMPL instanciation time, TYPE_DECL will be checked to see
    if it can be accessed through SCOPE.
    LOCATION is the location of the usage point of TYPE_DECL.

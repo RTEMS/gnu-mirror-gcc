@@ -1,3 +1,176 @@
+2020-03-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/94190 - wrong no post-decrement operator error in template.
+	* call.c (convert_like_real): Use convert_from_reference on the result.
+
+2020-03-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/94186
+	* constraint.cc (constraint_satisfaction_value): Repeat noisily on
+	error.
+	(tsubst_nested_requirement): Likewise.
+	(get_constraint_error_location): Allow missing context.
+	(diagnose_atomic_constraint): Diagnose non-bool constraint here.
+	(satisfy_atom): Not here.  Only diagnose non-constant when noisy.
+
+2020-03-24  Jason Merrill  <jason@redhat.com>
+
+	* pt.c (any_template_parm_r): Look into the type of a non-type
+	template parm.
+
+2020-03-24  Jason Merrill  <jason@redhat.com>
+
+	* cp-tree.h (cp_expr): When constructing from an expr and a
+	location, call protected_set_expr_location.
+
+2020-03-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/93805
+	* except.c (maybe_noexcept_warning): Add TODO.
+	* method.c (walk_field_subobs): Pass tf_none to expr_noexcept_p.
+
+2020-03-23  nathans  <nathan@acm.org>
+
+	PR c++/94044
+	* tree.c (cp_tree_equal) [SIZEOF_EXPR]: Detect argument pack
+	operand.
+
+2020-03-21  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/94066
+	* constexpr.c (reduced_constant_expression_p) [CONSTRUCTOR]: Properly
+	handle unions without an initializer.
+	(cxx_eval_component_reference): Emit a different diagnostic when the
+	constructor element corresponding to a union member is NULL.
+	(cxx_eval_bare_aggregate): When constructing a union, always set the
+	active union member before evaluating the initializer.  Relax assertion
+	that verifies the index of the constructor element we're initializing
+	hasn't been changed.
+	(cxx_eval_store_expression): Diagnose changing the active union member
+	while the union is in the process of being initialized.  After setting
+	an active union member, clear CONSTRUCTOR_NO_CLEARING on the underlying
+	CONSTRUCTOR.
+	(cxx_eval_constant_expression) [PLACEHOLDER_EXPR]: Don't re-reduce a
+	CONSTRUCTOR returned by lookup_placeholder.
+
+2020-03-20  Patrick Palka  <ppalka@redhat.com>
+
+	* cxx-pretty-print.c (pp_cxx_parameter_mapping): Make extern.  Move
+	the "[with ]" bits to here from ...
+	(pp_cxx_atomic_constraint): ... here.
+	* cxx-pretty-print.h (pp_cxx_parameter_mapping): Declare.
+	* error.c (rebuild_concept_check): Delete.
+	(print_concept_check_info): Print the dependent form of the constraint and the
+	preferably substituted parameter mapping alongside it.
+
+2020-03-19  Jason Merrill  <jason@redhat.com>
+
+	PR c++/94175
+	* cp-gimplify.c (simple_empty_class_p): Look through
+	SIMPLE_TARGET_EXPR_P.
+	(cp_gimplify_expr) [MODIFY_EXPR]: Likewise.
+	[RETURN_EXPR]: Avoid producing 'return *retval;'.
+	* call.c (build_call_a): Strip TARGET_EXPR from empty class arg.
+	* cp-tree.h (SIMPLE_TARGET_EXPR_P): Check that TARGET_EXPR_INITIAL
+	is non-null.
+
+2020-03-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93931
+	* parser.c (cp_parser_omp_var_list_no_open): Call process_outer_var_ref
+	on outer_automatic_var_p decls.
+	* cp-gimplify.c (cxx_omp_disregard_value_expr): Return true also for
+	capture proxy decls.
+
+2020-03-18  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/94147 - mangling of lambdas assigned to globals
+	* parser.c (cp_parser_init_declarator): Namespace-scope variables
+	provide a lambda scope.
+	* tree.c (no_linkage_check): Lambdas with a variable for extra
+	scope have a linkage from the variable.
+
+2020-03-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* constraint.cc (resolve_function_concept_check, subsumes_constraints,
+	strictly_subsumes): Fix up duplicated word issue in a comment.
+	* coroutines.cc (build_init_or_final_await, captures_temporary):
+	Likewise.
+	* logic.cc (dnf_size_r, cnf_size_r): Likewise.
+	* pt.c (append_type_to_template_for_access_check): Likewise.
+
+	PR c++/91759
+	* decl.c (grokfndecl): Restore old diagnostics about deduction
+	guide declared in different scope if in_namespace is NULL_TREE.
+
+2020-03-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/90995
+	* parser.c (cp_parser_enum_specifier): Use temp_override for
+	parser->colon_corrects_to_scope_p, replace goto out with return.
+	If scoped enum or enum with underlying type is not followed by
+	{ or ;, call cp_parser_commit_to_tentative_parse before calling
+	cp_parser_error and make sure to return error_mark_node instead of
+	NULL_TREE.  Formatting fixes.
+
+2020-03-17  Ville Voutilainen  <ville.voutilainen@gmail.com>
+
+	PR c++/94197
+	* method.c (assignable_expr): Use cp_unevaluated.
+	(is_xible_helper): Push a non-deferred access check for
+	the stub objects created by assignable_expr and constructible_expr.
+
+2020-03-17  Jakub Jelinek  <jakub@redhat.com>
+
+	* pt.c (tsubst): Fix up duplicated word issue in a diagnostic message.
+	(lookup_template_class_1, tsubst_expr): Fix up duplicated word issue
+	in a comment.
+	* parser.c (cp_parser_statement, cp_parser_linkage_specification,
+	cp_parser_placeholder_type_specifier,
+	cp_parser_constraint_requires_parens): Likewise.
+	* name-lookup.c (suggest_alternative_in_explicit_scope): Likewise.
+
+2020-03-15  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* coroutines.cc (co_await_expander): Fix indentation.
+
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92068
+	* pt.c (process_partial_specialization): Error rather than crash on
+	extra pack expansion.
+
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92909
+	* pt.c (find_parameter_packs_r): [DECL_EXPR]: Walk
+	DECL_ORIGINAL_TYPE of a typedef.
+
+2020-03-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93248
+	* pt.c (build_deduction_guide): Clear cp_unevaluated_operand for
+	substituting DECL_ARGUMENTS.
+
+2020-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* logic.cc (formula::formula): Change "a an" to "an" in a comment.
+	* parser.c (cp_debug_parser): Change "a an" to "an" in a string
+	literal.
+
+2020-03-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/67960
+	* call.c (build_over_call): Use a warning_sentinel to disable
+	warn_deprecated_decl before calling build_addr_func.
+
+2020-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/94124
+	* decl.c (reshape_init_array_1): Don't unshare constructor if there
+	aren't any trailing zero elts, otherwise only unshare the first
+	nelts.
+
 2020-03-11  Jason Merrill  <jason@redhat.com>
 
 	PR c++/93907
@@ -27,7 +200,7 @@
 
 2020-03-10  Jason Merrill  <jason@redhat.com>
 
-	PR c++/93956
+	PR c++/93596
 	* pt.c (maybe_aggr_guide): Check BRACE_ENCLOSED_INITIALIZER_P.
 
 2020-03-10  Jason Merrill  <jason@redhat.com>

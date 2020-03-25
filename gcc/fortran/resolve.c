@@ -5314,11 +5314,11 @@ gfc_resolve_ref (gfc_expr *expr)
 	case REF_INQUIRY:
 	  /* Implement requirement in note 9.7 of F2018 that the result of the
 	     LEN inquiry be a scalar.  */
-	  if (ref->u.i == INQUIRY_LEN && array_ref)
+	  if (ref->u.i == INQUIRY_LEN && array_ref && expr->ts.deferred)
 	    {
 	      array_ref->u.ar.type = AR_ELEMENT;
 	      expr->rank = 0;
-	      /* INQUIRY_LEN is not evaluated from the the rest of the expr
+	      /* INQUIRY_LEN is not evaluated from the rest of the expr
 		 but directly from the string length. This means that setting
 		 the array indices to one does not matter but might trigger
 		 a runtime bounds error. Suppress the check.  */

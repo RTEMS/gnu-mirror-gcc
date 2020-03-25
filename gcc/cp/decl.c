@@ -6066,10 +6066,21 @@ reshape_init_array_1 (tree elt_type, tree max_index, reshape_iter *d,
 	 overload resolution.  E.g., initializing a class from
 	 {{0}} might be invalid while initializing the same class
 	 from {{}} might be valid.  */
-      if (reuse)
-	new_init = unshare_constructor (new_init);
-
-      vec_safe_truncate (CONSTRUCTOR_ELTS (new_init), nelts);
+      if (reuse && nelts < CONSTRUCTOR_NELTS (new_init))
+	{
+	  vec<constructor_elt, va_gc> *v;
+	  vec_alloc (v, nelts);
+	  for (unsigned int i = 0; i < nelts; i++)
+	    {
+	      constructor_elt elt = *CONSTRUCTOR_ELT (new_init, i);
+	      if (TREE_CODE (elt.value) == CONSTRUCTOR)
+		elt.value = unshare_constructor (elt.value);
+	      v->quick_push (elt);
+	    }
+	  new_init = build_constructor (TREE_TYPE (new_init), v);
+	}
+      else
+	vec_safe_truncate (CONSTRUCTOR_ELTS (new_init), nelts);
     }
 
   return new_init;
@@ -9631,6 +9642,15 @@ grokfndecl (tree ctype,
 	{
 	  error_at (location, "deduction guide %qD must be declared at "
 		    "namespace scope", decl);
+	  return NULL_TREE;
+	}
+      tree type = TREE_TYPE (DECL_NAME (decl));
+      if (in_namespace == NULL_TREE
+	  && CP_DECL_CONTEXT (decl) != CP_TYPE_CONTEXT (type))
+	{
+	  error_at (location, "deduction guide %qD must be declared in the "
+			      "same scope as %qT", decl, type);
+	  inform (location_of (type), "  declared here");
 	  return NULL_TREE;
 	}
       if (funcdef_flag)

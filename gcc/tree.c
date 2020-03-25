@@ -8862,6 +8862,21 @@ get_narrower (tree op, int *unsignedp_ptr)
   tree win = op;
   bool integral_p = INTEGRAL_TYPE_P (TREE_TYPE (op));
 
+  if (TREE_CODE (op) == COMPOUND_EXPR)
+    {
+      while (TREE_CODE (op) == COMPOUND_EXPR)
+	op = TREE_OPERAND (op, 1);
+      tree ret = get_narrower (op, unsignedp_ptr);
+      if (ret == op)
+	return win;
+      op = win;
+      for (tree *p = &win; TREE_CODE (op) == COMPOUND_EXPR;
+	   op = TREE_OPERAND (op, 1), p = &TREE_OPERAND (*p, 1))
+	*p = build2_loc (EXPR_LOCATION (op), COMPOUND_EXPR,
+			 TREE_TYPE (ret), TREE_OPERAND (op, 0),
+			 ret);
+      return win;
+    }
   while (TREE_CODE (op) == NOP_EXPR)
     {
       int bitschange
@@ -13663,7 +13678,7 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
     }
 
   /* BASE is the declared object of which MEMBER is either a member
-     or that is is cast to REFTYPE (e.g., a char buffer used to store
+     or that is cast to REFTYPE (e.g., a char buffer used to store
      a REFTYPE object).  */
   tree reftype = TREE_TYPE (TREE_OPERAND (ref, 0));
   tree basetype = TREE_TYPE (base);

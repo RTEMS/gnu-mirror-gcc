@@ -61,7 +61,7 @@
    record the surrounding bit region, i.e. bits that could be stored in
    a read-modify-write operation when storing the bit-field.  Record store
    chains to different bases in a hash_map (m_stores) and make sure to
-   terminate such chains when appropriate (for example when when the stored
+   terminate such chains when appropriate (for example when the stored
    values get used subsequently).
    These stores can be a result of structure element initializers, array stores
    etc.  A store_immediate_info object is recorded for every such store.
@@ -2773,7 +2773,8 @@ imm_store_chain_info::coalesce_immediate_stores ()
 			    break;
 			  if (info2->order < try_order)
 			    {
-			      if (info2->rhs_code != INTEGER_CST)
+			      if (info2->rhs_code != INTEGER_CST
+				  || info2->lp_nr != merged_store->lp_nr)
 				{
 				  /* Normally check_no_overlap makes sure this
 				     doesn't happen, but if end grows below,
@@ -2791,6 +2792,7 @@ imm_store_chain_info::coalesce_immediate_stores ()
 					      info2->bitpos + info2->bitsize);
 			    }
 			  else if (info2->rhs_code == INTEGER_CST
+				   && info2->lp_nr == merged_store->lp_nr
 				   && !last_iter)
 			    {
 			      max_order = MAX (max_order, info2->order + 1);

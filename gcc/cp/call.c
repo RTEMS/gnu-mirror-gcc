@@ -392,6 +392,10 @@ build_call_a (tree function, int n, tree *argarray)
 	if (is_empty_class (TREE_TYPE (arg))
 	    && simple_empty_class_p (TREE_TYPE (arg), arg, INIT_EXPR))
 	  {
+	    while (TREE_CODE (arg) == TARGET_EXPR)
+	      /* We're disconnecting the initializer from its target,
+		 don't create a temporary.  */
+	      arg = TARGET_EXPR_INITIAL (arg);
 	    tree t = build0 (EMPTY_CLASS_EXPR, TREE_TYPE (arg));
 	    arg = build2 (COMPOUND_EXPR, TREE_TYPE (t), arg, t);
 	    CALL_EXPR_ARG (function, i) = arg;
@@ -7385,7 +7389,10 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
   if (processing_template_decl
       && convs->kind != ck_identity
       && (CLASS_TYPE_P (totype) || CLASS_TYPE_P (TREE_TYPE (expr))))
-    return build1 (IMPLICIT_CONV_EXPR, totype, expr);
+    {
+      expr = build1 (IMPLICIT_CONV_EXPR, totype, expr);
+      return convs->kind == ck_ref_bind ? expr : convert_from_reference (expr);
+    }
 
   switch (convs->kind)
     {
@@ -9062,6 +9069,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
     }
   else
     {
+      /* If FN is marked deprecated, then we've already issued a deprecated-use
+	 warning from mark_used above, so avoid redundantly issuing another one
+	 from build_addr_func.  */
+      warning_sentinel w (warn_deprecated_decl);
+
       fn = build_addr_func (fn, complain);
       if (fn == error_mark_node)
 	return error_mark_node;
