@@ -201,7 +201,10 @@ enum basetype {
   BT_FLOAT,
   BT_DOUBLE,
   BT_INT128,
-  BT_FLOAT128
+  BT_FLOAT128,
+  BT_DECIMAL32,
+  BT_DECIMAL64,
+  BT_DECIMAL128
 };
 
 /* Ways in which a const int value can be restricted.  RES_BITS indicates
@@ -345,21 +348,24 @@ struct typemap
 
 /* This table must be kept in alphabetical order, as we use binary
    search for table lookups in map_token_to_type_node.  */
-#define TYPE_MAP_SIZE 33
+#define TYPE_MAP_SIZE 36
 static typemap type_map[TYPE_MAP_SIZE] =
   {
     { "bv16qi",	"bool_V16QI" },
     { "bv2di",	"bool_V2DI" },
     { "bv4si",	"bool_V4SI" },
     { "bv8hi",	"bool_V8HI" },
+    { "dd",	"dfloat64" },
     { "df",	"double" },
     { "di",	"intDI" },
     { "hi",	"intHI" },
     { "opaque", "opaque_V4SI" },
     { "pv",	"ptr" },
     { "qi",	"intQI" },
+    { "sd",	"dfloat32" },
     { "sf",	"float" },
     { "si",	"intSI" },
+    { "td",	"dfloat128" },
     { "tf",	"long_double" },
     { "ti",	"intTI" },
     { "udi",	"unsigned_intDI" },
@@ -572,6 +578,12 @@ match_basetype (typeinfo *typedata)
     typedata->base = BT_INT128;
   else if (!strcmp (token, "_Float128"))
     typedata->base = BT_FLOAT128;
+  else if (!strcmp (token, "_Decimal32"))
+    typedata->base = BT_DECIMAL32;
+  else if (!strcmp (token, "_Decimal64"))
+    typedata->base = BT_DECIMAL64;
+  else if (!strcmp (token, "_Decimal128"))
+    typedata->base = BT_DECIMAL128;
   else
     {
       (*diag) ("unrecognized base type at column %d\n", oldpos + 1);
@@ -743,6 +755,9 @@ match_type (typeinfo *typedata, int voidok)
        double
        __int128
        _Float128
+       _Decimal32
+       _Decimal64
+       _Decimal128
 
      Legal values of <vectype> are as follows, and are shorthand for
      the associated meaning:
@@ -1268,6 +1283,15 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
       break;
     case BT_FLOAT128:
       memcpy (&buf[*bufi], "tf", 2);
+      break;
+    case BT_DECIMAL32:
+      memcpy (&buf[*bufi], "sd", 2);
+      break;
+    case BT_DECIMAL64:
+      memcpy (&buf[*bufi], "dd", 2);
+      break;
+    case BT_DECIMAL128:
+      memcpy (&buf[*bufi], "td", 2);
       break;
     default:
       (*diag) ("unhandled basetype %d.\n", typeptr->base);

@@ -2585,3 +2585,12 @@
   fpmath double __builtin_vsx_truncf128_round_to_odd (_Float128);
     TRUNCF128_ODD trunckfdf2_odd {}
 
+
+; Decimal floating-point builtins.
+[MASK_DFP]
+  const signed long long __builtin_dxex (_Decimal64);
+    DXEX dfp_dxex_dd {}
+
+  const signed long long __builtin_dxexq (_Decimal128);
+    DXEXQ dfp_dxex_td {}
+
