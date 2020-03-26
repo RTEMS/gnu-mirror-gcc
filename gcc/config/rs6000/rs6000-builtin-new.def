@@ -1503,7 +1503,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vull __builtin_vsx_xvcmpeqdp_p (vd);
-    XVCMPEQDP_P vector_eq_v2df_p {}
+    XVCMPEQDP_P vector_eq_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpeqsp (vf, vf);
     XVCMPEQSP vector_eqv4sf {}
@@ -1511,7 +1511,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vui __builtin_vsx_xvcmpeqsp_p (vf);
-    XVCMPEQSP_P vector_eq_v4sf_p {}
+    XVCMPEQSP_P vector_eq_v4sf_p {pred}
 
   const vbll __builtin_vsx_xvcmpgedp (vd, vd);
     XVCMPGEDP vector_gev2df {}
@@ -1519,7 +1519,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vull __builtin_vsx_xvcmpgedp_p (vd);
-    XVCMPGEDP_P vector_ge_v2df_p {}
+    XVCMPGEDP_P vector_ge_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpgesp (vf, vf);
     XVCMPGESP vector_gev4sf {}
@@ -1527,7 +1527,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vui __builtin_vsx_xvcmpgesp_p (vf);
-    XVCMPGESP_P vector_ge_v4sf_p {}
+    XVCMPGESP_P vector_ge_v4sf_p {pred}
 
   const vbll __builtin_vsx_xvcmpgtdp (vd, vd);
     XVCMPGTDP vector_gtv2df {}
@@ -1535,7 +1535,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vull __builtin_vsx_xvcmpgtdp_p (vd);
-    XVCMPGTDP_P vector_gt_v2df_p {}
+    XVCMPGTDP_P vector_gt_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpgtsp (vf, vf);
     XVCMPGTSP vector_gtv4sf {}
@@ -1543,7 +1543,7 @@
 ; This predicate isn't used in the ALL or ANY interfaces; it appears
 ; to return a vector rather than an integer as other predicates do.
   const vui __builtin_vsx_xvcmpgtsp_p (vf, vf);
-    XVCMPGTSP_P vector_gt_v4sf_p {}
+    XVCMPGTSP_P vector_gt_v4sf_p {pred}
 
   const vsll __builtin_vsx_xvcvdpsxds (vd);
     XVCVDPSXDS vsx_fix_truncv2dfv2di2 {}
@@ -1863,10 +1863,25 @@
     XXSPLTD_V2DI vsx_xxspltd_v2di {}
 
 
-; Miscellaneous builtins with a minimum of ISA 2.07 (Power8).
-[MASK_DIRECT_MOVE]
+; Power7 builtins (ISA 2.06).
+[MASK_POPCNTD]
+  const signed int __builtin_divwe (signed int, signed int);
+    DIVWE dive_si {}
+
+  const unsigned int __builtin_divweu (unsigned int, unsigned int);
+    DIVWEU diveu_si {}
+
   void __builtin_ppc_speculation_barrier ();
     SPECBARR speculation_barrier {}
+
+
+; Power7 builtins requiring 64-bit GPRs (even with 32-bit addressing).
+[(MASK_POPCNTD | MASK_POWERPC64)]
+  const signed long long __builtin_divde (signed long long, signed long long);
+    DIVDE dive_di {}
+
+  const unsigned long long __builtin_divdeu (unsigned long long, unsigned long long);
+    DIVDEU diveu_di {}
 
 
 ; Power8 vector built-ins.
@@ -2040,19 +2055,19 @@
     VCMPEQUD vector_eqv2di {}
 
   const int __builtin_altivec_vcmpequd_p (int, vsll, vsll);
-    VCMPEQUD_P vector_eq_v2di_p {}
+    VCMPEQUD_P vector_eq_v2di_p {pred}
 
   const vbll __builtin_altivec_vcmpgtsd (vsll, vsll);
     VCMPGTSD vector_gtv2di {}
 
   const int __builtin_altivec_vcmpgtsd_p (int, vsll, vsll);
-    VCMPGTSD_P vector_gt_v2di_p {}
+    VCMPGTSD_P vector_gt_v2di_p {pred}
 
   const vbll __builtin_altivec_vcmpgtud (vull, vull);
     VCMPGTUD vector_gtuv2di {}
 
   const int __builtin_altivec_vcmpgtud_p (vull, vull);
-    VCMPGTUD_P vector_gtu_v2di_p {}
+    VCMPGTUD_P vector_gtu_v2di_p {pred}
 
   const vsll __builtin_altivec_vmaxsd (vsll, vsll);
     VMAXSD smaxv2di3 {}
@@ -2282,6 +2297,87 @@
   const vull __builtin_altivec_vbpermd (vull, vuc);
     VBPERMD altivec_vbpermd {}
 
+  const signed int __builtin_altivec_vclzlsbb_v16qi (vsc);
+    VCLZLSBB_V16QI vclzlsbb_v16qi {}
+
+  const signed int __builtin_altivec_vclzlsbb_v4si (vsi);
+    VCLZLSBB_V4SI vclzlsbb_v4si {}
+
+  const signed int __builtin_altivec_vclzlsbb_v8hi (vss);
+    VCLZLSBB_V8HI vclzlsbb_v8hi {}
+
+  const signed int __builtin_altivec_vctzlsbb_v16qi (vsc);
+    VCTZLSBB_V16QI vctzlsbb_v16qi {}
+
+  const signed int __builtin_altivec_vctzlsbb_v4si (vsi);
+    VCTZLSBB_V4SI vctzlsbb_v4si {}
+
+  const signed int __builtin_altivec_vctzlsbb_v8hi (vss);
+    VCTZLSBB_V8HI vctzlsbb_v8hi {}
+
+  const signed int __builtin_altivec_vcmpaeb_p (vsc, vsc);
+    VCMPAEB_P vector_ae_v16qi_p {pred}
+
+  const signed int __builtin_altivec_vcmpaed_p (vsll, vsll);
+    VCMPAED_P vector_ae_v2di_p {pred}
+
+  const signed int __builtin_altivec_vcmpaedp_p (vd, vd);
+    VCMPAEDP_P vector_ae_v2df_p {pred}
+
+  const signed int __builtin_altivec_vcmpaefp_p (vf, vf);
+    VCMPAEFP_P vector_ae_v4sf_p {pred}
+
+  const signed int __builtin_altivec_vcmpaeh_p (vss, vss);
+    VCMPAEH_P vector_ae_v8hi_p {pred}
+
+  const signed int __builtin_altivec_vcmpaew_p (vsi, vsi);
+    VCMPAEW_P vector_ae_v4si_p {pred}
+
+  const vbc __builtin_altivec_vcmpneb (vsc, vsc);
+    CMPNEB vcmpneb {}
+
+  const signed int __builtin_altivec_vcmpneb_p (vsc, vsc);
+    VCMPNEB_P vector_ne_v16qi_p {pred}
+
+  const signed int __builtin_altivec_vcmpned_p (vsll, vsll);
+    VCMPNED_P vector_ne_v2di_p {pred}
+
+  const signed int __builtin_altivec_vcmpnedp_p (vd, vd);
+    VCMPNEDP_P vector_ne_v2df_p {pred}
+
+  const signed int __builtin_altivec_vcmpnefp_p (vf, vf);
+    VCMPNEFP_P vector_ne_v4sf_p {pred}
+
+  const vbs __builtin_altivec_vcmpneh (vss, vss);
+    CMPNEH vcmpneh {}
+
+  const signed int __builtin_altivec_vcmpneh_p (vss, vss);
+    VCMPNEH_P vector_ne_v8hi_p {pred}
+
+  const vbi __builtin_altivec_vcmpnew (vsi, vsi);
+    CMPNEW vcmpnew {}
+
+  const signed int __builtin_altivec_vcmpnew_p (vsi, vsi);
+    VCMPNEW_P vector_ne_v4si_p {pred}
+
+  const vbc __builtin_altivec_vcmpnezb (vsc, vsc);
+    CMPNEZB vcmpnezb {}
+
+  const signed int __builtin_altivec_vcmpnezb_p (signed int, vsc, vsc);
+    VCMPNEZB_P vector_nez_v16qi_p {pred}
+
+  const vbs __builtin_altivec_vcmpnezh (vss, vss);
+    CMPNEZH vcmpnezh {}
+
+  const signed int __builtin_altivec_vcmpnezh_p (signed int, vss, vss);
+    VCMPNEZH_P vector_nez_v8hi_p {pred}
+
+  const vbi __builtin_altivec_vcmpnezw (vsi, vsi);
+    CMPNEZW vcmpnezw {}
+
+  const signed int __builtin_altivec_vcmpnezw_p (vsi, vsi);
+    VCMPNEZW_P vector_nez_v4si_p {pred}
+
   const unsigned char __builtin_altivec_vextublx (unsigned int, vuc);
     VEXTUBLX vextublx {}
 
@@ -2317,6 +2413,9 @@
 
   const vuc __builtin_altivec_vsrv (vuc, vuc);
     VSRV vsrv {}
+
+  const vull __builtin_vsx_extract4b (vuc, signed int);
+    EXTRACT4B extract4b {}
 
   const vull __builtin_vsx_extract_exp_dp (vd);
     VEEDP xvxexpdp {}
@@ -2405,6 +2504,15 @@
 ; 32 bits, and the return value is DImode, so it seems that
 ; TARGET_64BIT (actually TARGET_POWERPC64) is justified.  TBD. ####
 [(MASK_P9_VECTOR | MASK_POWERPC64)]
+; The following two are inexplicably named __builtin_altivec_* while
+; their load counterparts are __builtin_vsx_*.  Need to deprecate
+; these interfaces in favor of the other naming scheme (or vice versa).
+  void __builtin_altivec_xst_len_r (vop, void *, unsigned long long);
+    XST_LEN_R xst_len_r {}
+
+  void __builtin_altivec_stxvl (vop, void *, unsigned long long);
+    STXVL stxvl {}
+
   pure vop __builtin_vsx_lxvl (void *, unsigned long long);
     LXVL lxvl {}
 
@@ -2426,6 +2534,18 @@
 
 ; Builtins requiring hardware support for IEEE-128 floating-point.
 [MASK_FLOAT128_HW]
+  fpmath _Float128 __builtin_vsx_addf128_round_to_odd (_Float128, _Float128);
+    ADDF128_ODD addkf3_odd {}
+
+  fpmath _Float128 __builtin_vsx_divf128_round_to_odd (_Float128, _Float128);
+    DIVF128_ODD divkf3_odd {}
+
+  fpmath _Float128 __builtin_vsx_fmaf128_round_to_odd (_Float128, _Float128, _Float128);
+    FMAF128_ODD fmakf4_odd {}
+
+  fpmath _Float128 __builtin_vsx_mulf128_round_to_odd (_Float128, _Float128);
+    MULF128_ODD mulkf3_odd {}
+
   const unsigned long long __builtin_vsx_scalar_extract_expq (_Float128);
     VSEEQP xsxexpqp_kf {}
 
@@ -2455,3 +2575,13 @@
 
   const unsigned int __builtin_vsx_scalar_test_neg_qp (_Float128);
     VSTDCNQP xststdcnegqp_kf {}
+
+  fpmath _Float128 __builtin_vsx_sqrtf128_round_to_odd (_Float128);
+    SQRTF128_ODD sqrtkf2_odd {}
+
+  fpmath _Float128 __builtin_vsx_subf128_round_to_odd (_Float128, _Float128);
+    SUBF128_ODD subkf3_odd {}
+
+  fpmath double __builtin_vsx_truncf128_round_to_odd (_Float128);
+    TRUNCF128_ODD trunckfdf2_odd {}
+

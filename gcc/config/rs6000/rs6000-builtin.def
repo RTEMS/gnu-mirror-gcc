@@ -2298,6 +2298,8 @@ BU_FLOAT128_HW_3 (FMAF128_ODD,   "fmaf128_round_to_odd",   FP, fmakf4_odd)
 
 /* 3 argument vector functions returning void, treated as SPECIAL,
    added in ISA 3.0 (power9).  */
+/* ??? Why are these named __builtin_altivec_* when the corresponding
+   load builtins are named __builtin_vsx_*??  */
 BU_P9V_64BIT_AV_X (STXVL,	"stxvl",	MISC)
 BU_P9V_64BIT_AV_X (XST_LEN_R,	"xst_len_r",	MISC)
 
