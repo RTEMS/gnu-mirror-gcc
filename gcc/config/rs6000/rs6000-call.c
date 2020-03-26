@@ -5181,6 +5181,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P9V_BUILTIN_VEC_VEXTRACT_FP_FROM_SHORTL, P9V_BUILTIN_VEXTRACT_FP_FROM_SHORTL,
     RS6000_BTI_V4SF, RS6000_BTI_unsigned_V8HI, 0, 0 },
 
+  /* Following ones have rules violations for scalar types.  */
   { P9V_BUILTIN_VEC_VEXTULX, P9V_BUILTIN_VEXTUBLX,
     RS6000_BTI_INTQI, RS6000_BTI_UINTSI,
     RS6000_BTI_V16QI, 0 },

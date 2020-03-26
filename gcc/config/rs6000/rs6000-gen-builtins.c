@@ -505,7 +505,7 @@ match_to_right_bracket ()
   while (linebuf[lastpos + 1] != ']')
     if (++lastpos >= LINELEN - 1)
       {
-	(*diag) ("linie length overrun.\n");
+	(*diag) ("line length overrun.\n");
 	exit (EC_INTERR);
       }
 
@@ -659,6 +659,7 @@ match_const_restriction (typeinfo *typedata)
 	  (*diag) ("missing comma at column %d.\n", pos + 1);
 	  return 0;
 	}
+      safe_inc_pos ();
       consume_whitespace ();
       oldpos = pos;
       int y = match_integer ();
@@ -696,6 +697,7 @@ match_const_restriction (typeinfo *typedata)
 	  (*diag) ("missing comma at column %d.\n", pos + 1);
 	  return 0;
 	}
+      safe_inc_pos ();
       consume_whitespace ();
       oldpos = pos;
       int y = match_integer ();
@@ -995,7 +997,7 @@ match_type (typeinfo *typedata, int voidok)
       typedata->base = BT_INT;
 
       consume_whitespace ();
-      if (linebuf[pos] == '<' || linebuf[pos] == '{')
+      if (linebuf[pos] == '<' || linebuf[pos] == '{' || linebuf[pos] == '[')
 	return match_const_restriction (typedata);
 
       return 1;
