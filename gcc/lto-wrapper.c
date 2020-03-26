@@ -1473,10 +1473,16 @@ run_gcc (unsigned argc, char *argv[])
       auto_parallel = 0;
       parallel = 0;
     }
-  else if (!jobserver && jobserver_active_p ())
+  else
     {
-      parallel = 1;
-      jobserver = 1;
+      bool active_jobserver = jobserver_active_p ();
+      if (jobserver && !active_jobserver)
+	warning (0, "jobserver is not available.");
+      else if (!jobserver && active_jobserver)
+	{
+	  parallel = 1;
+	  jobserver = 1;
+	}
     }
 
   if (linker_output)
