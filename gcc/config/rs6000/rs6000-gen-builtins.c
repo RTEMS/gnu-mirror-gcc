@@ -204,7 +204,8 @@ enum basetype {
   BT_FLOAT128,
   BT_DECIMAL32,
   BT_DECIMAL64,
-  BT_DECIMAL128
+  BT_DECIMAL128,
+  BT_IBM128
 };
 
 /* Ways in which a const int value can be restricted.  RES_BITS indicates
@@ -269,10 +270,10 @@ struct prototype {
   char *bifname;
   int nargs;
   typelist *args;
-  int restr_opnd;
-  restriction restr;
-  int restr_val1;
-  int restr_val2;
+  int restr_opnd[2];
+  restriction restr[2];
+  int restr_val1[2];
+  int restr_val2[2];
 };
 
 /* Data associated with a builtin function, and a table of such data.  */
@@ -347,8 +348,11 @@ struct typemap
 };
 
 /* This table must be kept in alphabetical order, as we use binary
-   search for table lookups in map_token_to_type_node.  */
-#define TYPE_MAP_SIZE 36
+   search for table lookups in map_token_to_type_node.  The table
+   maps tokens from a fntype string to a tree type.  For example,
+   in "si_ftype_hi" we would map "si" to "intSI_type_node" and
+   map "hi" to "intHI_type_node".  */
+#define TYPE_MAP_SIZE 37
 static typemap type_map[TYPE_MAP_SIZE] =
   {
     { "bv16qi",	"bool_V16QI" },
@@ -359,6 +363,7 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "df",	"double" },
     { "di",	"intDI" },
     { "hi",	"intHI" },
+    { "if",	"ibm128_float" },
     { "opaque", "opaque_V4SI" },
     { "pv",	"ptr" },
     { "qi",	"intQI" },
@@ -584,6 +589,8 @@ match_basetype (typeinfo *typedata)
     typedata->base = BT_DECIMAL64;
   else if (!strcmp (token, "_Decimal128"))
     typedata->base = BT_DECIMAL128;
+  else if (!strcmp (token, "__ibm128"))
+    typedata->base = BT_IBM128;
   else
     {
       (*diag) ("unrecognized base type at column %d\n", oldpos + 1);
@@ -758,6 +765,7 @@ match_type (typeinfo *typedata, int voidok)
        _Decimal32
        _Decimal64
        _Decimal128
+       __ibm128
 
      Legal values of <vectype> are as follows, and are shorthand for
      the associated meaning:
@@ -1029,10 +1037,11 @@ parse_args (prototype *protoptr)
 {
   typelist **argptr = &protoptr->args;
   int *nargs = &protoptr->nargs;
-  int *restr_opnd = &protoptr->restr_opnd;
-  restriction *restr = &protoptr->restr;
-  int *val1 = &protoptr->restr_val1;
-  int *val2 = &protoptr->restr_val2;
+  int *restr_opnd = protoptr->restr_opnd;
+  restriction *restr = protoptr->restr;
+  int *val1 = protoptr->restr_val1;
+  int *val2 = protoptr->restr_val2;
+  int restr_cnt = 0;
 
   int success;
   *nargs = 0;
@@ -1057,15 +1066,15 @@ parse_args (prototype *protoptr)
       {
 	if (argtype->restr)
 	  {
-	    if (*restr_opnd)
+	    if (restr_cnt >= 2)
 	      {
-		(*diag) ("More than one restricted operand\n");
+		(*diag) ("More than two restricted operands\n");
 		return 0;
 	      }
-	    *restr_opnd = *nargs + 1;
-	    *restr = argtype->restr;
-	    *val1 = argtype->val1;
-	    *val2 = argtype->val2;
+	    restr_opnd[restr_cnt] = *nargs + 1;
+	    restr[restr_cnt] = argtype->restr;
+	    val1[restr_cnt] = argtype->val1;
+	    val2[restr_cnt++] = argtype->val2;
 	  }
 	(*nargs)++;
 	*argptr = argentry;
@@ -1293,6 +1302,9 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
     case BT_DECIMAL128:
       memcpy (&buf[*bufi], "td", 2);
       break;
+    case BT_IBM128:
+      memcpy (&buf[*bufi], "if", 2);
+      break;
     default:
       (*diag) ("unhandled basetype %d.\n", typeptr->base);
       exit (EC_INTERR);
@@ -1421,7 +1433,8 @@ parse_prototype (prototype *protoptr)
 #ifdef DEBUG
   (*diag) ("return type: isvoid = %d, isconst = %d, isvector = %d, \
 issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, ispointer = %d, \
-base = %d, restr = %d, val1 = %d, val2 = %d, pos = %d.\n",
+base = %d, restr[0] = %d, val1[0] = %d, val2[0] = %d, restr1[1] = %d, \
+val1[1] = %d, val2[1] = %d, pos = %d.\n",
 	   ret_type->isvoid, ret_type->isconst, ret_type->isvector,
 	   ret_type->issigned, ret_type->isunsigned, ret_type->isbool,
 	   ret_type->ispixel, ret_type->ispointer, ret_type->base,
@@ -1863,10 +1876,10 @@ write_decls ()
   fprintf (header_file, "  insn_code icode;\n");
   fprintf (header_file, "  int  nargs;\n");
   fprintf (header_file, "  int  bifattrs;\n");
-  fprintf (header_file, "  int  restr_opnd;\n");
-  fprintf (header_file, "  restriction restr;\n");
-  fprintf (header_file, "  int  restr_val1;\n");
-  fprintf (header_file, "  int  restr_val2;\n");
+  fprintf (header_file, "  int  restr_opnd[2];\n");
+  fprintf (header_file, "  restriction restr[2];\n");
+  fprintf (header_file, "  int  restr_val1[2];\n");
+  fprintf (header_file, "  int  restr_val2[2];\n");
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define bif_init_bit\t\t(0x00000001)\n");
@@ -2150,32 +2163,35 @@ write_init_bif_table ()
       if (bifs[i].attrs.isldstmask)
 	fprintf (init_file, " | bif_ldstmask_bit");
       fprintf (init_file, ";\n");
-      fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd"
-	       "\n    = %d;\n",
-	       bifs[i].idname, bifs[i].proto.restr_opnd);
-      if (bifs[i].proto.restr_opnd)
+      for (int j = 0; j < 1; j++)
 	{
-	  const char *res
-	    = (bifs[i].proto.restr == RES_BITS ? "RES_BITS"
-	       : (bifs[i].proto.restr == RES_RANGE ? "RES_RANGE"
-		  : (bifs[i].proto.restr == RES_VALUES ? "RES_VALUES"
-		     : (bifs[i].proto.restr == RES_VAR_RANGE ? "RES_VAR_RANGE"
-			: "ERROR"))));
 	  fprintf (init_file,
-		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr"
-		   "\n    = %s;\n",
-		   bifs[i].idname, res);
-	  fprintf (init_file,
-		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1"
+		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd[%d]"
 		   "\n    = %d;\n",
-		   bifs[i].idname, bifs[i].proto.restr_val1);
-	  fprintf (init_file,
-		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2"
-		   "\n    = %d;\n",
-		   bifs[i].idname, bifs[i].proto.restr_val2);
+		   bifs[i].idname, j, bifs[i].proto.restr_opnd);
+	  if (bifs[i].proto.restr_opnd[j])
+	    {
+	      const char *res
+		= (bifs[i].proto.restr[j] == RES_BITS ? "RES_BITS"
+		   : (bifs[i].proto.restr[j] == RES_RANGE ? "RES_RANGE"
+		      : (bifs[i].proto.restr[j] == RES_VALUES ? "RES_VALUES"
+			 : (bifs[i].proto.restr[j] == RES_VAR_RANGE
+			    ? "RES_VAR_RANGE" : "ERROR"))));
+	      fprintf (init_file,
+		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr[%d]"
+		       "\n    = %s;\n",
+		       bifs[i].idname, j, res);
+	      fprintf (init_file,
+		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1[%d]"
+		       "\n    = %d;\n",
+		       bifs[i].idname, j, bifs[i].proto.restr_val1);
+	      fprintf (init_file,
+		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2[%d]"
+		       "\n    = %d;\n",
+		       bifs[i].idname, j, bifs[i].proto.restr_val2);
+	    }
+	  fprintf (init_file, "\n");
 	}
-      fprintf (init_file, "\n");
 
       fprintf (init_file,
 	       "  bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",

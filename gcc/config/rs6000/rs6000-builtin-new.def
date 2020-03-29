@@ -158,6 +158,76 @@
 ; a semicolon are also treated as blank lines.
 
 
+; Builtins that have been around since time immemorial or are just
+; considered available everywhere.
+[MASK_PPC_GPOPT]
+  void __builtin_cpu_init ();
+    CPU_INIT nothing {cpu}
+
+; #### We don't accept const char * yet.
+;  unsigned int __builtin_cpu_is (const char *);
+;    CPU_IS nothing {cpu}
+;
+;  unsigned int __builtin_cpu_supports (const char *);
+;    CPU_SUPPORTS nothing {cpu}
+
+  unsigned long long __builtin_ppc_get_timebase ();
+    GET_TB rs6000_get_timebase {}
+
+  double __builtin_mffs ();
+    MFFS rs6000_mffs {}
+
+  unsigned long long __builtin_ppc_mftb ();
+    MFTB rs6000_mftb_di {}
+
+  void __builtin_mtfsb0 (const int<5>);
+    MTFSB0 rs6000_mtfsb0 {}
+
+  void __builtin_mtfsb1 (const int<5>);
+    MTFSB1 rs6000_mtfsb1 {}
+
+  void __builtin_mtfsf (const int<8>, double);
+    MTFSF rs6000_mtfsf {}
+
+  const __ibm128 __builtin_pack_ibm128 (double, double);
+    PACK_IF packif {}
+
+  void __builtin_set_fpscr_rn (signed int);
+    SET_FPSCR_RN rs6000_set_fpscr_rn {}
+
+  const double __builtin_unpack_ibm128 (__ibm128, const int<1>);
+    UNPACK_IF unpackif {}
+
+
+; Builtins that have been around just about forever, but not quite.
+[MASK_POPCNTB]
+; #### Not sure what to do with this one.  It is apparently another
+; name for __builtin_pack_ibm128 when long double == __ibm128.
+; There isn't a lot of sense in having pack and unpack for _Float128.
+; Inclined to deprecate, should discuss with Steve Munroe.
+;  const long double __builtin_pack_longdouble (double, double);
+;    PACK_TF packtf {}
+
+  fpmath double __builtin_recipdiv (double, double);
+    RECIP recipdf3 {}
+
+  fpmath float __builtin_recipdivf (float, float);
+    RECIPF recipsf3 {}
+
+  fpmath double __builtin_rsqrt (double);
+    RSQRT rsqrtdf2 {}
+
+  fpmath float __builtin_rsqrtf (float);
+    RSQRTF rsqrtsf2 {}
+
+; #### Not sure what to do with this one.  It is apparently another
+; name for __builtin_pack_ibm128 when long double == __ibm128.
+; There isn't a lot of sense in having pack and unpack for _Float128.
+; Inclined to deprecate, should discuss with Steve Munroe.
+;  const double __builtin_unpack_longdouble (long double, const int<1>);
+;    UNPACK_TF unpacktf {}
+
+
 ; Power6 builtins.
 [MASK_CMPB]
   const signed int __builtin_p6_cmpb (signed int, signed int);
@@ -1865,14 +1935,32 @@
 
 ; Power7 builtins (ISA 2.06).
 [MASK_POPCNTD]
+  const unsigned int __builtin_addg6s (unsigned int, unsigned int);
+    ADDG6S addg6s {}
+
+  const signed long long __builtin_bpermd (signed long long, signed long long);
+    BPERMD bpermd_di {}
+
+  const unsigned int __builtin_cbcdtd (unsigned int);
+    CBCDTD cbcdtd {}
+
+  const unsigned int __builtin_cdtbcd (unsigned int);
+    CDTBCD cdtbcd {}
+
   const signed int __builtin_divwe (signed int, signed int);
     DIVWE dive_si {}
 
   const unsigned int __builtin_divweu (unsigned int, unsigned int);
     DIVWEU diveu_si {}
 
+  const vsq __builtin_pack_vector_int128 (unsigned long long, unsigned long long);
+    PACK_V1TI packv1ti {}
+
   void __builtin_ppc_speculation_barrier ();
     SPECBARR speculation_barrier {}
+
+  const unsigned long long __builtin_unpack_vector_int128 (vsq, const int<1>);
+    UNPACK_V1TI unpackv1ti {}
 
 
 ; Power7 builtins requiring 64-bit GPRs (even with 32-bit addressing).
@@ -2132,17 +2220,20 @@
   const vui __builtin_altivec_vpkudus (vull, vull);
     VPKUDUS altivec_vpkudus {}
 
-  const vus __builtin_altivec_vpmsumb (vuc, vuc);
-    VPMSUMB crypto_vpmsumb {}
-
-  const vuq __builtin_altivec_vpmsumd (vull, vull);
-    VPMSUMD crypto_vpmsumd {}
-
-  const vui __builtin_altivec_vpmsumh (vus, vus);
-    VPMSUMH crypto_vpmsumh {}
-
-  const vull __builtin_altivec_vpmsumw (vui, vui);
-    VPMSUMW crypto_vpmsumw {}
+; #### Following are duplicates of __builtin_crypto_vpmsum*.  This
+; can't have ever worked properly!
+;
+;  const vus __builtin_altivec_vpmsumb (vuc, vuc);
+;    VPMSUMB crypto_vpmsumb {}
+;
+;  const vuq __builtin_altivec_vpmsumd (vull, vull);
+;    VPMSUMD crypto_vpmsumd {}
+;
+;  const vui __builtin_altivec_vpmsumh (vus, vus);
+;    VPMSUMH crypto_vpmsumh {}
+;
+;  const vull __builtin_altivec_vpmsumw (vui, vui);
+;    VPMSUMW crypto_vpmsumw {}
 
   const vuc __builtin_altivec_vpopcntb (vsc);
     VPOPCNTB popcountv16qi2 {}
@@ -2200,6 +2291,60 @@
 
   const vsll __builtin_altivec_vupklsw (vsi);
     VUPKLSW altivec_vupklsw {}
+
+  const vsq __builtin_bcdadd (vsq, vsq, const int<1>);
+    BCDADD bcdadd {}
+
+  const unsigned int __builtin_bcdadd_eq (vsq, vsq, const int<1>);
+    BCDADD_EQ bcdadd_eq {}
+
+  const unsigned int __builtin_bcdadd_gt (vsq, vsq, const int<1>);
+    BCDADD_GT bcdadd_gt {}
+
+  const unsigned int __builtin_bcdadd_lt (vsq, vsq, const int<1>);
+    BCDADD_LT bcdadd_lt {}
+
+  const unsigned int __builtin_bcdadd_ov (vsq, vsq, const int<1>);
+    BCDADD_OV bcdadd_unordered {}
+
+  const vsq __builtin_bcdsub (vsq, vsq, const int<1>);
+    BCDSUB bcdsub {}
+
+  const unsigned int __builtin_bcdsub_eq (vsq, vsq, const int<1>);
+    BCDSUB_EQ bcdsub_eq {}
+
+  const unsigned int __builtin_bcdsub_gt (vsq, vsq, const int<1>);
+    BCDSUB_GT bcdsub_gt {}
+
+  const unsigned int __builtin_bcdsub_lt (vsq, vsq, const int<1>);
+    BCDSUB_LT bcdsub_lt {}
+
+  const unsigned int __builtin_bcdsub_ov (vsq, vsq, const int<1>);
+    BCDSUB_OV bcdsub_unordered {}
+
+  const vuc __builtin_crypto_vpermxor_v16qi (vuc, vuc, vuc);
+    VPERMXOR_V16QI crypto_vpermxor_v16qi {}
+
+  const vull __builtin_crypto_vpermxor_v2di (vull, vull, vull);
+    VPERMXOR_V2DI crypto_vpermxor_v2di {}
+
+  const vui __builtin_crypto_vpermxor_v4si (vui, vui, vui);
+    VPERMXOR_V4SI crypto_vpermxor_v4si {}
+
+  const vus __builtin_crypto_vpermxor_v8hi (vus, vus, vus);
+    VPERMXOR_V8HI crypto_vpermxor_v8hi {}
+
+  const vus __builtin_crypto_vpmsumb (vuc, vuc);
+    VPMSUMB crypto_vpmsumb {}
+
+  const vuq __builtin_crypto_vpmsumd (vull, vull);
+    VPMSUMD crypto_vpmsumd {}
+
+  const vui __builtin_crypto_vpmsumh (vus, vus);
+    VPMSUMH crypto_vpmsumh {}
+
+  const vull __builtin_crypto_vpmsumw (vui, vui);
+    VPMSUMW crypto_vpmsumw {}
 
   const vf __builtin_vsx_float2_v2df (vd, vd);
     FLOAT2_V2DF float2_v2df {}
@@ -2306,6 +2451,18 @@
   const signed int __builtin_altivec_vclzlsbb_v8hi (vss);
     VCLZLSBB_V8HI vclzlsbb_v8hi {}
 
+  const vsc __builtin_altivec_vctzb (vsc);
+    VCTZB ctzv16qi2 {}
+
+  const vsll __builtin_altivec_vctzd (vsll);
+    VCTZD ctzv2di2 {}
+
+  const vss __builtin_altivec_vctzh (vss);
+    VCTZH ctzv8hi2 {}
+
+  const vsi __builtin_altivec_vctzw (vsi);
+    VCTZW ctzv4si2 {}
+
   const signed int __builtin_altivec_vctzlsbb_v16qi (vsc);
     VCTZLSBB_V16QI vctzlsbb_v16qi {}
 
@@ -2396,6 +2553,15 @@
   const unsigned int __builtin_altivec_vextuwrx (unsigned int, vui);
     VEXTUWRX vextuwrx {}
 
+  const vsll __builtin_altivec_vprtybd (vsll);
+    VPRTYBD parityv2di2 {}
+
+  const vsq __builtin_altivec_vprtybq (vsq);
+    VPRTYBQ parityv1ti2 {}
+
+  const vsi __builtin_altivec_vprtybw (vsi);
+    VPRTYBW parityv4si2 {}
+
   const vull __builtiin_altivec_vrldmi (vull, vull, vull);
     VRLDMI altivec_vrldmi {}
 
@@ -2413,6 +2579,12 @@
 
   const vuc __builtin_altivec_vsrv (vuc, vuc);
     VSRV vsrv {}
+
+  const signed int __builtin_scalar_byte_in_range (unsigned char, unsigned int);
+    CMPRB cmprb {}
+
+  const signed int __builtin_scalar_byte_in_either_range (unsigned char, unsigned int);
+    CMPRB2 cmprb2 {}
 
   const vull __builtin_vsx_extract4b (vuc, signed int);
     EXTRACT4B extract4b {}
@@ -2496,6 +2668,41 @@
     XXBRW_V4SI p9_xxbrw_v4si {}
 
 
+[MASK_P9_MISC]
+  signed long long __builtin_darn ();
+    DARN darn {}
+
+  signed int __builtin_darn_32 ();
+    DARN_32 darn_32 {}
+
+  signed long long __builtin_darn_raw ();
+    DARN_RAW darn_raw {}
+
+  const signed int __builtin_dtstsfi_eq_dd (unsigned int, _Decimal64);
+    TSTSFI_EQ_DD dfptstsfi_eq_dd {}
+
+  const signed int __builtin_dtstsfi_eq_td (unsigned int, _Decimal128);
+    TSTSFI_EQ_TD dfptstsfi_eq_td {}
+
+  const signed int __builtin_dtstsfi_gt_dd (unsigned int, _Decimal64);
+    TSTSFI_GT_DD dfptstsfi_gt_dd {}
+
+  const signed int __builtin_dtstsfi_gt_td (unsigned int, _Decimal128);
+    TSTSFI_GT_TD dfptstsfi_gt_td {}
+
+  const signed int __builtin_dtstsfi_lt_dd (unsigned int, _Decimal64);
+    TSTSFI_LT_DD dfptstsfi_lt_dd {}
+
+  const signed int __builtin_dtstsfi_lt_td (unsigned int, _Decimal128);
+    TSTSFI_LT_TD dfptstsfi_lt_td {}
+
+  const signed int __builtin_dtstsfi_ov_dd (unsigned int, _Decimal64);
+    TSTSFI_OV_DD dfptstsfi_unordered_dd {}
+
+  const signed int __builtin_dtstsfi_ov_td (unsigned int, _Decimal128);
+    TSTSFI_OV_TD dfptstsfi_unordered_td {}
+
+
 ; These things need some review to see whether they really require
 ; MASK_POWERPC64.  For xsxexpdp, this seems to be fine for 32-bit,
 ; because the result will always fit in 32 bits and the return
@@ -2512,6 +2719,9 @@
 
   void __builtin_altivec_stxvl (vop, void *, unsigned long long);
     STXVL stxvl {}
+
+  const signed int __builtin_scalar_byte_in_set (unsigned char, unsigned long long);
+    CMPEQB cmpeqb {}
 
   pure vop __builtin_vsx_lxvl (void *, unsigned long long);
     LXVL lxvl {}
@@ -2586,11 +2796,166 @@
     TRUNCF128_ODD trunckfdf2_odd {}
 
 
+
 ; Decimal floating-point builtins.
 [MASK_DFP]
+  const _Decimal64 __builtin_ddedpd (const int<0,2>, _Decimal64);
+    DDEDPD dfp_ddedpd_dd {}
+
+  const _Decimal128 __builtin_ddedpdq (const int<0,2>, _Decimal128);
+    DDEDPDQ dfp_ddedpd_td {}
+
+  const _Decimal64 __builtin_denbcd (const int<1>, _Decimal64);
+    DENBCD dfp_denbcd_dd {}
+
+  const _Decimal128 __builtin_denbcdq (const int<1>, _Decimal128);
+    DENBCDQ dfp_denbcd_td {}
+
+  const _Decimal64 __builtin_diex (signed long long, _Decimal64);
+    DIEX dfp_diex_dd {}
+
+  const _Decimal128 __builtin_diexq (signed long long, _Decimal128);
+    DIEXQ dfp_diex_td {}
+
+  const _Decimal64 __builtin_dscli (_Decimal64, const int<6>);
+    DSCLI dfp_dscli_dd {}
+
+  const _Decimal128 __builtin_dscliq (_Decimal128, const int<6>);
+    DSCLIQ dfp_dscli_td {}
+
+  const _Decimal64 __builtin_dscri (_Decimal64, const int<6>);
+    DSCRI dfp_dscri_dd {}
+
+  const _Decimal128 __builtin_dscriq (_Decimal128, const int<6>);
+    DSCRIQ dfp_dscri_td {}
+
   const signed long long __builtin_dxex (_Decimal64);
     DXEX dfp_dxex_dd {}
 
   const signed long long __builtin_dxexq (_Decimal128);
     DXEXQ dfp_dxex_td {}
 
+  const _Decimal128 __builtin_pack_dec128 (unsigned long long, unsigned long long);
+    PACK_TD packtd {}
+
+  void __builtin_set_fpscr_drn (signed int);
+    SET_FPSCR_DRN rs6000_set_fpscr_drn {}
+
+  const unsigned long long __builtin_unpack_dec128 (_Decimal128, const int<1>);
+    UNPACK_TD unpacktd {}
+
+
+[MASK_CRYPTO]
+  const vull __builtin_crypto_vcipher (vull, vull);
+    VCIPHER crypto_vcipher_v2di {}
+
+  const vuc __builtin_crypto_vcipher_be (vuc, vuc);
+    VCIPHER_BE crypto_vcipher_v16qi {}
+
+  const vull __builtin_crypto_vcipherlast (vull, vull);
+    VCIPHERLAST crypto_vcipherlast_v2di {}
+
+  const vuc __builtin_crypto_vcipherlast_be (vuc, vuc);
+    VCIPHERLAST_BE crypto_vcipherlast_v16qi {}
+
+  const vull __builtin_crypto_vncipher (vull, vull);
+    VNCIPHER crypto_vncipher_v2di {}
+
+  const vuc __builtin_crypto_vncipher_be (vuc, vuc);
+    VNCIPHER_BE crypto_vncipher_v16qi {}
+
+  const vull __builtin_crypto_vncipherlast (vull, vull);
+    VNCIPHERLAST crypto_vncipherlast_v2di {}
+
+  const vuc __builtin_crypto_vncipherlast_be (vuc, vuc);
+    VNCIPHERLAST_BE crypto_vncipherlast_v16qi {}
+
+  const vull __builtin_crypto_vsbox (vull);
+    VSBOX crypto_vsbox_v2di {}
+
+  const vuc __builtin_crypto_vsbox_be (vuc);
+    VSBOX_BE crypto_vsbox_v16qi {}
+
+  const vull __builtin_crypto_vshasigmad (vull, const int<1>, const int<4>);
+    VSHASIGMAD crypto_vshasigmad {}
+
+  const vui __builtin_crypto_vshasigmaw (vui, const int<1>, const int<4>);
+    VSHASIGMAW crypto_vshasigmaw {}
+
+
+[MASK_HTM]
+  unsigned long long __builtin_get_texasr ();
+    GET_TEXASR nothing {htm,htmspr}
+
+  unsigned long long __builtin_get_texasru ();
+    GET_TEXASRU nothing {htm,htmspr}
+
+  unsigned long long __builtin_get_tfhar ();
+    GET_TFHAR nothing {htm,htmspr}
+
+  unsigned long long __builtin_get_tfiar ();
+    GET_TFIAR nothing {htm,htmspr}
+
+  void __builtin_set_texasr (unsigned long long);
+    SET_TEXASR nothing {htm,htmspr}
+
+  void __builtin_set_texasru (unsigned long long);
+    SET_TEXASRU nothing {htm,htmspr}
+
+  void __builtin_set_tfhar (unsigned long long);
+    SET_TFHAR nothing {htm,htmspr}
+
+  void __builtin_set_tfiar (unsigned long long);
+    SET_TFIAR nothing {htm,htmspr}
+
+  unsigned int __builtin_tabort (unsigned int);
+    TABORT tabort {htm,htmcr}
+
+  unsigned int __builtin_tabortdc (unsigned int, unsigned int, unsigned int);
+    TABORTDC tabortdc {htm,htmcr}
+
+  unsigned int __builtin_tabortdci (unsigned int, unsigned int, signed int);
+    TABORTDCI tabortdci {htm,htmcr}
+
+  unsigned int __builtin_tabortwc (unsigned int, unsigned int, unsigned int);
+    TABORTWC tabortwc {htm,htmcr}
+
+  unsigned int __builtin_tabortwci (unsigned int, unsigned int, signed int);
+    TABORTWCI tabortwci {htm,htmcr}
+
+  unsigned int __builtin_tbegin (unsigned int);
+    TBEGIN tbegin {htm,htmcr}
+
+  unsigned int __builtin_tcheck ();
+    TCHECK tcheck {htm,htmcr}
+
+  unsigned int __builtin_tend (unsigned int);
+    TEND tend {htm,htmcr}
+
+  unsigned int __builtin_tendall ();
+    TENDALL tend {htm,htmcr}
+
+  unsigned int __builtin_trechkpt ();
+    TRECHKPT trechkpt {htm,htmcr}
+
+  unsigned int __builtin_treclaim (unsigned int);
+    TRECLAIM treclaim {htm,htmcr}
+
+  unsigned int __builtin_tresume ();
+    TRESUME tsr {htm,htmcr}
+
+  unsigned int __builtin_tsr (unsigned int);
+    TSR tsr {htm,htmcr}
+
+  unsigned int __builtin_tsuspend ();
+    TSUSPEND tsr {htm,htmcr}
+
+  unsigned int __builtin_ttest (unsigned int, unsigned int, signed int);
+    TTEST ttest {htm,htmcr}
+
+
+; #### We don't yet have the Darwin CfString builtin supported, but
+; that has its own special handling so it should go in there, I guess.
+;
+; BU_SPECIAL_X (RS6000_BUILTIN_CFSTRING, "__builtin_cfstring", RS6000_BTM_ALWAYS,
+;	      RS6000_BTC_MISC)

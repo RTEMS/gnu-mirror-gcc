@@ -12138,74 +12138,78 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	}
 
       /* Check for restricted constant arguments.  */
-      switch (bifaddr->restr)
+      for (int i = 0; i < 2; i++)
 	{
-	default:
-	case RES_NONE:
-	  break;
-	case RES_BITS:
-	  {
-	    size_t mask = (1 << bifaddr->restr_val1) - 1;
-	    tree restr_arg = arg[bifaddr->restr_opnd - 1];
-	    STRIP_NOPS (restr_arg);
-	    if (TREE_CODE (restr_arg) != INTEGER_CST
-		|| TREE_INT_CST_LOW (restr_arg) & ~mask)
+	  switch (bifaddr->restr[i])
+	    {
+	    default:
+	    case RES_NONE:
+	      break;
+	    case RES_BITS:
 	      {
-		error ("argument %d must be a %d-bit unsigned literal",
-		       bifaddr->restr_opnd, bifaddr->restr_val1);
-		return CONST0_RTX (mode[0]);
+		size_t mask = (1 << bifaddr->restr_val1[i]) - 1;
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || TREE_INT_CST_LOW (restr_arg) & ~mask)
+		  {
+		    error ("argument %d must be a %d-bit unsigned literal",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
 	      }
-	    break;
-	  }
-	case RES_RANGE:
-	  {
-	    tree restr_arg = arg[bifaddr->restr_opnd - 1];
-	    STRIP_NOPS (restr_arg);
-	    if (TREE_CODE (restr_arg) != INTEGER_CST
-		|| !IN_RANGE (tree_to_shwi (restr_arg),
-			      bifaddr->restr_val1, bifaddr->restr_val2))
+	    case RES_RANGE:
 	      {
-		error ("argument %d must be a literal between %d and %d,"
-		       " inclusive",
-		       bifaddr->restr_opnd, bifaddr->restr_val1,
-		       bifaddr->restr_val2);
-		return CONST0_RTX (mode[0]);
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || !IN_RANGE (tree_to_shwi (restr_arg),
+				  bifaddr->restr_val1[i],
+				  bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be a literal between %d and %d,"
+			   " inclusive",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
 	      }
-	    break;
-	  }
-	case RES_VAR_RANGE:
-	  {
-	    tree restr_arg = arg[bifaddr->restr_opnd - 1];
-	    STRIP_NOPS (restr_arg);
-	    if (TREE_CODE (restr_arg) == INTEGER_CST
-		&& !IN_RANGE (tree_to_shwi (restr_arg),
-			      bifaddr->restr_val1,
-			      bifaddr->restr_val2))
+	    case RES_VAR_RANGE:
 	      {
-		error ("argument %d must be a variable or a literal between "
-		       "%d and %d, inclusive",
-		       bifaddr->restr_opnd, bifaddr->restr_val1,
-		       bifaddr->restr_val2);
-		return CONST0_RTX (mode[0]);
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) == INTEGER_CST
+		    && !IN_RANGE (tree_to_shwi (restr_arg),
+				  bifaddr->restr_val1[i],
+				  bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be a variable or a literal "
+			   "between %d and %d, inclusive",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
 	      }
-	    break;
-	  }
-	case RES_VALUES:
-	  {
-	    tree restr_arg = arg[bifaddr->restr_opnd - 1];
-	    STRIP_NOPS (restr_arg);
-	    if (TREE_CODE (restr_arg) != INTEGER_CST
-		|| (tree_to_shwi (restr_arg) != bifaddr->restr_val1
-		    && tree_to_shwi (restr_arg) != bifaddr->restr_val2))
+	    case RES_VALUES:
 	      {
-		error ("argument %d must be either a literal %d or a "
-		       "literal %d",
-		       bifaddr->restr_opnd, bifaddr->restr_val1,
-		       bifaddr->restr_val2);
-		return CONST0_RTX (mode[0]);
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || (tree_to_shwi (restr_arg) != bifaddr->restr_val1[i]
+			&& tree_to_shwi (restr_arg) != bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be either a literal %d or a "
+			   "literal %d",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
 	      }
-	    break;
-	  }
+	    }
 	}
 
       if (bif_is_ldstmask (*bifaddr))
