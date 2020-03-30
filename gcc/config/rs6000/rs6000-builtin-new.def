@@ -55,6 +55,10 @@
 ;   double
 ;   __int128
 ;   _Float128
+;   _Decimal32
+;   _Decimal64
+;   _Decimal128
+;   __ibm128
 ;
 ; Legal values of <vectype> are as follows, and are shorthand for
 ; the associated meaning:
@@ -83,8 +87,8 @@
 ; We don't currently support a <basetype> of "bool", "long double",
 ; or "_Float16".  "signed" and "unsigned" only apply to integral base
 ; types.  The optional * indicates a pointer type, which can be used
-; only with "void" in this file.  (More specific pointer types are
-; allowed in overload prototypes.)
+; only with "void" and "const char" in this file.  (More specific
+; pointer types are allowed in overload prototypes.)
 ;
 ; The attributes line looks like this:
 ;
@@ -164,12 +168,11 @@
   void __builtin_cpu_init ();
     CPU_INIT nothing {cpu}
 
-; #### We don't accept const char * yet.
-;  unsigned int __builtin_cpu_is (const char *);
-;    CPU_IS nothing {cpu}
-;
-;  unsigned int __builtin_cpu_supports (const char *);
-;    CPU_SUPPORTS nothing {cpu}
+  unsigned int __builtin_cpu_is (const char *);
+    CPU_IS nothing {cpu}
+
+  unsigned int __builtin_cpu_supports (const char *);
+    CPU_SUPPORTS nothing {cpu}
 
   unsigned long long __builtin_ppc_get_timebase ();
     GET_TB rs6000_get_timebase {}

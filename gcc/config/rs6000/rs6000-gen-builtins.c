@@ -807,9 +807,16 @@ match_type (typeinfo *typedata, int voidok)
 
   if (!strcmp (token, "void"))
     typedata->isvoid = 1;
+
   if (!strcmp (token, "const"))
-    typedata->isconst = 1;
-  else if (!strcmp (token, "vsc"))
+    {
+      typedata->isconst = 1;
+      consume_whitespace ();
+      oldpos = pos;
+      token = match_identifier ();
+    }
+
+  if (!strcmp (token, "vsc"))
     {
       typedata->isvector = 1;
       typedata->issigned = 1;
@@ -960,8 +967,9 @@ match_type (typeinfo *typedata, int voidok)
     typedata->issigned = 1;
   else if (!strcmp (token, "unsigned"))
     typedata->isunsigned = 1;
-  else if (!typedata->isvoid)
+  else if (!typedata->isvoid && !typedata->isconst)
     {
+      /* Push back token.  */
       pos = oldpos;
       return match_basetype (typedata);
     }
@@ -982,9 +990,15 @@ match_type (typeinfo *typedata, int voidok)
   if (typedata->isconst)
     {
       consume_whitespace ();
-      oldpos = pos;
+      pos = oldpos;
       token = match_identifier ();
-      if (!strcmp (token, "signed"))
+      if (!strcmp (token, "char"))
+	{
+	  typedata->base = BT_CHAR;
+	  handle_pointer (typedata);
+	  return 1;
+	}
+      else if (!strcmp (token, "signed"))
 	{
 	  typedata->issigned = 1;
 	  consume_whitespace ();
