@@ -824,16 +824,27 @@ propagate_necessity (bool aggressive)
 			   || DECL_FUNCTION_CODE (def_callee) == BUILT_IN_CALLOC))
 		      || DECL_IS_REPLACEABLE_OPERATOR_NEW_P (def_callee)))
 		{
-		  /* Delete operators can have alignment and (or) size as next
-		     arguments.  When being a SSA_NAME, they must be marked
-		     as necessary.  */
-		  if (is_delete_operator && gimple_call_num_args (stmt) >= 2)
-		    for (unsigned i = 1; i < gimple_call_num_args (stmt); i++)
-		      {
-			tree arg = gimple_call_arg (stmt, i);
-			if (TREE_CODE (arg) == SSA_NAME)
-			  mark_operand_necessary (arg);
-		      }
+		  if (is_delete_operator)
+		    {
+		      /* Verify that new and delete operators have the same
+			 context.  */
+		      if (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (def_callee)
+			  && (DECL_CONTEXT (def_callee)
+			      != DECL_CONTEXT (gimple_call_fndecl (stmt))))
+			mark_operand_necessary (gimple_call_arg (stmt, 0));
+
+		      /* Delete operators can have alignment and (or) size
+			 as next arguments.  When being a SSA_NAME, they
+			 must be marked as necessary.  */
+		      if (gimple_call_num_args (stmt) >= 2)
+			for (unsigned i = 1; i < gimple_call_num_args (stmt);
+			     i++)
+			  {
+			    tree arg = gimple_call_arg (stmt, i);
+			    if (TREE_CODE (arg) == SSA_NAME)
+			      mark_operand_necessary (arg);
+			  }
+		    }
 
 		  continue;
 		}
