@@ -224,7 +224,7 @@
     RSQRTF rsqrtsf2 {}
 
 ; #### Not sure what to do with this one.  It is apparently another
-; name for __builtin_pack_ibm128 when long double == __ibm128.
+; name for __builtin_unpack_ibm128 when long double == __ibm128.
 ; There isn't a lot of sense in having pack and unpack for _Float128.
 ; Inclined to deprecate, should discuss with Steve Munroe.
 ;  const double __builtin_unpack_longdouble (long double, const int<1>);

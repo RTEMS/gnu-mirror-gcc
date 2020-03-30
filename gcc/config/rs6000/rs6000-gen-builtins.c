@@ -2182,7 +2182,7 @@ write_init_bif_table ()
 	  fprintf (init_file,
 		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd[%d]"
 		   "\n    = %d;\n",
-		   bifs[i].idname, j, bifs[i].proto.restr_opnd);
+		   bifs[i].idname, j, bifs[i].proto.restr_opnd[j]);
 	  if (bifs[i].proto.restr_opnd[j])
 	    {
 	      const char *res
@@ -2198,11 +2198,11 @@ write_init_bif_table ()
 	      fprintf (init_file,
 		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1[%d]"
 		       "\n    = %d;\n",
-		       bifs[i].idname, j, bifs[i].proto.restr_val1);
+		       bifs[i].idname, j, bifs[i].proto.restr_val1[j]);
 	      fprintf (init_file,
 		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2[%d]"
 		       "\n    = %d;\n",
-		       bifs[i].idname, j, bifs[i].proto.restr_val2);
+		       bifs[i].idname, j, bifs[i].proto.restr_val2[j]);
 	    }
 	  fprintf (init_file, "\n");
 	}
