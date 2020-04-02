@@ -1230,7 +1230,10 @@ aarch64_gen_compare_reg_maybe_ze (RTX_CODE code, rtx x, rtx y,
   if (y_mode == QImode || y_mode == HImode)
     {
       if (CONST_INT_P (y))
-	y = GEN_INT (INTVAL (y) & GET_MODE_MASK (y_mode));
+	{
+	  y = GEN_INT (INTVAL (y) & GET_MODE_MASK (y_mode));
+	  y_mode = SImode;
+	}
       else
 	{
 	  rtx t, cc_reg;
