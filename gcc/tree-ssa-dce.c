@@ -646,6 +646,37 @@ degenerate_phi_p (gimple *phi)
   return true;
 }
 
+static bool
+compare_new_delete_inline_contexts (gimple *new_call, gimple *delete_call)
+{
+  auto_vec<tree> new_operators_stack;
+  auto_vec<tree> delete_operators_stack;
+
+  for (tree block = gimple_block (new_call); block && TREE_CODE (block) == BLOCK;
+       block = BLOCK_SUPERCONTEXT (block))
+    {
+      tree fn = block_ultimate_origin (block);
+      if (fn != NULL && TREE_CODE (fn) == FUNCTION_DECL)
+	{
+	  if (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (fn))
+	    new_operators_stack.safe_push (DECL_CONTEXT (fn));
+	}
+    }
+
+  for (tree block = gimple_block (delete_call); block && TREE_CODE (block) == BLOCK;
+       block = BLOCK_SUPERCONTEXT (block))
+    {
+      tree fn = block_ultimate_origin (block);
+      if (fn != NULL && TREE_CODE (fn) == FUNCTION_DECL)
+	{
+	  if (!DECL_IS_OPERATOR_DELETE_P (fn))
+	    delete_operators_stack.safe_push (DECL_CONTEXT (fn));
+	}
+    }
+
+  return true;
+}
+
 /* Propagate necessity using the operands of necessary statements.
    Process the uses on each statement in the worklist, and add all
    feeding statements which contribute to the calculation of this
@@ -828,9 +859,7 @@ propagate_necessity (bool aggressive)
 		    {
 		      /* Verify that new and delete operators have the same
 			 context.  */
-		      if (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (def_callee)
-			  && (DECL_CONTEXT (def_callee)
-			      != DECL_CONTEXT (gimple_call_fndecl (stmt))))
+		      if (!compare_new_delete_inline_contexts (def_stmt, stmt))
 			mark_operand_necessary (gimple_call_arg (stmt, 0));
 
 		      /* Delete operators can have alignment and (or) size
