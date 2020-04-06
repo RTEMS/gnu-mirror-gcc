@@ -1041,6 +1041,10 @@ fsanitize-undefined-trap-on-error
 Common Driver Report Var(flag_sanitize_undefined_trap_on_error) Init(0)
 Use trap instead of a library function for undefined behavior sanitization.
 
+fsanitize-minimal-runtime
+Common Driver Report Var(flag_sanitize_minimal_runtime) Init(0)
+Use simple reporting API for undefined behavior sanitization.
+
 fasynchronous-unwind-tables
 Common Report Var(flag_asynchronous_unwind_tables) Optimization
 Generate unwind tables that are exact at each instruction boundary.

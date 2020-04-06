@@ -207,34 +207,62 @@ ubsan_instrument_shift (location_t loc, enum tree_code code,
     tt = build_call_expr_loc (loc, builtin_decl_explicit (BUILT_IN_TRAP), 0);
   else
     {
-      tree data = ubsan_create_data ("__ubsan_shift_data", 1, &loc,
-				     ubsan_type_descriptor (type0),
-				     ubsan_type_descriptor (type1), NULL_TREE,
-				     NULL_TREE);
-      data = build_fold_addr_expr_loc (loc, data);
-
-      enum built_in_function bcode
-	= (flag_sanitize_recover & recover_kind)
-	  ? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS
-	  : BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_ABORT;
-      tt = builtin_decl_explicit (bcode);
-      op0 = unshare_expr (op0);
-      op1 = unshare_expr (op1);
-      tt = build_call_expr_loc (loc, tt, 3, data, ubsan_encode_value (op0),
-				ubsan_encode_value (op1));
-      if (else_t != void_node)
+      tree data = NULL_TREE;
+      if (flag_sanitize_minimal_runtime)
 	{
-	  bcode = (flag_sanitize_recover & SANITIZE_SHIFT_BASE)
-		  ? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS
-		  : BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_ABORT;
-	  tree else_tt = builtin_decl_explicit (bcode);
+	  enum built_in_function bcode
+	    = (flag_sanitize_recover & recover_kind)
+	    ? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_MINIMAL
+	    : BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_MINIMAL_ABORT;
+	  tt = builtin_decl_explicit (bcode);
+	  tt = build_call_expr_loc (loc, tt, 0);
+	}
+      else
+	{
+	  data = ubsan_create_data ("__ubsan_shift_data", 1, &loc,
+				    ubsan_type_descriptor (type0),
+				    ubsan_type_descriptor (type1), NULL_TREE,
+				    NULL_TREE);
+	  data = build_fold_addr_expr_loc (loc, data);
+	  enum built_in_function bcode
+	    = (flag_sanitize_recover & recover_kind)
+	    ? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS
+	    : BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_ABORT;
+	  tt = builtin_decl_explicit (bcode);
 	  op0 = unshare_expr (op0);
 	  op1 = unshare_expr (op1);
-	  else_tt = build_call_expr_loc (loc, else_tt, 3, data,
-					 ubsan_encode_value (op0),
-					 ubsan_encode_value (op1));
-	  else_t = fold_build3 (COND_EXPR, void_type_node, else_t,
-				else_tt, void_node);
+	  tt = build_call_expr_loc (loc, tt, 3, data, ubsan_encode_value (op0),
+				    ubsan_encode_value (op1));
+	}
+
+      if (else_t != void_node)
+	{
+	  if (flag_sanitize_minimal_runtime)
+	    {
+	      enum built_in_function bcode
+		= (flag_sanitize_recover & SANITIZE_SHIFT_BASE)
+		? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_MINIMAL
+		: BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_MINIMAL_ABORT;
+	      tree else_tt = builtin_decl_explicit (bcode);
+	      else_tt = build_call_expr_loc (loc, else_tt, 0);
+	      else_t = fold_build3 (COND_EXPR, void_type_node, else_t,
+				    else_tt, void_node);
+	    }
+	  else
+	    {
+	      enum built_in_function bcode
+		= (flag_sanitize_recover & SANITIZE_SHIFT_BASE)
+		? BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS
+		: BUILT_IN_UBSAN_HANDLE_SHIFT_OUT_OF_BOUNDS_ABORT;
+	      tree else_tt = builtin_decl_explicit (bcode);
+	      op0 = unshare_expr (op0);
+	      op1 = unshare_expr (op1);
+	      else_tt = build_call_expr_loc (loc, else_tt, 3, data,
+					     ubsan_encode_value (op0),
+					     ubsan_encode_value (op1));
+	      else_t = fold_build3 (COND_EXPR, void_type_node, else_t,
+				    else_tt, void_node);
+	    }
 	}
     }
   t = fold_build3 (COND_EXPR, void_type_node, t, tt, else_t);
