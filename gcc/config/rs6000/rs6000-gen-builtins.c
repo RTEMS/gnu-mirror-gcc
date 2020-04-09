@@ -2121,6 +2121,8 @@ write_header_file ()
 static void
 write_init_bif_table ()
 {
+  const char *attr_string;
+
   for (int i = 0; i <= curr_bif; i++)
     {
       const char *bif_mask = bif_stanzas[bifs[i].stanza];
@@ -2258,11 +2260,13 @@ write_init_bif_table ()
 	{
 	  fprintf (init_file, "      TREE_READONLY (t) = 1;\n");
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	  attr_string = ", const";
 	}
       else if (bifs[i].kind == FNK_PURE)
 	{
 	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
+	  attr_string = ", pure";
 	}
       else if (bifs[i].kind == FNK_FPMATH)
 	{
@@ -2272,7 +2276,15 @@ write_init_bif_table ()
 	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
 	  fprintf (init_file, "        }\n");
+	  attr_string = ", fp, const";
 	}
+      else
+	attr_string = "";
+
+      fprintf (init_file, "      if (TARGET_DEBUG_BUILTIN)\n");
+      fprintf (init_file, "        fprintf (stderr, \"rs6000_builtin"
+	       ", code = %4d, \"\n                  \"%s%s\\n\");\n",
+	       i, bifs[i].proto.bifname, attr_string);
       fprintf (init_file, "    }\n\n");
     }
 }
@@ -2351,7 +2363,11 @@ write_init_file ()
   fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
 
+#ifdef BILLDEBUG
+  fprintf (init_file, "int new_builtins_are_live = 1;\n\n");
+#else
   fprintf (init_file, "int new_builtins_are_live = 0;\n\n");
+#endif
 
   fprintf (init_file,
 	   "bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");

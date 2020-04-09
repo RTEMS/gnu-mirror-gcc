@@ -164,7 +164,7 @@
 
 ; Builtins that have been around since time immemorial or are just
 ; considered available everywhere.
-[MASK_PPC_GPOPT]
+[MASK_PPC_GFXOPT]
   void __builtin_cpu_init ();
     CPU_INIT nothing {cpu}
 
