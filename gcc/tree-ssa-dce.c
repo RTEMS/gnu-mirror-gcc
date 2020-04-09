@@ -646,6 +646,53 @@ degenerate_phi_p (gimple *phi)
   return true;
 }
 
+/* Compare new/delete inline contexts and return false if
+   either number of replaceable operators is different or we meet
+  a non-replaceable operator.  */
+
+static bool
+compare_new_delete_inline_contexts (gimple *new_call, gimple *delete_call)
+{
+  unsigned int replaceable_new_ops = 0;
+  unsigned int replaceable_delete_ops = 0;
+
+  for (tree block = gimple_block (new_call);
+       block && TREE_CODE (block) == BLOCK; block = BLOCK_SUPERCONTEXT (block))
+    {
+      tree fn = block_ultimate_origin (block);
+      if (fn != NULL && TREE_CODE (fn) == FUNCTION_DECL)
+	{
+	  if (DECL_IS_OPERATOR_NEW_P (fn))
+	    {
+	      if (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (fn))
+		++replaceable_new_ops;
+	      else
+		return false;
+	    }
+	}
+    }
+
+  for (tree block = gimple_block (delete_call);
+       block && TREE_CODE (block) == BLOCK; block = BLOCK_SUPERCONTEXT (block))
+    {
+      tree fn = block_ultimate_origin (block);
+      if (fn != NULL && TREE_CODE (fn) == FUNCTION_DECL)
+	{
+	  if (DECL_IS_OPERATOR_DELETE_P (fn))
+	    {
+	      if (DECL_IS_REPLACEABLE_OPERATOR_DELETE_P (fn))
+		++replaceable_delete_ops;
+	      else
+		return false;
+	    }
+	}
+    }
+
+  return (replaceable_new_ops <= 1
+	  && replaceable_delete_ops <= 1
+	  && replaceable_new_ops == replaceable_delete_ops);
+}
+
 /* Propagate necessity using the operands of necessary statements.
    Process the uses on each statement in the worklist, and add all
    feeding statements which contribute to the calculation of this
@@ -824,16 +871,25 @@ propagate_necessity (bool aggressive)
 			   || DECL_FUNCTION_CODE (def_callee) == BUILT_IN_CALLOC))
 		      || DECL_IS_REPLACEABLE_OPERATOR_NEW_P (def_callee)))
 		{
-		  /* Delete operators can have alignment and (or) size as next
-		     arguments.  When being a SSA_NAME, they must be marked
-		     as necessary.  */
-		  if (is_delete_operator && gimple_call_num_args (stmt) >= 2)
-		    for (unsigned i = 1; i < gimple_call_num_args (stmt); i++)
-		      {
-			tree arg = gimple_call_arg (stmt, i);
-			if (TREE_CODE (arg) == SSA_NAME)
-			  mark_operand_necessary (arg);
-		      }
+		  if (is_delete_operator)
+		    {
+		      /* Verify that new and delete operators have the same
+			 context.  */
+		      if (!compare_new_delete_inline_contexts (def_stmt, stmt))
+			mark_operand_necessary (gimple_call_arg (stmt, 0));
+
+		      /* Delete operators can have alignment and (or) size
+			 as next arguments.  When being a SSA_NAME, they
+			 must be marked as necessary.  */
+		      if (gimple_call_num_args (stmt) >= 2)
+			for (unsigned i = 1; i < gimple_call_num_args (stmt);
+			     i++)
+			  {
+			    tree arg = gimple_call_arg (stmt, i);
+			    if (TREE_CODE (arg) == SSA_NAME)
+			      mark_operand_necessary (arg);
+			  }
+		    }
 
 		  continue;
 		}
