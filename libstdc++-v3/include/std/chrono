@@ -799,7 +799,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       explicit last_spec() = default;
     };
 
-    constexpr last_spec last{};
+    inline constexpr last_spec last{};
 
     const tzdb& get_tzdb();
     tzdb_list& get_tzdb_list();
@@ -1677,18 +1677,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return 1 <= this->_M_m && this->_M_m <= 12; }
     };
 
-    constexpr chrono::month January{1};
-    constexpr chrono::month February{2};
-    constexpr chrono::month March{3};
-    constexpr chrono::month April{4};
-    constexpr chrono::month May{5};
-    constexpr chrono::month June{6};
-    constexpr chrono::month July{7};
-    constexpr chrono::month August{8};
-    constexpr chrono::month September{9};
-    constexpr chrono::month October{10};
-    constexpr chrono::month November{11};
-    constexpr chrono::month December{12};
+    inline constexpr chrono::month January{1};
+    inline constexpr chrono::month February{2};
+    inline constexpr chrono::month March{3};
+    inline constexpr chrono::month April{4};
+    inline constexpr chrono::month May{5};
+    inline constexpr chrono::month June{6};
+    inline constexpr chrono::month July{7};
+    inline constexpr chrono::month August{8};
+    inline constexpr chrono::month September{9};
+    inline constexpr chrono::month October{10};
+    inline constexpr chrono::month November{11};
+    inline constexpr chrono::month December{12};
 
     constexpr bool
     operator==(const month& __x, const month& __y) noexcept
@@ -1993,13 +1993,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator[](last_spec) const noexcept;
     };
 
-    constexpr chrono::weekday Sunday{0};
-    constexpr chrono::weekday Monday{1};
-    constexpr chrono::weekday Tuesday{2};
-    constexpr chrono::weekday Wednesday{3};
-    constexpr chrono::weekday Thursday{4};
-    constexpr chrono::weekday Friday{5};
-    constexpr chrono::weekday Saturday{6};
+    inline constexpr chrono::weekday Sunday{0};
+    inline constexpr chrono::weekday Monday{1};
+    inline constexpr chrono::weekday Tuesday{2};
+    inline constexpr chrono::weekday Wednesday{3};
+    inline constexpr chrono::weekday Thursday{4};
+    inline constexpr chrono::weekday Friday{5};
+    inline constexpr chrono::weekday Saturday{6};
 
     constexpr bool
     operator==(const weekday& __x, const weekday& __y) noexcept
