@@ -1,7 +1,6 @@
 /* PR c++/94314.  */
 /* { dg-do run } */
-/* { dg-options "-O2 --param early-inlining-insns=100 -fdump-tree-cddce-details" } */
-/* { dg-additional-options "-fdelete-null-pointer-checks" } */
+/* { dg-options "-O2 --param early-inlining-insns=100 -fdump-tree-cddce-details -fdelete-null-pointer-checks" } */
 
 #include <stdio.h>
 
