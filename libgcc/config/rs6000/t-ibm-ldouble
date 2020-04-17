@@ -4,3 +4,8 @@ LIB2ADD += $(srcdir)/config/rs6000/ibm-ldouble.c
 HOST_LIBGCC2_CFLAGS += -mlong-double-128
 
 SHLIB_MAPFILES += $(srcdir)/config/rs6000/libgcc-ibm-ldouble.ver
+
+# In order to support configuring the long double type to be IEEE 128-bit, we
+# need to suppress the gnu attribute that says what the default long double
+# format is.
+ibm-ldouble.o : INTERNAL_CFLAGS += -mno-gnu-attribute
