@@ -1,12 +1,6 @@
 LIB2ADD += $(srcdir)/config/rs6000/ibm-ldouble.c \
 	   $(srcdir)/config/rs6000/tramp.S
 
-# If we are switching the default long double type, we need to use
-# -mno-gnu-attribute so that the __ibm128 support functions don't signal a
-# linker error since the default long double is now IEEE 128-bit instead of IBM
-# 128-bit.
-ibm-ldouble$(objext) : INTERNAL_CFLAGS += -mno-gnu-attribute
-
 # This can't end up in shared libgcc
 LIB2ADD_ST += \
 	   $(srcdir)/config/rs6000/eabi.S
