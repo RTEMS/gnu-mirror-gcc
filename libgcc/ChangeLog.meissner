@@ -1,5 +1,6 @@
 2020-04-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/94630
 	* config/rs6000/t-ibm-ldouble: Add -mno-gnu-attribute when
 	building ibm-ldouble.o.
 
