@@ -1,3 +1,9 @@
+2020-04-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/94630
+	* config/rs6000/t-ppccomm (ibm-ldouble$(object)): Add
+	-mno-gnu-attribute option.
+
 2020-03-16   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
