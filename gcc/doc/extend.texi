@@ -2545,7 +2545,7 @@ __attribute__ ((access (read_write, 1), access (read_only, 2))) char* strcat (ch
 The @code{write_only} access mode applies to arguments of pointer types
 without the @code{const} qualifier.  It specifies that the pointer to which
 it applies is used to write to the referenced object but not read from it.
-The object refrenced by the pointer need not be initialized.  An example
+The object referenced by the pointer need not be initialized.  An example
 of the use of the @code{write_only} access mode is the first argument to
 the @code{strcpy} function, or the first two arguments to the @code{fgets}
 function.
@@ -2817,7 +2817,7 @@ the same type as the target function.  As a result of the @code{copy}
 attribute the alias also shares the same attributes as the target.
 
 @smallexample
-#define StrongAlias(TagetFunc, AliasDecl)   \
+#define StrongAlias(TargetFunc, AliasDecl)  \
   extern __typeof__ (TargetFunc) AliasDecl  \
     __attribute__ ((alias (#TargetFunc), copy (TargetFunc)));
 
@@ -12434,6 +12434,7 @@ is called and the @var{flag} argument passed to it.
 @findex printf_unlocked
 @findex putchar
 @findex puts
+@findex realloc
 @findex remainder
 @findex remainderf
 @findex remainderl
@@ -12670,15 +12671,15 @@ The ISO C90 functions
 @code{abort}, @code{abs}, @code{acos}, @code{asin}, @code{atan2},
 @code{atan}, @code{calloc}, @code{ceil}, @code{cosh}, @code{cos},
 @code{exit}, @code{exp}, @code{fabs}, @code{floor}, @code{fmod},
-@code{fprintf}, @code{fputs}, @code{frexp}, @code{fscanf},
+@code{fprintf}, @code{fputs}, @code{free}, @code{frexp}, @code{fscanf},
 @code{isalnum}, @code{isalpha}, @code{iscntrl}, @code{isdigit},
 @code{isgraph}, @code{islower}, @code{isprint}, @code{ispunct},
 @code{isspace}, @code{isupper}, @code{isxdigit}, @code{tolower},
 @code{toupper}, @code{labs}, @code{ldexp}, @code{log10}, @code{log},
 @code{malloc}, @code{memchr}, @code{memcmp}, @code{memcpy},
 @code{memset}, @code{modf}, @code{pow}, @code{printf}, @code{putchar},
-@code{puts}, @code{scanf}, @code{sinh}, @code{sin}, @code{snprintf},
-@code{sprintf}, @code{sqrt}, @code{sscanf}, @code{strcat},
+@code{puts}, @code{realloc}, @code{scanf}, @code{sinh}, @code{sin},
+@code{snprintf}, @code{sprintf}, @code{sqrt}, @code{sscanf}, @code{strcat},
 @code{strchr}, @code{strcmp}, @code{strcpy}, @code{strcspn},
 @code{strlen}, @code{strncat}, @code{strncmp}, @code{strncpy},
 @code{strpbrk}, @code{strrchr}, @code{strspn}, @code{strstr},

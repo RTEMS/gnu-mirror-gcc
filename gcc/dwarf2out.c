@@ -1479,7 +1479,7 @@ dw_val_equal_p (dw_val_node *a, dw_val_node *b)
 
     case dw_val_class_vms_delta:
       return (!strcmp (a->v.val_vms_delta.lbl1, b->v.val_vms_delta.lbl1)
-              && !strcmp (a->v.val_vms_delta.lbl1, b->v.val_vms_delta.lbl1));
+	      && !strcmp (a->v.val_vms_delta.lbl2, b->v.val_vms_delta.lbl2));
 
     case dw_val_class_discr_value:
       return (a->v.val_discr_value.pos == b->v.val_discr_value.pos
@@ -22905,11 +22905,22 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		  != (unsigned) s.column))
 	    add_AT_unsigned (subr_die, DW_AT_decl_column, s.column);
 
-	  /* If the prototype had an 'auto' or 'decltype(auto)' return type,
-	     emit the real type on the definition die.  */
+	  /* If the prototype had an 'auto' or 'decltype(auto)' in
+	     the return type, emit the real type on the definition die.  */
 	  if (is_cxx () && debug_info_level > DINFO_LEVEL_TERSE)
 	    {
 	      dw_die_ref die = get_AT_ref (old_die, DW_AT_type);
+	      while (die
+		     && (die->die_tag == DW_TAG_reference_type
+			 || die->die_tag == DW_TAG_rvalue_reference_type
+			 || die->die_tag == DW_TAG_pointer_type
+			 || die->die_tag == DW_TAG_const_type
+			 || die->die_tag == DW_TAG_volatile_type
+			 || die->die_tag == DW_TAG_restrict_type
+			 || die->die_tag == DW_TAG_array_type
+			 || die->die_tag == DW_TAG_ptr_to_member_type
+			 || die->die_tag == DW_TAG_subroutine_type))
+		die = get_AT_ref (die, DW_AT_type);
 	      if (die == auto_die || die == decltype_auto_die)
 		add_type_attribute (subr_die, TREE_TYPE (TREE_TYPE (decl)),
 				    TYPE_UNQUALIFIED, false, context_die);
@@ -32040,24 +32051,6 @@ dwarf2out_early_finish (const char *filename)
      sure to adjust the phase after annotating the LTRANS CU DIE.  */
   if (in_lto_p)
     {
-      /* Force DW_TAG_imported_unit to be created now, otherwise
-	 we might end up without it or ordered after DW_TAG_inlined_subroutine
-	 referencing DIEs from it.  */
-      if (! flag_wpa && flag_incremental_link != INCREMENTAL_LINK_LTO)
-	{
-	  unsigned i;
-	  tree tu;
-	  if (external_die_map)
-	    FOR_EACH_VEC_SAFE_ELT (all_translation_units, i, tu)
-	      if (sym_off_pair *desc = external_die_map->get (tu))
-		{
-		  dw_die_ref import = new_die (DW_TAG_imported_unit,
-					       comp_unit_die (), NULL_TREE);
-		  add_AT_external_die_ref (import, DW_AT_import,
-					   desc->sym, desc->off);
-		}
-	}
-
       early_dwarf_finished = true;
       if (dump_file)
 	{

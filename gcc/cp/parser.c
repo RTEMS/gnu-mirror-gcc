@@ -13675,7 +13675,7 @@ cp_parser_simple_declaration (cp_parser* parser,
 	    if ((decl != error_mark_node
 		 && DECL_INITIAL (decl) != error_mark_node)
 		|| cp_parser_uncommitted_to_tentative_parse_p (parser))
-	      cp_parser_error (parser, "expected %<,%> or %<;%>");
+	      cp_parser_error (parser, "expected %<;%>");
 	    /* Skip tokens until we reach the end of the statement.  */
 	    cp_parser_skip_to_end_of_statement (parser);
 	    /* If the next token is now a `;', consume it.  */
@@ -18367,7 +18367,7 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
 
   /* As per the standard, require auto or decltype(auto), except in some
      cases (template parameter lists, -fconcepts-ts enabled).  */
-  cp_token *placeholder = NULL, *open_paren = NULL, *close_paren = NULL;
+  cp_token *placeholder = NULL, *close_paren = NULL;
   if (cxx_dialect >= cxx2a)
     {
       if (cp_lexer_next_token_is_keyword (parser->lexer, RID_AUTO))
@@ -18375,12 +18375,10 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
       else if (cp_lexer_next_token_is_keyword (parser->lexer, RID_DECLTYPE))
 	{
 	  placeholder = cp_lexer_consume_token (parser->lexer);
-	  open_paren = cp_parser_require (parser, CPP_OPEN_PAREN,
-					  RT_OPEN_PAREN);
+	  matching_parens parens;
+	  parens.require_open (parser);
 	  cp_parser_require_keyword (parser, RID_AUTO, RT_AUTO);
-          close_paren = cp_parser_require (parser, CPP_CLOSE_PAREN,
-					   RT_CLOSE_PAREN,
-					   open_paren->location);
+	  close_paren = parens.require_close (parser);
 	}
     }
 
@@ -18429,7 +18427,7 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
      results in an invented template parameter.  */
   if (parser->auto_is_implicit_function_template_parm_p)
     {
-      if (placeholder && token_is_decltype (placeholder))
+      if (close_paren)
 	{
 	  location_t loc = make_location (placeholder->location,
 					  placeholder->location,
@@ -27704,7 +27702,22 @@ cp_parser_requires_clause_opt (cp_parser *parser, bool lambda_p)
 	}
       return NULL_TREE;
     }
-  cp_lexer_consume_token (parser->lexer);
+
+  cp_token *tok2 = cp_lexer_peek_nth_token (parser->lexer, 2);
+  if (tok2->type == CPP_OPEN_BRACE)
+    {
+      /* An opening brace following the start of a requires-clause is
+	 ill-formed; the user likely forgot the second `requires' that
+	 would start a requires-expression.  */
+      gcc_rich_location richloc (tok2->location);
+      richloc.add_fixit_insert_after (tok->location, " requires");
+      error_at (&richloc, "missing additional %<requires%> to start "
+		"a requires-expression");
+      /* Don't consume the `requires', so that it's reused as the start of a
+	 requires-expression.  */
+    }
+  else
+    cp_lexer_consume_token (parser->lexer);
 
   if (!flag_concepts_ts)
     return cp_parser_requires_clause_expression (parser, lambda_p);
@@ -27726,6 +27739,9 @@ cp_parser_requires_expression (cp_parser *parser)
 {
   gcc_assert (cp_lexer_next_token_is_keyword (parser->lexer, RID_REQUIRES));
   location_t loc = cp_lexer_consume_token (parser->lexer)->location;
+
+  /* Avoid committing to outer tentative parse.  */
+  tentative_firewall firewall (parser);
 
   /* This is definitely a requires-expression.  */
   cp_parser_commit_to_tentative_parse (parser);
@@ -27762,7 +27778,9 @@ cp_parser_requires_expression (cp_parser *parser)
       parms = NULL_TREE;
 
     /* Parse the requirement body. */
+    ++processing_template_decl;
     reqs = cp_parser_requirement_body (parser);
+    --processing_template_decl;
     if (reqs == error_mark_node)
       return error_mark_node;
   }
@@ -27771,7 +27789,17 @@ cp_parser_requires_expression (cp_parser *parser)
      the parm chain.  */
   grokparms (parms, &parms);
   loc = make_location (loc, loc, parser->lexer);
-  return finish_requires_expr (loc, parms, reqs);
+  tree expr = finish_requires_expr (loc, parms, reqs);
+  if (!processing_template_decl)
+    {
+      /* Perform semantic processing now to diagnose any invalid types and
+	 expressions.  */
+      int saved_errorcount = errorcount;
+      tsubst_requires_expr (expr, NULL_TREE, tf_warning_or_error, NULL_TREE);
+      if (errorcount > saved_errorcount)
+	return error_mark_node;
+    }
+  return expr;
 }
 
 /* Parse a parameterized requirement.
@@ -28502,6 +28530,10 @@ cp_parser_check_template_parameters (cp_parser* parser,
   if (!template_id_p
       && parser->num_template_parameter_lists == num_templates + 1)
     return true;
+
+  if (cp_parser_simulate_error (parser))
+    return false;
+
   /* If there are more template classes than parameter lists, we have
      something like:
 
@@ -39122,8 +39154,7 @@ cp_parser_omp_for_loop (cp_parser *parser, enum tree_code code, tree clauses,
 	    incr = cp_parser_omp_for_incr (parser, real_decl);
 	  else
 	    incr = cp_parser_expression (parser);
-	  if (!EXPR_HAS_LOCATION (incr))
-	    protected_set_expr_location (incr, input_location);
+	  protected_set_expr_location_if_unset (incr, input_location);
 	}
 
     parse_close_paren:
@@ -39792,9 +39823,9 @@ cp_parser_omp_parallel (cp_parser *parser, cp_token *pragma_tok,
 	  cp_parser_end_omp_structured_block (parser, save);
 	  stmt = finish_omp_parallel (cclauses[C_OMP_CLAUSE_SPLIT_PARALLEL],
 				      block);
-	  OMP_PARALLEL_COMBINED (stmt) = 1;
 	  if (ret == NULL_TREE)
 	    return ret;
+	  OMP_PARALLEL_COMBINED (stmt) = 1;
 	  return stmt;
 	}
       else if (strcmp (p, "loop") == 0)
@@ -40879,6 +40910,7 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 {
   tree clauses, stmt;
   bool error = false;
+  bool found_in_scope = global_bindings_p ();
 
   clauses = cp_parser_oacc_all_clauses (parser, OACC_DECLARE_CLAUSE_MASK,
 					"#pragma acc declare", pragma_tok, true);
@@ -40951,6 +40983,22 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 	  break;
 	}
 
+      if (!found_in_scope)
+	for (tree d = current_binding_level->names; d; d = TREE_CHAIN (d))
+	  if (d == decl)
+	    {
+	      found_in_scope = true;
+	      break;
+	    }
+      if (!found_in_scope)
+	{
+	  error_at (loc,
+		    "%qD must be a variable declared in the same scope as "
+		    "%<#pragma acc declare%>", decl);
+	  error = true;
+	  continue;
+	}
+
       if (lookup_attribute ("omp declare target", DECL_ATTRIBUTES (decl))
 	  || lookup_attribute ("omp declare target link",
 			       DECL_ATTRIBUTES (decl)))
@@ -40972,7 +41020,7 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 
 	  DECL_ATTRIBUTES (decl)
 	    = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (decl));
-	  if (global_bindings_p ())
+	  if (current_binding_level->kind == sk_namespace)
 	    {
 	      symtab_node *node = symtab_node::get (decl);
 	      if (node != NULL)
@@ -40989,7 +41037,7 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 	}
     }
 
-  if (error || global_bindings_p ())
+  if (error || current_binding_level->kind == sk_namespace)
     return NULL_TREE;
 
   stmt = make_node (OACC_DECLARE);
@@ -43757,6 +43805,13 @@ cp_parser_pragma (cp_parser *parser, enum pragma_context context, bool *if_p)
       return true;
 
     case PRAGMA_OMP_REQUIRES:
+      if (context != pragma_external)
+	{
+	  error_at (pragma_tok->location,
+		    "%<#pragma omp requires%> may only be used at file or "
+		    "namespace scope");
+	  break;
+	}
       return cp_parser_omp_requires (parser, pragma_tok);
 
     case PRAGMA_OMP_ORDERED:

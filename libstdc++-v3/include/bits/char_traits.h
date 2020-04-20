@@ -39,6 +39,9 @@
 #include <bits/stl_algobase.h>  // std::copy, std::fill_n
 #include <bits/postypes.h>      // For streampos
 #include <cwchar>               // For WEOF, wmemmove, wmemset, etc.
+#if __cplusplus > 201703L
+# include <compare>
+#endif
 
 #ifndef _GLIBCXX_ALWAYS_INLINE
 # define _GLIBCXX_ALWAYS_INLINE inline __attribute__((__always_inline__))
@@ -91,6 +94,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef typename _Char_types<_CharT>::pos_type    pos_type;
       typedef typename _Char_types<_CharT>::off_type    off_type;
       typedef typename _Char_types<_CharT>::state_type  state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = std::strong_ordering;
+#endif
 
       static _GLIBCXX14_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2)
@@ -113,13 +119,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static _GLIBCXX14_CONSTEXPR const char_type*
       find(const char_type* __s, std::size_t __n, const char_type& __a);
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, std::size_t __n);
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, std::size_t __n);
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, std::size_t __n, char_type __a);
 
       static _GLIBCXX_CONSTEXPR char_type
@@ -179,17 +185,29 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT>
+    _GLIBCXX20_CONSTEXPR
     typename char_traits<_CharT>::char_type*
     char_traits<_CharT>::
     move(char_type* __s1, const char_type* __s2, std::size_t __n)
     {
       if (__n == 0)
 	return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+      if (std::is_constant_evaluated())
+	{
+	  if (__s1 > __s2 && __s1 < __s2 + __n)
+	    std::copy_backward(__s2, __s2 + __n, __s1);
+	  else
+	    std::copy(__s2, __s2 + __n, __s1);
+	  return __s1;
+	}
+#endif
       return static_cast<_CharT*>(__builtin_memmove(__s1, __s2,
 						    __n * sizeof(char_type)));
     }
 
   template<typename _CharT>
+    _GLIBCXX20_CONSTEXPR
     typename char_traits<_CharT>::char_type*
     char_traits<_CharT>::
     copy(char_type* __s1, const char_type* __s2, std::size_t __n)
@@ -200,6 +218,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _CharT>
+    _GLIBCXX20_CONSTEXPR
     typename char_traits<_CharT>::char_type*
     char_traits<_CharT>::
     assign(char_type* __s, std::size_t __n, char_type __a)
@@ -294,6 +313,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef streampos         pos_type;
       typedef streamoff         off_type;
       typedef mbstate_t         state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = strong_ordering;
+#endif
 
       static _GLIBCXX17_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2) _GLIBCXX_NOEXCEPT
@@ -349,27 +371,39 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return static_cast<const char_type*>(__builtin_memchr(__s, __a, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::move(__s1, __s2, __n);
+#endif
 	return static_cast<char_type*>(__builtin_memmove(__s1, __s2, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+#endif
 	return static_cast<char_type*>(__builtin_memcpy(__s1, __s2, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, size_t __n, char_type __a)
       {
 	if (__n == 0)
 	  return __s;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::assign(__s, __n, __a);
+#endif
 	return static_cast<char_type*>(__builtin_memset(__s, __a, __n));
       }
 
@@ -407,6 +441,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef streamoff         off_type;
       typedef wstreampos        pos_type;
       typedef mbstate_t         state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = strong_ordering;
+#endif
 
       static _GLIBCXX17_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2) _GLIBCXX_NOEXCEPT
@@ -458,27 +495,39 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return wmemchr(__s, __a, __n);
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::move(__s1, __s2, __n);
+#endif
 	return wmemmove(__s1, __s2, __n);
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+#endif
 	return wmemcpy(__s1, __s2, __n);
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, size_t __n, char_type __a)
       {
 	if (__n == 0)
 	  return __s;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::assign(__s, __n, __a);
+#endif
 	return wmemset(__s, __a, __n);
       }
 
@@ -513,6 +562,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef u8streampos       pos_type;
       typedef streamoff         off_type;
       typedef mbstate_t         state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = strong_ordering;
+#endif
 
       static _GLIBCXX17_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2) _GLIBCXX_NOEXCEPT
@@ -567,27 +619,39 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return static_cast<const char_type*>(__builtin_memchr(__s, __a, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::move(__s1, __s2, __n);
+#endif
 	return static_cast<char_type*>(__builtin_memmove(__s1, __s2, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+#endif
 	return static_cast<char_type*>(__builtin_memcpy(__s1, __s2, __n));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, size_t __n, char_type __a)
       {
 	if (__n == 0)
 	  return __s;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::assign(__s, __n, __a);
+#endif
 	return static_cast<char_type*>(__builtin_memset(__s, __a, __n));
       }
 
@@ -638,6 +702,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef streamoff         off_type;
       typedef u16streampos      pos_type;
       typedef mbstate_t         state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = strong_ordering;
+#endif
 
       static _GLIBCXX17_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2) noexcept
@@ -680,25 +747,33 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return 0;
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::move(__s1, __s2, __n);
+#endif
 	return (static_cast<char_type*>
 		(__builtin_memmove(__s1, __s2, __n * sizeof(char_type))));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+#endif
 	return (static_cast<char_type*>
 		(__builtin_memcpy(__s1, __s2, __n * sizeof(char_type))));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, size_t __n, char_type __a)
       {
 	for (size_t __i = 0; __i < __n; ++__i)
@@ -741,6 +816,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef streamoff         off_type;
       typedef u32streampos      pos_type;
       typedef mbstate_t         state_type;
+#if __cpp_lib_three_way_comparison
+      using comparison_category = strong_ordering;
+#endif
 
       static _GLIBCXX17_CONSTEXPR void
       assign(char_type& __c1, const char_type& __c2) noexcept
@@ -783,25 +861,33 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	return 0;
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       move(char_type* __s1, const char_type* __s2, size_t __n)
       {
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::move(__s1, __s2, __n);
+#endif
 	return (static_cast<char_type*>
 		(__builtin_memmove(__s1, __s2, __n * sizeof(char_type))));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       copy(char_type* __s1, const char_type* __s2, size_t __n)
       { 
 	if (__n == 0)
 	  return __s1;
+#ifdef __cpp_lib_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  return __gnu_cxx::char_traits<char_type>::copy(__s1, __s2, __n);
+#endif
 	return (static_cast<char_type*>
 		(__builtin_memcpy(__s1, __s2, __n * sizeof(char_type))));
       }
 
-      static char_type*
+      static _GLIBCXX20_CONSTEXPR char_type*
       assign(char_type* __s, size_t __n, char_type __a)
       {
 	for (size_t __i = 0; __i < __n; ++__i)
@@ -829,6 +915,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       not_eof(const int_type& __c) noexcept
       { return eq_int_type(__c, eof()) ? 0 : __c; }
     };
+
+#if __cpp_lib_three_way_comparison
+  namespace __detail
+  {
+    template<typename _ChTraits>
+      constexpr auto
+      __char_traits_cmp_cat(int __cmp) noexcept
+      {
+	if constexpr (requires { typename _ChTraits::comparison_category; })
+	  {
+	    using _Cat = typename _ChTraits::comparison_category;
+	    static_assert( !is_void_v<common_comparison_category_t<_Cat>> );
+	    return static_cast<_Cat>(__cmp <=> 0);
+	  }
+	else
+	  return static_cast<weak_ordering>(__cmp <=> 0);
+      }
+  } // namespace __detail
+#endif // C++20
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace

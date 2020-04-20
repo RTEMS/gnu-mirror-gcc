@@ -4715,8 +4715,20 @@ cse_insn (rtx_insn *insn)
 
       /* Compute SRC's hash code, and also notice if it
 	 should not be recorded at all.  In that case,
-	 prevent any further processing of this assignment.  */
-      do_not_record = 0;
+	 prevent any further processing of this assignment.
+
+	 We set DO_NOT_RECORD if the destination has a REG_UNUSED note.
+	 This avoids getting the source register into the tables, where it
+	 may be invalidated later (via REG_QTY), then trigger an ICE upon
+	 re-insertion.
+
+	 This is only a problem in multi-set insns.  If it were a single
+	 set the dead copy would have been removed.  If the RHS were anything
+	 but a simple REG, then we won't call insert_regs and thus there's
+	 no potential for triggering the ICE.  */
+      do_not_record = (REG_P (dest)
+		       && REG_P (src)
+		       && find_reg_note (insn, REG_UNUSED, dest));
       hash_arg_in_memory = 0;
 
       sets[i].src = src;
@@ -5074,7 +5086,7 @@ cse_insn (rtx_insn *insn)
 	     to prefer it.  Copy it to src_related.  The code below will
 	     then give it a negative cost.  */
 	  if (GET_CODE (dest) == code && rtx_equal_p (p->exp, dest))
-	    src_related = dest;
+	    src_related = p->exp;
 	}
 
       /* Find the cheapest valid equivalent, trying all the available
@@ -5332,7 +5344,16 @@ cse_insn (rtx_insn *insn)
 		   && rtx_equal_p (trial, dest)
 		   && !side_effects_p (dest)
 		   && (cfun->can_delete_dead_exceptions
-		       || insn_nothrow_p (insn)))
+		       || insn_nothrow_p (insn))
+		   /* We can only remove the later store if the earlier aliases
+		      at least all accesses the later one.  */
+		   && (!MEM_P (trial)
+		       || ((MEM_ALIAS_SET (dest) == MEM_ALIAS_SET (trial)
+			    || alias_set_subset_of (MEM_ALIAS_SET (dest),
+						    MEM_ALIAS_SET (trial)))
+			    && (!MEM_EXPR (trial)
+				|| refs_same_for_tbaa_p (MEM_EXPR (trial),
+							 MEM_EXPR (dest))))))
 	    {
 	      SET_SRC (sets[i].rtl) = trial;
 	      noop_insn = true;

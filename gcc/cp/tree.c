@@ -669,6 +669,9 @@ build_aggr_init_expr (tree type, tree init)
   else
     rval = init;
 
+  if (location_t loc = EXPR_LOCATION (init))
+    SET_EXPR_LOCATION (rval, loc);
+
   return rval;
 }
 
@@ -2464,6 +2467,8 @@ is_overloaded_fn (tree x)
 tree
 dependent_name (tree x)
 {
+  /* FIXME a dependent name must be unqualified, but this function doesn't
+     distinguish between qualified and unqualified identifiers.  */
   if (identifier_p (x))
     return x;
   if (TREE_CODE (x) == TEMPLATE_ID_EXPR)
@@ -2778,9 +2783,10 @@ verify_stmt_tree (tree t)
   cp_walk_tree (&t, verify_stmt_tree_r, &statements, NULL);
 }
 
-/* Check if the type T depends on a type with no linkage and if so, return
-   it.  If RELAXED_P then do not consider a class type declared within
-   a vague-linkage function to have no linkage.  */
+/* Check if the type T depends on a type with no linkage and if so,
+   return it.  If RELAXED_P then do not consider a class type declared
+   within a vague-linkage function to have no linkage.  Remember:
+   no-linkage is not the same as internal-linkage*/
 
 tree
 no_linkage_check (tree t, bool relaxed_p)
@@ -2798,17 +2804,6 @@ no_linkage_check (tree t, bool relaxed_p)
     {
       tree extra = LAMBDA_TYPE_EXTRA_SCOPE (t);
       if (!extra)
-	return t;
-
-      /* If the mangling scope is internal-linkage or not repeatable
-	 elsewhere, the lambda effectively has no linkage.  (Sadly
-	 we're not very careful with the linkages of types.)  */
-      if (TREE_CODE (extra) == VAR_DECL
-	  && !(TREE_PUBLIC (extra)
-	       && (processing_template_decl
-		   || (DECL_LANG_SPECIFIC (extra) && DECL_USE_TEMPLATE (extra))
-		   /* DECL_COMDAT is set too late for us to check.  */
-		   || DECL_VAR_DECLARED_INLINE_P (extra))))
 	return t;
     }
 
@@ -3237,7 +3232,7 @@ replace_placeholders_r (tree* t, int* walk_subtrees, void* data_)
    a PLACEHOLDER_EXPR has been encountered.  */
 
 tree
-replace_placeholders (tree exp, tree obj, bool *seen_p)
+replace_placeholders (tree exp, tree obj, bool *seen_p /*= NULL*/)
 {
   /* This is only relevant for C++14.  */
   if (cxx_dialect < cxx14)
@@ -3245,7 +3240,7 @@ replace_placeholders (tree exp, tree obj, bool *seen_p)
 
   /* If the object isn't a (member of a) class, do nothing.  */
   tree op0 = obj;
-  while (TREE_CODE (op0) == COMPONENT_REF)
+  while (handled_component_p (op0))
     op0 = TREE_OPERAND (op0, 0);
   if (!CLASS_TYPE_P (strip_array_types (TREE_TYPE (op0))))
     return exp;
@@ -3581,6 +3576,15 @@ called_fns_equal (tree t1, tree t2)
       if (name1 != name2)
 	return false;
 
+      /* FIXME dependent_name currently returns an unqualified name regardless
+	 of whether the function was named with a qualified- or unqualified-id.
+	 Until that's fixed, check that we aren't looking at overload sets from
+	 different scopes.  */
+      if (is_overloaded_fn (t1) && is_overloaded_fn (t2)
+	  && (DECL_CONTEXT (get_first_fn (t1))
+	      != DECL_CONTEXT (get_first_fn (t2))))
+	return false;
+
       if (TREE_CODE (t1) == TEMPLATE_ID_EXPR)
 	targs1 = TREE_OPERAND (t1, 1);
       if (TREE_CODE (t2) == TEMPLATE_ID_EXPR)
@@ -3677,7 +3681,8 @@ cp_tree_equal (tree t1, tree t2)
       {
 	tree arg1, arg2;
 	call_expr_arg_iterator iter1, iter2;
-	if (!called_fns_equal (CALL_EXPR_FN (t1), CALL_EXPR_FN (t2)))
+	if (KOENIG_LOOKUP_P (t1) != KOENIG_LOOKUP_P (t2)
+	    || !called_fns_equal (CALL_EXPR_FN (t1), CALL_EXPR_FN (t2)))
 	  return false;
 	for (arg1 = first_call_expr_arg (t1, &iter1),
 	       arg2 = first_call_expr_arg (t2, &iter2);
@@ -3718,11 +3723,12 @@ cp_tree_equal (tree t1, tree t2)
 	 up for expressions that involve 'this' in a member function
 	 template.  */
 
-      if (comparing_specializations && !CONSTRAINT_VAR_P (t1))
+      if (comparing_specializations
+	  && DECL_CONTEXT (t1) != DECL_CONTEXT (t2))
 	/* When comparing hash table entries, only an exact match is
 	   good enough; we don't want to replace 'this' with the
 	   version from another function.  But be more flexible
-	   with local parameters in a requires-expression.  */
+	   with parameters with identical contexts.  */
 	return false;
 
       if (same_type_p (TREE_TYPE (t1), TREE_TYPE (t2)))
@@ -3765,8 +3771,11 @@ cp_tree_equal (tree t1, tree t2)
 			      TREE_TYPE (TEMPLATE_PARM_DECL (t2))));
 
     case TEMPLATE_ID_EXPR:
-      return (cp_tree_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0))
-	      && cp_tree_equal (TREE_OPERAND (t1, 1), TREE_OPERAND (t2, 1)));
+      if (!cp_tree_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0)))
+	return false;
+      if (!comp_template_args (TREE_OPERAND (t1, 1), TREE_OPERAND (t2, 1)))
+	return false;
+      return true;
 
     case CONSTRAINT_INFO:
       return cp_tree_equal (CI_ASSOCIATED_CONSTRAINTS (t1),
@@ -3896,6 +3905,15 @@ cp_tree_equal (tree t1, tree t2)
 	return true;
       }
 
+    case EXPR_PACK_EXPANSION:
+      if (!cp_tree_equal (PACK_EXPANSION_PATTERN (t1),
+			  PACK_EXPANSION_PATTERN (t2)))
+	return false;
+      if (!comp_template_args (PACK_EXPANSION_EXTRA_ARGS (t1),
+			       PACK_EXPANSION_EXTRA_ARGS (t2)))
+	return false;
+      return true;
+
     default:
       break;
     }
@@ -3910,14 +3928,12 @@ cp_tree_equal (tree t1, tree t2)
     case tcc_reference:
     case tcc_statement:
       {
-	int i, n;
-
-	n = cp_tree_operand_length (t1);
+	int n = cp_tree_operand_length (t1);
 	if (TREE_CODE_CLASS (code1) == tcc_vl_exp
 	    && n != TREE_OPERAND_LENGTH (t2))
 	  return false;
 
-	for (i = 0; i < n; ++i)
+	for (int i = 0; i < n; ++i)
 	  if (!cp_tree_equal (TREE_OPERAND (t1, i), TREE_OPERAND (t2, i)))
 	    return false;
 
@@ -3926,9 +3942,11 @@ cp_tree_equal (tree t1, tree t2)
 
     case tcc_type:
       return same_type_p (t1, t2);
+
     default:
       gcc_unreachable ();
     }
+
   /* We can get here with --disable-checking.  */
   return false;
 }

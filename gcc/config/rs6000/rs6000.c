@@ -1734,6 +1734,10 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
 #define TARGET_MANGLE_DECL_ASSEMBLER_NAME rs6000_mangle_decl_assembler_name
+
+#undef TARGET_CANNOT_SUBSTITUTE_MEM_EQUIV_P
+#define TARGET_CANNOT_SUBSTITUTE_MEM_EQUIV_P \
+  rs6000_cannot_substitute_mem_equiv_p
 
 
 /* Processor table.  */
@@ -13621,7 +13625,7 @@ rs6000_indirect_call_template_1 (rtx *operands, unsigned int funop,
   if (DEFAULT_ABI == ABI_AIX)
     s += sprintf (s,
 		  "l%s 2,%%%u\n\t",
-		  ptrload, funop + 2);
+		  ptrload, funop + 3);
 
   /* We don't need the extra code to stop indirect call speculation if
      calling via LR.  */
@@ -13675,12 +13679,12 @@ rs6000_indirect_call_template_1 (rtx *operands, unsigned int funop,
 	sprintf (s,
 		 "b%%T%ul\n\t"
 		 "l%s 2,%%%u(1)",
-		 funop, ptrload, funop + 3);
+		 funop, ptrload, funop + 4);
       else
 	sprintf (s,
 		 "beq%%T%ul-\n\t"
 		 "l%s 2,%%%u(1)",
-		 funop, ptrload, funop + 3);
+		 funop, ptrload, funop + 4);
     }
   else if (DEFAULT_ABI == ABI_ELFv2)
     {
@@ -13688,12 +13692,12 @@ rs6000_indirect_call_template_1 (rtx *operands, unsigned int funop,
 	sprintf (s,
 		 "b%%T%ul\n\t"
 		 "l%s 2,%%%u(1)",
-		 funop, ptrload, funop + 2);
+		 funop, ptrload, funop + 3);
       else
 	sprintf (s,
 		 "beq%%T%ul-\n\t"
 		 "l%s 2,%%%u(1)",
-		 funop, ptrload, funop + 2);
+		 funop, ptrload, funop + 3);
     }
   else
     {
@@ -24321,7 +24325,7 @@ rs6000_call_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   rtx toc_restore = NULL_RTX;
   rtx func_addr;
   rtx abi_reg = NULL_RTX;
-  rtx call[4];
+  rtx call[5];
   int n_call;
   rtx insn;
   bool is_pltseq_longcall;
@@ -24462,7 +24466,8 @@ rs6000_call_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   call[0] = gen_rtx_CALL (VOIDmode, gen_rtx_MEM (SImode, func_addr), tlsarg);
   if (value != NULL_RTX)
     call[0] = gen_rtx_SET (value, call[0]);
-  n_call = 1;
+  call[1] = gen_rtx_USE (VOIDmode, cookie);
+  n_call = 2;
 
   if (toc_load)
     call[n_call++] = toc_load;
@@ -24840,15 +24845,21 @@ address_to_insn_form (rtx addr,
   if (GET_RTX_CLASS (GET_CODE (addr)) == RTX_AUTOINC)
     return INSN_FORM_UPDATE;
 
-  /* Handle PC-relative symbols and labels.  Check for both local and external
-     symbols.  Assume labels are always local.  */
+  /* Handle PC-relative symbols and labels.  Check for both local and
+     external symbols.  Assume labels are always local.  TLS symbols
+     are not PC-relative for rs6000.  */
   if (TARGET_PCREL)
     {
-      if (SYMBOL_REF_P (addr) && !SYMBOL_REF_LOCAL_P (addr))
-	return INSN_FORM_PCREL_EXTERNAL;
-
-      if (SYMBOL_REF_P (addr) || LABEL_REF_P (addr))
+      if (LABEL_REF_P (addr))
 	return INSN_FORM_PCREL_LOCAL;
+
+      if (SYMBOL_REF_P (addr) && !SYMBOL_REF_TLS_MODEL (addr))
+	{
+	  if (!SYMBOL_REF_LOCAL_P (addr))
+	    return INSN_FORM_PCREL_EXTERNAL;
+	  else
+	    return INSN_FORM_PCREL_LOCAL;
+	}
     }
 
   if (GET_CODE (addr) == CONST)
@@ -24882,14 +24893,19 @@ address_to_insn_form (rtx addr,
     return INSN_FORM_BAD;
 
   /* Check for local and external PC-relative addresses.  Labels are always
-     local.  */
+     local.  TLS symbols are not PC-relative for rs6000.  */
   if (TARGET_PCREL)
     {
-      if (SYMBOL_REF_P (op0) && !SYMBOL_REF_LOCAL_P (op0))
-	return INSN_FORM_PCREL_EXTERNAL;
-
-      if (SYMBOL_REF_P (op0) || LABEL_REF_P (op0))
+      if (LABEL_REF_P (op0))
 	return INSN_FORM_PCREL_LOCAL;
+
+      if (SYMBOL_REF_P (op0) && !SYMBOL_REF_TLS_MODEL (op0))
+	{
+	  if (!SYMBOL_REF_LOCAL_P (op0))
+	    return INSN_FORM_PCREL_EXTERNAL;
+	  else
+	    return INSN_FORM_PCREL_LOCAL;
+	}
     }
 
   /* If it isn't PC-relative, the address must use a base register.  */
@@ -26378,6 +26394,22 @@ rs6000_predict_doloop_p (struct loop *loop)
     }
 
   return true;
+}
+
+/* Implement TARGET_CANNOT_SUBSTITUTE_MEM_EQUIV_P.  */
+
+static bool
+rs6000_cannot_substitute_mem_equiv_p (rtx mem)
+{
+  gcc_assert (MEM_P (mem));
+
+  /* curr_insn_transform()'s handling of subregs cannot handle altivec AND:
+     type addresses, so don't allow MEMs with those address types to be
+     substituted as an equivalent expression.  See PR93974 for details.  */
+  if (GET_CODE (XEXP (mem, 0)) == AND)
+    return true;
+
+  return false;
 }
 
 struct gcc_target targetm = TARGET_INITIALIZER;

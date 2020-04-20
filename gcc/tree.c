@@ -5148,31 +5148,21 @@ protected_set_expr_location (tree t, location_t loc)
     SET_EXPR_LOCATION (t, loc);
   else if (t && TREE_CODE (t) == STATEMENT_LIST)
     {
-      /* With -gstatement-frontiers we could have a STATEMENT_LIST with
-	 DEBUG_BEGIN_STMT(s) and only a single other stmt, which with
-	 -g wouldn't be present and we'd have that single other stmt
-	 directly instead.  */
-      struct tree_statement_list_node *n = STATEMENT_LIST_HEAD (t);
-      if (!n)
-	return;
-      while (TREE_CODE (n->stmt) == DEBUG_BEGIN_STMT)
-	{
-	  n = n->next;
-	  if (!n)
-	    return;
-	}
-      tree t2 = n->stmt;
-      do
-	{
-	  n = n->next;
-	  if (!n)
-	    {
-	      protected_set_expr_location (t2, loc);
-	      return;
-	    }
-	}
-      while (TREE_CODE (n->stmt) == DEBUG_BEGIN_STMT);
+      t = expr_single (t);
+      if (t && CAN_HAVE_LOCATION_P (t))
+	SET_EXPR_LOCATION (t, loc);
     }
+}
+
+/* Like PROTECTED_SET_EXPR_LOCATION, but only do that if T has
+   UNKNOWN_LOCATION.  */
+
+void
+protected_set_expr_location_if_unset (tree t, location_t loc)
+{
+  t = expr_single (t);
+  if (t && !EXPR_HAS_LOCATION (t))
+    protected_set_expr_location (t, loc);
 }
 
 /* Data used when collecting DECLs and TYPEs for language data removal.  */
@@ -13426,7 +13416,9 @@ array_ref_low_bound (tree exp)
     return SUBSTITUTE_PLACEHOLDER_IN_EXPR (TYPE_MIN_VALUE (domain_type), exp);
 
   /* Otherwise, return a zero of the appropriate type.  */
-  return build_int_cst (TREE_TYPE (TREE_OPERAND (exp, 1)), 0);
+  tree idxtype = TREE_TYPE (TREE_OPERAND (exp, 1));
+  return (idxtype == error_mark_node
+	  ? integer_zero_node : build_int_cst (idxtype, 0));
 }
 
 /* Return a tree representing the upper bound of the array mentioned in

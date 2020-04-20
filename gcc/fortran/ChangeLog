@@ -1,3 +1,187 @@
+2020-04-20  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/93364
+	* array.c (gfc_set_array_spec): Check for sum of rank and corank
+	not exceeding GFC_MAX_DIMENSIONS.
+
+2020-04-20  Steve Kargl  <kargl@gcc.gnu.org>
+	Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/91800
+	* decl.c (variable_decl): Reject Hollerith constants as type
+	initializer.
+
+2020-04-19  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/93500
+	* resolve.c (resolve_operator): If both operands are
+	NULL, return false.
+	* simplify.c (simplify_bound): If a division by zero
+	was seen during bound simplification, free the
+	corresponcing expression and return &gfc_bad_expr.
+
+2020-04-17  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/94090
+	* gfortran.dg (gfc_compare_interfaces): Add
+	optional argument bad_result_characteristics.
+	* interface.c (gfc_check_result_characteristics): Fix
+	whitespace.
+	(gfc_compare_interfaces): Handle new argument; return
+	true if function return values are wrong.
+	* resolve.c (resolve_global_procedure): Hard error if
+	the return value of a function is wrong.
+
+2020-04-15  Fritz Reese  <foreese@gcc.gnu.org>
+	Linus Koenig <link@sig-st.de>
+
+	PR fortran/94192
+	* simplify.c (simplify_bound): Simplify condition for error check.
+
+2020-04-14  Tobias Burnus  <tobias@codesourcery.com>
+
+	* module.c (gfc_match_use): Fix name-conflict check for use-associating
+	the same symbol again in a submodule.
+
+2020-04-13  Linus Koenig <link@sig-st.de>
+
+	PR fortran/94192
+	* resolve.c (resolve_fl_var_and_proc): Set flag "error" to 1 if
+	pointer is found to not have an assumed rank or a deferred shape.
+	* simplify.c (simplify_bound): If an error has been issued for a
+	given pointer, one should not attempt to find its bounds.
+
+2020-04-09  Fritz Reese  <foreese@gcc.gnu.org>
+
+	PR fortran/87923
+	* gfortran.h (gfc_resolve_open, gfc_resolve_close): Add
+	locus parameter.
+	(gfc_resolve_dt): Add code parameter.
+	* io.c (async_io_dt, check_char_variable, is_char_type): Removed.
+	(resolve_tag_format): Add locus to error message regarding
+	zero-sized array in FORMAT tag.
+	(check_open_constraints, check_close_constraints): New functions
+	called at resolution time.
+	(gfc_match_open, gfc_match_close, match_io): Move checks which don't
+	affect the match result to new functions check_open_constraints,
+	check_close_constraints, check_io_constraints.
+	(gfc_resolve_open, gfc_resolve_close): Call new functions
+	check_open_constraints, check_close_constraints after all tags have
+	been independently resolved.  Remove duplicate constraints which are
+	already verified by resolve_tag.  Explicitly pass locus to all error
+	reports.
+	(compare_to_allowed_values): Add locus parameter and provide
+	explicit locus all error reports.
+	(match_open_element, match_close_element, match_file_element,
+	match_dt_element, match_inquire_element): Remove redundant special
+	cases for ASYNCHRONOUS and IOMSG tags.
+	(gfc_resolve_dt): Remove redundant special case for format
+	expression.  Call check_io_constraints, forwarding an I/O list as
+	the io_code parameter if present.
+	(check_io_constraints): Change return type to bool.  Pass explicit
+	locus to error reports.  Move generic checks after tag-specific
+	checks, since errors are no longer buffered.  Move simplification of
+	format string to match_io.  Remove redundant checks which are
+	verified by resolve_tag.  Remove usage of async_io_dt flag and
+	explicitly mark symbols used in asynchronous I/O with the
+	asynchronous attribute.
+	* resolve.c (resolve_transfer, resolve_fl_namelist): Remove checks
+	for async_io_dt flag.  This is now done in io.c.
+	(check_io_constraints).
+	(gfc_resolve_code): Pass code locus to gfc_resolve_open,
+	gfc_resolve_close, gfc_resolve_dt.
+
+2020-04-07  Fritz Reese  <foreese@gcc.gnu.org>
+	    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93871
+	* gfortran.h (GFC_ISYM_ACOSD, GFC_ISYM_ASIND, GFC_ISYM_ATAN2D,
+	GFC_ISYM_ATAND, GFC_ISYM_COSD, GFC_ISYM_COTAND, GFC_ISYM_SIND,
+	GFC_ISYM_TAND): New.
+	* intrinsic.c (add_functions): Remove check for flag_dec_math.
+	Give degree trig functions simplification and name resolution
+	functions (e.g, gfc_simplify_atrigd () and gfc_resolve_atrigd ()).
+	(do_simplify): Remove special casing of degree trig functions.
+	* intrinsic.h (gfc_simplify_acosd, gfc_simplify_asind,
+	gfc_simplify_atand, gfc_simplify_cosd, gfc_simplify_cotand,
+	gfc_simplify_sind, gfc_simplify_tand, gfc_resolve_trigd2): Add new
+	prototypes.
+	(gfc_simplify_atrigd, gfc_simplify_trigd, gfc_resolve_cotan,
+	resolve_atrigd): Remove prototypes of deleted functions.
+	* iresolve.c (is_trig_resolved, copy_replace_function_shallow,
+	gfc_resolve_cotan, get_radians, get_degrees, resolve_trig_call,
+	gfc_resolve_atrigd, gfc_resolve_atan2d): Delete functions.
+	(gfc_resolve_trigd, gfc_resolve_trigd2): Resolve to library functions.
+	* simplify.c (rad2deg, deg2rad, gfc_simplify_acosd, gfc_simplify_asind,
+	gfc_simplify_atand, gfc_simplify_atan2d, gfc_simplify_cosd,
+	gfc_simplify_sind, gfc_simplify_tand, gfc_simplify_cotand): New
+	functions.
+	(gfc_simplify_atan2): Fix error message.
+	(simplify_trig_call, gfc_simplify_trigd, gfc_simplify_atrigd,
+	radians_f): Delete functions.
+	* trans-intrinsic.c: Add LIB_FUNCTION decls for sind, cosd, tand.
+	(rad2deg, gfc_conv_intrinsic_atrigd, gfc_conv_intrinsic_cotan,
+	gfc_conv_intrinsic_cotand, gfc_conv_intrinsic_atan2d): New functions.
+	(gfc_conv_intrinsic_function): Handle ACOSD, ASIND, ATAND, COTAN,
+	COTAND, ATAN2D.
+	* trigd_fe.inc: New file. Included by simplify.c to implement
+	simplify_sind, simplify_cosd, simplify_tand with code common to the
+	libgfortran implementation.
+
+2020-04-06  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93686
+	* decl.c (gfc_match_data): Handle data matching for derived type
+	pointers.
+
+2020-04-02  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.h (gfc_resolve_formal_arglist): Add prototype.
+	* interface.c (check_dtio_interface1): Call it.
+	* resolve.c (gfc_resolve_formal_arglist): Renamed from
+	resolve_formal_arglist, removed static.
+	(find_arglists, resolve_types): Update calls.
+
+2020-04-02  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93522
+	* match.c (gfc_match_select_rank): Fix error cleanup.
+
+2020-04-02  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93498
+	* check.c (gfc_check_findloc):  If the kinds of the arguments
+	differ goto label "incompat".
+
+2020-04-02 Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/94030
+	* resolve.c (resolve_equivalence): Correct formatting
+	around the label "identical_types".  Instead of using
+	gfc_resolve_array_spec use is_non_constants_shape_array
+	to determine whether the array can be used in a in an
+	equivalence statement.
+
+2020-04-01  Mark Eggleston  <mark.eggleston@codethink.com>
+
+	PR fortran/94386
+	expr.c (simplify_parameter_variable): Restore code deleted
+	in PR94246.
+
+2020-03-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/94246
+	* arith.c : Remove trailing white space.
+	* expr.c (scalarize_intrinsic_call): Remove the error checking.
+	Make a copy of the expression to be simplified and only replace
+	the original if the simplification succeeds.
+
+2020-03-28  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/94348
+	* decl.c (gfc_match_submod_proc): Add result var to the
+	proc's namespace.
+
 2020-03-27  Tobias Burnus  <tobias@codesourcery.com>
 
 	PR fortran/93957

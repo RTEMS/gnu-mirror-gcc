@@ -205,6 +205,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-section-names.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "ipa-inline.h"
 
 /* Queue of cgraph nodes scheduled to be added into cgraph.  This is a
    secondary queue used during optimization to accommodate passes that
@@ -856,8 +857,7 @@ process_function_and_variable_attributes (cgraph_node *first,
 	  && lookup_attribute ("flatten", DECL_ATTRIBUTES (decl)))
 	{
 	  warning_at (DECL_SOURCE_LOCATION (node->decl), OPT_Wattributes,
-		      "%<flatten%>"
-		      " attribute attribute is ignored on aliases");
+		      "%<flatten%> attribute is ignored on aliases");
 	}
       if (DECL_PRESERVE_P (decl))
 	node->mark_force_output ();
@@ -2482,7 +2482,8 @@ expand_all_functions (void)
 
   symtab->process_new_functions ();
   free_gimplify_stack ();
-
+  delete ipa_saved_clone_sources;
+  ipa_saved_clone_sources = NULL;
   free (order);
 }
 

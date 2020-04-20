@@ -226,8 +226,7 @@ genericize_if_stmt (tree *stmt_p)
     stmt = else_;
   else
     stmt = build3 (COND_EXPR, void_type_node, cond, then_, else_);
-  if (!EXPR_HAS_LOCATION (stmt))
-    protected_set_expr_location (stmt, locus);
+  protected_set_expr_location_if_unset (stmt, locus);
   *stmt_p = stmt;
 }
 
@@ -248,8 +247,7 @@ genericize_cp_loop (tree *stmt_p, location_t start_locus, tree cond, tree body,
   tree stmt_list = NULL;
   tree debug_begin = NULL;
 
-  if (EXPR_LOCATION (incr) == UNKNOWN_LOCATION)
-    protected_set_expr_location (incr, start_locus);
+  protected_set_expr_location_if_unset (incr, start_locus);
 
   cp_walk_tree (&cond, cp_genericize_r, data, NULL);
   cp_walk_tree (&incr, cp_genericize_r, data, NULL);
@@ -1745,6 +1743,13 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  && TREE_CODE (TARGET_EXPR_INITIAL (stmt)) == CONSTRUCTOR
 	  && CONSTRUCTOR_PLACEHOLDER_BOUNDARY (TARGET_EXPR_INITIAL (stmt)))
 	TARGET_EXPR_NO_ELIDE (stmt) = 1;
+      break;
+
+    case REQUIRES_EXPR:
+      /* Emit the value of the requires-expression.  */
+      *stmt_p = constant_boolean_node (constraints_satisfied_p (stmt),
+				       boolean_type_node);
+      *walk_subtrees = 0;
       break;
 
     case TEMPLATE_ID_EXPR:

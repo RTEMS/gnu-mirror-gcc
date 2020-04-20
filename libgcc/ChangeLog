@@ -1,3 +1,51 @@
+2020-04-19  Uroš Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/sfp-exceptions.c (__sfp_handle_exceptions) [__SSE_MATH__]:
+	Remove unneeded assignments to volatile memory.
+
+2020-04-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/93053
+	* configure.ac (LIBGCC_CHECK_AS_LSE): Add HAVE_AS_LSE checking.
+	* config/aarch64/lse.S: Include auto-target.h, if HAVE_AS_LSE
+	is not defined, use just .arch armv8-a.
+	(B, M, N, OPN): Define.
+	(COMMENT): New .macro.
+	(CAS, CASP, SWP, LDOP): Use .inst directive if HAVE_AS_LSE is not
+	defined.  Otherwise, move the operands right after the glue? and
+	comment out operands where the macros are used.
+	* configure: Regenerated.
+	* config.in: Regenerated.
+
+2020-04-07  Ian Lance Taylor  <iant@golang.org>
+
+	PR libgcc/94513
+	* generic-morestack.c: Give up trying to use __mmap/__munmap, use
+	syscall instead.
+
+2020-04-04  Ian Lance Taylor  <iant@golang.org>
+
+	* generic-morestack.c: Only use __mmap on glibc >= 2.26.
+
+2020-04-03  Ian Lance Taylor  <iant@golang.org>
+
+	* generic-morestack.c: On GNU/Linux use __mmap/__munmap rather
+	than mmap/munmap, to avoid hooks.
+
+2020-04-03  Jim Johnston  <jjohnst@us.ibm.com>
+
+	* config/s390/tpf-unwind.h (MIN_PATRANGE, MAX_PATRANGE)
+	(TPFRA_OFFSET): Macros removed.
+	(CP_CNF, cinfc_fast, CINFC_CMRESET, CINTFC_CMCENBKST)
+	(CINTFC_CMCENBKED, ICST_CRET, ICST_SRET, LOWCORE_PAGE3_ADDR)
+	(PG3_SKIPPING_OFFSET): New macros.
+	(__isPATrange): Use cinfc_fast for the check.
+	(__isSkipResetAddr): New function.
+	(s390_fallback_frame_state): Check for skip trace addresses. Use
+	either ICST_CRET or ICST_SRET to calculate return address
+	location.
+	(__tpf_eh_return): Handle skip trace addresses.
+
 2020-03-26  Richard Earnshaw  <rearnsha@arm.com>
 
 	PR target/94220

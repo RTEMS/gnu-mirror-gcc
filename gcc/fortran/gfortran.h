@@ -357,6 +357,7 @@ enum gfc_isym_id
   GFC_ISYM_ACCESS,
   GFC_ISYM_ACHAR,
   GFC_ISYM_ACOS,
+  GFC_ISYM_ACOSD,
   GFC_ISYM_ACOSH,
   GFC_ISYM_ADJUSTL,
   GFC_ISYM_ADJUSTR,
@@ -369,10 +370,13 @@ enum gfc_isym_id
   GFC_ISYM_ANINT,
   GFC_ISYM_ANY,
   GFC_ISYM_ASIN,
+  GFC_ISYM_ASIND,
   GFC_ISYM_ASINH,
   GFC_ISYM_ASSOCIATED,
   GFC_ISYM_ATAN,
   GFC_ISYM_ATAN2,
+  GFC_ISYM_ATAN2D,
+  GFC_ISYM_ATAND,
   GFC_ISYM_ATANH,
   GFC_ISYM_ATOMIC_ADD,
   GFC_ISYM_ATOMIC_AND,
@@ -410,8 +414,10 @@ enum gfc_isym_id
   GFC_ISYM_CONJG,
   GFC_ISYM_CONVERSION,
   GFC_ISYM_COS,
+  GFC_ISYM_COSD,
   GFC_ISYM_COSH,
   GFC_ISYM_COTAN,
+  GFC_ISYM_COTAND,
   GFC_ISYM_COUNT,
   GFC_ISYM_CPU_TIME,
   GFC_ISYM_CSHIFT,
@@ -598,6 +604,7 @@ enum gfc_isym_id
   GFC_ISYM_SIGNAL,
   GFC_ISYM_SI_KIND,
   GFC_ISYM_SIN,
+  GFC_ISYM_SIND,
   GFC_ISYM_SINH,
   GFC_ISYM_SIZE,
   GFC_ISYM_SLEEP,
@@ -618,6 +625,7 @@ enum gfc_isym_id
   GFC_ISYM_SYSTEM,
   GFC_ISYM_SYSTEM_CLOCK,
   GFC_ISYM_TAN,
+  GFC_ISYM_TAND,
   GFC_ISYM_TANH,
   GFC_ISYM_TEAM_NUMBER,
   GFC_ISYM_THIS_IMAGE,
@@ -3369,6 +3377,7 @@ bool gfc_resolve_expr (gfc_expr *);
 void gfc_resolve (gfc_namespace *);
 void gfc_resolve_code (gfc_code *, gfc_namespace *);
 void gfc_resolve_blocks (gfc_code *, gfc_namespace *);
+void gfc_resolve_formal_arglist (gfc_symbol *);
 int gfc_impure_variable (gfc_symbol *);
 int gfc_pure (gfc_symbol *);
 int gfc_implicit_pure (gfc_symbol *);
@@ -3436,7 +3445,8 @@ bool gfc_check_dummy_characteristics (gfc_symbol *, gfc_symbol *,
 bool gfc_check_result_characteristics (gfc_symbol *, gfc_symbol *,
 				       char *, int);
 bool gfc_compare_interfaces (gfc_symbol*, gfc_symbol*, const char *, int, int,
-			     char *, int, const char *, const char *);
+			     char *, int, const char *, const char *,
+			     bool *bad_result_characteristics = NULL);
 void gfc_check_interfaces (gfc_namespace *);
 bool gfc_procedure_use (gfc_symbol *, gfc_actual_arglist **, locus *);
 void gfc_ppc_use (gfc_component *, gfc_actual_arglist **, locus *);
@@ -3467,18 +3477,17 @@ bool gfc_compare_actual_formal (gfc_actual_arglist **, gfc_formal_arglist *,
 extern gfc_st_label format_asterisk;
 
 void gfc_free_open (gfc_open *);
-bool gfc_resolve_open (gfc_open *);
+bool gfc_resolve_open (gfc_open *, locus *);
 void gfc_free_close (gfc_close *);
-bool gfc_resolve_close (gfc_close *);
+bool gfc_resolve_close (gfc_close *, locus *);
 void gfc_free_filepos (gfc_filepos *);
 bool gfc_resolve_filepos (gfc_filepos *, locus *);
 void gfc_free_inquire (gfc_inquire *);
 bool gfc_resolve_inquire (gfc_inquire *);
 void gfc_free_dt (gfc_dt *);
-bool gfc_resolve_dt (gfc_dt *, locus *);
+bool gfc_resolve_dt (gfc_code *, gfc_dt *, locus *);
 void gfc_free_wait (gfc_wait *);
 bool gfc_resolve_wait (gfc_wait *);
-extern bool async_io_dt;
 
 /* module.c */
 void gfc_module_init_2 (void);
