@@ -264,7 +264,8 @@ vect_slp_tree_uniform_p (slp_tree node)
 
 int
 vect_get_place_in_interleaving_chain (stmt_vec_info stmt_info,
-				      stmt_vec_info first_stmt_info)
+				      stmt_vec_info first_stmt_info,
+				      bool add_gaps)
 {
   stmt_vec_info next_stmt_info = first_stmt_info;
   int result = 0;
@@ -278,7 +279,7 @@ vect_get_place_in_interleaving_chain (stmt_vec_info stmt_info,
 	return result;
       next_stmt_info = DR_GROUP_NEXT_ELEMENT (next_stmt_info);
       if (next_stmt_info)
-	result += DR_GROUP_GAP (next_stmt_info);
+	result += add_gaps ? DR_GROUP_GAP (next_stmt_info) : 1;
     }
   while (next_stmt_info);
 
@@ -1263,27 +1264,104 @@ vect_build_slp_tree_2 (vec_info *vinfo,
 	}
       else
 	{
-	  *max_nunits = this_max_nunits;
-	  (*tree_size)++;
+	  /* We represent a grouped load as a vector build of all
+	     lanes of the load group in memory order (a load
+	     with possibly a load permutation compacting a group
+	     with gaps) plus a lane permutation node that selects
+	     and permutes the load group lanes.  That allows
+	     sharing of the vector build between different
+	     SLP sub-graphs like for
+		l1 = a[0]; l2 = a[1];
+		b[0] = l1; b[1] = l2;
+		c[0] = l2; c[1] = l1;
+	     where we can avoid generating loads twice.  For
+		l1 = a[0]; l2 = a[1]; l3 = a[2];
+		b[0] = l1; b[1] = l2;
+		c[0] = l2; c[1] = l3;
+	     we will have a SLP load node with three lanes plus
+	     two lane permutation nodes selecting two lanes each.
+
+	     ???  This has ripple-down effects for vectorization
+	     factor computation and bad interaction with vectorized
+	     stmt placing.  */
 	  node = vect_create_new_slp_node (stmts, 0);
 	  SLP_TREE_VECTYPE (node) = vectype;
 	  /* And compute the load permutation.  Whether it is actually
 	     a permutation depends on the unrolling factor which is
 	     decided later.  */
 	  vec<unsigned> load_permutation;
+	  vec<std::pair<unsigned, unsigned> > lane_permutation;
 	  int j;
 	  stmt_vec_info load_info;
+	  lane_permutation.create (group_size);
 	  load_permutation.create (group_size);
 	  stmt_vec_info first_stmt_info
 	    = DR_GROUP_FIRST_ELEMENT (SLP_TREE_SCALAR_STMTS (node)[0]);
-	  FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (node), j, load_info)
+	  for (load_info = first_stmt_info; load_info;
+	       load_info = DR_GROUP_NEXT_ELEMENT (load_info))
 	    {
 	      int load_place = vect_get_place_in_interleaving_chain
-		  (load_info, first_stmt_info);
+		  (load_info, first_stmt_info, true);
 	      gcc_assert (load_place != -1);
 	      load_permutation.safe_push (load_place);
 	    }
-	  SLP_TREE_LOAD_PERMUTATION (node) = load_permutation;
+	  bool any_lane_permute = false;
+	  FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (node), j, load_info)
+	    {
+	      int lane_place = vect_get_place_in_interleaving_chain
+		  (load_info, first_stmt_info, false);
+	      gcc_assert (lane_place != -1);
+	      lane_permutation.quick_push (std::make_pair (0, lane_place));
+	      if (lane_place != j)
+		any_lane_permute = true;
+	    }
+	  /* When there's a lane permutation or selection make a separate
+	     SLP node for the full group load in lane-order (but keep handling
+	     gaps with load permutations for now).  */
+	  if (!any_lane_permute && load_permutation.length () == group_size)
+	    {
+	      lane_permutation.release ();
+	      SLP_TREE_LOAD_PERMUTATION (node) = load_permutation;
+	    }
+	  else
+	    {
+	      /* Build a SLP node loading all members from the group
+		 in order with gaps not represented.
+		 ???  We easily end up with an odd number of lanes here
+		 requiring a larger VF.  In some cases this is desirable
+		 but as gaps are not explicitely represented here those
+		 present an issue (see dg.exp/vect/slp-23.c for example).
+		 That also can end up requiring unsupported load
+		 permutations.  */
+	      load_permutation.release ();
+	      SLP_TREE_LANE_PERMUTATION (node) = lane_permutation;
+	      SLP_TREE_CODE (node) = VEC_PERM_EXPR;
+	      vec<stmt_vec_info> loads;
+	      loads.create (group_size);
+	      for (load_info = first_stmt_info; load_info;
+		   load_info = DR_GROUP_NEXT_ELEMENT (load_info))
+		loads.safe_push (load_info);
+	      bool *lmatches = XALLOCAVEC (bool, loads.length ());
+	      slp_tree load_node = vect_build_slp_tree (vinfo, loads,
+							loads.length (),
+							&this_max_nunits,
+							lmatches, npermutes,
+							&this_tree_size,
+							bst_map);
+	      /* ???  For BB vect the above doesn't always work.  */
+	      if (!load_node)
+		{
+		  matches[0] = false;
+		  loads.release ();
+		  /* The caller still owns defs if we fail.  */
+		  SLP_TREE_SCALAR_STMTS (node) = vNULL;
+		  vect_free_slp_tree (node, false);
+		  return NULL;
+		}
+	      SLP_TREE_CHILDREN (node).safe_push (load_node);
+	    }
+	  *tree_size += this_tree_size + 1;
+	  *max_nunits = this_max_nunits;
 	  return node;
 	}
     }
@@ -1803,7 +1881,8 @@ vect_slp_rearrange_stmts (slp_tree node, unsigned int group_size,
    otherwise return false.  */
 
 static bool
-vect_attempt_slp_rearrange_stmts (slp_instance slp_instn)
+vect_attempt_slp_rearrange_stmts (slp_instance slp_instn,
+				  poly_uint64 unrolling_factor)
 {
   unsigned int i, j;
   unsigned int lidx;
@@ -1829,9 +1908,13 @@ vect_attempt_slp_rearrange_stmts (slp_instance slp_instn)
     }
 
   /* Check that the loads in the first sequence are different and there
-     are no gaps between them.  */
+     are no gaps between them.  Also check there is any permutation.  */
+  /* ???  We now would need to check lane permutations or more generally
+     apply optimization of permutations by pushing them up/down the
+     graph.  */
   auto_sbitmap load_index (group_size);
   bitmap_clear (load_index);
+  bool any = false;
   FOR_EACH_VEC_ELT (node->load_permutation, i, lidx)
     {
       if (lidx >= group_size)
@@ -1839,8 +1922,12 @@ vect_attempt_slp_rearrange_stmts (slp_instance slp_instn)
       if (bitmap_bit_p (load_index, lidx))
 	return false;
 
+      if (lidx != i)
+	any = true;
       bitmap_set_bit (load_index, lidx);
     }
+  if (!any)
+    return false;
   for (i = 0; i < group_size; i++)
     if (!bitmap_bit_p (load_index, i))
       return false;
@@ -1866,7 +1953,6 @@ vect_attempt_slp_rearrange_stmts (slp_instance slp_instn)
 			    node->load_permutation, visited);
 
   /* We are done, no actual permutations need to be generated.  */
-  poly_uint64 unrolling_factor = SLP_INSTANCE_UNROLLING_FACTOR (slp_instn);
   FOR_EACH_VEC_ELT (SLP_INSTANCE_LOADS (slp_instn), i, node)
     {
       stmt_vec_info first_stmt_info = SLP_TREE_SCALAR_STMTS (node)[0];
@@ -2012,6 +2098,41 @@ calculate_unrolling_factor (poly_uint64 nunits, unsigned int group_size)
   return exact_div (common_multiple (nunits, group_size), group_size);
 }
 
+/* Since the group size now can change in the SLP graph the minimum
+   unroll factor needs to be decided on a node-by-node base and a common
+   multiple be found for the overall unrolling.  */
+
+static poly_uint64
+calculate_unrolling_factor (slp_tree node,
+			    hash_map<slp_tree, poly_uint64> &visited)
+{
+  bool existed_p;
+  poly_uint64 &uf = visited.get_or_insert (node, &existed_p);
+  if (existed_p)
+    return uf;
+
+  poly_uint64 this_uf
+    = calculate_unrolling_factor (node->max_nunits, SLP_TREE_LANES (node));
+  uf = this_uf;
+
+  slp_tree child;
+  unsigned i;
+  FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
+    {
+      poly_uint64 child_uf = calculate_unrolling_factor (child, visited);
+      this_uf = force_common_multiple (child_uf, this_uf);
+    }
+  *visited.get (node) = this_uf;
+  return this_uf;
+}
+
+static poly_uint64
+calculate_unrolling_factor (slp_tree node)
+{
+  hash_map<slp_tree, poly_uint64> visited;
+  return calculate_unrolling_factor (node, visited);
+}
+
 /* Analyze an SLP instance starting from a group of grouped stores.  Call
    vect_build_slp_tree to build a tree of packed stmts if possible.
    Return FALSE if it's impossible to SLP any stmt in the loop.  */
@@ -2138,9 +2259,11 @@ vect_analyze_slp_instance (vec_info *vinfo,
 			      &tree_size, bst_map);
   if (node != NULL)
     {
+      /* ???  Instead of walking the SLP tree here record the minimum
+	 unroll factor instead of max_nunits in the SLP nodes?  */
       /* Calculate the unrolling factor based on the smallest type.  */
       poly_uint64 unrolling_factor
-	= calculate_unrolling_factor (max_nunits, group_size);
+	= calculate_unrolling_factor (node);
 
       if (maybe_ne (unrolling_factor, 1U)
 	  && is_a <bb_vec_info> (vinfo))
@@ -2493,8 +2616,28 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
       vect_free_slp_tree ((*it).second, false);
   delete bst_map;
 
-  /* Optimize permutations in SLP reductions.  */
   slp_instance instance;
+  /* Get the overall SLP induced unrolling factor.  */
+  poly_uint64 unrolling_factor = 1;
+  FOR_EACH_VEC_ELT (vinfo->slp_instances, i, instance)
+    {
+      /* All unroll factors have the form:
+
+	   GET_MODE_SIZE (vinfo->vector_mode) * X
+
+	 for some rational X, so they must have a common multiple.  */
+      unrolling_factor
+	= force_common_multiple (unrolling_factor,
+				 SLP_INSTANCE_UNROLLING_FACTOR (instance));
+
+    }
+  if (loop_vec_info loop_vinfo = dyn_cast <loop_vec_info> (vinfo))
+    LOOP_VINFO_SLP_UNROLLING_FACTOR (loop_vinfo) = unrolling_factor;
+  else
+    /* For BB vectorization we removed any entries that need unrolling.  */
+    gcc_assert (known_eq (unrolling_factor, 1U));
+
+  /* Optimize permutations in SLP reductions.  */
   FOR_EACH_VEC_ELT (vinfo->slp_instances, i, instance)
     {
       slp_tree node = SLP_INSTANCE_TREE (instance);
@@ -2503,7 +2646,7 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 	 In reduction chain the order of the loads is not important.  */
       if (!STMT_VINFO_DATA_REF (stmt_info)
 	  && !REDUC_GROUP_FIRST_ELEMENT (stmt_info))
-	vect_attempt_slp_rearrange_stmts (instance);
+	vect_attempt_slp_rearrange_stmts (instance, unrolling_factor);
     }
 
   /* Gather all loads in the SLP graph.  */
@@ -2588,7 +2731,6 @@ bool
 vect_make_slp_decision (loop_vec_info loop_vinfo)
 {
   unsigned int i;
-  poly_uint64 unrolling_factor = 1;
   vec<slp_instance> slp_instances = LOOP_VINFO_SLP_INSTANCES (loop_vinfo);
   slp_instance instance;
   int decided_to_slp = 0;
@@ -2598,15 +2740,6 @@ vect_make_slp_decision (loop_vec_info loop_vinfo)
   FOR_EACH_VEC_ELT (slp_instances, i, instance)
     {
       /* FORNOW: SLP if you can.  */
-      /* All unroll factors have the form:
-
-	   GET_MODE_SIZE (vinfo->vector_mode) * X
-
-	 for some rational X, so they must have a common multiple.  */
-      unrolling_factor
-	= force_common_multiple (unrolling_factor,
-				 SLP_INSTANCE_UNROLLING_FACTOR (instance));
-
       /* Mark all the stmts that belong to INSTANCE as PURE_SLP stmts.  Later we
 	 call vect_detect_hybrid_slp () to find stmts that need hybrid SLP and
 	 loop-based vectorization.  Such stmts will be marked as HYBRID.  */
@@ -2614,14 +2747,12 @@ vect_make_slp_decision (loop_vec_info loop_vinfo)
       decided_to_slp++;
     }
 
-  LOOP_VINFO_SLP_UNROLLING_FACTOR (loop_vinfo) = unrolling_factor;
-
   if (decided_to_slp && dump_enabled_p ())
     {
       dump_printf_loc (MSG_NOTE, vect_location,
 		       "Decided to SLP %d instances. Unrolling factor ",
 		       decided_to_slp);
-      dump_dec (MSG_NOTE, unrolling_factor);
+      dump_dec (MSG_NOTE, LOOP_VINFO_SLP_UNROLLING_FACTOR (loop_vinfo));
       dump_printf (MSG_NOTE, "\n");
     }
 

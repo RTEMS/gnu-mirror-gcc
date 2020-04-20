@@ -2008,7 +2008,8 @@ extern bool can_duplicate_and_interleave_p (vec_info *, unsigned int, tree,
 					    tree * = NULL, tree * = NULL);
 extern void duplicate_and_interleave (vec_info *, gimple_seq *, tree,
 				      vec<tree>, unsigned int, vec<tree> &);
-extern int vect_get_place_in_interleaving_chain (stmt_vec_info, stmt_vec_info);
+extern int vect_get_place_in_interleaving_chain (stmt_vec_info, stmt_vec_info,
+						 bool = true);
 
 /* In tree-vect-patterns.c.  */
 /* Pattern recognition functions.
