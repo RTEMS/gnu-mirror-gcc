@@ -23011,11 +23011,22 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		  != (unsigned) s.column))
 	    add_AT_unsigned (subr_die, DW_AT_decl_column, s.column);
 
-	  /* If the prototype had an 'auto' or 'decltype(auto)' return type,
-	     emit the real type on the definition die.  */
+	  /* If the prototype had an 'auto' or 'decltype(auto)' in
+	     the return type, emit the real type on the definition die.  */
 	  if (is_cxx () && debug_info_level > DINFO_LEVEL_TERSE)
 	    {
 	      dw_die_ref die = get_AT_ref (old_die, DW_AT_type);
+	      while (die
+		     && (die->die_tag == DW_TAG_reference_type
+			 || die->die_tag == DW_TAG_rvalue_reference_type
+			 || die->die_tag == DW_TAG_pointer_type
+			 || die->die_tag == DW_TAG_const_type
+			 || die->die_tag == DW_TAG_volatile_type
+			 || die->die_tag == DW_TAG_restrict_type
+			 || die->die_tag == DW_TAG_array_type
+			 || die->die_tag == DW_TAG_ptr_to_member_type
+			 || die->die_tag == DW_TAG_subroutine_type))
+		die = get_AT_ref (die, DW_AT_type);
 	      if (die == auto_die || die == decltype_auto_die)
 		add_type_attribute (subr_die, TREE_TYPE (TREE_TYPE (decl)),
 				    TYPE_UNQUALIFIED, false, context_die);
@@ -27685,6 +27696,7 @@ dwarf2out_inline_entry (tree block)
 static void
 dwarf2out_size_function (tree decl)
 {
+  set_early_dwarf s;
   function_to_dwarf_procedure (decl);
 }
 
@@ -29580,9 +29592,9 @@ prune_unused_types (void)
   for (i = 0; base_types.iterate (i, &base_type); i++)
     prune_unused_types_mark (base_type, 1);
 
-  /* For -fvar-tracking-assignments, also set the mark on nodes that could be
-     referenced by DW_TAG_call_site DW_AT_call_origin (i.e. direct call
-     callees).  */
+  /* Also set the mark on nodes that could be referenced by
+     DW_TAG_call_site DW_AT_call_origin (i.e. direct call callees) or
+     by DW_TAG_inlined_subroutine origins.  */
   cgraph_node *cnode;
   FOR_EACH_FUNCTION (cnode)
     if (cnode->referred_to_p (false))
@@ -29591,8 +29603,7 @@ prune_unused_types (void)
 	if (die == NULL || die->die_mark)
 	  continue;
 	for (cgraph_edge *e = cnode->callers; e; e = e->next_caller)
-	  if (e->caller != cnode
-	      && opt_for_fn (e->caller->decl, flag_var_tracking_assignments))
+	  if (e->caller != cnode)
 	    {
 	      prune_unused_types_mark (die, 1);
 	      break;

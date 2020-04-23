@@ -291,6 +291,9 @@ static object_allocator<assign_link> assign_link_pool ("SRA links");
 /* Base (tree) -> Vector (vec<access_p> *) map.  */
 static hash_map<tree, auto_vec<access_p> > *base_access_vec;
 
+/* Hash to limit creation of artificial accesses */
+static hash_map<tree, unsigned> *propagation_budget;
+
 /* Candidate hash table helpers.  */
 
 struct uid_decl_hasher : nofree_ptr_hash <tree_node>
@@ -2326,7 +2329,7 @@ create_access_replacement (struct access *access, tree reg_type = NULL_TREE)
 	  print_generic_expr (dump_file, access->base);
 	  fprintf (dump_file, " offset: %u, size: %u: ",
 		   (unsigned) access->offset, (unsigned) access->size);
-	  print_generic_expr (dump_file, repl);
+	  print_generic_expr (dump_file, repl, TDF_UID);
 	  fprintf (dump_file, "\n");
 	}
     }
@@ -2670,6 +2673,32 @@ subtree_mark_written_and_enqueue (struct access *access)
     subtree_mark_written_and_enqueue (child);
 }
 
+/* If there is still budget to create a propagation access for DECL, return
+   true and decrement the budget.  Otherwise return false.  */
+
+static bool
+budget_for_propagation_access (tree decl)
+{
+  unsigned b, *p = propagation_budget->get (decl);
+  if (p)
+    b = *p;
+  else
+    b = PARAM_SRA_MAX_PROPAGATIONS;
+
+  if (b == 0)
+    return false;
+  b--;
+
+  if (b == 0 && dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "The propagation budget of ");
+      print_generic_expr (dump_file, decl);
+      fprintf (dump_file, " (UID: %u) has been exhausted.\n", DECL_UID (decl));
+    }
+  propagation_budget->put (decl, b);
+  return true;
+}
+
 /* Propagate subaccesses and grp_write flags of RACC across an assignment link
    to LACC.  Enqueue sub-accesses as necessary so that the write flag is
    propagated transitively.  Return true if anything changed.  Additionally, if
@@ -2770,7 +2799,8 @@ propagate_subaccesses_across_link (struct access *lacc, struct access *racc)
 	  continue;
 	}
 
-      if (rchild->grp_unscalarizable_region)
+      if (rchild->grp_unscalarizable_region
+	  || !budget_for_propagation_access (lacc->base))
 	{
 	  if (rchild->grp_write && !lacc->grp_write)
 	    {
@@ -2800,6 +2830,7 @@ propagate_subaccesses_across_link (struct access *lacc, struct access *racc)
 static void
 propagate_all_subaccesses (void)
 {
+  propagation_budget = new hash_map<tree, unsigned>;
   while (work_queue_head)
     {
       struct access *racc = pop_access_from_work_queue ();
@@ -2838,6 +2869,7 @@ propagate_all_subaccesses (void)
 	    while (lacc);
 	}
     }
+  delete propagation_budget;
 }
 
 /* Go through all accesses collected throughout the (intraprocedural) analysis
@@ -3155,6 +3187,7 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
   location_t loc;
   struct access *access;
   tree type, bfr, orig_expr;
+  bool partial_cplx_access = false;
 
   if (TREE_CODE (*expr) == BIT_FIELD_REF)
     {
@@ -3165,7 +3198,10 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
     bfr = NULL_TREE;
 
   if (TREE_CODE (*expr) == REALPART_EXPR || TREE_CODE (*expr) == IMAGPART_EXPR)
-    expr = &TREE_OPERAND (*expr, 0);
+    {
+      expr = &TREE_OPERAND (*expr, 0);
+      partial_cplx_access = true;
+    }
   access = get_access_for_expr (*expr);
   if (!access)
     return false;
@@ -3193,13 +3229,32 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
          be accessed as a different type too, potentially creating a need for
          type conversion (see PR42196) and when scalarized unions are involved
          in assembler statements (see PR42398).  */
-      if (!useless_type_conversion_p (type, access->type))
+      if (!bfr && !useless_type_conversion_p (type, access->type))
 	{
 	  tree ref;
 
 	  ref = build_ref_for_model (loc, orig_expr, 0, access, gsi, false);
 
-	  if (write)
+	  if (partial_cplx_access)
+	    {
+	    /* VIEW_CONVERT_EXPRs in partial complex access are always fine in
+	       the case of a write because in such case the replacement cannot
+	       be a gimple register.  In the case of a load, we have to
+	       differentiate in between a register an non-register
+	       replacement.  */
+	      tree t = build1 (VIEW_CONVERT_EXPR, type, repl);
+	      gcc_checking_assert (!write || access->grp_partial_lhs);
+	      if (!access->grp_partial_lhs)
+		{
+		  tree tmp = make_ssa_name (type);
+		  gassign *stmt = gimple_build_assign (tmp, t);
+		  /* This is always a read. */
+		  gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
+		  t = tmp;
+		}
+	      *expr = t;
+	    }
+	  else if (write)
 	    {
 	      gassign *stmt;
 

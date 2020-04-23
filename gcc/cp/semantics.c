@@ -380,7 +380,8 @@ add_stmt (tree t)
 
       /* When we expand a statement-tree, we must know whether or not the
 	 statements are full-expressions.  We record that fact here.  */
-      STMT_IS_FULL_EXPR_P (t) = stmts_are_full_exprs_p ();
+      if (STATEMENT_CODE_P (TREE_CODE (t)))
+	STMT_IS_FULL_EXPR_P (t) = stmts_are_full_exprs_p ();
     }
 
   if (code == LABEL_EXPR || code == CASE_LABEL_EXPR)
@@ -2577,7 +2578,6 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	      tree arg2 = (*orig_args)[2];
 	      int literal_mask = ((literal_integer_zerop (arg1) << 1)
 				  | (literal_integer_zerop (arg2) << 2));
-	      arg2 = instantiate_non_dependent_expr (arg2);
 	      warn_for_memset (input_location, arg0, arg2, literal_mask);
 	    }
 
@@ -10036,7 +10036,8 @@ cp_build_vec_convert (tree arg, location_t loc, tree type,
 
   tree ret = NULL_TREE;
   if (!type_dependent_expression_p (arg) && !dependent_type_p (type))
-    ret = c_build_vec_convert (cp_expr_loc_or_loc (arg, input_location), arg,
+    ret = c_build_vec_convert (cp_expr_loc_or_loc (arg, input_location),
+			       decay_conversion (arg, complain),
 			       loc, type, (complain & tf_error) != 0);
 
   if (!processing_template_decl)

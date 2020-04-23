@@ -821,6 +821,9 @@ cx_check_missing_mem_inits (tree ctype, tree body, bool complain)
 		return true;
 	      continue;
 	    }
+	  if (DECL_SIZE (field) && integer_zerop (DECL_SIZE (field)))
+	    /* An empty field doesn't need an initializer.  */
+	    continue;
 	  ftype = strip_array_types (TREE_TYPE (field));
 	  if (type_has_constexpr_default_constructor (ftype))
 	    {
@@ -1085,7 +1088,8 @@ constexpr_call_hasher::equal (constexpr_call *lhs, constexpr_call *rhs)
     {
       tree lhs_arg = TREE_VALUE (lhs_bindings);
       tree rhs_arg = TREE_VALUE (rhs_bindings);
-      gcc_assert (same_type_p (TREE_TYPE (lhs_arg), TREE_TYPE (rhs_arg)));
+      gcc_assert (same_type_ignoring_top_level_qualifiers_p
+		  (TREE_TYPE (lhs_arg), TREE_TYPE (rhs_arg)));
       if (!cp_tree_equal (lhs_arg, rhs_arg))
         return false;
       lhs_bindings = TREE_CHAIN (lhs_bindings);
@@ -2662,8 +2666,16 @@ cxx_eval_array_reference (const constexpr_ctx *ctx, tree t,
     }
 
   /* If it's within the array bounds but doesn't have an explicit
-     initializer, it's value-initialized.  */
-  tree val = build_value_init (elem_type, tf_warning_or_error);
+     initializer, it's initialized from {}.  But use build_value_init
+     directly for non-aggregates to avoid creating a garbage CONSTRUCTOR.  */
+  tree val;
+  if (CP_AGGREGATE_TYPE_P (elem_type))
+    {
+      tree empty_ctor = build_constructor (init_list_type_node, NULL);
+      val = digest_init (elem_type, empty_ctor, tf_warning_or_error);
+    }
+  else
+    val = build_value_init (elem_type, tf_warning_or_error);
   return cxx_eval_constant_expression (ctx, val, lval, non_constant_p,
 				       overflow_p);
 }
@@ -3126,6 +3138,10 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
   bool pre_init = false;
   unsigned HOST_WIDE_INT i;
   tsubst_flags_t complain = ctx->quiet ? tf_none : tf_warning_or_error;
+
+  if (init && TREE_CODE (init) == CONSTRUCTOR)
+    return cxx_eval_bare_aggregate (ctx, init, lval,
+				    non_constant_p, overflow_p);
 
   /* For the default constructor, build up a call to the default
      constructor of the element type.  We only need to handle class types
@@ -5582,7 +5598,15 @@ maybe_constant_value (tree t, tree decl, bool manifestly_const_eval)
   if (cv_cache == NULL)
     cv_cache = hash_map<tree, tree>::create_ggc (101);
   if (tree *cached = cv_cache->get (t))
-    return unshare_expr_without_location (*cached);
+    {
+      r = *cached;
+      if (r != t)
+	{
+	  r = break_out_target_exprs (r, /*clear_loc*/true);
+	  protected_set_expr_location (r, EXPR_LOCATION (t));
+	}
+      return r;
+    }
 
   r = cxx_eval_outermost_constant_expr (t, true, true, false, decl);
   gcc_checking_assert (r == t
@@ -5980,8 +6004,13 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       return true;
 
     case PARM_DECL:
-      if (now)
+      if (now && want_rval)
 	{
+	  tree type = TREE_TYPE (t);
+	  if (dependent_type_p (type)
+	      || is_really_empty_class (type, /*ignore_vptr*/false))
+	    /* An empty class has no data to read.  */
+	    return true;
 	  if (flags & tf_error)
 	    error ("%qE is not a constant expression", t);
 	  return false;
@@ -6222,10 +6251,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 #endif
       return RECUR (t, any);
 
-    case REALPART_EXPR:
-    case IMAGPART_EXPR:
     case COMPONENT_REF:
-    case BIT_FIELD_REF:
     case ARROW_EXPR:
     case OFFSET_REF:
       /* -- a class member access unless its postfix-expression is
@@ -6234,6 +6260,15 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	 postfix-expression being a potential constant expression.  */
       if (type_unknown_p (t))
 	return true;
+      if (is_overloaded_fn (t))
+	/* In a template, a COMPONENT_REF of a function expresses ob.fn(),
+	   which uses ob as an lvalue.  */
+	want_rval = false;
+      gcc_fallthrough ();
+
+    case REALPART_EXPR:
+    case IMAGPART_EXPR:
+    case BIT_FIELD_REF:
       return RECUR (TREE_OPERAND (t, 0), want_rval);
 
     case EXPR_PACK_EXPANSION:

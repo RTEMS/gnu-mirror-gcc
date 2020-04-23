@@ -1,3 +1,136 @@
+2020-04-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR libgomp/92843
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-1-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-1-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-1.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-1.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-2-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-2-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-2.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-2.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-3-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-3-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-3.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-3.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-4-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-4-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-4.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-4.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-5-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-5-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-5.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-5.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-6-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-6-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-6.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-6.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-7-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-7-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-7.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-7.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-8-lib.c:
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-8-lib.c:
+	... this.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-8.c::
+	Rename to...
+	* testsuite/libgomp.oacc-c-c++-common/structured-dynamic-lifetimes-8.c:
+	... this.
+
+2020-04-10  Julian Brown  <julian@codesourcery.com>
+	    Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR libgomp/92843
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-1-lib.c:
+	New file.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-1.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-2-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-2.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-3-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-3.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-4-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-4.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-5-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-5.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-6-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-6.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-7-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-7.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-8-lib.c:
+	Likewise.
+	* testsuite/libgomp.oacc-c-c++-common/static-dynamic-lifetimes-8.c:
+	Likewise.
+
+2020-04-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-03-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/93931
+	* testsuite/libgomp.c++/pr93931.C: New test.
+
+2020-03-17  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/93566
+	* testsuite/libgomp.c/pr93566.c: New test.
+
+2020-03-12  Release Manager
+
+	* GCC 9.3.0 released.
+
+2020-02-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgomp/93515
+	* testsuite/libgomp.c-c++-common/pr93515.c: New test.
+
 2020-01-22  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from mainline

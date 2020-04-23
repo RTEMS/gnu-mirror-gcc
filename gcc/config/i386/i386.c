@@ -2535,7 +2535,12 @@ rest_of_insert_endbranch (void)
       && (!flag_manual_endbr
 	  || lookup_attribute ("cf_check",
 			       DECL_ATTRIBUTES (cfun->decl)))
-      && !cgraph_node::get (cfun->decl)->only_called_directly_p ())
+      && (!cgraph_node::get (cfun->decl)->only_called_directly_p ()
+	  || ix86_cmodel == CM_LARGE
+	  || ix86_cmodel == CM_LARGE_PIC
+	  || flag_force_indirect_call
+	  || (TARGET_DLLIMPORT_DECL_ATTRIBUTES
+	      && DECL_DLLIMPORT_P (cfun->decl))))
     {
       /* Queue ENDBR insertion to x86_function_profiler.  */
       if (crtl->profile && flag_fentry)
@@ -8665,7 +8670,7 @@ function_arg_64 (const CUMULATIVE_ARGS *cum, machine_mode mode,
 
 static rtx
 function_arg_ms_64 (const CUMULATIVE_ARGS *cum, machine_mode mode,
-		    machine_mode orig_mode, bool named,
+		    machine_mode orig_mode, bool named, const_tree type,
 		    HOST_WIDE_INT bytes)
 {
   unsigned int regno;
@@ -8685,7 +8690,10 @@ function_arg_ms_64 (const CUMULATIVE_ARGS *cum, machine_mode mode,
   if (TARGET_SSE && (mode == SFmode || mode == DFmode))
     {
       if (named)
-	regno = cum->regno + FIRST_SSE_REG;
+	{
+	  if (type == NULL_TREE || !AGGREGATE_TYPE_P (type))
+	    regno = cum->regno + FIRST_SSE_REG;
+	}
       else
 	{
 	  rtx t1, t2;
@@ -8773,7 +8781,7 @@ ix86_function_arg (cumulative_args_t cum_v, machine_mode omode,
       enum calling_abi call_abi = cum ? cum->call_abi : ix86_abi;
 
       if (call_abi == MS_ABI)
-	arg = function_arg_ms_64 (cum, mode, omode, named, bytes);
+	arg = function_arg_ms_64 (cum, mode, omode, named, type, bytes);
       else
 	arg = function_arg_64 (cum, mode, omode, type, named);
     }
@@ -14344,8 +14352,13 @@ ix86_expand_epilogue (int style)
 	      t = plus_constant (Pmode, t, m->fs.fp_offset - UNITS_PER_WORD);
 	      emit_insn (gen_rtx_SET (sa, t));
 
-	      t = gen_frame_mem (Pmode, hard_frame_pointer_rtx);
-	      insn = emit_move_insn (hard_frame_pointer_rtx, t);
+	      /* NB: eh_return epilogues must restore the frame pointer
+		 in word_mode since the upper 32 bits of RBP register
+		 can have any values.  */
+	      t = gen_frame_mem (word_mode, hard_frame_pointer_rtx);
+	      rtx frame_reg = gen_rtx_REG (word_mode,
+					   HARD_FRAME_POINTER_REGNUM);
+	      insn = emit_move_insn (frame_reg, t);
 
 	      /* Note that we use SA as a temporary CFA, as the return
 		 address is at the proper place relative to it.  We
@@ -14360,7 +14373,7 @@ ix86_expand_epilogue (int style)
 	      add_reg_note (insn, REG_CFA_DEF_CFA,
 			    plus_constant (Pmode, sa, UNITS_PER_WORD));
 	      ix86_add_queued_cfa_restore_notes (insn);
-	      add_reg_note (insn, REG_CFA_RESTORE, hard_frame_pointer_rtx);
+	      add_reg_note (insn, REG_CFA_RESTORE, frame_reg);
 	      RTX_FRAME_RELATED_P (insn) = 1;
 
 	      m->fs.cfa_reg = sa;
@@ -30286,9 +30299,14 @@ ix86_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
 	 the stack, we need to skip the first insn which pushes the
 	 (call-saved) register static chain; this push is 1 byte.  */
       offset += 5;
+      int skip = MEM_P (chain) ? 1 : 0;
+      /* Skip ENDBR32 at the entry of the target function.  */
+      if (need_endbr
+	  && !cgraph_node::get (fndecl)->only_called_directly_p ())
+	skip += 4;
       disp = expand_binop (SImode, sub_optab, fnaddr,
 			   plus_constant (Pmode, XEXP (m_tramp, 0),
-					  offset - (MEM_P (chain) ? 1 : 0)),
+					  offset - skip),
 			   NULL_RTX, 1, OPTAB_DIRECT);
       emit_move_insn (mem, disp);
     }
@@ -33415,8 +33433,13 @@ ix86_fold_builtin (tree fndecl, int n_args,
 		    countt = build_int_cst (integer_type_node, count);
 		}
 	      tree_vector_builder builder;
-	      builder.new_unary_operation (TREE_TYPE (args[0]), args[0],
-					   false);
+	      if (mask != HOST_WIDE_INT_M1U || is_vshift)
+		builder.new_vector (TREE_TYPE (args[0]),
+				    TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])),
+				    1);
+	      else
+		builder.new_unary_operation (TREE_TYPE (args[0]), args[0],
+					     false);
 	      unsigned int cnt = builder.encoded_nelts ();
 	      for (unsigned int i = 0; i < cnt; ++i)
 		{
@@ -44137,43 +44160,51 @@ emit_reduc_half (rtx dest, rtx src, int i)
       break;
     case E_V64QImode:
     case E_V32HImode:
+      if (i < 64)
+	{
+	  d = gen_reg_rtx (V4TImode);
+	  tem = gen_avx512bw_lshrv4ti3 (d, gen_lowpart (V4TImode, src),
+					GEN_INT (i / 2));
+	  break;
+	}
+      /* FALLTHRU */
     case E_V16SImode:
     case E_V16SFmode:
     case E_V8DImode:
     case E_V8DFmode:
       if (i > 128)
 	tem = gen_avx512f_shuf_i32x4_1 (gen_lowpart (V16SImode, dest),
-				      gen_lowpart (V16SImode, src),
-				      gen_lowpart (V16SImode, src),
-				      GEN_INT (0x4 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x5 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x6 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x7 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0xC), GEN_INT (0xD),
-				      GEN_INT (0xE), GEN_INT (0xF),
-				      GEN_INT (0x10), GEN_INT (0x11),
-				      GEN_INT (0x12), GEN_INT (0x13),
-				      GEN_INT (0x14), GEN_INT (0x15),
-				      GEN_INT (0x16), GEN_INT (0x17));
+					gen_lowpart (V16SImode, src),
+					gen_lowpart (V16SImode, src),
+					GEN_INT (0x4 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x5 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x6 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x7 + (i == 512 ? 4 : 0)),
+					GEN_INT (0xC), GEN_INT (0xD),
+					GEN_INT (0xE), GEN_INT (0xF),
+					GEN_INT (0x10), GEN_INT (0x11),
+					GEN_INT (0x12), GEN_INT (0x13),
+					GEN_INT (0x14), GEN_INT (0x15),
+					GEN_INT (0x16), GEN_INT (0x17));
       else
 	tem = gen_avx512f_pshufd_1 (gen_lowpart (V16SImode, dest),
-				   gen_lowpart (V16SImode, src),
-				   GEN_INT (i == 128 ? 0x2 : 0x1),
-				   GEN_INT (0x3),
-				   GEN_INT (0x3),
-				   GEN_INT (0x3),
-				   GEN_INT (i == 128 ? 0x6 : 0x5),
-				   GEN_INT (0x7),
-				   GEN_INT (0x7),
-				   GEN_INT (0x7),
-				   GEN_INT (i == 128 ? 0xA : 0x9),
-				   GEN_INT (0xB),
-				   GEN_INT (0xB),
-				   GEN_INT (0xB),
-				   GEN_INT (i == 128 ? 0xE : 0xD),
-				   GEN_INT (0xF),
-				   GEN_INT (0xF),
-				   GEN_INT (0xF));
+				    gen_lowpart (V16SImode, src),
+				    GEN_INT (i == 128 ? 0x2 : 0x1),
+				    GEN_INT (0x3),
+				    GEN_INT (0x3),
+				    GEN_INT (0x3),
+				    GEN_INT (i == 128 ? 0x6 : 0x5),
+				    GEN_INT (0x7),
+				    GEN_INT (0x7),
+				    GEN_INT (0x7),
+				    GEN_INT (i == 128 ? 0xA : 0x9),
+				    GEN_INT (0xB),
+				    GEN_INT (0xB),
+				    GEN_INT (0xB),
+				    GEN_INT (i == 128 ? 0xE : 0xD),
+				    GEN_INT (0xF),
+				    GEN_INT (0xF),
+				    GEN_INT (0xF));
       break;
     default:
       gcc_unreachable ();
@@ -46654,7 +46685,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
 	      /* vpshufb only works intra lanes, it is not
 		 possible to shuffle bytes in between the lanes.  */
 	      for (i = 0; i < nelt; ++i)
-		if ((d->perm[i] ^ i) & (nelt / 4))
+		if ((d->perm[i] ^ i) & (3 * nelt / 4))
 		  return false;
 	    }
 	}

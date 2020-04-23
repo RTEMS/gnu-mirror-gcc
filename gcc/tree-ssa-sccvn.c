@@ -2113,7 +2113,8 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	       || (INTEGRAL_TYPE_P (vr->type) && known_eq (ref->size, 8)))
 	      && CHAR_BIT == 8 && BITS_PER_UNIT == 8
 	      && offset.is_constant (&offseti)
-	      && offseti % BITS_PER_UNIT == 0))
+	      && offseti % BITS_PER_UNIT == 0
+	      && multiple_p (ref->size, BITS_PER_UNIT)))
       && poly_int_tree_p (gimple_call_arg (def_stmt, 2))
       && (TREE_CODE (gimple_call_arg (def_stmt, 0)) == ADDR_EXPR
 	  || TREE_CODE (gimple_call_arg (def_stmt, 0)) == SSA_NAME))
@@ -4123,13 +4124,22 @@ visit_reference_op_load (tree lhs, tree op, gimple *stmt)
   if (result
       && !useless_type_conversion_p (TREE_TYPE (result), TREE_TYPE (op)))
     {
-      /* We will be setting the value number of lhs to the value number
-	 of VIEW_CONVERT_EXPR <TREE_TYPE (result)> (result).
-	 So first simplify and lookup this expression to see if it
-	 is already available.  */
-      gimple_match_op res_op (gimple_match_cond::UNCOND,
-			      VIEW_CONVERT_EXPR, TREE_TYPE (op), result);
-      result = vn_nary_build_or_lookup (&res_op);
+      /* Avoid the type punning in case the result mode has padding where
+	 the op we lookup has not.  */
+      if (maybe_lt (GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (result))),
+		    GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (op)))))
+	result = NULL_TREE;
+      else
+	{
+	  /* We will be setting the value number of lhs to the value number
+	     of VIEW_CONVERT_EXPR <TREE_TYPE (result)> (result).
+	     So first simplify and lookup this expression to see if it
+	     is already available.  */
+	  gimple_match_op res_op (gimple_match_cond::UNCOND,
+				  VIEW_CONVERT_EXPR, TREE_TYPE (op), result);
+	  result = vn_nary_build_or_lookup (&res_op);
+	}
+
       /* When building the conversion fails avoid inserting the reference
          again.  */
       if (!result)

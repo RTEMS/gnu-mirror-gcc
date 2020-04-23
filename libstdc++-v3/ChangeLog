@@ -1,3 +1,227 @@
+2020-04-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/Makefile.am (xml_sources_manual): Add missing XML files.
+	* doc/Makefile.in: Regenerate.
+	* doc/xml/manual/status_cxx1998.xml: Refer to "this section" instead
+	of "this page".
+	* doc/xml/manual/status_cxx2011.xml: Formatting and other corrections
+	to the C++11 status table.
+	* doc/xml/manual/status_cxx2014.xml: Replace list of C++14 feature
+	proposals with table matching contents of the C++14 standard.
+	* doc/html/*: Regenerate.
+
+	Backport from mainline
+	2020-02-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/erase_if.h (__cpp_lib_erase_if): Define to 202002L.
+	* include/std/deque (__cpp_lib_erase_if): Likewise.
+	* include/std/forward_list (__cpp_lib_erase_if): Likewise.
+	* include/std/list (__cpp_lib_erase_if): Likewise.
+	* include/std/string (__cpp_lib_erase_if): Likewise.
+	* include/std/vector (__cpp_lib_erase_if): Likewise.
+	* include/std/version (__cpp_lib_erase_if): Likewise.
+	* testsuite/21_strings/basic_string/erasure.cc: Test for new value.
+	* testsuite/23_containers/deque/erasure.cc: Likewise.
+	* testsuite/23_containers/forward_list/erasure.cc: Likewise.
+	* testsuite/23_containers/list/erasure.cc: Likewise.
+	* testsuite/23_containers/map/erasure.cc: Likewise.
+	* testsuite/23_containers/set/erasure.cc: Likewise.
+	* testsuite/23_containers/unordered_map/erasure.cc: Likewise.
+	* testsuite/23_containers/unordered_set/erasure.cc: Likewise.
+	* testsuite/23_containers/vector/erasure.cc: Likewise.
+
+2020-04-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2017.xml: Fix name of feature test macro.
+	* doc/html/*: Regenerate.
+
+2020-04-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-04-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93960
+	* include/bits/ptr_traits.h (__to_address): Add special case for debug
+	iterators, to avoid dereferenceable check.
+	* testsuite/20_util/to_address/1_neg.cc: Adjust dg-error line number.
+	* testsuite/20_util/to_address/debug.cc: New test.
+
+2020-03-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-03-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94199
+	* include/experimental/executor (service_already_exists): Add default
+	constructor. Declare make_service to be a friend.
+	* testsuite/experimental/net/execution_context/make_service.cc: New
+	test.
+
+2020-03-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-03-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94063
+	* src/c++17/fs_path.cc (path::operator+=(const path&)): Add kluge to
+	handle concatenations that change the type of the first component.
+	(path::operator+=(basic_string_view<value_type>)): Likewise.
+	* testsuite/27_io/filesystem/path/concat/94063.cc: New test.
+
+	Backport from mainline
+	2020-02-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/functional (_GLIBCXX_NOT_FN_CALL_OP): Un-define after
+	use.
+
+	Backport from mainline
+	2020-03-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/tr1/8_c_compatibility/cstdlib/functions.cc: Do not pass
+	a null pointer to functions with nonnull(1) attribute.
+
+	Backport from mainline
+	2020-02-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/filesystem/operations/last_write_time.cc: Fixes for
+	filesystems that silently truncate timestamps.
+	* testsuite/experimental/filesystem/operations/last_write_time.cc:
+	Likewise.
+
+	Backport from mainline
+	2020-01-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93244
+	* include/bits/fs_path.h (path::generic_string<C,A>)
+	[_GLIBCXX_FILESYSTEM_IS_WINDOWS]: Convert root-dir to forward-slash.
+	* testsuite/27_io/filesystem/path/generic/generic_string.cc: Check
+	root-dir is converted to forward slash in generic pathname.
+	* testsuite/27_io/filesystem/path/generic/utf.cc: New test.
+	* testsuite/27_io/filesystem/path/generic/wchar_t.cc: New test.
+
+2020-03-12  Release Manager
+
+	* GCC 9.3.0 released.
+
+2020-03-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-03-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94069
+	* include/std/shared_mutex [!PTHREAD_RWLOCK_INITIALIZER]
+	(__shared_mutex_pthread::__shared_mutex_pthread()): Remove incorrect
+	second argument to __glibcxx_rwlock_init.
+	* testsuite/30_threads/shared_timed_mutex/94069.cc: New test.
+
+2020-03-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-03-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/filesystem/operations/all.cc: Mark unused variable.
+	* testsuite/27_io/filesystem/operations/copy.cc: Fix typo.
+	* testsuite/experimental/filesystem/operations/copy.cc: Likewise.
+	* testsuite/27_io/filesystem/operations/file_size.cc: Use correct type
+	for return value, and in comparison.
+	* testsuite/experimental/filesystem/operations/file_size.cc: Likewise.
+
+	Backport from mainline
+	2019-09-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/91910
+	* src/c++11/debug.cc (_Safe_iterator_base::_M_detach()): Load pointer
+	atomically and lock the mutex before accessing the sequence.
+	(_Safe_local_iterator_base::_M_detach()): Likewise.
+	(_Safe_iterator_base::_M_reset()): Clear _M_sequence atomically.
+
+	Backport from mainline
+	2019-06-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/c_global/cmath (__lerp, lerp): Add noexcept (LWG 3201).
+
+	Backport from mainline
+	2019-11-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_algo.h (for_each_n): Handle negative count.
+	* testsuite/25_algorithms/for_each/for_each_n_debug.cc: New test.
+
+	Backport from mainline
+	2020-01-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93470
+	* include/bits/refwrap.h (reference_wrapper::operator()): Restrict
+	static assertion to object types.
+
+2020-01-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93325
+	* acinclude.m4 (GLIBCXX_ENABLE_LIBSTDCXX_TIME): Use AC_SEARCH_LIBS for
+	clock_gettime instead of explicit glibc version check.
+	* configure: Regenerate.
+
+2020-03-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* config/abi/post/x86_64-linux-gnu/x32/baseline_symbols.txt: Updated.
+
+2020-02-29  John David Anglin  <danglin@gcc.gnu.org>
+
+	* testsuite/17_intro/headers/c++1998/charset.cc: Skip on *-*-hpux*.
+	* testsuite/17_intro/headers/c++2011/charset.cc: Likewise.
+	* testsuite/17_intro/headers/c++2014/charset.cc: Likewise.
+	* testsuite/17_intro/headers/c++2017/charset.cc: Likewise.
+	* testsuite/17_intro/headers/c++2020/charset.cc: Likewise.
+
+2020-02-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2020-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93205
+	* include/bits/random.h (operator>>): Check stream operation succeeds.
+	* include/bits/random.tcc (operator>>): Likewise.
+	(__extract_params): New function to fill a vector from a stream.
+	* testsuite/26_numerics/random/pr60037-neg.cc: Adjust dg-error line.
+
+	Backport from mainline
+	2019-12-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92886
+	* include/bits/ios_base.h (std::ios_base::trunc): Fix comment.
+
+	Backport from mainline
+	2020-01-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93325
+	* acinclude.m4 (GLIBCXX_ENABLE_LIBSTDCXX_TIME): Use AC_SEARCH_LIBS for
+	clock_gettime instead of explicit glibc version check.
+	* configure: Regenerate.
+
+	Backport from mainline
+	2020-02-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93562
+	* include/bits/unique_ptr.h (__uniq_ptr_impl::swap): Define.
+	(unique_ptr::swap, unique_ptr<T[], D>::swap): Call it.
+	* testsuite/20_util/unique_ptr/modifiers/93562.cc: New test.
+
+	Backport from mainline
+	2020-01-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92376
+	* include/bits/c++config: Only do PSTL config when the header is
+	present, to fix freestanding.
+	* libsupc++/new_opa.cc [!_GLIBCXX_HOSTED]: Declare allocation
+	functions if they were detected by configure.
+
+	Backport from mainline
+	2019-10-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/78552
+	* src/c++98/locale_init.cc (locale::classic()): Do not construct a new
+	locale object for every call.
+	(locale::_S_initialize_once()): Construct C locale here.
+
 2020-01-24  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backport from mainline

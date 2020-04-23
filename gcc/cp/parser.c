@@ -10453,6 +10453,10 @@ cp_parser_lambda_expression (cp_parser* parser)
     parser->implicit_template_scope = 0;
     parser->auto_is_implicit_function_template_parm_p = false;
 
+    /* The body of a lambda in a discarded statement is not discarded.  */
+    bool discarded = in_discarded_stmt;
+    in_discarded_stmt = 0;
+
     /* By virtue of defining a local class, a lambda expression has access to
        the private variables of enclosing classes.  */
 
@@ -10482,6 +10486,8 @@ cp_parser_lambda_expression (cp_parser* parser)
       maybe_add_lambda_conv_op (type);
 
     type = finish_struct (type, /*attributes=*/NULL_TREE);
+
+    in_discarded_stmt = discarded;
 
     parser->num_template_parameter_lists = saved_num_template_parameter_lists;
     parser->in_statement = in_statement;
@@ -10852,6 +10858,9 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
       ++parser->num_template_parameter_lists;
     }
 
+  /* Committee discussion supports allowing attributes here.  */
+  lambda_specs.attributes = cp_parser_attributes_opt (parser);
+
   /* The parameter-declaration-clause is optional (unless
      template-parameter-list was given), but must begin with an
      opening parenthesis if present.  */
@@ -10961,7 +10970,7 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 
     fco = grokmethod (&return_type_specs,
 		      declarator,
-		      gnu_attrs);
+		      chainon (gnu_attrs, lambda_specs.attributes));
     if (fco != error_mark_node)
       {
 	DECL_INITIALIZED_IN_CLASS_P (fco) = 1;
@@ -18696,9 +18705,7 @@ cp_parser_enum_specifier (cp_parser* parser)
   bool is_unnamed = false;
   tree underlying_type = NULL_TREE;
   cp_token *type_start_token = NULL;
-  bool saved_colon_corrects_to_scope_p = parser->colon_corrects_to_scope_p;
-
-  parser->colon_corrects_to_scope_p = false;
+  temp_override<bool> cleanup (parser->colon_corrects_to_scope_p, false);
 
   /* Parse tentatively so that we can back up if we don't find a
      enum-specifier.  */
@@ -18738,24 +18745,24 @@ cp_parser_enum_specifier (cp_parser* parser)
 
   push_deferring_access_checks (dk_no_check);
   nested_name_specifier
-      = cp_parser_nested_name_specifier_opt (parser,
-					     /*typename_keyword_p=*/true,
-					     /*check_dependency_p=*/false,
-					     /*type_p=*/false,
-					     /*is_declaration=*/false);
+    = cp_parser_nested_name_specifier_opt (parser,
+					   /*typename_keyword_p=*/true,
+					   /*check_dependency_p=*/false,
+					   /*type_p=*/false,
+					   /*is_declaration=*/false);
 
   if (nested_name_specifier)
     {
       tree name;
 
       identifier = cp_parser_identifier (parser);
-      name =  cp_parser_lookup_name (parser, identifier,
-				     enum_type,
-				     /*is_template=*/false,
-				     /*is_namespace=*/false,
-				     /*check_dependency=*/true,
-				     /*ambiguous_decls=*/NULL,
-				     input_location);
+      name = cp_parser_lookup_name (parser, identifier,
+				    enum_type,
+				    /*is_template=*/false,
+				    /*is_namespace=*/false,
+				    /*check_dependency=*/true,
+				    /*ambiguous_decls=*/NULL,
+				    input_location);
       if (name && name != error_mark_node)
 	{
 	  type = TREE_TYPE (name);
@@ -18835,23 +18842,21 @@ cp_parser_enum_specifier (cp_parser* parser)
     {
       if (cxx_dialect < cxx11 || (!scoped_enum_p && !underlying_type))
 	{
+	  if (has_underlying_type)
+	    cp_parser_commit_to_tentative_parse (parser);
 	  cp_parser_error (parser, "expected %<{%>");
 	  if (has_underlying_type)
-	    {
-	      type = NULL_TREE;
-	      goto out;
-	    }
+	    return error_mark_node;
 	}
       /* An opaque-enum-specifier must have a ';' here.  */
       if ((scoped_enum_p || underlying_type)
 	  && cp_lexer_next_token_is_not (parser->lexer, CPP_SEMICOLON))
 	{
+	  if (has_underlying_type)
+	    cp_parser_commit_to_tentative_parse (parser);
 	  cp_parser_error (parser, "expected %<;%> or %<{%>");
 	  if (has_underlying_type)
-	    {
-	      type = NULL_TREE;
-	      goto out;
-	    }
+	    return error_mark_node;
 	}
     }
 
@@ -18867,9 +18872,7 @@ cp_parser_enum_specifier (cp_parser* parser)
 	  push_scope (nested_name_specifier);
 	}
       else if (TREE_CODE (nested_name_specifier) == NAMESPACE_DECL)
-	{
-	  push_nested_namespace (nested_name_specifier);
-	}
+	push_nested_namespace (nested_name_specifier);
     }
 
   /* Issue an error message if type-definitions are forbidden here.  */
@@ -19029,12 +19032,8 @@ cp_parser_enum_specifier (cp_parser* parser)
 	  pop_scope (nested_name_specifier);
 	}
       else if (TREE_CODE (nested_name_specifier) == NAMESPACE_DECL)
-	{
-	  pop_nested_namespace (nested_name_specifier);
-	}
+	pop_nested_namespace (nested_name_specifier);
     }
- out:
-  parser->colon_corrects_to_scope_p = saved_colon_corrects_to_scope_p;
   return type;
 }
 
@@ -21992,6 +21991,18 @@ cp_parser_type_specifier_seq (cp_parser* parser,
       /* Check for attributes first.  */
       if (cp_next_tokens_can_be_attribute_p (parser))
 	{
+	  /* GNU attributes at the end of a declaration apply to the
+	     declaration as a whole, not to the trailing return type.  So look
+	     ahead to see if these attributes are at the end.  */
+	  if (seen_type_specifier && is_trailing_return
+	      && cp_next_tokens_can_be_gnu_attribute_p (parser))
+	    {
+	      size_t n = cp_parser_skip_attributes_opt (parser, 1);
+	      cp_token *tok = cp_lexer_peek_nth_token (parser->lexer, n);
+	      if (tok->type == CPP_SEMICOLON || tok->type == CPP_COMMA
+		  || tok->type == CPP_EQ || tok->type == CPP_OPEN_BRACE)
+		break;
+	    }
 	  type_specifier_seq->attributes
 	    = attr_chainon (type_specifier_seq->attributes,
 			    cp_parser_attributes_opt (parser));
@@ -32552,6 +32563,8 @@ cp_parser_omp_var_list_no_open (cp_parser *parser, enum omp_clause_code kind,
 					   token->location);
 	    }
 	}
+      if (outer_automatic_var_p (decl))
+	decl = process_outer_var_ref (decl, tf_warning_or_error);
       if (decl == error_mark_node)
 	;
       else if (kind != 0)
@@ -37807,9 +37820,9 @@ cp_parser_omp_parallel (cp_parser *parser, cp_token *pragma_tok,
 	  cp_parser_end_omp_structured_block (parser, save);
 	  stmt = finish_omp_parallel (cclauses[C_OMP_CLAUSE_SPLIT_PARALLEL],
 				      block);
-	  OMP_PARALLEL_COMBINED (stmt) = 1;
 	  if (ret == NULL_TREE)
 	    return ret;
+	  OMP_PARALLEL_COMBINED (stmt) = 1;
 	  return stmt;
 	}
       else if (!flag_openmp)  /* flag_openmp_simd  */

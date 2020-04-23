@@ -1082,9 +1082,9 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 /*xmm8,xmm9,xmm10,xmm11,xmm12,xmm13,xmm14,xmm15*/		\
      6,   6,    6,    6,    6,    6,    6,    6,		\
 /*xmm16,xmm17,xmm18,xmm19,xmm20,xmm21,xmm22,xmm23*/		\
-     6,    6,     6,    6,    6,    6,    6,    6,		\
+     1,    1,     1,    1,    1,    1,    1,    1,		\
 /*xmm24,xmm25,xmm26,xmm27,xmm28,xmm29,xmm30,xmm31*/		\
-     6,    6,     6,    6,    6,    6,    6,    6,		\
+     1,    1,     1,    1,    1,    1,    1,    1,		\
  /* k0,  k1,  k2,  k3,  k4,  k5,  k6,  k7*/			\
      1,   1,   1,   1,   1,   1,   1,   1 }
 
@@ -2232,11 +2232,10 @@ extern int const svr4_dbx_register_map[FIRST_PSEUDO_REGISTER];
 
 /* Under some conditions we need jump tables in the text section,
    because the assembler cannot handle label differences between
-   sections.  This is the case for x86_64 on Mach-O for example.  */
+   sections.  */
 
 #define JUMP_TABLES_IN_TEXT_SECTION \
-  (flag_pic && ((TARGET_MACHO && TARGET_64BIT) \
-   || (!TARGET_64BIT && !HAVE_AS_GOTOFF_IN_DATA)))
+  (flag_pic && !(TARGET_64BIT || HAVE_AS_GOTOFF_IN_DATA))
 
 /* Switch to init or fini section via SECTION_OP, emit a call to FUNC,
    and switch back.  For x86 we do this only to save a few bytes that

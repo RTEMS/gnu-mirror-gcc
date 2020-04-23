@@ -2402,6 +2402,8 @@ is_overloaded_fn (tree x)
 tree
 dependent_name (tree x)
 {
+  /* FIXME a dependent name must be unqualified, but this function doesn't
+     distinguish between qualified and unqualified identifiers.  */
   if (identifier_p (x))
     return x;
   if (TREE_CODE (x) == TEMPLATE_ID_EXPR)
@@ -3506,6 +3508,15 @@ called_fns_equal (tree t1, tree t2)
       if (name1 != name2)
 	return false;
 
+      /* FIXME dependent_name currently returns an unqualified name regardless
+	 of whether the function was named with a qualified- or unqualified-id.
+	 Until that's fixed, check that we aren't looking at overload sets from
+	 different scopes.  */
+      if (is_overloaded_fn (t1) && is_overloaded_fn (t2)
+	  && (DECL_CONTEXT (get_first_fn (t1))
+	      != DECL_CONTEXT (get_first_fn (t2))))
+	return false;
+
       if (TREE_CODE (t1) == TEMPLATE_ID_EXPR)
 	targs1 = TREE_OPERAND (t1, 1);
       if (TREE_CODE (t2) == TEMPLATE_ID_EXPR)
@@ -3602,7 +3613,8 @@ cp_tree_equal (tree t1, tree t2)
       {
 	tree arg1, arg2;
 	call_expr_arg_iterator iter1, iter2;
-	if (!called_fns_equal (CALL_EXPR_FN (t1), CALL_EXPR_FN (t2)))
+	if (KOENIG_LOOKUP_P (t1) != KOENIG_LOOKUP_P (t2)
+	    || !called_fns_equal (CALL_EXPR_FN (t1), CALL_EXPR_FN (t2)))
 	  return false;
 	for (arg1 = first_call_expr_arg (t1, &iter1),
 	       arg2 = first_call_expr_arg (t2, &iter2);
@@ -4362,6 +4374,33 @@ zero_init_p (const_tree t)
     return 0;
 
   return 1;
+}
+
+/* Returns true if the expression or initializer T is the result of
+   zero-initialization for its type, taking pointers to members
+   into consideration.  */
+
+bool
+zero_init_expr_p (tree t)
+{
+  tree type = TREE_TYPE (t);
+  if (!type || dependent_type_p (type))
+    return false;
+  if (zero_init_p (type))
+    return initializer_zerop (t);
+  if (TYPE_PTRMEM_P (type))
+    return null_member_pointer_value_p (t);
+  if (TREE_CODE (t) == CONSTRUCTOR
+      && CP_AGGREGATE_TYPE_P (type))
+    {
+      tree elt_init;
+      unsigned HOST_WIDE_INT i;
+      FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (t), i, elt_init)
+	if (!zero_init_expr_p (elt_init))
+	  return false;
+      return true;
+    }
+  return false;
 }
 
 /* Handle the C++17 [[nodiscard]] attribute, which is similar to the GNU
@@ -5490,68 +5529,6 @@ maybe_warn_zero_as_null_pointer_constant (tree expr, location_t loc)
       return true;
     }
   return false;
-}
-
-/* Given an initializer INIT for a TYPE, return true if INIT is zero
-   so that it can be replaced by value initialization.  This function
-   distinguishes betwen empty strings as initializers for arrays and
-   for pointers (which make it return false).  */
-
-bool
-type_initializer_zero_p (tree type, tree init)
-{
-  if (type == error_mark_node || init == error_mark_node)
-    return false;
-
-  STRIP_NOPS (init);
-
-  if (POINTER_TYPE_P (type))
-    return TREE_CODE (init) != STRING_CST && initializer_zerop (init);
-
-  if (TREE_CODE (init) != CONSTRUCTOR)
-    return initializer_zerop (init);
-
-  if (TREE_CODE (type) == ARRAY_TYPE)
-    {
-      tree elt_type = TREE_TYPE (type);
-      elt_type = TYPE_MAIN_VARIANT (elt_type);
-      if (elt_type == char_type_node)
-	return initializer_zerop (init);
-
-      tree elt_init;
-      unsigned HOST_WIDE_INT i;
-      FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (init), i, elt_init)
-	if (!type_initializer_zero_p (elt_type, elt_init))
-	  return false;
-      return true;
-    }
-
-  if (TREE_CODE (type) != RECORD_TYPE)
-    return initializer_zerop (init);
-
-  if (TYPE_NON_AGGREGATE_CLASS (type))
-    return false;
-
-  tree fld = TYPE_FIELDS (type);
-
-  tree fld_init;
-  unsigned HOST_WIDE_INT i;
-  FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (init), i, fld_init)
-    {
-      fld = next_initializable_field (fld);
-      if (!fld)
-	return true;
-
-      tree fldtype = TREE_TYPE (fld);
-      if (!type_initializer_zero_p (fldtype, fld_init))
-	return false;
-
-      fld = DECL_CHAIN (fld);
-      if (!fld)
-	break;
-    }
-
-  return true;
 }
 
 #if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
