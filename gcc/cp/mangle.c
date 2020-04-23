@@ -875,7 +875,16 @@ decl_mangling_context (tree decl)
   else if (template_type_parameter_p (decl))
      /* template type parms have no mangling context.  */
       return NULL_TREE;
-  return CP_DECL_CONTEXT (decl);
+
+  tcontext = CP_DECL_CONTEXT (decl);
+
+  /* Ignore the artificial declare reduction functions.  */
+  if (tcontext
+      && TREE_CODE (tcontext) == FUNCTION_DECL
+      && DECL_OMP_DECLARE_REDUCTION_P (tcontext))
+    return decl_mangling_context (tcontext);
+
+  return tcontext;
 }
 
 /* <name> ::= <unscoped-name>
@@ -2893,6 +2902,7 @@ write_expression (tree expr)
   /* Skip NOP_EXPR and CONVERT_EXPR.  They can occur when (say) a pointer
      argument is converted (via qualification conversions) to another type.  */
   while (CONVERT_EXPR_CODE_P (code)
+	 || code == IMPLICIT_CONV_EXPR
 	 || location_wrapper_p (expr)
 	 /* Parentheses aren't mangled.  */
 	 || code == PAREN_EXPR

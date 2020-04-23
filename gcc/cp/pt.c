@@ -398,6 +398,36 @@ template_class_depth (tree type)
   return depth;
 }
 
+/* Return TRUE if NODE instantiates a template that has arguments of
+   its own, be it directly a primary template or indirectly through a
+   partial specializations.  */
+static bool
+instantiates_primary_template_p (tree node)
+{
+  tree tinfo = get_template_info (node);
+  if (!tinfo)
+    return false;
+
+  tree tmpl = TI_TEMPLATE (tinfo);
+  if (PRIMARY_TEMPLATE_P (tmpl))
+    return true;
+
+  if (!DECL_TEMPLATE_SPECIALIZATION (tmpl))
+    return false;
+
+  /* So now we know we have a specialization, but it could be a full
+     or a partial specialization.  To tell which, compare the depth of
+     its template arguments with those of its context.  */
+
+  tree ctxt = DECL_CONTEXT (tmpl);
+  tree ctinfo = get_template_info (ctxt);
+  if (!ctinfo)
+    return true;
+
+  return (TMPL_ARGS_DEPTH (TI_ARGS (tinfo))
+	  > TMPL_ARGS_DEPTH (TI_ARGS (ctinfo)));
+}
+
 /* Subroutine of maybe_begin_member_template_processing.
    Returns true if processing DECL needs us to push template parms.  */
 
@@ -3784,10 +3814,18 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
       return NULL_TREE;
 
     case DECL_EXPR:
-      /* Ignore the declaration of a capture proxy for a parameter pack.  */
-      if (is_capture_proxy (DECL_EXPR_DECL (t)))
-	*walk_subtrees = 0;
-      return NULL_TREE;
+      {
+	tree decl = DECL_EXPR_DECL (t);
+	/* Ignore the declaration of a capture proxy for a parameter pack.  */
+	if (is_capture_proxy (decl))
+	  *walk_subtrees = 0;
+	if (is_typedef_decl (decl) && TYPE_ALIAS_P (TREE_TYPE (decl)))
+	  /* Since we stop at aliases above, we need to look through them at
+	     the point of the DECL_EXPR.  */
+	  cp_walk_tree (&DECL_ORIGINAL_TYPE (decl),
+			&find_parameter_packs_r, ppd, ppd->visited);
+	return NULL_TREE;
+      }
 
     case RECORD_TYPE:
       if (TYPE_PTRMEMFUNC_P (t))
@@ -3944,7 +3982,7 @@ make_pack_expansion (tree arg, tsubst_flags_t complain)
          class expansion.  */
       ppd.visited = new hash_set<tree>;
       ppd.parameter_packs = &parameter_packs;
-      ppd.type_pack_expansion_p = true;
+      ppd.type_pack_expansion_p = false;
       gcc_assert (TYPE_P (TREE_PURPOSE (arg)));
       cp_walk_tree (&TREE_PURPOSE (arg), &find_parameter_packs_r, 
                     &ppd, ppd.visited);
@@ -4889,6 +4927,14 @@ process_partial_specialization (tree decl)
       return decl;
     }
 
+  else if (nargs > DECL_NTPARMS (maintmpl))
+    {
+      error ("too many arguments for partial specialization %qT", type);
+      inform (DECL_SOURCE_LOCATION (maintmpl), "primary template here");
+      /* Avoid crash below.  */
+      return decl;
+    }
+
   /* If we aren't in a dependent class, we can actually try deduction.  */
   else if (tpd.level == 1
 	   /* FIXME we should be able to handle a partial specialization of a
@@ -4914,7 +4960,6 @@ process_partial_specialization (tree decl)
 
      Also, we verify that pack expansions only occur at the
      end of the argument list.  */
-  gcc_assert (nargs == DECL_NTPARMS (maintmpl));
   tpd2.parms = 0;
   for (i = 0; i < nargs; ++i)
     {
@@ -6141,6 +6186,33 @@ uses_all_template_parms_r (tree t, void *data_)
   return 0;
 }
 
+/* for_each_template_parm any_fn callback for complex_alias_template_p.  */
+
+static int
+complex_pack_expansion_r (tree t, void *data_)
+{
+  /* An alias template with a pack expansion that expands a pack from the
+     enclosing class needs to be considered complex, to avoid confusion with
+     the same pack being used as an argument to the alias's own template
+     parameter (91966).  */
+  if (!PACK_EXPANSION_P (t))
+    return 0;
+  struct uses_all_template_parms_data &data
+    = *(struct uses_all_template_parms_data*)data_;
+  for (tree pack = PACK_EXPANSION_PARAMETER_PACKS (t); pack;
+       pack = TREE_CHAIN (pack))
+    {
+      tree parm_pack = TREE_VALUE (pack);
+      if (!TEMPLATE_PARM_P (parm_pack))
+	continue;
+      int idx, level;
+      template_parm_level_and_index (parm_pack, &level, &idx);
+      if (level < data.level)
+	return 1;
+    }
+  return 0;
+}
+
 static bool
 complex_alias_template_p (const_tree tmpl)
 {
@@ -6153,7 +6225,9 @@ complex_alias_template_p (const_tree tmpl)
   for (int i = 0; i < len; ++i)
     data.seen[i] = false;
 
-  for_each_template_parm (pat, uses_all_template_parms_r, &data, NULL, true);
+  if (for_each_template_parm (pat, uses_all_template_parms_r, &data,
+			      NULL, true, complex_pack_expansion_r))
+    return true;
   for (int i = 0; i < len; ++i)
     if (!data.seen[i])
       return true;
@@ -10550,7 +10624,10 @@ tsubst_friend_class (tree friend_tmpl, tree args)
   if (TREE_CODE (context) == NAMESPACE_DECL)
     push_nested_namespace (context);
   else
-    push_nested_class (context);
+    {
+      context = tsubst (context, args, tf_error, NULL_TREE);
+      push_nested_class (context);
+    }
 
   tmpl = lookup_name_real (DECL_NAME (friend_tmpl), /*prefer_type=*/false,
 			   /*non_class=*/false, /*block_p=*/false,
@@ -13358,7 +13435,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 
                 /* Zero-length parameter packs are boring. Just substitute
                    into the chain.  */
-                if (len == 0)
+		if (len == 0 && !cp_unevaluated_operand)
                   RETURN (tsubst (TREE_CHAIN (t), args, complain,
 				  TREE_CHAIN (t)));
               }
@@ -20462,8 +20539,15 @@ type_unification_real (tree tparms,
 	    }
 	  else
 	    {
+	      /* Even if the call is happening in template context, getting
+		 here means it's non-dependent, and a default argument is
+		 considered a separate definition under [temp.decls], so we can
+		 do this substitution without processing_template_decl.  This
+		 is important if the default argument contains something that
+		 might be instantiation-dependent like access (87480).  */
+	      processing_template_decl_sentinel s;
 	      tree substed = NULL_TREE;
-	      if (saw_undeduced == 1 && processing_template_decl == 0)
+	      if (saw_undeduced == 1)
 		{
 		  /* First instatiate in template context, in case we still
 		     depend on undeduced template parameters.  */
@@ -22979,6 +23063,11 @@ most_specialized_partial_spec (tree target, tsubst_flags_t complain)
       args = INNERMOST_TEMPLATE_ARGS (args);
     }
 
+  /* The caller hasn't called push_to_top_level yet, but we need
+     get_partial_spec_bindings to be done in non-template context so that we'll
+     fully resolve everything.  */
+  processing_template_decl_sentinel ptds;
+
   for (t = DECL_TEMPLATE_SPECIALIZATIONS (main_tmpl); t; t = TREE_CHAIN (t))
     {
       tree spec_args;
@@ -25166,7 +25255,7 @@ type_dependent_expression_p (tree expression)
 	 that come from the template-id; the template arguments for the
 	 enclosing class do not make it type-dependent unless they are used in
 	 the type of the decl.  */
-      if (PRIMARY_TEMPLATE_P (DECL_TI_TEMPLATE (expression))
+      if (instantiates_primary_template_p (expression)
 	  && (any_dependent_template_arguments_p
 	      (INNERMOST_TEMPLATE_ARGS (DECL_TI_ARGS (expression)))))
 	return true;
@@ -26475,10 +26564,13 @@ build_deduction_guide (tree ctor, tree outer_args, tsubst_flags_t complain)
 				     complain, ctor);
 	  if (fparms == error_mark_node)
 	    ok = false;
-	  fargs = tsubst (fargs, tsubst_args, complain, ctor);
 	  if (ci)
 	    ci = tsubst_constraint_info (ci, tsubst_args, complain, ctor);
 
+	  /* Parms are to have DECL_CHAIN tsubsted, which would be skipped if
+	     cp_unevaluated_operand.  */
+	  temp_override<int> ev (cp_unevaluated_operand, 0);
+	  fargs = tsubst (fargs, tsubst_args, complain, ctor);
 	  current_template_parms = save_parms;
 	}
 

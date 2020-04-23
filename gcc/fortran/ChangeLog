@@ -1,3 +1,116 @@
+2020-04-14  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backport from trunk.
+	PR fortran/94270
+	* trans-decl.c (generate_local_decl): Do not warn if the
+	symbol is artifical.
+
+2020-04-02  Mark Eggleston <markeggleston@gcc.gnu.org>
+
+	Backport from master
+	2020-04-02  Mark Eggleston <markeggleston@gcc.gnu.org>
+	Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/94030
+	* gfortran.dg/pr94030_1.f90: New test.
+	* gfortran.dg/pr94030_2.f90: New test.
+
+2020-03-30  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2019-12-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/92775
+	* trans.h (struct lang_type, struct lang_decl): Remove span member.
+	(GFC_DECL_SPAN, GFC_TYPE_ARRAY_SPAN): Remove macros.
+	* trans-array.h (gfc_get_descriptor_offsets_for_info): Add another
+	argument.
+	* trans-array.c (gfc_get_descriptor_offsets_for_info): Add SPAN_OFF
+	argument and initialize *SPAN_OFF to the offset of span field.
+	* trans-types.c (gfc_get_array_descr_info): Adjust
+	gfc_get_descriptor_offsets_for_info caller.  Compute elem_size
+	as base->span instead of TYPE_SIZE_UNIT (etype) constant.
+
+2020-03-25  Mark Eggleston <markeggleston@gcc.gnu.org>
+
+	Backport from master
+	2020-03-25  Mark Eggleston <markeggleston@gcc.gnu.org>
+
+	PR fortran/93484
+	* match.c (gfc_match_type_spec): Replace gfc_match_init_expr with
+	gfc_match_expr. Return m if m is MATCH_NO or MATCH_ERROR.
+
+2020-02-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from mainline
+	2020-01-31  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93462
+	* frontend-passes.c (gfc_code_walker): For EXEC_OACC_ATOMIC, set
+	in_omp_atomic to true prevent front-end optimization.
+
+2020-03-04  Release Manager
+
+	* GCC 8.4.0 released.
+
+2020-02-19  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	Backported from mainline
+	2020-02-18  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/93714
+	* expr.c (gfc_check_pointer_assign): Move check for
+	matching character length to after checking the lvalue
+	attributes for target or pointer.
+
+2020-02-14  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/93463
+	* openmp.c (oacc_code_to_statement): Handle
+	EXEC_OACC_{ROUTINE,UPDATE,WAIT,CACHE,{ENTER,EXIT}_DATA,DECLARE}.
+
+	2020-01-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* parse.c (parse_omp_structured_block): Handle ST_OMP_TARGET_PARALLEL.
+	* trans-openmp.c (gfc_trans_omp_target)
+	<case EXEC_OMP_TARGET_PARALLEL>: Call pushlevel first.
+
+	PR fortran/93329
+	* openmp.c (omp_code_to_statement): Handle remaining EXEC_OMP_*
+	cases.
+
+	2019-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/92977
+	* frontend-passes.c (in_omp_atomic): New variable.
+	(cfe_expr_0, matmul_to_var_expr, matmul_temp_args,
+	inline_matmul_assign): Don't optimize in EXEC_OMP_ATOMIC.
+	(optimize_namespace): Clear in_omp_atomic.
+	(gfc_code_walker): Set in_omp_atomic for EXEC_OMP_ATOMIC, save/restore
+	it around.
+
+	2019-12-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/92899
+	* trans-openmp.c (gfc_trans_omp_atomic): For GFC_OMP_ATOMIC_SWAP,
+	do look through conversion on expr2 if any.
+
+	2019-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/92781
+	* trans-decl.c (gfc_get_symbol_decl): If sym->backend_decl is
+	current_function_decl, add length to current rather than parent
+	function and expect DECL_CONTEXT (length) to be current_function_decl.
+
+	2019-11-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/91944
+	* simplify.c (gfc_simplify_spread): Check gfc_init_expr_flag instead
+	of gfc_current_ns->sym_root->n.sym->attr.flavor == FL_PARAMETER.
+
 2020-02-03  Tobias Burnus  <tobias@codesourcery.com>
 
 	Backported from mainline

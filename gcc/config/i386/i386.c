@@ -2498,7 +2498,12 @@ rest_of_insert_endbranch (void)
 
   if (!lookup_attribute ("nocf_check",
 			 TYPE_ATTRIBUTES (TREE_TYPE (cfun->decl)))
-      && !cgraph_node::get (cfun->decl)->only_called_directly_p ())
+      && (!cgraph_node::get (cfun->decl)->only_called_directly_p ()
+	  || ix86_cmodel == CM_LARGE
+	  || ix86_cmodel == CM_LARGE_PIC
+	  || flag_force_indirect_call
+	  || (TARGET_DLLIMPORT_DECL_ATTRIBUTES
+	      && DECL_DLLIMPORT_P (cfun->decl))))
     {
       /* Queue ENDBR insertion to x86_function_profiler.  */
       if (crtl->profile && flag_fentry)
@@ -10005,6 +10010,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   tree ptrtype;
   machine_mode nat_mode;
   unsigned int arg_boundary;
+  unsigned int type_align;
 
   /* Only 64bit target needs something special.  */
   if (is_va_list_char_pointer (TREE_TYPE (valist)))
@@ -10062,6 +10068,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   /* Pull the value out of the saved registers.  */
 
   addr = create_tmp_var (ptr_type_node, "addr");
+  type_align = TYPE_ALIGN (type);
 
   if (container)
     {
@@ -10232,6 +10239,9 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 	  t = build2 (PLUS_EXPR, TREE_TYPE (gpr), gpr,
 		      build_int_cst (TREE_TYPE (gpr), needed_intregs * 8));
 	  gimplify_assign (gpr, t, pre_p);
+	  /* The GPR save area guarantees only 8-byte alignment.  */
+	  if (!need_temp)
+	    type_align = MIN (type_align, 64);
 	}
 
       if (needed_sseregs)
@@ -10276,6 +10286,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   if (container)
     gimple_seq_add_stmt (pre_p, gimple_build_label (lab_over));
 
+  type = build_aligned_type (type, type_align);
   ptrtype = build_pointer_type_for_mode (type, ptr_mode, true);
   addr = fold_convert (ptrtype, addr);
 
@@ -14590,8 +14601,13 @@ ix86_expand_epilogue (int style)
 	      t = plus_constant (Pmode, t, m->fs.fp_offset - UNITS_PER_WORD);
 	      emit_insn (gen_rtx_SET (sa, t));
 
-	      t = gen_frame_mem (Pmode, hard_frame_pointer_rtx);
-	      insn = emit_move_insn (hard_frame_pointer_rtx, t);
+	      /* NB: eh_return epilogues must restore the frame pointer
+		 in word_mode since the upper 32 bits of RBP register
+		 can have any values.  */
+	      t = gen_frame_mem (word_mode, hard_frame_pointer_rtx);
+	      rtx frame_reg = gen_rtx_REG (word_mode,
+					   HARD_FRAME_POINTER_REGNUM);
+	      insn = emit_move_insn (frame_reg, t);
 
 	      /* Note that we use SA as a temporary CFA, as the return
 		 address is at the proper place relative to it.  We
@@ -14606,7 +14622,7 @@ ix86_expand_epilogue (int style)
 	      add_reg_note (insn, REG_CFA_DEF_CFA,
 			    plus_constant (Pmode, sa, UNITS_PER_WORD));
 	      ix86_add_queued_cfa_restore_notes (insn);
-	      add_reg_note (insn, REG_CFA_RESTORE, hard_frame_pointer_rtx);
+	      add_reg_note (insn, REG_CFA_RESTORE, frame_reg);
 	      RTX_FRAME_RELATED_P (insn) = 1;
 
 	      m->fs.cfa_reg = sa;
@@ -19916,8 +19932,6 @@ ix86_output_addr_diff_elt (FILE *file, int value, int rel)
   if (TARGET_64BIT || TARGET_VXWORKS_RTP)
     fprintf (file, "%s%s%d-%s%d\n",
 	     directive, LPREFIX, value, LPREFIX, rel);
-  else if (HAVE_AS_GOTOFF_IN_DATA)
-    fprintf (file, ASM_LONG "%s%d@GOTOFF\n", LPREFIX, value);
 #if TARGET_MACHO
   else if (TARGET_MACHO)
     {
@@ -19926,6 +19940,8 @@ ix86_output_addr_diff_elt (FILE *file, int value, int rel)
       putc ('\n', file);
     }
 #endif
+  else if (HAVE_AS_GOTOFF_IN_DATA)
+    fprintf (file, ASM_LONG "%s%d@GOTOFF\n", LPREFIX, value);
   else
     asm_fprintf (file, ASM_LONG "%U%s+[.-%s%d]\n",
 		 GOT_SYMBOL_NAME, LPREFIX, value);
@@ -30473,9 +30489,14 @@ ix86_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
 	 the stack, we need to skip the first insn which pushes the
 	 (call-saved) register static chain; this push is 1 byte.  */
       offset += 5;
+      int skip = MEM_P (chain) ? 1 : 0;
+      /* Skip ENDBR32 at the entry of the target function.  */
+      if (need_endbr
+	  && !cgraph_node::get (fndecl)->only_called_directly_p ())
+	skip += 4;
       disp = expand_binop (SImode, sub_optab, fnaddr,
 			   plus_constant (Pmode, XEXP (m_tramp, 0),
-					  offset - (MEM_P (chain) ? 1 : 0)),
+					  offset - skip),
 			   NULL_RTX, 1, OPTAB_DIRECT);
       emit_move_insn (mem, disp);
     }
@@ -44517,43 +44538,51 @@ emit_reduc_half (rtx dest, rtx src, int i)
       break;
     case E_V64QImode:
     case E_V32HImode:
+      if (i < 64)
+	{
+	  d = gen_reg_rtx (V4TImode);
+	  tem = gen_avx512bw_lshrv4ti3 (d, gen_lowpart (V4TImode, src),
+					GEN_INT (i / 2));
+	  break;
+	}
+      /* FALLTHRU */
     case E_V16SImode:
     case E_V16SFmode:
     case E_V8DImode:
     case E_V8DFmode:
       if (i > 128)
 	tem = gen_avx512f_shuf_i32x4_1 (gen_lowpart (V16SImode, dest),
-				      gen_lowpart (V16SImode, src),
-				      gen_lowpart (V16SImode, src),
-				      GEN_INT (0x4 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x5 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x6 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0x7 + (i == 512 ? 4 : 0)),
-				      GEN_INT (0xC), GEN_INT (0xD),
-				      GEN_INT (0xE), GEN_INT (0xF),
-				      GEN_INT (0x10), GEN_INT (0x11),
-				      GEN_INT (0x12), GEN_INT (0x13),
-				      GEN_INT (0x14), GEN_INT (0x15),
-				      GEN_INT (0x16), GEN_INT (0x17));
+					gen_lowpart (V16SImode, src),
+					gen_lowpart (V16SImode, src),
+					GEN_INT (0x4 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x5 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x6 + (i == 512 ? 4 : 0)),
+					GEN_INT (0x7 + (i == 512 ? 4 : 0)),
+					GEN_INT (0xC), GEN_INT (0xD),
+					GEN_INT (0xE), GEN_INT (0xF),
+					GEN_INT (0x10), GEN_INT (0x11),
+					GEN_INT (0x12), GEN_INT (0x13),
+					GEN_INT (0x14), GEN_INT (0x15),
+					GEN_INT (0x16), GEN_INT (0x17));
       else
 	tem = gen_avx512f_pshufd_1 (gen_lowpart (V16SImode, dest),
-				   gen_lowpart (V16SImode, src),
-				   GEN_INT (i == 128 ? 0x2 : 0x1),
-				   GEN_INT (0x3),
-				   GEN_INT (0x3),
-				   GEN_INT (0x3),
-				   GEN_INT (i == 128 ? 0x6 : 0x5),
-				   GEN_INT (0x7),
-				   GEN_INT (0x7),
-				   GEN_INT (0x7),
-				   GEN_INT (i == 128 ? 0xA : 0x9),
-				   GEN_INT (0xB),
-				   GEN_INT (0xB),
-				   GEN_INT (0xB),
-				   GEN_INT (i == 128 ? 0xE : 0xD),
-				   GEN_INT (0xF),
-				   GEN_INT (0xF),
-				   GEN_INT (0xF));
+				    gen_lowpart (V16SImode, src),
+				    GEN_INT (i == 128 ? 0x2 : 0x1),
+				    GEN_INT (0x3),
+				    GEN_INT (0x3),
+				    GEN_INT (0x3),
+				    GEN_INT (i == 128 ? 0x6 : 0x5),
+				    GEN_INT (0x7),
+				    GEN_INT (0x7),
+				    GEN_INT (0x7),
+				    GEN_INT (i == 128 ? 0xA : 0x9),
+				    GEN_INT (0xB),
+				    GEN_INT (0xB),
+				    GEN_INT (0xB),
+				    GEN_INT (i == 128 ? 0xE : 0xD),
+				    GEN_INT (0xF),
+				    GEN_INT (0xF),
+				    GEN_INT (0xF));
       break;
     default:
       gcc_unreachable ();
@@ -44774,11 +44803,15 @@ ix86_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &/*inputs*/,
 	    {
 	      x = force_reg (dest_mode, const0_rtx);
 
-	      emit_insn (gen_movstrictqi
-			 (gen_lowpart (QImode, x), destqi));
+	      emit_insn (gen_movstrictqi (gen_lowpart (QImode, x), destqi));
 	    }
 	  else
-	    x = gen_rtx_ZERO_EXTEND (dest_mode, destqi);
+	    {
+	      x = gen_rtx_ZERO_EXTEND (dest_mode, destqi);
+	      if (dest_mode == GET_MODE (dest)
+		  && !register_operand (dest, GET_MODE (dest)))
+		x = force_reg (dest_mode, x);
+	    }
 	}
 
       if (dest_mode != GET_MODE (dest))

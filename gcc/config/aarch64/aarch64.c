@@ -1517,11 +1517,67 @@ emit_set_insn (rtx x, rtx y)
 rtx
 aarch64_gen_compare_reg (RTX_CODE code, rtx x, rtx y)
 {
-  machine_mode mode = SELECT_CC_MODE (code, x, y);
-  rtx cc_reg = gen_rtx_REG (mode, CC_REGNUM);
+  machine_mode cmp_mode = GET_MODE (x);
+  machine_mode cc_mode;
+  rtx cc_reg;
 
-  emit_set_insn (cc_reg, gen_rtx_COMPARE (mode, x, y));
+  if (cmp_mode == TImode)
+    {
+      gcc_assert (code == NE);
+
+      cc_mode = CCmode;
+      cc_reg = gen_rtx_REG (cc_mode, CC_REGNUM);
+
+      rtx x_lo = operand_subword (x, 0, 0, TImode);
+      rtx y_lo = operand_subword (y, 0, 0, TImode);
+      emit_set_insn (cc_reg, gen_rtx_COMPARE (cc_mode, x_lo, y_lo));
+
+      rtx x_hi = operand_subword (x, 1, 0, TImode);
+      rtx y_hi = operand_subword (y, 1, 0, TImode);
+      emit_insn (gen_ccmpdi (cc_reg, cc_reg, x_hi, y_hi,
+			     gen_rtx_EQ (cc_mode, cc_reg, const0_rtx),
+			     GEN_INT (AARCH64_EQ)));
+    }
+  else
+    {
+      cc_mode = SELECT_CC_MODE (code, x, y);
+      cc_reg = gen_rtx_REG (cc_mode, CC_REGNUM);
+      emit_set_insn (cc_reg, gen_rtx_COMPARE (cc_mode, x, y));
+    }
   return cc_reg;
+}
+
+/* Similarly, but maybe zero-extend Y if Y_MODE < SImode.  */
+
+static rtx
+aarch64_gen_compare_reg_maybe_ze (RTX_CODE code, rtx x, rtx y,
+                                  machine_mode y_mode)
+{
+  if (y_mode == E_QImode || y_mode == E_HImode)
+    {
+      if (CONST_INT_P (y))
+	{
+	  y = GEN_INT (INTVAL (y) & GET_MODE_MASK (y_mode));
+	  y_mode = SImode;
+	}
+      else
+	{
+	  rtx t, cc_reg;
+	  machine_mode cc_mode;
+
+	  t = gen_rtx_ZERO_EXTEND (SImode, y);
+	  t = gen_rtx_COMPARE (CC_SWPmode, t, x);
+	  cc_mode = CC_SWPmode;
+	  cc_reg = gen_rtx_REG (cc_mode, CC_REGNUM);
+	  emit_set_insn (cc_reg, t);
+	  return cc_reg;
+	}
+    }
+
+  if (!aarch64_plus_operand (y, y_mode))
+    y = force_reg (y_mode, y);
+
+  return aarch64_gen_compare_reg (code, x, y);
 }
 
 /* Build the SYMBOL_REF for __tls_get_addr.  */
@@ -6600,7 +6656,7 @@ sizetochar (int size)
      'S/T/U/V':		Print a FP/SIMD register name for a register list.
 			The register printed is the FP/SIMD register name
 			of X + 0/1/2/3 for S/T/U/V.
-     'R':		Print a scalar FP/SIMD register name + 1.
+     'R':		Print a scalar Integer/FP/SIMD register name + 1.
      'X':		Print bottom 16 bits of integer constant in hex.
      'w/x':		Print a general register name or the zero register
 			(32-bit or 64-bit).
@@ -6786,12 +6842,13 @@ aarch64_print_operand (FILE *f, rtx x, int code)
       break;
 
     case 'R':
-      if (!REG_P (x) || !FP_REGNUM_P (REGNO (x)))
-	{
-	  output_operand_lossage ("incompatible floating point / vector register operand for '%%%c'", code);
-	  return;
-	}
-      asm_fprintf (f, "q%d", REGNO (x) - V0_REGNUM + 1);
+      if (REG_P (x) && FP_REGNUM_P (REGNO (x)))
+	asm_fprintf (f, "q%d", REGNO (x) - V0_REGNUM + 1);
+      else if (REG_P (x) && GP_REGNUM_P (REGNO (x)))
+	asm_fprintf (f, "x%d", REGNO (x) - R0_REGNUM + 1);
+      else
+	output_operand_lossage ("incompatible register operand for '%%%c'",
+				code);
       break;
 
     case 'X':
@@ -14117,40 +14174,54 @@ static void
 aarch64_emit_load_exclusive (machine_mode mode, rtx rval,
 			     rtx mem, rtx model_rtx)
 {
-  rtx (*gen) (rtx, rtx, rtx);
-
-  switch (mode)
+  if (mode == TImode)
+    emit_insn (gen_aarch64_load_exclusive_pair (gen_lowpart (DImode, rval),
+						gen_highpart (DImode, rval),
+						mem, model_rtx));
+  else
     {
-    case E_QImode: gen = gen_aarch64_load_exclusiveqi; break;
-    case E_HImode: gen = gen_aarch64_load_exclusivehi; break;
-    case E_SImode: gen = gen_aarch64_load_exclusivesi; break;
-    case E_DImode: gen = gen_aarch64_load_exclusivedi; break;
-    default:
-      gcc_unreachable ();
-    }
+      rtx (*gen) (rtx, rtx, rtx);
 
-  emit_insn (gen (rval, mem, model_rtx));
+      switch (mode)
+	{
+	case E_QImode: gen = gen_aarch64_load_exclusiveqi; break;
+	case E_HImode: gen = gen_aarch64_load_exclusivehi; break;
+	case E_SImode: gen = gen_aarch64_load_exclusivesi; break;
+	case E_DImode: gen = gen_aarch64_load_exclusivedi; break;
+	default:
+	  gcc_unreachable ();
+	}
+
+      emit_insn (gen (rval, mem, model_rtx));
+    }
 }
 
 /* Emit store exclusive.  */
 
 static void
 aarch64_emit_store_exclusive (machine_mode mode, rtx bval,
-			      rtx rval, rtx mem, rtx model_rtx)
+			      rtx mem, rtx rval, rtx model_rtx)
 {
-  rtx (*gen) (rtx, rtx, rtx, rtx);
-
-  switch (mode)
+  if (mode == TImode)
+    emit_insn (gen_aarch64_store_exclusive_pair
+	       (bval, mem, operand_subword (rval, 0, 0, TImode),
+		operand_subword (rval, 1, 0, TImode), model_rtx));
+  else
     {
-    case E_QImode: gen = gen_aarch64_store_exclusiveqi; break;
-    case E_HImode: gen = gen_aarch64_store_exclusivehi; break;
-    case E_SImode: gen = gen_aarch64_store_exclusivesi; break;
-    case E_DImode: gen = gen_aarch64_store_exclusivedi; break;
-    default:
-      gcc_unreachable ();
-    }
+      rtx (*gen) (rtx, rtx, rtx, rtx);
 
-  emit_insn (gen (bval, rval, mem, model_rtx));
+      switch (mode)
+	{
+	case E_QImode: gen = gen_aarch64_store_exclusiveqi; break;
+	case E_HImode: gen = gen_aarch64_store_exclusivehi; break;
+	case E_SImode: gen = gen_aarch64_store_exclusivesi; break;
+	case E_DImode: gen = gen_aarch64_store_exclusivedi; break;
+	default:
+	  gcc_unreachable ();
+	}
+
+      emit_insn (gen (bval, mem, rval, model_rtx));
+    }
 }
 
 /* Mark the previous jump instruction as unlikely.  */
@@ -14162,30 +14233,89 @@ aarch64_emit_unlikely_jump (rtx insn)
   add_reg_br_prob_note (jump, profile_probability::very_unlikely ());
 }
 
+/* We store the names of the various atomic helpers in a 5x4 array.
+   Return the libcall function given MODE, MODEL and NAMES.  */
+
+rtx
+aarch64_atomic_ool_func (machine_mode mode, rtx model_rtx,
+			 const atomic_ool_names *names)
+{
+  memmodel model = memmodel_base (INTVAL (model_rtx));
+  int mode_idx, model_idx;
+
+  switch (mode)
+    {
+    case E_QImode:
+      mode_idx = 0;
+      break;
+    case E_HImode:
+      mode_idx = 1;
+      break;
+    case E_SImode:
+      mode_idx = 2;
+      break;
+    case E_DImode:
+      mode_idx = 3;
+      break;
+    case E_TImode:
+      mode_idx = 4;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  switch (model)
+    {
+    case MEMMODEL_RELAXED:
+      model_idx = 0;
+      break;
+    case MEMMODEL_CONSUME:
+    case MEMMODEL_ACQUIRE:
+      model_idx = 1;
+      break;
+    case MEMMODEL_RELEASE:
+      model_idx = 2;
+      break;
+    case MEMMODEL_ACQ_REL:
+    case MEMMODEL_SEQ_CST:
+      model_idx = 3;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  return init_one_libfunc_visibility (names->str[mode_idx][model_idx],
+				      VISIBILITY_HIDDEN);
+}
+
+#define DEF0(B, N) \
+  { "__aarch64_" #B #N "_relax", \
+    "__aarch64_" #B #N "_acq", \
+    "__aarch64_" #B #N "_rel", \
+    "__aarch64_" #B #N "_acq_rel" }
+
+#define DEF4(B)  DEF0(B, 1), DEF0(B, 2), DEF0(B, 4), DEF0(B, 8), \
+		 { NULL, NULL, NULL, NULL }
+#define DEF5(B)  DEF0(B, 1), DEF0(B, 2), DEF0(B, 4), DEF0(B, 8), DEF0(B, 16)
+
+static const atomic_ool_names aarch64_ool_cas_names = { { DEF5(cas) } };
+const atomic_ool_names aarch64_ool_swp_names = { { DEF4(swp) } };
+const atomic_ool_names aarch64_ool_ldadd_names = { { DEF4(ldadd) } };
+const atomic_ool_names aarch64_ool_ldset_names = { { DEF4(ldset) } };
+const atomic_ool_names aarch64_ool_ldclr_names = { { DEF4(ldclr) } };
+const atomic_ool_names aarch64_ool_ldeor_names = { { DEF4(ldeor) } };
+
+#undef DEF0
+#undef DEF4
+#undef DEF5
+
 /* Expand a compare and swap pattern.  */
 
 void
 aarch64_expand_compare_and_swap (rtx operands[])
 {
-  rtx bval, rval, mem, oldval, newval, is_weak, mod_s, mod_f, x;
-  machine_mode mode, cmp_mode;
-  typedef rtx (*gen_cas_fn) (rtx, rtx, rtx, rtx, rtx, rtx, rtx);
-  int idx;
-  gen_cas_fn gen;
-  const gen_cas_fn split_cas[] =
-  {
-    gen_aarch64_compare_and_swapqi,
-    gen_aarch64_compare_and_swaphi,
-    gen_aarch64_compare_and_swapsi,
-    gen_aarch64_compare_and_swapdi
-  };
-  const gen_cas_fn atomic_cas[] =
-  {
-    gen_aarch64_compare_and_swapqi_lse,
-    gen_aarch64_compare_and_swaphi_lse,
-    gen_aarch64_compare_and_swapsi_lse,
-    gen_aarch64_compare_and_swapdi_lse
-  };
+  rtx bval, rval, mem, oldval, newval, is_weak, mod_s, mod_f, x, cc_reg;
+  machine_mode mode, r_mode;
 
   bval = operands[0];
   rval = operands[1];
@@ -14196,86 +14326,105 @@ aarch64_expand_compare_and_swap (rtx operands[])
   mod_s = operands[6];
   mod_f = operands[7];
   mode = GET_MODE (mem);
-  cmp_mode = mode;
 
   /* Normally the succ memory model must be stronger than fail, but in the
      unlikely event of fail being ACQUIRE and succ being RELEASE we need to
      promote succ to ACQ_REL so that we don't lose the acquire semantics.  */
-
   if (is_mm_acquire (memmodel_from_int (INTVAL (mod_f)))
       && is_mm_release (memmodel_from_int (INTVAL (mod_s))))
     mod_s = GEN_INT (MEMMODEL_ACQ_REL);
 
-  switch (mode)
-    {
-    case E_QImode:
-    case E_HImode:
-      /* For short modes, we're going to perform the comparison in SImode,
-	 so do the zero-extension now.  */
-      cmp_mode = SImode;
-      rval = gen_reg_rtx (SImode);
-      oldval = convert_modes (SImode, mode, oldval, true);
-      /* Fall through.  */
-
-    case E_SImode:
-    case E_DImode:
-      /* Force the value into a register if needed.  */
-      if (!aarch64_plus_operand (oldval, mode))
-	oldval = force_reg (cmp_mode, oldval);
-      break;
-
-    default:
-      gcc_unreachable ();
-    }
-
-  switch (mode)
-    {
-    case E_QImode: idx = 0; break;
-    case E_HImode: idx = 1; break;
-    case E_SImode: idx = 2; break;
-    case E_DImode: idx = 3; break;
-    default:
-      gcc_unreachable ();
-    }
-  if (TARGET_LSE)
-    gen = atomic_cas[idx];
-  else
-    gen = split_cas[idx];
-
-  emit_insn (gen (rval, mem, oldval, newval, is_weak, mod_s, mod_f));
-
+  r_mode = mode;
   if (mode == QImode || mode == HImode)
-    emit_move_insn (operands[1], gen_lowpart (mode, rval));
-
-  x = gen_rtx_REG (CCmode, CC_REGNUM);
-  x = gen_rtx_EQ (SImode, x, const0_rtx);
-  emit_insn (gen_rtx_SET (bval, x));
-}
-
-/* Test whether the target supports using a atomic load-operate instruction.
-   CODE is the operation and AFTER is TRUE if the data in memory after the
-   operation should be returned and FALSE if the data before the operation
-   should be returned.  Returns FALSE if the operation isn't supported by the
-   architecture.  */
-
-bool
-aarch64_atomic_ldop_supported_p (enum rtx_code code)
-{
-  if (!TARGET_LSE)
-    return false;
-
-  switch (code)
     {
-    case SET:
-    case AND:
-    case IOR:
-    case XOR:
-    case MINUS:
-    case PLUS:
-      return true;
-    default:
-      return false;
+      r_mode = SImode;
+      rval = gen_reg_rtx (r_mode);
     }
+
+  if (TARGET_LSE)
+    {
+      insn_code code;
+      switch (mode)
+	{
+	case E_QImode:
+	 code = CODE_FOR_aarch64_compare_and_swapqi_lse;
+	 break;
+	case E_HImode:
+	 code = CODE_FOR_aarch64_compare_and_swaphi_lse;
+	 break;
+	case E_SImode:
+	 code = CODE_FOR_aarch64_compare_and_swapsi_lse;
+	 break;
+	case E_DImode:
+	 code = CODE_FOR_aarch64_compare_and_swapdi_lse;
+	 break;
+	case E_TImode:
+	 code = CODE_FOR_aarch64_compare_and_swapti_lse;
+	 break;
+	default:
+	  gcc_unreachable ();
+	}
+      /* The CAS insn requires oldval and rval overlap, but we need to
+	 have a copy of oldval saved across the operation to tell if
+	 the operation is successful.  */
+      if (reg_overlap_mentioned_p (rval, oldval))
+        rval = copy_to_mode_reg (r_mode, oldval);
+      else
+	emit_move_insn (rval, gen_lowpart (r_mode, oldval));
+
+      emit_insn (GEN_FCN (code) (rval, mem, newval, mod_s));
+
+      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+    }
+  else if (TARGET_OUTLINE_ATOMICS)
+    {
+      /* Oldval must satisfy compare afterward.  */
+      if (!aarch64_plus_operand (oldval, mode))
+	oldval = force_reg (mode, oldval);
+      rtx func = aarch64_atomic_ool_func (mode, mod_s, &aarch64_ool_cas_names);
+      rval = emit_library_call_value (func, NULL_RTX, LCT_NORMAL, r_mode,
+				      oldval, mode, newval, mode,
+				      XEXP (mem, 0), Pmode);
+      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+    }
+  else
+    {
+      /* The oldval predicate varies by mode.  Test it and force to reg.  */
+      insn_code code;
+      switch (mode)
+	{
+	  case E_QImode:
+	    code = CODE_FOR_aarch64_compare_and_swapqi;
+	    break;
+	  case E_HImode:
+	    code = CODE_FOR_aarch64_compare_and_swaphi;
+	    break;
+	  case E_SImode:
+	    code = CODE_FOR_aarch64_compare_and_swapsi;
+	    break;
+	  case E_DImode:
+	    code = CODE_FOR_aarch64_compare_and_swapdi;
+	    break;
+	  case E_TImode:
+	    code = CODE_FOR_aarch64_compare_and_swapti;
+	    break;
+	  default:
+	    gcc_unreachable ();
+	}
+      if (!insn_data[code].operand[2].predicate (oldval, mode))
+	oldval = force_reg (mode, oldval);
+
+      emit_insn (GEN_FCN (code) (rval, mem, oldval, newval,
+				 is_weak, mod_s, mod_f));
+      cc_reg = gen_rtx_REG (CCmode, CC_REGNUM);
+    }
+
+  if (r_mode != mode)
+    rval = gen_lowpart (mode, rval);
+  emit_move_insn (operands[1], rval);
+
+  x = gen_rtx_EQ (SImode, cc_reg, const0_rtx);
+  emit_insn (gen_rtx_SET (bval, x));
 }
 
 /* Emit a barrier, that is appropriate for memory model MODEL, at the end of a
@@ -14295,42 +14444,6 @@ aarch64_emit_post_barrier (enum memmodel model)
     }
 }
 
-/* Emit an atomic compare-and-swap operation.  RVAL is the destination register
-   for the data in memory.  EXPECTED is the value expected to be in memory.
-   DESIRED is the value to store to memory.  MEM is the memory location.  MODEL
-   is the memory ordering to use.  */
-
-void
-aarch64_gen_atomic_cas (rtx rval, rtx mem,
-			rtx expected, rtx desired,
-			rtx model)
-{
-  rtx (*gen) (rtx, rtx, rtx, rtx);
-  machine_mode mode;
-
-  mode = GET_MODE (mem);
-
-  switch (mode)
-    {
-    case E_QImode: gen = gen_aarch64_atomic_casqi; break;
-    case E_HImode: gen = gen_aarch64_atomic_cashi; break;
-    case E_SImode: gen = gen_aarch64_atomic_cassi; break;
-    case E_DImode: gen = gen_aarch64_atomic_casdi; break;
-    default:
-      gcc_unreachable ();
-    }
-
-  /* Move the expected value into the CAS destination register.  */
-  emit_insn (gen_rtx_SET (rval, expected));
-
-  /* Emit the CAS.  */
-  emit_insn (gen (rval, mem, desired, model));
-
-  /* Compare the expected value with the value loaded by the CAS, to establish
-     whether the swap was made.  */
-  aarch64_gen_compare_reg (EQ, rval, expected);
-}
-
 /* Split a compare and swap pattern.  */
 
 void
@@ -14339,13 +14452,11 @@ aarch64_split_compare_and_swap (rtx operands[])
   /* Split after prolog/epilog to avoid interactions with shrinkwrapping.  */
   gcc_assert (epilogue_completed);
 
-  rtx rval, mem, oldval, newval, scratch;
+  rtx rval, mem, oldval, newval, scratch, x, model_rtx;
   machine_mode mode;
   bool is_weak;
   rtx_code_label *label1, *label2;
-  rtx x, cond;
   enum memmodel model;
-  rtx model_rtx;
 
   rval = operands[0];
   mem = operands[1];
@@ -14366,7 +14477,7 @@ aarch64_split_compare_and_swap (rtx operands[])
 	CBNZ	scratch, .label1
     .label2:
 	CMP	rval, 0.  */
-  bool strong_zero_p = !is_weak && oldval == const0_rtx;
+  bool strong_zero_p = (!is_weak && oldval == const0_rtx && mode != TImode);
 
   label1 = NULL;
   if (!is_weak)
@@ -14379,26 +14490,20 @@ aarch64_split_compare_and_swap (rtx operands[])
   /* The initial load can be relaxed for a __sync operation since a final
      barrier will be emitted to stop code hoisting.  */
   if (is_mm_sync (model))
-    aarch64_emit_load_exclusive (mode, rval, mem,
-				 GEN_INT (MEMMODEL_RELAXED));
+    aarch64_emit_load_exclusive (mode, rval, mem, GEN_INT (MEMMODEL_RELAXED));
   else
     aarch64_emit_load_exclusive (mode, rval, mem, model_rtx);
 
   if (strong_zero_p)
-    {
-      x = gen_rtx_NE (VOIDmode, rval, const0_rtx);
-      x = gen_rtx_IF_THEN_ELSE (VOIDmode, x,
-				gen_rtx_LABEL_REF (Pmode, label2), pc_rtx);
-      aarch64_emit_unlikely_jump (gen_rtx_SET (pc_rtx, x));
-    }
+    x = gen_rtx_NE (VOIDmode, rval, const0_rtx);
   else
     {
-      cond = aarch64_gen_compare_reg (NE, rval, oldval);
-      x = gen_rtx_NE (VOIDmode, cond, const0_rtx);
-      x = gen_rtx_IF_THEN_ELSE (VOIDmode, x,
-				 gen_rtx_LABEL_REF (Pmode, label2), pc_rtx);
-      aarch64_emit_unlikely_jump (gen_rtx_SET (pc_rtx, x));
+      rtx cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+      x = gen_rtx_NE (VOIDmode, cc_reg, const0_rtx);
     }
+  x = gen_rtx_IF_THEN_ELSE (VOIDmode, x,
+			    gen_rtx_LABEL_REF (Pmode, label2), pc_rtx);
+  aarch64_emit_unlikely_jump (gen_rtx_SET (pc_rtx, x));
 
   aarch64_emit_store_exclusive (mode, scratch, mem, newval, model_rtx);
 
@@ -14410,271 +14515,19 @@ aarch64_split_compare_and_swap (rtx operands[])
       aarch64_emit_unlikely_jump (gen_rtx_SET (pc_rtx, x));
     }
   else
-    {
-      cond = gen_rtx_REG (CCmode, CC_REGNUM);
-      x = gen_rtx_COMPARE (CCmode, scratch, const0_rtx);
-      emit_insn (gen_rtx_SET (cond, x));
-    }
+    aarch64_gen_compare_reg (NE, scratch, const0_rtx);
 
   emit_label (label2);
+
   /* If we used a CBNZ in the exchange loop emit an explicit compare with RVAL
      to set the condition flags.  If this is not used it will be removed by
      later passes.  */
   if (strong_zero_p)
-    {
-      cond = gen_rtx_REG (CCmode, CC_REGNUM);
-      x = gen_rtx_COMPARE (CCmode, rval, const0_rtx);
-      emit_insn (gen_rtx_SET (cond, x));
-    }
+    aarch64_gen_compare_reg (NE, rval, const0_rtx);
+
   /* Emit any final barrier needed for a __sync operation.  */
   if (is_mm_sync (model))
     aarch64_emit_post_barrier (model);
-}
-
-/* Emit a BIC instruction.  */
-
-static void
-aarch64_emit_bic (machine_mode mode, rtx dst, rtx s1, rtx s2, int shift)
-{
-  rtx shift_rtx = GEN_INT (shift);
-  rtx (*gen) (rtx, rtx, rtx, rtx);
-
-  switch (mode)
-    {
-    case E_SImode: gen = gen_and_one_cmpl_lshrsi3; break;
-    case E_DImode: gen = gen_and_one_cmpl_lshrdi3; break;
-    default:
-      gcc_unreachable ();
-    }
-
-  emit_insn (gen (dst, s2, shift_rtx, s1));
-}
-
-/* Emit an atomic swap.  */
-
-static void
-aarch64_emit_atomic_swap (machine_mode mode, rtx dst, rtx value,
-			  rtx mem, rtx model)
-{
-  rtx (*gen) (rtx, rtx, rtx, rtx);
-
-  switch (mode)
-    {
-    case E_QImode: gen = gen_aarch64_atomic_swpqi; break;
-    case E_HImode: gen = gen_aarch64_atomic_swphi; break;
-    case E_SImode: gen = gen_aarch64_atomic_swpsi; break;
-    case E_DImode: gen = gen_aarch64_atomic_swpdi; break;
-    default:
-      gcc_unreachable ();
-    }
-
-  emit_insn (gen (dst, mem, value, model));
-}
-
-/* Operations supported by aarch64_emit_atomic_load_op.  */
-
-enum aarch64_atomic_load_op_code
-{
-  AARCH64_LDOP_PLUS,	/* A + B  */
-  AARCH64_LDOP_XOR,	/* A ^ B  */
-  AARCH64_LDOP_OR,	/* A | B  */
-  AARCH64_LDOP_BIC	/* A & ~B  */
-};
-
-/* Emit an atomic load-operate.  */
-
-static void
-aarch64_emit_atomic_load_op (enum aarch64_atomic_load_op_code code,
-			     machine_mode mode, rtx dst, rtx src,
-			     rtx mem, rtx model)
-{
-  typedef rtx (*aarch64_atomic_load_op_fn) (rtx, rtx, rtx, rtx);
-  const aarch64_atomic_load_op_fn plus[] =
-  {
-    gen_aarch64_atomic_loadaddqi,
-    gen_aarch64_atomic_loadaddhi,
-    gen_aarch64_atomic_loadaddsi,
-    gen_aarch64_atomic_loadadddi
-  };
-  const aarch64_atomic_load_op_fn eor[] =
-  {
-    gen_aarch64_atomic_loadeorqi,
-    gen_aarch64_atomic_loadeorhi,
-    gen_aarch64_atomic_loadeorsi,
-    gen_aarch64_atomic_loadeordi
-  };
-  const aarch64_atomic_load_op_fn ior[] =
-  {
-    gen_aarch64_atomic_loadsetqi,
-    gen_aarch64_atomic_loadsethi,
-    gen_aarch64_atomic_loadsetsi,
-    gen_aarch64_atomic_loadsetdi
-  };
-  const aarch64_atomic_load_op_fn bic[] =
-  {
-    gen_aarch64_atomic_loadclrqi,
-    gen_aarch64_atomic_loadclrhi,
-    gen_aarch64_atomic_loadclrsi,
-    gen_aarch64_atomic_loadclrdi
-  };
-  aarch64_atomic_load_op_fn gen;
-  int idx = 0;
-
-  switch (mode)
-    {
-    case E_QImode: idx = 0; break;
-    case E_HImode: idx = 1; break;
-    case E_SImode: idx = 2; break;
-    case E_DImode: idx = 3; break;
-    default:
-      gcc_unreachable ();
-    }
-
-  switch (code)
-    {
-    case AARCH64_LDOP_PLUS: gen = plus[idx]; break;
-    case AARCH64_LDOP_XOR: gen = eor[idx]; break;
-    case AARCH64_LDOP_OR: gen = ior[idx]; break;
-    case AARCH64_LDOP_BIC: gen = bic[idx]; break;
-    default:
-      gcc_unreachable ();
-    }
-
-  emit_insn (gen (dst, mem, src, model));
-}
-
-/* Emit an atomic load+operate.  CODE is the operation.  OUT_DATA is the
-   location to store the data read from memory.  OUT_RESULT is the location to
-   store the result of the operation.  MEM is the memory location to read and
-   modify.  MODEL_RTX is the memory ordering to use.  VALUE is the second
-   operand for the operation.  Either OUT_DATA or OUT_RESULT, but not both, can
-   be NULL.  */
-
-void
-aarch64_gen_atomic_ldop (enum rtx_code code, rtx out_data, rtx out_result,
-			 rtx mem, rtx value, rtx model_rtx)
-{
-  machine_mode mode = GET_MODE (mem);
-  machine_mode wmode = (mode == DImode ? DImode : SImode);
-  const bool short_mode = (mode < SImode);
-  aarch64_atomic_load_op_code ldop_code;
-  rtx src;
-  rtx x;
-
-  if (out_data)
-    out_data = gen_lowpart (mode, out_data);
-
-  if (out_result)
-    out_result = gen_lowpart (mode, out_result);
-
-  /* Make sure the value is in a register, putting it into a destination
-     register if it needs to be manipulated.  */
-  if (!register_operand (value, mode)
-      || code == AND || code == MINUS)
-    {
-      src = out_result ? out_result : out_data;
-      emit_move_insn (src, gen_lowpart (mode, value));
-    }
-  else
-    src = value;
-  gcc_assert (register_operand (src, mode));
-
-  /* Preprocess the data for the operation as necessary.  If the operation is
-     a SET then emit a swap instruction and finish.  */
-  switch (code)
-    {
-    case SET:
-      aarch64_emit_atomic_swap (mode, out_data, src, mem, model_rtx);
-      return;
-
-    case MINUS:
-      /* Negate the value and treat it as a PLUS.  */
-      {
-	rtx neg_src;
-
-	/* Resize the value if necessary.  */
-	if (short_mode)
-	  src = gen_lowpart (wmode, src);
-
-	neg_src = gen_rtx_NEG (wmode, src);
-	emit_insn (gen_rtx_SET (src, neg_src));
-
-	if (short_mode)
-	  src = gen_lowpart (mode, src);
-      }
-      /* Fall-through.  */
-    case PLUS:
-      ldop_code = AARCH64_LDOP_PLUS;
-      break;
-
-    case IOR:
-      ldop_code = AARCH64_LDOP_OR;
-      break;
-
-    case XOR:
-      ldop_code = AARCH64_LDOP_XOR;
-      break;
-
-    case AND:
-      {
-	rtx not_src;
-
-	/* Resize the value if necessary.  */
-	if (short_mode)
-	  src = gen_lowpart (wmode, src);
-
-	not_src = gen_rtx_NOT (wmode, src);
-	emit_insn (gen_rtx_SET (src, not_src));
-
-	if (short_mode)
-	  src = gen_lowpart (mode, src);
-      }
-      ldop_code = AARCH64_LDOP_BIC;
-      break;
-
-    default:
-      /* The operation can't be done with atomic instructions.  */
-      gcc_unreachable ();
-    }
-
-  aarch64_emit_atomic_load_op (ldop_code, mode, out_data, src, mem, model_rtx);
-
-  /* If necessary, calculate the data in memory after the update by redoing the
-     operation from values in registers.  */
-  if (!out_result)
-    return;
-
-  if (short_mode)
-    {
-      src = gen_lowpart (wmode, src);
-      out_data = gen_lowpart (wmode, out_data);
-      out_result = gen_lowpart (wmode, out_result);
-    }
-
-  x = NULL_RTX;
-
-  switch (code)
-    {
-    case MINUS:
-    case PLUS:
-      x = gen_rtx_PLUS (wmode, out_data, src);
-      break;
-    case IOR:
-      x = gen_rtx_IOR (wmode, out_data, src);
-      break;
-    case XOR:
-      x = gen_rtx_XOR (wmode, out_data, src);
-      break;
-    case AND:
-      aarch64_emit_bic (wmode, out_result, out_data, src, 0);
-      return;
-    default:
-      gcc_unreachable ();
-    }
-
-  emit_set_insn (out_result, x);
-
-  return;
 }
 
 /* Split an atomic operation.  */

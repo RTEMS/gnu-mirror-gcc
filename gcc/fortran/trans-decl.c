@@ -1626,15 +1626,18 @@ gfc_get_symbol_decl (gfc_symbol * sym)
 	      /* Add the string length to the same context as the symbol.  */
 	      if (DECL_CONTEXT (length) == NULL_TREE)
 		{
-		  if (DECL_CONTEXT (sym->backend_decl)
-		      == current_function_decl)
+		  if (sym->backend_decl == current_function_decl
+		      || (DECL_CONTEXT (sym->backend_decl)
+			  == current_function_decl))
 		    gfc_add_decl_to_function (length);
 		  else
 		    gfc_add_decl_to_parent_function (length);
 		}
 
-	      gcc_assert (DECL_CONTEXT (sym->backend_decl)
-			  == DECL_CONTEXT (length));
+	      gcc_assert (sym->backend_decl == current_function_decl
+			  ? DECL_CONTEXT (length) == current_function_decl
+			  : (DECL_CONTEXT (sym->backend_decl)
+			     == DECL_CONTEXT (length)));
 
 	      gfc_defer_symbol_init (sym);
 	    }
@@ -5870,7 +5873,7 @@ generate_local_decl (gfc_symbol * sym)
       /* Unused procedure passed as dummy argument.  */
       if (sym->attr.flavor == FL_PROCEDURE)
 	{
-	  if (!sym->attr.referenced)
+	  if (!sym->attr.referenced && !sym->attr.artificial)
 	    {
 	      if (warn_unused_dummy_argument)
 		gfc_warning (OPT_Wunused_dummy_argument,

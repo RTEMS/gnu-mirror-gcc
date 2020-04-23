@@ -496,10 +496,7 @@ rtx aarch64_load_tp (rtx);
 
 void aarch64_expand_compare_and_swap (rtx op[]);
 void aarch64_split_compare_and_swap (rtx op[]);
-void aarch64_gen_atomic_cas (rtx, rtx, rtx, rtx, rtx);
 
-bool aarch64_atomic_ldop_supported_p (enum rtx_code);
-void aarch64_gen_atomic_ldop (enum rtx_code, rtx, rtx, rtx, rtx, rtx);
 void aarch64_split_atomic_op (enum rtx_code, rtx, rtx, rtx, rtx, rtx, rtx);
 
 bool aarch64_gen_adjusted_ldpstp (rtx *, bool, scalar_mode, RTX_CODE);
@@ -550,5 +547,18 @@ std::string aarch64_get_extension_string_for_isa_flags (unsigned long,
 rtl_opt_pass *make_pass_fma_steering (gcc::context *ctxt);
 
 poly_uint64 aarch64_regmode_natural_size (machine_mode);
+
+struct atomic_ool_names
+{
+    const char *str[5][4];
+};
+
+rtx aarch64_atomic_ool_func(machine_mode mode, rtx model_rtx,
+			    const atomic_ool_names *names);
+extern const atomic_ool_names aarch64_ool_swp_names;
+extern const atomic_ool_names aarch64_ool_ldadd_names;
+extern const atomic_ool_names aarch64_ool_ldset_names;
+extern const atomic_ool_names aarch64_ool_ldclr_names;
+extern const atomic_ool_names aarch64_ool_ldeor_names;
 
 #endif /* GCC_AARCH64_PROTOS_H */
