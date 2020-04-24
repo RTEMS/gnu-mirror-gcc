@@ -1,5 +1,11 @@
 2020-04-24  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Map all of
+	the special f128 constant builtins to the long double version if
+	long double is IEEE 128-bit.
+
+2020-04-24  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
 	double is IEEE 128-bit, map the old 'q' built-in functions to
 	'f128' versions.  Also map the silent NaN f128 function to the
