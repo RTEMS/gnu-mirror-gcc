@@ -1,3 +1,16 @@
+2020-04-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE 128-bit, map the old 'q' built-in functions to
+	'f128' versions.  Also map the silent NaN f128 function to the
+	long double version.
+
+2020-04-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
+	special cases for built-in functions that return or use long
+	double, but don't end in 'l'.
+
 2020-04-17  Michael Meissner  <meissner@linux.ibm.com>
 
 	(~/patches/ieee128-lib-patch002b)
