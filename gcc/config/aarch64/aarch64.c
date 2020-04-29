@@ -1084,10 +1084,14 @@ aarch64_hard_regno_mode_ok (unsigned regno, machine_mode mode)
   if (regno == FRAME_POINTER_REGNUM || regno == ARG_POINTER_REGNUM)
     return mode == Pmode;
 
-  if (GP_REGNUM_P (regno) && ! aarch64_vect_struct_mode_p (mode))
-    return 1;
-
-  if (FP_REGNUM_P (regno))
+  if (GP_REGNUM_P (regno))
+    {
+      if (GET_MODE_SIZE (mode) <= 8)
+	return true;
+      if (GET_MODE_SIZE (mode) <= 16)
+	return (regno & 1) == 0;
+    }
+  else if (FP_REGNUM_P (regno))
     {
       if (aarch64_vect_struct_mode_p (mode))
 	return
