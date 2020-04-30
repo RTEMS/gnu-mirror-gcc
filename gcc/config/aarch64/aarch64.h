@@ -98,6 +98,11 @@
     && (ALIGN) < BITS_PER_WORD)			\
    ? BITS_PER_WORD : ALIGN)
 
+/* Emit calls to libgcc helpers for atomic operations for runtime detection
+   of LSE instructions.  */
+#define TARGET_OUTLINE_ATOMICS (aarch64_flag_outline_atomics)
+
+
 #define DATA_ALIGNMENT(EXP, ALIGN)		\
   ((((ALIGN) < BITS_PER_WORD)			\
     && (TREE_CODE (EXP) == ARRAY_TYPE		\
