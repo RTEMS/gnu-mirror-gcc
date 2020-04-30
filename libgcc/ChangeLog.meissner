@@ -1,5 +1,11 @@
 2020-04-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	(~/patches/ieee128-lib-patch011b)
+	* config/rs6000/float128-decimal.c: Fix typos.
+	* config/rs6000/float128-decimal.ver: Fix typos.
+
+2020-04-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	(~/patches/ieee128-lib-patch010b)
 	* config.host (powerpc*-*-linux): Add support if glibc does not
 	provide the appropriate IEEE 128-bit conversions to/from Decimal.
