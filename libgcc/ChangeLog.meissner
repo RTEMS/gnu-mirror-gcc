@@ -1,7 +1,14 @@
 2020-04-30  Michael Meissner  <meissner@linux.ibm.com>
 
 	(~/patches/ieee128-lib-patch011b)
+	* config/rs6000/float128-decimal.c (__dpd_extendkftd): Convert
+	from float128 to decimal by using the string functions.
+
+2020-04-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	(~/patches/ieee128-lib-patch011b)
 	* config/rs6000/float128-decimal.c: Fix typos.
+
 	* config/rs6000/float128-decimal.ver: Fix typos.
 
 2020-04-30  Michael Meissner  <meissner@linux.ibm.com>

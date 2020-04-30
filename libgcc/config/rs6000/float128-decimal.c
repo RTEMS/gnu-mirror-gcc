@@ -28,6 +28,11 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
+#define __STDC_WANT_DEC_FP__			1
+#define __STDC_WANT_IEC_60559_TYPES_EXT__	1
+#define __STDC_WANT_IEC_60559_FUNCS_EXT__	1
+#include <stdlib.h>
+
 extern __float128 __dpd_trunctdkf (_Decimal128);
 extern __float128 __dpd_extendddkf (_Decimal64);
 extern __float128 __dpd_extendsdkf (_Decimal32);
@@ -59,20 +64,23 @@ __dpd_extendsdkf (_Decimal32 x)
 _Decimal128
 __dpd_extendkftd (__float128 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (_Decimal128) ibm;
+  char buffer[7000];
+  strfromf128 (buffer, sizeof (buffer), "%f", x);
+  return strtod128 (buffer, NULL);
 }
 
 _Decimal64
 __dpd_trunckfdd (__float128 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (_Decimal64) ibm;
+  char buffer[7000];
+  strfromf128 (buffer, sizeof (buffer), "%f", x);
+  return strtod64 (buffer, NULL);
 }
 
 _Decimal32
 __dpd_trunckfsd (__float128 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (_Decimal32) ibm;
+  char buffer[7000];
+  strfromf128 (buffer, sizeof (buffer), "%f", x);
+  return strtod32 (buffer, NULL);
 }
