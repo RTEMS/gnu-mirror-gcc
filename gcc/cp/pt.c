@@ -83,7 +83,9 @@ static tree cur_stmt_expr;
 local_specialization_stack::local_specialization_stack (lss_policy policy)
   : saved (local_specializations)
 {
-  if (policy == lss_blank || !saved)
+  if (policy == lss_nop)
+    ;
+  else if (policy == lss_blank || !saved)
     local_specializations = new hash_map<tree, tree>;
   else
     local_specializations = new hash_map<tree, tree>(*saved);
@@ -91,8 +93,11 @@ local_specialization_stack::local_specialization_stack (lss_policy policy)
 
 local_specialization_stack::~local_specialization_stack ()
 {
-  delete local_specializations;
-  local_specializations = saved;
+  if (local_specializations != saved)
+    {
+      delete local_specializations;
+      local_specializations = saved;
+    }
 }
 
 /* True if we've recursed into fn_type_unification too many times.  */
@@ -385,7 +390,12 @@ template_class_depth (tree type)
 	++depth;
 
       if (DECL_P (type))
-	type = CP_DECL_CONTEXT (type);
+	{
+	  if (tree fctx = DECL_FRIEND_CONTEXT (type))
+	    type = fctx;
+	  else
+	    type = CP_DECL_CONTEXT (type);
+	}
       else if (LAMBDA_TYPE_P (type) && LAMBDA_TYPE_EXTRA_SCOPE (type))
 	type = LAMBDA_TYPE_EXTRA_SCOPE (type);
       else
@@ -7001,6 +7011,11 @@ invalid_tparm_referent_p (tree type, tree expr, tsubst_flags_t complain)
 
 }
 
+/* The template arguments corresponding to template parameter objects of types
+   that contain pointers to members.  */
+
+static GTY(()) hash_map<tree, tree> *tparm_obj_values;
+
 /* Return a VAR_DECL for the C++20 template parameter object corresponding to
    template argument EXPR.  */
 
@@ -7034,8 +7049,30 @@ get_template_parm_object (tree expr, tsubst_flags_t complain)
   SET_DECL_ASSEMBLER_NAME (decl, name);
   DECL_CONTEXT (decl) = global_namespace;
   comdat_linkage (decl);
+
+  if (!zero_init_p (type))
+    {
+      /* If EXPR contains any PTRMEM_CST, they will get clobbered by
+	 lower_var_init before we're done mangling.  So store the original
+	 value elsewhere.  */
+      tree copy = unshare_constructor (expr);
+      hash_map_safe_put<hm_ggc> (tparm_obj_values, decl, copy);
+    }
+
   pushdecl_top_level_and_finish (decl, expr);
+
   return decl;
+}
+
+/* Return the actual template argument corresponding to template parameter
+   object VAR.  */
+
+tree
+tparm_object_argument (tree var)
+{
+  if (zero_init_p (TREE_TYPE (var)))
+    return DECL_INITIAL (var);
+  return *(tparm_obj_values->get (var));
 }
 
 /* Attempt to convert the non-type template parameter EXPR to the
@@ -10402,12 +10439,14 @@ for_each_template_parm (tree t, tree_fn_t fn, void* data,
 struct find_template_parameter_info
 {
   explicit find_template_parameter_info (tree ctx_parms)
-    : ctx_parms (ctx_parms),
+    : parm_list (NULL_TREE),
+      ctx_parms (ctx_parms),
       max_depth (TMPL_PARMS_DEPTH (ctx_parms))
   {}
 
   hash_set<tree> visited;
   hash_set<tree> parms;
+  tree parm_list;
   tree ctx_parms;
   int max_depth;
 };
@@ -10439,7 +10478,8 @@ keep_template_parm (tree t, void* data)
      T and const T. Adjust types to their unqualified versions.  */
   if (TYPE_P (t))
     t = TYPE_MAIN_VARIANT (t);
-  ftpi->parms.add (t);
+  if (!ftpi->parms.add (t))
+    ftpi->parm_list = tree_cons (NULL_TREE, t, ftpi->parm_list);
 
   return 0;
 }
@@ -10524,6 +10564,12 @@ any_template_parm_r (tree t, void *data)
       }
       break;
 
+    case IDENTIFIER_NODE:
+      if (IDENTIFIER_CONV_OP_P (t))
+	/* The conversion-type-id of a conversion operator may be dependent.  */
+	WALK_SUBTREE (TREE_TYPE (t));
+      break;
+
     default:
       break;
     }
@@ -10544,11 +10590,7 @@ find_template_parameters (tree t, tree ctx_parms)
   find_template_parameter_info ftpi (ctx_parms);
   for_each_template_parm (t, keep_template_parm, &ftpi, &ftpi.visited,
 			  /*include_nondeduced*/true, any_template_parm_r);
-  tree list = NULL_TREE;
-  for (hash_set<tree>::iterator iter = ftpi.parms.begin();
-       iter != ftpi.parms.end(); ++iter)
-    list = tree_cons (NULL_TREE, *iter, list);
-  return list;
+  return ftpi.parm_list;
 }
 
 /* Returns true if T depends on any template parameter.  */
@@ -12379,6 +12421,7 @@ fold_expression (tree t, tree left, tree right, tsubst_flags_t complain)
   if (FOLD_EXPR_MODIFY_P (t))
     return build_x_modify_expr (input_location, left, code, right, complain);
 
+  warning_sentinel s(warn_parentheses);
   switch (code)
     {
     case COMPOUND_EXPR:
@@ -12714,10 +12757,8 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
   tree pattern;
   tree pack, packs = NULL_TREE;
   bool unsubstituted_packs = false;
-  bool unsubstituted_fn_pack = false;
   int i, len = -1;
   tree result;
-  hash_map<tree, tree> *saved_local_specializations = NULL;
   bool need_local_specializations = false;
   int levels;
 
@@ -12795,19 +12836,15 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 	      else
 		arg_pack = make_fnparm_pack (arg_pack);
 	    }
-	  else if (argument_pack_element_is_expansion_p (arg_pack, 0))
-	    /* This argument pack isn't fully instantiated yet.  We set this
-	       flag rather than clear arg_pack because we do want to do the
-	       optimization below, and we don't want to substitute directly
-	       into the pattern (as that would expose a NONTYPE_ARGUMENT_PACK
-	       where it isn't expected).  */
-	    unsubstituted_fn_pack = true;
+	  else if (DECL_PACK_P (arg_pack))
+	    /* This argument pack isn't fully instantiated yet.  */
+	    arg_pack = NULL_TREE;
 	}
       else if (is_capture_proxy (parm_pack))
 	{
 	  arg_pack = retrieve_local_specialization (parm_pack);
-	  if (argument_pack_element_is_expansion_p (arg_pack, 0))
-	    unsubstituted_fn_pack = true;
+	  if (DECL_PACK_P (arg_pack))
+	    arg_pack = NULL_TREE;
 	}
       else
         {
@@ -12842,8 +12879,7 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 
           if (len < 0)
 	    len = my_len;
-          else if (len != my_len
-		   && !unsubstituted_fn_pack)
+	  else if (len != my_len)
             {
 	      if (!(complain & tf_error))
 		/* Fail quietly.  */;
@@ -12866,10 +12902,6 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 	  /* We can't substitute for this parameter pack.  We use a flag as
 	     well as the missing_level counter because function parameter
 	     packs don't have a level.  */
-          if (!(processing_template_decl || is_auto (parm_pack)))
-	    {
-	      gcc_unreachable ();
-	    }
 	  gcc_assert (processing_template_decl || is_auto (parm_pack));
 	  unsubstituted_packs = true;
 	}
@@ -12916,7 +12948,15 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 	= build_extra_args (pattern, args, complain);
       return t;
     }
-  else if (unsubstituted_packs)
+
+  /* If NEED_LOCAL_SPECIALIZATIONS then we're in a late-specified return
+     type, so create our own local specializations map; the current map is
+     either NULL or (in the case of recursive unification) might have
+     bindings that we don't want to use or alter.  */
+  local_specialization_stack lss (need_local_specializations
+				  ? lss_blank : lss_nop);
+
+  if (unsubstituted_packs)
     {
       /* There were no real arguments, we're just replacing a parameter
 	 pack with another version of itself. Substitute into the
@@ -12932,16 +12972,6 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
     }
 
   gcc_assert (len >= 0);
-
-  if (need_local_specializations)
-    {
-      /* We're in a late-specified return type, so create our own local
-	 specializations map; the current map is either NULL or (in the
-	 case of recursive unification) might have bindings that we don't
-	 want to use or alter.  */
-      saved_local_specializations = local_specializations;
-      local_specializations = new hash_map<tree, tree>;
-    }
 
   /* For each argument in each argument pack, substitute into the
      pattern.  */
@@ -12987,12 +13017,6 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
           else
             TREE_VEC_ELT (args, idx) = TREE_TYPE (pack);
         }
-    }
-
-  if (need_local_specializations)
-    {
-      delete local_specializations;
-      local_specializations = saved_local_specializations;
     }
 
   /* If the dependent pack arguments were such that we end up with only a
@@ -17867,7 +17891,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 	      {
 		inst = (retrieve_local_specialization
 			(DECL_CAPTURED_VARIABLE (decl)));
-		gcc_assert (TREE_CODE (inst) == NONTYPE_ARGUMENT_PACK);
+		gcc_assert (TREE_CODE (inst) == NONTYPE_ARGUMENT_PACK
+			    || DECL_PACK_P (inst));
 	      }
 	    else
 	      inst = lookup_init_capture_pack (decl);
@@ -19412,7 +19437,11 @@ tsubst_copy_and_build (tree t,
     case POINTER_PLUS_EXPR:
       {
 	tree op0 = RECUR (TREE_OPERAND (t, 0));
+	if (op0 == error_mark_node)
+	  RETURN (error_mark_node);
 	tree op1 = RECUR (TREE_OPERAND (t, 1));
+	if (op1 == error_mark_node)
+	  RETURN (error_mark_node);
 	RETURN (fold_build_pointer_plus (op0, op1));
       }
 
@@ -25150,6 +25179,18 @@ maybe_instantiate_noexcept (tree fn, tsubst_flags_t complain)
       && (!flag_noexcept_type || type_dependent_expression_p (fn)))
     return true;
 
+  if (DECL_MAYBE_DELETED (fn))
+    {
+      if (fn == current_function_decl)
+	/* We're in start_preparsed_function, keep going.  */
+	return true;
+
+      ++function_depth;
+      synthesize_method (fn);
+      --function_depth;
+      return !DECL_MAYBE_DELETED (fn);
+    }
+
   if (DECL_CLONED_FUNCTION_P (fn))
     fn = DECL_CLONED_FUNCTION (fn);
 
@@ -25281,7 +25322,8 @@ register_parameter_specializations (tree pattern, tree inst)
     }
   for (; tmpl_parm; tmpl_parm = DECL_CHAIN (tmpl_parm))
     {
-      if (!DECL_PACK_P (tmpl_parm))
+      if (!DECL_PACK_P (tmpl_parm)
+	  || (spec_parm && DECL_PACK_P (spec_parm)))
 	{
 	  register_local_specialization (spec_parm, tmpl_parm);
 	  spec_parm = DECL_CHAIN (spec_parm);

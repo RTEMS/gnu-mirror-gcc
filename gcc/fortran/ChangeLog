@@ -1,3 +1,54 @@
+2020-04-29  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	PR fortran/94769
+	* io.c (check_io_constraints): Initialize local variable num to
+	-1 and assert that it receives a meaningful value by function
+	compare_to_allowed_values.
+
+2020-04-27  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/93956
+	PR fortran/94788
+	* expr.c (gfc_check_pointer_assign): Revert patch for PR 93956.
+	* interface.c: Likewise.
+
+2020-04-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/94578
+	* trans-expr.c (arrayfunc_assign_needs_temporary): If the
+	LHS is a subref pointer, we also need a temporary.
+
+2020-04-23  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/93956
+	* expr.c (gfc_check_pointer_assign): Also set subref_array_pointer
+	when a function returns a pointer.
+	* interface.c (gfc_set_subref_array_pointer_arg): New function.
+	(gfc_procedure_use): Call it.
+
+2020-04-22  Fritz Reese  <foreese@gcc.gnu.org>
+
+	* trigd_fe.inc: Use mpfr to compute cosd(30) rather than a host-
+	precision floating point literal based on an invalid macro.
+
+2020-04-22  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/90350
+	* simplify.c (simplify_bound): In the case of assumed-size arrays
+	check if the reference is to a full array.
+
+2020-04-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/94709
+	* scanner.c (load_line): In fixed form, also treat 'C' as comment and
+	'D'/'d' only with -fd-lines-as-comments. Treat '!$' with -fopenmp,
+	'!$acc' with -fopenacc and '!GCC$' as non-comment to permit <tab>
+	and truncation warnings.
+
+2020-04-20  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* dump-parse-tree.c (show_attr): Add numerous flags, some cleanup.
+
 2020-04-20  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/93364
