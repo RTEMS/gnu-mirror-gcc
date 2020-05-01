@@ -1,6 +1,6 @@
 2020-05-01  Michael Meissner  <meissner@linux.ibm.com>
 
-	(~/patches/ieee128-lib-patch012b)
+	(~/patches/ieee128-lib-patch013b)
 	* config/rs6000/float128-decimal.c: Rewrite all functions to
 	directly call the appropriate conversion function.
 
