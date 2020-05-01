@@ -1,6 +1,15 @@
 2020-05-01  Michael Meissner  <meissner@linux.ibm.com>
 
 	(~/patches/ieee128-lib-patch013b)
+	* config.host (powerpc*-*-linux): Change spelling of configure
+	variable libgcc_cv_powerpc_float128_decimal
+	* configure.ac (powerpc*-*-linux): Assume glibc 2.31 will provide
+	the float128 to/from Decimal conversions.
+	* configure: Regenerate.
+
+2020-05-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	(~/patches/ieee128-lib-patch013b)
 	* config/rs6000/float128-decimal.c: Rewrite all functions to
 	directly call the appropriate conversion function.
 
