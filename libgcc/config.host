@@ -1220,7 +1220,7 @@ powerpc*-*-linux*)
 
 	if test $libgcc_cv_powerpc_float128 = yes; then
 		tmake_file="${tmake_file} rs6000/t-float128"
-		if test $libgcc_cv_powerpc_float128_dec = no; then
+		if test $libgcc_cv_powerpc_float128_decimal = no; then
 			tmake_file="${tmake_file} rs6000/t-float128-dec"
 		fi
 	fi
