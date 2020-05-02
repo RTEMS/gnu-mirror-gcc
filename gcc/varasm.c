@@ -1829,8 +1829,8 @@ assemble_start_function (tree decl, const char *fnname)
   if (DECL_PRESERVE_P (decl))
     targetm.asm_out.mark_decl_preserved (fnname);
 
-  unsigned HOST_WIDE_INT patch_area_size = function_entry_patch_area_size;
-  unsigned HOST_WIDE_INT patch_area_entry = function_entry_patch_area_start;
+  unsigned short patch_area_size = crtl->patch_area_size;
+  unsigned short patch_area_entry = crtl->patch_area_entry;
 
   tree patchable_function_entry_attr
     = lookup_attribute ("patchable_function_entry", DECL_ATTRIBUTES (decl));
