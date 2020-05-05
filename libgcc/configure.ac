@@ -437,6 +437,17 @@ powerpc*-*-linux*)
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
 
+  AC_MSG_CHECKING([whether glibc provides IEEE to/from Decimal conversions])
+  libgcc_cv_powerpc_float128_decimal="no"
+  if test $libgcc_cv_powerpc_float128 = yes; then
+    if test $glibc_version_major -gt 2 \
+      || ( test $glibc_version_major -eq 2 \
+          && test $glibc_version_minor -ge 31 ); then
+      libgcc_cv_powerpc_float128_decimal="yes"
+    fi
+  fi
+  AC_MSG_RESULT([$libgcc_cv_powerpc_float128_decimal])
+
   CFLAGS="$CFLAGS -mpower9-vector -mfloat128-hardware"
   AC_CACHE_CHECK([for PowerPC ISA 3.0 to build hardware __float128 libraries],
 		 [libgcc_cv_powerpc_float128_hw],
@@ -459,48 +470,6 @@ powerpc*-*-linux*)
 	__attribute__ ((__ifunc__ ("add_resolver")));])],
     [libgcc_cv_powerpc_float128_hw=yes],
     [libgcc_cv_powerpc_float128_hw=no])])
-  AC_CACHE_CHECK([for PowerPC convert __float128 to/from _Decimal libraries],
-		 [libgcc_cv_powerpc_float128_dec],
-		 [AC_LINK_IFELSE(
-    [AC_LANG_SOURCE([#include <stdlib.h>
-     __attribute__((noinline)) __float128 f128_from_d128 (_Decimal128 d128)
-     {
-       return (__float128)d128;
-     }
-     __attribute__((noinline)) __float128 f128_from_d64 (_Decimal128 d64)
-     {
-       return (__float128)d64;
-     }
-     __attribute__((noinline)) __float128 f128_from_d32 (_Decimal128 d32)
-     {
-       return (__float128)d32;
-     }
-     __attribute__((noinline)) _Decimal128 d128_from_f128 (__float128 f128)
-     {
-       return (_Decimal128)f128;
-     }
-     __attribute__((noinline)) _Decimal64 d64_from_f128 (__float128 f128)
-     {
-       return (_Decimal64)f128;
-     }
-     __attribute__((noinline)) _Decimal32 d32_from_f128 (__float128 f128)
-     {
-       return (_Decimal32)f128;
-     }
-     int main (void)
-     {
-       __float128 five = 5.0;
-       if (f128_from_d128 (5.0dl) != five
-           || f128_from_d64 (5.0dd) != five
-           || f128_from_d32 (5.0df) != five
-           || d128_from_f128 (five) != 5.0dl
-           || d64_from_f128 (five) != 5.0dd
-           || d32_from_f128 (five) != 5.0df)
-         abort ();
-       return 0;
-     }])],
-    [libgcc_cv_powerpc_float128_dec=yes],
-    [libgcc_cv_powerpc_float128_dec=no])])
   CFLAGS="$saved_CFLAGS"
 esac
 
