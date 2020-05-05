@@ -29,8 +29,8 @@
    <http://www.gnu.org/licenses/>.  */
 
 extern __float128 __dpd_trunctdkf (_Decimal128);
-extern __float128 __dpd_truncddkf (_Decimal64);
-extern __float128 __dpd_truncsdkf (_Decimal64);
+extern __float128 __dpd_extendddkf (_Decimal64);
+extern __float128 __dpd_extendsdkf (_Decimal32);
 extern _Decimal128 __dpd_extendkftd (__float128);
 extern _Decimal64 __dpd_trunckfdd (__float128);
 extern _Decimal32 __dpd_trunckfsd (__float128);
@@ -43,14 +43,14 @@ __dpd_trunctdkf (_Decimal128 x)
 }
 
 __float128
-__dpd_truncddkf (_Decimal64 x)
+__dpd_extendddkf (_Decimal64 x)
 {
   __ibm128 ibm = (__ibm128) x;
   return (__float128) ibm;
 }
 
 __float128
-__dpd_truncsdkf (_Decimal64 x)
+__dpd_extendsdkf (_Decimal32 x)
 {
   __ibm128 ibm = (__ibm128) x;
   return (__float128) ibm;
