@@ -1,5 +1,11 @@
 2020-05-05  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch013b)
+	* config/rs6000/float128-decimal.c: Rewrite all functions to
+	directly call the appropriate conversion function.
+
+2020-05-05  Michael Meissner  <meissner@linux.ibm.com>
+
 	(ieee128-lib-patch012b)
 	* config/rs6000/float128-decimal.c (__dpd_extendkftd): Convert
 	from float128 to decimal by using the string functions.

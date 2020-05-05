@@ -28,11 +28,6 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-#define __STDC_WANT_DEC_FP__			1
-#define __STDC_WANT_IEC_60559_TYPES_EXT__	1
-#define __STDC_WANT_IEC_60559_FUNCS_EXT__	1
-#include <stdlib.h>
-
 extern __float128 __dpd_trunctdkf (_Decimal128);
 extern __float128 __dpd_extendddkf (_Decimal64);
 extern __float128 __dpd_extendsdkf (_Decimal32);
@@ -40,47 +35,54 @@ extern _Decimal128 __dpd_extendkftd (__float128);
 extern _Decimal64 __dpd_trunckfdd (__float128);
 extern _Decimal32 __dpd_trunckfsd (__float128);
 
+extern __ibm128 __dpd_trunctdtf (_Decimal128);
+extern __ibm128 __dpd_extendddtf (_Decimal64);
+extern __ibm128 __dpd_extendsdtf (_Decimal32);
+extern _Decimal128 __dpd_extendtftd (__ibm128);
+extern _Decimal64 __dpd_trunctfdd (__ibm128);
+extern _Decimal32 __dpd_trunctfsd (__ibm128);
+
+extern __float128 __trunctfkf2 (__ibm128);
+extern __ibm128 __extendkftf2 (__float128);
+
 __float128
 __dpd_trunctdkf (_Decimal128 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (__float128) ibm;
+  __ibm128 ibm = __dpd_trunctdtf (x);
+  return __trunctfkf2 (ibm);
 }
 
 __float128
 __dpd_extendddkf (_Decimal64 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (__float128) ibm;
+  __ibm128 ibm = __dpd_extendddtf (x);
+  return __trunctfkf2 (ibm);
 }
 
 __float128
 __dpd_extendsdkf (_Decimal32 x)
 {
-  __ibm128 ibm = (__ibm128) x;
-  return (__float128) ibm;
+  __ibm128 ibm = __dpd_extendsdtf (x);
+  return __trunctfkf2 (ibm);
 }
 
 _Decimal128
 __dpd_extendkftd (__float128 x)
 {
-  char buffer[7000];
-  strfromf128 (buffer, sizeof (buffer), "%f", x);
-  return strtod128 (buffer, NULL);
+  __ibm128 ibm = __extendkftf2 (x);
+  return __dpd_extendtftd (ibm);
 }
 
 _Decimal64
 __dpd_trunckfdd (__float128 x)
 {
-  char buffer[7000];
-  strfromf128 (buffer, sizeof (buffer), "%f", x);
-  return strtod64 (buffer, NULL);
+  __ibm128 ibm = __extendkftf2 (x);
+  return __dpd_trunctfdd (ibm);
 }
 
 _Decimal32
 __dpd_trunckfsd (__float128 x)
 {
-  char buffer[7000];
-  strfromf128 (buffer, sizeof (buffer), "%f", x);
-  return strtod32 (buffer, NULL);
+  __ibm128 ibm = __extendkftf2 (x);
+  return __dpd_trunctfsd (ibm);
 }
