@@ -5505,6 +5505,17 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI,
     RS6000_BTI_INTSI, RS6000_BTI_INTSI },
 
+  /* FUTURE overloaded builtin functions, */
+  { FUTURE_BUILTIN_VEC_GNB, FUTURE_BUILTIN_VGNB, RS6000_BTI_unsigned_long_long,
+    RS6000_BTI_unsigned_V16QI, RS6000_BTI_UINTQI, 0 },
+  { FUTURE_BUILTIN_VEC_GNB, FUTURE_BUILTIN_VGNB, RS6000_BTI_unsigned_long_long,
+    RS6000_BTI_unsigned_V8HI, RS6000_BTI_UINTQI, 0 },
+  { FUTURE_BUILTIN_VEC_GNB, FUTURE_BUILTIN_VGNB, RS6000_BTI_unsigned_long_long,
+    RS6000_BTI_unsigned_V4SI, RS6000_BTI_UINTQI, 0 },
+  { FUTURE_BUILTIN_VEC_GNB, FUTURE_BUILTIN_VGNB, RS6000_BTI_unsigned_long_long,
+    RS6000_BTI_unsigned_V2DI, RS6000_BTI_UINTQI, 0 },
+  { FUTURE_BUILTIN_VEC_GNB, FUTURE_BUILTIN_VGNB, RS6000_BTI_unsigned_long_long,
+    RS6000_BTI_unsigned_V1TI, RS6000_BTI_UINTQI, 0 },
   { RS6000_BUILTIN_NONE, RS6000_BUILTIN_NONE, 0, 0, 0, 0 }
 };
 
@@ -8896,6 +8907,21 @@ rs6000_expand_binop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || !IN_RANGE (TREE_INT_CST_LOW (arg1), 0, 127))
 	{
 	  error ("argument 2 must be a 7-bit unsigned literal");
+	  return CONST0_RTX (tmode);
+	}
+    }
+  else if (icode == CODE_FOR_vgnb)
+    {
+      /* Only allow 3-bit unsigned literals.  */
+      STRIP_NOPS (arg1);
+      if (TREE_CODE (arg1) != INTEGER_CST)
+	{
+	  error ("argument 2 must be an unsigned literal");
+	  return CONST0_RTX (tmode);
+	}
+      if (!IN_RANGE (TREE_INT_CST_LOW (arg1), 2, 7))
+	{
+	  error ("argument 2 must be between 2 and 7");
 	  return CONST0_RTX (tmode);
 	}
     }
