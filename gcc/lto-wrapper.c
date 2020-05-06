@@ -1897,6 +1897,10 @@ cont:
 	  new_argv[0] = getenv ("MAKE");
 	  if (!new_argv[0])
 	    new_argv[0] = "make";
+	  else if (strchr (new_argv[0], ' '))
+	    fatal_error (input_location,
+			 "an option found in %<MAKE%> environment variable: %qs, "
+			 "use %<MAKEFLAGS%> instead", new_argv[0]);
 	  new_argv[1] = "-f";
 	  new_argv[2] = makefile;
 	  i = 3;
