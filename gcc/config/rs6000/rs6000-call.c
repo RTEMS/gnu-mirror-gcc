@@ -8840,6 +8840,20 @@ rs6000_expand_binop_builtin (enum insn_code icode, tree exp, rtx target)
 	  return CONST0_RTX (tmode);
 	}
     }
+  else if (icode == CODE_FOR_vgnb)
+    {
+      /* Only allow unsigned literals in range 2..7.  */
+      /* Note that arg1 is second operand.  */
+      STRIP_NOPS (arg1);
+      if (TREE_CODE (arg1) != INTEGER_CST
+	  || (TREE_INT_CST_LOW (arg1) & ~7)
+	  || !IN_RANGE (TREE_INT_CST_LOW (arg1), 2, 7))
+	{
+	  error ("argument 2 must be unsigned literal between "
+		 "2 and 7 inclusive");
+	  return CONST0_RTX (tmode);
+	}
+    }
   else if (icode == CODE_FOR_altivec_vsplth)
     {
       /* Only allow 3-bit unsigned literals.  */
@@ -8907,21 +8921,6 @@ rs6000_expand_binop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || !IN_RANGE (TREE_INT_CST_LOW (arg1), 0, 127))
 	{
 	  error ("argument 2 must be a 7-bit unsigned literal");
-	  return CONST0_RTX (tmode);
-	}
-    }
-  else if (icode == CODE_FOR_vgnb)
-    {
-      /* Only allow 3-bit unsigned literals.  */
-      STRIP_NOPS (arg1);
-      if (TREE_CODE (arg1) != INTEGER_CST)
-	{
-	  error ("argument 2 must be an unsigned literal");
-	  return CONST0_RTX (tmode);
-	}
-      if (!IN_RANGE (TREE_INT_CST_LOW (arg1), 2, 7))
-	{
-	  error ("argument 2 must be between 2 and 7");
 	  return CONST0_RTX (tmode);
 	}
     }
@@ -12936,6 +12935,7 @@ builtin_function_type (machine_mode mode_ret, machine_mode mode_arg0,
     case P8V_BUILTIN_ORC_V1TI_UNS:
     case FUTURE_BUILTIN_VCLZDM:
     case FUTURE_BUILTIN_VCTZDM:
+    case FUTURE_BUILTIN_VGNB:
     case FUTURE_BUILTIN_VPDEPD:
     case FUTURE_BUILTIN_VPEXTD:
       h.uns_p[0] = 1;
