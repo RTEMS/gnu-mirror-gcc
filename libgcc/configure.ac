@@ -441,9 +441,6 @@ powerpc*-*-linux*)
   # In theory, libdfp will provide the conversion functions between __float128
   # and decimal someday.  For now, define our own versions.
   libgcc_cv_powerpc_float128_decimal="no"
-  if test $libgcc_cv_powerpc_float128 = yes; then
-    libgcc_cv_powerpc_float128_decimal="yes"
-  fi
   AC_MSG_RESULT([$libgcc_cv_powerpc_float128_decimal])
 
   CFLAGS="$CFLAGS -mpower9-vector -mfloat128-hardware"
