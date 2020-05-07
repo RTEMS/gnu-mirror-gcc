@@ -1,3 +1,20 @@
+2020-05-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	(ieee128-lib-patch015b)
+	* config/rs6000/extendkftf2-sw.c: Include float128-convert.h.
+	(__extendkftf2_sw): Use convert_float128_to_ibm128 function for
+	conversion.
+	* config/rs6000/float128-convert.h: New file.
+	* config/rs6000/float128-hw.c: Include float128-convert.h.
+	(__extendkftf2_hw): Use convert_float128_to_ibm128 for
+	conversion.
+	(__trunctfkf2_hw): Use convert_ibm128_to_float128 for conversion.
+	* config/rs6000/quad-float128.h (ibm128_union): Delete.
+	(CVT_FLOAT128_TO_IBM128): Delete.
+	(CVT_IBM128_TO_FLOAT128): Delete.
+	* config/rs6000/trunctfkf2-sw.c: Include float128-convert.h.
+	(__trunctfkf2_sw): Use convert_ibm128_to_float182 for conversion.
+
 2020-05-05  Michael Meissner  <meissner@linux.ibm.com>
 
 	(ieee128-lib-patch014b)
