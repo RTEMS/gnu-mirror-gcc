@@ -5226,15 +5226,13 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_powerpc_float128" >&5
 $as_echo "$libgcc_cv_powerpc_float128" >&6; }
 
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether glibc provides IEEE to/from Decimal conversions" >&5
-$as_echo_n "checking whether glibc provides IEEE to/from Decimal conversions... " >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to provide IEEE to/from Decimal conversions" >&5
+$as_echo_n "checking whether to provide IEEE to/from Decimal conversions... " >&6; }
+  # In theory, libdfp will provide the conversion functions between __float128
+  # and decimal someday.  For now, define our own versions.
   libgcc_cv_powerpc_float128_decimal="no"
   if test $libgcc_cv_powerpc_float128 = yes; then
-    if test $glibc_version_major -gt 2 \
-      || ( test $glibc_version_major -eq 2 \
-          && test $glibc_version_minor -ge 31 ); then
-      libgcc_cv_powerpc_float128_decimal="yes"
-    fi
+    libgcc_cv_powerpc_float128_decimal="yes"
   fi
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_powerpc_float128_decimal" >&5
 $as_echo "$libgcc_cv_powerpc_float128_decimal" >&6; }

@@ -437,14 +437,12 @@ powerpc*-*-linux*)
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
 
-  AC_MSG_CHECKING([whether glibc provides IEEE to/from Decimal conversions])
+  AC_MSG_CHECKING([whether to provide IEEE to/from Decimal conversions])
+  # In theory, libdfp will provide the conversion functions between __float128
+  # and decimal someday.  For now, define our own versions.
   libgcc_cv_powerpc_float128_decimal="no"
   if test $libgcc_cv_powerpc_float128 = yes; then
-    if test $glibc_version_major -gt 2 \
-      || ( test $glibc_version_major -eq 2 \
-          && test $glibc_version_minor -ge 31 ); then
-      libgcc_cv_powerpc_float128_decimal="yes"
-    fi
+    libgcc_cv_powerpc_float128_decimal="yes"
   fi
   AC_MSG_RESULT([$libgcc_cv_powerpc_float128_decimal])
 
