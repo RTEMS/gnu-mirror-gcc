@@ -1,3 +1,37 @@
+2020-05-07  Marek Polacek  <polacek@redhat.com>
+	
+	Backported from mainline
+	2020-05-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/94938
+	* pt.c (tsubst_copy_and_build): Call type_dependent_expression_p_push
+	instead of uses_template_parms.  Move the warning_sentinels after the
+	RECURs.
+
+2020-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from mainline
+	2020-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/94951
+	* typeck.c (cp_strict_aliasing_warning): New function.
+	(cp_build_indirect_ref_1, build_reinterpret_cast_1): Use
+	it instead of strict_aliasing_warning.
+
+	PR c++/94907
+	* method.c (defaulted_late_check): Don't call synthesize_method
+	on constexpr sfk_comparison if it has been called on it already.
+
+2020-05-07  Release Manager
+
+	* GCC 10.1.0 released.
+
+2020-05-06  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/94946
+	* decl.c (grokdeclarator): Don't splice template attributes in
+	parm context -- they can apply to the parm.
+
 2020-04-30  Jason Merrill  <jason@redhat.com>
 	    Nathan Sidwell  <nathan@acm.org>
 
