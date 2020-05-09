@@ -76,6 +76,10 @@ $(fp128_obj)		 : $(srcdir)/config/rs6000/quad-float128.h
 # 128-bit.
 ibm-ldouble$(objext)	: INTERNAL_CFLAGS += -mno-gnu-attribute
 
+# Similarly for the decimal routines, compile with long double == IBM 128-bit,
+# but set the flags so that it can be linked with either long double format.
+DECNUMINC	+= -Wno-psabi -mabi=ibmlongdouble -mno-gnu-attribute
+
 $(fp128_softfp_src) : $(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@)) $(fp128_dep)
 	@src="$(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@))"; \
 	echo "Create $@"; \

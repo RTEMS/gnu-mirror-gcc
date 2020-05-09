@@ -1,3 +1,9 @@
+2020-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (DECNUMINC): Make sure long double is
+	the traditional IBM long double, but allow it to be called from
+	any long double format.
+
 2020-05-06  Michael Meissner  <meissner@linux.ibm.com>
 
 	(ieee128-lib-patch017b)
