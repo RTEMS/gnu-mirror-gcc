@@ -1,5 +1,12 @@
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch027b)
+	* gcc.target/powerpc/float128-mix-2.c: New test.
+	* gcc.target/powerpc/float128-mix-3.c: New test.
+	* gcc.target/powerpc/float128-mix.c: Update error messages.
+
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	(ieee128-lib-patch025b)
 	* gcc.target/powerpc/float128-mix.c: Explicitly set long double to
 	IBM extended double to get the proper error message.

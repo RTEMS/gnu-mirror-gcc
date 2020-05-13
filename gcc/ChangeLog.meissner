@@ -1,5 +1,12 @@
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch026b)
+	* config/rs6000/rs6000.c (rs6000_invalid_binary_op): Change error
+	message for intermixing IEEE 128-bit and IBM 128-bit floating
+	point types.
+
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	(ieee128-lib-patch024b)
 	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
 	double is IEEE 128-bit, go back to mapping the 'q' functions to

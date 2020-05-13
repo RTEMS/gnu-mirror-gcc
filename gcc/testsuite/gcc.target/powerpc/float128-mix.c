@@ -8,11 +8,11 @@
 __float128
 add (__float128 a, long double b)
 {
-  return a+b;	/* { dg-error "__float128 and long double cannot be used in the same expression" } */
+  return a+b;	/* { dg-error "IEEE 128-bit and IBM 128-bit floating point" } */
 }
 
 long double
 sub (long double a, __float128 b)
 {
-  return a-b;	/* { dg-error "__float128 and long double cannot be used in the same expression" } */
+  return a-b;	/* { dg-error "IEEE 128-bit and IBM 128-bit floating point" } */
 }
