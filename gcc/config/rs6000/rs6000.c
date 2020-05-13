@@ -22792,12 +22792,8 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 64:
-	  /* Originally we used KFmode if long double is IBM long double, and
-	     TFmode if long double is IEEE 128-bit.  Now, always use KFmode for
-	     _Float128.  Things like nan/nans just don't work correctly if we
-	     switch the types.  */
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -22821,7 +22817,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
