@@ -1,5 +1,14 @@
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch028b)
+	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c: Adjust tests so
+	they will work with long double being either IBM or IEEE 128-bit.
+	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-test-data-class-11.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-test-neg-5.c: Likewise.
+
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	(ieee128-lib-patch027b)
 	* gcc.target/powerpc/float128-mix-2.c: New test.
 	* gcc.target/powerpc/float128-mix-3.c: New test.
