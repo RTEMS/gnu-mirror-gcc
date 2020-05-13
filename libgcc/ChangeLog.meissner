@@ -1,5 +1,17 @@
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch029b)
+	* config/rs6000/float128-decimal.c (__dpd_trunctdkf): Add support
+	for -0.0.
+	(__dpd_extendddkf): Likewise.
+	(__dpd_extendsdkf): Likewise.
+	(__dpd_extendkftd): Likewise.
+	(__dpd_trunckfdd): Likewise.
+	(__dpd_trunckfsd): Likewise.
+
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	(ieee128-lib-patch022b)
 	* config/rs6000/_mulkc3.c (__mulkc3x): Provide alternate entry
 	point when long double is IEEE 128-bit.
 	* config/rs6000/_divkc3.c (__divkc3x): Likewise.
@@ -8,6 +20,7 @@
 
 2020-05-08  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch018b)
 	* config/rs6000/t-float128 (DECNUMINC): Make sure long double is
 	the traditional IBM long double, but allow it to be called from
 	any long double format.
