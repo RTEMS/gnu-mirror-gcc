@@ -1,3 +1,11 @@
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_mulkc3.c (__mulkc3x): Provide alternate entry
+	point when long double is IEEE 128-bit.
+	* config/rs6000/_divkc3.c (__divkc3x): Likewise.
+	* config/rs6000/float128-ifunc.c (__mulkc3x): Likewise.
+	(__divkc3x): Likewise.
+
 2020-05-08  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/t-float128 (DECNUMINC): Make sure long double is

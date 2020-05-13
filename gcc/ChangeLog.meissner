@@ -1,3 +1,9 @@
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (init_float128_ieee): Use different names
+	for complex multiply/divide if long double is IEEE 128-bit.
+	(rs6000_floatn_mode): Always use KFmode for _Flaot128.
+
 2020-05-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	(ieee128-lib-patch019b)

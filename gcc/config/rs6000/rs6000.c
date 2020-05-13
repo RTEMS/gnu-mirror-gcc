@@ -10121,7 +10121,10 @@ init_float128_ieee (machine_mode mode)
 
       /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  If
 	 we have clone or target attributes, this will be called a second
-	 time.  We want to create the built-in function only once.  */
+	 time.  We want to create the built-in function only once.
+
+	 Unfortunately, we cannot call it __mulkc3 or __divkc3.  Add an 'x'
+	 suffix, and in libgcc provide both names.  */
      if (mode == TFmode && TARGET_IEEEQUAD && !complex_muldiv_init_p)
        {
 	 complex_muldiv_init_p = true;
@@ -10139,8 +10142,8 @@ init_float128_ieee (machine_mode mode)
 						 long_double_type_node,
 						 NULL_TREE);
 
-	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
-	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
+	 create_complex_muldiv ("__mulkc3x", fncode_mul, fntype);
+	 create_complex_muldiv ("__divkc3x", fncode_div, fntype);
        }
 
       set_optab_libfunc (add_optab, mode, "__addkf3");
@@ -22789,8 +22792,12 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 64:
+	  /* Originally we used KFmode if long double is IBM long double, and
+	     TFmode if long double is IEEE 128-bit.  Now, always use KFmode for
+	     _Float128.  Things like nan/nans just don't work correctly if we
+	     switch the types.  */
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -22814,7 +22821,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
