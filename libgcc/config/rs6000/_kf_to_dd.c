@@ -23,7 +23,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 /* _Float128 -> Decimal64 conversion.  */
 #define FINE_GRAINED_LIBRARIES	1
-#define L_tf_to_dd		1
+#define L_kf_to_dd		1
 #define WIDTH			64
 
 /* Use dfp-bit.c to do the real work.  */
