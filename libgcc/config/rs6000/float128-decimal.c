@@ -49,7 +49,7 @@ __float128
 __dpd_trunctdkf (_Decimal128 x)
 {
   if (x == 0.0dl)
-    return __builtin_signbit (x) < 0 ? -0.0f128 : 0.0f128;
+    return __builtin_signbit (x) ? -0.0f128 : 0.0f128;
 
   __ibm128 ibm = __dpd_trunctdtf (x);
   return __trunctfkf2 (ibm);
@@ -59,7 +59,7 @@ __float128
 __dpd_extendddkf (_Decimal64 x)
 {
   if (x == 0.0dd)
-    return __builtin_signbit (x) < 0 ? -0.0f128 : 0.0f128;
+    return __builtin_signbit (x) ? -0.0f128 : 0.0f128;
 
   __ibm128 ibm = __dpd_extendddtf (x);
   return __trunctfkf2 (ibm);
@@ -69,7 +69,7 @@ __float128
 __dpd_extendsdkf (_Decimal32 x)
 {
   if (x == 0.0df)
-    return __builtin_signbit (x) < 0 ? -0.0f128 : 0.0f128;
+    return __builtin_signbit (x) ? -0.0f128 : 0.0f128;
 
   __ibm128 ibm = __dpd_extendsdtf (x);
   return __trunctfkf2 (ibm);
@@ -79,7 +79,7 @@ _Decimal128
 __dpd_extendkftd (__float128 x)
 {
   if (x == 0.0f128)
-    return __builtin_signbit (x) < 0 ? -0.0dl : 0.0dl;
+    return __builtin_signbit (x) ? -0.0dl : 0.0dl;
 
   __ibm128 ibm = __extendkftf2 (x);
   return __dpd_extendtftd (ibm);
@@ -89,7 +89,7 @@ _Decimal64
 __dpd_trunckfdd (__float128 x)
 {
   if (x == 0.0f128)
-    return __builtin_signbit (x) < 0 ? -0.0dd : 0.0df;
+    return __builtin_signbit (x) ? -0.0dd : 0.0df;
 
   __ibm128 ibm = __extendkftf2 (x);
   return __dpd_trunctfdd (ibm);
@@ -99,7 +99,7 @@ _Decimal32
 __dpd_trunckfsd (__float128 x)
 {
   if (x == 0.0f128)
-    return __builtin_signbit (x) < 0 ? -0.0df : 0.0df;
+    return __builtin_signbit (x) ? -0.0df : 0.0df;
 
   __ibm128 ibm = __extendkftf2 (x);
   return __dpd_trunctfsd (ibm);
