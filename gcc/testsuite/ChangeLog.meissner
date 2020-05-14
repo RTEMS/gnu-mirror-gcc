@@ -1,5 +1,11 @@
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
+	(ieee128-lib-patch030b)
+	* gcc.dg/torture/float128-nan.c: Undo change converting q
+	functions to f128.
+
+2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
+
 	(ieee128-lib-patch028b)
 	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c: Adjust tests so
 	they will work with long double being either IBM or IEEE 128-bit.

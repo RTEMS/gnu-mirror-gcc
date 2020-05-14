@@ -69,32 +69,32 @@ main (void)
 {
   __float128 nan;
 
-  nan = __builtin_nanf128 ("");
+  nan = __builtin_nanq ("");
 
   if (!check_nan (nan, true))
     __builtin_abort ();
 
-  nan = __builtin_nanf128 ("0x0");
+  nan = __builtin_nanq ("0x0");
 
   if (!check_nan (nan, true))
     __builtin_abort ();
 
-  nan = __builtin_nanf128 ("0x1");
+  nan = __builtin_nanq ("0x1");
 
   if (!check_nan (nan, true))
     __builtin_abort ();
 
-  nan = __builtin_nansf128 ("");
+  nan = __builtin_nansq ("");
 
   if (!check_nan (nan, false))
     __builtin_abort ();
 
-  nan = __builtin_nansf128 ("0x0");
+  nan = __builtin_nansq ("0x0");
 
   if (!check_nan (nan, false))
     __builtin_abort ();
 
-  nan = __builtin_nansf128 ("0x1");
+  nan = __builtin_nansq ("0x1");
 
   if (!check_nan (nan, false))
     __builtin_abort ();
