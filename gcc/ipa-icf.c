@@ -1,3 +1,5 @@
+
+
 /* Interprocedural Identical Code Folding pass
    Copyright (C) 2014-2020 Free Software Foundation, Inc.
 
