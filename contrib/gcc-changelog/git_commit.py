@@ -150,6 +150,8 @@ star_prefix_regex = re.compile(r'\t\*(?P<spaces>\ *)(?P<content>.*)')
 LINE_LIMIT = 100
 TAB_WIDTH = 8
 CO_AUTHORED_BY_PREFIX = 'co-authored-by: '
+CHERRY_PICK_PREFIX = '(cherry picked from commit '
+REVERT_PREFIX = '(this reverts commit '
 
 
 class Error:
@@ -221,6 +223,8 @@ class GitCommit:
         self.top_level_authors = []
         self.co_authors = []
         self.top_level_prs = []
+        self.cherry_pick = False
+        self.revert = False
 
         project_files = [f for f in self.modified_files
                          if self.is_changelog_filename(f[0])
@@ -372,7 +376,11 @@ class GitCommit:
                     last_entry.author_lines.append(author_tuple)
                     continue
 
-                if not line.startswith('\t'):
+                if line.startswith(CHERRY_PICK_PREFIX):
+                    self.cherry_pick = True
+                elif line.startswith(REVERT_PREFIX):
+                    self.revert = True
+                elif not line.startswith('\t'):
                     err = Error('line should start with a tab', line)
                     self.errors.append(err)
                 elif pr_line:
@@ -500,24 +508,40 @@ class GitCommit:
                     err = Error(msg % (entry.folder, changelog_location), file)
                     self.errors.append(err)
 
+    @classmethod
+    def format_authors_in_changelog(cls, authors, timestamp, prefix=''):
+        output = ''
+        for i, author in enumerate(authors):
+            if i == 0:
+                output += '%s%s  %s\n' % (prefix, timestamp, author)
+            else:
+                output += '%s\t    %s\n' % (prefix, author)
+        output += '\n'
+        return output
+
     def to_changelog_entries(self):
+        current_timestamp = self.date.strftime('%Y-%m-%d')
         for entry in self.changelog_entries:
             output = ''
             timestamp = entry.datetime
             if not timestamp:
                 timestamp = self.date.strftime('%Y-%m-%d')
             authors = entry.authors if entry.authors else [self.author]
-            # add Co-Authored-By authors to all ChangeLog entries
-            for author in self.co_authors:
-                if author not in authors:
-                    authors.append(author)
-
-            for i, author in enumerate(authors):
-                if i == 0:
-                    output += '%s  %s\n' % (timestamp, author)
+            if self.cherry_pick or self.revert:
+                output += self.format_authors_in_changelog(authors,
+                                                           current_timestamp)
+                if self.cherry_pick:
+                    header = 'Backport from master'
                 else:
-                    output += '\t    %s\n' % author
-            output += '\n'
+                    header = 'Revert'
+                output += '\t%s:\n' % header
+            else:
+                # add Co-Authored-By authors to all ChangeLog entries
+                for author in self.co_authors:
+                    if author not in authors:
+                        authors.append(author)
+
+                output += self.format_authors_in_changelog(authors, timestamp)
             for pr in entry.prs:
                 output += '\t%s\n' % pr
             for line in entry.lines:

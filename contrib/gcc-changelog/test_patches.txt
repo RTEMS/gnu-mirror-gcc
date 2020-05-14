@@ -2381,4 +2381,92 @@ index 00000000000..66c87d48694
 +
 -- 
 2.26.1
+=== 0001-Test-tree.h.patch ===
+From a71eeba28ffa2427d24d5b2654e93b261980b9e3 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Wed, 13 May 2020 13:19:22 +0200
+Subject: [PATCH] Test tree.h.
 
+gcc/ChangeLog:
+
+2020-01-03  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/12345
+	* tree.h: Just test it.
+
+(cherry picked from commit a2bdf56b15b51c3a7bd988943bdbc42aa156f133)
+---
+ gcc/tree.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/gcc/tree.h b/gcc/tree.h
+index 9ca9ab58ec0..99a9e1a73d9 100644
+--- a/gcc/tree.h
++++ b/gcc/tree.h
+@@ -1,6 +1,8 @@
+ /* Definitions for the ubiquitous 'tree' type for GNU compilers.
+    Copyright (C) 1989-2020 Free Software Foundation, Inc.
+ 
++
++
+ This file is part of GCC.
+ 
+ GCC is free software; you can redistribute it and/or modify it under
+-- 
+2.26.2
+
+=== 0001-Revert-i386-Add-V2DFmode.patch ===
+
+From 3bb5665870ddba0a4c6aaf264d4efb44dc6438fe Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Thu, 14 May 2020 14:16:12 +0200
+Subject: [PATCH] Revert "i386: Add V2DFmode conversion functions [PR95046]"
+
+gcc/ChangeLog:
+
+	PR target/95046
+	* config/i386/sse.md (sse2_cvtpi2pd): Add memory to alternative 1.
+
+	(floatv2siv2df2): New expander.
+	(floatunsv2siv2df2): New insn pattern.
+
+	(fix_truncv2dfv2si2): New expander.
+	(fixuns_truncv2dfv2si2): New insn pattern.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/95046
+	* gcc.target/i386/pr95046-6.c: New test.
+
+(this reverts commit 365e3cde4978c6a7dbfa50865720226254c016be)
+---
+ gcc/ChangeLog                             | 19 +++-------
+ gcc/config/i386/sse.md                    | 34 ++----------------
+ gcc/testsuite/ChangeLog                   |  5 ---
+ gcc/testsuite/gcc.target/i386/pr95046-6.c | 44 -----------------------
+ 4 files changed, 6 insertions(+), 96 deletions(-)
+ delete mode 100644 gcc/testsuite/gcc.target/i386/pr95046-6.c
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 072ad082852..125f7c7c389 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1 +1,2 @@
+
++
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index dc0ecbc182e..7a7ecd4be87 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -1 +1,2 @@
+
++
+diff --git a/gcc/testsuite/gcc.target/i386/pr95046-6.c b/gcc/testsuite/gcc.target/i386/pr95046-6.c
+deleted file mode 100644
+index dcc8999c446..00000000000
+--- a/gcc/testsuite/gcc.target/i386/pr95046-6.c
++++ /dev/null
+@@ -1 +0,0 @@
+-
+-- 
+2.26.2

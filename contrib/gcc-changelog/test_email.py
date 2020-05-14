@@ -258,3 +258,17 @@ class TestGccChangelog(unittest.TestCase):
         email = self.from_patch_glob('0020-IPA-Avoid')
         assert (email.errors[0].message
                 == 'first line should start with a tab, asterisk and space')
+
+    def test_backport(self):
+        email = self.get_git_email('0001-Test-tree.h.patch')
+        assert len(email.changelog_entries) == 1
+        entry, output = list(email.to_changelog_entries())[0]
+        assert entry == 'gcc'
+        assert '2020-05-13  Martin Liska  <mliska@suse.cz>' in output
+        assert '\tBackport from master:' in output
+
+    def test_revert(self):
+        email = self.get_git_email('0001-Revert-i386-Add-V2DFmode.patch')
+        assert len(email.changelog_entries) == 2
+        entry, output = list(email.to_changelog_entries())[0]
+        assert 'Revert:' in output
