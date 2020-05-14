@@ -289,7 +289,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define BFP_TYPE _Float128
 #define BFP_FMT "%.36Le"
 #define STR_TO_BFP strtof128
-#define BFP_VIA_TYPE __float128
+#define BFP_VIA_TYPE _Float128
 extern _Float128 strtof128 (const char *__restrict __nptr,
                             char **__restrict __endptr)
   __THROW __nonnull ((1));
