@@ -1,3 +1,27 @@
+2020-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	(ieee128-lib-patch031b)
+	* config.host (powerpc*-*-linux*): Delete special rules for
+	building float128 <-> decimal conversions.
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+	* config/rs6000/float128-decimal.c: Delete.
+	* config/rs6000/float128-decimal.ver: Delete.
+	* config/rs6000/t-float128: Add rules for building conversions
+	between _Float128 and decimal.  Make sure the IBM long double and
+	decimal conversions use -mabi=ibmlongdouble.  Don't set DECNUMINC.
+	* config/rs6000/t-float128-decimal: Delete.
+	* configure.ac (powerpc*-*-linux*): Remove special tests for
+	float128 <-> decimal conversions.
+	* configure: Regenerate.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
+
 2020-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	(ieee128-lib-patch029b)

@@ -1,9 +1,0 @@
-GCC_9.0.0 {
-  # float128 <-> decimal conversions
-  __dpd_trunctdkf
-  __dpd_extendddkf
-  __dpd_extendsdkf
-  __dpd_extendkftd
-  __dpd_trunckfdd
-  __dpd_trunckfsd
-}

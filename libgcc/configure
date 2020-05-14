@@ -5201,9 +5201,7 @@ case ${host} in
 # At present, we cannot turn -mfloat128 on via #pragma GCC target, so just
 # check if we have VSX (ISA 2.06) support to build the software libraries, and
 # whether the assembler can handle xsaddqp for hardware support.  Also check if
-# a new glibc is being used so that __builtin_cpu_supports can be used.  Check
-# to see if glibc provides the necessary decimal <-> IEEE 128 function, and
-# arrange to build our own version if they are not provided.
+# a new glibc is being used so that __builtin_cpu_supports can be used.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
@@ -5225,14 +5223,6 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_powerpc_float128" >&5
 $as_echo "$libgcc_cv_powerpc_float128" >&6; }
-
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to provide IEEE to/from Decimal conversions" >&5
-$as_echo_n "checking whether to provide IEEE to/from Decimal conversions... " >&6; }
-  # In theory, libdfp will provide the conversion functions between __float128
-  # and decimal someday.  For now, define our own versions.
-  libgcc_cv_powerpc_float128_decimal="no"
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_powerpc_float128_decimal" >&5
-$as_echo "$libgcc_cv_powerpc_float128_decimal" >&6; }
 
   CFLAGS="$CFLAGS -mpower9-vector -mfloat128-hardware"
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for PowerPC ISA 3.0 to build hardware __float128 libraries" >&5

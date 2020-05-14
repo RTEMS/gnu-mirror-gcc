@@ -424,9 +424,7 @@ case ${host} in
 # At present, we cannot turn -mfloat128 on via #pragma GCC target, so just
 # check if we have VSX (ISA 2.06) support to build the software libraries, and
 # whether the assembler can handle xsaddqp for hardware support.  Also check if
-# a new glibc is being used so that __builtin_cpu_supports can be used.  Check
-# to see if glibc provides the necessary decimal <-> IEEE 128 function, and
-# arrange to build our own version if they are not provided.
+# a new glibc is being used so that __builtin_cpu_supports can be used.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
@@ -436,12 +434,6 @@ powerpc*-*-linux*)
     [AC_LANG_SOURCE([vector double dadd (vector double a, vector double b) { return a + b; }])],
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
-
-  AC_MSG_CHECKING([whether to provide IEEE to/from Decimal conversions])
-  # In theory, libdfp will provide the conversion functions between __float128
-  # and decimal someday.  For now, define our own versions.
-  libgcc_cv_powerpc_float128_decimal="no"
-  AC_MSG_RESULT([$libgcc_cv_powerpc_float128_decimal])
 
   CFLAGS="$CFLAGS -mpower9-vector -mfloat128-hardware"
   AC_CACHE_CHECK([for PowerPC ISA 3.0 to build hardware __float128 libraries],
