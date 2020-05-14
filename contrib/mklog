@@ -449,9 +449,7 @@ otherwise writes to stdout.'
     out.write("""\
 %s:
 
-%s  %s  <%s>
-
-%s%s\n""" % (log_name, date, name, email, bugmsg, msg))
+%s%s\n""" % (log_name, bugmsg, msg))
 
   if args.inline:
     # Append patch body
