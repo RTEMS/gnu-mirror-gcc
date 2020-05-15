@@ -30,6 +30,13 @@ if ![gcc_parallel_test_run_p $b] {
 }
 gcc_parallel_test_enable 0
 
+set gsplit_dwarf "-gsplit-dwarf"
+if ![check_no_compiler_messages gsplitdwarf object {
+    void foo (void) { }
+} "$gsplit_dwarf"] {
+    set gsplit_dwarf ""
+}
+
 # For the test named TEST, run the compiler with SOURCES and OPTS, and
 # look in DIRS for OUTPUTS.  SOURCES is a list of suffixes for source
 # files starting with $b in $srcdir/$subdir, OPTS is a string with
@@ -50,6 +57,7 @@ proc outest { test sources opts dirs outputs } {
     global b
     global srcdir
     global subdir
+    global gsplit_dwarf
     set src {}
     foreach s $sources {
 	lappend src $srcdir/$subdir/$b$s
@@ -72,8 +80,8 @@ proc outest { test sources opts dirs outputs } {
     foreach d $dirs olist $outputs {
 	foreach og $olist {
 	    if { [string index $og 0] == "-" } then {
-		if { [string index $og 1] == "-" || \
-			 [string index $og 1] == "." } then {
+		if { [string index $og 1] == "-" \
+		     || [string index $og 1] == "." } then {
 		    set o "$b-$b[string range $og 1 end]"
 		} else {
 		    set o "$b$og"
@@ -86,6 +94,10 @@ proc outest { test sources opts dirs outputs } {
 		set o "a-$b.[string range $og 3 end]"
 	    } else {
 		set o "$og"
+	    }
+	    if { "$gsplit_dwarf" == "" \
+		 && [string match "*.dwo" "$og"] } then {
+		continue
 	    }
 	    if { [file exists $d$o] } then {
 		pass "$test: $d$o"
@@ -261,102 +273,102 @@ outest "$b exe ddstovr namedir2" $mult "-o $b.exe -save-temps -dumpdir o/" {o/} 
 # Compiler- and driver-generated aux and dump outputs.
 # -fdump-rtl-final creates a .c.???r.final dump in the compiler.
 # -fstack-usage creates a .su aux output in the compiler.
-# -gsplit-dwarf extracts a .dwo aux output from the .o in the driver.
-outest "$b asm auxdump 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.s}}
-outest "$b asm auxdump 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-1.c.???r.final -1.su -1.s -2.c.???r.final -2.su -2.s}}
-outest "$b obj auxdump unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
-outest "$b obj auxdump unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-1.c.???r.final -1.su -1.dwo -1.o -2.c.???r.final -2.su -2.dwo -2.o}}
+# $gsplit_dwarf extracts a .dwo aux output from the .o in the driver.
+outest "$b asm auxdump 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.s}}
+outest "$b asm auxdump 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-1.c.???r.final -1.su -1.s -2.c.???r.final -2.su -2.s}}
+outest "$b obj auxdump unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
+outest "$b obj auxdump unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-1.c.???r.final -1.su -1.dwo -1.o -2.c.???r.final -2.su -2.dwo -2.o}}
 
-outest "$b cpp auxdump named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.i}}
-outest "$b asm auxdump named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.s}}
-outest "$b obj auxdump named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
-outest "$b cpp auxdump namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{.i}}
-outest "$b asm auxdump namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{.c.???r.final .su .s}}
-outest "$b obj auxdump namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{.c.???r.final .su .dwo .o}}
+outest "$b cpp auxdump named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.i}}
+outest "$b asm auxdump named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.s}}
+outest "$b obj auxdump named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
+outest "$b cpp auxdump namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{.i}}
+outest "$b asm auxdump namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{.c.???r.final .su .s}}
+outest "$b obj auxdump namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{.c.???r.final .su .dwo .o}}
 
-outest "$b exe auxdump unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{a--0.c.???r.final a--0.su a--0.dwo a.{out,exe}}}
-outest "$b exe auxdump unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo a.{out,exe}}}
-outest "$b exe auxdump named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.exe}}
-outest "$b exe auxdump namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{--0.c.???r.final --0.su --0.dwo .exe}}
-outest "$b exe auxdump named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe}}
+outest "$b exe auxdump unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{a--0.c.???r.final a--0.su a--0.dwo a.{out,exe}}}
+outest "$b exe auxdump unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo a.{out,exe}}}
+outest "$b exe auxdump named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.exe}}
+outest "$b exe auxdump namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{--0.c.???r.final --0.su --0.dwo .exe}}
+outest "$b exe auxdump named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe}}
 
-outest "$b cpp auxdump namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{-0.i} {}}
-outest "$b asm auxdump namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{-0.c.???r.final -0.su -0.s} {}}
-outest "$b obj auxdump namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{-0.c.???r.final -0.su -0.dwo -0.o} {}}
-outest "$b cpp auxdump namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{.i} {}}
-outest "$b asm auxdump namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{.c.???r.final .su .s} {}}
-outest "$b obj auxdump namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{.c.???r.final .su .dwo .o} {}}
-outest "$b exe auxdump namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{-0.c.???r.final -0.su -0.dwo -0.exe} {}}
-outest "$b exe auxdump namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{--0.c.???r.final --0.su --0.dwo .exe} {}}
-outest "$b exe auxdump namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf" {o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe} {}}
+outest "$b cpp auxdump namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{-0.i} {}}
+outest "$b asm auxdump namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{-0.c.???r.final -0.su -0.s} {}}
+outest "$b obj auxdump namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{-0.c.???r.final -0.su -0.dwo -0.o} {}}
+outest "$b cpp auxdump namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{.i} {}}
+outest "$b asm auxdump namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{.c.???r.final .su .s} {}}
+outest "$b obj auxdump namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{.c.???r.final .su .dwo .o} {}}
+outest "$b exe auxdump namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{-0.c.???r.final -0.su -0.dwo -0.exe} {}}
+outest "$b exe auxdump namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{--0.c.???r.final --0.su --0.dwo .exe} {}}
+outest "$b exe auxdump namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf" {o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe} {}}
 
 # Check that -save-temps doesn't break compiler aux or dumps as it
 # changes temp file names.
-outest "$b asm auxdmps 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s}}
-outest "$b asm auxdmps 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-1.i -1.c.???r.final -1.su -1.s -2.i -2.c.???r.final -2.su -2.s}}
-outest "$b obj auxdmps unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o}}
-outest "$b obj auxdmps unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-1.i -1.c.???r.final -1.su -1.s -1.dwo -1.o -2.i -2.c.???r.final -2.su -2.s -2.dwo -2.o}}
+outest "$b asm auxdmps 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s}}
+outest "$b asm auxdmps 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-1.i -1.c.???r.final -1.su -1.s -2.i -2.c.???r.final -2.su -2.s}}
+outest "$b obj auxdmps unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o}}
+outest "$b obj auxdmps unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-1.i -1.c.???r.final -1.su -1.s -1.dwo -1.o -2.i -2.c.???r.final -2.su -2.s -2.dwo -2.o}}
 
-outest "$b cpp auxdmps named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i}}
-outest "$b asm auxdmps named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s}}
-outest "$b obj auxdmps named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o}}
-outest "$b cpp auxdmps namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{.i}}
-outest "$b asm auxdmps namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{.i .c.???r.final .su .s}}
-outest "$b obj auxdmps namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{.i .c.???r.final .su .s .dwo .o}}
+outest "$b cpp auxdmps named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i}}
+outest "$b asm auxdmps named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s}}
+outest "$b obj auxdmps named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o}}
+outest "$b cpp auxdmps namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{.i}}
+outest "$b asm auxdmps namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{.i .c.???r.final .su .s}}
+outest "$b obj auxdmps namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{.i .c.???r.final .su .s .dwo .o}}
 
-outest "$b exe auxdmps unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{a--0.i a--0.c.???r.final a--0.su a--0.s a--0.dwo a--0.o a.{out,exe}}}
-outest "$b exe auxdmps unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{a--1.i a--1.c.???r.final a--1.su a--1.s a--1.dwo a--1.o a--2.i a--2.c.???r.final a--2.su a--2.s a--2.dwo a--2.o a.{out,exe}}}
-outest "$b exe auxdmps named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o -0.exe}}
-outest "$b exe auxdmps namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{--0.i --0.c.???r.final --0.su --0.s --0.dwo --0.o .exe}}
-outest "$b exe auxdmps named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {} {{--1.i --1.c.???r.final --1.su --1.s --1.dwo --1.o --2.i --2.c.???r.final --2.su --2.s --2.dwo --2.o .exe}}
+outest "$b exe auxdmps unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{a--0.i a--0.c.???r.final a--0.su a--0.s a--0.dwo a--0.o a.{out,exe}}}
+outest "$b exe auxdmps unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{a--1.i a--1.c.???r.final a--1.su a--1.s a--1.dwo a--1.o a--2.i a--2.c.???r.final a--2.su a--2.s a--2.dwo a--2.o a.{out,exe}}}
+outest "$b exe auxdmps named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o -0.exe}}
+outest "$b exe auxdmps namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{--0.i --0.c.???r.final --0.su --0.s --0.dwo --0.o .exe}}
+outest "$b exe auxdmps named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {} {{--1.i --1.c.???r.final --1.su --1.s --1.dwo --1.o --2.i --2.c.???r.final --2.su --2.s --2.dwo --2.o .exe}}
 
-outest "$b cpp auxdmps namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{-0.i} {}}
-outest "$b asm auxdmps namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s} {}}
-outest "$b obj auxdmps namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o} {}}
-outest "$b cpp auxdmps namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{.i} {}}
-outest "$b asm auxdmps namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{.i .c.???r.final .su .s} {}}
-outest "$b obj auxdmps namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{.i .c.???r.final .su .s .dwo .o} {}}
-outest "$b exe auxdmps namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o -0.exe} {}}
-outest "$b exe auxdmps namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{--0.i --0.c.???r.final --0.su --0.s --0.dwo --0.o .exe} {}}
-outest "$b exe auxdmps namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -save-temps" {o/} {{--1.i --1.c.???r.final --1.su --1.s --1.dwo --1.o --2.i --2.c.???r.final --2.su --2.s --2.dwo --2.o .exe} {}}
+outest "$b cpp auxdmps namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{-0.i} {}}
+outest "$b asm auxdmps namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s} {}}
+outest "$b obj auxdmps namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o} {}}
+outest "$b cpp auxdmps namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{.i} {}}
+outest "$b asm auxdmps namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{.i .c.???r.final .su .s} {}}
+outest "$b obj auxdmps namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{.i .c.???r.final .su .s .dwo .o} {}}
+outest "$b exe auxdmps namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{-0.i -0.c.???r.final -0.su -0.s -0.dwo -0.o -0.exe} {}}
+outest "$b exe auxdmps namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{--0.i --0.c.???r.final --0.su --0.s --0.dwo --0.o .exe} {}}
+outest "$b exe auxdmps namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -save-temps" {o/} {{--1.i --1.c.???r.final --1.su --1.s --1.dwo --1.o --2.i --2.c.???r.final --2.su --2.s --2.dwo --2.o .exe} {}}
 
 
 # Check that dumpdir changes the location of non-primary outputs
-outest "$b asm dumpdir 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su} {-0.s}}
-outest "$b asm dumpdir 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -2.c.???r.final -2.su} {-1.s -2.s}}
-outest "$b obj dumpdir unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.o}}
-outest "$b obj dumpdir unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {-1.o -2.o}}
+outest "$b asm dumpdir 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su} {-0.s}}
+outest "$b asm dumpdir 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -2.c.???r.final -2.su} {-1.s -2.s}}
+outest "$b obj dumpdir unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.o}}
+outest "$b obj dumpdir unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {-1.o -2.o}}
 
-outest "$b cpp dumpdir named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{} {-0.i}}
-outest "$b asm dumpdir named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su} {-0.s}}
-outest "$b obj dumpdir named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.o}}
-outest "$b cpp dumpdir namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{} {.i}}
-outest "$b asm dumpdir namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{.c.???r.final .su} {.s}}
-outest "$b obj dumpdir namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{.c.???r.final .su .dwo} {.o}}
+outest "$b cpp dumpdir named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{} {-0.i}}
+outest "$b asm dumpdir named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su} {-0.s}}
+outest "$b obj dumpdir named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.o}}
+outest "$b cpp dumpdir namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{} {.i}}
+outest "$b asm dumpdir namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{.c.???r.final .su} {.s}}
+outest "$b obj dumpdir namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{.c.???r.final .su .dwo} {.o}}
 
-outest "$b exe dumpdir unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {a.{out,exe}}}
-outest "$b exe dumpdir unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
-outest "$b exe dumpdir named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.exe}}
-outest "$b exe dumpdir namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {.exe}}
-outest "$b exe dumpdir named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe}}
-outest "$b exe dumpdira namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
-outest "$b exe dumpdira named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
-outest "$b exe dumpdirb namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/$b-" {od/} {{--0.c.???r.final --0.su --0.dwo} {.exe}}
-outest "$b exe dumpdirb named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/$b-" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
+outest "$b exe dumpdir unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {a.{out,exe}}}
+outest "$b exe dumpdir unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
+outest "$b exe dumpdir named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {-0.exe}}
+outest "$b exe dumpdir namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-0.c.???r.final -0.su -0.dwo} {.exe}}
+outest "$b exe dumpdir named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe}}
+outest "$b exe dumpdira namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
+outest "$b exe dumpdira named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
+outest "$b exe dumpdirb namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/$b-" {od/} {{--0.c.???r.final --0.su --0.dwo} {.exe}}
+outest "$b exe dumpdirb named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/$b-" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
 
-outest "$b cpp dumpdir namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{} {-0.i} {}}
-outest "$b asm dumpdir namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su} {-0.s} {}}
-outest "$b obj dumpdir namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {-0.o} {}}
-outest "$b cpp dumpdir namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{} {.i} {}}
-outest "$b asm dumpdir namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{.c.???r.final .su} {.s} {}}
-outest "$b obj dumpdir namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{.c.???r.final .su .dwo} {.o} {}}
-outest "$b exe dumpdir namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {-0.exe} {}}
-outest "$b exe dumpdir namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {.exe} {}}
-outest "$b exe dumpdir namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/" {od/ o/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe} {}}
-outest "$b exe dumpdira namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/ o/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe} {}}
-outest "$b exe dumpdira namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/a-" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
-outest "$b exe dumpdirb namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/$b-" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {.exe} {}}
-outest "$b exe dumpdirb namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/$b-" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
+outest "$b cpp dumpdir namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{} {-0.i} {}}
+outest "$b asm dumpdir namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su} {-0.s} {}}
+outest "$b obj dumpdir namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {-0.o} {}}
+outest "$b cpp dumpdir namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{} {.i} {}}
+outest "$b asm dumpdir namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{.c.???r.final .su} {.s} {}}
+outest "$b obj dumpdir namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{.c.???r.final .su .dwo} {.o} {}}
+outest "$b exe dumpdir namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {-0.exe} {}}
+outest "$b exe dumpdir namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{-0.c.???r.final -0.su -0.dwo} {.exe} {}}
+outest "$b exe dumpdir namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/" {od/ o/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe} {}}
+outest "$b exe dumpdira namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/ o/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe} {}}
+outest "$b exe dumpdira namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/a-" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
+outest "$b exe dumpdirb namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/$b-" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {.exe} {}}
+outest "$b exe dumpdirb namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/$b-" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
 
 # Check that a -dumpbase with a dir component disregards the -dumpdir
 # prefix.  Also, start testing -dumpbase-ext to distinguish between
@@ -368,90 +380,90 @@ outest "$b exe dumpdirb namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack
 # for them all), or when linking (the specified dumpbase is then used
 # as prefix instead of the linker output, and a new dumpbase is
 # computed per source).
-outest "$b asm dbsovrdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b asm dbsovrddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
-outest "$b asm dbsovrdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
-outest "$b asm dbsovrdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
-outest "$b asm dbsovrdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b asm dbsovrddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b obj dbsovrdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbsovrddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbsovrdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
+outest "$b asm dbsovrdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b asm dbsovrddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
+outest "$b asm dbsovrdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
+outest "$b asm dbsovrdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
+outest "$b asm dbsovrdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b asm dbsovrddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b obj dbsovrdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbsovrddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbsovrdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
 
-outest "$b cpp dbsovrdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{} {-0.i}}
-outest "$b asm dbsovrdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b obj dbsovrdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b cpp dbsovrdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{} {.i}}
-outest "$b asm dbsovrdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {.s}}
-outest "$b obj dbsovrdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {.o}}
+outest "$b cpp dbsovrdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{} {-0.i}}
+outest "$b asm dbsovrdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b obj dbsovrdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b cpp dbsovrdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{} {.i}}
+outest "$b asm dbsovrdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su} {.s}}
+outest "$b obj dbsovrdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {.o}}
 
 # Nit: -dumpdir affects whether the specified dumpbase is combined
 # into dumpdir or taken as the output basename, even if dumpbase will
 # ultimately override it.
-outest "$b exe dbsovrdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {a.{out,exe}}}
-outest "$b exe dbsovrdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
-outest "$b exe dbsovrdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.exe}}
-outest "$b exe dbsovrdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.exe -dumpbase-ext .exe" {od/} {{.exe.???r.final .su .dwo} {.exe}}
-outest "$b exe dbsovrdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
-outest "$b exe dbsovrdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a.???r.final a.su a.dwo} {.exe}}
-outest "$b exe dbsovrddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a.c -dumpbase-ext .c" {od/} {{a.c.???r.final a.su a.dwo} {.exe}}
-outest "$b exe dbsovrdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
+outest "$b exe dbsovrdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {a.{out,exe}}}
+outest "$b exe dbsovrdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
+outest "$b exe dbsovrdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.exe}}
+outest "$b exe dbsovrdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.exe -dumpbase-ext .exe" {od/} {{.exe.???r.final .su .dwo} {.exe}}
+outest "$b exe dbsovrdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
+outest "$b exe dbsovrdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a.???r.final a.su a.dwo} {.exe}}
+outest "$b exe dbsovrddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a.c -dumpbase-ext .c" {od/} {{a.c.???r.final a.su a.dwo} {.exe}}
+outest "$b exe dbsovrdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
 
-outest "$b cpp dbsovrdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{} {-0.i} {}}
-outest "$b asm dbsovrdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su} {-0.s} {}}
-outest "$b obj dbsovrdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
-outest "$b cpp dbsovrdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{} {.i} {}}
-outest "$b asm dbsovrdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su} {.s} {}}
-outest "$b obj dbsovrdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
-outest "$b exe dbsovrdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.exe} {}}
-outest "$b exe dbsovrdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b.exe -dumpbase-ext .exe" {od/ o/} {{.exe.???r.final .su .dwo} {.exe} {}}
-outest "$b exe dbsovrdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
-outest "$b exe dbsovrdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a" {od/ o/} {{a.???r.final a.su a.dwo} {.exe} {}}
-outest "$b exe dbsovrdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir ./ -dumpbase od/a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
+outest "$b cpp dbsovrdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{} {-0.i} {}}
+outest "$b asm dbsovrdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su} {-0.s} {}}
+outest "$b obj dbsovrdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
+outest "$b cpp dbsovrdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{} {.i} {}}
+outest "$b asm dbsovrdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su} {.s} {}}
+outest "$b obj dbsovrdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
+outest "$b exe dbsovrdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.exe} {}}
+outest "$b exe dbsovrdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b.exe -dumpbase-ext .exe" {od/ o/} {{.exe.???r.final .su .dwo} {.exe} {}}
+outest "$b exe dbsovrdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/$b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
+outest "$b exe dbsovrdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a" {od/ o/} {{a.???r.final a.su a.dwo} {.exe} {}}
+outest "$b exe dbsovrdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir ./ -dumpbase od/a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
 
 
 # Check that a -dumpbase without a dir component adds to the -dumpdir
 # prefix.
-outest "$b asm dbswthdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b asm dbswthddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
-outest "$b asm dbswthdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
-outest "$b asm dbswthdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
-outest "$b asm dbswthdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b asm dbswthddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b obj dbswthdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbswthddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbswthdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
+outest "$b asm dbswthdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b asm dbswthddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
+outest "$b asm dbswthdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
+outest "$b asm dbswthdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
+outest "$b asm dbswthdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b asm dbswthddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b obj dbswthdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbswthddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbswthdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
 
-outest "$b cpp dbswthdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{} {-0.i}}
-outest "$b asm dbswthdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b obj dbswthdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b cpp dbswthdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{} {.i}}
-outest "$b asm dbswthdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {.s}}
-outest "$b obj dbswthdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {.o}}
+outest "$b cpp dbswthdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{} {-0.i}}
+outest "$b asm dbswthdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b obj dbswthdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b cpp dbswthdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{} {.i}}
+outest "$b asm dbswthdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su} {.s}}
+outest "$b obj dbswthdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {.o}}
 
 # Nitty details: -dumpdir affects whether the specified dumpbase is
 # combined into dumpdir or taken as the output basename, even if
 # dumpbase will ultimately override it.
-outest "$b exe dbswthdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {a.{out,exe}}}
-outest "$b exe dbswthdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
-outest "$b exe dbswthdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.exe}}
-outest "$b exe dbswthdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.exe -dumpbase-ext .exe" {od/} {{.exe.???r.final .su .dwo} {.exe}}
-outest "$b exe dbswthdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
-outest "$b exe dbswthdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a" {od/} {{a.???r.final a.su a.dwo} {.exe}}
-outest "$b exe dbswthddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a.c -dumpbase-ext .c" {od/} {{a.c.???r.final a.su a.dwo} {.exe}}
-outest "$b exe dbswthdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
+outest "$b exe dbswthdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {a.{out,exe}}}
+outest "$b exe dbswthdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
+outest "$b exe dbswthdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{.???r.final .su .dwo} {-0.exe}}
+outest "$b exe dbswthdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.exe -dumpbase-ext .exe" {od/} {{.exe.???r.final .su .dwo} {.exe}}
+outest "$b exe dbswthdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
+outest "$b exe dbswthdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a" {od/} {{a.???r.final a.su a.dwo} {.exe}}
+outest "$b exe dbswthddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a.c -dumpbase-ext .c" {od/} {{a.c.???r.final a.su a.dwo} {.exe}}
+outest "$b exe dbswthdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
 
-outest "$b cpp dbswthdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{} {-0.i} {}}
-outest "$b asm dbswthdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su} {-0.s} {}}
-outest "$b obj dbswthdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
-outest "$b cpp dbswthdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{} {.i} {}}
-outest "$b asm dbswthdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su} {.s} {}}
-outest "$b obj dbswthdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
-outest "$b exe dbswthdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {-0.exe} {}}
-outest "$b exe dbswthdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b.exe -dumpbase-ext .exe" {od/ o/} {{.exe.???r.final .su .dwo} {.exe} {}}
-outest "$b exe dbswthdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
-outest "$b exe dbswthdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a" {od/ o/} {{a.???r.final a.su a.dwo} {.exe} {}}
-outest "$b exe dbswthdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpdir od/ -dumpbase a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
+outest "$b cpp dbswthdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{} {-0.i} {}}
+outest "$b asm dbswthdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su} {-0.s} {}}
+outest "$b obj dbswthdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
+outest "$b cpp dbswthdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{} {.i} {}}
+outest "$b asm dbswthdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su} {.s} {}}
+outest "$b obj dbswthdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
+outest "$b exe dbswthdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{.???r.final .su .dwo} {-0.exe} {}}
+outest "$b exe dbswthdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b.exe -dumpbase-ext .exe" {od/ o/} {{.exe.???r.final .su .dwo} {.exe} {}}
+outest "$b exe dbswthdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase $b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
+outest "$b exe dbswthdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a" {od/ o/} {{a.???r.final a.su a.dwo} {.exe} {}}
+outest "$b exe dbswthdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpdir od/ -dumpbase a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
 
 
 # Check for the minor differences when -dumpbase is used without
@@ -459,48 +471,48 @@ outest "$b exe dbswthdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstac
 # is in the single-input link tests: with the dump dir/ prefix moved
 # to dumpbase, and without -dumpdir we end up using -dumpbase as the
 # executable prefix rather than as the dumpbase for the single input.
-outest "$b asm dbwoutdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b asm dbwoutddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
-outest "$b asm dbwoutdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
-outest "$b asm dbwoutdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
-outest "$b asm dbwoutdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b asm dbwoutddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
-outest "$b obj dbwoutdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbwoutddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
-outest "$b obj dbwoutdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
+outest "$b asm dbwoutdd 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b asm dbwoutddx 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su} {-0.s}}
+outest "$b asm dbwoutdd-x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.c" {od/} {{.c.???r.final .c.su} {-0.s}}
+outest "$b asm dbwoutdd.x 1" $sing "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.x" {od/} {{.x.???r.final .x.su} {-0.s}}
+outest "$b asm dbwoutdd 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b asm dbwoutddx 2" $mult "-S -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.x -dumpbase-ext .x" {od/} {{--1.c.???r.final --1.su --2.c.???r.final --2.su} {-1.s -2.s}}
+outest "$b obj dbwoutdd unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbwoutddx unnamed1" $sing "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.c -dumpbase-ext .c" {od/} {{.c.???r.final .su .dwo} {-0.o}}
+outest "$b obj dbwoutdd unnamed2" $mult "-c -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
 
-outest "$b cpp dbwoutdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{} {-0.i}}
-outest "$b asm dbwoutdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
-outest "$b obj dbwoutdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
-outest "$b cpp dbwoutdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{} {.i}}
-outest "$b asm dbwoutdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {.s}}
-outest "$b obj dbwoutdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {.o}}
+outest "$b cpp dbwoutdd named0" $sing "-E -o $b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{} {-0.i}}
+outest "$b asm dbwoutdd named0" $sing "-S -o $b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {-0.s}}
+outest "$b obj dbwoutdd named0" $sing "-c -o $b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b cpp dbwoutdd namedb" $sing "-E -o $b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{} {.i}}
+outest "$b asm dbwoutdd namedb" $sing "-S -o $b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su} {.s}}
+outest "$b obj dbwoutdd namedb" $sing "-c -o $b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{.???r.final .su .dwo} {.o}}
 
-outest "$b exe dbwoutdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{--0.c.???r.final --0.su --0.dwo} {a.{out,exe}}}
-outest "$b exe dbwoutdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
-outest "$b exe dbwoutdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{--0.c.???r.final --0.su --0.dwo} {-0.exe}}
-outest "$b exe dbwoutdd named0d" $sing "-o od/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase $b" {od/} {{--0.c.???r.final --0.su --0.dwo -0.exe} {}}
-outest "$b exe dbwoutdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.exe -dumpbase-ext .exe" {od/} {{--0.c.???r.final --0.su --0.dwo} {.exe}}
-outest "$b exe dbwoutdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
-outest "$b exe dbwoutdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
-outest "$b exe dbwoutddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a.c -dumpbase-ext .c" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
-outest "$b exe dbwoutdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
+outest "$b exe dbwoutdd unnamed1" $sing "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{--0.c.???r.final --0.su --0.dwo} {a.{out,exe}}}
+outest "$b exe dbwoutdd unnamed2" $mult "-g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {a.{out,exe}}}
+outest "$b exe dbwoutdd named0" $sing "-o $b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{--0.c.???r.final --0.su --0.dwo} {-0.exe}}
+outest "$b exe dbwoutdd named0d" $sing "-o od/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase $b" {od/} {{--0.c.???r.final --0.su --0.dwo -0.exe} {}}
+outest "$b exe dbwoutdd namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.exe -dumpbase-ext .exe" {od/} {{--0.c.???r.final --0.su --0.dwo} {.exe}}
+outest "$b exe dbwoutdd named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe}}
+outest "$b exe dbwoutdda namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
+outest "$b exe dbwoutddac namedb" $sing "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a.c -dumpbase-ext .c" {od/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe}}
+outest "$b exe dbwoutdda named2" $mult "-o $b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a" {od/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe}}
 
-outest "$b cpp dbwoutdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{} {-0.i} {}}
-outest "$b asm dbwoutdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su} {-0.s} {}}
-outest "$b obj dbwoutdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
-outest "$b cpp dbwoutdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{} {.i} {}}
-outest "$b asm dbwoutdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su} {.s} {}}
-outest "$b obj dbwoutdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
-outest "$b exe dbwoutdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {-0.exe} {}}
-outest "$b exe dbwoutdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b.exe -dumpbase-ext .exe" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {.exe} {}}
-outest "$b exe dbwoutdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/$b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
-outest "$b exe dbwoutdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a" {od/ o/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe} {}}
-outest "$b exe dbwoutdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage -gsplit-dwarf -dumpbase od/a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
+outest "$b cpp dbwoutdd namedir0" $sing "-E -o o/$b-0.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{} {-0.i} {}}
+outest "$b asm dbwoutdd namedir0" $sing "-S -o o/$b-0.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su} {-0.s} {}}
+outest "$b obj dbwoutdd namedir0" $sing "-c -o o/$b-0.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {-0.o} {}}
+outest "$b cpp dbwoutdd namedir" $sing "-E -o o/$b.i -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{} {.i} {}}
+outest "$b asm dbwoutdd namedir" $sing "-S -o o/$b.s -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su} {.s} {}}
+outest "$b obj dbwoutdd namedir" $sing "-c -o o/$b.o -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{.???r.final .su .dwo} {.o} {}}
+outest "$b exe dbwoutdd namedir0" $sing "-o o/$b-0.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {-0.exe} {}}
+outest "$b exe dbwoutdd namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b.exe -dumpbase-ext .exe" {od/ o/} {{--0.c.???r.final --0.su --0.dwo} {.exe} {}}
+outest "$b exe dbwoutdd namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/$b" {od/ o/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {.exe} {}}
+outest "$b exe dbwoutdda namedirb" $sing "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a" {od/ o/} {{a--0.c.???r.final a--0.su a--0.dwo} {.exe} {}}
+outest "$b exe dbwoutdda namedir2" $mult "-o o/$b.exe -g -fdump-rtl-final -fstack-usage $gsplit_dwarf -dumpbase od/a" {od/ o/} {{a--1.c.???r.final a--1.su a--1.dwo a--2.c.???r.final a--2.su a--2.dwo} {.exe} {}}
 
 # -fcompare-debug
-outest "$b obj compare-debug" $sing "-c -fcompare-debug -fdump-rtl-final -fstack-usage -gsplit-dwarf -fdump-final-insns" {} {{-0.c.???r.final -0.su -0.c.gkd -0.gk.c.???r.final -0.dwo -0.o}}
-outest "$b obj compare-debug save-temps" $sing "-c -fcompare-debug -save-temps -fdump-rtl-final -fstack-usage -gsplit-dwarf -fdump-final-insns" {} {{-0.c.???r.final -0.su -0.i -0.c.gkd -0.s -0.gk.i -0.gk.c.???r.final -0.gk.c.gkd -0.dwo -0.o}}
+outest "$b obj compare-debug" $sing "-c -fcompare-debug -fdump-rtl-final -fstack-usage $gsplit_dwarf -fdump-final-insns" {} {{-0.c.???r.final -0.su -0.c.gkd -0.gk.c.???r.final -0.dwo -0.o}}
+outest "$b obj compare-debug save-temps" $sing "-c -fcompare-debug -save-temps -fdump-rtl-final -fstack-usage $gsplit_dwarf -fdump-final-insns" {} {{-0.c.???r.final -0.su -0.i -0.c.gkd -0.s -0.gk.i -0.gk.c.???r.final -0.gk.c.gkd -0.dwo -0.o}}
 
 # -flto
 outest "$b lto sing unnamed" $sing "-O2 -flto -flto-partition=one -fdump-ipa-icf-optimized -fdump-rtl-final -fstack-usage" {} {{a--0.c.???i.icf a.wpa.???i.icf a.ltrans0.ltrans.???r.final a.ltrans0.ltrans.su a.{out,exe}}}
@@ -593,16 +605,16 @@ outest "$b lto st mult namedb" $mult "-o dir/$b.exe -save-temps -O2 -flto -flto-
 # but we want to make sure behavior matches the docs.
 
 # gcc -c foo.c ...
-outest "$b doc single  -c !-o" $sing "-c -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
+outest "$b doc single  -c !-o" $sing "-c -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.o}}
 
 # gcc -c foo.c -o dir/foobar.o ...
-outest "$b doc single  -c +-o" $sing "-c -o dir/$b.o -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{.c.???r.final .su .dwo .o} {}}
+outest "$b doc single  -c +-o" $sing "-c -o dir/$b.o -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{.c.???r.final .su .dwo .o} {}}
 
 # gcc foo.c bar.c -o dir/foobar ...
-outest "$b doc double !-c  -o" $mult "-o dir/$b.exe -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe} {}}
+outest "$b doc double !-c  -o" $mult "-o dir/$b.exe -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .exe} {}}
 
 # gcc foo.c -o dir/foo ...
-outest "$b doc single !-c  -o" $sing "-o dir/$b-0 -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{-0.c.???r.final -0.su -0.dwo -0} {}}
+outest "$b doc single !-c  -o" $sing "-o dir/$b-0 -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{-0.c.???r.final -0.su -0.dwo -0} {}}
 
 # gcc -save-temps -S foo.c
 outest "$b doc single  -S -st" $sing "-save-temps -S" {} {{-0.i -0.s}}
@@ -612,44 +624,44 @@ outest "$b doc single  -c -st -db" $sing "-save-temps -dumpbase $b -c" {} {{.i .
 
 # gcc foo.c -c -o dir/foo.o -dumpbase alt/foo \
 #   -dumpdir pfx- -save-temps=cwd ...
-outest "$b doc single  -c  -o -db" $sing "-c -o dir/$b.o -dumpbase alt/$b -dumpdir pfx- -save-temps=cwd -fdump-rtl-final -fstack-usage -gsplit-dwarf" {alt/ dir/} {{.i .s .???r.final .su .dwo} {.o} {}}
+outest "$b doc single  -c  -o -db" $sing "-c -o dir/$b.o -dumpbase alt/$b -dumpdir pfx- -save-temps=cwd -fdump-rtl-final -fstack-usage $gsplit_dwarf" {alt/ dir/} {{.i .s .???r.final .su .dwo} {.o} {}}
 
 # gcc foo.c bar.c -c -dumpbase main ...
-outest "$b doc double  -c !-o -db" $mult "-c -dumpbase $b -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{--1.c.???r.final --1.su --1.dwo -1.o --2.c.???r.final --2.su --2.dwo -2.o}}
+outest "$b doc double  -c !-o -db" $mult "-c -dumpbase $b -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{--1.c.???r.final --1.su --1.dwo -1.o --2.c.???r.final --2.su --2.dwo -2.o}}
 
 # gcc -c foo.c -o dir/foobar.o -dumpbase '' ...
-outest "$b doc single  -c  -o -db''" $sing "-c -o dir/$b.o -dumpbase \"\" -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{-0.c.???r.final -0.su -0.dwo .o} {}}
+outest "$b doc single  -c  -o -db''" $sing "-c -o dir/$b.o -dumpbase \"\" -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{-0.c.???r.final -0.su -0.dwo .o} {}}
 
 # gcc foo.c bar.c -o dir/foobar -dumpbase '' -flto ...
 outest "$b doc double !-c  -o -db'' -flto" $mult "-o dir/$b.exe -dumpbase \"\" -flto -O2 -flto-partition=one -fdump-ipa-icf-optimized -fdump-rtl-final -fstack-usage" {dir/} {{-1.c.???i.icf -2.c.???i.icf .wpa.???i.icf .ltrans0.ltrans.???r.final .ltrans0.ltrans.su .exe} {}}
 
 
 # gcc foo.c -c -o dir/foo.o -dumpbase x-foo.c -dumpbase-ext .c ...
-outest "$b doc single  -c  -o -dbx" $sing "-c -o dir/$b-0.o -dumpbase $b.c -dumpbase-ext .c -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{.c.???r.final .su .dwo -0.o} {}}
+outest "$b doc single  -c  -o -dbx" $sing "-c -o dir/$b-0.o -dumpbase $b.c -dumpbase-ext .c -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{.c.???r.final .su .dwo -0.o} {}}
 
 # gcc foo.c bar.c -o main.out -dumpbase-ext .out ...
-outest "$b doc double !-c  -o -dbx" $mult "-o $b.out -dumpbase-ext .out -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .out}}
+outest "$b doc double !-c  -o -dbx" $mult "-o $b.out -dumpbase-ext .out -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo .out}}
 
 # gcc -dumpdir pfx- -c foo.c ...
-outest "$b doc single  -c !-o -dd" $sing "-dumpdir $b- -c -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{--0.c.???r.final --0.su --0.dwo -0.o}}
+outest "$b doc single  -c !-o -dd" $sing "-dumpdir $b- -c -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{--0.c.???r.final --0.su --0.dwo -0.o}}
 
 # gcc -dumpdir dir/ -c foo.c -o obj/bar.o ...
-outest "$b doc single  -c  -o -dd" $sing "-dumpdir dir/ -c -o obj/$b.o -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/ obj/} {{.c.???r.final .su .dwo} {.o} {}}
+outest "$b doc single  -c  -o -dd" $sing "-dumpdir dir/ -c -o obj/$b.o -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/ obj/} {{.c.???r.final .su .dwo} {.o} {}}
 
 # gcc -dumpdir pfx- -c foo.c -save-temps=obj ...
-outest "$b doc single  -c  -o -dd -st=" $sing "-dumpdir $b- -c -save-temps=obj -fdump-rtl-final -fstack-usage -gsplit-dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.i -0.s -0.o}}
+outest "$b doc single  -c  -o -dd -st=" $sing "-dumpdir $b- -c -save-temps=obj -fdump-rtl-final -fstack-usage $gsplit_dwarf" {} {{-0.c.???r.final -0.su -0.dwo -0.i -0.s -0.o}}
 
 # gcc foo.c bar.c -c -dumpdir dir/pfx- -dumpbase main ...
-outest "$b doc double  -c !-o -dd -db" $mult "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
+outest "$b doc double  -c !-o -dd -db" $mult "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{--1.c.???r.final --1.su --1.dwo --2.c.???r.final --2.su --2.dwo} {-1.o -2.o}}
 
 # gcc foo.c -c -dumpdir dir/pfx- -dumpbase main ...
-outest "$b doc single  -c !-o -dd -db" $sing "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b doc single  -c !-o -dd -db" $sing "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{.???r.final .su .dwo} {-0.o}}
 
 # gcc foo.c bar.c -dumpdir dir/pfx- -o main ...
-outest "$b doc double !-c  -o -dd" $mult "-dumpdir dir/ -o $b.exe -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe}}
+outest "$b doc double !-c  -o -dd" $mult "-dumpdir dir/ -o $b.exe -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{-1.c.???r.final -1.su -1.dwo -2.c.???r.final -2.su -2.dwo} {.exe}}
 
 # gcc foo.c -dumpdir alt/pfx- -o dir/main.exe -save-temps=cwd ...
-outest "$b doc single !-c  -o -dd -st=" $sing "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage -gsplit-dwarf" {dir/} {{.???r.final .su .dwo} {-0.o}}
+outest "$b doc single !-c  -o -dd -st=" $sing "-c -dumpdir dir/ -dumpbase $b -fdump-rtl-final -fstack-usage $gsplit_dwarf" {dir/} {{.???r.final .su .dwo} {-0.o}}
 
 
 gcc_parallel_test_enable 1
