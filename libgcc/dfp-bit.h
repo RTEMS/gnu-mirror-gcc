@@ -287,7 +287,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #elif BFP_KIND == 4 && HAVE_KF_MODE
 #define BFP_TYPE _Float128
-#define BFP_FMT "%.36Le"
+#define BFP_FMT "%.36e"
 #define STR_TO_BFP strtof128
 #define BFP_VIA_TYPE _Float128
 extern _Float128 strtof128 (const char *__restrict __nptr,
