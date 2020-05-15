@@ -25,7 +25,7 @@ set b "outputs"
 # doesn't return the same values, so disable parallelization
 # of this *.exp file.  The first parallel runtest to reach
 # this will run all the tests serially.
-if ![gcc_parallel_test_run_p $b] {
+if {![gcc_parallel_test_run_p $b] || [is_remote host]} {
     return
 }
 gcc_parallel_test_enable 0
@@ -35,6 +35,29 @@ if ![check_no_compiler_messages gsplitdwarf object {
     void foo (void) { }
 } "$gsplit_dwarf"] {
     set gsplit_dwarf ""
+}
+
+# Prepare additional options to be used for linking.
+# We do not compile to an executable, because that requires naming an output.
+set link_options ""
+set dest [target_info name]
+foreach i { ldflags libs ldscripts } {
+    if {[board_info $dest exists $i]} {
+	set skip ""
+	foreach opt [split [board_info $dest $i]] {
+	    if { $skip != "" } then {
+		set skip ""
+	    } elseif { $opt == "-Xlinker" } then {
+		set skip $opt
+	    } elseif { ![string match "-*" $opt] && [file isfile $opt] } {
+	    	set opt "-Wl,$opt"
+	    }
+	    append link_options " additional_flags=$opt"
+	}
+    }
+}
+if {[board_info $dest exists output_format]} {
+    append link_options " additional_flags=-Wl,-oformat,[board_info $dest output_format]"
 }
 
 # For the test named TEST, run the compiler with SOURCES and OPTS, and
@@ -73,7 +96,12 @@ proc outest { test sources opts dirs outputs } {
     }
     set options ""
     foreach opt [split $opts " "] {
-	set options "$options additional_flags=$opt"
+	append options " additional_flags=$opt"
+    }
+    # Add linker flags if we're linking
+    if {![string match "* -\[ESc\] *" " $opts "]} {
+	global link_options
+	append options "$link_options"
     }
     set gcc_output [gcc_target_compile $src "" none "$options"]
     set outs {}
@@ -130,13 +158,13 @@ proc outest { test sources opts dirs outputs } {
     if { [llength $outs] == 0 } then {
 	pass "$test: extra"
     } else {
-	fail "$test: extra $outs"
+	fail "$test: extra\n$outs"
     }
 
     if { [string equal "$gcc_output" ""] } then {
 	pass "$test: std out"
     } else {
-	fail "$test: std out $gcc_output"
+	fail "$test: std out\n$gcc_output"
     }
 
 }
