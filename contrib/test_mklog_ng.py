@@ -62,6 +62,7 @@ gcc/ChangeLog:
 
 	* config/riscv/riscv.h (C_S_BITS):
 	(CSW_MAX_OFFSET):
+
 '''
 
 PATCH2 = '''\
@@ -94,6 +95,7 @@ gcc/ChangeLog:
 
 	* targhooks.h (default_add_stmt_cost):
 	(default_new_address_profitable_p):
+
 '''
 
 PATCH3 = '''\
@@ -127,6 +129,7 @@ libcpp/ChangeLog:
 
 	* include/cpplib.h (enum c_lang):
 	(struct cpp_options):
+
 '''
 
 class TestMklog(unittest.TestCase):

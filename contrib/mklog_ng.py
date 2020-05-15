@@ -171,6 +171,7 @@ def generate_changelog(data):
                         out += '\t(%s):\n' % fn
                 else:
                     out += '\t* %s:\n' % relative_path
+        out += '\n'
     return out
 
 
