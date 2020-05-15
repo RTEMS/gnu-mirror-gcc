@@ -91,6 +91,7 @@ static tree handle_nonnull_attribute (tree *, tree, tree, int, bool *);
 static tree handle_sentinel_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noreturn_attribute (tree *, tree, tree, int, bool *);
 static tree handle_stack_protect_attribute (tree *, tree, tree, int, bool *);
+static tree handle_no_stack_protect_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noinline_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noclone_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noicf_attribute (tree *, tree, tree, int, bool *);
@@ -141,6 +142,8 @@ const struct attribute_spec gnat_internal_attribute_table[] =
     handle_noreturn_attribute, NULL },
   { "stack_protect",0, 0, true,  false, false, false,
     handle_stack_protect_attribute, NULL },
+  { "no_stack_protect",0, 0, true,  false, false, false,
+    handle_no_stack_protect_attribute, NULL },
   { "noinline",     0, 0,  true,  false, false, false,
     handle_noinline_attribute, NULL },
   { "noclone",      0, 0,  true,  false, false, false,
@@ -6523,9 +6526,38 @@ handle_stack_protect_attribute (tree *node, tree name, tree, int,
       warning (OPT_Wattributes, "%qE attribute ignored", name);
       *no_add_attrs = true;
     }
+  else if (lookup_attribute ("no_stack_protect", DECL_ATTRIBUTES (*node)))
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored due to conflict "
+	       "with %qs attribute", name, "no_stack_protect");
+      *no_add_attrs = true;
+    }
 
   return NULL_TREE;
 }
+
+/* Handle a "no_stack_protect" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_no_stack_protect_attribute (tree *node, tree name, tree, int,
+				   bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+  else if (lookup_attribute ("stack_protect", DECL_ATTRIBUTES (*node)))
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored due to conflict "
+	       "with %qs attribute", name, "stack_protect");
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
 
 /* Handle a "noinline" attribute; arguments as in
    struct attribute_spec.handler.  */
