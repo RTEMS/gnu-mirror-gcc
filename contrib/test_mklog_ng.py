@@ -132,6 +132,14 @@ libcpp/ChangeLog:
 
 '''
 
+EXPECTED3B = '''\
+libcpp/ChangeLog:
+
+	* include/cpplib.h:
+
+'''
+
+
 class TestMklog(unittest.TestCase):
     def test_macro_definition(self):
         changelog = generate_changelog(PATCH1)
@@ -144,3 +152,7 @@ class TestMklog(unittest.TestCase):
     def test_enum_and_struct(self):
         changelog = generate_changelog(PATCH3)
         assert changelog == EXPECTED3
+
+    def test_no_function(self):
+        changelog = generate_changelog(PATCH3, True)
+        assert changelog == EXPECTED3B
