@@ -1,5 +1,31 @@
 #!/usr/bin/env python3
 
+# Copyright (C) 2020 Free Software Foundation, Inc.
+#
+# This file is part of GCC.
+#
+# GCC is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GCC is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING.  If not, write to
+# the Free Software Foundation, 51 Franklin Street, Fifth Floor,
+# Boston, MA 02110-1301, USA.
+
+# This script parses a .diff file generated with 'diff -up' or 'diff -cp'
+# and adds a skeleton ChangeLog file to the file. It does not try to be
+# too smart when parsing function names, but it produces a reasonable
+# approximation.
+#
+# Author: Martin Liska <mliska@suse.cz>
+
 import argparse
 import os
 import re
@@ -21,12 +47,8 @@ function_extensions = set(['.c', '.cpp', '.C', '.cc', '.h', '.inc', '.def'])
 help_message = """\
 Generate ChangeLog template for PATCH.
 PATCH must be generated using diff(1)'s -up or -cp options
-(or their equivalent in Subversion/git).
+(or their equivalent in git).
 """
-
-changelogs = {}
-sorted_changelogs = []
-prs = []
 
 script_folder = os.path.realpath(__file__)
 gcc_root = os.path.dirname(os.path.dirname(script_folder))
@@ -75,6 +97,9 @@ def try_add_function(functions, line):
 
 
 def generate_changelog(data):
+    changelogs = {}
+    sorted_changelogs = []
+    prs = []
     out = ''
     diff = PatchSet(data)
 
