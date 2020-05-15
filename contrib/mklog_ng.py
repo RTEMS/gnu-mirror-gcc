@@ -96,7 +96,7 @@ def try_add_function(functions, line):
     return bool(fn)
 
 
-def generate_changelog(data):
+def generate_changelog(data, no_functions=False):
     changelogs = {}
     sorted_changelogs = []
     prs = []
@@ -137,34 +137,36 @@ def generate_changelog(data):
             elif file.is_removed_file:
                 out += '\t* %s: Removed.\n' % (relative_path)
             else:
-                for hunk in file:
-                    # Do not add function names for testsuite files
-                    extension = os.path.splitext(relative_path)[1]
-                    if not in_tests and extension in function_extensions:
-                        last_fn = None
-                        modified_visited = False
-                        success = False
-                        for line in hunk:
-                            m = identifier_regex.match(line.value)
-                            if line.is_added or line.is_removed:
-                                if not line.value.strip():
-                                    continue
-                                modified_visited = True
-                                if m and try_add_function(functions,
-                                                          m.group(1)):
-                                    last_fn = None
-                                    success = True
-                            elif line.is_context:
-                                if last_fn and modified_visited:
-                                    try_add_function(functions, last_fn)
-                                    last_fn = None
-                                    modified_visited = False
-                                    success = True
-                                elif m:
-                                    last_fn = m.group(1)
-                                    modified_visited = False
-                        if not success:
-                            try_add_function(functions, hunk.section_header)
+                if not no_functions:
+                    for hunk in file:
+                        # Do not add function names for testsuite files
+                        extension = os.path.splitext(relative_path)[1]
+                        if not in_tests and extension in function_extensions:
+                            last_fn = None
+                            modified_visited = False
+                            success = False
+                            for line in hunk:
+                                m = identifier_regex.match(line.value)
+                                if line.is_added or line.is_removed:
+                                    if not line.value.strip():
+                                        continue
+                                    modified_visited = True
+                                    if m and try_add_function(functions,
+                                                              m.group(1)):
+                                        last_fn = None
+                                        success = True
+                                elif line.is_context:
+                                    if last_fn and modified_visited:
+                                        try_add_function(functions, last_fn)
+                                        last_fn = None
+                                        modified_visited = False
+                                        success = True
+                                    elif m:
+                                        last_fn = m.group(1)
+                                        modified_visited = False
+                            if not success:
+                                try_add_function(functions,
+                                                 hunk.section_header)
                 if functions:
                     out += '\t* %s (%s):\n' % (relative_path, functions[0])
                     for fn in functions[1:]:
@@ -179,10 +181,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=help_message)
     parser.add_argument('input', nargs='?',
                         help='Patch file (or missing, read standard input)')
+    parser.add_argument('-s', '--no-functions', action='store_true',
+                        help='Do not generate function names in ChangeLogs')
     args = parser.parse_args()
     if args.input == '-':
         args.input = None
 
     input = open(args.input) if args.input else sys.stdin
-    output = generate_changelog(input.read())
-    print(output)
+    output = generate_changelog(input.read(), args.no_functions)
+    print(output, end='')
