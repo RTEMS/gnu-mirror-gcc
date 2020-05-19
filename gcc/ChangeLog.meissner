@@ -1,3 +1,21 @@
+2020-05-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Map the old
+	'q' built-in functions into long double if long double is IEEE
+	128-bit.
+	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
+	built-in functions for long double built-ins that use IEEE
+	128-bit.
+	(rs6000_expand_builtin): Change the KF IEEE 128-bit comparison
+	insns to TF if long double is IEEE 128-bit.
+	* config/rs6000/rs6000.c (init_float128_ieee): Use __mulkc3x and
+	__divkc3x if long double is IEEE 128-bit.
+	(rs6000_invalid_binary_op): Update error messages about mixing IBM
+	long double and IEEE 128-bit.
+	(rs6000_mangle_decl_assembler_name): Add support for mapping
+	built-in function names for long double built-in functions if long
+	double is IEEE 128-bit.
+
 2020-05-19   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
