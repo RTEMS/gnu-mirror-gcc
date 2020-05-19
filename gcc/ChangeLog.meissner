@@ -1,5 +1,6 @@
 2020-05-19  Michael Meissner  <meissner@linux.ibm.com>
 
+	(~meissner/patches/ieee3-patch001b)
 	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Map the old
 	'q' built-in functions into long double if long double is IEEE
 	128-bit.
