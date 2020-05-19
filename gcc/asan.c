@@ -1375,7 +1375,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   char buf[32];
   HOST_WIDE_INT base_offset = offsets[length - 1];
   HOST_WIDE_INT base_align_bias = 0, offset, prev_offset;
-  HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
+  unsigned HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
   HOST_WIDE_INT last_offset, last_size, last_size_aligned;
   int l;
   unsigned char cur_shadow_byte = ASAN_STACK_MAGIC_LEFT;
@@ -1428,7 +1428,9 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   str_cst = asan_pp_string (&asan_pp);
 
   /* Emit the prologue sequence.  */
-  if (asan_frame_size > 32 && asan_frame_size <= 65536 && pbase
+  if (asan_frame_size >= ASAN_MIN_STACK_FRAME_SIZE
+      && asan_frame_size <= ASAN_MAX_STACK_FRAME_SIZE
+      && pbase
       && param_asan_use_after_return)
     {
       use_after_return_class = floor_log2 (asan_frame_size - 1) - 5;
@@ -1598,8 +1600,24 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       if (use_after_return_class < 5
 	  && can_store_by_pieces (sz, builtin_memset_read_str, &c,
 				  BITS_PER_UNIT, true))
-	store_by_pieces (shadow_mem, sz, builtin_memset_read_str, &c,
-			 BITS_PER_UNIT, true, RETURN_BEGIN);
+	{
+	  /* Emit:
+	       memset(ShadowBase, kAsanStackAfterReturnMagic, ShadowSize);
+	       **SavedFlagPtr(FakeStack) = 0
+	  */
+	  store_by_pieces (shadow_mem, sz, builtin_memset_read_str, &c,
+			   BITS_PER_UNIT, true, RETURN_BEGIN);
+
+	  unsigned HOST_WIDE_INT offset
+	    = (1 << (use_after_return_class + ASAN_MIN_STACK_FRAME_SIZE_LOG));
+	  offset -= GET_MODE_SIZE (ptr_mode);
+	  mem = adjust_address (mem, Pmode, offset);
+	  mem = gen_rtx_MEM (ptr_mode, mem);
+	  rtx tmp_reg = gen_reg_rtx (Pmode);
+	  emit_move_insn (tmp_reg, mem);
+	  mem = adjust_address (mem, QImode, 0);
+	  emit_move_insn (mem, const0_rtx);
+	}
       else if (use_after_return_class >= 5
 	       || !set_storage_via_setmem (shadow_mem,
 					   GEN_INT (sz),

@@ -58,6 +58,14 @@ extern hash_set <tree> *asan_used_labels;
 
 #define ASAN_MIN_RED_ZONE_SIZE	16
 
+/* Minimal and maximal frame size for a fake stack frame.  */
+
+#define ASAN_MIN_STACK_FRAME_SIZE_LOG 6
+#define ASAN_MAX_STACK_FRAME_SIZE_LOG 16
+
+#define ASAN_MIN_STACK_FRAME_SIZE (1UL << ASAN_MIN_STACK_FRAME_SIZE_LOG)
+#define ASAN_MAX_STACK_FRAME_SIZE (1UL << ASAN_MAX_STACK_FRAME_SIZE_LOG)
+
 /* Shadow memory values for stack protection.  Left is below protected vars,
    the first pointer in stack corresponding to that offset contains
    ASAN_STACK_FRAME_MAGIC word, the second pointer to a string describing
