@@ -16,6 +16,17 @@
 	(rs6000_mangle_decl_assembler_name): Add support for mapping
 	built-in function names for long double built-in functions if long
 	double is IEEE 128-bit.
+	* config/rs6000/rs6000-builtin.def (scalar_extract_exptf): Add
+	support for long double being IEEE 128-bit built-in functions.
+	(scalar_extract_sigtf): Likewise.
+	(scalar_test_neg_tf): Likewise.
+	(scalar_insert_exp_tf): Likewise.
+	(scalar_insert_exp_tfp): Likewise.
+	(scalar_cmp_exp_tf_gt): Likewise.
+	(scalar_cmp_exp_tf_lt): Likewise.
+	(scalar_cmp_exp_tf_eq): Likewise.
+	(scalar_cmp_exp_tf_unordered): Likewise.
+	(scalar_test_data_class_tf): Likewise.
 
 2020-05-19   Michael Meissner  <meissner@linux.ibm.com>
 
