@@ -226,6 +226,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define STR_TO_INT strtoull
 #endif
 
+/* Support PowerPC KF mode, which is __float128 when long double is
+   IBM extended double.  */
+#if defined (L_sd_to_kf) || defined (L_dd_to_kf) || defined (L_td_to_kf) \
+ || defined (L_kf_to_sd) || defined (L_kf_to_dd) || defined (L_kf_to_td)
+#define HAVE_KF_MODE 1
+#endif
+
 /* Conversions between decimal float types and binary float types use
    BFP_KIND to determine the data type and C functions to use.  */
 
@@ -239,7 +246,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
  ||   defined (L_xf_to_sd) || defined (L_xf_to_dd) || defined (L_xf_to_td)
 #define BFP_KIND 3
 #elif defined (L_sd_to_tf) || defined (L_dd_to_tf) || defined (L_td_to_tf) \
- ||   defined (L_tf_to_sd) || defined (L_tf_to_dd) || defined (L_tf_to_td)
+ ||   defined (L_tf_to_sd) || defined (L_tf_to_dd) || defined (L_tf_to_td) \
+ ||   defined (HAVE_KF_MODE)
 #define BFP_KIND 4
 #endif
 
@@ -276,6 +284,18 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define BFP_VIA_TYPE long double
 #define STR_TO_BFP strtold
 #endif /* LONG_DOUBLE_HAS_XF_MODE */
+
+#elif BFP_KIND == 4 && HAVE_KF_MODE
+#define BFP_TYPE _Float128
+#define BFP_FMT "%.36e"
+#define STR_TO_BFP strtof128
+#define BFP_VIA_TYPE _Float128
+extern _Float128 strtof128 (const char *__restrict __nptr,
+                            char **__restrict __endptr)
+  __THROW __nonnull ((1));
+extern int strfromf128 (char *__dest, size_t __size, const char * __format,
+                        _Float128 __f)
+  __THROW __nonnull ((3));
 
 #elif BFP_KIND == 4
 #if LONG_DOUBLE_HAS_TF_MODE
@@ -487,6 +507,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #elif BFP_KIND == 3
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_truncxfsd,__bid_truncxfsd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendsdxf,__bid_extendsdxf)
+#elif BFP_KIND == 4 && HAVE_KF_MODE
+#define BFP_TO_DFP	DPD_BID_NAME(__dpd_trunckfsd,__bid_trunckfsd)
+#define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendsdkf,__bid_extendsdkf)
 #elif BFP_KIND == 4
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_trunctfsd,__bid_trunctfsd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendsdtf,__bid_extendsdtf)
@@ -502,6 +525,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #elif BFP_KIND == 3
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_truncxfdd,__bid_truncxfdd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendddxf,__bid_extendddxf)
+#elif BFP_KIND == 4 && HAVE_KF_MODE
+#define BFP_TO_DFP	DPD_BID_NAME(__dpd_trunckfdd,__bid_trunckfdd)
+#define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendddkf,__bid_extendddkf)
 #elif BFP_KIND == 4
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_trunctfdd,__bid_trunctfdd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_extendddtf,__bid_extendddtf)
@@ -517,6 +543,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #elif BFP_KIND == 3
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_extendxftd,__bid_extendxftd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_trunctdxf,__bid_trunctdxf)
+#elif BFP_KIND == 4 && HAVE_KF_MODE
+#define BFP_TO_DFP	DPD_BID_NAME(__dpd_extendkftd,__bid_extendkftd)
+#define DFP_TO_BFP	DPD_BID_NAME(__dpd_trunctdkf,__bid_trunctdkf)
 #elif BFP_KIND == 4
 #define BFP_TO_DFP	DPD_BID_NAME(__dpd_extendtftd,__bid_extendtftd)
 #define DFP_TO_BFP	DPD_BID_NAME(__dpd_trunctdtf,__bid_trunctdtf)
@@ -612,7 +641,8 @@ extern DFP_C_TYPE INT_TO_DFP (INT_TYPE);
  || ((defined (L_sd_to_xf) || defined (L_dd_to_xf) || defined (L_td_to_xf)) \
      && LONG_DOUBLE_HAS_XF_MODE) \
  || ((defined (L_sd_to_tf) || defined (L_dd_to_tf) || defined (L_td_to_tf)) \
-     && LONG_DOUBLE_HAS_TF_MODE)
+     && LONG_DOUBLE_HAS_TF_MODE) \
+ || defined (L_sd_to_kf) || defined (L_dd_to_kf) || defined (L_td_to_kf)
 extern BFP_TYPE DFP_TO_BFP (DFP_C_TYPE);
 #endif
 
@@ -621,7 +651,8 @@ extern BFP_TYPE DFP_TO_BFP (DFP_C_TYPE);
  || ((defined (L_xf_to_sd) || defined (L_xf_to_dd) || defined (L_xf_to_td)) \
      && LONG_DOUBLE_HAS_XF_MODE) \
  || ((defined (L_tf_to_sd) || defined (L_tf_to_dd) || defined (L_tf_to_td)) \
-     && LONG_DOUBLE_HAS_TF_MODE)
+     && LONG_DOUBLE_HAS_TF_MODE) \
+ || defined (L_kf_to_sd) || defined (L_kf_to_dd) || defined (L_kf_to_td)
 extern DFP_C_TYPE BFP_TO_DFP (BFP_TYPE);
 #endif
 

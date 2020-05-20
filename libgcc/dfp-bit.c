@@ -609,7 +609,8 @@ INT_TO_DFP (INT_TYPE i)
  || ((defined (L_sd_to_xf) || defined (L_dd_to_xf) || defined (L_td_to_xf)) \
      && LONG_DOUBLE_HAS_XF_MODE) \
  || ((defined (L_sd_to_tf) || defined (L_dd_to_tf) || defined (L_td_to_tf)) \
-     && LONG_DOUBLE_HAS_TF_MODE)
+     && LONG_DOUBLE_HAS_TF_MODE) \
+  || defined (L_sd_to_kf) || defined (L_dd_to_kf) || defined (L_td_to_kf)
 BFP_TYPE
 DFP_TO_BFP (DFP_C_TYPE f)
 {
@@ -629,7 +630,8 @@ DFP_TO_BFP (DFP_C_TYPE f)
  || ((defined (L_xf_to_sd) || defined (L_xf_to_dd) || defined (L_xf_to_td)) \
      && LONG_DOUBLE_HAS_XF_MODE) \
  || ((defined (L_tf_to_sd) || defined (L_tf_to_dd) || defined (L_tf_to_td)) \
-     && LONG_DOUBLE_HAS_TF_MODE)
+     && LONG_DOUBLE_HAS_TF_MODE) \
+ || defined (L_kf_to_sd) || defined (L_kf_to_dd) || defined (L_kf_to_td)
 DFP_C_TYPE
 BFP_TO_DFP (BFP_TYPE x)
 {
@@ -642,7 +644,11 @@ BFP_TO_DFP (BFP_TYPE x)
   DFP_INIT_ROUNDMODE (context.round);
 
   /* Use a C library function to write the floating point value to a string.  */
+#if HAVE_KF_MODE
+  strfromf128 (buf, BUFMAX, BFP_FMT, (BFP_VIA_TYPE) x);
+#else
   sprintf (buf, BFP_FMT, (BFP_VIA_TYPE) x);
+#endif
 
   /* Convert from the floating point string to a decimal* type.  */
   FROM_STRING (&s, buf, &context);
