@@ -23,6 +23,9 @@
 	being IBM extended double.
 	* config/rs6000/trunctfkf2-sw.c: Move __ibm128 to __float128
 	conversion to float128-convert.h.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
 
 2020-05-19   Michael Meissner  <meissner@linux.ibm.com>
 
