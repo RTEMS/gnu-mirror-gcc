@@ -1,7 +1,7 @@
 2020-05-21  Michael Meissner  <meissner@linux.ibm.com>
 
-	* c-c++-common/dfp/convert-bfp-11.c: Use __ibm128 if long double
-	is IEEE 128-bit.
+	* c-c++-common/dfp/convert-bfp-11.c: If long double is IEEE
+	128-bit, skip the test.
 
 2020-05-19  Michael Meissner  <meissner@linux.ibm.com>
 
