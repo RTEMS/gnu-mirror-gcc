@@ -1,3 +1,8 @@
+2020-05-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* c-c++-common/dfp/convert-bfp-11.c: Use __ibm128 if long double
+	is IEEE 128-bit.
+
 2020-05-19  Michael Meissner  <meissner@linux.ibm.com>
 
 	(~meissner/patches/ieee3-patch002b)
