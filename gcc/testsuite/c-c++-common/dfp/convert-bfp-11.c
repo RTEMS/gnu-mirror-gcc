@@ -12,7 +12,15 @@ volatile _Decimal64 dd;
 volatile _Decimal128 td;
 volatile float sf;
 volatile double df;
+
+/* Explicitly use __ibm128 if the default for long double is IEEE 128-bit, but
+   use long double otherwise (__ibm128 is not available unless _Float128 is
+   avialable).  */
+#if defined(__LONG_DOUBLE_IEEE128__)
+volatile __ibm128 tf;
+#else
 volatile long double tf;
+#endif
 
 /* A value slightly less than DEC32_MAX can be converted in both directions.  */
 CONVERT_VALID (101, sd, tf, 9.999998e96df, 9.999998e96L, 1.e+81L)
@@ -36,7 +44,7 @@ CONVERT_TO_PINF (312, tf, sd, 1.6e+308L, d32)
 int
 main ()
 {
-  if (sizeof (long double) != 16)
+  if (sizeof (tf) != 16)
     return 0;
 
   convert_101 ();
