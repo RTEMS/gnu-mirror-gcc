@@ -7,10 +7,6 @@
 
 #include "convert.h"
 
-#ifndef __LONG_DOUBLE_IEEE128__
-  /* If long double is IEEE 128-bit, this test is invalid.  We don't have a
-     suffixed for explicit __ibm128 types, so just don't run the test.  */
-
 volatile _Decimal32 sd;
 volatile _Decimal64 dd;
 volatile _Decimal128 td;
@@ -57,15 +53,6 @@ main ()
   convert_304 ();
   convert_311 ();
   convert_312 ();
-#endif
 
   FINISH
 }
-
-#else	/* __LONG_DOUBLE_IEEE128__  */
-int
-main ()
-{
-  return 0;
-}
-#endif
