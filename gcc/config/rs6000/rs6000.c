@@ -26355,6 +26355,10 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 	case BUILT_IN_NEXTTOWARDL:
 	  newname = "__nexttowardieee128";
 	  break;
+
+	case BUILT_IN_SINCOSL:
+	  newname = "__sincosieee128";
+	  break;
 	}
 
       /* Update the __builtin_*printf && __builtin_*scanf functions.  */
