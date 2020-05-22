@@ -1,3 +1,8 @@
+2020-05-22  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name):
+	Add support for sincosl.
+
 2020-05-19  Michael Meissner  <meissner@linux.ibm.com>
 
 	(~meissner/patches/ieee3-patch001b)
