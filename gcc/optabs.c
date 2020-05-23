@@ -4028,7 +4028,15 @@ prepare_cmp_insn (rtx x, rtx y, enum rtx_code comparison, rtx size,
 
       /* Handle a libcall just for the mode we are using.  */
       libfunc = optab_libfunc (cmp_optab, mode);
-      gcc_assert (libfunc);
+
+      /* If we don't have a comparison function, just raise a normal error
+	 instead of an assertion failure.  */
+      if (!libfunc)
+	{
+	  error ("There is no comparison between values with the %qs mode",
+		 GET_MODE_NAME (mode));
+	  return;
+	}
 
       /* If we want unsigned, and this mode has a distinct unsigned
 	 comparison routine, use that.  */
@@ -4930,7 +4938,16 @@ expand_float (rtx to, rtx from, int unsignedp)
 	from = convert_to_mode (SImode, from, unsignedp);
 
       libfunc = convert_optab_libfunc (tab, GET_MODE (to), GET_MODE (from));
-      gcc_assert (libfunc);
+
+      /* If we don't have a conversion function, just raise a normal error
+	 instead of an assertion failure.  */
+      if (!libfunc)
+	{
+	  error ("There is no conversion between %qs and %qs modes",
+		 GET_MODE_NAME (GET_MODE (from)),
+		 GET_MODE_NAME (GET_MODE (to)));
+	  return;
+	}
 
       start_sequence ();
 
@@ -5122,7 +5139,16 @@ expand_fix (rtx to, rtx from, int unsignedp)
 
       convert_optab tab = unsignedp ? ufix_optab : sfix_optab;
       libfunc = convert_optab_libfunc (tab, GET_MODE (to), GET_MODE (from));
-      gcc_assert (libfunc);
+
+      /* If we don't have a conversion function, just raise a normal error
+	 instead of an assertion failure.  */
+      if (!libfunc)
+	{
+	  error ("There is no conversion between %qs and %qs modes",
+		 GET_MODE_NAME (GET_MODE (from)),
+		 GET_MODE_NAME (GET_MODE (to)));
+	  return;
+	}
 
       start_sequence ();
 
@@ -5212,7 +5238,16 @@ expand_fixed_convert (rtx to, rtx from, int uintp, int satp)
     }
 
   libfunc = convert_optab_libfunc (tab, to_mode, from_mode);
-  gcc_assert (libfunc);
+
+  /* If we don't have a conversion function, just raise a normal error instead
+     of an assertion failure.  */
+  if (!libfunc)
+    {
+      error ("There is no conversion between %qs and %qs modes",
+	     GET_MODE_NAME (GET_MODE (from)),
+	     GET_MODE_NAME (GET_MODE (to)));
+      return;
+    }
 
   from = prepare_libcall_arg (from, uintp);
   from_mode = GET_MODE (from);
