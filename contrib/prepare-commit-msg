@@ -1,0 +1,32 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+SHA1=$3
+
+# Can't do anything if $COMMIT_MSG_FILE isn't a file.
+if ! [ -f "$COMMIT_MSG_FILE" ]; then exit 0; fi
+
+# Don't mess with existing entries unless requested to.
+if [ -z "$GCC_PREPARE_COMMIT" ]; then exit 0; fi
+
+if [ -z "$COMMIT_SOURCE" ] || [ $COMMIT_SOURCE == template ]; then
+    # No source or "template" means new commit.
+    cmd="diff --cached"
+elif [ $COMMIT_SOURCE == message ]; then
+    # "message" means -m, but could be either a new commit or --amend.
+    # Guess which based on whether there are any changes staged.
+    if git diff --cached --quiet; then
+	cmd="show"
+    else
+	cmd="diff --cached"
+    fi
+elif [ $COMMIT_SOURCE == commit ]; then
+    # The message of an existing commit.
+    cmd="show $SHA1"
+else
+    # Do nothing for merge or squash.
+    exit 0
+fi
+
+git $cmd | git gcc-mklog -c "$COMMIT_MSG_FILE"

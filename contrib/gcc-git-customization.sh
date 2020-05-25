@@ -30,6 +30,11 @@ git config alias.gcc-backport '!f() { rev=$1; git cherry-pick -x $@; } ; f'
 
 git config alias.gcc-mklog '!f() { "`git rev-parse --show-toplevel`/contrib/mklog.py" $@; } ; f'
 
+hookdir=`git rev-parse --git-path hooks`
+install "`git rev-parse --show-toplevel`/contrib/prepare-commit-msg" "$hookdir"
+
+git config alias.commit-mklog '!f() { GCC_PREPARE_COMMIT=1 git commit "$@"; }; f'
+
 # Make diff on MD files use "(define" as a function marker.
 # Use this in conjunction with a .gitattributes file containing
 # *.md    diff=md
