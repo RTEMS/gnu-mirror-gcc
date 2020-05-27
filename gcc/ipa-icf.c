@@ -3573,3 +3573,4 @@ make_pass_ipa_icf (gcc::context *ctxt)
 {
   return new ipa_icf::pass_ipa_icf (ctxt);
 }
+
