@@ -1,5 +1,11 @@
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc/testsuite/gcc.target/powerpc/prefix-add.c: New.
+	* gcc/testsuite/gcc.target/powerpc/prefix-si-constant.c: New.
+	* gcc/testsuite/gcc.target/powerpc/prefix-di-constant.c: New.
+
+2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* lib/target-supports.exp (check_effective_target_powerpc_pcrel):
 	New.
 	(check_effective_target_powerpc_prefixed_addr): New.
