@@ -1,3 +1,12 @@
+2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (bswaphi2_reg): If -mcpu=future,
+	generate the BRH instruction.
+	(bswapsi2_reg): If -mcpu=future, generate the BRW instruction.
+	(bswapdi2): Rename bswapdi2_xxbrd to bswapdi2_hw.
+	(bswapdi2_hw): Rename from bswapdi2_xxbrd.  If -mcpu=future,
+	generate the BRD instruction.
+
 2020-05-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
