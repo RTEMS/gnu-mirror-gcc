@@ -1,8 +1,8 @@
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc/testsuite/gcc.target/powerpc/prefix-add.c: New.
-	* gcc/testsuite/gcc.target/powerpc/prefix-si-constant.c: New.
-	* gcc/testsuite/gcc.target/powerpc/prefix-di-constant.c: New.
+	* gcc.target/powerpc/prefix-add.c: New.
+	* gcc.target/powerpc/prefix-si-constant.c: New.
+	* gcc.target/powerpc/prefix-di-constant.c: New.
 
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
