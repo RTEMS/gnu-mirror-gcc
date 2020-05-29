@@ -1,5 +1,23 @@
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-pcrel-dd.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-df.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-di.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-hi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-kf.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-qi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-sd.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-sf.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-si.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-udi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-uhi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-uqi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-usi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-v2df.c: New test.
+	* gcc.target/powerpc/prefix-pcrel.h: Include file for new tests.
+
+2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-large-dd.c: New test.
 	* gcc.target/powerpc/prefix-large-df.c: New test.
 	* gcc.target/powerpc/prefix-large-di.c: New test.
