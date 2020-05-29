@@ -1,5 +1,23 @@
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-large-dd.c: New test.
+	* gcc.target/powerpc/prefix-large-df.c: New test.
+	* gcc.target/powerpc/prefix-large-di.c: New test.
+	* gcc.target/powerpc/prefix-large-hi.c: New test.
+	* gcc.target/powerpc/prefix-large-kf.c: New test.
+	* gcc.target/powerpc/prefix-large-qi.c: New test.
+	* gcc.target/powerpc/prefix-large-sd.c: New test.
+	* gcc.target/powerpc/prefix-large-sf.c: New test.
+	* gcc.target/powerpc/prefix-large-si.c: New test.
+	* gcc.target/powerpc/prefix-large-udi.c: New test.
+	* gcc.target/powerpc/prefix-large-uhi.c: New test.
+	* gcc.target/powerpc/prefix-large-uqi.c: New test.
+	* gcc.target/powerpc/prefix-large-usi.c: New test.
+	* gcc.target/powerpc/prefix-large-v2df.c: New test.
+	* gcc.target/powerpc/prefix-large.h: Include file for new tests.
+
+2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-no-update.c: New test.
 
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
@@ -21,4 +39,3 @@
 2020-05-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
