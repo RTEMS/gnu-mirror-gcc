@@ -1,5 +1,9 @@
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/prefix-stack-protect.c: New test.
+
+2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/prefix-pcrel-dd.c: New test.
 	* gcc.target/powerpc/prefix-pcrel-df.c: New test.
 	* gcc.target/powerpc/prefix-pcrel-di.c: New test.
