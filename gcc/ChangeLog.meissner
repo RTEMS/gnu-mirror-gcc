@@ -1,3 +1,13 @@
+2020-03-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_hw_fp_minmax): Rename
+	rs6000_emit_p9_fp_minmax for support of new min/max instructions
+	in the future.
+	(rs6000_emit_hw_fp_cmove): Rename rs6000_emit_p9_fp_cmove for
+	support of new conditional move instructions in the future.
+	(rs6000_emit_cmove): Update calls to rs6000_emit_hw_fp_minmax and
+	rs6000_emit_hw_fp_cmove.
+
 2020-05-29  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.md (bswaphi2_reg): If -mcpu=future,
