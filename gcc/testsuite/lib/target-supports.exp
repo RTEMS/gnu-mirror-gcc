@@ -2178,7 +2178,7 @@ proc check_effective_target_powerpc_pcrel { } {
 proc check_effective_target_powerpc_prefixed_addr { } {
     return [check_no_messages_and_pattern powerpc_prefixed_addr \
 	{\mplwz\M} assembly {
-	    unsigned short foo (unsigned short *p) { return p[0x12345]; }
+	    unsigned int foo (unsigned int *p) { return p[0x12345]; }
 	} {-O2 -mcpu=future}]
 }
 
