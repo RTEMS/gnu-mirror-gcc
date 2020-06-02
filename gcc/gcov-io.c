@@ -518,6 +518,12 @@ gcov_read_unsigned (void)
   return value;
 }
 
+GCOV_LINKAGE gcov_type
+gcov_read_signed (void)
+{
+  return (gcov_type)gcov_read_unsigned ();
+}
+
 /* Read counter value from a coverage file. Sets error flag on file
    error, overflow flag on overflow */
 

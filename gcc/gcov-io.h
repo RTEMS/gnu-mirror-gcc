@@ -341,6 +341,7 @@ GCOV_LINKAGE int gcov_magic (gcov_unsigned_t, gcov_unsigned_t);
 /* Available everywhere.  */
 GCOV_LINKAGE int gcov_close (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE gcov_unsigned_t gcov_read_unsigned (void) ATTRIBUTE_HIDDEN;
+GCOV_LINKAGE gcov_type gcov_read_signed (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE gcov_type gcov_read_counter (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_read_summary (struct gcov_summary *) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE const char *gcov_read_string (void);
