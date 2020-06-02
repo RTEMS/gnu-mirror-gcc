@@ -6031,7 +6031,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		    tmp = (char *) alloca (temp_filename_length);
 		    if (dumpdir_length)
 		      memcpy (tmp, dumpdir, dumpdir_length);
-		    if (!outbase_length)
+		    if (!outbase_length && input_basename != NULL)
 		      memcpy (tmp + dumpdir_length, input_basename,
 			      basename_length);
 		    else
