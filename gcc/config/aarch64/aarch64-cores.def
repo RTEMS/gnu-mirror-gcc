@@ -87,6 +87,11 @@ AARCH64_CORE("cortex-a76",  cortexa76, cortexa57, 8_2A,  AARCH64_FL_FOR_ARCH8_2 
 AARCH64_CORE("ares",  ares, cortexa57, 8_2A,  AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_F16, neoversen1, 0x41, 0xd0c, -1)
 AARCH64_CORE("neoverse-n1",  neoversen1, cortexa57, 8_2A,  AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_F16, neoversen1, 0x41, 0xd0c, -1)
 
+/* ARMv8.4-A Architecture Processors.  */
+
+/* ARM ('A') cores. */
+AARCH64_CORE("zeus", zeus, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_F16, cortexa72, 0x41, 0xd40, -1)
+
 /* V8 big.LITTLE implementations.  */
 
 AARCH64_CORE("cortex-a57.cortex-a53",  cortexa57cortexa53, cortexa53, 8A,  AARCH64_FL_FOR_ARCH8 | AARCH64_FL_CRC, cortexa57, 0x41, AARCH64_BIG_LITTLE (0xd07, 0xd03), -1)
