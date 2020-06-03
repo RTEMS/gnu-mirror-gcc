@@ -6,7 +6,7 @@
    for the _Decimal32 type.  Note, the _Decimal32 type will not generate any
    prefixed load or stores, because there is no prefixed load/store instruction
    to load up a vector register as a zero extended 32-bit integer.  So we count
-   the number load addresses that are generated.  */
+   the number of load addresses that are generated.  */
 
 #define TYPE _Decimal32
 
