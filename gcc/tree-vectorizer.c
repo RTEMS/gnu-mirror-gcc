@@ -104,13 +104,10 @@ dump_stmt_cost (FILE *f, void *data, int count, enum vect_cost_for_stmt kind,
 {
   fprintf (f, "%p ", data);
   if (stmt_info)
-    {
-      print_gimple_expr (f, STMT_VINFO_STMT (stmt_info), 0, TDF_SLIM);
-      fprintf (f, " ");
-    }
+    print_gimple_expr (f, STMT_VINFO_STMT (stmt_info), 0, TDF_SLIM);
   else
-    fprintf (f, "<unknown> ");
-  fprintf (f, "%d times ", count);
+    fprintf (f, "<unknown>");
+  fprintf (f, ": %d times ", count);
   const char *ks = "unknown";
   switch (kind)
     {

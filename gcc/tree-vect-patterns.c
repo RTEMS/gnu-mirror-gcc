@@ -5118,21 +5118,19 @@ vect_determine_precisions (vec_info *vinfo)
     }
   else
     {
-      bb_vec_info bb_vinfo = as_a <bb_vec_info> (vinfo);
-      gimple_stmt_iterator si = bb_vinfo->region_end;
+      basic_block bb;
+      gimple_stmt_iterator gsi;
       gimple *stmt;
-      do
-	{
-	  if (!gsi_stmt (si))
-	    si = gsi_last_bb (bb_vinfo->bb);
-	  else
-	    gsi_prev (&si);
-	  stmt = gsi_stmt (si);
-	  stmt_vec_info stmt_info = vinfo->lookup_stmt (stmt);
-	  if (stmt_info && STMT_VINFO_VECTORIZABLE (stmt_info))
-	    vect_determine_stmt_precisions (vinfo, stmt_info);
-	}
-      while (stmt != gsi_stmt (bb_vinfo->region_begin));
+
+      FOR_EACH_BB_FN (bb, cfun)
+	for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	     gsi_next (&gsi))
+	  {
+	    stmt = gsi_stmt (gsi);
+	    stmt_vec_info stmt_info = vinfo->lookup_stmt (stmt);
+	    if (stmt_info && STMT_VINFO_VECTORIZABLE (stmt_info))
+	      vect_determine_stmt_precisions (vinfo, stmt_info);
+	  }
     }
 }
 
@@ -5488,19 +5486,23 @@ vect_pattern_recog (vec_info *vinfo)
     }
   else
     {
-      bb_vec_info bb_vinfo = as_a <bb_vec_info> (vinfo);
-      for (si = bb_vinfo->region_begin;
-	   gsi_stmt (si) != gsi_stmt (bb_vinfo->region_end); gsi_next (&si))
+      basic_block bb;
+      FOR_EACH_BB_FN (bb, cfun)
 	{
-	  gimple *stmt = gsi_stmt (si);
-	  stmt_vec_info stmt_info = bb_vinfo->lookup_stmt (stmt);
-	  if (stmt_info && !STMT_VINFO_VECTORIZABLE (stmt_info))
-	    continue;
+	  bb_vec_info bb_vinfo = as_a <bb_vec_info> (vinfo);
+	  for (si = gsi_start_bb (bb); !gsi_end_p (si);
+	       gsi_next (&si))
+	    {
+	      gimple *stmt = gsi_stmt (si);
+	      stmt_vec_info stmt_info = bb_vinfo->lookup_stmt (stmt);
+	      if (stmt_info && !STMT_VINFO_VECTORIZABLE (stmt_info))
+		continue;
 
-	  /* Scan over all generic vect_recog_xxx_pattern functions.  */
-	  for (j = 0; j < NUM_PATTERNS; j++)
-	    vect_pattern_recog_1 (vinfo,
-				  &vect_vect_recog_func_ptrs[j], stmt_info);
+	      /* Scan over all generic vect_recog_xxx_pattern functions.  */
+	      for (j = 0; j < NUM_PATTERNS; j++)
+		vect_pattern_recog_1 (vinfo,
+				      &vect_vect_recog_func_ptrs[j], stmt_info);
+	    }
 	}
     }
 }

@@ -2615,25 +2615,24 @@ vect_detect_hybrid_slp (loop_vec_info loop_vinfo)
 /* Initialize a bb_vec_info struct for the statements between
    REGION_BEGIN_IN (inclusive) and REGION_END_IN (exclusive).  */
 
-_bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
-			    gimple_stmt_iterator region_end_in,
-			    vec_info_shared *shared)
-  : vec_info (vec_info::bb, init_cost (NULL), shared),
-    bb (gsi_bb (region_begin_in)),
-    region_begin (region_begin_in),
-    region_end (region_end_in)
+_bb_vec_info::_bb_vec_info (vec_info_shared *shared)
+  : vec_info (vec_info::bb, init_cost (NULL), shared)
 {
   gimple_stmt_iterator gsi;
+  basic_block bb;
 
-  for (gsi = region_begin; gsi_stmt (gsi) != gsi_stmt (region_end);
-       gsi_next (&gsi))
+  FOR_EACH_BB_FN (bb, cfun)
     {
-      gimple *stmt = gsi_stmt (gsi);
-      gimple_set_uid (stmt, 0);
-      add_stmt (stmt);
-    }
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  gimple_set_uid (stmt, 0);
+	  add_stmt (stmt);
+	}
 
-  bb->aux = this;
+      bb->aux = this;
+    }
 }
 
 
@@ -2642,12 +2641,18 @@ _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 
 _bb_vec_info::~_bb_vec_info ()
 {
-  for (gimple_stmt_iterator si = region_begin;
-       gsi_stmt (si) != gsi_stmt (region_end); gsi_next (&si))
-    /* Reset region marker.  */
-    gimple_set_uid (gsi_stmt (si), -1);
+  gimple_stmt_iterator gsi;
+  basic_block bb;
+ 
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	/* Reset region marker.  */
+	gimple_set_uid (gsi_stmt (gsi), -1);
 
-  bb->aux = NULL;
+      bb->aux = NULL;
+    }
 }
 
 /* Subroutine of vect_slp_analyze_node_operations.  Handle the root of NODE,
@@ -3086,9 +3091,12 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
   destroy_cost_data (target_cost_data);
 
   /* Unset visited flag.  */
-  for (gimple_stmt_iterator gsi = bb_vinfo->region_begin;
-       gsi_stmt (gsi) != gsi_stmt (bb_vinfo->region_end); gsi_next (&gsi))
-    gimple_set_visited  (gsi_stmt (gsi), false);
+  basic_block bb;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	 gsi_next (&gsi))
+      gimple_set_visited  (gsi_stmt (gsi), false);
 
   /* Complete the target-specific cost calculation.  */
   finish_cost (BB_VINFO_TARGET_COST_DATA (bb_vinfo), &vec_prologue_cost,
@@ -3111,7 +3119,8 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
      the cost estimate is otherwise quite pessimistic (constant uses are
      free on the scalar side but cost a load on the vector side for
      example).  */
-  if (vec_outside_cost + vec_inside_cost > scalar_cost)
+  // TODO: hack
+  if (vec_outside_cost + vec_inside_cost - 20 > scalar_cost)
     return false;
 
   return true;
@@ -3123,26 +3132,27 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
 static void
 vect_slp_check_for_constructors (bb_vec_info bb_vinfo)
 {
-  gimple_stmt_iterator gsi;
+  basic_block bb;
 
-  for (gsi = bb_vinfo->region_begin;
-       gsi_stmt (gsi) != gsi_stmt (bb_vinfo->region_end); gsi_next (&gsi))
-    {
-      gassign *stmt = dyn_cast <gassign *> (gsi_stmt (gsi));
-      if (!stmt || gimple_assign_rhs_code (stmt) != CONSTRUCTOR)
-	continue;
+  FOR_EACH_BB_FN (bb, cfun)
+    for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	 gsi_next (&gsi))
+      {
+	gassign *stmt = dyn_cast <gassign *> (gsi_stmt (gsi));
+	if (!stmt || gimple_assign_rhs_code (stmt) != CONSTRUCTOR)
+	  continue;
 
-      tree rhs = gimple_assign_rhs1 (stmt);
-      if (!VECTOR_TYPE_P (TREE_TYPE (rhs))
-	  || maybe_ne (TYPE_VECTOR_SUBPARTS (TREE_TYPE (rhs)),
-		       CONSTRUCTOR_NELTS (rhs))
-	  || VECTOR_TYPE_P (TREE_TYPE (CONSTRUCTOR_ELT (rhs, 0)->value))
-	  || uniform_vector_p (rhs))
-	continue;
+	tree rhs = gimple_assign_rhs1 (stmt);
+	if (!VECTOR_TYPE_P (TREE_TYPE (rhs))
+	    || maybe_ne (TYPE_VECTOR_SUBPARTS (TREE_TYPE (rhs)),
+			 CONSTRUCTOR_NELTS (rhs))
+	    || VECTOR_TYPE_P (TREE_TYPE (CONSTRUCTOR_ELT (rhs, 0)->value))
+	    || uniform_vector_p (rhs))
+	  continue;
 
-      stmt_vec_info stmt_info = bb_vinfo->lookup_stmt (stmt);
-      BB_VINFO_GROUPED_STORES (bb_vinfo).safe_push (stmt_info);
-    }
+	stmt_vec_info stmt_info = bb_vinfo->lookup_stmt (stmt);
+	BB_VINFO_GROUPED_STORES (bb_vinfo).safe_push (stmt_info);
+      }
 }
 
 /* Check if the region described by BB_VINFO can be vectorized, returning
@@ -3312,7 +3322,7 @@ vect_slp_bb_region (gimple_stmt_iterator region_begin,
     {
       bool vectorized = false;
       bool fatal = false;
-      bb_vinfo = new _bb_vec_info (region_begin, region_end, &shared);
+      bb_vinfo = new _bb_vec_info (&shared);
 
       bool first_time_p = shared.datarefs.is_empty ();
       BB_VINFO_DATAREFS (bb_vinfo) = datarefs;

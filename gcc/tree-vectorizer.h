@@ -771,12 +771,9 @@ loop_vec_info_for_loop (class loop *loop)
 typedef class _bb_vec_info : public vec_info
 {
 public:
-  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
+  _bb_vec_info (vec_info_shared *);
   ~_bb_vec_info ();
 
-  basic_block bb;
-  gimple_stmt_iterator region_begin;
-  gimple_stmt_iterator region_end;
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb

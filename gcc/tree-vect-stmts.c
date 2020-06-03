@@ -1340,7 +1340,9 @@ vect_init_vector_1 (vec_info *vinfo, stmt_vec_info stmt_vinfo, gimple *new_stmt,
       else
        {
           bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (vinfo);
-	  gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin;
+	  // TODO
+	  gimple_stmt_iterator gsi_region_begin = gsi_start_bb
+	    (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
 	  gsi_insert_before (&gsi_region_begin, new_stmt, GSI_SAME_STMT);
        }
     }
