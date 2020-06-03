@@ -1,11 +1,12 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_pcrel } */
+/* { dg-require-effective-target lp64 } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
-/* Tests for prefixed instructions testing whether pc-relative prefixed
-   instructions are generated for unsigned long type.  */
+/* Tests whether pc-relative prefixed instructions are generated for the
+   unsigned long long type.  */
 
-#define TYPE unsigned long
+#define TYPE unsigned long long
 
 #include "prefix-pcrel.h"
 

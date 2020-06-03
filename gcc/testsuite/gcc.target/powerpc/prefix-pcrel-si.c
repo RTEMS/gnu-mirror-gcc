@@ -2,8 +2,8 @@
 /* { dg-require-effective-target powerpc_pcrel } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
-/* Tests for prefixed instructions testing whether pc-relative prefixed
-   instructions are generated for the int type.  */
+/* Tests whether pc-relative prefixed instructions are generated for the
+   int type.  */
 
 #define TYPE int
 
