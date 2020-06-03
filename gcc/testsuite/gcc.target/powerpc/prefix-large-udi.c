@@ -1,12 +1,12 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_prefixed_addr } */
+/* { dg-require-effective-target lp64 } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
-/* Tests for prefixed instructions testing whether we can generate a prefixed
-   load/store instruction that has a 34-bit offset for unsigned long
-   objects.  */
+/* Tests whether prefixed instructions with large numeric offsets are generated
+   for the unsigned long long type.  */
 
-#define TYPE unsigned long
+#define TYPE unsigned long long
 
 #include "prefix-large.h"
 

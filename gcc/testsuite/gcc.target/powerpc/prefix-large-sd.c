@@ -2,8 +2,11 @@
 /* { dg-require-effective-target powerpc_prefixed_addr } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
-/* Tests for prefixed instructions testing whether we can generate a prefixed
-   load/store instruction that has a 34-bit offset for _Decimal32 objects.  */
+/* Tests whether prefixed instructions with large numeric offsets are generated
+   for the _Decimal32 type.  Note, the _Decimal32 type will not generate any
+   prefixed load or stores, because there is no prefixed load/store instruction
+   to load up a vector register as a zero extended 32-bit integer.  So we count
+   the number load addresses that are generated.  */
 
 #define TYPE _Decimal32
 

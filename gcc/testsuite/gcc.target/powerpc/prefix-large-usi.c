@@ -2,9 +2,8 @@
 /* { dg-require-effective-target powerpc_prefixed_addr } */
 /* { dg-options "-O2 -mdejagnu-cpu=future" } */
 
-/* Tests for prefixed instructions testing whether we can generate a prefixed
-   load/store instruction that has a 34-bit offset for unsigned int
-   objects.  */
+/* Tests whether prefixed instructions with large numeric offsets are generated
+   for the unsigned int type.  */
 
 #define TYPE unsigned int
 
