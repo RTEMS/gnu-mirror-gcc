@@ -939,6 +939,7 @@ try_vectorize_loop_1 (hash_table<simduid_to_vf> *&simduid_to_vf_htab,
 	      gimple_set_uid (stmt, -1);
 	      gimple_set_visited (stmt, false);
 	    }
+#if 0
 	  if (!require_loop_vectorize && vect_slp_bb (bb))
 	    {
 	      if (dump_enabled_p ())
@@ -949,6 +950,7 @@ try_vectorize_loop_1 (hash_table<simduid_to_vf> *&simduid_to_vf_htab,
 	      loop_vectorized_call = NULL;
 	      ret |= TODO_cleanup_cfg | TODO_update_ssa_only_virtuals;
 	    }
+#endif
 	}
       /* If outer loop vectorization fails for LOOP_VECTORIZED guarded
 	 loop, don't vectorize its inner loop; we'll attempt to
@@ -1312,12 +1314,8 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
-    {
-      if (vect_slp_bb (bb))
-	if (dump_enabled_p ())
-	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
+  if (vect_slp_function ())
+    dump_printf_loc (MSG_NOTE, vect_location, "function vectorized\n");
 
   if (!in_loop_pipeline)
     {

@@ -3119,8 +3119,7 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
      the cost estimate is otherwise quite pessimistic (constant uses are
      free on the scalar side but cost a load on the vector side for
      example).  */
-  // TODO: hack
-  if (vec_outside_cost + vec_inside_cost - 20 > scalar_cost)
+  if (vec_outside_cost + vec_inside_cost > scalar_cost)
     return false;
 
   return true;
@@ -3296,16 +3295,9 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
   return true;
 }
 
-/* Subroutine of vect_slp_bb.  Try to vectorize the statements between
-   REGION_BEGIN (inclusive) and REGION_END (exclusive), returning true
-   on success.  The region has N_STMTS statements and has the datarefs
-   given by DATAREFS.  */
-
 static bool
-vect_slp_bb_region (gimple_stmt_iterator region_begin,
-		    gimple_stmt_iterator region_end,
-		    vec<data_reference_p> datarefs,
-		    unsigned int n_stmts)
+vect_slp_analyze_function (vec<data_reference_p> datarefs,
+			   unsigned int n_stmts)
 {
   bb_vec_info bb_vinfo;
   auto_vector_modes vector_modes;
@@ -3421,63 +3413,42 @@ vect_slp_bb_region (gimple_stmt_iterator region_begin,
     }
 }
 
-/* Main entry for the BB vectorizer.  Analyze and transform BB, returns
-   true if anything in the basic-block was vectorized.  */
-
 bool
-vect_slp_bb (basic_block bb)
+vect_slp_function ()
 {
   gimple_stmt_iterator gsi;
+  basic_block bb;
   bool any_vectorized = false;
+  vec<data_reference_p> datarefs = vNULL;
+  int insns = 0;
 
-  gsi = gsi_after_labels (bb);
-  while (!gsi_end_p (gsi))
+  FOR_EACH_BB_FN (bb, cfun)
     {
-      gimple_stmt_iterator region_begin = gsi;
-      vec<data_reference_p> datarefs = vNULL;
-      int insns = 0;
-
-      for (; !gsi_end_p (gsi); gsi_next (&gsi))
+      for (gsi = gsi_after_labels (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
 	{
 	  gimple *stmt = gsi_stmt (gsi);
 	  if (is_gimple_debug (stmt))
 	    continue;
 	  insns++;
-
 	  if (gimple_location (stmt) != UNKNOWN_LOCATION)
 	    vect_location = stmt;
 
+	  if (insns > param_slp_max_insns_in_bb)
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				 "not vectorized: too many instructions in "
+				 "basic block.\n");
+	      return false;
+	    }
+
 	  if (!vect_find_stmt_data_reference (NULL, stmt, &datarefs))
-	    break;
+	    return false;
 	}
-
-      /* Skip leading unhandled stmts.  */
-      if (gsi_stmt (region_begin) == gsi_stmt (gsi))
-	{
-	  gsi_next (&gsi);
-	  continue;
-	}
-
-      gimple_stmt_iterator region_end = gsi;
-
-      if (insns > param_slp_max_insns_in_bb)
-	{
-	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			     "not vectorized: too many instructions in "
-			     "basic block.\n");
-	}
-      else if (vect_slp_bb_region (region_begin, region_end, datarefs, insns))
-	any_vectorized = true;
-
-      if (gsi_end_p (region_end))
-	break;
-
-      /* Skip the unhandled stmt.  */
-      gsi_next (&gsi);
     }
 
-  return any_vectorized;
+  return vect_slp_analyze_function (datarefs, insns);
 }
 
 
