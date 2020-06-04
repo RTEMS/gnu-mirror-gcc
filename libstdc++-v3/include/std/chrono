@@ -1284,6 +1284,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     using local_seconds = local_time<seconds>;
     using local_days = local_time<days>;
 
+    class utc_clock;
+    class tai_clock;
+    class gps_clock;
+
+    template<typename _Duration>
+      using utc_time = time_point<utc_clock, _Duration>;
+    using utc_seconds = utc_time<seconds>;
+
+    template<typename _Duration>
+      using tai_time = time_point<tai_clock, _Duration>;
+    using tai_seconds = tai_time<seconds>;
+
+    template<typename _Duration>
+      using gps_time = time_point<gps_clock, _Duration>;
+    using gps_seconds = gps_time<seconds>;
+
+    template<> struct is_clock<utc_clock> : true_type { };
+    template<> struct is_clock<tai_clock> : true_type { };
+    template<> struct is_clock<gps_clock> : true_type { };
+
+    template<> inline constexpr bool is_clock_v<utc_clock> = true;
+    template<> inline constexpr bool is_clock_v<tai_clock> = true;
+    template<> inline constexpr bool is_clock_v<gps_clock> = true;
+
     /**
      *  @brief Universal coordinated time clock
      *
@@ -1299,21 +1323,28 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       using time_point = chrono::time_point<utc_clock>;
       static constexpr bool is_steady = false;
 
-      static time_point now()
-      { return from_sys(std::chrono::system_clock::now()); }
+      static time_point
+      now()
+      { return from_sys(system_clock::now()); }
 
       template<typename _Duration>
-        static chrono::time_point<system_clock, common_type_t<_Duration, seconds>>
-        to_sys(const chrono::time_point<utc_clock, _Duration>&);
+	static sys_time<common_type_t<_Duration, seconds>>
+	to_sys(const chrono::time_point<utc_clock, _Duration>&);
 
       template<typename _Duration>
-        static chrono::time_point<utc_clock, common_type_t<_Duration, seconds>>
-        from_sys(const chrono::time_point<system_clock, _Duration>&);
+	static utc_time<common_type_t<_Duration, seconds>>
+	from_sys(const chrono::time_point<system_clock, _Duration>&);
+    };
+
+    struct leap_second_info
+    {
+      bool    is_leap_scond;
+      seconds elapsed;
     };
 
     template<typename _Duration>
-      using utc_time = time_point<utc_clock, _Duration>;
-    using utc_seconds = utc_time<seconds>;
+      leap_second_info
+      get_leap_second_info(const utc_time<_Duration>& __ut);
 
     /**
      *  @brief International Atomic Time (TAI) clock
@@ -1331,21 +1362,26 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static constexpr bool is_steady = false;
 
       static time_point
-      now()
+      now() noexcept(noexcept(utc_clock::now()))
       { return from_utc(utc_clock::now()); };
 
       template<typename _Duration>
-        static chrono::time_point<utc_clock, common_type_t<_Duration, seconds>>
-        to_utc(const chrono::time_point<tai_clock, _Duration>&) noexcept;
+	static utc_time<common_type_t<_Duration, seconds>>
+	to_utc(const chrono::time_point<tai_clock, _Duration>& __t) noexcept
+	{
+	  using _Ct = common_type_t<_Duration, seconds>;
+	  return utc_time<_Ct>{__t.time_since_epoch()} - 378691210s;
+	}
 
       template<typename _Duration>
-        static chrono::time_point<tai_clock, common_type_t<_Duration, seconds>>
-        from_utc(const chrono::time_point<utc_clock, _Duration>&) noexcept;
+	static tai_time<common_type_t<_Duration, seconds>>
+	from_utc(const chrono::time_point<utc_clock, _Duration>& __t) noexcept
+	{
+	  using _Ct = common_type_t<_Duration, seconds>;
+	  return tai_time<_Ct>{__t.time_since_epoch()} + 378691210s;
+	}
     };
 
-    template<typename _Duration>
-      using tai_time = time_point<tai_clock, _Duration>;
-    using tai_seconds = tai_time<seconds>;
 
     /**
      *  @brief Global Positioning System (GPS) clock
@@ -1363,20 +1399,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static constexpr bool is_steady = false;
 
       static time_point
-      now();
+      now() noexcept(noexcept(utc_clock::now()))
+      { return from_utc(utc_clock::now()); }
 
       template<typename _Duration>
-        static chrono::time_point<utc_clock, common_type_t<_Duration, seconds>>
-        to_utc(const chrono::time_point<gps_clock, _Duration>&) noexcept;
+	static utc_time<common_type_t<_Duration, seconds>>
+	to_utc(const chrono::time_point<gps_clock, _Duration>& __t) noexcept
+	{
+	  using _Ct = common_type_t<_Duration, seconds>;
+	  return utc_time<_Ct>{__t.time_since_epoch()} - 315964809s;
+	}
 
       template<typename _Duration>
-        static chrono::time_point<gps_clock, common_type_t<_Duration, seconds>>
-        from_utc(const chrono::time_point<utc_clock, _Duration>&) noexcept;
+	static gps_time<common_type_t<_Duration, seconds>>
+	from_utc(const chrono::time_point<utc_clock, _Duration>& __t) noexcept
+	{
+	  using _Ct = common_type_t<_Duration, seconds>;
+	  return gps_time<_Ct>{__t.time_since_epoch()} + 315964809s;
+	}
     };
-
-    template<typename _Duration>
-      using gps_time = time_point<gps_clock, _Duration>;
-    using gps_seconds = gps_time<seconds>;
 
     // TIME_POINT CONVERSIONS
 
