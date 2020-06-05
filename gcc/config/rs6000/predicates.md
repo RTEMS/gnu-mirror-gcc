@@ -1874,3 +1874,38 @@
   return (base_reg_operand (XEXP (addr, 0), Pmode)
 	  && satisfies_constraint_I (XEXP (addr, 1)));
 })
+
+;; Return true if the operand is a valid memory operand with an offsettable
+;; address that can be split into 2 sub-addresses, each of which is a valid
+;; DS-form (bottom 2 bits of the offset are 0).
+(define_predicate "ds_form_memory"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  rtx addr = XEXP (op, 0);
+
+  if (REG_P (addr) || SUBREG_P (addr))
+    return true;
+
+  if (GET_CODE (addr) != PLUS)
+    return false;
+
+  if (!base_reg_operand (XEXP (addr, 0), Pmode))
+    return false;
+
+  rtx offset = XEXP (addr, 1);
+  if (!CONST_INT_P (offset))
+    return false;
+
+  HOST_WIDE_INT value = INTVAL (offset);
+  if ((value & 0x3) != 0)
+    return false;
+
+  size_t size = GET_MODE_SIZE (mode);
+  size_t extra
+    = (size > GET_MODE_SIZE (DImode)) ? size - GET_MODE_SIZE (DImode) : size;
+
+  return SIGNED_16BIT_OFFSET_EXTRA_P (value, extra));
+})

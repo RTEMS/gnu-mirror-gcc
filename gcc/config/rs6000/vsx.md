@@ -2878,6 +2878,85 @@
 }
   [(set_attr "type" "vecperm")])
 
+;; If the only use for a VEC_CONCAT is to store 2 64-bit values, replace it
+;; with two stores.
+(define_insn_and_split "*concat<mode>_store"
+  [(set (match_operand:VSX_D 0 "memory_operand" "=m,m,m,m")
+	(vec_concat:VSX_D
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "r,wa,r,wa")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "r,wa,wa,r")))
+   (clobber (match_scratch:DI 3 "=&b,&b,&b,&b"))]
+  "TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(match_dup 5))
+   (set (match_dup 6)
+	(match_dup 7))]
+{
+  rtx mem = operands[0];
+  rtx reg1 = operands[1];
+  rtx reg2 = operands[2];
+
+  if (!BYTES_BIG_ENDIAN)
+    std::swap (reg1, reg2);
+
+  /* If the address can't be used directly for both stores, copy it to the
+     temporary base register.  */
+  if (!ds_form_memory (mem, <MODE>mode))
+    {
+      rtx old_addr = XEXP (mem, 0);
+      rtx new_addr = operands[3];
+      if (GET_CODE (new_addr) == SCRATCH)
+	new_addr = gen_reg_rtx (Pmode);
+
+      emit_move_insn (new_addr, old_addr);
+      mem = change_address (mem, VOIDmode, new_addr);
+    }
+
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[5] = reg1;
+  operands[6] = adjust_address (mem, <VS_scalar>mode, 8);
+  operands[7] = reg2;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "store,fpstore,fpstore,store")])
+
+;; Optimize creating a vector with 2 duplicate elements and storing it.
+(define_insn_and_split "*dup<mode>_store"
+  [(set (match_operand:VSX_D 0 "memory_operand" "=m,m")
+	(vec_duplicate:VSX_D
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "r,wa")))
+   (clobber (match_scratch:DI 2 "=&b,&b"))]
+  "TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 3)
+	(match_dup 1))
+   (set (match_dup 4)
+	(match_dup 1))]
+{
+  rtx mem = operands[0];
+
+  /* If the address can't be used directly for both stores, copy it to the
+     temporary base register.  */
+  if (!ds_form_memory (mem, <MODE>mode))
+    {
+      rtx old_addr = XEXP (mem, 0);
+      rtx new_addr = operands[2];
+      if (GET_CODE (new_addr) == SCRATCH)
+	new_addr = gen_reg_rtx (Pmode);
+
+      emit_move_insn (new_addr, old_addr);
+      mem = change_address (mem, VOIDmode, new_addr);
+    }
+
+  operands[3] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 8);
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "store,fpstore")])
+
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
 ;; as doubles.  This is used to initialize a V4SF vector with 4 floats
