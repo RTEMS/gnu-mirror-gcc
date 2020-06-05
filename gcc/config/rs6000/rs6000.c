@@ -1175,7 +1175,6 @@ static bool rs6000_secondary_reload_move (enum rs6000_reg_type,
 					  machine_mode,
 					  secondary_reload_info *,
 					  bool);
-static enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 rtl_opt_pass *make_pass_analyze_swaps (gcc::context*);
 
 /* Hash table stuff for keeping track of TOC entries.  */
@@ -4200,6 +4199,14 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mpcrel", "-mcmodel=medium");
 
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
+    }
+
+  if (!TARGET_PCREL && TARGET_PCREL_OPT)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL_OPT) != 0)
+	error ("%qs requires %qs", "-mpcrel-opt", "-mpcrel");
+
+	rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
     }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -8340,7 +8347,11 @@ rs6000_delegitimize_address (rtx orig_x)
 {
   rtx x, y, offset;
 
-  if (GET_CODE (orig_x) == UNSPEC && XINT (orig_x, 1) == UNSPEC_FUSION_GPR)
+  if (GET_CODE (orig_x) == UNSPEC
+      && (XINT (orig_x, 1) == UNSPEC_FUSION_GPR
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_GOT
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_GOT_SAME_REG
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_ST_GOT))
     orig_x = XVECEXP (orig_x, 0, 0);
 
   orig_x = delegitimize_mem_from_attrs (orig_x);
@@ -12993,6 +13004,19 @@ print_operand (FILE *file, rtx x, int code)
 	output_operand_lossage ("invalid %%R value");
       else
 	fprintf (file, "%d", 128 >> (REGNO (x) - CR0_REGNO));
+      return;
+
+    case 'r':
+      /* X is a label number for the PCREL_OPT optimization.  Emit the .reloc
+	 to enable this optimization, unless the value is 0.  */
+      gcc_assert (CONST_INT_P (x));
+      if (UINTVAL (x) != 0)
+	{
+	  unsigned int label_num = UINTVAL (x);
+	  fprintf (file,
+		   ".reloc .Lpcrel%u-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%u-8)\n\t",
+		   label_num, label_num);
+	}
       return;
 
     case 's':
@@ -22938,6 +22962,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
+  { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
@@ -25050,7 +25075,7 @@ is_stfs_insn (rtx_insn *insn)
 /* Helper function to take a REG and a MODE and turn it into the non-prefixed
    instruction format (D/DS/DQ) used for offset memory.  */
 
-static enum non_prefixed_form
+enum non_prefixed_form
 reg_to_non_prefixed (rtx reg, machine_mode mode)
 {
   /* If it isn't a register, use the defaults.  */
@@ -25270,7 +25295,15 @@ void
 rs6000_asm_output_opcode (FILE *stream)
 {
   if (next_insn_prefixed_p)
-    fprintf (stream, "p");
+    {
+      fprintf (stream, "p");
+
+      /* Reset flag in case there are separate insn lines in the sequence, so
+	 the 'p' is only emited for the first line.  This shows up when we are
+	 doing the PCREL_OPT optimization, in that the label created with %r<n>
+	 would have a leading 'p' printed.  */
+      next_insn_prefixed_p = false;
+    }
 
   return;
 }
