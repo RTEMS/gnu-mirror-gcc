@@ -1907,5 +1907,5 @@
   size_t extra
     = (size > GET_MODE_SIZE (DImode)) ? size - GET_MODE_SIZE (DImode) : size;
 
-  return SIGNED_16BIT_OFFSET_EXTRA_P (value, extra));
+  return SIGNED_16BIT_OFFSET_EXTRA_P (value, extra);
 })
