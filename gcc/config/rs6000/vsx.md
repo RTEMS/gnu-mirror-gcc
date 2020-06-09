@@ -2879,12 +2879,14 @@
   [(set_attr "type" "vecperm")])
 
 ;; If the only use for a VEC_CONCAT is to store 2 64-bit values, replace it
-;; with two stores.
-(define_insn_and_split "*concat<mode>_store"
-  [(set (match_operand:VSX_D 0 "memory_operand" "=m,m,m,m")
-	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "r,wa,r,wa")
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "r,wa,wa,r")))
+;; with two stores.  Only do DImode, since it saves doing 1 direct move on
+;; power9, and 2 direct moves + XXPERMDI on power8.  Typically DFmode would
+;; just be a XXPERMDI/STX.
+(define_insn_and_split "*concatv2di_store"
+  [(set (match_operand:V2DI 0 "memory_operand" "=m,m,m,m")
+	(vec_concat:V2DI
+	 (match_operand:DI 1 "gpc_reg_operand" "r,wa,r,wa")
+	 (match_operand:DI 2 "gpc_reg_operand" "r,wa,wa,r")))
    (clobber (match_scratch:DI 3 "=&b,&b,&b,&b"))]
   "TARGET_DIRECT_MOVE_64BIT"
   "#"
@@ -2898,7 +2900,7 @@
 
   /* If the address can't be used directly for both stores, copy it to the
      temporary base register.  */
-  if (!ds_form_memory (mem, <MODE>mode))
+  if (!ds_form_memory (mem, V2DImode))
     {
       rtx old_addr = XEXP (mem, 0);
       rtx new_addr = operands[3];
@@ -2912,19 +2914,19 @@
   /* Because we are creating scalar stores, we don't have to swap the order
      of the elements and then swap the stores to get the right order on
      little endian systems.  */
-  operands[4] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[4] = adjust_address (mem, DImode, 0);
   operands[5] = operands[1];
-  operands[6] = adjust_address (mem, <VS_scalar>mode, 8);
+  operands[6] = adjust_address (mem, DImode, 8);
   operands[7] = operands[2];
 }
   [(set_attr "length" "8")
    (set_attr "type" "store,fpstore,fpstore,store")])
 
 ;; Optimize creating a vector with 2 duplicate elements and storing it.
-(define_insn_and_split "*dup<mode>_store"
-  [(set (match_operand:VSX_D 0 "memory_operand" "=m,m")
-	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "r,wa")))
+(define_insn_and_split "*dupv2di_store"
+  [(set (match_operand:V2DI 0 "memory_operand" "=m,m")
+	(vec_duplicate:V2DI
+	 (match_operand:DI 1 "gpc_reg_operand" "r,wa")))
    (clobber (match_scratch:DI 2 "=&b,&b"))]
   "TARGET_DIRECT_MOVE_64BIT"
   "#"
@@ -2938,7 +2940,7 @@
 
   /* If the address can't be used directly for both stores, copy it to the
      temporary base register.  */
-  if (!ds_form_memory (mem, <MODE>mode))
+  if (!ds_form_memory (mem, V2DImode))
     {
       rtx old_addr = XEXP (mem, 0);
       rtx new_addr = operands[2];
@@ -2949,8 +2951,8 @@
       mem = change_address (mem, VOIDmode, new_addr);
     }
 
-  operands[3] = adjust_address (mem, <VS_scalar>mode, 0);
-  operands[4] = adjust_address (mem, <VS_scalar>mode, 8);
+  operands[3] = adjust_address (mem, DImode, 0);
+  operands[4] = adjust_address (mem, DImode, 8);
 }
   [(set_attr "length" "8")
    (set_attr "type" "store,fpstore")])
