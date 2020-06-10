@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "tree.h"
 #include "gimple.h"
+#include "cfghooks.h"
 #include "tree-pass.h"
 #include "ssa.h"
 #include "expmed.h"
@@ -42,8 +43,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-config.h"
 #include "recog.h"		/* FIXME: for insn_data */
 
+typedef auto_vec<std::pair<gimple *, gimple *>> gimple_pair_vec;
 
-static void expand_vector_operations_1 (gimple_stmt_iterator *);
+static void expand_vector_operations_1 (gimple_stmt_iterator *,
+					gimple_pair_vec *);
 
 /* Return the number of elements in a vector type TYPE that we have
    already decided needs to be expanded piecewise.  We don't support
@@ -932,7 +935,8 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 /* Expand a vector condition to scalars, by using many conditions
    on the vector's elements.  */
 static void
-expand_vector_condition (gimple_stmt_iterator *gsi)
+expand_vector_condition (gimple_stmt_iterator *gsi,
+			 gimple_pair_vec *moved_eh_stmts)
 {
   gassign *stmt = as_a <gassign *> (gsi_stmt (*gsi));
   tree type = gimple_expr_type (stmt);
@@ -971,7 +975,13 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
 	{
 	  a = gimplify_build2 (gsi, TREE_CODE (a), TREE_TYPE (a), a1, a2);
 	  gimple_assign_set_rhs1 (stmt, a);
+	  gimple *assign = SSA_NAME_DEF_STMT (a);
 	  update_stmt (stmt);
+	  if (lookup_stmt_eh_lp (stmt) != 0)
+	    {
+	      maybe_clean_or_replace_eh_stmt (stmt, assign);
+	      moved_eh_stmts->safe_push (std::pair<gimple *, gimple *> (stmt, assign));
+	    }
 	  return;
 	}
       gcc_assert (TREE_CODE (a) == SSA_NAME || TREE_CODE (a) == VECTOR_CST);
@@ -1958,7 +1968,8 @@ expand_vector_conversion (gimple_stmt_iterator *gsi)
 /* Process one statement.  If we identify a vector operation, expand it.  */
 
 static void
-expand_vector_operations_1 (gimple_stmt_iterator *gsi)
+expand_vector_operations_1 (gimple_stmt_iterator *gsi,
+			    gimple_pair_vec *moved_eh_stmts)
 {
   tree lhs, rhs1, rhs2 = NULL, type, compute_type = NULL_TREE;
   enum tree_code code;
@@ -1987,7 +1998,7 @@ expand_vector_operations_1 (gimple_stmt_iterator *gsi)
 
   if (code == VEC_COND_EXPR)
     {
-      expand_vector_condition (gsi);
+      expand_vector_condition (gsi, moved_eh_stmts);
       return;
     }
 
@@ -2231,23 +2242,29 @@ expand_vector_operations_1 (gimple_stmt_iterator *gsi)
 static unsigned int
 expand_vector_operations (void)
 {
+  edge e;
+  edge_iterator ei;
   gimple_stmt_iterator gsi;
   basic_block bb;
   bool cfg_changed = false;
+  gimple_pair_vec moved_eh_stmts;
 
   FOR_EACH_BB_FN (bb, cfun)
+    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+      expand_vector_operations_1 (&gsi, &moved_eh_stmts);
+
+  for (unsigned i = 0; i < moved_eh_stmts.length (); i++)
     {
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-	{
-	  expand_vector_operations_1 (&gsi);
-	  /* ???  If we do not cleanup EH then we will ICE in
-	     verification.  But in reality we have created wrong-code
-	     as we did not properly transition EH info and edges to
-	     the piecewise computations.  */
-	  if (maybe_clean_eh_stmt (gsi_stmt (gsi))
-	      && gimple_purge_dead_eh_edges (bb))
-	    cfg_changed = true;
-	}
+      gimple *old_stmt = moved_eh_stmts[i].first;
+      gimple *new_stmt = moved_eh_stmts[i].second;
+      split_block (gimple_bb (new_stmt), new_stmt);
+
+      FOR_EACH_EDGE (e, ei, gimple_bb (old_stmt)->succs)
+	if (e->flags & EDGE_EH)
+	  make_edge (gimple_bb (new_stmt), e->dest, e->flags);
+
+      gimple_purge_dead_eh_edges (gimple_bb (old_stmt));
+      cfg_changed = true;
     }
 
   return cfg_changed ? TODO_cleanup_cfg : 0;

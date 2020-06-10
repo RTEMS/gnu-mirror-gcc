@@ -193,13 +193,6 @@ gimple_expand_vec_cond_exprs (void)
 	      gimple_set_lhs (g, lhs);
 	      gsi_replace (&gsi, g, false);
 	    }
-	  /* ???  If we do not cleanup EH then we will ICE in
-	     verification.  But in reality we have created wrong-code
-	     as we did not properly transition EH info and edges to
-	     the piecewise computations.  */
-	  if (maybe_clean_eh_stmt (gsi_stmt (gsi))
-	      && gimple_purge_dead_eh_edges (bb))
-	    cfg_changed = true;
 	}
     }
 
