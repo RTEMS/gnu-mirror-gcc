@@ -787,12 +787,96 @@ loop_vec_info_for_loop (class loop *loop)
 typedef class _bb_vec_info : public vec_info
 {
 public:
-  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
-  ~_bb_vec_info ();
+
+  /* GIMPLE statement iterator going from region_begin to region_end.  */
+
+  struct const_iterator
+  {
+    const_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+
+    const const_iterator &
+    operator++ ()
+    {
+      gsi_next (&gsi); return *this;
+    }
+
+    gimple *operator* () const { return gsi_stmt (gsi); }
+
+    bool
+    operator== (const const_iterator& other) const
+    {
+      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+    }
+
+    bool
+    operator!= (const const_iterator& other) const
+    {
+      return !(*this == other);
+    }
+
+    gimple_stmt_iterator gsi;
+  };
+
+  /* GIMPLE statement iterator going from region_end to region_begin.  */
+
+  struct reverse_const_iterator
+  {
+    reverse_const_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+
+    const reverse_const_iterator &
+    operator++ ()
+    {
+      gsi_prev (&gsi); return *this;
+    }
+
+    gimple *operator* () const { return gsi_stmt (gsi); }
+
+    bool
+    operator== (const reverse_const_iterator& other) const
+    {
+      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+    }
+
+    bool
+    operator!= (const reverse_const_iterator& other) const
+    {
+      return !(*this == other);
+    }
+
+    gimple_stmt_iterator gsi;
+  };
+
+  /* Returns iterator_pair for range-based loop.  */
+
+  iterator_pair<const_iterator>
+  region_stmts ()
+  {
+    return iterator_pair<const_iterator> (const_iterator (region_begin),
+					  const_iterator (region_end));
+  }
+
+  /* Returns iterator_pair for range-based loop in a reverse order.  */
+
+  iterator_pair<reverse_const_iterator>
+  reverse_region_stmts ()
+  {
+    reverse_const_iterator begin = reverse_const_iterator (region_end);
+    if (*begin == NULL)
+      begin = reverse_const_iterator (gsi_last_bb (region_end.bb));
+    else
+      ++begin;
+    reverse_const_iterator end = reverse_const_iterator (region_begin);
+
+    return iterator_pair<reverse_const_iterator> (begin, end);
+  }
 
   basic_block bb;
   gimple_stmt_iterator region_begin;
   gimple_stmt_iterator region_end;
+
+  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
+  ~_bb_vec_info ();
+
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb
