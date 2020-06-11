@@ -787,12 +787,92 @@ loop_vec_info_for_loop (class loop *loop)
 typedef class _bb_vec_info : public vec_info
 {
 public:
+  struct const_iterator
+    {
+      const_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+
+      const const_iterator &
+      operator++ ()
+	{
+	  gsi_next (&gsi); return *this;
+	}
+
+      gimple *operator* () const { return gsi_stmt (gsi); }
+
+      bool
+      operator== (const const_iterator& other) const
+	{
+	  return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+	}
+
+      bool
+      operator!= (const const_iterator& other) const
+	{
+	  return !(*this == other);
+	}
+
+      gimple_stmt_iterator gsi;
+    };
+
+  struct reverse_iterator
+    {
+      reverse_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+
+      const reverse_iterator &
+      operator++ ()
+	{
+	  gsi_prev (&gsi); return *this;
+	}
+
+      gimple *operator* () const { return gsi_stmt (gsi); }
+
+      bool
+      operator== (const reverse_iterator& other) const
+	{
+	  return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+	}
+
+      bool
+      operator!= (const reverse_iterator& other) const
+	{
+	  return !(*this == other);
+	}
+
+      gimple_stmt_iterator gsi;
+    };
+
+  struct stmt_iterator
+    {
+      stmt_iterator (gimple_stmt_iterator region_begin,
+		     gimple_stmt_iterator region_end)
+      : m_region_begin (region_begin), m_region_end (region_end) {}
+
+      gimple_stmt_iterator region_begin () { return m_region_begin; }
+
+      const_iterator begin () const { return const_iterator (m_region_begin); }
+      const_iterator end () const { return const_iterator (m_region_end); }
+
+      gimple_stmt_iterator m_region_begin;
+      gimple_stmt_iterator m_region_end;
+
+      reverse_iterator rbegin () const
+	{
+	  reverse_iterator it = reverse_iterator (m_region_end);
+	  if (*it == NULL)
+	    return reverse_iterator (gsi_last_bb (m_region_end.bb));
+	  else
+	    return ++it;
+	}
+
+      reverse_iterator rend () const { return reverse_iterator (m_region_begin); }
+    };
+
+  basic_block bb;
+  stmt_iterator region_stmts;
+
   _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
   ~_bb_vec_info ();
 
-  basic_block bb;
-  gimple_stmt_iterator region_begin;
-  gimple_stmt_iterator region_end;
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb
