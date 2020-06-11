@@ -2551,15 +2551,12 @@ _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 			    vec_info_shared *shared)
   : vec_info (vec_info::bb, init_cost (NULL), shared),
     bb (gsi_bb (region_begin_in)),
-    region_begin (region_begin_in),
-    region_end (region_end_in)
+    m_region_begin (region_begin_in),
+    m_region_end (region_end_in)
 {
-  gimple_stmt_iterator gsi;
-
-  for (gsi = region_begin; gsi_stmt (gsi) != gsi_stmt (region_end);
-       gsi_next (&gsi))
+  for (_bb_vec_info::const_iterator it = begin (); it != end (); it++)
     {
-      gimple *stmt = gsi_stmt (gsi);
+      gimple *stmt = *it;
       gimple_set_uid (stmt, 0);
       if (is_gimple_debug (stmt))
 	continue;
@@ -2575,10 +2572,9 @@ _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 
 _bb_vec_info::~_bb_vec_info ()
 {
-  for (gimple_stmt_iterator si = region_begin;
-       gsi_stmt (si) != gsi_stmt (region_end); gsi_next (&si))
+  for (_bb_vec_info::const_iterator it = begin (); it != end (); it++)
     /* Reset region marker.  */
-    gimple_set_uid (gsi_stmt (si), -1);
+    gimple_set_uid (*it, -1);
 
   bb->aux = NULL;
 }
@@ -3012,12 +3008,10 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
 static void
 vect_slp_check_for_constructors (bb_vec_info bb_vinfo)
 {
-  gimple_stmt_iterator gsi;
-
-  for (gsi = bb_vinfo->region_begin;
-       gsi_stmt (gsi) != gsi_stmt (bb_vinfo->region_end); gsi_next (&gsi))
+  for (_bb_vec_info::const_iterator it = bb_vinfo->begin ();
+       it != bb_vinfo->end (); it++)
     {
-      gassign *stmt = dyn_cast <gassign *> (gsi_stmt (gsi));
+      gassign *stmt = dyn_cast <gassign *> (*it);
       if (!stmt || gimple_assign_rhs_code (stmt) != CONSTRUCTOR)
 	continue;
 

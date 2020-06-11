@@ -787,12 +787,46 @@ loop_vec_info_for_loop (class loop *loop)
 typedef class _bb_vec_info : public vec_info
 {
 public:
+  struct const_iterator
+  {
+    const_iterator (gimple_stmt_iterator _gsi): gsi (_gsi)
+    {
+    }
+
+    const_iterator &
+    operator++ (int)
+    {
+      gsi_next (&gsi); return *this;
+    }
+
+    gimple *operator* () { return gsi_stmt (gsi); }
+
+    bool
+    operator== (const const_iterator& other) const
+    {
+      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+    }
+
+    bool
+    operator!= (const const_iterator& other) const
+    {
+      return !(*this == other);
+    }
+
+    gimple_stmt_iterator gsi;
+  };
+
+  const_iterator begin () const { return const_iterator (m_region_begin); }
+  const_iterator end () const { return const_iterator (m_region_end); }
+
   _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
   ~_bb_vec_info ();
 
   basic_block bb;
-  gimple_stmt_iterator region_begin;
-  gimple_stmt_iterator region_end;
+
+private:
+  gimple_stmt_iterator m_region_begin;
+  gimple_stmt_iterator m_region_end;
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb
