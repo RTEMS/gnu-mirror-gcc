@@ -664,19 +664,15 @@ void
 vec_info::set_vinfo_for_stmt (gimple *stmt, stmt_vec_info info)
 {
   unsigned int uid = gimple_uid (stmt);
-  if (uid == 0)
+  if (info != NULL)
     {
       gcc_assert (!stmt_vec_info_ro);
-      gcc_checking_assert (info);
       uid = stmt_vec_infos.length () + 1;
       gimple_set_uid (stmt, uid);
       stmt_vec_infos.safe_push (info);
     }
   else
-    {
-      gcc_checking_assert (info == NULL);
-      stmt_vec_infos[uid - 1] = info;
-    }
+    stmt_vec_infos[uid - 1] = info;
 }
 
 /* Free the contents of stmt_vec_infos.  */
@@ -717,7 +713,17 @@ bool
 vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
 {
   basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
+  return vect_stmt_dominates_stmt_p (s1, bb1, s2, bb2, true);
+}
 
+/* Returns true if S1 dominates S2.  Any of S1 and S2 can be null
+  and then basic blocks BB1 and BB2 are compared.  */
+
+bool
+vect_stmt_dominates_stmt_p (gimple *s1, basic_block bb1,
+			    gimple *s2, basic_block bb2,
+			    bool handle_out_of_region)
+{
   /* If bb1 is NULL, it should be a GIMPLE_NOP def stmt of an (D)
      SSA_NAME.  Assume it lives at the beginning of function and
      thus dominates everything.  */
@@ -752,7 +758,7 @@ vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
       if (gsi_stmt (gsi1) == s2)
 	return true;
     }
-  if (gimple_uid (gsi_stmt (gsi1)) == -1u)
+  if (handle_out_of_region && gimple_uid (gsi_stmt (gsi1)) == -1u)
     return false;
 
   gimple_stmt_iterator gsi2 = gsi_for_stmt (s2);
@@ -764,7 +770,7 @@ vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
       if (gsi_stmt (gsi2) == s1)
 	return true;
     }
-  if (gimple_uid (gsi_stmt (gsi2)) == -1u)
+  if (handle_out_of_region && gimple_uid (gsi_stmt (gsi2)) == -1u)
     return false;
 
   if (gimple_uid (gsi_stmt (gsi1)) <= gimple_uid (gsi_stmt (gsi2)))
@@ -1379,12 +1385,16 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
+  if (vect_slp_function ())
     {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location, "function vectorized\n");
+    }
+  else
+    FOR_EACH_BB_FN (bb, fun)
       if (vect_slp_bb (bb))
 	if (dump_enabled_p ())
 	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
 
   if (!in_loop_pipeline)
     {
