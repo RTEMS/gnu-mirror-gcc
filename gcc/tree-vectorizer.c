@@ -717,7 +717,16 @@ bool
 vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
 {
   basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
+  return vect_stmt_dominates_stmt_p (s1, bb1, s2, bb2);
+}
 
+/* Returns true if S1 dominates S2.  Any of S1 and S2 can be null
+  and then basic blocks BB1 and BB2 are compared.  */
+
+bool
+vect_stmt_dominates_stmt_p (gimple *s1, basic_block bb1,
+			    gimple *s2, basic_block bb2)
+{
   /* If bb1 is NULL, it should be a GIMPLE_NOP def stmt of an (D)
      SSA_NAME.  Assume it lives at the beginning of function and
      thus dominates everything.  */
@@ -730,6 +739,11 @@ vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
 
   if (bb1 != bb2)
     return dominated_by_p (CDI_DOMINATORS, bb2, bb1);
+
+  if (s1 == NULL)
+    return false;
+  else if (s2 == NULL)
+    return true;
 
   /* PHIs in the same basic block are assumed to be
      executed all in parallel, if only one stmt is a PHI,
@@ -1379,12 +1393,17 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
+  if (vect_slp_function ())
     {
+      // TODO: change to function vectorized
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
+    }
+  else
+    FOR_EACH_BB_FN (bb, fun)
       if (vect_slp_bb (bb))
 	if (dump_enabled_p ())
 	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
 
   if (!in_loop_pipeline)
     {

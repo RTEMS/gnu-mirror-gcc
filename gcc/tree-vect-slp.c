@@ -2636,8 +2636,6 @@ _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 	continue;
       add_stmt (stmt);
     }
-
-  bb->aux = this;
 }
 
 
@@ -3127,7 +3125,8 @@ vect_slp_check_for_constructors (bb_vec_info bb_vinfo)
    region.  */
 
 static bool
-vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
+vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal,
+		       vec<int> *dataref_groups)
 {
   DUMP_VECT_SCOPE ("vect_slp_analyze_bb");
 
@@ -3149,7 +3148,7 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
       return false;
     }
 
-  if (!vect_analyze_data_ref_accesses (bb_vinfo))
+  if (!vect_analyze_data_ref_accesses (bb_vinfo, dataref_groups))
     {
      if (dump_enabled_p ())
        dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -3258,10 +3257,11 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
    given by DATAREFS.  */
 
 static bool
-vect_slp_bb_region (gimple_stmt_iterator region_begin,
-		    gimple_stmt_iterator region_end,
-		    vec<data_reference_p> datarefs,
-		    unsigned int n_stmts)
+vect_slp_region (gimple_stmt_iterator region_begin,
+		 gimple_stmt_iterator region_end,
+		 vec<data_reference_p> datarefs,
+		 vec<int> *dataref_groups,
+		 unsigned int n_stmts)
 {
   bb_vec_info bb_vinfo;
   auto_vector_modes vector_modes;
@@ -3288,7 +3288,7 @@ vect_slp_bb_region (gimple_stmt_iterator region_begin,
 	bb_vinfo->shared->check_datarefs ();
       bb_vinfo->vector_mode = next_vector_mode;
 
-      if (vect_slp_analyze_bb_1 (bb_vinfo, n_stmts, fatal)
+      if (vect_slp_analyze_bb_1 (bb_vinfo, n_stmts, fatal, dataref_groups)
 	  && dbg_cnt (vect_slp))
 	{
 	  if (dump_enabled_p ())
@@ -3408,7 +3408,7 @@ vect_slp_bb (basic_block bb)
 	  if (gimple_location (stmt) != UNKNOWN_LOCATION)
 	    vect_location = stmt;
 
-	  if (!vect_find_stmt_data_reference (NULL, stmt, &datarefs))
+	  if (!vect_find_stmt_data_reference (NULL, stmt, &datarefs, NULL, 0))
 	    break;
 	}
       if (gsi_end_p (region_begin))
@@ -3430,7 +3430,7 @@ vect_slp_bb (basic_block bb)
 			     "not vectorized: too many instructions in "
 			     "basic block.\n");
 	}
-      else if (vect_slp_bb_region (region_begin, region_end, datarefs, insns))
+      else if (vect_slp_region (region_begin, region_end, datarefs, NULL, insns))
 	any_vectorized = true;
 
       if (gsi_end_p (region_end))
@@ -3442,6 +3442,62 @@ vect_slp_bb (basic_block bb)
 
   return any_vectorized;
 }
+
+bool
+vect_slp_function ()
+{
+  basic_block bb;
+  vec_info_shared shared;
+  vec<data_reference_p> datarefs = vNULL;
+  vec<int> dataref_groups = vNULL;
+  bool any_vectorized = false;
+  int insns = 0;
+  gimple_stmt_iterator region_begin
+    = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
+  // TODO
+  while (gsi_stmt (region_begin) == NULL)
+    {
+      basic_block next_bb = region_begin.bb->next_bb;
+      if (next_bb == NULL)
+	return false;
+      region_begin = gsi_after_labels (next_bb);
+    }
+
+  gimple_stmt_iterator region_end
+    = gsi_last_bb (EXIT_BLOCK_PTR_FOR_FN (cfun)->prev_bb);
+  if (!gsi_end_p (region_end))
+    gsi_next (&region_end);
+  int current_group = 0;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gimple_stmt_iterator gsi = gsi_after_labels (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  if (is_gimple_debug (stmt))
+	    continue;
+
+	  insns++;
+
+	  if (gimple_location (stmt) != UNKNOWN_LOCATION)
+	    vect_location = stmt;
+
+	  if (!vect_find_stmt_data_reference (NULL, stmt, &datarefs,
+					      &dataref_groups, current_group))
+	    ++current_group;
+	}
+
+      ++current_group;
+    }
+
+  if (vect_slp_region (region_begin, region_end, datarefs, &dataref_groups,
+		       insns))
+    any_vectorized = true;
+
+  return any_vectorized;
+}
+
 
 
 /* Build a variable-length vector in which the elements in ELTS are repeated
@@ -3611,7 +3667,7 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
   constant_p = true;
   tree_vector_builder elts (vector_type, nunits, 1);
   elts.quick_grow (nunits);
-  stmt_vec_info insert_after = NULL;
+  gimple_stmt_iterator insert_before = gsi_none ();
   for (j = 0; j < number_of_copies; j++)
     {
       tree op;
@@ -3675,15 +3731,67 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 	     when a def is inside the analyzed region since we cannot
 	     simply insert at the BB start in this case.  */
 	  stmt_vec_info opdef;
-	  if (TREE_CODE (orig_op) == SSA_NAME
-	      && !SSA_NAME_IS_DEFAULT_DEF (orig_op)
-	      && is_a <bb_vec_info> (vinfo)
-	      && (opdef = vinfo->lookup_def (orig_op)))
+	  if (is_a <bb_vec_info> (vinfo))
 	    {
-	      if (!insert_after)
-		insert_after = opdef;
-	      else
-		insert_after = get_later_stmt (insert_after, opdef);
+	      gimple_stmt_iterator to_insert = gsi_none ();
+	      if (TREE_CODE (orig_op) == SSA_NAME)
+		{
+		  if (SSA_NAME_IS_DEFAULT_DEF (orig_op))
+		    to_insert = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
+		  else if ((opdef = vinfo->lookup_def (orig_op)))
+		    {
+		      to_insert = gsi_for_stmt (opdef->stmt);
+		      gsi_next (&to_insert);
+		    }
+
+		  else
+		    {
+		      gimple *def = SSA_NAME_DEF_STMT (orig_op);
+		      if (is_a<gphi *> (def))
+			to_insert = gsi_after_labels (gimple_bb (def));
+		      else
+			{
+			  to_insert = gsi_for_stmt (def);
+			  gsi_next (&to_insert);
+			}
+		    }
+		}
+	      else if (CONSTANT_CLASS_P (orig_op)
+		       || TREE_CODE (orig_op) == ADDR_EXPR)
+		to_insert = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
+
+	      if (gsi_bb (to_insert))
+		{
+		  if (gsi_bb (insert_before))
+		    {
+		      bool dom0 = vect_stmt_dominates_stmt_p (gsi_stmt (insert_before),
+							      gsi_bb (insert_before),
+							      gsi_stmt (to_insert),
+							      gsi_bb (to_insert));
+		      bool dom1 = vect_stmt_dominates_stmt_p (gsi_stmt (to_insert),
+							      gsi_bb (to_insert),
+							      gsi_stmt (insert_before),
+							      gsi_bb (insert_before));
+		      if (dom0 ==false && dom1 == false)
+			{
+			  gcc_assert (gsi_bb (to_insert) == gsi_bb (insert_before));
+			  gimple_stmt_iterator it = to_insert;
+			  while (!gsi_end_p (it))
+			    {
+			      if (gsi_stmt (it) == gsi_stmt (insert_before))
+				{
+				  insert_before = to_insert;
+				  break;
+				}
+			      gsi_prev (&it);
+			    }
+			}
+		      else if (dom0)
+			insert_before = to_insert;
+		    }
+		  else
+		    insert_before = to_insert;
+		}
 	    }
 
           if (number_of_places_left_in_vector == 0)
@@ -3701,14 +3809,9 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 		  vec_cst = permute_results[number_of_vectors - j - 1];
 		}
 	      tree init;
-	      if (insert_after)
-		{
-		  gimple_stmt_iterator gsi = gsi_for_stmt (insert_after->stmt);
-		  /* vect_init_vector inserts before.  */
-		  gsi_next (&gsi);
-		  init = vect_init_vector (vinfo, NULL, vec_cst,
-					   vector_type, &gsi);
-		}
+	      if (gsi_bb (insert_before))
+		init = vect_init_vector (vinfo, NULL, vec_cst,
+					 vector_type, &insert_before);
 	      else
 		init = vect_init_vector (vinfo, NULL, vec_cst,
 					 vector_type, NULL);
@@ -3720,7 +3823,7 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 		  ctor_seq = NULL;
 		}
 	      voprnds.quick_push (init);
-	      insert_after = NULL;
+	      insert_before = gsi_none ();
               number_of_places_left_in_vector = nunits;
 	      constant_p = true;
 	      elts.new_vector (vector_type, nunits, 1);
