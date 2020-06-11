@@ -802,7 +802,17 @@ public:
     const const_iterator &
     operator++ ()
     {
-      gsi_next (&gsi); return *this;
+      basic_block bb = gimple_bb (gsi_stmt (gsi));
+      gsi_next (&gsi);
+      while (gsi_end_p (gsi))
+	{
+	  bb = bb->next_bb;
+	  if (bb == NULL)
+	    break;
+	  gsi = gsi_after_labels (bb);
+	}
+
+      return *this;
     }
 
     gimple *operator* () const { return gsi_stmt (gsi); }
@@ -831,7 +841,15 @@ public:
     const const_reverse_iterator &
     operator++ ()
     {
-      gsi_prev (&gsi); return *this;
+      basic_block bb = gimple_bb (gsi_stmt (gsi));
+      gsi_prev (&gsi);
+      while (gsi_end_p (gsi) && bb->prev_bb != NULL)
+	{
+	  bb = bb->prev_bb;
+	  gsi = gsi_after_labels (bb);
+	}
+
+      return *this;
     }
 
     gimple *operator* () const { return gsi_stmt (gsi); }
@@ -869,7 +887,12 @@ public:
   {
     const_reverse_iterator begin = region_end;
     if (*begin == NULL)
-      begin = const_reverse_iterator (gsi_last_bb (gsi_bb (region_end)));
+      {
+	basic_block bb = gsi_bb (region_end);
+	while (gsi_stmt (gsi_last_bb (bb)) == NULL)
+	  bb = bb->prev_bb;
+	begin = const_reverse_iterator (gsi_last_bb (bb));
+      }
     else
       ++begin;
 
@@ -1893,14 +1916,15 @@ extern opt_result vect_analyze_data_refs_alignment (loop_vec_info);
 extern opt_result vect_verify_datarefs_alignment (loop_vec_info);
 extern bool vect_slp_analyze_and_verify_instance_alignment (vec_info *,
 							    slp_instance);
-extern opt_result vect_analyze_data_ref_accesses (vec_info *);
+extern opt_result vect_analyze_data_ref_accesses (vec_info *, vec<int> *);
 extern opt_result vect_prune_runtime_alias_test_list (loop_vec_info);
 extern bool vect_gather_scatter_fn_p (vec_info *, bool, bool, tree, tree,
 				      tree, int, internal_fn *, tree *);
 extern bool vect_check_gather_scatter (stmt_vec_info, loop_vec_info,
 				       gather_scatter_info *);
 extern opt_result vect_find_stmt_data_reference (loop_p, gimple *,
-						 vec<data_reference_p> *);
+						 vec<data_reference_p> *,
+						 vec<int> *, int);
 extern opt_result vect_analyze_data_refs (vec_info *, poly_uint64 *, bool *);
 extern void vect_record_base_alignments (vec_info *);
 extern tree vect_create_data_ref_ptr (vec_info *,
@@ -1999,6 +2023,7 @@ extern void vect_get_slp_defs (slp_tree, vec<tree> *);
 extern void vect_get_slp_defs (vec_info *, slp_tree, vec<vec<tree> > *,
 			       unsigned n = -1U);
 extern bool vect_slp_bb (basic_block);
+extern bool vect_slp_function ();
 extern stmt_vec_info vect_find_last_scalar_stmt_in_slp (slp_tree);
 extern stmt_vec_info vect_find_first_scalar_stmt_in_slp (slp_tree);
 extern bool is_simple_and_all_uses_invariant (stmt_vec_info, loop_vec_info);
@@ -2020,5 +2045,6 @@ unsigned vectorize_loops (void);
 void vect_free_loop_info_assumptions (class loop *);
 gimple *vect_loop_vectorized_call (class loop *, gcond **cond = NULL);
 bool vect_stmt_dominates_stmt_p (gimple *, gimple *);
+bool vect_stmt_dominates_stmt_p (gimple *, basic_block, gimple *, basic_block);
 
 #endif  /* GCC_TREE_VECTORIZER_H  */

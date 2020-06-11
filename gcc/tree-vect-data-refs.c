@@ -2853,10 +2853,10 @@ dr_group_sort_cmp (const void *dra_, const void *drb_)
     return 0;
 
   /* DRs in different loops never belong to the same group.  */
-  loop_p loopa = gimple_bb (DR_STMT (dra))->loop_father;
-  loop_p loopb = gimple_bb (DR_STMT (drb))->loop_father;
-  if (loopa != loopb)
-    return loopa->num < loopb->num ? -1 : 1;
+  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+  if (bb_index1 != bb_index2)
+    return bb_index1 < bb_index2 ? -1 : 1;
 
   /* Ordering of DRs according to base.  */
   cmp = data_ref_compare_tree (DR_BASE_ADDRESS (dra),
@@ -2962,7 +2962,8 @@ can_group_stmts_p (stmt_vec_info stmt1_info, stmt_vec_info stmt2_info,
    FORNOW: handle only arrays and pointer accesses.  */
 
 opt_result
-vect_analyze_data_ref_accesses (vec_info *vinfo)
+vect_analyze_data_ref_accesses (vec_info *vinfo,
+				vec<int> *dataref_groups)
 {
   unsigned int i;
   vec<data_reference_p> datarefs = vinfo->shared->datarefs;
@@ -2984,6 +2985,7 @@ vect_analyze_data_ref_accesses (vec_info *vinfo)
   for (i = 0; i < datarefs_copy.length () - 1;)
     {
       data_reference_p dra = datarefs_copy[i];
+      int dra_group_id = dataref_groups ? (*dataref_groups)[i] : 0;
       dr_vec_info *dr_info_a = vinfo->lookup_dr (dra);
       stmt_vec_info stmtinfo_a = dr_info_a->stmt;
       stmt_vec_info lastinfo = NULL;
@@ -2996,6 +2998,7 @@ vect_analyze_data_ref_accesses (vec_info *vinfo)
       for (i = i + 1; i < datarefs_copy.length (); ++i)
 	{
 	  data_reference_p drb = datarefs_copy[i];
+	  int drb_group_id = dataref_groups ? (*dataref_groups)[i] : 0;
 	  dr_vec_info *dr_info_b = vinfo->lookup_dr (drb);
 	  stmt_vec_info stmtinfo_b = dr_info_b->stmt;
 	  if (!STMT_VINFO_VECTORIZABLE (stmtinfo_b)
@@ -3008,10 +3011,14 @@ vect_analyze_data_ref_accesses (vec_info *vinfo)
 	     matters we can push those to a worklist and re-iterate
 	     over them.  The we can just skip ahead to the next DR here.  */
 
-	  /* DRs in a different loop should not be put into the same
+	  /* DRs in a different BBs should not be put into the same
 	     interleaving group.  */
-	  if (gimple_bb (DR_STMT (dra))->loop_father
-	      != gimple_bb (DR_STMT (drb))->loop_father)
+	  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+	  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+	  if (bb_index1 != bb_index2)
+	    break;
+
+	  if (dra_group_id != drb_group_id)
 	    break;
 
 	  /* Check that the data-refs have same first location (except init)
@@ -4070,7 +4077,8 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
 
 opt_result
 vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
-			       vec<data_reference_p> *datarefs)
+			       vec<data_reference_p> *datarefs,
+			       vec<int> *dataref_groups, int group_id)
 {
   /* We can ignore clobbers for dataref analysis - they are removed during
      loop vectorization and BB vectorization checks dependences with a
@@ -4197,6 +4205,8 @@ vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
 		      newdr->aux = (void *) (-1 - tree_to_uhwi (arg2));
 		      free_data_ref (dr);
 		      datarefs->safe_push (newdr);
+		      if (dataref_groups)
+			dataref_groups->safe_push (group_id);
 		      return opt_result::success ();
 		    }
 		}
@@ -4206,6 +4216,8 @@ vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
     }
 
   datarefs->safe_push (dr);
+  if (dataref_groups)
+    dataref_groups->safe_push (group_id);
   return opt_result::success ();
 }
 
