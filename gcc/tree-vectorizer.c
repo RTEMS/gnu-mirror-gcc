@@ -664,19 +664,15 @@ void
 vec_info::set_vinfo_for_stmt (gimple *stmt, stmt_vec_info info)
 {
   unsigned int uid = gimple_uid (stmt);
-  if (uid == 0)
+  if (info != NULL)
     {
       gcc_assert (!stmt_vec_info_ro);
-      gcc_checking_assert (info);
       uid = stmt_vec_infos.length () + 1;
       gimple_set_uid (stmt, uid);
       stmt_vec_infos.safe_push (info);
     }
   else
-    {
-      gcc_checking_assert (info == NULL);
-      stmt_vec_infos[uid - 1] = info;
-    }
+    stmt_vec_infos[uid - 1] = info;
 }
 
 /* Free the contents of stmt_vec_infos.  */
@@ -1379,12 +1375,16 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
+  if (vect_slp_function ())
     {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location, "function vectorized\n");
+    }
+  else
+    FOR_EACH_BB_FN (bb, fun)
       if (vect_slp_bb (bb))
 	if (dump_enabled_p ())
 	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
 
   if (!in_loop_pipeline)
     {

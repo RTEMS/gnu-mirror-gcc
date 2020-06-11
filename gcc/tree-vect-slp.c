@@ -2601,7 +2601,8 @@ vect_detect_hybrid_slp (loop_vec_info loop_vinfo)
 
 _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 			    gimple_stmt_iterator region_end_in,
-			    vec_info_shared *shared)
+			    vec_info_shared *shared,
+			    hash_map<gimple *, int> *data_ref_mapping)
   : vec_info (vec_info::bb, init_cost (NULL), shared),
     bb (gsi_bb (region_begin_in)),
     region_begin (region_begin_in),
@@ -2609,12 +2610,14 @@ _bb_vec_info::_bb_vec_info (gimple_stmt_iterator region_begin_in,
 {
   for (gimple *stmt : this->region_stmts ())
     {
-      gimple_set_uid (stmt, 0);
       if (is_gimple_debug (stmt))
 	continue;
+      int uid = data_ref_mapping != NULL ? *data_ref_mapping->get (stmt) : 0;
+      gimple_set_uid (stmt, uid);
       add_stmt (stmt);
     }
 
+  // TODO
   bb->aux = this;
 }
 
@@ -3245,10 +3248,11 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
    given by DATAREFS.  */
 
 static bool
-vect_slp_bb_region (gimple_stmt_iterator region_begin,
-		    gimple_stmt_iterator region_end,
-		    vec<data_reference_p> datarefs,
-		    unsigned int n_stmts)
+vect_slp_region (gimple_stmt_iterator region_begin,
+		 gimple_stmt_iterator region_end,
+		 vec<data_reference_p> datarefs,
+		 unsigned int n_stmts,
+		 hash_map<gimple *,int> *data_ref_mapping = NULL)
 {
   bb_vec_info bb_vinfo;
   auto_vector_modes vector_modes;
@@ -3265,7 +3269,8 @@ vect_slp_bb_region (gimple_stmt_iterator region_begin,
     {
       bool vectorized = false;
       bool fatal = false;
-      bb_vinfo = new _bb_vec_info (region_begin, region_end, &shared);
+      bb_vinfo = new _bb_vec_info (region_begin, region_end, &shared,
+				   data_ref_mapping);
 
       bool first_time_p = shared.datarefs.is_empty ();
       BB_VINFO_DATAREFS (bb_vinfo) = datarefs;
@@ -3417,7 +3422,7 @@ vect_slp_bb (basic_block bb)
 			     "not vectorized: too many instructions in "
 			     "basic block.\n");
 	}
-      else if (vect_slp_bb_region (region_begin, region_end, datarefs, insns))
+      else if (vect_slp_region (region_begin, region_end, datarefs, insns))
 	any_vectorized = true;
 
       if (gsi_end_p (region_end))
@@ -3429,6 +3434,59 @@ vect_slp_bb (basic_block bb)
 
   return any_vectorized;
 }
+
+bool
+vect_slp_function ()
+{
+  basic_block bb;
+  vec_info_shared shared;
+  vec<data_reference_p> datarefs = vNULL;
+  bool any_vectorized = false;
+  int insns = 0;
+  gimple_stmt_iterator region_begin
+    = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
+  // TODO
+  while (gsi_stmt (region_begin) == NULL)
+    region_begin = gsi_after_labels (region_begin.bb->next_bb);
+
+  gimple_stmt_iterator region_end
+    = gsi_last_bb (EXIT_BLOCK_PTR_FOR_FN (cfun)->prev_bb);
+  if (!gsi_end_p (region_end))
+    gsi_next (&region_end);
+  hash_map<gimple *, int> data_ref_mapping;
+  int current_group = 0;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gimple_stmt_iterator gsi = gsi_after_labels (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  if (is_gimple_debug (stmt))
+	    continue;
+
+	  // TODO: add something like param_slp_max_insns_in_bb?
+	  insns++;
+
+	  if (gimple_location (stmt) != UNKNOWN_LOCATION)
+	    vect_location = stmt;
+
+	  if (!vect_find_stmt_data_reference (NULL, stmt, &datarefs))
+	    ++current_group;
+
+	  data_ref_mapping.put (stmt, current_group);
+	}
+
+      ++current_group;
+    }
+
+  if (vect_slp_region (region_begin, region_end, datarefs, insns,
+		       &data_ref_mapping))
+    any_vectorized = true;
+
+  return any_vectorized;
+}
+
 
 
 /* Build a variable-length vector in which the elements in ELTS are repeated

@@ -2853,10 +2853,10 @@ dr_group_sort_cmp (const void *dra_, const void *drb_)
     return 0;
 
   /* DRs in different loops never belong to the same group.  */
-  loop_p loopa = gimple_bb (DR_STMT (dra))->loop_father;
-  loop_p loopb = gimple_bb (DR_STMT (drb))->loop_father;
-  if (loopa != loopb)
-    return loopa->num < loopb->num ? -1 : 1;
+  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+  if (bb_index1 != bb_index2)
+    return bb_index1 < bb_index2 ? -1 : 1;
 
   /* Ordering of DRs according to base.  */
   cmp = data_ref_compare_tree (DR_BASE_ADDRESS (dra),
@@ -3008,10 +3008,11 @@ vect_analyze_data_ref_accesses (vec_info *vinfo)
 	     matters we can push those to a worklist and re-iterate
 	     over them.  The we can just skip ahead to the next DR here.  */
 
-	  /* DRs in a different loop should not be put into the same
+	  /* DRs in a different BBs should not be put into the same
 	     interleaving group.  */
-	  if (gimple_bb (DR_STMT (dra))->loop_father
-	      != gimple_bb (DR_STMT (drb))->loop_father)
+	  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+	  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+	  if (bb_index1 != bb_index2)
 	    break;
 
 	  /* Check that the data-refs have same first location (except init)
