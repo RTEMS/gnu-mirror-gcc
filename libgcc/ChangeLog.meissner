@@ -1,1 +1,30 @@
+2020-06-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	(~meissner/patches/ieee4-patch002b)
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_divkc3.c (__divkc3x): Provide alternate name.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_mulkc3.c (__mulkc3x): Provide alternate name.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+	* config/rs6000/extendkftf2-sw.c: Move __float128 to __ibm128
+	conversion into float128-convert.h.
+	* config/rs6000/float128-convert.h: New file.
+	* config/rs6000/float128-hw.c: Move conversions between __float128
+	and __ibm128 into float128-convert.h.
+	* config/rs6000/quad-float128.h: Move conversions between
+	__float128 and __ibm128 into float128-convert.h.
+	(__mulkc3x): Add declaration.
+	(__divkc3x): Add declaration.
+	* config/rs6000/t-float128: Build __floating conversions to/from
+	Decimal support functions.  By default compile with long double
+	being IBM extended double.
+	* config/rs6000/trunctfkf2-sw.c: Move __ibm128 to __float128
+	conversion to float128-convert.h.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
+
 <clone branch>
