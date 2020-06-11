@@ -1333,9 +1333,31 @@ vect_init_vector_1 (vec_info *vinfo, stmt_vec_info stmt_vinfo, gimple *new_stmt,
 	}
       else
        {
-          bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (vinfo);
-	  gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin;
-	  gsi_insert_before (&gsi_region_begin, new_stmt, GSI_SAME_STMT);
+	 unsigned HOST_WIDE_INT nunits;
+	 bool only_constants = false;
+	 if (gimple_assign_rhs_code (new_stmt) == VECTOR_CST)
+	   {
+	     tree rhs = gimple_assign_rhs1 (new_stmt);
+	     if (VECTOR_CST_NELTS (rhs).is_constant (&nunits))
+	       {
+		 only_constants = true;
+		 for (unsigned i = 0; i < nunits; i++)
+		   if (!TREE_CONSTANT (VECTOR_CST_ELT (rhs, i)))
+		     {
+		       only_constants = false;
+		       break;
+		     }
+	       }
+	   }
+
+	 if (only_constants)
+	  gsi_insert_seq_on_edge_immediate (single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun)), new_stmt);
+	 else
+	   {
+	     bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (vinfo);
+	     gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin;
+	     gsi_insert_before (&gsi_region_begin, new_stmt, GSI_SAME_STMT);
+	   }
        }
     }
 
