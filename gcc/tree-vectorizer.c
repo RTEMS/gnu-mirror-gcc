@@ -664,19 +664,15 @@ void
 vec_info::set_vinfo_for_stmt (gimple *stmt, stmt_vec_info info)
 {
   unsigned int uid = gimple_uid (stmt);
-  if (uid == 0)
+  if (info != NULL)
     {
       gcc_assert (!stmt_vec_info_ro);
-      gcc_checking_assert (info);
       uid = stmt_vec_infos.length () + 1;
       gimple_set_uid (stmt, uid);
       stmt_vec_infos.safe_push (info);
     }
   else
-    {
-      gcc_checking_assert (info == NULL);
-      stmt_vec_infos[uid - 1] = info;
-    }
+    stmt_vec_infos[uid - 1] = info;
 }
 
 /* Free the contents of stmt_vec_infos.  */
