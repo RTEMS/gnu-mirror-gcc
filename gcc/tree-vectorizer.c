@@ -1314,12 +1314,16 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
+  if (vect_slp_function ())
     {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location, "function vectorized\n");
+    }
+  else
+    FOR_EACH_BB_FN (bb, fun)
       if (vect_slp_bb (bb))
 	if (dump_enabled_p ())
 	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
 
   if (!in_loop_pipeline)
     {

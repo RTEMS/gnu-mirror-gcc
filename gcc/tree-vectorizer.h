@@ -796,7 +796,17 @@ public:
     const_iterator &
     operator++ (int)
     {
-      gsi_next (&gsi); return *this;
+      basic_block bb = gimple_bb (gsi_stmt (gsi));
+      gsi_next (&gsi);
+      while (gsi_end_p (gsi))
+	{
+	  bb = bb->next_bb;
+	  if (bb == NULL)
+	    break;
+	  gsi = gsi_after_labels (bb);
+	}
+
+      return *this;
     }
 
     gimple *operator* () { return gsi_stmt (gsi); }
@@ -819,7 +829,8 @@ public:
   const_iterator begin () const { return const_iterator (m_region_begin); }
   const_iterator end () const { return const_iterator (m_region_end); }
 
-  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
+  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *,
+		hash_map<gimple *,int > *);
   ~_bb_vec_info ();
 
   basic_block bb;
@@ -1947,6 +1958,7 @@ extern void vect_get_slp_defs (slp_tree, vec<tree> *);
 extern void vect_get_slp_defs (vec_info *, slp_tree, vec<vec<tree> > *,
 			       unsigned n = -1U);
 extern bool vect_slp_bb (basic_block);
+extern bool vect_slp_function ();
 extern stmt_vec_info vect_find_last_scalar_stmt_in_slp (slp_tree);
 extern bool is_simple_and_all_uses_invariant (stmt_vec_info, loop_vec_info);
 extern bool can_duplicate_and_interleave_p (vec_info *, unsigned int, tree,
