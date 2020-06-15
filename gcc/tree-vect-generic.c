@@ -952,20 +952,24 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
   tree index = bitsize_int (0);
   tree comp_width = width;
   tree comp_index = index;
-  int i;
   location_t loc = gimple_location (gsi_stmt (*gsi));
+  tree_code code = TREE_CODE (a);
 
-  if (!is_gimple_val (a))
+  if (code == SSA_NAME)
     {
-      gcc_assert (COMPARISON_CLASS_P (a));
-      a_is_comparison = true;
-      a1 = TREE_OPERAND (a, 0);
-      a2 = TREE_OPERAND (a, 1);
-      comp_inner_type = TREE_TYPE (TREE_TYPE (a1));
-      comp_width = vector_element_bits_tree (TREE_TYPE (a1));
+      gimple *assign = SSA_NAME_DEF_STMT (a);
+      if (TREE_CODE_CLASS (gimple_assign_rhs_code (assign)) == tcc_comparison)
+	{
+	  a_is_comparison = true;
+	  a1 = gimple_assign_rhs1 (assign);
+	  a2 = gimple_assign_rhs2 (assign);
+	  code = gimple_assign_rhs_code (assign);
+	  comp_inner_type = TREE_TYPE (TREE_TYPE (a1));
+	  comp_width = vector_element_bits_tree (TREE_TYPE (a1));
+	}
     }
 
-  if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), TREE_CODE (a)))
+  if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), code))
     {
       gcc_assert (TREE_CODE (a) == SSA_NAME || TREE_CODE (a) == VECTOR_CST);
       return;
@@ -992,7 +996,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
 	  : expand_vec_cmp_expr_p (TREE_TYPE (a1), type, TREE_CODE (a))))
     {
       if (a_is_comparison)
-	a = gimplify_build2 (gsi, TREE_CODE (a), type, a1, a2);
+	a = gimplify_build2 (gsi, code, type, a1, a2);
       a1 = gimplify_build2 (gsi, BIT_AND_EXPR, type, a, b);
       a2 = gimplify_build1 (gsi, BIT_NOT_EXPR, type, a);
       a2 = gimplify_build2 (gsi, BIT_AND_EXPR, type, a2, c);
@@ -1023,7 +1027,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
 
   int nunits = nunits_for_known_piecewise_op (type);
   vec_alloc (v, nunits);
-  for (i = 0; i < nunits; i++)
+  for (int i = 0; i < nunits; i++)
     {
       tree aa, result;
       tree bb = tree_vec_extract (gsi, inner_type, b, width, index);
@@ -1034,7 +1038,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
 				       comp_width, comp_index);
 	  tree aa2 = tree_vec_extract (gsi, comp_inner_type, a2,
 				       comp_width, comp_index);
-	  aa = fold_build2 (TREE_CODE (a), cond_type, aa1, aa2);
+	  aa = fold_build2 (code, cond_type, aa1, aa2);
 	}
       else if (a_is_scalar_bitmask)
 	{
