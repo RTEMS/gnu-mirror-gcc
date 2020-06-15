@@ -14219,24 +14219,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  }
 
 	case VEC_COND_EXPR:
-	  {
-	    enum gimplify_status r0, r1, r2;
-	    r0 = gimplify_expr (&TREE_OPERAND (*expr_p, 0), pre_p,
-				post_p, is_gimple_condexpr, fb_rvalue);
-	    tree xop0 = TREE_OPERAND (*expr_p, 0);
-	    tmp = create_tmp_var_raw (TREE_TYPE (xop0), "vec_cond_cmp");
-	    gimple_add_tmp_var (tmp);
-	    gimplify_assign (tmp, xop0, pre_p);
-	    TREE_OPERAND (*expr_p, 0) = tmp;
-	    r1 = gimplify_expr (&TREE_OPERAND (*expr_p, 1), pre_p,
-				post_p, is_gimple_val, fb_rvalue);
-	    r2 = gimplify_expr (&TREE_OPERAND (*expr_p, 2), pre_p,
-				post_p, is_gimple_val, fb_rvalue);
-
-	    ret = MIN (MIN (r0, r1), r2);
-	    recalculate_side_effects (*expr_p);
-	  }
-	  break;
+	  goto expr_3;
 
 	case VEC_PERM_EXPR:
 	  /* Classified as tcc_expression.  */

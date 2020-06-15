@@ -2226,12 +2226,24 @@ expand_vector_operations (void)
 {
   gimple_stmt_iterator gsi;
   basic_block bb;
+  bool cfg_changed = false;
 
   FOR_EACH_BB_FN (bb, cfun)
-    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      expand_vector_operations_1 (&gsi);
+    {
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  expand_vector_operations_1 (&gsi);
+	  /* ???  If we do not cleanup EH then we will ICE in
+	     verification.  But in reality we have created wrong-code
+	     as we did not properly transition EH info and edges to
+	     the piecewise computations.  */
+	  if (maybe_clean_eh_stmt (gsi_stmt (gsi))
+	      && gimple_purge_dead_eh_edges (bb))
+	    cfg_changed = true;
+	}
+    }
 
-  return 0;
+  return cfg_changed ? TODO_cleanup_cfg : 0;
 }
 
 namespace {
