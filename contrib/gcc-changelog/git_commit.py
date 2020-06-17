@@ -259,6 +259,7 @@ class GitCommit:
         self.top_level_authors = []
         self.co_authors = []
         self.top_level_prs = []
+        self.cherry_pick = False
 
         project_files = [f for f in self.modified_files
                          if self.is_changelog_filename(f[0])
@@ -402,6 +403,7 @@ class GitCommit:
                 elif lowered_line.startswith(REVIEW_PREFIXES):
                     continue
                 elif line.startswith(CHERRY_PICK_PREFIX):
+                    self.cherry_pick = True
                     continue
 
                 # ChangeLog name will be deduced later
@@ -592,24 +594,38 @@ class GitCommit:
                     err = Error(msg % (entry.folder, changelog_location), file)
                     self.errors.append(err)
 
+    @classmethod
+    def format_authors_in_changelog(cls, authors, timestamp, prefix=''):
+        output = ''
+        for i, author in enumerate(authors):
+            if i == 0:
+                output += '%s%s  %s\n' % (prefix, timestamp, author)
+            else:
+                output += '%s\t    %s\n' % (prefix, author)
+        output += '\n'
+        return output
+
     def to_changelog_entries(self, use_commit_ts=False):
+        current_timestamp = self.date.strftime('%Y-%m-%d')
         for entry in self.changelog_entries:
             output = ''
             timestamp = entry.datetime
             if not timestamp or use_commit_ts:
-                timestamp = self.date.strftime('%Y-%m-%d')
+                timestamp = current_timestamp
             authors = entry.authors if entry.authors else [self.author]
             # add Co-Authored-By authors to all ChangeLog entries
             for author in self.co_authors:
                 if author not in authors:
                     authors.append(author)
 
-            for i, author in enumerate(authors):
-                if i == 0:
-                    output += '%s  %s\n' % (timestamp, author)
-                else:
-                    output += '\t    %s\n' % author
-            output += '\n'
+            if self.cherry_pick:
+                output += self.format_authors_in_changelog([self.author],
+                                                           current_timestamp)
+                output += '\tBackported from master:\n'
+                output += self.format_authors_in_changelog(authors,
+                                                           timestamp, '\t')
+            else:
+                output += self.format_authors_in_changelog(authors, timestamp)
             for pr in entry.prs:
                 output += '\t%s\n' % pr
             for line in entry.lines:
