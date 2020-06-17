@@ -3146,8 +3146,10 @@ vect_recog_divmod_pattern (vec_info *vinfo,
 	  return pattern_stmt;
 	}
 
-      cond = build2 (LT_EXPR, boolean_type_node, oprnd0,
-		     build_int_cst (itype, 0));
+      cond = make_ssa_name (boolean_type_node);
+      gimple *assign = gimple_build_assign (cond, LT_EXPR, oprnd0,
+					    build_int_cst (itype, 0));
+      append_pattern_def_seq (vinfo, stmt_vinfo, assign);
       if (rhs_code == TRUNC_DIV_EXPR
 	  || rhs_code == EXACT_DIV_EXPR)
 	{

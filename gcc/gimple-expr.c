@@ -615,7 +615,7 @@ is_gimple_condexpr_1 (tree t, bool allow_traps)
 bool
 is_gimple_condexpr (tree t)
 {
-  return is_gimple_condexpr_1 (t, true);
+  return is_gimple_val (t);
 }
 
 /* Like is_gimple_condexpr, but does not allow T to trap.  */

@@ -4283,7 +4283,9 @@ vr_values::simplify_stmt_using_ranges (gimple_stmt_iterator *gsi)
 	     in divide by zero, new_rhs1 / new_rhs will be NULL_TREE.  */
 	  if (new_rhs1 && new_rhs2)
 	    {
-	      tree cond = build2 (EQ_EXPR, boolean_type_node, cmp_var, val1);
+	      tree cond = make_ssa_name (boolean_type_node, NULL);
+	      gimple *s = gimple_build_assign (cond, EQ_EXPR, cmp_var, val1);
+	      gsi_insert_before (gsi, s, GSI_SAME_STMT);
 	      gimple_assign_set_rhs_with_ops (gsi,
 					      COND_EXPR, cond,
 					      new_rhs1,

@@ -448,6 +448,7 @@ gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
   p = as_a <gassign *> (
         gimple_build_with_ops_stat (GIMPLE_ASSIGN, (unsigned)subcode, num_ops
 				    PASS_MEM_STAT));
+  gcc_assert (!COMPARISON_CLASS_P (op1));
   gimple_assign_set_lhs (p, lhs);
   gimple_assign_set_rhs1 (p, op1);
   if (op2)

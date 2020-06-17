@@ -5009,12 +5009,11 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
 		  gsi_insert_before (&exit_gsi, epilog_stmt, GSI_SAME_STMT);
 		}
 	      tree new_val = make_ssa_name (data_eltype);
-	      epilog_stmt = gimple_build_assign (new_val,
-						 COND_EXPR,
-						 build2 (GT_EXPR,
-							 boolean_type_node,
-							 idx_val,
-							 old_idx_val),
+	      tree tmp = make_ssa_name (boolean_type_node, NULL);
+	      gimple *cond = gimple_build_assign (tmp, GT_EXPR,
+						  idx_val, old_idx_val);
+	      gsi_insert_before (&exit_gsi, cond, GSI_SAME_STMT);
+	      epilog_stmt = gimple_build_assign (new_val, COND_EXPR, tmp,
 						 val, old_val);
 	      gsi_insert_before (&exit_gsi, epilog_stmt, GSI_SAME_STMT);
 	      idx_val = new_idx_val;
@@ -5059,8 +5058,10 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
 	     values.  Check the result and if it is induc_val then replace
 	     with the original initial value, unless induc_val is
 	     the same as initial_def already.  */
-	  tree zcompare = build2 (EQ_EXPR, boolean_type_node, new_temp,
-				  induc_val);
+	  tree zcompare = make_ssa_name (boolean_type_node);
+	  gassign *assign = gimple_build_assign (zcompare, EQ_EXPR, new_temp,
+						 induc_val);
+	  gsi_insert_before (&exit_gsi, assign, GSI_SAME_STMT);
 
 	  tmp = make_ssa_name (new_scalar_dest);
 	  epilog_stmt = gimple_build_assign (tmp, COND_EXPR, zcompare,
