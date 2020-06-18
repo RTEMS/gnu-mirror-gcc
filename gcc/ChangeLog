@@ -1,3 +1,414 @@
+2020-06-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-06-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* hsa-gen.c (gen_hsa_insns_for_call): Move 'function_decl ==
+	NULL_TREE' check earlier.
+
+2020-06-16  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	* config/arm/arm_mve.h (__arm_vbicq_n_u16): Correct the intrinsic
+	arguments.
+	(__arm_vbicq_n_s16): Likewise.
+	(__arm_vbicq_n_u32): Likewise.
+	(__arm_vbicq_n_s32): Likewise.
+	(__arm_vbicq): Modify polymorphic variant.
+
+2020-06-16  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/94735
+	* config/arm/predicates.md (mve_scatter_memory): Define to
+	match (mem (reg)) for scatter store memory.
+	* config/arm/mve.md (mve_vstrbq_scatter_offset_<supf><mode>): Modify
+	define_insn to define_expand.
+	(mve_vstrbq_scatter_offset_p_<supf><mode>): Likewise.
+	(mve_vstrhq_scatter_offset_<supf><mode>): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_p_<supf><mode>): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_<supf><mode>): Likewise.
+	(mve_vstrdq_scatter_offset_p_<supf>v2di): Likewise.
+	(mve_vstrdq_scatter_offset_<supf>v2di): Likewise.
+	(mve_vstrdq_scatter_shifted_offset_p_<supf>v2di): Likewise.
+	(mve_vstrdq_scatter_shifted_offset_<supf>v2di): Likewise.
+	(mve_vstrhq_scatter_offset_fv8hf): Likewise.
+	(mve_vstrhq_scatter_offset_p_fv8hf): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_fv8hf): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_p_fv8hf): Likewise.
+	(mve_vstrwq_scatter_offset_fv4sf): Likewise.
+	(mve_vstrwq_scatter_offset_p_fv4sf): Likewise.
+	(mve_vstrwq_scatter_offset_p_<supf>v4si): Likewise.
+	(mve_vstrwq_scatter_offset_<supf>v4si): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_fv4sf): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_p_fv4sf): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_p_<supf>v4si): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_<supf>v4si): Likewise.
+	(mve_vstrbq_scatter_offset_<supf><mode>_insn): Define insn for scatter
+	stores.
+	(mve_vstrbq_scatter_offset_p_<supf><mode>_insn): Likewise.
+	(mve_vstrhq_scatter_offset_<supf><mode>_insn): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_p_<supf><mode>_insn): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_<supf><mode>_insn): Likewise.
+	(mve_vstrdq_scatter_offset_p_<supf>v2di_insn): Likewise.
+	(mve_vstrdq_scatter_offset_<supf>v2di_insn): Likewise.
+	(mve_vstrdq_scatter_shifted_offset_p_<supf>v2di_insn): Likewise.
+	(mve_vstrdq_scatter_shifted_offset_<supf>v2di_insn): Likewise.
+	(mve_vstrhq_scatter_offset_fv8hf_insn): Likewise.
+	(mve_vstrhq_scatter_offset_p_fv8hf_insn): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_fv8hf_insn): Likewise.
+	(mve_vstrhq_scatter_shifted_offset_p_fv8hf_insn): Likewise.
+	(mve_vstrwq_scatter_offset_fv4sf_insn): Likewise.
+	(mve_vstrwq_scatter_offset_p_fv4sf_insn): Likewise.
+	(mve_vstrwq_scatter_offset_p_<supf>v4si_insn): Likewise.
+	(mve_vstrwq_scatter_offset_<supf>v4si_insn): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_fv4sf_insn): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_p_fv4sf_insn): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_p_<supf>v4si_insn): Likewise.
+	(mve_vstrwq_scatter_shifted_offset_<supf>v4si_insn): Likewise.
+
+2020-06-16  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	* config/arm/arm.c (mve_vector_mem_operand): Fix unwanted
+	fall-throughs.
+
+2020-06-16  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+	    Andre Vieira   <andre.simoesdiasvieira@arm.com>
+
+	PR target/94959
+	* config/arm/arm-protos.h (arm_mode_base_reg_class): Function
+	declaration.
+	(mve_vector_mem_operand): Likewise.
+	* config/arm/arm.c (thumb2_legitimate_address_p): For MVE target check
+	the load from memory to a core register is legitimate for give mode.
+	(mve_vector_mem_operand): Define function.
+	(arm_print_operand): Modify comment.
+	(arm_mode_base_reg_class): Define.
+	* config/arm/arm.h (MODE_BASE_REG_CLASS): Modify to add check for
+	TARGET_HAVE_MVE and expand to arm_mode_base_reg_class on TRUE.
+	* config/arm/constraints.md (Ux): Likewise.
+	(Ul): Likewise.
+	* config/arm/mve.md (mve_mov): Replace constraint Us with Ux and also
+	add support for missing Vector Store Register and Vector Load Register.
+	Add a new alternative to support load from memory to PC (or label) in
+	vector store/load.
+	(mve_vstrbq_<supf><mode>): Modify constraint Us to Ux.
+	(mve_vldrbq_<supf><mode>): Modify constriant Us to Ux, predicate to
+	mve_memory_operand and also modify the MVE instructions to emit.
+	(mve_vldrbq_z_<supf><mode>): Modify constraint Us to Ux.
+	(mve_vldrhq_fv8hf): Modify constriant Us to Ux, predicate to
+	mve_memory_operand and also modify the MVE instructions to emit.
+	(mve_vldrhq_<supf><mode>): Modify constriant Us to Ux, predicate to
+	mve_memory_operand and also modify the MVE instructions to emit.
+	(mve_vldrhq_z_fv8hf): Likewise.
+	(mve_vldrhq_z_<supf><mode>): Likewise.
+	(mve_vldrwq_fv4sf): Likewise.
+	(mve_vldrwq_<supf>v4si): Likewise.
+	(mve_vldrwq_z_fv4sf): Likewise.
+	(mve_vldrwq_z_<supf>v4si): Likewise.
+	(mve_vld1q_f<mode>): Modify constriant Us to Ux.
+	(mve_vld1q_<supf><mode>): Likewise.
+	(mve_vstrhq_fv8hf): Modify constriant Us to Ux, predicate to
+	mve_memory_operand.
+	(mve_vstrhq_p_fv8hf): Modify constriant Us to Ux, predicate to
+	mve_memory_operand and also modify the MVE instructions to emit.
+	(mve_vstrhq_p_<supf><mode>): Likewise.
+	(mve_vstrhq_<supf><mode>): Modify constriant Us to Ux, predicate to
+	mve_memory_operand.
+	(mve_vstrwq_fv4sf): Modify constriant Us to Ux.
+	(mve_vstrwq_p_fv4sf): Modify constriant Us to Ux and also modify the MVE
+	instructions to emit.
+	(mve_vstrwq_p_<supf>v4si): Likewise.
+	(mve_vstrwq_<supf>v4si): Likewise.Modify constriant Us to Ux.
+	* config/arm/predicates.md (mve_memory_operand): Define.
+
+2020-06-15  Andrew Stubbs  <ams@codesourcery.com>
+
+	* config/gcn/gcn-valu.md (v<expander><mode>3): Fix unsignedp.
+
+2020-06-15  Tobias Burnus  <tobias@codesourcery.com>
+
+	* omp-offload.c (add_decls_addresses_to_decl_constructor,
+	omp_finish_file): With in_lto_p, stream out all offload-table
+	items even if the symtab_node does not exist.
+
+2020-06-15  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR lto/94848
+	PR middle-end/95551
+	* omp-offload.c (add_decls_addresses_to_decl_constructor,
+	omp_finish_file): Skip removed items.
+	* lto-cgraph.c (output_offload_tables): Likewise; set force_output
+	to this node for variables and functions.
+
+2020-06-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/95528
+	* tree-ssa-forwprop.c (simplify_vector_constructor): Don't use
+	VEC_UNPACK*_EXPR or VEC_PACK_TRUNC_EXPR with scalar modes unless the
+	type is vector boolean.
+
+2020-06-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/95197
+	* gimplify.c (find_combined_omp_for): Move to omp-general.c.
+	* omp-general.h (find_combined_omp_for): Declare.
+	* omp-general.c: Include tree-iterator.h.
+	(find_combined_omp_for): New function, moved from gimplify.c.
+
+2020-06-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/95108
+	* omp-simd-clone.c (struct modify_stmt_info): Add after_stmt member.
+	(ipa_simd_modify_stmt_ops): For PHIs, only add before first stmt in
+	entry block if info->after_stmt is NULL, otherwise add after that stmt
+	and update it after adding each stmt.
+	(ipa_simd_modify_function_body): Initialize info.after_stmt.
+
+2020-06-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/95080
+	* cfgrtl.c (purge_dead_edges): Skip over debug and note insns even
+	if the last insn is a note.
+
+2020-06-12  Martin Liska  <mliska@suse.cz>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/95634
+	* asan.c (asan_emit_stack_protection): Fix emission for ilp32
+	by using Pmode instead of ptr_mode.
+
+2020-06-12  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/94910
+	* asan.c (asan_emit_stack_protection): Emit
+	also **SavedFlagPtr(FakeStack, class_id) = 0 in order to release
+	a stack frame.
+
+2020-06-08  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/95113
+	* tree-ssa-dce.c (mark_stmt_if_obviously_necessary): Move non-call
+	exceptions check to...
+	* tree-eh.c (stmt_unremovable_because_of_non_call_eh_p): ...this
+	new function.
+	* tree-eh.h (stmt_unremovable_because_of_non_call_eh_p): Declare it.
+	* ipa-sra.c (isra_track_scalar_value_uses): Use it.  New parameter
+	fun.
+
+2020-06-05  Thomas Schwinge  <thomas@codesourcery.com>
+	    Julian Brown  <julian@codesourcery.com>
+
+	* gimplify.c (gimplify_adjust_omp_clauses): Remove
+	'GOMP_MAP_STRUCT' mapping from OpenACC 'exit data' directives.
+
+2020-06-05  H.J. Lu  <hjl.tools@gmail.com>
+
+	* config/i386/driver-i386.c (host_detect_local_cpu): Support
+	Intel Airmont, Tremont, Comet Lake, Ice Lake and Tiger Lake
+	processor families.
+
+2020-06-05  Lili Cui  <lili.cui@intel.com>
+
+	PR target/95525
+	* config/i386/i386.h (PTA_WAITPKG): Change bitmask value.
+
+2020-06-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (zeus): Define.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi (AArch64 Options): Document zeus -mcpu option.
+
+2020-06-02  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR target/95420
+	* config.gcc (arm-wrs-vxworks7*): Set default cpu to generic-armv7-a.
+
+2020-05-29  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/94591
+	* config/aarch64/aarch64.c (aarch64_evpc_rev_local): Don't match
+	identity permutation.
+
+2020-05-29  Andrew Stubbs  <ams@codesourcery.com>
+
+	* config/gcn/gcn-valu.md (add<mode>3_zext_dup): Change to a
+	define_expand, and rename the original to ...
+	(add<mode>3_vcc_zext_dup): ... this, and add a custom VCC operand.
+	(add<mode>3_zext_dup_exec): Likewise, with ...
+	(add<mode>3_vcc_zext_dup_exec): ... this.
+	(add<mode>3_zext_dup2): Likewise, with ...
+	(add<mode>3_zext_dup_exec): ... this.
+	(add<mode>3_zext_dup2_exec): Likewise, with ...
+	(add<mode>3_zext_dup2): ... this.
+	* config/gcn/gcn.c (gcn_expand_scalar_to_vector_address): Switch
+	addv64di3_zext* calls to use addv64di3_vcc_zext*.
+
+2020-05-29  Dong JianQiang  <dongjianqiang2@huawei.com>
+
+	PR gcov-profile/95332
+	* gcov-io.c (gcov_var::endian): Move field.
+	(from_file): Add IN_GCOV_TOOL check.
+	* gcov-io.h (gcov_magic): Ditto.
+
+2020-05-28  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR testsuite/95361
+	* config/aarch64/aarch64.c (aarch64_expand_epilogue): Only
+	redefine the CFA if we have CFI operations.
+
+2020-05-28  Uroš Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/mmx.md (mmx_haddsubv2sf3): Correct
+	RTL template to model horizontal subtraction and addition.
+
+2020-05-28  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/95355
+	* config/i386/sse.md
+	(<mask_codefor>avx512f_<code>v16qiv16si2<mask_name>):
+	Remove %q operand modifier from insn template.
+	(avx512f_<code>v8hiv8di2<mask_name>): Ditto.
+
+2020-05-28  Martin Liska  <mliska@suse.cz>
+
+	PR web/95380
+	* doc/invoke.texi: Add missing params, remove max-once-peeled-insns and
+	rename ipcp-unit-growth to ipa-cp-unit-growth.
+
+2020-05-24  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/95255
+	* config/i386/i386.md (<rounding_insn><mode>2): Do not try to
+	expand non-sse4 ROUND_ROUNDEVEN rounding via SSE support routines.
+
+2020-05-24  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master.
+	2020-05-22  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h (ASM_GENERATE_INTERNAL_LABEL):
+	Make ubsan_{data,type},ASAN linker-visible.
+
+2020-05-24  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/95258
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect
+	AVX512VPOPCNTDQ.
+
+2020-05-22  Richard Biener  <rguenther@suse.de>
+
+	PR lto/95190
+	* doc/invoke.texi (flto): Document behavior of diagnostic
+	options.
+
+2020-05-21  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/95169
+	* config/i386/i386-expand.c (ix86_expand_int_movcc):
+	 Avoid reversing a non-trapping comparison to a trapping one.
+
+2020-05-21  Martin Liska  <mliska@suse.cz>
+
+	* common/config/aarch64/aarch64-common.c (aarch64_handle_option):
+	Handle OPT_moutline_atomics.
+	* config/aarch64/aarch64.c: Add outline-atomics to
+	aarch64_attributes.
+	* doc/extend.texi: Document the newly added target attribute.
+
+2020-05-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	Backport from master
+	2020-05-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/95212
+	* config/i386/i386-builtins.c (processor_features): Move
+	F_AVX512VP2INTERSECT after F_AVX512BF16.
+	(isa_names_table): Likewise.
+
+2020-05-19  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backport from mainline
+	2020-05-10  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* config/i386/i386-c.c (ix86_target_macros): Define _ILP32 and
+	__ILP32__ for 32-bit targets.
+
+2020-05-19  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backport from mainline
+	2020-05-15  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/94635
+	* gimplify.c (gimplify_scan_omp_clauses): For MAP_TO_PSET with
+	OMP_TARGET_EXIT_DATA, use 'release:' unless the associated
+	item is 'delete:'.
+
+2020-05-18  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/94940
+	* tree-vrp.c (vrp_prop::check_mem_ref): Remove unreachable code.
+	* tree.c (component_ref_size): Correct the handling or array members
+	of unions.
+	Drop a pointless test.
+	Rename a local variable.
+
+2020-05-12  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2020-05-07  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/94947
+	* tree-ssa-structalias.c (refered_from_nonlocal_fn): Use
+	DECL_EXTERNAL || TREE_PUBLIC instead of externally_visible.
+	(refered_from_nonlocal_var): Likewise.
+	(ipa_pta_execute): Likewise.
+
+	2020-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/94947
+	* tree-ssa-structalias.c (ipa_pta_execute): Use
+	varpool_node::externally_visible_p ().
+	(refered_from_nonlocal_var): Likewise.
+
+2020-05-12  David Edelsohn  <dje.gcc@gmail.com>
+
+	Backport from mainline
+	2020-05-04  Clement Chigot  <clement.chigot@atos.net>
+		    David Edelsohn  <dje.gcc@gmail.com>
+
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Override explicit
+	for fmodl, frexpl, ldexpl and modfl builtins.
+
+2020-05-11  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backport from mainline
+	2020-05-05  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rtems.h (RTEMS_STARTFILE_SPEC): Define if undefined.
+	(RTEMS_ENDFILE_SPEC): Likewise.
+	(STARTFILE_SPEC): Update comment.  Add RTEMS_STARTFILE_SPEC.
+	(ENDFILE_SPEC): Add RTEMS_ENDFILE_SPEC.
+	(LIB_SPECS): Support -nodefaultlibs option.
+	* config/or1k/rtems.h (RTEMS_STARTFILE_SPEC): Define.
+	(RTEMS_ENDFILE_SPEC): Likewise.
+	* config/rs6000/rtems.h (RTEMS_STARTFILE_SPEC): Likewise.
+	(RTEMS_ENDFILE_SPEC): Likewise.
+	* config/v850/rtems.h (RTEMS_STARTFILE_SPEC): Likewise.
+	(RTEMS_ENDFILE_SPEC): Likewise.
+
+2020-05-11  Martin Liska  <mliska@suse.cz>
+
+	Backport from mainline
+	2020-05-11  Martin Liska  <mliska@suse.cz>
+
+	PR c/95040
+	* common.opt: Fix typo in option description.
+
+2020-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/94724
+	* tree.c (get_narrower): Reuse the op temporary instead of
+	shadowing it.
+
 2020-05-07  Uroš Bizjak  <ubizjak@gmail.com>
 
 	* config/alpha/alpha.c (alpha_atomic_assign_expand_fenv): Use

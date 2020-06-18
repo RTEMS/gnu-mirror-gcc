@@ -8789,7 +8789,9 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	     to be delete; hence, we turn the MAP_TO_PSET into a MAP_DELETE.  */
 	  if (code == OMP_TARGET_EXIT_DATA
 	      && OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_TO_PSET)
-	    OMP_CLAUSE_SET_MAP_KIND (c, GOMP_MAP_DELETE);
+	    OMP_CLAUSE_SET_MAP_KIND (c, OMP_CLAUSE_MAP_KIND (*prev_list_p)
+					== GOMP_MAP_DELETE
+					? GOMP_MAP_DELETE : GOMP_MAP_RELEASE);
 	  else if ((code == OMP_TARGET_EXIT_DATA || code == OMP_TARGET_UPDATE)
 		   && (OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_POINTER
 		       || OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_TO_PSET))
@@ -10406,7 +10408,8 @@ gimplify_adjust_omp_clauses (gimple_seq *pre_p, gimple_seq body, tree *list_p,
 		}
 	    }
 	  else if (OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_STRUCT
-		   && code == OMP_TARGET_EXIT_DATA)
+		   && (code == OMP_TARGET_EXIT_DATA
+		       || code == OACC_EXIT_DATA))
 	    remove = true;
 	  else if (DECL_SIZE (decl)
 		   && TREE_CODE (DECL_SIZE (decl)) != INTEGER_CST
@@ -10982,62 +10985,6 @@ gimplify_omp_task (tree *expr_p, gimple_seq *pre_p)
     gimple_omp_task_set_taskwait_p (g, true);
   gimplify_seq_add_stmt (pre_p, g);
   *expr_p = NULL_TREE;
-}
-
-/* Helper function of gimplify_omp_for, find OMP_FOR resp. OMP_SIMD
-   with non-NULL OMP_FOR_INIT.  Also, fill in pdata array,
-   pdata[0] non-NULL if there is anything non-trivial in between, pdata[1]
-   is address of OMP_PARALLEL in between if any, pdata[2] is address of
-   OMP_FOR in between if any and pdata[3] is address of the inner
-   OMP_FOR/OMP_SIMD.  */
-
-static tree
-find_combined_omp_for (tree *tp, int *walk_subtrees, void *data)
-{
-  tree **pdata = (tree **) data;
-  *walk_subtrees = 0;
-  switch (TREE_CODE (*tp))
-    {
-    case OMP_FOR:
-      if (OMP_FOR_INIT (*tp) != NULL_TREE)
-	{
-	  pdata[3] = tp;
-	  return *tp;
-	}
-      pdata[2] = tp;
-      *walk_subtrees = 1;
-      break;
-    case OMP_SIMD:
-      if (OMP_FOR_INIT (*tp) != NULL_TREE)
-	{
-	  pdata[3] = tp;
-	  return *tp;
-	}
-      break;
-    case BIND_EXPR:
-      if (BIND_EXPR_VARS (*tp)
-	  || (BIND_EXPR_BLOCK (*tp)
-	      && BLOCK_VARS (BIND_EXPR_BLOCK (*tp))))
-	pdata[0] = tp;
-      *walk_subtrees = 1;
-      break;
-    case STATEMENT_LIST:
-      if (!tsi_one_before_end_p (tsi_start (*tp)))
-	pdata[0] = tp;
-      *walk_subtrees = 1;
-      break;
-    case TRY_FINALLY_EXPR:
-      pdata[0] = tp;
-      *walk_subtrees = 1;
-      break;
-    case OMP_PARALLEL:
-      pdata[1] = tp;
-      *walk_subtrees = 1;
-      break;
-    default:
-      break;
-    }
-  return NULL_TREE;
 }
 
 /* Gimplify the gross structure of an OMP_FOR statement.  */
