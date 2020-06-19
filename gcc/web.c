@@ -1,7 +1,6 @@
 /* Web construction code for GNU compiler.
    Contributed by Jan Hubicka.
    Copyright (C) 2001-2020 Free Software Foundation, Inc.
-  //from up
 
 This file is part of GCC.
 
