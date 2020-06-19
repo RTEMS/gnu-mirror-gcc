@@ -1924,7 +1924,6 @@ irange::multi_range_union (const irange &r)
 	    }
 	  else
 	    i += 2;
-
 	}
     }
 
@@ -2397,7 +2396,7 @@ vrp_operand_equal_p (const_tree val1, const_tree val2)
   return true;
 }
 
-#define DEFINE_INT_RANGX_GC_STUBS(N)		\
+#define DEFINE_INT_RANGE_GC_STUBS(N)		\
   void						\
   gt_pch_nx (int_range<N> *&x)			\
   {						\
@@ -2418,7 +2417,7 @@ vrp_operand_equal_p (const_tree val1, const_tree val2)
       }						\
   }
 
-#define DEFINE_INT_RANGX_INSTANCE(N)					\
+#define DEFINE_INT_RANGE_INSTANCE(N)					\
   template int_range<N>::int_range(tree, tree, value_range_kind);	\
   template int_range<N>::int_range(tree_node *,				\
 				   const wide_int &,			\
@@ -2429,7 +2428,7 @@ vrp_operand_equal_p (const_tree val1, const_tree val2)
   template int_range<N>::int_range(const int_range &);			\
   template int_range<N>& int_range<N>::operator= (const int_range &);
 
-DEFINE_INT_RANGX_INSTANCE(1)
-DEFINE_INT_RANGX_INSTANCE(2)
-DEFINE_INT_RANGX_INSTANCE(3)
-DEFINE_INT_RANGX_GC_STUBS(1)
+DEFINE_INT_RANGE_INSTANCE(1)
+DEFINE_INT_RANGE_INSTANCE(2)
+DEFINE_INT_RANGE_INSTANCE(3)
+DEFINE_INT_RANGE_GC_STUBS(1)
