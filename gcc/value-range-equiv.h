@@ -27,7 +27,11 @@ along with GCC; see the file COPYING3.  If not see
 class GTY((user)) value_range_equiv : public value_range
 {
  public:
-  value_range_equiv () : value_range () { m_equiv = NULL; }
+  value_range_equiv () : value_range ()
+    {
+      m_discriminator = IRANGE_KIND_INT;
+      m_equiv = NULL;
+    }
   value_range_equiv (const value_range &);
   /* Deep-copies equiv bitmap argument.  */
   value_range_equiv (tree, tree, bitmap = NULL, value_range_kind = VR_RANGE);

@@ -30,12 +30,14 @@ along with GCC; see the file COPYING3.  If not see
 value_range_equiv::value_range_equiv (tree min, tree max, bitmap equiv,
 				      value_range_kind kind)
 {
+  m_discriminator = IRANGE_KIND_INT;
   m_equiv = NULL;
   set (min, max, equiv, kind);
 }
 
 value_range_equiv::value_range_equiv (const value_range &other)
 {
+  m_discriminator = IRANGE_KIND_INT;
   m_equiv = NULL;
   set (other.min(), other.max (), NULL, other.kind ());
 }
