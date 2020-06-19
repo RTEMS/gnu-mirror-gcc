@@ -2194,11 +2194,6 @@ operator_bitwise_and::wi_fold (irange &r, tree type,
     value_range_with_overflow (r, type, new_lb, new_ub);
 }
 
-// FIXME: Eventually move tree-vrp.c version here.
-wide_int
-masked_increment (const wide_int &val_in, const wide_int &mask,
-		  const wide_int &sgnbit, unsigned int prec);
-
 static void
 set_nonzero_range_from_mask (irange &r, tree type, const irange &lhs)
 {
