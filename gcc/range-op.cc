@@ -1117,14 +1117,11 @@ operator_mult::op1_range (irange &r, tree type,
 {
   tree offset;
 
-  // FIXME: We can't solve 0 = OP1 * N by dividing by N with a
-  // wrapping type.  Bail for now.
+  // We can't solve 0 = OP1 * N by dividing by N with a wrapping type.
+  // Bail for now.
   //
-  // For example: For 0 = OP1 * 2, OP1 could be 0, or
-  // MAXINT.
-  //
-  // For example: For 4 = OP1 * 2, OP1 could be 2 or 130 (unsigned
-  // 8-bit)
+  // For example: For 0 = OP1 * 2, OP1 could be 0, or MAXINT, whereas
+  // for 4 = OP1 * 2, OP1 could be 2 or 130 (unsigned 8-bit)
   if (TYPE_OVERFLOW_WRAPS (type))
     return false;
 
@@ -1609,7 +1606,6 @@ operator_rshift::op1_range (irange &r,
       // OP1 is anything from 0011 1000 to 0011 1111.  That is, a
       // range from LHS<<3 plus a mask of the 3 bits we shifted on the
       // right hand side (0x07).
-
       tree mask = fold_build1 (BIT_NOT_EXPR, type,
 			       fold_build2 (LSHIFT_EXPR, type,
 					    build_minus_one_cst (type),
@@ -1618,13 +1614,11 @@ operator_rshift::op1_range (irange &r,
       op_plus.fold_range (ub, type, lb, mask_range);
       r = lb;
       r.union_ (ub);
-
       if (!lhs_refined.contains_p (build_zero_cst (type)))
 	{
 	  mask_range.invert ();
 	  r.intersect (mask_range);
 	}
-
       return true;
     }
   return false;
@@ -2233,8 +2227,7 @@ operator_bitwise_and::simple_op1_range_solver (irange &r, tree type,
   bool we_know_nothing = false;
   if (minv != valv)
     {
-      /* If (VAL & CST2) != VAL, X & CST2 can't be equal to
-	 VAL.  */
+      // If (VAL & CST2) != VAL, X & CST2 can't be equal to VAL.
       minv = masked_increment (valv, cst2v, sgnbit, nprec);
       if (minv == valv)
 	{

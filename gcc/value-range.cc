@@ -1,5 +1,6 @@
 /* Support routines for value ranges.
    Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Major hacks by Aldy Hernandez <aldyh@redhat.com>.
 
 This file is part of GCC.
 
@@ -120,10 +121,7 @@ irange::copy_simple_range (const irange &vsrc)
   else if (src->varying_p ())
     set_varying (src->type ());
   else if (src->kind () == VR_ANTI_RANGE)
-    {
-      tree lb = src->min (), ub = src->max ();
-      set (lb, ub, VR_ANTI_RANGE);
-    }
+    set (src->min (), src->max (), VR_ANTI_RANGE);
   else if (maybe_anti_range (*src))
     {
       widest_irange tmp = *src;
@@ -133,15 +131,12 @@ irange::copy_simple_range (const irange &vsrc)
 	   VR_ANTI_RANGE);
     }
   else
-    {
-      wide_int lb = src->lower_bound (), ub = src->upper_bound ();
-      set (wide_int_to_tree (src->type (), lb),
-	   wide_int_to_tree (src->type (), ub),
-	   src->kind ());
-    }
+    set (wide_int_to_tree (src->type (), src->lower_bound ()),
+	 wide_int_to_tree (src->type (), src->upper_bound ()),
+	 src->kind ());
 }
 
-// irange constructors
+// Constructors for irange.
 
 irange::irange (tree *base, unsigned nranges)
 {
@@ -160,7 +155,7 @@ irange::irange (tree *base, unsigned nranges, const irange &other)
   *this = other;
 }
 
-// int_range constructors.
+// Constructors for int_range<>.
 
 template<unsigned N>
 int_range<N>::int_range (const int_range &other)
@@ -206,7 +201,7 @@ int_range<N>::operator= (const int_range &src)
   return *this;
 }
 
-// widest_irange implementation
+// Implementation for widest_irange.
 
 template <>
 template <>
@@ -302,6 +297,10 @@ widest_irange::init_widest_irange ()
   m_discriminator = IRANGE_KIND_WIDEST_INT;
 }
 
+// If necessary, resize a widest_irange to fit NRANGES.  If the new
+// size will not fix in what can be represented in M_MAX_RANGES, do
+// nothing.
+
 void
 widest_irange::resize_if_needed (unsigned nranges)
 {
@@ -314,7 +313,7 @@ widest_irange::resize_if_needed (unsigned nranges)
   if (nranges * 2 > sizeof (m_max_ranges) * 255)
     return;
 
-  bool must_initialize = m_blob == NULL;
+  bool must_initialize = (m_blob == NULL);
   m_max_ranges = nranges * 2;
   unsigned alloc_size = m_max_ranges * sizeof (*m_blob) * 2;
   m_blob = (tree *) xrealloc (m_blob, alloc_size);
@@ -331,6 +330,9 @@ widest_irange::resize_if_needed (unsigned nranges)
 
 int widest_irange::stats_used_buckets[11];
 
+// Record the maximum number of sub-ranges that were used throughout
+// the life of this object.
+
 void
 widest_irange::stats_register_use (void)
 {
@@ -340,6 +342,8 @@ widest_irange::stats_register_use (void)
   else
     stats_used_buckets[10]++;
 }
+
+// Dump statistics on sub-range usage within widest_irange.
 
 void
 widest_irange::stats_dump (FILE *file)
@@ -361,7 +365,7 @@ dump_value_range_stats (FILE *file)
 {
   widest_irange::stats_dump (file);
 }
-
+
 void
 irange::set_undefined ()
 {
@@ -655,10 +659,12 @@ irange::check ()
 	  }
 	if (simple_ranges_p ())
 	  {
-	    /* Creating ~[-MIN, +MAX] is stupid because that would be
-	       the empty set.  */
-	    if (INTEGRAL_TYPE_P (TREE_TYPE (min ())) && m_kind == VR_ANTI_RANGE)
-	      gcc_assert (!vrp_val_is_min (min ()) || !vrp_val_is_max (max ()));
+	    // Creating ~[-MIN, +MAX] is stupid because that would be
+	    // the empty set.
+	    if (INTEGRAL_TYPE_P (TREE_TYPE (min ()))
+		&& m_kind == VR_ANTI_RANGE)
+	      gcc_assert (!vrp_val_is_min (min ())
+			  || !vrp_val_is_max (max ()));
 	  }
 	break;
       }
@@ -799,9 +805,6 @@ irange::operator== (const irange &r) const
   return equal_p (r);
 }
 
-/* If range is a singleton, place it in RESULT and return TRUE.
-   Note: A singleton can be any gimple invariant, not just constants.
-   So, [&x, &x] counts as a singleton.  */
 /* Return TRUE if this is a symbolic range.  */
 
 bool
@@ -827,13 +830,16 @@ irange::constant_p () const
 	  && TREE_CODE (max ()) == INTEGER_CST);
 }
 
+/* If range is a singleton, place it in RESULT and return TRUE.
+   Note: A singleton can be any gimple invariant, not just constants.
+   So, [&x, &x] counts as a singleton.  */
+
 bool
 irange::singleton_p (tree *result) const
 {
   if (!simple_ranges_p ())
     {
-      if (num_pairs () == 1
-	  && operand_equal_p (min (), max (), 0))
+      if (num_pairs () == 1 && operand_equal_p (min (), max (), 0))
 	{
 	  if (result)
 	    *result = min ();
@@ -889,8 +895,8 @@ irange::value_inside_range (tree val) const
   if (undefined_p ())
     return 0;
 
-  /* For constants we can just intersect and avoid using VR_ANTI_RANGE
-     code further below.  */
+  // For constants we can just intersect and avoid using VR_ANTI_RANGE
+  // code further below.
   if (TREE_CODE (val) == INTEGER_CST && constant_p ())
     {
       widest_irange v (val, val);
@@ -1709,11 +1715,6 @@ union_helper (const value_range *vr0, const value_range *vr1)
 void
 irange::union_ (const irange *other)
 {
-  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
-    {
-      unsigned size = num_pairs () + other->num_pairs ();
-      widest->resize_if_needed (size);
-    }
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "Meeting\n  ");
@@ -1722,15 +1723,20 @@ irange::union_ (const irange *other)
       dump_value_range (dump_file, other);
       fprintf (dump_file, "\n");
     }
+  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
+    {
+      unsigned size = num_pairs () + other->num_pairs ();
+      widest->resize_if_needed (size);
+    }
   if (simple_ranges_p ())
     {
       int_range<1> small;
       if (!other->simple_ranges_p ())
 	{
-	  /* If a simple range was requested on the LHS, do the entire
-	     operation in simple mode, because the RHS may be a
-	     symbolic, and we only know how to deal with those in
-	     simple mode.  */
+	  // If a simple range was requested on the LHS, do the entire
+	  // operation in simple mode, because the RHS may be a
+	  // symbolic, and we only know how to deal with those in
+	  // simple mode.
 	  small = *other;
 	  other = &small;
 	}
@@ -1793,14 +1799,14 @@ irange::intersect (const irange *other)
       int_range<1> small;
       if (!other->simple_ranges_p ())
 	{
-	  /* If a simple range was requested on the LHS, do the entire
-	     operation in simple mode, because the RHS may be a
-	     symbolic, and we only know how to deal with those in
-	     simple mode.
-
-	     FIXME: Squishing [10,10][20,20] into a value_range, will
-	     yield [10,20].  If this result is then used with
-	     contains_p(15), the result may be wrong.  Revisit this.  */
+	  // If a simple range was requested on the LHS, do the entire
+	  // operation in simple mode, because the RHS may be a
+	  // symbolic, and we only know how to deal with those in
+	  // simple mode.
+	  //
+	  // ?? Squishing [10,10][20,20] into a value_range, will
+	  // yield [10,20].  If this result is then used with
+	  // contains_p(15), the result may be wrong.
 	  small = *other;
 	  other = &small;
 	}
@@ -1927,10 +1933,10 @@ irange::multi_range_union (const irange &r)
 	}
     }
 
-  // At this point, the vector should have i ranges, none
-  // overlapping. Now it simply needs to be copied, and if there are
-  // too many ranges, merge some.  We wont do any analysis as to what
-  // the "best" merges are, simply combine the final ranges into one.
+  // At this point, the vector should have i ranges, none overlapping.
+  // Now it simply needs to be copied, and if there are too many
+  // ranges, merge some.  We wont do any analysis as to what the
+  // "best" merges are, simply combine the final ranges into one.
   if (i > m_max_ranges * 2)
     {
       res[m_max_ranges * 2 - 1] = res[i - 1];
@@ -1986,7 +1992,6 @@ irange::multi_range_intersect (const irange &r)
       set_undefined ();
       return;
     }
-
   // The algorithm is as follows.
   //
   // Intersect each sub-range of R with all of ORIG_RANGE one at a time, and
@@ -2028,18 +2033,11 @@ subtract_one (const wide_int &x, tree type, wi::overflow_type &overflow)
 void
 irange::invert ()
 {
-  // Resize a widest_irange if needed.
-  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
-    {
-      unsigned size = num_pairs () + 1;
-      widest->resize_if_needed (size);
-    }
-
-  // Handle simple ranges.
+  gcc_assert (!undefined_p () && !varying_p ());
   if (simple_ranges_p ())
     {
-      /* We can't just invert VR_RANGE and VR_ANTI_RANGE because we may
-	 create non-canonical ranges.  Use the constructors instead.  */
+      // We can't just invert VR_RANGE and VR_ANTI_RANGE because we may
+      // create non-canonical ranges.  Use the constructors instead.
       if (m_kind == VR_RANGE)
 	*this = value_range (min (), max (), VR_ANTI_RANGE);
       else if (m_kind == VR_ANTI_RANGE)
@@ -2048,10 +2046,11 @@ irange::invert ()
 	gcc_unreachable ();
       return;
     }
-
-  if (undefined_p ())
-    return;
-
+  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
+    {
+      unsigned size = num_pairs () + 1;
+      widest->resize_if_needed (size);
+    }
   // We always need one more set of bounds to represent an inverse, so
   // if we're at the limit, we can't properly represent things.
   //
@@ -2079,7 +2078,6 @@ irange::invert ()
       m_num_ranges = 1;
       return;
     }
-
   // The algorithm is as follows.  To calculate INVERT ([a,b][c,d]), we
   // generate [-MIN, a-1][b+1, c-1][d+1, MAX].
   //
@@ -2087,10 +2085,8 @@ irange::invert ()
   // sub-range, we eliminate that subrange.  This allows us to easily
   // calculate INVERT([-MIN, 5]) with: [-MIN, -MIN-1][6, MAX].  And since
   // we eliminate the underflow, only [6, MAX] remains.
-
   unsigned i = 0;
   wi::overflow_type ovf;
-
   // Construct leftmost range.
   widest_irange orig_range (*this);
   unsigned nitems = 0;
@@ -2144,50 +2140,6 @@ irange::invert ()
     check ();
 }
 
-// Dump a simple range.
-
-void
-irange::simple_dump (FILE *file) const
-{
-  if (undefined_p ())
-    fprintf (file, "UNDEFINED");
-  else if (m_kind == VR_RANGE || m_kind == VR_ANTI_RANGE)
-    {
-      tree ttype = type ();
-
-      print_generic_expr (file, ttype);
-      fprintf (file, " ");
-
-      fprintf (file, "%s[", (m_kind == VR_ANTI_RANGE) ? "~" : "");
-
-      if (INTEGRAL_TYPE_P (ttype)
-	  && !TYPE_UNSIGNED (ttype)
-	  && vrp_val_is_min (min ())
-	  && TYPE_PRECISION (ttype) != 1)
-	fprintf (file, "-INF");
-      else
-	print_generic_expr (file, min ());
-
-      fprintf (file, ", ");
-
-      if (supports_type_p (ttype)
-	  && vrp_val_is_max (max ())
-	  && TYPE_PRECISION (ttype) != 1)
-	fprintf (file, "+INF");
-      else
-	print_generic_expr (file, max ());
-
-      fprintf (file, "]");
-    }
-  else if (varying_p ())
-    {
-      print_generic_expr (file, type ());
-      fprintf (file, " VARYING");
-    }
-  else
-    gcc_unreachable ();
-}
-
 static void
 dump_bound_with_infinite_markers (FILE *file, tree bound)
 {
@@ -2209,11 +2161,6 @@ dump_bound_with_infinite_markers (FILE *file, tree bound)
 void
 irange::dump (FILE *file) const
 {
-  if (simple_ranges_p ())
-    {
-      simple_dump (file);
-      return;
-    }
   if (undefined_p ())
     {
       fprintf (file, "UNDEFINED");
@@ -2223,7 +2170,12 @@ irange::dump (FILE *file) const
   fprintf (file, " ");
   if (varying_p ())
     fprintf (file, "VARYING");
-  else if (m_kind == VR_RANGE)
+  if (simple_ranges_p ())
+    {
+      simple_dump_range (file);
+      return;
+    }
+  if (m_kind == VR_RANGE)
     {
       for (unsigned i = 0; i < m_num_ranges; ++i)
 	{
@@ -2250,6 +2202,21 @@ irange::dump (FILE *file) const
     }
   else
     gcc_unreachable ();
+}
+
+// Dump a simple VR_RANGE or VR_ANTI_RANGE.
+
+void
+irange::simple_dump_range (FILE *file) const
+{
+  if (m_kind == VR_RANGE || m_kind == VR_ANTI_RANGE)
+    {
+      fprintf (file, "%s[", (m_kind == VR_ANTI_RANGE) ? "~" : "");
+      dump_bound_with_infinite_markers (file, min ());
+      fprintf (file, ", ");
+      dump_bound_with_infinite_markers (file, max ());
+      fprintf (file, "]");
+    }
 }
 
 void

@@ -1,5 +1,6 @@
 /* Support routines for value ranges.
    Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Contributed by Aldy Hernandez <aldyh@redhat.com>.
 
 This file is part of GCC.
 
@@ -36,6 +37,9 @@ enum value_range_kind
 };
 
 // Helper for is_a<> to distinguish between irange and widest_irange.
+// We could do this with virtuals, but this enum fits in the free bits
+// of the irange.  This saves us from having to use virtuals, and the
+// vtable pointer associated with them.
 
 enum irange_discriminator
 {
@@ -85,7 +89,7 @@ public:
   bool nonzero_p () const;
   bool singleton_p (tree *result = NULL) const;
   void dump (FILE * = stderr) const;
-  void simple_dump (FILE *) const;
+  void simple_dump_range (FILE *) const;
 
   static bool supports_type_p (tree);
   void normalize_symbolics ();
@@ -100,8 +104,7 @@ public:
 
 protected:
   void check ();
-  // Returns true for an old-school value_range with anti ranges.
-  bool simple_ranges_p () const { return m_max_ranges == 1; }
+  bool simple_ranges_p () const;
   irange (tree *, unsigned);
   irange (tree *, unsigned, const irange &);
 
@@ -126,11 +129,11 @@ protected:
   unsigned char m_num_ranges;
   unsigned char m_max_ranges;
   ENUM_BITFIELD(value_range_kind) m_kind : 8;
-
   tree *m_base;
 };
 
-// int_range<N> describes an irange with N pairs of ranges.
+// Here we describe an irange with N pairs of ranges.  The storage for
+// the pairs is embedded in the class as an array.
 
 template<unsigned N>
 class GTY((user)) int_range : public irange
@@ -149,9 +152,9 @@ private:
   template <unsigned X> friend void gt_pch_nx (int_range<X> *);
   template <unsigned X> friend void gt_pch_nx (int_range<X> *,
 					       gt_pointer_operator, void *);
-  /* ?? hash-traits.h has its own extern for these, which is causing
-     them to never be picked up by the templates.  For now, define
-     elsewhere.  */
+  // ?? hash-traits.h has its own extern for these, which is causing
+  // them to never be picked up by the templates.  For now, define
+  // elsewhere.
   //template<unsigned X> friend void gt_ggc_mx (int_range<X> *&);
   //template<unsigned X> friend void gt_pch_nx (int_range<X> *&);
   friend void gt_ggc_mx (int_range<1> *&);
@@ -160,18 +163,22 @@ private:
   tree m_ranges[N*2];
 };
 
-// This is a special int_range<> with only one pair, plus
+// This is a special int_range<1> with only one pair, plus
 // VR_ANTI_RANGE magic to describe slightly more than can be described
 // in one pair.  It is described in the code as a "simple range" (as
 // opposed to multi-ranges which have multiple sub-ranges).  It is
-// provided for backward compatibility with the more limited,
-// traditional value_range's.
+// provided for backward compatibility with code that has not been
+// converted to multi-range irange's.
 //
-// simple_ranges_p() returns true for value_range's.
-//
-// There are copy methods to seamlessly copy to/fro multi-ranges.
-
+// There are copy operators to seamlessly copy to/fro multi-ranges.
 typedef int_range<1> value_range;
+
+// Returns true for an old-school value_range as described above.
+inline bool
+irange::simple_ranges_p () const
+{
+  return m_max_ranges == 1;
+}
 
 // An irange with "unlimited" sub-ranges.  In reality we are limited
 // by the number of values that fit in an `m_num_ranges'.
