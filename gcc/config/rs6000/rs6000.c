@@ -14967,7 +14967,9 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
 /* ISA 3.0 (power9) minmax subcase to emit a XSMAXCDP or XSMINCDP instruction
    for SF/DF scalars.  Move TRUE_COND to DEST if OP of the operands of the last
    comparison is nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the
-   hardware has no such operation.  */
+   hardware has no such operation.
+
+   Under FUTURE, also handle IEEE 128-bit floating point.  */
 
 static int
 rs6000_emit_hw_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
@@ -15009,7 +15011,9 @@ rs6000_emit_hw_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 /* ISA 3.0 (power9) conditional move subcase to emit XSCMP{EQ,GE,GT,NE}DP and
    XXSEL instructions for SF/DF scalars.  Move TRUE_COND to DEST if OP of the
    operands of the last comparison is nonzero/true, FALSE_COND if it is
-   zero/false.  Return 0 if the hardware has no such operation.  */
+   zero/false.  Return 0 if the hardware has no such operation.
+
+   Under FUTURE, also handle IEEE 128-bit conditional moves.  */
 
 static int
 rs6000_emit_hw_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
@@ -15093,6 +15097,21 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (TARGET_P9_MINMAX
       && (compare_mode == SFmode || compare_mode == DFmode)
       && (result_mode == SFmode || result_mode == DFmode))
+    {
+      if (rs6000_emit_hw_fp_minmax (dest, op, true_cond, false_cond))
+	return 1;
+
+      if (rs6000_emit_hw_fp_cmove (dest, op, true_cond, false_cond))
+	return 1;
+    }
+
+  /* See if we can use the FUTURE min/max/compare instructions for IEEE 128-bit
+     floating point.  At present, don't worry about doing conditional moves
+     with different types for the comparison and movement (unlike SF/DF, where
+     you can do a conditional test between double and use float as the if/then
+     parts. */
+  if (TARGET_FUTURE && FLOAT128_IEEE_P (compare_mode)
+      && compare_mode == result_mode)
     {
       if (rs6000_emit_hw_fp_minmax (dest, op, true_cond, false_cond))
 	return 1;
@@ -15324,7 +15343,8 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
+	  || (TARGET_FUTURE && FLOAT128_IEEE_P (mode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
