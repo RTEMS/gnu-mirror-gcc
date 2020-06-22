@@ -1,3 +1,67 @@
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/bswap-brd.c: New test.
+	* gcc.target/powerpc/bswap-brw.c: New test.
+	* gcc.target/powerpc/bswap-brh.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-stack-protect.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-pcrel-dd.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-df.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-di.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-hi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-kf.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-qi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-sd.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-sf.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-si.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-udi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-uhi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-uqi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-usi.c: New test.
+	* gcc.target/powerpc/prefix-pcrel-v2df.c: New test.
+	* gcc.target/powerpc/prefix-pcrel.h: Include file for new tests.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-large-dd.c: New test.
+	* gcc.target/powerpc/prefix-large-df.c: New test.
+	* gcc.target/powerpc/prefix-large-di.c: New test.
+	* gcc.target/powerpc/prefix-large-hi.c: New test.
+	* gcc.target/powerpc/prefix-large-kf.c: New test.
+	* gcc.target/powerpc/prefix-large-qi.c: New test.
+	* gcc.target/powerpc/prefix-large-sd.c: New test.
+	* gcc.target/powerpc/prefix-large-sf.c: New test.
+	* gcc.target/powerpc/prefix-large-si.c: New test.
+	* gcc.target/powerpc/prefix-large-udi.c: New test.
+	* gcc.target/powerpc/prefix-large-uhi.c: New test.
+	* gcc.target/powerpc/prefix-large-uqi.c: New test.
+	* gcc.target/powerpc/prefix-large-usi.c: New test.
+	* gcc.target/powerpc/prefix-large-v2df.c: New test.
+	* gcc.target/powerpc/prefix-large.h: Include file for new tests.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-no-update.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-ds-dq.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/prefix-add.c: New test.
+	* gcc.target/powerpc/prefix-si-constant.c: New test.
+	* gcc.target/powerpc/prefix-di-constant.c: New test.
+
 2020-06-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
