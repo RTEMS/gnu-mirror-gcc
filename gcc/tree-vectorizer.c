@@ -711,17 +711,18 @@ vec_info::free_stmt_vec_info (stmt_vec_info stmt_info)
   free (stmt_info);
 }
 
-/* Returns true if S1 dominates S2.  */
+/* Returns true if S1 in BB1 dominates S2 in BB2.  If S1 or S2
+   are NULL then the position is at the beginning of the corresponding
+   block.  */
 
 bool
-vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
+vect_stmt_dominates_stmt_p (gimple *s1, basic_block bb1,
+			    gimple *s2, basic_block bb2)
 {
-  basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
-
   /* If bb1 is NULL, it should be a GIMPLE_NOP def stmt of an (D)
      SSA_NAME.  Assume it lives at the beginning of function and
      thus dominates everything.  */
-  if (!bb1 || s1 == s2)
+  if (!bb1 || (s1 && s1 == s2))
     return true;
 
   /* If bb2 is NULL, it doesn't dominate any stmt with a bb.  */
@@ -730,6 +731,11 @@ vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
 
   if (bb1 != bb2)
     return dominated_by_p (CDI_DOMINATORS, bb2, bb1);
+
+  if (!s1)
+    return true;
+  if (!s2)
+    return false;
 
   /* PHIs in the same basic block are assumed to be
      executed all in parallel, if only one stmt is a PHI,
@@ -771,6 +777,14 @@ vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
     return true;
   return false;
 }
+
+bool
+vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
+{
+  basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
+  return vect_stmt_dominates_stmt_p (s1, bb1, s2, bb2);
+}
+
 
 /* A helper function to free scev and LOOP niter information, as well as
    clear loop constraint LOOP_C_FINITE.  */

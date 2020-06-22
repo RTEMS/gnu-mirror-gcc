@@ -2323,6 +2323,119 @@ vect_analyze_slp_instance (vec_info *vinfo,
 }
 
 
+/* Verify NODE can be emitted with stmt placing constraints BEFORE
+   and those of its children.  Returns TRUE if everything worked out,
+   FALSE otherwise.  */
+
+static bool
+vect_verify_slp_vec_stmt_placing (vec_info *vinfo, slp_tree node,
+				  gimple *before,
+				  hash_map<slp_tree,
+				    std::pair<gimple *, basic_block> > &visited)
+{
+  if (auto at = visited.get (node))
+    {
+      /* We still need to check before constraints.  */
+      if (before
+	  && at->second
+	  && !vect_stmt_dominates_stmt_p (at->first, at->second,
+					  before, gimple_bb (before)))
+	return false;
+      return true;
+    }
+
+  /* ???  First compute constraints from live lanes and merge with the
+     incoming before constraint.  */
+
+  /* Compute the position of the last SLP child.  */
+  gimple *after = NULL;
+  basic_block after_bb = NULL;
+  slp_tree child;
+  unsigned i;
+  if (SLP_TREE_DEF_TYPE (node) != vect_external_def)
+    FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
+      {
+	if (!vect_verify_slp_vec_stmt_placing (vinfo, child, before, visited))
+	  return false;
+	auto at = visited.get (child);
+	if (at->second)
+	  {
+	    if (!after_bb
+		|| vect_stmt_dominates_stmt_p (after, after_bb,
+					       at->first, at->second))
+	      after = at->first, after_bb = at->second;
+	    else
+	      /* ???  With multiple BBs we can get "unordered" defs and
+		 need to figure out common post-dominators.  Or give up.  */
+	      gcc_assert (vect_stmt_dominates_stmt_p (at->first, at->second,
+						      after, after_bb));
+	  }
+      }
+
+  /* Compute nodes own constraints.  */
+  gimple *last = NULL;
+  basic_block last_bb = NULL;
+  if (SLP_TREE_DEF_TYPE (node) == vect_external_def)
+    {
+      tree def;
+      FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, def)
+	if (TREE_CODE (def) == SSA_NAME
+	    && !SSA_NAME_IS_DEFAULT_DEF (def)
+	    /* Skip out-of region defs.  */
+	    && vinfo->lookup_def (def))
+	  {
+	    if (!last
+		|| vect_stmt_dominates_stmt_p (last, SSA_NAME_DEF_STMT (def)))
+	      last = SSA_NAME_DEF_STMT (def);
+	    else
+	      /* ???  With multiple BBs we can get "unordered" defs and
+		 need to figure out common post-dominators.  Or give up.  */
+	      gcc_assert (vect_stmt_dominates_stmt_p (SSA_NAME_DEF_STMT (def),
+						      last));
+	  }
+      if (last)
+	{
+	  last_bb = gimple_bb (last);
+	  gimple_stmt_iterator gsi = gsi_for_stmt (last);
+	  gsi_next (&gsi);
+	  last = gsi_stmt (gsi);
+	}
+    }
+  else if (SLP_TREE_DEF_TYPE (node) == vect_constant_def)
+    ;
+  else if (SLP_TREE_DEF_TYPE (node) == vect_internal_def
+	   && SLP_TREE_CODE (node) != VEC_PERM_EXPR
+	   && STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node)))
+    {
+      /* Currently vectorized stmts are placed after the last scalar
+	 stmt of a node.  That may change for loads.  */
+      if (DR_IS_READ (STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node))))
+	last = vect_find_first_scalar_stmt_in_slp (node)->stmt;
+      else /* DR_IS_WRITE */
+	last = vect_find_last_scalar_stmt_in_slp (node)->stmt;
+      last_bb = gimple_bb (last);
+    }
+
+  if (last_bb)
+    {
+      if (after_bb
+	  && !vect_stmt_dominates_stmt_p (after, after_bb, last, last_bb))
+	return false;
+      if (before
+	  && !vect_stmt_dominates_stmt_p (last, last_bb, before,
+					  gimple_bb (before)))
+	return false;
+    }
+  else
+    {
+      last = after;
+      last_bb = after_bb;
+    }
+
+  visited.put (node, std::make_pair (last, last_bb));
+  return true;
+}
+
 /* Check if there are stmts in the loop can be vectorized using SLP.  Build SLP
    trees of packed scalar stmts if SLP is possible.  */
 
@@ -2893,20 +3006,32 @@ vect_slp_analyze_operations (vec_info *vinfo)
   DUMP_VECT_SCOPE ("vect_slp_analyze_operations");
 
   hash_set<slp_tree> visited;
+  hash_map<slp_tree, std::pair<gimple *, basic_block> > vmap;
   for (i = 0; vinfo->slp_instances.iterate (i, &instance); )
     {
       hash_set<slp_tree> lvisited;
       stmt_vector_for_cost cost_vec;
       cost_vec.create (2);
+      stmt_vec_info instance_root = SLP_INSTANCE_ROOT_STMT (instance);
       if (!vect_slp_analyze_node_operations (vinfo,
 					     SLP_INSTANCE_TREE (instance),
 					     instance, visited, lvisited,
 					     &cost_vec)
 	  /* Instances with a root stmt require vectorized defs for the
 	     SLP tree root.  */
-	  || (SLP_INSTANCE_ROOT_STMT (instance)
+	  || (instance_root
 	      && (SLP_TREE_DEF_TYPE (SLP_INSTANCE_TREE (instance))
-		  != vect_internal_def)))
+		  != vect_internal_def))
+	  /* The above can create new external leafs which influences
+	     placement so we have to verify this late (but could do it
+	     as part of vect_slp_analyze_node_operations).  */
+	  || !vect_verify_slp_vec_stmt_placing (vinfo,
+						SLP_INSTANCE_TREE (instance),
+						/* Place before the live
+						   root stmt.  */
+						instance_root
+						? instance_root->stmt : NULL,
+						vmap))
         {
 	  slp_tree node = SLP_INSTANCE_TREE (instance);
 	  stmt_vec_info stmt_info = SLP_TREE_SCALAR_STMTS (node)[0];

@@ -2021,5 +2021,6 @@ unsigned vectorize_loops (void);
 void vect_free_loop_info_assumptions (class loop *);
 gimple *vect_loop_vectorized_call (class loop *, gcond **cond = NULL);
 bool vect_stmt_dominates_stmt_p (gimple *, gimple *);
+bool vect_stmt_dominates_stmt_p (gimple *, basic_block, gimple *, basic_block);
 
 #endif  /* GCC_TREE_VECTORIZER_H  */
