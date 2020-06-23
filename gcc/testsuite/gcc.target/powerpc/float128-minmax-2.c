@@ -1,5 +1,5 @@
 /* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
-/* { dg-require-effective-target powerpc_power10_ok } */
+/* { dg-require-effective-target power10_ok } */
 /* { dg-options "-mdejagnu-cpu=power10 -O2 -ffast-math" } */
 /* { dg-final { scan-assembler-not "xscmpuqp"  } } */
 /* { dg-final { scan-assembler     "xscmpeqqp" } } */
