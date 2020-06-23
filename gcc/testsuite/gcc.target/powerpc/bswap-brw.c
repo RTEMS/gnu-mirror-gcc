@@ -1,5 +1,5 @@
 /* { dg-do compile { target { powerpc*-*-* } } } */
-/* { dg-require-effective-target powerpc_power10_ok } */
+/* { dg-require-effective-target power10_ok } */
 /* { dg-options "-O2 -mdejagnu-cpu=power10" } */
 
 /* This tests whether GCC generates the ISA 3.1 BRW byte swap instruction for
