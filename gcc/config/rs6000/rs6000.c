@@ -14970,7 +14970,7 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
    hardware has no such operation.  */
 
 static int
-rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+rs6000_emit_hardware_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15012,7 +15012,7 @@ rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
    zero/false.  Return 0 if the hardware has no such operation.  */
 
 static int
-rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+rs6000_emit_hardware_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15094,10 +15094,10 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       && (compare_mode == SFmode || compare_mode == DFmode)
       && (result_mode == SFmode || result_mode == DFmode))
     {
-      if (rs6000_emit_p9_fp_minmax (dest, op, true_cond, false_cond))
+      if (rs6000_emit_hardware_fp_minmax (dest, op, true_cond, false_cond))
 	return 1;
 
-      if (rs6000_emit_p9_fp_cmove (dest, op, true_cond, false_cond))
+      if (rs6000_emit_hardware_fp_cmove (dest, op, true_cond, false_cond))
 	return 1;
     }
 
