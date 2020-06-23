@@ -55,7 +55,7 @@
 	* config/rs6000/pcrel-opt.md: New file for the insns created to
 	implement the PCREL_OPT optimization support.
 	* config/rs6000/predicates.md (d_form_memory): New predicate.
-	* config/rs6000/rs6000-cpus.def (OTHER_FUTURE_MASKS): Add
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
 	-mpcrel-opt.
 	(POWERPC_MASKS): Add -mpcrel-opt.
 	* config/rs6000/rs6000-passes.def: Add comment about the power8
@@ -94,10 +94,10 @@
 	New insns for IEEE 128-bit min/max.
 	(mov<mode>cc, IEEE128 iterator): New insns for IEEE 128-bit
 	conditional move.
-	(mov<mode>cc_future, IEEE128 iterator): New insns for IEEE 128-bit
-	conditional move.
-	(mov<mode>cc_invert_future, IEEE128 iterator): New insns for IEEE
+	(mov<mode>cc_hardware, IEEE128 iterator): New insns for IEEE
 	128-bit conditional move.
+	(mov<mode>cc_invert_hardware, IEEE128 iterator): New insns for
+	IEEE 128-bit conditional move.
 	(fpmask<mode>, IEEE128 iterator): New insns for IEEE 128-bit
 	conditional move.
 
