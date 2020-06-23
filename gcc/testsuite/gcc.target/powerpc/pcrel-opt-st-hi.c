@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_pcrel } */
-/* { dg-options "-O2 -mdejagnu-cpu=future" } */
+/* { dg-options "-O2 -mdejagnu-cpu=power10" } */
 
 #define TYPE	unsigned short
 #define LARGE	0x20000
