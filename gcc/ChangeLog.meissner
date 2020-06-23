@@ -1,5 +1,12 @@
 2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/81594
+	* config/rs6000/predicates.md (ds_form_memory): New predicate.
+	* config/rs6000/vsx.md (concatv2di_store): New insn.
+	(dupv2di_store): New insn.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config.gcc (powerpc*-*-*): Add pcrel-opt.o.
 	(rs6000*-*-*): Add pcrel-opt.o.
 	* config/rs6000/pcrel-opt.c: New file to implement the pass that

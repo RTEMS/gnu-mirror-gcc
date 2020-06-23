@@ -1,5 +1,10 @@
 2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
+2020-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/pcrel-opt-inc-di.c: New PCREL_OPT test.
 	* gcc.target/powerpc/pcrel-opt-ld-df.c: New PCREL_OPT test.
 	* gcc.target/powerpc/pcrel-opt-ld-di.c: New PCREL_OPT test.
