@@ -91,3 +91,11 @@ __divkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
   __imag__ res = y;
   return res;
 }
+
+/* Provide an alternate name for __divkc3 that is used when when long double is
+   IEEE 128.  Only do this if we aren't creating ifunc's to handle software
+   vs. hardware IEEE 128-bit functions.  */
+#ifndef __divkc3
+TCtype __divkc3x (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((weak, alias ("__divkc3")));
+#endif
