@@ -1,5 +1,40 @@
 2020-06-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config.gcc (powerpc*-*-*): Add pcrel-opt.o.
+	(rs6000*-*-*): Add pcrel-opt.o.
+	* config/rs6000/pcrel-opt.c: New file to implement the pass that
+	implements the PCREL_OPT optimization support.
+	* config/rs6000/pcrel-opt.md: New file for the insns created to
+	implement the PCREL_OPT optimization support.
+	* config/rs6000/predicates.md (d_form_memory): New predicate.
+	* config/rs6000/rs6000-cpus.def (OTHER_FUTURE_MASKS): Add
+	-mpcrel-opt.
+	(POWERPC_MASKS): Add -mpcrel-opt.
+	* config/rs6000/rs6000-passes.def: Add comment about the power8
+	analyze swaps pass.  Add a new pass for PCREL_OPT optimization.
+	* config/rs6000/rs6000-protos.h (reg_to_non_prefixed): New
+	declaration.
+	(make_pass_pcrel_opt): New declaration.
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): Make function
+	global.
+	(rs6000_option_override_internal): Add support for -mpcrel-opt.
+	(rs6000_delegitimize_address): Delegitimize the symbol refs in the
+	new insns created for PCREL_OPT optimizations.
+	(print_operand): Add %r<n> to print the special label for the
+	PCREL_OPT optimization.
+	(rs6000_opt_masks): Add -mpcrel-opt.
+	(rs6000_asm_output_opcode): Clear the next_insn_prefixed_p flag
+	after using it.
+	* config/rs6000/rs6000.md: Include pcrel-opt.md.
+	(isa insn attribute): Add pcrel_opt.
+	(enabled insn attribute): Handle -mpcrel-opt.
+	(pcrel_extern_addr): Make global.
+	* config/rs6000/rs6000.opt (-mpcrel-opt): New option.
+	* config/rs6000/t-rs6000 (pcrel-opt.o): Add build rule.
+	(MD_INCLUDES): Add pcrel-opt.md.
+
+2020-06-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_emit_hardware_fp_minmax): Update
 	comment.
 	(rs6000_emit_hardware_fp_cmove): Update comment.
