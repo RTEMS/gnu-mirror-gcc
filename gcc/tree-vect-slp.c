@@ -3656,7 +3656,8 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
   constant_p = true;
   tree_vector_builder elts (vector_type, nunits, 1);
   elts.quick_grow (nunits);
-  stmt_vec_info insert_after = NULL;
+  gimple *insert_after = NULL;
+  basic_block insert_bb = NULL;
   for (j = 0; j < number_of_copies; j++)
     {
       tree op;
@@ -3720,15 +3721,50 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 	     when a def is inside the analyzed region since we cannot
 	     simply insert at the BB start in this case.  */
 	  stmt_vec_info opdef;
-	  if (TREE_CODE (orig_op) == SSA_NAME
-	      && !SSA_NAME_IS_DEFAULT_DEF (orig_op)
-	      && is_a <bb_vec_info> (vinfo)
-	      && (opdef = vinfo->lookup_def (orig_op)))
+	  if (is_a <bb_vec_info> (vinfo))
 	    {
-	      if (!insert_after)
-		insert_after = opdef;
-	      else
-		insert_after = get_later_stmt (insert_after, opdef);
+	      basic_block to_insert_bb = NULL;
+	      if (TREE_CODE (orig_op) == SSA_NAME)
+		{
+		  if (SSA_NAME_IS_DEFAULT_DEF (orig_op))
+		    to_insert_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
+		  else if ((opdef = vinfo->lookup_def (orig_op)))
+		    {
+		      // TODO: check for insert_bb ???
+		      if (!insert_after)
+			insert_after = opdef->stmt;
+		      else
+			{
+			  if (vect_stmt_dominates_stmt_p (insert_after,
+							  opdef->stmt))
+			    insert_after = opdef->stmt;
+			  else if (vect_stmt_dominates_stmt_p (opdef->stmt,
+							       insert_after))
+			    ;
+			  else
+			    gcc_unreachable ();
+			}
+		    }
+		  else
+		    {
+		      gimple *def = SSA_NAME_DEF_STMT (orig_op);
+		      if (is_a<gphi *> (def))
+			to_insert_bb = gimple_bb (def);
+		      else
+			insert_after = def;
+		    }
+		}
+	      else if (CONSTANT_CLASS_P (orig_op)
+		       || TREE_CODE (orig_op) == ADDR_EXPR)
+		to_insert_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
+
+	      if (to_insert_bb)
+		{
+		  if (insert_bb == NULL)
+		    insert_bb = to_insert_bb;
+		  else
+		    gcc_assert (insert_bb == to_insert_bb);
+		}
 	    }
 
           if (number_of_places_left_in_vector == 0)
@@ -3748,9 +3784,15 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 	      tree init;
 	      if (insert_after)
 		{
-		  gimple_stmt_iterator gsi = gsi_for_stmt (insert_after->stmt);
+		  gimple_stmt_iterator gsi = gsi_for_stmt (insert_after);
 		  /* vect_init_vector inserts before.  */
 		  gsi_next (&gsi);
+		  init = vect_init_vector (vinfo, NULL, vec_cst,
+					   vector_type, &gsi);
+		}
+	      else if (insert_bb != NULL)
+		{
+		  gimple_stmt_iterator gsi = gsi_after_labels (insert_bb);
 		  init = vect_init_vector (vinfo, NULL, vec_cst,
 					   vector_type, &gsi);
 		}
