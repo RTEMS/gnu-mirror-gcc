@@ -3447,7 +3447,12 @@ vect_slp_function ()
     = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
   // TODO
   while (gsi_stmt (region_begin) == NULL)
-    region_begin = gsi_after_labels (region_begin.bb->next_bb);
+    {
+      basic_block next_bb = region_begin.bb->next_bb;
+      if (next_bb == NULL)
+	return false;
+      region_begin = gsi_after_labels (next_bb);
+    }
 
   gimple_stmt_iterator region_end
     = gsi_last_bb (EXIT_BLOCK_PTR_FOR_FN (cfun)->prev_bb);
