@@ -713,7 +713,16 @@ bool
 vect_stmt_dominates_stmt_p (gimple *s1, gimple *s2)
 {
   basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
+  return vect_stmt_dominates_stmt_p (s1, bb1, s2, bb2);
+}
 
+/* Returns true if S1 dominates S2.  Any of S1 and S2 can be null
+  and then basic blocks BB1 and BB2 are compared.  */
+
+bool
+vect_stmt_dominates_stmt_p (gimple *s1, basic_block bb1,
+			    gimple *s2, basic_block bb2)
+{
   /* If bb1 is NULL, it should be a GIMPLE_NOP def stmt of an (D)
      SSA_NAME.  Assume it lives at the beginning of function and
      thus dominates everything.  */

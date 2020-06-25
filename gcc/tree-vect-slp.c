@@ -3661,8 +3661,7 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
   constant_p = true;
   tree_vector_builder elts (vector_type, nunits, 1);
   elts.quick_grow (nunits);
-  gimple *insert_after = NULL;
-  basic_block insert_bb = NULL;
+  gimple_stmt_iterator insert_after = gsi_none ();
   for (j = 0; j < number_of_copies; j++)
     {
       tree op;
@@ -3728,47 +3727,47 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 	  stmt_vec_info opdef;
 	  if (is_a <bb_vec_info> (vinfo))
 	    {
-	      basic_block to_insert_bb = NULL;
+	      gimple_stmt_iterator to_insert = gsi_none ();
 	      if (TREE_CODE (orig_op) == SSA_NAME)
 		{
 		  if (SSA_NAME_IS_DEFAULT_DEF (orig_op))
-		    to_insert_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
+		    to_insert = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
 		  else if ((opdef = vinfo->lookup_def (orig_op)))
-		    {
-		      // TODO: check for insert_bb ???
-		      if (!insert_after)
-			insert_after = opdef->stmt;
-		      else
-			{
-			  if (vect_stmt_dominates_stmt_p (insert_after,
-							  opdef->stmt))
-			    insert_after = opdef->stmt;
-			  else if (vect_stmt_dominates_stmt_p (opdef->stmt,
-							       insert_after))
-			    ;
-			  else
-			    gcc_unreachable ();
-			}
-		    }
+		    to_insert = gsi_for_stmt (opdef->stmt);
+
 		  else
 		    {
 		      gimple *def = SSA_NAME_DEF_STMT (orig_op);
 		      if (is_a<gphi *> (def))
-			to_insert_bb = gimple_bb (def);
+			to_insert = gsi_after_labels (gimple_bb (def));
 		      else
-			insert_after = def;
+			to_insert = gsi_for_stmt (def);
 		    }
 		}
 	      else if (CONSTANT_CLASS_P (orig_op)
 		       || TREE_CODE (orig_op) == ADDR_EXPR)
-		to_insert_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
+		to_insert = gsi_after_labels (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
 
-	      if (to_insert_bb)
+	      if (gsi_bb (to_insert))
 		{
-		  if (insert_bb == NULL)
-		    insert_bb = to_insert_bb;
+		  if (gsi_bb (insert_after))
+		    {
+		      if (vect_stmt_dominates_stmt_p (gsi_stmt (to_insert),
+						      gsi_bb (to_insert),
+						      gsi_stmt (insert_after),
+						      gsi_bb (insert_after)))
+			;
+		      else if (vect_stmt_dominates_stmt_p (gsi_stmt (insert_after),
+							   gsi_bb (insert_after),
+							   gsi_stmt (to_insert),
+							   gsi_bb (to_insert)))
+			insert_after = to_insert;
+		      else
+			gcc_unreachable ();
+
+		    }
 		  else
-		    gcc_assert (insert_bb == to_insert_bb);
+		    insert_after = to_insert;
 		}
 	    }
 
@@ -3787,19 +3786,13 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 		  vec_cst = permute_results[number_of_vectors - j - 1];
 		}
 	      tree init;
-	      if (insert_after)
+	      if (gsi_bb (insert_after))
 		{
-		  gimple_stmt_iterator gsi = gsi_for_stmt (insert_after);
 		  /* vect_init_vector inserts before.  */
-		  gsi_next (&gsi);
+		  if (!gsi_end_p (insert_after))
+		    gsi_next (&insert_after);
 		  init = vect_init_vector (vinfo, NULL, vec_cst,
-					   vector_type, &gsi);
-		}
-	      else if (insert_bb != NULL)
-		{
-		  gimple_stmt_iterator gsi = gsi_after_labels (insert_bb);
-		  init = vect_init_vector (vinfo, NULL, vec_cst,
-					   vector_type, &gsi);
+					   vector_type, &insert_after);
 		}
 	      else
 		init = vect_init_vector (vinfo, NULL, vec_cst,
@@ -3812,7 +3805,7 @@ vect_create_constant_vectors (vec_info *vinfo, slp_tree op_node)
 		  ctor_seq = NULL;
 		}
 	      voprnds.quick_push (init);
-	      insert_after = NULL;
+	      insert_after = gsi_none ();
               number_of_places_left_in_vector = nunits;
 	      constant_p = true;
 	      elts.new_vector (vector_type, nunits, 1);
