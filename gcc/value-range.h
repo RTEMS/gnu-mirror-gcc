@@ -199,9 +199,7 @@ public:
   ~widest_irange ();
   widest_irange& operator= (const widest_irange &);
   void resize_if_needed (unsigned);
-#if CHECKING_P
   static void stats_dump (FILE *);
-#endif
 
 private:
   static const unsigned m_sub_ranges_in_local_storage = 5;
