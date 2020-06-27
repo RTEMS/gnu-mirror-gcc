@@ -238,6 +238,26 @@ vect_contains_pattern_stmt_p (vec<stmt_vec_info> stmts)
   return false;
 }
 
+/* Return true when all lanes in the external or constant NODE have
+   the same value.  */
+
+static bool
+vect_slp_tree_uniform_p (slp_tree node)
+{
+  gcc_assert (SLP_TREE_DEF_TYPE (node) == vect_constant_def
+	      || SLP_TREE_DEF_TYPE (node) == vect_external_def);
+
+  unsigned i;
+  tree op, first = NULL_TREE;
+  FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, op)
+    if (!first)
+      first = op;
+    else if (!operand_equal_p (first, op, 0))
+      return false;
+
+  return true;
+}
+
 /* Find the place of the data-ref in STMT_INFO in the interleaving chain
    that starts from FIRST_STMT_INFO.  Return -1 if the data-ref is not a part
    of the chain.  */
@@ -1439,7 +1459,7 @@ fail:
   vect_free_oprnd_info (oprnds_info);
 
   /* If we have all children of a non-unary child built up from
-     scalars then just throw that away, causing it built up
+     uniform scalars then just throw that away, causing it built up
      from scalars.  */
   if (nops > 1
       && is_a <bb_vec_info> (vinfo)
@@ -1451,11 +1471,13 @@ fail:
       slp_tree child;
       unsigned j;
       FOR_EACH_VEC_ELT (children, j, child)
-	if (SLP_TREE_DEF_TYPE (child) != vect_external_def)
+	if (SLP_TREE_DEF_TYPE (child) == vect_internal_def
+	    || !vect_slp_tree_uniform_p (child))
 	  break;
       if (!child)
 	{
 	  /* Roll back.  */
+	  matches[0] = false;
 	  FOR_EACH_VEC_ELT (children, j, child)
 	    vect_free_slp_tree (child, false);
 
@@ -1913,6 +1935,25 @@ vect_find_last_scalar_stmt_in_slp (slp_tree node)
     }
 
   return last;
+}
+
+/* Find the first stmt in NODE.  */
+
+stmt_vec_info
+vect_find_first_scalar_stmt_in_slp (slp_tree node)
+{
+  stmt_vec_info first = NULL;
+  stmt_vec_info stmt_vinfo;
+
+  for (int i = 0; SLP_TREE_SCALAR_STMTS (node).iterate (i, &stmt_vinfo); i++)
+    {
+      stmt_vinfo = vect_orig_stmt (stmt_vinfo);
+      if (!first
+	  || get_later_stmt (stmt_vinfo, first) == first)
+	first = stmt_vinfo;
+    }
+
+  return first;
 }
 
 /* Splits a group of stores, currently beginning at FIRST_VINFO, into
@@ -2969,7 +3010,22 @@ vect_bb_slp_scalar_cost (vec_info *vinfo,
 	{
 	  /* Do not directly pass LIFE to the recursive call, copy it to
 	     confine changes in the callee to the current child/subtree.  */
-	  subtree_life.safe_splice (*life);
+	  if (SLP_TREE_CODE (node) == VEC_PERM_EXPR)
+	    {
+	      subtree_life.safe_grow_cleared (SLP_TREE_LANES (child));
+	      for (unsigned j = 0;
+		   j < SLP_TREE_LANE_PERMUTATION (node).length (); ++j)
+		{
+		  auto perm = SLP_TREE_LANE_PERMUTATION (node)[j];
+		  if (perm.first == i)
+		    subtree_life[perm.second] = (*life)[j];
+		}
+	    }
+	  else
+	    {
+	      gcc_assert (SLP_TREE_LANES (node) == SLP_TREE_LANES (child));
+	      subtree_life.safe_splice (*life);
+	    }
 	  vect_bb_slp_scalar_cost (vinfo, child, &subtree_life, cost_vec,
 				   visited);
 	  subtree_life.truncate (0);
@@ -3093,15 +3149,6 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
       return false;
     }
 
-  if (BB_VINFO_DATAREFS (bb_vinfo).length () < 2)
-    {
-      if (dump_enabled_p ())
-        dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			 "not vectorized: not enough data-refs in "
-			 "basic block.\n");
-      return false;
-    }
-
   if (!vect_analyze_data_ref_accesses (bb_vinfo))
     {
      if (dump_enabled_p ())
@@ -3113,9 +3160,9 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
 
   vect_slp_check_for_constructors (bb_vinfo);
 
-  /* If there are no grouped stores in the region there is no need
-     to continue with pattern recog as vect_analyze_slp will fail
-     anyway.  */
+  /* If there are no grouped stores and no constructors in the region
+     there is no need to continue with pattern recog as vect_analyze_slp
+     will fail anyway.  */
   if (bb_vinfo->grouped_stores.is_empty ())
     {
       if (dump_enabled_p ())
@@ -4190,22 +4237,51 @@ vect_schedule_slp_instance (vec_info *vinfo,
 		     "------>vectorizing SLP node starting from: %G",
 		     stmt_info->stmt);
 
-  /* Vectorized stmts go before the last scalar stmt which is where
-     all uses are ready.  */
-  stmt_vec_info last_stmt_info = vect_find_last_scalar_stmt_in_slp (node);
-  if (last_stmt_info)
-    si = gsi_for_stmt (last_stmt_info->stmt);
+  if (STMT_VINFO_DATA_REF (stmt_info)
+      && SLP_TREE_CODE (node) != VEC_PERM_EXPR)
+    {
+      /* Vectorized loads go before the first scalar load to make it
+	 ready early, vectorized stores go before the last scalar
+	 stmt which is where all uses are ready.  */
+      stmt_vec_info last_stmt_info = NULL;
+      if (DR_IS_READ (STMT_VINFO_DATA_REF (stmt_info)))
+	last_stmt_info = vect_find_first_scalar_stmt_in_slp (node);
+      else /* DR_IS_WRITE */
+	last_stmt_info = vect_find_last_scalar_stmt_in_slp (node);
+      si = gsi_for_stmt (last_stmt_info->stmt);
+    }
+  else if (SLP_TREE_CHILDREN (node).is_empty ())
+    {
+      /* This happens for reduction and induction PHIs where we do not use the
+	 insertion iterator.  */
+      gcc_assert (STMT_VINFO_TYPE (SLP_TREE_REPRESENTATIVE (node))
+		  == cycle_phi_info_type
+		  || (STMT_VINFO_TYPE (SLP_TREE_REPRESENTATIVE (node))
+		      == induc_vec_info_type));
+      si = gsi_none ();
+    }
   else
     {
-      /* Or if we do not have 1:1 matching scalar stmts emit after the
-	 children vectorized defs.  */
+      /* Emit other stmts after the children vectorized defs which is
+	 earliest possible.  */
       gimple *last_stmt = NULL;
       FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
-	/* ???  With only external defs the following breaks.  Note
-	   external defs do not get all vector init stmts generated
-	   at the same place.  */
 	if (SLP_TREE_DEF_TYPE (child) == vect_internal_def)
 	  {
+	    /* For fold-left reductions we are retaining the scalar
+	       reduction PHI but we still have SLP_TREE_NUM_VEC_STMTS
+	       set so the representation isn't perfect.  Resort to the
+	       last scalar def here.  */
+	    if (SLP_TREE_VEC_STMTS (child).is_empty ())
+	      {
+		gcc_assert (STMT_VINFO_TYPE (SLP_TREE_REPRESENTATIVE (child))
+			    == cycle_phi_info_type);
+		gphi *phi = as_a <gphi *>
+			      (vect_find_last_scalar_stmt_in_slp (child)->stmt);
+		if (!last_stmt
+		    || vect_stmt_dominates_stmt_p (last_stmt, phi))
+		  last_stmt = phi;
+	      }
 	    /* We are emitting all vectorized stmts in the same place and
 	       the last one is the last.
 	       ???  Unless we have a load permutation applied and that
@@ -4216,6 +4292,21 @@ vect_schedule_slp_instance (vec_info *vinfo,
 	      if (!last_stmt
 		  || vect_stmt_dominates_stmt_p (last_stmt, vstmt))
 		last_stmt = vstmt;
+	  }
+	else
+	  {
+	    /* For externals we have to look at all defs since their
+	       insertion place is decided per vector.  */
+	    unsigned j;
+	    tree vdef;
+	    FOR_EACH_VEC_ELT (SLP_TREE_VEC_DEFS (child), j, vdef)
+	      if (TREE_CODE (vdef) == SSA_NAME)
+		{
+		  gimple *vstmt = SSA_NAME_DEF_STMT (vdef);
+		  if (!last_stmt
+		      || vect_stmt_dominates_stmt_p (last_stmt, vstmt))
+		    last_stmt = vstmt;
+		}
 	  }
       if (is_a <gphi *> (last_stmt))
 	si = gsi_after_labels (gimple_bb (last_stmt));
