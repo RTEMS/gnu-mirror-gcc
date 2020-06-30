@@ -1913,9 +1913,11 @@ operator_logical_and::op2_range (irange &r, tree type,
 class operator_bitwise_and : public range_operator
 {
 public:
+#if 0
   virtual bool fold_range (irange &r, tree type,
 			   const irange &lh,
 			   const irange &rh) const;
+#endif
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op2) const;
@@ -1997,6 +1999,7 @@ operator_bitwise_and::remove_impossible_ranges (irange &r,
     }
 }
 
+#if 0
 bool
 operator_bitwise_and::fold_range (irange &r, tree type,
 				  const irange &lh,
@@ -2009,6 +2012,7 @@ operator_bitwise_and::fold_range (irange &r, tree type,
     }
   return false;
 }
+#endif
 
 
 // Optimize BIT_AND_EXPR and BIT_IOR_EXPR in terms of a mask if
