@@ -216,7 +216,7 @@ value_range_from_overflowed_bounds (irange &r, tree type,
   if (covers || wi::cmp (tmin, tmax, sgn) > 0)
     r.set_varying (type);
   else
-    r = widest_irange (type, tmin, tmax, VR_ANTI_RANGE);
+    r = int_range<2> (type, tmin, tmax, VR_ANTI_RANGE);
 }
 
 // Create and return a range from a pair of wide-ints.  MIN_OVF and
@@ -1758,7 +1758,7 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 	  wide_int inner_ub = inner.upper_bound (x);
 	  wide_int min = wide_int::from (inner_lb, outer_prec, inner_sign);
 	  wide_int max = wide_int::from (inner_ub, outer_prec, inner_sign);
-	  widest_irange tmp;
+	  int_range<2> tmp;
 	  create_possibly_reversed_range (tmp, outer_type, min, max);
 	  r.union_ (tmp);
 	  if (r.varying_p ())

@@ -98,36 +98,30 @@ irange::maybe_anti_range (const irange &src) const
   tree ttype = src.type ();
   unsigned int precision = TYPE_PRECISION (ttype);
   signop sign = TYPE_SIGN (ttype);
-  wide_int type_min = wi::min_value (precision, sign);
-  wide_int type_max = wi::max_value (precision, sign);
-  wide_int lb = src.lower_bound ();
-  wide_int ub = src.upper_bound ();
   return (src.num_pairs () > 1
 	  && precision > 1
-	  && lb == type_min
-	  && ub == type_max);
+	  && src.lower_bound () == wi::min_value (precision, sign)
+	  && src.upper_bound () == wi::max_value (precision, sign));
 }
 
 // Copy between a simple and a multi-range or vice-versa.
 
 void
-irange::copy_simple_range (const irange &vsrc)
+irange::copy_simple_range (const irange &src)
 {
-  const irange *src = &vsrc;
-  gcc_checking_assert (src->simple_ranges_p () != simple_ranges_p ());
-
-  if (src->undefined_p ())
+  gcc_checking_assert (src.simple_ranges_p () != simple_ranges_p ());
+  if (src.undefined_p ())
     set_undefined ();
-  else if (src->varying_p ())
-    set_varying (src->type ());
-  else if (src->kind () == VR_ANTI_RANGE)
-    set (src->min (), src->max (), VR_ANTI_RANGE);
-  else if (maybe_anti_range (*src))
+  else if (src.varying_p ())
+    set_varying (src.type ());
+  else if (src.kind () == VR_ANTI_RANGE)
+    set (src.min (), src.max (), VR_ANTI_RANGE);
+  else if (simple_ranges_p () && maybe_anti_range (src))
     {
-      widest_irange tmp = *src;
+      int_range<3> tmp (src);
       tmp.invert ();
-      set (wide_int_to_tree (src->type (), tmp.lower_bound (0)),
-	   wide_int_to_tree (src->type (), tmp.upper_bound (0)),
+      set (wide_int_to_tree (src.type (), tmp.lower_bound (0)),
+	   wide_int_to_tree (src.type (), tmp.upper_bound (0)),
 	   VR_ANTI_RANGE);
     }
   else
@@ -688,7 +682,9 @@ irange::num_pairs () const
     return 0;
   if (varying_p ())
     return 1;
-  if (symbolic_p ())
+  // Inlined symbolic_p for performance:
+  if (!is_gimple_min_invariant (min ())
+      || !is_gimple_min_invariant (max ()))
     {
       value_range numeric_range (*this);
       numeric_range.normalize_symbolics ();
@@ -776,11 +772,15 @@ irange::upper_bound () const
 bool
 irange::equal_p (const irange &other) const
 {
-  if (simple_ranges_p () != other.simple_ranges_p ())
+  if (simple_ranges_p () && !other.simple_ranges_p ())
     {
-      widest_irange i = *this;
-      widest_irange j = other;
-      return i.equal_p (j);
+      widest_irange wide = *this;
+      return wide.equal_p (other);
+    }
+  if (!simple_ranges_p () && other.simple_ranges_p ())
+    {
+      widest_irange wide = other;
+      return wide.equal_p (*this);
     }
 
   if (m_kind != other.m_kind || m_num_ranges != other.m_num_ranges)
@@ -895,13 +895,16 @@ irange::value_inside_range (tree val) const
   if (undefined_p ())
     return 0;
 
-  // For constants we can just intersect and avoid using VR_ANTI_RANGE
-  // code further below.
-  if (TREE_CODE (val) == INTEGER_CST && constant_p ())
+  if (!simple_ranges_p ())
     {
-      widest_irange v (val, val);
-      v.intersect (this);
-      return v == value_range (val, val) ? 1 : 0;
+      for (unsigned r = 0; r < m_num_ranges; ++r)
+	{
+	  if (tree_int_cst_lt (val, tree_lower_bound (r)))
+	    return 0;
+	  if (tree_int_cst_lt (val, tree_upper_bound (r)))
+	    return 1;
+	}
+      return 0;
     }
 
   cmp1 = operand_less_p (val, min ());
@@ -1723,8 +1726,9 @@ irange::union_ (const irange *other)
       dump_value_range (dump_file, other);
       fprintf (dump_file, "\n");
     }
-  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
+  if (m_discriminator == IRANGE_KIND_WIDEST_INT)
     {
+      widest_irange *widest = as_a <widest_irange *> (this);
       unsigned size = num_pairs () + other->num_pairs ();
       widest->resize_if_needed (size);
     }
@@ -1737,7 +1741,7 @@ irange::union_ (const irange *other)
 	  // operation in simple mode, because the RHS may be a
 	  // symbolic, and we only know how to deal with those in
 	  // simple mode.
-	  small = *other;
+	  small.copy_simple_range (*other);
 	  other = &small;
 	}
       *this = union_helper ((value_range *) this,
@@ -1807,7 +1811,7 @@ irange::intersect (const irange *other)
 	  // ?? Squishing [10,10][20,20] into a value_range, will
 	  // yield [10,20].  If this result is then used with
 	  // contains_p(15), the result may be wrong.
-	  small = *other;
+	  small.copy_simple_range (*other);
 	  other = &small;
 	}
       *this = intersect_helper ((value_range *) this,
@@ -1842,8 +1846,27 @@ irange::intersect (const irange &r)
 void
 irange::multi_range_union (const irange &r)
 {
+  // Undefines are easy...
   if (r.undefined_p ())
     return;
+  // ...as are ranges that can be concatenated.
+  if (m_max_ranges - m_num_ranges > r.m_num_ranges
+      && (undefined_p ()
+	  || tree_int_cst_lt (build_int_cst (r.type (), 1),
+			      fold_build2 (MINUS_EXPR, r.type (),
+					   r.min (), max ()))))
+    {
+      m_kind = VR_RANGE;
+      for (unsigned i = 0; i < r.m_num_ranges; ++i)
+	{
+	  m_base[m_num_ranges * 2 + i] = r.m_base[i * 2];
+	  m_base[m_num_ranges * 2 + i + 1] = r.m_base[i * 2 + 1];
+	  m_num_ranges++;
+	}
+      if (flag_checking)
+	check ();
+      return;
+    }
 
   // Do not worry about merging and such by reserving twice as many
   // pairs as needed, and then simply sorting the 2 ranges into this
@@ -2046,8 +2069,9 @@ irange::invert ()
 	gcc_unreachable ();
       return;
     }
-  if (widest_irange *widest = dyn_cast <widest_irange *> (this))
+  if (m_discriminator == IRANGE_KIND_WIDEST_INT)
     {
+      widest_irange *widest = as_a <widest_irange *> (this);
       unsigned size = num_pairs () + 1;
       widest->resize_if_needed (size);
     }

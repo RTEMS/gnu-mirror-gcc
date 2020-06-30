@@ -305,10 +305,12 @@ irange::varying_p () const
 inline bool
 irange::undefined_p () const
 {
-  if (simple_ranges_p ())
+  if (CHECKING_P && simple_ranges_p ())
     {
-      gcc_checking_assert (m_kind != VR_UNDEFINED || m_num_ranges == 0);
-      return m_kind == VR_UNDEFINED;
+      if (m_kind == VR_UNDEFINED)
+	gcc_checking_assert (m_num_ranges == 0);
+      else
+	gcc_checking_assert (m_num_ranges != 0);
     }
   return m_num_ranges == 0;
 }
