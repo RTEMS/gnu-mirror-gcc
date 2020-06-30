@@ -34,6 +34,9 @@ def read_timestamp(path):
 
 def prepend_to_changelog_files(repo, folder, git_commit, add_to_git):
     if not git_commit.success:
+        # skip a Revert revision we accepted to master
+        if git_commit.hexsha == '2635f9e5086318f4560997d9741fdda496b9c801':
+            return
         for error in git_commit.errors:
             print(error)
         raise AssertionError()
