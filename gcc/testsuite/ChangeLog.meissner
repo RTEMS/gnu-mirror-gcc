@@ -1,5 +1,10 @@
 2020-06-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
+2020-06-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/float128-minmax-2.c: New test.
 
 2020-06-30  Michael Meissner  <meissner@linux.ibm.com>
