@@ -320,3 +320,12 @@ TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype)
 
 TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype)
   __attribute__ ((__ifunc__ ("__divkc3_resolve")));
+
+  /* We needed to use alternate names for complex multiple and divide for the
+     case where long double is IEEE 128-bit.  Resolve these to be the same as
+     the normal function.  */
+TCtype __mulkc3x (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__mulkc3_resolve")));
+
+TCtype __divkc3x (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__divkc3_resolve")));

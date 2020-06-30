@@ -10221,7 +10221,10 @@ init_float128_ieee (machine_mode mode)
 
       /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  If
 	 we have clone or target attributes, this will be called a second
-	 time.  We want to create the built-in function only once.  */
+	 time.  We want to create the built-in function only once.
+
+	 Unfortunately, we cannot call it __mulkc3 or __divkc3.  Add an 'x'
+	 suffix, and in libgcc provide both names.  */
      if (mode == TFmode && TARGET_IEEEQUAD && !complex_muldiv_init_p)
        {
 	 complex_muldiv_init_p = true;
@@ -10239,8 +10242,8 @@ init_float128_ieee (machine_mode mode)
 						 long_double_type_node,
 						 NULL_TREE);
 
-	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
-	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
+	 create_complex_muldiv ("__mulkc3x", fncode_mul, fntype);
+	 create_complex_muldiv ("__divkc3x", fncode_div, fntype);
        }
 
       set_optab_libfunc (add_optab, mode, "__addkf3");
