@@ -1,3 +1,9 @@
+2020-06-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/bswap-brd.c: New test.
+	* gcc.target/powerpc/bswap-brw.c: New test.
+	* gcc.target/powerpc/bswap-brh.c: New test.
+
 2020-06-29   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
