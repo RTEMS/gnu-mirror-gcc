@@ -900,6 +900,15 @@ public:
     return iterator_range<const_reverse_iterator> (begin, ++end);
   }
 
+  gimple_stmt_iterator
+  before_region_iterator ()
+  {
+    if (gsi_bb (region_begin) == gsi_bb (region_end))
+      return region_begin;
+    else
+      return gsi_after_labels (single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
+  }
+
   basic_block bb;
   gimple_stmt_iterator region_begin;
   gimple_stmt_iterator region_end;
