@@ -189,7 +189,6 @@ enum non_prefixed_form {
 
 extern enum insn_form address_to_insn_form (rtx, machine_mode,
 					    enum non_prefixed_form);
-extern enum non_prefixed_form reg_to_non_prefixed (rtx, machine_mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
@@ -305,7 +304,6 @@ namespace gcc { class context; }
 class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
-extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
