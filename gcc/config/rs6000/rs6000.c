@@ -14206,22 +14206,10 @@ rs6000_invalid_binary_op (int op ATTRIBUTE_UNUSED,
 
   if (!TARGET_FLOAT128_CVT)
     {
-      if ((mode1 == KFmode && mode2 == IFmode)
-	  || (mode1 == IFmode && mode2 == KFmode))
-	return N_("__float128 and __ibm128 cannot be used in the same "
-		  "expression");
-
-      if (TARGET_IEEEQUAD
-	  && ((mode1 == IFmode && mode2 == TFmode)
-	      || (mode1 == TFmode && mode2 == IFmode)))
-	return N_("__ibm128 and long double cannot be used in the same "
-		  "expression");
-
-      if (!TARGET_IEEEQUAD
-	  && ((mode1 == KFmode && mode2 == TFmode)
-	      || (mode1 == TFmode && mode2 == KFmode)))
-	return N_("__float128 and long double cannot be used in the same "
-		  "expression");
+      if ((FLOAT128_IEEE_P (mode1) && FLOAT128_IBM_P (mode2))
+	  || (FLOAT128_IBM_P (mode1) && FLOAT128_IEEE_P (mode2)))
+	return N_("Invalid mixing of IEEE 128-bit and IBM 128-bit floating "
+		  "point types");
     }
 
   return NULL;
