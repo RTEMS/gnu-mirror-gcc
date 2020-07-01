@@ -391,4 +391,107 @@ gt_pch_nx (int_range<N> *x, gt_pointer_operator op, void *cookie)
     }
 }
 
+// Constructors for irange.
+
+inline
+irange::irange (tree *base, unsigned nranges)
+{
+  m_kind = VR_UNDEFINED;
+  m_discriminator = IRANGE_KIND_INT;
+  m_base = base;
+  m_num_ranges = 0;
+  m_max_ranges = nranges;
+}
+
+inline
+irange::irange (tree *base, unsigned nranges, const irange &other)
+{
+  m_discriminator = IRANGE_KIND_INT;
+  m_base = base;
+  m_max_ranges = nranges;
+  *this = other;
+}
+
+// Constructors for int_range<>.
+
+template<unsigned N>
+int_range<N>::int_range (const int_range &other)
+  : irange (m_ranges, N, other)
+{
+}
+
+template<unsigned N>
+int_range<N>::int_range (tree min, tree max, value_range_kind kind)
+  : irange (m_ranges, N)
+{
+  set (min, max, kind);
+}
+
+template<unsigned N>
+int_range<N>::int_range (tree type)
+  : irange (m_ranges, N)
+{
+  set_varying (type);
+}
+
+template<unsigned N>
+int_range<N>::int_range (tree type, const wide_int &wmin, const wide_int &wmax,
+			 value_range_kind kind)
+  : irange (m_ranges, N)
+{
+  tree min = wide_int_to_tree (type, wmin);
+  tree max = wide_int_to_tree (type, wmax);
+  set (min, max, kind);
+}
+
+template<unsigned N>
+int_range<N>::int_range (const irange &other)
+  : irange (m_ranges, N, other)
+{
+}
+
+template<unsigned N>
+int_range<N>&
+int_range<N>::operator= (const int_range &src)
+{
+  irange::operator= (src);
+  return *this;
+}
+
+inline void
+irange::set_undefined ()
+{
+  if (simple_ranges_p ())
+    m_kind = VR_UNDEFINED;
+  else
+    m_kind = VR_RANGE;
+  m_num_ranges = 0;
+}
+
+inline
+bool
+irange::operator== (const irange &r) const
+{
+  return equal_p (r);
+}
+
+/* Return the highest bound in a range.  */
+
+inline wide_int
+irange::upper_bound () const
+{
+  unsigned pairs = num_pairs ();
+  gcc_checking_assert (pairs > 0);
+  return upper_bound (pairs - 1);
+}
+
+inline
+widest_irange::~widest_irange ()
+{
+  if (CHECKING_P)
+    stats_register_use ();
+  if (m_blob)
+    free (m_blob);
+}
+
 #endif // GCC_VALUE_RANGE_H

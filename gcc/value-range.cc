@@ -125,102 +125,12 @@ irange::copy_simple_range (const irange &src)
 	   VR_ANTI_RANGE);
     }
   else
-    set (wide_int_to_tree (src->type (), src->lower_bound ()),
-	 wide_int_to_tree (src->type (), src->upper_bound ()),
-	 src->kind ());
-}
-
-// Constructors for irange.
-
-irange::irange (tree *base, unsigned nranges)
-{
-  m_kind = VR_UNDEFINED;
-  m_discriminator = IRANGE_KIND_INT;
-  m_base = base;
-  m_num_ranges = 0;
-  m_max_ranges = nranges;
-}
-
-irange::irange (tree *base, unsigned nranges, const irange &other)
-{
-  m_discriminator = IRANGE_KIND_INT;
-  m_base = base;
-  m_max_ranges = nranges;
-  *this = other;
-}
-
-// Constructors for int_range<>.
-
-template<unsigned N>
-int_range<N>::int_range (const int_range &other)
-  : irange (m_ranges, N, other)
-{
-}
-
-template<unsigned N>
-int_range<N>::int_range (tree min, tree max, value_range_kind kind)
-  : irange (m_ranges, N)
-{
-  set (min, max, kind);
-}
-
-template<unsigned N>
-int_range<N>::int_range (tree type)
-  : irange (m_ranges, N)
-{
-  set_varying (type);
-}
-
-template<unsigned N>
-int_range<N>::int_range (tree type, const wide_int &wmin, const wide_int &wmax,
-			 value_range_kind kind)
-  : irange (m_ranges, N)
-{
-  tree min = wide_int_to_tree (type, wmin);
-  tree max = wide_int_to_tree (type, wmax);
-  set (min, max, kind);
-}
-
-template<unsigned N>
-int_range<N>::int_range (const irange &other)
-  : irange (m_ranges, N, other)
-{
-}
-
-template<unsigned N>
-int_range<N>&
-int_range<N>::operator= (const int_range &src)
-{
-  irange::operator= (src);
-  return *this;
+    set (wide_int_to_tree (src.type (), src.lower_bound ()),
+	 wide_int_to_tree (src.type (), src.upper_bound ()),
+	 src.kind ());
 }
 
 // Implementation for widest_irange.
-
-template <>
-template <>
-inline bool
-is_a_helper <const irange *>::test (const irange *p)
-{
-  return p && (p->m_discriminator == IRANGE_KIND_INT
-	       || p->m_discriminator == IRANGE_KIND_WIDEST_INT);
-}
-
-template <>
-template <>
-inline bool
-is_a_helper <const widest_irange *>::test (const irange *p)
-{
-  return p && p->m_discriminator == IRANGE_KIND_WIDEST_INT;
-}
-
-template <>
-template <>
-inline bool
-is_a_helper <widest_irange *>::test (irange *p)
-{
-  return p && p->m_discriminator == IRANGE_KIND_WIDEST_INT;
-}
 
 widest_irange::widest_irange ()
   : irange (m_ranges, m_sub_ranges_in_local_storage)
@@ -267,14 +177,6 @@ widest_irange::widest_irange (const irange &other)
   init_widest_irange ();
   resize_if_needed (other.num_pairs ());
   irange::operator= (other);
-}
-
-widest_irange::~widest_irange ()
-{
-  if (CHECKING_P)
-    stats_register_use ();
-  if (m_blob)
-    free (m_blob);
 }
 
 widest_irange &
@@ -337,6 +239,31 @@ widest_irange::stats_register_use (void)
     stats_used_buckets[10]++;
 }
 
+template <>
+template <>
+inline bool
+is_a_helper <const irange *>::test (const irange *p)
+{
+  return p && (p->m_discriminator == IRANGE_KIND_INT
+	       || p->m_discriminator == IRANGE_KIND_WIDEST_INT);
+}
+
+template <>
+template <>
+inline bool
+is_a_helper <const widest_irange *>::test (const irange *p)
+{
+  return p && p->m_discriminator == IRANGE_KIND_WIDEST_INT;
+}
+
+template <>
+template <>
+inline bool
+is_a_helper <widest_irange *>::test (irange *p)
+{
+  return p && p->m_discriminator == IRANGE_KIND_WIDEST_INT;
+}
+
 // Dump statistics on sub-range usage within widest_irange.
 
 void
@@ -358,16 +285,6 @@ void
 dump_value_range_stats (FILE *file)
 {
   widest_irange::stats_dump (file);
-}
-
-void
-irange::set_undefined ()
-{
-  if (simple_ranges_p ())
-    m_kind = VR_UNDEFINED;
-  else
-    m_kind = VR_RANGE;
-  m_num_ranges = 0;
 }
 
 void
@@ -758,17 +675,6 @@ irange::upper_bound (unsigned pair) const
     t = tree_upper_bound (pair);
   return wi::to_wide (t);
 }
-
-/* Return the highest bound in a range.  */
-
-wide_int
-irange::upper_bound () const
-{
-  unsigned pairs = num_pairs ();
-  gcc_checking_assert (pairs > 0);
-  return upper_bound (pairs - 1);
-}
-
 bool
 irange::equal_p (const irange &other) const
 {
@@ -797,12 +703,6 @@ irange::equal_p (const irange &other) const
 	return false;
     }
   return true;
-}
-
-bool
-irange::operator== (const irange &r) const
-{
-  return equal_p (r);
 }
 
 /* Return TRUE if this is a symbolic range.  */
