@@ -846,7 +846,7 @@ public:
       while (gsi_end_p (gsi) && bb->prev_bb != NULL)
 	{
 	  bb = bb->prev_bb;
-	  gsi = gsi_after_labels (bb);
+	  gsi = gsi_last_bb (bb);
 	}
 
       return *this;
