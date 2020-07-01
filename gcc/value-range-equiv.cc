@@ -208,8 +208,9 @@ value_range_equiv::intersect (const value_range_equiv *other)
     this->deep_copy (other);
   else
     {
-      value_range tem = intersect_helper (this, other);
-      this->update (tem.min (), tem.max (), tem.kind ());
+      intersect_helper (this, other);
+      if (varying_p () || undefined_p ())
+	equiv_clear ();
 
       /* If the result is VR_UNDEFINED there is no need to mess with
 	 equivalencies.  */
@@ -256,8 +257,9 @@ value_range_equiv::union_ (const value_range_equiv *other)
     this->deep_copy (other);
   else
     {
-      value_range tem = union_helper (this, other);
-      this->update (tem.min (), tem.max (), tem.kind ());
+      union_helper (this, other);
+      if (varying_p () || undefined_p ())
+	equiv_clear ();
 
       /* The resulting set of equivalences is always the intersection of
 	 the two sets.  */

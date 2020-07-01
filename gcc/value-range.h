@@ -105,6 +105,8 @@ public:
 protected:
   void check ();
   bool simple_ranges_p () const;
+  void union_helper (irange *, const irange *);
+  void intersect_helper (irange *, const irange *);
   irange (tree *, unsigned);
   irange (tree *, unsigned, const irange &);
 
@@ -112,7 +114,7 @@ private:
   int value_inside_range (tree) const;
 
   void intersect_from_wide_ints (const wide_int &, const wide_int &);
-  bool maybe_anti_range (const irange &) const;
+  bool maybe_anti_range () const;
   void multi_range_set_anti_range (tree, tree);
   void multi_range_union (const irange &);
   void multi_range_intersect (const irange &);
@@ -123,12 +125,13 @@ private:
   void copy_compatible_range (const irange &);
   void copy_simple_range (const irange &);
 
+protected:
+  unsigned char m_num_ranges;
+  ENUM_BITFIELD(value_range_kind) m_kind : 8;
+  unsigned char m_max_ranges;
 public:
   ENUM_BITFIELD(irange_discriminator) m_discriminator : 8;
 protected:
-  unsigned char m_num_ranges;
-  unsigned char m_max_ranges;
-  ENUM_BITFIELD(value_range_kind) m_kind : 8;
   tree *m_base;
 };
 
@@ -213,8 +216,6 @@ private:
   tree m_ranges[m_sub_ranges_in_local_storage*2];
 };
 
-value_range union_helper (const value_range *, const value_range *);
-value_range intersect_helper (const value_range *, const value_range *);
 extern bool range_has_numeric_bounds_p (const irange *);
 extern bool ranges_from_anti_range (const value_range *,
 				    value_range *, value_range *);
@@ -238,24 +239,22 @@ int_range<N>::int_range ()
 inline value_range_kind
 irange::kind () const
 {
-  if (simple_ranges_p ())
-    return m_kind;
-
   if (undefined_p ())
     return VR_UNDEFINED;
+
+  if (simple_ranges_p ())
+    return m_kind;
 
   if (varying_p ())
     return VR_VARYING;
 
-  if (m_kind == VR_ANTI_RANGE)
+  if (CHECKING_P && m_kind == VR_ANTI_RANGE)
     {
-      // VR_ANTI_RANGE's are only valid for symbolics.
+      // VR_ANTI_RANGE in multi-ranges are only valid for symbolics.
       gcc_checking_assert (m_num_ranges == 1);
       gcc_checking_assert (!range_has_numeric_bounds_p (this));
-      return VR_ANTI_RANGE;
     }
-
-  return VR_RANGE;
+  return m_kind;
 }
 
 inline tree

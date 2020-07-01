@@ -147,6 +147,14 @@ range_operator::fold_range (irange &r, tree type,
   if (empty_range_check (r, lh, rh))
     return true;
 
+  // ?? Using widest_irange here causes a performance hit, because the
+  // caller is probably VRP which passed a value_range for the result.
+  // The union code below will cause an expensive conversion
+  // (copy_simple_range) from the widest_irange and the value_range.
+  //
+  // Accumulating into a new widest_irange instead of `r', and then
+  // doing the copy into `r' at the end actually slows this code a
+  // tiny bit.
   widest_irange tmp;
   r.set_undefined ();
   for (unsigned x = 0; x < lh.num_pairs (); ++x)
@@ -256,7 +264,8 @@ value_range_with_overflow (irange &r, tree type,
 	  else
 	    // No overflow or both overflow or underflow.  The range
 	    // kind stays normal.
-	    r = widest_irange (type, tmin, tmax);
+	    r.set (wide_int_to_tree (type, tmin),
+		   wide_int_to_tree (type, tmax));
 	  return;
 	}
 
@@ -285,7 +294,8 @@ value_range_with_overflow (irange &r, tree type,
       else
         new_ub = wmax;
 
-      r = widest_irange (type, new_lb, new_ub);
+      r.set (wide_int_to_tree (type, new_lb),
+	     wide_int_to_tree (type, new_ub));
     }
 }
 
@@ -302,8 +312,8 @@ create_possibly_reversed_range (irange &r, tree type,
   if (wi::gt_p (new_lb, new_ub, s))
     value_range_from_overflowed_bounds (r, type, new_lb, new_ub);
   else
-    // Otherwise its just a normal range.
-    r = widest_irange (type, new_lb, new_ub);
+    // Otherwise it's just a normal range.
+    r.set (wide_int_to_tree (type, new_lb), wide_int_to_tree (type, new_ub));
 }
 
 // Return an irange instance that is a boolean TRUE.
@@ -1758,9 +1768,16 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 	  wide_int inner_ub = inner.upper_bound (x);
 	  wide_int min = wide_int::from (inner_lb, outer_prec, inner_sign);
 	  wide_int max = wide_int::from (inner_ub, outer_prec, inner_sign);
-	  int_range<2> tmp;
+
+	  // Note: Mix and matching simple and multi-ranges in the
+	  // union code below is expensive because of the conversion
+	  // in copy_simple_range.  Since the compiler is still mostly
+	  // using value_range's, it makes sense to make the temporary
+	  // a value_range, and avoid the conversion.
+	  value_range tmp;
 	  create_possibly_reversed_range (tmp, outer_type, min, max);
 	  r.union_ (tmp);
+
 	  if (r.varying_p ())
 	    return true;
 	  continue;
