@@ -494,4 +494,22 @@ widest_irange::~widest_irange ()
     free (m_blob);
 }
 
+inline void
+irange::union_ (const irange &r)
+{
+  dump_flags_t m_flags = dump_flags;
+  dump_flags &= ~TDF_DETAILS;
+  union_ (&r);
+  dump_flags = m_flags;
+}
+
+inline void
+irange::intersect (const irange &r)
+{
+  dump_flags_t m_flags = dump_flags;
+  dump_flags &= ~TDF_DETAILS;
+  intersect (&r);
+  dump_flags = m_flags;
+}
+
 #endif // GCC_VALUE_RANGE_H

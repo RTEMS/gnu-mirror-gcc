@@ -1662,31 +1662,6 @@ irange::union_ (const irange *other)
     }
 }
 
-class disable_dump_details
-{
-public:
-  disable_dump_details ()
-  {
-    m_flags = dump_flags;
-    dump_flags &= ~TDF_DETAILS;
-  }
-  ~disable_dump_details ()
-  {
-    dump_flags = m_flags;
-  }
-private:
-  dump_flags_t m_flags;
-};
-
-/* Range union, but for references.  */
-
-void
-irange::union_ (const irange &r)
-{
-  disable_dump_details details;
-  union_ (&r);
-}
-
 void
 irange::intersect (const irange *other)
 {
@@ -1730,15 +1705,6 @@ irange::intersect (const irange *other)
       dump_value_range (dump_file, this);
       fprintf (dump_file, "\n");
     }
-}
-
-/* Range intersect, but for references.  */
-
-void
-irange::intersect (const irange &r)
-{
-  disable_dump_details details;
-  intersect (&r);
 }
 
 // union_ for multi-ranges.
