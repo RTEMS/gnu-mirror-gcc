@@ -1690,7 +1690,8 @@ debug (slp_tree node)
 
 static void
 vect_print_slp_graph (dump_flags_t dump_kind, dump_location_t loc,
-		      slp_tree node, hash_set<slp_tree> &visited)
+		      slp_tree node, hash_set<slp_tree> &visited,
+		      hash_set<basic_block> *bbs)
 {
   unsigned i;
   slp_tree child;
@@ -1698,18 +1699,22 @@ vect_print_slp_graph (dump_flags_t dump_kind, dump_location_t loc,
   if (visited.add (node))
     return;
 
-  vect_print_slp_tree (dump_kind, loc, node);
+  if (!bbs)
+    vect_print_slp_tree (dump_kind, loc, node);
+  else
+    for (unsigned i = 0; i < node->stmts.length (); i++)
+      bbs->add (gimple_bb (node->stmts[i]->stmt));
 
   FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
-    vect_print_slp_graph (dump_kind, loc, child, visited);
+    vect_print_slp_graph (dump_kind, loc, child, visited, bbs);
 }
 
 static void
 vect_print_slp_graph (dump_flags_t dump_kind, dump_location_t loc,
-		      slp_tree entry)
+		      slp_tree entry, hash_set<basic_block> *bbs)
 {
   hash_set<slp_tree> visited;
-  vect_print_slp_graph (dump_kind, loc, entry, visited);
+  vect_print_slp_graph (dump_kind, loc, entry, visited, bbs);
 }
 
 /* Mark the tree rooted at NODE with PURE_SLP.  */
@@ -2339,7 +2344,7 @@ vect_analyze_slp_instance (vec_info *vinfo,
 	      dump_printf_loc (MSG_NOTE, vect_location,
 			       "Final SLP tree for instance:\n");
 	      vect_print_slp_graph (MSG_NOTE, vect_location,
-				    SLP_INSTANCE_TREE (new_instance));
+				    SLP_INSTANCE_TREE (new_instance), NULL);
 	    }
 
 	  return true;
@@ -4656,6 +4661,13 @@ vect_schedule_slp (vec_info *vinfo)
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
                          "vectorizing stmts using SLP.\n");
+
+      hash_set<basic_block> bbs;
+      vect_print_slp_graph (MSG_NOTE, vect_location,
+			    node, &bbs);
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+			 "Final SLP (%p) covers %d BBs\n", node, bbs.elements ());
     }
 
   FOR_EACH_VEC_ELT (slp_instances, i, instance)
