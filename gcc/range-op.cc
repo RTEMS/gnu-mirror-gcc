@@ -147,6 +147,17 @@ range_operator::fold_range (irange &r, tree type,
   if (empty_range_check (r, lh, rh))
     return true;
 
+  unsigned num_lh = lh.num_pairs ();
+  unsigned num_rh = rh.num_pairs ();
+
+  // If Both ranges are single pairs, fold directly into the result range.
+  if (num_lh == 1 && num_rh == 1)
+    {
+      wi_fold (r, type, lh.lower_bound (0), lh.upper_bound (0),
+	       rh.lower_bound (0), rh.upper_bound (0));
+      return true;
+    }
+
   // ?? Using widest_irange here causes a performance hit, because the
   // caller is probably VRP which passed a value_range for the result.
   // The union code below will cause an expensive conversion
@@ -157,8 +168,8 @@ range_operator::fold_range (irange &r, tree type,
   // tiny bit.
   widest_irange tmp;
   r.set_undefined ();
-  for (unsigned x = 0; x < lh.num_pairs (); ++x)
-    for (unsigned y = 0; y < rh.num_pairs (); ++y)
+  for (unsigned x = 0; x < num_lh; ++x)
+    for (unsigned y = 0; y < num_rh; ++y)
       {
 	wide_int lh_lb = lh.lower_bound (x);
 	wide_int lh_ub = lh.upper_bound (x);
@@ -224,7 +235,11 @@ value_range_from_overflowed_bounds (irange &r, tree type,
   if (covers || wi::cmp (tmin, tmax, sgn) > 0)
     r.set_varying (type);
   else
-    r = int_range<2> (type, tmin, tmax, VR_ANTI_RANGE);
+    {
+      tree tree_min = wide_int_to_tree (type, tmin);
+      tree tree_max = wide_int_to_tree (type, tmax);
+      r.set (tree_min, tree_max, VR_ANTI_RANGE);
+    }
 }
 
 // Create and return a range from a pair of wide-ints.  MIN_OVF and
@@ -1689,6 +1704,8 @@ private:
 			  const irange &outer) const;
   bool inside_domain_p (const wide_int &min, const wide_int &max,
 			const irange &outer) const;
+  void fold_pair (irange &r, unsigned index, const irange &inner,
+			   const irange &outer) const;
 } op_convert;
 
 // Return TRUE if casting from INNER to OUTER is a truncating cast.
@@ -1745,6 +1762,33 @@ operator_cast::inside_domain_p (const wide_int &min,
 	  && wi::ge_p (max, domain_min, domain_sign));
 }
 
+
+// Helper for fold_range which work on a pair at a time.
+
+void
+operator_cast::fold_pair (irange &r, unsigned index,
+			   const irange &inner,
+			   const irange &outer) const
+{
+  tree inner_type = inner.type ();
+  tree outer_type = outer.type ();
+  signop inner_sign = TYPE_SIGN (inner_type);
+  unsigned outer_prec = TYPE_PRECISION (outer_type);
+
+  if (conversion_fits_p (inner, index, outer))
+    {
+      wide_int inner_lb = inner.lower_bound (index);
+      wide_int inner_ub = inner.upper_bound (index);
+      wide_int min = wide_int::from (inner_lb, outer_prec, inner_sign);
+      wide_int max = wide_int::from (inner_ub, outer_prec, inner_sign);
+
+      create_possibly_reversed_range (r, outer_type, min, max);
+    }
+  else
+    r.set_varying (outer_type);
+}
+
+
 bool
 operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 			   const irange &inner,
@@ -1753,37 +1797,20 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
   if (empty_range_check (r, inner, outer))
     return true;
 
-  tree inner_type = inner.type ();
-  tree outer_type = outer.type ();
   gcc_checking_assert (outer.varying_p ());
-  signop inner_sign = TYPE_SIGN (inner_type);
-  unsigned outer_prec = TYPE_PRECISION (outer_type);
+  gcc_checking_assert (inner.num_pairs () > 0);
 
-  r.set_undefined ();
-  for (unsigned x = 0; x < inner.num_pairs (); ++x)
+  // Avoid a temporary by folding the first pair directly into the result.
+  fold_pair (r, 0, inner, outer);
+
+  // Then process any additonal pairs by unioning with their results.
+  for (unsigned x = 1; x < inner.num_pairs (); ++x)
     {
-      if (conversion_fits_p (inner, x, outer))
-	{
-	  wide_int inner_lb = inner.lower_bound (x);
-	  wide_int inner_ub = inner.upper_bound (x);
-	  wide_int min = wide_int::from (inner_lb, outer_prec, inner_sign);
-	  wide_int max = wide_int::from (inner_ub, outer_prec, inner_sign);
-
-	  // Note: Mix and matching simple and multi-ranges in the
-	  // union code below is expensive because of the conversion
-	  // in copy_simple_range.  Since the compiler is still mostly
-	  // using value_range's, it makes sense to make the temporary
-	  // a value_range, and avoid the conversion.
-	  value_range tmp;
-	  create_possibly_reversed_range (tmp, outer_type, min, max);
-	  r.union_ (tmp);
-
-	  if (r.varying_p ())
-	    return true;
-	  continue;
-	}
-      r.set_varying (outer_type);
-      break;
+      widest_irange tmp;
+      fold_pair (tmp, x, inner, outer);
+      r.union_ (tmp);
+      if (r.varying_p ())
+	return true;
     }
   return true;
 }
@@ -2870,7 +2897,7 @@ operator_abs::op1_range (irange &r, tree type,
   // Then add the negative of each pair:
   // ABS(op1) = [5,20] would yield op1 => [-20,-5][5,20].
   for (unsigned i = 0; i < positives.num_pairs (); ++i)
-    r.union_ (int_range<2> (type,
+    r.union_ (int_range<1> (type,
 			    -positives.upper_bound (i),
 			    -positives.lower_bound (i)));
   return true;
