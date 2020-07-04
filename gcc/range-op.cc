@@ -63,15 +63,17 @@ min_limit (const_tree type)
 }
 
 // If the range of either op1 or op2 is undefined, set the result to
-// undefined and return TRUE.
+// varying and return TRUE.  If the caller truely cares about a result, 
+// they should pass in a varying if it has an undefined that it wants 
+// treated as a varying.
 
 inline bool
-empty_range_check (irange &r,
-		   const irange &op1, const irange & op2)
+empty_range_varying (irange &r, tree type,
+		     const irange &op1, const irange & op2)
 {
   if (op1.undefined_p () || op2.undefined_p ())
     {
-      r.set_undefined ();
+      r.set_varying (type);
       return true;
     }
   else
@@ -144,7 +146,7 @@ range_operator::fold_range (irange &r, tree type,
 			    const irange &rh) const
 {
   gcc_checking_assert (irange::supports_type_p (type));
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   unsigned num_lh = lh.num_pairs ();
@@ -408,7 +410,7 @@ operator_equal::fold_range (irange &r, tree type,
 			    const irange &op1,
 			    const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   // We can be sure the values are always equal or not if both ranges
@@ -493,7 +495,7 @@ operator_not_equal::fold_range (irange &r, tree type,
 				const irange &op1,
 				const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   // We can be sure the values are always equal or not if both ranges
@@ -624,7 +626,7 @@ operator_lt::fold_range (irange &r, tree type,
 			 const irange &op1,
 			 const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   signop sign = TYPE_SIGN (op1.type ());
@@ -701,7 +703,7 @@ operator_le::fold_range (irange &r, tree type,
 			 const irange &op1,
 			 const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   signop sign = TYPE_SIGN (op1.type ());
@@ -777,7 +779,7 @@ bool
 operator_gt::fold_range (irange &r, tree type,
 			 const irange &op1, const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   signop sign = TYPE_SIGN (op1.type ());
@@ -853,7 +855,7 @@ operator_ge::fold_range (irange &r, tree type,
 			 const irange &op1,
 			 const irange &op2) const
 {
-  if (empty_range_check (r, op1, op2))
+  if (empty_range_varying (r, type, op1, op2))
     return true;
 
   signop sign = TYPE_SIGN (op1.type ());
@@ -1622,6 +1624,11 @@ operator_rshift::op1_range (irange &r,
       widest_irange lhs_refined;
       op_rshift.fold_range (lhs_refined, type, int_range<1> (type), op2);
       lhs_refined.intersect (lhs);
+      if (lhs_refined.undefined_p ())
+        {
+	  r.set_undefined ();
+	  return true;
+	}
       widest_irange shift_range (shift, shift);
       widest_irange lb, ub;
       op_lshift.fold_range (lb, type, lhs_refined, shift_range);
@@ -1794,7 +1801,7 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 			   const irange &inner,
 			   const irange &outer) const
 {
-  if (empty_range_check (r, inner, outer))
+  if (empty_range_varying (r, type, inner, outer))
     return true;
 
   gcc_checking_assert (outer.varying_p ());
@@ -1907,7 +1914,7 @@ operator_logical_and::fold_range (irange &r, tree type,
 				  const irange &lh,
 				  const irange &rh) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   // 0 && anything is 0.
@@ -2374,7 +2381,7 @@ operator_logical_or::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 				 const irange &lh,
 				 const irange &rh) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   r = lh;
@@ -2672,7 +2679,7 @@ operator_logical_not::fold_range (irange &r, tree type,
 				  const irange &lh,
 				  const irange &rh ATTRIBUTE_UNUSED) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   if (lh.varying_p () || lh.undefined_p ())
@@ -2715,7 +2722,7 @@ operator_bitwise_not::fold_range (irange &r, tree type,
 				  const irange &lh,
 				  const irange &rh) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   // ~X is simply -1 - X.
@@ -2883,7 +2890,7 @@ operator_abs::op1_range (irange &r, tree type,
 			 const irange &lhs,
 			 const irange &op2) const
 {
-  if (empty_range_check (r, lhs, op2))
+  if (empty_range_varying (r, type, lhs, op2))
     return true;
   if (TYPE_UNSIGNED (type))
     {
@@ -2964,7 +2971,7 @@ operator_negate::fold_range (irange &r, tree type,
 			     const irange &lh,
 			     const irange &rh) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
   // -X is simply 0 - X.
   return range_op_handler (MINUS_EXPR, type)->fold_range (r, type,
@@ -2998,7 +3005,7 @@ operator_addr_expr::fold_range (irange &r, tree type,
 				const irange &lh,
 				const irange &rh) const
 {
-  if (empty_range_check (r, lh, rh))
+  if (empty_range_varying (r, type, lh, rh))
     return true;
 
   // Return a non-null pointer of the LHS type (passed in op2).
