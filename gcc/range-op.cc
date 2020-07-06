@@ -63,8 +63,8 @@ min_limit (const_tree type)
 }
 
 // If the range of either op1 or op2 is undefined, set the result to
-// varying and return TRUE.  If the caller truely cares about a result, 
-// they should pass in a varying if it has an undefined that it wants 
+// varying and return TRUE.  If the caller truely cares about a result,
+// they should pass in a varying if it has an undefined that it wants
 // treated as a varying.
 
 inline bool
@@ -1625,7 +1625,7 @@ operator_rshift::op1_range (irange &r,
       op_rshift.fold_range (lhs_refined, type, int_range<1> (type), op2);
       lhs_refined.intersect (lhs);
       if (lhs_refined.undefined_p ())
-        {
+	{
 	  r.set_undefined ();
 	  return true;
 	}
