@@ -55,75 +55,87 @@ enum irange_discriminator
 class irange
 {
 public:
+  // In-place setters.
   void set (tree, tree, value_range_kind = VR_RANGE);
   void set (tree);
   void set_nonzero (tree);
   void set_zero (tree);
-
-  enum value_range_kind kind () const;
-  tree min () const;
-  tree max () const;
-
-  /* Types of value ranges.  */
-  bool symbolic_p () const;
-  bool constant_p () const;
-  bool undefined_p () const;
-  bool varying_p () const;
   void set_varying (tree type);
   void set_undefined ();
 
-  void union_ (const irange *);
-  void intersect (const irange *);
-  void union_ (const irange &);
-  void intersect (const irange &);
-
-  irange& operator= (const irange &);
-  bool operator== (const irange &) const;
-  bool operator!= (const irange &r) const { return !(*this == r); }
-  bool equal_p (const irange &) const;
-
-  /* Misc methods.  */
-  tree type () const;
-  bool may_contain_p (tree) const;
-  bool zero_p () const;
-  bool nonzero_p () const;
-  bool singleton_p (tree *result = NULL) const;
-  void dump (FILE * = stderr) const;
-  void simple_dump_range (FILE *) const;
-
-  static bool supports_type_p (tree);
-  void normalize_symbolics ();
-  void normalize_addresses ();
-
-  bool contains_p (tree) const;
+  // Iteration over sub-ranges.
   unsigned num_pairs () const;
   wide_int lower_bound (unsigned = 0) const;
   wide_int upper_bound (unsigned) const;
   wide_int upper_bound () const;
+
+  // Range types.
+  static bool supports_type_p (tree);
+  tree type () const;
+
+  // Predicates.
+  bool undefined_p () const;
+  bool varying_p () const;
+  bool zero_p () const;
+  bool nonzero_p () const;
+  bool singleton_p (tree *result = NULL) const;
+  bool contains_p (tree) const;
+
+  // In-place operators.
+  void union_ (const irange *);
+  void intersect (const irange *);
+  void union_ (const irange &);
+  void intersect (const irange &);
   void invert ();
+
+  // Comparison operators.
+  irange& operator= (const irange &);
+  bool operator== (const irange &) const;
+  bool operator!= (const irange &r) const { return !(*this == r); }
+
+  // Misc methods.
+  void dump (FILE * = stderr) const;
 
 protected:
   void check ();
-  bool simple_ranges_p () const;
-  void union_helper (irange *, const irange *);
-  void intersect_helper (irange *, const irange *);
   irange (tree *, unsigned);
   irange (tree *, unsigned, const irange &);
 
 private:
   int value_inside_range (tree) const;
-
   void intersect_from_wide_ints (const wide_int &, const wide_int &);
+  tree tree_lower_bound (unsigned = 0) const;
+  tree tree_upper_bound (unsigned) const;
+
+  // ======DEPRECATED API METHODS==========================================
+  //
+  // The following are deprecated API methods that are slated to be
+  // removed.  Any new code should avoid these, unless strictly
+  // necessary for the transition.
+public:
+  enum value_range_kind kind () const;
+  tree min () const;
+  tree max () const;
+  bool symbolic_p () const;
+  bool constant_p () const;
+  void simple_dump_range (FILE *) const;
+  void normalize_symbolics ();
+  void normalize_addresses ();
+  bool equal_p (const irange &) const;
+  bool may_contain_p (tree) const;
+protected:
+  bool simple_ranges_p () const;
+  void union_helper (irange *, const irange *);
+  void intersect_helper (irange *, const irange *);
+private:
   bool maybe_anti_range () const;
   void multi_range_set_anti_range (tree, tree);
   void multi_range_union (const irange &);
   void multi_range_intersect (const irange &);
-  tree tree_lower_bound (unsigned = 0) const;
-  tree tree_upper_bound (unsigned) const;
-
   bool compatible_copy_p (const irange &) const;
   void copy_compatible_range (const irange &);
   void copy_simple_range (const irange &);
+  // ======END OF DEPRECATED METHODS======================================
 
 protected:
   unsigned char m_num_ranges;
