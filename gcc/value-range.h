@@ -260,13 +260,8 @@ irange::kind () const
   if (varying_p ())
     return VR_VARYING;
 
-  if (CHECKING_P && m_kind == VR_ANTI_RANGE)
-    {
-      // VR_ANTI_RANGE in multi-ranges are only valid for symbolics.
-      gcc_checking_assert (m_num_ranges == 1);
-      gcc_checking_assert (!range_has_numeric_bounds_p (this));
-    }
-  return m_kind;
+  gcc_checking_assert (m_kind == VR_RANGE);
+  return VR_RANGE;
 }
 
 inline tree
