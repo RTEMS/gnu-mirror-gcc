@@ -415,7 +415,9 @@ expand_vector_comparison (gimple_stmt_iterator *gsi, tree type, tree op0,
 	}
     }
 
-  if (!uses.is_empty () && vec_cond_expr_only)
+  if (uses.is_empty ())
+    bitmap_set_bit (dce_ssa_names, SSA_NAME_VERSION (lhs));
+  else if (vec_cond_expr_only)
     return NULL_TREE;
 
   tree t;
