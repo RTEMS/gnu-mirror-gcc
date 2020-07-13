@@ -129,7 +129,7 @@ value_range_equiv::set_equiv (bitmap equiv)
 void
 value_range_equiv::check ()
 {
-  value_range::check ();
+  value_range::verify_range ();
   switch (m_kind)
     {
     case VR_UNDEFINED:
@@ -208,7 +208,7 @@ value_range_equiv::intersect (const value_range_equiv *other)
     this->deep_copy (other);
   else
     {
-      intersect_helper (this, other);
+      legacy_intersect (this, other);
       if (varying_p () || undefined_p ())
 	equiv_clear ();
 
@@ -257,7 +257,7 @@ value_range_equiv::union_ (const value_range_equiv *other)
     this->deep_copy (other);
   else
     {
-      union_helper (this, other);
+      legacy_union (this, other);
       if (varying_p () || undefined_p ())
 	equiv_clear ();
 
