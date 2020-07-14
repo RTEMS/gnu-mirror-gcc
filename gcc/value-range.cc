@@ -28,16 +28,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h"
 #include "fold-const.h"
 
-// Here we copy between any two irange's.  The ranges can be simple or
+// Here we copy between any two irange's.  The ranges can be legacy or
 // multi-ranges, and copying between any combination works correctly.
-
 
 irange &
 irange::operator= (const irange &src)
 {
   if (legacy_mode_p () != src.legacy_mode_p ())
     {
-      copy_simple_range (src);
+      copy_legacy_range (src);
       return *this;
     }
   if (legacy_mode_p ())
@@ -64,7 +63,6 @@ irange::operator= (const irange &src)
   
   m_num_ranges = lim;
   return *this;
-
 }
 
 // Return TRUE if range is a multi-range that can be represented as a
@@ -82,10 +80,10 @@ irange::maybe_anti_range () const
 	  && upper_bound () == wi::max_value (precision, sign));
 }
 
-// Copy between a simple and a multi-range or vice-versa.
+// Copy between a legacy and a multi-range, or vice-versa.
 
 void
-irange::copy_simple_range (const irange &src)
+irange::copy_legacy_range (const irange &src)
 {
   gcc_checking_assert (src.legacy_mode_p () != legacy_mode_p ());
   if (src.undefined_p ())
@@ -111,8 +109,8 @@ dump_value_range_stats (FILE *file)
   fprintf (file, "deprecated\n");
 }
 
-// Swap min/max if they are out of order.  Return FALSE if no further
-// processing of the range is necessary.
+// Swap min/max if they are out of order.  Return TRUE if further
+// processing of the range is necessary, FALSE otherwise.
 
 bool
 irange::swap_out_of_order_endpoints (tree &min, tree &max,
@@ -196,12 +194,9 @@ irange::irange_set_anti_range (tree min, tree max)
       m_base[m_num_ranges * 2 + 1] = type_range.tree_upper_bound (0);
       ++m_num_ranges;
     }
-  
   if (flag_checking)
     verify_range ();
 }
-
-
 
 /* Set value range to the canonical form of {VRTYPE, MIN, MAX, EQUIV}.
    This means adjusting VRTYPE, MIN and MAX representing the case of a
@@ -219,20 +214,18 @@ irange::set (tree min, tree max, value_range_kind kind)
     {
       if (kind == VR_RANGE)
 	irange_set (min, max);
-      else 
-        {
+      else
+	{
 	  gcc_checking_assert (kind == VR_ANTI_RANGE);
 	  irange_set_anti_range (min, max);
 	}
       return;
     }
-
   if (kind == VR_UNDEFINED)
     {
       set_undefined ();
       return;
     }
-
   if (kind == VR_VARYING)
     {
       set_varying (TREE_TYPE (min));
@@ -256,7 +249,6 @@ irange::set (tree min, tree max, value_range_kind kind)
   // Anti-ranges that can be represented as ranges should be so.
   if (kind == VR_ANTI_RANGE)
     {
-
       /* For -fstrict-enums we may receive out-of-range ranges so consider
          values < -INF and values > INF as -INF/INF as well.  */
       bool is_min = vrp_val_is_min (min);
@@ -347,8 +339,8 @@ irange::set (tree min, tree max, value_range_kind kind)
     verify_range ();
 }
 
-
 /* Check the validity of the range.  */
+
 void
 irange::verify_range ()
 {
@@ -418,6 +410,9 @@ irange::legacy_num_pairs () const
   return 1;
 }
 
+// Return the lower bound for a sub-range.  PAIR is the sub-range in
+// question.
+
 wide_int
 irange::legacy_lower_bound (unsigned pair) const
 {
@@ -442,8 +437,8 @@ irange::legacy_lower_bound (unsigned pair) const
  return wi::to_wide (tree_lower_bound (pair));
 }
 
-/* Return the upper bound for a sub-range.  PAIR is the sub-range in
-   question.  */
+// Return the upper bound for a sub-range.  PAIR is the sub-range in
+// question.
 
 wide_int
 irange::legacy_upper_bound (unsigned pair) const
@@ -469,7 +464,6 @@ irange::legacy_upper_bound (unsigned pair) const
   return wi::to_wide (tree_upper_bound (pair));
 }
 
-
 bool
 irange::legacy_equal_p (const irange &other) const
 {
@@ -483,14 +477,13 @@ irange::legacy_equal_p (const irange &other) const
 	 && (tree_upper_bound (0) == other.tree_upper_bound (0));
 }
 
-
 bool
 irange::equal_p (const irange &other) const
 {
   if (legacy_mode_p ())
     {
       if (other.legacy_mode_p ())
-        return legacy_equal_p (other);
+	return legacy_equal_p (other);
       value_range tmp (other);
       return legacy_equal_p (tmp);
     }
@@ -591,7 +584,7 @@ irange::singleton_p (tree *result) const
 }
 
 /* Return 1 if VAL is inside value range.
-          0 if VAL is not inside value range.
+	  0 if VAL is not inside value range.
 	 -2 if we cannot tell either way.
 
    Benchmark compile/20001226-1.c compilation time after changing this
@@ -1507,7 +1500,6 @@ irange::union_ (const irange *other)
     irange_union (*other);
 }
 
-
 void
 irange::intersect (const irange *other)
 {
@@ -1688,9 +1680,7 @@ irange::irange_intersect (const irange &r)
       return;
     }
 
-
   signop sign = TYPE_SIGN (TREE_TYPE(m_base[0]));
-
   unsigned bld_pair = 0;
   unsigned bld_lim = m_max_ranges;
   widest_irange r2 (*this);
@@ -1698,7 +1688,7 @@ irange::irange_intersect (const irange &r)
   unsigned i2 = 0;
   for (unsigned i = 0; i < r.num_pairs (); )
     {
-      // If r1's upper is < r2's lower, we can skip r1's pair
+      // If r1's upper is < r2's lower, we can skip r1's pair.
       tree ru = r.m_base[i * 2 + 1];
       tree r2l = r2.m_base[i2 * 2];
       if (wi::lt_p (wi::to_wide (ru), wi::to_wide (r2l), sign))
@@ -1706,8 +1696,7 @@ irange::irange_intersect (const irange &r)
 	  i++;
 	  continue;
 	}
-
-      // likewise, skip r2's pair if its excluded.
+      // Likewise, skip r2's pair if its excluded.
       tree r2u = r2.m_base[i2 * 2 + 1];
       tree rl = r.m_base[i * 2];
       if (wi::lt_p (wi::to_wide (r2u), wi::to_wide (rl), sign))
@@ -1715,12 +1704,13 @@ irange::irange_intersect (const irange &r)
 	  i2++;
 	  if (i2 < r2_lim)
 	    continue;
-	  // no more r2, break.
+	  // No more r2, break.
 	  break;
 	}
 
-      // Must be some overlap now. Find the highest of the lower bounds.
-      // And set it, unless the build limits lower bounds is already set.
+      // Must be some overlap.  Find the highest of the lower bounds,
+      // and set it, unless the build limits lower bounds is already
+      // set.
       if (bld_pair < bld_lim)
         {
 	  if (wi::ge_p (wi::to_wide (rl), wi::to_wide (r2l), sign))
@@ -1729,15 +1719,15 @@ irange::irange_intersect (const irange &r)
 	    m_base[bld_pair * 2] = r2l;
 	}
       else
-        // decrease and set a new upper.
+	// Decrease and set a new upper.
         bld_pair--;
 
-      // and choose the lower of the upper bounds
+      // ...and choose the lower of the upper bounds.
       if (wi::le_p (wi::to_wide (ru), wi::to_wide (r2u), sign))
 	{
 	  m_base[bld_pair * 2 + 1] = ru;
 	  bld_pair++;
-	  // move past the r1 pair and keep trying.
+	  // Move past the r1 pair and keep trying.
 	  i++;
 	  continue;
 	}
@@ -1748,15 +1738,14 @@ irange::irange_intersect (const irange &r)
 	  i2++;
 	  if (i2 < r2_lim)
 	    continue;
-	  // no more r2, break.
+	  // No more r2, break.
 	  break;
 	}
       // r2 has the higher lower bound.
     }
 
-  // At the exit of this loop, its one of 2 things.
+  // At the exit of this loop, it is one of 2 things:
   // ran out of r1, or r2, but either means we are done.
-
   m_num_ranges = bld_pair;
   if (flag_checking)
     verify_range ();
@@ -1775,7 +1764,6 @@ subtract_one (const wide_int &x, tree type, wi::overflow_type &overflow)
 }
 
 /* Return the inverse of a range.  */
-
 
 void
 irange::invert ()
@@ -1900,8 +1888,6 @@ dump_bound_with_infinite_markers (FILE *file, tree bound)
     print_generic_expr (file, bound);
 }
 
-// Dump any range.
-
 void
 irange::dump (FILE *file) const
 {
@@ -1917,7 +1903,6 @@ irange::dump (FILE *file) const
       fprintf (file, "VARYING");
       return;
     }
-
  if (legacy_mode_p ())
     {
       fprintf (file, "%s[", (m_kind == VR_ANTI_RANGE) ? "~" : "");
@@ -1927,7 +1912,6 @@ irange::dump (FILE *file) const
       fprintf (file, "]");
       return;
     }
-  
   for (unsigned i = 0; i < m_num_ranges; ++i)
     {
       tree lb = m_base[i * 2];

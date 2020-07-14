@@ -40,12 +40,7 @@ enum value_range_kind
 //
 // This is the base class without any storage.
 
-// This is the legacy API for irange.  It is meant to be compatible
-// with the legacy value_range code.  For now, irange is a typedef for
-// irange.  Once this class is no longer needed, it can be
-// removed and irange_base will become irange.
-
-class irange 
+class irange
 {
 public:
   // In-place setters.
@@ -86,7 +81,7 @@ public:
   // Misc methods.
   void dump (FILE * = stderr) const;
 
-  // Deprecated legacy public methods 
+  // Deprecated legacy public methods.
   enum value_range_kind kind () const;		// DEPRECATED
   tree min () const;				// DEPRECATED
   tree max () const;				// DEPRECATED
@@ -126,7 +121,7 @@ protected:
   wide_int legacy_upper_bound (unsigned) const;
   int value_inside_range (tree) const;
   bool maybe_anti_range () const;
-  void copy_simple_range (const irange &);
+  void copy_legacy_range (const irange &);
 
 private:
   unsigned char m_num_ranges;
@@ -168,13 +163,16 @@ private:
 
 // This is a special int_range<1> with only one pair, plus
 // VR_ANTI_RANGE magic to describe slightly more than can be described
-// in one pair.  It is described in the code as a "simple range" (as
+// in one pair.  It is described in the code as a "legacy range" (as
 // opposed to multi-ranges which have multiple sub-ranges).  It is
 // provided for backward compatibility with code that has not been
 // converted to multi-range irange's.
 //
 // There are copy operators to seamlessly copy to/fro multi-ranges.
 typedef int_range<1> value_range;
+
+// This is an "infinite" precision irange for use in temporary
+// calculations.
 typedef int_range<255> widest_irange;
 
 // Returns true for an old-school value_range as described above.
@@ -208,6 +206,8 @@ irange::kind () const
   return VR_RANGE;
 }
 
+// Number of sub-ranges in a range.
+
 inline unsigned
 irange::num_pairs () const
 {
@@ -224,17 +224,25 @@ irange::type () const
   return TREE_TYPE (m_base[0]);
 }
 
-inline tree
-irange::tree_lower_bound (unsigned i) const
-{
-  return m_base[i * 2];
-}
+// Return the lower bound of a sub-range expressed as a tree.  PAIR is
+// the sub-range in question.
 
 inline tree
-irange::tree_upper_bound (unsigned i) const
+irange::tree_lower_bound (unsigned pair) const
 {
-  return m_base[i * 2 + 1];
+  return m_base[pair * 2];
 }
+
+// Return the upper bound of a sub-range expressed as a tree.  PAIR is
+// the sub-range in question.
+
+inline tree
+irange::tree_upper_bound (unsigned pair) const
+{
+  return m_base[pair * 2 + 1];
+}
+
+// Return the highest bound of a range expressed as a tree.
 
 inline tree
 irange::tree_upper_bound () const
@@ -279,7 +287,6 @@ irange::varying_p () const
   return true;
 
 }
-
 
 inline bool
 irange::undefined_p () const
@@ -456,7 +463,7 @@ irange::set_varying (tree type)
 {
   if (legacy_mode_p ())
     m_kind = VR_VARYING;
-  
+
   m_num_ranges = 1;
   if (INTEGRAL_TYPE_P (type))
     {
@@ -478,7 +485,7 @@ irange::operator== (const irange &r) const
   return equal_p (r);
 }
 
-// Return the lower bound for a sub-range.  PAIR is the sub-range in
+// Return the lower bound of a sub-range.  PAIR is the sub-range in
 // question.
 
 inline wide_int
@@ -491,7 +498,7 @@ irange::lower_bound (unsigned pair) const
   return wi::to_wide (tree_lower_bound (pair));
 }
 
-// Return the upper bound for a sub-range.  PAIR is the sub-range in
+// Return the upper bound of a sub-range.  PAIR is the sub-range in
 // question.
 
 inline wide_int
@@ -504,7 +511,7 @@ irange::upper_bound (unsigned pair) const
   return wi::to_wide (tree_upper_bound (pair));
 }
 
-// Return the highest bound in a range.
+// Return the highest bound of a range.
 
 inline wide_int
 irange::upper_bound () const
@@ -556,18 +563,18 @@ irange::set_zero (tree type)
     irange_set (z, z);
 }
 
-/* Normalize [MIN, MAX] into VARYING and ~[MIN, MAX] into UNDEFINED.
-
-   Avoid using TYPE_{MIN,MAX}_VALUE because -fstrict-enums can
-   restrict those to a subset of what actually fits in the type.
-   Instead use the extremes of the type precision which will allow
-   compare_range_with_value() to check if a value is inside a range,
-   whereas if we used TYPE_*_VAL, said function would just punt
-   upon seeing a VARYING.  */
+// Normalize [MIN, MAX] into VARYING and ~[MIN, MAX] into UNDEFINED.
+//
+// Avoid using TYPE_{MIN,MAX}_VALUE because -fstrict-enums can
+// restrict those to a subset of what actually fits in the type.
+// Instead use the extremes of the type precision which will allow
+// compare_range_with_value() to check if a value is inside a range,
+// whereas if we used TYPE_*_VAL, said function would just punt upon
+// seeing a VARYING.
 
 inline bool
 irange::normalize_min_max (tree type, tree min, tree max,
-				value_range_kind kind)
+			   value_range_kind kind)
 {
   unsigned prec = TYPE_PRECISION (type);
   signop sign = TYPE_SIGN (type);
@@ -585,7 +592,7 @@ irange::normalize_min_max (tree type, tree min, tree max,
   return false;
 }
 
-/* Return the maximum value for TYPE.  */
+// Return the maximum value for TYPE.
 
 inline tree
 vrp_val_max (const_tree type)
@@ -600,7 +607,7 @@ vrp_val_max (const_tree type)
   return NULL_TREE;
 }
 
-/* Return the minimum value for TYPE.  */
+// Return the minimum value for TYPE.
 
 inline tree
 vrp_val_min (const_tree type)
