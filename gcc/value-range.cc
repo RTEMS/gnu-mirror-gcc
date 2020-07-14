@@ -59,7 +59,7 @@ irange::operator= (const irange &src)
 
   // If the range didn't fit, the last range should cover the rest.
   if (lim != src.m_num_ranges)
-    m_base[x - 1] = src.m_base[x -1];
+    m_base[x - 1] = src.m_base[src.m_num_ranges * 2 - 1];
   
   m_num_ranges = lim;
   return *this;
