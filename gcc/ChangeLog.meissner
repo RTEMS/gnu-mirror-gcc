@@ -1,5 +1,13 @@
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (bswaphi2_reg): Generate the BRH
+	instruction on ISA 3.1.
+	(bswapsi2_reg): Generate the BRW instruction on ISA 3.1.
+	(bswapdi2): Rename bswapdi2_xxbrd to bswapdi2_brd.
+	(bswapdi2_brd): Rename from bswapdi2_xxbrd.  Generate the BRD
+	instruction on ISA 3.1.
+
 2020-07-14   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
 	* REVISION: New file.
-
