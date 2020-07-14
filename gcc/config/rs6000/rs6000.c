@@ -14987,13 +14987,15 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
   return 1;
 }
 
-/* ISA 3.0 (power9) minmax subcase to emit a XSMAXCDP or XSMINCDP instruction
-   for SF/DF scalars.  Move TRUE_COND to DEST if OP of the operands of the last
-   comparison is nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the
-   hardware has no such operation.  */
+/* Min/max subcase to emit an appropriate instruction for SF/DF scalars on ISA
+   3.0.
+
+   Move TRUE_COND to DEST if OP of the operands of the last comparison is
+   nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the hardware has
+   no such operation.  */
 
 static int
-rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+emit_fp_min_max_insn (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15029,13 +15031,15 @@ rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   return 1;
 }
 
-/* ISA 3.0 (power9) conditional move subcase to emit XSCMP{EQ,GE,GT,NE}DP and
-   XXSEL instructions for SF/DF scalars.  Move TRUE_COND to DEST if OP of the
-   operands of the last comparison is nonzero/true, FALSE_COND if it is
-   zero/false.  Return 0 if the hardware has no such operation.  */
+/* Conditional move subcase to emit a floating point compare setting a mask
+   instruction and a XXSEL select instruction for SF/DF scalars on ISA 3.0.
+
+   Move TRUE_COND to DEST if OP of the operands of the last comparison is
+   nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the hardware has
+   no such operation.  */
 
 static int
-rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+emit_fp_cmove_with_mask_xxsel (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15117,10 +15121,10 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       && (compare_mode == SFmode || compare_mode == DFmode)
       && (result_mode == SFmode || result_mode == DFmode))
     {
-      if (rs6000_emit_p9_fp_minmax (dest, op, true_cond, false_cond))
+      if (emit_fp_min_max_insn (dest, op, true_cond, false_cond))
 	return 1;
 
-      if (rs6000_emit_p9_fp_cmove (dest, op, true_cond, false_cond))
+      if (emit_fp_cmove_with_mask_xxsel (dest, op, true_cond, false_cond))
 	return 1;
     }
 
