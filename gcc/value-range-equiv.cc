@@ -30,14 +30,12 @@ along with GCC; see the file COPYING3.  If not see
 value_range_equiv::value_range_equiv (tree min, tree max, bitmap equiv,
 				      value_range_kind kind)
 {
-  m_discriminator = IRANGE_KIND_INT;
   m_equiv = NULL;
   set (min, max, equiv, kind);
 }
 
 value_range_equiv::value_range_equiv (const value_range &other)
 {
-  m_discriminator = IRANGE_KIND_INT;
   m_equiv = NULL;
   set (other.min(), other.max (), NULL, other.kind ());
 }
@@ -92,13 +90,13 @@ value_range_equiv::update (tree min, tree max, value_range_kind kind)
 void
 value_range_equiv::deep_copy (const value_range_equiv *from)
 {
-  set (from->min (), from->max (), from->m_equiv, from->m_kind);
+  set (from->min (), from->max (), from->m_equiv, from->kind ());
 }
 
 void
 value_range_equiv::move (value_range_equiv *from)
 {
-  set (from->min (), from->max (), NULL, from->m_kind);
+  set (from->min (), from->max (), NULL, from->kind ());
   m_equiv = from->m_equiv;
   from->m_equiv = NULL;
 }
@@ -130,7 +128,7 @@ void
 value_range_equiv::check ()
 {
   value_range::verify_range ();
-  switch (m_kind)
+  switch (kind ())
     {
     case VR_UNDEFINED:
     case VR_VARYING:
@@ -281,7 +279,7 @@ void
 value_range_equiv::dump (FILE *file) const
 {
   value_range::dump (file);
-  if ((m_kind == VR_RANGE || m_kind == VR_ANTI_RANGE)
+  if ((kind () == VR_RANGE || kind () == VR_ANTI_RANGE)
       && m_equiv)
     {
       bitmap_iterator bi;

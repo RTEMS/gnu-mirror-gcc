@@ -29,7 +29,6 @@ class GTY((user)) value_range_equiv : public value_range
  public:
   value_range_equiv () : value_range ()
     {
-      m_discriminator = IRANGE_KIND_INT;
       m_equiv = NULL;
     }
   value_range_equiv (const value_range &);
