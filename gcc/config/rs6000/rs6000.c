@@ -14376,13 +14376,19 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  hw_convert = hw_conversions[kf_or_tf].from_sf;
 	  break;
 
+	  /* Depending on the precision used, IFmode/TFmode may be either an
+	     extend or truncate operation.  */
 	case E_KFmode:
 	case E_IFmode:
 	case E_TFmode:
-	  if (FLOAT128_IBM_P (src_mode))
-	    cvt = sext_optab;
-	  else
+	  if (FLOAT128_IEEE_P (src_mode))
 	    do_move = true;
+	  else if (convert_optab_libfunc (sext_optab, dest_mode, src_mode))
+	    cvt = sext_optab;
+	  else if (convert_optab_libfunc (trunc_optab, dest_mode, src_mode))
+	    cvt = trunc_optab;
+	  else
+	    gcc_unreachable ();
 	  break;
 
 	case E_SImode:
@@ -14438,13 +14444,19 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  hw_convert = hw_conversions[kf_or_tf].to_sf;
 	  break;
 
+	  /* Depending on the precision used, IFmode/TFmode may be either an
+	     extend or truncate operation.  */
 	case E_KFmode:
 	case E_IFmode:
 	case E_TFmode:
-	  if (FLOAT128_IBM_P (dest_mode))
+	  if (FLOAT128_IEEE_P (dest_mode))
+	    do_move = true;
+	  else if (convert_optab_libfunc (sext_optab, dest_mode, src_mode))
+	    cvt = sext_optab;
+	  else if (convert_optab_libfunc (trunc_optab, dest_mode, src_mode))
 	    cvt = trunc_optab;
 	  else
-	    do_move = true;
+	    gcc_unreachable ();
 	  break;
 
 	case E_SImode:
