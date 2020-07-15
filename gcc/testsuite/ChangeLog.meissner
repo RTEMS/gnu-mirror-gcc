@@ -1,3 +1,7 @@
+2020-07-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr85657-2.c: Delete invalid test.
+
 2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* c-c++-common/dfp/convert-bfp-11.c: If long double is IEEE
