@@ -1,5 +1,46 @@
 2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
+	built-in functions for long double built-ins that use IEEE
+	128-bit.
+	(rs6000_expand_builtin): Change the KF IEEE 128-bit comparison
+	insns to TF if long double is IEEE 128-bit.
+	* config/rs6000/rs6000-builtin.def (scalar_extract_exptf): Add
+	support for long double being IEEE 128-bit built-in functions.
+	(scalar_extract_sigtf): Likewise.
+	(scalar_test_neg_tf): Likewise.
+	(scalar_insert_exp_tf): Likewise.
+	(scalar_insert_exp_tfp): Likewise.
+	(scalar_cmp_exp_tf_gt): Likewise.
+	(scalar_cmp_exp_tf_lt): Likewise.
+	(scalar_cmp_exp_tf_eq): Likewise.
+	(scalar_cmp_exp_tf_unordered): Likewise.
+	(scalar_test_data_class_tf): Likewise.
+
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_invalid_binary_op): Update error
+	messages about mixing IBM long double and IEEE 128-bit.
+
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_invalid_binary_op): Update error
+	messages about mixing IBM long double and IEEE 128-bit.
+
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Map the old
+	'q' built-in functions into long double if long double is IEEE
+	128-bit.
+
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
+	support for mapping built-in function names for long double
+	built-in functions if long double is IEEE 128-bit.
+
+2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config.gcc (powerpc*-*-*): Add pcrel-opt.o.
 	(rs6000*-*-*): Add pcrel-opt.o.
 	* config/rs6000/pcrel-opt.c: New file to implement the pass that
