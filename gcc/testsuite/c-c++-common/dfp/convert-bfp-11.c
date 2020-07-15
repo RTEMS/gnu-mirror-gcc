@@ -5,6 +5,7 @@
    Don't force 128-bit long doubles because runtime support depends
    on glibc.  */
 
+#include <float.h>
 #include "convert.h"
 
 volatile _Decimal32 sd;
@@ -37,6 +38,12 @@ int
 main ()
 {
   if (sizeof (long double) != 16)
+    return 0;
+
+  /* This test is written to test IBM extended double, which is a pair of
+     doubles.  If long double can hold a larger value than a double can, such
+     as when long double is IEEE 128-bit, just exit immediately.  */
+  if (LDBL_MAX_10_EXP > DBL_MAX_10_EXP)
     return 0;
 
   convert_101 ();
