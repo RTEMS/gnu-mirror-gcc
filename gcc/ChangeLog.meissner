@@ -1,5 +1,10 @@
 2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_mangle_type): Mangle IEEE 128-bit
+	long double into "__ieee128_ld", not "e".
+
+2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-call.c (init_cumulative_args): Do not flag
 	functions returning an explicit __float128 type as having an IEEE
 	128-bit long double.
