@@ -1,4 +1,4 @@
-2020-07-15  Michael Meissner  <meissner@linux.ibm.com>
+2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/pr85657-2.c: Delete invalid test.
 

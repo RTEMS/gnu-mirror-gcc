@@ -1,3 +1,32 @@
+2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-call.c (init_cumulative_args): Do not flag
+	functions returning an explicit __float128 type as having an IEEE
+	128-bit long double.
+	(rs6000_function_arg_advance_1): Do not flag functions passing an
+	explicit __float128 type as passing an IEEE 128-bit long double.
+	(rs6000_expand_builtin): Remove code that mapped KF built-in
+	functions into TF built-in functions if long double is IEEE
+	128-bit.
+	(rs6000_expand_builtin): Remove code that converted pack and
+	unpack IF built-in functions into the pack or unpack TF built-in
+	function if long double is IBM extended double.
+	(rs6000_init_builtins): Always make __ibm128 and __float128
+	separate types from long double, even if long double has the same
+	representation.
+	* config/rs6000/rs6000.c (init_float128_ieee): Fix the conversion
+	from KFmode to IFmode to use the right name now that __ibm128
+	always uses a distinct type from long double.
+	(rs6000_expand_float128_convert): Fix up converts between 128-bit
+	floating point types to work when IFmode is a separate type from
+	TFmode when TFmode uses the IBM extended double encoding.
+	(rs6000_mangle_type): Adjust mangling so that 128-bit long double
+	that uses the IEEE 128-bit encoding uses "e" instead of "g".
+	(rs6000_floatn_mode): Always use KFmode for _Float128, even if
+	long double uses the IEEE 128-bit floating point representation.
+	(rs6000_c_mode_for_suffix): The 'q' suffix now always implies
+	KFmode.
+
 2020-07-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
