@@ -1515,6 +1515,40 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
   wide_int cst = wide_int::from (pcst, prec, sgn);
   unsigned int ext_len = get_int_cst_ext_nunits (type, cst);
 
+  enum tree_code code = TREE_CODE (type);
+  if (code == POINTER_TYPE || code == REFERENCE_TYPE)
+    {
+      /* Cache NULL pointer and zero bounds.  */
+      if (cst == 0)
+	ix = 0;
+      else if (cst == wi::max_value (prec, sgn))
+	ix = 1;
+      else if (cst == 1)
+	ix = 2;
+
+      if (ix >= 0)
+	{
+	  /* Look for it in the type's vector of small shared ints.  */
+	  if (!TYPE_CACHED_VALUES_P (type))
+	    {
+	      TYPE_CACHED_VALUES_P (type) = 1;
+	      TYPE_CACHED_VALUES (type) = make_tree_vec (3);
+	    }
+
+	  t = TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix);
+	  if (t)
+	    /* Make sure no one is clobbering the shared constant.  */
+	    gcc_checking_assert (TREE_TYPE (t) == type
+				 && cst == wi::to_wide (t));
+	  else
+	    {
+	      /* Create a new shared int.  */
+	      t = build_new_int_cst (type, cst);
+	      TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix) = t;
+	    }
+	  return t;
+	}
+    }
   if (ext_len == 1)
     {
       /* We just need to store a single HOST_WIDE_INT.  */
@@ -1524,7 +1558,7 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
       else
 	hwi = cst.to_shwi ();
 
-      switch (TREE_CODE (type))
+      switch (code)
 	{
 	case NULLPTR_TYPE:
 	  gcc_assert (hwi == 0);
@@ -1532,12 +1566,6 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
 
 	case POINTER_TYPE:
 	case REFERENCE_TYPE:
-	  /* Cache NULL pointer and zero bounds.  */
-	  if (hwi == 0)
-	    {
-	      limit = 1;
-	      ix = 0;
-	    }
 	  break;
 
 	case BOOLEAN_TYPE:
