@@ -138,10 +138,6 @@ bool rs6000_passes_ibm128 = false;
    name used in current releases (i.e. u9__ieee128).  */
 static bool ieee128_mangling_gcc_8_1;
 
-/* Generate the manged name (i.e. g) used in GCC 10.2 and earlier, and not the
-   name used in current releases (i.e. u8__ibm128).  */
-static bool ibm128_mangling_gcc_10_2;
-
 /* Width in bits of a pointer.  */
 unsigned rs6000_pointer_size;
 
@@ -19558,32 +19554,34 @@ rs6000_mangle_type (const_tree type)
   /* Originally we mapped __float128 (KFmode) to long double (TFmode) if long
      double used the IEEE 128-bit format.  Similarly for __ibm128 (IFmode) if
      long double used the IBM extended double format.  Now __float128 and
-     __ibm128 are always unique types.  We need a special mangling for long
-     double using the IEEE 128-bit format.
+     __ibm128 are always unique types.
 
-     In addition, GCC 8.1 used the wrong mangling and we provide a weak
+     Historically, GCC on PowerPC used "g" for mangling __ibm128 and long
+     double using IBM extended doubles encoding.  According to the Itanium C++
+     standard that defines mangling, "g" should have been the mangling for
+     __float128 and _Float128.
+
+     If the long double type uses the IEEE 128-bit encoding, we now use the
+     standard "e" for the encoding of long double, instead of "g".
+
+     To be compatible with earlier versions of GCC, we continue to use "g" as
+     the mangling of __ibm128.  This meant you could not have separate
+     functions that use __ibm128 and long double when long double uses the IBM
+     extended double ordering.
+
+     GCC 8.1 used the wrong mangling for __float128 and we provide a weak
      reference from the old name to the new name.  This was fixed starting in
      GCC 8.2.  */
-  switch (TYPE_MODE (type))
-    {
-    default:
-      break;
-
-    case KFmode:
-      return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
-
-    case IFmode:
-      return ibm128_mangling_gcc_10_2 ? "g" : "u8__ibm128";
-
-    case TFmode:
-      return FLOAT128_IEEE_P (TFmode) ? "u12__ieee128_ld" : "g";
-
-    case POImode:
-      return "u13__vector_pair";
-
-    case PXImode:
-      return "u13__vector_quad";
-    }
+  if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
+    return TARGET_IEEEQUAD ? "e" : "g";
+  if (type == ieee128_float_type_node)
+    return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
+  if (type == ibm128_float_type_node)
+    return "g";
+  if (type == vector_pair_type_node)
+    return "u13__vector_pair";
+  if (type == vector_quad_type_node)
+    return "u13__vector_quad";
 
   /* For all other types, use the default mangling.  */
   return NULL;
@@ -26719,25 +26717,6 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
       old_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
       SET_DECL_ASSEMBLER_NAME (decl, save_asm_name);
       ieee128_mangling_gcc_8_1 = false;
-
-      if (strcmp (name, old_name) != 0)
-	{
-	  fprintf (stream, "\t.weak %s\n", old_name);
-	  fprintf (stream, "\t.set %s,%s\n", old_name, name);
-	}
-    }
-
-  if (rs6000_passes_ibm128 && name[0] == '_' && name[1] == 'Z'
-      && !TARGET_IEEEQUAD)
-    {
-      tree save_asm_name = DECL_ASSEMBLER_NAME (decl);
-      const char *old_name;
-
-      ibm128_mangling_gcc_10_2 = true;
-      lang_hooks.set_decl_assembler_name (decl);
-      old_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-      SET_DECL_ASSEMBLER_NAME (decl, save_asm_name);
-      ibm128_mangling_gcc_10_2 = false;
 
       if (strcmp (name, old_name) != 0)
 	{
