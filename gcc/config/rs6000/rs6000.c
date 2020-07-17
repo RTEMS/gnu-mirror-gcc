@@ -126,12 +126,6 @@ scalar_int_mode rs6000_pmode;
    may want to generate a weak alias of the old mangling (U10__float128) to the
    new mangling (u9__ieee128).  */
 bool rs6000_passes_ieee128 = false;
-
-/* Note whether an explicit IBM 128-bit floating point was passed or returned.
-   In GCC 10.2 and earlier, __ibm128 was mangled as 'g' if the long double type
-   was IBM extended double.  This allows us to generate a weak reference for
-   the old name for C++ mangling.  */
-bool rs6000_passes_ibm128 = false;
 #endif
 
 /* Generate the manged name (i.e. U10__float128) used in GCC 8.1, and not the
@@ -10308,17 +10302,13 @@ init_float128_ieee (machine_mode mode)
       set_conv_libfunc (trunc_optab, SFmode, mode, "__trunckfsf2");
       set_conv_libfunc (trunc_optab, DFmode, mode, "__trunckfdf2");
 
-      /* Whether we use sext or trunc to convert between the 128-bit floating
-	 point types, depends on the 'precision' field setup in rs6000-modes.h.
-	 The name called (__extend<...> or __trunc<...>) depends on the the
-	 original names picked for the conversions.  */
       set_conv_libfunc (sext_optab, mode, IFmode, "__trunctfkf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (sext_optab, mode, TFmode, "__trunctfkf2");
 
-      set_conv_libfunc (sext_optab, IFmode, mode, "__extendkftf2");
+      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendkftf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
-	set_conv_libfunc (sext_optab, TFmode, mode, "__extendkftf2");
+	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
       set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdkf");
       set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddkf");
@@ -14372,19 +14362,13 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  hw_convert = hw_conversions[kf_or_tf].from_sf;
 	  break;
 
-	  /* Depending on the precision used, IFmode/TFmode may be either an
-	     extend or truncate operation.  */
 	case E_KFmode:
 	case E_IFmode:
 	case E_TFmode:
-	  if (FLOAT128_IEEE_P (src_mode))
-	    do_move = true;
-	  else if (convert_optab_libfunc (sext_optab, dest_mode, src_mode))
+	  if (FLOAT128_IBM_P (src_mode))
 	    cvt = sext_optab;
-	  else if (convert_optab_libfunc (trunc_optab, dest_mode, src_mode))
-	    cvt = trunc_optab;
 	  else
-	    gcc_unreachable ();
+	    do_move = true;
 	  break;
 
 	case E_SImode:
@@ -14440,19 +14424,13 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  hw_convert = hw_conversions[kf_or_tf].to_sf;
 	  break;
 
-	  /* Depending on the precision used, IFmode/TFmode may be either an
-	     extend or truncate operation.  */
 	case E_KFmode:
 	case E_IFmode:
 	case E_TFmode:
-	  if (FLOAT128_IEEE_P (dest_mode))
-	    do_move = true;
-	  else if (convert_optab_libfunc (sext_optab, dest_mode, src_mode))
-	    cvt = sext_optab;
-	  else if (convert_optab_libfunc (trunc_optab, dest_mode, src_mode))
+	  if (FLOAT128_IBM_P (dest_mode))
 	    cvt = trunc_optab;
 	  else
-	    gcc_unreachable ();
+	    do_move = true;
 	  break;
 
 	case E_SImode:
@@ -19551,33 +19529,11 @@ rs6000_mangle_type (const_tree type)
   if (type == bool_int_type_node) return "U6__booli";
   if (type == bool_long_long_type_node) return "U6__boolx";
 
-  /* Originally we mapped __float128 (KFmode) to long double (TFmode) if long
-     double used the IEEE 128-bit format.  Similarly for __ibm128 (IFmode) if
-     long double used the IBM extended double format.  Now __float128 and
-     __ibm128 are always unique types.
-
-     Historically, GCC on PowerPC used "g" for mangling __ibm128 and long
-     double using IBM extended doubles encoding.  According to the Itanium C++
-     standard that defines mangling, "g" should have been the mangling for
-     __float128 and _Float128.
-
-     If the long double type uses the IEEE 128-bit encoding, we now use the
-     standard "e" for the encoding of long double, instead of "g".
-
-     To be compatible with earlier versions of GCC, we continue to use "g" as
-     the mangling of __ibm128.  This meant you could not have separate
-     functions that use __ibm128 and long double when long double uses the IBM
-     extended double ordering.
-
-     GCC 8.1 used the wrong mangling for __float128 and we provide a weak
-     reference from the old name to the new name.  This was fixed starting in
-     GCC 8.2.  */
-  if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
-    return TARGET_IEEEQUAD ? "e" : "g";
-  if (type == ieee128_float_type_node)
-    return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
-  if (type == ibm128_float_type_node)
+  if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IBM_P (TYPE_MODE (type)))
     return "g";
+  if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IEEE_P (TYPE_MODE (type)))
+    return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
+
   if (type == vector_pair_type_node)
     return "u13__vector_pair";
   if (type == vector_quad_type_node)
@@ -23133,7 +23089,10 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 64:
-	  return TARGET_FLOAT128_TYPE ? KFmode :  opt_scalar_float_mode ();
+	  if (TARGET_FLOAT128_TYPE)
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	  else
+	    return opt_scalar_float_mode ();
 
 	case 128:
 	  return opt_scalar_float_mode ();
@@ -23154,7 +23113,10 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 128:
-	  return TARGET_FLOAT128_TYPE ? KFmode :  opt_scalar_float_mode ();
+	  if (TARGET_FLOAT128_TYPE)
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	  else
+	    return opt_scalar_float_mode ();
 
 	default:
 	  return opt_scalar_float_mode ();
@@ -23170,7 +23132,7 @@ rs6000_c_mode_for_suffix (char suffix)
   if (TARGET_FLOAT128_TYPE)
     {
       if (suffix == 'q' || suffix == 'Q')
-	return KFmode;
+	return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 
       /* At the moment, we are not defining a suffix for IBM extended double.
 	 If/when the default for -mabi=ieeelongdouble is changed, and we want
