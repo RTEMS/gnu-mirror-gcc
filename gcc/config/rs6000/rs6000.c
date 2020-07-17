@@ -19555,8 +19555,8 @@ rs6000_mangle_type (const_tree type)
      standard that defines mangling, "g" should have been the mangling for
      __float128 and _Float128.
 
-     If the long double type uses the IEEE 128-bit encoding, we now use the
-     standard "e" for the encoding of long double, instead of "g".
+     If the long double type uses the IEEE 128-bit encoding, we now use a
+     new mangling to represent the long double type, instead of "g".
 
      To be compatible with earlier versions of GCC, we continue to use "g" as
      the mangling of __ibm128.  This meant you could not have separate
@@ -19567,7 +19567,7 @@ rs6000_mangle_type (const_tree type)
      reference from the old name to the new name.  This was fixed starting in
      GCC 8.2.  */
   if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
-    return TARGET_IEEEQUAD ? "e" : "g";
+    return TARGET_IEEEQUAD ? "u12__ieee128_ld" : "g";
   if (type == ieee128_float_type_node)
     return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
   if (type == ibm128_float_type_node)
