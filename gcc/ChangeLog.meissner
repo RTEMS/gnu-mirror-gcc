@@ -1,5 +1,10 @@
 2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Always map
+	the 'q' functions into 'f128' functions.
+
+2020-07-17  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_mangle_type): Mangle IEEE 128-bit
 	long double into "__ieee128_ld", not "e".
 
