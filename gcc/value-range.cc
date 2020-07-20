@@ -543,8 +543,8 @@ irange::singleton_p (tree *result) const
 {
   if (!legacy_mode_p ())
     {
-      if (num_pairs () == 1 && operand_equal_p (tree_lower_bound (),
-						tree_upper_bound (), 0))
+      if (num_pairs () == 1 && (wi::to_wide (tree_lower_bound ())
+			        == wi::to_wide (tree_upper_bound ())))
 	{
 	  if (result)
 	    *result = tree_lower_bound ();
