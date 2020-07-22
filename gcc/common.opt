@@ -3412,4 +3412,28 @@ fipa-ra
 Common Report Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
 
+fipa-type-escape-analysis
+Common Report Var(flag_ipa_type_escape_analysis) Optimization
+This flag is only used for debugging the type escape analysis
+
+Wdfa
+Common Var(warn_dfa) Init(1) Warning
+Warn about dead fields at link time.
+
+fipa-type-escape-analysis-keep-casts
+Common Report Var(flag_ipa_type_escape_analysis_keep_casts) Init(0)
+This flag is used to ignore casting in the legality analysis of dead field elimination.
+
+fprint-escape-analysis
+Common Report Var(flag_print_escape_analysis) Optimization
+This flag is used to print the escape analysis proper.  It does not include type casting.
+
+fprint-cast-analysis
+Common Report Var(flag_print_cast_analysis) Optimization
+This flag is used to print the escape analysis including type casting.
+
+fprint-access-analysis
+Common Report Var(flag_print_access_analysis) Optimization
+This flag is used to print the access analysis (if field is read or written to).
+
 ; This comment is to ensure we retain the blank line above.
