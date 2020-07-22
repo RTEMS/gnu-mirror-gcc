@@ -46,7 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "gimple-range-trace.h"
 
-class rvrp_ranger 
+class rvrp_ranger
 {
 public:
   rvrp_ranger () : range_pool ("rvrp value range pool") { }
@@ -58,6 +58,7 @@ public:
   // used for the conditional folding which still uses equivalences.
   virtual const value_range_equiv *get_value_range (const_tree expr,
 						    gimple *stmt)
+  // FIXME: Add OVERRIDE when this calls the simplifier.
   {
     widest_irange r;
     if (query.range_of_expr (r, const_cast<tree> (expr), stmt))

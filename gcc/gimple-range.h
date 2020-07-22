@@ -81,7 +81,7 @@ private:
   void range_of_ssa_name_with_loop_info (irange &, tree, class loop *,
 					 gphi *);
 
-  class vr_values *m_vr_values;
+  class range_query *m_range_query;
 };
 
 // Calculate a basic range for a tree expression.

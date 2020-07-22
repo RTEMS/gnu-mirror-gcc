@@ -1212,17 +1212,44 @@ gimple_ranger::dump (FILE *f)
     }
 }
 
+// Bridge to provide a get_value_range() to range_of_var_in_loop.
+// As an alternative, gimple_ranger could inherit from range_query and
+// provide get_value_range, thus rendering this class unnecessary.
+
+class range_query_bridge : public range_query
+{
+public:
+  range_query_bridge (gimple_ranger *ranger)
+    : range_pool ("range_query_bridge range pool"),
+      ranger (ranger) { }
+  ~range_query_bridge ()
+  {
+    range_pool.release ();
+  }
+  const value_range_equiv *get_value_range (const_tree expr,
+					    gimple *stmt) OVERRIDE
+  {
+    widest_irange r;
+    if (ranger->range_of_expr (r, const_cast<tree> (expr), stmt))
+      return new (range_pool.allocate ()) value_range_equiv (r);
+    return new (range_pool.allocate ()) value_range_equiv (TREE_TYPE (expr));
+  }
+private:
+  object_allocator<value_range_equiv> range_pool;
+  gimple_ranger *ranger;
+};
+
 
 // loop_ranger implementation.
 
 loop_ranger::loop_ranger ()
 {
-  m_vr_values = new vr_values;
+  m_range_query = new range_query_bridge (this);
 }
 
 loop_ranger::~loop_ranger ()
 {
-  delete m_vr_values;
+  delete m_range_query;
 }
 
 void
@@ -1230,11 +1257,7 @@ loop_ranger::range_of_ssa_name_with_loop_info (irange &r, tree name,
 					       class loop *l, gphi *phi)
 {
   gcc_checking_assert (TREE_CODE (name) == SSA_NAME);
-  value_range_equiv vr;
-  vr.set_varying (TREE_TYPE (name));
-  m_vr_values->adjust_range_with_scev (&vr, l, phi, name);
-  vr.normalize_symbolics ();
-  r = vr;
+  range_of_var_in_loop (&r, m_range_query, l, phi, name);
 }
 
 // If NAME is either a PHI result or a PHI argument, see if we can
