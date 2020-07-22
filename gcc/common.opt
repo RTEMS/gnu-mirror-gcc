@@ -3494,4 +3494,12 @@ fipa-ra
 Common Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
 
+fipa-type-escape-analysis
+Common Report Var(flag_ipa_type_escape_analysis) Optimization
+This flag is only used for debugging the type escape analysis
+
+Wdfa
+Common Var(warn_dfa) Init(1) Warning
+Warn about dead fields at link time.
+
 ; This comment is to ensure we retain the blank line above.
