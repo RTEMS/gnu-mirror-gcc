@@ -1,3 +1,322 @@
+2020-07-23  Release Manager
+
+	* GCC 10.2.0 released.
+
+2020-07-16  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2020-06-16  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/vector/align-1.c: Change target architecture
+	to z13.
+	* gcc.target/s390/vector/align-2.c: Change target architecture
+	to z13.
+
+2020-07-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/95726
+	* g++.target/aarch64/pr95726.C: New test.
+	* g++.target/arm/pr95726.C: Likewise.
+
+2020-07-15  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/96174
+	* gcc.target/i386/avx512f-vcmppd-3.c: New test.
+	* gcc.target/i386/avx512f-vcmpps-3.c: New test.
+
+2020-07-14  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-07-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/95789
+	PR c++/96104
+	PR c++/96179
+	* g++.dg/conversion/ref4.C: New test.
+	* g++.dg/conversion/ref5.C: New test.
+	* g++.dg/conversion/ref6.C: New test.
+
+2020-07-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR middle-end/95114
+	* g++.target/aarch64/pr95114.C: New test.
+
+2020-07-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/96146
+	* gcc.target/aarch64/sve/acle/general/pr96146.c: New test.
+
+2020-07-14  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/96194
+	* g++.dg/opt/pr96194.C: New test.
+
+2020-07-13  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-07-13  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* lib/target-supports.exp (is-effective-target):
+	Reorder to put powerpc stuff together.
+	(is-effective-target-keyword): Add power10_hw.
+
+2020-07-13  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-07-13  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* lib/target-supports.exp (check_ppc_mma_hw_available):
+	New function.
+	(is-effective-target): Add ppc_mma_hw.
+	(is-effective-target-keyword): Add ppc_mma_hw.
+	* gcc.target/powerpc/mma-supported.c: New file.
+	* gcc.target/powerpc/mma-single-test.c: Require ppc_mma_hw.
+	* gcc.target/powerpc/mma-double-test.c: Require ppc_mma_hw.
+
+2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* gcc.target/aarch64/return_address_sign_1.c: Update test.
+	* gcc.target/aarch64/return_address_sign_b_1.c: Likewise.
+
+2020-07-13  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2020-07-13  Julian Brown  <julian@codesourcery.com>
+		    Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gfortran.dg/goacc/finalize-1.f: Update expected dump output.
+
+2020-07-13  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2020-07-09  Julian Brown  <julian@codesourcery.com>
+		    Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR middle-end/95270
+	* c-c++-common/goacc/mdc-1.c: Update expected dump output for zero
+	bias.
+
+2020-07-13  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2020-07-09  Julian Brown  <julian@codesourcery.com>
+
+	* gfortran.dg/goacc/mapping-tests-3.f90: New test.
+	* gfortran.dg/goacc/mapping-tests-4.f90: New test.
+
+2020-07-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/96130
+	* gcc.dg/torture/pr96130.c: New test.
+
+2020-07-13  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/96063
+	* g++.dg/warn/Wmismatched-tags-7.C: New test.
+	* g++.dg/warn/Wmismatched-tags-8.C: New test.
+
+2020-07-13  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-07-13  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/96077
+	* g++.dg/parse/enum14.C: New test.
+
+2020-07-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-13  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/96180
+	* gcc.dg/torture/pr96133.c: Align global variable.
+
+2020-07-13  Hans-Peter Nilsson  <hp@axis.com>
+
+	Backported from master:
+	2020-07-13  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR middle-end/94600
+	* gcc.dg/pr94600-1.c, gcc.dg/pr94600-2.c, gcc.dg/pr94600-3.c,
+	gcc.dg/pr94600-4.c, gcc.dg/pr94600-5.c, gcc.dg/pr94600-6.c,
+	gcc.dg/pr94600-7.c, gcc.dg/pr94600-8.c: New tests.
+
+2020-07-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/95857
+	* gcc.dg/pr95857.c: New test.
+
+2020-07-10  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-07-10  Rajalakshmi Srinivasaraghavan  <rajis@linux.vnet.ibm.com>
+		    Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* gcc.target/powerpc/p10-identify.c: New file.
+	* gcc.target/powerpc/p10-arch31.c: New file.
+	* gcc.target/powerpc/mma-single-test.c: New file.
+	* gcc.target/powerpc/mma-double-test.c: New file.
+
+2020-07-10  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-07-07  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* lib/target-supports.exp (check_power10_hw_available):
+	Return 0 for passing test.
+
+2020-07-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-07-09  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/96125
+	* gcc.target/powerpc/pr96125.c: New test.
+
+2020-07-10  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	Backported from master:
+	2020-07-08  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* gcc.target/powerpc/builtins-msum-runnable.c: New test.
+	* gcc.target/powerpc/vsx-builtin-msum.c: New test.
+
+2020-07-10  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96105
+	PR c++/96052
+	PR c++/95976
+	* g++.dg/cpp2a/no_unique_address4.C: New test.
+	* g++.dg/cpp2a/no_unique_address5.C: New test.
+	* g++.dg/cpp2a/no_unique_address6.C: New test.
+
+2020-07-10  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96133
+	* gcc.dg/torture/pr96133.c: New testcase.
+
+2020-07-10  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backported from master:
+	2020-07-09  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/95804
+	* gcc.dg/tree-ssa/pr95804.c: New test.
+
+2020-07-10  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backported from master:
+	2020-06-20  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/95638
+	* g++.dg/tree-ssa/pr95638.C: New test.
+
+2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/save-restore-9.c: New.
+
+2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-06-22  Kito Cheng  <kito.cheng@sifive.com>
+
+	* g++.target/riscv/frflags.C: New.
+
+2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-06-16  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/95683
+	* gcc.target/riscv/pr95683.c: New.
+
+2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-06-11  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/pr95252.c: New.
+
+2020-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95709
+	* gfortran.dg/pr95709.f90: New file.
+
+2020-07-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/95105
+	* gcc.target/aarch64/sve/acle/general/attributes_8.c: New test.
+	* g++.target/aarch64/sve/acle/general-c++/attributes_1.C: Likewise.
+
+2020-07-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96075
+	* gcc.dg/vect/slp-46.c: New testcase.
+
+2020-07-06  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* gcc.target/powerpc/builtins-1-p9-runnable.c: Update.
+
+2020-07-06  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-02  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/93337
+	* gfortran.dg/pr93337.f90: New file.
+
+2020-07-05  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2020-06-30  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/95366
+	* gfortran.dg/select_type_49.f90: New file.
+
+2020-07-04  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2020-07-03  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/96040
+	* gcc.dg/ipa/pr96040.c: New test.
+
+2020-07-03  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2020-07-02  Martin Jambor  <mjambor@suse.cz>
+
+	PR debug/95343
+	* gcc.dg/guality/pr95343.c: New test.
+
 2020-07-02  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

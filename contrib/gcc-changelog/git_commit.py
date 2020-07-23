@@ -154,6 +154,7 @@ changelog_regex = re.compile(r'^(?:[fF]or +)?([a-z0-9+-/]*)ChangeLog:?')
 pr_regex = re.compile(r'\tPR (?P<component>[a-z+-]+\/)?([0-9]+)$')
 dr_regex = re.compile(r'\tDR ([0-9]+)$')
 star_prefix_regex = re.compile(r'\t\*(?P<spaces>\ *)(?P<content>.*)')
+end_of_location_regex = re.compile(r'[\[<(:]')
 
 LINE_LIMIT = 100
 TAB_WIDTH = 8
@@ -204,14 +205,13 @@ class ChangeLogEntry:
                 line = m.group('content')
 
             if in_location:
-                # Strip everything that is not a filename in "line": entities
-                # "(NAME)", entry text (the colon, if present, and anything
-                # that follows it).
-                if '(' in line:
-                    line = line[:line.index('(')]
-                    in_location = False
-                if ':' in line:
-                    line = line[:line.index(':')]
+                # Strip everything that is not a filename in "line":
+                # entities "(NAME)", cases "<PATTERN>", conditions
+                # "[COND]", entry text (the colon, if present, and
+                # anything that follows it).
+                m = end_of_location_regex.search(line)
+                if m:
+                    line = line[:m.start()]
                     in_location = False
 
                 # At this point, all that's left is a list of filenames
@@ -628,7 +628,11 @@ class GitCommit:
         for entry in self.changelog_entries:
             output = ''
             timestamp = entry.datetime
-            if self.cherry_pick_commit:
+            if self.revert_commit:
+                timestamp = current_timestamp
+                orig_date = self.original_info.date
+                current_timestamp = orig_date.strftime(DATE_FORMAT)
+            elif self.cherry_pick_commit:
                 info = self.commit_to_info_hook(self.cherry_pick_commit)
                 # it can happen that it is a cherry-pick for a different
                 # repository
@@ -636,10 +640,6 @@ class GitCommit:
                     timestamp = info.date.strftime(DATE_FORMAT)
                 else:
                     timestamp = current_timestamp
-            elif self.revert_commit:
-                timestamp = current_timestamp
-                orig_date = self.original_info.date
-                current_timestamp = orig_date.strftime(DATE_FORMAT)
             elif not timestamp or use_commit_ts:
                 timestamp = current_timestamp
             authors = entry.authors if entry.authors else [self.info.author]
@@ -649,12 +649,13 @@ class GitCommit:
                     authors.append(author)
 
             if self.cherry_pick_commit or self.revert_commit:
-                output += self.format_authors_in_changelog([self.info.author],
+                original_author = self.original_info.author
+                output += self.format_authors_in_changelog([original_author],
                                                            current_timestamp)
-                if self.cherry_pick_commit:
-                    output += '\tBackported from master:\n'
-                else:
+                if self.revert_commit:
                     output += '\tRevert:\n'
+                else:
+                    output += '\tBackported from master:\n'
                 output += self.format_authors_in_changelog(authors,
                                                            timestamp, '\t')
             else:

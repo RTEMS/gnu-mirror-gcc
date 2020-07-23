@@ -1,3 +1,44 @@
+2020-07-23  Release Manager
+
+	* GCC 10.2.0 released.
+
+2020-07-13  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2020-07-09  Julian Brown  <julian@codesourcery.com>
+
+	* trans-openmp.c (gfc_trans_omp_clauses): Use 'inner' not 'decl' for
+	derived type members which themselves have derived types.
+
+2020-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95709
+	* resolve.c (gfc_resolve_code): Check for valid arguments to
+	assigned GOTO.
+
+2020-07-06  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-02  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/93337
+	* class.c (gfc_find_derived_vtab): Punt if name is not set.
+
+2020-07-05  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2020-06-30  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/95366
+	* gfortran.h (gfc_typename): Add optional argument for_hash.
+	* misc.c (gfc_typename): When for_hash is true, just retur
+	  CHARACTER(kind).
+	* class.c (gfc_intrinsic_hash_value): Call gfc_typename with
+	  for_hash = true.
+
 2020-07-02  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
