@@ -1474,6 +1474,11 @@ process_options (void)
   if (flag_unroll_all_loops)
     flag_unroll_loops = 1;
 
+  /* Allow cunroll to grow size accordingly.  */
+  if (flag_cunroll_grow_size == AUTODETECT_VALUE)
+    flag_cunroll_grow_size
+      = flag_unroll_loops || flag_peel_loops || optimize >= 3;
+
   /* web and rename-registers help when run after loop unrolling.  */
   if (flag_web == AUTODETECT_VALUE)
     flag_web = flag_unroll_loops;
@@ -1822,11 +1827,31 @@ process_options (void)
   /* Address Sanitizer needs porting to each target architecture.  */
 
   if ((flag_sanitize & SANITIZE_ADDRESS)
-      && (!FRAME_GROWS_DOWNWARD || targetm.asan_shadow_offset == NULL))
+      && !FRAME_GROWS_DOWNWARD)
     {
       warning_at (UNKNOWN_LOCATION, 0,
 		  "%<-fsanitize=address%> and %<-fsanitize=kernel-address%> "
 		  "are not supported for this target");
+      flag_sanitize &= ~SANITIZE_ADDRESS;
+    }
+
+  if ((flag_sanitize & SANITIZE_USER_ADDRESS)
+      && targetm.asan_shadow_offset == NULL)
+    {
+      warning_at (UNKNOWN_LOCATION, 0,
+		  "%<-fsanitize=address%> not supported for this target");
+      flag_sanitize &= ~SANITIZE_ADDRESS;
+    }
+
+  if ((flag_sanitize & SANITIZE_KERNEL_ADDRESS)
+      && (targetm.asan_shadow_offset == NULL
+	  && param_asan_stack
+	  && !asan_shadow_offset_set_p ()))
+    {
+      warning_at (UNKNOWN_LOCATION, 0,
+		  "%<-fsanitize=kernel-address%> with stack protection "
+		  "is not supported without %<-fasan-shadow-offset=%> "
+		  "for this target");
       flag_sanitize &= ~SANITIZE_ADDRESS;
     }
 
