@@ -355,7 +355,7 @@ public:
 
     if ((unsigned int)id >= m_vector->length ())
       vec_safe_grow_cleared (m_vector,
-			     this->m_symtab->cgraph_max_summary_id);
+			     this->m_symtab->cgraph_max_summary_id, false);
 
     if ((*m_vector)[id] == NULL)
       (*m_vector)[id] = this->allocate_new ();
@@ -812,7 +812,8 @@ public:
       id = this->m_symtab->assign_summary_id (edge);
 
     if ((unsigned)id >= m_vector->length ())
-      vec_safe_grow_cleared (m_vector, this->m_symtab->edges_max_summary_id);
+      vec_safe_grow_cleared (m_vector, this->m_symtab->edges_max_summary_id,
+			     false);
 
     if ((*m_vector)[id] == NULL)
       (*m_vector)[id] = this->allocate_new ();
