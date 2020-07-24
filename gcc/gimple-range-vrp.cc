@@ -169,7 +169,7 @@ public:
     { return flag_tree_vrp != 0; }
   virtual unsigned int execute (function *)
     {
-      return execute_ranger_vrp (false);
+      return execute_ranger_vrp (true);
     }
 private:
   bool allow_il_changes;

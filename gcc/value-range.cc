@@ -599,6 +599,9 @@ irange::value_inside_range (tree val) const
   if (undefined_p ())
     return 0;
 
+  if (!legacy_mode_p () && TREE_CODE (val) == INTEGER_CST)
+    return contains_p (val);
+
   int cmp1 = operand_less_p (val, min ());
   if (cmp1 == -2)
     return -2;
@@ -649,13 +652,17 @@ irange::contains_p (tree cst) const
       return value_inside_range (cst) == 1;
     }
 
+  gcc_checking_assert (TREE_CODE (cst) == INTEGER_CST);
+  signop sign = TYPE_SIGN (TREE_TYPE (cst));
+  wide_int v = wi::to_wide (cst);
   for (unsigned r = 0; r < m_num_ranges; ++r)
     {
-      if (tree_int_cst_lt (cst, tree_lower_bound (r)))
+      if (wi::lt_p (v, lower_bound (r), sign))
 	return false;
-      if (tree_int_cst_lt (cst, tree_upper_bound (r)))
+      if (wi::le_p (v, upper_bound (r), sign))
 	return true;
     }
+
   return false;
 }
 
