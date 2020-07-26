@@ -110,6 +110,49 @@ non_null_ref::process_name (tree name)
   m_nn[v] = b;
 }
 
+class irange_pool
+{
+public:
+  irange_pool ();
+  ~irange_pool ();
+  irange *allocate (unsigned num_pairs);
+  irange *allocate (const irange &);
+private:
+  struct obstack irange_obstack;
+};
+
+irange_pool::irange_pool ()
+{
+  obstack_init (&irange_obstack);
+}
+
+irange_pool::~irange_pool ()
+{
+  obstack_free (&irange_obstack, NULL);
+}
+
+irange *
+irange_pool::allocate (unsigned num_pairs)
+{
+  // ?? Ideally we should allocate both the irange and the sub-ranges
+  // with one call, but there is an unspecified amount of padding at
+  // the end of irange to fit the sub-ranges chunk.  This wouldn't be
+  // the case if m_base was defined as m_base[1], but then we wouldn't
+  // be able to assign to it.  Another option would be to allocate an
+  // additional large number to accomodate any alignment needed. ??
+  irange *r = XOBNEW (&irange_obstack, struct irange);
+  tree *ranges = XOBNEWVEC (&irange_obstack, tree, 2 * num_pairs);
+  return new (r) irange (ranges, num_pairs);
+}
+
+irange *
+irange_pool::allocate (const irange &src)
+{
+  irange *r = allocate (src.m_max_ranges);
+  *r = src;
+  return r;
+}
+
 // This class implements a cache of ranges indexed by basic block.  It
 // represents all that is known about an SSA_NAME on entry to each
 // block.  It caches a range-for-type varying range so it doesn't need
@@ -131,9 +174,10 @@ public:
 
   void dump(FILE *f);
 private:
-  vec<irange_storage *> m_tab;
-  irange_storage *m_type_range;
+  vec<irange *> m_tab;
+  irange *m_type_range;
   tree m_type;
+  irange_pool m_irange_pool;
 };
 
 
@@ -141,7 +185,6 @@ private:
 
 ssa_block_ranges::ssa_block_ranges (tree t)
 {
-  irange_storage tr;
   gcc_assert (TYPE_P (t));
   m_type = t;
 
@@ -149,8 +192,8 @@ ssa_block_ranges::ssa_block_ranges (tree t)
   m_tab.safe_grow_cleared (last_basic_block_for_fn (cfun));
 
   // Create the cached type range.
-  tr.set_varying (t);
-  m_type_range = new irange_storage (tr);
+  m_type_range = m_irange_pool.allocate (2);
+  m_type_range->set_varying (t);
 
   m_tab[ENTRY_BLOCK_PTR_FOR_FN (cfun)->index] = m_type_range;
 }
@@ -167,17 +210,7 @@ ssa_block_ranges::~ssa_block_ranges ()
 void
 ssa_block_ranges::set_bb_range (const basic_block bb, const irange &r)
 {
-  irange_storage *m = m_tab[bb->index];
-
-// If there is already range memory for this block, kill it.
-// Look into reuse.
-//
-// right now we're losing memory.
-//
-//  if (m && m != m_type_range)
-//    delete m;
-
-  m = new irange_storage (r);
+  irange *m = m_irange_pool.allocate (r);
   m_tab[bb->index] = m;
 }
 
@@ -195,10 +228,10 @@ ssa_block_ranges::set_bb_varying (const basic_block bb)
 bool
 ssa_block_ranges::get_bb_range (irange &r, const basic_block bb)
 {
-  irange_storage *m = m_tab[bb->index];
+  irange *m = m_tab[bb->index];
   if (m)
     {
-      r = irange_storage (*m);
+      r = *m;
       return true;
     }
   return false;
@@ -374,6 +407,7 @@ ssa_global_cache::ssa_global_cache ()
 {
   m_tab.create (0);
   m_tab.safe_grow_cleared (num_ssa_names);
+  m_irange_pool = new irange_pool;
 }
 
 // Deconstruct a global cache.
@@ -381,6 +415,7 @@ ssa_global_cache::ssa_global_cache ()
 ssa_global_cache::~ssa_global_cache ()
 {
   m_tab.release ();
+  delete m_irange_pool;
 }
 
 // Retrieve the global range of NAME from cache memory if it exists. 
@@ -393,10 +428,10 @@ ssa_global_cache::get_global_range (irange &r, tree name) const
   if (v >= m_tab.length ())
     return false;
 
-  irange_storage *stow = m_tab[v];
+  irange *stow = m_tab[v];
   if (!stow)
     return false;
-  r = irange_storage (*stow);
+  r = *stow;
   return true;
 }
 
@@ -408,17 +443,12 @@ ssa_global_cache::set_global_range (tree name, const irange &r)
   unsigned v = SSA_NAME_VERSION (name);
   if (v >= m_tab.length ())
     m_tab.safe_grow_cleared (num_ssa_names + 1);
-  irange_storage *m = m_tab[v];
 
-  // Fixme update in place it if fits.
-//  if (m && m->update (r, TREE_TYPE (name)))
-//    ;
-//  else
-    {
-//      m = irange_storage::alloc (r, TREE_TYPE (name));
-      m = new irange_storage (r);
-      m_tab[SSA_NAME_VERSION (name)] = m;
-    }
+  irange *m = m_tab[v];
+  if (m && m->fits_p (r))
+    *m = r;
+  else
+    m_tab[v] = m_irange_pool->allocate (r);
 }
 
 // Set the range for NAME to R in the glonbal cache.
@@ -437,7 +467,7 @@ ssa_global_cache::clear_global_range (tree name)
 void
 ssa_global_cache::clear ()
 {
-  memset (m_tab.address(), 0, m_tab.length () * sizeof (irange_storage *));
+  memset (m_tab.address(), 0, m_tab.length () * sizeof (irange *));
 }
 
 // Dump the contents of the global cache to F.
@@ -676,7 +706,3 @@ if (DEBUG_CACHE)  fprintf (dump_file, "BACK visiting block %d\n", node->index);
 
   iterative_cache_update (name);
 }
-
-
-
-

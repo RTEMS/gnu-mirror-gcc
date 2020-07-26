@@ -27,8 +27,6 @@ along with GCC; see the file COPYING3.  If not see
 // has been visited during this incarnation.  Once the ranger evaluates
 // a name, it is typically not re-evaluated again.
 
-typedef int_range<3> irange_storage;
-
 class ssa_global_cache
 {
 public:
@@ -40,7 +38,8 @@ public:
   void clear ();
   void dump (FILE *f = stderr);
 private:
-  vec<irange_storage *> m_tab;
+  vec<irange *> m_tab;
+  class irange_pool *m_irange_pool;
 };
 
 // This class manages a vector of pointers to ssa_block ranges.  It
@@ -81,7 +80,7 @@ private:
   void process_name (tree name);
 };
 
-// THis class provides all the caches a global ranger may needs, and makes 
+// This class provides all the caches a global ranger may needs, and makes 
 // them available for gori-computes to query so outgoing edges can be
 // properly calculated.
 //

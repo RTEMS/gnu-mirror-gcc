@@ -42,6 +42,7 @@ enum value_range_kind
 
 class irange
 {
+  friend class irange_pool;
 public:
   // In-place setters.
   void set (tree, tree, value_range_kind = VR_RANGE);
@@ -79,6 +80,7 @@ public:
   bool operator!= (const irange &r) const { return !(*this == r); }
 
   // Misc methods.
+  bool fits_p (const irange &r) { return m_max_ranges >= r.num_pairs (); }
   void dump (FILE * = stderr) const;
 
   // Deprecated legacy public methods.
