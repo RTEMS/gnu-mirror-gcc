@@ -4209,7 +4209,7 @@ extend_insn_data (void)
         size = 3 * sched_max_luid / 2;
 
 
-      s_i_d.safe_grow_cleared (size);
+      s_i_d.safe_grow_cleared (size, true);
     }
 }
 
