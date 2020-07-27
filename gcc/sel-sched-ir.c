@@ -4200,17 +4200,7 @@ extend_insn_data (void)
   /* Extend data structures for insns from current region.  */
   reserve = (sched_max_luid + 1 - s_i_d.length ());
   if (reserve > 0 && ! s_i_d.space (reserve))
-    {
-      int size;
-
-      if (sched_max_luid / 2 > 1024)
-        size = sched_max_luid + 1024;
-      else
-        size = 3 * sched_max_luid / 2;
-
-
-      s_i_d.safe_grow_cleared (size);
-    }
+    s_i_d.safe_grow_cleared (sched_max_luid + 1);
 }
 
 /* Finalize data structures for insns from current region.  */
