@@ -2506,7 +2506,12 @@ execute_one_pass (opt_pass *pass)
 		     (void *)(size_t)pass->properties_required);
 
   /* Do it!  */
+  if (g_timer)
+    g_timer->start_trace (pass->name ? pass->name : "",
+			  cfun ? cgraph_node::get (cfun->decl)->name (): "");
   todo_after = pass->execute (cfun);
+  if (g_timer)
+    g_timer->end_trace ();
 
   if (todo_after & TODO_discard_function)
     {

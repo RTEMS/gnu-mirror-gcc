@@ -118,7 +118,11 @@ class timer
   void push_client_item (const char *item_name);
   void pop_client_item ();
 
+  void start_trace (const char *pass_name, const char *function_name);
+  void end_trace ();
+
   void print (FILE *fp);
+  void dump_time_traces ();
 
   const char *get_topmost_item_name () const;
 
@@ -173,6 +177,14 @@ class timer
     struct timevar_stack_def *next;
   };
 
+  struct time_trace_entry
+  {
+    const char *pass_name;
+    const char *function_name;
+    unsigned long start;
+    unsigned long duration;
+  };
+
   /* A class for managing a collection of named timing items, for use
      e.g. by libgccjit for timing client code.  This class is declared
      inside timevar.c to avoid everything using timevar.h
@@ -180,6 +192,8 @@ class timer
   class named_items;
 
  private:
+
+  auto_vec<time_trace_entry *> time_trace_entries;
 
   /* Data members (all private).  */
 
@@ -198,6 +212,8 @@ class timer
      pushed.  Time elapsed since then is attributed to the topmost
      element.  */
   timevar_time_def m_start_time;
+
+  unsigned long m_time_trace_start;
 
   /* If non-NULL, for use when timing libgccjit's client code.  */
   named_items *m_jit_client_items;

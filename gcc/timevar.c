@@ -23,6 +23,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "timevar.h"
 #include "options.h"
+#include "json.h"
+#include "json.h"
+#include <math.h>
 
 #ifndef HAVE_CLOCK_T
 typedef int clock_t;
@@ -193,6 +196,35 @@ timer::named_items::pop ()
   m_timer->pop_internal ();
 }
 
+long get_ts()
+{
+  struct timeval tv;
+  gettimeofday (&tv, NULL);
+  return round (1000 * tv.tv_sec + tv.tv_usec / 1000);
+}
+
+void
+timer::start_trace (const char *pass_name, const char *function_name)
+{
+  time_trace_entry *entry = new time_trace_entry();
+
+  entry->pass_name = xstrdup (pass_name);
+  entry->function_name = xstrdup (function_name);
+  entry->start = get_ts ();
+  entry->duration = 0;
+  time_trace_entries.safe_push (entry);
+}
+
+void
+timer::end_trace ()
+{
+  time_trace_entry *last = time_trace_entries.last ();
+  gcc_assert (last->duration == 0);
+  last->duration = get_ts () - last->start;
+  if (last->duration == 0)
+    time_trace_entries.pop ();
+}
+
 /* Print the given client item.  Helper function for timer::print.  */
 
 void
@@ -256,11 +288,13 @@ timevar_accumulate (struct timevar_time_def *timer,
 /* Class timer's constructor.  */
 
 timer::timer () :
+  time_trace_entries (),
   m_stack (NULL),
   m_unused_stack_instances (NULL),
   m_start_time (),
   m_jit_client_items (NULL)
 {
+  m_time_trace_start = get_ts ();
   /* Zero all elapsed times.  */
   memset (m_timevars, 0, sizeof (m_timevars));
 
@@ -791,6 +825,34 @@ timer::print (FILE *fp)
 	  || defined (HAVE_WALL_TIME) */
 
   validate_phases (fp);
+}
+
+void
+timer::dump_time_traces ()
+{
+  json::object *root = new json::object ();
+  json::array *traces = new json::array ();
+  root->set ("traceEvents", traces);
+  for (unsigned i = 0; i < time_trace_entries.length (); i++)
+    {
+      time_trace_entry *ts = time_trace_entries[i];
+      json::object *entry = new json::object ();
+      entry->set ("pid", new json::integer_number (0));
+      entry->set ("tid", new json::integer_number (0));
+      entry->set ("ph", new json::string ("X"));
+      entry->set ("name", new json::string (ts->pass_name));
+      entry->set ("ts", new json::integer_number (ts->start - m_time_trace_start));
+      entry->set ("dur", new json::integer_number (ts->duration));
+
+      if (ts->function_name)
+	{
+	  json::object *details = new json::object ();
+	  details->set ("detail", new json::string (ts->function_name));
+	  entry->set ("args", details);
+	}
+      traces->append (entry);
+    }
+  root->dump (fopen("/tmp/time-trace.json", "w"));
 }
 
 /* Get the name of the topmost item.  For use by jit for validating

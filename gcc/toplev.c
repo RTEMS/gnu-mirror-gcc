@@ -2354,6 +2354,7 @@ toplev::~toplev ()
     {
       g_timer->stop (TV_TOTAL);
       g_timer->print (stderr);
+      g_timer->dump_time_traces ();
       delete g_timer;
       g_timer = NULL;
     }
