@@ -473,8 +473,10 @@ irange::legacy_equal_p (const irange &other) const
    return false;
   if (m_kind == VR_UNDEFINED || m_kind == VR_VARYING)
     return true;
-  return (tree_lower_bound (0) == other.tree_lower_bound (0))
-	 && (tree_upper_bound (0) == other.tree_upper_bound (0));
+  return (vrp_operand_equal_p (tree_lower_bound (0),
+			       other.tree_lower_bound (0))
+	  && vrp_operand_equal_p (tree_upper_bound (0),
+				  other.tree_upper_bound (0)));
 }
 
 bool
