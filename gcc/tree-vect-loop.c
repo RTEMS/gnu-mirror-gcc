@@ -1865,7 +1865,8 @@ vect_get_datarefs_in_loop (loop_p loop, basic_block *bbs,
 	if (is_gimple_debug (stmt))
 	  continue;
 	++(*n_stmts);
-	opt_result res = vect_find_stmt_data_reference (loop, stmt, datarefs);
+	opt_result res = vect_find_stmt_data_reference (loop, stmt, datarefs,
+							0);
 	if (!res)
 	  {
 	    if (is_gimple_call (stmt) && loop->safelen)

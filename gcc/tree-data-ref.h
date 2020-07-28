@@ -174,6 +174,9 @@ struct data_reference
 
   /* Alias information for the data reference.  */
   struct dr_alias alias;
+
+  /* Group ID that can be vectorized together.  */
+  int group_id;
 };
 
 #define DR_STMT(DR)                (DR)->stmt
@@ -196,6 +199,7 @@ struct data_reference
 #define DR_OFFSET_ALIGNMENT(DR)    (DR)->innermost.offset_alignment
 #define DR_STEP_ALIGNMENT(DR)      (DR)->innermost.step_alignment
 #define DR_INNERMOST(DR)           (DR)->innermost
+#define DR_GROUP_ID(DR)		   (DR)->group_id
 
 typedef struct data_reference *data_reference_p;
 

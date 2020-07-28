@@ -2772,10 +2772,10 @@ dr_group_sort_cmp (const void *dra_, const void *drb_)
     return 0;
 
   /* DRs in different loops never belong to the same group.  */
-  loop_p loopa = gimple_bb (DR_STMT (dra))->loop_father;
-  loop_p loopb = gimple_bb (DR_STMT (drb))->loop_father;
-  if (loopa != loopb)
-    return loopa->num < loopb->num ? -1 : 1;
+  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+  if (bb_index1 != bb_index2)
+    return bb_index1 < bb_index2 ? -1 : 1;
 
   /* Ordering of DRs according to base.  */
   cmp = data_ref_compare_tree (DR_BASE_ADDRESS (dra),
@@ -2927,10 +2927,14 @@ vect_analyze_data_ref_accesses (vec_info *vinfo)
 	     matters we can push those to a worklist and re-iterate
 	     over them.  The we can just skip ahead to the next DR here.  */
 
-	  /* DRs in a different loop should not be put into the same
+	  /* DRs in a different BBs should not be put into the same
 	     interleaving group.  */
-	  if (gimple_bb (DR_STMT (dra))->loop_father
-	      != gimple_bb (DR_STMT (drb))->loop_father)
+	  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
+	  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
+	  if (bb_index1 != bb_index2)
+	    break;
+
+	  if (DR_GROUP_ID (dra) != DR_GROUP_ID (drb))
 	    break;
 
 	  /* Check that the data-refs have same first location (except init)
@@ -3991,7 +3995,8 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
 
 opt_result
 vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
-			       vec<data_reference_p> *datarefs)
+			       vec<data_reference_p> *datarefs,
+			       int group_id)
 {
   /* We can ignore clobbers for dataref analysis - they are removed during
      loop vectorization and BB vectorization checks dependences with a
@@ -4113,6 +4118,7 @@ vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
 		      DR_STEP (newdr) = step;
 		      DR_OFFSET_ALIGNMENT (newdr) = BIGGEST_ALIGNMENT;
 		      DR_STEP_ALIGNMENT (newdr) = highest_pow2_factor (step);
+		      DR_GROUP_ID (newdr) = group_id;
 		      /* Mark as simd-lane access.  */
 		      tree arg2 = gimple_call_arg (def, 1);
 		      newdr->aux = (void *) (-1 - tree_to_uhwi (arg2));
@@ -4127,6 +4133,7 @@ vect_find_stmt_data_reference (loop_p loop, gimple *stmt,
     }
 
   datarefs->safe_push (dr);
+  DR_GROUP_ID (dr) = group_id;
   return opt_result::success ();
 }
 
