@@ -1,3 +1,73 @@
+2020-07-28  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/96058
+	* expr.c (string_constant): Build string_constant only
+	for a type that has same precision as char_type_node
+	and is an integral type.
+
+2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/96335
+	* calls.c (maybe_warn_rdwr_sizes): Add FNDECL and FNTYPE arguments,
+	instead of trying to rediscover them in the body.
+	(initialize_argument_information): Adjust caller.
+
+2020-07-27  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-06-23  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config.gcc: Identify power10 as a 64-bit processor and as valid
+	for --with-cpu and --with-tune.
+
+2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	PR lto/45375
+	* symbol-summary.h: Call vec_safe_reserve before grow is called
+	in order to grow to a reasonable size.
+	* vec.h (vec_safe_reserve): Add missing function for vl_ptr
+	type.
+
+2020-07-23  Sergei Trofimovich  <siarheit@google.com>
+
+	Backported from master:
+	2020-07-20  Sergei Trofimovich  <siarheit@google.com>
+
+	PR target/96190
+	* config/sparc/linux.h (ENDFILE_SPEC): Use GNU_USER_TARGET_ENDFILE_SPEC
+	to get crtendS.o for !no-pie mode.
+	* config/sparc/linux64.h (ENDFILE_SPEC): Ditto.
+
+2020-07-23  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-07-22  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/96236
+	* config/rs6000/rs6000-call.c (rs6000_gimple_fold_mma_builtin): Handle
+	little-endian memory ordering.
+
+2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/96260
+	* asan.c (asan_shadow_offset_set_p): New.
+	* asan.h (asan_shadow_offset_set_p): Ditto.
+	* toplev.c (process_options): Allow -fsanitize=kernel-address
+	even TARGET_ASAN_SHADOW_OFFSET not implemented, only check when
+	asan stack protection is enabled.
+
 2020-07-23  Release Manager
 
 	* GCC 10.2.0 released.

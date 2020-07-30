@@ -1,3 +1,131 @@
+2020-07-29  Tiziano Müller  <tiziano.mueller@chem.uzh.ch>
+
+	* c-c++-common/cpp/has-include-1-traditional.c: New.
+
+2020-07-29  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	Backported from master:
+	2020-07-29  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/96319
+	* gfortran.dg/pr96319.f90: New test.
+
+2020-07-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2020-07-16  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/95591
+	PR c++/95599
+	PR c++/95823
+	PR c++/95824
+	PR c++/95895
+	* g++.dg/coroutines/pr95591.C: New test.
+	* g++.dg/coroutines/pr95599.C: New test.
+	* g++.dg/coroutines/pr95823.C: New test.
+	* g++.dg/coroutines/pr95824.C: New test.
+
+2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/96335
+	* gcc.dg/pr96335.c: New test.
+
+2020-07-27  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	Backported from master:
+	2020-07-14  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/95612
+	* gfortran.dg/pr95612.f90: New test.
+
+2020-07-26  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	Backported from master:
+	2020-06-22  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/95585
+	* gfortran.dg/pr95585.f90: New test.
+
+2020-07-25  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	Backported from master:
+	2020-07-24  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	PR fortran/93567
+	* gfortran.dg/round_3.f08: Add test cases.
+
+2020-07-25  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	Backported from master:
+	2020-07-24  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	PR fortran/93592
+	* gfortran.dg/fmt_en.f90: Adjust test.
+	* gfortran.dg/fmt_en_rd.f90: New test.
+	* gfortran.dg/fmt_en_rn.f90: New test.
+	* gfortran.dg/fmt_en_ru.f90: New test.
+	* gfortran.dg/fmt_en_rz.f90: New test.
+
+2020-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95980
+	* gfortran.dg/pr95980_2.f90: New file.
+
+2020-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95980
+	* gfortran.dg/pr95980.f90: New file.
+
+2020-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96086
+	* gfortran.dg/pr96086.f90: New file.
+
+2020-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-07-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/89574
+	* gfortran.dg/pr89574.f90: New file.
+
+2020-07-23  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-07-22  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/96236
+	* gcc.target/powerpc/mma-double-test.c: Update storing results for
+	correct little-endian ordering.
+	* gcc.target/powerpc/mma-single-test.c: Likewise.
+
+2020-07-23  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/96018
+	* gfortran.dg/implicit_pure_5.c: New file.
+	* gfortran.dg/implicit_pure_5.f90: New file.
+
+2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/96260
+	* gcc.target/riscv/pr91441.c: Update warning message.
+	* gcc.target/riscv/pr96260.c: New.
+
 2020-07-23  Release Manager
 
 	* GCC 10.2.0 released.
