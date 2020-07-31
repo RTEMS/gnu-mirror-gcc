@@ -1,7 +1,7 @@
-class trace_ranger : public loop_ranger
+class trace_ranger : public gimple_ranger
 {
 public:
-  trace_ranger();
+  trace_ranger (bool use_loop_info);
   virtual bool range_of_stmt (irange &r, gimple *s, tree name = NULL_TREE);
   virtual bool range_of_expr (irange &r, tree name, gimple *s = NULL);
   virtual void range_on_edge (irange &r, edge e, tree name);
@@ -20,7 +20,8 @@ private:
 
 // trace_ranger implementation.
 
-trace_ranger::trace_ranger ()
+trace_ranger::trace_ranger (bool use_loop_info)
+  : gimple_ranger (use_loop_info)
 {
   indent = 0;
   trace_count = 0;
@@ -92,7 +93,7 @@ trace_ranger::range_on_edge (irange &r, edge e, tree name)
       indent += bump;
     }
 
-  loop_ranger::range_on_edge (r, e, name);
+  gimple_ranger::range_on_edge (r, e, name);
 
   trailer (idx, "range_on_edge", true, name, r);
 }
@@ -152,7 +153,7 @@ trace_ranger::range_of_stmt (irange &r, gimple *s, tree name)
       indent += bump;
     }
 
-  res = loop_ranger::range_of_stmt (r, s, name);
+  res = gimple_ranger::range_of_stmt (r, s, name);
 
   return trailer (idx, "range_of_stmt", res, name, r);
 }

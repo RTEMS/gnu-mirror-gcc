@@ -50,7 +50,9 @@ class rvrp_ranger : public range_query
 {
 public:
   rvrp_ranger ()
-    : simplifier (this), range_pool ("rvrp value range pool") { }
+    : query (/*use_loop_info=*/true),
+      simplifier (this),
+      range_pool ("rvrp value range pool") { }
   ~rvrp_ranger ()
   {
     range_pool.release ();
@@ -63,7 +65,7 @@ public:
       return new (range_pool.allocate ()) value_range_equiv (r);
     return new (range_pool.allocate ()) value_range_equiv (TREE_TYPE (expr));
   }
-  loop_ranger query;
+  gimple_ranger query;
   simplify_using_ranges simplifier;
 private:
   object_allocator<value_range_equiv> range_pool;

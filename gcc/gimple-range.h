@@ -44,6 +44,8 @@ along with GCC; see the file COPYING3.  If not see
 class gimple_ranger
 {
 public:
+  gimple_ranger (bool use_loop_info);
+  ~gimple_ranger ();
   virtual bool range_of_stmt (irange &r, gimple *s, tree name = NULL_TREE);
   virtual bool range_of_expr (irange &r, tree name, gimple *stmt = NULL);
   virtual void range_on_edge (irange &r, edge e, tree name);
@@ -62,24 +64,10 @@ private:
   bool range_of_non_trivial_assignment (irange &r, gimple *s);
   bool range_of_builtin_call (irange &r, gcall *call);
   void range_of_builtin_ubsan_call (irange &r, gcall *call, tree_code code);
-};
-
-
-// A global ranger that uses SCEV/loop (if available) to refine PHI results.
-
-class loop_ranger : public gimple_ranger
-{
-public:
-  loop_ranger ();
-  ~loop_ranger ();
-  virtual void range_on_edge (irange &r, edge e, tree name);
-  virtual bool range_of_stmt (irange &r, gimple *stmt, tree name = NULL_TREE);
-
-private:
-  typedef gimple_ranger super;
   bool range_with_loop_info (irange &r, tree name);
   void range_of_ssa_name_with_loop_info (irange &, tree, class loop *,
 					 gphi *);
+  bool loop_aware_p () { return m_range_query != NULL; }
 
   class range_query *m_range_query;
 };
