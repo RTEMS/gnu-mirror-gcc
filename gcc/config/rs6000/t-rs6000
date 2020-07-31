@@ -44,7 +44,7 @@ rs6000-logue.o: $(srcdir)/config/rs6000/rs6000-logue.c
 	$(POSTCOMPILE)
 
 rs6000-gen-builtins.o: $(srcdir)/config/rs6000/rs6000-gen-builtins.c
-	$(COMPILE) $<
+	$(COMPILE) $(CXXFLAGS) $<
 	$(POSTCOMPILE)
 
 rbtree.o: $(srcdir)/config/rs6000/rbtree.c
@@ -52,7 +52,7 @@ rbtree.o: $(srcdir)/config/rs6000/rbtree.c
 	$(POSTCOMPILE)
 
 rs6000-gen-builtins: rs6000-gen-builtins.o rbtree.o
-	+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
+	$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
 	    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)
 
 rs6000-builtins.c: rs6000-gen-builtins \
