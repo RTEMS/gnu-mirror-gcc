@@ -2673,7 +2673,7 @@
     XXBRW_V4SI p9_xxbrw_v4si {}
 
 
-; Miscellaneour P9 functions
+; Miscellaneous P9 functions
 [power9]
   signed long long __builtin_darn ();
     DARN darn {}
@@ -2713,7 +2713,7 @@
 ; MASK_POWERPC64.  For xsxexpdp, this seems to be fine for 32-bit,
 ; because the result will always fit in 32 bits and the return
 ; value is SImode; but the pattern currently requires TARGET_64BIT.
-; On the other hand, xsssigdp has a result that doesn't fit in
+; On the other hand, xsxsigdp has a result that doesn't fit in
 ; 32 bits, and the return value is DImode, so it seems that
 ; TARGET_64BIT (actually TARGET_POWERPC64) is justified.  TBD. ####
 [power9-64]
