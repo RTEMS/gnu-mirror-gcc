@@ -64,7 +64,7 @@ _slp_tree::_slp_tree ()
   SLP_TREE_LOAD_PERMUTATION (this) = vNULL;
   SLP_TREE_LANE_PERMUTATION (this) = vNULL;
   SLP_TREE_DEF_TYPE (this) = vect_uninitialized_def;
-  SLP_TREE_CODE (this) = ERROR_MARK;
+  SLP_TREE_CODE (this) = VEC_NORMAL;
   SLP_TREE_VECTYPE (this) = NULL_TREE;
   SLP_TREE_REPRESENTATIVE (this) = NULL;
   SLP_TREE_VEC_GSI (this) = gsi_none ();
@@ -1506,7 +1506,7 @@ fail:
 	 node represents the final lane configuration.  */
       node = vect_create_new_slp_node (stmts, 2);
       SLP_TREE_VECTYPE (node) = vectype;
-      SLP_TREE_CODE (node) = VEC_PERM_EXPR;
+      SLP_TREE_CODE (node) = VEC_PERM;
       SLP_TREE_CHILDREN (node).quick_push (one);
       SLP_TREE_CHILDREN (node).quick_push (two);
       gassign *stmt = as_a <gassign *> (stmts[0]->stmt);
@@ -1526,8 +1526,6 @@ fail:
 	  else
 	    SLP_TREE_LANE_PERMUTATION (node).safe_push (std::make_pair (0, i));
 	}
-      SLP_TREE_CODE (one) = code0;
-      SLP_TREE_CODE (two) = ocode;
       SLP_TREE_LANES (one) = stmts.length ();
       SLP_TREE_LANES (two) = stmts.length ();
       SLP_TREE_REPRESENTATIVE (one) = stmts[0];
@@ -1999,6 +1997,121 @@ vect_split_slp_store_group (stmt_vec_info first_vinfo, unsigned group1_size)
   return group2;
 }
 
+#if 0
+static bool
+vect_slp_check_for_reductions (vec_info *vinfo, slp_instance new_instance,
+			       vec<stmt_vec_info> ordered_set)
+{
+  stmt_vec_info stmt_vinfo;
+  unsigned i;
+  auto_vec <stmt_vec_info> uses;
+  /* Collect all single uses of our root node.  */
+  FOR_EACH_VEC_ELT (ordered_set, i, stmt_vinfo)
+    {
+      use_operand_p use_p;
+      gimple *use_stmt;
+      stmt_vec_info use_info;
+      tree def = gimple_get_lhs (stmt_vinfo->stmt);
+      if (!single_imm_use (def, &use_p, &use_stmt)
+	  || !(use_info = vinfo->lookup_stmt (use_stmt)))
+	continue;
+
+      uses.safe_push (use_info);
+    }
+
+  auto_vec <stmt_vec_info> outputs;
+  auto_vec <stmt_vec_info> visited;
+  auto_vec <vec <tree *> > output_defs;
+  FOR_EACH_VEC_ELT (uses, i, stmt_vinfo)
+    {
+      use_operand_p use_p;
+      gimple *use_stmt;
+      stmt_vec_info use_info;
+      tree def = gimple_get_lhs (stmt_vinfo->stmt);
+      if (!single_imm_use (def, &use_p, &use_stmt)
+	  || !(use_info = vinfo->lookup_stmt (use_stmt))
+	  || !uses.contains (use_info))
+	/* This stmt is not (only) used by the uses of our root node, so it has
+	   to be an output statement.  */
+	outputs.safe_push (stmt_vinfo);
+      else
+	{
+	  /* They should have the same operator.  */
+	  if (!is_gimple_assign (stmt_vinfo->stmt)
+	      || !is_gimple_assign (use_info->stmt))
+	    {
+	      tree_code my_code = gimple_assign_rhs_code (stmt_vinfo->stmt);
+	      tree_code use_code = gimple_assign_rhs_code (use_info->stmt);
+	      bool reduction = false;
+	      switch (my_code)
+		{
+		case PLUS_EXPR:
+		case MINUS_EXPR:
+		case MAX_EXPR:
+		case MIN_EXPR:
+		  /* ?? Support for alternating plus and sub? */
+		  reduction = my_code == use_code;
+		default:
+		  break;
+		}
+
+	      if (!reduction)
+		outputs.safe_push (stmt_vinfo);
+	    }
+    }
+
+
+  unsigned noutputs = outputs.length ();
+  if (ordered_set.length () > noutputs)
+    {
+      vec<vec<tree *> > output_defs;
+      output_defs.create (noutputs);
+      output_defs.quick_grow (noutputs);
+
+      for (int i = 0; i < noutputs; ++i)
+	{
+	  stmt_vec_info out_vinfo = outputs[i];
+	  gimple *stmt = out_vinfo->stmt;
+	  enum vect_reduction_type reduc_type = TREE_CODE_REDUCTION;
+
+	  tree op;
+	  for (int j = 1; gimple_num_ops (stmt); ++j)
+	    {
+	      op = gimple_op (stmt, j);
+
+	    }
+
+	}
+      /* ?? Need to check number of stmts in reduction chain, to be able to
+         compute vectype for cases where outputs.length () > 1.  */
+      for (int i = 0; i < outputs.length (); ++i)
+	{
+	  enum vect_reduction_type reduc_type = TREE_CODE_REDUCTION;
+	  stmt_vec_info stmt_vinfo = outputs[i];
+	  gimple *stmt = stmt_vinfo->stmt;
+	  tree_code orig_code = gimple_assign_rhs_code (stmt);
+	  if (needs_fold_left_reduction_p (TREE_TYPE (gimple_lhs (stmt)),
+					   orig_code))
+	    reduc_type = FOLD_LEFT_REDUCTION;
+
+	  internal_fn reduc_fn = IFN_LAST;
+
+	  if (!(reduc_type == FOLD_LEFT_REDUCTION
+		? fold_left_reduction_fn (orig_codei, &reduc_fn)
+		: reduction_fn_for_scalar_code (orig_code, &reduc_fn)))
+	    return false;
+
+	  if (!direct_internal_fn_supported_p (reduc_fn, vectype,
+					       OPTIMIZE_FOR_SPEED)
+
+	}
+    }
+	}
+
+  return false;
+}
+#endif
+
 /* Calculate the unrolling factor for an SLP instance with GROUP_SIZE
    statements and a vector of NUNITS elements.  */
 
@@ -2195,8 +2308,6 @@ vect_analyze_slp_instance (vec_info *vinfo,
 	}
       else
 	{
-	  if (ordered_set)
-	    SLP_TREE_CODE (node) = BIT_FIELD_REF;
 	  /* Create a new SLP instance.  */
 	  new_instance = XNEW (class _slp_instance);
 	  SLP_INSTANCE_TREE (new_instance) = node;
@@ -2286,6 +2397,16 @@ vect_analyze_slp_instance (vec_info *vinfo,
 		 elsewhere.  */
 	      REDUC_GROUP_FIRST_ELEMENT (next_info) = next_info;
 	      REDUC_GROUP_NEXT_ELEMENT (next_info) = NULL;
+	    }
+
+	  if (ordered_set)
+	    {
+#if 0
+	      /* Check if the uses of our root scalar definitions form a
+	         reduction.  */
+	      if (!vect_slp_check_for_reductions (vinfo, new_instance, *ordered_set))
+#endif
+		SLP_TREE_CODE (node) = VEC_LANE_EXTRACT;
 	    }
 
 	  vinfo->slp_instances.safe_push (new_instance);
@@ -2439,7 +2560,7 @@ vect_compute_slp_vec_stmt_placing (vec_info *vinfo, slp_tree node,
   else if (SLP_TREE_DEF_TYPE (node) == vect_constant_def)
     ;
   else if (SLP_TREE_DEF_TYPE (node) == vect_internal_def
-	   && SLP_TREE_CODE (node) != VEC_PERM_EXPR
+	   && SLP_TREE_CODE (node) != VEC_PERM
 	   && STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node)))
     {
       vec<stmt_vec_info> scalars = SLP_TREE_SCALAR_STMTS (node);
@@ -2894,7 +3015,7 @@ vect_slp_analyze_node_operations_1 (vec_info *vinfo, slp_tree node,
     }
 
   /* Handle purely internal nodes.  */
-  if (SLP_TREE_CODE (node) == VEC_PERM_EXPR)
+  if (SLP_TREE_CODE (node) == VEC_PERM)
     return vectorizable_slp_permutation (vinfo, NULL, node, cost_vec);
 
   bool dummy;
@@ -3181,7 +3302,7 @@ vect_bb_slp_scalar_cost (vec_info *vinfo,
 	    if (!is_gimple_debug (use_stmt))
 	      {
 		stmt_vec_info use_stmt_info = vinfo->lookup_stmt (use_stmt);
-		if (SLP_TREE_CODE (node) != BIT_FIELD_REF
+		if (SLP_TREE_CODE (node) != VEC_LANE_EXTRACT
 		    && (!use_stmt_info
 			|| !(PURE_SLP_STMT (use_stmt_info)
 			     || (!STMT_VINFO_DATA_REF (use_stmt_info)
@@ -3258,7 +3379,7 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
 			       SLP_INSTANCE_TREE (instance),
 			       &life, &scalar_costs, visited);
 
-      if (SLP_TREE_CODE (node) == BIT_FIELD_REF)
+      if (SLP_TREE_CODE (node) == VEC_LANE_EXTRACT)
 	{
 	  record_stmt_cost (&extract_costs, SLP_TREE_LANES (node),
 			    vec_to_scalar, SLP_TREE_SCALAR_STMTS (node)[0], 0,
@@ -3361,7 +3482,7 @@ static bool stmt_earlier (gimple * const &A, gimple * const &B)
 }
 
 static void
-vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
+vect_slp_check_for_candidates (bb_vec_info bb_vinfo)
 {
   gimple_stmt_iterator gsi;
 
@@ -3567,7 +3688,7 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal)
     }
 
   vect_slp_check_for_constructors (bb_vinfo);
-  vect_slp_check_for_reductions (bb_vinfo);
+  vect_slp_check_for_candidates (bb_vinfo);
 
   /* If there are no grouped stores in the region there is no need
      to continue with pattern recog as vect_analyze_slp will fail
@@ -4628,7 +4749,7 @@ vect_schedule_slp_instance (vec_info *vinfo,
 		     "------>vectorizing SLP node starting from: %G",
 		     stmt_info->stmt);
   if (STMT_VINFO_DATA_REF (stmt_info)
-      && SLP_TREE_CODE (node) != VEC_PERM_EXPR)
+      && SLP_TREE_CODE (node) != VEC_PERM)
     {
       /* Vectorized loads go before the first scalar load to make it
          ready early, vectorized stores go before the last scalar
@@ -4683,7 +4804,7 @@ vect_schedule_slp_instance (vec_info *vinfo,
   bool done_p = false;
 
   /* Handle purely internal nodes.  */
-  if (SLP_TREE_CODE (node) == VEC_PERM_EXPR)
+  if (SLP_TREE_CODE (node) == VEC_PERM)
     {
       /* ???  the transform kind is stored to STMT_VINFO_TYPE which might
 	 be shared with different SLP nodes (but usually it's the same
@@ -4931,7 +5052,7 @@ vect_schedule_slp (vec_info *vinfo)
       /* Schedule the tree of INSTANCE.  */
       vect_schedule_slp_instance (vinfo, node, instance);
 
-      if (SLP_TREE_CODE (node) == BIT_FIELD_REF)
+      if (SLP_TREE_CODE (node) == VEC_LANE_EXTRACT)
 	build_extractions (vinfo, node);
 
       if (SLP_INSTANCE_ROOT_STMT (instance))

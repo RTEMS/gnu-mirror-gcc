@@ -115,6 +115,14 @@ typedef hash_map<tree_operand_hash,
  ************************************************************************/
 typedef struct _slp_tree *slp_tree;
 
+enum slp_code
+{
+  VEC_NORMAL,
+  VEC_PERM,
+  VEC_LANE_EXTRACT,
+  VEC_REDUC
+};
+
 /* A computation tree of an SLP instance.  Each node corresponds to a group of
    stmts to be packed in a SIMD stmt.  */
 struct _slp_tree {
@@ -163,7 +171,7 @@ struct _slp_tree {
   /* The number of scalar lanes produced by this node.  */
   unsigned int lanes;
   /* The operation of this node.  */
-  enum tree_code code;
+  enum slp_code code;
 };
 
 
