@@ -1707,6 +1707,7 @@ slp_copy_subtree (slp_tree node, hash_map<slp_tree, slp_tree> &map)
   copy_ref = new _slp_tree;
   slp_tree copy = copy_ref;
   SLP_TREE_DEF_TYPE (copy) = SLP_TREE_DEF_TYPE (node);
+  SLP_TREE_CODE (copy) = SLP_TREE_CODE (node);
   SLP_TREE_VECTYPE (copy) = SLP_TREE_VECTYPE (node);
   SLP_TREE_REPRESENTATIVE (copy) = SLP_TREE_REPRESENTATIVE (node);
   SLP_TREE_LANES (copy) = SLP_TREE_LANES (node);
@@ -1990,7 +1991,8 @@ calculate_unrolling_factor (poly_uint64 nunits, unsigned int group_size)
 static bool
 vect_analyze_slp_instance (vec_info *vinfo,
 			   scalar_stmts_to_slp_tree_map_t *bst_map,
-			   stmt_vec_info stmt_info, unsigned max_tree_size)
+			   stmt_vec_info stmt_info, unsigned max_tree_size,
+			   vec <stmt_vec_info> *ordered_set = NULL)
 {
   slp_instance new_instance;
   slp_tree node;
@@ -2002,7 +2004,14 @@ vect_analyze_slp_instance (vec_info *vinfo,
   bool constructor = false;
   bool slp_reduction = false;
 
-  if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
+  if (ordered_set)
+    {
+      slp_reduction = true;
+      scalar_type = TREE_TYPE (gimple_assign_lhs (stmt_info->stmt));
+      group_size = ordered_set->length ();
+      vectype = get_vectype_for_scalar_type (vinfo, scalar_type, group_size);
+    }
+  else if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
     {
       scalar_type = TREE_TYPE (DR_REF (dr));
       group_size = DR_GROUP_SIZE (stmt_info);
@@ -2011,14 +2020,8 @@ vect_analyze_slp_instance (vec_info *vinfo,
   else if (!dr && REDUC_GROUP_FIRST_ELEMENT (stmt_info))
     {
       group_size = REDUC_GROUP_SIZE (stmt_info);
-      if (is_a <loop_vec_info> (vinfo))
-	vectype = STMT_VINFO_VECTYPE (stmt_info);
-      else
-	{
-	  slp_reduction = true;
-	  scalar_type = TREE_TYPE (gimple_assign_lhs (stmt_info->stmt));
-	  vectype = get_vectype_for_scalar_type (vinfo, scalar_type, group_size);
-	}
+      gcc_assert (is_a <loop_vec_info> (vinfo));
+      vectype = STMT_VINFO_VECTYPE (stmt_info);
     }
   else if (is_gimple_assign (stmt_info->stmt)
 	    && gimple_assign_rhs_code (stmt_info->stmt) == CONSTRUCTOR)
@@ -2070,7 +2073,11 @@ vect_analyze_slp_instance (vec_info *vinfo,
   /* Create a node (a root of the SLP tree) for the packed grouped stores.  */
   scalar_stmts.create (group_size);
   stmt_vec_info next_info = stmt_info;
-  if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
+  if (ordered_set)
+    {
+      scalar_stmts = *ordered_set;
+    }
+  else if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
     {
       /* Collect the stores and store them in SLP_TREE_SCALAR_STMTS.  */
       while (next_info)
@@ -2081,87 +2088,20 @@ vect_analyze_slp_instance (vec_info *vinfo,
     }
   else if (!dr && REDUC_GROUP_FIRST_ELEMENT (stmt_info))
     {
-      if (is_a <bb_vec_info> (vinfo))
+      /* Collect the reduction stmts and store them in
+	 SLP_TREE_SCALAR_STMTS.  */
+      while (next_info)
 	{
-	  stmt_vec_info def_vinfo;
-	  internal_fn reduc_fn;
-	  vect_reduction_type reduc_type;
-	  tree_code orig_code;
-
-	  next_info = REDUC_GROUP_FIRST_ELEMENT (stmt_info);
-	  reduc_type = STMT_VINFO_REDUC_TYPE (next_info);
-
-	  orig_code = gimple_assign_rhs_code (next_info->stmt);
-
-	  if (!((reduc_type == FOLD_LEFT_REDUCTION)
-		 ? fold_left_reduction_fn (orig_code, &reduc_fn)
-		 : reduction_fn_for_scalar_code (orig_code, &reduc_fn)))
-	    {
-	      if (dump_enabled_p ())
-		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-				 "no reduc code for scalar code.\n");
-
-	      return false;
-	    }
-
-	  if (reduc_fn != IFN_LAST
-	      && !direct_internal_fn_supported_p (reduc_fn, vectype,
-						  OPTIMIZE_FOR_SPEED))
-	    {
-	      if (dump_enabled_p ())
-		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-				 "reduc op not supported by target.\n");
-	      reduc_fn = IFN_LAST;
-	    }
-
-	  STMT_VINFO_REDUC_FN (next_info) = reduc_fn;
-	  while (next_info != NULL)
-	    {
-	      int idx = STMT_VINFO_REDUC_IDX (next_info) + 1;
-	      if (idx > 0)
-		{
-		  /* Get the non-reduction operand.  */
-		  def_vinfo
-		    = vinfo->lookup_def (gimple_op (next_info->stmt, idx));
-		  if (def_vinfo == NULL)
-		    return false;
-		  scalar_stmts.safe_push (def_vinfo);
-		}
-	      else
-		{
-		  /* This is the last of the reduction statements, so both
-		     operands are leafs.  */
-		  def_vinfo
-		    = vinfo->lookup_def (gimple_op (next_info->stmt, 1));
-		  if (def_vinfo == NULL)
-		    return false;
-		  scalar_stmts.safe_push (def_vinfo);
-		  def_vinfo
-		    = vinfo->lookup_def (gimple_op (next_info->stmt, 2));
-		  if (def_vinfo == NULL)
-		    return false;
-		  scalar_stmts.safe_push (def_vinfo);
-		}
-	      next_info = REDUC_GROUP_NEXT_ELEMENT (next_info);
-	    }
+	  scalar_stmts.safe_push (vect_stmt_to_vectorize (next_info));
+	  next_info = REDUC_GROUP_NEXT_ELEMENT (next_info);
 	}
-      else
-	{
-	  /* Collect the reduction stmts and store them in
-	     SLP_TREE_SCALAR_STMTS.  */
-	  while (next_info)
-	    {
-	      scalar_stmts.safe_push (vect_stmt_to_vectorize (next_info));
-	      next_info = REDUC_GROUP_NEXT_ELEMENT (next_info);
-	    }
-	  /* Mark the first element of the reduction chain as reduction to properly
-	     transform the node.  In the reduction analysis phase only the last
-	     element of the chain is marked as reduction.  */
-	  STMT_VINFO_DEF_TYPE (stmt_info)
-	    = STMT_VINFO_DEF_TYPE (scalar_stmts.last ());
-	  STMT_VINFO_REDUC_DEF (vect_orig_stmt (stmt_info))
-	    = STMT_VINFO_REDUC_DEF (vect_orig_stmt (scalar_stmts.last ()));
-	}
+      /* Mark the first element of the reduction chain as reduction to properly
+	 transform the node.  In the reduction analysis phase only the last
+	 element of the chain is marked as reduction.  */
+      STMT_VINFO_DEF_TYPE (stmt_info)
+	= STMT_VINFO_DEF_TYPE (scalar_stmts.last ());
+      STMT_VINFO_REDUC_DEF (vect_orig_stmt (stmt_info))
+	= STMT_VINFO_REDUC_DEF (vect_orig_stmt (scalar_stmts.last ()));
     }
   else if (constructor)
     {
@@ -2231,13 +2171,15 @@ vect_analyze_slp_instance (vec_info *vinfo,
 	}
       else
 	{
+	  if (ordered_set)
+	    SLP_TREE_CODE (node) = BIT_FIELD_REF;
 	  /* Create a new SLP instance.  */
 	  new_instance = XNEW (class _slp_instance);
 	  SLP_INSTANCE_TREE (new_instance) = node;
 	  SLP_INSTANCE_UNROLLING_FACTOR (new_instance) = unrolling_factor;
 	  SLP_INSTANCE_LOADS (new_instance) = vNULL;
 	  SLP_INSTANCE_ROOT_STMT (new_instance)
-	    = constructor || slp_reduction ? stmt_info : NULL;
+	    = constructor ? stmt_info : NULL;
 
 	  vect_gather_slp_loads (new_instance, node);
 	  if (dump_enabled_p ())
@@ -2450,41 +2392,8 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 	  /* Find SLP sequences starting from reduction chains.  */
 	  FOR_EACH_VEC_ELT (vinfo->bb_reduc_chains, i, ordered_set)
 	    {
-	      stmt_vec_info first_stmt = (*ordered_set)[ordered_set->length () - 1];
-	      REDUC_GROUP_FIRST_ELEMENT (first_stmt) = first_stmt;
-	      REDUC_GROUP_SIZE (first_stmt) = ordered_set->length () + 1;
-	      STMT_VINFO_REDUC_TYPE (first_stmt) = TREE_CODE_REDUCTION;
-	      stmt_vec_info prev_stmt = first_stmt;
-	      for (unsigned i = ordered_set->length () - 1; i >= 1; --i)
-		{
-		  stmt_vec_info stmt = (*ordered_set)[i - 1];
-		  if (dump_file)
-		    print_gimple_stmt (dump_file, stmt->stmt, 0);
-		  REDUC_GROUP_FIRST_ELEMENT (stmt) = first_stmt;
-		  REDUC_GROUP_NEXT_ELEMENT (prev_stmt) = stmt;
-		  if (gimple_assign_lhs (stmt->stmt)
-		      == gimple_assign_rhs1 (prev_stmt->stmt))
-		    STMT_VINFO_REDUC_IDX (prev_stmt) = 1;
-		  else if (gimple_assign_lhs (stmt->stmt)
-			   == gimple_assign_rhs2 (prev_stmt->stmt))
-		    STMT_VINFO_REDUC_IDX (prev_stmt) = 0;
-		  else
-		    STMT_VINFO_REDUC_IDX (prev_stmt) = -1;
-		  prev_stmt = stmt;
-		}
-
-	      if (!vect_analyze_slp_instance (vinfo, bst_map, first_stmt,
-					      max_tree_size))
-		{
-		  stmt_vec_info last = first_stmt;
-		  while (first_stmt != NULL)
-		  {
-		    first_stmt = REDUC_GROUP_NEXT_ELEMENT (first_stmt);
-		    REDUC_GROUP_FIRST_ELEMENT (last) = NULL;
-		    REDUC_GROUP_NEXT_ELEMENT (last) = NULL;
-		    last = first_stmt;
-		  }
-		}
+	      vect_analyze_slp_instance (vinfo, bst_map, (*ordered_set)[0],
+					 max_tree_size, ordered_set);
 	    }
 	}
     }
@@ -3093,7 +3002,8 @@ vect_bb_slp_scalar_cost (vec_info *vinfo,
 		if (!use_stmt_info
 		    || !(PURE_SLP_STMT (use_stmt_info)
 			 || (!STMT_VINFO_DATA_REF (use_stmt_info)
-			     && REDUC_GROUP_FIRST_ELEMENT (use_stmt_info))))
+			     && REDUC_GROUP_FIRST_ELEMENT (use_stmt_info))
+			 || SLP_TREE_CODE (node) == BIT_FIELD_REF))
 		  {
 		    (*life)[i] = true;
 		    BREAK_FROM_IMM_USE_STMT (use_iter);
@@ -3261,9 +3171,14 @@ static bool chain_earlier (vec <stmt_vec_info> * const &A, vec <stmt_vec_info> *
     return gimple_uid (stmt_first_A) < gimple_uid (stmt_first_B);
 }
 
-static bool stmt_earlier (const stmt_vec_info &A, const stmt_vec_info &B)
+static bool stmt_vinfo_earlier (const stmt_vec_info &A, const stmt_vec_info &B)
 {
   return gimple_uid (A->stmt) < gimple_uid (B->stmt);
+}
+
+static bool stmt_earlier (gimple * const &A, gimple * const &B)
+{
+  return gimple_uid (A) < gimple_uid (B);
 }
 
 static void
@@ -3280,7 +3195,7 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
   /* We store hashval_t which is unsigned int, use 32bits extra for
      empty/deleted.
      ???  Use pair<level, hash> as key instead?  */
-  typedef hash_map<int_hash<int64_t, -1, -2>, vec<tree> *> hash_to_def_map_t;
+  typedef hash_map<int_hash<int64_t, -1, -2>, vec<stmt_vec_info> *> hash_to_def_map_t;
   hash_to_def_map_t hash_to_def_map;
 
   for (gsi = bb_vinfo->region_begin;
@@ -3339,12 +3254,13 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
 	    }
 	  ssa_hash[SSA_NAME_VERSION (def)].safe_push (hash);
 	  bool existed;
-	  vec<tree> *& set = hash_to_def_map.get_or_insert (hash, &existed);
+	  vec<stmt_vec_info> *& set = hash_to_def_map.get_or_insert (hash, &existed);
 	  if (!existed)
-	    set = new vec<tree> ();
-	  if (set->contains (def))
-	    gcc_unreachable ();
-	  set->safe_push (def);
+	    set = new vec<stmt_vec_info> ();
+	  stmt_vec_info def_vinfo = bb_vinfo->lookup_def (def);
+	  gcc_assert (def_vinfo != NULL);
+	  unsigned idx = set->lower_bound (def_vinfo, &stmt_vinfo_earlier);
+	  set->safe_insert (idx, def_vinfo);
 	  if (set->length () > max_count)
 	    max_count = set->length ();
 
@@ -3366,30 +3282,28 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
        it != hash_to_def_map.end (); ++it)
     {
       hashval_t hash = (*it).first;
-      vec<tree> *tree_set = (*it).second;
+      vec<stmt_vec_info> *stmt_set = (*it).second;
 
-      if (tree_set->length () < 1)
+      if (stmt_set->length () < 2)
 	continue;
-      order_map[tree_set->length() - 1].safe_push (hash);
+      order_map[stmt_set->length() - 1].safe_push (hash);
     }
 
   auto_vec <uint64_t> visited;
-
   /* Better a pair<level, hash> -> vec<tree> map?  Sort things
      so longer chains prevail?  Or chains with bigger level?  */
   for (unsigned c = max_count; c != 0; --c)
     for (unsigned j = 0; j < order_map[c - 1].length (); ++j)
     {
-      vec<tree> *set = *(hash_to_def_map.get ((order_map[c - 1])[j]));
+      vec<stmt_vec_info> *ordered_set = *(hash_to_def_map.get ((order_map[c - 1])[j]));
       bool skip = false;
-      vec<stmt_vec_info> *ordered_set = new vec<stmt_vec_info>;
-      ordered_set->create (set->length ());
-      for (unsigned i = 0; i < set->length (); ++i)
+      for (unsigned i = 0; i < ordered_set->length (); ++i)
 	{
 	  use_operand_p use_p;
 	  gimple *use_stmt;
 	  stmt_vec_info use_info;
-	  if (!single_imm_use ((*set)[i], &use_p, &use_stmt)
+	  tree def = gimple_get_lhs ((*ordered_set)[i]->stmt);
+	  if (!single_imm_use (def, &use_p, &use_stmt)
 	      || !(use_info = bb_vinfo->lookup_stmt (use_stmt)))
 	    {
 	      if (dump_file)
@@ -3408,68 +3322,6 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
 	      skip = true;
 	      break;
 	    }
-
-	  unsigned idx = ordered_set->lower_bound (use_info, &stmt_earlier);
-	  if (ordered_set->length () <= idx
-	      || gimple_uid ((*ordered_set)[idx]->stmt)
-	      != gimple_uid (use_info->stmt))
-	    ordered_set->safe_insert (idx, use_info);
-	}
-
-      if (skip || ordered_set->length () < 2)
-	{
-	  free (ordered_set);
-	  continue;
-	}
-
-      /* Now we have a set of scalar stmts with their defs being
-	 of similar shape (so likely a SLP tree build will succeed
-	 with them as the root).  To check whether we can vectorize
-	 them we need to check that we can replace all scalar uses
-	 of their defs with extracts from the vectorized stmts
-	 which means we need to be able to either move them or
-	 ensure all uses are dominated by the last in the set.
-
-	 For reductions we need to verify their single uses are
-	 actually summed up and we can associate that reduction
-	 (and there's nothing else in the reduction chain).  Half
-	 of the verification we do above.
-	 Verify the stmts form a reduction.  */
-      if (dump_file)
-	fprintf (dump_file, "Trying reduction chain\n");
-
-      tree_code accepted_op = PLUS_EXPR;
-      for (unsigned i = 0; i < ordered_set->length (); ++i)
-	{
-	  gimple *stmt = (*ordered_set)[i]->stmt;
-	  if (!is_gimple_assign (stmt))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "This is not a chain\n");
-	      skip = true;
-	      break;
-	    }
-	  if (gimple_assign_rhs_code (stmt) != accepted_op)
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "Chain is not a reduction, wrong operation\n");
-	      skip = true;
-	      break;
-	    }
-	  if (i != (ordered_set->length () - 1))
-	    {
-	      gimple *next = (*ordered_set)[i + 1]->stmt;
-	      if (!is_gimple_assign (next)
-		  || (gimple_assign_rhs1 (next) != gimple_assign_lhs (stmt)
-		      && gimple_assign_rhs2 (next) != gimple_assign_lhs (stmt)))
-		{
-		  if (dump_file)
-		    fprintf (dump_file, "This is not a chain\n");
-		  skip = true;
-		  break;
-		}
-	    }
-	  visited.safe_push (gimple_uid (stmt));
 	}
 
       if (skip)
@@ -3478,12 +3330,7 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
 	  continue;
 	}
 
-      unsigned idx = bb_vinfo->bb_reduc_chains.lower_bound (ordered_set,
-							    &chain_earlier);
-      if (bb_vinfo->bb_reduc_chains.length () <= idx
-	  || gimple_uid ((*bb_vinfo->bb_reduc_chains[idx])[0]->stmt)
-	    != gimple_uid ((*ordered_set)[0]->stmt))
-	bb_vinfo->bb_reduc_chains.safe_insert (idx, ordered_set);
+	bb_vinfo->bb_reduc_chains.safe_push (ordered_set);
     }
 }
 
@@ -4822,6 +4669,48 @@ vectorize_slp_instance_root_stmt (slp_tree node, slp_instance instance)
     gsi_replace (&rgsi, rstmt, true);
 }
 
+static void
+build_extractions (vec_info *info, slp_tree node)
+{
+  unsigned int i;
+  unsigned int idx = 0;
+  unsigned int vidx = 0;
+  stmt_vec_info scalar_vinfo;
+  vec <stmt_vec_info> vector_stmts = SLP_TREE_VEC_STMTS (node);
+  tree vectype = SLP_TREE_VECTYPE (node);
+  unsigned vec_lanes = TYPE_VECTOR_SUBPARTS (vectype).to_constant ();
+  FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (node), i, scalar_vinfo)
+    {
+      if (idx >= vec_lanes)
+	{
+	  vidx++;
+	  idx = 0;
+	}
+
+      stmt_vec_info vector_vinfo = vector_stmts[vidx];
+
+      unsigned HOST_WIDE_INT elsize
+	= tree_to_uhwi (TYPE_SIZE (TREE_TYPE (vectype)));
+      tree lhs = gimple_get_lhs (scalar_vinfo->stmt);
+      gimple *new_stmt
+	= gimple_build_assign (gimple_get_lhs (scalar_vinfo->stmt),
+			       BIT_FIELD_REF,
+			       build3 (BIT_FIELD_REF, TREE_TYPE (vectype),
+				       gimple_get_lhs (vector_vinfo->stmt),
+				       bitsize_int (elsize),
+				       bitsize_int (elsize * idx)));
+
+      SSA_NAME_DEF_STMT (lhs) = new_stmt;
+
+
+      gimple_stmt_iterator gsi = gsi_for_stmt (vector_vinfo->stmt);
+      gsi_insert_after (&gsi, new_stmt, GSI_SAME_STMT);
+      gsi = gsi_for_stmt (scalar_vinfo->stmt);
+      //gsi_remove(&gsi, true);
+      idx++;
+    }
+}
+
 /* Generate vector code for all SLP instances in the loop/basic block.  */
 
 void
@@ -4837,6 +4726,9 @@ vect_schedule_slp (vec_info *vinfo)
       slp_tree node = SLP_INSTANCE_TREE (instance);
       /* Schedule the tree of INSTANCE.  */
       vect_schedule_slp_instance (vinfo, node, instance);
+
+      if (SLP_TREE_CODE (node) == BIT_FIELD_REF)
+	build_extractions (vinfo, node);
 
       if (SLP_INSTANCE_ROOT_STMT (instance))
 	vectorize_slp_instance_root_stmt (node, instance);
