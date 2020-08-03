@@ -351,6 +351,14 @@ public:
      stmt in the chain.  */
   auto_vec<stmt_vec_info> grouped_stores;
 
+  /* All reduction chains in the loop, represented by the first
+     stmt in the chain.  */
+  auto_vec<stmt_vec_info> reduction_chains;
+
+  /* All reduction chains in the bb, represented by the ordered set of stmts
+     in the chain.  */
+  auto_vec<vec <stmt_vec_info> *> bb_reduc_chains;
+
   /* Cost data used by the target cost model.  */
   void *target_cost_data;
 
@@ -597,10 +605,6 @@ public:
 
   /* Reduction cycles detected in the loop. Used in loop-aware SLP.  */
   auto_vec<stmt_vec_info> reductions;
-
-  /* All reduction chains in the loop, represented by the first
-     stmt in the chain.  */
-  auto_vec<stmt_vec_info> reduction_chains;
 
   /* Cost vector for a single scalar iteration.  */
   auto_vec<stmt_info_for_cost> scalar_cost_vec;
@@ -1835,6 +1839,13 @@ extern tree vect_create_addr_base_for_vector_ref (vec_info *,
 
 /* In tree-vect-loop.c.  */
 extern widest_int vect_iv_limit_for_full_masking (loop_vec_info loop_vinfo);
+extern bool fold_left_reduction_fn (enum tree_code, internal_fn *);
+extern bool reduction_fn_for_scalar_code (enum tree_code, internal_fn *);
+extern tree vect_expand_fold_left (gimple_stmt_iterator *, tree, tree_code,
+				   tree, tree);
+extern void vect_model_reduction_cost (vec_info *, stmt_vec_info,
+				       internal_fn, vect_reduction_type,
+				       int, stmt_vector_for_cost *);
 /* Used in tree-vect-loop-manip.c */
 extern void determine_peel_for_niter (loop_vec_info);
 /* Used in gimple-loop-interchange.c and tree-parloops.c.  */

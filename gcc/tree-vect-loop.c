@@ -2733,7 +2733,7 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
 /* Return true if there is an in-order reduction function for CODE, storing
    it in *REDUC_FN if so.  */
 
-static bool
+bool
 fold_left_reduction_fn (tree_code code, internal_fn *reduc_fn)
 {
   switch (code)
@@ -2760,7 +2760,7 @@ fold_left_reduction_fn (tree_code code, internal_fn *reduc_fn)
 
    Return FALSE if CODE currently cannot be vectorized as reduction.  */
 
-static bool
+bool
 reduction_fn_for_scalar_code (enum tree_code code, internal_fn *reduc_fn)
 {
   switch (code)
@@ -3926,8 +3926,8 @@ have_whole_vector_shift (machine_mode mode)
    generated within the strip-mine loop, the initial definition before
    the loop, and the epilogue code that must be generated.  */
 
-static void
-vect_model_reduction_cost (loop_vec_info loop_vinfo,
+void
+vect_model_reduction_cost (vec_info *vinfo,
 			   stmt_vec_info stmt_info, internal_fn reduc_fn,
 			   vect_reduction_type reduction_type,
 			   int ncopies, stmt_vector_for_cost *cost_vec)
@@ -3939,14 +3939,21 @@ vect_model_reduction_cost (loop_vec_info loop_vinfo,
   machine_mode mode;
   class loop *loop = NULL;
 
-  if (loop_vinfo)
-    loop = LOOP_VINFO_LOOP (loop_vinfo);
+  if (is_a <loop_vec_info> (vinfo))
+    loop = LOOP_VINFO_LOOP (as_a <loop_vec_info> (vinfo));
 
   /* Condition reductions generate two reductions in the loop.  */
   if (reduction_type == COND_REDUCTION)
     ncopies *= 2;
 
-  vectype = STMT_VINFO_VECTYPE (stmt_info);
+  if (is_a <loop_vec_info> (vinfo))
+    vectype = STMT_VINFO_VECTYPE (stmt_info);
+  else
+    {
+      tree scalar_type = TREE_TYPE (gimple_assign_lhs (stmt_info->stmt));
+      vectype = get_vectype_for_scalar_type (vinfo, scalar_type,
+					     REDUC_GROUP_SIZE (stmt_info));
+    }
   mode = TYPE_MODE (vectype);
   stmt_vec_info orig_stmt_info = vect_orig_stmt (stmt_info);
 
@@ -5610,7 +5617,7 @@ merge_with_identity (gimple_stmt_iterator *gsi, tree mask, tree vectype,
    associate the new scalar SSA names with variable SCALAR_DEST.
    Return the SSA name for the result.  */
 
-static tree
+tree
 vect_expand_fold_left (gimple_stmt_iterator *gsi, tree scalar_dest,
 		       tree_code code, tree lhs, tree vector_rhs)
 {
@@ -5629,15 +5636,20 @@ vect_expand_fold_left (gimple_stmt_iterator *gsi, tree scalar_dest,
 			 bitsize, bitpos);
 
       gassign *stmt = gimple_build_assign (scalar_dest, rhs);
-      rhs = make_ssa_name (scalar_dest, stmt);
+      rhs = make_ssa_name (TREE_TYPE (scalar_dest), stmt);
       gimple_assign_set_lhs (stmt, rhs);
       gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
 
-      stmt = gimple_build_assign (scalar_dest, code, lhs, rhs);
-      tree new_name = make_ssa_name (scalar_dest, stmt);
-      gimple_assign_set_lhs (stmt, new_name);
-      gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
-      lhs = new_name;
+      if (lhs)
+	{
+	  stmt = gimple_build_assign (scalar_dest, code, lhs, rhs);
+	  tree new_name = make_ssa_name (TREE_TYPE (scalar_dest), stmt);
+	  gimple_assign_set_lhs (stmt, new_name);
+	  gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
+	  lhs = new_name;
+	}
+      else
+	lhs = rhs;
     }
   return lhs;
 }
