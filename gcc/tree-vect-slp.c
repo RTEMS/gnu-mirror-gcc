@@ -1156,14 +1156,16 @@ static slp_tree
 vect_build_slp_tree_2 (vec_info *vinfo,
 		       vec<stmt_vec_info> stmts, unsigned int group_size,
 		       poly_uint64 *max_nunits,
-		       bool *matches, unsigned *npermutes, unsigned *tree_size,
+		       bool *matches, unsigned *npermutes,
+		       bool parent_can_permute, unsigned *tree_size,
 		       scalar_stmts_to_slp_tree_map_t *bst_map);
 
 static slp_tree
 vect_build_slp_tree (vec_info *vinfo,
 		     vec<stmt_vec_info> stmts, unsigned int group_size,
 		     poly_uint64 *max_nunits,
-		     bool *matches, unsigned *npermutes, unsigned *tree_size,
+		     bool *matches, unsigned *npermutes,
+		     bool parent_can_permute, unsigned *tree_size,
 		     scalar_stmts_to_slp_tree_map_t *bst_map)
 {
   if (slp_tree *leader = bst_map->get (stmts))
@@ -1180,8 +1182,8 @@ vect_build_slp_tree (vec_info *vinfo,
     }
   poly_uint64 this_max_nunits = 1;
   slp_tree res = vect_build_slp_tree_2 (vinfo, stmts, group_size,
-					&this_max_nunits,
-					matches, npermutes, tree_size, bst_map);
+					&this_max_nunits, matches, npermutes,
+					parent_can_permute, tree_size, bst_map);
   if (res)
     {
       res->max_nunits = this_max_nunits;
@@ -1204,7 +1206,8 @@ static slp_tree
 vect_build_slp_tree_2 (vec_info *vinfo,
 		       vec<stmt_vec_info> stmts, unsigned int group_size,
 		       poly_uint64 *max_nunits,
-		       bool *matches, unsigned *npermutes, unsigned *tree_size,
+		       bool *matches, unsigned *npermutes,
+		       bool parent_can_permute, unsigned *tree_size,
 		       scalar_stmts_to_slp_tree_map_t *bst_map)
 {
   unsigned nops, i, this_tree_size = 0;
@@ -1354,9 +1357,21 @@ vect_build_slp_tree_2 (vec_info *vinfo,
 	  continue;
 	}
 
+      bool we_can_permute
+	= (i == 0
+	   /* ???  For COND_EXPRs we can swap the comparison operands
+	      as well as the arms under some constraints.  */
+	   && nops == 2
+	   && oprnds_info[1]->first_dt == vect_internal_def
+	   && is_gimple_assign (stmt_info->stmt)
+	   /* Swapping operands for reductions breaks assumptions later on.  */
+	   && STMT_VINFO_DEF_TYPE (stmt_info) != vect_reduction_def
+	   && STMT_VINFO_DEF_TYPE (stmt_info) != vect_double_reduction_def);
+
       if ((child = vect_build_slp_tree (vinfo, oprnd_info->def_stmts,
 					group_size, &this_max_nunits,
 					matches, npermutes,
+					parent_can_permute || we_can_permute,
 					&this_tree_size, bst_map)) != NULL)
 	{
 	  oprnd_info->def_stmts = vNULL;
@@ -1368,15 +1383,10 @@ vect_build_slp_tree_2 (vec_info *vinfo,
          simply treat nodes we fail to build as externally defined
 	 (and thus build vectors from the scalar defs).
 	 The cost model will reject outright expensive cases.
-	 ???  This doesn't treat cases where permutation ultimatively
-	 fails (or we don't try permutation below).  Ideally we'd
-	 even compute a permutation that will end up with the maximum
-	 SLP tree size...  */
+	 ???  We delay the build from scalars when the parent can still
+	 try permutations, still this may not handle all cases.  */
       if (is_a <bb_vec_info> (vinfo)
 	  && !matches[0]
-	  /* ???  Rejecting patterns this way doesn't work.  We'd have to
-	     do extra work to cancel the pattern so the uses see the
-	     scalar version.  */
 	  && !is_pattern_stmt_p (stmt_info)
 	  && !oprnd_info->any_pattern)
 	{
@@ -1456,6 +1466,7 @@ vect_build_slp_tree_2 (vec_info *vinfo,
 	  if ((child = vect_build_slp_tree (vinfo, oprnd_info->def_stmts,
 					    group_size, &this_max_nunits,
 					    tem, npermutes,
+					    parent_can_permute,
 					    &this_tree_size, bst_map)) != NULL)
 	    {
 	      oprnd_info->def_stmts = vNULL;
@@ -2158,7 +2169,7 @@ vect_analyze_slp_instance (vec_info *vinfo,
   poly_uint64 max_nunits = nunits;
   unsigned tree_size = 0;
   node = vect_build_slp_tree (vinfo, scalar_stmts, group_size,
-			      &max_nunits, matches, &npermutes,
+			      &max_nunits, matches, &npermutes, false,
 			      &tree_size, bst_map);
   if (node != NULL)
     {
