@@ -4414,8 +4414,8 @@ vect_schedule_slp_instance (vec_info *vinfo,
 	}
       if (ocode != ERROR_MARK)
 	{
-	  vec<stmt_vec_info> v0;
-	  vec<stmt_vec_info> v1;
+	  vec<gimple *> v0;
+	  vec<gimple *> v1;
 	  unsigned j;
 	  tree tmask = NULL_TREE;
 	  vect_transform_stmt (vinfo, stmt_info, &si, node, instance);
@@ -4456,11 +4456,11 @@ vect_schedule_slp_instance (vec_info *vinfo,
 	      gimple *vstmt;
 	      vstmt = gimple_build_assign (make_ssa_name (vectype),
 					   VEC_PERM_EXPR,
-					   gimple_assign_lhs (v0[j]->stmt),
-					   gimple_assign_lhs (v1[j]->stmt),
+					   gimple_assign_lhs (v0[j]),
+					   gimple_assign_lhs (v1[j]),
 					   tmask);
-	      SLP_TREE_VEC_STMTS (node).quick_push
-		(vect_finish_stmt_generation (vinfo, stmt_info, vstmt, &si));
+	      vect_finish_stmt_generation (vinfo, stmt_info, vstmt, &si);
+	      SLP_TREE_VEC_STMTS (node).quick_push (vstmt);
 	    }
 	  v0.release ();
 	  v1.release ();
