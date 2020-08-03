@@ -150,6 +150,9 @@ struct _slp_tree {
      divided by vector size.  */
   unsigned int vec_stmts_size;
 
+  /* Vector insertion place.  */
+  gimple_stmt_iterator vec_gsi;
+
   /* Reference count in the SLP graph.  */
   unsigned int refcnt;
   /* The maximum number of vector elements for the subtree rooted
@@ -205,6 +208,7 @@ public:
 #define SLP_TREE_REPRESENTATIVE(S)		 (S)->representative
 #define SLP_TREE_LANES(S)			 (S)->lanes
 #define SLP_TREE_CODE(S)			 (S)->code
+#define SLP_TREE_VEC_GSI(S)			 (S)->vec_gsi
 
 /* Key for map that records association between
    scalar conditions and corresponding loop mask, and

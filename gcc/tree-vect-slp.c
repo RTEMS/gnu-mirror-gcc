@@ -67,6 +67,7 @@ _slp_tree::_slp_tree ()
   SLP_TREE_CODE (this) = ERROR_MARK;
   SLP_TREE_VECTYPE (this) = NULL_TREE;
   SLP_TREE_REPRESENTATIVE (this) = NULL;
+  SLP_TREE_VEC_GSI (this) = gsi_none ();
   this->refcnt = 1;
   this->max_nunits = 1;
   this->lanes = 0;
@@ -1587,6 +1588,9 @@ vect_print_slp_tree (dump_flags_t dump_kind, dump_location_t loc,
 		     SLP_TREE_LANE_PERMUTATION (node)[i].second);
       dump_printf (dump_kind, " }\n");
     }
+  if (!gsi_end_p (SLP_TREE_VEC_GSI (node)))
+    dump_printf_loc (dump_kind, user_loc, "\tvec stmt before %G",
+		     gsi_stmt (SLP_TREE_VEC_GSI (node)));
   if (SLP_TREE_CHILDREN (node).is_empty ())
     return;
   dump_printf_loc (metadata, user_loc, "\tchildren");
@@ -1711,6 +1715,7 @@ slp_copy_subtree (slp_tree node, hash_map<slp_tree, slp_tree> &map)
   SLP_TREE_VECTYPE (copy) = SLP_TREE_VECTYPE (node);
   SLP_TREE_REPRESENTATIVE (copy) = SLP_TREE_REPRESENTATIVE (node);
   SLP_TREE_LANES (copy) = SLP_TREE_LANES (node);
+  SLP_TREE_VEC_GSI (copy) = SLP_TREE_VEC_GSI (node);
   copy->max_nunits = node->max_nunits;
   copy->refcnt = 0;
   if (SLP_TREE_SCALAR_STMTS (node).exists ())
@@ -2334,6 +2339,111 @@ vect_analyze_slp_instance (vec_info *vinfo,
 }
 
 
+/* Compute SLP_TREE_VEC_GSI for NODE making sure we can emit before
+   BEFORE.  Returns TRUE if everything worked out, FALSE otherwise.  */
+
+static bool
+vect_compute_slp_vec_stmt_placing (vec_info *vinfo, slp_tree node,
+				   gimple *before,
+				   hash_set<slp_tree> &visited)
+{
+  if (visited.add (node))
+    {
+      /* We still need to check before constraints.  */
+      if (before
+	  && !gsi_end_p (SLP_TREE_VEC_GSI (node))
+	  && !vect_stmt_dominates_stmt_p (gsi_stmt (SLP_TREE_VEC_GSI (node)),
+					  before))
+	return false;
+      return true;
+    }
+
+  /* ???  First compute constraints from live lanes and merge with the
+     incoming before constraint.  */
+
+  /* Compute the position of the last SLP child.  */
+  gimple *after = NULL;
+  slp_tree child;
+  unsigned i;
+  if (SLP_TREE_DEF_TYPE (node) != vect_external_def)
+  FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
+    {
+      if (!vect_compute_slp_vec_stmt_placing (vinfo, child, before, visited))
+	return false;
+      if (!gsi_end_p (SLP_TREE_VEC_GSI (child)))
+	{
+	  if (!after
+	      || vect_stmt_dominates_stmt_p (after,
+					     gsi_stmt (SLP_TREE_VEC_GSI (child))))
+	    after = gsi_stmt (SLP_TREE_VEC_GSI (child));
+	  else
+	    /* ???  With multiple BBs we can get "unordered" defs and
+	       need to figure out common post-dominators.  Or give up.  */
+	    gcc_assert (vect_stmt_dominates_stmt_p (gsi_stmt (SLP_TREE_VEC_GSI (child)),
+						    after));
+	}
+    }
+
+  /* Compute nodes own constraints.  */
+  gimple *last = NULL;
+  if (SLP_TREE_DEF_TYPE (node) == vect_external_def)
+    {
+      tree def;
+      FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, def)
+	if (TREE_CODE (def) == SSA_NAME
+	    && !SSA_NAME_IS_DEFAULT_DEF (def)
+	    /* Skip out-of region defs.  */
+	    && vinfo->lookup_def (def))
+	  {
+	    if (!last)
+	      last = SSA_NAME_DEF_STMT (def);
+	    else if (vect_stmt_dominates_stmt_p (last,
+						 SSA_NAME_DEF_STMT (def)))
+	      last = SSA_NAME_DEF_STMT (def);
+	    else
+	      /* ???  With multiple BBs we can get "unordered" defs and
+		 need to figure out common post-dominators.  Or give up.  */
+	      gcc_assert (vect_stmt_dominates_stmt_p (SSA_NAME_DEF_STMT (def),
+						      last));
+	  }
+      if (last)
+	{
+	  gimple_stmt_iterator gsi = gsi_for_stmt (last);
+	  gsi_next (&gsi);
+	  last = gsi_stmt (gsi);
+	  /* With multi-BB we need to always track iterators and make
+	     vect_stmt_dominates_stmt_p use iterators as well to have
+	     at least a BB.  */
+	  gcc_assert (last);
+	}
+    }
+  else if (SLP_TREE_DEF_TYPE (node) == vect_constant_def)
+    ;
+  else if (SLP_TREE_DEF_TYPE (node) == vect_internal_def
+	   && SLP_TREE_CODE (node) != VEC_PERM_EXPR
+	   && STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node)))
+    {
+      /* Currently vectorized stmts are placed after the last scalar
+	 stmt of a node.  That may change for loads.  */
+      last = vect_find_last_scalar_stmt_in_slp (node)->stmt;
+    }
+
+  if (last)
+    {
+      if (after && !vect_stmt_dominates_stmt_p (after, last))
+	return false;
+      if (before && !vect_stmt_dominates_stmt_p (last, before))
+	return false;
+    }
+  else
+    last = after;
+
+  if (last)
+    SLP_TREE_VEC_GSI (node) = gsi_for_stmt (last);
+
+  return true;
+}
+
 /* Check if there are stmts in the loop can be vectorized using SLP.  Build SLP
    trees of packed scalar stmts if SLP is possible.  */
 
@@ -2405,8 +2515,44 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
       vect_free_slp_tree ((*it).second, false);
   delete bst_map;
 
-  /* Optimize permutations in SLP reductions.  */
+  /* Constrain SLP node vectorized stmt placing.
+     ???  Sometimes splitting the group can cause parts of the
+     SLP graph to be vectorizable, but the following is too late
+     for the splitting done during individual instance analysis.
+     It seems the following could maybe be done during
+     vect_analyze_slp_instance or even SLP discovery though.  */
   slp_instance instance;
+  hash_set<slp_tree> visited;
+#if 0
+  for (i = 0; i < vinfo->slp_instances.length ();)
+    {
+      instance = vinfo->slp_instances[i];
+      stmt_vec_info root_stmt = SLP_INSTANCE_ROOT_STMT (instance);
+      if (!vect_compute_slp_vec_stmt_placing (vinfo,
+					      SLP_INSTANCE_TREE (instance),
+					      /* Place before the root stmt.  */
+					      root_stmt 
+					      ? root_stmt->stmt : NULL,
+					      visited))
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			     "removing SLP instance because of order "
+			     "constraints\n");
+	  if (i + 1 < vinfo->slp_instances.length ())
+	    vinfo->slp_instances[i] = vinfo->slp_instances.last ();
+	  vinfo->slp_instances.pop ();
+	}
+      else
+	++i;
+    }
+  visited.empty ();
+#endif
+
+  /* Determine whether we can fulful SLP node vectorized stmt placing
+     constraints.  */
+
+  /* Optimize permutations in SLP reductions.  */
   FOR_EACH_VEC_ELT (vinfo->slp_instances, i, instance)
     {
       slp_tree node = SLP_INSTANCE_TREE (instance);
@@ -2419,7 +2565,6 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
     }
 
   /* Gather all loads in the SLP graph.  */
-  hash_set<slp_tree> visited;
   FOR_EACH_VEC_ELT (vinfo->slp_instances, i, instance)
     vect_gather_slp_loads (vinfo->slp_loads, SLP_INSTANCE_TREE (instance),
 			   visited);
@@ -2919,6 +3064,7 @@ vect_slp_analyze_operations (vec_info *vinfo)
   DUMP_VECT_SCOPE ("vect_slp_analyze_operations");
 
   hash_set<slp_tree> visited;
+  hash_set<slp_tree> pvisited;
   for (i = 0; vinfo->slp_instances.iterate (i, &instance); )
     {
       hash_set<slp_tree> lvisited;
@@ -2932,7 +3078,16 @@ vect_slp_analyze_operations (vec_info *vinfo)
 	     SLP tree root.  */
 	  || (SLP_INSTANCE_ROOT_STMT (instance)
 	      && (SLP_TREE_DEF_TYPE (SLP_INSTANCE_TREE (instance))
-		  != vect_internal_def)))
+		  != vect_internal_def))
+	  /* The above can create new external leafs which influences
+	     placement so we have to verify this late (but could do it
+	     as part of vect_slp_analyze_node_operations).  */
+	  || !vect_compute_slp_vec_stmt_placing (vinfo,
+						 SLP_INSTANCE_TREE (instance),
+						 /* Place before the root stmt.  */
+						 SLP_INSTANCE_ROOT_STMT (instance) 
+						 ? SLP_INSTANCE_ROOT_STMT (instance)->stmt : NULL,
+						 pvisited))
         {
 	  slp_tree node = SLP_INSTANCE_TREE (instance);
 	  stmt_vec_info stmt_info = SLP_TREE_SCALAR_STMTS (node)[0];
@@ -4445,6 +4600,8 @@ vect_schedule_slp_instance (vec_info *vinfo,
 
   /* Vectorized stmts go before the last scalar stmt which is where
      all uses are ready.  */
+  /* We cannot use SLP_TREE_VEC_GSI since it is not computed for all
+     stmts and when vectorizing epilogues points to the wrong loop.  */
   stmt_vec_info last_stmt_info = vect_find_last_scalar_stmt_in_slp (node);
   if (last_stmt_info)
     si = gsi_for_stmt (last_stmt_info->stmt);
