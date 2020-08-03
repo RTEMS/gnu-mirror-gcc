@@ -855,18 +855,19 @@ vect_reassociating_reduction_p (vec_info *vinfo,
 				tree *op0_out, tree *op1_out)
 {
   loop_vec_info loop_info = dyn_cast <loop_vec_info> (vinfo);
-  if (!loop_info)
-    return false;
 
   gassign *assign = dyn_cast <gassign *> (stmt_info->stmt);
   if (!assign || gimple_assign_rhs_code (assign) != code)
     return false;
 
-  /* We don't allow changing the order of the computation in the inner-loop
-     when doing outer-loop vectorization.  */
-  class loop *loop = LOOP_VINFO_LOOP (loop_info);
-  if (loop && nested_in_vect_loop_p (loop, stmt_info))
-    return false;
+  if (loop_info)
+    {
+      /* We don't allow changing the order of the computation in the inner-loop
+	 when doing outer-loop vectorization.  */
+      class loop *loop = LOOP_VINFO_LOOP (loop_info);
+      if (loop && nested_in_vect_loop_p (loop, stmt_info))
+	return false;
+    }
 
   if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_reduction_def)
     {
@@ -1544,6 +1545,13 @@ vect_recog_over_widening_pattern (vec_info *vinfo,
 {
   gassign *last_stmt = dyn_cast <gassign *> (last_stmt_info->stmt);
   if (!last_stmt)
+    return NULL;
+
+  /*?? This will just stand in the way of WIDEN_SUM, maybe there is a better
+       way of avoind this...   */
+  if (is_a <bb_vec_info> (vinfo)
+      && !STMT_VINFO_DATA_REF (last_stmt_info)
+      && REDUC_GROUP_FIRST_ELEMENT (last_stmt_info))
     return NULL;
 
   /* See whether we have found that this operation can be done on a
