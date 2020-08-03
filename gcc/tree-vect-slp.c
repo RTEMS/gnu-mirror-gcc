@@ -2423,9 +2423,17 @@ vect_compute_slp_vec_stmt_placing (vec_info *vinfo, slp_tree node,
 	   && SLP_TREE_CODE (node) != VEC_PERM_EXPR
 	   && STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node)))
     {
-      /* Currently vectorized stmts are placed after the last scalar
-	 stmt of a node.  That may change for loads.  */
-      last = vect_find_last_scalar_stmt_in_slp (node)->stmt;
+      vec<stmt_vec_info> scalars = SLP_TREE_SCALAR_STMTS (node);
+      gimple *first = NULL;
+      stmt_vec_info stmt_vinfo;
+      unsigned i;
+      FOR_EACH_VEC_ELT (scalars, i, stmt_vinfo)
+	{
+	  if (!first
+	      || gimple_uid (first) > gimple_uid (stmt_vinfo->stmt))
+	    first = stmt_vinfo->stmt;
+	}
+      last = first;
     }
 
   if (last)
@@ -3154,11 +3162,12 @@ vect_bb_slp_scalar_cost (vec_info *vinfo,
 	    if (!is_gimple_debug (use_stmt))
 	      {
 		stmt_vec_info use_stmt_info = vinfo->lookup_stmt (use_stmt);
-		if (!use_stmt_info
-		    || !(PURE_SLP_STMT (use_stmt_info)
-			 || (!STMT_VINFO_DATA_REF (use_stmt_info)
-			     && REDUC_GROUP_FIRST_ELEMENT (use_stmt_info))
-			 || SLP_TREE_CODE (node) == BIT_FIELD_REF))
+		if (SLP_TREE_CODE (node) != BIT_FIELD_REF
+		    && (!use_stmt_info
+			|| !(PURE_SLP_STMT (use_stmt_info)
+			     || (!STMT_VINFO_DATA_REF (use_stmt_info)
+				 && REDUC_GROUP_FIRST_ELEMENT
+				 (use_stmt_info)))))
 		  {
 		    (*life)[i] = true;
 		    BREAK_FROM_IMM_USE_STMT (use_iter);
@@ -3217,30 +3226,26 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
   /* Calculate scalar cost.  */
   stmt_vector_for_cost scalar_costs;
   scalar_costs.create (0);
-  stmt_vector_for_cost reduc_costs;
-  reduc_costs.create (0);
+  stmt_vector_for_cost extract_costs;
+  extract_costs.create (0);
   hash_set<slp_tree> visited;
   FOR_EACH_VEC_ELT (slp_instances, i, instance)
     {
       auto_vec<bool, 20> life;
       stmt_vec_info root_stmt;
-      life.safe_grow_cleared (SLP_TREE_LANES (SLP_INSTANCE_TREE (instance)));
+      slp_tree node = SLP_INSTANCE_TREE (instance);
+      life.safe_grow_cleared (SLP_TREE_LANES (node));
       vect_bb_slp_scalar_cost (bb_vinfo,
 			       SLP_INSTANCE_TREE (instance),
 			       &life, &scalar_costs, visited);
 
-      root_stmt = SLP_INSTANCE_ROOT_STMT (instance);
-      if (root_stmt != NULL
-	  && (STMT_VINFO_DATA_REF (root_stmt) == NULL
-	      && REDUC_GROUP_FIRST_ELEMENT (root_stmt) != NULL))
+      if (SLP_TREE_CODE (node) == BIT_FIELD_REF)
 	{
-	  stmt_vec_info reduc_info
-	    = REDUC_GROUP_FIRST_ELEMENT (SLP_INSTANCE_ROOT_STMT (instance));
-	  vect_model_reduction_cost (bb_vinfo, reduc_info,
-				     STMT_VINFO_REDUC_FN (reduc_info),
-				     STMT_VINFO_REDUC_TYPE (reduc_info),
-				     1, &reduc_costs);
+	  record_stmt_cost (&extract_costs, SLP_TREE_LANES (node),
+			    vec_to_scalar, SLP_TREE_SCALAR_STMTS (node)[0], 0,
+			    vect_body);
 	}
+
     }
   /* Unset visited flag.  */
   stmt_info_for_cost *si;
@@ -3255,8 +3260,8 @@ vect_bb_vectorization_profitable_p (bb_vec_info bb_vinfo)
   destroy_cost_data (target_cost_data);
 
   add_stmt_costs (bb_vinfo, BB_VINFO_TARGET_COST_DATA (bb_vinfo),
-		  &reduc_costs);
-  reduc_costs.release ();
+		  &extract_costs);
+  extract_costs.release ();
 
 
   /* Unset visited flag.  */
@@ -3444,7 +3449,6 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
       order_map[stmt_set->length() - 1].safe_push (hash);
     }
 
-  auto_vec <uint64_t> visited;
   /* Better a pair<level, hash> -> vec<tree> map?  Sort things
      so longer chains prevail?  Or chains with bigger level?  */
   for (unsigned c = max_count; c != 0; --c)
@@ -3452,8 +3456,14 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
     {
       vec<stmt_vec_info> *ordered_set = *(hash_to_def_map.get ((order_map[c - 1])[j]));
       bool skip = false;
+#if 0
+      /* ?? This code is from an earlier version, given we support
+	 extracting values (and not only reductions) I think we can still
+	 support multiple uses, or data accesses using the extract values.
+      */
       for (unsigned i = 0; i < ordered_set->length (); ++i)
 	{
+
 	  use_operand_p use_p;
 	  gimple *use_stmt;
 	  stmt_vec_info use_info;
@@ -3484,6 +3494,7 @@ vect_slp_check_for_reductions (bb_vec_info bb_vinfo)
 	  free (ordered_set);
 	  continue;
 	}
+#endif
 
 	bb_vinfo->bb_reduc_chains.safe_push (ordered_set);
     }
@@ -4597,14 +4608,8 @@ vect_schedule_slp_instance (vec_info *vinfo,
     dump_printf_loc (MSG_NOTE, vect_location,
 		     "------>vectorizing SLP node starting from: %G",
 		     stmt_info->stmt);
-
-  /* Vectorized stmts go before the last scalar stmt which is where
-     all uses are ready.  */
-  /* We cannot use SLP_TREE_VEC_GSI since it is not computed for all
-     stmts and when vectorizing epilogues points to the wrong loop.  */
-  stmt_vec_info last_stmt_info = vect_find_last_scalar_stmt_in_slp (node);
-  if (last_stmt_info)
-    si = gsi_for_stmt (last_stmt_info->stmt);
+  if (!gsi_end_p (SLP_TREE_VEC_GSI (node)))
+    si = SLP_TREE_VEC_GSI (node);
   else
     {
       /* Or if we do not have 1:1 matching scalar stmts emit after the
@@ -4863,7 +4868,7 @@ build_extractions (vec_info *info, slp_tree node)
       gimple_stmt_iterator gsi = gsi_for_stmt (vector_vinfo->stmt);
       gsi_insert_after (&gsi, new_stmt, GSI_SAME_STMT);
       gsi = gsi_for_stmt (scalar_vinfo->stmt);
-      //gsi_remove(&gsi, true);
+      gsi_remove(&gsi, true);
       idx++;
     }
 }
