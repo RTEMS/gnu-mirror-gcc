@@ -6226,11 +6226,8 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	    {
 	      rs6000_passes_float = true;
 	      if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-		  && (FLOAT128_IBM_P (return_mode)
-		      || FLOAT128_IEEE_P (return_mode)
-		      || (return_type != NULL
-			  && (TYPE_MAIN_VARIANT (return_type)
-			      == long_double_type_node))))
+		  && return_type != NULL
+		  && (TYPE_MAIN_VARIANT (return_type) == long_double_type_node))
 		rs6000_passes_long_double = true;
 
 	      /* Note if we passed or return a IEEE 128-bit type.  We changed
@@ -6666,10 +6663,8 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	{
 	  rs6000_passes_float = true;
 	  if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-	      && (FLOAT128_IBM_P (mode)
-		  || FLOAT128_IEEE_P (mode)
-		  || (type != NULL
-		      && TYPE_MAIN_VARIANT (type) == long_double_type_node)))
+	      && type != NULL
+	      && TYPE_MAIN_VARIANT (type) == long_double_type_node)
 	    rs6000_passes_long_double = true;
 
 	  /* Note if we passed or return a IEEE 128-bit type.  We changed the
@@ -12239,51 +12234,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
   bool func_valid_p = ((rs6000_builtin_mask & mask) == mask);
   enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
 
-  /* We have two different modes (KFmode, TFmode) that are the IEEE 128-bit
-     floating point type, depending on whether long double is the IBM extended
-     double (KFmode) or long double is IEEE 128-bit (TFmode).  It is simpler if
-     we only define one variant of the built-in function, and switch the code
-     when defining it, rather than defining two built-ins and using the
-     overload table in rs6000-c.c to switch between the two.  If we don't have
-     the proper assembler, don't do this switch because CODE_FOR_*kf* and
-     CODE_FOR_*tf* will be CODE_FOR_nothing.  */
-  if (FLOAT128_IEEE_P (TFmode))
-    switch (icode)
-      {
-      default:
-	break;
-
-      case CODE_FOR_sqrtkf2_odd:	icode = CODE_FOR_sqrttf2_odd;	break;
-      case CODE_FOR_trunckfdf2_odd:	icode = CODE_FOR_trunctfdf2_odd; break;
-      case CODE_FOR_addkf3_odd:		icode = CODE_FOR_addtf3_odd;	break;
-      case CODE_FOR_subkf3_odd:		icode = CODE_FOR_subtf3_odd;	break;
-      case CODE_FOR_mulkf3_odd:		icode = CODE_FOR_multf3_odd;	break;
-      case CODE_FOR_divkf3_odd:		icode = CODE_FOR_divtf3_odd;	break;
-      case CODE_FOR_fmakf4_odd:		icode = CODE_FOR_fmatf4_odd;	break;
-      case CODE_FOR_xsxexpqp_kf:	icode = CODE_FOR_xsxexpqp_tf;	break;
-      case CODE_FOR_xsxsigqp_kf:	icode = CODE_FOR_xsxsigqp_tf;	break;
-      case CODE_FOR_xststdcnegqp_kf:	icode = CODE_FOR_xststdcnegqp_tf; break;
-      case CODE_FOR_xsiexpqp_kf:	icode = CODE_FOR_xsiexpqp_tf;	break;
-      case CODE_FOR_xsiexpqpf_kf:	icode = CODE_FOR_xsiexpqpf_tf;	break;
-      case CODE_FOR_xststdcqp_kf:	icode = CODE_FOR_xststdcqp_tf;	break;
-
-      case CODE_FOR_xscmpexpqp_eq_kf:
-	icode = CODE_FOR_xscmpexpqp_eq_tf;
-	break;
-
-      case CODE_FOR_xscmpexpqp_lt_kf:
-	icode = CODE_FOR_xscmpexpqp_lt_tf;
-	break;
-
-      case CODE_FOR_xscmpexpqp_gt_kf:
-	icode = CODE_FOR_xscmpexpqp_gt_tf;
-	break;
-
-      case CODE_FOR_xscmpexpqp_unordered_kf:
-	icode = CODE_FOR_xscmpexpqp_unordered_tf;
-	break;
-      }
-
   if (TARGET_DEBUG_BUILTIN)
     {
       const char *name1 = rs6000_builtin_info[uns_fcode].name;
@@ -12435,26 +12385,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	{
 	  exp = build_call_nary (TREE_TYPE (exp), CALL_EXPR_FN (exp),
 				 2, CALL_EXPR_ARG (exp, 0), integer_zero_node);
-	}
-      break;
-
-      /* For the pack and unpack int128 routines, fix up the builtin so it
-	 uses the correct IBM128 type.  */
-    case MISC_BUILTIN_PACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
-	{
-	  icode = CODE_FOR_packtf;
-	  fcode = MISC_BUILTIN_PACK_TF;
-	  uns_fcode = (size_t)fcode;
-	}
-      break;
-
-    case MISC_BUILTIN_UNPACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
-	{
-	  icode = CODE_FOR_unpacktf;
-	  fcode = MISC_BUILTIN_UNPACK_TF;
-	  uns_fcode = (size_t)fcode;
 	}
       break;
 
@@ -12642,24 +12572,15 @@ rs6000_init_builtins (void)
      __ieee128.  */
   if (TARGET_FLOAT128_TYPE)
     {
-      if (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	ibm128_float_type_node = long_double_type_node;
-      else
-	{
-	  ibm128_float_type_node = make_node (REAL_TYPE);
-	  TYPE_PRECISION (ibm128_float_type_node) = 128;
-	  SET_TYPE_MODE (ibm128_float_type_node, IFmode);
-	  layout_type (ibm128_float_type_node);
-	}
+      ibm128_float_type_node = make_node (REAL_TYPE);
+      TYPE_PRECISION (ibm128_float_type_node) = 128;
+      SET_TYPE_MODE (ibm128_float_type_node, IFmode);
+      layout_type (ibm128_float_type_node);
 
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
 
-      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	ieee128_float_type_node = long_double_type_node;
-      else
-	ieee128_float_type_node = float128_type_node;
-
+      ieee128_float_type_node = float128_type_node;
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
     }
