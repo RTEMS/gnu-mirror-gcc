@@ -33,6 +33,7 @@
 
 #include <soft-fp.h>
 #include <quad-float128.h>
+#include "float128-convert.h"
 
 #ifndef __FLOAT128_HARDWARE__
 #error "This module must be compiled with IEEE 128-bit hardware support"
@@ -190,18 +191,12 @@ __unordkf2_hw (TFtype a, TFtype b)
 IBM128_TYPE
 __extendkftf2_hw (TFtype value)
 {
-  IBM128_TYPE ret;
-
-  CVT_FLOAT128_TO_IBM128 (ret, value);
-  return ret;
+  return convert_float128_to_ibm128 (value);
 }
 
 /* Convert __ibm128 to __float128.  */
 TFtype
 __trunctfkf2_hw (IBM128_TYPE value)
 {
-  TFtype ret;
-
-  CVT_IBM128_TO_FLOAT128 (ret, value);
-  return ret;
+  return convert_ibm128_to_float128 (value);
 }
