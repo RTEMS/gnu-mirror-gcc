@@ -15002,7 +15002,7 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
 }
 
 /* Min/max subcase to emit an appropriate instruction for SF/DF scalars on ISA
-   3.0.
+   3.0 and for IEEE 128-bit scalars on ISA 3.1.
 
    Move TRUE_COND to DEST if OP of the operands of the last comparison is
    nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the hardware has
@@ -15046,7 +15046,8 @@ emit_fp_min_max_insn (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 }
 
 /* Conditional move subcase to emit a floating point compare setting a mask
-   instruction and a XXSEL select instruction for SF/DF scalars on ISA 3.0.
+   instruction and a XXSEL select instruction for SF/DF scalars on ISA 3.0 and
+   for IEEE 128-bit scalars on ISA 3.1.
 
    Move TRUE_COND to DEST if OP of the operands of the last comparison is
    nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the hardware has
@@ -15134,6 +15135,21 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (TARGET_P9_MINMAX
       && (compare_mode == SFmode || compare_mode == DFmode)
       && (result_mode == SFmode || result_mode == DFmode))
+    {
+      if (emit_fp_min_max_insn (dest, op, true_cond, false_cond))
+	return 1;
+
+      if (emit_fp_cmove_with_mask_xxsel (dest, op, true_cond, false_cond))
+	return 1;
+    }
+
+  /* See if we can use the ISA 3.1 min/max/compare instructions for IEEE
+     128-bit floating point.  At present, don't worry about doing conditional
+     moves with different types for the comparison and movement (unlike SF/DF,
+     where you can do a conditional test between double and use float as the
+     if/then parts. */
+  if (TARGET_FLOAT128_HW && TARGET_POWER10 && FLOAT128_IEEE_P (compare_mode)
+      && compare_mode == result_mode)
     {
       if (emit_fp_min_max_insn (dest, op, true_cond, false_cond))
 	return 1;
@@ -15365,7 +15381,8 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
+	  || (TARGET_FLOAT128_HW && TARGET_POWER10 && FLOAT128_IEEE_P (mode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
