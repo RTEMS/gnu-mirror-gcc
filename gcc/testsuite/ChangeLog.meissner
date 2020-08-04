@@ -1,5 +1,11 @@
 2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/bswap-brd.c: New test.
+	* gcc.target/powerpc/bswap-brw.c: New test.
+	* gcc.target/powerpc/bswap-brh.c: New test.
+
+2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* ChangeLog.meissner: New file.
 
 2020-08-03   Michael Meissner  <meissner@linux.ibm.com>
