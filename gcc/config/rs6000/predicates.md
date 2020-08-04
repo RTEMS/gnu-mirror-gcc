@@ -1856,3 +1856,45 @@
 {
   return address_is_prefixed (XEXP (op, 0), mode, NON_PREFIXED_DEFAULT);
 })
+
+;; Return true if the operand is a valid memory operand with an offsettable
+;; address that can be split into 2 sub-addresses, each of which is a valid
+;; DS-form (bottom 2 bits of the offset are 0).  This is used to optimize
+;; creating a vector of two DImode elements and then storing the vector.  We
+;; want to eliminate the direct moves from GPRs to form the vector and do the
+;; store directly from the GPRs.
+
+(define_predicate "ds_form_memory"
+  (match_code "mem")
+{
+  if (!memory_operand (op, mode))
+    return false;
+
+  rtx addr = XEXP (op, 0);
+
+  if (REG_P (addr) || SUBREG_P (addr))
+    return true;
+
+  if (GET_CODE (addr) != PLUS)
+    return false;
+
+  if (!base_reg_operand (XEXP (addr, 0), Pmode))
+    return false;
+
+  rtx offset = XEXP (addr, 1);
+  if (!CONST_INT_P (offset))
+    return false;
+
+  HOST_WIDE_INT value = INTVAL (offset);
+
+  if (TARGET_PREFIXED)
+    return SIGNED_34BIT_OFFSET_EXTRA_P (value, GET_MODE_SIZE (DImode));
+
+  /* If we don't support prefixed addressing, ensure that the two addresses
+     created would each be valid for doing a STD instruction (which is a
+     DS-form instruction that requires the bottom 2 bits to be 0).  */
+  if ((value & 0x3) != 0)
+    return false;
+
+  return SIGNED_16BIT_OFFSET_EXTRA_P (value, GET_MODE_SIZE (DImode));
+})
