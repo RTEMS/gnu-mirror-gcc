@@ -1,5 +1,31 @@
 2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (emit_fp_min_max_insn): Update comment.
+	(emit_fp_cmove_with_mask_xxsel): Update comment.
+	(rs6000_emit_cmove): Add support for IEEE 128-bit min, max, and
+	comparisons on ISA 3.1.
+	(rs6000_emit_minmax): Add support for IEEE 128-bit min/max on ISA
+	3.1.
+	* config/rs6000/rs6000.md (s<minmax><mode>3, IEEE128 iterator):
+	New insns for IEEE 128-bit min/max.
+	(mov<mode>cc, IEEE128 iterator): New insns for IEEE 128-bit
+	conditional move.
+	(mov<mode>cc_future, IEEE128 iterator): New insns for IEEE 128-bit
+	conditional move.
+	(mov<mode>cc_invert_future, IEEE128 iterator): New insns for IEEE
+	128-bit conditional move.
+	(fpmask<mode>, IEEE128 iterator): New insns for IEEE 128-bit
+	conditional move.
+
+2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (emit_fp_min_max_insn): Rename
+	rs6000_emit_p9_fp_minmax.
+	(emit_fp_cmove_with_mask_xxsel): Rename rs6000_emit_p9_fp_cmove.
+	(rs6000_emit_cmove): Update to use renamed functions.
+
+2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (bswaphi2_reg): Generate the BRH
 	instruction on ISA 3.1.
 	(bswapsi2_reg): Generate the BRW instruction on ISA 3.1.
