@@ -1,3 +1,70 @@
+2020-08-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-call.c (init_cumulative_args): Do not flag
+	functions returning an explicit __float128 type as having an IEEE
+	128-bit long double.
+	(rs6000_function_arg_advance_1): Do not flag functions passing an
+	explicit __float128 type as passing an IEEE 128-bit long double.
+	(rs6000_expand_builtin): Remove code that mapped KF built-in
+	functions into TF built-in functions if long double is IEEE
+	128-bit.
+	(rs6000_expand_builtin): Remove code that converted pack and
+	unpack IF built-in functions into the pack or unpack TF built-in
+	function if long double is IBM extended double.
+	(rs6000_init_builtins): Always make __ibm128 and __float128
+	separate types from long double, even if long double has the same
+	representation.
+	* config/rs6000/rs6000.c (init_float128_ieee): Fix the conversion
+	from KFmode to IFmode to use the right name now that __ibm128
+	always uses a distinct type from long double.
+	(rs6000_expand_float128_convert): Fix up converts between 128-bit
+	floating point types to work when IFmode is a separate type from
+	TFmode when TFmode uses the IBM extended double encoding.
+	(rs6000_mangle_type): Adjust mangling so that 128-bit long double
+	that uses the IEEE 128-bit encoding uses "e" instead of "g".
+	(rs6000_floatn_mode): Always use KFmode for _Float128, even if
+	long double uses the IEEE 128-bit floating point representation.
+	(rs6000_c_mode_for_suffix): The 'q' suffix now always implies
+	KFmode.
+
+2020-08-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
+	built-in functions for long double built-ins that use IEEE
+	128-bit.
+	(rs6000_expand_builtin): Change the KF IEEE 128-bit comparison
+	insns to TF if long double is IEEE 128-bit.
+	* config/rs6000/rs6000-builtin.def (scalar_extract_exptf): Add
+	support for long double being IEEE 128-bit built-in functions.
+	(scalar_extract_sigtf): Likewise.
+	(scalar_test_neg_tf): Likewise.
+	(scalar_insert_exp_tf): Likewise.
+	(scalar_insert_exp_tfp): Likewise.
+	(scalar_cmp_exp_tf_gt): Likewise.
+	(scalar_cmp_exp_tf_lt): Likewise.
+	(scalar_cmp_exp_tf_eq): Likewise.
+	(scalar_cmp_exp_tf_unordered): Likewise.
+	(scalar_test_data_class_tf): Likewise.
+
+2020-08-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_invalid_binary_op): Update error
+	messages about mixing IBM long double and IEEE 128-bit.
+
+2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_type): Mangle IEEE 128-bit
+	floating point long double to "u12__ieee128_ld".  Always mangle
+	__ibm128 into "g"
+	(rs6000_mangle_decl_assembler_name): Add support for mapping
+	built-in function names for long double built-in functions if long
+	double is IEEE 128-bit.
+
+2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (init_float128_ieee): Use a different
+	name for IEEE 128-bit long double complex multiply and divide.
+
 2020-08-03  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Add pcrel-opt.o.
