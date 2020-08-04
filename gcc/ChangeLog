@@ -1,3 +1,127 @@
+2020-08-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/cpp.texi (Variadic Macros): Use the exact ... token in
+	code examples.
+
+2020-08-03  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-03  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* doc/invoke.texi: Add missing comma after octeontx2f95mm entry.
+
+2020-08-03  Qian Jianhua  <qianjh@cn.fujitsu.com>
+
+	Backported from master:
+	2020-08-03  Qian jianhua  <qianjh@cn.fujitsu.com>
+
+	* config/aarch64/aarch64-cores.def (a64fx): New core.
+	* config/aarch64/aarch64-tune.md: Regenerated.
+	* config/aarch64/aarch64.c (a64fx_prefetch_tune, a64fx_tunings): New.
+	* doc/invoke.texi: Add a64fx to the list.
+
+2020-07-31  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-31  Martin Liska  <mliska@suse.cz>
+
+	* cgraph.h: Remove leading empty lines.
+	* cgraphunit.c (enum cgraph_order_sort_kind): Remove
+	ORDER_UNDEFINED.
+	(struct cgraph_order_sort): Add constructors.
+	(cgraph_order_sort::process): New.
+	(cgraph_order_cmp): New.
+	(output_in_order): Simplify and push nodes to vector.
+
+2020-07-30  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-30  Martin Liska  <mliska@suse.cz>
+
+	PR target/95435
+	* config/i386/x86-tune-costs.h: Use libcall for large sizes for
+	-m32. Start using libcall from 128+ bytes.
+
+2020-07-30  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-30  Martin Liska  <mliska@suse.cz>
+
+	* config/i386/x86-tune-costs.h: Change code formatting.
+
+2020-07-28  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/96058
+	* expr.c (string_constant): Build string_constant only
+	for a type that has same precision as char_type_node
+	and is an integral type.
+
+2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-07-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/96335
+	* calls.c (maybe_warn_rdwr_sizes): Add FNDECL and FNTYPE arguments,
+	instead of trying to rediscover them in the body.
+	(initialize_argument_information): Adjust caller.
+
+2020-07-27  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	Backported from master:
+	2020-06-23  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config.gcc: Identify power10 as a 64-bit processor and as valid
+	for --with-cpu and --with-tune.
+
+2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-07-27  Martin Liska  <mliska@suse.cz>
+
+	PR lto/45375
+	* symbol-summary.h: Call vec_safe_reserve before grow is called
+	in order to grow to a reasonable size.
+	* vec.h (vec_safe_reserve): Add missing function for vl_ptr
+	type.
+
+2020-07-23  Sergei Trofimovich  <siarheit@google.com>
+
+	Backported from master:
+	2020-07-20  Sergei Trofimovich  <siarheit@google.com>
+
+	PR target/96190
+	* config/sparc/linux.h (ENDFILE_SPEC): Use GNU_USER_TARGET_ENDFILE_SPEC
+	to get crtendS.o for !no-pie mode.
+	* config/sparc/linux64.h (ENDFILE_SPEC): Ditto.
+
+2020-07-23  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-07-22  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/96236
+	* config/rs6000/rs6000-call.c (rs6000_gimple_fold_mma_builtin): Handle
+	little-endian memory ordering.
+
+2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-07-23  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/96260
+	* asan.c (asan_shadow_offset_set_p): New.
+	* asan.h (asan_shadow_offset_set_p): Ditto.
+	* toplev.c (process_options): Allow -fsanitize=kernel-address
+	even TARGET_ASAN_SHADOW_OFFSET not implemented, only check when
+	asan stack protection is enabled.
+
 2020-07-23  Release Manager
 
 	* GCC 10.2.0 released.
