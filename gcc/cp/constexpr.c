@@ -1708,6 +1708,43 @@ cxx_eval_internal_function (const constexpr_ctx *ctx, tree t,
 	  }
       }
 
+    case IFN_FENV_FLOAT:
+    case IFN_FENV_CONVERT:
+      {
+	tree arg = cxx_eval_constant_expression (ctx, CALL_EXPR_ARG (t, 0),
+						 false, non_constant_p,
+						 overflow_p);
+	if (CONSTANT_CLASS_P (arg))
+	  {
+	    combined_fn cfn = CFN_FENV_CONVERT;
+	    if (CALL_EXPR_IFN (t) == IFN_FENV_FLOAT)
+	      cfn = CFN_FENV_FLOAT;
+	    tree res = fold_const_call (cfn, TREE_TYPE (t), arg,
+					CALL_EXPR_ARG (t, 1),
+					CALL_EXPR_ARG (t, 2));
+	    if (res)
+	      return res;
+	  }
+	*non_constant_p = true;
+	return t;
+      }
+
+    case IFN_FENV_SQRT:
+      {
+	tree arg = cxx_eval_constant_expression (ctx, CALL_EXPR_ARG (t, 0),
+						 false, non_constant_p,
+						 overflow_p);
+	if (CONSTANT_CLASS_P (arg))
+	  {
+	    tree res = fold_const_call (CFN_FENV_SQRT, TREE_TYPE (t), arg,
+					CALL_EXPR_ARG (t, 1));
+	    if (res)
+	      return res;
+	  }
+	*non_constant_p = true;
+	return t;
+      }
+
     default:
       if (!ctx->quiet)
 	error_at (cp_expr_loc_or_input_loc (t),
@@ -7486,6 +7523,9 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		case IFN_MUL_OVERFLOW:
 		case IFN_LAUNDER:
 		case IFN_VEC_CONVERT:
+		case IFN_FENV_FLOAT:
+		case IFN_FENV_CONVERT:
+		case IFN_FENV_SQRT:
 		  bail = false;
 		  break;
 

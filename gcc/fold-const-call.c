@@ -689,6 +689,35 @@ fold_const_vec_convert (tree ret_type, tree arg)
   return elts.build ();
 }
 
+/* Fold a call to IFN_FENV_CONVERT (ARG) returning TYPE.  */
+
+static tree
+fold_const_fenv_convert (tree ret_type, tree arg0, tree arg1, tree arg2)
+{
+  // FIXME!
+  return NULL_TREE;
+}
+
+/* Fold a call to IFN_FENV_FLOAT (ARG) returning TYPE.  */
+
+static tree
+fold_const_fenv_float (tree ret_type, tree arg0, tree arg1, tree arg2)
+{
+  // FIXME!
+  if (integer_zerop (arg0))
+    return build_zero_cst (ret_type);
+  return NULL_TREE;
+}
+
+/* Fold a call to IFN_FENV_SQRT (ARG) returning TYPE.  */
+
+static tree
+fold_const_fenv_sqrt (tree ret_type, tree arg0, tree arg1)
+{
+  // FIXME!
+  return NULL_TREE;
+}
+
 /* Try to evaluate:
 
       IFN_WHILE_ULT (ARG0, ARG1, (TYPE) { ... })
@@ -1675,6 +1704,9 @@ fold_const_call (combined_fn fn, tree type, tree arg0, tree arg1)
     case CFN_FOLD_LEFT_PLUS:
       return fold_const_fold_left (type, arg0, arg1, PLUS_EXPR);
 
+    case CFN_FENV_SQRT:
+      return fold_const_fenv_sqrt (type, arg0, arg1);
+
     default:
       return fold_const_call_1 (fn, type, arg0, arg1);
     }
@@ -1833,6 +1865,12 @@ fold_const_call (combined_fn fn, tree type, tree arg0, tree arg1, tree arg2)
 	  return fold_while_ult (type, parg0, parg1);
 	return NULL_TREE;
       }
+
+    case CFN_FENV_CONVERT:
+      return fold_const_fenv_convert (type, arg0, arg1, arg2);
+
+    case CFN_FENV_FLOAT:
+      return fold_const_fenv_float (type, arg0, arg1, arg2);
 
     default:
       return fold_const_call_1 (fn, type, arg0, arg1, arg2);

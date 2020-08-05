@@ -5768,6 +5768,38 @@ cp_build_binary_op (const op_location_t &location,
 	instrument_expr = instrument_expr1;
     }
 
+  // FIXME: vectors (and complex?) as well
+  if (flag_fenv_access && SCALAR_FLOAT_TYPE_P (build_type))
+    {
+      bool do_fenv_subst = true;
+      internal_fn ifn;
+      switch (resultcode)
+	{
+	case PLUS_EXPR:
+	  ifn = IFN_FENV_PLUS;
+	  break;
+	case MINUS_EXPR:
+	  ifn = IFN_FENV_MINUS;
+	  break;
+	case MULT_EXPR:
+	  ifn = IFN_FENV_MULT;
+	  break;
+	case RDIV_EXPR:
+	  ifn = IFN_FENV_RDIV;
+	  break;
+	default:
+	  do_fenv_subst = false;
+	}
+      if (do_fenv_subst)
+	{
+	  result = build_call_expr_internal_loc (location, ifn, build_type,
+						 3, op0, op1,
+						 integer_zero_node);
+	  TREE_SIDE_EFFECTS (result) = 1;
+	  return result;
+	}
+    }
+
   result = build2_loc (location, resultcode, build_type, op0, op1);
   if (final_type != 0)
     result = cp_convert (final_type, result, complain);

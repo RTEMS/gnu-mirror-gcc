@@ -1635,16 +1635,23 @@ lazy_hex_fp_value (cpp_reader *, cpp_macro *macro, unsigned num)
 {
   REAL_VALUE_TYPE real;
   char dec_str[64], buf1[256];
+  size_t len;
 
   gcc_checking_assert (num < lazy_hex_fp_value_count);
 
-  real_from_string (&real, lazy_hex_fp_values[num].hex_str);
-  real_to_decimal_for_mode (dec_str, &real, sizeof (dec_str),
-			    lazy_hex_fp_values[num].digits, 0,
-			    lazy_hex_fp_values[num].mode);
+  if (!flag_isoc99)
+    {
+      real_from_string (&real, lazy_hex_fp_values[num].hex_str);
+      real_to_decimal_for_mode (dec_str, &real, sizeof (dec_str),
+				lazy_hex_fp_values[num].digits, 0,
+				lazy_hex_fp_values[num].mode);
 
-  size_t len
-    = sprintf (buf1, "%s%s", dec_str, lazy_hex_fp_values[num].fp_suffix);
+      len = sprintf (buf1, "%s%s", dec_str, lazy_hex_fp_values[num].fp_suffix);
+    }
+  else
+    len = sprintf (buf1, "%s%s", lazy_hex_fp_values[num].hex_str,
+		   lazy_hex_fp_values[num].fp_suffix);
+
   gcc_assert (len < sizeof (buf1));
   for (unsigned idx = 0; idx < macro->count; idx++)
     if (macro->exp.tokens[idx].type == CPP_NUMBER)
@@ -1701,13 +1708,16 @@ builtin_define_with_hex_fp_value (const char *macro,
      it's easy to get the exact correct value), parse it as a real,
      then print it back out as decimal.  */
 
-  real_from_string (&real, hex_str);
-  real_to_decimal_for_mode (dec_str, &real, sizeof (dec_str), digits, 0,
-			    TYPE_MODE (type));
+  if (!flag_isoc99)
+    {
+      real_from_string (&real, hex_str);
+      real_to_decimal_for_mode (dec_str, &real, sizeof (dec_str), digits, 0,
+				TYPE_MODE (type));
+    }
 
   /* Assemble the macro in the following fashion
      macro = fp_cast [dec_str fp_suffix] */
-  sprintf (buf2, "%s%s", dec_str, fp_suffix);
+  sprintf (buf2, "%s%s", flag_isoc99 ? hex_str : dec_str, fp_suffix);
   sprintf (buf1, fp_cast, buf2);
   sprintf (buf, "%s=%s", macro, buf1);
 

@@ -1554,6 +1554,10 @@ finput-charset=
 C ObjC C++ ObjC++ Joined RejectNegative
 -finput-charset=<cset>	Specify the default character set for source files.
 
+ffenv-access
+C++ ObjC++ Var(flag_fenv_access)
+Assume #pragma STDC FENV_ACCESS ON at the beginning of the translation unit (experimental and incomplete support).
+
 fextern-tls-init
 C++ ObjC++ Var(flag_extern_tls_init) Init(-1)
 Support dynamic initialization of thread-local variables in a different translation unit.

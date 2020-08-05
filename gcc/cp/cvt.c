@@ -910,7 +910,32 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 		      TREE_TYPE (e));
 	}
       if (code == REAL_TYPE)
-	return convert_to_real_maybe_fold (type, e, dofold);
+	{
+	  if (flag_fenv_access && SCALAR_FLOAT_TYPE_P (TREE_TYPE (e))
+	      && TREE_TYPE (e) != type)
+	    {
+	      // encode the type information, in case the lhs disappears
+	      tree z = build_zero_cst (build_pointer_type (type));
+	      tree result
+		= build_call_expr_internal_loc (loc, IFN_FENV_CONVERT,
+						type, 3, e, z,
+						integer_zero_node);
+	      TREE_SIDE_EFFECTS (result) = 1;
+	      return result;
+	    }
+	  if (flag_fenv_access && INTEGRAL_TYPE_P (TREE_TYPE (e)))
+	    {
+	      // encode the type information, in case the lhs disappears
+	      tree z = build_zero_cst (build_pointer_type (type));
+	      tree result
+		= build_call_expr_internal_loc (loc, IFN_FENV_FLOAT,
+						type, 3, e, z,
+						integer_zero_node);
+	      TREE_SIDE_EFFECTS (result) = 1;
+	      return result;
+	    }
+	  return convert_to_real_maybe_fold (type, e, dofold);
+	}
       else if (code == COMPLEX_TYPE)
 	return convert_to_complex_maybe_fold (type, e, dofold);
     }

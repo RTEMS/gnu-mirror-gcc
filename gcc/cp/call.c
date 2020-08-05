@@ -9634,7 +9634,20 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 
   /* Remember roughly where this call is.  */
   location_t loc = cp_expr_loc_or_input_loc (fn);
-  fn = build_call_a (fn, nargs, argarray);
+  if (flag_fenv_access && TREE_CODE (fn) == ADDR_EXPR
+      && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
+      && (fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRT)
+	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTF)
+	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTL)))
+    {
+      fn = build_call_expr_internal_loc (loc, IFN_FENV_SQRT,
+					 TREE_TYPE (argarray[0]), 2,
+					 argarray[0], integer_zero_node);
+      TREE_SIDE_EFFECTS (fn) = 1;
+    }
+  else
+    fn = build_call_a (fn, nargs, argarray);
+
   SET_EXPR_LOCATION (fn, loc);
 
   fndecl = get_callee_fndecl (fn);

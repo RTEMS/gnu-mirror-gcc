@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vrp.h"
 #include "tree-ssanames.h"
 #include "expmed.h"
+#include "explow.h"
 #include "memmodel.h"
 #include "optabs.h"
 #include "emit-rtl.h"
@@ -2998,6 +2999,265 @@ static void
 expand_NOP (internal_fn, gcall *)
 {
   /* Nothing.  But it shouldn't really prevail.  */
+}
+
+/* Checks if OP is already protected (in particular the result of some FENV
+   arithmetic) and thus can skip the inline asm.  */
+static bool
+already_protected (tree op)
+{
+  // TODO: function parameters/returns, volatile reads, etc may also be ok?
+  gimple *def_stmt;
+  if (TREE_CODE (op) != SSA_NAME
+      || !(def_stmt = SSA_NAME_DEF_STMT (op))
+      || gimple_code (def_stmt) != GIMPLE_CALL
+      || !gimple_call_internal_p (def_stmt))
+    return false;
+  switch (gimple_call_internal_fn (def_stmt))
+    {
+    case IFN_FENV_PLUS:
+    case IFN_FENV_MINUS:
+    case IFN_FENV_MULT:
+    case IFN_FENV_RDIV:
+    case IFN_FENV_SQRT:
+    case IFN_FENV_FLOAT:
+    case IFN_FENV_CONVERT:
+      return true;
+    default:
+      return false;
+    }
+}
+
+/* Emit asm volatile with inout memory parameter X.  */
+static void
+emit_asm_protection (rtx x, machine_mode mode, location_t loc)
+{
+  const char* constraint = "=m";
+  rtvec argvec = rtvec_alloc (1);
+  rtvec constraintvec = rtvec_alloc (1);
+  rtvec labelvec = rtvec_alloc (0);
+  rtx body = gen_rtx_ASM_OPERANDS (mode, "", "", 0, argvec, constraintvec,
+				   labelvec, loc);
+  MEM_VOLATILE_P (body) = true;
+  ASM_OPERANDS_INPUT (body, 0) = x;
+  ASM_OPERANDS_INPUT_CONSTRAINT_EXP (body, 0)
+    = gen_rtx_ASM_INPUT_loc (mode, "0", loc);
+  ASM_OPERANDS_OUTPUT_CONSTRAINT (body) = constraint;
+  emit_insn (gen_rtx_SET (x, body));
+}
+
+/* Expand FENV-protected arithmetic.  */
+static void
+expand_FENV_binop (gcall *stmt, tree_code code)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  tree op0 = gimple_call_arg (stmt, 0);
+  tree op1 = gimple_call_arg (stmt, 1);
+  tree ftype = TREE_TYPE (op0);
+  machine_mode fmode = TYPE_MODE (ftype);
+  location_t loc = gimple_location (stmt);
+  rtx x0, x1;
+  bool skip0 = false;
+
+  if (already_protected (op0))
+    {
+      skip0 = true;
+      x0 = expand_normal (op0);
+    }
+  else
+    {
+      x0 = validize_mem (assign_temp (ftype, true, true));
+      expand_assignment (make_tree (ftype, x0), op0, false);
+      emit_asm_protection (x0, fmode, loc);
+    }
+
+  /* Careful not to end up with something like X - X, which could get
+     simplified.  */
+  if (!skip0 && already_protected (op1))
+    {
+      x1 = expand_normal (op1);
+    }
+  else
+    {
+      x1 = validize_mem (assign_temp (ftype, true, true));
+      expand_assignment (make_tree (ftype, x1), op1, false);
+      emit_asm_protection (x1, fmode, loc);
+    }
+
+  rtx x2 = validize_mem (assign_temp (ftype, true, true));
+  // Using some intermediate registers for x0 and x1 could help x86 avoid
+  // reg+mem when it isn't necessary. It could also save a bit of stack.
+  optab o = optab_for_tree_code (code, ftype, optab_default);
+  rtx y2 = expand_binop (fmode, o, x0, x1, x2, false, OPTAB_DIRECT);
+  if (x2 != y2)
+    emit_move_insn (x2, y2);
+  emit_asm_protection (x2, fmode, loc);
+  if (lhs)
+    expand_assignment (lhs, make_tree (ftype, x2), false);
+  crtl->has_asm_statement = 1;
+}
+
+static void
+expand_FENV_PLUS (internal_fn, gcall *stmt)
+{
+  expand_FENV_binop (stmt, PLUS_EXPR);
+}
+
+static void
+expand_FENV_MINUS (internal_fn, gcall *stmt)
+{
+  expand_FENV_binop (stmt, MINUS_EXPR);
+}
+
+static void
+expand_FENV_MULT (internal_fn, gcall *stmt)
+{
+  expand_FENV_binop (stmt, MULT_EXPR);
+}
+
+static void
+expand_FENV_RDIV (internal_fn, gcall *stmt)
+{
+  expand_FENV_binop (stmt, RDIV_EXPR);
+}
+
+#if 0
+static void
+expand_FENV_NEGATE (internal_fn, gcall *stmt)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  tree op = gimple_call_arg (stmt, 0);
+  tree ftype = TREE_TYPE (op);
+  machine_mode fmode = TYPE_MODE (ftype);
+  location_t loc = gimple_location (stmt);
+  rtx x;
+
+  if (already_protected (op))
+    {
+      x = expand_normal (op);
+    }
+  else
+    {
+      x = validize_mem (assign_temp (ftype, true, true));
+      expand_assignment (make_tree (ftype, x), op, false);
+      emit_asm_protection (x, fmode, loc);
+    }
+
+  rtx x2 = validize_mem (assign_temp (ftype, true, true));
+  optab o = optab_for_tree_code (NEGATE_EXPR, ftype, optab_default);
+  rtx y2 = expand_unop (fmode, o, x, x2, false);
+  if (x2 != y2)
+    emit_move_insn (x2, y2);
+  emit_asm_protection (x2, fmode, loc);
+  if (lhs)
+    expand_assignment (lhs, make_tree (ftype, x2), false);
+  crtl->has_asm_statement = 1;
+}
+#endif
+
+static void
+expand_FENV_SQRT (internal_fn, gcall *stmt)
+{
+  // We cannot delegate to expand_call_stmt of a dummy stmt with BUILT_IN_SQRT
+  // because it does not always generate a call.
+  tree lhs = gimple_call_lhs (stmt);
+  tree op = gimple_call_arg (stmt, 0);
+  tree ftype = TREE_TYPE (op);
+  machine_mode fmode = TYPE_MODE (ftype);
+  location_t loc = gimple_location (stmt);
+  built_in_function f;
+  if (fmode == TYPE_MODE (float_type_node))
+    f = BUILT_IN_SQRTF;
+  else if (fmode == TYPE_MODE (double_type_node))
+    f = BUILT_IN_SQRT;
+  else if (fmode == TYPE_MODE (long_double_type_node))
+    f = BUILT_IN_SQRTL;
+  else
+    gcc_unreachable();
+  tree sqrtfn = mathfn_built_in (ftype, f);
+  tree exp = build_vl_exp (CALL_EXPR, 1 + 3);
+  CALL_EXPR_FN (exp)
+    = build1_loc (loc, ADDR_EXPR,
+		  build_pointer_type (TREE_TYPE (sqrtfn)), sqrtfn);
+  TREE_TYPE (exp) = ftype;
+  CALL_EXPR_STATIC_CHAIN (exp) = gimple_call_chain (stmt); // ???
+  TREE_SIDE_EFFECTS (exp) = 1;
+  TREE_NOTHROW (exp) = 1;
+  CALL_EXPR_TAILCALL (exp) = gimple_call_tail_p (stmt);
+  CALL_FROM_THUNK_P (exp) = gimple_call_from_thunk_p (stmt);
+  CALL_EXPR_ARG (exp, 0) = op;
+  SET_EXPR_LOCATION (exp, loc);
+  // debug?
+
+  rtx res = validize_mem (assign_temp (ftype, true, true));
+  tree tmp = make_tree (ftype, res);
+  expand_assignment (tmp, exp, false);
+  // Still needed to avoid DCE when the result is unused.
+  emit_asm_protection (res, fmode, loc);
+  if (lhs)
+    expand_assignment (lhs, tmp, false);
+}
+
+static void
+expand_FENV_FLOAT (internal_fn, gcall *stmt)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  tree op = gimple_call_arg (stmt, 0);
+  tree itype = TREE_TYPE (op);
+  tree otype = TREE_TYPE (TREE_TYPE (gimple_call_arg (stmt, 1)));
+  machine_mode imode = TYPE_MODE (itype);
+  machine_mode omode = TYPE_MODE (otype);
+  location_t loc = gimple_location (stmt);
+  rtx x;
+
+  if (already_protected (op))
+    {
+      x = expand_normal (op);
+    }
+  else
+    {
+      x = validize_mem (assign_temp (itype, true, true));
+      expand_assignment (make_tree (itype, x), op, false);
+      emit_asm_protection (x, imode, loc);
+    }
+
+  rtx x2 = validize_mem (assign_temp (otype, true, true));
+  expand_float (x2, x, TYPE_UNSIGNED (itype));
+  emit_asm_protection (x2, omode, loc);
+  if (lhs)
+    expand_assignment (lhs, make_tree (otype, x2), false);
+  crtl->has_asm_statement = 1;
+}
+
+static void
+expand_FENV_CONVERT (internal_fn, gcall *stmt)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  tree op = gimple_call_arg (stmt, 0);
+  tree itype = TREE_TYPE (op);
+  tree otype = TREE_TYPE (TREE_TYPE (gimple_call_arg (stmt, 1)));
+  machine_mode imode = TYPE_MODE (itype);
+  machine_mode omode = TYPE_MODE (otype);
+  location_t loc = gimple_location (stmt);
+  rtx x;
+
+  if (already_protected (op))
+    {
+      x = expand_normal (op);
+    }
+  else
+    {
+      x = validize_mem (assign_temp (itype, true, true));
+      expand_assignment (make_tree (itype, x), op, false);
+      emit_asm_protection (x, imode, loc);
+    }
+
+  rtx x2 = validize_mem (assign_temp (otype, true, true));
+  convert_move (x2, x, 0);
+  emit_asm_protection (x2, omode, loc);
+  if (lhs)
+    expand_assignment (lhs, make_tree (otype, x2), false);
+  crtl->has_asm_statement = 1;
 }
 
 /* Coroutines, all should have been processed at this stage.  */
