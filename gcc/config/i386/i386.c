@@ -16502,6 +16502,25 @@ ix86_get_multilib_abi_name (void)
     return "x86_64";
 }
 
+std::pair<const char*, const char*>
+ix86_asm_passthrough_constraints (machine_mode mode)
+{
+  switch (mode)
+    {
+    case SFmode:
+    case DFmode:
+      if (!TARGET_SSE || !TARGET_SSE_MATH)
+	break;
+      return std::make_pair("=xm", "0");
+    case DImode:
+    case SImode:
+    case HImode:
+    case QImode:
+      return std::make_pair("=rm", "0");
+    }
+  return default_asm_passthrough_constraints (mode);
+}
+
 /* Compute the alignment for a variable for Intel MCU psABI.  TYPE is
    the data type, and ALIGN is the alignment that the object would
    ordinarily have.  */
@@ -23414,6 +23433,9 @@ ix86_run_selftests (void)
 #undef TARGET_GET_MULTILIB_ABI_NAME
 #define TARGET_GET_MULTILIB_ABI_NAME \
   ix86_get_multilib_abi_name
+
+#undef TARGET_ASM_PASSTHROUGH_CONSTRAINTS
+#define TARGET_ASM_PASSTHROUGH_CONSTRAINTS ix86_asm_passthrough_constraints
 
 static bool ix86_libc_has_fast_function (int fcode ATTRIBUTE_UNUSED)
 {

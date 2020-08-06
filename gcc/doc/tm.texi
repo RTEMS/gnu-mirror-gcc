@@ -781,6 +781,10 @@ is 0.
 Returns true if the target supports IEEE 754 floating-point exceptions and rounding modes, false otherwise.  This is intended to relate to the @code{float} and @code{double} types, but not necessarily @code{long double}. By default, returns true if the @code{adddf3} instruction pattern is available and false otherwise, on the assumption that hardware floating point supports exceptions and rounding modes but software floating point does not.
 @end deftypefn
 
+@deftypefn {Target Hook} {std::pair<const char* GCC_COMMA const char*>} TARGET_ASM_PASSTHROUGH_CONSTRAINTS (machine_mode)
+Return the output and input constraints to use in the inline asm generated for the expansion of IFN_FENV_* calls, to make a value in mode MODE opaque to the optimizers.
+@end deftypefn
+
 @node Per-Function Data
 @section Defining data structures for per-function information.
 @cindex per-function data

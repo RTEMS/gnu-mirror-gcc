@@ -285,4 +285,6 @@ extern bool default_have_speculation_safe_value (bool);
 extern bool speculation_safe_value_not_needed (bool);
 extern rtx default_speculation_safe_value (machine_mode, rtx, rtx, rtx);
 
+extern std::pair<const char*, const char*> default_asm_passthrough_constraints (machine_mode);
+
 #endif /* GCC_TARGHOOKS_H */

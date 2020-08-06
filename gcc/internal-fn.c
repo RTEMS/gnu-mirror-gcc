@@ -3032,7 +3032,8 @@ already_protected (tree op)
 static void
 emit_asm_protection (rtx x, machine_mode mode, location_t loc)
 {
-  const char* constraint = "=m";
+  std::pair<const char*, const char*> constraints
+    = targetm.asm_passthrough_constraints (mode);
   rtvec argvec = rtvec_alloc (1);
   rtvec constraintvec = rtvec_alloc (1);
   rtvec labelvec = rtvec_alloc (0);
@@ -3041,8 +3042,8 @@ emit_asm_protection (rtx x, machine_mode mode, location_t loc)
   MEM_VOLATILE_P (body) = true;
   ASM_OPERANDS_INPUT (body, 0) = x;
   ASM_OPERANDS_INPUT_CONSTRAINT_EXP (body, 0)
-    = gen_rtx_ASM_INPUT_loc (mode, "0", loc);
-  ASM_OPERANDS_OUTPUT_CONSTRAINT (body) = constraint;
+    = gen_rtx_ASM_INPUT_loc (mode, constraints.second, loc);
+  ASM_OPERANDS_OUTPUT_CONSTRAINT (body) = constraints.first;
   emit_insn (gen_rtx_SET (x, body));
 }
 

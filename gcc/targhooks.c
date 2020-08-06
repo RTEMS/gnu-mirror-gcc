@@ -2379,4 +2379,12 @@ default_speculation_safe_value (machine_mode mode ATTRIBUTE_UNUSED,
   return result;
 }
 
+/* Default constraint for the asm passthrough used to expand IFN_FENV_*, just
+   use memory.  */
+std::pair<const char*, const char*>
+default_asm_passthrough_constraints (machine_mode)
+{
+  return std::make_pair("=m", "0");
+}
+
 #include "gt-targhooks.h"
