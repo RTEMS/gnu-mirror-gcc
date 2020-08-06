@@ -97,6 +97,16 @@ assert_is_gimple_rhs_class (const gimple *stmt,
   gcc_assert (succeeds);
 }
 
+/* There are some cases where I need to change a const_tree to a tree.
+ * Some of these are part of the way the API is written.  To avoid
+ * warnings, always use this function for casting away const-ness.
+ */
+inline static tree
+const_tree_to_tree (const_tree t)
+{
+  return (tree) t;
+}
+
 // TODO: Rename?
 // TSET_T stands for type set.
 typedef std::set<const_tree> tset_t;
