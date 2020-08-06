@@ -167,6 +167,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <stack>
 
 #include "ipa-type-escape-analysis.h"
+#include "ipa-dfe.h"
 
 // Main function that drives dfe.
 static unsigned int
@@ -211,15 +212,6 @@ bitpos_of_field (const tree fdecl)
 	  + tree_to_shwi (DECL_FIELD_BIT_OFFSET (fdecl)));
 }
 
-/* There are some cases where I need to change a const_tree to a tree.
- * Some of these are part of the way the API is written.  To avoid
- * warnings, always use this function for casting away const-ness.
- */
-inline static tree
-const_tree_to_tree (const_tree t)
-{
-  return (tree) t;
-}
 
 namespace {
 const pass_data pass_data_ipa_type_escape_analysis = {
@@ -280,6 +272,17 @@ lto_dead_field_elimination ()
 					    record_field_map);
   if (record_field_offset_map.empty ())
     return;
+
+    // Prepare for transformation.
+  std::set<const_tree> to_modify
+    = get_all_types_pointing_to (record_field_offset_map,
+				 escaping_nonescaping_sets);
+  reorg_maps_t replacements
+    = get_types_replacement (record_field_offset_map, to_modify);
+  reorg_record_map_t map = replacements.first;
+  reorg_field_map_t field_map = replacements.second;
+  // Transformation.
+  substitute_types_in_program (map, field_map);
 
 }
 
