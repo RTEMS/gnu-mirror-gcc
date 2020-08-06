@@ -9554,9 +9554,18 @@ proc check_effective_target_avr_tiny { } {
 # Return 1 if <fenv.h> is available.
 
 proc check_effective_target_fenv {} {
+    set opts ""
+    if [check_effective_target_c] {
+        append opts "-std=gnu99"
+    }
+    if [check_effective_target_c++] {
+	if { ![check_effective_target_c++11] } {
+	    return 0
+	}
+    }
     return [check_no_compiler_messages fenv object {
 	#include <fenv.h>
-    } [add_options_for_ieee "-std=gnu99"]]
+    } [add_options_for_ieee "$opts"]]
 }
 
 # Return 1 if <fenv.h> is available with all the standard IEEE
@@ -9565,6 +9574,15 @@ proc check_effective_target_fenv {} {
 # exceptions, those need to be specified in the testcases.)
 
 proc check_effective_target_fenv_exceptions {} {
+    set opts ""
+    if [check_effective_target_c] {
+        append opts "-std=gnu99"
+    }
+    if [check_effective_target_c++] {
+	if { ![check_effective_target_c++11] } {
+	    return 0
+	}
+    }
     return [check_runtime fenv_exceptions {
 	#include <fenv.h>
 	#include <stdlib.h>
@@ -9593,7 +9611,7 @@ proc check_effective_target_fenv_exceptions {} {
 	  else
 	    abort ();
 	}
-    } [add_options_for_ieee "-std=gnu99"]]
+    } [add_options_for_ieee "$opts"]]
 }
 
 # Return 1 if -fexceptions is supported.
