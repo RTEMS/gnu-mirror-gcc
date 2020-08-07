@@ -1,3 +1,27 @@
+2020-08-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_cmove): Add support for IEEE
+	128-bit min, max, and comparisons on ISA 3.1.
+	(rs6000_emit_minmax): Add support for IEEE 128-bit min/max on ISA
+	3.1.
+	* config/rs6000/rs6000.md (s<minmax><mode>3, IEEE128 iterator):
+	New insns for IEEE 128-bit min/max.
+	(mov<mode>cc, IEEE128 iterator): New insns for IEEE 128-bit
+	conditional move.
+	(mov<mode>cc_hardware, IEEE128 iterator): New insns for IEEE
+	128-bit conditional move.
+	(mov<mode>cc_invert_hardware, IEEE128 iterator): New insns for
+	IEEE 128-bit conditional move.
+	(fpmask<mode>, IEEE128 iterator): New insns for IEEE 128-bit
+	conditional move.
+
+2020-08-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c
+	(rs6000_emit_p9_fp_minmax,generate_fp_min_max): Rename.
+	(rs6000_emit_p9_fp_cmove,generate_fp_cmove): Rename.
+	(rs6000_emit_cmove): Update to use renamed functions.
+
 2020-08-07   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
