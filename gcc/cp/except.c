@@ -1073,7 +1073,21 @@ check_noexcept_r (tree *tp, int * /*walk_subtrees*/, void * /*data*/)
       if (!TYPE_NOTHROW_P (type))
 	return fn;
     }
-
+  if (code == CALL_EXPR && CALL_EXPR_FN (t) == NULL_TREE)
+    {
+      switch (CALL_EXPR_IFN (t))
+	{
+	case IFN_FENV_PLUS:
+	case IFN_FENV_MINUS:
+	case IFN_FENV_MULT:
+	case IFN_FENV_RDIV:
+	case IFN_FENV_FLOAT:
+	case IFN_FENV_CONVERT:
+	case IFN_FENV_SQRT:
+	  return TREE_NOTHROW (t) ? NULL_TREE : t;
+	default:;
+	}
+    }
   return NULL_TREE;
 }
 

@@ -5796,6 +5796,7 @@ cp_build_binary_op (const op_location_t &location,
 						 3, op0, op1,
 						 integer_zero_node);
 	  TREE_SIDE_EFFECTS (result) = 1;
+	  TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	  return result;
 	}
     }

@@ -9643,6 +9643,7 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
       fn = build_call_expr_internal_loc (loc, IFN_FENV_SQRT,
 					 TREE_TYPE (argarray[0]), 2,
 					 argarray[0], integer_zero_node);
+      TREE_NOTHROW (fn) = !flag_non_call_exceptions;
       TREE_SIDE_EFFECTS (fn) = 1;
     }
   else

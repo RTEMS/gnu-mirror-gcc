@@ -921,6 +921,7 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 						type, 3, e, z,
 						integer_zero_node);
 	      TREE_SIDE_EFFECTS (result) = 1;
+	      TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	      return result;
 	    }
 	  if (flag_fenv_access && INTEGRAL_TYPE_P (TREE_TYPE (e)))
@@ -932,6 +933,7 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 						type, 3, e, z,
 						integer_zero_node);
 	      TREE_SIDE_EFFECTS (result) = 1;
+	      TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	      return result;
 	    }
 	  return convert_to_real_maybe_fold (type, e, dofold);
