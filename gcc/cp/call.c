@@ -9636,6 +9636,7 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
   location_t loc = cp_expr_loc_or_input_loc (fn);
   if (flag_fenv_access && TREE_CODE (fn) == ADDR_EXPR
       && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
+      && nargs == 1
       && (fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRT)
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTF)
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTL)))
@@ -9643,6 +9644,20 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
       fn = build_call_expr_internal_loc (loc, IFN_FENV_SQRT,
 					 TREE_TYPE (argarray[0]), 2,
 					 argarray[0], integer_zero_node);
+      TREE_NOTHROW (fn) = !flag_non_call_exceptions;
+      TREE_SIDE_EFFECTS (fn) = 1;
+    }
+  else if (flag_fenv_access && TREE_CODE (fn) == ADDR_EXPR
+      && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
+      && nargs == 3
+      && (fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_FMA)
+	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_FMAF)
+	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_FMAL)))
+    {
+      fn = build_call_expr_internal_loc (loc, IFN_FENV_FMA,
+					 TREE_TYPE (argarray[0]), 4,
+					 argarray[0], argarray[1],
+					 argarray[2], integer_zero_node);
       TREE_NOTHROW (fn) = !flag_non_call_exceptions;
       TREE_SIDE_EFFECTS (fn) = 1;
     }
@@ -9667,6 +9682,7 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
       for (i = 0; i < nargs; i++)
 	argarray[i] = maybe_constant_value (argarray[i]);
 
+      // FIXME: FENV variants have more than nargs arguments...
       if (!check_builtin_function_arguments (EXPR_LOCATION (fn), vNULL, fndecl,
 					     orig_fndecl, nargs, argarray))
 	return error_mark_node;

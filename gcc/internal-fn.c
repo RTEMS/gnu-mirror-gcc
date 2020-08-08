@@ -3022,6 +3022,7 @@ already_protected (tree op)
     case IFN_FENV_SQRT:
     case IFN_FENV_FLOAT:
     case IFN_FENV_CONVERT:
+    case IFN_FENV_FMA:
       return true;
     default:
       return false;
@@ -3161,6 +3162,12 @@ expand_FENV_SQRT (internal_fn, gcall *stmt)
 {
   // We cannot delegate to expand_call_stmt of a dummy stmt with BUILT_IN_SQRT
   // because it does not always generate a call.
+  // For targets where sqrt is expanded inline, it would be better to expand
+  // this similarly to FENV_PLUS, use a regular expansion with asm protection
+  // on the argument and the result.
+  // When sqrt is a function call, we can skip the argument protection, but not
+  // the result protection in case sqrt is pure and might disappear.
+  // What about errno?
   tree lhs = gimple_call_lhs (stmt);
   tree op = gimple_call_arg (stmt, 0);
   tree ftype = TREE_TYPE (op);
@@ -3187,6 +3194,53 @@ expand_FENV_SQRT (internal_fn, gcall *stmt)
   CALL_EXPR_TAILCALL (exp) = gimple_call_tail_p (stmt);
   CALL_FROM_THUNK_P (exp) = gimple_call_from_thunk_p (stmt);
   CALL_EXPR_ARG (exp, 0) = op;
+  SET_EXPR_LOCATION (exp, loc);
+  // debug?
+
+  rtx res = validize_mem (assign_temp (ftype, true, true));
+  tree tmp = make_tree (ftype, res);
+  expand_assignment (tmp, exp, false);
+  // Still needed to avoid DCE when the result is unused.
+  emit_asm_protection (res, fmode, loc);
+  if (lhs)
+    expand_assignment (lhs, tmp, false);
+}
+
+static void
+expand_FENV_FMA (internal_fn, gcall *stmt)
+{
+  // Try delegating to expand_call_stmt of a dummy stmt with BUILT_IN_FMA
+  // instead, with asm protection on the 3 arguments?
+  tree lhs = gimple_call_lhs (stmt);
+  tree op0 = gimple_call_arg (stmt, 0);
+  tree op1 = gimple_call_arg (stmt, 1);
+  tree op2 = gimple_call_arg (stmt, 2);
+  tree ftype = TREE_TYPE (lhs);
+  machine_mode fmode = TYPE_MODE (ftype);
+  location_t loc = gimple_location (stmt);
+  built_in_function f;
+  if (fmode == TYPE_MODE (float_type_node))
+    f = BUILT_IN_FMAF;
+  else if (fmode == TYPE_MODE (double_type_node))
+    f = BUILT_IN_FMA;
+  else if (fmode == TYPE_MODE (long_double_type_node))
+    f = BUILT_IN_FMAL;
+  else
+    gcc_unreachable();
+  tree fmafn = mathfn_built_in (ftype, f);
+  tree exp = build_vl_exp (CALL_EXPR, 3 + 3);
+  CALL_EXPR_FN (exp)
+    = build1_loc (loc, ADDR_EXPR,
+		  build_pointer_type (TREE_TYPE (fmafn)), fmafn);
+  TREE_TYPE (exp) = ftype;
+  CALL_EXPR_STATIC_CHAIN (exp) = gimple_call_chain (stmt); // ???
+  TREE_SIDE_EFFECTS (exp) = 1;
+  TREE_NOTHROW (exp) = 1;
+  CALL_EXPR_TAILCALL (exp) = gimple_call_tail_p (stmt);
+  CALL_FROM_THUNK_P (exp) = gimple_call_from_thunk_p (stmt);
+  CALL_EXPR_ARG (exp, 0) = op0;
+  CALL_EXPR_ARG (exp, 1) = op1;
+  CALL_EXPR_ARG (exp, 2) = op2;
   SET_EXPR_LOCATION (exp, loc);
   // debug?
 

@@ -1084,6 +1084,7 @@ check_noexcept_r (tree *tp, int * /*walk_subtrees*/, void * /*data*/)
 	case IFN_FENV_FLOAT:
 	case IFN_FENV_CONVERT:
 	case IFN_FENV_SQRT:
+	case IFN_FENV_FMA:
 	  return TREE_NOTHROW (t) ? NULL_TREE : t;
 	default:;
 	}

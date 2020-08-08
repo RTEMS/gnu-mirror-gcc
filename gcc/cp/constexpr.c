@@ -1745,6 +1745,12 @@ cxx_eval_internal_function (const constexpr_ctx *ctx, tree t,
 	return t;
       }
 
+    case IFN_FENV_FMA:
+      {
+	*non_constant_p = true;
+	return t;
+      }
+
     default:
       if (!ctx->quiet)
 	error_at (cp_expr_loc_or_input_loc (t),
@@ -7526,6 +7532,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		case IFN_FENV_FLOAT:
 		case IFN_FENV_CONVERT:
 		case IFN_FENV_SQRT:
+		case IFN_FENV_FMA:
 		  bail = false;
 		  break;
 
