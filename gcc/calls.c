@@ -875,7 +875,29 @@ call_expr_flags (const_tree t)
   if (decl)
     flags = flags_from_decl_or_type (decl);
   else if (CALL_EXPR_FN (t) == NULL_TREE)
-    flags = internal_fn_flags (CALL_EXPR_IFN (t));
+    {
+      flags = internal_fn_flags (CALL_EXPR_IFN (t));
+      switch (CALL_EXPR_IFN (t))
+	{
+	case IFN_FENV_SQRT:
+	  if (wi::bit_and (wi::to_wide (CALL_EXPR_ARG (t, 1)), 1) == 1)
+	    flags |= ECF_PURE;
+	  break;
+	case IFN_FENV_PLUS:
+	case IFN_FENV_MINUS:
+	case IFN_FENV_MULT:
+	case IFN_FENV_RDIV:
+	case IFN_FENV_FLOAT:
+	case IFN_FENV_CONVERT:
+	  if (wi::bit_and (wi::to_wide (CALL_EXPR_ARG (t, 2)), 1) == 1)
+	    flags |= ECF_PURE;
+	  break;
+	case IFN_FENV_FMA:
+	  if (wi::bit_and (wi::to_wide (CALL_EXPR_ARG (t, 3)), 1) == 1)
+	    flags |= ECF_PURE;
+	  break;
+	}
+    }
   else
     {
       tree type = TREE_TYPE (CALL_EXPR_FN (t));

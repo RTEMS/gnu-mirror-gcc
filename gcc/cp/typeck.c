@@ -5792,9 +5792,10 @@ cp_build_binary_op (const op_location_t &location,
 	}
       if (do_fenv_subst)
 	{
+	  tree opts = (flag_fenv_access >= 2
+		       ? integer_zero_node : integer_one_node);
 	  result = build_call_expr_internal_loc (location, ifn, build_type,
-						 3, op0, op1,
-						 integer_zero_node);
+						 3, op0, op1, opts);
 	  TREE_SIDE_EFFECTS (result) = 1;
 	  TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	  return result;

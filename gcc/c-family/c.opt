@@ -1555,8 +1555,12 @@ C ObjC C++ ObjC++ Joined RejectNegative
 -finput-charset=<cset>	Specify the default character set for source files.
 
 ffenv-access
-C++ ObjC++ Var(flag_fenv_access)
+C++ ObjC++ Alias(ffenv-access=, 2, 0)
 Assume #pragma STDC FENV_ACCESS ON at the beginning of the translation unit (experimental and incomplete support).
+
+ffenv-access=
+C++ ObjC++ Var(flag_fenv_access) Joined UInteger IntegerRange(0, 2)
+Assume #pragma STDC FENV_ACCESS ON at the beginning of the translation unit (experimental and incomplete support). 0: don't care. 1: care about rounding. 2: also care about exceptions.
 
 fextern-tls-init
 C++ ObjC++ Var(flag_extern_tls_init) Init(-1)

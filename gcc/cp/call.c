@@ -9641,9 +9641,11 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTF)
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_SQRTL)))
     {
+      tree opts = (flag_fenv_access >= 2
+		   ? integer_zero_node : integer_one_node);
       fn = build_call_expr_internal_loc (loc, IFN_FENV_SQRT,
 					 TREE_TYPE (argarray[0]), 2,
-					 argarray[0], integer_zero_node);
+					 argarray[0], opts);
       TREE_NOTHROW (fn) = !flag_non_call_exceptions;
       TREE_SIDE_EFFECTS (fn) = 1;
     }
@@ -9654,10 +9656,12 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_FMAF)
 	  || fndecl_built_in_p (TREE_OPERAND (fn, 0), BUILT_IN_FMAL)))
     {
+      tree opts = (flag_fenv_access >= 2
+		   ? integer_zero_node : integer_one_node);
       fn = build_call_expr_internal_loc (loc, IFN_FENV_FMA,
 					 TREE_TYPE (argarray[0]), 4,
 					 argarray[0], argarray[1],
-					 argarray[2], integer_zero_node);
+					 argarray[2], opts);
       TREE_NOTHROW (fn) = !flag_non_call_exceptions;
       TREE_SIDE_EFFECTS (fn) = 1;
     }

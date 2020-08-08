@@ -914,24 +914,29 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 	  if (flag_fenv_access && SCALAR_FLOAT_TYPE_P (TREE_TYPE (e))
 	      && TREE_TYPE (e) != type)
 	    {
+	      tree opts = (flag_fenv_access >= 2
+			   ? integer_zero_node : integer_one_node);
 	      // encode the type information, in case the lhs disappears
 	      tree z = build_zero_cst (build_pointer_type (type));
 	      tree result
 		= build_call_expr_internal_loc (loc, IFN_FENV_CONVERT,
 						type, 3, e, z,
-						integer_zero_node);
+						opts);
+	      // TODO: Only if flag_fenv_access >= 2 ?
 	      TREE_SIDE_EFFECTS (result) = 1;
 	      TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	      return result;
 	    }
 	  if (flag_fenv_access && INTEGRAL_TYPE_P (TREE_TYPE (e)))
 	    {
+	      tree opts = (flag_fenv_access >= 2
+			   ? integer_zero_node : integer_one_node);
 	      // encode the type information, in case the lhs disappears
 	      tree z = build_zero_cst (build_pointer_type (type));
 	      tree result
 		= build_call_expr_internal_loc (loc, IFN_FENV_FLOAT,
 						type, 3, e, z,
-						integer_zero_node);
+						opts);
 	      TREE_SIDE_EFFECTS (result) = 1;
 	      TREE_NOTHROW (result) = !flag_non_call_exceptions;
 	      return result;

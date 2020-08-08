@@ -3201,7 +3201,9 @@ expand_FENV_SQRT (internal_fn, gcall *stmt)
   tree tmp = make_tree (ftype, res);
   expand_assignment (tmp, exp, false);
   // Still needed to avoid DCE when the result is unused.
-  emit_asm_protection (res, fmode, loc);
+  // FIXME: when there is no lhs, the asm doesn't seem to be emitted
+  if (wi::bit_and (wi::to_wide (gimple_call_arg (stmt, 1)), 1) == 0)
+    emit_asm_protection (res, fmode, loc);
   if (lhs)
     expand_assignment (lhs, tmp, false);
 }

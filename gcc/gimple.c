@@ -1462,7 +1462,42 @@ gimple_call_flags (const gimple *stmt)
   int flags = 0;
 
   if (gimple_call_internal_p (stmt))
-    flags = internal_fn_flags (gimple_call_internal_fn (stmt));
+    {
+      internal_fn ifn = gimple_call_internal_fn (stmt);
+      flags = internal_fn_flags (ifn);
+      switch (ifn)
+	{
+	case IFN_FENV_SQRT:
+	    {
+	      tree opts = gimple_call_arg (stmt, 1);
+	      // the function is sometimes called on fake or incomplete statements
+	      if (opts && wi::bit_and (wi::to_wide (opts), 1) == 1)
+		flags |= ECF_PURE;
+	      break;
+	    }
+	case IFN_FENV_PLUS:
+	case IFN_FENV_MINUS:
+	case IFN_FENV_MULT:
+	case IFN_FENV_RDIV:
+	case IFN_FENV_FLOAT:
+	case IFN_FENV_CONVERT:
+	    {
+	      tree opts = gimple_call_arg (stmt, 2);
+	      // the function is sometimes called on fake or incomplete statements
+	      if (opts && wi::bit_and (wi::to_wide (opts), 1) == 1)
+		flags |= ECF_PURE;
+	      break;
+	    }
+	case IFN_FENV_FMA:
+	    {
+	      tree opts = gimple_call_arg (stmt, 3);
+	      // the function is sometimes called on fake or incomplete statements
+	      if (opts && wi::bit_and (wi::to_wide (opts), 1) == 1)
+		flags |= ECF_PURE;
+	      break;
+	    }
+	}
+    }
   else
     {
       tree decl = gimple_call_fndecl (stmt);
