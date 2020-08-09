@@ -242,9 +242,9 @@ get_types_replacement (record_field_offset_map_t record_field_offset_map,
  */
 void
 substitute_types_in_program (reorg_record_map_t map,
-			     reorg_field_map_t field_map)
+			     reorg_field_map_t field_map, bool _delete)
 {
-  GimpleTypeRewriter rewriter (map, field_map);
+  GimpleTypeRewriter rewriter (map, field_map, _delete);
   rewriter.walk ();
   rewriter._rewrite_function_decl ();
 }
@@ -358,8 +358,11 @@ TypeReconstructor::set_is_not_modified_yet (const_tree t)
     return;
 
   tree type = _reorg_map[tt];
-  const bool is_modified
+  bool is_modified
     = strstr (TypeStringifier::get_type_identifier (type).c_str (), ".reorg");
+  is_modified
+    |= (bool) strstr (TypeStringifier::get_type_identifier (type).c_str (),
+		      ".reorder");
   if (!is_modified)
     return;
 
@@ -404,14 +407,20 @@ TypeReconstructor::is_memoized (const_tree t)
   return already_changed;
 }
 
-static tree
-get_new_identifier (const_tree type)
+const char *
+TypeReconstructor::get_new_suffix ()
+{
+  return _suffix;
+}
+
+tree
+get_new_identifier (const_tree type, const char *suffix)
 {
   const char *identifier = TypeStringifier::get_type_identifier (type).c_str ();
-  const bool is_new_type = strstr (identifier, "reorg");
+  const bool is_new_type = strstr (identifier, suffix);
   gcc_assert (!is_new_type);
   char *new_name;
-  asprintf (&new_name, "%s.reorg", identifier);
+  asprintf (&new_name, "%s.%s", identifier, suffix);
   return get_identifier (new_name);
 }
 
@@ -467,7 +476,9 @@ TypeReconstructor::_walk_ARRAY_TYPE_post (const_tree t)
   TREE_TYPE (copy) = build_variant_type_copy (TREE_TYPE (copy));
   copy = is_modified ? build_distinct_type_copy (copy) : copy;
   TREE_TYPE (copy) = is_modified ? _reorg_map[TREE_TYPE (t)] : TREE_TYPE (copy);
-  TYPE_NAME (copy) = is_modified ? get_new_identifier (copy) : TYPE_NAME (copy);
+  TYPE_NAME (copy) = is_modified
+		       ? get_new_identifier (copy, this->get_new_suffix ())
+		       : TYPE_NAME (copy);
   // This is useful so that we go again through type layout
   TYPE_SIZE (copy) = is_modified ? NULL : TYPE_SIZE (copy);
   tree domain = TYPE_DOMAIN (t);
@@ -520,7 +531,9 @@ TypeReconstructor::_walk_POINTER_TYPE_post (const_tree t)
 
   copy = is_modified ? build_variant_type_copy (copy) : copy;
   TREE_TYPE (copy) = is_modified ? _reorg_map[TREE_TYPE (t)] : TREE_TYPE (copy);
-  TYPE_NAME (copy) = is_modified ? get_new_identifier (copy) : TYPE_NAME (copy);
+  TYPE_NAME (copy) = is_modified
+		       ? get_new_identifier (copy, this->get_new_suffix ())
+		       : TYPE_NAME (copy);
   TYPE_CACHED_VALUES_P (copy) = false;
 
   tree _t = const_tree_to_tree (t);
@@ -614,7 +627,8 @@ TypeReconstructor::_walk_RECORD_TYPE_post (const_tree t)
       tree main = TYPE_MAIN_VARIANT (t);
       tree main_reorg = _reorg_map[main];
       tree copy_variant = build_variant_type_copy (main_reorg);
-      TYPE_NAME (copy_variant) = get_new_identifier (copy);
+      TYPE_NAME (copy_variant)
+	= get_new_identifier (copy, this->get_new_suffix ());
       TYPE_SIZE (copy_variant) = NULL;
       TYPE_MAIN_VARIANT (copy_variant) = main_reorg;
       TYPE_SIZE (main_reorg) = NULL;
@@ -626,8 +640,9 @@ TypeReconstructor::_walk_RECORD_TYPE_post (const_tree t)
       // Ok, so now that we have fixed the TYPE_FIELDS of the copy...
       // We need to call layout_type
       copy = is_modified ? build_distinct_type_copy (copy) : copy;
-      TYPE_NAME (copy)
-	= is_modified ? get_new_identifier (copy) : TYPE_NAME (copy);
+      TYPE_NAME (copy) = is_modified
+			   ? get_new_identifier (copy, this->get_new_suffix ())
+			   : TYPE_NAME (copy);
       // This is useful so that we go again through type layout
       TYPE_SIZE (copy) = is_modified ? NULL : TYPE_SIZE (copy);
       TYPE_MAIN_VARIANT (copy) = is_modified ? copy : TYPE_MAIN_VARIANT (copy);
@@ -708,6 +723,9 @@ ExprTypeRewriter::_walk_PARM_DECL_post (const_tree t)
 {
   tree temp = const_tree_to_tree (t);
   tree ttemp = TREE_TYPE (temp);
+  TypeStringifier stringifier;
+  const char *name = stringifier.stringify (ttemp).c_str ();
+  log ("relayout parameter declaration %s\n", name);
   const bool is_interesting = is_interesting_type (ttemp);
   if (!is_interesting)
     return;
@@ -744,6 +762,21 @@ ExprTypeRewriter::_walk_FUNCTION_DECL_post (const_tree t)
 void
 ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
 {
+  tree op0 = TREE_OPERAND (e, 0);
+  tree t2 = TREE_TYPE (op0);
+  const bool in_map2 = _map.find (t2) != _map.end ();
+
+  log ("trying out substituting expression in component_Ref directly\n");
+  TypeStringifier stringifier;
+  log ("mem_ref doing weird things maybe %s\n",
+       stringifier.stringify (t2).c_str ());
+  if (in_map2)
+    {
+      log ("success\n");
+      tree r_t = _map[t2];
+      tree _e = const_tree_to_tree (op0);
+      TREE_TYPE (_e) = r_t;
+    }
   // The second operand is a pointer constant.
   // Its type specifying the type used for type based alias analysis
   tree op1 = TREE_OPERAND (e, 1);
@@ -776,7 +809,8 @@ ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
     = old_offset / old_type_size_int * reorg_type_size_int + remainder;
 
   tree new_offset_tree = build_int_cst (TREE_TYPE (op1), new_offset);
-  TREE_OPERAND (e, 1) = new_offset_tree;
+  tree _e = const_tree_to_tree (e);
+  TREE_OPERAND (_e, 1) = new_offset_tree;
 }
 
 // TODO:
@@ -798,9 +832,12 @@ ExprTypeRewriter::is_interesting_type (tree t)
 
   // Let's just do a quick sanity check
   tree interesting_type = t;
-  const bool has_valid_suffix
+  bool has_valid_suffix
     = strstr (TypeStringifier::get_type_identifier (interesting_type).c_str (),
 	      ".reorg");
+  has_valid_suffix |= (bool)
+    strstr (TypeStringifier::get_type_identifier (interesting_type).c_str (),
+	    ".reorder");
   gcc_assert (has_valid_suffix);
   return true;
 }
@@ -1022,9 +1059,11 @@ ExprTypeRewriter::handle_pointer_arithmetic_constants (gimple *s, tree p,
   const_tree original_type = _imap[reorg_type];
   // If we are here, that means that our type has the ".reorg" suffix
   // Let's add a sanity check
-  const bool has_suffix
+  bool has_suffix
     = strstr (TypeStringifier::get_type_identifier (reorg_type).c_str (),
 	      ".reorg");
+  has_suffix |= (bool) strstr (
+    TypeStringifier::get_type_identifier (reorg_type).c_str (), ".reorder");
   bool is_valid_input = has_suffix;
   gcc_assert (is_valid_input);
 
@@ -1078,6 +1117,8 @@ ExprTypeRewriter::_walk_post (const_tree e)
 void
 ExprTypeRewriter::_walk_COMPONENT_REF_post (const_tree e)
 {
+  gcc_assert (e);
+
   const_tree f = TREE_OPERAND (e, 1);
   // So, what we need is a map between this field and the new field
   const bool in_map = _map2.find (f) != _map2.end ();
@@ -1087,12 +1128,14 @@ ExprTypeRewriter::_walk_COMPONENT_REF_post (const_tree e)
   std::pair<tree, bool> p = _map2[f];
   tree n_f = p.first;
   bool is_deleted = p.second;
-  TREE_OPERAND (e, 1) = n_f;
+  tree _e = const_tree_to_tree (e);
+  TREE_OPERAND (_e, 1) = n_f;
 
   if (!is_deleted)
     return;
 
-  _delete = true;
+  _delete = _can_delete && true;
+  log ("are we deleting? %s %s\n", _delete ? "t" : "f", is_deleted ? "t" : "f");
 }
 
 void
@@ -1239,7 +1282,14 @@ GimpleTypeRewriter::_walk_pre_gassign (gassign *s)
     {
     case POINTER_PLUS_EXPR:
     case POINTER_DIFF_EXPR:
+      log ("am i handling pointer arithmetic?\n");
+      if (dump_file)
+	print_gimple_stmt (dump_file, s, 0);
+      log ("\n");
       handle_pointer_arithmetic (s);
+      if (dump_file)
+	print_gimple_stmt (dump_file, s, 0);
+      log ("\n");
       break;
     default:
       break;

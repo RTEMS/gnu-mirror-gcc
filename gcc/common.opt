@@ -3488,4 +3488,8 @@ fprint-access-analysis
 Common Report Var(flag_print_access_analysis) Optimization
 This flag is used to print the access analysis (if field is read or written to).
 
+fipa-field-reorder
+Common Report Var(flag_ipa_field_reorder) Optimization
+Reorder fields.
+
 ; This comment is to ensure we retain the blank line above.

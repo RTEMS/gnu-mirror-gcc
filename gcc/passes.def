@@ -172,6 +172,7 @@ along with GCC; see the file COPYING3.  If not see
   INSERT_PASSES_AFTER (all_late_ipa_passes)
   NEXT_PASS (pass_materialize_all_clones);
   NEXT_PASS (pass_ipa_type_escape_analysis);
+  NEXT_PASS (pass_ipa_field_reorder);
   NEXT_PASS (pass_ipa_structure_reorg);
   NEXT_PASS (pass_ipa_prototype);
   NEXT_PASS (pass_ipa_pta);
