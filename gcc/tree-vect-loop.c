@@ -8392,7 +8392,7 @@ vect_record_loop_mask (loop_vec_info loop_vinfo, vec_loop_masks *masks,
 {
   gcc_assert (nvectors != 0);
   if (masks->length () < nvectors)
-    masks->safe_grow_cleared (nvectors);
+    masks->safe_grow_cleared (nvectors, true);
   rgroup_controls *rgm = &(*masks)[nvectors - 1];
   /* The number of scalars per iteration and the number of vectors are
      both compile-time constants.  */
@@ -8432,7 +8432,7 @@ vect_get_loop_mask (gimple_stmt_iterator *gsi, vec_loop_masks *masks,
      used it.  */
   if (rgm->controls.is_empty ())
     {
-      rgm->controls.safe_grow_cleared (nvectors);
+      rgm->controls.safe_grow_cleared (nvectors, true);
       for (unsigned int i = 0; i < nvectors; ++i)
 	{
 	  tree mask = make_temp_ssa_name (mask_type, NULL, "loop_mask");
@@ -8474,7 +8474,7 @@ vect_record_loop_len (loop_vec_info loop_vinfo, vec_loop_lens *lens,
 {
   gcc_assert (nvectors != 0);
   if (lens->length () < nvectors)
-    lens->safe_grow_cleared (nvectors);
+    lens->safe_grow_cleared (nvectors, true);
   rgroup_controls *rgl = &(*lens)[nvectors - 1];
 
   /* The number of scalars per iteration, scalar occupied bytes and
@@ -8510,7 +8510,7 @@ vect_get_loop_len (loop_vec_info loop_vinfo, vec_loop_lens *lens,
      used it.  */
   if (rgl->controls.is_empty ())
     {
-      rgl->controls.safe_grow_cleared (nvectors);
+      rgl->controls.safe_grow_cleared (nvectors, true);
       for (unsigned int i = 0; i < nvectors; ++i)
 	{
 	  tree len_type = LOOP_VINFO_RGROUP_COMPARE_TYPE (loop_vinfo);
