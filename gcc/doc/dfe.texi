@@ -1,0 +1,187 @@
+@c Copyright (C) 2001 Free Software Foundation, Inc.
+@c This is part of the GCC manual.
+@c For copying conditions, see the file gcc.texi.
+
+@node Dead Field Elimination
+@chapter Dead Field Elimination
+
+@node Dead Field Elimination Internals
+@section Dead Field Elimination Internals
+
+@subsection Introduction
+
+Dead field elimination is a compiler transformation that removes fields from structs. There are several challenges to removing fields from structs at link time but, depending on the workload of the compiled program and the architecture where the program runs, dead field elimination might be a worthwhile transformation to apply. Generally speaking, when the bottle-neck of an application is given by the memory bandwidth of the host system and the memory requested is of a struct which can be reduced in size, then that combination of workload, program and architecture can benefit from applying dead field elimination. The benefits come from removing unnecessary fields from structures and thus reducing the memory/cache requirements to represent a structure.  
+
+ 
+
+While challenges exist to fully automate a dead field elimination transformation, similar and more powerful optimizations have been implemented in the past. Chakrabarti et al [0] implement struct peeling, splitting into hot and cold parts of a structure, and field reordering. Golovanevsky et al [1] also shows efforts to implement data layout optimizations at link time. Unlike the work of Chakrabarti and Golovanesky, this text only talks about dead field elimination. This doesn't mean that the implementation can't be expanded to perform other link-time layout optimizations, it just means that dead field elimination is the only transformation that is implemented at the time of this writing. 
+
+[0] Chakrabarti, Gautam, Fred Chow, and L. PathScale. "Structure layout optimizations in the open64 compiler: Design, implementation and measurements." Open64 Workshop at the International Symposium on Code Generation and Optimization. 2008.  
+
+[1] Golovanevsky, Olga, and Ayal Zaks. "Struct-reorg: current status and future perspectives." Proceedings of the GCC Developers’ Summit. 2007.  
+
+@subsection Overview
+
+The dead field implementation is structured in the following way:  
+
+ 
+@itemize @bullet
+@item
+Collect all types which can refer to a @code{RECORD_TYPE}. This means that if we have a pointer to a record, we also collect this pointer. Or an array, or a union. 
+@item
+Mark types as escaping. More of this in the following section.  
+@item
+Find fields which can be deleted. (Iterate over all gimple code and find which fields are read.)  
+@item
+Create new types with removed fields (and reference these types in pointers, arrays, etc.)  
+@item
+Modify gimple to include these types.  
+@end itemize
+
+
+Most of this code relies on the visitor pattern. Types, Expr, and Gimple statements are visited using this pattern. You can find the base classes in @file{type-walker.c} @file{expr-walker.c} and @file{gimple-walker.c}. There are assertions in place where a type, expr, or gimple code is encountered which has not been encountered before during the testing of this transformation. This facilitates fuzzying of the transformation.
+
+@subsubsection Implementation Details: Is a global variable escaping?
+
+How does the analysis determine whether a global variable is visible to code outside the current linking unit? In the file @file{gimple-escaper.c} we have a simple function called @code{is_variable_escaping} which checks whether a variable is visible to code outside the current linking unit by looking at the @code{varpool_node}’s @code{externally_visible} field. 
+
+@subsubsection Implementation Details: is a function escaping?  
+
+Like above, the analysis currently uses @code{cgraph_node}’s @code{externally_visible} field to determine whether a function is externally visible.  
+
+Furthermore, we also must have access to the gimple body of the function. We call functions whose body is not available "undefined". The body must be available through the @code{FOR_EACH_FUNCTION_WITH_GIMPLE_BODY} macro in order to not be in the undefined set. If a function is undefined, we also say that its arguments and return type are escaping.  
+
+Indirect functions whose targets cannot be discovered have their arguments and return types marked as escaping as well. 
+
+The analysis also encountered an interesting edge case, where callsites had function declaration’s but no cgraph_node associated to them. The analysis addresses this issue by duplicating some of the code used to determine whether a @code{cgraph_node} is escaping. 
+
+Arguments from/to builtin functions which the analysis understands (@code{malloc}, @code{memset}, @code{realloc}, etc) are treated in a special way and marked their arguments’ and return values’ types will not be marked as escaping. 
+
+@subsubsection Implementation Details: Constructors and static initialization  
+ 
+Static initializers are not available at LTRANS. Furthermore, the code necessary to transform correctly brace initializers is unimplemented. Currently, the analysis marks types which have constructors or are statically initialized as escaping. 
+
+@subsubsection Implementation Details: is a type casted? 
+
+Due to how types are represented in GCC, it is difficult to say whether a type is casted or not. Not only is comparing type pointers insufficient; @code{TYPE_MAIN_VARIANT} and @code{TYPE_CANONICAL} are also not enough. A full structural type equality seems necessary. However, for this transformation to succeed, it also needs to compare incomplete types to complete types. Therefore, the analysis has its own type equality implementation. It is available on @file{type-*-equality.c} . There are different implementations that exist for historical reasons. 
+ 
+The typecasting pass itself is found in @code{gimple-caster.c}.
+
+It was found that there are instances where a type might be casted to @code{void*}. For example, in the @code{qsort} function. So, the analysis allows the user to disable casting checks. This is unsafe and it is up to the user to understand that there might be errors. Casts can be disabled with the @option{-fipa-type-escape-analysis-keep-casts} flag. 
+
+@subsubsection Implementation Details : what about @code{volatile}?
+
+If a single @code{volatile} variable of type @code{t} is found, type @code{t} is marked as escaping.  
+
+@subsubsection Implementation Details : is a type escaping?  
+Types in gimple may be represented as directed graph of the datatype called @code{tree}. Escaping is a transitive property that flows from a node of the graph to the direction of the edges. For example, if we find a @code{struct a**} type which is escaping, then all pointer types (i.e. @code{struct a**}, @code{struct a*} and array types @code{struct a[]}) and @code{struct a}” itself are marked as escaping. However, a struct which has a field of type @code{struct a*} will not be marked as escaping. This is implemented in the @file{type-walker.c} file.  
+
+Furthermore, because there might be two or more @code{tree} pointers representing the same type, we need to update all trees which are not marked as "escaping" if there is another representation of the same type which is escaping. This is an expensive operation as we need to compute a fixed point. This is performed on the @file{ipa-type-escape-analysis.c} file function @code{fix_escaping_types_in_set.}
+
+@subsection Dead Field Elimination Legality Analysis  
+
+Finally, for all types which are not escaping, it would be possible to change the layout of the type. However, not all layout changes are possible. Let's focus on dead field elimination which transforms that definition of a type for the whole linking unit. Here, let’s distinguish the cases where if a type is changed, all the variables of that type must be changed from the case where a type definition is changed for a specific context. Specializing a type to its specific calling context might uncover more optimization opportunities but it is not currently supported by this implementation. 
+
+In order to guarantee that no fields are read, the gimple code needs to be inspected for the following cases 
+
+@itemize @bullet
+@item
+The simple case where a @code{COMPONENT_REF} is read. In this case the @code{COMPONENT_REF} is marked as read and will not be deleted. 
+@item
+The slightly more complicated case where @code{MEM_REF} is accessed via a an @code{ADDR_EXPR}. In this case all fields previously accessed and including the field accessed through @code{MEM_REF} are marked as read and will not be deleted.
+@item
+If we take the address of a field. In this case, due to pointer arithmetic all fields contained in the record will be marked as read and will not be deleted. 
+@end itemize
+
+The code for the access analysis lives in the @file{*-accessor.c} files. To keep track of which fields are read we use the following data structure map of maps. 
+
+@code{std::map<const_tree /* record */, std::map<const_tree /* field */, unsigned /* read, written, never accessed */ > }
+
+The key to the map is always a @code{RECORD_TYPE}.
+
+The map which is the value for the given @code{RECORD_TYPE} holds @code{FIELD_DECL} and maps to an enum which corresponds to whether the field has been READ, WRITTEN or Neither (EMPTY).  
+
+After gathering this information, we the result of all @code{RECORD_TYPE}s are unified across the different tree pointers representing the same type. Here a fixed point is unneeded. An equivalence between different @code{RECORD_TYPE} is computed and propagates the field status to all values in the map. Now, for all @code{RECORD_TYPES} which do not escape, there’s a map that holds the status of each @code{FIELD_DECL}. (I.e. whether a field is read, written or neither). Let’s call the @code{RECORD_TYPE}s with fields that can be removed, candidates for reorganization. 
+
+@subsection Rewriting Types and Gimple
+
+All types which refer to reorganization candidates must be collected and transformed. The collection is performed in @file{specific-type-collector.c}. The transformation is performed in @code{type-reconstructor.c }
+
+For the reconstruction the analysis uses build_distinct_variant_copy to build copies of reorganization candidates and modify the @code{DECL_CHAIN} to remove the deleted fields. The analysis then relayouts the type. A map of old fields -> new fields and old records -> new records is made to simplify modifying gimple expressions. 
+
+For rewriting gimple, pointer arithmetic also needs to be handled. This happens in @file{expr-rewriter.c}. To fix offsets in pointer arithmetic, pointer arithmetic is first detected by looking for @code{POINTER_PLUS_EXPR} and @code{POINTER_DIFF_EXPR}.
+
+The analysis navigates the SSA definitions or uses of the operands used in these instructions to find the integer constant which correspond to the offset. Then the integer constant is replaced with the new integer constant. 
+
+@subsection How to run
+
+To run, you must have the following flags enabled: 
+
+@itemize @bullet
+@item
+@option{-flto}
+@item
+@option{-flto-partition=none}
+@item
+@option{-fipa-type-escape-analysis}
+@item
+(optional unsafe) @option{-fipa-type-escape-analysis-keep-casts}
+@end itemize
+
+The transformation is not a “full” ipa pass and must run in a single partition. 
+
+In order to find out if the analysis has performed a transformation on a struct, you can dump the results of the file by passing the following flag: 
+
+@itemize @bullet
+@item
+@option{-fdump-ipa-type-escape-analysis}
+@end itemize
+
+You can inspect the file or just grep for the following string: “may be deleted” which will print out a list of fields which the analysis considers safe for removal. 
+
+The transformation is known to compile code using the following flags: 
+
+@itemize @bullet
+@item
+@option{-ggdb}
+@item
+@option{-Ofast}
+@item
+@option{-fprofile-generate}
+@item
+@option{-fprofile-use}
+@end itemize
+
+Keep in mind that since @option{–fprofile-generate} adds a lot of indirection to the code, it is very unlikely that dead field elimination will provide any results when used with @option{–fprofile-generate}. However, things should go back to normal when using @option{–fprofile-use}. Another interesting note is that it in order to provide this transformation the best static information available, it might be worthy to consider using the following flags when using PGO: 
+
+@itemize @bullet
+@item
+@option{--param=hot-bb-count-ws-permille=0}
+@item
+@option{--param=ipa-cp-eval-threshold=0}
+@item
+@option{-fno-ipa-inline}
+@end itemize
+
+The first two flags used together will increase the amount of code specialization and allow for indirect functions to be resolved. During our exploration, we found that @option{–fipa-inline} removed some functions from the symbol table, and therefore we marked these functions as undefined. Marking these functions as undefined is still safe, but potentially adds false positives to types that escape. In order to fix this in the correct way, it might be necessary to implement this as a full ipa-pass. As an alternative, if you are seeing some gimple calls with a fndecl but which are not in the @code{FOR_EACH_FUNCTION_WITH_GIMPLE_BODY} macro, then consider disabling inlining. (Note, it seems that @option{–fkeep-inline-functions} might work but it is untested.) 
+
+@subsection Future work 
+
+@itemize @bullet
+@item
+Making this pass a full “ipa pass” 
+@item
+Support brace constructor initializations. 
+@item
+Support static initialization. 
+@item
+Implementation of sizeof() and offsetof() handling. 
+@item
+Handling unions. 
+@item
+Supporting other languages that translate to gimple. At the moment we only handle C languages. 
+@end itemize
+
+@subsection Known limitations 
+
+When this implementation was being developed, we included tests to make sure that our progress wasn’t lost. However, for the tests to run it seems we need to place the pass during WPA (which might fail for more complex code) and the code that deals with taking the address of a field needs to be disabled. The reason why we need to move to WPA to run the tests fully is because we are using scan-wpa-ipa to scan the dump file. The reason why taking the address of a field needs to be disabled is because otherwise there is no way to test the transformation with assertions. The tests work by computing the pointer difference between fields in a struct and calling an assertion to see if the arithmetic coincides with a field being deleted. 
