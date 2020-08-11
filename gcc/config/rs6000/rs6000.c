@@ -15178,6 +15178,21 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 	return 1;
     }
 
+  /* See if we can use the ISA 3.1 min/max/compare instructions for IEEE
+     128-bit floating point.  At present, don't worry about doing conditional
+     moves with different types for the comparison and movement (unlike SF/DF,
+     where you can do a conditional test between double and use float as the
+     if/then parts. */
+  if (TARGET_FLOAT128_HW && TARGET_POWER10 && FLOAT128_IEEE_P (compare_mode)
+      && compare_mode == result_mode)
+    {
+      if (maybe_emit_fp_c_min_max (dest, op, true_cond, false_cond))
+	return 1;
+
+      if (maybe_emit_fp_cmove (dest, op, true_cond, false_cond))
+	return 1;
+    }
+
   /* Don't allow using floating point comparisons for integer results for
      now.  */
   if (FLOAT_MODE_P (compare_mode) && !FLOAT_MODE_P (result_mode))
@@ -15401,7 +15416,8 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
+	  || (TARGET_FLOAT128_HW && TARGET_POWER10 && FLOAT128_IEEE_P (mode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
