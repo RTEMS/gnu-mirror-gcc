@@ -299,24 +299,28 @@ get_default_value (tree var)
 	      wide_int nonzero_bits = get_nonzero_bits (var);
 	      tree value;
 	      widest_int mask;
+	      tree type = TREE_TYPE (var);
 
 	      if (SSA_NAME_VAR (var)
 		  && TREE_CODE (SSA_NAME_VAR (var)) == PARM_DECL
 		  && ipcp_get_parm_bits (SSA_NAME_VAR (var), &value, &mask))
 		{
 		  val.lattice_val = CONSTANT;
-		  val.value = value;
+		  /* Known bits from IPA CP should be masked
+		     with nonzero_bits.  */
+		  wide_int ipa_value = wi::to_wide (value);
+		  ipa_value &= nonzero_bits;
+		  val.value = wide_int_to_tree (type, ipa_value);
+
 		  val.mask = mask;
 		  if (nonzero_bits != -1)
-		    val.mask &= extend_mask (nonzero_bits,
-					     TYPE_SIGN (TREE_TYPE (var)));
+		    val.mask &= extend_mask (nonzero_bits, TYPE_SIGN (type));
 		}
 	      else if (nonzero_bits != -1)
 		{
 		  val.lattice_val = CONSTANT;
 		  val.value = build_zero_cst (TREE_TYPE (var));
-		  val.mask = extend_mask (nonzero_bits,
-					  TYPE_SIGN (TREE_TYPE (var)));
+		  val.mask = extend_mask (nonzero_bits, TYPE_SIGN (type));
 		}
 	    }
 	}
