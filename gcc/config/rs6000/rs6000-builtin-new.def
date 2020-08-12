@@ -2396,6 +2396,9 @@
 
 ; Power9 vector builtins.
 [power9-vector]
+  const vus __builtin_altivec_convert_4f32_8f16 (vf, vf);
+    CONVERT_4F32_8F16 convert_4f32_8f16 {}
+
   const vus __builtin_altivec_convert_4f32_8i16 (vf, vf);
     CONVERT_4F32_8I16 convert_4f32_8i16 {}
 
@@ -2558,6 +2561,9 @@
   const unsigned int __builtin_altivec_vextuwrx (unsigned int, vui);
     VEXTUWRX vextuwrx {}
 
+  const vsq __builtin_altivec_vmsumudm (vsll, vsll, vsq);
+    VMSUMUDM altivec_vmsumudm {}
+
   const vsll __builtin_altivec_vprtybd (vsll);
     VPRTYBD parityv2di2 {}
 
@@ -2567,7 +2573,7 @@
   const vsi __builtin_altivec_vprtybw (vsi);
     VPRTYBW parityv4si2 {}
 
-  const vull __builtiin_altivec_vrldmi (vull, vull, vull);
+  const vull __builtin_altivec_vrldmi (vull, vull, vull);
     VRLDMI altivec_vrldmi {}
 
   const vull __builtin_altivec_vrldnm (vull, vull);
@@ -2959,6 +2965,174 @@
   unsigned int __builtin_ttest (unsigned int, unsigned int, signed int);
     TTEST ttest {htm,htmcr}
 
+
+[power10]
+  const unsigned long long __builtin_altivec_cntmbb (vuc, const int<1>);
+    VCNTMBB vec_cntmb_v16qi {}
+
+  const unsigned long long __builtin_altivec_cntmbd (vull, const int<1>);
+    VCNTMBD vec_cntmb_v2di {}
+
+  const unsigned long long __builtin_altivec_cntmbh (vus, const int<1>);
+    VCNTMBH vec_cntmb_v8hi {}
+
+  const unsigned long long __builtin_altivec_cntmbw (vui, const int<1>);
+    VCNTMBW vec_cntmb_v4si {}
+
+  const vuc __builtin_altivec_mtvsrbm (unsigned long long);
+    MTVSRBM vec_mtvsr_v16qi {}
+
+  const vull __builtin_altivec_mtvsrdm (unsigned long long);
+    MTVSRDM vec_mtvsr_v2di {}
+
+  const vus __builtin_altivec_mtvsrhm (unsigned long long);
+    MTVSRHM vec_mtvsr_v8hi {}
+
+  const vuq __builtin_altivec_mtvsrqm (unsigned long long);
+    MTVSRQM vec_mtvsr_v1ti {}
+
+  const vui __builtin_altivec_mtvsrwm (unsigned long long);
+    MTVSRWM vec_mtvsr_v4si {}
+
+  const vuc __builtin_altivec_vcfuged (vuc, vuc);
+    VCFUGED vcfuged {}
+
+  const vsc __builtin_altivec_vclrlb (vsc, unsigned int);
+    VCLRLB vclrlb {}
+
+  const vsc __builtin_altivec_vclrrb (vsc, unsigned int);
+    VCLRRB vclrrb {}
+
+  const vuc __builtin_altivec_vclzdm (vuc, vuc);
+    VCLZDM vclzdm {}
+
+  const vuc __builtin_altivec_vctzdm (vuc, vuc);
+    VCTZDM vctzdm {}
+
+  const vuc __builtin_altivec_vexpandmb (vuc);
+    VEXPANDMB vec_expand_v16qi {}
+
+  const vull __builtin_altivec_vexpandmd (vull);
+    VEXPANDMD vec_expand_v2di {}
+
+  const vus __builtin_altivec_vexpandmh (vus);
+    VEXPANDMH vec_expand_v8hi {}
+
+  const vuq __builtin_altivec_vexpandmq (vuq);
+    VEXPANDMQ vec_expand_v1ti {}
+
+  const vui __builtin_altivec_vexpandmw (vui);
+    VEXPANDMW vec_expand_v4si {}
+
+  const vull __builtin_altivec_vextddvhx (vull, vull, unsigned char);
+    VEXTRACTDR vextractrv2di {}
+
+  const vull __builtin_altivec_vextddvlx (vull, vull, unsigned char);
+    VEXTRACTDL vextractlv2di {}
+
+  const vull __builtin_altivec_vextdubvhx (vuc, vuc, unsigned char);
+    VEXTRACTBR vextractrv16qi {}
+
+  const vull __builtin_altivec_vextdubvlx (vuc, vuc, unsigned char);
+    VEXTRACTBL vextractlv16qi {}
+
+  const vull __builtin_altivec_vextduhvhx (vus, vus, unsigned char);
+    VEXTRACTHR vextractrv8hi {}
+
+  const vull __builtin_altivec_vextduhvlx (vus, vus, unsigned char);
+    VEXTRACTHL vextractlv8hi {}
+
+  const vull __builtin_altivec_vextduwvrx (vui, vui, unsigned char);
+    VEXTRACTWR vextractrv4si {}
+
+  const vull __builtin_altivec_vextduwvlx (vui, vui, unsigned char);
+    VEXTRACTWL vextractlv4si {}
+
+  const unsigned int __builtin_altivec_vextractmb (vuc);
+    VEXTRACTMB vec_extract_v16qi {}
+
+  const unsigned int __builtin_altivec_vextractmd (vull);
+    VEXTRACTMD vec_extract_v2di {}
+
+  const unsigned int __builtin_altivec_vextractmh (vus);
+    VEXTRACTMH vec_extract_v8hi {}
+
+  const unsigned int __builtin_altivec_vextractmq (vuq);
+    VEXTRACTMQ vec_extract_v1ti {}
+
+  const unsigned int __builtin_altivec_vextractmw (vui);
+    VEXTRACTMW vec_extract_v4si {}
+
+  const unsigned long long __builtin_altivec_vgnb (vuq, const int <2,7>);
+    VGNB vgnb {}
+
+  const vuc __builtin_altivec_vpdepd (vuc, vuc);
+    VPDEPD vpdepd {}
+
+  const vuc __builtin_altivec_vpextd (vuc, vuc);
+    VPEXTD vpextd {}
+
+  const vuc __builtin_altivec_vstribl (vuc);
+    VSTRIBL vstril_v16qi {}
+
+  const signed int __builtin_altivec_vstribl_p (vuc);
+    VSTRIBL_P vstril_p_v16qi {}
+
+  const vuc __builtin_altivec_vstribr (vuc);
+    VSTRIBR vstrir_v16qi {}
+
+  const signed int __builtin_altivec_vstribr_p (vuc);
+    VSTRIBR_P vstrir_p_v16qi {}
+
+  const vus __builtin_altivec_vstrihl (vus);
+    VSTRIHL vstril_v8hi {}
+
+  const signed int __builtin_altivec_vstrihl_p (vus);
+    VSTRIHL_P vstril_p_v8hi {}
+
+  const vus __builtin_altivec_vstrihr (vus);
+    VSTRIHR vstrir_v8hi {}
+
+  const signed int __builtin_altivec_vstrihr_p (vus);
+    VSTRIHR_P vstrir_p_v8hi {}
+
+  const vop __builtin_vsx_xxeval (vop, vop, vop, const int <8>);
+    XXEVAL xxeval {}
+
+  const vuc __builtin_vsx_xxgenpcvm_v16qi (vuc, const int <2>);
+    XXGENPCVM_V16QI xxgenpcvm_v16qi {}
+
+  const vull __builtin_vsx_xxgenpcvm_v2di (vull, const int <2>);
+    XXGENPCVM_V2DI xxgenpcvm_v2di {}
+
+  const vui __builtin_vsx_xxgenpcvm_v4si (vui, const int <2>);
+    XXGENPCVM_V4SI xxgenpcvm_v4si {}
+
+  const vus __builtin_vsx_xxgenpcvm_v8hi (vus, const int <2>);
+    XXGENPCVM_V8HI xxgenpcvm_v8hi {}
+
+  const vop __builtin_vsx_xvcvbf16sp (vop);
+    XVCVBF16SP vsx_xvcvbf16sp {}
+
+  const vop __builtin_vsx_xvcvspbf16 (vop);
+    XVCVSPBF16 vsx_xvcvspbf16 {}
+
+
+[power10-64]
+  const unsigned long long __builtin_cfuged (unsigned long long, unsigned long long);
+    CFUGED cfuged {}
+
+  const unsigned long long __builtin_cntlzdm (unsigned long long, unsigned long long);
+    CNTLZDM cntlzdm {}
+
+  const unsigned long long __builtin_cnttzdm (unsigned long long, unsigned long long);
+    CNTTZDM cnttzdm {}
+
+  const unsigned long long __builtin_pdepd (unsigned long long, unsigned long long);
+    PDEPD pdepd {}
+
+  const unsigned long long __builtin_pextd (unsigned long long, unsigned long long);
+    PEXTD pextd {}
 
 ; #### We don't yet have the Darwin CfString builtin supported, but
 ; that has its own special handling so it should go in there, I guess.

@@ -82,6 +82,8 @@ along with GCC; see the file COPYING3.  If not see
      htmspr   HTM function using an SPR
      htmcr    HTM function using a CR
      mma      Needs special handling for MMA instructions
+     quad     MMA instruction using a register quad as an input operand
+     pair     MMA instruction using a register pair as an input operand
      no32bit  Not valid for TARGET_32BIT
      cpu      This is a "cpu_is" or "cpu_supports" builtin
      ldstmask Altivec mask for load or store
@@ -194,6 +196,7 @@ enum bif_stanza {
   BSTZ_CRYPTO,
   BSTZ_HTM,
   BSTZ_P10,
+  BSTZ_P10_64,
   BSTZ_MMA,
   NUMBIFSTANZAS
 };
@@ -225,6 +228,7 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "crypto",		BSTZ_CRYPTO	},
     { "htm",		BSTZ_HTM	},
     { "power10",	BSTZ_P10	},
+    { "power10-64",	BSTZ_P10_64	},
     { "mma",		BSTZ_MMA	}
   };
 
@@ -247,6 +251,7 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_CRYPTO",
     "ENB_HTM",
     "ENB_P10",
+    "ENB_P10_64",
     "ENB_MMA"
   };
 
@@ -328,6 +333,8 @@ struct attrinfo {
   char ishtmspr;
   char ishtmcr;
   char ismma;
+  char isquad;
+  char ispair;
   char isno32bit;
   char iscpu;
   char isldstmask;
@@ -1260,6 +1267,10 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->ishtmcr = 1;
 	else if (!strcmp (attrname, "mma"))
 	  attrptr->ismma = 1;
+	else if (!strcmp (attrname, "quad"))
+	  attrptr->isquad = 1;
+	else if (!strcmp (attrname, "pair"))
+	  attrptr->ispair = 1;
 	else if (!strcmp (attrname, "no32bit"))
 	  attrptr->isno32bit = 1;
 	else if (!strcmp (attrname, "cpu"))
@@ -1297,12 +1308,13 @@ parse_bif_attrs (attrinfo *attrptr)
 #ifdef DEBUG
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
 nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, \
-htmspr = %d, htmcr = %d, mma = %d, no32bit = %d, cpu = %d, ldstmask = %d.\n",
+htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, no32bit = %d, \
+cpu = %d, ldstmask = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
 	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
-	   attrptr->ishtmcr, attrptr->ismma, attrptr->isno32bit,
-	   attrptr->iscpu, attrptr->isldstmask);
+	   attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attriptr->ispair,
+	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask);
 #endif
 
   return PC_OK;
@@ -1987,6 +1999,7 @@ write_decls ()
   fprintf (header_file, "  ENB_CRYPTO,\n");
   fprintf (header_file, "  ENB_HTM,\n");
   fprintf (header_file, "  ENB_P10,\n");
+  fprintf (header_file, "  ENB_P10_64,\n");
   fprintf (header_file, "  ENB_MMA\n");
   fprintf (header_file, "};\n\n");
 
@@ -2016,9 +2029,11 @@ write_decls ()
   fprintf (header_file, "#define bif_htmspr_bit\t\t(0x00000200)\n");
   fprintf (header_file, "#define bif_htmcr_bit\t\t(0x00000400)\n");
   fprintf (header_file, "#define bif_mma_bit\t\t(0x00000800)\n");
-  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00001000)\n");
-  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00002000)\n");
-  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00004000)\n");
+  fprintf (header_file, "#define bif_quad_bit\t\t(0x00001000)\n");
+  fprintf (header_file, "#define bif_pair_bit\t\t(0x00002000)\n");
+  fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00004000)\n");
+  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00008000)\n");
+  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00010000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -2044,6 +2059,10 @@ write_decls ()
 	   "#define bif_is_htmcr(x)\t\t((x).bifattrs & bif_htmcr_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_mma(x)\t\t((x).bifattrs & bif_mma_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_quad(x)\t\t((x).bifattrs & bif_quad_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_pair(x)\t\t((x).bifattrs & bif_pair_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_no32bit(x)\t((x).bifattrs & bif_no32bit_bit)\n");
   fprintf (header_file,
@@ -2262,6 +2281,10 @@ write_init_bif_table ()
 	fprintf (init_file, " | bif_htmcr_bit");
       if (bifs[i].attrs.ismma)
 	fprintf (init_file, " | bif_mma_bit");
+      if (bifs[i].attrs.isquad)
+	fprintf (init_file, " | bif_quad_bit");
+      if (bifs[i].attrs.ispair)
+	fprintf (init_file, " | bif_pair_bit");
       if (bifs[i].attrs.isno32bit)
 	fprintf (init_file, " | bif_no32bit_bit");
       if (bifs[i].attrs.iscpu)
