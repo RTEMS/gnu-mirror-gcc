@@ -463,6 +463,15 @@ public:
      Return NULL if there's no such node.  */
   static symtab_node *get_for_asmname (const_tree asmname);
 
+  /* Get symtab node by order.  */
+  static symtab_node *find_by_order (int order);
+
+  /* Get symtab_node by its name.  */
+  static symtab_node *find_by_name (const char *);
+
+  /* Get symtab_node by its ASM name.  */
+  static symtab_node *find_by_asm_name (const char *);
+
   /* Verify symbol table for internal consistency.  */
   static DEBUG_FUNCTION void verify_symtab_nodes (void);
 
@@ -1336,6 +1345,9 @@ struct GTY((tag ("SYMTAB_FUNCTION"))) cgraph_node : public symtab_node
 
   /* Dump the callgraph to file F.  */
   static void dump_cgraph (FILE *f);
+
+  /* Release function dominator info if available.  */
+  void maybe_release_dominators ();
 
   /* Dump the call graph to stderr.  */
   static inline
@@ -2273,7 +2285,7 @@ public:
   inline asm_node *finalize_toplevel_asm (tree asm_str);
 
   /* Analyze the whole compilation unit once it is parsed completely.  */
-  void finalize_compilation_unit (void);
+  void finalize_compilation_unit (const char *);
 
   /* C++ frontend produce same body aliases all over the place, even before PCH
      gets streamed out. It relies on us linking the aliases with their function
@@ -2283,7 +2295,7 @@ public:
   void process_same_body_aliases (void);
 
   /* Perform simple optimizations based on callgraph.  */
-  void compile (void);
+  void compile (const char *);
 
   /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
      functions into callgraph in a way so they look like ordinary reachable

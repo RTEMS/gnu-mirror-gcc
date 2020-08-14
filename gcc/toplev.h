@@ -52,6 +52,7 @@ extern void rest_of_decl_compilation (tree, int, int);
 extern void rest_of_type_compilation (tree, int);
 extern void init_optimization_passes (void);
 extern bool enable_rtl_dump_file (void);
+extern void init_asm_output (const char *);
 
 /* In except.c.  Initialize exception handling.  This is used by the Ada
    and LTO front ends to initialize EH "on demand".  See lto-streamer-in.c
@@ -102,5 +103,8 @@ extern unsigned int min_align_functions_log;
 extern void parse_alignment_opts (void);
 
 extern void initialize_rtl (void);
+
+extern void init_additional_asm_names_file (void);
+extern void handle_additional_asm (int);
 
 #endif /* ! GCC_TOPLEV_H */
