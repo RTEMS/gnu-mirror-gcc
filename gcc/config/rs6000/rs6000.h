@@ -504,10 +504,6 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
-/* ISA 3.1 has C min/max instructions for IEEE 128-bit.  */
-#define HAS_FLOAT128_MINMAX(MODE)					\
-  (TARGET_POWER10 && TARGET_FLOAT128_HW && FLOAT128_IEEE_P (MODE))
-
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
