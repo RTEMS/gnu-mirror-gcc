@@ -15153,6 +15153,14 @@ have_compare_and_set_mask (machine_mode mode)
     case DFmode:
       return TARGET_P9_MINMAX;
 
+    case TFmode:
+      if (!TARGET_IEEEQUAD)
+	return false;
+
+      /* fall through.  */
+    case KFmode:
+      return (TARGET_POWER10 && TARGET_FLOAT128_HW);
+
     default:
       break;
     }
@@ -15421,7 +15429,8 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
+	  || (TARGET_FLOAT128_HW && TARGET_POWER10 && FLOAT128_IEEE_P (mode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
