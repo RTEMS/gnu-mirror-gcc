@@ -704,6 +704,15 @@ htab_find_slot (htab_t htab, const PTR element, enum insert_option insert)
 				   insert);
 }
 
+/* Insert ELEMENT into HTAB.  If the element exists, it is overwritten.  */
+
+void
+htab_insert (htab_t htab, PTR element)
+{
+  void **slot = htab_find_slot (htab, element, INSERT);
+  *slot = element;
+}
+
 /* This function deletes an element with the given value from hash
    table (the hash is computed from the element).  If there is no matching
    element in the hash table, this function does nothing.  */
@@ -801,6 +810,20 @@ htab_collisions (htab_t htab)
     return 0.0;
 
   return (double) htab->collisions / (double) htab->searches;
+}
+
+/* Print statistics about a hash table.  */
+
+void
+htab_print_statistics (FILE *f, htab_t table, const char *name,
+		       const char *prefix)
+{
+  fprintf (f, "%s hash statistics:\n", name);
+  fprintf (f, "%s%u searches\n", prefix, table->searches);
+  fprintf (f, "%s%lu elements\n", prefix, htab_elements (table));
+  fprintf (f, "%s%lu table size\n", prefix, htab_size (table));
+  fprintf (f, "%s%.2f collisions per search\n",
+	   prefix, htab_collisions (table));
 }
 
 /* Hash P as a null-terminated string.

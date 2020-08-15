@@ -37,6 +37,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "ansidecl.h"
+#include <stdio.h>
 
 /* The type for a hash code.  */
 typedef unsigned int hashval_t;
@@ -172,6 +173,7 @@ extern void **	htab_find_slot (htab_t, const void *, enum insert_option);
 extern void *	htab_find_with_hash (htab_t, const void *, hashval_t);
 extern void **	htab_find_slot_with_hash (htab_t, const void *,
 					  hashval_t, enum insert_option);
+extern void	htab_insert (htab_t, void *);
 extern void	htab_clear_slot	(htab_t, void **);
 extern void	htab_remove_elt	(htab_t, const void *);
 extern void	htab_remove_elt_with_hash (htab_t, const void *, hashval_t);
@@ -182,6 +184,10 @@ extern void	htab_traverse_noresize (htab_t, htab_trav, void *);
 extern size_t	htab_size (htab_t);
 extern size_t	htab_elements (htab_t);
 extern double	htab_collisions	(htab_t);
+
+extern void	htab_print_statistics (FILE *f, htab_t table,
+				       const char *name,
+				       const char *prefix);
 
 /* A hash function for pointers.  */
 extern htab_hash htab_hash_pointer;
