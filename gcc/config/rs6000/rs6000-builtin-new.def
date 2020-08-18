@@ -3111,10 +3111,10 @@
   const vus __builtin_vsx_xxgenpcvm_v8hi (vus, const int <2>);
     XXGENPCVM_V8HI xxgenpcvm_v8hi {}
 
-  const vop __builtin_vsx_xvcvbf16sp (vop);
+  const vuc __builtin_vsx_xvcvbf16sp (vuc);
     XVCVBF16SP vsx_xvcvbf16sp {}
 
-  const vop __builtin_vsx_xvcvspbf16 (vop);
+  const vuc __builtin_vsx_xvcvspbf16 (vuc);
     XVCVSPBF16 vsx_xvcvspbf16 {}
 
 
@@ -3133,6 +3133,205 @@
 
   const unsigned long long __builtin_pextd (unsigned long long, unsigned long long);
     PEXTD pextd {}
+
+
+[mma]
+  void __builtin_mma_assemble_acc (v512 *, vuc, vuc, vuc, vuc);
+    ASSEMBLE_ACC mma_assemble_acc {mma}
+
+  void __builtin_mma_assemble_pair (v256 *, vuc, vuc);
+    ASSEMBLE_PAIR mma_assemble_pair {mma}
+
+  void __builtin_mma_disassemble_acc (void *, v512 *);
+    DISASSEMBLE_ACC nothing {mma,quad}
+
+  void __builtin_mma_disassemble_pair (void *, v256 *);
+    DISASSEMBLE_PAIR nothing {mma,pair}
+
+  void __builtin_mma_pmxvbf16ger2 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2 mma_pmxvbf16ger2 {mma}
+
+  void __builtin_mma_pmxvbf16ger2nn (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2NN mma_pmxvbf16ger2nn {mma,quad}
+
+  void __builtin_mma_pmxvbf16ger2np (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2NP mma_pmxvbf16ger2np {mma,quad}
+
+  void __builtin_mma_pmxvbf16ger2pn (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2PN mma_pmxvbf16ger2pn {mma,quad}
+
+  void __builtin_mma_pmxvbf16ger2pp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2PP mma_pmxvbf16ger2pp {mma,quad}
+
+  void __builtin_mma_pmxvf16ger2 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVF16GER2 mma_pmxvf16ger2 {mma}
+
+  void __builtin_mma_pmxvf16ger2nn (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVF16GER2NN mma_pmxvf16ger2nn {mma,quad}
+
+  void __builtin_mma_pmxvf16ger2np (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVF16GER2NP mma_pmxvf16ger2np {mma,quad}
+
+  void __builtin_mma_pmxvf16ger2pn (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVF16GER2PN mma_pmxvf16ger2pn {mma,quad}
+
+  void __builtin_mma_pmxvf16ger2pp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVF16GER2PP mma_pmxvf16ger2pp {mma,quad}
+
+  void __builtin_mma_pmxvf32ger (v512 *, vuc, vuc, const int<4>, const int<4>);
+    PMXVF32GER mma_pmxvf32ger {mma}
+
+  void __builtin_mma_pmxvf32gernn (v512 *, vuc, vuc, const int<4>, const int<4>);
+    PMXVF32GERNN mma_pmxvf32gernn {mma,quad}
+
+  void __builtin_mma_pmxvf32gernp (v512 *, vuc, vuc, const int<4>, const int<4>);
+    PMXVF32GERNP mma_pmxvf32gernp {mma,quad}
+
+  void __builtin_mma_pmxvf32gerpn (v512 *, vuc, vuc, const int<4>, const int<4>);
+    PMXVF32GERPN mma_pmxvf32gerpn {mma,quad}
+
+  void __builtin_mma_pmxvf32gerpp (v512 *, vuc, vuc, const int<4>, const int<4>);
+    PMXVF32GERPP mma_pmxvf32gerpp {mma,quad}
+
+  void __builtin_mma_pmxvf64ger (v512 *, v256, vuc, const int<4>, const int<2>);
+    PMXVF64GER mma_pmxvf64ger {mma,pair}
+
+  void __builtin_mma_pmxvf64gernn (v512 *, v256, vuc, const int<4>, const int<2>);
+    PMXVF64GERNN mma_pmxvf64gernn {mma,pair,quad}
+
+  void __builtin_mma_pmxvf64gernp (v512 *, v256, vuc, const int<4>, const int<2>);
+    PMXVF64GERNP mma_pmxvf64gernp {mma,pair,quad}
+
+  void __builtin_mma_pmxvf64gerpn (v512 *, v256, vuc, const int<4>, const int<2>);
+    PMXVF64GERPN mma_pmxvf64gerpn {mma,pair,quad}
+
+  void __builtin_mma_pmxvf64gerpp (v512 *, v256, vuc, const int<4>, const int<2>);
+    PMXVF64GERPP mma_pmxvf64gerpp {mma,pair,quad}
+
+  void __builtin_mma_pmxvi16ger2 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVI16GER2 mma_pmxvi16ger2 {mma}
+
+  void __builtin_mma_pmxvi16ger2pp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVI16GER2PP mma_pmxvi16ger2pp {mma,quad}
+
+  void __builtin_mma_pmxvi16ger2s (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVI16GER2S mma_pmxvi16ger2s {mma}
+
+  void __builtin_mma_pmxvi16ger2spp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVI16GER2SPP mma_pmxvi16ger2spp {mma,quad}
+
+  void __builtin_mma_pmxvi4ger8 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<8>);
+    PMXVI4GER8 mma_pmxvi4ger8 {mma}
+
+  void __builtin_mma_pmxvi4ger8pp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<4>);
+    PMXVI4GER8PP mma_pmxvi4ger8pp {mma,quad}
+
+  void __builtin_mma_pmxvi8ger4 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<4>);
+    PMXVI8GER4 mma_pmxvi8ger4 {mma}
+
+  void __builtin_mma_pmxvi8ger4pp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<4>);
+    PMXVI8GER4PP mma_pmxvi8ger4pp {mma,quad}
+
+  void __builtin_mma_pmxvi8ger4spp (v512 *, vuc, vuc, const int<4>, const int<4>, const int<4>);
+    PMXVI8GER4SPP mma_pmxvi8ger4spp {mma,quad}
+
+  void __builtin_mma_xvbf16ger2 (v512 *, vuc, vuc);
+    XVBF16GER2 mma_xvbf16ger2 {mma}
+
+  void __builtin_mma_xvbf16ger2nn (v512 *, vuc, vuc);
+    XVBF16GER2NN mma_xvbf16ger2nn {mma,quad}
+
+  void __builtin_mma_xvbf16ger2np (v512 *, vuc, vuc);
+    XVBF16GER2NP mma_xvbf16ger2np {mma,quad}
+
+  void __builtin_mma_xvbf16ger2pn (v512 *, vuc, vuc);
+    XVBF16GER2PN mma_xvbf16ger2pn {mma,quad}
+
+  void __builtin_mma_xvbf16ger2pp (v512 *, vuc, vuc);
+    XVBF16GER2PP mma_xvbf16ger2pp {mma,quad}
+
+  void __builtin_mma_xvf16ger2 (v512 *, vuc, vuc);
+    XVF16GER2 mma_xvf16ger2 {mma}
+
+  void __builtin_mma_xvf16ger2nn (v512 *, vuc, vuc);
+    XVF16GER2NN mma_xvf16ger2nn {mma,quad}
+
+  void __builtin_mma_xvf16ger2np (v512 *, vuc, vuc);
+    XVF16GER2NP mma_xvf16ger2np {mma,quad}
+
+  void __builtin_mma_xvf16ger2pn (v512 *, vuc, vuc);
+    XVF16GER2PN mma_xvf16ger2pn {mma,quad}
+
+  void __builtin_mma_xvf16ger2pp (v512 *, vuc, vuc);
+    XVF16GER2PP mma_xvf16ger2pp {mma,quad}
+
+  void __builtin_mma_xvf32ger (v512 *, vuc, vuc);
+    XVF32GER mma_xvf32ger {mma}
+
+  void __builtin_mma_xvf32gernn (v512 *, vuc, vuc);
+    XVF32GERNN mma_xvf32gernn {mma,quad}
+
+  void __builtin_mma_xvf32gernp (v512 *, vuc, vuc);
+    XVF32GERNP mma_xvf32gernp {mma,quad}
+
+  void __builtin_mma_xvf32gerpn (v512 *, vuc, vuc);
+    XVF32GERPN mma_xvf32gerpn {mma,quad}
+
+  void __builtin_mma_xvf32gerpp (v512 *, vuc, vuc);
+    XVF32GERPP mma_xvf32gerpp {mma,quad}
+
+  void __builtin_mma_xvf64ger (v512 *, v256, vuc);
+    XVF64GER mma_xvf64ger {mma,pair}
+
+  void __builtin_mma_xvf64gernn (v512 *, v256, vuc);
+    XVF64GERNN mma_xvf64gernn {mma,pair,quad}
+
+  void __builtin_mma_xvf64gernp (v512 *, v256, vuc);
+    XVF64GERNP mma_xvf64gernp {mma,pair,quad}
+
+  void __builtin_mma_xvf64gerpn (v512 *, v256, vuc);
+    XVF64GERPN mma_xvf64gerpn {mma,pair,quad}
+
+  void __builtin_mma_xvf64gerpp (v512 *, v256, vuc);
+    XVF64GERPP mma_xvf64gerpp {mma,pair,quad}
+
+  void __builtin_mma_xvi16ger2 (v512 *, vuc, vuc);
+    XVI16GER2 mma_xvi16ger2 {mma}
+
+  void __builtin_mma_xvi16ger2pp (v512 *, vuc, vuc);
+    XVI16GER2PP mma_xvi16ger2pp {mma,quad}
+
+  void __builtin_mma_xvi16ger2s (v512 *, vuc, vuc);
+    XVI16GER2S mma_xvi16ger2s {mma}
+
+  void __builtin_mma_xvi16ger2spp (v512 *, vuc, vuc);
+    XVI16GER2SPP mma_xvi16ger2spp {mma,quad}
+
+  void __builtin_mma_xvi4ger8 (v512 *, vuc, vuc);
+    XVI4GER8 mma_xvi4ger8 {mma}
+
+  void __builtin_mma_xvi4ger8pp (v512 *, vuc, vuc);
+    XVI4GER8PP mma_xvi4ger8pp {mma,quad}
+
+  void __builtin_mma_xvi8ger4 (v512 *, vuc, vuc);
+    XVI8GER4 mma_xvi8ger4 {mma}
+
+  void __builtin_mma_xvi8ger4pp (v512 *, vuc, vuc);
+    XVI8GER4PP mma_xvi8ger4pp {mma,quad}
+
+  void __builtin_mma_xvi8ger4spp (v512 *, vuc, vuc);
+    XVI8GER4SPP mma_xvi8ger4spp {mma,quad}
+
+  void __builtin_mma_xxmfacc (v512 *);
+    XXMFACC mma_xxmfacc {mma,quad}
+
+  void __builtin_mma_xxmtacc (v512 *);
+    XXMTACC mma_xxmtacc {mma,quad}
+
+  void __builtin_mma_xxsetaccz (v512 *);
+    XXSETACCZ mma_xxsetaccz {mma}
+
+
 
 ; #### We don't yet have the Darwin CfString builtin supported, but
 ; that has its own special handling so it should go in there, I guess.

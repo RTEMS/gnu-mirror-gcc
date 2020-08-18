@@ -278,7 +278,9 @@ enum basetype {
   BT_DECIMAL32,
   BT_DECIMAL64,
   BT_DECIMAL128,
-  BT_IBM128
+  BT_IBM128,
+  BT_VPAIR,
+  BT_VQUAD
 };
 
 /* Ways in which a const int value can be restricted.  RES_BITS indicates
@@ -341,15 +343,16 @@ struct attrinfo {
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
+#define MAXRESTROPNDS 3
 struct prototype {
   typeinfo rettype;
   char *bifname;
   int nargs;
   typelist *args;
-  int restr_opnd[2];
-  restriction restr[2];
-  int restr_val1[2];
-  int restr_val2[2];
+  int restr_opnd[MAXRESTROPNDS];
+  restriction restr[MAXRESTROPNDS];
+  int restr_val1[MAXRESTROPNDS];
+  int restr_val2[MAXRESTROPNDS];
 };
 
 /* Data associated with a builtin function, and a table of such data.  */
@@ -881,6 +884,8 @@ match_type (typeinfo *typedata, int voidok)
        vp	vector pixel
        vf	vector float
        vd	vector double
+       v256	__vector_pair
+       v512	__vector_quad
        vop	opaque vector (matches all vectors)
 
      For simplicity, We don't support "short int" and "long long int".
@@ -1051,6 +1056,20 @@ match_type (typeinfo *typedata, int voidok)
       handle_pointer (typedata);
       return 1;
     }
+  else if (!strcmp (token, "v256"))
+    {
+      typedata->isvector = 1;
+      typedata->base = BT_VPAIR;
+      handle_pointer (typedata);
+      return 1;
+    }
+  else if (!strcmp (token, "v512"))
+    {
+      typedata->isvector = 1;
+      typedata->base = BT_VQUAD;
+      handle_pointer (typedata);
+      return 1;
+    }
   else if (!strcmp (token, "vop"))
     {
       typedata->isopaque = 1;
@@ -1172,9 +1191,9 @@ parse_args (prototype *protoptr)
       {
 	if (argtype->restr)
 	  {
-	    if (restr_cnt >= 2)
+	    if (restr_cnt >= MAXRESTROPNDS)
 	      {
-		(*diag) ("More than two restricted operands\n");
+		(*diag) ("More than two %d operands\n", MAXRESTROPNDS);
 		return PC_PARSEFAIL;
 	      }
 	    restr_opnd[restr_cnt] = *nargs + 1;
@@ -1367,6 +1386,14 @@ complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
 	case BT_FLOAT128:
 	  memcpy (&buf[*bufi], "1tf", 3);
 	  *bufi += 3;
+	  break;
+	case BT_VPAIR:
+	  memcpy (&buf[*bufi], "1poi", 4);
+	  *bufi += 4;
+	  break;
+	case BT_VQUAD:
+	  memcpy (&buf[*bufi], "1pxi", 4);
+	  *bufi += 4;
 	  break;
 	default:
 	  (*diag) ("unhandled basetype %d.\n", typeptr->base);
@@ -2003,6 +2030,7 @@ write_decls ()
   fprintf (header_file, "  ENB_MMA\n");
   fprintf (header_file, "};\n\n");
 
+  fprintf (header_file, "#define PPC_MAXRESTROPNDS 3\n");
   fprintf (header_file, "struct bifdata\n");
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
@@ -2011,10 +2039,10 @@ write_decls ()
   fprintf (header_file, "  insn_code icode;\n");
   fprintf (header_file, "  int  nargs;\n");
   fprintf (header_file, "  int  bifattrs;\n");
-  fprintf (header_file, "  int  restr_opnd[2];\n");
-  fprintf (header_file, "  restriction restr[2];\n");
-  fprintf (header_file, "  int  restr_val1[2];\n");
-  fprintf (header_file, "  int  restr_val2[2];\n");
+  fprintf (header_file, "  int  restr_opnd[PPC_MAXRESTROPNDS];\n");
+  fprintf (header_file, "  restriction restr[PPC_MAXRESTROPNDS];\n");
+  fprintf (header_file, "  int  restr_val1[PPC_MAXRESTROPNDS];\n");
+  fprintf (header_file, "  int  restr_val2[PPC_MAXRESTROPNDS];\n");
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define bif_init_bit\t\t(0x00000001)\n");
@@ -2292,7 +2320,7 @@ write_init_bif_table ()
       if (bifs[i].attrs.isldstmask)
 	fprintf (init_file, " | bif_ldstmask_bit");
       fprintf (init_file, ";\n");
-      for (int j = 0; j < 1; j++)
+      for (int j = 0; j < MAXRESTROPNDS; j++)
 	{
 	  fprintf (init_file,
 		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd[%d]"
