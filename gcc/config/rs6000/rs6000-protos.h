@@ -119,6 +119,7 @@ extern char * output_cbranch (rtx, const char *, int, rtx_insn *);
 extern const char * output_probe_stack_range (rtx, rtx, rtx);
 extern void rs6000_emit_dot_insn (rtx dst, rtx src, int dot, rtx ccreg);
 extern bool rs6000_emit_set_const (rtx, rtx);
+extern bool have_compare_and_set_mask (machine_mode);
 extern bool rs6000_emit_cmove (rtx, rtx, rtx, rtx);
 extern bool rs6000_emit_int_cmove (rtx, rtx, rtx, rtx);
 extern int rs6000_emit_vector_cond_expr (rtx, rtx, rtx, rtx, rtx, rtx);
