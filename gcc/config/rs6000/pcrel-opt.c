@@ -529,6 +529,34 @@ next_active_insn_in_basic_block (rtx_insn *insn)
 }
 
 
+// Validate loads or stores that don't translate into a single instruction.
+static bool
+is_single_instruction (rtx_insn *insn, rtx reg)
+{
+  if (!REG_P (reg) && !SUBREG_P (reg))
+    return false;
+
+  if (get_attr_length (insn) != 4)
+    return false;
+
+  // _Decimal128 and IBM extended double are always multiple instructions.
+  machine_mode mode = GET_MODE (reg);
+  if (mode == TFmode && !TARGET_IEEEQUAD)
+    return false;
+
+  if (mode == TDmode || mode == IFmode)
+    return false;
+
+  // Don't optimize PLQ/PSTQ instructions
+  unsigned int regno = reg_or_subregno (reg);
+  unsigned int size = GET_MODE_SIZE (mode);
+  if (size >= 16 && !VSX_REGNO_P (regno))
+    return false;
+
+  return true;
+}
+
+
 // Given an insn with that loads up a base register with the address of an
 // external symbol, see if we can optimize it with the PCREL_OPT optimization.
 
@@ -633,20 +661,23 @@ do_pcrel_opt_addr (rtx_insn *addr_insn)
       || !dead_or_set_p (insn, addr_reg))
     return;
 
-  // If the last insn is not a load or store, we can't do the optimization.
-  // If it is a load or store, get the register and memory.
-  rtx load_store_set = single_set (insn);
-  if (!load_store_set)
+  rtx set = single_set (insn);
+  if (!set)
     return;
 
-  rtx reg = NULL_RTX;
-  rtx mem = NULL_RTX;
-
-  // Get register and memory, and validate it.
+  // Optimize loads
   if (is_load)
     {
-      reg = SET_DEST (load_store_set);
-      mem = SET_SRC (load_store_set);
+      // If there were any stores in the insns between loading the external
+      // address and doing the load, turn off the optimization.
+      if (had_store)
+	return;
+
+      rtx reg = SET_DEST (set);
+      if (!is_single_instruction (insn, reg))
+	return;
+
+      rtx mem = SET_SRC (set);
       switch (GET_CODE (mem))
 	{
 	case MEM:
@@ -663,69 +694,49 @@ do_pcrel_opt_addr (rtx_insn *addr_insn)
 	  return;
 	}
 
-      // If there were any stores in the insns between loading the external
-      // address and doing the load, turn off the optimization.
-      if (had_store)
+      // If the register being loaded was used or set between the load of
+      // the external address and the load using the address, we can't do
+      // the optimization.
+      if (reg_used_between_p (reg, addr_insn, insn)
+	  || reg_set_between_p (reg, addr_insn, insn))
 	return;
+
+      // Process the load in detail
+      if (do_pcrel_opt_load (addr_insn, insn))
+	{
+	  counters.loads++;
+	  counters.load_separation[num_insns-1]++;
+	}
     }
 
+  // Optimize stores
   else if (is_store)
     {
-      reg = SET_SRC (load_store_set);
-      mem = SET_DEST (load_store_set);
-      if (!MEM_P (mem))
-	return;
-
       // If there were any loads in the insns between loading the external
       // address and doing the store, turn off the optimization.
       if (had_load)
 	return;
-    }
 
-  else
-    return;
+      rtx reg = SET_SRC (set);
+      rtx mem = SET_DEST (set);
+      if (!is_single_instruction (insn, reg))
+	return;
 
-  if (!REG_P (reg) && !SUBREG_P (reg))
-    return;
+      if (!MEM_P (mem))
+	return;
 
-  machine_mode mode = GET_MODE (reg);
-  unsigned int regno = reg_or_subregno (reg);
-  unsigned int size = GET_MODE_SIZE (mode);
+      // If the register being loaded or stored was used or set between the
+      // load of the external address and the load or store using the address,
+      // we can't do the optimization.
+      if (reg_used_between_p (reg, addr_insn, insn)
+	  || reg_set_between_p (reg, addr_insn, insn))
+	return;
 
-  // Eliminate various possiblies involving multiple instructions.
-  if (get_attr_length (insn) != 4)
-    return;
-
-  if (mode == TFmode && !TARGET_IEEEQUAD)
-    return;
-
-  if (mode == TDmode)
-    return;
-
-  if (size == 16 && !VSX_REGNO_P (regno))
-    return;
-
-  else if (size > 16)
-    return;
-
-  // If the register being loaded or stored was used or set between the load of
-  // the external address and the load or store using the address, we can't do
-  // the optimization.
-  if (reg_used_between_p (reg, addr_insn, insn)
-      || reg_set_between_p (reg, addr_insn, insn))
-    return;
-
-  // Process the load or store in detail
-  if (is_load && do_pcrel_opt_load (addr_insn, insn))
-    {
-      counters.loads++;
-      counters.load_separation[num_insns-1]++;
-    }
-
-  else if (is_store && do_pcrel_opt_store (addr_insn, insn))
-    {
-      counters.stores++;
-      counters.store_separation[num_insns-1]++;
+      if (do_pcrel_opt_store (addr_insn, insn))
+	{
+	  counters.stores++;
+	  counters.store_separation[num_insns-1]++;
+	}
     }
 
   return;
