@@ -439,7 +439,7 @@ struct typemap
    maps tokens from a fntype string to a tree type.  For example,
    in "si_ftype_hi" we would map "si" to "intSI_type_node" and
    map "hi" to "intHI_type_node".  */
-#define TYPE_MAP_SIZE 37
+#define TYPE_MAP_SIZE 39
 static typemap type_map[TYPE_MAP_SIZE] =
   {
     { "bv16qi",	"bool_V16QI" },
@@ -472,6 +472,8 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "uv8hi",	"unsigned_V8HI" },
     { "v",	"void" },
     { "v16qi",	"V16QI" },
+    { "v1poi",	"vector_pair" },
+    { "v1pxi",	"vector_quad" },
     { "v1ti",	"V1TI" },
     { "v2df",	"V2DF" },
     { "v2di",	"V2DI" },
