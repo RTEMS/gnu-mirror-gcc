@@ -43,6 +43,8 @@ class simplify_using_ranges
 public:
   simplify_using_ranges (class range_query *);
   ~simplify_using_ranges ();
+  void set_range_query (class range_query *);
+
   bool simplify (gimple_stmt_iterator *);
 
   // ?? These should be cleaned, merged, and made private.
@@ -176,6 +178,12 @@ class vr_values : public range_query
   int *vr_phi_edge_counts;
   simplify_using_ranges simplifier;
 };
+
+inline void
+simplify_using_ranges::set_range_query (class range_query *query)
+{
+  store = query;
+}
 
 inline const value_range_equiv *
 simplify_using_ranges::get_value_range (const_tree op, gimple *stmt)

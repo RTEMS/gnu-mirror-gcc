@@ -3890,7 +3890,7 @@ simplify_using_ranges::simplify_switch_using_ranges (gswitch *stmt)
   su.stmt = stmt;
   su.vec = vec2;
   to_update_switch_stmts.safe_push (su);
-  return false;
+  return true;
 }
 
 void

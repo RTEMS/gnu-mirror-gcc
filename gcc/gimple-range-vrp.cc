@@ -51,7 +51,6 @@ class rvrp_ranger : public range_query
 public:
   rvrp_ranger ()
     : query (/*use_loop_info=*/true),
-      simplifier (this),
       range_pool ("rvrp value range pool") { }
   ~rvrp_ranger ()
   {
@@ -66,7 +65,6 @@ public:
     return new (range_pool.allocate ()) value_range_equiv (TREE_TYPE (expr));
   }
   gimple_ranger query;
-  simplify_using_ranges simplifier;
 private:
   object_allocator<value_range_equiv> range_pool;
 };
@@ -77,7 +75,7 @@ public:
   rvrp_ranger ranger;
 
   rvrp_folder (bool allow_il_changes)
-    : allow_il_changes (allow_il_changes) { }
+    : ranger (), simplifier (&ranger), allow_il_changes (allow_il_changes) { }
 
   tree get_value (tree op, gimple *stmt) OVERRIDE
   {
@@ -115,10 +113,11 @@ public:
     if (cond && fold_cond (cond))
       return true;
 
-    return ranger.simplifier.simplify (gsi);
+    return simplifier.simplify (gsi);
   }
 
 private:
+  simplify_using_ranges simplifier;
   bool allow_il_changes;
 };
 

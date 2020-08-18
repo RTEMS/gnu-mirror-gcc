@@ -1058,7 +1058,7 @@ gimple_ranger::range_on_edge (irange &r, edge e, tree name)
 
   if (loop_aware_p ())
     {
-      value_range loop_range;
+      int_range<2> loop_range;
       if (range_with_loop_info (loop_range, name))
 	r.intersect (loop_range);
     }

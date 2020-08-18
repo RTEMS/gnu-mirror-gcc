@@ -1367,7 +1367,6 @@ OBJS = \
 	gimple-range.o \
 	gimple-range-cache.o \
 	gimple-range-gori.o \
-	gimple-range-vrp.o \
 	gimple-ssa-backprop.o \
 	gimple-ssa-evrp.o \
 	gimple-ssa-evrp-analyze.o \

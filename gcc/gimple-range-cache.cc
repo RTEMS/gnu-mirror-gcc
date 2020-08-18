@@ -110,49 +110,6 @@ non_null_ref::process_name (tree name)
   m_nn[v] = b;
 }
 
-class irange_pool
-{
-public:
-  irange_pool ();
-  ~irange_pool ();
-  irange *allocate (unsigned num_pairs);
-  irange *allocate (const irange &);
-private:
-  struct obstack irange_obstack;
-};
-
-irange_pool::irange_pool ()
-{
-  obstack_init (&irange_obstack);
-}
-
-irange_pool::~irange_pool ()
-{
-  obstack_free (&irange_obstack, NULL);
-}
-
-irange *
-irange_pool::allocate (unsigned num_pairs)
-{
-  // ?? Ideally we should allocate both the irange and the sub-ranges
-  // with one call, but there is an unspecified amount of padding at
-  // the end of irange to fit the sub-ranges chunk.  This wouldn't be
-  // the case if m_base was defined as m_base[1], but then we wouldn't
-  // be able to assign to it.  Another option would be to allocate an
-  // additional large number to accomodate any alignment needed. ??
-  irange *r = XOBNEW (&irange_obstack, struct irange);
-  tree *ranges = XOBNEWVEC (&irange_obstack, tree, 2 * num_pairs);
-  return new (r) irange (ranges, num_pairs);
-}
-
-irange *
-irange_pool::allocate (const irange &src)
-{
-  irange *r = allocate (src.m_max_ranges);
-  *r = src;
-  return r;
-}
-
 // This class implements a cache of ranges indexed by basic block.  It
 // represents all that is known about an SSA_NAME on entry to each
 // block.  It caches a range-for-type varying range so it doesn't need

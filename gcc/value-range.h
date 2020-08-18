@@ -621,4 +621,56 @@ vrp_val_min (const_tree type)
   return NULL_TREE;
 }
 
+
+class irange_pool
+{
+public:
+  irange_pool ();
+  ~irange_pool ();
+  irange *allocate (unsigned num_pairs);
+  irange *allocate (const irange &);
+private:
+  struct obstack irange_obstack;
+};
+
+inline
+irange_pool::irange_pool ()
+{
+  obstack_init (&irange_obstack);
+}
+
+inline
+irange_pool::~irange_pool ()
+{
+  obstack_free (&irange_obstack, NULL);
+}
+
+inline irange *
+irange_pool::allocate (unsigned num_pairs)
+{
+  struct newir {
+    irange range;
+    tree mem[1];
+  };
+
+  // Never allocate 0 pairs.  
+  // // Dont allocate 1 either, or we get legacy value_range "usage".
+  if (num_pairs < 2)
+    num_pairs = 2;
+
+  struct newir *r = (struct newir *) obstack_alloc (&irange_obstack,
+						       sizeof (struct newir)
+						       + sizeof(tree) * 2
+							 * (num_pairs - 1));
+  return new ((irange *)r) irange (&(r->mem[0]), num_pairs);
+}
+
+inline irange *
+irange_pool::allocate (const irange &src)
+{
+  irange *r = allocate (src.num_pairs ());
+  *r = src;
+  return r;
+}
+
 #endif // GCC_VALUE_RANGE_H
