@@ -1,5 +1,13 @@
 2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/float128-cmove.c: New test.
+
+2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
+2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+
 	* gcc.target/powerpc/pcrel-opt-inc-di.c: New PCREL_OPT test.
 	* gcc.target/powerpc/pcrel-opt-ld-df.c: New PCREL_OPT test.
 	* gcc.target/powerpc/pcrel-opt-ld-di.c: New PCREL_OPT test.
