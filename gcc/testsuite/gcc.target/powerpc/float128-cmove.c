@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-reguire-effective-target lp64 } */
+/* { dg-require-effective-target lp64 } */
 /* { dg-reguire-effective-target float128 } */
 /* { dg-require-effective-target power10_ok } */
 /* { dg-options "-mdejagnu-cpu=power10 -O2" } */

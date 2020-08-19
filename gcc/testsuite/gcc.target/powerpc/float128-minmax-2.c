@@ -1,4 +1,5 @@
-/* { dg-require-effective-target powerpc_float128_hw_ok } */
+/* { dg-require-effective-target lp64 } */
+/* { dg-require-effective-target float128 } */
 /* { dg-require-effective-target power10_ok } */
 /* { dg-options "-mdejagnu-cpu=power10 -O2 -ffast-math" } */
 
