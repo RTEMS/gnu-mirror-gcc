@@ -152,7 +152,7 @@ range_operator::fold_range (irange &r, tree type,
   unsigned num_lh = lh.num_pairs ();
   unsigned num_rh = rh.num_pairs ();
 
-  // If Both ranges are single pairs, fold directly into the result range.
+  // If both ranges are single pairs, fold directly into the result range.
   if (num_lh == 1 && num_rh == 1)
     {
       wi_fold (r, type, lh.lower_bound (0), lh.upper_bound (0),
@@ -160,14 +160,6 @@ range_operator::fold_range (irange &r, tree type,
       return true;
     }
 
-  // ?? Using widest_irange here causes a performance hit, because the
-  // caller is probably VRP which passed a value_range for the result.
-  // The union code below will cause an expensive conversion
-  // (copy_simple_range) from the widest_irange and the value_range.
-  //
-  // Accumulating into a new widest_irange instead of `r', and then
-  // doing the copy into `r' at the end actually slows this code a
-  // tiny bit.
   widest_irange tmp;
   r.set_undefined ();
   for (unsigned x = 0; x < num_lh; ++x)
@@ -1145,8 +1137,6 @@ operator_mult::op1_range (irange &r, tree type,
   tree offset;
 
   // We can't solve 0 = OP1 * N by dividing by N with a wrapping type.
-  // Bail for now.
-  //
   // For example: For 0 = OP1 * 2, OP1 could be 0, or MAXINT, whereas
   // for 4 = OP1 * 2, OP1 could be 2 or 130 (unsigned 8-bit)
   if (TYPE_OVERFLOW_WRAPS (type))
@@ -1947,11 +1937,9 @@ operator_logical_and::op2_range (irange &r, tree type,
 class operator_bitwise_and : public range_operator
 {
 public:
-#if 0
   virtual bool fold_range (irange &r, tree type,
 			   const irange &lh,
 			   const irange &rh) const;
-#endif
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op2) const;
@@ -2033,7 +2021,6 @@ operator_bitwise_and::remove_impossible_ranges (irange &r,
     }
 }
 
-#if 0
 bool
 operator_bitwise_and::fold_range (irange &r, tree type,
 				  const irange &lh,
@@ -2041,12 +2028,13 @@ operator_bitwise_and::fold_range (irange &r, tree type,
 {
   if (range_operator::fold_range (r, type, lh, rh))
     {
-      remove_impossible_ranges (r, rh);
+      // FIXME: This is temporarily disabled because, though it
+      // generates better ranges, it's noticeably slower for evrp.
+      // remove_impossible_ranges (r, rh);
       return true;
     }
   return false;
 }
-#endif
 
 
 // Optimize BIT_AND_EXPR and BIT_IOR_EXPR in terms of a mask if
@@ -2235,6 +2223,9 @@ set_nonzero_range_from_mask (irange &r, tree type, const irange &lhs)
     r.set_varying (type);
 }
 
+// This was shamelessly stolen from register_edge_assert_for_2 and
+// adjusted to work with iranges.
+
 void
 operator_bitwise_and::simple_op1_range_solver (irange &r, tree type,
 					       const irange &lhs,
@@ -2258,7 +2249,7 @@ operator_bitwise_and::simple_op1_range_solver (irange &r, tree type,
   //
   // Minimum unsigned value for >= if (VAL & CST2) == VAL is VAL and
   // maximum unsigned value is ~0.  For signed comparison, if CST2
-  // doesn't have most significant bit set, handle it similarly.  If
+  // doesn't have the most significant bit set, handle it similarly.  If
   // CST2 has MSB set, the minimum is the same, and maximum is ~0U/2.
   wide_int valv = lhs.lower_bound ();
   wide_int minv = valv & cst2v, maxv;
@@ -3536,15 +3527,16 @@ operator_tests ()
   }
 
   // signed: ~[-1] = OP1 >> 31
-  {
-    widest_irange lhs (INT (-1), INT (-1), VR_ANTI_RANGE);
-    widest_irange shift (INT (31), INT (31));
-    widest_irange op1;
-    op_rshift.op1_range (op1, integer_type_node, lhs, shift);
-    widest_irange negatives = range_negatives (integer_type_node);
-    negatives.intersect (op1);
-    ASSERT_TRUE (negatives.undefined_p ());
-  }
+  if (TYPE_PRECISION (integer_type_node) > 31)
+    {
+      widest_irange lhs (INT (-1), INT (-1), VR_ANTI_RANGE);
+      widest_irange shift (INT (31), INT (31));
+      widest_irange op1;
+      op_rshift.op1_range (op1, integer_type_node, lhs, shift);
+      widest_irange negatives = range_negatives (integer_type_node);
+      negatives.intersect (op1);
+      ASSERT_TRUE (negatives.undefined_p ());
+    }
 }
 
 // Run all of the selftests within this file.

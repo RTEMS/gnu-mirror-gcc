@@ -1282,7 +1282,20 @@ gimple_ranger::range_of_ssa_name_with_loop_info (irange &r, tree name,
 						 class loop *l, gphi *phi)
 {
   gcc_checking_assert (TREE_CODE (name) == SSA_NAME);
-  range_of_var_in_loop (&r, m_range_query, l, phi, name);
+  tree min, max, type = TREE_TYPE (name);
+  if (bounds_of_var_in_loop (&min, &max, m_range_query, l, phi, name))
+    {
+      // ?? We could do better here.  Since MIN/MAX can only be an
+      // SSA, SSA +- INTEGER_CST, or INTEGER_CST, we could easily call
+      // the ranger and solve anything not an integer.
+      if (TREE_CODE (min) != INTEGER_CST)
+	min = vrp_val_min (type);
+      if (TREE_CODE (max) != INTEGER_CST)
+	max = vrp_val_max (type);
+      r.set (min, max);
+    }
+  else
+    r.set_varying (type);
 }
 
 // If NAME is either a PHI result or a PHI argument, see if we can

@@ -1,6 +1,7 @@
 /* Support routines for value ranges.
    Copyright (C) 2019-2020 Free Software Foundation, Inc.
-   Contributed by Aldy Hernandez <aldyh@redhat.com>.
+   Contributed by Aldy Hernandez <aldyh@redhat.com> and
+   Andrew Macleod <amacleod@redhat.com>.
 
 This file is part of GCC.
 
@@ -188,7 +189,6 @@ extern bool range_has_numeric_bounds_p (const irange *);
 extern bool ranges_from_anti_range (const value_range *,
 				    value_range *, value_range *);
 extern void dump_value_range (FILE *, const irange *);
-extern void dump_value_range_stats (FILE *);
 extern bool vrp_val_is_min (const_tree);
 extern bool vrp_val_is_max (const_tree);
 extern bool vrp_operand_equal_p (const_tree, const_tree);
@@ -345,7 +345,7 @@ range_includes_zero_p (const irange *vr)
 }
 
 template<unsigned N>
-static inline void
+inline void
 gt_ggc_mx (int_range<N> *x)
 {
   for (unsigned i = 0; i < N; ++i)
@@ -356,7 +356,7 @@ gt_ggc_mx (int_range<N> *x)
 }
 
 template<unsigned N>
-static inline void
+inline void
 gt_pch_nx (int_range<N> *x)
 {
   for (unsigned i = 0; i < N; ++i)
@@ -367,7 +367,7 @@ gt_pch_nx (int_range<N> *x)
 }
 
 template<unsigned N>
-static inline void
+inline void
 gt_pch_nx (int_range<N> *x, gt_pointer_operator op, void *cookie)
 {
   for (unsigned i = 0; i < N; ++i)
@@ -653,8 +653,8 @@ irange_pool::allocate (unsigned num_pairs)
     tree mem[1];
   };
 
-  // Never allocate 0 pairs.  
-  // // Dont allocate 1 either, or we get legacy value_range "usage".
+  // Never allocate 0 pairs.
+  // Dont allocate 1 either, or we get legacy value_range "usage".
   if (num_pairs < 2)
     num_pairs = 2;
 

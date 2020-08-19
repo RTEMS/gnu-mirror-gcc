@@ -1,6 +1,7 @@
 /* Support routines for value ranges.
    Copyright (C) 2019-2020 Free Software Foundation, Inc.
-   Major hacks by Aldy Hernandez <aldyh@redhat.com>.
+   Major hacks by Aldy Hernandez <aldyh@redhat.com> and
+   Andrew MacLeod <amacleod@redhat.com>.
 
 This file is part of GCC.
 
@@ -60,7 +61,7 @@ irange::operator= (const irange &src)
   // If the range didn't fit, the last range should cover the rest.
   if (lim != src.m_num_ranges)
     m_base[x - 1] = src.m_base[src.m_num_ranges * 2 - 1];
-  
+
   m_num_ranges = lim;
   return *this;
 }
@@ -101,12 +102,6 @@ irange::copy_legacy_range (const irange &src)
     }
   else
     set (src.min (), src.max (), VR_RANGE);
-}
-
-void
-dump_value_range_stats (FILE *file)
-{
-  fprintf (file, "deprecated\n");
 }
 
 // Swap min/max if they are out of order.  Return TRUE if further
@@ -226,6 +221,31 @@ irange::set (tree min, tree max, value_range_kind kind)
       set_undefined ();
       return;
     }
+  if (kind == VR_RANGE)
+    {
+      /* Convert POLY_INT_CST bounds into worst-case INTEGER_CST bounds.  */
+      if (POLY_INT_CST_P (min))
+	{
+	  tree type_min = vrp_val_min (TREE_TYPE (min));
+	  widest_int lb
+	    = constant_lower_bound_with_limit (wi::to_poly_widest (min),
+					       wi::to_widest (type_min));
+	  min = wide_int_to_tree (TREE_TYPE (min), lb);
+	}
+      if (POLY_INT_CST_P (max))
+	{
+	  tree type_max = vrp_val_max (TREE_TYPE (max));
+	  widest_int ub
+	    = constant_upper_bound_with_limit (wi::to_poly_widest (max),
+					       wi::to_widest (type_max));
+	  max = wide_int_to_tree (TREE_TYPE (max), ub);
+	}
+    }
+  else if (kind != VR_VARYING)
+    {
+     if (POLY_INT_CST_P (min) || POLY_INT_CST_P (max))
+       kind = VR_VARYING;
+    }
   if (kind == VR_VARYING)
     {
       set_varying (TREE_TYPE (min));
@@ -287,29 +307,8 @@ irange::set (tree min, tree max, value_range_kind kind)
 	  kind = VR_RANGE;
         }
     }
-  else
-    {
-      /* Convert POLY_INT_CST bounds into worst-case INTEGER_CST bounds.  */
-      if (POLY_INT_CST_P (min))
-	{
-	  tree type_min = vrp_val_min (TREE_TYPE (min));
-	  widest_int lb
-	    = constant_lower_bound_with_limit (wi::to_poly_widest (min),
-					       wi::to_widest (type_min));
-	  min = wide_int_to_tree (TREE_TYPE (min), lb);
-	}
-      if (POLY_INT_CST_P (max))
-	{
-	  tree type_max = vrp_val_max (TREE_TYPE (max));
-	  widest_int ub
-	    = constant_upper_bound_with_limit (wi::to_poly_widest (max),
-					       wi::to_widest (type_max));
-	  max = wide_int_to_tree (TREE_TYPE (max), ub);
-	}
-
-      if (!swap_out_of_order_endpoints (min, max, kind))
-	goto cleanup_set;
-    }
+  else if (!swap_out_of_order_endpoints (min, max, kind))
+    goto cleanup_set;
 
   /* Do not drop [-INF(OVF), +INF(OVF)] to varying.  (OVF) has to be sticky
      to make sure VRP iteration terminates, otherwise we can get into
@@ -391,8 +390,7 @@ irange::legacy_num_pairs () const
   if (varying_p ())
     return 1;
   // Inlined symbolic_p for performance:
-  if (!is_gimple_min_invariant (min ())
-      || !is_gimple_min_invariant (max ()))
+  if (!is_gimple_min_invariant (min ()) || !is_gimple_min_invariant (max ()))
     {
       value_range numeric_range (*this);
       numeric_range.normalize_symbolics ();
@@ -546,7 +544,7 @@ irange::singleton_p (tree *result) const
   if (!legacy_mode_p ())
     {
       if (num_pairs () == 1 && (wi::to_wide (tree_lower_bound ())
-			        == wi::to_wide (tree_upper_bound ())))
+				== wi::to_wide (tree_upper_bound ())))
 	{
 	  if (result)
 	    *result = tree_lower_bound ();
@@ -630,7 +628,7 @@ irange::may_contain_p (tree val) const
 
 /* Return TRUE if range contains INTEGER_CST.  */
 /* Return 1 if VAL is inside value range.
-          0 if VAL is not inside value range.
+	  0 if VAL is not inside value range.
 
    Benchmark compile/20001226-1.c compilation time after changing this
    function.  */
@@ -1561,20 +1559,20 @@ irange::irange_union (const irange &r)
     }
 
   // Do not worry about merging and such by reserving twice as many
-  // pairs as needed, and then simply sorting the 2 ranges into this
+  // pairs as needed, and then simply sort the 2 ranges into this
   // intermediate form.
   //
   // The intermediate result will have the property that the beginning
   // of each range is <= the beginning of the next range.  There may
   // be overlapping ranges at this point.  I.e. this would be valid
   // [-20, 10], [-10, 0], [0, 20], [40, 90] as it satisfies this
-  // contraint : -20 < -10 < 0 < 40 When the range is rebuilt into r,
+  // contraint : -20 < -10 < 0 < 40.  When the range is rebuilt into r,
   // the merge is performed.
   //
   // [Xi,Yi]..[Xn,Yn]  U  [Xj,Yj]..[Xm,Ym]   -->  [Xk,Yk]..[Xp,Yp]
   tree ttype = r.type ();
   signop sign = TYPE_SIGN (ttype);
-  
+
   auto_vec<tree, 20> res;
   wide_int u1 ;
   wi::overflow_type ovf;
@@ -1701,7 +1699,7 @@ irange::irange_intersect (const irange &r)
       tree ru = r.m_base[i * 2 + 1];
       tree r2l = r2.m_base[i2 * 2];
       if (wi::lt_p (wi::to_wide (ru), wi::to_wide (r2l), sign))
-        { 
+	{
 	  i++;
 	  continue;
 	}
@@ -1709,7 +1707,7 @@ irange::irange_intersect (const irange &r)
       tree r2u = r2.m_base[i2 * 2 + 1];
       tree rl = r.m_base[i * 2];
       if (wi::lt_p (wi::to_wide (r2u), wi::to_wide (rl), sign))
-        {
+	{
 	  i2++;
 	  if (i2 < r2_lim)
 	    continue;
@@ -1721,7 +1719,7 @@ irange::irange_intersect (const irange &r)
       // and set it, unless the build limits lower bounds is already
       // set.
       if (bld_pair < bld_lim)
-        {
+	{
 	  if (wi::ge_p (wi::to_wide (rl), wi::to_wide (r2l), sign))
 	    m_base[bld_pair * 2] = rl;
 	  else
@@ -1729,7 +1727,7 @@ irange::irange_intersect (const irange &r)
 	}
       else
 	// Decrease and set a new upper.
-        bld_pair--;
+	bld_pair--;
 
       // ...and choose the lower of the upper bounds.
       if (wi::le_p (wi::to_wide (ru), wi::to_wide (r2u), sign))

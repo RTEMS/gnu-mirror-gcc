@@ -22,13 +22,13 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "value-range-equiv.h"
 
+// Abstract class to return a range for a given SSA.
+
 class range_query
 {
 public:
-  virtual const value_range_equiv *get_value_range (const_tree, gimple *) = 0;
-  // This is to silence "deleting object of polymorphic class type
-  // ‘vr_values’ which has non-virtual destructor might cause
-  // undefined behavior".
+  virtual const value_range_equiv *get_value_range (const_tree,
+						    gimple * = NULL) = 0;
   virtual ~range_query () { }
 };
 
@@ -38,7 +38,7 @@ public:
 // get_value_range() from it.  This class could be made to work with
 // any range repository.
 
-class simplify_using_ranges
+class simplify_using_ranges : public range_query
 {
 public:
   simplify_using_ranges (class range_query *);
@@ -55,7 +55,8 @@ public:
 						bool *, bool *);
 
 private:
-  const value_range_equiv *get_value_range (const_tree op, gimple *stmt);
+  const value_range_equiv *get_value_range (const_tree op,
+					    gimple *stmt = NULL) OVERRIDE;
   bool simplify_truth_ops_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_div_or_mod_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_abs_using_ranges (gimple_stmt_iterator *, gimple *);
@@ -113,8 +114,7 @@ class vr_values : public range_query
   vr_values (void);
   ~vr_values (void);
 
-  virtual const value_range_equiv *get_value_range (const_tree,
-						    gimple * = NULL) OVERRIDE;
+  const value_range_equiv *get_value_range (const_tree, gimple * = NULL);
   void set_vr_value (tree, value_range_equiv *);
   value_range_equiv *swap_vr_value (tree, value_range_equiv *);
 
@@ -153,8 +153,7 @@ class vr_values : public range_query
   void extract_range_from_unary_expr (value_range_equiv *, enum tree_code,
 				      tree, tree);
   void extract_range_from_cond_expr (value_range_equiv *, gassign *);
-  void extract_range_from_comparison (value_range_equiv *, gimple *,
-				      enum tree_code, tree, tree, tree);
+  void extract_range_from_comparison (value_range_equiv *, gimple *);
   void vrp_visit_assignment_or_call (gimple*, tree *, value_range_equiv *);
   void vrp_visit_switch_stmt (gswitch *, edge *);
 
@@ -196,7 +195,7 @@ extern tree get_output_for_vrp (gimple *);
 // FIXME: Move this to tree-vrp.c.
 void simplify_cond_using_ranges_2 (class vr_values *, gcond *);
 
-extern void range_of_var_in_loop (irange *, range_query *,
-				  class loop *loop, gimple *stmt, tree var);
+extern bool bounds_of_var_in_loop (tree *min, tree *max, range_query *,
+				   class loop *loop, gimple *stmt, tree var);
 
 #endif /* GCC_VR_VALUES_H */

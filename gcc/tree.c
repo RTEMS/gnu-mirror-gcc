@@ -357,7 +357,6 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_NUM_WORKERS  */
   1, /* OMP_CLAUSE_VECTOR_LENGTH  */
   3, /* OMP_CLAUSE_TILE  */
-  2, /* OMP_CLAUSE__GRIDDIM_  */
   0, /* OMP_CLAUSE_IF_PRESENT */
   0, /* OMP_CLAUSE_FINALIZE */
 };
@@ -442,7 +441,6 @@ const char * const omp_clause_code_name[] =
   "num_workers",
   "vector_length",
   "tile",
-  "_griddim_",
   "if_present",
   "finalize",
 };
@@ -1800,6 +1798,8 @@ cache_integer_cst (tree t)
       break;
 
     case ENUMERAL_TYPE:
+      /* The slot used by TYPE_CACHED_VALUES is used for the enum
+	 members.  */
       break;
 
     default:
@@ -2233,29 +2233,29 @@ build_real_from_int_cst (tree type, const_tree i)
   return v;
 }
 
-/* Return a newly constructed STRING_CST node whose value is
-   the LEN characters at STR.
+/* Return a newly constructed STRING_CST node whose value is the LEN
+   characters at STR when STR is nonnull, or all zeros otherwise.
    Note that for a C string literal, LEN should include the trailing NUL.
    The TREE_TYPE is not initialized.  */
 
 tree
-build_string (int len, const char *str)
+build_string (unsigned len, const char *str /*= NULL */)
 {
-  tree s;
-  size_t length;
-
   /* Do not waste bytes provided by padding of struct tree_string.  */
-  length = len + offsetof (struct tree_string, str) + 1;
+  unsigned size = len + offsetof (struct tree_string, str) + 1;
 
-  record_node_allocation_statistics (STRING_CST, length);
+  record_node_allocation_statistics (STRING_CST, size);
 
-  s = (tree) ggc_internal_alloc (length);
+  tree s = (tree) ggc_internal_alloc (size);
 
   memset (s, 0, sizeof (struct tree_typed));
   TREE_SET_CODE (s, STRING_CST);
   TREE_CONSTANT (s) = 1;
   TREE_STRING_LENGTH (s) = len;
-  memcpy (s->string.str, str, len);
+  if (str)
+    memcpy (s->string.str, str, len);
+  else
+    memset (s->string.str, 0, len);
   s->string.str[len] = '\0';
 
   return s;
@@ -8877,7 +8877,7 @@ get_narrower (tree op, int *unsignedp_ptr)
 	v.safe_push (op);
       FOR_EACH_VEC_ELT_REVERSE (v, i, op)
 	ret = build2_loc (EXPR_LOCATION (op), COMPOUND_EXPR,
-			  TREE_TYPE (win), TREE_OPERAND (op, 0),
+			  TREE_TYPE (ret), TREE_OPERAND (op, 0),
 			  ret);
       return ret;
     }
@@ -11599,12 +11599,12 @@ build_alloca_call_expr (tree size, unsigned int align, HOST_WIDE_INT max_size)
 
 /* Create a new constant string literal of type ELTYPE[SIZE] (or LEN
    if SIZE == -1) and return a tree node representing char* pointer to
-   it as an ADDR_EXPR (ARRAY_REF (ELTYPE, ...)).  The STRING_CST value
-   is the LEN bytes at STR (the representation of the string, which may
-   be wide).  */
+   it as an ADDR_EXPR (ARRAY_REF (ELTYPE, ...)).  When STR is nonnull
+   the STRING_CST value is the LEN bytes at STR (the representation
+   of the string, which may be wide).  Otherwise it's all zeros.  */
 
 tree
-build_string_literal (int len, const char *str,
+build_string_literal (unsigned len, const char *str /* = NULL */,
 		      tree eltype /* = char_type_node */,
 		      unsigned HOST_WIDE_INT size /* = -1 */)
 {
@@ -12096,7 +12096,6 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
       switch (OMP_CLAUSE_CODE (*tp))
 	{
 	case OMP_CLAUSE_GANG:
-	case OMP_CLAUSE__GRIDDIM_:
 	  WALK_SUBTREE (OMP_CLAUSE_OPERAND (*tp, 1));
 	  /* FALLTHRU */
 
@@ -12839,10 +12838,11 @@ lhd_gcc_personality (void)
    OBJ_TYPE_REF representing an virtual call of C++ method.
    (As opposed to OBJ_TYPE_REF representing objc calls
    through a cast where middle-end devirtualization machinery
-   can't apply.) */
+   can't apply.)  FOR_DUMP_P is true when being called from
+   the dump routines.  */
 
 bool
-virtual_method_call_p (const_tree target)
+virtual_method_call_p (const_tree target, bool for_dump_p)
 {
   if (TREE_CODE (target) != OBJ_TYPE_REF)
     return false;
@@ -12855,7 +12855,7 @@ virtual_method_call_p (const_tree target)
   /* If we do not have BINFO associated, it means that type was built
      without devirtualization enabled.  Do not consider this a virtual
      call.  */
-  if (!TYPE_BINFO (obj_type_ref_class (target)))
+  if (!TYPE_BINFO (obj_type_ref_class (target, for_dump_p)))
     return false;
   return true;
 }
@@ -13282,7 +13282,9 @@ get_tree_code_name (enum tree_code code)
 {
   const char *invalid = "<invalid tree code>";
 
-  if (code >= MAX_TREE_CODES)
+  /* The tree_code enum promotes to signed, but we could be getting
+     invalid values, so force an unsigned comparison.  */
+  if (unsigned (code) >= MAX_TREE_CODES)
     {
       if (code == 0xa5a5)
 	return "ggc_freed";
@@ -14994,11 +14996,18 @@ get_nonnull_args (const_tree fntype)
   if (fntype == NULL_TREE)
     return NULL;
 
+  bitmap argmap = NULL;
+  if (TREE_CODE (fntype) == METHOD_TYPE)
+    {
+      /* The this pointer in C++ non-static member functions is
+	 implicitly nonnull whether or not it's declared as such.  */
+      argmap = BITMAP_ALLOC (NULL);
+      bitmap_set_bit (argmap, 0);
+    }
+
   tree attrs = TYPE_ATTRIBUTES (fntype);
   if (!attrs)
-    return NULL;
-
-  bitmap argmap = NULL;
+    return argmap;
 
   /* A function declaration can specify multiple attribute nonnull,
      each with zero or more arguments.  The loop below creates a bitmap
