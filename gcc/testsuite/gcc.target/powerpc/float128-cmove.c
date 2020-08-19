@@ -1,5 +1,6 @@
 /* { dg-do compile } */
-/* { dg-reguire-effective-target powerpc_float128_hw_ok } */
+/* { dg-reguire-effective-target lp64 } */
+/* { dg-reguire-effective-target float128 } */
 /* { dg-require-effective-target power10_ok } */
 /* { dg-options "-mdejagnu-cpu=power10 -O2" } */
 /* { dg-final { scan-assembler-not {\mxscmpu[dq]p\M}  } } */
