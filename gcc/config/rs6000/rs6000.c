@@ -15072,17 +15072,13 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
   return 1;
 }
 
-/* Possibly emit the C variant of the minimum or maximum instruction for
-   floating point scalars (xsmincdp, xsmaxcdp, etc.).
+/* ISA 3.0 (power9) minmax subcase to emit a XSMAXCDP or XSMINCDP instruction
+   for SF/DF scalars.  Move TRUE_COND to DEST if OP of the operands of the last
+   comparison is nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the
+   hardware has no such operation.  */
 
-   Move TRUE_COND to DEST if OP of the operands of the last comparison is
-   nonzero/true, FALSE_COND if it is zero/false.
-
-   Return false if we can't generate the appropriate minimum or maximum, and
-   true if we can did the minimum or maximum.  */
-
-static bool
-maybe_emit_fp_c_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+static int
+rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15092,14 +15088,14 @@ maybe_emit_fp_c_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   bool max_p = false;
 
   if (result_mode != compare_mode)
-    return false;
+    return 0;
 
   if (code == GE || code == GT)
     max_p = true;
   else if (code == LE || code == LT)
     max_p = false;
   else
-    return false;
+    return 0;
 
   if (rtx_equal_p (op0, true_cond) && rtx_equal_p (op1, false_cond))
     ;
@@ -15112,23 +15108,19 @@ maybe_emit_fp_c_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
     max_p = !max_p;
 
   else
-    return false;
+    return 0;
 
   rs6000_emit_minmax (dest, max_p ? SMAX : SMIN, op0, op1);
-  return true;
+  return 1;
 }
 
-/* Possibly emit a floating point conditional move by generating a compare that
-   sets a mask instruction and a XXSEL select instruction.
+/* ISA 3.0 (power9) conditional move subcase to emit XSCMP{EQ,GE,GT,NE}DP and
+   XXSEL instructions for SF/DF scalars.  Move TRUE_COND to DEST if OP of the
+   operands of the last comparison is nonzero/true, FALSE_COND if it is
+   zero/false.  Return 0 if the hardware has no such operation.  */
 
-   Move TRUE_COND to DEST if OP of the operands of the last comparison is
-   nonzero/true, FALSE_COND if it is zero/false.
-
-   Return false if the operation cannot be generated, and true if we could
-   generate the instruction.  */
-
-static bool
-maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+static int
+rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15156,7 +15148,7 @@ maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       break;
 
     default:
-      return false;
+      return 0;
     }
 
   /* Generate:	[(parallel [(set (dest)
@@ -15176,39 +15168,14 @@ maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   emit_insn (gen_rtx_PARALLEL (VOIDmode,
 			       gen_rtvec (2, cmove_rtx, clobber_rtx)));
 
-  return true;
-}
-
-/* Helper function to return true if the target has instructions to do a
-   compare and set mask instruction that can be used with XXSEL to implement a
-   conditional move.  It is also assumed that such a target also supports the
-   "C" minimum and maximum instructions. */
-
-static bool
-have_compare_and_set_mask (machine_mode mode)
-{
-  switch (mode)
-    {
-    case SFmode:
-    case DFmode:
-      return TARGET_P9_MINMAX;
-
-    case TFmode:
-    case KFmode:
-      return FLOAT128_IEEE_MINMAX_P (mode);
-
-    default:
-      break;
-    }
-
-  return false;
+  return 1;
 }
 
 /* Emit a conditional move: move TRUE_COND to DEST if OP of the
    operands of the last comparison is nonzero/true, FALSE_COND if it
    is zero/false.  Return 0 if the hardware has no such operation.  */
 
-bool
+int
 rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
@@ -15224,28 +15191,28 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       /* In the isel case however, we can use a compare immediate, so
 	 op1 may be a small constant.  */
       && (!TARGET_ISEL || !short_cint_operand (op1, VOIDmode)))
-    return false;
+    return 0;
   if (GET_MODE (true_cond) != result_mode)
-    return false;
+    return 0;
   if (GET_MODE (false_cond) != result_mode)
-    return false;
+    return 0;
 
-  /* See if we can use the "C" minimum, "C" maximum, and compare and set mask
-     instructions.  */
-  if (have_compare_and_set_mask (compare_mode)
-      && have_compare_and_set_mask (result_mode))
+  /* See if we can use the ISA 3.0 (power9) min/max/compare functions.  */
+  if (TARGET_P9_MINMAX
+      && (compare_mode == SFmode || compare_mode == DFmode)
+      && (result_mode == SFmode || result_mode == DFmode))
     {
-      if (maybe_emit_fp_c_minmax (dest, op, true_cond, false_cond))
-	return true;
+      if (rs6000_emit_p9_fp_minmax (dest, op, true_cond, false_cond))
+	return 1;
 
-      if (maybe_emit_fp_cmove (dest, op, true_cond, false_cond))
-	return true;
+      if (rs6000_emit_p9_fp_cmove (dest, op, true_cond, false_cond))
+	return 1;
     }
 
   /* Don't allow using floating point comparisons for integer results for
      now.  */
   if (FLOAT_MODE_P (compare_mode) && !FLOAT_MODE_P (result_mode))
-    return false;
+    return 0;
 
   /* First, work out if the hardware can do this at all, or
      if it's too slow....  */
@@ -15253,7 +15220,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
     {
       if (TARGET_ISEL)
 	return rs6000_emit_int_cmove (dest, op, true_cond, false_cond);
-      return false;
+      return 0;
     }
 
   is_against_zero = op1 == CONST0_RTX (compare_mode);
@@ -15265,7 +15232,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
      generated.  */
   if (SCALAR_FLOAT_MODE_P (compare_mode)
       && flag_trapping_math && ! is_against_zero)
-    return false;
+    return 0;
 
   /* Eliminate half of the comparisons by switching operands, this
      makes the remaining code simpler.  */
@@ -15281,7 +15248,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   /* UNEQ and LTGT take four instructions for a comparison with zero,
      it'll probably be faster to use a branch here too.  */
   if (code == UNEQ && HONOR_NANS (compare_mode))
-    return false;
+    return 0;
 
   /* We're going to try to implement comparisons by performing
      a subtract, then comparing against zero.  Unfortunately,
@@ -15296,14 +15263,14 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       && ((! rtx_equal_p (op0, false_cond) && ! rtx_equal_p (op1, false_cond))
 	  || (! rtx_equal_p (op0, true_cond)
 	      && ! rtx_equal_p (op1, true_cond))))
-    return false;
+    return 0;
 
   /* At this point we know we can use fsel.  */
 
   /* Don't allow compare_mode other than SFmode or DFmode, for others there
      is no fsel instruction.  */
   if (compare_mode != SFmode && compare_mode != DFmode)
-    return false;
+    return 0;
 
   /* Reduce the comparison to a comparison against zero.  */
   if (! is_against_zero)
@@ -15402,12 +15369,12 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 						gen_rtx_GE (VOIDmode,
 							    op0, op1),
 						true_cond, false_cond)));
-  return true;
+  return 1;
 }
 
 /* Same as above, but for ints (isel).  */
 
-bool
+int
 rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   rtx condition_rtx, cr;
@@ -15417,7 +15384,7 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   bool signedp;
 
   if (mode != SImode && (!TARGET_POWERPC64 || mode != DImode))
-    return false;
+    return 0;
 
   /* We still have to do the compare, because isel doesn't do a
      compare, it just looks at the CRx bits set by a previous compare
@@ -15452,7 +15419,7 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 
   emit_insn (isel_func (dest, condition_rtx, true_cond, false_cond, cr));
 
-  return true;
+  return 1;
 }
 
 void
@@ -15465,8 +15432,7 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
-	  || FLOAT128_IEEE_MINMAX_P (mode)))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
