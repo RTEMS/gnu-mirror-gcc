@@ -3111,8 +3111,8 @@
   const vus __builtin_vsx_xxgenpcvm_v8hi (vus, const int <2>);
     XXGENPCVM_V8HI xxgenpcvm_v8hi {}
 
-  const vuc __builtin_vsx_xvcvbf16sp (vuc);
-    XVCVBF16SP vsx_xvcvbf16sp {}
+  const vuc __builtin_vsx_xvcvbf16spn (vuc);
+    XVCVBF16SPN vsx_xvcvbf16spn {}
 
   const vuc __builtin_vsx_xvcvspbf16 (vuc);
     XVCVSPBF16 vsx_xvcvspbf16 {}
