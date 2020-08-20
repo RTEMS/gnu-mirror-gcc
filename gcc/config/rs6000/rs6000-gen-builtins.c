@@ -2045,6 +2045,7 @@ write_decls ()
   fprintf (header_file, "  restriction restr[PPC_MAXRESTROPNDS];\n");
   fprintf (header_file, "  int  restr_val1[PPC_MAXRESTROPNDS];\n");
   fprintf (header_file, "  int  restr_val2[PPC_MAXRESTROPNDS];\n");
+  fprintf (header_file, "  const char *attr_string;\n");
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define bif_init_bit\t\t(0x00000001)\n");
@@ -2259,8 +2260,6 @@ write_header_file ()
 static void
 write_init_bif_table ()
 {
-  const char *attr_string;
-
   for (int i = 0; i <= curr_bif; i++)
     {
       fprintf (init_file,
@@ -2349,6 +2348,14 @@ write_init_bif_table ()
 		       "\n    = %d;\n",
 		       bifs[i].idname, j, bifs[i].proto.restr_val2[j]);
 	    }
+	  fprintf (init_file,
+		   "  rs6000_builtin_info_x[RS6000_BIF_%s].attr_string"
+		   "\n    = %s;\n",
+		   bifs[i].idname,
+		   bifs[i].kind == FNK_CONST ? "\"= const\""
+		   : (bifs[i].kind == FNK_PURE ? "\"= pure\""
+		      : (bifs[i].kind == FNK_FPMATH ? "\"= fp, const\""
+			 : "\"\"")));
 	  fprintf (init_file, "\n");
 	}
 
@@ -2389,13 +2396,11 @@ write_init_bif_table ()
 	{
 	  fprintf (init_file, "      TREE_READONLY (t) = 1;\n");
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
-	  attr_string = "= const";
 	}
       else if (bifs[i].kind == FNK_PURE)
 	{
 	  fprintf (init_file, "      DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "      TREE_NOTHROW (t) = 1;\n");
-	  attr_string = "= pure";
 	}
       else if (bifs[i].kind == FNK_FPMATH)
 	{
@@ -2405,37 +2410,7 @@ write_init_bif_table ()
 	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
 	  fprintf (init_file, "        }\n");
-	  attr_string = "= fp, const";
 	}
-      else
-	attr_string = "";
-
-#ifdef BILLDEBUG
-      char *buf = (char *) malloc (strlen (bifs[i].fndecl) + 1);
-      strcpy (buf, bifs[i].fndecl);
-      char *tok = strtok (buf, "_");
-      const char *str = map_token_to_type_node (tok);
-      fprintf (stderr, "%s %s (", str, bifs[i].proto.bifname);
-      tok = strtok (0, "_");
-      assert (tok);
-      assert (!strcmp (tok, "ftype"));
-      tok = strtok (0, "_");
-      while (tok && strcmp (tok, "v"))
-	{
-	  str = map_token_to_type_node (tok);
-	  fprintf (stderr, "%s", str);
-	  tok = strtok (0, "_");
-	  if (tok)
-	    fprintf (stderr, ", ");
-	}
-      fprintf (stderr, "); %s [%4d] %s\n", attr_string, i,
-	       enable_string[bifs[i].stanza]);
-#endif
-
-      fprintf (init_file, "      if (TARGET_DEBUG_BUILTIN)\n");
-      fprintf (init_file, "        fprintf (stderr, \"rs6000_builtin"
-	       ", code = %4d, \"\n                  \"%s%s\\n\");\n",
-	       i, bifs[i].proto.bifname, attr_string);
       fprintf (init_file, "    }\n\n");
     }
 }
