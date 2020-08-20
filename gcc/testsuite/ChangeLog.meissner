@@ -1,8 +1,9 @@
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-cmove.c: New test.
+	* gcc.target/powerpc/float128-minmax-3.c: New test.
 
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-minmax-2.c: New test.
 

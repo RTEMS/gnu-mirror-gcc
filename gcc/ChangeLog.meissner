@@ -1,35 +1,35 @@
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
 	128-bit floating point types.
-	* config/rs6000/rs6000.md (FCMV1, FCMV2): New iterators for
-	floating point conditional moves.
+	* config/rs6000/rs6000.md (FSCALAR2): New iterator for floating
+	point conditional moves.
 	(mov<SFDF:mode><SFDF2:mode>cc_p9): Rename to
-	mov<FCMV1:mode><FCMV2:mode>.
-	(mov<FCMV1:mode><FCMV2:mode>): Rename from
+	mov<FSCALAR:mode><FSCALAR2:mode>.
+	(mov<FSCALAR:mode><FSCALAR2:mode>): Rename from
 	mov<SFDF:mode><SFDF2:mode>cc_p9.  Add ISA 3.1 support for IEEE
-	128-bit conditional moves.
-	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Rename to
-	mov<FCMV1:mode><FCMV2:mode>cc_invert.
-	(mov<FCMV1:mode><FCMV2:mode>cc_invert): Rename from
+	128-bit conditional moves.  Always use an earlyclobber
+	register for the mask.
+	(mov<FSCALAR:mode><FSCALAR2:mode>cc_invert): Rename from
 	mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add ISA 3.1 support for
-	IEEE 128-bit conditional moves.
+	IEEE 128-bit conditional moves.  Always use an earlyclobber
+	register for the mask.
 	(fpmask<mode>, xxsel<mode>): Add ISA 3.1 support for IEEE 128-bit
 	conditional moves.
 
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.h (FLOAT128_IEEE_MINMAX_P): New helper
 	macro.
-	* config/rs6000/rs6000.md (FMIN): New mode iterator for floating
-	point min/max.
-	(Fm): New mode attribute for floating point min/max.
+	* config/rs6000/rs6000.md (FSCALAR): New mode iterator for floating
+	point scalars.
+	(Fm): New mode attribute for floating point scalars.
 	(s<minmax><mode>): Add support for the ISA 3.1 IEEE 128-bit
 	minimum and maximum instructions.
 	(s<minmax><mode>3_vsx): Add support for the ISA 3.1 IEEE 128-bit
 	minimum and maximum instructions.
 
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_p9_fp_minmax): Rename to
 	maybe_emit_fp_c_minmax.
@@ -43,7 +43,7 @@
 	generate "C" minimum, "C" maximum, and conditional move
 	instructions for scalar floating point.
 
-2020-08-18  Michael Meissner  <meissner@linux.ibm.com>
+2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-protos.h (rs6000_emit_cmove): Change return
 	type to bool.
