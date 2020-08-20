@@ -1,21 +1,26 @@
 2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (fpmask_normal_or_invert_operator):
+	New predicate.
 	* config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
 	128-bit floating point types.
 	* config/rs6000/rs6000.md (FSCALAR2): New iterator for floating
 	point conditional moves.
-	(mov<SFDF:mode><SFDF2:mode>cc_p9): Rename to
+	(mov<SFDF:mode><SFDF2:mode>cc_p9): Replace with
 	mov<FSCALAR:mode><FSCALAR2:mode>.
-	(mov<FSCALAR:mode><FSCALAR2:mode>): Rename from
-	mov<SFDF:mode><SFDF2:mode>cc_p9.  Add ISA 3.1 support for IEEE
-	128-bit conditional moves.  Always use an earlyclobber
-	register for the mask.
-	(mov<FSCALAR:mode><FSCALAR2:mode>cc_invert): Rename from
-	mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add ISA 3.1 support for
-	IEEE 128-bit conditional moves.  Always use an earlyclobber
+	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Replace with
+	mov<FSCALAR:mode><FSCALAR2:mode>.
+	(mov<FSCALAR:mode><FSCALAR2:mode>): Combine both
+	mov<SFDF:mode><SFDF2:mode>cc_p9 and
+	mov<SFDF:mode><SFDF2:mode>cc_invert_p9 patterns.  Add ISA 3.1
+	support for IEEE 128-bit conditional moves.  Always use an
+	earlyclobber register for the mask.  Use XXPERMDI to extend the
+	mask if we have a 64-bit comparison and 128-bit move.
 	register for the mask.
 	(fpmask<mode>, xxsel<mode>): Add ISA 3.1 support for IEEE 128-bit
-	conditional moves.
+	conditional moves.  Enable the generator functionality so
+	mov<FSCALAR:mode><FSCALAR2:mode> can call it.  Update constraints
+	for 128-bit operations.
 
 2020-08-20  Michael Meissner  <meissner@linux.ibm.com>
 
