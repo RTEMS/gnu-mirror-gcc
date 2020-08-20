@@ -2825,21 +2825,23 @@ operator_abs::wi_fold (irange &r, tree type,
   // ABS_EXPR may flip the range around, if the original range
   // included negative values.
   if (wi::eq_p (lh_lb, min_value))
-    min = max_value;
+    {
+      // ABS ([-MIN, -MIN]) isn't representable, but we have traditionally
+      // returned [-MIN,-MIN] so this preserves that behaviour.  PR37078
+      if (wi::eq_p (lh_ub, min_value))
+	{
+	  r = int_range<1> (type, min_value, min_value);
+	  return;
+	}
+      min = max_value;
+    }
   else
     min = wi::abs (lh_lb);
+
   if (wi::eq_p (lh_ub, min_value))
     max = max_value;
   else
     max = wi::abs (lh_ub);
-
-  // ABS (-MIN) isn't representable, but we have traditionally returned -MIN,
-  // so this preserves that behaviour.  PR37078
-  if (wi::eq_p (lh_lb, min_value) && wi::eq_p (min, max))
-    {
-      r = int_range<1> (type, min_value, min_value);
-      return;
-    }
 
   // If the range contains zero then we know that the minimum value in the
   // range will be zero.
