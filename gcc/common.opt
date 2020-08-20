@@ -2866,6 +2866,25 @@ ftree-vrp
 Common Report Var(flag_tree_vrp) Init(0) Optimization
 Perform Value Range Propagation on trees.
 
+fevrp-mode=
+Common Joined RejectNegative Enum(evrp_mode) Var(flag_evrp_mode) Init(EVRP_MODE_EVRP_FIRST) Optimization
+-fevrp-mode=[evrp_only|rvrp_only|evrp_first|rvrp_first] Specifies the mode Early VRP should operate in.
+
+Enum
+Name(evrp_mode) Type(enum evrp_mode) UnknownError(unknown evrp mode %qs)
+
+EnumValue
+Enum(evrp_mode) String(evrp_only) Value(EVRP_MODE_EVRP_ONLY)
+
+EnumValue
+Enum(evrp_mode) String(rvrp_only) Value(EVRP_MODE_RVRP_ONLY)
+
+EnumValue
+Enum(evrp_mode) String(evrp_first) Value(EVRP_MODE_EVRP_FIRST)
+
+EnumValue
+Enum(evrp_mode) String(rvrp_first) Value(EVRP_MODE_RVRP_FIRST)
+
 fsplit-paths
 Common Report Var(flag_split_paths) Init(0) Optimization
 Split paths leading to loop backedges.

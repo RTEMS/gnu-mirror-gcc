@@ -382,4 +382,13 @@ enum parloops_schedule_type
   PARLOOPS_SCHEDULE_RUNTIME
 };
 
+/* EVRP mode.  */
+enum evrp_mode
+{
+  EVRP_MODE_EVRP_ONLY,
+  EVRP_MODE_RVRP_ONLY,
+  EVRP_MODE_EVRP_FIRST,
+  EVRP_MODE_RVRP_FIRST
+};
+
 #endif /* ! GCC_FLAG_TYPES_H */

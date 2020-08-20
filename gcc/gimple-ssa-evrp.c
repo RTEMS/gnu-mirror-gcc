@@ -44,8 +44,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-range.h"
 #include "gimple-range-trace.h"
 
-enum evrp_mode { evrp_only, rvrp_only, evrp_first, rvrp_first };
-
 class evrp_folder : public substitute_and_fold_engine
 {
 public:
@@ -204,7 +202,7 @@ private:
 class hybrid_folder : public substitute_and_fold_engine
 {
 public:
-  hybrid_folder (enum evrp_mode mode) : evrp_try_first (mode == evrp_first),
+  hybrid_folder () : evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST),
     m_range_analyzer (true), m_vr_values (m_range_analyzer.get_vr_values ()),
     simplifier (m_vr_values)
   {
@@ -242,7 +240,7 @@ public:
         if (dump_file)
 	  {
 	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
-	    print_generic_expr (stderr, e_ret);
+	    print_generic_expr (dump_file, e_ret);
 	    fprintf (dump_file, "\n");
 	  }
 	return e_ret;
@@ -250,7 +248,7 @@ public:
     if (dump_file)
       {
 	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
-	print_generic_expr (stderr, r_ret);
+	print_generic_expr (dump_file, r_ret);
 	fprintf (dump_file, "\n");
       }
     return r_ret;
@@ -284,19 +282,33 @@ public:
 
         simplifier.set_range_query (&ranger);
 	if (cond && ranger.fold_cond (cond))
-	  return true;
+	  {
+	    if (dump_file)
+	      fprintf (dump_file, "EVRP:hybrid: RVRP folded conditional\n");
+	    return true;
+	  }
 	if (simplifier.simplify (gsi))
-	  return true;
+	  {
+	    if (dump_file)
+	      fprintf (dump_file, "EVRP:hybrid: RVRP simplifed stmt\n");
+	    return true;
+	  }
 	return false;
       }
+
     simplifier.set_range_query (&ranger);
     if (cond && ranger.fold_cond (cond))
       return true;
     if (simplifier.simplify (gsi))
       return true;
+
     simplifier.set_range_query (m_vr_values);
     if (simplifier.simplify (gsi))
-      return true;
+      {
+	if (dump_file)
+	  fprintf (dump_file, "EVRP:hybrid: EVRP simplifed stmt\n");
+	return true;
+      }
     return false;
   }
 
@@ -327,7 +339,7 @@ private:
    ranges discovered in early vrp will also be used by ipa-vrp.  */
 
 static unsigned int
-execute_early_vrp (enum evrp_mode mode)
+execute_early_vrp ()
 {
   /* Ideally this setup code would move into the ctor for the folder
      However, this setup can change the number of blocks which
@@ -338,24 +350,24 @@ execute_early_vrp (enum evrp_mode mode)
   scev_initialize ();
   calculate_dominance_info (CDI_DOMINATORS);
 
-  switch (mode)
+  switch (flag_evrp_mode)
     {
-    case evrp_only:
+    case EVRP_MODE_EVRP_ONLY:
       {
 	evrp_folder folder;
 	folder.substitute_and_fold ();
 	break;
       }
-    case rvrp_only:
+    case EVRP_MODE_RVRP_ONLY:
       {
         rvrp_folder folder (true);
 	folder.substitute_and_fold ();
 	break;
       }
-    case evrp_first:
-    case rvrp_first:
+    case EVRP_MODE_EVRP_FIRST:
+    case EVRP_MODE_RVRP_FIRST:
       {
-	hybrid_folder folder (mode);
+	hybrid_folder folder;
 	folder.substitute_and_fold ();
 	break;
       }
@@ -397,7 +409,7 @@ public:
       return flag_tree_vrp != 0;
     }
   virtual unsigned int execute (function *)
-    { return execute_early_vrp (evrp_only); }
+    { return execute_early_vrp (); }
 
 }; // class pass_vrp
 } // anon namespace
@@ -406,44 +418,4 @@ gimple_opt_pass *
 make_pass_early_vrp (gcc::context *ctxt)
 {
   return new pass_early_vrp (ctxt);
-}
-
-
-namespace {
-
-const pass_data pass_data_ranger_vrp =
-{
- GIMPLE_PASS,			// type
- "rvrp",			// name
- OPTGROUP_NONE,			// optinfo_flags
- TV_TREE_RVRP,			// tv_id
- PROP_ssa,			// properties_required
- 0,				// properties_provided
- 0,				// properties_destroyed
- 0,				// todo_flags_start
- ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
-};
-
-class pass_ranger_vrp : public gimple_opt_pass
-{
-public:
-  pass_ranger_vrp (gcc::context *ctxt)
-    : gimple_opt_pass (pass_data_ranger_vrp, ctxt)
-    { }
-  opt_pass *clone () { return new pass_ranger_vrp (m_ctxt); }
-  virtual bool gate (function *)
-    { return flag_tree_vrp != 0; }
-  virtual unsigned int execute (function *)
-    {
-      return execute_early_vrp (rvrp_only);
-    }
-private:
-};
-
-} // anon namespace
-
-gimple_opt_pass *
-make_pass_ranger_vrp (gcc::context *ctxt)
-{
-  return new pass_ranger_vrp (ctxt);
 }
