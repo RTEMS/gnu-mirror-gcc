@@ -2833,6 +2833,14 @@ operator_abs::wi_fold (irange &r, tree type,
   else
     max = wi::abs (lh_ub);
 
+  // ABS (-MIN) isn't representable, but we have traditionally returned -MIN,
+  // so this preserves that behaviour.  PR37078
+  if (wi::eq_p (lh_lb, min_value) && wi::eq_p (min, max))
+    {
+      r = int_range<1> (type, min_value, min_value);
+      return;
+    }
+
   // If the range contains zero then we know that the minimum value in the
   // range will be zero.
   if (wi::le_p (lh_lb, 0, sign) && wi::ge_p (lh_ub, 0, sign))
