@@ -1225,6 +1225,11 @@
 (define_predicate "invert_fpmask_comparison_operator"
   (match_code "ne,unlt,unle"))
 
+;; Return 1 if OP is either a fpmask_comparison_operator or
+;; invert_fpmask_comparsion_operator.
+(define_predicate "fpmask_normal_or_invert_operator"
+  (match_code "eq,gt,ge,ne,unlt,unle"))
+
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.
 (define_predicate "vecint_comparison_operator"
