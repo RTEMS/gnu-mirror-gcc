@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "range.h"
 #include "range-op.h"
+#include "gimple-range-edge.h"
 #include "gimple-range-gori.h"
 #include "gimple-range-cache.h"
 
@@ -74,15 +75,6 @@ private:
 
 // Calculate a basic range for a tree expression.
 extern bool get_tree_range (irange &r, tree expr);
-
-// If BB ends with a range generating stmt, return its GSI.
-extern gimple_stmt_iterator gsi_outgoing_range_stmt (basic_block bb);
-// If BB ends with a range generating stmt, return that stmt.
-extern gimple *gimple_outgoing_range_stmt_p (basic_block bb);
-// If edge E has a constant range, return it and the range generating
-// statement.  for conditonals its TRUE/FALSE, for switches its the
-// possible cases.
-extern gimple *gimple_outgoing_edge_range_p (irange &r, edge e);
 
 // These routines provide a GIMPLE interface to the range-ops code.
 extern tree gimple_range_operand1 (const gimple *s);

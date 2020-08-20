@@ -1371,6 +1371,7 @@ OBJS = \
 	gimple-pretty-print.o \
 	gimple-range.o \
 	gimple-range-cache.o \
+	gimple-range-edge.o \
 	gimple-range-gori.o \
 	gimple-ssa-backprop.o \
 	gimple-ssa-evrp.o \

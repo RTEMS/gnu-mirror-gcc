@@ -69,6 +69,7 @@ private:
 					    const irange &lhs, tree name);
 
   class gori_map *m_gori_map;
+  outgoing_range outgoing;
 };
 
 class gori_compute_cache : public gori_compute
