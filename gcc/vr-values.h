@@ -38,7 +38,7 @@ public:
 // get_value_range() from it.  This class could be made to work with
 // any range repository.
 
-class simplify_using_ranges : public range_query
+class simplify_using_ranges 
 {
 public:
   simplify_using_ranges (class range_query *);
@@ -55,8 +55,7 @@ public:
 						bool *, bool *);
 
 private:
-  const value_range_equiv *get_value_range (const_tree op,
-					    gimple *stmt = NULL) OVERRIDE;
+  const value_range_equiv *get_value_range (const_tree op, gimple *stmt = NULL);
   bool simplify_truth_ops_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_div_or_mod_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_abs_using_ranges (gimple_stmt_iterator *, gimple *);
