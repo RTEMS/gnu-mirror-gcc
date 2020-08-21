@@ -125,6 +125,12 @@ gimple_range_global (tree name)
 {
   gcc_checking_assert (gimple_range_ssa_p (name));
   tree type = TREE_TYPE (name);
+#if 0
+  // Reenable picking up global ranges when we are OK failing tests that look
+  // for builtin_unreachable in the code, like
+  // RUNTESTFLAGS=dg.exp=pr61034.C check-g++
+  // pre-optimizations (inlining) set a global range which causes the ranger
+  // to remove the condition which leads to builtin_unreachable
   if (!POINTER_TYPE_P (type) && SSA_NAME_RANGE_INFO (name))
     {
       // Return a range from an SSA_NAME's available range.
@@ -132,6 +138,7 @@ gimple_range_global (tree name)
       enum value_range_kind kind = get_range_info (name, &min, &max);
       return value_range (type, min, max, kind);
     }
+#endif
  // Otherwise return range for the type.
  return value_range (type);
 }

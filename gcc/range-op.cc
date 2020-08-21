@@ -1317,10 +1317,10 @@ operator_div::wi_fold (irange &r, tree type,
 		       const wide_int &lh_lb, const wide_int &lh_ub,
 		       const wide_int &rh_lb, const wide_int &rh_ub) const
 {
-  // If we know we will divide by zero, return undefined.
+  // If we know we will divide by zero, return varying.
   if (rh_lb == 0 && rh_ub == 0)
     {
-      r.set_undefined ();
+      r.set_varying (type);
       return;
     }
 
