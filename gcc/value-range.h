@@ -673,4 +673,36 @@ irange_pool::allocate (const irange &src)
   return r;
 }
 
+// The bare minimum that must be implemented for this class is
+// range_of_expr.  However, the VRP twins also provide their own
+// value_of_expr because the substitute_and_fold_engine may use this
+// method and expect a non-constant (is_gimple_min_invariant may
+// return an ADDR_EXPR).
+//
+// It would be interesting to see if using the default value_of_expr
+// causes any regressions for users of the substitute_and_fold_engine.
+
+class valuation_query
+{
+public:
+  valuation_query ();
+  virtual ~valuation_query ();
+
+  virtual bool range_of_expr (irange &, tree name, gimple * = NULL);
+  virtual bool range_on_edge (irange &, edge, tree name);
+  virtual bool range_of_stmt (irange &, gimple *, tree name = NULL);
+
+  virtual bool value_of_expr (tree &, tree name, gimple * = NULL);
+  virtual bool value_on_edge (tree &, edge, tree name);
+  virtual bool value_of_stmt (tree &, gimple *, tree name = NULL);
+
+  // DEPRECATED: This method is used from vr-values.  The plan is to
+  // rewrite all uses of it to the above API.
+  virtual const class value_range_equiv *get_value_range (const_tree,
+							  gimple * = NULL);
+
+private:
+  class equiv_allocator *equiv_pool;
+};
+
 #endif // GCC_VALUE_RANGE_H

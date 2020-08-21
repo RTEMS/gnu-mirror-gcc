@@ -941,24 +941,41 @@ do_dbg_cnt (void)
     }
 }
 
+class ccp_valuation : public valuation_query
+{
+  /* This method just wraps GET_CONSTANT_VALUE for now.  Over time
+     naked calls to GET_CONSTANT_VALUE should be eliminated in favor
+     of calling member functions.  */
+  bool value_of_expr (tree &t, tree name, gimple *) OVERRIDE
+  {
+    t = get_constant_value (name);
+    return t != NULL;
+  }
+
+  virtual bool range_of_expr (irange &r, tree name, gimple *stmt) OVERRIDE
+  {
+    tree t;
+    if (value_of_expr (t, name, stmt))
+      {
+	if (TREE_CODE (t) == INTEGER_CST)
+	  r.set (t, t);
+	else
+	  r.set_varying (TREE_TYPE (name));
+	return true;
+      }
+    return false;
+  }
+};
 
 /* We want to provide our own GET_VALUE and FOLD_STMT virtual methods.  */
 class ccp_folder : public substitute_and_fold_engine
 {
- public:
-  tree get_value (tree, gimple *) FINAL OVERRIDE;
+public:
+  ccp_folder () : substitute_and_fold_engine (&m_query) { }
   bool fold_stmt (gimple_stmt_iterator *) FINAL OVERRIDE;
+private:
+  ccp_valuation m_query;
 };
-
-/* This method just wraps GET_CONSTANT_VALUE for now.  Over time
-   naked calls to GET_CONSTANT_VALUE should be eliminated in favor
-   of calling member functions.  */
-
-tree
-ccp_folder::get_value (tree op, gimple *stmt ATTRIBUTE_UNUSED)
-{
-  return get_constant_value (op);
-}
 
 /* Do final substitution of propagated values, cleanup the flowgraph and
    free allocated storage.  If NONZERO_P, record nonzero bits.

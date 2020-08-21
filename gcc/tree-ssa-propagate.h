@@ -100,11 +100,16 @@ class ssa_propagation_engine
 class substitute_and_fold_engine
 {
  public:
+  /* If query is unset here, it must be initialized with
+     set_valuation_query instead.  */
   substitute_and_fold_engine (bool fold_all_stmts = false)
-    : fold_all_stmts (fold_all_stmts) { }
+    : fold_all_stmts (fold_all_stmts), query (NULL) { }
+  substitute_and_fold_engine (class valuation_query *query,
+			      bool fold_all_stmts = false)
+    : fold_all_stmts (fold_all_stmts), query (query) { }
+  void set_valuation_query (class valuation_query *q) { query = q; }
   virtual ~substitute_and_fold_engine (void) { }
   virtual bool fold_stmt (gimple_stmt_iterator *) { return false; }
-  virtual tree get_value (tree, gimple *) { return NULL_TREE; }
 
   bool substitute_and_fold (basic_block = NULL);
   bool replace_uses_in (gimple *);
@@ -120,6 +125,8 @@ class substitute_and_fold_engine
   /* Users like VRP can set this when they want to perform
      folding for every propagation.  */
   bool fold_all_stmts;
+
+  class valuation_query *query;
 };
 
 #endif /* _TREE_SSA_PROPAGATE_H  */

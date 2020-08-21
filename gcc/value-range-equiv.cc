@@ -26,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ssa.h"
 #include "tree-pretty-print.h"
 #include "value-range-equiv.h"
+#include "alloc-pool.h"
 
 value_range_equiv::value_range_equiv (tree min, tree max, bitmap equiv,
 				      value_range_kind kind)
@@ -321,4 +322,32 @@ DEBUG_FUNCTION void
 debug (const value_range_equiv &vr)
 {
   dump_value_range (stderr, &vr);
+}
+
+// valuation_query support routines for value_range_equiv's.
+
+class equiv_allocator : public object_allocator<value_range_equiv>
+{
+public:
+  equiv_allocator ()
+    : object_allocator<value_range_equiv> ("equiv_allocator pool") { }
+};
+
+const class value_range_equiv *
+valuation_query::get_value_range (const_tree expr, gimple *stmt)
+{
+  widest_irange r;
+  if (range_of_expr (r, const_cast<tree> (expr), stmt))
+    return new (equiv_pool->allocate ()) value_range_equiv (r);
+  return new (equiv_pool->allocate ()) value_range_equiv (TREE_TYPE (expr));
+}
+
+valuation_query::valuation_query ()
+{
+  equiv_pool = new equiv_allocator;
+}
+
+valuation_query::~valuation_query ()
+{
+  equiv_pool->release ();
 }

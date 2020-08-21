@@ -4,7 +4,7 @@ public:
   trace_ranger (bool use_loop_info);
   virtual bool range_of_stmt (irange &r, gimple *s, tree name = NULL_TREE);
   virtual bool range_of_expr (irange &r, tree name, gimple *s = NULL);
-  virtual void range_on_edge (irange &r, edge e, tree name);
+  virtual bool range_on_edge (irange &r, edge e, tree name);
   virtual void range_on_entry (irange &r, basic_block bb, tree name);
   virtual void range_on_exit (irange &r, basic_block bb, tree name);
 private:
@@ -81,7 +81,7 @@ trace_ranger::trailer (unsigned counter, const char *caller, bool result,
 
 // Tracing version of range_on_edge.  Call it with printing wrappers.
 
-void
+bool
 trace_ranger::range_on_edge (irange &r, edge e, tree name)
 {
   unsigned idx = ++trace_count;
@@ -93,9 +93,9 @@ trace_ranger::range_on_edge (irange &r, edge e, tree name)
       indent += bump;
     }
 
-  gimple_ranger::range_on_edge (r, e, name);
-
+  bool res = gimple_ranger::range_on_edge (r, e, name);
   trailer (idx, "range_on_edge", true, name, r);
+  return res;
 }
 
 // Tracing version of range_on_entry.  Call it with printing wrappers.

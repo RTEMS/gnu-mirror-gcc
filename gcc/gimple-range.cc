@@ -910,7 +910,7 @@ gimple_ranger::range_on_exit (irange &r, basic_block bb, tree name)
 
 // Calculate a range for NAME on edge E and return it in R.
 
-void
+bool
 gimple_ranger::range_on_edge (irange &r, edge e, tree name)
 {
   widest_irange edge_range;
@@ -920,7 +920,7 @@ gimple_ranger::range_on_edge (irange &r, edge e, tree name)
   if (!gimple_range_ssa_p (name))
     {
       gcc_assert (range_of_expr (r, name));
-      return;
+      return true;
     }
 
   range_on_exit (r, e->src, name);
@@ -937,6 +937,7 @@ gimple_ranger::range_on_edge (irange &r, edge e, tree name)
       if (range_with_loop_info (loop_range, name))
 	r.intersect (loop_range);
     }
+  return true;
 }
 
 // Calculate a range for statement S and return it in R.  If NAME is
@@ -1111,54 +1112,13 @@ gimple_ranger::dump (FILE *f)
     }
 }
 
-// Bridge to provide a get_value_range() to range_of_var_in_loop.
-// As an alternative, gimple_ranger could inherit from range_query and
-// provide get_value_range, thus rendering this class unnecessary.
-
-class range_query_bridge : public range_query
-{
-public:
-  range_query_bridge (gimple_ranger *ranger)
-    : range_pool ("range_query_bridge range pool"),
-      ranger (ranger) { }
-  ~range_query_bridge ()
-  {
-    range_pool.release ();
-  }
-  const value_range_equiv *get_value_range (const_tree expr,
-					    gimple *stmt) OVERRIDE
-  {
-    widest_irange r;
-    if (ranger->range_of_expr (r, const_cast<tree> (expr), stmt))
-      return new (range_pool.allocate ()) value_range_equiv (r);
-    return new (range_pool.allocate ()) value_range_equiv (TREE_TYPE (expr));
-  }
-private:
-  object_allocator<value_range_equiv> range_pool;
-  gimple_ranger *ranger;
-};
-
-gimple_ranger::gimple_ranger (bool use_loop_info)
-{
-  if (use_loop_info)
-    m_range_query = new range_query_bridge (this);
-  else
-    m_range_query = NULL;
-}
-
-gimple_ranger::~gimple_ranger ()
-{
-  if (loop_aware_p ())
-    delete m_range_query;
-}
-
 void
 gimple_ranger::range_of_ssa_name_with_loop_info (irange &r, tree name,
 						 class loop *l, gphi *phi)
 {
   gcc_checking_assert (TREE_CODE (name) == SSA_NAME);
   tree min, max, type = TREE_TYPE (name);
-  if (bounds_of_var_in_loop (&min, &max, m_range_query, l, phi, name))
+  if (bounds_of_var_in_loop (&min, &max, this, l, phi, name))
     {
       // ?? We could do better here.  Since MIN/MAX can only be an
       // SSA, SSA +- INTEGER_CST, or INTEGER_CST, we could easily call

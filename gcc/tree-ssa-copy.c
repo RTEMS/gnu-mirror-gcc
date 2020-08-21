@@ -489,25 +489,24 @@ init_copy_prop (void)
     }
 }
 
-class copy_folder : public substitute_and_fold_engine
+class copy_valuation : public valuation_query
 {
- public:
-  tree get_value (tree, gimple *) FINAL OVERRIDE;
+  bool value_of_expr (tree &val, tree name, gimple *) FINAL OVERRIDE
+  {
+    if (SSA_NAME_VERSION (name) >= n_copy_of)
+      return false;
+    val = copy_of[SSA_NAME_VERSION (name)].value;
+    return val && val != name;
+  }
 };
 
-/* Callback for substitute_and_fold to get at the final copy-of values.  */
-
-tree
-copy_folder::get_value (tree name, gimple *stmt ATTRIBUTE_UNUSED)
+class copy_folder : public substitute_and_fold_engine
 {
-  tree val;
-  if (SSA_NAME_VERSION (name) >= n_copy_of)
-    return NULL_TREE;
-  val = copy_of[SSA_NAME_VERSION (name)].value;
-  if (val && val != name)
-    return val;
-  return NULL_TREE;
-}
+public:
+  copy_folder () : substitute_and_fold_engine (&m_query) { }
+private:
+  copy_valuation m_query;
+};
 
 /* Deallocate memory used in copy propagation and do final
    substitution.  */

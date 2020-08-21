@@ -47,10 +47,13 @@ along with GCC; see the file COPYING3.  If not see
 class evrp_folder : public substitute_and_fold_engine
 {
 public:
-  evrp_folder () : m_range_analyzer (/*update_global_ranges=*/true),
+  evrp_folder () :
+    substitute_and_fold_engine (),
+    m_range_analyzer (/*update_global_ranges=*/true),
     m_vr_values (m_range_analyzer.get_vr_values ()),
     simplifier (m_vr_values)
   {
+    set_valuation_query (m_vr_values);
   }
 
   ~evrp_folder ()
@@ -61,11 +64,6 @@ public:
 	m_range_analyzer.dump_all_value_ranges (dump_file);
 	fprintf (dump_file, "\n");
       }
-  }
-
-  tree get_value (tree op, gimple *stmt ATTRIBUTE_UNUSED) OVERRIDE
-  {
-    return m_vr_values->op_with_constant_singleton_value_range (op);
   }
 
   void pre_fold_bb (basic_block bb) OVERRIDE
@@ -111,33 +109,17 @@ private:
 
 // RVRP pass implementation using ranger.
 
-class rvrp_ranger : public range_query
+class rvrp_ranger : public gimple_ranger
 {
 public:
-  rvrp_ranger ()
-   : query (/*use_loop_info=*/true),
-     range_pool ("rvrp value range pool") { }
-  ~rvrp_ranger ()
+  rvrp_ranger (bool changes) :
+    gimple_ranger (/*use_loop_info=*/true),
+    allow_il_changes (changes)
+  { }
+
+  virtual bool value_of_expr (tree &t, tree name, gimple *stmt) OVERRIDE
   {
-    range_pool.release ();
-  }
-  // This is the range getter for the simplifier, but is really only
-  // used for the conditional folding which still uses equivalences.
-  virtual const value_range_equiv *get_value_range (const_tree expr,
-						    gimple *stmt)
-  {
-    widest_irange r;
-    if (query.range_of_expr (r, const_cast<tree> (expr), stmt))
-      return new (range_pool.allocate ()) value_range_equiv (r);
-    return new (range_pool.allocate ()) value_range_equiv (TREE_TYPE (expr));
-  }
-  tree singleton_p (tree op, gimple *stmt)
-  {
-    widest_irange r;
-    tree singleton;
-    if (query.range_of_expr (r, op, stmt) && r.singleton_p (&singleton))
-      return singleton;
-    return NULL_TREE;
+    return gimple_ranger::value_of_expr (t, name, stmt) && allow_il_changes;
   }
 
   bool fold_cond (gcond *cond)
@@ -146,7 +128,7 @@ public:
 	return false;
 
       widest_irange r;
-      if (query.range_of_stmt (r, cond) && r.singleton_p ())
+      if (range_of_stmt (r, cond) && r.singleton_p () && allow_il_changes)
 	{
 	  if (r.zero_p ())
 	    gimple_cond_make_false (cond);
@@ -157,9 +139,8 @@ public:
       return false;
     }
 
-  gimple_ranger query;
 private:
-  object_allocator<value_range_equiv> range_pool;
+  bool allow_il_changes;
 };
 
 class rvrp_folder : public substitute_and_fold_engine
@@ -167,21 +148,16 @@ class rvrp_folder : public substitute_and_fold_engine
 public:
   rvrp_ranger ranger;
 
-  rvrp_folder (bool allow_il_changes)
-    : ranger (), simplifier (&ranger), allow_il_changes (allow_il_changes) { }
+  rvrp_folder (bool allow_il_changes) :
+    substitute_and_fold_engine (&ranger),
+    ranger (allow_il_changes),
+    simplifier (&ranger),
+    allow_il_changes (allow_il_changes) { }
 
   ~rvrp_folder ()
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
-      ranger.query.dump (dump_file);
-  }
-
-  tree get_value (tree op, gimple *stmt) OVERRIDE
-  {
-    tree result = ranger.singleton_p (op, stmt);
-    if (allow_il_changes && result)
-      return result;
-    return NULL_TREE;
+      ranger.dump (dump_file);
   }
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
@@ -198,14 +174,82 @@ private:
   bool allow_il_changes;
 };
 
+class hybrid_ranger : public rvrp_ranger
+{
+public:
+  hybrid_ranger (vr_values *v) :
+    rvrp_ranger (/*allow_il_changes=*/true),
+    m_vr_values (v) { }
+
+  bool value_of_expr (tree &t, tree op, gimple *stmt) OVERRIDE
+  {
+    tree e_ret = m_vr_values->op_with_constant_singleton_value_range (op);
+    tree r_ret = singleton_p (op, stmt);
+
+    if (e_ret == r_ret)
+      {
+	if (e_ret)
+	  {
+	    t = e_ret;
+	    return true;
+	  }
+	return false;
+      }
+
+    // if the values are the same, return.
+    if (e_ret && r_ret && !compare_values (e_ret, r_ret))
+      {
+	t = e_ret;
+	return true;
+      }
+
+    // We should never get different singletons.
+    gcc_checking_assert (!e_ret || !r_ret);
+    if (e_ret)
+      {
+        if (dump_file)
+	  {
+	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
+	    print_generic_expr (dump_file, e_ret);
+	    fprintf (dump_file, "\n");
+	  }
+	t = e_ret;
+	return true;
+      }
+    if (dump_file)
+      {
+	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
+	print_generic_expr (dump_file, r_ret);
+	fprintf (dump_file, "\n");
+      }
+    return false;
+  }
+
+private:
+  tree singleton_p (tree op, gimple *stmt)
+  {
+    widest_irange r;
+    tree singleton;
+    if (range_of_expr (r, op, stmt) && r.singleton_p (&singleton))
+      return singleton;
+    return NULL_TREE;
+  }
+
+  vr_values *m_vr_values;
+};
 
 class hybrid_folder : public substitute_and_fold_engine
 {
 public:
-  hybrid_folder () : evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST),
-    m_range_analyzer (true), m_vr_values (m_range_analyzer.get_vr_values ()),
+  hybrid_folder () :
+    substitute_and_fold_engine (),
+    evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST),
+    m_range_analyzer (true),
+    m_vr_values (m_range_analyzer.get_vr_values ()),
+    ranger (m_vr_values),
     simplifier (m_vr_values)
   {
+    set_valuation_query (m_vr_values);
   }
 
   ~hybrid_folder ()
@@ -218,40 +262,7 @@ public:
       }
 
     if (dump_file && (dump_flags & TDF_DETAILS))
-      ranger.query.dump (dump_file);
-  }
-
-  tree get_value (tree op, gimple *stmt ATTRIBUTE_UNUSED) OVERRIDE
-  {
-    tree e_ret = m_vr_values->op_with_constant_singleton_value_range (op);
-    tree r_ret = ranger.singleton_p (op, stmt);
-
-    if (e_ret == r_ret)
-      return e_ret;
-
-    // if the values are the same, return.
-    if (e_ret && r_ret && !compare_values (e_ret, r_ret))
-      return e_ret;
-
-    // Shouldnt get DIFFERENT singletons ever, so one should be NULL
-    gcc_checking_assert (!e_ret || !r_ret);
-    if (e_ret)
-      {
-        if (dump_file)
-	  {
-	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
-	    print_generic_expr (dump_file, e_ret);
-	    fprintf (dump_file, "\n");
-	  }
-	return e_ret;
-      }
-    if (dump_file)
-      {
-	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
-	print_generic_expr (dump_file, r_ret);
-	fprintf (dump_file, "\n");
-      }
-    return r_ret;
+      ranger.dump (dump_file);
   }
 
   void pre_fold_bb (basic_block bb) OVERRIDE
@@ -276,11 +287,11 @@ public:
     gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
     if (evrp_try_first)
       {
-        simplifier.set_range_query (m_vr_values);
+	simplifier.set_valuation_query (m_vr_values);
 	if (simplifier.simplify (gsi))
 	  return true;
 
-        simplifier.set_range_query (&ranger);
+	simplifier.set_valuation_query (&ranger);
 	if (cond && ranger.fold_cond (cond))
 	  {
 	    if (dump_file)
@@ -296,13 +307,13 @@ public:
 	return false;
       }
 
-    simplifier.set_range_query (&ranger);
+    simplifier.set_valuation_query (&ranger);
     if (cond && ranger.fold_cond (cond))
       return true;
     if (simplifier.simplify (gsi))
       return true;
 
-    simplifier.set_range_query (m_vr_values);
+    simplifier.set_valuation_query (m_vr_values);
     if (simplifier.simplify (gsi))
       {
 	if (dump_file)
@@ -323,12 +334,11 @@ public:
   }
 
 private:
-  bool evrp_try_first;
-  rvrp_ranger ranger;
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
+  bool evrp_try_first;
   class evrp_range_analyzer m_range_analyzer;
   class vr_values *m_vr_values;
-
+  hybrid_ranger ranger;
   simplify_using_ranges simplifier;
 };
 
@@ -354,6 +364,12 @@ execute_early_vrp ()
     {
     case EVRP_MODE_EVRP_ONLY:
       {
+	/* ?? We could do:
+	     evrp_range_analyzer range_analyzer;
+	     evrp_folder folder (range_analyzer);
+	   And then we wouldn't need we could instantiate
+	   substitute_and_fold_engine with the correct vr_values
+	   instead of calling set_valuation_query.  */
 	evrp_folder folder;
 	folder.substitute_and_fold ();
 	break;
