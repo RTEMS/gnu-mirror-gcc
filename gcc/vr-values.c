@@ -4255,6 +4255,8 @@ simplify_using_ranges::~simplify_using_ranges ()
 bool
 simplify_using_ranges::simplify (gimple_stmt_iterator *gsi)
 {
+  gcc_checking_assert (query);
+
   gimple *stmt = gsi_stmt (*gsi);
   if (is_gimple_assign (stmt))
     {

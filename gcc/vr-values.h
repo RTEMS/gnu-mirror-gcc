@@ -29,7 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 class simplify_using_ranges
 {
 public:
-  simplify_using_ranges (class valuation_query *);
+  simplify_using_ranges (class valuation_query *query = NULL);
   ~simplify_using_ranges ();
   void set_valuation_query (class valuation_query *);
 

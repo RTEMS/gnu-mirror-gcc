@@ -98,7 +98,7 @@ public:
     m_range_analyzer.get_vr_values ()->set_defs_to_varying (stmt);
   }
 
-private:
+protected:
   DISABLE_COPY_AND_ASSIGN (evrp_folder);
   class evrp_range_analyzer m_range_analyzer;
   class vr_values *m_vr_values;
@@ -106,108 +106,98 @@ private:
   simplify_using_ranges simplifier;
 };
 
+// -------------------------------------------------------------------------
 
-// RVRP pass implementation using ranger.
 
-class rvrp_ranger : public gimple_ranger
+// Until the simplifier is adjusted to use range_of_stmt for folding conditons,
+// we'll have to do it manually here.
+
+static bool
+fold_cond (gimple_ranger *ranger, gcond *cond)
 {
-public:
-  rvrp_ranger (bool changes) :
-    gimple_ranger (/*use_loop_info=*/true),
-    allow_il_changes (changes)
-  { }
+  if (!irange::supports_type_p (gimple_expr_type (cond)))
+    return false;
 
-  virtual bool value_of_expr (tree &t, tree name, gimple *stmt) OVERRIDE
-  {
-    return gimple_ranger::value_of_expr (t, name, stmt) && allow_il_changes;
-  }
-
-  bool fold_cond (gcond *cond)
+  widest_irange r;
+  if (ranger->range_of_stmt (r, cond) && r.singleton_p ())
     {
-      if (!irange::supports_type_p (gimple_expr_type (cond)))
-	return false;
-
-      widest_irange r;
-      if (range_of_stmt (r, cond) && r.singleton_p () && allow_il_changes)
+      if (r.zero_p ())
 	{
-	  if (r.zero_p ())
-	    gimple_cond_make_false (cond);
-	  else
-	    gimple_cond_make_true (cond);
-	  return true;
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "\nPredicate evaluates to: 0\n");
+	  gimple_cond_make_false (cond);
 	}
-      return false;
+      else
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "\nPredicate evaluates to: 1\n");
+	  gimple_cond_make_true (cond);
+	}
+      return true;
     }
+  return false;
+}
 
-private:
-  bool allow_il_changes;
-};
 
 class rvrp_folder : public substitute_and_fold_engine
 {
 public:
-  rvrp_ranger ranger;
 
-  rvrp_folder (bool allow_il_changes) :
-    substitute_and_fold_engine (&ranger),
-    ranger (allow_il_changes),
-    simplifier (&ranger),
-    allow_il_changes (allow_il_changes) { }
+  rvrp_folder () : substitute_and_fold_engine (), m_simplifier ()
+  { 
+    if (flag_evrp_mode == EVRP_MODE_RVRP_TRACE)
+      m_ranger = new trace_ranger (true);
+    else
+      m_ranger = new gimple_ranger (true);
+    substitute_and_fold_engine::set_valuation_query (m_ranger);
+    m_simplifier.set_valuation_query (m_ranger);
+  }
+      
 
   ~rvrp_folder ()
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
-      ranger.dump (dump_file);
+      m_ranger->dump (dump_file);
+    delete m_ranger;
   }
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
     gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
-    if (cond && allow_il_changes && ranger.fold_cond (cond))
+    if (cond && fold_cond (m_ranger, cond))
       return true;
 
-    return simplifier.simplify (gsi);
+    return m_simplifier.simplify (gsi);
   }
 
 private:
-  simplify_using_ranges simplifier;
-  bool allow_il_changes;
+  gimple_ranger *m_ranger;
+  simplify_using_ranges m_simplifier;
 };
 
-class hybrid_ranger : public rvrp_ranger
+// -----------------------------------------------------------------------
+
+
+// Override value_of_expr in a ranger to compare results with the EVRp
+// evaluator
+class hybrid_ranger : public gimple_ranger
 {
 public:
-  hybrid_ranger (vr_values *v) :
-    rvrp_ranger (/*allow_il_changes=*/true),
-    m_vr_values (v) { }
+  hybrid_ranger (vr_values *v) : gimple_ranger (true), m_vr_values (v) { }
 
   bool value_of_expr (tree &t, tree op, gimple *stmt) OVERRIDE
   {
     tree e_ret = m_vr_values->op_with_constant_singleton_value_range (op);
-    tree r_ret = singleton_p (op, stmt);
+    bool ret = gimple_ranger::value_of_expr (t, op, stmt);
 
-    if (e_ret == r_ret)
+    if (!ret)
       {
-	if (e_ret)
-	  {
-	    t = e_ret;
-	    return true;
-	  }
-	return false;
-      }
+	// If neither returned a value, return false.
+	if (!e_ret)
+	  return false;
 
-    // if the values are the same, return.
-    if (e_ret && r_ret && !compare_values (e_ret, r_ret))
-      {
-	t = e_ret;
-	return true;
-      }
-
-    // We should never get different singletons.
-    gcc_checking_assert (!e_ret || !r_ret);
-    if (e_ret)
-      {
-        if (dump_file)
+	// Otherwise EVRP found something.
+	if (dump_file)
 	  {
 	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
 	    print_generic_expr (dump_file, e_ret);
@@ -216,83 +206,65 @@ public:
 	t = e_ret;
 	return true;
       }
+
+
+    // Otherwise ranger found a value, if they match we're good.
+    if (e_ret && !compare_values (e_ret, t))
+      return true;
+
+    // We should never get different singletons.
+    gcc_checking_assert (!e_ret);
+
+    // Now ranger has found a value, but EVRP did not.
     if (dump_file)
       {
 	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
-	print_generic_expr (dump_file, r_ret);
+	print_generic_expr (dump_file, t);
 	fprintf (dump_file, "\n");
       }
-    return false;
+    return true;
   }
-
 private:
-  tree singleton_p (tree op, gimple *stmt)
-  {
-    widest_irange r;
-    tree singleton;
-    if (range_of_expr (r, op, stmt) && r.singleton_p (&singleton))
-      return singleton;
-    return NULL_TREE;
-  }
-
   vr_values *m_vr_values;
 };
 
-class hybrid_folder : public substitute_and_fold_engine
+
+// In a hybrid folder, start with an EVRP folder, and add the required fold_stmt
+// bits do either try the ranger first or second.
+
+class hybrid_folder : public evrp_folder
 {
 public:
   hybrid_folder () :
-    substitute_and_fold_engine (),
-    evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST),
-    m_range_analyzer (true),
-    m_vr_values (m_range_analyzer.get_vr_values ()),
-    ranger (m_vr_values),
-    simplifier (m_vr_values)
+    evrp_folder (),
+    m_ranger (m_vr_values),
+    m_evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST)
   {
-    set_valuation_query (m_vr_values);
+    // Default to the hybrid evaluator if we should try it first
+    if (!m_evrp_try_first)
+      {
+	simplifier.set_valuation_query (&m_ranger);
+	substitute_and_fold_engine::set_valuation_query (&m_ranger);
+      }
   }
 
   ~hybrid_folder ()
   {
-    if (dump_file)
-      {
-	fprintf (dump_file, "\nValue ranges after Early VRP:\n\n");
-	m_range_analyzer.dump_all_value_ranges (dump_file);
-	fprintf (dump_file, "\n");
-      }
-
     if (dump_file && (dump_flags & TDF_DETAILS))
-      ranger.dump (dump_file);
-  }
-
-  void pre_fold_bb (basic_block bb) OVERRIDE
-  {
-    if (dump_file && (dump_flags & TDF_DETAILS))
-      fprintf (dump_file, "evrp visiting BB%d\n", bb->index);
-    m_range_analyzer.enter (bb);
-  }
-
-  void pre_fold_stmt (gimple *stmt) OVERRIDE
-  {
-    if (dump_file && (dump_flags & TDF_DETAILS))
-      {
-	fprintf (dump_file, "evrp visiting stmt ");
-	print_gimple_stmt (dump_file, stmt, 0);
-      }
-    m_range_analyzer.record_ranges_from_stmt (stmt, false);
+      m_ranger.dump (dump_file);
   }
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
     gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
-    if (evrp_try_first)
+    if (m_evrp_try_first)
       {
 	simplifier.set_valuation_query (m_vr_values);
 	if (simplifier.simplify (gsi))
 	  return true;
 
-	simplifier.set_valuation_query (&ranger);
-	if (cond && ranger.fold_cond (cond))
+	simplifier.set_valuation_query (&m_ranger);
+	if (cond && fold_cond (&m_ranger, cond))
 	  {
 	    if (dump_file)
 	      fprintf (dump_file, "EVRP:hybrid: RVRP folded conditional\n");
@@ -307,8 +279,8 @@ public:
 	return false;
       }
 
-    simplifier.set_valuation_query (&ranger);
-    if (cond && ranger.fold_cond (cond))
+    simplifier.set_valuation_query (&m_ranger);
+    if (cond && fold_cond (&m_ranger, cond))
       return true;
     if (simplifier.simplify (gsi))
       return true;
@@ -323,23 +295,10 @@ public:
     return false;
   }
 
-  void post_fold_bb (basic_block bb) OVERRIDE
-  {
-    m_range_analyzer.leave (bb);
-  }
-
-  void post_new_stmt (gimple *stmt) OVERRIDE
-  {
-    m_range_analyzer.get_vr_values ()->set_defs_to_varying (stmt);
-  }
-
 private:
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
-  bool evrp_try_first;
-  class evrp_range_analyzer m_range_analyzer;
-  class vr_values *m_vr_values;
-  hybrid_ranger ranger;
-  simplify_using_ranges simplifier;
+  hybrid_ranger m_ranger;
+  bool m_evrp_try_first;
 };
 
 
@@ -375,8 +334,9 @@ execute_early_vrp ()
 	break;
       }
     case EVRP_MODE_RVRP_ONLY:
+    case EVRP_MODE_RVRP_TRACE:
       {
-        rvrp_folder folder (true);
+	rvrp_folder folder;
 	folder.substitute_and_fold ();
 	break;
       }
