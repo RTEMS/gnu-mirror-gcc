@@ -187,33 +187,33 @@ public:
 
   bool value_of_expr (tree &t, tree op, gimple *stmt) OVERRIDE
   {
-    tree e_ret = m_vr_values->op_with_constant_singleton_value_range (op);
+    tree evrp_ret = m_vr_values->op_with_constant_singleton_value_range (op);
     bool ret = gimple_ranger::value_of_expr (t, op, stmt);
 
     if (!ret)
       {
 	// If neither returned a value, return false.
-	if (!e_ret)
+	if (!evrp_ret)
 	  return false;
 
 	// Otherwise EVRP found something.
 	if (dump_file)
 	  {
 	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
-	    print_generic_expr (dump_file, e_ret);
+	    print_generic_expr (dump_file, evrp_ret);
 	    fprintf (dump_file, "\n");
 	  }
-	t = e_ret;
+	t = evrp_ret;
 	return true;
       }
 
 
     // Otherwise ranger found a value, if they match we're good.
-    if (e_ret && !compare_values (e_ret, t))
+    if (evrp_ret && !compare_values (evrp_ret, t))
       return true;
 
     // We should never get different singletons.
-    gcc_checking_assert (!e_ret);
+    gcc_checking_assert (!evrp_ret);
 
     // Now ranger has found a value, but EVRP did not.
     if (dump_file)
