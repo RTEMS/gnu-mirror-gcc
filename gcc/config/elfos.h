@@ -248,15 +248,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
     }					\
   while (0)
 
-#define ASM_OUTPUT_SYMVER_DIRECTIVE(FILE, NAME, NAME2)		\
-  do								\
-    {								\
-      fputs ("\t.symver\t", (FILE));				\
-      assemble_name ((FILE), (NAME));				\
-      fputs (", ", (FILE));					\
-      assemble_name ((FILE), (NAME2));				\
-      fputc ('\n', (FILE));					\
-    }								\
+#define ASM_OUTPUT_SYMVER_DIRECTIVE(FILE, NAME, NAME2, VISIBILITY)  \
+  do								    \
+    {								    \
+      fputs ("\t.symver\t", (FILE));				    \
+      assemble_name ((FILE), (NAME));				    \
+      fputs (", ", (FILE));					    \
+      assemble_name ((FILE), (NAME2));				    \
+      if (visibility != NULL)					    \
+	fprintf ((FILE), ", %s", (VISIBILITY));			    \
+      fputc ('\n', (FILE));					    \
+    }								    \
   while (0)
 
 /* The following macro defines the format used to output the second

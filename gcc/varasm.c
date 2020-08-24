@@ -5964,15 +5964,23 @@ do_assemble_alias (tree decl, tree target)
 /* Output .symver directive.  */
 
 void
-do_assemble_symver (tree decl, tree target)
+do_assemble_symver (tree decl, tree origin_decl)
 {
+  tree target = DECL_ASSEMBLER_NAME (origin_decl);
   tree id = DECL_ASSEMBLER_NAME (decl);
   ultimate_transparent_alias_target (&id);
   ultimate_transparent_alias_target (&target);
 #ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
+  const char *visibility = NULL;
+  if (!TREE_PUBLIC (origin_decl))
+    visibility = "remove";
+  else if (DECL_VISIBILITY (origin_decl) == VISIBILITY_INTERNAL)
+    visibility = "local";
+  else if (DECL_VISIBILITY (origin_decl) == VISIBILITY_HIDDEN)
+    visibility = "hidden";
   ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file,
 			       IDENTIFIER_POINTER (target),
-			       IDENTIFIER_POINTER (id));
+			       IDENTIFIER_POINTER (id), visibility);
 #else
   error ("symver is only supported on ELF platforms");
 #endif

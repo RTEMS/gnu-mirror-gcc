@@ -765,18 +765,6 @@ process_symver_attribute (symtab_node *n)
 		    "%<weakref%> cannot be versioned");
 	  return;
 	}
-      if (!TREE_PUBLIC (n->decl))
-	{
-	  error_at (DECL_SOURCE_LOCATION (n->decl),
-		    "versioned symbol must be public");
-	  return;
-	}
-      if (DECL_VISIBILITY (n->decl) != VISIBILITY_DEFAULT)
-	{
-	  error_at (DECL_SOURCE_LOCATION (n->decl),
-		    "versioned symbol must have default visibility");
-	  return;
-	}
 
       /* Create new symbol table entry representing the version.  */
       tree new_decl = copy_node (n->decl);
@@ -2239,8 +2227,7 @@ cgraph_node::assemble_thunks_and_aliases (void)
 	     of buffering it in same alias pairs.  */
 	  TREE_ASM_WRITTEN (decl) = 1;
 	  if (alias->symver)
-	    do_assemble_symver (alias->decl,
-				DECL_ASSEMBLER_NAME (decl));
+	    do_assemble_symver (alias->decl, decl);
 	  else
 	    do_assemble_alias (alias->decl,
 			       DECL_ASSEMBLER_NAME (decl));

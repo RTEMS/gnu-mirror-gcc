@@ -3729,8 +3729,7 @@ On ELF targets this attribute creates a symbol version.  The @var{name2} part
 of the parameter is the actual name of the symbol by which it will be
 externally referenced.  The @code{nodename} portion should be the name of a
 node specified in the version script supplied to the linker when building a
-shared library.  Versioned symbol must be defined and must be exported with
-default visibility.
+shared library.
 
 @smallexample
 __attribute__ ((__symver__ ("foo@@VERS_1"))) int
