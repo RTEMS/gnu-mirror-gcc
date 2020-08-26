@@ -151,6 +151,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "symbol-summary.h"
 #include "ipa-utils.h"
 #include "ipa-prop.h"
+#include "value-query.h"
 
 /* Possible lattice values.  */
 typedef enum
@@ -941,7 +942,7 @@ do_dbg_cnt (void)
     }
 }
 
-class ccp_valuation : public valuation_query
+class ccp_valuation : public value_query
 {
   /* This method just wraps GET_CONSTANT_VALUE for now.  Over time
      naked calls to GET_CONSTANT_VALUE should be eliminated in favor
@@ -950,20 +951,6 @@ class ccp_valuation : public valuation_query
   {
     t = get_constant_value (name);
     return t != NULL;
-  }
-
-  virtual bool range_of_expr (irange &r, tree name, gimple *stmt) OVERRIDE
-  {
-    tree t;
-    if (value_of_expr (t, name, stmt))
-      {
-	if (TREE_CODE (t) == INTEGER_CST)
-	  r.set (t, t);
-	else
-	  r.set_varying (TREE_TYPE (name));
-	return true;
-      }
-    return false;
   }
 };
 

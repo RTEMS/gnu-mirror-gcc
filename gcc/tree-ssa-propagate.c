@@ -38,6 +38,7 @@
 #include "cfgloop.h"
 #include "tree-cfgcleanup.h"
 #include "cfganal.h"
+#include "value-query.h"
 
 /* This file implements a generic value propagation engine based on
    the same propagation used by the SSA-CCP algorithm [1].
@@ -910,11 +911,10 @@ substitute_and_fold_engine::replace_phi_args_in (gphi *phi)
       if (TREE_CODE (arg) == SSA_NAME)
 	{
 	  tree val;
-	  if (query->value_of_expr (val, arg, phi)
+	  edge e = gimple_phi_arg_edge (phi, i);
+	  if (query->value_on_edge (val, e, arg)
 	      && val != arg && may_propagate_copy (arg, val))
 	    {
-	      edge e = gimple_phi_arg_edge (phi, i);
-
 	      if (TREE_CODE (val) != SSA_NAME)
 		prop_stats.num_const_prop++;
 	      else
@@ -1037,7 +1037,7 @@ substitute_and_fold_engine::propagate_into_phi_args (basic_block bb)
 	      || virtual_operand_p (arg))
 	    continue;
 	  tree val;
-	  if (query->value_of_expr (val, arg, phi)
+	  if (query->value_on_edge (val, e, arg)
 	      && is_gimple_min_invariant (val)
 	      && may_propagate_copy (arg, val))
 	    {

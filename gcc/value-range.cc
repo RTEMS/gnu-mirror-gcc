@@ -2048,50 +2048,6 @@ vrp_operand_equal_p (const_tree val1, const_tree val2)
   return true;
 }
 
-// Default definitions for valuation_query methods.
-
-bool
-valuation_query::range_of_expr (irange &, tree, gimple *)
-{
-  return false;
-}
-
-bool
-valuation_query::range_on_edge (irange &r, edge, tree name)
-{
-  return range_of_expr (r, name);
-}
-
-bool
-valuation_query::range_of_stmt (irange &r, gimple *, tree name)
-{
-  if (name)
-    return range_of_expr (r, name);
-  return false;
-}
-
-bool
-valuation_query::value_of_expr (tree &t, tree name, gimple *stmt)
-{
-  widest_irange r;
-  return range_of_expr (r, name, stmt) && r.singleton_p (&t);
-}
-
-bool
-valuation_query::value_on_edge (tree &t, edge e, tree name)
-{
-  widest_irange r;
-  return range_on_edge (r, e, name) && r.singleton_p (&t);
-}
-
-bool
-valuation_query::value_of_stmt (tree &t, gimple *stmt, tree name)
-{
-  widest_irange r;
-  return range_of_stmt (r, stmt, name) && r.singleton_p (&t);
-}
-
-
 #define DEFINE_INT_RANGE_GC_STUBS(N)		\
   void						\
   gt_pch_nx (int_range<N> *&x)			\

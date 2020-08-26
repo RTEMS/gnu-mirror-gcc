@@ -271,7 +271,7 @@ private:
     evrp_range_analyzer m_range_analyzer;
   };
 
-  class valuation : public valuation_query
+  class valuation : public value_query
   {
   public:
     valuation (loop_info *li) : m_li (li) { }

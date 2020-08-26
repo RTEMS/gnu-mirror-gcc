@@ -101,11 +101,11 @@ class substitute_and_fold_engine
 {
  public:
   /* If query is unset here, it must be initialized with
-     set_valuation_query instead.  */
-  substitute_and_fold_engine (class valuation_query *query = NULL,
+     set_value_query instead.  */
+  substitute_and_fold_engine (class value_query *query = NULL,
 			      bool fold_all_stmts = false)
     : fold_all_stmts (fold_all_stmts), query (query) { }
-  void set_valuation_query (class valuation_query *q) { query = q; }
+  void set_value_query (class value_query *q) { query = q; }
   virtual ~substitute_and_fold_engine (void) { }
   virtual bool fold_stmt (gimple_stmt_iterator *) { return false; }
 
@@ -124,7 +124,7 @@ class substitute_and_fold_engine
      folding for every propagation.  */
   bool fold_all_stmts;
 
-  class valuation_query *query;
+  class value_query *query;
 };
 
 #endif /* _TREE_SSA_PROPAGATE_H  */

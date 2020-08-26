@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_VR_VALUES_H
 
 #include "value-range-equiv.h"
+#include "value-query.h"
 
 // Abstract class to return a range for a given SSA.
 
@@ -29,9 +30,9 @@ along with GCC; see the file COPYING3.  If not see
 class simplify_using_ranges
 {
 public:
-  simplify_using_ranges (class valuation_query *query = NULL);
+  simplify_using_ranges (class range_query *query = NULL);
   ~simplify_using_ranges ();
-  void set_valuation_query (class valuation_query *);
+  void set_range_query (class range_query *);
 
   bool simplify (gimple_stmt_iterator *);
 
@@ -77,7 +78,7 @@ private:
 
   vec<edge> to_remove_edges;
   vec<switch_update> to_update_switch_stmts;
-  class valuation_query *query;
+  class range_query *query;
 };
 
 /* The VR_VALUES class holds the current view of range information
@@ -94,13 +95,15 @@ private:
    gets attached to an SSA_NAME.  It's unclear how useful that global
    information will be in a world where we can compute context sensitive
    range information fast or perform on-demand queries.  */
-class vr_values : public valuation_query
+class vr_values : public range_query
 {
  public:
   vr_values (void);
   ~vr_values (void);
 
   virtual bool value_of_expr (tree &, tree, gimple *) OVERRIDE;
+  virtual bool value_on_edge (tree &, edge, tree) OVERRIDE;
+  virtual bool value_of_stmt (tree &, gimple *, tree) OVERRIDE;
   bool range_of_expr (irange &r, tree name, gimple *stmt) OVERRIDE;
   virtual const value_range_equiv *get_value_range (const_tree,
 						    gimple * = NULL) OVERRIDE;
@@ -168,7 +171,7 @@ class vr_values : public valuation_query
 };
 
 inline void
-simplify_using_ranges::set_valuation_query (class valuation_query *q)
+simplify_using_ranges::set_range_query (class range_query *q)
 {
   query = q;
 }
@@ -178,7 +181,7 @@ extern tree get_output_for_vrp (gimple *);
 // FIXME: Move this to tree-vrp.c.
 void simplify_cond_using_ranges_2 (class vr_values *, gcond *);
 
-extern bool bounds_of_var_in_loop (tree *min, tree *max, valuation_query *,
+extern bool bounds_of_var_in_loop (tree *min, tree *max, range_query *,
 				   class loop *loop, gimple *stmt, tree var);
 
 #endif /* GCC_VR_VALUES_H */

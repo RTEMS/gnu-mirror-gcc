@@ -53,7 +53,7 @@ public:
     m_vr_values (m_range_analyzer.get_vr_values ()),
     simplifier (m_vr_values)
   {
-    set_valuation_query (m_vr_values);
+    set_value_query (m_vr_values);
   }
 
   ~evrp_folder ()
@@ -149,8 +149,8 @@ public:
       m_ranger = new trace_ranger (true);
     else
       m_ranger = new gimple_ranger (true);
-    substitute_and_fold_engine::set_valuation_query (m_ranger);
-    m_simplifier.set_valuation_query (m_ranger);
+    substitute_and_fold_engine::set_value_query (m_ranger);
+    m_simplifier.set_range_query (m_ranger);
   }
       
 
@@ -243,8 +243,8 @@ public:
     // Default to the hybrid evaluator if we should try it first
     if (!m_evrp_try_first)
       {
-	simplifier.set_valuation_query (&m_ranger);
-	substitute_and_fold_engine::set_valuation_query (&m_ranger);
+	simplifier.set_range_query (&m_ranger);
+	substitute_and_fold_engine::set_value_query (&m_ranger);
       }
   }
 
@@ -259,11 +259,11 @@ public:
     gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
     if (m_evrp_try_first)
       {
-	simplifier.set_valuation_query (m_vr_values);
+	simplifier.set_range_query (m_vr_values);
 	if (simplifier.simplify (gsi))
 	  return true;
 
-	simplifier.set_valuation_query (&m_ranger);
+	simplifier.set_range_query (&m_ranger);
 	if (cond && fold_cond (&m_ranger, cond))
 	  {
 	    if (dump_file)
@@ -279,13 +279,13 @@ public:
 	return false;
       }
 
-    simplifier.set_valuation_query (&m_ranger);
+    simplifier.set_range_query (&m_ranger);
     if (cond && fold_cond (&m_ranger, cond))
       return true;
     if (simplifier.simplify (gsi))
       return true;
 
-    simplifier.set_valuation_query (m_vr_values);
+    simplifier.set_range_query (m_vr_values);
     if (simplifier.simplify (gsi))
       {
 	if (dump_file)
@@ -328,7 +328,7 @@ execute_early_vrp ()
 	     evrp_folder folder (range_analyzer);
 	   And then we wouldn't need we could instantiate
 	   substitute_and_fold_engine with the correct vr_values
-	   instead of calling set_valuation_query.  */
+	   instead of calling set_range_query.  */
 	evrp_folder folder;
 	folder.substitute_and_fold ();
 	break;

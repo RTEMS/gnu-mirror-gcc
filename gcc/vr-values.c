@@ -194,6 +194,20 @@ vr_values::value_of_expr (tree &t, tree op, gimple *)
   return t != NULL;
 }
 
+bool
+vr_values::value_on_edge (tree &t, edge, tree op)
+{
+  return vr_values::value_of_expr (t, op, NULL);
+}
+
+bool
+vr_values::value_of_stmt (tree &t, gimple *, tree op)
+{
+  if (op)
+    return vr_values::value_of_expr (t, op, NULL);
+  return false;
+}
+
 /* Set the lattice entry for DEF to VARYING.  */
 
 void
@@ -1027,7 +1041,7 @@ vr_values::extract_range_from_comparison (value_range_equiv *vr,
    overflow.  */
 
 static bool
-check_for_binary_op_overflow (valuation_query *query,
+check_for_binary_op_overflow (range_query *query,
 			      enum tree_code subcode, tree type,
 			      tree op0, tree op1, bool *ovf)
 {
@@ -1763,7 +1777,7 @@ compare_range_with_value (enum tree_code comp, const value_range *vr,
    could be determined, return FALSE.  */
 
 bool
-bounds_of_var_in_loop (tree *min, tree *max, valuation_query *query,
+bounds_of_var_in_loop (tree *min, tree *max, range_query *query,
 		       class loop *loop, gimple *stmt, tree var)
 {
   tree init, step, chrec, tmin, tmax, type = TREE_TYPE (var);
@@ -4238,7 +4252,7 @@ simplify_using_ranges::two_valued_val_range_p (tree var, tree *a, tree *b)
   return false;
 }
 
-simplify_using_ranges::simplify_using_ranges (valuation_query *query)
+simplify_using_ranges::simplify_using_ranges (range_query *query)
   : query (query)
 {
   to_remove_edges = vNULL;

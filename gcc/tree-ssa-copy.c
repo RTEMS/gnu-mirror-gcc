@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "tree-scalar-evolution.h"
 #include "tree-ssa-loop-niter.h"
+#include "value-query.h"
 
 
 /* This file implements the copy propagation pass and provides a
@@ -489,7 +490,7 @@ init_copy_prop (void)
     }
 }
 
-class copy_valuation : public valuation_query
+class copy_valuation : public value_query
 {
   bool value_of_expr (tree &val, tree name, gimple *) FINAL OVERRIDE
   {

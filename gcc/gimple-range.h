@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-range-edge.h"
 #include "gimple-range-gori.h"
 #include "gimple-range-cache.h"
+#include "value-query.h"
 
 // This is the basic range generator interface.
 //
@@ -42,7 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 // related methods return whatever the current global value is.
 
 
-class gimple_ranger : public valuation_query
+class gimple_ranger : public range_query
 {
 public:
   gimple_ranger (bool use_loop_info) : m_use_loop_info (use_loop_info) { }
