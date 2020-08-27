@@ -495,40 +495,6 @@ do_pcrel_opt_store (rtx_insn *addr_insn,	// insn loading address
 }
 
 
-/* Given an insn, find the next insn in the basic block.  Stop if we find a the
-   end of a basic block, such as a label, call or jump, and return NULL.  */
-
-static rtx_insn *
-next_active_insn_in_basic_block (rtx_insn *insn)
-{
-  insn = NEXT_INSN (insn);
-
-  while (insn != NULL_RTX)
-    {
-      /* If the basic block ends or there is a jump of some kind, exit the
-	 loop.  */
-      if (CALL_P (insn)
-	  || JUMP_P (insn)
-	  || JUMP_TABLE_DATA_P (insn)
-	  || LABEL_P (insn)
-	  || BARRIER_P (insn))
-	return NULL;
-
-      /* If this is a real insn, return it.  */
-      if (!insn->deleted ()
-	  && NONJUMP_INSN_P (insn)
-	  && GET_CODE (PATTERN (insn)) != USE
-	  && GET_CODE (PATTERN (insn)) != CLOBBER)
-	return insn;
-
-      /* Loop for USE, CLOBBER, DEBUG_INSN, NOTEs.  */
-      insn = NEXT_INSN (insn);
-    }
-
-  return NULL;
-}
-
-
 // Validate that a load or store is actually a single instruction that can be
 // optimized with the PCREL_OPT optimization.
 
@@ -558,6 +524,54 @@ is_single_instruction (rtx_insn *insn, rtx reg)
   return true;
 }
 
+/* Nonzero if INSN is a load.  */
+static int
+load_p (rtx_insn *insn)
+{
+  attr_type t = get_attr_type (insn);
+  return (t == TYPE_LOAD || t == TYPE_FPLOAD || t == TYPE_VECLOAD);
+}
+
+/* Nonzero if INSN is a store.  */
+static int
+store_p (rtx_insn *insn)
+{
+  attr_type t = get_attr_type (insn);
+  return (t == TYPE_STORE || t == TYPE_FPSTORE || t == TYPE_VECSTORE);
+}
+
+/* Nonzero if there is a load between FROM_INSN and TO_INSN (exclusive
+   of those two.  */
+static int
+load_between_p (rtx_insn *from_insn, rtx_insn *to_insn)
+{
+  rtx_insn *insn;
+
+  if (from_insn == to_insn)
+    return 0;
+
+  for (insn = NEXT_INSN (from_insn); insn != to_insn; insn = NEXT_INSN (insn))
+    if (NONDEBUG_INSN_P (insn) && load_p (insn))
+      return 1;
+  return 0;
+}
+
+/* Nonzero if there is a store between FROM_INSN and TO_INSN (exclusive
+   of those two.  */
+static int
+store_between_p (rtx_insn *from_insn, rtx_insn *to_insn)
+{
+  rtx_insn *insn;
+
+  if (from_insn == to_insn)
+    return 0;
+
+  for (insn = NEXT_INSN (from_insn); insn != to_insn; insn = NEXT_INSN (insn))
+    if (NONDEBUG_INSN_P (insn) && store_p (insn))
+      return 1;
+  return 0;
+}
+
 
 // Given an insn with that loads up a base register with the address of an
 // external symbol, see if we can optimize it with the PCREL_OPT optimization.
@@ -565,8 +579,6 @@ is_single_instruction (rtx_insn *insn, rtx reg)
 static void
 do_pcrel_opt_addr (rtx_insn *addr_insn)
 {
-  int num_insns = 0;
-
   // Do some basic validation.
   rtx addr_set = PATTERN (addr_insn);
   if (GET_CODE (addr_set) != SET)
@@ -579,169 +591,61 @@ do_pcrel_opt_addr (rtx_insn *addr_insn)
       || !pcrel_external_address (addr_symbol, Pmode))
     return;
 
-  rtx_insn *insn = addr_insn;
-  bool looping = true;
-  bool had_load = false;	// whether intermediate insns had a load
-  bool had_store = false;	// whether intermediate insns had a store
-  bool is_load = false;		// whether the current insn is a load
-  bool is_store = false;	// whether the current insn is a store
-
-  // Check the following insns and see if it is a load or store that uses the
-  // external address.  If we can't do the optimization, just return.
-  while (looping)
-    {
-      is_load = is_store = false;
-
-      // Don't allow too many insns between the load of the external address
-      // and the eventual load or store.
-      if (++num_insns >= MAX_PCREL_OPT_INSNS)
-	return;
-
-      insn = next_active_insn_in_basic_block (insn);
-      if (!insn)
-	return;
-
-      // See if the current insn is a load or store
-      switch (get_attr_type (insn))
-	{
-	  // While load of the external address is a 'load' for scheduling
-	  // purposes, it should be safe to allow loading other external
-	  // addresses between the load of the external address we are
-	  // currently looking at and the load or store using that address.
-	case TYPE_LOAD:
-	  if (get_attr_loads_extern_addr (insn) == LOADS_EXTERN_ADDR_YES)
-	    break;
-	  /* fall through */
-
-	case TYPE_FPLOAD:
-	case TYPE_VECLOAD:
-	  is_load = true;
-	  break;
-
-	case TYPE_STORE:
-	case TYPE_FPSTORE:
-	case TYPE_VECSTORE:
-	  is_store = true;
-	  break;
-
-	  // Don't do the optimization through atomic operations.
-	case TYPE_LOAD_L:
-	case TYPE_STORE_C:
-	case TYPE_HTM:
-	case TYPE_HTMSIMPLE:
-	  return;
-
-	default:
-	  break;
-	}
-
-      // If the external addresss register was referenced, it must also die in
-      // the same insn.
-      if (reg_referenced_p (addr_reg, PATTERN (insn)))
-	{
-	  if (!dead_or_set_p (insn, addr_reg))
-	    return;
-
-	  looping = false;
-	}
-
-      // If it dies by being set without being referenced, exit.
-      else if (dead_or_set_p (insn, addr_reg))
-	return;
-
-      // If it isn't the insn we want, remember if there were loads or stores.
-      else
-	{
-	  had_load |= is_load;
-	  had_store |= is_store;
-	}
-    }
-
-  // If the insn does not use the external address, or the external address
-  // register does not die at this insn, we can't do the optimization.
-  if (!reg_referenced_p (addr_reg, PATTERN (insn))
-      || !dead_or_set_p (insn, addr_reg))
+  /* The address register must have exactly one use, and that use must
+     be in the same basic block.  */
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (addr_insn);
+  df_ref use = df_single_use (insn_info);
+  if (!use || DF_REF_BB (use) != BLOCK_FOR_INSN (addr_insn))
     return;
+  
+  rtx_insn *use_insn = DF_REF_INSN (use);
 
-  rtx set = single_set (insn);
+  /* The use must be a load or store using addr_reg as a base register.
+     For loads this is already known.  For stores, ensure that addr_reg
+     isn't the value being stored.  */
+  rtx set = single_set (use_insn);
   if (!set)
     return;
 
-  // Optimize loads
+  bool is_load = load_p (use_insn);
+  bool is_store = store_p (use_insn);
+  rtx value_reg = is_load ? SET_DEST (set) : SET_SRC (set);
+  if (is_store && value_reg == addr_reg)
+    return;
+
+  /* Check the instruction meets other requirements for the optimization.
+     TODO: is_single_instruction needs a better name.  */
+  if (!is_single_instruction (use_insn, value_reg))
+    return;
+
+  /* Walk intervening instructions looking for mentions of the register
+     loaded or stored by the use (the "value register").  If the use is
+     a load, any mention of the value register kills the optimization.
+     If the use is a store, any definition of the value register kills
+     the optimization.  Also look for any intervening stores, which
+     kill the optimization for either loads or stores; or for any
+     intervening loads, which kill the optimization for stores.  TBD:
+     Improve with alias checks?  */
   if (is_load)
     {
-      // If there were any stores in the insns between loading the external
-      // address and doing the load, turn off the optimization.
-      if (had_store)
+      if (reg_used_between_p (value_reg, addr_insn, use_insn)
+	  || reg_set_between_p (value_reg, addr_insn, use_insn)
+	  || store_between_p (addr_insn, use_insn))
 	return;
-
-      rtx reg = SET_DEST (set);
-      if (!is_single_instruction (insn, reg))
-	return;
-
-      rtx mem = SET_SRC (set);
-      switch (GET_CODE (mem))
-	{
-	case MEM:
-	  break;
-
-	case SIGN_EXTEND:
-	case ZERO_EXTEND:
-	case FLOAT_EXTEND:
-	  if (!MEM_P (XEXP (mem, 0)))
-	    return;
-	  break;
-
-	default:
-	  return;
-	}
-
-      // If the register being loaded was used or set between the load of
-      // the external address and the load using the address, we can't do
-      // the optimization.
-      if (reg_used_between_p (reg, addr_insn, insn)
-	  || reg_set_between_p (reg, addr_insn, insn))
-	return;
-
-      // Process the load in detail
-      if (do_pcrel_opt_load (addr_insn, insn))
-	{
-	  counters.loads++;
-	  counters.load_separation[num_insns-1]++;
-	}
+      
+      if (do_pcrel_opt_load (addr_insn, use_insn))
+	counters.loads++;
     }
-
-  // Optimize stores
   else if (is_store)
     {
-      // If there were any loads in the insns between loading the external
-      // address and doing the store, turn off the optimization.
-      if (had_load)
+      if (reg_set_between_p (value_reg, addr_insn, use_insn)
+	  || store_between_p (addr_insn, use_insn)
+	  || load_between_p (addr_insn, use_insn))
 	return;
 
-      rtx reg = SET_SRC (set);
-      rtx mem = SET_DEST (set);
-      if (!is_single_instruction (insn, reg))
-	return;
-
-      if (!MEM_P (mem))
-	return;
-
-      // If the register being loaded or stored was used or set between the
-      // load of the external address and the load or store using the address,
-      // we can't do the optimization.
-      if (reg_used_between_p (reg, addr_insn, insn)
-	  || reg_set_between_p (reg, addr_insn, insn))
-	return;
-
-      if (do_pcrel_opt_store (addr_insn, insn))
-	{
-	  counters.stores++;
-	  counters.store_separation[num_insns-1]++;
-	}
+      if (do_pcrel_opt_store (addr_insn, use_insn))
+	counters.stores++;
     }
-
-  return;
 }
 
 
