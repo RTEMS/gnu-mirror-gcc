@@ -8533,7 +8533,8 @@ rs6000_delegitimize_address (rtx orig_x)
   if (GET_CODE (orig_x) == UNSPEC
       && (XINT (orig_x, 1) == UNSPEC_FUSION_GPR
 	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_ADDR
-	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG))
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG
+	  || XINT (orig_x, 1) == UNSPEC_PCREL_OPT_ST_ADDR))
     orig_x = XVECEXP (orig_x, 0, 0);
 
   orig_x = delegitimize_mem_from_attrs (orig_x);
