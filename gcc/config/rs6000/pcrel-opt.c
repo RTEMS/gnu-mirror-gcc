@@ -525,7 +525,7 @@ is_single_instruction (rtx_insn *insn, rtx reg)
 }
 
 /* Nonzero if INSN is a load.  */
-static int
+static bool
 load_p (rtx_insn *insn)
 {
   attr_type t = get_attr_type (insn);
@@ -533,7 +533,7 @@ load_p (rtx_insn *insn)
 }
 
 /* Nonzero if INSN is a store.  */
-static int
+static bool
 store_p (rtx_insn *insn)
 {
   attr_type t = get_attr_type (insn);
@@ -542,7 +542,7 @@ store_p (rtx_insn *insn)
 
 /* Nonzero if there is a load between FROM_INSN and TO_INSN (exclusive
    of those two.  */
-static int
+static bool
 load_between_p (rtx_insn *from_insn, rtx_insn *to_insn)
 {
   rtx_insn *insn;
@@ -558,7 +558,7 @@ load_between_p (rtx_insn *from_insn, rtx_insn *to_insn)
 
 /* Nonzero if there is a store between FROM_INSN and TO_INSN (exclusive
    of those two.  */
-static int
+static bool
 store_between_p (rtx_insn *from_insn, rtx_insn *to_insn)
 {
   rtx_insn *insn;
