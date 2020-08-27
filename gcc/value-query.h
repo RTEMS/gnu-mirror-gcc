@@ -1,5 +1,5 @@
 /* Support routines for value queries.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2020 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com> and
    Andrew Macleod <amacleod@redhat.com>.
 
@@ -23,8 +23,8 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_QUERY_H
 
 
-// value_query is used by optimization passes that require valueizing ssa_names
-// in terms of a tree value, but have no neeed for ranges.
+// value_query is used by optimization passes that require valueizing
+// ssa_names in terms of a tree value, but have no neeed for ranges.
 //
 // value_of_expr is required to be provided.
 // value_on_edge and value_of_stmt default to simply calling value_of_expr.
@@ -44,7 +44,6 @@ public:
 };
 
 
-
 // range_query is used by optimization passes which are range aware.
 //
 // range_of_expr must be provided.  The default for range_on_edge and
@@ -52,7 +51,7 @@ public:
 // be calculated, those functions can be overridden.
 //
 // The default for the value_* routines is to call the equivalent range_*
-// routine, and check if the range is a singleton, and return that if so.
+// routine, check if the range is a singleton, and return it if so.
 //
 //  get_value_range is currently provided for compatibility with vr-values.
 //  It will be deprecated when possible.

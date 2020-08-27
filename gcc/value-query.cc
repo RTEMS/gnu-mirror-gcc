@@ -1,6 +1,6 @@
-/* Support routines for value queries
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
-   Major hacks by Aldy Hernandez <aldyh@redhat.com> and
+/* Support routines for value queries.
+   Copyright (C) 2020 Free Software Foundation, Inc.
+   Contributed by Aldy Hernandez <aldyh@redhat.com> and
    Andrew MacLeod <amacleod@redhat.com>.
 
 This file is part of GCC.
@@ -49,7 +49,6 @@ value_query::value_of_stmt (tree &t, gimple *, tree name)
 
 
 // -----------------------------------------------------------
-
 
 bool
 range_query::range_on_edge (irange &r, edge, tree name)
