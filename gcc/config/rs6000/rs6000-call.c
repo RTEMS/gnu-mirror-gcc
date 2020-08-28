@@ -13366,7 +13366,7 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   return false;
 }
 
-/* Expand ALTIVEC_BUILTIN_MASK_FOR_LOAD/STORE.  */
+/* Expand ALTIVEC_BUILTIN_MASK_FOR_LOAD.  */
 rtx
 rs6000_expand_ldst_mask (rtx target, rs6000_builtins fcode, tree arg0)
 {
@@ -13381,16 +13381,10 @@ rs6000_expand_ldst_mask (rtx target, rs6000_builtins fcode, tree arg0)
   gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg0)));
   op = expand_expr (arg0, NULL_RTX, Pmode, EXPAND_NORMAL);
   addr = memory_address (mode, op);
-  if (fcode == ALTIVEC_BUILTIN_MASK_FOR_STORE)
-    op = addr;
-  else
-    {
-      gcc_assert (fcode == ALTIVEC_BUILTIN_MASK_FOR_LOAD);
-      /* For the load case need to negate the address.  */
-      op = gen_reg_rtx (GET_MODE (addr));
-      emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr),
-					       addr)));
-    }
+  gcc_assert (fcode == ALTIVEC_BUILTIN_MASK_FOR_LOAD);
+  /* We need to negate the address.  */
+  op = gen_reg_rtx (GET_MODE (addr));
+  emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
   op = gen_rtx_MEM (mode, op);
 
   if (target == 0
@@ -13859,7 +13853,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  }
 
 	case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
-	case ALTIVEC_BUILTIN_MASK_FOR_STORE:
 	  {
 	    int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
 			  : (int) CODE_FOR_altivec_lvsl_direct);
@@ -13874,15 +13867,9 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	    gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg)));
 	    op = expand_expr (arg, NULL_RTX, Pmode, EXPAND_NORMAL);
 	    addr = memory_address (mode, op);
-	    if (fcode == ALTIVEC_BUILTIN_MASK_FOR_STORE)
-	      op = addr;
-	    else
-	      {
-		/* For the load case need to negate the address.  */
-		op = gen_reg_rtx (GET_MODE (addr));
-		emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr),
-							 addr)));
-	      }
+	    /* We need to negate the address.  */
+	    op = gen_reg_rtx (GET_MODE (addr));
+	    emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
 	    op = gen_rtx_MEM (mode, op);
 
 	    if (target == 0
@@ -14918,6 +14905,12 @@ altivec_init_builtins (void)
 			       ALTIVEC_BUILTIN_MASK_FOR_LOAD,
 			       BUILT_IN_MD, NULL, NULL_TREE);
   TREE_READONLY (decl) = 1;
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "%s __builtin_altivec_mask_for_load (%s); [%4d]\n",
+	     rs6000_debug_type (TREE_TYPE (v16qi_ftype_pcvoid)),
+	     rs6000_debug_type (TREE_VALUE
+				(TYPE_ARG_TYPES (v16qi_ftype_pcvoid))),
+	     (int) ALTIVEC_BUILTIN_MASK_FOR_LOAD);
   /* Record the decl. Will be used by rs6000_builtin_mask_for_load.  */
   altivec_builtin_mask_for_load = decl;
 

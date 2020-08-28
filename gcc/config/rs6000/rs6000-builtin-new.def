@@ -356,9 +356,6 @@
   vuc __builtin_altivec_mask_for_load (long long, void *);
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
 
-  vuc __builtin_altivec_mask_for_store (long long, void *);
-    MASK_FOR_STORE altivec_lvsr_direct {ldstmask}
-
   vus __builtin_altivec_mfvscr ();
     MFVSCR altivec_mfvscr {}
 
@@ -2723,10 +2720,10 @@
 ; 32 bits, and the return value is DImode, so it seems that
 ; TARGET_64BIT (actually TARGET_POWERPC64) is justified.  TBD. ####
 [power9-64]
-; The following two are inexplicably named __builtin_altivec_* while
+; The following two are inexplicably named __builtin_{alti,}vec_* while
 ; their load counterparts are __builtin_vsx_*.  Need to deprecate
 ; these interfaces in favor of the other naming scheme (or vice versa).
-  void __builtin_altivec_xst_len_r (vop, void *, unsigned long long);
+  void __builtin_vec_xst_len_r (vop, void *, unsigned long long);
     XST_LEN_R xst_len_r {}
 
   void __builtin_altivec_stxvl (vop, void *, unsigned long long);
@@ -2774,7 +2771,7 @@
   const unsigned __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
     VSESQP xsxsigqp_kf {}
 
-  const signed int __buiiltin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
     VSCEQPEQ xscmpexpqp_eq_kf {}
 
   const signed int __builtin_vsx_scalar_cmp_exp_qp_gt (_Float128, _Float128);
@@ -3042,7 +3039,7 @@
   const vull __builtin_altivec_vextduhvlx (vus, vus, unsigned char);
     VEXTRACTHL vextractlv8hi {}
 
-  const vull __builtin_altivec_vextduwvrx (vui, vui, unsigned char);
+  const vull __builtin_altivec_vextduwvhx (vui, vui, unsigned char);
     VEXTRACTWR vextractrv4si {}
 
   const vull __builtin_altivec_vextduwvlx (vui, vui, unsigned char);
