@@ -471,7 +471,7 @@ Objective-C and Objective-C++ Dialects}.
 -fassociative-math  -fauto-profile  -fauto-profile[=@var{path}] @gol
 -fauto-inc-dec  -fbranch-probabilities @gol
 -fcaller-saves @gol
--fcombine-stack-adjustments  -fconserve-stack @gol
+-fcombine-stack-adjustments  -fconserve-stack -fconvert-if-to-switch  @gol
 -fcompare-elim  -fcprop-registers  -fcrossjumping @gol
 -fcse-follow-jumps  -fcse-skip-blocks  -fcx-fortran-rules @gol
 -fcx-limited-range @gol
@@ -538,7 +538,7 @@ Objective-C and Objective-C++ Dialects}.
 -fthread-jumps  -ftracer  -ftree-bit-ccp @gol
 -ftree-builtin-call-dce  -ftree-ccp  -ftree-ch @gol
 -ftree-coalesce-vars  -ftree-copy-prop  -ftree-dce  -ftree-dominator-opts @gol
--ftree-dse  -ftree-forwprop  -ftree-fre  -fcode-hoisting @gol
+-ftree-dse  -ftree-forwprop  -ftree-fre -fcode-hoisting @gol
 -ftree-loop-if-convert  -ftree-loop-im @gol
 -ftree-phiprop  -ftree-loop-distribution  -ftree-loop-distribute-patterns @gol
 -ftree-loop-ivcanon  -ftree-loop-linear  -ftree-loop-optimize @gol
@@ -2653,6 +2653,14 @@ supported for C, not C++.
 Allow conditional expressions with mismatched types in the second and
 third arguments.  The value of such an expression is void.  This option
 is not supported for C++.
+
+@item -fconvert-if-to-switch
+@opindex fconvert-if-to-switch
+Perform conversion of an if cascade into a switch statement.
+Do so if the switch can be later transformed using a jump table
+or a bit test.  The transformation can help to produce faster code for
+the switch statement.  This flag is enabled by default
+at @option{-O2} and higher.
 
 @item -flax-vector-conversions
 @opindex flax-vector-conversions
@@ -9756,6 +9764,7 @@ also turns on the following optimization flags:
 -falign-labels  -falign-loops @gol
 -fcaller-saves @gol
 -fcode-hoisting @gol
+-fconvert-if-to-switch @gol
 -fcrossjumping @gol
 -fcse-follow-jumps  -fcse-skip-blocks @gol
 -fdelete-null-pointer-checks @gol

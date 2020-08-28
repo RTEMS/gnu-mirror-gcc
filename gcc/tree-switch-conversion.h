@@ -48,8 +48,8 @@ class cluster
 {
 public:
   /* Constructor.  */
-  cluster (tree case_label_expr, basic_block case_bb, profile_probability prob,
-	   profile_probability subtree_prob);
+  inline cluster (tree case_label_expr, basic_block case_bb,
+		  profile_probability prob, profile_probability subtree_prob);
 
   /* Destructor.  */
   virtual ~cluster ()
@@ -121,8 +121,8 @@ class simple_cluster: public cluster
 {
 public:
   /* Constructor.  */
-  simple_cluster (tree low, tree high, tree case_label_expr,
-		  basic_block case_bb, profile_probability prob);
+  inline simple_cluster (tree low, tree high, tree case_label_expr,
+			 basic_block case_bb, profile_probability prob);
 
   /* Destructor.  */
   ~simple_cluster ()
@@ -144,6 +144,11 @@ public:
   get_high ()
   {
     return m_high;
+  }
+
+  void set_high (tree high)
+  {
+    m_high = high;
   }
 
   void
@@ -271,7 +276,7 @@ public:
   static inline unsigned int case_values_threshold (void);
 
   /* Return whether jump table expansion is allowed.  */
-  static bool is_enabled (void);
+  static inline bool is_enabled (void);
 };
 
 /* A GIMPLE switch statement can be expanded to a short sequence of bit-wise
