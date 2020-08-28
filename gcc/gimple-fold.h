@@ -147,6 +147,20 @@ gimple_build_vector (gimple_seq *seq, tree_vector_builder *builder)
 extern bool gimple_stmt_nonnegative_warnv_p (gimple *, bool *, int = 0);
 extern bool gimple_stmt_integer_valued_real_p (gimple *, int = 0);
 
+/* Return the number of elements in a vector type TYPE that we have
+   already decided needs to be expanded piecewise.  We don't support
+   this kind of expansion for variable-length vectors, since we should
+   always check for target support before introducing uses of those.  */
+
+static inline unsigned int
+nunits_for_known_piecewise_op (const_tree type)
+{
+  return TYPE_VECTOR_SUBPARTS (type).to_constant ();
+}
+
+extern tree expand_cmp_piecewise (gimple_stmt_iterator *gsi, tree lhs,
+				  tree op0, tree op1);
+
 /* In gimple-match.c.  */
 extern tree gimple_simplify (enum tree_code, tree, tree,
 			     gimple_seq *, tree (*)(tree));

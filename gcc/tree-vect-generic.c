@@ -42,19 +42,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-config.h"
 #include "tree-ssa-dce.h"
 #include "recog.h"		/* FIXME: for insn_data */
+#include "gimple-fold.h"
 
 
 static void expand_vector_operations_1 (gimple_stmt_iterator *, bitmap);
-
-/* Return the number of elements in a vector type TYPE that we have
-   already decided needs to be expanded piecewise.  We don't support
-   this kind of expansion for variable-length vectors, since we should
-   always check for target support before introducing uses of those.  */
-static unsigned int
-nunits_for_known_piecewise_op (const_tree type)
-{
-  return TYPE_VECTOR_SUBPARTS (type).to_constant ();
-}
 
 /* Return true if TYPE1 has more elements than TYPE2, where either
    type may be a vector or a scalar.  */
@@ -427,35 +418,7 @@ expand_vector_comparison (gimple_stmt_iterator *gsi, tree type, tree op0,
 		       TYPE_VECTOR_SUBPARTS (type)
 		       * GET_MODE_BITSIZE (SCALAR_TYPE_MODE
 						(TREE_TYPE (type)))))
-	{
-	  tree inner_type = TREE_TYPE (TREE_TYPE (op0));
-	  tree part_width = vector_element_bits_tree (TREE_TYPE (op0));
-	  tree index = bitsize_int (0);
-	  int nunits = nunits_for_known_piecewise_op (TREE_TYPE (op0));
-	  int prec = GET_MODE_PRECISION (SCALAR_TYPE_MODE (type));
-	  tree ret_type = build_nonstandard_integer_type (prec, 1);
-	  tree ret_inner_type = boolean_type_node;
-	  int i;
-	  location_t loc = gimple_location (gsi_stmt (*gsi));
-	  t = build_zero_cst (ret_type);
-
-	  if (TYPE_PRECISION (ret_inner_type) != 1)
-	    ret_inner_type = build_nonstandard_integer_type (1, 1);
-	  warning_at (loc, OPT_Wvector_operation_performance,
-		      "vector operation will be expanded piecewise");
-	  for (i = 0; i < nunits;
-	       i++, index = int_const_binop (PLUS_EXPR, index, part_width))
-	    {
-	      tree a = tree_vec_extract (gsi, inner_type, op0, part_width,
-					 index);
-	      tree b = tree_vec_extract (gsi, inner_type, op1, part_width,
-					 index);
-	      tree result = gimplify_build2 (gsi, code, ret_inner_type, a, b);
-	      t = gimplify_build3 (gsi, BIT_INSERT_EXPR, ret_type, t, result,
-				   bitsize_int (i));
-	    }
-	  t = gimplify_build1 (gsi, VIEW_CONVERT_EXPR, type, t);
-	}
+	t = expand_cmp_piecewise (gsi, type, op0, op1);
       else
 	t = expand_vector_piecewise (gsi, do_compare, type,
 				     TREE_TYPE (TREE_TYPE (op0)), op0, op1,

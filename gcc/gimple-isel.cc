@@ -33,8 +33,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify-me.h"
 #include "gimplify.h"
 #include "tree-cfg.h"
-#include "bitmap.h"
 #include "tree-ssa-dce.h"
+#include "gimple-fold.h"
 
 /* Expand all VEC_COND_EXPR gimple assignments into calls to internal
    function based on type of selected expansion.  */
@@ -119,8 +119,12 @@ gimple_expand_vec_cond_expr (gimple_stmt_iterator *gsi,
       /* Fake op0 < 0.  */
       else
 	{
-	  gcc_assert (GET_MODE_CLASS (TYPE_MODE (TREE_TYPE (op0)))
-		      == MODE_VECTOR_INT);
+	  if (GET_MODE_CLASS (TYPE_MODE (TREE_TYPE (op0))) != MODE_VECTOR_INT)
+	    {
+	      tree t = expand_cmp_piecewise (gsi, TREE_TYPE (lhs), op0, op1);
+	      return gimple_build_assign (lhs, NOP_EXPR, t);
+	    }
+
 	  op0a = op0;
 	  op0b = build_zero_cst (TREE_TYPE (op0));
 	  tcode = LT_EXPR;

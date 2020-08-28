@@ -8056,3 +8056,31 @@ gimple_stmt_integer_valued_real_p (gimple *stmt, int depth)
       return false;
     }
 }
+
+tree
+expand_cmp_piecewise (gimple_stmt_iterator *gsi, tree type, tree op0, tree op1)
+{
+  tree inner_type = TREE_TYPE (TREE_TYPE (op0));
+  tree part_width = vector_element_bits_tree (TREE_TYPE (op0));
+  tree index = bitsize_int (0);
+  int nunits = nunits_for_known_piecewise_op (TREE_TYPE (op0));
+  int prec = GET_MODE_PRECISION (SCALAR_TYPE_MODE (type));
+  tree ret_type = build_nonstandard_integer_type (prec, 1);
+  tree ret_inner_type = boolean_type_node;
+  int i;
+  tree t = build_zero_cst (ret_type);
+
+  if (TYPE_PRECISION (ret_inner_type) != 1)
+    ret_inner_type = build_nonstandard_integer_type (1, 1);
+  for (i = 0; i < nunits;
+       i++, index = int_const_binop (PLUS_EXPR, index, part_width))
+    {
+      tree a = tree_vec_extract (gsi, inner_type, op0, part_width, index);
+      tree b = tree_vec_extract (gsi, inner_type, op1, part_width, index);
+      tree result = gimplify_build2 (gsi, NE_EXPR, ret_inner_type, a, b);
+      t = gimplify_build3 (gsi, BIT_INSERT_EXPR, ret_type, t, result,
+			   bitsize_int (i));
+    }
+
+  return gimplify_build1 (gsi, VIEW_CONVERT_EXPR, type, t);
+}
