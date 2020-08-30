@@ -1165,4 +1165,6 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 				      record_field_map_t record_field_map,
 				      int warning);
 
+extern bool detected_incompatible_syntax;
+
 #endif /* GCC_IPA_TYPE_ESCAPE_ANALYSIS_H */

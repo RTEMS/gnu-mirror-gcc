@@ -587,6 +587,7 @@ lto_fr_execute ()
 {
   log ("here in field reordering \n");
   // Analysis.
+  detected_incompatible_syntax = false;
   tpartitions_t escaping_nonescaping_sets
     = partition_types_into_escaping_nonescaping ();
   record_field_map_t record_field_map = find_fields_accessed ();
@@ -594,7 +595,7 @@ lto_fr_execute ()
     = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
 					    record_field_map, 0);
 
-  if (record_field_offset_map.empty ())
+  if (detected_incompatible_syntax || record_field_offset_map.empty ())
     return 0;
 
   // Prepare for transformation.
