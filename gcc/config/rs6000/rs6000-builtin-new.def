@@ -321,9 +321,7 @@
   pure vuc __builtin_altivec_lvsr (signed long long, void *);
     LVSR altivec_lvsr {ldvec}
 
-; Following LVX one is redundant, and I don't think we need to
-; keep it.  It only maps to LVX_V4SI.  Probably remove.
-  pure vop __builtin_altivec_lvx (signed long long, void *);
+  pure vsi __builtin_altivec_lvx (signed long long, void *);
     LVX altivec_lvx_v4si {ldvec}
 
   pure vsc __builtin_altivec_lvx_v16qi (signed long long, void *);
@@ -395,7 +393,8 @@
   void __builtin_altivec_stvrxl (vop, signed long long, void *);
     STVRXL altivec_stvrxl {stvec}
 
-; Skipping the STVX one that maps to STVX_V4SI (see above for LVX)
+  void __builtin_altivec_stvx (vsi, signed long long, void *);
+    STVX altivec_stvx_v4si {stvec}
 
   void __builtin_altivec_stvx_v16qi (vsc, signed long long, void *);
     STVX_V16QI altivec_stvx_v16qi {stvec}
@@ -409,7 +408,8 @@
   void __builtin_altivec_stvx_v8hi (vss, signed long long, void *);
     STVX_V8HI altivec_stvx_v8hi {stvec}
 
-; Skipping the STVXL one that maps to STVXL_V4SI (see above for LVX)
+  void __builtin_altivec_stvxl (vsi, signed long long, void *);
+    STVXL altivec_stvxl_v4si {stvec}
 
   void __builtin_altivec_stvxl_v16qi (vsc, signed long long, void *);
     STVXL_V16QI altivec_stvxl_v16qi {stvec}
@@ -1206,6 +1206,33 @@
   const vull __builtin_altivec_vxor_v2di_uns (vull, vull);
     VXOR_V2DI_UNS xorv2di3 {}
 
+  const signed __int128 __builtin_vec_ext_v1ti (vsq, signed int);
+    VEC_EXT_V1TI nothing {extract}
+
+  const double __builtin_vec_ext_v2df (vd, signed int);
+    VEC_EXT_V2DF nothing {extract}
+
+  const signed long long __builtin_vec_ext_v2di (vsll, signed int);
+    VEC_EXT_V2DI nothing {extract}
+
+  const vsq __builtin_vec_init_v1ti (signed __int128);
+    VEC_INIT_V1TI nothing {init}
+
+  const vd __builtin_vec_init_v2df (double, double);
+    VEC_INIT_V2DF nothing {init}
+
+  const vsll __builtin_vec_init_v2di (signed long long, signed long long);
+    VEC_INIT_V2DI nothing {init}
+
+  const vsq __builtin_vec_set_v1ti (vsq, signed __int128, const int<0,0>);
+    VEC_SET_V1TI nothing {set}
+
+  const vd __builtin_vec_set_v2df (vd, double, const int<1>);
+    VEC_SET_V2DF nothing {set}
+
+  const vsll __builtin_vec_set_v2di (vsll, signed long long, const int<1>);
+    VEC_SET_V2DI nothing {set}
+
   const vbc __builtin_vsx_cmpge_16qi (vsc, vsc);
     CMPGE_16QI vector_nltv16qi {}
 
@@ -1348,7 +1375,7 @@
   pure vsll __builtin_vsx_lxvd2x_v2di (signed long long, void *);
     LXVD2X_V2DI vsx_load_v2di {ldvec}
 
-  pure vsc __builtin_vsx_lxvw4x_16qi (signed long long, void *);
+  pure vsc __builtin_vsx_lxvw4x_v16qi (signed long long, void *);
     LXVW4X_V16QI vsx_load_v16qi {ldvec}
 
   pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, void *);
@@ -1466,33 +1493,6 @@
 
   const vf __builtin_vsx_uns_floato_v2di (vull);
     UNS_FLOATO_V2DI unsfloatov2di {}
-
-  const signed __int128 __builtin_vsx_vec_ext_v1ti (vsq, signed int);
-    VEC_EXT_V1TI nothing {extract}
-
-  const double __builtin_vsx_vec_ext_v2df (vd, signed int);
-    VEC_EXT_V2DF nothing {extract}
-
-  const signed long long __builtin_vsx_vec_ext_v2di (vsll, signed int);
-    VEC_EXT_V2DI nothing {extract}
-
-  const vsq __builtin_vsx_vec_init_v1ti (signed __int128);
-    VEC_INIT_V1TI nothing {init}
-
-  const vd __builtin_vsx_vec_init_v2df (double, double);
-    VEC_INIT_V2DF nothing {init}
-
-  const vsll __builtin_vsx_vec_init_v2di (signed long long, signed long long);
-    VEC_INIT_V2DI nothing {init}
-
-  const vsq __builtin_vsx_vec_set_v1ti (vsq, signed __int128, const int<0,0>);
-    VEC_SET_V1TI nothing {set}
-
-  const vd __builtin_vsx_vec_set_v2df (vd, double, const int<1>);
-    VEC_SET_V2DF nothing {set}
-
-  const vsll __builtin_vsx_vec_set_v2di (vsll, signed long long, const int<1>);
-    VEC_SET_V2DI nothing {set}
 
   const vsll __builtin_vsx_vsigned_v2df (vd);
     VEC_VSIGNED_V2DF vsx_xvcvdpsxds {}
@@ -2753,23 +2753,17 @@
 
 ; Builtins requiring hardware support for IEEE-128 floating-point.
 [ieee128-hw]
-  fpmath _Float128 __builtin_vsx_addf128_round_to_odd (_Float128, _Float128);
+  fpmath _Float128 __builtin_addf128_round_to_odd (_Float128, _Float128);
     ADDF128_ODD addkf3_odd {}
 
-  fpmath _Float128 __builtin_vsx_divf128_round_to_odd (_Float128, _Float128);
+  fpmath _Float128 __builtin_divf128_round_to_odd (_Float128, _Float128);
     DIVF128_ODD divkf3_odd {}
 
-  fpmath _Float128 __builtin_vsx_fmaf128_round_to_odd (_Float128, _Float128, _Float128);
+  fpmath _Float128 __builtin_fmaf128_round_to_odd (_Float128, _Float128, _Float128);
     FMAF128_ODD fmakf4_odd {}
 
-  fpmath _Float128 __builtin_vsx_mulf128_round_to_odd (_Float128, _Float128);
+  fpmath _Float128 __builtin_mulf128_round_to_odd (_Float128, _Float128);
     MULF128_ODD mulkf3_odd {}
-
-  const unsigned long long __builtin_vsx_scalar_extract_expq (_Float128);
-    VSEEQP xsxexpqp_kf {}
-
-  const unsigned __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
-    VSESQP xsxsigqp_kf {}
 
   const signed int __builtin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
     VSCEQPEQ xscmpexpqp_eq_kf {}
@@ -2783,6 +2777,21 @@
   const signed int __builtin_vsx_scalar_cmp_exp_qp_unordered (_Float128, _Float128);
     VSCEQPUO xscmpexpqp_unordered_kf {}
 
+  fpmath _Float128 __builtin_sqrtf128_round_to_odd (_Float128);
+    SQRTF128_ODD sqrtkf2_odd {}
+
+  fpmath _Float128 __builtin_subf128_round_to_odd (_Float128, _Float128);
+    SUBF128_ODD subkf3_odd {}
+
+  fpmath double __builtin_truncf128_round_to_odd (_Float128);
+    TRUNCF128_ODD trunckfdf2_odd {}
+
+  const unsigned long long __builtin_vsx_scalar_extract_expq (_Float128);
+    VSEEQP xsxexpqp_kf {}
+
+  const unsigned __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
+    VSESQP xsxsigqp_kf {}
+
   const _Float128 __builtin_vsx_scalar_insert_exp_q (unsigned __int128, unsigned long long);
     VSIEQP xsiexpqp_kf {}
 
@@ -2794,15 +2803,6 @@
 
   const unsigned int __builtin_vsx_scalar_test_neg_qp (_Float128);
     VSTDCNQP xststdcnegqp_kf {}
-
-  fpmath _Float128 __builtin_vsx_sqrtf128_round_to_odd (_Float128);
-    SQRTF128_ODD sqrtkf2_odd {}
-
-  fpmath _Float128 __builtin_vsx_subf128_round_to_odd (_Float128, _Float128);
-    SUBF128_ODD subkf3_odd {}
-
-  fpmath double __builtin_vsx_truncf128_round_to_odd (_Float128);
-    TRUNCF128_ODD trunckfdf2_odd {}
 
 
 
@@ -3132,12 +3132,26 @@
     PEXTD pextd {}
 
 
+; TODO: Land-mine alert.
+;
+; The original built-in support has code that assumes the internal
+; copy of an MMA built-in function appears immediately after the
+; external copy in the built-in table.  This is fragile.  For the
+; new support, we should transition this to do a name lookup in
+; the built-in hash table, but to start with we will honor the
+; positioning of the built-ins in the table.
 [mma]
   void __builtin_mma_assemble_acc (v512 *, vuc, vuc, vuc, vuc);
-    ASSEMBLE_ACC mma_assemble_acc {mma}
+    ASSEMBLE_ACC nothing {mma}
+
+  void __builtin_mma_assemble_acc_internal (v512 *, vuc, vuc, vuc, vuc);
+    ASSEMBLE_ACC_INTERNAL mma_assemble_acc {mma}
 
   void __builtin_mma_assemble_pair (v256 *, vuc, vuc);
-    ASSEMBLE_PAIR mma_assemble_pair {mma}
+    ASSEMBLE_PAIR nothing {mma}
+
+  void __builtin_mma_assemble_pair_internal (v256 *, vuc, vuc);
+    ASSEMBLE_PAIR_INTERNAL mma_assemble_pair {mma}
 
   void __builtin_mma_disassemble_acc (void *, v512 *);
     DISASSEMBLE_ACC nothing {mma,quad}
@@ -3146,7 +3160,10 @@
     DISASSEMBLE_PAIR nothing {mma,pair}
 
   void __builtin_mma_pmxvbf16ger2 (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
-    PMXVBF16GER2 mma_pmxvbf16ger2 {mma}
+    PMXVBF16GER2 nothing {mma}
+
+  void __builtin_mma_pmxvbf16ger2_internal (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
+    PMXVBF16GER2_INTERNAL mma_pmxvbf16ger2 {mma}
 
   void __builtin_mma_pmxvbf16ger2nn (v512 *, vuc, vuc, const int<4>, const int<4>, const int<2>);
     PMXVBF16GER2NN mma_pmxvbf16ger2nn {mma,quad}
