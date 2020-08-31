@@ -145,7 +145,8 @@ public:
 
   rvrp_folder () : substitute_and_fold_engine (), m_simplifier ()
   { 
-    if (flag_evrp_mode == EVRP_MODE_RVRP_TRACE)
+    if (flag_evrp_mode == EVRP_MODE_RVRP_TRACE
+	|| flag_evrp_mode == EVRP_MODE_RVRP_DEBUG)
       m_ranger = new trace_ranger (true);
     else
       m_ranger = new gimple_ranger (true);
@@ -335,6 +336,7 @@ execute_early_vrp ()
       }
     case EVRP_MODE_RVRP_ONLY:
     case EVRP_MODE_RVRP_TRACE:
+    case EVRP_MODE_RVRP_DEBUG:
       {
 	rvrp_folder folder;
 	folder.substitute_and_fold ();

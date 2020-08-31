@@ -182,6 +182,6 @@ trace_ranger::range_of_expr (irange &r, tree name, gimple *s)
 
   res = gimple_ranger::range_of_expr (r, name, s);
 
-  return trailer (idx, "range_of_stmt", res, name, r);
+  return trailer (idx, "range_of_expr", res, name, r);
 }
 

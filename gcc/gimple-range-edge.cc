@@ -144,7 +144,10 @@ gimple *
 gimple_outgoing_range_stmt_p (basic_block bb)
 {
   // This will return NULL if there is not a branch statement.
-  return gsi_stmt (gsi_outgoing_range_stmt (bb));
+  gimple *stmt = gsi_stmt (gsi_outgoing_range_stmt (bb));
+  if (stmt && gimple_range_handler (stmt))
+    return stmt;
+  return NULL;
 }
 
 // Calculate the range forced on on edge E by control flow, return it

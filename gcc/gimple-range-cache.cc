@@ -535,7 +535,7 @@ ranger_cache::add_to_update (basic_block bb)
     m_update_list.quick_push (bb);
 }
 
-#define DEBUG_CACHE (0 && dump_file)
+#define DEBUG_CACHE (dump_file && flag_evrp_mode == EVRP_MODE_RVRP_DEBUG)
 
 // If there is anything in the iterative update_list, continue
 // processing NAME until the list of blocks is empty.
