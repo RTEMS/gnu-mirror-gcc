@@ -32,4 +32,4 @@ along with GCC; see the file COPYING3.  If not see
   /* Pass to do the PCREL_OPT optimization that combines the load of an
      external symbol's address along with a single load or store using that
      address as a base register.  */
-  INSERT_PASS_AFTER (pass_sched2, 1, pass_pcrel_opt);
+  INSERT_PASS_BEFORE (pass_sched2, 1, pass_pcrel_opt);
