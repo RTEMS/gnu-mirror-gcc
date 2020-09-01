@@ -599,7 +599,9 @@ pcrel_opt_address (rtx_insn *addr_insn)
   rtx_insn *insn;
 
   for (insn = NEXT_INSN (addr_insn); insn != use_insn; insn = NEXT_INSN (insn))
-    if (NONDEBUG_INSN_P (insn))
+    if (NONDEBUG_INSN_P (insn)
+	&& GET_CODE (PATTERN (insn)) != USE
+	&& GET_CODE (PATTERN (insn)) != CLOBBER)
       switch (get_attr_type (insn))
 	{
 	  /* While load of the external address is a 'load' for scheduling
