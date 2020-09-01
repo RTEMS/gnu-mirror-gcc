@@ -130,7 +130,6 @@ static struct {
   unsigned long stores;
   unsigned long adjacent_stores;
 } counters;
-
 
 /* Optimize a PC-relative load address to be used in a load.
 
@@ -364,7 +363,6 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
 
   return;
 }
-
 
 /* Optimize a PC-relative load address to be used in a store.
 
@@ -535,7 +533,22 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
 
   return;
 }
+
+/* Return the TYPE attribute, but don't abort for things like USE, CLOBBER,
+   notes, etc.  Instead just return TYPE_INTEGER.  */
 
+static enum attr_type
+get_attr_type_safe (rtx_insn *insn)
+{
+  if (insn && NONDEBUG_INSN_P (insn))
+    {
+      enum rtx_code icode = GET_CODE (PATTERN (insn));
+      if (icode == SET || icode == PARALLEL)
+	return get_attr_type (insn);
+    }
+
+  return TYPE_INTEGER;
+}
 
 /* Given an insn with that loads up a base register with the address of an
    external symbol, see if we can optimize it with the PCREL_OPT
@@ -599,45 +612,42 @@ pcrel_opt_address (rtx_insn *addr_insn)
   rtx_insn *insn;
 
   for (insn = NEXT_INSN (addr_insn); insn != use_insn; insn = NEXT_INSN (insn))
-    if (NONDEBUG_INSN_P (insn)
-	&& GET_CODE (PATTERN (insn)) != USE
-	&& GET_CODE (PATTERN (insn)) != CLOBBER)
-      switch (get_attr_type (insn))
-	{
-	  /* While load of the external address is a 'load' for scheduling
-	     purposes, it should be safe to allow loading other external
-	     addresses between the load of the external address we are
-	     currently looking at and the load or store using that address.  */
-	case TYPE_LOAD:
-	  if (get_attr_loads_extern_addr (insn) != LOADS_EXTERN_ADDR_YES)
-	    load_insns_found = true;
-	  break;
-
-	case TYPE_FPLOAD:
-	case TYPE_VECLOAD:
+    switch (get_attr_type_safe (insn))
+      {
+	/* While load of the external address is a 'load' for scheduling
+	   purposes, it should be safe to allow loading other external
+	   addresses between the load of the external address we are currently
+	   looking at and the load or store using that address.  */
+      case TYPE_LOAD:
+	if (get_attr_loads_extern_addr (insn) != LOADS_EXTERN_ADDR_YES)
 	  load_insns_found = true;
-	  break;
+	break;
 
-	case TYPE_STORE:
-	case TYPE_FPSTORE:
-	case TYPE_VECSTORE:
-	  store_insns_found = true;
-	  break;
+      case TYPE_FPLOAD:
+      case TYPE_VECLOAD:
+	load_insns_found = true;
+	break;
 
-	  /* Don't do the optimization through atomic operations.  */
-	case TYPE_LOAD_L:
-	case TYPE_STORE_C:
-	case TYPE_HTM:
-	case TYPE_HTMSIMPLE:
-	  atomic_insns_found = true;
-	  break;
+      case TYPE_STORE:
+      case TYPE_FPSTORE:
+      case TYPE_VECSTORE:
+	store_insns_found = true;
+	break;
 
-	default:
-	  break;
-	}
+	/* Don't do the optimization through atomic operations.  */
+      case TYPE_LOAD_L:
+      case TYPE_STORE_C:
+      case TYPE_HTM:
+      case TYPE_HTMSIMPLE:
+	atomic_insns_found = true;
+	break;
+
+      default:
+	break;
+      }
 
   /* Is this a load or a store?  */
-  switch (get_attr_type (use_insn))
+  switch (get_attr_type_safe (use_insn))
     {
     case TYPE_LOAD:
     case TYPE_FPLOAD:
@@ -659,7 +669,6 @@ pcrel_opt_address (rtx_insn *addr_insn)
 
   return;
 }
-
 
 /* Optimize pcrel external variable references.  */
 
@@ -711,7 +720,6 @@ pcrel_opt_pass (function *fun)
   df_analyze ();
   return 0;
 }
-
 
 /* Optimize pc-relative references for the new PCREL_OPT pass.  */
 const pass_data pass_data_pcrel_opt =
