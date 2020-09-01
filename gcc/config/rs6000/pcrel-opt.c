@@ -206,8 +206,8 @@ static struct {
 	nop  */
 
 static void
-do_pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
-		   rtx_insn *load_insn)		/* insn using address.  */
+pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
+		rtx_insn *load_insn)		/* insn using address.  */
 {
   rtx addr_set = PATTERN (addr_insn);
   gcc_assert (GET_CODE (addr_set) == SET);
@@ -420,8 +420,8 @@ do_pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
 	nop  */
 
 static void
-do_pcrel_opt_store (rtx_insn *addr_insn,	/* insn loading address.  */
-		    rtx_insn *store_insn)	/* insn using address.  */
+pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
+		 rtx_insn *store_insn)		/* insn using address.  */
 {
   rtx addr_set = PATTERN (addr_insn);
   gcc_assert (GET_CODE (addr_set) == SET);
@@ -542,8 +542,10 @@ do_pcrel_opt_store (rtx_insn *addr_insn,	/* insn loading address.  */
    optimization.  */
 
 static void
-do_pcrel_opt_addr (rtx_insn *addr_insn)
+pcrel_opt_address (rtx_insn *addr_insn)
 {
+  counters.extern_addrs++;
+
   /* Do some basic validation.  */
   rtx addr_set = PATTERN (addr_insn);
   if (GET_CODE (addr_set) != SET)
@@ -639,14 +641,14 @@ do_pcrel_opt_addr (rtx_insn *addr_insn)
     case TYPE_FPLOAD:
     case TYPE_VECLOAD:
       if (!store_insns_found && !atomic_insns_found)
-	do_pcrel_opt_load (addr_insn, use_insn);
+	pcrel_opt_load (addr_insn, use_insn);
       break;
 
     case TYPE_STORE:
     case TYPE_FPSTORE:
     case TYPE_VECSTORE:
       if (!store_insns_found && !load_insns_found && !atomic_insns_found)
-	do_pcrel_opt_store (addr_insn, use_insn);
+	pcrel_opt_store (addr_insn, use_insn);
       break;
 
     default:
@@ -660,7 +662,7 @@ do_pcrel_opt_addr (rtx_insn *addr_insn)
 /* Optimize pcrel external variable references.  */
 
 static unsigned int
-do_pcrel_opt_pass (function *fun)
+pcrel_opt_pass (function *fun)
 {
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
@@ -681,12 +683,10 @@ do_pcrel_opt_pass (function *fun)
     {
       FOR_BB_INSNS_SAFE (bb, insn, curr_insn)
 	{
-	  if (NONJUMP_INSN_P (insn) && single_set (insn)
+	  if (NONJUMP_INSN_P (insn)
+	      && single_set (insn)
 	      && get_attr_loads_extern_addr (insn) == LOADS_EXTERN_ADDR_YES)
-	    {
-	      counters.extern_addrs++;
-	      do_pcrel_opt_addr (insn);
-	    }
+	    pcrel_opt_address (insn);
 	}
     }
 
@@ -706,8 +706,6 @@ do_pcrel_opt_pass (function *fun)
   df_remove_problem (df_chain);
   df_process_deferred_rescans ();
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS | DF_LR_RUN_DCE);
-  df_chain_add_problem (DF_UD_CHAIN);
-  df_note_add_problem ();
   df_analyze ();
   return 0;
 }
@@ -746,7 +744,7 @@ public:
 
   virtual unsigned int execute (function *fun)
   {
-    return do_pcrel_opt_pass (fun);
+    return pcrel_opt_pass (fun);
   }
 
   opt_pass *clone ()
