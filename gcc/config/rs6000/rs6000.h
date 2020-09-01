@@ -345,10 +345,6 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || ((MODE) == TDmode)						\
    || (!TARGET_FLOAT128_TYPE && FLOAT128_IEEE_P (MODE)))
 
-/* Macro whether the float128 min/max instructions are enabled.  */
-#define FLOAT128_IEEE_MINMAX_P(MODE)					\
-  (TARGET_POWER10 && TARGET_FLOAT128_HW && FLOAT128_IEEE_P (MODE))
-
 /* Return true for floating point that does not use a vector register.  */
 #define SCALAR_FLOAT_MODE_NOT_VECTOR_P(MODE)				\
   (SCALAR_FLOAT_MODE_P (MODE) && !FLOAT128_VECTOR_P (MODE))
