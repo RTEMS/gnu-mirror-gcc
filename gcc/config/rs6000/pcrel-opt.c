@@ -226,9 +226,6 @@ do_pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
     return;
 
   rtx mem = SET_SRC (load_set);
-  if (!MEM_P (mem))
-    return;
-
   machine_mode reg_mode = GET_MODE (reg);
   machine_mode mem_mode = GET_MODE (mem);
   rtx mem_inner = mem;
@@ -254,6 +251,9 @@ do_pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
       mem_inner = XEXP (mem, 0);
       mem_mode = GET_MODE (mem_inner);
     }
+
+  if (!MEM_P (mem_inner))
+    return;
 
   /* If this is LFIWAX or similar instructions that are indexed only, we can't
      do the optimization.  */
