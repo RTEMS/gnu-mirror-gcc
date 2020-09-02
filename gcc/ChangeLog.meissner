@@ -1,5 +1,64 @@
 2020-09-02  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/pcrel-opt.c (toplevel): Add comments about
+	supporting the PCREL_OPT store optimization.
+	(struct counters): Add PCREL_OPT store counters.
+	(pcrel_opt_load): Add PCREL_OPT store support.
+	(pcrel_opt_store): New function for PCREL_OPT store support.
+	(pcrel_opt_address): Add PCREL_OPT store support.
+	* config/rs6000/pcrel-opt.md (UNSPEC_PCREL_OPT_ST_ADDR): New
+	unspec.
+	(UNSPEC_PCREL_OPT_ST_RELOC): New unspec.
+	(pcrel_opt_st_addr<mode>): New insns for the PCREL_OPT store
+	optimization support.
+	(pcrel_opt_st<mode>, QHSI iterator): New insns for the PCREL_OPT
+	store optimization support.
+	(pcrel_opt_stdi): New insn for the PCREL_OPT store optimization
+	support.
+	(pcrel_opt_stsf): New insn for the PCREL_OPT store optimization
+	support.
+	(pcrel_opt_stdf): New insn for the PCREL_OPT store optimization
+	support.
+	(pcrel_opt_st<mode>, PO_VECT iterator): New insns for the
+	PCREL_OPT store optimization support.
+	* config/rs6000/rs6000.c (rs6000_delegitimize_address): Add
+	support for the PCREL_OPT store optimization.
+
+2020-09-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*): Add pcrel-opt.o.
+	(rs6000*-*-*): Add pcrel-opt.o.
+	* config/rs6000/pcrel-opt.c: New file.
+	* config/rs6000/pcrel-opt.md: New file.
+	* config/rs6000/predicates.md (d_form_memory): New predicate.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mpcrel-opt.
+	(POWERPC_MASKS): Add -mpcrel-opt.
+	* config/rs6000/rs6000-protos.h (reg_to_non_prefixed): New
+	declaration.
+	(make_pass_pcrel_opt): New declaration.
+	* config/rs6000/rs6000.c (reg_to_non_prefixed): Make function a
+	global function.
+	(rs6000_option_override_internal): Add support for -mpcrel-opt.
+	(rs6000_delegitimize_address): Convert the addresses used for
+	PCREL_OPT load optimization back into the original symbol.
+	(print_operand): Add new case 'r' for PCREL_OPT support.
+	(rs6000_opt_masks): Add -mpcrel-opt.
+	(rs6000_asm_output_opcode): Reset prefixed flag after the first
+	use.
+	* config/rs6000/rs6000.md (loads_extern_addr): New insn
+	attribute.
+	(isa insn attribute): Add PCREL_OPT support.
+	(enabled insn attribute): Add PCREL_OPT support.
+	(pcrel_extern_addr): Mark that this insn loads external
+	addresses.
+	(toplevel): Include pcrel-opt.md.
+	* config/rs6000/rs6000.opt (-mpcrel-opt): New debug option.
+	* config/rs6000/t-rs6000 (pcrel-opt.o): Add build rules.
+	(MD_INCLUDES): Add pcrel-opt.md
+
+2020-09-02  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/predicates.md (fpmask_normal_or_invert_operator):
 	New predicate.
 	* config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
