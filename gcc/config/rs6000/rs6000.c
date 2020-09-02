@@ -15177,6 +15177,10 @@ have_compare_and_set_mask (machine_mode mode)
     case DFmode:
       return TARGET_P9_MINMAX;
 
+    case KFmode:
+    case TFmode:
+      return FLOAT128_IEEE_MINMAX_P (mode);
+
     default:
       break;
     }
