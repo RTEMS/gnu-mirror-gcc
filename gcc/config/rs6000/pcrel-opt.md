@@ -84,7 +84,9 @@
 (define_c_enum "unspec"
   [UNSPEC_PCREL_OPT_LD_ADDR
    UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG
-   UNSPEC_PCREL_OPT_LD_RELOC])
+   UNSPEC_PCREL_OPT_LD_RELOC
+   UNSPEC_PCREL_OPT_ST_ADDR
+   UNSPEC_PCREL_OPT_ST_RELOC])
 
 ;; Modes that are supported for PCREL_OPT
 (define_mode_iterator PO [QI HI SI DI TI SF DF KF
@@ -245,4 +247,115 @@
   "TARGET_PCREL_OPT"
   "%r3lxv %x0,%1"
   [(set_attr "type" "vecload")
+   (set_attr "isa" "pcrel_opt")])
+
+
+;; PCREL_OPT optimization for stores.  We need to put the label after the PLD
+;; instruction, because the assembler might insert a NOP before the PLD for
+;; alignment.
+;;
+;; If we are optimizing a single write, normally the code would look like:
+;;
+;;	(set (reg:DI <ptr>)
+;;	     (symbol_ref:DI "<extern_addr>"))	# <data> must be live here
+;;
+;;	    ...              # insns do not need to be adjacent
+;;
+;;	(set (mem:SI (reg:DI <xxx>))
+;;	     (reg:SI <data>))			# <ptr> dies with this insn
+;;
+;; We optimize this to be:
+;;
+;;	(parallel [(set (reg:DI <ptr>)
+;;	                (unspec:DI [(symbol_ref:DI "<extern_addr>")
+;;	                            (const_int <marker>)]
+;;	                           UNSPEC_PCREL_OPT_ST_ADDR))
+;;	           (use (reg:<MODE> <data>))])
+;;
+;;	    ...              # insns do not need to be adjacent
+;;
+;;	(parallel [(set (mem:<MODE> (reg:DI <ptr>))
+;;	                (unspec:<MODE> [(reg:<MODE> <data>)
+;;	                                (const_int <marker>)]
+;;	                               UNSPEC_PCREL_OPT_ST_RELOC))
+;;	           (clobber (reg:DI <ptr>))])
+
+(define_insn "*pcrel_opt_st_addr<mode>"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=b")
+	(unspec:DI [(match_operand:DI 1 "pcrel_external_address")
+		    (match_operand 2 "const_int_operand" "n")]
+		UNSPEC_PCREL_OPT_ST_ADDR))
+   (use (match_operand:PO 3 "gpc_reg_operand" "rwa"))]
+  "TARGET_PCREL_OPT"
+  "ld %0,%a1\n.Lpcrel%2:"
+  [(set_attr "prefixed" "yes")
+   (set_attr "type" "load")
+   (set_attr "isa" "pcrel_opt")
+   (set_attr "loads_extern_addr" "yes")])
+
+;; Alternate form of the stores that include a marker to identify whether we
+;; can do the PCREL_OPT optimization.
+(define_insn "*pcrel_opt_st<mode>"
+  [(set (match_operand:QHSI 0 "d_form_memory" "=o")
+	(unspec:QHSI [(match_operand:QHSI 1 "gpc_reg_operand" "r")
+		      (match_operand 2 "const_int_operand" "n")]
+		     UNSPEC_PCREL_OPT_ST_RELOC))
+   (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
+  "TARGET_PCREL_OPT"
+  "%r2st<wd> %1,%0"
+  [(set_attr "type" "store")
+   (set_attr "isa" "pcrel_opt")])
+
+(define_insn "*pcrel_opt_stdi"
+  [(set (match_operand:DI 0 "d_form_memory" "=o,o,o")
+	(unspec:DI [(match_operand:DI 1 "gpc_reg_operand" "r,d,v")
+		    (match_operand 2 "const_int_operand" "n,n,n")]
+		   UNSPEC_PCREL_OPT_ST_RELOC))
+   (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
+  "TARGET_PCREL_OPT && TARGET_POWERPC64"
+  "@
+   %r2std %1,%0
+   %r2stfd %1,%0
+   %r2stxsd %1,%0"
+  [(set_attr "type" "store,fpstore,fpstore")
+   (set_attr "isa" "pcrel_opt")])
+
+(define_insn "*pcrel_opt_stsf"
+  [(set (match_operand:SF 0 "d_form_memory" "=o,o,o")
+	(unspec:SF [(match_operand:SF 1 "gpc_reg_operand" "d,v,r")
+		    (match_operand 2 "const_int_operand" "n,n,n")]
+		   UNSPEC_PCREL_OPT_ST_RELOC))
+   (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
+  "TARGET_PCREL_OPT"
+  "@
+   %r2stfs %1,%0
+   %r2stxssp %1,%0
+   %r2stw %1,%0"
+  [(set_attr "type" "fpstore,fpstore,store")
+   (set_attr "isa" "pcrel_opt")])
+
+(define_insn "*pcrel_opt_stdf"
+  [(set (match_operand:DF 0 "d_form_memory" "=o,o,o")
+	(unspec:DF [(match_operand:DF 1 "gpc_reg_operand" "d,v,r")
+		    (match_operand 2 "const_int_operand" "n,n,n")]
+		   UNSPEC_PCREL_OPT_ST_RELOC))
+   (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
+  "TARGET_PCREL_OPT
+   && (TARGET_POWERPC64 || vsx_register_operand (operands[1], DFmode))"
+  "@
+   %r2stfd %1,%0
+   %r2stxsd %1,%0
+   %r2std %1,%0"
+  [(set_attr "type" "fpstore,fpstore,store")
+   (set_attr "isa" "pcrel_opt")])
+
+(define_insn "*pcrel_opt_st<mode>"
+  [(set (match_operand:PO_VECT 0 "d_form_memory" "=o")
+	(unspec:PO_VECT [(match_operand:PO_VECT 1 "gpc_reg_operand" "wa")
+		     (match_operand 2 "const_int_operand" "n")]
+		    UNSPEC_PCREL_OPT_ST_RELOC))
+   (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
+  "TARGET_PCREL_OPT"
+  "%r2stxv %x1,%0"
+  [(set_attr "type" "vecstore")
    (set_attr "isa" "pcrel_opt")])
