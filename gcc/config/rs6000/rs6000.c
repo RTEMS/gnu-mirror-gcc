@@ -25394,6 +25394,32 @@ address_to_insn_form (rtx addr,
   return INSN_FORM_BAD;
 }
 
+/* Return true if an REG with a given MODE is loaded from or stored into a MEM
+   location uses a non-prefixed offsettable address.  This is used to validate
+   the load or store with the PCREL_OPT optimization to make sure it is an
+   instruction that can be optimized.
+
+   We need to specify the MODE separately from the REG to allow for loads that
+   include zero/sign/float extension.  */
+
+bool
+offsettable_non_prefixed_memory (rtx reg, machine_mode mode, rtx mem)
+{
+  /* If the instruction is indexed only like LFIWAX/LXSIWAX, it is not
+     offsettable.  */
+  enum non_prefixed_form non_prefixed = reg_to_non_prefixed (reg, mode);
+  if (non_prefixed == NON_PREFIXED_X)
+    return false;
+
+  /* Check if this is a non-prefixed offsettable instruction.  */
+  rtx addr = XEXP (mem, 0);
+  enum insn_form iform = address_to_insn_form (addr, mode, non_prefixed);
+  return (iform == INSN_FORM_BASE_REG
+	  || iform == INSN_FORM_D
+	  || iform == INSN_FORM_DS
+	  || iform == INSN_FORM_DQ);
+}
+
 /* Helper function to see if we're potentially looking at lfs/stfs.
    - PARALLEL containing a SET and a CLOBBER
    - stfs:

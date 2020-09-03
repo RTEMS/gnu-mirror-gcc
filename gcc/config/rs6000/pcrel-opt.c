@@ -232,8 +232,8 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
 
   /* LWA is a DS format instruction, but LWZ is a D format instruction.  We use
      DImode for the mode to force checking whether the bottom 2 bits are 0.
-     However FPR and vector registers uses the LFIWAX instruction which is
-     indexed only.  */
+     However FPR and vector registers uses the LFIWAX/LXSIWAX instructions
+     which only have indexed forms.  */
   if (GET_CODE (mem) == SIGN_EXTEND && GET_MODE (XEXP (mem, 0)) == SImode)
     {
       if (!INT_REGNO_P (reg_regno))
@@ -254,19 +254,9 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   if (!MEM_P (mem_inner))
     return;
 
-  /* If this is LFIWAX or similar instructions that are indexed only, we can't
-     do the optimization.  */
-  enum non_prefixed_form non_prefixed = reg_to_non_prefixed (reg, mem_mode);
-  if (non_prefixed == NON_PREFIXED_X)
-    return;
-
-  /* The optimization will only work on non-prefixed offsettable loads.  */
-  rtx addr = XEXP (mem_inner, 0);
-  enum insn_form iform = address_to_insn_form (addr, mem_mode, non_prefixed);
-  if (iform != INSN_FORM_BASE_REG
-      && iform != INSN_FORM_D
-      && iform != INSN_FORM_DS
-      && iform != INSN_FORM_DQ)
+  /* If the address isn't a non-prefixed offsettable instruction, we can't do
+     the optimization.  */
+  if (!offsettable_non_prefixed_memory (reg, mem_mode, mem_inner))
     return;
 
   /* Allocate a new PC-relative label, and update the load external address
@@ -443,19 +433,9 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
       && !reg_set_between_p (reg, addr_insn, store_insn))
     return;
 
-  /* If this is LFIWAX or similar instructions that are indexed only, we can't
-     do the optimization.  */
-  enum non_prefixed_form non_prefixed = reg_to_non_prefixed (reg, mem_mode);
-  if (non_prefixed == NON_PREFIXED_X)
-    return;
-
-  /* The optimization will only work on non-prefixed offsettable loads.  */
-  rtx addr = XEXP (mem, 0);
-  enum insn_form iform = address_to_insn_form (addr, mem_mode, non_prefixed);
-  if (iform != INSN_FORM_BASE_REG
-      && iform != INSN_FORM_D
-      && iform != INSN_FORM_DS
-      && iform != INSN_FORM_DQ)
+  /* If the address isn't a non-prefixed offsettable instruction, we can't do
+     the optimization.  */
+  if (!offsettable_non_prefixed_memory (reg, mem_mode, mem))
     return;
 
   /* Allocate a new PC-relative label, and update the load address insn.
