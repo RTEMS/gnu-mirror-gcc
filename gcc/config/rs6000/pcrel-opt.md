@@ -152,7 +152,10 @@
   "TARGET_PCREL_OPT
    && (GET_CODE (operands[4]) == SCRATCH
        || reg_mentioned_p (operands[4], operands[1]))"
-  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_GPR_LD> %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return "<PO_GPR_LD> %0,%1";
+}
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -166,7 +169,10 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lw<az> %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return "lw<az> %0,%1";
+}
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -179,7 +185,10 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lh<az> %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return "lh<az> %0,%1";
+}
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -192,7 +201,10 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lbz %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return "lbz %0,%1";
+}
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -214,9 +226,10 @@
 		       UNSPEC_PCREL_OPT_LD_RELOC))
    (clobber (match_operand:DI 4 "base_reg_operand" "=b,b"))]
   "TARGET_PCREL_OPT"
-  "@
-   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_FPR_LD> %0,%1
-   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_AVX_LD> %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return which_alternative ? "<PO_AVX_LD> %0,%1" : "<PO_FPR_LD> %0,%1";
+}
   [(set_attr "type" "fpload")
    (set_attr "isa" "p10")])
 
@@ -230,9 +243,10 @@
 		    UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_operand:DI 4 "base_reg_operand" "=b,b"))]
   "TARGET_PCREL_OPT"
-  "@
-   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lfs %0,%1
-   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lxssp %0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return which_alternative ? "lxssp %0,%1" : "lfs %0,%1";
+}
   [(set_attr "type" "fpload")
    (set_attr "isa" "p10")])
 
@@ -245,7 +259,10 @@
 			UNSPEC_PCREL_OPT_LD_RELOC))
    (clobber (match_operand:DI 4 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lxv %x0,%1"
+{
+  output_pcrel_opt_reloc (operands[3]);
+  return "lxv %x0,%1";
+}
   [(set_attr "type" "vecload")
    (set_attr "isa" "p10")])
 
@@ -302,7 +319,10 @@
 		     UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;st<wd> %1,%0"
+{
+  output_pcrel_opt_reloc (operands[2]);
+  return "st<wd> %1,%0";
+}
   [(set_attr "type" "store")
    (set_attr "isa" "p10")])
 
@@ -313,10 +333,16 @@
 		   UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
   "TARGET_PCREL_OPT && TARGET_POWERPC64"
-  "@
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;std %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfd %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxsd %1,%0"
+{
+  output_pcrel_opt_reloc (operands[2]);
+  switch (which_alternative)
+    {
+    case 0: return "std %1,%0";
+    case 1: return "stfd %1,%0";
+    case 2: return "stxsd %1,%0";
+    default: gcc_unreachable ();
+    }
+}
   [(set_attr "type" "store,fpstore,fpstore")
    (set_attr "isa" "p10")])
 
@@ -327,10 +353,16 @@
 		   UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
   "TARGET_PCREL_OPT"
-  "@
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfs %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxssp %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stw %1,%0"
+{
+  output_pcrel_opt_reloc (operands[2]);
+  switch (which_alternative)
+    {
+    case 0: return "stfs %1,%0";
+    case 1: return "stxssp %1,%0";
+    case 2: return "stw %1,%0";
+    default: gcc_unreachable ();
+    }
+}
   [(set_attr "type" "fpstore,fpstore,store")
    (set_attr "isa" "p10")])
 
@@ -342,10 +374,16 @@
    (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
   "TARGET_PCREL_OPT
    && (TARGET_POWERPC64 || vsx_register_operand (operands[1], DFmode))"
-  "@
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfd %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxsd %1,%0
-   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;std %1,%0"
+{
+  output_pcrel_opt_reloc (operands[2]);
+  switch (which_alternative)
+    {
+    case 0: return "stfd %1,%0";
+    case 1: return "stxsd %1,%0";
+    case 2: return "std %1,%0";
+    default: gcc_unreachable ();
+    }
+}
   [(set_attr "type" "fpstore,fpstore,store")
    (set_attr "isa" "p10")])
 
@@ -356,6 +394,9 @@
 		    UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  ".reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxv %x1,%0"
+{
+  output_pcrel_opt_reloc (operands[2]);
+  return "stxv %x1,%0";
+}
   [(set_attr "type" "vecstore")
    (set_attr "isa" "p10")])
