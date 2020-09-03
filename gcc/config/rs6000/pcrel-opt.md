@@ -152,7 +152,7 @@
   "TARGET_PCREL_OPT
    && (GET_CODE (operands[4]) == SCRATCH
        || reg_mentioned_p (operands[4], operands[1]))"
-  "%r3<PO_GPR_LD> %0,%1"
+  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_GPR_LD> %0,%1"
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -166,7 +166,7 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  "%r3lw<az> %0,%1"
+  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lw<az> %0,%1"
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -179,7 +179,7 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  "%r3lh<az> %0,%1"
+  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lh<az> %0,%1"
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -192,7 +192,7 @@
 		     UNSPEC_PCREL_OPT_LD_RELOC)))
    (clobber (match_scratch:DI 4 "=bX"))]
   "TARGET_PCREL_OPT"
-  "%r3lbz %0,%1"
+  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lbz %0,%1"
   [(set_attr "type" "load")
    (set_attr "isa" "p10")])
 
@@ -215,8 +215,8 @@
    (clobber (match_operand:DI 4 "base_reg_operand" "=b,b"))]
   "TARGET_PCREL_OPT"
   "@
-   %r3<PO_FPR_LD> %0,%1
-   %r3<PO_AVX_LD> %0,%1"
+   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_FPR_LD> %0,%1
+   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;<PO_AVX_LD> %0,%1"
   [(set_attr "type" "fpload")
    (set_attr "isa" "p10")])
 
@@ -231,8 +231,8 @@
    (clobber (match_operand:DI 4 "base_reg_operand" "=b,b"))]
   "TARGET_PCREL_OPT"
   "@
-   %r3lfs %0,%1
-   %r3lxssp %0,%1"
+   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lfs %0,%1
+   .reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lxssp %0,%1"
   [(set_attr "type" "fpload")
    (set_attr "isa" "p10")])
 
@@ -245,7 +245,7 @@
 			UNSPEC_PCREL_OPT_LD_RELOC))
    (clobber (match_operand:DI 4 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  "%r3lxv %x0,%1"
+  ".reloc .Lpcrel%3-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%3-8)\;lxv %x0,%1"
   [(set_attr "type" "vecload")
    (set_attr "isa" "p10")])
 
@@ -302,7 +302,7 @@
 		     UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  "%r2st<wd> %1,%0"
+  ".reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;st<wd> %1,%0"
   [(set_attr "type" "store")
    (set_attr "isa" "p10")])
 
@@ -314,9 +314,9 @@
    (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
   "TARGET_PCREL_OPT && TARGET_POWERPC64"
   "@
-   %r2std %1,%0
-   %r2stfd %1,%0
-   %r2stxsd %1,%0"
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;std %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfd %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxsd %1,%0"
   [(set_attr "type" "store,fpstore,fpstore")
    (set_attr "isa" "p10")])
 
@@ -328,9 +328,9 @@
    (clobber (match_operand:DI 3 "base_reg_operand" "=b,b,b"))]
   "TARGET_PCREL_OPT"
   "@
-   %r2stfs %1,%0
-   %r2stxssp %1,%0
-   %r2stw %1,%0"
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfs %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxssp %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stw %1,%0"
   [(set_attr "type" "fpstore,fpstore,store")
    (set_attr "isa" "p10")])
 
@@ -343,9 +343,9 @@
   "TARGET_PCREL_OPT
    && (TARGET_POWERPC64 || vsx_register_operand (operands[1], DFmode))"
   "@
-   %r2stfd %1,%0
-   %r2stxsd %1,%0
-   %r2std %1,%0"
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stfd %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxsd %1,%0
+   .reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;std %1,%0"
   [(set_attr "type" "fpstore,fpstore,store")
    (set_attr "isa" "p10")])
 
@@ -356,6 +356,6 @@
 		    UNSPEC_PCREL_OPT_ST_RELOC))
    (clobber (match_operand:DI 3 "base_reg_operand" "=b"))]
   "TARGET_PCREL_OPT"
-  "%r2stxv %x1,%0"
+  ".reloc .Lpcrel%2-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%2-8)\;stxv %x1,%0"
   [(set_attr "type" "vecstore")
    (set_attr "isa" "p10")])

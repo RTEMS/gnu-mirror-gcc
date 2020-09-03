@@ -13216,19 +13216,6 @@ print_operand (FILE *file, rtx x, int code)
 	fprintf (file, "%d", 128 >> (REGNO (x) - CR0_REGNO));
       return;
 
-    case 'r':
-      /* X is a label number for the PCREL_OPT optimization.  Emit the .reloc
-	 to enable this optimization, unless the value is 0.  */
-      gcc_assert (CONST_INT_P (x));
-      if (UINTVAL (x) != 0)
-	{
-	  unsigned int label_num = UINTVAL (x);
-	  fprintf (file,
-		   ".reloc .Lpcrel%u-8,R_PPC64_PCREL_OPT,.-(.Lpcrel%u-8)\n\t",
-		   label_num, label_num);
-	}
-      return;
-
     case 's':
       /* Low 5 bits of 32 - value */
       if (! INT_P (x))
