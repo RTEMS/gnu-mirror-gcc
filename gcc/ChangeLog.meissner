@@ -1,3 +1,62 @@
+2020-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (fpmask_normal_or_invert_operator):
+	New predicate.
+	* config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
+	128-bit floating point types.
+	* config/rs6000/rs6000.md (FSCALAR2): New iterator for floating
+	point conditional moves.
+	(mov<SFDF:mode><SFDF2:mode>cc_p9): Replace with
+	mov<FSCALAR:mode><FSCALAR2:mode>.
+	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Replace with
+	mov<FSCALAR:mode><FSCALAR2:mode>.
+	(mov<FSCALAR:mode><FSCALAR2:mode>): Combine both
+	mov<SFDF:mode><SFDF2:mode>cc_p9 and
+	mov<SFDF:mode><SFDF2:mode>cc_invert_p9 patterns.  Add ISA 3.1
+	support for IEEE 128-bit conditional moves.  Always use an
+	earlyclobber register for the mask.  Use XXPERMDI to extend the
+	mask if we have a 64-bit comparison and 128-bit move.
+	register for the mask.
+	(fpmask<mode>, xxsel<mode>): Add ISA 3.1 support for IEEE 128-bit
+	conditional moves.  Enable the generator functionality so
+	mov<FSCALAR:mode><FSCALAR2:mode> can call it.  Update constraints
+	for 128-bit operations.
+
+2020-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.h (FLOAT128_IEEE_MINMAX_P): New helper
+	macro.
+	* config/rs6000/rs6000.md (FSCALAR): New mode iterator for floating
+	point scalars.
+	(Fm): New mode attribute for floating point scalars.
+	(s<minmax><mode>): Add support for the ISA 3.1 IEEE 128-bit
+	minimum and maximum instructions.
+	(s<minmax><mode>3_vsx): Add support for the ISA 3.1 IEEE 128-bit
+	minimum and maximum instructions.
+
+2020-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_p9_fp_minmax): Rename to
+	maybe_emit_fp_c_minmax.
+	(maybe_emit_fp_c_minmax): Rename rs6000_emit_p9_fp_minmax.  Return
+	bool instead of int.
+	(rs6000_emit_p9_fp_cmove): Rename to maybe_emit_fp_cmove.
+	(maybe_emit_fp_cmove): Rename rs6000_emit_p9_fp_cmove.  Return
+	bool instead of int.
+	(have_compare_and_set_mask): New helper function.
+	(rs6000_emit_cmove): Rework support of ISA 3.0 functions to
+	generate "C" minimum, "C" maximum, and conditional move
+	instructions for scalar floating point.
+
+2020-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_emit_cmove): Change return
+	type to bool.
+	(rs6000_emit_int_cmove): Change return type to bool.
+	* config/rs6000/rs6000.c (rs6000_emit_cmove): Change return type
+	to bool.
+	(rs6000_emit_int_cmove): Change return type to bool.
+
 2020-09-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
