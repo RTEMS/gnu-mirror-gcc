@@ -112,7 +112,6 @@
   "ld %0,%a1\n.Lpcrel%2:"
   [(set_attr "prefixed" "yes")
    (set_attr "type" "load")
-   (set_attr "isa" "p10")
    (set_attr "loads_extern_addr" "yes")])
 
 ;; Alternate form of loading up the external address that is the same register
@@ -126,7 +125,6 @@
   "ld %0,%a1\n.Lpcrel%2:"
   [(set_attr "prefixed" "yes")
    (set_attr "type" "load")
-   (set_attr "isa" "p10")
    (set_attr "loads_extern_addr" "yes")])
 
 ;; PCREL_OPT modes that are optimized for loading or storing GPRs.
@@ -156,8 +154,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return "<PO_GPR_LD> %0,%1";
 }
-  [(set_attr "type" "load")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "load")])
 
 ;; PCREL_OPT load with sign/zero extension
 (define_insn "*pcrel_opt_ldsi_<u><mode>_gpr"
@@ -173,8 +170,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return "lw<az> %0,%1";
 }
-  [(set_attr "type" "load")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "load")])
 
 (define_insn "*pcrel_opt_ldhi_<u><mode>_gpr"
   [(set (match_operand:EXTHI 0 "int_reg_operand" "+r")
@@ -189,8 +185,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return "lh<az> %0,%1";
 }
-  [(set_attr "type" "load")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "load")])
 
 (define_insn "*pcrel_opt_ldqi_u<mode>_gpr"
   [(set (match_operand:EXTQI 0 "int_reg_operand" "+r")
@@ -205,8 +200,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return "lbz %0,%1";
 }
-  [(set_attr "type" "load")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "load")])
 
 ;; Scalar types that can be optimized by loading them into floating point
 ;; or Altivec registers.
@@ -230,8 +224,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return which_alternative ? "<PO_AVX_LD> %0,%1" : "<PO_FPR_LD> %0,%1";
 }
-  [(set_attr "type" "fpload")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "fpload")])
 
 ;; PCREL_OPT optimization extending SFmode to DFmode via a load.
 (define_insn "*pcrel_opt_ldsf_df"
@@ -247,8 +240,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return which_alternative ? "lxssp %0,%1" : "lfs %0,%1";
 }
-  [(set_attr "type" "fpload")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "fpload")])
 
 ;; PCREL_OPT load operation of vector/float128 types into vector registers.
 (define_insn "*pcrel_opt_ld<mode>"
@@ -263,8 +255,7 @@
   output_pcrel_opt_reloc (operands[3]);
   return "lxv %x0,%1";
 }
-  [(set_attr "type" "vecload")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "vecload")])
 
 
 ;; PCREL_OPT optimization for stores.  We need to put the label after the PLD
@@ -307,11 +298,9 @@
   "ld %0,%a1\n.Lpcrel%2:"
   [(set_attr "prefixed" "yes")
    (set_attr "type" "load")
-   (set_attr "isa" "p10")
    (set_attr "loads_extern_addr" "yes")])
 
-;; Alternate form of the stores that include a marker to identify whether we
-;; can do the PCREL_OPT optimization.
+;; PCREL_OPT stores.
 (define_insn "*pcrel_opt_st<mode>"
   [(set (match_operand:QHSI 0 "d_form_memory" "=o")
 	(unspec:QHSI [(match_operand:QHSI 1 "gpc_reg_operand" "r")
@@ -323,8 +312,7 @@
   output_pcrel_opt_reloc (operands[2]);
   return "st<wd> %1,%0";
 }
-  [(set_attr "type" "store")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "store")])
 
 (define_insn "*pcrel_opt_stdi"
   [(set (match_operand:DI 0 "d_form_memory" "=o,o,o")
@@ -343,8 +331,7 @@
     default: gcc_unreachable ();
     }
 }
-  [(set_attr "type" "store,fpstore,fpstore")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "store,fpstore,fpstore")])
 
 (define_insn "*pcrel_opt_stsf"
   [(set (match_operand:SF 0 "d_form_memory" "=o,o,o")
@@ -363,8 +350,7 @@
     default: gcc_unreachable ();
     }
 }
-  [(set_attr "type" "fpstore,fpstore,store")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "fpstore,fpstore,store")])
 
 (define_insn "*pcrel_opt_stdf"
   [(set (match_operand:DF 0 "d_form_memory" "=o,o,o")
@@ -384,8 +370,7 @@
     default: gcc_unreachable ();
     }
 }
-  [(set_attr "type" "fpstore,fpstore,store")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "fpstore,fpstore,store")])
 
 (define_insn "*pcrel_opt_st<mode>"
   [(set (match_operand:PO_VECT 0 "d_form_memory" "=o")
@@ -398,5 +383,4 @@
   output_pcrel_opt_reloc (operands[2]);
   return "stxv %x1,%0";
 }
-  [(set_attr "type" "vecstore")
-   (set_attr "isa" "p10")])
+  [(set_attr "type" "vecstore")])
