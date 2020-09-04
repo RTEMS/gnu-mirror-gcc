@@ -118,10 +118,6 @@
 #include "insn-attr.h"
 #include "insn-codes.h"
 
-
-/* Next PCREL_OPT label number.  */
-static unsigned int pcrel_opt_next_num;
-
 /* Various counters.  */
 static struct {
   unsigned long extern_addrs;
@@ -130,6 +126,19 @@ static struct {
   unsigned long stores;
   unsigned long adjacent_stores;
 } counters;
+
+/* Return a marker to identify the PCREL_OPT load address and load/store
+   instruction.  We use a constant integer which is added to ".Lpcrel" to make
+   the label.  */
+
+static rtx
+pcrel_opt_next_marker (void)
+{
+  static unsigned int pcrel_opt_next_num;
+
+  pcrel_opt_next_num++;
+  return GEN_INT (pcrel_opt_next_num);
+}
 
 /* Optimize a PC-relative load address to be used in a load.
 
@@ -280,9 +289,8 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
 	     (unspec [(symbol_ref addr_symbol)
 	              (const_int label_num)]
 	             UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG))  */
-  ++pcrel_opt_next_num;
   unsigned int addr_regno = reg_or_subregno (addr_reg);
-  rtx label_num = GEN_INT (pcrel_opt_next_num);
+  rtx label_num = pcrel_opt_next_marker ();
   rtx reg_di = gen_rtx_REG (DImode, reg_regno);
 
   PATTERN (addr_insn)
@@ -445,8 +453,7 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
 	                         (const_int label_num)]
 	                        UNSPEC_PCREL_OPT_ST_ADDR))
 	           (use (reg store))])  */
-  ++pcrel_opt_next_num;
-  rtx label_num = GEN_INT (pcrel_opt_next_num);
+  rtx label_num = pcrel_opt_next_marker ();
   rtvec v_addr = gen_rtvec (2, addr_symbol, label_num);
   rtx addr_unspec = gen_rtx_UNSPEC (Pmode, v_addr,
 				   UNSPEC_PCREL_OPT_ST_ADDR);
