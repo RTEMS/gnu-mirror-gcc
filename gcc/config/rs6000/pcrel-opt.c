@@ -223,7 +223,11 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   gcc_assert (GET_CODE (addr_set) == SET);
 
   rtx addr_reg = SET_DEST (addr_set);
+  gcc_assert (base_reg_operand (addr_reg, Pmode));
+
   rtx addr_symbol = SET_SRC (addr_set);
+  gcc_assert (pcrel_external_address (addr_symbol, Pmode));
+
   rtx load_set = PATTERN (load_insn);
   gcc_assert (GET_CODE (load_set) == SET);
 
@@ -425,7 +429,11 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
   gcc_assert (GET_CODE (addr_old_set) == SET);
 
   rtx addr_reg = SET_DEST (addr_old_set);
+  gcc_assert (base_reg_operand (addr_reg, Pmode));
+
   rtx addr_symbol = SET_SRC (addr_old_set);
+  gcc_assert (pcrel_external_address (addr_symbol, Pmode));
+
   rtx store_set = PATTERN (store_insn);
   gcc_assert (GET_CODE (store_set) == SET);
 
@@ -732,12 +740,14 @@ pcrel_opt_pass (function *fun)
 	fprintf (dump_file, "# of failed PCREL_OPT load(s) = %lu\n",
 		 counters.failed_loads);
 
-      fprintf (dump_file, "# of PCREL_OPT store(s) = %lu (adjacent %lu)\n\n",
+      fprintf (dump_file, "# of PCREL_OPT store(s) = %lu (adjacent %lu)\n",
 	       counters.stores, counters.adjacent_stores);
 
       if (counters.failed_stores)
 	fprintf (dump_file, "# of failed PCREL_OPT store(s) = %lu\n",
 		 counters.failed_stores);
+
+      fprintf (dump_file, "\n");
     }
 
   df_remove_problem (df_chain);
