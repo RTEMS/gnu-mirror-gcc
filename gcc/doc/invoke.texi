@@ -634,6 +634,7 @@ Objective-C and Objective-C++ Dialects}.
 -mpc-relative-literal-loads @gol
 -msign-return-address=@var{scope} @gol
 -mbranch-protection=@var{none}|@var{standard}|@var{pac-ret}[+@var{leaf}]|@var{bti} @gol
+-mharden-sls=@var{opts} @gol
 -march=@var{name}  -mcpu=@var{name}  -mtune=@var{name}  @gol
 -moverride=@var{string}  -mverbose-cost-dump @gol
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{sysreg} @gol
@@ -15852,9 +15853,11 @@ performance of the code.  Permissible values for this option are:
 @samp{cortex-a76}, @samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor},
 @samp{neoverse-e1},@samp{neoverse-n1},@samp{qdf24xx}, @samp{saphira},
 @samp{phecda}, @samp{xgene1}, @samp{vulcan}, @samp{octeontx},
-@samp{octeontx81},  @samp{octeontx83}, @samp{thunderx}, @samp{thunderxt88},
+@samp{octeontx81},  @samp{octeontx83},
+@samp{a64fx},
+@samp{thunderx}, @samp{thunderxt88},
 @samp{thunderxt88p1}, @samp{thunderxt81}, @samp{tsv110},
-@samp{thunderxt83}, @samp{thunderx2t99},
+@samp{thunderxt83}, @samp{thunderx2t99}, @samp{zeus},
 @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
 @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},
 @samp{cortex-a75.cortex-a55}, @samp{cortex-a76.cortex-a55}
@@ -15939,6 +15942,17 @@ functions will practically always do this) using the a-key.  The optional
 argument @samp{leaf} can be used to extend the signing to include leaf
 functions.
 @samp{bti} turns on branch target identification mechanism.
+
+@item -mharden-sls=@var{opts}
+@opindex mharden-sls
+Enable compiler hardening against straight line speculation (SLS).
+@var{opts} is a comma-separated list of the following options:
+@table @samp
+@item retbr
+@item blr
+@end table
+In addition, @samp{-mharden-sls=all} enables all SLS hardening while
+@samp{-mharden-sls=none} disables all SLS hardening.
 
 @item -msve-vector-bits=@var{bits}
 @opindex msve-vector-bits
@@ -17950,7 +17964,7 @@ is only available when generating non-pic code for M-profile targets.
 @opindex mcmse
 Generate secure code as per the "ARMv8-M Security Extensions: Requirements on
 Development Tools Engineering Specification", which can be found on
-@url{http://infocenter.arm.com/help/topic/com.arm.doc.ecm0359818/ECM0359818_armv8m_security_extensions_reqs_on_dev_tools_1_0.pdf}.
+@url{https://developer.arm.com/documentation/ecm0359818/latest/}.
 @end table
 
 @node AVR Options
@@ -28735,9 +28749,9 @@ Note that @option{-mcmodel=large} is incompatible with
 @option{-mindirect-branch=thunk-extern} since the thunk function may
 not be reachable in the large code model.
 
-Note that @option{-mindirect-branch=thunk-extern} is incompatible with
-@option{-fcf-protection=branch} since the external thunk cannot be modified
-to disable control-flow check.
+Note that @option{-mindirect-branch=thunk-extern} is compatible with
+@option{-fcf-protection=branch} since the external thunk can be made
+to enable control-flow check.
 
 @item -mfunction-return=@var{choice}
 @opindex mfunction-return
@@ -28749,6 +28763,10 @@ function return to external call and return thunk provided in a separate
 object file.  You can control this behavior for a specific function by
 using the function attribute @code{function_return}.
 @xref{Function Attributes}.
+
+Note that @option{-mindirect-return=thunk-extern} is compatible with
+@option{-fcf-protection=branch} since the external thunk can be made
+to enable control-flow check.
 
 Note that @option{-mcmodel=large} is incompatible with
 @option{-mfunction-return=thunk} and

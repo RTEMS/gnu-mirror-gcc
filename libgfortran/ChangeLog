@@ -1,3 +1,45 @@
+2020-08-24  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	Backported from master:
+	2020-08-24  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/96486
+	* intrinsics/env.c: If value_len is > 0 blank the string.
+	Copy the result only if its length is > 0.
+
+2020-07-25  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	Backported from master:
+	2020-07-24  Dominique d'Humieres  <dhumieres.dominique@free.fr>
+
+	PR fortran/93592
+	* io/write_float.def (build_float_string): Do not reset
+	  nbefore for FMT_F and FMT_EN.
+
+2020-05-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR libfortran/95104
+	* io/unit.c (unlock_unit): Guard by check for NULL pointer.
+
+2020-05-27  Harald Anlauf  <anlauf@gmx.de>
+	    Steven G. Kargl   <kargl@gcc.gnu.org>
+
+	PR libfortran/95104
+	* io/transfer.c (st_wait_async): Do not dereference NULL pointer.
+
+2020-05-27  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR libfortran/95191
+	* io/async.c (async_wait_id): Generate error if ID is higher
+	than the highest current ID.
+	* runtime/error.c (translate_error): Handle LIBERROR_BAD_WAIT_ID.
+
+2020-05-22  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR libfortran/95119
+	* io/close.c (close_status): Add CLOSE_INVALID.
+	(st_close): Return early on invalid STATUS parameter.
+
 2020-04-19  Uroš Bizjak  <ubizjak@gmail.com>
 
 	* config/fpu-387.h (local_feraiseexcept) [__SSE_MATH__]:

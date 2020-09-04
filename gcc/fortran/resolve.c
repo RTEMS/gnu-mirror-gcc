@@ -1754,8 +1754,10 @@ gfc_resolve_intrinsic (gfc_symbol *sym, locus *loc)
   gfc_intrinsic_sym* isym = NULL;
   const char* symstd;
 
-  if (sym->formal)
+  if (sym->resolve_symbol_called >= 2)
     return true;
+
+  sym->resolve_symbol_called = 2;
 
   /* Already resolved.  */
   if (sym->from_intmod && sym->ts.type != BT_UNKNOWN)
@@ -5094,8 +5096,8 @@ gfc_resolve_substring_charlen (gfc_expr *e)
 static bool
 resolve_ref (gfc_expr *expr)
 {
-  int current_part_dimension, n_components, seen_part_dimension;
-  gfc_ref *ref, **prev;
+  int current_part_dimension, n_components, seen_part_dimension, dim;
+  gfc_ref *ref, **prev, *array_ref;
   bool equal_length;
 
   for (ref = expr->ref; ref; ref = ref->next)
@@ -5141,12 +5143,14 @@ resolve_ref (gfc_expr *expr)
   current_part_dimension = 0;
   seen_part_dimension = 0;
   n_components = 0;
+  array_ref = NULL;
 
   for (ref = expr->ref; ref; ref = ref->next)
     {
       switch (ref->type)
 	{
 	case REF_ARRAY:
+	  array_ref = ref;
 	  switch (ref->u.ar.type)
 	    {
 	    case AR_FULL:
@@ -5162,6 +5166,7 @@ resolve_ref (gfc_expr *expr)
 	      break;
 
 	    case AR_ELEMENT:
+	      array_ref = NULL;
 	      current_part_dimension = 0;
 	      break;
 
@@ -5201,7 +5206,33 @@ resolve_ref (gfc_expr *expr)
 	  break;
 
 	case REF_SUBSTRING:
+	  break;
+
 	case REF_INQUIRY:
+	  /* Implement requirement in note 9.7 of F2018 that the result of the
+	     LEN inquiry be a scalar.  */
+	  if (ref->u.i == INQUIRY_LEN && array_ref)
+	    {
+	      array_ref->u.ar.type = AR_ELEMENT;
+	      expr->rank = 0;
+	      /* INQUIRY_LEN is not evaluated from the the rest of the expr
+		 but directly from the string length. This means that setting
+		 the array indices to one does not matter but might trigger
+		 a runtime bounds error. Suppress the check.  */
+	      expr->no_bounds_check = 1;
+	      for (dim = 0; dim < array_ref->u.ar.dimen; dim++)
+		{
+		  array_ref->u.ar.dimen_type[dim] = DIMEN_ELEMENT;
+		  if (array_ref->u.ar.start[dim])
+		    gfc_free_expr (array_ref->u.ar.start[dim]);
+		  array_ref->u.ar.start[dim]
+			= gfc_get_int_expr (gfc_default_integer_kind, NULL, 1);
+		  if (array_ref->u.ar.end[dim])
+		    gfc_free_expr (array_ref->u.ar.end[dim]);
+		  if (array_ref->u.ar.stride[dim])
+		    gfc_free_expr (array_ref->u.ar.stride[dim]);
+		}
+	    }
 	  break;
 	}
 
@@ -8870,7 +8901,7 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
 	  as = NULL;
 	  sym->ts = *ts;
 	  sym->ts.type = BT_CLASS;
-	  attr = CLASS_DATA (sym)->attr;
+	  attr = CLASS_DATA (sym) ? CLASS_DATA (sym)->attr : sym->attr;
 	  attr.class_ok = 0;
 	  attr.associate_var = 1;
 	  attr.dimension = attr.codimension = 0;
@@ -11449,10 +11480,18 @@ start:
 	case EXEC_GOTO:
 	  if (code->expr1 != NULL)
 	    {
-	      if (code->expr1->ts.type != BT_INTEGER)
-		gfc_error ("ASSIGNED GOTO statement at %L requires an "
-			   "INTEGER variable", &code->expr1->where);
-	      else if (code->expr1->symtree->n.sym->attr.assign != 1)
+	      if (code->expr1->expr_type != EXPR_VARIABLE
+		  || code->expr1->ts.type != BT_INTEGER
+		  || (code->expr1->ref
+		      && code->expr1->ref->type == REF_ARRAY)
+		  || code->expr1->symtree == NULL
+		  || (code->expr1->symtree->n.sym
+		      && (code->expr1->symtree->n.sym->attr.flavor
+			  == FL_PARAMETER)))
+		gfc_error ("ASSIGNED GOTO statement at %L requires a "
+			   "scalar INTEGER variable", &code->expr1->where);
+	      else if (code->expr1->symtree->n.sym
+		       && code->expr1->symtree->n.sym->attr.assign != 1)
 		gfc_error ("Variable %qs has not been assigned a target "
 			   "label at %L", code->expr1->symtree->n.sym->name,
 			   &code->expr1->where);
@@ -12000,7 +12039,7 @@ resolve_charlen (gfc_charlen *cl)
 	}
 
       /* cl->length has been resolved.  It should have an integer type.  */
-      if (cl->length->ts.type != BT_INTEGER)
+      if (cl->length->ts.type != BT_INTEGER || cl->length->rank != 0)
 	{
 	  gfc_error ("Scalar INTEGER expression expected at %L",
 		     &cl->length->where);
@@ -12629,6 +12668,7 @@ resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
 	{
 	  if (arg->sym
 	      && arg->sym->ts.type == BT_DERIVED
+	      && arg->sym->ts.u.derived
 	      && !arg->sym->ts.u.derived->attr.use_assoc
 	      && !gfc_check_symbol_access (arg->sym->ts.u.derived)
 	      && !gfc_notify_std (GFC_STD_F2003, "%qs is of a PRIVATE type "
@@ -12755,8 +12795,10 @@ resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
     {
       if (sym->attr.proc_pointer)
 	{
+	  const char* name = (sym->attr.result ? sym->ns->proc_name->name
+					       : sym->name);
 	  gfc_error ("Procedure pointer %qs at %L shall not be elemental",
-		     sym->name, &sym->declared_at);
+		     name, &sym->declared_at);
 	  return false;
 	}
       if (sym->attr.dummy)
@@ -12843,7 +12885,7 @@ resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
       if (sym->attr.subroutine && sym->attr.result)
 	{
 	  gfc_error ("PROCEDURE attribute conflicts with RESULT attribute "
-		     "in %qs at %L", sym->name, &sym->declared_at);
+		     "in %qs at %L", sym->ns->proc_name->name, &sym->declared_at);
 	  return false;
 	}
       if (sym->attr.external && sym->attr.function && !sym->attr.module_procedure
@@ -13541,7 +13583,7 @@ resolve_typebound_procedure (gfc_symtree* stree)
     {
       /* If proc has not been resolved at this point, proc->name may
 	 actually be a USE associated entity. See PR fortran/89647. */
-      if (!proc->resolved
+      if (!proc->resolve_symbol_called
 	  && proc->attr.function == 0 && proc->attr.subroutine == 0)
 	{
 	  gfc_symbol *tmp;
@@ -14791,9 +14833,9 @@ resolve_symbol (gfc_symbol *sym)
   gfc_array_spec *as;
   bool saved_specification_expr;
 
-  if (sym->resolved)
+  if (sym->resolve_symbol_called >= 1)
     return;
-  sym->resolved = 1;
+  sym->resolve_symbol_called = 1;
 
   /* No symbol will ever have union type; only components can be unions.
      Union type declaration symbols have type BT_UNKNOWN but flavor FL_UNION
@@ -14805,6 +14847,7 @@ resolve_symbol (gfc_symbol *sym)
   if (flag_coarray == GFC_FCOARRAY_LIB && sym->ts.type == BT_CLASS
       && sym->ts.u.derived && CLASS_DATA (sym)
       && CLASS_DATA (sym)->attr.codimension
+      && CLASS_DATA (sym)->ts.u.derived
       && (CLASS_DATA (sym)->ts.u.derived->attr.alloc_comp
 	  || CLASS_DATA (sym)->ts.u.derived->attr.pointer_comp))
     {

@@ -331,10 +331,25 @@
 ;; Attribute that specifies whether the alternative uses MOVPRFX.
 (define_attr "movprfx" "no,yes" (const_string "no"))
 
+;; Attribute to specify that an alternative has the length of a single
+;; instruction plus a speculation barrier.
+(define_attr "sls_length" "none,retbr,casesi" (const_string "none"))
+
 (define_attr "length" ""
   (cond [(eq_attr "movprfx" "yes")
            (const_int 8)
-        ] (const_int 4)))
+
+	 (eq_attr "sls_length" "retbr")
+	   (cond [(match_test "!aarch64_harden_sls_retbr_p ()") (const_int 4)
+		  (match_test "TARGET_SB") (const_int 8)]
+		 (const_int 12))
+
+	 (eq_attr "sls_length" "casesi")
+	   (cond [(match_test "!aarch64_harden_sls_retbr_p ()") (const_int 16)
+		  (match_test "TARGET_SB") (const_int 20)]
+		 (const_int 24))
+	]
+	  (const_int 4)))
 
 ;; Strictly for compatibility with AArch32 in pipeline models, since AArch64 has
 ;; no predicated insns.
@@ -370,8 +385,12 @@
 (define_insn "indirect_jump"
   [(set (pc) (match_operand:DI 0 "register_operand" "r"))]
   ""
-  "br\\t%0"
-  [(set_attr "type" "branch")]
+  {
+    output_asm_insn ("br\\t%0", operands);
+    return aarch64_sls_barrier (aarch64_harden_sls_retbr_p ());
+  }
+  [(set_attr "type" "branch")
+   (set_attr "sls_length" "retbr")]
 )
 
 (define_insn "jump"
@@ -657,7 +676,7 @@
   "*
   return aarch64_output_casesi (operands);
   "
-  [(set_attr "length" "16")
+  [(set_attr "sls_length" "casesi")
    (set_attr "type" "branch")]
 )
 
@@ -736,14 +755,18 @@
   [(return)]
   ""
   {
+    const char *ret = NULL;
     if (aarch64_return_address_signing_enabled ()
 	&& TARGET_ARMV8_3
 	&& !crtl->calls_eh_return)
-      return "retaa";
-
-    return "ret";
+      ret = "retaa";
+    else
+      ret = "ret";
+    output_asm_insn (ret, operands);
+    return aarch64_sls_barrier (aarch64_harden_sls_retbr_p ());
   }
-  [(set_attr "type" "branch")]
+  [(set_attr "type" "branch")
+   (set_attr "sls_length" "retbr")]
 )
 
 (define_expand "return"
@@ -755,8 +778,12 @@
 (define_insn "simple_return"
   [(simple_return)]
   "aarch64_use_simple_return_insn_p ()"
-  "ret"
-  [(set_attr "type" "branch")]
+  {
+    output_asm_insn ("ret", operands);
+    return aarch64_sls_barrier (aarch64_harden_sls_retbr_p ());
+  }
+  [(set_attr "type" "branch")
+   (set_attr "sls_length" "retbr")]
 )
 
 (define_insn "*cb<optab><mode>1"
@@ -881,15 +908,14 @@
 )
 
 (define_insn "*call_insn"
-  [(call (mem:DI (match_operand:DI 0 "aarch64_call_insn_operand" "r, Usf"))
+  [(call (mem:DI (match_operand:DI 0 "aarch64_call_insn_operand" "Ucr, Usf"))
 	 (match_operand 1 "" ""))
    (clobber (reg:DI LR_REGNUM))]
   ""
   "@
-  blr\\t%0
+  * return aarch64_indirect_call_asm (operands[0]);
   bl\\t%c0"
-  [(set_attr "type" "call, call")]
-)
+  [(set_attr "type" "call, call")])
 
 (define_expand "call_value"
   [(parallel [(set (match_operand 0 "" "")
@@ -907,12 +933,12 @@
 
 (define_insn "*call_value_insn"
   [(set (match_operand 0 "" "")
-	(call (mem:DI (match_operand:DI 1 "aarch64_call_insn_operand" "r, Usf"))
+	(call (mem:DI (match_operand:DI 1 "aarch64_call_insn_operand" "Ucr, Usf"))
 		      (match_operand 2 "" "")))
    (clobber (reg:DI LR_REGNUM))]
   ""
   "@
-  blr\\t%1
+  * return aarch64_indirect_call_asm (operands[1]);
   bl\\t%c1"
   [(set_attr "type" "call, call")]
 )
@@ -947,10 +973,16 @@
 	 (match_operand 1 "" ""))
    (return)]
   "SIBLING_CALL_P (insn)"
-  "@
-   br\\t%0
-   b\\t%c0"
-  [(set_attr "type" "branch, branch")]
+  {
+    if (which_alternative == 0)
+      {
+	output_asm_insn ("br\\t%0", operands);
+	return aarch64_sls_barrier (aarch64_harden_sls_retbr_p ());
+      }
+    return "b\\t%c0";
+  }
+  [(set_attr "type" "branch, branch")
+   (set_attr "sls_length" "retbr,none")]
 )
 
 (define_insn "*sibcall_value_insn"
@@ -960,10 +992,16 @@
 	      (match_operand 2 "" "")))
    (return)]
   "SIBLING_CALL_P (insn)"
-  "@
-   br\\t%1
-   b\\t%c1"
-  [(set_attr "type" "branch, branch")]
+  {
+    if (which_alternative == 0)
+      {
+	output_asm_insn ("br\\t%1", operands);
+	return aarch64_sls_barrier (aarch64_harden_sls_retbr_p ());
+      }
+    return "b\\t%c1";
+  }
+  [(set_attr "type" "branch, branch")
+   (set_attr "sls_length" "retbr,none")]
 )
 
 ;; Call subroutine returning any type.
@@ -6947,10 +6985,8 @@
    (match_operand 2)]
   ""
 {
-  rtx result;
   machine_mode mode = GET_MODE (operands[0]);
 
-  result = gen_reg_rtx(mode);
   if (aarch64_stack_protector_guard != SSP_GLOBAL)
   {
     /* Generate access through the system register. The
@@ -6975,29 +7011,27 @@
     operands[1] = gen_rtx_MEM (mode, tmp_reg);
   }
   emit_insn ((mode == DImode
-		  ? gen_stack_protect_test_di
-		  : gen_stack_protect_test_si) (result,
-					        operands[0],
-					        operands[1]));
+	     ? gen_stack_protect_test_di
+	     : gen_stack_protect_test_si) (operands[0], operands[1]));
 
-  if (mode == DImode)
-    emit_jump_insn (gen_cbranchdi4 (gen_rtx_EQ (VOIDmode, result, const0_rtx),
-				    result, const0_rtx, operands[2]));
-  else
-    emit_jump_insn (gen_cbranchsi4 (gen_rtx_EQ (VOIDmode, result, const0_rtx),
-				    result, const0_rtx, operands[2]));
+  rtx cc_reg = gen_rtx_REG (CCmode, CC_REGNUM);
+  emit_jump_insn (gen_condjump (gen_rtx_EQ (VOIDmode, cc_reg, const0_rtx),
+				cc_reg, operands[2]));
   DONE;
 })
 
+;; DO NOT SPLIT THIS PATTERN.  It is important for security reasons that the
+;; canary value does not live beyond the end of this sequence.
 (define_insn "stack_protect_test_<mode>"
-  [(set (match_operand:PTR 0 "register_operand" "=r")
-	(unspec:PTR [(match_operand:PTR 1 "memory_operand" "m")
-		     (match_operand:PTR 2 "memory_operand" "m")]
-	 UNSPEC_SP_TEST))
+  [(set (reg:CC CC_REGNUM)
+	(unspec:CC [(match_operand:PTR 0 "memory_operand" "m")
+		    (match_operand:PTR 1 "memory_operand" "m")]
+		   UNSPEC_SP_TEST))
+   (clobber (match_scratch:PTR 2 "=&r"))
    (clobber (match_scratch:PTR 3 "=&r"))]
   ""
-  "ldr\t%<w>3, %1\;ldr\t%<w>0, %2\;eor\t%<w>0, %<w>3, %<w>0"
-  [(set_attr "length" "12")
+  "ldr\t%<w>2, %0\;ldr\t%<w>3, %1\;subs\t%<w>2, %<w>2, %<w>3\;mov\t%3, 0"
+  [(set_attr "length" "16")
    (set_attr "type" "multiple")])
 
 ;; Write Floating-point Control Register.

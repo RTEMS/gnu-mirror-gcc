@@ -1,3 +1,678 @@
+2020-09-02  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2019-12-30  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/92923
+	* config/rs6000/rs6000-builtin.def (VAND, VANDC, VNOR, VOR, VXOR):
+	Delete.
+	(EQV_V16QI_UNS, EQV_V8HI_UNS, EQV_V4SI_UNS, EQV_V2DI_UNS, EQV_V1TI_UNS,
+	NAND_V16QI_UNS, NAND_V8HI_UNS, NAND_V4SI_UNS, NAND_V2DI_UNS,
+	NAND_V1TI_UNS, ORC_V16QI_UNS, ORC_V8HI_UNS, ORC_V4SI_UNS, ORC_V2DI_UNS,
+	ORC_V1TI_UNS, VAND_V16QI_UNS, VAND_V16QI, VAND_V8HI_UNS, VAND_V8HI,
+	VAND_V4SI_UNS, VAND_V4SI, VAND_V2DI_UNS, VAND_V2DI, VAND_V4SF,
+	VAND_V2DF, VANDC_V16QI_UNS, VANDC_V16QI, VANDC_V8HI_UNS, VANDC_V8HI,
+	VANDC_V4SI_UNS, VANDC_V4SI, VANDC_V2DI_UNS, VANDC_V2DI, VANDC_V4SF,
+	VANDC_V2DF, VNOR_V16QI_UNS, VNOR_V16QI, VNOR_V8HI_UNS, VNOR_V8HI,
+	VNOR_V4SI_UNS, VNOR_V4SI, VNOR_V2DI_UNS, VNOR_V2DI, VNOR_V4SF,
+	VNOR_V2DF, VOR_V16QI_UNS, VOR_V16QI, VOR_V8HI_UNS, VOR_V8HI,
+	VOR_V4SI_UNS, VOR_V4SI, VOR_V2DI_UNS, VOR_V2DI, VOR_V4SF, VOR_V2DF,
+	VXOR_V16QI_UNS, VXOR_V16QI, VXOR_V8HI_UNS, VXOR_V8HI,
+	VXOR_V4SI_UNS, VXOR_V4SI, VXOR_V2DI_UNS, VXOR_V2DI, VXOR_V4SF,
+	VXOR_V2DF): Add definitions.
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins)
+	<ALTIVEC_BUILTIN_VAND, ALTIVEC_BUILTIN_VANDC, ALTIVEC_BUILTIN_VNOR,
+	ALTIVEC_BUILTIN_VOR, ALTIVEC_BUILTIN_VXOR>: Remove.
+	<ALTIVEC_BUILTIN_VAND_V4SF, ALTIVEC_BUILTIN_VAND_V2DF,
+	ALTIVEC_BUILTIN_VAND_V2DI, ALTIVEC_BUILTIN_VAND_V2DI_UNS,
+	ALTIVEC_BUILTIN_VAND_V4SI_UNS, ALTIVEC_BUILTIN_VAND_V4SI,
+	ALTIVEC_BUILTIN_VAND_V8HI_UNS, ALTIVEC_BUILTIN_VAND_V8HI,
+	ALTIVEC_BUILTIN_VAND_V16QI, ALTIVEC_BUILTIN_VAND_V16QI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V4SF, ALTIVEC_BUILTIN_VANDC_V2DF,
+	ALTIVEC_BUILTIN_VANDC_V2DI, ALTIVEC_BUILTIN_VANDC_V2DI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V4SI_UNS, ALTIVEC_BUILTIN_VANDC_V4SI,
+	ALTIVEC_BUILTIN_VANDC_V8HI_UNS, ALTIVEC_BUILTIN_VANDC_V8HI,
+	ALTIVEC_BUILTIN_VANDC_V16QI, ALTIVEC_BUILTIN_VANDC_V16QI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V4SF, ALTIVEC_BUILTIN_VNOR_V2DF,
+	ALTIVEC_BUILTIN_VNOR_V2DI, ALTIVEC_BUILTIN_VNOR_V2DI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V4SI, ALTIVEC_BUILTIN_VNOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V8HI, ALTIVEC_BUILTIN_VNOR_V8HI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V16QI, ALTIVEC_BUILTIN_VNOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VOR_V4SF, ALTIVEC_BUILTIN_VOR_V2DF,
+	ALTIVEC_BUILTIN_VOR_V2DI, ALTIVEC_BUILTIN_VOR_V2DI_UNS,
+	ALTIVEC_BUILTIN_VOR_V4SI_UNS, ALTIVEC_BUILTIN_VOR_V4SI,
+	ALTIVEC_BUILTIN_VOR_V8HI_UNS, ALTIVEC_BUILTIN_VOR_V8HI,
+	ALTIVEC_BUILTIN_VOR_V16QI, ALTIVEC_BUILTIN_VOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V4SF, ALTIVEC_BUILTIN_VXOR_V2DF,
+	ALTIVEC_BUILTIN_VXOR_V2DI, ALTIVEC_BUILTIN_VXOR_V2DI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V4SI_UNS, ALTIVEC_BUILTIN_VXOR_V4SI,
+	ALTIVEC_BUILTIN_VXOR_V8HI, ALTIVEC_BUILTIN_VXOR_V8HI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V16QI, ALTIVEC_BUILTIN_VXOR_V16QI_UNS>: Add
+	definitions.
+	<P8V_BUILTIN_EQV_V16QI, P8V_BUILTIN_EQV_V8HI, P8V_BUILTIN_EQV_V4SI,
+	P8V_BUILTIN_EQV_V2DI, P8V_BUILTIN_NAND_V16QI, P8V_BUILTIN_NAND_V8HI,
+	P8V_BUILTIN_NAND_V4SI, P8V_BUILTIN_NAND_V2DI, P8V_BUILTIN_ORC_V16QI,
+	P8V_BUILTIN_ORC_V8HI, P8V_BUILTIN_ORC_V4SI,
+	P8V_BUILTIN_ORC_V2DI>: Change unsigned usages to use the new *_UNS
+	definition names.
+	* config/rs6000/rs6000.c
+	(rs6000_gimple_fold_builtin) <ALTIVEC_BUILTIN_VAND_V16QI_UNS,
+	ALTIVEC_BUILTIN_VAND_V16QI, ALTIVEC_BUILTIN_VAND_V8HI_UNS,
+	ALTIVEC_BUILTIN_VAND_V8HI, ALTIVEC_BUILTIN_VAND_V4SI_UNS,
+	ALTIVEC_BUILTIN_VAND_V4SI, ALTIVEC_BUILTIN_VAND_V2DI_UNS,
+	ALTIVEC_BUILTIN_VAND_V2DI, ALTIVEC_BUILTIN_VAND_V4SF,
+	ALTIVEC_BUILTIN_VAND_V2DF, ALTIVEC_BUILTIN_VANDC_V16QI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V16QI, ALTIVEC_BUILTIN_VANDC_V8HI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V8HI, ALTIVEC_BUILTIN_VANDC_V4SI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V4SI, ALTIVEC_BUILTIN_VANDC_V2DI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V2DI, ALTIVEC_BUILTIN_VANDC_V4SF,
+	ALTIVEC_BUILTIN_VANDC_V2DF, P8V_BUILTIN_NAND_V16QI_UNS,
+	P8V_BUILTIN_NAND_V8HI_UNS, P8V_BUILTIN_NAND_V4SI_UNS,
+	P8V_BUILTIN_NAND_V2DI_UNS, P8V_BUILTIN_NAND_V2DI,
+	ALTIVEC_BUILTIN_VOR_V16QI_UNS, ALTIVEC_BUILTIN_VOR_V16QI,
+	ALTIVEC_BUILTIN_VOR_V8HI_UNS, ALTIVEC_BUILTIN_VOR_V8HI,
+	ALTIVEC_BUILTIN_VOR_V4SI_UNS, ALTIVEC_BUILTIN_VOR_V4SI,
+	ALTIVEC_BUILTIN_VOR_V2DI_UNS, ALTIVEC_BUILTIN_VOR_V2DI,
+	ALTIVEC_BUILTIN_VOR_V4SF, ALTIVEC_BUILTIN_VOR_V2DF,
+	P8V_BUILTIN_ORC_V16QI_UNS, P8V_BUILTIN_ORC_V8HI_UNS,
+	P8V_BUILTIN_ORC_V4SI_UNS, P8V_BUILTIN_ORC_V2DI_UNS,
+	P8V_BUILTIN_ORC_V2DI, ALTIVEC_BUILTIN_VXOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V16QI, ALTIVEC_BUILTIN_VXOR_V8HI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V8HI, ALTIVEC_BUILTIN_VXOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V4SI, ALTIVEC_BUILTIN_VXOR_V2DI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V2DI, ALTIVEC_BUILTIN_VXOR_V4SF,
+	ALTIVEC_BUILTIN_VXOR_V2DF, ALTIVEC_BUILTIN_VNOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V16QI, ALTIVEC_BUILTIN_VNOR_V8HI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V8HI, ALTIVEC_BUILTIN_VNOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V4SI, ALTIVEC_BUILTIN_VNOR_V2DI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V2DI, ALTIVEC_BUILTIN_VNOR_V4SF,
+	ALTIVEC_BUILTIN_VNOR_V2DF>: Use new definition names.
+	(builtin_function_type) <ALTIVEC_BUILTIN_VAND_V16QI_UNS,
+	ALTIVEC_BUILTIN_VAND_V8HI_UNS, ALTIVEC_BUILTIN_VAND_V4SI_UNS,
+	ALTIVEC_BUILTIN_VAND_V2DI_UNS, ALTIVEC_BUILTIN_VANDC_V16QI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V8HI_UNS, ALTIVEC_BUILTIN_VANDC_V4SI_UNS,
+	ALTIVEC_BUILTIN_VANDC_V2DI_UNS, ALTIVEC_BUILTIN_VNOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V8HI_UNS, ALTIVEC_BUILTIN_VNOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VNOR_V2DI_UNS, ALTIVEC_BUILTIN_VOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VOR_V8HI_UNS, ALTIVEC_BUILTIN_VOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VOR_V2DI_UNS, ALTIVEC_BUILTIN_VXOR_V16QI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V8HI_UNS, ALTIVEC_BUILTIN_VXOR_V4SI_UNS,
+	ALTIVEC_BUILTIN_VXOR_V2DI_UNS, P8V_BUILTIN_EQV_V16QI_UNS,
+	P8V_BUILTIN_EQV_V8HI_UNS, P8V_BUILTIN_EQV_V4SI_UNS,
+	P8V_BUILTIN_EQV_V2DI_UNS, P8V_BUILTIN_EQV_V1TI_UNS,
+	P8V_BUILTIN_NAND_V16QI_UNS, P8V_BUILTIN_NAND_V8HI_UNS,
+	P8V_BUILTIN_NAND_V4SI_UNS, P8V_BUILTIN_NAND_V2DI_UNS,
+	P8V_BUILTIN_NAND_V1TI_UNS, P8V_BUILTIN_ORC_V16QI_UNS,
+	P8V_BUILTIN_ORC_V8HI_UNS, P8V_BUILTIN_ORC_V4SI_UNS,
+	P8V_BUILTIN_ORC_V2DI_UNS, P8V_BUILTIN_ORC_V1TI_UNS>: Handle unsigned
+	builtins.
+
+2020-08-27  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	Backported from master:
+	2020-08-24  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/94538
+	PR target/94538
+	* config/arm/thumb1.md: Disable set-constant splitter when
+	TARGET_HAVE_MOVT.
+	(thumb1_movsi_insn): Fix -mpure-code
+	alternative.
+
+2020-08-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* doc/extend.texi: Update links to Arm docs.
+	* doc/invoke.texi: Likewise.
+
+2020-08-21  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-08-03  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/aarch64/driver-aarch64.c (readline): Check return value fgets.
+
+2020-08-21  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-07-17  Tamar Christina  <tamar.christina@arm.com>
+
+	* doc/sourcebuild.texi (dg-set-compiler-env-var,
+	dg-set-target-env-var): Document.
+
+2020-08-21  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-07-17  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/arm/driver-arm.c (host_detect_local_cpu): Add GCC_CPUINFO.
+
+2020-08-21  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-07-17  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/aarch64/driver-aarch64.c (host_detect_local_cpu):
+	Add GCC_CPUINFO.
+
+2020-08-21  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-07-17  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/aarch64/driver-aarch64.c (INCLUDE_SET): New.
+	(parse_field): Use std::string.
+	(split_words, readline, find_field): New.
+	(host_detect_local_cpu): Fix truncation issues.
+
+2020-08-18  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96536
+	* config/i386/i386.md (restore_stack_nonlocal):
+	Add missing compare RTX.
+
+2020-08-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-06  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/96191
+	* config/arm/arm.md (arm_stack_protect_test_insn): Zero out
+	operand 2 after use.
+	* config/arm/thumb1.md (thumb1_stack_protect_test_insn): Likewise.
+
+2020-08-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/96191
+	* config/aarch64/aarch64.md (stack_protect_test_<mode>): Set the
+	CC register directly, instead of a GPR.  Replace the original GPR
+	destination with an extra scratch register.  Zero out operand 3
+	after use.
+	(stack_protect_test): Update accordingly.
+
+2020-08-07  Qian Jianhua  <qianjh@cn.fujitsu.com>
+
+	Backported from master:
+	2020-08-03  Qian jianhua  <qianjh@cn.fujitsu.com>
+
+	* config/aarch64/aarch64-cores.def (a64fx): New core.
+	* config/aarch64/aarch64-tune.md: Regenerated.
+	* config/aarch64/aarch64.c (a64fx_prefetch_tune, a64fx_tunings): New.
+	* doc/invoke.texi: Add a64fx to the list.
+
+2020-08-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-04-16  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/94605
+	* early-remat.c (early_remat::process_block): Handle insns that
+	set multiple candidate registers.
+
+2020-08-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-07-13  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR middle-end/95114
+	* tree.h (virtual_method_call_p): Add a default-false parameter
+	that indicates whether the function is being called from dump
+	routines.
+	(obj_type_ref_class): Likewise.
+	* tree.c (virtual_method_call_p): Likewise.
+	* ipa-devirt.c (obj_type_ref_class): Likewise.  Lazily add ODR
+	type information for the type when the parameter is false.
+	* tree-pretty-print.c (dump_generic_node): Update calls to
+	virtual_method_call_p and obj_type_ref_class accordingly.
+
+2020-08-04  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch64_indirect_call_asm):
+	New declaration.
+	* config/aarch64/aarch64.c (aarch64_regno_regclass): Handle new
+	stub registers class.
+	(aarch64_class_max_nregs): Likewise.
+	(aarch64_register_move_cost): Likewise.
+	(aarch64_sls_shared_thunks): Global array to store stub labels.
+	(aarch64_sls_emit_function_stub): New.
+	(aarch64_create_blr_label): New.
+	(aarch64_sls_emit_blr_function_thunks): New.
+	(aarch64_sls_emit_shared_blr_thunks): New.
+	(aarch64_asm_file_end): New.
+	(aarch64_indirect_call_asm): New.
+	(TARGET_ASM_FILE_END): Use aarch64_asm_file_end.
+	(TARGET_ASM_FUNCTION_EPILOGUE): Use
+	aarch64_sls_emit_blr_function_thunks.
+	* config/aarch64/aarch64.h (STB_REGNUM_P): New.
+	(enum reg_class): Add STUB_REGS class.
+	(machine_function): Introduce `call_via` array for
+	function-local stub labels.
+	* config/aarch64/aarch64.md (*call_insn, *call_value_insn): Use
+	aarch64_indirect_call_asm to emit code when hardening BLR
+	instructions.
+	* config/aarch64/constraints.md (Ucr): New constraint
+	representing registers for indirect calls.  Is GENERAL_REGS
+	usually, and STUB_REGS when hardening BLR instruction against
+	SLS.
+	* config/aarch64/predicates.md (aarch64_general_reg): STUB_REGS class
+	is also a general register.
+
+2020-08-04  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch64_sls_barrier): New.
+	* config/aarch64/aarch64.c (aarch64_output_casesi): Emit
+	speculation barrier after BR instruction if needs be.
+	(aarch64_trampoline_init): Handle ptr_mode value & adjust size
+	of code copied.
+	(aarch64_sls_barrier): New.
+	(aarch64_asm_trampoline_template): Add needed barriers.
+	* config/aarch64/aarch64.h (AARCH64_ISA_SB): New.
+	(TARGET_SB): New.
+	(TRAMPOLINE_SIZE): Account for barrier.
+	* config/aarch64/aarch64.md (indirect_jump, *casesi_dispatch,
+	simple_return, *do_return, *sibcall_insn, *sibcall_value_insn):
+	Emit barrier if needs be, also account for possible barrier using
+	"sls_length" attribute.
+	(sls_length): New attribute.
+	(length): Determine default using any non-default sls_length
+	value.
+
+2020-08-04  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch64_harden_sls_retbr_p):
+	New.
+	(aarch64_harden_sls_blr_p): New.
+	* config/aarch64/aarch64.c (enum aarch64_sls_hardening_type):
+	New.
+	(aarch64_harden_sls_retbr_p): New.
+	(aarch64_harden_sls_blr_p): New.
+	(aarch64_validate_sls_mitigation): New.
+	(aarch64_override_options): Parse options for SLS mitigation.
+	* config/aarch64/aarch64.opt (-mharden-sls): New option.
+	* doc/invoke.texi: Document new option.
+
+2020-08-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/cpp.texi (Variadic Macros): Use the exact ... token in
+	code examples.
+
+2020-07-23  David Edelsohn  <dje.gcc@gmail.com>
+
+	Backported from master:
+	2020-03-06  David Edelsohn  <dje.gcc@gmail.com>
+
+	PR target/94065
+	* config/rs6000/aix61.h (TARGET_NO_SUM_IN_TOC): Set to 1 for
+	cmodel=large.
+	(TARGET_NO_FP_IN_TOC): Same.
+	* config/rs6000/aix71.h: Same.
+	* config/rs6000/aix72.h: Same.
+
+2020-07-17  Romain Naour  <romain.naour@gmail.com>
+
+	Backported from master:
+	2020-07-17  Romain Naour  <romain.naour@gmail.com>
+
+	* Makefile.in (SELFTEST_DEPS): Move before including language makefile
+	fragments.
+
+2020-07-16  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/aarch64/aarch64-c.c (aarch64_update_cpp_builtins): Add
+	__ARM_FEATURE_PAC_DEFAULT support.
+
+2020-07-16  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* doc/extend.texi: Update the text for  __builtin_return_address.
+
+2020-07-16  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* config/aarch64/aarch64.c (aarch64_return_address_signing_enabled):
+	Disable return address signing if __builtin_eh_return is used.
+
+2020-07-16  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	PR target/94791
+	* config/aarch64/aarch64-protos.h (aarch64_return_addr_rtx): Declare.
+	* config/aarch64/aarch64.c (aarch64_return_addr_rtx): New.
+	(aarch64_return_addr): Use aarch64_return_addr_rtx.
+	* config/aarch64/aarch64.h (PROFILE_HOOK): Likewise.
+
+2020-07-16  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2020-06-16  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* config.in: Regenerate.
+	* config/s390/s390.c (print_operand): Emit vector alignment hints
+	for target z13, if AS accepts them.  For other targets the logic
+	stays the same.
+	* config/s390/s390.h (TARGET_VECTOR_LOADSTORE_ALIGNMENT_HINTS): Define
+	macro.
+	* configure: Regenerate.
+	* configure.ac: Check HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13.
+
+2020-07-10  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* config/rs6000/altivec.h (vec_vmsumudm): New define.
+	* config/rs6000/altivec.md (UNSPEC_VMSUMUDM): New unspec.
+	  (altivec_vmsumudm): New define_insn.
+	* config/rs6000/rs6000-builtin.def (altivec_vmsumudm): New BU_ALTIVEC_3
+	  entry. (vmsumudm): New BU_ALTIVEC_OVERLOAD_3 entry.
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Add
+	  entries for ALTIVEC_BUILTIN_VMSUMUDM variants of vec_msum.
+	* doc/extend.texi: Add document for vmsumudm behind vmsum.
+
+2020-07-10  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backported from master:
+	2020-07-09  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/95804
+	* tree-loop-distribution.c (break_alias_scc_partitions): Force
+	negative post order to reduction partition.
+
+2020-07-10  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backported from master:
+	2020-06-20  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/95638
+	* tree-loop-distribution.c (pg_edge_callback_data): New field.
+	(loop_distribution::break_alias_scc_partitions): Record and restore
+	postorder information.  Fix memory leak.
+
+2020-07-06  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	PR target/94954
+	* config/rs6000/altivec.h (vec_pack_to_short_fp32): Update.
+	* config/rs6000/altivec.md (UNSPEC_CONVERT_4F32_8F16): New unspec.
+	(convert_4f32_8f16): New define_expand
+	* config/rs6000/rs6000-builtin.def (convert_4f32_8f16): New builtin define
+	and overload.
+	* config/rs6000/rs6000-c.c (P9V_BUILTIN_VEC_CONVERT_4F32_8F16): New
+	overloaded builtin entry.
+	* config/rs6000/vsx.md (UNSPEC_VSX_XVCVSPHP): New unspec.
+	(vsx_xvcvsphp): New define_insn.
+
+2020-06-30  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2020-05-18  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm.c (output_move_double): Fix codegen when loading into
+	a register pair with an odd base register.
+
+2020-06-25  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2020-06-25  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/95874
+	* config/i386/i386.h (PTA_ICELAKE_CLIENT): Remove PTA_CLWB.
+	(PTA_ICELAKE_SERVER): Add PTA_CLWB.
+
+2020-06-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-06-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* hsa-gen.c (gen_hsa_insns_for_call): Move 'function_decl ==
+	NULL_TREE' check earlier.
+
+2020-06-12  Martin Liska  <mliska@suse.cz>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/95634
+	* asan.c (asan_emit_stack_protection): Fix emission for ilp32
+	by using Pmode instead of ptr_mode.
+
+2020-06-12  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/94910
+	* asan.c (asan_emit_stack_protection): Emit
+	also **SavedFlagPtr(FakeStack, class_id) = 0 in order to release
+	a stack frame.
+
+2020-06-06  Carl Love  <cel@us.ibm.com>
+
+	PR target/94833
+	* config/rs6000/vsx.md (define_expand): Fix instruction generation for
+	first_match_index_<mode>.
+
+2020-06-05  H.J. Lu  <hjl.tools@gmail.com>
+
+	* config/i386/driver-i386.c (host_detect_local_cpu): Support
+	Intel Airmont, Tremont, Comet Lake, Ice Lake and Tiger Lake
+	processor families.
+
+2020-06-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (zeus): Define.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi (AArch64 Options): Document zeus -mcpu option.
+
+2020-05-31  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* config/i386/i386-c.c (ix86_target_macros): Define _ILP32 and
+	__ILP32__ for 32-bit targets.
+
+2020-05-29  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/94591
+	* config/aarch64/aarch64.c (aarch64_evpc_rev_local): Don't match
+	identity permutation.
+
+2020-05-29  Dong JianQiang  <dongjianqiang2@huawei.com>
+
+	PR gcov-profile/95332
+	* gcov-io.c (gcov_var::endian): Move field.
+	(from_file): Add IN_GCOV_TOOL check.
+	* gcov-io.h (gcov_magic): Ditto.
+
+2020-05-26  Alexandre Oliva  <oliva@adacore.com>
+
+	PR target/94812
+	* config/rs6000/rs6000.md (rs6000_mffsl): Copy result to
+	output operand in emulation.  Don't overwrite pseudos.
+
+2020-05-24  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/95258
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect
+	AVX512VPOPCNTDQ.
+
+2020-05-22  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backport from master
+	PR tree-optimization/94969
+	2020-05-13  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	* tree-data-ref.c (constant_access_functions): Rename to...
+	(invariant_access_functions): ...this.  Add parameter.  Check for
+	invariant access function, rather than constant.
+	(build_classic_dist_vector): Call above function.
+	* tree-loop-distribution.c (pg_add_dependence_edges): Add comment.
+
+2020-05-21  Martin Liska  <mliska@suse.cz>
+
+	* common/config/aarch64/aarch64-common.c (aarch64_handle_option):
+	Use MASK_OUTLINE_ATOMICS for x_target_flags.
+
+2020-05-21  Martin Liska  <mliska@suse.cz>
+
+	* common/config/aarch64/aarch64-common.c (aarch64_handle_option):
+	Handle OPT_moutline_atomics.
+	* config/aarch64/aarch64.c: Add outline-atomics to
+	aarch64_attributes.
+	* doc/extend.texi: Document the newly added target attribute.
+
+2020-05-14  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backport from mainline.
+	2020-04-30  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94748
+	* config/aarch64/aarch64-bti-insert.c (rest_of_insert_bti): Remove
+	the check for NOTE_INSN_DELETED_LABEL.
+
+2020-05-14  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backport from mainline.
+	2020-04-23  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94697
+	* config/aarch64/aarch64-bti-insert.c (rest_of_insert_bti): Swap
+	bti c and bti j handling.
+
+2020-05-14  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backport from mainline.
+	2020-04-27  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94515
+	* dwarf2cfi.c (struct GTY): Add ra_mangled.
+	(cfi_row_equal_p): Check ra_mangled.
+	(dwarf2out_frame_debug_cfa_window_save): Remove the argument,
+	this only handles the sparc logic now.
+	(dwarf2out_frame_debug_cfa_toggle_ra_mangle): New function for
+	the aarch64 specific logic.
+	(dwarf2out_frame_debug): Update to use the new subroutines.
+	(change_cfi_row): Check ra_mangled.
+
+2020-05-12  David Edelsohn  <dje.gcc@gmail.com>
+
+	Backport from mainline
+	2020-04-08  Clement Chigot  <clement.chigot@atos.net>
+
+        * config/rs6000/aix61.h (LIB_SPEC): Add -lc128 with -mlong-double-128.
+        * config/rs6000/aix71.h (LIB_SPEC): Likewise.
+        * config/rs6000/aix72.h (LIB_SPEC): Likewise.
+
+2020-05-12  David Edelsohn  <dje.gcc@gmail.com>
+
+	Backport from mainline
+	2020-05-04  Clement Chigot  <clement.chigot@atos.net>
+		    David Edelsohn  <dje.gcc@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Override explicit
+	for fmodl, frexpl, ldexpl and modfl builtins.
+
+2020-05-11  Xiong Hu Luo  <luoxhu@linux.ibm.com>
+
+	Backport from master.
+	2020-04-27  Xiong Hu Luo  <luoxhu@linux.ibm.com>
+
+	PR target/91518
+	* config/rs6000/rs6000.c (frame_pointer_needed_indeed):
+	New variable.
+	(rs6000_emit_prologue_components):
+	Check with frame_pointer_needed_indeed.
+	(rs6000_emit_epilogue_components): Likewise.
+	(rs6000_emit_prologue): Likewise.
+	(rs6000_emit_epilogue): Set frame_pointer_needed_indeed.
+
+2020-05-07 Uroš Bizjak  <ubizjak@gmail.com>
+
+	* config/alpha/alpha.c (alpha_atomic_assign_expand_fenv): Use
+	TARGET_EXPR instead of MODIFY_EXPR for the first assignments to
+	fenv_var and new_fenv_var.
+
+2020-05-05  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backport from mainline
+	2020-04-30  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* config/s390/constraints.md ("j>f", "jb4"): New constraints.
+	* config/s390/vecintrin.h (vec_load_len_r, vec_store_len_r): Fix
+	macro definitions.
+	* config/s390/vx-builtins.md ("vlrlrv16qi", "vstrlrv16qi"): Add a
+	separate expander.
+	("*vlrlrv16qi", "*vstrlrv16qi"): Add alternative for vl/vst.
+	Change constraint for vlrl/vstrl to jb4.
+
+2020-05-04  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backport from mainline
+	2020-04-20  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* config/s390/vector.md ("popcountv8hi2_vx", "popcountv4si2_vx")
+	("popcountv2di2_vx"): Use simplify_gen_subreg.
+
+2020-05-04  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backport from mainline
+	2020-04-20  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR target/94613
+	* config/s390/s390-builtin-types.def: Add 3 new function modes.
+	* config/s390/s390-builtins.def: Add mode dependent low-level
+	builtin and map the overloaded builtins to these.
+	* config/s390/vx-builtins.md ("vec_selV_HW"): Rename to ...
+	("vsel<V_HW"): ... this and rewrite the pattern with bitops.
+
+2020-05-04  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/93674
+	Backport from master
+	2020-04-09  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	* tree-ssa-loop-ivopts.c (langhooks.h): New include.
+	(add_iv_candidate_for_use): For iv_use of non integer or pointer type,
+	or non-mode precision type, add candidate in unsigned type with the
+	same precision.
+
+2020-05-01  Alan Modra	 <amodra@gmail.com>
+
+	PR target/94145
+	Backport from master
+	2020-03-27  Alan Modra	 <amodra@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_longcall_ref): Use unspec_volatile
+	for PLT16_LO.
+	* config/rs6000/rs6000.md (UNSPEC_PLT16_LO): Remove.
+	(UNSPECV_PLT16_LO): Define.
+	(pltseq_plt16_lo_): Use unspec_volatile.
+
+2020-04-30  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/emmintrin.h (_mm_movemask_epi8): Fix comment.
+
+2020-04-29  H.J. Lu  <hongjiu.lu@intel.com>
+
+	Backport from master
+	2020-04-29  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/93654
+	* config/i386/i386.c (ix86_set_indirect_branch_type): Allow
+	-fcf-protection with -mindirect-branch=thunk-extern and
+	-mfunction-return=thunk-extern.
+	* doc/invoke.texi: Update notes for -fcf-protection=branch with
+	-mindirect-branch=thunk-extern and -mindirect-return=thunk-extern.
+
 2020-04-21  Martin Jambor  <mjambor@suse.cz>
 
 	Backport from master
@@ -153,7 +828,7 @@
 
 2020-04-07  Will Schmidt  <will_schmidt@vnet.ibm.com>
 
-Backport from mainline.
+	Backport from mainline.
 	2020-03-23  Will Schmidt  <will_schmidt@vnet.ibm.com>
 
 	* config/rs6000/rs6000-call.c altivec_init_builtins(): Remove

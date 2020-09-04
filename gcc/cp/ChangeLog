@@ -1,3 +1,58 @@
+2020-06-16  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/95678
+	* tree.c (zero_init_expr_p): Use uses_template_parms instead of
+	dependent_type_p.
+
+2020-06-11  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/95344
+	* cp-gimplify.c (cp_fold) <case MODIFY_EXPR>: Don't set
+	TREE_THIS_VOLATILE here.
+	(cp_fold): Set it here along with TREE_NO_WARNING.
+
+2020-06-11  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/95560
+	* name-lookup.c (check_local_shadow): Check if types are
+	non-null before calling same_type_p.
+
+2020-05-25  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90212
+	* constexpr.c (potential_constant_expression_1): In a lambda
+	function, consider a captured variable directly.
+
+2020-05-25  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90479
+	* init.c (get_nsdmi): Don't push_to_top_level for a local class.
+
+2020-05-25  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91529
+	* decl.c (cp_finish_decl): Also clear TREE_READONLY if
+	-fmerge-all-constants.
+
+2020-05-25  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93822
+	* pt.c (tsubst_decl): Make sure DECL_VALUE_EXPR continues to have
+	the same type as the variable.
+
+2020-05-06  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/94946
+	* decl.c (grokdeclarator): Don't splice template attributes in
+	parm context -- they can apply to the parm.
+
+2020-04-27  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90750
+	PR c++/79585
+	* decl.c (grokdeclarator): Move dependent attribute to decl.
+	* decl2.c (splice_template_attributes): No longer static.
+
 2020-04-21  Martin Sebor  <msebor@redhat.com>
 	    Jason Merrill  <jason@redhat.com>
 

@@ -1,3 +1,67 @@
+2020-08-01  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-07-30  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/96140
+	* intrinsics.cc (expand_intrinsic_vaarg): Handle ref parameters as
+	arguments to va_arg().
+	(expand_intrinsic_vastart): Handle ref parameters as arguments to
+	va_start().
+
+2020-06-26  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-06-25  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/95250
+	* dmd/expressionsem.c (class ExpressionSemanticVisitor): Return early
+	if error occurred during semantic of DivExp.
+
+2020-06-26  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-06-25  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/95173
+	* d-attribs.cc (uda_attribute_p): Don't search target attribute table
+	if NULL.
+
+2020-05-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backport from mainline
+	2020-03-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/92216
+	* decl.cc (make_thunk): Don't set TREE_PUBLIC on thunks if the target
+	function is external to the current compilation.
+
+2020-05-17  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backport from mainline
+	2020-05-06  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/94970
+	* d-codegen.cc (force_target_expr): Move create_temporary_var
+	implementation inline here.
+	(create_temporary_var): Remove.
+	(maybe_temporary_var): Remove.
+	(bind_expr): Remove.
+	* d-convert.cc (d_array_convert): Use build_local_temp to generate
+	temporaries, and generate its assignment.
+	* d-tree.h (create_temporary_var): Remove.
+	(maybe_temporary_var): Remove.
+	(d_array_convert): Remove vars argument.
+	* expr.cc (ExprVisitor::visit (CatExp *)): Use build_local_temp to
+	generate temporaries, don't wrap them in a BIND_EXPR.
+	(ExprVisitor::visit (NewExp *)): Likewise.
+
+2020-05-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/95155
+	* dmd/dclass.c (ClassDeclaration::semantic): Don't prematurely
+	set done on semantic analysis.
+
 2020-04-07  Iain Buclaw  <ibuclaw@gdcproject.org>
 
 	PR d/94240

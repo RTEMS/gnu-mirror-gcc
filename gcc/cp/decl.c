@@ -7299,7 +7299,10 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       /* This needs to happen after the linkage is set. */
       determine_visibility (decl);
 
-      if (var_definition_p && TREE_STATIC (decl))
+      if (var_definition_p
+	  /* With -fmerge-all-constants, gimplify_init_constructor
+	     might add TREE_STATIC to the variable.  */
+	  && (TREE_STATIC (decl) || flag_merge_constants >= 2))
 	{
 	  /* If a TREE_READONLY variable needs initialization
 	     at runtime, it is no longer readonly and we need to
@@ -11259,9 +11262,16 @@ grokdeclarator (const cp_declarator *declarator,
 	    attr_flags |= (int) ATTR_FLAG_FUNCTION_NEXT;
 	  if (declarator->kind == cdk_array)
 	    attr_flags |= (int) ATTR_FLAG_ARRAY_NEXT;
+	  tree late_attrs = NULL_TREE;
+	  if (decl_context != PARM)
+	    /* Assume that any attributes that get applied late to
+	       templates will DTRT when applied to the declaration
+	       as a whole.  */
+	    late_attrs = splice_template_attributes (&attrs, type);
 	  returned_attrs = decl_attributes (&type,
 					    chainon (returned_attrs, attrs),
 					    attr_flags);
+	  returned_attrs = chainon (late_attrs, returned_attrs);
 	}
 
       inner_declarator = declarator->declarator;
