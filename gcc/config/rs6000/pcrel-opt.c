@@ -514,22 +514,6 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
   return;
 }
 
-/* Return the TYPE attribute, but don't abort for things like USE, CLOBBER,
-   notes, etc.  Instead just return TYPE_INTEGER.  */
-
-static enum attr_type
-get_attr_type_safe (rtx_insn *insn)
-{
-  if (insn && NONDEBUG_INSN_P (insn))
-    {
-      enum rtx_code icode = GET_CODE (PATTERN (insn));
-      if (icode == SET || icode == PARALLEL)
-	return get_attr_type (insn);
-    }
-
-  return TYPE_INTEGER;
-}
-
 /* Given an insn with that loads up a base register with the address of an
    external symbol, see if we can optimize it with the PCREL_OPT
    optimization.  */
@@ -588,77 +572,112 @@ pcrel_opt_address (rtx_insn *addr_insn)
      type of insn it is.  */
   bool load_insns_found = false;
   bool store_insns_found = false;
-  bool atomic_insns_found = false;
+  bool do_pcrel_opt = true;
   rtx_insn *insn;
+  rtx_insn *last_insn_in_bb = BB_END (BLOCK_FOR_INSN (use_insn));
 
-  for (insn = NEXT_INSN (addr_insn); insn != use_insn; insn = NEXT_INSN (insn))
+
+  for (insn = NEXT_INSN (addr_insn);
+       insn != use_insn && do_pcrel_opt;
+       insn = NEXT_INSN (insn))
     {
-      /* If we didn't find the load/store in the list of insns, just skip doing
-	 the optimization.  */
-      if (!insn)
-	return;
-
-      switch (get_attr_type_safe (insn))
+      /* If we see things like labels, calls, etc. don't do the PCREL_OPT
+	 optimization.  */
+      if (!insn
+	  || LABEL_P (insn)
+	  || JUMP_P (insn)
+	  || CALL_P (insn)
+	  || BARRIER_P (insn))
 	{
-	  /* While load of the external address is a 'load' for scheduling
-	     purposes, it should be safe to allow loading other external
-	     addresses between the load of the external address we are
-	     currently looking at and the load or store using that address.  */
-	case TYPE_LOAD:
-	  if (get_attr_loads_extern_addr (insn) != LOADS_EXTERN_ADDR_YES)
-	    load_insns_found = true;
+	  do_pcrel_opt = false;
 	  break;
+	}
 
-	case TYPE_FPLOAD:
-	case TYPE_VECLOAD:
-	  load_insns_found = true;
-	  break;
+      /* For a normal insn, see if it is a load or store.  */
+      if (NONDEBUG_INSN_P (insn)
+	  && GET_CODE (PATTERN (insn)) != USE
+	  && GET_CODE (PATTERN (insn)) != CLOBBER)
+	{
+	  switch (get_attr_type (insn))
+	    {
+	      /* While load of the external address is a 'load' for scheduling
+		 purposes, it should be safe to allow loading other external
+		 addresses between the load of the external address we are
+		 currently looking at and the load or store using that
+		 address.  */
+	    case TYPE_LOAD:
+	      if (get_attr_loads_extern_addr (insn) != LOADS_EXTERN_ADDR_YES)
+		load_insns_found = true;
+	      break;
 
-	case TYPE_STORE:
-	case TYPE_FPSTORE:
-	case TYPE_VECSTORE:
-	  store_insns_found = true;
-	  break;
+	    case TYPE_FPLOAD:
+	    case TYPE_VECLOAD:
+	      load_insns_found = true;
+	      break;
 
-	  /* Don't do the optimization through atomic operations.  */
-	case TYPE_LOAD_L:
-	case TYPE_STORE_C:
-	case TYPE_HTM:
-	case TYPE_HTMSIMPLE:
-	  atomic_insns_found = true;
-	  break;
+	    case TYPE_STORE:
+	    case TYPE_FPSTORE:
+	    case TYPE_VECSTORE:
+	      store_insns_found = true;
+	      break;
 
-	default:
+	      /* Don't do the optimization through atomic operations.  */
+	    case TYPE_LOAD_L:
+	    case TYPE_STORE_C:
+	    case TYPE_HTM:
+	    case TYPE_HTMSIMPLE:
+	      do_pcrel_opt = false;
+	      break;
+
+	    default:
+	      break;
+	    }
+	}
+
+      /* If this is the last insn in the basic block, and we haven't found the
+	 load or store, exit.  */
+      if (insn == last_insn_in_bb)
+	{
+	  do_pcrel_opt = false;
 	  break;
 	}
     }
 
+  /* Don't do the optimization if something went wrong.  */
+  if (!do_pcrel_opt)
+    return;
+
   /* Is this a load or a store?  */
-  switch (get_attr_type_safe (use_insn))
+  switch (get_attr_type (use_insn))
     {
-      /* Don't do the PCREL_OPT load optimization if there was a store or
-	 atomic operation.  Perhaps the store might be to the global variable
-	 through a pointer.  */
+      /* Don't do the PCREL_OPT load optimization if there was a store
+	 operation.  Perhaps the store might be to the global variable through
+	 a pointer.  */
     case TYPE_LOAD:
     case TYPE_FPLOAD:
     case TYPE_VECLOAD:
-      if (!store_insns_found && !atomic_insns_found)
-	pcrel_opt_load (addr_insn, use_insn);
+      if (store_insns_found)
+	break;
+
+      pcrel_opt_load (addr_insn, use_insn);
       break;
 
-      /* Don't do the PCREL_OPT store optimization if there was a load, store,
-	 or atomic operation.  For example, a load might be trying to load the
-	 value being stored in between getting the address and doing the store.
-	 If we do the PCREL_OPT store optimization, there is the potential for
-	 the optimization to replace the load address with a store, which could
+      /* Don't do the PCREL_OPT store optimization if there was a load or store
+	 operation.  For example, a load might be trying to load the value
+	 being stored in between getting the address and doing the store.  If
+	 we do the PCREL_OPT store optimization, there is the potential for the
+	 optimization to replace the load address with a store, which could
 	 change the program.  */
     case TYPE_STORE:
     case TYPE_FPSTORE:
     case TYPE_VECSTORE:
-      if (!store_insns_found && !load_insns_found && !atomic_insns_found)
-	pcrel_opt_store (addr_insn, use_insn);
+      if (store_insns_found || load_insns_found)
+	break;
+
+      pcrel_opt_store (addr_insn, use_insn);
       break;
 
+      /* If the use is not a load or store, just skip the optimization.  */
     default:
       break;
     }
