@@ -123,8 +123,10 @@ static struct {
   unsigned long extern_addrs;
   unsigned long loads;
   unsigned long adjacent_loads;
+  unsigned long failed_loads;
   unsigned long stores;
   unsigned long adjacent_stores;
+  unsigned long failed_stores;
 } counters;
 
 /* Return a marker to identify the PCREL_OPT load address and load/store
@@ -292,21 +294,20 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   unsigned int addr_regno = reg_or_subregno (addr_reg);
   rtx label_num = pcrel_opt_next_marker ();
   rtx reg_di = gen_rtx_REG (DImode, reg_regno);
+  rtx addr_pattern;
 
-  PATTERN (addr_insn)
-    = ((addr_regno != reg_regno)
-       ? gen_pcrel_opt_ld_addr (addr_reg, addr_symbol, label_num, reg_di)
-       : gen_pcrel_opt_ld_addr_same_reg (addr_reg, addr_symbol, label_num));
+  /* Create the load address, either using the pattern with an explicit clobber
+     if the address register is not the same as the register being loaded, or
+     using the pattern that requires the address register to be the address
+     loaded.  */
+  if (addr_regno != reg_regno)
+    addr_pattern = gen_pcrel_opt_ld_addr (addr_reg, addr_symbol, label_num,
+					  reg_di);
+  else
+    addr_pattern = gen_pcrel_opt_ld_addr_same_reg (addr_reg, addr_symbol,
+						   label_num);
 
-  /* Revalidate the insn, backing out of the optimization if the insn is not
-     supported.  */
-  INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
-  if (INSN_CODE (addr_insn) < 0)
-    {
-      PATTERN (addr_insn) = addr_set;
-      INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
-      return;
-    }
+  validate_change (addr_insn, &PATTERN (addr_insn), addr_pattern, true);
 
   /* Update the load insn.  If the mem had a sign/zero/float extend, add that
      also after doing the UNSPEC.  Add an explicit clobber of the external
@@ -325,39 +326,40 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   if (GET_CODE (mem) != GET_CODE (mem_inner))
     new_load = gen_rtx_fmt_e (GET_CODE (mem), reg_mode, new_load);
 
-  rtx old_load_set = PATTERN (load_insn);
   rtx new_load_set = gen_rtx_SET (reg, new_load);
   rtx load_clobber = gen_rtx_CLOBBER (VOIDmode,
 				      (addr_regno == reg_regno
 				       ? gen_rtx_SCRATCH (Pmode)
 				       : addr_reg));
-  PATTERN (load_insn)
+  rtx new_load_pattern
     = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, new_load_set, load_clobber));
 
-  /* Revalidate the insn, backing out of the optimization if the insn is not
-     supported.  */
-  INSN_CODE (load_insn) = recog (PATTERN (load_insn), load_insn, 0);
-  if (INSN_CODE (load_insn) < 0)
+  validate_change (load_insn, &PATTERN (load_insn), new_load_pattern, true);
+
+  /* Note whether the changes were sucessful or not.  */
+  if (apply_change_group ())
     {
-      PATTERN (addr_insn) = addr_set;
-      INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
+      /* PCREL_OPT load optimization succeeded.  */
+      counters.loads++;
+      if (next_nonnote_insn (addr_insn) == load_insn)
+	counters.adjacent_loads++;
 
-      PATTERN (load_insn) = old_load_set;
-      INSN_CODE (load_insn) = recog (PATTERN (load_insn), load_insn, 0);
-      return;
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT load (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (load_insn));
     }
-
-  /* PCREL_OPT load optimization succeeded.  */
-  counters.loads++;
-  if (next_nonnote_insn (addr_insn) == load_insn)
-    counters.adjacent_loads++;
-
-  if (dump_file)
-    fprintf (dump_file,
-	     "%sPCREL_OPT load (addr insn = %d, use insn = %d).\n",
-	     counters.loads == 1 && counters.stores == 0 ? "\n" : "",
-	     INSN_UID (addr_insn),
-	     INSN_UID (load_insn));
+  else
+    {
+      /* PCREL_OPT load optimization did not succeed.  */
+      counters.failed_loads++;
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT load failed (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (load_insn));
+    }
 
   return;
 }
@@ -419,11 +421,11 @@ static void
 pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
 		 rtx_insn *store_insn)		/* insn using address.  */
 {
-  rtx addr_set = PATTERN (addr_insn);
-  gcc_assert (GET_CODE (addr_set) == SET);
+  rtx addr_old_set = PATTERN (addr_insn);
+  gcc_assert (GET_CODE (addr_old_set) == SET);
 
-  rtx addr_reg = SET_DEST (addr_set);
-  rtx addr_symbol = SET_SRC (addr_set);
+  rtx addr_reg = SET_DEST (addr_old_set);
+  rtx addr_symbol = SET_SRC (addr_old_set);
   rtx store_set = PATTERN (store_insn);
   gcc_assert (GET_CODE (store_set) == SET);
 
@@ -459,19 +461,10 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
 				   UNSPEC_PCREL_OPT_ST_ADDR);
   rtx addr_new_set = gen_rtx_SET (addr_reg, addr_unspec);
   rtx addr_use = gen_rtx_USE (VOIDmode, reg);
-
-  PATTERN (addr_insn)
+  rtx addr_new_pattern
     = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, addr_new_set, addr_use));
 
-  /* Revalidate the insn, backing out of the optimization if the insn is not
-     supported.  */
-  INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
-  if (INSN_CODE (addr_insn) < 0)
-    {
-      PATTERN (addr_insn) = addr_set;
-      INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
-      return;
-    }
+  validate_change (addr_insn, &PATTERN (addr_insn), addr_new_pattern, true);
 
   /* Update the store insn.  Add an explicit clobber of the external address
      register just to be sure there are no additional uses of the address
@@ -486,37 +479,37 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
   rtx new_store = gen_rtx_UNSPEC (mem_mode, v_store,
 				  UNSPEC_PCREL_OPT_ST_RELOC);
 
-  rtx old_store_set = PATTERN (store_insn);
   rtx new_store_set = gen_rtx_SET (mem, new_store);
   rtx store_clobber = gen_rtx_CLOBBER (VOIDmode, addr_reg);
-
-  PATTERN (store_insn)
+  rtx new_store_pattern
     = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, new_store_set, store_clobber));
 
-  /* Revalidate the insn, backing out of the optimization if the insn is not
-     supported.  */
-  INSN_CODE (store_insn) = recog (PATTERN (store_insn), store_insn, 0);
-  if (INSN_CODE (store_insn) < 0)
+  validate_change (store_insn, &PATTERN (store_insn), new_store_pattern, true);
+
+  /* Note whether changes succeeded or not.  */
+  if (apply_change_group ())
     {
-      PATTERN (addr_insn) = addr_set;
-      INSN_CODE (addr_insn) = recog (PATTERN (addr_insn), addr_insn, 0);
+      /* PCREL_OPT store succeeded.  */
+      counters.stores++;
+      if (next_nonnote_insn (addr_insn) == store_insn)
+	counters.adjacent_stores++;
 
-      PATTERN (store_insn) = old_store_set;
-      INSN_CODE (store_insn) = recog (PATTERN (store_insn), store_insn, 0);
-      return;
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT store (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (store_insn));
     }
-
-  /* PCREL_OPT store succeeded.  */
-  counters.stores++;
-  if (next_nonnote_insn (addr_insn) == store_insn)
-    counters.adjacent_stores++;
-
-  if (dump_file)
-    fprintf (dump_file,
-	     "%sPCREL_OPT store (addr insn = %d, use insn = %d).\n",
-	     counters.loads == 0 && counters.stores == 1 ? "\n" : "",
-	     INSN_UID (addr_insn),
-	     INSN_UID (store_insn));
+  else
+    {
+      /* PCREL_OPT store failed.  */
+      counters.failed_stores++;
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT store failed (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (store_insn));
+    }
 
   return;
 }
@@ -709,6 +702,9 @@ pcrel_opt_pass (function *fun)
   df_analyze ();
   df_set_flags (DF_DEFER_INSN_RESCAN | DF_LR_RUN_DCE);
 
+  if (dump_file)
+    fprintf (dump_file, "\n");
+
   /* Look at each basic block to see if there is a load of an external
      variable's external address, and a single load/store using that external
      address.  */
@@ -732,8 +728,16 @@ pcrel_opt_pass (function *fun)
       fprintf (dump_file, "# of PCREL_OPT load(s) = %lu (adjacent %lu)\n",
 	       counters.loads, counters.adjacent_loads);
 
+      if (counters.failed_loads)
+	fprintf (dump_file, "# of failed PCREL_OPT load(s) = %lu\n",
+		 counters.failed_loads);
+
       fprintf (dump_file, "# of PCREL_OPT store(s) = %lu (adjacent %lu)\n\n",
 	       counters.stores, counters.adjacent_stores);
+
+      if (counters.failed_stores)
+	fprintf (dump_file, "# of failed PCREL_OPT store(s) = %lu\n",
+		 counters.failed_stores);
     }
 
   df_remove_problem (df_chain);
