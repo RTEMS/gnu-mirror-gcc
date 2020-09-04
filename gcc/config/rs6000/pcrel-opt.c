@@ -219,7 +219,7 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   /* Make sure there are no references to the register being loaded inbetween
      the two insns.  */
   rtx reg = SET_DEST (load_set);
-  if ((!REG_P (reg) && !SUBREG_P (reg))
+  if (!register_operand (reg, GET_MODE (reg))
       || reg_used_between_p (reg, addr_insn, load_insn)
       || reg_set_between_p (reg, addr_insn, load_insn))
     return;
@@ -428,7 +428,7 @@ pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
 
   /*  Don't allow storing the address of the external variable.  Make sure the
       value being stored wasn't updated.  */
-  if ((!REG_P (reg) && !SUBREG_P (reg))
+  if (!register_operand (reg, GET_MODE (reg))
       && reg_or_subregno (reg) != reg_or_subregno (addr_reg)
       && !reg_set_between_p (reg, addr_insn, store_insn))
     return;
