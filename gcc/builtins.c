@@ -3936,7 +3936,7 @@ gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
   if (!rng1)
     rng1 = rng1_buf;
 
-  if (!get_range (size, rng1, rvals))
+  if (!get_range (size, stmt, rng1, rvals))
     return NULL_TREE;
 
   if (argidx2 > nargs && TREE_CODE (size) == INTEGER_CST)
@@ -3946,7 +3946,7 @@ gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
      of the upper bounds as a constant.  Ignore anti-ranges.  */
   tree n = argidx2 < nargs ? gimple_call_arg (stmt, argidx2) : integer_one_node;
   wide_int rng2[2];
-  if (!get_range (n, rng2, rvals))
+  if (!get_range (n, stmt, rng2, rvals))
     return NULL_TREE;
 
   /* Extend to the maximum precision to avoid overflow.  */
@@ -3974,11 +3974,11 @@ gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
    result but accepts offset_int instead.  */
 
 static bool
-get_range (tree x, signop sgn, offset_int r[2],
+get_range (tree x, gimple *stmt, signop sgn, offset_int r[2],
 	   const vr_values *rvals /* = NULL */)
 {
   wide_int wr[2];
-  if (!get_range (x, wr, rvals))
+  if (!get_range (x, stmt, wr, rvals))
     return false;
 
   r[0] = offset_int::from (wr[0], sgn);
@@ -4100,7 +4100,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 
       offset_int orng[2];
       tree off = TREE_OPERAND (ptr, 1);
-      if (!get_range (off, SIGNED, orng, rvals))
+      if (!get_range (off, NULL, SIGNED, orng, rvals))
 	/* Fail unless the size of the object is zero.  */
 	return pref->sizrng[0] == 0 && pref->sizrng[0] == pref->sizrng[1];
 
@@ -4181,7 +4181,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 	     offset to the maximum.  */
 	  offset_int orng[2];
 	  tree off = gimple_assign_rhs2 (stmt);
-	  if (!get_range (off, SIGNED, orng, rvals)
+	  if (!get_range (off, stmt, SIGNED, orng, rvals)
 	      || !wi::les_p (orng[0], orng[1]))
 	    {
 	      orng[0] = wi::to_offset (TYPE_MIN_VALUE (ptrdiff_type_node));
@@ -4206,7 +4206,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
       && !array_at_struct_end_p (ptr))
     {
       if (tree size = TYPE_SIZE_UNIT (type))
-	return get_range (size, UNSIGNED, pref->sizrng, rvals);
+	return get_range (size, NULL, UNSIGNED, pref->sizrng, rvals);
     }
 
   return false;

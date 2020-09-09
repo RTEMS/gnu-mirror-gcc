@@ -2014,7 +2014,8 @@ format_floating (const directive &dir, tree arg, const vr_values *)
    Used by the format_string function below.  */
 
 static fmtresult
-get_string_length (tree str, unsigned eltsize, const vr_values *vr)
+get_string_length (tree str, gimple *stmt, unsigned eltsize,
+		   const vr_values *vr)
 {
   if (!str)
     return fmtresult ();
@@ -2025,7 +2026,7 @@ get_string_length (tree str, unsigned eltsize, const vr_values *vr)
   c_strlen_data lendata = { };
   lendata.maxbound = str;
   if (eltsize == 1)
-    get_range_strlen_dynamic (str, &lendata, vr);
+    get_range_strlen_dynamic (str, stmt, &lendata, vr);
   else
     {
       /* Determine the length of the shortest and longest string referenced
@@ -2462,7 +2463,8 @@ format_string (const directive &dir, tree arg, const vr_values *vr_values)
       gcc_checking_assert (count_by == 2 || count_by == 4);
     }
 
-  fmtresult slen = get_string_length (arg, count_by, vr_values);
+  gimple *stmt = dir.info->callstmt;
+  fmtresult slen = get_string_length (arg, stmt, count_by, vr_values);
   if (slen.range.min == slen.range.max
       && slen.range.min < HOST_WIDE_INT_MAX)
     {

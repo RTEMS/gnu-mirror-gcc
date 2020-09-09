@@ -200,7 +200,8 @@ static void handle_builtin_stxncpy_strncat (bool, gimple_stmt_iterator *);
    to determine the range, otherwise get_range_info.  */
 
 tree
-get_range (tree val, wide_int minmax[2], const vr_values *rvals /* = NULL */)
+get_range (tree val, gimple *stmt, wide_int minmax[2],
+	   const vr_values *rvals /* = NULL */)
 {
   if (TREE_CODE (val) == INTEGER_CST)
     {
@@ -211,7 +212,7 @@ get_range (tree val, wide_int minmax[2], const vr_values *rvals /* = NULL */)
   if (TREE_CODE (val) != SSA_NAME)
     return NULL_TREE;
 
-  if (rvals)
+  if (rvals && stmt)
     {
       /* The range below may be "inaccurate" if a constant has been
 	 substituted earlier for VAL by this pass that hasn't been
@@ -219,7 +220,7 @@ get_range (tree val, wide_int minmax[2], const vr_values *rvals /* = NULL */)
 	 on-demand VRP if/when it becomes available (hopefully in
 	 GCC 11).  */
       const value_range *vr
-	= (CONST_CAST (class vr_values *, rvals)->get_value_range (val));
+	= (CONST_CAST (class vr_values *, rvals)->get_value_range (val, stmt));
       value_range_kind rng = vr->kind ();
       if (rng != VR_RANGE || !range_int_cst_p (vr))
 	return NULL_TREE;
@@ -276,7 +277,7 @@ compare_nonzero_chars (strinfo *si, unsigned HOST_WIDE_INT off,
 
   const value_range_equiv *vr
     = (CONST_CAST (class vr_values *, rvals)
-       ->get_value_range (si->nonzero_chars));
+       ->get_value_range (si->nonzero_chars, si->stmt));
 
   value_range_kind rng = vr->kind ();
   if (rng != VR_RANGE || !range_int_cst_p (vr))
@@ -474,7 +475,7 @@ get_stridx (tree exp, wide_int offrng[2] = NULL, const vr_values *rvals = NULL)
 		       return the index corresponding to the SSA_NAME.
 		       Do this irrespective of the whether the offset
 		       is known.  */
-		    if (get_range (off, offrng, rvals))
+		    if (get_range (off, def_stmt, offrng, rvals))
 		      {
 			/* When the offset range is known, increment it
 			   it by the constant offset computed in prior
@@ -911,7 +912,7 @@ dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
 			{
 			  const value_range *vr
 			    = CONST_CAST (class vr_values *, rvals)
-			    ->get_value_range (si->nonzero_chars);
+			    ->get_value_range (si->nonzero_chars, si->stmt);
 			  rng = vr->kind ();
 			  if (range_int_cst_p (vr))
 			    {
@@ -922,6 +923,7 @@ dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
 			    rng = VR_UNDEFINED;
 			}
 		      else
+			// FIXME: call ranger
 			rng = get_range_info (si->nonzero_chars, &min, &max);
 
 		      if (rng == VR_RANGE || rng == VR_ANTI_RANGE)
@@ -1009,7 +1011,8 @@ dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
    recursion.  */
 
 static bool
-get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
+get_range_strlen_dynamic (tree src, gimple *stmt,
+			  c_strlen_data *pdata, bitmap *visited,
 			  const vr_values *rvals, unsigned *pssa_def_max)
 {
   int idx = get_stridx (src);
@@ -1042,8 +1045,8 @@ get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
 		    continue;
 
 		  c_strlen_data argdata = { };
-		  if (get_range_strlen_dynamic (arg, &argdata, visited, rvals,
-						pssa_def_max))
+		  if (get_range_strlen_dynamic (arg, phi, &argdata, visited,
+						rvals, pssa_def_max))
 		    {
 		      /* Set the DECL of an unterminated array this argument
 			 refers to if one hasn't been found yet.  */
@@ -1112,7 +1115,7 @@ get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
 	    {
 	      const value_range_equiv *vr
 		= CONST_CAST (class vr_values *, rvals)
-		->get_value_range (si->nonzero_chars);
+		->get_value_range (si->nonzero_chars, si->stmt);
 	      if (vr->kind () == VR_RANGE
 		  && range_int_cst_p (vr))
 		{
@@ -1158,7 +1161,7 @@ get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
 	{
 	  const value_range_equiv *vr
 	    = CONST_CAST (class vr_values *, rvals)
-	    ->get_value_range (si->nonzero_chars);
+	    ->get_value_range (si->nonzero_chars, stmt);
 	  if (vr->kind () == VR_RANGE
 	      && range_int_cst_p (vr))
 	    {
@@ -1201,14 +1204,14 @@ get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
    points to EVRP info.  */
 
 void
-get_range_strlen_dynamic (tree src, c_strlen_data *pdata,
+get_range_strlen_dynamic (tree src, gimple *stmt, c_strlen_data *pdata,
 			  const vr_values *rvals)
 {
   bitmap visited = NULL;
   tree maxbound = pdata->maxbound;
 
   unsigned limit = param_ssa_name_def_chain_limit;
-  if (!get_range_strlen_dynamic (src, pdata, &visited, rvals, &limit))
+  if (!get_range_strlen_dynamic (src, stmt, pdata, &visited, rvals, &limit))
     {
       /* On failure extend the length range to an impossible maximum
 	 (a valid MAXLEN must be less than PTRDIFF_MAX - 1).  Other
@@ -1959,7 +1962,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
 	  tree off = TREE_OPERAND (ref, 1);
 	  ref = TREE_OPERAND (ref, 0);
 	  wide_int rng[2];
-	  if (get_range (off, rng, rvals))
+	  if (get_range (off, stmt, rng, rvals))
 	    {
 	      /* Convert offsets to the maximum precision.  */
 	      offrng[0] = widest_int::from (rng[0], SIGNED);
@@ -1977,7 +1980,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
 	  tree mem_off = TREE_OPERAND (ref, 1);
 	  ref = TREE_OPERAND (ref, 0);
 	  wide_int rng[2];
-	  if (get_range (mem_off, rng, rvals))
+	  if (get_range (mem_off, stmt, rng, rvals))
 	    {
 	      offrng[0] += widest_int::from (rng[0], SIGNED);
 	      offrng[1] += widest_int::from (rng[1], SIGNED);
@@ -2049,7 +2052,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
 	    }
 
 	  wide_int rng[2];
-	  if (get_range (destsize, rng, rvals))
+	  if (get_range (destsize, stmt, rng, rvals))
 	    {
 	      sizrng[0] = widest_int::from (rng[0], UNSIGNED);
 	      sizrng[1] = widest_int::from (rng[1], UNSIGNED);
@@ -2080,7 +2083,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
     return;
 
   wide_int rng[2];
-  if (!get_range (len, rng, rvals))
+  if (!get_range (len, stmt, rng, rvals))
     return;
 
   widest_int lenrng[2] =
@@ -2231,7 +2234,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
   if (destoff)
     {
       wide_int rng[2];
-      if (get_range (destoff, rng))
+      if (get_range (destoff, stmt, rng))
 	{
 	  offrng[0] = widest_int::from (rng[0], SIGNED);
 	  offrng[1] = widest_int::from (rng[1], SIGNED);
@@ -4103,7 +4106,8 @@ handle_builtin_memcmp (gimple_stmt_iterator *gsi)
    determine range information. Returns true on success.  */
 
 static bool
-get_len_or_size (tree arg, int idx, unsigned HOST_WIDE_INT lenrng[2],
+get_len_or_size (gimple *stmt, tree arg, int idx,
+		 unsigned HOST_WIDE_INT lenrng[2],
 		 unsigned HOST_WIDE_INT *size, bool *nulterm,
 		 const vr_values *rvals)
 {
@@ -4158,7 +4162,7 @@ get_len_or_size (tree arg, int idx, unsigned HOST_WIDE_INT lenrng[2],
   /* Set MAXBOUND to an arbitrary non-null non-integer node as a request
      to have it set to the length of the longest string in a PHI.  */
   lendata.maxbound = arg;
-  get_range_strlen_dynamic (arg, &lendata, rvals);
+  get_range_strlen_dynamic (arg, stmt, &lendata, rvals);
 
   unsigned HOST_WIDE_INT maxbound = HOST_WIDE_INT_M1U;
   if (tree_fits_uhwi_p (lendata.maxbound)
@@ -4216,7 +4220,7 @@ get_len_or_size (tree arg, int idx, unsigned HOST_WIDE_INT lenrng[2],
    Otherwise return null.  */
 
 static tree
-strxcmp_eqz_result (tree arg1, int idx1, tree arg2, int idx2,
+strxcmp_eqz_result (gimple *stmt, tree arg1, int idx1, tree arg2, int idx2,
 		    unsigned HOST_WIDE_INT bound, unsigned HOST_WIDE_INT len[2],
 		    unsigned HOST_WIDE_INT *psize, const vr_values *rvals)
 {
@@ -4225,8 +4229,8 @@ strxcmp_eqz_result (tree arg1, int idx1, tree arg2, int idx2,
   bool nul1, nul2;
   unsigned HOST_WIDE_INT siz1, siz2;
   unsigned HOST_WIDE_INT len1rng[2], len2rng[2];
-  if (!get_len_or_size (arg1, idx1, len1rng, &siz1, &nul1, rvals)
-      || !get_len_or_size (arg2, idx2, len2rng, &siz2, &nul2, rvals))
+  if (!get_len_or_size (stmt, arg1, idx1, len1rng, &siz1, &nul1, rvals)
+      || !get_len_or_size (stmt, arg2, idx2, len2rng, &siz2, &nul2, rvals))
     return NULL_TREE;
 
   /* BOUND is set to HWI_M1U for strcmp and less to strncmp, and LENiRNG
@@ -4420,7 +4424,7 @@ handle_builtin_string_cmp (gimple_stmt_iterator *gsi, const vr_values *rvals)
     /* Try to determine if the two strings are either definitely equal
        or definitely unequal and if so, either fold the result to zero
        (when equal) or set the range of the result to ~[0, 0] otherwise.  */
-    if (tree eqz = strxcmp_eqz_result (arg1, idx1, arg2, idx2, bound,
+    if (tree eqz = strxcmp_eqz_result (stmt, arg1, idx1, arg2, idx2, bound,
 				       len, &siz, rvals))
       {
 	if (integer_zerop (eqz))
@@ -4457,8 +4461,9 @@ handle_builtin_string_cmp (gimple_stmt_iterator *gsi, const vr_values *rvals)
     unsigned HOST_WIDE_INT arsz1, arsz2;
     bool nulterm[2];
 
-    if (!get_len_or_size (arg1, idx1, len1rng, &arsz1, nulterm, rvals)
-	|| !get_len_or_size (arg2, idx2, len2rng, &arsz2, nulterm + 1, rvals))
+    if (!get_len_or_size (stmt, arg1, idx1, len1rng, &arsz1, nulterm, rvals)
+	|| !get_len_or_size (stmt, arg2, idx2, len2rng, &arsz2, nulterm + 1,
+			     rvals))
       return false;
 
     if (len1rng[0] == len1rng[1] && len1rng[0] < HOST_WIDE_INT_MAX)
@@ -4846,7 +4851,8 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
 	       && TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	{
 	  vr_values *v = CONST_CAST (vr_values *, rvals);
-	  const value_range_equiv *vr = v->get_value_range (si->nonzero_chars);
+	  const value_range_equiv *vr
+	    = v->get_value_range (si->nonzero_chars, si->stmt);
 	  if (vr->kind () != VR_RANGE || !range_int_cst_p (vr))
 	    return false;
 
