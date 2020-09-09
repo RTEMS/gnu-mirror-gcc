@@ -20,6 +20,7 @@ private:
 
 // trace_ranger implementation.
 
+inline
 trace_ranger::trace_ranger (bool use_loop_info)
   : gimple_ranger (use_loop_info)
 {
@@ -50,7 +51,7 @@ trace_ranger::dumping (unsigned counter, bool trailing)
 // After calling a routine, if dumping, print the CALLER, NAME, and RESULT,
 // returning RESULT.
 
-bool
+inline bool
 trace_ranger::trailer (unsigned counter, const char *caller, bool result,
 		       tree name, const irange &r)
 {
@@ -81,7 +82,7 @@ trace_ranger::trailer (unsigned counter, const char *caller, bool result,
 
 // Tracing version of range_on_edge.  Call it with printing wrappers.
 
-bool
+inline bool
 trace_ranger::range_on_edge (irange &r, edge e, tree name)
 {
   unsigned idx = ++trace_count;
@@ -100,7 +101,7 @@ trace_ranger::range_on_edge (irange &r, edge e, tree name)
 
 // Tracing version of range_on_entry.  Call it with printing wrappers.
 
-void
+inline void
 trace_ranger::range_on_entry (irange &r, basic_block bb, tree name)
 {
   unsigned idx = ++trace_count;
@@ -119,7 +120,7 @@ trace_ranger::range_on_entry (irange &r, basic_block bb, tree name)
 
 // Tracing version of range_on_exit.  Call it with printing wrappers.
 
-void
+inline void
 trace_ranger::range_on_exit (irange &r, basic_block bb, tree name)
 {
   unsigned idx = ++trace_count;
@@ -138,7 +139,7 @@ trace_ranger::range_on_exit (irange &r, basic_block bb, tree name)
 
 // Tracing version of range_of_stmt.  Call it with printing wrappers.
 
-bool
+inline bool
 trace_ranger::range_of_stmt (irange &r, gimple *s, tree name)
 {
   bool res;
@@ -160,7 +161,7 @@ trace_ranger::range_of_stmt (irange &r, gimple *s, tree name)
 
 // Tracing version of range_of_expr.  Call it with printing wrappers.
 
-bool
+inline bool
 trace_ranger::range_of_expr (irange &r, tree name, gimple *s)
 {
   bool res;
@@ -184,4 +185,3 @@ trace_ranger::range_of_expr (irange &r, tree name, gimple *s)
 
   return trailer (idx, "range_of_expr", res, name, r);
 }
-
