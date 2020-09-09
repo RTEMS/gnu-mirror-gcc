@@ -90,5 +90,5 @@ INT_MODE (OI, 32);
 INT_MODE (XI, 64);
 
 /* Modes used by __vector_pair and __vector_quad.  */
-PARTIAL_INT_MODE (OI, 256, POI);	/* __vector_pair.  */
+PARTIAL_INT_MODE (OI, 1, POI);	/* __vector_pair.  */
 PARTIAL_INT_MODE (XI, 512, PXI);	/* __vector_quad.  */
