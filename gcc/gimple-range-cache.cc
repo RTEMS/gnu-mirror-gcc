@@ -516,7 +516,7 @@ ranger_cache::block_range (irange &r, basic_block bb, tree name, bool calc)
 	  def_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
 	}
 
-      // There is no range on entry for the defintion block.
+      // There is no range on entry for the definition block.
       if (def_bb == bb)
 	return false;
 
