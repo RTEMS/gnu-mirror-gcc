@@ -25,7 +25,6 @@
 #include "backend.h"
 #include "tree.h"
 #include "gimple.h"
-#include "domwalk.h"
 #include "tree-pass.h"
 #include "builtins.h"
 #include "ssa.h"
@@ -41,6 +40,7 @@
 #include "calls.h"
 #include "cfgloop.h"
 #include "intl.h"
+#include "gimple-range.h"
 
 namespace {
 
@@ -77,21 +77,10 @@ pass_wrestrict::gate (function *fun ATTRIBUTE_UNUSED)
   return warn_array_bounds || warn_restrict || warn_stringop_overflow;
 }
 
-/* Class to walk the basic blocks of a function in dominator order.  */
-class wrestrict_dom_walker : public dom_walker
-{
- public:
-  wrestrict_dom_walker () : dom_walker (CDI_DOMINATORS) {}
+static void check_call (gimple *);
 
-  edge before_dom_children (basic_block) FINAL OVERRIDE;
-  bool handle_gimple_call (gimple_stmt_iterator *);
-
- private:
-  void check_call (gimple *);
-};
-
-edge
-wrestrict_dom_walker::before_dom_children (basic_block bb)
+static void
+wrestrict_walk (basic_block bb)
 {
   /* Iterate over statements, looking for function calls.  */
   for (gimple_stmt_iterator si = gsi_start_bb (bb); !gsi_end_p (si);
@@ -103,19 +92,14 @@ wrestrict_dom_walker::before_dom_children (basic_block bb)
 
       check_call (stmt);
     }
-
-  return NULL;
 }
-
-/* Execute the pass for function FUN, walking in dominator order.  */
 
 unsigned
 pass_wrestrict::execute (function *fun)
 {
-  calculate_dominance_info (CDI_DOMINATORS);
-
-  wrestrict_dom_walker walker;
-  walker.walk (ENTRY_BLOCK_PTR_FOR_FN (fun));
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    wrestrict_walk (bb);
 
   return 0;
 }
@@ -159,11 +143,12 @@ public:
      only the destination reference is.  */
   bool strbounded_p;
 
-  builtin_memref (tree, tree);
+  builtin_memref (gimple *, tree, tree);
 
   tree offset_out_of_bounds (int, offset_int[3]) const;
 
 private:
+  gimple *stmt;
 
   /* Ctor helper to set or extend OFFRANGE based on argument.  */
   void extend_offset_range (tree);
@@ -235,7 +220,7 @@ class builtin_access
    a size SIZE in bytes.  If SIZE is NULL_TREE then the size is assumed
    to be unknown.  */
 
-builtin_memref::builtin_memref (tree expr, tree size)
+builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
 : ptr (expr),
   ref (),
   base (),
@@ -245,7 +230,8 @@ builtin_memref::builtin_memref (tree expr, tree size)
   offrange (),
   sizrange (),
   maxobjsize (tree_to_shwi (max_object_size ())),
-  strbounded_p ()
+  strbounded_p (),
+  stmt (stmt)
 {
   /* Unfortunately, wide_int default ctor is a no-op so array members
      of the type must be set individually.  */
@@ -264,7 +250,7 @@ builtin_memref::builtin_memref (tree expr, tree size)
       tree range[2];
       /* Determine the size range, allowing for the result to be [0, 0]
 	 for SIZE in the anti-range ~[0, N] where N >= PTRDIFF_MAX.  */
-      get_size_range (size, range, true);
+      get_size_range (size, stmt, range, true);
       sizrange[0] = wi::to_offset (range[0]);
       sizrange[1] = wi::to_offset (range[1]);
       /* get_size_range returns SIZE_MAX for the maximum size.
@@ -341,7 +327,7 @@ builtin_memref::extend_offset_range (tree offset)
       /* A pointer offset is represented as sizetype but treated
 	 as signed.  */
       wide_int min, max;
-      value_range_kind rng = get_range_info (offset, &min, &max);
+      value_range_kind rng = determine_value_range (offset, stmt, &min, &max);
       if (rng == VR_ANTI_RANGE && wi::lts_p (max, min))
 	{
 	  /* Convert an anti-range whose upper bound is less than
@@ -797,7 +783,7 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
       tree size = gimple_call_arg (call, sizeargno);
       tree range[2];
-      if (get_size_range (size, range, true))
+      if (get_size_range (size, call, range, true))
 	{
 	  bounds[0] = wi::to_offset (range[0]);
 	  bounds[1] = wi::to_offset (range[1]);
@@ -1873,8 +1859,8 @@ maybe_diag_access_bounds (gimple *call, tree func, int strict,
 /* Check a CALL statement for restrict-violations and issue warnings
    if/when appropriate.  */
 
-void
-wrestrict_dom_walker::check_call (gimple *call)
+static void
+check_call (gimple *call)
 {
   /* Avoid checking the call if it has already been diagnosed for
      some reason.  */
@@ -1987,8 +1973,8 @@ check_bounds_or_overlap (gimple *call, tree dst, tree src, tree dstsize,
 {
   tree func = gimple_call_fndecl (call);
 
-  builtin_memref dstref (dst, dstsize);
-  builtin_memref srcref (src, srcsize);
+  builtin_memref dstref (call, dst, dstsize);
+  builtin_memref srcref (call, src, srcsize);
 
   /* Create a descriptor of the access.  This may adjust both DSTREF
      and SRCREF based on one another and the kind of the access.  */

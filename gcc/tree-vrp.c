@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "range-op.h"
 #include "value-range-equiv.h"
 #include "gimple-array-bounds.h"
+#include "gimple-range.h"
 
 /* Set of SSA names found live during the RPO traversal of the function
    for still active basic-blocks.  */
@@ -4553,20 +4554,20 @@ make_pass_vrp (gcc::context *ctxt)
 /* Worker for determine_value_range.  */
 
 static void
-determine_value_range_1 (value_range *vr, tree expr)
+determine_value_range_1 (value_range *vr, tree expr, gimple *stmt)
 {
   if (BINARY_CLASS_P (expr))
     {
       value_range vr0, vr1;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
-      determine_value_range_1 (&vr1, TREE_OPERAND (expr, 1));
+      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0), stmt);
+      determine_value_range_1 (&vr1, TREE_OPERAND (expr, 1), stmt);
       range_fold_binary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
 			      &vr0, &vr1);
     }
   else if (UNARY_CLASS_P (expr))
     {
       value_range vr0;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
+      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0), stmt);
       range_fold_unary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
 			     &vr0, TREE_TYPE (TREE_OPERAND (expr, 0)));
     }
@@ -4574,6 +4575,20 @@ determine_value_range_1 (value_range *vr, tree expr)
     vr->set (expr);
   else
     {
+      /* ?? The check for cfun->cfg is because the ranger_cache
+	 constructor needs last_basic_block_for_fn.
+
+	 Whereas the check for gimple_body is because
+	 gimple_range_global() does not pick up global ranges.  */
+      if (cfun->cfg && cfun->gimple_body)
+	{
+	  gimple_ranger ranger (true);
+	  if (!ranger.range_of_expr (*vr, expr, stmt))
+	    vr->set_varying (TREE_TYPE (expr));
+	  return;
+	}
+      /* ?? Simiarly here.  The following code would be unnecessary if
+	 the block above would get global ranges.  */
       value_range_kind kind;
       wide_int min, max;
       /* For SSA names try to extract range info computed by VRP.  Otherwise
@@ -4593,10 +4608,10 @@ determine_value_range_1 (value_range *vr, tree expr)
    the determined range type.  */
 
 value_range_kind
-determine_value_range (tree expr, wide_int *min, wide_int *max)
+determine_value_range (tree expr, gimple *stmt, wide_int *min, wide_int *max)
 {
   value_range vr;
-  determine_value_range_1 (&vr, expr);
+  determine_value_range_1 (&vr, expr, stmt);
   if (vr.constant_p ())
     {
       *min = wi::to_wide (vr.min ());
