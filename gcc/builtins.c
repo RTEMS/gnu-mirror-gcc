@@ -3884,7 +3884,7 @@ check_access (tree exp, tree, tree, tree dstwrite,
 
 tree
 gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
-			const vr_values *rvals /* = NULL */)
+			range_query *rvals /* = NULL */)
 {
   if (!stmt)
     return NULL_TREE;
@@ -3975,7 +3975,7 @@ gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
 
 static bool
 get_range (tree x, gimple *stmt, signop sgn, offset_int r[2],
-	   const vr_values *rvals /* = NULL */)
+	   range_query *rvals /* = NULL */)
 {
   wide_int wr[2];
   if (!get_range (x, stmt, wr, rvals))
@@ -4002,7 +4002,7 @@ get_range (tree x, gimple *stmt, signop sgn, offset_int r[2],
 
 static bool
 compute_objsize (tree ptr, int ostype, access_ref *pref,
-		 bitmap *visited, const vr_values *rvals /* = NULL */)
+		 bitmap *visited, range_query *rvals /* = NULL */)
 {
   const bool addr = TREE_CODE (ptr) == ADDR_EXPR;
   if (addr)
@@ -4216,7 +4216,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 
 static tree
 compute_objsize (tree ptr, int ostype, access_ref *pref,
-		 const vr_values *rvals = NULL)
+		 range_query *rvals = NULL)
 {
   bitmap visited = NULL;
 
@@ -4248,7 +4248,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 
 tree
 compute_objsize (tree ptr, int ostype, tree *pdecl /* = NULL */,
-		 tree *poff /* = NULL */, const vr_values *rvals /* = NULL */)
+		 tree *poff /* = NULL */, class range_query *rvals /* = NULL */)
 {
   /* Set the initial offsets to zero and size to negative to indicate
      none has been computed yet.  */

@@ -134,11 +134,10 @@ extern void set_builtin_user_assembler_name (tree decl, const char *asmspec);
 extern bool is_simple_builtin (tree);
 extern bool is_inexpensive_builtin (tree);
 
-class vr_values;
 tree gimple_call_alloc_size (gimple *, wide_int[2] = NULL,
-			     const vr_values * = NULL);
+			     class range_query * = NULL);
 extern tree compute_objsize (tree, int, tree * = NULL, tree * = NULL,
-			     const vr_values * = NULL);
+			     class range_query * = NULL);
 
 extern bool readonly_data_expr (tree exp);
 extern bool init_target_chars (void);

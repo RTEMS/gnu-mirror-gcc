@@ -201,7 +201,7 @@ static void handle_builtin_stxncpy_strncat (bool, gimple_stmt_iterator *);
 
 tree
 get_range (tree val, gimple *stmt, wide_int minmax[2],
-	   const vr_values *rvals /* = NULL */)
+	   range_query *rvals /* = NULL */)
 {
   if (TREE_CODE (val) == INTEGER_CST)
     {
@@ -214,19 +214,15 @@ get_range (tree val, gimple *stmt, wide_int minmax[2],
 
   if (rvals && stmt)
     {
-      /* The range below may be "inaccurate" if a constant has been
-	 substituted earlier for VAL by this pass that hasn't been
-	 propagated through the CFG.  This shoud be fixed by the new
-	 on-demand VRP if/when it becomes available (hopefully in
-	 GCC 11).  */
-      const value_range *vr
-	= (CONST_CAST (class vr_values *, rvals)->get_value_range (val, stmt));
-      value_range_kind rng = vr->kind ();
-      if (rng != VR_RANGE || !range_int_cst_p (vr))
+      value_range vr;
+      if (!rvals->range_of_expr (vr, val, stmt))
+	return NULL_TREE;
+      value_range_kind rng = vr.kind ();
+      if (rng != VR_RANGE)
 	return NULL_TREE;
 
-      minmax[0] = wi::to_wide (vr->min ());
-      minmax[1] = wi::to_wide (vr->max ());
+      minmax[0] = wi::to_wide (vr.min ());
+      minmax[1] = wi::to_wide (vr.max ());
       return val;
     }
 
@@ -264,7 +260,7 @@ compare_nonzero_chars (strinfo *si, unsigned HOST_WIDE_INT off)
 
 static int
 compare_nonzero_chars (strinfo *si, unsigned HOST_WIDE_INT off,
-		       const vr_values *rvals)
+		       range_query *rvals)
 {
   if (!si->nonzero_chars)
     return -1;
@@ -275,20 +271,19 @@ compare_nonzero_chars (strinfo *si, unsigned HOST_WIDE_INT off,
   if (!rvals || TREE_CODE (si->nonzero_chars) != SSA_NAME)
     return -1;
 
-  const value_range_equiv *vr
-    = (CONST_CAST (class vr_values *, rvals)
-       ->get_value_range (si->nonzero_chars, si->stmt));
-
-  value_range_kind rng = vr->kind ();
-  if (rng != VR_RANGE || !range_int_cst_p (vr))
+  value_range vr;
+  if (!rvals->range_of_expr (vr, si->nonzero_chars, si->stmt))
+    return -1;
+  value_range_kind rng = vr.kind ();
+  if (rng != VR_RANGE)
     return -1;
 
   /* If the offset is less than the minimum length or if the bounds
      of the length range are equal return the result of the comparison
      same as in the constant case.  Otherwise return a conservative
      result.  */
-  int cmpmin = compare_tree_int (vr->min (), off);
-  if (cmpmin > 0 || tree_int_cst_equal (vr->min (), vr->max ()))
+  int cmpmin = compare_tree_int (vr.min (), off);
+  if (cmpmin > 0 || tree_int_cst_equal (vr.min (), vr.max ()))
     return cmpmin;
 
   return -1;
@@ -333,7 +328,7 @@ get_next_strinfo (strinfo *si)
 
 static int
 get_addr_stridx (tree exp, tree ptr, unsigned HOST_WIDE_INT *offset_out,
-		 const vr_values *rvals = NULL)
+		 range_query *rvals = NULL)
 {
   HOST_WIDE_INT off;
   struct stridxlist *list, *last = NULL;
@@ -393,7 +388,7 @@ get_addr_stridx (tree exp, tree ptr, unsigned HOST_WIDE_INT *offset_out,
    When nonnull, uses RVALS to determine range information.  */
 
 static int
-get_stridx (tree exp, wide_int offrng[2] = NULL, const vr_values *rvals = NULL)
+get_stridx (tree exp, wide_int offrng[2] = NULL, range_query *rvals = NULL)
 {
   if (offrng)
     offrng[0] = offrng[1] = wi::zero (TYPE_PRECISION (ptrdiff_type_node));
@@ -869,7 +864,7 @@ get_string_length (strinfo *si)
    results.  */
 
 DEBUG_FUNCTION void
-dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
+dump_strlen_info (FILE *fp, gimple *stmt, range_query *rvals)
 {
   if (stmt)
     {
@@ -910,20 +905,20 @@ dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
 		      wide_int min, max;
 		      if (rvals)
 			{
-			  const value_range *vr
-			    = CONST_CAST (class vr_values *, rvals)
-			    ->get_value_range (si->nonzero_chars, si->stmt);
-			  rng = vr->kind ();
-			  if (range_int_cst_p (vr))
+			  value_range vr;
+			  if (!rvals->range_of_expr (vr, si->nonzero_chars,
+						     si->stmt))
+			    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+			  rng = vr.kind ();
+			  if (range_int_cst_p (&vr))
 			    {
-			      min = wi::to_wide (vr->min ());
-			      max = wi::to_wide (vr->max ());
+			      min = wi::to_wide (vr.min ());
+			      max = wi::to_wide (vr.max ());
 			    }
 			  else
 			    rng = VR_UNDEFINED;
 			}
 		      else
-			// FIXME: call ranger
 			rng = get_range_info (si->nonzero_chars, &min, &max);
 
 		      if (rng == VR_RANGE || rng == VR_ANTI_RANGE)
@@ -1013,7 +1008,7 @@ dump_strlen_info (FILE *fp, gimple *stmt, const vr_values *rvals)
 static bool
 get_range_strlen_dynamic (tree src, gimple *stmt,
 			  c_strlen_data *pdata, bitmap *visited,
-			  const vr_values *rvals, unsigned *pssa_def_max)
+			  range_query *rvals, unsigned *pssa_def_max)
 {
   int idx = get_stridx (src);
   if (!idx)
@@ -1113,14 +1108,13 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
 	    pdata->minlen = si->nonzero_chars;
 	  else if (TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	    {
-	      const value_range_equiv *vr
-		= CONST_CAST (class vr_values *, rvals)
-		->get_value_range (si->nonzero_chars, si->stmt);
-	      if (vr->kind () == VR_RANGE
-		  && range_int_cst_p (vr))
+	      value_range vr;
+	      if (!rvals->range_of_expr (vr, si->nonzero_chars, si->stmt))
+		vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	      if (range_int_cst_p (&vr))
 		{
-		  pdata->minlen = vr->min ();
-		  pdata->maxlen = vr->max ();
+		  pdata->minlen = vr.min ();
+		  pdata->maxlen = vr.max ();
 		}
 	      else
 		pdata->minlen = build_zero_cst (size_type_node);
@@ -1159,14 +1153,13 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
 	}
       else if (pdata->minlen && TREE_CODE (pdata->minlen) == SSA_NAME)
 	{
-	  const value_range_equiv *vr
-	    = CONST_CAST (class vr_values *, rvals)
-	    ->get_value_range (si->nonzero_chars, stmt);
-	  if (vr->kind () == VR_RANGE
-	      && range_int_cst_p (vr))
+	  value_range vr;
+	  if (!rvals->range_of_expr (vr, si->nonzero_chars, stmt))
+	    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	  if (range_int_cst_p (&vr))
 	    {
-	      pdata->minlen = vr->min ();
-	      pdata->maxlen = vr->max ();
+	      pdata->minlen = vr.min ();
+	      pdata->maxlen = vr.max ();
 	      pdata->maxbound = pdata->maxlen;
 	    }
 	  else
@@ -1205,7 +1198,7 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
 
 void
 get_range_strlen_dynamic (tree src, gimple *stmt, c_strlen_data *pdata,
-			  const vr_values *rvals)
+			  range_query *rvals)
 {
   bitmap visited = NULL;
   tree maxbound = pdata->maxbound;
@@ -1806,6 +1799,7 @@ set_strlen_range (tree lhs, wide_int min, wide_int max,
       else if (TREE_CODE (bound) == SSA_NAME)
 	{
 	  wide_int minbound, maxbound;
+	  // FIXME: have callers pass rvals and use range_query.
 	  value_range_kind rng = get_range_info (bound, &minbound, &maxbound);
 	  if (rng == VR_RANGE)
 	    {
@@ -1910,7 +1904,7 @@ maybe_set_strlen_range (tree lhs, tree src, tree bound)
 
 static void
 maybe_warn_overflow (gimple *stmt, tree len,
-		     const vr_values *rvals = NULL,
+		     range_query *rvals = NULL,
 		     strinfo *si = NULL, bool plus_one = false,
 		     bool rawmem = false)
 {
@@ -2342,7 +2336,7 @@ maybe_warn_overflow (gimple *stmt, tree len,
 
 static inline void
 maybe_warn_overflow (gimple *stmt, unsigned HOST_WIDE_INT len,
-		     const vr_values *rvals = NULL, strinfo *si = NULL,
+		     range_query *rvals = NULL, strinfo *si = NULL,
 		     bool plus_one = false, bool rawmem = false)
 {
   maybe_warn_overflow (stmt, build_int_cst (size_type_node, len), rvals,
@@ -2645,7 +2639,7 @@ handle_builtin_strchr (gimple_stmt_iterator *gsi)
 
 static void
 handle_builtin_strcpy (enum built_in_function bcode, gimple_stmt_iterator *gsi,
-		       const vr_values *rvals)
+		       range_query *rvals)
 {
   int idx, didx;
   tree src, dst, srclen, len, lhs, type, fn, oldlen;
@@ -3039,6 +3033,7 @@ maybe_diag_stxncpy_trunc (gimple_stmt_iterator gsi, tree src, tree cnt)
     cntrange[0] = cntrange[1] = wi::to_wide (cnt);
   else if (TREE_CODE (cnt) == SSA_NAME)
     {
+      // FIXME: Pass rvals and use range_query.
       enum value_range_kind rng = get_range_info (cnt, cntrange, cntrange + 1);
       if (rng == VR_RANGE)
 	;
@@ -3447,7 +3442,7 @@ handle_builtin_stxncpy_strncat (bool append_p, gimple_stmt_iterator *gsi)
 
 static void
 handle_builtin_memcpy (enum built_in_function bcode, gimple_stmt_iterator *gsi,
-		       const vr_values *rvals)
+		       range_query *rvals)
 {
   tree lhs, oldlen, newlen;
   gimple *stmt = gsi_stmt (*gsi);
@@ -3912,7 +3907,7 @@ handle_alloc_call (enum built_in_function bcode, gimple_stmt_iterator *gsi)
 
 static bool
 handle_builtin_memset (gimple_stmt_iterator *gsi, bool *zero_write,
-		       const vr_values *rvals)
+		       range_query *rvals)
 {
   gimple *memset_stmt = gsi_stmt (*gsi);
   tree ptr = gimple_call_arg (memset_stmt, 0);
@@ -4109,7 +4104,7 @@ static bool
 get_len_or_size (gimple *stmt, tree arg, int idx,
 		 unsigned HOST_WIDE_INT lenrng[2],
 		 unsigned HOST_WIDE_INT *size, bool *nulterm,
-		 const vr_values *rvals)
+		 range_query *rvals)
 {
   /* Invalidate.  */
   *size = HOST_WIDE_INT_M1U;
@@ -4144,6 +4139,7 @@ get_len_or_size (gimple *stmt, tree arg, int idx,
       else if (TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	{
 	  wide_int min, max;
+	  // FIXME: Use range_query, you already have it.
 	  value_range_kind rng = get_range_info (si->nonzero_chars, &min, &max);
 	  if (rng == VR_RANGE)
 	    {
@@ -4222,7 +4218,7 @@ get_len_or_size (gimple *stmt, tree arg, int idx,
 static tree
 strxcmp_eqz_result (gimple *stmt, tree arg1, int idx1, tree arg2, int idx2,
 		    unsigned HOST_WIDE_INT bound, unsigned HOST_WIDE_INT len[2],
-		    unsigned HOST_WIDE_INT *psize, const vr_values *rvals)
+		    unsigned HOST_WIDE_INT *psize, range_query *rvals)
 {
   /* Determine the range the length of each string is in and whether it's
      known to be nul-terminated, or the size of the array it's stored in.  */
@@ -4379,7 +4375,7 @@ maybe_warn_pointless_strcmp (gimple *stmt, HOST_WIDE_INT bound,
    another and false otherwise.  */
 
 static bool
-handle_builtin_string_cmp (gimple_stmt_iterator *gsi, const vr_values *rvals)
+handle_builtin_string_cmp (gimple_stmt_iterator *gsi, range_query *rvals)
 {
   gcall *stmt = as_a <gcall *> (gsi_stmt (*gsi));
   tree lhs = gimple_call_lhs (stmt);
@@ -4620,7 +4616,7 @@ int ssa_name_limit_t::next_ssa_name (tree ssa_name)
 static bool
 count_nonzero_bytes_addr (tree, unsigned HOST_WIDE_INT, unsigned HOST_WIDE_INT,
 			  unsigned [3], bool *, bool *, bool *,
-			  const vr_values *, ssa_name_limit_t &);
+			  range_query *, ssa_name_limit_t &);
 
 /* Determines the minimum and maximum number of leading non-zero bytes
    in the representation of EXP and set LENRANGE[0] and LENRANGE[1]
@@ -4641,7 +4637,7 @@ static bool
 count_nonzero_bytes (tree exp, unsigned HOST_WIDE_INT offset,
 		     unsigned HOST_WIDE_INT nbytes,
 		     unsigned lenrange[3], bool *nulterm,
-		     bool *allnul, bool *allnonnul, const vr_values *rvals,
+		     bool *allnul, bool *allnonnul, range_query *rvals,
 		     ssa_name_limit_t &snlim)
 {
   if (TREE_CODE (exp) == SSA_NAME)
@@ -4833,7 +4829,7 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
 			  unsigned HOST_WIDE_INT nbytes,
 			  unsigned lenrange[3], bool *nulterm,
 			  bool *allnul, bool *allnonnul,
-			  const vr_values *rvals, ssa_name_limit_t &snlim)
+			  range_query *rvals, ssa_name_limit_t &snlim)
 {
   int idx = get_stridx (exp);
   if (idx > 0)
@@ -4850,14 +4846,14 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
       else if (si->nonzero_chars
 	       && TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	{
-	  vr_values *v = CONST_CAST (vr_values *, rvals);
-	  const value_range_equiv *vr
-	    = v->get_value_range (si->nonzero_chars, si->stmt);
-	  if (vr->kind () != VR_RANGE || !range_int_cst_p (vr))
+	  value_range vr;
+	  if (!rvals->range_of_expr (vr, si->nonzero_chars, si->stmt))
+	    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	  if (vr.kind () != VR_RANGE)
 	    return false;
 
-	  minlen = tree_to_uhwi (vr->min ());
-	  maxlen = tree_to_uhwi (vr->max ());
+	  minlen = tree_to_uhwi (vr.min ());
+	  maxlen = tree_to_uhwi (vr.max ());
 	}
       else
 	return false;
@@ -4946,7 +4942,7 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
 
 static bool
 count_nonzero_bytes (tree exp, unsigned lenrange[3], bool *nulterm,
-		     bool *allnul, bool *allnonnul, const vr_values *rvals)
+		     bool *allnul, bool *allnonnul, range_query *rvals)
 {
   /* Set to optimistic values so the caller doesn't have to worry about
      initializing these and to what.  On success, the function will clear
@@ -4970,7 +4966,7 @@ count_nonzero_bytes (tree exp, unsigned lenrange[3], bool *nulterm,
 
 static bool
 handle_store (gimple_stmt_iterator *gsi, bool *zero_write,
-	      const vr_values *rvals)
+	      range_query *rvals)
 {
   int idx = -1;
   strinfo *si = NULL;
@@ -5380,7 +5376,7 @@ is_char_type (tree type)
 
 static bool
 strlen_check_and_optimize_call (gimple_stmt_iterator *gsi, bool *zero_write,
-				const vr_values *rvals)
+				range_query *rvals)
 {
   gimple *stmt = gsi_stmt (*gsi);
 
@@ -5471,7 +5467,7 @@ strlen_check_and_optimize_call (gimple_stmt_iterator *gsi, bool *zero_write,
 
 static void
 handle_integral_assign (gimple_stmt_iterator *gsi, bool *cleanup_eh,
-			const vr_values *rvals)
+			range_query *rvals)
 {
   gimple *stmt = gsi_stmt (*gsi);
   tree lhs = gimple_assign_lhs (stmt);
@@ -5563,6 +5559,7 @@ handle_integral_assign (gimple_stmt_iterator *gsi, bool *cleanup_eh,
 		  wide_int min, max;
 		  signop sign = TYPE_SIGN (lhs_type);
 		  int prec = TYPE_PRECISION (lhs_type);
+		  // FIXME: Use range_query, you already have it.
 		  value_range_kind vr = get_range_info (lhs, &min, &max);
 		  if (vr == VR_VARYING
 		      || (vr == VR_RANGE
@@ -5615,7 +5612,7 @@ handle_integral_assign (gimple_stmt_iterator *gsi, bool *cleanup_eh,
 
 static bool
 check_and_optimize_stmt (gimple_stmt_iterator *gsi, bool *cleanup_eh,
-			 const vr_values *rvals)
+			 range_query *rvals)
 {
   gimple *stmt = gsi_stmt (*gsi);
 
