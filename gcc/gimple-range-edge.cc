@@ -133,7 +133,10 @@ gsi_outgoing_range_stmt (basic_block bb)
   if (!gsi_end_p (gsi))
     {
       gimple *s = gsi_stmt (gsi);
-      if (is_a<gcond *> (s) || is_a<gswitch *> (s))
+      if (is_a<gcond *> (s) && gimple_range_handler (s))
+	return gsi;
+      gswitch *sw = dyn_cast<gswitch *> (s);
+      if (sw && irange::supports_type_p (TREE_TYPE (gimple_switch_index (sw))))
 	return gsi;
     }
   return gsi_none ();
@@ -145,9 +148,7 @@ gimple_outgoing_range_stmt_p (basic_block bb)
 {
   // This will return NULL if there is not a branch statement.
   gimple *stmt = gsi_stmt (gsi_outgoing_range_stmt (bb));
-  if (stmt && gimple_range_handler (stmt))
-    return stmt;
-  return NULL;
+  return stmt;
 }
 
 // Calculate the range forced on on edge E by control flow, return it
