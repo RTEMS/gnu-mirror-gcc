@@ -840,6 +840,8 @@ get_normalized_constraints_from_decl (tree d, bool diag = false)
     if (tree *p = hash_map_safe_get (normalized_map, tmpl))
       return *p;
 
+  push_nested_class_guard pncs (DECL_CONTEXT (d));
+
   tree args = generic_targs_for (tmpl);
   tree ci = get_constraints (decl);
   tree norm = get_normalized_constraints_from_info (ci, args, tmpl, diag);
@@ -2550,7 +2552,7 @@ get_mapped_args (tree map)
       /* Insert the argument into its corresponding position.  */
       vec<tree> &list = lists[level - 1];
       if (index >= (int)list.length ())
-	list.safe_grow_cleared (index + 1);
+	list.safe_grow_cleared (index + 1, true);
       list[index] = TREE_PURPOSE (p);
     }
 
@@ -2812,16 +2814,22 @@ satisfy_declaration_constraints (tree t, tree args, subst_info info)
   info.in_decl = t;
 
   gcc_assert (TREE_CODE (t) == TEMPLATE_DECL);
+
+  args = add_outermost_template_args (t, args);
+
+  tree result = boolean_true_node;
   if (tree norm = normalize_template_requirements (t, info.noisy ()))
     {
+      if (!push_tinst_level (t, args))
+	return result;
       tree pattern = DECL_TEMPLATE_RESULT (t);
       push_access_scope (pattern);
-      tree result = satisfy_associated_constraints (norm, args, info);
+      result = satisfy_associated_constraints (norm, args, info);
       pop_access_scope (pattern);
-      return result;
+      pop_tinst_level ();
     }
 
-  return boolean_true_node;
+  return result;
 }
 
 static tree

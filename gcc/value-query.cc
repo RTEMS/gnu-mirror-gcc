@@ -67,7 +67,7 @@ range_query::range_of_stmt (irange &r, gimple *, tree name)
 bool
 range_query::value_of_expr (tree &t, tree name, gimple *stmt)
 {
-  widest_irange r;
+  int_range_max r;
   if (!irange::supports_type_p (TREE_TYPE (name)))
     return false;
   return (range_of_expr (r, name, stmt) && r.singleton_p (&t));
@@ -76,7 +76,7 @@ range_query::value_of_expr (tree &t, tree name, gimple *stmt)
 bool
 range_query::value_on_edge (tree &t, edge e, tree name)
 {
-  widest_irange r;
+  int_range_max r;
   if (!irange::supports_type_p (TREE_TYPE (name)))
     return false;
   return (range_on_edge (r, e, name) && r.singleton_p (&t));
@@ -85,7 +85,7 @@ range_query::value_on_edge (tree &t, edge e, tree name)
 bool
 range_query::value_of_stmt (tree &t, gimple *stmt, tree name)
 {
-  widest_irange r;
+  int_range_max r;
   if (!irange::supports_type_p (TREE_TYPE (name)))
     return false;
   return (range_of_stmt (r, stmt, name) && r.singleton_p (&t));
@@ -104,7 +104,7 @@ public:
 const class value_range_equiv *
 range_query::get_value_range (const_tree expr, gimple *stmt)
 {
-  widest_irange r;
+  int_range_max r;
   if (range_of_expr (r, const_cast<tree> (expr), stmt))
     return new (equiv_pool->allocate ()) value_range_equiv (r);
   return new (equiv_pool->allocate ()) value_range_equiv (TREE_TYPE (expr));

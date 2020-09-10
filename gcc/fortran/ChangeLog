@@ -1,3 +1,175 @@
+2020-09-09  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/95109
+	PR fortran/94690
+	* resolve.c (gfc_resolve_code): Also call
+	gfc_resolve_omp_parallel_blocks for 'distribute parallel do (simd)'.
+	* openmp.c (gfc_resolve_omp_parallel_blocks): Handle it.
+	(gfc_resolve_do_iterator): Remove special code for SIMD, which is
+	not needed.
+	* trans-openmp.c (gfc_trans_omp_target): For TARGET_PARALLEL_DO_SIMD,
+	call simd not do processing function.
+
+2020-09-08  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* intrinsic.texi: Fix description of FINDLOC result.
+
+2020-09-07  Harald Anlauf  <anlauf@gmx.de>
+
+	* trans-intrinsic.c (build_round_expr): Use temporary with
+	appropriate kind for conversion before rounding to nearest
+	integer when the result precision is 128 bits.
+
+2020-09-07  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/96896
+	* resolve.c (get_temp_from_expr): Also reset proc_pointer +
+	use_assoc attribute.
+	(resolve_ptr_fcn_assign): Use information from the LHS.
+
+2020-09-07  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* trans-types.c (gfc_get_derived_type): Fix argument types.
+
+2020-09-07  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* resolve.c (resolve_select_type): Provide a formal arg list.
+
+2020-09-06  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* trans-types.c (gfc_get_ppc_type): Add comment.
+
+2020-09-06  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* trans-types.c (gfc_get_ppc_type): Fix function arg types.
+
+2020-09-06  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR fortran/96947
+	* trans-stmt.c (gfc_trans_fail_image): caf_fail_image
+	expects no argument.
+
+2020-09-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/96859
+	* check.c (gfc_boz2real, gfc_boz2int): When clearing first two bits,
+	change also '2' to '0' and '3' to '1' rather than just handling '4'
+	through '7'.
+
+2020-09-01  Steven G. Kargl  <kargl@gcc.gnu.org>
+	    Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/95398
+	* resolve.c (resolve_select_type): Add check for BT_CLASS
+	type before using the CLASS_DATA macro which will have a
+	NULL pointer to derive components if it isn't BT_CLASS.
+
+2020-08-30  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/96728
+	* module.c (module_peek_char): Peek ahead function.
+	(parse_integer): Add code for parsing signed integers.
+	(parse_atom): Add code to handle signed integers.
+	(peek_atom): Add code to handle signed integers.
+
+2020-08-30  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/96727
+	* expr.c (gfc_check_init_expr): Add default error message for the AS_ASSUMED_RANK case.
+
+2020-08-30  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/96726
+	* expr.c (check_references): Change different relational operator
+	to less-than operator to avoid infinite loop.
+
+2020-08-30  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/95352
+	* simplify.c (simplify_bound_dim): Add check for NULL pointer
+	before trying to access structure member.
+
+2020-08-30  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/94110
+	* interface.c (gfc_compare_actual_formal): Add code to also raise
+	the actual argument cannot be an assumed-size array error when the
+	dummy arguments are deferred-shape or assumed-rank pointer.
+
+2020-08-28  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/94672
+	* trans-array.c (gfc_trans_g77_array): Check against the parm decl and
+	set the nonparm decl used for the is-present check to NULL if absent.
+
+2020-08-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/96624
+	* simplify.c (gfc_simplify_reshape): Detect zero shape and
+	clear index if found.
+
+2020-08-27  Mark Eggleston  <markeggleston@gcc.gnu.org>
+
+	PR fortran/95882
+	* decl.c (char_len_param_value): Check gfc_seen_div0 and
+	if it is set return MATCH_ERROR.
+
+2020-08-27  Martin Liska  <mliska@suse.cz>
+
+	* trans-openmp.c (gfc_trans_omp_do): Set exact argument of a vector
+	growth function to true.
+
+2020-08-26  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.h (enum gfc_omp_device_type): New.
+	(symbol_attribute, gfc_omp_clauses, gfc_common_head): Use it.
+	* module.c (enum ab_attribute): Add AB_OMP_DEVICE_TYPE_HOST,
+	AB_OMP_DEVICE_TYPE_NOHOST and AB_OMP_DEVICE_TYPE_ANY.
+	(attr_bits, mio_symbol_attribute): Handle it.
+	(load_commons, write_common_0): Handle omp_device_type flag.
+	* openmp.c (enum omp_mask1): Add OMP_CLAUSE_DEVICE_TYPE
+	(OMP_DECLARE_TARGET_CLAUSES): Likewise.
+	(gfc_match_omp_clauses): Match 'device_type'.
+	(gfc_match_omp_declare_target): Handle it.
+	* trans-common.c (build_common_decl): Write device-type clause.
+	* trans-decl.c (add_attributes_to_decl): Likewise.
+
+2020-08-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/96737
+	* trans-types.c (gfc_get_derived_type): Derived types that are
+	used in submodules are not compatible with TYPE_CANONICAL from
+	any of the global namespaces.
+
+2020-08-20  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/96100
+	PR fortran/96101
+	* trans-array.c (get_array_charlen): Tidy up the evaluation of
+	the string length for array constructors. Avoid trailing array
+	references. Ensure string lengths of deferred length components
+	are set. For parentheses operator apply string  length to both
+	the primary expression and the enclosed expression.
+
+2020-08-20  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/94958
+	* trans-array.c (gfc_bcast_alloc_comp): Use the correct variable.
+
+2020-08-20  Tobias Burnus  <tobias@codesourcery.com>
+
+	* openmp.c (gfc_match_omp_clauses): Re-order 'if' clause pasing
+	to avoid creating spurious symbols.
+
+2020-08-18  Harald Anlauf  <anlauf@gmx.de>
+
+	* check.c (check_rest): Reject MIN/MAX character arguments of
+	different kind.
+	* simplify.c (min_max_choose): The simplification result shall
+	have the highest kind value of the arguments.
+	* trans-intrinsic.c (gfc_conv_intrinsic_minmax): Choose type and
+	kind of intermediate by looking at all arguments, not the result.
+
 2020-08-17  Martin Liska  <mliska@suse.cz>
 
 	* openmp.c (resolve_omp_clauses): Add static assert

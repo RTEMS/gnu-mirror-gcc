@@ -396,21 +396,17 @@ get_subregion_within_ctor (const region *parent_reg, tree index,
 static const svalue *
 get_svalue_for_ctor_val (tree val, region_model_manager *mgr)
 {
-  if (TREE_CODE (val) == ADDR_EXPR)
-    {
-      gcc_assert (TREE_CODE (TREE_OPERAND (val, 0)) == STRING_CST);
-      const string_region *str_reg
-	= mgr->get_region_for_string (TREE_OPERAND (val, 0));
-      return mgr->get_ptr_svalue (TREE_TYPE (val), str_reg);
-    }
-  gcc_assert (CONSTANT_CLASS_P (val));
-  return mgr->get_or_create_constant_svalue (val);
+  /* Reuse the get_rvalue logic from region_model.  */
+  region_model m (mgr);
+  return m.get_rvalue (path_var (val, 0), NULL);
 }
 
 /* Bind values from CONSTRUCTOR to this map, relative to
-   PARENT_REG's relationship to its base region.  */
+   PARENT_REG's relationship to its base region.
+   Return true if successful, false if there was a problem (e.g. due
+   to hitting a complexity limit).  */
 
-void
+bool
 binding_map::apply_ctor_to_region (const region *parent_reg, tree ctor,
 				   region_model_manager *mgr)
 {
@@ -425,18 +421,127 @@ binding_map::apply_ctor_to_region (const region *parent_reg, tree ctor,
     {
       if (!index)
 	index = build_int_cst (integer_type_node, ix);
-      const region *child_reg
-	= get_subregion_within_ctor (parent_reg, index, mgr);
-      if (TREE_CODE (val) == CONSTRUCTOR)
-	apply_ctor_to_region (child_reg, val, mgr);
-      else
+      else if (TREE_CODE (index) == RANGE_EXPR)
 	{
-	  const svalue *sval = get_svalue_for_ctor_val (val, mgr);
-	  const binding_key *k
-	    = binding_key::make (mgr->get_store_manager (), child_reg,
-				 BK_direct);
-	  put (k, sval);
+	  tree min_index = TREE_OPERAND (index, 0);
+	  tree max_index = TREE_OPERAND (index, 1);
+	  if (min_index == max_index)
+	    {
+	      if (!apply_ctor_pair_to_child_region (parent_reg, mgr,
+						    min_index, val))
+		return false;
+	    }
+	  else
+	    {
+	      if (!apply_ctor_val_to_range (parent_reg, mgr,
+					    min_index, max_index, val))
+		return false;
+	    }
+	  continue;
 	}
+      if (!apply_ctor_pair_to_child_region (parent_reg, mgr, index, val))
+	return false;
+    }
+  return true;
+}
+
+/* Bind the value VAL into the range of elements within PARENT_REF
+   from MIN_INDEX to MAX_INDEX (including endpoints).
+   For use in handling RANGE_EXPR within a CONSTRUCTOR.
+   Return true if successful, false if there was a problem (e.g. due
+   to hitting a complexity limit).  */
+
+bool
+binding_map::apply_ctor_val_to_range (const region *parent_reg,
+				      region_model_manager *mgr,
+				      tree min_index, tree max_index,
+				      tree val)
+{
+  gcc_assert (TREE_CODE (min_index) == INTEGER_CST);
+  gcc_assert (TREE_CODE (max_index) == INTEGER_CST);
+
+  /* Generate a binding key for the range.  */
+  const region *min_element
+    = get_subregion_within_ctor (parent_reg, min_index, mgr);
+  const region *max_element
+    = get_subregion_within_ctor (parent_reg, max_index, mgr);
+  region_offset min_offset = min_element->get_offset ();
+  if (min_offset.symbolic_p ())
+    return false;
+  bit_offset_t start_bit_offset = min_offset.get_bit_offset ();
+  store_manager *smgr = mgr->get_store_manager ();
+  const binding_key *max_element_key
+    = binding_key::make (smgr, max_element, BK_direct);
+  if (max_element_key->symbolic_p ())
+    return false;
+  const concrete_binding *max_element_ckey
+    = max_element_key->dyn_cast_concrete_binding ();
+  bit_size_t range_size_in_bits
+    = max_element_ckey->get_next_bit_offset () - start_bit_offset;
+  const concrete_binding *range_key
+    = smgr->get_concrete_binding (start_bit_offset, range_size_in_bits,
+				  BK_direct);
+  if (range_key->symbolic_p ())
+    return false;
+
+  /* Get the value.  */
+  if (TREE_CODE (val) == CONSTRUCTOR)
+    return false;
+  const svalue *sval = get_svalue_for_ctor_val (val, mgr);
+
+  /* Bind the value to the range.  */
+  put (range_key, sval);
+  return true;
+}
+
+/* Bind the value VAL into INDEX within PARENT_REF.
+   For use in handling a pair of entries within a CONSTRUCTOR.
+   Return true if successful, false if there was a problem (e.g. due
+   to hitting a complexity limit).  */
+
+bool
+binding_map::apply_ctor_pair_to_child_region (const region *parent_reg,
+					      region_model_manager *mgr,
+					      tree index, tree val)
+{
+  const region *child_reg
+    = get_subregion_within_ctor (parent_reg, index, mgr);
+  if (TREE_CODE (val) == CONSTRUCTOR)
+    return apply_ctor_to_region (child_reg, val, mgr);
+  else
+    {
+      const svalue *sval = get_svalue_for_ctor_val (val, mgr);
+      const binding_key *k
+	= binding_key::make (mgr->get_store_manager (), child_reg,
+			     BK_direct);
+      /* Handle the case where we have an unknown size for child_reg
+	 (e.g. due to it being a trailing field with incomplete array
+	 type.  */
+      if (!k->concrete_p ())
+	{
+	  /* Assume that sval has a well-defined size for this case.  */
+	  tree sval_type = sval->get_type ();
+	  gcc_assert (sval_type);
+	  HOST_WIDE_INT sval_byte_size = int_size_in_bytes (sval_type);
+	  gcc_assert (sval_byte_size != -1);
+	  bit_size_t sval_bit_size = sval_byte_size * BITS_PER_UNIT;
+	  /* Get offset of child relative to base region.  */
+	  region_offset child_base_offset = child_reg->get_offset ();
+	  if (child_base_offset.symbolic_p ())
+	    return false;
+	  /* Convert to an offset relative to the parent region.  */
+	  region_offset parent_base_offset = parent_reg->get_offset ();
+	  gcc_assert (!parent_base_offset.symbolic_p ());
+	  bit_offset_t child_parent_offset
+	    = (child_base_offset.get_bit_offset ()
+	       - parent_base_offset.get_bit_offset ());
+	  /* Create a concrete key for the child within the parent.  */
+	  k = mgr->get_store_manager ()->get_concrete_binding
+	    (child_parent_offset, sval_bit_size, BK_direct);
+	}
+      gcc_assert (k->concrete_p ());
+      put (k, sval);
+      return true;
     }
 }
 
@@ -1550,7 +1655,7 @@ store::set_value (store_manager *mgr, const region *lhs_reg,
 
 tristate
 store::eval_alias (const region *base_reg_a,
-		   const region *base_reg_b)
+		   const region *base_reg_b) const
 {
   /* SSA names can't alias.  */
   tree decl_a = base_reg_a->maybe_get_decl ();
@@ -1560,31 +1665,63 @@ store::eval_alias (const region *base_reg_a,
   if (decl_b && TREE_CODE (decl_b) == SSA_NAME)
     return tristate::TS_FALSE;
 
+  /* Try both ways, for symmetry.  */
+  tristate ts_ab = eval_alias_1 (base_reg_a, base_reg_b);
+  if (ts_ab.is_false ())
+    return tristate::TS_FALSE;
+  tristate ts_ba = eval_alias_1 (base_reg_b, base_reg_a);
+  if (ts_ba.is_false ())
+    return tristate::TS_FALSE;
+  return tristate::TS_UNKNOWN;
+}
+
+/* Half of store::eval_alias; called twice for symmetry.  */
+
+tristate
+store::eval_alias_1 (const region *base_reg_a,
+		     const region *base_reg_b) const
+{
   if (const symbolic_region *sym_reg_a
       = base_reg_a->dyn_cast_symbolic_region ())
     {
       const svalue *sval_a = sym_reg_a->get_pointer ();
+      if (sval_a->get_kind () == SK_INITIAL)
+	if (tree decl_b = base_reg_b->maybe_get_decl ())
+	  if (!is_global_var (decl_b))
+	    {
+	      /* The initial value of a pointer can't point to a local.  */
+	      return tristate::TS_FALSE;
+	    }
       if (sval_a->get_kind () == SK_INITIAL
-	  && decl_b
-	  && !is_global_var (decl_b))
+	  && base_reg_b->get_kind () == RK_HEAP_ALLOCATED)
 	{
-	  /* The initial value of a pointer can't point to a local.  */
+	  /* The initial value of a pointer can't point to a
+	     region that was allocated on the heap after the beginning of the
+	     path.  */
 	  return tristate::TS_FALSE;
 	}
-    }
-  if (const symbolic_region *sym_reg_b
-      = base_reg_b->dyn_cast_symbolic_region ())
-    {
-      const svalue *sval_b = sym_reg_b->get_pointer ();
-      if (sval_b->get_kind () == SK_INITIAL
-	  && decl_a
-	  && !is_global_var (decl_a))
+      if (const widening_svalue *widening_sval_a
+	  = sval_a->dyn_cast_widening_svalue ())
 	{
-	  /* The initial value of a pointer can't point to a local.  */
-	  return tristate::TS_FALSE;
+	  const svalue *base = widening_sval_a->get_base_svalue ();
+	  if (const region_svalue *region_sval
+		= base->dyn_cast_region_svalue ())
+	    {
+	      const region *pointee = region_sval->get_pointee ();
+	      /* If we have sval_a is WIDENING(&REGION, OP), and
+		 B can't alias REGION, then B can't alias A either.
+		 For example, A might arise from
+		   for (ptr = &REGION; ...; ptr++)
+		 where sval_a is ptr in the 2nd iteration of the loop.
+		 We want to ensure that "*ptr" can only clobber things
+		 within REGION's base region.  */
+	      tristate ts = eval_alias (pointee->get_base_region (),
+					base_reg_b);
+	      if (ts.is_false ())
+		return tristate::TS_FALSE;
+	    }
 	}
     }
-
   return tristate::TS_UNKNOWN;
 }
 

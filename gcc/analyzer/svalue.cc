@@ -128,16 +128,19 @@ svalue::maybe_get_constant () const
     return NULL_TREE;
 }
 
-/* If this svalue is a cast (i.e a unaryop NOP_EXPR), return the underlying
-   svalue.
+/* If this svalue is a cast (i.e a unaryop NOP_EXPR or VIEW_CONVERT_EXPR),
+   return the underlying svalue.
    Otherwise return NULL.  */
 
 const svalue *
 svalue::maybe_undo_cast () const
 {
   if (const unaryop_svalue *unaryop_sval = dyn_cast_unaryop_svalue ())
-    if (unaryop_sval->get_op () == NOP_EXPR)
-      return unaryop_sval->get_arg ();
+    {
+      enum tree_code op = unaryop_sval->get_op ();
+      if (op == NOP_EXPR || op == VIEW_CONVERT_EXPR)
+	return unaryop_sval->get_arg ();
+    }
   return NULL;
 }
 
@@ -196,6 +199,18 @@ svalue::can_merge_p (const svalue *other,
 						 other, this);
     }
 
+  /* Merger of:
+	 this: BINOP (X, OP, CST)
+	other: X, where X is non-widening
+	   to: WIDENING (other, this).  */
+  if (const binop_svalue *binop_sval = dyn_cast_binop_svalue ())
+    if (binop_sval->get_arg0 () == other
+	&& binop_sval->get_arg1 ()->get_kind () == SK_CONSTANT
+	&& other->get_kind () != SK_WIDENING)
+      return mgr->get_or_create_widening_svalue (other->get_type (),
+						 merger->m_point,
+						 other, this);
+
   /* Merge: (Widen(existing_val, V), existing_val) -> Widen (existing_val, V)
      and thus get a fixed point.  */
   if (const widening_svalue *widen_sval = dyn_cast_widening_svalue ())
@@ -231,6 +246,17 @@ svalue::can_merge_p (const svalue *other,
 	  {
 	    return widen_arg0;
 	  }
+
+	/* Merger of:
+	    this: BINOP(WIDENING(BASE, BINOP(BASE, X)), X)
+	   other: BINOP(BASE, X)
+	      to: WIDENING(BASE, BINOP(BASE, X)).  */
+	if (widen_arg0->get_iter_svalue () == other)
+	  if (const binop_svalue *other_binop_sval
+		= other->dyn_cast_binop_svalue ())
+	    if (other_binop_sval->get_arg0 () == widen_arg0->get_base_svalue ()
+		&& other_binop_sval->get_arg1 () == binop_sval->get_arg1 ())
+	      return widen_arg0;
       }
 
   return mgr->get_or_create_unknown_svalue (get_type ());
@@ -543,7 +569,7 @@ unaryop_svalue::dump_to_pp (pretty_printer *pp, bool simple) const
 {
   if (simple)
     {
-      if (m_op == NOP_EXPR)
+      if (m_op == VIEW_CONVERT_EXPR || m_op == NOP_EXPR)
 	{
 	  pp_string (pp, "CAST(");
 	  dump_tree (pp, get_type ());
@@ -909,6 +935,20 @@ unmergeable_svalue::implicitly_live_p (const svalue_set &live_svalues,
 }
 
 /* class compound_svalue : public svalue.  */
+
+compound_svalue::compound_svalue (tree type, const binding_map &map)
+: svalue (calc_complexity (map), type), m_map (map)
+{
+  /* All keys within the underlying binding_map are required to be concrete,
+     not symbolic.  */
+#if CHECKING_P
+  for (iterator_t iter = begin (); iter != end (); ++iter)
+    {
+      const binding_key *key = (*iter).first;
+      gcc_assert (key->concrete_p ());
+    }
+#endif
+}
 
 /* Implementation of svalue::dump_to_pp vfunc for compound_svalue.  */
 

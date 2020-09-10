@@ -116,6 +116,12 @@ split_double_mode (machine_mode mode, rtx operands[],
     case E_DImode:
       half_mode = SImode;
       break;
+    case E_P2HImode:
+      half_mode = HImode;
+      break;
+    case E_P2QImode:
+      half_mode = QImode;
+      break;
     default:
       gcc_unreachable ();
     }
@@ -11433,24 +11439,24 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 	}
       else
 	{
-	  rtx pat;
+	  if (target == 0
+	      || !register_operand (target, SImode))
+	    target = gen_reg_rtx (SImode);
 
-	  target = gen_reg_rtx (SImode);
 	  emit_move_insn (target, const0_rtx);
 	  target = gen_rtx_SUBREG (QImode, target, 0);
 
-	  if (fcode == IX86_BUILTIN_ENQCMD)
-	    pat = gen_enqcmd (UNSPECV_ENQCMD, Pmode, op0, op1);
-	  else
-	    pat = gen_enqcmd (UNSPECV_ENQCMDS, Pmode, op0, op1);
+	  int unspecv = (fcode == IX86_BUILTIN_ENQCMD
+			 ? UNSPECV_ENQCMD
+			 : UNSPECV_ENQCMDS);
+	  icode = code_for_enqcmd (unspecv, Pmode);
+	  emit_insn (GEN_FCN (icode) (op0, op1));
 
-	  emit_insn (pat);
-
-	  emit_insn (gen_rtx_SET (gen_rtx_STRICT_LOW_PART (VOIDmode, target),
-				  gen_rtx_fmt_ee (EQ, QImode,
-						  SET_DEST (pat),
-						  const0_rtx)));
-
+	  emit_insn
+	    (gen_rtx_SET (gen_rtx_STRICT_LOW_PART (VOIDmode, target),
+			  gen_rtx_fmt_ee (EQ, QImode,
+					  gen_rtx_REG (CCZmode, FLAGS_REG),
+					  const0_rtx)));
 	  return SUBREG_REG (target);
 	}
 
@@ -12839,10 +12845,12 @@ rdseed_step:
 	}
       op1 = gen_rtx_MEM (mode, op1);
 
-      emit_insn ((fcode == IX86_BUILTIN_WRSSD
-		  || fcode == IX86_BUILTIN_WRSSQ)
-		 ? gen_wrss (mode, op0, op1)
-		 : gen_wruss (mode, op0, op1));
+      icode = ((fcode == IX86_BUILTIN_WRSSD
+		|| fcode == IX86_BUILTIN_WRSSQ)
+	       ? code_for_wrss (mode)
+	       : code_for_wruss (mode));
+      emit_insn (GEN_FCN (icode) (op0, op1));
+
       return 0;
 
     default:
@@ -19602,7 +19610,7 @@ bool
 ix86_expand_vec_shift_qihi_constant (enum rtx_code code, rtx dest, rtx op1, rtx op2)
 {
   machine_mode qimode, himode;
-  unsigned int and_constant, xor_constant;
+  HOST_WIDE_INT and_constant, xor_constant;
   HOST_WIDE_INT shift_amount;
   rtx vec_const_and, vec_const_xor;
   rtx tmp, op1_subreg;
@@ -19677,7 +19685,7 @@ ix86_expand_vec_shift_qihi_constant (enum rtx_code code, rtx dest, rtx op1, rtx 
   emit_move_insn (dest, simplify_gen_subreg (qimode, tmp, himode, 0));
   emit_move_insn (vec_const_and,
 		  ix86_build_const_vector (qimode, true,
-					   GEN_INT (and_constant)));
+					   gen_int_mode (and_constant, QImode)));
   emit_insn (gen_and (dest, dest, vec_const_and));
 
   /* For ASHIFTRT, perform extra operation like
@@ -19688,7 +19696,7 @@ ix86_expand_vec_shift_qihi_constant (enum rtx_code code, rtx dest, rtx op1, rtx 
       vec_const_xor = gen_reg_rtx (qimode);
       emit_move_insn (vec_const_xor,
 		      ix86_build_const_vector (qimode, true,
-					       GEN_INT (xor_constant)));
+					       gen_int_mode (xor_constant, QImode)));
       emit_insn (gen_xor (dest, dest, vec_const_xor));
       emit_insn (gen_sub (dest, dest, vec_const_xor));
     }

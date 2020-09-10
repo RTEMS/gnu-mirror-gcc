@@ -8286,6 +8286,19 @@ resolve_address_of_overloaded_function (tree target_type,
 	     one, or vice versa.  */
 	  continue;
 
+	/* Constraints must be satisfied. This is done before
+	   return type deduction since that instantiates the
+	   function. */
+	if (!constraints_satisfied_p (fn))
+	  continue;
+
+	if (undeduced_auto_decl (fn))
+	  {
+	    /* Force instantiation to do return type deduction.  */
+	    maybe_instantiate_decl (fn);
+	    require_deduced_type (fn);
+	  }
+
 	/* In C++17 we need the noexcept-qualifier to compare types.  */
 	if (flag_noexcept_type
 	    && !maybe_instantiate_noexcept (fn, complain))
@@ -9742,7 +9755,8 @@ build_vtbl_initializer (tree binfo,
     {
       int n_entries = vec_safe_length (vid.inits);
 
-      vec_safe_grow (vid.inits, TARGET_VTABLE_DATA_ENTRY_DISTANCE * n_entries);
+      vec_safe_grow (vid.inits, TARGET_VTABLE_DATA_ENTRY_DISTANCE * n_entries,
+		     true);
 
       /* Move data entries into their new positions and add padding
 	 after the new positions.  Iterate backwards so we don't
@@ -9774,7 +9788,7 @@ build_vtbl_initializer (tree binfo,
      order.  Straighten them out and add them to the running list in one
      step.  */
   jx = vec_safe_length (*inits);
-  vec_safe_grow (*inits, jx + vid.inits->length ());
+  vec_safe_grow (*inits, jx + vid.inits->length (), true);
 
   for (ix = vid.inits->length () - 1;
        vid.inits->iterate (ix, &e);

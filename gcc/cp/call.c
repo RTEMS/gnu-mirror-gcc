@@ -3631,7 +3631,7 @@ equal_functions (tree fn1, tree fn2)
     return 0;
   if (TREE_CODE (fn1) == TEMPLATE_DECL)
     return fn1 == fn2;
-  if (DECL_LOCAL_FUNCTION_P (fn1) || DECL_LOCAL_FUNCTION_P (fn2)
+  if (DECL_LOCAL_DECL_P (fn1) || DECL_LOCAL_DECL_P (fn2)
       || DECL_EXTERN_C_FUNCTION_P (fn1))
     return decls_match (fn1, fn2);
   return fn1 == fn2;
@@ -8430,10 +8430,12 @@ conv_binds_ref_to_prvalue (conversion *c)
 }
 
 /* Call the trivial destructor for INSTANCE, which can be either an lvalue of
-   class type or a pointer to class type.  */
+   class type or a pointer to class type.  If NO_PTR_DEREF is true and
+   INSTANCE has pointer type, clobber the pointer rather than what it points
+   to.  */
 
 tree
-build_trivial_dtor_call (tree instance)
+build_trivial_dtor_call (tree instance, bool no_ptr_deref)
 {
   gcc_assert (!is_dummy_object (instance));
 
@@ -8443,7 +8445,8 @@ build_trivial_dtor_call (tree instance)
       return fold_convert (void_type_node, instance);
     }
 
-  if (INDIRECT_TYPE_P (TREE_TYPE (instance)))
+  if (INDIRECT_TYPE_P (TREE_TYPE (instance))
+      && (!no_ptr_deref || TYPE_REF_P (TREE_TYPE (instance))))
     {
       if (VOID_TYPE_P (TREE_TYPE (TREE_TYPE (instance))))
 	goto no_clobber;
@@ -10294,8 +10297,8 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	  && !vec_safe_is_empty (user_args))
 	{
 	  /* Create a CONSTRUCTOR from ARGS, e.g. {1, 2} from <1, 2>.  */
-	  tree list = build_tree_list_vec (user_args);
-	  tree ctor = build_constructor_from_list (init_list_type_node, list);
+	  tree ctor = build_constructor_from_vec (init_list_type_node,
+						  user_args);
 	  CONSTRUCTOR_IS_DIRECT_INIT (ctor) = true;
 	  CONSTRUCTOR_IS_PAREN_INIT (ctor) = true;
 	  if (is_dummy_object (instance))

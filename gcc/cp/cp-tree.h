@@ -506,7 +506,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 
    Usage of DECL_LANG_FLAG_?:
    0: DECL_TEMPLATE_PARM_P (in PARM_DECL, CONST_DECL, TYPE_DECL, or TEMPLATE_DECL)
-      DECL_LOCAL_FUNCTION_P (in FUNCTION_DECL)
+      DECL_LOCAL_DECL_P (in FUNCTION_DECL, VAR_DECL)
       DECL_MUTABLE_P (in FIELD_DECL)
       DECL_DEPENDENT_P (in USING_DECL)
       LABEL_DECL_BREAK (in LABEL_DECL)
@@ -3485,13 +3485,12 @@ struct GTY(()) lang_decl {
    ? TYPE_ALIAS_TEMPLATE_INFO (NODE)					\
    : TYPE_TEMPLATE_INFO (NODE))
 
-/* Set the template information for an ENUMERAL_, RECORD_, or
-   UNION_TYPE to VAL.  */
+/* Set the template information for a non-alias n ENUMERAL_, RECORD_,
+   or UNION_TYPE to VAL.  ALIAS's are dealt with separately.  */
 #define SET_TYPE_TEMPLATE_INFO(NODE, VAL)				\
-  (TREE_CODE (NODE) == ENUMERAL_TYPE					\
-   || (CLASS_TYPE_P (NODE) && !TYPE_ALIAS_P (NODE))			\
-   ? (TYPE_LANG_SLOT_1 (NODE) = (VAL))				\
-   : (DECL_TEMPLATE_INFO (TYPE_NAME (NODE)) = (VAL)))
+  (gcc_checking_assert (TREE_CODE (NODE) == ENUMERAL_TYPE		\
+			|| (CLASS_TYPE_P (NODE) && !TYPE_ALIAS_P (NODE))), \
+   (TYPE_LANG_SLOT_1 (NODE) = (VAL)))					\
 
 #define TI_TEMPLATE(NODE) \
   ((struct tree_template_info*)TEMPLATE_INFO_CHECK (NODE))->tmpl
@@ -4010,10 +4009,10 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
 #define TYPE_CONTAINS_VPTR_P(NODE)		\
   (TYPE_POLYMORPHIC_P (NODE) || CLASSTYPE_VBASECLASSES (NODE))
 
-/* Nonzero if NODE is a FUNCTION_DECL (for a function with global
-   scope) declared in a local scope.  */
-#define DECL_LOCAL_FUNCTION_P(NODE) \
-  DECL_LANG_FLAG_0 (FUNCTION_DECL_CHECK (NODE))
+/* Nonzero if NODE is a FUNCTION_DECL or VARIABLE_DECL (for a decl
+   with namespace scope) declared in a local scope.  */
+#define DECL_LOCAL_DECL_P(NODE) \
+  DECL_LANG_FLAG_0 (VAR_OR_FUNCTION_DECL_CHECK (NODE))
 
 /* Nonzero if NODE is the target for genericization of 'break' stmts.  */
 #define LABEL_DECL_BREAK(NODE) \
@@ -6249,7 +6248,7 @@ extern bool null_member_pointer_value_p		(tree);
 extern bool sufficient_parms_p			(const_tree);
 extern tree type_decays_to			(tree);
 extern tree extract_call_expr			(tree);
-extern tree build_trivial_dtor_call		(tree);
+extern tree build_trivial_dtor_call		(tree, bool = false);
 extern tree build_user_type_conversion		(tree, tree, int,
 						 tsubst_flags_t);
 extern tree build_new_function_call		(tree, vec<tree, va_gc> **,
@@ -6583,6 +6582,7 @@ extern bool check_array_designated_initializer  (constructor_elt *,
 extern bool check_for_uninitialized_const_var   (tree, bool, tsubst_flags_t);
 extern tree build_explicit_specifier		(tree, tsubst_flags_t);
 extern void do_push_parm_decls			(tree, tree, tree *);
+extern tree do_aggregate_paren_init		(tree, tree);
 
 /* in decl2.c */
 extern void record_mangling			(tree, bool);
@@ -6905,6 +6905,7 @@ extern void do_type_instantiation		(tree, tree, tsubst_flags_t);
 extern bool always_instantiate_p		(tree);
 extern bool maybe_instantiate_noexcept		(tree, tsubst_flags_t = tf_warning_or_error);
 extern tree instantiate_decl			(tree, bool, bool);
+extern void maybe_instantiate_decl		(tree);
 extern int comp_template_parms			(const_tree, const_tree);
 extern bool template_heads_equivalent_p		(const_tree, const_tree);
 extern bool builtin_pack_fn_p			(tree);
@@ -6982,7 +6983,9 @@ extern bool template_parm_object_p		(const_tree);
 extern tree tparm_object_argument		(tree);
 extern bool explicit_class_specialization_p     (tree);
 extern bool push_tinst_level                    (tree);
+extern bool push_tinst_level                    (tree, tree);
 extern bool push_tinst_level_loc                (tree, location_t);
+extern bool push_tinst_level_loc                (tree, tree, location_t);
 extern void pop_tinst_level                     (void);
 extern struct tinst_level *outermost_tinst_level(void);
 extern void init_template_processing		(void);
@@ -8136,6 +8139,24 @@ is_constrained_auto (const_tree t)
 {
   return is_auto (t) && PLACEHOLDER_TYPE_CONSTRAINTS (t);
 }
+
+/* RAII class to push/pop class scope T; if T is not a class, do nothing.  */
+
+struct push_nested_class_guard
+{
+  bool push;
+  push_nested_class_guard (tree t)
+    : push (t && CLASS_TYPE_P (t))
+  {
+    if (push)
+      push_nested_class (t);
+  }
+  ~push_nested_class_guard ()
+  {
+    if (push)
+      pop_nested_class ();
+  }
+};
 
 #if CHECKING_P
 namespace selftest {

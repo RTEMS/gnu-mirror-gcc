@@ -324,6 +324,7 @@ region_model_manager::maybe_fold_unaryop (tree type, enum tree_code op,
   switch (op)
     {
     default: break;
+    case VIEW_CONVERT_EXPR:
     case NOP_EXPR:
       {
 	/* Handle redundant casts.  */
@@ -390,13 +391,39 @@ region_model_manager::get_or_create_unaryop (tree type, enum tree_code op,
   return unaryop_sval;
 }
 
+/* Get a tree code for a cast to DST_TYPE from SRC_TYPE.
+   Use NOP_EXPR if possible (e.g. to help fold_unary convert casts
+   of 0 to (T*) to simple pointer constants), but use FIX_TRUNC_EXPR
+   and VIEW_CONVERT_EXPR for cases that fold_unary would otherwise crash
+   on.  */
+
+static enum tree_code
+get_code_for_cast (tree dst_type, tree src_type)
+{
+  gcc_assert (dst_type);
+  if (!src_type)
+    return NOP_EXPR;
+
+  if (TREE_CODE (src_type) == REAL_TYPE)
+    {
+      if (TREE_CODE (dst_type) == INTEGER_TYPE)
+	return FIX_TRUNC_EXPR;
+      else
+	return VIEW_CONVERT_EXPR;
+    }
+
+  return NOP_EXPR;
+}
+
 /* Return the svalue * for a cast of ARG to type TYPE, creating it
    if necessary.  */
 
 const svalue *
 region_model_manager::get_or_create_cast (tree type, const svalue *arg)
 {
-  return get_or_create_unaryop (type, NOP_EXPR, arg);
+  gcc_assert (type);
+  enum tree_code op = get_code_for_cast (type, arg->get_type ());
+  return get_or_create_unaryop (type, op, arg);
 }
 
 /* Subroutine of region_model_manager::get_or_create_binop.
@@ -440,17 +467,23 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
       break;
     case MULT_EXPR:
       /* (VAL * 0).  */
-      if (cst1 && zerop (cst1))
+      if (cst1 && zerop (cst1) && INTEGRAL_TYPE_P (type))
 	return get_or_create_constant_svalue (build_int_cst (type, 0));
       /* (VAL * 1) -> VAL.  */
       if (cst1 && integer_onep (cst1))
 	return arg0;
       break;
+    case BIT_AND_EXPR:
+      if (cst1)
+	if (zerop (cst1) && INTEGRAL_TYPE_P (type))
+	  /* "(ARG0 & 0)" -> "0".  */
+	  return get_or_create_constant_svalue (build_int_cst (type, 0));
+      break;
     case TRUTH_ANDIF_EXPR:
     case TRUTH_AND_EXPR:
       if (cst1)
 	{
-	  if (zerop (cst1))
+	  if (zerop (cst1) && INTEGRAL_TYPE_P (type))
 	    /* "(ARG0 && 0)" -> "0".  */
 	    return get_or_create_constant_svalue (build_int_cst (type, 0));
 	  else
@@ -550,7 +583,8 @@ region_model_manager::maybe_fold_sub_svalue (tree type,
   if (const unaryop_svalue *unary
       = parent_svalue->dyn_cast_unaryop_svalue ())
     {
-      if (unary->get_op () == NOP_EXPR)
+      if (unary->get_op () == NOP_EXPR
+	  || unary->get_op () == VIEW_CONVERT_EXPR)
 	if (tree cst = unary->get_arg ()->maybe_get_constant ())
 	  if (zerop (cst))
 	    {
@@ -640,6 +674,8 @@ region_model_manager::get_or_create_widening_svalue (tree type,
 						     const svalue *base_sval,
 						     const svalue *iter_sval)
 {
+  gcc_assert (base_sval->get_kind () != SK_WIDENING);
+  gcc_assert (iter_sval->get_kind () != SK_WIDENING);
   widening_svalue::key_t key (type, point, base_sval, iter_sval);
   if (widening_svalue **slot = m_widening_values_map.get (key))
     return *slot;
@@ -776,6 +812,8 @@ region_model_manager::get_region_for_global (tree expr)
 const region *
 region_model_manager::get_field_region (const region *parent, tree field)
 {
+  gcc_assert (TREE_CODE (field) == FIELD_DECL);
+
   field_region::key_t key (parent, field);
   if (field_region *reg = m_field_regions.get (key))
     return reg;

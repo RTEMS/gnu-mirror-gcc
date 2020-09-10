@@ -615,7 +615,7 @@ bool
 gori_compute::compute_name_range_op (irange &r, gimple *stmt,
 				     const irange &lhs, tree name)
 {
-  widest_irange op1_range, op2_range;
+  int_range_max op1_range, op2_range;
 
   tree op1 = gimple_range_operand1 (stmt);
   tree op2 = gimple_range_operand2 (stmt);
@@ -790,7 +790,7 @@ struct tf_range
   tf_range () { }
   tf_range (const irange &t_range, const irange &f_range)
     : true_range (t_range), false_range (f_range) { }
-  widest_irange true_range, false_range;
+  int_range_max true_range, false_range;
 };
 
 // Evaluate a binary logical expression by combining the true and
@@ -845,7 +845,7 @@ gori_compute::logical_combine (irange &r, enum tree_code code,
   // would be lost.
   if (!range_is_either_true_or_false (lhs))
     {
-      widest_irange r1;
+      int_range_max r1;
       if (logical_combine (r1, code, m_bool_zero, op1, op2)
 	  && logical_combine (r, code, m_bool_one, op1, op2))
 	{
@@ -870,11 +870,11 @@ gori_compute::logical_combine (irange &r, enum tree_code code,
 	else
 	  {
 	    // The FALSE side is the union of the other 3 cases.
-	    widest_irange ff (op1.false_range);
+	    int_range_max ff (op1.false_range);
 	    ff.intersect (op2.false_range);
-	    widest_irange tf (op1.true_range);
+	    int_range_max tf (op1.true_range);
 	    tf.intersect (op2.false_range);
-	    widest_irange ft (op1.false_range);
+	    int_range_max ft (op1.false_range);
 	    ft.intersect (op2.true_range);
 	    r = ff;
 	    r.union_ (tf);
@@ -897,11 +897,11 @@ gori_compute::logical_combine (irange &r, enum tree_code code,
 	  {
 	    // The TRUE side of an OR operation will be the union of
 	    // the other three combinations.
-	    widest_irange tt (op1.true_range);
+	    int_range_max tt (op1.true_range);
 	    tt.intersect (op2.true_range);
-	    widest_irange tf (op1.true_range);
+	    int_range_max tf (op1.true_range);
 	    tf.intersect (op2.false_range);
-	    widest_irange ft (op1.false_range);
+	    int_range_max ft (op1.false_range);
 	    ft.intersect (op2.true_range);
 	    r = tt;
 	    r.union_ (tf);
@@ -1020,7 +1020,7 @@ bool
 gori_compute::compute_operand1_range (irange &r, gimple *stmt,
 				      const irange &lhs, tree name)
 {
-  widest_irange op1_range, op2_range;
+  int_range_max op1_range, op2_range;
   tree op1 = gimple_range_operand1 (stmt);
   tree op2 = gimple_range_operand2 (stmt);
 
@@ -1069,7 +1069,7 @@ bool
 gori_compute::compute_operand2_range (irange &r, gimple *stmt,
 				      const irange &lhs, tree name)
 {
-  widest_irange op1_range, op2_range;
+  int_range_max op1_range, op2_range;
   tree op1 = gimple_range_operand1 (stmt);
   tree op2 = gimple_range_operand2 (stmt);
 
@@ -1106,7 +1106,7 @@ gori_compute::compute_operand1_and_operand2_range
 					 const irange &lhs,
 					 tree name)
 {
-  widest_irange op_range;
+  int_range_max op_range;
 
   // Calculate a good a range for op2.  Since op1 == op2, this will
   // have already included whatever the actual range of name is.
@@ -1145,7 +1145,7 @@ gori_compute::dump (FILE *f)
 bool
 gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name)
 {
-  widest_irange lhs;
+  int_range_max lhs;
 
   gcc_checking_assert (gimple_range_ssa_p (name));
   // Determine if there is an outgoing edge.
@@ -1425,10 +1425,10 @@ gori_compute_cache::cache_comparison_with_int (gimple *stmt,
 					       enum tree_code code,
 					       tree op1, tree op2)
 {
-  widest_irange r_true_side, r_false_side;
+  int_range_max r_true_side, r_false_side;
   tree lhs = gimple_assign_lhs (stmt);
   range_operator *handler = range_op_handler (code, TREE_TYPE (lhs));
-  widest_irange op2_range;
+  int_range_max op2_range;
   expr_range_in_bb (op2_range, op2, gimple_bb (stmt));
   tree type = TREE_TYPE (op1);
   handler->op1_range (r_true_side, type, m_bool_one, op2_range);
@@ -1442,7 +1442,7 @@ gori_compute_cache::cache_comparison_with_ssa (gimple *stmt,
 					       tree op1, tree op2)
 {
   tree cached_name = m_cache->same_cached_name (op1, op2);
-  widest_irange r_true_side, r_false_side;
+  int_range_max r_true_side, r_false_side;
   tf_range op1_range, op2_range;
   gcc_assert (m_cache->get_range (op1_range, op1, cached_name));
   gcc_assert (m_cache->get_range (op2_range, op2, cached_name));

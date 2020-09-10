@@ -875,7 +875,6 @@ public:
 	    tree offexp = d_array_length (result);
 	    offexp = build2 (MINUS_EXPR, TREE_TYPE (offexp),
 			     offexp, size_one_node);
-	    offexp = d_save_expr (offexp);
 
 	    tree ptrexp = d_array_ptr (result);
 	    ptrexp = void_okay_p (ptrexp);
@@ -885,9 +884,7 @@ public:
 	    tree t2 = build_expr (e->e2);
 	    tree expr = stabilize_expr (&t2);
 
-	    t2 = d_save_expr (t2);
 	    result = modify_expr (build_deref (ptrexp), t2);
-	    result = compound_expr (t2, result);
 
 	    this->result_ = compound_expr (expr, result);
 	  }
@@ -1781,6 +1778,9 @@ public:
 		    cleanup = TREE_OPERAND (thisexp, 0);
 		    thisexp = TREE_OPERAND (thisexp, 1);
 		  }
+
+		if (TREE_CODE (thisexp) == CONSTRUCTOR)
+		  thisexp = force_target_expr (thisexp);
 
 		/* Want reference to `this' object.  */
 		if (!POINTER_TYPE_P (TREE_TYPE (thisexp)))
@@ -2886,7 +2886,16 @@ public:
        processing has complete.  Build the static initializer now.  */
     if (e->useStaticInit && !this->constp_)
       {
-	this->result_ = aggregate_initializer_decl (e->sd);
+	tree init = aggregate_initializer_decl (e->sd);
+
+	/* If initializing a symbol, don't forget to set it.  */
+	if (e->sym != NULL)
+	  {
+	    tree var = build_deref (e->sym);
+	    init = compound_expr (modify_expr (var, init), var);
+	  }
+
+	this->result_ = init;
 	return;
       }
 

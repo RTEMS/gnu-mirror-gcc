@@ -4018,6 +4018,14 @@ rs6000_option_override_internal (bool global_init_p)
 	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX;
     }
 
+  if (!(rs6000_isa_flags_explicit & OPTION_MASK_BLOCK_OPS_VECTOR_PAIR))
+    {
+      if (TARGET_MMA && TARGET_EFFICIENT_UNALIGNED_VSX)
+	rs6000_isa_flags |= OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
+      else
+	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
+    }
+
   /* Use long double size to select the appropriate long double.  We use
      TYPE_PRECISION to differentiate the 3 different long double types.  We map
      128 into the precision used for TFmode.  */
@@ -23222,8 +23230,10 @@ struct rs6000_opt_mask {
 static struct rs6000_opt_mask const rs6000_opt_masks[] =
 {
   { "altivec",			OPTION_MASK_ALTIVEC,		false, true  },
-  { "block-ops-unaligned-vsx",  OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX,
-                                                                false, true  },
+  { "block-ops-unaligned-vsx",	OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX,
+								false, true  },
+  { "block-ops-vector-pair",	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR,
+								false, true  },
   { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
@@ -24715,8 +24725,7 @@ rs6000_call_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
 	  /* A function pointer in the ELFv2 ABI is just a plain address, but
 	     the ABI requires it to be loaded into r12 before the call.  */
 	  func_addr = gen_rtx_REG (Pmode, 12);
-	  if (!rtx_equal_p (func_addr, func))
-	    emit_move_insn (func_addr, func);
+	  emit_move_insn (func_addr, func);
 	  abi_reg = func_addr;
 	  /* Indirect calls via CTR are strongly preferred over indirect
 	     calls via LR, so move the address there.  Needed to mark
@@ -24823,14 +24832,26 @@ rs6000_sibcall_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
 {
   rtx call[2];
   rtx insn;
+  rtx r12 = NULL_RTX;
+  rtx func_addr = func_desc;
 
   gcc_assert (INTVAL (cookie) == 0);
 
   if (global_tlsarg)
     tlsarg = global_tlsarg;
 
+  /* For ELFv2, r12 and CTR need to hold the function address
+     for an indirect call.  */
+  if (GET_CODE (func_desc) != SYMBOL_REF && DEFAULT_ABI == ABI_ELFv2)
+    {
+      r12 = gen_rtx_REG (Pmode, 12);
+      emit_move_insn (r12, func_desc);
+      func_addr = gen_rtx_REG (Pmode, CTR_REGNO);
+      emit_move_insn (func_addr, r12);
+    }
+
   /* Create the call.  */
-  call[0] = gen_rtx_CALL (VOIDmode, gen_rtx_MEM (SImode, func_desc), tlsarg);
+  call[0] = gen_rtx_CALL (VOIDmode, gen_rtx_MEM (SImode, func_addr), tlsarg);
   if (value != NULL_RTX)
     call[0] = gen_rtx_SET (value, call[0]);
 
@@ -24843,6 +24864,10 @@ rs6000_sibcall_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   if (!rs6000_pcrel_p (cfun))
     use_reg (&CALL_INSN_FUNCTION_USAGE (insn),
 	     gen_rtx_REG (Pmode, TOC_REGNUM));
+
+  /* Note use of r12.  */
+  if (r12)
+    use_reg (&CALL_INSN_FUNCTION_USAGE (insn), r12);
 }
 
 /* Expand code to perform a call under the SYSV4 ABI.  */

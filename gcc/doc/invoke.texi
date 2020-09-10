@@ -366,7 +366,8 @@ Objective-C and Objective-C++ Dialects}.
 -Wstack-protector  -Wstack-usage=@var{byte-size}  -Wstrict-aliasing @gol
 -Wstrict-aliasing=n  -Wstrict-overflow  -Wstrict-overflow=@var{n} @gol
 -Wstring-compare @gol
--Wstringop-overflow=@var{n}  -Wno-stringop-truncation @gol
+-Wno-stringop-overflow -Wno-stringop-overread @gol
+-Wno-stringop-truncation @gol
 -Wsuggest-attribute=@r{[}pure@r{|}const@r{|}noreturn@r{|}format@r{|}malloc@r{]} @gol
 -Wswitch  -Wno-switch-bool  -Wswitch-default  -Wswitch-enum @gol
 -Wno-switch-outside-range  -Wno-switch-unreachable  -Wsync-nand @gol
@@ -413,6 +414,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wno-analyzer-file-leak @gol
 -Wno-analyzer-free-of-non-heap @gol
 -Wno-analyzer-malloc-leak @gol
+-Wno-analyzer-mismatching-deallocation @gol
 -Wno-analyzer-null-argument @gol
 -Wno-analyzer-null-dereference @gol
 -Wno-analyzer-possible-null-argument @gol
@@ -1070,7 +1072,7 @@ Objective-C and Objective-C++ Dialects}.
 -mwarn-mcu @gol
 -mcode-region=  -mdata-region= @gol
 -msilicon-errata=  -msilicon-errata-warn= @gol
--mhwmult=  -minrt  -mtiny-printf}
+-mhwmult=  -minrt  -mtiny-printf  -mmax-inline-shift=}
 
 @emph{NDS32 Options}
 @gccoptlist{-mbig-endian  -mlittle-endian @gol
@@ -6754,6 +6756,7 @@ void f (char *d)
 
 @option{-Wstring-compare} is enabled by @option{-Wextra}.
 
+@item -Wno-stringop-overflow
 @item -Wstringop-overflow
 @itemx -Wstringop-overflow=@var{type}
 @opindex Wstringop-overflow
@@ -6794,6 +6797,15 @@ const char* f (enum Color clr)
 @end smallexample
 
 Option @option{-Wstringop-overflow=2} is enabled by default.
+
+@item -Wno-stringop-overread
+@opindex Wstringop-overread
+@opindex Wno-stringop-overread
+Warn for calls to string manipulation functions such as @code{memchr},
+@code{strcpy} that are determined to read past the end of the source
+sequence. 
+
+Option @option{-Wstringop-overread} is enabled by default.
 
 @table @gcctabopt
 @item -Wstringop-overflow
@@ -7502,8 +7514,12 @@ This warning is also enabled by @option{-Wshadow=local}.
 Warn whenever an object is defined whose size exceeds @var{byte-size}.
 @option{-Wlarger-than=}@samp{PTRDIFF_MAX} is enabled by default.
 Warnings controlled by the option can be disabled either by specifying
-@var{byte-size} of @samp{SIZE_MAX} or more or by
-@option{-Wno-larger-than}.
+@var{byte-size} of @samp{SIZE_MAX} or more or by @option{-Wno-larger-than}.
+
+Also warn for calls to bounded functions such as @code{memchr} or
+@code{strnlen} that specify a bound greater than the largest possible
+object, which is @samp{PTRDIFF_MAX} bytes by default.  These warnings
+can only be disabled by @option{-Wno-larger-than}.
 
 @item -Wno-larger-than
 @opindex Wno-larger-than
@@ -8630,6 +8646,7 @@ Enabling this option effectively enables the following warnings:
 -Wanalyzer-file-leak @gol
 -Wanalyzer-free-of-non-heap @gol
 -Wanalyzer-malloc-leak @gol
+-Wanalyzer-mismatching-deallocation @gol
 -Wanalyzer-possible-null-argument @gol
 -Wanalyzer-possible-null-dereference @gol
 -Wanalyzer-null-argument @gol
@@ -8713,6 +8730,17 @@ to disable it.
 
 This diagnostic warns for paths through the code in which a
 pointer allocated via @code{malloc} is leaked.
+
+@item -Wno-analyzer-mismatching-deallocation
+@opindex Wanalyzer-mismatching-deallocation
+@opindex Wno-analyzer-mismatching-deallocation
+This warning requires @option{-fanalyzer}, which enables it; use
+@option{-Wno-analyzer-mismatching-deallocation}
+to disable it.
+
+This diagnostic warns for paths through the code in which the
+wrong deallocation function is called on a pointer value, based on
+which function was used to allocate the pointer value.
 
 @item -Wno-analyzer-possible-null-argument
 @opindex Wanalyzer-possible-null-argument
@@ -11569,9 +11597,20 @@ There are some code generation flags preserved by GCC when
 generating bytecodes, as they need to be used during the final link.
 Currently, the following options and their settings are taken from
 the first object file that explicitly specifies them: 
-@option{-fPIC}, @option{-fpic}, @option{-fpie}, @option{-fcommon},
-@option{-fexceptions}, @option{-fnon-call-exceptions}, @option{-fgnu-tm}
-and all the @option{-m} target flags.
+@option{-fcommon}, @option{-fexceptions}, @option{-fnon-call-exceptions},
+@option{-fgnu-tm} and all the @option{-m} target flags.
+
+The following options @option{-fPIC}, @option{-fpic}, @option{-fpie} and
+@option{-fPIE} are combined based on the following scheme:
+
+@smallexample
+@option{-fPIC} + @option{-fpic} = @option{-fpic}
+@option{-fPIC} + @option{-fno-pic} = @option{-fno-pic}
+@option{-fpic/-fPIC} + (no option) = (no option)
+@option{-fPIC} + @option{-fPIE} = @option{-fPIE}
+@option{-fpic} + @option{-fPIE} = @option{-fpie}
+@option{-fPIC/-fpic} + @option{-fpie} = @option{-fpie}
+@end smallexample
 
 Certain ABI-changing flags are required to match in all compilation units,
 and trying to override this at link time with a conflicting value
@@ -13848,20 +13887,20 @@ is present in the command line.
 @item -fprofile-filter-files=@var{regex}
 @opindex fprofile-filter-files
 
-Instrument only functions from files where names match
-any regular expression (separated by a semi-colon).
+Instrument only functions from files whose name matches
+any of the regular expressions (separated by semi-colons).
 
-For example, @option{-fprofile-filter-files=main.c;module.*.c} will instrument
+For example, @option{-fprofile-filter-files=main\.c;module.*\.c} will instrument
 only @file{main.c} and all C files starting with 'module'.
 
 @item -fprofile-exclude-files=@var{regex}
 @opindex fprofile-exclude-files
 
-Instrument only functions from files where names do not match
-all the regular expressions (separated by a semi-colon).
+Instrument only functions from files whose name does not match
+any of the regular expressions (separated by semi-colons).
 
-For example, @option{-fprofile-exclude-files=/usr/*} will prevent instrumentation
-of all files that are located in @file{/usr/} folder.
+For example, @option{-fprofile-exclude-files=/usr/.*} will prevent instrumentation
+of all files that are located in the @file{/usr/} folder.
 
 @item -fprofile-reproducible
 @opindex fprofile-reproducible
@@ -19571,7 +19610,7 @@ is only available when generating non-pic code for M-profile targets.
 @opindex mcmse
 Generate secure code as per the "ARMv8-M Security Extensions: Requirements on
 Development Tools Engineering Specification", which can be found on
-@url{http://infocenter.arm.com/help/topic/com.arm.doc.ecm0359818/ECM0359818_armv8m_security_extensions_reqs_on_dev_tools_1_0.pdf}.
+@url{https://developer.arm.com/documentation/ecm0359818/latest/}.
 
 @item -mfdpic
 @itemx -mno-fdpic
@@ -24751,7 +24790,7 @@ any scripts that would be selected by the @option{-mmcu=} option.
 
 @item -mlarge
 @opindex mlarge
-Use large-model addressing (20-bit pointers, 32-bit @code{size_t}).
+Use large-model addressing (20-bit pointers, 20-bit @code{size_t}).
 
 @item -msmall
 @opindex msmall
@@ -24804,6 +24843,19 @@ buffered before it is sent to write.
 
 This option requires Newlib Nano IO, so GCC must be configured with
 @samp{--enable-newlib-nano-formatted-io}.
+
+@item -mmax-inline-shift=
+@opindex mmax-inline-shift=
+This option takes an integer between 0 and 64 inclusive, and sets
+the maximum number of inline shift instructions which should be emitted to
+perform a shift operation by a constant amount.  When this value needs to be
+exceeded, an mspabi helper function is used instead.  The default value is 4.
+
+This only affects cases where a shift by multiple positions cannot be
+completed with a single instruction (e.g. all shifts >1 on the 430 ISA).
+
+Shifts of a 32-bit value are at least twice as costly, so the value passed for
+this option is divided by 2 and the resulting value used instead.
 
 @item -mcode-region=
 @itemx -mdata-region=

@@ -944,20 +944,11 @@ public:
        Implemented by overriding all the RETURN_EXPRs and replacing all
        occurrences of VAR with the RESULT_DECL for the function.
        This is only worth doing for functions that can return in memory.  */
-    if (d->nrvo_can)
+    tree resdecl = DECL_RESULT (fndecl);
+
+    if (TREE_ADDRESSABLE (TREE_TYPE (resdecl))
+	|| aggregate_value_p (TREE_TYPE (resdecl), fndecl))
       {
-	tree restype = TREE_TYPE (DECL_RESULT (fndecl));
-
-	if (!AGGREGATE_TYPE_P (restype))
-	  d->nrvo_can = 0;
-	else
-	  d->nrvo_can = aggregate_value_p (restype, fndecl);
-      }
-
-    if (d->nrvo_can)
-      {
-	tree resdecl = DECL_RESULT (fndecl);
-
 	/* Return non-trivial structs by invisible reference.  */
 	if (TREE_ADDRESSABLE (TREE_TYPE (resdecl)))
 	  {
@@ -965,9 +956,12 @@ public:
 	    DECL_BY_REFERENCE (resdecl) = 1;
 	    TREE_ADDRESSABLE (resdecl) = 0;
 	    relayout_decl (resdecl);
+	    d->shidden = build_deref (resdecl);
 	  }
+	else
+	  d->shidden = resdecl;
 
-	if (d->nrvo_var)
+	if (d->nrvo_can && d->nrvo_var)
 	  {
 	    tree var = get_symbol_decl (d->nrvo_var);
 
@@ -976,12 +970,9 @@ public:
 	    /* Don't forget that we take its address.  */
 	    TREE_ADDRESSABLE (var) = 1;
 
-	    if (DECL_BY_REFERENCE (resdecl))
-	      resdecl = build_deref (resdecl);
-
 	    SET_DECL_VALUE_EXPR (var, resdecl);
 	    DECL_HAS_VALUE_EXPR_P (var) = 1;
-	    SET_DECL_LANG_NRVO (var, resdecl);
+	    SET_DECL_LANG_NRVO (var, d->shidden);
 	  }
       }
 
@@ -1998,42 +1989,6 @@ mark_needed (tree decl)
       struct varpool_node *node = varpool_node::get_create (decl);
       node->forced_by_abi = true;
     }
-}
-
-/* Get the offset to the BC's vtbl[] initializer from the start of CD.
-   Returns "~0u" if the base class is not found in any vtable interfaces.  */
-
-unsigned
-base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
-{
-  unsigned csymoffset = target.classinfosize;
-  unsigned interfacesize = int_size_in_bytes (vtbl_interface_type_node);
-  csymoffset += cd->vtblInterfaces->length * interfacesize;
-
-  for (size_t i = 0; i < cd->vtblInterfaces->length; i++)
-    {
-      BaseClass *b = (*cd->vtblInterfaces)[i];
-      if (b == bc)
-	return csymoffset;
-      csymoffset += b->sym->vtbl.length * target.ptrsize;
-    }
-
-  /* Check all overriding interface vtbl[]s.  */
-  for (ClassDeclaration *cd2 = cd->baseClass; cd2; cd2 = cd2->baseClass)
-    {
-      for (size_t k = 0; k < cd2->vtblInterfaces->length; k++)
-	{
-	  BaseClass *bs = (*cd2->vtblInterfaces)[k];
-	  if (bs->fillVtbl (cd, NULL, 0))
-	    {
-	      if (bc == bs)
-		return csymoffset;
-	      csymoffset += bs->sym->vtbl.length * target.ptrsize;
-	    }
-	}
-    }
-
-  return ~0u;
 }
 
 /* Get the VAR_DECL of the vtable symbol for DECL.  If this does not yet exist,

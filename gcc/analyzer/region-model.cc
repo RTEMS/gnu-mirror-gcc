@@ -462,24 +462,23 @@ region_model::get_gassign_result (const gassign *assign,
       {
 	tree rhs2 = gimple_assign_rhs2 (assign);
 
-	// TODO: constraints between svalues
 	const svalue *rhs1_sval = get_rvalue (rhs1, ctxt);
 	const svalue *rhs2_sval = get_rvalue (rhs2, ctxt);
 
-	tristate t = eval_condition (rhs1_sval, op, rhs2_sval);
-	if (t.is_known ())
-	  return get_rvalue (t.is_true ()
-			     ? boolean_true_node
-			     : boolean_false_node,
-			     ctxt);
-	else
+	if (TREE_TYPE (lhs) == boolean_type_node)
 	  {
-	    // TODO: symbolic value for binop
-	    const svalue *sval_binop
-	      = m_mgr->get_or_create_binop (TREE_TYPE (lhs), op,
-					    rhs1_sval, rhs2_sval);
-	    return sval_binop;
+	    /* Consider constraints between svalues.  */
+	    tristate t = eval_condition (rhs1_sval, op, rhs2_sval);
+	    if (t.is_known ())
+	      return m_mgr->get_or_create_constant_svalue
+		(t.is_true () ? boolean_true_node : boolean_false_node);
 	  }
+
+	/* Otherwise, generate a symbolic binary op.  */
+	const svalue *sval_binop
+	  = m_mgr->get_or_create_binop (TREE_TYPE (lhs), op,
+					rhs1_sval, rhs2_sval);
+	return sval_binop;
       }
       break;
 
@@ -653,18 +652,51 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	 in region-model-impl-calls.cc.
 	 Having them split out into separate functions makes it easier
 	 to put breakpoints on the handling of specific functions.  */
-      if (is_named_call_p (callee_fndecl, "malloc", call, 1))
+
+      if (fndecl_built_in_p (callee_fndecl, BUILT_IN_NORMAL)
+	  && gimple_builtin_call_types_compatible_p (call, callee_fndecl))
+	switch (DECL_UNCHECKED_FUNCTION_CODE (callee_fndecl))
+	  {
+	  default:
+	    break;
+	  case BUILT_IN_ALLOCA:
+	  case BUILT_IN_ALLOCA_WITH_ALIGN:
+	    return impl_call_alloca (cd);
+	  case BUILT_IN_CALLOC:
+	    return impl_call_calloc (cd);
+	  case BUILT_IN_EXPECT:
+	  case BUILT_IN_EXPECT_WITH_PROBABILITY:
+	    return impl_call_builtin_expect (cd);
+	  case BUILT_IN_FREE:
+	    /* Handle in "on_call_post".  */
+	    break;
+	  case BUILT_IN_MALLOC:
+	    return impl_call_malloc (cd);
+	  case BUILT_IN_MEMSET:
+	  case BUILT_IN_MEMSET_CHK:
+	    impl_call_memset (cd);
+	    return false;
+	    break;
+	  case BUILT_IN_STRLEN:
+	    if (impl_call_strlen (cd))
+	      return false;
+	    break;
+	  }
+      else if (gimple_call_internal_p (call))
+	switch (gimple_call_internal_fn (call))
+	  {
+	  default:
+	    break;
+	  case IFN_BUILTIN_EXPECT:
+	    return impl_call_builtin_expect (cd);
+	  }
+      else if (is_named_call_p (callee_fndecl, "malloc", call, 1))
 	return impl_call_malloc (cd);
       else if (is_named_call_p (callee_fndecl, "calloc", call, 2))
 	return impl_call_calloc (cd);
-      else if (is_named_call_p (callee_fndecl, "__builtin_alloca", call, 1))
+      else if (is_named_call_p (callee_fndecl, "alloca", call, 1))
 	return impl_call_alloca (cd);
-      else if (gimple_call_builtin_p (call, BUILT_IN_EXPECT)
-	       || gimple_call_builtin_p (call, BUILT_IN_EXPECT_WITH_PROBABILITY)
-	       || gimple_call_internal_p (call, IFN_BUILTIN_EXPECT))
-	return impl_call_builtin_expect (cd);
-      else if (is_named_call_p (callee_fndecl, "memset", call, 3)
-	       || gimple_call_builtin_p (call, BUILT_IN_MEMSET))
+      else if (is_named_call_p (callee_fndecl, "memset", call, 3))
 	{
 	  impl_call_memset (cd);
 	  return false;
@@ -673,6 +705,16 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	{
 	  if (impl_call_strlen (cd))
 	    return false;
+	}
+      else if (is_named_call_p (callee_fndecl, "operator new", call, 1))
+	return impl_call_operator_new (cd);
+      else if (is_named_call_p (callee_fndecl, "operator new []", call, 1))
+	return impl_call_operator_new (cd);
+      else if (is_named_call_p (callee_fndecl, "operator delete", call, 1)
+	       || is_named_call_p (callee_fndecl, "operator delete", call, 2)
+	       || is_named_call_p (callee_fndecl, "operator delete []", call, 1))
+	{
+	  /* Handle in "on_call_post".  */
 	}
       else if (!fndecl_has_gimple_body_p (callee_fndecl)
 	       && !DECL_PURE_P (callee_fndecl)
@@ -714,12 +756,22 @@ region_model::on_call_post (const gcall *call,
 			    region_model_context *ctxt)
 {
   if (tree callee_fndecl = get_fndecl_for_call (call, ctxt))
-    if (is_named_call_p (callee_fndecl, "free", call, 1))
-      {
-	call_details cd (call, this, ctxt);
-	impl_call_free (cd);
-	return;
-      }
+    {
+      if (is_named_call_p (callee_fndecl, "free", call, 1))
+	{
+	  call_details cd (call, this, ctxt);
+	  impl_call_free (cd);
+	  return;
+	}
+      if (is_named_call_p (callee_fndecl, "operator delete", call, 1)
+	  || is_named_call_p (callee_fndecl, "operator delete", call, 2)
+	  || is_named_call_p (callee_fndecl, "operator delete []", call, 1))
+	{
+	  call_details cd (call, this, ctxt);
+	  impl_call_operator_delete (cd);
+	  return;
+	}
+    }
 
   if (unknown_side_effects)
     handle_unrecognized_call (call, ctxt);
@@ -1204,6 +1256,76 @@ region_model::get_rvalue (tree expr, region_model_context *ctxt)
   return get_rvalue (path_var (expr, get_stack_depth () - 1), ctxt);
 }
 
+/* Return true if this model is on a path with "main" as the entrypoint
+   (as opposed to one in which we're merely analyzing a subset of the
+   path through the code).  */
+
+bool
+region_model::called_from_main_p () const
+{
+  if (!m_current_frame)
+    return false;
+  /* Determine if the oldest stack frame in this model is for "main".  */
+  const frame_region *frame0 = get_frame_at_index (0);
+  gcc_assert (frame0);
+  return id_equal (DECL_NAME (frame0->get_function ()->decl), "main");
+}
+
+/* Subroutine of region_model::get_store_value for when REG is (or is within)
+   a global variable that hasn't been touched since the start of this path
+   (or was implicitly touched due to a call to an unknown function).  */
+
+const svalue *
+region_model::get_initial_value_for_global (const region *reg) const
+{
+  /* Get the decl that REG is for (or is within).  */
+  const decl_region *base_reg
+    = reg->get_base_region ()->dyn_cast_decl_region ();
+  gcc_assert (base_reg);
+  tree decl = base_reg->get_decl ();
+
+  /* Special-case: to avoid having to explicitly update all previously
+     untracked globals when calling an unknown fn, they implicitly have
+     an unknown value if an unknown call has occurred, unless this is
+     static to-this-TU and hasn't escaped.  Globals that have escaped
+     are explicitly tracked, so we shouldn't hit this case for them.  */
+  if (m_store.called_unknown_fn_p () && TREE_PUBLIC (decl))
+    return m_mgr->get_or_create_unknown_svalue (reg->get_type ());
+
+  /* If we are on a path from the entrypoint from "main" and we have a
+     global decl defined in this TU that hasn't been touched yet, then
+     the initial value of REG can be taken from the initialization value
+     of the decl.  */
+  if (called_from_main_p () && !DECL_EXTERNAL (decl))
+    {
+      /* Get the initializer value for base_reg.  */
+      const svalue *base_reg_init
+	= base_reg->get_svalue_for_initializer (m_mgr);
+      gcc_assert (base_reg_init);
+      if (reg == base_reg)
+	return base_reg_init;
+      else
+	{
+	  /* Get the value for REG within base_reg_init.  */
+	  binding_cluster c (base_reg);
+	  c.bind (m_mgr->get_store_manager (), base_reg, base_reg_init,
+		  BK_direct);
+	  const svalue *sval
+	    = c.get_any_binding (m_mgr->get_store_manager (), reg);
+	  if (sval)
+	    {
+	      if (reg->get_type ())
+		sval = m_mgr->get_or_create_cast (reg->get_type (),
+						  sval);
+	      return sval;
+	    }
+	}
+    }
+
+  /* Otherwise, return INIT_VAL(REG).  */
+  return m_mgr->get_or_create_initial_value (reg);
+}
+
 /* Get a value for REG, looking it up in the store, or otherwise falling
    back to "initial" or "unknown" values.  */
 
@@ -1256,14 +1378,10 @@ region_model::get_store_value (const region *reg) const
      would have returned UNKNOWN, and we would already have returned
      that above).  */
 
-  /* Special-case: to avoid having to explicitly update all previously
-     untracked globals when calling an unknown fn, we instead change
-     the default here so we implicitly have an unknown value for such
-     regions.  */
-  if (m_store.called_unknown_fn_p ())
-    if (reg->get_base_region ()->get_parent_region ()->get_kind ()
-	== RK_GLOBALS)
-      return m_mgr->get_or_create_unknown_svalue (reg->get_type ());
+  /* Handle globals.  */
+  if (reg->get_base_region ()->get_parent_region ()->get_kind ()
+      == RK_GLOBALS)
+    return get_initial_value_for_global (reg);
 
   return m_mgr->get_or_create_initial_value (reg);
 }
@@ -1300,10 +1418,19 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
 {
   gcc_assert (ptr_sval);
 
+  /* If we're dereferencing PTR_SVAL, assume that it is non-NULL; add this
+     as a constraint.  This suppresses false positives from
+     -Wanalyzer-null-dereference for the case where we later have an
+     if (PTR_SVAL) that would occur if we considered the false branch
+     and transitioned the malloc state machine from start->null.  */
+  tree null_ptr_cst = build_int_cst (ptr_sval->get_type (), 0);
+  const svalue *null_ptr = m_mgr->get_or_create_constant_svalue (null_ptr_cst);
+  m_constraints->add_constraint (ptr_sval, NE_EXPR, null_ptr);
+
   switch (ptr_sval->get_kind ())
     {
     default:
-      gcc_unreachable ();
+      break;
 
     case SK_REGION:
       {
@@ -1329,17 +1456,10 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
 	      return m_mgr->get_offset_region (parent_region, type, offset);
 	    }
 	  default:
-	    goto create_symbolic_region;
+	    break;
 	  }
       }
-
-    case SK_CONSTANT:
-    case SK_INITIAL:
-    case SK_UNARYOP:
-    case SK_SUB:
-    case SK_WIDENING:
-    case SK_CONJURED:
-      goto create_symbolic_region;
+      break;
 
     case SK_POISONED:
       {
@@ -1359,20 +1479,11 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
 		ctxt->warn (new poisoned_value_diagnostic (ptr, pkind));
 	      }
 	  }
-	goto create_symbolic_region;
       }
-
-    case SK_UNKNOWN:
-      {
-      create_symbolic_region:
-	return m_mgr->get_symbolic_region (ptr_sval);
-      }
-
-    case SK_SETJMP:
-      goto create_symbolic_region;
+      break;
     }
 
-  gcc_unreachable ();
+  return m_mgr->get_symbolic_region (ptr_sval);
 }
 
 /* Set the value of the region given by LHS_REG to the value given
@@ -1715,6 +1826,7 @@ region_model::add_any_constraints_from_gassign (enum tree_code op,
       break;
 
     case NOP_EXPR:
+    case VIEW_CONVERT_EXPR:
       {
 	add_constraint (gimple_assign_rhs1 (assign), op, rhs, ctxt);
       }
@@ -2099,6 +2211,11 @@ region_model::maybe_update_for_edge (const superedge &edge,
       return apply_constraints_for_gswitch (*switch_sedge, switch_stmt, ctxt);
     }
 
+  /* Apply any constraints due to an exception being thrown.  */
+  if (const cfg_superedge *cfg_sedge = dyn_cast <const cfg_superedge *> (&edge))
+    if (cfg_sedge->get_flags () & EDGE_EH)
+      return apply_constraints_for_exception (last_stmt, ctxt);
+
   return true;
 }
 
@@ -2257,6 +2374,34 @@ region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
     }
 }
 
+/* Apply any constraints due to an exception being thrown at LAST_STMT.
+
+   If they are feasible, add the constraints and return true.
+
+   Return false if the constraints contradict existing knowledge
+   (and so the edge should not be taken).  */
+
+bool
+region_model::apply_constraints_for_exception (const gimple *last_stmt,
+					       region_model_context *ctxt)
+{
+  gcc_assert (last_stmt);
+  if (const gcall *call = dyn_cast <const gcall *> (last_stmt))
+    if (tree callee_fndecl = get_fndecl_for_call (call, ctxt))
+      if (is_named_call_p (callee_fndecl, "operator new", call, 1)
+	  || is_named_call_p (callee_fndecl, "operator new []", call, 1))
+	{
+	  /* We have an exception thrown from operator new.
+	     Add a constraint that the result was NULL, to avoid a false
+	     leak report due to the result being lost when following
+	     the EH edge.  */
+	  if (tree lhs = gimple_call_lhs (call))
+	    return add_constraint (lhs, EQ_EXPR, null_pointer_node, ctxt);
+	  return true;
+	}
+  return true;
+}
+
 /* For use with push_frame when handling a top-level call within the analysis.
    PARAM has a defined but unknown initial value.
    Anything it points to has escaped, since the calling context "knows"
@@ -2304,17 +2449,12 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 	     rest of the params as uninitialized.  */
 	  if (idx >= arg_svals->length ())
 	    break;
+	  tree parm_lval = iter_parm;
+	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
+	    parm_lval = parm_default_ssa;
+	  const region *parm_reg = get_lvalue (parm_lval, ctxt);
 	  const svalue *arg_sval = (*arg_svals)[idx];
-	  const region *parm_reg = get_lvalue (iter_parm, ctxt);
 	  set_value (parm_reg, arg_sval, ctxt);
-
-	  /* Also do it for default SSA name (sharing the same value).  */
-	  tree parm_default_ssa = ssa_default_def (fun, iter_parm);
-	  if (parm_default_ssa)
-	    {
-	      const region *defssa_reg = get_lvalue (parm_default_ssa, ctxt);
-	      set_value (defssa_reg, arg_sval, ctxt);
-	    }
 	}
     }
   else
@@ -2326,10 +2466,10 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
       for (tree iter_parm = DECL_ARGUMENTS (fndecl); iter_parm;
 	   iter_parm = DECL_CHAIN (iter_parm))
 	{
-	  on_top_level_param (iter_parm, ctxt);
-	  tree parm_default_ssa = ssa_default_def (fun, iter_parm);
-	  if (parm_default_ssa)
+	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
 	    on_top_level_param (parm_default_ssa, ctxt);
+	  else
+	    on_top_level_param (iter_parm, ctxt);
 	}
     }
 

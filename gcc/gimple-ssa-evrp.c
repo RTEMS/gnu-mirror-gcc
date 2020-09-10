@@ -118,7 +118,7 @@ fold_cond (gimple_ranger *ranger, gcond *cond)
   if (!irange::supports_type_p (gimple_expr_type (cond)))
     return false;
 
-  widest_irange r;
+  int_range_max r;
   if (ranger->range_of_stmt (r, cond) && r.singleton_p ())
     {
       if (r.zero_p ())

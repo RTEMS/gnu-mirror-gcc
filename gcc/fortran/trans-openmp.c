@@ -4480,7 +4480,7 @@ gfc_trans_omp_do (gfc_code *code, gfc_exec_op op, stmtblock_t *pblock,
 	  if (clauses->orderedc)
 	    {
 	      if (doacross_steps == NULL)
-		vec_safe_grow_cleared (doacross_steps, clauses->orderedc);
+		vec_safe_grow_cleared (doacross_steps, clauses->orderedc, true);
 	      (*doacross_steps)[i] = step;
 	    }
 	}
@@ -5591,8 +5591,14 @@ gfc_trans_omp_target (gfc_code *code)
       }
       break;
     case EXEC_OMP_TARGET_PARALLEL_DO:
-    case EXEC_OMP_TARGET_PARALLEL_DO_SIMD:
       stmt = gfc_trans_omp_parallel_do (code, &block, clausesa);
+      if (TREE_CODE (stmt) != BIND_EXPR)
+	stmt = build3_v (BIND_EXPR, NULL, stmt, poplevel (1, 0));
+      else
+	poplevel (0, 0);
+      break;
+    case EXEC_OMP_TARGET_PARALLEL_DO_SIMD:
+      stmt = gfc_trans_omp_parallel_do_simd (code, &block, clausesa);
       if (TREE_CODE (stmt) != BIND_EXPR)
 	stmt = build3_v (BIND_EXPR, NULL, stmt, poplevel (1, 0));
       else

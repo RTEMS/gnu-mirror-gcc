@@ -340,10 +340,18 @@ public:
   void dump_to_pp (pretty_printer *pp, bool simple, bool multiline) const;
   void dump (bool simple) const;
 
-  void apply_ctor_to_region (const region *parent_reg, tree ctor,
+  bool apply_ctor_to_region (const region *parent_reg, tree ctor,
 			     region_model_manager *mgr);
 
 private:
+  bool apply_ctor_val_to_range (const region *parent_reg,
+				region_model_manager *mgr,
+				tree min_index, tree max_index,
+				tree val);
+  bool apply_ctor_pair_to_child_region (const region *parent_reg,
+					region_model_manager *mgr,
+					tree index, tree val);
+
   map_t m_map;
 };
 
@@ -451,6 +459,8 @@ public:
   iterator_t begin () const { return m_map.begin (); }
   iterator_t end () const { return m_map.end (); }
 
+  const binding_map &get_map () const { return m_map; }
+
 private:
   const svalue *get_any_value (const binding_key *key) const;
   void get_overlapping_bindings (store_manager *mgr, const region *reg,
@@ -551,7 +561,7 @@ public:
   cluster_map_t::iterator end () const { return m_cluster_map.end (); }
 
   tristate eval_alias (const region *base_reg_a,
-		       const region *base_reg_b);
+		       const region *base_reg_b) const;
 
   template <typename BindingVisitor>
   void for_each_binding (BindingVisitor &v)
@@ -567,6 +577,8 @@ public:
 
 private:
   void remove_overlapping_bindings (store_manager *mgr, const region *reg);
+  tristate eval_alias_1 (const region *base_reg_a,
+			 const region *base_reg_b) const;
 
   cluster_map_t m_cluster_map;
 

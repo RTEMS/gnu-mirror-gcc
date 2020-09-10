@@ -395,11 +395,24 @@ build_round_expr (tree arg, tree restype)
     fn = builtin_decl_for_precision (BUILT_IN_LROUND, argprec);
   else if (resprec <= LONG_LONG_TYPE_SIZE)
     fn = builtin_decl_for_precision (BUILT_IN_LLROUND, argprec);
+  else if (resprec >= argprec && resprec == 128)
+    {
+      /* Search for a real kind suitable as temporary for conversion.  */
+      int kind = -1;
+      for (int i = 0; kind < 0 && gfc_real_kinds[i].kind != 0; i++)
+	if (gfc_real_kinds[i].mode_precision >= resprec)
+	  kind = gfc_real_kinds[i].kind;
+      if (kind < 0)
+	gfc_internal_error ("Could not find real kind with at least %d bits",
+			    resprec);
+      arg = fold_convert (gfc_float128_type_node, arg);
+      fn = gfc_builtin_decl_for_float_kind (BUILT_IN_ROUND, kind);
+    }
   else
     gcc_unreachable ();
 
-  return fold_convert (restype, build_call_expr_loc (input_location,
-						 fn, 1, arg));
+  return convert (restype, build_call_expr_loc (input_location,
+						fn, 1, arg));
 }
 
 
@@ -4073,6 +4086,7 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
   tree val;
   tree *args;
   tree type;
+  tree argtype;
   gfc_actual_arglist *argexpr;
   unsigned int i, nargs;
 
@@ -4082,16 +4096,24 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
   gfc_conv_intrinsic_function_args (se, expr, args, nargs);
   type = gfc_typenode_for_spec (&expr->ts);
 
-  argexpr = expr->value.function.actual;
-  if (TREE_TYPE (args[0]) != type)
-    args[0] = convert (type, args[0]);
   /* Only evaluate the argument once.  */
   if (!VAR_P (args[0]) && !TREE_CONSTANT (args[0]))
     args[0] = gfc_evaluate_now (args[0], &se->pre);
 
-  mvar = gfc_create_var (type, "M");
-  gfc_add_modify (&se->pre, mvar, args[0]);
+  /* Determine suitable type of temporary, as a GNU extension allows
+     different argument kinds.  */
+  argtype = TREE_TYPE (args[0]);
+  argexpr = expr->value.function.actual;
+  for (i = 1, argexpr = argexpr->next; i < nargs; i++, argexpr = argexpr->next)
+    {
+      tree tmptype = TREE_TYPE (args[i]);
+      if (TYPE_PRECISION (tmptype) > TYPE_PRECISION (argtype))
+	argtype = tmptype;
+    }
+  mvar = gfc_create_var (argtype, "M");
+  gfc_add_modify (&se->pre, mvar, convert (argtype, args[0]));
 
+  argexpr = expr->value.function.actual;
   for (i = 1, argexpr = argexpr->next; i < nargs; i++, argexpr = argexpr->next)
     {
       tree cond = NULL_TREE;
@@ -4119,8 +4141,8 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
 	 Also, there is no consensus among other tested compilers.  In
 	 short, it's a mess.  So lets just do whatever is fastest.  */
       tree_code code = op == GT_EXPR ? MAX_EXPR : MIN_EXPR;
-      calc = fold_build2_loc (input_location, code, type,
-			      convert (type, val), mvar);
+      calc = fold_build2_loc (input_location, code, argtype,
+			      convert (argtype, val), mvar);
       tmp = build2_v (MODIFY_EXPR, mvar, calc);
 
       if (cond != NULL_TREE)
@@ -4128,7 +4150,10 @@ gfc_conv_intrinsic_minmax (gfc_se * se, gfc_expr * expr, enum tree_code op)
 			build_empty_stmt (input_location));
       gfc_add_expr_to_block (&se->pre, tmp);
     }
-  se->expr = mvar;
+  if (TREE_CODE (type) == INTEGER_TYPE)
+    se->expr = fold_build1_loc (input_location, FIX_TRUNC_EXPR, type, mvar);
+  else
+    se->expr = convert (type, mvar);
 }
 
 

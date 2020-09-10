@@ -692,8 +692,18 @@ poplevel (int keep, int reverse, int functionbody)
   /* Remove declarations for all the DECLs in this level.  */
   for (link = decls; link; link = TREE_CHAIN (link))
     {
-      decl = TREE_CODE (link) == TREE_LIST ? TREE_VALUE (link) : link;
-      tree name = OVL_NAME (decl);
+      tree name;
+      if (TREE_CODE (link) == TREE_LIST)
+	{
+	  decl = TREE_VALUE (link);
+	  name = TREE_PURPOSE (link);
+	  gcc_checking_assert (name);
+	}
+      else
+	{
+	  decl = link;
+	  name = DECL_NAME (decl);
+	}
 
       /* Remove the binding.  */
       if (TREE_CODE (decl) == LABEL_DECL)
@@ -5189,8 +5199,8 @@ groktypename (cp_decl_specifier_seq *type_specifiers,
   return type;
 }
 
-/* Process a DECLARATOR for a function-scope variable declaration,
-   namespace-scope variable declaration, or function declaration.
+/* Process a DECLARATOR for a function-scope or namespace-scope
+   variable or function declaration.
    (Function definitions go through start_function; class member
    declarations appearing in the body of the class go through
    grokfield.)  The DECL corresponding to the DECLARATOR is returned.
@@ -5400,6 +5410,11 @@ start_decl (const cp_declarator *declarator,
 
   was_public = TREE_PUBLIC (decl);
 
+  if ((DECL_EXTERNAL (decl) || TREE_CODE (decl) == FUNCTION_DECL)
+      && current_function_decl)
+    /* A function-scope decl of some namespace-scope decl.  */
+    DECL_LOCAL_DECL_P (decl) = true;
+
   /* Enter this declaration into the symbol table.  Don't push the plain
      VAR_DECL for a variable template.  */
   if (!template_parm_scope_p ()
@@ -5547,6 +5562,37 @@ start_decl_1 (tree decl, bool initialized)
   maybe_push_cleanup_level (type);
 }
 
+/* Given a parenthesized list of values INIT, create a CONSTRUCTOR to handle
+   C++20 P0960.  TYPE is the type of the object we're initializing.  */
+
+tree
+do_aggregate_paren_init (tree init, tree type)
+{
+  tree val = TREE_VALUE (init);
+
+  if (TREE_CHAIN (init) == NULL_TREE)
+    {
+      /* If the list has a single element and it's a string literal,
+	 then it's the initializer for the array as a whole.  */
+      if (TREE_CODE (type) == ARRAY_TYPE
+	  && char_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (type)))
+	  && TREE_CODE (tree_strip_any_location_wrapper (val))
+	     == STRING_CST)
+	return val;
+      /* Handle non-standard extensions like compound literals.  This also
+	 prevents triggering aggregate parenthesized-initialization in
+	 compiler-generated code for =default.  */
+      else if (same_type_ignoring_top_level_qualifiers_p (type,
+							  TREE_TYPE (val)))
+	return val;
+    }
+
+  init = build_constructor_from_list (init_list_type_node, init);
+  CONSTRUCTOR_IS_DIRECT_INIT (init) = true;
+  CONSTRUCTOR_IS_PAREN_INIT (init) = true;
+  return init;
+}
+
 /* Handle initialization of references.  DECL, TYPE, and INIT have the
    same meaning as in cp_finish_decl.  *CLEANUP must be NULL on entry,
    but will be set to a new CLEANUP_STMT if a temporary is created
@@ -5594,11 +5640,7 @@ grok_reference_init (tree decl, tree type, tree init, int flags)
 	  /* If the list had more than one element, the code is ill-formed
 	     pre-C++20, so we can build a constructor right away.  */
 	  else
-	    {
-	      init = build_constructor_from_list (init_list_type_node, init);
-	      CONSTRUCTOR_IS_DIRECT_INIT (init) = true;
-	      CONSTRUCTOR_IS_PAREN_INIT (init) = true;
-	    }
+	    init = do_aggregate_paren_init (init, ttype);
 	}
       else
 	init = build_x_compound_expr_from_list (init, ELK_INIT,
@@ -6429,7 +6471,7 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
      non-empty subaggregate, brace elision is assumed and the
      initializer is considered for the initialization of the first
      member of the subaggregate.  */
-  if (TREE_CODE (init) != CONSTRUCTOR
+  if ((TREE_CODE (init) != CONSTRUCTOR || COMPOUND_LITERAL_P (init))
       /* But don't try this for the first initializer, since that would be
 	 looking through the outermost braces; A a2 = { a1 }; is not a
 	 valid aggregate initialization.  */
@@ -6562,7 +6604,17 @@ reshape_init (tree type, tree init, tsubst_flags_t complain)
   /* Brace elision is not performed for a CONSTRUCTOR representing
      parenthesized aggregate initialization.  */
   if (CONSTRUCTOR_IS_PAREN_INIT (init))
-    return init;
+    {
+      tree elt = (*v)[0].value;
+      /* If we're initializing a char array from a string-literal that is
+	 enclosed in braces, unwrap it here.  */
+      if (TREE_CODE (type) == ARRAY_TYPE
+	  && vec_safe_length (v) == 1
+	  && char_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (type)))
+	  && TREE_CODE (tree_strip_any_location_wrapper (elt)) == STRING_CST)
+	return elt;
+      return init;
+    }
 
   /* Handle [dcl.init.list] direct-list-initialization from
      single element of enumeration with a fixed underlying type.  */
@@ -6784,30 +6836,7 @@ check_initializer (tree decl, tree init, int flags, vec<tree, va_gc> **cleanups)
 	       && TREE_CODE (type) == ARRAY_TYPE
 	       && !DECL_DECOMPOSITION_P (decl)
 	       && (cxx_dialect >= cxx20))
-	{
-	  /* [dcl.init.string] "An array of ordinary character type [...]
-	     can be initialized by an ordinary string literal [...] by an
-	     appropriately-typed string literal enclosed in braces" only
-	     talks about braces, but GCC has always accepted
-
-	       char a[]("foobar");
-
-	     so we continue to do so.  */
-	  tree val = TREE_VALUE (init);
-	  if (TREE_CHAIN (init) == NULL_TREE
-	      && char_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (type)))
-	      && TREE_CODE (tree_strip_any_location_wrapper (val))
-		 == STRING_CST)
-	    /* If the list has a single element and it's a string literal,
-	       then it's the initializer for the array as a whole.  */
-	    init = val;
-	  else
-	    {
-	      init = build_constructor_from_list (init_list_type_node, init);
-	      CONSTRUCTOR_IS_DIRECT_INIT (init) = true;
-	      CONSTRUCTOR_IS_PAREN_INIT (init) = true;
-	    }
-	}
+	init = do_aggregate_paren_init (init, type);
       else if (TREE_CODE (init) == TREE_LIST
 	       && TREE_TYPE (init) != unknown_type_node
 	       && !MAYBE_CLASS_TYPE_P (type))
@@ -7336,7 +7365,7 @@ omp_declare_variant_finalize_one (tree decl, tree attr)
 	  fn = STRIP_TEMPLATE (fn);
 	  if (!((TREE_CODE (fn) == USING_DECL && DECL_DEPENDENT_P (fn))
 		 || DECL_FUNCTION_MEMBER_P (fn)
-		 || DECL_LOCAL_FUNCTION_P (fn)))
+		 || DECL_LOCAL_DECL_P (fn)))
 	    {
 	      koenig_p = true;
 	      if (!any_type_dependent_arguments_p (args))
@@ -8204,7 +8233,7 @@ cp_maybe_mangle_decomp (tree decl, tree first, unsigned int count)
       && TREE_STATIC (decl))
     {
       auto_vec<tree, 16> v;
-      v.safe_grow (count);
+      v.safe_grow (count, true);
       tree d = first;
       for (unsigned int i = 0; i < count; i++, d = DECL_CHAIN (d))
 	v[count - i - 1] = d;
@@ -8264,7 +8293,7 @@ cp_finish_decomp (tree decl, tree first, unsigned int count)
     }
 
   auto_vec<tree, 16> v;
-  v.safe_grow (count);
+  v.safe_grow (count, true);
   tree d = first;
   for (unsigned int i = 0; i < count; i++, d = DECL_CHAIN (d))
     {
@@ -13853,11 +13882,9 @@ int
 local_variable_p (const_tree t)
 {
   if ((VAR_P (t)
-       /* A VAR_DECL with a context that is a _TYPE is a static data
-	  member.  */
-       && !TYPE_P (CP_DECL_CONTEXT (t))
-       /* Any other non-local variable must be at namespace scope.  */
-       && !DECL_NAMESPACE_SCOPE_P (t))
+       && (DECL_LOCAL_DECL_P (t)
+	   || !DECL_CONTEXT (t)
+	   || TREE_CODE (DECL_CONTEXT (t)) == FUNCTION_DECL))
       || (TREE_CODE (t) == PARM_DECL))
     return 1;
 

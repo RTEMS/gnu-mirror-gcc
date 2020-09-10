@@ -1109,6 +1109,9 @@ namespace ana {
    mapping, but are required to use an svalue, such as when handling
    compound assignments and compound return values.
 
+   All keys within the underlying binding_map are required to be concrete,
+   not symbolic.
+
    Instances of this class shouldn't be bound as-is into the store;
    instead they should be unpacked.  Similarly, they should not be
    nested.  */
@@ -1150,11 +1153,7 @@ public:
     const binding_map *m_map_ptr;
   };
 
-  compound_svalue (tree type, const binding_map &map)
-  : svalue (calc_complexity (map), type),
-    m_map (map)
-  {
-  }
+  compound_svalue (tree type, const binding_map &map);
 
   enum svalue_kind get_kind () const FINAL OVERRIDE { return SK_COMPOUND; }
   const compound_svalue *dyn_cast_compound_svalue () const { return this; }
@@ -1870,6 +1869,9 @@ public:
   int get_stack_depth () const;
 
   const svalue *maybe_get_constant_value (region_model_manager *mgr) const;
+  const svalue *get_svalue_for_constructor (tree ctor,
+					    region_model_manager *mgr) const;
+  const svalue *get_svalue_for_initializer (region_model_manager *mgr) const;
 
 private:
   tree m_decl;
@@ -2554,6 +2556,8 @@ class region_model
   bool impl_call_malloc (const call_details &cd);
   bool impl_call_memset (const call_details &cd);
   bool impl_call_strlen (const call_details &cd);
+  bool impl_call_operator_new (const call_details &cd);
+  bool impl_call_operator_delete (const call_details &cd);
 
   void handle_unrecognized_call (const gcall *call,
 				 region_model_context *ctxt);
@@ -2692,6 +2696,8 @@ class region_model
   bool apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
 				      const gswitch *switch_stmt,
 				      region_model_context *ctxt);
+  bool apply_constraints_for_exception (const gimple *last_stmt,
+					region_model_context *ctxt);
 
   int poison_any_pointers_to_descendents (const region *reg,
 					  enum poison_kind pkind);
@@ -2700,6 +2706,9 @@ class region_model
 
   void record_dynamic_extents (const region *reg,
 			       const svalue *size_in_bytes);
+
+  bool called_from_main_p () const;
+  const svalue *get_initial_value_for_global (const region *reg) const;
 
   /* Storing this here to avoid passing it around everywhere.  */
   region_model_manager *const m_mgr;

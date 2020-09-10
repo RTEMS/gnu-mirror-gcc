@@ -183,6 +183,13 @@ public:
 
   /* The SLP node containing the reduction PHIs.  */
   slp_tree reduc_phis;
+
+  /* Vector cost of this entry to the SLP graph.  */
+  stmt_vector_for_cost cost_vec;
+
+  /* If this instance is the main entry of a subgraph the set of
+     entries into the same subgraph, including itself.  */
+  vec<_slp_instance *> subgraph_entries;
 } *slp_instance;
 
 
@@ -913,7 +920,6 @@ public:
 #define BB_VINFO_SLP_INSTANCES(B)    (B)->slp_instances
 #define BB_VINFO_DATAREFS(B)         (B)->shared->datarefs
 #define BB_VINFO_DDRS(B)             (B)->shared->ddrs
-#define BB_VINFO_TARGET_COST_DATA(B) (B)->target_cost_data
 
 static inline bb_vec_info
 vec_info_for_bb (basic_block bb)
@@ -1917,14 +1923,15 @@ extern bool vect_slp_analyze_instance_dependence (vec_info *, slp_instance);
 extern opt_result vect_enhance_data_refs_alignment (loop_vec_info);
 extern opt_result vect_analyze_data_refs_alignment (loop_vec_info);
 extern bool vect_slp_analyze_instance_alignment (vec_info *, slp_instance);
-extern opt_result vect_analyze_data_ref_accesses (vec_info *);
+extern opt_result vect_analyze_data_ref_accesses (vec_info *, vec<int> *);
 extern opt_result vect_prune_runtime_alias_test_list (loop_vec_info);
 extern bool vect_gather_scatter_fn_p (vec_info *, bool, bool, tree, tree,
 				      tree, int, internal_fn *, tree *);
 extern bool vect_check_gather_scatter (stmt_vec_info, loop_vec_info,
 				       gather_scatter_info *);
 extern opt_result vect_find_stmt_data_reference (loop_p, gimple *,
-						 vec<data_reference_p> *);
+						 vec<data_reference_p> *,
+						 vec<int> *, int);
 extern opt_result vect_analyze_data_refs (vec_info *, poly_uint64 *, bool *);
 extern void vect_record_base_alignments (vec_info *);
 extern tree vect_create_data_ref_ptr (vec_info *,
@@ -1989,7 +1996,7 @@ extern stmt_vec_info info_for_reduction (vec_info *, stmt_vec_info);
 extern class loop *vect_transform_loop (loop_vec_info, gimple *);
 extern opt_loop_vec_info vect_analyze_loop_form (class loop *,
 						 vec_info_shared *);
-extern bool vectorizable_live_operation (loop_vec_info,
+extern bool vectorizable_live_operation (vec_info *,
 					 stmt_vec_info, gimple_stmt_iterator *,
 					 slp_tree, slp_instance, int,
 					 bool, stmt_vector_for_cost *);

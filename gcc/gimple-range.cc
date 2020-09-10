@@ -413,7 +413,7 @@ gimple_ranger::calc_stmt (irange &r, gimple *s, tree name)
 bool
 gimple_ranger::range_of_range_op (irange &r, gimple *s)
 {
-  widest_irange range1, range2;
+  int_range_max range1, range2;
   tree type = gimple_expr_type (s);
   gcc_checking_assert (irange::supports_type_p (type));
 
@@ -452,7 +452,7 @@ gimple_ranger::range_of_non_trivial_assignment (irange &r, gimple *stmt)
   if (base && TREE_CODE (base) == MEM_REF
       && TREE_CODE (TREE_OPERAND (base, 0)) == SSA_NAME)
     {
-      widest_irange range1;
+      int_range_max range1;
       tree ssa = TREE_OPERAND (base, 0);
       if (range_of_expr (range1, ssa, stmt))
 	{
@@ -475,7 +475,7 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
 {
   tree phi_def = gimple_phi_result (phi);
   tree type = TREE_TYPE (phi_def);
-  widest_irange phi_range;
+  int_range_max phi_range;
   unsigned x;
 
   if (!irange::supports_type_p (type))
@@ -502,7 +502,7 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
   r.set_undefined ();
   for (x = 0; x < gimple_phi_num_args (phi); x++)
     {
-      widest_irange arg_range;
+      int_range_max arg_range;
       tree arg = gimple_phi_arg_def (phi, x);
       edge e = gimple_phi_arg_edge (phi, x);
 
@@ -560,7 +560,7 @@ gimple_ranger::range_of_builtin_ubsan_call (irange &r, gcall *call,
   tree type = gimple_call_return_type (call);
   range_operator *op = range_op_handler (code, type);
   gcc_checking_assert (op);
-  widest_irange ir0, ir1;
+  int_range_max ir0, ir1;
   tree arg0 = gimple_call_arg (call, 0);
   tree arg1 = gimple_call_arg (call, 1);
   gcc_assert (range_of_expr (ir0, arg0, call));
@@ -796,7 +796,7 @@ gimple_ranger::range_of_builtin_call (irange &r, gcall *call)
 bool
 gimple_ranger::range_of_cond_expr  (irange &r, gassign *s)
 {
-  widest_irange cond_range, range1, range2;
+  int_range_max cond_range, range1, range2;
   tree cond = gimple_assign_rhs1 (s);
   tree op1 = gimple_assign_rhs2 (s);
   tree op2 = gimple_assign_rhs3 (s);
@@ -875,7 +875,7 @@ gimple_ranger::range_of_expr (irange &r, tree expr, gimple *stmt)
 void
 gimple_ranger::range_on_entry (irange &r, basic_block bb, tree name)
 {
-  widest_irange entry_range;
+  int_range_max entry_range;
   gcc_checking_assert (gimple_range_ssa_p (name));
 
   // Start with any known range
@@ -913,7 +913,7 @@ gimple_ranger::range_on_exit (irange &r, basic_block bb, tree name)
 bool
 gimple_ranger::range_on_edge (irange &r, edge e, tree name)
 {
-  widest_irange edge_range;
+  int_range_max edge_range;
   gcc_checking_assert (irange::supports_type_p (TREE_TYPE (name)));
 
   // PHI arguments can be constants, catch these here.
@@ -963,7 +963,7 @@ gimple_ranger::range_of_stmt (irange &r, gimple *s, tree name)
   if (m_cache.m_globals.get_global_range (r, name))
     return true;
   // Avoid infinite recursion by initializing global cache
-  widest_irange tmp = gimple_range_global (name);
+  int_range_max tmp = gimple_range_global (name);
   m_cache.m_globals.set_global_range (name, tmp);
 
   gcc_assert (calc_stmt (r, s, name));
@@ -982,7 +982,7 @@ void
 gimple_ranger::export_global_ranges ()
 {
   unsigned x;
-  widest_irange r;
+  int_range_max r;
   if (dump_file)
     {
       fprintf (dump_file, "Exported global range table\n");
@@ -998,7 +998,7 @@ gimple_ranger::export_global_ranges ()
 	  && !r.varying_p())
 	{
 	  // Make sure the new range is a subset of the old range.
-	  widest_irange old_range;
+	  int_range_max old_range;
 	  old_range = gimple_range_global (name);
 	  old_range.intersect (r);
 	  /* Disable this while we fix tree-ssa/pr61743-2.c.  */
@@ -1037,7 +1037,7 @@ gimple_ranger::dump (FILE *f)
       unsigned x;
       edge_iterator ei;
       edge e;
-      widest_irange range;
+      int_range_max range;
       fprintf (f, "\n=========== BB %d ============\n", bb->index);
       m_cache.m_on_entry.dump (f, bb);
 

@@ -209,7 +209,7 @@ void
 ssa_block_ranges::dump (FILE *f)
 {
   basic_block bb;
-  widest_irange r;
+  int_range_max r;
 
   FOR_EACH_BB_FN (bb, cfun)
     if (get_bb_range (r, bb))
@@ -317,7 +317,7 @@ void
 block_range_cache::dump (FILE *f, basic_block bb, bool print_varying)
 {
   unsigned x;
-  widest_irange r;
+  int_range_max r;
   bool summarize_varying = false;
   for (x = 1; x < m_ssa_ranges.length (); ++x)
     {
@@ -433,7 +433,7 @@ void
 ssa_global_cache::dump (FILE *f)
 {
   unsigned x;
-  widest_irange r;
+  int_range_max r;
   fprintf (f, "Non-varying global ranges:\n");
   fprintf (f, "=========================:\n");
   for ( x = 1; x < num_ssa_names; x++)
@@ -546,9 +546,9 @@ ranger_cache::iterative_cache_update (tree name)
   basic_block bb;
   edge_iterator ei;
   edge e;
-  widest_irange new_range;
-  widest_irange current_range;
-  widest_irange e_range;
+  int_range_max new_range;
+  int_range_max current_range;
+  int_range_max e_range;
 
   // Process each block by seeing if it's calculated range on entry is
   // the same as it's cached value. IF there is a difference, update
@@ -596,8 +596,8 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 {
   edge_iterator ei;
   edge e;
-  widest_irange block_result;
-  widest_irange undefined;
+  int_range_max block_result;
+  int_range_max undefined;
 
   // At this point we shouldnt be looking at the def, entry or exit block.
   gcc_checking_assert (bb != def_bb && bb != ENTRY_BLOCK_PTR_FOR_FN (cfun) &&
@@ -626,7 +626,7 @@ if (DEBUG_CACHE)  fprintf (dump_file, "BACK visiting block %d\n", node->index);
       FOR_EACH_EDGE (e, ei, node->preds)
         {
 	  basic_block pred = e->src;
-	  widest_irange r;
+	  int_range_max r;
 	  // If the pred block is the def block add this BB to update list.
 	  if (pred == def_bb)
 	    {

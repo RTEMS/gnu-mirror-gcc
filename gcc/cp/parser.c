@@ -7467,7 +7467,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 			if ((TREE_CODE (fn) == USING_DECL
 			     && DECL_DEPENDENT_P (fn))
 			    || DECL_FUNCTION_MEMBER_P (fn)
-			    || DECL_LOCAL_FUNCTION_P (fn))
+			    || DECL_LOCAL_DECL_P (fn))
 			  {
 			    do_adl_p = false;
 			    break;
@@ -9011,7 +9011,9 @@ cp_parser_new_type_id (cp_parser* parser, tree *nelts)
       if (*nelts == error_mark_node)
 	*nelts = integer_one_node;
 
-      if (outer_declarator)
+      if (*nelts == NULL_TREE)
+	/* Leave [] in the declarator.  */;
+      else if (outer_declarator)
 	outer_declarator->declarator = declarator->declarator;
       else
 	new_declarator = NULL;
@@ -9072,6 +9074,7 @@ static cp_declarator *
 cp_parser_direct_new_declarator (cp_parser* parser)
 {
   cp_declarator *declarator = NULL;
+  bool first_p = true;
 
   while (true)
     {
@@ -9082,14 +9085,17 @@ cp_parser_direct_new_declarator (cp_parser* parser)
       cp_parser_require (parser, CPP_OPEN_SQUARE, RT_OPEN_SQUARE);
 
       token = cp_lexer_peek_token (parser->lexer);
-      expression = cp_parser_expression (parser);
+      if (token->type == CPP_CLOSE_SQUARE && first_p)
+	expression = NULL_TREE;
+      else
+	expression = cp_parser_expression (parser);
       /* The standard requires that the expression have integral
 	 type.  DR 74 adds enumeration types.  We believe that the
 	 real intent is that these expressions be handled like the
 	 expression in a `switch' condition, which also allows
 	 classes with a single conversion to integral or
 	 enumeration type.  */
-      if (!processing_template_decl)
+      if (expression && !processing_template_decl)
 	{
 	  expression
 	    = build_expr_type_conversion (WANT_INT | WANT_ENUM,
@@ -9114,6 +9120,7 @@ cp_parser_direct_new_declarator (cp_parser* parser)
 	 bounds.  */
       if (cp_lexer_next_token_is_not (parser->lexer, CPP_OPEN_SQUARE))
 	break;
+      first_p = false;
     }
 
   return declarator;
@@ -39302,7 +39309,7 @@ cp_parser_omp_for_loop (cp_parser *parser, enum tree_code code, tree clauses,
       TREE_VEC_ELT (incrv, i) = incr;
       if (orig_init)
 	{
-	  orig_inits.safe_grow_cleared (i + 1);
+	  orig_inits.safe_grow_cleared (i + 1, true);
 	  orig_inits[i] = orig_init;
 	}
       if (orig_decl)
@@ -42575,6 +42582,7 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
 	{
 	  block_scope = true;
 	  DECL_CONTEXT (fndecl) = global_namespace;
+	  DECL_LOCAL_DECL_P (fndecl) = true;
 	  if (!processing_template_decl)
 	    pushdecl (fndecl);
 	}
@@ -42609,16 +42617,9 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
 	  cp_parser_push_lexer_for_tokens (parser, cp);
 	  parser->lexer->in_pragma = true;
 	}
-      if (!cp_parser_omp_declare_reduction_exprs (fndecl, parser))
-	{
-	  if (!block_scope)
-	    finish_function (/*inline_p=*/false);
-	  else
-	    DECL_CONTEXT (fndecl) = current_function_decl;
-	  if (cp)
-	    cp_parser_pop_lexer (parser);
-	  goto fail;
-	}
+
+      bool ok = cp_parser_omp_declare_reduction_exprs (fndecl, parser);
+
       if (cp)
 	cp_parser_pop_lexer (parser);
       if (!block_scope)
@@ -42626,6 +42627,14 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
       else
 	{
 	  DECL_CONTEXT (fndecl) = current_function_decl;
+	  if (DECL_TEMPLATE_INFO (fndecl))
+	    DECL_CONTEXT (DECL_TI_TEMPLATE (fndecl)) = current_function_decl;
+	}
+      if (!ok)
+	goto fail;
+
+      if (block_scope)
+	{
 	  block = finish_omp_structured_block (block);
 	  if (TREE_CODE (block) == BIND_EXPR)
 	    DECL_SAVED_TREE (fndecl) = BIND_EXPR_BODY (block);
@@ -42634,6 +42643,7 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
 	  if (processing_template_decl)
 	    add_decl_expr (fndecl);
 	}
+
       cp_check_omp_declare_reduction (fndecl);
       if (cp == NULL && types.length () > 1)
 	cp = cp_token_cache_new (first_token,
