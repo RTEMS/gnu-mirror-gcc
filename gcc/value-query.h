@@ -73,6 +73,10 @@ public:
   virtual const class value_range_equiv *get_value_range (const_tree,
 							  gimple * = NULL);
 
+protected:
+  class value_range_equiv *allocate_value_range_equiv ();
+  void free_value_range_equiv (class value_range_equiv *);
+
 private:
   class equiv_allocator *equiv_alloc;
 };

@@ -92,7 +92,7 @@ vr_values::get_lattice_entry (const_tree var)
     return vr;
 
   /* Create a default value range.  */
-  vr = new (vrp_value_range_pool.allocate ()) value_range_equiv;
+  vr = allocate_value_range_equiv ();
   vr_value[ver] = vr;
 
   /* After propagation finished return varying.  */
@@ -1979,8 +1979,7 @@ vr_values::dump_all_value_ranges (FILE *file)
 
 /* Initialize VRP lattice.  */
 
-vr_values::vr_values () : vrp_value_range_pool ("Tree VRP value ranges"),
-  simplifier (this)
+vr_values::vr_values () : simplifier (this)
 {
   values_propagated = false;
   num_vr_values = num_ssa_names * 2;
@@ -1997,7 +1996,6 @@ vr_values::~vr_values ()
   free (vr_value);
   free (vr_phi_edge_counts);
   bitmap_obstack_release (&vrp_equiv_obstack);
-  vrp_value_range_pool.release ();
 
   /* So that we can distinguish between VRP data being available
      and not available.  */

@@ -100,6 +100,18 @@ public:
     : object_allocator<value_range_equiv> ("equiv_allocator pool") { }
 };
 
+value_range_equiv *
+range_query::allocate_value_range_equiv ()
+{
+  return new (equiv_alloc->allocate ()) value_range_equiv;
+}
+
+void
+range_query::free_value_range_equiv (value_range_equiv *v)
+{
+  equiv_alloc->remove (v);
+}
+
 const class value_range_equiv *
 range_query::get_value_range (const_tree expr, gimple *stmt)
 {

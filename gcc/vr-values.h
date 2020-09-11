@@ -129,9 +129,9 @@ class vr_values : public range_query
 
   /* Allocate a new value_range object.  */
   value_range_equiv *allocate_value_range_equiv (void)
-    { return vrp_value_range_pool.allocate (); }
+    { return range_query::allocate_value_range_equiv (); }
   void free_value_range (value_range_equiv *vr)
-    { vrp_value_range_pool.remove (vr); }
+    { free_value_range_equiv (vr); }
 
  private:
   value_range_equiv *get_lattice_entry (const_tree);
@@ -147,9 +147,6 @@ class vr_values : public range_query
   void extract_range_from_comparison (value_range_equiv *, gimple *);
   void vrp_visit_assignment_or_call (gimple*, tree *, value_range_equiv *);
   void vrp_visit_switch_stmt (gswitch *, edge *);
-
-  /* Allocation pools for value_range objects.  */
-  object_allocator<value_range_equiv> vrp_value_range_pool;
 
   /* This probably belongs in the lattice rather than in here.  */
   bool values_propagated;
