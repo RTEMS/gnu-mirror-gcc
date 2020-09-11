@@ -271,6 +271,7 @@ private:
     evrp_range_analyzer m_range_analyzer;
   };
 
+  /* Valuation callback for substitute_and_fold_engine.  */
   class valuation : public value_query
   {
   public:
@@ -541,7 +542,8 @@ loop_versioning::lv_dom_walker::after_dom_children (basic_block bb)
 }
 
 /* Decide whether to replace VAL with a new value in a versioned loop.
-   Return the new value if so, otherwise return null.  */
+   If so, set T to the new value and return true.  Otherwise, return
+   false.  */
 
 bool
 loop_versioning::valuation::value_of_expr (tree &t, tree val, gimple *)

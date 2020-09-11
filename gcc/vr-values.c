@@ -178,10 +178,14 @@ vr_values::range_of_expr (irange &r, tree name, gimple *stmt)
 {
   if (const value_range *vr = get_value_range (name, stmt))
     {
-      if (vr->symbolic_p ())
-	r.set_varying (TREE_TYPE (name));
-      else
+      if (vr->undefined_p () || vr->varying_p () || vr->constant_p ())
 	r = *vr;
+      else
+	{
+	  value_range tmp = *vr;
+	  tmp.normalize_symbolics ();
+	  r = tmp;
+	}
       return true;
     }
   return false;
@@ -197,15 +201,7 @@ vr_values::value_of_expr (tree &t, tree op, gimple *)
 bool
 vr_values::value_on_edge (tree &t, edge, tree op)
 {
-  return vr_values::value_of_expr (t, op, NULL);
-}
-
-bool
-vr_values::value_of_stmt (tree &t, gimple *, tree op)
-{
-  if (op)
-    return vr_values::value_of_expr (t, op, NULL);
-  return false;
+  return value_of_expr (t, op);
 }
 
 /* Set the lattice entry for DEF to VARYING.  */

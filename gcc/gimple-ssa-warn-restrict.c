@@ -218,7 +218,7 @@ class builtin_access
 
 /* Initialize a memory reference representation from a pointer EXPR and
    a size SIZE in bytes.  If SIZE is NULL_TREE then the size is assumed
-   to be unknown.  */
+   to be unknown.  STMT is the statement in which expr appears in.  */
 
 builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
 : ptr (expr),

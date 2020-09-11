@@ -621,14 +621,23 @@ vrp_val_min (const_tree type)
   return NULL_TREE;
 }
 
+// This is the irange storage class.  It is used to allocate the
+// minimum amount of storage needed for a given irange.  Storage is
+// automatically freed at destruction.
+//
+// It is meant for long term storage, as opposed to int_range_max
+// which is meant for intermediate temporary results on the stack.
 
 class irange_pool
 {
 public:
   irange_pool ();
   ~irange_pool ();
+  // Return an uninitialized range with NUM_PAIRS.
   irange *allocate (unsigned num_pairs);
-  irange *allocate (const irange &);
+  // Return a copy of SRC with the minimum amount of sub-ranges needed
+  // to represent it.
+  irange *allocate (const irange &src);
 private:
   struct obstack irange_obstack;
 };
@@ -645,24 +654,25 @@ irange_pool::~irange_pool ()
   obstack_free (&irange_obstack, NULL);
 }
 
+// Return an uninitialized range with NUM_PAIRS.
+
 inline irange *
 irange_pool::allocate (unsigned num_pairs)
 {
+  // Never allocate 0 pairs.
+  // Don't allocate 1 either, or we get legacy value_range's.
+  if (num_pairs < 2)
+    num_pairs = 2;
+
   struct newir {
     irange range;
     tree mem[1];
   };
-
-  // Never allocate 0 pairs.
-  // Dont allocate 1 either, or we get legacy value_range "usage".
-  if (num_pairs < 2)
-    num_pairs = 2;
-
-  struct newir *r = (struct newir *) obstack_alloc (&irange_obstack,
-						       sizeof (struct newir)
-						       + sizeof(tree) * 2
-							 * (num_pairs - 1));
-  return new ((irange *)r) irange (&(r->mem[0]), num_pairs);
+  struct newir *r
+    = (struct newir *) obstack_alloc (&irange_obstack,
+				      sizeof (struct newir)
+				      + sizeof (tree) * 2 * (num_pairs - 1));
+  return new ((irange *) r) irange (&(r->mem[0]), num_pairs);
 }
 
 inline irange *

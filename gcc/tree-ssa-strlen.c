@@ -860,8 +860,8 @@ get_string_length (strinfo *si)
 }
 
 /* Dump strlen data to FP for statement STMT.  When non-null, RVALS
-   points to EVRP info and is used to dump strlen range for non-constant
-   results.  */
+   points to the valuation engine used to calculate ranges, and is
+   used to dump strlen range for non-constant results.  */
 
 DEBUG_FUNCTION void
 dump_strlen_info (FILE *fp, gimple *stmt, range_query *rvals)
@@ -1001,9 +1001,9 @@ dump_strlen_info (FILE *fp, gimple *stmt, range_query *rvals)
 
 /* Attempt to determine the length of the string SRC.  On success, store
    the length in *PDATA and return true.  Otherwise, return false.
-   VISITED is a bitmap of visited PHI nodes.  RVALS points to EVRP info
-   and PSSA_DEF_MAX to an SSA_NAME assignment limit used to prevent runaway
-   recursion.  */
+   VISITED is a bitmap of visited PHI nodes.  RVALS points to the valuation
+   engine used to calculate ranges.  PSSA_DEF_MAX to an SSA_NAME
+   assignment limit used to prevent runaway recursion.  */
 
 static bool
 get_range_strlen_dynamic (tree src, gimple *stmt,
@@ -1194,7 +1194,7 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
    Try to obtain the range of the lengths of the string(s) referenced
    by SRC, or the size of the largest array SRC refers to if the range
    of lengths cannot be determined, and store all in *PDATA.  RVALS
-   points to EVRP info.  */
+   points to the valuation engine used to calculate ranges.  */
 
 void
 get_range_strlen_dynamic (tree src, gimple *stmt, c_strlen_data *pdata,
@@ -1799,7 +1799,7 @@ set_strlen_range (tree lhs, wide_int min, wide_int max,
       else if (TREE_CODE (bound) == SSA_NAME)
 	{
 	  wide_int minbound, maxbound;
-	  // FIXME: have callers pass rvals and use range_query.
+	  // FIXME: Use range_query instead of global ranges.
 	  value_range_kind rng = get_range_info (bound, &minbound, &maxbound);
 	  if (rng == VR_RANGE)
 	    {
@@ -3033,7 +3033,7 @@ maybe_diag_stxncpy_trunc (gimple_stmt_iterator gsi, tree src, tree cnt)
     cntrange[0] = cntrange[1] = wi::to_wide (cnt);
   else if (TREE_CODE (cnt) == SSA_NAME)
     {
-      // FIXME: Pass rvals and use range_query.
+      // FIXME: Use range_query instead of global ranges.
       enum value_range_kind rng = get_range_info (cnt, cntrange, cntrange + 1);
       if (rng == VR_RANGE)
 	;
@@ -4139,7 +4139,7 @@ get_len_or_size (gimple *stmt, tree arg, int idx,
       else if (TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	{
 	  wide_int min, max;
-	  // FIXME: Use range_query, you already have it.
+	  // FIXME: Use range_query instead of global ranges.
 	  value_range_kind rng = get_range_info (si->nonzero_chars, &min, &max);
 	  if (rng == VR_RANGE)
 	    {
@@ -5567,7 +5567,7 @@ handle_integral_assign (gimple_stmt_iterator *gsi, bool *cleanup_eh,
 		  wide_int min, max;
 		  signop sign = TYPE_SIGN (lhs_type);
 		  int prec = TYPE_PRECISION (lhs_type);
-		  // FIXME: Use range_query, you already have it.
+		  // FIXME: Use range_query instead of global ranges.
 		  value_range_kind vr = get_range_info (lhs, &min, &max);
 		  if (vr == VR_VARYING
 		      || (vr == VR_RANGE

@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_QUERY_H
 #define GCC_QUERY_H
 
-
 // value_query is used by optimization passes that require valueizing
 // ssa_names in terms of a tree value, but have no neeed for ranges.
 //
@@ -43,7 +42,6 @@ public:
   virtual bool value_of_stmt (tree &, gimple *, tree name = NULL);
 };
 
-
 // range_query is used by optimization passes which are range aware.
 //
 // range_of_expr must be provided.  The default for range_on_edge and
@@ -53,8 +51,8 @@ public:
 // The default for the value_* routines is to call the equivalent range_*
 // routine, check if the range is a singleton, and return it if so.
 //
-//  get_value_range is currently provided for compatibility with vr-values.
-//  It will be deprecated when possible.
+//  get_value_range is currently provided for compatibility with
+//  vr-values.  It will be deprecated when possible.
 
 class range_query : public value_query
 {
@@ -76,7 +74,7 @@ public:
 							  gimple * = NULL);
 
 private:
-  class equiv_allocator *equiv_pool;
+  class equiv_allocator *equiv_alloc;
 };
 
 #endif // GCC_QUERY_H

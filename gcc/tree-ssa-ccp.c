@@ -942,6 +942,8 @@ do_dbg_cnt (void)
     }
 }
 
+/* Valuation callback for substitute_and_fold_engine.  */
+
 class ccp_valuation : public value_query
 {
   /* This method just wraps GET_CONSTANT_VALUE for now.  Over time

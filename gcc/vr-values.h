@@ -32,7 +32,7 @@ class simplify_using_ranges
 public:
   simplify_using_ranges (class range_query *query = NULL);
   ~simplify_using_ranges ();
-  void set_range_query (class range_query *);
+  void set_range_query (class range_query *q) { query = q; }
 
   bool simplify (gimple_stmt_iterator *);
 
@@ -101,10 +101,9 @@ class vr_values : public range_query
   vr_values (void);
   ~vr_values (void);
 
-  virtual bool value_of_expr (tree &, tree, gimple *) OVERRIDE;
+  virtual bool range_of_expr (irange &r, tree name, gimple *stmt) OVERRIDE;
+  virtual bool value_of_expr (tree &, tree, gimple * = NULL) OVERRIDE;
   virtual bool value_on_edge (tree &, edge, tree) OVERRIDE;
-  virtual bool value_of_stmt (tree &, gimple *, tree) OVERRIDE;
-  bool range_of_expr (irange &r, tree name, gimple *stmt) OVERRIDE;
   virtual const value_range_equiv *get_value_range (const_tree,
 						    gimple * = NULL) OVERRIDE;
   void set_vr_value (tree, value_range_equiv *);
@@ -169,12 +168,6 @@ class vr_values : public range_query
   int *vr_phi_edge_counts;
   simplify_using_ranges simplifier;
 };
-
-inline void
-simplify_using_ranges::set_range_query (class range_query *q)
-{
-  query = q;
-}
 
 extern tree get_output_for_vrp (gimple *);
 

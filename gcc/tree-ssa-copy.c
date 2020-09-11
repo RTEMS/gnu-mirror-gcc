@@ -490,6 +490,8 @@ init_copy_prop (void)
     }
 }
 
+/* Valuation callback for substitute_and_fold_engine.  */
+
 class copy_valuation : public value_query
 {
   bool value_of_expr (tree &val, tree name, gimple *) FINAL OVERRIDE

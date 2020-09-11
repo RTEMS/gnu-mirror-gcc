@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "value-query.h"
 #include "alloc-pool.h"
 
+// value_query default methods.
 
 bool
 value_query::value_on_edge (tree &t, edge, tree name)
@@ -47,8 +48,7 @@ value_query::value_of_stmt (tree &t, gimple *, tree name)
   return false;
 }
 
-
-// -----------------------------------------------------------
+// range_query default methods.
 
 bool
 range_query::range_on_edge (irange &r, edge, tree name)
@@ -91,7 +91,6 @@ range_query::value_of_stmt (tree &t, gimple *stmt, tree name)
   return (range_of_stmt (r, stmt, name) && r.singleton_p (&t));
 }
 
-
 // valuation_query support routines for value_range_equiv's.
 
 class equiv_allocator : public object_allocator<value_range_equiv>
@@ -106,16 +105,16 @@ range_query::get_value_range (const_tree expr, gimple *stmt)
 {
   int_range_max r;
   if (range_of_expr (r, const_cast<tree> (expr), stmt))
-    return new (equiv_pool->allocate ()) value_range_equiv (r);
-  return new (equiv_pool->allocate ()) value_range_equiv (TREE_TYPE (expr));
+    return new (equiv_alloc->allocate ()) value_range_equiv (r);
+  return new (equiv_alloc->allocate ()) value_range_equiv (TREE_TYPE (expr));
 }
 
 range_query::range_query ()
 {
-  equiv_pool = new equiv_allocator;
+  equiv_alloc = new equiv_allocator;
 }
 
 range_query::~range_query ()
 {
-  equiv_pool->release ();
+  equiv_alloc->release ();
 }
