@@ -633,7 +633,7 @@ class irange_pool
 public:
   irange_pool ();
   ~irange_pool ();
-  // Return an uninitialized range with NUM_PAIRS.
+  // Return a new range with NUM_PAIRS.
   irange *allocate (unsigned num_pairs);
   // Return a copy of SRC with the minimum amount of sub-ranges needed
   // to represent it.
@@ -654,7 +654,7 @@ irange_pool::~irange_pool ()
   obstack_free (&irange_obstack, NULL);
 }
 
-// Return an uninitialized range with NUM_PAIRS.
+// Return a new range with NUM_PAIRS.
 
 inline irange *
 irange_pool::allocate (unsigned num_pairs)
