@@ -109,36 +109,6 @@ protected:
 // -------------------------------------------------------------------------
 
 
-// Until the simplifier is adjusted to use range_of_stmt for folding conditons,
-// we'll have to do it manually here.
-
-static bool
-fold_cond (gimple_ranger *ranger, gcond *cond)
-{
-  if (!irange::supports_type_p (gimple_expr_type (cond)))
-    return false;
-
-  int_range_max r;
-  if (ranger->range_of_stmt (r, cond) && r.singleton_p ())
-    {
-      if (r.zero_p ())
-	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, "\nPredicate evaluates to: 0\n");
-	  gimple_cond_make_false (cond);
-	}
-      else
-	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, "\nPredicate evaluates to: 1\n");
-	  gimple_cond_make_true (cond);
-	}
-      return true;
-    }
-  return false;
-}
-
-
 class rvrp_folder : public substitute_and_fold_engine
 {
 public:
@@ -164,10 +134,6 @@ public:
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
-    gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
-    if (cond && fold_cond (m_ranger, cond))
-      return true;
-
     return m_simplifier.simplify (gsi);
   }
 
@@ -257,7 +223,6 @@ public:
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
-    gcond *cond = dyn_cast <gcond *> (gsi_stmt (*gsi));
     if (m_evrp_try_first)
       {
 	simplifier.set_range_query (m_vr_values);
@@ -265,12 +230,6 @@ public:
 	  return true;
 
 	simplifier.set_range_query (&m_ranger);
-	if (cond && fold_cond (&m_ranger, cond))
-	  {
-	    if (dump_file)
-	      fprintf (dump_file, "EVRP:hybrid: RVRP folded conditional\n");
-	    return true;
-	  }
 	if (simplifier.simplify (gsi))
 	  {
 	    if (dump_file)
@@ -281,8 +240,6 @@ public:
       }
 
     simplifier.set_range_query (&m_ranger);
-    if (cond && fold_cond (&m_ranger, cond))
-      return true;
     if (simplifier.simplify (gsi))
       return true;
 
