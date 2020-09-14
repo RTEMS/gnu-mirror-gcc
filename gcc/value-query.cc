@@ -34,18 +34,23 @@ along with GCC; see the file COPYING3.  If not see
 
 // value_query default methods.
 
-bool
-value_query::value_on_edge (tree &t, edge, tree name)
+tree
+value_query::value_on_edge (edge, tree name)
 {
-  return value_of_expr (t, name);
+  return value_of_expr (name);
 }
 
-bool
-value_query::value_of_stmt (tree &t, gimple *, tree name)
+tree
+value_query::value_of_stmt (gimple *stmt, tree name)
 {
+  if (!name)
+    name = gimple_get_lhs (stmt);
+
+  gcc_checking_assert (!name || name == gimple_get_lhs (stmt));
+
   if (name)
-    return value_of_expr (t, name);
-  return false;
+    return value_of_expr (name);
+  return NULL_TREE;
 }
 
 // range_query default methods.
@@ -57,38 +62,62 @@ range_query::range_on_edge (irange &r, edge, tree name)
 }
 
 bool
-range_query::range_of_stmt (irange &r, gimple *, tree name)
+range_query::range_of_stmt (irange &r, gimple *stmt, tree name)
 {
+  if (!name)
+    name = gimple_get_lhs (stmt);
+
+  gcc_checking_assert (!name || name == gimple_get_lhs (stmt));
+
   if (name)
     return range_of_expr (r, name);
   return false;
 }
 
-bool
-range_query::value_of_expr (tree &t, tree name, gimple *stmt)
+tree
+range_query::value_of_expr (tree name, gimple *stmt)
 {
-  int_range_max r;
+  tree t;
+  value_range r;
+
   if (!irange::supports_type_p (TREE_TYPE (name)))
-    return false;
-  return (range_of_expr (r, name, stmt) && r.singleton_p (&t));
+    return NULL_TREE;
+  if (range_of_expr (r, name, stmt) && r.singleton_p (&t))
+    return t;
+  return NULL_TREE;
 }
 
-bool
-range_query::value_on_edge (tree &t, edge e, tree name)
+tree
+range_query::value_on_edge (edge e, tree name)
 {
-  int_range_max r;
+  tree t;
+  value_range r;
+
   if (!irange::supports_type_p (TREE_TYPE (name)))
-    return false;
-  return (range_on_edge (r, e, name) && r.singleton_p (&t));
+    return NULL_TREE;
+  if (range_on_edge (r, e, name) && r.singleton_p (&t))
+    return t;
+  return NULL_TREE;
+
 }
 
-bool
-range_query::value_of_stmt (tree &t, gimple *stmt, tree name)
+tree
+range_query::value_of_stmt (gimple *stmt, tree name)
 {
-  int_range_max r;
-  if (!irange::supports_type_p (TREE_TYPE (name)))
-    return false;
-  return (range_of_stmt (r, stmt, name) && r.singleton_p (&t));
+  tree t;
+  value_range r;
+
+  if (!name)
+    name = gimple_get_lhs (stmt);
+
+  gcc_checking_assert (!name || name == gimple_get_lhs (stmt));
+
+  if (!name || !irange::supports_type_p (TREE_TYPE (name)))
+    return NULL_TREE;
+  if (range_of_stmt (r, stmt, name) && r.singleton_p (&t))
+    return t;
+  return NULL_TREE;
+
 }
 
 // valuation_query support routines for value_range_equiv's.

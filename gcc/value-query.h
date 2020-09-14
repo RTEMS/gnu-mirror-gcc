@@ -37,9 +37,9 @@ along with GCC; see the file COPYING3.  If not see
 class value_query
 {
 public:
-  virtual bool value_of_expr (tree &, tree name, gimple * = NULL) = 0;
-  virtual bool value_on_edge (tree &, edge, tree name);
-  virtual bool value_of_stmt (tree &, gimple *, tree name = NULL);
+  virtual tree value_of_expr (tree name, gimple * = NULL) = 0;
+  virtual tree value_on_edge (edge, tree name);
+  virtual tree value_of_stmt (gimple *, tree name = NULL);
 };
 
 // range_query is used by optimization passes which are range aware.
@@ -60,9 +60,9 @@ public:
   range_query ();
   virtual ~range_query ();
 
-  virtual bool value_of_expr (tree &, tree name, gimple * = NULL) OVERRIDE;
-  virtual bool value_on_edge (tree &, edge, tree name) OVERRIDE;
-  virtual bool value_of_stmt (tree &, gimple *, tree name = NULL) OVERRIDE;
+  virtual tree value_of_expr (tree name, gimple * = NULL) OVERRIDE;
+  virtual tree value_on_edge (edge, tree name) OVERRIDE;
+  virtual tree value_of_stmt (gimple *, tree name = NULL) OVERRIDE;
 
   virtual bool range_of_expr (irange &, tree name, gimple * = NULL) = 0;
   virtual bool range_on_edge (irange &, edge, tree name);

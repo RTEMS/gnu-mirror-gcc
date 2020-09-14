@@ -152,16 +152,16 @@ class hybrid_ranger : public gimple_ranger
 public:
   hybrid_ranger (vr_values *v) : gimple_ranger (true), m_vr_values (v) { }
 
-  bool value_of_expr (tree &t, tree op, gimple *stmt) OVERRIDE
+  tree value_of_expr (tree op, gimple *stmt) OVERRIDE
   {
-    tree evrp_ret = m_vr_values->op_with_constant_singleton_value_range (op);
-    bool ret = gimple_ranger::value_of_expr (t, op, stmt);
+    tree evrp_ret = m_vr_values->value_of_expr (op, stmt);
+    tree ranger_ret = gimple_ranger::value_of_expr (op, stmt);
 
-    if (!ret)
+    if (!ranger_ret)
       {
 	// If neither returned a value, return false.
 	if (!evrp_ret)
-	  return false;
+	  return NULL_TREE;
 
 	// Otherwise EVRP found something.
 	if (dump_file)
@@ -170,14 +170,13 @@ public:
 	    print_generic_expr (dump_file, evrp_ret);
 	    fprintf (dump_file, "\n");
 	  }
-	t = evrp_ret;
-	return true;
+	return evrp_ret;
       }
 
 
     // Otherwise ranger found a value, if they match we're good.
-    if (evrp_ret && !compare_values (evrp_ret, t))
-      return true;
+    if (evrp_ret && !compare_values (evrp_ret, ranger_ret))
+      return evrp_ret;
 
     // We should never get different singletons.
     gcc_checking_assert (!evrp_ret);
@@ -186,10 +185,10 @@ public:
     if (dump_file)
       {
 	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
-	print_generic_expr (dump_file, t);
+	print_generic_expr (dump_file, ranger_ret);
 	fprintf (dump_file, "\n");
       }
-    return true;
+    return ranger_ret;
   }
 private:
   vr_values *m_vr_values;

@@ -494,12 +494,14 @@ init_copy_prop (void)
 
 class copy_valuation : public value_query
 {
-  bool value_of_expr (tree &val, tree name, gimple *) FINAL OVERRIDE
+  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
   {
     if (SSA_NAME_VERSION (name) >= n_copy_of)
-      return false;
-    val = copy_of[SSA_NAME_VERSION (name)].value;
-    return val && val != name;
+      return NULL_TREE;
+    tree val = copy_of[SSA_NAME_VERSION (name)].value;
+    if (val && val != name)
+      return val;
+    return NULL_TREE;
   }
 };
 

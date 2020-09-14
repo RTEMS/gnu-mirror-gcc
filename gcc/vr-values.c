@@ -191,17 +191,29 @@ vr_values::range_of_expr (irange &r, tree name, gimple *stmt)
   return false;
 }
 
-bool
-vr_values::value_of_expr (tree &t, tree op, gimple *)
+tree
+vr_values::value_of_expr (tree op, gimple *)
 {
-  t = op_with_constant_singleton_value_range (op);
-  return t != NULL;
+  return op_with_constant_singleton_value_range (op);
 }
 
-bool
-vr_values::value_on_edge (tree &t, edge, tree op)
+tree
+vr_values::value_on_edge (edge, tree op)
 {
-  return value_of_expr (t, op);
+  return op_with_constant_singleton_value_range (op);
+}
+
+tree
+vr_values::value_of_stmt (gimple *stmt, tree op)
+{
+  if (!op)
+    op = gimple_get_lhs (stmt);
+
+  gcc_checking_assert (!op|| op == gimple_get_lhs (stmt));
+
+  if (op)
+    return op_with_constant_singleton_value_range (op);
+  return NULL_TREE;
 }
 
 /* Set the lattice entry for DEF to VARYING.  */

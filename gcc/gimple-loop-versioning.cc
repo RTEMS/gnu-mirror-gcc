@@ -277,7 +277,7 @@ private:
   public:
     valuation (loop_info *li) : m_li (li) { }
   private:
-    bool value_of_expr (tree &, tree name, gimple *) FINAL OVERRIDE;
+    tree value_of_expr (tree name, gimple *) FINAL OVERRIDE;
     loop_info *m_li;
   };
 
@@ -545,16 +545,13 @@ loop_versioning::lv_dom_walker::after_dom_children (basic_block bb)
    If so, set T to the new value and return true.  Otherwise, return
    false.  */
 
-bool
-loop_versioning::valuation::value_of_expr (tree &t, tree val, gimple *)
+tree
+loop_versioning::valuation::value_of_expr (tree val, gimple *)
 {
   if (TREE_CODE (val) == SSA_NAME
       && bitmap_bit_p (&m_li->unity_names, SSA_NAME_VERSION (val)))
-    {
-      t = build_one_cst (TREE_TYPE (val));
-      return true;
-    }
-  return false;
+    return build_one_cst (TREE_TYPE (val));
+  return NULL_TREE;
 }
 
 /* Initialize the structure to optimize FN.  */
