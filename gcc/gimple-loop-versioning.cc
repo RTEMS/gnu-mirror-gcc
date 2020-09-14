@@ -523,8 +523,7 @@ loop_versioning::lv_dom_walker::before_dom_children (basic_block bb)
   m_range_analyzer.enter (bb);
 
   if (bb == bb->loop_father->header)
-    m_lv.prune_loop_conditions (bb->loop_father,
-				m_range_analyzer.get_vr_values ());
+    m_lv.prune_loop_conditions (bb->loop_father, &m_range_analyzer);
 
   for (gimple_stmt_iterator si = gsi_start_bb (bb); !gsi_end_p (si);
        gsi_next (&si))

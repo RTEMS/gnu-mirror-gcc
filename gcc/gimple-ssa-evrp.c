@@ -50,10 +50,9 @@ public:
   evrp_folder () :
     substitute_and_fold_engine (),
     m_range_analyzer (/*update_global_ranges=*/true),
-    m_vr_values (m_range_analyzer.get_vr_values ()),
-    simplifier (m_vr_values)
+    simplifier (&m_range_analyzer)
   {
-    set_value_query (m_vr_values);
+    set_value_query (&m_range_analyzer);
   }
 
   ~evrp_folder ()
@@ -95,14 +94,12 @@ public:
 
   void post_new_stmt (gimple *stmt) OVERRIDE
   {
-    m_range_analyzer.get_vr_values ()->set_defs_to_varying (stmt);
+    m_range_analyzer.set_defs_to_varying (stmt);
   }
 
 protected:
   DISABLE_COPY_AND_ASSIGN (evrp_folder);
   class evrp_range_analyzer m_range_analyzer;
-  class vr_values *m_vr_values;
-
   simplify_using_ranges simplifier;
 };
 
@@ -203,7 +200,7 @@ class hybrid_folder : public evrp_folder
 public:
   hybrid_folder () :
     evrp_folder (),
-    m_ranger (m_vr_values),
+    m_ranger (&m_range_analyzer),
     m_evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST)
   {
     // Default to the hybrid evaluator if we should try it first
@@ -224,7 +221,7 @@ public:
   {
     if (m_evrp_try_first)
       {
-	simplifier.set_range_query (m_vr_values);
+	simplifier.set_range_query (&m_range_analyzer);
 	if (simplifier.simplify (gsi))
 	  return true;
 
@@ -242,7 +239,7 @@ public:
     if (simplifier.simplify (gsi))
       return true;
 
-    simplifier.set_range_query (m_vr_values);
+    simplifier.set_range_query (&m_range_analyzer);
     if (simplifier.simplify (gsi))
       {
 	if (dump_file)
