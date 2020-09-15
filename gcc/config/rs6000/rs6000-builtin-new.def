@@ -169,6 +169,7 @@
   void __builtin_cpu_init ();
     CPU_INIT nothing {cpu}
 
+  ; TODO: Following two should return bool?
   unsigned int __builtin_cpu_is (const char *);
     CPU_IS nothing {cpu}
 
@@ -234,7 +235,7 @@
 
 ; Power6 builtins.
 [power6]
-  const signed int __builtin_p6_cmpb (signed int, signed int);
+  const signed long long __builtin_p6_cmpb (signed long long, signed long long);
     CMPB cmpbdi3 {}
 
   const signed int __builtin_p6_cmpb_32 (signed int, signed int);
@@ -810,7 +811,7 @@
   const vuc __builtin_altivec_vpkshus (vss, vss);
     VPKSHUS altivec_vpkshus {}
 
-  const vsi __builtin_altivec_vpkswss (vsi, vsi);
+  const vss __builtin_altivec_vpkswss (vsi, vsi);
     VPKSWSS altivec_vpkswss {}
 
   const vus __builtin_altivec_vpkswus (vsi, vsi);
@@ -1539,10 +1540,10 @@
   const vsi __builtin_vsx_vsigned_v4sf (vf);
     VEC_VSIGNED_V4SF vsx_xvcvspsxws {}
 
-  const vsll __builtin_vsx_vsignede_v2df (vd);
+  const vsi __builtin_vsx_vsignede_v2df (vd);
     VEC_VSIGNEDE_V2DF vsignede_v2df {}
 
-  const vsll __builtin_vsx_vsignedo_v2df (vd);
+  const vsi __builtin_vsx_vsignedo_v2df (vd);
     VEC_VSIGNEDO_V2DF vsignedo_v2df {}
 
   const vull __builtin_vsx_vunsigned_v2df (vd);
@@ -1560,7 +1561,7 @@
   const vf __builtin_vsx_xscvdpsp (vd);
     XSCVDPSP vsx_xscvdpsp {}
 
-  const vd __builtin_vsx_xscvspdp (vf);
+  const double __builtin_vsx_xscvspdp (float);
     XSCVSPDP vsx_xscvspdp {}
 
   const double __builtin_vsx_xsmaxdp (double, double);
@@ -1569,19 +1570,19 @@
   const double __builtin_vsx_xsmindp (double, double);
     XSMINDP smindf3 {}
 
-  const vd __builtin_vsx_xsrdpi (vd);
+  const double __builtin_vsx_xsrdpi (double);
     XSRDPI vsx_xsrdpi {}
 
-  const vd __builtin_vsx_xsrdpic (vd);
+  const double __builtin_vsx_xsrdpic (double);
     XSRDPIC vsx_xsrdpic {}
 
-  const vd __builtin_vsx_xsrdpim (vd);
+  const double __builtin_vsx_xsrdpim (double);
     XSRDPIM floordf2 {}
 
-  const vd __builtin_vsx_xsrdpip (vd);
+  const double __builtin_vsx_xsrdpip (double);
     XSRDPIP ceildf2 {}
 
-  const vd __builtin_vsx_xsrdpiz (vd);
+  const double __builtin_vsx_xsrdpiz (double);
     XSRDPIZ btruncdf2 {}
 
   const unsigned int __builtin_vsx_xstdivdp_fe (vd, vd);
@@ -1611,49 +1612,37 @@
   const vbll __builtin_vsx_xvcmpeqdp (vd, vd);
     XVCMPEQDP vector_eqv2df {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vull __builtin_vsx_xvcmpeqdp_p (vd);
+  const signed int __builtin_vsx_xvcmpeqdp_p (vd);
     XVCMPEQDP_P vector_eq_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpeqsp (vf, vf);
     XVCMPEQSP vector_eqv4sf {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vui __builtin_vsx_xvcmpeqsp_p (vf);
+  const signed int __builtin_vsx_xvcmpeqsp_p (vf);
     XVCMPEQSP_P vector_eq_v4sf_p {pred}
 
   const vbll __builtin_vsx_xvcmpgedp (vd, vd);
     XVCMPGEDP vector_gev2df {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vull __builtin_vsx_xvcmpgedp_p (vd);
+  const signed int __builtin_vsx_xvcmpgedp_p (vd);
     XVCMPGEDP_P vector_ge_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpgesp (vf, vf);
     XVCMPGESP vector_gev4sf {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vui __builtin_vsx_xvcmpgesp_p (vf);
+  const signed int __builtin_vsx_xvcmpgesp_p (vf);
     XVCMPGESP_P vector_ge_v4sf_p {pred}
 
   const vbll __builtin_vsx_xvcmpgtdp (vd, vd);
     XVCMPGTDP vector_gtv2df {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vull __builtin_vsx_xvcmpgtdp_p (vd);
+  const signed int __builtin_vsx_xvcmpgtdp_p (vd);
     XVCMPGTDP_P vector_gt_v2df_p {pred}
 
   const vbi __builtin_vsx_xvcmpgtsp (vf, vf);
     XVCMPGTSP vector_gtv4sf {}
 
-; This predicate isn't used in the ALL or ANY interfaces; it appears
-; to return a vector rather than an integer as other predicates do.
-  const vui __builtin_vsx_xvcmpgtsp_p (vf, vf);
+  const signed int __builtin_vsx_xvcmpgtsp_p (vf, vf);
     XVCMPGTSP_P vector_gt_v4sf_p {pred}
 
   const vf __builtin_vsx_xvcvdpsp (vd);
@@ -1665,7 +1654,7 @@
   const vsll __builtin_vsx_xvcvdpsxds_scale (vd, const int);
     XVCVDPSXDS_SCALE vsx_xvcvdpsxds_scale {}
 
-  const vsll __builtin_vsx_xvcvdpsxws (vd);
+  const vsi __builtin_vsx_xvcvdpsxws (vd);
     XVCVDPSXWS vsx_xvcvdpsxws {}
 
   const vull __builtin_vsx_xvcvdpuxds (vd);
@@ -1678,7 +1667,7 @@
   const vull __builtin_vsx_xvcvdpuxds_uns (vd);
     XVCVDPUXDS_UNS vsx_fixuns_truncv2dfv2di2 {}
 
-  const vull __builtin_vsx_xvcvdpuxws (vd);
+  const vui __builtin_vsx_xvcvdpuxws (vd);
     XVCVDPUXWS vsx_xvcvdpuxws {}
 
   const vd __builtin_vsx_xvcvspdp (vf);
@@ -1736,7 +1725,7 @@
   const vf __builtin_vsx_xvcvuxwsp (vui);
     XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
 
-  fpmath vf __builtin_vsx_xvdivdp (vf, vf);
+  fpmath vd __builtin_vsx_xvdivdp (vd, vd);
     XVDIVDP divv2df3 {}
 
   fpmath vf __builtin_vsx_xvdivsp (vf, vf);
@@ -1895,7 +1884,7 @@
   const vf __builtin_vsx_xxmrglw (vf, vf);
     XXMRGLW_4SF vsx_xxmrglw_v4sf {}
 
-  const vss __builtin_vsx_xxmrglw_4si (vsi, vsi);
+  const vsi __builtin_vsx_xxmrglw_4si (vsi, vsi);
     XXMRGLW_4SI vsx_xxmrglw_v4si {}
 
   const vsc __builtin_vsx_xxpermdi_16qi (vsc, vsc, const int<1>);
@@ -2268,7 +2257,8 @@
     VPKUDUS altivec_vpkudus {}
 
 ; #### Following are duplicates of __builtin_crypto_vpmsum*.  This
-; can't have ever worked properly!
+; can't have ever worked properly!  However, these have the right
+; result types, and the others have wrong ones!!  Whatwhatwhat...
 ;
 ;  const vus __builtin_altivec_vpmsumb (vuc, vuc);
 ;    VPMSUMB crypto_vpmsumb {}
@@ -2282,13 +2272,13 @@
 ;  const vull __builtin_altivec_vpmsumw (vui, vui);
 ;    VPMSUMW crypto_vpmsumw {}
 
-  const vuc __builtin_altivec_vpopcntb (vsc);
+  const vsc __builtin_altivec_vpopcntb (vsc);
     VPOPCNTB popcountv16qi2 {}
 
-  const vull __builtin_altivec_vpopcntd (vsll);
+  const vsll __builtin_altivec_vpopcntd (vsll);
     VPOPCNTD popcountv2di2 {}
 
-  const vus __builtin_altivec_vpopcnth (vss);
+  const vss __builtin_altivec_vpopcnth (vss);
     VPOPCNTH popcountv8hi2 {}
 
   const vuc __builtin_altivec_vpopcntub (vuc);
@@ -2303,7 +2293,7 @@
   const vui __builtin_altivec_vpopcntuw (vui);
     VPOPCNTUW popcountv4si2 {}
 
-  const vui __builtin_altivec_vpopcntw (vsi);
+  const vsi __builtin_altivec_vpopcntw (vsi);
     VPOPCNTW popcountv4si2 {}
 
   const vsll __builtin_altivec_vrld (vsll, vull);
@@ -2342,31 +2332,31 @@
   const vsq __builtin_bcdadd (vsq, vsq, const int<1>);
     BCDADD bcdadd {}
 
-  const unsigned int __builtin_bcdadd_eq (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdadd_eq (vsq, vsq, const int<1>);
     BCDADD_EQ bcdadd_eq {}
 
-  const unsigned int __builtin_bcdadd_gt (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdadd_gt (vsq, vsq, const int<1>);
     BCDADD_GT bcdadd_gt {}
 
-  const unsigned int __builtin_bcdadd_lt (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdadd_lt (vsq, vsq, const int<1>);
     BCDADD_LT bcdadd_lt {}
 
-  const unsigned int __builtin_bcdadd_ov (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdadd_ov (vsq, vsq, const int<1>);
     BCDADD_OV bcdadd_unordered {}
 
   const vsq __builtin_bcdsub (vsq, vsq, const int<1>);
     BCDSUB bcdsub {}
 
-  const unsigned int __builtin_bcdsub_eq (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdsub_eq (vsq, vsq, const int<1>);
     BCDSUB_EQ bcdsub_eq {}
 
-  const unsigned int __builtin_bcdsub_gt (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdsub_gt (vsq, vsq, const int<1>);
     BCDSUB_GT bcdsub_gt {}
 
-  const unsigned int __builtin_bcdsub_lt (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdsub_lt (vsq, vsq, const int<1>);
     BCDSUB_LT bcdsub_lt {}
 
-  const unsigned int __builtin_bcdsub_ov (vsq, vsq, const int<1>);
+  const signed int __builtin_bcdsub_ov (vsq, vsq, const int<1>);
     BCDSUB_OV bcdsub_unordered {}
 
   const vuc __builtin_crypto_vpermxor_v16qi (vuc, vuc, vuc);
@@ -2381,16 +2371,19 @@
   const vus __builtin_crypto_vpermxor_v8hi (vus, vus, vus);
     VPERMXOR_V8HI crypto_vpermxor_v8hi {}
 
-  const vus __builtin_crypto_vpmsumb (vuc, vuc);
+; Note: these four have incorrect return types per the way the
+; instructions work, but this matches the old signatures that
+; have been around for too long.
+  const vuc __builtin_crypto_vpmsumb (vuc, vuc);
     VPMSUMB crypto_vpmsumb {}
 
-  const vuq __builtin_crypto_vpmsumd (vull, vull);
+  const vull __builtin_crypto_vpmsumd (vull, vull);
     VPMSUMD crypto_vpmsumd {}
 
-  const vui __builtin_crypto_vpmsumh (vus, vus);
+  const vus __builtin_crypto_vpmsumh (vus, vus);
     VPMSUMH crypto_vpmsumh {}
 
-  const vull __builtin_crypto_vpmsumw (vui, vui);
+  const vui __builtin_crypto_vpmsumw (vui, vui);
     VPMSUMW crypto_vpmsumw {}
 
   const vf __builtin_vsx_float2_v2df (vd, vd);
@@ -2615,16 +2608,16 @@
   const vsi __builtin_altivec_vprtybw (vsi);
     VPRTYBW parityv4si2 {}
 
-  const vull __builtin_altivec_vrldmi (vull, vull, vull);
+  const vsll __builtin_altivec_vrldmi (vsll, vsll, vsll);
     VRLDMI altivec_vrldmi {}
 
-  const vull __builtin_altivec_vrldnm (vull, vull);
+  const vsll __builtin_altivec_vrldnm (vsll, vsll);
     VRLDNM altivec_vrldnm {}
 
-  const vui __builtin_altivec_vrlwmi (vui, vui, vui);
+  const vsi __builtin_altivec_vrlwmi (vsi, vsi, vsi);
     VRLWMI altivec_vrlwmi {}
 
-  const vui __builtin_altivec_vrlwnm (vui, vui);
+  const vsi __builtin_altivec_vrlwnm (vsi, vsi);
     VRLWNM altivec_vrlwnm {}
 
   const vuc __builtin_altivec_vslv (vuc, vuc);
@@ -2687,10 +2680,10 @@
   const unsigned int __builtin_vsx_scalar_test_neg_sp (float);
     VSTDCNSP xststdcnegsp {}
 
-  const unsigned long long __builtin_vsx_test_data_class_dp (vd, signed int);
+  const vbll __builtin_vsx_test_data_class_dp (vd, signed int);
     VTDCDP xvtstdcdp {}
 
-  const unsigned int __builtin_vsx_test_data_class_sp (vf, signed int);
+  const vbi __builtin_vsx_test_data_class_sp (vf, signed int);
     VTDCSP xvtstdcsp {}
 
   const vf __builtin_vsx_vextract_fp_from_shorth (vus);
@@ -2735,28 +2728,28 @@
   double __builtin_mffsl ();
     MFFSL rs6000_mffsl {}
 
-  const signed int __builtin_dfp_dtstsfi_eq_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_eq_dd (unsigned int, _Decimal64);
     TSTSFI_EQ_DD dfptstsfi_eq_dd {}
 
-  const signed int __builtin_dfp_dtstsfi_eq_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_eq_td (unsigned int, _Decimal128);
     TSTSFI_EQ_TD dfptstsfi_eq_td {}
 
-  const signed int __builtin_dfp_dtstsfi_gt_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_gt_dd (unsigned int, _Decimal64);
     TSTSFI_GT_DD dfptstsfi_gt_dd {}
 
-  const signed int __builtin_dfp_dtstsfi_gt_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_gt_td (unsigned int, _Decimal128);
     TSTSFI_GT_TD dfptstsfi_gt_td {}
 
-  const signed int __builtin_dfp_dtstsfi_lt_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_lt_dd (unsigned int, _Decimal64);
     TSTSFI_LT_DD dfptstsfi_lt_dd {}
 
-  const signed int __builtin_dfp_dtstsfi_lt_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_lt_td (unsigned int, _Decimal128);
     TSTSFI_LT_TD dfptstsfi_lt_td {}
 
-  const signed int __builtin_dfp_dtstsfi_ov_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_ov_dd (unsigned int, _Decimal64);
     TSTSFI_OV_DD dfptstsfi_unordered_dd {}
 
-  const signed int __builtin_dfp_dtstsfi_ov_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_ov_td (unsigned int, _Decimal128);
     TSTSFI_OV_TD dfptstsfi_unordered_td {}
 
 
@@ -3219,25 +3212,25 @@
   const vss __builtin_altivec_vsrdb_v8hi (vss, vss, const int<3>);
     VSRDB_V8HI vsrdb_v8hi {}
 
-  const vuc __builtin_altivec_vstribl (vuc);
+  const vsc __builtin_altivec_vstribl (vsc);
     VSTRIBL vstril_v16qi {}
 
   const signed int __builtin_altivec_vstribl_p (vuc);
     VSTRIBL_P vstril_p_v16qi {}
 
-  const vuc __builtin_altivec_vstribr (vuc);
+  const vsc __builtin_altivec_vstribr (vsc);
     VSTRIBR vstrir_v16qi {}
 
   const signed int __builtin_altivec_vstribr_p (vuc);
     VSTRIBR_P vstrir_p_v16qi {}
 
-  const vus __builtin_altivec_vstrihl (vus);
+  const vss __builtin_altivec_vstrihl (vss);
     VSTRIHL vstril_v8hi {}
 
   const signed int __builtin_altivec_vstrihl_p (vus);
     VSTRIHL_P vstril_p_v8hi {}
 
-  const vus __builtin_altivec_vstrihr (vus);
+  const vss __builtin_altivec_vstrihr (vss);
     VSTRIHR vstrir_v8hi {}
 
   const signed int __builtin_altivec_vstrihr_p (vus);
@@ -3270,22 +3263,22 @@
   const vuc __builtin_vsx_xvcvspbf16 (vuc);
     XVCVSPBF16 vsx_xvcvspbf16 {}
 
-  const vsc __builtin_vsx_xxblend_v16qi (vsc, vsc, vuc);
+  const vuc __builtin_vsx_xxblend_v16qi (vuc, vuc, vuc);
     VXXBLEND_V16QI xxblend_v16qi {}
 
   const vd __builtin_vsx_xxblend_v2df (vd, vd, vull);
     VXXBLEND_V2DF xxblend_v2df {}
 
-  const vsll __builtin_vsx_xxblend_v2di (vsll, vsll, vull);
+  const vull __builtin_vsx_xxblend_v2di (vull, vull, vull);
     VXXBLEND_V2DI xxblend_v2di {}
 
   const vf __builtin_vsx_xxblend_v4sf (vf, vf, vui);
     VXXBLEND_V4SF xxblend_v4sf {}
 
-  const vsi __builtin_vsx_xxblend_v4si (vsi, vsi, vui);
+  const vui __builtin_vsx_xxblend_v4si (vui, vui, vui);
     VXXBLEND_V4SI xxblend_v4si {}
 
-  const vss __builtin_vsx_xxblend_v8hi (vss, vss, vus);
+  const vus __builtin_vsx_xxblend_v8hi (vus, vus, vus);
     VXXBLEND_V8HI xxblend_v8hi {}
 
   const vop __builtin_vsx_xxeval (vop, vop, vop, const int <8>);

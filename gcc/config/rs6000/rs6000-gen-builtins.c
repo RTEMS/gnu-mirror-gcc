@@ -458,7 +458,7 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "sf",	"float" },
     { "si",	"intSI" },
     { "td",	"dfloat128" },
-    { "tf",	"long_double" },
+    { "tf",	"float128" },
     { "ti",	"intTI" },
     { "udi",	"unsigned_intDI" },
     { "uhi",	"unsigned_intHI" },
