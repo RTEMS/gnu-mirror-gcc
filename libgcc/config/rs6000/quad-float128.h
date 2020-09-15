@@ -167,9 +167,13 @@ extern TFtype __floatundikf (UDItype_ppc);
 extern IBM128_TYPE __extendkftf2 (TFtype);
 extern TFtype __trunctfkf2 (IBM128_TYPE);
 
-/* Complex __float128 built on __float128 interfaces.  */
+/* Complex __float128 built on __float128 interfaces.  The 'x' version is used
+   when long double is IEEE 128 to avoid reusing the same name.  */
 extern TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype);
+
+extern TCtype __mulkc3x (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3x (TFtype, TFtype, TFtype, TFtype);
 
 /* Implementation of conversions between __ibm128 and __float128, to allow the
    same code to be used on systems with IEEE 128-bit emulation and with IEEE
