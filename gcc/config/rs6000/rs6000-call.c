@@ -10882,12 +10882,8 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
   /* Convert this built-in into an internal version that uses pass-by-value
      arguments.  The internal built-in follows immediately after this one.  */
   new_decl = rs6000_builtin_decls[fncode + 1];
-  tree lhs, mem, op[MAX_MMA_OPERANDS];
+  tree lhs, op[MAX_MMA_OPERANDS];
   tree acc = gimple_call_arg (stmt, 0);
-  if (TREE_CODE (acc) == PARM_DECL)
-    mem = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (acc)), acc);
-  else
-    mem = build_simple_mem_ref (acc);
   push_gimplify_context (true);
 
   if ((attr & RS6000_BTC_QUAD) != 0)
@@ -10897,7 +10893,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
       op[0] = make_ssa_name (vector_quad_type_node);
       for (unsigned i = 1; i < nopnds; i++)
 	op[i] = gimple_call_arg (stmt, i);
-      gimplify_assign (op[0], mem, &new_seq);
+      gimplify_assign (op[0], build_simple_mem_ref (acc), &new_seq);
     }
   else
     {
@@ -10947,7 +10943,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
     lhs = make_ssa_name (vector_quad_type_node);
   gimple_call_set_lhs (new_call, lhs);
   gimple_seq_add_stmt (&new_seq, new_call);
-  gimplify_assign (mem, lhs, &new_seq);
+  gimplify_assign (build_simple_mem_ref (acc), lhs, &new_seq);
   pop_gimplify_context (NULL);
   gsi_replace_with_seq (gsi, new_seq, true);
 
@@ -12214,7 +12210,7 @@ rs6000_init_builtins (void)
 
   V2DI_type_node = rs6000_vector_type (TARGET_POWERPC64 ? "__vector long"
 				       : "__vector long long",
-				       intDI_type_node, 2);
+				       long_long_integer_type_node, 2);
   V2DF_type_node = rs6000_vector_type ("__vector double", double_type_node, 2);
   V4SI_type_node = rs6000_vector_type ("__vector signed int",
 				       intSI_type_node, 4);
@@ -12233,7 +12229,7 @@ rs6000_init_builtins (void)
   unsigned_V2DI_type_node = rs6000_vector_type (TARGET_POWERPC64
 				       ? "__vector unsigned long"
 				       : "__vector unsigned long long",
-				       unsigned_intDI_type_node, 2);
+				       long_long_unsigned_type_node, 2);
 
   opaque_V4SI_type_node = build_opaque_vector_type (intSI_type_node, 4);
 
@@ -13383,8 +13379,8 @@ builtin_function_type (machine_mode mode_ret, machine_mode mode_arg0,
     case P8V_BUILTIN_VGBBD:
     case MISC_BUILTIN_CDTBCD:
     case MISC_BUILTIN_CBCDTD:
-    case VSX_BUILTIN_XVCVSPBF16:
-    case VSX_BUILTIN_XVCVBF16SPN:
+    case P10V_BUILTIN_XVCVSPBF16:
+    case P10V_BUILTIN_XVCVBF16SPN:
       h.uns_p[0] = 1;
       h.uns_p[1] = 1;
       break;
