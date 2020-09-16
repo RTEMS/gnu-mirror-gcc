@@ -16,7 +16,7 @@ int main(void)
 {
   int result;
   double a_dble, b_dble;
-  __ieee128 a_ieee128, b_ieee128;
+  __float128 a_ieee128, b_ieee128;
   
   a_dble = 3.10;
   b_dble = 3.10;

@@ -4,14 +4,14 @@
 
 typedef union
 {
-  __ieee128 a;
+  __float128 a;
   int b;
 } c;
 
-__ieee128
-d (__ieee128 x)
+__float128
+d (__float128 x)
 {
-  __ieee128 g;
+  __float128 g;
   c h;
   h.a = x;
   g = h.b & 5;
