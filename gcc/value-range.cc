@@ -1078,19 +1078,14 @@ intersect_ranges (enum value_range_kind *vr0type,
 void
 irange::legacy_intersect (irange *vr0, const irange *vr1)
 {
+  gcc_checking_assert (vr0->legacy_mode_p ());
+  gcc_checking_assert (vr1->legacy_mode_p ());
   /* If either range is VR_VARYING the other one wins.  */
   if (vr1->varying_p ())
     return;
   if (vr0->varying_p ())
     {
-      /* Avoid the full copy if we already know both sides are simple
-	 and can be trivially copied.  */
-      if (vr1->legacy_mode_p ())
-	{
-	  vr0->set (vr1->min (), vr1->max (), vr1->kind ());
-	  return;
-	}
-      *vr0 = *vr1;
+      vr0->set (vr1->min (), vr1->max (), vr1->kind ());
       return;
     }
 
@@ -1107,17 +1102,9 @@ irange::legacy_intersect (irange *vr0, const irange *vr1)
   value_range_kind vr0kind = vr0->kind ();
   tree vr0min = vr0->min ();
   tree vr0max = vr0->max ();
-  /* Handle multi-ranges that can be represented as anti-ranges.  */
-  if (!vr1->legacy_mode_p () && vr1->maybe_anti_range ())
-    {
-      int_range<3> tmp (*vr1);
-      tmp.invert ();
-      intersect_ranges (&vr0kind, &vr0min, &vr0max,
-			VR_ANTI_RANGE, tmp.min (), tmp.max ());
-    }
-  else
-    intersect_ranges (&vr0kind, &vr0min, &vr0max,
-		      vr1->kind (), vr1->min (), vr1->max ());
+
+  intersect_ranges (&vr0kind, &vr0min, &vr0max,
+		    vr1->kind (), vr1->min (), vr1->max ());
 
   /* Make sure to canonicalize the result though as the inversion of a
      VR_RANGE can still be a VR_RANGE.  */
@@ -1412,6 +1399,9 @@ give_up:
 void
 irange::legacy_union (irange *vr0, const irange *vr1)
 {
+  gcc_checking_assert (vr0->legacy_mode_p ());
+  gcc_checking_assert (vr1->legacy_mode_p ());
+
   /* VR0 has the resulting range if VR1 is undefined or VR0 is varying.  */
   if (vr1->undefined_p ()
       || vr0->varying_p ())
@@ -1420,16 +1410,10 @@ irange::legacy_union (irange *vr0, const irange *vr1)
   /* VR1 has the resulting range if VR0 is undefined or VR1 is varying.  */
   if (vr0->undefined_p ())
     {
-      /* Avoid the full copy if we already know both sides are simple
-	 and can be trivially copied.  */
-      if (vr1->legacy_mode_p ())
-	{
-	  vr0->set (vr1->min (), vr1->max (), vr1->kind ());
-	  return;
-	}
-      *vr0 = *vr1;
+      vr0->set (vr1->min (), vr1->max (), vr1->kind ());
       return;
     }
+
   if (vr1->varying_p ())
     {
       vr0->set_varying (vr1->type ());
@@ -1439,17 +1423,9 @@ irange::legacy_union (irange *vr0, const irange *vr1)
   value_range_kind vr0kind = vr0->kind ();
   tree vr0min = vr0->min ();
   tree vr0max = vr0->max ();
-  /* Handle multi-ranges that can be represented as anti-ranges.  */
-  if (!vr1->legacy_mode_p () && vr1->maybe_anti_range ())
-    {
-      int_range<3> tmp (*vr1);
-      tmp.invert ();
-      union_ranges (&vr0kind, &vr0min, &vr0max,
-		    VR_ANTI_RANGE, tmp.min (), tmp.max ());
-    }
-  else
-    union_ranges (&vr0kind, &vr0min, &vr0max,
-		  vr1->kind (), vr1->min (), vr1->max ());
+
+  union_ranges (&vr0kind, &vr0min, &vr0max,
+		vr1->kind (), vr1->min (), vr1->max ());
 
   if (vr0kind == VR_UNDEFINED)
     vr0->set_undefined ();
@@ -1477,6 +1453,12 @@ irange::union_ (const irange *other)
 {
   if (legacy_mode_p ())
     {
+      if (!other->legacy_mode_p ())
+        {
+	  int_range<1> tmp = *other;
+	  legacy_union (this, &tmp);
+	  return;
+	}
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Meeting\n  ");
@@ -1499,8 +1481,7 @@ irange::union_ (const irange *other)
 
   if (other->legacy_mode_p ())
     {
-      int_range<2> wider;
-      wider = *other;
+      int_range<2> wider = *other;
       irange_union (wider);
     }
   else
@@ -1512,6 +1493,12 @@ irange::intersect (const irange *other)
 {
   if (legacy_mode_p ())
     {
+      if (!other->legacy_mode_p ())
+        {
+	  int_range<1> tmp = *other;
+	  legacy_intersect (this, &tmp);
+	  return;
+	}
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Intersecting\n  ");
