@@ -490,27 +490,18 @@ init_copy_prop (void)
     }
 }
 
-/* Valuation callback for substitute_and_fold_engine.  */
-
-class copy_valuation : public value_query
-{
-  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
-  {
-    if (SSA_NAME_VERSION (name) >= n_copy_of)
-      return NULL_TREE;
-    tree val = copy_of[SSA_NAME_VERSION (name)].value;
-    if (val && val != name)
-      return val;
-    return NULL_TREE;
-  }
-};
-
 class copy_folder : public substitute_and_fold_engine
 {
 public:
-  copy_folder () : substitute_and_fold_engine (&m_query) { }
-private:
-  copy_valuation m_query;
+  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
+    {
+      if (SSA_NAME_VERSION (name) >= n_copy_of)
+	return NULL_TREE;
+      tree val = copy_of[SSA_NAME_VERSION (name)].value;
+      if (val && val != name)
+	return val;
+      return NULL_TREE;
+    }
 };
 
 /* Deallocate memory used in copy propagation and do final

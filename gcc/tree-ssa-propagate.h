@@ -22,6 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef _TREE_SSA_PROPAGATE_H
 #define _TREE_SSA_PROPAGATE_H 1
 
+#include "value-query.h"
+
 /* If SIM_P is true, statement S will be simulated again.  */
 
 static inline void
@@ -97,15 +99,13 @@ class ssa_propagation_engine
   void simulate_block (basic_block);
 };
 
-class substitute_and_fold_engine
+class substitute_and_fold_engine : public value_query
 {
  public:
   /* If query is unset here, it must be initialized with
      set_value_query instead.  */
-  substitute_and_fold_engine (class value_query *query = NULL,
-			      bool fold_all_stmts = false)
-    : fold_all_stmts (fold_all_stmts), query (query) { }
-  void set_value_query (class value_query *q) { query = q; }
+  substitute_and_fold_engine (bool fold_all_stmts = false)
+    : fold_all_stmts (fold_all_stmts) { }
   virtual ~substitute_and_fold_engine (void) { }
   virtual bool fold_stmt (gimple_stmt_iterator *) { return false; }
 
@@ -123,8 +123,6 @@ class substitute_and_fold_engine
   /* Users like VRP can set this when they want to perform
      folding for every propagation.  */
   bool fold_all_stmts;
-
-  class value_query *query;
 };
 
 #endif /* _TREE_SSA_PROPAGATE_H  */

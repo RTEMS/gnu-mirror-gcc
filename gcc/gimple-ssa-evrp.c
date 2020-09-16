@@ -51,9 +51,7 @@ public:
     substitute_and_fold_engine (),
     m_range_analyzer (/*update_global_ranges=*/true),
     simplifier (&m_range_analyzer)
-  {
-    set_value_query (&m_range_analyzer);
-  }
+  { }
 
   ~evrp_folder ()
   {
@@ -63,6 +61,11 @@ public:
 	m_range_analyzer.dump_all_value_ranges (dump_file);
 	fprintf (dump_file, "\n");
       }
+  }
+
+  tree value_of_expr (tree name, gimple *stmt) OVERRIDE
+  {
+    return m_range_analyzer.value_of_expr (name, stmt);
   }
 
   void pre_fold_bb (basic_block bb) OVERRIDE
@@ -117,10 +120,24 @@ public:
       m_ranger = new trace_ranger (true);
     else
       m_ranger = new gimple_ranger (true);
-    substitute_and_fold_engine::set_value_query (m_ranger);
     m_simplifier.set_range_query (m_ranger);
   }
       
+  tree value_of_expr (tree name, gimple *s = NULL) OVERRIDE
+  {
+    return m_ranger->value_of_expr (name, s);
+  }
+
+  tree value_on_edge (edge e, tree name) OVERRIDE
+  {
+    return m_ranger->value_on_edge (e, name);
+  }
+
+  tree value_of_stmt (gimple *s, tree name = NULL) OVERRIDE
+  {
+    return m_ranger->value_of_stmt (s, name);
+  }
+
 
   ~rvrp_folder ()
   {
@@ -139,57 +156,6 @@ private:
   simplify_using_ranges m_simplifier;
 };
 
-// -----------------------------------------------------------------------
-
-
-// Override value_of_expr in a ranger to compare results with the EVRp
-// evaluator
-class hybrid_ranger : public gimple_ranger
-{
-public:
-  hybrid_ranger (vr_values *v) : gimple_ranger (true), m_vr_values (v) { }
-
-  tree value_of_expr (tree op, gimple *stmt) OVERRIDE
-  {
-    tree evrp_ret = m_vr_values->value_of_expr (op, stmt);
-    tree ranger_ret = gimple_ranger::value_of_expr (op, stmt);
-
-    if (!ranger_ret)
-      {
-	// If neither returned a value, return false.
-	if (!evrp_ret)
-	  return NULL_TREE;
-
-	// Otherwise EVRP found something.
-	if (dump_file)
-	  {
-	    fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
-	    print_generic_expr (dump_file, evrp_ret);
-	    fprintf (dump_file, "\n");
-	  }
-	return evrp_ret;
-      }
-
-
-    // Otherwise ranger found a value, if they match we're good.
-    if (evrp_ret && !compare_values (evrp_ret, ranger_ret))
-      return evrp_ret;
-
-    // We should never get different singletons.
-    gcc_checking_assert (!evrp_ret);
-
-    // Now ranger has found a value, but EVRP did not.
-    if (dump_file)
-      {
-	fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
-	print_generic_expr (dump_file, ranger_ret);
-	fprintf (dump_file, "\n");
-      }
-    return ranger_ret;
-  }
-private:
-  vr_values *m_vr_values;
-};
 
 
 // In a hybrid folder, start with an EVRP folder, and add the required fold_stmt
@@ -207,7 +173,6 @@ public:
     if (!m_evrp_try_first)
       {
 	simplifier.set_range_query (&m_ranger);
-	substitute_and_fold_engine::set_value_query (&m_ranger);
       }
   }
 
@@ -216,6 +181,10 @@ public:
     if (dump_file && (dump_flags & TDF_DETAILS))
       m_ranger.dump (dump_file);
   }
+
+  tree value_of_expr (tree name, gimple * = NULL) OVERRIDE;
+  tree value_on_edge (edge, tree name) OVERRIDE;
+  tree value_of_stmt (gimple *, tree name = NULL) OVERRIDE;
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
@@ -251,9 +220,72 @@ public:
 
 private:
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
-  hybrid_ranger m_ranger;
+  trace_ranger m_ranger;
   bool m_evrp_try_first;
+  tree choose_value (tree evrp_val, tree ranger_val);
 };
+
+tree
+hybrid_folder::value_of_expr (tree op, gimple *stmt)
+{
+  tree evrp_ret = evrp_folder::value_of_expr (op, stmt);
+  tree ranger_ret = m_ranger.value_of_expr (op, stmt);
+  return choose_value (evrp_ret, ranger_ret);
+}
+
+tree
+hybrid_folder::value_on_edge (edge e, tree op)
+{
+  tree evrp_ret = evrp_folder::value_on_edge (e, op);
+  tree ranger_ret = m_ranger.value_on_edge (e, op);
+  return choose_value (evrp_ret, ranger_ret);
+}
+
+tree
+hybrid_folder::value_of_stmt (gimple *stmt, tree op) 
+{
+  tree evrp_ret = evrp_folder::value_of_stmt (stmt, op);
+  tree ranger_ret = m_ranger.value_of_stmt (stmt, op);
+  return choose_value (evrp_ret, ranger_ret);
+}
+
+tree
+hybrid_folder::choose_value (tree evrp_val, tree ranger_val)
+{
+  if (!ranger_val)
+    {
+      // If neither returned a value, return NULL_TREE.
+      if (!evrp_val)
+	return NULL_TREE;
+
+      // Otherwise EVRP found something.
+      if (dump_file)
+	{
+	  fprintf (dump_file, "EVRP:hybrid: EVRP found singleton ");
+	  print_generic_expr (dump_file, evrp_val);
+	  fprintf (dump_file, "\n");
+	}
+      return evrp_val;
+    }
+
+
+  // Otherwise ranger found a value, if they match we're good.
+  if (evrp_val && !compare_values (evrp_val, ranger_val))
+    return evrp_val;
+
+  // We should never get different singletons.
+  gcc_checking_assert (!evrp_val);
+
+  // Now ranger has found a value, but EVRP did not.
+  if (dump_file)
+    {
+      fprintf (dump_file, "EVRP:hybrid: RVRP found singleton ");
+      print_generic_expr (dump_file, ranger_val);
+      fprintf (dump_file, "\n");
+    }
+  return ranger_val;
+}
+
 
 
 

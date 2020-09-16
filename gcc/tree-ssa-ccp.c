@@ -942,27 +942,18 @@ do_dbg_cnt (void)
     }
 }
 
-/* Valuation callback for substitute_and_fold_engine.  */
-
-class ccp_valuation : public value_query
-{
-  /* This method just wraps GET_CONSTANT_VALUE for now.  Over time
-     naked calls to GET_CONSTANT_VALUE should be eliminated in favor
-     of calling member functions.  */
-  tree value_of_expr (tree name, gimple *) OVERRIDE
-  {
-    return get_constant_value (name);
-  }
-};
-
 /* We want to provide our own GET_VALUE and FOLD_STMT virtual methods.  */
 class ccp_folder : public substitute_and_fold_engine
 {
 public:
-  ccp_folder () : substitute_and_fold_engine (&m_query) { }
   bool fold_stmt (gimple_stmt_iterator *) FINAL OVERRIDE;
-private:
-  ccp_valuation m_query;
+  /* This method just wraps GET_CONSTANT_VALUE for now.  Over time
+     naked calls to GET_CONSTANT_VALUE should be eliminated in favor
+     of calling member functions.  */
+  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
+  {
+    return get_constant_value (name);
+  }
 };
 
 /* Do final substitution of propagated values, cleanup the flowgraph and

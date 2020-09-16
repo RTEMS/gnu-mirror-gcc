@@ -271,28 +271,17 @@ private:
     evrp_range_analyzer m_range_analyzer;
   };
 
-  /* Valuation callback for substitute_and_fold_engine.  */
-  class valuation : public value_query
-  {
-  public:
-    valuation (loop_info *li) : m_li (li) { }
-  private:
-    tree value_of_expr (tree name, gimple *) FINAL OVERRIDE;
-    loop_info *m_li;
-  };
-
   /* Used to simplify statements based on conditions that are established
      by the version checks.  */
   class name_prop : public substitute_and_fold_engine
   {
   public:
-    name_prop (loop_info &li)
-      : substitute_and_fold_engine (&m_query), m_li (li), m_query (&m_li) {}
+    name_prop (loop_info &li) : m_li (li) {}
+    tree value_of_expr (tree name, gimple *) FINAL OVERRIDE;
 
   private:
     /* Information about the versioning we've performed on the loop.  */
     loop_info &m_li;
-    valuation m_query;
   };
 
   loop_info &get_loop_info (class loop *loop) { return m_loops[loop->num]; }
@@ -545,10 +534,10 @@ loop_versioning::lv_dom_walker::after_dom_children (basic_block bb)
    false.  */
 
 tree
-loop_versioning::valuation::value_of_expr (tree val, gimple *)
+loop_versioning::name_prop::value_of_expr (tree val, gimple *)
 {
   if (TREE_CODE (val) == SSA_NAME
-      && bitmap_bit_p (&m_li->unity_names, SSA_NAME_VERSION (val)))
+      && bitmap_bit_p (&m_li.unity_names, SSA_NAME_VERSION (val)))
     return build_one_cst (TREE_TYPE (val));
   return NULL_TREE;
 }

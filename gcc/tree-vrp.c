@@ -4008,11 +4008,15 @@ class vrp_folder : public substitute_and_fold_engine
 {
  public:
   vrp_folder (vr_values *v)
-    : substitute_and_fold_engine (v, /* Fold all stmts.  */ true),
+    : substitute_and_fold_engine (/* Fold all stmts.  */ true),
       m_vr_values (v), simplifier (v)
     {  }
   bool fold_stmt (gimple_stmt_iterator *) FINAL OVERRIDE;
 
+  tree value_of_expr (tree name, gimple *stmt) OVERRIDE
+    {
+      return m_vr_values->value_of_expr (name, stmt);
+    }
   class vr_values *m_vr_values;
 
 private:

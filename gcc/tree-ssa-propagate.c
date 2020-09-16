@@ -38,7 +38,6 @@
 #include "cfgloop.h"
 #include "tree-cfgcleanup.h"
 #include "cfganal.h"
-#include "value-query.h"
 
 /* This file implements a generic value propagation engine based on
    the same propagation used by the SSA-CCP algorithm [1].
@@ -870,7 +869,7 @@ substitute_and_fold_engine::replace_uses_in (gimple *stmt)
     {
       tree tuse = USE_FROM_PTR (use);
 
-      tree val = query->value_of_expr (tuse, stmt);
+      tree val = value_of_expr (tuse, stmt);
       if (!val || val == tuse)
 	continue;
 
@@ -911,7 +910,7 @@ substitute_and_fold_engine::replace_phi_args_in (gphi *phi)
       if (TREE_CODE (arg) == SSA_NAME)
 	{
 	  edge e = gimple_phi_arg_edge (phi, i);
-	  tree val = query->value_on_edge (e, arg);
+	  tree val = value_on_edge (e, arg);
 	  if (val && val != arg && may_propagate_copy (arg, val))
 	    {
 	      if (TREE_CODE (val) != SSA_NAME)
@@ -1035,7 +1034,7 @@ substitute_and_fold_engine::propagate_into_phi_args (basic_block bb)
 	  if (TREE_CODE (arg) != SSA_NAME
 	      || virtual_operand_p (arg))
 	    continue;
-	  tree val = query->value_on_edge (e, arg);
+	  tree val = value_on_edge (e, arg);
 	  if (val && is_gimple_min_invariant (val)
 	      && may_propagate_copy (arg, val))
 	    {
@@ -1068,8 +1067,7 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 	}
       if (res && TREE_CODE (res) == SSA_NAME)
 	{
-	  tree sprime = substitute_and_fold_engine->query->value_of_expr (res,
-									  phi);
+	  tree sprime = substitute_and_fold_engine->value_of_expr (res, phi);
 	  if (sprime && sprime != res && may_propagate_copy (res, sprime))
 	    {
 	      if (dump_file && (dump_flags & TDF_DETAILS))
@@ -1107,8 +1105,7 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
       tree lhs = gimple_get_lhs (stmt);
       if (lhs && TREE_CODE (lhs) == SSA_NAME)
 	{
-	  tree sprime = substitute_and_fold_engine->query->value_of_expr (lhs,
-									  stmt);
+	  tree sprime = substitute_and_fold_engine->value_of_expr (lhs, stmt);
 	  if (sprime && sprime != lhs
 	      && may_propagate_copy (lhs, sprime)
 	      && !stmt_could_throw_p (cfun, stmt)
