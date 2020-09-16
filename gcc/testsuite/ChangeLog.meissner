@@ -1,6 +1,9 @@
-2020-09-15  Michael Meissner  <meissner@linux.ibm.com>
+2020-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc.target/powerpc/pr85657-2.c: Delete invalid test.
+	* gcc.target/powerpc/float128-cmp2-runnable.c: Use __float128
+	keyword instead of __ieee128.
+	* gcc.target/powerpc/pr92796.c: Use __float128 keyword instead of
+	__ieee128.
 
 2020-09-15  Michael Meissner  <meissner@linux.ibm.com>
 
