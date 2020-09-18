@@ -8,8 +8,8 @@
      etc
      etc
 
-   Before evrp went hybrid, we were threading paths that started at
-   the following edges:
+   Before the new evrp, we were threading paths that started at the
+   following edges:
 
       Registering FSM jump thread: (10, 12) incoming edge
       Registering FSM jump thread:  (6, 12) incoming edge
@@ -20,7 +20,7 @@
 
    # state_10 = PHI <state_11(7), 0(10), state_11(5), 1(6), state_11(8), 2(9), state_11(11)>
 
-   Now with the hybrid evrp, we get:
+   Now with the new evrp, we get:
 
    # state_10 = PHI <0(7), 0(10), state_11(5), 1(6), 0(8), 2(9), 1(11)>
 
