@@ -1,3 +1,15 @@
+2020-09-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/extendkftf2-sw.c: Move __float128 to __ibm128
+	conversion into float128-convert.h.
+	* config/rs6000/float128-convert.h: New file.
+	* config/rs6000/float128-hw.c: Move conversions between __float128
+	and __ibm128 into float128-convert.h.
+	* config/rs6000/quad-float128.h: Move conversions between
+	__float128 and __ibm128 into float128-convert.h.
+	* config/rs6000/trunctfkf2-sw.c: Move __ibm128 to __float128
+	conversion to float128-convert.h.
+
 2020-09-16   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
