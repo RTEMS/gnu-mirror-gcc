@@ -220,7 +220,7 @@ public:
 
 private:
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
-  trace_ranger m_ranger;
+  gimple_ranger m_ranger;
   bool m_evrp_try_first;
   tree choose_value (tree evrp_val, tree ranger_val);
 };
