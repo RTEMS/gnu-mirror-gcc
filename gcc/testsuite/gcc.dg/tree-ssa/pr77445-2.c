@@ -124,6 +124,10 @@ enum STATES FMS( u8 **in , u32 *transitions) {
    to change decisions in switch expansion which in turn can expose new
    jump threading opportunities.  Skip the later tests on aarch64.  */
 /* { dg-final { scan-tree-dump "Jumps threaded: 1\[1-9\]" "thread1" } } */
+/* ?? I have no idea what this "Invalid sum" business was originally
+   checking for, but we are threading 6 more paths on x86_64 which is
+   obviously changing the IL in visible ways.  FWIW, we are getting 6
+   "Invalid sum" messages instead of 3.  */
 /* { dg-final { scan-tree-dump-times "Invalid sum" 3 "thread1" } } */
 /* { dg-final { scan-tree-dump-not "optimizing for size" "thread1" } } */
 /* { dg-final { scan-tree-dump-not "optimizing for size" "thread2" } } */
