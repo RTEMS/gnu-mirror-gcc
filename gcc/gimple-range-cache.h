@@ -21,8 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_SSA_RANGE_CACHE_H
 #define GCC_SSA_RANGE_CACHE_H
 
-#include "gimple-range-gori.h"
-
+#include "gimple-range-gori.h" 
 // This global cache is used with the range engine as markers for what
 // has been visited during this incarnation.  Once the ranger evaluates
 // a name, it is typically not re-evaluated again.
@@ -87,7 +86,7 @@ private:
 class ranger_cache : public gori_compute_cache
 {
 public:
-  ranger_cache ();
+  ranger_cache (class range_query &q);
   ~ranger_cache ();
 
   virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb);
@@ -104,6 +103,14 @@ private:
   vec<basic_block> m_workback;
   vec<basic_block> m_update_list;
 
+  struct update_record
+  {
+    basic_block bb;	// Block which value needs to be calculated in.
+    tree calc;		// SSA_NAME whch needs its value calculated
+  };
+  bool push_poor_value (basic_block bb, tree name);
+  vec<update_record> m_poor_value_list;
+  class range_query &query;
 };
 
 #endif // GCC_SSA_RANGE_CACHE_H

@@ -46,7 +46,8 @@ along with GCC; see the file COPYING3.  If not see
 class gimple_ranger : public range_query
 {
 public:
-  gimple_ranger (bool use_loop_info) : m_use_loop_info (use_loop_info) { }
+  gimple_ranger (bool use_loop_info) : m_cache (*this),
+				       m_use_loop_info (use_loop_info) { }
   virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL) OVERRIDE;
   virtual bool range_of_expr (irange &r, tree name, gimple * = NULL) OVERRIDE;
   virtual bool range_on_edge (irange &r, edge e, tree name) OVERRIDE;
