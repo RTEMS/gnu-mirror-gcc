@@ -3832,13 +3832,15 @@ propagate_constants_topo (class ipa_topo_info *topo)
 
 
 /* Return the sum of A and B if none of them is bigger than INT_MAX/2, return
-   the bigger one if otherwise.  */
+   the bigger one if otherwise.  Similarly for negative numbers.  */
 
 static int
 safe_add (int a, int b)
 {
   if (a > INT_MAX/2 || b > INT_MAX/2)
     return a > b ? a : b;
+  else if (a < -INT_MAX/2 || b < -INT_MAX/2)
+    return a > b ? b : a;
   else
     return a + b;
 }
@@ -3861,9 +3863,10 @@ value_topo_info<valtype>::propagate_effects ()
 
       for (val = base; val; val = val->scc_next)
 	{
-	  time = safe_add (time,
-			   val->local_time_benefit + val->prop_time_benefit);
-	  size = safe_add (size, val->local_size_cost + val->prop_size_cost);
+	  time = safe_add (time, val->local_time_benefit);
+	  time = safe_add (time, val->prop_time_benefit);
+	  size = safe_add (size, val->local_size_cost);
+	  size = safe_add (size, val->prop_size_cost);
 	}
 
       for (val = base; val; val = val->scc_next)
