@@ -190,10 +190,13 @@ enum non_prefixed_form {
 
 extern enum insn_form address_to_insn_form (rtx, machine_mode,
 					    enum non_prefixed_form);
+extern enum non_prefixed_form reg_to_non_prefixed (rtx, machine_mode);
+extern bool offsettable_non_prefixed_memory (rtx, machine_mode, rtx);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
+extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
 extern int rs6000_adjust_insn_length (rtx_insn *, int);
 
@@ -306,6 +309,7 @@ namespace gcc { class context; }
 class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
+extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
