@@ -605,11 +605,11 @@ vec_info::remove_stmt (stmt_vec_info stmt_info)
   set_vinfo_for_stmt (stmt_info->stmt, NULL);
   unlink_stmt_vdef (stmt_info->stmt);
   gimple_stmt_iterator si = gsi_for_stmt (stmt_info->stmt);
-  gimple_stmt_iterator *psi = &si;
+  gimple_stmt_iterator psi = si;
   if (bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (this))
-    if (gsi_stmt (bb_vinfo->region_begin) == stmt_info->stmt)
-      psi = &bb_vinfo->region_begin;
-  gsi_remove (psi, true);
+    if (gsi_stmt (bb_vinfo->region_begin ()) == stmt_info->stmt)
+      psi = bb_vinfo->region_begin ();
+  gsi_remove (&psi, true);
   release_defs (stmt_info->stmt);
   free_stmt_vec_info (stmt_info);
 }
@@ -653,7 +653,7 @@ vec_info::insert_seq_on_entry (stmt_vec_info context, gimple_seq seq)
   else
     {
       bb_vec_info bb_vinfo = as_a <bb_vec_info> (this);
-      gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin;
+      gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin ();
       gsi_insert_seq_before (&gsi_region_begin, seq, GSI_SAME_STMT);
     }
 }
@@ -1428,12 +1428,10 @@ pass_slp_vectorize::execute (function *fun)
 	}
     }
 
-  FOR_EACH_BB_FN (bb, fun)
-    {
-      if (vect_slp_bb (bb))
-	if (dump_enabled_p ())
-	  dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
-    }
+  if (vect_slp_function ())
+    // TODO: change to function vectorized
+    if (dump_enabled_p ())
+      dump_printf_loc (MSG_NOTE, vect_location, "basic block vectorized\n");
 
   if (!in_loop_pipeline)
     {
