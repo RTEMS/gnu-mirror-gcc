@@ -38,6 +38,7 @@
 
 #include "soft-fp.h"
 #include "quad-float128.h"
+#include "float128-convert.h"
 
 #ifndef FLOAT128_HW_INSNS
 #define __trunctfkf2_sw __trunctfkf2
@@ -46,8 +47,5 @@
 TFtype
 __trunctfkf2_sw (IBM128_TYPE value)
 {
-  TFtype ret;
-
-  CVT_IBM128_TO_FLOAT128 (ret, value);
-  return ret;
+  return convert_ibm128_to_float128 (value);
 }
