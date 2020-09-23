@@ -5121,8 +5121,6 @@ vect_determine_precisions (vec_info *vinfo)
       bb_vec_info bb_vinfo = as_a <bb_vec_info> (vinfo);
       for (gimple *stmt : bb_vinfo->reverse_region_stmts ())
 	{
-	  if (stmt == NULL)
-	    continue;
 	  stmt_vec_info stmt_info = vinfo->lookup_stmt (stmt);
 	  if (stmt_info && STMT_VINFO_VECTORIZABLE (stmt_info))
 	    vect_determine_stmt_precisions (vinfo, stmt_info);

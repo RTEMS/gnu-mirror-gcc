@@ -2733,8 +2733,6 @@ _bb_vec_info::_bb_vec_info (vec<basic_block> _bbs,
 {
   for (gimple *stmt : this->region_stmts ())
     {
-      if (stmt == NULL)
-	continue;
       gimple_set_uid (stmt, 0);
       if (is_gimple_debug (stmt))
 	continue;
@@ -2749,9 +2747,8 @@ _bb_vec_info::_bb_vec_info (vec<basic_block> _bbs,
 _bb_vec_info::~_bb_vec_info ()
 {
   for (gimple *stmt : this->region_stmts ())
-    if (stmt != NULL)
-      /* Reset region marker.  */
-      gimple_set_uid (stmt, -1);
+    /* Reset region marker.  */
+    gimple_set_uid (stmt, -1);
 }
 
 /* Subroutine of vect_slp_analyze_node_operations.  Handle the root of NODE,
@@ -3454,8 +3451,6 @@ vect_slp_check_for_constructors (bb_vec_info bb_vinfo)
 {
   for (gimple *stmt : bb_vinfo->region_stmts ())
     {
-      if (stmt == NULL)
-	continue;
       gassign *assign = dyn_cast<gassign *> (stmt);
       if (!assign || gimple_assign_rhs_code (assign) != CONSTRUCTOR)
 	continue;
@@ -3813,13 +3808,18 @@ vect_slp_function ()
     {
       basic_block bb = BASIC_BLOCK_FOR_FN (cfun, rpo[i]);
       gphi_iterator phi = gsi_start_phis (bb);
+      gimple_stmt_iterator gsi = gsi_start_nondebug_after_labels_bb (bb);
       if (gsi_end_p (phi))
-	ebb.safe_push (bb);
+	{
+	  if (!gsi_end_p (gsi))
+	    ebb.safe_push (bb);
+	}
       else if (!ebb.is_empty ())
 	{
 	  r |= vect_slp_bbs (ebb);
 	  ebb.truncate (0);
-	  ebb.quick_push (bb);
+	  if (!gsi_end_p (gsi))
+	    ebb.quick_push (bb);
 	}
     }
 
