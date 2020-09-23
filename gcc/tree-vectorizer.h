@@ -832,12 +832,18 @@ public:
 
   struct const_iterator
   {
-    const_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+    const_iterator (gimple_stmt_iterator _gsi, vec<basic_block> _bbs)
+      : gsi (_gsi), bbs (_bbs), bb_index (1) {}
 
     const const_iterator &
     operator++ ()
     {
-      gsi_next (&gsi); return *this;
+      if (!gsi_end_p (gsi))
+	gsi_next (&gsi);
+      while (gsi_end_p (gsi) && bb_index < (int)bbs.length ())
+	gsi = gsi_start_nondebug_after_labels_bb (bbs[bb_index++]);
+
+      return *this;
     }
 
     gimple *operator* () const { return gsi_stmt (gsi); }
@@ -845,7 +851,8 @@ public:
     bool
     operator== (const const_iterator &other) const
     {
-      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+      return (gsi_stmt (gsi) == gsi_stmt (other.gsi)
+	      && gsi_bb (gsi) == gsi_bb (other.gsi));
     }
 
     bool
@@ -855,18 +862,33 @@ public:
     }
 
     gimple_stmt_iterator gsi;
+    vec<basic_block> bbs;
+    int bb_index;
   };
 
   /* GIMPLE statement iterator going from region_end to region_begin.  */
 
   struct const_reverse_iterator
   {
-    const_reverse_iterator (gimple_stmt_iterator _gsi) : gsi (_gsi) {}
+    const_reverse_iterator (gimple_stmt_iterator _gsi, vec<basic_block> _bbs)
+      : gsi (_gsi), bbs (_bbs)
+    {
+      bb_index = bbs.length () - 1;
+    }
 
     const const_reverse_iterator &
     operator++ ()
     {
-      gsi_prev (&gsi); return *this;
+      if (!gsi_end_p (gsi))
+	gsi_prev (&gsi);
+      while (gsi_end_p (gsi) && bb_index >= 0)
+	{
+	  gsi = gsi_last_bb (bbs[bb_index--]);
+	  if (!gsi_end_p (gsi))
+	    gsi_prev (&gsi);
+	}
+
+      return *this;
     }
 
     gimple *operator* () const { return gsi_stmt (gsi); }
@@ -874,7 +896,8 @@ public:
     bool
     operator== (const const_reverse_iterator &other) const
     {
-      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
+      return (gsi_stmt (gsi) == gsi_stmt (other.gsi)
+	      && gsi_bb (gsi) == gsi_bb (other.gsi));
     }
 
     bool
@@ -884,17 +907,35 @@ public:
     }
 
     gimple_stmt_iterator gsi;
+    vec<basic_block> bbs;
+    int bb_index;
   };
 
-  _bb_vec_info (gimple_stmt_iterator, gimple_stmt_iterator, vec_info_shared *);
+  _bb_vec_info (vec<basic_block> bbs, vec_info_shared *);
   ~_bb_vec_info ();
+
+  // TODO
+  gimple_stmt_iterator region_begin ()
+  {
+    return gsi_start_nondebug_after_labels_bb (bbs[0]);
+  }
+
+  // TODO
+  gimple_stmt_iterator region_end ()
+  {
+    gimple_stmt_iterator gsi = gsi_last_bb (bbs[bbs.length () - 1]);
+    if (!gsi_end_p (gsi))
+      gsi_next (&gsi);
+    return gsi;
+  }
 
   /* Returns iterator_range for range-based loop.  */
 
   iterator_range<const_iterator>
   region_stmts ()
   {
-    return iterator_range<const_iterator> (region_begin, region_end);
+    return iterator_range<const_iterator> (const_iterator (region_begin (), bbs),
+					   const_iterator (region_end (), bbs));
   }
 
   /* Returns iterator_range for range-based loop in a reverse order.  */
@@ -902,19 +943,17 @@ public:
   iterator_range<const_reverse_iterator>
   reverse_region_stmts ()
   {
-    const_reverse_iterator begin = region_end;
+    const_reverse_iterator begin (region_end (), bbs);
     if (*begin == NULL)
-      begin = const_reverse_iterator (gsi_last_bb (gsi_bb (region_end)));
+      begin = const_reverse_iterator (gsi_last_bb (gsi_bb (region_end ())), bbs);
     else
       ++begin;
 
-    const_reverse_iterator end = region_begin;
+    const_reverse_iterator end (region_begin (), bbs);
     return iterator_range<const_reverse_iterator> (begin, ++end);
   }
 
-  basic_block bb;
-  gimple_stmt_iterator region_begin;
-  gimple_stmt_iterator region_end;
+  vec<basic_block> bbs;
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb
@@ -2035,6 +2074,7 @@ extern void vect_get_slp_defs (slp_tree, vec<tree> *);
 extern void vect_get_slp_defs (vec_info *, slp_tree, vec<vec<tree> > *,
 			       unsigned n = -1U);
 extern bool vect_slp_bb (basic_block);
+extern bool vect_slp_function ();
 extern stmt_vec_info vect_find_last_scalar_stmt_in_slp (slp_tree);
 extern stmt_vec_info vect_find_first_scalar_stmt_in_slp (slp_tree);
 extern bool is_simple_and_all_uses_invariant (stmt_vec_info, loop_vec_info);
