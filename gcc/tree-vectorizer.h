@@ -840,7 +840,7 @@ public:
     {
       if (!gsi_end_p (gsi))
 	gsi_next (&gsi);
-      while (gsi_end_p (gsi) && bb_index < (int)bbs.length ())
+      if (gsi_end_p (gsi) && bb_index < (int)bbs.length ())
 	gsi = gsi_start_nondebug_after_labels_bb (bbs[bb_index++]);
 
       return *this;
@@ -851,8 +851,7 @@ public:
     bool
     operator== (const const_iterator &other) const
     {
-      return (gsi_stmt (gsi) == gsi_stmt (other.gsi)
-	      && gsi_bb (gsi) == gsi_bb (other.gsi));
+      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
     }
 
     bool
@@ -881,12 +880,8 @@ public:
     {
       if (!gsi_end_p (gsi))
 	gsi_prev (&gsi);
-      while (gsi_end_p (gsi) && bb_index >= 0)
-	{
-	  gsi = gsi_last_bb (bbs[bb_index--]);
-	  if (!gsi_end_p (gsi))
-	    gsi_prev (&gsi);
-	}
+      if (gsi_end_p (gsi) && bb_index >= 0)
+	gsi = gsi_last_bb (bbs[bb_index--]);
 
       return *this;
     }
@@ -896,8 +891,7 @@ public:
     bool
     operator== (const const_reverse_iterator &other) const
     {
-      return (gsi_stmt (gsi) == gsi_stmt (other.gsi)
-	      && gsi_bb (gsi) == gsi_bb (other.gsi));
+      return gsi_stmt (gsi) == gsi_stmt (other.gsi);
     }
 
     bool
