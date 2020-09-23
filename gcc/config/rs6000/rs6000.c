@@ -8557,7 +8557,17 @@ rs6000_delegitimize_address (rtx orig_x)
 	(set (reg:DI <base-reg>)
 	     (unspec:DI [(symbol_ref <symbol>)
 	                 (const_int <marker>)]
-			UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG))  */
+			UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG))
+
+     UNSPEC_PCREL_OPT_ST_ADDR is used by the power10 PCREL_OPT pass.  This
+     UNSPEC include the external SYMBOL_REF along with the value being loaded.
+     We return the original SYMBOL_REF.
+
+	(parallel [(set (reg:DI <base-reg>)
+	                (unspec:DI [(symbol_ref <symbol>)
+	                            (const_int <marker>)]
+	                           UNSPEC_PCREL_OPT_ST_ADDR))
+	           (use (reg <store-reg>))])  */
 
   if (GET_CODE (orig_x) == UNSPEC)
     switch (XINT (orig_x, 1))
@@ -8565,6 +8575,7 @@ rs6000_delegitimize_address (rtx orig_x)
       case UNSPEC_FUSION_GPR:
       case UNSPEC_PCREL_OPT_LD_ADDR:
       case UNSPEC_PCREL_OPT_LD_ADDR_SAME_REG:
+      case UNSPEC_PCREL_OPT_ST_ADDR:
 	orig_x = XVECEXP (orig_x, 0, 0);
 	break;
 
