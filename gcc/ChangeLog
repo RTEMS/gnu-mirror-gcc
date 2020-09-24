@@ -1,3 +1,81 @@
+2020-09-22  David Faust  <david.faust@oracle.com>
+
+	Backported from master:
+	2020-09-22  David Faust  <david.faust@oracle.com>
+
+	* config/bpf/bpf.md: Add defines for signed div and mod operators.
+
+2020-09-20  John David Anglin  < danglin@gcc.gnu.org>
+
+	* config/pa/pa-hpux11.h (LINK_GCC_C_SEQUENCE_SPEC): Delete.
+	* config/pa/pa64-hpux.h (LINK_GCC_C_SEQUENCE_SPEC): Likewise.
+	(ENDFILE_SPEC): Link with libgcc_stub.a and mill.a.
+	* config/pa/pa32-linux.h (ENDFILE_SPEC): Link with libgcc.a.
+
+2020-09-17  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-09-16  Marek Polacek  <polacek@redhat.com>
+
+	PR preprocessor/96935
+	* input.c (get_substring_ranges_for_loc): Return if start.column
+	is less than 1.
+
+2020-09-17  liuhongt  <hongtao.liu@intel.com>
+
+	* common/config/i386/i386-common.c
+	(OPTION_MASK_ISA_AVX_UNSET): Remove OPTION_MASK_ISA_XSAVE_UNSET.
+	(OPTION_MASK_ISA_XSAVE_UNSET): Add OPTION_MASK_ISA_AVX_UNSET.
+
+2020-09-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-09-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/97053
+	* gimple-ssa-store-merging.c (check_no_overlap): Add FIRST_ORDER,
+	START, FIRST_EARLIER and LAST_EARLIER arguments.  Return false if
+	any stores between FIRST_EARLIER inclusive and LAST_EARLIER exclusive
+	has order in between FIRST_ORDER and LAST_ORDER and overlaps the to
+	be merged store.
+	(imm_store_chain_info::try_coalesce_bswap): Add FIRST_EARLIER argument.
+	Adjust check_no_overlap caller.
+	(imm_store_chain_info::coalesce_immediate_stores): Add first_earlier
+	and last_earlier variables, adjust them during iterations.  Adjust
+	check_no_overlap callers, call check_no_overlap even when extending
+	overlapping stores by extra INTEGER_CST stores.
+
+2020-09-15  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	Backported from master:
+	2020-09-03  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* config/rs6000/rs6000-call.c (rs6000_init_builtin): Update V2DI_type_node
+	and unsigned_V2DI_type_node definitions.
+
+2020-09-15  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-09-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97028
+	* config/i386/sse.md (mul<mode>3<mask_name>_bcs,
+	<avx512>_div<mode>3<mask_name>_bcst): Use <avx512bcst> instead of
+	<<avx512bcst>>.
+
+2020-09-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-08-25  Richard Biener  <rguenther@suse.de>
+
+	PR debug/96690
+	* dwarf2out.c (reference_to_unused): Make FUNCTION_DECL
+	processing more consistent with respect to
+	symtab->global_info_ready.
+	(tree_add_const_value_attribute): Unconditionally call
+	rtl_for_decl_init to do all mangling early but throw
+	away the result if early_dwarf.
+
 2020-09-14  Sergei Trofimovich  <siarheit@google.com>
 
 	Backported from master:
