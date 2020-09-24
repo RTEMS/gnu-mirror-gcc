@@ -2611,6 +2611,23 @@
 				    UNSPEC_SQRDCMLAH180
 				    UNSPEC_SQRDCMLAH270])
 
+;; Unlike the normal CMLA instructions these represent the actual operation you
+;; to be performed.  They will always need to be expanded into multiple
+;; sequences consisting of CMLA.
+(define_int_iterator SVE2_INT_CMLA_OP [UNSPEC_CMLA
+				       UNSPEC_CMLA180
+				       UNSPEC_CMLS])
+
+;; Unlike the normal CMLA instructions these represent the actual operation you
+;; to be performed.  They will always need to be expanded into multiple
+;; sequences consisting of CMLA.
+(define_int_iterator SVE2_INT_CMUL_OP [UNSPEC_CMUL
+				       UNSPEC_CMUL180])
+
+;; Same as SVE2_INT_CADD but exclude the saturating instructions
+(define_int_iterator SVE2_INT_CADD_OP [UNSPEC_CADD90
+				       UNSPEC_CADD270])
+
 (define_int_iterator SVE2_INT_CDOT [UNSPEC_CDOT
 				    UNSPEC_CDOT90
 				    UNSPEC_CDOT180
