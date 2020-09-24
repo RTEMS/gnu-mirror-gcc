@@ -1,3 +1,9 @@
+2020-09-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/gcc-with-ieee-128bit-longdouble.txt: New file to
+	describe how to build GCC with long double defaulting to IEEE
+	128-bit.
+
 2020-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
