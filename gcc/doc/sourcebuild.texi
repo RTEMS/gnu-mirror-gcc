@@ -1678,6 +1678,10 @@ Target supports a vector dot-product of @code{signed short}.
 @item vect_udot_hi
 Target supports a vector dot-product of @code{unsigned short}.
 
+@item vect_complex_rot_@var{n}
+Target supports a vector complex addition and complex fma of mode @var{N}.
+Possible values of @var{n} are @code{hf}, @code{sf}, @code{df}.
+
 @item vect_pack_trunc
 Target supports a vector demotion (packing) of @code{short} to @code{char}
 and from @code{int} to @code{short} using modulo arithmetic.
@@ -1947,6 +1951,16 @@ options.
 ARM target supports executing instructions from ARMv8.2-A with the Dot
 Product extension. Some multilibs may be incompatible with these options.
 Implies arm_v8_2a_dotprod_neon_ok.
+
+@item arm_v8_3a_complex_neon_ok
+@anchor{arm_v8_3a_complex_neon_ok}
+ARM target supports options to generate complex number arithmetic instructions
+from ARMv8.3-A.  Some multilibs may be incompatible with these options.
+
+@item arm_v8_3a_complex_neon_hw
+ARM target supports executing complex arithmetic instructions from ARMv8.3-A.
+Some multilibs may be incompatible with these options.
+Implies arm_v8_3a_complex_neon_ok.
 
 @item arm_fp16fml_neon_ok
 @anchor{arm_fp16fml_neon_ok}
