@@ -2729,10 +2729,10 @@ vect_detect_hybrid_slp (loop_vec_info loop_vinfo)
 
 /* Initialize a bb_vec_info struct for the statements in BBS basic blocks.  */
 
-_bb_vec_info::_bb_vec_info (vec<basic_block> _bbs,
-			    vec_info_shared *shared)
+_bb_vec_info::_bb_vec_info (vec<basic_block> _bbs, vec<basic_block>
+			    _nonempty_bbs, vec_info_shared *shared)
   : vec_info (vec_info::bb, init_cost (NULL), shared),
-  bbs (_bbs)
+  bbs (_bbs), nonempty_bbs (_nonempty_bbs)
 {
   for (gimple *stmt : this->region_stmts ())
     {
@@ -3598,7 +3598,7 @@ vect_slp_analyze_bb_1 (bb_vec_info bb_vinfo, int n_stmts, bool &fatal,
    The region has N_STMTS statements and has the datarefs given by DATAREFS.  */
 
 static bool
-vect_slp_region (vec<basic_block> bbs,
+vect_slp_region (vec<basic_block> bbs, vec<basic_block> nonempty_bbs,
 		 vec<data_reference_p> datarefs,
 		 vec<int> *dataref_groups,
 		 unsigned int n_stmts)
@@ -3618,7 +3618,7 @@ vect_slp_region (vec<basic_block> bbs,
     {
       bool vectorized = false;
       bool fatal = false;
-      bb_vinfo = new _bb_vec_info (bbs, &shared);
+      bb_vinfo = new _bb_vec_info (bbs, nonempty_bbs, &shared);
 
       bool first_time_p = shared.datarefs.is_empty ();
       BB_VINFO_DATAREFS (bb_vinfo) = datarefs;
@@ -3751,6 +3751,18 @@ vect_slp_bbs (vec<basic_block> bbs)
   vec<int> dataref_groups = vNULL;
   int insns = 0;
   int current_group = 0;
+  auto_vec<basic_block> nonempty_bbs;
+
+  for (unsigned i = 0; i < bbs.length (); i++)
+    {
+      basic_block bb = bbs[i];
+      gimple_stmt_iterator gsi = gsi_start_nondebug_after_labels_bb (bb);
+      if (!gsi_end_p (gsi))
+	nonempty_bbs.safe_push (bb);
+    }
+
+  if (nonempty_bbs.is_empty ())
+    return false;
 
   for (unsigned i = 0; i < bbs.length (); i++)
     {
@@ -3781,7 +3793,7 @@ vect_slp_bbs (vec<basic_block> bbs)
 	}
     }
 
-  return vect_slp_region (bbs, datarefs, &dataref_groups, insns);
+  return vect_slp_region (bbs, nonempty_bbs, datarefs, &dataref_groups, insns);
 }
 
 /* Main entry for the BB vectorizer.  Analyze and transform BB, returns
@@ -3811,18 +3823,13 @@ vect_slp_function ()
     {
       basic_block bb = BASIC_BLOCK_FOR_FN (cfun, rpo[i]);
       gphi_iterator phi = gsi_start_phis (bb);
-      gimple_stmt_iterator gsi = gsi_start_nondebug_after_labels_bb (bb);
       if (gsi_end_p (phi))
-	{
-	  if (!gsi_end_p (gsi))
-	    ebb.safe_push (bb);
-	}
+	ebb.safe_push (bb);
       else if (!ebb.is_empty ())
 	{
 	  r |= vect_slp_bbs (ebb);
 	  ebb.truncate (0);
-	  if (!gsi_end_p (gsi))
-	    ebb.quick_push (bb);
+	  ebb.quick_push (bb);
 	}
     }
 
@@ -4709,7 +4716,7 @@ vect_schedule_slp_instance (vec_info *vinfo,
 	       we do not insert before the region boundary.  */
 	    if (SLP_TREE_SCALAR_OPS (child).is_empty ()
 		&& !vinfo->lookup_def (SLP_TREE_VEC_DEFS (child)[0]))
-	      last_stmt = gsi_stmt (as_a <bb_vec_info> (vinfo)->region_begin ());
+	      last_stmt = gsi_stmt (as_a <bb_vec_info> (vinfo)->region_begin (false));
 	    else
 	      {
 		unsigned j;

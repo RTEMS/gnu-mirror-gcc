@@ -905,19 +905,22 @@ public:
     int bb_index;
   };
 
-  _bb_vec_info (vec<basic_block> bbs, vec_info_shared *);
+  _bb_vec_info (vec<basic_block> bbs, vec<basic_block> nonempty_bbs,
+		vec_info_shared *);
   ~_bb_vec_info ();
 
   // TODO
-  gimple_stmt_iterator region_begin ()
+  gimple_stmt_iterator region_begin (bool non_empty_bb)
   {
-    return gsi_start_nondebug_after_labels_bb (bbs[0]);
+    vec<basic_block> &v = non_empty_bb ? nonempty_bbs : bbs;
+    return gsi_start_nondebug_after_labels_bb (v[0]);
   }
 
   // TODO
-  gimple_stmt_iterator region_end ()
+  gimple_stmt_iterator region_end (bool non_empty_bb)
   {
-    gimple_stmt_iterator gsi = gsi_last_bb (bbs[bbs.length () - 1]);
+    vec<basic_block> &v = non_empty_bb ? nonempty_bbs : bbs;
+    gimple_stmt_iterator gsi = gsi_last_bb (v[v.length () - 1]);
     if (!gsi_end_p (gsi))
       gsi_next (&gsi);
     return gsi;
@@ -928,8 +931,8 @@ public:
   iterator_range<const_iterator>
   region_stmts ()
   {
-    return iterator_range<const_iterator> (const_iterator (region_begin (), bbs),
-					   const_iterator (region_end (), bbs));
+    return iterator_range<const_iterator> (const_iterator (region_begin (true), nonempty_bbs),
+					   const_iterator (region_end (true), nonempty_bbs));
   }
 
   /* Returns iterator_range for range-based loop in a reverse order.  */
@@ -937,17 +940,19 @@ public:
   iterator_range<const_reverse_iterator>
   reverse_region_stmts ()
   {
-    const_reverse_iterator begin (region_end (), bbs);
+    const_reverse_iterator begin (region_end (true), nonempty_bbs);
     if (*begin == NULL)
-      begin = const_reverse_iterator (gsi_last_bb (gsi_bb (region_end ())), bbs);
+      begin = const_reverse_iterator (gsi_last_bb (gsi_bb (region_end (true))),
+				      nonempty_bbs);
     else
       ++begin;
 
-    const_reverse_iterator end (region_begin (), bbs);
+    const_reverse_iterator end (region_begin (true), nonempty_bbs);
     return iterator_range<const_reverse_iterator> (begin, ++end);
   }
 
   vec<basic_block> bbs;
+  vec<basic_block> nonempty_bbs;
 } *bb_vec_info;
 
 #define BB_VINFO_BB(B)               (B)->bb
