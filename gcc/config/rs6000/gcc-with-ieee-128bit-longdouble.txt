@@ -1,0 +1,249 @@
+This is a short memo of how to build a GCC 11 compiler where the long double
+type is IEEE 128-bit instead of using the IBM extended double format on the
+PowerPC 64-bit little endian Linux environment.
+
+You will likely need the Advance Toolchain AT14.0 library, as it has all of the
+changes to support switching the long double default to IEEE 128-bit.
+
+    *	https://www.ibm.com/support/pages/advance-toolchain-linux-power
+
+You will need a recent version of binutils.  I've used the binutils that I
+downloaded via git on September 14th, 2020:
+
+    *	git clone git://sourceware.org/git/binutils-gdb.git
+
+You will need appropriate versions of the gmp, mpfr, and mpc libraries:
+
+    *	http://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.1.0.tar.bz2
+    *	http://gcc.gnu.org/pub/gcc/infrastructure/mpfr-3.1.4.tar.bz2
+    *	http://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.0.3.tar.gz
+
+Currently, I use --without-ppl --without-cloog --without-isl so I haven't used
+those libraries.
+
+I currently disable plug-in support.  If you want plug-in support, you will
+likely need to build a binutils with the first compiler, to use with the second
+and third compilers.  If you use a binutils compiled with a compiler where the
+long double format is IBM extended double, it may not work.
+
+I found I needed the configuration option --with-system-zlib to avoid some
+issues when doing a bootstrap build.
+
+Build the first PowerPC GCC compiler (non-bootstrap) using at least the
+following options:
+
+	--prefix=<first-gcc-install>
+	--enable-stage1-languages=c,c++,fortran
+	--disable-bootstrap
+	--disable-plugin
+	--with-long-double-format=ieee
+	--with-advance-toolchain=at14.0
+	--with-system-zlib
+	--with-native-system-header-dir=/opt/at14.0/include
+	--without-ppl
+	--without-cloog
+	--without-isl
+
+Other configuration options that I use but may not affect switching the long
+double default include:
+
+	--enable-checking
+	--enable-languages=c,c++,fortran
+	--enable-stage1-checking
+	--enable-gnu-indirect-function
+	--enable-decimal-float
+	--with-long-double-128
+	--enable-secureplt
+	--enable-threads=posix
+	--enable-__cxa_atexit
+	--with-as=<as location>
+	--with-ld=<ld location>
+	--with-gnu-as=<as location>
+	--with-gnu-ld=<ld location>
+	--with-cpu=power9		(or --with-cpu=power8)
+
+Build and install the first compiler.
+
+Configure, build, and install gmp 6.1.0 using the first compiler built above
+with following configuration options:
+
+	--prefix=<gmp-install>
+	--enable-static
+	--disable-shared
+	--enable-cxx
+	CPPFLAGS=-fexceptions
+
+Configure, build, and install mpfr 3.1.4 using the first compiler build above
+with the following configuration options:
+
+	--prefix=<mprf-install>
+	--enable-static
+	--disable-shared
+	--with-gmp=<gmp-install>
+
+Configure, build, and install mpc 1.0.3 using the first compiler build above
+with the following configuration options:
+
+	--prefix=<mpc-install>
+	--enable-static
+	--disable-shared
+	--with-gmp=<gmp-install>
+	--with-mpfr=<mpfr-install>
+
+Configure, build, and install the second compiler using the first compiler to
+build the second compiler, and using the gmp, mpfr, and mpc libraries built
+above.  You could skip this step, but I found during development, it was useful
+to shake things out before diving into a bootstrap build.  The notable
+configuration options used are:
+
+	--prefix=<second-gcc-install>
+	--enable-stage1-languages=c,c++,fortran
+	--disable-bootstrap
+	--disable-plugin
+	--with-long-double-format=ieee
+	--with-system-zlib
+	--with-advance-toolchain=at14.0
+	--with-native-system-header-dir=/opt/at14.0/include
+	--with-gmp=<gmp-install>
+	--with-mpfr=<mpfr-install>
+	--with-mpc=<mpc-install>
+	--without-ppl
+	--without-cloog
+	--without-isl
+
+As before, I tend to add these options as well:
+
+	--enable-checking
+	--enable-languages=c,c++,fortran
+	--enable-stage1-checking
+	--enable-gnu-indirect-function
+	--enable-decimal-float
+	--with-long-double-128
+	--enable-secureplt
+	--enable-threads=posix
+	--enable-__cxa_atexit
+	--with-as=<as location>
+	--with-ld=<ld location>
+	--with-gnu-as=<as location>
+	--with-gnu-ld=<ld location>
+	--with-cpu=power9		(or --with-cpu=power8)
+
+Assuming the second compiler builds and installs, now go onto building a
+bootstrap third compiler, using the second compiler to build stage1.  The
+options I used include:
+
+	--prefix=<third-gcc-install>
+	--disable-plugin
+	--with-long-double-format=ieee
+	--with-cpu=power9
+	--with-system-zlib
+	--with-advance-toolchain=at14.0
+	--with-native-system-header-dir=/opt/at14.0/include
+	--with-gmp=<gmp-location>
+	--with-mpfr=<mpfr-location>
+	--with-mpc=<mpc-location>
+	--without-ppl
+	--without-cloog
+	--without-isl
+
+As before, I tend to add these options as well:
+
+	--enable-languages=c,c++,fortran
+	--enable-checking
+	--enable-stage1-checking
+	--enable-gnu-indirect-function
+	--enable-decimal-float
+	--with-long-double-128
+	--enable-secureplt
+	--enable-threads=posix
+	--enable-__cxa_atexit
+	--with-as=<as location>
+	--with-ld=<ld location>
+	--with-gnu-as=<as location>
+	--with-gnu-ld=<ld location>
+	--with-cpu=power9		(or --with-cpu=power8)
+
+Three fortran tests that used to fail now succeed:
+
+gfortran.dg/default_format_2.f90		(marked XFAIL)
+gfortran.dg/default_format_denormal_2.f90	(marked XFAIL)
+gfortran.dg/ieee/large_2.f90			(not marked XFAIL)
+
+I built Spec 2017 rate benchmarks with the newest compiler.
+
+    1)	The 500.perlbench_r benchmark uses long double in the sv.c module.  It
+	looks like perl uses long double as the universal type in the sv.c
+	module.  There are 2 conversions from double to long double, 1
+	conversion from long double back to double, and 3 long double
+	comparisons.
+
+	In looking at the sv.c in the Spec 2017 suite, there are a bunch of
+	#ifdef's to control how perl optimizes the use of long double.  The
+	Spec options disables these #ifdef's, but it is likely these same
+	#ifdef's are used in the current version of perl used by the
+	distributions.  It is likely that if the long double change is made on
+	a system wide basis, that the perl configuration will need to be
+	tweaked to know that long double uses the IEEE 128-bit format.
+
+    2)	The 510.parest_r benchmark fails to link because there are missing
+	functions in libstdc++.  I'm including a simplification of the error
+	messages below:
+
+<...>/ld: source/lac/full_matrix.o: in function `dealii::FullMatrix<std::complex<__ieee128> >::ExcNotRegular::print_info(std::ostream&) const':
+<...>/include/lac/full_matrix.h:1206: undefined reference to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)'
+
+<...>/ld: source/lac/full_matrix.o: in function `void dealii::LogStream::print<std::complex<__ieee128> >(std::complex<__ieee128> const&)':
+<...>/include/base/logstream.h:441: undefined reference to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)'
+
+<...>/ld: source/lac/full_matrix.o: in function `void dealii::FullMatrix<std::complex<__ieee128> >::print<std::ostream>(std::ostream&, unsigned int, unsigned int) const':
+<...>/include/lac/full_matrix.h:1499: undefined reference to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)'
+
+<...>/ld: source/lac/full_matrix.o: in function `dealii::FullMatrix<std::complex<__ieee128> >::print_formatted(std::ostream&, unsigned int, bool, unsigned int, char const*, double, double) const':
+<...>/include/lac/full_matrix.templates.h:1479: undefined reference to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)'
+
+<...>/ld: source/lac/vector.o: in function `dealii::Vector<std::complex<__ieee128> >::print(std::ostream&, unsigned int, bool, bool) const':
+<...>/include/lac/vector.templates.h:800: undefined reference to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)'
+
+<...>/ld: source/lac/vector.o:<...>/include/lac/vector.templates.h:797: more undefined references to `std::basic_ostream<char, std::char_traits<char> >& std::operator<< <__ieee128, char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >, std::complex<__ieee128> const&)' follow
+collect2: error: ld returned 1 exit status
+
+With the discusion:
+
+    *	https://gcc.gnu.org/pipermail/gcc/2020-August/233338.html
+
+the agreement was to continue having essentially two types (& three modes) in
+the compiler.
+
+    *	When long double uses the IEEE 128-bit representation, the type node
+	for __float128/_Float128 is the same as the type node for long double,
+	and __ibm128 has a unique node.
+
+    *	When long double uses the IBM extended double representation (current
+	behavior), the type node for __ibm128 is the same as for long double,
+	and __float128/_Float128 have a unique node.
+
+This means that when the long double format changes, C++ libraries cannot mix
+functions with the same name using __float128 and long double types.  I.e. the
+following would generate an error:
+
+	class foo {
+	  long double add (long double a, long double b) { return a+b; }
+	  __float128 add (__float128 a, __float128 b) { return a+b; }
+	};
+
+But C++ users would be able say:
+
+	class foo {
+	  long double add (long double a, long double b) { return a+b; }
+	  __ibm128 add (__ibm128 a, __ibm128 b) { return a+b; }
+	};
+
+The boost library is believed to have both __float128 and long double in a
+class.  Boost would need to be tweaked so that if the default long double is
+IEEE 128-bit, not to enable the explicit __float128 support.
+
+The compiler defines the following macros based on the long double support:
+
+	#define __LONG_DOUBLE_IEEE128__	1 /* if long double is IEEE 128-bit.  */
+	#define __LONG_DOUBLE_IBM128__	1 /* if long double is IBM 128-bit.  */
+	#define __LONG_DOUBLE_128__	1 /* if sizeof (long double) == #16.  */
