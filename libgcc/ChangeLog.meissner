@@ -1,3 +1,23 @@
+2020-09-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ieee128 if long double is IEEE 128-bit.
+
+2020-09-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+	* config/rs6000/t-float128: Build __floating conversions to/from
+	Decimal support functions.  By default compile with long double
+	being IBM extended double.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
+
 2020-09-18  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/extendkftf2-sw.c: Move __float128 to __ibm128
