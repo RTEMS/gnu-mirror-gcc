@@ -1,5 +1,10 @@
 2020-09-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ieee128 if long double is IEEE 128-bit.
+
+2020-09-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/_dd_to_kf.c: New file.
 	* config/rs6000/_kf_to_dd.c: New file.
 	* config/rs6000/_kf_to_sd.c: New file.
