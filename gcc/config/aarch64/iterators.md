@@ -3471,6 +3471,35 @@
 			    (UNSPEC_FCMLS "180")
 			    (UNSPEC_FCMLS180 "180")])
 
+;; SVE has slightly different namings from NEON so we have to split these
+;; iterators.
+(define_int_attr sve_rot1 [(UNSPEC_FCMLA "")
+			   (UNSPEC_FCMLA180 "")
+			   (UNSPEC_FCMUL "")
+			   (UNSPEC_FCMUL180 "")
+			   (UNSPEC_FCMLS "270")
+			   (UNSPEC_FCMLS180 "90")
+			   (UNSPEC_CMLA "")
+			   (UNSPEC_CMLA180 "")
+			   (UNSPEC_CMUL "")
+			   (UNSPEC_CMUL180 "")
+			   (UNSPEC_CMLS "270")
+			   (UNSPEC_CMLS180 "90")])
+
+(define_int_attr sve_rot2 [(UNSPEC_FCMLA "90")
+			   (UNSPEC_FCMLA180 "270")
+			   (UNSPEC_FCMUL "90")
+			   (UNSPEC_FCMUL180 "270")
+			   (UNSPEC_FCMLS "180")
+			   (UNSPEC_FCMLS180 "180")
+			   (UNSPEC_CMLA "90")
+			   (UNSPEC_CMLA180 "270")
+			   (UNSPEC_CMUL "90")
+			   (UNSPEC_CMUL180 "270")
+			   (UNSPEC_CMLS "180")
+			   (UNSPEC_CMLS180 "180")])
+
+
 (define_int_attr fcmac1 [(UNSPEC_FCMLA "a") (UNSPEC_FCMLA180 "a")
 			 (UNSPEC_FCMLS "s") (UNSPEC_FCMLS180 "s")
 			 (UNSPEC_CMLA "a") (UNSPEC_CMLA180 "a")

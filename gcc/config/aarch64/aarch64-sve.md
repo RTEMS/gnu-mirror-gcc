@@ -5459,6 +5459,20 @@
   "TARGET_SVE"
 )
 
+;; Predicated FCADD using ptrue for unpredicated optab for auto-vectorizer
+(define_expand "@cadd<rot><mode>3"
+  [(set (match_operand:SVE_FULL_F 0 "register_operand")
+	(unspec:SVE_FULL_F
+	  [(match_dup 3)
+	   (const_int SVE_RELAXED_GP)
+	   (match_operand:SVE_FULL_F 1 "register_operand")
+	   (match_operand:SVE_FULL_F 2 "register_operand")]
+	  SVE_COND_FCADD))]
+  "TARGET_SVE"
+{
+  operands[3] = aarch64_ptrue_reg (<VPRED>mode);
+})
+
 ;; Predicated FCADD, merging with the first input.
 (define_insn_and_rewrite "*cond_<optab><mode>_2_relaxed"
   [(set (match_operand:SVE_FULL_F 0 "register_operand" "=w, ?&w")
@@ -7130,6 +7144,62 @@
    movprfx\t%0, %4\;fcmla\t%0.<Vetype>, %1/m, %2.<Vetype>, %3.<Vetype>, #<rot>"
   [(set_attr "movprfx" "*,yes")]
 )
+
+;; unpredicated optab pattern for auto-vectorizer
+;; The complex mla/mls operations always need to expand to two instructions.
+;; The first operation does half the computation and the second does the
+;; remainder.  Because of this, expand early.
+(define_expand "cml<fcmac1><rot_op><mode>4"
+  [(set (match_operand:SVE_FULL_F 0 "register_operand")
+	(unspec:SVE_FULL_F
+	  [(match_dup 4)
+	   (match_dup 5)
+	   (match_operand:SVE_FULL_F 1 "register_operand")
+	   (match_operand:SVE_FULL_F 2 "register_operand")
+	   (match_operand:SVE_FULL_F 3 "register_operand")]
+	  FCMLA_OP))]
+  "TARGET_SVE"
+{
+  operands[4] = aarch64_ptrue_reg (<VPRED>mode);
+  operands[5] = gen_int_mode (SVE_RELAXED_GP, SImode);
+  emit_insn (
+    gen_aarch64_pred_fcmla<sve_rot1><mode> (operands[0], operands[4],
+					    operands[1], operands[2],
+					    operands[3], operands[5]));
+  emit_insn (
+    gen_aarch64_pred_fcmla<sve_rot2><mode> (operands[0], operands[4],
+					    operands[0], operands[2],
+					    operands[3], operands[5]));
+  DONE;
+})
+
+;; unpredicated optab pattern for auto-vectorizer
+;; The complex mul operations always need to expand to two instructions.
+;; The first operation does half the computation and the second does the
+;; remainder.  Because of this, expand early.
+(define_expand "cmul<rot_op><mode>3"
+  [(set (match_operand:SVE_FULL_F 0 "register_operand")
+	(unspec:SVE_FULL_F
+	  [(match_dup 3)
+	   (match_dup 4)
+	   (match_operand:SVE_FULL_F 1 "register_operand")
+	   (match_operand:SVE_FULL_F 2 "register_operand")
+	   (match_dup 5)]
+	  FCMUL_OP))]
+  "TARGET_SVE"
+{
+  operands[3] = aarch64_ptrue_reg (<VPRED>mode);
+  operands[4] = gen_int_mode (SVE_RELAXED_GP, SImode);
+  operands[5] = force_reg (<MODE>mode, CONST0_RTX (<MODE>mode));
+  emit_insn (
+    gen_aarch64_pred_fcmla<sve_rot1><mode> (operands[0], operands[3], operands[1],
+					    operands[2], operands[5], operands[4]));
+  emit_insn (
+    gen_aarch64_pred_fcmla<sve_rot2><mode> (operands[0], operands[3], operands[1],
+					    operands[2], operands[0],
+					    operands[4]));
+  DONE;
+})
 
 ;; Predicated FCMLA with merging.
 (define_expand "@cond_<optab><mode>"
