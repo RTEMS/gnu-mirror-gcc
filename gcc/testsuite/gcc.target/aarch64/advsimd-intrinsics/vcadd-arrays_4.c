@@ -1,0 +1,30 @@
+/* { dg-do run } */
+/* { dg-require-effective-target arm_v8_3a_complex_neon_ok } */
+/* { dg-require-effective-target vect_complex_rot_df } */
+/* { dg-add-options arm_v8_3a_complex_neon } */
+/* { dg-additional-options "-Ofast -save-temps" } */
+
+#define TYPE double
+#include "vcadd-arrays-autovec-270.c"
+
+extern void abort(void);
+
+int main()
+{
+  TYPE a[N] = {1.0, 2.0, 3.0, 4.0};
+  TYPE b[N] = {4.0, 2.0, 1.5, 4.5};
+  TYPE c[N] = {0};
+  calc (a, b, c);
+
+  if (c[0] != 3.0 || c[1] != -2.0)
+    abort ();
+
+  if (c[2] != 7.5 || c[3] != 2.5)
+    abort ();
+
+  return 0;
+}
+
+/* { dg-final { scan-assembler-times {fcadd\tv[0-9]+\.2d, v[0-9]+\.2d, v[0-9]+\.2d, #270} 1 { target { aarch64*-*-* } } } } */
+/* { dg-final { scan-assembler-not {vcadd\.} { target { arm*-*-* } } } } */
+
