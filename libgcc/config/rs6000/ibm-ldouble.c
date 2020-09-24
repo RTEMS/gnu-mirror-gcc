@@ -102,9 +102,17 @@ __asm__ (".symver __gcc_qadd,_xlqadd@GCC_3.4\n\t"
 static inline IBM128_TYPE
 pack_ldouble (double dh, double dl)
 {
+  /* If we are building on a non-VSX system, the __ibm128 type is not defined.
+     This means we can't always use __builtin_pack_ibm128.  Instead, we use
+     __builtin_pack_longdouble if long double uses the IBM extended double
+     128-bit format, and use the explicit __builtin_pack_ibm128 if long double
+     is IEEE 128-bit.  */
 #if defined (__LONG_DOUBLE_128__) && defined (__LONG_DOUBLE_IBM128__)	\
     && !(defined (_SOFT_FLOAT) || defined (__NO_FPRS__))
   return __builtin_pack_longdouble (dh, dl);
+#elif defined (__LONG_DOUBLE_128__) && defined (__LONG_DOUBLE_IEEE128__) \
+    && !(defined (_SOFT_FLOAT) || defined (__NO_FPRS__))
+  return __builtin_pack_ibm128 (dh, dl);
 #else
   union
   {
