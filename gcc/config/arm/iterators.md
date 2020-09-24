@@ -712,7 +712,7 @@
 				(DI   "di")   (V2DI  "v2di")
 				(V2SF "v2si") (V4SF  "v4si")])
 
-;; Get element type from double-width mode, for operations where we 
+;; Get element type from double-width mode, for operations where we
 ;; don't care about signedness.
 (define_mode_attr V_if_elem [(V8QI "i8")  (V16QI "i8")
 			     (V4HI "i16") (V8HI  "i16")
@@ -1177,10 +1177,38 @@
 
 (define_int_attr rot [(UNSPEC_VCADD90 "90")
 		      (UNSPEC_VCADD270 "270")
+		      (UNSPEC_VCMLS "0")
 		      (UNSPEC_VCMLA "0")
 		      (UNSPEC_VCMLA90 "90")
 		      (UNSPEC_VCMLA180 "180")
-		      (UNSPEC_VCMLA270 "270")])
+		      (UNSPEC_VCMLA270 "270")
+		      (UNSPEC_VCMUL "0")
+		      (UNSPEC_VCMUL180 "180")])
+
+;; A conjucate is a rotation of 180* around the argand plane, or * I.
+(define_int_attr rot_op [(UNSPEC_VCMLS "")
+			 (UNSPEC_VCMLS180 "_conj")
+			 (UNSPEC_VCMLA "")
+			 (UNSPEC_VCMLA180 "_conj")
+			 (UNSPEC_VCMUL "")
+			 (UNSPEC_VCMUL180 "_conj")])
+
+(define_int_attr rotsplit1 [(UNSPEC_VCMLA "0")
+			    (UNSPEC_VCMLA180 "0")
+			    (UNSPEC_VCMUL "0")
+			    (UNSPEC_VCMUL180 "0")
+			    (UNSPEC_VCMLS "270")
+			    (UNSPEC_VCMLS180 "90")])
+
+(define_int_attr rotsplit2 [(UNSPEC_VCMLA "90")
+			    (UNSPEC_VCMLA180 "270")
+			    (UNSPEC_VCMUL "90")
+			    (UNSPEC_VCMUL180 "270")
+			    (UNSPEC_VCMLS "180")
+			    (UNSPEC_VCMLS180 "180")])
+
+(define_int_attr fcmac1 [(UNSPEC_VCMLA "a") (UNSPEC_VCMLA180 "a")
+			 (UNSPEC_VCMLS "s") (UNSPEC_VCMLS180 "s")])
 
 (define_int_attr simd32_op [(UNSPEC_QADD8 "qadd8") (UNSPEC_QSUB8 "qsub8")
 			    (UNSPEC_SHADD8 "shadd8") (UNSPEC_SHSUB8 "shsub8")
@@ -1715,3 +1743,11 @@
 (define_int_iterator UQRSHLLQ [UQRSHLL_64 UQRSHLL_48])
 (define_int_iterator SQRSHRLQ [SQRSHRL_64 SQRSHRL_48])
 (define_int_iterator VSHLCQ_M [VSHLCQ_M_S VSHLCQ_M_U])
+;; Define iterators for VCMLA operations
+(define_int_iterator VCMLA_OP [UNSPEC_VCMLA
+			       UNSPEC_VCMLA180
+			       UNSPEC_VCMLS])
+
+;; Define iterators for VCMLA operations as MUL
+(define_int_iterator VCMUL_OP [UNSPEC_VCMUL
+			       UNSPEC_VCMUL180])
