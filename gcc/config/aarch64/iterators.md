@@ -182,6 +182,11 @@
 ;; All Advanced SIMD modes on which we support any arithmetic operations.
 (define_mode_iterator VALL [V8QI V16QI V4HI V8HI V2SI V4SI V2DI V2SF V4SF V2DF])
 
+;; All Advanced SIMD modes suitable for performing arithmetics.
+(define_mode_iterator VALL_ARITH [V8QI V16QI V4HI V8HI V2SI V4SI V2DI
+				  (V4HF "TARGET_SIMD_F16INST") (V8HF "TARGET_SIMD_F16INST")
+				  V2SF V4SF V2DF])
+
 ;; All Advanced SIMD modes suitable for moving, loading, and storing.
 (define_mode_iterator VALL_F16 [V8QI V16QI V4HI V8HI V2SI V4SI V2DI
 				V4HF V8HF V4BF V8BF V2SF V4SF V2DF])
@@ -708,6 +713,10 @@
     UNSPEC_FCMLA90	; Used in aarch64-simd.md.
     UNSPEC_FCMLA180	; Used in aarch64-simd.md.
     UNSPEC_FCMLA270	; Used in aarch64-simd.md.
+    UNSPEC_FCMUL	; Used in aarch64-simd.md.
+    UNSPEC_FCMUL180	; Used in aarch64-simd.md.
+    UNSPEC_FCMLS	; Used in aarch64-simd.md.
+    UNSPEC_FCMLS180	; Used in aarch64-simd.md.
     UNSPEC_ASRD		; Used in aarch64-sve.md.
     UNSPEC_ADCLB	; Used in aarch64-sve2.md.
     UNSPEC_ADCLT	; Used in aarch64-sve2.md.
@@ -726,6 +735,10 @@
     UNSPEC_CMLA180	; Used in aarch64-sve2.md.
     UNSPEC_CMLA270	; Used in aarch64-sve2.md.
     UNSPEC_CMLA90	; Used in aarch64-sve2.md.
+    UNSPEC_CMLS		; Used in aarch64-sve2.md.
+    UNSPEC_CMLS180	; Used in aarch64-sve2.md.
+    UNSPEC_CMUL		; Used in aarch64-sve2.md.
+    UNSPEC_CMUL180	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTLT	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTNT	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTX	; Used in aarch64-sve2.md.
@@ -2708,6 +2721,14 @@
 (define_int_iterator BF_MLA [UNSPEC_BFMLALB
 			     UNSPEC_BFMLALT])
 
+(define_int_iterator FCMLA_OP [UNSPEC_FCMLA
+			       UNSPEC_FCMLA180
+			       UNSPEC_FCMLS
+			       UNSPEC_FCMLS180])
+
+(define_int_iterator FCMUL_OP [UNSPEC_FCMUL
+			       UNSPEC_FCMUL180])
+
 ;; Iterators for atomic operations.
 
 (define_int_iterator ATOMIC_LDOP
@@ -3403,6 +3424,7 @@
 		      (UNSPEC_CMLA270 "270")
 		      (UNSPEC_FCADD90 "90")
 		      (UNSPEC_FCADD270 "270")
+		      (UNSPEC_FCMLS "0")
 		      (UNSPEC_FCMLA "0")
 		      (UNSPEC_FCMLA90 "90")
 		      (UNSPEC_FCMLA180 "180")
@@ -3418,7 +3440,41 @@
 		      (UNSPEC_COND_FCMLA "0")
 		      (UNSPEC_COND_FCMLA90 "90")
 		      (UNSPEC_COND_FCMLA180 "180")
-		      (UNSPEC_COND_FCMLA270 "270")])
+		      (UNSPEC_COND_FCMLA270 "270")
+		      (UNSPEC_FCMUL "0")
+		      (UNSPEC_FCMUL180 "180")])
+
+;; A conjucate is a rotation of 180* around the argand plane, or * I.
+(define_int_attr rot_op [(UNSPEC_FCMLS "")
+			 (UNSPEC_FCMLS180 "_conj")
+			 (UNSPEC_FCMLA "")
+			 (UNSPEC_FCMLA180 "_conj")
+			 (UNSPEC_FCMUL "")
+			 (UNSPEC_FCMUL180 "_conj")
+			 (UNSPEC_CMLS "")
+			 (UNSPEC_CMLA "")
+			 (UNSPEC_CMLA180 "_conj")
+			 (UNSPEC_CMUL "")
+			 (UNSPEC_CMUL180 "_conj")])
+
+(define_int_attr rotsplit1 [(UNSPEC_FCMLA "0")
+			    (UNSPEC_FCMLA180 "0")
+			    (UNSPEC_FCMUL "0")
+			    (UNSPEC_FCMUL180 "0")
+			    (UNSPEC_FCMLS "270")
+			    (UNSPEC_FCMLS180 "90")])
+
+(define_int_attr rotsplit2 [(UNSPEC_FCMLA "90")
+			    (UNSPEC_FCMLA180 "270")
+			    (UNSPEC_FCMUL "90")
+			    (UNSPEC_FCMUL180 "270")
+			    (UNSPEC_FCMLS "180")
+			    (UNSPEC_FCMLS180 "180")])
+
+(define_int_attr fcmac1 [(UNSPEC_FCMLA "a") (UNSPEC_FCMLA180 "a")
+			 (UNSPEC_FCMLS "s") (UNSPEC_FCMLS180 "s")
+			 (UNSPEC_CMLA "a") (UNSPEC_CMLA180 "a")
+			 (UNSPEC_CMLS "s") (UNSPEC_CMLS180 "s")])
 
 (define_int_attr sve_fmla_op [(UNSPEC_COND_FMLA "fmla")
 			      (UNSPEC_COND_FMLS "fmls")
