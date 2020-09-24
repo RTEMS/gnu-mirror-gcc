@@ -1446,10 +1446,10 @@ gori_compute_cache::cache_comparison_with_ssa (gimple *stmt,
   tf_range op1_range, op2_range;
   gcc_assert (m_cache->get_range (op1_range, op1, cached_name));
   gcc_assert (m_cache->get_range (op2_range, op2, cached_name));
-  gcc_checking_assert (logical_combine (r_true_side, code, m_bool_one,
-					op1_range, op2_range));
-  gcc_checking_assert (logical_combine (r_false_side, code, m_bool_zero,
-					op1_range, op2_range));
+  gcc_assert (logical_combine (r_true_side, code, m_bool_one,
+			       op1_range, op2_range));
+  gcc_assert (logical_combine (r_false_side, code, m_bool_zero,
+			       op1_range, op2_range));
   tree carrier = gimple_assign_lhs (stmt);
   m_cache->set_range (carrier, cached_name,
 		      tf_range (r_true_side, r_false_side));
