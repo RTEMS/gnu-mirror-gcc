@@ -607,8 +607,8 @@ vec_info::remove_stmt (stmt_vec_info stmt_info)
   gimple_stmt_iterator si = gsi_for_stmt (stmt_info->stmt);
   gimple_stmt_iterator psi = si;
   if (bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (this))
-    if (gsi_stmt (bb_vinfo->region_begin ()) == stmt_info->stmt)
-      psi = bb_vinfo->region_begin ();
+    if (gsi_stmt (bb_vinfo->region_begin (false)) == stmt_info->stmt)
+      psi = bb_vinfo->region_begin (false);
   gsi_remove (&psi, true);
   release_defs (stmt_info->stmt);
   free_stmt_vec_info (stmt_info);
@@ -653,7 +653,7 @@ vec_info::insert_seq_on_entry (stmt_vec_info context, gimple_seq seq)
   else
     {
       bb_vec_info bb_vinfo = as_a <bb_vec_info> (this);
-      gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin ();
+      gimple_stmt_iterator gsi_region_begin = bb_vinfo->region_begin (false);
       gsi_insert_seq_before (&gsi_region_begin, seq, GSI_SAME_STMT);
     }
 }
