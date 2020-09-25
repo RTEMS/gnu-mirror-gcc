@@ -2974,14 +2974,6 @@
   [(set_attr "type" "neon_fcadd")]
 )
 
-(define_expand "cadd<rot><mode>3"
-  [(set (match_operand:VF 0 "register_operand")
-	(unspec:VF [(match_operand:VF 1 "register_operand")
-		    (match_operand:VF 2 "register_operand")]
-		    VCADD))]
-  "TARGET_COMPLEX"
-)
-
 (define_insn "neon_vcmla<rot><mode>"
   [(set (match_operand:VF 0 "register_operand" "=w")
 	(plus:VF (match_operand:VF 1 "register_operand" "0")
@@ -3038,32 +3030,13 @@
   [(set_attr "type" "neon_fcmla")]
 )
 
-
-;; The complex mla/mls operations always need to expand to two instructions.
-;; The first operation does half the computation and the second does the
-;; remainder.  Because of this, expand early.
-(define_expand "cml<fcmac1><rot_op><mode>4"
-  [(set (match_operand:VF 0 "register_operand")
-	(plus:VF (match_operand:VF 1 "register_operand")
-		 (unspec:VF [(match_operand:VF 2 "register_operand")
-			     (match_operand:VF 3 "register_operand")]
-			     VCMLA_OP)))]
-  "TARGET_COMPLEX"
-{
-  emit_insn (gen_neon_vcmla<rotsplit1><mode> (operands[0], operands[1],
-					      operands[2], operands[3]));
-  emit_insn (gen_neon_vcmla<rotsplit2><mode> (operands[0], operands[0],
-					      operands[2], operands[3]));
-  DONE;
-})
-
 ;; The complex mul operations always need to expand to two instructions.
 ;; The first operation does half the computation and the second does the
 ;; remainder.  Because of this, expand early.
 (define_expand "cmul<rot_op><mode>3"
-  [(set (match_operand:VF 0 "register_operand")
-	(unspec:VF [(match_operand:VF 1 "register_operand")
-		    (match_operand:VF 2 "register_operand")]
+  [(set (match_operand:VDF 0 "register_operand")
+	(unspec:VDF [(match_operand:VDF 1 "register_operand")
+		     (match_operand:VDF 2 "register_operand")]
 		    VCMUL_OP))]
   "TARGET_COMPLEX"
 {
@@ -3075,6 +3048,7 @@
 					      operands[1], operands[2]));
   DONE;
 })
+
 
 ;; These instructions map to the __builtins for the Dot Product operations.
 (define_insn "neon_<sup>dot<vsi2qi>"

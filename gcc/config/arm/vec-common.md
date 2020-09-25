@@ -172,3 +172,70 @@
 					       GEN_INT (elem), operands[0]));
   DONE;
 })
+
+(define_expand "cadd<rot><mode>3"
+  [(set (match_operand:VF 0 "register_operand")
+	(unspec:VF [(match_operand:VF 1 "register_operand")
+		    (match_operand:VF 2 "register_operand")]
+		   VCADD))]
+  "TARGET_COMPLEX || (TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT
+		      && ARM_HAVE_NEON_<MODE>_ARITH)"
+)
+
+;; The complex mul operations always need to expand to two instructions.
+;; The first operation does half the computation and the second does the
+;; remainder.  Because of this, expand early.
+(define_expand "cmul<rot_op><mode>3"
+  [(set (match_operand:VQ_HSF 0 "register_operand")
+        (unspec:VQ_HSF [(match_operand:VQ_HSF 1 "register_operand")
+			(match_operand:VQ_HSF 2 "register_operand")]
+		       VCMUL_OP))]
+  "TARGET_COMPLEX || (TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT)"
+{
+  if (TARGET_COMPLEX)
+    {
+      rtx tmp = gen_reg_rtx (<MODE>mode);
+      emit_move_insn (tmp, CONST0_RTX (<MODE>mode));
+      emit_insn (gen_neon_vcmla<rotsplit1><mode> (operands[0], tmp,
+                                                  operands[1], operands[2]));
+      emit_insn (gen_neon_vcmla<rotsplit2><mode> (operands[0], operands[0],
+                                                  operands[1], operands[2]));
+    }
+  else
+    {
+      emit_insn (gen_mve_vcmulq<mve_rotsplit1><mode> (operands[0], operands[1],
+                                                      operands[2]));
+      emit_insn (gen_mve_vcmulq<mve_rotsplit2><mode> (operands[0], operands[1],
+                                                      operands[2]));
+    }
+  DONE;
+})
+
+(define_expand "arm_vcmla<rot><mode>"
+  [(set (match_operand:VF 0 "register_operand")
+	(plus:VF (match_operand:VF 1 "register_operand")
+		 (unspec:VF [(match_operand:VF 2 "register_operand")
+			     (match_operand:VF 3 "register_operand")]
+			     VCMLA)))]
+  "TARGET_COMPLEX || (TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT
+		      && ARM_HAVE_NEON_<MODE>_ARITH)"
+)
+
+;; The complex mla/mls operations always need to expand to two instructions.
+;; The first operation does half the computation and the second does the
+;; remainder.  Because of this, expand early.
+(define_expand "cml<fcmac1><rot_op><mode>4"
+  [(set (match_operand:VF 0 "register_operand")
+	(plus:VF (match_operand:VF 1 "register_operand")
+		 (unspec:VF [(match_operand:VF 2 "register_operand")
+			     (match_operand:VF 3 "register_operand")]
+			    VCMLA_OP)))]
+  "TARGET_COMPLEX || (TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT
+		      && ARM_HAVE_NEON_<MODE>_ARITH)"
+{
+  emit_insn (gen_arm_vcmla<rotsplit1><mode> (operands[0], operands[1],
+					     operands[2], operands[3]));
+  emit_insn (gen_arm_vcmla<rotsplit2><mode> (operands[0], operands[0],
+					     operands[2], operands[3]));
+  DONE;
+})
