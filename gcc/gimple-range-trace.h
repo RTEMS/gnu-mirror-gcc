@@ -1,7 +1,7 @@
 class trace_ranger : public gimple_ranger
 {
 public:
-  trace_ranger (bool use_loop_info);
+  trace_ranger ();
   virtual bool range_of_stmt (irange &r, gimple *s, tree name = NULL_TREE);
   virtual bool range_of_expr (irange &r, tree name, gimple *s = NULL);
   virtual bool range_on_edge (irange &r, edge e, tree name);
@@ -21,8 +21,7 @@ private:
 // trace_ranger implementation.
 
 inline
-trace_ranger::trace_ranger (bool use_loop_info)
-  : gimple_ranger (use_loop_info)
+trace_ranger::trace_ranger ()
 {
   indent = 0;
   trace_count = 0;

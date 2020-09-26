@@ -264,7 +264,7 @@ in_loop_p (gimple *stmt)
 unsigned int
 pass_walloca::execute (function *fun)
 {
-  gimple_ranger ranger (false);
+  gimple_ranger ranger;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {

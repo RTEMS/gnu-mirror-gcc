@@ -44,6 +44,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-range.h"
 #include "gimple-range-trace.h"
 
+// This is the classic EVRP folder which uses a dominator walk and pushes
+// ranges into the next block if it is a single predecessor block.
+
 class evrp_folder : public substitute_and_fold_engine
 {
 public:
@@ -106,8 +109,9 @@ protected:
   simplify_using_ranges simplifier;
 };
 
-// -------------------------------------------------------------------------
-
+// This is a ranger based folder which continues to use the dominator
+// walk to access the substitute and fold machinery.  Ranges are calculated
+// on demand.
 
 class rvrp_folder : public substitute_and_fold_engine
 {
@@ -117,9 +121,9 @@ public:
   { 
     if (flag_evrp_mode == EVRP_MODE_RVRP_TRACE
 	|| flag_evrp_mode == EVRP_MODE_RVRP_DEBUG)
-      m_ranger = new trace_ranger (true);
+      m_ranger = new trace_ranger ();
     else
-      m_ranger = new gimple_ranger (true);
+      m_ranger = new gimple_ranger ();
     m_simplifier.set_range_query (m_ranger);
   }
       
@@ -138,7 +142,6 @@ public:
     return m_ranger->value_of_stmt (s, name);
   }
 
-
   ~rvrp_folder ()
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
@@ -152,28 +155,38 @@ public:
   }
 
 private:
+  DISABLE_COPY_AND_ASSIGN (rvrp_folder);
   gimple_ranger *m_ranger;
   simplify_using_ranges m_simplifier;
 };
 
-
-
 // In a hybrid folder, start with an EVRP folder, and add the required fold_stmt
 // bits do either try the ranger first or second.
+//
+// The 3 value_* routines will always query both EVRP and the ranger for
+// a result, and ensure they return the same value. If either returns a value 
+// when the other doesn't it is flagged in the listing, and the discoverd
+// value is returned.
+//
+// The simplifier is unable to process 2 different sources, thus we try to 
+// use one engine, and if it fails to simplify, try using the other engine.
+// It is reported when the first attempt fails and the second succeeds.
 
 class hybrid_folder : public evrp_folder
 {
 public:
-  hybrid_folder () :
-    evrp_folder (),
-    m_ranger (&m_range_analyzer),
-    m_evrp_try_first (flag_evrp_mode == EVRP_MODE_EVRP_FIRST)
+  hybrid_folder (bool evrp_first)
   {
-    // Default to the hybrid evaluator if we should try it first
-    if (!m_evrp_try_first)
-      {
-	simplifier.set_range_query (&m_ranger);
-      }
+     if (evrp_first)
+       {
+         first = &m_range_analyzer;
+	 second = &m_ranger;
+       }
+      else
+       {
+	 first = &m_ranger;
+         second = &m_range_analyzer;
+       }
   }
 
   ~hybrid_folder ()
@@ -182,48 +195,34 @@ public:
       m_ranger.dump (dump_file);
   }
 
-  tree value_of_expr (tree name, gimple * = NULL) OVERRIDE;
-  tree value_on_edge (edge, tree name) OVERRIDE;
-  tree value_of_stmt (gimple *, tree name = NULL) OVERRIDE;
-
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
-  {
-    if (m_evrp_try_first)
-      {
-	simplifier.set_range_query (&m_range_analyzer);
-	if (simplifier.simplify (gsi))
-	  return true;
-
-	simplifier.set_range_query (&m_ranger);
-	if (simplifier.simplify (gsi))
-	  {
-	    if (dump_file)
-	      fprintf (dump_file, "EVRP:hybrid: RVRP simplifed stmt\n");
-	    return true;
-	  }
-	return false;
-      }
-
-    simplifier.set_range_query (&m_ranger);
-    if (simplifier.simplify (gsi))
-      return true;
-
-    simplifier.set_range_query (&m_range_analyzer);
-    if (simplifier.simplify (gsi))
-      {
-	if (dump_file)
-	  fprintf (dump_file, "EVRP:hybrid: EVRP simplifed stmt\n");
+    {
+      simplifier.set_range_query (first);
+      if (simplifier.simplify (gsi))
 	return true;
-      }
-    return false;
-  }
+
+      simplifier.set_range_query (second);
+      if (simplifier.simplify (gsi))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "EVRP:hybrid: Second query simplifed stmt\n");
+	  return true;
+	}
+      return false;
+    }
+
+  tree value_of_expr (tree name, gimple *) OVERRIDE;
+  tree value_on_edge (edge, tree name) OVERRIDE;
+  tree value_of_stmt (gimple *, tree name) OVERRIDE;
 
 private:
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
   gimple_ranger m_ranger;
-  bool m_evrp_try_first;
+  range_query *first;
+  range_query *second;
   tree choose_value (tree evrp_val, tree ranger_val);
 };
+
 
 tree
 hybrid_folder::value_of_expr (tree op, gimple *stmt)
@@ -248,6 +247,9 @@ hybrid_folder::value_of_stmt (gimple *stmt, tree op)
   tree ranger_ret = m_ranger.value_of_stmt (stmt, op);
   return choose_value (evrp_ret, ranger_ret);
 }
+
+// Given trees returned by EVRP and Ranger, choose/report the value to use
+// by the folder.
 
 tree
 hybrid_folder::choose_value (tree evrp_val, tree ranger_val)
@@ -286,9 +288,6 @@ hybrid_folder::choose_value (tree evrp_val, tree ranger_val)
   return ranger_val;
 }
 
-
-
-
 /* Main entry point for the early vrp pass which is a simplified non-iterative
    version of vrp where basic blocks are visited in dominance order.  Value
    ranges discovered in early vrp will also be used by ipa-vrp.  */
@@ -309,12 +308,6 @@ execute_early_vrp ()
     {
     case EVRP_MODE_EVRP_ONLY:
       {
-	/* ?? We could do:
-	     evrp_range_analyzer range_analyzer;
-	     evrp_folder folder (range_analyzer);
-	   And then we wouldn't need we could instantiate
-	   substitute_and_fold_engine with the correct vr_values
-	   instead of calling set_range_query.  */
 	evrp_folder folder;
 	folder.substitute_and_fold ();
 	break;
@@ -330,7 +323,7 @@ execute_early_vrp ()
     case EVRP_MODE_EVRP_FIRST:
     case EVRP_MODE_RVRP_FIRST:
       {
-	hybrid_folder folder;
+	hybrid_folder folder (flag_evrp_mode == EVRP_MODE_EVRP_FIRST);
 	folder.substitute_and_fold ();
 	break;
       }

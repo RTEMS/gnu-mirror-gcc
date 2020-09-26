@@ -46,8 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 class gimple_ranger : public range_query
 {
 public:
-  gimple_ranger (bool use_loop_info) : m_cache (*this),
-				       m_use_loop_info (use_loop_info) { }
+  gimple_ranger () : m_cache (*this) { }
   virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL) OVERRIDE;
   virtual bool range_of_expr (irange &r, tree name, gimple * = NULL) OVERRIDE;
   virtual bool range_on_edge (irange &r, edge e, tree name) OVERRIDE;
@@ -69,9 +68,6 @@ private:
   bool range_with_loop_info (irange &r, tree name);
   void range_of_ssa_name_with_loop_info (irange &, tree, class loop *,
 					 gphi *);
-  bool loop_aware_p () { return m_use_loop_info; }
-
-  bool m_use_loop_info;
 };
 
 // Calculate a basic range for a tree expression.

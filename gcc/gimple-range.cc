@@ -475,34 +475,16 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
 {
   tree phi_def = gimple_phi_result (phi);
   tree type = TREE_TYPE (phi_def);
-  int_range_max phi_range;
+  int_range_max arg_range;
   unsigned x;
 
   if (!irange::supports_type_p (type))
     return false;
 
-  if (loop_aware_p ())
-    {
-      // If there is no global range for a PHI, start the party with
-      // whatever information SCEV may have.
-      tree phi_result = PHI_RESULT (phi);
-      if (!POINTER_TYPE_P (TREE_TYPE (phi_result))
-	  && !m_cache.m_globals.get_global_range (r, phi_result)
-	  && range_with_loop_info (r, phi_result))
-	{
-	  value_range loop_range;
-	  get_range_info (phi_result, loop_range);
-	  r.intersect (loop_range);
-	  if (!r.varying_p ())
-	    set_range_info (phi_result, r);
-	}
-    }
-
-  // And start with an empty range, unioning in each argument's range.
+  // start with an empty range, unioning in each argument's range.
   r.set_undefined ();
   for (x = 0; x < gimple_phi_num_args (phi); x++)
     {
-      int_range_max arg_range;
       tree arg = gimple_phi_arg_def (phi, x);
       edge e = gimple_phi_arg_edge (phi, x);
 
@@ -511,6 +493,31 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
       // Once the value reaches varying, stop looking.
       if (r.varying_p ())
 	break;
+    }
+
+  // If SCEV is available, query if this PHI has any knonwn values.
+  if (scev_initialized_p () && !POINTER_TYPE_P (TREE_TYPE (phi_def)))
+    {
+      value_range loop_range;
+      class loop *l = loop_containing_stmt (phi);
+      if (l)
+        {
+	  range_of_ssa_name_with_loop_info (loop_range, phi_def, l, phi);
+	  if (!loop_range.varying_p ())
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  fprintf (dump_file, "   Loops range found for ");
+		  print_generic_expr (dump_file, phi_def, TDF_SLIM);
+		  fprintf (dump_file, ": ");
+		  loop_range.dump (dump_file);
+		  fprintf (dump_file, " and calculated range :");
+		  r.dump (dump_file);
+		  fprintf (dump_file, "\n");
+		}
+	      r.intersect (loop_range);
+	    }
+	}
     }
 
   return true;
@@ -931,12 +938,6 @@ gimple_ranger::range_on_edge (irange &r, edge e, tree name)
   if (m_cache.outgoing_edge_range_p (edge_range, e, name))
     r.intersect (edge_range);
 
-  if (loop_aware_p ())
-    {
-      int_range<2> loop_range;
-      if (range_with_loop_info (loop_range, name))
-	r.intersect (loop_range);
-    }
   return true;
 }
 
@@ -1131,39 +1132,4 @@ gimple_ranger::range_of_ssa_name_with_loop_info (irange &r, tree name,
     }
   else
     r.set_varying (type);
-}
-
-// If NAME is either a PHI result or a PHI argument, see if we can
-// determine range information by querying loop info.  If so, return
-// TRUE and set the range in R.
-
-bool
-gimple_ranger::range_with_loop_info (irange &r, tree name)
-{
-  if (!scev_initialized_p ())
-    return false;
-
-  gimple *def = SSA_NAME_DEF_STMT (name);
-  class loop *l = loop_containing_stmt (def);
-  if (!l)
-    return false;
-
-  basic_block header = l->header;
-  for (gphi_iterator iter = gsi_start_phis (header);
-       !gsi_end_p (iter); gsi_next (&iter))
-    {
-      gphi *phi = iter.phi ();
-      if (PHI_RESULT (phi) == name)
-	{
-	  range_of_ssa_name_with_loop_info (r, name, l, phi);
-	  return true;
-	}
-      for (size_t i = 0; i < gimple_phi_num_args (phi); ++i)
-	if (PHI_ARG_DEF (phi, i) == name)
-	  {
-	    range_of_ssa_name_with_loop_info (r, name, l, phi);
-	    return true;
-	  }
-    }
-  return false;
 }

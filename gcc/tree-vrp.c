@@ -4586,20 +4586,6 @@ determine_value_range_1 (value_range *vr, tree expr, gimple *stmt)
     vr->set (expr);
   else
     {
-      /* ?? The check for cfun->cfg is because the ranger_cache
-	 constructor needs last_basic_block_for_fn.
-
-	 Whereas the check for gimple_body is because
-	 gimple_range_global() does not pick up global ranges.  */
-      if (cfun->cfg && cfun->gimple_body)
-	{
-	  gimple_ranger ranger (true);
-	  if (!ranger.range_of_expr (*vr, expr, stmt))
-	    vr->set_varying (TREE_TYPE (expr));
-	  return;
-	}
-      /* ?? Simiarly here.  The following code would be unnecessary if
-	 the block above would get global ranges.  */
       value_range_kind kind;
       wide_int min, max;
       /* For SSA names try to extract range info computed by VRP.  Otherwise
