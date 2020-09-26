@@ -22,6 +22,19 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GIMPLE_RANGE_EDGE_H
 #define GIMPLE_RANGE_EDGE_H
 
+// This class is used to query ranges on constant edges in GIMPLE.
+//
+// For a COND_EXPR,  the TRUE edge will return [1,1] and the false edge a [0,0].
+//
+// For SWITCH_EXPR it is awkward to calculate ranges. When a request
+// is made, the entire switch is evalauted and the results cached. 
+// Any future requests to that switch will use the cached value, providing
+// dramatic decrease in computation time.
+//
+// The API is simple. just ask for the range on the edge.
+// The return value is NULL for no range, or the branch statement which the
+// edge gets the range from, along with the range.
+
 class outgoing_range
 {
 public:
@@ -36,7 +49,7 @@ private:
   irange_pool range_pool;
 }; 
 
-
+// If there is a range control statment at the end of block BB, return it.
 gimple *gimple_outgoing_range_stmt_p (basic_block bb);
 
 #endif  // GIMPLE_RANGE_EDGE_H

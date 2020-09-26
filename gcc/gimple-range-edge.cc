@@ -32,6 +32,25 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "gimple-range.h"
 
+// If there is a range control statment at the end of block BB, return it.
+// Otherwise return NULL.
+
+gimple *
+gimple_outgoing_range_stmt_p (basic_block bb)
+{
+  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
+  if (!gsi_end_p (gsi))
+    {
+      gimple *s = gsi_stmt (gsi);
+      if (is_a<gcond *> (s) && gimple_range_handler (s))
+	return gsi_stmt (gsi);
+      gswitch *sw = dyn_cast<gswitch *> (s);
+      if (sw && irange::supports_type_p (TREE_TYPE (gimple_switch_index (sw))))
+	return gsi_stmt (gsi);
+    }
+  return NULL;
+}
+
 
 outgoing_range::outgoing_range ()
 {
@@ -44,6 +63,10 @@ outgoing_range::~outgoing_range ()
     delete m_edge_table;
 }
 
+
+// Get a range for a switch edge E from statement S and return it in R.
+// Use a cached value if it exists, or calculate it if not.
+
 bool
 outgoing_range::get_edge_range (irange &r, gimple *s, edge e)
 {
@@ -53,7 +76,7 @@ outgoing_range::get_edge_range (irange &r, gimple *s, edge e)
   // ADA currently has cases where the index is 64 bits and the case
   // arguments are  32 bit, causing a trap when we create a case_range.
   // Until this is resolved (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87798)
-  // punt on these switches.
+  // punt on switches where the labels dont match the argument.
   if (gimple_switch_num_labels (sw) > 1 && 
       TYPE_PRECISION (TREE_TYPE (CASE_LOW (gimple_switch_label (sw, 1)))) !=
       TYPE_PRECISION (TREE_TYPE (gimple_switch_index (sw))))
@@ -73,6 +96,8 @@ outgoing_range::get_edge_range (irange &r, gimple *s, edge e)
   return true;
 }
 
+
+// calculate all switch edges from SW and cache them in the hash table.
 void
 outgoing_range::calc_switch_ranges (gswitch *sw)
 {
@@ -83,11 +108,14 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
   
   edge default_edge = gimple_switch_default_edge (cfun, sw);
   irange *&default_slot = m_edge_table->get_or_insert (default_edge, &existed);
+
   // This should be the first call into this switch.
   // For the default range case, start with varying and intersect each other 
   // case from it. 
+
   gcc_assert (!existed);
-  // Allocatea int_range_max for default case.
+
+  // Allocate an int_range_max for default case.
   default_slot = range_pool.allocate (255);
   default_slot->set_varying (type);
 
@@ -97,14 +125,14 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
 
       // If this edge is the same as the default edge, do nothing else.
       if (e == default_edge)
-        continue;
+	continue;
 
       tree low = CASE_LOW (gimple_switch_label (sw, x));
       tree high = CASE_HIGH (gimple_switch_label (sw, x));
       if (!high)
 	high = low;
 
-      // intersect the case from the default case.
+      // Remove the case range from the default case.
       int_range_max def_range (low, high);
       range_cast (def_range, type);
       def_range.invert ();
@@ -115,41 +143,21 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
       range_cast (case_range, type);
       irange *&slot = m_edge_table->get_or_insert (e, &existed);
       if (existed)
-	case_range.union_ (*slot);
-      // If there was an existing range, we lose the memory, but it'll get
-      // reclaimed when the obstack is freed.  This seems less intrusive than
-      // allocating max ranges for each case.
+	{
+	  case_range.union_ (*slot);
+	  if (slot->fits_p (case_range))
+	    {
+	      *slot = case_range;
+	      continue;
+	    }
+	}
+      // If there was an existing range and it doesn't fit, we lose the memory.
+      // it'll get reclaimed when the obstack is freed.  This seems less
+      // intrusive than allocating max ranges for each case.
       slot = range_pool.allocate (case_range);
     }
 }
 
-
-// If there is a range control statment at the end of block BB, return it.
-
-static inline gimple_stmt_iterator
-gsi_outgoing_range_stmt (basic_block bb)
-{
-  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
-  if (!gsi_end_p (gsi))
-    {
-      gimple *s = gsi_stmt (gsi);
-      if (is_a<gcond *> (s) && gimple_range_handler (s))
-	return gsi;
-      gswitch *sw = dyn_cast<gswitch *> (s);
-      if (sw && irange::supports_type_p (TREE_TYPE (gimple_switch_index (sw))))
-	return gsi;
-    }
-  return gsi_none ();
-}
-
-// If there is a range control statment at the end of block BB, return it.
-gimple *
-gimple_outgoing_range_stmt_p (basic_block bb)
-{
-  // This will return NULL if there is not a branch statement.
-  gimple *stmt = gsi_stmt (gsi_outgoing_range_stmt (bb));
-  return stmt;
-}
 
 // Calculate the range forced on on edge E by control flow, return it
 // in R.  Return the statment which defines the range, otherwise
@@ -186,6 +194,3 @@ outgoing_range::edge_range_p (irange &r, edge e)
 
   return NULL;
 }
-
-
-
