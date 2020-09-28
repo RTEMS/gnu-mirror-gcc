@@ -4406,6 +4406,12 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_MMA) == 0)
     rs6000_isa_flags |= OPTION_MASK_MMA;
 
+  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION;
+
+  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
+
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
@@ -23391,6 +23397,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "power9-minmax",		OPTION_MASK_P9_MINMAX,		false, true  },
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },
   { "power9-vector",		OPTION_MASK_P9_VECTOR,		false, true  },
+  { "power10-fusion",		OPTION_MASK_P10_FUSION,		false, true  },
   { "powerpc-gfxopt",		OPTION_MASK_PPC_GFXOPT,		false, true  },
   { "powerpc-gpopt",		OPTION_MASK_PPC_GPOPT,		false, true  },
   { "prefixed",			OPTION_MASK_PREFIXED,		false, true  },
@@ -25480,6 +25487,33 @@ address_to_insn_form (rtx addr,
     }
 
   return INSN_FORM_BAD;
+}
+
+bool
+address_ok_for_form (rtx addr,
+		     machine_mode mode,
+		     enum non_prefixed_form non_prefixed_format)
+{
+  enum insn_form result_form;
+
+  result_form = address_to_insn_form (addr, mode, non_prefixed_format);
+
+  switch (non_prefixed_format)
+    {
+    case NON_PREFIXED_DS:
+      switch (result_form)
+	{
+	case INSN_FORM_DS:
+	case INSN_FORM_BASE_REG:
+	  return true;
+	default:
+	  break;
+	}
+      break;
+    default:
+      break;
+    }
+  return false;
 }
 
 /* Helper function to see if we're potentially looking at lfs/stfs.
