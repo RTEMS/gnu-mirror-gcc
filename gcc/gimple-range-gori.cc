@@ -596,6 +596,13 @@ debug (gori_map &g)
 
 // -------------------------------------------------------------------
 
+// Provide a default of VARYIGN for al incoming ssa-names.
+
+void
+gori_compute::ssa_range_in_bb (irange &r, tree name, basic_block)
+{
+  r.set_varying (TREE_TYPE (name));
+}
 
 void
 gori_compute::expr_range_in_bb (irange &r, tree expr, basic_block bb)
@@ -651,8 +658,6 @@ gori_compute::compute_name_range_op (irange &r, gimple *stmt,
     }
   return false;
 }
-
-
 
 // Construct a gori_compute object.
 
@@ -1123,6 +1128,8 @@ gori_compute::compute_operand1_and_operand2_range
   return true;
 }
 
+// Return TRUE if a range can be calcalated for NAME on edge E.
+
 bool
 gori_compute::has_edge_range_p (edge e, tree name)
 {
@@ -1130,6 +1137,7 @@ gori_compute::has_edge_range_p (edge e, tree name)
 	  || m_gori_map->def_chain_in_export_p (name, e->src));
 }
 
+// Dump what is known to GORI computes to listing file F.
 
 void
 gori_compute::dump (FILE *f)
@@ -1163,7 +1171,7 @@ gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name)
   return false;
 }
 
-
+// --------------------------------------------------------------------------
 
 
 class logical_stmt_cache

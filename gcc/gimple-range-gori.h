@@ -23,9 +23,45 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_GIMPLE_RANGE_GORI_H
 
 
-// This class utilizes a GORI map to determine which SSA_NAMES can
-// have ranges calculated for them on outgoing edges from basic
-// blocks.
+// This class is used to determine which SSA_NAMES can have ranges
+// calculated for them on outgoing edges from basic blocks.  This represents
+// ONLY the effect of the basic block edge->src on a range.
+//
+// There are 2 primary entry points.
+//
+// has_edge_range_p (edge e, tree name)  
+//   returns true if the outgoing edge *may* be able to produce range
+//   information for ssa_name NAME on edge E.
+//   FALSE is returned if this edge does not affect the range of NAME,
+//
+// outgoing_edge_range_p (irange &range, edge e, tree name)
+//   Actually does the calculation of RANGE for name on E
+//   This represents application of whatever static range effect edge  E
+//   may have on NAME, not any cumulative effect.
+
+// There are also some internal APIs
+//
+// ssa_range_in_bb ()  is an internal routine which is used to start any
+// calculation chain using SSA_NAMES which come from outside the block. ie
+//      a_2 = b_4 - 8
+//      if (a_2 < 30)
+// on the true edge, a_2 is known to be [0, 29] 
+// b_4 can be calculated as [8, 37]
+// during this calculation, b_4 is considered an "import" and ssa_range_in_bb
+// is queried for a starting range which is used in the calculation. 
+// A default value of VARYING provides the raw static info for the edge.
+//
+// IF there is any known range for b_4 coming into this block, it can refine
+// the results.  This allows for cascading results to be propogated.
+// if b_4 is [100, 200] on entry to the block, feeds into the calculation
+// of a_2 = [92, 192], and finally on the true edge the range would be 
+// an empty range [] because it is not possibel for the true edge to be taken.
+//
+// expr_range_in_bb is simply a wrapper which calls ssa_range_in_bb for 
+// SSA_NAMES and otherwise simply calcautes te range of the expression.
+//
+// The remaining routines are internal use only.
+
 
 class gori_compute 
 {
@@ -36,7 +72,7 @@ public:
   bool has_edge_range_p (edge e, tree name);
   void dump (FILE *f);
 protected:
-  virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb) = 0;
+  virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb);
   virtual bool compute_operand_range (irange &r, gimple *stmt,
 				      const irange &lhs, tree name);
 
@@ -46,10 +82,10 @@ protected:
 				 tree name);
   void compute_logical_operands_in_chain (class tf_range &range,
 					  gimple *stmt, const irange &lhs,
-					  tree name, tree op, bool op_in_chain);
+					  tree name, tree op,
+					  bool op_in_chain);
   bool optimize_logical_operands (tf_range &range, gimple *stmt,
 				  const irange &lhs, tree name, tree op);
-
   bool logical_combine (irange &r, enum tree_code code, const irange &lhs,
 			const class tf_range &op1_range,
 			const class tf_range &op2_range);
@@ -69,8 +105,23 @@ private:
 					    const irange &lhs, tree name);
 
   class gori_map *m_gori_map;
-  outgoing_range outgoing;
+  outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
 };
+
+
+// This class adds a cache to gori_computes for logical expressions.
+//       bool result = x && y
+// requires calcuation of both x and Y for both true and false results.
+// there are 4 combinations [0,0][0,0] [0,0][1,1] [1,1][0,0] and [1,1][1,1].
+// note that each pair of possible results for x and Y are uses twice,and
+// the calcuation of those results are the same each time.
+//
+// The cache simply checks if a stmt is cachable, and if so, saves both the
+// true and false results for the next time the query is made.
+//
+// This is used to speed up long chains of logical operations which become
+// expoential quickly.
+//
 
 class gori_compute_cache : public gori_compute
 {
