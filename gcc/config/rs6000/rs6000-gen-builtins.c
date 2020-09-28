@@ -273,8 +273,10 @@ enum basetype {
   BT_LONGLONG,
   BT_FLOAT,
   BT_DOUBLE,
+  BT_LONGDOUBLE,
   BT_INT128,
   BT_FLOAT128,
+  BT_BOOL,
   BT_DECIMAL32,
   BT_DECIMAL64,
   BT_DECIMAL128,
@@ -439,9 +441,10 @@ struct typemap
    maps tokens from a fntype string to a tree type.  For example,
    in "si_ftype_hi" we would map "si" to "intSI_type_node" and
    map "hi" to "intHI_type_node".  */
-#define TYPE_MAP_SIZE 39
+#define TYPE_MAP_SIZE 42
 static typemap type_map[TYPE_MAP_SIZE] =
   {
+    { "bi",	"bool_int" },
     { "bv16qi",	"bool_V16QI" },
     { "bv2di",	"bool_V2DI" },
     { "bv4si",	"bool_V4SI" },
@@ -451,7 +454,9 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "di",	"intDI" },
     { "hi",	"intHI" },
     { "if",	"ibm128_float" },
+    { "ld",	"long_double" },
     { "opaque", "opaque_V4SI" },
+    { "pcvoid",	"pcvoid" },
     { "pv",	"ptr" },
     { "qi",	"intQI" },
     { "sd",	"dfloat32" },
@@ -665,13 +670,19 @@ match_basetype (typeinfo *typedata)
   else if (!strcmp (token, "long"))
     {
       consume_whitespace ();
-      char *mustbelong = match_identifier ();
-      if (!mustbelong || strcmp (mustbelong, "long"))
+      char *mustbelongordbl = match_identifier ();
+      if (!mustbelongordbl
+	  || (strcmp (mustbelongordbl, "long")
+	      && strcmp (mustbelongordbl, "double")))
 	{
-	  (*diag) ("incomplete 'long long' at column %d\n", oldpos + 1);
+	  (*diag) ("incomplete 'long long' or 'long double' at column %d\n",
+		   oldpos + 1);
 	  return 0;
 	}
-      typedata->base = BT_LONGLONG;
+      if (!strcmp (mustbelongordbl, "long"))
+	typedata->base = BT_LONGLONG;
+      else
+	typedata->base = BT_LONGDOUBLE;
     }
   else if (!strcmp (token, "float"))
     typedata->base = BT_FLOAT;
@@ -681,6 +692,8 @@ match_basetype (typeinfo *typedata)
     typedata->base = BT_INT128;
   else if (!strcmp (token, "_Float128"))
     typedata->base = BT_FLOAT128;
+  else if (!strcmp (token, "bool"))
+    typedata->base = BT_BOOL;
   else if (!strcmp (token, "_Decimal32"))
     typedata->base = BT_DECIMAL32;
   else if (!strcmp (token, "_Decimal64"))
@@ -905,9 +918,6 @@ match_type (typeinfo *typedata, int voidok)
   if (!token)
     return 0;
 
-  if (!strcmp (token, "void"))
-    typedata->isvoid = 1;
-
   if (!strcmp (token, "const"))
     {
       typedata->isconst = 1;
@@ -915,6 +925,9 @@ match_type (typeinfo *typedata, int voidok)
       oldpos = pos;
       token = match_identifier ();
     }
+
+  if (!strcmp (token, "void"))
+    typedata->isvoid = 1;
 
   if (!strcmp (token, "vsc"))
     {
@@ -1428,11 +1441,17 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
     case BT_DOUBLE:
       memcpy (&buf[*bufi], "df", 2);
       break;
+    case BT_LONGDOUBLE:
+      memcpy (&buf[*bufi], "ld", 2);
+      break;
     case BT_INT128:
       memcpy (&buf[*bufi], "ti", 2);
       break;
     case BT_FLOAT128:
       memcpy (&buf[*bufi], "tf", 2);
+      break;
+    case BT_BOOL:
+      memcpy (&buf[*bufi], "bi", 2);
       break;
     case BT_DECIMAL32:
       memcpy (&buf[*bufi], "sd", 2);
@@ -1519,8 +1538,16 @@ construct_fntype_id (prototype *protoptr)
 	  buf[bufi++] = '_';
 	  if (argptr->info.ispointer)
 	    {
-	      buf[bufi++] = 'p';
-	      buf[bufi++] = 'v';
+	      if (argptr->info.isconst)
+		{
+		  memcpy (&buf[bufi], "pcvoid", 6);
+		  bufi += 6;
+		}
+	      else
+		{
+		  buf[bufi++] = 'p';
+		  buf[bufi++] = 'v';
+		}
 	    }
 	  else
 	    {
