@@ -22,6 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_SSA_RANGE_CACHE_H
 
 #include "gimple-range-gori.h" 
+
+
 // This global cache is used with the range engine as markers for what
 // has been visited during this incarnation.  Once the ranger evaluates
 // a name, it is typically not re-evaluated again.
@@ -61,6 +63,7 @@ public:
 private:
   vec<class ssa_block_ranges *> m_ssa_ranges;
   ssa_block_ranges &get_block_ranges (tree name);
+  irange_pool *m_irange_pool;
 };
 
 // Class used to track non-null references of an SSA name.  A vector
@@ -77,12 +80,13 @@ public:
 private:
   vec <bitmap> m_nn;
   void process_name (tree name);
+  bitmap_obstack m_bitmaps;
 };
 
-// This class provides all the caches a global ranger may needs, and makes 
+// This class provides all the caches a global ranger may need, and makes 
 // them available for gori-computes to query so outgoing edges can be
 // properly calculated.
-//
+
 class ranger_cache : public gori_compute_cache
 {
 public:
@@ -103,10 +107,11 @@ private:
   vec<basic_block> m_workback;
   vec<basic_block> m_update_list;
 
+  // Iterative "poor value" calculations.
   struct update_record
   {
     basic_block bb;	// Block which value needs to be calculated in.
-    tree calc;		// SSA_NAME whch needs its value calculated
+    tree calc;		// SSA_NAME which needs its value calculated.
   };
   bool push_poor_value (basic_block bb, tree name);
   vec<update_record> m_poor_value_list;

@@ -35,16 +35,15 @@ non_null_ref::non_null_ref ()
 {
   m_nn.create (0);
   m_nn.safe_grow_cleared (num_ssa_names);
+  bitmap_obstack_initialize (&m_bitmaps);
 }
 
 // Free any bitmaps which were allocated,a swell as the vector itself.
 
 non_null_ref::~non_null_ref ()
 {
-  unsigned x;
-  for (x = 0; x< m_nn.length (); x++)
-    if (m_nn[x])
-      BITMAP_FREE (m_nn[x]);
+  bitmap_obstack_release (&m_bitmaps);
+  m_nn.release ();
 }
 
 // Return true if NAME has a non-null dereference in block bb.  If this is the
@@ -85,7 +84,7 @@ non_null_ref::process_name (tree name)
   if (m_nn[v])
     return;
 
-  b = BITMAP_ALLOC (NULL);
+  b = BITMAP_ALLOC (&m_bitmaps);
 
   // Loop over each immediate use and see if it implies a non-null value.
   FOR_EACH_IMM_USE_FAST (use_p, iter, name)
@@ -110,6 +109,8 @@ non_null_ref::process_name (tree name)
   m_nn[v] = b;
 }
 
+// -------------------------------------------------------------------------
+
 // This class implements a cache of ranges indexed by basic block.  It
 // represents all that is known about an SSA_NAME on entry to each
 // block.  It caches a range-for-type varying range so it doesn't need
@@ -121,7 +122,7 @@ non_null_ref::process_name (tree name)
 class ssa_block_ranges
 {
 public:
-  ssa_block_ranges (tree t);
+  ssa_block_ranges (tree t, irange_pool *pool);
   ~ssa_block_ranges ();
 
   void set_bb_range (const basic_block bb, const irange &r);
@@ -134,22 +135,23 @@ private:
   vec<irange *> m_tab;
   irange *m_type_range;
   tree m_type;
-  irange_pool m_irange_pool;
+  irange_pool *m_irange_pool;
 };
 
 
 // Initialize a block cache for an ssa_name of type T
 
-ssa_block_ranges::ssa_block_ranges (tree t)
+ssa_block_ranges::ssa_block_ranges (tree t, irange_pool *pool)
 {
   gcc_assert (TYPE_P (t));
   m_type = t;
+  m_irange_pool = pool;
 
   m_tab.create (0);
   m_tab.safe_grow_cleared (last_basic_block_for_fn (cfun));
 
   // Create the cached type range.
-  m_type_range = m_irange_pool.allocate (2);
+  m_type_range = m_irange_pool->allocate (2);
   m_type_range->set_varying (t);
 
   m_tab[ENTRY_BLOCK_PTR_FOR_FN (cfun)->index] = m_type_range;
@@ -167,7 +169,7 @@ ssa_block_ranges::~ssa_block_ranges ()
 void
 ssa_block_ranges::set_bb_range (const basic_block bb, const irange &r)
 {
-  irange *m = m_irange_pool.allocate (r);
+  irange *m = m_irange_pool->allocate (r);
   m_tab[bb->index] = m;
 }
 
@@ -228,6 +230,7 @@ block_range_cache::block_range_cache ()
 {
   m_ssa_ranges.create (0);
   m_ssa_ranges.safe_grow_cleared (num_ssa_names);
+  m_irange_pool = new irange_pool;
 }
 
 // Remove any m_block_caches which have been created.
@@ -240,6 +243,7 @@ block_range_cache::~block_range_cache ()
       if (m_ssa_ranges[x])
 	delete m_ssa_ranges[x];
     }
+  delete m_irange_pool;
   // Release the vector itself.
   m_ssa_ranges.release ();
 }
@@ -255,7 +259,7 @@ block_range_cache::get_block_ranges (tree name)
     m_ssa_ranges.safe_grow_cleared (num_ssa_names + 1);
 
   if (!m_ssa_ranges[v])
-    m_ssa_ranges[v] = new ssa_block_ranges (TREE_TYPE (name));
+    m_ssa_ranges[v] = new ssa_block_ranges (TREE_TYPE (name), m_irange_pool);
 
   return *(m_ssa_ranges[v]);
 }
@@ -295,6 +299,7 @@ block_range_cache::bb_range_p (tree name, const basic_block bb)
 }
 
 // Print all known block caches to file F.
+
 void
 block_range_cache::dump (FILE *f)
 {
@@ -313,6 +318,7 @@ block_range_cache::dump (FILE *f)
 }
 
 // Print all known ranges on entry to blobk BB to file F.
+
 void
 block_range_cache::dump (FILE *f, basic_block bb, bool print_varying)
 {
@@ -588,6 +594,7 @@ ranger_cache::block_range (irange &r, basic_block bb, tree name, bool calc)
   return m_on_entry.get_bb_range (r, name, bb);
 }
 
+// Add BB to the list of blocks to update, unless its already in the list.
 
 void
 ranger_cache::add_to_update (basic_block bb)
