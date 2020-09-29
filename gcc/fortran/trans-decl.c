@@ -3303,6 +3303,7 @@ tree
 gfc_build_library_function_decl_with_spec (tree name, const char *spec,
 					   tree rettype, int nargs, ...)
 {
+  gcc_checking_assert ((int)strlen (spec) == abs (nargs) + 1);
   tree ret;
   va_list args;
   va_start (args, nargs);
@@ -3484,16 +3485,16 @@ gfc_build_intrinsic_function_decls (void)
   /* Misc. functions.  */
 
   gfor_fndecl_ttynam = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("ttynam")), ".W",
+	get_identifier (PREFIX("ttynam")), ".W..",
 	void_type_node, 3, pchar_type_node, gfc_charlen_type_node,
 	integer_type_node);
 
   gfor_fndecl_fdate = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("fdate")), ".W",
+	get_identifier (PREFIX("fdate")), ".W.",
 	void_type_node, 2, pchar_type_node, gfc_charlen_type_node);
 
   gfor_fndecl_ctime = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("ctime")), ".W",
+	get_identifier (PREFIX("ctime")), ".W..",
 	void_type_node, 3, pchar_type_node, gfc_charlen_type_node,
 	gfc_int8_type_node);
 
@@ -3515,7 +3516,7 @@ gfc_build_intrinsic_function_decls (void)
   TREE_NOTHROW (gfor_fndecl_si_kind) = 1;
 
   gfor_fndecl_sr_kind = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("selected_real_kind2008")), ".RR",
+	get_identifier (PREFIX("selected_real_kind2008")), ".RR.",
 	gfc_int4_type_node, 3, pvoid_type_node, pvoid_type_node,
 	pvoid_type_node);
   DECL_PURE_P (gfor_fndecl_sr_kind) = 1;
@@ -3662,7 +3663,7 @@ gfc_build_intrinsic_function_decls (void)
   TREE_NOTHROW (gfor_fndecl_size0) = 1;
 
   gfor_fndecl_size1 = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("size1")), ".R",
+	get_identifier (PREFIX("size1")), ".R.",
 	gfc_array_index_type, 2, pvoid_type_node, gfc_array_index_type);
   DECL_PURE_P (gfor_fndecl_size1) = 1;
   TREE_NOTHROW (gfor_fndecl_size1) = 1;
@@ -3701,7 +3702,7 @@ gfc_build_builtin_function_decls (void)
   TREE_THIS_VOLATILE (gfor_fndecl_stop_numeric) = 1;
 
   gfor_fndecl_stop_string = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("stop_string")), ".R.",
+	get_identifier (PREFIX("stop_string")), ".R..",
 	void_type_node, 3, pchar_type_node, size_type_node,
 	boolean_type_node);
   /* STOP doesn't return.  */
@@ -3714,7 +3715,7 @@ gfc_build_builtin_function_decls (void)
   TREE_THIS_VOLATILE (gfor_fndecl_error_stop_numeric) = 1;
 
   gfor_fndecl_error_stop_string = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("error_stop_string")), ".R.",
+	get_identifier (PREFIX("error_stop_string")), ".R..",
 	void_type_node, 3, pchar_type_node, size_type_node,
 	boolean_type_node);
   /* ERROR STOP doesn't return.  */
