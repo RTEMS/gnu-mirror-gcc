@@ -42,7 +42,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "vr-values.h"
 #include "gimple-ssa-evrp-analyze.h"
 #include "gimple-range.h"
-#include "gimple-range-trace.h"
 
 // This is the classic EVRP folder which uses a dominator walk and pushes
 // ranges into the next block if it is a single predecessor block.
@@ -177,22 +176,28 @@ class hybrid_folder : public evrp_folder
 public:
   hybrid_folder (bool evrp_first)
   {
-     if (evrp_first)
-       {
-         first = &m_range_analyzer;
-	 second = &m_ranger;
-       }
-      else
-       {
-	 first = &m_ranger;
-         second = &m_range_analyzer;
-       }
+    if (flag_evrp_mode == EVRP_MODE_TRACE)
+      m_ranger = new trace_ranger ();
+    else
+      m_ranger = new gimple_ranger ();
+
+    if (evrp_first)
+      {
+	first = &m_range_analyzer;
+	second = m_ranger;
+      }
+     else
+      {
+	first = m_ranger;
+	second = &m_range_analyzer;
+      }
   }
 
   ~hybrid_folder ()
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
-      m_ranger.dump (dump_file);
+      m_ranger->dump (dump_file);
+    delete m_ranger;
   }
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
@@ -217,7 +222,7 @@ public:
 
 private:
   DISABLE_COPY_AND_ASSIGN (hybrid_folder);
-  gimple_ranger m_ranger;
+  gimple_ranger *m_ranger;
   range_query *first;
   range_query *second;
   tree choose_value (tree evrp_val, tree ranger_val);
@@ -228,7 +233,7 @@ tree
 hybrid_folder::value_of_expr (tree op, gimple *stmt)
 {
   tree evrp_ret = evrp_folder::value_of_expr (op, stmt);
-  tree ranger_ret = m_ranger.value_of_expr (op, stmt);
+  tree ranger_ret = m_ranger->value_of_expr (op, stmt);
   return choose_value (evrp_ret, ranger_ret);
 }
 
@@ -236,7 +241,7 @@ tree
 hybrid_folder::value_on_edge (edge e, tree op)
 {
   tree evrp_ret = evrp_folder::value_on_edge (e, op);
-  tree ranger_ret = m_ranger.value_on_edge (e, op);
+  tree ranger_ret = m_ranger->value_on_edge (e, op);
   return choose_value (evrp_ret, ranger_ret);
 }
 
@@ -244,7 +249,7 @@ tree
 hybrid_folder::value_of_stmt (gimple *stmt, tree op) 
 {
   tree evrp_ret = evrp_folder::value_of_stmt (stmt, op);
-  tree ranger_ret = m_ranger.value_of_stmt (stmt, op);
+  tree ranger_ret = m_ranger->value_of_stmt (stmt, op);
   return choose_value (evrp_ret, ranger_ret);
 }
 
@@ -322,8 +327,9 @@ execute_early_vrp ()
       }
     case EVRP_MODE_EVRP_FIRST:
     case EVRP_MODE_RVRP_FIRST:
+    case EVRP_MODE_TRACE:
       {
-	hybrid_folder folder (flag_evrp_mode == EVRP_MODE_EVRP_FIRST);
+	hybrid_folder folder (flag_evrp_mode != EVRP_MODE_RVRP_FIRST);
 	folder.substitute_and_fold ();
 	break;
       }

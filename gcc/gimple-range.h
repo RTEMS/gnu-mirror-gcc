@@ -141,4 +141,26 @@ gimple_range_global (tree name)
  return value_range (type);
 }
 
+
+// This class overloads the ranger routines to provide tracing facilties
+// entry and exit to each of the APIs is documented in the listing.
+
+class trace_ranger : public gimple_ranger
+{
+public:
+  trace_ranger ();
+  virtual bool range_of_stmt (irange &r, gimple *s, tree name = NULL_TREE);
+  virtual bool range_of_expr (irange &r, tree name, gimple *s = NULL);
+  virtual bool range_on_edge (irange &r, edge e, tree name);
+  virtual void range_on_entry (irange &r, basic_block bb, tree name);
+  virtual void range_on_exit (irange &r, basic_block bb, tree name);
+private:
+  static const unsigned bump = 2;
+  unsigned indent;
+  unsigned trace_count;		// Current trace index count.
+
+  bool dumping (unsigned counter, bool trailing = false);
+  bool trailer (unsigned counter, const char *caller, bool result, tree name,
+		const irange &r);
+};
 #endif // GCC_GIMPLE_RANGE_STMT_H
