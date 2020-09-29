@@ -132,11 +132,7 @@ protected:
   virtual bool compute_operand_range (irange &r, gimple *stmt,
 				      const irange &lhs, tree name);
 private:
-  void cache_comparison (gimple *);
-  void cache_comparison_with_int (gimple *, enum tree_code,
-				  tree op1, tree op2);
-  void cache_comparison_with_ssa (gimple *, enum tree_code,
-				  tree op1, tree op2);
+  void cache_stmt (gimple *);
   typedef gori_compute super;
   class logical_stmt_cache *m_cache;
 };
