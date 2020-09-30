@@ -688,13 +688,13 @@ LIBGFOR_CHECK_AVX128
 AC_CACHE_CHECK([whether -pthread is supported],
 [libgfortran_cv_lib_pthread],
 [CFLAGS_hold=$CFLAGS
-CFLAGS="$CFLAGS -pthread -L../libatomic/.libs"
+CFLAGS="$CFLAGS -pthread"
 AC_COMPILE_IFELSE([AC_LANG_SOURCE([int i;])],
 [libgfortran_cv_lib_pthread=yes],
 [libgfortran_cv_lib_pthread=no])
 CFLAGS=$CFLAGS_hold])
 PTHREAD_CFLAGS=
-if test "$libgfortran_cv_lib_pthread" = yes; then
+if test "$libgfortran_cv_lib_pthread" = "yes" -a "$cpu_type" = "riscv"; then
   # RISC-V apparently adds -latomic when using -pthread.
   PTHREAD_CFLAGS="-pthread -L../libatomic/.libs"
 fi
