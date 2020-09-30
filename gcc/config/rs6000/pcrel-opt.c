@@ -53,6 +53,43 @@
 
    We only look for a single usage in the basic block where the external
    address is loaded.  Multiple uses or references in another basic block will
+   force us to not use the PCREL_OPT relocation.
+
+   We also optimize stores to the address of an external variable using the
+   PCREL_GOT relocation and a single store that uses that external address.  If
+   that is found we create the PCREL_OPT relocation to possibly convert:
+
+	pld addr_reg,var@pcrel@got
+
+	<possibly other insns that do not use 'addr_reg' or 'data_reg'>
+
+	stw data_reg,0(addr_reg)
+
+   into:
+
+	pstw data_reg,var@pcrel
+
+	<possibly other insns that do not use 'addr_reg' or 'data_reg'>
+
+	nop
+
+   If the variable is not defined in the main program or the code using it is
+   not in the main program, the linker put the address in the .got section and
+   do:
+
+		.section .got
+	.Lvar_got:
+		.dword var
+
+		.section .text
+		pld addr_reg,.Lvar_got@pcrel
+
+		<possibly other insns that do not use 'addr_reg' or 'data_reg'>
+
+		stw data_reg,0(addr_reg)
+
+   We only look for a single usage in the basic block where the external
+   address is loaded.  Multiple uses or references in another basic block will
    force us to not use the PCREL_OPT relocation.  */
 
 #define IN_TARGET_CODE 1
@@ -87,9 +124,12 @@ static struct {
   unsigned long loads;
   unsigned long adjacent_loads;
   unsigned long failed_loads;
+  unsigned long stores;
+  unsigned long adjacent_stores;
+  unsigned long failed_stores;
 } counters;
 
-/* Return a marker to identify the PCREL_OPT load address and load
+/* Return a marker to identify the PCREL_OPT load address and load/store
    instruction.  We use a constant integer which is added to ".Lpcrel" to make
    the label.  */
 
@@ -328,6 +368,160 @@ pcrel_opt_load (rtx_insn *addr_insn,		/* insn loading address.  */
   return;
 }
 
+/* Optimize a PC-relative load address to be used in a store.
+
+   If the sequence of insns is safe to use the PCREL_OPT optimization (i.e. no
+   additional references to the address register, the address register dies at
+   the load, and no references to the load), convert insns of the form:
+
+	(set (reg:DI addr)
+	     (symbol_ref:DI "ext_symbol"))
+
+	...
+
+	(set (mem:<MODE> (reg:DI addr))
+	     (reg:<MODE> value))
+
+   into:
+
+	(parallel [(set (reg:DI addr)
+	                (unspec:DI [(symbol_ref:DI "ext_symbol")
+	                            (const_int label_num)]
+	                          UNSPEC_PCREL_OPT_ST_ADDR))
+	          (use (reg:<MODE> value))])
+
+	...
+
+	(parallel [(set (mem:<MODE> (reg:DI addr))
+	                (unspec:<MODE> [(reg:<MODE>)
+	                                (const_int label_num)]
+	                               UNSPEC_PCREL_OPT_ST_RELOC))
+	           (clobber (reg:DI addr))])
+
+   The UNSPEC_PCREL_OPT_ST_ADDR insn will generate the load address plus a
+   definition of a label (.Lpcrel<n>), while the UNSPEC_PCREL_OPT_ST_RELOC insn
+   will generate the .reloc to tell the linker to tie the load address and load
+   using that address together.
+
+	pld b,ext_symbol@got@pcrel
+   .Lpcrel1:
+
+	...
+
+	.reloc .Lpcrel1-8,R_PPC64_PCREL_OPT,.-(.Lpcrel1-8)
+	stw r,0(b)
+
+   If ext_symbol is defined in another object file in the main program and we
+   are linking the main program, the linker will convert the above instructions
+   to:
+
+	pstwz r,ext_symbol@got@pcrel
+
+	...
+
+	nop  */
+
+static void
+pcrel_opt_store (rtx_insn *addr_insn,		/* insn loading address.  */
+		 rtx_insn *store_insn)		/* insn using address.  */
+{
+  rtx addr_old_set = PATTERN (addr_insn);
+  gcc_assert (GET_CODE (addr_old_set) == SET);
+
+  rtx addr_reg = SET_DEST (addr_old_set);
+  gcc_assert (base_reg_operand (addr_reg, Pmode));
+
+  rtx addr_symbol = SET_SRC (addr_old_set);
+  gcc_assert (pcrel_external_address (addr_symbol, Pmode));
+
+  rtx store_set = PATTERN (store_insn);
+  gcc_assert (GET_CODE (store_set) == SET);
+
+  rtx mem = SET_DEST (store_set);
+  if (!MEM_P (mem))
+    return;
+
+  machine_mode mem_mode = GET_MODE (mem);
+  rtx reg = SET_SRC (store_set);
+
+  /*  Don't allow storing the address of the external variable.  Make sure the
+      value being stored wasn't updated.  */
+  if (!register_operand (reg, GET_MODE (reg))
+      && reg_or_subregno (reg) != reg_or_subregno (addr_reg)
+      && !reg_set_between_p (reg, addr_insn, store_insn))
+    return;
+
+  /* If the address isn't a non-prefixed offsettable instruction, we can't do
+     the optimization.  */
+  if (!offsettable_non_prefixed_memory (reg, mem_mode, mem))
+    return;
+
+  /* Allocate a new PC-relative label, and update the load address insn.
+
+	(parallel [(set (reg addr)
+	                (unspec [(symbol_ref symbol)
+	                         (const_int label_num)]
+	                        UNSPEC_PCREL_OPT_ST_ADDR))
+	           (use (reg store))])  */
+  rtx label_num = pcrel_opt_next_marker ();
+  rtvec v_addr = gen_rtvec (2, addr_symbol, label_num);
+  rtx addr_unspec = gen_rtx_UNSPEC (Pmode, v_addr,
+				   UNSPEC_PCREL_OPT_ST_ADDR);
+  rtx addr_new_set = gen_rtx_SET (addr_reg, addr_unspec);
+  rtx addr_use = gen_rtx_USE (VOIDmode, reg);
+  rtx addr_new_pattern
+    = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, addr_new_set, addr_use));
+
+  validate_change (addr_insn, &PATTERN (addr_insn), addr_new_pattern, true);
+
+  /* Update the store insn.  Add an explicit clobber of the external address
+     register just to be sure there are no additional uses of the address
+     register.
+
+	(parallel [(set (mem (addr_reg)
+	                (unspec:<MODE> [(reg)
+	                                (const_int label_num)]
+			               UNSPEC_PCREL_OPT_ST_RELOC))
+	          (clobber (reg:DI addr_reg))])  */
+  rtvec v_store = gen_rtvec (2, reg, label_num);
+  rtx new_store = gen_rtx_UNSPEC (mem_mode, v_store,
+				  UNSPEC_PCREL_OPT_ST_RELOC);
+
+  rtx new_store_set = gen_rtx_SET (mem, new_store);
+  rtx store_clobber = gen_rtx_CLOBBER (VOIDmode, addr_reg);
+  rtx new_store_pattern
+    = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, new_store_set, store_clobber));
+
+  validate_change (store_insn, &PATTERN (store_insn), new_store_pattern, true);
+
+  /* Note whether changes succeeded or not.  */
+  if (apply_change_group ())
+    {
+      /* PCREL_OPT store succeeded.  */
+      counters.stores++;
+      if (next_nonnote_insn (addr_insn) == store_insn)
+	counters.adjacent_stores++;
+
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT store (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (store_insn));
+    }
+  else
+    {
+      /* PCREL_OPT store failed.  */
+      counters.failed_stores++;
+      if (dump_file)
+	fprintf (dump_file,
+		 "PCREL_OPT store failed (addr insn = %d, use insn = %d).\n",
+		 INSN_UID (addr_insn),
+		 INSN_UID (store_insn));
+    }
+
+  return;
+}
+
 /* Given an insn with that loads up a base register with the address of an
    external symbol, see if we can optimize it with the PCREL_OPT
    optimization.  */
@@ -363,7 +557,7 @@ pcrel_opt_address (rtx_insn *addr_insn)
   if (!chain || chain->next)
     return;
 
-  /* Get the insn of the possible load.  */
+  /* Get the insn of the possible load or store.  */
   df_ref use = chain->ref;
   if (!use)
     return;
@@ -449,7 +643,7 @@ pcrel_opt_address (rtx_insn *addr_insn)
 	}
 
       /* If this is the last insn in the basic block, and we haven't found the
-	 load, exit.  */
+	 load or store, exit.  */
       if (insn == last_insn_in_bb)
 	{
 	  do_pcrel_opt = false;
@@ -461,7 +655,7 @@ pcrel_opt_address (rtx_insn *addr_insn)
   if (!do_pcrel_opt)
     return;
 
-  /* Is this a load?  */
+  /* Is this a load or a store?  */
   switch (get_attr_type (use_insn))
     {
       /* Don't do the PCREL_OPT load optimization if there was a store
@@ -476,7 +670,22 @@ pcrel_opt_address (rtx_insn *addr_insn)
       pcrel_opt_load (addr_insn, use_insn);
       break;
 
-      /* If the use is not a load, just skip the optimization.  */
+      /* Don't do the PCREL_OPT store optimization if there was a load or store
+	 operation.  For example, a load might be trying to load the value
+	 being stored in between getting the address and doing the store.  If
+	 we do the PCREL_OPT store optimization, there is the potential for the
+	 optimization to replace the load address with a store, which could
+	 change the program.  */
+    case TYPE_STORE:
+    case TYPE_FPSTORE:
+    case TYPE_VECSTORE:
+      if (store_insns_found || load_insns_found)
+	break;
+
+      pcrel_opt_store (addr_insn, use_insn);
+      break;
+
+      /* If the use is not a load or store, just skip the optimization.  */
     default:
       break;
     }
@@ -505,7 +714,7 @@ pcrel_opt_pass (function *fun)
     fprintf (dump_file, "\n");
 
   /* Look at each basic block to see if there is a load of an external
-     variable's external address, and a single load using that external
+     variable's external address, and a single load/store using that external
      address.  */
   FOR_ALL_BB_FN (bb, fun)
     {
@@ -530,6 +739,13 @@ pcrel_opt_pass (function *fun)
       if (counters.failed_loads)
 	fprintf (dump_file, "# of failed PCREL_OPT load(s) = %lu\n",
 		 counters.failed_loads);
+
+      fprintf (dump_file, "# of PCREL_OPT store(s) = %lu (adjacent %lu)\n",
+	       counters.stores, counters.adjacent_stores);
+
+      if (counters.failed_stores)
+	fprintf (dump_file, "# of failed PCREL_OPT store(s) = %lu\n",
+		 counters.failed_stores);
 
       fprintf (dump_file, "\n");
     }
