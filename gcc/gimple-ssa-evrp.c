@@ -159,12 +159,12 @@ private:
   simplify_using_ranges m_simplifier;
 };
 
-// In a hybrid folder, start with an EVRP folder, and add the required fold_stmt
-// bits do either try the ranger first or second.
+// In a hybrid folder, start with an EVRP folder, and add the required
+// fold_stmt bits to either try the ranger first or second.
 //
 // The 3 value_* routines will always query both EVRP and the ranger for
-// a result, and ensure they return the same value. If either returns a value 
-// when the other doesn't it is flagged in the listing, and the discoverd
+// a result, and ensure they return the same value.  If either returns a value
+// when the other doesn't, it is flagged in the listing, and the discoverd
 // value is returned.
 //
 // The simplifier is unable to process 2 different sources, thus we try to 
@@ -274,7 +274,6 @@ hybrid_folder::choose_value (tree evrp_val, tree ranger_val)
 	}
       return evrp_val;
     }
-
 
   // Otherwise ranger found a value, if they match we're good.
   if (evrp_val && !compare_values (evrp_val, ranger_val))

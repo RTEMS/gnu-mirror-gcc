@@ -97,8 +97,7 @@ private:
 };
 
 
-
-// Construct a range_def_chain
+// Construct a range_def_chain.
 
 range_def_chain::range_def_chain ()
 {
@@ -108,7 +107,7 @@ range_def_chain::range_def_chain ()
   m_terminal.safe_grow_cleared (num_ssa_names);
 }
 
-// Destruct a range_def_chain
+// Destruct a range_def_chain.
 
 range_def_chain::~range_def_chain ()
 {
@@ -129,7 +128,7 @@ range_def_chain::in_chain_p (tree name, tree def)
   gcc_checking_assert (gimple_range_ssa_p (def));
   gcc_checking_assert (gimple_range_ssa_p (name));
 
-  // Get the defintion chain for DEF
+  // Get the defintion chain for DEF.
   bitmap chain = get_def_chain (def);
 
   if (chain == NULL)
@@ -148,8 +147,8 @@ range_def_chain::terminal_name (tree name)
   return m_terminal[SSA_NAME_VERSION (name)];
 }
 
-// Given up to 3 ssa names, return the common name or NULL_TREE.
-// NULL_TREE's passed in can be ignored, but all specified ssa-names
+// Given up to 3 SSA names, return the common name or NULL_TREE.
+// NULL_TREE's passed in can be ignored, but all specified SSA names
 // must be the same name.
 
 static inline tree
@@ -166,7 +165,7 @@ pick_import (tree ssa1, tree ssa2, tree ssa3)
     }
   if (ssa2)
     {
-      // If there is no ssa3 or ssa3 is the same as ssa2, thats the import.
+      // If there is no ssa3 or ssa3 is the same as ssa2, that's the import.
       if (!ssa3 || ssa2 == ssa3)
         return ssa2;
       // They must both be different, so no import.
@@ -175,7 +174,7 @@ pick_import (tree ssa1, tree ssa2, tree ssa3)
   return ssa3;
 }
 
-// Build def_chains for NAME if it is in BB.. copy the def chain into
+// Build def_chains for NAME if it is in BB.  Copy the def chain into
 // RESULT.  Return the import for name, or NAME if it is an import.
 
 tree
@@ -188,7 +187,7 @@ range_def_chain::build_def_chain (tree name, bitmap result, basic_block bb)
 
   if (gimple_bb (def_stmt) == bb && !is_a<gphi *>(def_stmt))
     {
-      // Get the def chain for the operand
+      // Get the def chain for the operand.
       b = get_def_chain (name);
       // If there was one, copy it into result and return the terminal name.
       if (b)
@@ -198,7 +197,8 @@ range_def_chain::build_def_chain (tree name, bitmap result, basic_block bb)
 	}
       // If there is no def chain, this terminal is within the same BB.
     }
-  return name;	// This is an import.
+  // This is an import.
+  return name;
 }
 
 // Return TRUE if NAME has been processed for a def_chain.
@@ -254,10 +254,9 @@ range_def_chain::get_def_chain (tree name)
 
   basic_block bb = gimple_bb (stmt);
 
-  // Allocate a new bitmap and initialize it.
   m_def_chain[v] = BITMAP_ALLOC (NULL);
 
-  // build_def_chain returns the terminal name. If we have more than
+  // build_def_chain returns the terminal name.  If we have more than
   // one unique terminal name, then this statement will have no
   // terminal.
   bool has_term = true;
@@ -265,7 +264,7 @@ range_def_chain::get_def_chain (tree name)
   if (ssa1)
     {
       ssa1 = build_def_chain (ssa1, m_def_chain[v], bb);
-      // if this chain has no terminal, root cannot either.
+      // If this chain has no terminal, root cannot either.
       if (!ssa1)
         has_term = false;
     }
@@ -291,10 +290,10 @@ range_def_chain::get_def_chain (tree name)
   // huge (I'm thinking fppp for instance.. huge basic block fully
   // unrolled) we might be able to limit this by deciding here that if
   // there is no import AND 2 or more ssa names, we change the
-  // def_chain back to be just the ssa-names.  that should prevent a_2
-  // = b_6 + a_8 from creating a pathological case yet allow us to
+  // def_chain back to be just the ssa-names.  that should prevent
+  // a_2 = b_6 + a_8 from creating a pathological case yet allow us to
   // still handle it when b_6 and a_8 are derived from the same base
-  // name.  thoughts?
+  // name.  Thoughts?
   return m_def_chain[v];
 }
 
@@ -367,7 +366,7 @@ gori_map::~gori_map ()
   m_outgoing.release ();
 }
 
-// Return the bitmap vector of all imports to BB. Calculate if necessary.
+// Return the bitmap vector of all imports to BB.  Calculate if necessary.
 
 bitmap
 gori_map::imports (basic_block bb)
@@ -377,7 +376,7 @@ gori_map::imports (basic_block bb)
   return m_incoming[bb->index];
 }
 
-// Return true if NAME is an import to basic block BB
+// Return true if NAME is an import to basic block BB.
 
 bool
 gori_map::is_import_p (tree name, basic_block bb)
@@ -385,7 +384,7 @@ gori_map::is_import_p (tree name, basic_block bb)
   return bitmap_bit_p (imports (bb), SSA_NAME_VERSION (name));
 }
 
-// Return the bitmap vector of all export from BB. Calculate if necessary.
+// Return the bitmap vector of all export from BB.  Calculate if necessary.
 
 bitmap
 gori_map::exports (basic_block bb)
@@ -575,7 +574,7 @@ gori_map::dump(FILE *f, basic_block bb)
 }
 
 // Dump the entire GORI map structure to file F.
-//
+
 void
 gori_map::dump(FILE *f)
 {
@@ -596,7 +595,7 @@ debug (gori_map &g)
 
 // -------------------------------------------------------------------
 
-// Provide a default of VARYING for al incoming ssa-names.
+// Provide a default of VARYING for all incoming SSA names.
 
 void
 gori_compute::ssa_range_in_bb (irange &r, tree name, basic_block)
@@ -614,7 +613,7 @@ gori_compute::expr_range_in_bb (irange &r, tree expr, basic_block bb)
 }
 
 // Calculate the range for NAME if the lhs of statement S has the
-// range LHS.  Return the result in R. Return false if no range can be
+// range LHS.  Return the result in R.  Return false if no range can be
 // calculated.
 
 bool
@@ -668,7 +667,7 @@ gori_compute::gori_compute ()
   m_gori_map = new gori_map;
 }
 
-// Destruct a gori_compute_object
+// Destruct a gori_compute_object.
 
 gori_compute::~gori_compute ()
 {
@@ -707,7 +706,7 @@ gori_compute::compute_operand_range_switch (irange &r, gswitch *s,
 static inline bool
 is_gimple_logical_p (const gimple *gs)
 {
-  /* Look for boolean and/or condition.  */
+  // Look for boolean and/or condition.
   if (gimple_code (gs) == GIMPLE_ASSIGN)
     switch (gimple_expr_code (gs))
       {
@@ -921,6 +920,12 @@ gori_compute::logical_combine (irange &r, enum tree_code code,
   return true;
 }
 
+// Helper function for compute_logical_operands_in_chain that computes
+// the range of logical statements that can be computed without
+// chasing down operands.  These are things like [0 = x | y] where we
+// know neither operand can be non-zero, or [1 = x & y] where we know
+// neither operand can be zero.
+
 bool
 gori_compute::optimize_logical_operands (tf_range &range,
 					 gimple *stmt,
@@ -992,7 +997,7 @@ gori_compute::compute_logical_operands (irange &r, gimple *stmt,
 					tree name)
 {
   // Reaching this point means NAME is not in this stmt, but one of
-  // the names in it ought to be derived from it.  */
+  // the names in it ought to be derived from it.
   tree op1 = gimple_range_operand1 (stmt);
   tree op2 = gimple_range_operand2 (stmt);
   gcc_checking_assert (op1 != name && op2 != name);
@@ -1049,17 +1054,16 @@ gori_compute::compute_operand1_range (irange &r, gimple *stmt,
   op1_range.intersect (r);
 
   gimple *src_stmt = SSA_NAME_DEF_STMT (op1);
-  // If defstmt is outside of this BB, then name must be an import.
+  // If def stmt is outside of this BB, then name must be an import.
   if (!src_stmt || (gimple_bb (src_stmt) != gimple_bb (stmt)))
     {
-      // IF this isn't the right import statement, then abort calculation
+      // If this isn't the right import statement, then abort calculation.
       if (!src_stmt || gimple_get_lhs (src_stmt) != name)
         return false;
       return compute_name_range_op (r, src_stmt, op1_range, name);
     }
-  else
   // Then feed this range back as the LHS of the defining statement.
-    return compute_operand_range (r, src_stmt, op1_range, name);
+  return compute_operand_range (r, src_stmt, op1_range, name);
 }
 
 
@@ -1078,22 +1082,21 @@ gori_compute::compute_operand2_range (irange &r, gimple *stmt,
   expr_range_in_bb (op1_range, op1, gimple_bb (stmt));
   expr_range_in_bb (op2_range, op2, gimple_bb (stmt));
 
-  // INtersect with range for op2 based on lhs and op1.
+  // Intersect with range for op2 based on lhs and op1.
   if (gimple_range_calc_op2 (r, stmt, lhs, op1_range))
     op2_range.intersect (r);
 
   gimple *src_stmt = SSA_NAME_DEF_STMT (op2);
-  // If defstmt is outside of this BB, then name must be an import.
+  // If def stmt is outside of this BB, then name must be an import.
   if (!src_stmt || (gimple_bb (src_stmt) != gimple_bb (stmt)))
     {
-      // IF this isn't the right src statement, then abort calculation
+      // If  this isn't the right src statement, then abort calculation.
       if (!src_stmt || gimple_get_lhs (src_stmt) != name)
         return false;
       return compute_name_range_op (r, src_stmt, op2_range, name);
     }
-  else
   // Then feed this range back as the LHS of the defining statement.
-    return compute_operand_range (r, src_stmt, op2_range, name);
+  return compute_operand_range (r, src_stmt, op2_range, name);
 }
 
 // Calculate a range for NAME from both operand positions of S
@@ -1114,7 +1117,7 @@ gori_compute::compute_operand1_and_operand2_range
   if (!compute_operand2_range (op_range, stmt, lhs, name))
     return false;
 
-  // Now get the range thru op1...
+  // Now get the range thru op1.
   if (!compute_operand1_range (r, stmt, lhs, name))
     return false;
 
@@ -1454,6 +1457,7 @@ gori_compute_cache::cache_stmt (gimple *stmt)
   tree op2 = gimple_range_operand2 (stmt);
   int_range_max r_true_side, r_false_side;
 
+  // LHS = s_5 > 999.
   if (TREE_CODE (op2) == INTEGER_CST)
     {
       range_operator *handler = range_op_handler (code, TREE_TYPE (lhs));
@@ -1464,6 +1468,7 @@ gori_compute_cache::cache_stmt (gimple *stmt)
       handler->op1_range (r_false_side, type, m_bool_zero, op2_range);
       m_cache->set_range (lhs, op1, tf_range (r_true_side, r_false_side));
     }
+  // LHS = s_5 > b_8.
   else if (tree cached_name = m_cache->same_cached_name (op1, op2))
     {
       tf_range op1_range, op2_range;

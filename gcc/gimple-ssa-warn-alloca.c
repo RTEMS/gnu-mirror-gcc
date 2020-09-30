@@ -228,7 +228,7 @@ alloca_call_type (range_query &query, gimple *stmt, bool is_vla)
       return ret;
     }
 
-  // If the user specified a limit, use it possibly warn.
+  // If the user specified a limit, use it.
   int_range_max r;
   if (warn_limit_specified_p (is_vla)
       && TREE_CODE (len) == SSA_NAME

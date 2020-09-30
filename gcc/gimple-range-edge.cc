@@ -74,7 +74,7 @@ outgoing_range::get_edge_range (irange &r, gimple *s, edge e)
   gswitch *sw = as_a<gswitch *> (s);
 
   // ADA currently has cases where the index is 64 bits and the case
-  // arguments are  32 bit, causing a trap when we create a case_range.
+  // arguments are 32 bit, causing a trap when we create a case_range.
   // Until this is resolved (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87798)
   // punt on switches where the labels dont match the argument.
   if (gimple_switch_num_labels (sw) > 1 && 
@@ -97,7 +97,8 @@ outgoing_range::get_edge_range (irange &r, gimple *s, edge e)
 }
 
 
-// calculate all switch edges from SW and cache them in the hash table.
+// Calculate all switch edges from SW and cache them in the hash table.
+
 void
 outgoing_range::calc_switch_ranges (gswitch *sw)
 {
@@ -109,9 +110,9 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
   edge default_edge = gimple_switch_default_edge (cfun, sw);
   irange *&default_slot = m_edge_table->get_or_insert (default_edge, &existed);
 
-  // This should be the first call into this switch.
-  // For the default range case, start with varying and intersect each other 
-  // case from it. 
+  // This should be the first call into this switch.  For the default
+  // range case, start with varying and intersect each other case from
+  // it.
 
   gcc_assert (!existed);
 
@@ -152,7 +153,7 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
 	    }
 	}
       // If there was an existing range and it doesn't fit, we lose the memory.
-      // it'll get reclaimed when the obstack is freed.  This seems less
+      // It'll get reclaimed when the obstack is freed.  This seems less
       // intrusive than allocating max ranges for each case.
       slot = range_pool.allocate (case_range);
     }

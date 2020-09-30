@@ -143,7 +143,6 @@ gimple_range_adjustment (irange &res, const gimple *stmt)
     }
 }
 
-
 // Return a range in R for the tree EXPR.  Return true if a range is
 // representable.
 
@@ -203,7 +202,6 @@ gimple_range_fold (irange &res, const gimple *stmt, const irange &r1)
 
   return gimple_range_fold (res, stmt, r1, r2);
 }
-
 
 // Fold this binary statement using R1 and R2 as the operands ranges,
 // returning the result in RES.  Return false if the operation fails.
@@ -269,7 +267,6 @@ gimple_range_operand1 (const gimple *stmt)
   return NULL;
 }
 
-
 // Return the second operand of statement STMT, otherwise return NULL_TREE.
 
 tree
@@ -290,8 +287,6 @@ gimple_range_operand2 (const gimple *stmt)
   return NULL_TREE;
 }
 
-
-
 // Calculate what we can determine of the range of this unary
 // statement's operand if the lhs of the expression has the range
 // LHS_RANGE.  Return false if nothing can be determined.
@@ -300,8 +295,8 @@ bool
 gimple_range_calc_op1 (irange &r, const gimple *stmt, const irange &lhs_range)
 {
   gcc_checking_assert (gimple_num_ops (stmt) < 3);
-  // An empty range is viral, so return an empty range.
 
+  // An empty range is viral.
   tree type = TREE_TYPE (gimple_range_operand1 (stmt));
   if (lhs_range.undefined_p ())
     {
@@ -315,7 +310,6 @@ gimple_range_calc_op1 (irange &r, const gimple *stmt, const irange &lhs_range)
 						 type_range);
 }
 
-
 // Calculate what we can determine of the range of this statement's
 // first operand if the lhs of the expression has the range LHS_RANGE
 // and the second operand has the range OP2_RANGE.  Return false if
@@ -327,9 +321,9 @@ gimple_range_calc_op1 (irange &r, const gimple *stmt,
 {
   // Unary operation are allowed to pass a range in for second operand
   // as there are often additional restrictions beyond the type which
-  // can be imposed.  See operator_cast::op1_range.()
+  // can be imposed.  See operator_cast::op1_range().
   tree type = TREE_TYPE (gimple_range_operand1 (stmt));
-  // An empty range is viral, so return an empty range.
+  // An empty range is viral.
   if (op2_range.undefined_p () || lhs_range.undefined_p ())
     {
       r.set_undefined ();
@@ -338,7 +332,6 @@ gimple_range_calc_op1 (irange &r, const gimple *stmt,
   return gimple_range_handler (stmt)->op1_range (r, type, lhs_range,
 						 op2_range);
 }
-
 
 // Calculate what we can determine of the range of this statement's
 // second operand if the lhs of the expression has the range LHS_RANGE
@@ -350,7 +343,7 @@ gimple_range_calc_op2 (irange &r, const gimple *stmt,
 		       const irange &lhs_range, const irange &op1_range)
 {
   tree type = TREE_TYPE (gimple_range_operand2 (stmt));
-  // An empty range is viral, so return an empty range.
+  // An empty range is viral.
   if (op1_range.undefined_p () || lhs_range.undefined_p ())
     {
       r.set_undefined ();
@@ -359,7 +352,6 @@ gimple_range_calc_op2 (irange &r, const gimple *stmt,
   return gimple_range_handler (stmt)->op2_range (r, type, lhs_range,
 						 op1_range);
 }
-
 
 // Calculate a range for statement S and return it in R. If NAME is provided it
 // represents the SSA_NAME on the LHS of the statement. It is only required
@@ -370,7 +362,7 @@ bool
 gimple_ranger::calc_stmt (irange &r, gimple *s, tree name)
 {
   bool res = false;
-  // If name is specified, make sure it is a LHS of S.
+  // If name is specified, make sure it is an LHS of S.
   gcc_checking_assert (name ? SSA_NAME_DEF_STMT (name) == s : true);
 
   if (gimple_range_handler (s))
@@ -435,7 +427,6 @@ gimple_ranger::range_of_range_op (irange &r, gimple *s)
   return true;
 }
 
-
 // Calculate the range of a non-trivial assignment.  That is, is one
 // inolving arithmetic on an SSA name (for example, an ADDR_EXPR).
 // Return the range in R.
@@ -466,7 +457,6 @@ gimple_ranger::range_of_non_trivial_assignment (irange &r, gimple *stmt)
   return false;
 }
 
-
 // Calculate a range for phi statement S and return it in R.
 // If a range cannot be calculated, return false.
 
@@ -481,7 +471,7 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
   if (!irange::supports_type_p (type))
     return false;
 
-  // start with an empty range, unioning in each argument's range.
+  // Start with an empty range, unioning in each argument's range.
   r.set_undefined ();
   for (x = 0; x < gimple_phi_num_args (phi); x++)
     {
@@ -523,7 +513,6 @@ gimple_ranger::range_of_phi (irange &r, gphi *phi)
   return true;
 }
 
-
 // Calculate a range for call statement S and return it in R.
 // If a range cannot be calculated, return false.
 
@@ -547,7 +536,7 @@ gimple_ranger::range_of_call (irange &r, gcall *call)
   else
     r.set_varying (type);
 
-  // If there is a lHS, intersect that with what is known.
+  // If there is an LHS, intersect that with what is known.
   if (lhs)
     {
       value_range def;
@@ -574,17 +563,15 @@ gimple_ranger::range_of_builtin_ubsan_call (irange &r, gcall *call,
   gcc_assert (range_of_expr (ir1, arg1, call));
 
   bool saved_flag_wrapv = flag_wrapv;
-  /* Pretend the arithmetics is wrapping.  If there is
-     any overflow, we'll complain, but will actually do
-     wrapping operation.  */
+  // Pretend the arithmetic is wrapping.  If there is any overflow,
+  // we'll complain, but will actually do wrapping operation.
   flag_wrapv = 1;
   op->fold_range (r, type, ir0, ir1);
   flag_wrapv = saved_flag_wrapv;
 
-  /* If for both arguments vrp_valueize returned non-NULL,
-     this should have been already folded and if not, it
-     wasn't folded because of overflow.  Avoid removing the
-     UBSAN_CHECK_* calls in that case.  */
+  // If for both arguments vrp_valueize returned non-NULL, this should
+  // have been already folded and if not, it wasn't folded because of
+  // overflow.  Avoid removing the UBSAN_CHECK_* calls in that case.
   if (r.singleton_p ())
     r.set_varying (type);
 }
@@ -796,7 +783,6 @@ gimple_ranger::range_of_builtin_call (irange &r, gcall *call)
 
 
 
-
 // Calculate a range for COND_EXPR statement S and return it in R.
 // If a range cannot be calculated, return false.
 
@@ -821,7 +807,7 @@ gimple_ranger::range_of_cond_expr  (irange &r, gassign *s)
   // If the condition is known, choose the appropriate expression.
   if (cond_range.singleton_p ())
     {
-      // False, pick second operand
+      // False, pick second operand.
       if (cond_range.zero_p ())
 	r = range2;
       else
@@ -834,8 +820,6 @@ gimple_ranger::range_of_cond_expr  (irange &r, gassign *s)
     }
   return true;
 }
-
-
 
 bool
 gimple_ranger::range_of_expr (irange &r, tree expr, gimple *stmt)
@@ -876,7 +860,6 @@ gimple_ranger::range_of_expr (irange &r, tree expr, gimple *stmt)
   return true;
 }
 
-
 // Return the range of NAME on entry to block BB in R.
 
 void
@@ -892,7 +875,6 @@ gimple_ranger::range_on_entry (irange &r, basic_block bb, tree name)
   if (m_cache.block_range (entry_range, bb, name))
     r.intersect (entry_range);
 }
-
 
 // Calculate the range for NAME at the end of block BB and return it in R.
 // Return false if no range can be calculated.
@@ -975,7 +957,6 @@ gimple_ranger::range_of_stmt (irange &r, gimple *s, tree name)
   return true;
 }
 
-
 // This routine will export whatever global ranges are known to GCC
 // SSA_RANGE_NAME_INFO fields.
 
@@ -1025,7 +1006,6 @@ gimple_ranger::export_global_ranges ()
     }
 }
 
-
 // Print the known table values to file F.
 
 void
@@ -1044,7 +1024,7 @@ gimple_ranger::dump (FILE *f)
 
       dump_bb (f, bb, 4, TDF_NONE);
 
-      // Now find any globals defined in this block
+      // Now find any globals defined in this block.
       for (x = 1; x < num_ssa_names; x++)
 	{
 	  tree name = ssa_name (x);
@@ -1194,7 +1174,6 @@ trace_ranger::trailer (unsigned counter, const char *caller, bool result,
     }
   return result;
 }
-
 
 // Tracing version of range_on_edge.  Call it with printing wrappers.
 

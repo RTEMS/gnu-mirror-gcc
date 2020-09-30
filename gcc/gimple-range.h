@@ -128,7 +128,7 @@ gimple_range_global (tree name)
   // for builtin_unreachable in the code, like
   // RUNTESTFLAGS=dg.exp=pr61034.C check-g++
   // pre-optimizations (inlining) set a global range which causes the ranger
-  // to remove the condition which leads to builtin_unreachable
+  // to remove the condition which leads to builtin_unreachable.
   if (!POINTER_TYPE_P (type) && SSA_NAME_RANGE_INFO (name))
     {
       // Return a range from an SSA_NAME's available range.
