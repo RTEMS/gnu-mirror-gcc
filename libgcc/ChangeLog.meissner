@@ -1,16 +1,5 @@
 2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/_divkc3.c (__divkc3x): Provide alias with
-	alternate name.
-	* config/rs6000/_mulkc3.c (__mulkc3x): Provide alias with
-	alternate name.
-	* config/rs6000/float128-ifunc.c (Add alternate aliases __divkc3x
-	and __mulkc3x).
-	* config/rs6000/quad-float128.c (__divkc3x): New declaration.
-	(__mulkc3x): New declaration.
-
-2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
-
 	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
 	__builtin_pack_ieee128 if long double is IEEE 128-bit.
 
