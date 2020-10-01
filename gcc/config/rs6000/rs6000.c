@@ -23195,8 +23195,7 @@ rs6000_vector_mode_supported_p (machine_mode mode)
     return false;
 }
 
-/* Target hook for floatn_mode.  For _Float128 and _Float64x, always use
-   KFmode, even if long double uses the IEEE 128-bit representation.  */
+/* Target hook for floatn_mode.  */
 static opt_scalar_float_mode
 rs6000_floatn_mode (int n, bool extended)
 {
@@ -23209,7 +23208,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23233,7 +23232,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
