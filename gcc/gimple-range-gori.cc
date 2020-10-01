@@ -19,8 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#define DEBUG_CACHE (0 && getenv("DEBUG_CACHE"))
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -44,15 +42,6 @@ along with GCC; see the file COPYING3.  If not see
    within this bitmap to indicate SSA names that are defined in the
    SAME block and used to calculate this SSA name.
 
-   One import is maintained per def-chain.  An IMPORT is defined as an
-   SSA name in the def chain which occurs outside the basic block. A
-   change in the value of this SSA name can change the value of any
-   name in the chain.
-
-   If there is more than one import, or an ssa_name originates WITHIN
-   the same basic block, but is defined by a statement that the range
-   engine does not know how to calculate, then there is no import for
-   the entire chain.
 
     <bb 2> :
       _1 = x_4(D) + -2;
@@ -61,20 +50,15 @@ along with GCC; see the file COPYING3.  If not see
       q_5 = _2 + 3;
       if (q_5 <= 13)
 
-    _1  : (import : x_4(D))  :x_4(D)
-    _2  : (import : x_4(D))  :_1  x_4(D)
-    q_5  : (import : x_4(D))  :_1  _2  x_4(D)
+    _1  : x_4(D)
+    _2  : 1  x_4(D)
+    q_5  : _1  _2  x_4(D)
 
-    This dump indicates the bits set in the def_chain vector and their
-    import, as well as demonstrates the def_chain bits for the related
-    ssa_names.
+    This dump indicates the bits set in the def_chain vector.
+    as well as demonstrates the def_chain bits for the related ssa_names.
 
     Checking the chain for _2 indicates that _1 and x_4 are used in
-    its evaluation, and with x_4 being an import.
-
-    For the purpose of defining an import, PHI node defintions are
-    considered imports as they don't really reside in the block, but
-    are accumulators of values from incoming edges.
+    its evaluation.
 
     Def chains also only include statements which are valid gimple
     so a def chain will only span statements for which the range
@@ -86,14 +70,12 @@ class range_def_chain
 public:
   range_def_chain ();
   ~range_def_chain ();
-  tree terminal_name (tree name);
   bool has_def_chain (tree name);
   bitmap get_def_chain (tree name);
   bool in_chain_p (tree name, tree def);
 private:
   vec<bitmap> m_def_chain;	// SSA_NAME : def chain components.
-  vec<tree> m_terminal;	        // SSA_NAME : chain terminal name.
-  tree build_def_chain (tree name, bitmap result, basic_block bb);
+  void build_def_chain (tree name, bitmap result, basic_block bb);
 };
 
 
@@ -103,8 +85,6 @@ range_def_chain::range_def_chain ()
 {
   m_def_chain.create (0);
   m_def_chain.safe_grow_cleared (num_ssa_names);
-  m_terminal.create (0);
-  m_terminal.safe_grow_cleared (num_ssa_names);
 }
 
 // Destruct a range_def_chain.
@@ -116,7 +96,6 @@ range_def_chain::~range_def_chain ()
     if (m_def_chain[x])
       BITMAP_FREE (m_def_chain[x]);
   m_def_chain.release ();
-  m_terminal.release ();
 }
 
 // Return true if NAME is in the def chain of DEF.  If BB is provided,
@@ -136,48 +115,9 @@ range_def_chain::in_chain_p (tree name, tree def)
   return bitmap_bit_p (chain, SSA_NAME_VERSION (name));
 }
 
-// If NAME has a definition chain, and the chain has a single import
-// into the block, return the name of that import.
+// Build def_chains for NAME if it is in BB.  Copy the def chain into RESULT.
 
-tree
-range_def_chain::terminal_name (tree name)
-{
-  // Ensure the def chain has been calculated.
-  get_def_chain (name);
-  return m_terminal[SSA_NAME_VERSION (name)];
-}
-
-// Given up to 3 SSA names, return the common name or NULL_TREE.
-// NULL_TREE's passed in can be ignored, but all specified SSA names
-// must be the same name.
-
-static inline tree
-pick_import (tree ssa1, tree ssa2, tree ssa3)
-{
-  if (ssa1)
-    {
-      if (ssa2 && ssa1 != ssa2)
-        return NULL_TREE;	// No match.
-      // Either ssa2 is NULL, or it is the same as ssa1.
-      if (!ssa3 || ssa1 == ssa3)
-        return ssa1;	// ssa1 is the import.
-      return NULL_TREE;
-    }
-  if (ssa2)
-    {
-      // If there is no ssa3 or ssa3 is the same as ssa2, that's the import.
-      if (!ssa3 || ssa2 == ssa3)
-        return ssa2;
-      // They must both be different, so no import.
-      return NULL_TREE;
-    }
-  return ssa3;
-}
-
-// Build def_chains for NAME if it is in BB.  Copy the def chain into
-// RESULT.  Return the import for name, or NAME if it is an import.
-
-tree
+void
 range_def_chain::build_def_chain (tree name, bitmap result, basic_block bb)
 {
   bitmap b;
@@ -189,16 +129,10 @@ range_def_chain::build_def_chain (tree name, bitmap result, basic_block bb)
     {
       // Get the def chain for the operand.
       b = get_def_chain (name);
-      // If there was one, copy it into result and return the terminal name.
+      // If there was one, copy it into result.
       if (b)
-        {
-	  bitmap_ior_into (result, b);
-	  return m_terminal [SSA_NAME_VERSION (name)];
-	}
-      // If there is no def chain, this terminal is within the same BB.
+	bitmap_ior_into (result, b);
     }
-  // This is an import.
-  return name;
 }
 
 // Return TRUE if NAME has been processed for a def_chain.
@@ -206,12 +140,10 @@ range_def_chain::build_def_chain (tree name, bitmap result, basic_block bb)
 inline bool
 range_def_chain::has_def_chain (tree name)
 {
+  // Ensure there is an entry in the internal vector.
   unsigned v = SSA_NAME_VERSION (name);
   if (v >= m_def_chain.length ())
-    {
-      m_def_chain.safe_grow_cleared (num_ssa_names + 1);
-      m_terminal.safe_grow_cleared (num_ssa_names + 1);
-    }
+    m_def_chain.safe_grow_cleared (num_ssa_names + 1);
   return (m_def_chain[v] != NULL);
 }
 
@@ -256,44 +188,18 @@ range_def_chain::get_def_chain (tree name)
 
   m_def_chain[v] = BITMAP_ALLOC (NULL);
 
-  // build_def_chain returns the terminal name.  If we have more than
-  // one unique terminal name, then this statement will have no
-  // terminal.
-  bool has_term = true;
-  m_terminal[v] = NULL_TREE;
   if (ssa1)
-    {
-      ssa1 = build_def_chain (ssa1, m_def_chain[v], bb);
-      // If this chain has no terminal, root cannot either.
-      if (!ssa1)
-        has_term = false;
-    }
+    build_def_chain (ssa1, m_def_chain[v], bb);
   if (ssa2)
-    {
-      ssa2 = build_def_chain (ssa2, m_def_chain[v], bb);
-      if (!ssa2)
-        has_term = false;
-    }
+    build_def_chain (ssa2, m_def_chain[v], bb);
   if (ssa3)
-    {
-      ssa3 = build_def_chain (ssa3, m_def_chain[v], bb);
-      if (!ssa3)
-        has_term = false;
-    }
-
-  if (has_term)
-    m_terminal[v] = pick_import (ssa1, ssa2, ssa3);
-  else
-    m_terminal[v] = NULL_TREE;
+    build_def_chain (ssa3, m_def_chain[v], bb);
 
   // If we run into pathological cases where the defintion chains are
-  // huge (I'm thinking fppp for instance.. huge basic block fully
-  // unrolled) we might be able to limit this by deciding here that if
-  // there is no import AND 2 or more ssa names, we change the
-  // def_chain back to be just the ssa-names.  that should prevent
-  // a_2 = b_6 + a_8 from creating a pathological case yet allow us to
-  // still handle it when b_6 and a_8 are derived from the same base
-  // name.  Thoughts?
+  // huge (ie  huge basic block fully unrolled) we might be able to limit
+  // this by deciding here that if some criteria is satisfied, we change the
+  // def_chain back to be just the ssa-names.  That will help prevent chains
+  // of a_2 = b_6 + a_8 from creating a pathological case.
   return m_def_chain[v];
 }
 
@@ -310,18 +216,12 @@ range_def_chain::get_def_chain (tree name)
    only calculated the first time a query is made.  If no queries are
    made, there is little overhead.
 
-   2 bitmaps are maintained for each basic block:
-
+   one bitmap is maintained for each basic block:
    m_outgoing  : a set bit indicates a range can be generated for a name.
-   m_incoming  : a set bit means a this name come from outside the
-	         block and is used in the calculation of some outgoing
-	         range.
 
    Generally speaking, the m_outgoing vector is the union of the
    entire def_chain of all SSA names used in the last statement of the
-   block which generate ranges.  The m_incoming vector is the union of
-   all the terminal names of those def chains.  They act as a one-stop
-   summary for the block.  */
+   block which generate ranges.  */
 
 class gori_map : public range_def_chain
 {
@@ -331,17 +231,14 @@ public:
 
   bool is_export_p (tree name, basic_block bb);
   bool def_chain_in_export_p (tree name, basic_block bb);
-  bool is_import_p (tree name, basic_block bb);
 
   void dump (FILE *f);
   void dump (FILE *f, basic_block bb);
 private:
   bitmap_obstack m_bitmaps;
   vec<bitmap> m_outgoing;	// BB: Outgoing ranges calculatable on edges
-  vec<bitmap> m_incoming;	// BB: block imports
   void maybe_add_gori (tree name, basic_block bb);
   void calculate_gori (basic_block bb);
-  bitmap imports (basic_block bb);
   bitmap exports (basic_block bb);
 };
 
@@ -352,8 +249,6 @@ gori_map::gori_map ()
 {
   m_outgoing.create (0);
   m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
-  m_incoming.create (0);
-  m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
   bitmap_obstack_initialize (&m_bitmaps);
 }
 
@@ -362,26 +257,7 @@ gori_map::gori_map ()
 gori_map::~gori_map ()
 {
   bitmap_obstack_release (&m_bitmaps);
-  m_incoming.release ();
   m_outgoing.release ();
-}
-
-// Return the bitmap vector of all imports to BB.  Calculate if necessary.
-
-bitmap
-gori_map::imports (basic_block bb)
-{
-  if (!m_incoming[bb->index])
-    calculate_gori (bb);
-  return m_incoming[bb->index];
-}
-
-// Return true if NAME is an import to basic block BB.
-
-bool
-gori_map::is_import_p (tree name, basic_block bb)
-{
-  return bitmap_bit_p (imports (bb), SSA_NAME_VERSION (name));
 }
 
 // Return the bitmap vector of all export from BB.  Calculate if necessary.
@@ -417,7 +293,7 @@ gori_map::def_chain_in_export_p (tree name, basic_block bb)
 }
 
 // If NAME is non-NULL and defined in block BB, calculate the def
-// chain and add it to m_outgoing, and any imports to m_incoming.
+// chain and add it to m_outgoing.
 
 void
 gori_map::maybe_add_gori (tree name, basic_block bb)
@@ -428,19 +304,7 @@ gori_map::maybe_add_gori (tree name, basic_block bb)
       bitmap r = get_def_chain (name);
       // Check if there is a def chain, and it is in this block.
       if (r && gimple_bb (s) == bb)
-        {
-	  bitmap_copy (m_outgoing[bb->index], r);
-	  tree im = terminal_name (name);
-	  if (im)
-	    bitmap_set_bit (m_incoming[bb->index], SSA_NAME_VERSION (im));
-	}
-      else
-        {
-	  // If there is no def chain, and name originates outside
-	  // this block then this name is also an import.
-	  if (!s || gimple_bb (s) != bb)
-	    bitmap_set_bit (m_incoming[bb->index], SSA_NAME_VERSION (name));
-	}
+	bitmap_copy (m_outgoing[bb->index], r);
       // Def chain doesn't include itself, and even if there isn't a
       // def chain, this name should be added to exports.
       bitmap_set_bit (m_outgoing[bb->index], SSA_NAME_VERSION (name));
@@ -454,13 +318,9 @@ gori_map::calculate_gori (basic_block bb)
 {
   tree name;
   if (bb->index >= (signed int)m_outgoing.length ())
-    {
-      m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
-      m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
-    }
-  gcc_assert (m_outgoing[bb->index] == NULL);
+    m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
+  gcc_checking_assert (m_outgoing[bb->index] == NULL);
   m_outgoing[bb->index] = BITMAP_ALLOC (&m_bitmaps);
-  m_incoming[bb->index] = BITMAP_ALLOC (&m_bitmaps);
 
   // If this block's last statement may generate range informaiton, go
   // calculate it.
@@ -487,9 +347,8 @@ gori_map::calculate_gori (basic_block bb)
 // Dump the table information for BB to file F.
 
 void
-gori_map::dump(FILE *f, basic_block bb)
+gori_map::dump (FILE *f, basic_block bb)
 {
-  tree t;
   bool header = false;
   const char *header_string = "bb%-4d ";
   const char *header2 = "       ";
@@ -515,12 +374,6 @@ gori_map::dump(FILE *f, basic_block bb)
 	  header_string = header2;
 	  header = true;
 	  print_generic_expr (f, name, TDF_SLIM);
-	  if ((t = terminal_name (name)))
-	    {
-	      fprintf (f, "  : (terminal ");
-	      print_generic_expr (f, t, TDF_SLIM);
-	      fprintf (f, ")");
-	    }
 	  fprintf (f, " : ");
 	  EXECUTE_IF_SET_IN_BITMAP (chain, 0, y, bi)
 	    {
@@ -532,26 +385,8 @@ gori_map::dump(FILE *f, basic_block bb)
     }
 
   printed_something |= header;
-  // Now dump the incoming vector.
-  header = false;
-  EXECUTE_IF_SET_IN_BITMAP (m_incoming[bb->index], 0, y, bi)
-    {
-      if (!header)
-        {
-	  fprintf (f, header_string, bb->index);
-	  fprintf (f, "imports: ");
-	  header_string = header2;
-	  header = true;
-	}
-      print_generic_expr (f, ssa_name (y), TDF_SLIM);
-      fprintf (f, "  ");
-    }
-
-  if (header)
-    fputc ('\n', f);
 
   // Now dump the export vector.
-  printed_something |= header;
   header = false;
   EXECUTE_IF_SET_IN_BITMAP (m_outgoing[bb->index], 0, y, bi)
     {
@@ -576,7 +411,7 @@ gori_map::dump(FILE *f, basic_block bb)
 // Dump the entire GORI map structure to file F.
 
 void
-gori_map::dump(FILE *f)
+gori_map::dump (FILE *f)
 {
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
@@ -594,6 +429,23 @@ debug (gori_map &g)
 }
 
 // -------------------------------------------------------------------
+
+// Construct a gori_compute object.
+
+gori_compute::gori_compute ()
+{
+  // Create a boolean_type true and false range.
+  m_bool_zero = int_range<2> (boolean_false_node, boolean_false_node);
+  m_bool_one = int_range<2> (boolean_true_node, boolean_true_node);
+  m_gori_map = new gori_map;
+}
+
+// Destruct a gori_compute_object.
+
+gori_compute::~gori_compute ()
+{
+  delete m_gori_map;
+}
 
 // Provide a default of VARYING for all incoming SSA names.
 
@@ -655,23 +507,6 @@ gori_compute::compute_name_range_op (irange &r, gimple *stmt,
       return true;
     }
   return false;
-}
-
-// Construct a gori_compute object.
-
-gori_compute::gori_compute ()
-{
-  // Create a boolean_type true and false range.
-  m_bool_zero = int_range<2> (boolean_false_node, boolean_false_node);
-  m_bool_one = int_range<2> (boolean_true_node, boolean_true_node);
-  m_gori_map = new gori_map;
-}
-
-// Destruct a gori_compute_object.
-
-gori_compute::~gori_compute ()
-{
-  delete m_gori_map;
 }
 
 // Given the switch S, return an evaluation in R for NAME when the lhs
@@ -771,6 +606,8 @@ gori_compute::compute_operand_range (irange &r, gimple *stmt,
   // If neither operand is derived, this statement tells us nothing.
   return false;
 }
+
+// Return TRUE if range R is either a true or false compatible range.
 
 static bool
 range_is_either_true_or_false (const irange &r)
@@ -1354,14 +1191,14 @@ logical_stmt_cache::slot_diagnostics (tree lhs, const tf_range &range) const
 
   if (!slot)
     {
-      if (DEBUG_CACHE)
+      if (DEBUG_RANGE_CACHE)
 	{
 	  fprintf (dump_file ? dump_file : stderr, "registering range for: ");
 	  dump (dump_file ? dump_file : stderr, stmt);
 	}
       return;
     }
-  if (DEBUG_CACHE)
+  if (DEBUG_RANGE_CACHE)
     fprintf (dump_file ? dump_file : stderr,
 	     "reusing range for SSA #%d\n", version);
   if (CHECKING_P && (slot->range.true_range != range.true_range

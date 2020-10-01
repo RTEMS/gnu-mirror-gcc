@@ -1093,6 +1093,8 @@ gimple_ranger::dump (FILE *f)
     }
 }
 
+// If SCEV has any information about phi node NAME, return it as a range in R.
+
 void
 gimple_ranger::range_of_ssa_name_with_loop_info (irange &r, tree name,
 						 class loop *l, gphi *phi)

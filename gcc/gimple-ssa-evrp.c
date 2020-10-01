@@ -104,7 +104,7 @@ public:
 
 protected:
   DISABLE_COPY_AND_ASSIGN (evrp_folder);
-  class evrp_range_analyzer m_range_analyzer;
+  evrp_range_analyzer m_range_analyzer;
   simplify_using_ranges simplifier;
 };
 
@@ -126,6 +126,13 @@ public:
     m_simplifier.set_range_query (m_ranger);
   }
       
+  ~rvrp_folder ()
+  {
+    if (dump_file && (dump_flags & TDF_DETAILS))
+      m_ranger->dump (dump_file);
+    delete m_ranger;
+  }
+
   tree value_of_expr (tree name, gimple *s = NULL) OVERRIDE
   {
     return m_ranger->value_of_expr (name, s);
@@ -139,13 +146,6 @@ public:
   tree value_of_stmt (gimple *s, tree name = NULL) OVERRIDE
   {
     return m_ranger->value_of_stmt (s, name);
-  }
-
-  ~rvrp_folder ()
-  {
-    if (dump_file && (dump_flags & TDF_DETAILS))
-      m_ranger->dump (dump_file);
-    delete m_ranger;
   }
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE

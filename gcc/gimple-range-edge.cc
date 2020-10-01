@@ -114,7 +114,7 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
   // range case, start with varying and intersect each other case from
   // it.
 
-  gcc_assert (!existed);
+  gcc_checking_assert (!existed);
 
   // Allocate an int_range_max for default case.
   default_slot = range_pool.allocate (255);

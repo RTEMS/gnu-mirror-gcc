@@ -143,7 +143,7 @@ gimple_range_global (tree name)
 
 
 // This class overloads the ranger routines to provide tracing facilties
-// entry and exit to each of the APIs is documented in the listing.
+// Entry and exit values to each of the APIs is placed in the dumpfile.
 
 class trace_ranger : public gimple_ranger
 {
@@ -163,4 +163,8 @@ private:
   bool trailer (unsigned counter, const char *caller, bool result, tree name,
 		const irange &r);
 };
+
+// Flag to enable debugging the various internal Caches.
+#define DEBUG_RANGE_CACHE (dump_file && flag_evrp_mode == EVRP_MODE_RVRP_DEBUG)
+
 #endif // GCC_GIMPLE_RANGE_STMT_H

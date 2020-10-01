@@ -23,24 +23,21 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "gimple-range-gori.h" 
 
+// Class used to track non-null references of an SSA name.  A vector
+// of bitmaps indexed by SSA name is maintained.  When indexed by
+// basic block, an on-bit indicates there is a non-null dereference
+// for that SSA in that block.
 
-// This global cache is used with the range engine as markers for what
-// has been visited during this incarnation.  Once the ranger evaluates
-// a name, it is typically not re-evaluated again.
-
-class ssa_global_cache
+class non_null_ref
 {
 public:
-  ssa_global_cache ();
-  ~ssa_global_cache ();
-  bool get_global_range (irange &r, tree name) const;
-  void set_global_range (tree name, const irange &r);
-  void clear_global_range (tree name);
-  void clear ();
-  void dump (FILE *f = stderr);
+  non_null_ref ();
+  ~non_null_ref ();
+  bool non_null_deref_p (tree name, basic_block bb);
 private:
-  vec<irange *> m_tab;
-  class irange_pool *m_irange_pool;
+  vec <bitmap> m_nn;
+  void process_name (tree name);
+  bitmap_obstack m_bitmaps;
 };
 
 // This class manages a vector of pointers to ssa_block ranges.  It
@@ -66,21 +63,23 @@ private:
   irange_pool *m_irange_pool;
 };
 
-// Class used to track non-null references of an SSA name.  A vector
-// of bitmaps indexed by SSA name is maintained.  When indexed by
-// basic block, an on-bit indicates there is a non-null dereference
-// for that SSA in that block.
+// This global cache is used with the range engine as markers for what
+// has been visited during this incarnation.  Once the ranger evaluates
+// a name, it is typically not re-evaluated again.
 
-class non_null_ref
+class ssa_global_cache
 {
 public:
-  non_null_ref ();
-  ~non_null_ref ();
-  bool non_null_deref_p (tree name, basic_block bb);
+  ssa_global_cache ();
+  ~ssa_global_cache ();
+  bool get_global_range (irange &r, tree name) const;
+  void set_global_range (tree name, const irange &r);
+  void clear_global_range (tree name);
+  void clear ();
+  void dump (FILE *f = stderr);
 private:
-  vec <bitmap> m_nn;
-  void process_name (tree name);
-  bitmap_obstack m_bitmaps;
+  vec<irange *> m_tab;
+  class irange_pool *m_irange_pool;
 };
 
 // This class provides all the caches a global ranger may need, and makes 
