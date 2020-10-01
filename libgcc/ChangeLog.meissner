@@ -1,3 +1,34 @@
+2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_divkc3.c (__divkc3x): Provide alias with
+	alternate name.
+	* config/rs6000/_mulkc3.c (__mulkc3x): Provide alias with
+	alternate name.
+	* config/rs6000/float128-ifunc.c (Add alternate aliases __divkc3x
+	and __mulkc3x).
+	* config/rs6000/quad-float128.c (__divkc3x): New declaration.
+	(__mulkc3x): New declaration.
+
+2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ieee128 if long double is IEEE 128-bit.
+
+2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+	* config/rs6000/t-float128: Build __floating conversions to/from
+	Decimal support functions.  By default compile with long double
+	being IBM extended double.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
+
 2020-09-30   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
