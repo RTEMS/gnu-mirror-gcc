@@ -1270,10 +1270,23 @@ jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
 
   unsigned HOST_WIDE_INT max_ratio
     = optimize_insn_for_size_p () ? max_ratio_for_size : max_ratio_for_speed;
+  max_ratio *= 100;
   unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
 					    clusters[end]->get_high ());
   /* Check overflow.  */
   if (range == 0)
+    return false;
+
+  if (range > HOST_WIDE_INT_M1U / 100)
+    return false;
+
+  unsigned HOST_WIDE_INT lhs = 100 * range;
+  if (lhs < range)
+    return false;
+
+  /* First make quick guess as each cluster
+     can add at maximum 2 to the comparison_count.  */
+  if (lhs > 2 * max_ratio * (end - start + 1))
     return false;
 
   unsigned HOST_WIDE_INT comparison_count = 0;
@@ -1373,12 +1386,12 @@ bit_test_cluster::can_be_handled (unsigned HOST_WIDE_INT range,
 {
   /* Check overflow.  */
   if (range == 0)
-    return 0;
+    return false;
 
   if (range >= GET_MODE_BITSIZE (word_mode))
     return false;
 
-  return uniq <= 3;
+  return uniq <= m_max_case_bit_tests;
 }
 
 /* Return true when cluster starting at START and ending at END (inclusive)
@@ -1388,6 +1401,7 @@ bool
 bit_test_cluster::can_be_handled (const vec<cluster *> &clusters,
 				  unsigned start, unsigned end)
 {
+  auto_vec<int, m_max_case_bit_tests> dest_bbs;
   /* For algorithm correctness, bit test for a single case must return
      true.  We bail out in is_beneficial if it's called just for
      a single case.  */
@@ -1396,15 +1410,25 @@ bit_test_cluster::can_be_handled (const vec<cluster *> &clusters,
 
   unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
 					    clusters[end]->get_high ());
-  auto_bitmap dest_bbs;
+
+  /* Make a guess first.  */
+  if (!can_be_handled (range, m_max_case_bit_tests))
+    return false;
 
   for (unsigned i = start; i <= end; i++)
     {
       simple_cluster *sc = static_cast<simple_cluster *> (clusters[i]);
-      bitmap_set_bit (dest_bbs, sc->m_case_bb->index);
+      /* m_max_case_bit_tests is very small integer, thus the operation
+	 is constant. */
+      if (!dest_bbs.contains (sc->m_case_bb->index))
+	{
+	  if (dest_bbs.length () >= m_max_case_bit_tests)
+	    return false;
+	  dest_bbs.quick_push (sc->m_case_bb->index);
+	}
     }
 
-  return can_be_handled (range, bitmap_count_bits (dest_bbs));
+  return true;
 }
 
 /* Return true when COUNT of cases of UNIQ labels is beneficial for bit test
