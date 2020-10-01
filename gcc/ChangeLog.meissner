@@ -1,5 +1,15 @@
 2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	Undo selected parts of the last patch:
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Update
+	comment about how the internal types and keywords for the 128-bit
+	floating point types are created.
+	(rs6000_floatn_mode): Always use KFmode for _Float128 and
+	_Float64x, even if long double uses the IEEE 128-bit
+	representation.
+
+2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Update
 	comment about how the internal types and keywords for the 128-bit
 	floating point types are created.
