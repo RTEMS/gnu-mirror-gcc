@@ -12920,12 +12920,20 @@ rs6000_init_builtins (void)
      floating point, we need make sure the type is non-zero or else self-test
      fails during bootstrap.
 
-     Always create __ibm128 as a separate type, even if the current long double
-     format is IBM extended double.
+     We create the keyword '__ieee128' instead of '__float128' and provide a
+     macro to change '__float128' into '__ieee128' in rs6000-.c.  Using a
+     macro, instead of creating the __float128 as a keyword allows us to turn
+     on/off the float 128 support (with the -mno-float128 switch), but still
+     have the type internally for creating built-in functions.
 
-     For IEEE 128-bit floating point, always create the type __ieee128.  If the
-     user used -mfloat128, rs6000-c.c will create a define from __float128 to
-     __ieee128.  */
+     The _Float128 type always uses KFmode.  The __float128 (__ieee128)
+     extension will use TFmode if long double uses the IEEE 128-bit
+     representation, and it will use KFmode (i.e. _Float128) if long double is
+     either 64-bits or uses the IBM extended double representation.
+
+     Similar to '__ieee128', the '__ibm128' keyword either uses the long double
+     type if long double uses the IBM extended double representation, or it is
+     a separate type if long double uses the IEEE 128-bit representation.  */
   if (TARGET_FLOAT128_TYPE)
     {
       if (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)

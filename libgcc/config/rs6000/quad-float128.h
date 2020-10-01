@@ -91,8 +91,13 @@ extern TFtype __floatunsikf_sw (USItype_ppc);
 extern TFtype __floatundikf_sw (UDItype_ppc);
 extern IBM128_TYPE __extendkftf2_sw (TFtype);
 extern TFtype __trunctfkf2_sw (IBM128_TYPE);
+
+/* Complex __float128 built on __float128 interfaces.  The 'x' version is used
+   when long double is IEEE 128 to avoid reusing the same name.  */
 extern TCtype __mulkc3_sw (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __divkc3_sw (TFtype, TFtype, TFtype, TFtype);
++extern TCtype __mulkc3x (TFtype, TFtype, TFtype, TFtype);
++extern TCtype __divkc3x (TFtype, TFtype, TFtype, TFtype);
 
 #ifdef _ARCH_PPC64
 /* We do not provide ifunc resolvers for __fixkfti, __fixunskfti, __floattikf,

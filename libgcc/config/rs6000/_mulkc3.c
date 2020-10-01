@@ -96,3 +96,10 @@ __mulkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
   return res;
 }
 
+/* Provide an alternate name for __mulkc3 that is used when when long double is
+   IEEE 128.  Only do this if we aren't creating ifunc's to handle software
+   vs. hardware IEEE 128-bit functions.  */
+#ifndef __mulkc3
+TCtype __mulkc3x (TFtype, TFtype, TFtype, TFtype)
+     __attribute__ ((weak, alias ("__mulkc3")));
+#endif
