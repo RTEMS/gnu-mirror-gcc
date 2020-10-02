@@ -288,7 +288,7 @@ if_chain::record_phi_arguments (edge e)
 	  tree *v = m_phi_map.get (phi);
 	  if (v != NULL)
 	    {
-	      if (arg != *v)
+	      if (!operand_equal_p (arg, *v))
 		return false;
 	    }
 	  else
@@ -494,7 +494,7 @@ extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
 
 static void
 find_switch_in_bb (basic_block bb, auto_vec<if_chain *> *all_candidates,
-		   auto_bitmap *visited_bbs)
+		   auto_sbitmap *visited_bbs)
 {
   if_chain *chain = new if_chain ();
   unsigned total_case_values = 0;
@@ -668,15 +668,13 @@ find_switch_in_bb (basic_block bb, auto_vec<if_chain *> *all_candidates,
       && chain->check_non_overlapping_cases ()
       && chain->is_beneficial ())
     {
-    expanded_location loc
-    = expand_location (gimple_location (chain->m_first_condition));
-      if (dump_file)
-	{
-	  fprintf (dump_file, "Condition chain (at %s:%d) with %d conditions "
-		   "(%d BBs) transformed into a switch statement.\n",
-		   loc.file, loc.line, total_case_values,
-		   chain->m_entries.length ());
-	}
+      location_t loc = gimple_location (chain->m_first_condition);
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS,
+			 dump_user_location_t::from_location_t (loc),
+			 "Condition chain with %d conditions "
+			 "(%d BBs) transformed into a switch statement.\n",
+			 total_case_values, chain->m_entries.length ());
 
       all_candidates->safe_push (chain);
     }
@@ -713,7 +711,12 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return flag_convert_if_to_switch != 0; }
+  virtual bool gate (function *)
+  {
+    return (jump_table_cluster::is_enabled ()
+	    || bit_test_cluster::is_enabled ());
+  }
+
   virtual unsigned int execute (function *);
 
 }; // class pass_if_to_switch
@@ -725,7 +728,7 @@ pass_if_to_switch::execute (function *fun)
 
   auto_vec<if_chain *> all_candidates;
   auto_vec<basic_block> worklist;
-  auto_bitmap visited_bbs;
+  auto_sbitmap visited_bbs (last_basic_block_for_fn (fun));
 
   worklist.safe_push (ENTRY_BLOCK_PTR_FOR_FN (fun));
   while (!worklist.is_empty ())

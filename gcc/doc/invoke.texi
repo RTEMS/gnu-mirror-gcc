@@ -2654,14 +2654,6 @@ Allow conditional expressions with mismatched types in the second and
 third arguments.  The value of such an expression is void.  This option
 is not supported for C++.
 
-@item -fconvert-if-to-switch
-@opindex fconvert-if-to-switch
-Perform conversion of an if cascade into a switch statement.
-Do so if the switch can be later transformed using a jump table
-or a bit test.  The transformation can help to produce faster code for
-the switch statement.  This flag is enabled by default
-at @option{-O2} and higher.
-
 @item -flax-vector-conversions
 @opindex flax-vector-conversions
 Allow implicit conversions between vectors with differing numbers of
@@ -9764,7 +9756,6 @@ also turns on the following optimization flags:
 -falign-labels  -falign-loops @gol
 -fcaller-saves @gol
 -fcode-hoisting @gol
--fconvert-if-to-switch @gol
 -fcrossjumping @gol
 -fcse-follow-jumps  -fcse-skip-blocks @gol
 -fdelete-null-pointer-checks @gol
