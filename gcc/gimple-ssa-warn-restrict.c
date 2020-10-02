@@ -250,7 +250,7 @@ builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
       tree range[2];
       /* Determine the size range, allowing for the result to be [0, 0]
 	 for SIZE in the anti-range ~[0, N] where N >= PTRDIFF_MAX.  */
-      get_size_range (size, stmt, range, true);
+      get_size_range (size, range, true);
       sizrange[0] = wi::to_offset (range[0]);
       sizrange[1] = wi::to_offset (range[1]);
       /* get_size_range returns SIZE_MAX for the maximum size.
@@ -327,7 +327,7 @@ builtin_memref::extend_offset_range (tree offset)
       /* A pointer offset is represented as sizetype but treated
 	 as signed.  */
       wide_int min, max;
-      value_range_kind rng = determine_value_range (offset, stmt, &min, &max);
+      value_range_kind rng = get_range_info (offset, &min, &max);
       if (rng == VR_ANTI_RANGE && wi::lts_p (max, min))
 	{
 	  /* Convert an anti-range whose upper bound is less than
@@ -783,7 +783,7 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
       tree size = gimple_call_arg (call, sizeargno);
       tree range[2];
-      if (get_size_range (size, call, range, true))
+      if (get_size_range (size, range, true))
 	{
 	  bounds[0] = wi::to_offset (range[0]);
 	  bounds[1] = wi::to_offset (range[1]);

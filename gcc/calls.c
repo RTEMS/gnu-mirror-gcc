@@ -1251,8 +1251,7 @@ alloc_max_size (void)
    functions like memset.  */
 
 bool
-get_size_range (tree exp, gimple *stmt, tree range[2],
-		bool allow_zero /* = false */)
+get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
 {
   if (!exp)
     return false;
@@ -1271,7 +1270,7 @@ get_size_range (tree exp, gimple *stmt, tree range[2],
   enum value_range_kind range_type;
 
   if (integral)
-    range_type = determine_value_range (exp, stmt, &min, &max);
+    range_type = determine_value_range (exp, &min, &max);
   else
     range_type = VR_VARYING;
 
@@ -1350,12 +1349,6 @@ get_size_range (tree exp, gimple *stmt, tree range[2],
   range[1] = wide_int_to_tree (exptype, max);
 
   return true;
-}
-
-bool
-get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
-{
-  return get_size_range (exp, NULL, range, allow_zero);
 }
 
 /* Diagnose a call EXP to function FN decorated with attribute alloc_size

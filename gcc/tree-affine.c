@@ -348,7 +348,7 @@ expr_to_aff_combination (aff_tree *comb, tree_code code, tree type,
 	    if (TYPE_UNSIGNED (itype)
 		&& TYPE_OVERFLOW_WRAPS (itype)
 		&& TREE_CODE (op1) == INTEGER_CST
-		&& determine_value_range (op0, NULL, &minv, &maxv) == VR_RANGE)
+		&& determine_value_range (op0, &minv, &maxv) == VR_RANGE)
 	      {
 		wi::overflow_type overflow = wi::OVF_NONE;
 		signop sign = UNSIGNED;
