@@ -151,7 +151,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "symbol-summary.h"
 #include "ipa-utils.h"
 #include "ipa-prop.h"
-#include "value-query.h"
 
 /* Possible lattice values.  */
 typedef enum
@@ -942,19 +941,24 @@ do_dbg_cnt (void)
     }
 }
 
+
 /* We want to provide our own GET_VALUE and FOLD_STMT virtual methods.  */
 class ccp_folder : public substitute_and_fold_engine
 {
-public:
+ public:
+  tree value_of_expr (tree, gimple *) FINAL OVERRIDE;
   bool fold_stmt (gimple_stmt_iterator *) FINAL OVERRIDE;
-  /* This method just wraps GET_CONSTANT_VALUE for now.  Over time
-     naked calls to GET_CONSTANT_VALUE should be eliminated in favor
-     of calling member functions.  */
-  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
-  {
-    return get_constant_value (name);
-  }
 };
+
+/* This method just wraps GET_CONSTANT_VALUE for now.  Over time
+   naked calls to GET_CONSTANT_VALUE should be eliminated in favor
+   of calling member functions.  */
+
+tree
+ccp_folder::value_of_expr (tree op, gimple *)
+{
+  return get_constant_value (op);
+}
 
 /* Do final substitution of propagated values, cleanup the flowgraph and
    free allocated storage.  If NONZERO_P, record nonzero bits.

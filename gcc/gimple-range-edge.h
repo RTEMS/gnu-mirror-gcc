@@ -46,7 +46,7 @@ private:
   bool get_edge_range (irange &r, gimple *s, edge e);
 
   hash_map<edge, irange *> *m_edge_table;
-  irange_pool range_pool;
+  irange_allocator range_allocator;
 }; 
 
 // If there is a range control statment at the end of block BB, return it.

@@ -530,8 +530,7 @@ loop_versioning::lv_dom_walker::after_dom_children (basic_block bb)
 }
 
 /* Decide whether to replace VAL with a new value in a versioned loop.
-   If so, set T to the new value and return true.  Otherwise, return
-   false.  */
+   Return the new value if so, otherwise return null.  */
 
 tree
 loop_versioning::name_prop::value_of_expr (tree val, gimple *)

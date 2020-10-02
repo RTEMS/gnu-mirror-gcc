@@ -1173,7 +1173,7 @@
   return rs6000_output_move_128bit (operands);
 }
   [(set_attr "type"
-               "vecstore,  vecload,   vecsimple, mffgpr,    mftgpr,    load,
+               "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
@@ -2885,7 +2885,7 @@
   else
     gcc_unreachable ();
 }
-  [(set_attr "type" "vecperm")])
+  [(set_attr "type" "vecperm,vecmove")])
 
 ;; Combiner patterns to allow creating XXPERMDI's to access either double
 ;; word element in a vector register.
@@ -3314,7 +3314,7 @@
   else
     gcc_unreachable ();
 }
-  [(set_attr "type" "veclogical,mftgpr,mftgpr,vecperm")
+  [(set_attr "type" "veclogical,mfvsr,mfvsr,vecperm")
    (set_attr "isa" "*,*,p8v,p9v")])
 
 ;; Optimize extracting a single scalar element from memory.
@@ -3757,7 +3757,7 @@
 
   DONE;
 }
-  [(set_attr "type" "mftgpr,vecperm,fpstore")
+  [(set_attr "type" "mfvsr,vecperm,fpstore")
    (set_attr "length" "8")
    (set_attr "isa" "*,p8v,*")])
 
@@ -3806,7 +3806,7 @@
 		  gen_rtx_REG (DImode, REGNO (vec_tmp)));
   DONE;
 }
-  [(set_attr "type" "mftgpr")])
+  [(set_attr "type" "mfvsr")])
 
 ;; Optimize extracting a single scalar element from memory.
 (define_insn_and_split "*vsx_extract_<mode>_load"
@@ -4440,7 +4440,7 @@
   "@
    xxpermdi %x0,%x1,%x1,0
    mtvsrdd %x0,%1,%1"
-  [(set_attr "type" "vecperm")])
+  [(set_attr "type" "vecperm,vecmove")])
 
 (define_insn "vsx_splat_<mode>_mem"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
@@ -4493,7 +4493,7 @@
 	(unspec:V4SF [(match_dup 0)
 		      (const_int 0)] UNSPEC_VSX_XXSPLTW))]
   ""
-  [(set_attr "type" "vecload,vecperm,mftgpr")
+  [(set_attr "type" "vecload,vecperm,vecperm")
    (set_attr "length" "*,8,*")
    (set_attr "isa" "*,p8v,*")])
 

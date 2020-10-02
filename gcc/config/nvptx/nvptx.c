@@ -2050,11 +2050,20 @@ output_init_frag (rtx sym)
 static void
 nvptx_assemble_value (unsigned HOST_WIDE_INT val, unsigned size)
 {
-  val &= ((unsigned  HOST_WIDE_INT)2 << (size * BITS_PER_UNIT - 1)) - 1;
+  bool negative_p
+    = val & (HOST_WIDE_INT_1U << (HOST_BITS_PER_WIDE_INT - 1));
+
+  /* Avoid undefined behaviour.  */
+  if (size * BITS_PER_UNIT < HOST_BITS_PER_WIDE_INT)
+    val &= (HOST_WIDE_INT_1U << (size * BITS_PER_UNIT)) - 1;
 
   for (unsigned part = 0; size; size -= part)
     {
-      val >>= part * BITS_PER_UNIT;
+      if (part * BITS_PER_UNIT == HOST_BITS_PER_WIDE_INT)
+	/* Avoid undefined behaviour.  */
+	val = negative_p ? -1 : 0;
+      else
+	val >>= (part * BITS_PER_UNIT);
       part = init_frag.size - init_frag.offset;
       part = MIN (part, size);
 
@@ -2092,7 +2101,7 @@ nvptx_assemble_integer (rtx x, unsigned int size, int ARG_UNUSED (aligned_p))
       val = INTVAL (XEXP (x, 1));
       x = XEXP (x, 0);
       gcc_assert (GET_CODE (x) == SYMBOL_REF);
-      /* FALLTHROUGH */
+      gcc_fallthrough (); /* FALLTHROUGH */
 
     case SYMBOL_REF:
       gcc_assert (size == init_frag.size);
@@ -2340,6 +2349,7 @@ const char *
 nvptx_output_mov_insn (rtx dst, rtx src)
 {
   machine_mode dst_mode = GET_MODE (dst);
+  machine_mode src_mode = GET_MODE (src);
   machine_mode dst_inner = (GET_CODE (dst) == SUBREG
 			    ? GET_MODE (XEXP (dst, 0)) : dst_mode);
   machine_mode src_inner = (GET_CODE (src) == SUBREG
@@ -2366,7 +2376,7 @@ nvptx_output_mov_insn (rtx dst, rtx src)
   if (GET_MODE_SIZE (dst_inner) == GET_MODE_SIZE (src_inner))
     {
       if (GET_MODE_BITSIZE (dst_mode) == 128
-	  && GET_MODE_BITSIZE (GET_MODE (src)) == 128)
+	  && GET_MODE_BITSIZE (src_mode) == 128)
 	{
 	  /* mov.b128 is not supported.  */
 	  if (dst_inner == V2DImode && src_inner == TImode)
@@ -2378,6 +2388,10 @@ nvptx_output_mov_insn (rtx dst, rtx src)
 	}
       return "%.\tmov.b%T0\t%0, %1;";
     }
+
+  if (GET_MODE_BITSIZE (src_inner) == 128
+      && GET_MODE_BITSIZE (src_mode) == 64)
+    return "%.\tmov.b%T0\t%0, %1;";
 
   return "%.\tcvt%t0%t1\t%0, %1;";
 }
@@ -2589,7 +2603,7 @@ nvptx_print_operand (FILE *file, rtx x, int code)
     {
     case 'A':
       x = XEXP (x, 0);
-      /* FALLTHROUGH.  */
+      gcc_fallthrough (); /* FALLTHROUGH. */
 
     case 'D':
       if (GET_CODE (x) == CONST)
@@ -6522,6 +6536,23 @@ nvptx_set_current_function (tree fndecl)
   oacc_bcast_partition = 0;
 }
 
+/* Implement TARGET_LIBC_HAS_FUNCTION.  */
+
+bool
+nvptx_libc_has_function (enum function_class fn_class, tree type)
+{
+  if (fn_class == function_sincos)
+    {
+      if (type != NULL_TREE)
+	/* Currently, newlib does not support sincosl.  */
+	return type == float_type_node || type == double_type_node;
+      else
+	return true;
+    }
+
+  return default_libc_has_function (fn_class, type);
+}
+
 #undef TARGET_OPTION_OVERRIDE
 #define TARGET_OPTION_OVERRIDE nvptx_option_override
 
@@ -6666,6 +6697,9 @@ nvptx_set_current_function (tree fndecl)
 
 #undef TARGET_SET_CURRENT_FUNCTION
 #define TARGET_SET_CURRENT_FUNCTION nvptx_set_current_function
+
+#undef TARGET_LIBC_HAS_FUNCTION
+#define TARGET_LIBC_HAS_FUNCTION nvptx_libc_has_function
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

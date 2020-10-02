@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "bitmap.h"
 #include "selftest.h"
 #include "function.h"
+#include "json.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
 #include "ordered-hash-map.h"
@@ -101,6 +102,14 @@ tree
 call_details::get_arg_tree (unsigned idx) const
 {
   return gimple_call_arg (m_call, idx);
+}
+
+/* Get the type of argument IDX.  */
+
+tree
+call_details::get_arg_type (unsigned idx) const
+{
+  return TREE_TYPE (gimple_call_arg (m_call, idx));
 }
 
 /* Get argument IDX at the callsite as an svalue.  */
@@ -276,6 +285,30 @@ region_model::impl_call_malloc (const call_details &cd)
   return true;
 }
 
+/* Handle the on_call_pre part of "memcpy" and "__builtin_memcpy".  */
+
+void
+region_model::impl_call_memcpy (const call_details &cd)
+{
+  const svalue *dest_sval = cd.get_arg_svalue (0);
+  const svalue *num_bytes_sval = cd.get_arg_svalue (2);
+
+  const region *dest_reg = deref_rvalue (dest_sval, cd.get_arg_tree (0),
+					 cd.get_ctxt ());
+
+  cd.maybe_set_lhs (dest_sval);
+
+  if (tree num_bytes = num_bytes_sval->maybe_get_constant ())
+    {
+      /* "memcpy" of zero size is a no-op.  */
+      if (zerop (num_bytes))
+	return;
+    }
+
+  /* Otherwise, mark region's contents as unknown.  */
+  mark_region_as_unknown (dest_reg);
+}
+
 /* Handle the on_call_pre part of "memset" and "__builtin_memset".  */
 
 bool
@@ -351,6 +384,21 @@ region_model::impl_call_operator_delete (const call_details &cd)
       unbind_region_and_descendents (freed_reg, POISON_KIND_FREED);
     }
   return false;
+}
+
+/* Handle the on_call_pre part of "strcpy" and "__builtin_strcpy_chk".  */
+
+void
+region_model::impl_call_strcpy (const call_details &cd)
+{
+  const svalue *dest_sval = cd.get_arg_svalue (0);
+  const region *dest_reg = deref_rvalue (dest_sval, cd.get_arg_tree (0),
+					 cd.get_ctxt ());
+
+  cd.maybe_set_lhs (dest_sval);
+
+  /* For now, just mark region's contents as unknown.  */
+  mark_region_as_unknown (dest_reg);
 }
 
 /* Handle the on_call_pre part of "strlen".

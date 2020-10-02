@@ -30,6 +30,10 @@ The maximum number of 'after supernode' exploded nodes within the analyzer per s
 Common Joined UInteger Var(param_analyzer_max_enodes_per_program_point) Init(8) Param
 The maximum number of exploded nodes per program point within the analyzer, before terminating analysis of that point.
 
+-param=analyzer-max-constraints=
+Common Joined UInteger Var(param_analyzer_max_constraints) Init(20) Param
+The maximum number of constraints per state.
+
 -param=analyzer-max-recursion-depth=
 Common Joined UInteger Var(param_analyzer_max_recursion_depth) Init(2) Param
 The maximum number of times a callsite can appear in a call stack within the analyzer, before terminating analysis of a call that would recurse deeper.
@@ -122,6 +126,10 @@ fanalyzer-fine-grained
 Common Var(flag_analyzer_fine_grained) Init(0)
 Avoid combining multiple statements into one exploded edge.
 
+fanalyzer-feasibility
+Common Var(flag_analyzer_feasibility) Init(1)
+Verify that paths are feasible when emitting diagnostics.
+
 fanalyzer-show-duplicate-count
 Common Var(flag_analyzer_show_duplicate_count) Init(0)
 Issue a note when diagnostics are deduplicated.
@@ -181,6 +189,10 @@ Dump a textual representation of the exploded graph to SRCFILE.eg.txt.
 fdump-analyzer-exploded-nodes-3
 Common RejectNegative Var(flag_dump_analyzer_exploded_nodes_3)
 Dump a textual representation of the exploded graph to SRCFILE.eg-ID.txt.
+
+fdump-analyzer-json
+Common RejectNegative Var(flag_dump_analyzer_json)
+Dump analyzer-specific data to a SRCFILE.analyzer.json.gz file.
 
 fdump-analyzer-state-purge
 Common RejectNegative Var(flag_dump_analyzer_state_purge)

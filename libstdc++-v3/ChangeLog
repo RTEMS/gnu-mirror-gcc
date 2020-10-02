@@ -1,3 +1,456 @@
+2020-09-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/cpu/arm/cxxabi_tweaks.h (_GLIBCXX_GUARD_TEST_AND_ACQUIRE):
+	(_GLIBCXX_GUARD_SET_AND_RELEASE): Define for EABI.
+
+2020-09-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (_GLIBCXX_HAVE_BUILTIN_IS_SAME):
+	Define for GCC 11 or when !__is_identifier(__is_same).
+	(_GLIBCXX_BUILTIN_IS_SAME_AS): Remove.
+	* include/std/type_traits (is_same, is_same_v): Replace uses
+	of _GLIBCXX_BUILTIN_IS_SAME_AS.
+
+2020-09-28  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (filter_view): Declare the data member
+	_M_base last instead of first, and adjust constructors' member
+	initializer lists accordingly.
+	(transform_view): Likewise.
+	(take_view): Likewise.
+	(take_while_view): Likewise.
+	(drop_view): Likewise.
+	(drop_while_view): Likewise.
+	(join_view): Likewise.
+	(split_view): Likewise (and tweak nearby formatting).
+	(reverse_view): Likewise.
+	* testsuite/std/ranges/adaptors/sizeof.cc: Update expected
+	sizes.
+
+2020-09-28  Patrick Palka  <ppalka@redhat.com>
+
+	* testsuite/std/ranges/adaptors/sizeof.cc: New test.
+
+2020-09-28  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_util.h (subrange::_M_end): Give it
+	[[no_unique_address]].
+	* testsuite/std/ranges/subrange/sizeof.cc: New test.
+
+2020-09-28  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (iota_view::_M_bound): Give it
+	[[no_unique_address]].
+	* testsuite/std/ranges/iota/iota_view.cc: Check that an
+	unbounded iota_view has minimal size.
+
+2020-09-27  Clement Chigot  <clement.chigot@atos.net>
+
+	* config/os/aix/t-aix: Use $(AR) without -X32_64.
+
+2020-09-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96817
+	* include/ext/atomicity.h (__gnu_cxx::__is_single_threaded()):
+	New function wrapping __libc_single_threaded if available.
+	(__exchange_and_add_dispatch, __atomic_add_dispatch): Use it.
+	* libsupc++/guard.cc (__cxa_guard_acquire, __cxa_guard_abort)
+	(__cxa_guard_release): Likewise.
+	* testsuite/18_support/96817.cc: New test.
+
+2020-09-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/Makefile.am: Remove redundant -std=gnu++1z flags.
+	* libsupc++/Makefile.in: Regenerate.
+
+2020-09-24  Antony Polukhin  <antoshkka@gmail.com>
+
+	PR libstdc++/71579
+	* include/std/type_traits (invoke_result, is_invocable)
+	(is_invocable_r, is_nothrow_invocable, is_nothrow_invocable_r):
+	Add static_asserts to make sure that the arguments of the type
+	traits are not misused with incomplete types.
+	* testsuite/20_util/invoke_result/incomplete_args_neg.cc: New test.
+	* testsuite/20_util/is_invocable/incomplete_args_neg.cc: New test.
+	* testsuite/20_util/is_invocable/incomplete_neg.cc: New test.
+	* testsuite/20_util/is_nothrow_invocable/incomplete_args_neg.cc:
+	New test.
+	* testsuite/20_util/is_nothrow_invocable/incomplete_neg.cc: Check
+	for error on incomplete type usage in trait.
+
+2020-09-24  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (__detail::__boxable): Split out the
+	associated constraints of __box into here.
+	(__detail::__box): Use the __boxable concept.  Define a leaner
+	partial specialization for semiregular types.
+	(single_view::_M_value): Give it [[no_unique_address]].
+	(filter_view::_M_pred): Likewise.
+	(transform_view::_M_fun): Likewise.
+	(take_while_view::_M_pred): Likewise.
+	(drop_while_view::_M_pred):: Likewise.
+	* testsuite/std/ranges/adaptors/detail/semiregular_box.cc: New
+	test.
+
+2020-09-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/configure.xml: Correct name of option.
+	* doc/html/*: Regenerate.
+
+2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97167
+	* src/c++17/fs_path.cc (path::_Parser::root_path()): Check
+	for empty string before inspecting the first character.
+	* testsuite/27_io/filesystem/path/append/source.cc: Append
+	empty string_view to path.
+
+2020-09-22  Glen Joseph Fernandes  <glenjofe@gmail.com>
+
+	* include/bits/align.h (align): Fix overflow handling.
+	* testsuite/20_util/align/3.cc: New test.
+
+2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/Makefile.am: Add new headers and adjust for renamed
+	header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/iterator_concepts.h: Adjust for renamed header.
+	* include/bits/range_access.h (ranges::*): Move to new
+	<bits/ranges_base.h> header.
+	* include/bits/ranges_algobase.h: Include new <bits/ranges_base.h>
+	header instead of <ranges>.
+	* include/bits/ranges_algo.h: Include new <bits/ranges_util.h>
+	header.
+	* include/bits/range_cmp.h: Moved to...
+	* include/bits/ranges_cmp.h: ...here.
+	* include/bits/ranges_base.h: New header.
+	* include/bits/ranges_util.h: New header.
+	* include/experimental/string_view: Include new
+	<bits/ranges_base.h> header.
+	* include/std/functional: Adjust for renamed header.
+	* include/std/ranges (ranges::view_base, ranges::enable_view)
+	(ranges::dangling, ranges::borrowed_iterator_t): Move to new
+	<bits/ranges_base.h> header.
+	(ranges::view_interface, ranges::subrange)
+	(ranges::borrowed_subrange_t): Move to new <bits/ranges_util.h>
+	header.
+	* include/std/span: Include new <bits/ranges_base.h> header.
+	* include/std/string_view: Likewise.
+	* testsuite/24_iterators/back_insert_iterator/pr93884.cc: Add
+	missing <ranges> header.
+	* testsuite/24_iterators/front_insert_iterator/pr93884.cc:
+	Likewise.
+
+2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96803
+	* include/std/tuple
+	(_Tuple_impl(allocator_arg_t, Alloc, const _Tuple_impl<U...>&)):
+	Use correct value category in __use_alloc call.
+	* testsuite/20_util/tuple/cons/96803.cc: Check with constructors
+	that require correct value category to be used.
+
+2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/span (span::front): Remove static_assert.
+	(span::back): Likewise.
+	(span::operator[]): Likewise.
+	* testsuite/23_containers/span/back_neg.cc: Rewrite to verify
+	that we check the preconditions of back() only when it's called.
+	* testsuite/23_containers/span/front_neg.cc: Likewise for
+	front().
+	* testsuite/23_containers/span/index_op_neg.cc: Likewise for
+	operator[].
+
+2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (__sample): Exit early when the
+	input range is empty.
+	* testsuite/25_algorithms/sample/3.cc: New test.
+
+2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (for_each_n): Mark constexpr for C++20.
+	(search): Likewise for the overload that takes a searcher.
+	* testsuite/25_algorithms/for_each/constexpr.cc: Test constexpr
+	std::for_each_n.
+	* testsuite/25_algorithms/search/constexpr.cc: Test constexpr
+	std::search overload that takes a searcher.
+
+2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (__replacement_assert): Add noreturn
+	attribute.
+	(__glibcxx_assert_impl): Use __builtin_expect to hint that the
+	assertion is expected to pass.
+
+2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (drop_view::begin()): Adjust constraints
+	to match the correct condition for O(1) ranges::next (LWG 3482).
+	* testsuite/std/ranges/adaptors/drop.cc: Check that iterator is
+	cached for non-sized_range.
+
+2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (transform_view, elements_view): Relax
+	constraints on operator- for iterators, as per LWG 3483.
+	* testsuite/std/ranges/adaptors/elements.cc: Check that we
+	can take the difference of two iterators from a non-random
+	access range.
+	* testsuite/std/ranges/adaptors/transform.cc: Likewise.
+
+2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97132
+	* include/bits/align.h (align) [!_GLIBCXX_USE_C99_STDINT_TR1]:
+	Remove unused code.
+	(assume_aligned): Do not use __builtin_assume_aligned during
+	constant evaluation.
+	* testsuite/20_util/assume_aligned/1.cc: Improve test.
+	* testsuite/20_util/assume_aligned/97132.cc: New test.
+
+2020-09-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97101
+	* include/std/functional (bind_front): Fix order of parameters
+	in is_nothrow_constructible_v specialization.
+	* testsuite/20_util/function_objects/bind_front/97101.cc: New test.
+
+2020-09-11  Thomas Rodgers  <trodgers@redhat.com>
+
+	* include/std/memory: Move #include <bits/align.h> inside C++11
+	conditional includes.
+
+2020-09-11  Thomas Rodgers  <trodgers@redhat.com>
+
+	* include/Makefile.am (bits_headers): Add new header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/align.h: New file.
+	* include/std/memory (align): Move definition to bits/align.h.
+	(assume_aligned): Likewise.
+
+2020-09-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/chrono [C++17] (chrono::__detail::ceil): Add
+	using declaration to make chrono::ceil available for internal
+	use with a consistent name.
+	(chrono::__detail::__ceil_impl): New function template.
+	(chrono::__detail::ceil): Use __ceil_impl to compare and
+	increment the value. Remove SFINAE constraint.
+
+2020-09-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/regex_error.h (__throw_regex_error): Fix
+	parameter declaration and use reserved attribute names.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* include/std/condition_variable (condition_variable::wait_until):
+	Convert delta to steady_clock duration before adding to current
+	steady_clock time to avoid rounding errors described in PR68519.
+	(condition_variable::wait_for): Simplify calculation of absolute
+	time by using chrono::__detail::ceil in both overloads.
+	* testsuite/30_threads/condition_variable/members/68519.cc:
+	(test_wait_for): Renamed from test01. Replace unassigned val
+	variable with constant false. Reduce scope of mx and cv
+	variables to just test_wait_for function.
+	(test_wait_until): Add new test case.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	PR libstdc++/91486
+	* include/bits/atomic_futex.h
+	(__atomic_futex_unsigned::_M_load_when_equal_for)
+	(__atomic_futex_unsigned::_M_load_when_equal_until): Use
+	__detail::ceil to convert delta to the reference clock
+	duration type to avoid resolution problems.
+	* include/std/chrono (__detail::ceil): Move implementation
+	of std::chrono::ceil into private namespace so that it's
+	available to pre-C++17 code.
+	* testsuite/30_threads/async/async.cc (test_pr91486):
+	Test __atomic_futex_unsigned::_M_load_when_equal_for.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* include/bits/atomic_futex.h
+	(__atomic_futex_unsigned::_M_load_when_equal_until): Add
+	loop on generic _Clock to check the timeout against _Clock
+	again after _M_load_when_equal_until returns indicating a
+	timeout.
+	* testsuite/30_threads/async/async.cc: Invent slow_clock
+	that runs at an eleventh of steady_clock's speed. Use it
+	to test the user-supplied-clock variant of
+	__atomic_futex_unsigned::_M_load_when_equal_until works
+	generally with test03 and loops correctly when the timeout
+	time hasn't been reached in test04.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* include/bits/atomic_futex.h (__atomic_futex_unsigned): Change
+	__clock_t typedef to use steady_clock so that unknown clocks are
+	synced to it rather than system_clock. Change existing __clock_t
+	overloads of _M_load_and_text_until_impl and
+	_M_load_when_equal_until to use system_clock explicitly. Remove
+	comment about DR 887 since these changes address that problem as
+	best as we currently able.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* config/abi/pre/gnu.ver: Update for addition of
+	__atomic_futex_unsigned_base::_M_futex_wait_until_steady.
+	* include/bits/atomic_futex.h (__atomic_futex_unsigned_base):
+	Add comments to clarify that _M_futex_wait_until and
+	_M_load_and_test_until use CLOCK_REALTIME.
+	(__atomic_futex_unsigned_base::_M_futex_wait_until_steady)
+	(__atomic_futex_unsigned_base::_M_load_and_text_until_steady):
+	New member functions that use CLOCK_MONOTONIC.
+	(__atomic_futex_unsigned_base::_M_load_and_test_until_impl)
+	(__atomic_futex_unsigned_base::_M_load_when_equal_until): Add
+	overloads that accept a steady_clock time_point and use the
+	new member functions.
+	* src/c++11/futex.cc: Include headers required for
+	clock_gettime.
+	(futex_clock_monotonic_flag): New constant to tell futex to
+	use CLOCK_MONOTONIC to match existing futex_clock_realtime_flag.
+	(futex_clock_monotonic_unavailable): New global to store the
+	result of trying to use CLOCK_MONOTONIC.
+	(__atomic_futex_unsigned_base::_M_futex_wait_until_steady): Add
+	new variant of _M_futex_wait_until that uses CLOCK_MONOTONIC to
+	support waiting using steady_clock.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* src/c++11/futex.cc: Add new constants for required futex
+	flags.  Add futex_clock_realtime_unavailable flag to store
+	result of trying to use FUTEX_CLOCK_REALTIME.
+	(__atomic_futex_unsigned_base::_M_futex_wait_until): Try to
+	use FUTEX_WAIT_BITSET with FUTEX_CLOCK_REALTIME and only
+	fall back to using gettimeofday and FUTEX_WAIT if that's not
+	supported.
+
+2020-09-11  Mike Crowe  <mac@mcrowe.com>
+
+	* testsuite/30_threads/async/async.cc (test02): Test steady_clock
+	with std::future::wait_until.
+	(test03): Add new test templated on clock type waiting for future
+	associated with async to resolve.
+	(main): Call test03 to test both system_clock and steady_clock.
+
+2020-09-11  Torbjörn SVENSSON  <torbjorn.svensson@st.com>
+	    Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* libsupc++/eh_call.cc: Avoid warning with -fno-exceptions.
+
+2020-09-11  Torbjörn SVENSSON  <torbjorn.svensson@st.com>
+	    Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* libsupc++/eh_call.cc: Avoid warning with -fno-exceptions.
+
+2020-09-11  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* include/bits/regex_error.h: Avoid warning with -fno-exceptions.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/locale_conv.h (__do_str_codecvt, __str_codecvt_in_all):
+	Add casts to compare types of the same signedness.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_algobase.h (__equal_fn): Remove unused
+	typedef.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/version (__cpp_lib_array_constexpr):
+	(__cpp_lib_constexpr_char_traits): Only define C++17 value when
+	compiling C++17.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/bits/shared_ptr.h (shared_ptr(auto_ptr&&))
+	(operator=(auto_ptr&&)): Add diagnostic pragmas to suppress
+	warnings for uses of std::auto_ptr.
+	* include/experimental/type_traits (is_literal_type_v):
+	Likewise, for use of std::is_literal_type.
+	* include/std/condition_variable (condition_variable_any::_Unlock):
+	Likewise, for use of std::uncaught_exception.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/fs_path.h (path::_List::type()): Avoid narrowing
+	conversion.
+	* include/std/chrono (operator+(const year&, const years&)):
+	Likewise.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/codecvt.h (codecvt_byname): Remove names of
+	unused parameters.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/locale_facets_nonio.tcc: Adjust whitespace.
+
+2020-09-10  Krystian Kuźniarek  <krystian.kuzniarek@gmail.com>
+
+	* include/c_global/cmath (__lerp): Avoid -Wparentheses warnings.
+
+2020-09-10  Krystian Kuźniarek  <krystian.kuzniarek@gmail.com>
+
+	* include/bits/atomic_base.h: Fix -Wunused-variable
+	warnings.
+	* include/ext/new_allocator.h: Fix -Wunused-parameter
+	warnings.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_iterator.h (counted_iterator): Add assertions
+	to check preconditions added by LWG 3472.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94160
+	* src/c++17/memory_resource.cc (munge_options): Round
+	max_blocks_per_chunk to a multiple of four.
+	(__pool_resource::_M_alloc_pools()): Simplify slightly.
+	* testsuite/20_util/unsynchronized_pool_resource/allocate.cc:
+	Check that valid pointers are returned when small values are
+	used for max_blocks_per_chunk.
+
+2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96942
+	* include/std/memory_resource (monotonic_buffer_resource::do_allocate):
+	Use __builtin_expect when checking if a new buffer needs to be
+	allocated from the upstream resource, and for checks for edge
+	cases like zero sized buffers and allocations.
+	* src/c++17/memory_resource.cc (aligned_size): New class template.
+	(aligned_ceil): New helper function to round up to a given
+	alignment.
+	(monotonic_buffer_resource::chunk): Replace _M_size and _M_align
+	with an aligned_size member. Remove _M_canary member. Change _M_next
+	to pointer instead of unaligned buffer.
+	(monotonic_buffer_resource::chunk::allocate): Round up to multiple
+	of 64 instead of to power of two. Check for size overflow. Remove
+	redundant check for minimum required alignment.
+	(monotonic_buffer_resource::chunk::release): Adjust for changes
+	to data members.
+	(monotonic_buffer_resource::_M_new_buffer): Use aligned_ceil.
+	(big_block): Replace _M_size and _M_align with aligned_size
+	member.
+	(big_block::big_block): Check for size overflow.
+	(big_block::size, big_block::align): Adjust to use aligned_size.
+	(big_block::alloc_size): Use aligned_ceil.
+	(munge_options): Use aligned_ceil.
+	(__pool_resource::allocate): Use big_block::align for alignment.
+	* testsuite/20_util/monotonic_buffer_resource/allocate.cc: Check
+	upstream resource gets expected values for impossible sizes.
+	* testsuite/20_util/unsynchronized_pool_resource/allocate.cc:
+	Likewise. Adjust checks for expected alignment in existing test.
+
 2020-09-07  Jonathan Wakely  <jwakely@redhat.com>
 
 	* include/std/chrono (duration::_S_gcd): Use invariant that

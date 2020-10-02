@@ -906,9 +906,8 @@ dump_strlen_info (FILE *fp, gimple *stmt, range_query *rvals)
 		      if (rvals)
 			{
 			  value_range vr;
-			  if (!rvals->range_of_expr (vr, si->nonzero_chars,
-						     si->stmt))
-			    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+			  rvals->range_of_expr (vr, si->nonzero_chars,
+						si->stmt);
 			  rng = vr.kind ();
 			  if (range_int_cst_p (&vr))
 			    {
@@ -1109,8 +1108,7 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
 	  else if (TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	    {
 	      value_range vr;
-	      if (!rvals->range_of_expr (vr, si->nonzero_chars, si->stmt))
-		vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	      rvals->range_of_expr (vr, si->nonzero_chars, si->stmt);
 	      if (range_int_cst_p (&vr))
 		{
 		  pdata->minlen = vr.min ();
@@ -1154,8 +1152,7 @@ get_range_strlen_dynamic (tree src, gimple *stmt,
       else if (pdata->minlen && TREE_CODE (pdata->minlen) == SSA_NAME)
 	{
 	  value_range vr;
-	  if (!rvals->range_of_expr (vr, si->nonzero_chars, stmt))
-	    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	  rvals->range_of_expr (vr, si->nonzero_chars, stmt);
 	  if (range_int_cst_p (&vr))
 	    {
 	      pdata->minlen = vr.min ();
@@ -4855,8 +4852,7 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
 	       && TREE_CODE (si->nonzero_chars) == SSA_NAME)
 	{
 	  value_range vr;
-	  if (!rvals->range_of_expr (vr, si->nonzero_chars, si->stmt))
-	    vr.set_varying (TREE_TYPE (si->nonzero_chars));
+	  rvals->range_of_expr (vr, si->nonzero_chars, si->stmt);
 	  if (vr.kind () != VR_RANGE)
 	    return false;
 

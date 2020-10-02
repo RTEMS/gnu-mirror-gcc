@@ -12646,6 +12646,64 @@ do_range_for_auto_deduction (tree decl, tree range_expr)
     }
 }
 
+/* Warns when the loop variable should be changed to a reference type to
+   avoid unnecessary copying.  I.e., from
+
+     for (const auto x : range)
+
+   where range returns a reference, to
+
+     for (const auto &x : range)
+
+   if this version doesn't make a copy.  DECL is the RANGE_DECL; EXPR is the
+   *__for_begin expression.
+   This function is never called when processing_template_decl is on.  */
+
+static void
+warn_for_range_copy (tree decl, tree expr)
+{
+  if (!warn_range_loop_construct
+      || decl == error_mark_node)
+    return;
+
+  location_t loc = DECL_SOURCE_LOCATION (decl);
+  tree type = TREE_TYPE (decl);
+
+  if (from_macro_expansion_at (loc))
+    return;
+
+  if (TYPE_REF_P (type))
+    {
+      /* TODO: Implement reference warnings.  */
+      return;
+    }
+  else if (!CP_TYPE_CONST_P (type))
+    return;
+
+  /* Since small trivially copyable types are cheap to copy, we suppress the
+     warning for them.  64B is a common size of a cache line.  */
+  if (TREE_CODE (TYPE_SIZE_UNIT (type)) != INTEGER_CST
+      || (tree_to_uhwi (TYPE_SIZE_UNIT (type)) <= 64
+	  && trivially_copyable_p (type)))
+    return;
+
+  tree rtype = cp_build_reference_type (type, /*rval*/false);
+  /* If we could initialize the reference directly, it wouldn't involve any
+     copies.  */
+  if (!ref_conv_binds_directly_p (rtype, expr))
+    return;
+
+  auto_diagnostic_group d;
+  if (warning_at (loc, OPT_Wrange_loop_construct,
+		  "loop variable %qD creates a copy from type %qT",
+		  decl, type))
+    {
+      gcc_rich_location richloc (loc);
+      richloc.add_fixit_insert_before ("&");
+      inform (&richloc, "use reference type to prevent copying");
+    }
+}
+
 /* Converts a range-based for-statement into a normal
    for-statement, as per the definition.
 
@@ -12656,7 +12714,7 @@ do_range_for_auto_deduction (tree decl, tree range_expr)
 
       {
 	auto &&__range = RANGE_EXPR;
-	for (auto __begin = BEGIN_EXPR, end = END_EXPR;
+	for (auto __begin = BEGIN_EXPR, __end = END_EXPR;
 	      __begin != __end;
 	      ++__begin)
 	  {
@@ -12756,13 +12814,15 @@ cp_convert_range_for (tree statement, tree range_decl, tree range_expr,
     cp_maybe_mangle_decomp (range_decl, decomp_first_name, decomp_cnt);
 
   /* The declaration is initialized with *__begin inside the loop body.  */
-  cp_finish_decl (range_decl,
-		  build_x_indirect_ref (input_location, begin, RO_UNARY_STAR,
-					tf_warning_or_error),
+  tree deref_begin = build_x_indirect_ref (input_location, begin, RO_UNARY_STAR,
+					   tf_warning_or_error);
+  cp_finish_decl (range_decl, deref_begin,
 		  /*is_constant_init*/false, NULL_TREE,
 		  LOOKUP_ONLYCONVERTING);
   if (VAR_P (range_decl) && DECL_DECOMPOSITION_P (range_decl))
     cp_finish_decomp (range_decl, decomp_first_name, decomp_cnt);
+
+  warn_for_range_copy (range_decl, deref_begin);
 
   return statement;
 }
@@ -14096,12 +14156,9 @@ cp_parser_decomposition_declaration (cp_parser *parser,
 
       if (decl != error_mark_node)
 	{
-	  int flags = (decl_spec_seq_has_spec_p (decl_specifiers, ds_constinit)
-		       ? LOOKUP_CONSTINIT : 0);
 	  cp_maybe_mangle_decomp (decl, prev, v.length ());
 	  cp_finish_decl (decl, initializer, non_constant_p, NULL_TREE,
-			  (is_direct_init ? LOOKUP_NORMAL : LOOKUP_IMPLICIT)
-			  | flags);
+			  (is_direct_init ? LOOKUP_NORMAL : LOOKUP_IMPLICIT));
 	  cp_finish_decomp (decl, prev, v.length ());
 	}
     }
@@ -19060,21 +19117,20 @@ cp_parser_elaborated_type_specifier (cp_parser* parser,
 	     definition of a new type; a new type can only be declared in a
 	     declaration context.  */
 
-	  tag_scope ts;
-	  bool template_p;
+	  TAG_how how;
 
 	  if (is_friend)
 	    /* Friends have special name lookup rules.  */
-	    ts = ts_within_enclosing_non_class;
+	    how = TAG_how::HIDDEN_FRIEND;
 	  else if (is_declaration
 		   && cp_lexer_next_token_is (parser->lexer,
 					      CPP_SEMICOLON))
 	    /* This is a `class-key identifier ;' */
-	    ts = ts_current;
+	    how = TAG_how::CURRENT_ONLY;
 	  else
-	    ts = ts_global;
+	    how = TAG_how::GLOBAL;
 
-	  template_p =
+	  bool template_p =
 	    (template_parm_lists_apply
 	     && (cp_parser_next_token_starts_class_definition_p (parser)
 		 || cp_lexer_next_token_is (parser->lexer, CPP_SEMICOLON)));
@@ -19087,7 +19143,8 @@ cp_parser_elaborated_type_specifier (cp_parser* parser,
 						       token->location,
 						       /*declarator=*/NULL))
 	    return error_mark_node;
-	  type = xref_tag (tag_type, identifier, ts, template_p);
+
+	  type = xref_tag (tag_type, identifier, how, template_p);
 	}
     }
 
@@ -21018,8 +21075,6 @@ cp_parser_init_declarator (cp_parser* parser,
      declarations.  */
   if (!member_p && decl && decl != error_mark_node && !range_for_decl_p)
     {
-      int cf = (decl_spec_seq_has_spec_p (decl_specifiers, ds_constinit)
-		? LOOKUP_CONSTINIT : 0);
       cp_finish_decl (decl,
 		      initializer, !is_non_constant_init,
 		      asm_specification,
@@ -21028,7 +21083,7 @@ cp_parser_init_declarator (cp_parser* parser,
 			 `explicit' constructor is OK.  Otherwise, an
 			 `explicit' constructor cannot be used.  */
 		      ((is_direct_init || !is_initialized)
-		       ? LOOKUP_NORMAL : LOOKUP_IMPLICIT) | cf);
+		       ? LOOKUP_NORMAL : LOOKUP_IMPLICIT));
     }
   else if ((cxx_dialect != cxx98) && friend_p
 	   && decl && TREE_CODE (decl) == FUNCTION_DECL)
@@ -24713,10 +24768,10 @@ cp_parser_class_head (cp_parser* parser,
       /* If the class was unnamed, create a dummy name.  */
       if (!id)
 	id = make_anon_name ();
-      tag_scope tag_scope = (parser->in_type_id_in_expr_p
-			     ? ts_within_enclosing_non_class
-			     : ts_current);
-      type = xref_tag (class_key, id, tag_scope,
+      TAG_how how = (parser->in_type_id_in_expr_p
+		     ? TAG_how::INNERMOST_NON_CLASS
+		     : TAG_how::CURRENT_ONLY);
+      type = xref_tag (class_key, id, how,
 		       parser->num_template_parameter_lists);
     }
 
@@ -32985,44 +33040,42 @@ cp_parser_objc_method_prototype_list (cp_parser* parser)
 static void
 cp_parser_objc_method_definition_list (cp_parser* parser)
 {
-  cp_token *token = cp_lexer_peek_token (parser->lexer);
-
-  while (token->keyword != RID_AT_END && token->type != CPP_EOF)
+  for (;;)
     {
-      tree meth;
+      cp_token *token = cp_lexer_peek_token (parser->lexer);
 
-      if (token->type == CPP_PLUS || token->type == CPP_MINUS)
+      if (token->keyword == RID_AT_END)
 	{
-	  cp_token *ptk;
-	  tree sig, attribute;
-	  bool is_class_method;
-	  if (token->type == CPP_PLUS)
-	    is_class_method = true;
-	  else
-	    is_class_method = false;
+	  cp_lexer_consume_token (parser->lexer);  /* Eat '@end'.  */
+	  break;
+	}
+      else if (token->type == CPP_EOF)
+	{
+	  cp_parser_error (parser, "expected %<@end%>");
+	  break;
+	}
+      else if (token->type == CPP_PLUS || token->type == CPP_MINUS)
+	{
+	  bool is_class_method = token->type == CPP_PLUS;
+
 	  push_deferring_access_checks (dk_deferred);
-	  sig = cp_parser_objc_method_signature (parser, &attribute);
+	  tree attribute;
+	  tree sig = cp_parser_objc_method_signature (parser, &attribute);
 	  if (sig == error_mark_node)
+	    cp_parser_skip_to_end_of_block_or_statement (parser);
+	  else
 	    {
-	      cp_parser_skip_to_end_of_block_or_statement (parser);
-	      token = cp_lexer_peek_token (parser->lexer);
-	      continue;
-	    }
-	  objc_start_method_definition (is_class_method, sig, attribute,
-					NULL_TREE);
+	      objc_start_method_definition (is_class_method, sig,
+					    attribute, NULL_TREE);
 
-	  /* For historical reasons, we accept an optional semicolon.  */
-	  if (cp_lexer_next_token_is (parser->lexer, CPP_SEMICOLON))
-	    cp_lexer_consume_token (parser->lexer);
+	      /* For historical reasons, we accept an optional semicolon.  */
+	      if (cp_lexer_next_token_is (parser->lexer, CPP_SEMICOLON))
+		cp_lexer_consume_token (parser->lexer);
 
-	  ptk = cp_lexer_peek_token (parser->lexer);
-	  if (!(ptk->type == CPP_PLUS || ptk->type == CPP_MINUS
-		|| ptk->type == CPP_EOF || ptk->keyword == RID_AT_END))
-	    {
 	      perform_deferred_access_checks (tf_warning_or_error);
 	      stop_deferring_access_checks ();
-	      meth = cp_parser_function_definition_after_declarator (parser,
-								     false);
+	      tree meth
+		= cp_parser_function_definition_after_declarator (parser, false);
 	      pop_deferring_access_checks ();
 	      objc_finish_method_definition (meth);
 	    }
@@ -33042,14 +33095,7 @@ cp_parser_objc_method_definition_list (cp_parser* parser)
       else
 	/* Allow for interspersed non-ObjC++ code.  */
 	cp_parser_objc_interstitial_code (parser);
-
-      token = cp_lexer_peek_token (parser->lexer);
     }
-
-  if (token->type != CPP_EOF)
-    cp_lexer_consume_token (parser->lexer);  /* Eat '@end'.  */
-  else
-    cp_parser_error (parser, "expected %<@end%>");
 
   objc_finish_implementation ();
 }
@@ -42581,7 +42627,7 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
       if (current_function_decl)
 	{
 	  block_scope = true;
-	  DECL_CONTEXT (fndecl) = global_namespace;
+	  DECL_CONTEXT (fndecl) = current_function_decl;
 	  DECL_LOCAL_DECL_P (fndecl) = true;
 	  if (!processing_template_decl)
 	    pushdecl (fndecl);
@@ -42606,7 +42652,9 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
       else
 	{
 	  DECL_CONTEXT (fndecl) = current_namespace;
-	  pushdecl (fndecl);
+	  tree d = pushdecl (fndecl);
+	  /* We should never meet a matched duplicate decl.  */
+	  gcc_checking_assert (d == error_mark_node || d == fndecl);
 	}
       if (!block_scope)
 	start_preparsed_function (fndecl, NULL_TREE, SF_PRE_PARSED);

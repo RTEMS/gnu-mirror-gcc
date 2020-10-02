@@ -1355,6 +1355,12 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       case BUILT_IN_STRSTR:
 	strops = 2;
 	strret = 1;
+	break;
+      case BUILT_IN_ASAN_POINTER_COMPARE:
+      case BUILT_IN_ASAN_POINTER_SUBTRACT:
+	/* These builtins shall be ignored during constant expression
+	   evaluation.  */
+	return void_node;
       default:
 	break;
       }
@@ -2336,9 +2342,10 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	      tree arg = CALL_EXPR_ARG (t, i);
 	      arg = cxx_eval_constant_expression (ctx, arg, false,
 						  non_constant_p, overflow_p);
-	      VERIFY_CONSTANT (arg);
 	      if (i == 1)
 		arg1 = arg;
+	      else
+		VERIFY_CONSTANT (arg);
 	    }
 	  gcc_assert (arg1);
 	  return arg1;

@@ -597,7 +597,7 @@ struct directive
 
   /* Format conversion function that given a directive and an argument
      returns the formatting result.  */
-  fmtresult (*fmtfunc) (gimple *, const directive &, tree, range_query *);
+  fmtresult (*fmtfunc) (const directive &, tree, range_query *);
 
   /* Return True when the format flag CHR has been used.  */
   bool get_flag (char chr) const
@@ -965,7 +965,7 @@ directive::set_precision (tree arg, range_query *query)
 /* Return the result of formatting a no-op directive (such as '%n').  */
 
 static fmtresult
-format_none (gimple *, const directive &, tree, range_query *)
+format_none (const directive &, tree, range_query *)
 {
   fmtresult res (0);
   return res;
@@ -974,7 +974,7 @@ format_none (gimple *, const directive &, tree, range_query *)
 /* Return the result of formatting the '%%' directive.  */
 
 static fmtresult
-format_percent (gimple *, const directive &, tree, range_query *)
+format_percent (const directive &, tree, range_query *)
 {
   fmtresult res (1);
   return res;
@@ -1075,8 +1075,7 @@ get_int_range (tree arg, gimple *stmt,
 	{
 	  /* Try to determine the range of values of the integer argument.  */
 	  value_range vr;
-	  if (!query->range_of_expr (vr, arg, stmt))
-	    vr.set_varying (TREE_TYPE (arg));
+	  query->range_of_expr (vr, arg, stmt);
 
 	  if (!vr.undefined_p () && !vr.varying_p ())
 	    {
@@ -1197,8 +1196,7 @@ adjust_range_for_overflow (tree dirtype, tree *argmin, tree *argmax)
    used when the directive argument or its value isn't known.  */
 
 static fmtresult
-format_integer (gimple *stmt, const directive &dir, tree arg,
-		range_query *query)
+format_integer (const directive &dir, tree arg, range_query *query)
 {
   tree intmax_type_node;
   tree uintmax_type_node;
@@ -1382,8 +1380,7 @@ format_integer (gimple *stmt, const directive &dir, tree arg,
       /* Try to determine the range of values of the integer argument
 	 (range information is not available for pointers).  */
       value_range vr;
-      if (!query->range_of_expr (vr, arg, stmt))
-	vr.set_varying (TREE_TYPE (arg));
+      query->range_of_expr (vr, arg, dir.info->callstmt);
 
       if (!vr.varying_p () && !vr.undefined_p ())
 	{
@@ -1414,7 +1411,7 @@ format_integer (gimple *stmt, const directive &dir, tree arg,
 	      if (code == INTEGER_CST)
 		{
 		  arg = gimple_assign_rhs1 (def);
-		  return format_integer (def, dir, arg, query);
+		  return format_integer (dir, arg, query);
 		}
 
 	      if (code == NOP_EXPR)
@@ -1459,16 +1456,16 @@ format_integer (gimple *stmt, const directive &dir, tree arg,
       /* For unsigned conversions/directives or signed when
 	 the minimum is positive, use the minimum and maximum to compute
 	 the shortest and longest output, respectively.  */
-      res.range.min = format_integer (stmt, dir, argmin, query).range.min;
-      res.range.max = format_integer (stmt, dir, argmax, query).range.max;
+      res.range.min = format_integer (dir, argmin, query).range.min;
+      res.range.max = format_integer (dir, argmax, query).range.max;
     }
   else if (tree_int_cst_sgn (argmax) < 0)
     {
       /* For signed conversions/directives if maximum is negative,
 	 use the minimum as the longest output and maximum as the
 	 shortest output.  */
-      res.range.min = format_integer (stmt, dir, argmax, query).range.min;
-      res.range.max = format_integer (stmt, dir, argmin, query).range.max;
+      res.range.min = format_integer (dir, argmax, query).range.min;
+      res.range.max = format_integer (dir, argmin, query).range.max;
     }
   else
     {
@@ -1477,11 +1474,11 @@ format_integer (gimple *stmt, const directive &dir, tree arg,
 	 length of the output of both minimum and maximum and pick the
 	 longer.  */
       unsigned HOST_WIDE_INT max1
-	= format_integer (stmt, dir, argmin, query).range.max;
+	= format_integer (dir, argmin, query).range.max;
       unsigned HOST_WIDE_INT max2
-	= format_integer (stmt, dir, argmax, query).range.max;
+	= format_integer (dir, argmax, query).range.max;
       res.range.min
-	= format_integer (stmt, dir, integer_zero_node, query).range.min;
+	= format_integer (dir, integer_zero_node, query).range.min;
       res.range.max = MAX (max1, max2);
     }
 
@@ -1830,7 +1827,7 @@ format_floating (const directive &dir, const HOST_WIDE_INT prec[2])
    ARG.  */
 
 static fmtresult
-format_floating (gimple *, const directive &dir, tree arg, range_query *)
+format_floating (const directive &dir, tree arg, range_query *)
 {
   HOST_WIDE_INT prec[] = { dir.prec[0], dir.prec[1] };
   tree type = (dir.modifier == FMT_LEN_L || dir.modifier == FMT_LEN_ll
@@ -2133,8 +2130,7 @@ get_string_length (tree str, gimple *stmt, unsigned eltsize,
    vsprinf).  */
 
 static fmtresult
-format_character (gimple *stmt, const directive &dir, tree arg,
-		  range_query *query)
+format_character (const directive &dir, tree arg, range_query *query)
 {
   fmtresult res;
 
@@ -2147,7 +2143,7 @@ format_character (gimple *stmt, const directive &dir, tree arg,
       res.range.min = 0;
 
       HOST_WIDE_INT min, max;
-      if (get_int_range (arg, stmt, &min, &max, false, 0, query))
+      if (get_int_range (arg, dir.info->callstmt, &min, &max, false, 0, query))
 	{
 	  if (min == 0 && max == 0)
 	    {
@@ -2445,8 +2441,7 @@ alias_offset (tree arg, tree dst, HOST_WIDE_INT dst_fld)
    vsprinf).  */
 
 static fmtresult
-format_string (gimple *stmt, const directive &dir, tree arg,
-	       range_query *query)
+format_string (const directive &dir, tree arg, range_query *query)
 {
   fmtresult res;
 
@@ -2475,7 +2470,7 @@ format_string (gimple *stmt, const directive &dir, tree arg,
       gcc_checking_assert (count_by == 2 || count_by == 4);
     }
 
-  fmtresult slen = get_string_length (arg, stmt, count_by, query);
+  fmtresult slen = get_string_length (arg, dir.info->callstmt, count_by, query);
   if (slen.range.min == slen.range.max
       && slen.range.min < HOST_WIDE_INT_MAX)
     {
@@ -2647,7 +2642,7 @@ format_string (gimple *stmt, const directive &dir, tree arg,
 /* Format plain string (part of the format string itself).  */
 
 static fmtresult
-format_plain (gimple *, const directive &dir, tree, range_query *)
+format_plain (const directive &dir, tree, range_query *)
 {
   fmtresult res (dir.len);
   return res;
@@ -3068,7 +3063,7 @@ format_directive (const call_info &info,
     return false;
 
   /* Compute the range of lengths of the formatted output.  */
-  fmtresult fmtres = dir.fmtfunc (info.callstmt, dir, dir.arg, query);
+  fmtresult fmtres = dir.fmtfunc (dir, dir.arg, query);
 
   /* Record whether the output of all directives is known to be
      bounded by some maximum, implying that their arguments are
@@ -3971,8 +3966,7 @@ maybe_warn_overlap (call_info &info, format_result *res)
    that caused the processing to be terminated early).  */
 
 static bool
-compute_format_length (call_info &info, format_result *res,
-		       range_query *query)
+compute_format_length (call_info &info, format_result *res, range_query *query)
 {
   if (dump_file)
     {
@@ -4308,8 +4302,7 @@ handle_printf_call (gimple_stmt_iterator *gsi, range_query *query)
 
   call_info info = call_info ();
 
-  gimple *stmt = gsi_stmt (*gsi);
-  info.callstmt = stmt;
+  info.callstmt = gsi_stmt (*gsi);
   info.func = gimple_call_fndecl (info.callstmt);
   if (!info.func)
     return false;
@@ -4573,8 +4566,7 @@ handle_printf_call (gimple_stmt_iterator *gsi, range_query *query)
 	     and use the greater of the two at level 1 and the smaller
 	     of them at level 2.  */
 	  value_range vr;
-	  if (!query->range_of_expr (vr, size, stmt))
-	    vr.set_varying (TREE_TYPE (size));
+	  query->range_of_expr (vr, size, info.callstmt);
 
 	  if (!vr.undefined_p ())
 	    {

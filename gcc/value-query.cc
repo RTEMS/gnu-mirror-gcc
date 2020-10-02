@@ -158,4 +158,5 @@ range_query::range_query ()
 range_query::~range_query ()
 {
   equiv_alloc->release ();
+  delete equiv_alloc;
 }

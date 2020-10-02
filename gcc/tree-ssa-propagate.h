@@ -102,8 +102,6 @@ class ssa_propagation_engine
 class substitute_and_fold_engine : public value_query
 {
  public:
-  /* If query is unset here, it must be initialized with
-     set_value_query instead.  */
   substitute_and_fold_engine (bool fold_all_stmts = false)
     : fold_all_stmts (fold_all_stmts) { }
   virtual ~substitute_and_fold_engine (void) { }

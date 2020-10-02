@@ -868,9 +868,9 @@ substitute_and_fold_engine::replace_uses_in (gimple *stmt)
   FOR_EACH_SSA_USE_OPERAND (use, stmt, iter, SSA_OP_USE)
     {
       tree tuse = USE_FROM_PTR (use);
-
       tree val = value_of_expr (tuse, stmt);
-      if (!val || val == tuse)
+
+      if (val == tuse || val == NULL_TREE)
 	continue;
 
       if (gimple_code (stmt) == GIMPLE_ASM
@@ -911,6 +911,7 @@ substitute_and_fold_engine::replace_phi_args_in (gphi *phi)
 	{
 	  edge e = gimple_phi_arg_edge (phi, i);
 	  tree val = value_on_edge (e, arg);
+
 	  if (val && val != arg && may_propagate_copy (arg, val))
 	    {
 	      if (TREE_CODE (val) != SSA_NAME)
@@ -1035,7 +1036,8 @@ substitute_and_fold_engine::propagate_into_phi_args (basic_block bb)
 	      || virtual_operand_p (arg))
 	    continue;
 	  tree val = value_on_edge (e, arg);
-	  if (val && is_gimple_min_invariant (val)
+	  if (val
+	      && is_gimple_min_invariant (val)
 	      && may_propagate_copy (arg, val))
 	    {
 	      propagate_value (use_p, val);
@@ -1068,7 +1070,9 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
       if (res && TREE_CODE (res) == SSA_NAME)
 	{
 	  tree sprime = substitute_and_fold_engine->value_of_expr (res, phi);
-	  if (sprime && sprime != res && may_propagate_copy (res, sprime))
+	  if (sprime
+	      && sprime != res
+	      && may_propagate_copy (res, sprime))
 	    {
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
@@ -1106,7 +1110,8 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
       if (lhs && TREE_CODE (lhs) == SSA_NAME)
 	{
 	  tree sprime = substitute_and_fold_engine->value_of_expr (lhs, stmt);
-	  if (sprime && sprime != lhs
+	  if (sprime
+	      && sprime != lhs
 	      && may_propagate_copy (lhs, sprime)
 	      && !stmt_could_throw_p (cfun, stmt)
 	      && !gimple_has_side_effects (stmt)

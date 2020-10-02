@@ -60,7 +60,7 @@ public:
 private:
   vec<class ssa_block_ranges *> m_ssa_ranges;
   ssa_block_ranges &get_block_ranges (tree name);
-  irange_pool *m_irange_pool;
+  irange_allocator *m_irange_allocator;
 };
 
 // This global cache is used with the range engine as markers for what
@@ -79,7 +79,7 @@ public:
   void dump (FILE *f = stderr);
 private:
   vec<irange *> m_tab;
-  class irange_pool *m_irange_pool;
+  class irange_allocator *m_irange_allocator;
 };
 
 // This class provides all the caches a global ranger may need, and makes 

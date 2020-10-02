@@ -1351,6 +1351,7 @@ scan_sharing_clauses (tree clauses, omp_context *ctx)
 	      && OMP_CLAUSE_MAP_KIND (c) != GOMP_MAP_ALWAYS_TO
 	      && OMP_CLAUSE_MAP_KIND (c) != GOMP_MAP_ALWAYS_FROM
 	      && OMP_CLAUSE_MAP_KIND (c) != GOMP_MAP_ALWAYS_TOFROM
+	      && OMP_CLAUSE_MAP_KIND (c) != GOMP_MAP_TO_PSET
 	      && is_global_var (maybe_lookup_decl_in_outer_ctx (decl, ctx))
 	      && varpool_node::get_create (decl)->offloadable
 	      && !lookup_attribute ("omp declare target link",
@@ -3728,7 +3729,8 @@ scan_omp_1_stmt (gimple_stmt_iterator *gsi, bool *handled_ops_p,
       if ((gimple_omp_for_kind (as_a <gomp_for *> (stmt))
 	   == GF_OMP_FOR_KIND_SIMD)
 	  && omp_maybe_offloaded_ctx (ctx)
-	  && omp_max_simt_vf ())
+	  && omp_max_simt_vf ()
+	  && gimple_omp_for_collapse (stmt) == 1)
 	scan_omp_simd (gsi, as_a <gomp_for *> (stmt), ctx);
       else
 	scan_omp_for (as_a <gomp_for *> (stmt), ctx);

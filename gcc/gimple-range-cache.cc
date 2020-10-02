@@ -122,7 +122,7 @@ non_null_ref::process_name (tree name)
 class ssa_block_ranges
 {
 public:
-  ssa_block_ranges (tree t, irange_pool *pool);
+  ssa_block_ranges (tree t, irange_allocator *);
   ~ssa_block_ranges ();
 
   void set_bb_range (const basic_block bb, const irange &r);
@@ -135,23 +135,23 @@ private:
   vec<irange *> m_tab;
   irange *m_type_range;
   tree m_type;
-  irange_pool *m_irange_pool;
+  irange_allocator *m_irange_allocator;
 };
 
 
 // Initialize a block cache for an ssa_name of type T.
 
-ssa_block_ranges::ssa_block_ranges (tree t, irange_pool *pool)
+ssa_block_ranges::ssa_block_ranges (tree t, irange_allocator *allocator)
 {
   gcc_checking_assert (TYPE_P (t));
   m_type = t;
-  m_irange_pool = pool;
+  m_irange_allocator = allocator;
 
   m_tab.create (0);
   m_tab.safe_grow_cleared (last_basic_block_for_fn (cfun));
 
   // Create the cached type range.
-  m_type_range = m_irange_pool->allocate (2);
+  m_type_range = m_irange_allocator->allocate (2);
   m_type_range->set_varying (t);
 
   m_tab[ENTRY_BLOCK_PTR_FOR_FN (cfun)->index] = m_type_range;
@@ -169,7 +169,7 @@ ssa_block_ranges::~ssa_block_ranges ()
 void
 ssa_block_ranges::set_bb_range (const basic_block bb, const irange &r)
 {
-  irange *m = m_irange_pool->allocate (r);
+  irange *m = m_irange_allocator->allocate (r);
   m_tab[bb->index] = m;
 }
 
@@ -230,7 +230,7 @@ block_range_cache::block_range_cache ()
 {
   m_ssa_ranges.create (0);
   m_ssa_ranges.safe_grow_cleared (num_ssa_names);
-  m_irange_pool = new irange_pool;
+  m_irange_allocator = new irange_allocator;
 }
 
 // Remove any m_block_caches which have been created.
@@ -243,7 +243,7 @@ block_range_cache::~block_range_cache ()
       if (m_ssa_ranges[x])
 	delete m_ssa_ranges[x];
     }
-  delete m_irange_pool;
+  delete m_irange_allocator;
   // Release the vector itself.
   m_ssa_ranges.release ();
 }
@@ -259,7 +259,7 @@ block_range_cache::get_block_ranges (tree name)
     m_ssa_ranges.safe_grow_cleared (num_ssa_names + 1);
 
   if (!m_ssa_ranges[v])
-    m_ssa_ranges[v] = new ssa_block_ranges (TREE_TYPE (name), m_irange_pool);
+    m_ssa_ranges[v] = new ssa_block_ranges (TREE_TYPE (name), m_irange_allocator);
 
   return *(m_ssa_ranges[v]);
 }
@@ -371,7 +371,7 @@ ssa_global_cache::ssa_global_cache ()
 {
   m_tab.create (0);
   m_tab.safe_grow_cleared (num_ssa_names);
-  m_irange_pool = new irange_pool;
+  m_irange_allocator = new irange_allocator;
 }
 
 // Deconstruct a global cache.
@@ -379,7 +379,7 @@ ssa_global_cache::ssa_global_cache ()
 ssa_global_cache::~ssa_global_cache ()
 {
   m_tab.release ();
-  delete m_irange_pool;
+  delete m_irange_allocator;
 }
 
 // Retrieve the global range of NAME from cache memory if it exists. 
@@ -412,7 +412,7 @@ ssa_global_cache::set_global_range (tree name, const irange &r)
   if (m && m->fits_p (r))
     *m = r;
   else
-    m_tab[v] = m_irange_pool->allocate (r);
+    m_tab[v] = m_irange_allocator->allocate (r);
 }
 
 // Set the range for NAME to R in the glonbal cache.

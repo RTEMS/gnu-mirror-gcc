@@ -209,7 +209,10 @@ static struct ix86_target_opts isa2_opts[] =
   { "-mavx512bf16",	OPTION_MASK_ISA2_AVX512BF16 },
   { "-menqcmd",		OPTION_MASK_ISA2_ENQCMD },
   { "-mserialize",	OPTION_MASK_ISA2_SERIALIZE },
-  { "-mtsxldtrk",	OPTION_MASK_ISA2_TSXLDTRK }
+  { "-mtsxldtrk",	OPTION_MASK_ISA2_TSXLDTRK },
+  { "-mamx-tile",	OPTION_MASK_ISA2_AMX_TILE },
+  { "-mamx-int8",	OPTION_MASK_ISA2_AMX_INT8 },
+  { "-mamx-bf16",	OPTION_MASK_ISA2_AMX_BF16 }
 };
 static struct ix86_target_opts isa_opts[] =
 {
@@ -627,7 +630,8 @@ ix86_debug_options (void)
 
 void
 ix86_function_specific_save (struct cl_target_option *ptr,
-			     struct gcc_options *opts)
+			     struct gcc_options *opts,
+			     struct gcc_options */* opts_set */)
 {
   ptr->arch = ix86_arch;
   ptr->schedule = ix86_schedule;
@@ -754,6 +758,7 @@ set_ix86_tune_features (struct gcc_options *opts,
 
 void
 ix86_function_specific_restore (struct gcc_options *opts,
+				struct gcc_options */* opts_set */,
 				struct cl_target_option *ptr)
 {
   enum processor_type old_tune = ix86_tune;
@@ -1031,6 +1036,9 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     IX86_ATTR_ISA ("enqcmd", OPT_menqcmd),
     IX86_ATTR_ISA ("serialize", OPT_mserialize),
     IX86_ATTR_ISA ("tsxldtrk", OPT_mtsxldtrk),
+    IX86_ATTR_ISA ("amx-tile", OPT_mamx_tile),
+    IX86_ATTR_ISA ("amx-int8", OPT_mamx_int8),
+    IX86_ATTR_ISA ("amx-bf16", OPT_mamx_bf16),
 
     /* enum options */
     IX86_ATTR_ENUM ("fpmath=",	OPT_mfpmath_),
@@ -1356,7 +1364,7 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
 
       /* Save the current options unless we are validating options for
 	 #pragma.  */
-      t = build_target_option_node (opts);
+      t = build_target_option_node (opts, opts_set);
 
       opts->x_ix86_arch_string = orig_arch_string;
       opts->x_ix86_tune_string = orig_tune_string;
@@ -1377,7 +1385,7 @@ ix86_valid_target_attribute_p (tree fndecl,
 			       tree args,
 			       int flags)
 {
-  struct gcc_options func_options;
+  struct gcc_options func_options, func_options_set;
   tree new_target, new_optimize;
   bool ret = true;
 
@@ -1389,7 +1397,8 @@ ix86_valid_target_attribute_p (tree fndecl,
       && strcmp (TREE_STRING_POINTER (TREE_VALUE (args)), "default") == 0)
     return true;
 
-  tree old_optimize = build_optimization_node (&global_options);
+  tree old_optimize = build_optimization_node (&global_options,
+					       &global_options_set);
 
   /* Get the optimization options of the current function.  */  
   tree func_optimize = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl);
@@ -1401,21 +1410,22 @@ ix86_valid_target_attribute_p (tree fndecl,
   memset (&func_options, 0, sizeof (func_options));
   init_options_struct (&func_options, NULL);
   lang_hooks.init_options_struct (&func_options);
- 
-  cl_optimization_restore (&func_options,
+  memset (&func_options_set, 0, sizeof (func_options_set));
+
+  cl_optimization_restore (&func_options, &func_options_set,
 			   TREE_OPTIMIZATION (func_optimize));
 
   /* Initialize func_options to the default before its target options can
      be set.  */
-  cl_target_option_restore (&func_options,
+  cl_target_option_restore (&func_options, &func_options_set,
 			    TREE_TARGET_OPTION (target_option_default_node));
 
   /* FLAGS == 1 is used for target_clones attribute.  */
   new_target
     = ix86_valid_target_attribute_tree (fndecl, args, &func_options,
-					&global_options_set, flags == 1);
+					&func_options_set, flags == 1);
 
-  new_optimize = build_optimization_node (&func_options);
+  new_optimize = build_optimization_node (&func_options, &func_options_set);
 
   if (new_target == error_mark_node)
     ret = false;
@@ -2048,10 +2058,27 @@ ix86_option_override_internal (bool main_args_p,
 	    return false;
 	  }
 
+	/* The feature-only micro-architecture levels that use
+	   PTA_NO_TUNE are only defined for the x86-64 psABI.  */
+	if ((processor_alias_table[i].flags & PTA_NO_TUNE) != 0
+	    && (!TARGET_64BIT_P (opts->x_ix86_isa_flags)
+		|| opts->x_ix86_abi != SYSV_ABI))
+	  {
+	    error (G_("%<%s%> architecture level is only defined"
+		      " for the x86-64 psABI"), opts->x_ix86_arch_string);
+	    return false;
+	  }
+
 	ix86_schedule = processor_alias_table[i].schedule;
 	ix86_arch = processor_alias_table[i].processor;
-	/* Default cpu tuning to the architecture.  */
-	ix86_tune = ix86_arch;
+
+	/* Default cpu tuning to the architecture, unless the table
+	   entry requests not to do this.  Used by the x86-64 psABI
+	   micro-architecture levels.  */
+	if ((processor_alias_table[i].flags & PTA_NO_TUNE) == 0)
+	  ix86_tune = ix86_arch;
+	else
+	  ix86_tune = PROCESSOR_GENERIC;
 
 	if (((processor_alias_table[i].flags & PTA_MMX) != 0)
 	    && !(opts->x_ix86_isa_flags_explicit & OPTION_MASK_ISA_MMX))
@@ -2254,6 +2281,18 @@ ix86_option_override_internal (bool main_args_p,
 	    && !(opts->x_ix86_isa_flags2_explicit
 		 & OPTION_MASK_ISA2_AVX512BF16))
 	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AVX512BF16;
+	if (((processor_alias_table[i].flags & PTA_AMX_TILE) != 0)
+	    && !(opts->x_ix86_isa_flags2_explicit
+		 & OPTION_MASK_ISA2_AMX_TILE))
+	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AMX_TILE;
+	if (((processor_alias_table[i].flags & PTA_AMX_INT8) != 0)
+	    && !(opts->x_ix86_isa_flags2_explicit
+		 & OPTION_MASK_ISA2_AMX_INT8))
+	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AMX_INT8;
+	if (((processor_alias_table[i].flags & PTA_AMX_BF16) != 0)
+	    && !(opts->x_ix86_isa_flags2_explicit
+		 & OPTION_MASK_ISA2_AMX_BF16))
+	  opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_AMX_BF16;
         if (((processor_alias_table[i].flags & PTA_MOVDIRI) != 0)
             && !(opts->x_ix86_isa_flags_explicit & OPTION_MASK_ISA_MOVDIRI))
           opts->x_ix86_isa_flags |= OPTION_MASK_ISA_MOVDIRI;
@@ -2362,7 +2401,8 @@ ix86_option_override_internal (bool main_args_p,
     ix86_arch_features[i] = !!(initial_ix86_arch_features[i] & ix86_arch_mask);
 
   for (i = 0; i < pta_size; i++)
-    if (! strcmp (opts->x_ix86_tune_string, processor_alias_table[i].name))
+    if (! strcmp (opts->x_ix86_tune_string, processor_alias_table[i].name)
+	&& (processor_alias_table[i].flags & PTA_NO_TUNE) == 0)
       {
 	ix86_schedule = processor_alias_table[i].schedule;
 	ix86_tune = processor_alias_table[i].processor;
@@ -2406,8 +2446,9 @@ ix86_option_override_internal (bool main_args_p,
 
       auto_vec <const char *> candidates;
       for (i = 0; i < pta_size; i++)
-	if (!TARGET_64BIT_P (opts->x_ix86_isa_flags)
-	    || ((processor_alias_table[i].flags & PTA_64BIT) != 0))
+	if ((!TARGET_64BIT_P (opts->x_ix86_isa_flags)
+	     || ((processor_alias_table[i].flags & PTA_64BIT) != 0))
+	    && (processor_alias_table[i].flags & PTA_NO_TUNE) == 0)
 	  candidates.safe_push (processor_alias_table[i].name);
 
 #ifdef HAVE_LOCAL_CPU_DETECT
@@ -2954,7 +2995,7 @@ ix86_option_override_internal (bool main_args_p,
      options.  */
   if (main_args_p)
     target_option_default_node = target_option_current_node
-      = build_target_option_node (opts);
+      = build_target_option_node (opts, opts_set);
 
   if (opts->x_flag_cf_protection != CF_NONE)
     opts->x_flag_cf_protection
@@ -2991,7 +3032,8 @@ void
 ix86_reset_previous_fndecl (void)
 {
   tree new_tree = target_option_current_node;
-  cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+  cl_target_option_restore (&global_options, &global_options_set,
+			    TREE_TARGET_OPTION (new_tree));
   if (TREE_TARGET_GLOBALS (new_tree))
     restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
   else if (new_tree == target_option_default_node)
@@ -3250,7 +3292,8 @@ ix86_set_current_function (tree fndecl)
 
   if (old_tree != new_tree)
     {
-      cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+      cl_target_option_restore (&global_options, &global_options_set,
+				TREE_TARGET_OPTION (new_tree));
       if (TREE_TARGET_GLOBALS (new_tree))
 	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
       else if (new_tree == target_option_default_node)

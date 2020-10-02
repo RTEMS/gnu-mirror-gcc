@@ -2393,7 +2393,7 @@ rs6000_debug_reg_global (void)
   else
     fprintf (stderr, DEBUG_FMT_S, "tune", "<none>");
 
-  cl_target_option_save (&cl_opts, &global_options);
+  cl_target_option_save (&cl_opts, &global_options, &global_options_set);
   rs6000_print_isa_options (stderr, 0, "rs6000_isa_flags",
 			    rs6000_isa_flags);
 
@@ -4020,10 +4020,11 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (!(rs6000_isa_flags_explicit & OPTION_MASK_BLOCK_OPS_VECTOR_PAIR))
     {
-      if (TARGET_MMA && TARGET_EFFICIENT_UNALIGNED_VSX)
-	rs6000_isa_flags |= OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
-      else
-	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
+      /* When the POImode issues of PR96791 are resolved, then we can
+	 once again enable use of vector pair for memcpy/memmove on
+	 P10 if we have TARGET_MMA.  For now we make it disabled by
+	 default for all targets.  */
+      rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
     }
 
   /* Use long double size to select the appropriate long double.  We use
@@ -4768,7 +4769,7 @@ rs6000_option_override_internal (bool global_init_p)
   /* Save the initial options in case the user does function specific options */
   if (global_init_p)
     target_option_default_node = target_option_current_node
-      = build_target_option_node (&global_options);
+      = build_target_option_node (&global_options, &global_options_set);
 
   /* If not explicitly specified via option, decide whether to generate the
      extra blr's required to preserve the link stack on some cpus (eg, 476).  */
@@ -5730,7 +5731,7 @@ direct_return (void)
 
 /* Helper for num_insns_constant.  Calculate number of instructions to
    load VALUE to a single gpr using combinations of addi, addis, ori,
-   oris and sldi instructions.  */
+   oris, sldi and rldimi instructions.  */
 
 static int
 num_insns_constant_gpr (HOST_WIDE_INT value)
@@ -5758,7 +5759,7 @@ num_insns_constant_gpr (HOST_WIDE_INT value)
 
       high >>= 1;
 
-      if (low == 0)
+      if (low == 0 || low == high)
 	return num_insns_constant_gpr (high) + 1;
       else if (high == 0)
 	return num_insns_constant_gpr (low) + 1;
@@ -8779,7 +8780,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 
   dest = gen_reg_rtx (Pmode);
   if (model == TLS_MODEL_LOCAL_EXEC
-      && (rs6000_tls_size == 16 || rs6000_pcrel_p (cfun)))
+      && (rs6000_tls_size == 16 || rs6000_pcrel_p ()))
     {
       rtx tlsreg;
 
@@ -8826,7 +8827,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	 them in the .got section.  So use a pointer to the .got section,
 	 not one to secondary TOC sections used by 64-bit -mminimal-toc,
 	 or to secondary GOT sections used by 32-bit -fPIC.  */
-      if (rs6000_pcrel_p (cfun))
+      if (rs6000_pcrel_p ())
 	got = const0_rtx;
       else if (TARGET_64BIT)
 	got = gen_rtx_REG (Pmode, 2);
@@ -8891,7 +8892,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	  rtx uns = gen_rtx_UNSPEC (Pmode, vec, UNSPEC_TLS_GET_ADDR);
 	  set_unique_reg_note (get_last_insn (), REG_EQUAL, uns);
 
-	  if (rs6000_tls_size == 16 || rs6000_pcrel_p (cfun))
+	  if (rs6000_tls_size == 16 || rs6000_pcrel_p ())
 	    {
 	      if (TARGET_64BIT)
 		insn = gen_tls_dtprel_64 (dest, tmp1, addr);
@@ -8932,7 +8933,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 	  else
 	    insn = gen_tls_got_tprel_32 (tmp2, got, addr);
 	  emit_insn (insn);
-	  if (rs6000_pcrel_p (cfun))
+	  if (rs6000_pcrel_p ())
 	    {
 	      if (TARGET_64BIT)
 		insn = gen_tls_tls_pcrel_64 (dest, tmp2, addr);
@@ -13739,7 +13740,7 @@ rs6000_call_template_1 (rtx *operands, unsigned int funop, bool sibcall)
 	    ? "+32768" : ""));
 
   static char str[32];  /* 1 spare */
-  if (rs6000_pcrel_p (cfun))
+  if (rs6000_pcrel_p ())
     sprintf (str, "b%s %s@notoc%s", sibcall ? "" : "l", z, arg);
   else if (DEFAULT_ABI == ABI_AIX || DEFAULT_ABI == ABI_ELFv2)
     sprintf (str, "b%s %s%s%s", sibcall ? "" : "l", z, arg,
@@ -13879,7 +13880,7 @@ rs6000_indirect_call_template_1 (rtx *operands, unsigned int funop,
 		     rel64);
 	}
 
-      const char *notoc = rs6000_pcrel_p (cfun) ? "_NOTOC" : "";
+      const char *notoc = rs6000_pcrel_p () ? "_NOTOC" : "";
       const char *addend = (DEFAULT_ABI == ABI_V4 && TARGET_SECURE_PLT
 			    && flag_pic == 2 ? "+32768" : "");
       if (!speculate)
@@ -13896,7 +13897,7 @@ rs6000_indirect_call_template_1 (rtx *operands, unsigned int funop,
   else if (!speculate)
     s += sprintf (s, "crset 2\n\t");
 
-  if (rs6000_pcrel_p (cfun))
+  if (rs6000_pcrel_p ())
     {
       if (speculate)
 	sprintf (s, "b%%T%ul", funop);
@@ -15056,13 +15057,33 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
   return 1;
 }
 
-/* ISA 3.0 (power9) minmax subcase to emit a XSMAXCDP or XSMINCDP instruction
-   for SF/DF scalars.  Move TRUE_COND to DEST if OP of the operands of the last
-   comparison is nonzero/true, FALSE_COND if it is zero/false.  Return 0 if the
-   hardware has no such operation.  */
+/* Possibly emit the xsmaxcdp and xsmincdp instructions to emit a maximum or
+   minimum with "C" semantics.
 
-static int
-rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+   Unless you use -ffast-math, you can't use these instructions to replace
+   conditions that implicitly reverse the condition because the comparison
+   might generate a NaN or signed zer0.
+
+   I.e. the following can be replaced all of the time
+	ret = (op1 >  op2) ? op1 : op2	; generate xsmaxcdp
+	ret = (op1 >= op2) ? op1 : op2	; generate xsmaxcdp
+	ret = (op1 <  op2) ? op1 : op2;	; generate xsmincdp
+	ret = (op1 <= op2) ? op1 : op2;	; generate xsmincdp
+
+   The following can be replaced only if -ffast-math is used:
+	ret = (op1 <  op2) ? op2 : op1	; generate xsmaxcdp
+	ret = (op1 <= op2) ? op2 : op1	; generate xsmaxcdp
+	ret = (op1 >  op2) ? op2 : op1;	; generate xsmincdp
+	ret = (op1 >= op2) ? op2 : op1;	; generate xsmincdp
+
+   Move TRUE_COND to DEST if OP of the operands of the last comparison is
+   nonzero/true, FALSE_COND if it is zero/false.
+
+   Return false if we can't generate the appropriate minimum or maximum, and
+   true if we can did the minimum or maximum.  */
+
+static bool
+rs6000_maybe_emit_maxc_minc (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15072,14 +15093,14 @@ rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   bool max_p = false;
 
   if (result_mode != compare_mode)
-    return 0;
+    return false;
 
   if (code == GE || code == GT)
     max_p = true;
   else if (code == LE || code == LT)
     max_p = false;
   else
-    return 0;
+    return false;
 
   if (rtx_equal_p (op0, true_cond) && rtx_equal_p (op1, false_cond))
     ;
@@ -15092,19 +15113,23 @@ rs6000_emit_p9_fp_minmax (rtx dest, rtx op, rtx true_cond, rtx false_cond)
     max_p = !max_p;
 
   else
-    return 0;
+    return false;
 
   rs6000_emit_minmax (dest, max_p ? SMAX : SMIN, op0, op1);
-  return 1;
+  return true;
 }
 
-/* ISA 3.0 (power9) conditional move subcase to emit XSCMP{EQ,GE,GT,NE}DP and
-   XXSEL instructions for SF/DF scalars.  Move TRUE_COND to DEST if OP of the
-   operands of the last comparison is nonzero/true, FALSE_COND if it is
-   zero/false.  Return 0 if the hardware has no such operation.  */
+/* Possibly emit a floating point conditional move by generating a compare that
+   sets a mask instruction and a XXSEL select instruction.
 
-static int
-rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+   Move TRUE_COND to DEST if OP of the operands of the last comparison is
+   nonzero/true, FALSE_COND if it is zero/false.
+
+   Return false if the operation cannot be generated, and true if we could
+   generate the instruction.  */
+
+static bool
+rs6000_maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
@@ -15132,7 +15157,7 @@ rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       break;
 
     default:
-      return 0;
+      return false;
     }
 
   /* Generate:	[(parallel [(set (dest)
@@ -15152,14 +15177,35 @@ rs6000_emit_p9_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   emit_insn (gen_rtx_PARALLEL (VOIDmode,
 			       gen_rtvec (2, cmove_rtx, clobber_rtx)));
 
-  return 1;
+  return true;
+}
+
+/* Helper function to return true if the target has instructions to do a
+   compare and set mask instruction that can be used with XXSEL to implement a
+   conditional move.  It is also assumed that such a target also supports the
+   "C" minimum and maximum instructions. */
+
+static bool
+have_compare_and_set_mask (machine_mode mode)
+{
+  switch (mode)
+    {
+    case E_SFmode:
+    case E_DFmode:
+      return TARGET_P9_MINMAX;
+
+    default:
+      break;
+    }
+
+  return false;
 }
 
 /* Emit a conditional move: move TRUE_COND to DEST if OP of the
    operands of the last comparison is nonzero/true, FALSE_COND if it
    is zero/false.  Return 0 if the hardware has no such operation.  */
 
-int
+bool
 rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   enum rtx_code code = GET_CODE (op);
@@ -15175,28 +15221,28 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       /* In the isel case however, we can use a compare immediate, so
 	 op1 may be a small constant.  */
       && (!TARGET_ISEL || !short_cint_operand (op1, VOIDmode)))
-    return 0;
+    return false;
   if (GET_MODE (true_cond) != result_mode)
-    return 0;
+    return false;
   if (GET_MODE (false_cond) != result_mode)
-    return 0;
+    return false;
 
-  /* See if we can use the ISA 3.0 (power9) min/max/compare functions.  */
-  if (TARGET_P9_MINMAX
-      && (compare_mode == SFmode || compare_mode == DFmode)
-      && (result_mode == SFmode || result_mode == DFmode))
+  /* See if we can use the "C" minimum, "C" maximum, and compare and set mask
+     instructions.  */
+  if (have_compare_and_set_mask (compare_mode)
+      && have_compare_and_set_mask (result_mode))
     {
-      if (rs6000_emit_p9_fp_minmax (dest, op, true_cond, false_cond))
-	return 1;
+      if (rs6000_maybe_emit_maxc_minc (dest, op, true_cond, false_cond))
+	return true;
 
-      if (rs6000_emit_p9_fp_cmove (dest, op, true_cond, false_cond))
-	return 1;
+      if (rs6000_maybe_emit_fp_cmove (dest, op, true_cond, false_cond))
+	return true;
     }
 
   /* Don't allow using floating point comparisons for integer results for
      now.  */
   if (FLOAT_MODE_P (compare_mode) && !FLOAT_MODE_P (result_mode))
-    return 0;
+    return false;
 
   /* First, work out if the hardware can do this at all, or
      if it's too slow....  */
@@ -15204,7 +15250,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
     {
       if (TARGET_ISEL)
 	return rs6000_emit_int_cmove (dest, op, true_cond, false_cond);
-      return 0;
+      return false;
     }
 
   is_against_zero = op1 == CONST0_RTX (compare_mode);
@@ -15216,7 +15262,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
      generated.  */
   if (SCALAR_FLOAT_MODE_P (compare_mode)
       && flag_trapping_math && ! is_against_zero)
-    return 0;
+    return false;
 
   /* Eliminate half of the comparisons by switching operands, this
      makes the remaining code simpler.  */
@@ -15232,7 +15278,7 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   /* UNEQ and LTGT take four instructions for a comparison with zero,
      it'll probably be faster to use a branch here too.  */
   if (code == UNEQ && HONOR_NANS (compare_mode))
-    return 0;
+    return false;
 
   /* We're going to try to implement comparisons by performing
      a subtract, then comparing against zero.  Unfortunately,
@@ -15247,14 +15293,14 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
       && ((! rtx_equal_p (op0, false_cond) && ! rtx_equal_p (op1, false_cond))
 	  || (! rtx_equal_p (op0, true_cond)
 	      && ! rtx_equal_p (op1, true_cond))))
-    return 0;
+    return false;
 
   /* At this point we know we can use fsel.  */
 
   /* Don't allow compare_mode other than SFmode or DFmode, for others there
      is no fsel instruction.  */
   if (compare_mode != SFmode && compare_mode != DFmode)
-    return 0;
+    return false;
 
   /* Reduce the comparison to a comparison against zero.  */
   if (! is_against_zero)
@@ -15353,12 +15399,12 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 						gen_rtx_GE (VOIDmode,
 							    op0, op1),
 						true_cond, false_cond)));
-  return 1;
+  return true;
 }
 
 /* Same as above, but for ints (isel).  */
 
-int
+bool
 rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   rtx condition_rtx, cr;
@@ -15368,7 +15414,7 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   bool signedp;
 
   if (mode != SImode && (!TARGET_POWERPC64 || mode != DImode))
-    return 0;
+    return false;
 
   /* We still have to do the compare, because isel doesn't do a
      compare, it just looks at the CRx bits set by a previous compare
@@ -15403,7 +15449,7 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 
   emit_insn (isel_func (dest, condition_rtx, true_cond, false_cond, cr));
 
-  return 1;
+  return true;
 }
 
 void
@@ -17452,14 +17498,6 @@ rs6000_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep_insn, int cost,
               }
             break;
 
-          case TYPE_FPLOAD:
-            if ((rs6000_tune == PROCESSOR_POWER6)
-                && get_attr_update (insn) == UPDATE_NO
-                && recog_memoized (dep_insn)
-                && (INSN_CODE (dep_insn) >= 0)
-                && (get_attr_type (dep_insn) == TYPE_MFFGPR))
-              return 2;
-
           default:
             break;
           }
@@ -17484,11 +17522,6 @@ rs6000_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep_insn, int cost,
               if (get_attr_type (dep_insn) == TYPE_FP
 		  || get_attr_type (dep_insn) == TYPE_FPSIMPLE)
                 return 1;
-              break;
-            case TYPE_FPLOAD:
-              if (get_attr_update (insn) == UPDATE_NO
-                  && get_attr_type (dep_insn) == TYPE_MFFGPR)
-                return 2;
               break;
             default:
               break;
@@ -19635,7 +19668,7 @@ rs6000_longcall_ref (rtx call_ref, rtx arg)
     {
       rtx base = const0_rtx;
       int regno = 12;
-      if (rs6000_pcrel_p (cfun))
+      if (rs6000_pcrel_p ())
 	{
 	  rtx reg = gen_rtx_REG (Pmode, regno);
 	  rtx u = gen_rtx_UNSPEC_VOLATILE (Pmode,
@@ -21143,9 +21176,9 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  return true;
 	}
       else if ((outer_code == PLUS
-		&& reg_or_add_cint_operand (x, VOIDmode))
+		&& reg_or_add_cint_operand (x, mode))
 	       || (outer_code == MINUS
-		   && reg_or_sub_cint_operand (x, VOIDmode))
+		   && reg_or_sub_cint_operand (x, mode))
 	       || ((outer_code == SET
 		    || outer_code == IOR
 		    || outer_code == XOR)
@@ -23616,18 +23649,19 @@ rs6000_valid_attribute_p (tree fndecl,
       && strcmp (TREE_STRING_POINTER (TREE_VALUE (args)), "default") == 0)
     return true;
 
-  old_optimize = build_optimization_node (&global_options);
+  old_optimize = build_optimization_node (&global_options,
+					  &global_options_set);
   func_optimize = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl);
 
   /* If the function changed the optimization levels as well as setting target
      options, start with the optimizations specified.  */
   if (func_optimize && func_optimize != old_optimize)
-    cl_optimization_restore (&global_options,
+    cl_optimization_restore (&global_options, &global_options_set,
 			     TREE_OPTIMIZATION (func_optimize));
 
   /* The target attributes may also change some optimization flags, so update
      the optimization options if necessary.  */
-  cl_target_option_save (&cur_target, &global_options);
+  cl_target_option_save (&cur_target, &global_options, &global_options_set);
   rs6000_cpu_index = rs6000_tune_index = -1;
   ret = rs6000_inner_target_options (args, true);
 
@@ -23635,12 +23669,14 @@ rs6000_valid_attribute_p (tree fndecl,
   if (ret)
     {
       ret = rs6000_option_override_internal (false);
-      new_target = build_target_option_node (&global_options);
+      new_target = build_target_option_node (&global_options,
+					     &global_options_set);
     }
   else
     new_target = NULL;
 
-  new_optimize = build_optimization_node (&global_options);
+  new_optimize = build_optimization_node (&global_options,
+					  &global_options_set);
 
   if (!new_target)
     ret = false;
@@ -23653,10 +23689,10 @@ rs6000_valid_attribute_p (tree fndecl,
 	DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl) = new_optimize;
     }
 
-  cl_target_option_restore (&global_options, &cur_target);
+  cl_target_option_restore (&global_options, &global_options_set, &cur_target);
 
   if (old_optimize != new_optimize)
-    cl_optimization_restore (&global_options,
+    cl_optimization_restore (&global_options, &global_options_set,
 			     TREE_OPTIMIZATION (old_optimize));
 
   return ret;
@@ -23670,7 +23706,8 @@ rs6000_valid_attribute_p (tree fndecl,
 bool
 rs6000_pragma_target_parse (tree args, tree pop_target)
 {
-  tree prev_tree = build_target_option_node (&global_options);
+  tree prev_tree = build_target_option_node (&global_options,
+					     &global_options_set);
   tree cur_tree;
   struct cl_target_option *prev_opt, *cur_opt;
   HOST_WIDE_INT prev_flags, cur_flags, diff_flags;
@@ -23699,7 +23736,7 @@ rs6000_pragma_target_parse (tree args, tree pop_target)
       cur_tree = ((pop_target)
 		  ? pop_target
 		  : target_option_default_node);
-      cl_target_option_restore (&global_options,
+      cl_target_option_restore (&global_options, &global_options_set,
 				TREE_TARGET_OPTION (cur_tree));
     }
   else
@@ -23707,7 +23744,8 @@ rs6000_pragma_target_parse (tree args, tree pop_target)
       rs6000_cpu_index = rs6000_tune_index = -1;
       if (!rs6000_inner_target_options (args, false)
 	  || !rs6000_option_override_internal (false)
-	  || (cur_tree = build_target_option_node (&global_options))
+	  || (cur_tree = build_target_option_node (&global_options,
+						   &global_options_set))
 	     == NULL_TREE)
 	{
 	  if (TARGET_DEBUG_BUILTIN || TARGET_DEBUG_TARGET)
@@ -23762,7 +23800,8 @@ static GTY(()) tree rs6000_previous_fndecl;
 void
 rs6000_activate_target_options (tree new_tree)
 {
-  cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+  cl_target_option_restore (&global_options, &global_options_set,
+			    TREE_TARGET_OPTION (new_tree));
   if (TREE_TARGET_GLOBALS (new_tree))
     restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
   else if (new_tree == target_option_default_node)
@@ -23853,7 +23892,8 @@ rs6000_set_current_function (tree fndecl)
 
 static void
 rs6000_function_specific_save (struct cl_target_option *ptr,
-			       struct gcc_options *opts)
+			       struct gcc_options *opts,
+			       struct gcc_options */* opts_set */)
 {
   ptr->x_rs6000_isa_flags = opts->x_rs6000_isa_flags;
   ptr->x_rs6000_isa_flags_explicit = opts->x_rs6000_isa_flags_explicit;
@@ -23863,6 +23903,7 @@ rs6000_function_specific_save (struct cl_target_option *ptr,
 
 static void
 rs6000_function_specific_restore (struct gcc_options *opts,
+				  struct gcc_options */* opts_set */,
 				  struct cl_target_option *ptr)
 				  
 {
@@ -24688,7 +24729,7 @@ rs6000_call_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   if (!SYMBOL_REF_P (func)
       || (DEFAULT_ABI == ABI_AIX && !SYMBOL_REF_FUNCTION_P (func)))
     {
-      if (!rs6000_pcrel_p (cfun))
+      if (!rs6000_pcrel_p ())
 	{
 	  /* Save the TOC into its reserved slot before the call,
 	     and prepare to restore it after the call.  */
@@ -24794,7 +24835,7 @@ rs6000_call_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   else
     {
       /* No TOC register needed for calls from PC-relative callers.  */
-      if (!rs6000_pcrel_p (cfun))
+      if (!rs6000_pcrel_p ())
 	/* Direct calls use the TOC: for local calls, the callee will
 	   assume the TOC register is set; for non-local calls, the
 	   PLT stub needs the TOC register.  */
@@ -24861,7 +24902,7 @@ rs6000_sibcall_aix (rtx value, rtx func_desc, rtx tlsarg, rtx cookie)
   insn = emit_call_insn (insn);
 
   /* Note use of the TOC register.  */
-  if (!rs6000_pcrel_p (cfun))
+  if (!rs6000_pcrel_p ())
     use_reg (&CALL_INSN_FUNCTION_USAGE (insn),
 	     gen_rtx_REG (Pmode, TOC_REGNUM));
 
@@ -25148,7 +25189,7 @@ rs6000_fndecl_pcrel_p (const_tree fndecl)
 
 /* Return whether we should generate PC-relative code for *FN.  */
 bool
-rs6000_pcrel_p (struct function *fn)
+rs6000_function_pcrel_p (struct function *fn)
 {
   if (DEFAULT_ABI != ABI_ELFv2)
     return false;
@@ -25159,6 +25200,16 @@ rs6000_pcrel_p (struct function *fn)
 	    && TARGET_CMODEL == CMODEL_MEDIUM);
 
   return rs6000_fndecl_pcrel_p (fn->decl);
+}
+
+/* Return whether we should generate PC-relative code for the current
+   function.  */
+bool
+rs6000_pcrel_p ()
+{
+  return (DEFAULT_ABI == ABI_ELFv2
+	  && (rs6000_isa_flags & OPTION_MASK_PCREL) != 0
+	  && TARGET_CMODEL == CMODEL_MEDIUM);
 }
 
 

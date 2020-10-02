@@ -1,3 +1,15 @@
+2020-09-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/97163
+	* lex.c (search_line_fast): Only use _ARCH_PWR8 Altivec version
+	for GCC >= 4.5.
+
+2020-09-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR c/80076
+	* include/line-map.h (first_map_in_common): Declare.
+	* line-map.c (first_map_in_common): Remove static.
+
 2020-09-07  Martin Storsjö  <martin@martin.st>
 
 	* files.c (remap_filename): Make a strchr return value pointer

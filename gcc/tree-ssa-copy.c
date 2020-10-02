@@ -33,7 +33,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "tree-scalar-evolution.h"
 #include "tree-ssa-loop-niter.h"
-#include "value-query.h"
 
 
 /* This file implements the copy propagation pass and provides a
@@ -492,17 +491,23 @@ init_copy_prop (void)
 
 class copy_folder : public substitute_and_fold_engine
 {
-public:
-  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE
-    {
-      if (SSA_NAME_VERSION (name) >= n_copy_of)
-	return NULL_TREE;
-      tree val = copy_of[SSA_NAME_VERSION (name)].value;
-      if (val && val != name)
-	return val;
-      return NULL_TREE;
-    }
+ public:
+  tree value_of_expr (tree name, gimple *) FINAL OVERRIDE;
 };
+
+/* Callback for substitute_and_fold to get at the final copy-of values.  */
+
+tree
+copy_folder::value_of_expr (tree name, gimple *)
+{
+  tree val;
+  if (SSA_NAME_VERSION (name) >= n_copy_of)
+    return NULL_TREE;
+  val = copy_of[SSA_NAME_VERSION (name)].value;
+  if (val && val != name)
+    return val;
+  return NULL_TREE;
+}
 
 /* Deallocate memory used in copy propagation and do final
    substitution.  */

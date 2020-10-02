@@ -190,6 +190,8 @@ public:
   /* If this instance is the main entry of a subgraph the set of
      entries into the same subgraph, including itself.  */
   vec<_slp_instance *> subgraph_entries;
+
+  dump_user_location_t location () const;
 } *slp_instance;
 
 
@@ -202,6 +204,7 @@ public:
 #define SLP_TREE_CHILDREN(S)                     (S)->children
 #define SLP_TREE_SCALAR_STMTS(S)                 (S)->stmts
 #define SLP_TREE_SCALAR_OPS(S)                   (S)->ops
+#define SLP_TREE_REF_COUNT(S)                    (S)->refcnt
 #define SLP_TREE_VEC_STMTS(S)                    (S)->vec_stmts
 #define SLP_TREE_VEC_DEFS(S)                     (S)->vec_defs
 #define SLP_TREE_NUMBER_OF_VEC_STMTS(S)          (S)->vec_stmts_size
@@ -357,7 +360,6 @@ public:
 
   /* The SLP graph.  */
   auto_vec<slp_instance> slp_instances;
-  auto_vec<slp_tree> slp_loads;
 
   /* Maps base addresses to an innermost_loop_behavior that gives the maximum
      known alignment for that base.  */
@@ -1221,9 +1223,6 @@ public:
   /* Whether on this stmt reduction meta is recorded.  */
   bool is_reduc_info;
 
-  /* The number of scalar stmt references from active SLP instances.  */
-  unsigned int num_slp_uses;
-
   /* If nonzero, the lhs of the statement could be truncated to this
      many bits without affecting any users of the result.  */
   unsigned int min_output_precision;
@@ -1338,7 +1337,6 @@ struct gather_scatter_info {
 #define STMT_VINFO_LOOP_PHI_EVOLUTION_BASE_UNCHANGED(S) (S)->loop_phi_evolution_base_unchanged
 #define STMT_VINFO_LOOP_PHI_EVOLUTION_PART(S) (S)->loop_phi_evolution_part
 #define STMT_VINFO_MIN_NEG_DIST(S)	(S)->min_neg_dist
-#define STMT_VINFO_NUM_SLP_USES(S)	(S)->num_slp_uses
 #define STMT_VINFO_REDUC_TYPE(S)	(S)->reduc_type
 #define STMT_VINFO_REDUC_CODE(S)	(S)->reduc_code
 #define STMT_VINFO_REDUC_FN(S)		(S)->reduc_fn
@@ -1969,7 +1967,8 @@ extern tree vect_create_addr_base_for_vector_ref (vec_info *,
 extern widest_int vect_iv_limit_for_partial_vectors (loop_vec_info loop_vinfo);
 bool vect_rgroup_iv_might_wrap_p (loop_vec_info, rgroup_controls *);
 /* Used in tree-vect-loop-manip.c */
-extern void determine_peel_for_niter (loop_vec_info);
+extern opt_result vect_determine_partial_vectors_and_peeling (loop_vec_info,
+							      bool);
 /* Used in gimple-loop-interchange.c and tree-parloops.c.  */
 extern bool check_reduction_path (dump_user_location_t, loop_p, gphi *, tree,
 				  enum tree_code);
@@ -2022,12 +2021,12 @@ extern int vect_get_known_peeling_cost (loop_vec_info, int, int *,
 extern tree cse_and_gimplify_to_preheader (loop_vec_info, tree);
 
 /* In tree-vect-slp.c.  */
-extern void vect_free_slp_instance (slp_instance, bool);
+extern void vect_free_slp_instance (slp_instance);
 extern bool vect_transform_slp_perm_load (vec_info *, slp_tree, vec<tree>,
 					  gimple_stmt_iterator *, poly_uint64,
 					  bool, unsigned *);
 extern bool vect_slp_analyze_operations (vec_info *);
-extern void vect_schedule_slp (vec_info *);
+extern void vect_schedule_slp (vec_info *, vec<slp_instance>);
 extern opt_result vect_analyze_slp (vec_info *, unsigned);
 extern bool vect_make_slp_decision (loop_vec_info);
 extern void vect_detect_hybrid_slp (loop_vec_info);
@@ -2045,6 +2044,7 @@ extern bool can_duplicate_and_interleave_p (vec_info *, unsigned int, tree,
 extern void duplicate_and_interleave (vec_info *, gimple_seq *, tree,
 				      vec<tree>, unsigned int, vec<tree> &);
 extern int vect_get_place_in_interleaving_chain (stmt_vec_info, stmt_vec_info);
+extern bool vect_update_shared_vectype (stmt_vec_info, tree);
 
 /* In tree-vect-patterns.c.  */
 /* Pattern recognition functions.

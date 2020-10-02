@@ -466,6 +466,7 @@ static const struct default_options default_options_table[] =
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_finline_functions_called_once, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fmove_loop_invariants, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fssa_phiopt, NULL, 1 },
+    { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fipa_modref, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_ftree_bit_ccp, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_ftree_dse, NULL, 1 },
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_ftree_pta, NULL, 1 },
@@ -790,6 +791,13 @@ control_options_for_live_patching (struct gcc_options *opts,
 		  "%<-flive-patching=inline-only-static|inline-clone%>");
       else
 	opts->x_flag_ipa_pure_const = 0;
+
+      if (opts_set->x_flag_ipa_modref && opts->x_flag_ipa_modref)
+	error_at (loc,
+		  "%<-fipa-modref%> is incompatible with "
+		  "%<-flive-patching=inline-only-static|inline-clone%>");
+      else
+	opts->x_flag_ipa_modref = 0;
 
       /* FIXME: disable unreachable code removal.  */
 

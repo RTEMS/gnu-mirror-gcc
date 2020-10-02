@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "bitmap.h"
 #include "selftest.h"
 #include "function.h"
+#include "json.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
 #include "ordered-hash-map.h"
@@ -658,6 +659,8 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	switch (DECL_UNCHECKED_FUNCTION_CODE (callee_fndecl))
 	  {
 	  default:
+	    if (!DECL_PURE_P (callee_fndecl))
+	      unknown_side_effects = true;
 	    break;
 	  case BUILT_IN_ALLOCA:
 	  case BUILT_IN_ALLOCA_WITH_ALIGN:
@@ -672,20 +675,54 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	    break;
 	  case BUILT_IN_MALLOC:
 	    return impl_call_malloc (cd);
+	  case BUILT_IN_MEMCPY:
+	  case BUILT_IN_MEMCPY_CHK:
+	    impl_call_memcpy (cd);
+	    return false;
 	  case BUILT_IN_MEMSET:
 	  case BUILT_IN_MEMSET_CHK:
 	    impl_call_memset (cd);
 	    return false;
 	    break;
+	  case BUILT_IN_STRCPY:
+	  case BUILT_IN_STRCPY_CHK:
+	    impl_call_strcpy (cd);
+	    return false;
 	  case BUILT_IN_STRLEN:
 	    if (impl_call_strlen (cd))
 	      return false;
+	    break;
+
+	  /* Stdio builtins.  */
+	  case BUILT_IN_FPRINTF:
+	  case BUILT_IN_FPRINTF_UNLOCKED:
+	  case BUILT_IN_PUTC:
+	  case BUILT_IN_PUTC_UNLOCKED:
+	  case BUILT_IN_FPUTC:
+	  case BUILT_IN_FPUTC_UNLOCKED:
+	  case BUILT_IN_FPUTS:
+	  case BUILT_IN_FPUTS_UNLOCKED:
+	  case BUILT_IN_FWRITE:
+	  case BUILT_IN_FWRITE_UNLOCKED:
+	  case BUILT_IN_PRINTF:
+	  case BUILT_IN_PRINTF_UNLOCKED:
+	  case BUILT_IN_PUTCHAR:
+	  case BUILT_IN_PUTCHAR_UNLOCKED:
+	  case BUILT_IN_PUTS:
+	  case BUILT_IN_PUTS_UNLOCKED:
+	  case BUILT_IN_VFPRINTF:
+	  case BUILT_IN_VPRINTF:
+	    /* These stdio builtins have external effects that are out
+	       of scope for the analyzer: we only want to model the effects
+	       on the return value.  */
 	    break;
 	  }
       else if (gimple_call_internal_p (call))
 	switch (gimple_call_internal_fn (call))
 	  {
 	  default:
+	    if (!DECL_PURE_P (callee_fndecl))
+	      unknown_side_effects = true;
 	    break;
 	  case IFN_BUILTIN_EXPECT:
 	    return impl_call_builtin_expect (cd);
@@ -696,12 +733,19 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	return impl_call_calloc (cd);
       else if (is_named_call_p (callee_fndecl, "alloca", call, 1))
 	return impl_call_alloca (cd);
-      else if (is_named_call_p (callee_fndecl, "memset", call, 3))
+      else if (is_named_call_p (callee_fndecl, "getchar", call, 0))
+	{
+	  /* No side-effects (tracking stream state is out-of-scope
+	     for the analyzer).  */
+	}
+      else if (is_named_call_p (callee_fndecl, "memset", call, 3)
+	       && POINTER_TYPE_P (cd.get_arg_type (0)))
 	{
 	  impl_call_memset (cd);
 	  return false;
 	}
-      else if (is_named_call_p (callee_fndecl, "strlen", call, 1))
+      else if (is_named_call_p (callee_fndecl, "strlen", call, 1)
+	       && POINTER_TYPE_P (cd.get_arg_type (0)))
 	{
 	  if (impl_call_strlen (cd))
 	    return false;
@@ -1410,6 +1454,7 @@ region_model::region_exists_p (const region *reg) const
 
 /* Get a region for referencing PTR_SVAL, creating a region if need be, and
    potentially generating warnings via CTXT.
+   PTR_SVAL must be of pointer type.
    PTR_TREE if non-NULL can be used when emitting diagnostics.  */
 
 const region *
@@ -1417,6 +1462,7 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
 			    region_model_context *ctxt)
 {
   gcc_assert (ptr_sval);
+  gcc_assert (POINTER_TYPE_P (ptr_sval->get_type ()));
 
   /* If we're dereferencing PTR_SVAL, assume that it is non-NULL; add this
      as a constraint.  This suppresses false positives from
@@ -1764,6 +1810,20 @@ region_model::add_constraint (tree lhs, enum tree_code op, tree rhs,
   return true;
 }
 
+/* As above, but when returning false, if OUT is non-NULL, write a
+   new rejected_constraint to *OUT.  */
+
+bool
+region_model::add_constraint (tree lhs, enum tree_code op, tree rhs,
+			      region_model_context *ctxt,
+			      rejected_constraint **out)
+{
+  bool sat = add_constraint (lhs, op, rhs, ctxt);
+  if (!sat && out)
+    *out = new rejected_constraint (*this, lhs, op, rhs);
+  return sat;
+}
+
 /* Subroutine of region_model::add_constraint for handling optimized
    && and || conditionals.
 
@@ -2080,11 +2140,14 @@ region_model::get_representative_path_var (const region *reg,
 	path_var offset_pv
 	  = get_representative_path_var (offset_reg->get_byte_offset (),
 					 visited);
-	if (!offset_pv)
+	if (!offset_pv || TREE_CODE (offset_pv.m_tree) != INTEGER_CST)
 	  return path_var (NULL_TREE, 0);
+	tree addr_parent = build1 (ADDR_EXPR,
+				   build_pointer_type (reg->get_type ()),
+				   parent_pv.m_tree);
 	return path_var (build2 (MEM_REF,
 				 reg->get_type (),
-				 parent_pv.m_tree, offset_pv.m_tree),
+				 addr_parent, offset_pv.m_tree),
 			 parent_pv.m_stack_depth);
       }
 
@@ -2142,6 +2205,8 @@ region_model::update_for_phis (const supernode *snode,
 /* Attempt to update this model for taking EDGE (where the last statement
    was LAST_STMT), returning true if the edge can be taken, false
    otherwise.
+   When returning false, if OUT is non-NULL, write a new rejected_constraint
+   to it.
 
    For CFG superedges where LAST_STMT is a conditional or a switch
    statement, attempt to add the relevant conditions for EDGE to this
@@ -2161,7 +2226,8 @@ region_model::update_for_phis (const supernode *snode,
 bool
 region_model::maybe_update_for_edge (const superedge &edge,
 				     const gimple *last_stmt,
-				     region_model_context *ctxt)
+				     region_model_context *ctxt,
+				     rejected_constraint **out)
 {
   /* Handle frame updates for interprocedural edges.  */
   switch (edge.m_kind)
@@ -2201,20 +2267,21 @@ region_model::maybe_update_for_edge (const superedge &edge,
   if (const gcond *cond_stmt = dyn_cast <const gcond *> (last_stmt))
     {
       const cfg_superedge *cfg_sedge = as_a <const cfg_superedge *> (&edge);
-      return apply_constraints_for_gcond (*cfg_sedge, cond_stmt, ctxt);
+      return apply_constraints_for_gcond (*cfg_sedge, cond_stmt, ctxt, out);
     }
 
   if (const gswitch *switch_stmt = dyn_cast <const gswitch *> (last_stmt))
     {
       const switch_cfg_superedge *switch_sedge
 	= as_a <const switch_cfg_superedge *> (&edge);
-      return apply_constraints_for_gswitch (*switch_sedge, switch_stmt, ctxt);
+      return apply_constraints_for_gswitch (*switch_sedge, switch_stmt,
+					    ctxt, out);
     }
 
   /* Apply any constraints due to an exception being thrown.  */
   if (const cfg_superedge *cfg_sedge = dyn_cast <const cfg_superedge *> (&edge))
     if (cfg_sedge->get_flags () & EDGE_EH)
-      return apply_constraints_for_exception (last_stmt, ctxt);
+      return apply_constraints_for_exception (last_stmt, ctxt, out);
 
   return true;
 }
@@ -2292,12 +2359,15 @@ region_model::update_for_call_summary (const callgraph_superedge &cg_sedge,
    If they are feasible, add the constraints and return true.
 
    Return false if the constraints contradict existing knowledge
-   (and so the edge should not be taken).  */
+   (and so the edge should not be taken).
+   When returning false, if OUT is non-NULL, write a new rejected_constraint
+   to it.  */
 
 bool
 region_model::apply_constraints_for_gcond (const cfg_superedge &sedge,
 					   const gcond *cond_stmt,
-					   region_model_context *ctxt)
+					   region_model_context *ctxt,
+					   rejected_constraint **out)
 {
   ::edge cfg_edge = sedge.get_cfg_edge ();
   gcc_assert (cfg_edge != NULL);
@@ -2308,7 +2378,7 @@ region_model::apply_constraints_for_gcond (const cfg_superedge &sedge,
   tree rhs = gimple_cond_rhs (cond_stmt);
   if (cfg_edge->flags & EDGE_FALSE_VALUE)
     op = invert_tree_comparison (op, false /* honor_nans */);
-  return add_constraint (lhs, op, rhs, ctxt);
+  return add_constraint (lhs, op, rhs, ctxt, out);
 }
 
 /* Given an EDGE guarded by SWITCH_STMT, determine appropriate constraints
@@ -2317,12 +2387,15 @@ region_model::apply_constraints_for_gcond (const cfg_superedge &sedge,
    If they are feasible, add the constraints and return true.
 
    Return false if the constraints contradict existing knowledge
-   (and so the edge should not be taken).  */
+   (and so the edge should not be taken).
+   When returning false, if OUT is non-NULL, write a new rejected_constraint
+   to it.  */
 
 bool
 region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
 					     const gswitch *switch_stmt,
-					     region_model_context *ctxt)
+					     region_model_context *ctxt,
+					     rejected_constraint **out)
 {
   tree index  = gimple_switch_index (switch_stmt);
   tree case_label = edge.get_case_label ();
@@ -2334,13 +2407,13 @@ region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
       if (upper_bound)
 	{
 	  /* Range.  */
-	  if (!add_constraint (index, GE_EXPR, lower_bound, ctxt))
+	  if (!add_constraint (index, GE_EXPR, lower_bound, ctxt, out))
 	    return false;
-	  return add_constraint (index, LE_EXPR, upper_bound, ctxt);
+	  return add_constraint (index, LE_EXPR, upper_bound, ctxt, out);
 	}
       else
 	/* Single-value.  */
-	return add_constraint (index, EQ_EXPR, lower_bound, ctxt);
+	return add_constraint (index, EQ_EXPR, lower_bound, ctxt, out);
     }
   else
     {
@@ -2360,14 +2433,16 @@ region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
 	      /* Exclude this range-valued case.
 		 For now, we just exclude the boundary values.
 		 TODO: exclude the values within the region.  */
-	      if (!add_constraint (index, NE_EXPR, other_lower_bound, ctxt))
+	      if (!add_constraint (index, NE_EXPR, other_lower_bound,
+				   ctxt, out))
 		return false;
-	      if (!add_constraint (index, NE_EXPR, other_upper_bound, ctxt))
+	      if (!add_constraint (index, NE_EXPR, other_upper_bound,
+				   ctxt, out))
 		return false;
 	    }
 	  else
 	    /* Exclude this single-valued case.  */
-	    if (!add_constraint (index, NE_EXPR, other_lower_bound, ctxt))
+	    if (!add_constraint (index, NE_EXPR, other_lower_bound, ctxt, out))
 	      return false;
 	}
       return true;
@@ -2379,11 +2454,14 @@ region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
    If they are feasible, add the constraints and return true.
 
    Return false if the constraints contradict existing knowledge
-   (and so the edge should not be taken).  */
+   (and so the edge should not be taken).
+   When returning false, if OUT is non-NULL, write a new rejected_constraint
+   to it.  */
 
 bool
 region_model::apply_constraints_for_exception (const gimple *last_stmt,
-					       region_model_context *ctxt)
+					       region_model_context *ctxt,
+					       rejected_constraint **out)
 {
   gcc_assert (last_stmt);
   if (const gcall *call = dyn_cast <const gcall *> (last_stmt))
@@ -2396,7 +2474,7 @@ region_model::apply_constraints_for_exception (const gimple *last_stmt,
 	     leak report due to the result being lost when following
 	     the EH edge.  */
 	  if (tree lhs = gimple_call_lhs (call))
-	    return add_constraint (lhs, EQ_EXPR, null_pointer_node, ctxt);
+	    return add_constraint (lhs, EQ_EXPR, null_pointer_node, ctxt, out);
 	  return true;
 	}
   return true;
@@ -2814,6 +2892,19 @@ DEBUG_FUNCTION void
 debug (const region_model &rmodel)
 {
   rmodel.dump (false);
+}
+
+/* struct rejected_constraint.  */
+
+void
+rejected_constraint::dump_to_pp (pretty_printer *pp) const
+{
+  region_model m (m_model);
+  const svalue *lhs_sval = m.get_rvalue (m_lhs, NULL);
+  const svalue *rhs_sval = m.get_rvalue (m_rhs, NULL);
+  lhs_sval->dump_to_pp (pp, true);
+  pp_printf (pp, " %s ", op_symbol_code (m_op));
+  rhs_sval->dump_to_pp (pp, true);
 }
 
 /* class engine.  */

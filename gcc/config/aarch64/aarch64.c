@@ -1935,6 +1935,29 @@ aarch64_sve_abi (void)
   return sve_abi;
 }
 
+/* If X is an UNSPEC_SALT_ADDR expression, return the address that it
+   wraps, otherwise return X itself.  */
+
+static rtx
+strip_salt (rtx x)
+{
+  rtx search = x;
+  if (GET_CODE (search) == CONST)
+    search = XEXP (search, 0);
+  if (GET_CODE (search) == UNSPEC && XINT (search, 1) == UNSPEC_SALT_ADDR)
+    x = XVECEXP (search, 0, 0);
+  return x;
+}
+
+/* Like strip_offset, but also strip any UNSPEC_SALT_ADDR from the
+   expression.  */
+
+static rtx
+strip_offset_and_salt (rtx addr, poly_int64 *offset)
+{
+  return strip_salt (strip_offset (addr, offset));
+}
+
 /* Generate code to enable conditional branches in functions over 1 MiB.  */
 const char *
 aarch64_gen_far_branch (rtx * operands, int pos_label, const char * dest,
@@ -2932,14 +2955,9 @@ static enum tls_model
 tls_symbolic_operand_type (rtx addr)
 {
   enum tls_model tls_kind = TLS_MODEL_NONE;
-  if (GET_CODE (addr) == CONST)
-    {
-      poly_int64 addend;
-      rtx sym = strip_offset (addr, &addend);
-      if (GET_CODE (sym) == SYMBOL_REF)
-	tls_kind = SYMBOL_REF_TLS_MODEL (sym);
-    }
-  else if (GET_CODE (addr) == SYMBOL_REF)
+  poly_int64 offset;
+  addr = strip_offset_and_salt (addr, &offset);
+  if (GET_CODE (addr) == SYMBOL_REF)
     tls_kind = SYMBOL_REF_TLS_MODEL (addr);
 
   return tls_kind;
@@ -3404,11 +3422,16 @@ aarch64_split_128bit_move (rtx dst, rtx src)
     }
 }
 
+/* Return true if we should split a move from 128-bit value SRC
+   to 128-bit register DEST.  */
+
 bool
 aarch64_split_128bit_move_p (rtx dst, rtx src)
 {
-  return (! REG_P (src)
-	  || ! (FP_REGNUM_P (REGNO (dst)) && FP_REGNUM_P (REGNO (src))));
+  if (FP_REGNUM_P (REGNO (dst)))
+    return REG_P (src) && !FP_REGNUM_P (REGNO (src));
+  /* All moves to GPRs need to be split.  */
+  return true;
 }
 
 /* Split a complex SIMD combine.  */
@@ -5237,6 +5260,48 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 
   aarch64_internal_mov_immediate (dest, imm, true,
 				  as_a <scalar_int_mode> (mode));
+}
+
+/* Return the MEM rtx that provides the canary value that should be used
+   for stack-smashing protection.  MODE is the mode of the memory.
+   For SSP_GLOBAL, DECL_RTL is the MEM rtx for the canary variable
+   (__stack_chk_guard), otherwise it has no useful value.  SALT_TYPE
+   indicates whether the caller is performing a SET or a TEST operation.  */
+
+rtx
+aarch64_stack_protect_canary_mem (machine_mode mode, rtx decl_rtl,
+				  aarch64_salt_type salt_type)
+{
+  rtx addr;
+  if (aarch64_stack_protector_guard == SSP_GLOBAL)
+    {
+      gcc_assert (MEM_P (decl_rtl));
+      addr = XEXP (decl_rtl, 0);
+      poly_int64 offset;
+      rtx base = strip_offset_and_salt (addr, &offset);
+      if (!SYMBOL_REF_P (base))
+	return decl_rtl;
+
+      rtvec v = gen_rtvec (2, base, GEN_INT (salt_type));
+      addr = gen_rtx_UNSPEC (Pmode, v, UNSPEC_SALT_ADDR);
+      addr = gen_rtx_CONST (Pmode, addr);
+      addr = plus_constant (Pmode, addr, offset);
+    }
+  else
+    {
+      /* Calculate the address from the system register.  */
+      rtx salt = GEN_INT (salt_type);
+      addr = gen_reg_rtx (mode);
+      if (mode == DImode)
+	emit_insn (gen_reg_stack_protect_address_di (addr, salt));
+      else
+	{
+	  emit_insn (gen_reg_stack_protect_address_si (addr, salt));
+	  addr = convert_memory_address (Pmode, addr);
+	}
+      addr = plus_constant (Pmode, addr, aarch64_stack_protector_guard_offset);
+    }
+  return gen_rtx_MEM (mode, force_reg (Pmode, addr));
 }
 
 /* Emit an SVE predicated move from SRC to DEST.  PRED is a predicate
@@ -8677,8 +8742,6 @@ aarch64_move_imm (HOST_WIDE_INT val, machine_mode mode)
 static bool
 aarch64_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
-  rtx base, offset;
-
   if (GET_CODE (x) == HIGH)
     return true;
 
@@ -8688,10 +8751,12 @@ aarch64_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
     if (GET_CODE (*iter) == CONST_POLY_INT)
       return true;
 
-  split_const (x, &base, &offset);
+  poly_int64 offset;
+  rtx base = strip_offset_and_salt (x, &offset);
   if (GET_CODE (base) == SYMBOL_REF || GET_CODE (base) == LABEL_REF)
     {
-      if (aarch64_classify_symbol (base, INTVAL (offset))
+      /* We checked for POLY_INT_CST offsets above.  */
+      if (aarch64_classify_symbol (base, offset.to_constant ())
 	  != SYMBOL_FORCE_TO_MEM)
 	return true;
       else
@@ -9217,9 +9282,8 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  && GET_MODE_SIZE (mode).is_constant (&const_size)
 	  && const_size >= 4)
 	{
-	  rtx sym, addend;
-
-	  split_const (x, &sym, &addend);
+	  poly_int64 offset;
+	  rtx sym = strip_offset_and_salt (x, &offset);
 	  return ((GET_CODE (sym) == LABEL_REF
 		   || (GET_CODE (sym) == SYMBOL_REF
 		       && CONSTANT_POOL_ADDRESS_P (sym)
@@ -9234,10 +9298,12 @@ aarch64_classify_address (struct aarch64_address_info *info,
       if (allow_reg_index_p
 	  && aarch64_base_register_rtx_p (info->base, strict_p))
 	{
-	  rtx sym, offs;
-	  split_const (info->offset, &sym, &offs);
+	  poly_int64 offset;
+	  HOST_WIDE_INT const_offset;
+	  rtx sym = strip_offset_and_salt (info->offset, &offset);
 	  if (GET_CODE (sym) == SYMBOL_REF
-	      && (aarch64_classify_symbol (sym, INTVAL (offs))
+	      && offset.is_constant (&const_offset)
+	      && (aarch64_classify_symbol (sym, const_offset)
 		  == SYMBOL_SMALL_ABSOLUTE))
 	    {
 	      /* The symbol and offset must be aligned to the access size.  */
@@ -9263,7 +9329,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	      if (known_eq (ref_size, 0))
 		ref_size = GET_MODE_SIZE (DImode);
 
-	      return (multiple_p (INTVAL (offs), ref_size)
+	      return (multiple_p (const_offset, ref_size)
 		      && multiple_p (align / BITS_PER_UNIT, ref_size));
 	    }
 	}
@@ -9295,9 +9361,8 @@ aarch64_address_valid_for_prefetch_p (rtx x, bool strict_p)
 bool
 aarch64_symbolic_address_p (rtx x)
 {
-  rtx offset;
-
-  split_const (x, &x, &offset);
+  poly_int64 offset;
+  x = strip_offset_and_salt (x, &offset);
   return GET_CODE (x) == SYMBOL_REF || GET_CODE (x) == LABEL_REF;
 }
 
@@ -10028,27 +10093,16 @@ aarch64_print_operand (FILE *f, rtx x, int code)
   switch (code)
     {
     case 'c':
-      switch (GET_CODE (x))
+      if (CONST_INT_P (x))
+	fprintf (f, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+      else
 	{
-	case CONST_INT:
-	  fprintf (f, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
-	  break;
-
-	case SYMBOL_REF:
-	  output_addr_const (f, x);
-	  break;
-
-	case CONST:
-	  if (GET_CODE (XEXP (x, 0)) == PLUS
-	      && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF)
-	    {
-	      output_addr_const (f, x);
-	      break;
-	    }
-	  /* Fall through.  */
-
-	default:
-	  output_operand_lossage ("unsupported operand for code '%c'", code);
+	  poly_int64 offset;
+	  rtx base = strip_offset_and_salt (x, &offset);
+	  if (SYMBOL_REF_P (base))
+	    output_addr_const (f, x);
+	  else
+	    output_operand_lossage ("unsupported operand for code '%c'", code);
 	}
       break;
 
@@ -10621,6 +10675,19 @@ aarch64_print_operand_address (FILE *f, machine_mode mode, rtx x)
 {
   if (!aarch64_print_address_internal (f, mode, x, ADDR_QUERY_ANY))
     output_addr_const (f, x);
+}
+
+/* Implement TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
+
+static bool
+aarch64_output_addr_const_extra (FILE *file, rtx x)
+{
+  if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_SALT_ADDR)
+    {
+      output_addr_const (file, XVECEXP (x, 0, 0));
+      return true;
+   }
+  return false;
 }
 
 bool
@@ -15034,7 +15101,7 @@ aarch64_override_options (void)
   /* Save these options as the default ones in case we push and pop them later
      while processing functions with potential target attributes.  */
   target_option_default_node = target_option_current_node
-      = build_target_option_node (&global_options);
+    = build_target_option_node (&global_options, &global_options_set);
 }
 
 /* Implement targetm.override_options_after_change.  */
@@ -15109,7 +15176,8 @@ initialize_aarch64_code_model (struct gcc_options *opts)
 /* Implement TARGET_OPTION_SAVE.  */
 
 static void
-aarch64_option_save (struct cl_target_option *ptr, struct gcc_options *opts)
+aarch64_option_save (struct cl_target_option *ptr, struct gcc_options *opts,
+		     struct gcc_options */* opts_set */)
 {
   ptr->x_aarch64_override_tune_string = opts->x_aarch64_override_tune_string;
   ptr->x_aarch64_branch_protection_string
@@ -15120,7 +15188,9 @@ aarch64_option_save (struct cl_target_option *ptr, struct gcc_options *opts)
    using the information saved in PTR.  */
 
 static void
-aarch64_option_restore (struct gcc_options *opts, struct cl_target_option *ptr)
+aarch64_option_restore (struct gcc_options *opts,
+			struct gcc_options */* opts_set */,
+			struct cl_target_option *ptr)
 {
   opts->x_explicit_tune_core = ptr->x_explicit_tune_core;
   selected_tune = aarch64_get_tune_cpu (ptr->x_explicit_tune_core);
@@ -15210,7 +15280,8 @@ aarch64_set_current_function (tree fndecl)
   aarch64_previous_fndecl = fndecl;
 
   /* First set the target options.  */
-  cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+  cl_target_option_restore (&global_options, &global_options_set,
+			    TREE_TARGET_OPTION (new_tree));
 
   aarch64_save_restore_target_globals (new_tree);
 }
@@ -15709,17 +15780,18 @@ aarch64_option_valid_attribute_p (tree fndecl, tree, tree args, int)
     }
   tree func_optimize = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl);
 
-  old_optimize = build_optimization_node (&global_options);
+  old_optimize
+    = build_optimization_node (&global_options, &global_options_set);
   func_optimize = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl);
 
   /* If the function changed the optimization levels as well as setting
      target options, start with the optimizations specified.  */
   if (func_optimize && func_optimize != old_optimize)
-    cl_optimization_restore (&global_options,
+    cl_optimization_restore (&global_options, &global_options_set,
 			     TREE_OPTIMIZATION (func_optimize));
 
   /* Save the current target options to restore at the end.  */
-  cl_target_option_save (&cur_target, &global_options);
+  cl_target_option_save (&cur_target, &global_options, &global_options_set);
 
   /* If fndecl already has some target attributes applied to it, unpack
      them so that we add this attribute on top of them, rather than
@@ -15730,11 +15802,12 @@ aarch64_option_valid_attribute_p (tree fndecl, tree, tree args, int)
 	= TREE_TARGET_OPTION (existing_target);
 
       if (existing_options)
-	cl_target_option_restore (&global_options, existing_options);
+	cl_target_option_restore (&global_options, &global_options_set,
+				  existing_options);
     }
   else
-    cl_target_option_restore (&global_options,
-			TREE_TARGET_OPTION (target_option_current_node));
+    cl_target_option_restore (&global_options, &global_options_set,
+			      TREE_TARGET_OPTION (target_option_current_node));
 
   ret = aarch64_process_target_attr (args);
 
@@ -15754,12 +15827,14 @@ aarch64_option_valid_attribute_p (tree fndecl, tree, tree args, int)
 	  aarch64_init_simd_builtins ();
 	  current_target_pragma = saved_current_target_pragma;
 	}
-      new_target = build_target_option_node (&global_options);
+      new_target = build_target_option_node (&global_options,
+					     &global_options_set);
     }
   else
     new_target = NULL;
 
-  new_optimize = build_optimization_node (&global_options);
+  new_optimize = build_optimization_node (&global_options,
+					  &global_options_set);
 
   if (fndecl && ret)
     {
@@ -15769,10 +15844,10 @@ aarch64_option_valid_attribute_p (tree fndecl, tree, tree args, int)
 	DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl) = new_optimize;
     }
 
-  cl_target_option_restore (&global_options, &cur_target);
+  cl_target_option_restore (&global_options, &global_options_set, &cur_target);
 
   if (old_optimize != new_optimize)
-    cl_optimization_restore (&global_options,
+    cl_optimization_restore (&global_options, &global_options_set,
 			     TREE_OPTIMIZATION (old_optimize));
   return ret;
 }
@@ -15924,6 +15999,7 @@ aarch64_tls_symbol_p (rtx x)
   if (! TARGET_HAVE_TLS)
     return false;
 
+  x = strip_salt (x);
   if (GET_CODE (x) != SYMBOL_REF)
     return false;
 
@@ -15979,6 +16055,8 @@ aarch64_classify_tls_symbol (rtx x)
 enum aarch64_symbol_type
 aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 {
+  x = strip_salt (x);
+
   if (GET_CODE (x) == LABEL_REF)
     {
       switch (aarch64_cmodel)
@@ -16078,11 +16156,10 @@ aarch64_constant_address_p (rtx x)
 bool
 aarch64_legitimate_pic_operand_p (rtx x)
 {
-  if (GET_CODE (x) == SYMBOL_REF
-      || (GET_CODE (x) == CONST
-	  && GET_CODE (XEXP (x, 0)) == PLUS
-	  && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF))
-     return false;
+  poly_int64 offset;
+  x = strip_offset_and_salt (x, &offset);
+  if (GET_CODE (x) == SYMBOL_REF)
+    return false;
 
   return true;
 }
@@ -16128,7 +16205,7 @@ aarch64_legitimate_constant_p (machine_mode mode, rtx x)
   /* If an offset is being added to something else, we need to allow the
      base to be moved into the destination register, meaning that there
      are no free temporaries for the offset.  */
-  x = strip_offset (x, &offset);
+  x = strip_offset_and_salt (x, &offset);
   if (!offset.is_constant () && aarch64_offset_temporaries (true, offset) > 0)
     return false;
 
@@ -18027,6 +18104,7 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
       return aarch64_simd_valid_immediate (x, NULL);
     }
 
+  x = strip_salt (x);
   if (GET_CODE (x) == SYMBOL_REF && mode == DImode && CONSTANT_ADDRESS_P (x))
     return true;
 
@@ -23881,6 +23959,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_PRINT_OPERAND_ADDRESS
 #define TARGET_PRINT_OPERAND_ADDRESS aarch64_print_operand_address
+
+#undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
+#define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA aarch64_output_addr_const_extra
 
 #undef TARGET_OPTAB_SUPPORTED_P
 #define TARGET_OPTAB_SUPPORTED_P aarch64_optab_supported_p

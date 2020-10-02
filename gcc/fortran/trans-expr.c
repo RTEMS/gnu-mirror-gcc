@@ -728,7 +728,7 @@ gfc_conv_derived_to_class (gfc_se *parmse, gfc_expr *e,
 	  gfc_expr *len;
 	  gfc_se se;
 
-	  len = gfc_copy_expr (e);
+	  len = gfc_find_and_cut_at_last_class_ref (e);
 	  gfc_add_len_component (len);
 	  gfc_init_se (&se, NULL);
 	  gfc_conv_expr (&se, len);
@@ -739,6 +739,7 @@ gfc_conv_derived_to_class (gfc_se *parmse, gfc_expr *e,
 					    integer_zero_node));
 	  else
 	    tmp = se.expr;
+	  gfc_free_expr (len);
 	}
       else
 	tmp = integer_zero_node;
@@ -6421,6 +6422,26 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 
 	  if (!finalized && !e->must_finalize)
 	    {
+	      bool scalar_res_outside_loop;
+	      scalar_res_outside_loop = e->expr_type == EXPR_FUNCTION
+					&& parm_rank == 0
+					&& parmse.loop;
+
+	      if (scalar_res_outside_loop)
+		{
+		  /* Go through the ss chain to find the argument and use
+		     the stored value.  */
+		  gfc_ss *tmp_ss = parmse.loop->ss;
+		  for (; tmp_ss; tmp_ss = tmp_ss->next)
+		    if (tmp_ss->info
+			&& tmp_ss->info->expr == e
+			&& tmp_ss->info->data.scalar.value != NULL_TREE)
+		      {
+			tmp = tmp_ss->info->data.scalar.value;
+			break;
+		      }
+		}
+
 	      if ((e->ts.type == BT_CLASS
 		   && GFC_CLASS_TYPE_P (TREE_TYPE (tmp)))
 		  || e->ts.type == BT_DERIVED)
@@ -6429,7 +6450,11 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 	      else if (e->ts.type == BT_CLASS)
 		tmp = gfc_deallocate_alloc_comp (CLASS_DATA (e)->ts.u.derived,
 						 tmp, parm_rank);
-	      gfc_prepend_expr_to_block (&post, tmp);
+
+	      if (scalar_res_outside_loop)
+		gfc_add_expr_to_block (&parmse.loop->post, tmp);
+	      else
+		gfc_prepend_expr_to_block (&post, tmp);
 	    }
         }
 

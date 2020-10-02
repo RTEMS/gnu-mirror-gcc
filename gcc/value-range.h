@@ -43,7 +43,7 @@ enum value_range_kind
 
 class irange
 {
-  friend class irange_pool;
+  friend class irange_allocator;
 public:
   // In-place setters.
   void set (tree, tree, value_range_kind = VR_RANGE);
@@ -623,41 +623,45 @@ vrp_val_min (const_tree type)
 
 // This is the irange storage class.  It is used to allocate the
 // minimum amount of storage needed for a given irange.  Storage is
-// automatically freed at destruction.
+// automatically freed at destruction of the storage class.
 //
 // It is meant for long term storage, as opposed to int_range_max
 // which is meant for intermediate temporary results on the stack.
+//
+// The newly allocated irange is initialized to the empty set
+// (undefined_p() is true).
 
-class irange_pool
+class irange_allocator
 {
 public:
-  irange_pool ();
-  ~irange_pool ();
+  irange_allocator ();
+  ~irange_allocator ();
   // Return a new range with NUM_PAIRS.
   irange *allocate (unsigned num_pairs);
   // Return a copy of SRC with the minimum amount of sub-ranges needed
   // to represent it.
   irange *allocate (const irange &src);
 private:
-  struct obstack irange_obstack;
+  DISABLE_COPY_AND_ASSIGN (irange_allocator);
+  struct obstack m_obstack;
 };
 
 inline
-irange_pool::irange_pool ()
+irange_allocator::irange_allocator ()
 {
-  obstack_init (&irange_obstack);
+  obstack_init (&m_obstack);
 }
 
 inline
-irange_pool::~irange_pool ()
+irange_allocator::~irange_allocator ()
 {
-  obstack_free (&irange_obstack, NULL);
+  obstack_free (&m_obstack, NULL);
 }
 
 // Return a new range with NUM_PAIRS.
 
 inline irange *
-irange_pool::allocate (unsigned num_pairs)
+irange_allocator::allocate (unsigned num_pairs)
 {
   // Never allocate 0 pairs.
   // Don't allocate 1 either, or we get legacy value_range's.
@@ -668,15 +672,13 @@ irange_pool::allocate (unsigned num_pairs)
     irange range;
     tree mem[1];
   };
-  struct newir *r
-    = (struct newir *) obstack_alloc (&irange_obstack,
-				      sizeof (struct newir)
-				      + sizeof (tree) * 2 * (num_pairs - 1));
-  return new ((irange *) r) irange (&(r->mem[0]), num_pairs);
+  size_t nbytes = (sizeof (newir) + sizeof (tree) * 2 * (num_pairs - 1));
+  struct newir *r = (newir *) obstack_alloc (&m_obstack, nbytes);
+  return new (r) irange (r->mem, num_pairs);
 }
 
 inline irange *
-irange_pool::allocate (const irange &src)
+irange_allocator::allocate (const irange &src)
 {
   irange *r = allocate (src.num_pairs ());
   *r = src;
