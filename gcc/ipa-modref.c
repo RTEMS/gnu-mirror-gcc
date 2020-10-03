@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "value-range.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
+#include "tree-ssa-alias.h"
 
 /* Class (from which there is one global instance) that holds modref summaries
    for all analyzed functions.  */
@@ -257,6 +258,8 @@ modref_summary::dump (FILE *out)
       fprintf (out, "  LTO stores:\n");
       dump_lto_records (stores_lto, out);
     }
+  if (writes_errno)
+    fprintf (out, "  Writes errno\n");
 }
 
 
@@ -437,6 +440,35 @@ ignore_stores_p (tree caller, int flags)
   return false;
 }
 
+/* Return parm map value for OP.
+   This means returning nonnegative value if OP is function parameter,
+   -2 is OP points to local or readonly memory and -1 otherwise.  */
+static int
+parm_map_for (tree op)
+{
+  if (TREE_CODE (op) == SSA_NAME
+      && SSA_NAME_IS_DEFAULT_DEF (op)
+      && TREE_CODE (SSA_NAME_VAR (op)) == PARM_DECL)
+    {
+      int index = 0;
+      for (tree t = DECL_ARGUMENTS (current_function_decl);
+	   t != SSA_NAME_VAR (op); t = DECL_CHAIN (t))
+	{
+	  if (!t)
+	    {
+	      index = -1;
+	      break;
+	    }
+	  index++;
+	}
+      return index;
+    }
+  else if (points_to_local_or_readonly_memory_p (op))
+    return -2;
+  else
+    return -1;
+}
+
 /* Merge side effects of call STMT to function with CALLEE_SUMMARY
    int CUR_SUMMARY.  Return true if something changed.
    If IGNORE_STORES is true, do not merge stores.  */
@@ -452,29 +484,7 @@ merge_call_side_effects (modref_summary *cur_summary,
   parm_map.safe_grow (gimple_call_num_args (stmt));
   for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
     {
-      tree op = gimple_call_arg (stmt, i);
-      STRIP_NOPS (op);
-      if (TREE_CODE (op) == SSA_NAME
-	  && SSA_NAME_IS_DEFAULT_DEF (op)
-	  && TREE_CODE (SSA_NAME_VAR (op)) == PARM_DECL)
-	{
-	  int index = 0;
-	  for (tree t = DECL_ARGUMENTS (current_function_decl);
-	       t != SSA_NAME_VAR (op); t = DECL_CHAIN (t))
-	    {
-	      if (!t)
-		{
-		  index = -1;
-		  break;
-		}
-	      index++;
-	    }
-	  parm_map[i] = index;
-	}
-      else if (points_to_local_or_readonly_memory_p (op))
-	parm_map[i] = -2;
-      else
-	parm_map[i] = -1;
+      parm_map[i] = parm_map_for (gimple_call_arg (stmt, i));
     }
 
   /* Merge with callee's summary.  */
@@ -543,6 +553,85 @@ analyze_call (modref_summary *cur_summary,
 	fprintf (dump_file, " - Indirect call.\n");
       return false;
     }
+
+  struct ao_function_info info;
+  if (callee
+      && gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
+      && ao_classify_builtin (callee, &info)
+      && !(info.flags & AO_FUNCTION_BARRIER))
+    {
+      bool collapse_loads = false, collapse_stores = false;
+      if (info.num_param_reads >= 0)
+	{
+	  for (int i = 0; i < info.num_param_reads && !collapse_loads; i++)
+	    {
+	      int map = parm_map_for
+			  (gimple_call_arg (stmt,
+					    info.reads[i].param));
+	      if (map == -2)
+		continue;
+	      else if (map == -1)
+		collapse_loads = true;
+	      else
+		{
+		  modref_access_node a = {map};
+		  if (cur_summary->loads)
+		    cur_summary->loads->insert (0, 0, a);
+		  if (cur_summary->loads_lto)
+		    cur_summary->loads_lto->insert (NULL, NULL, a);
+		}
+	    }
+	}
+      else
+	collapse_loads = true;
+      if (collapse_loads)
+	{
+	  if (cur_summary->loads)
+	    cur_summary->loads->collapse ();
+	  if (cur_summary->loads_lto)
+	    cur_summary->loads_lto->collapse ();
+	}
+      if (ignore_stores)
+	;
+      else if (info.num_param_writes >= 0)
+	{
+	  if ((info.flags & AO_FUNCTION_ERRNO) && flag_errno_math)
+	    cur_summary->writes_errno = true;
+	  for (int i = 0; i < info.num_param_writes && !collapse_stores;
+	       i++)
+	    {
+	      int map = parm_map_for
+			  (gimple_call_arg (stmt,
+					    info.writes[i].param));
+	      if (map == -2)
+		continue;
+	      else if (map == -1)
+		collapse_stores = true;
+	      else
+		{
+		  modref_access_node a = {map};
+		  if (cur_summary->stores)
+		    cur_summary->stores->insert (0, 0, a);
+		  if (cur_summary->stores_lto)
+		    cur_summary->stores_lto->insert (NULL, NULL, a);
+		}
+	    }
+	}
+      else
+	collapse_stores = true;
+
+      if (collapse_stores)
+	{
+	  if (cur_summary->stores)
+	    cur_summary->stores->collapse ();
+	  if (cur_summary->stores_lto)
+	    cur_summary->stores_lto->collapse ();
+	}
+      return true;
+    }
+  else if (dump_file && gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
+    fprintf (dump_file, "      Unclassified builtin %s\n",
+	     IDENTIFIER_POINTER (DECL_NAME (callee)));
 
   struct cgraph_node *callee_node = cgraph_node::get_create (callee);
 
@@ -772,6 +861,7 @@ analyze_function (function *f, bool ipa)
 				  param_modref_max_accesses);
     }
   summary->finished = false;
+  summary->writes_errno = false;
   int ecf_flags = flags_from_decl_or_type (current_function_decl);
   auto_vec <gimple *, 32> recursive_calls;
 
@@ -872,6 +962,7 @@ modref_summaries::duplicate (cgraph_node *, cgraph_node *,
 			     modref_summary *dst_data)
 {
   dst_data->finished = src_data->finished;
+  dst_data->writes_errno = src_data->writes_errno;
   if (src_data->stores)
     {
       dst_data->stores = modref_records::create_ggc
@@ -1151,6 +1242,7 @@ modref_write ()
 	    write_modref_records (r->loads_lto, ob);
 	  if (r->stores_lto)
 	    write_modref_records (r->stores_lto, ob);
+	  streamer_write_uhwi (ob, r->writes_errno);
 	}
     }
   streamer_write_char_stream (ob->main_stream, 0);
@@ -1204,6 +1296,7 @@ read_section (struct lto_file_decl_data *file_data, const char *data,
 	 read_modref_records (&ib, data_in,
 			      &modref_sum->stores,
 			      &modref_sum->stores_lto);
+      modref_sum->writes_errno = streamer_read_uhwi (&ib);
       if (dump_file)
 	{
 	  fprintf (dump_file, "Read modref for %s\n",
@@ -1472,6 +1565,28 @@ collapse_loads (modref_summary *cur_summary)
   return changed;
 }
 
+/* Collapse stores and return true if something changed.  */
+
+bool
+collapse_stores (modref_summary *cur_summary)
+{
+  bool changed = false;
+
+  if (cur_summary->stores && !cur_summary->stores->every_base)
+    {
+      cur_summary->stores->collapse ();
+      changed = true;
+    }
+  if (cur_summary->stores_lto
+      && !cur_summary->stores_lto->every_base)
+    {
+      cur_summary->stores_lto->collapse ();
+      changed = true;
+    }
+  return changed;
+}
+
+
 /* Perform iterative dataflow on SCC component starting in COMPONENT_NODE.  */
 
 static void
@@ -1552,6 +1667,94 @@ modref_propagate_in_scc (cgraph_node *component_node)
 			 callee_edge->callee->dump_name ());
 
 	      bool ignore_stores = ignore_stores_p (cur->decl, flags);
+	      struct ao_function_info info;
+	      if (callee
+		  && fndecl_built_in_p (callee->decl, BUILT_IN_NORMAL)
+		  && ao_classify_builtin (callee->decl, &info)
+		  && !(info.flags & AO_FUNCTION_BARRIER))
+		{
+		  bool collapse_loads_p = false, collapse_stores_p = false;
+		  auto_vec <int, 32> parm_map;
+
+		  compute_parm_map (callee_edge, &parm_map);
+
+		  if (info.num_param_reads >= 0)
+		    {
+		      for (int i = 0; i < info.num_param_reads
+			   && !collapse_loads_p; i++)
+			{
+			  int map = i < (int) parm_map.length ()
+				    ? parm_map[i] : -1;
+
+			  if (dump_file && i >= (int) parm_map.length ())
+			    fprintf (dump_file, "      Untracked param %i\n",
+				     i);
+
+			  if (map == -2)
+			    continue;
+			  else if (map == -1)
+			    collapse_loads_p = true;
+			  else
+			    {
+			      modref_access_node a = {map};
+			      if (cur_summary->loads)
+				changed |= cur_summary->loads->insert (0, 0, a);
+			      if (cur_summary->loads_lto)
+				changed |= cur_summary->loads_lto->insert
+						 (NULL, NULL, a);
+			    }
+			}
+		    }
+		  else
+		    collapse_loads_p = true;
+		  if (collapse_loads_p)
+		    changed |= collapse_loads (cur_summary);
+		  if (ignore_stores)
+		    ;
+		  else if (info.num_param_writes >= 0)
+		    {
+		      if ((info.flags & AO_FUNCTION_ERRNO) && flag_errno_math)
+			cur_summary->writes_errno = true;
+		      for (int i = 0;
+			   i < info.num_param_writes && !collapse_stores_p;
+			   i++)
+			{
+			  int map = i < (int) parm_map.length ()
+				    ? parm_map[i] : -1;
+
+			  if (dump_file && i >= (int) parm_map.length ())
+			    fprintf (dump_file, "      Untracked param %i\n",
+				     i);
+
+			  if (map == -2)
+			    continue;
+			  else if (map == -1)
+			    collapse_stores_p = true;
+			  else
+			    {
+			      modref_access_node a = {map};
+			      if (cur_summary->stores)
+				changed |= cur_summary->stores->insert
+					       (0, 0, a);
+			      if (cur_summary->stores_lto)
+				changed |= cur_summary->stores_lto->insert
+						(NULL, NULL, a);
+			    }
+			}
+		    }
+		  else
+		    collapse_stores_p = true;
+
+		  if (collapse_stores_p)
+		    changed |= collapse_stores (cur_summary);
+
+		  continue;
+		}
+	      else if (dump_file && callee
+		       && fndecl_built_in_p (callee->decl, BUILT_IN_NORMAL))
+		fprintf (dump_file, "      Unclassified builtin %s\n",
+			 IDENTIFIER_POINTER (DECL_NAME (callee->decl)));
+
 
 	      /* We don't know anything about CALLEE, hence we cannot tell
 		 anything about the entire component.  */

@@ -2503,6 +2503,507 @@ modref_may_conflict (const gimple *stmt,
   return false;
 }
 
+/* If CALLEE has known side effects, fill in INFO and return true.
+   See tree-ssa-structalias.c:find_func_aliases
+   for the list of builtins we might need to handle here.  */
+
+bool
+ao_classify_builtin (tree callee, ao_function_info *info)
+{
+  built_in_function code = DECL_FUNCTION_CODE (callee);
+
+  switch (code)
+    {
+      /* All the following functions read memory pointed to by
+	 their second argument and write memory pointed to by first
+	 argument.
+	 strcat/strncat additionally reads memory pointed to by the first
+	 argument.  */
+      case BUILT_IN_STRCAT:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    2,				/* num_param_reads.  */
+
+		    /* Reads and write descriptors are triples containing:
+		       - index of parameter read
+		       - index of parameter specifying access size
+			 (-1 if unknown)
+		       - access size in bytes (0 if unkown).  */
+
+		    {{0, -1, 0}, {1, -1, 0}},	/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRNCAT:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    2,				/* num_param_reads.  */
+		    {{0, -1, 0}, {1, 2, 0}},	/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRCPY:
+      case BUILT_IN_STPCPY:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{1, -1, 0}},		/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRNCPY:
+      case BUILT_IN_MEMCPY:
+      case BUILT_IN_MEMMOVE:
+      case BUILT_IN_MEMPCPY:
+      case BUILT_IN_STPNCPY:
+      case BUILT_IN_TM_MEMCPY:
+      case BUILT_IN_TM_MEMMOVE:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{1, 2, 0}},		/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, 2, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRCAT_CHK:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    2,				/* num_param_reads.  */
+		    {{0, -1, 0}, {1, -1, 0}},	/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRNCAT_CHK:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    2,				/* num_param_reads.  */
+		    {{0, -1, 0}, {1, 2, 0}},	/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRCPY_CHK:
+      case BUILT_IN_STPCPY_CHK:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{1, -1, 0}},		/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRNCPY_CHK:
+      case BUILT_IN_MEMCPY_CHK:
+      case BUILT_IN_MEMMOVE_CHK:
+      case BUILT_IN_MEMPCPY_CHK:
+      case BUILT_IN_STPNCPY_CHK:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{1, 2, 0}},		/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, 2, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_BCOPY:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{0, 2, 0}},		/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{1, 2, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+
+      /* The following functions read memory pointed to by their
+	 first argument.  */
+      CASE_BUILT_IN_TM_LOAD (1):
+      CASE_BUILT_IN_TM_LOAD (2):
+      CASE_BUILT_IN_TM_LOAD (4):
+      CASE_BUILT_IN_TM_LOAD (8):
+      CASE_BUILT_IN_TM_LOAD (FLOAT):
+      CASE_BUILT_IN_TM_LOAD (DOUBLE):
+      CASE_BUILT_IN_TM_LOAD (LDOUBLE):
+      CASE_BUILT_IN_TM_LOAD (M64):
+      CASE_BUILT_IN_TM_LOAD (M128):
+      CASE_BUILT_IN_TM_LOAD (M256):
+      case BUILT_IN_TM_LOG:
+      case BUILT_IN_TM_LOG_1:
+      case BUILT_IN_TM_LOG_2:
+      case BUILT_IN_TM_LOG_4:
+      case BUILT_IN_TM_LOG_8:
+      case BUILT_IN_TM_LOG_FLOAT:
+      case BUILT_IN_TM_LOG_DOUBLE:
+      case BUILT_IN_TM_LOG_LDOUBLE:
+      case BUILT_IN_TM_LOG_M64:
+      case BUILT_IN_TM_LOG_M128:
+      case BUILT_IN_TM_LOG_M256:
+
+      case BUILT_IN_INDEX:
+      case BUILT_IN_STRCHR:
+      case BUILT_IN_STRRCHR:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    /* TODO: For TM builtins size is known.  */
+		    {{0, -1, 0}},		/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+
+      /* These read memory pointed to by the first argument.
+	 Allocating memory does not have any side-effects apart from
+	 being the definition point for the pointer.
+	 Unix98 specifies that errno is set on allocation failure.  */
+      case BUILT_IN_STRDUP:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{0, -1, 0}},		/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STRNDUP:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{0, 1, 0}},		/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* Allocating memory does not have any side-effects apart from
+	 being the definition point for the pointer.  */
+      case BUILT_IN_MALLOC:
+      case BUILT_IN_ALIGNED_ALLOC:
+      case BUILT_IN_CALLOC:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* These read memory pointed to by the first argument with size
+	 in the third argument.  */
+      case BUILT_IN_MEMCHR:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{0, 2, 0}},		/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* These read memory pointed to by the first and second arguments.  */
+      case BUILT_IN_STRSTR:
+      case BUILT_IN_STRPBRK:
+	{
+	  static struct ao_function_info ret_info
+	       = {
+		    2,				/* num_param_reads.  */
+		    {{0, -1, 0}, {1, -1, 0}},	/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* Freeing memory kills the pointed-to memory.  More importantly
+	 the call has to serve as a barrier for moving loads and stores
+	 across it.  */
+      case BUILT_IN_FREE:
+      case BUILT_IN_VA_END:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* Realloc serves both as allocation point and deallocation point.  */
+      case BUILT_IN_REALLOC:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    1,				/* num_param_reads.  */
+		    {{0, 1, 0}},		/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_GAMMA_R:
+      case BUILT_IN_GAMMAF_R:
+      case BUILT_IN_GAMMAL_R:
+      case BUILT_IN_LGAMMA_R:
+      case BUILT_IN_LGAMMAF_R:
+      case BUILT_IN_LGAMMAL_R:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{1, -1, 0}},		/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_FREXP:
+      case BUILT_IN_FREXPF:
+      case BUILT_IN_FREXPL:
+      case BUILT_IN_MODF:
+      case BUILT_IN_MODFF:
+      case BUILT_IN_MODFL:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{1, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_REMQUO:
+      case BUILT_IN_REMQUOF:
+      case BUILT_IN_REMQUOL:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{2, -1, 0}},		/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_SINCOS:
+      case BUILT_IN_SINCOSF:
+      case BUILT_IN_SINCOSL:
+	{
+	  static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {{1, -1, 0}, {2, -1, 0}},	/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  tree type = float_ptr_type_node;
+	  if (code == BUILT_IN_SINCOS)
+	    type = double_ptr_type_node;
+	  else
+	    type = long_double_ptr_type_node;
+	  ret_info.writes[0].size = ret_info.writes[1].size
+		 = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_MEMSET:
+      case BUILT_IN_MEMSET_CHK:
+      case BUILT_IN_TM_MEMSET:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    {0, 2, 0},			/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      CASE_BUILT_IN_TM_STORE (1):
+      CASE_BUILT_IN_TM_STORE (2):
+      CASE_BUILT_IN_TM_STORE (4):
+      CASE_BUILT_IN_TM_STORE (8):
+      CASE_BUILT_IN_TM_STORE (FLOAT):
+      CASE_BUILT_IN_TM_STORE (DOUBLE):
+      CASE_BUILT_IN_TM_STORE (LDOUBLE):
+      CASE_BUILT_IN_TM_STORE (M64):
+      CASE_BUILT_IN_TM_STORE (M128):
+      CASE_BUILT_IN_TM_STORE (M256):
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    1,				/* num_param_writes.  */
+		    /* TODO: Size is known.  */
+		    {0, -1, 0},			/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      case BUILT_IN_STACK_SAVE:
+      CASE_BUILT_IN_ALLOCA:
+      case BUILT_IN_ASSUME_ALIGNED:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* But posix_memalign stores a pointer into the memory pointed to
+	 by its first argument.  */
+      case BUILT_IN_POSIX_MEMALIGN:
+	{
+	  static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {{0, -1, 0}},		/* Param written.  */
+		    AO_FUNCTION_ERRNO,		/* flags.  */
+		 };
+	  ret_info.writes[0].size
+		 = tree_to_uhwi (TYPE_SIZE_UNIT (ptr_type_node));
+	  *info = ret_info;
+	  return true;
+	}
+      /* The following builtins do not read from memory.  */
+      case BUILT_IN_STACK_RESTORE:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    0,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    0,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    (ao_function_flags)0,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+      /* __sync_* builtins and some OpenMP builtins act as threading
+	 barriers.  */
+#undef DEF_SYNC_BUILTIN
+#define DEF_SYNC_BUILTIN(ENUM, NAME, TYPE, ATTRS) case ENUM:
+#include "sync-builtins.def"
+#undef DEF_SYNC_BUILTIN
+      case BUILT_IN_GOMP_ATOMIC_START:
+      case BUILT_IN_GOMP_ATOMIC_END:
+      case BUILT_IN_GOMP_BARRIER:
+      case BUILT_IN_GOMP_BARRIER_CANCEL:
+      case BUILT_IN_GOMP_TASKWAIT:
+      case BUILT_IN_GOMP_TASKGROUP_END:
+      case BUILT_IN_GOMP_CRITICAL_START:
+      case BUILT_IN_GOMP_CRITICAL_END:
+      case BUILT_IN_GOMP_CRITICAL_NAME_START:
+      case BUILT_IN_GOMP_CRITICAL_NAME_END:
+      case BUILT_IN_GOMP_LOOP_END:
+      case BUILT_IN_GOMP_LOOP_END_CANCEL:
+      case BUILT_IN_GOMP_ORDERED_START:
+      case BUILT_IN_GOMP_ORDERED_END:
+      case BUILT_IN_GOMP_SECTIONS_END:
+      case BUILT_IN_GOMP_SECTIONS_END_CANCEL:
+      case BUILT_IN_GOMP_SINGLE_COPY_START:
+      case BUILT_IN_GOMP_SINGLE_COPY_END:
+	{
+	  const static struct ao_function_info ret_info
+	       = {
+		    -1,				/* num_param_reads.  */
+		    {},				/* Param read.  */
+		    -1,				/* num_param_writes.  */
+		    {},				/* Param written.  */
+		    AO_FUNCTION_BARRIER,	/* flags.  */
+		 };
+	  *info = ret_info;
+	  return true;
+	}
+
+      default:
+	return false;
+    }
+}
+
 /* If the call CALL may use the memory reference REF return true,
    otherwise return false.  */
 
@@ -2574,219 +3075,37 @@ ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
   /* Handle those builtin functions explicitly that do not act as
      escape points.  See tree-ssa-structalias.c:find_func_aliases
      for the list of builtins we might need to handle here.  */
+  struct ao_function_info info;
   if (callee != NULL_TREE
-      && gimple_call_builtin_p (call, BUILT_IN_NORMAL))
-    switch (DECL_FUNCTION_CODE (callee))
-      {
-	/* All the following functions read memory pointed to by
-	   their second argument.  strcat/strncat additionally
-	   reads memory pointed to by the first argument.  */
-	case BUILT_IN_STRCAT:
-	case BUILT_IN_STRNCAT:
-	  {
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   NULL_TREE);
-	    if (refs_may_alias_p_1 (&dref, ref, false))
-	      return true;
-	  }
-	  /* FALLTHRU */
-	case BUILT_IN_STRCPY:
-	case BUILT_IN_STRNCPY:
-	case BUILT_IN_MEMCPY:
-	case BUILT_IN_MEMMOVE:
-	case BUILT_IN_MEMPCPY:
-	case BUILT_IN_STPCPY:
-	case BUILT_IN_STPNCPY:
-	case BUILT_IN_TM_MEMCPY:
-	case BUILT_IN_TM_MEMMOVE:
-	  {
-	    ao_ref dref;
-	    tree size = NULL_TREE;
-	    if (gimple_call_num_args (call) == 3)
-	      size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 1),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	case BUILT_IN_STRCAT_CHK:
-	case BUILT_IN_STRNCAT_CHK:
-	  {
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   NULL_TREE);
-	    if (refs_may_alias_p_1 (&dref, ref, false))
-	      return true;
-	  }
-	  /* FALLTHRU */
-	case BUILT_IN_STRCPY_CHK:
-	case BUILT_IN_STRNCPY_CHK:
-	case BUILT_IN_MEMCPY_CHK:
-	case BUILT_IN_MEMMOVE_CHK:
-	case BUILT_IN_MEMPCPY_CHK:
-	case BUILT_IN_STPCPY_CHK:
-	case BUILT_IN_STPNCPY_CHK:
-	  {
-	    ao_ref dref;
-	    tree size = NULL_TREE;
-	    if (gimple_call_num_args (call) == 4)
-	      size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 1),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	case BUILT_IN_BCOPY:
-	  {
-	    ao_ref dref;
-	    tree size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
+      && gimple_call_builtin_p (call, BUILT_IN_NORMAL)
+      && (ao_classify_builtin (callee, &info)))
+    {
+      if (info.flags & AO_FUNCTION_BARRIER)
+	return true;
+      if (info.num_param_reads >= 0)
+	{
+	  for (int i = 0; i < info.num_param_reads; i++)
+	    {
+	      ao_ref dref;
+	      tree size = NULL_TREE;
 
-	/* The following functions read memory pointed to by their
-	   first argument.  */
-	CASE_BUILT_IN_TM_LOAD (1):
-	CASE_BUILT_IN_TM_LOAD (2):
-	CASE_BUILT_IN_TM_LOAD (4):
-	CASE_BUILT_IN_TM_LOAD (8):
-	CASE_BUILT_IN_TM_LOAD (FLOAT):
-	CASE_BUILT_IN_TM_LOAD (DOUBLE):
-	CASE_BUILT_IN_TM_LOAD (LDOUBLE):
-	CASE_BUILT_IN_TM_LOAD (M64):
-	CASE_BUILT_IN_TM_LOAD (M128):
-	CASE_BUILT_IN_TM_LOAD (M256):
-	case BUILT_IN_TM_LOG:
-	case BUILT_IN_TM_LOG_1:
-	case BUILT_IN_TM_LOG_2:
-	case BUILT_IN_TM_LOG_4:
-	case BUILT_IN_TM_LOG_8:
-	case BUILT_IN_TM_LOG_FLOAT:
-	case BUILT_IN_TM_LOG_DOUBLE:
-	case BUILT_IN_TM_LOG_LDOUBLE:
-	case BUILT_IN_TM_LOG_M64:
-	case BUILT_IN_TM_LOG_M128:
-	case BUILT_IN_TM_LOG_M256:
-	  return ptr_deref_may_alias_ref_p_1 (gimple_call_arg (call, 0), ref);
-
-	/* These read memory pointed to by the first argument.  */
-	case BUILT_IN_STRDUP:
-	case BUILT_IN_STRNDUP:
-	case BUILT_IN_REALLOC:
-	  {
-	    ao_ref dref;
-	    tree size = NULL_TREE;
-	    if (gimple_call_num_args (call) == 2)
-	      size = gimple_call_arg (call, 1);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	/* These read memory pointed to by the first argument.  */
-	case BUILT_IN_INDEX:
-	case BUILT_IN_STRCHR:
-	case BUILT_IN_STRRCHR:
-	  {
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   NULL_TREE);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	/* These read memory pointed to by the first argument with size
-	   in the third argument.  */
-	case BUILT_IN_MEMCHR:
-	  {
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   gimple_call_arg (call, 2));
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	/* These read memory pointed to by the first and second arguments.  */
-	case BUILT_IN_STRSTR:
-	case BUILT_IN_STRPBRK:
-	  {
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   NULL_TREE);
-	    if (refs_may_alias_p_1 (&dref, ref, false))
-	      return true;
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 1),
-					   NULL_TREE);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-
-	/* The following builtins do not read from memory.  */
-	case BUILT_IN_FREE:
-	case BUILT_IN_MALLOC:
-	case BUILT_IN_POSIX_MEMALIGN:
-	case BUILT_IN_ALIGNED_ALLOC:
-	case BUILT_IN_CALLOC:
-	CASE_BUILT_IN_ALLOCA:
-	case BUILT_IN_STACK_SAVE:
-	case BUILT_IN_STACK_RESTORE:
-	case BUILT_IN_MEMSET:
-	case BUILT_IN_TM_MEMSET:
-	case BUILT_IN_MEMSET_CHK:
-	case BUILT_IN_FREXP:
-	case BUILT_IN_FREXPF:
-	case BUILT_IN_FREXPL:
-	case BUILT_IN_GAMMA_R:
-	case BUILT_IN_GAMMAF_R:
-	case BUILT_IN_GAMMAL_R:
-	case BUILT_IN_LGAMMA_R:
-	case BUILT_IN_LGAMMAF_R:
-	case BUILT_IN_LGAMMAL_R:
-	case BUILT_IN_MODF:
-	case BUILT_IN_MODFF:
-	case BUILT_IN_MODFL:
-	case BUILT_IN_REMQUO:
-	case BUILT_IN_REMQUOF:
-	case BUILT_IN_REMQUOL:
-	case BUILT_IN_SINCOS:
-	case BUILT_IN_SINCOSF:
-	case BUILT_IN_SINCOSL:
-	case BUILT_IN_ASSUME_ALIGNED:
-	case BUILT_IN_VA_END:
+	      gcc_checking_assert (info.reads[i].size_param
+				   != info.reads[i].param);
+	      if (info.reads[i].size_param != -1)
+		size = gimple_call_arg (call, info.reads[i].size);
+	      else if (info.reads[i].size)
+		size = build_int_cst (size_type_node, info.reads[i].size);
+	      ao_ref_init_from_ptr_and_size (&dref,
+					     gimple_call_arg
+						 (call,
+						  info.reads[i].param),
+					     size);
+	      if (refs_may_alias_p_1 (&dref, ref, tbaa_p))
+		return true;
+	    }
 	  return false;
-	/* __sync_* builtins and some OpenMP builtins act as threading
-	   barriers.  */
-#undef DEF_SYNC_BUILTIN
-#define DEF_SYNC_BUILTIN(ENUM, NAME, TYPE, ATTRS) case ENUM:
-#include "sync-builtins.def"
-#undef DEF_SYNC_BUILTIN
-	case BUILT_IN_GOMP_ATOMIC_START:
-	case BUILT_IN_GOMP_ATOMIC_END:
-	case BUILT_IN_GOMP_BARRIER:
-	case BUILT_IN_GOMP_BARRIER_CANCEL:
-	case BUILT_IN_GOMP_TASKWAIT:
-	case BUILT_IN_GOMP_TASKGROUP_END:
-	case BUILT_IN_GOMP_CRITICAL_START:
-	case BUILT_IN_GOMP_CRITICAL_END:
-	case BUILT_IN_GOMP_CRITICAL_NAME_START:
-	case BUILT_IN_GOMP_CRITICAL_NAME_END:
-	case BUILT_IN_GOMP_LOOP_END:
-	case BUILT_IN_GOMP_LOOP_END_CANCEL:
-	case BUILT_IN_GOMP_ORDERED_START:
-	case BUILT_IN_GOMP_ORDERED_END:
-	case BUILT_IN_GOMP_SECTIONS_END:
-	case BUILT_IN_GOMP_SECTIONS_END_CANCEL:
-	case BUILT_IN_GOMP_SINGLE_COPY_START:
-	case BUILT_IN_GOMP_SINGLE_COPY_END:
-	  return true;
-
-	default:
-	  /* Fallthru to general call handling.  */;
-      }
+	}
+    }
 
   /* Check if base is a global static variable that is not read
      by the function.  */
@@ -2961,7 +3280,9 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 	  modref_summary *summary = get_modref_function_summary (node);
 	  if (summary)
 	    {
-	      if (!modref_may_conflict (call, summary->stores, ref, tbaa_p))
+	      if (!modref_may_conflict (call, summary->stores, ref, tbaa_p)
+		  && (!summary->writes_errno
+		      || !targetm.ref_may_alias_errno (ref)))
 		{
 		  alias_stats.modref_clobber_no_alias++;
 		  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -3016,205 +3337,43 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
       && SSA_NAME_POINTS_TO_READONLY_MEMORY (TREE_OPERAND (base, 0)))
     return false;
 
+  struct ao_function_info info;
   /* Handle those builtin functions explicitly that do not act as
-     escape points.  See tree-ssa-structalias.c:find_func_aliases
-     for the list of builtins we might need to handle here.  */
+     escape points.  */
   if (callee != NULL_TREE
-      && gimple_call_builtin_p (call, BUILT_IN_NORMAL))
-    switch (DECL_FUNCTION_CODE (callee))
-      {
-	/* All the following functions clobber memory pointed to by
-	   their first argument.  */
-	case BUILT_IN_STRCPY:
-	case BUILT_IN_STRNCPY:
-	case BUILT_IN_MEMCPY:
-	case BUILT_IN_MEMMOVE:
-	case BUILT_IN_MEMPCPY:
-	case BUILT_IN_STPCPY:
-	case BUILT_IN_STPNCPY:
-	case BUILT_IN_STRCAT:
-	case BUILT_IN_STRNCAT:
-	case BUILT_IN_MEMSET:
-	case BUILT_IN_TM_MEMSET:
-	CASE_BUILT_IN_TM_STORE (1):
-	CASE_BUILT_IN_TM_STORE (2):
-	CASE_BUILT_IN_TM_STORE (4):
-	CASE_BUILT_IN_TM_STORE (8):
-	CASE_BUILT_IN_TM_STORE (FLOAT):
-	CASE_BUILT_IN_TM_STORE (DOUBLE):
-	CASE_BUILT_IN_TM_STORE (LDOUBLE):
-	CASE_BUILT_IN_TM_STORE (M64):
-	CASE_BUILT_IN_TM_STORE (M128):
-	CASE_BUILT_IN_TM_STORE (M256):
-	case BUILT_IN_TM_MEMCPY:
-	case BUILT_IN_TM_MEMMOVE:
-	  {
-	    ao_ref dref;
-	    tree size = NULL_TREE;
-	    /* Don't pass in size for strncat, as the maximum size
-	       is strlen (dest) + n + 1 instead of n, resp.
-	       n + 1 at dest + strlen (dest), but strlen (dest) isn't
-	       known.  */
-	    if (gimple_call_num_args (call) == 3
-		&& DECL_FUNCTION_CODE (callee) != BUILT_IN_STRNCAT)
-	      size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	case BUILT_IN_STRCPY_CHK:
-	case BUILT_IN_STRNCPY_CHK:
-	case BUILT_IN_MEMCPY_CHK:
-	case BUILT_IN_MEMMOVE_CHK:
-	case BUILT_IN_MEMPCPY_CHK:
-	case BUILT_IN_STPCPY_CHK:
-	case BUILT_IN_STPNCPY_CHK:
-	case BUILT_IN_STRCAT_CHK:
-	case BUILT_IN_STRNCAT_CHK:
-	case BUILT_IN_MEMSET_CHK:
-	  {
-	    ao_ref dref;
-	    tree size = NULL_TREE;
-	    /* Don't pass in size for __strncat_chk, as the maximum size
-	       is strlen (dest) + n + 1 instead of n, resp.
-	       n + 1 at dest + strlen (dest), but strlen (dest) isn't
-	       known.  */
-	    if (gimple_call_num_args (call) == 4
-		&& DECL_FUNCTION_CODE (callee) != BUILT_IN_STRNCAT_CHK)
-	      size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 0),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	case BUILT_IN_BCOPY:
-	  {
-	    ao_ref dref;
-	    tree size = gimple_call_arg (call, 2);
-	    ao_ref_init_from_ptr_and_size (&dref,
-					   gimple_call_arg (call, 1),
-					   size);
-	    return refs_may_alias_p_1 (&dref, ref, false);
-	  }
-	/* Allocating memory does not have any side-effects apart from
-	   being the definition point for the pointer.  */
-	case BUILT_IN_MALLOC:
-	case BUILT_IN_ALIGNED_ALLOC:
-	case BUILT_IN_CALLOC:
-	case BUILT_IN_STRDUP:
-	case BUILT_IN_STRNDUP:
-	  /* Unix98 specifies that errno is set on allocation failure.  */
-	  if (flag_errno_math
-	      && targetm.ref_may_alias_errno (ref))
-	    return true;
+      && gimple_call_builtin_p (call, BUILT_IN_NORMAL)
+      && (ao_classify_builtin (callee, &info)))
+    {
+      if (info.flags & AO_FUNCTION_BARRIER)
+	return true;
+      if ((info.flags & AO_FUNCTION_ERRNO)
+	  && flag_errno_math
+	  && targetm.ref_may_alias_errno (ref))
+	return true;
+      if (info.num_param_writes >= 0)
+	{
+	  for (int i = 0; i < info.num_param_writes; i++)
+	    {
+	      ao_ref dref;
+	      tree size = NULL_TREE;
+
+	      gcc_checking_assert (info.writes[i].size_param
+				   != info.writes[i].param);
+	      if (info.writes[i].size_param != -1)
+		size = gimple_call_arg (call, info.writes[i].size_param);
+	      else if (info.writes[i].size)
+		size = build_int_cst (size_type_node, info.writes[i].size);
+	      ao_ref_init_from_ptr_and_size (&dref,
+					     gimple_call_arg
+						 (call,
+						  info.writes[i].param),
+					     size);
+	      if (refs_may_alias_p_1 (&dref, ref, tbaa_p))
+		return true;
+	    }
 	  return false;
-	case BUILT_IN_STACK_SAVE:
-	CASE_BUILT_IN_ALLOCA:
-	case BUILT_IN_ASSUME_ALIGNED:
-	  return false;
-	/* But posix_memalign stores a pointer into the memory pointed to
-	   by its first argument.  */
-	case BUILT_IN_POSIX_MEMALIGN:
-	  {
-	    tree ptrptr = gimple_call_arg (call, 0);
-	    ao_ref dref;
-	    ao_ref_init_from_ptr_and_size (&dref, ptrptr,
-					   TYPE_SIZE_UNIT (ptr_type_node));
-	    return (refs_may_alias_p_1 (&dref, ref, false)
-		    || (flag_errno_math
-			&& targetm.ref_may_alias_errno (ref)));
-	  }
-	/* Freeing memory kills the pointed-to memory.  More importantly
-	   the call has to serve as a barrier for moving loads and stores
-	   across it.  */
-	case BUILT_IN_FREE:
-	case BUILT_IN_VA_END:
-	  {
-	    tree ptr = gimple_call_arg (call, 0);
-	    return ptr_deref_may_alias_ref_p_1 (ptr, ref);
-	  }
-	/* Realloc serves both as allocation point and deallocation point.  */
-	case BUILT_IN_REALLOC:
-	  {
-	    tree ptr = gimple_call_arg (call, 0);
-	    /* Unix98 specifies that errno is set on allocation failure.  */
-	    return ((flag_errno_math
-		     && targetm.ref_may_alias_errno (ref))
-		    || ptr_deref_may_alias_ref_p_1 (ptr, ref));
-	  }
-	case BUILT_IN_GAMMA_R:
-	case BUILT_IN_GAMMAF_R:
-	case BUILT_IN_GAMMAL_R:
-	case BUILT_IN_LGAMMA_R:
-	case BUILT_IN_LGAMMAF_R:
-	case BUILT_IN_LGAMMAL_R:
-	  {
-	    tree out = gimple_call_arg (call, 1);
-	    if (ptr_deref_may_alias_ref_p_1 (out, ref))
-	      return true;
-	    if (flag_errno_math)
-	      break;
-	    return false;
-	  }
-	case BUILT_IN_FREXP:
-	case BUILT_IN_FREXPF:
-	case BUILT_IN_FREXPL:
-	case BUILT_IN_MODF:
-	case BUILT_IN_MODFF:
-	case BUILT_IN_MODFL:
-	  {
-	    tree out = gimple_call_arg (call, 1);
-	    return ptr_deref_may_alias_ref_p_1 (out, ref);
-	  }
-	case BUILT_IN_REMQUO:
-	case BUILT_IN_REMQUOF:
-	case BUILT_IN_REMQUOL:
-	  {
-	    tree out = gimple_call_arg (call, 2);
-	    if (ptr_deref_may_alias_ref_p_1 (out, ref))
-	      return true;
-	    if (flag_errno_math)
-	      break;
-	    return false;
-	  }
-	case BUILT_IN_SINCOS:
-	case BUILT_IN_SINCOSF:
-	case BUILT_IN_SINCOSL:
-	  {
-	    tree sin = gimple_call_arg (call, 1);
-	    tree cos = gimple_call_arg (call, 2);
-	    return (ptr_deref_may_alias_ref_p_1 (sin, ref)
-		    || ptr_deref_may_alias_ref_p_1 (cos, ref));
-	  }
-	/* __sync_* builtins and some OpenMP builtins act as threading
-	   barriers.  */
-#undef DEF_SYNC_BUILTIN
-#define DEF_SYNC_BUILTIN(ENUM, NAME, TYPE, ATTRS) case ENUM:
-#include "sync-builtins.def"
-#undef DEF_SYNC_BUILTIN
-	case BUILT_IN_GOMP_ATOMIC_START:
-	case BUILT_IN_GOMP_ATOMIC_END:
-	case BUILT_IN_GOMP_BARRIER:
-	case BUILT_IN_GOMP_BARRIER_CANCEL:
-	case BUILT_IN_GOMP_TASKWAIT:
-	case BUILT_IN_GOMP_TASKGROUP_END:
-	case BUILT_IN_GOMP_CRITICAL_START:
-	case BUILT_IN_GOMP_CRITICAL_END:
-	case BUILT_IN_GOMP_CRITICAL_NAME_START:
-	case BUILT_IN_GOMP_CRITICAL_NAME_END:
-	case BUILT_IN_GOMP_LOOP_END:
-	case BUILT_IN_GOMP_LOOP_END_CANCEL:
-	case BUILT_IN_GOMP_ORDERED_START:
-	case BUILT_IN_GOMP_ORDERED_END:
-	case BUILT_IN_GOMP_SECTIONS_END:
-	case BUILT_IN_GOMP_SECTIONS_END_CANCEL:
-	case BUILT_IN_GOMP_SINGLE_COPY_START:
-	case BUILT_IN_GOMP_SINGLE_COPY_END:
-	  return true;
-	default:
-	  /* Fallthru to general call handling.  */;
-      }
+	}
+    }
 
   /* Check if base is a global static variable that is not written
      by the function.  */
