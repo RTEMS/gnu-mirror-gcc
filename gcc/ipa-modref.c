@@ -550,7 +550,7 @@ analyze_call (modref_summary *cur_summary,
      not always bind to current def: it is possible that memory load
      was optimized out earlier which may not happen in the interposed
      variant.  */
-  if (!callee_node->binds_to_current_def_p ())
+  if (!callee_node->binds_to_current_def_p () && 0)
     {
       if (dump_file)
 	fprintf (dump_file, " - May be interposed: collapsing loads.\n");
@@ -1589,7 +1589,7 @@ modref_propagate_in_scc (cgraph_node *component_node)
 		 does not always bind to current def: it is possible that
 		 memory load was optimized out earlier which may not happen in
 		 the interposed variant.  */
-	      if (!callee_edge->binds_to_current_def_p ())
+	      if (!callee_edge->binds_to_current_def_p () && 0)
 		{
 		  changed |= collapse_loads (cur_summary);
 		  if (dump_file)

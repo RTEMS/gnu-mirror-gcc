@@ -494,7 +494,7 @@ worse_state (enum pure_const_state_e *state, bool *looping,
      may end up being just pure.  We always must assume the worst scenario here.
    */
   if (*state == IPA_CONST && state2 == IPA_CONST
-      && to && !TREE_READONLY (to->decl) && !to->binds_to_current_def_p (from))
+      && to && !TREE_READONLY (to->decl) && !to->binds_to_current_def_p (from) && 0)
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "Dropping state to PURE because call to %s may not "
