@@ -117,7 +117,7 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
   gcc_checking_assert (!existed);
 
   // Allocate an int_range_max for default case.
-  default_slot = range_allocator.allocate (255);
+  default_slot = m_range_allocator.allocate (255);
   default_slot->set_varying (type);
 
   for (x = 1; x < lim; x++)
@@ -155,7 +155,7 @@ outgoing_range::calc_switch_ranges (gswitch *sw)
       // If there was an existing range and it doesn't fit, we lose the memory.
       // It'll get reclaimed when the obstack is freed.  This seems less
       // intrusive than allocating max ranges for each case.
-      slot = range_allocator.allocate (case_range);
+      slot = m_range_allocator.allocate (case_range);
     }
 }
 

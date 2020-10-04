@@ -118,8 +118,7 @@ public:
 
   rvrp_folder () : substitute_and_fold_engine (), m_simplifier ()
   { 
-    if (flag_evrp_mode == EVRP_MODE_RVRP_TRACE
-	|| flag_evrp_mode == EVRP_MODE_RVRP_DEBUG)
+    if (flag_evrp_mode & EVRP_MODE_TRACE)
       m_ranger = new trace_ranger ();
     else
       m_ranger = new gimple_ranger ();
@@ -176,7 +175,7 @@ class hybrid_folder : public evrp_folder
 public:
   hybrid_folder (bool evrp_first)
   {
-    if (flag_evrp_mode == EVRP_MODE_TRACE)
+    if (flag_evrp_mode & EVRP_MODE_TRACE)
       m_ranger = new trace_ranger ();
     else
       m_ranger = new gimple_ranger ();
@@ -308,7 +307,8 @@ execute_early_vrp ()
   scev_initialize ();
   calculate_dominance_info (CDI_DOMINATORS);
 
-  switch (flag_evrp_mode)
+  // only the last 2 bits matter for choosing the folder.
+  switch (flag_evrp_mode & EVRP_MODE_RVRP_FIRST)
     {
     case EVRP_MODE_EVRP_ONLY:
       {
@@ -317,18 +317,20 @@ execute_early_vrp ()
 	break;
       }
     case EVRP_MODE_RVRP_ONLY:
-    case EVRP_MODE_RVRP_TRACE:
-    case EVRP_MODE_RVRP_DEBUG:
       {
 	rvrp_folder folder;
 	folder.substitute_and_fold ();
 	break;
       }
     case EVRP_MODE_EVRP_FIRST:
-    case EVRP_MODE_RVRP_FIRST:
-    case EVRP_MODE_TRACE:
       {
-	hybrid_folder folder (flag_evrp_mode != EVRP_MODE_RVRP_FIRST);
+	hybrid_folder folder (true);
+	folder.substitute_and_fold ();
+	break;
+      }
+    case EVRP_MODE_RVRP_FIRST:
+      {
+	hybrid_folder folder (false);
 	folder.substitute_and_fold ();
 	break;
       }

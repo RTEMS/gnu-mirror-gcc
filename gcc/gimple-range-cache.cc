@@ -122,7 +122,7 @@ non_null_ref::process_name (tree name)
 class ssa_block_ranges
 {
 public:
-  ssa_block_ranges (tree t, irange_allocator *);
+  ssa_block_ranges (tree t, irange_allocator *allocator);
   ~ssa_block_ranges ();
 
   void set_bb_range (const basic_block bb, const irange &r);
