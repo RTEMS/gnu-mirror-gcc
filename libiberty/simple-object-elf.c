@@ -1109,7 +1109,7 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
   unsigned new_i;
   unsigned *sh_map;
   unsigned first_shndx = 0;
-  unsigned int *symtab_indices_shndx;
+  unsigned int symtab_shndx = 0;
 
   shdr_size = (ei_class == ELFCLASS32
 	       ? sizeof (Elf32_External_Shdr)
@@ -1151,9 +1151,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
   pfnret = XNEWVEC (int, shnum);
   pfnname = XNEWVEC (const char *, shnum);
 
-  /* Map of symtab to index section.  */
-  symtab_indices_shndx = XCNEWVEC (unsigned int, shnum - 1);
-
   /* First perform the callbacks to know which sections to preserve and
      what name to use for those.  */
   for (i = 1; i < shnum; ++i)
@@ -1188,10 +1185,9 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 				 shdr, sh_type, Elf_Word);
       if (sh_type == SHT_SYMTAB_SHNDX)
 	{
-	  unsigned int sh_link;
-	  sh_link = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
-				     shdr, sh_link, Elf_Word);
-	  symtab_indices_shndx[sh_link - 1] = i;
+	  if (symtab_shndx != 0)
+	    return "Multiple SYMTAB SECTION INDICES sections";
+	  symtab_shndx = i - 1;
 	  /* Always discard the extended index sections, after
 	     copying it will not be needed.  This way we don't need to
 	     update it and deal with the ordering constraints of
@@ -1323,7 +1319,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	  *err = 0;
 	  XDELETEVEC (names);
 	  XDELETEVEC (shdrs);
-	  XDELETEVEC (symtab_indices_shndx);
 	  return "ELF section name out of range";
 	}
 
@@ -1341,7 +1336,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	{
 	  XDELETEVEC (names);
 	  XDELETEVEC (shdrs);
-	  XDELETEVEC (symtab_indices_shndx);
 	  return errmsg;
 	}
 
@@ -1362,7 +1356,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	  XDELETEVEC (buf);
 	  XDELETEVEC (names);
 	  XDELETEVEC (shdrs);
-	  XDELETEVEC (symtab_indices_shndx);
 	  return errmsg;
 	}
 
@@ -1372,19 +1365,22 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	{
 	  unsigned entsize = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
 					      shdr, sh_entsize, Elf_Addr);
-	  unsigned strtab = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
-					     shdr, sh_link, Elf_Word);
 	  size_t prevailing_name_idx = 0;
 	  unsigned char *ent;
 	  unsigned *shndx_table = NULL;
 	  /* Read the section index table if present.  */
-	  if (symtab_indices_shndx[i - 1] != 0)
+	  if (symtab_shndx != 0)
 	    {
-	      unsigned char *sidxhdr = shdrs + (strtab - 1) * shdr_size;
+	      unsigned char *sidxhdr = shdrs + symtab_shndx * shdr_size;
 	      off_t sidxoff = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
 					       sidxhdr, sh_offset, Elf_Addr);
 	      size_t sidxsz = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
 					       sidxhdr, sh_size, Elf_Addr);
+	      unsigned int shndx_type
+		= ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
+				   sidxhdr, sh_type, Elf_Word);
+	      if (shndx_type != SHT_SYMTAB_SHNDX)
+		return "Wrong section type of a SYMTAB SECTION INDICES section";
 	      shndx_table = (unsigned *)XNEWVEC (char, sidxsz);
 	      simple_object_internal_read (sobj->descriptor,
 					   sobj->offset + sidxoff,
@@ -1543,7 +1539,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	{
 	  XDELETEVEC (names);
 	  XDELETEVEC (shdrs);
-	  XDELETEVEC (symtab_indices_shndx);
 	  return errmsg;
 	}
 
@@ -1585,7 +1580,6 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
   XDELETEVEC (shdrs);
   XDELETEVEC (pfnret);
   XDELETEVEC (pfnname);
-  XDELETEVEC (symtab_indices_shndx);
   XDELETEVEC (sh_map);
 
   return NULL;
