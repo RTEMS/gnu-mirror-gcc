@@ -1,3 +1,454 @@
+2020-10-02  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm-cpus.in (neoverse-n2): New.
+	* config/arm/arm-tables.opt: Regenerate.
+	* config/arm/arm-tune.md: Regenerate.
+	* doc/invoke.texi: Document support for Neoverse N2.
+
+2020-10-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-10-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (neoversev1_tunings): Define.
+	* config/aarch64/aarch64-cores.def (zeus): Use it.
+	(neoverse-v1): Likewise.
+
+2020-10-02  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-10-02  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/97193
+	* coverage.c (coverage_init): GCDA note files should not be
+	mangled and should end in output directory.
+
+2020-10-01  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-09-25  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/64636
+	* value-prof.c (stream_out_histogram_value): Allow negative
+	values for HIST_TYPE_IOR.
+
+2020-10-01  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-09-29  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/96979
+	* tree-switch-conversion.c (jump_table_cluster::can_be_handled):
+	Make a fast bail out.
+	(bit_test_cluster::can_be_handled): Likewise here.
+	* tree-switch-conversion.h (get_range): Use wi::to_wide instead
+	of a folding.
+
+2020-10-01  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-09-23  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/97069
+	* profile.c (branch_prob): Line number must be at least 1.
+
+2020-10-01  Michael Davidsaver  <mdavidsaver@gmail.com>
+
+	* config/i386/t-rtems: Change from mtune to march when building
+	multilibs.  The mtune argument tunes or optimizes for a specific
+	CPU model but does not ensure the generated code is appropriate
+	for the CPU model. Prior to this patch, i386 compatible code
+	was always generated but tuned for later models.
+
+2020-10-01  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2020-09-30  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/96795
+	* config/arm/arm_mve.h (__ARM_mve_coerce2): Define.
+	(__arm_vaddq): Correct the scalar argument.
+	(__arm_vaddq_m): Likewise.
+	(__arm_vaddq_x): Likewise.
+	(__arm_vcmpeqq_m): Likewise.
+	(__arm_vcmpeqq): Likewise.
+	(__arm_vcmpgeq_m): Likewise.
+	(__arm_vcmpgeq): Likewise.
+	(__arm_vcmpgtq_m): Likewise.
+	(__arm_vcmpgtq): Likewise.
+	(__arm_vcmpleq_m): Likewise.
+	(__arm_vcmpleq): Likewise.
+	(__arm_vcmpltq_m): Likewise.
+	(__arm_vcmpltq): Likewise.
+	(__arm_vcmpneq_m): Likewise.
+	(__arm_vcmpneq): Likewise.
+	(__arm_vfmaq_m): Likewise.
+	(__arm_vfmaq): Likewise.
+	(__arm_vfmasq_m): Likewise.
+	(__arm_vfmasq): Likewise.
+	(__arm_vmaxnmavq): Likewise.
+	(__arm_vmaxnmavq_p): Likewise.
+	(__arm_vmaxnmvq): Likewise.
+	(__arm_vmaxnmvq_p): Likewise.
+	(__arm_vminnmavq): Likewise.
+	(__arm_vminnmavq_p): Likewise.
+	(__arm_vminnmvq): Likewise.
+	(__arm_vminnmvq_p): Likewise.
+	(__arm_vmulq_m): Likewise.
+	(__arm_vmulq): Likewise.
+	(__arm_vmulq_x): Likewise.
+	(__arm_vsetq_lane): Likewise.
+	(__arm_vsubq_m): Likewise.
+	(__arm_vsubq): Likewise.
+	(__arm_vsubq_x): Likewise.
+
+2020-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/s390/s390.c (s390_atomic_assign_expand_fenv): Use
+	TARGET_EXPR instead of MODIFY_EXPR for the first assignments to
+	fenv_var and old_fpc.  Formatting fixes.
+
+2020-10-01  Joel Hutton  <joel.hutton@arm.com>
+
+	Backported from master:
+	2020-09-30  Joel Hutton  <joel.hutton@arm.com>
+
+	PR target/96827
+	* tree-vect-slp.c (vect_analyze_slp): Do not call
+	vect_attempt_slp_rearrange_stmts for vector constructors.
+
+2020-09-30  Jim Wilson  <jimw@sifive.com>
+
+	PR bootstrap/97183
+	* configure.ac (gcc_cv_header_zstd_h): Check ZSTD_VERISON_NUMBER.
+	* configure: Regenerated.
+
+2020-09-30  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-25  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-option-extensions.def (rng): Add
+	cpuinfo string.
+
+2020-09-30  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2020-09-30  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/97184
+	* config/i386/i386.md (UNSPECV_MOVDIRI): Renamed to ...
+	(UNSPEC_MOVDIRI): This.
+	(UNSPECV_MOVDIR64B): Renamed to ...
+	(UNSPEC_MOVDIR64B): This.
+	(movdiri<mode>): Use SET operation.
+	(@movdir64b_<mode>): Likewise.
+
+2020-09-29  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2020-09-29  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/97247
+	* config/i386/enqcmdintrin.h: Replace <enqcmdntrin.h> with
+	<enqcmdintrin.h>.  Replace _ENQCMDNTRIN_H_INCLUDED with
+	_ENQCMDINTRIN_H_INCLUDED.
+
+2020-09-29  Hongyu Wang  <hongyu.wang@intel.com>
+
+	Backported from master:
+	2020-09-29  Hongyu Wang  <hongyu.wang@intel.com>
+
+	PR target/97231
+	* config/i386/avx512vp2intersectintrin.h: Add FSF copyright notes.
+	* config/i386/avx512vp2intersectvlintrin.h: Ditto.
+	* config/i386/pconfigintrin.h: Ditto.
+	* config/i386/wbnoinvdintrin.h: Ditto.
+
+2020-09-29  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/aarch64/aarch64-cores.def: Add Neoverse N2.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi: Document AArch64 support for Neoverse N2.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-09-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR middle-end/97054
+	* ira.c (ira_setup_eliminable_regset): Skip the special elimination
+	handling of the hard frame pointer if the hard frame pointer is fixed.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-09-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/arm/arm.md (*stack_protect_combined_set_insn): For non-PIC,
+	load the address of the canary rather than the address of the
+	constant pool entry that points to it.
+	(*stack_protect_combined_test_insn): Likewise.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-09-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch64_salt_type): New enum.
+	(aarch64_stack_protect_canary_mem): Declare.
+	* config/aarch64/aarch64.md (UNSPEC_SALT_ADDR): New unspec.
+	(stack_protect_set): Forward to stack_protect_combined_set.
+	(stack_protect_combined_set): New pattern.  Use
+	aarch64_stack_protect_canary_mem.
+	(reg_stack_protect_address_<mode>): Add a salt operand.
+	(stack_protect_test): Forward to stack_protect_combined_test.
+	(stack_protect_combined_test): New pattern.  Use
+	aarch64_stack_protect_canary_mem.
+	* config/aarch64/aarch64.c (strip_salt): New function.
+	(strip_offset_and_salt): Likewise.
+	(tls_symbolic_operand_type): Use strip_offset_and_salt.
+	(aarch64_stack_protect_canary_mem): New function.
+	(aarch64_cannot_force_const_mem): Use strip_offset_and_salt.
+	(aarch64_classify_address): Likewise.
+	(aarch64_symbolic_address_p): Likewise.
+	(aarch64_print_operand): Likewise.
+	(aarch64_output_addr_const_extra): New function.
+	(aarch64_tls_symbol_p): Use strip_salt.
+	(aarch64_classify_symbol): Likewise.
+	(aarch64_legitimate_pic_operand_p): Use strip_offset_and_salt.
+	(aarch64_legitimate_constant_p): Likewise.
+	(aarch64_mov_operand_p): Use strip_salt.
+	(TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA): Override.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-25  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-c.c (aarch64_update_cpp_builtins): Rename
+	__ARM_FEATURE_SVE_VECTOR_OPERATIONS to
+	__ARM_FEATURE_SVE_VECTOR_OPERATORS.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-25  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-sve-builtins.cc (add_sve_type_attribute):
+	Take the ACLE name of the type as a parameter and add it as fourth
+	argument to the "SVE type" attribute.
+	(register_builtin_types): Update call accordingly.
+	(register_tuple_type): Likewise.  Construct the name of the type
+	earlier in order to do this.
+	(get_arm_sve_vector_bits_attributes): New function.
+	(handle_arm_sve_vector_bits_attribute): Report a more sensible
+	error message if the attribute is applied to an SVE tuple type.
+	Don't allow the attribute to be applied to an existing fixed-length
+	SVE type.  Mangle the new type as __SVE_VLS<type, vector-bits>.
+	Add a dummy TYPE_DECL to the new type.
+
+2020-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-25  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-sve-builtins.cc (DEF_SVE_TYPE): Add a
+	leading "u" to each mangled name.
+
+2020-09-29  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm-cpus.in (neoverse-v1): New.
+	* config/arm/arm-tables.opt: Regenerate.
+	* config/arm/arm-tune.md: Regenerate.
+	* doc/invoke.texi: Document AArch32 support for Neoverse V1.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vreinterpretq_f64_p128,
+	vreinterpretq_p128_f64): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/aarch64-simd-builtins.def (frintn): Use BUILTIN_VHSDF_HSDF
+	for modes.  Remove explicit hf instantiation.
+	* config/aarch64/arm_neon.h (vrndns_f32): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vtrn1q_p64, vtrn2q_p64, vuzp1q_p64,
+	vuzp2q_p64, vzip1q_p64, vzip2q_p64): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vldrq_p128): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vstrq_p128): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vcls_u8, vcls_u16, vcls_u32,
+	vclsq_u8, vclsq_u16, vclsq_u32): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vceqq_p64, vceqz_p64, vceqzq_p64): Define.
+
+2020-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/71233
+	* config/aarch64/arm_neon.h (vadd_p8, vadd_p16, vadd_p64, vaddq_p8,
+	vaddq_p16, vaddq_p64, vaddq_p128): Define.
+
+2020-09-27  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-09-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/97073
+	* optabs.c (expand_binop, expand_absneg_bit, expand_unop,
+	expand_copysign_bit): Check reg_overlap_mentioned_p between target
+	and operand(s) and if it returns true, force a pseudo as target.
+
+2020-09-25  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2020-06-04  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR middle-end/95464
+	* lra.c (lra_emit_move): Add processing STRICT_LOW_PART.
+	* lra-constraints.c (match_reload): Use STRICT_LOW_PART in output
+	reload if the original insn has it too.
+
+2020-09-25  Joe Ramsay  <Joe.Ramsay@arm.com>
+
+	Backported from master:
+	2020-08-20  Joe Ramsay  <Joe.Ramsay@arm.com>
+
+	PR target/96683
+	* config/arm/mve.md (mve_vst1q_f<mode>): Require MVE memory operand for
+	destination.
+	(mve_vst1q_<supf><mode>): Likewise.
+
+2020-09-24  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2020-09-16  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/97032
+	* cfgexpand.c (asm_clobber_reg_kind): Set sp_is_clobbered_by_asm
+	to true if the stack pointer is clobbered by asm statement.
+	* emit-rtl.h (rtl_data): Add sp_is_clobbered_by_asm.
+	* config/i386/i386.c (ix86_get_drap_rtx): Set need_drap to true
+	if the stack pointer is clobbered by asm statement.
+
+2020-09-24  Alan Modra  <amodra@gmail.com>
+
+	Backported from master:
+	2020-09-24  Alan Modra  <amodra@gmail.com>
+
+	PR target/97166
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros):
+	Conditionally define __PCREL__.
+
+2020-09-24  Andrea Corallo  <andrea.corallo@arm.com>
+
+	Backported from master:
+	2020-09-21  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* config/aarch64/aarch64-builtins.c
+	(aarch64_general_expand_builtin): Use expand machinery not to
+	alter the value of an rtx returned by force_reg.
+
+2020-09-24  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/aarch64/aarch64-cores.def: Add Neoverse V1.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi: Document support for Neoverse V1.
+
+2020-09-22  David Faust  <david.faust@oracle.com>
+
+	Backported from master:
+	2020-09-22  David Faust  <david.faust@oracle.com>
+
+	* config/bpf/bpf.md: Add defines for signed div and mod operators.
+
+2020-09-20  John David Anglin  < danglin@gcc.gnu.org>
+
+	* config/pa/pa-hpux11.h (LINK_GCC_C_SEQUENCE_SPEC): Delete.
+	* config/pa/pa64-hpux.h (LINK_GCC_C_SEQUENCE_SPEC): Likewise.
+	(ENDFILE_SPEC): Link with libgcc_stub.a and mill.a.
+	* config/pa/pa32-linux.h (ENDFILE_SPEC): Link with libgcc.a.
+
+2020-09-17  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-09-16  Marek Polacek  <polacek@redhat.com>
+
+	PR preprocessor/96935
+	* input.c (get_substring_ranges_for_loc): Return if start.column
+	is less than 1.
+
+2020-09-17  liuhongt  <hongtao.liu@intel.com>
+
+	* common/config/i386/i386-common.c
+	(OPTION_MASK_ISA_AVX_UNSET): Remove OPTION_MASK_ISA_XSAVE_UNSET.
+	(OPTION_MASK_ISA_XSAVE_UNSET): Add OPTION_MASK_ISA_AVX_UNSET.
+
+2020-09-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-09-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/97053
+	* gimple-ssa-store-merging.c (check_no_overlap): Add FIRST_ORDER,
+	START, FIRST_EARLIER and LAST_EARLIER arguments.  Return false if
+	any stores between FIRST_EARLIER inclusive and LAST_EARLIER exclusive
+	has order in between FIRST_ORDER and LAST_ORDER and overlaps the to
+	be merged store.
+	(imm_store_chain_info::try_coalesce_bswap): Add FIRST_EARLIER argument.
+	Adjust check_no_overlap caller.
+	(imm_store_chain_info::coalesce_immediate_stores): Add first_earlier
+	and last_earlier variables, adjust them during iterations.  Adjust
+	check_no_overlap callers, call check_no_overlap even when extending
+	overlapping stores by extra INTEGER_CST stores.
+
 2020-09-15  Will Schmidt  <will_schmidt@vnet.ibm.com>
 
 	Backported from master:
