@@ -3822,15 +3822,24 @@ vect_slp_function ()
   for (unsigned i = 0; i < n; i++)
     {
       basic_block bb = BASIC_BLOCK_FOR_FN (cfun, rpo[i]);
-      gphi_iterator phi = gsi_start_phis (bb);
-      if (gsi_end_p (phi))
-	ebb.safe_push (bb);
-      else if (!ebb.is_empty ())
+
+      /* Split when a basic block has multiple predecessors.  */
+      bool split = false;
+      if (!single_pred_p (bb))
+	split = true;
+      /* Split when a BB is not dominated by the first block in a EBB.  */
+      else if (!ebb.is_empty ()
+	       && !dominated_by_p (CDI_DOMINATORS, bb, ebb[0]))
+	split = true;
+
+      if (split && !ebb.is_empty ())
 	{
 	  r |= vect_slp_bbs (ebb);
 	  ebb.truncate (0);
 	  ebb.quick_push (bb);
 	}
+      else
+	ebb.safe_push (bb);
     }
 
   if (!ebb.is_empty ())
