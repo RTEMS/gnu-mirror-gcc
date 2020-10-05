@@ -1317,7 +1317,7 @@ operator_div::wi_fold (irange &r, tree type,
 		       const wide_int &lh_lb, const wide_int &lh_ub,
 		       const wide_int &rh_lb, const wide_int &rh_ub) const
 {
-  // If we know we will divide by zero, return varying.
+  // If we know we will divide by zero...
   if (rh_lb == 0 && rh_ub == 0)
     {
       r.set_varying (type);
@@ -1437,10 +1437,10 @@ public:
 			   const irange &op1,
 			   const irange &op2) const;
   virtual void wi_fold (irange &r, tree type,
-		        const wide_int &lh_lb,
-		        const wide_int &lh_ub,
-		        const wide_int &rh_lb,
-		        const wide_int &rh_ub) const;
+			const wide_int &lh_lb,
+			const wide_int &lh_ub,
+			const wide_int &rh_lb,
+			const wide_int &rh_ub) const;
   virtual bool wi_op_overflows (wide_int &res,
 				tree type,
 				const wide_int &w0,
@@ -1573,7 +1573,7 @@ operator_lshift::op1_range (irange &r,
       // Work completely in unsigned mode to start.
       tree utype = type;
       if (TYPE_SIGN (type) == SIGNED)
-        {
+	{
 	  int_range_max tmp = lhs;
 	  utype = unsigned_type_for (type);
 	  range_cast (tmp, utype);
@@ -1582,7 +1582,7 @@ operator_lshift::op1_range (irange &r,
       else
 	op_rshift.fold_range (r, utype, lhs, op2);
 
-      // Start with ranges which can produce the LHS by right shifting the 
+      // Start with ranges which can produce the LHS by right shifting the
       // result by the shift amount.
       // ie   [0x08, 0xF0] = op1 << 2 will start with
       //      [00001000, 11110000] = op1 << 2
@@ -1590,8 +1590,8 @@ operator_lshift::op1_range (irange &r,
 
       // Then create a range from the LB with the least significant upper bit
       // set, to the upper bound with all the bits set.
-      // this would be [0x42, 0xFC] aka [01000010, 11111100] 
-      
+      // This would be [0x42, 0xFC] aka [01000010, 11111100].
+
       // Ideally we do this for each subrange, but just lump them all for now.
       unsigned low_bits = TYPE_PRECISION (utype)
 			  - TREE_INT_CST_LOW (shift_amount);
@@ -3573,45 +3573,45 @@ operator_tests ()
 
   if (TYPE_PRECISION (unsigned_type_node) > 31)
     {
-      // unsigned  VARYING = op1 << 1  should be VARYING
+      // unsigned VARYING = op1 << 1 should be VARYING.
       int_range<2> lhs (unsigned_type_node);
       int_range<2> shift (INT (1), INT (1));
       int_range_max op1;
       op_lshift.op1_range (op1, unsigned_type_node, lhs, shift);
       ASSERT_TRUE (op1.varying_p ());
 
-      //  0 = op1 << 1  should be [0,0], [0x8000000, 0x8000000]
+      // 0 = op1 << 1  should be [0,0], [0x8000000, 0x8000000].
       int_range<2> zero (UINT (0), UINT (0));
       op_lshift.op1_range (op1, unsigned_type_node, zero, shift);
       ASSERT_TRUE (op1.num_pairs () == 2);
-      // remove the [0,0] range
+      // Remove the [0,0] range.
       op1.intersect (zero);
       ASSERT_TRUE (op1.num_pairs () == 1);
-      //  op1 << 1   shuould be [0x8000,0x8000] << 1,
-      //  which should result in [0,0]
+      //  op1 << 1   should be [0x8000,0x8000] << 1,
+      //  which should result in [0,0].
       int_range_max result;
       op_lshift.fold_range (result, unsigned_type_node, op1, shift);
       ASSERT_TRUE (result == zero);
     }
-  // signed  VARYING = op1 << 1  should be VARYING
+  // signed VARYING = op1 << 1 should be VARYING.
   if (TYPE_PRECISION (integer_type_node) > 31)
     {
-      // unsigned  VARYING = op1 << 1  should be VARYING
+      // unsigned VARYING = op1 << 1  hould be VARYING.
       int_range<2> lhs (integer_type_node);
       int_range<2> shift (INT (1), INT (1));
       int_range_max op1;
       op_lshift.op1_range (op1, integer_type_node, lhs, shift);
       ASSERT_TRUE (op1.varying_p ());
 
-      //  0 = op1 << 1  should be [0,0], [0x8000000, 0x8000000]
+      //  0 = op1 << 1  should be [0,0], [0x8000000, 0x8000000].
       int_range<2> zero (INT (0), INT (0));
       op_lshift.op1_range (op1, integer_type_node, zero, shift);
       ASSERT_TRUE (op1.num_pairs () == 2);
-      // remove the [0,0] range
+      // Remove the [0,0] range.
       op1.intersect (zero);
       ASSERT_TRUE (op1.num_pairs () == 1);
       //  op1 << 1   shuould be [0x8000,0x8000] << 1,
-      //  which should result in [0,0]
+      //  which should result in [0,0].
       int_range_max result;
       op_lshift.fold_range (result, unsigned_type_node, op1, shift);
       ASSERT_TRUE (result == zero);
