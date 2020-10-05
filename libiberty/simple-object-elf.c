@@ -1380,11 +1380,16 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	  /* Read the section index table if present.  */
 	  if (symtab_indices_shndx[i - 1] != 0)
 	    {
-	      unsigned char *sidxhdr = shdrs + (strtab - 1) * shdr_size;
+	      unsigned char *sidxhdr = shdrs + (strtab - 2) * shdr_size;
 	      off_t sidxoff = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
 					       sidxhdr, sh_offset, Elf_Addr);
 	      size_t sidxsz = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
 					       sidxhdr, sh_size, Elf_Addr);
+	      unsigned int shndx_type
+		= ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
+				   sidxhdr, sh_type, Elf_Word);
+	      if (shndx_type != SHT_SYMTAB_SHNDX)
+		return "Wrong section type of a SYMTAB SECTION INDICES section";
 	      shndx_table = (unsigned *)XNEWVEC (char, sidxsz);
 	      simple_object_internal_read (sobj->descriptor,
 					   sobj->offset + sidxoff,
