@@ -162,19 +162,6 @@ adjusted_warn_limit (bool idx)
   return limits[idx];
 }
 
-static struct alloca_type_and_limit
-alloca_call_type_by_arg (unsigned HOST_WIDE_INT max_size)
-{
-  const offset_int maxobjsize = tree_to_shwi (max_object_size ());
-
-  /* When MAX_SIZE is greater than or equal to PTRDIFF_MAX treat
-     allocations that aren't visibly constrained as OK, otherwise
-     report them as (potentially) unbounded.  */
-  alloca_type unbounded_result = (max_size < maxobjsize.to_uhwi ()
-				  ? ALLOCA_UNBOUNDED : ALLOCA_OK);
-  return alloca_type_and_limit (unbounded_result);
-}
-
 // Analyze the alloca call in STMT and return the alloca type with its
 // corresponding limit (if applicable).  IS_VLA is set if the alloca
 // call was created by the gimplifier for a VLA.
@@ -242,13 +229,20 @@ alloca_call_type (range_query &query, gimple *stmt, bool is_vla)
 					 VR_ANTI_RANGE);
 
       r.intersect (invalid_range);
-      if (!r.undefined_p ())
-	return alloca_type_and_limit (ALLOCA_BOUND_MAYBE_LARGE,
-				      wi::to_wide (integer_zero_node));
-      return alloca_type_and_limit (ALLOCA_OK);
+      if (r.undefined_p ())
+	return alloca_type_and_limit (ALLOCA_OK);
+
+      return alloca_type_and_limit (ALLOCA_BOUND_MAYBE_LARGE,
+				    wi::to_wide (integer_zero_node));
     }
 
-  return alloca_call_type_by_arg (max_size);
+  const offset_int maxobjsize = tree_to_shwi (max_object_size ());
+  /* When MAX_SIZE is greater than or equal to PTRDIFF_MAX treat
+     allocations that aren't visibly constrained as OK, otherwise
+     report them as (potentially) unbounded.  */
+  alloca_type unbounded_result = (max_size < maxobjsize.to_uhwi ()
+				  ? ALLOCA_UNBOUNDED : ALLOCA_OK);
+  return alloca_type_and_limit (unbounded_result);
 }
 
 // Return TRUE if STMT is in a loop, otherwise return FALSE.
