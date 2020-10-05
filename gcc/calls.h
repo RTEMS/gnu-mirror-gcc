@@ -134,6 +134,8 @@ extern void maybe_warn_alloc_args_overflow (tree, tree, tree[2], int[2]);
 extern tree get_attr_nonstring_decl (tree, tree * = NULL);
 extern bool maybe_warn_nonstring_arg (tree, tree);
 extern bool get_size_range (tree, tree[2], bool = false);
+extern bool get_size_range (class range_query *, tree, gimple *,
+			    tree[2], bool = false);
 extern rtx rtx_for_static_chain (const_tree, bool);
 extern bool cxx17_empty_base_field_p (const_tree);
 

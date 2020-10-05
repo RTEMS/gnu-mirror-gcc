@@ -1,10 +1,9 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -Wrestrict" } */
 
-unsigned n;
-
-void test_memcpy_warn (char *d)
+void test_memcpy_warn (char *d, unsigned n)
 {
-  if (n > 10 && n < 20)
-    __builtin_memcpy (d, d + 2, n); /* { dg-warning "overlaps between" } */
+  for (unsigned i = n; i < 30; ++i)
+    if (i > 10)
+      __builtin_memcpy (d, d + 2, i); /* { dg-warning "overlaps between" } */
 }

@@ -77,10 +77,10 @@ pass_wrestrict::gate (function *fun ATTRIBUTE_UNUSED)
   return warn_array_bounds || warn_restrict || warn_stringop_overflow;
 }
 
-static void check_call (gimple *);
+static void check_call (range_query *, gimple *);
 
 static void
-wrestrict_walk (basic_block bb)
+wrestrict_walk (range_query *query, basic_block bb)
 {
   /* Iterate over statements, looking for function calls.  */
   for (gimple_stmt_iterator si = gsi_start_bb (bb); !gsi_end_p (si);
@@ -90,16 +90,17 @@ wrestrict_walk (basic_block bb)
       if (!is_gimple_call (stmt))
 	continue;
 
-      check_call (stmt);
+      check_call (query, stmt);
     }
 }
 
 unsigned
 pass_wrestrict::execute (function *fun)
 {
+  gimple_ranger ranger;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
-    wrestrict_walk (bb);
+    wrestrict_walk (&ranger, bb);
 
   return 0;
 }
@@ -143,12 +144,14 @@ public:
      only the destination reference is.  */
   bool strbounded_p;
 
-  builtin_memref (gimple *, tree, tree);
+  builtin_memref (range_query *, gimple *, tree, tree);
 
   tree offset_out_of_bounds (int, offset_int[3]) const;
 
 private:
   gimple *stmt;
+
+  range_query *query;
 
   /* Ctor helper to set or extend OFFRANGE based on argument.  */
   void extend_offset_range (tree);
@@ -182,7 +185,7 @@ class builtin_access
 	    && detect_overlap != &builtin_access::no_overlap);
   }
 
-  builtin_access (gimple *, builtin_memref &, builtin_memref &);
+  builtin_access (range_query *, gimple *, builtin_memref &, builtin_memref &);
 
   /* Entry point to determine overlap.  */
   bool overlap ();
@@ -220,7 +223,8 @@ class builtin_access
    a size SIZE in bytes.  If SIZE is NULL_TREE then the size is assumed
    to be unknown.  STMT is the statement in which expr appears in.  */
 
-builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
+builtin_memref::builtin_memref (range_query *query, gimple *stmt, tree expr,
+				tree size)
 : ptr (expr),
   ref (),
   base (),
@@ -231,7 +235,8 @@ builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
   sizrange (),
   maxobjsize (tree_to_shwi (max_object_size ())),
   strbounded_p (),
-  stmt (stmt)
+  stmt (stmt),
+  query (query)
 {
   /* Unfortunately, wide_int default ctor is a no-op so array members
      of the type must be set individually.  */
@@ -250,7 +255,7 @@ builtin_memref::builtin_memref (gimple *stmt, tree expr, tree size)
       tree range[2];
       /* Determine the size range, allowing for the result to be [0, 0]
 	 for SIZE in the anti-range ~[0, N] where N >= PTRDIFF_MAX.  */
-      get_size_range (size, range, true);
+      get_size_range (query, size, stmt, range, true);
       sizrange[0] = wi::to_offset (range[0]);
       sizrange[1] = wi::to_offset (range[1]);
       /* get_size_range returns SIZE_MAX for the maximum size.
@@ -327,7 +332,25 @@ builtin_memref::extend_offset_range (tree offset)
       /* A pointer offset is represented as sizetype but treated
 	 as signed.  */
       wide_int min, max;
-      value_range_kind rng = get_range_info (offset, &min, &max);
+      value_range_kind rng;
+      if (query)
+	{
+	  value_range vr;
+	  gcc_assert (query->range_of_expr (vr, offset, stmt));
+	  rng = vr.kind ();
+	  if (!vr.undefined_p ())
+	    {
+	      min = wi::to_wide (vr.min ());
+	      max = wi::to_wide (vr.max ());
+	    }
+	}
+      else
+	{
+	  /* There is a global version here because
+	     check_bounds_or_overlap may be called from gimple
+	     fold during gimple lowering.  */
+	  rng = get_range_info (offset, &min, &max);
+	}
       if (rng == VR_ANTI_RANGE && wi::lts_p (max, min))
 	{
 	  /* Convert an anti-range whose upper bound is less than
@@ -644,7 +667,8 @@ builtin_memref::offset_out_of_bounds (int strict, offset_int ooboff[3]) const
 /* Create an association between the memory references DST and SRC
    for access by a call EXPR to a memory or string built-in funtion.  */
 
-builtin_access::builtin_access (gimple *call, builtin_memref &dst,
+builtin_access::builtin_access (range_query *query, gimple *call,
+				builtin_memref &dst,
 				builtin_memref &src)
 : dstref (&dst), srcref (&src), sizrange (), ovloff (), ovlsiz (),
   dstoff (), srcoff (), dstsiz (), srcsiz ()
@@ -783,7 +807,7 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
       tree size = gimple_call_arg (call, sizeargno);
       tree range[2];
-      if (get_size_range (size, range, true))
+      if (get_size_range (query, size, call, range, true))
 	{
 	  bounds[0] = wi::to_offset (range[0]);
 	  bounds[1] = wi::to_offset (range[1]);
@@ -1860,7 +1884,7 @@ maybe_diag_access_bounds (gimple *call, tree func, int strict,
    if/when appropriate.  */
 
 static void
-check_call (gimple *call)
+check_call (range_query *query, gimple *call)
 {
   /* Avoid checking the call if it has already been diagnosed for
      some reason.  */
@@ -1950,7 +1974,7 @@ check_call (gimple *call)
       || (dstwr && !INTEGRAL_TYPE_P (TREE_TYPE (dstwr))))
     return;
 
-  if (!check_bounds_or_overlap (call, dst, src, dstwr, NULL_TREE))
+  if (!check_bounds_or_overlap (query, call, dst, src, dstwr, NULL_TREE))
     return;
 
   /* Avoid diagnosing the call again.  */
@@ -1971,14 +1995,25 @@ check_bounds_or_overlap (gimple *call, tree dst, tree src, tree dstsize,
 			 tree srcsize, bool bounds_only /* = false */,
 			 bool do_warn /* = true */)
 {
+  return check_bounds_or_overlap (/*range_query=*/NULL,
+				  call, dst, src, dstsize, srcsize,
+				  bounds_only, do_warn);
+}
+
+int
+check_bounds_or_overlap (range_query *query,
+			 gimple *call, tree dst, tree src, tree dstsize,
+			 tree srcsize, bool bounds_only /* = false */,
+			 bool do_warn /* = true */)
+{
   tree func = gimple_call_fndecl (call);
 
-  builtin_memref dstref (call, dst, dstsize);
-  builtin_memref srcref (call, src, srcsize);
+  builtin_memref dstref (query, call, dst, dstsize);
+  builtin_memref srcref (query, call, src, srcsize);
 
   /* Create a descriptor of the access.  This may adjust both DSTREF
      and SRCREF based on one another and the kind of the access.  */
-  builtin_access acs (call, dstref, srcref);
+  builtin_access acs (query, call, dstref, srcref);
 
   /* Set STRICT to the value of the -Warray-bounds=N argument for
      string functions or when N > 1.  */

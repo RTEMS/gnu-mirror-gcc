@@ -58,7 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "builtins.h"
 #include "gimple-fold.h"
-
+#include "value-query.h"
 #include "tree-pretty-print.h"
 
 /* Like PREFERRED_STACK_BOUNDARY but in units of bytes, not bits.  */
@@ -1251,7 +1251,8 @@ alloc_max_size (void)
    functions like memset.  */
 
 bool
-get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
+get_size_range (range_query *query, tree exp, gimple *stmt, tree range[2],
+		bool allow_zero /* = false */)
 {
   if (!exp)
     return false;
@@ -1270,7 +1271,21 @@ get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
   enum value_range_kind range_type;
 
   if (integral)
-    range_type = determine_value_range (exp, &min, &max);
+    {
+      if (query)
+	{
+	  value_range vr;
+	  gcc_assert (TREE_CODE (exp) == SSA_NAME
+		      || TREE_CODE (exp) == INTEGER_CST);
+	  gcc_assert (query->range_of_expr (vr, exp, stmt));
+	  range_type = vr.kind ();
+	  min = wi::to_wide (vr.min ());
+	  max = wi::to_wide (vr.max ());
+	}
+      else
+	range_type = determine_value_range (exp, &min, &max);
+
+    }
   else
     range_type = VR_VARYING;
 
@@ -1349,6 +1364,13 @@ get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
   range[1] = wide_int_to_tree (exptype, max);
 
   return true;
+}
+
+bool
+get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
+{
+  return get_size_range (/*query=*/NULL, exp, /*stmt=*/NULL, range,
+			 allow_zero);
 }
 
 /* Diagnose a call EXP to function FN decorated with attribute alloc_size
