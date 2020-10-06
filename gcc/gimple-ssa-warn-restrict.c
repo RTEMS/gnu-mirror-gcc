@@ -149,6 +149,7 @@ public:
   tree offset_out_of_bounds (int, offset_int[3]) const;
 
 private:
+  /* Call statement to the built-in.  */
   gimple *stmt;
 
   range_query *query;
