@@ -181,7 +181,10 @@
   double __builtin_mffs ();
     MFFS rs6000_mffs {}
 
-  unsigned long long __builtin_ppc_mftb ();
+; This one requires special handling at expand time; it should be
+; expanded to rs6000_mftb_di in 64-bit mode, and rs6000_mftb_si in
+; 32-bit mode.  Use of "long" for this builtin is sanctioned.
+  unsigned long __builtin_ppc_mftb ();
     MFTB rs6000_mftb_di {}
 
   void __builtin_mtfsb0 (const int<5>);
@@ -1969,7 +1972,10 @@
   const unsigned int __builtin_addg6s (unsigned int, unsigned int);
     ADDG6S addg6s {}
 
-  const signed long long __builtin_bpermd (signed long long, signed long long);
+; This one requires special handling at expand time; it should be
+; expanded to bperm_di in 64-bit mode and bpermd_si in 32-bit mode.
+; Use of "long" for this builtin is sanctioned.
+  const signed long __builtin_bpermd (signed long, signed long);
     BPERMD bpermd_di {}
 
   const unsigned int __builtin_cbcdtd (unsigned int);

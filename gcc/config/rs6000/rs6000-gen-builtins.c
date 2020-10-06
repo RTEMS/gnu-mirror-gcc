@@ -270,6 +270,7 @@ enum basetype {
   BT_CHAR,
   BT_SHORT,
   BT_INT,
+  BT_LONG,
   BT_LONGLONG,
   BT_FLOAT,
   BT_DOUBLE,
@@ -441,7 +442,7 @@ struct typemap
    maps tokens from a fntype string to a tree type.  For example,
    in "si_ftype_hi" we would map "si" to "intSI_type_node" and
    map "hi" to "intHI_type_node".  */
-#define TYPE_MAP_SIZE 42
+#define TYPE_MAP_SIZE 44
 static typemap type_map[TYPE_MAP_SIZE] =
   {
     { "bi",	"bool_int" },
@@ -455,6 +456,7 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "hi",	"intHI" },
     { "if",	"ibm128_float" },
     { "ld",	"long_double" },
+    { "lg",	"long_integer" },
     { "opaque", "opaque_V4SI" },
     { "pcvoid",	"pcvoid" },
     { "pv",	"ptr" },
@@ -467,6 +469,7 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "ti",	"intTI" },
     { "udi",	"unsigned_intDI" },
     { "uhi",	"unsigned_intHI" },
+    { "ulg",	"long_unsigned" },
     { "uqi",	"unsigned_intQI" },
     { "usi",	"unsigned_intSI" },
     { "uti",	"unsigned_intTI" },
@@ -670,19 +673,26 @@ match_basetype (typeinfo *typedata)
   else if (!strcmp (token, "long"))
     {
       consume_whitespace ();
+      oldpos = pos;
       char *mustbelongordbl = match_identifier ();
-      if (!mustbelongordbl
-	  || (strcmp (mustbelongordbl, "long")
-	      && strcmp (mustbelongordbl, "double")))
-	{
-	  (*diag) ("incomplete 'long long' or 'long double' at column %d\n",
-		   oldpos + 1);
-	  return 0;
-	}
-      if (!strcmp (mustbelongordbl, "long"))
+      /* We rarely permit just "long".  There are a couple of builtins
+	 for which an argument or return type is 32 bits in 32-bit mode
+	 and 64 bits in 64-bit mode.  This is the only time that "long"
+	 should be used instead of "int" or "long long".  */
+      if (!mustbelongordbl)
+	typedata->base = BT_LONG;
+      else if (!strcmp (mustbelongordbl, "long"))
 	typedata->base = BT_LONGLONG;
-      else
+      else if (!strcmp (mustbelongordbl, "double"))
 	typedata->base = BT_LONGDOUBLE;
+      else
+	/* Speculatively accept "long" here and push back the token.
+	   This occurs when "long" is a return type and the next token
+	   is the function name.  */
+	{
+	  typedata->base = BT_LONG;
+	  pos = oldpos;
+	}
     }
   else if (!strcmp (token, "float"))
     typedata->base = BT_FLOAT;
@@ -1431,6 +1441,9 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
       break;
     case BT_INT:
       memcpy (&buf[*bufi], "si", 2);
+      break;
+    case BT_LONG:
+      memcpy (&buf[*bufi], "lg", 2);
       break;
     case BT_LONGLONG:
       memcpy (&buf[*bufi], "di", 2);
