@@ -81,7 +81,7 @@ struct if_chain_entry
 {
   /* Constructor.  */
   if_chain_entry (basic_block bb, edge true_edge, edge false_edge)
-    : m_case_values (), m_bb (bb),
+    : m_case_values (), m_bb (bb), index (NULL_TREE),
       m_true_edge (true_edge), m_false_edge (false_edge)
   {
     m_case_values.create (2);
@@ -91,6 +91,7 @@ struct if_chain_entry
   vec<case_range> m_case_values;
   /* Basic block of the original condition.  */
   basic_block m_bb;
+  tree index;
   /* True edge of the gimple condition.  */
   edge m_true_edge;
   /* False edge of the gimple condition.  */
@@ -418,8 +419,7 @@ convert_if_conditions_to_switch (if_chain *chain)
 
 static bool
 extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
-			if_chain *chain, if_chain_entry *entry,
-			unsigned *visited_stmt_count)
+			if_chain_entry *entry)
 {
   tree index = NULL_TREE;
   case_range range;
@@ -436,7 +436,6 @@ extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
 	return false;
 
       range = case_range (rhs2, rhs2);
-      *visited_stmt_count += 1;
     }
   else if (code == LE_EXPR)
     {
@@ -470,7 +469,6 @@ extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
 	      || !TYPE_UNSIGNED (TREE_TYPE (casted)))
 	    return false;
 	  index = gimple_assign_rhs1 (to_unsigned);
-	  ++(*visited_stmt_count);
 	}
       else
 	index = casted;
@@ -480,57 +478,27 @@ extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
       range = case_range (range_min, const_binop (PLUS_EXPR, type, range_min,
 						  fold_convert (type,
 								range_size)));
-      *visited_stmt_count += 2;
     }
   else
     return false;
 
-  if (!chain->set_and_check_index (index))
-    return false;
+  entry->index = index;
   entry->m_case_values.safe_push (range);
-
   return true;
 }
 
-static void
-find_switch_in_bb (basic_block bb, auto_vec<if_chain *> *all_candidates,
-		   auto_sbitmap *visited_bbs)
+static if_chain_entry *
+analyze_condition_in_bb (basic_block bb)
 {
-  if_chain *chain = new if_chain ();
-  unsigned total_case_values = 0;
+  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
+  if (gsi_end_p (gsi))
+    return NULL;
 
-  while (true)
-    {
-      bool first = chain->m_entries.is_empty ();
-      if (bitmap_bit_p (*visited_bbs, bb->index))
-	break;
-      bitmap_set_bit (*visited_bbs, bb->index);
+  gcond *cond = dyn_cast<gcond *> (gsi_stmt (gsi));
+  if (cond == NULL)
+    return NULL;
 
-      gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
-      if (gsi_end_p (gsi))
-	break;
-
-      if (!chain->m_entries.is_empty () && EDGE_COUNT (bb->preds) != 1)
-	break;
-
-      gcond *cond = dyn_cast<gcond *> (gsi_stmt (gsi));
-      if (cond == NULL)
-	break;
-
-      if (first)
-	chain->m_first_condition = cond;
-
-      edge true_edge, false_edge;
-      extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
-
-      /* Prevent loosing information for a PHI node where 2 edges will
-	 be folded into one.  Note that we must do the same also for false_edge
-	 (for last BB in a if-elseif chain).  */
-      if (!chain->record_phi_arguments (true_edge)
-	  || !chain->record_phi_arguments (false_edge))
-	break;
-
-      if_chain_entry entry (bb, true_edge, false_edge);
+  if_chain_entry *entry = new if_chain_entry (bb, NULL, NULL);
 
       /* Current we support following patterns (situations):
 
@@ -576,116 +544,64 @@ find_switch_in_bb (basic_block bb, auto_vec<if_chain *> *all_candidates,
 	      goto <bb 3>; [INV]
 		*/
 
-      tree lhs = gimple_cond_lhs (cond);
-      tree rhs = gimple_cond_rhs (cond);
-      tree_code code = gimple_cond_code (cond);
-      unsigned visited_stmt_count = 0;
-      unsigned case_values = 0;
+  tree lhs = gimple_cond_lhs (cond);
+  tree rhs = gimple_cond_rhs (cond);
+  tree_code code = gimple_cond_code (cond);
 
-      /* Situation 1.  */
-      if (code == EQ_EXPR)
-	{
-	  if (!extract_case_from_stmt (lhs, rhs, code, chain, &entry,
-				       &visited_stmt_count))
-	    break;
-	  case_values = 1;
-	}
-      /* Situation 2.  */
-      else if (code == LE_EXPR)
-	{
-	  case_range range;
-	  if (!extract_case_from_stmt (lhs, rhs, code, chain, &entry,
-				       &visited_stmt_count))
-	    break;
-	  case_values = 1;
-	}
-      /* Situation 3.  */
-      else if (code == NE_EXPR
-	       && integer_zerop (rhs)
-	       && TREE_CODE (lhs) == SSA_NAME
-	       && TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
-	{
-	  gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
-	  if (def == NULL
-	      || gimple_assign_rhs_code (def) != BIT_IOR_EXPR
-	      || gimple_bb (def) != bb)
-	    break;
-
-	  tree rhs1 = gimple_assign_rhs1 (def);
-	  tree rhs2 = gimple_assign_rhs2 (def);
-	  if (TREE_CODE (rhs1) != SSA_NAME || TREE_CODE (rhs2) != SSA_NAME)
-	    break;
-
-	  gassign *def1 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs1));
-	  gassign *def2 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs2));
-	  if (def1 == NULL
-	      || def2 == NULL
-	      || def1 == def2
-	      || gimple_bb (def1) != bb
-	      || gimple_bb (def2) != bb)
-	    break;
-
-	  if (!extract_case_from_stmt (gimple_assign_rhs1 (def1),
-				       gimple_assign_rhs2 (def1),
-				       gimple_assign_rhs_code (def1),
-				       chain, &entry,
-				       &visited_stmt_count))
-	    break;
-
-	  if (!extract_case_from_stmt (gimple_assign_rhs1 (def2),
-				       gimple_assign_rhs2 (def2),
-				       gimple_assign_rhs_code (def2),
-				       chain, &entry,
-				       &visited_stmt_count))
-	    break;
-	  case_values = 2;
-	  visited_stmt_count += 2;
-	}
-      else
-	break;
-
-      /* If it's not the first condition, then we need a BB without
-	 any statements.  */
-      if (!first)
-	{
-	  unsigned stmt_count = 0;
-	  for (gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
-	       !gsi_end_p (gsi); gsi_next_nondebug (&gsi))
-	    ++stmt_count;
-
-	  if (stmt_count - visited_stmt_count != 0)
-	    break;
-	}
-
-      total_case_values += case_values;
-      chain->m_entries.safe_push (entry);
-
-      /* Follow if-elseif-elseif chain.  */
-      bb = false_edge->dest;
-    }
-
-  if (total_case_values >= 3
-      && chain->check_non_overlapping_cases ()
-      && chain->is_beneficial ())
+  /* Situation 1.  */
+  if (code == EQ_EXPR)
     {
-      location_t loc = gimple_location (chain->m_first_condition);
-      if (dump_enabled_p ())
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS,
-			 dump_user_location_t::from_location_t (loc),
-			 "Condition chain with %d conditions "
-			 "(%d BBs) transformed into a switch statement.\n",
-			 total_case_values, chain->m_entries.length ());
+      if (!extract_case_from_stmt (lhs, rhs, code, entry))
+	return NULL;
+    }
+  /* Situation 2.  */
+  else if (code == LE_EXPR)
+    {
+      if (!extract_case_from_stmt (lhs, rhs, code, entry))
+	return NULL;
+    }
+  /* Situation 3.  */
+  else if (code == NE_EXPR
+	   && integer_zerop (rhs)
+	   && TREE_CODE (lhs) == SSA_NAME
+	   && TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
+    {
+      gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
+      if (def == NULL
+	  || gimple_assign_rhs_code (def) != BIT_IOR_EXPR
+	  || gimple_bb (def) != bb)
+	return NULL;
 
-      all_candidates->safe_push (chain);
+      tree rhs1 = gimple_assign_rhs1 (def);
+      tree rhs2 = gimple_assign_rhs2 (def);
+      if (TREE_CODE (rhs1) != SSA_NAME || TREE_CODE (rhs2) != SSA_NAME)
+	return NULL;
+
+      gassign *def1 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs1));
+      gassign *def2 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs2));
+      if (def1 == NULL
+	  || def2 == NULL
+	  || def1 == def2
+	  || gimple_bb (def1) != bb
+	  || gimple_bb (def2) != bb)
+	return NULL;
+
+      if (!extract_case_from_stmt (gimple_assign_rhs1 (def1),
+				   gimple_assign_rhs2 (def1),
+				   gimple_assign_rhs_code (def1),
+				   entry))
+	return NULL;
+
+      if (!extract_case_from_stmt (gimple_assign_rhs1 (def2),
+				   gimple_assign_rhs2 (def2),
+				   gimple_assign_rhs_code (def2),
+				   entry))
+	return NULL;
     }
   else
-    {
-      /* Unmark last if chain entry to that it can become a potential beginning
-	 of another chain.  */
-      if (!chain->m_entries.is_empty ())
-	bitmap_clear_bit (*visited_bbs, bb->index);
-      delete chain;
-    }
+    return NULL;
+
+  return entry;
 }
 
 namespace {
@@ -724,34 +640,28 @@ public:
 unsigned int
 pass_if_to_switch::execute (function *fun)
 {
-  calculate_dominance_info (CDI_DOMINATORS);
-
-  auto_vec<if_chain *> all_candidates;
-  auto_vec<basic_block> worklist;
-  auto_sbitmap visited_bbs (last_basic_block_for_fn (fun));
-
-  worklist.safe_push (ENTRY_BLOCK_PTR_FOR_FN (fun));
-  while (!worklist.is_empty ())
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
     {
-      basic_block bb = worklist.pop ();
-      find_switch_in_bb (bb, &all_candidates, &visited_bbs);
-      for (basic_block son = first_dom_son (CDI_DOMINATORS, bb); son;
-	   son = next_dom_son (CDI_DOMINATORS, son))
-	if (!bitmap_bit_p (visited_bbs, son->index))
-	  worklist.safe_push (son);
+      if_chain_entry *entry = analyze_condition_in_bb (bb);
+      if (entry != NULL)
+	{
+	  fprintf (stderr, "Parsed BB: ");
+	  print_generic_expr (stderr, entry->index, TDF_SLIM);
+	  fprintf (stderr, ": ");
+	  for (unsigned i = 0; i < entry->m_case_values.length (); i++)
+	    {
+	      case_range r = entry->m_case_values[i];
+	      fprintf (stderr, "[");
+	      print_generic_expr (stderr, r.m_min, TDF_SLIM);
+	      fprintf (stderr, "-");
+	      print_generic_expr (stderr, r.m_max, TDF_SLIM);
+	      fprintf (stderr, "] ");
+	    }
+	  fprintf (stderr, "\n");
+	}
     }
 
-  for (unsigned i = 0; i < all_candidates.length (); i++)
-    {
-      convert_if_conditions_to_switch (all_candidates[i]);
-      delete all_candidates[i];
-    }
-
-  /* For now, just wipe the dominator information.  */
-  free_dominance_info (CDI_DOMINATORS);
-
-  if (!all_candidates.is_empty ())
-    mark_virtual_operands_for_renaming (fun);
 
   return 0;
 }
