@@ -437,10 +437,7 @@ ipa_merge_profiles (struct cgraph_node *dst,
   else if (dst->count.ipa ().initialized_p ())
     ;
   else if (src->count.ipa ().initialized_p ())
-    {
-      copy_counts = true;
-      dst->count = src->count.ipa ();
-    }
+    copy_counts = true;
 
   /* If no updating needed return early.  */
   if (dst->count == orig_count)
@@ -619,6 +616,9 @@ ipa_merge_profiles (struct cgraph_node *dst,
       profile_count dstden = ENTRY_BLOCK_PTR_FOR_FN (dstcfun)->count;
       bool dstscale = !copy_counts
 		      && dstnum.initialized_p () && !(dstnum == dstden);
+
+      if (copy_counts)
+	dst->count = src->count.ipa ();
 
       /* TODO: merge also statement histograms.  */
       FOR_ALL_BB_FN (srcbb, srccfun)
