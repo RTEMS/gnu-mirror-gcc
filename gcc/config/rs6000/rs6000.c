@@ -27024,10 +27024,18 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 		 <name>f128.  */
 	      if (uses_ieee128_p)
 		{
-		  size_t prefix_len = sizeof ("__ieee754_") - 1;
-		  char *name2 = (char *) alloca (len + prefix_len + 1);
-		  memcpy (name2, "__ieee754_", prefix_len);
-		  memcpy (name2 + prefix_len, name, len + 1);
+		  size_t prefix_len = sizeof ("__") - 1;
+		  size_t suffix_len = sizeof ("ieee128") - 1;
+		  char *name2 = (char *) alloca (len + prefix_len + suffix_len + 1);
+		  char *name3 = name2;
+
+		  memcpy (name3, "__", prefix_len);
+		  name3 += prefix_len;
+
+		  memcpy (name3, name, len - 1);	/* omit trailing 'l'.  */
+		  name3 += len - 1;
+
+		  memcpy (name3, "ieee128", suffix_len + 1);
 		  newname = (const char *) name2;
 		}
 	    }
