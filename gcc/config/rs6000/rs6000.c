@@ -27020,12 +27020,14 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 		}
 
 	      /* If we passed or returned an IEEE 128-bit floating point type,
-		 change the name.  */
+		 change the name.  Use __ieee754_<name>l, instead of
+		 <name>f128.  */
 	      if (uses_ieee128_p)
 		{
-		  char *name2 = (char *) alloca (len + 4);
-		  memcpy (name2, name, len - 1);
-		  strcpy (name2 + len - 1, "f128");
+		  size_t prefix_len = sizeof ("__ieee754_") - 1;
+		  char *name2 = (char *) alloca (len + prefix_len + 1);
+		  memcpy (name2, "__ieee754_", prefix_len);
+		  memcpy (name2 + prefix_len, name, len + 1);
 		  newname = (const char *) name2;
 		}
 	    }
