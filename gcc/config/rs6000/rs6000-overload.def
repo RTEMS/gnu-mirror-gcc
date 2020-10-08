@@ -38,9 +38,34 @@
 ;
 ;   <return-type> <internal-name> (<argument-list>);
 ;
-; The second line contains only one token: the <bif-id> that this
-; particular instance of the overloaded function maps to.  It must
-; match a token that appears in rs6000-builtin-new.def.
+; The second line contains the <bif-id> that this particular instance of
+; the overloaded function maps to.  It must match a token that appears in
+; rs6000-builtin-new.def.  Optionally, a second token may appear.  If only
+; one token is on the line, it is also used to build the unique identifier
+; for the overloaded function.  If a second token is present, the second
+; token is used instead for this purpose.  This is necessary in cases
+; where a built-in function accepts more than one type signature.  For
+; example, opaque vector types accept any vector type.  It is also common
+; to have a built-in function that, for example, specifies a "vector
+; signed char" argument, but accepts "vector unsigned char" and "vector
+; bool char" as well because only the mode matters.  Note that the
+; overload resolution mechanism has always handled these cases by
+; performing fold_convert on vector arguments to hide type mismatches,
+; and it will continue to do so.
+;
+; As a concrete example, __builtin_altivec_mtvscr uses an opaque argument
+; type for the source operand.  Its built-in function id is MTVSCR.  The
+; overloaded function __builtin_vec_mtvscr takes a variety of specific
+; types, but not all vector types.  Each of these maps to the same
+; __builtin_altivec_mtvscr built-in function, but the overload ID must
+; be unique, so we must specify the second token as shown here.
+;
+;[VEC_MTVSCR, vec_mtvscr, __builtin_vec_mtvscr]
+;  void __builtin_vec_mtvscr (vbc);
+;    MTVSCR  MTVSCR_VBC
+;  void __builtin_vec_mtvscr (vsc);
+;    MTVSCR  MTVSCR_VSC
+;  ...
 ;
 ; Blank lines may be used as desired in this file between the lines as
 ; defined above; that is, you can introduce as many extra newlines as you
@@ -48,10 +73,438 @@
 ; a semicolon are also treated as blank lines.
 
 
-
 [VEC_ABS, vec_abs, __builtin_vec_abs]
   vsc __builtin_vec_abs (vsc);
     ABS_V16QI
-
   vss __builtin_vec_abs (vss);
     ABS_V8HI
+  vsi __builtin_vec_abs (vsi);
+    ABS_V4SI
+  vsll __builtin_vec_abs (vsll);
+    ABS_V2DI
+  vf __builtin_vec_abs (vf);
+    ABS_V4SF
+  vd __builtin_vec_abs (vd);
+    XVABSDP
+
+[VEC_ABSS, vec_abss, __builtin_vec_abss]
+  vsc __builtin_vec_abss (vsc);
+    ABSS_V16QI
+  vss __builtin_vec_abss (vss);
+    ABSS_V8HI
+  vsi __builtin_vec_abss (vsi);
+    ABSS_V4SI
+
+[VEC_ADD, vec_add, __builtin_vec_add]
+  vsc __builtin_vec_add (vsc, vsc);
+    VADDUBM  VADDUBM_VSC
+  vuc __builtin_vec_add (vuc, vuc);
+    VADDUBM  VADDUBM_VUC
+  vss __builtin_vec_add (vss, vss);
+    VADDUHM  VADDUHM_VSS
+  vus __builtin_vec_add (vus, vus);
+    VADDUHM  VADDUHM_VUS
+  vsi __builtin_vec_add (vsi, vsi);
+    VADDUWM  VADDUWM_VSI
+  vui __builtin_vec_add (vui, vui);
+    VADDUWM  VADDUWM_VUI
+  vsll __builtin_vec_add (vsll, vsll);
+    VADDUDM  VADDUDM_VSLL
+  vull __builtin_vec_add (vull, vull);
+    VADDUDM  VADDUDM_VULL
+  vsq __builtin_vec_add (vsq, vsq);
+    VADDUQM  VADDUQM_VSQ
+  vuq __builtin_vec_add (vuq, vuq);
+    VADDUQM  VADDUQM_VUQ
+  vf __builtin_vec_add (vf, vf);
+    XVADDSP
+  vd __builtin_vec_add (vd, vd);
+    XVADDDP
+
+[VEC_ADDC, vec_addc, __builtin_vec_addc]
+  vsi __builtin_vec_addc (vsi, vsi);
+    VADDCUW  VADDCUW_VSI
+  vui __builtin_vec_addc (vui, vui);
+    VADDCUW  VADDCUW_VUI
+  vsq __builtin_vec_addc (vsq, vsq);
+    VADDCUQ  VADDCUQ_VSQ
+  vuq __builtin_vec_addc (vuq, vuq);
+    VADDCUQ  VADDCUQ_VUQ
+
+; TODO: Note that the entry for VEC_ADDEC currently gets ignored in
+; altivec_resolve_overloaded_builtin.  There are also forms for
+; vsi and vui arguments, but rather than building a define_expand
+; for the instruction sequence generated for those, we do some RTL
+; hackery.  Revisit whether we can remove that.  For now, keep this
+; much of the entry here to generate the #define, at least.
+[VEC_ADDEC, vec_addec, __builtin_vec_addec]
+  vsq __builtin_vec_addec (vsq, vsq, vsq);
+    VADDECUQ  VADDECUQ_VSQ
+  vuq __builtin_vec_addec (vuq, vuq, vuq);
+    VADDECUQ  VADDECUQ_VUQ
+
+[VEC_ADDS, vec_adds, __builtin_vec_adds]
+  vuc __builtin_vec_adds (vuc, vuc);
+    VADDUBS
+  vsc __builtin_vec_adds (vsc, vsc);
+    VADDSBS
+  vus __builtin_vec_adds (vus, vus);
+    VADDUHS
+  vss __builtin_vec_adds (vss, vss);
+    VADDSHS
+  vui __builtin_vec_adds (vui, vui);
+    VADDUWS
+  vsi __builtin_vec_adds (vsi, vsi);
+    VADDSWS
+
+[VEC_ANDC, vec_andc, __builtin_vec_andc]
+  vbc __builtin_vec_andc (vbc, vbc);
+    VANDC_V16QI_UNS VANDC_VBC
+  vsc __builtin_vec_andc (vsc, vsc);
+    VANDC_V16QI
+  vuc __builtin_vec_andc (vuc, vuc);
+    VANDC_V16QI_UNS VANDC_VUC
+  vbs __builtin_vec_andc (vbs, vbs);
+    VANDC_V8HI_UNS VANDC_VBS
+  vss __builtin_vec_andc (vss, vss);
+    VANDC_V8HI
+  vus __builtin_vec_andc (vus, vus);
+    VANDC_V8HI_UNS VANDC_VUS
+  vbi __builtin_vec_andc (vbi, vbi);
+    VANDC_V4SI_UNS VANDC_VBI
+  vsi __builtin_vec_andc (vsi, vsi);
+    VANDC_V4SI
+  vui __builtin_vec_andc (vui, vui);
+    VANDC_V4SI_UNS VANDC_VUI
+  vbll __builtin_vec_andc (vbll, vbll);
+    VANDC_V4SI_UNS VANDC_VBLL
+  vsll __builtin_vec_andc (vsll, vsll);
+    VANDC_V2DI
+  vull __builtin_vec_andc (vull, vull);
+    VANDC_V2DI_UNS VANDC_VULL
+  vf __builtin_vec_andc (vf, vf);
+    VANDC_V4SF
+  vd __builtin_vec_andc (vd, vd);
+    VANDC_V2DF
+
+[VEC_AVG, vec_avg, __builtin_vec_avg]
+  vsc __builtin_vec_avg (vsc, vsc);
+    VAVGSB
+  vuc __builtin_vec_avg (vuc, vuc);
+    VAVGUB
+  vss __builtin_vec_avg (vss, vss);
+    VAVGSH
+  vus __builtin_vec_avg (vus, vus);
+    VAVGUH
+  vsi __builtin_vec_avg (vsi, vsi);
+    VAVGSW
+  vui __builtin_vec_avg (vui, vui);
+    VAVGUW
+
+[VEC_CEIL, vec_ceil, __builtin_vec_ceil]
+  vf __builtin_vec_ceil (vf);
+    XVRSPIP
+  vd __builtin_vec_ceil (vd);
+    XVRDPIP
+
+[VEC_CMPB, vec_cmpb, __builtin_vec_cmpb]
+  vsi __builtin_vec_cmpb (vf, vf);
+    VCMPBFP
+
+[VEC_CMPEQ, vec_cmpeq, __builtin_vec_cmpeq]
+  vbc __builtin_vec_cmpeq (vsc, vsc);
+    VCMPEQUB  VCMPEQUB_VSC
+  vbc __builtin_vec_cmpeq (vuc, vuc);
+    VCMPEQUB  VCMPEQUB_VUC
+  vbc __builtin_vec_cmpeq (vbc, vbc);
+    VCMPEQUB  VCMPEQUB_VBC
+  vbs __builtin_vec_cmpeq (vss, vss);
+    VCMPEQUH  VCMPEQUH_VSS
+  vbs __builtin_vec_cmpeq (vus, vus);
+    VCMPEQUH  VCMPEQUH_VUS
+  vbs __builtin_vec_cmpeq (vbs, vbs);
+    VCMPEQUH  VCMPEQUH_VBS
+  vbi __builtin_vec_cmpeq (vsi, vsi);
+    VCMPEQUW  VCMPEQUW_VSI
+  vbi __builtin_vec_cmpeq (vui, vui);
+    VCMPEQUW  VCMPEQUW_VUI
+  vbi __builtin_vec_cmpeq (vbi, vbi);
+    VCMPEQUW  VCMPEQUW_VBI
+  vbll __builtin_vec_cmpeq (vsll, vsll);
+    VCMPEQUD  VCMPEQUD_VSLL
+  vbll __builtin_vec_cmpeq (vull, vull);
+    VCMPEQUD  VCMPEQUD_VULL
+  vbll __builtin_vec_cmpeq (vbll, vbll);
+    VCMPEQUD  VCMPEQUD_VBLL
+  vbi __builtin_vec_cmpeq (vf, vf);
+    XVCMPEQSP
+  vbll __builtin_vec_cmpeq (vd, vd);
+    XVCMPEQDP
+
+[VEC_CMPGE, vec_cmpge, __builtin_vec_cmpge]
+  vbc __builtin_vec_cmpge (vsc, vsc);
+    CMPGE_16QI  CMPGE_16QI_VSC
+  vbc __builtin_vec_cmpge (vuc, vuc);
+    CMPGE_16QI  CMPGE_16QI_VUC
+  vbs __builtin_vec_cmpge (vss, vss);
+    CMPGE_8HI  CMPGE_8HI_VSS
+  vbs __builtin_vec_cmpge (vus, vus);
+    CMPGE_8HI  CMPGE_8HI_VUS
+  vbi __builtin_vec_cmpge (vsi, vsi);
+    CMPGE_4SI  CMPGE_4SI_VSI
+  vbi __builtin_vec_cmpge (vui, vui);
+    CMPGE_4SI  CMPGE_4SI_VUI
+  vbll __builtin_vec_cmpge (vsll, vsll);
+    CMPGE_2DI  CMPGE_2DI_VSLL
+  vbll __builtin_vec_cmpge (vull, vull);
+    CMPGE_2DI  CMPGE_2DI_VULL
+  vbi __builtin_vec_cmpge (vf, vf);
+    XVCMPGESP
+  vbll __builtin_vec_cmpge (vd, vd);
+    XVCMPGEDP
+
+[VEC_CMPGT, vec_cmpgt, __builtin_vec_cmpgt]
+  vbc __builtin_vec_cmpgt (vsc, vsc);
+    VCMPGTSB
+  vbc __builtin_vec_cmpgt (vuc, vuc);
+    VCMPGTUB
+  vbs __builtin_vec_cmpgt (vss, vss);
+    VCMPGTSH
+  vbs __builtin_vec_cmpgt (vus, vus);
+    VCMPGTUH
+  vbi __builtin_vec_cmpgt (vsi, vsi);
+    VCMPGTSW
+  vbi __builtin_vec_cmpgt (vui, vui);
+    VCMPGTUW
+  vbll __builtin_vec_cmpgt (vsll, vsll);
+    VCMPGTSD
+  vbll __builtin_vec_cmpgt (vull, vull);
+    VCMPGTUD
+  vbi __builtin_vec_cmpgt (vf, vf);
+    XVCMPGTSP
+  vbll __builtin_vec_cmpgt (vd, vd);
+    XVCMPGTDP
+
+; Note that there is no entry for VEC_CMPLE.  VEC_CMPLE is implemented
+; using VEC_CMPGE with reversed arguments in altivec.h.
+
+; Note that there is no entry for VEC_CMPLT.  VEC_CMPLT is implemented
+; using VEC_CMPGT with reversed arguments in altivec.h.
+
+[VEC_COPYSIGN, vec_cpsgn, __builtin_vec_copysign]
+  vf __builtin_vec_copysign (vf, vf);
+    CPSGNSP
+  vd __builtin_vec_copysign (vd, vd);
+    CPSGNDP
+
+[VEC_CTF, vec_ctf, __builtin_vec_ctf]
+  vf __builtin_vec_ctf (vsi, const int);
+    VCFSX
+  vf __builtin_vec_ctf (vui, const int);
+    VCFUX
+  vd __builtin_vec_ctf (vsll, const int);
+    XVCVSXDDP_SCALE
+  vd __builtin_vec_ctf (vull, const int);
+    XVCVUXDDP_SCALE
+
+[VEC_CTS, vec_cts, __builtin_vec_cts]
+  vsi __builtin_vec_cts (vf, const int);
+    VCTSXS
+  vsll __builtin_vec_cts (vd, const int);
+    XVCVDPSXDS_SCALE
+
+[VEC_CTU, vec_ctu, __builtin_vec_ctu]
+  vui __builtin_vec_ctu (vf, const int);
+    VCTUXS
+  vull __builtin_vec_ctu (vd, const int);
+    XVCVDPUXDS_SCALE
+
+[VEC_DIV, vec_div, __builtin_vec_div]
+  vsll __builtin_vec_div (vsll, vsll);
+    DIV_V2DI
+  vull __builtin_vec_div (vull, vull);
+    UDIV_V2DI
+  vf __builtin_vec_div (vf, vf);
+    XVDIVSP
+  vd __builtin_vec_div (vd, vd);
+    XVDIVDP
+
+[VEC_DOUBLE, vec_double, __builtin_vec_double]
+  vd __builtin_vec_double (vsll);
+    XVCVSXDDP
+  vd __builtin_vec_double (vull);
+    XVCVUXDDP
+
+[VEC_DOUBLEE, vec_doublee, __builtin_vec_doublee]
+  vd __builtin_vec_doublee (vsi);
+    DOUBLEE_V4SI
+  vd __builtin_vec_doublee (vui);
+    UNS_DOUBLEE_V4SI
+  vd __builtin_vec_doublee (vf);
+    DOUBLEE_V4SF
+
+[VEC_DOUBLEH, vec_doubleh, __builtin_vec_doubleh]
+  vd __builtin_vec_doubleh (vsi);
+    DOUBLEH_V4SI
+  vd __builtin_vec_doubleh (vui);
+    UNS_DOUBLEH_V4SI
+  vd __builtin_vec_doubleh (vf);
+    DOUBLEH_V4SF
+
+[VEC_DOUBLEL, vec_doublel, __builtin_vec_doublel]
+  vd __builtin_vec_doublel (vsi);
+    DOUBLEL_V4SI
+  vd __builtin_vec_doublel (vui);
+    UNS_DOUBLEL_V4SI
+  vd __builtin_vec_doublel (vf);
+    DOUBLEL_V4SF
+
+[VEC_DOUBLEO, vec_doubleo, __builtin_vec_doubleo]
+  vd __builtin_vec_doubleo (vsi);
+    DOUBLEO_V4SI
+  vd __builtin_vec_doubleo (vui);
+    UNS_DOUBLEO_V4SI
+  vd __builtin_vec_doubleo (vf);
+    DOUBLEO_V4SF
+
+[VEC_EXPTE, vec_expte, __builtin_vec_expte]
+  vf __builtin_vec_expte (vf);
+    VEXPTEFP
+
+[VEC_FLOAT, vec_float, __builtin_vec_float]
+  vf __builtin_vec_float (vsi);
+    XVCVSXWSP_V4SF
+  vf __builtin_vec_float (vui);
+    XVCVUXWSP_V4SF
+
+[VEC_FLOAT2, vec_float2, __builtin_vec_float2]
+  vf __builtin_vec_float2 (vsll, vsll);
+    FLOAT2_V2DI
+  vf __builtin_vec_float2 (vull, vull);
+    UNS_FLOAT2_V2DI
+  vf __builtin_vec_float2 (vd, vd);
+    FLOAT2_V2DF
+
+[VEC_FLOATE, vec_floate, __builtin_vec_floate]
+  vf __builtin_vec_floate (vsll);
+    FLOATE_V2DI
+  vf __builtin_vec_floate (vull);
+    UNS_FLOATE_V2DI
+  vf __builtin_vec_floate (vd);
+    FLOATE_V2DF
+
+[VEC_FLOATO, vec_floato, __builtin_vec_floato]
+  vf __builtin_vec_floato (vsll);
+    FLOATO_V2DI
+  vf __builtin_vec_floato (vull);
+    UNS_FLOATO_V2DI
+  vf __builtin_vec_floato (vd);
+    FLOATO_V2DF
+
+[VEC_FLOOR, vec_floor, __builtin_vec_floor]
+  vf __builtin_vec_floor (vf);
+    XVRSPIM
+  vd __builtin_vec_floor (vd);
+    XVRDPIM
+
+[VEC_LD, vec_ld, __builtin_vec_ld]
+  vsq __builtin_vec_ld (signed long long, const vsq *);
+    LVX_V1TI
+
+[VEC_LOGE, vec_loge, __builtin_vec_loge]
+  vf __builtin_vec_loge (vf);
+    VLOGEFP
+
+[VEC_MTVSCR, vec_mtvscr, __builtin_vec_mtvscr]
+  void __builtin_vec_mtvscr (vbc);
+    MTVSCR  MTVSCR_VBC
+  void __builtin_vec_mtvscr (vsc);
+    MTVSCR  MTVSCR_VSC
+  void __builtin_vec_mtvscr (vuc);
+    MTVSCR  MTVSCR_VUC
+  void __builtin_vec_mtvscr (vbs);
+    MTVSCR  MTVSCR_VBS
+  void __builtin_vec_mtvscr (vss);
+    MTVSCR  MTVSCR_VSS
+  void __builtin_vec_mtvscr (vus);
+    MTVSCR  MTVSCR_VUS
+  void __builtin_vec_mtvscr (vp);
+    MTVSCR  MTVSCR_VP
+  void __builtin_vec_mtvscr (vbi);
+    MTVSCR  MTVSCR_VBI
+  void __builtin_vec_mtvscr (vsi);
+    MTVSCR  MTVSCR_VSI
+  void __builtin_vec_mtvscr (vui);
+    MTVSCR  MTVSCR_VUI
+
+[VEC_RE, vec_re, __builtin_vec_re]
+  vf __builtin_vec_re (vf);
+    XVRESP
+  vd __builtin_vec_re (vd);
+    XVREDP
+
+[VEC_RECIP, vec_recipdiv, __builtin_vec_recipdiv]
+  vf __builtin_vec_recipdiv (vf, vf);
+    RECIP_V4SF
+  vd __builtin_vec_recipdiv (vd, vd);
+    RECIP_V2DF
+
+[VEC_ROUND, vec_round, __builtin_vec_round]
+  vf __builtin_vec_round (vf);
+    XVRSPI
+  vd __builtin_vec_round (vd);
+    XVRDPI
+
+[VEC_RSQRT, vec_rsqrt, __builtin_vec_rsqrt]
+  vf __builtin_vec_rsqrt (vf);
+    RSQRT_4SF
+  vd __builtin_vec_rsqrt (vd);
+    RSQRT_2DF
+
+[VEC_RSQRTE, vec_rsqrte, __builtin_vec_rsqrte]
+  vf __builtin_vec_rsqrte (vf);
+    XVRSQRTESP
+  vd __builtin_vec_rsqrte (vd);
+    XVRSQRTEDP
+
+[VEC_TRUNC, vec_trunc, __builtin_vec_trunc]
+  vf __builtin_vec_trunc (vf);
+    XVRSPIZ
+  vd __builtin_vec_trunc (vd);
+    XVRDPIZ
+
+[VEC_UNPACKH, vec_unpackh, __builtin_vec_unpackh]
+  vss __builtin_vec_unpackh (vsc);
+    VUPKHSB  VUPKHSB_VSC
+  vbs __builtin_vec_unpackh (vbc);
+    VUPKHSB  VUPKHSB_VBC
+  vsi __builtin_vec_unpackh (vss);
+    VUPKHSH  VUPKHSH_VSS
+  vbi __builtin_vec_unpackh (vbs);
+    VUPKHSH  VUPKHSH_VBS
+  vui __builtin_vec_unpackh (vp);
+    VUPKHPX
+  vsll __builtin_vec_unpackh (vsi);
+    VUPKHSW  VUPKHSW_VSI
+  vbll __builtin_vec_unpackh (vbi);
+    VUPKHSW  VUPKHSW_VBI
+  vd __builtin_vec_unpackh (vf);
+    DOUBLEH_V4SF VUPKHF
+
+[VEC_UNPACKL, vec_unpackl, __builtin_vec_unpackl]
+  vss __builtin_vec_unpackl (vsc);
+    VUPKLSB  VUPKLSB_VSC
+  vbs __builtin_vec_unpackl (vbc);
+    VUPKLSB  VUPKLSB_VBC
+  vsi __builtin_vec_unpackl (vss);
+    VUPKLSH  VUPKLSH_VSS
+  vbi __builtin_vec_unpackl (vbs);
+    VUPKLSH  VUPKLSH_VBS
+  vui __builtin_vec_unpackl (vp);
+    VUPKLPX
+  vsll __builtin_vec_unpackl (vsi);
+    VUPKLSW  VUPKLSW_VSI
+  vbll __builtin_vec_unpackl (vbi);
+    VUPKLSW  VUPKLSW_VBI
+  vd __builtin_vec_unpackl (vf);
+    DOUBLEL_V4SF VUPKLF

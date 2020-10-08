@@ -391,7 +391,8 @@ static int curr_ovld_stanza;
 struct ovlddata {
   int stanza;
   prototype proto;
-  char *idname;
+  char *bif_id_name;
+  char *ovld_id_name;
   char *fndecl;
 };
 
@@ -1852,7 +1853,8 @@ parse_ovld_entry ()
      and argument types, and store it if it does not already exist.  */
   ovlds[curr_ovld].fndecl = construct_fntype_id (&ovlds[curr_ovld].proto);
 
-  /* Now process line 2, which just contains the builtin id.  */
+  /* Now process line 2, which just contains the builtin id and an
+     optional overload id.  */
   if (!advance_line (ovld_file))
     {
       (*diag) ("unexpected EOF.\n");
@@ -1863,7 +1865,8 @@ parse_ovld_entry ()
   consume_whitespace ();
   int oldpos = pos;
   char *id = match_identifier ();
-  ovlds[curr_ovld].idname = id;
+  ovlds[curr_ovld].bif_id_name = id;
+  ovlds[curr_ovld].ovld_id_name = id;
   if (!id)
     {
       (*diag) ("missing overload id at column %d.\n", pos + 1);
@@ -1881,14 +1884,25 @@ parse_ovld_entry ()
       return PC_PARSEFAIL;
     }
 
-  /* Save the ID in a lookup structure.  */
+  /* Check for an optional overload id.  Usually we use the builtin
+     function id for that purpose, but sometimes we need multiple
+     overload entries for the same builtin id when we use opaque
+     vector parameter and return types, and it needs to be unique.  */
+  consume_whitespace ();
+  if (linebuf[pos] != '\n')
+    {
+      id = match_identifier ();
+      ovlds[curr_ovld].ovld_id_name = id;
+      consume_whitespace ();
+    }
+
+ /* Save the overload ID in a lookup structure.  */
   if (!rbt_insert (&ovld_rbt, id))
     {
-      (*diag) ("duplicate function ID '%s' at column %d.\n", id, oldpos + 1);
+      (*diag) ("duplicate overload ID '%s' at column %d.\n", id, oldpos + 1);
       return PC_PARSEFAIL;
     }
 
-  consume_whitespace ();
   if (linebuf[pos] != '\n')
     {
       (*diag) ("garbage at end of line at column %d.\n", pos + 1);
@@ -1999,15 +2013,13 @@ parse_ovld ()
 {
   parse_codes result = PC_OK;
   diag = &ovld_diag;
-  while (result == PC_OK)
-    {
-      /* Read ahead one line and check for EOF.  */
-      if (!advance_line (ovld_file))
-	return PC_OK;
 
-      /* Parse a stanza beginning at this line.  */
-      result = parse_ovld_stanza ();
-    }
+  if (!advance_line (ovld_file))
+    return PC_OK;
+
+  while (result == PC_OK)
+    result = parse_ovld_stanza ();
+
   if (result == PC_EOFILE)
     return PC_OK;
   return result;
@@ -2466,23 +2478,23 @@ write_init_ovld_table ()
       fprintf (init_file,
 	       "  rs6000_overload_info[RS6000_OVLD_%s - base].bifname"
 	       "\n    = \"%s\";\n",
-	       ovlds[i].idname, ovlds[i].proto.bifname);
+	       ovlds[i].ovld_id_name, ovlds[i].proto.bifname);
       fprintf (init_file,
 	       "  rs6000_overload_info[RS6000_OVLD_%s - base].bifid"
 	       "\n    = RS6000_BIF_%s;\n",
-	       ovlds[i].idname, ovlds[i].idname);
+	       ovlds[i].ovld_id_name, ovlds[i].bif_id_name);
       fprintf (init_file,
 	       "  rs6000_overload_info[RS6000_OVLD_%s - base].fntype"
 	       "\n    = %s;\n",
-	       ovlds[i].idname, ovlds[i].fndecl);
+	       ovlds[i].ovld_id_name, ovlds[i].fndecl);
       fprintf (init_file,
 	       "  rs6000_overload_info[RS6000_OVLD_%s - base].next"
-	       "\n    = ", ovlds[i].idname);
+	       "\n    = ", ovlds[i].ovld_id_name);
       if (i < curr_ovld
 	  && !strcmp (ovlds[i+1].proto.bifname, ovlds[i].proto.bifname))
 	fprintf (init_file,
 		 "&rs6000_overload_info[RS6000_OVLD_%s - base];\n",
-		 ovlds[i+1].idname);
+		 ovlds[i+1].ovld_id_name);
       else
 	fprintf (init_file, "NULL;\n");
 
@@ -2493,7 +2505,7 @@ write_init_ovld_table ()
 	  fprintf (init_file,
 		   "  ovldaddr = &rs6000_overload_info"
 		   "[RS6000_OVLD_%s - base];\n",
-		   ovlds[i].idname);
+		   ovlds[i].ovld_id_name);
 	  fprintf (init_file,
 		   "  hash = rs6000_ovld_hasher::hash (ovldaddr);\n");
 	  fprintf (init_file,
