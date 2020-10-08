@@ -1,3 +1,8 @@
+2020-10-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-longdouble-math.c: Update names.
+	* gcc.target/powerpc/float128-math.c: Likewise.
+
 2020-09-30  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-cmp2-runnable.c: Use __float128

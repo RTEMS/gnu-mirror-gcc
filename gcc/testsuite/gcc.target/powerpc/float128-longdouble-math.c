@@ -44,52 +44,52 @@ void
 return_ld_arg_ld (long double *p,
 		  long double *q)
 {
-  /* { dg-final { scan-assembler {\m__acoshieee128\M} } }  */
+  /* { dg-final { scan-assembler {\macoshf128\M} } }  */
   *p++ = BUILTIN1 (acoshl, *q++);
 
-  /* { dg-final { scan-assembler {\m__acosieee128\M} } }  */
+  /* { dg-final { scan-assembler {\macosf128\M} } }  */
   *p++ = BUILTIN1 (acosl, *q++);
 
-  /* { dg-final { scan-assembler {\m__asinhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\masinhf128\M} } }  */
   *p++ = BUILTIN1 (asinhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__asinieee128\M} } }  */
+  /* { dg-final { scan-assembler {\masinf128\M} } }  */
   *p++ = BUILTIN1 (asinl, *q++);
 
-  /* { dg-final { scan-assembler {\m__atanhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\matanhf128\M} } }  */
   *p++ = BUILTIN1 (atanhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__atanieee128\M} } }  */
+  /* { dg-final { scan-assembler {\matanf128\M} } }  */
   *p++ = BUILTIN1 (atanl, *q++);
 
-  /* { dg-final { scan-assembler {\m__cbrtieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcbrtf128\M} } }  */
   *p++ = BUILTIN1 (cbrtl, *q++);
 
   /* inline code.  */
   *p++ = BUILTIN1 (ceill, *q++);
 
-  /* { dg-final { scan-assembler {\m__coshieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcoshf128\M} } }  */
   *p++ = BUILTIN1 (coshl, *q++);
 
-  /* { dg-final { scan-assembler {\m__cosieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcosf128\M} } }  */
   *p++ = BUILTIN1 (cosl, *q++);
 
-  /* { dg-final { scan-assembler {\m__erfcieee128\M} } }  */
+  /* { dg-final { scan-assembler {\merfcf128\M} } }  */
   *p++ = BUILTIN1 (erfcl, *q++);
 
-  /* { dg-final { scan-assembler {\m__erfieee128\M} } }  */
+  /* { dg-final { scan-assembler {\merff128\M} } }  */
   *p++ = BUILTIN1 (erfl, *q++);
 
-  /* { dg-final { scan-assembler {\m__exp10ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mexp10f128\M} } }  */
   *p++ = BUILTIN1 (exp10l, *q++);
 
-  /* { dg-final { scan-assembler {\m__exp2ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mexp2f128\M} } }  */
   *p++ = BUILTIN1 (exp2l, *q++);
 
-  /* { dg-final { scan-assembler {\m__expieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mexpf128\M} } }  */
   *p++ = BUILTIN1 (expl, *q++);
 
-  /* { dg-final { scan-assembler {\m__expm1ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mexpm1f128\M} } }  */
   *p++ = BUILTIN1 (expm1l, *q++);
 
   /* inline code.  */
@@ -98,43 +98,43 @@ return_ld_arg_ld (long double *p,
   /* inline code.  */
   *p++ = BUILTIN1 (floorl, *q++);
 
-  /* { dg-final { scan-assembler {\m__lgammaieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlgammaf128\M} } }  */
   *p++ = BUILTIN1 (gammal, *q++);
 
-  /* { dg-final { scan-assembler {\m__j0ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mj0f128\M} } }  */
   *p++ = BUILTIN1 (j0l, *q++);
 
-  /* { dg-final { scan-assembler {\m__j1ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mj1f128\M} } }  */
   *p++ = BUILTIN1 (j1l, *q++);
 
   /* lgammaf128 mentioned previously.  */
   *p++ = BUILTIN1 (lgammal, *q++);
 
-  /* { dg-final { scan-assembler {\m__log10ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlog10f128\M} } }  */
   *p++ = BUILTIN1 (log10l, *q++);
 
-  /* { dg-final { scan-assembler {\m__log1pieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlog1pf128\M} } }  */
   *p++ = BUILTIN1 (log1pl, *q++);
 
-  /* { dg-final { scan-assembler {\m__log2ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlog2f128\M} } }  */
   *p++ = BUILTIN1 (log2l, *q++);
 
-  /* { dg-final { scan-assembler {\m__logbieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlogbf128\M} } }  */
   *p++ = BUILTIN1 (logbl, *q++);
 
-  /* { dg-final { scan-assembler {\m__logieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlogf128\M} } }  */
   *p++ = BUILTIN1 (logl, *q++);
 
-  /* { dg-final { scan-assembler {\m__nearbyintieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mnearbyintf128\M} } }  */
   *p++ = BUILTIN1 (nearbyintl, *q++);
 
-  /* { dg-final { scan-assembler {\m__exp10ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mexp10f128\M} } }  */
   *p++ = BUILTIN1 (pow10l, *q++);
 
-  /* { dg-final { scan-assembler {\m__rintieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mrintf128\M} } }  */
   *p++ = BUILTIN1 (rintl, *q++);
 
-  /* { dg-final { scan-assembler {\m__roundevenieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mroundevenf128\M} } }  */
   *p++ = BUILTIN1 (roundevenl, *q++);
 
   /* inline code.  */
@@ -143,31 +143,31 @@ return_ld_arg_ld (long double *p,
   /* { dg-final { scan-assembler {\m__significandieee128\M} } }  */
   *p++ = BUILTIN1 (significandl, *q++);
 
-  /* { dg-final { scan-assembler {\m__sinhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\msinhf128\M} } }  */
   *p++ = BUILTIN1 (sinhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__sinieee128\M} } }  */
+  /* { dg-final { scan-assembler {\msinf128\M} } }  */
   *p++ = BUILTIN1 (sinl, *q++);
 
-  /* { dg-final { scan-assembler {\m__sqrtieee128\M} } }  */
+  /* { dg-final { scan-assembler {\msqrtf128\M} } }  */
   *p++ = BUILTIN1 (sqrtl, *q++);
 
-  /* { dg-final { scan-assembler {\m__tanhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mtanhf128\M} } }  */
   *p++ = BUILTIN1 (tanhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__tanieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mtanf128\M} } }  */
   *p++ = BUILTIN1 (tanl, *q++);
 
-  /* { dg-final { scan-assembler {\m__tgammaieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mtgammaf128\M} } }  */
   *p++ = BUILTIN1 (tgammal, *q++);
 
   /* inline code.  */
   *p++ = BUILTIN1 (truncl, *q++);
 
-  /* { dg-final { scan-assembler {\m__y0ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\my0f128\M} } }  */
   *p++ = BUILTIN1 (y0l, *q++);
 
-  /* { dg-final { scan-assembler {\m__y1ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\my1f128\M} } }  */
   *p   = BUILTIN1 (y1l, *q);  
 
 }
@@ -180,37 +180,37 @@ return_ld_arg_ld_ld (long double *p,
 		     long double *q,
 		     long double *r)
 {
-  /* { dg-final { scan-assembler {\m__atan2ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\matan2f128\M} } }  */
   *p++ = BUILTIN2 (atan2l, *q++, *r++);
 
   /* inline code.  */
   *p++ = BUILTIN2 (copysignl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__remainderieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mremainderf128\M} } }  */
   *p++ = BUILTIN2 (dreml, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__fdimieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfdimf128\M} } }  */
   *p++ = BUILTIN2 (fdiml, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__fmaxieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfmaxf128\M} } }  */
   *p++ = BUILTIN2 (fmaxl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__fminieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfminf128\M} } }  */
   *p++ = BUILTIN2 (fminl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__fmodieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfmodf128\M} } }  */
   *p++ = BUILTIN2 (fmodl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__hypotieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mhypotf128\M} } }  */
   *p++ = BUILTIN2 (hypotl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__nextafterieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mnextafterf128\M} } }  */
   *p++ = BUILTIN2 (nextafterl, *q++, *r++);
 
   /* { dg-final { scan-assembler {\m__nexttowardieee128\M} } }  */
   *p++ = BUILTIN2 (nexttowardl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__powieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mpowf128\M} } }  */
   *p++ = BUILTIN2 (powl, *q++, *r++);
 
   /* remainderf128 mentioned previously.  */
@@ -240,7 +240,7 @@ void
 return_ld_arg_cld (long double *p,
 		   _Complex long double *q)
 {
-  /* { dg-final { scan-assembler {\m__cabsieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcabsf128\M} } }  */
   *p++ = BUILTIN1 (cabsl, *q++);
 
   /* inline code.  */
@@ -260,58 +260,58 @@ void
 return_cld_arg_cld (_Complex long double *p,
 		    _Complex long double *q)
 {
-  /* { dg-final { scan-assembler {\m__cacoshieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcacoshf128\M} } }  */
   *p++ = BUILTIN1 (cacoshl, *q++);
 
-  /* { dg-final { scan-assembler {\m__cacosieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcacosf128\M} } }  */
   *p++ = BUILTIN1 (cacosl, *q++);
 
-  /* { dg-final { scan-assembler {\m__casinhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcasinhf128\M} } }  */
   *p++ = BUILTIN1 (casinhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__casinieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcasinf128\M} } }  */
   *p++ = BUILTIN1 (casinl, *q++);
 
-  /* { dg-final { scan-assembler {\m__catanhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcatanhf128\M} } }  */
   *p++ = BUILTIN1 (catanhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__catanieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcatanf128\M} } }  */
   *p++ = BUILTIN1 (catanl, *q++);
 
-  /* { dg-final { scan-assembler {\m__ccoshieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mccoshf128\M} } }  */
   *p++ = BUILTIN1 (ccoshl, *q++);
 
-  /* { dg-final { scan-assembler {\m__ccosieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mccosf128\M} } }  */
   *p++ = BUILTIN1 (ccosl, *q++);
 
-  /* { dg-final { scan-assembler {\m__cexpieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcexpf128\M} } }  */
   *p++ = BUILTIN1 (cexpl, *q++);
 
-  /* { dg-final { scan-assembler {\m__clogieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mclogf128\M} } }  */
   *p++ = BUILTIN1 (clogl, *q++);
 
-  /* { dg-final { scan-assembler {\m__clog10ieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mclog10f128\M} } }  */
   *p++ = BUILTIN1 (clog10l, *q++);
 
   /* inline code.  */
   *p++ = BUILTIN1 (conjl, *q++);
 
-  /* { dg-final { scan-assembler {\m__cprojieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcprojf128\M} } }  */
   *p++ = BUILTIN1 (cprojl, *q++);
 
-  /* { dg-final { scan-assembler {\m__csinhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcsinhf128\M} } }  */
   *p++ = BUILTIN1 (csinhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__csinieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcsinf128\M} } }  */
   *p++ = BUILTIN1 (csinl, *q++);
 
-  /* { dg-final { scan-assembler {\m__csqrtieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcsqrtf128\M} } }  */
   *p++ = BUILTIN1 (csqrtl, *q++);
 
-  /* { dg-final { scan-assembler {\m__ctanhieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mctanhf128\M} } }  */
   *p++ = BUILTIN1 (ctanhl, *q++);
 
-  /* { dg-final { scan-assembler {\m__ctanieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mctanf128\M} } }  */
   *p   = BUILTIN1 (ctanl, *q);  
 }
 
@@ -334,7 +334,7 @@ return_cld_arg_cld_cld (_Complex long double *p,
 			_Complex long double *q,
 			_Complex long double *r)
 {
-  /* { dg-final { scan-assembler {\m__cpowieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mcpowf128\M} } }  */
   *p = BUILTIN2 (cpowl, *q, *r);
 }
 
@@ -346,7 +346,7 @@ return_ld_arg_ld_pi (long double *p,
 		     long double *q,
 		     int **r)
 {
-  /* { dg-final { scan-assembler {\m__frexpieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfrexpf128\M} } }  */
   *p++ = BUILTIN2 (frexpl, *q++, *r++);
 
   /* { dg-final { scan-assembler {\m__lgammaieee128_r\M} } }  */
@@ -364,13 +364,13 @@ return_ld_arg_ld_i (long double *p,
 		    long double *q,
 		    int *r)
 {
-  /* { dg-final { scan-assembler {\m__ldexpieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mldexpf128\M} } }  */
   *p++ = BUILTIN2 (ldexpl, *q++, *r++);
 
   /* { dg-final { scan-assembler {\m__powikf2\M} } }  */
   *p++ = BUILTIN2 (powil, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__scalbnieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mscalbnf128\M} } }  */
   *p   = BUILTIN2 (scalbnl, *q, *r);  
 }
 
@@ -382,7 +382,7 @@ return_ld_arg_ld_l (long double *p,
 		    long double *q,
 		    long *r)
 {
-  /* { dg-final { scan-assembler {\m__scalblnieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mscalblnf128\M} } }  */
   *p = BUILTIN2 (scalblnl, *q, *r);
 }
 
@@ -394,10 +394,10 @@ return_ld_arg_i_ld (long double *p,
 		    int *q,
 		    long double *r)
 {
-  /* { dg-final { scan-assembler {\m__jnieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mjnf128\M} } }  */
   *p++ = BUILTIN2 (jnl, *q++, *r++);
 
-  /* { dg-final { scan-assembler {\m__ynieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mynf128\M} } }  */
   *p   = BUILTIN2 (ynl, *q, *r);  
 }
 
@@ -409,7 +409,7 @@ return_ld_arg_ld_pld (long double *p,
 		      long double *q,
 		      long double **r)
 {
-  /* { dg-final { scan-assembler {\m__modfieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mmodff128\M} } }  */
   *p = BUILTIN2 (modfl, *q, *r);
 }
 
@@ -422,7 +422,7 @@ return_ld_arg_ld_ld_pi (long double *p,
 			long double *r,
 			int **s)
 {
-  /* { dg-final { scan-assembler {\m__remquoieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mremquof128\M} } }  */
   *p = BUILTIN3 (remquol, *q, *r, *s);
 }
 
@@ -444,19 +444,19 @@ void
 return_i_arg_ld (int *p,
 		 long double *q)
 {
-  /* { dg-final { scan-assembler {\m__ceilieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mceilf128\M} } }  */
   *p++ = BUILTIN1 (iceill, *q++);
 
-  /* { dg-final { scan-assembler {\m__floorieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mfloorf128\M} } }  */
   *p++ = BUILTIN1 (ifloorl, *q++);
 
-  /* { dg-final { scan-assembler {\m__ilogbieee128\M} } }  */
+  /* { dg-final { scan-assembler {\milogbf128\M} } }  */
   *p++ = BUILTIN1 (ilogbl, *q++);
 
-  /* { dg-final { scan-assembler {\m__lrintieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlrintf128\M} } }  */
   *p++ = BUILTIN1 (irintl, *q++);
 
-  /* { dg-final { scan-assembler {\m__lroundieee128\M} } }  */
+  /* { dg-final { scan-assembler {\mlroundf128\M} } }  */
   *p++ = BUILTIN1 (iroundl, *q++);
 
   /* inline code.  */

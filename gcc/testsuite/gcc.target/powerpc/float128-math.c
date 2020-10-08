@@ -16,5 +16,5 @@ void foo (__float128 *p, long double *q, long double *r)
   *q = __builtin_sinl (*q);
 }
 
-/* { dg-final { scan-assembler-times {\mbl __sinieee128\M} 2 } } */
-/* { dg-final { scan-assembler-not   {\mbl sinl\M}           } } */
+/* { dg-final { scan-assembler-times {\mbl sinf128\M} 2 } } */
+/* { dg-final { scan-assembler-not   {\mbl sinl\M}      } } */
