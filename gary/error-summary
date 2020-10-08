@@ -1,0 +1,31 @@
+There are two errors know to date and one porblem.
+
+Errors:
+
+1) Using typedef to create differents names for the same type will
+confuse the optimization into thinking that they are different
+types.
+
+This is a know big issue and not a surprise.
+
+2) Some local declarations go missing for not apparient reason.
+To verify this is the case in a suspicious situation uncoment
+the DEBUG statemest annotated with "test_1_8" and you'll see in the
+stderr output that there are no declarations associate with the
+function of interest.
+
+This was a surprise and will require a lot of debugging to track
+dowm the root case of the problem. If you wish to see my test case
+I will send it to you.
+
+Problem:
+
+If you invoke any of the structure reorg optimizations
+(e.g. -fipa-structure-reorg), you'll need to include the options
+"-flto -flto-partition=one". The problem is that struction reorg
+will unfortunenately run if only "-flto" is included with a
+struct reorg option but it will be insane and not function correctly.
+
+I've not found a way to address this yet but I'm hopeful that this
+is someing we can cope with.
+

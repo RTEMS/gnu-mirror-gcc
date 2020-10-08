@@ -1408,6 +1408,30 @@ OBJS = \
 	incpath.o \
 	init-regs.o \
 	internal-fn.o \
+	ipa-prototype.o \
+	ipa-type-escape-analysis.o \
+	type-walker.o \
+	type-reconstructor.o \
+	expr-walker.o \
+	gimple-walker.o \
+	gimple-accesser.o \
+	expr-accessor.o \
+	type-accessor.o \
+	type-collector.o \
+	expr-collector.o \
+	gimple-collector.o \
+	gimple-caster.o \
+	gimple-rewriter.o \
+	expr-rewriter.o \
+	type-escaper.o \
+	type-structural-equality.o \
+	type-structural-main-variant.o \
+	type-canonical-equality.o \
+	type-incomplete-equality.o \
+	expr-escaper.o \
+	gimple-escaper.o \
+	type-stringifier.o \
+	collect-types.o \
 	ipa-cp.o \
 	ipa-sra.o \
 	ipa-devirt.o \
@@ -1428,6 +1452,11 @@ OBJS = \
 	ipa-icf-gimple.o \
 	ipa-reference.o \
 	ipa-ref.o \
+	ipa-structure-reorg.o \
+	ipa-str-reorg-dead-field-eliminate.o \
+	ipa-str-reorg-field-reorder.o \
+	ipa-str-reorg-instance-interleave.o \
+	ipa-str-reorg-utils.o \
 	ipa-utils.o \
 	ipa.o \
 	ira.o \

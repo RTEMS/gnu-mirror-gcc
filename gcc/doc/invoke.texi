@@ -475,6 +475,8 @@ Objective-C and Objective-C++ Dialects}.
 -fdelete-null-pointer-checks  -fdevirtualize  -fdevirtualize-speculatively @gol
 -fdevirtualize-at-ltrans  -fdse @gol
 -fearly-inlining  -fipa-sra  -fexpensive-optimizations  -ffat-lto-objects @gol
+-fipa-structure-reorg -fipa-dead-field-eliminate @gol
+-fipa-field-reorder -fipa-instance-interleave @gol
 -ffast-math  -ffinite-math-only  -ffloat-store  -fexcess-precision=@var{style} @gol
 -ffinite-loops @gol
 -fforward-propagate  -ffp-contract=@var{style}  -ffunction-sections @gol
@@ -9833,6 +9835,29 @@ unused parameters and replacement of parameters passed by reference
 by parameters passed by value.
 
 Enabled at levels @option{-O2}, @option{-O3} and @option{-Os}.
+
+@item -fipa-structure-reorg
+@opindex fipa-structure-reorg
+Transforms arrays of structures with the dead field, field reordering
+and instance interleaving optimizations (which can be invoked seperately
+with their own flags.)
+
+@item -fipa-dead-field-eliminate
+@opindex fipa-dead-field-eliminate
+Theobroma plaese add comment here.
+
+@item -fipa-field-reorder
+@opindex fipa-field-reorder
+Theobroma plaese add comment here.
+
+@item -fipa-instance-interleave
+@opindex fipa-instance-interleave
+Transforms arrays of structures into structures of arrays. This
+improves cache locality if there are loops that use only a small
+number of fields from a transformed array. The performance
+qualification of this optimization relies on execution counts of loops
+so running with branch profiling data available will improve the
+outcome.
 
 @item -finline-limit=@var{n}
 @opindex finline-limit

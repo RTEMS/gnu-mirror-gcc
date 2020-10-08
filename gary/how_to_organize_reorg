@@ -1,0 +1,40 @@
+I'll put shared types and externs in ipa-structure-reorg.h.
+The externs in file ipa-structure-reorg.h will be for the API
+calls.
+
+There will three flags associated with
+
+-fipa-structure-reorg
+-fipa-dead-field-eliminate
+-fipa-field-reorder
+-fipa-instance-interleave
+
+Specifying any of them will run the shared qualification analysis.
+
+Specifying -fipa-structure-reorg will be equivalent
+to invoking all the other flags.
+
+The other flags just run the specific structure reorg algorithm.
+
+The driver and shared qualification code will be in ipa-structure-reorg.c.
+I'm assuming for now that each algorithm will be in it's own file
+and can be invoked via from the driver like this
+
+  if ( control code )
+  {
+    int return_val = algorithm( info);
+    // typical actions dependent on the return value;
+  }
+
+Note, the info parameter (of type Info *) is how I'd like to give the
+API calls access to the persistent information. Frankly, this is my
+own strange idiom but it's served me well in the past and I think it
+beats globals which are something I want to avoid.
+
+Would it be OK for our first integration of code that I create one or
+two empty files. You'd supply a name that you are using now of course
+so you can just subsitute your work for the stubs on itegration.
+
+Also, reagarding the API itself wouldn't a reasonable start just
+be some of the functions in the utility section of my design?
+Check them out see if that makes any sense.

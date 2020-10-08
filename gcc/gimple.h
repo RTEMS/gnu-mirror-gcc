@@ -6397,13 +6397,6 @@ gimple_transaction_set_subcode (gtransaction *transaction_stmt,
   transaction_stmt->subcode = subcode;
 }
 
-/* Return a pointer to the return value for GIMPLE_RETURN GS.  */
-
-static inline tree *
-gimple_return_retval_ptr (greturn *gs)
-{
-  return &gs->op[0];
-}
 
 /* Return the return value for GIMPLE_RETURN GS.  */
 
@@ -6413,6 +6406,29 @@ gimple_return_retval (const greturn *gs)
   return gs->op[0];
 }
 
+static inline tree
+gimple_return_retval(const gimple *gs)
+{
+  GIMPLE_CHECK(gs, GIMPLE_RETURN);
+  const greturn *gr = dyn_cast<const greturn *> (gs);
+  return gimple_return_retval (gr);
+}
+
+/* Return a pointer to the return value for GIMPLE_RETURN GS.  */
+
+static inline tree *
+gimple_return_retval_ptr (greturn *gs)
+{
+  return &gs->op[0];
+}
+
+static inline tree *
+gimple_return_retval_ptr (gimple *gs)
+{
+  GIMPLE_CHECK(gs, GIMPLE_RETURN);
+  greturn *gr = dyn_cast<greturn *> (gs);
+  return gimple_return_retval_ptr (gr);
+}
 
 /* Set RETVAL to be the return value for GIMPLE_RETURN GS.  */
 

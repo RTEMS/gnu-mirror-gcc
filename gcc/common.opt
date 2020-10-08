@@ -1869,6 +1869,22 @@ fipa-struct-reorg
 Common Ignore
 Does nothing. Preserved for backward compatibility.
 
+fipa-structure-reorg
+Common Report Var(flag_ipa_structure_reorg) Init(0) Optimization
+Structure reorganization optimization.
+
+fipa-dead-field-eliminate
+Common Report Var(flag_ipa_dead_field_eliminate) Init(0) Optimization
+Structure reorganization optimization, dead field elimination.
+
+fipa-field-reorder
+Common Report Var(flag_ipa_field_reorder) Init(0) Optimization
+Structure reorganization optimization, field reordering.
+
+fipa-instance-interleave
+Common Report Var(flag_ipa_instance_interleave) Init(0) Optimization
+Structure reorganization optimization, instance interleaving.
+
 fipa-vrp
 Common Report Var(flag_ipa_vrp) Optimization
 Perform IPA Value Range Propagation.
@@ -3447,5 +3463,39 @@ Driver Joined Separate
 fipa-ra
 Common Report Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
+
+fipa-typelist-struct=
+Common Joined Report Var(flag_ipa_typelist_struct) Init(0)
+-fipa-typelist-struct=<string>	Name of struct of interest
+
+fipa-typelist-field=
+Common Joined Report Var(flag_ipa_typelist_field) Init(0)
+-fipa-typelist-field=<string>	Name of struct of interest
+
+ftp-types-compared=
+Common Joined Report Var(flag_tp_types_compared) Init(0)
+
+ftp-comparison-functions=
+Common Joined Report Var(flag_tp_comparison_functions) Init(0)
+
+fipa-prototype
+Common Report Var(flag_ipa_prototype) Optimization
+TBD
+
+fipa-type-escape-analysis
+Common Report Var(flag_ipa_type_escape_analysis) Optimization
+This flag is only used for debugging the type escape analysis
+
+fprint-escape-analysis
+Common Report Var(flag_print_escape_analysis) Optimization
+This flag is used to print the escape analysis proper. It does not include type casting.
+
+fprint-cast-analysis
+Common Report Var(flag_print_cast_analysis) Optimization
+This flag is used to print the escape analysis including type casting.
+
+fprint-access-analysis
+Common Report Var(flag_print_access_analysis) Optimization
+This flag is used to print the access analysis (if field is read or written to).
 
 ; This comment is to ensure we retain the blank line above.
