@@ -548,6 +548,66 @@ analyze_condition_in_bb (basic_block bb)
   tree rhs = gimple_cond_rhs (cond);
   tree_code code = gimple_cond_code (cond);
 
+  operand_rank = new hash_map<tree, long>;
+  debug_bb(bb);
+
+  if (code == NE_EXPR)
+    {
+      gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
+      if (def)
+	{
+      enum tree_code rhs_code = gimple_assign_rhs_code (def);
+      if (associative_tree_code (rhs_code))
+	{
+	  auto_vec<operand_entry *> ops;
+	  if (TREE_CODE (lhs) == SSA_NAME && has_zero_uses (lhs))
+	    ;
+	  else
+	    {
+	      linearize_expr_tree (&ops, def, true, false);
+	      unsigned length = ops.length ();
+	      struct range_entry *ranges = XNEWVEC (struct range_entry, length);
+	      for (unsigned i = 0; i < length; i++)
+		{
+		  operand_entry *oe = ops[i];
+		  ranges[i].idx = i;
+		  init_range_entry (ranges + i, oe->op,
+				    oe->op
+				    ? NULL
+				    : last_stmt (BASIC_BLOCK_FOR_FN (cfun, oe->id)));
+		  /* For | invert it now, we will invert it again before emitting
+		     the optimized expression.  */
+		  if (rhs_code == BIT_IOR_EXPR
+		      || (rhs_code == ERROR_MARK && oe->rank == BIT_IOR_EXPR))
+		    ranges[i].in_p = !ranges[i].in_p;
+		  debug_range_entry (&ranges[i]);
+		}
+	      fprintf (stderr, "\n");
+
+	      int a = 2;
+	    }
+	}
+	}
+      else
+	{
+      struct range_entry entry;
+      init_range_entry (&entry, NULL_TREE, cond);
+      debug_range_entry (&entry);
+      fprintf (stderr, "\n");
+
+	}
+    }
+  else
+    {
+      struct range_entry entry;
+      init_range_entry (&entry, NULL_TREE, cond);
+      debug_range_entry (&entry);
+      fprintf (stderr, "\n");
+    }
+
+  delete operand_rank;
+  operand_rank = NULL;
+
   /* Situation 1.  */
   if (code == EQ_EXPR)
     {

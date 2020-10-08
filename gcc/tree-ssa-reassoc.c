@@ -188,15 +188,6 @@ static struct
   int pows_created;
 } reassociate_stats;
 
-/* Operator, rank pair.  */
-struct operand_entry
-{
-  unsigned int rank;
-  unsigned int id;
-  tree op;
-  unsigned int count;
-  gimple *stmt_to_insert;
-};
 
 static object_allocator<operand_entry> operand_entry_pool
   ("operand entry pool");
@@ -211,7 +202,7 @@ static unsigned int next_operand_entry_id;
 static long *bb_rank;
 
 /* Operand->rank hashtable.  */
-static hash_map<tree, long> *operand_rank;
+hash_map<tree, long> *operand_rank;
 
 /* Vector of SSA_NAMEs on which after reassociate_bb is done with
    all basic blocks the CFG should be adjusted - basic blocks
@@ -226,7 +217,7 @@ static bool reassoc_stmt_dominates_stmt_p (gimple *, gimple *);
 /* Wrapper around gsi_remove, which adjusts gimple_uid of debug stmts
    possibly added by gsi_remove.  */
 
-bool
+static bool
 reassoc_remove_stmt (gimple_stmt_iterator *gsi)
 {
   gimple *stmt = gsi_stmt (*gsi);
@@ -1060,8 +1051,6 @@ eliminate_using_constants (enum tree_code opcode,
 }
 
 
-static void linearize_expr_tree (vec<operand_entry *> *, gimple *,
-				 bool, bool);
 
 /* Structure for tracking and counting operands.  */
 struct oecount {
@@ -2406,18 +2395,7 @@ optimize_ops_list (enum tree_code opcode,
    For more information see comments above fold_test_range in fold-const.c,
    this implementation is for GIMPLE.  */
 
-struct range_entry
-{
-  tree exp;
-  tree low;
-  tree high;
-  bool in_p;
-  bool strict_overflow_p;
-  unsigned int idx, next;
-};
 
-void dump_range_entry (FILE *file, struct range_entry *r);
-void debug_range_entry (struct range_entry *r);
 
 /* Dump the range entry R to FILE, skipping its expression if SKIP_EXP.  */
 
@@ -2447,7 +2425,7 @@ debug_range_entry (struct range_entry *r)
    an SSA_NAME and STMT argument is ignored, otherwise STMT
    argument should be a GIMPLE_COND.  */
 
-static void
+void
 init_range_entry (struct range_entry *r, tree exp, gimple *stmt)
 {
   int in_p;
@@ -3805,7 +3783,9 @@ optimize_range_tests (enum tree_code opcode,
       if (opcode == BIT_IOR_EXPR
 	  || (opcode == ERROR_MARK && oe->rank == BIT_IOR_EXPR))
 	ranges[i].in_p = !ranges[i].in_p;
+//      debug_range_entry (&ranges[i]);
     }
+//  fprintf (stderr, "\n");
 
   qsort (ranges, length, sizeof (*ranges), range_entry_cmp);
   for (i = 0; i < length; i++)
@@ -4693,7 +4673,7 @@ maybe_optimize_range_tests (gimple *stmt)
       if (bb == first_bb)
 	break;
     }
-  if (ops.length () > 1)
+//  if (ops.length () > 1)
     any_changes = optimize_range_tests (ERROR_MARK, &ops, first_bb);
   if (any_changes)
     {
@@ -5605,7 +5585,7 @@ try_special_add_to_ops (vec<operand_entry *> *ops,
 /* Recursively linearize a binary expression that is the RHS of STMT.
    Place the operands of the expression tree in the vector named OPS.  */
 
-static void
+void
 linearize_expr_tree (vec<operand_entry *> *ops, gimple *stmt,
 		     bool is_associative, bool set_visited)
 {
