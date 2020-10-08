@@ -43,6 +43,9 @@
 #include "attribs.h"
 #include "tree-ssa.h"
 #include "tree-cfg.h"
+#include "graphds.h"
+#include "gimple-pretty-print.h"
+#include <map>
 
 /* The idea behind this analyzer is to generate set constraints from the
    program, then solve the resulting constraints in order to generate the
@@ -197,6 +200,7 @@
 
    And probably more.  */
 
+static const char * alias_get_name (tree decl);
 static bool use_field_sensitive = true;
 static int in_ipa_mode = 0;
 
@@ -208,6 +212,9 @@ static bitmap_obstack pta_obstack;
 
 /* Used for oldsolution members of variables. */
 static bitmap_obstack oldpta_obstack;
+
+/* Used for oldsolution members of variables. */
+static bitmap_obstack alias_obstack;
 
 /* Used for per-solver-iteration bitmaps.  */
 static bitmap_obstack iteration_obstack;
@@ -1679,7 +1686,9 @@ do_sd_constraint (constraint_graph_t graph, constraint_t c,
 	    flag |= bitmap_set_bit (sol, escaped_id);
 	  else if (v->may_have_pointers
 		   && add_graph_edge (graph, lhs, t))
+	  {
 	    flag |= bitmap_ior_into (sol, get_varinfo (t)->solution);
+	  }
 
 	  if (v->is_full_var
 	      || v->next == 0)
@@ -6214,6 +6223,7 @@ create_variable_info_for_1 (tree decl, const char *name, bool add_id,
 	}
       if (i + 1 < fieldstack.length ())
 	{
+          if (dump_file) fprintf(dump_file, "we are making variables for fields\n");
 	  varinfo_t tem = new_var_info (decl, name, false);
 	  newvi->next = tem->id;
 	  tem->head = vi->id;
@@ -6354,6 +6364,7 @@ debug_solution_for_var (unsigned int var)
 {
   dump_solution_for_var (stderr, var);
 }
+
 
 /* Register the constraints for function parameter related VI.  */
 
@@ -8104,6 +8115,9 @@ refered_from_nonlocal_var (struct varpool_node *node, void *data)
   return false;
 }
 
+static void compute_alias_sets();
+static void delete_alias_sets();
+
 /* Execute the driver for IPA PTA.  */
 static unsigned int
 ipa_pta_execute (void)
@@ -8518,11 +8532,1433 @@ ipa_pta_execute (void)
       gcc_obstack_init (&final_solutions_obstack);
     }
 
+  if (false)
+    {
+      compute_alias_sets();
+      delete_alias_sets();
+    }
+
   delete_points_to_sets ();
 
   in_ipa_mode = 0;
 
   return 0;
+}
+
+static void
+delete_alias_sets()
+{
+    bitmap_obstack_release (&alias_obstack);
+}
+
+/* Returns true if node is a built in */
+static bool
+is_built_in_p (cgraph_node *node)
+{
+  gcc_assert(node);
+  tree decl = node->decl;
+  gcc_assert(decl);
+  const enum tree_code code = TREE_CODE (decl);
+  const bool is_function_decl = FUNCTION_DECL == code;
+  gcc_assert (is_function_decl);
+  const bool is_built_in = fndecl_built_in_p (decl);
+  return is_built_in;
+}
+
+/* Returns true if node is either built in malloc or calloc */
+static bool
+is_malloc_or_calloc (cgraph_node *node)
+{
+  gcc_assert(node);
+  const bool is_built_in = is_built_in_p (node);
+  if (!is_built_in) return false;
+
+  tree decl = node->decl;
+  gcc_assert(decl);
+  auto function_code = DECL_FUNCTION_CODE (decl);
+  // initial candidates at the moment are malloc and calloc
+  const bool is_malloc = BUILT_IN_MALLOC == function_code;
+  //const bool is_calloc = BUILT_IN_CALLOC == function_code;
+  const bool is_mcalloc = is_malloc; // is_malloc || is_calloc;
+  return is_mcalloc;
+}
+
+static void get_initial_candidates (hash_set<tree> &c, hash_map<tree, cgraph_edge*> &cs);
+static void get_alias_set (hash_set<tree> &c, hash_map<tree, bitmap> &ac);
+static void get_vector_of_alias_sets(hash_map<tree, bitmap> &alias_sets, vec<bitmap> &alias_set_unique, std::map<bitmap, unsigned> &index_map);
+static struct graph* compute_SSG(vec<bitmap> &alias_set_unique, struct graph_edge*** edge_table);
+static void dump_alias_sets(FILE* dump_file, hash_map<tree, bitmap> &alias_sets);
+static void label_all_edges(vec<bitmap> &alias_set_vector, hash_map<tree, bitmap> &alias_sets, std::map<bitmap, unsigned> &index_map, struct graph_edge ***table, struct graph *SSG, hash_map<struct graph_edge *, bitmap> &labels);
+
+class Info2 {
+public:
+  Info2 () : alias_set_unique(vNULL) , SSG(nullptr), table(nullptr)
+  {
+    get_initial_candidates (this->initial_candidates, this->call_stmts);
+    const bool is_empty = this->initial_candidates.is_empty ();
+    if (dump_file) fprintf(dump_file, "is_empty? %s\n", is_empty ? "T" : "F");
+    if (is_empty) return;
+
+    get_alias_set (this->initial_candidates, this->alias_sets);
+    const bool has_no_alias_sets = this->alias_sets.is_empty ();
+    if (dump_file) fprintf(dump_file, "has_no_alias_sets ? %s\n", has_no_alias_sets ? "T" : "F");
+    if (has_no_alias_sets) return;
+
+    get_vector_of_alias_sets(this->alias_sets, this->alias_set_unique, this->index_map);
+    if (dump_file) dump_alias_sets(dump_file, this->alias_sets);
+
+    int cardinality = this->alias_set_unique.length ();
+    this->table = (struct graph_edge***) xmalloc(cardinality * sizeof(struct graph_edge **));
+    for (int i = 0; i < cardinality; i++)
+    {
+      this->table[i] = (struct graph_edge **) xmalloc(cardinality * sizeof(struct graph_edge**));
+      memset(this->table[i], 0, sizeof(graph_edge**) * cardinality);
+    }
+    this->SSG = compute_SSG (this->alias_set_unique, this->table);
+    if (dump_file) fprintf(dump_file, "attempting to print the graph\n");
+    label_all_edges(this->alias_set_unique, this->alias_sets, this->index_map, this->table, this->SSG, this->labels);
+    if (dump_file) dump_graph(dump_file, SSG);
+  };
+  ~Info2()
+  {
+    int cardinality = this->alias_set_unique.length ();
+    if (0 == cardinality) return;
+    if (this->table) 
+    {
+      for (int i = 0; i < cardinality; i++)
+        free(this->table[i]);
+      free(this->table);
+    }
+    if (this->SSG) free_graph(this->SSG);
+  }
+  hash_set<tree> initial_candidates;
+  hash_map<tree, cgraph_edge*> call_stmts;
+  hash_map<tree, bitmap> alias_sets;
+  std::map<bitmap, unsigned> index_map;
+  vec<bitmap> alias_set_unique;
+  hash_map<struct graph_edge *, bitmap> labels;
+  struct graph *SSG;
+  struct graph_edge ***table;
+};
+
+/* Store the LHS of call_stmt in INITIAL_CANDIDATES */
+static void
+get_lhs_of_callers (cgraph_node *n, hash_set<tree> &c, hash_map<tree, cgraph_edge*> &cs)
+{
+  gcc_assert(n);
+  for (cgraph_edge *e = n->callers; e; e = e->next_caller)
+  {
+    gcall *call_stmt = e->call_stmt;
+    tree lhs = gimple_call_lhs (call_stmt);
+    if (!lhs) continue;
+
+    cs.put (lhs, e);
+    const enum tree_code code = TREE_CODE (lhs);
+    const bool is_ssa_name = SSA_NAME == code;
+    gcc_assert (is_ssa_name);
+    c.add(lhs);
+  }
+}
+
+
+/* Store LHS of callor and malloc in INITIAL_CANDIDATES */
+static void
+get_initial_candidates (hash_set<tree> &c, hash_map<tree, cgraph_edge*> &cs)
+{
+  cgraph_node *node = NULL;
+  FOR_EACH_FUNCTION (node)
+  {
+    const bool is_interesting_node = is_malloc_or_calloc(node);
+    if (!is_interesting_node) continue;
+
+    get_lhs_of_callers(node, c, cs);
+  }
+}
+
+static bitmap
+get_alias_set_for(varinfo_t v, hash_map<tree, bitmap> &A2)
+{
+  gcc_assert(v);
+  tree t = v->decl;
+  gcc_assert(t);
+  bitmap *retval = A2.get(t);
+  const bool in_map = retval;
+  if (in_map) return *retval;
+
+  for (auto i = A2.begin(), e = A2.end(); i != e; ++i)
+  {
+    bitmap a_i = (*i).second;
+    gcc_assert(a_i);
+    const bool in_set = bitmap_bit_p(a_i, v->id);
+    if (!in_set) continue;
+
+    return a_i;
+  }
+
+  return NULL;
+}
+
+static bitmap
+get_or_create_alias_set_for(varinfo_t v, hash_map<tree, bitmap> &A2)
+{
+  bitmap a_i = get_alias_set_for(v, A2);
+  if (a_i) return a_i;
+
+  a_i = BITMAP_ALLOC(&alias_obstack);
+  return a_i;
+}
+
+/* Use compatible layout as defined in Forma */
+static bool
+is_valid_layout(tree decl_i, tree decl_j)
+{
+  gcc_assert (decl_i && decl_j);
+  // assumption decl_i and decl_j have a may-alias relationship
+  //
+  // The following is not true. HEAP variables have no SSA_NAME code
+  // const enum tree_code code_i = TREE_CODE (decl_i);
+  // const bool is_ssa_name_i = SSA_NAME == code_i;
+  // const enum tree_code code_j = TREE_CODE (decl_j);
+  // const bool is_ssa_name_j = SSA_NAME == code_j;
+  // gcc_assert (is_ssa_name_i && is_ssa_name_j);
+
+  tree type_i = TREE_TYPE(decl_i);
+  tree type_j = TREE_TYPE(decl_j);
+  gcc_assert (type_i && type_j);
+  //TODO:
+  // This is too conservative at the time being, but I think for the time being
+  // it is somewhat good enough?
+  if (type_i == ptr_type_node || type_j == ptr_type_node) return true;
+  bool retval = TYPE_MAIN_VARIANT(type_i) == TYPE_MAIN_VARIANT(type_j);
+  return retval;
+}
+
+static bool
+is_bad_varinfo_t (varinfo_t v)
+{
+  if (!v) return true;
+
+  tree decl = v->decl;
+  if (!decl) return true;
+
+  bool vi_is_heap_var = v->is_heap_var;
+  if (vi_is_heap_var) return true;
+
+  // Anything else?
+  return false;
+}
+
+inline static void 
+assert_debugging(varinfo_t v)
+{
+  //gcc_assert(v);
+  //gcc_assert(v->name)
+  //gcc_assert(v->decl || strcmp(v->name
+}
+
+static void
+parse_complex_constraint (constraint_t &c)
+{
+  struct constraint_expr lhs = c->lhs;
+  int id_lhs = lhs.var;
+  varinfo_t v_lhs = get_varinfo(find(id_lhs));
+  tree decl_lhs = v_lhs->decl;
+  // SOME OF THESE WON'T HAVE A DECL...
+  // I think those would usually be the clobber variables?
+
+  HOST_WIDE_INT off_lhs = lhs.offset;
+  enum constraint_expr_type type_lhs = lhs.type;
+
+  struct constraint_expr rhs = c->rhs;
+  enum constraint_expr_type type_rhs = rhs.type;
+  int id_rhs = rhs.var;
+  varinfo_t v_rhs = get_varinfo(find(id_rhs));
+  tree decl_rhs = v_rhs->decl;
+  HOST_WIDE_INT off_rhs = rhs.offset;
+}
+
+static void
+parse_complex_exprs_for_varinfo (varinfo_t v)
+{
+  if (v) return;
+
+  int id = v->id;
+  const bool has_complex = graph->complex[id].exists ();
+  if (!has_complex) return;
+
+  unsigned j;
+  constraint_t c;
+  for (j = 0; graph->complex[id].iterate (j, &c); ++j)
+  {
+    parse_complex_constraint (c);
+  }
+}
+
+/* Get the alias set of trees in C and trees pointed to by trees in C.
+ * Store the alias_sets in A[c]
+ */
+static void
+get_alias_set (hash_set<tree> &c, hash_map<tree, bitmap> &ac)
+{
+  size_t old_size = c.elements ();
+  gcc_assert(old_size != 0);
+
+  hash_set<tree> pointed_to;
+  hash_map<bitmap, bool> layout_incompatibility;
+  size_t new_size = 0;
+  varinfo_t escaped_info = get_varinfo(escaped_id);
+  varinfo_t nonlocal_info = get_varinfo(nonlocal_id);
+  bitmap set_escaped = escaped_info->solution;
+  bitmap set_nonlocal = nonlocal_info->solution;
+  bitmap temp = BITMAP_ALLOC(&alias_obstack);
+  unsigned non_local_id = nonlocal_info->id;
+  gcc_assert(escaped_info);
+  int pt_old_size = -1;
+  unsigned pt_new_size = 0;
+
+  // We might need to add more elements to C if c points to something
+  // interesting.  Compute until fixed point is achieved.
+  while (new_size != old_size || pt_old_size != pt_new_size)
+  {
+    old_size = c.elements();
+    pt_old_size = pointed_to.elements ();
+    for (unsigned i = 0; i < varmap.length (); i++)
+    {
+      varinfo_t v_i = get_varinfo(i);
+      if (!v_i) continue;
+
+      tree decl_i = v_i->decl;
+      if (!decl_i) continue;
+
+
+      if (dump_file) fprintf(dump_file, "decl %s->%d\n", alias_get_name(decl_i), v_i->offset);
+      if (dump_file) fprintf(dump_file, "complex exists ? %s\n", graph->complex[i].exists () ? "T" : "F");
+      if (dump_file && graph->complex[i].exists ())
+	{
+	  unsigned j;
+	  constraint_t c;
+	  fprintf (dump_file, " [label=\"\N\n");
+	  for (j = 0; graph->complex[v_i->id].iterate (j, &c); ++j)
+	    {
+	      dump_constraint (dump_file, c);
+	      fprintf (dump_file, "\l");
+	    }
+	  fprintf (dump_file, "\"]\n");
+	}
+
+
+      //if (graph->complex[i].exists()) break;
+
+      const bool is_artificial_i = v_i->is_artificial_var;
+      if (is_artificial_i) continue;
+
+      const bool shadows_i = 0 != v_i->shadow_var_uid;
+      if (shadows_i) continue;
+
+
+      if (v_i->is_heap_var) continue;
+ 
+      tree type_i = TREE_TYPE(decl_i);
+      gcc_assert(type_i);
+      const enum tree_code type_code_i = TREE_CODE(type_i);
+      const bool is_pointer_i = POINTER_TYPE == type_code_i;
+      if (!is_pointer_i) continue;
+
+      bool is_candidate = c.contains (decl_i);
+      const bool in_set_i = is_candidate || pointed_to.contains (decl_i);
+      if (!in_set_i) continue;
+
+      bool is_result_decl = TREE_CODE(decl_i) == RESULT_DECL;
+      if (is_result_decl) continue;
+
+      bitmap a_i = get_or_create_alias_set_for(v_i, ac);
+      gcc_assert(a_i);
+      ac.put(decl_i, a_i);
+      bitmap_set_bit(a_i, v_i->id);
+
+      if (dump_file) fprintf(dump_file, "investigating %s->%d\n", alias_get_name(decl_i), v_i->offset);
+    
+      bool *is_layout_incompatible_ptr = layout_incompatibility.get(a_i);
+      bool is_layout_incompatibility = is_layout_incompatible_ptr ? *is_layout_incompatible_ptr : false;
+      // Does it aliases the escaped_id?
+      bitmap set_i = v_i->solution;
+      if (dump_file) fprintf(dump_file, "%s has a solution ? %s\n", alias_get_name(decl_i), set_i ? "T" : "F");
+      bitmap_clear(temp);
+      if (set_i) {
+        bitmap_ior_into(temp, set_i);
+        bitmap_clear_bit(temp, nonlocal_id);
+        bitmap_clear_bit(temp, escaped_id);
+      }
+      //TODO: maybe this is not the best place to check for escaping
+      const bool escapes_i = set_i && set_escaped ? bitmap_intersect_p(set_escaped, set_i) : false;
+      if (dump_file && escapes_i) {
+          fprintf(dump_file, "%s is escaping\n", alias_get_name(decl_i));
+      }
+      const bool illegal_alias_i = is_layout_incompatibility || escapes_i;
+      layout_incompatibility.put(a_i, illegal_alias_i);
+
+      for (unsigned j = 0; j < varmap.length (); j++)
+      {
+        varinfo_t v_j = get_varinfo(j);
+        if (!v_j) continue;
+
+        tree decl_j = v_j->decl;
+        if (!decl_j) continue;
+
+        if (dump_file) fprintf(dump_file, "against %s->%d\n", alias_get_name(decl_j), v_j->offset);
+        if (dump_file) fprintf(dump_file, "complex exists ? %s\n", graph->complex[j].exists () ? "T" : "F");
+        if (graph->complex[j].exists()) {
+	  unsigned j;
+	  constraint_t c;
+	  for (j = 0; graph->complex[i].iterate (j, &c); ++j)
+	  {
+	     struct constraint_expr lhs = c->lhs;
+	     enum constraint_expr_type lhs_type = lhs.type;
+             int lhs_var_ = lhs.var;
+	     tree lhs_var = get_varinfo(find(lhs_var_))->decl;
+	     HOST_WIDE_INT lhs_off = lhs.offset;
+	     // clobber? can we narrow this?
+	     if (!lhs_var) continue;
+	     gcc_assert(lhs_var);
+	     if (dump_file) fprintf(dump_file, "lhs = %s %d %ld\n", alias_get_name(lhs_var), lhs_type, lhs_off);
+	     struct constraint_expr rhs = c->rhs;
+	     int rhs_var_ = rhs.var;
+	     tree rhs_var = get_varinfo(find(rhs_var_))->decl;
+	     HOST_WIDE_INT rhs_off = rhs.offset;
+	     enum constraint_expr_type rhs_type = rhs.type;
+	     if (dump_file) fprintf(dump_file, "rhs = %s %d %ld\n", alias_get_name(rhs_var), rhs_type, rhs_off);
+	  }
+	  break;
+	}
+
+        const bool is_artificial_j = v_j->is_artificial_var;
+        if (is_artificial_j) continue;
+
+        const bool shadows_j = 0 != v_j->shadow_var_uid;
+        if (shadows_j) continue;
+
+        if (v_j->is_heap_var) continue;
+
+
+        tree type_j = TREE_TYPE(decl_j);
+        gcc_assert(type_j);
+        const enum tree_code type_code_j = TREE_CODE(type_j);
+        const bool is_pointer_j = POINTER_TYPE == type_code_j;
+        if (!is_pointer_j) continue;
+
+        bool is_result_decl_j = TREE_CODE(decl_j) == RESULT_DECL;
+        if (is_result_decl_j) continue;
+        // decl_i points-to decl_j
+	// We also should investigate what decl_j aliases.
+	
+	const bool is_being_pointed_to = set_i ? bitmap_bit_p(temp, v_j->id) : false;
+        if (dump_file) fprintf(dump_file, "set_i %s?\n", set_i ? "T" : "F");
+        if (dump_file) fprintf(dump_file, "is_being_pointed_to %s?\n", is_being_pointed_to ? "T" : "F");
+	if (is_candidate && is_being_pointed_to) pointed_to.add(decl_j);
+
+        bitmap set_j = v_j->solution;
+        bitmap temp2 = BITMAP_ALLOC(&alias_obstack);
+	set_j = set_j ? set_j : get_varinfo(find(j))->solution;
+        if (set_j) {
+          bitmap_ior_into(temp2, set_j);
+          bitmap_clear_bit(temp2, nonlocal_id);
+          bitmap_clear_bit(temp2, escaped_id);
+        }
+        bool alias = set_i && set_j ? bitmap_intersect_p(temp, temp2) : false;
+        if (dump_file) fprintf(dump_file, "aliases %s\n", alias ? "T" : "F");
+        if (!alias) continue;
+
+
+        bitmap_set_bit(a_i, v_j->id);
+        ac.put(decl_j, a_i);
+        c.add(decl_j);
+
+        bool valid_layout = is_valid_layout (decl_i, decl_j);
+        is_layout_incompatible_ptr = layout_incompatibility.get(a_i);
+        is_layout_incompatibility = is_layout_incompatible_ptr ? *is_layout_incompatible_ptr : false;
+	const bool illegal_alias_j = is_layout_incompatibility || !valid_layout;
+        if (dump_file) fprintf(dump_file, "%s and %s illegal alias? %s\n", alias_get_name(decl_i), alias_get_name(decl_j), illegal_alias_j ? "T" : "F");
+        layout_incompatibility.put(a_i, illegal_alias_j);
+      }
+    }
+    new_size = c.elements ();
+    pt_new_size = pointed_to.elements ();
+  }
+
+  hash_set<tree> to_delete;
+  // THIS IS EXPENSIVE:
+  for (auto i = ac.begin(), e = ac.end(); i != e; ++i)
+  {
+    tree decl = (*i).first;
+    bitmap a_i = (*i).second;
+    varinfo_t v_i = nullptr;
+    unsigned id = 0;
+    bool _break = true;
+    for (id = 0; id < varmap.length (); id++)
+    {
+      v_i = get_varinfo(id);
+      if (!v_i) continue;
+
+      tree decl_i = v_i->decl;
+      if (decl_i != decl) continue;
+
+      const bool is_ssa_name_i = TREE_CODE(decl_i) == SSA_NAME;
+      if (dump_file) fprintf(dump_file, "is_ssa_name_i ? %s\n", is_ssa_name_i ? "T" : "F");
+
+      if (!v_i->solution) continue;
+      _break = false;
+      break;
+    }
+
+    if (_break) continue;
+    if (dump_file) fprintf(dump_file, "HERE HERE inspecting... %s\n", alias_get_name(decl));
+    gcc_assert(v_i);
+
+    bitmap points_to = v_i->solution;
+    if (dump_file) fprintf(dump_file, "v_i->id == id = %s\n", v_i->id == id ? "T" : "F");
+    gcc_assert(points_to);
+    unsigned j = 0;
+    bitmap_iterator bi;
+    if (dump_file) fprintf(dump_file, "points_to ? %s\n", points_to ? "T" : "F");
+    if (!points_to) break;
+    EXECUTE_IF_SET_IN_BITMAP (points_to, 0, j, bi)
+    {
+        varinfo_t v_j = get_varinfo(j);
+        if (!v_j) continue;
+
+        tree decl_j = v_j->decl;
+	if (dump_file) fprintf(dump_file, "decl_j ? %s\n", decl_j ? "T" : "F");
+        if (!decl_j) continue;
+	if (dump_file) fprintf(dump_file, "inspecting... %s\n", alias_get_name(decl_j));
+
+        const bool is_artificial_j = v_j->is_artificial_var;
+	if (dump_file) fprintf(dump_file, "is_artificial_j ? %s\n", is_artificial_j ? "T" : "F");
+        if (is_artificial_j) continue;
+
+        const bool shadows_j = 0 != v_j->shadow_var_uid;
+	if (dump_file) fprintf(dump_file, "shadows_j ? %s\n", shadows_j ? "T" : "F");
+	if (dump_file) fprintf(dump_file, "v_j->id == j? %s\n", v_j->id == j ? "T" : "F");
+	unsigned shadow_var_uid = v_j->shadow_var_uid;
+	
+	const bool is_ssa_name_j = TREE_CODE(decl_j) == SSA_NAME;
+	if (dump_file) fprintf(dump_file, "is_ssa_name_j ? %s\n", is_ssa_name_j ? "T" : "F");
+
+
+        tree type_j = TREE_TYPE(decl_j);
+        gcc_assert(type_j);
+        const enum tree_code type_code_j = TREE_CODE(type_j);
+        const bool is_pointer_j = POINTER_TYPE == type_code_j;
+	if (dump_file) fprintf(dump_file, "is_pointer_j: %s\n", is_pointer_j ? "T" : "F");
+        if (!is_pointer_j) continue;
+
+	bitmap a_j = v_j->solution;
+	if (!a_j) continue;
+
+
+	//TODO: I think bitmap_bit_p is overly conservative (i.e., it marks escaping at the granularity of a function
+	//however, is_ipa_escape_point is probably not safe to use yet given the comments I read above?
+	//or maybe I don't understand fully what is_ipa_escape_point_means...
+	const bool is_pointed_to_escaping = bitmap_bit_p (a_j, escaped_id); //v_j->is_ipa_escape_point; 
+	if (dump_file) fprintf(dump_file, "investigating escaping of: %s\n", alias_get_name(decl_j));
+	if (dump_file) fprintf(dump_file, "is_pointed_to_escaping %s\n", is_pointed_to_escaping ? "T" : "F");
+	if (!is_pointed_to_escaping) continue;
+
+	if (dump_file) fprintf(dump_file, "added for deletion %s\n", alias_get_name(decl));
+        //to_delete.add(decl_j);
+        layout_incompatibility.put(a_i, true);
+    }
+  }
+
+  for (auto i = ac.begin(), e = ac.end(); i != e; ++i)
+  {
+    bitmap a_i = (*i).second;
+    const bool *is_layout_compatible_ptr = layout_incompatibility.get(a_i);
+    const bool is_layout_compatible = !(*is_layout_compatible_ptr);
+    if (is_layout_compatible) continue;
+
+    tree a = (*i).first;
+    to_delete.add(a);
+  }
+
+  // We don't want to care about alias_sets which are incompatible.
+  for (auto i = to_delete.begin(), e = to_delete.end(); i != e; ++i)
+  {
+    ac.remove(*i);
+  }
+}
+
+static void
+dump_alias_sets(FILE* dump_file, hash_map<tree, bitmap> &alias_sets)
+{
+  if (!dump_file) return;
+
+  fprintf(dump_file, "alias-sets\n");
+  for (auto i = alias_sets.begin(), e = alias_sets.end(); i != e; ++i)
+  {
+    tree lhs = (*i).first;
+    bitmap a_i = (*i).second;
+    gcc_assert(a_i && !bitmap_empty_p(a_i));
+    fprintf(dump_file, "%s = { ", alias_get_name(lhs));
+
+    unsigned j = 0;
+    bitmap_iterator bi;
+    EXECUTE_IF_SET_IN_BITMAP (a_i, 0, j, bi)
+    {
+      varinfo_t v_j = get_varinfo(j);
+      gcc_assert(v_j);
+      tree alias = v_j->decl;
+      gcc_assert(alias);
+      fprintf(dump_file, "%s ", alias_get_name(alias));
+    }
+    fprintf(dump_file, "}\n");
+  }
+}
+
+static void
+get_vector_of_alias_sets(hash_map<tree, bitmap> &alias_sets, vec<bitmap> &alias_set_unique, std::map<bitmap, unsigned> &index_map)
+{
+  hash_set<bitmap> alias_set_no_tree;
+  unsigned index = 0;
+  for (auto i = alias_sets.begin(), e = alias_sets.end(); i != e; ++i)
+  {
+    bitmap a_i = (*i).second;
+    const bool already_in_set = alias_set_no_tree.contains (a_i);
+    if (already_in_set) continue;
+
+    alias_set_no_tree.add(a_i);
+    alias_set_unique.safe_push(a_i);
+    index_map.insert({a_i, index});
+    index++;
+  }
+}
+
+static struct graph*
+compute_SSG(vec<bitmap> &alias_set_unique, struct graph_edge*** edge_table)
+{
+  int cardinality = alias_set_unique.length ();
+  gcc_assert(cardinality > 0);
+  unsigned index_i = 0;
+  struct graph *SSG = new_graph(cardinality);
+  for (auto i = alias_set_unique.begin(), e = alias_set_unique.end(); i != e; ++i, index_i++)
+  {
+
+    bitmap a_i = *i;
+    bitmap a_i_points_to = BITMAP_ALLOC(&alias_obstack);
+
+    unsigned j = 0;
+    bitmap_iterator bi;
+    EXECUTE_IF_SET_IN_BITMAP (a_i, 0, j, bi)
+    {
+      varinfo_t v_j = get_varinfo(j);
+      bitmap set_j = v_j->solution;
+      if (!set_j) continue;
+      bitmap_ior_into (a_i_points_to, set_j);
+    }
+    
+    unsigned index_j = 0;
+    for (auto j = alias_set_unique.begin(), f = alias_set_unique.end(); j != f; ++j, index_j++)
+    {
+      bitmap a_j = *j;
+      const bool a_i_points_to_a_j = bitmap_intersect_p(a_i_points_to, a_j);
+      if (!a_i_points_to_a_j) continue;
+
+      struct graph_edge *e = add_edge(SSG, index_i, index_j);
+      edge_table[index_i][index_j] = e;
+    }
+  }
+
+  return SSG;
+}
+
+static bool
+is_there_a_field_access(tree lhsOrRhs1, bool &can_handle, tree *_struct, tree *field, unsigned &offset_constant)
+{
+  gcc_assert(lhsOrRhs1);
+  enum tree_code code = TREE_CODE(lhsOrRhs1);
+  bool definitely = false;
+  bool maybe = false;
+  can_handle = false;
+  switch (code)
+  {
+    case COMPONENT_REF:
+       definitely = true;
+       *_struct = TREE_OPERAND(lhsOrRhs1, 0);
+       *field = TREE_OPERAND(lhsOrRhs1, 1);
+    /* fall-through */
+    case ADDR_EXPR:
+    case SSA_NAME:
+       maybe = true;
+    /* fall-through */
+    case VAR_DECL:
+    case LT_EXPR:
+    case POINTER_PLUS_EXPR:
+       can_handle = true;
+    break;
+    default:
+    break;
+  }
+
+  if (!can_handle) return false;
+  if (!maybe) return false;
+
+  tree addr_expr_0 = definitely ? lhsOrRhs1 : NULL;
+  if (ADDR_EXPR == code)
+  {
+    addr_expr_0 = TREE_OPERAND(lhsOrRhs1, 0);
+  }
+
+  code = TREE_CODE(addr_expr_0 ? addr_expr_0 : lhsOrRhs1);
+  definitely = true;
+  poly_uint64 offset = 0;
+  if (COMPONENT_REF == code)
+  {
+    // This is the struct.
+    *field = TREE_OPERAND(addr_expr_0, 1);
+    *_struct = TREE_OPERAND(addr_expr_0, 0);
+    const enum tree_code fcode = TREE_CODE(*field);
+    const bool is_field_decl = FIELD_DECL == fcode;
+    gcc_assert(is_field_decl);
+
+    poly_uint64 bit_offset;
+    if (poly_int_tree_p (DECL_FIELD_OFFSET (*field), &offset)
+      && poly_int_tree_p (DECL_FIELD_BIT_OFFSET (*field), &bit_offset))
+    {
+      offset = (offset << LOG2_BITS_PER_UNIT) + bit_offset;
+    }
+    offset_constant = offset.to_constant();
+
+    const enum tree_code code_possibly_memref = TREE_CODE(*_struct);
+    if (MEM_REF == code_possibly_memref)
+    {
+      // pointer
+      *_struct = TREE_OPERAND(*_struct, 0);
+    }
+  }
+
+  return definitely;
+}
+
+
+static void
+label_to_edges(tree def, bitmap a_i, hash_set<bitmap> &invalid, hash_map<tree, bitmap> &tree_map, std::map<bitmap, unsigned> &index_map, struct graph_edge ***table, struct graph* SSG, hash_map<struct graph_edge*, bitmap> &edge_labels)
+{
+  gcc_assert(def);
+  gimple *use = NULL;
+  imm_use_iterator iterator;
+  bool is_alias_set_valid = true;
+  FOR_EACH_IMM_USE_STMT (use, iterator, def)
+  {
+    const enum gimple_code gcode_use = gimple_code(use);
+    const bool is_call = GIMPLE_CALL == gcode_use;
+    const bool is_assign = GIMPLE_ASSIGN == gcode_use;
+    is_alias_set_valid &= is_call || is_assign;
+    if (!is_alias_set_valid) BREAK_FROM_IMM_USE_STMT(iterator);
+    if (is_call) continue;
+
+    tree rhs1 = gimple_assign_rhs1 (use);
+    bool can_handle_rhs = false;
+    tree _struct_rhs = NULL;
+    tree field_rhs = NULL;
+    unsigned offset_rhs = 0;
+    is_there_a_field_access(rhs1, can_handle_rhs, &_struct_rhs, &field_rhs, offset_rhs);
+
+    tree lhs = gimple_assign_lhs (use);
+    bool can_handle_lhs = false;
+    tree _struct_lhs = NULL;
+    tree field_lhs = NULL;
+    unsigned offset_lhs = 0;
+    is_there_a_field_access(lhs, can_handle_lhs, &_struct_lhs, &field_lhs, offset_lhs);
+
+    // So, if there's no field access at all we just don't care.
+    const bool dont_care = !field_rhs && !field_lhs;
+    if (dont_care) continue;
+
+    tree lhs_alias_set = _struct_lhs ? _struct_lhs : lhs;
+    tree rhs_alias_set = _struct_rhs ? _struct_rhs : rhs1;
+    // If we do have this, then we need a bidirectional edge...
+    // which we haven't implemented.
+    gcc_assert(field_lhs != field_rhs);
+    const bool is_rhs_source = field_rhs;
+    //direction_from_to = field_rhs && !field_lhs;
+
+    // So now we need to find out which alias-set lhs belongs...
+    bitmap *alias_set_rhs_ptr = tree_map.get (rhs_alias_set);
+    bitmap *alias_set_lhs_ptr = tree_map.get (lhs_alias_set);
+    // I think this is fine...
+    if (!alias_set_rhs_ptr || !alias_set_lhs_ptr) continue;
+    bitmap alias_set_rhs = *alias_set_rhs_ptr;
+    bitmap alias_set_lhs = *alias_set_lhs_ptr;
+
+    // what is the index of this alias_set?
+    const bool index_rhs_exists = index_map.find(alias_set_rhs) != index_map.end();
+    // I think this is still fine...
+    if (!index_rhs_exists) continue;
+    unsigned index_j = index_map.at(alias_set_rhs);
+    const bool index_lhs_exists = index_map.find(alias_set_lhs) != index_map.end();
+    if (!index_lhs_exists) continue;
+    unsigned index_i = index_map.at(alias_set_lhs);
+    unsigned i_i = is_rhs_source ? index_j : index_i;
+    unsigned i_j = is_rhs_source ? index_i : index_j;
+    struct graph_edge *e = table[i_i][i_j];
+    // So, if there's no edge
+    // or if there's an edge
+    // is both possible.
+    if (!e) e = add_edge(SSG, i_i, i_j);
+    table[i_i][i_j] = e;
+    // What we need to do here is make sure that there's
+    // an edge and that it is labeled with the field offset
+    // that points to index_j...
+
+    bitmap *label_ptr = edge_labels.get (e);
+    bitmap label = label_ptr ? *label_ptr : BITMAP_ALLOC(&alias_obstack);
+    unsigned offset_constant = is_rhs_source ? offset_rhs : offset_lhs;
+    bitmap_set_bit (label, offset_constant);
+    edge_labels.put (e, label);
+
+  }
+
+  if (!is_alias_set_valid) invalid.add(a_i);
+}
+
+static tree
+label_from_edges(gimple* def, bitmap a_i, hash_set<bitmap> &invalid, hash_map<tree, bitmap> &tree_map, std::map<bitmap, unsigned> &index_map, struct graph_edge ***table, struct graph* SSG, hash_map<struct graph_edge*, bitmap> &edge_labels)
+{
+  gcc_assert(def);
+  const enum gimple_code gcode = gimple_code(def);
+  bool interesting = false;
+  tree lhs = NULL;
+  switch (gcode)
+  {
+     case GIMPLE_ASSIGN:
+        lhs = gimple_assign_lhs (def);
+        interesting = true;
+     break;
+     case GIMPLE_CALL:
+        lhs = gimple_call_lhs (def);
+     break;
+       default:
+     invalid.add (a_i);
+     break;
+  }
+  if (!interesting) return lhs;
+
+  tree rhs1 = gimple_assign_rhs1 (def);
+  bool can_handle_rhs = false;
+  tree _struct_rhs = NULL;
+  tree field_rhs = NULL;
+  unsigned offset_rhs = 0;
+  is_there_a_field_access(rhs1, can_handle_rhs, &_struct_rhs, &field_rhs, offset_rhs);
+
+  lhs = gimple_assign_lhs (def);
+  bool can_handle_lhs = false;
+  tree _struct_lhs = NULL;
+  tree field_lhs = NULL;
+  unsigned offset_lhs = 0;
+  is_there_a_field_access(lhs, can_handle_lhs, &_struct_lhs, &field_lhs, offset_lhs);
+
+  // So, if there's no field access at all we just don't care.
+  const bool dont_care = !field_rhs && !field_lhs;
+  if (dont_care) return lhs;
+
+  tree lhs_alias_set = _struct_lhs ? _struct_lhs : lhs;
+  tree rhs_alias_set = _struct_rhs ? _struct_rhs : rhs1;
+  // If we do have this, then we need a bidirectional edge...
+  // which we haven't implemented.
+  gcc_assert(field_lhs != field_rhs);
+  bool direction_from_to = field_lhs && !field_rhs;
+  const bool is_rhs_source = field_rhs;
+
+  // So now we need to find out which alias-set lhs belongs...
+  bitmap *alias_set_rhs_ptr = tree_map.get (rhs_alias_set);
+  bitmap *alias_set_lhs_ptr = tree_map.get (lhs_alias_set);
+  // I think this is fine...
+  if (!alias_set_rhs_ptr || !alias_set_lhs_ptr) return lhs;
+  bitmap alias_set_rhs = *alias_set_rhs_ptr;
+  bitmap alias_set_lhs = *alias_set_lhs_ptr;
+  // what is the index of this alias_set?
+  const bool index_j_exists = index_map.find(alias_set_rhs) != index_map.end();
+  // I think this is still fine...
+  if (!index_j_exists) return lhs;
+  unsigned index_j = index_map.at(alias_set_rhs);
+  const bool index_i_exists = index_map.find(alias_set_lhs) != index_map.end();
+  if (!index_i_exists) return lhs;
+  unsigned index_i = index_map.at(alias_set_lhs);
+  // now we have from and to
+  // in index_i and index_j
+  unsigned i_i = is_rhs_source ? index_j : index_i;
+  unsigned i_j = is_rhs_source ? index_i : index_j;
+  struct graph_edge *e = table[i_i][i_j];
+
+  if (!e) e = add_edge(SSG, i_i, i_j);
+  table[i_i][i_j] = e;
+  // What we need to do here is make sure that there's
+  // an edge and that it is labeled with the field offset
+  // that points to index_j...
+  
+  bitmap *label_ptr = edge_labels.get (e);
+  bitmap label = label_ptr ? *label_ptr : BITMAP_ALLOC(&alias_obstack);
+  unsigned offset_constant = direction_from_to ? offset_lhs : offset_rhs;
+  if (dump_file) fprintf(dump_file, "table [%u][%u] = %u\n", i_i, i_j, offset_constant);
+  bitmap_set_bit (label, offset_constant);
+  edge_labels.put (e, label);
+
+  return lhs;
+}
+
+static void
+call_hello_world(gimple* g, tree inner_type, vec<tree> splitted_types)
+{
+  gimple_stmt_iterator gsi = gsi_start(g);
+  const char* _string = "runtime argument to malloc: %d\nsizeof struct A%d\nlength of array %d\n";
+  const unsigned _size = strlen(_string) + 1;
+  tree _string_cst = build_string_literal (_size, _string);
+
+  const char* _string2 = "beginning of array for field %d = %p\n";
+  const unsigned _size2 = strlen(_string2) + 1;
+  tree _string_cst2 = build_string_literal (_size2, _string2);
+
+  tree _var_decl2 = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier("blabla"), TREE_TYPE(_string_cst2));
+  gassign *assign_string = gimple_build_assign(_var_decl2, _string_cst2);
+  gsi_insert_after(&gsi, assign_string, GSI_NEW_STMT);
+
+  gcc_assert(TREE_CODE(inner_type) == RECORD_TYPE);
+  tree size_tree = TYPE_SIZE_UNIT(inner_type);
+  int size_int = tree_to_shwi (size_tree);
+  tree _int_cst = build_int_cst(long_unsigned_type_node, size_int);
+  tree _size_decl = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier("sizedecl"), TREE_TYPE(_int_cst));
+  gassign *assign_stmt0 = gimple_build_assign(_size_decl, _int_cst);
+  gsi_insert_after(&gsi, assign_stmt0, GSI_NEW_STMT);
+
+
+  tree _var_decl = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier("hellostring"), TREE_TYPE(_string_cst));
+  gassign *assign_stmt = gimple_build_assign(_var_decl, _string_cst);
+  tree argument = gimple_call_arg(g, 0);
+  gsi_insert_after(&gsi, assign_stmt, GSI_NEW_STMT);
+
+  tree div = build2 (EXACT_DIV_EXPR, TREE_TYPE(_size_decl), argument, _size_decl);
+  tree div_res = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier("divresult"), TREE_TYPE(div));
+  gassign *assign_stmt1 = gimple_build_assign(div_res, div);
+  gsi_insert_after(&gsi, assign_stmt1, GSI_NEW_STMT);
+
+  gcall *call_stmt = gimple_build_call(builtin_decl_explicit(BUILT_IN_PRINTF), 4, _var_decl, argument, _size_decl, div_res);
+  gsi_insert_after (&gsi, call_stmt, GSI_NEW_STMT);
+
+  tree base = gimple_call_lhs (g);
+  tree offset_i = build_int_cst(long_unsigned_type_node, 0);
+  unsigned index_i = 0;
+  for (auto i = splitted_types.begin(), e = splitted_types.end(); i != e; ++i)
+  {
+    tree type_i = (*i);
+    tree offset_expr_i = build2 (POINTER_PLUS_EXPR, TREE_TYPE(base), base, offset_i);
+    char* identifier_i;
+    asprintf(&identifier_i, "split.%d", index_i);
+    tree pointer_handle = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier(identifier_i), type_i);
+    gassign *pointer_assign = gimple_build_assign(pointer_handle, offset_expr_i);
+    gsi_insert_after (&gsi, pointer_assign, GSI_NEW_STMT);
+    tree size_i_tree = TYPE_SIZE_UNIT(TREE_TYPE(type_i));
+
+    tree mult_expr = build2(MULT_EXPR, TREE_TYPE(size_i_tree), size_i_tree, div_res);
+    char* mult_i;
+    asprintf(&mult_i, "mult.%d", index_i);
+    tree mult_handle = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier(mult_i), TREE_TYPE(mult_expr));
+    gassign *mult_assign = gimple_build_assign(mult_handle, mult_expr);
+    gsi_insert_after (&gsi, mult_assign, GSI_NEW_STMT);
+    gcall *new_call_stmt = gimple_build_call(builtin_decl_explicit(BUILT_IN_PRINTF), 3, _var_decl2, build_int_cst(long_unsigned_type_node, index_i), pointer_handle);
+    gsi_insert_after (&gsi, new_call_stmt, GSI_NEW_STMT);
+
+    char *add_i;
+    asprintf(&add_i, "add.%d", index_i);
+    tree add_expr = build2(POINTER_PLUS_EXPR, TREE_TYPE(pointer_handle), pointer_handle, mult_handle);
+    tree add_handle = build_decl(UNKNOWN_LOCATION, VAR_DECL, get_identifier(add_i), TREE_TYPE(pointer_handle));
+    gassign *add_assign = gimple_build_assign(add_handle, add_expr);
+    gsi_insert_after (&gsi, add_assign, GSI_NEW_STMT);
+
+    base = add_handle;
+    index_i++;
+  }
+}
+
+inline void
+log (const char* const fmt, ...)
+{
+  if (!dump_file) return;
+
+  va_list args;
+  va_start (args, fmt);
+  vfprintf (dump_file, fmt, args);
+  fflush (dump_file);
+  va_end (args);
+}
+
+static bool
+find_instance_of_rule_1_SSA_NAME (hash_map<tree, bitmap> &AS, tree lhs, tree ic)
+{
+  gcc_assert (lhs && ic);
+  const enum tree_code code = TREE_CODE (lhs);
+  const bool is_ssa_name = SSA_NAME == code;
+  gcc_assert (is_ssa_name);
+
+  bitmap *lhs_aliasset_ptr = AS.get(lhs);
+  if (!lhs_aliasset_ptr) return false;
+
+  bitmap *ic_aliasset_ptr = AS.get(ic);
+  gcc_assert(ic_aliasset_ptr);
+  bitmap lhs_aliasset = *lhs_aliasset_ptr;
+  bitmap ic_aliasset = *ic_aliasset_ptr;
+  gcc_assert (lhs_aliasset && ic_aliasset);
+
+  // Rule 1 is Finding out if this is a pointer to the base object
+  // So, what else do we need here?
+  // I guess we need a type...
+  // and some pointing to information?
+  bool retval = bitmap_intersect_p (lhs_aliasset, ic_aliasset);
+  return retval;
+}
+
+static bool
+find_instance_of_rule_1_tree(hash_map<tree, bitmap> &AS, tree t, tree ic)
+{
+  gcc_assert(t && ic);
+  enum tree_code code = TREE_CODE(t);
+  bool retval = false;
+  switch (code)
+  {
+    case SSA_NAME: retval = find_instance_of_rule_1_SSA_NAME(AS, t, ic); break;
+    case COMPONENT_REF: 
+    {
+       tree mem_ref = TREE_OPERAND(t, 0);
+       code = TREE_CODE(mem_ref);
+       gcc_assert(MEM_REF == code);
+       tree decl = TREE_OPERAND(mem_ref, 0);
+       code = TREE_CODE(decl);
+       gcc_assert(SSA_NAME == code);
+       retval = find_instance_of_rule_1_SSA_NAME(AS, decl, ic);
+       break;
+    }
+    // VAR_DECLs are not in the alias-set, must be an SSA_name
+    case MEM_REF:
+    {
+       tree decl = TREE_OPERAND(t, 0);
+       code = TREE_CODE(decl);
+       gcc_assert(SSA_NAME == code);
+       retval = find_instance_of_rule_1_SSA_NAME(AS, decl, ic);
+    }
+    break;
+    case VAR_DECL:
+    break;
+    default: {
+     log("unreachabel code = %s\n", get_tree_code_name(code));
+     if (dump_file) print_generic_expr (dump_file, t);
+     log("\n", get_tree_code_name(code));
+     gcc_unreachable();
+     }
+     break;
+  }
+  return retval;
+}
+
+static bool
+find_instance_of_rule_1_gassign_lhs(hash_map<tree, bitmap> &AS, gassign *_gassign, tree ic)
+{
+  gcc_assert(_gassign && ic);
+  tree lhs = gimple_assign_lhs (_gassign);
+  return lhs ? find_instance_of_rule_1_tree(AS, lhs, ic) : false;
+}
+
+
+static bool
+find_instance_of_rule_1_gassign_rhs(hash_map<tree, bitmap> &AS, gassign *_gassign, tree ic)
+{
+  gcc_assert(_gassign && ic);
+  bool retval = false;
+  const enum gimple_rhs_class code = gimple_assign_rhs_class (_gassign);
+  if (dump_file) print_gimple_stmt (dump_file, _gassign, 0);
+  switch (code)
+  {
+    case GIMPLE_BINARY_RHS:
+    case GIMPLE_UNARY_RHS:
+    case GIMPLE_SINGLE_RHS:
+    {
+       tree rhs1 = gimple_assign_rhs1(_gassign);
+       retval |= find_instance_of_rule_1_tree(AS, rhs1, ic);
+    }
+    break;
+    default:
+    break;
+  }
+  return retval;
+}
+
+static bool
+find_instance_of_rule_1_gcall_lhs(hash_map<tree, bitmap> &AS, gcall *_gcall, tree ic)
+{
+  gcc_assert(_gcall && ic);
+  tree lhs = gimple_call_lhs (_gcall);
+  if (!lhs) return false;
+
+  return find_instance_of_rule_1_SSA_NAME(AS, lhs, ic);
+}
+
+static bool
+find_instance_of_rule_1_gcall_rhs(hash_map<tree, bitmap> &AS, gcall *_gcall, tree ic)
+{
+  gcc_assert(_gcall && ic);
+  const unsigned n = gimple_call_num_args (_gcall);
+  bool retval = false;
+  for (unsigned i = 0; i < n; i++)
+  {
+    tree a_i = gimple_call_arg (_gcall, i);
+    gcc_assert(a_i);
+    const enum tree_code code = TREE_CODE(a_i);
+    const bool is_ssa_name = SSA_NAME == code;
+    if (!is_ssa_name) continue;
+    retval |= find_instance_of_rule_1_SSA_NAME(AS, a_i, ic);
+  }
+  return retval;
+}
+
+static bool
+find_instance_of_rule_1_gcall(hash_map<tree, bitmap> &AS, gcall *_gcall, tree ic)
+{
+  gcc_assert(_gcall && ic);
+  bool retval = false;
+  retval |= find_instance_of_rule_1_gcall_lhs(AS, _gcall, ic);
+  retval |= find_instance_of_rule_1_gcall_rhs(AS, _gcall, ic);
+  return retval;
+}
+
+static bool
+find_instance_of_rule_2_gassign (hash_map<tree, bitmap> &AS, gassign *_gassign, tree ic)
+{
+  gcc_assert(_gassign && ic);
+  // TODO: What operations are valid on the lhs?
+  const enum tree_code e_code = gimple_expr_code(_gassign);
+
+  const bool is_pointer_plus = POINTER_PLUS_EXPR == e_code;
+  const bool is_pointer_diff = POINTER_DIFF_EXPR == e_code;
+  const bool is_pointer_math = is_pointer_plus || is_pointer_diff;
+  if (!is_pointer_math) return false;
+
+  // If we have pointer math... Then that's basically rule 2.
+  // Though, we first need to confirm that the the first operand
+  // is an alias of IC
+  tree base = gimple_assign_rhs1(_gassign);
+  gcc_assert(base);
+  const enum tree_code code = TREE_CODE(base);
+  const bool is_ssa_name = SSA_NAME == code;
+  gcc_assert(is_ssa_name);
+  bitmap *alias_set_ptr = AS.get (base);
+  if (!alias_set_ptr) return false;
+
+  bitmap alias_set = *alias_set_ptr;
+  bitmap *alias_set_ptr_original = AS.get (ic);
+  gcc_assert(alias_set_ptr_original);
+  bitmap alias_set_original = *alias_set_ptr_original;
+  const bool aliases = bitmap_intersect_p (alias_set_original, alias_set);
+  if (!aliases) return false;
+
+  log ("rhs assign:");
+  if (dump_file) print_gimple_stmt (dump_file, _gassign, 0);
+  log ("rhs assign code : %s\n", get_tree_code_name(e_code));
+
+  return true;
+}
+
+static bool 
+find_instance_of_rule_1_gassign(hash_map<tree, bitmap> &AS, gassign *_gassign, tree ic)
+{
+  gcc_assert(_gassign && ic);
+  bool retval = false;
+  retval |= find_instance_of_rule_1_gassign_lhs(AS, _gassign, ic);
+  retval |= find_instance_of_rule_1_gassign_rhs(AS, _gassign, ic);
+  return retval;
+}
+
+static bool
+find_instance_of_rule_2(hash_map<tree, bitmap> &AS, gimple *def, tree ic)
+{
+  gcc_assert(def && ic);
+  gassign *_gassign = dyn_cast<gassign*> (def);
+  if (!_gassign) return false;
+
+  return find_instance_of_rule_2_gassign(AS, _gassign, ic);
+}
+
+static bool
+find_instance_of_rule_1(hash_map<tree, bitmap> &AS, gimple *def, tree ic)
+{
+  gcc_assert(def && ic);
+  gassign *_gassign = dyn_cast<gassign*> (def);
+  if (_gassign) return find_instance_of_rule_1_gassign(AS, _gassign, ic);
+  gcall *_gcall = dyn_cast<gcall*> (def);
+  if (_gcall) return find_instance_of_rule_1_gcall(AS, _gcall, ic);
+  return false;
+}
+
+static void
+find_instance_of_rule_2(hash_map<tree, bitmap> &AS, bitmap A, tree ic)
+{
+  gcc_assert(A && ic);
+  unsigned i = 0;
+  bitmap_iterator bi;
+  EXECUTE_IF_SET_IN_BITMAP (A, 0, i, bi)
+  {
+     varinfo_t v_i = get_varinfo(i);
+     if (!v_i) continue;
+
+     if (v_i->is_heap_var) continue;
+
+     tree decl = v_i->decl;
+     if (!decl) continue;
+
+     const enum tree_code code = TREE_CODE(decl);
+     const bool is_ssa = SSA_NAME == code;
+     if (!is_ssa) continue;
+
+     gimple *def = SSA_NAME_DEF_STMT(decl);
+     bool rule_2_def = find_instance_of_rule_2(AS, def, ic);
+     if (rule_2_def && dump_file) print_gimple_stmt(dump_file, def, 0);
+
+     gimple *use = NULL;
+     imm_use_iterator iterator;
+
+     const enum gimple_code gcode_def = gimple_code(def);
+     const bool is_gassign = GIMPLE_ASSIGN == gcode_def;
+     const bool skip = !is_gassign;
+     if (skip) continue;
+     tree lhs = gimple_assign_lhs (def);
+     FOR_EACH_IMM_USE_STMT (use, iterator, lhs)
+     {
+       bool rule_2_use = find_instance_of_rule_2(AS, use, ic);
+       if (rule_2_use && dump_file) print_gimple_stmt(dump_file, use, 0);
+     }
+  }
+}
+
+
+static void
+find_instance_of_rule_1(hash_map<tree, bitmap> &AS, bitmap A, tree ic)
+{
+  gcc_assert(A && ic);
+  unsigned i = 0;
+  bitmap_iterator bi;
+  EXECUTE_IF_SET_IN_BITMAP (A, 0, i, bi)
+  {
+     varinfo_t v_i = get_varinfo(i);
+     if (!v_i) continue;
+
+     if (v_i->is_heap_var) continue;
+
+     tree decl = v_i->decl;
+     if (!decl) continue;
+
+     const enum tree_code code = TREE_CODE(decl);
+     const bool is_ssa = SSA_NAME == code;
+     if (!is_ssa) continue;
+
+     gimple *def = SSA_NAME_DEF_STMT(decl);
+     bool rule_1_def = find_instance_of_rule_1(AS, def, ic);
+     if (rule_1_def) log("rule 1: ");
+     if (rule_1_def && dump_file) print_gimple_stmt(dump_file, def, 0);
+
+     gimple *use = NULL;
+     imm_use_iterator iterator;
+
+     const enum gimple_code gcode_def = gimple_code(def);
+     const bool is_gcall = GIMPLE_CALL == gcode_def;
+     const bool is_gassign = GIMPLE_ASSIGN == gcode_def;
+     const bool skip = !(is_gcall || is_gassign);
+     if (skip) continue;
+     tree lhs = is_gcall ? gimple_call_lhs (def) : gimple_assign_lhs (def);
+     FOR_EACH_IMM_USE_STMT (use, iterator, lhs)
+     {
+       bool rule_1_use = find_instance_of_rule_1(AS, use, ic);
+       if (rule_1_use) log("rule 1: ");
+       if (rule_1_use && dump_file) print_gimple_stmt(dump_file, use, 0);
+     }
+  }
+}
+
+static void
+label_all_edges(vec<bitmap> &alias_set_vector, hash_map<tree, bitmap> &alias_sets, std::map<bitmap, unsigned> &index_map, struct graph_edge ***table, struct graph *SSG, hash_map<struct graph_edge *, bitmap> &labels)
+{
+  hash_set<bitmap> invalid;
+  for (auto i = alias_set_vector.begin(), e = alias_set_vector.end(); i != e; ++i)
+  {
+    bitmap a_i = *i;
+    unsigned j = 0;
+    bitmap_iterator bi;
+    EXECUTE_IF_SET_IN_BITMAP (a_i, 0, j, bi)
+    {
+       varinfo_t v_j = get_varinfo(j);
+       if (!v_j) continue;
+
+       if (v_j->is_heap_var) continue;
+
+       tree decl = v_j->decl;
+       if (!decl) continue;
+
+       const enum tree_code code = TREE_CODE(decl);
+       const bool is_ssa = SSA_NAME == code;
+       if (!is_ssa) continue;
+
+       gimple *def = SSA_NAME_DEF_STMT(decl);
+       tree lhs = label_from_edges(def, a_i, invalid, alias_sets, index_map, table, SSG, labels);
+
+       // At some point here... I will need to update the graph
+       // with new edges and annotate the edges...
+       if (!lhs) break;
+
+       label_to_edges(lhs, a_i, invalid, alias_sets, index_map, table, SSG, labels);
+    }
+  }
+}
+
+/* Compute the alias-sets for the LHS of malloc and calloc statements. */
+static void
+compute_alias_sets()
+{
+  if (dump_file) fprintf(dump_file, "we are dumping the constraint graph \n");
+  if (dump_file) dump_constraint_graph (dump_file);
+  if (dump_file) fprintf(dump_file, "we are computing alias sets\n");
+  bitmap_obstack_initialize (&alias_obstack);
+
+  Info2 info;
+  const bool is_empty = info.initial_candidates.is_empty ();
+  if (is_empty) return;
+
+  const bool has_no_alias_sets = info.alias_sets.is_empty ();
+  if (has_no_alias_sets) return;
+
+  const int cardinality = info.alias_set_unique.length ();
+  gcc_assert(cardinality > 0);
+
+  // So now, here we have a graph that is correct and we should inspect the initial candidates to see which survived and became
+  // actual nodes in the graph...
+  //
+  // I have a small belief that the authors of the Forma paper, used the graph to iterate and analyze...
+  // however, here we are doing that before the graph is generated so the graph is a bit moot...
+  // So... what does that mean? It means that let's iterate over all alias sets...
+  // even though I would like to iterate over the nodes in the graph...
+
+  // "Queue" of vertices we want to have in post-order
+  int nq = cardinality;
+  int *qs = new int[nq];
+  for (int i = 0; i < cardinality; i++)
+  {
+    qs[i] = i;
+  }
+  vec<int> nodes = vNULL;
+  graphds_dfs (info.SSG, qs, nq, &nodes, false, NULL);
+  free(qs);
+
+  // Now we have the nodes in post-order... so we can iterate over all nodes in the graph
+  for (auto i = nodes.begin(), e = nodes.end(); i != e; ++i)
+  {
+    unsigned index = *i;
+    bitmap alias_set = info.alias_set_unique[index];
+    gcc_assert(alias_set);
+    // here we are guaranteed that the alias-set is legal...
+    // but what do we do now?
+    // I guess we need to find out which type it is that we have and let's change it...
+    unsigned j = 0;
+    bitmap_iterator bi;
+    tree type = NULL;
+    tree decl = NULL;
+    EXECUTE_IF_SET_IN_BITMAP (alias_set, 0, j, bi)
+    {
+       unsigned length = varmap.length ();
+       bool larger_than = j >= length;
+       if (larger_than) continue;
+
+       varinfo_t v_j = get_varinfo(j);
+       if (!v_j) continue;
+
+       if (v_j->is_heap_var) continue;
+
+       decl = v_j->decl;
+       if (!decl) continue;
+
+       const bool is_malloc = info.initial_candidates.contains (decl);
+       if (!is_malloc) continue;
+
+       const enum tree_code code = TREE_CODE(decl);
+       const bool is_ssa = SSA_NAME == code;
+       if (!is_ssa) continue;
+
+       // can I get the uses of decl?
+       type = TREE_TYPE(decl);
+       // We only need a single type here...
+       break;
+    }
+
+    // We need to find types which are pointers to structs...
+    //
+    // Technically we can change pointers to pointers... all the way down...
+    // but let's keep it simple...
+    if (!type) continue;
+    enum tree_code code = TREE_CODE(type);
+    const bool is_pointer = POINTER_TYPE == code;
+    if (!is_pointer) continue;
+
+    tree inner_type = TREE_TYPE(type);
+    code = TREE_CODE(inner_type);
+    const bool is_struct = RECORD_TYPE == code;
+    if (!is_struct) continue;
+
+    // Ok... we have found a useful type to change... let's change it?
+    // What do we need? We need to pass this type and split it...
+    // Let's do the maximal splitting strategy...
+    // I don't think we need a really complicated thing like the one
+    // in TypeReconstructor at least for maximal splitting...
+    // Let's give it a try...
+    gcc_assert(TYPE_FIELDS(inner_type)); // We cannot split an incomplete type
+    vec<tree> splitted = vNULL;
+    unsigned k = 0;
+    for (tree field = TYPE_FIELDS (inner_type); field; field = DECL_CHAIN(field), k++)
+    {
+      splitted.safe_push(build_pointer_type(TREE_TYPE(field)));
+    }
+
+    // Congrats! We now have a vector of the field types
+    // Ok, now what?
+    // We also have decl which corresponds to the malloc or calloc call...
+    // Let's focus only on malloc at the moment.
+    //
+    // Ok... so we need to find out the argument to malloc to find out how big our
+    // array is. I think it is possible that this is not known at compile time...
+    // so we might need to do some arithmetic to find out how many elements the array contains
+    //
+    cgraph_edge **edge_ptr = info.call_stmts.get (decl);
+    gcc_assert(edge_ptr);
+    cgraph_edge *edge = *edge_ptr;
+    gcall *_gcall = edge->call_stmt;
+    push_cfun(DECL_STRUCT_FUNCTION(edge->caller->decl));
+    // Since we know that this is only a malloc, we are sure that we only need
+    // to inspect argument 0
+    tree rhs = gimple_call_arg(_gcall, 0);
+    gcc_assert(rhs);
+    tree rhs_type = TREE_TYPE(rhs);
+    gcc_assert(rhs_type);
+    const enum tree_code rhs_type_code = TREE_CODE(rhs_type);
+    const bool is_int_cst = INTEGER_CST == rhs_type_code;
+    const bool is_integer_type = INTEGER_TYPE == rhs_type_code;
+    const bool is_valid_arg = is_int_cst || is_integer_type;
+    gcc_assert(is_valid_arg);
+    // I need to find out how "big" the argument to malloc is at runtime
+    // So... let's do just that...
+    // This is rule 7 with transformation
+    gimple *_gcallgimple = _gcall;
+    //call_hello_world(_gcallgimple, inner_type, splitted);
+    find_instance_of_rule_1(info.alias_sets, alias_set, decl);
+    find_instance_of_rule_2(info.alias_sets, alias_set, decl);
+    //find_instance_of_rule_3(alias_sets, alias_set, decl);
+
+    pop_cfun();
+
+    
+  }
+
 }
 
 namespace {
