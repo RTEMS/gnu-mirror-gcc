@@ -334,10 +334,9 @@ builtin_memref::extend_offset_range (tree offset)
 	 as signed.  */
       wide_int min, max;
       value_range_kind rng;
-      if (query)
+      value_range vr;
+      if (query && query->range_of_expr (vr, offset, stmt))
 	{
-	  value_range vr;
-	  gcc_assert (query->range_of_expr (vr, offset, stmt));
 	  rng = vr.kind ();
 	  if (!vr.undefined_p ())
 	    {

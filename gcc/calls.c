@@ -1272,12 +1272,9 @@ get_size_range (range_query *query, tree exp, gimple *stmt, tree range[2],
 
   if (integral)
     {
-      if (query)
+      value_range vr;
+      if (query && query->range_of_expr (vr, exp, stmt))
 	{
-	  value_range vr;
-	  gcc_assert (TREE_CODE (exp) == SSA_NAME
-		      || TREE_CODE (exp) == INTEGER_CST);
-	  gcc_assert (query->range_of_expr (vr, exp, stmt));
 	  range_type = vr.kind ();
 	  if (!vr.undefined_p ())
 	    {
