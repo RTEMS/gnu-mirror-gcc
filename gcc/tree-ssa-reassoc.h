@@ -40,6 +40,12 @@ struct range_entry
   unsigned int idx, next;
 };
 
+/* Starting rank number for a given basic block, so that we can rank
+   operations using unmovable instructions in that BB based on the bb
+   depth.  */
+extern long *bb_rank;
+
+/* Operand->rank hashtable.  */
 extern hash_map<tree, long> *operand_rank;
 
 void linearize_expr_tree (vec<operand_entry *> *, gimple *, bool, bool);

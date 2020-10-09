@@ -454,8 +454,9 @@ find_conditions (basic_block bb,
 
   if (code == NE_EXPR)
     {
-      gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
-      if (def)
+      gassign *def;
+      if (TREE_CODE (lhs) == SSA_NAME
+	  && (def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs))) != NULL)
 	{
 	  enum tree_code rhs_code = gimple_assign_rhs_code (def);
 	  if (associative_tree_code (rhs_code))
@@ -548,6 +549,7 @@ pass_if_to_switch::execute (function *fun)
 {
   operand_rank = new hash_map<tree, long>;
   hash_map<basic_block, condition_info> conditions_in_bbs;
+  bb_rank = XCNEWVEC (long, last_basic_block_for_fn (cfun));
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -605,8 +607,13 @@ pass_if_to_switch::execute (function *fun)
 	}
     }
 
+  free (rpo);
+
   delete operand_rank;
   operand_rank = NULL;
+
+  free (bb_rank);
+  bb_rank = NULL;
 
   return 0;
 }

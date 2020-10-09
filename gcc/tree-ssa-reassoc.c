@@ -200,7 +200,7 @@ static unsigned int next_operand_entry_id;
 /* Starting rank number for a given basic block, so that we can rank
    operations using unmovable instructions in that BB based on the bb
    depth.  */
-static long *bb_rank;
+long *bb_rank;
 
 /* Operand->rank hashtable.  */
 hash_map<tree, long> *operand_rank;
