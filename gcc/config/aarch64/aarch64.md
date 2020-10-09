@@ -105,6 +105,7 @@
     UNSPEC_CRC32X
     UNSPEC_FCVTZS
     UNSPEC_FCVTZU
+    UNSPEC_FJCVTZS
     UNSPEC_URECPE
     UNSPEC_FRECPE
     UNSPEC_FRECPS
@@ -200,6 +201,8 @@
     UNSPECV_SET_FPSR		; Represent assign of FPSR content.
     UNSPECV_BLOCKAGE		; Represent a blockage
     UNSPECV_PROBE_STACK_RANGE	; Represent stack range probing.
+    UNSPEC_RNDR			; Represent RNDR
+    UNSPEC_RNDRRS		; Represent RNDRRS
   ]
 )
 
@@ -5885,6 +5888,16 @@
   [(set_attr "length" "0")]
 )
 
+(define_insn "aarch64_fjcvtzs"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(unspec:SI [(match_operand:DF 1 "register_operand" "w")]
+		   UNSPEC_FJCVTZS))
+   (clobber (reg:CC CC_REGNUM))]
+  "TARGET_JSCVT"
+  "fjcvtzs\\t%w0, %d1"
+  [(set_attr "type" "f_cvtf2i")]
+)
+
 ;; Pointer authentication patterns are always provided.  In architecture
 ;; revisions prior to ARMv8.3-A these HINT instructions operate as NOPs.
 ;; This lets the user write portable software which authenticates pointers
@@ -6086,6 +6099,26 @@
   [(parallel [(set (match_operand 0)
 		   (match_operand 1))
 	      (clobber (reg:CC CC_REGNUM))])])
+
+(define_insn "aarch64_rndr"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_RNDR))
+   (set (reg:CC_Z CC_REGNUM)
+	(unspec_volatile:CC_Z [(const_int 0)] UNSPEC_RNDR))]
+  "TARGET_RNG"
+  "mrs\t%0, RNDR"
+  [(set_attr "type" "mrs")]
+)
+
+(define_insn "aarch64_rndrrs"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_RNDRRS))
+   (set (reg:CC_Z CC_REGNUM)
+	(unspec_volatile:CC_Z [(const_int 0)] UNSPEC_RNDRRS))]
+  "TARGET_RNG"
+  "mrs\t%0, RNDRRS"
+  [(set_attr "type" "mrs")]
+)
 
 ;; AdvSIMD Stuff
 (include "aarch64-simd.md")

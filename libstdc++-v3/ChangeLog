@@ -1,3 +1,132 @@
+2020-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/random.h (seed_seq(initializer_list<T>)): Rename
+	parameter to use reserved name.
+	* testsuite/17_intro/names.cc: Check "il".
+
+2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96803
+	* include/std/tuple
+	(_Tuple_impl(allocator_arg_t, Alloc, const _Tuple_impl<U...>&)):
+	Replace parameter pack with a type parameter and a pack and pass
+	the first type to __use_alloc.
+	* testsuite/20_util/tuple/cons/96803.cc: New test.
+
+2020-09-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-03-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94033
+	* include/std/type_traits (__is_nt_default_constructible_atom): Remove.
+	(__is_nt_default_constructible_impl): Remove.
+	(__is_nothrow_default_constructible_impl): Remove.
+	(__is_nt_constructible_impl): Add bool template parameter. Adjust
+	partial specializations.
+	(__is_nothrow_constructible_impl): Replace class template with alias
+	template.
+	(is_nothrow_default_constructible): Derive from alias template
+	__is_nothrow_constructible_impl instead of
+	__is_nothrow_default_constructible_impl.
+	* testsuite/20_util/is_nothrow_constructible/94003.cc: New test.
+	* testsuite/20_util/is_nothrow_default_constructible/96999.cc: New file.
+
+2020-09-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/71960
+	* include/experimental/string_view (basic_string_view):
+	Enable debug assertions.
+	* include/std/string_view (basic_string_view):
+	Likewise.
+
+2020-08-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++17/Makefile.in: Remove unused file.
+
+2020-08-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-03-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/filesystem/operations/last_write_time.cc: Fixes for
+	filesystems that silently truncate timestamps.
+	* testsuite/experimental/filesystem/operations/last_write_time.cc:
+	Likewise.
+
+2020-08-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2019-01-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/filesystem/operations/last_write_time.cc: Fix
+	test failures on targets with 32-bit time_t.
+
+2020-08-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-03-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93245
+	* include/experimental/bits/fs_path.h (path::generic_string<C,T,A>()):
+	Return the generic format not the native format.
+	* testsuite/experimental/filesystem/path/generic/generic_string.cc:
+	Improve test coverage.
+
+2020-08-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-03-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/94242
+	* include/bits/fs_path.h (path::_S_str_convert): Replace first
+	parameter with basic_string_view so that strings with different
+	allocators can be accepted.
+	(path::generic_string<C,T,A>()): Use basic_string object that uses the
+	right allocator type.
+	* testsuite/27_io/filesystem/path/generic/94242.cc: New test.
+	* testsuite/27_io/filesystem/path/generic/generic_string.cc: Improve
+	test coverage.
+
+2020-08-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96484
+	* src/filesystem/ops.cc (fs::read_symlink): Return an error
+	immediately for non-symlinks.
+	* src/filesystem/std-ops.cc (fs::read_symlink): Likewise.
+
+2020-07-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2019-01-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/68737
+	* config/locale/generic/c_locale.h (__convert_from_v)
+	[_GLIBCXX_USE_C99_STDIO]: Also check _GLIBCXX_HAVE_BROKEN_VSNPRINTF.
+	* config/os/hpux/os_defines.h: Define _GLIBCXX_HAVE_BROKEN_VSNPRINTF.
+	* include/bits/locale_facets.tcc (num_put::_M_insert_float)
+	[_GLIBCXX_USE_C99_STDIO]: Also check _GLIBCXX_HAVE_BROKEN_VSNPRINTF.
+
+2020-05-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/abi.xml (abi.versioning.history): Update 8.0.0 to
+	8.1.0 in list of versions.
+	* doc/html/*: Regenerate.
+
+2020-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/faq.xml: Use working link for SGI STL FAQ.
+	* doc/html/*: Regenerate.
+
 2020-04-21  Jonathan Wakely  <jwakely@redhat.com>
 
 	* doc/xml/manual/status_cxx2017.xml: Fix name of feature test macro.

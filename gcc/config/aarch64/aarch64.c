@@ -760,6 +760,32 @@ static const struct tune_params cortexa72_tunings =
   &generic_prefetch_tune
 };
 
+static const struct tune_params neoversev1_tunings =
+{
+  &cortexa57_extra_costs,
+  &generic_addrcost_table,
+  &cortexa57_regmove_cost,
+  &cortexa57_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  4, /* memmov_cost  */
+  3, /* issue_rate  */
+  (AARCH64_FUSE_AES_AESMC | AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_ADRP_ADD
+   | AARCH64_FUSE_MOVK_MOVK), /* fusible_ops  */
+  16,	/* function_align.  */
+  4,	/* jump_align.  */
+  8,	/* loop_align.  */
+  2,	/* int_reassoc_width.  */
+  4,	/* fp_reassoc_width.  */
+  1,	/* vec_reassoc_width.  */
+  2,	/* min_div_recip_mul_sf.  */
+  2,	/* min_div_recip_mul_df.  */
+  0,	/* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),	/* tune_flags.  */
+  &generic_prefetch_tune
+};
+
 static const struct tune_params cortexa73_tunings =
 {
   &cortexa57_extra_costs,
@@ -1369,10 +1395,14 @@ aarch64_hard_regno_mode_ok (unsigned regno, machine_mode mode)
   if (regno == FRAME_POINTER_REGNUM || regno == ARG_POINTER_REGNUM)
     return mode == Pmode;
 
-  if (GP_REGNUM_P (regno) && known_le (GET_MODE_SIZE (mode), 16))
-    return true;
-
-  if (FP_REGNUM_P (regno))
+  if (GP_REGNUM_P (regno))
+    {
+      if (known_le (GET_MODE_SIZE (mode), 8))
+	return true;
+      else if (known_le (GET_MODE_SIZE (mode), 16))
+	return (regno & 1) == 0;
+    }
+  else if (FP_REGNUM_P (regno))
     {
       if (vec_flags & VEC_STRUCT)
 	return end_hard_regno (mode, regno) - 1 <= V31_REGNUM;
@@ -2537,7 +2567,7 @@ aarch64_add_offset_1 (scalar_int_mode mode, rtx dest,
   gcc_assert (emit_move_imm || temp1 != NULL_RTX);
   gcc_assert (temp1 == NULL_RTX || !reg_overlap_mentioned_p (temp1, src));
 
-  HOST_WIDE_INT moffset = abs_hwi (offset);
+  unsigned HOST_WIDE_INT moffset = absu_hwi (offset);
   rtx_insn *insn;
 
   if (!moffset)
@@ -2581,7 +2611,8 @@ aarch64_add_offset_1 (scalar_int_mode mode, rtx dest,
   if (emit_move_imm)
     {
       gcc_assert (temp1 != NULL_RTX || can_create_pseudo_p ());
-      temp1 = aarch64_force_temporary (mode, temp1, GEN_INT (moffset));
+      temp1 = aarch64_force_temporary (mode, temp1,
+				       gen_int_mode (moffset, mode));
     }
   insn = emit_insn (offset < 0
 		    ? gen_sub3_insn (dest, src, temp1)
@@ -11387,6 +11418,8 @@ static const struct aarch64_attribute_info aarch64_attributes[] =
      OPT_mtune_ },
   { "sign-return-address", aarch64_attr_enum, false, NULL,
      OPT_msign_return_address_ },
+  { "outline-atomics", aarch64_attr_bool, true, NULL,
+     OPT_moutline_atomics},
   { NULL, aarch64_attr_custom, false, NULL, OPT____ }
 };
 
@@ -12963,7 +12996,12 @@ aarch64_simd_container_mode (scalar_mode mode, poly_int64 width)
 static machine_mode
 aarch64_preferred_simd_mode (scalar_mode mode)
 {
-  poly_int64 bits = TARGET_SVE ? BITS_PER_SVE_VECTOR : 128;
+  /* If current tuning prefers Advanced SIMD, bypass SVE.  */
+  bool use_sve
+    = TARGET_SVE
+      && !(aarch64_tune_params.extra_tuning_flags
+	   & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC);
+  poly_int64 bits = use_sve ? BITS_PER_SVE_VECTOR : 128;
   return aarch64_simd_container_mode (mode, bits);
 }
 
@@ -12972,7 +13010,11 @@ aarch64_preferred_simd_mode (scalar_mode mode)
 static void
 aarch64_autovectorize_vector_sizes (vector_sizes *sizes)
 {
-  if (TARGET_SVE)
+  bool use_sve
+    = TARGET_SVE
+      && !(aarch64_tune_params.extra_tuning_flags
+	   & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC);
+  if (use_sve)
     sizes->safe_push (BYTES_PER_SVE_VECTOR);
   sizes->safe_push (16);
   sizes->safe_push (8);
@@ -15288,7 +15330,8 @@ aarch64_evpc_rev_local (struct expand_vec_perm_d *d)
 
   if (d->vec_flags == VEC_SVE_PRED
       || !d->one_vector_p
-      || !d->perm[0].is_constant (&diff))
+      || !d->perm[0].is_constant (&diff)
+      || !diff)
     return false;
 
   size = (diff + 1) * GET_MODE_UNIT_SIZE (d->vmode);

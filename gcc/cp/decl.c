@@ -7250,7 +7250,10 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       /* This needs to happen after the linkage is set. */
       determine_visibility (decl);
 
-      if (var_definition_p && TREE_STATIC (decl))
+      if (var_definition_p
+	  /* With -fmerge-all-constants, gimplify_init_constructor
+	     might add TREE_STATIC to the variable.  */
+	  && (TREE_STATIC (decl) || flag_merge_constants >= 2))
 	{
 	  /* If a TREE_READONLY variable needs initialization
 	     at runtime, it is no longer readonly and we need to
@@ -7810,6 +7813,8 @@ cp_finish_decomp (tree decl, tree first, unsigned int count)
       error_at (loc, "cannot decompose lambda closure type %qT", type);
       goto error_out;
     }
+  else if (processing_template_decl && complete_type (type) == error_mark_node)
+    goto error_out;
   else if (processing_template_decl && !COMPLETE_TYPE_P (type))
     pedwarn (loc, 0, "structured binding refers to incomplete class type %qT",
 	     type);
@@ -15589,14 +15594,20 @@ begin_destructor_body (void)
 	    /* If the vptr is shared with some virtual nearly empty base,
 	       don't clear it if not in charge, the dtor of the virtual
 	       nearly empty base will do that later.  */
-	    if (CLASSTYPE_VBASECLASSES (current_class_type)
-		&& CLASSTYPE_PRIMARY_BINFO (current_class_type)
-		&& BINFO_VIRTUAL_P
-			  (CLASSTYPE_PRIMARY_BINFO (current_class_type)))
+	    if (CLASSTYPE_VBASECLASSES (current_class_type))
 	      {
-		stmt = convert_to_void (stmt, ICV_STATEMENT,
-					tf_warning_or_error);
-		stmt = build_if_in_charge (stmt);
+		tree c = current_class_type;
+		while (CLASSTYPE_PRIMARY_BINFO (c))
+		  {
+		    if (BINFO_VIRTUAL_P (CLASSTYPE_PRIMARY_BINFO (c)))
+		      {
+			stmt = convert_to_void (stmt, ICV_STATEMENT,
+						tf_warning_or_error);
+			stmt = build_if_in_charge (stmt);
+			break;
+		      }
+		    c = BINFO_TYPE (CLASSTYPE_PRIMARY_BINFO (c));
+		  }
 	      }
 	    finish_decl_cleanup (NULL_TREE, stmt);
 	  }

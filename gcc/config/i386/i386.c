@@ -3385,9 +3385,9 @@ ix86_option_override_internal (bool main_args_p,
     | PTA_AVX512VBMI | PTA_AVX512IFMA | PTA_SHA;
   const wide_int_bitmask PTA_ICELAKE_CLIENT = PTA_CANNONLAKE | PTA_AVX512VNNI
     | PTA_GFNI | PTA_VAES | PTA_AVX512VBMI2 | PTA_VPCLMULQDQ | PTA_AVX512BITALG
-    | PTA_RDPID | PTA_CLWB | PTA_AVX512VPOPCNTDQ;
+    | PTA_RDPID | PTA_AVX512VPOPCNTDQ;
   const wide_int_bitmask PTA_ICELAKE_SERVER = PTA_ICELAKE_CLIENT | PTA_PCONFIG
-    | PTA_WBNOINVD;
+    | PTA_WBNOINVD | PTA_CLWB;
   const wide_int_bitmask PTA_KNL = PTA_BROADWELL | PTA_AVX512PF | PTA_AVX512ER
     | PTA_AVX512F | PTA_AVX512CD;
   const wide_int_bitmask PTA_BONNELL = PTA_CORE2 | PTA_MOVBE;
@@ -12528,10 +12528,12 @@ ix86_update_stack_boundary (void)
 static rtx
 ix86_get_drap_rtx (void)
 {
-  /* We must use DRAP if there are outgoing arguments on stack and
+  /* We must use DRAP if there are outgoing arguments on stack or
+     the stack pointer register is clobbered by asm statment and
      ACCUMULATE_OUTGOING_ARGS is false.  */
   if (ix86_force_drap
-      || (cfun->machine->outgoing_args_on_stack
+      || ((cfun->machine->outgoing_args_on_stack
+	   || crtl->sp_is_clobbered_by_asm)
 	  && !ACCUMULATE_OUTGOING_ARGS))
     crtl->need_drap = true;
 
@@ -46771,7 +46773,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
 	      /* vpshufb only works intra lanes, it is not
 		 possible to shuffle bytes in between the lanes.  */
 	      for (i = 0; i < nelt; ++i)
-		if ((d->perm[i] ^ i) & (nelt / 4))
+		if ((d->perm[i] ^ i) & (3 * nelt / 4))
 		  return false;
 	    }
 	}
@@ -50355,7 +50357,9 @@ ix86_get_mask_mode (poly_uint64 nunits, poly_uint64 vector_size)
   if ((TARGET_AVX512F && vector_size == 64)
       || (TARGET_AVX512VL && (vector_size == 32 || vector_size == 16)))
     {
-      if (elem_size == 4 || elem_size == 8 || TARGET_AVX512BW)
+      if (elem_size == 4
+	  || elem_size == 8
+	  || (TARGET_AVX512BW && (elem_size == 1 || elem_size == 2)))
 	return smallest_int_mode_for_size (nunits);
     }
 
@@ -50988,11 +50992,12 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
       *clear = build_call_expr (fnclex, 0);
       tree sw_var = create_tmp_var_raw (short_unsigned_type_node);
       tree fnstsw_call = build_call_expr (fnstsw, 0);
-      tree sw_mod = build2 (MODIFY_EXPR, short_unsigned_type_node,
-			    sw_var, fnstsw_call);
+      tree sw_mod = build4 (TARGET_EXPR, short_unsigned_type_node, sw_var,
+			    fnstsw_call, NULL_TREE, NULL_TREE);
       tree exceptions_x87 = fold_convert (integer_type_node, sw_var);
-      tree update_mod = build2 (MODIFY_EXPR, integer_type_node,
-				exceptions_var, exceptions_x87);
+      tree update_mod = build4 (TARGET_EXPR, integer_type_node,
+				exceptions_var, exceptions_x87,
+				NULL_TREE, NULL_TREE);
       *update = build2 (COMPOUND_EXPR, integer_type_node,
 			sw_mod, update_mod);
       tree update_fldenv = build_call_expr (fldenv, 1, fenv_addr);
@@ -51005,15 +51010,17 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
       tree stmxcsr = ix86_builtins[IX86_BUILTIN_STMXCSR];
       tree ldmxcsr = ix86_builtins[IX86_BUILTIN_LDMXCSR];
       tree stmxcsr_hold_call = build_call_expr (stmxcsr, 0);
-      tree hold_assign_orig = build2 (MODIFY_EXPR, unsigned_type_node,
-				      mxcsr_orig_var, stmxcsr_hold_call);
+      tree hold_assign_orig = build4 (TARGET_EXPR, unsigned_type_node,
+				      mxcsr_orig_var, stmxcsr_hold_call,
+				      NULL_TREE, NULL_TREE);
       tree hold_mod_val = build2 (BIT_IOR_EXPR, unsigned_type_node,
 				  mxcsr_orig_var,
 				  build_int_cst (unsigned_type_node, 0x1f80));
       hold_mod_val = build2 (BIT_AND_EXPR, unsigned_type_node, hold_mod_val,
 			     build_int_cst (unsigned_type_node, 0xffffffc0));
-      tree hold_assign_mod = build2 (MODIFY_EXPR, unsigned_type_node,
-				     mxcsr_mod_var, hold_mod_val);
+      tree hold_assign_mod = build4 (TARGET_EXPR, unsigned_type_node,
+				     mxcsr_mod_var, hold_mod_val,
+				     NULL_TREE, NULL_TREE);
       tree ldmxcsr_hold_call = build_call_expr (ldmxcsr, 1, mxcsr_mod_var);
       tree hold_all = build2 (COMPOUND_EXPR, unsigned_type_node,
 			      hold_assign_orig, hold_assign_mod);
@@ -51042,8 +51049,8 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
 			    exceptions_assign);
 	}
       else
-	*update = build2 (MODIFY_EXPR, integer_type_node,
-			  exceptions_var, exceptions_sse);
+	*update = build4 (TARGET_EXPR, integer_type_node, exceptions_var,
+			  exceptions_sse, NULL_TREE, NULL_TREE);
       tree ldmxcsr_update_call = build_call_expr (ldmxcsr, 1, mxcsr_orig_var);
       *update = build2 (COMPOUND_EXPR, void_type_node, *update,
 			ldmxcsr_update_call);

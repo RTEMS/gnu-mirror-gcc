@@ -1001,7 +1001,7 @@ generate_memset_builtin (struct loop *loop, partition *partition)
   nb_bytes = rewrite_to_non_trapping_overflow (builtin->size);
   nb_bytes = force_gimple_operand_gsi (&gsi, nb_bytes, true, NULL_TREE,
 				       false, GSI_CONTINUE_LINKING);
-  mem = builtin->dst_base;
+  mem = rewrite_to_non_trapping_overflow (builtin->dst_base);
   mem = force_gimple_operand_gsi (&gsi, mem, true, NULL_TREE,
 				  false, GSI_CONTINUE_LINKING);
 
@@ -1053,8 +1053,8 @@ generate_memcpy_builtin (struct loop *loop, partition *partition)
   nb_bytes = rewrite_to_non_trapping_overflow (builtin->size);
   nb_bytes = force_gimple_operand_gsi (&gsi, nb_bytes, true, NULL_TREE,
 				       false, GSI_CONTINUE_LINKING);
-  dest = builtin->dst_base;
-  src = builtin->src_base;
+  dest = rewrite_to_non_trapping_overflow (builtin->dst_base);
+  src = rewrite_to_non_trapping_overflow (builtin->src_base);
   if (partition->kind == PKIND_MEMCPY
       || ! ptr_derefs_may_alias_p (dest, src))
     kind = BUILT_IN_MEMCPY;
@@ -1919,7 +1919,8 @@ pg_add_dependence_edges (struct graph *rdg, int dir,
 		this_dir = -this_dir;
 
 	      /* Known dependences can still be unordered througout the
-		 iteration space, see gcc.dg/tree-ssa/ldist-16.c.  */
+		 iteration space, see gcc.dg/tree-ssa/ldist-16.c and
+		 gcc.dg/tree-ssa/pr94969.c.  */
 	      if (DDR_NUM_DIST_VECTS (ddr) != 1)
 		this_dir = 2;
 	      /* If the overlap is exact preserve stmt order.  */
