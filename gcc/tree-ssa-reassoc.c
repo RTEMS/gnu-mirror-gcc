@@ -51,6 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "gimplify.h"
 #include "case-cfn-macros.h"
+#include "tree-ssa-reassoc.h"
 
 /*  This is a simple global reassociation pass.  It is, in part, based
     on the LLVM pass of the same name (They do some things more/less

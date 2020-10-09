@@ -6346,32 +6346,6 @@ public:
   operator location_t () const { return m_combined_loc; }
 };
 
-void dump_range_entry (FILE *file, struct range_entry *r);
-void debug_range_entry (struct range_entry *r);
-void init_range_entry (struct range_entry *r, tree exp, gimple *stmt);
-
-/* Operator, rank pair.  */
-struct operand_entry
-{
-  unsigned int rank;
-  unsigned int id;
-  tree op;
-  unsigned int count;
-  gimple *stmt_to_insert;
-};
-
-struct range_entry
-{
-  tree exp;
-  tree low;
-  tree high;
-  bool in_p;
-  bool strict_overflow_p;
-  unsigned int idx, next;
-};
-
-
-void linearize_expr_tree (vec<operand_entry *> *, gimple *, bool, bool);
-extern hash_map<tree, long> *operand_rank;
+bool bb_no_side_effects_p (basic_block bb);
 
 #endif  /* GCC_TREE_H  */

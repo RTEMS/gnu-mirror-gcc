@@ -53,8 +53,23 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "alloc-pool.h"
 #include "tree-switch-conversion.h"
+#include "tree-ssa-reassoc.h"
 
 using namespace tree_switch_conversion;
+
+struct condition_info
+{
+  condition_info (gcond *cond): m_cond (cond), m_ranges (),
+    m_in_range_edge (NULL)
+  {
+    m_ranges.create (0);
+  }
+
+  gcond *m_cond;
+  vec<range_entry> m_ranges;
+  edge m_in_range_edge;
+};
+
 
 /* Tuple that holds minimum and maximum values in a case.  */
 
@@ -417,251 +432,82 @@ convert_if_conditions_to_switch (if_chain *chain)
     }
 }
 
-static bool
-extract_case_from_stmt (tree rhs1, tree rhs2, tree_code code,
-			if_chain_entry *entry)
-{
-  tree index = NULL_TREE;
-  case_range range;
-
-  if (code == EQ_EXPR)
-    {
-      /* Handle situation 2a:
-	 _1 = aChar_8(D) == 1;  */
-      index = rhs1;
-
-      /* We can meet a readonly type used for a constant.  */
-      rhs2 = fold_convert (TREE_TYPE (index), rhs2);
-      if (TREE_CODE (rhs2) != INTEGER_CST)
-	return false;
-
-      range = case_range (rhs2, rhs2);
-    }
-  else if (code == LE_EXPR)
-    {
-      /* Handle situation 2b:
-	 aChar.1_1 = (unsigned int) aChar_10(D);
-	 _2 = aChar.1_1 + 4294967287;
-	 _3 = _2 <= 1;  */
-      tree ssa = rhs1;
-      tree range_size = rhs2;
-      if (TREE_CODE (ssa) != SSA_NAME
-	  || TREE_CODE (range_size) != INTEGER_CST)
-	return false;
-
-      gassign *subtraction = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (ssa));
-      if (subtraction == NULL
-	  || gimple_assign_rhs_code (subtraction) != PLUS_EXPR)
-	return false;
-
-      tree casted = gimple_assign_rhs1 (subtraction);
-      tree min = gimple_assign_rhs2 (subtraction);
-      if (TREE_CODE (casted) != SSA_NAME
-	  || TREE_CODE (min) != INTEGER_CST)
-	return false;
-
-      if (!SSA_NAME_IS_DEFAULT_DEF (casted))
-	{
-	  gassign *to_unsigned
-	    = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (casted));
-	  if (to_unsigned == NULL
-	      || !gimple_assign_unary_nop_p (to_unsigned)
-	      || !TYPE_UNSIGNED (TREE_TYPE (casted)))
-	    return false;
-	  index = gimple_assign_rhs1 (to_unsigned);
-	}
-      else
-	index = casted;
-
-      tree type = TREE_TYPE (index);
-      tree range_min = fold_convert (type, const_unop (NEGATE_EXPR, type, min));
-      range = case_range (range_min, const_binop (PLUS_EXPR, type, range_min,
-						  fold_convert (type,
-								range_size)));
-    }
-  else
-    return false;
-
-  entry->index = index;
-  entry->m_case_values.safe_push (range);
-  return true;
-}
-
-static if_chain_entry *
-analyze_condition_in_bb (basic_block bb)
+void
+find_conditions (basic_block bb,
+		 hash_map<basic_block, condition_info> *conditions_in_bbs)
 {
   gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
   if (gsi_end_p (gsi))
-    return NULL;
+    return;
 
   gcond *cond = dyn_cast<gcond *> (gsi_stmt (gsi));
   if (cond == NULL)
-    return NULL;
+    return;
 
-  if_chain_entry *entry = new if_chain_entry (bb, NULL, NULL);
-
-      /* Current we support following patterns (situations):
-
-	 1) if condition with equal operation:
-
-	    <bb 2> :
-	    if (argc_8(D) == 1)
-	      goto <bb 3>; [INV]
-	    else
-	      goto <bb 4>; [INV]
-
-	 2) if condition with a range check:
-
-	    <bb 3> :
-	    _4 = c_13(D) + 198;
-	    if (_4 <= 1)
-	      goto <bb 7>; [INV]
-	    else
-	      goto <bb 4>; [INV]
-
-	 3) mixture of 1) and 2) with a or condition:
-
-	    <bb 2> :
-	    _1 = aChar_8(D) == 1;
-	    _2 = aChar_8(D) == 10;
-	    _3 = _1 | _2;
-	    if (_3 != 0)
-	      goto <bb 5>; [INV]
-	    else
-	      goto <bb 3>; [INV]
-
-	    or:
-
-	    <bb 2> :
-	    aChar.1_1 = (unsigned int) aChar_10(D);
-	    _2 = aChar.1_1 + 4294967287;
-	    _3 = _2 <= 1;
-	    _4 = aChar_10(D) == 12;
-	    _5 = _3 | _4;
-	    if (_5 != 0)
-	      goto <bb 5>; [INV]
-	    else
-	      goto <bb 3>; [INV]
-		*/
+  if (!bb_no_side_effects_p (bb))
+    return;
 
   tree lhs = gimple_cond_lhs (cond);
-  tree rhs = gimple_cond_rhs (cond);
   tree_code code = gimple_cond_code (cond);
 
-  operand_rank = new hash_map<tree, long>;
-  debug_bb(bb);
+  condition_info info (cond);
 
   if (code == NE_EXPR)
     {
       gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
       if (def)
 	{
-      enum tree_code rhs_code = gimple_assign_rhs_code (def);
-      if (associative_tree_code (rhs_code))
-	{
-	  auto_vec<operand_entry *> ops;
-	  if (TREE_CODE (lhs) == SSA_NAME && has_zero_uses (lhs))
-	    ;
-	  else
+	  enum tree_code rhs_code = gimple_assign_rhs_code (def);
+	  if (associative_tree_code (rhs_code))
 	    {
-	      linearize_expr_tree (&ops, def, true, false);
-	      unsigned length = ops.length ();
-	      struct range_entry *ranges = XNEWVEC (struct range_entry, length);
-	      for (unsigned i = 0; i < length; i++)
+	      auto_vec<operand_entry *> ops;
+	      if (TREE_CODE (lhs) == SSA_NAME && has_zero_uses (lhs))
+		;
+	      else
 		{
-		  operand_entry *oe = ops[i];
-		  ranges[i].idx = i;
-		  init_range_entry (ranges + i, oe->op,
-				    oe->op
-				    ? NULL
-				    : last_stmt (BASIC_BLOCK_FOR_FN (cfun, oe->id)));
-		  /* For | invert it now, we will invert it again before emitting
-		     the optimized expression.  */
-		  if (rhs_code == BIT_IOR_EXPR
-		      || (rhs_code == ERROR_MARK && oe->rank == BIT_IOR_EXPR))
-		    ranges[i].in_p = !ranges[i].in_p;
-		  debug_range_entry (&ranges[i]);
+		  linearize_expr_tree (&ops, def, true, false);
+		  unsigned length = ops.length ();
+		  info.m_ranges.safe_grow (length, true);
+		  for (unsigned i = 0; i < length; i++)
+		    {
+		      operand_entry *oe = ops[i];
+		      info.m_ranges[i].idx = i;
+		      init_range_entry (&info.m_ranges[i], oe->op,
+					oe->op
+					? NULL
+					: last_stmt (BASIC_BLOCK_FOR_FN (cfun, oe->id)));
+		    }
 		}
-	      fprintf (stderr, "\n");
-
-	      int a = 2;
 	    }
-	}
 	}
       else
 	{
-      struct range_entry entry;
-      init_range_entry (&entry, NULL_TREE, cond);
-      debug_range_entry (&entry);
-      fprintf (stderr, "\n");
-
+	  info.m_ranges.safe_grow (1, true);
+	  init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
 	}
     }
-  else
+  else if (code == EQ_EXPR)
     {
-      struct range_entry entry;
-      init_range_entry (&entry, NULL_TREE, cond);
-      debug_range_entry (&entry);
-      fprintf (stderr, "\n");
+      info.m_ranges.safe_grow (1, true);
+      init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
     }
 
-  delete operand_rank;
-  operand_rank = NULL;
-
-  /* Situation 1.  */
-  if (code == EQ_EXPR)
+  /* All identified ranges must have equal expression and IN_P flag.  */
+  if (!info.m_ranges.is_empty ())
     {
-      if (!extract_case_from_stmt (lhs, rhs, code, entry))
-	return NULL;
+      edge true_edge, false_edge;
+      tree expr = info.m_ranges[0].exp;
+      bool in_p = info.m_ranges[0].in_p;
+
+      extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
+      info.m_in_range_edge = in_p ? true_edge : false_edge;
+
+      for (unsigned i = 1; i < info.m_ranges.length (); ++i)
+	if (info.m_ranges[i].exp != expr || info.m_ranges[i].in_p != in_p)
+	  return;
+      conditions_in_bbs->put (bb, info);
     }
-  /* Situation 2.  */
-  else if (code == LE_EXPR)
-    {
-      if (!extract_case_from_stmt (lhs, rhs, code, entry))
-	return NULL;
-    }
-  /* Situation 3.  */
-  else if (code == NE_EXPR
-	   && integer_zerop (rhs)
-	   && TREE_CODE (lhs) == SSA_NAME
-	   && TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
-    {
-      gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
-      if (def == NULL
-	  || gimple_assign_rhs_code (def) != BIT_IOR_EXPR
-	  || gimple_bb (def) != bb)
-	return NULL;
 
-      tree rhs1 = gimple_assign_rhs1 (def);
-      tree rhs2 = gimple_assign_rhs2 (def);
-      if (TREE_CODE (rhs1) != SSA_NAME || TREE_CODE (rhs2) != SSA_NAME)
-	return NULL;
-
-      gassign *def1 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs1));
-      gassign *def2 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs2));
-      if (def1 == NULL
-	  || def2 == NULL
-	  || def1 == def2
-	  || gimple_bb (def1) != bb
-	  || gimple_bb (def2) != bb)
-	return NULL;
-
-      if (!extract_case_from_stmt (gimple_assign_rhs1 (def1),
-				   gimple_assign_rhs2 (def1),
-				   gimple_assign_rhs_code (def1),
-				   entry))
-	return NULL;
-
-      if (!extract_case_from_stmt (gimple_assign_rhs1 (def2),
-				   gimple_assign_rhs2 (def2),
-				   gimple_assign_rhs_code (def2),
-				   entry))
-	return NULL;
-    }
-  else
-    return NULL;
-
-  return entry;
 }
 
 namespace {
@@ -700,28 +546,67 @@ public:
 unsigned int
 pass_if_to_switch::execute (function *fun)
 {
+  operand_rank = new hash_map<tree, long>;
+  hash_map<basic_block, condition_info> conditions_in_bbs;
+
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
+    find_conditions (bb, &conditions_in_bbs);
+
+  FOR_EACH_BB_FN (bb, fun)
     {
-      if_chain_entry *entry = analyze_condition_in_bb (bb);
-      if (entry != NULL)
+      condition_info *info = conditions_in_bbs.get (bb);
+      if (info)
 	{
-	  fprintf (stderr, "Parsed BB: ");
-	  print_generic_expr (stderr, entry->index, TDF_SLIM);
-	  fprintf (stderr, ": ");
-	  for (unsigned i = 0; i < entry->m_case_values.length (); i++)
-	    {
-	      case_range r = entry->m_case_values[i];
-	      fprintf (stderr, "[");
-	      print_generic_expr (stderr, r.m_min, TDF_SLIM);
-	      fprintf (stderr, "-");
-	      print_generic_expr (stderr, r.m_max, TDF_SLIM);
-	      fprintf (stderr, "] ");
-	    }
-	  fprintf (stderr, "\n");
+	  debug_bb (gimple_bb (info->m_cond));
+	  for (unsigned i = 0; i < info->m_ranges.length (); i++)
+	    debug_range_entry (&info->m_ranges[i]);
 	}
     }
 
+  fprintf (stderr, "=====================\n");
+
+  int *rpo = XNEWVEC (int, n_basic_blocks_for_fn (fun));
+  unsigned n = pre_and_rev_post_order_compute_fn (fun, NULL, rpo, false);
+
+  auto_bitmap seen_bbs;
+  for (int i = n - 1; i >= 0; --i)
+    {
+      basic_block bb = BASIC_BLOCK_FOR_FN (fun, rpo[i]);
+      if (bitmap_bit_p (seen_bbs, bb->index))
+	continue;
+
+      bitmap_set_bit (seen_bbs, bb->index);
+      condition_info *info = conditions_in_bbs.get (bb);
+      if (info)
+	{
+	  auto_vec<condition_info *> chain;
+	  chain.safe_push (info);
+	  /* Try to find a chain starting in this BB.  */
+	  while (true)
+	    {
+	      if (!single_pred_p (gimple_bb (info->m_cond)))
+		break;
+	      edge e = single_pred_edge (gimple_bb (info->m_cond));
+	      condition_info *info2 = conditions_in_bbs.get (e->src);
+	      if (!info2 || info->m_ranges[0].exp != info2->m_ranges[0].exp)
+		break;
+
+	      chain.safe_push (info2);
+	      bitmap_set_bit (seen_bbs, e->src->index);
+	      info = info2;
+	    }
+
+	  fprintf (stderr, "Found chain with %d items\n", chain.length ());
+	  for (unsigned i = 0; i < chain.length (); i++)
+	    {
+	      debug_bb (chain[i]->m_in_range_edge->src);
+	    }
+	}
+    }
+
+  delete operand_rank;
+  operand_rank = NULL;
 
   return 0;
 }

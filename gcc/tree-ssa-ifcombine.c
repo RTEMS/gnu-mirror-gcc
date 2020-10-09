@@ -111,7 +111,7 @@ recognize_if_then_else (basic_block cond_bb,
 /* Verify if the basic block BB does not have side-effects.  Return
    true in this case, else false.  */
 
-static bool
+bool
 bb_no_side_effects_p (basic_block bb)
 {
   gimple_stmt_iterator gsi;
