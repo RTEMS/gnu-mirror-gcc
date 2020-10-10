@@ -2532,7 +2532,7 @@ ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 	 not always bind to current def: it is possible that memory load
 	 was optimized out earlier and the interposed variant may not be
 	 optimized this way.  */
-      if (node/* && node->binds_to_current_def_p ()*/)
+      if (node && node->binds_to_current_def_p ())
 	{
 	  modref_summary *summary = get_modref_function_summary (node);
 	  if (summary)
