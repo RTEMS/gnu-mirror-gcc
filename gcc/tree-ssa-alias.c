@@ -40,6 +40,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "ipa-modref-tree.h"
 #include "ipa-modref.h"
+#include "attr-fnspec.h"
+#include "errors.h"
+#include "dbgcnt.h"
+#include "gimple-pretty-print.h"
 
 /* Broad overview of how alias analysis on gimple works:
 
@@ -735,14 +739,21 @@ ao_ref_alias_set (ao_ref *ref)
 }
 
 /* Init an alias-oracle reference representation from a gimple pointer
-   PTR and a gimple size SIZE in bytes.  If SIZE is NULL_TREE then the
-   size is assumed to be unknown.  The access is assumed to be only
-   to or after of the pointer target, not before it.  */
+   PTR a range specified by OFFSET, SIZE and MAX_SIZE under the assumption
+   that RANGE_KNOWN is set.
 
-void
-ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
+   The access is assumed to be only to or after of the pointer target adjusted
+   by the offset, not before it (even in the case RANGE_KNOWN is false).  */
+
+static void
+ao_ref_init_from_ptr_and_range (ao_ref *ref, tree ptr,
+				bool range_known,
+				poly_int64 offset,
+				poly_int64 size,
+				poly_int64 max_size)
 {
-  poly_int64 t, size_hwi, extra_offset = 0;
+  poly_int64 t, extra_offset = 0;
+
   ref->ref = NULL_TREE;
   if (TREE_CODE (ptr) == SSA_NAME)
     {
@@ -766,7 +777,7 @@ ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
 	ref->offset = BITS_PER_UNIT * t;
       else
 	{
-	  size = NULL_TREE;
+	  range_known = false;
 	  ref->offset = 0;
 	  ref->base = get_base_address (TREE_OPERAND (ptr, 0));
 	}
@@ -778,16 +789,37 @@ ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
 			  ptr, null_pointer_node);
       ref->offset = 0;
     }
-  ref->offset += extra_offset;
-  if (size
-      && poly_int_tree_p (size, &size_hwi)
-      && coeffs_in_range_p (size_hwi, 0, HOST_WIDE_INT_MAX / BITS_PER_UNIT))
-    ref->max_size = ref->size = size_hwi * BITS_PER_UNIT;
+  ref->offset += extra_offset + offset;
+  if (range_known)
+    {
+      ref->max_size = max_size;
+      ref->size = size;
+    }
   else
     ref->max_size = ref->size = -1;
   ref->ref_alias_set = 0;
   ref->base_alias_set = 0;
   ref->volatile_p = false;
+}
+
+/* Init an alias-oracle reference representation from a gimple pointer
+   PTR and a gimple size SIZE in bytes.  If SIZE is NULL_TREE then the
+   size is assumed to be unknown.  The access is assumed to be only
+   to or after of the pointer target, not before it.  */
+
+void
+ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
+{
+  poly_int64 size_hwi;
+  if (size
+      && poly_int_tree_p (size, &size_hwi)
+      && coeffs_in_range_p (size_hwi, 0, HOST_WIDE_INT_MAX / BITS_PER_UNIT))
+    {
+      size_hwi = size_hwi * BITS_PER_UNIT;
+      ao_ref_init_from_ptr_and_range (ref, ptr, true, 0, size_hwi, size_hwi);
+    }
+  else
+    ao_ref_init_from_ptr_and_range (ref, ptr, false, 0, -1, -1);
 }
 
 /* S1 and S2 are TYPE_SIZE or DECL_SIZE.  Compare them:
@@ -2440,6 +2472,9 @@ modref_may_conflict (const gimple *stmt,
   if (tt->every_base)
     return true;
 
+  if (!dbg_cnt (ipa_mod_ref))
+    return true;
+
   base_set = ao_ref_base_alias_set (ref);
 
   ref_set = ao_ref_alias_set (ref);
@@ -2475,8 +2510,8 @@ modref_may_conflict (const gimple *stmt,
 	    }
 
 	  /* TBAA checks did not disambiguate,  try to use base pointer, for
-	     that we however need to have ref->ref.  */
-	  if (ref_node->every_access || !ref->ref)
+	     that we however need to have ref->ref or ref->base.  */
+	  if (ref_node->every_access || (!ref->ref && !ref->base))
 	    return true;
 
 	  modref_access_node *access_node;
@@ -2490,12 +2525,46 @@ modref_may_conflict (const gimple *stmt,
 		     >= gimple_call_num_args (stmt))
 		return true;
 
-
 	      alias_stats.modref_baseptr_tests++;
 
-	      if (ptr_deref_may_alias_ref_p_1
-		   (gimple_call_arg (stmt, access_node->parm_index), ref))
+	      tree arg = gimple_call_arg (stmt, access_node->parm_index);
+
+	      if (integer_zerop (arg) && flag_delete_null_pointer_checks)
+		continue;
+
+	      if (!POINTER_TYPE_P (TREE_TYPE (arg)))
 		return true;
+
+	      /* ao_ref_init_from_ptr_and_range assumes that memory access
+		 starts by the pointed to location.  If we did not track the
+		 offset it is possible that it starts before the actual
+		 pointer.  */
+	      if (!access_node->parm_offset_known)
+		{
+		  if (ptr_deref_may_alias_ref_p_1 (arg, ref))
+		    return true;
+		}
+	      else
+		{
+		  ao_ref ref2;
+		  poly_offset_int off = (poly_offset_int)access_node->offset
+			+ ((poly_offset_int)access_node->parm_offset
+			   << LOG2_BITS_PER_UNIT);
+		  poly_int64 off2;
+		  if (off.to_shwi (&off2))
+		    {
+		      ao_ref_init_from_ptr_and_range
+			     (&ref2, arg, true, off2,
+			      access_node->size,
+			      access_node->max_size);
+		      ref2.ref_alias_set = ref_set;
+		      ref2.base_alias_set = base_set;
+		      if (refs_may_alias_p_1 (&ref2, ref, tbaa_p))
+			return true;
+		    }
+		  else if (ptr_deref_may_alias_ref_p_1 (arg, ref))
+		    return true;
+		}
 	      num_tests++;
 	    }
 	}
@@ -2542,13 +2611,23 @@ ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 		  alias_stats.modref_use_no_alias++;
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    {
-		      fprintf (dump_file, "ipa-modref: in %s,"
-			       " call to %s does not use ",
-			       cgraph_node::get
-				   (current_function_decl)->dump_name (),
+		      fprintf (dump_file,
+			       "ipa-modref: call stmt ");
+		      print_gimple_stmt (dump_file, call, 0);
+		      fprintf (dump_file,
+			       "ipa-modref: call to %s does not use ",
 			       node->dump_name ());
-		      print_generic_expr (dump_file, ref->ref);
-		      fprintf (dump_file, " %i->%i\n",
+		      if (!ref->ref && ref->base)
+			{
+			  fprintf (dump_file, "base: ");
+			  print_generic_expr (dump_file, ref->base);
+			}
+		      else if (ref->ref)
+			{
+			  fprintf (dump_file, "ref: ");
+			  print_generic_expr (dump_file, ref->ref);
+			}
+		      fprintf (dump_file, " alias sets: %i->%i\n",
 			       ao_ref_base_alias_set (ref),
 			       ao_ref_alias_set (ref));
 		    }
@@ -2967,13 +3046,22 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    {
 		      fprintf (dump_file,
-			       "ipa-modref: in %s, "
-			       "call to %s does not clobber ",
-			       cgraph_node::get
-				  (current_function_decl)->dump_name (),
+			       "ipa-modref: call stmt ");
+		      print_gimple_stmt (dump_file, call, 0);
+		      fprintf (dump_file,
+			       "ipa-modref: call to %s does not clobber ",
 			       node->dump_name ());
-		      print_generic_expr (dump_file, ref->ref);
-		      fprintf (dump_file, " %i->%i\n",
+		      if (!ref->ref && ref->base)
+			{
+			  fprintf (dump_file, "base: ");
+			  print_generic_expr (dump_file, ref->base);
+			}
+		      else if (ref->ref)
+			{
+			  fprintf (dump_file, "ref: ");
+			  print_generic_expr (dump_file, ref->ref);
+			}
+		      fprintf (dump_file, " alias sets: %i->%i\n",
 			       ao_ref_base_alias_set (ref),
 			       ao_ref_alias_set (ref));
 		    }
@@ -3252,12 +3340,12 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
    return true, otherwise return false.  */
 
 bool
-call_may_clobber_ref_p (gcall *call, tree ref)
+call_may_clobber_ref_p (gcall *call, tree ref, bool tbaa_p)
 {
   bool res;
   ao_ref r;
   ao_ref_init (&r, ref);
-  res = call_may_clobber_ref_p_1 (call, &r, true);
+  res = call_may_clobber_ref_p_1 (call, &r, tbaa_p);
   if (res)
     ++alias_stats.call_may_clobber_ref_p_may_alias;
   else
@@ -3984,3 +4072,49 @@ walk_aliased_vdefs (ao_ref *ref, tree vdef,
   return ret;
 }
 
+/* Verify validity of the fnspec string.
+   See attr-fnspec.h for details.  */
+
+void
+attr_fnspec::verify ()
+{
+  bool err = false;
+
+  /* Check return value specifier.  */
+  if (len < return_desc_size)
+    err = true;
+  else if ((len - return_desc_size) % arg_desc_size)
+    err = true;
+  else if ((str[0] < '1' || str[0] > '4')
+	   && str[0] != '.' && str[0] != 'm'
+	   /* FIXME: Fortran trans-decl.c contains multiple wrong fnspec
+	      strings.  The following characters have no meaning.  */
+	   && str[0] != 'R' && str[0] != 'W')
+    err = true;
+
+  if (str[1] != ' ')
+    err = true;
+
+  /* Now check all parameters.  */
+  for (unsigned int i = 0; arg_specified_p (i); i++)
+    {
+      unsigned int idx = arg_idx (i);
+      switch (str[idx])
+	{
+	  case 'x':
+	  case 'X':
+	  case 'r':
+	  case 'R':
+	  case 'w':
+	  case 'W':
+	  case '.':
+	    break;
+	  default:
+	    err = true;
+	}
+      if (str[idx + 1] != ' ')
+	err = true;
+    }
+  if (err)
+    internal_error ("invalid fn spec attribute \"%s\"", str);
+}

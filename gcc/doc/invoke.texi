@@ -4345,7 +4345,8 @@ options:
 @gccoptlist{-fno-diagnostics-show-caret @gol
 -fno-diagnostics-show-line-numbers @gol
 -fdiagnostics-color=never @gol
--fdiagnostics-urls=never}
+-fdiagnostics-urls=never @gol
+-fdiagnostics-path-format=separate-events}
 In the future, if GCC changes the default appearance of its diagnostics, the
 corresponding option to disable the new behavior will be added to this list.
 
@@ -11621,7 +11622,18 @@ Do not remove unused C++ allocations in dead code elimination.
 
 @item -fallow-store-data-races
 @opindex fallow-store-data-races
-Allow the compiler to introduce new data races on stores.
+Allow the compiler to perform optimizations that may introduce new data races
+on stores, without proving that the variable cannot be concurrently accessed
+by other threads.  Does not affect optimization of local data.  It is safe to
+use this option if it is known that global data will not be accessed by
+multiple threads.
+
+Examples of optimizations enabled by @option{-fallow-store-data-races} include
+hoisting or if-conversions that may cause a value that was already in memory
+to be re-written with that same value.  Such re-writing is safe in a single
+threaded context but may be unsafe in a multi-threaded context.  Note that on
+some processors, if-conversions may be required in order to enable
+vectorization.
 
 Enabled at level @option{-Ofast}.
 
@@ -13452,6 +13464,10 @@ When IPA-CP determines that a cloning candidate would make the number
 of iterations of a loop known, it adds a bonus of
 @option{ipa-cp-loop-hint-bonus} to the profitability score of
 the candidate.
+
+@item ipa-max-loop-predicates
+The maximum number of different predicates IPA will use to describe when
+loops in a function have known properties.
 
 @item ipa-max-aa-steps
 During its analysis of function bodies, IPA-CP employs alias analysis
@@ -27694,7 +27710,7 @@ system representing a certain processor type.  Possible values for
 @var{cpu-type} are @samp{z900}/@samp{arch5}, @samp{z990}/@samp{arch6},
 @samp{z9-109}, @samp{z9-ec}/@samp{arch7}, @samp{z10}/@samp{arch8},
 @samp{z196}/@samp{arch9}, @samp{zEC12}, @samp{z13}/@samp{arch11},
-@samp{z14}/@samp{arch12}, and @samp{native}.
+@samp{z14}/@samp{arch12}, @samp{z15}/@samp{arch13}, and @samp{native}.
 
 The default is @option{-march=z900}.
 

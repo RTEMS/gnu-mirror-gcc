@@ -1,3 +1,1782 @@
+2020-10-09  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/97313
+	* lra-constraints.c (match_reload): Don't keep strict_low_part in
+	reloads for non-registers.
+
+2020-10-09  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/97148
+	* config.gcc (extra_headers): Add x86gprintrin.h.
+	* config/i386/adxintrin.h: Check _X86GPRINTRIN_H_INCLUDED for
+	<x86gprintrin.h>.
+	* config/i386/bmi2intrin.h: Likewise.
+	* config/i386/bmiintrin.h: Likewise.
+	* config/i386/cetintrin.h: Likewise.
+	* config/i386/cldemoteintrin.h: Likewise.
+	* config/i386/clflushoptintrin.h: Likewise.
+	* config/i386/clwbintrin.h: Likewise.
+	* config/i386/enqcmdintrin.h: Likewise.
+	* config/i386/fxsrintrin.h: Likewise.
+	* config/i386/ia32intrin.h: Likewise.
+	* config/i386/lwpintrin.h: Likewise.
+	* config/i386/lzcntintrin.h: Likewise.
+	* config/i386/movdirintrin.h: Likewise.
+	* config/i386/pconfigintrin.h: Likewise.
+	* config/i386/pkuintrin.h: Likewise.
+	* config/i386/rdseedintrin.h: Likewise.
+	* config/i386/rtmintrin.h: Likewise.
+	* config/i386/serializeintrin.h: Likewise.
+	* config/i386/tbmintrin.h: Likewise.
+	* config/i386/tsxldtrkintrin.h: Likewise.
+	* config/i386/waitpkgintrin.h: Likewise.
+	* config/i386/wbnoinvdintrin.h: Likewise.
+	* config/i386/xsavecintrin.h: Likewise.
+	* config/i386/xsaveintrin.h: Likewise.
+	* config/i386/xsaveoptintrin.h: Likewise.
+	* config/i386/xsavesintrin.h: Likewise.
+	* config/i386/xtestintrin.h: Likewise.
+	* config/i386/immintrin.h: Include <x86gprintrin.h> instead of
+	<fxsrintrin.h>, <xsaveintrin.h>, <xsaveoptintrin.h>,
+	<xsavesintrin.h>, <xsavecintrin.h>, <lzcntintrin.h>,
+	<bmiintrin.h>, <bmi2intrin.h>, <xtestintrin.h>, <cetintrin.h>,
+	<movdirintrin.h>, <sgxintrin.h, <pconfigintrin.h>,
+	<waitpkgintrin.h>, <cldemoteintrin.h>, <enqcmdintrin.h>,
+	<serializeintrin.h>, <tsxldtrkintrin.h>, <adxintrin.h>,
+	<clwbintrin.h>, <clflushoptintrin.h>, <wbnoinvdintrin.h> and
+	<pkuintrin.h>.
+	(_wbinvd): Moved to config/i386/x86gprintrin.h.
+	(_rdrand16_step): Likewise.
+	(_rdrand32_step): Likewise.
+	(_rdpid_u32): Likewise.
+	(_readfsbase_u32): Likewise.
+	(_readfsbase_u64): Likewise.
+	(_readgsbase_u32): Likewise.
+	(_readgsbase_u64): Likewise.
+	(_writefsbase_u32): Likewise.
+	(_writefsbase_u64): Likewise.
+	(_writegsbase_u32): Likewise.
+	(_writegsbase_u64): Likewise.
+	(_rdrand64_step): Likewise.
+	(_ptwrite64): Likewise.
+	(_ptwrite32): Likewise.
+	* config/i386/x86gprintrin.h: New file.
+	* config/i386/x86intrin.h: Include <x86gprintrin.h>.  Don't
+	include <ia32intrin.h>, <lwpintrin.h>, <tbmintrin.h>,
+	<popcntintrin.h>, <mwaitxintrin.h> and <clzerointrin.h>.
+
+2020-10-09  Tom de Vries  <tdevries@suse.de>
+
+	PR target/97348
+	* config/nvptx/nvptx.h (ASM_SPEC): Also pass -m to nvptx-as if
+	default is used.
+	* config/nvptx/nvptx.opt (misa): Init with PTX_ISA_SM35.
+
+2020-10-09  Richard Biener  <rguenther@suse.de>
+
+	* doc/sourcebuild.texi (vect_masked_load): Document.
+
+2020-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97334
+	* tree-vect-slp.c (vect_build_slp_tree_1): Do not fatally
+	fail lanes other than zero when BB vectorizing.
+
+2020-10-09  Jan Hubicka  <jh@suse.cz>
+
+	PR ipa/97292
+	PR ipa/97335
+	* ipa-modref-tree.h (copy_from): Drop summary in a
+	clone.
+
+2020-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97347
+	* tree-vect-slp.c (vect_create_constant_vectors): Use
+	edge insertion when inserting on the fallthru edge,
+	appropriately insert at the start of BBs when inserting
+	after PHIs.
+
+2020-10-09  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/97317
+	* range-op.cc (operator_cast::op1_range): Handle casts where the precision
+	of the RHS is only 1 greater than the precision of the LHS.
+
+2020-10-09  Richard Biener  <rguenther@suse.de>
+
+	* cgraphunit.c (expand_all_functions): Free tp_first_run_order.
+	* ipa-modref.c (pass_ipa_modref::execute): Free order.
+	* tree-ssa-loop-niter.c (estimate_numbers_of_iterations): Free
+	loop body.
+	* tree-vect-data-refs.c (vect_find_stmt_data_reference): Free
+	data references upon failure.
+	* tree-vect-loop.c (update_epilogue_loop_vinfo): Free BBs
+	array of the original loop.
+	* tree-vect-slp.c (vect_slp_bbs): Use an auto_vec for
+	dataref_groups to release its memory.
+
+2020-10-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/94801
+	PR target/97312
+	* vr-values.c (vr_values::extract_range_basic) <CASE_CFN_CLZ,
+	CASE_CFN_CTZ>: When stmt is not an internal-fn call or
+	C?Z_DEFINED_VALUE_AT_ZERO is not 2, assume argument is not zero
+	and thus use [0, prec-1] range unless it can be further improved.
+	For CTZ, don't update maxi from upper bound if it was previously prec.
+	* gimple-range.cc (gimple_ranger::range_of_builtin_call) <CASE_CFN_CLZ,
+	CASE_CFN_CTZ>: Likewise.
+
+2020-10-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/97325
+	* match.pd (FFS(nonzero) -> CTZ(nonzero) + 1): Cast argument to
+	corresponding unsigned type.
+
+2020-10-09  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.c (vect_create_constant_vectors): Properly insert
+	after PHIs.
+
+2020-10-08  Alexandre Oliva  <oliva@adacore.com>
+
+	* builtins.c (mathfn_built_in_type): New.
+	* builtins.h (mathfn_built_in_type): Declare.
+	* tree-ssa-math-opts.c (execute_cse_sincos_1): Use it to
+	obtain the type expected by the intrinsic.
+
+2020-10-08  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_P10_MISC_2): Rename
+	to BU_P10_POWERPC64_MISC_2.
+	CFUGED, CNTLZDM, CNTTZDM, PDEPD, PEXTD): Call renamed macro.
+
+2020-10-08  Jan Hubicka  <jh@suse.cz>
+
+	* tree-nrv.c (dest_safe_for_nrv_p): Disable tbaa in
+	call_may_clobber_ref_p and ref_maybe_used_by_stmt_p.
+	* tree-tailcall.c (find_tail_calls): Likewise.
+	* tree-ssa-alias.c (call_may_clobber_ref_p): Add tbaa_p parameter.
+	* tree-ssa-alias.h (call_may_clobber_ref_p): Update prototype.
+	* tree-ssa-sccvn.c (vn_reference_lookup_3): Pass data->tbaa_p
+	to call_may_clobber_ref_p_1.
+
+2020-10-08  Mark Wielaard  <mark@klomp.org>
+
+	* dwarf2out.c (dwarf2out_finish): Emit .file 0 entry when
+	generating DWARF5 .debug_line table through gas.
+
+2020-10-08  John Henning  <john.henning@oracle.com>
+
+	PR other/97309
+	* doc/invoke.texi: Improve documentation of
+	-fallow-store-data-races.
+
+2020-10-08  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/96914
+	* config/arm/arm_mve.h (__arm_vcvtnq_u32_f32): New.
+
+2020-10-08  Martin Liska  <mliska@suse.cz>
+	    Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (_bb_vec_info::const_iterator): Remove.
+	(_bb_vec_info::const_reverse_iterator): Likewise.
+	(_bb_vec_info::region_stmts): Likewise.
+	(_bb_vec_info::reverse_region_stmts): Likewise.
+	(_bb_vec_info::_bb_vec_info): Adjust.
+	(_bb_vec_info::bb): Remove.
+	(_bb_vec_info::region_begin): Remove.
+	(_bb_vec_info::region_end): Remove.
+	(_bb_vec_info::bbs): New vector of BBs.
+	(vect_slp_function): Declare.
+	* tree-vect-patterns.c (vect_determine_precisions): Use
+	regular stmt iteration.
+	(vect_pattern_recog): Likewise.
+	* tree-vect-slp.c: Include cfganal.h, tree-eh.h and tree-cfg.h.
+	(vect_build_slp_tree_1): Properly refuse to vectorize
+	volatile and throwing stmts.
+	(vect_build_slp_tree_2): Pass group-size down to
+	get_vectype_for_scalar_type.
+	(_bb_vec_info::_bb_vec_info): Use regular stmt iteration,
+	adjust for changed region specification.
+	(_bb_vec_info::~_bb_vec_info): Likewise.
+	(vect_slp_check_for_constructors): Likewise.
+	(vect_slp_region): Likewise.
+	(vect_slp_bbs): New worker operating on a vector of BBs.
+	(vect_slp_bb): Wrap it.
+	(vect_slp_function): New function splitting the function
+	into multi-BB regions.
+	(vect_create_constant_vectors): Handle the case of inserting
+	after a throwing def.
+	(vect_schedule_slp_instance): Adjust.
+	* tree-vectorizer.c (vec_info::remove_stmt): Simplify again.
+	(vec_info::insert_seq_on_entry): Adjust.
+	(pass_slp_vectorize::execute): Also init PHIs.  Call
+	vect_slp_function.
+
+2020-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97330
+	* tree-ssa-sink.c (statement_sink_location): Avoid skipping
+	PHIs when they dominate the insert location.
+
+2020-10-08  Jan Hubicka  <jh@suse.cz>
+
+	* ipa-modref.c (get_access): Fix handling of offsets.
+	* tree-ssa-alias.c (modref_may_conflict): Watch for overflows.
+
+2020-10-08  Martin Liska  <mliska@suse.cz>
+
+	* dbgcnt.def (DEBUG_COUNTER): Add ipa_mod_ref debug counter.
+	* tree-ssa-alias.c (modref_may_conflict): Handle the counter.
+
+2020-10-08  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.c (try_vectorize_loop_1): Do not dump
+	"basic block vectorized".
+	(pass_slp_vectorize::execute): Likewise.
+	* tree-vect-slp.c (vect_analyze_slp_instance): Avoid
+	re-analyzing split single stmts.
+
+2020-10-08  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/96914
+	* config/arm/arm_mve.h (vqrdmlashq_n_u8, vqrdmlashq_n_u16)
+	(vqrdmlashq_n_u32, vqrdmlahq_n_u8, vqrdmlahq_n_u16)
+	(vqrdmlahq_n_u32, vqdmlahq_n_u8, vqdmlahq_n_u16, vqdmlahq_n_u32)
+	(vmlaldavaxq_p_u16, vmlaldavaxq_p_u32): Remove.
+	* config/arm/arm_mve_builtins.def (vqrdmlashq_n_u, vqrdmlahq_n_u)
+	(vqdmlahq_n_u, vmlaldavaxq_p_u): Remove.
+	* config/arm/unspecs.md (VQDMLAHQ_N_U, VQRDMLAHQ_N_U)
+	(VQRDMLASHQ_N_U)
+	(VMLALDAVAXQ_P_U): Remove unspecs.
+	* config/arm/iterators.md (VQDMLAHQ_N_U, VQRDMLAHQ_N_U)
+	(VQRDMLASHQ_N_U, VMLALDAVAXQ_P_U): Remove attributes.
+	(VQDMLAHQ_N, VQRDMLAHQ_N, VQRDMLASHQ_N, VMLALDAVAXQ_P): Remove
+	unsigned variants from iterators.
+	* config/arm/mve.md (mve_vqdmlahq_n_<supf><mode>)
+	(mve_vqrdmlahq_n_<supf><mode>)
+	(mve_vqrdmlashq_n_<supf><mode>, mve_vmlaldavaxq_p_<supf><mode>):
+	Update comment.
+
+2020-10-08  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/96914
+	* config/arm/arm_mve.h (vqdmlashq, vqdmlashq_m): Define.
+	* config/arm/arm_mve_builtins.def (vqdmlashq_n_s)
+	(vqdmlashq_m_n_s,): New.
+	* config/arm/unspecs.md (VQDMLASHQ_N_S, VQDMLASHQ_M_N_S): New
+	unspecs.
+	* config/arm/iterators.md (VQDMLASHQ_N_S, VQDMLASHQ_M_N_S): New
+	attributes.
+	(VQDMLASHQ_N): New iterator.
+	* config/arm/mve.md (mve_vqdmlashq_n_, mve_vqdmlashq_m_n_s): New
+	patterns.
+
+2020-10-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97322
+	* config/arm/arm.c (arm_expand_divmod_libfunc): Pass mode instead of
+	GET_MODE (op0) or GET_MODE (op1) to emit_library_call_value.
+
+2020-10-08  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/97325
+	* gimple-range.cc (gimple_ranger::range_of_builtin_call): Handle
+	negative numbers in __builtin_ffs and __builtin_popcount.
+
+2020-10-08  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/97315
+	* range-op.cc (value_range_with_overflow): Change any
+	non-overflow calculation in which both bounds are
+	overflow/underflow to be undefined.
+
+2020-10-08  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/97315
+	* gimple-ssa-evrp.c (hybrid_folder::choose_value): Removes the
+	trap and instead annotates the listing.
+
+2020-10-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/97294
+	* tree-cfg.c (move_block_to_fn): Call notice_special_calls on
+	call stmts being moved into dest_cfun.
+	* omp-low.c (lower_rec_input_clauses): Set cfun->calls_alloca when
+	adding __builtin_alloca_with_align call without gimplification.
+
+2020-10-07  Aldy Hernandez  <aldyh@redhat.com>
+
+	* common.opt (-fevrp-mode): Rename and move...
+	* params.opt (--param=evrp-mode): ...here.
+	* gimple-range.h (DEBUG_RANGE_CACHE): Use param_evrp_mode instead
+	of flag_evrp_mode.
+	* gimple-ssa-evrp.c (rvrp_folder): Same.
+	(hybrid_folder): Same.
+	(execute_early_vrp): Same.
+
+2020-10-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97307
+	* tree-ssa-sink.c (statement_sink_location): Change heuristic
+	for not skipping stores to look for virtual definitions
+	rather than uses.
+
+2020-10-07  Andrew MacLeod  <amacleod@redhat.com>
+
+	* value-range.h (irange_allocator::allocate): Allocate in two hunks
+	instead of using the variably-sized trailing array approach.
+
+2020-10-07  David Malcolm  <dmalcolm@redhat.com>
+
+	* doc/invoke.texi (-fdiagnostics-plain-output): Add
+	-fdiagnostics-path-format=separate-events to list of
+	options injected by -fdiagnostics-plain-output.
+	* opts-common.c (decode_cmdline_options_to_array): Likewise.
+
+2020-10-07  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/96394
+	* ipa-prop.c (update_indirect_edges_after_inlining): Do not add
+	resolved speculation edges to vector of new direct edges even in
+	presence of multiple speculative direct edges for a single call.
+
+2020-10-07  Andrew Stubbs  <ams@codesourcery.com>
+
+	* config/gcn/gcn.md (unspec): Add UNSPEC_ADDPTR.
+	(addptrdi3): Add SGPR alternative.
+
+2020-10-07  Mark Wielaard  <mark@klomp.org>
+
+	* dwarf2out.c (add_filepath_AT_string): New function.
+	(asm_outputs_debug_line_str): Likewise.
+	(add_filename_attribute): Likewise.
+	(add_comp_dir_attribute): Call add_filepath_AT_string.
+	(gen_compile_unit_die): Call add_filename_attribute for name.
+	(init_sections_and_labels): Init debug_line_str_section when
+	asm_outputs_debug_line_str return true.
+	(dwarf2out_early_finish): Remove DW_AT_name and DW_AT_comp_dir
+	hack and call add_filename_attribute for the remap_debug_filename.
+
+2020-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	* configure.ac (HAVE_AS_GDWARF_5_DEBUG_FLAG,
+	HAVE_AS_WORKING_DWARF_4_FLAG): New tests.
+	* gcc.c (ASM_DEBUG_DWARF_OPTION): Define.
+	(ASM_DEBUG_SPEC): Use ASM_DEBUG_DWARF_OPTION instead of
+	"--gdwarf2".  Use %{cond:opt1;:opt2} style.
+	(ASM_DEBUG_OPTION_DWARF_OPT): Define.
+	(ASM_DEBUG_OPTION_SPEC): Define.
+	(asm_debug_option): New variable.
+	(asm_options): Add "%(asm_debug_option)".
+	(static_specs): Add asm_debug_option entry.
+	(static_spec_functions): Add dwarf-version-gt.
+	(debug_level_greater_than_spec_func): New function.
+	* config/darwin.h (ASM_DEBUG_OPTION_SPEC): Define.
+	* config/darwin9.h (ASM_DEBUG_OPTION_SPEC): Redefine.
+	* config.in: Regenerated.
+	* configure: Regenerated.
+
+2020-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/97305
+	* optc-save-gen.awk: Don't declare mask variable if explicit_mask
+	array is not present.
+
+2020-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	* omp-expand.c (expand_omp_simd): Don't emit MIN_EXPR and PLUS_EXPR
+	at the end of entry_bb and innermost init_bb, instead force arguments
+	for MIN_EXPR into temporaries in both cases and jump to a new bb that
+	performs MIN_EXPR and PLUS_EXPR.
+
+2020-10-07  Tom de Vries  <tdevries@suse.de>
+
+	* tree-ssa-loop-ch.c (ch_base::copy_headers): Add missing NULL test
+	for dump_file.
+
+2020-10-06  Andrew MacLeod  <amacleod@redhat.com>
+
+	* flag-types.h (enum evrp_mode): New enumerated type EVRP_MODE_*.
+	* common.opt (fevrp-mode): New undocumented flag.
+	* gimple-ssa-evrp.c: Include gimple-range.h
+	(class rvrp_folder): EVRP folding using ranger exclusively.
+	(rvrp_folder::rvrp_folder): New.
+	(rvrp_folder::~rvrp_folder): New.
+	(rvrp_folder::value_of_expr): New.  Use rangers value_of_expr.
+	(rvrp_folder::value_on_edge): New.  Use rangers value_on_edge.
+	(rvrp_folder::value_of_Stmt): New.  Use rangers value_of_stmt.
+	(rvrp_folder::fold_stmt): New.  Call the simplifier.
+	(class hybrid_folder): EVRP folding using both engines.
+	(hybrid_folder::hybrid_folder): New.
+	(hybrid_folder::~hybrid_folder): New.
+	(hybrid_folder::fold_stmt): New.  Simplify with one engne, then the
+	other.
+	(hybrid_folder::value_of_expr): New.  Use both value routines.
+	(hybrid_folder::value_on_edge): New.  Use both value routines.
+	(hybrid_folder::value_of_stmt): New.  Use both value routines.
+	(hybrid_folder::choose_value): New.  Choose between range_analzyer and
+	rangers values.
+	(execute_early_vrp): Choose a folder based on flag_evrp_mode.
+	* vr-values.c (simplify_using_ranges::fold_cond): Try range_of_stmt
+	first to see if it returns a value.
+	(simplify_using_ranges::simplify_switch_using_ranges): Return true if
+	any changes were made to the switch.
+
+2020-10-06  Andrew MacLeod  <amacleod@redhat.com>
+
+	* Makefile.in (OBJS): Add gimple-range*.o.
+	* gimple-range.h: New file.
+	* gimple-range.cc: New file.
+	* gimple-range-cache.h: New file.
+	* gimple-range-cache.cc: New file.
+	* gimple-range-edge.h: New file.
+	* gimple-range-edge.cc: New file.
+	* gimple-range-gori.h: New file.
+	* gimple-range-gori.cc: New file.
+
+2020-10-06  Dennis Zhang  <dennis.zhang@arm.com>
+
+	* config/arm/arm.c (arm_preferred_simd_mode): Enable MVE SIMD modes.
+
+2020-10-06  Tom de Vries  <tdevries@suse.de>
+
+	PR middle-end/90861
+	* gimplify.c (gimplify_bind_expr): Handle lookup in
+	oacc_declare_returns using key with decl-expr.
+
+2020-10-06  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	* config/arm/iterators.md (MVE_types): Move mode iterator from mve.md to
+	iterators.md.
+	(MVE_VLD_ST): Likewise.
+	(MVE_0): Likewise.
+	(MVE_1): Likewise.
+	(MVE_3): Likewise.
+	(MVE_2): Likewise.
+	(MVE_5): Likewise.
+	(MVE_6): Likewise.
+	(MVE_CNVT): Move mode attribute iterator from mve.md to iterators.md.
+	(MVE_LANES): Likewise.
+	(MVE_constraint): Likewise.
+	(MVE_constraint1): Likewise.
+	(MVE_constraint2): Likewise.
+	(MVE_constraint3): Likewise.
+	(MVE_pred): Likewise.
+	(MVE_pred1): Likewise.
+	(MVE_pred2): Likewise.
+	(MVE_pred3): Likewise.
+	(MVE_B_ELEM): Likewise.
+	(MVE_H_ELEM): Likewise.
+	(V_sz_elem1): Likewise.
+	(V_extr_elem): Likewise.
+	(earlyclobber_32): Likewise.
+	(supf): Move int attribute from mve.md to iterators.md.
+	(mode1): Likewise.
+	(VCVTQ_TO_F): Move int iterator from mve.md to iterators.md.
+	(VMVNQ_N): Likewise.
+	(VREV64Q): Likewise.
+	(VCVTQ_FROM_F): Likewise.
+	(VREV16Q): Likewise.
+	(VCVTAQ): Likewise.
+	(VMVNQ): Likewise.
+	(VDUPQ_N): Likewise.
+	(VCLZQ): Likewise.
+	(VADDVQ): Likewise.
+	(VREV32Q): Likewise.
+	(VMOVLBQ): Likewise.
+	(VMOVLTQ): Likewise.
+	(VCVTPQ): Likewise.
+	(VCVTNQ): Likewise.
+	(VCVTMQ): Likewise.
+	(VADDLVQ): Likewise.
+	(VCTPQ): Likewise.
+	(VCTPQ_M): Likewise.
+	(VCVTQ_N_TO_F): Likewise.
+	(VCREATEQ): Likewise.
+	(VSHRQ_N): Likewise.
+	(VCVTQ_N_FROM_F): Likewise.
+	(VADDLVQ_P): Likewise.
+	(VCMPNEQ): Likewise.
+	(VSHLQ): Likewise.
+	(VABDQ): Likewise.
+	(VADDQ_N): Likewise.
+	(VADDVAQ): Likewise.
+	(VADDVQ_P): Likewise.
+	(VANDQ): Likewise.
+	(VBICQ): Likewise.
+	(VBRSRQ_N): Likewise.
+	(VCADDQ_ROT270): Likewise.
+	(VCADDQ_ROT90): Likewise.
+	(VCMPEQQ): Likewise.
+	(VCMPEQQ_N): Likewise.
+	(VCMPNEQ_N): Likewise.
+	(VEORQ): Likewise.
+	(VHADDQ): Likewise.
+	(VHADDQ_N): Likewise.
+	(VHSUBQ): Likewise.
+	(VHSUBQ_N): Likewise.
+	(VMAXQ): Likewise.
+	(VMAXVQ): Likewise.
+	(VMINQ): Likewise.
+	(VMINVQ): Likewise.
+	(VMLADAVQ): Likewise.
+	(VMULHQ): Likewise.
+	(VMULLBQ_INT): Likewise.
+	(VMULLTQ_INT): Likewise.
+	(VMULQ): Likewise.
+	(VMULQ_N): Likewise.
+	(VORNQ): Likewise.
+	(VORRQ): Likewise.
+	(VQADDQ): Likewise.
+	(VQADDQ_N): Likewise.
+	(VQRSHLQ): Likewise.
+	(VQRSHLQ_N): Likewise.
+	(VQSHLQ): Likewise.
+	(VQSHLQ_N): Likewise.
+	(VQSHLQ_R): Likewise.
+	(VQSUBQ): Likewise.
+	(VQSUBQ_N): Likewise.
+	(VRHADDQ): Likewise.
+	(VRMULHQ): Likewise.
+	(VRSHLQ): Likewise.
+	(VRSHLQ_N): Likewise.
+	(VRSHRQ_N): Likewise.
+	(VSHLQ_N): Likewise.
+	(VSHLQ_R): Likewise.
+	(VSUBQ): Likewise.
+	(VSUBQ_N): Likewise.
+	(VADDLVAQ): Likewise.
+	(VBICQ_N): Likewise.
+	(VMLALDAVQ): Likewise.
+	(VMLALDAVXQ): Likewise.
+	(VMOVNBQ): Likewise.
+	(VMOVNTQ): Likewise.
+	(VORRQ_N): Likewise.
+	(VQMOVNBQ): Likewise.
+	(VQMOVNTQ): Likewise.
+	(VSHLLBQ_N): Likewise.
+	(VSHLLTQ_N): Likewise.
+	(VRMLALDAVHQ): Likewise.
+	(VBICQ_M_N): Likewise.
+	(VCVTAQ_M): Likewise.
+	(VCVTQ_M_TO_F): Likewise.
+	(VQRSHRNBQ_N): Likewise.
+	(VABAVQ): Likewise.
+	(VSHLCQ): Likewise.
+	(VRMLALDAVHAQ): Likewise.
+	(VADDVAQ_P): Likewise.
+	(VCLZQ_M): Likewise.
+	(VCMPEQQ_M_N): Likewise.
+	(VCMPEQQ_M): Likewise.
+	(VCMPNEQ_M_N): Likewise.
+	(VCMPNEQ_M): Likewise.
+	(VDUPQ_M_N): Likewise.
+	(VMAXVQ_P): Likewise.
+	(VMINVQ_P): Likewise.
+	(VMLADAVAQ): Likewise.
+	(VMLADAVQ_P): Likewise.
+	(VMLAQ_N): Likewise.
+	(VMLASQ_N): Likewise.
+	(VMVNQ_M): Likewise.
+	(VPSELQ): Likewise.
+	(VQDMLAHQ_N): Likewise.
+	(VQRDMLAHQ_N): Likewise.
+	(VQRDMLASHQ_N): Likewise.
+	(VQRSHLQ_M_N): Likewise.
+	(VQSHLQ_M_R): Likewise.
+	(VREV64Q_M): Likewise.
+	(VRSHLQ_M_N): Likewise.
+	(VSHLQ_M_R): Likewise.
+	(VSLIQ_N): Likewise.
+	(VSRIQ_N): Likewise.
+	(VMLALDAVQ_P): Likewise.
+	(VQMOVNBQ_M): Likewise.
+	(VMOVLTQ_M): Likewise.
+	(VMOVNBQ_M): Likewise.
+	(VRSHRNTQ_N): Likewise.
+	(VORRQ_M_N): Likewise.
+	(VREV32Q_M): Likewise.
+	(VREV16Q_M): Likewise.
+	(VQRSHRNTQ_N): Likewise.
+	(VMOVNTQ_M): Likewise.
+	(VMOVLBQ_M): Likewise.
+	(VMLALDAVAQ): Likewise.
+	(VQSHRNBQ_N): Likewise.
+	(VSHRNBQ_N): Likewise.
+	(VRSHRNBQ_N): Likewise.
+	(VMLALDAVXQ_P): Likewise.
+	(VQMOVNTQ_M): Likewise.
+	(VMVNQ_M_N): Likewise.
+	(VQSHRNTQ_N): Likewise.
+	(VMLALDAVAXQ): Likewise.
+	(VSHRNTQ_N): Likewise.
+	(VCVTMQ_M): Likewise.
+	(VCVTNQ_M): Likewise.
+	(VCVTPQ_M): Likewise.
+	(VCVTQ_M_N_FROM_F): Likewise.
+	(VCVTQ_M_FROM_F): Likewise.
+	(VRMLALDAVHQ_P): Likewise.
+	(VADDLVAQ_P): Likewise.
+	(VABAVQ_P): Likewise.
+	(VSHLQ_M): Likewise.
+	(VSRIQ_M_N): Likewise.
+	(VSUBQ_M): Likewise.
+	(VCVTQ_M_N_TO_F): Likewise.
+	(VHSUBQ_M): Likewise.
+	(VSLIQ_M_N): Likewise.
+	(VRSHLQ_M): Likewise.
+	(VMINQ_M): Likewise.
+	(VMULLBQ_INT_M): Likewise.
+	(VMULHQ_M): Likewise.
+	(VMULQ_M): Likewise.
+	(VHSUBQ_M_N): Likewise.
+	(VHADDQ_M_N): Likewise.
+	(VORRQ_M): Likewise.
+	(VRMULHQ_M): Likewise.
+	(VQADDQ_M): Likewise.
+	(VRSHRQ_M_N): Likewise.
+	(VQSUBQ_M_N): Likewise.
+	(VADDQ_M): Likewise.
+	(VORNQ_M): Likewise.
+	(VRHADDQ_M): Likewise.
+	(VQSHLQ_M): Likewise.
+	(VANDQ_M): Likewise.
+	(VBICQ_M): Likewise.
+	(VSHLQ_M_N): Likewise.
+	(VCADDQ_ROT270_M): Likewise.
+	(VQRSHLQ_M): Likewise.
+	(VQADDQ_M_N): Likewise.
+	(VADDQ_M_N): Likewise.
+	(VMAXQ_M): Likewise.
+	(VQSUBQ_M): Likewise.
+	(VMLASQ_M_N): Likewise.
+	(VMLADAVAQ_P): Likewise.
+	(VBRSRQ_M_N): Likewise.
+	(VMULQ_M_N): Likewise.
+	(VCADDQ_ROT90_M): Likewise.
+	(VMULLTQ_INT_M): Likewise.
+	(VEORQ_M): Likewise.
+	(VSHRQ_M_N): Likewise.
+	(VSUBQ_M_N): Likewise.
+	(VHADDQ_M): Likewise.
+	(VABDQ_M): Likewise.
+	(VMLAQ_M_N): Likewise.
+	(VQSHLQ_M_N): Likewise.
+	(VMLALDAVAQ_P): Likewise.
+	(VMLALDAVAXQ_P): Likewise.
+	(VQRSHRNBQ_M_N): Likewise.
+	(VQRSHRNTQ_M_N): Likewise.
+	(VQSHRNBQ_M_N): Likewise.
+	(VQSHRNTQ_M_N): Likewise.
+	(VRSHRNBQ_M_N): Likewise.
+	(VRSHRNTQ_M_N): Likewise.
+	(VSHLLBQ_M_N): Likewise.
+	(VSHLLTQ_M_N): Likewise.
+	(VSHRNBQ_M_N): Likewise.
+	(VSHRNTQ_M_N): Likewise.
+	(VSTRWSBQ): Likewise.
+	(VSTRBSOQ): Likewise.
+	(VSTRBQ): Likewise.
+	(VLDRBGOQ): Likewise.
+	(VLDRBQ): Likewise.
+	(VLDRWGBQ): Likewise.
+	(VLD1Q): Likewise.
+	(VLDRHGOQ): Likewise.
+	(VLDRHGSOQ): Likewise.
+	(VLDRHQ): Likewise.
+	(VLDRWQ): Likewise.
+	(VLDRDGBQ): Likewise.
+	(VLDRDGOQ): Likewise.
+	(VLDRDGSOQ): Likewise.
+	(VLDRWGOQ): Likewise.
+	(VLDRWGSOQ): Likewise.
+	(VST1Q): Likewise.
+	(VSTRHSOQ): Likewise.
+	(VSTRHSSOQ): Likewise.
+	(VSTRHQ): Likewise.
+	(VSTRWQ): Likewise.
+	(VSTRDSBQ): Likewise.
+	(VSTRDSOQ): Likewise.
+	(VSTRDSSOQ): Likewise.
+	(VSTRWSOQ): Likewise.
+	(VSTRWSSOQ): Likewise.
+	(VSTRWSBWBQ): Likewise.
+	(VLDRWGBWBQ): Likewise.
+	(VSTRDSBWBQ): Likewise.
+	(VLDRDGBWBQ): Likewise.
+	(VADCIQ): Likewise.
+	(VADCIQ_M): Likewise.
+	(VSBCQ): Likewise.
+	(VSBCQ_M): Likewise.
+	(VSBCIQ): Likewise.
+	(VSBCIQ_M): Likewise.
+	(VADCQ): Likewise.
+	(VADCQ_M): Likewise.
+	(UQRSHLLQ): Likewise.
+	(SQRSHRLQ): Likewise.
+	(VSHLCQ_M): Likewise.
+	* config/arm/mve.md (MVE_types): Move mode iterator to iterators.md from mve.md.
+	(MVE_VLD_ST): Likewise.
+	(MVE_0): Likewise.
+	(MVE_1): Likewise.
+	(MVE_3): Likewise.
+	(MVE_2): Likewise.
+	(MVE_5): Likewise.
+	(MVE_6): Likewise.
+	(MVE_CNVT): Move mode attribute iterator to iterators.md from mve.md.
+	(MVE_LANES): Likewise.
+	(MVE_constraint): Likewise.
+	(MVE_constraint1): Likewise.
+	(MVE_constraint2): Likewise.
+	(MVE_constraint3): Likewise.
+	(MVE_pred): Likewise.
+	(MVE_pred1): Likewise.
+	(MVE_pred2): Likewise.
+	(MVE_pred3): Likewise.
+	(MVE_B_ELEM): Likewise.
+	(MVE_H_ELEM): Likewise.
+	(V_sz_elem1): Likewise.
+	(V_extr_elem): Likewise.
+	(earlyclobber_32): Likewise.
+	(supf): Move int attribute to iterators.md from mve.md.
+	(mode1): Likewise.
+	(VCVTQ_TO_F): Move int iterator to iterators.md from mve.md.
+	(VMVNQ_N): Likewise.
+	(VREV64Q): Likewise.
+	(VCVTQ_FROM_F): Likewise.
+	(VREV16Q): Likewise.
+	(VCVTAQ): Likewise.
+	(VMVNQ): Likewise.
+	(VDUPQ_N): Likewise.
+	(VCLZQ): Likewise.
+	(VADDVQ): Likewise.
+	(VREV32Q): Likewise.
+	(VMOVLBQ): Likewise.
+	(VMOVLTQ): Likewise.
+	(VCVTPQ): Likewise.
+	(VCVTNQ): Likewise.
+	(VCVTMQ): Likewise.
+	(VADDLVQ): Likewise.
+	(VCTPQ): Likewise.
+	(VCTPQ_M): Likewise.
+	(VCVTQ_N_TO_F): Likewise.
+	(VCREATEQ): Likewise.
+	(VSHRQ_N): Likewise.
+	(VCVTQ_N_FROM_F): Likewise.
+	(VADDLVQ_P): Likewise.
+	(VCMPNEQ): Likewise.
+	(VSHLQ): Likewise.
+	(VABDQ): Likewise.
+	(VADDQ_N): Likewise.
+	(VADDVAQ): Likewise.
+	(VADDVQ_P): Likewise.
+	(VANDQ): Likewise.
+	(VBICQ): Likewise.
+	(VBRSRQ_N): Likewise.
+	(VCADDQ_ROT270): Likewise.
+	(VCADDQ_ROT90): Likewise.
+	(VCMPEQQ): Likewise.
+	(VCMPEQQ_N): Likewise.
+	(VCMPNEQ_N): Likewise.
+	(VEORQ): Likewise.
+	(VHADDQ): Likewise.
+	(VHADDQ_N): Likewise.
+	(VHSUBQ): Likewise.
+	(VHSUBQ_N): Likewise.
+	(VMAXQ): Likewise.
+	(VMAXVQ): Likewise.
+	(VMINQ): Likewise.
+	(VMINVQ): Likewise.
+	(VMLADAVQ): Likewise.
+	(VMULHQ): Likewise.
+	(VMULLBQ_INT): Likewise.
+	(VMULLTQ_INT): Likewise.
+	(VMULQ): Likewise.
+	(VMULQ_N): Likewise.
+	(VORNQ): Likewise.
+	(VORRQ): Likewise.
+	(VQADDQ): Likewise.
+	(VQADDQ_N): Likewise.
+	(VQRSHLQ): Likewise.
+	(VQRSHLQ_N): Likewise.
+	(VQSHLQ): Likewise.
+	(VQSHLQ_N): Likewise.
+	(VQSHLQ_R): Likewise.
+	(VQSUBQ): Likewise.
+	(VQSUBQ_N): Likewise.
+	(VRHADDQ): Likewise.
+	(VRMULHQ): Likewise.
+	(VRSHLQ): Likewise.
+	(VRSHLQ_N): Likewise.
+	(VRSHRQ_N): Likewise.
+	(VSHLQ_N): Likewise.
+	(VSHLQ_R): Likewise.
+	(VSUBQ): Likewise.
+	(VSUBQ_N): Likewise.
+	(VADDLVAQ): Likewise.
+	(VBICQ_N): Likewise.
+	(VMLALDAVQ): Likewise.
+	(VMLALDAVXQ): Likewise.
+	(VMOVNBQ): Likewise.
+	(VMOVNTQ): Likewise.
+	(VORRQ_N): Likewise.
+	(VQMOVNBQ): Likewise.
+	(VQMOVNTQ): Likewise.
+	(VSHLLBQ_N): Likewise.
+	(VSHLLTQ_N): Likewise.
+	(VRMLALDAVHQ): Likewise.
+	(VBICQ_M_N): Likewise.
+	(VCVTAQ_M): Likewise.
+	(VCVTQ_M_TO_F): Likewise.
+	(VQRSHRNBQ_N): Likewise.
+	(VABAVQ): Likewise.
+	(VSHLCQ): Likewise.
+	(VRMLALDAVHAQ): Likewise.
+	(VADDVAQ_P): Likewise.
+	(VCLZQ_M): Likewise.
+	(VCMPEQQ_M_N): Likewise.
+	(VCMPEQQ_M): Likewise.
+	(VCMPNEQ_M_N): Likewise.
+	(VCMPNEQ_M): Likewise.
+	(VDUPQ_M_N): Likewise.
+	(VMAXVQ_P): Likewise.
+	(VMINVQ_P): Likewise.
+	(VMLADAVAQ): Likewise.
+	(VMLADAVQ_P): Likewise.
+	(VMLAQ_N): Likewise.
+	(VMLASQ_N): Likewise.
+	(VMVNQ_M): Likewise.
+	(VPSELQ): Likewise.
+	(VQDMLAHQ_N): Likewise.
+	(VQRDMLAHQ_N): Likewise.
+	(VQRDMLASHQ_N): Likewise.
+	(VQRSHLQ_M_N): Likewise.
+	(VQSHLQ_M_R): Likewise.
+	(VREV64Q_M): Likewise.
+	(VRSHLQ_M_N): Likewise.
+	(VSHLQ_M_R): Likewise.
+	(VSLIQ_N): Likewise.
+	(VSRIQ_N): Likewise.
+	(VMLALDAVQ_P): Likewise.
+	(VQMOVNBQ_M): Likewise.
+	(VMOVLTQ_M): Likewise.
+	(VMOVNBQ_M): Likewise.
+	(VRSHRNTQ_N): Likewise.
+	(VORRQ_M_N): Likewise.
+	(VREV32Q_M): Likewise.
+	(VREV16Q_M): Likewise.
+	(VQRSHRNTQ_N): Likewise.
+	(VMOVNTQ_M): Likewise.
+	(VMOVLBQ_M): Likewise.
+	(VMLALDAVAQ): Likewise.
+	(VQSHRNBQ_N): Likewise.
+	(VSHRNBQ_N): Likewise.
+	(VRSHRNBQ_N): Likewise.
+	(VMLALDAVXQ_P): Likewise.
+	(VQMOVNTQ_M): Likewise.
+	(VMVNQ_M_N): Likewise.
+	(VQSHRNTQ_N): Likewise.
+	(VMLALDAVAXQ): Likewise.
+	(VSHRNTQ_N): Likewise.
+	(VCVTMQ_M): Likewise.
+	(VCVTNQ_M): Likewise.
+	(VCVTPQ_M): Likewise.
+	(VCVTQ_M_N_FROM_F): Likewise.
+	(VCVTQ_M_FROM_F): Likewise.
+	(VRMLALDAVHQ_P): Likewise.
+	(VADDLVAQ_P): Likewise.
+	(VABAVQ_P): Likewise.
+	(VSHLQ_M): Likewise.
+	(VSRIQ_M_N): Likewise.
+	(VSUBQ_M): Likewise.
+	(VCVTQ_M_N_TO_F): Likewise.
+	(VHSUBQ_M): Likewise.
+	(VSLIQ_M_N): Likewise.
+	(VRSHLQ_M): Likewise.
+	(VMINQ_M): Likewise.
+	(VMULLBQ_INT_M): Likewise.
+	(VMULHQ_M): Likewise.
+	(VMULQ_M): Likewise.
+	(VHSUBQ_M_N): Likewise.
+	(VHADDQ_M_N): Likewise.
+	(VORRQ_M): Likewise.
+	(VRMULHQ_M): Likewise.
+	(VQADDQ_M): Likewise.
+	(VRSHRQ_M_N): Likewise.
+	(VQSUBQ_M_N): Likewise.
+	(VADDQ_M): Likewise.
+	(VORNQ_M): Likewise.
+	(VRHADDQ_M): Likewise.
+	(VQSHLQ_M): Likewise.
+	(VANDQ_M): Likewise.
+	(VBICQ_M): Likewise.
+	(VSHLQ_M_N): Likewise.
+	(VCADDQ_ROT270_M): Likewise.
+	(VQRSHLQ_M): Likewise.
+	(VQADDQ_M_N): Likewise.
+	(VADDQ_M_N): Likewise.
+	(VMAXQ_M): Likewise.
+	(VQSUBQ_M): Likewise.
+	(VMLASQ_M_N): Likewise.
+	(VMLADAVAQ_P): Likewise.
+	(VBRSRQ_M_N): Likewise.
+	(VMULQ_M_N): Likewise.
+	(VCADDQ_ROT90_M): Likewise.
+	(VMULLTQ_INT_M): Likewise.
+	(VEORQ_M): Likewise.
+	(VSHRQ_M_N): Likewise.
+	(VSUBQ_M_N): Likewise.
+	(VHADDQ_M): Likewise.
+	(VABDQ_M): Likewise.
+	(VMLAQ_M_N): Likewise.
+	(VQSHLQ_M_N): Likewise.
+	(VMLALDAVAQ_P): Likewise.
+	(VMLALDAVAXQ_P): Likewise.
+	(VQRSHRNBQ_M_N): Likewise.
+	(VQRSHRNTQ_M_N): Likewise.
+	(VQSHRNBQ_M_N): Likewise.
+	(VQSHRNTQ_M_N): Likewise.
+	(VRSHRNBQ_M_N): Likewise.
+	(VRSHRNTQ_M_N): Likewise.
+	(VSHLLBQ_M_N): Likewise.
+	(VSHLLTQ_M_N): Likewise.
+	(VSHRNBQ_M_N): Likewise.
+	(VSHRNTQ_M_N): Likewise.
+	(VSTRWSBQ): Likewise.
+	(VSTRBSOQ): Likewise.
+	(VSTRBQ): Likewise.
+	(VLDRBGOQ): Likewise.
+	(VLDRBQ): Likewise.
+	(VLDRWGBQ): Likewise.
+	(VLD1Q): Likewise.
+	(VLDRHGOQ): Likewise.
+	(VLDRHGSOQ): Likewise.
+	(VLDRHQ): Likewise.
+	(VLDRWQ): Likewise.
+	(VLDRDGBQ): Likewise.
+	(VLDRDGOQ): Likewise.
+	(VLDRDGSOQ): Likewise.
+	(VLDRWGOQ): Likewise.
+	(VLDRWGSOQ): Likewise.
+	(VST1Q): Likewise.
+	(VSTRHSOQ): Likewise.
+	(VSTRHSSOQ): Likewise.
+	(VSTRHQ): Likewise.
+	(VSTRWQ): Likewise.
+	(VSTRDSBQ): Likewise.
+	(VSTRDSOQ): Likewise.
+	(VSTRDSSOQ): Likewise.
+	(VSTRWSOQ): Likewise.
+	(VSTRWSSOQ): Likewise.
+	(VSTRWSBWBQ): Likewise.
+	(VLDRWGBWBQ): Likewise.
+	(VSTRDSBWBQ): Likewise.
+	(VLDRDGBWBQ): Likewise.
+	(VADCIQ): Likewise.
+	(VADCIQ_M): Likewise.
+	(VSBCQ): Likewise.
+	(VSBCQ_M): Likewise.
+	(VSBCIQ): Likewise.
+	(VSBCIQ_M): Likewise.
+	(VADCQ): Likewise.
+	(VADCQ_M): Likewise.
+	(UQRSHLLQ): Likewise.
+	(SQRSHRLQ): Likewise.
+	(VSHLCQ_M): Likewise.
+	(define_c_enum "unspec"): Move MVE enumerator to unspecs.md from mve.md.
+	* config/arm/unspecs.md (define_c_enum "unspec"): Move MVE enumerator from
+	mve.md to unspecs.md.
+
+2020-10-06  Martin Liska  <mliska@suse.cz>
+
+	* common.opt: Remove -fdbg-cnt-list from deferred options.
+	* dbgcnt.c (dbg_cnt_set_limit_by_index): Make a copy
+	to original_limits.
+	(dbg_cnt_list_all_counters): Print also current counter value
+	and print to stderr.
+	* opts-global.c (handle_common_deferred_options): Do not handle
+	-fdbg-cnt-list.
+	* opts.c (common_handle_option): Likewise.
+	* toplev.c (finalize): Handle it after compilation here.
+
+2020-10-06  Martin Liska  <mliska@suse.cz>
+
+	* dbgcnt.c (dbg_cnt): Report also upper limit.
+
+2020-10-06  Tom de Vries  <tdevries@suse.de>
+
+	* tracer.c (count_insns): Rename to ...
+	(analyze_bb): ... this.
+	(cache_can_duplicate_bb_p, cached_can_duplicate_bb_p): New function.
+	(ignore_bb_p): Use cached_can_duplicate_bb_p.
+	(tail_duplicate): Call cache_can_duplicate_bb_p.
+
+2020-10-06  Tom de Vries  <tdevries@suse.de>
+
+	* tracer.c (can_duplicate_insn_p, can_duplicate_bb_no_insn_iter_p)
+	(can_duplicate_bb_p): New function, factored out of ...
+	(ignore_bb_p): ... here.
+
+2020-10-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/97282
+	* tree-ssa-math-opts.c (divmod_candidate_p): Don't return false for
+	constant op2 if it is not a power of two and the type has precision
+	larger than HOST_BITS_PER_WIDE_INT or BITS_PER_WORD.
+	* internal-fn.c (contains_call_div_mod): New function.
+	(expand_DIVMOD): If last argument is a constant, try to expand it as
+	TRUNC_DIV_EXPR followed by TRUNC_MOD_EXPR, but if the sequence
+	contains any calls or {,U}{DIV,MOD} rtxes, throw it away and use
+	divmod optab or divmod libfunc.
+
+2020-10-06  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.h (irange_allocator::allocate): Increase
+	newir storage by one.
+
+2020-10-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/97289
+	* omp-offload.c (omp_discover_declare_target_tgt_fn_r): Only follow
+	node->alias_target if it is a FUNCTION_DECL.
+
+2020-10-06  Joe Ramsay  <joe.ramsay@arm.com>
+
+	* config/arm/arm-cpus.in:
+	(ALL_FPU_INTERNAL): Remove vfp_base.
+	(VFPv2): Remove vfp_base.
+	(MVE): Remove vfp_base.
+	(vfp_base): Redefine as implied bit dependent on MVE or FP
+	(cortex-m55): Add flags to disable MVE, MVE FP, FP and DSP extensions.
+	* config/arm/arm.c (arm_configure_build_target): Add implied bits to ISA.
+	* config/arm/parsecpu.awk:
+	(gen_isa): Print implied bits and their dependencies to ISA header.
+	(gen_data): Add parsing for implied feature bits.
+
+2020-10-06  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* doc/invoke.texi: Add z15/arch13 to the list of documented
+	-march/-mtune options.
+
+2020-10-05  Dennis Zhang  <dennis.zhang@arm.com>
+
+	* config/arm/arm.c (arm_preferred_simd_mode): Enable MVE SIMD modes.
+
+2020-10-05  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.cc (irange::legacy_intersect): Only handle
+	legacy ranges.
+	(irange::legacy_union): Same.
+	(irange::union_): When unioning legacy with non-legacy,
+	first convert to legacy and do everything in legacy mode.
+	(irange::intersect): Same, but for intersect.
+	* range-op.cc (range_tests): Adjust for above changes.
+
+2020-10-05  Aldy Hernandez  <aldyh@redhat.com>
+
+	* range-op.cc (operator_div::wi_fold): Return varying for
+	division by zero.
+	(class operator_rshift): Move class up.
+	(operator_abs::wi_fold): Return [-MIN,-MIN] for ABS([-MIN,-MIN]).
+	(operator_tests): Adjust tests.
+
+2020-10-05  Tom de Vries  <tdevries@suse.de>
+
+	* tracer.c (ignore_bb_p): Ignore GOMP_SIMT_XCHG_*.
+
+2020-10-05  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm-cpus.in (neoverse-v1): Add missing vendor and
+	part numbers.
+
+2020-10-05  Tom de Vries  <tdevries@suse.de>
+
+	* tracer.c (ignore_bb_p): Remove incorrect suggestion.
+
+2020-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* opth-gen.awk: Don't emit explicit_mask array if n_target_explicit
+	is equal to n_target_explicit_mask.
+	* optc-save-gen.awk: Compute has_target_explicit_mask and if false,
+	don't emit code iterating over explicit_mask array elements.  Stream
+	also explicit_mask_* target members.
+
+2020-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimple-ssa-store-merging.c
+	(imm_store_chain_info::output_merged_store): Use ~0U instead of ~0 in
+	unsigned int array initializer.
+
+2020-10-05  Tom de Vries  <tdevries@suse.de>
+
+	PR fortran/95654
+	* tracer.c (ignore_bb_p): Ignore GOMP_SIMT_ENTER_ALLOC,
+	GOMP_SIMT_VOTE_ANY and GOMP_SIMT_EXIT.
+
+2020-10-03  Jakub Jelinek  <jakub@redhat.com>
+
+	* opth-gen.awk: For variables referenced in Mask and InverseMask,
+	don't use the explicit_mask bitmask array, but add separate
+	explicit_mask_* members with the same types as the variables.
+	* optc-save-gen.awk: Save, restore, compare and hash the separate
+	explicit_mask_* members.
+
+2020-10-03  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-modref-tree.c (test_insert_search_collapse): Update andling
+	of accesses.
+	(test_merge): Likewise.
+	* ipa-modref-tree.h (struct modref_access_node): Add offset, size,
+	max_size, parm_offset and parm_offset_known.
+	(modref_access_node::useful_p): Constify.
+	(modref_access_node::range_info_useful_p): New predicate.
+	(modref_access_node::operator==): New.
+	(struct modref_parm_map): New structure.
+	(modref_tree::merge): Update for racking parameters)
+	* ipa-modref.c (dump_access): Dump new fields.
+	(get_access): Fill in new fields.
+	(merge_call_side_effects): Update handling of parm map.
+	(write_modref_records): Stream new fields.
+	(read_modref_records): Stream new fields.
+	(compute_parm_map): Update for new parm map.
+	(ipa_merge_modref_summary_after_inlining): Update.
+	(modref_propagate_in_scc): Update.
+	* tree-ssa-alias.c (modref_may_conflict): Handle known ranges.
+
+2020-10-03  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR other/97280
+	* doc/extend.texi: Replace roudnevenl with roundevenl
+
+2020-10-02  David Edelsohn  <dje.gcc@gmail.com>
+	    Andrew MacLeod  <amacleod@redhat.com>
+
+	* config/rs6000/rs6000.c: Include ssa.h. Reorder some headers.
+	* config/rs6000/rs6000-call.c: Same.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* params.opt (ipa-cp-large-unit-insns): New parameter.
+	* ipa-cp.c (get_max_overall_size): Use the new parameter.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-cp.c (estimate_local_effects): Add overeall_size to dumped
+	string.
+	(decide_about_value): Add dumping new overall_size.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-fnsummary.h (ipa_freqcounting_predicate): New type.
+	(ipa_fn_summary): Change the type of loop_iterations and loop_strides
+	to vectors of ipa_freqcounting_predicate.
+	(ipa_fn_summary::ipa_fn_summary): Construct the new vectors.
+	(ipa_call_estimates): New fields loops_with_known_iterations and
+	loops_with_known_strides.
+	* ipa-cp.c (hint_time_bonus): Multiply param_ipa_cp_loop_hint_bonus
+	with the expected frequencies of loops with known iteration count or
+	stride.
+	* ipa-fnsummary.c (add_freqcounting_predicate): New function.
+	(ipa_fn_summary::~ipa_fn_summary): Release the new vectors instead of
+	just two predicates.
+	(remap_hint_predicate_after_duplication): Replace with function
+	remap_freqcounting_preds_after_dup.
+	(ipa_fn_summary_t::duplicate): Use it or duplicate new vectors.
+	(ipa_dump_fn_summary): Dump the new vectors.
+	(analyze_function_body): Compute the loop property vectors.
+	(ipa_call_context::estimate_size_and_time): Calculate also
+	loops_with_known_iterations and loops_with_known_strides.  Adjusted
+	dumping accordinly.
+	(remap_hint_predicate): Replace with function
+	remap_freqcounting_predicate.
+	(ipa_merge_fn_summary_after_inlining): Use it.
+	(inline_read_section): Stream loopcounting vectors instead of two
+	simple predicates.
+	(ipa_fn_summary_write): Likewise.
+	* params.opt (ipa-max-loop-predicates): New parameter.
+	* doc/invoke.texi (ipa-max-loop-predicates): Document new param.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-inline-analysis.c (do_estimate_edge_time): Adjusted to use
+	ipa_call_estimates.
+	(do_estimate_edge_size): Likewise.
+	(do_estimate_edge_hints): Likewise.
+	* ipa-fnsummary.h (struct ipa_call_estimates): New type.
+	(ipa_call_context::estimate_size_and_time): Adjusted declaration.
+	(estimate_ipcp_clone_size_and_time): Likewise.
+	* ipa-cp.c (hint_time_bonus): Changed the type of the second argument
+	to ipa_call_estimates.
+	(perform_estimation_of_a_value): Adjusted to use ipa_call_estimates.
+	(estimate_local_effects): Likewise.
+	* ipa-fnsummary.c (ipa_call_context::estimate_size_and_time): Adjusted
+	to return estimates in a single ipa_call_estimates parameter.
+	(estimate_ipcp_clone_size_and_time): Likewise.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-fnsummary.h (ipa_cached_call_context): New forward declaration
+	and class.
+	(class ipa_call_context): Make friend ipa_cached_call_context.  Moved
+	methods duplicate_from and release to it too.
+	* ipa-fnsummary.c (ipa_call_context::duplicate_from): Moved to class
+	ipa_cached_call_context.
+	(ipa_call_context::release): Likewise, removed the parameter.
+	* ipa-inline-analysis.c (node_context_cache_entry): Change the type of
+	ctx to ipa_cached_call_context.
+	(do_estimate_edge_time): Remove parameter from the call to
+	ipa_cached_call_context::release.
+
+2020-10-02  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-prop.h (ipa_auto_call_arg_values): New type.
+	(class ipa_call_arg_values): Likewise.
+	(ipa_get_indirect_edge_target): Replaced vector arguments with
+	ipa_call_arg_values in declaration.  Added an overload for
+	ipa_auto_call_arg_values.
+	* ipa-fnsummary.h (ipa_call_context): Removed members m_known_vals,
+	m_known_contexts, m_known_aggs, duplicate_from, release and equal_to,
+	new members m_avals, store_to_cache and equivalent_to_p.  Adjusted
+	construcotr arguments.
+	(estimate_ipcp_clone_size_and_time): Replaced vector arguments
+	with ipa_auto_call_arg_values in declaration.
+	(evaluate_properties_for_edge): Likewise.
+	* ipa-cp.c (ipa_get_indirect_edge_target): Adjusted to work on
+	ipa_call_arg_values rather than on separate vectors.  Added an
+	overload for ipa_auto_call_arg_values.
+	(devirtualization_time_bonus): Adjusted to work on
+	ipa_auto_call_arg_values rather than on separate vectors.
+	(gather_context_independent_values): Adjusted to work on
+	ipa_auto_call_arg_values rather than on separate vectors.
+	(perform_estimation_of_a_value): Likewise.
+	(estimate_local_effects): Likewise.
+	(modify_known_vectors_with_val): Adjusted both variants to work on
+	ipa_auto_call_arg_values and rename them to
+	copy_known_vectors_add_val.
+	(decide_about_value): Adjusted to work on ipa_call_arg_values rather
+	than on separate vectors.
+	(decide_whether_version_node): Likewise.
+	* ipa-fnsummary.c (evaluate_conditions_for_known_args): Likewise.
+	(evaluate_properties_for_edge): Likewise.
+	(ipa_fn_summary_t::duplicate): Likewise.
+	(estimate_edge_devirt_benefit): Adjusted to work on
+	ipa_call_arg_values rather than on separate vectors.
+	(estimate_edge_size_and_time): Likewise.
+	(estimate_calls_size_and_time_1): Likewise.
+	(summarize_calls_size_and_time): Adjusted calls to
+	estimate_edge_size_and_time.
+	(estimate_calls_size_and_time): Adjusted to work on
+	ipa_call_arg_values rather than on separate vectors.
+	(ipa_call_context::ipa_call_context): Construct from a pointer to
+	ipa_auto_call_arg_values instead of inividual vectors.
+	(ipa_call_context::duplicate_from): Adjusted to access vectors within
+	m_avals.
+	(ipa_call_context::release): Likewise.
+	(ipa_call_context::equal_to): Likewise.
+	(ipa_call_context::estimate_size_and_time): Adjusted to work on
+	ipa_call_arg_values rather than on separate vectors.
+	(estimate_ipcp_clone_size_and_time): Adjusted to work with
+	ipa_auto_call_arg_values rather than on separate vectors.
+	(ipa_merge_fn_summary_after_inlining): Likewise.  Adjusted call to
+	estimate_edge_size_and_time.
+	(ipa_update_overall_fn_summary): Adjusted call to
+	estimate_edge_size_and_time.
+	* ipa-inline-analysis.c (do_estimate_edge_time): Adjusted to work with
+	ipa_auto_call_arg_values rather than with separate vectors.
+	(do_estimate_edge_size): Likewise.
+	(do_estimate_edge_hints): Likewise.
+	* ipa-prop.c (ipa_auto_call_arg_values::~ipa_auto_call_arg_values):
+	New destructor.
+
+2020-10-02  Joe Ramsay  <joe.ramsay@arm.com>
+
+	* config/arm/arm_mve.h (__arm_vmaxnmavq): Remove coercion of scalar
+	argument.
+	(__arm_vmaxnmvq): Likewise.
+	(__arm_vminnmavq): Likewise.
+	(__arm_vminnmvq): Likewise.
+	(__arm_vmaxnmavq_p): Likewise.
+	(__arm_vmaxnmvq_p): Likewise (and delete duplicate definition).
+	(__arm_vminnmavq_p): Likewise.
+	(__arm_vminnmvq_p): Likewise.
+	(__arm_vmaxavq): Likewise.
+	(__arm_vmaxavq_p): Likewise.
+	(__arm_vmaxvq): Likewise.
+	(__arm_vmaxvq_p): Likewise.
+	(__arm_vminavq): Likewise.
+	(__arm_vminavq_p): Likewise.
+	(__arm_vminvq): Likewise.
+	(__arm_vminvq_p): Likewise.
+
+2020-10-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (neoversev1_tunings): Define.
+	* config/aarch64/aarch64-cores.def (zeus): Use it.
+	(neoverse-v1): Likewise.
+
+2020-10-02  Jan Hubicka  <hubicka@ucw.cz>
+
+	* attr-fnspec.h: Update documentation.
+	(attr_fnsec::return_desc_size): Set to 2
+	(attr_fnsec::arg_desc_size): Set to 2
+	* builtin-attrs.def (STR1): Update fnspec.
+	* internal-fn.def (UBSAN_NULL): Update fnspec.
+	(UBSAN_VPTR): Update fnspec.
+	(UBSAN_PTR): Update fnspec.
+	(ASAN_CHECK): Update fnspec.
+	(GOACC_DIM_SIZE): Remove fnspec.
+	(GOACC_DIM_POS): Remove fnspec.
+	* tree-ssa-alias.c (attr_fnspec::verify): Update verification.
+
+2020-10-02  Jan Hubicka  <jh@suse.cz>
+
+	* attr-fnspec.h: New file.
+	* calls.c (decl_return_flags): Use attr_fnspec.
+	* gimple.c (gimple_call_arg_flags): Use attr_fnspec.
+	(gimple_call_return_flags): Use attr_fnspec.
+	* tree-into-ssa.c (pass_build_ssa::execute): Use attr_fnspec.
+	* tree-ssa-alias.c (attr_fnspec::verify): New member fuction.
+
+2020-10-02  Jan Hubicka  <jh@suse.cz>
+
+	* tree-ssa-alias.c (ao_ref_init_from_ptr_and_range): Break out from ...
+	(ao_ref_init_from_ptr_and_size): ... here.
+
+2020-10-02  Jan Hubicka  <hubicka@ucw.cz>
+
+	* data-streamer-in.c (streamer_read_poly_int64): New function.
+	* data-streamer-out.c (streamer_write_poly_int64): New function.
+	* data-streamer.h (streamer_write_poly_int64): Declare.
+	(streamer_read_poly_int64): Declare.
+
+2020-10-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch64_sve_pred_dominates_p):
+	Delete.
+	* config/aarch64/aarch64.c (aarch64_sve_pred_dominates_p): Likewise.
+	* config/aarch64/aarch64-sve.md: Add banner comment describing
+	how merging predicated FP operations are represented.
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_2): Split into...
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_2_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_2_strict): ...this.
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_any_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_UNARY:optab><mode>_any_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_2): Split into...
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_2_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_2_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_any_relaxed): ...this
+	and...
+	(*cond_<SVE_COND_FP_BINARY_INT:optab><mode>_any_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_2): Split into...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_2_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_2_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_2_const): Split into...
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_2_const_relaxed): ...this
+	and...
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_2_const_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_3): Split into...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_3_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_3_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_any_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_BINARY:optab><mode>_any_strict): ...this.
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_any_const): Split into...
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_any_const_relaxed): ...this
+	and...
+	(*cond_<SVE_COND_FP_BINARY_I1:optab><mode>_any_const_strict): ...this.
+	(*cond_add<mode>_2_const): Split into...
+	(*cond_add<mode>_2_const_relaxed): ...this and...
+	(*cond_add<mode>_2_const_strict): ...this.
+	(*cond_add<mode>_any_const): Split into...
+	(*cond_add<mode>_any_const_relaxed): ...this and...
+	(*cond_add<mode>_any_const_strict): ...this.
+	(*cond_<SVE_COND_FCADD:optab><mode>_2): Split into...
+	(*cond_<SVE_COND_FCADD:optab><mode>_2_relaxed): ...this and...
+	(*cond_<SVE_COND_FCADD:optab><mode>_2_strict): ...this.
+	(*cond_<SVE_COND_FCADD:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FCADD:optab><mode>_any_relaxed): ...this and...
+	(*cond_<SVE_COND_FCADD:optab><mode>_any_strict): ...this.
+	(*cond_sub<mode>_3_const): Split into...
+	(*cond_sub<mode>_3_const_relaxed): ...this and...
+	(*cond_sub<mode>_3_const_strict): ...this.
+	(*aarch64_pred_abd<mode>): Split into...
+	(*aarch64_pred_abd<mode>_relaxed): ...this and...
+	(*aarch64_pred_abd<mode>_strict): ...this.
+	(*aarch64_cond_abd<mode>_2): Split into...
+	(*aarch64_cond_abd<mode>_2_relaxed): ...this and...
+	(*aarch64_cond_abd<mode>_2_strict): ...this.
+	(*aarch64_cond_abd<mode>_3): Split into...
+	(*aarch64_cond_abd<mode>_3_relaxed): ...this and...
+	(*aarch64_cond_abd<mode>_3_strict): ...this.
+	(*aarch64_cond_abd<mode>_any): Split into...
+	(*aarch64_cond_abd<mode>_any_relaxed): ...this and...
+	(*aarch64_cond_abd<mode>_any_strict): ...this.
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_2): Split into...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_2_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_2_strict): ...this.
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_4): Split into...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_4_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_4_strict): ...this.
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_any_relaxed): ...this and...
+	(*cond_<SVE_COND_FP_TERNARY:optab><mode>_any_strict): ...this.
+	(*cond_<SVE_COND_FCMLA:optab><mode>_4): Split into...
+	(*cond_<SVE_COND_FCMLA:optab><mode>_4_relaxed): ...this and...
+	(*cond_<SVE_COND_FCMLA:optab><mode>_4_strict): ...this.
+	(*cond_<SVE_COND_FCMLA:optab><mode>_any): Split into...
+	(*cond_<SVE_COND_FCMLA:optab><mode>_any_relaxed): ...this and...
+	(*cond_<SVE_COND_FCMLA:optab><mode>_any_strict): ...this.
+	(*aarch64_pred_fac<cmp_op><mode>): Split into...
+	(*aarch64_pred_fac<cmp_op><mode>_relaxed): ...this and...
+	(*aarch64_pred_fac<cmp_op><mode>_strict): ...this.
+	(*cond_<optab>_nontrunc<SVE_FULL_F:mode><SVE_FULL_HSDI:mode>): Split
+	into...
+	(*cond_<optab>_nontrunc<SVE_FULL_F:mode><SVE_FULL_HSDI:mode>_relaxed):
+	...this and...
+	(*cond_<optab>_nontrunc<SVE_FULL_F:mode><SVE_FULL_HSDI:mode>_strict):
+	...this.
+	(*cond_<optab>_nonextend<SVE_FULL_HSDI:mode><SVE_FULL_F:mode>): Split
+	into...
+	(*cond_<optab>_nonextend<SVE_FULL_HSDI:mode><SVE_FULL_F:mode>_relaxed):
+	...this and...
+	(*cond_<optab>_nonextend<SVE_FULL_HSDI:mode><SVE_FULL_F:mode>_strict):
+	...this.
+	* config/aarch64/aarch64-sve2.md
+	(*cond_<SVE2_COND_FP_UNARY_LONG:optab><mode>): Split into...
+	(*cond_<SVE2_COND_FP_UNARY_LONG:optab><mode>_relaxed): ...this and...
+	(*cond_<SVE2_COND_FP_UNARY_LONG:optab><mode>_strict): ...this.
+	(*cond_<SVE2_COND_FP_UNARY_NARROWB:optab><mode>_any): Split into...
+	(*cond_<SVE2_COND_FP_UNARY_NARROWB:optab><mode>_any_relaxed): ...this
+	and...
+	(*cond_<SVE2_COND_FP_UNARY_NARROWB:optab><mode>_any_strict): ...this.
+	(*cond_<SVE2_COND_INT_UNARY_FP:optab><mode>): Split into...
+	(*cond_<SVE2_COND_INT_UNARY_FP:optab><mode>_relaxed): ...this and...
+	(*cond_<SVE2_COND_INT_UNARY_FP:optab><mode>_strict): ...this.
+
+2020-10-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/arm/neon.md (*sub<VDQ:mode>3_neon): Use the new mode macros
+	for the insn condition.
+	(sub<VH:mode>3, *mul<VDQW:mode>3_neon): Likewise.
+	(mul<VDQW:mode>3add<VDQW:mode>_neon): Likewise.
+	(mul<VH:mode>3add<VH:mode>_neon): Likewise.
+	(mul<VDQW:mode>3neg<VDQW:mode>add<VDQW:mode>_neon): Likewise.
+	(fma<VCVTF:mode>4, fma<VH:mode>4, *fmsub<VCVTF:mode>4): Likewise.
+	(quad_halves_<code>v4sf, reduc_plus_scal_<VD:mode>): Likewise.
+	(reduc_plus_scal_<VQ:mode>, reduc_smin_scal_<VD:mode>): Likewise.
+	(reduc_smin_scal_<VQ:mode>, reduc_smax_scal_<VD:mode>): Likewise.
+	(reduc_smax_scal_<VQ:mode>, mul<VH:mode>3): Likewise.
+	(neon_vabd<VF:mode>_2, neon_vabd<VF:mode>_3): Likewise.
+	(fma<VH:mode>4_intrinsic): Delete.
+	(neon_vadd<VCVTF:mode>): Use the new mode macros to decide which
+	form of instruction to generate.
+	(neon_vmla<VDQW:mode>, neon_vmls<VDQW:mode>): Likewise.
+	(neon_vsub<VCVTF:mode>): Likewise.
+	(neon_vfma<VH:mode>): Generate the main fma<mode>4 form instead
+	of using fma<mode>4_intrinsic.
+
+2020-10-02  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/97193
+	* coverage.c (coverage_init): GCDA note files should not be
+	mangled and should end in output directory.
+
+2020-10-02  Jason Merril  <jason@redhat.com>
+
+	* gimple.h (gimple_call_operator_delete_p): Rename from
+	gimple_call_replaceable_operator_delete_p.
+	* gimple.c (gimple_call_operator_delete_p): Likewise.
+	* tree.h (DECL_IS_REPLACEABLE_OPERATOR_DELETE_P): Remove.
+	* tree-ssa-dce.c (mark_all_reaching_defs_necessary_1): Adjust.
+	(propagate_necessity): Likewise.
+	(eliminate_unnecessary_stmts): Likewise.
+	* tree-ssa-structalias.c (find_func_aliases_for_call): Likewise.
+
+2020-10-02  Richard Biener  <rguenther@suse.de>
+
+	* gimple.h (GF_CALL_FROM_NEW_OR_DELETE): New call flag.
+	(gimple_call_set_from_new_or_delete): New.
+	(gimple_call_from_new_or_delete): Likewise.
+	* gimple.c (gimple_build_call_from_tree): Set
+	GF_CALL_FROM_NEW_OR_DELETE appropriately.
+	* ipa-icf-gimple.c (func_checker::compare_gimple_call):
+	Compare gimple_call_from_new_or_delete.
+	* tree-ssa-dce.c (mark_all_reaching_defs_necessary_1): Make
+	sure to only consider new/delete calls from new or delete
+	expressions.
+	(propagate_necessity): Likewise.
+	(eliminate_unnecessary_stmts): Likewise.
+	* tree-ssa-structalias.c (find_func_aliases_for_call):
+	Likewise.
+
+2020-10-02  Jason Merril  <jason@redhat.com>
+
+	* tree.h (CALL_FROM_NEW_OR_DELETE_P): Move from cp-tree.h.
+	* tree-core.h: Document new usage of protected_flag.
+
+2020-10-02  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.h (irange::fits_p): New.
+
+2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_legitimize_address): Use
+	gen_int_mode for high part of address constant.
+
+2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_linux64_override_options):
+	Formatting.  Correct setting of TARGET_NO_FP_IN_TOC and
+	TARGET_NO_SUM_IN_TOC.
+
+2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/freebsd64.h (SUBSUBTARGET_OVERRIDE_OPTIONS): Use
+	rs6000_linux64_override_options.
+	* config/rs6000/linux64.h (SUBSUBTARGET_OVERRIDE_OPTIONS): Break
+	out to..
+	* config/rs6000/rs6000.c (rs6000_linux64_override_options): ..this,
+	new function.  Tweak non-biarch test and clearing of
+	profile_kernel to work with freebsd64.h.
+
+2020-10-01  Martin Liska  <mliska@suse.cz>
+
+	* config/rs6000/rs6000-call.c: Include value-range.h.
+	* config/rs6000/rs6000.c: Likewise.
+
+2020-10-01  Tom de Vries  <tdevries@suse.de>
+
+	PR target/80845
+	* config/nvptx/nvptx.md (define_insn "truncsi<QHIM>2"): Emit mov.u32
+	instead of cvt.u32.u32.
+
+2020-10-01  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/96528
+	PR target/97288
+	* config/arm/arm-protos.h (arm_expand_vector_compare): Declare.
+	(arm_expand_vcond): Likewise.
+	* config/arm/arm.c (arm_expand_vector_compare): New function.
+	(arm_expand_vcond): Likewise.
+	* config/arm/neon.md (vec_cmp<VDQW:mode><v_cmp_result>): New pattern.
+	(vec_cmpu<VDQW:mode><VDQW:mode>): Likewise.
+	(vcond<VDQW:mode><VDQW:mode>): Require operand 5 to be a register
+	or zero.  Use arm_expand_vcond.
+	(vcond<V_cvtto><V32:mode>): New pattern.
+	(vcondu<VDQIW:mode><VDQIW:mode>): Generalize to...
+	(vcondu<VDQW:mode><v_cmp_result): ...this.  Require operand 5
+	to be a register or zero.  Use arm_expand_vcond.
+	(vcond_mask_<VDQW:mode><v_cmp_result>): New pattern.
+	(neon_vc<cmp_op><mode>, neon_vc<cmp_op><mode>_insn): Add "@" marker.
+	(neon_vbsl<mode>): Likewise.
+	(neon_vc<cmp_op>u<mode>): Reexpress as...
+	(@neon_vc<code><mode>): ...this.
+
+2020-10-01  Michael Davidsaver  <mdavidsaver@gmail.com>
+
+	* config/i386/t-rtems: Change from mtune to march when building
+	multilibs.  The mtune argument tunes or optimizes for a specific
+	CPU model but does not ensure the generated code is appropriate
+	for the CPU model. Prior to this patch, i386 compatible code
+	was always generated but tuned for later models.
+
+2020-10-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* builtins.c (compute_objsize): Replace vr_values with range_query.
+	(get_range): Same.
+	(gimple_call_alloc_size): Same.
+	* builtins.h (class vr_values):  Remove.
+	(gimple_call_alloc_size): Replace vr_values with range_query.
+	* gimple-ssa-sprintf.c (get_int_range): Same.
+	(struct directive): Pass gimple context to fmtfunc callback.
+	(directive::set_width): Replace inline with out-of-line version.
+	(directive::set_precision): Same.
+	(format_none): New gimple argument.
+	(format_percent): New gimple argument.
+	(format_integer): New gimple argument.
+	(format_floating): New gimple argument.
+	(get_string_length): Use range_query API.
+	(format_character): New gimple argument.
+	(format_string): New gimple argument.
+	(format_plain): New gimple argument.
+	(format_directive): New gimple argument.
+	(parse_directive): Replace vr_values with range_query.
+	(compute_format_length): Same.
+	(handle_printf_call): Same.  Adjust for range_query API.
+	* tree-ssa-strlen.c (get_range): Same.
+	(compare_nonzero_chars): Same.
+	(get_addr_stridx) Replace vr_values with range_query.
+	(get_stridx): Same.
+	(dump_strlen_info): Same.
+	(get_range_strlen_dynamic): Adjust for range_query API.
+	(set_strlen_range): Same
+	(maybe_warn_overflow): Replace vr_values with range_query.
+	(handle_builtin_strcpy): Same.
+	(maybe_diag_stxncpy_trunc): Add FIXME comment.
+	(handle_builtin_memcpy): Replace vr_values with range_query.
+	(handle_builtin_memset): Same.
+	(get_len_or_size): Same.
+	(strxcmp_eqz_result): Same.
+	(handle_builtin_string_cmp): Same.
+	(count_nonzero_bytes_addr): Same, plus adjust for range_query API.
+	(count_nonzero_bytes): Replace vr_values with range_query.
+	(handle_store): Same.
+	(strlen_check_and_optimize_call): Same.
+	(handle_integral_assign): Same.
+	(check_and_optimize_stmt): Same.
+	* tree-ssa-strlen.h (class vr_values): Remove.
+	(get_range): Replace vr_values with range_query.
+	(get_range_strlen_dynamic): Same.
+	(handle_printf_call): Same.
+
+2020-10-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gimple-loop-versioning.cc (lv_dom_walker::before_dom_children):
+	Pass m_range_analyzer instead of get_vr_values.
+	(loop_versioning::name_prop::get_value): Rename to...
+	(loop_versioning::name_prop::value_of_expr): ...this.
+	* gimple-ssa-evrp-analyze.c (evrp_range_analyzer::evrp_range_analyzer):
+	Adjust for evrp_range_analyzer
+	inheriting from vr_values.
+	(evrp_range_analyzer::try_find_new_range): Same.
+	(evrp_range_analyzer::record_ranges_from_incoming_edge): Same.
+	(evrp_range_analyzer::record_ranges_from_phis): Same.
+	(evrp_range_analyzer::record_ranges_from_stmt): Same.
+	(evrp_range_analyzer::push_value_range): Same.
+	(evrp_range_analyzer::pop_value_range): Same.
+	* gimple-ssa-evrp-analyze.h (class evrp_range_analyzer): Inherit from
+	vr_values.  Adjust accordingly.
+	* gimple-ssa-evrp.c: Adjust for evrp_range_analyzer inheriting from
+	vr_values.
+	(evrp_folder::value_of_evrp): Rename from get_value.
+	* tree-ssa-ccp.c (class ccp_folder): Rename get_value to
+	value_of_expr.
+	(ccp_folder::get_value): Rename to...
+	(ccp_folder::value_of_expr): ...this.
+	* tree-ssa-copy.c (class copy_folder): Rename get_value to
+	value_of_expr.
+	(copy_folder::get_value): Rename to...
+	(copy_folder::value_of_expr): ...this.
+	* tree-ssa-dom.c (dom_opt_dom_walker::after_dom_children): Adjust
+	for evrp_range_analyzer inheriting from vr_values.
+	(dom_opt_dom_walker::optimize_stmt): Same.
+	* tree-ssa-propagate.c (substitute_and_fold_engine::replace_uses_in):
+	Call value_of_* instead of get_value.
+	(substitute_and_fold_engine::replace_phi_args_in): Same.
+	(substitute_and_fold_engine::propagate_into_phi_args): Same.
+	(substitute_and_fold_dom_walker::before_dom_children): Same.
+	* tree-ssa-propagate.h: Include value-query.h.
+	(class substitute_and_fold_engine): Inherit from value_query.
+	* tree-ssa-strlen.c (strlen_dom_walker::before_dom_children):
+	Adjust for evrp_range_analyzer inheriting from vr_values.
+	* tree-ssa-threadedge.c (record_temporary_equivalences_from_phis):
+	Same.
+	* tree-vrp.c (class vrp_folder): Same.
+	(vrp_folder::get_value): Rename to value_of_expr.
+	* vr-values.c (vr_values::get_lattice_entry): Adjust for
+	vr_values inheriting from range_query.
+	(vr_values::range_of_expr): New.
+	(vr_values::value_of_expr): New.
+	(vr_values::value_on_edge): New.
+	(vr_values::value_of_stmt): New.
+	(simplify_using_ranges::op_with_boolean_value_range_p): Call
+	get_value_range through query.
+	(check_for_binary_op_overflow): Rename store to query.
+	(vr_values::vr_values): Remove vrp_value_range_pool.
+	(vr_values::~vr_values): Same.
+	(simplify_using_ranges::get_vr_for_comparison): Call get_value_range
+	through query.
+	(simplify_using_ranges::compare_names): Same.
+	(simplify_using_ranges::vrp_evaluate_conditional): Same.
+	(simplify_using_ranges::vrp_visit_cond_stmt): Same.
+	(simplify_using_ranges::simplify_abs_using_ranges): Same.
+	(simplify_using_ranges::simplify_cond_using_ranges_1): Same.
+	(simplify_cond_using_ranges_2): Same.
+	(simplify_using_ranges::simplify_switch_using_ranges): Same.
+	(simplify_using_ranges::two_valued_val_range_p): Same.
+	(simplify_using_ranges::simplify_using_ranges): Rename store to query.
+	(simplify_using_ranges::simplify): Assert that we have a query.
+	* vr-values.h (class range_query): Remove.
+	(class simplify_using_ranges): Remove inheritance of range_query.
+	(class vr_values): Add virtuals for range_of_expr, value_of_expr,
+	value_on_edge, value_of_stmt, and get_value_range.
+	Call range_query allocator instead of using vrp_value_range_pool.
+	Remove vrp_value_range_pool.
+	(simplify_using_ranges::get_value_range): Remove.
+
+2020-10-01  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97236
+	* tree-vect-stmts.c (get_group_load_store_type): Keep
+	VMAT_ELEMENTWISE for single-element vectors.
+
+2020-10-01  Jan Hubicka  <jh@suse.cz>
+
+	* ipa-modref.c (compute_parm_map): Be ready for callee_pi to be NULL.
+
+2020-10-01  Jan Hubicka  <jh@suse.cz>
+
+	PR ipa/97244
+	* ipa-fnsummary.c (pass_free_fnsummary::execute): Free
+	also indirect inlining datastructure.
+	* ipa-modref.c (pass_ipa_modref::execute): Do not free them here.
+	* ipa-prop.c (ipa_free_all_node_params): Do not crash when info does
+	not exist.
+	(ipa_unregister_cgraph_hooks): Likewise.
+
+2020-10-01  Jan Hubicka  <jh@suse.cz>
+
+	* internal-fn.c (DEF_INTERNAL_FN): Fix handling of fnspec
+
+2020-10-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* Makefile.in: Add value-query.o.
+	* value-query.cc: New file.
+	* value-query.h: New file.
+
+2020-10-01  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm-cpus.in: Fix ordering, move Neoverse N2 down.
+	* config/arm/arm-tables.opt: Regenerate.
+	* config/arm/arm-tune.md: Regenerate.
+
+2020-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/s390/s390.c (s390_atomic_assign_expand_fenv): Use
+	TARGET_EXPR instead of MODIFY_EXPR for the first assignments to
+	fenv_var and old_fpc.  Formatting fixes.
+
+2020-10-01  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-patterns.c (vect_recog_bool_pattern): Also handle
+	VIEW_CONVERT_EXPR.
+
+2020-10-01  Florian Weimer  <fweimer@redhat.com>
+
+	PR target/97250
+	* config/i386/i386.h (PTA_NO_TUNE, PTA_X86_64_BASELINE)
+	(PTA_X86_64_V2, PTA_X86_64_V3, PTA_X86_64_V4): New.
+	* common/config/i386/i386-common.c (processor_alias_table):
+	Add "x86-64-v2", "x86-64-v3", "x86-64-v4".
+	* config/i386/i386-options.c (ix86_option_override_internal):
+	Handle new PTA_NO_TUNE processor table entries.
+	* doc/invoke.texi (x86 Options): Document new -march values.
+
+2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/ppc-asm.h: Support __PCREL__ code.
+
+2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/linux64.h (SUBSUBTARGET_OVERRIDE_OPTIONS): Don't
+	set -mcmodel=small for -mno-minimal-toc when pcrel.
+
 2020-09-30  Martin Sebor  <msebor@redhat.com>
 
 	PR middle-end/97189

@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 
 static cxx_binding *cxx_binding_make (tree value, tree type);
 static cp_binding_level *innermost_nonclass_level (void);
+static tree do_pushdecl_with_scope (tree x, cp_binding_level *, bool hiding);
 static void set_identifier_type_value_with_scope (tree id, tree decl,
 						  cp_binding_level *b);
 static name_hint maybe_suggest_missing_std_header (location_t location,
@@ -842,12 +843,6 @@ name_lookup::adl_class_only (tree type)
 	  if (CP_DECL_CONTEXT (fn) != context)
 	    continue;
 
-	  /* Only interested in anticipated friends.  (Non-anticipated
-	     ones will have been inserted during the namespace
-	     adl.)  */
-	  if (!DECL_ANTICIPATED (fn))
-	    continue;
-
 	  /* Template specializations are never found by name lookup.
 	     (Templates themselves can be found, but not template
 	     specializations.)  */
@@ -1079,11 +1074,8 @@ name_lookup::adl_template_arg (tree arg)
 tree
 name_lookup::search_adl (tree fns, vec<tree, va_gc> *args)
 {
-  if (fns)
-    {
-      deduping = true;
-      lookup_mark (fns, true);
-    }
+  deduping = true;
+  lookup_mark (fns, true);
   value = fns;
 
   unsigned ix;
@@ -2136,19 +2128,9 @@ strip_using_decl (tree decl)
 static bool
 anticipated_builtin_p (tree ovl)
 {
-  if (TREE_CODE (ovl) != OVERLOAD)
-    return false;
-
-  if (!OVL_HIDDEN_P (ovl))
-    return false;
-
-  tree fn = OVL_FUNCTION (ovl);
-  gcc_checking_assert (DECL_ANTICIPATED (fn));
-
-  if (DECL_BUILTIN_P (fn))
-    return true;
-
-  return false;
+  return (TREE_CODE (ovl) == OVERLOAD
+	  && OVL_HIDDEN_P (ovl)
+	  && DECL_UNDECLARED_BUILTIN_P (OVL_FUNCTION (ovl)));
 }
 
 /* BINDING records an existing declaration for a name in the current scope.
@@ -2940,108 +2922,66 @@ set_decl_context_in_fn (tree ctx, tree decl)
     DECL_CONTEXT (decl) = ctx;
 }
 
-/* DECL is a local-scope decl with linkage.  SHADOWED is true if the
-   name is already bound at the current level.
-
-   [basic.link] If there is a visible declaration of an entity with
-   linkage having the same name and type, ignoring entities declared
-   outside the innermost enclosing namespace scope, the block scope
-   declaration declares that same entity and receives the linkage of
-   the previous declaration.
-
-   Also, make sure that this decl matches any existing external decl
-   in the enclosing namespace.  */
+/* DECL is a local extern decl.  Find or create the namespace-scope
+   decl that it aliases.  Also, determines the linkage of DECL.  */
 
 static void
-set_local_extern_decl_linkage (tree decl, bool shadowed)
+push_local_extern_decl_alias (tree decl)
 {
-  tree ns_value = decl; /* Unique marker.  */
+  if (dependent_type_p (TREE_TYPE (decl)))
+    return;
+  /* EH specs were not part of the function type prior to c++17, but
+     we still can't go pushing dependent eh specs into the namespace.  */
+  if (cxx_dialect < cxx17
+      && TREE_CODE (decl) == FUNCTION_DECL
+      && (value_dependent_expression_p
+	  (TYPE_RAISES_EXCEPTIONS (TREE_TYPE (decl)))))
+    return;
 
-  if (!shadowed)
+  gcc_checking_assert (!DECL_LANG_SPECIFIC (decl)
+		       || !DECL_TEMPLATE_INFO (decl));
+  if (DECL_LANG_SPECIFIC (decl) && DECL_LOCAL_DECL_ALIAS (decl))
+    /* We're instantiating a non-dependent local decl, it already
+       knows the alias.  */
+    return;
+
+  tree alias = NULL_TREE;
+
+  if (DECL_SIZE (decl) && !TREE_CONSTANT (DECL_SIZE (decl)))
+    /* Do not let a VLA creep into a namespace.  Diagnostic will be
+       emitted in layout_var_decl later.  */
+    alias = error_mark_node;
+  else
     {
-      tree loc_value = innermost_non_namespace_value (DECL_NAME (decl));
-      if (!loc_value)
-	{
-	  ns_value
-	    = find_namespace_value (current_namespace, DECL_NAME (decl));
-	  loc_value = ns_value;
-	}
-      if (loc_value == error_mark_node
-	  /* An ambiguous lookup.  */
-	  || (loc_value && TREE_CODE (loc_value) == TREE_LIST))
-	loc_value = NULL_TREE;
+      /* First look for a decl that matches.  */
+      tree ns = CP_DECL_CONTEXT (decl);
+      tree binding = find_namespace_value (ns, DECL_NAME (decl));
 
-      for (ovl_iterator iter (loc_value); iter; ++iter)
-	if (!iter.hidden_p ()
-	    && (TREE_STATIC (*iter) || DECL_EXTERNAL (*iter))
-	    && decls_match (*iter, decl))
-	  {
-	    /* The standard only says that the local extern inherits
-	       linkage from the previous decl; in particular, default
-	       args are not shared.  Add the decl into a hash table to
-	       make sure only the previous decl in this case is seen
-	       by the middle end.  */
-	    struct cxx_int_tree_map *h;
-
-	    /* We inherit the outer decl's linkage.  But we're a
-	       different decl.  */
-	    TREE_PUBLIC (decl) = TREE_PUBLIC (*iter);
-
-	    if (cp_function_chain->extern_decl_map == NULL)
-	      cp_function_chain->extern_decl_map
-		= hash_table<cxx_int_tree_map_hasher>::create_ggc (20);
-
-	    h = ggc_alloc<cxx_int_tree_map> ();
-	    h->uid = DECL_UID (decl);
-	    h->to = *iter;
-	    cxx_int_tree_map **loc = cp_function_chain->extern_decl_map
-	      ->find_slot (h, INSERT);
-	    *loc = h;
-	    break;
-	  }
-    }
-
-  if (TREE_PUBLIC (decl))
-    {
-      /* DECL is externally visible.  Make sure it matches a matching
-	 decl in the namespace scope.  We only really need to check
-	 this when inserting the decl, not when we find an existing
-	 match in the current scope.  However, in practice we're
-	 going to be inserting a new decl in the majority of cases --
-	 who writes multiple extern decls for the same thing in the
-	 same local scope?  Doing it here often avoids a duplicate
-	 namespace lookup.  */
-
-      /* Avoid repeating a lookup.  */
-      if (ns_value == decl)
-	ns_value = find_namespace_value (current_namespace, DECL_NAME (decl));
-
-      if (ns_value == error_mark_node
-	  || (ns_value && TREE_CODE (ns_value) == TREE_LIST))
-	ns_value = NULL_TREE;
-
-      for (ovl_iterator iter (ns_value); iter; ++iter)
-	{
-	  tree other = *iter;
-
-	  if (!(TREE_PUBLIC (other) || DECL_EXTERNAL (other)))
-	    ; /* Not externally visible.   */
-	  else if (DECL_EXTERN_C_P (decl) && DECL_EXTERN_C_P (other))
-	    ; /* Both are extern "C", we'll check via that mechanism.  */
-	  else if (TREE_CODE (other) != TREE_CODE (decl)
-		   || ((VAR_P (decl) || matching_fn_p (other, decl))
-		       && !comptypes (TREE_TYPE (decl), TREE_TYPE (other),
-				      COMPARE_REDECLARATION)))
+      if (binding && TREE_CODE (binding) != TREE_LIST)
+	for (ovl_iterator iter (binding); iter; ++iter)
+	  if (decls_match (*iter, decl))
 	    {
-	      auto_diagnostic_group d;
-	      if (permerror (DECL_SOURCE_LOCATION (decl),
-			     "local external declaration %q#D", decl))
-		inform (DECL_SOURCE_LOCATION (other),
-			"does not match previous declaration %q#D", other);
+	      alias = *iter;
 	      break;
 	    }
+
+      if (!alias)
+	{
+	  /* No existing namespace-scope decl.  Make one.  */
+	  alias = copy_decl (decl);
+
+	  /* This is the real thing.  */
+	  DECL_LOCAL_DECL_P (alias) = false;
+
+	  /* Expected default linkage is from the namespace.  */
+	  TREE_PUBLIC (alias) = TREE_PUBLIC (ns);
+	  alias = do_pushdecl_with_scope (alias, NAMESPACE_LEVEL (ns),
+					  /* hiding= */true);
 	}
     }
+
+  retrofit_lang_decl (decl);
+  DECL_LOCAL_DECL_ALIAS (decl) = alias;
 }
 
 /* Record DECL as belonging to the current lexical scope.  Check for
@@ -3079,14 +3019,6 @@ do_pushdecl (tree decl, bool hiding)
       tree *slot = NULL; /* Binding slot in namespace.  */
       tree old = NULL_TREE;
 
-      if (!hiding)
-	/* We should never unknownly push an anticipated decl.  */
-	gcc_checking_assert (!((TREE_CODE (decl) == TYPE_DECL
-				|| TREE_CODE (decl) == FUNCTION_DECL
-				|| TREE_CODE (decl) == TEMPLATE_DECL)
-			       && DECL_LANG_SPECIFIC (decl)
-			       && DECL_ANTICIPATED (decl)));
-
       if (level->kind == sk_namespace)
 	{
 	  /* We look in the decl's namespace for an existing
@@ -3106,10 +3038,6 @@ do_pushdecl (tree decl, bool hiding)
 	  if (binding)
 	    old = binding->value;
 	}
-
-      if (current_function_decl && VAR_OR_FUNCTION_DECL_P (decl)
-	  && DECL_EXTERNAL (decl))
-	set_local_extern_decl_linkage (decl, old != NULL_TREE);
 
       if (old == error_mark_node)
 	old = NULL_TREE;
@@ -3142,6 +3070,16 @@ do_pushdecl (tree decl, bool hiding)
 		  /* We need to check and register the decl now.  */
 		  check_extern_c_conflict (match);
 	      }
+	    else if (slot && !hiding
+		     && STAT_HACK_P (*slot) && STAT_DECL_HIDDEN_P (*slot))
+	      {
+		/* Unhide the non-function.  */
+		gcc_checking_assert (old == match);
+		if (!STAT_TYPE (*slot))
+		  *slot = match;
+		else
+		  STAT_DECL (*slot) = match;
+	      }
 	    return match;
 	  }
 
@@ -3171,8 +3109,6 @@ do_pushdecl (tree decl, bool hiding)
 		  /* Don't attempt to push it.  */
 		  return error_mark_node;
 		}
-	      /* Hide it from ordinary lookup.  */
-	      DECL_ANTICIPATED (decl) = true;
 	    }
 	}
 
@@ -3219,12 +3155,21 @@ do_pushdecl (tree decl, bool hiding)
 	  if (!instantiating_current_function_p ())
 	    record_locally_defined_typedef (decl);
 	}
-      else if (VAR_P (decl))
-	maybe_register_incomplete_var (decl);
+      else
+	{
+	  if (VAR_P (decl) && !DECL_LOCAL_DECL_P (decl))
+	    maybe_register_incomplete_var (decl);
 
-      if ((VAR_P (decl) || TREE_CODE (decl) == FUNCTION_DECL)
-	  && DECL_EXTERN_C_P (decl))
-	check_extern_c_conflict (decl);
+	  if (VAR_OR_FUNCTION_DECL_P (decl))
+	    {
+	      if (DECL_LOCAL_DECL_P (decl)
+		  && TREE_CODE (CP_DECL_CONTEXT (decl)) == NAMESPACE_DECL)
+		push_local_extern_decl_alias (decl);
+
+	      if (DECL_EXTERN_C_P (decl))
+		check_extern_c_conflict (decl);
+	    }
+	}
     }
   else
     add_decl_to_level (level, decl);
@@ -4011,7 +3956,7 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
 		}
 	      else if (old.using_p ())
 		continue; /* This is a using decl. */
-	      else if (old.hidden_p () && DECL_BUILTIN_P (old_fn))
+	      else if (old.hidden_p () && DECL_UNDECLARED_BUILTIN_P (old_fn))
 		continue; /* This is an anticipated builtin.  */
 	      else if (!matching_fn_p (new_fn, old_fn))
 		continue; /* Parameters do not match.  */
@@ -6106,6 +6051,101 @@ qualified_namespace_lookup (tree scope, name_lookup *lookup)
   return found;
 }
 
+/* If DECL is suitably visible to the user, consider its name for
+   spelling correction.  */
+
+static void
+consider_decl (tree decl,  best_match <tree, const char *> &bm,
+	       bool consider_impl_names)
+{
+  /* Skip compiler-generated variables (e.g. __for_begin/__for_end
+     within range for).  */
+  if (TREE_CODE (decl) == VAR_DECL && DECL_ARTIFICIAL (decl))
+    return;
+
+  tree suggestion = DECL_NAME (decl);
+  if (!suggestion)
+    return;
+
+  /* Don't suggest names that are for anonymous aggregate types, as
+     they are an implementation detail generated by the compiler.  */
+  if (IDENTIFIER_ANON_P (suggestion))
+    return;
+
+  const char *suggestion_str = IDENTIFIER_POINTER (suggestion);
+
+  /* Ignore internal names with spaces in them.  */
+  if (strchr (suggestion_str, ' '))
+    return;
+
+  /* Don't suggest names that are reserved for use by the
+     implementation, unless NAME began with an underscore.  */
+  if (!consider_impl_names
+      && name_reserved_for_implementation_p (suggestion_str))
+    return;
+
+  bm.consider (suggestion_str);
+}
+
+/* If DECL is suitably visible to the user, add its name to VEC and
+   return true.  Otherwise return false.  */
+
+static bool
+maybe_add_fuzzy_decl (auto_vec<tree> &vec, tree decl)
+{
+  /* Skip compiler-generated variables (e.g. __for_begin/__for_end
+     within range for).  */
+  if (TREE_CODE (decl) == VAR_DECL && DECL_ARTIFICIAL (decl))
+    return false;
+
+  tree suggestion = DECL_NAME (decl);
+  if (!suggestion)
+    return false;
+
+  /* Don't suggest names that are for anonymous aggregate types, as
+     they are an implementation detail generated by the compiler.  */
+  if (IDENTIFIER_ANON_P (suggestion))
+    return false;
+
+  vec.safe_push (suggestion);
+
+  return true;
+}
+
+/* Examing the namespace binding BINDING, and add at most one instance
+   of the name, if it contains a visible entity of interest.  */
+
+void
+maybe_add_fuzzy_binding (auto_vec<tree> &vec, tree binding,
+			      lookup_name_fuzzy_kind kind)
+{
+  tree value = NULL_TREE;
+
+  if (STAT_HACK_P (binding))
+    {
+      if (!STAT_TYPE_HIDDEN_P (binding)
+	  && STAT_TYPE (binding))
+	{
+	  if (maybe_add_fuzzy_decl (vec, STAT_TYPE (binding)))
+	    return;
+	}
+      else if (!STAT_DECL_HIDDEN_P (binding))
+	value = STAT_DECL (binding);
+    }
+  else
+    value = binding;
+
+  value = ovl_skip_hidden (value);
+  if (value)
+    {
+      value = OVL_FIRST (value);
+      if (kind != FUZZY_LOOKUP_TYPENAME
+	  || TREE_CODE (STRIP_TEMPLATE (value)) == TYPE_DECL)
+	if (maybe_add_fuzzy_decl (vec, value))
+	  return;
+    }
+}
+
 /* Helper function for lookup_name_fuzzy.
    Traverse binding level LVL, looking for good name matches for NAME
    (and BM).  */
@@ -6129,54 +6169,71 @@ consider_binding_level (tree name, best_match <tree, const char *> &bm,
      with an underscore.  */
   bool consider_implementation_names = (IDENTIFIER_POINTER (name)[0] == '_');
 
-  for (tree t = lvl->names; t; t = TREE_CHAIN (t))
+  if (lvl->kind != sk_namespace)
+    for (tree t = lvl->names; t; t = TREE_CHAIN (t))
+      {
+	tree d = t;
+
+	/* OVERLOADs or decls from using declaration are wrapped into
+	   TREE_LIST.  */
+	if (TREE_CODE (d) == TREE_LIST)
+	  d = OVL_FIRST (TREE_VALUE (d));
+
+	/* Don't use bindings from implicitly declared functions,
+	   as they were likely misspellings themselves.  */
+	if (TREE_TYPE (d) == error_mark_node)
+	  continue;
+
+	/* If we want a typename, ignore non-types.  */
+	if (kind == FUZZY_LOOKUP_TYPENAME
+	    && TREE_CODE (STRIP_TEMPLATE (d)) != TYPE_DECL)
+	  continue;
+
+	consider_decl (d, bm, consider_implementation_names);
+      }
+  else
     {
-      tree d = t;
+      /* We need to iterate over the namespace hash table, in order to
+         not mention hidden entities.  But hash table iteration is
+         (essentially) unpredictable, our correction-distance measure
+         is very granular, and we pick the first of equal distances.
+         Hence, we need to call the distance-measurer in a predictable
+         order.  So, iterate over the namespace hash, inserting
+         visible names into a vector.  Then sort the vector.  Then
+         determine spelling distance.  */
+      
+      tree ns = lvl->this_entity;
+      auto_vec<tree> vec;
 
-      /* OVERLOADs or decls from using declaration are wrapped into
-	 TREE_LIST.  */
-      if (TREE_CODE (d) == TREE_LIST)
-	d = OVL_FIRST (TREE_VALUE (d));
+      hash_table<named_decl_hash>::iterator end
+	(DECL_NAMESPACE_BINDINGS (ns)->end ());
+      for (hash_table<named_decl_hash>::iterator iter
+	     (DECL_NAMESPACE_BINDINGS (ns)->begin ()); iter != end; ++iter)
+	maybe_add_fuzzy_binding (vec, *iter, kind);
 
-      /* Don't use bindings from implicitly declared functions,
-	 as they were likely misspellings themselves.  */
-      if (TREE_TYPE (d) == error_mark_node)
-	continue;
+      vec.qsort ([] (const void *a_, const void *b_)
+		 {
+		   return strcmp (IDENTIFIER_POINTER (*(const tree *)a_),
+				  IDENTIFIER_POINTER (*(const tree *)b_));
+		 });
 
-      /* Skip anticipated decls of builtin functions.  */
-      if (TREE_CODE (d) == FUNCTION_DECL
-	  && fndecl_built_in_p (d)
-	  && DECL_ANTICIPATED (d))
-	continue;
+      /* Examine longest to shortest.  */
+      for (unsigned ix = vec.length (); ix--;)
+	{
+	  const char *str = IDENTIFIER_POINTER (vec[ix]);
 
-      /* Skip compiler-generated variables (e.g. __for_begin/__for_end
-	 within range for).  */
-      if (TREE_CODE (d) == VAR_DECL
-	  && DECL_ARTIFICIAL (d))
-	continue;
+	  /* Ignore internal names with spaces in them.  */
+	  if (strchr (str, ' '))
+	    continue;
+	  
+	  /* Don't suggest names that are reserved for use by the
+	     implementation, unless NAME began with an underscore.  */
+	  if (!consider_implementation_names
+	      && name_reserved_for_implementation_p (str))
+	    continue;
 
-      tree suggestion = DECL_NAME (d);
-      if (!suggestion)
-	continue;
-
-      /* Don't suggest names that are for anonymous aggregate types, as
-	 they are an implementation detail generated by the compiler.  */
-      if (IDENTIFIER_ANON_P (suggestion))
-	continue;
-
-      const char *suggestion_str = IDENTIFIER_POINTER (suggestion);
-
-      /* Ignore internal names with spaces in them.  */
-      if (strchr (suggestion_str, ' '))
-	continue;
-
-      /* Don't suggest names that are reserved for use by the
-	 implementation, unless NAME began with an underscore.  */
-      if (name_reserved_for_implementation_p (suggestion_str)
-	  && !consider_implementation_names)
-	continue;
-
-      bm.consider (suggestion_str);
+	  bm.consider (str);
+	}
     }
 }
 
@@ -6688,7 +6745,6 @@ lookup_elaborated_type_1 (tree name, TAG_how how)
 		HIDDEN_TYPE_BINDING_P (iter) = false;
 
 		/* Unanticipate the decl itself.  */
-		DECL_ANTICIPATED (found) = false;
 		DECL_FRIEND_P (found) = false;
 
 		gcc_checking_assert (TREE_CODE (found) != TEMPLATE_DECL);
@@ -6696,7 +6752,6 @@ lookup_elaborated_type_1 (tree name, TAG_how how)
 		if (tree ti = TYPE_TEMPLATE_INFO (TREE_TYPE (found)))
 		  {
 		    tree tmpl = TI_TEMPLATE (ti);
-		    DECL_ANTICIPATED (tmpl) = false;
 		    DECL_FRIEND_P (tmpl) = false;
 		  }
 	      }
@@ -6757,18 +6812,17 @@ lookup_elaborated_type_1 (tree name, TAG_how how)
 	  if (reveal)
 	    {
 	      /* Reveal the previously hidden thing.  */
-	      DECL_ANTICIPATED (found) = false;
 	      DECL_FRIEND_P (found) = false;
 
 	      if (TREE_CODE (found) == TEMPLATE_DECL)
 		{
-		  DECL_ANTICIPATED (DECL_TEMPLATE_RESULT (found)) = false;
-		  DECL_FRIEND_P (DECL_TEMPLATE_RESULT (found)) = false;
+		  tree res = DECL_TEMPLATE_RESULT (found);
+		  if (DECL_LANG_SPECIFIC (res))
+		    DECL_FRIEND_P (res) = false;
 		}
 	      else if (tree ti = TYPE_TEMPLATE_INFO (TREE_TYPE (found)))
 		{
 		  tree tmpl = TI_TEMPLATE (ti);
-		  DECL_ANTICIPATED (tmpl) = false;
 		  DECL_FRIEND_P (tmpl) = false;
 		}
 	    }
@@ -6789,20 +6843,6 @@ lookup_elaborated_type (tree name, TAG_how how)
   tree ret = lookup_elaborated_type_1 (name, how);
   timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return ret;
-}
-
-/* Returns true iff DECL is a block-scope extern declaration of a function
-   or variable.  We will already have determined validity of the decl
-   when pushing it.  So we do not have to redo that lookup.  */
-
-bool
-is_local_extern (tree decl)
-{
-  if ((TREE_CODE (decl) == FUNCTION_DECL
-       || TREE_CODE (decl) == VAR_DECL))
-    return DECL_LOCAL_DECL_P (decl);
-
-  return false;
 }
 
 /* The type TYPE is being declared.  If it is a class template, or a
@@ -6977,7 +7017,6 @@ do_pushtag (tree name, tree type, TAG_how how)
 	     ordinary name lookup.  Its corresponding TEMPLATE_DECL
 	     will be marked in push_template_decl.  */
 	  retrofit_lang_decl (tdef);
-	  DECL_ANTICIPATED (tdef) = 1;
 	  DECL_FRIEND_P (tdef) = 1;
 	}
 
@@ -7404,6 +7443,8 @@ pushdecl_top_level (tree x)
 {
   bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   do_push_to_top_level ();
+  gcc_checking_assert (!DECL_CONTEXT (x));
+  DECL_CONTEXT (x) = FROB_CONTEXT (global_namespace);
   x = pushdecl_namespace_level (x);
   do_pop_from_top_level ();
   timevar_cond_stop (TV_NAME_LOOKUP, subtime);
@@ -7418,6 +7459,8 @@ pushdecl_top_level_and_finish (tree x, tree init)
 {
   bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   do_push_to_top_level ();
+  gcc_checking_assert (!DECL_CONTEXT (x));
+  DECL_CONTEXT (x) = FROB_CONTEXT (global_namespace);
   x = pushdecl_namespace_level (x);
   cp_finish_decl (x, init, false, NULL_TREE, 0);
   do_pop_from_top_level ();

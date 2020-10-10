@@ -2261,8 +2261,6 @@ ovl_insert (tree fn, tree maybe_ovl, int using_or_hidden)
     {
       maybe_ovl = ovl_make (fn, maybe_ovl);
 
-      gcc_checking_assert ((using_or_hidden < 0) == DECL_HIDDEN_P (fn));
-
       if (using_or_hidden < 0)
 	OVL_HIDDEN_P (maybe_ovl) = true;
       if (using_or_hidden > 0)
@@ -2287,14 +2285,8 @@ ovl_insert (tree fn, tree maybe_ovl, int using_or_hidden)
 tree
 ovl_skip_hidden (tree ovl)
 {
-  for (;
-       ovl && TREE_CODE (ovl) == OVERLOAD && OVL_HIDDEN_P (ovl);
-       ovl = OVL_CHAIN (ovl))
-    gcc_checking_assert (DECL_HIDDEN_P (OVL_FUNCTION (ovl)));
-
-  /* We should not see a naked hidden decl.  */
-  gcc_checking_assert (!(ovl && TREE_CODE (ovl) != OVERLOAD
-			 && DECL_HIDDEN_P (ovl)));
+  while (ovl && TREE_CODE (ovl) == OVERLOAD && OVL_HIDDEN_P (ovl))
+    ovl = OVL_CHAIN (ovl);
 
   return ovl;
 }
@@ -2646,6 +2638,9 @@ build_cp_fntype_variant (tree type, cp_ref_qualifier rqual,
 
   /* Need to build a new variant.  */
   v = build_variant_type_copy (type);
+  if (!TYPE_DEPENDENT_P (v))
+    /* We no longer know that it's not type-dependent.  */
+    TYPE_DEPENDENT_P_VALID (v) = false;
   TYPE_RAISES_EXCEPTIONS (v) = raises;
   TYPE_HAS_LATE_RETURN_TYPE (v) = late;
   switch (rqual)
@@ -3808,6 +3803,8 @@ cp_tree_equal (tree t1, tree t2)
 	    if (SIZEOF_EXPR_TYPE_P (t2))
 	      o2 = TREE_TYPE (o2);
 	  }
+	else if (ALIGNOF_EXPR_STD_P (t1) != ALIGNOF_EXPR_STD_P (t2))
+	  return false;
 
 	if (TREE_CODE (o1) != TREE_CODE (o2))
 	  return false;

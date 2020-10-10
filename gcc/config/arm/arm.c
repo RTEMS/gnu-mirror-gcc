@@ -3391,6 +3391,20 @@ arm_configure_build_target (struct arm_build_target *target,
       bitmap_ior (target->isa, target->isa, fpu_bits);
     }
 
+  /* There may be implied bits which we still need to enable. These are
+     non-named features which are needed to complete other sets of features,
+     but cannot be enabled from arm-cpus.in due to being shared between
+     multiple fgroups. Each entry in all_implied_fbits is of the form
+     ante -> cons, meaning that if the feature "ante" is enabled, we should
+     implicitly enable "cons".  */
+  const struct fbit_implication *impl = all_implied_fbits;
+  while (impl->ante)
+    {
+      if (bitmap_bit_p (target->isa, impl->ante))
+	bitmap_set_bit (target->isa, impl->cons);
+      impl++;
+    }
+
   if (!arm_selected_tune)
     arm_selected_tune = arm_selected_cpu;
   else /* Validate the features passed to -mtune.  */
@@ -28950,6 +28964,30 @@ arm_preferred_simd_mode (scalar_mode mode)
       default:;
       }
 
+  if (TARGET_HAVE_MVE)
+    switch (mode)
+      {
+      case QImode:
+	return V16QImode;
+      case HImode:
+	return V8HImode;
+      case SImode:
+	return V4SImode;
+
+      default:;
+      }
+
+  if (TARGET_HAVE_MVE_FLOAT)
+    switch (mode)
+      {
+      case HFmode:
+	return V8HFmode;
+      case SFmode:
+	return V4SFmode;
+
+      default:;
+      }
+
   return word_mode;
 }
 
@@ -30632,6 +30670,127 @@ arm_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
   if (is_armv8_sync
       || !(use_acquire || use_release))
     arm_post_atomic_barrier (model);
+}
+
+/* Expand code to compare vectors OP0 and OP1 using condition CODE.
+   If CAN_INVERT, store either the result or its inverse in TARGET
+   and return true if TARGET contains the inverse.  If !CAN_INVERT,
+   always store the result in TARGET, never its inverse.
+
+   Note that the handling of floating-point comparisons is not
+   IEEE compliant.  */
+
+bool
+arm_expand_vector_compare (rtx target, rtx_code code, rtx op0, rtx op1,
+			   bool can_invert)
+{
+  machine_mode cmp_result_mode = GET_MODE (target);
+  machine_mode cmp_mode = GET_MODE (op0);
+
+  bool inverted;
+  switch (code)
+    {
+    /* For these we need to compute the inverse of the requested
+       comparison.  */
+    case UNORDERED:
+    case UNLT:
+    case UNLE:
+    case UNGT:
+    case UNGE:
+    case UNEQ:
+    case NE:
+      code = reverse_condition_maybe_unordered (code);
+      if (!can_invert)
+	{
+	  /* Recursively emit the inverted comparison into a temporary
+	     and then store its inverse in TARGET.  This avoids reusing
+	     TARGET (which for integer NE could be one of the inputs).  */
+	  rtx tmp = gen_reg_rtx (cmp_result_mode);
+	  if (arm_expand_vector_compare (tmp, code, op0, op1, true))
+	    gcc_unreachable ();
+	  emit_insn (gen_rtx_SET (target, gen_rtx_NOT (cmp_result_mode, tmp)));
+	  return false;
+	}
+      inverted = true;
+      break;
+
+    default:
+      inverted = false;
+      break;
+    }
+
+  switch (code)
+    {
+    /* These are natively supported for zero comparisons, but otherwise
+       require the operands to be swapped.  */
+    case LE:
+    case LT:
+      if (op1 != CONST0_RTX (cmp_mode))
+	{
+	  code = swap_condition (code);
+	  std::swap (op0, op1);
+	}
+      /* Fall through.  */
+
+    /* These are natively supported for both register and zero operands.  */
+    case EQ:
+    case GE:
+    case GT:
+      emit_insn (gen_neon_vc (code, cmp_mode, target, op0, op1));
+      return inverted;
+
+    /* These are natively supported for register operands only.
+       Comparisons with zero aren't useful and should be folded
+       or canonicalized by target-independent code.  */
+    case GEU:
+    case GTU:
+      emit_insn (gen_neon_vc (code, cmp_mode, target,
+			      op0, force_reg (cmp_mode, op1)));
+      return inverted;
+
+    /* These require the operands to be swapped and likewise do not
+       support comparisons with zero.  */
+    case LEU:
+    case LTU:
+      emit_insn (gen_neon_vc (swap_condition (code), cmp_mode,
+			      target, force_reg (cmp_mode, op1), op0));
+      return inverted;
+
+    /* These need a combination of two comparisons.  */
+    case LTGT:
+    case ORDERED:
+      {
+	/* Operands are LTGT iff (a > b || a > b).
+	   Operands are ORDERED iff (a > b || a <= b).  */
+	rtx gt_res = gen_reg_rtx (cmp_result_mode);
+	rtx alt_res = gen_reg_rtx (cmp_result_mode);
+	rtx_code alt_code = (code == LTGT ? LT : LE);
+	if (arm_expand_vector_compare (gt_res, GT, op0, op1, true)
+	    || arm_expand_vector_compare (alt_res, alt_code, op0, op1, true))
+	  gcc_unreachable ();
+	emit_insn (gen_rtx_SET (target, gen_rtx_IOR (cmp_result_mode,
+						     gt_res, alt_res)));
+	return inverted;
+      }
+
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Expand a vcond or vcondu pattern with operands OPERANDS.
+   CMP_RESULT_MODE is the mode of the comparison result.  */
+
+void
+arm_expand_vcond (rtx *operands, machine_mode cmp_result_mode)
+{
+  rtx mask = gen_reg_rtx (cmp_result_mode);
+  bool inverted = arm_expand_vector_compare (mask, GET_CODE (operands[3]),
+					     operands[4], operands[5], true);
+  if (inverted)
+    std::swap (operands[1], operands[2]);
+  emit_insn (gen_neon_vbsl (GET_MODE (operands[0]), operands[0],
+			    mask, operands[1], operands[2]));
 }
 
 #define MAX_VECT_LEN 16
@@ -33116,9 +33275,7 @@ arm_expand_divmod_libfunc (rtx libfunc, machine_mode mode,
     = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode));
 
   rtx libval = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST,
-					libval_mode,
-					op0, GET_MODE (op0),
-					op1, GET_MODE (op1));
+					libval_mode, op0, mode, op1, mode);
 
   rtx quotient = simplify_gen_subreg (mode, libval, libval_mode, 0);
   rtx remainder = simplify_gen_subreg (mode, libval, libval_mode,
