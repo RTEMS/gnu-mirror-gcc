@@ -19,21 +19,24 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#include <vector>
+#include <map>
+#include <set>
+#include <list>
+#include <algorithm>
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
 #include "tree.h"
 #include "tree-ssa.h"
+#include "tree-ssa-loop-ivopts.h"
 #include "tree-dfa.h"
 #include "gimple.h"
 #include "tree-pass.h"
 #include "cgraph.h"
 #include "gimple-iterator.h"
 #include "pretty-print.h"
-#include <vector>
-#include <map>
-#include <set>
 #include "ipa-structure-reorg.h"
 #include "dumpfile.h"
 #include "tree-pretty-print.h"
@@ -49,13 +52,26 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "wide-int.h"
 
+typedef struct acc_base_info acc_base_info_t;
+typedef struct acc_info acc_info_t;
+typedef struct varInfo varInfo_t;
+
 static void wrangle_ssa_type( tree, Info_t*);
 //static bool print_internals (gimple *, void *);
 static void str_reorg_instance_interleave_qual_part ( Info *);
 static void str_reorg_instance_interleave_type_part ( Info *);
 static void header ( bool);
+static void print_var_infos ( FILE *, std::vector<varInfo_t> &);
+static void compress_acc_infos ( std::vector <acc_info_t>);
+static void print_acc_info ( FILE *, acc_info_t *);
+static void print_acc_infos ( FILE *, std::vector <acc_info_t>);
+static bool acc_lt ( const acc_info_t&, const acc_info_t&);
+static bool acc_eq ( const acc_info_t&, const acc_info_t&);
+static bool all_but_field_eq ( const acc_info_t&, const acc_info_t&);
 static double cut_off_eq_single_pool( double);
 static double alignment_effect( unsigned HOST_WIDE_INT);
+static void tell_me_about_ssa_name ( tree, int);
+static void analyze_access ( tree , acc_info_t *);
 static void create_new_types ( Info_t *);
 static void create_a_new_type ( Info_t *, tree);
 static unsigned int reorg_perf_qual ( Info *);
@@ -93,10 +109,10 @@ static basic_block make_bb ( char *, basic_block);
 */
 
 // These are dummy values tha alway result the reorganization
-#define SINGLE_POOL_RAW_SKIP_IT      0.0
-#define SINGLE_POOL_RAW_DO_IT_ALWAYS 0.0
-#define SINGLE_POOL_ABS_SKIP_IT      0.0
-#define SINGLE_POOL_ABS_DO_IT_ALWAYS 0.0
+#define SINGLE_POOL_RAW_SKIP_IT      0.05
+#define SINGLE_POOL_RAW_DO_IT_ALWAYS 0.90
+#define SINGLE_POOL_ABS_SKIP_IT      0.02
+#define SINGLE_POOL_ABS_DO_IT_ALWAYS 0.10
   
 int
 str_reorg_instance_interleave_qual ( Info *info)
@@ -105,6 +121,7 @@ str_reorg_instance_interleave_qual ( Info *info)
   //
   str_reorg_instance_interleave_qual_part ( info);
 
+  //if ( BYPASS_TRANSFORM ) return 0;
   // this modifiies the qualified types.
   //
   str_reorg_instance_interleave_type_part ( info);
@@ -114,14 +131,21 @@ str_reorg_instance_interleave_qual ( Info *info)
 int
 str_reorg_instance_interleave_trans ( Info *info)
 {
+  if ( BYPASS_TRANSFORM )
+    {
+
+      fprintf ( stderr, "Bypassing str_reorg_instance_interleave_trans for experiment\n");
+      return 0;
+    }
+  
   if ( info->show_all_reorg_cands )
   {
     fprintf ( info->reorg_dump_file, "Start of str_reorg_instance_interleave_trans:\n");
     print_program ( info->reorg_dump_file, PRINT_FORMAT, 4, info);
   }
 
-  DEBUG ("INTERNALS PRINT\n");
-  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  //DEBUG ("INTERNALS PRINT\n");
+  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
   
   struct cgraph_node *node;
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node)  {
@@ -245,7 +269,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      
 		      DEBUG_L("ReorgT_ElemAssign: ");
 		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-		      INDENT(2);
+		      //INDENT(2);
 		      // Needed for helloworld
 		      tree lhs = gimple_assign_lhs( stmt);
 		      tree rhs = gimple_assign_rhs1( stmt);
@@ -255,7 +279,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree ro_side = ro_on_left ? lhs : rhs;
 		      tree nonro_side = ro_on_left ? rhs : lhs;
 		      
-		      switch ( recognize_op ( ro_side, info) )  // "a->f"
+		      switch ( recognize_op ( ro_side, true, info) )  // "a->f"
 			{
 			case ReorgOpT_Indirect:
 			  {
@@ -427,14 +451,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  
 			} // end recognize_op ( rhs, info) switch
 
-		      INDENT(-2);
+		      //INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
 		  case ReorgT_If_Null:
 		  case ReorgT_If_NotNull:
 		    {
-		      DEBUG_L("ReorgT_If_(Not)Null: ");
-		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_L("ReorgT_If_(Not)Null: ");
+		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      /*
 			gimple_cond_set_rhs( stmt, 
 			TYPE_MAX_VALUE( pointer_sized_int_node));
@@ -449,14 +473,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //tree max = TYPE_MAX_VALUE ( TREE_TYPE ( ri->pointer_rep));
 		      tree max = TYPE_MAX_VALUE ( ri->pointer_rep);
 		      
-		      DEBUG_L("max: ");
-		      DEBUG_F(print_generic_expr, stderr, max, (dump_flags_t)0);
-		      DEBUG("\n");
+		      //DEBUG_L("max: ");
+		      //DEBUG_F(print_generic_expr, stderr, max, (dump_flags_t)0);
+		      //DEBUG("\n");
 		      
 		      gimple_cond_set_rhs( cond_stmt, max);
 		      
-		      DEBUG_L("after: ");
-		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_L("after: ");
+		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		    }
 		    break;
 		  case ReorgT_IfPtrEQ:
@@ -465,13 +489,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_IfPtrGT:
 		  case ReorgT_IfPtrLE:
 		  case ReorgT_IfPtrGE:
-		    DEBUG_L("ReorgT_IfPtr*\n");
+		    //DEBUG_L("ReorgT_IfPtr*\n");
 		    // Not needed for single pool. TBD test this
 		    break;
 		  case ReorgT_PtrPlusInt:   // "a = b + i"
 		    {
-		      DEBUG_L("ReorgT_PtrPlusInt: ");
-		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_L("ReorgT_PtrPlusInt: ");
+		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      // Needed for hellowotrld
 		      
 		      // Does the type of stmt need to be adjusted? I assume so.
@@ -526,14 +550,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 
 		      gsi_remove ( &gsi, true);
 
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPPI_rhs2_cast, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPPI_adj, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPPI, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPPI_cast, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_rhs2_cast, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_adj, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPPI, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_cast, 0);
 		    }
 		    break;
 		  case ReorgT_Ptr2Zero:   //  "a = 0"
@@ -587,14 +611,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 
 		      gsi_remove ( &gsi, true);
 
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPD_rhs1_cast, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPD_rhs2_cast, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPD, 0);
-		      DEBUG_L("");
-		      DEBUG_F( print_gimple_stmt, stderr, gPD_cast, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPD_rhs1_cast, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPD_rhs2_cast, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPD, 0);
+		      //DEBUG_L("");
+		      //DEBUG_F( print_gimple_stmt, stderr, gPD_cast, 0);
 		  }
 		    break;
 		  case ReorgT_Adr2Ptr:    //  "a = &x[i]"
@@ -616,7 +640,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    break;
 		  case ReorgT_PtrNull:     //  "x = a == 0"
 		  case ReorgT_PtrNotNull:  //  "x = a != 0"
-		    DEBUG_L("ReorgT_Ptr(Not)Null\n");\
+		    DEBUG_L("ReorgT_Ptr(Not)Null\n");	\
 		    // TBD
 		    /*
 	      gimple_set_op( stmt, 2, 
@@ -635,7 +659,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_Malloc:
 		    {
 		      DEBUG_L("Transform ReorgT_Malloc\n");
-		      INDENT(2);
+		      //INDENT(2);
 
 		      // We need to use the user malloc function
 		      // declaration rather than the builtin!!!
@@ -1082,7 +1106,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //DEBUG_L("End of malloc:\n");
 		      //DEBUG_F( print_program, PRINT_FORMAT, stderr, 4);
 		    }
-		    INDENT(-2);
+		    //INDENT(-2);
 		    break;
 		  case ReorgT_Calloc:
 		    // TBD
@@ -1301,8 +1325,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	// transform any constant zero into it's new repersentation.
 	// OR MAYBE... use FOR_EACH_PHI_ARG for the iterator...
 	
-	DEBUG_L("Phis with constant operands:\n");
-	INDENT(4);
+	//DEBUG_L("Phis with constant operands:\n");
+	//INDENT(4);
 	gphi_iterator pi;
 	for ( pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	  {
@@ -1319,30 +1343,30 @@ str_reorg_instance_interleave_trans ( Info *info)
 		for (int i = 0; i < gimple_phi_num_args (phi); i++)
 		  {
 		    tree *arg = gimple_phi_arg_def_ptr (phi, i);
-		    DEBUG_A("arg[%d] = ",i);
-		    DEBUG_F(flexible_print, stderr, *arg, 1, (dump_flags_t)0);
+		    //DEBUG_A("arg[%d] = ",i);
+		    //DEBUG_F(flexible_print, stderr, *arg, 1, (dump_flags_t)0);
 		    bool int_cst = TREE_CODE ( *arg) == INTEGER_CST;
-		    DEBUG_A("is %sinteger constant\n", int_cst ? "" : "not ");
+		    //DEBUG_A("is %sinteger constant\n", int_cst ? "" : "not ");
 		    if ( int_cst && integer_zerop ( *arg) )
 		      {
 			*arg = TYPE_MAX_VALUE ( ri->pointer_rep);
-			DEBUG_L("arg after = ");
-			DEBUG_F(flexible_print, stderr, *arg, 1, (dump_flags_t)0);
+			//DEBUG_L("arg after = ");
+			//DEBUG_F(flexible_print, stderr, *arg, 1, (dump_flags_t)0);
 		      }
 		  }
 	      }
 	  }
-	INDENT(-4);
+	//INDENT(-4);
       }
     pop_cfun ();
   }
 
-  DEBUG_L("after bulk of transformations\n");
+  //DEBUG_L("after bulk of transformations\n");
 
-  DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
+  //DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
   
-  DEBUG ("INTERNALS PRINT\n");
-  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  //DEBUG ("INTERNALS PRINT\n");
+  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
 
   // A mini-pass to fixup dangling SSA temps.
   
@@ -1353,7 +1377,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 
       std::vector <tree> ssa_to_delete;
 
-      DEBUG_L("Mini-Pass on Function %s:\n", lang_hooks.decl_printable_name ( func->decl, 2));
+      //DEBUG_L("Mini-Pass on Function %s:\n", lang_hooks.decl_printable_name ( func->decl, 2));
       
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
@@ -1385,21 +1409,21 @@ str_reorg_instance_interleave_trans ( Info *info)
       // of many functions mapping onto one declaration (which I
       // even doubt is possible in thi case) can't be a problem.
       
-      DEBUG_L("Dangling Types for Function Params (default defs).\n");
-      INDENT(4);
+      //DEBUG_L("Dangling Types for Function Params (default defs).\n");
+      //INDENT(4);
       tree parm;
       for ( parm = DECL_ARGUMENTS ( func->decl);
 	    parm;
 	    parm = DECL_CHAIN ( parm) )
 	{
-	  DEBUG_A("param: ");
-	  DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
-	  DEBUG("\n");
-	  INDENT(2);
+	  //DEBUG_A("param: ");
+	  //DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
+	  //DEBUG("\n");
+	  //INDENT(2);
 	  tree old_default_def = ssa_default_def ( func, parm);
-	  DEBUG_A("old_default_def: ");
-	  DEBUG_F( print_generic_expr, stderr, old_default_def, (dump_flags_t)0);
-	  DEBUG("\n");
+	  //DEBUG_A("old_default_def: ");
+	  //DEBUG_F( print_generic_expr, stderr, old_default_def, (dump_flags_t)0);
+	  //DEBUG("\n");
 	  tree new_default_def;
 
 	  // Modify prameter and do the default def stuff
@@ -1409,9 +1433,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  
 	  if ( modify_decl_core ( &parm, info) )
 	    {
-	      DEBUG_A("double check new param: ");
-	      DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
-	      DEBUG("\n");
+	      //DEBUG_A("double check new param: ");
+	      //DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
+	      //DEBUG("\n");
 	      
 	      // New default def here
 
@@ -1438,11 +1462,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  new_default_def = make_ssa_name_fn ( func, parm, gimple_build_nop ());
 		  set_ssa_default_def ( func, parm, new_default_def);
 
-		  DEBUG_A("new_default_def: ");
-		  DEBUG_F(print_generic_expr, stderr, new_default_def, (dump_flags_t)0);
-		  DEBUG(", TYPE: ");
-		  DEBUG_F(print_generic_expr, stderr, TREE_TYPE(new_default_def), (dump_flags_t)0);
-		  DEBUG("\n");
+		  //DEBUG_A("new_default_def: ");
+		  //DEBUG_F(print_generic_expr, stderr, new_default_def, (dump_flags_t)0);
+		  //DEBUG(", TYPE: ");
+		  //DEBUG_F(print_generic_expr, stderr, TREE_TYPE(new_default_def), (dump_flags_t)0);
+		  //DEBUG("\n");
 
 		  // TBD REMOVE DUPLICATE!
 		  // Replace old one (not really totally hence the
@@ -1456,8 +1480,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  // new default def
 		  FOR_EACH_IMM_USE_STMT ( stmt, iter, old_default_def)  // <== use other form??? Not
 		    {
-		      DEBUG_A("before: ");
-		      DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_A("before: ");
+		      //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
 		      use_operand_p use_p;
 		      ssa_op_iter ssa_iter;
 		      // The F_E_S_U_O macro was blowing up on a phi
@@ -1466,14 +1490,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 			{
 			  if ( use_p == NULL ) continue;
 			  tree use = USE_FROM_PTR (use_p);
-			  DEBUG_A("use to replace: ");
-			  DEBUG_F( print_generic_expr, stderr, use, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_A("use to replace: ");
+			  //DEBUG_F( print_generic_expr, stderr, use, (dump_flags_t)0);
+			  //DEBUG("\n");
 			  if (use == old_default_def)
 			    SET_USE ( use_p, new_default_def);
 			}
-		      DEBUG_A("after: ");
-		      DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_A("after: ");
+		      //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
 		    }
 		  // Get rid of the old default def because it confuses
 		  //
@@ -1482,12 +1506,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  release_ssa_name_fn ( func, old_default_def);
 		}
 	    }
-	  INDENT(-2);
+	  //INDENT(-2);
 	}
-      INDENT(-4);
+      //INDENT(-4);
       
-      DEBUG_L("Dangling Types for Function Local (default defs).\n");
-      INDENT(4);
+      //DEBUG_L("Dangling Types for Function Local (default defs).\n");
+      //INDENT(4);
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
       
@@ -1502,9 +1526,9 @@ str_reorg_instance_interleave_trans ( Info *info)
       tree decl;
       FOR_EACH_LOCAL_DECL ( func, i, decl)
 	{
-	  DEBUG_A("local: ");
-	  DEBUG_F( print_generic_decl, stderr, decl, (dump_flags_t)0);
-	  DEBUG("\n");
+	  //DEBUG_A("local: ");
+	  //DEBUG_F( print_generic_decl, stderr, decl, (dump_flags_t)0);
+	  //DEBUG("\n");
 	  tree old_default_def = ssa_default_def ( func, decl);
 	  tree new_default_def;
 	  
@@ -1544,28 +1568,28 @@ str_reorg_instance_interleave_trans ( Info *info)
 		}
 	    }
 	}
-      INDENT(-4);      
+      //INDENT(-4);      
       
       // Normal ssa name case
-      DEBUG_L("Dangling Types for Normal SSA Names:\n");
+      //DEBUG_L("Dangling Types for Normal SSA Names:\n");
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
       
-      INDENT(4);
+      //INDENT(4);
       // We use len instead of using func->length() in the for loop test
       // because new ssa names are created in the loop body and we
       // shouldn't process them.
       unsigned int len = SSANAMES ( func)->length ();
-      DEBUG_L("len = %d\n",len);
+      //DEBUG_L("len = %d\n",len);
       for ( unsigned int i = 0; i < len; i++)
 	{
-	  DEBUG_L("SSANAMES(func)[%d]\n",i);
+	  //DEBUG_L("SSANAMES(func)[%d]\n",i);
 
 	  tree ssa_name = (*SSANAMES ( func))[i];
 
 	  if( ssa_name == NULL )
 	    {
-	      DEBUG_L("Skip, ssa_name == NULL\n");
+	      //DEBUG_L("Skip, ssa_name == NULL\n");
 	      continue;
 	    }
 
@@ -1576,42 +1600,42 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  tree type = TREE_TYPE ( ssa_name);
 	  tree bottom_type = base_type_of ( type);
 	  ReorgType_t *ri = get_reorgtype_info ( bottom_type, info);
-	  DEBUG_L("ssa_name = ");
-	  DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
-	  DEBUG(" %s", a_default_def ? "is default_def" : "");
-	  DEBUG(" %s", no_defining_stmt ? "has no defining stmt" : "");
-	  DEBUG(" %s", defined_by_nop ? "defined by a nop" : "");
-	  DEBUG(", type = ");
-	  DEBUG_F(print_generic_expr, stderr, type, (dump_flags_t)0);
-	  DEBUG(", bottom_type = ");
-	  DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
-	  DEBUG(", ri = %p\n",ri);
+	  //DEBUG_L("ssa_name = ");
+	  //DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
+	  //DEBUG(" %s", a_default_def ? "is default_def" : "");
+	  //DEBUG(" %s", no_defining_stmt ? "has no defining stmt" : "");
+	  //DEBUG(" %s", defined_by_nop ? "defined by a nop" : "");
+	  //DEBUG(", type = ");
+	  //DEBUG_F(print_generic_expr, stderr, type, (dump_flags_t)0);
+	  //DEBUG(", bottom_type = ");
+	  //DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
+	  //DEBUG(", ri = %p\n",ri);
 
 	  // If it's not a dangling type we don't care
 	  if ( ri == NULL )
 	    {
-	      DEBUG_L("Skip, ri == NULL\n");
+	      //DEBUG_L("Skip, ri == NULL\n");
 	      continue;
 	    }
 
 	  // A default def is processed seperately
 	  if ( a_default_def )
 	    {
-	      DEBUG_L("Skip default_def\n");
+	      //DEBUG_L("Skip default_def\n");
 	      continue;
 	    }
 
 	  gcc_assert ( !no_defining_stmt);
 	  gcc_assert ( !defined_by_nop);
 
-	  DEBUG_L("Defining stmt: ");
-	  DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
+	  //DEBUG_L("Defining stmt: ");
+	  //DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
 
 	  tree new_type = ri->pointer_rep;
 	  tree new_ssa_name = make_temp_ssa_name( new_type, NULL, "dedangled");
-	  DEBUG_L("new_ssa_name = ");
-	  DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);
-	  DEBUG("\n");
+	  //DEBUG_L("new_ssa_name = ");
+	  //DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);
+	  //DEBUG("\n");
 	  #if DEBUGGING
 	  for ( unsigned int j = 0; j < SSANAMES ( func)->length (); j++)
 	    {
@@ -1627,8 +1651,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  imm_use_iterator iter;
 	  FOR_EACH_IMM_USE_STMT ( use_stmt, iter, ssa_name)
 	    {
-	      DEBUG_L("use_stmt before: ");
-	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      //DEBUG_L("use_stmt before: ");
+	      //DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
 	      
 	      // Deal with the uses
 	      use_operand_p use_p;
@@ -1637,14 +1661,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      //FOR_EACH_SSA_USE_OPERAND( use_p, use_stmt, ssa_iter, SSA_OP_USE )
 	      FOR_EACH_PHI_OR_STMT_USE ( use_p, use_stmt, ssa_iter, SSA_OP_USE )
 		{
-		  DEBUG_L("use_p = %p\n",use_p);
+		  //DEBUG_L("use_p = %p\n",use_p);
 		  if ( use_p == NULL ) continue;
 		  tree use = USE_FROM_PTR (use_p);
 		  if (use == ssa_name)
 		    SET_USE ( use_p, new_ssa_name);
 		}
-	      DEBUG_L("use_stmt after: ");
-	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      //DEBUG_L("use_stmt after: ");
+	      //DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
 	      
 	      // Should update_stmt be called here?
 	      // It does not seem either harm or help so I'll
@@ -1653,12 +1677,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    }
 	  // Modify the LHS too
 	  // TBD This code needs to be more general.
-	  DEBUG_L("What is ssa_name? ");
-	  DEBUG_F(flexible_print, stderr, ssa_name, 1, (dump_flags_t)0);
+	  //DEBUG_L("What is ssa_name? ");
+	  //DEBUG_F(flexible_print, stderr, ssa_name, 1, (dump_flags_t)0);
 	  gimple *def = SSA_NAME_DEF_STMT ( ssa_name);
 	  
-	  DEBUG_L("def: ");
-	  DEBUG_F ( print_gimple_stmt, stderr, def, 0);
+	  //DEBUG_L("def: ");
+	  //DEBUG_F ( print_gimple_stmt, stderr, def, 0);
 	  
 	  set_lhs_for ( def, new_ssa_name);
 
@@ -1668,7 +1692,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  release_ssa_name_fn ( func, ssa_name);
 	  
 	}
-      INDENT(-4);
+      //INDENT(-4);
 
       // Might be a bad idea.
       #if 0
@@ -1681,17 +1705,20 @@ str_reorg_instance_interleave_trans ( Info *info)
       pop_cfun ();
     }
 
-  DEBUG_L("after mini-passes\n");
+  // This used to be off of.. "if ( info->show_all_reorg_cands ) { ..."
+  // I'm leaning towards deleting this as redundnt.
+  //DEBUG ( info->reorg_dump_file,
+  //  "\nEnd of str_reorg_instance_interleave_trans (after mini-psasses):\n\n");
+  //DEBUG_F ( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
 
-  if ( info->show_all_reorg_cands )
-    {
-      fprintf ( info->reorg_dump_file, "End of str_reorg_instance_interleave_trans:\n");
-      print_program ( info->reorg_dump_file, PRINT_FORMAT, 4, info);
-    }
-  
   // TBD Should this be a diagnostic or not?
-  DEBUG ("INTERNALS PRINT\n");
-  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  //DEBUG ("INTERNALS PRINT\n");
+  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  
+  // NOTE, spinning through all the functions and recomputing all the
+  // dominace info here is a really bad idea.
+
+  return 0;
 }
 
 // Note, the following code might be a bit overly simplistic.
@@ -1888,32 +1915,64 @@ struct reorg_bb_info {
 };
 
 typedef struct perf_bb_info perf_bb_info_t;
-typedef struct acc_info acc_info_t;
-typedef struct var_info var_info_t;
 
-struct var_info {
-  varpool_node *var;
-  sbitmap *bits;
-  double  count;
+struct acc_base_info {
+  bool a_def_def;
+  bool a_decl;
+  bool a_func;
+  bool has_induct_var_acc;
+  bool multi_induct;
+  bool complicated;
+  // TBD Note could look at sign of operation for the
+  // induction. Variables moving forward are different (cache access
+  // wise) that those moving backward do the sort/compress shouldn't
+  // lump them together.
+  tree acc_base;
+  tree induct_base;
+  gimple *function;
+};
+
+struct varInfo {
+  // Varpool_nodes are a pain to get at so I'll just
+  // use the first entry in a run of access info enties
+  // where all of the information but the field is the
+  // same.
+  //varpool_node *var;
+  acc_info_t *rep_access;
+  // This seems bit map scheme seems tedious and unnecessay.
+  // just use the fields
+  // sbitmap *bits;
+  std::list<tree> fields;
+  // The count doesn't vary in the simplified scheme
+  //double  count;
 };
 
 struct acc_info {
-  varpool_node *v;
-  int           field_num;
+  // trying to get to the varpool seems too hard
+  // so I'll try for he decl
+  //varpool_node *v;
+  tree access;
+  tree field; // int field_num;
+  acc_base_info_t base_info;
+  ReorgType_t *reorg;
 };
 
-struct perf_loop_info {
-  std::vector <var_info_t*> *vari;
-  class loop *gcc_loop;
-};
+//struct perf_loop_info {
+//  std::vector <varInfo_t*> *vari;
+//  class loop *gcc_loop;
+//};
 
-static void account_for_use( tree, std::vector <acc_info_t> *);
+static void account_for_access( tree, tree, std::vector <acc_info_t> *, Info_t *);
 static bool is_array_access( tree);
 
 static unsigned int
 reorg_perf_qual ( Info *info)
 {
-  DEBUG_L("reorg_perf_qual:\n");
+  if ( info->show_perf_qualify )
+    {
+      fprintf ( info->reorg_dump_file, "Doing Performance Qualification\n");
+    }
+  //DEBUG_L("reorg_perf_qual:\n");
   #if 1
   // TBD use design in doc but mark ReorgTypes
   // (do_instance_interleave) that qualify instead of deleting them
@@ -1926,7 +1985,8 @@ reorg_perf_qual ( Info *info)
     {
       (*(info->reorg_type))[i].do_instance_interleave = true;
     }
-  #else
+  #endif
+  #if 1
   // We are doing a quick and dirty version of performance
   // qualification for testing purposes and possibly the
   // initial version of for the main branch.
@@ -1949,167 +2009,451 @@ reorg_perf_qual ( Info *info)
 
   // Perf Analysis
   struct cgraph_node *node;
+  
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node)  {
     struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
+
+    if ( info->show_perf_qualify )
+      {
+	fprintf ( info->reorg_dump_file, "Function: ");
+	print_generic_expr ( info->reorg_dump_file,
+			     TREE_TYPE(TREE_TYPE( func->decl)),
+			     (dump_flags_t)0);
+      }
+    
     // Ulgy GCC idiom with global pointer to current function.
     // However, the dominace calculations other things need it.
     push_cfun ( func);
 
+    #if 1
     if ( dom_info_available_p ( CDI_DOMINATORS) )
       {
 	free_dominance_info ( CDI_DOMINATORS);
       }
     calculate_dominance_info (CDI_DOMINATORS);
-   
+    #endif
+
+    if ( info->show_perf_qualify )
+      {
+	fprintf ( info->reorg_dump_file,"  Function: %s\n",
+		  lang_hooks.decl_printable_name ( func->decl, 2));
+      }
+
+    
     // TBD
-    std::vector<perf_loop_info> loop_perf;
-    loop_perf.reserve ( number_of_loops ( func));
+    //std::vector<perf_loop_info> loop_perf;
+    //loop_perf.reserve ( number_of_loops ( func));
     class loop *loop;
+    bool missing_cases = false;
     FOR_EACH_LOOP_FN ( func, loop, LI_ONLY_INNERMOST )
       {
-	loop_perf [ loop->num ].vari = new std::vector<var_info_t*>; // ???
-	loop_perf [ loop->num ].gcc_loop = loop;
+	//We don't need these
+	//loop_perf [ loop->num ].vari = new std::vector<varInfo_t*>; // ???
+	//loop_perf [ loop->num ].gcc_loop = loop;
+
+	std::vector<acc_info_t> acc_info;
+	std::vector<varInfo_t> var_info;
+	
         size_t num_bbs = loop->num_nodes;
 	basic_block *bbs = get_loop_body ( loop);
 
-	// TBD Stuff here
+	// For the basic blocks in the the loop
 	for ( unsigned i = 0; i < loop->num_nodes; i++)
 	  {
 	    basic_block bb = bbs [i];
+	    //DEBUG_A("BB %i:\n", bb->index);
+	    //INDENT(4);
 	    for ( auto gsi = gsi_start_bb ( bb); !gsi_end_p ( gsi); gsi_next ( &gsi) )
 	      {
 		gimple *stmt = gsi_stmt ( gsi);
-		if ( contains_a_reorgtype ( stmt, info) != NULL )
+		//DEBUG_A("examine: ");
+		//DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+		//INDENT(4);
+
+		if ( gimple_code ( stmt) == GIMPLE_LABEL  ||
+		     gimple_code ( stmt) == GIMPLE_SWITCH    ) continue;
+		  		
+		unsigned n_ops = gimple_num_ops( stmt);
+		tree op;
+		unsigned ith_op;
+		for ( ith_op = 0; ith_op < n_ops; ith_op++ )
 		  {
-		    DEBUG_A("examine: ");
-		    DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
-		    INDENT(4);
-		    unsigned n_ops = gimple_num_ops( stmt);
-		    tree op;
-		    unsigned ith_op;
-		    for ( ith_op = 0; i < n_ops; i++ )
+		    op = gimple_op ( stmt, ith_op);
+		    // It's lieing about the number of operands... so...
+		    if ( op == NULL ) continue;
+		    //DEBUG_A("op[%d]: %p, ", ith_op, op);
+		    //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+		    ReorgType_t *tri = tree_contains_a_reorgtype ( op, info);
+		    enum ReorgOpTrans optran = recognize_op ( op, false, info);
+		    // TBD This is where we need to remember
+		    // each germane access
+		    const char *s = optrans_to_str( optran);
+		    // Commenting out these 3 debug commands causes a
+		    // regression
+		    //DEBUG_A(", %s\n", s);
+		    if ( tri != NULL )
 		      {
-			op = gimple_op ( stmt, ith_op);
-			ReorgType_t *tri = tree_contains_a_reorgtype (op, info);
-			if ( tri != NULL )
-			  {
-			    DEBUG_A("");
-			    DEBUG_F(print_reorg, stderr, 0, tri);
-			    DEBUG(", ");
-			    DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
-			  }
+			//DEBUG(", ");
+			//DEBUG_F(print_reorg, stderr, 0, tri);
 		      }
-		    INDENT(-4);
-
+		    else
+		      {
+			//DEBUG("\n");
+			;
+		      }
+		    switch ( optran)
+		      {
+		      case ReorgOpT_Indirect:
+			{
+			  // TBD
+			  // Is the var an induction variable for this loop?
+			  // If so find the assocaite varpool_node and push
+			  // it and the field onto var_acc_info;
+			  tree op_var = TREE_OPERAND( op, 0);
+			  tree op_field = TREE_OPERAND( op, 1);
+			  // Since doesn't have an easily exposed mechanism
+			  // for induction variable I'm hand waving here.
+			  if ( !expr_invariant_in_loop_p ( loop, op_var) )
+			    {
+			      account_for_access ( op_var, op_field, &acc_info, info);
+			    }
+			}
+			break;
+		      case ReorgOpT_Array:
+			{
+			  // TBD
+			  // Is the var an induction variable for this loop?
+			  // If so find the assocaite varpool_node and push
+			  // it and the field onto var_acc_info;
+			  tree op_var = TREE_OPERAND( op, 0);
+			  tree op_field = TREE_OPERAND( op, 1);
+			  // Since doesn't have an easily exposed mechanism
+			  // for induction variable I'm hand waving here.
+			  if ( !expr_invariant_in_loop_p ( loop, op_var) )
+			    {
+			      account_for_access ( op_var, op_field, &acc_info, info);
+			    }
+			}
+		      case ReorgOpT_AryDir:
+		      case ReorgOpT_Deref: // ??
+			missing_cases = true;
+		      }
 		  }
+		//INDENT(-4);
 	      }
-	  }continue; // Testing above here
+	    //INDENT(-4);
+	  }
 
+	//DEBUG_L("Dumping acc_info:\n");
+	for ( auto aci = acc_info.begin (); aci != acc_info.end (); aci++ )
+	  {
+	    //DEBUG_A("variable:\n");
+	    //DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
+	    //DEBUG_A("field: ");
+	    //DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
+	  }
+
+	//DEBUG_A("before sort: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
+
+	// Sort and compact the access infos.
+	stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
+
+	//DEBUG_A("before compress: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
+
+	// Sort and compact the access infos.
+	std::stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
+	
+	compress_acc_infos ( acc_info );
+
+	//DEBUG_A("after compress: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	
 	// Obtain loop count by looking at all the block counts.
-	unsigned max_count = 0;
+	unsigned loop_count = 0;
 	for ( unsigned i = 0; i < loop->num_nodes; i++)
 	  {
 	    basic_block bb = bbs [i];
-	    max_count = MAX( max_count, bb->count.value ());
+	    loop_count = MAX( loop_count, bb->count.value ());
 	  }
-	DEBUG_L("max_count = %d, nb_iterations_estimate = %ld\n",
-		max_count, loop->nb_iterations_estimate);
+	//DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
+	//	loop_count, loop->nb_iterations_estimate);
+
+	// Create the variable infos
+	varInfo_t var_entry;
+	var_entry.rep_access = &acc_info[0];
+	unsigned len = acc_info.size ();
+
+	// If no accesses detected, never for this loop.
+	if ( len == 0 ) continue;
+	
+ 	if ( len == 1 )
+	  {
+	    var_entry.fields.push_front ( acc_info[0].field);
+	  }
+	else
+	  {
+	    unsigned i, j;
+	    for ( i = 0, j = 1; j < len; j++ )
+	      {
+		acc_info_t *a_of_i = &acc_info[i];
+		acc_info_t *a_of_j = &acc_info[j];
+		var_entry.fields.push_front ( a_of_i->field);
+		if ( !all_but_field_eq ( *a_of_i, *a_of_j ) )
+		  {
+		    var_info.push_back( var_entry);
+		    var_entry.rep_access = a_of_j;
+		    var_entry.fields.clear ();
+		    a_of_i = a_of_j;
+		  }
+	      }
+	  }
+	var_info.push_back( var_entry);
+
+	if ( info->show_perf_qualify )
+	  {
+	    fprintf ( stderr, "%d VarInfos\n", var_info.size ());
+	  }
+	//DEBUG_F(print_var_infos, stderr, var_info);
+
+	//
+	// Model the performance
+	//
+	//DEBUG_A("Model The Performance\n");
 
 	// Originally this was done per bb but now it has to be per
 	// loop. TBD But perf_bb is per loop so we need something similar
 	// per loop.
 
-	std::vector <var_info_t*> *pv = loop_perf [ loop->num].vari;
-	for ( auto pvi = pv->begin (); pvi != pv->end (); pvi++ )
+	for ( auto pvi = var_info.begin (); pvi != var_info.end (); pvi++ )
 	  { // 676
-	    tree base_type = base_type_of( ( *pvi)->var->decl);
-	    ReorgType_t *ri = get_reorgtype_info ( base_type, info);
+	    //tree base_type = base_type_of( pvi->rep_access.access);
+	    ReorgType_t *ri = pvi->rep_access->reorg;
+	    
 	    // Reorg accounting
+	    //DEBUG_L("\n");
+	    //DEBUG_A("Reorg Accounting\n");
+	    
 	    if( ri != NULL )
 	      {
 		double reorg_nca = 0.0;
-		int fi;
-		tree field;
-		for( field = TYPE_FIELDS ( ri->gcc_type), fi = 0; 
-		     field; 
-		     field = DECL_CHAIN ( field), fi++ ) // 684
+
+		//DEBUG_A("  for: ");
+		//DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
+		//INDENT(4);
+		for ( auto fldi = pvi->fields.begin (); fldi != pvi->fields.end (); fldi++ )
 		  {
-		    if ( bitmap_bit_p ( *(*pvi)->bits, fi) )
-		      {
-			unsigned HOST_WIDE_INT fld_width =
-			  tree_to_uhwi ( DECL_SIZE ( field));
-			reorg_nca += max_count * alignment_effect ( fld_width);
-		      }
+		    unsigned HOST_WIDE_INT fld_width =
+		      tree_to_uhwi ( DECL_SIZE ( *fldi));
+		    double effect = alignment_effect ( fld_width);
+		    double product = loop_count * effect;
+		    reorg_nca += product;
+		    //DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
+		    //	    loop_count, effect, product, reorg_nca);
 		  }
+		//INDENT(-4);
 		ri->instance_interleave.reorg_perf += reorg_nca;
-	      } // 699
-	    
+		//DEBUG_A("Add reorg_nca (%f) to reorg_perf (now %e)\n",
+		//	reorg_nca, ri->instance_interleave.reorg_perf);
+              } // 699
+
 	    // regular accounting
+	    //DEBUG_L("\n");
+	    //DEBUG_A("Regular Accounting\n");
+	    
 	    double regular_nca = 0.0;
 	    sbitmap cache_model = sbitmap_alloc(1);
-	    // TBD NOTE, pv steps on the pv above.
-	    std::vector <var_info_t*> *pv2 = loop_perf[ loop->num].vari;
-	    for( auto pv2i = pv2->begin (); pv2i != pv2->end (); pv2i++ ) { // 704
-	      tree base_type = base_type_of ( (*pv2i)->var->decl);
-	      // create a tiny model of the cache big
-	      // enough for this record.
-	      unsigned HOST_WIDE_INT len =
-		(( tree_to_uhwi ( DECL_SIZE ( base_type))
-		   +
-		   param_l1_cache_line_size -1)
-		 /
-		 param_l1_cache_line_size)
-		+
-		1;
-	      cache_model = sbitmap_resize( cache_model, (unsigned) len, 0);
-	      double accum = 0.0;
-	      int nrbo = 0;
-	      for ( auto field_ex = TYPE_FIELDS ( base_type);
-		    field_ex; 
-		    field_ex = DECL_CHAIN ( field_ex) )
-		{
-		  nrbo++;
-		  unsigned HOST_WIDE_INT base_offset =
-		    tree_to_uhwi ( DECL_FIELD_OFFSET( field_ex));
-		  // Access accounting
-		  int fi = 0;
-		  for ( auto field = TYPE_FIELDS ( base_type);
-			field; 
-			field = DECL_CHAIN ( field), fi++)
-		    {
-		      if ( bitmap_bit_p ( *(*pv2i)->bits, fi) )
+	    
+	    for( auto pv2i = var_info.begin (); pv2i != var_info.end (); pv2i++ )
+	      { // 704
+		tree access = pv2i->rep_access->base_info.acc_base;
+		tree base_type; // = base_type_of ( access);
+		if ( pv2i->rep_access->reorg != NULL )
+		  {
+		    //DEBUG_A("Base type from reorg: ");
+		    base_type = pv2i->rep_access->reorg->gcc_type;
+		  }
+		else
+		  {
+		    //DEBUG_A("Base type from access: ");
+		    if ( TREE_TYPE ( access ) != NULL )
+		      {
+			base_type = base_type_of ( access);
+		      }
+		    else
+		      {
+			gcc_assert (0);
+		      }
+		  }
+		//DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+
+		bool base_type_isa_decl = DECL_P ( base_type );
+
+		// create a tiny model of the cache big
+		// enough for this record.
+		#if 0
+		tree base_type_size = base_type_isa_decl ?
+		  DECL_SIZE ( base_type )
+		  :
+		  TYPE_SIZE ( base_type);
+		#else
+		tree base_type_size;
+		if ( base_type_isa_decl )
+		  {
+		    //DEBUG_A("decl\n");
+		    switch ( TREE_CODE (base_type) )
+		      {
+		      case VAR_DECL:
 			{
-			  unsigned HOST_WIDE_INT fld_width, fld_offset;
-			  fld_width = tree_to_uhwi ( DECL_SIZE ( field));
-			  fld_offset = tree_to_uhwi ( DECL_FIELD_OFFSET ( field));
-			  int chari;
-			  for ( chari = 0; chari < fld_width; chari++ )
-			    {
-			      int loc = (chari + fld_offset + base_offset)
-				/
-				param_l1_cache_line_size;
-			      bitmap_set_bit ( cache_model, loc);
-			    }
+			  //DEBUG_A("VAR_DECL\n");
+			  base_type_size = TYPE_SIZE ( base_type);
+			  break;
 			}
-		    }
-		  accum += bitmap_count_bits ( cache_model);
-		  bitmap_clear ( cache_model);
-		}
-	      regular_nca += accum / nrbo;
+		      case FIELD_DECL:
+			{
+			  //DEBUG_A("VAR_DECL\n");
+			  base_type_size = TYPE_SIZE ( TREE_TYPE ( base_type));
+			  break;
+			}
+		      default:
+			{
+			  //DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
+			  gcc_assert(0);
+			}
+		      }
+		  }
+		else
+		  {
+		    //DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
+		    if ( TREE_CODE ( base_type) == SSA_NAME )
+		      {
+			base_type_size = TYPE_SIZE ( TREE_TYPE( base_type));
+		      }
+		    else
+		      {
+			base_type_size = TYPE_SIZE ( base_type);
+		      }
+		  }
+		#endif
+		    
+		unsigned HOST_WIDE_INT len =
+		  (( tree_to_uhwi ( base_type_size)
+		     +
+		     param_l1_cache_line_size -1)
+		   /
+		   param_l1_cache_line_size)
+		  +
+		  1;
+		//DEBUG_L("\n");
+		//DEBUG_A("cache len = %d (lines), for: ", len);
+		//DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
+		//DEBUG("%sstruct\n")
 	      
-	    } // 739
+		// TBD Does this clear the bits??? It needs to.
+		// Each bit represents a cache line.
+		cache_model = sbitmap_resize( cache_model, (unsigned) len, 0);
+		double accum = 0.0;
+		int nrbo = 0;
+		tree type = TREE_TYPE ( base_type);
+		
+		//bool a_record = type == NULL && TREE_CODE ( type) == RECORD_TYPE;
+		bool a_record = type != NULL && TREE_CODE ( type) == RECORD_TYPE;
+		if ( base_type_isa_decl && a_record )
+		  {
+		    for ( auto field_ex = TYPE_FIELDS ( base_type);
+			  field_ex; 
+			  field_ex = DECL_CHAIN ( field_ex) )
+		      {
+			nrbo++;
+			// Looking back on my design I don't have a clue
+			// why this is here and what it does. Sigh...
+			unsigned HOST_WIDE_INT base_offset =
+			  tree_to_uhwi ( DECL_FIELD_OFFSET( field_ex));
+			//DEBUG_L("\n");
+			//DEBUG_A("For field_ex: ");
+			//DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
+			//DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
+			
+			// Access accounting
+
+			//INDENT(4);
+			for ( auto fldi = pv2i->fields.begin ();
+			      fldi != pv2i->fields.end (); fldi++ )
+			  {
+			    tree field = *fldi;
+			    unsigned HOST_WIDE_INT fld_width, fld_offset;
+			    fld_width = tree_to_uhwi ( DECL_SIZE ( field));
+			    fld_offset = tree_to_uhwi ( DECL_FIELD_OFFSET ( field));
+			    //DEBUG_A("Field: ");
+			    //DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
+			    //DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
+			    int chari;
+			    //INDENT(4);
+			    for ( chari = 0; chari < fld_width; chari++ )
+			      {
+				int loc = (chari + fld_offset + base_offset)
+				  /
+				  param_l1_cache_line_size;
+				//DEBUG_A("loc: %d\n", loc);
+				bitmap_set_bit ( cache_model, loc);
+			      }
+			    //INDENT(-4);
+			  }
+			//INDENT(-4);
+			unsigned bcount = bitmap_count_bits ( cache_model);
+			accum += bcount;
+			//DEBUG_L("\n");
+			//DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
+			//	bcount, accum);
+			bitmap_clear ( cache_model);
+		      }
+		  }
+		else
+		  {
+		    nrbo = 1;
+		    accum++;
+		    //DEBUG_L("\n");
+		    //DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
+		  }
+		#if 1	
+		double amount = accum / nrbo;
+		double product = amount * loop_count;
+		regular_nca += product;
+		//DEBUG_L("\n");
+		//DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
+		//	loop_count, accum, nrbo, product, regular_nca);
+		#else
+		double amount = accum / nrbo;
+		regular_nca += amount;
+		//DEBUG_L("\n");
+		//DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
+		//	accum, nrbo, amount, regular_nca);
+		#endif
+	      } // 739
 	    sbitmap_free ( cache_model);
 	    
 	    if( ri != NULL ) {
 	      ri->instance_interleave.regular_perf += regular_nca;
-	      cache_accesses_noreorg += regular_nca;
-	    } else {
-	      cache_accesses += regular_nca;
-	    }
-	  } // end for each prop_var 748
-	
-	
-      } // 
+              cache_accesses_noreorg += regular_nca;
+	      //DEBUG_L("\n");
+	      //DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
+	      //	      regular_nca, ri->instance_interleave.regular_perf);
+	      //DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
+	      //	      cache_accesses_noreorg);
+            } else {
+	        cache_accesses += regular_nca;
+            }
+	  } // end for prop_var
+      } //
+
+    if ( info->show_perf_qualify && missing_cases )
+      {
+	fprintf ( info->reorg_dump_file,
+		  "    Ignored unimplemented cases when finding accesses.\n");
+      }
+    
+    free_dominance_info ( CDI_DOMINATORS);
     pop_cfun ();
   }
 
@@ -2124,6 +2468,17 @@ reorg_perf_qual ( Info *info)
 
   info->total_cache_accesses = total_cache_accesses;
 
+  if ( info->show_perf_qualify )
+    {
+      fprintf ( info->reorg_dump_file, "total_cache_accesses: %e\n\n",
+		total_cache_accesses);
+    }
+
+  if ( info->show_perf_qualify )
+    {
+      fprintf ( info->reorg_dump_file,
+		"Decide which reorgTypes fail performance qualification\n");
+    }
   //
   // Decide which reorgTypes fail performance qualification
   //
@@ -2134,10 +2489,16 @@ reorg_perf_qual ( Info *info)
 	reorgi != reorg_types->end (); reorgi++ )
     {
       double with_opt = reorgi->instance_interleave.reorg_perf;
-      double wihtout_opt = reorgi->instance_interleave.regular_perf;
-      double raw_effect = with_opt/wihtout_opt;
+      double without_opt = reorgi->instance_interleave.regular_perf;
+      double raw_effect = with_opt/without_opt;
       double absolute_effect =
-        (wihtout_opt - with_opt) / total_cache_accesses;
+        (without_opt - with_opt) / total_cache_accesses;
+      //DEBUG_A("For ");
+      //DEBUG_F(flexible_print, stderr, reorgi->gcc_type, 0, (dump_flags_t)0);
+      //DEBUG(" with_opt: %e, without_opt %e, total_cache_accesses %e\n",
+      //	    with_opt, without_opt, total_cache_accesses);
+      //DEBUG_A("  Raw Effect: %5.4f, Absolute Effect %5.4f\n",
+      //	      raw_effect, absolute_effect);
 
       // Note, there would need to be a multi-pool case here if
       // that is every done.
@@ -2145,6 +2506,16 @@ reorg_perf_qual ( Info *info)
       // If the relative effect is small enough don't bother.
       if ( raw_effect < SINGLE_POOL_RAW_SKIP_IT )
 	{
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Disqualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Very small effect:\n");
+	      fprintf ( info->reorg_dump_file,
+			"    raw_effect %5.4f < SINGLE_POOL_RAW_SKIP_IT %5.4f\n",
+			raw_effect, SINGLE_POOL_RAW_SKIP_IT);
+	    }
 	  reorgi->do_instance_interleave = false;
 	  continue;
 	}
@@ -2152,16 +2523,51 @@ reorg_perf_qual ( Info *info)
       // otherwise look at the absolute effect.
       if ( raw_effect >= SINGLE_POOL_RAW_DO_IT_ALWAYS )
 	{
+
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Qualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Large raw effect:\n");
+	      fprintf ( info->reorg_dump_file,
+			"    raw_effect %5.4f >= SINGLE_POOL_RAW_DO_IT_ALWAYS %5.4f\n",
+			raw_effect, SINGLE_POOL_RAW_DO_IT_ALWAYS);
+	    }
+	  
 	  reorgi->do_instance_interleave = true;
 	  continue;
 	}
       if ( absolute_effect < SINGLE_POOL_ABS_SKIP_IT )
 	{
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Disqualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Very small absolute effect:\n");
+	      fprintf ( info->reorg_dump_file,
+			"    absolute_effect %5.4f < SINGLE_POOL_ABS_SKIP_IT %5.4f\n",
+			absolute_effect, SINGLE_POOL_ABS_SKIP_IT);
+	    }
+	  
 	  reorgi->do_instance_interleave = false;
 	  continue;
 	}
       if ( absolute_effect >= SINGLE_POOL_ABS_DO_IT_ALWAYS )
 	{
+
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Qualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Large absolute effect:\n");
+	      fprintf ( info->reorg_dump_file,
+			"    absolute_effect %5.4f >= SINGLE_POOL_ABS_DO_IT_ALWAYS %5.4f\n",
+			absolute_effect, SINGLE_POOL_ABS_DO_IT_ALWAYS);
+	    }
+	  
 	  reorgi->do_instance_interleave = true;
 	  continue;
 	}
@@ -2172,13 +2578,224 @@ reorg_perf_qual ( Info *info)
       double cut_off = cut_off_eq_single_pool ( absolute_effect);
       if ( raw_effect < cut_off )
 	{
+
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Disqualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Failed cut off equations:\n");
+	      fprintf ( info->reorg_dump_file,
+			"    raw_effect %5.4f < cut_off %5.4f\n",
+			raw_effect, cut_off);
+	    }
+	  
 	  reorgi->do_instance_interleave = false;
-	} 
+	  continue;
+	}
+
+      if ( info->show_perf_qualify )
+	{
+	  fprintf ( info->reorg_dump_file, "  Qualified: ");
+	  flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			   (dump_flags_t)0);
+	  fprintf ( info->reorg_dump_file, ": Passed cut off equations:\n");
+	  fprintf ( info->reorg_dump_file,
+			"    raw_effect %5.4f >= cut_off %5.4f\n",
+			raw_effect, cut_off);
+	}
+      
     }
-
-  free_dominance_info ( CDI_DOMINATORS);
-
   #endif
+}
+
+static void
+print_var_info ( FILE *file, varInfo_t &vinfo)
+{
+  print_acc_info ( file, vinfo.rep_access );
+  for ( auto fi = vinfo.fields.begin (); fi != vinfo.fields.end (); fi++ )
+    {
+      if ( fi != vinfo.fields.begin () ) fprintf ( stderr,", ");
+      flexible_print (  stderr, *fi, 0, (dump_flags_t)0);
+    }
+  fprintf ( stderr,"\n");
+}
+
+static void
+print_var_infos ( FILE *file, std::vector<varInfo_t> &vinfo)
+{
+  fprintf( stderr, "print_var_infos:\n");
+  for ( auto vi = vinfo.begin (); vi != vinfo.end (); vi++ )
+    {
+      print_var_info ( file, *vi);
+    }
+}
+
+static void
+compress_acc_infos ( std::vector <acc_info_t> ainfo )
+{
+  unsigned len = ainfo.size ();
+  //DEBUG_L("compress_acc_infos: len in %d, ",len);
+  if ( len <= 1 ) return;
+  unsigned i, j;
+  for ( i = j = 1; j < len; j++ )
+    {
+      ainfo[i] = ainfo[j];
+      if ( !acc_eq ( ainfo[i], ainfo[i - 1]) ) i++;
+    }
+  if ( i == j ) return;
+  ainfo.resize ( len - (j -i));
+  //DEBUG_L("len out %d, ", ainfo.size ());
+}
+
+static void
+print_acc_info ( FILE *file, acc_info_t *ainfo )
+{
+  //DEBUG_L("print_acc_info: ainfo %p\n", ainfo);
+  fprintf ( file, "%s%s%s%s%s%s\n",
+	    ainfo->base_info.a_def_def ? ", deflt_def" : "",
+	    ainfo->base_info.a_decl ? ", decl" : "",
+	    ainfo->base_info.a_func ? ", a_func" : "",
+	    ainfo->base_info.has_induct_var_acc ? ", induct" : "",
+	    ainfo->base_info.multi_induct ? ", multi" : "",
+	    ainfo->base_info.complicated ? ", complicated" : "");
+  fprintf ( file, "   base var ");
+  flexible_print ( stderr, ainfo->base_info.acc_base, 0, (dump_flags_t)0);
+  if ( ainfo->base_info.has_induct_var_acc )
+    {
+      fprintf ( file, ", induc var ");
+      flexible_print ( stderr, ainfo->base_info.acc_base,
+		       0, (dump_flags_t)0);
+    }
+  fprintf ( file, ", field ");
+  flexible_print ( stderr, ainfo->field, 0, (dump_flags_t)0);
+  if ( ainfo->reorg )
+    {
+      fprintf ( file, ", reorg of ");
+      flexible_print ( stderr, ainfo->reorg->gcc_type,
+		       0, (dump_flags_t)0);
+    }
+  fprintf ( file, "\n");
+}
+
+static void
+print_acc_infos ( FILE *file, std::vector <acc_info_t> ainfo )
+{
+  fprintf ( file, "print_acc_infos:\n");
+  unsigned i;
+  unsigned len = ainfo.size ();
+
+  for ( i = 0; i < len; i++ )
+    {
+      fprintf ( file, "[%d] ", i);
+      print_acc_info ( file, &ainfo[i]);
+    }
+}
+
+
+// decls < default defs < defined by function
+static bool
+acc_lt_acc_category ( const acc_info_t& a, const acc_info_t& b )
+{
+  int ord_a = a.base_info.a_decl ? 1 : a.base_info.a_def_def ? 2 : 3;
+  int ord_b = b.base_info.a_decl ? 1 : b.base_info.a_def_def ? 2 : 3;
+  if ( ord_a < ord_b ) return true;
+  if ( ord_a > ord_b ) return false;
+  switch ( ord_a ) {
+  case 1:
+    // The field isn't there for decls, it's the index. Ignoring the
+    // index is harmless.  This is becauseif if we take an arbitary
+    // small number of iterations of a loop, then all the permutations
+    // of the accesses in those iterations touch the same number of
+    // cache lines (just in a different order.)
+    return false;
+  case 2:
+    {
+      if ( a.access < b.access ) return true;
+      if ( a.access > b.access ) return false;
+      return a.field < b.field;
+    }
+  case 3:
+    {
+      if ( a.base_info.function < b.base_info.function ) return true;
+      if ( a.base_info.function > b.base_info.function ) return false;
+      return a.field < b.field;
+    }
+  }
+}
+
+// Complicated is less than noncomplicated and null reorgs are less than non
+// null reorgs.
+static bool
+acc_lt ( const acc_info_t& a, const acc_info_t& b )
+{
+  if ( a.base_info.complicated && !b.base_info.complicated ) return true;
+  if ( !a.base_info.complicated && !b.base_info.complicated ) return false;
+  if ( a.reorg == NULL )
+    {
+      if ( b.reorg != NULL ) return true;
+      // compare non_reorg_bit
+      return acc_lt_acc_category ( a, b);
+    }
+  else
+    {
+      if ( b.reorg == NULL ) return false;
+      if ( a.reorg < b.reorg ) return true;
+      if ( a.reorg > b.reorg ) return false;
+      // compare non_reorg_bit
+      return acc_lt_acc_category ( a, b);
+    }
+}
+
+static bool
+acc_eq ( const acc_info_t& a, const acc_info_t& b )
+{
+  // nothing complicated is equal to anything else.  Being complicated
+  // is basically saying that little is really know about it and it's
+  // difficult if not meaningless to analyze in depth given this
+  // framework.
+  if ( a.base_info.complicated || b.base_info.complicated ) return false;
+  if ( a.reorg != b.reorg ) return false;
+  int ord_a = a.base_info.a_decl ? 1 : a.base_info.a_def_def ? 2 : 3;
+  int ord_b = b.base_info.a_decl ? 1 : b.base_info.a_def_def ? 2 : 3;
+  if ( ord_a != ord_b ) return false;
+  switch ( ord_a ) {
+  case 1:
+  case 2:
+    {
+      if ( a.access != b.access ) return false;
+    }
+  case 3:
+    {
+      if ( a.base_info.function != b.base_info.function ) return false;
+    }
+  }
+  return a.field == b.field;
+}
+
+static bool
+all_but_field_eq ( const acc_info_t& a, const acc_info_t& b )
+{
+  // nothing complicated is equal to anything else.  Being complicated
+  // is basically saying that little is really know about it and it's
+  // difficult if not meaningless to analyze in depth given this
+  // framework.
+  if ( a.base_info.complicated || b.base_info.complicated ) return false;
+  if ( a.reorg != b.reorg ) return false;
+  int ord_a = a.base_info.a_decl ? 1 : a.base_info.a_def_def ? 2 : 3;
+  int ord_b = b.base_info.a_decl ? 1 : b.base_info.a_def_def ? 2 : 3;
+  if ( ord_a != ord_b ) return false;
+  switch ( ord_a ) {
+  case 1:
+  case 2:
+    {
+      return a.access == b.access;
+    }
+  case 3:
+    {
+      return a.base_info.function == b.base_info.function;
+    }
+  }
 }
 
 #define SINGLE_POOL_SLOPE					\
@@ -2246,16 +2863,246 @@ is_array_access( tree acc)
 }
 
 static void
-account_for_use( tree acc, std::vector <acc_info_t> *acc_info)
+account_for_access ( tree access, tree field, std::vector <acc_info_t> *acc_info, Info_t *info)
 {
-  // determine element of access
-  // find field access number i
-  // find var v
-  varpool_node *v;
-  int i;
-  // TBD
-  acc_info_t ai = { v, i};
+  //DEBUG_A("account_for_use var: ");
+  //DEBUG_F(flexible_print, stderr, access, 0, (dump_flags_t)0);
+  //DEBUG(", field: ");
+  //DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
+  
+  // assert might eventually make sense but not yet
+  //gcc_assert ( TREE_CODE ( ssa_var) == SSA_NAME);
+  acc_info_t ai;
+  //ai.v = SSA_NAME_VAR ( ssa_var);
+  ai.access = access; // TBD We need to see if we can find the decl
+  ai.field = field;
+  ai.reorg = tree_contains_a_reorgtype ( access, info);
+  analyze_access ( access, &ai);
+  // don't count this acces if there is no associated induction variable
+  if ( !ai.base_info.has_induct_var_acc ) return;
+  // Otherwise add the access
   acc_info->push_back( ai);
+}
+
+static void
+tmasn_helper ( tree t, int indent, std::set<tree> *already )
+{
+  //DEBUG_A("");
+  fprintf( stderr, "%*s", indent, " ");
+  indent += 4;
+  flexible_print ( stderr, t, 0, (dump_flags_t)0);
+  if ( already->find (t) != already->end () )
+    {
+      fprintf( stderr, " <Induction>\n");
+      return;
+    }
+  else
+    {
+      fprintf( stderr, "\n");
+    }
+  //DEBUG_L("code: %s\n", code_str(TREE_CODE (t)));
+  if ( TREE_CODE (t) == SSA_NAME )
+    {
+      already->insert (t);
+      gimple *stmt = SSA_NAME_DEF_STMT (t);
+      fprintf( stderr, "%*sSSA_NAME defined in: ", indent - 4, " ");
+      print_gimple_stmt( stderr, stmt, TDF_DETAILS);
+      if ( gimple_code ( stmt) == GIMPLE_PHI )
+	{
+	  gphi *phi_stmt = dyn_cast <gphi *> ( stmt);
+	  for (int i = 0; i < gimple_phi_num_args (phi_stmt); i++)
+	    {
+	      tree *arg = gimple_phi_arg_def_ptr (phi_stmt, i);
+	      tmasn_helper ( *arg, indent, already);
+	    }
+	}
+      else
+	{
+	  bool a_ass = gimple_code ( stmt) == GIMPLE_ASSIGN;
+	  bool a_call = gimple_code ( stmt) == GIMPLE_CALL;
+	  // This was being triggered an add: op = op + op
+	  //gcc_assert ( a_ass || a_call );
+
+	  if ( a_call )
+	    {
+	      for ( int i = 0; i < gimple_call_num_args ( stmt); i++ )
+		{
+		  tmasn_helper ( gimple_call_arg  ( stmt, i) , indent, already);
+		}
+	    }
+	  else
+	    {
+	      // Note, start with one to skip lhs op. 
+	      for ( int i = 1; i < gimple_num_ops ( stmt); i++ )
+		{
+		  tmasn_helper ( gimple_op ( stmt, i) , indent, already);
+		}
+	    }
+	}
+      return;
+    }
+  if ( DECL_P ( t) )
+    {
+      return;
+    }
+  if ( TREE_CODE ( t) == MEM_REF )
+    {
+      tree t_0 = TREE_OPERAND ( t, 0);
+      fprintf( stderr, "%*sMEM_REF t_0: ", indent - 4, " ");
+      flexible_print ( stderr, t_0, 1, (dump_flags_t)0);
+      tmasn_helper ( t_0 , indent, already);
+      return;
+    }
+  if ( TREE_CODE ( t) == INTEGER_CST ) return;
+  fprintf ( stderr, "unanticipated TREE_CODE\n");
+  gcc_assert ( 0);
+}
+
+static void
+tell_me_about_ssa_name ( tree ssa_name, int indent)
+{
+  fprintf(stderr,"about:\n");
+  std::set<tree> already;
+  tmasn_helper ( ssa_name, indent, &already);
+}
+
+static unsigned insane_helper;
+
+static void
+an_ac_helper ( tree t, int indent, std::set<tree> *already, acc_info_t *ainfo )
+{
+  gcc_assert ( insane_helper < 100 );
+  insane_helper++;
+  acc_base_info_t *binfo = &ainfo->base_info;
+  //DEBUG_A("%*s", indent, " ");
+  indent += 4;
+  //DEBUG_F( flexible_print, stderr, t, 0, (dump_flags_t)0);
+  if ( already->find (t) != already->end () )
+    {
+      //DEBUG(" <Induction>\n");
+      binfo->multi_induct =
+	binfo->multi_induct || binfo->has_induct_var_acc;
+      binfo->induct_base = t;
+      binfo->has_induct_var_acc = true;
+      return;
+    }
+  else
+    {
+      //DEBUG("\n");
+      
+    }
+  //DEBUG_A("%*scode: %s\n", indent, " ", code_str(TREE_CODE (t)));
+  if ( TREE_CODE (t) == SSA_NAME )
+    {
+      already->insert (t);
+      gimple *stmt = SSA_NAME_DEF_STMT (t);
+      //DEBUG_A("%*sSSA_NAME defined in: ", indent, " ");
+      //DEBUG_F(print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+      if ( SSA_NAME_IS_DEFAULT_DEF ( t ) )
+        {
+	  binfo->acc_base = t;
+	  binfo->complicated =
+	    binfo->complicated || binfo->a_def_def || binfo->a_decl || binfo->a_func;
+	  binfo->a_def_def = true;
+	}
+      if ( gimple_code ( stmt) == GIMPLE_PHI )
+	{
+	  gphi *phi_stmt = dyn_cast <gphi *> ( stmt);
+	  for (int i = 0; i < gimple_phi_num_args (phi_stmt); i++)
+	    {
+	      tree *arg = gimple_phi_arg_def_ptr (phi_stmt, i);
+	      an_ac_helper ( *arg, indent, already, ainfo);
+	    }
+	}
+      else
+	{
+	  bool a_ass = gimple_code ( stmt) == GIMPLE_ASSIGN;
+	  bool a_call = gimple_code ( stmt) == GIMPLE_CALL;
+	  // This was being triggered an add: op = op + op
+	  //gcc_assert ( a_ass || a_call );
+
+	  if ( a_call )
+	    {
+	      binfo->acc_base = t;
+	      binfo->complicated =
+		binfo->complicated || binfo->a_def_def || binfo->a_decl || binfo->a_func;
+	      binfo->a_func = true;
+	      binfo->function = stmt;
+	      // Question, do we want to walk the call arguements???
+	      // Because how do the arguments effect the return value?
+	      // It's basically unknow so we shouldn't walk the
+	      // arguemets.
+	      // 
+	      for ( int i = 0; i < gimple_call_num_args ( stmt); i++ )
+		{
+		  an_ac_helper ( gimple_call_arg  ( stmt, i), indent, already, ainfo);
+		}
+	    }
+	  else
+	    {
+	      // Note, start with one to skip lhs op. 
+	      for ( int i = 1; i < gimple_num_ops ( stmt); i++ )
+		{
+		  an_ac_helper ( gimple_op ( stmt, i), indent, already, ainfo);
+		}
+	    }
+	}
+      return;
+    }
+  if ( DECL_P ( t) )
+    {
+      binfo->acc_base = t;
+      binfo->complicated =
+		binfo->complicated || binfo->a_def_def || binfo->a_decl || binfo->a_func;
+      binfo->a_decl = true;
+      
+      //DEBUG_A("field (index) for a_decl: ");
+      //DEBUG_F(flexible_print, stderr, ainfo->field, 1, (dump_flags_t)0);
+
+      if ( TREE_CODE ( t) != FIELD_DECL )
+	{
+	  an_ac_helper ( ainfo->field, indent, already, ainfo);
+	}
+      return;
+    }
+  if ( TREE_CODE ( t) == MEM_REF )
+    {
+      tree t_0 = TREE_OPERAND ( t, 0);
+      //DEBUG_A("%*sMEM_REF t_0: ", indent, " ");
+      //DEBUG_F(flexible_print, stderr, t_0, 1, (dump_flags_t)0);
+      an_ac_helper ( t_0 , indent, already, ainfo);
+      return;
+    }
+  if ( TREE_CODE ( t) == COMPONENT_REF )
+    {
+      tree t_0 = TREE_OPERAND ( t, 0);
+      //DEBUG_A("%*sCOMPONENT_REF t_0: ", indent, " ");
+      //DEBUG_F(flexible_print, stderr, t_0, 1, (dump_flags_t)0);
+      an_ac_helper ( t_0 , indent, already, ainfo);
+      return;
+    }
+  if ( TREE_CODE ( t) == INTEGER_CST ) return;
+  if ( TREE_CODE ( t) == ADDR_EXPR ) return;
+  fprintf ( stderr, "Unanticipated TREE_CODE\n");
+  gcc_assert ( 0);
+}
+
+static void
+analyze_access ( tree access, acc_info_t *acc_info)
+{
+  insane_helper = 0;
+  acc_base_info_t *base_info = &acc_info->base_info;
+  //DEBUG_A("analyze_access:\n");
+  base_info->a_def_def = false;
+  base_info->a_decl = false;
+  base_info->a_func = false;
+  base_info->has_induct_var_acc = false;
+  base_info->multi_induct = false;
+  base_info->complicated = false;
+  base_info->acc_base = NULL;
+  base_info->induct_base = NULL;
+  std::set<tree> already;
+  an_ac_helper ( access, 4, &already, acc_info);
 }
 
 
@@ -2527,10 +3374,10 @@ static basic_block
 make_bb ( char *msg, basic_block prev_bb )
 {
   basic_block ret = create_empty_bb ( prev_bb);
-  DEBUG_A( "make_bb ( %s, <bb %d>/%p  ): <bb %d>/%p, prev: <bb %d>/%p, next: <bb %d>/%p\n",
-	   msg, prev_bb->index, prev_bb,
-	   ret->index, ret,
-	   ret->prev_bb->index, ret->prev_bb,
-	   ret->next_bb->index, ret->next_bb);
+  //DEBUG_A( "make_bb ( %s, <bb %d>/%p  ): <bb %d>/%p, prev: <bb %d>/%p, next: <bb %d>/%p\n",
+  //	   msg, prev_bb->index, prev_bb,
+  //	   ret->index, ret,
+  //	   ret->prev_bb->index, ret->prev_bb,
+  //	   ret->next_bb->index, ret->next_bb);
   return ret;
 }

@@ -28,6 +28,8 @@ along with GCC; see the file COPYING3.  If not see
 #define USE_REORG_TYPES 1
 // If PRINT_FORMAT is true use pass specific print format.
 #define PRINT_FORMAT false
+// Trun off actual transformations for testing
+#define BYPASS_TRANSFORM false
 
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;
@@ -99,7 +101,9 @@ enum ReorgOpTrans {
   ReorgOpT_Array,       // "x[i]"
   ReorgOpT_Scalar,      // "z"
   ReorgOpT_Indirect,    // "a->f"
-  ReorgOpT_AryDir       // "x[i].f"
+  ReorgOpT_AryDir,      // "x[i].f"
+  ReorgOpT_Cst,
+  ReorgOpT_Cst0
 };
 
 enum CompressionControl {
@@ -160,6 +164,7 @@ struct Info {
   // TODO: What is the meaning of reorg type?
   // Hasn't this meaning changed now that we have three
   // transformations roughly running at the same time?
+  // Eric: Interesting point
   std::vector <ReorgType_t>      *reorg_type;
   // Added to by remove_deleted_types
   std::vector <ReorgType_t>      *saved_reorg_type;
@@ -176,6 +181,7 @@ struct Info {
   // Debug flags
   bool                            show_all_reorg_cands;
   bool                            show_all_reorg_cands_in_detail;
+  bool                            show_perf_qualify;
   bool                            show_prog_decls;
   bool                            show_delete;
   bool                            show_new_BBs;
@@ -196,6 +202,7 @@ struct Info {
   , reorg_dump_file(NULL)
   , show_all_reorg_cands(false)
   , show_all_reorg_cands_in_detail(false)
+  , show_perf_qualify(false)
   , show_prog_decls(false)
   , show_new_BBs(false)
   , show_transforms(false)
@@ -222,13 +229,14 @@ extern int str_reorg_instance_interleave ( Info *);
 #endif
 
 extern int number_of_levels ( tree);
+extern tree make_multilevel( tree, int);
 extern bool modify_decl_core ( tree *, Info *);
 extern void delete_reorgtype ( ReorgType_t *, Info_t *);
 extern void undelete_reorgtype ( ReorgType_t *, Info_t *);
 extern void clear_deleted_types( Info *);
 extern void restore_deleted_types ( Info *);
 extern void remove_deleted_types ( Info *, ReorgFn);
-extern enum ReorgOpTrans recognize_op ( tree,  Info_t *);
+extern enum ReorgOpTrans recognize_op ( tree,  bool, Info_t *);
 extern ReorgTransformation reorg_recognize ( gimple *,
 					     cgraph_node *,
 					     Info_t *);
@@ -246,14 +254,16 @@ extern void print_program ( FILE *, bool, int, Info_t *);
 extern void print_type ( FILE *, tree);
 extern void modify_ssa_name_type ( tree, tree);
 extern bool print_internals (gimple *, void *);
+extern const char *optrans_to_str ( enum ReorgOpTrans);
+extern bool is_assign_from_ssa ( gimple *);
 
 
 
-// I have no intention of leaving this or uses of the
-// defined marcos in the code. However, some of uses
-// should obviously be converted to dump file information.
+// I have no intention of leaving these debugging marcos or uses of
+// them in the code. However, some of the uses should obviously be
+// converted to dump file information.
 
-#define DEBUGGING 0
+#define DEBUGGING 1
 #if DEBUGGING
 enum Display {
   Show_nothing,
