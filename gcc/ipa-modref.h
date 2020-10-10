@@ -37,7 +37,6 @@ struct GTY(()) modref_summary
   modref_records_lto *loads_lto;
   modref_records_lto *stores_lto;
   bool finished;
-  bool writes_errno;
 
   modref_summary ();
   ~modref_summary ();

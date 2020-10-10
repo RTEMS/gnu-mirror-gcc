@@ -108,33 +108,6 @@ ao_ref::max_size_known_p () const
   return known_size_p (max_size);
 }
 
-/* Flags used in ao_function_info.  */
-
-enum ao_function_flags
-{
-  AO_FUNCTION_BARRIER = 1,
-  AO_FUNCTION_ERRNO = 2,
-};
-
-/* Describe side effects relevant for alias analysis of function call to
-   DECL.  */
-
-struct ao_function_info
-{
-  int num_param_reads;  /* Number of parameters function reads from,
-			   -1 if reads are unknown.  */
-  struct ao_access_info
-    {
-      char param; 	/* Index of parameter read/written from.  */
-      char size_param;	/* Index of parameter specifying size of the access,
-			   -1 if unknown.  */
-      char size;	/* Size of access if known, 0 if unknown.  */
-    } reads[2];
-  int num_param_writes;
-  struct ao_access_info writes[2];
-  enum ao_function_flags flags;
-};
-
 /* In tree-ssa-alias.c  */
 extern void ao_ref_init (ao_ref *, tree);
 extern void ao_ref_init_from_ptr_and_size (ao_ref *, tree, tree);
@@ -185,7 +158,6 @@ extern void debug (pt_solution *ptr);
 extern void dump_points_to_info_for (FILE *, tree);
 extern void debug_points_to_info_for (tree);
 extern void dump_alias_stats (FILE *);
-extern bool ao_classify_builtin (tree callee, ao_function_info *info);
 
 
 /* In tree-ssa-structalias.c  */
