@@ -1333,7 +1333,12 @@ remap_arguments (vec <int> *map, modref_records *tt)
 	  modref_access_node *access_node;
 	  FOR_EACH_VEC_SAFE_ELT (ref_node->accesses, k, access_node)
 	    if (access_node->parm_index > 0)
-	      access_node->parm_index = (*map)[access_node->parm_index];
+	      {
+		if (access_node->parm_index < (int)map->length ())
+		  access_node->parm_index = (*map)[access_node->parm_index];
+		else
+		  access_node->parm_index = -1;
+	      }
 	}
     }
 }
@@ -1367,14 +1372,14 @@ modref_transform (struct cgraph_node *node)
 
   auto_vec <int, 32> map;
 
-  map.safe_grow (max + 1);
+  map.reserve (max + 1);
   for (i = 0; i <= max; i++)
     map.quick_push (-1);
   FOR_EACH_VEC_SAFE_ELT (node->clone.param_adjustments->m_adj_params, i, p)
     {
       int idx = node->clone.param_adjustments->get_original_index (i);
       if (idx >= 0)
-	map[i] = idx;
+	map[idx] = i;
     }
   remap_arguments (&map, r->loads);
   remap_arguments (&map, r->stores);
