@@ -2614,9 +2614,10 @@ static int
 write_defines_file ()
 {
   for (int i = 0; i < num_ovld_stanzas; i++)
-    fprintf (defines_file, "#define %s %s\n",
-	     ovld_stanzas[i].extern_name,
-	     ovld_stanzas[i].intern_name);
+    if (strcmp (ovld_stanzas[i].extern_name, "SKIP"))
+      fprintf (defines_file, "#define %s %s\n",
+	       ovld_stanzas[i].extern_name,
+	       ovld_stanzas[i].intern_name);
   return 1;
 }
 

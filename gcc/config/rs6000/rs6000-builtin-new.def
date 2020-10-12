@@ -706,7 +706,7 @@
     VNMSUBFP nfmsv4sf4 {}
 
   const vsc __builtin_altivec_vnor_v16qi (vsc, vsc);
-    VNOR_V16QIS norv16qi3 {}
+    VNOR_V16QI norv16qi3 {}
 
   const vuc __builtin_altivec_vnor_v16qi_uns (vuc, vuc);
     VNOR_V16QI_UNS norv16qi3 {}
@@ -2617,16 +2617,16 @@
   const vsi __builtin_altivec_vprtybw (vsi);
     VPRTYBW parityv4si2 {}
 
-  const vsll __builtin_altivec_vrldmi (vsll, vsll, vsll);
+  const vull __builtin_altivec_vrldmi (vull, vull, vull);
     VRLDMI altivec_vrldmi {}
 
-  const vsll __builtin_altivec_vrldnm (vsll, vsll);
+  const vull __builtin_altivec_vrldnm (vull, vull);
     VRLDNM altivec_vrldnm {}
 
-  const vsi __builtin_altivec_vrlwmi (vsi, vsi, vsi);
+  const vui __builtin_altivec_vrlwmi (vui, vui, vui);
     VRLWMI altivec_vrlwmi {}
 
-  const vsi __builtin_altivec_vrlwnm (vsi, vsi);
+  const vui __builtin_altivec_vrlwnm (vui, vui);
     VRLWNM altivec_vrlwnm {}
 
   const vuc __builtin_altivec_vslv (vuc, vuc);

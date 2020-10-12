@@ -29,7 +29,8 @@
 ; unique internal identifier for the overload that will be used as part
 ; of an enumeration of all overloaded functions; <abi-name> is the name
 ; that will appear as a #define in altivec.h; and <builtin-name> is the
-; name that is overloaded in the back end.
+; name that is overloaded in the back end.  If no #define is desired,
+; the <abi-name> should be replaced with the token SKIP.
 ;
 ; Each function entry has two lines.  The first line is a prototype line.
 ; See rs6000-builtin-new.def for a description of the prototype line.
@@ -291,6 +292,14 @@
 ; Note that there is no entry for VEC_CMPLT.  VEC_CMPLT is implemented
 ; using VEC_CMPGT with reversed arguments in altivec.h.
 
+[VEC_CONVERT_4F32_8I16, SKIP, __builtin_vec_convert_4f32_8i16]
+  vus __builtin_vec_convert_4f32_8i16 (vf, vf);
+    CONVERT_4F32_8I16
+
+[VEC_CONVERT_4F32_8F16, SKIP, __builtin_vec_convert_4f32_8f16]
+  vus __builtin_vec_convert_4f32_8f16 (vf, vf);
+    CONVERT_4F32_8F16
+
 [VEC_COPYSIGN, vec_cpsgn, __builtin_vec_copysign]
   vf __builtin_vec_copysign (vf, vf);
     CPSGNSP
@@ -370,6 +379,62 @@
 [VEC_EXPTE, vec_expte, __builtin_vec_expte]
   vf __builtin_vec_expte (vf);
     VEXPTEFP
+
+[VEC_FIRSTMATCHINDEX, vec_first_match_index, __builtin_vec_first_match_index]
+  unsigned int __builtin_vec_first_match_index (vsc, vsc);
+    VFIRSTMATCHINDEX_V16QI FIRSTMATCHINDEX_VSC
+  unsigned int __builtin_vec_first_match_index (vuc, vuc);
+    VFIRSTMATCHINDEX_V16QI FIRSTMATCHINDEX_VUC
+  unsigned int __builtin_vec_first_match_index (vss, vss);
+    VFIRSTMATCHINDEX_V8HI FIRSTMATCHINDEX_VSS
+  unsigned int __builtin_vec_first_match_index (vus, vus);
+    VFIRSTMATCHINDEX_V8HI FIRSTMATCHINDEX_VUS
+  unsigned int __builtin_vec_first_match_index (vsi, vsi);
+    VFIRSTMATCHINDEX_V4SI FIRSTMATCHINDEX_VSI
+  unsigned int __builtin_vec_first_match_index (vui, vui);
+    VFIRSTMATCHINDEX_V4SI FIRSTMATCHINDEX_VUI
+
+[VEC_FIRSTMATCHOREOSINDEX, vec_first_match_or_eos_index, __builtin_vec_first_match_or_eos_index]
+  unsigned int __builtin_vec_first_match_or_eos_index (vsc, vsc);
+    VFIRSTMATCHOREOSINDEX_V16QI FIRSTMATCHOREOSINDEX_VSC
+  unsigned int __builtin_vec_first_match_or_eos_index (vuc, vuc);
+    VFIRSTMATCHOREOSINDEX_V16QI FIRSTMATCHOREOSINDEX_VUC
+  unsigned int __builtin_vec_first_match_or_eos_index (vss, vss);
+    VFIRSTMATCHOREOSINDEX_V8HI FIRSTMATCHOREOSINDEX_VSS
+  unsigned int __builtin_vec_first_match_or_eos_index (vus, vus);
+    VFIRSTMATCHOREOSINDEX_V8HI FIRSTMATCHOREOSINDEX_VUS
+  unsigned int __builtin_vec_first_match_or_eos_index (vsi, vsi);
+    VFIRSTMATCHOREOSINDEX_V4SI FIRSTMATCHOREOSINDEX_VSI
+  unsigned int __builtin_vec_first_match_or_eos_index (vui, vui);
+    VFIRSTMATCHOREOSINDEX_V4SI FIRSTMATCHOREOSINDEX_VUI
+
+[VEC_FIRSTMISMATCHINDEX, vec_first_mismatch_index, __builtin_vec_first_mismatch_index]
+  unsigned int __builtin_vec_first_mismatch_index (vsc, vsc);
+    VFIRSTMISMATCHINDEX_V16QI FIRSTMISMATCHINDEX_VSC
+  unsigned int __builtin_vec_first_mismatch_index (vuc, vuc);
+    VFIRSTMISMATCHINDEX_V16QI FIRSTMISMATCHINDEX_VUC
+  unsigned int __builtin_vec_first_mismatch_index (vss, vss);
+    VFIRSTMISMATCHINDEX_V8HI FIRSTMISMATCHINDEX_VSS
+  unsigned int __builtin_vec_first_mismatch_index (vus, vus);
+    VFIRSTMISMATCHINDEX_V8HI FIRSTMISMATCHINDEX_VUS
+  unsigned int __builtin_vec_first_mismatch_index (vsi, vsi);
+    VFIRSTMISMATCHINDEX_V4SI FIRSTMISMATCHINDEX_VSI
+  unsigned int __builtin_vec_first_mismatch_index (vui, vui);
+    VFIRSTMISMATCHINDEX_V4SI FIRSTMISMATCHINDEX_VUI
+
+[VEC_FIRSTMISMATCHOREOSINDEX, vec_first_mismatch_or_eos_index, __builtin_vec_first_mismatch_or_eos_index]
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vsc, vsc);
+    VFIRSTMISMATCHOREOSINDEX_V16QI FIRSTMISMATCHOREOSINDEX_VSC
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vuc, vuc);
+    VFIRSTMISMATCHOREOSINDEX_V16QI FIRSTMISMATCHOREOSINDEX_VUC
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vss, vss);
+    VFIRSTMISMATCHOREOSINDEX_V8HI FIRSTMISMATCHOREOSINDEX_VSS
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vus, vus);
+    VFIRSTMISMATCHOREOSINDEX_V8HI FIRSTMISMATCHOREOSINDEX_VUS
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vsi, vsi);
+    VFIRSTMISMATCHOREOSINDEX_V4SI FIRSTMISMATCHOREOSINDEX_VSI
+  unsigned int __builtin_vec_first_mismatch_or_eos_index (vui, vui);
+    VFIRSTMISMATCHOREOSINDEX_V4SI FIRSTMISMATCHOREOSINDEX_VUI
 
 [VEC_FLOAT, vec_float, __builtin_vec_float]
   vf __builtin_vec_float (vsi);
@@ -733,6 +798,92 @@
   vd __builtin_vec_max (vd, vd);
     XVMAXDP
 
+[VEC_MERGEH, vec_mergeh, __builtin_vec_mergeh]
+  vbc __builtin_vec_mergeh (vbc, vbc);
+    VMRGHB  VMRGHB_VBC
+  vsc __builtin_vec_mergeh (vsc, vsc);
+    VMRGHB  VMRGHB_VSC
+  vuc __builtin_vec_mergeh (vuc, vuc);
+    VMRGHB  VMRGHB_VUC
+  vbs __builtin_vec_mergeh (vbs, vbs);
+    VMRGHH  VMRGHH_VBS
+  vss __builtin_vec_mergeh (vss, vss);
+    VMRGHH  VMRGHH_VSS
+  vus __builtin_vec_mergeh (vus, vus);
+    VMRGHH  VMRGHH_VUS
+  vp __builtin_vec_mergeh (vp, vp);
+    VMRGHH  VMRGHH_VP
+  vbi __builtin_vec_mergeh (vbi, vbi);
+    VMRGHW  VMRGHW_VBI
+  vsi __builtin_vec_mergeh (vsi, vsi);
+    VMRGHW  VMRGHW_VSI
+  vui __builtin_vec_mergeh (vui, vui);
+    VMRGHW  VMRGHW_VUI
+  vbll __builtin_vec_mergeh (vbll, vbll);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VBLL
+  vsll __builtin_vec_mergeh (vsll, vsll);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VSLL
+  vull __builtin_vec_mergeh (vull, vull);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VULL
+  vf __builtin_vec_mergeh (vf, vf);
+    VMRGHW  VMRGHW_VF
+  vd __builtin_vec_mergeh (vd, vd);
+    VEC_MERGEH_V2DF
+
+[VEC_MERGEL, vec_mergel, __builtin_vec_mergel]
+  vbc __builtin_vec_mergel (vbc, vbc);
+    VMRGLB  VMRGLB_VBC
+  vsc __builtin_vec_mergel (vsc, vsc);
+    VMRGLB  VMRGLB_VSC
+  vuc __builtin_vec_mergel (vuc, vuc);
+    VMRGLB  VMRGLB_VUC
+  vbs __builtin_vec_mergel (vbs, vbs);
+    VMRGLH  VMRGLH_VBS
+  vss __builtin_vec_mergel (vss, vss);
+    VMRGLH  VMRGLH_VSS
+  vus __builtin_vec_mergel (vus, vus);
+    VMRGLH  VMRGLH_VUS
+  vp __builtin_vec_mergel (vp, vp);
+    VMRGLH  VMRGLH_VP
+  vbi __builtin_vec_mergel (vbi, vbi);
+    VMRGLW  VMRGLW_VBI
+  vsi __builtin_vec_mergel (vsi, vsi);
+    VMRGLW  VMRGLW_VSI
+  vui __builtin_vec_mergel (vui, vui);
+    VMRGLW  VMRGLW_VUI
+  vbll __builtin_vec_mergel (vbll, vbll);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VBLL
+  vsll __builtin_vec_mergel (vsll, vsll);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VSLL
+  vull __builtin_vec_mergel (vull, vull);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VULL
+  vf __builtin_vec_mergel (vf, vf);
+    VMRGLW  VMRGLW_VF
+  vd __builtin_vec_mergel (vd, vd);
+    VEC_MERGEL_V2DF
+
+[VEC_MIN, vec_min, __builtin_vec_min]
+  vsc __builtin_vec_min (vsc, vsc);
+    VMINSB
+  vuc __builtin_vec_min (vuc, vuc);
+    VMINUB
+  vss __builtin_vec_min (vss, vss);
+    VMINSH
+  vus __builtin_vec_min (vus, vus);
+    VMINUH
+  vsi __builtin_vec_min (vsi, vsi);
+    VMINSW
+  vui __builtin_vec_min (vui, vui);
+    VMINUW
+  vsll __builtin_vec_min (vsll, vsll);
+    VMINSD
+  vull __builtin_vec_min (vull, vull);
+    VMINUD
+  vf __builtin_vec_min (vf, vf);
+    XVMINSP
+  vd __builtin_vec_min (vd, vd);
+    XVMINDP
+
 [VEC_MTVSCR, vec_mtvscr, __builtin_vec_mtvscr]
   void __builtin_vec_mtvscr (vbc);
     MTVSCR  MTVSCR_VBC
@@ -755,6 +906,168 @@
   void __builtin_vec_mtvscr (vui);
     MTVSCR  MTVSCR_VUI
 
+[VEC_MULE, vec_mule, __builtin_vec_mule]
+  vss __builtin_vec_mule (vsc, vsc);
+    VMULESB
+  vus __builtin_vec_mule (vuc, vuc);
+    VMULEUB
+  vsi __builtin_vec_mule (vss, vss);
+    VMULESH
+  vui __builtin_vec_mule (vus, vus);
+    VMULEUH
+  vsll __builtin_vec_mule (vsi, vsi);
+    VMULESW
+  vull __builtin_vec_mule (vui, vui);
+    VMULEUW
+
+[VEC_MULO, vec_mulo, __builtin_vec_mulo]
+  vss __builtin_vec_mulo (vsc, vsc);
+    VMULOSB
+  vus __builtin_vec_mulo (vuc, vuc);
+    VMULOUB
+  vsi __builtin_vec_mulo (vss, vss);
+    VMULOSH
+  vui __builtin_vec_mulo (vus, vus);
+    VMULOUH
+  vsll __builtin_vec_mulo (vsi, vsi);
+    VMULOSW
+  vull __builtin_vec_mulo (vui, vui);
+    VMULOUW
+
+[VEC_NABS, vec_nabs, __builtin_vec_nabs]
+  vsc __builtin_vec_nabs (vsc);
+    NABS_V16QI
+  vss __builtin_vec_nabs (vss);
+    NABS_V8HI
+  vsi __builtin_vec_nabs (vsi);
+    NABS_V4SI
+  vsll __builtin_vec_nabs (vsll);
+    NABS_V2DI
+  vf __builtin_vec_nabs (vf);
+    NABS_V4SF
+  vd __builtin_vec_nabs (vd);
+    NABS_V2DF
+
+[VEC_NEARBYINT, vec_nearbyint, __builtin_vec_nearbyint]
+  vf __builtin_vec_nearbyint (vf);
+    XVRSPI  XVRSPI_NBI
+  vd __builtin_vec_nearbyint (vd);
+    XVRDPI  XVRDPI_NBI
+
+[VEC_NEG, vec_neg, __builtin_vec_neg]
+  vsc __builtin_vec_neg (vsc);
+    NEG_V16QI
+  vss __builtin_vec_neg (vss);
+    NEG_V8HI
+  vsi __builtin_vec_neg (vsi);
+    NEG_V4SI
+  vsll __builtin_vec_neg (vsll);
+    NEG_V2DI
+  vf __builtin_vec_neg (vf);
+    NEG_V4SF
+  vd __builtin_vec_neg (vd);
+    NEG_V2DF
+
+[VEC_NOR, vec_nor, __builtin_vec_nor]
+  vsc __builtin_vec_nor (vsc, vsc);
+    VNOR_V16QI
+  vuc __builtin_vec_nor (vuc, vuc);
+    VNOR_V16QI_UNS  VNOR_V16QI_U
+  vbc __builtin_vec_nor (vbc, vbc);
+    VNOR_V16QI_UNS  VNOR_V16QI_B
+  vss __builtin_vec_nor (vss, vss);
+    VNOR_V8HI
+  vus __builtin_vec_nor (vus, vus);
+    VNOR_V8HI_UNS  VNOR_V8HI_U
+  vbs __builtin_vec_nor (vbs, vbs);
+    VNOR_V8HI_UNS  VNOR_V8HI_B
+  vsi __builtin_vec_nor (vsi, vsi);
+    VNOR_V4SI
+  vui __builtin_vec_nor (vui, vui);
+    VNOR_V4SI_UNS  VNOR_V4SI_U
+  vbi __builtin_vec_nor (vbi, vbi);
+    VNOR_V4SI_UNS  VNOR_V4SI_B
+  vsll __builtin_vec_nor (vsll, vsll);
+    VNOR_V2DI
+  vull __builtin_vec_nor (vull, vull);
+    VNOR_V2DI_UNS  VNOR_V2DI_U
+  vbll __builtin_vec_nor (vbll, vbll);
+    VNOR_V2DI_UNS  VNOR_V2DI_B
+  vf __builtin_vec_nor (vf, vf);
+    VNOR_V4SF
+  vd __builtin_vec_nor (vd, vd);
+    VNOR_V2DF
+
+[VEC_OR, vec_or, __builtin_vec_or]
+  vsc __builtin_vec_or (vsc, vsc);
+    VOR_V16QI
+  vuc __builtin_vec_or (vuc, vuc);
+    VOR_V16QI_UNS  VOR_V16QI_U
+  vbc __builtin_vec_or (vbc, vbc);
+    VOR_V16QI_UNS  VOR_V16QI_B
+  vss __builtin_vec_or (vss, vss);
+    VOR_V8HI
+  vus __builtin_vec_or (vus, vus);
+    VOR_V8HI_UNS  VOR_V8HI_U
+  vbs __builtin_vec_or (vbs, vbs);
+    VOR_V8HI_UNS  VOR_V8HI_B
+  vsi __builtin_vec_or (vsi, vsi);
+    VOR_V4SI
+  vui __builtin_vec_or (vui, vui);
+    VOR_V4SI_UNS  VOR_V4SI_U
+  vbi __builtin_vec_or (vbi, vbi);
+    VOR_V4SI_UNS  VOR_V4SI_B
+  vsll __builtin_vec_or (vsll, vsll);
+    VOR_V2DI
+  vull __builtin_vec_or (vull, vull);
+    VOR_V2DI_UNS  VOR_V2DI_U
+  vbll __builtin_vec_or (vbll, vbll);
+    VOR_V2DI_UNS  VOR_V2DI_B
+  vf __builtin_vec_or (vf, vf);
+    VOR_V4SF
+  vd __builtin_vec_or (vd, vd);
+    VOR_V2DF
+
+[VEC_PACK, vec_pack, __builtin_vec_pack]
+  vsc __builtin_vec_pack (vss, vss);
+    VPKUHUM  VPKUHUM_VSS
+  vuc __builtin_vec_pack (vus, vus);
+    VPKUHUM  VPKUHUM_VUS
+  vbc __builtin_vec_pack (vbs, vbs);
+    VPKUHUM  VPKUHUM_VBS
+  vss __builtin_vec_pack (vsi, vsi);
+    VPKUWUM  VPKUWUM_VSI
+  vus __builtin_vec_pack (vui, vui);
+    VPKUWUM  VPKUWUM_VUI
+  vbs __builtin_vec_pack (vbi, vbi);
+    VPKUWUM  VPKUWUM_VBI
+  vsi __builtin_vec_pack (vsll, vsll);
+    VPKUDUM  VPKUDUM_VSLL
+  vui __builtin_vec_pack (vull, vull);
+    VPKUDUM  VPKUDUM_VULL
+  vbi __builtin_vec_pack (vbll, vbll);
+    VPKUDUM  VPKUDUM_VBLL
+  vf __builtin_vec_pack (vd, vd);
+    FLOAT2_V2DF FLOAT2_V2DF_PACK
+
+[VEC_PACKPX, vec_packpx, __builtin_vec_packpx]
+  vp __builtin_vec_packpx (vui, vui);
+    VPKPX
+
+[VEC_PACKS, vec_packs, __builtin_vec_packs]
+  vuc __builtin_vec_packs (vus, vus);
+    VPKUHUS
+  vsc __builtin_vec_packs (vss, vss);
+    VPKSHSS
+  vus __builtin_vec_packs (vui, vui);
+    VPKUWUS
+  vss __builtin_vec_packs (vsi, vsi);
+    VPKSWSS
+  vui __builtin_vec_packs (vull, vull);
+    VPKUDUS
+  vsi __builtin_vec_packs (vsll, vsll);
+    VPKSDSS
+
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
     XVRESP
@@ -766,6 +1079,42 @@
     RECIP_V4SF
   vd __builtin_vec_recipdiv (vd, vd);
     RECIP_V2DF
+
+[VEC_RINT, vec_rint, __builtin_vec_rint]
+  vf __builtin_vec_rint (vf);
+    XVRSPIC
+  vd __builtin_vec_rint (vd);
+    XVRDPIC
+
+[VEC_RL, vec_rl, __builtin_vec_rl]
+  vsc __builtin_vec_rl (vsc, vuc);
+    VRLB  VRLB_VSC
+  vuc __builtin_vec_rl (vuc, vuc);
+    VRLB  VRLB_VUC
+  vss __builtin_vec_rl (vss, vus);
+    VRLH  VRLH_VSS
+  vus __builtin_vec_rl (vus, vus);
+    VRLH  VRLH_VUS
+  vsi __builtin_vec_rl (vsi, vui);
+    VRLW  VRLW_VSI
+  vui __builtin_vec_rl (vui, vui);
+    VRLW  VRLW_VUI
+  vsll __builtin_vec_rl (vsll, vull);
+    VRLD  VRLD_VSLL
+  vull __builtin_vec_rl (vull, vull);
+    VRLD  VRLD_VULL
+
+[VEC_RLMI, vec_rlmi, __builtin_vec_rlmi]
+  vui __builtin_vec_rlmi (vui, vui, vui);
+    VRLWMI
+  vull __builtin_vec_rlmi (vull, vull, vull);
+    VRLDMI
+
+[VEC_RLNM, vec_rlnm, __builtin_vec_rlnm]
+  vui __builtin_vec_rlnm (vui, vui);
+    VRLWNM
+  vull __builtin_vec_rlnm (vull, vull);
+    VRLDNM
 
 [VEC_ROUND, vec_round, __builtin_vec_round]
   vf __builtin_vec_round (vf);
@@ -784,6 +1133,50 @@
     XVRSQRTESP
   vd __builtin_vec_rsqrte (vd);
     XVRSQRTEDP
+
+[VEC_SL, vec_sl, __builtin_vec_sl]
+  vsc __builtin_vec_sl (vsc, vuc);
+    VSLB  VSLB_VSC
+  vuc __builtin_vec_sl (vuc, vuc);
+    VSLB  VSLB_VUC
+  vss __builtin_vec_sl (vss, vus);
+    VSLH  VSLH_VSS
+  vus __builtin_vec_sl (vus, vus);
+    VSLH  VSLH_VUS
+  vsi __builtin_vec_sl (vsi, vui);
+    VSLW  VSLW_VSI
+  vui __builtin_vec_sl (vui, vui);
+    VSLW  VSLW_VUI
+  vsll __builtin_vec_sl (vsll, vull);
+    VSLD  VSLD_VSLL
+  vull __builtin_vec_sl (vull, vull);
+    VSLD  VSLD_VULL
+
+[VEC_SLL, vec_sll, __builtin_vec_sll]
+  vsc __builtin_vec_sll (vsc, vuc);
+    VSL  VSL_VSC
+  vuc __builtin_vec_sll (vuc, vuc);
+    VSL  VSL_VUC
+  vss __builtin_vec_sll (vss, vuc);
+    VSL  VSL_VSS
+  vus __builtin_vec_sll (vus, vuc);
+    VSL  VSL_VUS
+  vp __builtin_vec_sll (vp, vuc);
+    VSL  VSL_VP
+  vsi __builtin_vec_sll (vsi, vuc);
+    VSL  VSL_VSI
+  vui __builtin_vec_sll (vui, vuc);
+    VSL  VSL_VUI
+  vsll __builtin_vec_sll (vsll, vuc);
+    VSL  VSL_VSLL
+  vull __builtin_vec_sll (vull, vuc);
+    VSL  VSL_VULL
+
+[VEC_SQRT, vec_sqrt, __builtin_vec_sqrt]
+  vf __builtin_vec_sqrt (vf);
+    XVSQRTSP
+  vd __builtin_vec_sqrt (vd);
+    XVSQRTDP
 
 [VEC_TRUNC, vec_trunc, __builtin_vec_trunc]
   vf __builtin_vec_trunc (vf);
