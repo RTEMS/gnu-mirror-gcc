@@ -183,6 +183,7 @@ enum bif_stanza {
   BSTZ_P5,
   BSTZ_P6,
   BSTZ_ALTIVEC,
+  BSTZ_CELL,
   BSTZ_VSX,
   BSTZ_P7,
   BSTZ_P7_64,
@@ -215,6 +216,7 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "power5",		BSTZ_P5		},
     { "power6",		BSTZ_P6		},
     { "altivec",	BSTZ_ALTIVEC	},
+    { "cell",		BSTZ_CELL	},
     { "vsx",		BSTZ_VSX	},
     { "power7",		BSTZ_P7		},
     { "power7-64",	BSTZ_P7_64	},
@@ -238,6 +240,7 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_P5",
     "ENB_P6",
     "ENB_ALTIVEC",
+    "ENB_CELL",
     "ENB_VSX",
     "ENB_P7",
     "ENB_P7_64",
@@ -2067,6 +2070,7 @@ write_decls ()
   fprintf (header_file, "  ENB_P5,\n");
   fprintf (header_file, "  ENB_P6,\n");
   fprintf (header_file, "  ENB_ALTIVEC,\n");
+  fprintf (header_file, "  ENB_CELL,\n");
   fprintf (header_file, "  ENB_VSX,\n");
   fprintf (header_file, "  ENB_P7,\n");
   fprintf (header_file, "  ENB_P7_64,\n");

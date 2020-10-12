@@ -1188,6 +1188,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_long, 0 },
   { ALTIVEC_BUILTIN_VEC_LDE, ALTIVEC_BUILTIN_LVEWX,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_long, 0 },
+  /* All ALTIVEC_BUILTIN_VEC_LVE* are deprecated and not included
+     in rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_LVEWX, ALTIVEC_BUILTIN_LVEWX,
     RS6000_BTI_V4SF, RS6000_BTI_INTSI, ~RS6000_BTI_float, 0 },
   { ALTIVEC_BUILTIN_VEC_LVEWX, ALTIVEC_BUILTIN_LVEWX,
@@ -13528,6 +13530,10 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	  break;
 	case ENB_ALTIVEC:
 	  if (!TARGET_ALTIVEC)
+	    return const0_rtx;
+	  break;
+	case ENB_CELL:
+	  if (!TARGET_ALTIVEC || rs6000_cpu != PROCESSOR_CELL)
 	    return const0_rtx;
 	  break;
 	case ENB_VSX:

@@ -300,18 +300,6 @@
   pure vop __builtin_altivec_lvewx (signed long long, const void *);
     LVEWX altivec_lvewx {ldvec}
 
-  pure vop __builtin_altivec_lvlx (signed long long, const void *);
-    LVLX altivec_lvlx {ldvec}
-
-  pure vop __builtin_altivec_lvlxl (signed long long, const void *);
-    LVLXL altivec_lvlxl {ldvec}
-
-  pure vop __builtin_altivec_lvrx (signed long long, const void *);
-    LVRX altivec_lvrx {ldvec}
-
-  pure vop __builtin_altivec_lvrxl (signed long long, const void *);
-    LVRXL altivec_lvrxl {ldvec}
-
   pure vuc __builtin_altivec_lvsl (signed long long, const void *);
     LVSL altivec_lvsl {ldvec}
 
@@ -377,18 +365,6 @@
 
   void __builtin_altivec_stvewx (vsi, signed long long, void *);
     STVEWX altivec_stvewx {stvec}
-
-  void __builtin_altivec_stvlx (vop, signed long long, void *);
-    STVLX altivec_stvlx {stvec}
-
-  void __builtin_altivec_stvlxl (vop, signed long long, void *);
-    STVLXL altivec_stvlxl {stvec}
-
-  void __builtin_altivec_stvrx (vop, signed long long, void *);
-    STVRX altivec_stvrx {stvec}
-
-  void __builtin_altivec_stvrxl (vop, signed long long, void *);
-    STVRXL altivec_stvrxl {stvec}
 
   void __builtin_altivec_stvx (vsi, signed long long, void *);
     STVX altivec_stvx_v4si {stvec}
@@ -1093,6 +1069,33 @@
     VEC_SET_V8HI nothing {set}
 
 
+; Cell builtins.
+[cell]
+  pure vop __builtin_altivec_lvlx (signed long long, const void *);
+    LVLX altivec_lvlx {ldvec}
+
+  pure vop __builtin_altivec_lvlxl (signed long long, const void *);
+    LVLXL altivec_lvlxl {ldvec}
+
+  pure vop __builtin_altivec_lvrx (signed long long, const void *);
+    LVRX altivec_lvrx {ldvec}
+
+  pure vop __builtin_altivec_lvrxl (signed long long, const void *);
+    LVRXL altivec_lvrxl {ldvec}
+
+  void __builtin_altivec_stvlx (vop, signed long long, void *);
+    STVLX altivec_stvlx {stvec}
+
+  void __builtin_altivec_stvlxl (vop, signed long long, void *);
+    STVLXL altivec_stvlxl {stvec}
+
+  void __builtin_altivec_stvrx (vop, signed long long, void *);
+    STVRX altivec_stvrx {stvec}
+
+  void __builtin_altivec_stvrxl (vop, signed long long, void *);
+    STVRXL altivec_stvrxl {stvec}
+
+
 ; VSX builtins.
 [vsx]
   pure vsq __builtin_altivec_lvx_v1ti (signed long long, const void *);
@@ -1103,6 +1106,9 @@
 
   pure vsll __builtin_altivec_lvx_v2di (signed long long, const void *);
     LVX_V2DI altivec_lvx_v2di {ldvec}
+
+  pure vuq __builtin_altivec_lvxl_v1ti (signed long long, const void *);
+    LVXL_V1TI altivec_lvxl_v1ti {ldvec}
 
   pure vd __builtin_altivec_lvxl_v2df (signed long long, const void *);
     LVXL_V2DF altivec_lvxl_v2df {ldvec}
