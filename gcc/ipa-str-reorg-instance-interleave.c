@@ -1316,6 +1316,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    // TBD This case probably is unnecessary.
 		    DEBUG_L("ReorgT_Return\n");
 		    break;
+		  case ReorgT_Ignore:
+		    DEBUG_L("ReorgT_Ignore\n");
+		    break;
 		  default:
 		    internal_error( "Invalid transformation");
 		  }

@@ -149,6 +149,7 @@ enum ReorgTransformation {
   ReorgT_UserFunc,     //
   ReorgT_Convert,      // type casts
   ReorgT_Return,       // return t
+  ReorgT_Ignore,       // "a = b"
   Not_Supported
 };
 
