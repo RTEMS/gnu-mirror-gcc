@@ -40,17 +40,9 @@ struct range_entry
   unsigned int idx, next;
 };
 
-/* Starting rank number for a given basic block, so that we can rank
-   operations using unmovable instructions in that BB based on the bb
-   depth.  */
-extern long *bb_rank;
-
-/* Operand->rank hashtable.  */
-extern hash_map<tree, long> *operand_rank;
-
-void linearize_expr_tree (vec<operand_entry *> *, gimple *, bool, bool);
 void dump_range_entry (FILE *file, struct range_entry *r);
 void debug_range_entry (struct range_entry *r);
 void init_range_entry (struct range_entry *r, tree exp, gimple *stmt);
+bool no_side_effect_bb (basic_block bb);
 
 #endif  /* GCC_SSA_REASSOC_H  */

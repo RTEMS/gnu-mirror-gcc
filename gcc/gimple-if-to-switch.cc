@@ -60,7 +60,7 @@ using namespace tree_switch_conversion;
 struct condition_info
 {
   condition_info (gcond *cond): m_cond (cond), m_bb (gimple_bb (cond)),
-    m_ranges (), m_true_edge(NULL), m_false_edge (NULL), m_hoisting (false)
+    m_ranges (), m_true_edge(NULL), m_false_edge (NULL)
   {
     m_ranges.create (0);
   }
@@ -70,7 +70,6 @@ struct condition_info
   vec<range_entry> m_ranges;
   edge m_true_edge;
   edge m_false_edge;
-  bool m_hoisting;
 };
 
 
@@ -371,25 +370,7 @@ convert_if_conditions_to_switch (vec<condition_info *> &chain)
 	  remove_edge (first_cond->m_false_edge);
 	}
       else
-	{
-	  /* Move all statements from the BB to the BB with gswitch.  */
-	  auto_vec<gimple *> stmts;
-	  for (gimple_stmt_iterator gsi = gsi_start_bb (info->m_bb);
-	       !gsi_end_p (gsi); gsi_next (&gsi))
-	    {
-	      gimple *stmt = gsi_stmt (gsi);
-	      if (gimple_code (stmt) != GIMPLE_COND)
-		stmts.safe_push (stmt);
-	    }
-
-	  for (unsigned i = 0; i < stmts.length (); i++)
-	    {
-	      gimple_stmt_iterator gsi_from = gsi_for_stmt (stmts[i]);
-	      gsi_move_before (&gsi_from, &gsi);
-	    }
-
-	  delete_basic_block (info->m_bb);
-	}
+	delete_basic_block (info->m_bb);
 
       make_edge (first_cond->m_bb, case_bb, 0);
     }
@@ -449,57 +430,33 @@ find_conditions (basic_block bb,
   if (cond == NULL)
     return;
 
-  if (!bb_no_side_effects_p (bb))
+  if (!no_side_effect_bb (bb))
     return;
 
   tree lhs = gimple_cond_lhs (cond);
+  tree rhs = gimple_cond_rhs (cond);
   tree_code code = gimple_cond_code (cond);
 
   condition_info info (cond);
 
-  if (code == NE_EXPR)
+  gassign *def;
+  if (code == NE_EXPR
+      && TREE_CODE (lhs) == SSA_NAME
+      && (def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs))) != NULL
+      && integer_zerop (rhs))
     {
-      gassign *def;
-      if (TREE_CODE (lhs) == SSA_NAME
-	  && (def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs))) != NULL)
+      enum tree_code rhs_code = gimple_assign_rhs_code (def);
+      if (rhs_code == BIT_IOR_EXPR)
 	{
-	  enum tree_code rhs_code = gimple_assign_rhs_code (def);
-	  if (associative_tree_code (rhs_code))
-	    {
-	      auto_vec<operand_entry *> ops;
-	      if (TREE_CODE (lhs) == SSA_NAME && has_zero_uses (lhs))
-		;
-	      else
-		{
-		  linearize_expr_tree (&ops, def, true, true);
-		  unsigned length = ops.length ();
-		  info.m_ranges.safe_grow (length, true);
-		  for (unsigned i = 0; i < length; i++)
-		    {
-		      operand_entry *oe = ops[i];
-		      if (oe->stmt_to_insert)
-			debug_gimple_stmt(oe->stmt_to_insert);
-		      info.m_ranges[i].idx = i;
-		      init_range_entry (&info.m_ranges[i], oe->op,
-					oe->op
-					? NULL
-					: last_stmt (BASIC_BLOCK_FOR_FN (cfun, oe->id)));
-		    }
-		}
-	    }
-	}
-      else
-	{
-	  info.m_ranges.safe_grow (1, true);
-	  init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
-	  gimple_set_visited (cond, true);
+	  info.m_ranges.safe_grow (2, true);
+	  init_range_entry (&info.m_ranges[0], gimple_assign_rhs1 (def), NULL);
+	  init_range_entry (&info.m_ranges[1], gimple_assign_rhs2 (def), NULL);
 	}
     }
-  else if (code == EQ_EXPR || code == LE_EXPR)
+  else
     {
       info.m_ranges.safe_grow (1, true);
       init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
-      gimple_set_visited (cond, true);
     }
 
   /* All identified ranges must have equal expression and IN_P flag.  */
@@ -516,15 +473,6 @@ find_conditions (basic_block bb,
       for (unsigned i = 1; i < info.m_ranges.length (); ++i)
 	if (info.m_ranges[i].exp != expr || info.m_ranges[i].in_p != in_p)
 	  return;
-
-      /* Identify if the condition will need a code hoisting.  */
-      for (gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
-	   !gsi_end_p (gsi); gsi_next_nondebug (&gsi))
-	if (!gsi_stmt (gsi)->visited)
-	  {
-	    info.m_hoisting = true;
-	    break;
-	  }
 
       conditions_in_bbs->put (bb, info);
     }
@@ -567,9 +515,7 @@ public:
 unsigned int
 pass_if_to_switch::execute (function *fun)
 {
-  operand_rank = new hash_map<tree, long>;
   hash_map<basic_block, condition_info> conditions_in_bbs;
-  bb_rank = XCNEWVEC (long, last_basic_block_for_fn (cfun));
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -623,7 +569,6 @@ pass_if_to_switch::execute (function *fun)
 	  chain.reverse ();
 	  for (unsigned i = 0; i < chain.length (); i++)
 	    {
-	      fprintf (stderr, "BB hoisting: %d\n", chain[i]->m_hoisting);
 	      debug_bb (chain[i]->m_true_edge->src);
 	    }
 
@@ -637,13 +582,6 @@ pass_if_to_switch::execute (function *fun)
     }
 
   free (rpo);
-
-  delete operand_rank;
-  operand_rank = NULL;
-
-  free (bb_rank);
-  bb_rank = NULL;
-
   free_dominance_info (CDI_DOMINATORS);
 
   return 0;

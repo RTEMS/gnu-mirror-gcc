@@ -200,10 +200,10 @@ static unsigned int next_operand_entry_id;
 /* Starting rank number for a given basic block, so that we can rank
    operations using unmovable instructions in that BB based on the bb
    depth.  */
-long *bb_rank;
+static long *bb_rank;
 
 /* Operand->rank hashtable.  */
-hash_map<tree, long> *operand_rank;
+static hash_map<tree, long> *operand_rank;
 
 /* Vector of SSA_NAMEs on which after reassociate_bb is done with
    all basic blocks the CFG should be adjusted - basic blocks
@@ -1052,6 +1052,8 @@ eliminate_using_constants (enum tree_code opcode,
 }
 
 
+static void linearize_expr_tree (vec<operand_entry *> *, gimple *,
+				 bool, bool);
 
 /* Structure for tracking and counting operands.  */
 struct oecount {
@@ -3784,9 +3786,7 @@ optimize_range_tests (enum tree_code opcode,
       if (opcode == BIT_IOR_EXPR
 	  || (opcode == ERROR_MARK && oe->rank == BIT_IOR_EXPR))
 	ranges[i].in_p = !ranges[i].in_p;
-//      debug_range_entry (&ranges[i]);
     }
-//  fprintf (stderr, "\n");
 
   qsort (ranges, length, sizeof (*ranges), range_entry_cmp);
   for (i = 0; i < length; i++)
@@ -4265,7 +4265,7 @@ suitable_cond_bb (basic_block bb, basic_block test_bb, basic_block *other_bb,
    range test optimization, all SSA_NAMEs set in the bb are consumed
    in the bb and there are no PHIs.  */
 
-static bool
+bool
 no_side_effect_bb (basic_block bb)
 {
   gimple_stmt_iterator gsi;
@@ -4674,7 +4674,7 @@ maybe_optimize_range_tests (gimple *stmt)
       if (bb == first_bb)
 	break;
     }
-//  if (ops.length () > 1)
+  if (ops.length () > 1)
     any_changes = optimize_range_tests (ERROR_MARK, &ops, first_bb);
   if (any_changes)
     {
@@ -5586,7 +5586,7 @@ try_special_add_to_ops (vec<operand_entry *> *ops,
 /* Recursively linearize a binary expression that is the RHS of STMT.
    Place the operands of the expression tree in the vector named OPS.  */
 
-void
+static void
 linearize_expr_tree (vec<operand_entry *> *ops, gimple *stmt,
 		     bool is_associative, bool set_visited)
 {
