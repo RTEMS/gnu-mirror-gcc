@@ -1571,6 +1571,8 @@ vect_recog_over_widening_pattern (vec_info *vinfo,
       tree op = gimple_op (last_stmt, first_op + i);
       if (TREE_CODE (op) == INTEGER_CST)
 	unprom[i].set_op (op, vect_constant_def);
+      else if (TREE_CODE (op) == POLY_INT_CST)
+	return NULL;
       else if (TREE_CODE (op) == SSA_NAME)
 	{
 	  bool op_single_use_p = true;
