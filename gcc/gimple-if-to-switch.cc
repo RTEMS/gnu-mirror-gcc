@@ -59,15 +59,18 @@ using namespace tree_switch_conversion;
 
 struct condition_info
 {
-  condition_info (gcond *cond): m_cond (cond), m_ranges (),
-    m_in_range_edge (NULL)
+  condition_info (gcond *cond): m_cond (cond), m_bb (gimple_bb (cond)),
+    m_ranges (), m_true_edge(NULL), m_false_edge (NULL), m_hoisting (false)
   {
     m_ranges.create (0);
   }
 
   gcond *m_cond;
+  basic_block m_bb;
   vec<range_entry> m_ranges;
-  edge m_in_range_edge;
+  edge m_true_edge;
+  edge m_false_edge;
+  bool m_hoisting;
 };
 
 
@@ -338,41 +341,40 @@ label_cmp (const void *a, const void *b)
 /* Convert a given if CHAIN into a switch GIMPLE statement.  */
 
 static void
-convert_if_conditions_to_switch (if_chain *chain)
+convert_if_conditions_to_switch (vec<condition_info *> &chain)
 {
   if (!dbg_cnt (if_to_switch))
     return;
 
   auto_vec<tree> labels;
-  if_chain_entry first_cond = chain->m_entries[0];
+  unsigned entries = chain.length ();
+  condition_info *first_cond = chain[0];
 
-  unsigned entries = chain->m_entries.length ();
-  edge default_edge = chain->m_entries[entries - 1].m_false_edge;
+  edge default_edge = chain[entries - 1]->m_false_edge;
   basic_block default_bb = default_edge->dest;
 
-  gimple_stmt_iterator gsi = gsi_for_stmt (chain->m_first_condition);
-  for (unsigned i = 0; i < chain->m_entries.length (); i++)
+  gimple_stmt_iterator gsi = gsi_for_stmt (first_cond->m_cond);
+  for (unsigned i = 0; i < entries; i++)
     {
-      if_chain_entry entry = chain->m_entries[i];
+      condition_info *info = chain[i];
+      basic_block case_bb = info->m_true_edge->dest;
 
-      basic_block case_bb = entry.m_true_edge->dest;
-
-      for (unsigned j = 0; j < entry.m_case_values.length (); j++)
-	labels.safe_push (build_case_label (entry.m_case_values[j].m_min,
-					    entry.m_case_values[j].m_max,
+      for (unsigned j = 0; j < info->m_ranges.length (); j++)
+	labels.safe_push (build_case_label (info->m_ranges[j].low,
+					    info->m_ranges[j].high,
 					    case_bb));
-      default_bb = entry.m_false_edge->dest;
+      default_bb = info->m_false_edge->dest;
 
       if (i == 0)
 	{
-	  remove_edge (first_cond.m_true_edge);
-	  remove_edge (first_cond.m_false_edge);
+	  remove_edge (first_cond->m_true_edge);
+	  remove_edge (first_cond->m_false_edge);
 	}
       else
 	{
 	  /* Move all statements from the BB to the BB with gswitch.  */
 	  auto_vec<gimple *> stmts;
-	  for (gimple_stmt_iterator gsi = gsi_start_bb (entry.m_bb);
+	  for (gimple_stmt_iterator gsi = gsi_start_bb (info->m_bb);
 	       !gsi_end_p (gsi); gsi_next (&gsi))
 	    {
 	      gimple *stmt = gsi_stmt (gsi);
@@ -386,19 +388,19 @@ convert_if_conditions_to_switch (if_chain *chain)
 	      gsi_move_before (&gsi_from, &gsi);
 	    }
 
-	  delete_basic_block (entry.m_bb);
+	  delete_basic_block (info->m_bb);
 	}
 
-      make_edge (first_cond.m_bb, case_bb, 0);
+      make_edge (first_cond->m_bb, case_bb, 0);
     }
 
   labels.qsort (label_cmp);
 
-  edge e = find_edge (first_cond.m_bb, default_bb);
+  edge e = find_edge (first_cond->m_bb, default_bb);
   if (e == NULL)
-    e = make_edge (first_cond.m_bb, default_bb, 0);
+    e = make_edge (first_cond->m_bb, default_bb, 0);
   gswitch *s
-    = gimple_build_switch (chain->m_index,
+    = gimple_build_switch (first_cond->m_ranges[0].exp,
 			   build_case_label (NULL_TREE, NULL_TREE, default_bb),
 			   labels);
 
@@ -412,7 +414,9 @@ convert_if_conditions_to_switch (if_chain *chain)
       putc ('\n', dump_file);
     }
 
+  // TODO: fixme
   /* Fill up missing PHI node arguments.  */
+#if 0
   for (hash_map<gphi *, tree>::iterator it = chain->m_phi_map.begin ();
        it != chain->m_phi_map.end (); ++it)
     {
@@ -430,6 +434,7 @@ convert_if_conditions_to_switch (if_chain *chain)
 	    }
 	}
     }
+#endif
 }
 
 void
@@ -466,12 +471,14 @@ find_conditions (basic_block bb,
 		;
 	      else
 		{
-		  linearize_expr_tree (&ops, def, true, false);
+		  linearize_expr_tree (&ops, def, true, true);
 		  unsigned length = ops.length ();
 		  info.m_ranges.safe_grow (length, true);
 		  for (unsigned i = 0; i < length; i++)
 		    {
 		      operand_entry *oe = ops[i];
+		      if (oe->stmt_to_insert)
+			debug_gimple_stmt(oe->stmt_to_insert);
 		      info.m_ranges[i].idx = i;
 		      init_range_entry (&info.m_ranges[i], oe->op,
 					oe->op
@@ -485,12 +492,14 @@ find_conditions (basic_block bb,
 	{
 	  info.m_ranges.safe_grow (1, true);
 	  init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
+	  gimple_set_visited (cond, true);
 	}
     }
-  else if (code == EQ_EXPR)
+  else if (code == EQ_EXPR || code == LE_EXPR)
     {
       info.m_ranges.safe_grow (1, true);
       init_range_entry (&info.m_ranges[0], NULL_TREE, cond);
+      gimple_set_visited (cond, true);
     }
 
   /* All identified ranges must have equal expression and IN_P flag.  */
@@ -501,11 +510,22 @@ find_conditions (basic_block bb,
       bool in_p = info.m_ranges[0].in_p;
 
       extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
-      info.m_in_range_edge = in_p ? true_edge : false_edge;
+      info.m_true_edge = in_p ? true_edge : false_edge;
+      info.m_false_edge = in_p ? false_edge : true_edge;
 
       for (unsigned i = 1; i < info.m_ranges.length (); ++i)
 	if (info.m_ranges[i].exp != expr || info.m_ranges[i].in_p != in_p)
 	  return;
+
+      /* Identify if the condition will need a code hoisting.  */
+      for (gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
+	   !gsi_end_p (gsi); gsi_next_nondebug (&gsi))
+	if (!gsi_stmt (gsi)->visited)
+	  {
+	    info.m_hoisting = true;
+	    break;
+	  }
+
       conditions_in_bbs->put (bb, info);
     }
 
@@ -600,9 +620,18 @@ pass_if_to_switch::execute (function *fun)
 	    }
 
 	  fprintf (stderr, "Found chain with %d items\n", chain.length ());
+	  chain.reverse ();
 	  for (unsigned i = 0; i < chain.length (); i++)
 	    {
-	      debug_bb (chain[i]->m_in_range_edge->src);
+	      fprintf (stderr, "BB hoisting: %d\n", chain[i]->m_hoisting);
+	      debug_bb (chain[i]->m_true_edge->src);
+	    }
+
+	  if (chain.length () >= 4)
+	    {
+	    convert_if_conditions_to_switch (chain);
+	    // TODO
+	    break;
 	    }
 	}
     }
@@ -614,6 +643,8 @@ pass_if_to_switch::execute (function *fun)
 
   free (bb_rank);
   bb_rank = NULL;
+
+  free_dominance_info (CDI_DOMINATORS);
 
   return 0;
 }
