@@ -13061,6 +13061,16 @@ grokdeclarator (const cp_declarator *declarator,
 
     if (decl_context == PARM)
       {
+	/* If -fno-alias then make all pointers used as parameters
+	   restrict pointers.  */
+	if (flag_no_alias && POINTER_TYPE_P (type)
+	    && !POINTER_TYPE_P (TREE_TYPE (type))
+	    && TREE_CODE (TREE_TYPE (type)) != FUNCTION_TYPE)
+	  {
+	    type = cp_build_qualified_type (type,
+					    TYPE_QUALS (type)
+					    | TYPE_QUAL_RESTRICT);
+	  }
 	decl = cp_build_parm_decl (NULL_TREE, unqualified_id, type);
 	DECL_ARRAY_PARAMETER_P (decl) = array_parameter_p;
 

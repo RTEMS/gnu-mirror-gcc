@@ -496,7 +496,7 @@ Objective-C and Objective-C++ Dialects}.
 -fno-defer-pop  -fno-fp-int-builtin-inexact  -fno-function-cse @gol
 -fno-guess-branch-probability  -fno-inline  -fno-math-errno  -fno-peephole @gol
 -fno-peephole2  -fno-printf-return-value  -fno-sched-interblock @gol
--fno-sched-spec  -fno-signed-zeros @gol
+-fno-sched-spec  -fno-signed-zeros -fno-alias @gol
 -fno-toplevel-reorder  -fno-trapping-math  -fno-zero-initialized-in-bss @gol
 -fomit-frame-pointer  -foptimize-sibling-calls @gol
 -fpartial-inlining  -fpeel-loops  -fpredictive-commoning @gol
@@ -10887,6 +10887,14 @@ object of a different type, unless the types are almost the same.  For
 example, an @code{unsigned int} can alias an @code{int}, but not a
 @code{void*} or a @code{double}.  A character type may alias any other
 type.
+
+@item -fno-alias
+@opindex fno-alias
+This option is equivalent to adding the @code{restrict} keyword to all pointers
+used as parameters.  This option can be used to assess the performance impact
+of adding restrict to your pointers without having to make code changes.  Be
+aware that the compiler does not actually perform any check to the validity of
+adding restrict and if pointers do alias correctness is not guaranteed.
 
 @anchor{Type-punning}Pay special attention to code like this:
 @smallexample

@@ -3415,4 +3415,7 @@ fipa-ra
 Common Report Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
 
+fno-alias
+Common RejectNegative Var(flag_no_alias) Optimization
+
 ; This comment is to ensure we retain the blank line above.

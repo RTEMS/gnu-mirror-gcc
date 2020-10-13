@@ -7182,8 +7182,18 @@ grokdeclarator (const struct c_declarator *declarator,
 	    type = c_build_pointer_type (type);
 	    type_quals = TYPE_UNQUALIFIED;
 	  }
-	else if (type_quals)
-	  type = c_build_qualified_type (type, type_quals);
+	else
+	  {
+	    /* If -fno-alias then make all pointers used as parameters
+	       restrict pointers.  */
+	    if (flag_no_alias && POINTER_TYPE_P (type)
+		&& !POINTER_TYPE_P (TREE_TYPE (type))
+		&& TREE_CODE (TREE_TYPE (type)) != FUNCTION_TYPE)
+	      type_quals |= TYPE_QUAL_RESTRICT;
+
+	    if (type_quals)
+	      type = c_build_qualified_type (type, type_quals);
+	  }
 
 	decl = build_decl (declarator->id_loc,
 			   PARM_DECL, declarator->u.id.id, type);
