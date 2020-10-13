@@ -73,48 +73,6 @@ struct condition_info
 };
 
 
-/* Tuple that holds minimum and maximum values in a case.  */
-
-struct case_range
-{
-  /* Default constructor.  */
-  case_range ():
-    m_min (NULL_TREE), m_max (NULL_TREE)
-  {}
-
-  case_range (tree min, tree max):
-    m_min (min), m_max (max)
-  {}
-
-  /* Minimum case value.  */
-  tree m_min;
-  /* Maximum case value.  */
-  tree m_max;
-};
-
-/* One entry of a if chain.  */
-
-struct if_chain_entry
-{
-  /* Constructor.  */
-  if_chain_entry (basic_block bb, edge true_edge, edge false_edge)
-    : m_case_values (), m_bb (bb), index (NULL_TREE),
-      m_true_edge (true_edge), m_false_edge (false_edge)
-  {
-    m_case_values.create (2);
-  }
-
-  /* Vector of at maximum 2 case ranges.  */
-  vec<case_range> m_case_values;
-  /* Basic block of the original condition.  */
-  basic_block m_bb;
-  tree index;
-  /* True edge of the gimple condition.  */
-  edge m_true_edge;
-  /* False edge of the gimple condition.  */
-  edge m_false_edge;
-};
-
 /* Master structure for one if to switch conversion candidate.  */
 
 struct if_chain
@@ -145,16 +103,16 @@ struct if_chain
 
   /* Record PHI arguments of a given edge E and return true
      if GIMPLE switch creation will violate a PHI node.  */
-  bool record_phi_arguments (edge e);
+  void record_phi_arguments (edge e, hash_set<edge> *forwarded_edges);
 
   /* First condition of the chain.  */
   gcond *m_first_condition;
   /* Switch index.  */
   tree m_index;
   /* If chain entries.  */
-  vec<if_chain_entry> m_entries;
+  vec<condition_info> m_entries;
   /* PHI map that is later used for reconstruction of PHI nodes.  */
-  hash_map<gphi *, tree> m_phi_map;
+  hash_map<gphi *, std::pair<edge, tree>> m_phi_map;
 };
 
 bool
@@ -174,28 +132,28 @@ if_chain::set_and_check_index (tree index)
 static int
 range_cmp (const void *a, const void *b)
 {
-  const case_range *cr1 = *(const case_range * const *) a;
-  const case_range *cr2 = *(const case_range * const *) b;
+  const range_entry *re1 = *(const range_entry * const *) a;
+  const range_entry *re2 = *(const range_entry * const *) b;
 
-  return tree_int_cst_compare (cr1->m_min, cr2->m_min);
+  return tree_int_cst_compare (re1->low, re2->low);
 }
 
 bool
 if_chain::check_non_overlapping_cases ()
 {
-  auto_vec<case_range *> all_ranges;
+  auto_vec<range_entry *> all_ranges;
   for (unsigned i = 0; i < m_entries.length (); i++)
-    for (unsigned j = 0; j < m_entries[i].m_case_values.length (); j++)
-      all_ranges.safe_push (&m_entries[i].m_case_values[j]);
+    for (unsigned j = 0; j < m_entries[i].m_ranges.length (); j++)
+      all_ranges.safe_push (&m_entries[i].m_ranges[j]);
 
   all_ranges.qsort (range_cmp);
 
   for (unsigned i = 0; i < all_ranges.length () - 1; i++)
     {
-      case_range *left = all_ranges[i];
-      case_range *right = all_ranges[i + 1];
-      if (tree_int_cst_le (left->m_min, right->m_min)
-	  && tree_int_cst_le (right->m_min, left->m_max))
+      range_entry *left = all_ranges[i];
+      range_entry *right = all_ranges[i + 1];
+      if (tree_int_cst_le (left->low, right->low)
+	  && tree_int_cst_le (right->low, left->high))
 	return false;
     }
 
@@ -238,13 +196,13 @@ if_chain::is_beneficial ()
 
   for (unsigned i = 0; i < m_entries.length (); i++)
     {
-      if_chain_entry *entry = &m_entries[i];
-      for (unsigned j = 0; j < entry->m_case_values.length (); j++)
+      condition_info *info = &m_entries[i];
+      for (unsigned j = 0; j < info->m_ranges.length (); j++)
 	{
-	  case_range *range = &entry->m_case_values[j];
-	  clusters.safe_push (new simple_cluster (range->m_min, range->m_max,
+	  range_entry *range = &info->m_ranges[j];
+	  clusters.safe_push (new simple_cluster (range->low, range->high,
 						  NULL_TREE,
-						  entry->m_true_edge->dest,
+						  info->m_true_edge->dest,
 						  prob));
 	}
     }
@@ -293,8 +251,8 @@ if_chain::is_beneficial ()
   return r;
 }
 
-bool
-if_chain::record_phi_arguments (edge e)
+void
+if_chain::record_phi_arguments (edge e, hash_set<edge> *forwarded_edges)
 {
   for (gphi_iterator gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi);
        gsi_next (&gsi))
@@ -303,18 +261,27 @@ if_chain::record_phi_arguments (edge e)
       if (!virtual_operand_p (gimple_phi_result (phi)))
 	{
 	  tree arg = PHI_ARG_DEF_FROM_EDGE (phi, e);
-	  tree *v = m_phi_map.get (phi);
+	  std::pair<edge, tree> *v = m_phi_map.get (phi);
 	  if (v != NULL)
 	    {
-	      if (!operand_equal_p (arg, *v))
-		return false;
+	      if (forwarded_edges->contains (v->first))
+		{
+		  v->first = e;
+		  v->second = arg;
+		}
+	      else if (!operand_equal_p (arg, v->second))
+		{
+		  forwarded_edges->add (e);
+		  return;
+		}
 	    }
 	  else
-	    m_phi_map.put (phi, arg);
+	    {
+	      std::pair<edge, tree> v (e, arg);
+	      m_phi_map.put (phi, v);
+	    }
 	}
     }
-
-  return true;
 }
 
 /* Build case label with MIN and MAX values of a given basic block DEST.  */
