@@ -100,8 +100,7 @@ condition_info::record_phi_mapping (edge e, mapping_vec *vec)
 struct if_chain
 {
   /* Default constructor.  */
-  if_chain():
-    m_first_condition (NULL), m_index (NULL_TREE), m_entries ()
+  if_chain(): m_entries ()
   {
     m_entries.create (2);
   }
@@ -112,9 +111,6 @@ struct if_chain
     m_entries.release ();
   }
 
-  /* Set index and check that it is not a different one.  */
-  bool set_and_check_index (tree index);
-
   /* Verify that all case ranges do not overlap.  */
   bool check_non_overlapping_cases ();
 
@@ -122,25 +118,9 @@ struct if_chain
      a bit test (at least partially).  */
   bool is_beneficial ();
 
-  /* First condition of the chain.  */
-  gcond *m_first_condition;
-  /* Switch index.  */
-  tree m_index;
   /* If chain entries.  */
   vec<condition_info *> m_entries;
 };
-
-bool
-if_chain::set_and_check_index (tree index)
-{
-  if (TREE_CODE (index) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (index)))
-    return false;
-
-  if (m_index == NULL)
-    m_index = index;
-
-  return index == m_index;
-}
 
 /* Compare two case ranges by minimum value.  */
 
@@ -215,10 +195,11 @@ if_chain::is_beneficial ()
       for (unsigned j = 0; j < info->m_ranges.length (); j++)
 	{
 	  range_entry *range = &info->m_ranges[j];
+	  basic_block bb = info->m_true_edge->dest;
+	  bool has_forwarder = !info->m_true_edge_phi_mapping.is_empty ();
 	  clusters.safe_push (new simple_cluster (range->low, range->high,
-						  NULL_TREE,
-						  info->m_true_edge->dest,
-						  prob));
+						  NULL_TREE, bb, prob,
+						  has_forwarder));
 	}
     }
 
@@ -234,7 +215,9 @@ if_chain::is_beneficial ()
       simple_cluster *right = static_cast<simple_cluster *> (clusters[i]);
       tree type = TREE_TYPE (left->get_low ());
       tree pos_one = build_int_cst (type, 1);
-      if (left->m_case_bb == right->m_case_bb)
+      if (!left->m_has_forward_bb
+	  && !right->m_has_forward_bb
+	  && left->m_case_bb == right->m_case_bb)
 	{
 	  tree next = int_const_binop (PLUS_EXPR, left->get_high (), pos_one);
 	  if (tree_int_cst_equal (next, right->get_low ()))
@@ -472,24 +455,12 @@ public:
 unsigned int
 pass_if_to_switch::execute (function *fun)
 {
+  auto_vec<if_chain *> all_candidates;
   hash_map<basic_block, condition_info> conditions_in_bbs;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     find_conditions (bb, &conditions_in_bbs);
-
-  FOR_EACH_BB_FN (bb, fun)
-    {
-      condition_info *info = conditions_in_bbs.get (bb);
-      if (info)
-	{
-	  debug_bb (gimple_bb (info->m_cond));
-	  for (unsigned i = 0; i < info->m_ranges.length (); i++)
-	    debug_range_entry (&info->m_ranges[i]);
-	}
-    }
-
-  fprintf (stderr, "=====================\n");
 
   int *rpo = XNEWVEC (int, n_basic_blocks_for_fn (fun));
   unsigned n = pre_and_rev_post_order_compute_fn (fun, NULL, rpo, false);
@@ -522,26 +493,35 @@ pass_if_to_switch::execute (function *fun)
 	      info = info2;
 	    }
 
-	  fprintf (stderr, "Found chain with %d items\n", chain->m_entries.length ());
 	  chain->m_entries.reverse ();
-	  for (unsigned i = 0; i < chain->m_entries.length (); i++)
+	  if (chain->m_entries.length () >= 3
+	      && chain->is_beneficial ())
 	    {
-	      debug_bb (chain->m_entries[i]->m_true_edge->src);
-	    }
-
-	  if (chain->m_entries.length () >= 4)
-	    {
-	    convert_if_conditions_to_switch (chain);
-	    // TODO
-	    break;
+	      expanded_location loc
+		= expand_location (gimple_location (chain->m_entries[0]->m_cond));
+	      if (dump_file)
+		{
+		  fprintf (dump_file, "Condition chain (at %s:%d) with %d BBs "
+			   "transformed into a switch statement.\n",
+			   loc.file, loc.line,
+			   chain->m_entries.length ());
+		}
+	      all_candidates.safe_push (chain);
 	    }
 	}
+    }
+
+  for (unsigned i = 0; i < all_candidates.length (); i++)
+    {
+      convert_if_conditions_to_switch (all_candidates[i]);
+      delete all_candidates[i];
     }
 
   free (rpo);
   free_dominance_info (CDI_DOMINATORS);
 
-  mark_virtual_operands_for_renaming (fun);
+  if (!all_candidates.is_empty ())
+    mark_virtual_operands_for_renaming (fun);
 
   return 0;
 }

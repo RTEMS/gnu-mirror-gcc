@@ -122,7 +122,8 @@ class simple_cluster: public cluster
 public:
   /* Constructor.  */
   inline simple_cluster (tree low, tree high, tree case_label_expr,
-			 basic_block case_bb, profile_probability prob);
+			 basic_block case_bb, profile_probability prob,
+			 bool has_forward_bb = false);
 
   /* Destructor.  */
   ~simple_cluster ()
@@ -187,12 +188,16 @@ public:
 
   /* True if case is a range.  */
   bool m_range_p;
+
+  /* True if the case will use a forwarder BB.  */
+  bool m_has_forward_bb;
 };
 
 simple_cluster::simple_cluster (tree low, tree high, tree case_label_expr,
-				basic_block case_bb, profile_probability prob):
+				basic_block case_bb, profile_probability prob,
+				bool has_forward_bb):
   cluster (case_label_expr, case_bb, prob, prob),
-  m_low (low), m_high (high)
+  m_low (low), m_high (high), m_has_forward_bb (has_forward_bb)
 {
   m_range_p = m_high != NULL;
   if (m_high == NULL)
