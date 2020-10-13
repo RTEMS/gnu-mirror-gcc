@@ -80,7 +80,7 @@ struct if_chain
   /* Default constructor.  */
   if_chain():
     m_first_condition (NULL), m_index (NULL_TREE), m_entries (),
-    m_phi_map ()
+    m_phi_map (), m_forwarded_edges ()
   {
     m_entries.create (2);
   }
@@ -103,16 +103,18 @@ struct if_chain
 
   /* Record PHI arguments of a given edge E and return true
      if GIMPLE switch creation will violate a PHI node.  */
-  void record_phi_arguments (edge e, hash_set<edge> *forwarded_edges);
+  void record_phi_arguments (edge e);
 
   /* First condition of the chain.  */
   gcond *m_first_condition;
   /* Switch index.  */
   tree m_index;
   /* If chain entries.  */
-  vec<condition_info> m_entries;
+  vec<condition_info *> m_entries;
   /* PHI map that is later used for reconstruction of PHI nodes.  */
   hash_map<gphi *, std::pair<edge, tree>> m_phi_map;
+  /* Set of edges for that we need a forwared block.  */
+  hash_set<edge> m_forwarded_edges;
 };
 
 bool
@@ -143,8 +145,8 @@ if_chain::check_non_overlapping_cases ()
 {
   auto_vec<range_entry *> all_ranges;
   for (unsigned i = 0; i < m_entries.length (); i++)
-    for (unsigned j = 0; j < m_entries[i].m_ranges.length (); j++)
-      all_ranges.safe_push (&m_entries[i].m_ranges[j]);
+    for (unsigned j = 0; j < m_entries[i]->m_ranges.length (); j++)
+      all_ranges.safe_push (&m_entries[i]->m_ranges[j]);
 
   all_ranges.qsort (range_cmp);
 
@@ -196,7 +198,7 @@ if_chain::is_beneficial ()
 
   for (unsigned i = 0; i < m_entries.length (); i++)
     {
-      condition_info *info = &m_entries[i];
+      condition_info *info = m_entries[i];
       for (unsigned j = 0; j < info->m_ranges.length (); j++)
 	{
 	  range_entry *range = &info->m_ranges[j];
@@ -252,7 +254,7 @@ if_chain::is_beneficial ()
 }
 
 void
-if_chain::record_phi_arguments (edge e, hash_set<edge> *forwarded_edges)
+if_chain::record_phi_arguments (edge e)
 {
   for (gphi_iterator gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi);
        gsi_next (&gsi))
@@ -264,14 +266,14 @@ if_chain::record_phi_arguments (edge e, hash_set<edge> *forwarded_edges)
 	  std::pair<edge, tree> *v = m_phi_map.get (phi);
 	  if (v != NULL)
 	    {
-	      if (forwarded_edges->contains (v->first))
+	      if (m_forwarded_edges.contains (v->first))
 		{
 		  v->first = e;
 		  v->second = arg;
 		}
 	      else if (!operand_equal_p (arg, v->second))
 		{
-		  forwarded_edges->add (e);
+		  m_forwarded_edges.add (e);
 		  return;
 		}
 	    }
@@ -307,22 +309,22 @@ label_cmp (const void *a, const void *b)
 /* Convert a given if CHAIN into a switch GIMPLE statement.  */
 
 static void
-convert_if_conditions_to_switch (vec<condition_info *> &chain)
+convert_if_conditions_to_switch (if_chain *chain)
 {
   if (!dbg_cnt (if_to_switch))
     return;
 
   auto_vec<tree> labels;
-  unsigned entries = chain.length ();
-  condition_info *first_cond = chain[0];
+  unsigned entries = chain->m_entries.length ();
+  condition_info *first_cond = chain->m_entries[0];
 
-  edge default_edge = chain[entries - 1]->m_false_edge;
+  edge default_edge = chain->m_entries[entries - 1]->m_false_edge;
   basic_block default_bb = default_edge->dest;
 
   gimple_stmt_iterator gsi = gsi_for_stmt (first_cond->m_cond);
   for (unsigned i = 0; i < entries; i++)
     {
-      condition_info *info = chain[i];
+      condition_info *info = chain->m_entries[i];
       basic_block case_bb = info->m_true_edge->dest;
 
       for (unsigned j = 0; j < info->m_ranges.length (); j++)
@@ -515,8 +517,9 @@ pass_if_to_switch::execute (function *fun)
       condition_info *info = conditions_in_bbs.get (bb);
       if (info)
 	{
-	  auto_vec<condition_info *> chain;
-	  chain.safe_push (info);
+	  if_chain *chain = new if_chain ();
+	  chain->record_phi_arguments (info->m_true_edge);
+	  chain->m_entries.safe_push (info);
 	  /* Try to find a chain starting in this BB.  */
 	  while (true)
 	    {
@@ -527,19 +530,19 @@ pass_if_to_switch::execute (function *fun)
 	      if (!info2 || info->m_ranges[0].exp != info2->m_ranges[0].exp)
 		break;
 
-	      chain.safe_push (info2);
+	      chain->m_entries.safe_push (info2);
 	      bitmap_set_bit (seen_bbs, e->src->index);
 	      info = info2;
 	    }
 
-	  fprintf (stderr, "Found chain with %d items\n", chain.length ());
-	  chain.reverse ();
-	  for (unsigned i = 0; i < chain.length (); i++)
+	  fprintf (stderr, "Found chain with %d items\n", chain->m_entries.length ());
+	  chain->m_entries.reverse ();
+	  for (unsigned i = 0; i < chain->m_entries.length (); i++)
 	    {
-	      debug_bb (chain[i]->m_true_edge->src);
+	      debug_bb (chain->m_entries[i]->m_true_edge->src);
 	    }
 
-	  if (chain.length () >= 4)
+	  if (chain->m_entries.length () >= 4)
 	    {
 	    convert_if_conditions_to_switch (chain);
 	    // TODO
