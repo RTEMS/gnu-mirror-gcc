@@ -89,7 +89,7 @@ condition_info::record_phi_mapping (edge e, mapping_vec *vec)
       gphi *phi = gsi.phi ();
       if (!virtual_operand_p (gimple_phi_result (phi)))
 	{
-	  tree arg = PHI_ARG_DEF_FROM_EDGE (phi, m_true_edge);
+	  tree arg = PHI_ARG_DEF_FROM_EDGE (phi, e);
 	  vec->safe_push (std::make_pair (phi, arg));
 	}
     }
@@ -408,8 +408,15 @@ find_conditions (basic_block bb,
       info.m_true_edge = in_p ? true_edge : false_edge;
       info.m_false_edge = in_p ? false_edge : true_edge;
 
+      for (unsigned i = 0; i < info.m_ranges.length (); ++i)
+	if (info.m_ranges[i].exp == NULL_TREE
+	    || info.m_ranges[i].low == NULL_TREE
+	    || info.m_ranges[i].high == NULL_TREE)
+	  return;
+
       for (unsigned i = 1; i < info.m_ranges.length (); ++i)
-	if (info.m_ranges[i].exp != expr || info.m_ranges[i].in_p != in_p)
+	if (info.m_ranges[i].exp != expr
+	    || info.m_ranges[i].in_p != in_p)
 	  return;
 
       info.record_phi_mapping (info.m_true_edge, &info.m_true_edge_phi_mapping);
@@ -495,6 +502,7 @@ pass_if_to_switch::execute (function *fun)
 
 	  chain->m_entries.reverse ();
 	  if (chain->m_entries.length () >= 3
+	      && chain->check_non_overlapping_cases ()
 	      && chain->is_beneficial ())
 	    {
 	      expanded_location loc
