@@ -22,10 +22,15 @@ fp128_softfp_static_obj	= $(addsuffix -sw$(objext),$(fp128_softfp_funcs))
 fp128_softfp_shared_obj	= $(addsuffix -sw_s$(objext),$(fp128_softfp_funcs))
 fp128_softfp_obj	= $(fp128_softfp_static_obj) $(fp128_softfp_shared_obj)
 
+# Decimal <-> _Float128 conversions
+fp128_dec_funcs		= _kf_to_sd _kf_to_dd _kf_to_td \
+			  _sd_to_kf _dd_to_kf _td_to_kf
+
 # New functions for software emulation
 fp128_ppc_funcs		= floattikf floatuntikf fixkfti fixunskfti \
 			  extendkftf2-sw trunctfkf2-sw \
-			  sfp-exceptions _mulkc3 _divkc3 _powikf2
+			  sfp-exceptions _mulkc3 _divkc3 _powikf2 \
+			  $(fp128_dec_funcs)
 
 fp128_ppc_src		= $(addprefix $(srcdir)/config/rs6000/,$(addsuffix \
 				.c,$(fp128_ppc_funcs)))
@@ -68,6 +73,29 @@ $(fp128_softfp_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
 $(fp128_ppc_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
 $(fp128_obj)		 : $(fp128_includes)
 $(fp128_obj)		 : $(srcdir)/config/rs6000/quad-float128.h
+
+
+# If we are switching the default long double type, we need to use
+# -mno-gnu-attribute so that the __ibm128 support functions don't signal a
+# linker error since the default long double is now IEEE 128-bit instead of IBM
+# 128-bit.
+ibm-ldouble$(objext)	: INTERNAL_CFLAGS += -mno-gnu-attribute
+
+# Similarly for the decimal routines, compile with long double == IBM 128-bit,
+# but set the flags so that it can be linked with either long double format.
+#DECNUMINC	+= -Wno-psabi -mabi=ibmlongdouble -mno-gnu-attribute
+
+# Force the TF mode to/from decimal functions to be compiled with IBM long double
+# Add building the KF mode to/from decimal conversions
+TF_DECIMAL_OBJS		= _dd_to_tf$(objext) _sd_to_tf$(objext) \
+		          _td_to_tf$(objext) _tf_to_dd$(objext) \
+			  _tf_to_sd$(objext) _tf_to_td$(objext)
+
+CFLAGS_TF_DECIMAL	= -mno-gnu-attribute -Wno-psabi -mabi=ibmlongdouble
+CFLAGS_KF_DECIMAL	= -mno-gnu-attribute -Wno-psabi -mabi=ieeelongdouble
+CFLAGS_KF_DECIMAL_SW	= $(CFLAGS_KF_DECIMAL) -mno-float128-hardware
+
+$(TF_DECIMAL_OBJS) : INTERNAL_CFLAGS += $(CFLAGS_TF_DECIMAL)
 
 $(fp128_softfp_src) : $(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@)) $(fp128_dep)
 	@src="$(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@))"; \
