@@ -59,19 +59,41 @@ using namespace tree_switch_conversion;
 
 struct condition_info
 {
+  typedef vec<std::pair<gphi *, tree>> mapping_vec;
+
   condition_info (gcond *cond): m_cond (cond), m_bb (gimple_bb (cond)),
-    m_ranges (), m_true_edge(NULL), m_false_edge (NULL)
+    m_forwarder_bb (NULL), m_ranges (), m_true_edge(NULL), m_false_edge (NULL),
+    m_true_edge_phi_mapping (), m_false_edge_phi_mapping ()
   {
     m_ranges.create (0);
   }
 
+  void record_phi_mapping (edge e, mapping_vec *vec);
+
   gcond *m_cond;
   basic_block m_bb;
+  basic_block m_forwarder_bb;
   vec<range_entry> m_ranges;
   edge m_true_edge;
   edge m_false_edge;
+  mapping_vec m_true_edge_phi_mapping;
+  mapping_vec m_false_edge_phi_mapping;
 };
 
+void
+condition_info::record_phi_mapping (edge e, mapping_vec *vec)
+{
+  for (gphi_iterator gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi);
+       gsi_next (&gsi))
+    {
+      gphi *phi = gsi.phi ();
+      if (!virtual_operand_p (gimple_phi_result (phi)))
+	{
+	  tree arg = PHI_ARG_DEF_FROM_EDGE (phi, m_true_edge);
+	  vec->safe_push (std::make_pair (phi, arg));
+	}
+    }
+}
 
 /* Master structure for one if to switch conversion candidate.  */
 
@@ -79,8 +101,7 @@ struct if_chain
 {
   /* Default constructor.  */
   if_chain():
-    m_first_condition (NULL), m_index (NULL_TREE), m_entries (),
-    m_phi_map (), m_forwarded_edges ()
+    m_first_condition (NULL), m_index (NULL_TREE), m_entries ()
   {
     m_entries.create (2);
   }
@@ -101,20 +122,12 @@ struct if_chain
      a bit test (at least partially).  */
   bool is_beneficial ();
 
-  /* Record PHI arguments of a given edge E and return true
-     if GIMPLE switch creation will violate a PHI node.  */
-  void record_phi_arguments (edge e);
-
   /* First condition of the chain.  */
   gcond *m_first_condition;
   /* Switch index.  */
   tree m_index;
   /* If chain entries.  */
   vec<condition_info *> m_entries;
-  /* PHI map that is later used for reconstruction of PHI nodes.  */
-  hash_map<gphi *, std::pair<edge, tree>> m_phi_map;
-  /* Set of edges for that we need a forwared block.  */
-  hash_set<edge> m_forwarded_edges;
 };
 
 bool
@@ -253,39 +266,6 @@ if_chain::is_beneficial ()
   return r;
 }
 
-void
-if_chain::record_phi_arguments (edge e)
-{
-  for (gphi_iterator gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi);
-       gsi_next (&gsi))
-    {
-      gphi *phi = gsi.phi ();
-      if (!virtual_operand_p (gimple_phi_result (phi)))
-	{
-	  tree arg = PHI_ARG_DEF_FROM_EDGE (phi, e);
-	  std::pair<edge, tree> *v = m_phi_map.get (phi);
-	  if (v != NULL)
-	    {
-	      if (m_forwarded_edges.contains (v->first))
-		{
-		  v->first = e;
-		  v->second = arg;
-		}
-	      else if (!operand_equal_p (arg, v->second))
-		{
-		  m_forwarded_edges.add (e);
-		  return;
-		}
-	    }
-	  else
-	    {
-	      std::pair<edge, tree> v (e, arg);
-	      m_phi_map.put (phi, v);
-	    }
-	}
-    }
-}
-
 /* Build case label with MIN and MAX values of a given basic block DEST.  */
 
 static tree
@@ -317,8 +297,9 @@ convert_if_conditions_to_switch (if_chain *chain)
   auto_vec<tree> labels;
   unsigned entries = chain->m_entries.length ();
   condition_info *first_cond = chain->m_entries[0];
+  condition_info *last_cond = chain->m_entries[entries - 1];
 
-  edge default_edge = chain->m_entries[entries - 1]->m_false_edge;
+  edge default_edge = last_cond->m_false_edge;
   basic_block default_bb = default_edge->dest;
 
   gimple_stmt_iterator gsi = gsi_for_stmt (first_cond->m_cond);
@@ -326,6 +307,13 @@ convert_if_conditions_to_switch (if_chain *chain)
     {
       condition_info *info = chain->m_entries[i];
       basic_block case_bb = info->m_true_edge->dest;
+
+      /* Create a forwarder block if needed.  */
+      if (!info->m_true_edge_phi_mapping.is_empty ())
+	{
+	  info->m_forwarder_bb = split_edge (info->m_true_edge);
+	  case_bb = info->m_forwarder_bb;
+	}
 
       for (unsigned j = 0; j < info->m_ranges.length (); j++)
 	labels.safe_push (build_case_label (info->m_ranges[j].low,
@@ -364,27 +352,25 @@ convert_if_conditions_to_switch (if_chain *chain)
       putc ('\n', dump_file);
     }
 
-  // TODO: fixme
   /* Fill up missing PHI node arguments.  */
-#if 0
-  for (hash_map<gphi *, tree>::iterator it = chain->m_phi_map.begin ();
-       it != chain->m_phi_map.end (); ++it)
+  for (unsigned i = 0; i < chain->m_entries.length (); ++i)
     {
-      gphi *phi = (*it).first;
-      if (!virtual_operand_p (gimple_phi_result (phi)))
+      condition_info *info = chain->m_entries[i];
+      for (unsigned j = 0; j < info->m_true_edge_phi_mapping.length (); ++j)
 	{
-	  for (unsigned i = 0; i < gimple_phi_num_args (phi); i++)
-	    {
-	      if (gimple_phi_arg_def (phi, i) == NULL_TREE)
-		{
-		  add_phi_arg (phi, (*it).second, gimple_phi_arg_edge (phi, i),
-			       UNKNOWN_LOCATION);
-		  break;
-		}
-	    }
+	  std::pair<gphi *, tree> item = info->m_true_edge_phi_mapping[j];
+	  add_phi_arg (item.first, item.second,
+		       single_succ_edge (info->m_forwarder_bb),
+		       UNKNOWN_LOCATION);
 	}
     }
-#endif
+
+  /* Fill up missing PHI nodes for the default BB.  */
+  for (unsigned j = 0; j < last_cond->m_false_edge_phi_mapping.length (); ++j)
+    {
+      std::pair<gphi *, tree> item = last_cond->m_false_edge_phi_mapping[j];
+      add_phi_arg (item.first, item.second, e, UNKNOWN_LOCATION);
+    }
 }
 
 void
@@ -443,6 +429,8 @@ find_conditions (basic_block bb,
 	if (info.m_ranges[i].exp != expr || info.m_ranges[i].in_p != in_p)
 	  return;
 
+      info.record_phi_mapping (info.m_true_edge, &info.m_true_edge_phi_mapping);
+      info.record_phi_mapping (info.m_false_edge, &info.m_false_edge_phi_mapping);
       conditions_in_bbs->put (bb, info);
     }
 
@@ -518,7 +506,6 @@ pass_if_to_switch::execute (function *fun)
       if (info)
 	{
 	  if_chain *chain = new if_chain ();
-	  chain->record_phi_arguments (info->m_true_edge);
 	  chain->m_entries.safe_push (info);
 	  /* Try to find a chain starting in this BB.  */
 	  while (true)
@@ -553,6 +540,8 @@ pass_if_to_switch::execute (function *fun)
 
   free (rpo);
   free_dominance_info (CDI_DOMINATORS);
+
+  mark_virtual_operands_for_renaming (fun);
 
   return 0;
 }
