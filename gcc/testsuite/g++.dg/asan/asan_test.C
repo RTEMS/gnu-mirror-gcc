@@ -9,6 +9,7 @@
 // { dg-additional-options "-DASAN_AVOID_EXPENSIVE_TESTS=1" { target { ! run_expensive_tests } } }
 // { dg-additional-options "-msse2" { target { i?86-*-linux* x86_64-*-linux* i?86-*-freebsd* x86_64-*-freebsd*} } }
 // { dg-additional-options "-D__NO_INLINE__" { target { *-*-linux-gnu } } }
+/* { dg-additional-options "-Wno-stringop-overflow" } */
 // { dg-set-target-env-var ASAN_OPTIONS "handle_segv=2" }
 // { dg-final { asan-gtest } }
 
