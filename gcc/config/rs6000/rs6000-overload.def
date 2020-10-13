@@ -1172,11 +1172,209 @@
   vull __builtin_vec_sll (vull, vuc);
     VSL  VSL_VULL
 
+[VEC_SLO, vec_slo, __builtin_vec_slo]
+  vsc __builtin_vec_slo (vsc, vsc);
+    VSLO  VSLO_VSCS
+  vsc __builtin_vec_slo (vsc, vuc);
+    VSLO  VSLO_VSCU
+  vuc __builtin_vec_slo (vuc, vsc);
+    VSLO  VSLO_VUCS
+  vuc __builtin_vec_slo (vuc, vuc);
+    VSLO  VSLO_VUCU
+  vss __builtin_vec_slo (vss, vsc);
+    VSLO  VSLO_VSSS
+  vss __builtin_vec_slo (vss, vuc);
+    VSLO  VSLO_VSSU
+  vus __builtin_vec_slo (vus, vsc);
+    VSLO  VSLO_VUSS
+  vus __builtin_vec_slo (vus, vuc);
+    VSLO  VSLO_VUSU
+  vp __builtin_vec_slo (vp, vsc);
+    VSLO  VSLO_VPS
+  vp __builtin_vec_slo (vp, vuc);
+    VSLO  VSLO_VPU
+  vsi __builtin_vec_slo (vsi, vsc);
+    VSLO  VSLO_VSIS
+  vsi __builtin_vec_slo (vsi, vuc);
+    VSLO  VSLO_VSIU
+  vui __builtin_vec_slo (vui, vsc);
+    VSLO  VSLO_VUIS
+  vui __builtin_vec_slo (vui, vuc);
+    VSLO  VSLO_VUIU
+  vsll __builtin_vec_slo (vsll, vsc);
+    VSLO  VSLO_VSLLS
+  vsll __builtin_vec_slo (vsll, vuc);
+    VSLO  VSLO_VSLLU
+  vull __builtin_vec_slo (vull, vsc);
+    VSLO  VSLO_VULLS
+  vull __builtin_vec_slo (vull, vuc);
+    VSLO  VSLO_VULLU
+  vf __builtin_vec_slo (vf, vsc);
+    VSLO  VSLO_VFS
+  vf __builtin_vec_slo (vf, vuc);
+    VSLO  VSLO_VFU
+
+[VEC_SPLAT, vec_splat, __builtin_vec_splat]
+  vsc __builtin_vec_splat (vsc, signed int);
+    VSPLTB  VSPLTB_VSC
+  vuc __builtin_vec_splat (vuc, signed int);
+    VSPLTB  VSPLTB_VUC
+  vbc __builtin_vec_splat (vbc, signed int);
+    VSPLTB  VSPLTB_VBC
+  vss __builtin_vec_splat (vss, signed int);
+    VSPLTH  VSPLTH_VSS
+  vus __builtin_vec_splat (vus, signed int);
+    VSPLTH  VSPLTH_VUS
+  vbs __builtin_vec_splat (vbs, signed int);
+    VSPLTH  VSPLTH_VBS
+  vp __builtin_vec_splat (vp, signed int);
+    VSPLTH  VSPLTH_VP
+  vf __builtin_vec_splat (vf, signed int);
+    VSPLTW  VSPLTW_VF
+  vsi __builtin_vec_splat (vsi, signed int);
+    VSPLTW  VSPLTW_VSI
+  vui __builtin_vec_splat (vui, signed int);
+    VSPLTW  VSPLTW_VUI
+  vbi __builtin_vec_splat (vbi, signed int);
+    VSPLTW  VSPLTW_VBI
+  vd __builtin_vec_splat (vd, signed int);
+    XXSPLTD_V2DF
+  vsll __builtin_vec_splat (vsll, signed int);
+    XXSPLTD_V2DI  XXSPLTD_VSLL
+  vull __builtin_vec_splat (vull, signed int);
+    XXSPLTD_V2DI  XXSPLTD_VULL
+  vbll __builtin_vec_splat (vbll, signed int);
+    XXSPLTD_V2DI  XXSPLTD_VBLL
+
 [VEC_SQRT, vec_sqrt, __builtin_vec_sqrt]
   vf __builtin_vec_sqrt (vf);
     XVSQRTSP
   vd __builtin_vec_sqrt (vd);
     XVSQRTDP
+
+[VEC_SR, vec_sr, __builtin_vec_sr]
+  vsc __builtin_vec_sr (vsc, vuc);
+    VSRB  VSRB_VSC
+  vuc __builtin_vec_sr (vuc, vuc);
+    VSRB  VSRB_VUC
+  vss __builtin_vec_sr (vss, vus);
+    VSRH  VSRH_VSS
+  vus __builtin_vec_sr (vus, vus);
+    VSRH  VSRH_VUS
+  vsi __builtin_vec_sr (vsi, vui);
+    VSRW  VSRW_VSI
+  vui __builtin_vec_sr (vui, vui);
+    VSRW  VSRW_VUI
+  vsll __builtin_vec_sr (vsll, vull);
+    VSRD  VSRD_VSLL
+  vull __builtin_vec_sr (vull, vull);
+    VSRD  VSRD_VULL
+
+[VEC_SRA, vec_sra, __builtin_vec_sra]
+  vsc __builtin_vec_sra (vsc, vuc);
+    VSRAB  VSRAB_VSC
+  vuc __builtin_vec_sra (vuc, vuc);
+    VSRAB  VSRAB_VUC
+  vss __builtin_vec_sra (vss, vus);
+    VSRAH  VSRAH_VSS
+  vus __builtin_vec_sra (vus, vus);
+    VSRAH  VSRAH_VUS
+  vsi __builtin_vec_sra (vsi, vui);
+    VSRAW  VSRAW_VSI
+  vui __builtin_vec_sra (vui, vui);
+    VSRAW  VSRAW_VUI
+  vsll __builtin_vec_sra (vsll, vull);
+    VSRAD  VSRAD_VSLL
+  vull __builtin_vec_sra (vull, vull);
+    VSRAD  VSRAD_VULL
+
+[VEC_SRL, vec_srl, __builtin_vec_srl]
+  vsc __builtin_vec_srl (vsc, vuc);
+    VSR  VSR_VSC
+  vuc __builtin_vec_srl (vuc, vuc);
+    VSR  VSR_VUC
+  vss __builtin_vec_srl (vss, vuc);
+    VSR  VSR_VSS
+  vus __builtin_vec_srl (vus, vuc);
+    VSR  VSR_VUS
+  vp __builtin_vec_srl (vp, vuc);
+    VSR  VSR_VP
+  vsi __builtin_vec_srl (vsi, vuc);
+    VSR  VSR_VSI
+  vui __builtin_vec_srl (vui, vuc);
+    VSR  VSR_VUI
+  vsll __builtin_vec_srl (vsll, vuc);
+    VSR  VSR_VSLL
+  vull __builtin_vec_srl (vull, vuc);
+    VSR  VSR_VULL
+
+[VEC_SRO, vec_sro, __builtin_vec_sro]
+  vsc __builtin_vec_sro (vsc, vsc);
+    VSRO  VSRO_VSCS
+  vsc __builtin_vec_sro (vsc, vuc);
+    VSRO  VSRO_VSCU
+  vuc __builtin_vec_sro (vuc, vsc);
+    VSRO  VSRO_VUCS
+  vuc __builtin_vec_sro (vuc, vuc);
+    VSRO  VSRO_VUCU
+  vss __builtin_vec_sro (vss, vsc);
+    VSRO  VSRO_VSSS
+  vss __builtin_vec_sro (vss, vuc);
+    VSRO  VSRO_VSSU
+  vus __builtin_vec_sro (vus, vsc);
+    VSRO  VSRO_VUSS
+  vus __builtin_vec_sro (vus, vuc);
+    VSRO  VSRO_VUSU
+  vp __builtin_vec_sro (vp, vsc);
+    VSRO  VSRO_VPS
+  vp __builtin_vec_sro (vp, vuc);
+    VSRO  VSRO_VPU
+  vsi __builtin_vec_sro (vsi, vsc);
+    VSRO  VSRO_VSIS
+  vsi __builtin_vec_sro (vsi, vuc);
+    VSRO  VSRO_VSIU
+  vui __builtin_vec_sro (vui, vsc);
+    VSRO  VSRO_VUIS
+  vui __builtin_vec_sro (vui, vuc);
+    VSRO  VSRO_VUIU
+  vsll __builtin_vec_sro (vsll, vsc);
+    VSRO  VSRO_VSLLS
+  vsll __builtin_vec_sro (vsll, vuc);
+    VSRO  VSRO_VSLLU
+  vull __builtin_vec_sro (vull, vsc);
+    VSRO  VSRO_VULLS
+  vull __builtin_vec_sro (vull, vuc);
+    VSRO  VSRO_VULLU
+  vf __builtin_vec_sro (vf, vsc);
+    VSRO  VSRO_VFS
+  vf __builtin_vec_sro (vf, vuc);
+    VSRO  VSRO_VFU
+
+[VEC_SUB, vec_sub, __builtin_vec_sub]
+  vsc __builtin_vec_sub (vsc, vsc);
+    VSUBUBM  VSUBUBM_VSC
+  vuc __builtin_vec_sub (vuc, vuc);
+    VSUBUBM  VSUBUBM_VUC
+  vss __builtin_vec_sub (vss, vss);
+    VSUBUHM  VSUBUHM_VSS
+  vus __builtin_vec_sub (vus, vus);
+    VSUBUHM  VSUBUHM_VUS
+  vsi __builtin_vec_sub (vsi, vsi);
+    VSUBUWM  VSUBUWM_VSI
+  vui __builtin_vec_sub (vui, vui);
+    VSUBUWM  VSUBUWM_VUI
+  vsll __builtin_vec_sub (vsll, vsll);
+    VSUBUDM  VSUBUDM_VSLL
+  vull __builtin_vec_sub (vull, vull);
+    VSUBUDM  VSUBUDM_VULL
+  vsq __builtin_vec_sub (vsq, vsq);
+    VSUBUQM  VSUBUQM_VSQ
+  vuq __builtin_vec_sub (vuq, vuq);
+    VSUBUQM  VSUBUQM_VUQ
+  vf __builtin_vec_sub (vf, vf);
+    XVSUBSP
+  vd __builtin_vec_sub (vd, vd);
+    XVSUBDP
 
 [VEC_TRUNC, vec_trunc, __builtin_vec_trunc]
   vf __builtin_vec_trunc (vf);
