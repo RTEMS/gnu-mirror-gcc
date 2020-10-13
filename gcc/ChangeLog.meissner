@@ -1,3 +1,8 @@
+2020-09-09  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config/rs6000/rs6000-modes.def (POImode): Change precision.
+	* expmed.c (extract_low_bits): Check precision.
+
 2020-10-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
