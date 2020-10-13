@@ -75,6 +75,7 @@ static bool modify_func_decl_core ( struct function *, Info *);
 static void disqualify_all_reorgtypes_of ( gimple *, int, Info *);
 static void adjust_result_decl ( struct function *);
 static tree modify_func_type ( struct function *, Info *);
+static tree reverse_args( tree);
 static bool needs_modification_p ( struct function *, Info *);
 //static int number_of_levels ( tree);
 //static void modify_decl_core ( tree *, Info *);
@@ -1216,9 +1217,9 @@ static tree
 modify_func_type ( struct function *func, Info *info )
 {
   tree func_type = TREE_TYPE ( func->decl);
-  //DEBUG_L("old func_type = ");
-  //DEBUG_F( flexible_print, stderr, func_type, 1, (dump_flags_t)0);
-  //INDENT(4);
+  DEBUG_L("old func_type = ");
+  DEBUG_F( flexible_print, stderr, func_type, 1, (dump_flags_t)0);
+  INDENT(4);
   tree new_type;
   tree func_ret_type = TREE_TYPE ( func_type);
   tree base = base_type_of ( func_ret_type);
@@ -1237,59 +1238,68 @@ modify_func_type ( struct function *func, Info *info )
 	  func_ret_type = make_multilevel ( ri->pointer_rep, levels);
 	}
     }
-  tree arg;
-  tree new_args = NULL_TREE;
-  //DEBUG_A("old arg = ");
-  //DEBUG_F( flexible_print, stderr, arg, 1, (dump_flags_t)0);
-  for ( arg = TYPE_ARG_TYPES ( func_type);
-	arg != NULL && arg != void_list_node;
-	arg = TREE_CHAIN ( arg))
+
+  tree interim_args = void_list_node;
+  tree new_args = void_list_node;
+  tree existing_args = TYPE_ARG_TYPES ( func_type);
+  DEBUG_A("TYPE_ARG_TYPES ( func_type) = ");
+  DEBUG_F( flexible_print, stderr, existing_args, 1, (dump_flags_t)0);
+  if ( existing_args != void_list_node )
     {
-      //DEBUG_L("arg: ");
-      //DEBUG_F( flexible_print, stderr, arg, 1, (dump_flags_t)0);
-
-      tree type_of_arg = TREE_VALUE (arg);
-      //DEBUG_L("type_of_arg: ");
-      //DEBUG_F( flexible_print, stderr, type_of_arg, 1, (dump_flags_t)0);
-      base = base_type_of ( type_of_arg);
-      //DEBUG_L("base: ");
-      //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
-
-      tree new_arg_type;
-      ri = get_reorgtype_info ( base, info);
-      if ( ri != NULL )
+      tree arg;
+      DEBUG_A("old arg = ");
+      DEBUG_F( flexible_print, stderr, TYPE_ARG_TYPES ( func_type), 1, (dump_flags_t)0);
+      for ( arg = TYPE_ARG_TYPES ( func_type);
+	    arg != NULL && arg != void_list_node;
+	    arg = TREE_CHAIN ( arg))
 	{
-	  int levels = number_of_levels ( type_of_arg );
-	  if ( number_of_levels ( type_of_arg ) == 1 )
+	  DEBUG_L("arg: ");
+	  DEBUG_F( flexible_print, stderr, arg, 1, (dump_flags_t)0);
+	  
+	  tree type_of_arg = TREE_VALUE (arg);
+	  DEBUG_L("type_of_arg: ");
+	  DEBUG_F( flexible_print, stderr, type_of_arg, 1, (dump_flags_t)0);
+	  base = base_type_of ( type_of_arg);
+	  DEBUG_L("base: ");
+	  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+	  
+	  tree new_arg_type;
+	  ri = get_reorgtype_info ( base, info);
+	  if ( ri != NULL )
 	    {
-	      new_arg_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
+	      int levels = number_of_levels ( type_of_arg );
+	      if ( number_of_levels ( type_of_arg ) == 1 )
+		{
+		  new_arg_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
+		}
+	      else
+		{
+		  new_arg_type = make_multilevel ( ri->pointer_rep, levels);
+		}
 	    }
 	  else
 	    {
-	      new_arg_type = make_multilevel ( ri->pointer_rep, levels);
+	      new_arg_type = type_of_arg;
 	    }
+	  interim_args = tree_cons ( NULL_TREE, new_arg_type, interim_args);
+	  DEBUG_A("interim new_args = ");
+	  DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
 	}
-      else
-	{
-	  new_arg_type = type_of_arg;
-	}
-      new_args = tree_cons ( NULL_TREE, new_arg_type, new_args);
-      //DEBUG_A("interim new_args = ");
-      //DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
+      DEBUG_A("before reverse interim_args = %p, ", new_args);
+      DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
+      tree last = new_args;
+      // swithed form nreverse to reverse_args 
+      new_args = reverse_args ( interim_args);
     }
-  //DEBUG_A("before reverse new_args = ");
-  //DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
-  tree last = new_args;
-  new_args = nreverse ( new_args);
-  TREE_CHAIN ( last) = void_list_node;
+  // Here
   
-  //DEBUG_A("new args = ");
-  //DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
-  //INDENT(-4);
+  DEBUG_A("new args = %p, ", new_args);
+  DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
+  INDENT(-4);
 
   new_type = build_function_type ( func_ret_type, new_args);
-  //DEBUG_L("new_type (func) = ");
-  //DEBUG_F( flexible_print, stderr, new_type, 1, (dump_flags_t)0);
+  DEBUG_L("new_type (func) = ");
+  DEBUG_F( flexible_print, stderr, new_type, 1, (dump_flags_t)0);
   TREE_TYPE ( func->decl) = new_type;
   return new_type;
 }
@@ -1312,6 +1322,34 @@ needs_modification_p ( struct function *func, Info *info )
   return false;
 }
 
+static tree
+reverse_args( tree args )
+{
+  tree next;
+  tree arg = args;
+  tree reveresed = void_list_node;
+  if ( args!= NULL )
+    next = TREE_CHAIN ( args);
+  else
+    {
+      return args;
+    }
+  for ( arg = args; arg != NULL && arg != void_list_node;
+	arg = next )
+    {
+      next = TREE_CHAIN ( arg);
+      TREE_CHAIN ( arg) = reveresed;
+      reveresed = arg;
+      //DEBUG_A("partial reverse = ");
+      //DEBUG_F( flexible_print, stderr, reveresed, 1, (dump_flags_t)0);
+    }
+  return reveresed;
+}
+	
+	
+  
+  
+
 int
 number_of_levels ( tree type)
 {
@@ -1330,12 +1368,24 @@ tree prev_type;
 tree
 make_multilevel( tree base_type, int levels_indirection)
 {
+  DEBUG_A("make_multilevel %d levels of ", levels_indirection);
+  DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+  INDENT(4);
   if ( levels_indirection == 0 )
-    return base_type;
+    {
+      INDENT(-4);
+      DEBUG_A("returns: ");
+      DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+      return base_type;
+    }
   else
     {
       tree lower = make_multilevel ( base_type, levels_indirection - 1);
-      return build_pointer_type ( lower);
+      tree returns = build_pointer_type ( lower);
+      INDENT(-4);
+      DEBUG_A("returns: ");
+      DEBUG_F( flexible_print, stderr, returns, 1, (dump_flags_t)0);
+      return returns;
     }
 }
 

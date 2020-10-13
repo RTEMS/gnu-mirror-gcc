@@ -264,7 +264,7 @@ extern bool is_assign_from_ssa ( gimple *);
 // them in the code. However, some of the uses should obviously be
 // converted to dump file information.
 
-#define DEBUGGING 1
+#define DEBUGGING 0
 #if DEBUGGING
 enum Display {
   Show_nothing,
