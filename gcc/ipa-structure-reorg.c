@@ -140,6 +140,12 @@ ipa_structure_reorg ( void)
 
   cgraph_node* node;
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node) node->get_untransformed_body ();
+  //FOR_EACH_FUNCTION ( node)
+  //{
+  //  struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
+  //  DEBUG_A(" %s ( ", lang_hooks.decl_printable_name ( func->decl, 2));
+  //  node->get_untransformed_body ();
+  //}
   
   //DEBUG_F( ssa_check, stderr, Show_everything, Do_not_fail, false, true);
 
@@ -1818,8 +1824,13 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
       DEBUG_L("GIMPLE_CALL:\n");
       struct cgraph_edge *edge = node->get_edge ( stmt);
       gcc_assert( edge);
-      DEBUG_L("called function %s gimple_body\n",
-      	      edge->callee->has_gimple_body_p() ? "has a" : "has no");
+      //DEBUG_L("called function %s gimple_body\n",
+      //	      edge->callee->has_gimple_body_p() ? "has a" : "has no");
+      //DEBUG_L("called function inline_to %s\n",
+      //	      edge->callee->inlined_to ? "true" : "false");
+      //DEBUG_L("called function external %s\n",
+      //	      edge->callee->get_partitioning_class() == SYMBOL_EXTERNAL ? "true" : "false");
+      
       INDENT(-2);
       if ( gimple_call_builtin_p( stmt, BUILT_IN_CALLOC ) ) return ReorgT_Calloc;
       if ( gimple_call_builtin_p( stmt, BUILT_IN_MALLOC ) ) return ReorgT_Malloc;
@@ -1833,9 +1844,10 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 
       if ( is_user_function ( stmt, node, info) )
 	{
+	  DEBUG_A("  ReorgT_UserFunc\n");
 	  return ReorgT_UserFunc;
 	}
-      
+      DEBUG_A("  Not_supported\n");
       return Not_Supported;
     }
     break;
@@ -1862,7 +1874,7 @@ is_user_function ( gimple *call_stmt, cgraph_node* node, Info *info)
   // that is part of our program.
   struct cgraph_edge *ce;
   ce = node->get_edge ( call_stmt);
-  return ce->callee->has_gimple_body_p();
+  return ce->callee->get_partitioning_class() != SYMBOL_EXTERNAL;
 }
 
 void
