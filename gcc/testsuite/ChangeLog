@@ -1,3 +1,7 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/opt/ctor1.C: New test.
+
 2022-01-04  Martin Sebor  <msebor@redhat.com>
 
 	PR middle-end/99612
