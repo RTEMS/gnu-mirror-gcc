@@ -1,3 +1,7 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* gnat-style.texi: Change dircategory to GNU Ada tools.
+
 2023-11-28  Simon Wright  <simon@pushface.org>
 
 	PR ada/111909

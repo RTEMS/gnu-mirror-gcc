@@ -1,3 +1,12 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/ia64/lib1funcs.S: Add .note.GNU-stack section on
+	ia64-linux.
+	* config/ia64/crtbegin.S: Likewise.
+	* config/ia64/crtend.S: Likewise.
+	* config/ia64/crti.S: Likewise.
+	* config/ia64/crtn.S: Likewise.
+
 2023-11-27  Richard Earnshaw  <rearnsha@arm.com>
 
 	* config/arm/lib1funcs.S (__sync_synchronize): Adjust warning message.
