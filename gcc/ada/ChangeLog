@@ -1,3 +1,7 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* gnat-style.texi: Change dircategory to GNU Ada tools.
+
 2024-11-26  Eric Botcazou  <ebotcazou@adacore.come>
 
 	* gcc-interface/trans.cc (Attribute_to_gnu) <Attr_Access>: Do not

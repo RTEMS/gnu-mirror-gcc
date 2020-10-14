@@ -1,3 +1,7 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/opt/ctor1.C: New test.
+
 2024-11-29  David Malcolm  <dmalcolm@redhat.com>
 
 	* libdiagnostics.dg/*: Rename to libgdiagnostics.dg, renaming
