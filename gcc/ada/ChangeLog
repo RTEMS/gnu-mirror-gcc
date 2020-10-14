@@ -1,3 +1,7 @@
+2010-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* gnat-style.texi: Change dircategory to GNU Ada tools.
+
 2022-12-06  Yannick Moy  <moy@adacore.com>
 
 	* contracts.adb (Add_Contract_Item): Allow No_Caching on types.
