@@ -180,6 +180,7 @@
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
    UNSPEC_XXPERMX
+   UNSPEC_TI_SHIFT_CONSTANT
 ])
 
 (define_c_enum "unspecv"
@@ -2075,6 +2076,67 @@
   "TARGET_ALTIVEC"
   "vsro %0,%1,%2"
   [(set_attr "type" "vecperm")])
+
+;; Power10 128-bit shifts
+(define_code_iterator ti_shift [lshiftrt ashift ashiftrt rotate])
+(define_code_attr ti_shift_names [(lshiftrt "lshr")
+				  (ashift   "ashl")
+				  (ashiftrt "ashr")
+				  (rotate   "rotl")])
+
+(define_code_attr ti_shift_op [(lshiftrt "vsrq")
+			       (ashift   "vslq")
+			       (ashiftrt "vsraq")
+			       (rotate   "vrlq")])
+
+
+;; Get the shift amount into the bottom part of the vector register.
+(define_insn_and_split "<ti_shift_names>ti3"
+  [(parallel [(set (match_operand:TI 0 "gpc_reg_operand" "=v,&v")
+		   (ti_shift:TI (match_operand:TI 1 "gpc_reg_operand" "v,v")
+				(match_operand:DI 2 "general_operand" "rvnZ,rvnZ")))
+	      (clobber (match_scratch:V2DI 3 "=&v,0"))])]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(ti_shift:TI (match_dup 1)
+		     (match_dup 3)))]
+{
+  rtx shift = operands[2];
+  rtx tmp_reg = operands[3];
+
+  if (GET_CODE (tmp_reg) == SCRATCH)
+    operands[3] = tmp_reg = gen_reg_rtx (V2DImode);
+
+  if (CONST_INT_P (shift))
+    emit_insn (gen_ti_shift_constant (tmp_reg, shift));
+  else
+    emit_insn (gen_vsx_splat_v2di (tmp_reg, shift));
+})
+
+;; Load up the shift constant in the bottom bits.  We don't care about any
+;; other bits.
+(define_insn "ti_shift_constant"
+  [(set (match_operand:V2DI 0 "gpc_reg_operand" "=v")
+	(unspec:V2DI [(match_operand:QI 1 "const_int_operand" "n")]
+		     UNSPEC_TI_SHIFT_CONSTANT))]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+{
+  operands[2] = GEN_INT (INTVAL (operands[1]) & 0xff);
+  return "xxspltib %x0,%2";
+}
+  [(set_attr "type" "vecperm")])
+
+;; Shift/rotate instruction.  Use V2DI to make sure the shift value is in the
+;; bottom bits.
+(define_insn "*<ti_shift_names>ti3_v2di"
+  [(set (match_operand:TI 0 "gpc_reg_operand" "=v")
+	(ti_shift:TI (match_operand:TI 1 "gpc_reg_operand" "v")
+		     (match_operand:V2DI 2 "gpc_reg_operand" "v")))]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+  "<ti_shift_op> %0,%1,%2"
+  [(set_attr "type" "vecsimple")])
 
 (define_insn "altivec_vsum4ubs"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
