@@ -123,7 +123,11 @@ struct ipa_vr_ggc_hash_traits : public ggc_cache_remove <value_range *>
   static bool
   equal (const value_range *a, const value_range *b)
     {
-      return a->equal_p (*b);
+      return (a->equal_p (*b)
+	      && types_compatible_p (TREE_TYPE (a->min ()),
+				     TREE_TYPE (b->min ()))
+	      && types_compatible_p (TREE_TYPE (a->max ()),
+				     TREE_TYPE (b->max ())));
     }
   static const bool empty_zero_p = true;
   static void
