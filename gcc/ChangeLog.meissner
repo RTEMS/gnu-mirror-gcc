@@ -1,3 +1,17 @@
+2020-10-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (ti_shift): New code iterator.
+	(ti_shift_names): New code attribute.
+	(ti_shift_op): New code attribute.
+	(<ti_shift_names>ti3): New expander to handle TImode shifts and
+	rotates on power10.
+	(<ti_shift_names>ti3_internal1): New insn for TI shift and
+	rotates.
+	(<ti_shift_names>ti3_internal2): New insn for TI shift and
+	rotates.
+	* config/rs6000/vector.md (vec_shr_<mode>): Use TI shift left or
+	right on power10 for variable shifts.
+
 2020-09-09  Aaron Sawdey  <acsawdey@linux.ibm.com>
 
 	* config/rs6000/rs6000-modes.def (POImode): Change precision.
