@@ -2076,6 +2076,64 @@
   "vsro %0,%1,%2"
   [(set_attr "type" "vecperm")])
 
+;; Power10 128-bit shifts
+(define_code_iterator ti_shift [lshiftrt ashift ashiftrt rotate])
+(define_code_attr ti_shift_names [(lshiftrt "lshr")
+				  (ashift   "ashl")
+				  (ashiftrt "ashr")
+				  (rotate   "rotl")])
+
+(define_code_attr ti_shift_op [(lshiftrt "vsrq")
+			       (ashift   "vslq")
+			       (ashiftrt "vsraq")
+			       (rotate   "vrlq")])
+
+
+;; TImode shifts.  We do a FAIL on shift by constant amounts so that the code
+;; generation will use the power9 code in the GPRs.  For the variable shifts
+;; and rotates, we need to get the shift/rotate amount into the bottom part of
+;; the vector register.
+(define_expand "<ti_shift_names>ti3"
+  [(parallel [(set (match_operand:TI 0 "gpc_reg_operand")
+		   (ti_shift:TI (match_operand:TI 1 "gpc_reg_operand")
+				(match_operand:DI 2 "reg_or_cint_operand")))
+	      (clobber (match_scratch:V2DI 3 "=v"))])]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+{
+  if (CONST_INT_P (operands[2]))
+    FAIL;
+})
+
+(define_insn_and_split "*<ti_shift_names>ti3_internal1"
+  [(set (match_operand:TI 0 "gpc_reg_operand" "=v")
+	(ti_shift:TI (match_operand:TI 1 "gpc_reg_operand" "v")
+		     (match_operand:DI 2 "gpc_reg_operand" "rwa")))
+   (clobber (match_scratch:V2DI 3 "=&v"))]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 3)
+	(vec_duplicate:V2DI (match_dup 2)))
+   (set (match_dup 0)
+	(ti_shift:TI (match_dup 1)
+		     (match_dup 3)))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (V2DImode);
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecperm")])
+
+;; Acutal shift/rotate instruction.  Use V2DImode to make sure the shift value
+;; is in the bottom bits.
+(define_insn "*<ti_shift_names>ti3_internal2"
+  [(set (match_operand:TI 0 "gpc_reg_operand" "=v")
+	(ti_shift:TI (match_operand:TI 1 "gpc_reg_operand" "v")
+		     (match_operand:V2DI 2 "gpc_reg_operand" "v")))]
+  "TARGET_POWER10 && TARGET_POWERPC64"
+  "<ti_shift_op> %0,%1,%2"
+  [(set_attr "type" "vecperm")])
+
 (define_insn "altivec_vsum4ubs"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
         (unspec:V4SI [(match_operand:V16QI 1 "register_operand" "v")
