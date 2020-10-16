@@ -316,6 +316,8 @@ protected:
    */
   bool _deleted;
 
+  cgraph_node *currently_walking;
+
   /* Walk global variables.  */
   void _walk_globals ();
 
@@ -323,7 +325,7 @@ protected:
   virtual void _walk_global (varpool_node *v);
 
   /* Will walk declarations, locals, ssa names, and basic blocks.  */
-  void _walk_cnode (cgraph_node *cnode);
+  virtual void _walk_cnode (cgraph_node *cnode);
 
   /* This will walk the CNODE->decl.  */
   void _walk_decl (cgraph_node *cnode);
@@ -439,6 +441,9 @@ struct type_partitions_s
   /* The set of all non escaping types.  */
   tset_t non_escaping;
 
+  /* The set of all records. */
+  tset_t records;
+
   /* Determine if we have seen this type before.  */
   bool in_universe (const_tree) const;
 
@@ -494,7 +499,10 @@ private:
    * from PTR.
    * This datastructure persists across calls to collect.
    */
+public:
   tpartitions_t ptrset;
+
+private:
 
   /* Sanity check determines that the partitions are mutually
    * exclusive.
@@ -648,9 +656,9 @@ public:
     return typeCollector.get_record_reaching_trees ();
   }
 
-private:
   TypeCollector typeCollector;
 
+private:
   /* Catch all callback for all nested expressions E.  */
   virtual void _walk_pre (const_tree e);
 };
@@ -676,8 +684,9 @@ public:
   // TODO: I believe this could be made const.
   void print_collected ();
 
-private:
   ExprCollector exprCollector;
+
+private:
 
   /* Call back for global variables.  */
   virtual void _walk_pre_tree (const_tree);
@@ -693,6 +702,53 @@ private:
 
   /* Call back for gcall.  */
   virtual void _walk_pre_gcall (gcall *s);
+
+  /* Call back for gdebug. */
+  virtual void _walk_pre_gdebug (gdebug *s);
+
+};
+
+class GimpleWhiteLister : GimpleTypeCollector
+{
+public:
+  GimpleWhiteLister()
+  {};
+
+  bool _no_external = true;
+  bool does_not_call_external_functions(cgraph_node *c, std::map<tree, bool> &whitelisted)
+  {
+    gcc_assert(c);
+
+    for (cgraph_edge *edge = c->callees; edge; edge = edge->next_callee)
+    {
+       cgraph_node *callee = edge->callee;
+       if (callee == c) continue;
+       bool in_map = whitelisted.find(callee->decl) != whitelisted.end();
+       if (!in_map) {
+	       return false;
+       }
+       bool w = whitelisted[callee->decl];
+       if (!w) {
+	       return false;
+       }
+    }
+
+    unsigned int how_many_records = exprCollector.typeCollector.ptrset.records.size();
+    return how_many_records <= 1;
+
+  }
+
+  /* Will walk declarations, locals, ssa names, and basic blocks.  */
+  virtual void _walk_cnode (cgraph_node *cnode)
+  {
+    GimpleTypeCollector::_walk_cnode(cnode);
+  }
+
+private:
+  virtual void _walk_pre_gcall (gcall *s)
+  {
+    this->_no_external = false;
+  }
 };
 
 // Reason for why a type is escaping
@@ -1004,10 +1060,13 @@ protected:
 class GimpleCaster : public GimpleEscaper
 {
 public:
-  GimpleCaster (tpartitions_t &types) : GimpleEscaper (types)
+  GimpleCaster (tpartitions_t &types, std::map<tree, bool> &whitelisted) : GimpleEscaper (types), _whitelisted(whitelisted)
 {};
 
 private:
+
+  std::map<tree, bool> &_whitelisted;
+
   /* Determine if cast comes from a known function.  */
   static bool follow_def_to_find_if_really_cast (const_tree);
 
@@ -1157,7 +1216,7 @@ typedef std::map<const_tree, field_offsets_t> record_field_offset_map_t;
 
 // Partition types into escaping or non escaping sets.
 tpartitions_t
-partition_types_into_escaping_nonescaping ();
+partition_types_into_escaping_nonescaping (std::map<tree, bool>&);
 
 // Compute set of not escaping unaccessed fields
 record_field_offset_map_t
@@ -1166,5 +1225,6 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 				      int warning);
 
 extern bool detected_incompatible_syntax;
+std::map<tree, bool> get_whitelisted_nodes();
 
 #endif /* GCC_IPA_TYPE_ESCAPE_ANALYSIS_H */

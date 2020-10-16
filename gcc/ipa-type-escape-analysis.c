@@ -166,6 +166,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <set>
 #include <map>
 #include <stack>
+#include <queue>
 
 #include "ipa-type-escape-analysis.h"
 #include "ipa-dfe.h"
@@ -249,6 +250,74 @@ lto_dfe_execute ()
   return 0;
 }
 
+std::map<tree, bool>
+get_whitelisted_nodes()
+{
+  cgraph_node *node = NULL;
+  std::set<cgraph_node *> nodes;
+  std::set<cgraph_node *> leaf_nodes;
+  std::set<tree> leaf_nodes_decl;
+  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
+  {
+    node->get_untransformed_body();
+    nodes.insert(node);
+    if (node->callees) continue;
+
+    leaf_nodes.insert(node);
+    leaf_nodes_decl.insert(node->decl);
+  }
+
+  std::queue<cgraph_node *> worklist;
+  for (std::set<cgraph_node*>::iterator i = leaf_nodes.begin(), e = leaf_nodes.end(); i != e; ++i)
+  {
+    if (dump_file) fprintf(dump_file, "is a leaf node %s\n", (*i)->name());
+    worklist.push(*i);
+  }
+
+  for (std::set<cgraph_node*>::iterator i = nodes.begin(), e = nodes.end(); i != e; ++i)
+  {
+    worklist.push(*i);
+  }
+
+  std::map<tree, bool> map;
+  while (!worklist.empty())
+  {
+
+    if (detected_incompatible_syntax) return map;
+    cgraph_node *i = worklist.front();
+    worklist.pop();
+    if (dump_file) fprintf(dump_file, "analyzing %s %p\n", i->name(), i);
+    GimpleWhiteLister whitelister;
+    whitelister._walk_cnode(i);
+    bool no_external = whitelister.does_not_call_external_functions(i, map);
+    bool before_in_map = map.find(i->decl) != map.end();
+    bool place_callers_in_worklist = !before_in_map;
+    if (!before_in_map)
+    {
+      map.insert(std::pair<tree, bool>(i->decl, no_external));
+    } else
+    {
+      map[i->decl] = no_external;
+    }
+    bool previous_value = map[i->decl];
+    place_callers_in_worklist |= previous_value != no_external;
+    if (previous_value != no_external)
+    {
+       gcc_assert(!previous_value);
+       gcc_assert(no_external);
+    }
+    if (dump_file) fprintf(dump_file, "no external %s\n", no_external ? "T" : "F");
+
+    for (cgraph_edge *e = i->callers; place_callers_in_worklist && e; e = e->next_caller)
+    {
+      worklist.push(e->caller);
+    }
+  }
+
+  return map;
+
+}
+
 /*
  * Perform dead field elimination at link-time.
  * This transformation is composed of two main stages:
@@ -261,11 +330,14 @@ lto_dead_field_elimination ()
 {
   // Analysis.
   detected_incompatible_syntax = false;
+  std::map<tree, bool> whitelisted = get_whitelisted_nodes();
   tpartitions_t escaping_nonescaping_sets
-    = partition_types_into_escaping_nonescaping ();
+    = partition_types_into_escaping_nonescaping (whitelisted);
+  if (detected_incompatible_syntax) return;
   record_field_map_t record_field_map = find_fields_accessed ();
+  if (detected_incompatible_syntax) return;
   record_field_offset_map_t record_field_offset_map
-    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
+    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets, 
 					    record_field_map, OPT_Wdfa);
   if (detected_incompatible_syntax || record_field_offset_map.empty ())
     return;
@@ -301,11 +373,12 @@ partition_types_into_record_reaching_or_non_record_reaching ()
  * which types are escaping AND are being casted.
  */
 tpartitions_t
-partition_types_into_escaping_nonescaping ()
+partition_types_into_escaping_nonescaping (std::map<tree, bool> &whitelisted)
 {
   tpartitions_t partitions
     = partition_types_into_record_reaching_or_non_record_reaching ();
-  GimpleCaster caster (partitions);
+  if (detected_incompatible_syntax) return partitions;
+  GimpleCaster caster (partitions, whitelisted);
   caster.walk ();
 
   // Dump for debugging.
@@ -1194,6 +1267,7 @@ GimpleWalker::walk ()
 
       if (dump_file)
 	dump_function_to_file (node->decl, dump_file, TDF_NONE);
+
       _walk_cnode (node);
       fndecls.insert (decl);
     }
@@ -1252,6 +1326,7 @@ void
 GimpleWalker::_walk_cnode (cgraph_node *cnode)
 {
   gcc_assert (cnode);
+  currently_walking = cnode;
   _walk_decl (cnode);
   _walk_locals (cnode);
   _walk_ssa_names (cnode);
@@ -1534,7 +1609,6 @@ GimpleWalker::_walk_gphi (gphi *g)
 {
 }
 
-
 void
 TypeCollector::collect (const_tree t)
 {
@@ -1746,6 +1820,7 @@ TypeCollector::_walk_RECORD_TYPE_post (const_tree t)
       i->second = true;
     }
   _collect_simple (t);
+
 }
 
 void
@@ -1793,9 +1868,28 @@ TypeCollector::_walk_METHOD_TYPE_pre (const_tree t)
 inline void
 ExprCollector::_walk_pre (const_tree e)
 {
+  if (!e) return;
   const_tree t = TREE_TYPE (e);
   gcc_assert (t);
   typeCollector.collect (t);
+
+  if (RECORD_TYPE != TREE_CODE(t)) return;
+
+  if (typeCollector.ptrset.records.empty()) {
+    typeCollector.ptrset.records.insert(TYPE_MAIN_VARIANT(t));
+    return;
+  }
+
+  for (std::set<const_tree>::iterator i = typeCollector.ptrset.records.begin(), e = typeCollector.ptrset.records.end(); i != e; ++i)
+  {
+    const_tree r = *i;
+    TypeIncompleteEquality structuralEquality;
+    bool is_same = structuralEquality.equal (TYPE_MAIN_VARIANT(r), TYPE_MAIN_VARIANT(t));
+    if (is_same) continue;
+
+    TypeStringifier stringifier;
+    typeCollector.ptrset.records.insert(TYPE_MAIN_VARIANT(t));
+  }
 }
 
 /*
@@ -1809,6 +1903,7 @@ ExprCollector::_walk_pre (const_tree e)
 void
 GimpleTypeCollector::_walk_pre_tree (const_tree t)
 {
+  if (!t) return;
   exprCollector.walk (t);
 }
 
@@ -1883,6 +1978,17 @@ GimpleTypeCollector::_walk_pre_gcall (gcall *s)
     return;
 
   exprCollector.walk (lhs);
+}
+
+void
+GimpleTypeCollector::_walk_pre_gdebug (gdebug *s)
+{
+  if (!gimple_debug_bind_p(s)) return;
+  tree var = gimple_debug_bind_get_var(s);
+  if (var) {
+	  gcc_assert(TREE_TYPE(var));
+	  exprCollector.walk(var);
+  }
 }
 
 // Print working set.
@@ -2453,18 +2559,28 @@ GimpleCaster::_walk_pre_gassign (gassign *s)
   const_tree t_lhs = TREE_TYPE (lhs);
   const_tree t_rhs = TREE_TYPE (rhs);
   gcc_assert (t_lhs && t_rhs);
-  bool is_cast = !equality.equal (t_lhs, t_rhs);
+  bool is_cast = !equality.equal (TYPE_MAIN_VARIANT(t_lhs), TYPE_MAIN_VARIANT(t_rhs));
   // If it is cast, we might need to look at the definition of rhs
   // If the definition comes from a known function... then we are good...
   bool is_ssa = TREE_CODE (rhs) == SSA_NAME;
-  is_cast = is_ssa ? follow_def_to_find_if_really_cast (rhs) : is_cast;
+  is_cast = is_cast && is_ssa ? follow_def_to_find_if_really_cast (rhs) : is_cast;
+  // we allow casts to pointers...
+  is_cast = is_cast && !(t_lhs == ptr_type_node);
 
+
+  TypeStringifier stringifier;
   reason.type_is_casted = is_cast;
+  bool in_map = _whitelisted.find(currently_walking->decl) != _whitelisted.end();
+  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  if (whitelisted) goto escaper_label;
+  log("lhs %s is casted: %s\n", stringifier.stringify(t_lhs).c_str(), is_cast ? "T" : "F");
+  log("rhs %s is casted: %s\n", stringifier.stringify(t_rhs).c_str(), is_cast ? "T" : "F");
   if (!flag_ipa_type_escape_analysis_keep_casts)
     exprEscaper.typeEscaper.update (TREE_TYPE (lhs), reason);
   if (!flag_ipa_type_escape_analysis_keep_casts)
     exprEscaper.typeEscaper.update (TREE_TYPE (rhs), reason);
 
+escaper_label:
   GimpleEscaper::_walk_pre_gassign (s);
 }
 
@@ -2476,7 +2592,7 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
   if (flag_ipa_type_escape_analysis_keep_casts)
     return;
 
-  const_tree fn = gimple_call_fndecl (s);
+  tree fn = gimple_call_fndecl (s);
   // If there's no function declaration, how do we
   // know the argument types?
   if (!fn)
@@ -2488,13 +2604,25 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
   if (known_function)
     return;
 
+  if (_whitelisted.find(fn) != _whitelisted.end() && _whitelisted[fn]) return;
+  bool in_map = _whitelisted.find(currently_walking->decl) != _whitelisted.end();
+  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  if (whitelisted) return;
+
+  if (!currently_walking->callers) return;
+
+  if (!node && currently_walking->inlined_to) return;
+
   const_tree f_t = TREE_TYPE (fn);
   TypeIncompleteEquality equality;
 
   unsigned i = 0;
+  TypeStringifier stringifier;
   for (tree a = TYPE_ARG_TYPES (f_t); NULL_TREE != a; a = TREE_CHAIN (a))
     {
       const_tree formal_t = TREE_VALUE (a);
+      //if (formal_t == ptr_type_node) continue;
+      //if (formal_t == void_type_node) continue;
       // There seems to be a final VOID_TYPE at the end of some functions?
       const enum tree_code code = TREE_CODE (formal_t);
       const bool is_void = VOID_TYPE == code;
@@ -2504,6 +2632,7 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
       const_tree real = gimple_call_arg (s, i);
       const_tree real_t = TREE_TYPE (real);
       const bool is_casted = !equality.equal (formal_t, real_t);
+      log("arg %s is casted: %s\n", stringifier.stringify(real_t).c_str(), is_casted ? "T" : "F");
       Reason arg_reason;
       arg_reason.type_is_casted = is_casted;
       exprEscaper.typeEscaper.update (TREE_TYPE (real), arg_reason);
@@ -3262,7 +3391,10 @@ TypeStructuralEquality::_equal_code (const_tree l, const_tree r)
   const enum tree_code code_l = TREE_CODE (l);
   const enum tree_code code_r = TREE_CODE (r);
   const bool equal = code_l == code_r;
-  return equal;
+  bool array_or_ptr_l = TREE_CODE(l) == ARRAY_TYPE || TREE_CODE(l) == POINTER_TYPE;
+  bool array_or_ptr_r = TREE_CODE(r) == ARRAY_TYPE || TREE_CODE(r) == POINTER_TYPE;
+  bool array_or_ptr = array_or_ptr_l && array_or_ptr_r;
+  return equal || array_or_ptr;
 }
 
 #define TSE_FUNC_DEF_SIMPLE(code) 					  \
@@ -3284,7 +3416,9 @@ bool
 TypeStructuralEquality::_equal_wrapper (const_tree l, const_tree r)
 {
   const_tree inner_l = TREE_TYPE (l);
+  if (TREE_CODE(inner_l) == ARRAY_TYPE && TREE_CODE(TREE_TYPE(inner_l)) == POINTER_TYPE ) inner_l = TREE_TYPE(inner_l);
   const_tree inner_r = TREE_TYPE (r);
+  if (TREE_CODE(inner_r) == ARRAY_TYPE && TREE_CODE(TREE_TYPE(inner_r)) == POINTER_TYPE ) inner_r = TREE_TYPE(inner_r);
   return _equal (inner_l, inner_r);
 }
 
