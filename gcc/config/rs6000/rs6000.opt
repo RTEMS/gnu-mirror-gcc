@@ -590,6 +590,6 @@ mmma
 Target Report Mask(MMA) Var(rs6000_isa_flags)
 Generate (do not generate) MMA instructions.
 
-mquad-add-subtract
+mquad-arithmetic
 Target Report Mask(QUAD_ARITHMETIC) Var(rs6000_isa_flags)
 Generate (do not generate) quad word arithmetic instructions.
