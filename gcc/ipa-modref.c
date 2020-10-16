@@ -298,7 +298,7 @@ dump_lto_records (modref_records_lto *tt, FILE *out)
 		   r->ref ? get_alias_set (r->ref) : 0);
 	  if (r->every_access)
 	    {
-	      fprintf (out, "      Every access\n");
+	      fprintf (out, "          Every access\n");
 	      continue;
 	    }
 	  size_t k;
@@ -314,16 +314,10 @@ dump_lto_records (modref_records_lto *tt, FILE *out)
 void
 modref_summary::dump (FILE *out)
 {
-  if (loads)
-    {
-      fprintf (out, "  loads:\n");
-      dump_records (loads, out);
-    }
-  if (stores)
-    {
-      fprintf (out, "  stores:\n");
-      dump_records (stores, out);
-    }
+  fprintf (out, "  loads:\n");
+  dump_records (loads, out);
+  fprintf (out, "  stores:\n");
+  dump_records (stores, out);
 }
 
 /* Dump summary.  */
@@ -331,16 +325,10 @@ modref_summary::dump (FILE *out)
 void
 modref_summary_lto::dump (FILE *out)
 {
-  if (loads)
-    {
-      fprintf (out, "  loads:\n");
-      dump_lto_records (loads, out);
-    }
-  if (stores)
-    {
-      fprintf (out, "  stores:\n");
-      dump_lto_records (stores, out);
-    }
+  fprintf (out, "  loads:\n");
+  dump_lto_records (loads, out);
+  fprintf (out, "  stores:\n");
+  dump_lto_records (stores, out);
 }
 
 /* Get function summary for FUNC if it exists, return NULL otherwise.  */
@@ -530,16 +518,23 @@ ignore_stores_p (tree caller, int flags)
 bool
 merge_call_side_effects (modref_summary *cur_summary,
 			 gimple *stmt, modref_summary *callee_summary,
-			 bool ignore_stores)
+			 bool ignore_stores, cgraph_node *callee_node)
 {
   auto_vec <modref_parm_map, 32> parm_map;
   bool changed = false;
+
+  if (dump_file)
+    fprintf (dump_file, " - Merging side effects of %s with parm map:",
+	     callee_node->dump_name ());
 
   parm_map.safe_grow_cleared (gimple_call_num_args (stmt));
   for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
     {
       tree op = gimple_call_arg (stmt, i);
-      STRIP_NOPS (op);
+      bool offset_known;
+      poly_int64 offset;
+
+      offset_known = unadjusted_ptr_and_unit_offset (op, &op, &offset);
       if (TREE_CODE (op) == SSA_NAME
 	  && SSA_NAME_IS_DEFAULT_DEF (op)
 	  && TREE_CODE (SSA_NAME_VAR (op)) == PARM_DECL)
@@ -556,24 +551,32 @@ merge_call_side_effects (modref_summary *cur_summary,
 	      index++;
 	    }
 	  parm_map[i].parm_index = index;
-	  parm_map[i].parm_offset_known = true;
-	  parm_map[i].parm_offset = 0;
+	  parm_map[i].parm_offset_known = offset_known;
+	  parm_map[i].parm_offset = offset;
 	}
       else if (points_to_local_or_readonly_memory_p (op))
 	parm_map[i].parm_index = -2;
       else
 	parm_map[i].parm_index = -1;
+      if (dump_file)
+	{
+	  fprintf (dump_file, " %i", parm_map[i].parm_index);
+	  if (parm_map[i].parm_offset_known)
+	    {
+	      fprintf (dump_file, " offset:");
+	      print_dec ((poly_int64_pod)parm_map[i].parm_offset,
+			 dump_file, SIGNED);
+	    }
+	}
     }
+  if (dump_file)
+    fprintf (dump_file, "\n");
 
   /* Merge with callee's summary.  */
-  if (cur_summary->loads)
-    changed |= cur_summary->loads->merge (callee_summary->loads, &parm_map);
+  changed |= cur_summary->loads->merge (callee_summary->loads, &parm_map);
   if (!ignore_stores)
-    {
-      if (cur_summary->stores)
-	changed |= cur_summary->stores->merge (callee_summary->stores,
-					       &parm_map);
-    }
+    changed |= cur_summary->stores->merge (callee_summary->stores,
+					   &parm_map);
   return changed;
 }
 
@@ -672,8 +675,7 @@ analyze_call (modref_summary *cur_summary,
     {
       if (ignore_stores)
 	{
-	  if (cur_summary->loads)
-	    cur_summary->loads->collapse ();
+	  cur_summary->loads->collapse ();
 	  return true;
 	}
       if (dump_file)
@@ -681,7 +683,8 @@ analyze_call (modref_summary *cur_summary,
       return false;
     }
 
-  merge_call_side_effects (cur_summary, stmt, callee_summary, ignore_stores);
+  merge_call_side_effects (cur_summary, stmt, callee_summary, ignore_stores,
+			   callee_node);
 
   return true;
 }
@@ -853,7 +856,10 @@ analyze_function (function *f, bool ipa)
       else /* Remove existing summary if we are re-running the pass.  */
 	{
 	  if (dump_file
-	      && optimization_summaries->get (cgraph_node::get (f->decl)))
+	      && (summary
+		  = optimization_summaries->get (cgraph_node::get (f->decl)))
+		 != NULL
+	      && summary->loads)
 	    {
 	      fprintf (dump_file, "Past summary:\n");
 	      optimization_summaries->get
@@ -950,7 +956,8 @@ analyze_function (function *f, bool ipa)
 			  (summary, recursive_calls[i], summary,
 			   ignore_stores_p (current_function_decl,
 					    gimple_call_flags
-						 (recursive_calls[i])));
+						 (recursive_calls[i])),
+			   fnode);
 	      if (!summary->useful_p (ecf_flags))
 		{
 		  remove_summary (lto, nolto, ipa);
@@ -1005,18 +1012,19 @@ modref_generate (void)
 void
 modref_summaries::insert (struct cgraph_node *node, modref_summary *)
 {
-  if (!DECL_STRUCT_FUNCTION (node->decl))
+  /* Local passes ought to be executed by the pass manager.  */
+  if (this == optimization_summaries)
     {
       optimization_summaries->remove (node);
+      return;
+    }
+  if (!DECL_STRUCT_FUNCTION (node->decl))
+    {
       summaries->remove (node);
+      return;
     }
   push_cfun (DECL_STRUCT_FUNCTION (node->decl));
-  /* This is not very pretty: We do not know if we insert into optimization
-     summary or summary.  Do both but check for duplicated effort.  */
-  if (optimization_summaries && !optimization_summaries->get (node)->loads)
-    analyze_function (DECL_STRUCT_FUNCTION (node->decl), false);
-  if (summaries && !summaries->get (node)->loads)
-    analyze_function (DECL_STRUCT_FUNCTION (node->decl), true);
+  analyze_function (DECL_STRUCT_FUNCTION (node->decl), true);
   pop_cfun ();
 }
 
@@ -1042,26 +1050,27 @@ modref_summaries_lto::insert (struct cgraph_node *node, modref_summary_lto *)
 /* Called when new clone is inserted to callgraph late.  */
 
 void
-modref_summaries::duplicate (cgraph_node *, cgraph_node *,
+modref_summaries::duplicate (cgraph_node *, cgraph_node *dst,
 			     modref_summary *src_data,
 			     modref_summary *dst_data)
 {
-  if (src_data->stores)
+  /* Do not duplicte optimization summaries; we do not handle parameter
+     transforms on them.  */
+  if (this == optimization_summaries)
     {
-      dst_data->stores = modref_records::create_ggc
-			    (src_data->stores->max_bases,
-			     src_data->stores->max_refs,
-			     src_data->stores->max_accesses);
-      dst_data->stores->copy_from (src_data->stores);
+      optimization_summaries->remove (dst);
+      return;
     }
-  if (src_data->loads)
-    {
-      dst_data->loads = modref_records::create_ggc
-			    (src_data->loads->max_bases,
-			     src_data->loads->max_refs,
-			     src_data->loads->max_accesses);
-      dst_data->loads->copy_from (src_data->loads);
-    }
+  dst_data->stores = modref_records::create_ggc
+			(src_data->stores->max_bases,
+			 src_data->stores->max_refs,
+			 src_data->stores->max_accesses);
+  dst_data->stores->copy_from (src_data->stores);
+  dst_data->loads = modref_records::create_ggc
+			(src_data->loads->max_bases,
+			 src_data->loads->max_refs,
+			 src_data->loads->max_accesses);
+  dst_data->loads->copy_from (src_data->loads);
 }
 
 /* Called when new clone is inserted to callgraph late.  */
@@ -1071,22 +1080,16 @@ modref_summaries_lto::duplicate (cgraph_node *, cgraph_node *,
 				 modref_summary_lto *src_data,
 				 modref_summary_lto *dst_data)
 {
-  if (src_data->stores)
-    {
-      dst_data->stores = modref_records_lto::create_ggc
-			    (src_data->stores->max_bases,
-			     src_data->stores->max_refs,
-			     src_data->stores->max_accesses);
-      dst_data->stores->copy_from (src_data->stores);
-    }
-  if (src_data->loads)
-    {
-      dst_data->loads = modref_records_lto::create_ggc
-			    (src_data->loads->max_bases,
-			     src_data->loads->max_refs,
-			     src_data->loads->max_accesses);
-      dst_data->loads->copy_from (src_data->loads);
-    }
+  dst_data->stores = modref_records_lto::create_ggc
+			(src_data->stores->max_bases,
+			 src_data->stores->max_refs,
+			 src_data->stores->max_accesses);
+  dst_data->stores->copy_from (src_data->stores);
+  dst_data->loads = modref_records_lto::create_ggc
+			(src_data->loads->max_bases,
+			 src_data->loads->max_refs,
+			 src_data->loads->max_accesses);
+  dst_data->loads->copy_from (src_data->loads);
 }
 
 namespace
@@ -1154,7 +1157,7 @@ write_modref_records (modref_records_lto *tt, struct output_block *ob)
 	  modref_access_node *access_node;
 	  FOR_EACH_VEC_SAFE_ELT (ref_node->accesses, k, access_node)
 	    {
-	      streamer_write_uhwi (ob, access_node->parm_index);
+	      streamer_write_hwi (ob, access_node->parm_index);
 	      if (access_node->parm_index != -1)
 		{
 		  streamer_write_uhwi (ob, access_node->parm_offset_known);
@@ -1278,7 +1281,7 @@ read_modref_records (lto_input_block *ib, struct data_in *data_in,
 
 	  for (size_t k = 0; k < naccesses; k++)
 	    {
-	      int parm_index = streamer_read_uhwi (ib);
+	      int parm_index = streamer_read_hwi (ib);
 	      bool parm_offset_known = false;
 	      poly_int64 parm_offset = 0;
 	      poly_int64 offset = 0;
@@ -1358,12 +1361,8 @@ modref_write ()
 
 	  streamer_write_uhwi (ob, lto_symtab_encoder_encode (encoder, cnode));
 
-	  streamer_write_uhwi (ob, r->loads ? 1 : 0);
-	  streamer_write_uhwi (ob, r->stores ? 1 : 0);
-	  if (r->loads)
-	    write_modref_records (r->loads, ob);
-	  if (r->stores)
-	    write_modref_records (r->stores, ob);
+	  write_modref_records (r->loads, ob);
+	  write_modref_records (r->stores, ob);
 	}
     }
   streamer_write_char_stream (ob->main_stream, 0);
@@ -1406,8 +1405,6 @@ read_section (struct lto_file_decl_data *file_data, const char *data,
       modref_summary_lto *modref_sum_lto = summaries_lto
 					   ? summaries_lto->get_create (node)
 					   : NULL;
-      int have_loads = streamer_read_uhwi (&ib);
-      int have_stores = streamer_read_uhwi (&ib);
 
       if (optimization_summaries)
 	modref_sum = optimization_summaries->get_create (node);
@@ -1416,14 +1413,12 @@ read_section (struct lto_file_decl_data *file_data, const char *data,
 				  && !modref_sum->stores));
       gcc_assert (!modref_sum_lto || (!modref_sum_lto->loads
 				      && !modref_sum_lto->stores));
-      if (have_loads)
-	 read_modref_records (&ib, data_in,
-			      modref_sum ? &modref_sum->loads : NULL,
-			      modref_sum_lto ? &modref_sum_lto->loads : NULL);
-      if (have_stores)
-	 read_modref_records (&ib, data_in,
-			      modref_sum ? &modref_sum->stores : NULL,
-			      modref_sum_lto ? &modref_sum_lto->stores : NULL);
+      read_modref_records (&ib, data_in,
+			   modref_sum ? &modref_sum->loads : NULL,
+			   modref_sum_lto ? &modref_sum_lto->loads : NULL);
+      read_modref_records (&ib, data_in,
+			   modref_sum ? &modref_sum->stores : NULL,
+			   modref_sum_lto ? &modref_sum_lto->stores : NULL);
       if (dump_file)
 	{
 	  fprintf (dump_file, "Read modref for %s\n",
@@ -1598,9 +1593,6 @@ public:
 
 unsigned int pass_modref::execute (function *f)
 {
-  /* If new function is being added during IPA, we can skip analysis.  */
-  if (!optimization_summaries)
-    return 0;
   analyze_function (f, false);
   return 0;
 }
@@ -1623,12 +1615,17 @@ make_pass_ipa_modref (gcc::context *ctxt)
 static bool
 ignore_edge (struct cgraph_edge *e)
 {
+  /* We merge summaries of inline clones into summaries of functions they
+     are inlined to.  For that reason the complete function bodies must
+     act as unit.  */
+  if (!e->inline_failed)
+    return false;
   enum availability avail;
   cgraph_node *callee = e->callee->function_or_virtual_thunk_symbol
 			  (&avail, e->caller);
 
   return (avail <= AVAIL_INTERPOSABLE
-	  || ((!summaries || !summaries->get (callee))
+	  || ((!optimization_summaries || !optimization_summaries->get (callee))
 	      && (!summaries_lto || !summaries_lto->get (callee)))
 	  || flags_from_decl_or_type (e->callee->decl)
 	     & (ECF_CONST | ECF_NOVOPS));
@@ -1684,10 +1681,19 @@ compute_parm_map (cgraph_edge *callee_edge, vec<modref_parm_map> *parm_map)
 	  if (jf && jf->type == IPA_JF_PASS_THROUGH)
 	    {
 	      (*parm_map)[i].parm_index
-		 = ipa_get_jf_pass_through_formal_id (jf);
-	      (*parm_map)[i].parm_offset_known
-		= ipa_get_jf_pass_through_operation (jf) == NOP_EXPR;
-	      (*parm_map)[i].parm_offset = 0;
+		= ipa_get_jf_pass_through_formal_id (jf);
+	      if (ipa_get_jf_pass_through_operation (jf) == NOP_EXPR)
+		{
+		  (*parm_map)[i].parm_offset_known = true;
+		  (*parm_map)[i].parm_offset = 0;
+		}
+	      else if (ipa_get_jf_pass_through_operation (jf)
+		       == POINTER_PLUS_EXPR
+		       && ptrdiff_tree_p (ipa_get_jf_pass_through_operand (jf),
+					  &(*parm_map)[i].parm_offset))
+		(*parm_map)[i].parm_offset_known = true;
+	      else
+		(*parm_map)[i].parm_offset_known = false;
 	      continue;
 	    }
 	  if (jf && jf->type == IPA_JF_ANCESTOR)
@@ -1743,7 +1749,7 @@ ipa_merge_modref_summary_after_inlining (cgraph_edge *edge)
 
   if (!callee_info && to_info)
     {
-      if (ignore_stores_p (edge->callee->decl, flags))
+      if (ignore_stores_p (edge->caller->decl, flags))
 	to_info->loads->collapse ();
       else
 	{
@@ -1753,7 +1759,7 @@ ipa_merge_modref_summary_after_inlining (cgraph_edge *edge)
     }
   if (!callee_info_lto && to_info_lto)
     {
-      if (ignore_stores_p (edge->callee->decl, flags))
+      if (ignore_stores_p (edge->caller->decl, flags))
 	to_info_lto->loads->collapse ();
       else
 	{
@@ -1767,7 +1773,7 @@ ipa_merge_modref_summary_after_inlining (cgraph_edge *edge)
 
       compute_parm_map (edge, &parm_map);
 
-      if (!ignore_stores_p (edge->callee->decl, flags))
+      if (!ignore_stores_p (edge->caller->decl, flags))
 	{
 	  if (to_info && callee_info)
 	    to_info->stores->merge (callee_info->stores, &parm_map);
@@ -1782,14 +1788,38 @@ ipa_merge_modref_summary_after_inlining (cgraph_edge *edge)
   if (summaries)
     {
       if (to_info && !to_info->useful_p (flags))
-	summaries->remove (to);
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Removed mod-ref summary for %s\n",
+		     to->dump_name ());
+	  summaries->remove (to);
+	}
+      else if (to_info && dump_file)
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Updated mod-ref summary for %s\n",
+		     to->dump_name ());
+	  to_info->dump (dump_file);
+	}
       if (callee_info)
 	summaries->remove (edge->callee);
     }
   if (summaries_lto)
     {
       if (to_info_lto && !to_info_lto->useful_p (flags))
-	summaries_lto->remove (to);
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Removed mod-ref summary for %s\n",
+		     to->dump_name ());
+	  summaries_lto->remove (to);
+	}
+      else if (to_info_lto && dump_file)
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Updated mod-ref summary for %s\n",
+		     to->dump_name ());
+	  to_info_lto->dump (dump_file);
+	}
       if (callee_info_lto)
 	summaries_lto->remove (edge->callee);
     }
@@ -1921,6 +1951,8 @@ modref_propagate_in_scc (cgraph_node *component_node)
 			optimization_summaries->remove (node);
 		      if (summaries_lto)
 			summaries_lto->remove (node);
+		      cur_summary = NULL;
+		      cur_summary_lto = NULL;
 		      changed = true;
 		      break;
 		    }
@@ -2009,19 +2041,17 @@ modref_propagate_in_scc (cgraph_node *component_node)
 	      /* Merge in callee's information.  */
 	      if (callee_summary)
 		{
-		  if (callee_summary->loads)
-		    changed |= cur_summary->loads->merge
-				    (callee_summary->loads, &parm_map);
-		  if (callee_summary->stores)
+		  changed |= cur_summary->loads->merge
+				  (callee_summary->loads, &parm_map);
+		  if (!ignore_stores)
 		    changed |= cur_summary->stores->merge
 				    (callee_summary->stores, &parm_map);
 		}
 	      if (callee_summary_lto)
 		{
-		  if (callee_summary_lto->loads)
-		    changed |= cur_summary_lto->loads->merge
-				    (callee_summary_lto->loads, &parm_map);
-		  if (callee_summary_lto->stores)
+		  changed |= cur_summary_lto->loads->merge
+				  (callee_summary_lto->loads, &parm_map);
+		  if (!ignore_stores)
 		    changed |= cur_summary_lto->stores->merge
 				    (callee_summary_lto->stores, &parm_map);
 		}

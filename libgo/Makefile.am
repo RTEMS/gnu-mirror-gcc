@@ -973,6 +973,12 @@ endif
 # Also use -fno-inline to get better results from the memory profiler.
 runtime_pprof_check_GOCFLAGS = -static-libgo -fno-inline
 
+if LIBGO_IS_AIX
+# reflect tests must be done with -static-libgo. Otherwize,
+# there will be a duplication of the canonicalization map.
+reflect_check_GOCFLAGS = -static-libgo -Wl,-bbigtoc
+endif
+
 if HAVE_STATIC_LINK
 # Use -static for the syscall tests if possible, because otherwise when
 # running as root the re-execs ignore LD_LIBRARY_PATH.
@@ -1090,7 +1096,7 @@ if LIBGO_IS_BSD
 $(eval $(call PACKAGE_template,golang.org/x/net/route))
 
 golangorg_x_net_route_lo = \
-	golang.org/net/route.lo
+	golang.org/x/net/route.lo
 
 endif
 
