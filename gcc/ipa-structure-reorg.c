@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-escaper.hpp"
 #include "tree-pass.h"
 #include "tree-cfg.h"
+#include "cfgloop.h"
 #include "cgraph.h"
 #include "dumpfile.h"
 #include "pretty-print.h"
@@ -53,6 +54,7 @@ static void setup_debug_flags ( Info *);
 static void initial_debug_info ( Info *);
 static void final_debug_info ( Info *);
 static unsigned int reorg_analysis ( Info *);
+static unsigned number_of_executions ( gimple *, struct cgraph_node *);
 static void reorg_analysis_debug ( Info *, ReorgType *);
 static bool find_decls_and_types ( Info *);
 #if USE_REORG_TYPES
@@ -427,14 +429,19 @@ reorg_analysis ( Info *info)
 	    ReorgType_t *ri = get_reorgtype_info ( bt, info);
 	    if ( ri != NULL && alloc_trigger )
 	    {
-	      //DEBUG_L( "Found allocaion: \n");
-	      //DEBUG_A( "  Reorg: ");
-	      //DEBUG_F( print_reorg, stderr, 0, ri);
-	      //DEBUG("\n");
+	      DEBUG_L( "Found allocaion: \n");
+	      DEBUG_A( "  Reorg: ");
+	      DEBUG_F( print_reorg, stderr, 0, ri);
+	      DEBUG("\n");
 	      // TBD this needs to increment with the execution count
 	      // instead of one. I hope the build-in block count estimation
 	      // will work or a DIY solution might be called for.
-	      ri->instance_interleave.numbOfDynmAllocs++;
+	      
+	      //ri->instance_interleave.numbOfDynmAllocs++;
+	      
+	      ri->instance_interleave.numbOfDynmAllocs +=
+		number_of_executions ( stmt, node);
+	      
 	    }
 	  }
 	}
@@ -485,7 +492,64 @@ reorg_analysis ( Info *info)
   return !info->reorg_type->empty ();
 }
 
-void
+// This will be imprecise in that it return 1 or many
+// and any number greaater than one is totally imprecise.
+static unsigned
+number_of_executions ( gimple *stmt,
+		       struct cgraph_node *node)
+{
+  basic_block bb = stmt->bb;
+  DEBUG_A("number_of_executions <bb %d> stmt: ", bb->index);
+  DEBUG_F(print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+
+  // Check for in loop
+  if ( bb->loop_father != NULL && bb->loop_father->latch->index != 1 )
+    {
+      DEBUG_A("In a loop (loop latch <bb %d>, returns 2\n", bb->loop_father->latch->index);
+      return 2;
+    }
+  struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
+  
+  // Check for recursive
+  // TBD Note, recusion detection might be moot since
+  // it implies more than on caller (see below where
+  // that's detected.)
+  //if ( funs->find ( function) != funs->end () ) return 2;
+  //funs->insert ( function);
+  
+  // Check for main (which shouldn't be called)
+  struct cgraph_edge *edge = node->get_edge ( stmt);
+  if ( node->callers == NULL )
+    {
+      DEBUG_A("In main, returns 1\n");
+      return 1;
+    }
+  else
+    {
+      // Check for multiple callers
+      if ( node->callers->next_caller != NULL )
+	{
+	  DEBUG_A("Has multiple callers, returns 2\n");
+	  return 2;
+	}
+      // Check single caller for multiple call sites
+      //if ( edge->prev_caller != NULL || edge->next_caller != NULL )
+      if ( node->callers->prev_caller != NULL ||
+	   node->callers->next_caller != NULL    )
+	{
+	  DEBUG_A("Single caller has multiple call sites, returns 2\n");
+	  return 2;
+	}
+      // walk up the call chain
+      gimple *call_stmt = static_cast <gimple *> (node->callers->call_stmt);
+      DEBUG_A("Walk up the call chain, e->call_stmt: ");
+      DEBUG_F(print_gimple_stmt, stderr, call_stmt, TDF_DETAILS);
+      //return number_of_executions ( call_stmt, edge->caller);
+      return number_of_executions ( call_stmt, node->callers->caller);
+    }
+}
+
+static void
 reorg_analysis_debug ( Info *info, ReorgType *reorg )
 {
   if ( info->show_delete )
