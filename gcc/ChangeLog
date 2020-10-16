@@ -1,3 +1,736 @@
+2020-10-15  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-10-15  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/97295
+	* profile-count.c (profile_count::to_frequency): Move part of
+	gcc_assert to STATIC_ASSERT.
+	* regs.h (REG_FREQ_FROM_BB): Do not use count.to_frequency for
+	a function that does not have count_max initialized.
+
+2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (neoversen2_tunings): Define.
+	* config/aarch64/aarch64-cores.def (neoverse-n2): Use it.
+
+2020-10-13  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2020-09-30  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/97251
+	* config/arm/arm.md (movsf): Relax TARGET_HARD_FLOAT to
+	TARGET_VFP_BASE.
+	(movdf): Likewise.
+	* config/arm/vfp.md (no_literal_pool_df_immediate): Likewise.
+	(no_literal_pool_sf_immediate): Likewise.
+
+2020-10-13  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-09-25  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/arm/arm-protos.h (arm_mve_mode_and_operands_type_check):
+	Delete.
+	* config/arm/arm.c (arm_coproc_mem_operand_wb): Use a scale factor
+	of 2 rather than 4 for 16-bit modes.
+	(arm_mve_mode_and_operands_type_check): Delete.
+	* config/arm/constraints.md (Uj): Allow writeback for Neon,
+	but continue to disallow it for MVE.
+	* config/arm/arm.md (*arm32_mov<HFBF:mode>): Add !TARGET_HAVE_MVE.
+	* config/arm/vfp.md (*mov_load_vfp_hf16, *mov_store_vfp_hf16): Fold
+	back into...
+	(*mov<mode>_vfp_<mode>16): ...here but use Uj for the FPR memory
+	constraints.  Use for base MVE too.
+
+2020-10-12  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-10-12  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/97349
+	* config/aarch64/arm_neon.h (vdupq_n_p8, vdupq_n_p16,
+	vdupq_n_p64, vdupq_n_s8, vdupq_n_s16, vdupq_n_u8, vdupq_n_u16):
+	Fix argument type.
+
+2020-10-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97357
+	* tree-ssa-loop-split.c (ssa_semi_invariant_p): Abnormal
+	SSA names are not semi invariant.
+
+2020-10-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97255
+	* tree-vect-patterns.c (vect_recog_bool_pattern): Also handle
+	VIEW_CONVERT_EXPR.
+
+2020-10-09  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/97313
+	* lra-constraints.c (match_reload): Don't keep strict_low_part in
+	reloads for non-registers.
+
+2020-10-08  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/95189
+	PR middle-end/95886
+	* builtins.c (inline_expand_builtin_string_cmp): Rename...
+	(inline_expand_builtin_bytecmp): ...to this.
+	(builtin_memcpy_read_str): Don't expect data to be nul-terminated.
+	(expand_builtin_memory_copy_args): Handle object representations
+	with embedded nul bytes.
+	(expand_builtin_memcmp): Same.
+	(expand_builtin_strcmp): Adjust call to naming change.
+	(expand_builtin_strncmp): Same.
+	* expr.c (string_constant): Create empty strings with nonzero size.
+	* fold-const.c (c_getstr): Rename locals and update comments.
+	* tree.c (build_string): Accept null pointer argument.
+	(build_string_literal): Same.
+	* tree.h (build_string): Provide a default.
+	(build_string_literal): Same.
+
+2020-10-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-30  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/97150
+	* config/aarch64/arm_neon.h (vqrshlb_u8): Make second argument
+	signed.
+	(vqrshlh_u16): Likewise.
+	(vqrshls_u32): Likewise.
+	(vqrshld_u64): Likewise.
+	(vqshlb_u8): Likewise.
+	(vqshlh_u16): Likewise.
+	(vqshls_u32): Likewise.
+	(vqshld_u64): Likewise.
+	(vshld_u64): Likewise.
+
+2020-10-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-09-30  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/96313
+	* config/aarch64/aarch64-simd-builtins.def (sqmovun): Use UNOPUS
+	qualifiers.
+	* config/aarch64/arm_neon.h (vqmovun_s16): Adjust builtin call.
+	Remove unnecessary result cast.
+	(vqmovun_s32): Likewise.
+	(vqmovun_s64): Likewise.
+	(vqmovunh_s16): Likewise.  Fix return type.
+	(vqmovuns_s32): Likewise.
+	(vqmovund_s64): Likewise.
+
+2020-10-08  Alan Modra  <amodra@gmail.com>
+
+	Backported from master:
+	2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/rs6000.c (rs6000_legitimize_address): Use
+	gen_int_mode for high part of address constant.
+
+2020-10-06  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2020-10-06  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	* config/arm/iterators.md (MVE_types): Move mode iterator from mve.md to
+	iterators.md.
+	(MVE_VLD_ST): Likewise.
+	(MVE_0): Likewise.
+	(MVE_1): Likewise.
+	(MVE_3): Likewise.
+	(MVE_2): Likewise.
+	(MVE_5): Likewise.
+	(MVE_6): Likewise.
+	(MVE_CNVT): Move mode attribute iterator from mve.md to iterators.md.
+	(MVE_LANES): Likewise.
+	(MVE_constraint): Likewise.
+	(MVE_constraint1): Likewise.
+	(MVE_constraint2): Likewise.
+	(MVE_constraint3): Likewise.
+	(MVE_pred): Likewise.
+	(MVE_pred1): Likewise.
+	(MVE_pred2): Likewise.
+	(MVE_pred3): Likewise.
+	(MVE_B_ELEM): Likewise.
+	(MVE_H_ELEM): Likewise.
+	(V_sz_elem1): Likewise.
+	(V_extr_elem): Likewise.
+	(earlyclobber_32): Likewise.
+	(supf): Move int attribute from mve.md to iterators.md.
+	(mode1): Likewise.
+	(VCVTQ_TO_F): Move int iterator from mve.md to iterators.md.
+	(VMVNQ_N): Likewise.
+	(VREV64Q): Likewise.
+	(VCVTQ_FROM_F): Likewise.
+	(VREV16Q): Likewise.
+	(VCVTAQ): Likewise.
+	(VMVNQ): Likewise.
+	(VDUPQ_N): Likewise.
+	(VCLZQ): Likewise.
+	(VADDVQ): Likewise.
+	(VREV32Q): Likewise.
+	(VMOVLBQ): Likewise.
+	(VMOVLTQ): Likewise.
+	(VCVTPQ): Likewise.
+	(VCVTNQ): Likewise.
+	(VCVTMQ): Likewise.
+	(VADDLVQ): Likewise.
+	(VCTPQ): Likewise.
+	(VCTPQ_M): Likewise.
+	(VCVTQ_N_TO_F): Likewise.
+	(VCREATEQ): Likewise.
+	(VSHRQ_N): Likewise.
+	(VCVTQ_N_FROM_F): Likewise.
+	(VADDLVQ_P): Likewise.
+	(VCMPNEQ): Likewise.
+	(VSHLQ): Likewise.
+	(VABDQ): Likewise.
+	(VADDQ_N): Likewise.
+	(VADDVAQ): Likewise.
+	(VADDVQ_P): Likewise.
+	(VANDQ): Likewise.
+	(VBICQ): Likewise.
+	(VBRSRQ_N): Likewise.
+	(VCADDQ_ROT270): Likewise.
+	(VCADDQ_ROT90): Likewise.
+	(VCMPEQQ): Likewise.
+	(VCMPEQQ_N): Likewise.
+	(VCMPNEQ_N): Likewise.
+	(VEORQ): Likewise.
+	(VHADDQ): Likewise.
+	(VHADDQ_N): Likewise.
+	(VHSUBQ): Likewise.
+	(VHSUBQ_N): Likewise.
+	(VMAXQ): Likewise.
+	(VMAXVQ): Likewise.
+	(VMINQ): Likewise.
+	(VMINVQ): Likewise.
+	(VMLADAVQ): Likewise.
+	(VMULHQ): Likewise.
+	(VMULLBQ_INT): Likewise.
+	(VMULLTQ_INT): Likewise.
+	(VMULQ): Likewise.
+	(VMULQ_N): Likewise.
+	(VORNQ): Likewise.
+	(VORRQ): Likewise.
+	(VQADDQ): Likewise.
+	(VQADDQ_N): Likewise.
+	(VQRSHLQ): Likewise.
+	(VQRSHLQ_N): Likewise.
+	(VQSHLQ): Likewise.
+	(VQSHLQ_N): Likewise.
+	(VQSHLQ_R): Likewise.
+	(VQSUBQ): Likewise.
+	(VQSUBQ_N): Likewise.
+	(VRHADDQ): Likewise.
+	(VRMULHQ): Likewise.
+	(VRSHLQ): Likewise.
+	(VRSHLQ_N): Likewise.
+	(VRSHRQ_N): Likewise.
+	(VSHLQ_N): Likewise.
+	(VSHLQ_R): Likewise.
+	(VSUBQ): Likewise.
+	(VSUBQ_N): Likewise.
+	(VADDLVAQ): Likewise.
+	(VBICQ_N): Likewise.
+	(VMLALDAVQ): Likewise.
+	(VMLALDAVXQ): Likewise.
+	(VMOVNBQ): Likewise.
+	(VMOVNTQ): Likewise.
+	(VORRQ_N): Likewise.
+	(VQMOVNBQ): Likewise.
+	(VQMOVNTQ): Likewise.
+	(VSHLLBQ_N): Likewise.
+	(VSHLLTQ_N): Likewise.
+	(VRMLALDAVHQ): Likewise.
+	(VBICQ_M_N): Likewise.
+	(VCVTAQ_M): Likewise.
+	(VCVTQ_M_TO_F): Likewise.
+	(VQRSHRNBQ_N): Likewise.
+	(VABAVQ): Likewise.
+	(VSHLCQ): Likewise.
+	(VRMLALDAVHAQ): Likewise.
+	(VADDVAQ_P): Likewise.
+	(VCLZQ_M): Likewise.
+	(VCMPEQQ_M_N): Likewise.
+	(VCMPEQQ_M): Likewise.
+	(VCMPNEQ_M_N): Likewise.
+	(VCMPNEQ_M): Likewise.
+	(VDUPQ_M_N): Likewise.
+	(VMAXVQ_P): Likewise.
+	(VMINVQ_P): Likewise.
+	(VMLADAVAQ): Likewise.
+	(VMLADAVQ_P): Likewise.
+	(VMLAQ_N): Likewise.
+	(VMLASQ_N): Likewise.
+	(VMVNQ_M): Likewise.
+	(VPSELQ): Likewise.
+	(VQDMLAHQ_N): Likewise.
+	(VQRDMLAHQ_N): Likewise.
+	(VQRDMLASHQ_N): Likewise.
+	(VQRSHLQ_M_N): Likewise.
+	(VQSHLQ_M_R): Likewise.
+	(VREV64Q_M): Likewise.
+	(VRSHLQ_M_N): Likewise.
+	(VSHLQ_M_R): Likewise.
+	(VSLIQ_N): Likewise.
+	(VSRIQ_N): Likewise.
+	(VMLALDAVQ_P): Likewise.
+	(VQMOVNBQ_M): Likewise.
+	(VMOVLTQ_M): Likewise.
+	(VMOVNBQ_M): Likewise.
+	(VRSHRNTQ_N): Likewise.
+	(VORRQ_M_N): Likewise.
+	(VREV32Q_M): Likewise.
+	(VREV16Q_M): Likewise.
+	(VQRSHRNTQ_N): Likewise.
+	(VMOVNTQ_M): Likewise.
+	(VMOVLBQ_M): Likewise.
+	(VMLALDAVAQ): Likewise.
+	(VQSHRNBQ_N): Likewise.
+	(VSHRNBQ_N): Likewise.
+	(VRSHRNBQ_N): Likewise.
+	(VMLALDAVXQ_P): Likewise.
+	(VQMOVNTQ_M): Likewise.
+	(VMVNQ_M_N): Likewise.
+	(VQSHRNTQ_N): Likewise.
+	(VMLALDAVAXQ): Likewise.
+	(VSHRNTQ_N): Likewise.
+	(VCVTMQ_M): Likewise.
+	(VCVTNQ_M): Likewise.
+	(VCVTPQ_M): Likewise.
+	(VCVTQ_M_N_FROM_F): Likewise.
+	(VCVTQ_M_FROM_F): Likewise.
+	(VRMLALDAVHQ_P): Likewise.
+	(VADDLVAQ_P): Likewise.
+	(VABAVQ_P): Likewise.
+	(VSHLQ_M): Likewise.
+	(VSRIQ_M_N): Likewise.
+	(VSUBQ_M): Likewise.
+	(VCVTQ_M_N_TO_F): Likewise.
+	(VHSUBQ_M): Likewise.
+	(VSLIQ_M_N): Likewise.
+	(VRSHLQ_M): Likewise.
+	(VMINQ_M): Likewise.
+	(VMULLBQ_INT_M): Likewise.
+	(VMULHQ_M): Likewise.
+	(VMULQ_M): Likewise.
+	(VHSUBQ_M_N): Likewise.
+	(VHADDQ_M_N): Likewise.
+	(VORRQ_M): Likewise.
+	(VRMULHQ_M): Likewise.
+	(VQADDQ_M): Likewise.
+	(VRSHRQ_M_N): Likewise.
+	(VQSUBQ_M_N): Likewise.
+	(VADDQ_M): Likewise.
+	(VORNQ_M): Likewise.
+	(VRHADDQ_M): Likewise.
+	(VQSHLQ_M): Likewise.
+	(VANDQ_M): Likewise.
+	(VBICQ_M): Likewise.
+	(VSHLQ_M_N): Likewise.
+	(VCADDQ_ROT270_M): Likewise.
+	(VQRSHLQ_M): Likewise.
+	(VQADDQ_M_N): Likewise.
+	(VADDQ_M_N): Likewise.
+	(VMAXQ_M): Likewise.
+	(VQSUBQ_M): Likewise.
+	(VMLASQ_M_N): Likewise.
+	(VMLADAVAQ_P): Likewise.
+	(VBRSRQ_M_N): Likewise.
+	(VMULQ_M_N): Likewise.
+	(VCADDQ_ROT90_M): Likewise.
+	(VMULLTQ_INT_M): Likewise.
+	(VEORQ_M): Likewise.
+	(VSHRQ_M_N): Likewise.
+	(VSUBQ_M_N): Likewise.
+	(VHADDQ_M): Likewise.
+	(VABDQ_M): Likewise.
+	(VMLAQ_M_N): Likewise.
+	(VQSHLQ_M_N): Likewise.
+	(VMLALDAVAQ_P): Likewise.
+	(VMLALDAVAXQ_P): Likewise.
+	(VQRSHRNBQ_M_N): Likewise.
+	(VQRSHRNTQ_M_N): Likewise.
+	(VQSHRNBQ_M_N): Likewise.
+	(VQSHRNTQ_M_N): Likewise.
+	(VRSHRNBQ_M_N): Likewise.
+	(VRSHRNTQ_M_N): Likewise.
+	(VSHLLBQ_M_N): Likewise.
+	(VSHLLTQ_M_N): Likewise.
+	(VSHRNBQ_M_N): Likewise.
+	(VSHRNTQ_M_N): Likewise.
+	(VSTRWSBQ): Likewise.
+	(VSTRBSOQ): Likewise.
+	(VSTRBQ): Likewise.
+	(VLDRBGOQ): Likewise.
+	(VLDRBQ): Likewise.
+	(VLDRWGBQ): Likewise.
+	(VLD1Q): Likewise.
+	(VLDRHGOQ): Likewise.
+	(VLDRHGSOQ): Likewise.
+	(VLDRHQ): Likewise.
+	(VLDRWQ): Likewise.
+	(VLDRDGBQ): Likewise.
+	(VLDRDGOQ): Likewise.
+	(VLDRDGSOQ): Likewise.
+	(VLDRWGOQ): Likewise.
+	(VLDRWGSOQ): Likewise.
+	(VST1Q): Likewise.
+	(VSTRHSOQ): Likewise.
+	(VSTRHSSOQ): Likewise.
+	(VSTRHQ): Likewise.
+	(VSTRWQ): Likewise.
+	(VSTRDSBQ): Likewise.
+	(VSTRDSOQ): Likewise.
+	(VSTRDSSOQ): Likewise.
+	(VSTRWSOQ): Likewise.
+	(VSTRWSSOQ): Likewise.
+	(VSTRWSBWBQ): Likewise.
+	(VLDRWGBWBQ): Likewise.
+	(VSTRDSBWBQ): Likewise.
+	(VLDRDGBWBQ): Likewise.
+	(VADCIQ): Likewise.
+	(VADCIQ_M): Likewise.
+	(VSBCQ): Likewise.
+	(VSBCQ_M): Likewise.
+	(VSBCIQ): Likewise.
+	(VSBCIQ_M): Likewise.
+	(VADCQ): Likewise.
+	(VADCQ_M): Likewise.
+	(UQRSHLLQ): Likewise.
+	(SQRSHRLQ): Likewise.
+	(VSHLCQ_M): Likewise.
+	* config/arm/mve.md (MVE_types): Move mode iterator to iterators.md from mve.md.
+	(MVE_VLD_ST): Likewise.
+	(MVE_0): Likewise.
+	(MVE_1): Likewise.
+	(MVE_3): Likewise.
+	(MVE_2): Likewise.
+	(MVE_5): Likewise.
+	(MVE_6): Likewise.
+	(MVE_CNVT): Move mode attribute iterator to iterators.md from mve.md.
+	(MVE_LANES): Likewise.
+	(MVE_constraint): Likewise.
+	(MVE_constraint1): Likewise.
+	(MVE_constraint2): Likewise.
+	(MVE_constraint3): Likewise.
+	(MVE_pred): Likewise.
+	(MVE_pred1): Likewise.
+	(MVE_pred2): Likewise.
+	(MVE_pred3): Likewise.
+	(MVE_B_ELEM): Likewise.
+	(MVE_H_ELEM): Likewise.
+	(V_sz_elem1): Likewise.
+	(V_extr_elem): Likewise.
+	(earlyclobber_32): Likewise.
+	(supf): Move int attribute to iterators.md from mve.md.
+	(mode1): Likewise.
+	(VCVTQ_TO_F): Move int iterator to iterators.md from mve.md.
+	(VMVNQ_N): Likewise.
+	(VREV64Q): Likewise.
+	(VCVTQ_FROM_F): Likewise.
+	(VREV16Q): Likewise.
+	(VCVTAQ): Likewise.
+	(VMVNQ): Likewise.
+	(VDUPQ_N): Likewise.
+	(VCLZQ): Likewise.
+	(VADDVQ): Likewise.
+	(VREV32Q): Likewise.
+	(VMOVLBQ): Likewise.
+	(VMOVLTQ): Likewise.
+	(VCVTPQ): Likewise.
+	(VCVTNQ): Likewise.
+	(VCVTMQ): Likewise.
+	(VADDLVQ): Likewise.
+	(VCTPQ): Likewise.
+	(VCTPQ_M): Likewise.
+	(VCVTQ_N_TO_F): Likewise.
+	(VCREATEQ): Likewise.
+	(VSHRQ_N): Likewise.
+	(VCVTQ_N_FROM_F): Likewise.
+	(VADDLVQ_P): Likewise.
+	(VCMPNEQ): Likewise.
+	(VSHLQ): Likewise.
+	(VABDQ): Likewise.
+	(VADDQ_N): Likewise.
+	(VADDVAQ): Likewise.
+	(VADDVQ_P): Likewise.
+	(VANDQ): Likewise.
+	(VBICQ): Likewise.
+	(VBRSRQ_N): Likewise.
+	(VCADDQ_ROT270): Likewise.
+	(VCADDQ_ROT90): Likewise.
+	(VCMPEQQ): Likewise.
+	(VCMPEQQ_N): Likewise.
+	(VCMPNEQ_N): Likewise.
+	(VEORQ): Likewise.
+	(VHADDQ): Likewise.
+	(VHADDQ_N): Likewise.
+	(VHSUBQ): Likewise.
+	(VHSUBQ_N): Likewise.
+	(VMAXQ): Likewise.
+	(VMAXVQ): Likewise.
+	(VMINQ): Likewise.
+	(VMINVQ): Likewise.
+	(VMLADAVQ): Likewise.
+	(VMULHQ): Likewise.
+	(VMULLBQ_INT): Likewise.
+	(VMULLTQ_INT): Likewise.
+	(VMULQ): Likewise.
+	(VMULQ_N): Likewise.
+	(VORNQ): Likewise.
+	(VORRQ): Likewise.
+	(VQADDQ): Likewise.
+	(VQADDQ_N): Likewise.
+	(VQRSHLQ): Likewise.
+	(VQRSHLQ_N): Likewise.
+	(VQSHLQ): Likewise.
+	(VQSHLQ_N): Likewise.
+	(VQSHLQ_R): Likewise.
+	(VQSUBQ): Likewise.
+	(VQSUBQ_N): Likewise.
+	(VRHADDQ): Likewise.
+	(VRMULHQ): Likewise.
+	(VRSHLQ): Likewise.
+	(VRSHLQ_N): Likewise.
+	(VRSHRQ_N): Likewise.
+	(VSHLQ_N): Likewise.
+	(VSHLQ_R): Likewise.
+	(VSUBQ): Likewise.
+	(VSUBQ_N): Likewise.
+	(VADDLVAQ): Likewise.
+	(VBICQ_N): Likewise.
+	(VMLALDAVQ): Likewise.
+	(VMLALDAVXQ): Likewise.
+	(VMOVNBQ): Likewise.
+	(VMOVNTQ): Likewise.
+	(VORRQ_N): Likewise.
+	(VQMOVNBQ): Likewise.
+	(VQMOVNTQ): Likewise.
+	(VSHLLBQ_N): Likewise.
+	(VSHLLTQ_N): Likewise.
+	(VRMLALDAVHQ): Likewise.
+	(VBICQ_M_N): Likewise.
+	(VCVTAQ_M): Likewise.
+	(VCVTQ_M_TO_F): Likewise.
+	(VQRSHRNBQ_N): Likewise.
+	(VABAVQ): Likewise.
+	(VSHLCQ): Likewise.
+	(VRMLALDAVHAQ): Likewise.
+	(VADDVAQ_P): Likewise.
+	(VCLZQ_M): Likewise.
+	(VCMPEQQ_M_N): Likewise.
+	(VCMPEQQ_M): Likewise.
+	(VCMPNEQ_M_N): Likewise.
+	(VCMPNEQ_M): Likewise.
+	(VDUPQ_M_N): Likewise.
+	(VMAXVQ_P): Likewise.
+	(VMINVQ_P): Likewise.
+	(VMLADAVAQ): Likewise.
+	(VMLADAVQ_P): Likewise.
+	(VMLAQ_N): Likewise.
+	(VMLASQ_N): Likewise.
+	(VMVNQ_M): Likewise.
+	(VPSELQ): Likewise.
+	(VQDMLAHQ_N): Likewise.
+	(VQRDMLAHQ_N): Likewise.
+	(VQRDMLASHQ_N): Likewise.
+	(VQRSHLQ_M_N): Likewise.
+	(VQSHLQ_M_R): Likewise.
+	(VREV64Q_M): Likewise.
+	(VRSHLQ_M_N): Likewise.
+	(VSHLQ_M_R): Likewise.
+	(VSLIQ_N): Likewise.
+	(VSRIQ_N): Likewise.
+	(VMLALDAVQ_P): Likewise.
+	(VQMOVNBQ_M): Likewise.
+	(VMOVLTQ_M): Likewise.
+	(VMOVNBQ_M): Likewise.
+	(VRSHRNTQ_N): Likewise.
+	(VORRQ_M_N): Likewise.
+	(VREV32Q_M): Likewise.
+	(VREV16Q_M): Likewise.
+	(VQRSHRNTQ_N): Likewise.
+	(VMOVNTQ_M): Likewise.
+	(VMOVLBQ_M): Likewise.
+	(VMLALDAVAQ): Likewise.
+	(VQSHRNBQ_N): Likewise.
+	(VSHRNBQ_N): Likewise.
+	(VRSHRNBQ_N): Likewise.
+	(VMLALDAVXQ_P): Likewise.
+	(VQMOVNTQ_M): Likewise.
+	(VMVNQ_M_N): Likewise.
+	(VQSHRNTQ_N): Likewise.
+	(VMLALDAVAXQ): Likewise.
+	(VSHRNTQ_N): Likewise.
+	(VCVTMQ_M): Likewise.
+	(VCVTNQ_M): Likewise.
+	(VCVTPQ_M): Likewise.
+	(VCVTQ_M_N_FROM_F): Likewise.
+	(VCVTQ_M_FROM_F): Likewise.
+	(VRMLALDAVHQ_P): Likewise.
+	(VADDLVAQ_P): Likewise.
+	(VABAVQ_P): Likewise.
+	(VSHLQ_M): Likewise.
+	(VSRIQ_M_N): Likewise.
+	(VSUBQ_M): Likewise.
+	(VCVTQ_M_N_TO_F): Likewise.
+	(VHSUBQ_M): Likewise.
+	(VSLIQ_M_N): Likewise.
+	(VRSHLQ_M): Likewise.
+	(VMINQ_M): Likewise.
+	(VMULLBQ_INT_M): Likewise.
+	(VMULHQ_M): Likewise.
+	(VMULQ_M): Likewise.
+	(VHSUBQ_M_N): Likewise.
+	(VHADDQ_M_N): Likewise.
+	(VORRQ_M): Likewise.
+	(VRMULHQ_M): Likewise.
+	(VQADDQ_M): Likewise.
+	(VRSHRQ_M_N): Likewise.
+	(VQSUBQ_M_N): Likewise.
+	(VADDQ_M): Likewise.
+	(VORNQ_M): Likewise.
+	(VRHADDQ_M): Likewise.
+	(VQSHLQ_M): Likewise.
+	(VANDQ_M): Likewise.
+	(VBICQ_M): Likewise.
+	(VSHLQ_M_N): Likewise.
+	(VCADDQ_ROT270_M): Likewise.
+	(VQRSHLQ_M): Likewise.
+	(VQADDQ_M_N): Likewise.
+	(VADDQ_M_N): Likewise.
+	(VMAXQ_M): Likewise.
+	(VQSUBQ_M): Likewise.
+	(VMLASQ_M_N): Likewise.
+	(VMLADAVAQ_P): Likewise.
+	(VBRSRQ_M_N): Likewise.
+	(VMULQ_M_N): Likewise.
+	(VCADDQ_ROT90_M): Likewise.
+	(VMULLTQ_INT_M): Likewise.
+	(VEORQ_M): Likewise.
+	(VSHRQ_M_N): Likewise.
+	(VSUBQ_M_N): Likewise.
+	(VHADDQ_M): Likewise.
+	(VABDQ_M): Likewise.
+	(VMLAQ_M_N): Likewise.
+	(VQSHLQ_M_N): Likewise.
+	(VMLALDAVAQ_P): Likewise.
+	(VMLALDAVAXQ_P): Likewise.
+	(VQRSHRNBQ_M_N): Likewise.
+	(VQRSHRNTQ_M_N): Likewise.
+	(VQSHRNBQ_M_N): Likewise.
+	(VQSHRNTQ_M_N): Likewise.
+	(VRSHRNBQ_M_N): Likewise.
+	(VRSHRNTQ_M_N): Likewise.
+	(VSHLLBQ_M_N): Likewise.
+	(VSHLLTQ_M_N): Likewise.
+	(VSHRNBQ_M_N): Likewise.
+	(VSHRNTQ_M_N): Likewise.
+	(VSTRWSBQ): Likewise.
+	(VSTRBSOQ): Likewise.
+	(VSTRBQ): Likewise.
+	(VLDRBGOQ): Likewise.
+	(VLDRBQ): Likewise.
+	(VLDRWGBQ): Likewise.
+	(VLD1Q): Likewise.
+	(VLDRHGOQ): Likewise.
+	(VLDRHGSOQ): Likewise.
+	(VLDRHQ): Likewise.
+	(VLDRWQ): Likewise.
+	(VLDRDGBQ): Likewise.
+	(VLDRDGOQ): Likewise.
+	(VLDRDGSOQ): Likewise.
+	(VLDRWGOQ): Likewise.
+	(VLDRWGSOQ): Likewise.
+	(VST1Q): Likewise.
+	(VSTRHSOQ): Likewise.
+	(VSTRHSSOQ): Likewise.
+	(VSTRHQ): Likewise.
+	(VSTRWQ): Likewise.
+	(VSTRDSBQ): Likewise.
+	(VSTRDSOQ): Likewise.
+	(VSTRDSSOQ): Likewise.
+	(VSTRWSOQ): Likewise.
+	(VSTRWSSOQ): Likewise.
+	(VSTRWSBWBQ): Likewise.
+	(VLDRWGBWBQ): Likewise.
+	(VSTRDSBWBQ): Likewise.
+	(VLDRDGBWBQ): Likewise.
+	(VADCIQ): Likewise.
+	(VADCIQ_M): Likewise.
+	(VSBCQ): Likewise.
+	(VSBCQ_M): Likewise.
+	(VSBCIQ): Likewise.
+	(VSBCIQ_M): Likewise.
+	(VADCQ): Likewise.
+	(VADCQ_M): Likewise.
+	(UQRSHLLQ): Likewise.
+	(SQRSHRLQ): Likewise.
+	(VSHLCQ_M): Likewise.
+	(define_c_enum "unspec"): Move MVE enumerator to unspecs.md from mve.md.
+	* config/arm/unspecs.md (define_c_enum "unspec"): Move MVE enumerator from
+	mve.md to unspecs.md.
+
+2020-10-06  Joe Ramsay  <Joe.Ramsay@arm.com>
+
+	Backported from master:
+	2020-10-02  Joe Ramsay  <joe.ramsay@arm.com>
+
+	* config/arm/arm_mve.h (__arm_vmaxnmavq): Remove coercion of scalar
+	argument.
+	(__arm_vmaxnmvq): Likewise.
+	(__arm_vminnmavq): Likewise.
+	(__arm_vminnmvq): Likewise.
+	(__arm_vmaxnmavq_p): Likewise.
+	(__arm_vmaxnmvq_p): Likewise (and delete duplicate definition).
+	(__arm_vminnmavq_p): Likewise.
+	(__arm_vminnmvq_p): Likewise.
+	(__arm_vmaxavq): Likewise.
+	(__arm_vmaxavq_p): Likewise.
+	(__arm_vmaxvq): Likewise.
+	(__arm_vmaxvq_p): Likewise.
+	(__arm_vminavq): Likewise.
+	(__arm_vminavq_p): Likewise.
+	(__arm_vminvq): Likewise.
+	(__arm_vminvq_p): Likewise.
+
+2020-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97236
+	* tree-vect-stmts.c (get_group_load_store_type): Keep
+	VMAT_ELEMENTWISE for single-element vectors.
+
+2020-10-06  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backported from master:
+	2020-10-06  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* doc/invoke.texi: Add z15/arch13 to the list of documented
+	-march/-mtune options.
+
+2020-10-06  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backported from master:
+	2020-08-12  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR target/96456
+	* config/s390/s390.h (TARGET_NONSIGNALING_VECTOR_COMPARE_OK): New
+	macro.
+	* config/s390/vector.md (vcond_comparison_operator): Use new macro
+	for the check.
+
+2020-10-05  Alex Coplan  <alex.coplan@arm.com>
+
+	* config/arm/arm-cpus.in (neoverse-v1): Add missing vendor and
+	part numbers.
+
 2020-10-02  Alex Coplan  <alex.coplan@arm.com>
 
 	* config/arm/arm-cpus.in (neoverse-n2): New.

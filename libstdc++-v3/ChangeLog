@@ -1,3 +1,54 @@
+2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/concepts: Fix typos in copyright notice.
+	* include/std/ranges: Likewise.
+
+2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2020.xml: Remove red background for
+	completed feature.
+	* doc/html/manual/status.html: Regenerate.
+
+2020-10-13  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95788
+	* include/bits/ranges_uninitialized.h:
+	(__construct_at_fn::operator()): Rewrite in terms of
+	std::construct_at.  Declare it conditionally noexcept.  Qualify
+	calls to declval in its requires-clause.
+	* testsuite/20_util/specialized_algorithms/construct_at/95788.cc:
+	New test.
+
+2020-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/random.h (seed_seq(initializer_list<T>)): Rename
+	parameter to use reserved name.
+	* include/bits/ranges_algo.h (shift_left, shift_right): Rename
+	template parameters to use reserved name.
+	* testsuite/17_intro/names.cc: Check "il". Do not check "d" and
+	"y" in C++20 mode.
+
+2020-10-06  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-02  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_iterator.h (reverse_iterator::iter_move):
+	Define for C++20 as per P0896.
+	(reverse_iterator::iter_swap): Likewise.
+	(move_iterator::operator*): Apply P0896 changes for C++20.
+	(move_iterator::operator[]): Likewise.
+	* testsuite/24_iterators/reverse_iterator/cust.cc: New test.
+
 2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:
