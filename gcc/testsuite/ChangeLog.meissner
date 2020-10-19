@@ -1,3 +1,9 @@
+work021.patch003:
+2020-10-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
 work021.patch002:
 2020-10-19  Michael Meissner  <meissner@linux.ibm.com>
 
