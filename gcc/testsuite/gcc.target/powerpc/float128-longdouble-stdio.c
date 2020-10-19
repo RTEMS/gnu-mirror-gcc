@@ -1,0 +1,37 @@
+/* { dg-require-effective-target ppc_float128_hw } */
+/* { dg-require-effective-target power10_ok } */
+/* { dg-options "-mdejagnu-cpu=power9 -mno-pcrel -O2 -Wno-psabi -mabi=ieeelongdouble" } */
+
+/* Test if switching long double to IEEE 128-bit maps the printf and scanf
+   function names correctly.  We explicitly turn off PC-relative support to
+   make it simpler to compare the call without having a @notoc qualifier.  */
+
+#include <stdlib.h>
+
+volatile long double x = 1.0L;
+volatile long double y, z;
+
+int
+main (void)
+{
+  char buffer[100];
+
+  /* { dg-final { scan-assembler {\m__sprintfieee128\M} } }  */
+  __builtin_sprintf (buffer, "%Lg", x);
+
+  /* { dg-final { scan-assembler {\m__printfieee128\M} } }  */
+  __builtin_printf ("x is %Lg [%s]\n", x, buffer);
+
+  /* { dg-final { scan-assembler {\m__isoc99sscanfieee128\M} } }  */
+  __builtin_sscanf (buffer, "%Lg", &y);
+
+  __builtin_printf ("Type 1.0: ");
+
+  /* { dg-final { scan-assembler {\m__isoc99scanfieee128\M} } }  */
+  __builtin_scanf ("%Lg", &z);
+
+  if (x != y || x != z)
+    abort ();
+
+  return 0;
+}
