@@ -4181,16 +4181,15 @@ rs6000_option_override_internal (bool global_init_p)
 
       if (!warned_minimum_system_long_double)
 	{
-	  if (BYTES_BIG_ENDIAN || !TARGET_POWERPC64)
+	  if (BYTES_BIG_ENDIAN || !TARGET_POWERPC64 || !OPTION_GLIBC)
 	    {
 	      warned_minimum_system_long_double = true;
 	      warning (OPT_Wpsabi,
 		       "IEEE 128-bit %<long double%> is only supported on "
-		       "little-endian 64-bit PowerPC systems");
+		       "little-endian 64-bit GLIBC PowerPC systems");
 	    }
 
-	  else if (TARGET_GLIBC_MAJOR < 2
-		   || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR < 32))
+	  else if (((TARGET_GLIBC_MAJOR * 1000) + TARGET_GLIBC_MINOR) < 2032)
 	    {
 	      warned_minimum_system_long_double = true;
 	      warning (OPT_Wpsabi,
