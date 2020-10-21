@@ -75,10 +75,8 @@ $(fp128_obj)		 : $(fp128_includes)
 $(fp128_obj)		 : $(srcdir)/config/rs6000/quad-float128.h
 
 
-# If we are switching the default long double type, we need to use
-# -mno-gnu-attribute so that the __ibm128 support functions don't signal a
-# linker error since the default long double is now IEEE 128-bit instead of IBM
-# 128-bit.
+# Turn off gnu attributes to allow using the IBM extended double support for
+# __ibm128 if long double uses the IEEE 128-bit representation.
 ibm-ldouble$(objext)	: INTERNAL_CFLAGS += -mno-gnu-attribute
 
 # Similarly for the decimal routines, compile with long double == IBM 128-bit,
