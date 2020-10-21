@@ -376,6 +376,174 @@
   vd __builtin_vec_doubleo (vf);
     DOUBLEO_V4SF
 
+[VEC_DST, vec_dst, __builtin_vec_dst]
+  void __builtin_vec_dst (unsigned char *, const int, const int);
+    DST  DST_UC
+  void __builtin_vec_dst (signed char *, const int, const int);
+    DST  DST_SC
+  void __builtin_vec_dst (unsigned short *, const int, const int);
+    DST  DST_US
+  void __builtin_vec_dst (signed short *, const int, const int);
+    DST  DST_SS
+  void __builtin_vec_dst (unsigned int *, const int, const int);
+    DST  DST_UI
+  void __builtin_vec_dst (signed int *, const int, const int);
+    DST  DST_SI
+  void __builtin_vec_dst (unsigned long long *, const int, const int);
+    DST  DST_ULL
+  void __builtin_vec_dst (signed long long *, const int, const int);
+    DST  DST_SLL
+  void __builtin_vec_dst (float *, const int, const int);
+    DST  DST_F
+  void __builtin_vec_dst (vuc *, const int, const int);
+    DST  DST_VUC
+  void __builtin_vec_dst (vsc *, const int, const int);
+    DST  DST_VSC
+  void __builtin_vec_dst (vbc *, const int, const int);
+    DST  DST_VBC
+  void __builtin_vec_dst (vus *, const int, const int);
+    DST  DST_VUS
+  void __builtin_vec_dst (vss *, const int, const int);
+    DST  DST_VSS
+  void __builtin_vec_dst (vbs *, const int, const int);
+    DST  DST_VBS
+  void __builtin_vec_dst (vp *, const int, const int);
+    DST  DST_VP
+  void __builtin_vec_dst (vui *, const int, const int);
+    DST  DST_VUI
+  void __builtin_vec_dst (vsi *, const int, const int);
+    DST  DST_VSI
+  void __builtin_vec_dst (vbi *, const int, const int);
+    DST  DST_VBI
+  void __builtin_vec_dst (vf *, const int, const int);
+    DST  DST_VF
+
+[VEC_DSTST, vec_dstst, __builtin_vec_dstst]
+  void __builtin_vec_dstst (unsigned char *, const int, const int);
+    DSTST  DSTST_UC
+  void __builtin_vec_dstst (signed char *, const int, const int);
+    DSTST  DSTST_SC
+  void __builtin_vec_dstst (unsigned short *, const int, const int);
+    DSTST  DSTST_US
+  void __builtin_vec_dstst (signed short *, const int, const int);
+    DSTST  DSTST_SS
+  void __builtin_vec_dstst (unsigned int *, const int, const int);
+    DSTST  DSTST_UI
+  void __builtin_vec_dstst (signed int *, const int, const int);
+    DSTST  DSTST_SI
+  void __builtin_vec_dstst (unsigned long long *, const int, const int);
+    DSTST  DSTST_ULL
+  void __builtin_vec_dstst (signed long long *, const int, const int);
+    DSTST  DSTST_SLL
+  void __builtin_vec_dstst (float *, const int, const int);
+    DSTST  DSTST_F
+  void __builtin_vec_dstst (vuc *, const int, const int);
+    DSTST  DSTST_VUC
+  void __builtin_vec_dstst (vsc *, const int, const int);
+    DSTST  DSTST_VSC
+  void __builtin_vec_dstst (vbc *, const int, const int);
+    DSTST  DSTST_VBC
+  void __builtin_vec_dstst (vus *, const int, const int);
+    DSTST  DSTST_VUS
+  void __builtin_vec_dstst (vss *, const int, const int);
+    DSTST  DSTST_VSS
+  void __builtin_vec_dstst (vbs *, const int, const int);
+    DSTST  DSTST_VBS
+  void __builtin_vec_dstst (vp *, const int, const int);
+    DSTST  DSTST_VP
+  void __builtin_vec_dstst (vui *, const int, const int);
+    DSTST  DSTST_VUI
+  void __builtin_vec_dstst (vsi *, const int, const int);
+    DSTST  DSTST_VSI
+  void __builtin_vec_dstst (vbi *, const int, const int);
+    DSTST  DSTST_VBI
+  void __builtin_vec_dstst (vf *, const int, const int);
+    DSTST  DSTST_VF
+
+[VEC_DSTSTT, vec_dststt, __builtin_vec_dststt]
+  void __builtin_vec_dststt (unsigned char *, const int, const int);
+    DSTSTT  DSTSTT_UC
+  void __builtin_vec_dststt (signed char *, const int, const int);
+    DSTSTT  DSTSTT_SC
+  void __builtin_vec_dststt (unsigned short *, const int, const int);
+    DSTSTT  DSTSTT_US
+  void __builtin_vec_dststt (signed short *, const int, const int);
+    DSTSTT  DSTSTT_SS
+  void __builtin_vec_dststt (unsigned int *, const int, const int);
+    DSTSTT  DSTSTT_UI
+  void __builtin_vec_dststt (signed int *, const int, const int);
+    DSTSTT  DSTSTT_SI
+  void __builtin_vec_dststt (unsigned long long *, const int, const int);
+    DSTSTT  DSTSTT_ULL
+  void __builtin_vec_dststt (signed long long *, const int, const int);
+    DSTSTT  DSTSTT_SLL
+  void __builtin_vec_dststt (float *, const int, const int);
+    DSTSTT  DSTSTT_F
+  void __builtin_vec_dststt (vuc *, const int, const int);
+    DSTSTT  DSTSTT_VUC
+  void __builtin_vec_dststt (vsc *, const int, const int);
+    DSTSTT  DSTSTT_VSC
+  void __builtin_vec_dststt (vbc *, const int, const int);
+    DSTSTT  DSTSTT_VBC
+  void __builtin_vec_dststt (vus *, const int, const int);
+    DSTSTT  DSTSTT_VUS
+  void __builtin_vec_dststt (vss *, const int, const int);
+    DSTSTT  DSTSTT_VSS
+  void __builtin_vec_dststt (vbs *, const int, const int);
+    DSTSTT  DSTSTT_VBS
+  void __builtin_vec_dststt (vp *, const int, const int);
+    DSTSTT  DSTSTT_VP
+  void __builtin_vec_dststt (vui *, const int, const int);
+    DSTSTT  DSTSTT_VUI
+  void __builtin_vec_dststt (vsi *, const int, const int);
+    DSTSTT  DSTSTT_VSI
+  void __builtin_vec_dststt (vbi *, const int, const int);
+    DSTSTT  DSTSTT_VBI
+  void __builtin_vec_dststt (vf *, const int, const int);
+    DSTSTT  DSTSTT_VF
+
+[VEC_DSTT, vec_dstt, __builtin_vec_dstt]
+  void __builtin_vec_dstt (unsigned char *, const int, const int);
+    DSTT  DSTT_UC
+  void __builtin_vec_dstt (signed char *, const int, const int);
+    DSTT  DSTT_SC
+  void __builtin_vec_dstt (unsigned short *, const int, const int);
+    DSTT  DSTT_US
+  void __builtin_vec_dstt (signed short *, const int, const int);
+    DSTT  DSTT_SS
+  void __builtin_vec_dstt (unsigned int *, const int, const int);
+    DSTT  DSTT_UI
+  void __builtin_vec_dstt (signed int *, const int, const int);
+    DSTT  DSTT_SI
+  void __builtin_vec_dstt (unsigned long long *, const int, const int);
+    DSTT  DSTT_ULL
+  void __builtin_vec_dstt (signed long long *, const int, const int);
+    DSTT  DSTT_SLL
+  void __builtin_vec_dstt (float *, const int, const int);
+    DSTT  DSTT_F
+  void __builtin_vec_dstt (vuc *, const int, const int);
+    DSTT  DSTT_VUC
+  void __builtin_vec_dstt (vsc *, const int, const int);
+    DSTT  DSTT_VSC
+  void __builtin_vec_dstt (vbc *, const int, const int);
+    DSTT  DSTT_VBC
+  void __builtin_vec_dstt (vus *, const int, const int);
+    DSTT  DSTT_VUS
+  void __builtin_vec_dstt (vss *, const int, const int);
+    DSTT  DSTT_VSS
+  void __builtin_vec_dstt (vbs *, const int, const int);
+    DSTT  DSTT_VBS
+  void __builtin_vec_dstt (vp *, const int, const int);
+    DSTT  DSTT_VP
+  void __builtin_vec_dstt (vui *, const int, const int);
+    DSTT  DSTT_VUI
+  void __builtin_vec_dstt (vsi *, const int, const int);
+    DSTT  DSTT_VSI
+  void __builtin_vec_dstt (vbi *, const int, const int);
+    DSTT  DSTT_VBI
+  void __builtin_vec_dstt (vf *, const int, const int);
+    DSTT  DSTT_VF
+
 [VEC_EXPTE, vec_expte, __builtin_vec_expte]
   vf __builtin_vec_expte (vf);
     VEXPTEFP
@@ -776,6 +944,24 @@
   vuc __builtin_vec_lvsr (signed long long, signed char *);
     LVSR  LVSR_SC
 
+[VEC_MADD, vec_madd, __builtin_vec_madd]
+  vss __builtin_vec_madd (vss, vss, vss);
+    VMLADDUHM  VMLADDUHM_VSS
+  vss __builtin_vec_madd (vss, vus, vus);
+    VMLADDUHM  VMLADDUHM_VSSVUS
+  vss __builtin_vec_madd (vus, vss, vss);
+    VMLADDUHM  VMLADDUHM_VUSVSS
+  vus __builtin_vec_madd (vss, vus, vus);
+    VMLADDUHM  VMLADDUHM_VUS
+  vf __builtin_vec_madd (vf, vf, vf);
+    XVMADDSP
+  vd __builtin_vec_madd (vd, vd, vd);
+    XVMADDDP
+
+[VEC_MADDS, vec_madds, __builtin_vec_madds]
+  vss __builtin_vec_madds (vss, vss, vss);
+    VMHADDSHS
+
 [VEC_MAX, vec_max, __builtin_vec_max]
   vsc __builtin_vec_max (vsc, vsc);
     VMAXSB
@@ -884,6 +1070,46 @@
   vd __builtin_vec_min (vd, vd);
     XVMINDP
 
+[VEC_MLADD, vec_mladd, __builtin_vec_mladd]
+  vss __builtin_vec_mladd (vss, vss, vss);
+    VMLADDUHM  VMLADDUHM_VSS2
+  vss __builtin_vec_mladd (vss, vus, vus);
+    VMLADDUHM  VMLADDUHM_VSSVUS2
+  vss __builtin_vec_mladd (vus, vss, vss);
+    VMLADDUHM  VMLADDUHM_VUSVSS2
+  vus __builtin_vec_mladd (vus, vus, vus);
+    VMLADDUHM  VMLADDUHM_VUS2
+
+[VEC_MRADDS, vec_mradds, __builtin_vec_mradds]
+  vss __builtin_vec_mradds (vss, vss, vss);
+    VMHRADDSHS
+
+[VEC_MSUB, vec_msub, __builtin_vec_msub]
+  vf __builtin_vec_msub (vf, vf, vf);
+    XVMSUBSP
+  vd __builtin_vec_msub (vd, vd, vd);
+    XVMSUBDP
+
+[VEC_MSUM, vec_msum, __builtin_vec_msum]
+  vui __builtin_vec_msum (vuc, vuc, vui);
+    VMSUMUBM
+  vsi __builtin_vec_msum (vsc, vuc, vsi);
+    VMSUMMBM
+  vui __builtin_vec_msum (vus, vus, vui);
+    VMSUMUHM
+  vsi __builtin_vec_msum (vss, vss, vsi);
+    VMSUMSHM
+  vsq __builtin_vec_msum (vsll, vsll, vsq);
+    VMSUMUDM  VMSUMUDM_S
+  vuq __builtin_vec_msum (vull, vull, vuq);
+    VMSUMUDM  VMSUMUDM_U
+
+[VEC_MSUMS, vec_msums, __builtin_vec_msums]
+  vui __builtin_vec_msums (vus, vus, vui);
+    VMSUMUHS
+  vsi __builtin_vec_msums (vss, vss, vsi);
+    VMSUMSHS
+
 [VEC_MTVSCR, vec_mtvscr, __builtin_vec_mtvscr]
   void __builtin_vec_mtvscr (vbc);
     MTVSCR  MTVSCR_VBC
@@ -967,6 +1193,18 @@
     NEG_V4SF
   vd __builtin_vec_neg (vd);
     NEG_V2DF
+
+[VEC_NMADD, vec_nmadd, __builtin_vec_nmadd]
+  vf __builtin_vec_nmadd (vf, vf, vf);
+    XVNMADDSP
+  vd __builtin_vec_nmadd (vd, vd, vd);
+    XVNMADDDP
+
+[VEC_NMSUB, vec_nmsub, __builtin_vec_nmsub]
+  vf __builtin_vec_nmsub (vf, vf, vf);
+    XVNMSUBSP
+  vd __builtin_vec_nmsub (vd, vd, vd);
+    XVNMSUBDP
 
 [VEC_NOR, vec_nor, __builtin_vec_nor]
   vsc __builtin_vec_nor (vsc, vsc);
@@ -1068,6 +1306,47 @@
   vsi __builtin_vec_packs (vsll, vsll);
     VPKSDSS
 
+[VEC_PERM, vec_perm, __builtin_vec_perm]
+  vsc __builtin_vec_perm (vsc, vsc, vuc);
+    VPERM_16QI
+  vuc __builtin_vec_perm (vuc, vuc, vuc);
+    VPERM_16QI_UNS VPERM_16QI_VUC
+  vbc __builtin_vec_perm (vbc, vbc, vuc);
+    VPERM_16QI_UNS VPERM_16QI_VBC
+  vss __builtin_vec_perm (vss, vss, vuc);
+    VPERM_8HI
+  vus __builtin_vec_perm (vus, vus, vuc);
+    VPERM_8HI_UNS VPERM_8HI_VUS
+  vbs __builtin_vec_perm (vbs, vbs, vuc);
+    VPERM_8HI_UNS VPERM_8HI_VBS
+  vp __builtin_vec_perm (vp, vp, vuc);
+    VPERM_8HI_UNS VPERM_8HI_VP
+  vsi __builtin_vec_perm (vsi, vsi, vuc);
+    VPERM_4SI
+  vui __builtin_vec_perm (vui, vui, vuc);
+    VPERM_4SI_UNS VPERM_4SI_VUI
+  vbi __builtin_vec_perm (vbi, vbi, vuc);
+    VPERM_4SI_UNS VPERM_4SI_VBI
+  vsll __builtin_vec_perm (vsll, vsll, vuc);
+    VPERM_2DI
+  vull __builtin_vec_perm (vull, vull, vuc);
+    VPERM_2DI_UNS VPERM_2DI_VULL
+  vbll __builtin_vec_perm (vbll, vbll, vuc);
+    VPERM_2DI_UNS VPERM_2DI_VBLL
+  vf __builtin_vec_perm (vf, vf, vuc);
+    VPERM_4SF
+  vd __builtin_vec_perm (vd, vd, vuc);
+    VPERM_2DF
+
+; TODO: There will be a separate CRYPTO_PERMXOR set with a SKIP directive
+[VEC_PERMXOR, vec_permxor, __builtin_vec_vpermxor]
+  vsc __builtin_vec_vpermxor (vsc, vsc, vsc);
+    VPERMXOR  VPERMXOR_VSC
+  vuc __builtin_vec_vpermxor (vuc, vuc, vuc);
+    VPERMXOR  VPERMXOR_VUC
+  vbc __builtin_vec_vpermxor (vbc, vbc, vbc);
+    VPERMXOR  VPERMXOR_VBC
+
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
     XVRESP
@@ -1134,6 +1413,64 @@
   vd __builtin_vec_rsqrte (vd);
     XVRSQRTEDP
 
+[VEC_SEL, vec_sel, __builtin_vec_sel]
+  vsc __builtin_vec_sel (vsc, vsc, vbc);
+    VSEL_16QI  VSEL_16QI_B
+  vsc __builtin_vec_sel (vsc, vsc, vuc);
+    VSEL_16QI  VSEL_16QI_U
+  vuc __builtin_vec_sel (vuc, vuc, vbc);
+    VSEL_16QI_UNS  VSEL_16QI_UB
+  vuc __builtin_vec_sel (vuc, vuc, vuc);
+    VSEL_16QI_UNS  VSEL_16QI_UU
+  vbc __builtin_vec_sel (vbc, vbc, vbc);
+    VSEL_16QI_UNS  VSEL_16QI_BB
+  vbc __builtin_vec_sel (vbc, vbc, vuc);
+    VSEL_16QI_UNS  VSEL_16QI_BU
+  vss __builtin_vec_sel (vss, vss, vbs);
+    VSEL_8HI  VSEL_8HI_B
+  vss __builtin_vec_sel (vss, vss, vus);
+    VSEL_8HI  VSEL_8HI_U
+  vus __builtin_vec_sel (vus, vus, vbs);
+    VSEL_8HI_UNS  VSEL_8HI_UB
+  vus __builtin_vec_sel (vus, vus, vus);
+    VSEL_8HI_UNS  VSEL_8HI_UU
+  vbs __builtin_vec_sel (vbs, vbs, vbs);
+    VSEL_8HI_UNS  VSEL_8HI_BB
+  vbs __builtin_vec_sel (vbs, vbs, vus);
+    VSEL_8HI_UNS  VSEL_8HI_BU
+  vsi __builtin_vec_sel (vsi, vsi, vbi);
+    VSEL_4SI  VSEL_4SI_B
+  vsi __builtin_vec_sel (vsi, vsi, vui);
+    VSEL_4SI  VSEL_4SI_U
+  vui __builtin_vec_sel (vui, vui, vbi);
+    VSEL_4SI_UNS  VSEL_4SI_UB
+  vui __builtin_vec_sel (vui, vui, vui);
+    VSEL_4SI_UNS  VSEL_4SI_UU
+  vbi __builtin_vec_sel (vbi, vbi, vbi);
+    VSEL_4SI_UNS  VSEL_4SI_BB
+  vbi __builtin_vec_sel (vbi, vbi, vui);
+    VSEL_4SI_UNS  VSEL_4SI_BU
+  vsll __builtin_vec_sel (vsll, vsll, vbll);
+    VSEL_2DI_B  VSEL_2DI_B
+  vsll __builtin_vec_sel (vsll, vsll, vull);
+    VSEL_2DI_B  VSEL_2DI_U
+  vull __builtin_vec_sel (vull, vull, vbll);
+    VSEL_2DI_UNS  VSEL_2DI_UB
+  vull __builtin_vec_sel (vull, vull, vull);
+    VSEL_2DI_UNS  VSEL_2DI_UU
+  vbll __builtin_vec_sel (vbll, vbll, vbll);
+    VSEL_2DI_UNS  VSEL_2DI_BB
+  vbll __builtin_vec_sel (vbll, vbll, vull);
+    VSEL_2DI_UNS  VSEL_2DI_BU
+  vf __builtin_vec_sel (vf, vf, vbll);
+    VSEL_4SF  VSEL_4SF_B
+  vf __builtin_vec_sel (vf, vf, vull);
+    VSEL_4SF  VSEL_4SF_U
+  vd __builtin_vec_sel (vd, vd, vbll);
+    VSEL_2DF  VSEL_2DF_B
+  vd __builtin_vec_sel (vd, vd, vull);
+    VSEL_2DF  VSEL_2DF_U
+
 [VEC_SL, vec_sl, __builtin_vec_sl]
   vsc __builtin_vec_sl (vsc, vuc);
     VSLB  VSLB_VSC
@@ -1151,6 +1488,56 @@
     VSLD  VSLD_VSLL
   vull __builtin_vec_sl (vull, vull);
     VSLD  VSLD_VULL
+
+[VEC_SLD, vec_sld, __builtin_vec_sld]
+  vsc __builtin_vec_sld (vsc, vsc, const int);
+    VSLDOI_16QI  VSLDOI_VSC
+  vbc __builtin_vec_sld (vbc, vbc, const int);
+    VSLDOI_16QI  VSLDOI_VBC
+  vuc __builtin_vec_sld (vuc, vuc, const int);
+    VSLDOI_16QI  VSLDOI_VUC
+  vss __builtin_vec_sld (vss, vss, const int);
+    VSLDOI_8HI  VSLDOI_VSS
+  vbs __builtin_vec_sld (vbs, vbs, const int);
+    VSLDOI_8HI  VSLDOI_VBS
+  vus __builtin_vec_sld (vus, vus, const int);
+    VSLDOI_8HI  VSLDOI_VUS
+  vp __builtin_vec_sld (vp, vp, const int);
+    VSLDOI_8HI  VSLDOI_VP
+  vsi __builtin_vec_sld (vsi, vsi, const int);
+    VSLDOI_4SI  VSLDOI_VSI
+  vbi __builtin_vec_sld (vbi, vbi, const int);
+    VSLDOI_4SI  VSLDOI_VBI
+  vui __builtin_vec_sld (vui, vui, const int);
+    VSLDOI_4SI  VSLDOI_VUI
+  vsll __builtin_vec_sld (vsll, vsll, const int);
+    VSLDOI_2DI  VSLDOI_VSLL
+  vbll __builtin_vec_sld (vbll, vbll, const int);
+    VSLDOI_2DI  VSLDOI_VBLL
+  vull __builtin_vec_sld (vull, vull, const int);
+    VSLDOI_2DI  VSLDOI_VULL
+  vf __builtin_vec_sld (vf, vf, const int);
+    VSLDOI_4SF
+  vd __builtin_vec_sld (vd, vd, const int);
+    VSLDOI_2DF
+
+[VEC_SLDW, vec_sldw, __builtin_vec_sldw]
+  vsc __builtin_vec_sldw (vsc, vsc, const int);
+    XXSLDWI_16QI  XXSLDWI_VSC
+  vuc __builtin_vec_sldw (vuc, vuc, const int);
+    XXSLDWI_16QI  XXSLDWI_VUC
+  vss __builtin_vec_sldw (vss, vss, const int);
+    XXSLDWI_16QI  XXSLDWI_VSS
+  vus __builtin_vec_sldw (vus, vus, const int);
+    XXSLDWI_16QI  XXSLDWI_VUS
+  vsi __builtin_vec_sldw (vsi, vsi, const int);
+    XXSLDWI_16QI  XXSLDWI_VSI
+  vui __builtin_vec_sldw (vui, vui, const int);
+    XXSLDWI_16QI  XXSLDWI_VUI
+  vsll __builtin_vec_sldw (vsll, vsll, const int);
+    XXSLDWI_16QI  XXSLDWI_VSLL
+  vull __builtin_vec_sldw (vull, vull, const int);
+    XXSLDWI_16QI  XXSLDWI_VULL
 
 [VEC_SLL, vec_sll, __builtin_vec_sll]
   vsc __builtin_vec_sll (vsc, vuc);
@@ -1350,6 +1737,326 @@
   vf __builtin_vec_sro (vf, vuc);
     VSRO  VSRO_VFU
 
+[VEC_ST, vec_st, __builtin_vec_st]
+  void __builtin_vec_st (vsc, signed long long, vsc *);
+    STVX_V16QI  STVX_VSC
+  void __builtin_vec_st (vsc, signed long long, signed char *);
+    STVX_V16QI  STVX_SC
+  void __builtin_vec_st (vuc, signed long long, vuc *);
+    STVX_V16QI  STVX_VUC
+  void __builtin_vec_st (vuc, signed long long, unsigned char *);
+    STVX_V16QI  STVX_UC
+  void __builtin_vec_st (vbc, signed long long, vbc *);
+    STVX_V16QI  STVX_VBC
+  void __builtin_vec_st (vbc, signed long long, signed char *);
+    STVX_V16QI  STVX_SC_B
+  void __builtin_vec_st (vbc, signed long long, unsigned char *);
+    STVX_V16QI  STVX_UC_B
+  void __builtin_vec_st (vss, signed long long, vss *);
+    STVX_V8HI  STVX_VSS
+  void __builtin_vec_st (vss, signed long long, signed short *);
+    STVX_V8HI  STVX_SS
+  void __builtin_vec_st (vus, signed long long, vus *);
+    STVX_V8HI  STVX_VUS
+  void __builtin_vec_st (vus, signed long long, unsigned short *);
+    STVX_V8HI  STVX_US
+  void __builtin_vec_st (vbs, signed long long, vbs *);
+    STVX_V8HI  STVX_VBS
+  void __builtin_vec_st (vbs, signed long long, signed short *);
+    STVX_V8HI  STVX_SS_B
+  void __builtin_vec_st (vbs, signed long long, unsigned short *);
+    STVX_V8HI  STVX_US_B
+  void __builtin_vec_st (vp, signed long long, vp *);
+    STVX_V8HI  STVX_P
+  void __builtin_vec_st (vsi, signed long long, vsi *);
+    STVX_V4SI  STVX_VSI
+  void __builtin_vec_st (vsi, signed long long, signed int *);
+    STVX_V4SI  STVX_SI
+  void __builtin_vec_st (vui, signed long long, vui *);
+    STVX_V4SI  STVX_VUI
+  void __builtin_vec_st (vui, signed long long, unsigned int *);
+    STVX_V4SI  STVX_UI
+  void __builtin_vec_st (vbi, signed long long, vbi *);
+    STVX_V4SI  STVX_VBI
+  void __builtin_vec_st (vbi, signed long long, signed int *);
+    STVX_V4SI  STVX_SI_B
+  void __builtin_vec_st (vbi, signed long long, unsigned int *);
+    STVX_V4SI  STVX_UI_B
+  void __builtin_vec_st (vsll, signed long long, vsll *);
+    STVX_V2DI  STVX_VSLL
+  void __builtin_vec_st (vsll, signed long long, signed long long *);
+    STVX_V2DI  STVX_SLL
+  void __builtin_vec_st (vull, signed long long, vull *);
+    STVX_V2DI  STVX_VULL
+  void __builtin_vec_st (vull, signed long long, unsigned long long *);
+    STVX_V2DI  STVX_ULL
+  void __builtin_vec_st (vbll, signed long long, vbll *);
+    STVX_V2DI  STVX_VBLL
+  void __builtin_vec_st (vbll, signed long long, signed long long *);
+    STVX_V2DI  STVX_SLL_B
+  void __builtin_vec_st (vbll, signed long long, unsigned long long *);
+    STVX_V2DI  STVX_ULL_B
+  void __builtin_vec_st (vf, signed long long, vf *);
+    STVX_V4SF  STVX_VF
+  void __builtin_vec_st (vf, signed long long, float *);
+    STVX_V4SF  STVX_F
+  void __builtin_vec_st (vd, signed long long, vd *);
+    STVX_V2DF  STVX_VD
+  void __builtin_vec_st (vd, signed long long, double *);
+    STVX_V2DF  STVX_D
+
+[VEC_STE, vec_ste, __builtin_vec_ste]
+  void __builtin_vec_ste (vsc, signed long long, signed char *);
+    STVEBX  STVEBX_S
+  void __builtin_vec_ste (vuc, signed long long, unsigned char *);
+    STVEBX  STVEBX_U
+  void __builtin_vec_ste (vbc, signed long long, signed char *);
+    STVEBX  STVEBX_BS
+  void __builtin_vec_ste (vbc, signed long long, unsigned char *);
+    STVEBX  STVEBX_BU
+  void __builtin_vec_ste (vss, signed long long, signed short *);
+    STVEHX  STVEHX_S
+  void __builtin_vec_ste (vus, signed long long, unsigned short *);
+    STVEHX  STVEHX_U
+  void __builtin_vec_ste (vbs, signed long long, signed short *);
+    STVEHX  STVEHX_BS
+  void __builtin_vec_ste (vbs, signed long long, unsigned short *);
+    STVEHX  STVEHX_BU
+  void __builtin_vec_ste (vp, signed long long, signed short *);
+    STVEHX  STVEHX_PS
+  void __builtin_vec_ste (vp, signed long long, unsigned short *);
+    STVEHX  STVEHX_PU
+  void __builtin_vec_ste (vsi, signed long long, signed int *);
+    STVEWX  STVEHWX_S
+  void __builtin_vec_ste (vui, signed long long, unsigned int *);
+    STVEWX  STVEWX_U
+  void __builtin_vec_ste (vbi, signed long long, signed int *);
+    STVEWX  STVEWX_BS
+  void __builtin_vec_ste (vbi, signed long long, unsigned int *);
+    STVEWX  STVEWX_BU
+  void __builtin_vec_ste (vf, signed long long, float *);
+    STVEWX  STVEWX_F
+
+[VEC_STL, vec_stl, __builtin_vec_stl]
+  void __builtin_vec_stl (vsc, signed long long, vsc *);
+    STVXL_V16QI  STVXL_VSC
+  void __builtin_vec_stl (vsc, signed long long, signed char *);
+    STVXL_V16QI  STVXL_SC
+  void __builtin_vec_stl (vuc, signed long long, vuc *);
+    STVXL_V16QI  STVXL_VUC
+  void __builtin_vec_stl (vuc, signed long long, unsigned char *);
+    STVXL_V16QI  STVXL_UC
+  void __builtin_vec_stl (vbc, signed long long, vbc *);
+    STVXL_V16QI  STVXL_VBC
+  void __builtin_vec_stl (vbc, signed long long, signed char *);
+    STVXL_V16QI  STVXL_SC_B
+  void __builtin_vec_stl (vbc, signed long long, unsigned char *);
+    STVXL_V16QI  STVXL_UC_B
+  void __builtin_vec_stl (vss, signed long long, vss *);
+    STVXL_V8HI  STVXL_VSS
+  void __builtin_vec_stl (vss, signed long long, signed short *);
+    STVXL_V8HI  STVXL_SS
+  void __builtin_vec_stl (vus, signed long long, vus *);
+    STVXL_V8HI  STVXL_VUS
+  void __builtin_vec_stl (vus, signed long long, unsigned short *);
+    STVXL_V8HI  STVXL_US
+  void __builtin_vec_stl (vbs, signed long long, vbs *);
+    STVXL_V8HI  STVXL_VBS
+  void __builtin_vec_stl (vbs, signed long long, signed short *);
+    STVXL_V8HI  STVXL_SS_B
+  void __builtin_vec_stl (vbs, signed long long, unsigned short *);
+    STVXL_V8HI  STVXL_US_B
+  void __builtin_vec_stl (vp, signed long long, vp *);
+    STVXL_V8HI  STVXL_P
+  void __builtin_vec_stl (vsi, signed long long, vsi *);
+    STVXL_V4SI  STVXL_VSI
+  void __builtin_vec_stl (vsi, signed long long, signed int *);
+    STVXL_V4SI  STVXL_SI
+  void __builtin_vec_stl (vui, signed long long, vui *);
+    STVXL_V4SI  STVXL_VUI
+  void __builtin_vec_stl (vui, signed long long, unsigned int *);
+    STVXL_V4SI  STVXL_UI
+  void __builtin_vec_stl (vbi, signed long long, vbi *);
+    STVXL_V4SI  STVXL_VBI
+  void __builtin_vec_stl (vbi, signed long long, signed int *);
+    STVXL_V4SI  STVXL_SI_B
+  void __builtin_vec_stl (vbi, signed long long, unsigned int *);
+    STVXL_V4SI  STVXL_UI_B
+  void __builtin_vec_stl (vsll, signed long long, vsll *);
+    STVXL_V2DI  STVXL_VSLL
+  void __builtin_vec_stl (vsll, signed long long, signed long long *);
+    STVXL_V2DI  STVXL_SLL
+  void __builtin_vec_stl (vull, signed long long, vull *);
+    STVXL_V2DI  STVXL_VULL
+  void __builtin_vec_stl (vull, signed long long, unsigned long long *);
+    STVXL_V2DI  STVXL_ULL
+  void __builtin_vec_stl (vbll, signed long long, vbll *);
+    STVXL_V2DI  STVXL_VBLL
+  void __builtin_vec_stl (vbll, signed long long, signed long long *);
+    STVXL_V2DI  STVXL_SLL_B
+  void __builtin_vec_stl (vbll, signed long long, unsigned long long *);
+    STVXL_V2DI  STVXL_ULL_B
+  void __builtin_vec_stl (vf, signed long long, vf *);
+    STVXL_V4SF  STVXL_VF
+  void __builtin_vec_stl (vf, signed long long, float *);
+    STVXL_V4SF  STVXL_F
+  void __builtin_vec_stl (vd, signed long long, vd *);
+    STVXL_V2DF  STVXL_VD
+  void __builtin_vec_stl (vd, signed long long, double *);
+    STVXL_V2DF  STVXL_D
+
+[VEC_STVLX, vec_stvlx, __builtin_vec_stvlx]
+  void __builtin_vec_stvlx (vbc, signed long long, vbc *);
+    STVLX  STVLX_VBC
+  void __builtin_vec_stvlx (vsc, signed long long, vsc *);
+    STVLX  STVLX_VSC
+  void __builtin_vec_stvlx (vsc, signed long long, signed char *);
+    STVLX  STVLX_SC
+  void __builtin_vec_stvlx (vuc, signed long long, vuc *);
+    STVLX  STVLX_VUC
+  void __builtin_vec_stvlx (vuc, signed long long, unsigned char *);
+    STVLX  STVLX_UC
+  void __builtin_vec_stvlx (vbs, signed long long, vbs *);
+    STVLX  STVLX_VBS
+  void __builtin_vec_stvlx (vss, signed long long, vss *);
+    STVLX  STVLX_VSS
+  void __builtin_vec_stvlx (vss, signed long long, signed short *);
+    STVLX  STVLX_SS
+  void __builtin_vec_stvlx (vus, signed long long, vus *);
+    STVLX  STVLX_VUS
+  void __builtin_vec_stvlx (vus, signed long long, unsigned short *);
+    STVLX  STVLX_US
+  void __builtin_vec_stvlx (vp, signed long long, vp *);
+    STVLX  STVLX_VP
+  void __builtin_vec_stvlx (vbi, signed long long, vbi *);
+    STVLX  STVLX_VBI
+  void __builtin_vec_stvlx (vsi, signed long long, vsi *);
+    STVLX  STVLX_VSI
+  void __builtin_vec_stvlx (vsi, signed long long, signed int *);
+    STVLX  STVLX_SI
+  void __builtin_vec_stvlx (vui, signed long long, vui *);
+    STVLX  STVLX_VUI
+  void __builtin_vec_stvlx (vui, signed long long, unsigned int *);
+    STVLX  STVLX_UI
+  void __builtin_vec_stvlx (vf, signed long long, vf *);
+    STVLX  STVLX_VF
+  void __builtin_vec_stvlx (vf, signed long long, float *);
+    STVLX  STVLX_F
+
+[VEC_STVLXL, vec_stvlxl, __builtin_vec_stvlxl]
+  void __builtin_vec_stvlxl (vbc, signed long long, vbc *);
+    STVLXL  STVLXL_VBC
+  void __builtin_vec_stvlxl (vsc, signed long long, vsc *);
+    STVLXL  STVLXL_VSC
+  void __builtin_vec_stvlxl (vsc, signed long long, signed char *);
+    STVLXL  STVLXL_SC
+  void __builtin_vec_stvlxl (vuc, signed long long, vuc *);
+    STVLXL  STVLXL_VUC
+  void __builtin_vec_stvlxl (vuc, signed long long, unsigned char *);
+    STVLXL  STVLXL_UC
+  void __builtin_vec_stvlxl (vbs, signed long long, vbs *);
+    STVLXL  STVLXL_VBS
+  void __builtin_vec_stvlxl (vss, signed long long, vss *);
+    STVLXL  STVLXL_VSS
+  void __builtin_vec_stvlxl (vss, signed long long, signed short *);
+    STVLXL  STVLXL_SS
+  void __builtin_vec_stvlxl (vus, signed long long, vus *);
+    STVLXL  STVLXL_VUS
+  void __builtin_vec_stvlxl (vus, signed long long, unsigned short *);
+    STVLXL  STVLXL_US
+  void __builtin_vec_stvlxl (vp, signed long long, vp *);
+    STVLXL  STVLXL_VP
+  void __builtin_vec_stvlxl (vbi, signed long long, vbi *);
+    STVLXL  STVLXL_VBI
+  void __builtin_vec_stvlxl (vsi, signed long long, vsi *);
+    STVLXL  STVLXL_VSI
+  void __builtin_vec_stvlxl (vsi, signed long long, signed int *);
+    STVLXL  STVLXL_SI
+  void __builtin_vec_stvlxl (vui, signed long long, vui *);
+    STVLXL  STVLXL_VUI
+  void __builtin_vec_stvlxl (vui, signed long long, unsigned int *);
+    STVLXL  STVLXL_UI
+  void __builtin_vec_stvlxl (vf, signed long long, vf *);
+    STVLXL  STVLXL_VF
+  void __builtin_vec_stvlxl (vf, signed long long, float *);
+    STVLXL  STVLXL_F
+
+[VEC_STVRX, vec_stvrx, __builtin_vec_stvrx]
+  void __builtin_vec_stvrx (vbc, signed long long, vbc *);
+    STVRX  STVRX_VBC
+  void __builtin_vec_stvrx (vsc, signed long long, vsc *);
+    STVRX  STVRX_VSC
+  void __builtin_vec_stvrx (vsc, signed long long, signed char *);
+    STVRX  STVRX_SC
+  void __builtin_vec_stvrx (vuc, signed long long, vuc *);
+    STVRX  STVRX_VUC
+  void __builtin_vec_stvrx (vuc, signed long long, unsigned char *);
+    STVRX  STVRX_UC
+  void __builtin_vec_stvrx (vbs, signed long long, vbs *);
+    STVRX  STVRX_VBS
+  void __builtin_vec_stvrx (vss, signed long long, vss *);
+    STVRX  STVRX_VSS
+  void __builtin_vec_stvrx (vss, signed long long, signed short *);
+    STVRX  STVRX_SS
+  void __builtin_vec_stvrx (vus, signed long long, vus *);
+    STVRX  STVRX_VUS
+  void __builtin_vec_stvrx (vus, signed long long, unsigned short *);
+    STVRX  STVRX_US
+  void __builtin_vec_stvrx (vp, signed long long, vp *);
+    STVRX  STVRX_VP
+  void __builtin_vec_stvrx (vbi, signed long long, vbi *);
+    STVRX  STVRX_VBI
+  void __builtin_vec_stvrx (vsi, signed long long, vsi *);
+    STVRX  STVRX_VSI
+  void __builtin_vec_stvrx (vsi, signed long long, signed int *);
+    STVRX  STVRX_SI
+  void __builtin_vec_stvrx (vui, signed long long, vui *);
+    STVRX  STVRX_VUI
+  void __builtin_vec_stvrx (vui, signed long long, unsigned int *);
+    STVRX  STVRX_UI
+  void __builtin_vec_stvrx (vf, signed long long, vf *);
+    STVRX  STVRX_VF
+  void __builtin_vec_stvrx (vf, signed long long, float *);
+    STVRX  STVRX_F
+
+[VEC_STVRXL, vec_stvrxl, __builtin_vec_stvrxl]
+  void __builtin_vec_stvrxl (vbc, signed long long, vbc *);
+    STVRXL  STVRXL_VBC
+  void __builtin_vec_stvrxl (vsc, signed long long, vsc *);
+    STVRXL  STVRXL_VSC
+  void __builtin_vec_stvrxl (vsc, signed long long, signed char *);
+    STVRXL  STVRXL_SC
+  void __builtin_vec_stvrxl (vuc, signed long long, vuc *);
+    STVRXL  STVRXL_VUC
+  void __builtin_vec_stvrxl (vuc, signed long long, unsigned char *);
+    STVRXL  STVRXL_UC
+  void __builtin_vec_stvrxl (vbs, signed long long, vbs *);
+    STVRXL  STVRXL_VBS
+  void __builtin_vec_stvrxl (vss, signed long long, vss *);
+    STVRXL  STVRXL_VSS
+  void __builtin_vec_stvrxl (vss, signed long long, signed short *);
+    STVRXL  STVRXL_SS
+  void __builtin_vec_stvrxl (vus, signed long long, vus *);
+    STVRXL  STVRXL_VUS
+  void __builtin_vec_stvrxl (vus, signed long long, unsigned short *);
+    STVRXL  STVRXL_US
+  void __builtin_vec_stvrxl (vp, signed long long, vp *);
+    STVRXL  STVRXL_VP
+  void __builtin_vec_stvrxl (vbi, signed long long, vbi *);
+    STVRXL  STVRXL_VBI
+  void __builtin_vec_stvrxl (vsi, signed long long, vsi *);
+    STVRXL  STVRXL_VSI
+  void __builtin_vec_stvrxl (vsi, signed long long, signed int *);
+    STVRXL  STVRXL_SI
+  void __builtin_vec_stvrxl (vui, signed long long, vui *);
+    STVRXL  STVRXL_VUI
+  void __builtin_vec_stvrxl (vui, signed long long, unsigned int *);
+    STVRXL  STVRXL_UI
+  void __builtin_vec_stvrxl (vf, signed long long, vf *);
+    STVRXL  STVRXL_VF
+  void __builtin_vec_stvrxl (vf, signed long long, float *);
+    STVRXL  STVRXL_F
+
 [VEC_SUB, vec_sub, __builtin_vec_sub]
   vsc __builtin_vec_sub (vsc, vsc);
     VSUBUBM  VSUBUBM_VSC
@@ -1375,6 +2082,46 @@
     XVSUBSP
   vd __builtin_vec_sub (vd, vd);
     XVSUBDP
+
+[VEC_SUBC, vec_subc, __builtin_vec_subc]
+  vsi __builtin_vec_subc (vsi, vsi);
+    VSUBCUW  VSUBCUW_VSI
+  vui __builtin_vec_subc (vui, vui);
+    VSUBCUW  VSUBCUW_VUI
+  vsq __builtin_vec_subc (vsq, vsq);
+    VSUBCUQ  VSUBCUQ_VSQ
+  vuq __builtin_vec_subc (vuq, vuq);
+    VSUBCUQ  VSUBCUQ_VUQ
+
+[VEC_SUBS, vec_subs, __builtin_vec_subs]
+  vuc __builtin_vec_subs (vuc, vuc);
+    VSUBUBS
+  vsc __builtin_vec_subs (vsc, vsc);
+    VSUBSBS
+  vus __builtin_vec_subs (vus, vus);
+    VSUBUHS
+  vss __builtin_vec_subs (vss, vss);
+    VSUBSHS
+  vui __builtin_vec_subs (vui, vui);
+    VSUBUWS
+  vsi __builtin_vec_subs (vsi, vsi);
+    VSUBSWS
+
+[VEC_SUM2S, vec_sum2s, __builtin_vec_sum2s]
+  vsi __builtin_vec_sum2s (vsi, vsi);
+    VSUM2SWS
+
+[VEC_SUM4S, vec_sum4s, __builtin_vec_sum4s]
+  vui __builtin_vec_sum4s (vuc, vui);
+    VSUM4UBS
+  vsi __builtin_vec_sum4s (vsc, vui);
+    VSUM4SBS
+  vsi __builtin_vec_sum4s (vss, vsi);
+    VSUM4SHS
+
+[VEC_SUMS, vec_sums, __builtin_vec_sums]
+  vsi __builtin_vec_sums (vsi, vsi);
+    VSUMSWS
 
 [VEC_TRUNC, vec_trunc, __builtin_vec_trunc]
   vf __builtin_vec_trunc (vf);
@@ -1417,3 +2164,299 @@
     VUPKLSW  VUPKLSW_VBI
   vd __builtin_vec_unpackl (vf);
     DOUBLEL_V4SF VUPKLF
+
+[VEC_XL, vec_xl, __builtin_vec_vsx_ld]
+  vsc __builtin_vec_vsx_ld (signed long long, vsc *);
+    LXVW4X_V4SI  LXVW4X_VSC
+  vsc __builtin_vec_vsx_ld (signed long long, signed char *);
+    LXVW4X_V4SI  LXVW4X_SC
+  vuc __builtin_vec_vsx_ld (signed long long, vuc *);
+    LXVW4X_V4SI  LXVW4X_VUC
+  vuc __builtin_vec_vsx_ld (signed long long, unsigned char *);
+    LXVW4X_V4SI  LXVW4X_UC
+  vss __builtin_vec_vsx_ld (signed long long, vss *);
+    LXVW4X_V4SI  LXVW4X_VSS
+  vss __builtin_vec_vsx_ld (signed long long, signed short *);
+    LXVW4X_V4SI  LXVW4X_SS
+  vus __builtin_vec_vsx_ld (signed long long, vus *);
+    LXVW4X_V4SI  LXVW4X_VUS
+  vus __builtin_vec_vsx_ld (signed long long, unsigned short *);
+    LXVW4X_V4SI  LXVW4X_US
+  vsi __builtin_vec_vsx_ld (signed long long, vsi *);
+    LXVW4X_V4SI  LXVW4X_VSI
+  vsi __builtin_vec_vsx_ld (signed long long, signed int *);
+    LXVW4X_V4SI  LXVW4X_SI
+  vui __builtin_vec_vsx_ld (signed long long, vui *);
+    LXVW4X_V4SI  LXVW4X_VUI
+  vui __builtin_vec_vsx_ld (signed long long, unsigned int *);
+    LXVW4X_V4SI  LXVW4X_UI
+  vsll __builtin_vec_vsx_ld (signed long long, vsll *);
+    LXVD2X_V2DI  LXVD2X_VSLL
+  vsll __builtin_vec_vsx_ld (signed long long, signed long long *);
+    LXVD2X_V2DI  LXVD2X_SLL
+  vull __builtin_vec_vsx_ld (signed long long, vull *);
+    LXVD2X_V2DI  LXVD2X_VULL
+  vull __builtin_vec_vsx_ld (signed long long, unsigned long long *);
+    LXVD2X_V2DI  LXVD2X_ULL
+  vsq __builtin_vec_vsx_ld (signed long long, vsq *);
+    LXVD2X_V1TI  LXVD2X_VSQ
+  vsq __builtin_vec_vsx_ld (signed long long, signed __int128 *);
+    LXVD2X_V1TI  LXVD2X_SQ
+  vuq __builtin_vec_vsx_ld (signed long long, unsigned __int128 *);
+    LXVD2X_V1TI  LXVD2X_UQ
+  vf __builtin_vec_vsx_ld (signed long long, vf *);
+    LXVW4X_V4SF  LXVW4X_VF
+  vf __builtin_vec_vsx_ld (signed long long, float *);
+    LXVW4X_V4SF  LXVW4X_F
+  vd __builtin_vec_vsx_ld (signed long long, vd *);
+    LXVD2X_V2DF  LXVD2X_VD
+  vd __builtin_vec_vsx_ld (signed long long, double *);
+    LXVD2X_V2DF  LXVD2X_D
+
+[VEC_XL_BE, vec_xl_be, __builtin_vec_xl_be]
+  vsc __builtin_vec_xl_be (signed long long, vsc *);
+    LD_ELEMREV_V16QI  LD_ELEMREV_VSC
+  vsc __builtin_vec_xl_be (signed long long, signed char *);
+    LD_ELEMREV_V16QI  LD_ELEMREV_SC
+  vuc __builtin_vec_xl_be (signed long long, vuc *);
+    LD_ELEMREV_V16QI  LD_ELEMREV_VUC
+  vuc __builtin_vec_xl_be (signed long long, unsigned char *);
+    LD_ELEMREV_V16QI  LD_ELEMREV_UC
+  vss __builtin_vec_xl_be (signed long long, vss *);
+    LD_ELEMREV_V8HI  LD_ELEMREV_VSS
+  vss __builtin_vec_xl_be (signed long long, signed short *);
+    LD_ELEMREV_V8HI  LD_ELEMREV_SS
+  vus __builtin_vec_xl_be (signed long long, vus *);
+    LD_ELEMREV_V8HI  LD_ELEMREV_VUS
+  vus __builtin_vec_xl_be (signed long long, unsigned short *);
+    LD_ELEMREV_V8HI  LD_ELEMREV_US
+  vsi __builtin_vec_xl_be (signed long long, vsi *);
+    LD_ELEMREV_V4SI  LD_ELEMREV_VSI
+  vsi __builtin_vec_xl_be (signed long long, signed int *);
+    LD_ELEMREV_V4SI  LD_ELEMREV_SI
+  vui __builtin_vec_xl_be (signed long long, vui *);
+    LD_ELEMREV_V4SI  LD_ELEMREV_VUI
+  vui __builtin_vec_xl_be (signed long long, unsigned int *);
+    LD_ELEMREV_V4SI  LD_ELEMREV_UI
+  vsll __builtin_vec_xl_be (signed long long, vsll *);
+    LD_ELEMREV_V2DI  LD_ELEMREV_VSLL
+  vsll __builtin_vec_xl_be (signed long long, signed long long *);
+    LD_ELEMREV_V2DI  LD_ELEMREV_SLL
+  vull __builtin_vec_xl_be (signed long long, vull *);
+    LD_ELEMREV_V2DI  LD_ELEMREV_VULL
+  vull __builtin_vec_xl_be (signed long long, unsigned long long *);
+    LD_ELEMREV_V2DI  LD_ELEMREV_ULL
+  vsq __builtin_vec_xl_be (signed long long, signed __int128 *);
+    LD_ELEMREV_V1TI  LD_ELEMREV_SQ
+  vuq __builtin_vec_xl_be (signed long long, unsigned __int128 *);
+    LD_ELEMREV_V1TI  LD_ELEMREV_UQ
+  vf __builtin_vec_xl_be (signed long long, vf *);
+    LD_ELEMREV_V4SF  LD_ELEMREV_VF
+  vf __builtin_vec_xl_be (signed long long, float *);
+    LD_ELEMREV_V4SF  LD_ELEMREV_F
+  vd __builtin_vec_xl_be (signed long long, vd *);
+    LD_ELEMREV_V2DF  LD_ELEMREV_VD
+  vd __builtin_vec_xl_be (signed long long, double *);
+    LD_ELEMREV_V2DF  LD_ELEMREV_DD
+
+[VEC_XOR, vec_xor, __builtin_vec_xor]
+  vsc __builtin_vec_xor (vsc, vsc);
+    VXOR_V16QI
+  vuc __builtin_vec_xor (vuc, vuc);
+    VXOR_V16QI_UNS  VXOR_VUC
+  vbc __builtin_vec_xor (vbc, vbc);
+    VXOR_V16QI_UNS  VXOR_VBC
+  vss __builtin_vec_xor (vss, vss);
+    VXOR_V8HI
+  vus __builtin_vec_xor (vus, vus);
+    VXOR_V8HI_UNS  VXOR_VUS
+  vbs __builtin_vec_xor (vbs, vbs);
+    VXOR_V8HI_UNS  VXOR_VBS
+  vsi __builtin_vec_xor (vsi, vsi);
+    VXOR_V4SI
+  vui __builtin_vec_xor (vui, vui);
+    VXOR_V4SI_UNS  VXOR_VUI
+  vbi __builtin_vec_xor (vbi, vbi);
+    VXOR_V4SI_UNS  VXOR_VBI
+  vsll __builtin_vec_xor (vsll, vsll);
+    VXOR_V2DI
+  vull __builtin_vec_xor (vull, vull);
+    VXOR_V2DI_UNS  VXOR_VULL
+  vbll __builtin_vec_xor (vbll, vbll);
+    VXOR_V2DI_UNS  VXOR_VBLL
+  vf __builtin_vec_xor (vf, vf);
+    VXOR_V4SF
+  vd __builtin_vec_xor (vd, vd);
+    VXOR_V2DF
+
+[VEC_XST, vec_xst, __builtin_vec_vsx_st]
+  void __builtin_vec_vsx_st (vsc, signed long long, vsc *);
+    STXVW4X_V16QI  STXVW4X_VSC
+  void __builtin_vec_vsx_st (vsc, signed long long, signed char *);
+    STXVW4X_V16QI  STXVW4X_SC
+  void __builtin_vec_vsx_st (vuc, signed long long, vuc *);
+    STXVW4X_V16QI  STXVW4X_VUC
+  void __builtin_vec_vsx_st (vuc, signed long long, unsigned char *);
+    STXVW4X_V16QI  STXVW4X_UC
+  void __builtin_vec_vsx_st (vbc, signed long long, vbc *);
+    STXVW4X_V16QI  STXVW4X_VBC
+  void __builtin_vec_vsx_st (vbc, signed long long, signed char *);
+    STXVW4X_V16QI  STXVW4X_VBC_S
+  void __builtin_vec_vsx_st (vbc, signed long long, unsigned char *);
+    STXVW4X_V16QI  STXVW4X_VBC_U
+  void __builtin_vec_vsx_st (vss, signed long long, vss *);
+    STXVW4X_V8HI  STXVW4X_VSS
+  void __builtin_vec_vsx_st (vss, signed long long, signed short *);
+    STXVW4X_V8HI  STXVW4X_SS
+  void __builtin_vec_vsx_st (vus, signed long long, vus *);
+    STXVW4X_V8HI  STXVW4X_VUS
+  void __builtin_vec_vsx_st (vus, signed long long, unsigned short *);
+    STXVW4X_V8HI  STXVW4X_US
+  void __builtin_vec_vsx_st (vbs, signed long long, vbs *);
+    STXVW4X_V8HI  STXVW4X_VBS
+  void __builtin_vec_vsx_st (vbs, signed long long, signed short *);
+    STXVW4X_V8HI  STXVW4X_VBS_S
+  void __builtin_vec_vsx_st (vbs, signed long long, unsigned short *);
+    STXVW4X_V8HI  STXVW4X_VBS_U
+  void __builtin_vec_vsx_st (vp, signed long long, vp *);
+    STXVW4X_V8HI  STXVW4X_VP
+  void __builtin_vec_vsx_st (vsi, signed long long, vsi *);
+    STXVW4X_V4SI  STXVW4X_VSI
+  void __builtin_vec_vsx_st (vsi, signed long long, signed int *);
+    STXVW4X_V4SI  STXVW4X_SI
+  void __builtin_vec_vsx_st (vui, signed long long, vui *);
+    STXVW4X_V4SI  STXVW4X_VUI
+  void __builtin_vec_vsx_st (vui, signed long long, unsigned int *);
+    STXVW4X_V4SI  STXVW4X_UI
+  void __builtin_vec_vsx_st (vbi, signed long long, vbi *);
+    STXVW4X_V4SI  STXVW4X_VBI
+  void __builtin_vec_vsx_st (vbi, signed long long, signed int *);
+    STXVW4X_V4SI  STXVW4X_VBI_S
+  void __builtin_vec_vsx_st (vbi, signed long long, unsigned int *);
+    STXVW4X_V4SI  STXVW4X_VBI_U
+  void __builtin_vec_vsx_st (vsll, signed long long, vsll *);
+    STXVD2X_V2DI  STXVD2X_VSLL
+  void __builtin_vec_vsx_st (vsll, signed long long, signed long long *);
+    STXVD2X_V2DI  STXVD2X_SLL
+  void __builtin_vec_vsx_st (vull, signed long long, vull *);
+    STXVD2X_V2DI  STXVD2X_VULL
+  void __builtin_vec_vsx_st (vull, signed long long, unsigned long long *);
+    STXVD2X_V2DI  STXVD2X_ULL
+  void __builtin_vec_vsx_st (vbll, signed long long, vbll *);
+    STXVD2X_V2DI  STXVD2X_VBLL
+  void __builtin_vec_vsx_st (vf, signed long long, vf *);
+    STXVW4X_V4SF  STXVW4X_VF
+  void __builtin_vec_vsx_st (vf, signed long long, float *);
+    STXVW4X_V4SF  STXVW4X_F
+  void __builtin_vec_vsx_st (vd, signed long long, vd *);
+    STXVD2X_V2DF  STXVD2X_VD
+  void __builtin_vec_vsx_st (vd, signed long long, double *);
+    STXVD2X_V2DF  STXVD2X_D
+
+[VEC_XST_BE, vec_xst_be, __builtin_vec_xst_be]
+  void __builtin_vec_xst_be (vsc, signed long long, vsc *);
+    STXVW4X_V16QI  STXVW4X_VSC_BE
+  void __builtin_vec_xst_be (vsc, signed long long, signed char *);
+    STXVW4X_V16QI  STXVW4X_SC_BE
+  void __builtin_vec_xst_be (vuc, signed long long, vuc *);
+    STXVW4X_V16QI  STXVW4X_VUC_BE
+  void __builtin_vec_xst_be (vuc, signed long long, unsigned char *);
+    STXVW4X_V16QI  STXVW4X_UC_BE
+  void __builtin_vec_xst_be (vbc, signed long long, vbc *);
+    STXVW4X_V16QI  STXVW4X_VBC_BE
+  void __builtin_vec_xst_be (vbc, signed long long, signed char *);
+    STXVW4X_V16QI  STXVW4X_VBC_S_BE
+  void __builtin_vec_xst_be (vbc, signed long long, unsigned char *);
+    STXVW4X_V16QI  STXVW4X_VBC_U_BE
+  void __builtin_vec_xst_be (vss, signed long long, vss *);
+    STXVW4X_V8HI  STXVW4X_VSS_BE
+  void __builtin_vec_xst_be (vss, signed long long, signed short *);
+    STXVW4X_V8HI  STXVW4X_SS_BE
+  void __builtin_vec_xst_be (vus, signed long long, vus *);
+    STXVW4X_V8HI  STXVW4X_VUS_BE
+  void __builtin_vec_xst_be (vus, signed long long, unsigned short *);
+    STXVW4X_V8HI  STXVW4X_US_BE
+  void __builtin_vec_xst_be (vbs, signed long long, vbs *);
+    STXVW4X_V8HI  STXVW4X_VBS_BE
+  void __builtin_vec_xst_be (vbs, signed long long, signed short *);
+    STXVW4X_V8HI  STXVW4X_VBS_S_BE
+  void __builtin_vec_xst_be (vbs, signed long long, unsigned short *);
+    STXVW4X_V8HI  STXVW4X_VBS_U_BE
+  void __builtin_vec_xst_be (vp, signed long long, vp *);
+    STXVW4X_V8HI  STXVW4X_VP_BE
+  void __builtin_vec_xst_be (vsi, signed long long, vsi *);
+    STXVW4X_V4SI  STXVW4X_VSI_BE
+  void __builtin_vec_xst_be (vsi, signed long long, signed int *);
+    STXVW4X_V4SI  STXVW4X_SI_BE
+  void __builtin_vec_xst_be (vui, signed long long, vui *);
+    STXVW4X_V4SI  STXVW4X_VUI_BE
+  void __builtin_vec_xst_be (vui, signed long long, unsigned int *);
+    STXVW4X_V4SI  STXVW4X_UI_BE
+  void __builtin_vec_xst_be (vbi, signed long long, vbi *);
+    STXVW4X_V4SI  STXVW4X_VBI_BE
+  void __builtin_vec_xst_be (vbi, signed long long, signed int *);
+    STXVW4X_V4SI  STXVW4X_VBI_S_BE
+  void __builtin_vec_xst_be (vbi, signed long long, unsigned int *);
+    STXVW4X_V4SI  STXVW4X_VBI_U_BE
+  void __builtin_vec_xst_be (vsll, signed long long, vsll *);
+    STXVD2X_V2DI  STXVD2X_VSLL_BE
+  void __builtin_vec_xst_be (vsll, signed long long, signed long long *);
+    STXVD2X_V2DI  STXVD2X_SLL_BE
+  void __builtin_vec_xst_be (vull, signed long long, vull *);
+    STXVD2X_V2DI  STXVD2X_VULL_BE
+  void __builtin_vec_xst_be (vull, signed long long, unsigned long long *);
+    STXVD2X_V2DI  STXVD2X_ULL_BE
+  void __builtin_vec_xst_be (vbll, signed long long, vbll *);
+    STXVD2X_V2DI  STXVD2X_VBLL_BE
+  void __builtin_vec_xst_be (vf, signed long long, vf *);
+    STXVW4X_V4SF  STXVW4X_VF_BE
+  void __builtin_vec_xst_be (vf, signed long long, float *);
+    STXVW4X_V4SF  STXVW4X_F_BE
+  void __builtin_vec_xst_be (vd, signed long long, vd *);
+    STXVD2X_V2DF  STXVD2X_VD_BE
+  void __builtin_vec_xst_be (vd, signed long long, double *);
+    STXVD2X_V2DF  STXVD2X_D_BE
+
+[VEC_XXPERMDI, vec_xxpermdi, __builtin_vsx_xxpermdi]
+  vsc __builtin_vsx_xxpermdi (vsc, vsc, const int);
+    XXPERMDI_16QI  XXPERMDI_VSC
+  vuc __builtin_vsx_xxpermdi (vuc, vuc, const int);
+    XXPERMDI_16QI  XXPERMDI_VUC
+  vss __builtin_vsx_xxpermdi (vss, vss, const int);
+    XXPERMDI_8HI  XXPERMDI_VSS
+  vus __builtin_vsx_xxpermdi (vus, vus, const int);
+    XXPERMDI_8HI  XXPERMDI_VUS
+  vsi __builtin_vsx_xxpermdi (vsi, vsi, const int);
+    XXPERMDI_4SI  XXPERMDI_VSI
+  vui __builtin_vsx_xxpermdi (vui, vui, const int);
+    XXPERMDI_4SI  XXPERMDI_VUI
+  vsll __builtin_vsx_xxpermdi (vsll, vsll, const int);
+    XXPERMDI_2DI  XXPERMDI_VSLL
+  vull __builtin_vsx_xxpermdi (vull, vull, const int);
+    XXPERMDI_2DI  XXPERMDI_VULL
+  vf __builtin_vsx_xxpermdi (vf, vf, const int);
+    XXPERMDI_4SF  XXPERMDI_VF
+  vd __builtin_vsx_xxpermdi (vd, vd, const int);
+    XXPERMDI_2DF  XXPERMDI_VD
+
+[VEC_XXSLDWI, vec_xxsldwi, __builtin_vsx_xxsldwi]
+  vsc __builtin_vsx_xxsldwi (vsc, vsc, const int);
+    XXSLDWI_16QI  XXSLDWI_VSC2
+  vuc __builtin_vsx_xxsldwi (vuc, vuc, const int);
+    XXSLDWI_16QI  XXSLDWI_VUC2
+  vss __builtin_vsx_xxsldwi (vss, vss, const int);
+    XXSLDWI_8HI  XXSLDWI_VSS2
+  vus __builtin_vsx_xxsldwi (vus, vus, const int);
+    XXSLDWI_8HI  XXSLDWI_VUS2
+  vsi __builtin_vsx_xxsldwi (vsi, vsi, const int);
+    XXSLDWI_4SI  XXSLDWI_VSI2
+  vui __builtin_vsx_xxsldwi (vui, vui, const int);
+    XXSLDWI_4SI  XXSLDWI_VUI2
+  vsll __builtin_vsx_xxsldwi (vsll, vsll, const int);
+    XXSLDWI_2DI  XXSLDWI_VSLL2
+  vull __builtin_vsx_xxsldwi (vull, vull, const int);
+    XXSLDWI_2DI  XXSLDWI_VULL2
+  vf __builtin_vsx_xxsldwi (vf, vf, const int);
+    XXSLDWI_4SF  XXSLDWI_VF2
+  vd __builtin_vsx_xxsldwi (vd, vd, const int);
+    XXSLDWI_2DF  XXSLDWI_VD2
