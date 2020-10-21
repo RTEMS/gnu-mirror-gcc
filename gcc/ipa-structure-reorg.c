@@ -142,6 +142,9 @@ ipa_structure_reorg ( void)
 
   cgraph_node* node;
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node) node->get_untransformed_body ();
+  // It really doesn't like get_body.
+  //FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node) node->get_body ();
+  
   //FOR_EACH_FUNCTION ( node)
   //{
   //  struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
@@ -1297,8 +1300,11 @@ modify_func_type ( struct function *func, Info *info )
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri != NULL )
     {
-      // TBD Do level based stuff here
       int levels = number_of_levels ( func_ret_type );
+      // TBD debug why top approach fails...
+      #if 0
+      func_ret_type = make_multilevel ( ri->pointer_rep, levels);
+      #else
       if ( levels == 1 )
 	{
 	  func_ret_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -1307,6 +1313,7 @@ modify_func_type ( struct function *func, Info *info )
 	{
 	  func_ret_type = make_multilevel ( ri->pointer_rep, levels);
 	}
+      #endif
     }
 
   tree interim_args = void_list_node;
@@ -1338,6 +1345,9 @@ modify_func_type ( struct function *func, Info *info )
 	  if ( ri != NULL )
 	    {
 	      int levels = number_of_levels ( type_of_arg );
+	      #if 0
+	      new_arg_type = make_multilevel ( ri->pointer_rep, levels);
+	      #else
 	      if ( number_of_levels ( type_of_arg ) == 1 )
 		{
 		  new_arg_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -1346,6 +1356,7 @@ modify_func_type ( struct function *func, Info *info )
 		{
 		  new_arg_type = make_multilevel ( ri->pointer_rep, levels);
 		}
+	      #endif
 	    }
 	  else
 	    {
@@ -1489,8 +1500,10 @@ modify_func_decl_core ( struct function *func, Info *info)
   
   int levels = number_of_levels ( func_type);
 
-  // TBD This code must in the near future handle an
-  // abritary number of levels!
+  #if 0
+  TREE_TYPE ( TREE_TYPE ( func->decl)) =
+    make_multilevel ( ri->pointer_rep, levels);
+  #else
   if ( levels == 1 )
     {
       //DEBUG_A( "levels == 1\n");
@@ -1507,6 +1520,7 @@ modify_func_decl_core ( struct function *func, Info *info)
       TREE_TYPE ( TREE_TYPE ( func->decl)) =
 	make_multilevel ( ri->pointer_rep, levels);
     }
+  #endif
 
   //DEBUG_L("AFTER modify_func_decl_core:\n");
   //DEBUG_A("func->decl = %p, ", func->decl);
@@ -1521,19 +1535,19 @@ modify_func_decl_core ( struct function *func, Info *info)
 }
 
 // Returns true if a modification occurred
-#if 1
+#if 0
 // Dubious version
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  //DEBUG_L("before modify_decl_core: ");
-  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  DEBUG_L("before modify_decl_core: ");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
   tree type = *location;
-  //DEBUG_A("type = ");
-  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  DEBUG_A("type = ");
+  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   tree base = base_type_of ( type);
-  //DEBUG_A(", base = ");
-  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  DEBUG_A(", base = ");
+  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
@@ -1551,7 +1565,7 @@ modify_decl_core ( tree *location, Info *info)
     {
       prev_type = type;
       type = TREE_TYPE ( prev_type);
-      //DEBUG_L( "prev_type: %p, type: %p\n", prev_type, type);
+      DEBUG_L( "prev_type: %p, type: %p\n", prev_type, type);
     }
   // TBD might use build_pointer_type to build new type for *(N)reorg_type
   // to *(N-1)ri->pointer_rep. NOTE, there is something similar implemented
@@ -1560,7 +1574,7 @@ modify_decl_core ( tree *location, Info *info)
   if ( levels == 0) // How did this test ever work???? It didn't
   //if ( levels == 1)
     {
-      //DEBUG_L( "LEVEL  ONE\n");
+      DEBUG_L( "LEVEL  ONE\n");
       //modify_ssa_name_type ( side, ri->pointer_rep);
       gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
       //TREE_TYPE ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -1568,7 +1582,7 @@ modify_decl_core ( tree *location, Info *info)
     }
   else
     {
-      //DEBUG_L( "LEVEL > ONE\n");
+      DEBUG_L( "LEVEL > ONE\n");
       gcc_assert(0);
    }
 
@@ -1580,9 +1594,8 @@ modify_decl_core ( tree *location, Info *info)
 
   relayout_decl ( *location);
 
-  //DEBUG_L(" after modify_decl_core");
-  //DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
-  //DEBUG("\n");
+  DEBUG_L(" after modify_decl_core");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
   return true;
 }
 #else
@@ -1590,14 +1603,17 @@ modify_decl_core ( tree *location, Info *info)
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  //DEBUG_L("before modify_decl_core: ");
-  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
-  tree type = *location;
-  //DEBUG_A("type = ");
-  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  DEBUG_L("before modify_decl_core: ");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  
+  //tree type = *location;
+  tree type = TREE_TYPE ( *location);
+  
+  DEBUG_A("type = ");
+  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   tree base = base_type_of ( type);
-  //DEBUG_A(", base = ");
-  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  DEBUG_A(", base = ");
+  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
@@ -1615,15 +1631,24 @@ modify_decl_core ( tree *location, Info *info)
     {
       prev_type = type;
       type = TREE_TYPE ( prev_type);
-      //DEBUG_L( "prev_type: %p, type: %p\n", prev_type, type);
+      DEBUG_A( "prev_type: %p, type: %p\n", prev_type, type);
     }
   // TBD might use build_pointer_type to build new type for *(N)reorg_type
   // to *(N-1)ri->pointer_rep
   // Fakes this for levels == 1
-  if ( levels == 0) // How did this test ever work???? It didn't
-  //if ( levels == 1)
+  if ( levels == 0)
     {
-      //DEBUG_L( "LEVEL  ONE\n");
+      DEBUG_A("Not a pointer, don't modify it!\n");
+      return false;
+    }
+  // TBD the upper code fails and it shouldn't. Debug and fix this.
+  // This also happens with other similar uses of make_multilevel.
+  #if 0
+  TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
+  #else
+  if ( levels == 1)
+    {
+      DEBUG_A( "LEVEL  ONE\n");
       //modify_ssa_name_type ( side, ri->pointer_rep);
       gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
       //TREE_TYPE ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -1631,9 +1656,10 @@ modify_decl_core ( tree *location, Info *info)
     }
   else
     {
-      //DEBUG_L( "LEVEL > ONE\n");
-      gcc_assert(0);
+      DEBUG_L( "LEVEL > ONE\n");
+      TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
    }
+  #endif
 
   if ( DECL_INITIAL ( *location) != NULL )
     {
@@ -1643,9 +1669,9 @@ modify_decl_core ( tree *location, Info *info)
 
   relayout_decl ( *location);
 
-  //DEBUG_L(" after modify_decl_core");
-  //DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
-  //DEBUG("\n");
+  DEBUG_L(" after modify_decl_core");
+  DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
+  DEBUG("\n");
   return true;
 }
 #endif
