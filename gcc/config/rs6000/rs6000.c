@@ -4172,6 +4172,33 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
+  /* Warn if the default long double is IEEE 128-bit, and we don't have the
+     minimum GLIBC (2.32), or the system is not a little endian PowerPC server
+     system.  An explicit -Wno-psabi will cancel this warning.  */
+  if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
+    {
+      static bool warned_minimum_system_long_double;
+
+      if (!warned_minimum_system_long_double)
+	{
+	  if (BYTES_BIG_ENDIAN || !TARGET_POWERPC64)
+	    {
+	      warned_minimum_system_long_double = true;
+	      warning (OPT_Wpsabi,
+		       "IEEE 128-bit %<long double%> is only supported on "
+		       "little-endian 64-bit PowerPC systems");
+	    }
+
+	  else if (TARGET_GLIBC_MAJOR < 2
+		   || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR < 32))
+	    {
+	      warned_minimum_system_long_double = true;
+	      warning (OPT_Wpsabi,
+		       "IEEE 128-bit %<long double%> needs GLIBC 2.32 or newer");
+	    }
+	}
+    }
+
   /* Enable the default support for IEEE 128-bit floating point on Linux VSX
      sytems.  In GCC 7, we would enable the IEEE 128-bit floating point
      infrastructure (-mfloat128-type) but not enable the actual __float128 type
