@@ -2396,6 +2396,9 @@ extract_low_bits (machine_mode mode, machine_mode src_mode, rtx src)
   if (GET_MODE_CLASS (mode) == MODE_CC || GET_MODE_CLASS (src_mode) == MODE_CC)
     return NULL_RTX;
 
+  if (known_lt (GET_MODE_PRECISION (src_mode), GET_MODE_BITSIZE (mode)))
+    return NULL_RTX;
+
   if (known_eq (GET_MODE_BITSIZE (mode), GET_MODE_BITSIZE (src_mode))
       && targetm.modes_tieable_p (mode, src_mode))
     {
