@@ -1,3 +1,9 @@
+work022.patch013:
+2020-10-21  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* config/rs6000/rs6000-modes.def (POImode): Change precision.
+	* expmed.c (extract_low_bits): Check precision.
+
 work022.patch011:
 2020-10-21  Michael Meissner  <meissner@linux.ibm.com>
 
