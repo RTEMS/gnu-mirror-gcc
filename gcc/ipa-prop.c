@@ -5067,6 +5067,13 @@ ipa_prop_write_jump_functions (void)
   lto_symtab_encoder_iterator lsei;
   lto_symtab_encoder_t encoder;
 
+  /* The function can be called from 2 IPA_PASSES: "fnsummary" and "cp"
+     which happens in partial linking (-r).  Prevent double streaming
+     as reported in PR97508.  */
+  static bool already_stremed = false;
+  if (already_stremed)
+    return;
+
   if (!ipa_node_params_sum || !ipa_edge_args_sum)
     return;
 
@@ -5096,6 +5103,8 @@ ipa_prop_write_jump_functions (void)
   streamer_write_char_stream (ob->main_stream, 0);
   produce_asm (ob, NULL);
   destroy_output_block (ob);
+
+  already_stremed = true;
 }
 
 /* Read section in file FILE_DATA of length LEN with data DATA.  */
