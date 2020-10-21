@@ -1,3 +1,21 @@
+work022.patch003:
+2020-10-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
+work022.patch002:
+2020-10-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-cmove.c: New test.
+	* gcc.target/powerpc/float128-minmax-3.c: New test.
+
+work022.patch001:
+2020-10-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
+
 2020-10-21   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
