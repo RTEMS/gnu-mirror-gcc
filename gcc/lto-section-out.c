@@ -59,12 +59,25 @@ lto_append_data (const char *chars, unsigned int num_chars, void *opaque)
 
 static struct lto_compression_stream *compression_stream = NULL;
 
+hash_set<nofree_string_hash> created_sections;
+
 /* Begin a new output section named NAME. If COMPRESS is true, zlib compress
    the section. */
 
 void
 lto_begin_section (const char *name, bool compress)
 {
+  if (flag_checking)
+    {
+      const char *n = xstrdup (name);
+      if (created_sections.contains (n))
+	{
+	  error ("LTO streaming: section already streamed: %qs", n);
+	  gcc_unreachable ();
+	}
+      created_sections.add (n);
+    }
+
   lang_hooks.lto.begin_section (name);
 
   if (streamer_dump_file)
