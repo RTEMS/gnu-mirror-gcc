@@ -1,3 +1,9 @@
+work022.patch014:
+2020-10-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Check
+	whether the system can support IEEE 128-bit long double.
+
 work022.patch013:
 2020-10-21  Aaron Sawdey  <acsawdey@linux.ibm.com>
 
