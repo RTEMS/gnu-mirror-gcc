@@ -22,12 +22,12 @@ main (void)
   /* { dg-final { scan-assembler {\m__printfieee128\M} } }  */
   __builtin_printf ("x is %Lg [%s]\n", x, buffer);
 
-  /* { dg-final { scan-assembler {\m__isoc99sscanfieee128\M} } }  */
+  /* { dg-final { scan-assembler {\m__isoc99_sscanfieee128\M} } }  */
   __builtin_sscanf (buffer, "%Lg", &y);
 
   __builtin_printf ("Type 1.0: ");
 
-  /* { dg-final { scan-assembler {\m__isoc99scanfieee128\M} } }  */
+  /* { dg-final { scan-assembler {\m__isoc99_scanfieee128\M} } }  */
   __builtin_scanf ("%Lg", &z);
 
   if (x != y || x != z)
