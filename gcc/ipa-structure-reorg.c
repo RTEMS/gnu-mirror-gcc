@@ -1791,7 +1791,16 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  case ReorgOpT_AryDir:    // "x[i].f"
 	    return ReorgT_ElemAssign;
 	  case ReorgOpT_Cst0:
-	    return ReorgT_Ptr2Zero;
+	    {
+	      if ( is_reorg_type ( TREE_TYPE (lhs), info) )
+		{
+		  return ReorgT_Ptr2Zero;
+		}
+	      else
+		{
+		  return ReorgT_ElemAssign;
+		}
+	    }
 	  default:
 	    return Not_Supported;
 	  }
@@ -2115,27 +2124,24 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     return recognize_op_ret_action ( ReorgOpT_Scalar);
   }
-  tree inner_op = TREE_OPERAND( op, 0);
-  tree inner_type = TREE_TYPE ( inner_op);
-  enum tree_code inner_op_code = TREE_CODE ( inner_op);
-  DEBUG_L("inner_op = ");
-  DEBUG_F(flexible_print, stderr, inner_op, 0, (dump_flags_t)0);
-  DEBUG(", TREE_CODE = %s\n", code_str( inner_op_code));
+  tree inner_op0 = TREE_OPERAND( op, 0);
+  tree inner_op0_type = TREE_TYPE ( inner_op0);
+  enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
   if ( op_code == ADDR_EXPR )
     {
       DEBUG_L("op_code == ADDR_EXPR\n");
-      if ( inner_op_code == ARRAY_REF )
+      if ( inner_op0_code == ARRAY_REF )
 	{
-	  bool a_reorg = is_reorg_type ( inner_op, info);
+	  bool a_reorg = is_reorg_type ( inner_op0, info);
 	  if ( a_reorg || !lie )
 	    {
 	      return recognize_op_ret_action ( ReorgOpT_Address);
 	    }
 	}
       // TBD shouldn't we be testing for a reorg???
-      if ( inner_op_code == VAR_DECL )
+      if ( inner_op0_code == VAR_DECL )
 	{
-	  tree var_type = TREE_TYPE ( inner_op );
+	  tree var_type = TREE_TYPE ( inner_op0 );
 	  bool a_reorg = is_reorg_type ( var_type, info);
 	  if ( a_reorg || !lie )
 	    {
@@ -2145,9 +2151,26 @@ recognize_op ( tree op,  bool lie, Info *info)
     }
   if ( op_code == COMPONENT_REF )
   {
-    DEBUG_L("op_code == COMPONENT_REF\n");
+    DEBUG_L("process: COMPONENT_REF\n");
+    tree inner_op1 = TREE_OPERAND( op, 1);
+    enum tree_code inner_op1_code = TREE_CODE ( inner_op1);
     
-    if ( inner_op_code == INDIRECT_REF )
+    DEBUG_L("inner_op1 = ");
+    DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
+    DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
+
+    if ( tree deep_type = multilevel_component_ref ( op) )
+      {
+	DEBUG_L("Is multilevel component ref\n");
+	bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
+	if ( a_reorg || !lie )
+	  {
+	    return recognize_op_ret_action ( ReorgOpT_Indirect);
+	  }
+	// Just normal field reference otherwise...
+	return recognize_op_ret_action ( ReorgOpT_Scalar);
+      }
+    if ( inner_op0_code == INDIRECT_REF )
     {
       DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
       bool a_reorg = is_reorg_type ( base_type_of ( type), info);
@@ -2158,9 +2181,9 @@ recognize_op ( tree op,  bool lie, Info *info)
       // Just normal field reference otherwise...
       return recognize_op_ret_action ( ReorgOpT_Scalar);
     }
-    if ( inner_op_code == MEM_REF ) {
+    if ( inner_op0_code == MEM_REF ) {
       DEBUG_L("TREE_CODE( inner_op) == MEM_REF\n");
-      bool a_reorg = is_reorg_type ( base_type_of ( inner_type), info);
+      bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
       if ( a_reorg || !lie )
       {
 	return recognize_op_ret_action ( ReorgOpT_Indirect);
@@ -2168,11 +2191,30 @@ recognize_op ( tree op,  bool lie, Info *info)
       // Just normal field reference otherwise...
       return recognize_op_ret_action ( ReorgOpT_Scalar);
     }
-    DEBUG_L("TREE_CODE( inner_op) not INDIRECT_REF or MEM_REF\n");
+    if ( inner_op0_code == COMPONENT_REF ) {
+      DEBUG_L("TREE_CODE( inner_op) == COMPONENT_REF\n");
+      tree inner_op0_0 = TREE_OPERAND ( inner_op0, 0);
+      tree inner_op0_0_type = TREE_TYPE ( inner_op0_0);
+      DEBUG_L("inner_op0_0 = ");
+      DEBUG_F(flexible_print, stderr, inner_op0_0, 0, (dump_flags_t)0);
+      DEBUG(" type = ");
+      DEBUG_F(flexible_print, stderr, inner_op0_0_type, 0, (dump_flags_t)0);
+      DEBUG(", TREE_CODE = %s\n", code_str( inner_op0_code));
+
+      
+      bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_0_type), info);
+      if ( a_reorg || !lie )
+      {
+	return recognize_op_ret_action ( ReorgOpT_Indirect);
+      }
+      // Just normal field reference otherwise...
+      return recognize_op_ret_action ( ReorgOpT_Scalar);
+    }
+    DEBUG_L("TREE_CODE( inner_op) not indirect, component or mem ref\n");
     // Note, doesn't this ignore ARRAY_REF of this?
     // I think it's OK at least until we start supporting
     // multi-pools.
-    bool a_reorg = is_reorg_type ( base_type_of ( inner_type), info);
+    bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
     if ( a_reorg || !lie )
       {
 	return recognize_op_ret_action ( ReorgOpT_AryDir);
@@ -2182,7 +2224,29 @@ recognize_op ( tree op,  bool lie, Info *info)
   }
   if ( op_code == ARRAY_REF )
   {
-    DEBUG_L("op_code == ARRAY_REF\n");
+    DEBUG_L("process: ARRAY_REF\n");
+    tree inner_op1 = TREE_OPERAND( op, 1);
+    tree inner_op1_type = TREE_TYPE ( inner_op1);
+    DEBUG_A("inner_op0, inner_op0_type = ");
+    DEBUG_F(flexible_print, stderr, inner_op0, 2, (dump_flags_t)0);
+    DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
+
+    DEBUG_A("inner_op1, inner_op1_type = ");
+    DEBUG_F(flexible_print, stderr, inner_op1, 2, (dump_flags_t)0);
+    DEBUG_F(flexible_print, stderr, inner_op1_type, 1, (dump_flags_t)0);
+
+    if ( tree deep_type = multilevel_component_ref ( op) )
+      {
+	DEBUG_L("Is multilevel component ref (with array)\n");
+	bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
+	if ( a_reorg || !lie )
+	  {
+	    return recognize_op_ret_action ( ReorgOpT_Indirect);
+	  }
+	// Just normal field reference otherwise...
+	return recognize_op_ret_action ( ReorgOpT_Scalar);
+      }
+    
     bool a_reorg = is_reorg_type( base_type_of ( type), info);
     if ( a_reorg || !lie )
     {
@@ -2192,7 +2256,7 @@ recognize_op ( tree op,  bool lie, Info *info)
   }
   if( op_code == INDIRECT_REF )
   {
-    DEBUG_L("op_code == INDIRECT_REF\n");
+    DEBUG_L("process: INDIRECT_REF\n");
     //  Do we want to chase the base type?
     // No, we care about (and transform) just
     // *r and not **...r (where r is a ReorgType.)
@@ -2204,6 +2268,33 @@ recognize_op ( tree op,  bool lie, Info *info)
     return recognize_op_ret_action ( ReorgOpT_Scalar);
   }
   return recognize_op_ret_action ( ReorgOpT_Scalar);
+}
+
+tree
+multilevel_component_ref ( tree op)
+{
+  DEBUG_A("multilevel_component_ref: ");
+  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  tree inner_op0 = TREE_OPERAND( op, 0);
+  //tree inner_op1 = TREE_OPERAND( op, 1);
+  enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
+  if ( inner_op0_code == COMPONENT_REF || inner_op0_code == ARRAY_REF )
+    {
+      return multilevel_component_ref ( inner_op0);
+    }
+  else
+    if ( inner_op0_code == MEM_REF )
+      {
+	if ( TREE_CODE ( op) == COMPONENT_REF )
+	  {
+	    tree type = TREE_TYPE (inner_op0);
+	    DEBUG_A("  found: %s, type: \n", code_str (inner_op0_code));
+	    DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+	    return type;
+	  }
+      }
+  return NULL;
 }
 
 bool
@@ -2953,6 +3044,10 @@ code_str( enum tree_code tc)
     return "FUNCTION_DECL";
   case RESULT_DECL:
     return "RESULT_DECL";
+  case COMPONENT_REF:
+    return "COMPONENT_REF";
+  case INDIRECT_REF:
+    return "INDIRECT_REF";
   default:
     return get_tree_code_name ( tc);
     switch( TREE_CODE_CLASS( tc) )
@@ -3174,7 +3269,8 @@ flexible_print( FILE *f, tree t, int nl, dump_flags_t d)
     {
       print_generic_expr(f,t,d);
     }
-  if ( nl ) fprintf ( f, "\n");
+  if ( nl == 1 ) fprintf ( f, "\n");
+  if ( nl == 2 ) fprintf ( f, ", ");
 }
 
 //---------------- Pass Control Follows ----------------

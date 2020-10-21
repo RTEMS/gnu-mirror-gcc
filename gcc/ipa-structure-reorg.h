@@ -247,6 +247,7 @@ extern void print_reorg_with_msg ( FILE *, ReorgType_t *, int, const char *);
 extern ReorgType_t *contains_a_reorgtype ( gimple *, Info *);
 extern bool tree_contains_a_reorgtype_p ( tree, Info *);
 extern ReorgType_t *tree_contains_a_reorgtype ( tree, Info *);
+extern tree multilevel_component_ref ( tree);
 extern bool is_reorg_type ( tree, Info_t *);
 extern tree base_type_of ( tree);
 extern tree base_type_with_levels ( tree, int *);
@@ -264,7 +265,7 @@ extern bool is_assign_from_ssa ( gimple *);
 // them in the code. However, some of the uses should obviously be
 // converted to dump file information.
 
-#define DEBUGGING 0
+#define DEBUGGING 1
 #if DEBUGGING
 enum Display {
   Show_nothing,

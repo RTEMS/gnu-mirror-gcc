@@ -77,6 +77,8 @@ static void create_a_new_type ( Info_t *, tree);
 static unsigned int reorg_perf_qual ( Info *);
 static tree find_coresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
+static tree find_deepest_comp_ref ( tree);
+static tree create_deep_ref ( tree, tree, tree);
 static void set_lhs_for ( gimple *, tree);
 static basic_block make_bb ( char *, basic_block);
 
@@ -283,20 +285,34 @@ str_reorg_instance_interleave_trans ( Info *info)
 			{
 			case ReorgOpT_Indirect:
 			  {
-			    tree orig_field = TREE_OPERAND( ro_side, 1);
-			    tree field_type = TREE_TYPE( orig_field);
+			    // For deeply nested case we need the lowest.
+			    tree lowest_comp_ref = find_deepest_comp_ref ( ro_side);
+			    DEBUG_A("lowest_comp_ref = ");
+			    DEBUG_F(flexible_print, stderr, lowest_comp_ref, 1, (dump_flags_t)0);
+			    tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
+			    tree field_type = TREE_TYPE ( orig_field);
 			    tree base = ri->instance_interleave.base;
+			    DEBUG_A("orig_field, field_type, base  = ");
+			    DEBUG_F(flexible_print, stderr, orig_field, 2, (dump_flags_t)0);
+			    DEBUG_F(flexible_print, stderr, field_type, 2, (dump_flags_t)0);
+			    DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
 			    
 			    tree base_field =
 			      find_coresponding_field ( base, orig_field);
 			    
 			    tree base_field_type = TREE_TYPE( base_field);
 
-			    gcc_assert ( field_type);
+			    // The this changes because it the lowest field now
+			    //gcc_assert ( field_type);
+			    //tree field_val_temp = 
+			    //  make_temp_ssa_name( field_type, NULL, "field_val_temp");
+			    //tree top_field = TREE_OPERAND ( ro_side, 1);	
+			    //tree top_field_type = TREE_TYPE ( top_field);
+			    tree top_field_type = TREE_TYPE ( ro_side);
 			    tree field_val_temp =
-			      make_temp_ssa_name( field_type, NULL, "field_val_temp");
+			      make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
 
-			    tree inner_op = TREE_OPERAND( ro_side, 0);
+			    tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
 			    inner_op = TREE_OPERAND( inner_op, 0);
 			    //DEBUG_L("inner_op: ");
 			    //DEBUG_F( print_generic_expr, stderr, inner_op, (dump_flags_t)0);
@@ -306,6 +322,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 			    
 			    // field_array = _base.f
 			    gcc_assert ( base_field_type);
+			    // Note, this looks like trouble because this is a structure
+			    // type for a deeply nested type. Maybe wrap it it in a
+			    // pointer if deeply nested???
 			    tree field_arry_addr =
 			      make_temp_ssa_name( base_field_type, NULL, "field_arry_addr");
 
@@ -354,6 +373,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 			      gimple_build_assign ( field_addr, POINTER_PLUS_EXPR, field_arry_addr, offset);
 			    SSA_NAME_DEF_STMT ( field_addr) = get_field_addr;
 
+			    #if 0
+			    // Tried other idioms here (tricky)
+			    tree ref_expr = build2 ( MEM_REF, field_type, field_addr,
+						    build_int_cst (ptr_type_node, 0));
+			    #else
+			    tree ref_expr = create_deep_ref ( ro_side, field_type, field_addr);
+			    #endif
+
 			    if ( ro_on_left )
 			      {
 				// With:    a->f = rhs
@@ -371,8 +398,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 				//  gimple_build_assign( elem_to_set, field_val_temp);
 
 				//                 *field_addr = temp
-				tree lhs_ref = build2 ( MEM_REF, field_type, field_addr,
-							build_int_cst (ptr_type_node, 0));
+				tree lhs_ref = ref_expr;
 				
 				final_set =
 				  gimple_build_assign( lhs_ref, field_val_temp);
@@ -382,16 +408,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 				// With:    lhs = a->f
 				// Generate:
 				
-				// Tried other idioms here (tricky)
-				tree rhs_ref = build2 ( MEM_REF, field_type, field_addr,
-							build_int_cst (ptr_type_node, 0));
-				
+				tree rhs_ref = ref_expr;
 
 				// If these will actually print then things are likely sane
 				//DEBUG_L("rhs_ref: ");
 				//DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
 				//DEBUG("\n");
-				
+
+				// These are here for debugging
 				tree op0 = TREE_OPERAND ( rhs_ref, 0);
 				tree op1 = TREE_OPERAND ( rhs_ref, 1);
 				tree op1type = TYPE_MAIN_VARIANT (TREE_TYPE (op1));
@@ -406,29 +430,29 @@ str_reorg_instance_interleave_trans ( Info *info)
 				SSA_NAME_DEF_STMT ( lhs) = final_set;
 			      }
 			    
-			    //DEBUG_L("get_field_arry_addr: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_field_arry_addr, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("get_field_arry_addr: ");
+			    DEBUG_F( print_gimple_stmt, stderr, get_field_arry_addr, 0);
+			    DEBUG("\n");
 			    
-			    //DEBUG_L("get_index: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_index, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("get_index: ");
+			    DEBUG_F( print_gimple_stmt, stderr, get_index, 0);
+			    DEBUG("\n");
 
-			    //DEBUG_L("get_offset: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_offset, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("get_offset: ");
+			    DEBUG_F( print_gimple_stmt, stderr, get_offset, 0);
+			    DEBUG("\n");
 
-			    //DEBUG_L("get_field_addr: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_field_addr, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("get_field_addr: ");
+			    DEBUG_F( print_gimple_stmt, stderr, get_field_addr, 0);
+			    DEBUG("\n");
 			    
-			    //DEBUG_L("temp_set: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("temp_set: ");
+			    DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
+			    DEBUG("\n");
 			    
-			    //DEBUG_L("final_set: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
-			    //DEBUG("\n");
+			    DEBUG_L("final_set: ");
+			    DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
+			    DEBUG("\n");
 
 			    gsi_insert_before( &gsi, get_field_arry_addr, GSI_SAME_STMT);
 			    gsi_insert_before( &gsi, get_index, GSI_SAME_STMT);
@@ -1722,6 +1746,86 @@ str_reorg_instance_interleave_trans ( Info *info)
   // dominace info here is a really bad idea.
 
   return 0;
+}
+
+static tree
+find_deepest_comp_ref ( tree comp_ref_expr )
+{
+  tree inner_op0 = TREE_OPERAND( comp_ref_expr, 0);
+  enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
+  if ( inner_op0_code == COMPONENT_REF )
+    {
+      return find_deepest_comp_ref ( inner_op0);
+    }
+  else if ( inner_op0_code == MEM_REF )
+      {
+	return comp_ref_expr;
+      }
+  gcc_assert (0);
+}
+
+static tree
+create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
+{
+  DEBUG_A("create_deep_ref: ");
+  DEBUG_F(flexible_print, stderr, old_ref, 1, (dump_flags_t)0);
+  INDENT(4);
+  tree inner_op0 = TREE_OPERAND( old_ref, 0);
+  enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
+  enum tree_code top_code = TREE_CODE ( old_ref);
+  if ( inner_op0_code == MEM_REF )
+    {
+      tree deepest =
+	build2 ( MEM_REF, field_type, field_addr,
+		 build_int_cst (ptr_type_node, 0));
+      
+      INDENT(-4);
+      DEBUG_A("returns deepest: ");
+      DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
+      
+      return deepest;
+    }
+  else if ( top_code == COMPONENT_REF )
+    {
+      tree lower_comp_part =
+	create_deep_ref ( inner_op0, field_type, field_addr);
+      tree level_field = TREE_OPERAND( old_ref, 1);;
+      tree level_field_type = TREE_TYPE ( level_field);
+      tree component_layer =
+	build3 ( COMPONENT_REF,
+		 level_field_type, 
+		 lower_comp_part,
+		 level_field,
+		 NULL_TREE);
+
+      INDENT(-4);
+      DEBUG_A("returns component_layer: ");
+      DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
+
+      return component_layer;
+    }
+  else if ( top_code == ARRAY_REF )
+    {
+      tree lower_array_part =
+	create_deep_ref ( inner_op0, field_type, field_addr);
+
+      tree array_index = TREE_OPERAND( old_ref, 1);
+      tree elem_type = TREE_TYPE ( old_ref);
+      
+      tree array_layer =
+	build4 ( ARRAY_REF,
+		 elem_type,
+		 lower_array_part,
+		 array_index,
+		 NULL_TREE, NULL_TREE);
+
+      INDENT(-4);
+      DEBUG_A("returns array_layer: ");
+      DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
+      
+      return array_layer;
+    }
+  gcc_assert (0);
 }
 
 // Note, the following code might be a bit overly simplistic.
