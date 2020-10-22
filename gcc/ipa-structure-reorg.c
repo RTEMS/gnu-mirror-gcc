@@ -432,10 +432,10 @@ reorg_analysis ( Info *info)
 	    ReorgType_t *ri = get_reorgtype_info ( bt, info);
 	    if ( ri != NULL && alloc_trigger )
 	    {
-	      DEBUG_L( "Found allocaion: \n");
-	      DEBUG_A( "  Reorg: ");
-	      DEBUG_F( print_reorg, stderr, 0, ri);
-	      DEBUG("\n");
+	      //DEBUG_L( "Found allocaion: \n");
+	      //DEBUG_A( "  Reorg: ");
+	      //DEBUG_F( print_reorg, stderr, 0, ri);
+	      //DEBUG("\n");
 	      // TBD this needs to increment with the execution count
 	      // instead of one. I hope the build-in block count estimation
 	      // will work or a DIY solution might be called for.
@@ -502,13 +502,13 @@ number_of_executions ( gimple *stmt,
 		       struct cgraph_node *node)
 {
   basic_block bb = stmt->bb;
-  DEBUG_A("number_of_executions <bb %d> stmt: ", bb->index);
-  DEBUG_F(print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+  //DEBUG_A("number_of_executions <bb %d> stmt: ", bb->index);
+  //DEBUG_F(print_gimple_stmt, stderr, stmt, TDF_DETAILS);
 
   // Check for in loop
   if ( bb->loop_father != NULL && bb->loop_father->latch->index != 1 )
     {
-      DEBUG_A("In a loop (loop latch <bb %d>, returns 2\n", bb->loop_father->latch->index);
+      //DEBUG_A("In a loop (loop latch <bb %d>, returns 2\n", bb->loop_father->latch->index);
       return 2;
     }
   struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
@@ -524,7 +524,7 @@ number_of_executions ( gimple *stmt,
   struct cgraph_edge *edge = node->get_edge ( stmt);
   if ( node->callers == NULL )
     {
-      DEBUG_A("In main, returns 1\n");
+      //DEBUG_A("In main, returns 1\n");
       return 1;
     }
   else
@@ -532,7 +532,7 @@ number_of_executions ( gimple *stmt,
       // Check for multiple callers
       if ( node->callers->next_caller != NULL )
 	{
-	  DEBUG_A("Has multiple callers, returns 2\n");
+	  //DEBUG_A("Has multiple callers, returns 2\n");
 	  return 2;
 	}
       // Check single caller for multiple call sites
@@ -540,13 +540,13 @@ number_of_executions ( gimple *stmt,
       if ( node->callers->prev_caller != NULL ||
 	   node->callers->next_caller != NULL    )
 	{
-	  DEBUG_A("Single caller has multiple call sites, returns 2\n");
+	  //DEBUG_A("Single caller has multiple call sites, returns 2\n");
 	  return 2;
 	}
       // walk up the call chain
       gimple *call_stmt = static_cast <gimple *> (node->callers->call_stmt);
-      DEBUG_A("Walk up the call chain, e->call_stmt: ");
-      DEBUG_F(print_gimple_stmt, stderr, call_stmt, TDF_DETAILS);
+      //DEBUG_A("Walk up the call chain, e->call_stmt: ");
+      //DEBUG_F(print_gimple_stmt, stderr, call_stmt, TDF_DETAILS);
       //return number_of_executions ( call_stmt, edge->caller);
       return number_of_executions ( call_stmt, node->callers->caller);
     }
@@ -1290,9 +1290,9 @@ static tree
 modify_func_type ( struct function *func, Info *info )
 {
   tree func_type = TREE_TYPE ( func->decl);
-  DEBUG_L("old func_type = ");
-  DEBUG_F( flexible_print, stderr, func_type, 1, (dump_flags_t)0);
-  INDENT(4);
+  //DEBUG_L("old func_type = ");
+  //DEBUG_F( flexible_print, stderr, func_type, 1, (dump_flags_t)0);
+  //INDENT(4);
   tree new_type;
   tree func_ret_type = TREE_TYPE ( func_type);
   tree base = base_type_of ( func_ret_type);
@@ -1319,26 +1319,26 @@ modify_func_type ( struct function *func, Info *info )
   tree interim_args = void_list_node;
   tree new_args = void_list_node;
   tree existing_args = TYPE_ARG_TYPES ( func_type);
-  DEBUG_A("TYPE_ARG_TYPES ( func_type) = ");
-  DEBUG_F( flexible_print, stderr, existing_args, 1, (dump_flags_t)0);
+  //DEBUG_A("TYPE_ARG_TYPES ( func_type) = ");
+  //DEBUG_F( flexible_print, stderr, existing_args, 1, (dump_flags_t)0);
   if ( existing_args != void_list_node )
     {
       tree arg;
-      DEBUG_A("old arg = ");
-      DEBUG_F( flexible_print, stderr, TYPE_ARG_TYPES ( func_type), 1, (dump_flags_t)0);
+      //DEBUG_A("old arg = ");
+      //DEBUG_F( flexible_print, stderr, TYPE_ARG_TYPES ( func_type), 1, (dump_flags_t)0);
       for ( arg = TYPE_ARG_TYPES ( func_type);
 	    arg != NULL && arg != void_list_node;
 	    arg = TREE_CHAIN ( arg))
 	{
-	  DEBUG_L("arg: ");
-	  DEBUG_F( flexible_print, stderr, arg, 1, (dump_flags_t)0);
+	  //DEBUG_L("arg: ");
+	  //DEBUG_F( flexible_print, stderr, arg, 1, (dump_flags_t)0);
 	  
 	  tree type_of_arg = TREE_VALUE (arg);
-	  DEBUG_L("type_of_arg: ");
-	  DEBUG_F( flexible_print, stderr, type_of_arg, 1, (dump_flags_t)0);
+	  //DEBUG_L("type_of_arg: ");
+	  //DEBUG_F( flexible_print, stderr, type_of_arg, 1, (dump_flags_t)0);
 	  base = base_type_of ( type_of_arg);
-	  DEBUG_L("base: ");
-	  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+	  //DEBUG_L("base: ");
+	  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
 	  
 	  tree new_arg_type;
 	  ri = get_reorgtype_info ( base, info);
@@ -1363,24 +1363,24 @@ modify_func_type ( struct function *func, Info *info )
 	      new_arg_type = type_of_arg;
 	    }
 	  interim_args = tree_cons ( NULL_TREE, new_arg_type, interim_args);
-	  DEBUG_A("interim new_args = ");
-	  DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
+	  //DEBUG_A("interim new_args = ");
+	  //DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
 	}
-      DEBUG_A("before reverse interim_args = %p, ", new_args);
-      DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
+      //DEBUG_A("before reverse interim_args = %p, ", new_args);
+      //DEBUG_F( flexible_print, stderr, interim_args, 1, (dump_flags_t)0);
       tree last = new_args;
       // swithed form nreverse to reverse_args 
       new_args = reverse_args ( interim_args);
     }
   // Here
   
-  DEBUG_A("new args = %p, ", new_args);
-  DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
-  INDENT(-4);
+  //DEBUG_A("new args = %p, ", new_args);
+  //DEBUG_F( flexible_print, stderr, new_args, 1, (dump_flags_t)0);
+  //INDENT(-4);
 
   new_type = build_function_type ( func_ret_type, new_args);
-  DEBUG_L("new_type (func) = ");
-  DEBUG_F( flexible_print, stderr, new_type, 1, (dump_flags_t)0);
+  //DEBUG_L("new_type (func) = ");
+  //DEBUG_F( flexible_print, stderr, new_type, 1, (dump_flags_t)0);
   TREE_TYPE ( func->decl) = new_type;
   return new_type;
 }
@@ -1449,23 +1449,23 @@ tree prev_type;
 tree
 make_multilevel( tree base_type, int levels_indirection)
 {
-  DEBUG_A("make_multilevel %d levels of ", levels_indirection);
-  DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
-  INDENT(4);
+  //DEBUG_A("make_multilevel %d levels of ", levels_indirection);
+  //DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+  //INDENT(4);
   if ( levels_indirection == 0 )
     {
-      INDENT(-4);
-      DEBUG_A("returns: ");
-      DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+      //INDENT(-4);
+      //DEBUG_A("returns: ");
+      //DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
       return base_type;
     }
   else
     {
       tree lower = make_multilevel ( base_type, levels_indirection - 1);
       tree returns = build_pointer_type ( lower);
-      INDENT(-4);
-      DEBUG_A("returns: ");
-      DEBUG_F( flexible_print, stderr, returns, 1, (dump_flags_t)0);
+      //INDENT(-4);
+      //DEBUG_A("returns: ");
+      //DEBUG_F( flexible_print, stderr, returns, 1, (dump_flags_t)0);
       return returns;
     }
 }
@@ -1603,17 +1603,17 @@ modify_decl_core ( tree *location, Info *info)
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  DEBUG_L("before modify_decl_core: ");
-  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  //DEBUG_L("before modify_decl_core: ");
+  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
   
   //tree type = *location;
   tree type = TREE_TYPE ( *location);
   
-  DEBUG_A("type = ");
-  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  //DEBUG_A("type = ");
+  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   tree base = base_type_of ( type);
-  DEBUG_A(", base = ");
-  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  //DEBUG_A(", base = ");
+  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
@@ -1631,14 +1631,14 @@ modify_decl_core ( tree *location, Info *info)
     {
       prev_type = type;
       type = TREE_TYPE ( prev_type);
-      DEBUG_A( "prev_type: %p, type: %p\n", prev_type, type);
+      //DEBUG_A( "prev_type: %p, type: %p\n", prev_type, type);
     }
   // TBD might use build_pointer_type to build new type for *(N)reorg_type
   // to *(N-1)ri->pointer_rep
   // Fakes this for levels == 1
   if ( levels == 0)
     {
-      DEBUG_A("Not a pointer, don't modify it!\n");
+      //DEBUG_A("Not a pointer, don't modify it!\n");
       return false;
     }
   // TBD the upper code fails and it shouldn't. Debug and fix this.
@@ -1648,7 +1648,7 @@ modify_decl_core ( tree *location, Info *info)
   #else
   if ( levels == 1)
     {
-      DEBUG_A( "LEVEL  ONE\n");
+      //DEBUG_A( "LEVEL  ONE\n");
       //modify_ssa_name_type ( side, ri->pointer_rep);
       gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
       //TREE_TYPE ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -1656,7 +1656,7 @@ modify_decl_core ( tree *location, Info *info)
     }
   else
     {
-      DEBUG_L( "LEVEL > ONE\n");
+      //DEBUG_L( "LEVEL > ONE\n");
       TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
    }
   #endif
@@ -1669,9 +1669,9 @@ modify_decl_core ( tree *location, Info *info)
 
   relayout_decl ( *location);
 
-  DEBUG_L(" after modify_decl_core");
-  DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
-  DEBUG("\n");
+  //DEBUG_L(" after modify_decl_core");
+  //DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
+  //DEBUG("\n");
   return true;
 }
 #endif
@@ -1707,28 +1707,28 @@ undelete_reorgtype ( ReorgType_t *rt, Info *info )
 ReorgTransformation
 reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 {
-  DEBUG_L ( "ReorgTransformation reorg_recognize for: ");
-  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
-  INDENT(2);
+  //DEBUG_L ( "ReorgTransformation reorg_recognize for: ");
+  //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  //INDENT(2);
   switch (  gimple_code( stmt) )
   {
   case  GIMPLE_ASSIGN:
     {
-      DEBUG_L("GIMPLE_ASSIGN:\n");
+      //DEBUG_L("GIMPLE_ASSIGN:\n");
       tree lhs = gimple_assign_lhs ( stmt);
       enum tree_code rhs_code = gimple_assign_rhs_code ( stmt);
       
       if ( gimple_assign_single_p ( stmt) )
       {
-	DEBUG_L("gimple_assign_single_p() = true\n");
-	INDENT(2);
+	//DEBUG_L("gimple_assign_single_p() = true\n");
+	//INDENT(2);
 	tree rhs = gimple_assign_rhs1 ( stmt);
 	enum ReorgOpTrans lhs_op = recognize_op ( lhs, true, info);
 	switch ( lhs_op )
 	{
 	case ReorgOpT_Pointer:     // "a"
-	  DEBUG_L("case ReorgOpT_Pointer\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Pointer\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Scalar:
@@ -1749,8 +1749,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return Not_Supported;
 	  }
 	case ReorgOpT_Struct:      // "s"
-	  DEBUG_L("case ReorgOpT_Struct\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Struct\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Deref:     // "*a"
@@ -1766,8 +1766,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return Not_Supported;
 	  }
 	case ReorgOpT_Deref:       // "*a"
-	  DEBUG_L("case ReorgOpT_Deref\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Deref\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Deref:     // "*a"
@@ -1778,8 +1778,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return Not_Supported;
 	  }
 	case ReorgOpT_Array:       // "x[i]"
-	  DEBUG_L("case ReorgOpT_Array\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Array\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Struct:    // "s"
@@ -1791,67 +1791,71 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  }
 	case ReorgOpT_Temp:        // t
 	case ReorgOpT_Scalar:      // "z"
-	  DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Temp ? "Temp" : "Scalar");
-	  INDENT(-4);
-	  switch ( recognize_op( rhs, true, info) )
 	  {
-	  case ReorgOpT_Scalar:      // "z"
-	  case ReorgOpT_Temp:      // "t"
-	    return ReorgT_Ignore;
-	  case ReorgOpT_Indirect:  // "a->f"
-	  case ReorgOpT_AryDir:    // "x[i].f"
-	    return ReorgT_ElemAssign;
-	  default:
-	    return Not_Supported;
+	    //DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Temp ? "Temp" : "Scalar");
+	    //INDENT(-4);
+	    switch ( recognize_op( rhs, true, info) )
+	      {
+	      case ReorgOpT_Scalar:      // "z"
+	      case ReorgOpT_Temp:      // "t"
+		return ReorgT_Ignore;
+	      case ReorgOpT_Indirect:  // "a->f"
+	      case ReorgOpT_AryDir:    // "x[i].f"
+		return ReorgT_ElemAssign;
+	      default:
+		return Not_Supported;
+	      }
 	  }
 	case ReorgOpT_Indirect:    // "a->f"
 	case ReorgOpT_AryDir:      // "x[i].f"
-	  DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Indirect ? "Indirect" : "AryDir");
-	  INDENT(-4);
-	  switch ( recognize_op ( rhs, true, info) )
 	  {
-	  case ReorgOpT_Cst:       // k
-	  case ReorgOpT_Temp:      // t
-	  case ReorgOpT_Scalar:    // "z"
-	  case ReorgOpT_Indirect:  // "a->f"
-	  case ReorgOpT_AryDir:    // "x[i].f"
-	    return ReorgT_ElemAssign;
-	  case ReorgOpT_Cst0:
-	    {
-	      if ( is_reorg_type ( TREE_TYPE (lhs), info) )
+	    //DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Indirect ? "Indirect" : "AryDir");
+	    //INDENT(-4);
+	    switch ( recognize_op ( rhs, true, info) )
+	      {
+	      case ReorgOpT_Cst:       // k
+	      case ReorgOpT_Temp:      // t
+	      case ReorgOpT_Scalar:    // "z"
+	      case ReorgOpT_Indirect:  // "a->f"
+	      case ReorgOpT_AryDir:    // "x[i].f"
+		return ReorgT_ElemAssign;
+	      case ReorgOpT_Cst0:
 		{
-		  return ReorgT_Ptr2Zero;
+		  if ( is_reorg_type ( TREE_TYPE (lhs), info) )
+		    {
+		      return ReorgT_Ptr2Zero;
+		    }
+		  else
+		    {
+		      return ReorgT_ElemAssign;
+		    }
 		}
-	      else
-		{
-		  return ReorgT_ElemAssign;
-		}
-	    }
-	  default:
-	    return Not_Supported;
+	      default:
+		return Not_Supported;
+	      }
 	  }
 	default:
 	  return Not_Supported;
 	} // switch ( recognize_op ( lhs, true, info) )
       } else {
-	DEBUG_L("gimple_assign_single_p() = false\n");
-	INDENT(2);
+	//DEBUG_L("gimple_assign_single_p() = false\n");
+	//INDENT(2);
 	tree op1 = gimple_assign_rhs1 ( stmt);
 	tree op2 = gimple_assign_rhs2 ( stmt);
-	DEBUG_L("op1 = %p, op2 = %p\n", op1, op2);
-	DEBUG_A("");
-	DEBUG_F( flexible_print, stderr, op1, 1, TDF_DETAILS);
+	//DEBUG_L("op1 = %p, op2 = %p\n", op1, op2);
+	//DEBUG_A("");
+	//DEBUG_F( flexible_print, stderr, op1, 1, TDF_DETAILS);
 	if ( CONVERT_EXPR_CODE_P ( gimple_assign_rhs_code ( stmt)))
 	  {
-	    DEBUG_L("CONVERT_EXPR_CODE_P (...)\n");
-	    INDENT(-4);
+	    //DEBUG_L("CONVERT_EXPR_CODE_P (...)\n");
+	    //INDENT(-4);
 	    return ReorgT_Convert;
 	  }
 
 	if ( gimple_assign_rhs3 ( stmt) != NULL )
 	  {
-	    DEBUG_L("gimple_assign_rhs3 ( stmt) != NULL\n");
-	    INDENT(-4);
+	    //DEBUG_L("gimple_assign_rhs3 ( stmt) != NULL\n");
+	    //INDENT(-4);
 	    return Not_Supported;
 	  }
 	
@@ -1861,8 +1865,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  (    (POINTER_TYPE_P ( TREE_TYPE( op1)) && integer_zerop ( op2))
 	    || (POINTER_TYPE_P ( TREE_TYPE( op2)) && integer_zerop ( op1)))
        && ( integer_zerop ( op1) || integer_zerop ( op2) );
-	DEBUG_L("zero_case = %s\n", zero_case ? "true" : "false" );
-	INDENT(-4);
+	//DEBUG_L("zero_case = %s\n", zero_case ? "true" : "false" );
+	//INDENT(-4);
 	switch ( rhs_code )
 	{
 	case POINTER_PLUS_EXPR:
@@ -1888,8 +1892,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
     }
   case GIMPLE_COND:  // Similar to assign cases
     {
-      DEBUG_L("GIMPLE_COND:\n");
-      INDENT(-2);
+      //DEBUG_L("GIMPLE_COND:\n");
+      //INDENT(-2);
       //tree op1 = gimple_assign_rhs1 ( stmt);
       //tree op2 = gimple_assign_rhs2( stmt);
       tree op1 = gimple_cond_lhs ( stmt);
@@ -1920,7 +1924,7 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
     }
   case  GIMPLE_CALL:
     {
-      DEBUG_L("GIMPLE_CALL:\n");
+      //DEBUG_L("GIMPLE_CALL:\n");
       struct cgraph_edge *edge = node->get_edge ( stmt);
       gcc_assert( edge);
       //DEBUG_L("called function %s gimple_body\n",
@@ -1930,7 +1934,7 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
       //DEBUG_L("called function external %s\n",
       //	      edge->callee->get_partitioning_class() == SYMBOL_EXTERNAL ? "true" : "false");
       
-      INDENT(-2);
+      //INDENT(-2);
       if ( gimple_call_builtin_p( stmt, BUILT_IN_CALLOC ) ) return ReorgT_Calloc;
       if ( gimple_call_builtin_p( stmt, BUILT_IN_MALLOC ) ) return ReorgT_Malloc;
       if ( gimple_call_builtin_p( stmt, BUILT_IN_REALLOC) ) return ReorgT_Realloc;
@@ -1943,23 +1947,23 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 
       if ( is_user_function ( stmt, node, info) )
 	{
-	  DEBUG_A("  ReorgT_UserFunc\n");
+	  //DEBUG_A("  ReorgT_UserFunc\n");
 	  return ReorgT_UserFunc;
 	}
-      DEBUG_A("  Not_supported\n");
-      return Not_Supported;
+      //DEBUG_A("  Not_supported\n");
+      //return Not_Supported;
     }
     break;
   case GIMPLE_RETURN:
-    DEBUG_L("GIMPLE_RETURN:\n");
-    INDENT(-2);
+    //DEBUG_L("GIMPLE_RETURN:\n");
+    //INDENT(-2);
     return ReorgT_Return;
     break;
   default:
-    DEBUG_L ( "didn't support: ");
-    DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
-    DEBUG( "\n");
-    INDENT(-2);
+    //DEBUG_L ( "didn't support: ");
+    //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+    //DEBUG( "\n");
+    //INDENT(-2);
     return Not_Supported;
   }
 }
@@ -2066,17 +2070,17 @@ remove_deleted_types ( Info *info, ReorgFn reorg_fn)
 static enum ReorgOpTrans
 recognize_op_ret_action ( enum ReorgOpTrans e )
 {
-  DEBUG_A("  returns %s\n", optrans_to_str ( e));
+  //DEBUG_A("  returns %s\n", optrans_to_str ( e));
   return e;
 }
 
 enum ReorgOpTrans
 recognize_op ( tree op,  bool lie, Info *info)
 {
-  DEBUG_L("recognize_op: ");
-  DEBUG_F( flexible_print, stderr, op, 1, TDF_DETAILS);
+  //DEBUG_L("recognize_op: ");
+  //DEBUG_F( flexible_print, stderr, op, 1, TDF_DETAILS);
   enum tree_code op_code = TREE_CODE ( op);
-  DEBUG_A("opcode = %s\n", code_str( op_code));
+  //DEBUG_A("opcode = %s\n", code_str( op_code));
   switch ( op_code )
     {
     case SSA_NAME:
@@ -2155,7 +2159,7 @@ recognize_op ( tree op,  bool lie, Info *info)
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
   if ( op_code == ADDR_EXPR )
     {
-      DEBUG_L("op_code == ADDR_EXPR\n");
+      //DEBUG_L("op_code == ADDR_EXPR\n");
       if ( inner_op0_code == ARRAY_REF )
 	{
 	  bool a_reorg = is_reorg_type ( inner_op0, info);
@@ -2177,17 +2181,17 @@ recognize_op ( tree op,  bool lie, Info *info)
     }
   if ( op_code == COMPONENT_REF )
   {
-    DEBUG_L("process: COMPONENT_REF\n");
+    //DEBUG_L("process: COMPONENT_REF\n");
     tree inner_op1 = TREE_OPERAND( op, 1);
     enum tree_code inner_op1_code = TREE_CODE ( inner_op1);
     
-    DEBUG_L("inner_op1 = ");
-    DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
-    DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
+    //DEBUG_L("inner_op1 = ");
+    //DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
+    //DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
 
     if ( tree deep_type = multilevel_component_ref ( op) )
       {
-	DEBUG_L("Is multilevel component ref\n");
+	//DEBUG_L("Is multilevel component ref\n");
 	bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
 	if ( a_reorg || !lie )
 	  {
@@ -2198,7 +2202,7 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     if ( inner_op0_code == INDIRECT_REF )
     {
-      DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
+      //DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
       bool a_reorg = is_reorg_type ( base_type_of ( type), info);
       if ( a_reorg || !lie )
       {
@@ -2208,7 +2212,7 @@ recognize_op ( tree op,  bool lie, Info *info)
       return recognize_op_ret_action ( ReorgOpT_Scalar);
     }
     if ( inner_op0_code == MEM_REF ) {
-      DEBUG_L("TREE_CODE( inner_op) == MEM_REF\n");
+      //DEBUG_L("TREE_CODE( inner_op) == MEM_REF\n");
       bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
       if ( a_reorg || !lie )
       {
@@ -2218,14 +2222,14 @@ recognize_op ( tree op,  bool lie, Info *info)
       return recognize_op_ret_action ( ReorgOpT_Scalar);
     }
     if ( inner_op0_code == COMPONENT_REF ) {
-      DEBUG_L("TREE_CODE( inner_op) == COMPONENT_REF\n");
+      //DEBUG_L("TREE_CODE( inner_op) == COMPONENT_REF\n");
       tree inner_op0_0 = TREE_OPERAND ( inner_op0, 0);
       tree inner_op0_0_type = TREE_TYPE ( inner_op0_0);
-      DEBUG_L("inner_op0_0 = ");
-      DEBUG_F(flexible_print, stderr, inner_op0_0, 0, (dump_flags_t)0);
-      DEBUG(" type = ");
-      DEBUG_F(flexible_print, stderr, inner_op0_0_type, 0, (dump_flags_t)0);
-      DEBUG(", TREE_CODE = %s\n", code_str( inner_op0_code));
+      //DEBUG_L("inner_op0_0 = ");
+      //DEBUG_F(flexible_print, stderr, inner_op0_0, 0, (dump_flags_t)0);
+      //DEBUG(" type = ");
+      //DEBUG_F(flexible_print, stderr, inner_op0_0_type, 0, (dump_flags_t)0);
+      //DEBUG(", TREE_CODE = %s\n", code_str( inner_op0_code));
 
       
       bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_0_type), info);
@@ -2236,7 +2240,7 @@ recognize_op ( tree op,  bool lie, Info *info)
       // Just normal field reference otherwise...
       return recognize_op_ret_action ( ReorgOpT_Scalar);
     }
-    DEBUG_L("TREE_CODE( inner_op) not indirect, component or mem ref\n");
+    //DEBUG_L("TREE_CODE( inner_op) not indirect, component or mem ref\n");
     // Note, doesn't this ignore ARRAY_REF of this?
     // I think it's OK at least until we start supporting
     // multi-pools.
@@ -2250,20 +2254,20 @@ recognize_op ( tree op,  bool lie, Info *info)
   }
   if ( op_code == ARRAY_REF )
   {
-    DEBUG_L("process: ARRAY_REF\n");
+    //DEBUG_L("process: ARRAY_REF\n");
     tree inner_op1 = TREE_OPERAND( op, 1);
     tree inner_op1_type = TREE_TYPE ( inner_op1);
-    DEBUG_A("inner_op0, inner_op0_type = ");
-    DEBUG_F(flexible_print, stderr, inner_op0, 2, (dump_flags_t)0);
-    DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
+    //DEBUG_A("inner_op0, inner_op0_type = ");
+    //DEBUG_F(flexible_print, stderr, inner_op0, 2, (dump_flags_t)0);
+    //DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
 
-    DEBUG_A("inner_op1, inner_op1_type = ");
-    DEBUG_F(flexible_print, stderr, inner_op1, 2, (dump_flags_t)0);
-    DEBUG_F(flexible_print, stderr, inner_op1_type, 1, (dump_flags_t)0);
+    //DEBUG_A("inner_op1, inner_op1_type = ");
+    //DEBUG_F(flexible_print, stderr, inner_op1, 2, (dump_flags_t)0);
+    //DEBUG_F(flexible_print, stderr, inner_op1_type, 1, (dump_flags_t)0);
 
     if ( tree deep_type = multilevel_component_ref ( op) )
       {
-	DEBUG_L("Is multilevel component ref (with array)\n");
+	//DEBUG_L("Is multilevel component ref (with array)\n");
 	bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
 	if ( a_reorg || !lie )
 	  {
@@ -2282,7 +2286,7 @@ recognize_op ( tree op,  bool lie, Info *info)
   }
   if( op_code == INDIRECT_REF )
   {
-    DEBUG_L("process: INDIRECT_REF\n");
+    //DEBUG_L("process: INDIRECT_REF\n");
     //  Do we want to chase the base type?
     // No, we care about (and transform) just
     // *r and not **...r (where r is a ReorgType.)
@@ -2299,9 +2303,9 @@ recognize_op ( tree op,  bool lie, Info *info)
 tree
 multilevel_component_ref ( tree op)
 {
-  DEBUG_A("multilevel_component_ref: ");
-  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
-  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  //DEBUG_A("multilevel_component_ref: ");
+  //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
   tree inner_op0 = TREE_OPERAND( op, 0);
   //tree inner_op1 = TREE_OPERAND( op, 1);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
@@ -2315,8 +2319,8 @@ multilevel_component_ref ( tree op)
 	if ( TREE_CODE ( op) == COMPONENT_REF )
 	  {
 	    tree type = TREE_TYPE (inner_op0);
-	    DEBUG_A("  found: %s, type: \n", code_str (inner_op0_code));
-	    DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+	    //DEBUG_A("  found: %s, type: \n", code_str (inner_op0_code));
+	    //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
 	    return type;
 	  }
       }

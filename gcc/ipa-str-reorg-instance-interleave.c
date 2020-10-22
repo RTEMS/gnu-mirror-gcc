@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa.h"
 #include "tree-ssa-loop-ivopts.h"
 #include "tree-dfa.h"
+#include "tree-cfg.h"
 #include "gimple.h"
 #include "tree-pass.h"
 #include "cgraph.h"
@@ -271,7 +272,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      
 		      DEBUG_L("ReorgT_ElemAssign: ");
 		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-		      //INDENT(2);
+		      INDENT(2);
 		      // Needed for helloworld
 		      tree lhs = gimple_assign_lhs( stmt);
 		      tree rhs = gimple_assign_rhs1( stmt);
@@ -301,6 +302,10 @@ str_reorg_instance_interleave_trans ( Info *info)
 			      find_coresponding_field ( base, orig_field);
 			    
 			    tree base_field_type = TREE_TYPE( base_field);
+
+			    DEBUG_A("base_field, base_field_type: ");
+			    DEBUG_F(flexible_print, stderr, base_field, 2, (dump_flags_t)0);
+			    DEBUG_F(flexible_print, stderr, base_field_type, 1, (dump_flags_t)0);
 
 			    // The this changes because it the lowest field now
 			    //gcc_assert ( field_type);
@@ -357,7 +362,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 			    gimple *final_set;
 
 			    // offset = index * size_of_field
-			    tree size_of_field = TYPE_SIZE_UNIT ( base_field_type);
+			    
+			    // Note base_field_type is a pointer and
+			    // we want the size of what's pointer to
+			    // instead
+			    //tree size_of_field = TYPE_SIZE_UNIT ( base_field_type);
+			    tree size_of_field = TYPE_SIZE_UNIT ( field_type);
+			    
 			    gcc_assert ( sizetype);
 			    tree offset = make_temp_ssa_name( sizetype, NULL, "offset");
 
@@ -430,29 +441,29 @@ str_reorg_instance_interleave_trans ( Info *info)
 				SSA_NAME_DEF_STMT ( lhs) = final_set;
 			      }
 			    
-			    DEBUG_L("get_field_arry_addr: ");
-			    DEBUG_F( print_gimple_stmt, stderr, get_field_arry_addr, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("get_field_arry_addr: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, get_field_arry_addr, 0);
+			    //DEBUG("\n");
 			    
-			    DEBUG_L("get_index: ");
-			    DEBUG_F( print_gimple_stmt, stderr, get_index, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("get_index: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, get_index, 0);
+			    //DEBUG("\n");
 
-			    DEBUG_L("get_offset: ");
-			    DEBUG_F( print_gimple_stmt, stderr, get_offset, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("get_offset: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, get_offset, 0);
+			    //DEBUG("\n");
 
-			    DEBUG_L("get_field_addr: ");
-			    DEBUG_F( print_gimple_stmt, stderr, get_field_addr, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("get_field_addr: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, get_field_addr, 0);
+			    //DEBUG("\n");
 			    
-			    DEBUG_L("temp_set: ");
-			    DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("temp_set: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
+			    //DEBUG("\n");
 			    
-			    DEBUG_L("final_set: ");
-			    DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
-			    DEBUG("\n");
+			    //DEBUG_L("final_set: ");
+			    //DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
+			    //DEBUG("\n");
 
 			    gsi_insert_before( &gsi, get_field_arry_addr, GSI_SAME_STMT);
 			    gsi_insert_before( &gsi, get_index, GSI_SAME_STMT);
@@ -475,7 +486,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  
 			} // end recognize_op ( rhs, info) switch
 
-		      //INDENT(-2);
+		      INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
 		  case ReorgT_If_Null:
@@ -683,7 +694,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_Malloc:
 		    {
 		      DEBUG_L("Transform ReorgT_Malloc\n");
-		      //INDENT(2);
+		      INDENT(2);
 
 		      // We need to use the user malloc function
 		      // declaration rather than the builtin!!!
@@ -695,15 +706,15 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree void_pointer_type_node = build_pointer_type ( void_type_node);
 		      param_type_list =
 			tree_cons ( NULL_TREE, void_pointer_type_node, param_type_list);
-		      //DEBUG_L("param_type_list: ");
-		      //DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
-		      //DEBUG("\n");
+		      DEBUG_L("param_type_list: ");
+		      DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
+		      DEBUG("\n");
 		      #if !USE_BUILT_IN_FREE
 		      tree free_return_type = void_type_node;
+		      DEBUG_L("free_return_type: ");
+		      DEBUG_F(print_generic_expr, stderr, free_return_type, (dump_flags_t)0);
+		      DEBUG("\n")
 		      #endif
-		      //DEBUG_L("free_return_type: ");
-		      //DEBUG_F(print_generic_expr, stderr, free_return_type, (dump_flags_t)0);
-		      //DEBUG("\n")
 		      #if USE_BUILT_IN_FREE
 		      tree fndecl_free = builtin_decl_implicit ( BUILT_IN_FREE);
 		      #else
@@ -723,9 +734,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree arg = gimple_call_arg( stmt, 0);
 		      // TBD: len is new SSA
 		      tree val = gimple_call_lhs( stmt);
-		      //DEBUG_L("val is: ");
-		      //DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
-		      //DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
+		      DEBUG_L("val is: ");
+		      DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
+		      DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
 		      //gcc_assert( TREE_CODE( TREE_TYPE(val)) == INDIRECT_REF);
 		      gcc_assert( TREE_CODE( TREE_TYPE(val)) == POINTER_TYPE);
 		      tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
@@ -733,7 +744,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //tree len = make_temp_ssa_name( sizetype, NULL, "fail_val");
 		      // The above segfaulted ??? note, it's not an idiom seen in gcc
 		      tree int_ptrsize_type = signed_type_for ( ptr_type_node);
-		      //DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
+		      DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
 		      gcc_assert ( TREE_TYPE ( size));
 		      tree len = make_temp_ssa_name ( TREE_TYPE ( size), NULL, "malloc_len");
 		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
@@ -757,12 +768,15 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      // Note in other places in this doc this would
 		      // be "insert glen before stmt" instead of this but
 		      // here we need to create new basic blocks.
+		      DEBUG_A("split_block <bb %d> to ", bb->index);
 		      edge new_edge = split_block ( bb, stmt);
 		      // FROM before_bb = edge->src // same as this bb
 		      basic_block before_bb = new_edge->src; // 
 		      basic_block after_bb = new_edge->dest;
 		      remove_edge ( new_edge);
 		      basic_block prev_bb = before_bb;
+		      DEBUG_A("before <bb %d> & after <bb %d>\n",
+			      before_bb->index, after_bb->index);
 		      
 		      // FROM failure_bb = create_empty_block(prev_bb)
 		      basic_block failure_bb = make_bb ( "failure_bb", prev_bb);
@@ -837,16 +851,16 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  tree base_field =
 			      find_coresponding_field ( base, field);
 
-			  //DEBUG_L("base_field: %p\n", base_field);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("base_field: %p\n", base_field);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  tree base_field_type = TREE_TYPE( base_field);
-			  //DEBUG_L("base_field_type: %p\n", base_field_type);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("base_field_type: %p\n", base_field_type);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
+			  DEBUG("\n");
 			  
 			  gimple_stmt_iterator gsi = gsi_start_bb ( new_bb);
 			  // Note, switching the order of edge creation and
@@ -878,32 +892,32 @@ str_reorg_instance_interleave_trans ( Info *info)
 						 base,
 						 base_field, NULL_TREE);
 
-			  //DEBUG_L("base: %p\n", base);
-			  //DEBUG_A("  base: ");
-			  //DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("base: %p\n", base);
+			  DEBUG_A("  base: ");
+			  DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
+			  DEBUG("\n");
 			  
-			  //DEBUG_L("field: %p\n", field);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("field: %p\n", field);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  tree field_type = TREE_TYPE( field);
-			  //DEBUG_L("field_type: %p\n", field_type);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("field_type: %p\n", field_type);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
+			  DEBUG("\n");
 			  
-			  //DEBUG_L("lhs_ass: %p\n", lhs_ass);
-			  //DEBUG_A("  lhs_ass: ");
-			  //DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("lhs_ass: %p\n", lhs_ass);
+			  DEBUG_A("  lhs_ass: ");
+			  DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  tree lhs_ass_type = TREE_TYPE ( lhs_ass);
-			  //DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
-			  //DEBUG_A("  lhs_ass_type: ");
-			  //DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
+			  DEBUG_A("  lhs_ass_type: ");
+			  DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  gcc_assert ( sizetype);
 			  tree mem_size = 
@@ -918,10 +932,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  // Move gprev_ok_field here
 			  
 			  // Move gfield_size here
+			  
+			  // Changed from TYPE_SIZE to TYPE_SIZE_UNIT
 			  gimple *gfield_size =
 			    gimple_build_assign ( field_size,
 						  CONVERT_EXPR,
-						  TYPE_SIZE ( TREE_TYPE ( field)));
+						  TYPE_SIZE_UNIT ( TREE_TYPE ( field)));
 			  SSA_NAME_DEF_STMT ( field_size) = gfield_size;
 
 			  // Move gsize here
@@ -941,10 +957,10 @@ str_reorg_instance_interleave_trans ( Info *info)
 			    make_temp_ssa_name ( TREE_TYPE ( base_field), NULL, "cast_res");
 
 			  tree res_type = TREE_TYPE( res);
-			  //DEBUG_L("res_type: %p\n", res_type);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("res_type: %p\n", res_type);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  // Move malloc_call here
 			  gcall *malloc_call = gimple_build_call( fndecl_malloc, 1, mem_size);
@@ -1127,11 +1143,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      
 		      //// FROM gsi_insert_after( &gsi, bad_field )
 
-		      //DEBUG_L("End of malloc:\n");
-		      //DEBUG_F( print_program, PRINT_FORMAT, stderr, 4);
+		      DEBUG_L("End of malloc... print function:\n");
+		      DEBUG_F(dump_function_header, stderr, func->decl, (dump_flags_t)0);
+		      DEBUG_F(dump_function_to_file, func->decl, stderr, (dump_flags_t)0);
 		    }
-		    //INDENT(-2);
-		    break;
+		    INDENT(-2);
+		    //break;
+		    goto exit_after_spilting_a_block;
 		  case ReorgT_Calloc:
 		    // TBD
 		    DEBUG_L("ReorgT_Calloc\n");
@@ -1347,7 +1365,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    internal_error( "Invalid transformation");
 		  }
 	      }
-	  }
+	  } // End loop over GIMPLE of
+	
+	// We must now operate on the next block since the last
+	// transformation started at the end of the first half of a
+	// block split as part of a transformation.
+      exit_after_spilting_a_block:
+	
 	// Iterate over the PHIs and for any PHI that is a reorgtype,
 	// transform any constant zero into it's new repersentation.
 	// OR MAYBE... use FOR_EACH_PHI_ARG for the iterator...
@@ -1361,8 +1385,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    gphi *phi = pi.phi ();
 	    gimple *stmt = static_cast <gimple *> (phi);
 	    
-	    DEBUG_A("phi: ");
-	    DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+	    //DEBUG_A("phi: ");
+	    //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 
 	    ReorgType_t *ri = contains_a_reorgtype( stmt, info);
 	    if ( ri != NULL && number_of_levels ( TREE_TYPE ( PHI_RESULT ( stmt))) == 1 )
@@ -1668,7 +1692,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    {
 	      if ( (*SSANAMES ( func))[j] == new_ssa_name )
 		{
-		  DEBUG_L("new name at j = %d\n",j);
+		  //DEBUG_L("new name at j = %d\n",j);
 		  break;
 		}
 	    }
@@ -1767,9 +1791,9 @@ find_deepest_comp_ref ( tree comp_ref_expr )
 static tree
 create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 {
-  DEBUG_A("create_deep_ref: ");
-  DEBUG_F(flexible_print, stderr, old_ref, 1, (dump_flags_t)0);
-  INDENT(4);
+  //DEBUG_A("create_deep_ref: ");
+  //DEBUG_F(flexible_print, stderr, old_ref, 1, (dump_flags_t)0);
+  //INDENT(4);
   tree inner_op0 = TREE_OPERAND( old_ref, 0);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
   enum tree_code top_code = TREE_CODE ( old_ref);
@@ -1779,9 +1803,9 @@ create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 	build2 ( MEM_REF, field_type, field_addr,
 		 build_int_cst (ptr_type_node, 0));
       
-      INDENT(-4);
-      DEBUG_A("returns deepest: ");
-      DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
+      //INDENT(-4);
+      //DEBUG_A("returns deepest: ");
+      //DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
       
       return deepest;
     }
@@ -1798,9 +1822,9 @@ create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 		 level_field,
 		 NULL_TREE);
 
-      INDENT(-4);
-      DEBUG_A("returns component_layer: ");
-      DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
+      //INDENT(-4);
+      //DEBUG_A("returns component_layer: ");
+      //DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
 
       return component_layer;
     }
@@ -1819,9 +1843,9 @@ create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 		 array_index,
 		 NULL_TREE, NULL_TREE);
 
-      INDENT(-4);
-      DEBUG_A("returns array_layer: ");
-      DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
+      //INDENT(-4);
+      //DEBUG_A("returns array_layer: ");
+      //DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
       
       return array_layer;
     }
@@ -2399,12 +2423,7 @@ reorg_perf_qual ( Info *info)
 
 		// create a tiny model of the cache big
 		// enough for this record.
-		#if 0
-		tree base_type_size = base_type_isa_decl ?
-		  DECL_SIZE ( base_type )
-		  :
-		  TYPE_SIZE ( base_type);
-		#else
+		// Note, changed TYPE_SIZE to TYPE_SIZE_UNIT below
 		tree base_type_size;
 		if ( base_type_isa_decl )
 		  {
@@ -2414,13 +2433,13 @@ reorg_perf_qual ( Info *info)
 		      case VAR_DECL:
 			{
 			  //DEBUG_A("VAR_DECL\n");
-			  base_type_size = TYPE_SIZE ( base_type);
+			  base_type_size = TYPE_SIZE_UNIT ( base_type);
 			  break;
 			}
 		      case FIELD_DECL:
 			{
 			  //DEBUG_A("VAR_DECL\n");
-			  base_type_size = TYPE_SIZE ( TREE_TYPE ( base_type));
+			  base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE ( base_type));
 			  break;
 			}
 		      default:
@@ -2435,14 +2454,13 @@ reorg_perf_qual ( Info *info)
 		    //DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
 		    if ( TREE_CODE ( base_type) == SSA_NAME )
 		      {
-			base_type_size = TYPE_SIZE ( TREE_TYPE( base_type));
+			base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE( base_type));
 		      }
 		    else
 		      {
-			base_type_size = TYPE_SIZE ( base_type);
+			base_type_size = TYPE_SIZE_UNIT ( base_type);
 		      }
 		  }
-		#endif
 		    
 		unsigned HOST_WIDE_INT len =
 		  (( tree_to_uhwi ( base_type_size)
