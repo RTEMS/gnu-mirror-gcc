@@ -4158,10 +4158,16 @@ rs6000_option_override_internal (bool global_init_p)
 
       if (rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT && TARGET_LONG_DOUBLE_128)
 	{
+	  /* Determine if the user can change the default long double type at
+	     compilation time.  Only C and C++ support this, and you need GLIBC
+	     2.32 or newer.  Only issue one warning.  */
 	  static bool warned_change_long_double;
-	  if (!warned_change_long_double)
+
+	  if (!warned_change_long_double
+	      && (!OPTION_GLIBC
+		  || (!lang_GNU_C () && !lang_GNU_CXX ())
+		  || ((TARGET_GLIBC_MAJOR * 1000) + TARGET_GLIBC_MINOR) < 2032))
 	    {
-	      warned_change_long_double = true;
 	      if (TARGET_IEEEQUAD)
 		warning (OPT_Wpsabi, "Using IEEE extended precision "
 			 "%<long double%>");
