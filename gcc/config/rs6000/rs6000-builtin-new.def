@@ -2178,7 +2178,7 @@
   const vsq __builtin_altivec_vadduqm (vsq, vsq);
     VADDUQM altivec_vadduqm {}
 
-  const vsll __builtin_altivec_vbpermq (vsc, vsc);
+  const vull __builtin_altivec_vbpermq (vuq, vuc);
     VBPERMQ altivec_vbpermq {}
 
   const vuc __builtin_altivec_vbpermq2 (vuc, vuc);
@@ -2543,7 +2543,7 @@
     VCMPAEW_P vector_ae_v4si_p {pred}
 
   const vsc __builtin_altivec_vcmpneb (vsc, vsc);
-    CMPNEB vcmpneb {}
+    VCMPNEB vcmpneb {}
 
   const signed int __builtin_altivec_vcmpneb_p (vsc, vsc);
     VCMPNEB_P vector_ne_v16qi_p {pred}
@@ -2558,13 +2558,13 @@
     VCMPNEFP_P vector_ne_v4sf_p {pred}
 
   const vss __builtin_altivec_vcmpneh (vss, vss);
-    CMPNEH vcmpneh {}
+    VCMPNEH vcmpneh {}
 
   const signed int __builtin_altivec_vcmpneh_p (vss, vss);
     VCMPNEH_P vector_ne_v8hi_p {pred}
 
   const vsi __builtin_altivec_vcmpnew (vsi, vsi);
-    CMPNEW vcmpnew {}
+    VCMPNEW vcmpnew {}
 
   const signed int __builtin_altivec_vcmpnew_p (vsi, vsi);
     VCMPNEW_P vector_ne_v4si_p {pred}
@@ -2662,7 +2662,7 @@
   const vd __builtin_vsx_insert_exp_dp (vop, vull);
     VIEDP xviexpdp {}
 
-  const vf __builtin_vsx_insert_exp_sp (vop, vull);
+  const vf __builtin_vsx_insert_exp_sp (vop, vui);
     VIESP xviexpsp {}
 
   const signed int __builtin_vsx_scalar_cmp_exp_dp_eq (double, double);

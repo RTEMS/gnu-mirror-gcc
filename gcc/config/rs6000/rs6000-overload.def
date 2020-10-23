@@ -88,6 +88,14 @@
   vd __builtin_vec_abs (vd);
     XVABSDP
 
+[VEC_ABSD, vec_absd, __builtin_vec_vadu]
+  vuc __builtin_vec_vadu (vuc, vuc);
+    VADUB
+  vus __builtin_vec_vadu (vus, vus);
+    VADUH
+  vui __builtin_vec_vadu (vui, vui);
+    VADUW
+
 [VEC_ABSS, vec_abss, __builtin_vec_abss]
   vsc __builtin_vec_abss (vsc);
     ABSS_V16QI
@@ -202,6 +210,14 @@
   vui __builtin_vec_avg (vui, vui);
     VAVGUW
 
+[VEC_BPERM, vec_bperm, __builtin_vec_vbperm_api]
+  vull __builtin_vec_vbperm_api (vull, vuc);
+    VBPERMD  VBPERMD_VULL
+  vull __builtin_vec_vbperm_api (vuq, vuc);
+    VBPERMD  VBPERMD_VUQ
+  vuc __builtin_vec_vbperm_api (vuc, vuc);
+    VBPERMQ2
+
 [VEC_CEIL, vec_ceil, __builtin_vec_ceil]
   vf __builtin_vec_ceil (vf);
     XVRSPIP
@@ -242,6 +258,40 @@
   vbll __builtin_vec_cmpeq (vd, vd);
     XVCMPEQDP
 
+; We skip generating a #define because of the C-versus-C++ complexity
+; in altivec.h.  Look there for the template-y details.
+[VEC_CMPEQ_P, SKIP, __builtin_vec_vcmpeq_p]
+  signed int __builtin_vec_vcmpeq_p (signed int, vuc, vuc);
+    VCMPEQUB_P  VCMPEQUB_PU
+  signed int __builtin_vec_vcmpeq_p (signed int, vsc, vsc);
+    VCMPEQUB_P  VCMPEQUB_PS
+  signed int __builtin_vec_vcmpeq_p (signed int, vbc, vbc);
+    VCMPEQUB_P  VCMPEQUB_PB
+  signed int __builtin_vec_vcmpeq_p (signed int, vus, vus);
+    VCMPEQUH_P  VCMPEQUH_PU
+  signed int __builtin_vec_vcmpeq_p (signed int, vss, vss);
+    VCMPEQUH_P  VCMPEQUH_PS
+  signed int __builtin_vec_vcmpeq_p (signed int, vbs, vbs);
+    VCMPEQUH_P  VCMPEQUH_PB
+  signed int __builtin_vec_vcmpeq_p (signed int, vp, vp);
+    VCMPEQUH_P  VCMPEQUH_PP
+  signed int __builtin_vec_vcmpeq_p (signed int, vui, vui);
+    VCMPEQUW_P  VCMPEQUW_PU
+  signed int __builtin_vec_vcmpeq_p (signed int, vsi, vsi);
+    VCMPEQUW_P  VCMPEQUW_PS
+  signed int __builtin_vec_vcmpeq_p (signed int, vbi, vbi);
+    VCMPEQUW_P  VCMPEQUW_PB
+  signed int __builtin_vec_vcmpeq_p (signed int, vull, vull);
+    VCMPEQUD_P  VCMPEQUD_PU
+  signed int __builtin_vec_vcmpeq_p (signed int, vsll, vsll);
+    VCMPEQUD_P  VCMPEQUD_PS
+  signed int __builtin_vec_vcmpeq_p (signed int, vbll, vbll);
+    VCMPEQUD_P  VCMPEQUD_PB
+  signed int __builtin_vec_vcmpeq_p (signed int, vf, vf);
+    XVCMPEQSP_P
+  signed int __builtin_vec_vcmpeq_p (signed int, vd, vd);
+    XVCMPEQDP_P
+
 [VEC_CMPGE, vec_cmpge, __builtin_vec_cmpge]
   vbc __builtin_vec_cmpge (vsc, vsc);
     CMPGE_16QI  CMPGE_16QI_VSC
@@ -263,6 +313,33 @@
     XVCMPGESP
   vbll __builtin_vec_cmpge (vd, vd);
     XVCMPGEDP
+
+; We skip generating a #define because of the C-versus-C++ complexity
+; in altivec.h.  Look there for the template-y details.
+; Also, cmpge is the same as cmpgt for all cases except floating point.
+; There is further code to deal with this special case in
+; altivec_build_resolved_builtin.  TODO: Make sure this is still true.
+[VEC_CMPGE_P, SKIP, __builtin_vec_vcmpgt_p]
+  signed int __builtin_vec_vcmpgt_p (signed int, vuc, vuc);
+    VCMPGTUB_P  VCMPGTUB_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vsc, vsc);
+    VCMPGTSB_P  VCMPGTSB_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vus, vus);
+    VCMPGTUH_P  VCMPGTUH_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vss, vss);
+    VCMPGTSH_P  VCMPGTSH_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vui, vui);
+    VCMPGTUW_P  VCMPGTUW_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vsi, vsi);
+    VCMPGTSW_P  VCMPGTSW_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vull, vull);
+    VCMPGTUD_P  VCMPGTUD_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vsll, vsll);
+    VCMPGTSD_P  VCMPGTSD_PR
+  signed int __builtin_vec_vcmpgt_p (signed int, vf, vf);
+    XVCMPGESP_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vd, vd);
+    XVCMPGEDP_P
 
 [VEC_CMPGT, vec_cmpgt, __builtin_vec_cmpgt]
   vbc __builtin_vec_cmpgt (vsc, vsc);
@@ -286,11 +363,125 @@
   vbll __builtin_vec_cmpgt (vd, vd);
     XVCMPGTDP
 
+; We skip generating a #define because of the C-versus-C++ complexity
+; in altivec.h.  Look there for the template-y details.
+[VEC_CMPGT_P, SKIP, __builtin_vec_vcmpgt_p]
+  signed int __builtin_vec_vcmpgt_p (signed int, vuc, vuc);
+    VCMPGTUB_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vsc, vsc);
+    VCMPGTSB_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vus, vus);
+    VCMPGTUH_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vss, vss);
+    VCMPGTSH_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vui, vui);
+    VCMPGTUW_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vsi, vsi);
+    VCMPGTSW_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vull, vull);
+    VCMPGTUD_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vsll, vsll);
+    VCMPGTSD_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vf, vf);
+    XVCMPGTSP_P
+  signed int __builtin_vec_vcmpgt_p (signed int, vd, vd);
+    XVCMPGTDP_P
+
 ; Note that there is no entry for VEC_CMPLE.  VEC_CMPLE is implemented
 ; using VEC_CMPGE with reversed arguments in altivec.h.
 
 ; Note that there is no entry for VEC_CMPLT.  VEC_CMPLT is implemented
 ; using VEC_CMPGT with reversed arguments in altivec.h.
+
+[VEC_CMPNE, vec_cmpne, __builtin_vec_cmpne]
+  vbc __builtin_vec_cmpne (vbc, vbc);
+    VCMPNEB  VCMPNEB_VBC
+  vbc __builtin_vec_cmpne (vsc, vsc);
+    VCMPNEB  VCMPNEB_VSC
+  vbc __builtin_vec_cmpne (vuc, vuc);
+    VCMPNEB  VCMPNEB_VUC
+  vbs __builtin_vec_cmpne (vbs, vbs);
+    VCMPNEH  VCMPNEH_VBS
+  vbs __builtin_vec_cmpne (vss, vss);
+    VCMPNEH  VCMPNEH_VSS
+  vbs __builtin_vec_cmpne (vus, vus);
+    VCMPNEH  VCMPNEH_VUS
+  vbi __builtin_vec_cmpne (vbi, vbi);
+    VCMPNEW  VCMPNEW_VBI
+  vbi __builtin_vec_cmpne (vsi, vsi);
+    VCMPNEW  VCMPNEW_VSI
+  vbi __builtin_vec_cmpne (vui, vui);
+    VCMPNEW  VCMPNEW_VUI
+
+; We skip generating a #define because of the C-versus-C++ complexity
+; in altivec.h.  Look there for the template-y details.
+[VEC_CMPNE_P, SKIP, __builtin_vec_vcmpne_p]
+  signed int __builtin_vec_vcmpne_p (vsc, vsc);
+    VCMPNEB_P  VCMPNEB_VSC_P
+  signed int __builtin_vec_vcmpne_p (vuc, vuc);
+    VCMPNEB_P  VCMPNEB_VUC_P
+  signed int __builtin_vec_vcmpne_p (vbc, vbc);
+    VCMPNEB_P  VCMPNEB_VBC_P
+  signed int __builtin_vec_vcmpne_p (vss, vss);
+    VCMPNEH_P  VCMPNEH_VSS_P
+  signed int __builtin_vec_vcmpne_p (vus, vus);
+    VCMPNEH_P  VCMPNEH_VUS_P
+  signed int __builtin_vec_vcmpne_p (vbs, vbs);
+    VCMPNEH_P  VCMPNEH_VBS_P
+  signed int __builtin_vec_vcmpne_p (vp, vp);
+    VCMPNEH_P  VCMPNEH_VP_P
+  signed int __builtin_vec_vcmpne_p (vsi, vsi);
+    VCMPNEW_P  VCMPNEW_VSI_P
+  signed int __builtin_vec_vcmpne_p (vui, vui);
+    VCMPNEW_P  VCMPNEW_VUI_P
+  signed int __builtin_vec_vcmpne_p (vbi, vbi);
+    VCMPNEW_P  VCMPNEW_VBI_P
+  signed int __builtin_vec_vcmpne_p (vsll, vsll);
+    VCMPNED_P  VCMPNED_VSLL_P
+  signed int __builtin_vec_vcmpne_p (vull, vull);
+    VCMPNED_P  VCMPNED_VULL_P
+  signed int __builtin_vec_vcmpne_p (vbll, vbll);
+    VCMPNED_P  VCMPNED_VBLL_P
+  signed int __builtin_vec_vcmpne_p (vf, vf);
+    VCMPNEFP_P
+  signed int __builtin_vec_vcmpne_p (vd, vd);
+    VCMPNEDP_P
+
+[VEC_CNTLZ, vec_cntlz, __builtin_vec_vclz]
+  vsc __builtin_vec_vclz (vsc);
+    VCLZB  VCLZB_S
+  vuc __builtin_vec_vclz (vuc);
+    VCLZB  VCLZB_U
+  vss __builtin_vec_vclz (vss);
+    VCLZH  VCLZH_S
+  vus __builtin_vec_vclz (vus);
+    VCLZH  VCLZH_U
+  vsi __builtin_vec_vclz (vsi);
+    VCLZW  VCLZW_S
+  vui __builtin_vec_vclz (vui);
+    VCLZW  VCLZW_U
+  vsll __builtin_vec_vclz (vsll);
+    VCLZD  VCLZD_S
+  vull __builtin_vec_vclz (vull);
+    VCLZD  VCLZD_U
+
+[VEC_CNTTZ, vec_cnttz, __builtin_vec_vctz]
+  vsc __builtin_vec_vctz (vsc);
+    VCTZB  VCTZB_S
+  vuc __builtin_vec_vctz (vuc);
+    VCTZB  VCTZB_U
+  vss __builtin_vec_vctz (vss);
+    VCTZH  VCTZH_S
+  vus __builtin_vec_vctz (vus);
+    VCTZH  VCTZH_U
+  vsi __builtin_vec_vctz (vsi);
+    VCTZW  VCTZW_S
+  vui __builtin_vec_vctz (vui);
+    VCTZW  VCTZW_U
+  vsll __builtin_vec_vctz (vsll);
+    VCTZD  VCTZD_S
+  vull __builtin_vec_vctz (vull);
+    VCTZD  VCTZD_U
 
 [VEC_CONVERT_4F32_8I16, SKIP, __builtin_vec_convert_4f32_8i16]
   vus __builtin_vec_convert_4f32_8i16 (vf, vf);
@@ -543,6 +734,36 @@
     DSTT  DSTT_VBI
   void __builtin_vec_dstt (vf *, const int, const int);
     DSTT  DSTT_VF
+
+[VEC_EQV, vec_eqv, __builtin_vec_eqv]
+  vsc __builtin_vec_eqv (vsc, vsc);
+    EQV_V16QI
+  vuc __builtin_vec_eqv (vuc, vuc);
+    EQV_V16QI_UNS  EQV_V16QI_VUC
+  vbc __builtin_vec_eqv (vbc, vbc);
+    EQV_V16QI_UNS  EQV_V16QI_VBC
+  vss __builtin_vec_eqv (vss, vss);
+    EQV_V8HI
+  vus __builtin_vec_eqv (vus, vus);
+    EQV_V8HI_UNS  EQV_V8HI_VUS
+  vbs __builtin_vec_eqv (vbs, vbs);
+    EQV_V8HI_UNS  EQV_V8HI_VBS
+  vsi __builtin_vec_eqv (vsi, vsi);
+    EQV_V4SI
+  vui __builtin_vec_eqv (vui, vui);
+    EQV_V4SI_UNS  EQV_V4SI_VUI
+  vbi __builtin_vec_eqv (vbi, vbi);
+    EQV_V4SI_UNS  EQV_V4SI_VBI
+  vsll __builtin_vec_eqv (vsll, vsll);
+    EQV_V2DI
+  vull __builtin_vec_eqv (vull, vull);
+    EQV_V2DI_UNS  EQV_V2DI_VULL
+  vbll __builtin_vec_eqv (vbll, vbll);
+    EQV_V2DI_UNS  EQV_V2DI_VBLL
+  vf __builtin_vec_eqv (vf, vf);
+    EQV_V4SF
+  vd __builtin_vec_eqv (vd, vd);
+    EQV_V2DF
 
 [VEC_EXPTE, vec_expte, __builtin_vec_expte]
   vf __builtin_vec_expte (vf);
@@ -944,6 +1165,32 @@
   vuc __builtin_vec_lvsr (signed long long, signed char *);
     LVSR  LVSR_SC
 
+[VEC_LXVL, vec_xl_len, __builtin_vec_lxvl]
+  vsc __builtin_vec_lxvl (signed char *, unsigned long long);
+    LXVL  LXVL_VSC
+  vuc __builtin_vec_lxvl (unsigned char *, unsigned long long);
+    LXVL  LXVL_VUC
+  vss __builtin_vec_lxvl (signed short *, unsigned long long);
+    LXVL  LXVL_VSS
+  vus __builtin_vec_lxvl (unsigned short *, unsigned long long);
+    LXVL  LXVL_VUS
+  vsi __builtin_vec_lxvl (signed int *, unsigned long long);
+    LXVL  LXVL_VSI
+  vui __builtin_vec_lxvl (unsigned int *, unsigned long long);
+    LXVL  LXVL_VUI
+  vsll __builtin_vec_lxvl (signed long long *, unsigned long long);
+    LXVL  LXVL_VSLL
+  vull __builtin_vec_lxvl (unsigned long long *, unsigned long long);
+    LXVL  LXVL_VULL
+  vsq __builtin_vec_lxvl (signed __int128 *, unsigned long long);
+    LXVL  LXVL_VSQ
+  vuq __builtin_vec_lxvl (unsigned __int128 *, unsigned long long);
+    LXVL  LXVL_VUQ
+  vf __builtin_vec_lxvl (float *, unsigned long long);
+    LXVL  LXVL_VF
+  vd __builtin_vec_lxvl (double *, unsigned long long);
+    LXVL  LXVL_VD
+
 [VEC_MADD, vec_madd, __builtin_vec_madd]
   vss __builtin_vec_madd (vss, vss, vss);
     VMLADDUHM  VMLADDUHM_VSS
@@ -1174,6 +1421,36 @@
   vd __builtin_vec_nabs (vd);
     NABS_V2DF
 
+[VEC_NAND, vec_nand, __builtin_vec_nand]
+  vsc __builtin_vec_nand (vsc, vsc);
+    NAND_V16QI
+  vuc __builtin_vec_nand (vuc, vuc);
+    NAND_V16QI_UNS  NAND_VUC
+  vbc __builtin_vec_nand (vbc, vbc);
+    NAND_V16QI_UNS  NAND_VBC
+  vss __builtin_vec_nand (vss, vss);
+    NAND_V8HI
+  vus __builtin_vec_nand (vus, vus);
+    NAND_V8HI_UNS  NAND_VUS
+  vbs __builtin_vec_nand (vbs, vbs);
+    NAND_V8HI_UNS  NAND_VBS
+  vsi __builtin_vec_nand (vsi, vsi);
+    NAND_V4SI
+  vui __builtin_vec_nand (vui, vui);
+    NAND_V4SI_UNS  NAND_VUI
+  vbi __builtin_vec_nand (vbi, vbi);
+    NAND_V4SI_UNS  NAND_VBI
+  vsll __builtin_vec_nand (vsll, vsll);
+    NAND_V2DI
+  vull __builtin_vec_nand (vull, vull);
+    NAND_V2DI_UNS  NAND_VULL
+  vbll __builtin_vec_nand (vbll, vbll);
+    NAND_V2DI_UNS  NAND_VBLL
+  vf __builtin_vec_nand (vf, vf);
+    NAND_V4SF
+  vd __builtin_vec_nand (vd, vd);
+    NAND_V2DF
+
 [VEC_NEARBYINT, vec_nearbyint, __builtin_vec_nearbyint]
   vf __builtin_vec_nearbyint (vf);
     XVRSPI  XVRSPI_NBI
@@ -1265,6 +1542,36 @@
     VOR_V4SF
   vd __builtin_vec_or (vd, vd);
     VOR_V2DF
+
+[VEC_ORC, vec_orc, __builtin_vec_orc]
+  vsc __builtin_vec_orc (vsc, vsc);
+    ORC_V16QI
+  vuc __builtin_vec_orc (vuc, vuc);
+    ORC_V16QI_UNS  ORC_VUC
+  vbc __builtin_vec_orc (vbc, vbc);
+    ORC_V16QI_UNS  ORC_VBC
+  vss __builtin_vec_orc (vss, vss);
+    ORC_V8HI
+  vus __builtin_vec_orc (vus, vus);
+    ORC_V8HI_UNS  ORC_VUS
+  vbs __builtin_vec_orc (vbs, vbs);
+    ORC_V8HI_UNS  ORC_VBS
+  vsi __builtin_vec_orc (vsi, vsi);
+    ORC_V4SI
+  vui __builtin_vec_orc (vui, vui);
+    ORC_V4SI_UNS  ORC_VUI
+  vbi __builtin_vec_orc (vbi, vbi);
+    ORC_V4SI_UNS  ORC_VBI
+  vsll __builtin_vec_orc (vsll, vsll);
+    ORC_V2DI
+  vull __builtin_vec_orc (vull, vull);
+    ORC_V2DI_UNS  ORC_VULL
+  vbll __builtin_vec_orc (vbll, vbll);
+    ORC_V2DI_UNS  ORC_VBLL
+  vf __builtin_vec_orc (vf, vf);
+    ORC_V4SF
+  vd __builtin_vec_orc (vd, vd);
+    ORC_V2DF
 
 [VEC_PACK, vec_pack, __builtin_vec_pack]
   vsc __builtin_vec_pack (vss, vss);
@@ -2057,6 +2364,32 @@
   void __builtin_vec_stvrxl (vf, signed long long, float *);
     STVRXL  STVRXL_F
 
+[VEC_STXVL, vec_xst_len, __builtin_vec_stxvl]
+  void __builtin_vec_stxvl (vsc, signed char *, unsigned long long);
+    STXVL  STXVL_VSC
+  void __builtin_vec_stxvl (vuc, unsigned char *, unsigned long long);
+    STXVL  STXVL_VUC
+  void __builtin_vec_stxvl (vss, signed short *, unsigned long long);
+    STXVL  STXVL_VSS
+  void __builtin_vec_stxvl (vus, unsigned short *, unsigned long long);
+    STXVL  STXVL_VUS
+  void __builtin_vec_stxvl (vsi, signed int *, unsigned long long);
+    STXVL  STXVL_VSI
+  void __builtin_vec_stxvl (vui, unsigned int *, unsigned long long);
+    STXVL  STXVL_VUI
+  void __builtin_vec_stxvl (vsll, signed long long *, unsigned long long);
+    STXVL  STXVL_VSLL
+  void __builtin_vec_stxvl (vull, unsigned long long *, unsigned long long);
+    STXVL  STXVL_VULL
+  void __builtin_vec_stxvl (vsq, signed __int128 *, unsigned long long);
+    STXVL  STXVL_VSQ
+  void __builtin_vec_stxvl (vuq, unsigned __int128 *, unsigned long long);
+    STXVL  STXVL_VUQ
+  void __builtin_vec_stxvl (vf, float *, unsigned long long);
+    STXVL  STXVL_VF
+  void __builtin_vec_stxvl (vd, double *, unsigned long long);
+    STXVL  STXVL_VD
+
 [VEC_SUB, vec_sub, __builtin_vec_sub]
   vsc __builtin_vec_sub (vsc, vsc);
     VSUBUBM  VSUBUBM_VSC
@@ -2129,6 +2462,30 @@
   vd __builtin_vec_trunc (vd);
     XVRDPIZ
 
+[VEC_TSTSFI_GT, SKIP, __builtin_dfp_dtstsfi_gt]
+  signed int __builtin_dfp_dtstsfi_gt (unsigned int, _Decimal64);
+    TSTSFI_GT_DD
+  signed int __builtin_dfp_dtstsfi_gt (unsigned int, _Decimal128);
+    TSTSFI_GT_TD
+
+[VEC_TSTSFI_EQ, SKIP, __builtin_dfp_dtstsfi_eq]
+  signed int __builtin_dfp_dtstsfi_eq (unsigned int, _Decimal64);
+    TSTSFI_EQ_DD
+  signed int __builtin_dfp_dtstsfi_eq (unsigned int, _Decimal128);
+    TSTSFI_EQ_TD
+
+[VEC_TSTSFI_LT, SKIP, __builtin_dfp_dtstsfi_lt]
+  signed int __builtin_dfp_dtstsfi_lt (unsigned int, _Decimal64);
+    TSTSFI_LT_DD
+  signed int __builtin_dfp_dtstsfi_lt (unsigned int, _Decimal128);
+    TSTSFI_LT_TD
+
+[VEC_TSTSFI_OV, SKIP, __builtin_dfp_dtstsfi_ov]
+  signed int __builtin_dfp_dtstsfi_ov (unsigned int, _Decimal64);
+    TSTSFI_OV_DD
+  signed int __builtin_dfp_dtstsfi_ov (unsigned int, _Decimal128);
+    TSTSFI_OV_TD
+
 [VEC_UNPACKH, vec_unpackh, __builtin_vec_unpackh]
   vss __builtin_vec_unpackh (vsc);
     VUPKHSB  VUPKHSB_VSC
@@ -2164,6 +2521,96 @@
     VUPKLSW  VUPKLSW_VBI
   vd __builtin_vec_unpackl (vf);
     DOUBLEL_V4SF VUPKLF
+
+[VEC_VEE, vec_extract_exp, __builtin_vec_extract_exp]
+  vui __builtin_vec_extract_exp (vf);
+    VEESP
+  vull __builtin_vec_extract_exp (vd);
+    VEEDP
+
+[VEC_VES, vec_extract_sig, __builtin_vec_extract_sig]
+  vui __builtin_vec_extract_sig (vf);
+    VESSP
+  vull __builtin_vec_extract_sig (vd);
+    VESDP
+
+[VEC_VIE, vec_insert_exp, __builtin_vec_insert_exp]
+  vf __builtin_vec_insert_exp (vf, vui);
+    VIESP  VIESP_VF
+  vf __builtin_vec_insert_exp (vui, vui);
+    VIESP  VIESP_VUI
+  vd __builtin_vec_insert_exp (vd, vull);
+    VIEDP  VIEDP_VD
+  vd __builtin_vec_insert_exp (vull, vull);
+    VIEDP  VIEDP_VULL
+
+[VEC_VSCEEQ, scalar_cmp_exp_eq, __builtin_vec_scalar_cmp_exp_eq]
+  signed int __builtin_vec_scalar_cmp_exp_eq (double, double);
+    VSCEDPEQ
+  signed int __builtin_vec_scalar_cmp_exp_eq (_Float128, _Float128);
+    VSCEQPEQ
+
+[VEC_VSCEGT, scalar_cmp_exp_gt, __builtin_vec_scalar_cmp_exp_gt]
+  signed int __builtin_vec_scalar_cmp_exp_gt (double, double);
+    VSCEDPGT
+  signed int __builtin_vec_scalar_cmp_exp_gt (_Float128, _Float128);
+    VSCEQPGT
+
+[VEC_VSCELT, scalar_cmp_exp_lt, __builtin_vec_scalar_cmp_exp_lt]
+  signed int __builtin_vec_scalar_cmp_exp_lt (double, double);
+    VSCEDPLT
+  signed int __builtin_vec_scalar_cmp_exp_lt (_Float128, _Float128);
+    VSCEQPLT
+
+[VEC_VSCEUO, scalar_cmp_exp_unordered, __builtin_vec_scalar_cmp_exp_unordered]
+  signed int __builtin_vec_scalar_cmp_exp_unordered (double, double);
+    VSCEDPUO
+  signed int __builtin_vec_scalar_cmp_exp_unordered (_Float128, _Float128);
+    VSCEQPUO
+
+[VEC_VSEE, scalar_extract_exp, __builtin_vec_scalar_extract_exp]
+  unsigned int __builtin_vec_scalar_extract_exp (double);
+    VSEEDP
+  unsigned int __builtin_vec_scalar_extract_exp (_Float128);
+    VSEEQP
+
+[VEC_VSES, scalar_extract_sig, __builtin_vec_scalar_extract_sig]
+  unsigned int __builtin_vec_scalar_extract_sig (double);
+    VSESDP
+  unsigned int __builtin_vec_scalar_extract_sig (_Float128);
+    VSESQP
+
+[VEC_VSIE, scalar_insert_exp, __builtin_vec_scalar_insert_exp]
+  double __builtin_vec_scalar_insert_exp (unsigned int, unsigned int);
+    VSIEDP  VSIEDP_UI
+  double __builtin_vec_scalar_insert_exp (double, unsigned int);
+    VSIEDP  VSIEDP_D
+  _Float128 __builtin_vec_scalar_insert_exp (unsigned long long, unsigned long long);
+    VSIEQP  VSIEQP_ULL
+  _Float128 __builtin_vec_scalar_insert_exp (_Float128, unsigned long long);
+    VSIEQP  VSIEQP_F128
+
+[VEC_VSTDC, scalar_test_data_class, __builtin_vec_scalar_test_data_class]
+  bool __builtin_vec_scalar_test_data_class (float, signed int);
+    VSTDCSP
+  bool __builtin_vec_scalar_test_data_class (double, signed int);
+    VSTDCDP
+  bool __builtin_vec_scalar_test_data_class (_Float128, signed int);
+    VSTDCQP
+
+[VEC_VSTDCN, scalar_test_neg, __builtin_vec_scalar_test_neg]
+  bool __builtin_vec_scalar_test_neg (float);
+    VSTDCNSP
+  bool __builtin_vec_scalar_test_neg (double);
+    VSTDCNDP
+  bool __builtin_vec_scalar_test_neg (_Float128);
+    VSTDCNQP
+
+[VEC_VTDC, vec_test_data_class, __builtin_vec_test_data_class]
+  vbi __builtin_vec_test_data_class (vf, signed int);
+    VTDCSP
+  vbll __builtin_vec_test_data_class (vd, signed int);
+    VTDCDP
 
 [VEC_XL, vec_xl, __builtin_vec_vsx_ld]
   vsc __builtin_vec_vsx_ld (signed long long, vsc *);
@@ -2258,6 +2705,10 @@
     LD_ELEMREV_V2DF  LD_ELEMREV_VD
   vd __builtin_vec_xl_be (signed long long, double *);
     LD_ELEMREV_V2DF  LD_ELEMREV_DD
+
+[VEC_XL_LEN_R, vec_xl_len_r, __builtin_vec_xl_len_r]
+  vuc __builtin_vsx_xl_len_r (unsigned char *, unsigned long long);
+    XL_LEN_R
 
 [VEC_XOR, vec_xor, __builtin_vec_xor]
   vsc __builtin_vec_xor (vsc, vsc);
@@ -2416,6 +2867,10 @@
     STXVD2X_V2DF  STXVD2X_VD_BE
   void __builtin_vec_xst_be (vd, signed long long, double *);
     STXVD2X_V2DF  STXVD2X_D_BE
+
+[VEC_XST_LEN_R, vec_xst_len_r, __builtin_vec_xst_len_r]
+  void __builtin_vsx_xst_len_r (vuc, unsigned char *, unsigned long long);
+    XST_LEN_R
 
 [VEC_XXPERMDI, vec_xxpermdi, __builtin_vsx_xxpermdi]
   vsc __builtin_vsx_xxpermdi (vsc, vsc, const int);
