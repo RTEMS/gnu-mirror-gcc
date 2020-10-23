@@ -102,7 +102,7 @@ public:
   typedef hash_map <const svalue *, entry_t> map_t;
   typedef map_t::iterator iterator_t;
 
-  sm_state_map (const state_machine &sm, int m_sm_idx);
+  sm_state_map (const state_machine &sm);
 
   sm_state_map *clone () const;
 
@@ -163,7 +163,6 @@ public:
 
 private:
   const state_machine &m_sm;
-  int m_sm_idx;
   map_t m_map;
   state_machine::state_t m_global_state;
 };
