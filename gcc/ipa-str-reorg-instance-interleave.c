@@ -78,6 +78,7 @@ static void create_a_new_type ( Info_t *, tree);
 static unsigned int reorg_perf_qual ( Info *);
 static tree find_coresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
+static void make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *, tree *, Info_t *);
 static tree find_deepest_comp_ref ( tree);
 static tree create_deep_ref ( tree, tree, tree);
 static void set_lhs_for ( gimple *, tree);
@@ -286,111 +287,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 			{
 			case ReorgOpT_Indirect:
 			  {
-			    // For deeply nested case we need the lowest.
-			    tree lowest_comp_ref = find_deepest_comp_ref ( ro_side);
-			    DEBUG_A("lowest_comp_ref = ");
-			    DEBUG_F(flexible_print, stderr, lowest_comp_ref, 1, (dump_flags_t)0);
-			    tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
-			    tree field_type = TREE_TYPE ( orig_field);
-			    tree base = ri->instance_interleave.base;
-			    DEBUG_A("orig_field, field_type, base  = ");
-			    DEBUG_F(flexible_print, stderr, orig_field, 2, (dump_flags_t)0);
-			    DEBUG_F(flexible_print, stderr, field_type, 2, (dump_flags_t)0);
-			    DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
+			    tree ref_expr;
+			    tree field_val_temp;
+			    gimple_seq ref_seq = NULL;
 			    
-			    tree base_field =
-			      find_coresponding_field ( base, orig_field);
-			    
-			    tree base_field_type = TREE_TYPE( base_field);
-
-			    DEBUG_A("base_field, base_field_type: ");
-			    DEBUG_F(flexible_print, stderr, base_field, 2, (dump_flags_t)0);
-			    DEBUG_F(flexible_print, stderr, base_field_type, 1, (dump_flags_t)0);
-
-			    // The this changes because it the lowest field now
-			    //gcc_assert ( field_type);
-			    //tree field_val_temp = 
-			    //  make_temp_ssa_name( field_type, NULL, "field_val_temp");
-			    //tree top_field = TREE_OPERAND ( ro_side, 1);	
-			    //tree top_field_type = TREE_TYPE ( top_field);
-			    tree top_field_type = TREE_TYPE ( ro_side);
-			    tree field_val_temp =
-			      make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
-
-			    tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
-			    inner_op = TREE_OPERAND( inner_op, 0);
-			    //DEBUG_L("inner_op: ");
-			    //DEBUG_F( print_generic_expr, stderr, inner_op, (dump_flags_t)0);
-			    //DEBUG("\n");
-			    
-			    // For either case generate common code:
-			    
-			    // field_array = _base.f
-			    gcc_assert ( base_field_type);
-			    // Note, this looks like trouble because this is a structure
-			    // type for a deeply nested type. Maybe wrap it it in a
-			    // pointer if deeply nested???
-			    tree field_arry_addr =
-			      make_temp_ssa_name( base_field_type, NULL, "field_arry_addr");
-
-			    tree rhs_faa = build3 ( COMPONENT_REF,
-						    // ???
-						    base_field_type, 
-						    //ptr_type_node, // This seems bogus
-						    base,
-						    base_field,
-						    // This almost certainly is bogus
-						    // If this "works" the the types
-						    // of fields are messed up.
-						    //orig_field,
-						    NULL_TREE);
-
-		            // Use this to access the array of element.
-			    gimple *get_field_arry_addr =
-			      gimple_build_assign( field_arry_addr, rhs_faa);
-			    SSA_NAME_DEF_STMT ( field_arry_addr) = get_field_arry_addr;
-
-			    // index = a
-			    gcc_assert ( sizetype);
-			    tree index =
-			      make_temp_ssa_name( sizetype, NULL, "index");
-			    gimple *get_index =
-			      gimple_build_assign( index, CONVERT_EXPR, inner_op);
-			    SSA_NAME_DEF_STMT ( index) = get_index;
+			    make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, info);
 
 			    gimple *temp_set;
 			    gimple *final_set;
-
-			    // offset = index * size_of_field
-			    
-			    // Note base_field_type is a pointer and
-			    // we want the size of what's pointer to
-			    // instead
-			    //tree size_of_field = TYPE_SIZE_UNIT ( base_field_type);
-			    tree size_of_field = TYPE_SIZE_UNIT ( field_type);
-			    
-			    gcc_assert ( sizetype);
-			    tree offset = make_temp_ssa_name( sizetype, NULL, "offset");
-
-			    gimple *get_offset = gimple_build_assign ( offset, MULT_EXPR, index, size_of_field);
-			    SSA_NAME_DEF_STMT ( offset) = get_offset;
-
-			    // field_addr = field_array + offset
-			    gcc_assert ( base_field_type);
-			    tree field_addr =
-			      make_temp_ssa_name( base_field_type, NULL, "field_addr");
-
-			    gimple *get_field_addr = 
-			      gimple_build_assign ( field_addr, POINTER_PLUS_EXPR, field_arry_addr, offset);
-			    SSA_NAME_DEF_STMT ( field_addr) = get_field_addr;
-
-			    #if 0
-			    // Tried other idioms here (tricky)
-			    tree ref_expr = build2 ( MEM_REF, field_type, field_addr,
-						    build_int_cst (ptr_type_node, 0));
-			    #else
-			    tree ref_expr = create_deep_ref ( ro_side, field_type, field_addr);
-			    #endif
 
 			    if ( ro_on_left )
 			      {
@@ -441,22 +345,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 				SSA_NAME_DEF_STMT ( lhs) = final_set;
 			      }
 			    
-			    //DEBUG_L("get_field_arry_addr: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_field_arry_addr, 0);
-			    //DEBUG("\n");
-			    
-			    //DEBUG_L("get_index: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_index, 0);
-			    //DEBUG("\n");
-
-			    //DEBUG_L("get_offset: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_offset, 0);
-			    //DEBUG("\n");
-
-			    //DEBUG_L("get_field_addr: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, get_field_addr, 0);
-			    //DEBUG("\n");
-			    
 			    //DEBUG_L("temp_set: ");
 			    //DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
 			    //DEBUG("\n");
@@ -465,13 +353,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 			    //DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
 			    //DEBUG("\n");
 
-			    gsi_insert_before( &gsi, get_field_arry_addr, GSI_SAME_STMT);
-			    gsi_insert_before( &gsi, get_index, GSI_SAME_STMT);
-			    gsi_insert_before( &gsi, get_offset, GSI_SAME_STMT);
-			    gsi_insert_before( &gsi, get_field_addr, GSI_SAME_STMT);
+			    gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
 			    gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
 			    gsi_insert_before( &gsi, final_set, GSI_SAME_STMT);
-			    
 			      
 			    //delete stmt
 			    gsi_remove ( &gsi, true);
@@ -1770,6 +1654,101 @@ str_reorg_instance_interleave_trans ( Info *info)
   // dominace info here is a really bad idea.
 
   return 0;
+}
+
+// For ref_in which is a ReorgOpT_Indirect, create gimple
+// sequence to setup a transformed ref and the ref itself.
+static void
+make_transformed_ref ( tree ref_in,
+		       ReorgType_t *ri,
+		       tree *ref_out,
+		       gimple_seq *pre_ref_seq,
+		       tree *field_val_temp,
+		       Info_t *info )
+{
+  
+  // For deeply nested case we need the lowest.
+  tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
+
+  tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
+  tree field_type = TREE_TYPE ( orig_field);
+  tree base = ri->instance_interleave.base;
+	
+  tree base_field =
+    find_coresponding_field ( base, orig_field);
+  
+  tree base_field_type = TREE_TYPE( base_field);
+  
+  // The this changes because it the lowest field now
+  tree top_field_type = TREE_TYPE ( ref_in);
+  
+  *field_val_temp =
+    make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
+  
+  tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
+  inner_op = TREE_OPERAND( inner_op, 0);
+  
+  // For either case generate common code:
+  
+  // field_array = _base.f
+  gcc_assert ( base_field_type);
+  // Note, this looks like trouble because this is a structure
+  // type for a deeply nested type. Maybe wrap it it in a
+  // pointer if deeply nested???
+  tree field_arry_addr =
+    make_temp_ssa_name( base_field_type, NULL, "field_arry_addr");
+  
+  tree rhs_faa = build3 ( COMPONENT_REF,
+			  base_field_type, 
+			  base,
+			  base_field,
+			  NULL_TREE);
+  
+  // Use this to access the array of element.
+  gimple *get_field_arry_addr =
+    gimple_build_assign( field_arry_addr, rhs_faa);
+  SSA_NAME_DEF_STMT ( field_arry_addr) = get_field_arry_addr;
+  
+  // index = a
+  gcc_assert ( sizetype);
+  tree index =
+    make_temp_ssa_name( sizetype, NULL, "index");
+  gimple *get_index =
+    gimple_build_assign( index, CONVERT_EXPR, inner_op);
+  SSA_NAME_DEF_STMT ( index) = get_index;
+
+  #if 0
+  gimple *temp_set;
+  gimple *final_set;
+  #endif
+  
+  // offset = index * size_of_field
+  
+  // Note base_field_type is a pointer and we want the size of what's
+  // pointed to.
+  tree size_of_field = TYPE_SIZE_UNIT ( field_type);
+  
+  gcc_assert ( sizetype);
+  tree offset = make_temp_ssa_name( sizetype, NULL, "offset");
+	
+  gimple *get_offset = gimple_build_assign ( offset, MULT_EXPR, index, size_of_field);
+  SSA_NAME_DEF_STMT ( offset) = get_offset;
+  
+  // field_addr = field_array + offset
+  gcc_assert ( base_field_type);
+  tree field_addr =
+    make_temp_ssa_name( base_field_type, NULL, "field_addr");
+  
+  gimple *get_field_addr = 
+    gimple_build_assign ( field_addr, POINTER_PLUS_EXPR, field_arry_addr, offset);
+  SSA_NAME_DEF_STMT ( field_addr) = get_field_addr;
+  
+  *ref_out = create_deep_ref ( ref_in, field_type, field_addr);
+  
+  gimple_seq_add_stmt ( pre_ref_seq, get_field_arry_addr);
+  gimple_seq_add_stmt ( pre_ref_seq, get_index);
+  gimple_seq_add_stmt ( pre_ref_seq, get_offset);
+  gimple_seq_add_stmt ( pre_ref_seq, get_field_addr);
 }
 
 static tree
