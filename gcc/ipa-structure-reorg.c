@@ -2253,8 +2253,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 	// Note, doesn't this ignore ARRAY_REF of this?
 	// I think it's OK at least until we start supporting
 	// multi-pools.
-	bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
-	if ( a_reorg || !lie )
+	bool a_reorg = is_reorg_type ( inner_op0_type, info);
+	bool a_base_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
+
+	if ( ( !a_reorg && a_base_reorg) || !lie )
 	  {
 	    return recognize_op_ret_action ( ReorgOpT_AryDir);
 	  }

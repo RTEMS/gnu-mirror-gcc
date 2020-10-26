@@ -2793,6 +2793,21 @@ reorg_perf_qual ( Info *info)
     {
       double with_opt = reorgi->instance_interleave.reorg_perf;
       double without_opt = reorgi->instance_interleave.regular_perf;
+
+      // If meaningless disqualify
+      if ( without_opt == 0.0 || total_cache_accesses == 0.0 )
+	{
+	  if ( info->show_perf_qualify )
+	    {
+	      fprintf ( info->reorg_dump_file, "  Disqualified: ");
+	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
+			       (dump_flags_t)0);
+	      fprintf ( info->reorg_dump_file, ": Doesn't occur in any meaningful loop.\n");
+	    }
+	  reorgi->do_instance_interleave = false;
+	  continue;
+	}
+      
       double raw_effect = with_opt/without_opt;
       double absolute_effect =
         (without_opt - with_opt) / total_cache_accesses;
