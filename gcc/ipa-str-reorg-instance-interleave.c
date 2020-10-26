@@ -78,6 +78,7 @@ static void create_a_new_type ( Info_t *, tree);
 static unsigned int reorg_perf_qual ( Info *);
 static tree find_coresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
+static void element_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
 static void make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *, tree *, Info_t *);
 static tree find_deepest_comp_ref ( tree);
 static tree create_deep_ref ( tree, tree, tree);
@@ -265,15 +266,104 @@ str_reorg_instance_interleave_trans ( Info *info)
 		}
 	     }
 		    */
+		    {
+		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+		      tree lhs = gimple_assign_lhs( stmt);
+		      tree rhs = gimple_assign_rhs1( stmt);
+		      
+		      enum ReorgOpTrans left_op_trans =
+			recognize_op ( lhs, true, info);
+		      enum ReorgOpTrans right_op_trans =
+			recognize_op ( rhs, true, info);
+
+		      // TBD lets rethink these
+		      #if 0
+		      // Ignore meaningless case
+		      if (    right_op_trans == ReorgOpT_Scalar 
+			   && left_op_trans == ReorgOpT_Scalar  )
+			break;
+
+		      // TBD Do these make sense?
+		      if ( ( left_op_trans != ReorgOpT_Scalar
+			     &&
+			     left_op_trans != ReorgOpT_Indirect )
+			   ||
+			   ( right_op_trans != ReorgOpT_Scalar
+			     &&
+			     right_op_trans != ReorgOpT_Indirect ))
+			{
+			  if ( left_op_trans   == ReorgOpT_AryDir ||
+			       right_op_trans  == ReorgOpT_AryDir    )
+			    {
+			      // Not implemented in single pool
+			      internal_error ( "ReorgOpT_AryDir not possible");
+			    }
+			  else
+			    {
+			      internal_error (
+					      "Reached tree operand default for "
+					      "ReorgT_StrAssign");
+			    }
+			}
+		      #endif
+
+		      bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
+		      bool ro_on_right = tree_contains_a_reorgtype_p ( rhs, info);
+
+		      gcc_assert ( ro_on_left || ro_on_right);
+
+		      tree reorg_type = ri->gcc_type;
+		      tree field;
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field))
+			{
+			  tree field_type = TREE_TYPE ( field);
+			  
+			  tree left_ref =
+			    build3 ( COMPONENT_REF,
+				     field_type,
+				     lhs,
+				     field,
+				     NULL_TREE);
+			  
+			  tree right_ref =
+			    build3 ( COMPONENT_REF,
+				     field_type,
+				     rhs,
+				     field,
+				     NULL_TREE);
+
+			  tree field_temp = 
+			    make_temp_ssa_name( field_type, NULL, "field_temp");
+			  
+			  gimple *do_rhs = gimple_build_assign ( field_temp, right_ref);
+			  SSA_NAME_DEF_STMT ( field_temp) = do_rhs;
+			  
+			  gimple *do_lhs = gimple_build_assign ( left_ref, field_temp);
+
+			  gsi_insert_before( &gsi, do_rhs, GSI_SAME_STMT);
+			  
+			  element_assign_transformation ( do_rhs, ri, info);
+
+			  gsi_insert_before( &gsi, do_lhs, GSI_SAME_STMT);
+			  
+			  element_assign_transformation ( do_lhs, ri, info);
+			}
+		      gsi_remove ( &gsi, true);
+		    }
 		    break;
 		  case ReorgT_ElemAssign:
 		    {
-		      //break;
-		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
-		      
 		      DEBUG_L("ReorgT_ElemAssign: ");
 		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      INDENT(2);
+
+		      #if 1
+		      element_assign_transformation (stmt, ri, info);
+		      #else
+		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+		      
 		      // Needed for helloworld
 		      tree lhs = gimple_assign_lhs( stmt);
 		      tree rhs = gimple_assign_rhs1( stmt);
@@ -366,10 +456,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  internal_error ( "ReorgOpT_AryDir not possible");
 			default:
 			  internal_error (
-					  "Reached operand default for ReorgOpT_Indirect");
-			  
-			} // end recognize_op ( rhs, info) switch
+					  "Reached tree operand default for "
+					  "ReorgT_ElemAssign");
 
+			} // end recognize_op ( rhs, info) switch
+		      #endif
 		      INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
@@ -1656,6 +1747,114 @@ str_reorg_instance_interleave_trans ( Info *info)
   return 0;
 }
 
+static void
+element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
+{
+  gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+  
+  DEBUG_L("element_assign_transformation: ");
+  DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+  INDENT(2);
+  // Needed for helloworld
+  tree lhs = gimple_assign_lhs( stmt);
+  tree rhs = gimple_assign_rhs1( stmt);
+  
+  bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
+		      
+  tree ro_side = ro_on_left ? lhs : rhs;
+  tree nonro_side = ro_on_left ? rhs : lhs;
+  
+  switch ( recognize_op ( ro_side, true, info) )  // "a->f"
+    {
+    case ReorgOpT_Indirect:
+      {
+	tree ref_expr;
+	tree field_val_temp;
+	gimple_seq ref_seq = NULL;
+	
+	make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, info);
+	
+	gimple *temp_set;
+	gimple *final_set;
+	
+	if ( ro_on_left )
+	  {
+	    // With:    a->f = rhs
+	    // Generate:
+	    
+	    //           temp = rhs
+	    temp_set = gimple_build_assign( field_val_temp, rhs);
+	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
+	    
+	    ////           field_array[index] = temp
+	    //tree elem_to_set =
+	    //  build4 ( ARRAY_REF, field_type, field_arry_addr, index,
+	    //	   NULL_TREE, NULL_TREE);
+	    //final_set =
+	    //  gimple_build_assign( elem_to_set, field_val_temp);
+	    
+	    //                 *field_addr = temp
+	    tree lhs_ref = ref_expr;
+	    
+	    final_set =
+	      gimple_build_assign( lhs_ref, field_val_temp);
+	  }
+	else
+	  {
+	    // With:    lhs = a->f
+	    // Generate:
+	    
+	    tree rhs_ref = ref_expr;
+	    
+	    // If these will actually print then things are likely sane
+	    //DEBUG_L("rhs_ref: ");
+	    //DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
+	    //DEBUG("\n");
+	    
+	    // These are here for debugging
+	    tree op0 = TREE_OPERAND ( rhs_ref, 0);
+	    tree op1 = TREE_OPERAND ( rhs_ref, 1);
+	    tree op1type = TYPE_MAIN_VARIANT (TREE_TYPE (op1));
+	    tree op1type_type = TREE_TYPE ( op1type);
+	    
+	    temp_set =
+	      gimple_build_assign( field_val_temp, rhs_ref);
+	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
+	    
+	    //          lhs = temp
+	    final_set = gimple_build_assign( lhs, field_val_temp);
+	    SSA_NAME_DEF_STMT ( lhs) = final_set;
+	  }
+	
+	//DEBUG_L("temp_set: ");
+	//DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
+	//DEBUG("\n");
+	
+	//DEBUG_L("final_set: ");
+	//DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
+	//DEBUG("\n");
+	
+	gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
+	gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
+	gsi_insert_before( &gsi, final_set, GSI_SAME_STMT);
+	
+	//delete stmt
+	gsi_remove ( &gsi, true);
+      } // end ReorgOpT_Indirect case
+      break;
+    case ReorgOpT_AryDir:  // "x[i].f"
+      // Not implemented in single pool
+      internal_error ( "ReorgOpT_AryDir not possible");
+    default:
+      internal_error (
+		      "Reached tree operand default for "
+		      "ReorgT_ElemAssign");
+      
+    } // end recognize_op ( rhs, info) switch
+  
+  INDENT(-2);
+}
+
 // For ref_in which is a ReorgOpT_Indirect, create gimple
 // sequence to setup a transformed ref and the ref itself.
 static void
@@ -2171,14 +2370,14 @@ reorg_perf_qual ( Info *info)
 	for ( unsigned i = 0; i < loop->num_nodes; i++)
 	  {
 	    basic_block bb = bbs [i];
-	    //DEBUG_A("BB %i:\n", bb->index);
-	    //INDENT(4);
+	    DEBUG_A("BB %i:\n", bb->index);
+	    INDENT(4);
 	    for ( auto gsi = gsi_start_bb ( bb); !gsi_end_p ( gsi); gsi_next ( &gsi) )
 	      {
 		gimple *stmt = gsi_stmt ( gsi);
-		//DEBUG_A("examine: ");
-		//DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
-		//INDENT(4);
+		DEBUG_A("examine: ");
+		DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+		INDENT(4);
 
 		if ( gimple_code ( stmt) == GIMPLE_LABEL  ||
 		     gimple_code ( stmt) == GIMPLE_SWITCH    ) continue;
@@ -2191,8 +2390,8 @@ reorg_perf_qual ( Info *info)
 		    op = gimple_op ( stmt, ith_op);
 		    // It's lieing about the number of operands... so...
 		    if ( op == NULL ) continue;
-		    //DEBUG_A("op[%d]: %p, ", ith_op, op);
-		    //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+		    DEBUG_A("op[%d]: %p, ", ith_op, op);
+		    DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
 		    ReorgType_t *tri = tree_contains_a_reorgtype ( op, info);
 		    enum ReorgOpTrans optran = recognize_op ( op, false, info);
 		    // TBD This is where we need to remember
@@ -2200,15 +2399,15 @@ reorg_perf_qual ( Info *info)
 		    const char *s = optrans_to_str( optran);
 		    // Commenting out these 3 debug commands causes a
 		    // regression
-		    //DEBUG_A(", %s\n", s);
+		    DEBUG_A(", %s\n", s);
 		    if ( tri != NULL )
 		      {
-			//DEBUG(", ");
-			//DEBUG_F(print_reorg, stderr, 0, tri);
+			DEBUG(", ");
+			DEBUG_F(print_reorg, stderr, 0, tri);
 		      }
 		    else
 		      {
-			//DEBUG("\n");
+			DEBUG("\n");
 			;
 		      }
 		    switch ( optran)
@@ -2249,36 +2448,36 @@ reorg_perf_qual ( Info *info)
 			missing_cases = true;
 		      }
 		  }
-		//INDENT(-4);
+		INDENT(-4);
 	      }
-	    //INDENT(-4);
+	    INDENT(-4);
 	  }
 
-	//DEBUG_L("Dumping acc_info:\n");
+	DEBUG_L("Dumping acc_info:\n");
 	for ( auto aci = acc_info.begin (); aci != acc_info.end (); aci++ )
 	  {
-	    //DEBUG_A("variable:\n");
-	    //DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
-	    //DEBUG_A("field: ");
-	    //DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
+	    DEBUG_A("variable:\n");
+	    DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
+	    DEBUG_A("field: ");
+	    DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
 	  }
 
-	//DEBUG_A("before sort: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("before sort: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 
-	//DEBUG_A("before compress: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("before compress: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	std::stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 	
 	compress_acc_infos ( acc_info );
 
-	//DEBUG_A("after compress: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("after compress: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 	
 	// Obtain loop count by looking at all the block counts.
 	unsigned loop_count = 0;
@@ -2287,8 +2486,8 @@ reorg_perf_qual ( Info *info)
 	    basic_block bb = bbs [i];
 	    loop_count = MAX( loop_count, bb->count.value ());
 	  }
-	//DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
-	//	loop_count, loop->nb_iterations_estimate);
+	DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
+		loop_count, loop->nb_iterations_estimate);
 
 	// Create the variable infos
 	varInfo_t var_entry;
@@ -2325,12 +2524,12 @@ reorg_perf_qual ( Info *info)
 	  {
 	    fprintf ( stderr, "%d VarInfos\n", var_info.size ());
 	  }
-	//DEBUG_F(print_var_infos, stderr, var_info);
+	DEBUG_F(print_var_infos, stderr, var_info);
 
 	//
 	// Model the performance
 	//
-	//DEBUG_A("Model The Performance\n");
+	DEBUG_A("Model The Performance\n");
 
 	// Originally this was done per bb but now it has to be per
 	// loop. TBD But perf_bb is per loop so we need something similar
@@ -2342,16 +2541,16 @@ reorg_perf_qual ( Info *info)
 	    ReorgType_t *ri = pvi->rep_access->reorg;
 	    
 	    // Reorg accounting
-	    //DEBUG_L("\n");
-	    //DEBUG_A("Reorg Accounting\n");
+	    DEBUG_L("\n");
+	    DEBUG_A("Reorg Accounting\n");
 	    
 	    if( ri != NULL )
 	      {
 		double reorg_nca = 0.0;
 
-		//DEBUG_A("  for: ");
-		//DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
-		//INDENT(4);
+		DEBUG_A("  for: ");
+		DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
+		INDENT(4);
 		for ( auto fldi = pvi->fields.begin (); fldi != pvi->fields.end (); fldi++ )
 		  {
 		    unsigned HOST_WIDE_INT fld_width =
@@ -2359,18 +2558,18 @@ reorg_perf_qual ( Info *info)
 		    double effect = alignment_effect ( fld_width);
 		    double product = loop_count * effect;
 		    reorg_nca += product;
-		    //DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
-		    //	    loop_count, effect, product, reorg_nca);
+		    DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
+		    	    loop_count, effect, product, reorg_nca);
 		  }
-		//INDENT(-4);
+		INDENT(-4);
 		ri->instance_interleave.reorg_perf += reorg_nca;
-		//DEBUG_A("Add reorg_nca (%f) to reorg_perf (now %e)\n",
-		//	reorg_nca, ri->instance_interleave.reorg_perf);
+		DEBUG_A("Add reorg_nca (%f) to reorg_perf (now %e)\n",
+			reorg_nca, ri->instance_interleave.reorg_perf);
               } // 699
 
 	    // regular accounting
-	    //DEBUG_L("\n");
-	    //DEBUG_A("Regular Accounting\n");
+	    DEBUG_L("\n");
+	    DEBUG_A("Regular Accounting\n");
 	    
 	    double regular_nca = 0.0;
 	    sbitmap cache_model = sbitmap_alloc(1);
@@ -2381,12 +2580,12 @@ reorg_perf_qual ( Info *info)
 		tree base_type; // = base_type_of ( access);
 		if ( pv2i->rep_access->reorg != NULL )
 		  {
-		    //DEBUG_A("Base type from reorg: ");
+		    DEBUG_A("Base type from reorg: ");
 		    base_type = pv2i->rep_access->reorg->gcc_type;
 		  }
 		else
 		  {
-		    //DEBUG_A("Base type from access: ");
+		    DEBUG_A("Base type from access: ");
 		    if ( TREE_TYPE ( access ) != NULL )
 		      {
 			base_type = base_type_of ( access);
@@ -2396,7 +2595,7 @@ reorg_perf_qual ( Info *info)
 			gcc_assert (0);
 		      }
 		  }
-		//DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+		DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
 
 		bool base_type_isa_decl = DECL_P ( base_type );
 
@@ -2406,31 +2605,31 @@ reorg_perf_qual ( Info *info)
 		tree base_type_size;
 		if ( base_type_isa_decl )
 		  {
-		    //DEBUG_A("decl\n");
+		    DEBUG_A("decl\n");
 		    switch ( TREE_CODE (base_type) )
 		      {
 		      case VAR_DECL:
 			{
-			  //DEBUG_A("VAR_DECL\n");
+			  DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( base_type);
 			  break;
 			}
 		      case FIELD_DECL:
 			{
-			  //DEBUG_A("VAR_DECL\n");
+			  DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE ( base_type));
 			  break;
 			}
 		      default:
 			{
-			  //DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
+			  DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
 			  gcc_assert(0);
 			}
 		      }
 		  }
 		else
 		  {
-		    //DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
+		    DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
 		    if ( TREE_CODE ( base_type) == SSA_NAME )
 		      {
 			base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE( base_type));
@@ -2449,10 +2648,10 @@ reorg_perf_qual ( Info *info)
 		   param_l1_cache_line_size)
 		  +
 		  1;
-		//DEBUG_L("\n");
-		//DEBUG_A("cache len = %d (lines), for: ", len);
-		//DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
-		//DEBUG("%sstruct\n")
+		DEBUG_L("\n");
+		DEBUG_A("cache len = %d (lines), for: ", len);
+		DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
+		DEBUG("%sstruct\n")
 	      
 		// TBD Does this clear the bits??? It needs to.
 		// Each bit represents a cache line.
@@ -2474,14 +2673,14 @@ reorg_perf_qual ( Info *info)
 			// why this is here and what it does. Sigh...
 			unsigned HOST_WIDE_INT base_offset =
 			  tree_to_uhwi ( DECL_FIELD_OFFSET( field_ex));
-			//DEBUG_L("\n");
-			//DEBUG_A("For field_ex: ");
-			//DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
-			//DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
+			DEBUG_L("\n");
+			DEBUG_A("For field_ex: ");
+			DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
+			DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
 			
 			// Access accounting
 
-			//INDENT(4);
+			INDENT(4);
 			for ( auto fldi = pv2i->fields.begin ();
 			      fldi != pv2i->fields.end (); fldi++ )
 			  {
@@ -2489,27 +2688,27 @@ reorg_perf_qual ( Info *info)
 			    unsigned HOST_WIDE_INT fld_width, fld_offset;
 			    fld_width = tree_to_uhwi ( DECL_SIZE ( field));
 			    fld_offset = tree_to_uhwi ( DECL_FIELD_OFFSET ( field));
-			    //DEBUG_A("Field: ");
-			    //DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
-			    //DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
+			    DEBUG_A("Field: ");
+			    DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
+			    DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
+			    INDENT(4);
 			    int chari;
-			    //INDENT(4);
 			    for ( chari = 0; chari < fld_width; chari++ )
 			      {
 				int loc = (chari + fld_offset + base_offset)
 				  /
 				  param_l1_cache_line_size;
-				//DEBUG_A("loc: %d\n", loc);
+				DEBUG_A("loc: %d\n", loc);
 				bitmap_set_bit ( cache_model, loc);
 			      }
-			    //INDENT(-4);
+			    INDENT(-4);
 			  }
-			//INDENT(-4);
+			INDENT(-4);
 			unsigned bcount = bitmap_count_bits ( cache_model);
 			accum += bcount;
-			//DEBUG_L("\n");
-			//DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
-			//	bcount, accum);
+			DEBUG_L("\n");
+			DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
+				bcount, accum);
 			bitmap_clear ( cache_model);
 		      }
 		  }
@@ -2517,22 +2716,22 @@ reorg_perf_qual ( Info *info)
 		  {
 		    nrbo = 1;
 		    accum++;
-		    //DEBUG_L("\n");
-		    //DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
+		    DEBUG_L("\n");
+		    DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
 		  }
 		#if 1	
 		double amount = accum / nrbo;
 		double product = amount * loop_count;
 		regular_nca += product;
-		//DEBUG_L("\n");
-		//DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
-		//	loop_count, accum, nrbo, product, regular_nca);
+		DEBUG_L("\n");
+		DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
+			loop_count, accum, nrbo, product, regular_nca);
 		#else
 		double amount = accum / nrbo;
 		regular_nca += amount;
-		//DEBUG_L("\n");
-		//DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
-		//	accum, nrbo, amount, regular_nca);
+		DEBUG_L("\n");
+		DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
+			accum, nrbo, amount, regular_nca);
 		#endif
 	      } // 739
 	    sbitmap_free ( cache_model);
@@ -2540,11 +2739,11 @@ reorg_perf_qual ( Info *info)
 	    if( ri != NULL ) {
 	      ri->instance_interleave.regular_perf += regular_nca;
               cache_accesses_noreorg += regular_nca;
-	      //DEBUG_L("\n");
-	      //DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
-	      //	      regular_nca, ri->instance_interleave.regular_perf);
-	      //DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
-	      //	      cache_accesses_noreorg);
+	      DEBUG_L("\n");
+	      DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
+	      	      regular_nca, ri->instance_interleave.regular_perf);
+	      DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
+	      	      cache_accesses_noreorg);
             } else {
 	        cache_accesses += regular_nca;
             }
@@ -2991,7 +3190,7 @@ account_for_access ( tree access, tree field, std::vector <acc_info_t> *acc_info
 static void
 tmasn_helper ( tree t, int indent, std::set<tree> *already )
 {
-  //DEBUG_A("");
+  DEBUG_A("");
   fprintf( stderr, "%*s", indent, " ");
   indent += 4;
   flexible_print ( stderr, t, 0, (dump_flags_t)0);
@@ -3004,7 +3203,7 @@ tmasn_helper ( tree t, int indent, std::set<tree> *already )
     {
       fprintf( stderr, "\n");
     }
-  //DEBUG_L("code: %s\n", code_str(TREE_CODE (t)));
+  DEBUG_L("code: %s\n", code_str(TREE_CODE (t)));
   if ( TREE_CODE (t) == SSA_NAME )
     {
       already->insert (t);
@@ -3053,6 +3252,14 @@ tmasn_helper ( tree t, int indent, std::set<tree> *already )
     {
       tree t_0 = TREE_OPERAND ( t, 0);
       fprintf( stderr, "%*sMEM_REF t_0: ", indent - 4, " ");
+      flexible_print ( stderr, t_0, 1, (dump_flags_t)0);
+      tmasn_helper ( t_0 , indent, already);
+      return;
+    }
+  if ( TREE_CODE ( t) == COMPONENT_REF )
+    {
+      tree t_0 = TREE_OPERAND ( t, 0);
+      fprintf ( stderr, "%*sCOMPONENT_REF t_0: ", indent, " ");
       flexible_print ( stderr, t_0, 1, (dump_flags_t)0);
       tmasn_helper ( t_0 , indent, already);
       return;
