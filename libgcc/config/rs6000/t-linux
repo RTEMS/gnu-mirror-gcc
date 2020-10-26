@@ -1,6 +1,18 @@
 SHLIB_MAPFILES += $(srcdir)/config/rs6000/libgcc-glibc.ver
 
-HOST_LIBGCC2_CFLAGS += -mlong-double-128
+# On the modules that deal with IBM 128-bit values, we need to make sure that
+# TFmode uses the IBM extended double format, and that gnu attributes are
+# turned off to prevent supurious linker warnings in case the user uses
+# a 64-bit or IEEE 128-bit long double.
+IBM128_OBJS	= ibm-ldouble$(objext) _powitf2$(objext) ppc64-fp$(objext) \
+		  _divtc3$(object) _multc3$(object) \
+		  _fixtfdi$(object) _fixunstfdi$(object) \
+		  _floatditf$(objext) _floatunsditf$(objext)
+
+IBM128_CFLAGS	= -mno-gnu-attribute -mlong-double-128 \
+		  -Wno-psabi -mabi=ibmlongdouble
+
+$(IBM128_OBJS)	: INTERNAL_CFLAGS += $(IBM128_CFLAGS)
 
 # This is a way of selecting -mcmodel=small for ppc64, which gives
 # smaller and faster libgcc code.  Directly specifying -mcmodel=small
