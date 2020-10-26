@@ -1986,6 +1986,21 @@ When neither of these configure options are used, the default will be
 128-bit @code{long double} when built against GNU C Library 2.4 and later,
 64-bit @code{long double} otherwise.
 
+@item --with-long-double-128ieee
+On PowerPC, specify that the @code{long double} type should be 128
+bits and it should be use the IEEE 128-bit representation.  The GNU C
+Library 2.32 and supports IEEE 128-bit floating point format.  If you
+use the @option{--with-long-double-128ieee} option, you cannot use the
+@option{--with-long-double=64} option.
+
+@item --with-long-double-128ibm
+On PowerPC, specify that the @code{long double} type should be 128
+bits and it should be use the IBM extended double representation.  The
+GNU C Library 2.4 and later and supports IBM extended double 128-bit
+floating point format.  If you use the
+@option{--with-long-double-128ibm} option, you cannot use the
+@option{--with-long-double=64} option.
+
 @item --with-long-double-format=ibm
 @itemx --with-long-double-format=ieee
 Specify whether @code{long double} uses the IBM extended double format
@@ -1995,14 +2010,15 @@ Linux systems and on big endian 64-bit systems where the default cpu
 is at least power7 (i.e.@: @option{--with-cpu=power7},
 @option{--with-cpu=power8}, or @option{--with-cpu=power9} is used).
 
-If you use the @option{--with-long-double-64} configuration option,
-the @option{--with-long-double-format=ibm} and
-@option{--with-long-double-format=ieee} options are ignored.
+You cannot use the @option{--with-long-double-64} configuration
+option, with either the @option{--with-long-double-format=ibm} or
+@option{--with-long-double-format=ieee} options.
 
 The default @code{long double} format is to use IBM extended double.
 Until all of the libraries are converted to use IEEE 128-bit floating
 point, it is not recommended to use
-@option{--with-long-double-format=ieee}.
+@option{--with-long-double-format=ieee} or
+@option{--with-long-double=128ieee}.
 
 On little endian PowerPC Linux systems, if you explicitly set the
 @code{long double} type, it will build multilibs to allow you to
