@@ -5024,45 +5024,13 @@ case "${target}" in
 		    fi
 		fi
 
-		# Allow the user to override the long double size and if the
-		# size is 128-bits, the user can select the format (IBM or
-		# IEEE).  We provide extensions to --with-long-double=size
-		# (128ieee and 128ibm) to allow a single switch to control both
-		# the long double size and format.
-		case "${with_long_double}:${with_long_double_format}" in
-		    :)
-			;;
-		    64:)
-			tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=64"
-			;;
-		    128:)
-			tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=128"
-			;;
-		    128:ieee | 128ieee: | 128ieee:ieee | ieee: | ieee:ieee | :ieee)
-			tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=128"
-			tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
-			;;
-		    128:ibm | 128ibm: | 128ibm:ibm | ibm: | ibm:ibm | :ibm)
-			tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=128"
-			tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
-			;;
-		    *:)
-			echo "Unknown --with-long-double option: " \
-			     "${with_long_double}"
-			exit 1
-			;;
-		    :*)
-			echo "Unknown --with-long-double-format option: " \
-			     "${with_long_double_format}"
-			exit 1
-			;;
-		    *)
-			echo "Unsupported combination: " \
-			     "--with-long-double=${with_long_double} and " \
-			     "--with-long-double-format=${with_long_double_format}"
-			exit 1
-			;;
-		esac
+		# Set up the default long double format if the user changed it.
+		if test x$with_long_double_format = xieee; then
+		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
+
+		elif test x$with_long_double_format = xibm; then
+		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
+		fi
 		;;
 
 	s390*-*-*)
