@@ -2354,6 +2354,7 @@ multilevel_component_ref ( tree op)
 	    return type;
 	  }
       }
+  INDENT(-2);
   return NULL;
 }
 

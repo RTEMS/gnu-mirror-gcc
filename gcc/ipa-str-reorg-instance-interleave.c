@@ -202,6 +202,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		// print out trans and stmt if dumping
 		if ( info->show_transforms )
 		  {
+		    //DEBUG_L("Transform: ");
 		    print_gimple_stmt( info->reorg_dump_file, stmt, 0);
 		  }
 
@@ -356,8 +357,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_ElemAssign:
 		    {
 		      DEBUG_L("ReorgT_ElemAssign: ");
-		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-		      INDENT(2);
+		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      //INDENT(2);
 
 		      #if 1
 		      element_assign_transformation (stmt, ri, info);
@@ -461,7 +462,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 
 			} // end recognize_op ( rhs, info) switch
 		      #endif
-		      INDENT(-2);
+		      //INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
 		  case ReorgT_If_Null:
@@ -669,7 +670,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_Malloc:
 		    {
 		      DEBUG_L("Transform ReorgT_Malloc\n");
-		      INDENT(2);
+		      //INDENT(2);
 
 		      // We need to use the user malloc function
 		      // declaration rather than the builtin!!!
@@ -681,14 +682,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree void_pointer_type_node = build_pointer_type ( void_type_node);
 		      param_type_list =
 			tree_cons ( NULL_TREE, void_pointer_type_node, param_type_list);
-		      DEBUG_L("param_type_list: ");
-		      DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
-		      DEBUG("\n");
+		      //DEBUG_L("param_type_list: ");
+		      //DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
+		      //DEBUG("\n");
 		      #if !USE_BUILT_IN_FREE
 		      tree free_return_type = void_type_node;
-		      DEBUG_L("free_return_type: ");
-		      DEBUG_F(print_generic_expr, stderr, free_return_type, (dump_flags_t)0);
-		      DEBUG("\n")
+		      //DEBUG_L("free_return_type: ");
+		      //DEBUG_F(print_generic_expr, stderr, free_return_type, (dump_flags_t)0);
+		      //DEBUG("\n")
 		      #endif
 		      #if USE_BUILT_IN_FREE
 		      tree fndecl_free = builtin_decl_implicit ( BUILT_IN_FREE);
@@ -709,9 +710,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree arg = gimple_call_arg( stmt, 0);
 		      // TBD: len is new SSA
 		      tree val = gimple_call_lhs( stmt);
-		      DEBUG_L("val is: ");
-		      DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
-		      DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
+		      //DEBUG_L("val is: ");
+		      //DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
+		      //DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
 		      //gcc_assert( TREE_CODE( TREE_TYPE(val)) == INDIRECT_REF);
 		      gcc_assert( TREE_CODE( TREE_TYPE(val)) == POINTER_TYPE);
 		      tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
@@ -719,7 +720,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //tree len = make_temp_ssa_name( sizetype, NULL, "fail_val");
 		      // The above segfaulted ??? note, it's not an idiom seen in gcc
 		      tree int_ptrsize_type = signed_type_for ( ptr_type_node);
-		      DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
+		      //DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
 		      gcc_assert ( TREE_TYPE ( size));
 		      tree len = make_temp_ssa_name ( TREE_TYPE ( size), NULL, "malloc_len");
 		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
@@ -743,15 +744,15 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      // Note in other places in this doc this would
 		      // be "insert glen before stmt" instead of this but
 		      // here we need to create new basic blocks.
-		      DEBUG_A("split_block <bb %d> to ", bb->index);
+		      //DEBUG_A("split_block <bb %d> to ", bb->index);
 		      edge new_edge = split_block ( bb, stmt);
 		      // FROM before_bb = edge->src // same as this bb
 		      basic_block before_bb = new_edge->src; // 
 		      basic_block after_bb = new_edge->dest;
 		      remove_edge ( new_edge);
 		      basic_block prev_bb = before_bb;
-		      DEBUG_A("before <bb %d> & after <bb %d>\n",
-			      before_bb->index, after_bb->index);
+		      //DEBUG_A("before <bb %d> & after <bb %d>\n",
+		      //	      before_bb->index, after_bb->index);
 		      
 		      // FROM failure_bb = create_empty_block(prev_bb)
 		      basic_block failure_bb = make_bb ( "failure_bb", prev_bb);
@@ -826,16 +827,16 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  tree base_field =
 			      find_coresponding_field ( base, field);
 
-			  DEBUG_L("base_field: %p\n", base_field);
-			  DEBUG_A("  : ");
-			  DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("base_field: %p\n", base_field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
+			  //DEBUG("\n");
 
 			  tree base_field_type = TREE_TYPE( base_field);
-			  DEBUG_L("base_field_type: %p\n", base_field_type);
-			  DEBUG_A("  : ");
-			  DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("base_field_type: %p\n", base_field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
 			  
 			  gimple_stmt_iterator gsi = gsi_start_bb ( new_bb);
 			  // Note, switching the order of edge creation and
@@ -867,32 +868,32 @@ str_reorg_instance_interleave_trans ( Info *info)
 						 base,
 						 base_field, NULL_TREE);
 
-			  DEBUG_L("base: %p\n", base);
-			  DEBUG_A("  base: ");
-			  DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("base: %p\n", base);
+			  //DEBUG_A("  base: ");
+			  //DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
+			  //DEBUG("\n");
 			  
-			  DEBUG_L("field: %p\n", field);
-			  DEBUG_A("  : ");
-			  DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("field: %p\n", field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
+			  //DEBUG("\n");
 
 			  tree field_type = TREE_TYPE( field);
-			  DEBUG_L("field_type: %p\n", field_type);
-			  DEBUG_A("  : ");
-			  DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("field_type: %p\n", field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
 			  
-			  DEBUG_L("lhs_ass: %p\n", lhs_ass);
-			  DEBUG_A("  lhs_ass: ");
-			  DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("lhs_ass: %p\n", lhs_ass);
+			  //DEBUG_A("  lhs_ass: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
+			  //DEBUG("\n");
 
 			  tree lhs_ass_type = TREE_TYPE ( lhs_ass);
-			  DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
-			  DEBUG_A("  lhs_ass_type: ");
-			  DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
+			  //DEBUG_A("  lhs_ass_type: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
+			  //DEBUG("\n");
 
 			  gcc_assert ( sizetype);
 			  tree mem_size = 
@@ -932,10 +933,10 @@ str_reorg_instance_interleave_trans ( Info *info)
 			    make_temp_ssa_name ( TREE_TYPE ( base_field), NULL, "cast_res");
 
 			  tree res_type = TREE_TYPE( res);
-			  DEBUG_L("res_type: %p\n", res_type);
-			  DEBUG_A("  : ");
-			  DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
-			  DEBUG("\n");
+			  //DEBUG_L("res_type: %p\n", res_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
+			  //DEBUG("\n");
 
 			  // Move malloc_call here
 			  gcall *malloc_call = gimple_build_call( fndecl_malloc, 1, mem_size);
@@ -1118,105 +1119,458 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      
 		      //// FROM gsi_insert_after( &gsi, bad_field )
 
-		      DEBUG_L("End of malloc... print function:\n");
-		      DEBUG_F(dump_function_header, stderr, func->decl, (dump_flags_t)0);
-		      DEBUG_F(dump_function_to_file, func->decl, stderr, (dump_flags_t)0);
+		      //DEBUG_L("End of malloc... print function:\n");
+		      //DEBUG_F(dump_function_header, stderr, func->decl, (dump_flags_t)0);
+		      //DEBUG_F(dump_function_to_file, func->decl, stderr, (dump_flags_t)0);
 		    }
-		    INDENT(-2);
+		    //INDENT(-2);
 		    //break;
 		    goto exit_after_spilting_a_block;
 		  case ReorgT_Calloc:
-		    // TBD
-		    DEBUG_L("ReorgT_Calloc\n");
-		    /*
-		    // This used to be almost a clone of the old version of
-		    // the malloc code above and needs to transformed just like
-		    // what was done above to malloc.
-		    tree arg = gimple_call_arg( stmt, 0);
-		    len is new SSA
+		    {
+		      DEBUG_L("Transform ReorgT_Calloc\n");
+		      //INDENT(2);
+
+		      // We need to use the user calloc function
+		      // declaration rather than the builtin!!!
+		      tree fndecl_calloc = gimple_call_fndecl ( stmt);
+		      
+		      // We need to synthesize the free function
+		      //
+		      tree param_type_list = NULL;
+		      tree void_pointer_type_node = build_pointer_type ( void_type_node);
+		      param_type_list =
+			tree_cons ( NULL_TREE, void_pointer_type_node, param_type_list);
+		      //DEBUG_L("param_type_list: ");
+		      //DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
+		      //DEBUG("\n");
+		      tree fndecl_free = builtin_decl_implicit ( BUILT_IN_FREE);
+		      // Note, add it to the call graph at each call site
+		      
+		      // Note, unlike other simpler transformations,
+		      // this must build new basic blocks to add new
+		      // gimple to and use a phi for the final result.
+		      // See appendix on malloc transformation for
+		      // each comment starting with "FROM."
+		      ReorgType_t *ri = contains_a_reorgtype( stmt, info);
+
+		      tree size_arg = gimple_call_arg( stmt, 0); // Likely not needed!
+		      
+		      // Note the num_arg is either a const or an ssa name so it
+		      // can be used as is in the calloc for each field;
+		      tree num_arg = gimple_call_arg( stmt, 1);
+
 		      tree val = gimple_call_lhs( stmt);
-		    gcc_assert( TREE_CODE( TREE_TYPE(val)) == INDIRECT_REF);
-		    tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
-		    gimple *glen = 
-		      gimple_build_assign( 
-					  len, 
-					  TRUNC_DIV_EXPR, 
-					  val, 
-					  size,
-					  NULL_TREE, NULL_TREE);
-		    //insert glen before stmt
-		    gimple_stmt_iterator stmt_gsi = gsi_for_stmt ( stmt);
-		    gsi_link_before( stmt_gsi, glen, GSI_SAME_STMT);
-		    tree lfial = create_artificial_label( UNKNOWN_LOCATION);
-		    gimple *gfail = gimple_build_label( lfail);
-		    tree lnotfial = create_artificial_label( UNKNOWN_LOCATION);
-		    gimple *gnotfail = gimple_build_label( lnotfail);
-		    tree base = ri->reorg_ver_type;
-		    for (each element of base) // TBD <==
-		      {
-			// call malloc
-			tree lok = create_artificial_label( UNKNOWN_LOCATION);
-			gimple *glok = gimple_build_label( lok);
-			tree *fndecl = builtin_decl_explicit( BUILT_IN_MALLOC);
-			mem_size is new SSA
+		      //DEBUG_L("val is: ");
+		      //DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
+		      //DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
+
+		      gcc_assert( TREE_CODE( TREE_TYPE(val)) == POINTER_TYPE);
+		      #if 0
+		      tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
+		      #endif
+
+		      #if 0
+		      tree int_ptrsize_type = signed_type_for ( ptr_type_node);
+		      //DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
+		      gcc_assert ( TREE_TYPE ( size));
+		      tree len = make_temp_ssa_name ( TREE_TYPE ( size), NULL, "malloc_len");
+		      #endif
+		      
+		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+
+		      #if 0
+		      // Cast arg to compatible type
+		      gcc_assert( TREE_TYPE ( size));
+		      TREE_TYPE (arg) = TREE_TYPE ( size);
+		      tree cast_arg =
+			    make_temp_ssa_name( TREE_TYPE ( size), NULL, "cast_arg");
+		      gimple *gcast_arg = gimple_build_assign ( cast_arg, CONVERT_EXPR, arg);
+		      SSA_NAME_DEF_STMT ( cast_arg) = gcast_arg;
+		      gsi_insert_before( &gsi, gcast_arg, GSI_SAME_STMT);
+			
+		      gimple *glen = 
+			gimple_build_assign ( len, TRUNC_DIV_EXPR, cast_arg, size);
+		      SSA_NAME_DEF_STMT ( len) = glen;
+		      
+		      gsi_insert_before( &gsi, glen, GSI_SAME_STMT);
+		      #endif
+		      
+		      // Note in other places in this doc this would
+		      // be "insert glen before stmt" instead of this but
+		      // here we need to create new basic blocks.
+		      //DEBUG_A("split_block <bb %d> to ", bb->index);
+		      edge new_edge = split_block ( bb, stmt);
+		      // FROM before_bb = edge->src // same as this bb
+		      basic_block before_bb = new_edge->src; // 
+		      basic_block after_bb = new_edge->dest;
+		      remove_edge ( new_edge);
+		      basic_block prev_bb = before_bb;
+		      //DEBUG_A("before <bb %d> & after <bb %d>\n",
+		      //	      before_bb->index, after_bb->index);
+		      
+		      // FROM failure_bb = create_empty_block(prev_bb)
+		      basic_block failure_bb = make_bb ( "failure_bb", prev_bb);
+		      // I need to set the count to zero and there doesn't
+		      // seem to be direct way of doing this...
+		      failure_bb->count = prev_bb->count - prev_bb->count;
+		      
+		      // set edge probability and flags
+		      edge fail_to_after_e = make_edge ( failure_bb,
+						      after_bb, EDGE_FALLTHRU);
+		      fail_to_after_e->probability = profile_probability::very_unlikely ();
+		      fail_to_after_e->count () = failure_bb->count;
+
+		      // Note, this should remove this call from the call graph
+		      cgraph_update_edges_for_call_stmt ( stmt, gimple_call_fndecl ( stmt), NULL);
+		      // Now it's safe to remove it!
+		      gsi_remove ( &gsi, true);
+		      
+		      tree field;
+		      tree reorg_type = ri->gcc_type;
+		      tree reorg_pointer_type = ri->pointer_rep;
+		      tree base = ri->instance_interleave.base;
+
+		      gcc_assert ( reorg_pointer_type);
+		      tree fail_val = 
+		      	make_temp_ssa_name ( reorg_pointer_type, NULL, "calloc_fail_val");
+		      
+		      // loop setup trickery for gimple idioms
+		      //
+		      basic_block prev_order = failure_bb;
+
+		      prev_bb = before_bb;
+		      int edge_flags = EDGE_FALLTHRU;
+		      
+		      // Generate all the real allocation code
+		      //
+		      // Note, I think there are ramifications of built in malloc (and free)
+		      // so I'm going try and use the malloc in the call transformed!!!
+		      // Actually, I ended up using the built in free and it was
+		      // the way to go.
+		      //
+		      
+		      // This, after the following loop, will hold the start of the
+		      // field related code.
+		      tree new_ok_field_L;
+		      
+		      // FROM (for fields) {
+		      bool first = true;
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field))
+			{
+			  basic_block new_bb = make_bb ( "new_bb", prev_order);
+			  new_bb->count = prev_order->count;
+			  // Nope! Don't do this.
+			  //set_immediate_dominator ( CDI_DOMINATORS, new_bb, prev_bb);
+			  //if ( first )
+			  //  {
+			  //    first = false;
+			  //    set_immediate_dominator ( CDI_DOMINATORS, failure_bb, new_bb);
+			  //    set_immediate_dominator ( CDI_DOMINATORS, after_bb, new_bb);
+			  //  }
+			    
+			  tree base_field =
+			      find_coresponding_field ( base, field);
+
+			  //DEBUG_L("base_field: %p\n", base_field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree base_field_type = TREE_TYPE( base_field);
+			  //DEBUG_L("base_field_type: %p\n", base_field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  gimple_stmt_iterator gsi = gsi_start_bb ( new_bb);
+			  // Note, switching the order of edge creation and
+			  // setting dominator seems to make no difference
+			  
+			  // set edge probability and flags
+			  
+			  // edge_flags depends on whether or not the predecessor
+			  // block was created in this loop.
+			  edge ok_edge = make_edge ( prev_bb, new_bb, edge_flags);
+			  edge_flags = EDGE_TRUE_VALUE;
+
+			  ok_edge->probability = profile_probability::very_likely ();
+			  ok_edge->count () = prev_bb->count;
+			  add_bb_to_loop ( new_bb, before_bb->loop_father);
+			  
+			  // Don't mess with the dominators.
+			  //set_immediate_dominator ( CDI_DOMINATORS, new_bb, prev_bb);
+
+			  // create edge and set edge probability and flags
+			  edge fail_edge = make_edge ( new_bb, failure_bb, EDGE_FALSE_VALUE);
+			  fail_edge->probability = profile_probability::very_unlikely ();
+			  fail_edge->count () = new_bb->count - new_bb->count;
+
+			  tree lhs_ass = build3( COMPONENT_REF,
+						 base_field_type,
+						 base,
+						 base_field, NULL_TREE);
+
+			  //DEBUG_L("base: %p\n", base);
+			  //DEBUG_A("  base: ");
+			  //DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  //DEBUG_L("field: %p\n", field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree field_type = TREE_TYPE( field);
+			  //DEBUG_L("field_type: %p\n", field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  //DEBUG_L("lhs_ass: %p\n", lhs_ass);
+			  //DEBUG_A("  lhs_ass: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree lhs_ass_type = TREE_TYPE ( lhs_ass);
+			  //DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
+			  //DEBUG_A("  lhs_ass_type: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  #if 0
+			  gcc_assert ( sizetype);
+			  tree mem_size = 
+			    make_temp_ssa_name( sizetype, NULL, "malloc_mem_size");
+			  #endif
+			  
+			  // We need field_size to be of the correct type so
+			  // we type cast.
+			  //tree field_size =
+			  //  make_temp_ssa_name( TREE_TYPE ( mem_size), NULL, "field_size");
+			  tree field_size =
+			    make_temp_ssa_name( sizetype, NULL, "field_size");
+
+			  // Move gprev_ok_field here
+			  
+			  // Move gfield_size here
+			  
+			  // Changed from TYPE_SIZE to TYPE_SIZE_UNIT
+			  gimple *gfield_size =
+			    gimple_build_assign ( field_size,
+						  CONVERT_EXPR,
+						  TYPE_SIZE_UNIT ( TREE_TYPE ( field)));
+			  SSA_NAME_DEF_STMT ( field_size) = gfield_size;
+
+			  #if 0
+			  // Move gsize here
 			  gimple *gsize = 
-			  gimple_build_assign( 
-					      mem_size, 
-					      MULT_EXPR, 
-					      TYPE_SIZE(element), 
-					      len,
-					      NULL_TREE, NULL_TREE);
-			insert gsize before stmt
-			  gcall *call = gimple_build_call( fndecl, 1, mem_size);
-			mres is new SSA
-			  gimple_call_set_lhs( call, mres)
-			  insert call before stmt
-			  // Set element to return value of malloc.
-			  // Note, the devil is in the details here.
-			  gen concat( REORG_SP_PREFIX,
-				      type_name( lhs)  ).element <- mres
-			  and insert before stmt
-			  // gen test of return
+			    gimple_build_assign ( mem_size,
+						  MULT_EXPR,
+						  field_size,
+						  len);
+			  SSA_NAME_DEF_STMT ( mem_size) = gsize;
+			  #endif
+
+			  gcc_assert ( ptr_type_node);
+			  tree res = 
+			    make_temp_ssa_name ( ptr_type_node, NULL, "res");
+
+			  gcc_assert ( TREE_TYPE ( base_field));
+			  tree cast_res =
+			    make_temp_ssa_name ( TREE_TYPE ( base_field), NULL, "cast_res");
+
+			  tree res_type = TREE_TYPE( res);
+			  //DEBUG_L("res_type: %p\n", res_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  #if 1
+			  gcall *calloc_call = gimple_build_call( fndecl_calloc, 2, field_size, num_arg);
+			  gimple_call_set_lhs( calloc_call, res);
+			  SSA_NAME_DEF_STMT ( res) = calloc_call;
+			  #else
+			  gcall *malloc_call = gimple_build_call( fndecl_malloc, 1, mem_size);
+			  gimple_call_set_lhs( malloc_call, res);
+			  SSA_NAME_DEF_STMT ( res) = malloc_call;
+			  #endif
+
+			  cgraph_node::get ( cfun->decl)->
+			    create_edge ( cgraph_node::get_create ( fndecl_calloc),
+					  calloc_call,
+					  new_bb->count
+					  );
+			  
+			  gimple *gcast_res =
+			    gimple_build_assign ( cast_res, CONVERT_EXPR, res);
+			  SSA_NAME_DEF_STMT ( cast_res) = gcast_res;
+			  
+			  // Move gset_field here
+			  gimple *gset_field = gimple_build_assign ( lhs_ass, cast_res);
+
+			  // Move gcond here
 			  gimple *gcond =
-			  gimple_build_cond( EQ_EXPR, mres,
-					     null_pointer_node, lfail, lok);
-			insert gcond before stmt
-			  insert glok before stmt
-			  // call memset
-			  fndecl = builtin_decl_explicit( BUILT_IN_MEMSET);
-			call =
-			  gimple_build_call( fndecl, 3, mres, int_node_zero, mem_size);
-			insert call before stmt
-			  }
-	      
-		    // fake return value of zero
-		    gimple *gretzero =
-		      gimple_build_assign( lhs,
-					   build_int_cst(
-							 TYPE_MIN_VALUE( TREE_TYPE(lhs)), 0));
-		    insert gretzero before stmt
-		      gimple *ggoto = gimple_build_goto( lnotfail);
-		    insert ggoto before stmt
-		      insert glab1 before stmt
-		      for each element of base {
-			  tree fndecl = builtin_decl_explicit( BUILT_IN_FREE);
-			  gcall *call = gimple_build_call( fndecl, 1, element);
-			  insert call before stmt
-			    set element to null
-			    }
-		    // fake return value of null
-		    gimple *gretnull =
-		      gimple_build_assign( lhs,
-					   build_int_cst(
-							 TYPE_MIN_VALUE( TREE_TYPE(lhs))));
-		    insert gretnull before stmt
-		      insert gnotfail before stmt
-		      delete stmt
-		      */
-		    break;
+			    gimple_build_cond ( NE_EXPR, res, null_pointer_node,
+						NULL, NULL
+						);
+
+			  // In execution order
+			  gsi_insert_after ( &gsi, gfield_size, GSI_NEW_STMT);
+			  //gsi_insert_after ( &gsi, gsize, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, calloc_call, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gcast_res, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gset_field, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gcond, GSI_CONTINUE_LINKING);
+			  
+			  prev_bb = new_bb;
+			  prev_order = new_bb;
+			}
+
+		      // Loop cleaup fo failure code bb here. There is loop state
+		      // overhead having nothing to do with the transformation
+		      // that never the less must be updated.
+		      add_bb_to_loop ( failure_bb, before_bb->loop_father);
+		      
+		      // create basic block for success
+		      //
+		      // FROM success_bb = create_empty_block(prev_bb_order);
+		      basic_block success_bb = make_bb ( "succ_bb", prev_bb);
+		      success_bb->count = prev_bb->count;
+		      
+		      // NOTE, it seems I shouldn't be attempting
+		      // to diddle the dominator information on the fly.
+		      // set_immediate_dominator ( CDI_DOMINATORS, success_bb, prev_bb);
+		      
+		      edge success_e = make_edge ( prev_bb, success_bb, EDGE_TRUE_VALUE );
+		      edge succ_to_after_e = make_edge ( success_bb, after_bb, EDGE_FALLTHRU);
+		      success_e->probability = profile_probability::very_likely ();
+		      succ_to_after_e->probability = profile_probability::always ();
+		      success_e->count () = prev_bb->count;
+		      succ_to_after_e->count () = prev_bb->count;
+		      add_bb_to_loop ( success_bb, before_bb->loop_father);
+		      
+		      // code in success_bb
+		      //
+		      gcc_assert ( reorg_pointer_type);
+		      tree success_val = 
+			make_temp_ssa_name( reorg_pointer_type, NULL, "calloc_success_val");
+
+		      gsi = gsi_start_bb ( success_bb);  // used to be failure_bb
+
+		      gimple *set_succ =
+			gimple_build_assign ( success_val,
+					      build_int_cst ( reorg_pointer_type, 0));
+		      SSA_NAME_DEF_STMT ( success_val) = set_succ;
+		      
+		      gsi_insert_after( &gsi, set_succ,	GSI_NEW_STMT);
+
+		      // FROM gsi_insert_after( &gsi, new_ok_field )
+		      //gimple *gnew_ok_field = gimple_build_label ( new_ok_field_L);
+		      //gsi_insert_after ( &gsi, gnew_ok_field, GSI_SAME_STMT);
+		      
+		      // add code to after_bb
+		      //
+		      // FROM gsi = gsi_start_bb( after_bb)
+		      // Reuse gsi
+		      //gimple_stmt_iterator gsi = gsi_start_bb( after_bb);
+		      gsi = gsi_start_bb( after_bb);
+
+		      // FROM gsi_insert_after( &gsi, "lhs = "phi(success_val, fail_val)
+		      
+		      // Note, BBs have a sequence of phis which create_phi_node takes care of
+		      // adding this phi too.
+		      gcc_assert ( TREE_TYPE ( success_val));
+		      tree c_phi_val =
+			make_temp_ssa_name ( TREE_TYPE ( success_val), NULL, "c_phi_val");
+		      gphi *der_phi = create_phi_node( c_phi_val, after_bb);
+		      add_phi_arg( der_phi, success_val, succ_to_after_e, UNKNOWN_LOCATION);
+		      add_phi_arg( der_phi, fail_val, fail_to_after_e, UNKNOWN_LOCATION);
+
+		      gimple *gc_cast_phi_val =
+			gimple_build_assign ( val, CONVERT_EXPR, c_phi_val);
+		      SSA_NAME_DEF_STMT ( val) = gc_cast_phi_val;
+
+		      gsi_insert_before( &gsi, gc_cast_phi_val, GSI_NEW_STMT);
+
+
+		      // failure_bb code here
+
+		      //
+		      // FROM fail_val is new SSA
+		      //tree return_type = TREE_TYPE ( arg);
+		      //tree fail_val = 
+		      gsi = gsi_start_bb ( failure_bb);
+
+		      gimple *gretnull =
+			gimple_build_assign ( fail_val, CONVERT_EXPR,
+					      TYPE_MAX_VALUE ( TREE_TYPE ( fail_val)));
+		      SSA_NAME_DEF_STMT ( fail_val) = gretnull;
+		      
+		      gsi_insert_after( &gsi, gretnull, GSI_NEW_STMT);
+		      
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field)) {
+
+			tree base_field =
+			      find_coresponding_field ( base, field);
+			tree base_field_type = TREE_TYPE( base_field);
+			
+			gcc_assert ( base_field_type);
+			tree c_to_free = 
+			  make_temp_ssa_name( base_field_type, NULL, "calloc_to_free");
+			
+			tree rhs_ass = build3( COMPONENT_REF,
+			    base_field_type,
+			    base,
+			    base_field, NULL_TREE);
+			
+			gimple *gaddr2free = gimple_build_assign( c_to_free, rhs_ass);
+			SSA_NAME_DEF_STMT ( c_to_free) = gaddr2free;
+			
+			gsi_insert_after( &gsi, gaddr2free, GSI_CONTINUE_LINKING);
+
+			gcc_assert ( ptr_type_node);
+			tree c_cast2free =
+			  make_temp_ssa_name( ptr_type_node, NULL, "c_cast2free");
+			
+			gimple *gc_cast2free =
+			  gimple_build_assign( c_cast2free, CONVERT_EXPR, c_to_free);
+			SSA_NAME_DEF_STMT ( c_cast2free) = gc_cast2free;
+
+			gsi_insert_after( &gsi, gc_cast2free, GSI_CONTINUE_LINKING);
+			
+			gcall *free_call = gimple_build_call( fndecl_free, 1, c_cast2free);
+			gsi_insert_after( &gsi, free_call, GSI_CONTINUE_LINKING);
+			
+			cgraph_node::get ( cfun->decl)->
+			create_edge ( cgraph_node::get_create ( fndecl_free),
+				      free_call,
+				      failure_bb->count
+				    );
+
+			tree lhs_ass = build3( COMPONENT_REF,
+					       base_field_type,
+					       base,
+					       base_field, NULL_TREE);
+			
+			gimple *gzero = gimple_build_assign( lhs_ass, null_pointer_node);
+			gsi_insert_after( &gsi, gzero, GSI_CONTINUE_LINKING);
+		      }
+		      
+		      //DEBUG_L("End of calloc... print function:\n");
+		      //DEBUG_F(dump_function_header, stderr, func->decl, (dump_flags_t)0);
+		      //DEBUG_F(dump_function_to_file, func->decl, stderr, (dump_flags_t)0);
+		    }
+		    //INDENT(-2);
+		    //break;
+		    goto exit_after_spilting_a_block;
 		  case ReorgT_Realloc:
 		    // TBD
-		    DEBUG_L("ReorgT_Realloc\n");
+		    //DEBUG_L("ReorgT_Realloc\n");
 		    /*
 		// This used to be closely related to the old version of
 		// the malloc code above and needs to transformed just like
@@ -1294,7 +1648,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    break;
 		  case ReorgT_Free:
 		    {
-		      DEBUG_L("ReorgT_Free\n");
+		      //DEBUG_L("ReorgT_Free\n");
 		      // We won't free the base because it a global.
 		      /*
 			for each element of base {
@@ -1370,8 +1724,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    break;
 		  case ReorgT_UserFunc:
 		    {
-		      DEBUG_L("ReorgT_UserFunc: ");
-		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      //DEBUG_L("ReorgT_UserFunc: ");
+		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      // Needed for helloworld.
 		      // The type must be adjusted, but not here.
 
@@ -1815,9 +2169,9 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 {
   gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
   
-  DEBUG_L("element_assign_transformation: ");
-  DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-  INDENT(2);
+  //DEBUG_L("element_assign_transformation: ");
+  //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+  //INDENT(2);
   // Needed for helloworld
   tree lhs = gimple_assign_lhs( stmt);
   tree rhs = gimple_assign_rhs1( stmt);
@@ -1915,7 +2269,7 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
       
     } // end recognize_op ( rhs, info) switch
   
-  INDENT(-2);
+  //INDENT(-2);
 }
 
 // For ref_in which is a ReorgOpT_Indirect, create gimple
@@ -2433,15 +2787,15 @@ reorg_perf_qual ( Info *info)
 	for ( unsigned i = 0; i < loop->num_nodes; i++)
 	  {
 	    basic_block bb = bbs [i];
-	    DEBUG_A("BB %i:\n", bb->index);
-	    INDENT(4);
+	    //DEBUG_A("BB %i:\n", bb->index);
+	    //INDENT(4);
 	    for ( auto gsi = gsi_start_bb ( bb); !gsi_end_p ( gsi); gsi_next ( &gsi) )
 	      {
 		gimple *stmt = gsi_stmt ( gsi);
-		DEBUG_A("examine: ");
-		DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
-		INDENT(4);
-
+		//DEBUG_A("examine: ");
+		//DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+		//INDENT(4);
+		
 		if ( gimple_code ( stmt) == GIMPLE_LABEL  ||
 		     gimple_code ( stmt) == GIMPLE_SWITCH    ) continue;
 		  		
@@ -2453,8 +2807,8 @@ reorg_perf_qual ( Info *info)
 		    op = gimple_op ( stmt, ith_op);
 		    // It's lieing about the number of operands... so...
 		    if ( op == NULL ) continue;
-		    DEBUG_A("op[%d]: %p, ", ith_op, op);
-		    DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+		    //DEBUG_A("op[%d]: %p, ", ith_op, op);
+		    //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
 		    ReorgType_t *tri = tree_contains_a_reorgtype ( op, info);
 		    enum ReorgOpTrans optran = recognize_op ( op, false, info);
 		    // TBD This is where we need to remember
@@ -2462,15 +2816,16 @@ reorg_perf_qual ( Info *info)
 		    const char *s = optrans_to_str( optran);
 		    // Commenting out these 3 debug commands causes a
 		    // regression
-		    DEBUG_A(", %s\n", s);
+		    //DEBUG_A(", %s\n", s);
 		    if ( tri != NULL )
 		      {
-			DEBUG(", ");
-			DEBUG_F(print_reorg, stderr, 0, tri);
+			//DEBUG(", ");
+			//DEBUG_F(print_reorg, stderr, 0, tri);
+			;
 		      }
 		    else
 		      {
-			DEBUG("\n");
+			//DEBUG("\n");
 			;
 		      }
 		    switch ( optran)
@@ -2511,36 +2866,37 @@ reorg_perf_qual ( Info *info)
 			missing_cases = true;
 		      }
 		  }
-		INDENT(-4);
+		//INDENT(-4);
 	      }
-	    INDENT(-4);
+	    //INDENT(-4);
 	  }
 
-	DEBUG_L("Dumping acc_info:\n");
+	//DEBUG_L("Dumping acc_info:\n");
 	for ( auto aci = acc_info.begin (); aci != acc_info.end (); aci++ )
 	  {
-	    DEBUG_A("variable:\n");
-	    DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
-	    DEBUG_A("field: ");
-	    DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
+	    //DEBUG_A("variable:\n");
+	    //DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
+	    //DEBUG_A("field: ");
+	    //DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
+	    ;
 	  }
 
-	DEBUG_A("before sort: \n");
-	DEBUG_F(print_acc_infos, stderr, acc_info );
+	//DEBUG_A("before sort: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 
-	DEBUG_A("before compress: \n");
-	DEBUG_F(print_acc_infos, stderr, acc_info );
+	//DEBUG_A("before compress: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	std::stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 	
 	compress_acc_infos ( acc_info );
 
-	DEBUG_A("after compress: \n");
-	DEBUG_F(print_acc_infos, stderr, acc_info );
+	//DEBUG_A("after compress: \n");
+	//DEBUG_F(print_acc_infos, stderr, acc_info );
 	
 	// Obtain loop count by looking at all the block counts.
 	unsigned loop_count = 0;
@@ -2549,8 +2905,8 @@ reorg_perf_qual ( Info *info)
 	    basic_block bb = bbs [i];
 	    loop_count = MAX( loop_count, bb->count.value ());
 	  }
-	DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
-		loop_count, loop->nb_iterations_estimate);
+	//DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
+	//	loop_count, loop->nb_iterations_estimate);
 
 	// Create the variable infos
 	varInfo_t var_entry;
@@ -2587,12 +2943,12 @@ reorg_perf_qual ( Info *info)
 	  {
 	    fprintf ( stderr, "%d VarInfos\n", var_info.size ());
 	  }
-	DEBUG_F(print_var_infos, stderr, var_info);
+	//DEBUG_F(print_var_infos, stderr, var_info);
 
 	//
 	// Model the performance
 	//
-	DEBUG_A("Model The Performance\n");
+	//DEBUG_A("Model The Performance\n");
 
 	// Originally this was done per bb but now it has to be per
 	// loop. TBD But perf_bb is per loop so we need something similar
@@ -2604,16 +2960,16 @@ reorg_perf_qual ( Info *info)
 	    ReorgType_t *ri = pvi->rep_access->reorg;
 	    
 	    // Reorg accounting
-	    DEBUG_L("\n");
-	    DEBUG_A("Reorg Accounting\n");
+	    //DEBUG_L("\n");
+	    //DEBUG_A("Reorg Accounting\n");
 	    
 	    if( ri != NULL )
 	      {
 		double reorg_nca = 0.0;
 
-		DEBUG_A("  for: ");
-		DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
-		INDENT(4);
+		//DEBUG_A("  for: ");
+		//DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
+		//INDENT(4);
 		for ( auto fldi = pvi->fields.begin (); fldi != pvi->fields.end (); fldi++ )
 		  {
 		    unsigned HOST_WIDE_INT fld_width =
@@ -2621,18 +2977,18 @@ reorg_perf_qual ( Info *info)
 		    double effect = alignment_effect ( fld_width);
 		    double product = loop_count * effect;
 		    reorg_nca += product;
-		    DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
-		    	    loop_count, effect, product, reorg_nca);
+		    //DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
+		    //	    loop_count, effect, product, reorg_nca);
 		  }
-		INDENT(-4);
+		//INDENT(-4);
 		ri->instance_interleave.reorg_perf += reorg_nca;
 		DEBUG_A("Add reorg_nca (%f) to reorg_perf (now %e)\n",
 			reorg_nca, ri->instance_interleave.reorg_perf);
               } // 699
 
 	    // regular accounting
-	    DEBUG_L("\n");
-	    DEBUG_A("Regular Accounting\n");
+	    //DEBUG_L("\n");
+	    //DEBUG_A("Regular Accounting\n");
 	    
 	    double regular_nca = 0.0;
 	    sbitmap cache_model = sbitmap_alloc(1);
@@ -2643,12 +2999,12 @@ reorg_perf_qual ( Info *info)
 		tree base_type; // = base_type_of ( access);
 		if ( pv2i->rep_access->reorg != NULL )
 		  {
-		    DEBUG_A("Base type from reorg: ");
+		    //DEBUG_A("Base type from reorg: ");
 		    base_type = pv2i->rep_access->reorg->gcc_type;
 		  }
 		else
 		  {
-		    DEBUG_A("Base type from access: ");
+		    //DEBUG_A("Base type from access: ");
 		    if ( TREE_TYPE ( access ) != NULL )
 		      {
 			base_type = base_type_of ( access);
@@ -2658,7 +3014,7 @@ reorg_perf_qual ( Info *info)
 			gcc_assert (0);
 		      }
 		  }
-		DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+		//DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
 
 		bool base_type_isa_decl = DECL_P ( base_type );
 
@@ -2668,31 +3024,31 @@ reorg_perf_qual ( Info *info)
 		tree base_type_size;
 		if ( base_type_isa_decl )
 		  {
-		    DEBUG_A("decl\n");
+		    //DEBUG_A("decl\n");
 		    switch ( TREE_CODE (base_type) )
 		      {
 		      case VAR_DECL:
 			{
-			  DEBUG_A("VAR_DECL\n");
+			  //DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( base_type);
 			  break;
 			}
 		      case FIELD_DECL:
 			{
-			  DEBUG_A("VAR_DECL\n");
+			  //DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE ( base_type));
 			  break;
 			}
 		      default:
 			{
-			  DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
+			  //DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
 			  gcc_assert(0);
 			}
 		      }
 		  }
 		else
 		  {
-		    DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
+		    //DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
 		    if ( TREE_CODE ( base_type) == SSA_NAME )
 		      {
 			base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE( base_type));
@@ -2711,10 +3067,10 @@ reorg_perf_qual ( Info *info)
 		   param_l1_cache_line_size)
 		  +
 		  1;
-		DEBUG_L("\n");
-		DEBUG_A("cache len = %d (lines), for: ", len);
-		DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
-		DEBUG("%sstruct\n")
+		//DEBUG_L("\n");
+		//DEBUG_A("cache len = %d (lines), for: ", len);
+		//DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
+		//DEBUG("%sstruct\n")
 	      
 		// TBD Does this clear the bits??? It needs to.
 		// Each bit represents a cache line.
@@ -2736,14 +3092,14 @@ reorg_perf_qual ( Info *info)
 			// why this is here and what it does. Sigh...
 			unsigned HOST_WIDE_INT base_offset =
 			  tree_to_uhwi ( DECL_FIELD_OFFSET( field_ex));
-			DEBUG_L("\n");
-			DEBUG_A("For field_ex: ");
-			DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
-			DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
+			//DEBUG_L("\n");
+			//DEBUG_A("For field_ex: ");
+			//DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
+			//DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
 			
 			// Access accounting
 
-			INDENT(4);
+			//INDENT(4);
 			for ( auto fldi = pv2i->fields.begin ();
 			      fldi != pv2i->fields.end (); fldi++ )
 			  {
@@ -2751,27 +3107,27 @@ reorg_perf_qual ( Info *info)
 			    unsigned HOST_WIDE_INT fld_width, fld_offset;
 			    fld_width = tree_to_uhwi ( DECL_SIZE ( field));
 			    fld_offset = tree_to_uhwi ( DECL_FIELD_OFFSET ( field));
-			    DEBUG_A("Field: ");
-			    DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
-			    DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
-			    INDENT(4);
+			    //DEBUG_A("Field: ");
+			    //DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
+			    //DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
+			    //INDENT(4);
 			    int chari;
 			    for ( chari = 0; chari < fld_width; chari++ )
 			      {
 				int loc = (chari + fld_offset + base_offset)
 				  /
 				  param_l1_cache_line_size;
-				DEBUG_A("loc: %d\n", loc);
+				//DEBUG_A("loc: %d\n", loc);
 				bitmap_set_bit ( cache_model, loc);
 			      }
-			    INDENT(-4);
+			    //INDENT(-4);
 			  }
-			INDENT(-4);
+			//INDENT(-4);
 			unsigned bcount = bitmap_count_bits ( cache_model);
 			accum += bcount;
-			DEBUG_L("\n");
-			DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
-				bcount, accum);
+			//DEBUG_L("\n");
+			//DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
+			//	bcount, accum);
 			bitmap_clear ( cache_model);
 		      }
 		  }
@@ -2779,22 +3135,22 @@ reorg_perf_qual ( Info *info)
 		  {
 		    nrbo = 1;
 		    accum++;
-		    DEBUG_L("\n");
-		    DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
+		    //DEBUG_L("\n");
+		    //DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
 		  }
 		#if 1	
 		double amount = accum / nrbo;
 		double product = amount * loop_count;
 		regular_nca += product;
-		DEBUG_L("\n");
-		DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
-			loop_count, accum, nrbo, product, regular_nca);
+		//DEBUG_L("\n");
+		//DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
+		//	loop_count, accum, nrbo, product, regular_nca);
 		#else
 		double amount = accum / nrbo;
 		regular_nca += amount;
-		DEBUG_L("\n");
-		DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
-			accum, nrbo, amount, regular_nca);
+		//DEBUG_L("\n");
+		//DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
+		//	accum, nrbo, amount, regular_nca);
 		#endif
 	      } // 739
 	    sbitmap_free ( cache_model);
@@ -2802,11 +3158,11 @@ reorg_perf_qual ( Info *info)
 	    if( ri != NULL ) {
 	      ri->instance_interleave.regular_perf += regular_nca;
               cache_accesses_noreorg += regular_nca;
-	      DEBUG_L("\n");
-	      DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
-	      	      regular_nca, ri->instance_interleave.regular_perf);
-	      DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
-	      	      cache_accesses_noreorg);
+	      //DEBUG_L("\n");
+	      //DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
+	      //	      regular_nca, ri->instance_interleave.regular_perf);
+	      //DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
+	      //	      cache_accesses_noreorg);
             } else {
 	        cache_accesses += regular_nca;
             }
@@ -3268,7 +3624,7 @@ account_for_access ( tree access, tree field, std::vector <acc_info_t> *acc_info
 static void
 tmasn_helper ( tree t, int indent, std::set<tree> *already )
 {
-  DEBUG_A("");
+  //DEBUG_A("");
   fprintf( stderr, "%*s", indent, " ");
   indent += 4;
   flexible_print ( stderr, t, 0, (dump_flags_t)0);
@@ -3281,7 +3637,7 @@ tmasn_helper ( tree t, int indent, std::set<tree> *already )
     {
       fprintf( stderr, "\n");
     }
-  DEBUG_L("code: %s\n", code_str(TREE_CODE (t)));
+  //DEBUG_L("code: %s\n", code_str(TREE_CODE (t)));
   if ( TREE_CODE (t) == SSA_NAME )
     {
       already->insert (t);
