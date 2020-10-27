@@ -1293,17 +1293,80 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    */
 		    break;
 		  case ReorgT_Free:
-		    // TBD
-		    DEBUG_L("ReorgT_Free\n");
-		    // We won't free the base because it a global.
-		    /*
-		  for each element of base {
-		    tree fndecl = builtin_decl_explicit( BUILT_IN_FREE);
-		    gcall *call = gimple_build_call( fndecl, 1, element);
-		    insert call before stmt
-		  }
-		  delete stmt
-		    */
+		    {
+		      DEBUG_L("ReorgT_Free\n");
+		      // We won't free the base because it a global.
+		      /*
+			for each element of base {
+			tree fndecl = builtin_decl_explicit( BUILT_IN_FREE);
+			gcall *call = gimple_build_call( fndecl, 1, element);
+			insert call before stmt
+			}
+			delete stmt
+		      */
+		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+
+		      //tree fndecl_free = gimple_call_fndecl ( stmt);
+		      tree fndecl_free = builtin_decl_implicit ( BUILT_IN_FREE);
+		      tree field;
+		      tree base = ri->instance_interleave.base;
+		      tree reorg_type = ri->gcc_type;
+
+		      cgraph_edge *edge = node->get_edge ( stmt); // expt
+		      
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field))
+			{
+			  
+			  tree base_field =
+			    find_coresponding_field ( base, field);
+			  tree base_field_type = TREE_TYPE( base_field);
+			  
+			  gcc_assert ( base_field_type);
+			  tree to_free = 
+			    make_temp_ssa_name( base_field_type, NULL, "to_free");
+			  
+			  tree rhs_ass = build3( COMPONENT_REF,
+						 base_field_type,
+						 base,
+						 base_field, NULL_TREE);
+			  
+			  gimple *gaddr2free = gimple_build_assign( to_free, rhs_ass);
+			  SSA_NAME_DEF_STMT ( to_free) = gaddr2free;
+			  
+			  gsi_insert_before( &gsi, gaddr2free, GSI_SAME_STMT);
+			  
+			  gcc_assert ( ptr_type_node);
+			  tree m_cast2free =
+			    make_temp_ssa_name( ptr_type_node, NULL, "m_cast2free");
+			  
+			  gimple *gm_cast2free =
+			    gimple_build_assign( m_cast2free, CONVERT_EXPR, to_free);
+			  SSA_NAME_DEF_STMT ( m_cast2free) = gm_cast2free;
+			  
+			  gsi_insert_before( &gsi, gm_cast2free, GSI_SAME_STMT);
+			  
+			  gcall *free_call = gimple_build_call( fndecl_free, 1, m_cast2free);
+			  gsi_insert_before( &gsi, free_call, GSI_SAME_STMT);
+
+			  if ( edge )
+			    {
+			      // We steal the existing edge to a free
+			      cgraph_edge::set_call_stmt ( edge, free_call);
+			      edge = NULL;
+			    }
+			  else
+			    {
+			      cgraph_node::get ( cfun->decl)->
+				create_edge ( cgraph_node::get_create ( fndecl_free),
+					      free_call,
+					      bb->count
+					      );
+			    }
+			}
+		      gsi_remove ( &gsi, true);
+		    }
 		    break;
 		  case ReorgT_UserFunc:
 		    {
