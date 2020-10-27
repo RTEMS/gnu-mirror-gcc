@@ -1,3 +1,36 @@
+work023.patch010
+2020-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ieee128 if long double is IEEE 128-bit.
+
+work023.patch006
+2020-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+	* config/rs6000/t-float128: Build __float128 conversions to and
+	from Decimal support functions.
+	* dfp-bit.c: Add support for building the PowerPC _Float128
+	to/from Decimal conversion functions.
+	* dfp-bit.h: Likewise.
+
+work023.patch004
+2020-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR libgcc/97543
+	* config/rs6000/t-linux (HOST_LIBGCC2_CFLAGS): Don't set
+	-mlong-double-128 for all modules.  Instead set
+	-mno-gnu-attributes.
+	(IBM128_OBJS): New make variable for long double support.
+	(IBM128_S_OBJS): New make variable for long double support.
+	(IBM128_ALL_OBJS): New make variable for long double support.
+	(IBM128_CFLAGS): New make variable for long double support.
+
 2020-10-27   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
