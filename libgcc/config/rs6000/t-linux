@@ -16,7 +16,7 @@ $(IBM128_ALL_OBJS) : INTERNAL_CFLAGS += $(IBM128_CFLAGS)
 
 # Turn off gnu attributes for the whole library.  This allows us to build
 # libgcc that supports the different long double formats.
-HOST_LIBGCC2_CFLAGS += -mno-gnu-attributes
+HOST_LIBGCC2_CFLAGS += -mno-gnu-attribute
 
 # This is a way of selecting -mcmodel=small for ppc64, which gives
 # smaller and faster libgcc code.  Directly specifying -mcmodel=small
