@@ -536,7 +536,7 @@ DEFTREECODE (NESTED_REQ, "nested_req", tcc_expression, 1)
    ATOMIC_CONSTR_EXPR has the expression to be evaluated.
    ATOMIC_CONSTR_PARMS is the parameter mapping for the atomic constraint
    and is stored in the type field.  */
-DEFTREECODE (ATOMIC_CONSTR, "atomic_constr", tcc_expression, 1)
+DEFTREECODE (ATOMIC_CONSTR, "atomic_constr", tcc_expression, 2)
 
 /* The conjunction and disjunction of two constraints, respectively.
    Operands are accessed using TREE_OPERAND. The third operand provides

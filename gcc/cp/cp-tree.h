@@ -1580,14 +1580,18 @@ check_constraint_info (tree t)
 
 /* The expression evaluated by the constraint.  */
 #define CONSTR_EXPR(NODE) \
-  TREE_PURPOSE (CONSTR_INFO (NODE))
+  (TREE_CODE (NODE) == ATOMIC_CONSTR \
+   ? ATOMIC_CONSTR_EXPR (NODE) \
+   : TREE_PURPOSE (TREE_TYPE (CONSTR_CHECK (NODE))))
 
 /* The expression or declaration from which this constraint was normalized.
    This is a TREE_LIST whose TREE_VALUE is either a template-id expression
    denoting a concept check or the declaration introducing the constraint.
    These are chained to other context objects.  */
 #define CONSTR_CONTEXT(NODE) \
-  TREE_VALUE (CONSTR_INFO (NODE))
+  (TREE_CODE (NODE) == ATOMIC_CONSTR \
+   ? TREE_TYPE (NODE) \
+   : TREE_VALUE (TREE_TYPE (CONSTR_CHECK (NODE))))
 
 /* The parameter mapping for an atomic constraint. */
 #define ATOMIC_CONSTR_MAP(NODE) \
@@ -1595,7 +1599,7 @@ check_constraint_info (tree t)
 
 /* The expression of an atomic constraint. */
 #define ATOMIC_CONSTR_EXPR(NODE) \
-  CONSTR_EXPR (ATOMIC_CONSTR_CHECK (NODE))
+  TREE_OPERAND (ATOMIC_CONSTR_CHECK (NODE), 1)
 
 /* The concept of a concept check. */
 #define CHECK_CONSTR_CONCEPT(NODE) \

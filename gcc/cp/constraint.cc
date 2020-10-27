@@ -765,10 +765,7 @@ normalize_atom (tree t, tree args, norm_info info)
   /* Build the parameter mapping for the atom.  */
   tree map = build_parameter_mapping (t, args, info.in_decl);
 
-  /* Build a new info object for the atom.  */
-  tree ci = build_tree_list (t, info.context);
-
-  return build1 (ATOMIC_CONSTR, ci, map);
+  return build2 (ATOMIC_CONSTR, info.context, map, t);
 }
 
 /* Returns the normal form of an expression. */
