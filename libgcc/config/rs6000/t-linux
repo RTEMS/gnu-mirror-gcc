@@ -10,7 +10,7 @@ IBM128_OBJS	= ibm-ldouble$(objext) _powitf2$(objext) ppc64-fp$(objext) \
 		  _floatditf$(objext) _floatunsditf$(objext)
 
 IBM128_S_OBJS	= $(patsubst %$(objext),%_s$(objext),$(IBM128_OBJS))
-IBM128_ALL_OJBS	= $(IBM128_OBJS) $(IBM128_S_OBJS)
+IBM128_ALL_OBJS	= $(IBM128_OBJS) $(IBM128_S_OBJS)
 
 IBM128_CFLAGS	= -mno-gnu-attribute -mlong-double-128 \
 		  -Wno-psabi -mabi=ibmlongdouble
