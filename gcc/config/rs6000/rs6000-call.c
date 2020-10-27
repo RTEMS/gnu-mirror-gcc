@@ -5453,6 +5453,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_unsigned_V1TI,
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_unsigned_V1TI },
 
+  /* All the VMIN* entries are deprecated, not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VMINSD, P8V_BUILTIN_VMINSD,
     RS6000_BTI_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VMINSD, P8V_BUILTIN_VMINSD,
@@ -5460,6 +5461,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P8V_BUILTIN_VEC_VMINSD, P8V_BUILTIN_VMINSD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
 
+  /* All the VMAX* entries are deprecated, not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VMAXSD, P8V_BUILTIN_VMAXSD,
     RS6000_BTI_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VMAXSD, P8V_BUILTIN_VMAXSD,
@@ -5467,7 +5469,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P8V_BUILTIN_VEC_VMAXSD, P8V_BUILTIN_VMAXSD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
 
-  /* Next two deprecated, not in rs6000-builtin-new.def.  */
+  /* All the VMIN* entries are deprecated, not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VMINUD, P8V_BUILTIN_VMINUD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_bool_V2DI,
     RS6000_BTI_unsigned_V2DI, 0 },
@@ -5478,6 +5480,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI,
     RS6000_BTI_unsigned_V2DI, 0 },
 
+  /* All the VMAX* entries are deprecated, not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VMAXUD, P8V_BUILTIN_VMAXUD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_bool_V2DI,
     RS6000_BTI_unsigned_V2DI, 0 },
@@ -5556,6 +5559,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P8V_BUILTIN_VEC_VPOPCNT, P8V_BUILTIN_VPOPCNTD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0, 0 },
 
+  /* All the VEC_VPOPCNT* entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VPOPCNTB, P8V_BUILTIN_VPOPCNTB,
     RS6000_BTI_V16QI, RS6000_BTI_V16QI, 0, 0 },
   { P8V_BUILTIN_VEC_VPOPCNTB, P8V_BUILTIN_VPOPCNTB,
@@ -5596,6 +5601,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P8V_BUILTIN_VEC_VPOPCNTD, P8V_BUILTIN_VPOPCNTD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0, 0 },
 
+  /* All the VEC_VPRTY* entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P9V_BUILTIN_VEC_VPRTYB, P9V_BUILTIN_VPRTYBW,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0, 0 },
   { P9V_BUILTIN_VEC_VPRTYB, P9V_BUILTIN_VPRTYBW,
@@ -5652,6 +5659,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P9_BUILTIN_CMPEQB, P9_BUILTIN_SCALAR_CMPEQB,
     RS6000_BTI_INTSI, RS6000_BTI_UINTQI, RS6000_BTI_UINTDI, 0 },
 
+  /* All the VEC_VPK* entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VPKUDUM, P8V_BUILTIN_VPKUDUM,
     RS6000_BTI_V4SI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VPKUDUM, P8V_BUILTIN_VPKUDUM,
@@ -5668,40 +5677,50 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P8V_BUILTIN_VEC_VPKSDUS, P8V_BUILTIN_VPKSDUS,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
 
+  /* All the VEC_VRLD entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VRLD, P8V_BUILTIN_VRLD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { P8V_BUILTIN_VEC_VRLD, P8V_BUILTIN_VRLD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
 
+  /* All the VEC_VSLD entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSLD, P8V_BUILTIN_VSLD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSLD, P8V_BUILTIN_VSLD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
 
+  /* All the VEC_VSRD entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSRD, P8V_BUILTIN_VSRD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSRD, P8V_BUILTIN_VSRD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
 
+  /* All the VEC_VSRAD entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSRAD, P8V_BUILTIN_VSRAD,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSRAD, P8V_BUILTIN_VSRAD,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
 
+  /* All the VEC_VSUBCUQ entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSUBCUQ, P8V_BUILTIN_VSUBCUQ,
     RS6000_BTI_V1TI, RS6000_BTI_V1TI, RS6000_BTI_V1TI, 0 },
   { P8V_BUILTIN_VEC_VSUBCUQ, P8V_BUILTIN_VSUBCUQ,
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_unsigned_V1TI,
     RS6000_BTI_unsigned_V1TI, 0 },
 
-  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
+  /* All the VEC_VSUBU*M entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSUBUDM, P8V_BUILTIN_VSUBUDM,
     RS6000_BTI_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSUBUDM, P8V_BUILTIN_VSUBUDM,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_bool_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSUBUDM, P8V_BUILTIN_VSUBUDM,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
-  /* Next 2 deprecated, not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VSUBUDM, P8V_BUILTIN_VSUBUDM,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_bool_V2DI, RS6000_BTI_unsigned_V2DI, 0 },
   { P8V_BUILTIN_VEC_VSUBUDM, P8V_BUILTIN_VSUBUDM,
@@ -5720,6 +5739,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P6_OV_BUILTIN_CMPB, P6_BUILTIN_CMPB,
     RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, 0 },
 
+  /* All the VEC_VUPK* entries are deprecated, not in
+     rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_VUPKHSW, P8V_BUILTIN_VUPKHSW,
     RS6000_BTI_V2DI, RS6000_BTI_V4SI, 0, 0 },
   { P8V_BUILTIN_VEC_VUPKHSW, P8V_BUILTIN_VUPKHSW,
@@ -5737,6 +5758,8 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_unsigned_V16QI,
     RS6000_BTI_unsigned_V16QI, 0 },
 
+  /* The ones of these that make no sense (boolean, character)
+     are deprecated and not in rs6000-builtin-new.def.  */
   { P8V_BUILTIN_VEC_REVB, P8V_BUILTIN_REVB_V1TI,
     RS6000_BTI_V1TI, RS6000_BTI_V1TI, 0, 0 },
   { P8V_BUILTIN_VEC_REVB, P8V_BUILTIN_REVB_V1TI,

@@ -161,6 +161,20 @@
 ; defined above; that is, you can introduce as many extra newlines as you
 ; like after a required newline, but nowhere else.  Lines beginning with
 ; a semicolon are also treated as blank lines.
+;
+; A const int argument may be restricted to certain values.  This is
+; indicated by one of the following occurring after the "int" token:
+;
+;    <x>   restricts the constant to x bits, interpreted as unsigned
+;    <x,y> restricts the constant to the inclusive range [x,y]
+;    [x,y] restricts the constant to the inclusive range [x,y],
+;	   but only applies if the argument is constant.
+;    {x,y} restricts the constant to one of two values, x or y.
+;
+; Here x and y are integer tokens.  Note that the "const" token is a
+; lie when the restriction is [x,y], but this simplifies the parsing
+; significantly and is hopefully forgivable.
+
 
 
 ; Builtins that have been around since time immemorial or are just
@@ -231,10 +245,10 @@
 
 ; Power6 builtins.
 [power6]
-  const signed long long __builtin_p6_cmpb (signed long long, signed long long);
+  const unsigned long long __builtin_p6_cmpb (unsigned long long, unsigned long long);
     CMPB cmpbdi3 {}
 
-  const signed int __builtin_p6_cmpb_32 (signed int, signed int);
+  const unsigned int __builtin_p6_cmpb_32 (unsigned int, unsigned int);
     CMPB_32 cmpbsi3 {}
 
 
@@ -2641,7 +2655,7 @@
   const signed int __builtin_scalar_byte_in_either_range (unsigned char, unsigned int);
     CMPRB2 cmprb2 {}
 
-  const vull __builtin_vsx_extract4b (vuc, signed int);
+  const vull __builtin_vsx_extract4b (vuc, const int[0,12]);
     EXTRACT4B extract4b {}
 
   const vull __builtin_vsx_extract_exp_dp (vd);
