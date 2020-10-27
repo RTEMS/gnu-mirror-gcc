@@ -1978,13 +1978,12 @@ This option is enabled by default for some targets (such as MIPS) which
 have hardware-support for fixed-point operations.  On other targets, you
 may enable this option manually.
 
-@item --with-long-double-128
-Specify if @code{long double} type should be 128-bit by default on selected
-GNU/Linux architectures.  If using @code{--without-long-double-128},
-@code{long double} will be by default 64-bit, the same as @code{double} type.
-When neither of these configure options are used, the default will be
-128-bit @code{long double} when built against GNU C Library 2.4 and later,
-64-bit @code{long double} otherwise.
+@item --with-long-double=64
+@itemx --with-long-double=128
+Specify whether @code{long double} should be 64-bit by default or
+128-bit by default.  When neither of these configure options are used,
+the default will be 128-bit @code{long double} when built against GNU
+C Library 2.4 and later, 64-bit @code{long double} otherwise.
 
 @item --with-long-double-format=ibm
 @itemx --with-long-double-format=ieee
@@ -1995,7 +1994,7 @@ Linux systems and on big endian 64-bit systems where the default cpu
 is at least power7 (i.e.@: @option{--with-cpu=power7},
 @option{--with-cpu=power8}, or @option{--with-cpu=power9} is used).
 
-If you use the @option{--with-long-double-64} configuration option,
+If you use the @option{--with-long-double=64} configuration option,
 the @option{--with-long-double-format=ibm} and
 @option{--with-long-double-format=ieee} options are ignored.
 

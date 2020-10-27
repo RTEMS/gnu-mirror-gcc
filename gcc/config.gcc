@@ -5024,6 +5024,14 @@ case "${target}" in
 		    fi
 		fi
 
+		# Set up the default long double size if the user changed it.
+		if test x$with_long_double = x64; then
+		    tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=64"
+
+		elif test x$with_long_double = x128; then
+		    tm_defines="${tm_defines} RS6000_DEFAULT_LONG_DOUBLE_SIZE=128"
+		fi
+
 		# Set up the default long double format if the user changed it.
 		if test x$with_long_double_format = xieee; then
 		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
