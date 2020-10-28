@@ -1569,83 +1569,406 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    //break;
 		    goto exit_after_spilting_a_block;
 		  case ReorgT_Realloc:
-		    // TBD
-		    //DEBUG_L("ReorgT_Realloc\n");
-		    /*
-		// This used to be closely related to the old version of
-		// the malloc code above and needs to transformed just like
-		// what was done above to malloc.
-		tree arg = gimple_call_arg( stmt, 0);
-		len is new SSA
-		tree val = gimple_call_lhs( stmt);
-		gcc_assert( TREE_CODE( TREE_TYPE(val)) == INDIRECT_REF);
-		tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
-		gimple *glen = 
-	        gimple_build_assign( 
-		  len, 
-		  TRUNC_DIV_EXPR, 
-		  val, 
-		  size,
-		  NULL_TREE, NULL_TREE);
-		insert glen before stmt
-		tree lfial = create_artificial_label( UNKNOWN_LOCATION);
-		gimple *gfail = gimple_build_label( lfail);
-		tree lnotfial = create_artificial_label( UNKNOWN_LOCATION);
-		gimple *gnotfail = gimple_build_label( lnotfail);
-		for each field of base {
-	      	  // call malloc
-		  tree lok = create_artificial_label( UNKNOWN_LOCATION);
-		  gimple *gok = gimple_build_label( lok);
-		  tree fndecl = builtin_decl_explicit( BUILT_IN_REALLOC);
-		  // but first compute how much to malloc
-		  mem_size, var, ptr are new SSA
-		  gimple *gsize = 
-	          gimple_build_assign( 
-        	    mem_size, 
-		    MULT_EXPR, 
-		    TYPE_SIZE(field), 
-		    len,
-		    NULL_TREE, NULL_TREE);
-		  insert gsize before stmt
-		  generate ptr = base.field & insert before stmt
-		  gcall *call
-		    = gimple_build_call( fndecl, 3, ptr,
-		    		         len, TYPE_SIZE( field));
-		  gimple_call_set_lhs( call, var);
-		  insert call before stmt
-		  // gen test of return
-		  gimple *gcond =
-		  gimple_build_cond( EQ_EXPR, var,
-		  null_pointer_node, lfail, lok);
-		  insert gcond before stmt
-		  insert gok before stmt
-		  generate base.field = var & insert before stmt
-		}
-		// fake return value of starting address (an index of zero)
-		gimple *gretzero =
-	          gimple_build_assign( lhs, //
-		    build_int_cst(
-		    TYPE_MIN_VALUE( TREE_TYPE(lhs)), 0));
-		insert gretzero before stmt
-		gimple *ggoto = gimple_build_goto( lnotfail);
-		insert ggoto before stmt
-		insert glab1 before stmt
-		for each element of base {
-	      	tree fndecl = builtin_decl_explicit( BUILT_IN_FREE);
-	        gcall *call = gimple_build_call( fndecl, 1, element);
-		insert call before stmt
-		set element to null
-	      }
-	      // fake return value of null (minimum value under this scheme)
-	      gimple *gretnull =
-	        gimple_build_assign( lhs,
-				     build_int_cst(
-				       TYPE_MIN_VALUE( TREE_TYPE(lhs))));
-	      insert gretnull before stmt
-	      insert gnotfail before stmt
-	      delete stmt
-		    */
-		    break;
+		    {
+		      DEBUG_L("Transform ReorgT_Realloc\n");
+		      //INDENT(2);
+
+		      // We need to use the user malloc function
+		      // declaration rather than the builtin!!!
+		      tree fndecl_realloc = gimple_call_fndecl ( stmt);
+		      
+		      // We need to synthesize the free function
+		      //
+		      tree param_type_list = NULL;
+		      tree void_pointer_type_node = build_pointer_type ( void_type_node);
+		      param_type_list =
+			tree_cons ( NULL_TREE, void_pointer_type_node, param_type_list);
+		      //DEBUG_L("param_type_list: ");
+		      //DEBUG_F(print_generic_expr, stderr, param_type_list, (dump_flags_t)0);
+		      //DEBUG("\n");
+
+		      tree fndecl_free = builtin_decl_implicit ( BUILT_IN_FREE);
+
+		      // Note, add it to the call graph at each call site
+		      
+		      // Note, unlike other simpler transformations,
+		      // this must build new basic blocks to add new
+		      // gimple to and use a phi for the final result.
+		      // See appendix on malloc transformation for
+		      // each comment starting with "FROM."
+		      ReorgType_t *ri = contains_a_reorgtype( stmt, info);
+
+		      // Note, arg 0 is meaningless for the single pool case.
+		      tree arg = gimple_call_arg( stmt, 1);
+
+		      tree val = gimple_call_lhs( stmt);
+		      //DEBUG_L("val is: ");
+		      //DEBUG_F( print_generic_expr, stderr, val, (dump_flags_t)-1);
+		      //DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
+
+		      gcc_assert( TREE_CODE( TREE_TYPE(val)) == POINTER_TYPE);
+		      tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
+
+		      tree int_ptrsize_type = signed_type_for ( ptr_type_node);
+		      //DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
+		      gcc_assert ( TREE_TYPE ( size));
+		      tree len = make_temp_ssa_name ( TREE_TYPE ( size), NULL, "realloc_len");
+		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+
+		      // Cast arg to compatible type
+		      gcc_assert( TREE_TYPE ( size));
+		      TREE_TYPE (arg) = TREE_TYPE ( size);
+		      tree cast_arg =
+			    make_temp_ssa_name( TREE_TYPE ( size), NULL, "cast_arg");
+		      gimple *gcast_arg = gimple_build_assign ( cast_arg, CONVERT_EXPR, arg);
+		      SSA_NAME_DEF_STMT ( cast_arg) = gcast_arg;
+		      gsi_insert_before( &gsi, gcast_arg, GSI_SAME_STMT);
+			
+		      gimple *glen = 
+			gimple_build_assign ( len, TRUNC_DIV_EXPR, cast_arg, size);
+		      SSA_NAME_DEF_STMT ( len) = glen;
+		      
+		      gsi_insert_before( &gsi, glen, GSI_SAME_STMT);
+		      // Note in other places in this doc this would
+		      // be "insert glen before stmt" instead of this but
+		      // here we need to create new basic blocks.
+		      edge new_edge = split_block ( bb, stmt);
+		      basic_block before_bb = new_edge->src;
+		      basic_block after_bb = new_edge->dest;
+		      remove_edge ( new_edge);
+		      basic_block prev_bb = before_bb;
+		      //DEBUG_A("before <bb %d> & after <bb %d>\n",
+		      //	      before_bb->index, after_bb->index);
+		      
+		      basic_block failure_bb = make_bb ( "failure_bb", prev_bb);
+		      // I need to set the count to zero and there doesn't
+		      // seem to be direct way of doing this...
+		      failure_bb->count = prev_bb->count - prev_bb->count;
+		      
+		      // set edge probability and flags
+		      edge fail_to_after_e = make_edge ( failure_bb,
+						      after_bb, EDGE_FALLTHRU);
+		      fail_to_after_e->probability = profile_probability::very_unlikely ();
+		      fail_to_after_e->count () = failure_bb->count;
+
+		      // Note, this should remove this call from the call graph
+		      cgraph_update_edges_for_call_stmt ( stmt, gimple_call_fndecl ( stmt), NULL);
+		      // Now it's safe to remove it!
+		      gsi_remove ( &gsi, true);
+		      
+		      tree field;
+		      tree reorg_type = ri->gcc_type;
+		      tree reorg_pointer_type = ri->pointer_rep;
+
+		      tree base = ri->instance_interleave.base;
+
+		      gcc_assert ( reorg_pointer_type);
+		      tree fail_val = 
+		      	make_temp_ssa_name ( reorg_pointer_type, NULL, "realloc_fail_val");
+		      
+		      // loop setup trickery for gimple idioms
+		      //
+		      basic_block prev_order = failure_bb;
+
+		      prev_bb = before_bb;
+		      int edge_flags = EDGE_FALLTHRU;
+		      
+		      // Generate all the real allocation code
+		      //
+		      // Note, I think there are ramifications of built in malloc (and free)
+		      // so I'm going try and use the malloc in the call transformed!!!
+		      // Actually, I ended up using the built in free and it was
+		      // the way to go.
+		      //
+		      
+		      // This, after the following loop, will hold the start of the
+		      // field related code.
+		      tree new_ok_field_L;
+		      
+		      bool first = true;
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field))
+			{
+			  basic_block new_bb = make_bb ( "new_bb", prev_order);
+			  new_bb->count = prev_order->count;
+			    
+			  tree base_field =
+			      find_coresponding_field ( base, field);
+
+			  //DEBUG_L("base_field: %p\n", base_field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree base_field_type = TREE_TYPE( base_field);
+			  //DEBUG_L("base_field_type: %p\n", base_field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  gimple_stmt_iterator gsi = gsi_start_bb ( new_bb);
+			  // Note, switching the order of edge creation and
+			  // setting dominator seems to make no difference
+			  
+			  // set edge probability and flags
+			  
+			  // edge_flags depends on whether or not the predecessor
+			  // block was created in this loop.
+			  edge ok_edge = make_edge ( prev_bb, new_bb, edge_flags);
+			  edge_flags = EDGE_TRUE_VALUE;
+
+			  ok_edge->probability = profile_probability::very_likely ();
+			  ok_edge->count () = prev_bb->count;
+			  add_bb_to_loop ( new_bb, before_bb->loop_father);
+			  
+			  // Don't mess with the dominators.
+			  //set_immediate_dominator ( CDI_DOMINATORS, new_bb, prev_bb);
+
+			  // create edge and set edge probability and flags
+			  edge fail_edge = make_edge ( new_bb, failure_bb, EDGE_FALSE_VALUE);
+			  fail_edge->probability = profile_probability::very_unlikely ();
+			  fail_edge->count () = new_bb->count - new_bb->count;
+
+			  tree lhs_ass = build3( COMPONENT_REF,
+						 base_field_type,
+						 base,
+						 base_field, NULL_TREE);
+
+			  //DEBUG_L("base: %p\n", base);
+			  //DEBUG_A("  base: ");
+			  //DEBUG_F(print_generic_expr, stderr, base, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  //DEBUG_L("field: %p\n", field);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree field_type = TREE_TYPE( field);
+			  //DEBUG_L("field_type: %p\n", field_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, field_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+			  
+			  //DEBUG_L("lhs_ass: %p\n", lhs_ass);
+			  //DEBUG_A("  lhs_ass: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree lhs_ass_type = TREE_TYPE ( lhs_ass);
+			  //DEBUG_L("lhs_ass_type: %p\n", lhs_ass_type);
+			  //DEBUG_A("  lhs_ass_type: ");
+			  //DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  gcc_assert ( sizetype);
+			  tree mem_size = 
+			    make_temp_ssa_name( sizetype, NULL, "malloc_mem_size");
+			  
+			  // We need field_size to be of the correct type so
+			  // we type cast.
+			  gcc_assert ( TREE_TYPE ( mem_size));
+			  tree field_size =
+			    make_temp_ssa_name( TREE_TYPE ( mem_size), NULL, "field_size");
+
+			  // Changed from TYPE_SIZE to TYPE_SIZE_UNIT
+			  gimple *gfield_size =
+			    gimple_build_assign ( field_size,
+						  CONVERT_EXPR,
+						  TYPE_SIZE_UNIT ( TREE_TYPE ( field)));
+			  SSA_NAME_DEF_STMT ( field_size) = gfield_size;
+
+			  gimple *gsize = 
+			    gimple_build_assign ( mem_size,
+						  MULT_EXPR,
+						  field_size,
+						  len);
+			  SSA_NAME_DEF_STMT ( mem_size) = gsize;
+
+			  gcc_assert ( ptr_type_node);
+			  tree res = 
+			    make_temp_ssa_name ( ptr_type_node, NULL, "res");
+
+			  gcc_assert ( TREE_TYPE ( base_field));
+			  tree cast_res =
+			    make_temp_ssa_name ( TREE_TYPE ( base_field), NULL, "cast_res");
+
+			  tree res_type = TREE_TYPE( res);
+			  //DEBUG_L("res_type: %p\n", res_type);
+			  //DEBUG_A("  : ");
+			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
+			  //DEBUG("\n");
+
+			  tree field_loc =
+			  make_temp_ssa_name( base_field_type, NULL, "field_to_realloc");
+
+			  tree rhs_loc = build3( COMPONENT_REF,
+						 base_field_type,
+						 base,
+						 base_field, NULL_TREE);
+
+			  gimple *gfield_loc = gimple_build_assign( field_loc, rhs_loc);
+			  SSA_NAME_DEF_STMT ( field_loc) =gfield_loc ;
+			
+			  gcall *realloc_call = gimple_build_call( fndecl_realloc, 2, field_loc, mem_size);
+			  gimple_call_set_lhs( realloc_call, res);
+			  SSA_NAME_DEF_STMT ( res) = realloc_call;
+
+			  cgraph_node::get ( cfun->decl)->
+			    create_edge ( cgraph_node::get_create ( fndecl_realloc),
+					  realloc_call,
+					  new_bb->count
+					  );
+			  
+			  gimple *gcast_res =
+			    gimple_build_assign ( cast_res, CONVERT_EXPR, res);
+			  SSA_NAME_DEF_STMT ( cast_res) = gcast_res;
+			  
+			  gimple *gset_field = gimple_build_assign ( lhs_ass, cast_res);
+
+			  gimple *gcond =
+			    gimple_build_cond ( NE_EXPR, res, null_pointer_node,
+						NULL, NULL
+						);
+
+			  // In execution order
+			  gsi_insert_after ( &gsi, gfield_size, GSI_NEW_STMT);
+			  gsi_insert_after ( &gsi, gsize, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gfield_loc, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, realloc_call, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gcast_res, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gset_field, GSI_CONTINUE_LINKING);
+			  gsi_insert_after ( &gsi, gcond, GSI_CONTINUE_LINKING);
+			  
+			  prev_bb = new_bb;
+			  prev_order = new_bb;
+			}
+
+		      // Loop cleaup fo failure code bb here. There is loop state
+		      // overhead having nothing to do with the transformation
+		      // that never the less must be updated.
+		      add_bb_to_loop ( failure_bb, before_bb->loop_father);
+		      
+		      // create basic block for success
+		      //
+		      basic_block success_bb = make_bb ( "succ_bb", prev_bb);
+		      success_bb->count = prev_bb->count;
+		      
+		      // NOTE, it seems I shouldn't be attempting
+		      // to diddle the dominator information on the fly.
+		      
+		      edge success_e = make_edge ( prev_bb, success_bb, EDGE_TRUE_VALUE );
+		      edge succ_to_after_e = make_edge ( success_bb, after_bb, EDGE_FALLTHRU);
+		      success_e->probability = profile_probability::very_likely ();
+		      succ_to_after_e->probability = profile_probability::always ();
+		      success_e->count () = prev_bb->count;
+		      succ_to_after_e->count () = prev_bb->count;
+		      add_bb_to_loop ( success_bb, before_bb->loop_father);
+		      
+		      // code in success_bb
+		      //
+		      gcc_assert ( reorg_pointer_type);
+		      tree success_val = 
+			make_temp_ssa_name( reorg_pointer_type, NULL, "realloc_success_val");
+
+		      gsi = gsi_start_bb ( success_bb);  // used to be failure_bb
+
+		      gimple *set_succ =
+			gimple_build_assign ( success_val,
+					      build_int_cst ( reorg_pointer_type, 0));
+		      SSA_NAME_DEF_STMT ( success_val) = set_succ;
+		      
+		      gsi_insert_after( &gsi, set_succ,	GSI_NEW_STMT);
+
+		      // add code to after_bb
+		      //
+		      gsi = gsi_start_bb( after_bb);
+
+		      // Note, BBs have a sequence of phis which create_phi_node takes care of
+		      // adding this phi too.
+		      gcc_assert ( TREE_TYPE ( success_val));
+		      tree r_phi_val =
+			make_temp_ssa_name ( TREE_TYPE ( success_val), NULL, "r_phi_val");
+		      gphi *der_phi = create_phi_node( r_phi_val, after_bb);
+		      add_phi_arg( der_phi, success_val, succ_to_after_e, UNKNOWN_LOCATION);
+		      add_phi_arg( der_phi, fail_val, fail_to_after_e, UNKNOWN_LOCATION);
+
+		      gimple *gr_cast_phi_val =
+			gimple_build_assign ( val, CONVERT_EXPR, r_phi_val);
+		      SSA_NAME_DEF_STMT ( val) = gr_cast_phi_val;
+
+		      gsi_insert_before( &gsi, gr_cast_phi_val, GSI_NEW_STMT);
+
+		      // failure_bb code here
+
+		      gsi = gsi_start_bb ( failure_bb);
+
+		      gimple *gretnull =
+			gimple_build_assign ( fail_val, CONVERT_EXPR,
+					      TYPE_MAX_VALUE ( TREE_TYPE ( fail_val)));
+		      SSA_NAME_DEF_STMT ( fail_val) = gretnull;
+		      
+		      gsi_insert_after( &gsi, gretnull, GSI_NEW_STMT);
+		      
+		      for( field = TYPE_FIELDS( reorg_type); 
+			   field; 
+			   field = DECL_CHAIN( field)) {
+
+			tree base_field =
+			      find_coresponding_field ( base, field);
+			tree base_field_type = TREE_TYPE( base_field);
+			
+			gcc_assert ( base_field_type);
+			tree r_to_free = 
+			  make_temp_ssa_name( base_field_type, NULL, "realloc_to_free");
+			
+			tree rhs_ass = build3( COMPONENT_REF,
+			    base_field_type,
+			    base,
+			    base_field, NULL_TREE);
+			
+			gimple *gaddr2free = gimple_build_assign( r_to_free, rhs_ass);
+			SSA_NAME_DEF_STMT ( r_to_free) = gaddr2free;
+			
+			gsi_insert_after( &gsi, gaddr2free, GSI_CONTINUE_LINKING);
+
+			gcc_assert ( ptr_type_node);
+			tree r_cast2free =
+			  make_temp_ssa_name( ptr_type_node, NULL, "r_cast2free");
+			
+			gimple *gr_cast2free =
+			  gimple_build_assign( r_cast2free, CONVERT_EXPR, r_to_free);
+			SSA_NAME_DEF_STMT ( r_cast2free) = gr_cast2free;
+
+			gsi_insert_after( &gsi, gr_cast2free, GSI_CONTINUE_LINKING);
+			
+			gcall *free_call = gimple_build_call( fndecl_free, 1, r_cast2free);
+			gsi_insert_after( &gsi, free_call, GSI_CONTINUE_LINKING);
+			
+			cgraph_node::get ( cfun->decl)->
+			create_edge ( cgraph_node::get_create ( fndecl_free),
+				      free_call,
+				      failure_bb->count
+				    );
+
+			tree lhs_ass = build3( COMPONENT_REF,
+					       base_field_type,
+					       base,
+					       base_field, NULL_TREE);
+			
+			gimple *gzero = gimple_build_assign( lhs_ass, null_pointer_node);
+			gsi_insert_after( &gsi, gzero, GSI_CONTINUE_LINKING);
+		      }
+		      
+		      //// FROM gsi_insert_after( &gsi, bad_field )
+
+		      //DEBUG_L("End of realloc... print function:\n");
+		      //DEBUG_F(dump_function_header, stderr, func->decl, (dump_flags_t)0);
+		      //DEBUG_F(dump_function_to_file, func->decl, stderr, (dump_flags_t)0);
+		    }
+		    //INDENT(-2);
+		    goto exit_after_spilting_a_block;
 		  case ReorgT_Free:
 		    {
 		      //DEBUG_L("ReorgT_Free\n");
