@@ -15279,6 +15279,53 @@ rs6000_maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   return true;
 }
 
+/* Possibly emit a TImode conditional move by generating a compare that sets a
+   mask instruction and a XXSEL select instruction.
+
+   Move TRUE_COND to DEST if OP of the operands of the last comparison is
+   nonzero/true, FALSE_COND if it is zero/false.
+
+   Return false if the operation cannot be generated, and true if we could
+   generate the instruction.  */
+
+static bool
+rs6000_maybe_emit_ti_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
+{
+  enum rtx_code code = GET_CODE (op);
+  rtx op0 = XEXP (op, 0);
+  rtx op1 = XEXP (op, 1);
+  machine_mode result_mode = GET_MODE (dest);
+  rtx compare_rtx;
+  rtx cmove_rtx;
+  rtx clobber_rtx;
+  machine_mode cc_mode = CCmode;
+
+  if (!can_create_pseudo_p ())
+    return false;
+
+  if (!vcmp_ti_split_operator (op, GET_MODE (op)))
+    return false;
+
+  /* Generate:	[(parallel [(set (dest)
+				 (if_then_else (op (cmp1) (cmp2))
+					       (true)
+					       (false)))
+			    (clobber (scratch))])].  */
+
+  compare_rtx = gen_rtx_fmt_ee (code, cc_mode, op0, op1);
+  cmove_rtx = gen_rtx_SET (dest,
+			   gen_rtx_IF_THEN_ELSE (result_mode,
+						 compare_rtx,
+						 true_cond,
+						 false_cond));
+
+  clobber_rtx = gen_rtx_CLOBBER (VOIDmode, gen_rtx_SCRATCH (V2DImode));
+  emit_insn (gen_rtx_PARALLEL (VOIDmode,
+			       gen_rtvec (2, cmove_rtx, clobber_rtx)));
+
+  return true;
+}
+
 /* Helper function to return true if the target has instructions to do a
    compare and set mask instruction that can be used with XXSEL to implement a
    conditional move.  It is also assumed that such a target also supports the
@@ -15296,6 +15343,9 @@ have_compare_and_set_mask (machine_mode mode)
     case E_KFmode:
     case E_TFmode:
       return FLOAT128_MIN_MAX_FPMASK_P (mode);
+
+    case E_TImode:
+      return TARGET_TI_COMPARE_MASK;
 
     default:
       break;
@@ -15335,11 +15385,19 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (have_compare_and_set_mask (compare_mode)
       && have_compare_and_set_mask (result_mode))
     {
-      if (rs6000_maybe_emit_maxc_minc (dest, op, true_cond, false_cond))
-	return true;
+      if (compare_mode == TImode)
+	{
+	  if (rs6000_maybe_emit_ti_cmove (dest, op, true_cond, false_cond))
+	    return true;
+	}
+      else
+	{
+	  if (rs6000_maybe_emit_maxc_minc (dest, op, true_cond, false_cond))
+	    return true;
 
-      if (rs6000_maybe_emit_fp_cmove (dest, op, true_cond, false_cond))
-	return true;
+	  if (rs6000_maybe_emit_fp_cmove (dest, op, true_cond, false_cond))
+	    return true;
+	}
     }
 
   /* Don't allow using floating point comparisons for integer results for

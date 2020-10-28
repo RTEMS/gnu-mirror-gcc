@@ -1230,6 +1230,17 @@
 (define_predicate "vecint_comparison_operator"
   (match_code "eq,gt,gtu"))
 
+;; Return 1 if OP is a comparison operation suitable for vcmp{eq,gt}{s,u}q.
+;; At the moment, don't support LE/GE.
+(define_predicate "vcmp_ti_strict_operator"
+  (match_code "eq,gt,gtu,lt,ltu"))
+
+;; Return 1 if OP is a comparison operation suitable for vcmp{eq,gt}{s,u}q.
+;; Add in support for ne, ge, geu, le, and leu which is handled in the
+;; splitter.
+(define_predicate "vcmp_ti_split_operator"
+  (match_code "eq,ne,gt,gtu,ge,geu,lt,ltu,le,leu"))
+
 ;; Return 1 if OP is a comparison operation that is valid for a branch
 ;; insn, which is true if the corresponding bit in the CC register is set.
 (define_predicate "branch_positive_comparison_operator"
