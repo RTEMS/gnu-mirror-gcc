@@ -579,9 +579,57 @@ build_parameter_mapping (tree expr, tree args, tree decl)
       ctx_parms = current_template_parms;
     }
 
+  while (ctx_parms && NUM_TMPL_ARGS (TREE_VALUE (ctx_parms)) == 0)
+    ctx_parms = TREE_CHAIN (ctx_parms);
+
   tree parms = find_template_parameters (expr, ctx_parms);
-  tree map = map_arguments (parms, args);
-  return map;
+  if (!parms)
+    return NULL_TREE;
+
+  tree mapping;
+  int depth = TMPL_PARMS_DEPTH (ctx_parms);
+  if (depth == 1)
+    mapping = make_tree_vec (0);
+  else
+    {
+      mapping = make_tree_vec (depth);
+      TREE_VEC_ELT (mapping, 0) = make_tree_vec (0);
+      gcc_assert (TMPL_ARGS_HAVE_MULTIPLE_LEVELS (mapping));
+    }
+
+  for (tree parm = parms; parm; parm = TREE_CHAIN (parm))
+    {
+      int level, index;
+      template_parm_level_and_index (TREE_VALUE (parm), &level, &index);
+
+      if (tree& lvl = TMPL_ARGS_LEVEL (mapping, level))
+	{
+	  int curlen = NUM_TMPL_ARGS (lvl);
+	  int newlen = index + 1;
+	  if (curlen < newlen)
+	    {
+	      lvl = grow_tree_vec (lvl, newlen);
+	      for (int i = curlen; i < newlen; i++)
+		TREE_VEC_ELT (lvl, i) = NULL_TREE;
+	      if (depth == 1)
+		mapping = lvl;
+	    }
+	}
+      else
+	lvl = make_tree_vec (index + 1);
+
+      if (args)
+	TMPL_ARG (mapping, level, index) = TMPL_ARG (args, level, index);
+      else
+	{
+	  tree header = ctx_parms;
+	  while (TREE_INT_CST_LOW (TREE_PURPOSE (header)) != level)
+	    header = TREE_CHAIN (header);
+	  TMPL_ARG (mapping, level, index)
+	    = template_parm_to_arg (TREE_VEC_ELT (TREE_VALUE (header), index));
+	}
+    }
+  return mapping;
 }
 
 /* True if the parameter mappings of two atomic constraints are equivalent.  */
@@ -591,16 +639,7 @@ parameter_mapping_equivalent_p (tree t1, tree t2)
 {
   tree map1 = ATOMIC_CONSTR_MAP (t1);
   tree map2 = ATOMIC_CONSTR_MAP (t2);
-  while (map1 && map2)
-    {
-      tree arg1 = TREE_PURPOSE (map1);
-      tree arg2 = TREE_PURPOSE (map2);
-      if (!template_args_equal (arg1, arg2))
-        return false;
-      map1 = TREE_CHAIN (map1);
-      map2 = TREE_CHAIN (map2);
-    }
-  return true;
+  return template_args_equal (map1, map2);
 }
 
 /* Provides additional context for normalization.  */
@@ -965,14 +1004,7 @@ hash_atomic_constraint (tree t)
   hashval_t val = htab_hash_pointer (ATOMIC_CONSTR_EXPR (t));
 
   /* Hash the targets of the parameter map.  */
-  tree p = ATOMIC_CONSTR_MAP (t);
-  while (p)
-    {
-      val = iterative_hash_template_arg (TREE_PURPOSE (p), val);
-      p = TREE_CHAIN (p);
-    }
-
-  return val;
+  return iterative_hash_template_arg (ATOMIC_CONSTR_MAP (t), val);
 }
 
 namespace inchash
@@ -2212,53 +2244,65 @@ tsubst_parameter_mapping (tree map, tree args, subst_info info)
   tsubst_flags_t complain = info.complain;
   tree in_decl = info.in_decl;
 
-  tree result = NULL_TREE;
-  for (tree p = map; p; p = TREE_CHAIN (p))
+  tree result;
+  int depth = TMPL_ARGS_DEPTH (map);
+  if (depth == 1)
+    result = make_tree_vec (TREE_VEC_LENGTH (map));
+  else
     {
-      if (p == error_mark_node)
-        return error_mark_node;
-      tree parm = TREE_VALUE (p);
-      tree arg = TREE_PURPOSE (p);
-      tree new_arg = NULL_TREE;
-      if (TYPE_P (arg))
-        {
-          /* If a template parameter is declared with a placeholder, we can
-             get those in the argument list if decltype is applied to the
-             placeholder. For example:
-
-		template<auto T>
-		  requires C<decltype(T)>
-		void f() { }
-
-	     The normalized argument for C will be an auto type, so we'll
-             need to deduce the actual argument from the corresponding
-             initializer (whatever argument is provided for T), and use
-             that result in the instantiated parameter mapping.  */
-          if (tree auto_node = type_uses_auto (arg))
-            {
-              int level;
-              int index;
-	      template_parm_level_and_index (parm, &level, &index);
-	      tree init = TMPL_ARG (args, level, index);
-              new_arg = do_auto_deduction (arg, init, auto_node,
-					   complain, adc_variable_type,
-					   make_tree_vec (0));
-            }
-        }
-      else if (ARGUMENT_PACK_P (arg))
-	new_arg = tsubst_argument_pack (arg, args, complain, in_decl);
-      if (!new_arg)
-	{
-	  new_arg = tsubst_template_arg (arg, args, complain, in_decl);
-	  if (TYPE_P (new_arg))
-	    new_arg = canonicalize_type_argument (new_arg, complain);
-	}
-      if (new_arg == error_mark_node)
-	return error_mark_node;
-
-      result = tree_cons (new_arg, parm, result);
+      result = make_tree_vec (depth);
+      for (int i = 1; i <= depth; i++)
+	if (tree level = TMPL_ARGS_LEVEL (map, i))
+	  TREE_VEC_ELT (result, i - 1) = make_tree_vec (NUM_TMPL_ARGS (level));
     }
-  return nreverse (result);
+  for (int i = 1; i <= depth; i++)
+    if (tree level = TMPL_ARGS_LEVEL (map, i))
+      {
+	int nargs = NUM_TMPL_ARGS (level);
+	for (int j = 0; j < nargs; j++)
+	  {
+	    tree arg = TMPL_ARG (map, i, j);
+	    tree new_arg = NULL_TREE;
+	    if (!arg)
+	      continue;
+	    else if (TYPE_P (arg))
+	      {
+		/* If a template parameter is declared with a placeholder, we
+		   can get those in the argument list if decltype is applied to
+		   the placeholder. For example:
+
+		      template<auto T>
+			requires C<decltype(T)>
+		      void f() { }
+
+		   The normalized argument for C will be an auto type, so we'll
+		   need to deduce the actual argument from the corresponding
+		   initializer (whatever argument is provided for T), and use
+		   that result in the instantiated parameter mapping.  */
+		if (tree auto_node = type_uses_auto (arg))
+		  {
+		    tree init = TMPL_ARG (args, i, j);
+		    new_arg = do_auto_deduction (arg, init, auto_node,
+						 complain, adc_variable_type,
+						 make_tree_vec (0));
+		  }
+	      }
+	    else if (ARGUMENT_PACK_P (arg))
+	      new_arg = tsubst_argument_pack (arg, args, complain, in_decl);
+	    if (!new_arg)
+	      {
+		new_arg = tsubst_template_arg (arg, args, complain, in_decl);
+		if (TYPE_P (new_arg))
+		  new_arg = canonicalize_type_argument (new_arg, complain);
+	      }
+	    if (new_arg == error_mark_node)
+	      return error_mark_node;
+
+	    TMPL_ARG (result, i, j) = new_arg;
+	  }
+      }
+  SET_NON_DEFAULT_TEMPLATE_ARGS_COUNT (result, 0);
+  return result;
 }
 
 tree
@@ -2583,18 +2627,15 @@ satisfy_atom (tree t, tree args, subst_info info)
       return cache.save (boolean_false_node);
     }
 
-  /* Rebuild the argument vector from the parameter mapping.  */
-  args = get_mapped_args (map);
-
   /* Apply the parameter mapping (i.e., just substitute).  */
   tree expr = ATOMIC_CONSTR_EXPR (t);
-  tree result = tsubst_expr (expr, args, quiet.complain, quiet.in_decl, false);
+  tree result = tsubst_expr (expr, map, quiet.complain, quiet.in_decl, false);
   if (result == error_mark_node)
     {
       /* If substitution results in an invalid type or expression, the constraint
 	 is not satisfied. Replay the substitution.  */
       if (info.noisy ())
-	tsubst_expr (expr, args, info.complain, info.in_decl, false);
+	tsubst_expr (expr, map, info.complain, info.in_decl, false);
       return cache.save (boolean_false_node);
     }
 
