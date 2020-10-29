@@ -103,13 +103,14 @@ along with GCC; see the file COPYING3.  If not see
    The overload file has more complex stanza headers.  Here the stanza
    represents all functions with the same overloaded function name:
 
-     [<overload-id>, <abi-name>, <builtin-name>]
+     [<overload-id>, <abi-name>, <builtin-name>[[, <ifdef>]] ]
 
-   Here the square brackets are part of the syntax, <overload-id> is a
-   unique internal identifier for the overload that will be used as part
-   of an enumeration of all overloaded functions; <abi-name> is the name
-   that will appear as a #define in altivec.h; and <builtin-name> is the
-   name that is overloaded in the back end.
+   Here the single square brackets are part of the syntax, <overload-id>
+   is a unique internal identifier for the overload that will be used as
+   part of an enumeration of all overloaded functions; <abi-name> is the
+   name that will appear as a #define in altivec.h; <builtin-name> is the
+   name that is overloaded in the back end; and <ifdef> is an optional
+   token used to guard the #define with an #ifdef in altivec.h.
 
    Each function entry again has two lines.  The first line is again a
    prototype line (this time without [kind]):
@@ -383,6 +384,7 @@ struct ovld_stanza {
   char *stanza_id;
   char *extern_name;
   char *intern_name;
+  char *ifdef;
 };
 
 #define MAXOVLDSTANZAS 256
@@ -1981,6 +1983,22 @@ parse_ovld_stanza ()
       return PC_PARSEFAIL;
     }
 
+  consume_whitespace ();
+  if (linebuf[pos] == ',')
+    {
+      safe_inc_pos ();
+      consume_whitespace ();
+      stanza->ifdef = match_identifier ();
+      if (!stanza->ifdef)
+	{
+	  (*diag) ("missing ifdef token at column %d.\n", pos + 1);
+	  return PC_PARSEFAIL;
+	}
+      consume_whitespace ();
+    }
+  else
+    stanza->ifdef = 0;
+
   if (linebuf[pos] != ']')
     {
       (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
@@ -2615,9 +2633,15 @@ write_defines_file ()
 {
   for (int i = 0; i < num_ovld_stanzas; i++)
     if (strcmp (ovld_stanzas[i].extern_name, "SKIP"))
-      fprintf (defines_file, "#define %s %s\n",
-	       ovld_stanzas[i].extern_name,
-	       ovld_stanzas[i].intern_name);
+      {
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#ifdef %s\n", ovld_stanzas[i].ifdef);
+	fprintf (defines_file, "#define %s %s\n",
+		 ovld_stanzas[i].extern_name,
+		 ovld_stanzas[i].intern_name);
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#endif\n");
+      }
   return 1;
 }
 
