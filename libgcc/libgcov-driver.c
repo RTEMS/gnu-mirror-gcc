@@ -608,12 +608,25 @@ __gcov_exit (void)
   gcov_error_exit ();
 }
 
+/* Test memory that forces malloc and free functions to be called early
+   so that allocate_gcov_kvp can use calloc.  Indirect call counters
+   taken from a pre-allocated array are used before that.  */
+char *__gcov_test_memory;
+
 /* Add a new object file onto the bb chain.  Invoked automatically
   when running an object file's global ctors.  */
 
 void
 __gcov_init (struct gcov_info *info)
 {
+  static int malloc_utilized = 0;
+  if (!malloc_utilized)
+    {
+      __gcov_test_memory  = malloc (16);
+      free (__gcov_test_memory);
+      malloc_utilized = 1;
+    }
+
   if (!info->version || !info->n_functions)
     return;
   if (gcov_version (info, info->version, 0))
