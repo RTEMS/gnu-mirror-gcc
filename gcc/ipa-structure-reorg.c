@@ -145,13 +145,6 @@ ipa_structure_reorg ( void)
   // It really doesn't like get_body.
   //FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node) node->get_body ();
   
-  //FOR_EACH_FUNCTION ( node)
-  //{
-  //  struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
-  //  DEBUG_A(" %s ( ", lang_hooks.decl_printable_name ( func->decl, 2));
-  //  node->get_untransformed_body ();
-  //}
-  
   //DEBUG_F( ssa_check, stderr, Show_everything, Do_not_fail, false, true);
 
   setup_debug_flags ( &info);
@@ -290,6 +283,7 @@ reorg_analysis ( Info *info)
   // concretely do.
   // Eric this is not really helping me... ;-)
   //DEBUG_L("reorg_analysis: entered\n");
+  // Eric, I think is depercated if not correct me.
   #if INTEGRATION_FUNCTIONAL
   const bool run_escape_analysis = flag_ipa_dead_field_eliminate && !flag_ipa_instance_interleave && !flag_ipa_field_reorder;
   if (run_escape_analysis)
@@ -304,6 +298,7 @@ reorg_analysis ( Info *info)
     return true;
   }
   #endif
+
   struct cgraph_node *node;
 
   find_decls_and_types ( info);
