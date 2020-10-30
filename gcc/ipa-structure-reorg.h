@@ -36,7 +36,6 @@ typedef struct RT_Reorder    RT_Reorder;
 typedef struct RT_Interleave RT_Interleave;
 
 #include <set>
-#include "collect-types.h"
 
 struct RT_Elim {
   int dummy;
@@ -173,9 +172,6 @@ struct Info {
   // Gcc doesn't have global decls readily available
   // so this holds them
   std::map <tree,BoolPair_t>     *struct_types; // desing bug fix
-  // ptrset_t holds types which point to records
-  // and types which escape
-  ptrset_t sets;
   int                             num_deleted;
   double                          total_cache_accesses;
   FILE                           *reorg_dump_file;

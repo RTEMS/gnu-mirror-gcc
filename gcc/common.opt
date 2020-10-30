@@ -1877,10 +1877,6 @@ fipa-dead-field-eliminate
 Common Report Var(flag_ipa_dead_field_eliminate) Init(0) Optimization
 Structure reorganization optimization, dead field elimination.
 
-fipa-field-reorder
-Common Report Var(flag_ipa_field_reorder) Init(0) Optimization
-Structure reorganization optimization, field reordering.
-
 fipa-instance-interleave
 Common Report Var(flag_ipa_instance_interleave) Init(0) Optimization
 Structure reorganization optimization, instance interleaving.
@@ -3491,5 +3487,21 @@ This flag is used to print the access analysis (if field is read or written to).
 fipa-field-reorder
 Common Report Var(flag_ipa_field_reorder) Optimization
 Reorder fields.
+
+fipa-typelist-struct=
+Common Joined Report Var(flag_ipa_typelist_struct) Init(0)
+TBD
+
+fipa-typelist-field=
+Common Joined Report Var(flag_ipa_typelist_field) Init(0)
+TBD
+
+ftp-types-compared=
+Common Joined Report Var(flag_tp_types_compared) Init(0)
+TBD
+
+ftp-comparison-functions=
+Common Joined Report Var(flag_tp_comparison_functions) Init(0)
+TBD
 
 ; This comment is to ensure we retain the blank line above.

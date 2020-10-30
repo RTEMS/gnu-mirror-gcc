@@ -51,8 +51,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-utils.h"
 #include "ipa-str-reorg-utils.h"
 
-#include "gimple-caster.hpp"
-
 #define test_write(M, ...)                                                     \
   if (dump_file)                                                               \
     {                                                                          \
@@ -2764,13 +2762,13 @@ str_reorg_dead_field_eliminate (__attribute__((unused)) Info *info)
 int
 str_reorg_dead_field_eliminate_qual (Info *info)
 {
-  GimpleCaster caster(info->sets);
-  caster.walk();
+  //GimpleCaster caster(info->sets);
+  //caster.walk();
   // sets here now holds the types that
   // are casted...
   // So, maybe we want to print them?
-  caster.print_reasons();
-  ptrset_t sets = caster.get_sets();
+  //caster.print_reasons();
+  //ptrset_t sets = caster.get_sets();
   return 0;
 }
 int

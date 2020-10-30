@@ -28,8 +28,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "gimple-iterator.h"
 #include "gimple-walk.h"
-#include "gimple-collector.hpp"
-#include "gimple-escaper.hpp"
 #include "tree-pass.h"
 #include "tree-cfg.h"
 #include "cfgloop.h"
@@ -39,13 +37,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h"
 #include "gimple-pretty-print.h"
 #include "langhooks.h"
-#include "collect-types.h"
 #include "stor-layout.h"
 #include "tree-dfa.h"
 #include <vector>
 #include <map>
 #include <set>
 #include "ipa-structure-reorg.h"
+#include "gimple-ssa.h"
 #include "tree-phinodes.h"
 #include "ssa-iterators.h"
 
@@ -170,7 +168,6 @@ ipa_structure_reorg ( void)
   {
     if ( flag_ipa_structure_reorg || flag_ipa_dead_field_eliminate )
       {
-        log("before str_reorg_dead_field_eliminate_qual \n");
         str_reorg_dead_field_eliminate_qual ( &info);
 	// Because I just want to do this now...
 	#if KLUDGE
@@ -270,34 +267,6 @@ final_debug_info ( Info *info)
 static unsigned int
 reorg_analysis ( Info *info)
 {
-  // TODO:
-  // Gary, this main "analysis" method seems to have a lot of
-  // instance interleave specific code. Shouldn't this method
-  // concretely be just the escape analysis?
-
-
-  // TODO:
-  // Gary, this is me adding a way to run the escape analysis...
-  // It is only triggered when flag_ipa_structure_reorg is 
-  // specified since I am not sure what this function should
-  // concretely do.
-  // Eric this is not really helping me... ;-)
-  //DEBUG_L("reorg_analysis: entered\n");
-  // Eric, I think is depercated if not correct me.
-  #if INTEGRATION_FUNCTIONAL
-  const bool run_escape_analysis = flag_ipa_dead_field_eliminate && !flag_ipa_instance_interleave && !flag_ipa_field_reorder;
-  if (run_escape_analysis)
-  {
-    GimpleTypeCollector collector;
-    collector.walk();
-    ptrset_t types = collector.get_pointer_set();
-    GimpleEscaper gimpleEscaper(types);
-    gimpleEscaper.walk();
-    info->sets = gimpleEscaper.get_sets();
-    info->sets.print_in_points_to_record();
-    return true;
-  }
-  #endif
 
   struct cgraph_node *node;
 
@@ -1016,9 +985,7 @@ reorg_qualification ( Info *info)
   // TBD
   // This only does a generic legality qualification and each
   // subpass does its own performance qualification.
-  log("before reorg_leaglity...\n");
   unsigned int retval = reorg_legality( info);
-  log("after reorg_leaglity...\n");
   return retval;
   
 }
@@ -1026,17 +993,14 @@ reorg_qualification ( Info *info)
 // Return false if nothing qualified
 bool
 reorg_legality( Info *info)  {
-  log("before transformation leagality...\n");
   bool retval = transformation_legality( info);
-  log("after transformation leagality...\n");
   return retval;
 }
 
 bool
 Info::is_non_escaping_set_empty()
 {
-  bool retval = this->sets.non_escaping.empty();
-  return retval;
+  return true;
 }
 
 // Return false if nothing qualified
