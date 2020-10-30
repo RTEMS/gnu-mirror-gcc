@@ -119,6 +119,7 @@
 ;   no32bit  Not valid for TARGET_32BIT
 ;   cpu      This is a "cpu_is" or "cpu_supports" builtin
 ;   ldstmask Altivec mask for load or store
+;   lxvr     Needs special handling for load-rightmost
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -3055,6 +3056,30 @@
   const vui __builtin_altivec_mtvsrwm (unsigned long long);
     MTVSRWM vec_mtvsr_v4si {}
 
+  pure vsq __builtin_altivec_se_lxvrbx (signed long long, signed char *);
+    SE_LXVRBX nothing {lxvr}
+
+  pure vsq __builtin_altivec_se_lxvrhx (signed long long, signed short *);
+    SE_LXVRHX nothing {lxvr}
+
+  pure vsq __builtin_altivec_se_lxvrwx (signed long long, signed int *);
+    SE_LXVRWX nothing {lxvr}
+
+  pure vsq __builtin_altivec_se_lxvrdx (signed long long, signed long long *);
+    SE_LXVRDX nothing {lxvr}
+
+  void __builtin_altivec_tr_stxvrbx (vsq, signed long long, signed char *);
+    TR_STXVRBX nothing {stvec}
+
+  void __builtin_altivec_tr_stxvrhx (vsq, signed long long, signed int *);
+    TR_STXVRHX nothing {stvec}
+
+  void __builtin_altivec_tr_stxvrwx (vsq, signed long long, signed short *);
+    TR_STXVRWX nothing {stvec}
+
+  void __builtin_altivec_tr_stxvrdx (vsq, signed long long, signed long long *);
+    TR_STXVRDX nothing {stvec}
+
   const vull __builtin_altivec_vcfuged (vull, vull);
     VCFUGED vcfuged {}
 
@@ -3350,6 +3375,18 @@
 
   const vss __builtin_vsx_xxpermx_v8hi (vss, vss, vuc, const int<3>);
     XXPERMX_V8HI xxpermx {}
+
+  pure vuq __builtin_altivec_ze_lxvrbx (signed long long, unsigned char *);
+    ZE_LXVRBX nothing {lxvr}
+
+  pure vuq __builtin_altivec_ze_lxvrhx (signed long long, unsigned short *);
+    ZE_LXVRHX nothing {lxvr}
+
+  pure vuq __builtin_altivec_ze_lxvrwx (signed long long, unsigned int *);
+    ZE_LXVRWX nothing {lxvr}
+
+  pure vuq __builtin_altivec_ze_lxvrdx (signed long long, unsigned long long *);
+    ZE_LXVRDX nothing {lxvr}
 
 
 [power10-64]

@@ -12000,6 +12000,7 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
     case ALTIVEC_BUILTIN_LVEWX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvewx,
 					exp, target, false);
+    /* TODO: Need to do the special handling on the islxvr bit.  */
     case P10_BUILTIN_SE_LXVRBX:
       return altivec_expand_lxvr_builtin (CODE_FOR_vsx_lxvrbx,
 					exp, target, false, true);

@@ -3464,6 +3464,26 @@
   vuc __builtin_vsx_xl_len_r (unsigned char *, unsigned long long);
     XL_LEN_R
 
+[VEC_XL_SEXT, vec_xl_sext, __builtin_vec_xl_sext, _ARCH_PWR10]
+  vsq __builtin_vec_xl_sext (signed long long, signed char *);
+    SE_LXVRBX
+  vsq __builtin_vec_xl_sext (signed long long, signed short *);
+    SE_LXVRHX
+  vsq __builtin_vec_xl_sext (signed long long, signed int *);
+    SE_LXVRWX
+  vsq __builtin_vec_xl_sext (signed long long, signed long long *);
+    SE_LXVRDX
+
+[VEC_XL_ZEXT, vec_xl_zext, __builtin_vec_xl_zext, _ARCH_PWR10]
+  vsq __builtin_vec_xl_zext (signed long long, signed char *);
+    ZE_LXVRBX
+  vsq __builtin_vec_xl_zext (signed long long, signed short *);
+    ZE_LXVRHX
+  vsq __builtin_vec_xl_zext (signed long long, signed int *);
+    ZE_LXVRWX
+  vsq __builtin_vec_xl_zext (signed long long, signed long long *);
+    ZE_LXVRDX
+
 [VEC_XOR, vec_xor, __builtin_vec_xor]
   vsc __builtin_vec_xor (vsc, vsc);
     VXOR_V16QI
@@ -3625,6 +3645,24 @@
 [VEC_XST_LEN_R, vec_xst_len_r, __builtin_vec_xst_len_r, _ARCH_PPC64_PWR9]
   void __builtin_vsx_xst_len_r (vuc, unsigned char *, unsigned long long);
     XST_LEN_R
+
+[VEC_XST_TRUNC, vec_xst_trunc, __builtin_vec_xst_trunc, _ARCH_PWR10]
+  void __builtin_vec_xst_trunc (vsq, signed long long, signed char *);
+    TR_STXVRBX  TR_STXVRBX_S
+  void __builtin_vec_xst_trunc (vuq, signed long long, unsigned char *);
+    TR_STXVRBX  TR_STXVRBX_U
+  void __builtin_vec_xst_trunc (vsq, signed long long, signed short *);
+    TR_STXVRHX  TR_STXVRHX_S
+  void __builtin_vec_xst_trunc (vuq, signed long long, unsigned short *);
+    TR_STXVRHX  TR_STXVRHX_U
+  void __builtin_vec_xst_trunc (vsq, signed long long, signed int *);
+    TR_STXVRWX  TR_STXVRWX_S
+  void __builtin_vec_xst_trunc (vuq, signed long long, unsigned int *);
+    TR_STXVRWX  TR_STXVRWX_U
+  void __builtin_vec_xst_trunc (vsq, signed long long, signed long long *);
+    TR_STXVRDX  TR_STXVRDX_S
+  void __builtin_vec_xst_trunc (vuq, signed long long, unsigned long long *);
+    TR_STXVRDX  TR_STXVRDX_U
 
 [VEC_XXPERMDI, vec_xxpermdi, __builtin_vsx_xxpermdi, __VSX__]
   vsc __builtin_vsx_xxpermdi (vsc, vsc, const int);
