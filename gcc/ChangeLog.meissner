@@ -1,3 +1,10 @@
+work023.patch22
+2020-10-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (glibc_supports_ieee_128bit): New helper
+	function.
+	(rs6000_option_override_internal): Call it.
+
 work023.patch014
 2020-10-27  Aaron Sawdey  <acsawdey@linux.ibm.com>
 
