@@ -144,6 +144,10 @@ along with GCC; see the file COPYING3.  If not see
 #include <assert.h>
 #include <unistd.h>
 
+/* Used as a sentinel for range constraints on integer fields.  No field can
+   be 32 bits wide, so this is a safe sentinel value.  */
+#define MININT INT32_MIN
+
 /* Input and output file descriptors and pathnames.  */
 static FILE *bif_file;
 static FILE *ovld_file;
@@ -165,6 +169,11 @@ static const char *defines_path;
 static char linebuf[LINELEN];
 static int line;
 static int pos;
+
+/* Exit codes for the shell.  */
+enum exit_codes {
+  EC_INTERR
+};
 
 /* Pointer to a diagnostic function.  */
 void (*diag) (const char *, ...) __attribute__ ((format (printf, 1, 2)))
@@ -189,5 +198,117 @@ ovld_diag (const char * fmt, ...)
   va_start (args, fmt);
   vfprintf (stderr, fmt, args);
   va_end (args);
+}
+
+/* Pass over unprintable characters and whitespace (other than a newline,
+   which terminates the scan).  */
+static void
+consume_whitespace ()
+{
+  while (pos < LINELEN && isspace(linebuf[pos]) && linebuf[pos] != '\n')
+    pos++;
+  return;
+}
+
+/* Get the next nonblank, noncomment line, returning 0 on EOF, 1 otherwise.  */
+static int
+advance_line (FILE *file)
+{
+  while (1)
+    {
+      /* Read ahead one line and check for EOF.  */
+      if (!fgets (linebuf, sizeof(linebuf), file))
+	return 0;
+      line++;
+      pos = 0;
+      consume_whitespace ();
+      if (linebuf[pos] != '\n' && linebuf[pos] != ';')
+	return 1;
+    }
+}
+
+static inline void
+safe_inc_pos ()
+{
+  if (pos++ >= LINELEN)
+    {
+      (*diag) ("line length overrun.\n");
+      exit (EC_INTERR);
+    }
+}
+
+/* Match an identifier, returning NULL on failure, else a pointer to a
+   buffer containing the identifier.  */
+static char *
+match_identifier ()
+{
+  int lastpos = pos - 1;
+  while (isalnum (linebuf[lastpos + 1]) || linebuf[lastpos + 1] == '_')
+    if (++lastpos >= LINELEN - 1)
+      {
+	(*diag) ("line length overrun.\n");
+	exit (EC_INTERR);
+      }
+
+  if (lastpos < pos)
+    return 0;
+
+  char *buf = (char *) malloc (lastpos - pos + 2);
+  memcpy (buf, &linebuf[pos], lastpos - pos + 1);
+  buf[lastpos - pos + 1] = '\0';
+
+  pos = lastpos + 1;
+  return buf;
+}
+
+/* Match an integer and return its value, or MININT on failure.  */
+static int
+match_integer ()
+{
+  int startpos = pos;
+  if (linebuf[pos] == '-')
+    safe_inc_pos ();
+
+  int lastpos = pos - 1;
+  while (isdigit (linebuf[lastpos + 1]))
+    if (++lastpos >= LINELEN - 1)
+      {
+	(*diag) ("line length overrun in match_integer.\n");
+	exit (EC_INTERR);
+      }
+
+  if (lastpos < pos)
+    return MININT;
+
+  pos = lastpos + 1;
+  char *buf = (char *) malloc (lastpos - startpos + 2);
+  memcpy (buf, &linebuf[startpos], lastpos - startpos + 1);
+  buf[lastpos - startpos + 1] = '\0';
+
+  int x;
+  sscanf (buf, "%d", &x);
+  return x;
+}
+
+static const char *
+match_to_right_bracket ()
+{
+  int lastpos = pos - 1;
+  while (linebuf[lastpos + 1] != ']')
+    if (++lastpos >= LINELEN - 1)
+      {
+	(*diag) ("line length overrun.\n");
+	exit (EC_INTERR);
+      }
+
+  if (lastpos < pos)
+    return 0;
+
+  char *buf = (char *) malloc (lastpos - pos + 2);
+  memcpy (buf, &linebuf[pos], lastpos - pos + 1);
+  buf[lastpos - pos + 1] = '\0';
+
+  pos = lastpos + 1;
+  return buf;
 }
 
