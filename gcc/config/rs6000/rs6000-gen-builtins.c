@@ -143,6 +143,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include "rbtree.h"
 
 /* Used as a sentinel for range constraints on integer fields.  No field can
    be 32 bits wide, so this is a safe sentinel value.  */
@@ -229,10 +230,40 @@ struct typeinfo {
   int val2;
 };
 
+static int num_bifs;
+static int num_ovld_stanzas;
+static int num_ovlds;
+
 /* Exit codes for the shell.  */
 enum exit_codes {
+  EC_OK,
+  EC_BADARGS,
+  EC_NOBIF,
+  EC_NOOVLD,
+  EC_NOHDR,
+  EC_NOINIT,
+  EC_NODEFINES,
+  EC_PARSEBIF,
+  EC_PARSEOVLD,
+  EC_WRITEHDR,
+  EC_WRITEINIT,
+  EC_WRITEDEFINES,
   EC_INTERR
 };
+
+/* Return codes for parsing routines.  */
+enum parse_codes {
+  PC_OK,
+  PC_EOFILE,
+  PC_EOSTANZA,
+  PC_PARSEFAIL
+};
+
+/* The red-black trees for built-in function identifiers, built-in
+   overload identifiers, and function type descriptors.  */
+static rbt_strings bif_rbt;
+static rbt_strings ovld_rbt;
+static rbt_strings fntype_rbt;
 
 /* Pointer to a diagnostic function.  */
 void (*diag) (const char *, ...) __attribute__ ((format (printf, 1, 2)))
@@ -915,3 +946,182 @@ match_type (typeinfo *typedata, int voidok)
   return match_basetype (typedata);
 }
 
+/* Parse the built-in file.  */
+static parse_codes
+parse_bif ()
+{
+  return PC_OK;
+}
+
+/* Parse the overload file.  */
+static parse_codes
+parse_ovld ()
+{
+  return PC_OK;
+}
+
+/* Write everything to the header file (rs6000-builtins.h).  */
+static int
+write_header_file ()
+{
+  return 1;
+}
+
+/* Write everything to the initialization file (rs6000-builtins.c).  */
+static int
+write_init_file ()
+{
+  return 1;
+}
+
+/* Write everything to the include file (rs6000-vecdefines.h).  */
+static int
+write_defines_file ()
+{
+  return 1;
+}
+
+/* Close and delete output files after any failure, so that subsequent
+   build dependencies will fail.  */
+static void
+delete_output_files ()
+{
+  /* Depending on whence we're called, some of these may already be
+     closed.  Don't check for errors.  */
+  fclose (header_file);
+  fclose (init_file);
+  fclose (defines_file);
+
+  unlink (header_path);
+  unlink (init_path);
+  unlink (defines_path);
+}
+
+/* Main program to convert flat files into built-in initialization code.  */
+int
+main (int argc, const char **argv)
+{
+  if (argc != 6)
+    {
+      fprintf (stderr,
+	       "Five arguments required: two input file and three output "
+	       "files.\n");
+      exit (EC_BADARGS);
+    }
+
+  pgm_path = argv[0];
+  bif_path = argv[1];
+  ovld_path = argv[2];
+  header_path = argv[3];
+  init_path = argv[4];
+  defines_path = argv[5];
+
+  bif_file = fopen (bif_path, "r");
+  if (!bif_file)
+    {
+      fprintf (stderr, "Cannot find input built-in file '%s'.\n", bif_path);
+      exit (EC_NOBIF);
+    }
+  ovld_file = fopen (ovld_path, "r");
+  if (!ovld_file)
+    {
+      fprintf (stderr, "Cannot find input overload file '%s'.\n", ovld_path);
+      exit (EC_NOOVLD);
+    }
+  header_file = fopen (header_path, "w");
+  if (!header_file)
+    {
+      fprintf (stderr, "Cannot open header file '%s' for output.\n",
+	       header_path);
+      exit (EC_NOHDR);
+    }
+  init_file = fopen (init_path, "w");
+  if (!init_file)
+    {
+      fprintf (stderr, "Cannot open init file '%s' for output.\n", init_path);
+      exit (EC_NOINIT);
+    }
+  defines_file = fopen (defines_path, "w");
+  if (!defines_file)
+    {
+      fprintf (stderr, "Cannot open defines file '%s' for output.\n",
+	       defines_path);
+      exit (EC_NODEFINES);
+    }
+
+  /* Initialize the balanced trees containing built-in function ids,
+     overload function ids, and function type declaration ids.  */
+  bif_rbt.rbt_nil = (rbt_string_node *) malloc (sizeof (rbt_string_node));
+  bif_rbt.rbt_nil->color = RBT_BLACK;
+  bif_rbt.rbt_root = bif_rbt.rbt_nil;
+
+  ovld_rbt.rbt_nil = (rbt_string_node *) malloc (sizeof (rbt_string_node));
+  ovld_rbt.rbt_nil->color = RBT_BLACK;
+  ovld_rbt.rbt_root = ovld_rbt.rbt_nil;
+
+  fntype_rbt.rbt_nil = (rbt_string_node *) malloc (sizeof (rbt_string_node));
+  fntype_rbt.rbt_nil->color = RBT_BLACK;
+  fntype_rbt.rbt_root = fntype_rbt.rbt_nil;
+
+  /* Parse the built-in function file.  */
+  num_bifs = 0;
+  line = 0;
+  if (parse_bif () == PC_PARSEFAIL)
+    {
+      fprintf (stderr, "Parsing of '%s' failed, aborting.\n", bif_path);
+      delete_output_files ();
+      exit (EC_PARSEBIF);
+    }
+  fclose (bif_file);
+
+#ifdef DEBUG
+  fprintf (stderr, "\nFunction ID list:\n");
+  rbt_dump (&bif_rbt, bif_rbt.rbt_root);
+  fprintf (stderr, "\n");
+#endif
+
+  /* Parse the overload file.  */
+  num_ovld_stanzas = 0;
+  num_ovlds = 0;
+  line = 0;
+  if (parse_ovld () == PC_PARSEFAIL)
+    {
+      fprintf (stderr, "Parsing of '%s' failed, aborting.\n", ovld_path);
+      delete_output_files ();
+      exit (EC_PARSEOVLD);
+    }
+  fclose (ovld_file);
+
+#ifdef DEBUG
+  fprintf (stderr, "\nFunction type decl list:\n");
+  rbt_dump (&fntype_rbt, fntype_rbt.rbt_root);
+  fprintf (stderr, "\n");
+#endif
+
+  /* Write the header file and the file containing initialization code.  */
+  if (!write_header_file ())
+    {
+      fprintf (stderr, "Output to '%s' failed, aborting.\n", header_path);
+      delete_output_files ();
+      exit (EC_WRITEHDR);
+    }
+  fclose (header_file);
+  if (!write_init_file ())
+    {
+      fprintf (stderr, "Output to '%s' failed, aborting.\n", init_path);
+      delete_output_files ();
+      exit (EC_WRITEINIT);
+    }
+  fclose (init_file);
+
+  /* Write the defines file to be included into altivec.h.  */
+  if (!write_defines_file ())
+    {
+      fprintf (stderr, "Output to '%s' failed, aborting.\n", defines_path);
+      delete_output_files ();
+      exit (EC_WRITEDEFINES);
+    }
+  fclose (defines_file);
+
+  return EC_OK;
+}
