@@ -13560,6 +13560,10 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 		       int ignore ATTRIBUTE_UNUSED)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+  /* #### This needs to be rs6000_gen_builtins now.  Can't make this
+     whole until the full set of builtins has been added, and there
+     is no overlap between the two enumerations, so we can run the
+     two in parallel.  */
   enum rs6000_builtins fcode
     = (enum rs6000_builtins) DECL_MD_FUNCTION_CODE (fndecl);
   size_t uns_fcode = (size_t)fcode;
@@ -13567,9 +13571,18 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
   size_t i;
   rtx ret;
   bool success;
-  HOST_WIDE_INT mask = rs6000_builtin_info[uns_fcode].mask;
+  HOST_WIDE_INT mask = (new_builtins_are_live
+			? 0
+			: rs6000_builtin_info[uns_fcode].mask);
+  /*
+  bif_enable enable = (new_builtins_are_live
+		       ? rs6000_builtin_info_x[uns_fcode].enable
+		       : (bif_enable) 0);
+  */
   bool func_valid_p = ((rs6000_builtin_mask & mask) == mask);
-  enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
+  enum insn_code icode = (new_builtins_are_live
+			  ? rs6000_builtin_info_x[uns_fcode].icode
+			  : rs6000_builtin_info[uns_fcode].icode);
 
   /* We have two different modes (KFmode, TFmode) that are the IEEE 128-bit
      floating point type, depending on whether long double is the IBM extended
@@ -13616,7 +13629,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 	break;
       }
 
-  if (TARGET_DEBUG_BUILTIN)
+  if (!new_builtins_are_live && TARGET_DEBUG_BUILTIN)
     {
       const char *name1 = rs6000_builtin_info[uns_fcode].name;
       const char *name2 = (icode != CODE_FOR_nothing)
@@ -13654,201 +13667,496 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       return expand_call (exp, target, ignore);
     }
 
-  switch (fcode)
+  if (new_builtins_are_live)
     {
-    case RS6000_BUILTIN_RECIP:
-      return rs6000_expand_binop_builtin (CODE_FOR_recipdf3, exp, target);
+      bifdata *bifaddr = &rs6000_builtin_info_x[uns_fcode];
 
-    case RS6000_BUILTIN_RECIPF:
-      return rs6000_expand_binop_builtin (CODE_FOR_recipsf3, exp, target);
-
-    case RS6000_BUILTIN_RSQRTF:
-      return rs6000_expand_unop_builtin (CODE_FOR_rsqrtsf2, exp, target);
-
-    case RS6000_BUILTIN_RSQRT:
-      return rs6000_expand_unop_builtin (CODE_FOR_rsqrtdf2, exp, target);
-
-    case POWER7_BUILTIN_BPERMD:
-      return rs6000_expand_binop_builtin (((TARGET_64BIT)
-					   ? CODE_FOR_bpermd_di
-					   : CODE_FOR_bpermd_si), exp, target);
-
-    case RS6000_BUILTIN_GET_TB:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_get_timebase,
-					   target);
-
-    case RS6000_BUILTIN_MFTB:
-      return rs6000_expand_zeroop_builtin (((TARGET_64BIT)
-					    ? CODE_FOR_rs6000_mftb_di
-					    : CODE_FOR_rs6000_mftb_si),
-					   target);
-
-    case RS6000_BUILTIN_MFFS:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffs, target);
-
-    case RS6000_BUILTIN_MTFSB0:
-      return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb0, exp);
-
-    case RS6000_BUILTIN_MTFSB1:
-      return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb1, exp);
-
-    case RS6000_BUILTIN_SET_FPSCR_RN:
-      return rs6000_expand_set_fpscr_rn_builtin (CODE_FOR_rs6000_set_fpscr_rn,
-						 exp);
-
-    case RS6000_BUILTIN_SET_FPSCR_DRN:
-      return
-        rs6000_expand_set_fpscr_drn_builtin (CODE_FOR_rs6000_set_fpscr_drn,
-					     exp);
-
-    case RS6000_BUILTIN_MFFSL:
-      return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffsl, target);
-
-    case RS6000_BUILTIN_MTFSF:
-      return rs6000_expand_mtfsf_builtin (CODE_FOR_rs6000_mtfsf, exp);
-
-    case RS6000_BUILTIN_CPU_INIT:
-    case RS6000_BUILTIN_CPU_IS:
-    case RS6000_BUILTIN_CPU_SUPPORTS:
-      return cpu_expand_builtin (fcode, exp, target);
-
-    case MISC_BUILTIN_SPEC_BARRIER:
-      {
-	emit_insn (gen_speculation_barrier ());
-	return NULL_RTX;
-      }
-
-    case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
-      {
-	int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
-		     : (int) CODE_FOR_altivec_lvsl_direct);
-	machine_mode tmode = insn_data[icode2].operand[0].mode;
-	machine_mode mode = insn_data[icode2].operand[1].mode;
-	tree arg;
-	rtx op, addr, pat;
-
-	gcc_assert (TARGET_ALTIVEC);
-
-	arg = CALL_EXPR_ARG (exp, 0);
-	gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg)));
-	op = expand_expr (arg, NULL_RTX, Pmode, EXPAND_NORMAL);
-	addr = memory_address (mode, op);
-	/* We need to negate the address.  */
-	op = gen_reg_rtx (GET_MODE (addr));
-	emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
-	op = gen_rtx_MEM (mode, op);
-
-	if (target == 0
-	    || GET_MODE (target) != tmode
-	    || ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
-	  target = gen_reg_rtx (tmode);
-
-	pat = GEN_FCN (icode2) (target, op);
-	if (!pat)
-	  return 0;
-	emit_insn (pat);
-
-	return target;
-      }
-
-    case ALTIVEC_BUILTIN_VCFUX:
-    case ALTIVEC_BUILTIN_VCFSX:
-    case ALTIVEC_BUILTIN_VCTUXS:
-    case ALTIVEC_BUILTIN_VCTSXS:
-  /* FIXME: There's got to be a nicer way to handle this case than
-     constructing a new CALL_EXPR.  */
-      if (call_expr_nargs (exp) == 1)
+      /* In case of "#pragma target" changes, we initialize all builtins
+	 but check for actual availability during expand time.  */
+      switch (bifaddr->enable)
 	{
-	  exp = build_call_nary (TREE_TYPE (exp), CALL_EXPR_FN (exp),
-				 2, CALL_EXPR_ARG (exp, 0), integer_zero_node);
-	}
-      break;
+	default:
+	  gcc_unreachable ();
+	case ENB_ALWAYS:
+	  break;
+	case ENB_P5:
+	  if (!TARGET_POPCNTB)
+	    return const0_rtx;
+	  break;
+	case ENB_P6:
+	  if (!TARGET_CMPB)
+	    return const0_rtx;
+	  break;
+	case ENB_ALTIVEC:
+	  if (!TARGET_ALTIVEC)
+	    return const0_rtx;
+	  break;
+	case ENB_CELL:
+	  if (!TARGET_ALTIVEC || rs6000_cpu != PROCESSOR_CELL)
+	    return const0_rtx;
+	  break;
+	case ENB_VSX:
+	  if (!TARGET_VSX)
+	    return const0_rtx;
+	  break;
+	case ENB_P7:
+	  if (!TARGET_POPCNTD)
+	    return const0_rtx;
+	  break;
+	case ENB_P7_64:
+	  if (!TARGET_POPCNTD || !TARGET_POWERPC64)
+	    return const0_rtx;
+	  break;
+	case ENB_P8:
+	  if (!TARGET_DIRECT_MOVE)
+	    return const0_rtx;
+	  break;
+	case ENB_P8V:
+	  if (!TARGET_P8_VECTOR)
+	    return const0_rtx;
+	  break;
+	case ENB_P9:
+	  if (!TARGET_MODULO)
+	    return const0_rtx;
+	  break;
+	case ENB_P9_64:
+	  if (!TARGET_MODULO || !TARGET_POWERPC64)
+	    return const0_rtx;
+	  break;
+	case ENB_P9V:
+	  if (!TARGET_P9_VECTOR)
+	    return const0_rtx;
+	  break;
+	case ENB_IEEE128_HW:
+	  if (!TARGET_FLOAT128_HW)
+	    return const0_rtx;
+	  break;
+	case ENB_DFP:
+	  if (!TARGET_DFP)
+	    return const0_rtx;
+	  break;
+	case ENB_CRYPTO:
+	  if (!TARGET_CRYPTO)
+	    return const0_rtx;
+	  break;
+	case ENB_HTM:
+	  if (!TARGET_HTM)
+	    return const0_rtx;
+	  break;
+	case ENB_P10:
+	  if (!TARGET_POWER10)
+	    return const0_rtx;
+	  break;
+	case ENB_MMA:
+	  if (!TARGET_MMA)
+	    return const0_rtx;
+	  break;
+	};
 
-      /* For the pack and unpack int128 routines, fix up the builtin so it
-	 uses the correct IBM128 type.  */
-    case MISC_BUILTIN_PACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+      if (bif_is_nosoft (*bifaddr)
+	  && rs6000_isa_flags & OPTION_MASK_SOFT_FLOAT)
+	{
+	  error ("%<%s%> not supported with %<-msoft-float%>",
+		 bifaddr->bifname);
+	  return const0_rtx;
+	}
+
+      if (bif_is_no32bit (*bifaddr) && TARGET_32BIT)
+	fatal_error (input_location,
+		     "%<%s%> is not supported in 32-bit mode",
+		     bifaddr->bifname);
+
+      if (bif_is_cpu (*bifaddr))
+	return cpu_expand_builtin (fcode, exp, target);
+
+      if (bif_is_init (*bifaddr))
+	return altivec_expand_vec_init_builtin (TREE_TYPE (exp), exp, target);
+
+      if (bif_is_set (*bifaddr))
+	return altivec_expand_vec_set_builtin (exp);
+
+      if (bif_is_extract (*bifaddr))
+	return altivec_expand_vec_ext_builtin (exp, target);
+
+      if (bif_is_predicate (*bifaddr))
+	return altivec_expand_predicate_builtin (icode, exp, target);
+
+      if (bif_is_htm (*bifaddr))
+	return new_htm_expand_builtin (bifaddr, fcode, exp, target);
+
+      rtx pat;
+      const int MAX_BUILTIN_ARGS = 5;
+      tree arg[MAX_BUILTIN_ARGS];
+      rtx op[MAX_BUILTIN_ARGS];
+      machine_mode mode[MAX_BUILTIN_ARGS + 1];
+
+      int nargs = bifaddr->nargs;
+      gcc_assert (nargs <= MAX_BUILTIN_ARGS);
+
+      mode[0] = insn_data[icode].operand[0].mode;
+      for (int i = 0; i < nargs; i++)
+	{
+	  arg[i] = CALL_EXPR_ARG (exp, i);
+	  if (arg[i] == error_mark_node)
+	    return const0_rtx;
+	  op[i] = expand_normal (arg[i]);
+	  mode[i+1] = insn_data[icode].operand[i+1].mode;
+	}
+
+      /* Check for restricted constant arguments.  */
+      for (int i = 0; i < 2; i++)
+	{
+	  switch (bifaddr->restr[i])
+	    {
+	    default:
+	    case RES_NONE:
+	      break;
+	    case RES_BITS:
+	      {
+		size_t mask = (1 << bifaddr->restr_val1[i]) - 1;
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || TREE_INT_CST_LOW (restr_arg) & ~mask)
+		  {
+		    error ("argument %d must be a %d-bit unsigned literal",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
+	      }
+	    case RES_RANGE:
+	      {
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || !IN_RANGE (tree_to_shwi (restr_arg),
+				  bifaddr->restr_val1[i],
+				  bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be a literal between %d and %d,"
+			   " inclusive",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
+	      }
+	    case RES_VAR_RANGE:
+	      {
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) == INTEGER_CST
+		    && !IN_RANGE (tree_to_shwi (restr_arg),
+				  bifaddr->restr_val1[i],
+				  bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be a variable or a literal "
+			   "between %d and %d, inclusive",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
+	      }
+	    case RES_VALUES:
+	      {
+		tree restr_arg = arg[bifaddr->restr_opnd[i] - 1];
+		STRIP_NOPS (restr_arg);
+		if (TREE_CODE (restr_arg) != INTEGER_CST
+		    || (tree_to_shwi (restr_arg) != bifaddr->restr_val1[i]
+			&& tree_to_shwi (restr_arg) != bifaddr->restr_val2[i]))
+		  {
+		    error ("argument %d must be either a literal %d or a "
+			   "literal %d",
+			   bifaddr->restr_opnd[i], bifaddr->restr_val1[i],
+			   bifaddr->restr_val2[i]);
+		    return CONST0_RTX (mode[0]);
+		  }
+		break;
+	      }
+	    }
+	}
+
+      if (bif_is_ldstmask (*bifaddr))
+	return rs6000_expand_ldst_mask (target, fcode, arg[0]);
+
+      if (bif_is_stvec (*bifaddr))
+	{
+	  if (bif_is_reve (*bifaddr))
+	    icode = elemrev_icode (fcode);
+	  return stv_expand_builtin (icode, op, mode[0], mode[1]);
+	}
+
+      if (bif_is_ldvec (*bifaddr))
+	{
+	  if (bif_is_reve (*bifaddr))
+	    icode = elemrev_icode (fcode);
+	  return ldv_expand_builtin (target, icode, op, mode[0]);
+	}
+
+      if (bif_is_mma (*bifaddr))
+	return new_mma_expand_builtin (exp, target, fcode, icode);
+
+      if (fcode == MISC_BUILTIN_PACK_IF
+	  && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
 	{
 	  icode = CODE_FOR_packtf;
 	  fcode = MISC_BUILTIN_PACK_TF;
 	  uns_fcode = (size_t)fcode;
 	}
-      break;
-
-    case MISC_BUILTIN_UNPACK_IF:
-      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+      else if (fcode == MISC_BUILTIN_UNPACK_IF
+	       && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
 	{
 	  icode = CODE_FOR_unpacktf;
 	  fcode = MISC_BUILTIN_UNPACK_TF;
 	  uns_fcode = (size_t)fcode;
 	}
-      break;
 
-    default:
-      break;
+      if (target == 0
+	  || GET_MODE (target) != mode[0]
+	  || !(*insn_data[icode].operand[0].predicate) (target, mode[0]))
+	target = gen_reg_rtx (mode[0]);
+
+      for (int i = 0; i < nargs; i++)
+	if (! (*insn_data[icode].operand[i+1].predicate) (op[i], mode[i+1]))
+	  op[i] = copy_to_mode_reg (mode[i+1], op[i]);
+
+      switch (nargs)
+	{
+	default:
+	  gcc_assert (MAX_BUILTIN_ARGS == 5);
+	  gcc_unreachable ();
+	case 0:
+	  pat = GEN_FCN (icode) (target);
+	  break;
+	case 1:
+	  pat = GEN_FCN (icode) (target, op[0]);
+	  break;
+	case 2:
+	  pat = GEN_FCN (icode) (target, op[0], op[1]);
+	  break;
+	case 3:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2]);
+	  break;
+	case 4:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3]);
+	  break;
+	case 5:
+	  pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3], op[4]);
+	  break;
+	}
+
+      if (!pat)
+	return 0;
+      emit_insn (pat);
+
+      return target;
     }
-
-  if (TARGET_MMA)
+  else
     {
-      ret = mma_expand_builtin (exp, target, &success);
+      switch (fcode)
+	{
+	case RS6000_BUILTIN_RECIP:
+	  return rs6000_expand_binop_builtin (CODE_FOR_recipdf3, exp, target);
 
-      if (success)
-	return ret;
+	case RS6000_BUILTIN_RECIPF:
+	  return rs6000_expand_binop_builtin (CODE_FOR_recipsf3, exp, target);
+
+	case RS6000_BUILTIN_RSQRTF:
+	  return rs6000_expand_unop_builtin (CODE_FOR_rsqrtsf2, exp, target);
+
+	case RS6000_BUILTIN_RSQRT:
+	  return rs6000_expand_unop_builtin (CODE_FOR_rsqrtdf2, exp, target);
+
+	case POWER7_BUILTIN_BPERMD:
+	  return rs6000_expand_binop_builtin (((TARGET_64BIT)
+					       ? CODE_FOR_bpermd_di
+					       : CODE_FOR_bpermd_si),
+					      exp, target);
+
+	case RS6000_BUILTIN_GET_TB:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_get_timebase,
+					       target);
+
+	case RS6000_BUILTIN_MFTB:
+	  return rs6000_expand_zeroop_builtin (((TARGET_64BIT)
+						? CODE_FOR_rs6000_mftb_di
+						: CODE_FOR_rs6000_mftb_si),
+					       target);
+
+	case RS6000_BUILTIN_MFFS:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffs, target);
+
+	case RS6000_BUILTIN_MTFSB0:
+	  return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb0, exp);
+
+	case RS6000_BUILTIN_MTFSB1:
+	  return rs6000_expand_mtfsb_builtin (CODE_FOR_rs6000_mtfsb1, exp);
+
+	case RS6000_BUILTIN_SET_FPSCR_RN:
+	  return rs6000_expand_set_fpscr_rn_builtin
+	    (CODE_FOR_rs6000_set_fpscr_rn, exp);
+
+	case RS6000_BUILTIN_SET_FPSCR_DRN:
+	  return
+	    rs6000_expand_set_fpscr_drn_builtin (CODE_FOR_rs6000_set_fpscr_drn,
+						 exp);
+
+	case RS6000_BUILTIN_MFFSL:
+	  return rs6000_expand_zeroop_builtin (CODE_FOR_rs6000_mffsl, target);
+
+	case RS6000_BUILTIN_MTFSF:
+	  return rs6000_expand_mtfsf_builtin (CODE_FOR_rs6000_mtfsf, exp);
+
+	case RS6000_BUILTIN_CPU_INIT:
+	case RS6000_BUILTIN_CPU_IS:
+	case RS6000_BUILTIN_CPU_SUPPORTS:
+	  return cpu_expand_builtin (fcode, exp, target);
+
+	case MISC_BUILTIN_SPEC_BARRIER:
+	  {
+	    emit_insn (gen_speculation_barrier ());
+	    return NULL_RTX;
+	  }
+
+	case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
+	  {
+	    int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
+			  : (int) CODE_FOR_altivec_lvsl_direct);
+	    machine_mode tmode = insn_data[icode2].operand[0].mode;
+	    machine_mode mode = insn_data[icode2].operand[1].mode;
+	    tree arg;
+	    rtx op, addr, pat;
+
+	    gcc_assert (TARGET_ALTIVEC);
+
+	    arg = CALL_EXPR_ARG (exp, 0);
+	    gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg)));
+	    op = expand_expr (arg, NULL_RTX, Pmode, EXPAND_NORMAL);
+	    addr = memory_address (mode, op);
+	    /* We need to negate the address.  */
+	    op = gen_reg_rtx (GET_MODE (addr));
+	    emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
+	    op = gen_rtx_MEM (mode, op);
+
+	    if (target == 0
+		|| GET_MODE (target) != tmode
+		|| ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
+	      target = gen_reg_rtx (tmode);
+
+	    pat = GEN_FCN (icode2) (target, op);
+	    if (!pat)
+	      return 0;
+	    emit_insn (pat);
+
+	    return target;
+	  }
+
+	case ALTIVEC_BUILTIN_VCFUX:
+	case ALTIVEC_BUILTIN_VCFSX:
+	case ALTIVEC_BUILTIN_VCTUXS:
+	case ALTIVEC_BUILTIN_VCTSXS:
+	  /* #### Replace this nonsense with a separate built-in for the
+	     vectorizer to use, which I believe is the only way we get
+	     into this situation.  */
+	  /* FIXME: There's got to be a nicer way to handle this case than
+	     constructing a new CALL_EXPR.  */
+	  if (call_expr_nargs (exp) == 1)
+	    {
+	      exp = build_call_nary (TREE_TYPE (exp), CALL_EXPR_FN (exp),
+				     2, CALL_EXPR_ARG (exp, 0),
+				     integer_zero_node);
+	    }
+	  break;
+
+	  /* For the pack and unpack int128 routines, fix up the builtin so it
+	     uses the correct IBM128 type.  */
+	case MISC_BUILTIN_PACK_IF:
+	  if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	    {
+	      icode = CODE_FOR_packtf;
+	      fcode = MISC_BUILTIN_PACK_TF;
+	      uns_fcode = (size_t)fcode;
+	    }
+	  break;
+
+	case MISC_BUILTIN_UNPACK_IF:
+	  if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	    {
+	      icode = CODE_FOR_unpacktf;
+	      fcode = MISC_BUILTIN_UNPACK_TF;
+	      uns_fcode = (size_t)fcode;
+	    }
+	  break;
+
+	default:
+	  break;
+	}
+
+      if (TARGET_MMA)
+	{
+	  ret = mma_expand_builtin (exp, target, &success);
+
+	  if (success)
+	    return ret;
+	}
+      if (TARGET_ALTIVEC)
+	{
+	  ret = altivec_expand_builtin (exp, target, &success);
+
+	  if (success)
+	    return ret;
+	}
+      if (TARGET_HTM)
+	{
+	  ret = htm_expand_builtin (exp, target, &success);
+
+	  if (success)
+	    return ret;
+	}
+
+      unsigned attr = (rs6000_builtin_info[uns_fcode].attr
+		       & RS6000_BTC_TYPE_MASK);
+      /* RS6000_BTC_SPECIAL represents no-operand operators.  */
+      gcc_assert (attr == RS6000_BTC_UNARY
+		  || attr == RS6000_BTC_BINARY
+		  || attr == RS6000_BTC_TERNARY
+		  || attr == RS6000_BTC_QUATERNARY
+		  || attr == RS6000_BTC_SPECIAL);
+
+      /* Handle simple unary operations.  */
+      d = bdesc_1arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_1arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_unop_builtin (icode, exp, target);
+
+      /* Handle simple binary operations.  */
+      d = bdesc_2arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_2arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_binop_builtin (icode, exp, target);
+
+      /* Handle simple ternary operations.  */
+      d = bdesc_3arg;
+      for (i = 0; i < ARRAY_SIZE  (bdesc_3arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_ternop_builtin (icode, exp, target);
+
+      /* Handle simple quaternary operations.  */
+      d = bdesc_4arg;
+      for (i = 0; i < ARRAY_SIZE  (bdesc_4arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_quaternop_builtin (icode, exp, target);
+
+      /* Handle simple no-argument operations. */
+      d = bdesc_0arg;
+      for (i = 0; i < ARRAY_SIZE (bdesc_0arg); i++, d++)
+	if (d->code == fcode)
+	  return rs6000_expand_zeroop_builtin (icode, target);
+
+      gcc_unreachable ();
     }
-  if (TARGET_ALTIVEC)
-    {
-      ret = altivec_expand_builtin (exp, target, &success);
-
-      if (success)
-	return ret;
-    }
-  if (TARGET_HTM)
-    {
-      ret = htm_expand_builtin (exp, target, &success);
-
-      if (success)
-	return ret;
-    }  
-
-  unsigned attr = rs6000_builtin_info[uns_fcode].attr & RS6000_BTC_OPND_MASK;
-  /* RS6000_BTC_SPECIAL represents no-operand operators.  */
-  gcc_assert (attr == RS6000_BTC_UNARY
-	      || attr == RS6000_BTC_BINARY
-	      || attr == RS6000_BTC_TERNARY
-	      || attr == RS6000_BTC_QUATERNARY
-	      || attr == RS6000_BTC_SPECIAL);
-  
-  /* Handle simple unary operations.  */
-  d = bdesc_1arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_1arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_unop_builtin (icode, exp, target);
-
-  /* Handle simple binary operations.  */
-  d = bdesc_2arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_2arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_binop_builtin (icode, exp, target);
-
-  /* Handle simple ternary operations.  */
-  d = bdesc_3arg;
-  for (i = 0; i < ARRAY_SIZE  (bdesc_3arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_ternop_builtin (icode, exp, target);
-
-  /* Handle simple quaternary operations.  */
-  d = bdesc_4arg;
-  for (i = 0; i < ARRAY_SIZE  (bdesc_4arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_quaternop_builtin (icode, exp, target);
-
-  /* Handle simple no-argument operations. */
-  d = bdesc_0arg;
-  for (i = 0; i < ARRAY_SIZE (bdesc_0arg); i++, d++)
-    if (d->code == fcode)
-      return rs6000_expand_zeroop_builtin (icode, target);
-
-  gcc_unreachable ();
 }
 
 /* Create a builtin vector type with a name.  Taking care not to give
