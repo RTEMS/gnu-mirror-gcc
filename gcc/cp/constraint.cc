@@ -2343,9 +2343,6 @@ struct sat_hasher : ggc_ptr_hash<sat_entry>
 /* Cache the result of satisfy_atom.  */
 static GTY((deletable)) hash_table<sat_hasher> *sat_cache;
 
-/* Cache the result of constraint_satisfaction_value.  */
-static GTY((deletable)) hash_map<tree, tree> *decl_satisfied_cache;
-
 static tree
 get_satisfaction (tree constr, tree args)
 {
@@ -2770,9 +2767,84 @@ satisfy_constraint_expression (tree expr)
   return satisfy_constraint_expression (expr, NULL_TREE, info);
 }
 
+/* Hash functions for declaration satisfaction entries.  */
+
+struct GTY((for_user)) decl_sat_entry
+{
+  tree decl;
+  tree args;
+  tree result;
+};
+
+struct decl_sat_hasher : ggc_ptr_hash<decl_sat_entry>
+{
+  static hashval_t hash (const decl_sat_entry *e)
+  {
+    hashval_t value = htab_hash_pointer (e->decl);
+    return iterative_hash_template_arg (e->args, value);
+  }
+
+  static bool equal (const decl_sat_entry *e1, const decl_sat_entry *e2)
+  {
+    if (e1->decl != e2->decl)
+      return false;
+    return template_args_equal (e1->args, e2->args);
+  }
+};
+
+/* Cache the result of satisfy_declaration_constraints.  */
+static GTY((deletable)) hash_table<decl_sat_hasher> *decl_sat_cache;
+
+struct decl_satisfaction_cache
+{
+  decl_satisfaction_cache (tree decl, tsubst_flags_t complain)
+    : decl_satisfaction_cache (decl, NULL_TREE, complain)
+  { }
+
+  decl_satisfaction_cache (tree decl, tree args, tsubst_flags_t complain)
+    : complain(complain)
+  {
+    entry.decl = decl;
+    entry.args = args;
+    hash = decl_sat_hasher::hash (&entry);
+  }
+
+  tree get ()
+  {
+    if (complain == tf_none && decl_sat_cache)
+      if (decl_sat_entry *found = decl_sat_cache->find_with_hash (&entry, hash))
+	return found->result;
+    return NULL_TREE;
+  }
+
+  tree save (tree result)
+  {
+    if (complain == tf_none)
+      {
+	if (!decl_sat_cache)
+	  decl_sat_cache = hash_table<decl_sat_hasher>::create_ggc (31);
+	decl_sat_entry **slot
+	  = decl_sat_cache->find_slot_with_hash (&entry, hash, INSERT);
+	*slot = ggc_alloc<decl_sat_entry> ();
+	(*slot)->decl = entry.decl;
+	(*slot)->args = entry.args;
+	(*slot)->result = result;
+      }
+    return result;
+  }
+
+  decl_sat_entry entry;
+  hashval_t hash;
+  tsubst_flags_t complain;
+};
+
 static tree
 satisfy_declaration_constraints (tree t, subst_info info)
 {
+  decl_satisfaction_cache cache (t, info.complain);
+  if (tree result = cache.get ())
+    return result;
+
   gcc_assert (DECL_P (t));
   const tree saved_t = t;
 
@@ -2788,10 +2860,6 @@ satisfy_declaration_constraints (tree t, subst_info info)
 
   /* Update the declaration for diagnostics.  */
   info.in_decl = t;
-
-  if (info.quiet ())
-    if (tree *result = hash_map_safe_get (decl_satisfied_cache, saved_t))
-      return *result;
 
   /* Get the normalized constraints.  */
   tree norm = NULL_TREE;
@@ -2824,15 +2892,16 @@ satisfy_declaration_constraints (tree t, subst_info info)
       pop_tinst_level ();
     }
 
-  if (info.quiet ())
-    hash_map_safe_put<hm_ggc> (decl_satisfied_cache, saved_t, result);
-
-  return result;
+  return cache.save (result);
 }
 
 static tree
 satisfy_declaration_constraints (tree t, tree args, subst_info info)
 {
+  decl_satisfaction_cache cache (t, args, info.complain);
+  if (tree result = cache.get ())
+    return result;
+
   /* Update the declaration for diagnostics.  */
   info.in_decl = t;
 
@@ -2852,7 +2921,7 @@ satisfy_declaration_constraints (tree t, tree args, subst_info info)
       pop_tinst_level ();
     }
 
-  return result;
+  return cache.save (result);
 }
 
 static tree
