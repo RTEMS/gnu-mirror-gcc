@@ -438,6 +438,67 @@ static rbt_strings bif_rbt;
 static rbt_strings ovld_rbt;
 static rbt_strings fntype_rbt;
 
+/* Mapping from type tokens to type node names.  */
+struct typemap
+{
+  const char *key;
+  const char *value;
+};
+
+/* This table must be kept in alphabetical order, as we use binary
+   search for table lookups in map_token_to_type_node.  The table
+   maps tokens from a fntype string to a tree type.  For example,
+   in "si_ftype_hi" we would map "si" to "intSI_type_node" and
+   map "hi" to "intHI_type_node".  */
+#define TYPE_MAP_SIZE 44
+static typemap type_map[TYPE_MAP_SIZE] =
+  {
+    { "bi",	"bool_int" },
+    { "bv16qi",	"bool_V16QI" },
+    { "bv2di",	"bool_V2DI" },
+    { "bv4si",	"bool_V4SI" },
+    { "bv8hi",	"bool_V8HI" },
+    { "dd",	"dfloat64" },
+    { "df",	"double" },
+    { "di",	"intDI" },
+    { "hi",	"intHI" },
+    { "if",	"ibm128_float" },
+    { "ld",	"long_double" },
+    { "lg",	"long_integer" },
+    { "opaque", "opaque_V4SI" },
+    { "pcvoid",	"pcvoid" },
+    { "pv",	"ptr" },
+    { "qi",	"intQI" },
+    { "sd",	"dfloat32" },
+    { "sf",	"float" },
+    { "si",	"intSI" },
+    { "td",	"dfloat128" },
+    { "tf",	"float128" },
+    { "ti",	"intTI" },
+    { "udi",	"unsigned_intDI" },
+    { "uhi",	"unsigned_intHI" },
+    { "ulg",	"long_unsigned" },
+    { "uqi",	"unsigned_intQI" },
+    { "usi",	"unsigned_intSI" },
+    { "uti",	"unsigned_intTI" },
+    { "uv16qi",	"unsigned_V16QI" },
+    { "uv1ti",	"unsigned_V1TI" },
+    { "uv2di",	"unsigned_V2DI" },
+    { "uv4si",	"unsigned_V4SI" },
+    { "uv8hi",	"unsigned_V8HI" },
+    { "v",	"void" },
+    { "v16qi",	"V16QI" },
+    { "v1poi",	"vector_pair" },
+    { "v1pxi",	"vector_quad" },
+    { "v1ti",	"V1TI" },
+    { "v2df",	"V2DF" },
+    { "v2di",	"V2DI" },
+    { "v4sf",	"V4SF" },
+    { "v4si",	"V4SI" },
+    { "v8hi",	"V8HI" },
+    { "vp8hi",	"pixel_V8HI" },
+  };
+
 /* Pointer to a diagnostic function.  */
 void (*diag) (const char *, ...) __attribute__ ((format (printf, 1, 2)))
   = NULL;
@@ -2187,10 +2248,72 @@ write_fntype (char *str)
   fprintf (init_file, "tree %s;\n", str);
 }
 
+/* Look up TOK in the type map and return the corresponding string used
+   to build the type node.  */
+static const char *
+map_token_to_type_node (char *tok)
+{
+  int low = 0;
+  int high = TYPE_MAP_SIZE - 1;
+  int mid = (low + high) >> 1;
+  int cmp;
+
+  while ((cmp = strcmp (type_map[mid].key, tok)) && low < high)
+    {
+      if (cmp < 0)
+	low = (low == mid ? mid + 1 : mid);
+      else
+	high = (high == mid ? mid - 1: mid);
+      mid = (low + high) >> 1;
+    }
+
+  if (low > high)
+    {
+      (*diag) ("token '%s' doesn't appear in the type map!\n", tok);
+      exit (EC_INTERR);
+    }
+
+  return type_map[mid].value;
+}
+
+/* Write the type node corresponding to TOK.  */
+static void
+write_type_node (char *tok)
+{
+  const char *str = map_token_to_type_node (tok);
+  fprintf (init_file, "%s_type_node", str);
+}
+
 /* Write an initializer for a function type identified by STR.  */
 void
 write_fntype_init (char *str)
 {
+  char *tok;
+
+  /* Avoid side effects of strtok on the original string by using a copy.  */
+  char *buf = (char *) malloc (strlen (str) + 1);
+  strcpy (buf, str);
+
+  fprintf (init_file, "  %s\n    = build_function_type_list (", buf);
+  tok = strtok (buf, "_");
+  write_type_node (tok);
+  tok = strtok (0, "_");
+  assert (tok);
+  assert (!strcmp (tok, "ftype"));
+
+  tok = strtok (0, "_");
+  if (tok)
+    fprintf (init_file, ",\n\t\t\t\t");
+
+  /* Note:  A function with no arguments ends with '_ftype_v'.  */
+  while (tok && strcmp (tok, "v"))
+    {
+      write_type_node (tok);
+      tok = strtok (0, "_");
+      fprintf (init_file, ",\n\t\t\t\t");
+    }
+  fprintf (init_file, "NULL_TREE);\n");
+  free (buf);
 }
 
 /* Write everything to the header file (rs6000-builtins.h).  */
