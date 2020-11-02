@@ -1,3 +1,57 @@
+2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/95132
+	* decl2.c (mark_used): Move up the constraints_satisfied_p check
+	so that we check constraints before calling maybe_instantiate_decl.
+
+2020-10-24  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-10-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/96241
+	* constexpr.c (cxx_eval_array_reference): Set up ctx->ctor if we
+	are initializing an aggregate.  Call free_constructor on the new
+	CONSTRUCTOR if it isn't returned from cxx_eval_constant_expression.
+
+2020-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/97328
+	* constexpr.c (init_subob_ctx): Don't punt on RANGE_EXPR
+	indexes, instead build a sub-aggregate initialization context
+	with no subobject.
+
+2020-10-20  Marek Polacek  <polacek@redhat.com>
+
+	* pt.c (tsubst_copy_and_build): Use cxx2a.
+
+2020-10-20  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-10-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97010
+	* pt.c (tsubst_copy_and_build) <case TEMPLATE_ID_EXPR>: Call
+	tsubst_copy_and_build explicitly instead of using the RECUR macro.
+	Handle a TEMPLATE_ID_EXPR with an IDENTIFIER_NODE as its operand.
+	<case CALL_EXPR>: Perform ADL for a TEMPLATE_ID_EXPR with an
+	IDENTIFIER_NODE as its operand.
+
+2020-10-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-10-05  Richard Biener  <rguenther@suse.de>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97197
+	* error.c (dump_expr): Handle TARGET_MEM_REF.
+
 2020-10-13  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

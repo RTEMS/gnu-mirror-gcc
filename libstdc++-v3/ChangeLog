@@ -1,3 +1,191 @@
+2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	* testsuite/25_algorithms/lexicographical_compare/constrained.cc:
+	(test03): Fix initializing the vector vy with the array y of size 4.
+
+2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-23  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (single_view::single_view): Mark the
+	in place constructor explicit as per LWG 3428.
+	(take_view): Remove the constraint on the deduction guide's
+	template parameter as per LWG 3447.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/span (span::front): Remove static_assert.
+	(span::back): Likewise.
+	(span::operator[]): Likewise.
+	* testsuite/23_containers/span/back_neg.cc: Rewrite to verify
+	that we check the preconditions of back() only when it's called.
+	* testsuite/23_containers/span/front_neg.cc: Likewise for
+	front().
+	* testsuite/23_containers/span/index_op_neg.cc: Likewise for
+	operator[].
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-12  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (take_while_view::begin): Constrain the
+	const overload further as per LWG 3450.
+	(take_while_view::end): Likewise.
+	* testsuite/std/ranges/adaptors/take_while.cc: Add test for LWG
+	3450.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (__sample): Exit early when the
+	input range is empty.
+	* testsuite/25_algorithms/sample/3.cc: New test.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (for_each_n): Mark constexpr for C++20.
+	(search): Likewise for the overload that takes a searcher.
+	* testsuite/25_algorithms/for_each/constexpr.cc: Test constexpr
+	std::for_each_n.
+	* testsuite/25_algorithms/search/constexpr.cc: Test constexpr
+	std::search overload that takes a searcher.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95322
+	* include/std/ranges (transform_view::sentinel::__distance_from):
+	Give this a deduced return type.
+	(transform_view::sentinel::operator-): Adjust the return type so
+	that it's based on the constness of the iterator rather than
+	that of the sentinel.
+	* testsuite/std/ranges/adaptors/95322.cc: Refer to LWG 3488.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (elements_view::begin): Adjust constraints.
+	(elements_view::end): Likewise.
+	(elements_view::_Sentinel::operator==): Templatize to take both
+	_Iterator<true> and _Iterator<false>.
+	(elements_view::_Sentinel::operator-): Likewise.
+	* testsuite/std/ranges/adaptors/elements.cc: Add testcase for
+	the example from P1994R1.
+	* testsuite/std/ranges/adaptors/lwg3406.cc: New test.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (elements_view::end): Replace these two
+	overloads with four new overloads.
+	(elements_view::_Iterator::operator==): Remove.
+	(elements_view::_Iterator::operator-): Likewise.
+	(elements_view::_Sentinel): Define.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (UniquePointerPrinter.__init__):
+	Use gdb.Type.strip_typedefs().
+	* testsuite/libstdc++-prettyprinters/compat.cc: Use a typedef in
+	the emulated old type.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h [!_GLIBCXX_USE_CXX11_ABI]
+	(basic_string(const _CharT*, const _Alloc&)): Constrain to
+	require an allocator-like type to fix CTAD ambiguity (LWG 3706).
+	Define inline.
+	* include/bits/basic_string.tcc [!_GLIBCXX_USE_CXX11_ABI]
+	(basic_string(const _CharT*, const _Alloc&)): Remove non-inline
+	definition.
+	* testsuite/21_strings/basic_string/cons/char/deduction.cc:
+	Remove dg-skip-if.
+	* testsuite/21_strings/basic_string/cons/wchar_t/deduction.cc:
+	Likewise.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/21_strings/basic_string/allocator/char/minimal.cc:
+	Do not require cxx11-abi effective target.
+	* testsuite/21_strings/basic_string/allocator/wchar_t/minimal.cc:
+	Likewise.
+	* testsuite/27_io/basic_fstream/cons/base.cc: Likewise.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ios_base.h (ios_base::failure): Add constructors
+	takeing error_code argument. Add code() member function.
+	* testsuite/27_io/ios_base/failure/cxx11.cc: Allow test to
+	run for the old ABI but do not check for derivation from
+	std::system_error.
+	* testsuite/27_io/ios_base/failure/error_code.cc: New test.
+
+2020-10-20  Nuno Lopes  <nuno.lopes@ist.utl.pt>
+
+	Backported from master:
+	2020-10-13  Nuno Lopes  <nuno.lopes@ist.utl.pt>
+
+	* include/bits/stl_algo.h (any_of): Fix incorrect description
+	in comment.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_algobase.h (copy, move, copy_backward)
+	(move_backward): Fix documentation for returned iterator.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/configure.xml: Correct name of option.
+	* doc/html/*: Regenerate.
+
+2020-10-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97132
+	* include/std/memory (assume_aligned): Do not use
+	__builtin_assume_aligned during constant evaluation.
+	* testsuite/20_util/assume_aligned/1.cc: Improve test.
+	* testsuite/20_util/assume_aligned/97132.cc: New test.
+
 2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:
