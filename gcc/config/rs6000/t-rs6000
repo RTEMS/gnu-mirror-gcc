@@ -43,7 +43,30 @@ rs6000-logue.o: $(srcdir)/config/rs6000/rs6000-logue.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-rs6000-call.o: $(srcdir)/config/rs6000/rs6000-call.c
+rs6000-gen-builtins.o: $(srcdir)/config/rs6000/rs6000-gen-builtins.c
+	$(COMPILE) $(CXXFLAGS) $<
+	$(POSTCOMPILE)
+
+rbtree.o: $(srcdir)/config/rs6000/rbtree.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+rs6000-gen-builtins: rs6000-gen-builtins.o rbtree.o
+	$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
+	    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)
+
+rs6000-builtins.c: rs6000-gen-builtins \
+		   $(srcdir)/config/rs6000/rs6000-builtin-new.def \
+		   $(srcdir)/config/rs6000/rs6000-overload.def
+	./rs6000-gen-builtins $(srcdir)/config/rs6000/rs6000-builtin-new.def \
+		$(srcdir)/config/rs6000/rs6000-overload.def rs6000-builtins.h \
+		rs6000-builtins.c rs6000-vecdefines.h
+
+rs6000-builtins.o: rs6000-builtins.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+rs6000-call.o: $(srcdir)/config/rs6000/rs6000-call.c rs6000-builtins.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
