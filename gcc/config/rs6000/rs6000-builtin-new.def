@@ -1084,6 +1084,33 @@
     VEC_SET_V8HI nothing {set}
 
 
+; Cell builtins.
+[cell]
+  pure vop __builtin_altivec_lvlx (signed long long, const void *);
+    LVLX altivec_lvlx {ldvec}
+
+  pure vop __builtin_altivec_lvlxl (signed long long, const void *);
+    LVLXL altivec_lvlxl {ldvec}
+
+  pure vop __builtin_altivec_lvrx (signed long long, const void *);
+    LVRX altivec_lvrx {ldvec}
+
+  pure vop __builtin_altivec_lvrxl (signed long long, const void *);
+    LVRXL altivec_lvrxl {ldvec}
+
+  void __builtin_altivec_stvlx (vop, signed long long, void *);
+    STVLX altivec_stvlx {stvec}
+
+  void __builtin_altivec_stvlxl (vop, signed long long, void *);
+    STVLXL altivec_stvlxl {stvec}
+
+  void __builtin_altivec_stvrx (vop, signed long long, void *);
+    STVRX altivec_stvrx {stvec}
+
+  void __builtin_altivec_stvrxl (vop, signed long long, void *);
+    STVRXL altivec_stvrxl {stvec}
+
+
 ; VSX builtins.
 [vsx]
   pure vsq __builtin_altivec_lvx_v1ti (signed long long, const void *);
