@@ -9065,6 +9065,102 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 
 /* Builtins.  */
 
+/* Debug utility to translate a type node to a single token.  */
+static
+const char *rs6000_debug_type (tree type)
+{
+  if (type == void_type_node)
+    return "void";
+  else if (type == long_integer_type_node)
+    return "long";
+  else if (type == long_unsigned_type_node)
+    return "ulong";
+  else if (type == bool_V16QI_type_node)
+    return "vbc";
+  else if (type == bool_V2DI_type_node)
+    return "vbll";
+  else if (type == bool_V4SI_type_node)
+    return "vbi";
+  else if (type == bool_V8HI_type_node)
+    return "vbs";
+  else if (type == bool_int_type_node)
+    return "bool";
+  else if (type == dfloat64_type_node)
+    return "_Decimal64";
+  else if (type == double_type_node)
+    return "double";
+  else if (type == intDI_type_node)
+    return "sll";
+  else if (type == intHI_type_node)
+    return "ss";
+  else if (type == ibm128_float_type_node)
+    return "__ibm128";
+  else if (type == opaque_V4SI_type_node)
+    return "opaque";
+  else if (POINTER_TYPE_P (type))
+    return "void*";
+  else if (type == intQI_type_node || type == char_type_node)
+    return "sc";
+  else if (type == dfloat32_type_node)
+    return "_Decimal32";
+  else if (type == float_type_node)
+    return "float";
+  else if (type == intSI_type_node || type == integer_type_node)
+    return "si";
+  else if (type == dfloat128_type_node)
+    return "_Decimal128";
+  else if (type == long_double_type_node)
+    return "longdouble";
+  else if (type == intTI_type_node)
+    return "sq";
+  else if (type == unsigned_intDI_type_node)
+    return "ull";
+  else if (type == unsigned_intHI_type_node)
+    return "us";
+  else if (type == unsigned_intQI_type_node)
+    return "uc";
+  else if (type == unsigned_intSI_type_node)
+    return "ui";
+  else if (type == unsigned_intTI_type_node)
+    return "uq";
+  else if (type == unsigned_V16QI_type_node)
+    return "vuc";
+  else if (type == unsigned_V1TI_type_node)
+    return "vuq";
+  else if (type == unsigned_V2DI_type_node)
+    return "vull";
+  else if (type == unsigned_V4SI_type_node)
+    return "vui";
+  else if (type == unsigned_V8HI_type_node)
+    return "vus";
+  else if (type == V16QI_type_node)
+    return "vsc";
+  else if (type == V1TI_type_node)
+    return "vsq";
+  else if (type == V2DF_type_node)
+    return "vd";
+  else if (type == V2DI_type_node)
+    return "vsll";
+  else if (type == V4SF_type_node)
+    return "vf";
+  else if (type == V4SI_type_node)
+    return "vsi";
+  else if (type == V8HI_type_node)
+    return "vss";
+  else if (type == pixel_V8HI_type_node)
+    return "vp";
+  else if (type == pcvoid_type_node)
+    return "voidc*";
+  else if (type == float128_type_node)
+    return "_Float128";
+  else if (type == vector_pair_type_node)
+    return "__vector_pair";
+  else if (type == vector_quad_type_node)
+    return "__vector_quad";
+  else
+    return "unknown";
+}
+
 static void
 def_builtin (const char *name, tree type, enum rs6000_builtins code)
 {
@@ -9093,7 +9189,7 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
       /* const function, function only depends on the inputs.  */
       TREE_READONLY (t) = 1;
       TREE_NOTHROW (t) = 1;
-      attr_string = ", const";
+      attr_string = "= const";
     }
   else if ((classify & RS6000_BTC_PURE) != 0)
     {
@@ -9101,7 +9197,7 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
 	 external state.  */
       DECL_PURE_P (t) = 1;
       TREE_NOTHROW (t) = 1;
-      attr_string = ", pure";
+      attr_string = "= pure";
     }
   else if ((classify & RS6000_BTC_FP) != 0)
     {
@@ -9115,12 +9211,12 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
 	{
 	  DECL_PURE_P (t) = 1;
 	  DECL_IS_NOVOPS (t) = 1;
-	  attr_string = ", fp, pure";
+	  attr_string = "= fp, pure";
 	}
       else
 	{
 	  TREE_READONLY (t) = 1;
-	  attr_string = ", fp, const";
+	  attr_string = "= fp, const";
 	}
     }
   else if ((classify & (RS6000_BTC_QUAD | RS6000_BTC_PAIR)) != 0)
@@ -9130,8 +9226,26 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
     gcc_unreachable ();
 
   if (TARGET_DEBUG_BUILTIN)
+    {
+      tree t = TREE_TYPE (type);
+      fprintf (stderr, "%s %s (", rs6000_debug_type (t), name);
+      t = TYPE_ARG_TYPES (type);
+      while (t && TREE_VALUE (t) != void_type_node)
+	{
+	  fprintf (stderr, "%s",
+		   rs6000_debug_type (TREE_VALUE (t)));
+	  t = TREE_CHAIN (t);
+	  if (t && TREE_VALUE (t) != void_type_node)
+	    fprintf (stderr, ", ");
+	}
+      fprintf (stderr, "); %s [%4d]\n", attr_string, (int)code);
+    }
+
+  /*
+  if (TARGET_DEBUG_BUILTIN)
     fprintf (stderr, "rs6000_builtin, code = %4d, %s%s\n",
 	     (int)code, name, attr_string);
+  */
 }
 
 /* Simple ternary operations: VECd = foo (VECa, VECb, VECc).  */
