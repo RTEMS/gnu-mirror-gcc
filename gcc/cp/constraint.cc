@@ -2343,56 +2343,42 @@ struct sat_hasher : ggc_ptr_hash<sat_entry>
 /* Cache the result of satisfy_atom.  */
 static GTY((deletable)) hash_table<sat_hasher> *sat_cache;
 
-static tree
-get_satisfaction (tree constr, tree args)
-{
-  if (!sat_cache)
-    return NULL_TREE;
-  sat_entry elt = { constr, args, NULL_TREE };
-  sat_entry* found = sat_cache->find (&elt);
-  if (found)
-    return found->result;
-  else
-    return NULL_TREE;
-}
-
-static void
-save_satisfaction (tree constr, tree args, tree result)
-{
-  if (!sat_cache)
-    sat_cache = hash_table<sat_hasher>::create_ggc (31);
-  sat_entry elt = {constr, args, result};
-  sat_entry** slot = sat_cache->find_slot (&elt, INSERT);
-  sat_entry* entry = ggc_alloc<sat_entry> ();
-  *entry = elt;
-  *slot = entry;
-}
-
 /* A tool to help manage satisfaction caching in satisfy_constraint_r.
    Note the cache is only used when not diagnosing errors.  */
 
 struct satisfaction_cache
 {
   satisfaction_cache (tree constr, tree args, tsubst_flags_t complain)
-    : constr(constr), args(args), complain(complain)
-  { }
+    : complain(complain)
+  {
+    elt = {constr, args, NULL_TREE};
+    hash = sat_hasher::hash (&elt);
+  }
 
   tree get ()
   {
-    if (complain == tf_none)
-      return get_satisfaction (constr, args);
+    if (complain == tf_none && sat_cache)
+      if (sat_entry *found = sat_cache->find_with_hash (&elt, hash))
+	return found->result;
     return NULL_TREE;
   }
 
   tree save (tree result)
   {
     if (complain == tf_none)
-      save_satisfaction (constr, args, result);
+      {
+	if (!sat_cache)
+	  sat_cache = hash_table<sat_hasher>::create_ggc (31);
+	sat_entry **slot = sat_cache->find_slot_with_hash (&elt, hash, INSERT);
+	*slot = ggc_alloc<sat_entry> ();
+	**slot = elt;
+	(*slot)->result = result;
+      }
     return result;
   }
 
-  tree constr;
-  tree args;
+  sat_entry elt;
+  hashval_t hash;
   tsubst_flags_t complain;
 };
 
