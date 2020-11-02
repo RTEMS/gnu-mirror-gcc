@@ -950,8 +950,8 @@ normalize_constraint_expression (tree expr, bool diag)
 bool
 atomic_constraints_identical_p (tree t1, tree t2)
 {
-  gcc_assert (TREE_CODE (t1) == ATOMIC_CONSTR);
-  gcc_assert (TREE_CODE (t2) == ATOMIC_CONSTR);
+  if (t1 == t2)
+    return true;
 
   if (ATOMIC_CONSTR_EXPR (t1) != ATOMIC_CONSTR_EXPR (t2))
     return false;
