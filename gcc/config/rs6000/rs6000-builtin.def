@@ -1861,8 +1861,10 @@ BU_VSX_3 (XXPERMDI_4SF,       "xxpermdi_4sf",   CONST, 	vsx_xxpermdi_v4sf)
 BU_VSX_3 (XXPERMDI_4SI,       "xxpermdi_4si",   CONST, 	vsx_xxpermdi_v4si)
 BU_VSX_3 (XXPERMDI_8HI,       "xxpermdi_8hi",   CONST, 	vsx_xxpermdi_v8hi)
 BU_VSX_3 (XXPERMDI_16QI,      "xxpermdi_16qi",  CONST, 	vsx_xxpermdi_v16qi)
+/* Following one needs an _UNS version.  */
 BU_VSX_3 (SET_1TI,            "set_1ti",        CONST, 	vsx_set_v1ti)
 BU_VSX_3 (SET_2DF,            "set_2df",        CONST, 	vsx_set_v2df)
+/* Following one needs an _UNS version.  */
 BU_VSX_3 (SET_2DI,            "set_2di",        CONST, 	vsx_set_v2di)
 BU_VSX_3 (XXSLDWI_2DI,        "xxsldwi_2di",    CONST, 	vsx_xxsldwi_v2di)
 BU_VSX_3 (XXSLDWI_2DF,        "xxsldwi_2df",    CONST, 	vsx_xxsldwi_v2df)
@@ -1906,8 +1908,11 @@ BU_VSX_2 (CPSGNDP,	      "cpsgndp",	CONST,	vector_copysignv2df3)
 BU_VSX_2 (CPSGNSP,	      "cpsgnsp",	CONST,	vector_copysignv4sf3)
 
 BU_VSX_2 (CONCAT_2DF,	      "concat_2df",	CONST,	vsx_concat_v2df)
+/* Following one needs an _UNS version.  */
 BU_VSX_2 (CONCAT_2DI,	      "concat_2di",	CONST,	vsx_concat_v2di)
+/* Following two should be unary functions?!  */
 BU_VSX_2 (SPLAT_2DF,	      "splat_2df",	CONST,	vsx_splat_v2df)
+/* Following one also needs an _UNS version.  */
 BU_VSX_2 (SPLAT_2DI,	      "splat_2di",	CONST,	vsx_splat_v2di)
 BU_VSX_2 (XXMRGHW_4SF,	      "xxmrghw",	CONST,	vsx_xxmrghw_v4sf)
 BU_VSX_2 (XXMRGHW_4SI,	      "xxmrghw_4si",	CONST,	vsx_xxmrghw_v4si)
@@ -2087,6 +2092,12 @@ BU_VSX_X (ST_ELEMREV_V4SF,    "st_elemrev_v4sf",  MEM)
 BU_VSX_X (ST_ELEMREV_V4SI,    "st_elemrev_v4si",  MEM)
 BU_VSX_X (ST_ELEMREV_V8HI,    "st_elemrev_v8hi",  MEM)
 BU_VSX_X (ST_ELEMREV_V16QI,   "st_elemrev_v16qi", MEM)
+/* #### Following builtins appear to be orphaned with no implementation.
+   They are all marked as requiring special handling, but there is no
+   special handling for them.  For now I am not sure we really miss
+   anything by not having these; they all have regular float counterparts
+   and there is little utility in forcing these with builtins.  No plan
+   to put them in rs6000-builtins-new.def.  */
 BU_VSX_X (XSABSDP,	      "xsabsdp",	CONST)
 BU_VSX_X (XSADDDP,	      "xsadddp",	FP)
 BU_VSX_X (XSCMPODP,	      "xscmpodp",	FP)
@@ -2111,6 +2122,7 @@ BU_VSX_X (XSNMADDMDP,	      "xsnmaddmdp",	FP)
 BU_VSX_X (XSNMSUBADP,	      "xsnmsubadp",	FP)
 BU_VSX_X (XSNMSUBMDP,	      "xsnmsubmdp",	FP)
 BU_VSX_X (XSSUBDP,	      "xssubdp",	FP)
+/* #### End orphaned builtins.  */
 BU_VSX_X (VEC_INIT_V1TI,      "vec_init_v1ti",	CONST)
 BU_VSX_X (VEC_INIT_V2DF,      "vec_init_v2df",	CONST)
 BU_VSX_X (VEC_INIT_V2DI,      "vec_init_v2di",	CONST)
@@ -2472,6 +2484,7 @@ BU_P9V_VSX_2 (VSCEDPLT,	"scalar_cmp_exp_dp_lt",	CONST,	xscmpexpdp_lt)
 BU_P9V_VSX_2 (VSCEDPEQ,	"scalar_cmp_exp_dp_eq",	CONST,	xscmpexpdp_eq)
 BU_P9V_VSX_2 (VSCEDPUO,	"scalar_cmp_exp_dp_unordered",	CONST,	xscmpexpdp_unordered)
 
+/* Shouldn't these be BU_FLOAT128_HW_VSX_2?  */
 BU_P9V_VSX_2 (VSCEQPGT,	"scalar_cmp_exp_qp_gt",	CONST,	xscmpexpqp_gt_kf)
 BU_P9V_VSX_2 (VSCEQPLT,	"scalar_cmp_exp_qp_lt",	CONST,	xscmpexpqp_lt_kf)
 BU_P9V_VSX_2 (VSCEQPEQ,	"scalar_cmp_exp_qp_eq",	CONST,	xscmpexpqp_eq_kf)
@@ -2578,6 +2591,8 @@ BU_FLOAT128_HW_3 (FMAF128_ODD,   "fmaf128_round_to_odd",   FP, fmakf4_odd)
 
 /* 3 argument vector functions returning void, treated as SPECIAL,
    added in ISA 3.0 (power9).  */
+/* ??? Why are these named __builtin_altivec_* when the corresponding
+   load builtins are named __builtin_vsx_*??  */
 BU_P9V_64BIT_AV_X (STXVL,	"stxvl",	MISC)
 BU_P9V_64BIT_AV_X (XST_LEN_R,	"xst_len_r",	MISC)
 
