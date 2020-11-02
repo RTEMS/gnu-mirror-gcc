@@ -2008,6 +2008,17 @@ write_init_file ()
 static int
 write_defines_file ()
 {
+  for (int i = 0; i < num_ovld_stanzas; i++)
+    if (strcmp (ovld_stanzas[i].extern_name, "SKIP"))
+      {
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#ifdef %s\n", ovld_stanzas[i].ifdef);
+	fprintf (defines_file, "#define %s %s\n",
+		 ovld_stanzas[i].extern_name,
+		 ovld_stanzas[i].intern_name);
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#endif\n");
+      }
   return 1;
 }
 
