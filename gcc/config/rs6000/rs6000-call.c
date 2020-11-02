@@ -10196,6 +10196,60 @@ altivec_expand_lv_builtin (enum insn_code icode, tree exp, rtx target, bool blk)
 }
 
 static rtx
+ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
+{
+  rtx pat, addr;
+  bool blk = (icode == CODE_FOR_altivec_lvlx
+	      || icode == CODE_FOR_altivec_lvlxl
+	      || icode == CODE_FOR_altivec_lvrx
+	      || icode == CODE_FOR_altivec_lvrxl);
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  /* For LVX, express the RTL accurately by ANDing the address with -16.
+     LVXL and LVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_lvx_v1ti
+      || icode == CODE_FOR_altivec_lvx_v2df
+      || icode == CODE_FOR_altivec_lvx_v2di
+      || icode == CODE_FOR_altivec_lvx_v4sf
+      || icode == CODE_FOR_altivec_lvx_v4si
+      || icode == CODE_FOR_altivec_lvx_v8hi
+      || icode == CODE_FOR_altivec_lvx_v16qi)
+    {
+      rtx rawaddr;
+      if (op[0] == const0_rtx)
+	rawaddr = op[1];
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[1], op[0]);
+	}
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (blk ? BLKmode : tmode, addr);
+
+      emit_insn (gen_rtx_SET (target, addr));
+    }
+  else
+    {
+      if (op[0] == const0_rtx)
+	addr = gen_rtx_MEM (blk ? BLKmode : tmode, op[1]);
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  addr = gen_rtx_MEM (blk ? BLKmode : tmode,
+			      gen_rtx_PLUS (Pmode, op[1], op[0]));
+	}
+
+      pat = GEN_FCN (icode) (target, addr);
+      if (! pat)
+	return 0;
+      emit_insn (pat);
+    }
+
+  return target;
+}
+
+static rtx
 altivec_expand_stxvl_builtin (enum insn_code icode, tree exp)
 {
   rtx pat;
@@ -10449,6 +10503,111 @@ mma_expand_builtin (tree exp, rtx target, bool *expandedp)
   return target;
 }
 
+static rtx
+stv_expand_builtin (insn_code icode, rtx *op,
+		    machine_mode tmode, machine_mode smode)
+{
+  rtx pat, addr, rawaddr;
+  op[2] = copy_to_mode_reg (Pmode, op[2]);
+
+  /* For STVX, express the RTL accurately by ANDing the address with -16.
+     STVXL and STVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_stvx_v2df
+      || icode == CODE_FOR_altivec_stvx_v2di
+      || icode == CODE_FOR_altivec_stvx_v4sf
+      || icode == CODE_FOR_altivec_stvx_v4si
+      || icode == CODE_FOR_altivec_stvx_v8hi
+      || icode == CODE_FOR_altivec_stvx_v16qi)
+    {
+      if (op[1] == const0_rtx)
+	rawaddr = op[2];
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[2], op[1]);
+	}
+
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (tmode, addr);
+      op[0] = copy_to_mode_reg (tmode, op[0]);
+      emit_insn (gen_rtx_SET (addr, op[0]));
+    }
+  else
+    {
+      if (! (*insn_data[icode].operand[1].predicate) (op[0], smode))
+	op[0] = copy_to_mode_reg (smode, op[0]);
+
+      if (op[1] == const0_rtx)
+	addr = gen_rtx_MEM (tmode, op[2]);
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op[2], op[1]));
+	}
+
+      pat = GEN_FCN (icode) (addr, op[0]);
+      if (pat)
+	emit_insn (pat);
+    }
+
+  return NULL_RTX;
+}
+
+static insn_code
+elemrev_icode (rs6000_builtins fcode)
+{
+  switch (fcode)
+    {
+    default:
+      gcc_unreachable ();
+    case VSX_BUILTIN_ST_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v1ti
+	      : CODE_FOR_vsx_st_elemrev_v1ti);
+    case VSX_BUILTIN_ST_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2df
+	      : CODE_FOR_vsx_st_elemrev_v2df);
+    case VSX_BUILTIN_ST_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2di
+	      : CODE_FOR_vsx_st_elemrev_v2di);
+    case VSX_BUILTIN_ST_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4sf
+	      : CODE_FOR_vsx_st_elemrev_v4sf);
+    case VSX_BUILTIN_ST_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4si
+	      : CODE_FOR_vsx_st_elemrev_v4si);
+    case VSX_BUILTIN_ST_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v8hi
+	      : CODE_FOR_vsx_st_elemrev_v8hi);
+    case VSX_BUILTIN_ST_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v16qi
+	      : CODE_FOR_vsx_st_elemrev_v16qi);
+    case VSX_BUILTIN_LD_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2df
+	      : CODE_FOR_vsx_ld_elemrev_v2df);
+    case VSX_BUILTIN_LD_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v1ti
+	      : CODE_FOR_vsx_ld_elemrev_v1ti);
+    case VSX_BUILTIN_LD_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2di
+	      : CODE_FOR_vsx_ld_elemrev_v2di);
+    case VSX_BUILTIN_LD_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4sf
+	      : CODE_FOR_vsx_ld_elemrev_v4sf);
+    case VSX_BUILTIN_LD_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4si
+	      : CODE_FOR_vsx_ld_elemrev_v4si);
+    case VSX_BUILTIN_LD_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v8hi
+	      : CODE_FOR_vsx_ld_elemrev_v8hi);
+    case VSX_BUILTIN_LD_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v16qi
+	      : CODE_FOR_vsx_ld_elemrev_v16qi);
+    }
+  gcc_unreachable ();
+  return (insn_code) 0;
+}
+
 /* Return the appropriate SPR number associated with the given builtin.  */
 static inline HOST_WIDE_INT
 htm_spr_num (enum rs6000_builtins code)
@@ -10669,6 +10828,156 @@ htm_expand_builtin (tree exp, rtx target, bool * expandedp)
 
   *expandedp = false;
   return NULL_RTX;
+}
+
+/* Expand the HTM builtin in EXP and store the result in TARGET.  */
+static rtx
+new_htm_expand_builtin (bifdata *bifaddr, rs6000_builtins fcode,
+			tree exp, rtx target)
+{
+  tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+  bool nonvoid = TREE_TYPE (TREE_TYPE (fndecl)) != void_type_node;
+
+  if (!TARGET_POWERPC64
+      && (fcode == HTM_BUILTIN_TABORTDC
+	  || fcode == HTM_BUILTIN_TABORTDCI))
+    {
+      error ("builtin %qs is only valid in 64-bit mode", bifaddr->bifname);
+      return const0_rtx;
+    }
+
+  rtx op[MAX_HTM_OPERANDS], pat;
+  int nopnds = 0;
+  tree arg;
+  call_expr_arg_iterator iter;
+  insn_code icode = bifaddr->icode;
+  bool uses_spr = bif_is_htmspr (*bifaddr);
+  rtx cr = NULL_RTX;
+
+  if (uses_spr)
+    icode = rs6000_htm_spr_icode (nonvoid);
+  const insn_operand_data *insn_op = &insn_data[icode].operand[0];
+
+  if (nonvoid)
+    {
+      machine_mode tmode = (uses_spr) ? insn_op->mode : E_SImode;
+      if (!target
+	  || GET_MODE (target) != tmode
+	  || (uses_spr && !(*insn_op->predicate) (target, tmode)))
+	target = gen_reg_rtx (tmode);
+      if (uses_spr)
+	op[nopnds++] = target;
+    }
+
+  FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
+    {
+      if (arg == error_mark_node || nopnds >= MAX_HTM_OPERANDS)
+	return const0_rtx;
+
+      insn_op = &insn_data[icode].operand[nopnds];
+      op[nopnds] = expand_normal (arg);
+
+      if (!(*insn_op->predicate) (op[nopnds], insn_op->mode))
+	{
+	  if (!strcmp (insn_op->constraint, "n"))
+	    {
+	      int arg_num = (nonvoid) ? nopnds : nopnds + 1;
+	      if (!CONST_INT_P (op[nopnds]))
+		error ("argument %d must be an unsigned literal", arg_num);
+	      else
+		error ("argument %d is an unsigned literal that is "
+		       "out of range", arg_num);
+	      return const0_rtx;
+	    }
+	  op[nopnds] = copy_to_mode_reg (insn_op->mode, op[nopnds]);
+	}
+
+      nopnds++;
+    }
+
+  /* Handle the builtins for extended mnemonics.  These accept
+     no arguments, but map to builtins that take arguments.  */
+  switch (fcode)
+    {
+    case HTM_BUILTIN_TENDALL:  /* Alias for: tend. 1  */
+    case HTM_BUILTIN_TRESUME:  /* Alias for: tsr. 1  */
+      op[nopnds++] = GEN_INT (1);
+      break;
+    case HTM_BUILTIN_TSUSPEND: /* Alias for: tsr. 0  */
+      op[nopnds++] = GEN_INT (0);
+      break;
+    default:
+      break;
+    }
+
+  /* If this builtin accesses SPRs, then pass in the appropriate
+     SPR number and SPR regno as the last two operands.  */
+  if (uses_spr)
+    {
+      machine_mode mode = (TARGET_POWERPC64) ? DImode : SImode;
+      op[nopnds++] = gen_rtx_CONST_INT (mode, htm_spr_num (fcode));
+    }
+  /* If this builtin accesses a CR, then pass in a scratch
+     CR as the last operand.  */
+  else if (bif_is_htmcr (*bifaddr))
+    {
+      cr = gen_reg_rtx (CCmode);
+      op[nopnds++] = cr;
+    }
+
+  switch (nopnds)
+    {
+    case 1:
+      pat = GEN_FCN (icode) (op[0]);
+      break;
+    case 2:
+      pat = GEN_FCN (icode) (op[0], op[1]);
+      break;
+    case 3:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2]);
+      break;
+    case 4:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3]);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  if (!pat)
+    return NULL_RTX;
+  emit_insn (pat);
+
+  if (bif_is_htmcr (*bifaddr))
+    {
+      if (fcode == HTM_BUILTIN_TBEGIN)
+	{
+	  /* Emit code to set TARGET to true or false depending on
+	     whether the tbegin. instruction successfully or failed
+	     to start a transaction.  We do this by placing the 1's
+	     complement of CR's EQ bit into TARGET.  */
+	  rtx scratch = gen_reg_rtx (SImode);
+	  emit_insn (gen_rtx_SET (scratch,
+				  gen_rtx_EQ (SImode, cr,
+					      const0_rtx)));
+	  emit_insn (gen_rtx_SET (target,
+				  gen_rtx_XOR (SImode, scratch,
+					       GEN_INT (1))));
+	}
+      else
+	{
+	  /* Emit code to copy the 4-bit condition register field
+	     CR into the least significant end of register TARGET.  */
+	  rtx scratch1 = gen_reg_rtx (SImode);
+	  rtx scratch2 = gen_reg_rtx (SImode);
+	  rtx subreg = simplify_gen_subreg (CCmode, scratch1, SImode, 0);
+	  emit_insn (gen_movcc (subreg, cr));
+	  emit_insn (gen_lshrsi3 (scratch2, scratch1, GEN_INT (28)));
+	  emit_insn (gen_andsi3 (target, scratch2, GEN_INT (0xf)));
+	}
+    }
+
+  if (nonvoid)
+    return target;
+  return const0_rtx;
 }
 
 /* Expand the CPU builtin in FCODE and store the result in TARGET.  */
@@ -11601,6 +11910,7 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
     case ALTIVEC_BUILTIN_LVEWX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvewx,
 					exp, target, false);
+    /* TODO: Need to do the special handling on the islxvr bit.  */
     case P10_BUILTIN_SE_LXVRBX:
       return altivec_expand_lxvr_builtin (CODE_FOR_vsx_lxvrbx,
 					exp, target, false, true);
@@ -13098,6 +13408,40 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     }
 
   return false;
+}
+
+/* Expand ALTIVEC_BUILTIN_MASK_FOR_LOAD.  */
+rtx
+rs6000_expand_ldst_mask (rtx target, rs6000_builtins fcode, tree arg0)
+{
+  int icode2 = (BYTES_BIG_ENDIAN ? (int) CODE_FOR_altivec_lvsr_direct
+		: (int) CODE_FOR_altivec_lvsl_direct);
+  machine_mode tmode = insn_data[icode2].operand[0].mode;
+  machine_mode mode = insn_data[icode2].operand[1].mode;
+  rtx op, addr, pat;
+
+  gcc_assert (TARGET_ALTIVEC);
+
+  gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg0)));
+  op = expand_expr (arg0, NULL_RTX, Pmode, EXPAND_NORMAL);
+  addr = memory_address (mode, op);
+  gcc_assert (fcode == ALTIVEC_BUILTIN_MASK_FOR_LOAD);
+  /* We need to negate the address.  */
+  op = gen_reg_rtx (GET_MODE (addr));
+  emit_insn (gen_rtx_SET (op, gen_rtx_NEG (GET_MODE (addr), addr)));
+  op = gen_rtx_MEM (mode, op);
+
+  if (target == 0
+      || GET_MODE (target) != tmode
+      || ! (*insn_data[icode2].operand[0].predicate) (target, tmode))
+    target = gen_reg_rtx (tmode);
+
+  pat = GEN_FCN (icode2) (target, op);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
+
+  return target;
 }
 
 /* Expand an expression EXP that calls a built-in function,
