@@ -4126,6 +4126,14 @@ rs6000_option_override_internal (bool global_init_p)
 	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
     }
 
+  if (!(rs6000_isa_flags_explicit & OPTION_MASK_BLOCK_OPS_UNKNOWN_LEN))
+    {
+      if (TARGET_POWER10)
+	rs6000_isa_flags |= OPTION_MASK_BLOCK_OPS_UNKNOWN_LEN;
+      else
+	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_UNKNOWN_LEN;
+    }
+
   /* Use long double size to select the appropriate long double.  We use
      TYPE_PRECISION to differentiate the 3 different long double types.  We map
      128 into the precision used for TFmode.  */
@@ -23585,6 +23593,8 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "block-ops-unaligned-vsx",	OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX,
 								false, true  },
   { "block-ops-vector-pair",	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR,
+								false, true  },
+  { "block-ops-unknown-len",	OPTION_MASK_BLOCK_OPS_UNKNOWN_LEN,
 								false, true  },
   { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },

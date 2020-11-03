@@ -2734,6 +2734,88 @@ gen_lxvl_stxvl_move (rtx dest, rtx src, int length)
     return gen_lxvl (dest, addr, len);
 }
 
+/* Expand a block move operation of unknown length, and return 1 if successful.
+   Return 0 if we should let the compiler generate normal code.
+
+   This emits a test for length <= 16 and code to do the move/copy with
+   lxvl/stxvl if true and a call to the library function if false.
+
+   operands[0] is the destination
+   operands[1] is the source
+   operands[2] is the length
+   operands[3] is the alignment */
+
+int
+expand_block_move_unk_lxvl (rtx operands[], bool might_overlap)
+{
+  rtx orig_dest = operands[0];
+  rtx orig_src	= operands[1];
+  rtx bytes_rtx	= operands[2];
+  rtx dest_addr = force_reg (Pmode, XEXP (orig_dest, 0));
+  rtx src_addr = force_reg (Pmode, XEXP (orig_src, 0));
+
+  /*
+    cmpli bytes,16
+    ble Linline
+    bl library_func
+    b Lfinish
+    .Linline
+    lxvl
+    stxvl
+    .Lfinish
+   */
+
+  rtx len_rtx = gen_reg_rtx (Pmode);
+  emit_move_insn (len_rtx, bytes_rtx);
+
+  rtx inline_label = gen_label_rtx ();
+  rtx finish_label = gen_label_rtx ();
+  rtx inline_ref = gen_rtx_LABEL_REF (VOIDmode, inline_label);
+  rtx cond = gen_reg_rtx (CCmode);
+  emit_move_insn (cond, gen_rtx_COMPARE (CCmode, len_rtx,
+					 GEN_INT (16)));
+
+  rtx cmp_rtx = gen_rtx_LE (VOIDmode, cond, const0_rtx);
+
+  rtx ifelse = gen_rtx_IF_THEN_ELSE (VOIDmode, cmp_rtx,
+				     inline_ref, pc_rtx);
+  rtx_insn *j = emit_jump_insn (gen_rtx_SET (pc_rtx, ifelse));
+  add_reg_br_prob_note (j, profile_probability::even ());
+  JUMP_LABEL (j) = inline_label;
+  LABEL_NUSES (inline_label) += 1;
+
+  if (might_overlap)
+    {
+      tree fun = builtin_decl_explicit (BUILT_IN_MEMMOVE);
+      emit_library_call (XEXP (DECL_RTL (fun), 0), LCT_NORMAL,
+			 Pmode, dest_addr, Pmode,
+			 src_addr, Pmode, len_rtx, Pmode);
+    }
+  else
+    {
+      tree fun = builtin_decl_explicit (BUILT_IN_MEMCPY);
+      emit_library_call (XEXP (DECL_RTL (fun), 0),
+			 LCT_NORMAL, Pmode,
+			 dest_addr, Pmode, src_addr, Pmode, len_rtx, Pmode);
+    }
+
+  rtx finish_ref = gen_rtx_LABEL_REF (VOIDmode, finish_label);
+  j = emit_jump_insn (gen_rtx_SET (pc_rtx, finish_ref));
+  JUMP_LABEL (j) = finish_label;
+  LABEL_NUSES (finish_label) += 1;
+  emit_barrier ();
+
+  emit_label (inline_label);
+
+  rtx data = gen_reg_rtx (V16QImode);
+  emit_insn (gen_lxvl (data, src_addr, len_rtx));
+  emit_insn (gen_stxvl (data, dest_addr, len_rtx));
+
+  emit_label (finish_label);
+
+  return 1;
+}
+
 /* Expand a block move operation, and return 1 if successful.  Return 0
    if we should let the compiler generate normal code.
 
@@ -2762,7 +2844,14 @@ expand_block_move (rtx operands[], bool might_overlap)
 
   /* If this is not a fixed size move, just call memcpy */
   if (! constp)
-    return 0;
+    {
+      if (!TARGET_BLOCK_OPS_UNKNOWN_LEN
+	  || !TARGET_BLOCK_OPS_UNALIGNED_VSX
+	  || !TARGET_POWER10)
+	return 0;
+      else
+	return expand_block_move_unk_lxvl (operands, might_overlap);
+    }
 
   /* This must be a fixed size alignment */
   gcc_assert (CONST_INT_P (align_rtx));
