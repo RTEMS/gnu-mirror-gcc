@@ -102,7 +102,8 @@ enum ReorgOpTrans {
   ReorgOpT_Indirect,    // "a->f"
   ReorgOpT_AryDir,      // "x[i].f"
   ReorgOpT_Cst,
-  ReorgOpT_Cst0
+  ReorgOpT_Cst0,
+  ReorgOpT_Clobber
 };
 
 enum CompressionControl {
@@ -253,6 +254,7 @@ extern void print_type ( FILE *, tree);
 extern void modify_ssa_name_type ( tree, tree);
 extern bool print_internals (gimple *, void *);
 extern const char *optrans_to_str ( enum ReorgOpTrans);
+extern char *reorgtrans_to_str ( enum ReorgTransformation);
 extern bool is_assign_from_ssa ( gimple *);
 
 

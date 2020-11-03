@@ -267,7 +267,6 @@ final_debug_info ( Info *info)
 static unsigned int
 reorg_analysis ( Info *info)
 {
-
   struct cgraph_node *node;
 
   find_decls_and_types ( info);
@@ -1663,6 +1662,18 @@ undelete_reorgtype ( ReorgType_t *rt, Info *info )
   }
 }
 
+#define REORG_RECOG_RET_ACT(rt) reorg_recognize_ret_action(rt,__LINE__)
+
+static ReorgTransformation
+reorg_recognize_ret_action( ReorgTransformation val, unsigned ln)
+{
+  #if DEBUGGING
+  fprintf ( stderr, "L# %4d: %*s  returns %s\n",
+	    ln, debug_indenting, "", reorgtrans_to_str (val));
+  #endif
+  return val;
+}
+
 ReorgTransformation
 reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 {
@@ -1694,18 +1705,31 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    {
 	      if ( integer_zerop ( rhs) )
 		{
-		  return ReorgT_Ptr2Zero;
+		  return REORG_RECOG_RET_ACT ( ReorgT_Ptr2Zero);
 		}
 	      // If we get here this is clearly really odd code
 	      // so we need to bail out.
-	      return Not_Supported;
+	      #if 1
+	      // If seems that this code occurrs in "nature"... sigh...
+	      return REORG_RECOG_RET_ACT ( ReorgT_Ignore);
+	      #else
+	      return REORG_RECOG_RET_ACT ( Not_Supported);
+	      #endif
 	    }
 	  case ReorgOpT_Temp:      // t
-	    return ReorgT_ElemAssign;
+	    return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 	  case ReorgOpT_Address:   // "&x[i]"
-	    return ReorgT_Adr2Ptr;
+	    return REORG_RECOG_RET_ACT ( ReorgT_Adr2Ptr);
+	    //--
+	  case ReorgOpT_Pointer:
+	    return REORG_RECOG_RET_ACT ( ReorgT_Ignore);
+	    //--
+	  case ReorgOpT_Cst0:
+	    return REORG_RECOG_RET_ACT ( ReorgT_Ptr2Zero);
+	  case ReorgOpT_Indirect:
+	    return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 	  default:
-	    return Not_Supported;
+	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Struct:      // "s"
 	  DEBUG_L("case ReorgOpT_Struct\n");
@@ -1720,9 +1744,9 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    // With the case commented out test_09_23
 	    // exposes a bug.
 	  case ReorgOpT_Struct:    // "s"
-	    return ReorgT_StrAssign;
+	    return REORG_RECOG_RET_ACT ( ReorgT_StrAssign);
 	  default:
-	    return Not_Supported;
+	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Deref:       // "*a"
 	  DEBUG_L("case ReorgOpT_Deref\n");
@@ -1732,9 +1756,9 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  case ReorgOpT_Deref:     // "*a"
 	  case ReorgOpT_Struct:    // "s"
 	  case ReorgOpT_Array:     // "x[i]"
-	    return ReorgT_StrAssign;
+	    return REORG_RECOG_RET_ACT ( ReorgT_StrAssign);
 	  default: 
-	    return Not_Supported;
+	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Array:       // "x[i]"
 	  DEBUG_L("case ReorgOpT_Array\n");
@@ -1744,9 +1768,9 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  case ReorgOpT_Struct:    // "s"
 	  case ReorgOpT_Deref:     // "*a"
 	  case ReorgOpT_Array:     // "x[i]"
-	    return ReorgT_StrAssign;
+	    return REORG_RECOG_RET_ACT ( ReorgT_StrAssign);
 	  default:
-	    return Not_Supported;
+	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Temp:        // t
 	case ReorgOpT_Scalar:      // "z"
@@ -1757,12 +1781,19 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	      {
 	      case ReorgOpT_Scalar:      // "z"
 	      case ReorgOpT_Temp:      // "t"
-		return ReorgT_Ignore;
+		//-- provisional
+		// The type on the lhs is that of the rhs (by
+		// definition) so its moving a pointer to a pointer.
+	      case ReorgOpT_Pointer:  // p
+		//--
+	      case ReorgOpT_Clobber:
+	      case ReorgOpT_Cst0:
+		return REORG_RECOG_RET_ACT ( ReorgT_Ignore);
 	      case ReorgOpT_Indirect:  // "a->f"
 	      case ReorgOpT_AryDir:    // "x[i].f"
-		return ReorgT_ElemAssign;
+		return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 	      default:
-		return Not_Supported;
+		return REORG_RECOG_RET_ACT ( Not_Supported);
 	      }
 	  }
 	case ReorgOpT_Indirect:    // "a->f"
@@ -1777,24 +1808,25 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	      case ReorgOpT_Scalar:    // "z"
 	      case ReorgOpT_Indirect:  // "a->f"
 	      case ReorgOpT_AryDir:    // "x[i].f"
-		return ReorgT_ElemAssign;
+	      case ReorgOpT_Pointer:   // "a"
+		return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 	      case ReorgOpT_Cst0:
 		{
 		  if ( is_reorg_type ( TREE_TYPE (lhs), info) )
 		    {
-		      return ReorgT_Ptr2Zero;
+		      return REORG_RECOG_RET_ACT ( ReorgT_Ptr2Zero);
 		    }
 		  else
 		    {
-		      return ReorgT_ElemAssign;
+		      return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 		    }
 		}
 	      default:
-		return Not_Supported;
+		return REORG_RECOG_RET_ACT ( Not_Supported);
 	      }
 	  }
 	default:
-	  return Not_Supported;
+	  return REORG_RECOG_RET_ACT ( Not_Supported);
 	} // switch ( recognize_op ( lhs, true, info) )
       } else {
 	DEBUG_L("gimple_assign_single_p() = false\n");
@@ -1808,14 +1840,14 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  {
 	    DEBUG_L("CONVERT_EXPR_CODE_P (...)\n");
 	    INDENT(-4);
-	    return ReorgT_Convert;
+	    return REORG_RECOG_RET_ACT ( ReorgT_Convert);
 	  }
 
 	if ( gimple_assign_rhs3 ( stmt) != NULL )
 	  {
 	    DEBUG_L("gimple_assign_rhs3 ( stmt) != NULL\n");
 	    INDENT(-4);
-	    return Not_Supported;
+	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	
 	// TBD The parenthesis where a disaster here in the HL Design so
@@ -1829,23 +1861,23 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	switch ( rhs_code )
 	{
 	case POINTER_PLUS_EXPR:
-	  return ReorgT_PtrPlusInt;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrPlusInt);
 	case POINTER_DIFF_EXPR:
-	  return ReorgT_PtrDiff;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrDiff);
 	case EQ_EXPR:
-	  return zero_case ? ReorgT_PtrNull : ReorgT_PtrEQ;
+	  return REORG_RECOG_RET_ACT ( zero_case ? ReorgT_PtrNull : ReorgT_PtrEQ);
 	case NE_EXPR:
-	  return zero_case ? ReorgT_PtrNotNull : ReorgT_PtrNE;
+	  return REORG_RECOG_RET_ACT ( zero_case ? ReorgT_PtrNotNull : ReorgT_PtrNE);
 	case LE_EXPR:
-	  return ReorgT_PtrLE;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrLE);
 	case LT_EXPR:
-	  return ReorgT_PtrLT;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrLT);
 	case GE_EXPR:
-	  return ReorgT_PtrGE;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrGE);
 	case GT_EXPR:
-	  return ReorgT_PtrGT;
+	  return REORG_RECOG_RET_ACT ( ReorgT_PtrGT);
 	default:
-	  return Not_Supported;
+	  return REORG_RECOG_RET_ACT ( Not_Supported);
 	}
       } // } else {
     }
@@ -1866,19 +1898,19 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
       switch ( cond_code )
       {
       case EQ_EXPR:
-	return zero_case ? ReorgT_If_Null : ReorgT_IfPtrEQ;
+	return REORG_RECOG_RET_ACT ( zero_case ? ReorgT_If_Null : ReorgT_IfPtrEQ);
       case NE_EXPR:
-	return zero_case ? ReorgT_If_NotNull : ReorgT_IfPtrNE;
+	return REORG_RECOG_RET_ACT ( zero_case ? ReorgT_If_NotNull : ReorgT_IfPtrNE);
       case LE_EXPR:
-	return ReorgT_IfPtrLE;
+	return REORG_RECOG_RET_ACT ( ReorgT_IfPtrLE);
       case LT_EXPR:
-	return ReorgT_IfPtrLT;
+	return REORG_RECOG_RET_ACT ( ReorgT_IfPtrLT);
       case GE_EXPR:
-	return ReorgT_IfPtrGE;
+	return REORG_RECOG_RET_ACT ( ReorgT_IfPtrGE);
       case GT_EXPR:
-	return ReorgT_IfPtrGT;
+	return REORG_RECOG_RET_ACT ( ReorgT_IfPtrGT);
       default:
-	return Not_Supported;
+	return REORG_RECOG_RET_ACT ( Not_Supported);
       }
     }
   case  GIMPLE_CALL:
@@ -1894,10 +1926,10 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
       	      edge->callee->get_partitioning_class() == SYMBOL_EXTERNAL ? "true" : "false");
       
       INDENT(-2);
-      if ( gimple_call_builtin_p( stmt, BUILT_IN_CALLOC ) ) return ReorgT_Calloc;
-      if ( gimple_call_builtin_p( stmt, BUILT_IN_MALLOC ) ) return ReorgT_Malloc;
-      if ( gimple_call_builtin_p( stmt, BUILT_IN_REALLOC) ) return ReorgT_Realloc;
-      if ( gimple_call_builtin_p( stmt, BUILT_IN_FREE   ) ) return ReorgT_Free;
+      if ( gimple_call_builtin_p( stmt, BUILT_IN_CALLOC ) ) return REORG_RECOG_RET_ACT ( ReorgT_Calloc);
+      if ( gimple_call_builtin_p( stmt, BUILT_IN_MALLOC ) ) return REORG_RECOG_RET_ACT ( ReorgT_Malloc);
+      if ( gimple_call_builtin_p( stmt, BUILT_IN_REALLOC) ) return REORG_RECOG_RET_ACT ( ReorgT_Realloc);
+      if ( gimple_call_builtin_p( stmt, BUILT_IN_FREE   ) ) return REORG_RECOG_RET_ACT ( ReorgT_Free);
       
       // Instead of just returning Not_Supported we need to
       // determine if it's a user defined function in which case the
@@ -1907,7 +1939,7 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
       if ( is_user_function ( stmt, node, info) )
 	{
 	  DEBUG_A("  ReorgT_UserFunc\n");
-	  return ReorgT_UserFunc;
+	  return REORG_RECOG_RET_ACT ( ReorgT_UserFunc);
 	}
       //DEBUG_A("  Not_supported\n");
       // TBD Why is this commented out?
@@ -1917,14 +1949,14 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
   case GIMPLE_RETURN:
     DEBUG_L("GIMPLE_RETURN:\n");
     INDENT(-2);
-    return ReorgT_Return;
+    return REORG_RECOG_RET_ACT ( ReorgT_Return);
     break;
   default:
     DEBUG_L ( "didn't support: ");
     DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
     DEBUG( "\n");
     INDENT(-2);
-    return Not_Supported;
+    return REORG_RECOG_RET_ACT ( Not_Supported);
   }
 }
 
@@ -2043,12 +2075,6 @@ recognize_op ( tree op,  bool lie, Info *info)
   DEBUG_A("opcode = %s\n", code_str( op_code));
   switch ( op_code )
     {
-    case SSA_NAME:
-      // We tried returning ReorgOpT_Scalar.
-      // It caused an assertion failue because
-      // it was incorrectly triggering the ReorgT_Ptr2Zero
-      // case with a bogus RHS.
-      return recognize_op_ret_action ( ReorgOpT_Temp);
     case INTEGER_CST:
       if ( integer_zerop ( op) )
 	{
@@ -2058,11 +2084,18 @@ recognize_op ( tree op,  bool lie, Info *info)
     case FIXED_CST:
     case STRING_CST:
     case COMPLEX_CST:
-    case CONSTRUCTOR:
     case VECTOR_CST:
       {
 	return recognize_op_ret_action ( ReorgOpT_Cst);
       }
+    case CONSTRUCTOR:
+      {
+	return recognize_op_ret_action ( ReorgOpT_Clobber);
+      }
+    default:
+      // Just drop through because we were simply picking
+      // the low hanging fruit here.
+      ;
     }
   
   tree type = TREE_TYPE ( op);
@@ -2088,35 +2121,57 @@ recognize_op ( tree op,  bool lie, Info *info)
     }
   }
   #endif
+  // From the ifdefed off code above it's probably
+  // reasonable to retain the check for a reorg type
+  bool a_reorg = is_reorg_type ( type, info);
+
+  if ( op_code == SSA_NAME )
+    {
+      if ( POINTER_TYPE_P (type) )
+	{
+	  tree lower_type = TREE_TYPE ( type);
+	  if ( TREE_CODE ( lower_type) == RECORD_TYPE
+	       && is_reorg_type ( lower_type, info))
+	    {
+	      return recognize_op_ret_action ( ReorgOpT_Pointer);
+	    }
+	}
+      // We tried returning ReorgOpT_Scalar.
+      // It caused an assertion failue because
+      // it was incorrectly triggering the ReorgT_Ptr2Zero
+      // case with a bogus RHS.
+      return recognize_op_ret_action ( ReorgOpT_Temp);
+    }
+  
   // This might not occur in practice
   if ( op_code == RECORD_TYPE )
-  {
-    // The assumption here is that this
-    // is a reorg type.
-    return recognize_op_ret_action ( ReorgOpT_Struct);
-  }
+    {
+      // The assumption here is that this
+      // is a reorg type.
+      return recognize_op_ret_action ( ReorgOpT_Struct);
+    }
   if ( op_code == VAR_DECL )
-  {
-    tree type = TREE_TYPE ( op);
-    gcc_assert ( type != NULL );
-    if ( POINTER_TYPE_P (type) )
-      {
-	bool a_reorg = is_reorg_type ( type, info);
-	if ( a_reorg || !lie )
-	  {
-	    return recognize_op_ret_action ( ReorgOpT_Pointer);
-	  }
-	else
-	  {
-	    // This would be for when the field of a struct
-	    // element is a pointer that's not a reorg
-	    // pointer. I.e. ReorgT_ElemAssign. That is
-	    // this is while lie for a good purpose.	    
-	    return recognize_op_ret_action ( ReorgOpT_Scalar);
-	  }
-      }
-    return recognize_op_ret_action ( ReorgOpT_Scalar);
-  }
+    {
+      //tree type = TREE_TYPE ( op);
+      gcc_assert ( type != NULL );
+      if ( POINTER_TYPE_P (type) )
+	{
+	  //bool a_reorg = is_reorg_type ( type, info);
+	  if ( a_reorg || !lie )
+	    {
+	      return recognize_op_ret_action ( ReorgOpT_Pointer);
+	    }
+	  else
+	    {
+	      // This would be for when the field of a struct
+	      // element is a pointer that's not a reorg
+	      // pointer. I.e. ReorgT_ElemAssign. That is
+	      // this is while lie for a good purpose.	    
+	      return recognize_op_ret_action ( ReorgOpT_Scalar);
+	    }
+	}
+      return recognize_op_ret_action ( ReorgOpT_Scalar);
+    }
   tree inner_op0 = TREE_OPERAND( op, 0);
   tree inner_op0_type = TREE_TYPE ( inner_op0);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
@@ -2128,10 +2183,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 	if ( inner_op0_code == ARRAY_REF )
 	  {
 	    bool a_reorg = is_reorg_type ( inner_op0, info);
-	  if ( a_reorg || !lie )
-	    {
-	      return recognize_op_ret_action ( ReorgOpT_Address);
-	    }
+	    if ( a_reorg || !lie )
+	      {
+		return recognize_op_ret_action ( ReorgOpT_Address);
+	      }
 	  }
 	// TBD shouldn't we be testing for a reorg???
 	if ( inner_op0_code == VAR_DECL )
@@ -2154,25 +2209,44 @@ recognize_op ( tree op,  bool lie, Info *info)
 	DEBUG_L("inner_op1 = ");
 	DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
 	DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
-	
+
+	// Note, a reorg type can only occurr at the bottom or
+	// the top, that is "rt.a.b..." or "a.b...z.rt".
 	if ( tree deep_type = multilevel_component_ref ( op) )
 	  {
 	    DEBUG_L("Is multilevel component ref: deep_type is ");
 	    DEBUG_F(flexible_print, stderr, deep_type, 1, (dump_flags_t)0);
 	    
-	    bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
-	    if ( a_reorg || !lie )
+	    bool a_deep_reorg = is_reorg_type ( base_type_of ( deep_type), info);
+	    if ( a_deep_reorg || !lie )
 	      {
 		return recognize_op_ret_action ( ReorgOpT_Indirect);
 	      }
 	    // Just normal field reference otherwise...
 	    return recognize_op_ret_action ( ReorgOpT_Scalar);
 	  }
+	if ( tree_contains_a_reorgtype_p ( op, info))
+	  {
+	    DEBUG_A("POINTER_TYPE_P ( type) : %s\n",
+		    POINTER_TYPE_P ( type) ? "true" : "false");
+	    if ( POINTER_TYPE_P ( type))
+	      {
+		DEBUG_A("TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE : %s\n",
+			TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE ? "true" : "false");
+	      }
+	  }
+	if (    tree_contains_a_reorgtype_p ( op, info)
+	     && POINTER_TYPE_P ( type)
+	     && TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE )
+	  {
+	    
+	    return recognize_op_ret_action ( ReorgOpT_Pointer);
+	  }
 	if ( inner_op0_code == INDIRECT_REF )
 	  {
 	    DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
-	    bool a_reorg = is_reorg_type ( base_type_of ( type), info);
-	    if ( a_reorg || !lie )
+	    bool a_base_reorg = is_reorg_type ( base_type_of ( type), info);
+	    if ( a_base_reorg || !lie )
 	      {
 		return recognize_op_ret_action ( ReorgOpT_Indirect);
 	      }
@@ -2290,7 +2364,6 @@ multilevel_component_ref ( tree op)
 {
   DEBUG_A("multilevel_component_ref: ");
   DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
-  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
   INDENT(2);
   tree inner_op0 = TREE_OPERAND( op, 0);
   //tree inner_op1 = TREE_OPERAND( op, 1);
@@ -2313,6 +2386,7 @@ multilevel_component_ref ( tree op)
 	    return type;
 	  }
       }
+  DEBUG_A("  found: no deep type\n");
   INDENT(-2);
   return NULL;
 }
@@ -2784,8 +2858,8 @@ print_program ( FILE *file, bool my_format, int leading_space, Info_t *info)
       }
   }
   
-  //DEBUG ("INTERNALS PRINT\n");
-  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void*)info);
+  DEBUG ("INTERNALS PRINT:\n");
+  DEBUG_F (apply_to_all_gimple, print_internals, true, (void*)info);
 }
 
 static void
@@ -3109,12 +3183,84 @@ optrans_to_str ( enum ReorgOpTrans e )
       return "ReorgOpT_AryDir";
     case ReorgOpT_Cst:
       return "ReorgOpT_Cst";
-    case ReorgOpT_Cst0  :
+    case ReorgOpT_Cst0:
       return "ReorgOpT_Cst0";
+    case ReorgOpT_Clobber:
+      return "ReorgOpT_Clobber";
     default:
       gcc_assert (0);
     }
   return NULL;
+}
+
+char *
+reorgtrans_to_str ( enum ReorgTransformation t)
+{
+  switch ( t )
+    {
+    case ReorgT_StrAssign:
+      return "ReorgT_StrAssign";
+    case ReorgT_ElemAssign:
+      return "ReorgT_ElemAssign";
+    case ReorgT_If_Null:
+      return "ReorgT_If_Null";
+    case ReorgT_If_NotNull:
+      return "ReorgT_If_NotNull";
+    case ReorgT_IfPtrEQ:
+      return "ReorgT_IfPtrEQ";
+    case ReorgT_IfPtrNE:
+      return "ReorgT_IfPtrNE";
+    case ReorgT_IfPtrLT:
+      return "ReorgT_IfPtrLT";
+    case ReorgT_IfPtrGT:
+      return "ReorgT_IfPtrGT";
+    case ReorgT_IfPtrLE:
+      return "ReorgT_IfPtrLE";
+    case ReorgT_IfPtrGE:
+      return "ReorgT_IfPtrGE";
+    case ReorgT_PtrPlusInt:
+      return "ReorgT_PtrPlusInt";
+    case ReorgT_Ptr2Zero:
+      return "ReorgT_Ptr2Zero";
+    case ReorgT_PtrDiff:
+      return "ReorgT_PtrDiff";
+    case ReorgT_Adr2Ptr:
+      return "ReorgT_Adr2Ptr";
+    case ReorgT_PtrNull:
+      return "ReorgT_PtrNull";
+    case ReorgT_PtrNotNull:
+      return "ReorgT_PtrNotNull";
+    case ReorgT_PtrEQ:
+      return "ReorgT_PtrEQ";
+    case ReorgT_PtrNE:
+      return "ReorgT_PtrNE";
+    case ReorgT_PtrLT:
+      return "ReorgT_PtrLT";
+    case ReorgT_PtrLE:
+      return "ReorgT_PtrLE";
+    case ReorgT_PtrGT:
+      return "ReorgT_PtrGT";
+    case ReorgT_PtrGE:
+      return "ReorgT_PtrGE";
+    case ReorgT_Malloc:
+      return "ReorgT_Malloc";
+    case ReorgT_Calloc:
+      return "ReorgT_Calloc";
+    case ReorgT_Realloc:
+      return "ReorgT_Realloc";
+    case ReorgT_Free:
+      return "ReorgT_Free";
+    case ReorgT_UserFunc:
+      return "ReorgT_UserFunc";
+    case ReorgT_Convert:
+      return "ReorgT_Convert";
+    case ReorgT_Return:
+      return "ReorgT_Return";
+    case ReorgT_Ignore:
+      return "ReorgT_Ignore";
+    case Not_Supported:
+      return "Not_Supported";
+    }
 }
 
 #if DEBUGGING

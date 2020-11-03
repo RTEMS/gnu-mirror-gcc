@@ -357,111 +357,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_ElemAssign:
 		    {
 		      DEBUG_L("ReorgT_ElemAssign: ");
-		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-		      //INDENT(2);
+		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      INDENT(2);
 
-		      #if 1
 		      element_assign_transformation (stmt, ri, info);
-		      #else
-		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
-		      
-		      // Needed for helloworld
-		      tree lhs = gimple_assign_lhs( stmt);
-		      tree rhs = gimple_assign_rhs1( stmt);
 
-		      bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
-		      
-		      tree ro_side = ro_on_left ? lhs : rhs;
-		      tree nonro_side = ro_on_left ? rhs : lhs;
-		      
-		      switch ( recognize_op ( ro_side, true, info) )  // "a->f"
-			{
-			case ReorgOpT_Indirect:
-			  {
-			    tree ref_expr;
-			    tree field_val_temp;
-			    gimple_seq ref_seq = NULL;
-			    
-			    make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, info);
-
-			    gimple *temp_set;
-			    gimple *final_set;
-
-			    if ( ro_on_left )
-			      {
-				// With:    a->f = rhs
-				// Generate:
-				
-				//           temp = rhs
-				temp_set = gimple_build_assign( field_val_temp, rhs);
-				SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-				
-				////           field_array[index] = temp
-				//tree elem_to_set =
-				//  build4 ( ARRAY_REF, field_type, field_arry_addr, index,
-				//	   NULL_TREE, NULL_TREE);
-				//final_set =
-				//  gimple_build_assign( elem_to_set, field_val_temp);
-
-				//                 *field_addr = temp
-				tree lhs_ref = ref_expr;
-				
-				final_set =
-				  gimple_build_assign( lhs_ref, field_val_temp);
-			      }
-			    else
-			      {
-				// With:    lhs = a->f
-				// Generate:
-				
-				tree rhs_ref = ref_expr;
-
-				// If these will actually print then things are likely sane
-				//DEBUG_L("rhs_ref: ");
-				//DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
-				//DEBUG("\n");
-
-				// These are here for debugging
-				tree op0 = TREE_OPERAND ( rhs_ref, 0);
-				tree op1 = TREE_OPERAND ( rhs_ref, 1);
-				tree op1type = TYPE_MAIN_VARIANT (TREE_TYPE (op1));
-				tree op1type_type = TREE_TYPE ( op1type);
-				
-				temp_set =
-				  gimple_build_assign( field_val_temp, rhs_ref);
-				SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-				
-				//          lhs = temp
-				final_set = gimple_build_assign( lhs, field_val_temp);
-				SSA_NAME_DEF_STMT ( lhs) = final_set;
-			      }
-			    
-			    //DEBUG_L("temp_set: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
-			    //DEBUG("\n");
-			    
-			    //DEBUG_L("final_set: ");
-			    //DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
-			    //DEBUG("\n");
-
-			    gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
-			    gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
-			    gsi_insert_before( &gsi, final_set, GSI_SAME_STMT);
-			      
-			    //delete stmt
-			    gsi_remove ( &gsi, true);
-			  } // end ReorgOpT_Indirect case
-			  break;
-			case ReorgOpT_AryDir:  // "x[i].f"
-			  // Not implemented in single pool
-			  internal_error ( "ReorgOpT_AryDir not possible");
-			default:
-			  internal_error (
-					  "Reached tree operand default for "
-					  "ReorgT_ElemAssign");
-
-			} // end recognize_op ( rhs, info) switch
-		      #endif
 		      //INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
@@ -2127,9 +2027,9 @@ str_reorg_instance_interleave_trans ( Info *info)
     pop_cfun ();
   }
 
-  //DEBUG_L("after bulk of transformations\n");
+  DEBUG_L("After bulk of transformations\n");
 
-  //DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
+  DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
   
   //DEBUG ("INTERNALS PRINT\n");
   //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
@@ -2143,7 +2043,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 
       std::vector <tree> ssa_to_delete;
 
-      //DEBUG_L("Mini-Pass on Function %s:\n", lang_hooks.decl_printable_name ( func->decl, 2));
+      DEBUG_L("Mini-Pass on Function %s:\n", lang_hooks.decl_printable_name ( func->decl, 2));
       
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
@@ -2175,21 +2075,19 @@ str_reorg_instance_interleave_trans ( Info *info)
       // of many functions mapping onto one declaration (which I
       // even doubt is possible in thi case) can't be a problem.
       
-      //DEBUG_L("Dangling Types for Function Params (default defs).\n");
-      //INDENT(4);
+      DEBUG_L("Dangling Types for Function Params (default defs).\n");
+      INDENT(4);
       tree parm;
       for ( parm = DECL_ARGUMENTS ( func->decl);
 	    parm;
 	    parm = DECL_CHAIN ( parm) )
 	{
-	  //DEBUG_A("param: ");
-	  //DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
-	  //DEBUG("\n");
-	  //INDENT(2);
+	  DEBUG_A("param: ");
+	  DEBUG_F( flexible_print, stderr, parm, 1, (dump_flags_t)0);
+	  INDENT(2);
 	  tree old_default_def = ssa_default_def ( func, parm);
-	  //DEBUG_A("old_default_def: ");
-	  //DEBUG_F( print_generic_expr, stderr, old_default_def, (dump_flags_t)0);
-	  //DEBUG("\n");
+	  DEBUG_A("old_default_def: ");
+	  DEBUG_F( flexible_print, stderr, old_default_def, 1, (dump_flags_t)0);
 	  tree new_default_def;
 
 	  // Modify prameter and do the default def stuff
@@ -2199,9 +2097,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  
 	  if ( modify_decl_core ( &parm, info) )
 	    {
-	      //DEBUG_A("double check new param: ");
-	      //DEBUG_F( print_generic_decl, stderr, parm, (dump_flags_t)0);
-	      //DEBUG("\n");
+	      DEBUG_A("double check new param: ");
+	      DEBUG_F( flexible_print, stderr, parm, 1, (dump_flags_t)0);
 	      
 	      // New default def here
 
@@ -2228,11 +2125,10 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  new_default_def = make_ssa_name_fn ( func, parm, gimple_build_nop ());
 		  set_ssa_default_def ( func, parm, new_default_def);
 
-		  //DEBUG_A("new_default_def: ");
-		  //DEBUG_F(print_generic_expr, stderr, new_default_def, (dump_flags_t)0);
-		  //DEBUG(", TYPE: ");
-		  //DEBUG_F(print_generic_expr, stderr, TREE_TYPE(new_default_def), (dump_flags_t)0);
-		  //DEBUG("\n");
+		  DEBUG_A("new_default_def: ");
+		  DEBUG_F(flexible_print, stderr, new_default_def, 0, (dump_flags_t)0);
+		  DEBUG(", TYPE: ");
+		  DEBUG_F(flexible_print, stderr, TREE_TYPE(new_default_def), 1, (dump_flags_t)0);
 
 		  // TBD REMOVE DUPLICATE!
 		  // Replace old one (not really totally hence the
@@ -2256,14 +2152,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 			{
 			  if ( use_p == NULL ) continue;
 			  tree use = USE_FROM_PTR (use_p);
-			  //DEBUG_A("use to replace: ");
-			  //DEBUG_F( print_generic_expr, stderr, use, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_A("use to replace: ");
+			  DEBUG_F( flexible_print, stderr, use, 1, (dump_flags_t)0);
 			  if (use == old_default_def)
 			    SET_USE ( use_p, new_default_def);
 			}
-		      //DEBUG_A("after: ");
-		      //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+		      DEBUG_A("after: ");
+		      DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
 		    }
 		  // Get rid of the old default def because it confuses
 		  //
@@ -2272,12 +2167,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  release_ssa_name_fn ( func, old_default_def);
 		}
 	    }
-	  //INDENT(-2);
+	  INDENT(-2);
 	}
-      //INDENT(-4);
+      INDENT(-4);
       
-      //DEBUG_L("Dangling Types for Function Local (default defs).\n");
-      //INDENT(4);
+      DEBUG_L("Dangling Types for Function Local (default defs).\n");
+      INDENT(4);
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
       
@@ -2292,9 +2187,9 @@ str_reorg_instance_interleave_trans ( Info *info)
       tree decl;
       FOR_EACH_LOCAL_DECL ( func, i, decl)
 	{
-	  //DEBUG_A("local: ");
-	  //DEBUG_F( print_generic_decl, stderr, decl, (dump_flags_t)0);
-	  //DEBUG("\n");
+	  DEBUG_A("local: ");
+	  DEBUG_F( flexible_print, stderr, decl, 1, (dump_flags_t)0);
+
 	  tree old_default_def = ssa_default_def ( func, decl);
 	  tree new_default_def;
 	  
@@ -2337,25 +2232,25 @@ str_reorg_instance_interleave_trans ( Info *info)
       //INDENT(-4);      
       
       // Normal ssa name case
-      //DEBUG_L("Dangling Types for Normal SSA Names:\n");
+      DEBUG_L("Dangling Types for Normal SSA Names:\n");
       //DEBUG_L("\n");
       //DEBUG_F( wolf_fence, info);
       
-      //INDENT(4);
+      INDENT(4);
       // We use len instead of using func->length() in the for loop test
       // because new ssa names are created in the loop body and we
       // shouldn't process them.
       unsigned int len = SSANAMES ( func)->length ();
-      //DEBUG_L("len = %d\n",len);
+      DEBUG_L("len = %d\n",len);
       for ( unsigned int i = 0; i < len; i++)
 	{
-	  //DEBUG_L("SSANAMES(func)[%d]\n",i);
+	  DEBUG_L("SSANAMES(func)[%d]\n",i);
 
 	  tree ssa_name = (*SSANAMES ( func))[i];
 
 	  if( ssa_name == NULL )
 	    {
-	      //DEBUG_L("Skip, ssa_name == NULL\n");
+	      DEBUG_L("Skip, ssa_name == NULL\n");
 	      continue;
 	    }
 
@@ -2366,48 +2261,48 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  tree type = TREE_TYPE ( ssa_name);
 	  tree bottom_type = base_type_of ( type);
 	  ReorgType_t *ri = get_reorgtype_info ( bottom_type, info);
-	  //DEBUG_L("ssa_name = ");
-	  //DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
-	  //DEBUG(" %s", a_default_def ? "is default_def" : "");
-	  //DEBUG(" %s", no_defining_stmt ? "has no defining stmt" : "");
-	  //DEBUG(" %s", defined_by_nop ? "defined by a nop" : "");
-	  //DEBUG(", type = ");
-	  //DEBUG_F(print_generic_expr, stderr, type, (dump_flags_t)0);
-	  //DEBUG(", bottom_type = ");
-	  //DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
-	  //DEBUG(", ri = %p\n",ri);
+	  DEBUG_L("ssa_name = ");
+	  DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
+	  DEBUG(" %s", a_default_def ? "is default_def" : "");
+	  DEBUG(" %s", no_defining_stmt ? "has no defining stmt" : "");
+	  DEBUG(" %s", defined_by_nop ? "defined by a nop" : "");
+	  DEBUG(", type = ");
+	  DEBUG_F(print_generic_expr, stderr, type, (dump_flags_t)0);
+	  DEBUG(", bottom_type = ");
+	  DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
+	  DEBUG(", ri = %p\n",ri);
 
 	  // If it's not a dangling type we don't care
 	  if ( ri == NULL )
 	    {
-	      //DEBUG_L("Skip, ri == NULL\n");
+	      DEBUG_L("Skip, ri == NULL\n");
 	      continue;
 	    }
 
 	  // A default def is processed seperately
 	  if ( a_default_def )
 	    {
-	      //DEBUG_L("Skip default_def\n");
+	      DEBUG_L("Skip default_def\n");
 	      continue;
 	    }
 
 	  gcc_assert ( !no_defining_stmt);
 	  gcc_assert ( !defined_by_nop);
 
-	  //DEBUG_L("Defining stmt: ");
-	  //DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
+	  DEBUG_L("Defining stmt: ");
+	  DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
 
 	  tree new_type = ri->pointer_rep;
 	  tree new_ssa_name = make_temp_ssa_name( new_type, NULL, "dedangled");
-	  //DEBUG_L("new_ssa_name = ");
-	  //DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);
-	  //DEBUG("\n");
+	  DEBUG_L("new_ssa_name = ");
+	  DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);
+	  DEBUG("\n");
 	  #if DEBUGGING
 	  for ( unsigned int j = 0; j < SSANAMES ( func)->length (); j++)
 	    {
 	      if ( (*SSANAMES ( func))[j] == new_ssa_name )
 		{
-		  //DEBUG_L("new name at j = %d\n",j);
+		  DEBUG_L("new name at j = %d\n",j);
 		  break;
 		}
 	    }
@@ -2417,8 +2312,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  imm_use_iterator iter;
 	  FOR_EACH_IMM_USE_STMT ( use_stmt, iter, ssa_name)
 	    {
-	      //DEBUG_L("use_stmt before: ");
-	      //DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      DEBUG_L("use_stmt before: ");
+	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
 	      
 	      // Deal with the uses
 	      use_operand_p use_p;
@@ -2427,14 +2322,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      //FOR_EACH_SSA_USE_OPERAND( use_p, use_stmt, ssa_iter, SSA_OP_USE )
 	      FOR_EACH_PHI_OR_STMT_USE ( use_p, use_stmt, ssa_iter, SSA_OP_USE )
 		{
-		  //DEBUG_L("use_p = %p\n",use_p);
+		  DEBUG_L("use_p = %p\n",use_p);
 		  if ( use_p == NULL ) continue;
 		  tree use = USE_FROM_PTR (use_p);
 		  if (use == ssa_name)
 		    SET_USE ( use_p, new_ssa_name);
 		}
-	      //DEBUG_L("use_stmt after: ");
-	      //DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      DEBUG_L("use_stmt after: ");
+	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
 	      
 	      // Should update_stmt be called here?
 	      // It does not seem either harm or help so I'll
@@ -2443,14 +2338,40 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    }
 	  // Modify the LHS too
 	  // TBD This code needs to be more general.
-	  //DEBUG_L("What is ssa_name? ");
-	  //DEBUG_F(flexible_print, stderr, ssa_name, 1, (dump_flags_t)0);
+	  DEBUG_L("What is ssa_name? ");
+	  DEBUG_F(flexible_print, stderr, ssa_name, 1, (dump_flags_t)0);
 	  gimple *def = SSA_NAME_DEF_STMT ( ssa_name);
 	  
-	  //DEBUG_L("def: ");
-	  //DEBUG_F ( print_gimple_stmt, stderr, def, 0);
-	  
-	  set_lhs_for ( def, new_ssa_name);
+	  DEBUG_L("def: ");
+	  DEBUG_F ( print_gimple_stmt, stderr, def, 0);
+
+	  // If necessary change the operation to deal with sizetype
+	  // instead of pointers.
+	  gassign *gass = static_cast <gassign *> (def);
+	  bool rebuild =
+	        gimple_code ( def) == GIMPLE_ASSIGN
+	    &&  POINTER_TYPE_P ( TREE_TYPE ( gimple_assign_lhs ( def)))
+	    && !POINTER_TYPE_P ( new_type)
+	    &&  get_gimple_rhs_class ((enum tree_code)gass->subcode) == GIMPLE_BINARY_RHS
+	    &&  gimple_assign_rhs_code (def) == POINTER_PLUS_EXPR;
+
+	  if ( rebuild )
+	    {
+	      tree op0 = gimple_assign_rhs1 ( def);
+	      tree op1 = gimple_assign_rhs2 ( def);
+
+	      gimple *rebuilt =
+		gimple_build_assign ( new_ssa_name, PLUS_EXPR, op0, op1);
+	      SSA_NAME_DEF_STMT ( new_ssa_name) = rebuilt;
+	      
+	      gimple_stmt_iterator gsi_def = gsi_for_stmt( def);
+	      gsi_insert_before( &gsi_def, rebuilt, GSI_SAME_STMT);
+	      gsi_remove ( &gsi_def, true);
+	    }
+	  else
+	    {
+	      set_lhs_for ( def, new_ssa_name);
+	    }
 
 	  update_stmt ( def);
 
@@ -2458,7 +2379,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  release_ssa_name_fn ( func, ssa_name);
 	  
 	}
-      //INDENT(-4);
+      INDENT(-4);
 
       // Might be a bad idea.
       #if 0
@@ -2492,19 +2413,26 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 {
   gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
   
-  //DEBUG_L("element_assign_transformation: ");
-  //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-  //INDENT(2);
+  DEBUG_L("element_assign_transformation: ");
+  DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+  INDENT(2);
   // Needed for helloworld
   tree lhs = gimple_assign_lhs( stmt);
   tree rhs = gimple_assign_rhs1( stmt);
-  
-  bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
+
+  // Just looking at the type is insufficient because
+  // the field itself can be a reorg type. Instead
+  // look at it's shape.
+  //bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
+  bool ro_on_left = find_deepest_comp_ref ( lhs) != NULL;
 		      
   tree ro_side = ro_on_left ? lhs : rhs;
   tree nonro_side = ro_on_left ? rhs : lhs;
-  
-  switch ( recognize_op ( ro_side, true, info) )  // "a->f"
+
+  DEBUG_A("ro_side = ");
+  DEBUG_F(flexible_print, stderr, ro_side, 1, (dump_flags_t)0);
+  enum ReorgOpTrans optype = recognize_op ( ro_side, true, info);
+  switch ( optype )  // "a->f"
     {
     case ReorgOpT_Indirect:
       {
@@ -2547,9 +2475,9 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    tree rhs_ref = ref_expr;
 	    
 	    // If these will actually print then things are likely sane
-	    //DEBUG_L("rhs_ref: ");
-	    //DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
-	    //DEBUG("\n");
+	    DEBUG_L("rhs_ref: ");
+	    DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
+	    DEBUG("\n");
 	    
 	    // These are here for debugging
 	    tree op0 = TREE_OPERAND ( rhs_ref, 0);
@@ -2566,13 +2494,13 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    SSA_NAME_DEF_STMT ( lhs) = final_set;
 	  }
 	
-	//DEBUG_L("temp_set: ");
-	//DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
-	//DEBUG("\n");
+	DEBUG_L("temp_set: ");
+	DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
+	DEBUG("\n");
 	
-	//DEBUG_L("final_set: ");
-	//DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
-	//DEBUG("\n");
+	DEBUG_L("final_set: ");
+	DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
+	DEBUG("\n");
 	
 	gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
 	gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
@@ -2588,11 +2516,11 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
     default:
       internal_error (
 		      "Reached tree operand default for "
-		      "ReorgT_ElemAssign");
+		      "ReorgT_ElemAssign (%s)", optrans_to_str ( optype));
       
     } // end recognize_op ( rhs, info) switch
   
-  //INDENT(-2);
+  INDENT(-2);
 }
 
 // For ref_in which is a ReorgOpT_Indirect, create gimple
@@ -2608,6 +2536,7 @@ make_transformed_ref ( tree ref_in,
   
   // For deeply nested case we need the lowest.
   tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
+  gcc_assert ( lowest_comp_ref);
 
   tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
   tree field_type = TREE_TYPE ( orig_field);
@@ -2666,9 +2595,15 @@ make_transformed_ref ( tree ref_in,
   // Note base_field_type is a pointer and we want the size of what's
   // pointed to.
   tree size_of_field = TYPE_SIZE_UNIT ( field_type);
-  
+
+  // I'm pretty sure this is not necessary... revert it
+  #if 0
+  tree unsigned_long_type = TYPE_MAIN_VARIANT ( pointer_sized_int_node);
+  tree offset = make_temp_ssa_name( unsigned_long_type, NULL, "offset");
+  #else
   gcc_assert ( sizetype);
   tree offset = make_temp_ssa_name( sizetype, NULL, "offset");
+  #endif
 	
   gimple *get_offset = gimple_build_assign ( offset, MULT_EXPR, index, size_of_field);
   SSA_NAME_DEF_STMT ( offset) = get_offset;
@@ -2693,6 +2628,10 @@ make_transformed_ref ( tree ref_in,
 static tree
 find_deepest_comp_ref ( tree comp_ref_expr )
 {
+  //DEBUG_A("find_deepest_comp_ref of ");
+  //DEBUG_F(flexible_print, stderr, comp_ref_expr, 2, (dump_flags_t)0);
+  //DEBUG_A("tree coded of %s\n", code_str( TREE_CODE(comp_ref_expr)));
+  if ( TREE_CODE(comp_ref_expr) == SSA_NAME ) return NULL;
   tree inner_op0 = TREE_OPERAND( comp_ref_expr, 0);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
   if ( inner_op0_code == COMPONENT_REF )
@@ -2703,7 +2642,7 @@ find_deepest_comp_ref ( tree comp_ref_expr )
       {
 	return comp_ref_expr;
       }
-  gcc_assert (0);
+  return NULL;
 }
 
 static tree
