@@ -31,6 +31,8 @@ along with GCC; see the file COPYING3.  If not see
 // Trun off actual transformations for testing
 #define BYPASS_TRANSFORM false
 
+#define CONSTIPATION 0
+
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;
 typedef struct RT_Interleave RT_Interleave;

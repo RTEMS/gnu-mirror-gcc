@@ -3542,6 +3542,7 @@ reorg_perf_qual ( Info *info)
 	  if ( info->show_perf_qualify )
 	    {
 	      fprintf ( info->reorg_dump_file, "  Disqualified: ");
+	      
 	      flexible_print ( info->reorg_dump_file, reorgi->gcc_type, 0,
 			       (dump_flags_t)0);
 	      fprintf ( info->reorg_dump_file, ": Very small absolute effect:\n");

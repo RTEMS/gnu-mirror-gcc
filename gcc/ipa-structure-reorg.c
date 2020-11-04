@@ -46,7 +46,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-ssa.h"
 #include "tree-phinodes.h"
 #include "ssa-iterators.h"
-
+#include <stack>
+#include "ipa-type-escape-analysis.h"
 
 static void setup_debug_flags ( Info *);
 static void initial_debug_info ( Info *);
@@ -56,7 +57,7 @@ static unsigned number_of_executions ( gimple *, struct cgraph_node *);
 static void reorg_analysis_debug ( Info *, ReorgType *);
 static bool find_decls_and_types ( Info *);
 #if USE_REORG_TYPES
-static void add_reorg_type( tree, Info *);
+static void add_reorg_type( tree, bool, Info *);
 #endif
 static void disqualify_struct_in_struct_or_union ( Info *);
 static void initial_reorg_debug ( Info *, ReorgType *reorg ); 
@@ -525,6 +526,184 @@ reorg_analysis_debug ( Info *info, ReorgType *reorg )
   }
 }
 
+#if 1
+static bool
+find_decls_and_types ( Info *info)
+{
+  //DEBUG_L("find_decls_and_types: entered\n");
+
+  detected_incompatible_syntax = false;
+  std::map<tree, bool> whitelisted = get_whitelisted_nodes();
+  tpartitions_t escaping_nonescaping_sets
+    = partition_types_into_escaping_nonescaping (whitelisted);
+
+  if ( detected_incompatible_syntax )
+    {
+      if ( info->show_all_reorg_cands_in_detail )
+	{
+	  fprintf ( info->reorg_dump_file, "find_decls_and_types: Not C code!\n");
+	}
+      return false;
+    }
+  std::set<tree> typeset; // ???
+
+  for ( auto typei = escaping_nonescaping_sets.points_to_record.begin ();
+	typei != escaping_nonescaping_sets.points_to_record.end (); typei++ )
+    {
+      tree type = *typei;
+      if ( escaping_nonescaping_sets.non_escaping.find ( type)
+	   !=
+	   escaping_nonescaping_sets.non_escaping.end ())
+	{
+	  tree base = base_type_of ( type);
+	  // The types are a bit redundant here so ignore
+	  // duplicates.
+	  if ( get_reorgtype_info ( base, info) ) continue;
+	  add_reorg_type ( base, false, info);
+	  //typeset.insert ( type);
+	}
+    }
+
+  // Don't keep any structure types if they aren't
+  // used in an array or have a pointer type (which
+  // hopefully will have an associated allocation.)
+  // Note, initially ignore the explicit statically
+  // allocated arrays.
+  //
+  // Note, from the original comment this needs to
+  // be the state. I'm not sure how Erick's scheme
+  // deals with statically allocated arrays. They
+  // are forbidden for instance interleaving Mark I
+  // (single pool) and need to be detected just to
+  // disqualify the assocaied type.
+
+  
+  // ???
+  
+  // We need this later for creating new types
+  for ( std::set<tree>::iterator ti = typeset.begin ();
+	ti != typeset.end ();
+	ti++                                            )
+  {
+    (*(info->struct_types))[*ti] = { false, false };
+  }
+
+  if ( info->show_all_reorg_cands_in_detail )
+  {
+    fprintf ( info->reorg_dump_file, "All possible candidates:\n");
+    print_reorgs ( info->reorg_dump_file, 2, info);
+  }
+  
+  if ( info->show_all_reorg_cands )
+  {
+    fprintf ( info->reorg_dump_file, "All preliminary ReorgTypes:\n");
+    print_reorgs ( info->reorg_dump_file, 2, info);
+  }
+      
+  // Scan all types in ReorgTypes for structure fields
+  // and if they are pointers to a type Q in ReorgTypes
+  // then clear the deletion mark of Q. Note, at this
+  // point in the execution ReorgTypes is all the structure
+  // types.
+  //
+  // It would be a bit nuts to allocate memory and hang it
+  // off of pointer in a structure, but it's still possible.
+  // Note, if there are no pointers to a structure of a type
+  // then it is impossible to dynamically allocate memory of
+  // that type. This of course assumes sane programming
+  // practices and if they violate those structure reorg has
+  // every right to punt.
+  //DEBUG_L( "Examine imbedded pointers\n");
+  //INDENT(2);
+  for ( std::vector<ReorgType_t>::iterator ri = info->reorg_type->begin ();
+	ri != info->reorg_type->end ();
+	ri++                                                              )
+  {
+    //DEBUG_A("");
+    //DEBUG_F( dump_reorg, &(*ri));
+    //DEBUG("\n");
+    //INDENT(2);
+    for ( tree fld = TYPE_FIELDS ( ri->gcc_type); 
+	  fld; 
+	  fld = DECL_CHAIN ( fld) )
+    {
+      tree field_type = TREE_TYPE( fld);
+      ReorgType_t *rtype =
+	find_struct_type_ptr_to_struct ( field_type, info);
+      if ( rtype != NULL )
+      {
+	undelete_reorgtype ( rtype, info);
+      }
+    }
+    //INDENT(-2);
+  }
+  //INDENT(-2);
+  //DEBUG_L( "after Scan all types in ReorgTypes for structure fields\n");
+  remove_deleted_types ( info, &initial_reorg_debug);
+
+  // Disqualifying structures in interior to structures is optional
+  // (see comment at end of type escape section) but if it's not 
+  // done it commits the optimization to do something a little too
+  // involved for the initial version.
+  disqualify_struct_in_struct_or_union ( info);
+  
+  if ( info->reorg_type->empty () )
+  {
+    if ( info->show_all_reorg_cands_in_detail )
+    {
+      fprintf ( info->reorg_dump_file, "find_decls_and_types: Found no types\n");
+    }
+    return false;
+  }
+
+  // initialize ids of ReorgTypes
+  int id = 0;
+  for ( std::vector<ReorgType_t>::iterator ri = info->reorg_type->begin ();
+	ri != info->reorg_type->end ();
+	ri++                                                              )
+  {
+    ri->id = id;
+    id++;
+  }
+
+  // Scan all declarations. If their type is in ReorgTypes
+  // add them to ProgDecl.
+  // Note, there is no mechanism for looking at global declarations
+  // so use FOR_EACH_VARIABLE instead. I'm not 100% this is the thing
+  // actuall do here... but...
+  //DEBUG_L( "ProgDecl global declarations:\n");
+  varpool_node *var;
+  FOR_EACH_VARIABLE ( var)
+  {
+    tree decl = var->decl;
+    tree type = base_type_of ( decl);
+    if ( TREE_CODE ( type ) == RECORD_TYPE        &&
+	 get_reorgtype_info ( type, info) != NULL    )
+    {
+      ProgDecl_t decl_info;
+      decl_info.gcc_decl = decl;
+      info->prog_decl->push_back ( decl_info);
+      //DEBUG_A("");
+      //DEBUG_F( print_progdecl, stderr, 2, &decl_info);
+    }
+  }
+  
+  if ( info->show_all_reorg_cands_in_detail )
+  {
+    fprintf ( info->reorg_dump_file, "find_decls_and_types: Found the following types:\n"); 
+    print_reorgs ( info->reorg_dump_file, 2, info);
+  }
+  
+  if ( info->show_prog_decls )
+  {
+    fprintf ( info->reorg_dump_file, "ProgDecls:\n");
+    print_progdecls ( info->reorg_dump_file, 2, info);
+  }
+
+  return true;
+}
+
+#else
 static bool
 find_decls_and_types ( Info *info)
 {
@@ -572,7 +751,7 @@ find_decls_and_types ( Info *info)
       }
 
       #if USE_REORG_TYPES
-      add_reorg_type ( tmv_base, info);
+      add_reorg_type ( tmv_base, true, info);
       #endif
       typeset.insert ( tmv_base); // ???
     }
@@ -618,7 +797,7 @@ find_decls_and_types ( Info *info)
 	}
 
 	#if USE_REORG_TYPES
-	add_reorg_type ( tmv_base, info);
+	add_reorg_type ( tmv_base, true, info);
 	#endif
 	typeset.insert ( tmv_base); // ???
       }
@@ -811,15 +990,18 @@ find_decls_and_types ( Info *info)
 
   return true;
 }
+#endif
 
 #if USE_REORG_TYPES
 static void
-add_reorg_type ( tree base, Info *info)
+add_reorg_type (
+		tree base,
+		bool del, Info *info)
 {
   tree tmv_type = TYPE_MAIN_VARIANT ( base);
-  tree type2add = tmv_type ? tmv_type : base;
+  //tree type2add = tmv_type ? tmv_type : base;
   ReorgType_t rt =
-    { 0, true, base, NULL, NULL, false, false, false,
+    { 0, del, base, NULL, NULL, false, false, false,
       { 0}, { 0}, { 0, 0, 0, NULL, 0.0, 0.0, false}};
 
   //DEBUG_L("add_reorg_type: ");
@@ -2509,7 +2691,9 @@ apply_to_all_gimple ( bool (*function)(gimple *, void *), bool phis_too, void *d
 // What's dicey about this is it may sort of work but then I
 // can see places where it wouldn't... The language has a say
 // in what types are equal so maybe language hooks are involved???
-bool same_type_p( tree a, tree b )
+bool same_type_p(
+		 tree a, tree b
+		 )
 {
   //DEBUG( "same_type_p:\n");
   //DEBUG( " a: TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(a)),TYPE_NAME(a));
@@ -2570,7 +2754,7 @@ get_reorgtype_info ( tree type, Info* info)
     //DEBUG_L("");
     //DEBUG_F( print_generic_expr, stderr, type, TDF_DETAILS);
     //DEBUG("\n");
-    if ( same_type_p ( ri->gcc_type, type2check) )
+    if ( same_type_p ( ri->gcc_type, type2check ) )
     {
       //DEBUG_A( "  returns %p\n", &(*ri));
       
