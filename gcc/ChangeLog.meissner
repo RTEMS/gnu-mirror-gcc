@@ -1,3 +1,72 @@
+work024.patch008
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-call.c (altivec_overloaded_builtins): Add
+	built-in functions for long double built-ins that use IEEE
+	128-bit.
+	(rs6000_expand_builtin): Change the KF IEEE 128-bit comparison
+	insns to TF if long double is IEEE 128-bit.
+	* config/rs6000/rs6000-builtin.def (scalar_extract_exptf): Add
+	support for long double being IEEE 128-bit built-in functions.
+	(scalar_extract_sigtf): Likewise.
+	(scalar_test_neg_tf): Likewise.
+	(scalar_insert_exp_tf): Likewise.
+	(scalar_insert_exp_tfp): Likewise.
+	(scalar_cmp_exp_tf_gt): Likewise.
+	(scalar_cmp_exp_tf_lt): Likewise.
+	(scalar_cmp_exp_tf_eq): Likewise.
+	(scalar_cmp_exp_tf_unordered): Likewise.
+	(scalar_test_data_class_tf): Likewise.
+
+work024.patch007
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE-128 map the nanq built-in functions to the long
+	double function, not the f128 function.
+
+work024.patch004
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
+	support for mapping built-in function names for long double
+	built-in functions if long double is IEEE 128-bit.
+
+work024.patch003
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* config/rs6000/predicates.md (ds_form_memory): New predicate.
+	* config/rs6000/vsx.md (concatv2di_store): New insn.
+	(dupv2di_store): New insn.
+
+work024.patch002
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
+	128-bit floating point types.
+	* config/rs6000/rs6000.md (FPMASK): New iterator.
+	(FPMASK2): New iterator.
+	(Fv mode attribute): Add KFmode and TFmode.
+	(mov<FPMASK:mode><FPMASK2:mode>cc_fpmask): Replace
+	mov<SFDF:mode><SFDF2:mode>cc_p9.  Add IEEE 128-bit fp support.
+	(mov<FPMASK:mode><FPMASK2:mode>cc_invert_fpmask): Replace
+	mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add IEEE 128-bit fp
+	support.
+	(fpmask<mode>): Add IEEE 128-bit fp support.  Enable generator to
+	build te RTL.
+	(xxsel<mode>): Add IEEE 128-bit fp support.  Enable generator to
+	build te RTL.
+
+work024.patch001
+2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs60000.h (FLOAT128_MIN_MAX_FPMASK_P): New macro.
+	* config/rs6000/rs6000.md (s<minmax><mode>3): Add support for the
+	ISA 3.1 IEEE 128-bit minimum and maximum instructions.
+
 2020-11-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
