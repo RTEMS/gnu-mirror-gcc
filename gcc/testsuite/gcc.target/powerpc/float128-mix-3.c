@@ -1,5 +1,6 @@
+/* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-options "-O2 -mvsx -Wno-psabi -mabi=ibmlongdouble -mlong-double-128" } */
+/* { dg-options "-O2 -mvsx" } */
 
 /* Test to make sure that __float128 and __ibm128 cannot be combined
    together.  */

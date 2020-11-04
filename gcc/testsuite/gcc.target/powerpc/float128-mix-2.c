@@ -1,3 +1,4 @@
+/* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target ppc_float128_sw } */
 /* { dg-options "-O2 -mvsx -Wno-psabi -mabi=ieeelongdouble -mlong-double-128" } */
 
