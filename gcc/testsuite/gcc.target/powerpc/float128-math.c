@@ -10,11 +10,11 @@
 
 extern __float128 sinf128 (__float128);
 
-void foo (__float128 *p, long double *q, long double *r)
+void foo (__float128 *p, long double *q)
 {
   *p = sinf128 (*p);
   *q = __builtin_sinl (*q);
 }
 
-/* { dg-final { scan-assembler-times {\mbl sinf128\M} 2 } } */
-/* { dg-final { scan-assembler-not   {\mbl sinl\M}      } } */
+/* { dg-final { scan-assembler     {\mbl __sinieee128\M} } } */
+/* { dg-final { scan-assembler-not {\mbl sinl\M}         } } */
