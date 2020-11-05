@@ -2117,9 +2117,9 @@
 
 
 ;; TImode shifts.  We do a FAIL on shift by constant amounts so that the code
-;; generation will use the power9 code in the GPRs.  For the variable shifts
-;; and rotates, we need to get the shift/rotate amount into the bottom part of
-;; the vector register.
+;; generation will use the power9 code in the GPRs unless -mquad-arithmetic is
+;; used.  For the variable shifts and rotates, we need to get the shift/rotate
+;; amount into the bottom part of the vector register.
 (define_expand "<ti_shift_names>ti3"
   [(parallel [(set (match_operand:TI 0 "gpc_reg_operand")
 		   (ti_shift:TI (match_operand:TI 1 "gpc_reg_operand")
@@ -2127,7 +2127,7 @@
 	      (clobber (match_scratch:V2DI 3 "=v"))])]
   "TARGET_POWER10 && TARGET_POWERPC64"
 {
-  if (CONST_INT_P (operands[2]))
+  if (!TARGET_QUAD_ARITHMETIC && CONST_INT_P (operands[2]))
     FAIL;
 })
 
@@ -2160,6 +2160,30 @@
   "TARGET_POWER10 && TARGET_POWERPC64"
   "<ti_shift_op> %0,%1,%2"
   [(set_attr "type" "vecperm")])
+
+;; TImode shift by constants.
+
+(define_insn_and_split "*<ti_shift_names>ti3_constant"
+  [(set (match_operand:TI 0 "gpc_reg_operand" "=v")
+	(ti_shift:TI (match_operand:TI 1 "gpc_reg_operand" "v")
+		     (match_operand:DI 2 "const_int_operand" "i")))
+   (clobber (match_scratch:V2DI 3 "=&v"))]
+  "TARGET_POWER10 && TARGET_POWERPC64 && TARGET_QUAD_ARITHMETIC"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(vec_duplicate:V16QI (match_dup 2)))
+   (set (match_dup 0)
+	(ti_shift:TI (match_dup 1)
+		     (match_dup 3)))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (V2DImode);
+
+  operands[4] = gen_lowpart (V16QImode, operands[3]);
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecperm")])
 
 (define_insn "altivec_vsum4ubs"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
