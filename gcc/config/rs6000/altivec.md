@@ -806,6 +806,32 @@
   DONE;
 })
 
+;; 64-bit multiply
+(define_insn "mulv2di3"
+  [(set (match_operand:V2DI 0 "register_operand" "=v")
+	(mult:V2DI (match_operand:V2DI 1 "register_operand" "v")
+		   (match_operand:V2DI 2 "register_operand" "v")))]
+  "TARGET_POWER10"
+  "vmulld %0,%1,%2"
+  [(set_attr "type" "veccomplex")])
+
+;; Vector integer signed/unsigned divide
+(define_insn "div<mode>3"
+  [(set (match_operand:VIlong 0 "register_operand" "=v")
+	(div:VIlong (match_operand:VIlong 1 "register_operand" "v")
+		    (match_operand:VIlong 2 "register_operand" "v")))]
+  "TARGET_POWER10"
+  "vdivs<wd> %0,%1,%2"
+  [(set_attr "type" "vecfdiv")])
+
+(define_insn "udiv<mode>3"
+  [(set (match_operand:VIlong 0 "register_operand" "=v")
+	(udiv:VIlong (match_operand:VIlong 1 "register_operand" "v")
+		     (match_operand:VIlong 2 "register_operand" "v")))]
+  "TARGET_POWER10"
+  "vdivu<wd> %0,%1,%2"
+  [(set_attr "type" "vecfdiv")])
+
 ;; Map UNSPEC_SLDB to "l" and  UNSPEC_SRDB to "r".
 (define_int_attr SLDB_lr [(UNSPEC_SLDB "l")
 			  (UNSPEC_SRDB "r")])
