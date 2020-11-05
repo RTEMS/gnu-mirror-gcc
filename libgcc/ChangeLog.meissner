@@ -2,10 +2,13 @@ work024.patch012
 2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR libgcc/97543
-	* config/rs6000/t-float128-hw (FP128_CFLAGS_HW): Do not set
-	-mno-gnu-attributes here.
-	* config/rs6000/t-linux (libgcc-s-objects): Compile all modules
-	for the shared library with -mno-gnu-attributes.
+	* config/rs6000/t-linux (IBM128_OBJS): New make variable for long
+	double support.
+	(IBM128_CFLAGS): New make variable for long double support.
+	Explicitly set the long double type to IBM extended for the
+	modules that deal with IBM extended values.
+	(gcc_s_compile): Add -mno-gnu-attribute to all shared library
+	modules.
 
 work024.patch009
 2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
