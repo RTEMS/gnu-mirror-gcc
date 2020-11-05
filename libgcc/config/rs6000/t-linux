@@ -6,7 +6,3 @@ HOST_LIBGCC2_CFLAGS += -mlong-double-128
 # smaller and faster libgcc code.  Directly specifying -mcmodel=small
 # would need to take into account targets for which -mcmodel is invalid.
 HOST_LIBGCC2_CFLAGS += -mno-minimal-toc
-
-# Turn off gnu attributes for long double size on the shared library modules,
-# but leave it on for the static modules.
-$(libgcc-s-objects) : INTERNAL_CFLAGS += -mno-gnu-attribute
