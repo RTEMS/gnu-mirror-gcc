@@ -1417,7 +1417,21 @@
   HOST_WIDE_INT byteshift_val;
 
   if (! CONSTANT_P (bitshift))
-    FAIL;
+    {
+      if (TARGET_POWER10 && TARGET_POWERPC64 && can_create_pseudo_p ())
+	{
+	  rtx dest_ti = gen_lowpart (TImode, operands[0]);
+	  rtx src_ti = gen_lowpart (TImode, operands[1]);
+	  if (BYTES_BIG_ENDIAN)
+	    emit_insn (gen_ashlti3 (dest_ti, src_ti, bitshift));
+	  else
+	    emit_insn (gen_lshrti3 (dest_ti, src_ti, bitshift));
+	  DONE;
+	}
+
+      FAIL;
+    }
+
   bitshift_val = INTVAL (bitshift);
   if (bitshift_val & 0x7)
     FAIL;
