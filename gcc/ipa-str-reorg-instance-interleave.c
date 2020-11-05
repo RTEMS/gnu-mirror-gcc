@@ -2960,7 +2960,7 @@ reorg_perf_qual ( Info *info)
     {
       fprintf ( info->reorg_dump_file, "Doing Performance Qualification\n");
     }
-  //DEBUG_L("reorg_perf_qual:\n");
+  DEBUG_L("reorg_perf_qual:\n");
   #if 1
   // TBD use design in doc but mark ReorgTypes
   // (do_instance_interleave) that qualify instead of deleting them
@@ -3049,14 +3049,14 @@ reorg_perf_qual ( Info *info)
 	for ( unsigned i = 0; i < loop->num_nodes; i++)
 	  {
 	    basic_block bb = bbs [i];
-	    //DEBUG_A("BB %i:\n", bb->index);
-	    //INDENT(4);
+	    DEBUG_A("BB %i:\n", bb->index);
+	    INDENT(4);
 	    for ( auto gsi = gsi_start_bb ( bb); !gsi_end_p ( gsi); gsi_next ( &gsi) )
 	      {
 		gimple *stmt = gsi_stmt ( gsi);
-		//DEBUG_A("examine: ");
-		//DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
-		//INDENT(4);
+		DEBUG_A("examine: ");
+		DEBUG_F ( print_gimple_stmt, stderr, stmt, TDF_DETAILS);
+		INDENT(4);
 		
 		if ( gimple_code ( stmt) == GIMPLE_LABEL  ||
 		     gimple_code ( stmt) == GIMPLE_SWITCH    ) continue;
@@ -3069,8 +3069,8 @@ reorg_perf_qual ( Info *info)
 		    op = gimple_op ( stmt, ith_op);
 		    // It's lieing about the number of operands... so...
 		    if ( op == NULL ) continue;
-		    //DEBUG_A("op[%d]: %p, ", ith_op, op);
-		    //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+		    DEBUG_A("op[%d]: %p, ", ith_op, op);
+		    DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
 		    ReorgType_t *tri = tree_contains_a_reorgtype ( op, info);
 		    enum ReorgOpTrans optran = recognize_op ( op, false, info);
 		    // TBD This is where we need to remember
@@ -3078,11 +3078,11 @@ reorg_perf_qual ( Info *info)
 		    const char *s = optrans_to_str( optran);
 		    // Commenting out these 3 debug commands causes a
 		    // regression
-		    //DEBUG_A(", %s\n", s);
+		    DEBUG_A(", %s\n", s);
 		    if ( tri != NULL )
 		      {
-			//DEBUG(", ");
-			//DEBUG_F(print_reorg, stderr, 0, tri);
+			DEBUG(", ");
+			DEBUG_F(print_reorg, stderr, 0, tri);
 			;
 		      }
 		    else
@@ -3128,37 +3128,37 @@ reorg_perf_qual ( Info *info)
 			missing_cases = true;
 		      }
 		  }
-		//INDENT(-4);
+		INDENT(-4);
 	      }
-	    //INDENT(-4);
+	    INDENT(-4);
 	  }
 
-	//DEBUG_L("Dumping acc_info:\n");
+	DEBUG_L("Dumping acc_info:\n");
 	for ( auto aci = acc_info.begin (); aci != acc_info.end (); aci++ )
 	  {
-	    //DEBUG_A("variable:\n");
-	    //DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
-	    //DEBUG_A("field: ");
-	    //DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
+	    DEBUG_A("variable:\n");
+	    DEBUG_F( tell_me_about_ssa_name, (*aci).access, debug_indenting + 4);
+	    DEBUG_A("field: ");
+	    DEBUG_F( flexible_print, stderr, (*aci).field, 1, (dump_flags_t)0);
 	    ;
 	  }
 
-	//DEBUG_A("before sort: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("before sort: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 
-	//DEBUG_A("before compress: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("before compress: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 
 	// Sort and compact the access infos.
 	std::stable_sort ( acc_info.begin (), acc_info.end (), acc_lt);
 	
 	compress_acc_infos ( acc_info );
 
-	//DEBUG_A("after compress: \n");
-	//DEBUG_F(print_acc_infos, stderr, acc_info );
+	DEBUG_A("after compress: \n");
+	DEBUG_F(print_acc_infos, stderr, acc_info );
 	
 	// Obtain loop count by looking at all the block counts.
 	unsigned loop_count = 0;
@@ -3167,8 +3167,8 @@ reorg_perf_qual ( Info *info)
 	    basic_block bb = bbs [i];
 	    loop_count = MAX( loop_count, bb->count.value ());
 	  }
-	//DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
-	//	loop_count, loop->nb_iterations_estimate);
+	DEBUG_L("loop_count = %d, nb_iterations_estimate = %ld\n",
+		loop_count, loop->nb_iterations_estimate);
 
 	// Create the variable infos
 	varInfo_t var_entry;
@@ -3205,12 +3205,12 @@ reorg_perf_qual ( Info *info)
 	  {
 	    fprintf ( stderr, "%d VarInfos\n", var_info.size ());
 	  }
-	//DEBUG_F(print_var_infos, stderr, var_info);
+	DEBUG_F(print_var_infos, stderr, var_info);
 
 	//
 	// Model the performance
 	//
-	//DEBUG_A("Model The Performance\n");
+	DEBUG_A("Model The Performance\n");
 
 	// Originally this was done per bb but now it has to be per
 	// loop. TBD But perf_bb is per loop so we need something similar
@@ -3222,16 +3222,16 @@ reorg_perf_qual ( Info *info)
 	    ReorgType_t *ri = pvi->rep_access->reorg;
 	    
 	    // Reorg accounting
-	    //DEBUG_L("\n");
-	    //DEBUG_A("Reorg Accounting\n");
+	    DEBUG_L("\n");
+	    DEBUG_A("Reorg Accounting\n");
 	    
 	    if( ri != NULL )
 	      {
 		double reorg_nca = 0.0;
 
-		//DEBUG_A("  for: ");
-		//DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
-		//INDENT(4);
+		DEBUG_A("  for: ");
+		DEBUG_F( flexible_print, stderr, ri->gcc_type, 1, (dump_flags_t)0);
+		INDENT(4);
 		for ( auto fldi = pvi->fields.begin (); fldi != pvi->fields.end (); fldi++ )
 		  {
 		    unsigned HOST_WIDE_INT fld_width =
@@ -3239,18 +3239,18 @@ reorg_perf_qual ( Info *info)
 		    double effect = alignment_effect ( fld_width);
 		    double product = loop_count * effect;
 		    reorg_nca += product;
-		    //DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
-		    //	    loop_count, effect, product, reorg_nca);
+		    DEBUG_A("Add loop_count * effect (%d * %f = %f) to reorg_nca (now %f)\n",
+		    	    loop_count, effect, product, reorg_nca);
 		  }
-		//INDENT(-4);
+		INDENT(-4);
 		ri->instance_interleave.reorg_perf += reorg_nca;
 		DEBUG_A("Add reorg_nca (%f) to reorg_perf (now %e)\n",
 			reorg_nca, ri->instance_interleave.reorg_perf);
               } // 699
 
 	    // regular accounting
-	    //DEBUG_L("\n");
-	    //DEBUG_A("Regular Accounting\n");
+	    DEBUG_L("\n");
+	    DEBUG_A("Regular Accounting\n");
 	    
 	    double regular_nca = 0.0;
 	    sbitmap cache_model = sbitmap_alloc(1);
@@ -3261,12 +3261,12 @@ reorg_perf_qual ( Info *info)
 		tree base_type; // = base_type_of ( access);
 		if ( pv2i->rep_access->reorg != NULL )
 		  {
-		    //DEBUG_A("Base type from reorg: ");
+		    DEBUG_A("Base type from reorg: ");
 		    base_type = pv2i->rep_access->reorg->gcc_type;
 		  }
 		else
 		  {
-		    //DEBUG_A("Base type from access: ");
+		    DEBUG_A("Base type from access: ");
 		    if ( TREE_TYPE ( access ) != NULL )
 		      {
 			base_type = base_type_of ( access);
@@ -3276,7 +3276,7 @@ reorg_perf_qual ( Info *info)
 			gcc_assert (0);
 		      }
 		  }
-		//DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+		DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
 
 		bool base_type_isa_decl = DECL_P ( base_type );
 
@@ -3286,31 +3286,31 @@ reorg_perf_qual ( Info *info)
 		tree base_type_size;
 		if ( base_type_isa_decl )
 		  {
-		    //DEBUG_A("decl\n");
+		    DEBUG_A("decl\n");
 		    switch ( TREE_CODE (base_type) )
 		      {
 		      case VAR_DECL:
 			{
-			  //DEBUG_A("VAR_DECL\n");
+			  DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( base_type);
 			  break;
 			}
 		      case FIELD_DECL:
 			{
-			  //DEBUG_A("VAR_DECL\n");
+			  DEBUG_A("VAR_DECL\n");
 			  base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE ( base_type));
 			  break;
 			}
 		      default:
 			{
-			  //DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
+			  DEBUG_A("other decl %s\n", code_str(TREE_CODE (base_type)));
 			  gcc_assert(0);
 			}
 		      }
 		  }
 		else
 		  {
-		    //DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
+		    DEBUG_A("nondecl %s\n", code_str(TREE_CODE (base_type)));
 		    if ( TREE_CODE ( base_type) == SSA_NAME )
 		      {
 			base_type_size = TYPE_SIZE_UNIT ( TREE_TYPE( base_type));
@@ -3320,7 +3320,9 @@ reorg_perf_qual ( Info *info)
 			base_type_size = TYPE_SIZE_UNIT ( base_type);
 		      }
 		  }
-		    
+
+		DEBUG_A("base_type_size %p = ", base_type_size);
+		DEBUG_F( flexible_print, stderr, base_type_size, 1, (dump_flags_t)0);
 		unsigned HOST_WIDE_INT len =
 		  (( tree_to_uhwi ( base_type_size)
 		     +
@@ -3329,10 +3331,10 @@ reorg_perf_qual ( Info *info)
 		   param_l1_cache_line_size)
 		  +
 		  1;
-		//DEBUG_L("\n");
-		//DEBUG_A("cache len = %d (lines), for: ", len);
-		//DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
-		//DEBUG("%sstruct\n")
+		DEBUG_L("\n");
+		DEBUG_A("cache len = %d (lines), for: ", len);
+		DEBUG_F( flexible_print, stderr, base_type, 0, (dump_flags_t)0);
+		DEBUG("%sstruct\n")
 	      
 		// TBD Does this clear the bits??? It needs to.
 		// Each bit represents a cache line.
@@ -3354,14 +3356,14 @@ reorg_perf_qual ( Info *info)
 			// why this is here and what it does. Sigh...
 			unsigned HOST_WIDE_INT base_offset =
 			  tree_to_uhwi ( DECL_FIELD_OFFSET( field_ex));
-			//DEBUG_L("\n");
-			//DEBUG_A("For field_ex: ");
-			//DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
-			//DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
+			DEBUG_L("\n");
+			DEBUG_A("For field_ex: ");
+			DEBUG_F( flexible_print, stderr, field_ex, 0, (dump_flags_t)0);
+			DEBUG(", nrbo %d, base_offset %d\n", nrbo, base_offset);
 			
 			// Access accounting
 
-			//INDENT(4);
+			INDENT(4);
 			for ( auto fldi = pv2i->fields.begin ();
 			      fldi != pv2i->fields.end (); fldi++ )
 			  {
@@ -3369,27 +3371,27 @@ reorg_perf_qual ( Info *info)
 			    unsigned HOST_WIDE_INT fld_width, fld_offset;
 			    fld_width = tree_to_uhwi ( DECL_SIZE ( field));
 			    fld_offset = tree_to_uhwi ( DECL_FIELD_OFFSET ( field));
-			    //DEBUG_A("Field: ");
-			    //DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
-			    //DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
-			    //INDENT(4);
+			    DEBUG_A("Field: ");
+			    DEBUG_F( flexible_print, stderr, field, 0, (dump_flags_t)0);
+			    DEBUG(", width = %d, offset = %d\n", fld_width, fld_offset);
+			    INDENT(4);
 			    int chari;
 			    for ( chari = 0; chari < fld_width; chari++ )
 			      {
 				int loc = (chari + fld_offset + base_offset)
 				  /
 				  param_l1_cache_line_size;
-				//DEBUG_A("loc: %d\n", loc);
+				DEBUG_A("loc: %d\n", loc);
 				bitmap_set_bit ( cache_model, loc);
 			      }
-			    //INDENT(-4);
+			    INDENT(-4);
 			  }
-			//INDENT(-4);
+			INDENT(-4);
 			unsigned bcount = bitmap_count_bits ( cache_model);
 			accum += bcount;
-			//DEBUG_L("\n");
-			//DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
-			//	bcount, accum);
+			DEBUG_L("\n");
+			DEBUG_A("Add popcount of cache (%d) to accum (now %f)\n",
+				bcount, accum);
 			bitmap_clear ( cache_model);
 		      }
 		  }
@@ -3397,22 +3399,22 @@ reorg_perf_qual ( Info *info)
 		  {
 		    nrbo = 1;
 		    accum++;
-		    //DEBUG_L("\n");
-		    //DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
+		    DEBUG_L("\n");
+		    DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
 		  }
 		#if 1	
 		double amount = accum / nrbo;
 		double product = amount * loop_count;
 		regular_nca += product;
-		//DEBUG_L("\n");
-		//DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
-		//	loop_count, accum, nrbo, product, regular_nca);
+		DEBUG_L("\n");
+		DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
+			loop_count, accum, nrbo, product, regular_nca);
 		#else
 		double amount = accum / nrbo;
 		regular_nca += amount;
-		//DEBUG_L("\n");
-		//DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
-		//	accum, nrbo, amount, regular_nca);
+		DEBUG_L("\n");
+		DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
+			accum, nrbo, amount, regular_nca);
 		#endif
 	      } // 739
 	    sbitmap_free ( cache_model);
@@ -3420,11 +3422,11 @@ reorg_perf_qual ( Info *info)
 	    if( ri != NULL ) {
 	      ri->instance_interleave.regular_perf += regular_nca;
               cache_accesses_noreorg += regular_nca;
-	      //DEBUG_L("\n");
-	      //DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
-	      //	      regular_nca, ri->instance_interleave.regular_perf);
-	      //DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
-	      //	      cache_accesses_noreorg);
+	      DEBUG_L("\n");
+	      DEBUG_A("Add regular_nca (%f) to regular_perf (now %e)",
+	      	      regular_nca, ri->instance_interleave.regular_perf);
+	      DEBUG_A("  and to cache_accesses_noreorg (now %e)\n",
+	      	      cache_accesses_noreorg);
             } else {
 	        cache_accesses += regular_nca;
             }
@@ -3492,12 +3494,12 @@ reorg_perf_qual ( Info *info)
       double raw_effect = with_opt/without_opt;
       double absolute_effect =
         (without_opt - with_opt) / total_cache_accesses;
-      //DEBUG_A("For ");
-      //DEBUG_F(flexible_print, stderr, reorgi->gcc_type, 0, (dump_flags_t)0);
-      //DEBUG(" with_opt: %e, without_opt %e, total_cache_accesses %e\n",
-      //	    with_opt, without_opt, total_cache_accesses);
-      //DEBUG_A("  Raw Effect: %5.4f, Absolute Effect %5.4f\n",
-      //	      raw_effect, absolute_effect);
+      DEBUG_A("For ");
+      DEBUG_F(flexible_print, stderr, reorgi->gcc_type, 0, (dump_flags_t)0);
+      DEBUG(" with_opt: %e, without_opt %e, total_cache_accesses %e\n",
+      	    with_opt, without_opt, total_cache_accesses);
+      DEBUG_A("  Raw Effect: %5.4f, Absolute Effect %5.4f\n",
+      	      raw_effect, absolute_effect);
 
       // Note, there would need to be a multi-pool case here if
       // that is every done.

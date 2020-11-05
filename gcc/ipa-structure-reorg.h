@@ -30,8 +30,8 @@ along with GCC; see the file COPYING3.  If not see
 #define PRINT_FORMAT false
 // Trun off actual transformations for testing
 #define BYPASS_TRANSFORM false
-
-#define CONSTIPATION 0
+// Use Erick's escape analysis
+#define USE_ESCAPE_ANALYSIS 0
 
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;

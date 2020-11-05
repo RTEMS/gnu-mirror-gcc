@@ -27,8 +27,10 @@ along with GCC; see the file COPYING3.  If not see
 #include <set>
 
 /* Logging function, useful for debugging.  */
+void log (const char *const fmt, ...) __attribute__((format(printf, 1, 0)));
+
 inline void
-log (const char *const fmt, ...)
+log (const char *const fmt, ...) 
 {
   if (!dump_file)
     return;
@@ -52,17 +54,17 @@ is_gimple_code (const gimple *stmt, const enum gimple_code ex_code)
 
 /* Determine if type A is complete.  */
 inline bool
-is_complete (const_tree a)
+is_complete (tree a)
 {
   gcc_assert (a);
-  const_tree type_size = TYPE_SIZE (a);
+  tree type_size = TYPE_SIZE (a);
   const bool _is_complete = NULL_TREE != type_size;
   return _is_complete;
 }
 
 /* Asserts type A is complete.  */
 inline void
-assert_is_complete (const_tree a)
+assert_is_complete (tree a)
 {
   const bool _is_complete = is_complete (a);
   gcc_assert (_is_complete);
@@ -70,14 +72,14 @@ assert_is_complete (const_tree a)
 
 /* Determine if type A is incomplete.  */
 inline bool
-is_incomplete (const_tree a)
+is_incomplete (tree a)
 {
   return !is_complete (a);
 }
 
 /* Assert type A has is EXPECTED_CODE.  */
 inline void
-assert_is_type (const_tree a, const enum tree_code expected_code)
+assert_is_type (tree a, const enum tree_code expected_code)
 {
   gcc_assert (a);
   const enum tree_code observed_code = TREE_CODE (a);
@@ -97,19 +99,19 @@ assert_is_gimple_rhs_class (const gimple *stmt,
   gcc_assert (succeeds);
 }
 
-/* There are some cases where I need to change a const_tree to a tree.
+/* There are some cases where I need to change a tree to a tree.
  * Some of these are part of the way the API is written.  To avoid
  * warnings, always use this function for casting away const-ness.
  */
 inline static tree
-const_tree_to_tree (const_tree t)
+tree_to_tree (tree t)
 {
   return (tree) t;
 }
 
 // TODO: Rename?
 // TSET_T stands for type set.
-typedef std::set<const_tree> tset_t;
+typedef std::set<tree> tset_t;
 
 /* Base class used for visiting tree nodes starting with root T.
  * It can handle recursive cases in the tree graph by holding
@@ -128,7 +130,7 @@ public:
   /* Main interface to type walker.
    * Walk type T.
    */
-  void walk (const_tree t);
+  void walk (tree t);
 
 protected:
 
@@ -136,19 +138,19 @@ protected:
   tset_t tset;
 
   /* Inner walking method, used to recurse.  */
-  void _walk (const_tree t);
+  void _walk (tree t);
 
   /* Common walking method for REFERENCE_TYPE, ARRAY_TYPE, and POINTER_TYPE.  */
-  void _walk_wrapper (const_tree t);
+  void _walk_wrapper (tree t);
 
   /* Common walking method for RECORD_TYPE and UNION_TYPE.  */
-  void _walk_record_or_union (const_tree t);
+  void _walk_record_or_union (tree t);
 
   /* Common walking method for FUNCTION_TYPE and METHOD_TYPE.  */
-  virtual void _walk_function_or_method (const_tree t);
+  virtual void _walk_function_or_method (tree t);
 
   /* If the type is memoized and we don't need to walk further down.  */
-  virtual bool is_memoized (__attribute__ ((unused)) const_tree t)
+  virtual bool is_memoized (__attribute__ ((unused)) tree t)
   {
     return false;
   }
@@ -159,7 +161,7 @@ protected:
      If you want to find a specific type in a specific order,
      (e.g. RECORD_TYPE and preorder)
      you can create a derived class and implement the function
-     void _walk_RECORD_TYPE_pre (const_tree).
+     void _walk_RECORD_TYPE_pre (tree).
 
      walk_##code is the function that calls
      the preorder callback
@@ -171,12 +173,12 @@ protected:
      specific tree code.
    */
 #define TypeWalkerFuncDecl(code) \
-  virtual void _walk_##code##_pre (__attribute__((unused)) const_tree t) \
+  virtual void _walk_##code##_pre (__attribute__((unused)) tree t) \
   {}; \
-  virtual void _walk_##code (const_tree t); \
-  virtual void _walk_##code##_post (__attribute__((unused)) const_tree t) \
+  virtual void _walk_##code (tree t); \
+  virtual void _walk_##code##_post (__attribute__((unused)) tree t) \
   {}; \
-  virtual void walk_##code (const_tree t)
+  virtual void walk_##code (tree t)
 
 // NOTE the lack of semicolon here.
 // This is so that when using the macro we can use a semi-colon
@@ -226,19 +228,19 @@ public:
   {};
 
   /* Walk tree E.  */
-  void walk (const_tree e);
+  void walk (tree e);
 
 private:
 
   /* Virtual function to be implemented.  Callback for all E in preorder.  */
-  virtual void _walk_pre (__attribute__ ((unused)) const_tree e)
+  virtual void _walk_pre (__attribute__ ((unused)) tree e)
   {};
 
   /* Inner method that will recurse for walking subtrees in E.  */
-  void _walk (const_tree e);
+  void _walk (tree e);
 
   /* Virtual function to be implemented.  Callback for all E in postorder.  */
-  virtual void _walk_post (__attribute__ ((unused)) const_tree e)
+  virtual void _walk_post (__attribute__ ((unused)) tree e)
   {};
 
   /* Walking subtrees generically.  Either it is a leaf node,
@@ -249,10 +251,10 @@ private:
      tree_code C is used to assert that we are visiting an operand
      of a specific tree code.
    */
-  inline void _walk_leaf (const_tree e, const enum tree_code c);
-  inline void _walk_op_n (const_tree e, unsigned n);
-  inline void _walk_op_0 (const_tree e, const enum tree_code c);
-  inline void _walk_op_1 (const_tree e, const enum tree_code c);
+  inline void _walk_leaf (tree e, const enum tree_code c);
+  inline void _walk_op_n (tree e, unsigned n);
+  inline void _walk_op_0 (tree e, const enum tree_code c);
+  inline void _walk_op_1 (tree e, const enum tree_code c);
 
   /* Virtual function declarations for the pre-order and post-order callbacks.
    * _walk_##code##_pre is the preorder callback
@@ -261,11 +263,11 @@ private:
    * _walk_##code##_post is the post-order callback.
    */
 #define ExprWalkerFuncDecl(code) 					   \
-  virtual void _walk_##code##_pre (__attribute__ ((unused)) const_tree e)  \
+  virtual void _walk_##code##_pre (__attribute__ ((unused)) tree e)  \
   {};									   \
-  void walk_##code (const_tree e);					   \
-  void _walk_##code (const_tree e);					   \
-  virtual void _walk_##code##_post (__attribute__ ((unused)) const_tree e) \
+  void walk_##code (tree e);					   \
+  void _walk_##code (tree e);					   \
+  virtual void _walk_##code##_post (__attribute__ ((unused)) tree e) \
   {}
 
   // Some of these are not "EXPR" codes, but they are reachable
@@ -346,11 +348,11 @@ protected:
    * These include the pre-order callbacks, walk subtrees,
    * and post-order callbacks.
    */
-  virtual void _walk_pre_tree(__attribute__((unused)) const_tree t)
+  virtual void _walk_pre_tree(__attribute__((unused)) tree t)
   {};
-  void walk_tree2(const_tree t);
-  void _walk_tree(const_tree t);
-  virtual void _walk_post_tree(__attribute__((unused)) const_tree t)
+  void walk_tree2(tree t);
+  void _walk_tree(tree t);
+  virtual void _walk_post_tree(__attribute__((unused)) tree t)
   {};
 
   virtual void _walk_pre_gimple(__attribute__((unused)) gimple* g)
@@ -445,16 +447,16 @@ struct type_partitions_s
   tset_t records;
 
   /* Determine if we have seen this type before.  */
-  bool in_universe (const_tree) const;
+  bool in_universe (tree) const;
 
   /* Determine if tree points to a record.  */
-  bool in_points_to_record (const_tree) const;
+  bool in_points_to_record (tree) const;
 
   /* Determine if tree does not point to a record.  */
-  bool in_complement (const_tree) const;
+  bool in_complement (tree) const;
 
   /* Insert either in points to record or complement.  */
-  void insert (const_tree, bool);
+  void insert (tree, bool);
 };
 
 typedef struct type_partitions_s tpartitions_t;
@@ -470,7 +472,7 @@ public:
   {};
 
   /* Main interface.  */
-  void collect (const_tree t);
+  void collect (tree t);
 
   /* Collect the result after walking all trees.  */
   tpartitions_t get_record_reaching_trees ()
@@ -491,7 +493,7 @@ private:
    * In other words, the contents are reset after every
    * call to collect.
    */
-  std::map<const_tree, bool> ptr;
+  std::map<tree, bool> ptr;
 
   /* The type partition set that will hold partitions for
    * points to record or does not point to record.
@@ -510,10 +512,10 @@ private:
   void _sanity_check ();
 
   /* Store T into partition depending on PTR.  */
-  void _collect_simple (const_tree t);
+  void _collect_simple (tree t);
 
   /* If the value is in PTRSET, no need to visit the lower nodes.  */
-  virtual bool is_memoized (const_tree t);
+  virtual bool is_memoized (tree t);
 
   /* These functions insert and erase elements in PTR.
 
@@ -523,36 +525,36 @@ private:
    * for all different type T.  However, we want to avoid
    * collecting FIELD_DECL, ARGS, and some other none-types.
    */
-  virtual void _walk_VOID_TYPE_pre (const_tree t);
-  virtual void _walk_VOID_TYPE_post (const_tree t);
-  virtual void _walk_INTEGER_TYPE_pre (const_tree t);
-  virtual void _walk_INTEGER_TYPE_post (const_tree t);
-  virtual void _walk_REAL_TYPE_pre (const_tree t);
-  virtual void _walk_REAL_TYPE_post (const_tree t);
-  virtual void _walk_FIXED_POINT_TYPE_pre (const_tree t);
-  virtual void _walk_FIXED_POINT_TYPE_post (const_tree t);
-  virtual void _walk_COMPLEX_TYPE_pre (const_tree t);
-  virtual void _walk_COMPLEX_TYPE_post (const_tree t);
-  virtual void _walk_ENUMERAL_TYPE_pre (const_tree t);
-  virtual void _walk_ENUMERAL_TYPE_post (const_tree t);
-  virtual void _walk_BOOLEAN_TYPE_pre (const_tree t);
-  virtual void _walk_BOOLEAN_TYPE_post (const_tree t);
-  virtual void _walk_ARRAY_TYPE_pre (const_tree t);
-  virtual void _walk_ARRAY_TYPE_post (const_tree t);
-  virtual void _walk_POINTER_TYPE_pre (const_tree t);
-  virtual void _walk_POINTER_TYPE_post (const_tree t);
-  virtual void _walk_REFERENCE_TYPE_pre (const_tree t);
-  virtual void _walk_REFERENCE_TYPE_post (const_tree t);
-  virtual void _walk_UNION_TYPE_pre (const_tree t);
-  virtual void _walk_UNION_TYPE_post (const_tree t);
-  virtual void _walk_FUNCTION_TYPE_pre (const_tree t);
-  virtual void _walk_FUNCTION_TYPE_post (const_tree t);
-  virtual void _walk_METHOD_TYPE_pre (const_tree t);
-  virtual void _walk_METHOD_TYPE_post (const_tree t);
+  virtual void _walk_VOID_TYPE_pre (tree t);
+  virtual void _walk_VOID_TYPE_post (tree t);
+  virtual void _walk_INTEGER_TYPE_pre (tree t);
+  virtual void _walk_INTEGER_TYPE_post (tree t);
+  virtual void _walk_REAL_TYPE_pre (tree t);
+  virtual void _walk_REAL_TYPE_post (tree t);
+  virtual void _walk_FIXED_POINT_TYPE_pre (tree t);
+  virtual void _walk_FIXED_POINT_TYPE_post (tree t);
+  virtual void _walk_COMPLEX_TYPE_pre (tree t);
+  virtual void _walk_COMPLEX_TYPE_post (tree t);
+  virtual void _walk_ENUMERAL_TYPE_pre (tree t);
+  virtual void _walk_ENUMERAL_TYPE_post (tree t);
+  virtual void _walk_BOOLEAN_TYPE_pre (tree t);
+  virtual void _walk_BOOLEAN_TYPE_post (tree t);
+  virtual void _walk_ARRAY_TYPE_pre (tree t);
+  virtual void _walk_ARRAY_TYPE_post (tree t);
+  virtual void _walk_POINTER_TYPE_pre (tree t);
+  virtual void _walk_POINTER_TYPE_post (tree t);
+  virtual void _walk_REFERENCE_TYPE_pre (tree t);
+  virtual void _walk_REFERENCE_TYPE_post (tree t);
+  virtual void _walk_UNION_TYPE_pre (tree t);
+  virtual void _walk_UNION_TYPE_post (tree t);
+  virtual void _walk_FUNCTION_TYPE_pre (tree t);
+  virtual void _walk_FUNCTION_TYPE_post (tree t);
+  virtual void _walk_METHOD_TYPE_pre (tree t);
+  virtual void _walk_METHOD_TYPE_post (tree t);
 
   /* When a RECORD_TYPE is found, update all values in PTR to true.  */
-  virtual void _walk_RECORD_TYPE_pre (const_tree t);
-  virtual void _walk_RECORD_TYPE_post (const_tree t);
+  virtual void _walk_RECORD_TYPE_pre (tree t);
+  virtual void _walk_RECORD_TYPE_post (tree t);
 };
 
 /* Derived class from TypeWalker.  This class
@@ -568,76 +570,76 @@ public:
   {};
 
   /* Main method, returns a stringified version of T.  */
-  std::string stringify (const_tree t);
+  std::string stringify (tree t);
 
   /* Only get type identifier.  */
-  static std::string get_type_identifier (const_tree t);
+  static std::string get_type_identifier (tree t);
 
   /* If field is not anonymous, return field identifier.  */
-  static std::string get_field_identifier (const_tree t);
+  static std::string get_field_identifier (tree t);
 
 private:
   /* Working string... will hold result for stringify.  */
   std::string _stringification;
 
   /* Append get_tree_code_name.  */
-  void _stringify_simple (const_tree t);
+  void _stringify_simple (tree t);
 
   /* Append identifier and "{".  */
-  void _stringify_aggregate_pre (const_tree t);
+  void _stringify_aggregate_pre (tree t);
 
   /* Append "}".  */
-  void _stringify_aggregate_post (const_tree t);
+  void _stringify_aggregate_post (tree t);
 
   /* Append "function {".  */
   // TODO: For C++ we will need to change this for methods.
-  void _stringify_fm_pre (const_tree t);
-  virtual void _walk_METHOD_TYPE_pre (const_tree t);
-  virtual void _walk_METHOD_TYPE_post (const_tree t);
-  virtual void _walk_FUNCTION_TYPE_pre (const_tree t);
-  virtual void _walk_FUNCTION_TYPE_post (const_tree t);
+  void _stringify_fm_pre (tree t);
+  virtual void _walk_METHOD_TYPE_pre (tree t);
+  virtual void _walk_METHOD_TYPE_post (tree t);
+  virtual void _walk_FUNCTION_TYPE_pre (tree t);
+  virtual void _walk_FUNCTION_TYPE_post (tree t);
 
   /* Append "}".  */
-  void _stringify_fm_post (const_tree t);
+  void _stringify_fm_post (tree t);
 
   /* Most of the pre-order walk can probably be replaced by
    * a catch all pre-order call back.
    * TODO: implement that...
    */
-  virtual void _walk_VOID_TYPE_pre (const_tree t);
-  virtual void _walk_INTEGER_TYPE_pre (const_tree t);
-  virtual void _walk_REAL_TYPE_pre (const_tree t);
-  virtual void _walk_FIXED_POINT_TYPE_pre (const_tree t);
-  virtual void _walk_COMPLEX_TYPE_pre (const_tree t);
-  virtual void _walk_BOOLEAN_TYPE_pre (const_tree t);
-  virtual void _walk_OFFSET_TYPE_pre (const_tree t);
-  virtual void _walk_return_pre (const_tree t);
-  virtual void _walk_args_pre (const_tree t);
+  virtual void _walk_VOID_TYPE_pre (tree t);
+  virtual void _walk_INTEGER_TYPE_pre (tree t);
+  virtual void _walk_REAL_TYPE_pre (tree t);
+  virtual void _walk_FIXED_POINT_TYPE_pre (tree t);
+  virtual void _walk_COMPLEX_TYPE_pre (tree t);
+  virtual void _walk_BOOLEAN_TYPE_pre (tree t);
+  virtual void _walk_OFFSET_TYPE_pre (tree t);
+  virtual void _walk_return_pre (tree t);
+  virtual void _walk_args_pre (tree t);
 
   /* Append "*".  */
-  virtual void _walk_POINTER_TYPE_post (const_tree t);
+  virtual void _walk_POINTER_TYPE_post (tree t);
 
   /* Append "&".  */
-  virtual void _walk_REFERENCE_TYPE_post (const_tree t);
+  virtual void _walk_REFERENCE_TYPE_post (tree t);
 
   /* Append "[]".  */
-  virtual void _walk_ARRAY_TYPE_post (const_tree t);
+  virtual void _walk_ARRAY_TYPE_post (tree t);
 
   /* Append "record" */
-  virtual void _walk_RECORD_TYPE_pre (const_tree t);
-  virtual void _walk_RECORD_TYPE_post (const_tree t);
+  virtual void _walk_RECORD_TYPE_pre (tree t);
+  virtual void _walk_RECORD_TYPE_post (tree t);
 
   /* Append "union" */
-  virtual void _walk_UNION_TYPE_pre (const_tree t);
-  virtual void _walk_UNION_TYPE_post (const_tree t);
+  virtual void _walk_UNION_TYPE_pre (tree t);
+  virtual void _walk_UNION_TYPE_post (tree t);
 
   /* Append "," */
-  virtual void _walk_field_post (const_tree t);
-  virtual void _walk_return_post (const_tree t);
+  virtual void _walk_field_post (tree t);
+  virtual void _walk_return_post (tree t);
 
   /* Append "," */
-  virtual void _walk_args_post (const_tree t);
-  virtual void _walk_arg_post (const_tree t);
+  virtual void _walk_args_post (tree t);
+  virtual void _walk_arg_post (tree t);
 };
 
 /* ExprCollector is an implementation of ExprWalker.  It walks
@@ -660,7 +662,7 @@ public:
 
 private:
   /* Catch all callback for all nested expressions E.  */
-  virtual void _walk_pre (const_tree e);
+  virtual void _walk_pre (tree e);
 };
 
 /* Derived from GimpleWalker.  Its purpose is to walk all gimple
@@ -689,7 +691,7 @@ public:
 private:
 
   /* Call back for global variables.  */
-  virtual void _walk_pre_tree (const_tree);
+  virtual void _walk_pre_tree (tree);
 
   /* Call back for gassign.  */
   virtual void _walk_pre_gassign (gassign *s);
@@ -745,7 +747,7 @@ public:
   }
 
 private:
-  virtual void _walk_pre_gcall (gcall *s)
+  virtual void _walk_pre_gcall (__attribute__((unused)) gcall *s)
   {
     this->_no_external = false;
   }
@@ -805,7 +807,7 @@ struct Reason
 {};
 };
 
-typedef std::map<const_tree, Reason> typemap;
+typedef std::map<tree, Reason> typemap;
 
 /* Type Escaper propagates information on whether a type escapes
  * to all types reachable by a root type.  It also propagates
@@ -836,29 +838,29 @@ public:
   void print_reasons ();
 
   // Update type T with escaping reason R.
-  void update (const_tree t, Reason r);
+  void update (tree t, Reason r);
 
 private:
   // TODO: we can probably reduce the amount of functions
   // by adding a catch all pre-order callback...
-  virtual void _walk_POINTER_TYPE_pre (const_tree t);
-  virtual void _walk_POINTER_TYPE_post (const_tree t);
-  virtual void _walk_REFERENCE_TYPE_pre (const_tree t);
-  virtual void _walk_ARRAY_TYPE_pre (const_tree t);
-  virtual void _walk_ARRAY_TYPE_post (const_tree t);
-  virtual void _walk_RECORD_TYPE_pre (const_tree t);
-  virtual void _walk_RECORD_TYPE_post (const_tree t);
-  virtual void _walk_field_pre (const_tree t);
-  virtual bool is_memoized (const_tree t);
+  virtual void _walk_POINTER_TYPE_pre (tree t);
+  virtual void _walk_POINTER_TYPE_post (tree t);
+  virtual void _walk_REFERENCE_TYPE_pre (tree t);
+  virtual void _walk_ARRAY_TYPE_pre (tree t);
+  virtual void _walk_ARRAY_TYPE_post (tree t);
+  virtual void _walk_RECORD_TYPE_pre (tree t);
+  virtual void _walk_RECORD_TYPE_post (tree t);
+  virtual void _walk_field_pre (tree t);
+  virtual bool is_memoized (tree t);
 
   /* Mark escaping reason as having a function pointer in a structure,
    * propagate up and down.  */
-  virtual void _walk_METHOD_TYPE_pre (const_tree t);
-  virtual void _walk_FUNCTION_TYPE_pre (const_tree t);
+  virtual void _walk_METHOD_TYPE_pre (tree t);
+  virtual void _walk_FUNCTION_TYPE_pre (tree t);
 
   /* Mark escaping reason as having a union and propagate up and down.  */
-  virtual void _walk_UNION_TYPE_pre (const_tree t);
-  virtual void _walk_UNION_TYPE_post (const_tree t);
+  virtual void _walk_UNION_TYPE_pre (tree t);
+  virtual void _walk_UNION_TYPE_post (tree t);
 
   // Record how many nested unions the current context is in.
   unsigned _inside_union;
@@ -871,7 +873,7 @@ private:
   Reason _reason;
 
   // Recursive inner function.
-  void _update (const_tree t);
+  void _update (tree t);
 
   // Final method that places types from calc to partitions.
   void place_escaping_types_in_set ();
@@ -885,7 +887,7 @@ public:
   {};
 
   /* Main interface: T escapes because R.  */
-  void update (const_tree t, Reason r);
+  void update (tree t, Reason r);
 
   /* Will be used to propagate escaping reasons to Types.  */
   TypeEscaper typeEscaper;
@@ -901,26 +903,26 @@ private:
   // is the subexpression being examined.
   // The bottom of the stack is the expression called on the update
   // function.
-  std::stack<const_tree> _stack;
+  std::stack<tree> _stack;
 
   // Reason to propagate across all subexpressions.
   Reason _r;
 
   // push to stack.
-  virtual void _walk_pre (const_tree e);
+  virtual void _walk_pre (tree e);
 
   // pop to stack.
-  virtual void _walk_post (const_tree e);
+  virtual void _walk_post (tree e);
 
   // Check if there is a cast between the
   // expression (MEM_REF (SSA_NAME))
   // SSA_NAME is the subexpression of MEM_REF.
-  virtual void _walk_SSA_NAME_pre (const_tree e);
+  virtual void _walk_SSA_NAME_pre (tree e);
 
   // If the expression E is a constructor then we need
   // to mark these types as escaping because we cannot
   // deal with constructors at the moment.
-  virtual void _walk_CONSTRUCTOR_pre (const_tree e);
+  virtual void _walk_CONSTRUCTOR_pre (tree e);
 };
 
 // Do a type structural equality for two types.
@@ -931,15 +933,15 @@ public:
   {};
 
   // Return TRUE if A and B have equal structures
-  bool equal (const_tree a, const_tree b);
+  bool equal (tree a, tree b);
 
 protected:
   // Recursive _equal
-  virtual bool _equal (const_tree a, const_tree b);
+  virtual bool _equal (tree a, tree b);
 
 private:
   // Use to limit recursion if we are revisiting a node
-  typedef std::set<const_tree> tset_t;
+  typedef std::set<tree> tset_t;
 
   // Limit recursion for LHS
   tset_t set_l;
@@ -948,14 +950,14 @@ private:
   tset_t set_r;
 
   // Determine if the code is equal
-  bool _equal_code (const_tree a, const_tree b);
+  bool _equal_code (tree a, tree b);
 
   // Wrapper around POINTER_TYPE, ARRAY_TYPE and REFERENCE_TYPE
-  bool _equal_wrapper (const_tree a, const_tree b);
+  bool _equal_wrapper (tree a, tree b);
 
   // Different types we are comparing
 #define TSE_FUNC_DECL(code)					\
-  virtual bool _walk_##code (const_tree l, const_tree r)
+  virtual bool _walk_##code (tree l, tree r)
 
   // Current types that can be compared.
   TSE_FUNC_DECL (VOID_TYPE);
@@ -986,7 +988,7 @@ public:
   {};
 
 protected:
-  virtual bool _equal (const_tree l, const_tree r);
+  virtual bool _equal (tree l, tree r);
 };
 
 /* Inspect gimple code and find reasons why types might escape given a gimple
@@ -1011,7 +1013,7 @@ public:
 protected:
   /* Set of undefined functions, this set is filled with
    * functions obtained via FOR_EACH_FUNCTION_WITH_GIMPLE_BODY.  */
-  typedef std::set<const_tree> undefset;
+  typedef std::set<tree> undefset;
   undefset undefined;
 
   /* Initializes undefined.  */
@@ -1019,11 +1021,11 @@ protected:
 
   /* Return true if it is a known builtin function.  */
   static bool filter_known_function (cgraph_node *);
-  static bool filter_known_function (const_tree);
+  static bool filter_known_function (tree);
 
   /* Return true if function is externally visible.  */
   static bool is_function_escaping (cgraph_node *);
-  static bool is_function_escaping (const_tree);
+  static bool is_function_escaping (tree);
 
   /* Return true if variable is externally visible.  */
   static bool is_variable_escaping (varpool_node *);
@@ -1049,7 +1051,7 @@ protected:
    * types introduced by profiling and mark them as escaping.
    * TODO: Improve this.
    */
-  virtual void _walk_pre_tree (const_tree t);
+  virtual void _walk_pre_tree (tree t);
 };
 
 /*
@@ -1068,7 +1070,7 @@ private:
   std::map<tree, bool> &_whitelisted;
 
   /* Determine if cast comes from a known function.  */
-  static bool follow_def_to_find_if_really_cast (const_tree);
+  static bool follow_def_to_find_if_really_cast (tree);
 
   /* If arguments are casted, mark them as escaping.
    * Assignments from malloc and other known functions
@@ -1091,10 +1093,10 @@ const unsigned Read = 0x01u;
 const unsigned Write = 0x02u;
 
 // maps FIELD_DECL -> bitflag.
-typedef std::map<const_tree, unsigned> field_access_map_t;
+typedef std::map<tree, unsigned> field_access_map_t;
 
 // maps RECORD_TYPE -> (FIELD_DECL -> bitflag).
-typedef std::map<const_tree, field_access_map_t> record_field_map_t;
+typedef std::map<tree, field_access_map_t> record_field_map_t;
 
 // Class used to determine if a FIELD is read, written or never accessed.
 class TypeAccessor : public TypeWalker
@@ -1108,14 +1110,14 @@ private:
   record_field_map_t &_map;
 
   // set of trees which are memoized and we don't need to look into them.
-  std::set<const_tree> memoized_map;
+  std::set<tree> memoized_map;
 
   // If a RECORD_TYPE is walked into, add all fields in struct to
   // record_field_map.
-  virtual void _walk_RECORD_TYPE_pre (const_tree t);
-  void add_all_fields_in_struct (const_tree t);
+  virtual void _walk_RECORD_TYPE_pre (tree t);
+  void add_all_fields_in_struct (tree t);
 
-  bool is_memoized (const_tree t);
+  bool is_memoized (tree t);
 };
 
 // Determine if a FIELD is read, written or never accessed from
@@ -1127,13 +1129,13 @@ public:
   {};
 
   // Expr E is accessed in A manner.
-  void update (const_tree e, unsigned a);
+  void update (tree e, unsigned a);
 
   // Print results.
   void print_accesses ();
 
   // Add all fields to map.  Initialize with empty.
-  void add_all_fields_in_struct (const_tree t);
+  void add_all_fields_in_struct (tree t);
 
   // Get final results.
   record_field_map_t get_map ();
@@ -1143,7 +1145,7 @@ private:
   unsigned _access;
 
   // Stack to keep track of how current subexpression was reached.
-  std::stack<const_tree> _stack;
+  std::stack<tree> _stack;
 
   // Holds main results.
   record_field_map_t record_field_map;
@@ -1155,7 +1157,7 @@ private:
   // If ADDR_EXPR is parent expression that means
   // The address of a field is taken.  Mark
   // all fields as possibly read.
-  virtual void _walk_COMPONENT_REF_pre (const_tree e);
+  virtual void _walk_COMPONENT_REF_pre (tree e);
 
   // Check if parent expression is MEM_REF.
   // This means that an optimization was made
@@ -1165,13 +1167,13 @@ private:
   // TODO: We don't necessarily need to mark them as
   // possibly read if we update these expressions to
   // point to the correct address in the future.
-  virtual void _walk_ADDR_EXPR_pre (const_tree e);
+  virtual void _walk_ADDR_EXPR_pre (tree e);
 
   // Push to stack.
-  virtual void _walk_pre (const_tree t);
+  virtual void _walk_pre (tree t);
 
   // Pop from stack.
-  virtual void _walk_post (const_tree t);
+  virtual void _walk_post (tree t);
 };
 
 /* Walk all gimple and determine if fields were accessed.  */
@@ -1212,7 +1214,7 @@ private:
 
 typedef std::set<unsigned> field_offsets_t;
 
-typedef std::map<const_tree, field_offsets_t> record_field_offset_map_t;
+typedef std::map<tree, field_offsets_t> record_field_offset_map_t;
 
 // Partition types into escaping or non escaping sets.
 tpartitions_t

@@ -48,6 +48,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "ssa-iterators.h"
 #include <stack>
 #include "ipa-type-escape-analysis.h"
+#include "value-range.h"
+#include "stringpool.h"
+#include "tree-ssanames.h"
 
 static void setup_debug_flags ( Info *);
 static void initial_debug_info ( Info *);
@@ -125,6 +128,7 @@ ipa_structure_reorg ( void)
   std::vector <ProgDecl_t>      Prog_Decl;
   std::map    <tree,BoolPair_t> StructTypes; // TBD horrible type name
 
+  DEBUG("SAMPLE DEGUG\n");
   //DEBUG_L( "Running ipa_structure_reorg\n");
   //INDENT(2);
 
@@ -526,7 +530,7 @@ reorg_analysis_debug ( Info *info, ReorgType *reorg )
   }
 }
 
-#if 1
+#if USE_ESCAPE_ANALYSIS
 static bool
 find_decls_and_types ( Info *info)
 {
@@ -1000,17 +1004,21 @@ add_reorg_type (
 {
   tree tmv_type = TYPE_MAIN_VARIANT ( base);
   //tree type2add = tmv_type ? tmv_type : base;
+  //ReorgType_t rt =
+  //  { 0, del, base, NULL, NULL, false, false, false,
+  //    { 0}, { 0}, { 0, 0, 0, NULL, 0.0, 0.0, false}};
   ReorgType_t rt =
-    { 0, del, base, NULL, NULL, false, false, false,
+    { 0, del, tmv_type, NULL, NULL, false, false, false,
       { 0}, { 0}, { 0, 0, 0, NULL, 0.0, 0.0, false}};
 
-  //DEBUG_L("add_reorg_type: ");
-  //DEBUG_F(print_generic_expr, base, (dump_flags_t)0);
-  //DEBUG("\n");
+  DEBUG_L("add_reorg_type: ");
+  DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
   info->reorg_type->push_back ( rt);
+  #if !USE_ESCAPE_ANALYSIS
   // Remember the intial assumption is the type added will be deleted
   // and is marked to be deleted.
   info->num_deleted++;
+  #endif
 }
 #endif
 
@@ -2695,12 +2703,12 @@ bool same_type_p(
 		 tree a, tree b
 		 )
 {
-  //DEBUG( "same_type_p:\n");
-  //DEBUG( " a: TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(a)),TYPE_NAME(a));
-  //DEBUG_F( print_generic_expr, stderr, a, (dump_flags_t)-1);
-  //DEBUG( "\n b TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(b)),TYPE_NAME(b));
-  //DEBUG_F( print_generic_expr, stderr, b, (dump_flags_t)-1);
-  //DEBUG( "\n");
+  DEBUG( "same_type_p:\n");
+  DEBUG( " a: TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(a)),TYPE_NAME(a));
+  DEBUG_F( print_generic_expr, stderr, a, (dump_flags_t)-1);
+  DEBUG( "\n b TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(b)),TYPE_NAME(b));
+  DEBUG_F( print_generic_expr, stderr, b, (dump_flags_t)-1);
+  DEBUG( "\n");
 
   // This replaces part of the below
   bool a_rec = TREE_CODE ( a ) == RECORD_TYPE;
@@ -2721,7 +2729,7 @@ bool same_type_p(
 	      
   bool ret = TYPE_NAME ( a) == TYPE_NAME ( b);
   
-  //DEBUG( "returns %s\n", ret ? "true" : "false");
+  DEBUG( "returns %s\n", ret ? "true" : "false");
   
   return ret;
 }
@@ -2732,8 +2740,8 @@ bool same_type_p(
 ReorgType_t *
 get_reorgtype_info ( tree type, Info* info)
 {
-  //DEBUG_L( "get_reorgtype_info: type = ");
-  //DEBUG_F(  flexible_print, stderr, type, 1, (dump_flags_t)0);
+  DEBUG_L( "get_reorgtype_info: type = ");
+  DEBUG_F(  flexible_print, stderr, type, 1, (dump_flags_t)0);
   
   // Note, I'm going to use the most stupid and slowest possible way
   // to do this. The advanage is it will be super easy and almost
@@ -2751,9 +2759,9 @@ get_reorgtype_info ( tree type, Info* info)
     // so this is just a place holder until I can get an answer
     // from the gcc community. Note, this is a big issue.
     // Remember, the same_type_p here is my own temporary hack.
-    //DEBUG_L("");
-    //DEBUG_F( print_generic_expr, stderr, type, TDF_DETAILS);
-    //DEBUG("\n");
+    DEBUG_L("");
+    DEBUG_F( print_generic_expr, stderr, type, TDF_DETAILS);
+    DEBUG("\n");
     if ( same_type_p ( ri->gcc_type, type2check ) )
     {
       //DEBUG_A( "  returns %p\n", &(*ri));
@@ -2761,7 +2769,7 @@ get_reorgtype_info ( tree type, Info* info)
       return &(*ri);
     }
   }
-  //DEBUG_A( "  returns NULL\n");
+  DEBUG_A( "  returns NULL\n");
   return NULL;
 }
 

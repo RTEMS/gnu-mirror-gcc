@@ -175,17 +175,17 @@ public:
 
 private:
   // Compute new RECORD_TYPE.
-  virtual void _walk_RECORD_TYPE_post (const_tree);
+  virtual void _walk_RECORD_TYPE_post (tree);
 };
 
 /* Compare FIELD_DECL tree based on TYPE_SIZE unit */
 static bool
-compare_FIELD_DECLs_TYPE_SIZE (const_tree _l, const_tree _r)
+compare_FIELD_DECLs_TYPE_SIZE (tree _l, tree _r)
 {
   gcc_assert (_l && _r);
 
-  tree l = const_tree_to_tree (_l);
-  tree r = const_tree_to_tree (_r);
+  tree l = tree_to_tree (_l);
+  tree r = tree_to_tree (_r);
 
   const enum tree_code code_l = TREE_CODE (l);
   const enum tree_code code_r = TREE_CODE (r);
@@ -217,9 +217,9 @@ compare_FIELD_DECLs_TYPE_SIZE (const_tree _l, const_tree _r)
 }
 
 void
-TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
+TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
 {
-  const_tree t2 = for_reference.top ();
+  tree t2 = for_reference.top ();
   gcc_assert (t2 == t);
   for_reference.pop ();
 
@@ -235,7 +235,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
   // So, now we want to do a couple of things.
   // First, collect all fields in a struct and make a copy of them
   bool is_modified = get_is_modified (t);
-  std::vector<const_tree> to_reorder;
+  std::vector<tree> to_reorder;
   is_modified = true;
   for (field_tuple_list_t::iterator i = field_tuple_list.begin (), e = field_tuple_list.end ();
        i != e; ++i)
@@ -253,7 +253,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
 	   TypeStringifier::get_field_identifier (field_tuple.first).c_str (),
 	   !modified_field ? "true" : "false");
       to_reorder.push_back (
-	(const_tree) copy_node (const_tree_to_tree (field_tuple.first)));
+	(tree) copy_node (tree_to_tree (field_tuple.first)));
     }
 
   if (is_modified)
@@ -286,21 +286,21 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
 
 	  gcc_assert (!modified_field && is_modified);
 	  // Create new TYPE_FIELDS with the order we want
-	  for (std::vector<const_tree>::iterator j = to_reorder.begin (), f = to_reorder.end (); j != f; ++j)
+	  for (std::vector<tree>::iterator j = to_reorder.begin (), f = to_reorder.end (); j != f; ++j)
 	    {
 	      entered_loop = true;
-	      const_tree current_field_inner = *j;
+	      tree current_field_inner = *j;
 	      if (!prev_field)
 		{
-		  TYPE_FIELDS (copy) = const_tree_to_tree (current_field_inner);
+		  TYPE_FIELDS (copy) = tree_to_tree (current_field_inner);
 		}
 	      else
 		{
 		  DECL_CHAIN (prev_field)
-		    = const_tree_to_tree (current_field_inner);
+		    = tree_to_tree (current_field_inner);
 		}
 
-	      prev_field = const_tree_to_tree (current_field_inner);
+	      prev_field = tree_to_tree (current_field_inner);
 	    }
 
 	  if (entered_loop)
@@ -308,10 +308,10 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
 	}
 
       // Modify _reorg_fields map
-      for (std::vector<const_tree>::iterator i = to_reorder.begin (), e = to_reorder.end (); i != e; ++i)
+      for (std::vector<tree>::iterator i = to_reorder.begin (), e = to_reorder.end (); i != e; ++i)
 	{
-	  const_tree to_find = *i;
-	  unsigned to_find_i = bitpos_of_field (const_tree_to_tree (to_find));
+	  tree to_find = *i;
+	  unsigned to_find_i = bitpos_of_field (tree_to_tree (to_find));
 	  const char *to_find_str
 	    = TypeStringifier::get_field_identifier (to_find).c_str ();
 	  // O^2 for now but an improvement can be to change this
@@ -324,7 +324,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
 	      if (haystack_i == to_find_i)
 		{
 		  _reorg_fields[field]
-		    = std::make_pair (const_tree_to_tree (to_find), false);
+		    = std::make_pair (tree_to_tree (to_find), false);
 		  log ("substituting %s for %s\n", to_find_str, haystack);
 		}
 	    }
@@ -367,7 +367,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (const_tree t)
       TYPE_MAIN_VARIANT (copy) = is_modified ? copy : TYPE_MAIN_VARIANT (copy);
       if (is_modified)
 	layout_type (copy);
-      tree _t = const_tree_to_tree (t);
+      tree _t = tree_to_tree (t);
       _reorg_map[t] = is_modified ? copy : _t;
     }
 
@@ -391,14 +391,14 @@ GimpleAccesserFieldReordering::_walk_pre_gassign (gassign *s)
     {
     case GIMPLE_TERNARY_RHS:
       {
-	const_tree rhs3 = gimple_assign_rhs3 (s);
+	tree rhs3 = gimple_assign_rhs3 (s);
 	gcc_assert (rhs3);
 	exprAccessor.update (rhs3, Empty);
       }
     /* fall-through */
     case GIMPLE_BINARY_RHS:
       {
-	const_tree rhs2 = gimple_assign_rhs2 (s);
+	tree rhs2 = gimple_assign_rhs2 (s);
 	gcc_assert (rhs2);
 	exprAccessor.update (rhs2, Empty);
       }
@@ -406,9 +406,9 @@ GimpleAccesserFieldReordering::_walk_pre_gassign (gassign *s)
     case GIMPLE_UNARY_RHS:
     case GIMPLE_SINGLE_RHS:
       {
-	const_tree rhs1 = gimple_assign_rhs1 (s);
+	tree rhs1 = gimple_assign_rhs1 (s);
 	exprAccessor.update (rhs1, Empty);
-	const_tree lhs = gimple_assign_lhs (s);
+	tree lhs = gimple_assign_lhs (s);
 	if (!lhs)
 	  break;
 	exprAccessor.update (lhs, Empty);
@@ -427,12 +427,12 @@ GimpleAccesserFieldReordering::_walk_pre_gcall (gcall *s)
   unsigned n = gimple_call_num_args (s);
   for (unsigned i = 0; i < n; i++)
     {
-      const_tree a = gimple_call_arg (s, i);
+      tree a = gimple_call_arg (s, i);
       gcc_assert (a);
       exprAccessor.update (a, Empty);
     }
 
-  const_tree lhs = gimple_call_lhs (s);
+  tree lhs = gimple_call_lhs (s);
   if (!lhs)
     return;
   exprAccessor.update (lhs, Empty);
@@ -442,7 +442,7 @@ GimpleAccesserFieldReordering::_walk_pre_gcall (gcall *s)
 void
 GimpleAccesserFieldReordering::_walk_pre_greturn (greturn *s)
 {
-  const_tree val = gimple_return_retval (s);
+  tree val = gimple_return_retval (s);
   if (!val)
     return;
   exprAccessor.update (val, Empty);
@@ -452,8 +452,8 @@ GimpleAccesserFieldReordering::_walk_pre_greturn (greturn *s)
 void
 GimpleAccesserFieldReordering::_walk_pre_gcond (gcond *s)
 {
-  const_tree lhs = gimple_cond_lhs (s);
-  const_tree rhs = gimple_cond_rhs (s);
+  tree lhs = gimple_cond_lhs (s);
+  tree rhs = gimple_cond_rhs (s);
   gcc_assert (lhs && rhs);
   exprAccessor.update (lhs, Empty);
   exprAccessor.update (rhs, Empty);
@@ -521,25 +521,25 @@ record_field_map_t static find_fields_accessed ()
  */
 reorg_maps_t
 get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
-			  std::set<const_tree> to_modify)
+			  std::set<tree> to_modify)
 {
   TypeStringifier stringifier;
 
   TypeReconstructorFieldReordering reconstructor (record_field_offset_map,
 						  "reorder");
-  for (std::set<const_tree>::const_iterator i = to_modify.begin (),
+  for (std::set<tree>::const_iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
-      const_tree record = *i;
+      tree record = *i;
       reconstructor.walk (TYPE_MAIN_VARIANT (record));
     }
 
-  for (std::set<const_tree>::const_iterator i = to_modify.begin (),
+  for (std::set<tree>::const_iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
-      const_tree record = *i;
+      tree record = *i;
       reconstructor.walk (record);
     }
 
@@ -550,11 +550,11 @@ get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
   // Also, we found some types for which TYPE_CACHED_VALUES_P is not being
   // rewritten.  This is probably indicative of a bug in
   // TypeReconstructorFieldReordering.
-  for (std::map<const_tree, tree>::const_iterator i = map.begin (),
+  for (std::map<tree, tree>::const_iterator i = map.begin (),
 						  e = map.end ();
        i != e; ++i)
     {
-      const_tree o_record = i->first;
+      tree o_record = i->first;
       std::string o_name = stringifier.stringify (o_record);
       log ("original: %s\n", o_name.c_str ());
       tree r_record = i->second;
@@ -565,7 +565,7 @@ get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
 	continue;
       tree m_record = TYPE_MAIN_VARIANT (r_record);
       // Info: We had a bug where some TYPED_CACHED_VALUES were preserved?
-      tree _o_record = const_tree_to_tree (o_record);
+      tree _o_record = tree_to_tree (o_record);
       TYPE_CACHED_VALUES_P (_o_record) = false;
       TYPE_CACHED_VALUES_P (m_record) = false;
 
@@ -600,7 +600,7 @@ lto_fr_execute ()
     return 0;
 
   // Prepare for transformation.
-  std::set<const_tree> to_modify
+  std::set<tree> to_modify
     = get_all_types_pointing_to (record_field_offset_map,
 				 escaping_nonescaping_sets);
 

@@ -126,22 +126,22 @@ along with GCC; see the file COPYING3.  If not see
  * Find all non_escaping types which point to RECORD_TYPEs in
  * record_field_offset_map.
  */
-std::set<const_tree>
+std::set<tree>
 get_all_types_pointing_to (record_field_offset_map_t record_field_offset_map,
 			   tpartitions_t casting)
 {
   const tset_t &non_escaping = casting.non_escaping;
 
-  std::set<const_tree> specific_types;
+  std::set<tree> specific_types;
   TypeStringifier stringifier;
 
   // Here we are just placing the types of interest in a set.
-  for (std::map<const_tree, field_offsets_t>::const_iterator i
+  for (std::map<tree, field_offsets_t>::const_iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      const_tree record = i->first;
+      tree record = i->first;
       std::string name = stringifier.stringify (record);
       specific_types.insert (record);
     }
@@ -150,16 +150,16 @@ get_all_types_pointing_to (record_field_offset_map_t record_field_offset_map,
 
   // SpecificTypeCollector will collect all types which point to the types in
   // the set.
-  for (std::set<const_tree>::const_iterator i = non_escaping.begin (),
+  for (std::set<tree>::const_iterator i = non_escaping.begin (),
 					    e = non_escaping.end ();
        i != e; ++i)
     {
-      const_tree type = *i;
+      tree type = *i;
       specifier.walk (type);
     }
 
   // These are all the types which need modifications.
-  std::set<const_tree> to_modify = specifier.get_set ();
+  std::set<tree> to_modify = specifier.get_set ();
   return to_modify;
 }
 
@@ -178,24 +178,24 @@ get_all_types_pointing_to (record_field_offset_map_t record_field_offset_map,
  */
 reorg_maps_t
 get_types_replacement (record_field_offset_map_t record_field_offset_map,
-		       std::set<const_tree> to_modify)
+		       std::set<tree> to_modify)
 {
   TypeStringifier stringifier;
 
   TypeReconstructor reconstructor (record_field_offset_map, "reorg");
-  for (std::set<const_tree>::const_iterator i = to_modify.begin (),
+  for (std::set<tree>::const_iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
-      const_tree record = *i;
+      tree record = *i;
       reconstructor.walk (TYPE_MAIN_VARIANT (record));
     }
 
-  for (std::set<const_tree>::const_iterator i = to_modify.begin (),
+  for (std::set<tree>::const_iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
-      const_tree record = *i;
+      tree record = *i;
       reconstructor.walk (record);
     }
 
@@ -205,11 +205,11 @@ get_types_replacement (record_field_offset_map_t record_field_offset_map,
   // Here, we are just making sure that we are not doing anything too crazy.
   // Also, we found some types for which TYPE_CACHED_VALUES_P is not being
   // rewritten.  This is probably indicative of a bug in TypeReconstructor.
-  for (std::map<const_tree, tree>::const_iterator i = map.begin (),
+  for (std::map<tree, tree>::const_iterator i = map.begin (),
 						  e = map.end ();
        i != e; ++i)
     {
-      const_tree o_record = i->first;
+      tree o_record = i->first;
       std::string o_name = stringifier.stringify (o_record);
       log ("original: %s\n", o_name.c_str ());
       tree r_record = i->second;
@@ -220,7 +220,7 @@ get_types_replacement (record_field_offset_map_t record_field_offset_map,
 	continue;
       tree m_record = TYPE_MAIN_VARIANT (r_record);
       // Info: We had a bug where some TYPED_CACHED_VALUES were preserved?
-      tree _o_record = const_tree_to_tree (o_record);
+      tree _o_record = tree_to_tree (o_record);
       TYPE_CACHED_VALUES_P (_o_record) = false;
       TYPE_CACHED_VALUES_P (m_record) = false;
 
@@ -252,44 +252,44 @@ substitute_types_in_program (reorg_record_map_t map,
 /* Return a set of trees which point to the set of trees
  * that can be modified.
  */
-std::set<const_tree>
+std::set<tree>
 SpecificTypeCollector::get_set ()
 {
   return to_return;
 }
 
 void
-SpecificTypeCollector::_walk_POINTER_TYPE_pre (const_tree t)
+SpecificTypeCollector::_walk_POINTER_TYPE_pre (tree t)
 {
   path.insert (t);
 }
 
 void
-SpecificTypeCollector::_walk_POINTER_TYPE_post (const_tree t)
+SpecificTypeCollector::_walk_POINTER_TYPE_post (tree t)
 {
   path.erase (t);
 }
 
 void
-SpecificTypeCollector::_walk_ARRAY_TYPE_pre (const_tree t)
+SpecificTypeCollector::_walk_ARRAY_TYPE_pre (tree t)
 {
   path.insert (t);
 }
 
 void
-SpecificTypeCollector::_walk_ARRAY_TYPE_post (const_tree t)
+SpecificTypeCollector::_walk_ARRAY_TYPE_post (tree t)
 {
   path.erase (t);
 }
 
 void
-SpecificTypeCollector::_walk_UNION_TYPE_pre (const_tree t)
+SpecificTypeCollector::_walk_UNION_TYPE_pre (tree t)
 {
   path.insert (t);
 }
 
 void
-SpecificTypeCollector::_walk_UNION_TYPE_post (const_tree t)
+SpecificTypeCollector::_walk_UNION_TYPE_post (tree t)
 {
   path.erase (t);
 }
@@ -298,7 +298,7 @@ SpecificTypeCollector::_walk_UNION_TYPE_post (const_tree t)
  * all types which we are currently keeping track of in TO_RETURN.
  */
 void
-SpecificTypeCollector::_walk_RECORD_TYPE_pre (const_tree t)
+SpecificTypeCollector::_walk_RECORD_TYPE_pre (tree t)
 {
   const bool in_set
     = _collect_these_types.find (t) != _collect_these_types.end ();
@@ -307,17 +307,17 @@ SpecificTypeCollector::_walk_RECORD_TYPE_pre (const_tree t)
   if (!must_collect)
     return;
 
-  for (std::set<const_tree>::const_iterator i = path.begin (),
+  for (std::set<tree>::const_iterator i = path.begin (),
 					    e = path.end ();
        i != e; ++i)
     {
-      const_tree type = *i;
+      tree type = *i;
       to_return.insert (type);
     }
 }
 
 void
-SpecificTypeCollector::_walk_RECORD_TYPE_post (const_tree t)
+SpecificTypeCollector::_walk_RECORD_TYPE_post (tree t)
 {
   path.erase (t);
 }
@@ -341,7 +341,7 @@ TypeReconstructor::get_field_map ()
 }
 
 void
-TypeReconstructor::set_is_not_modified_yet (const_tree t)
+TypeReconstructor::set_is_not_modified_yet (tree t)
 {
   gcc_assert (t);
   const bool is_in_reorg_map = _reorg_map.find (t) != _reorg_map.end ();
@@ -349,7 +349,7 @@ TypeReconstructor::set_is_not_modified_yet (const_tree t)
   if (is_in_reorg_map)
     mark_all_pointing_here_as_modified ();
 
-  const_tree tt = TREE_TYPE (t);
+  tree tt = TREE_TYPE (t);
   if (!tt)
     return;
 
@@ -379,7 +379,7 @@ TypeReconstructor::mark_all_pointing_here_as_modified ()
 }
 
 bool
-TypeReconstructor::get_is_modified (const_tree t)
+TypeReconstructor::get_is_modified (tree t)
 {
   gcc_assert (t);
   const bool in_map = modified_map.find (t) != modified_map.end ();
@@ -388,7 +388,7 @@ TypeReconstructor::get_is_modified (const_tree t)
   modified_map.erase (t);
 
   bool points_to_record = false;
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree tt = _t;
   while (TREE_TYPE (tt))
     {
@@ -400,7 +400,7 @@ TypeReconstructor::get_is_modified (const_tree t)
 }
 
 bool
-TypeReconstructor::is_memoized (const_tree t)
+TypeReconstructor::is_memoized (tree t)
 {
   const bool already_changed = _reorg_map.find (t) != _reorg_map.end ();
   mark_all_pointing_here_as_modified ();
@@ -414,7 +414,7 @@ TypeReconstructor::get_new_suffix ()
 }
 
 tree
-get_new_identifier (const_tree type, const char *suffix)
+get_new_identifier (tree type, const char *suffix)
 {
   const char *identifier = TypeStringifier::get_type_identifier (type).c_str ();
   const bool is_new_type = strstr (identifier, suffix);
@@ -443,12 +443,12 @@ get_new_identifier (const_tree type, const char *suffix)
 //
 //
 void
-TypeReconstructor::_walk_ARRAY_TYPE_pre (const_tree t)
+TypeReconstructor::_walk_ARRAY_TYPE_pre (tree t)
 {
   for_reference.push (t);
   set_is_not_modified_yet (t);
 
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree copy = build_variant_type_copy (_t);
   tree domain = TYPE_DOMAIN (t);
   if (domain)
@@ -463,9 +463,9 @@ TypeReconstructor::_walk_ARRAY_TYPE_pre (const_tree t)
 }
 
 void
-TypeReconstructor::_walk_ARRAY_TYPE_post (const_tree t)
+TypeReconstructor::_walk_ARRAY_TYPE_post (tree t)
 {
-  const_tree t2 = for_reference.top ();
+  tree t2 = for_reference.top ();
   gcc_assert (t2 == t);
   for_reference.pop ();
   tree copy = in_progress.top ();
@@ -493,7 +493,7 @@ TypeReconstructor::_walk_ARRAY_TYPE_post (const_tree t)
   if (is_modified)
     layout_type (copy);
   TYPE_CACHED_VALUES_P (copy) = false;
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree tt = _t;
   while (TREE_TYPE (tt))
     {
@@ -508,20 +508,20 @@ TypeReconstructor::_walk_ARRAY_TYPE_post (const_tree t)
 }
 
 void
-TypeReconstructor::_walk_POINTER_TYPE_pre (const_tree t)
+TypeReconstructor::_walk_POINTER_TYPE_pre (tree t)
 {
   for_reference.push (t);
   set_is_not_modified_yet (t);
 
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree copy = build_variant_type_copy (_t);
   in_progress.push (copy);
 }
 
 void
-TypeReconstructor::_walk_POINTER_TYPE_post (const_tree t)
+TypeReconstructor::_walk_POINTER_TYPE_post (tree t)
 {
-  const_tree t2 = for_reference.top ();
+  tree t2 = for_reference.top ();
   gcc_assert (t2 == t);
   for_reference.pop ();
   tree copy = in_progress.top ();
@@ -536,7 +536,7 @@ TypeReconstructor::_walk_POINTER_TYPE_post (const_tree t)
 		       : TYPE_NAME (copy);
   TYPE_CACHED_VALUES_P (copy) = false;
 
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree tt = _t;
   while (TREE_TYPE (tt))
     {
@@ -550,12 +550,12 @@ TypeReconstructor::_walk_POINTER_TYPE_post (const_tree t)
 }
 
 void
-TypeReconstructor::_walk_RECORD_TYPE_pre (const_tree t)
+TypeReconstructor::_walk_RECORD_TYPE_pre (tree t)
 {
   const bool is_main_variant = TYPE_MAIN_VARIANT (t) == t;
   if (!is_main_variant)
     {
-      const_tree main_variant = TYPE_MAIN_VARIANT (t);
+      tree main_variant = TYPE_MAIN_VARIANT (t);
       _walk_RECORD_TYPE_pre (main_variant);
       TypeWalker::_walk_RECORD_TYPE (main_variant);
       _walk_RECORD_TYPE_post (main_variant);
@@ -565,16 +565,16 @@ TypeReconstructor::_walk_RECORD_TYPE_pre (const_tree t)
   for_reference.push (t);
   // We don't know if we will modify this type t
   // So, let's make a copy.  Just in case.
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree copy = build_variant_type_copy (_t);
   in_progress.push (copy);
   field_list_stack.push (field_tuple_list_t ());
 }
 
 void
-TypeReconstructor::_walk_RECORD_TYPE_post (const_tree t)
+TypeReconstructor::_walk_RECORD_TYPE_post (tree t)
 {
-  const_tree t2 = for_reference.top ();
+  tree t2 = for_reference.top ();
   gcc_assert (t2 == t);
   for_reference.pop ();
 
@@ -648,7 +648,7 @@ TypeReconstructor::_walk_RECORD_TYPE_post (const_tree t)
       TYPE_MAIN_VARIANT (copy) = is_modified ? copy : TYPE_MAIN_VARIANT (copy);
       if (is_modified)
 	layout_type (copy);
-      tree _t = const_tree_to_tree (t);
+      tree _t = tree_to_tree (t);
       _reorg_map[t] = is_modified ? copy : _t;
     }
 
@@ -660,13 +660,13 @@ TypeReconstructor::_walk_RECORD_TYPE_post (const_tree t)
 }
 
 void
-TypeReconstructor::_walk_field_pre (const_tree t)
+TypeReconstructor::_walk_field_pre (tree t)
 {
   for_reference.push (t);
   // We don't know if we will rewrite the field
   // that we are working on.  So proactively, let's make
   // a copy.
-  tree _t = const_tree_to_tree (t);
+  tree _t = tree_to_tree (t);
   tree copy = copy_node (_t);
   tree type_copy = build_variant_type_copy ((TREE_TYPE (_t)));
   TREE_TYPE (copy) = type_copy;
@@ -676,9 +676,9 @@ TypeReconstructor::_walk_field_pre (const_tree t)
 }
 
 void
-TypeReconstructor::_walk_field_post (const_tree t)
+TypeReconstructor::_walk_field_post (tree t)
 {
-  const_tree t2 = for_reference.top ();
+  tree t2 = for_reference.top ();
   gcc_assert (t2 == t);
   for_reference.pop ();
 
@@ -688,7 +688,7 @@ TypeReconstructor::_walk_field_post (const_tree t)
   in_progress.pop ();
 
   // What record does this field belongs to?
-  const_tree record = for_reference.top ();
+  tree record = for_reference.top ();
 
   field_offsets_t field_offsets = _records[record];
   // What's the field offset?
@@ -700,7 +700,7 @@ TypeReconstructor::_walk_field_post (const_tree t)
     = field_offsets.find (f_offset) != field_offsets.end ();
   if (can_field_be_deleted)
     mark_all_pointing_here_as_modified ();
-  const_tree original_type = TREE_TYPE (t);
+  tree original_type = TREE_TYPE (t);
   const bool type_memoized = is_memoized (original_type);
 
   TREE_TYPE (copy)
@@ -719,9 +719,9 @@ TypeReconstructor::_walk_field_post (const_tree t)
 
 // Relayout parameters
 void
-ExprTypeRewriter::_walk_PARM_DECL_post (const_tree t)
+ExprTypeRewriter::_walk_PARM_DECL_post (tree t)
 {
-  tree temp = const_tree_to_tree (t);
+  tree temp = tree_to_tree (t);
   tree ttemp = TREE_TYPE (temp);
   TypeStringifier stringifier;
   const char *name = stringifier.stringify (ttemp).c_str ();
@@ -734,7 +734,7 @@ ExprTypeRewriter::_walk_PARM_DECL_post (const_tree t)
 
 // Update return types
 void
-ExprTypeRewriter::_walk_FUNCTION_DECL_post (const_tree t)
+ExprTypeRewriter::_walk_FUNCTION_DECL_post (tree t)
 {
   tree fn_type = TREE_TYPE (t);
   // This is saying that we cannot have indirect functions
@@ -760,7 +760,7 @@ ExprTypeRewriter::_walk_FUNCTION_DECL_post (const_tree t)
 
 // Rewrite MEM_REF operand 1
 void
-ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
+ExprTypeRewriter::_walk_MEM_REF_post (tree e)
 {
   tree op0 = TREE_OPERAND (e, 0);
   tree t2 = TREE_TYPE (op0);
@@ -774,7 +774,7 @@ ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
     {
       log ("success\n");
       tree r_t = _map[t2];
-      tree _e = const_tree_to_tree (op0);
+      tree _e = tree_to_tree (op0);
       TREE_TYPE (_e) = r_t;
     }
   // The second operand is a pointer constant.
@@ -789,9 +789,9 @@ ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
   if (!already_rewritten)
     return;
 
-  const_tree old_type = _imap[t];
+  tree old_type = _imap[t];
   assert_is_type (old_type, POINTER_TYPE);
-  const_tree old_base_type = TREE_TYPE (old_type);
+  tree old_base_type = TREE_TYPE (old_type);
   tree old_type_size_tree = TYPE_SIZE_UNIT (old_base_type);
   int old_type_size_int = tree_to_shwi (old_type_size_tree);
 
@@ -809,7 +809,7 @@ ExprTypeRewriter::_walk_MEM_REF_post (const_tree e)
     = old_offset / old_type_size_int * reorg_type_size_int + remainder;
 
   tree new_offset_tree = build_int_cst (TREE_TYPE (op1), new_offset);
-  tree _e = const_tree_to_tree (e);
+  tree _e = tree_to_tree (e);
   TREE_OPERAND (_e, 1) = new_offset_tree;
 }
 
@@ -823,8 +823,8 @@ ExprTypeRewriter::is_interesting_type (tree t)
   if (!interesting)
     return false;
 
-  const_tree const_possibly_copy = _imap[t];
-  tree possibly_copy = const_tree_to_tree (const_possibly_copy);
+  tree const_possibly_copy = _imap[t];
+  tree possibly_copy = tree_to_tree (const_possibly_copy);
   const bool is_copy = possibly_copy == t;
   interesting = !is_copy;
   if (!interesting)
@@ -865,8 +865,8 @@ ExprTypeRewriter::handle_pointer_arithmetic_diff (gimple *s, tree op_0)
   tree reorg_type_size_tree = TYPE_SIZE_UNIT (inner_reorg_type);
   int reorg_type_size_int = tree_to_shwi (reorg_type_size_tree);
 
-  const_tree const_old_type = _imap[reorg_type];
-  tree old_type = const_tree_to_tree (const_old_type);
+  tree const_old_type = _imap[reorg_type];
+  tree old_type = tree_to_tree (const_old_type);
   tree inner_old_type = TREE_TYPE (old_type);
   gcc_assert (old_type);
   tree old_type_size_tree = TYPE_SIZE_UNIT (inner_old_type);
@@ -980,8 +980,8 @@ ExprTypeRewriter::handle_pointer_arithmetic_nonconstant (gimple *s, tree op_0,
   tree reorg_type_size_tree = TYPE_SIZE_UNIT (reorg_inner_type);
   int reorg_type_size_int = tree_to_shwi (reorg_type_size_tree);
   // That means that the old type is
-  const_tree const_old_type_tree = _imap[reorg_type_tree];
-  tree old_type_tree = const_tree_to_tree (const_old_type_tree);
+  tree const_old_type_tree = _imap[reorg_type_tree];
+  tree old_type_tree = tree_to_tree (const_old_type_tree);
   tree old_inner_type = TREE_TYPE (old_type_tree);
   tree old_type_size_tree = TYPE_SIZE_UNIT (old_inner_type);
   int old_type_size_int = tree_to_shwi (old_type_size_tree);
@@ -1056,7 +1056,7 @@ ExprTypeRewriter::handle_pointer_arithmetic_constants (gimple *s, tree p,
     return;
 
   tree reorg_type = possibly_reorged_type; // this is the type of the variable
-  const_tree original_type = _imap[reorg_type];
+  tree original_type = _imap[reorg_type];
   // If we are here, that means that our type has the ".reorg" suffix
   // Let's add a sanity check
   bool has_suffix
@@ -1100,7 +1100,7 @@ ExprTypeRewriter::handle_pointer_arithmetic_constants (gimple *s, tree p,
 
 /* substitute types in post-order visit.  */
 void
-ExprTypeRewriter::_walk_post (const_tree e)
+ExprTypeRewriter::_walk_post (tree e)
 {
   gcc_assert (e);
   tree t = TREE_TYPE (e);
@@ -1109,17 +1109,17 @@ ExprTypeRewriter::_walk_post (const_tree e)
     return;
 
   tree r_t = _map[t];
-  tree _e = const_tree_to_tree (e);
+  tree _e = tree_to_tree (e);
   TREE_TYPE (_e) = r_t;
 }
 
 /* Rewrite Field.  */
 void
-ExprTypeRewriter::_walk_COMPONENT_REF_post (const_tree e)
+ExprTypeRewriter::_walk_COMPONENT_REF_post (tree e)
 {
   gcc_assert (e);
 
-  const_tree f = TREE_OPERAND (e, 1);
+  tree f = TREE_OPERAND (e, 1);
   // So, what we need is a map between this field and the new field
   const bool in_map = _map2.find (f) != _map2.end ();
   if (!in_map)
@@ -1128,7 +1128,7 @@ ExprTypeRewriter::_walk_COMPONENT_REF_post (const_tree e)
   std::pair<tree, bool> p = _map2[f];
   tree n_f = p.first;
   bool is_deleted = p.second;
-  tree _e = const_tree_to_tree (e);
+  tree _e = tree_to_tree (e);
   TREE_OPERAND (_e, 1) = n_f;
 
   if (!is_deleted)
@@ -1139,7 +1139,7 @@ ExprTypeRewriter::_walk_COMPONENT_REF_post (const_tree e)
 }
 
 void
-GimpleTypeRewriter::_walk_pre_tree (const_tree e)
+GimpleTypeRewriter::_walk_pre_tree (tree e)
 {
   // This is for local variables
   // and other declarations
@@ -1155,14 +1155,14 @@ GimpleTypeRewriter::_walk_pre_tree (const_tree e)
   const bool is_valid = is_interesting && is_var_decl;
   if (!is_valid)
     return;
-  tree _e = const_tree_to_tree (e);
+  tree _e = tree_to_tree (e);
   relayout_decl (_e);
 }
 
 void
 GimpleTypeRewriter::_walk_pre_greturn (greturn *s)
 {
-  const_tree val = gimple_return_retval (s);
+  tree val = gimple_return_retval (s);
   if (!val)
     return;
   exprTypeRewriter.walk (val);
@@ -1223,7 +1223,7 @@ GimpleTypeRewriter::handle_pointer_arithmetic (gimple *s)
 
   tree integer_constant = is_op_0_icst ? op_0 : op_1;
   tree maybe_pointer = is_op_0_icst ? op_1 : op_0;
-  const_tree maybe_pointer_t = TREE_TYPE (maybe_pointer);
+  tree maybe_pointer_t = TREE_TYPE (maybe_pointer);
   assert_is_type (maybe_pointer_t, POINTER_TYPE);
   tree pointer_variable = maybe_pointer;
 
@@ -1244,22 +1244,22 @@ GimpleTypeRewriter::_walk_pre_gassign (gassign *s)
     {
     case GIMPLE_TERNARY_RHS:
       {
-	const_tree rhs3 = gimple_assign_rhs3 (s);
+	tree rhs3 = gimple_assign_rhs3 (s);
 	exprTypeRewriter.walk (rhs3);
       }
     /* fall-through */
     case GIMPLE_BINARY_RHS:
       {
-	const_tree rhs2 = gimple_assign_rhs2 (s);
+	tree rhs2 = gimple_assign_rhs2 (s);
 	exprTypeRewriter.walk (rhs2);
       }
     /* fall-through */
     case GIMPLE_UNARY_RHS:
     case GIMPLE_SINGLE_RHS:
       {
-	const_tree rhs1 = gimple_assign_rhs1 (s);
+	tree rhs1 = gimple_assign_rhs1 (s);
 	exprTypeRewriter.walk (rhs1);
-	const_tree lhs = gimple_assign_lhs (s);
+	tree lhs = gimple_assign_lhs (s);
 	if (!lhs)
 	  break;
 	// Here is the only place where we likely can delete a statement.

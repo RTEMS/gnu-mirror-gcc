@@ -343,7 +343,7 @@ lto_dead_field_elimination ()
     return;
 
     // Prepare for transformation.
-  std::set<const_tree> to_modify
+  std::set<tree> to_modify
     = get_all_types_pointing_to (record_field_offset_map,
 				 escaping_nonescaping_sets);
   reorg_maps_t replacements
@@ -411,7 +411,7 @@ record_field_map_t static find_fields_accessed ()
   return record_field_map;
 }
 
-/* Find equivalent RECORD_TYPE trees to const_tree r_i.
+/* Find equivalent RECORD_TYPE trees to tree r_i.
  * This equivalence will be used for merging the results of field accesses
  * across all equivalent RECORD_TYPE trees.
 
@@ -419,22 +419,22 @@ record_field_map_t static find_fields_accessed ()
  * and it is a tree for which this method is going to find the rest of
  * equivalent trees found in record_field_map.
  */
-static std::vector<const_tree>
-find_equivalent_trees (const_tree r_i, record_field_map_t record_field_map,
+static std::vector<tree>
+find_equivalent_trees (tree r_i, record_field_map_t record_field_map,
 		       tpartitions_t casting)
 {
   TypeIncompleteEquality equality;
-  std::vector<const_tree> equivalence;
+  std::vector<tree> equivalence;
   bool is_rin_record = casting.in_points_to_record (r_i);
   if (!is_rin_record)
     return equivalence;
 
-  for (std::map<const_tree, field_access_map_t>::const_iterator j
+  for (std::map<tree, field_access_map_t>::const_iterator j
        = record_field_map.begin (),
        f = record_field_map.end ();
        j != f; j++)
     {
-      const_tree r_j = j->first;
+      tree r_j = j->first;
       const bool pointer_equal = r_i == r_j;
       if (pointer_equal)
 	continue;
@@ -459,7 +459,7 @@ find_equivalent_trees (const_tree r_i, record_field_map_t record_field_map,
  * tree (RECORD_TYPE) -> unsigned (bitpos_of_field for read fields).
  */
 static void
-add_offset_only_if_read (const_tree field, unsigned access,
+add_offset_only_if_read (tree field, unsigned access,
 			 field_offsets_t &field_offset)
 {
   assert_is_type (field, FIELD_DECL);
@@ -467,7 +467,7 @@ add_offset_only_if_read (const_tree field, unsigned access,
   if (!is_read)
     return;
 
-  tree _field = const_tree_to_tree (field);
+  tree _field = tree_to_tree (field);
   unsigned f_offset = bitpos_of_field (_field);
   field_offset.insert (f_offset);
 }
@@ -483,7 +483,7 @@ static void
 keep_only_read_fields_from_field_map (field_access_map_t &field_map,
 				      field_offsets_t &field_offset)
 {
-  for (std::map<const_tree, unsigned>::iterator j = field_map.begin (),
+  for (std::map<tree, unsigned>::iterator j = field_map.begin (),
 						f = field_map.end ();
        j != f; ++j)
     {
@@ -497,14 +497,14 @@ keep_only_read_fields_from_field_map (field_access_map_t &field_map,
  */
 static void
 keep_only_read_fields_from_equivalent_field_maps (
-  std::vector<const_tree> equivalent, record_field_map_t &record_field_map,
+  std::vector<tree> equivalent, record_field_map_t &record_field_map,
   field_offsets_t &field_offset)
 {
-  for (std::vector<const_tree>::iterator j = equivalent.begin (),
+  for (std::vector<tree>::iterator j = equivalent.begin (),
 					 f = equivalent.end ();
        j != f; j++)
     {
-      const_tree r_j = *j;
+      tree r_j = *j;
       field_access_map_t equivalent_field_map = record_field_map[r_j];
       keep_only_read_fields_from_field_map (equivalent_field_map, field_offset);
     }
@@ -517,14 +517,14 @@ keep_only_read_fields_from_equivalent_field_maps (
 static void
 erase_if_no_fields_can_be_deleted (
   record_field_offset_map_t &record_field_offset_map,
-  std::set<const_tree> &to_keep, std::set<const_tree> &to_erase)
+  std::set<tree> &to_keep, std::set<tree> &to_erase)
 {
-  for (std::map<const_tree, field_offsets_t>::iterator i
+  for (std::map<tree, field_offsets_t>::iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      const_tree record = i->first;
+      tree record = i->first;
       const bool keep = to_keep.find (record) != to_keep.end ();
       if (keep)
 	continue;
@@ -532,11 +532,11 @@ erase_if_no_fields_can_be_deleted (
       to_erase.insert (record);
     }
 
-  for (std::set<const_tree>::iterator i = to_erase.begin (),
+  for (std::set<tree>::iterator i = to_erase.begin (),
 				      e = to_erase.end ();
        i != e; ++i)
     {
-      const_tree record = *i;
+      tree record = *i;
       record_field_offset_map.erase (record);
     }
 }
@@ -548,15 +548,15 @@ erase_if_no_fields_can_be_deleted (
 static void
 mark_escaping_types_to_be_deleted (
   record_field_offset_map_t &record_field_offset_map,
-  std::set<const_tree> &to_erase, tpartitions_t casting)
+  std::set<tree> &to_erase, tpartitions_t casting)
 {
   const tset_t &non_escaping = casting.non_escaping;
-  for (std::map<const_tree, field_offsets_t>::iterator i
+  for (std::map<tree, field_offsets_t>::iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      const_tree record = i->first;
+      tree record = i->first;
       const bool in_set = non_escaping.find (record) != non_escaping.end ();
       if (in_set)
 	continue;
@@ -573,13 +573,13 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 {
   bool has_fields_that_can_be_deleted = false;
   record_field_offset_map_t record_field_offset_map;
-  for (std::map<const_tree, field_access_map_t>::iterator i
+  for (std::map<tree, field_access_map_t>::iterator i
        = record_field_map.begin (),
        e = record_field_map.end ();
        i != e; ++i)
     {
-      const_tree r_i = i->first;
-      std::vector<const_tree> equivalence
+      tree r_i = i->first;
+      std::vector<tree> equivalence
 	= find_equivalent_trees (r_i, record_field_map, casting);
       field_offsets_t field_offset;
       field_access_map_t original_field_map = record_field_map[r_i];
@@ -596,16 +596,16 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
   // we need to compute the complement...
 
   // Improve: This is tightly coupled, I need to decouple it...
-  std::set<const_tree> to_erase;
-  std::set<const_tree> to_keep;
+  std::set<tree> to_erase;
+  std::set<tree> to_keep;
   mark_escaping_types_to_be_deleted (record_field_offset_map, to_erase,
 				     casting);
-  for (std::map<const_tree, field_offsets_t>::iterator i
+  for (std::map<tree, field_offsets_t>::iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      const_tree record = i->first;
+      tree record = i->first;
       const bool will_be_erased = to_erase.find (record) != to_erase.end ();
       // No need to compute which fields can be deleted if type is escaping
       if (will_be_erased)
@@ -654,7 +654,7 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 // Main interface to TypeWalker
 // Start recursive walk
 void
-TypeWalker::walk (const_tree t)
+TypeWalker::walk (tree t)
 {
   gcc_assert (t);
   this->tset.clear ();
@@ -662,7 +662,7 @@ TypeWalker::walk (const_tree t)
 }
 
 void
-TypeWalker::_walk (const_tree type)
+TypeWalker::_walk (tree type)
 {
   // Improve, verify that having a type is an invariant.
   // I think there was a specific example which didn't
@@ -763,7 +763,7 @@ TypeWalker::_walk (const_tree type)
 // and after we need to
 // call the post-order callback.
 #define TypeWalkerFuncDef(code)						\
-  void TypeWalker::walk_##code (const_tree t)				\
+  void TypeWalker::walk_##code (tree t)				\
   {									\
     assert_is_type (t, code);						\
     _walk_##code##_pre (t);						\
@@ -772,7 +772,7 @@ TypeWalker::_walk (const_tree type)
   }
 
 #define TypeWalkerFuncDefInternal(code)					\
-  void TypeWalker::_walk_##code (__attribute__ ((unused)) const_tree t) \
+  void TypeWalker::_walk_##code (__attribute__ ((unused)) tree t) \
   {}
 
 TypeWalkerFuncDef (VOID_TYPE)
@@ -795,9 +795,9 @@ TypeWalkerFuncDefInternal (ENUMERAL_TYPE)
 /* walk wrapper is used for unwrapping
  * REFERENCE_TYPE, POINTER_TYPE, ARRAY_TYPE.
  */
-void TypeWalker::_walk_wrapper (const_tree t)
+void TypeWalker::_walk_wrapper (tree t)
 {
-  const_tree inner_type = TREE_TYPE (t);
+  tree inner_type = TREE_TYPE (t);
   // I think I encountered this code:
   // FIXME: Do we really need this?
   if (!inner_type)
@@ -808,7 +808,7 @@ void TypeWalker::_walk_wrapper (const_tree t)
 }
 
 #define TypeWalkerFuncDefWrapper(code)		\
-  void TypeWalker::_walk_##code (const_tree t)  \
+  void TypeWalker::_walk_##code (tree t)  \
   { _walk_wrapper (t); }
 
 TypeWalkerFuncDef (POINTER_TYPE)
@@ -820,7 +820,7 @@ TypeWalkerFuncDefWrapper (ARRAY_TYPE)
 TypeWalkerFuncDef (RECORD_TYPE)
 
 void
-TypeWalker::_walk_RECORD_TYPE (const_tree t)
+TypeWalker::_walk_RECORD_TYPE (tree t)
 {
   _walk_record_or_union (t);
 }
@@ -828,13 +828,13 @@ TypeWalker::_walk_RECORD_TYPE (const_tree t)
 TypeWalkerFuncDef (UNION_TYPE)
 
 void
-TypeWalker::_walk_UNION_TYPE (const_tree t)
+TypeWalker::_walk_UNION_TYPE (tree t)
 {
   _walk_record_or_union (t);
 }
 
 void
-TypeWalker::_walk_record_or_union (const_tree t)
+TypeWalker::_walk_record_or_union (tree t)
 {
   for (tree field = TYPE_FIELDS (t); field; field = DECL_CHAIN (field))
     {
@@ -844,7 +844,7 @@ TypeWalker::_walk_record_or_union (const_tree t)
 }
 
 void
-TypeWalker::walk_field (const_tree t)
+TypeWalker::walk_field (tree t)
 {
   _walk_field_pre (t);
   _walk_field (t);
@@ -852,37 +852,37 @@ TypeWalker::walk_field (const_tree t)
 }
 
 void
-TypeWalker::_walk_field (const_tree t)
+TypeWalker::_walk_field (tree t)
 {
-  const_tree inner_type = TREE_TYPE (t);
+  tree inner_type = TREE_TYPE (t);
   gcc_assert (inner_type);
   _walk (inner_type);
 }
 
 TypeWalkerFuncDef (FUNCTION_TYPE)
 
-  void TypeWalker::_walk_FUNCTION_TYPE (const_tree t)
+  void TypeWalker::_walk_FUNCTION_TYPE (tree t)
 {
   _walk_function_or_method (t);
 }
 
 TypeWalkerFuncDef (METHOD_TYPE)
 
-  void TypeWalker::_walk_METHOD_TYPE (const_tree t)
+  void TypeWalker::_walk_METHOD_TYPE (tree t)
 {
   _walk_function_or_method (t);
 }
 
 void
-TypeWalker::_walk_function_or_method (const_tree t)
+TypeWalker::_walk_function_or_method (tree t)
 {
-  const_tree ret_type = TREE_TYPE (t);
+  tree ret_type = TREE_TYPE (t);
   walk_return (ret_type);
   walk_args (t);
 }
 
 void
-TypeWalker::walk_return (const_tree t)
+TypeWalker::walk_return (tree t)
 {
   _walk_return_pre (t);
   _walk_return (t);
@@ -890,13 +890,13 @@ TypeWalker::walk_return (const_tree t)
 }
 
 void
-TypeWalker::_walk_return (const_tree t)
+TypeWalker::_walk_return (tree t)
 {
   _walk (t);
 }
 
 void
-TypeWalker::walk_args (const_tree t)
+TypeWalker::walk_args (tree t)
 {
   _walk_args_pre (t);
   _walk_args (t);
@@ -904,19 +904,19 @@ TypeWalker::walk_args (const_tree t)
 }
 
 void
-TypeWalker::_walk_args (const_tree t)
+TypeWalker::_walk_args (tree t)
 {
   for (tree arg_node = TYPE_ARG_TYPES (t); NULL_TREE != arg_node;
        arg_node = TREE_CHAIN (arg_node))
     {
-      const_tree arg_node_type = TREE_VALUE (arg_node);
+      tree arg_node_type = TREE_VALUE (arg_node);
       gcc_assert (arg_node_type);
       walk_arg (arg_node_type);
     }
 }
 
 void
-TypeWalker::walk_arg (const_tree t)
+TypeWalker::walk_arg (tree t)
 {
   _walk_arg_pre (t);
   _walk_arg (t);
@@ -924,14 +924,14 @@ TypeWalker::walk_arg (const_tree t)
 }
 
 void
-TypeWalker::_walk_arg (const_tree t)
+TypeWalker::_walk_arg (tree t)
 {
   _walk (t);
 }
 
 /* Main interface for the ExprWalker... */
 void
-ExprWalker::walk (const_tree e)
+ExprWalker::walk (tree e)
 {
   if (detected_incompatible_syntax) return;
   _walk_pre (e);
@@ -940,7 +940,7 @@ ExprWalker::walk (const_tree e)
 }
 
 void
-ExprWalker::_walk (const_tree e)
+ExprWalker::_walk (tree e)
 {
   gcc_assert (e);
   const enum tree_code code = TREE_CODE (e);
@@ -1035,7 +1035,7 @@ ExprWalker::_walk (const_tree e)
  * call post-order callback for everything.
  */
 #define ExprWalkerFuncDef(code) 			\
-  void ExprWalker::walk_##code (const_tree e)		\
+  void ExprWalker::walk_##code (tree e)		\
   {							\
     assert_is_type (e, code);				\
     _walk_pre (e);					\
@@ -1069,29 +1069,29 @@ ExprWalkerFuncDef (GT_EXPR)
 ExprWalkerFuncDef (GE_EXPR)
 ExprWalkerFuncDef (NE_EXPR)
 
-void ExprWalker::_walk_leaf (const_tree e, const enum tree_code c)
+void ExprWalker::_walk_leaf (tree e, const enum tree_code c)
 {
   assert_is_type (e, c);
 }
 
 void
-ExprWalker::_walk_op_n (const_tree e, unsigned n)
+ExprWalker::_walk_op_n (tree e, unsigned n)
 {
   gcc_assert (e);
-  const_tree op_n = TREE_OPERAND (e, n);
+  tree op_n = TREE_OPERAND (e, n);
   gcc_assert (op_n);
   walk (op_n);
 }
 
 void
-ExprWalker::_walk_op_0 (const_tree e, const enum tree_code c)
+ExprWalker::_walk_op_0 (tree e, const enum tree_code c)
 {
   assert_is_type (e, c);
   _walk_op_n (e, 0);
 }
 
 void
-ExprWalker::_walk_op_1 (const_tree e, const enum tree_code c)
+ExprWalker::_walk_op_1 (tree e, const enum tree_code c)
 {
   assert_is_type (e, c);
   _walk_op_n (e, 0);
@@ -1099,68 +1099,68 @@ ExprWalker::_walk_op_1 (const_tree e, const enum tree_code c)
 }
 
 void
-ExprWalker::_walk_CONSTRUCTOR (__attribute__ ((unused)) const_tree e)
+ExprWalker::_walk_CONSTRUCTOR (__attribute__ ((unused)) tree e)
 {
   // Future-work: If we want to support rewriting CONSTRUCTORs
   // we will have to walk them
 }
 
 void
-ExprWalker::_walk_LE_EXPR (const_tree e)
+ExprWalker::_walk_LE_EXPR (tree e)
 {
   _walk_op_1 (e, LE_EXPR);
 }
 
 void
-ExprWalker::_walk_LT_EXPR (const_tree e)
+ExprWalker::_walk_LT_EXPR (tree e)
 {
   _walk_op_1 (e, LT_EXPR);
 }
 
 void
-ExprWalker::_walk_EQ_EXPR (const_tree e)
+ExprWalker::_walk_EQ_EXPR (tree e)
 {
   _walk_op_1 (e, EQ_EXPR);
 }
 
 void
-ExprWalker::_walk_GT_EXPR (const_tree e)
+ExprWalker::_walk_GT_EXPR (tree e)
 {
   _walk_op_1 (e, GT_EXPR);
 }
 
 void
-ExprWalker::_walk_GE_EXPR (const_tree e)
+ExprWalker::_walk_GE_EXPR (tree e)
 {
   _walk_op_1 (e, GE_EXPR);
 }
 
 void
-ExprWalker::_walk_NE_EXPR (const_tree e)
+ExprWalker::_walk_NE_EXPR (tree e)
 {
   _walk_op_1 (e, NE_EXPR);
 }
 
 void
-ExprWalker::_walk_INTEGER_CST (const_tree e)
+ExprWalker::_walk_INTEGER_CST (tree e)
 {
   _walk_leaf (e, INTEGER_CST);
 }
 
 void
-ExprWalker::_walk_REAL_CST (const_tree e)
+ExprWalker::_walk_REAL_CST (tree e)
 {
   _walk_leaf (e, REAL_CST);
 }
 
 void
-ExprWalker::_walk_STRING_CST (const_tree e)
+ExprWalker::_walk_STRING_CST (tree e)
 {
   _walk_leaf (e, STRING_CST);
 }
 
 void
-ExprWalker::_walk_BIT_FIELD_REF (__attribute__ ((unused)) const_tree e)
+ExprWalker::_walk_BIT_FIELD_REF (__attribute__ ((unused)) tree e)
 {
   // TODO:
   // We currently don't support bit_field_ref
@@ -1168,73 +1168,73 @@ ExprWalker::_walk_BIT_FIELD_REF (__attribute__ ((unused)) const_tree e)
 }
 
 void
-ExprWalker::_walk_ARRAY_REF (const_tree e)
+ExprWalker::_walk_ARRAY_REF (tree e)
 {
   _walk_op_1 (e, ARRAY_REF);
 }
 
 void
-ExprWalker::_walk_MEM_REF (const_tree e)
+ExprWalker::_walk_MEM_REF (tree e)
 {
   _walk_op_1 (e, MEM_REF);
 }
 
 void
-ExprWalker::_walk_COMPONENT_REF (const_tree e)
+ExprWalker::_walk_COMPONENT_REF (tree e)
 {
   _walk_op_1 (e, COMPONENT_REF);
 }
 
 void
-ExprWalker::_walk_SSA_NAME (const_tree e)
+ExprWalker::_walk_SSA_NAME (tree e)
 {
   _walk_leaf (e, SSA_NAME);
 }
 
 void
-ExprWalker::_walk_ADDR_EXPR (const_tree e)
+ExprWalker::_walk_ADDR_EXPR (tree e)
 {
   _walk_op_0 (e, ADDR_EXPR);
 }
 
 void
-ExprWalker::_walk_VIEW_CONVERT_EXPR (__attribute__ ((unused)) const_tree e)
+ExprWalker::_walk_VIEW_CONVERT_EXPR (__attribute__ ((unused)) tree e)
 {
   // TODO: I don't think we need to do anything here
 }
 
 void
-ExprWalker::_walk_IMAGPART_EXPR (__attribute__ ((unused)) const_tree e)
+ExprWalker::_walk_IMAGPART_EXPR (__attribute__ ((unused)) tree e)
 {
   // TODO: I don't think we need to do anything here
 }
 
 void
-ExprWalker::_walk_FIELD_DECL (const_tree e)
+ExprWalker::_walk_FIELD_DECL (tree e)
 {
   _walk_leaf (e, FIELD_DECL);
 }
 
 void
-ExprWalker::_walk_VAR_DECL (const_tree e)
+ExprWalker::_walk_VAR_DECL (tree e)
 {
   _walk_leaf (e, VAR_DECL);
 }
 
 void
-ExprWalker::_walk_RESULT_DECL (const_tree e)
+ExprWalker::_walk_RESULT_DECL (tree e)
 {
   _walk_leaf (e, RESULT_DECL);
 }
 
 void
-ExprWalker::_walk_PARM_DECL (const_tree e)
+ExprWalker::_walk_PARM_DECL (tree e)
 {
   _walk_leaf (e, PARM_DECL);
 }
 
 void
-ExprWalker::_walk_FUNCTION_DECL (const_tree e)
+ExprWalker::_walk_FUNCTION_DECL (tree e)
 {
   _walk_leaf (e, FUNCTION_DECL);
   for (tree parm = DECL_ARGUMENTS (e); parm; parm = DECL_CHAIN (parm))
@@ -1301,7 +1301,7 @@ GimpleWalker::_walk_global (varpool_node *vnode)
 void
 GimpleWalker::_walk_ssa_names (cgraph_node *cnode)
 {
-  const_tree decl = cnode->decl;
+  tree decl = cnode->decl;
   gcc_assert (decl);
   function *func = DECL_STRUCT_FUNCTION (decl);
   gcc_assert (func);
@@ -1337,7 +1337,7 @@ GimpleWalker::_walk_cnode (cgraph_node *cnode)
 void
 GimpleWalker::_walk_locals (cgraph_node *cnode)
 {
-  const_tree decl = cnode->decl;
+  tree decl = cnode->decl;
   gcc_assert (decl);
   function *func = DECL_STRUCT_FUNCTION (decl);
   gcc_assert (func);
@@ -1356,7 +1356,7 @@ GimpleWalker::_walk_bb (cgraph_node *cnode)
 {
   gcc_assert (cnode);
   cnode->get_untransformed_body ();
-  const_tree decl = cnode->decl;
+  tree decl = cnode->decl;
   gcc_assert (decl);
   function *func = DECL_STRUCT_FUNCTION (decl);
   gcc_assert (func);
@@ -1373,7 +1373,7 @@ GimpleWalker::_walk_bb (cgraph_node *cnode)
 void
 GimpleWalker::_walk_decl (cgraph_node *cnode)
 {
-  const_tree decl = cnode->decl;
+  tree decl = cnode->decl;
   gcc_assert (decl);
   walk_tree2 (decl);
 }
@@ -1512,7 +1512,7 @@ GimpleWalker::_walk_gimple (gimple *stmt)
 }
 
 void
-GimpleWalker::walk_tree2 (const_tree t)
+GimpleWalker::walk_tree2 (tree t)
 {
   _walk_pre_tree (t);
   _walk_tree (t);
@@ -1520,7 +1520,7 @@ GimpleWalker::walk_tree2 (const_tree t)
 }
 
 void
-GimpleWalker::_walk_tree (const_tree t)
+GimpleWalker::_walk_tree (__attribute__((unused)) tree t)
 {}
 
 void
@@ -1532,7 +1532,7 @@ GimpleWalker::walk_gassign (gassign *g)
 }
 
 void
-GimpleWalker::_walk_gassign (gassign *g)
+GimpleWalker::_walk_gassign (__attribute__((unused)) gassign *g)
 {}
 
 void
@@ -1544,7 +1544,7 @@ GimpleWalker::walk_greturn (greturn *g)
 }
 
 void
-GimpleWalker::_walk_greturn (greturn *g)
+GimpleWalker::_walk_greturn (__attribute__((unused)) greturn *g)
 {}
 
 void
@@ -1556,7 +1556,7 @@ GimpleWalker::walk_gcond (gcond *g)
 }
 
 void
-GimpleWalker::_walk_gcond (gcond *g)
+GimpleWalker::_walk_gcond (__attribute__((unused)) gcond *g)
 {}
 
 void
@@ -1568,7 +1568,7 @@ GimpleWalker::walk_gcall (gcall *g)
 }
 
 void
-GimpleWalker::_walk_gcall (gcall *g)
+GimpleWalker::_walk_gcall (__attribute__((unused)) gcall *g)
 {}
 
 void
@@ -1580,7 +1580,7 @@ GimpleWalker::walk_glabel (glabel *g)
 }
 
 void
-GimpleWalker::_walk_glabel (glabel *g)
+GimpleWalker::_walk_glabel (__attribute__((unused))glabel *g)
 {}
 
 void
@@ -1592,7 +1592,7 @@ GimpleWalker::walk_gswitch (gswitch *g)
 }
 
 void
-GimpleWalker::_walk_gswitch (gswitch *g)
+GimpleWalker::_walk_gswitch (__attribute__((unused)) gswitch *g)
 {
 }
 
@@ -1605,12 +1605,12 @@ GimpleWalker::walk_gphi (gphi *g)
 }
 
 void
-GimpleWalker::_walk_gphi (gphi *g)
+GimpleWalker::_walk_gphi (__attribute__((unused)) gphi *g)
 {
 }
 
 void
-TypeCollector::collect (const_tree t)
+TypeCollector::collect (tree t)
 {
   const bool in_set = ptrset.in_universe (t);
   // Early memoization...
@@ -1644,9 +1644,9 @@ TypeCollector::_sanity_check ()
       for (tset_t::iterator j = ptrset.complement.begin (), f = ptrset.complement.end ();
 	   j != f; ++j)
 	{
-	  const_tree type_ptr = *i;
+	  tree type_ptr = *i;
 	  gcc_assert (type_ptr);
-	  const_tree type_com = *j;
+	  tree type_com = *j;
 	  gcc_assert (type_com);
 	  const bool valid_sets = type_ptr != type_com;
 	  if (valid_sets)
@@ -1664,7 +1664,7 @@ TypeCollector::_sanity_check ()
 
 /* Determine if T is already memoized in the TypeCollector.  */
 bool
-TypeCollector::is_memoized (const_tree t)
+TypeCollector::is_memoized (tree t)
 {
   /* If we haven't seen it then no.  */
   const bool in_set = ptrset.in_universe (t);
@@ -1675,7 +1675,7 @@ TypeCollector::is_memoized (const_tree t)
   // we must update all types that can refer
   // to memoized type.
   const bool points_to_record = ptrset.in_points_to_record (t);
-  for (std::map<const_tree, bool>::iterator i = ptr.begin (), e = ptr.end (); i != e; ++i)
+  for (std::map<tree, bool>::iterator i = ptr.begin (), e = ptr.end (); i != e; ++i)
     {
       i->second |= points_to_record;
     }
@@ -1683,91 +1683,91 @@ TypeCollector::is_memoized (const_tree t)
 }
 
 void
-TypeCollector::_walk_VOID_TYPE_pre (const_tree t)
+TypeCollector::_walk_VOID_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_VOID_TYPE_post (const_tree t)
+TypeCollector::_walk_VOID_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_INTEGER_TYPE_pre (const_tree t)
+TypeCollector::_walk_INTEGER_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_INTEGER_TYPE_post (const_tree t)
+TypeCollector::_walk_INTEGER_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_REAL_TYPE_pre (const_tree t)
+TypeCollector::_walk_REAL_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_REAL_TYPE_post (const_tree t)
+TypeCollector::_walk_REAL_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_FIXED_POINT_TYPE_pre (const_tree t)
+TypeCollector::_walk_FIXED_POINT_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_FIXED_POINT_TYPE_post (const_tree t)
+TypeCollector::_walk_FIXED_POINT_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_COMPLEX_TYPE_pre (const_tree t)
+TypeCollector::_walk_COMPLEX_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_COMPLEX_TYPE_post (const_tree t)
+TypeCollector::_walk_COMPLEX_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_ENUMERAL_TYPE_pre (const_tree t)
+TypeCollector::_walk_ENUMERAL_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_ENUMERAL_TYPE_post (const_tree t)
+TypeCollector::_walk_ENUMERAL_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_BOOLEAN_TYPE_pre (const_tree t)
+TypeCollector::_walk_BOOLEAN_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_BOOLEAN_TYPE_post (const_tree t)
+TypeCollector::_walk_BOOLEAN_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_collect_simple (const_tree t)
+TypeCollector::_collect_simple (tree t)
 {
   // Insert into persistent set.
   ptrset.insert (t, ptr[t]);
@@ -1776,46 +1776,46 @@ TypeCollector::_collect_simple (const_tree t)
 }
 
 void
-TypeCollector::_walk_ARRAY_TYPE_pre (const_tree t)
+TypeCollector::_walk_ARRAY_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_ARRAY_TYPE_post (const_tree t)
+TypeCollector::_walk_ARRAY_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_POINTER_TYPE_pre (const_tree t)
+TypeCollector::_walk_POINTER_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_POINTER_TYPE_post (const_tree t)
+TypeCollector::_walk_POINTER_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_REFERENCE_TYPE_pre (const_tree t)
+TypeCollector::_walk_REFERENCE_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_REFERENCE_TYPE_post (const_tree t)
+TypeCollector::_walk_REFERENCE_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_RECORD_TYPE_post (const_tree t)
+TypeCollector::_walk_RECORD_TYPE_post (tree t)
 {
   // All in ptr point to record
-  for (std::map<const_tree, bool>::iterator i = ptr.begin (), e = ptr.end (); i != e; ++i)
+  for (std::map<tree, bool>::iterator i = ptr.begin (), e = ptr.end (); i != e; ++i)
     {
       i->second = true;
     }
@@ -1824,52 +1824,52 @@ TypeCollector::_walk_RECORD_TYPE_post (const_tree t)
 }
 
 void
-TypeCollector::_walk_RECORD_TYPE_pre (const_tree t)
+TypeCollector::_walk_RECORD_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_UNION_TYPE_pre (const_tree t)
+TypeCollector::_walk_UNION_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_UNION_TYPE_post (const_tree t)
+TypeCollector::_walk_UNION_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_FUNCTION_TYPE_post (const_tree t)
+TypeCollector::_walk_FUNCTION_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_FUNCTION_TYPE_pre (const_tree t)
+TypeCollector::_walk_FUNCTION_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 void
-TypeCollector::_walk_METHOD_TYPE_post (const_tree t)
+TypeCollector::_walk_METHOD_TYPE_post (tree t)
 {
   _collect_simple (t);
 }
 
 void
-TypeCollector::_walk_METHOD_TYPE_pre (const_tree t)
+TypeCollector::_walk_METHOD_TYPE_pre (tree t)
 {
   ptr[t] = false;
 }
 
 inline void
-ExprCollector::_walk_pre (const_tree e)
+ExprCollector::_walk_pre (tree e)
 {
   if (!e) return;
-  const_tree t = TREE_TYPE (e);
+  tree t = TREE_TYPE (e);
   gcc_assert (t);
   typeCollector.collect (t);
 
@@ -1880,9 +1880,9 @@ ExprCollector::_walk_pre (const_tree e)
     return;
   }
 
-  for (std::set<const_tree>::iterator i = typeCollector.ptrset.records.begin(), e = typeCollector.ptrset.records.end(); i != e; ++i)
+  for (std::set<tree>::iterator i = typeCollector.ptrset.records.begin(), e = typeCollector.ptrset.records.end(); i != e; ++i)
   {
-    const_tree r = *i;
+    tree r = *i;
     TypeIncompleteEquality structuralEquality;
     bool is_same = structuralEquality.equal (TYPE_MAIN_VARIANT(r), TYPE_MAIN_VARIANT(t));
     if (is_same) continue;
@@ -1901,7 +1901,7 @@ ExprCollector::_walk_pre (const_tree e)
  * * does not reach a RECORD_TYPE.
  */
 void
-GimpleTypeCollector::_walk_pre_tree (const_tree t)
+GimpleTypeCollector::_walk_pre_tree (tree t)
 {
   if (!t) return;
   exprCollector.walk (t);
@@ -1920,7 +1920,7 @@ GimpleTypeCollector::_walk_pre_tree (const_tree t)
 void
 GimpleTypeCollector::_walk_pre_gassign (gassign *s)
 {
-  const_tree lhs = gimple_assign_lhs (s);
+  tree lhs = gimple_assign_lhs (s);
   exprCollector.walk (lhs);
 
   const enum gimple_rhs_class gclass = gimple_assign_rhs_class (s);
@@ -1928,20 +1928,20 @@ GimpleTypeCollector::_walk_pre_gassign (gassign *s)
     {
     case GIMPLE_TERNARY_RHS:
       {
-	const_tree rhs = gimple_assign_rhs3 (s);
+	tree rhs = gimple_assign_rhs3 (s);
 	exprCollector.walk (rhs);
       }
     /* fall-through */
     case GIMPLE_BINARY_RHS:
       {
-	const_tree rhs = gimple_assign_rhs2 (s);
+	tree rhs = gimple_assign_rhs2 (s);
 	exprCollector.walk (rhs);
       }
     /* fall-through */
     case GIMPLE_UNARY_RHS:
     case GIMPLE_SINGLE_RHS:
       {
-	const_tree rhs = gimple_assign_rhs1 (s);
+	tree rhs = gimple_assign_rhs1 (s);
 	exprCollector.walk (rhs);
       }
       break;
@@ -1954,7 +1954,7 @@ GimpleTypeCollector::_walk_pre_gassign (gassign *s)
 void
 GimpleTypeCollector::_walk_pre_greturn (greturn *s)
 {
-  const_tree retval = gimple_return_retval (s);
+  tree retval = gimple_return_retval (s);
   if (!retval)
     return;
 
@@ -1968,12 +1968,12 @@ GimpleTypeCollector::_walk_pre_gcall (gcall *s)
   unsigned n = gimple_call_num_args (s);
   for (unsigned i = 0; i < n; i++)
     {
-      const_tree a = gimple_call_arg (s, i);
+      tree a = gimple_call_arg (s, i);
       exprCollector.walk (a);
     }
 
   // Walk over the return type if it exists.
-  const_tree lhs = gimple_call_lhs (s);
+  tree lhs = gimple_call_lhs (s);
   if (!lhs)
     return;
 
@@ -2002,14 +2002,14 @@ GimpleTypeCollector::print_collected ()
 void
 GimpleTypeCollector::_walk_pre_gcond (gcond *s)
 {
-  const_tree lhs = gimple_cond_lhs (s);
+  tree lhs = gimple_cond_lhs (s);
   exprCollector.walk (lhs);
-  const_tree rhs = gimple_cond_rhs (s);
+  tree rhs = gimple_cond_rhs (s);
   exprCollector.walk (rhs);
 }
 
 bool
-TypeEscaper::is_memoized (__attribute__ ((unused)) const_tree t)
+TypeEscaper::is_memoized (__attribute__ ((unused)) tree t)
 {
   // Can't memoize here because
   // information is propagated up and down
@@ -2034,7 +2034,7 @@ TypeEscaper::place_escaping_types_in_set ()
   TypeStringifier stringifier;
   for (typemap::iterator i = calc.begin (), e = calc.end (); i != e; ++i)
     {
-      const_tree type = i->first;
+      tree type = i->first;
 
       // We should only track interesting types
       // Types which are not in points_to_record are the ones
@@ -2051,7 +2051,7 @@ TypeEscaper::place_escaping_types_in_set ()
 }
 
 void
-TypeEscaper::update (const_tree t, Reason r)
+TypeEscaper::update (tree t, Reason r)
 {
   gcc_assert (t);
   _reason = r;
@@ -2059,7 +2059,7 @@ TypeEscaper::update (const_tree t, Reason r)
 }
 
 void
-TypeEscaper::_update (const_tree t)
+TypeEscaper::_update (tree t)
 {
   gcc_assert (t);
   const bool already_in_typemap = calc.find (t) != calc.end ();
@@ -2076,37 +2076,37 @@ TypeEscaper::_update (const_tree t)
 }
 
 void
-TypeEscaper::_walk_ARRAY_TYPE_pre (const_tree t)
+TypeEscaper::_walk_ARRAY_TYPE_pre (tree t)
 {
   _update (t);
 }
 
 void
-TypeEscaper::_walk_ARRAY_TYPE_post (const_tree t)
+TypeEscaper::_walk_ARRAY_TYPE_post (tree t)
 {
   _update (t);
 }
 
 void
-TypeEscaper::_walk_POINTER_TYPE_pre (const_tree t)
+TypeEscaper::_walk_POINTER_TYPE_pre (tree t)
 {
   _update (t);
 }
 
 void
-TypeEscaper::_walk_POINTER_TYPE_post (const_tree t)
+TypeEscaper::_walk_POINTER_TYPE_post (tree t)
 {
   _update (t);
 }
 
 void
-TypeEscaper::_walk_REFERENCE_TYPE_pre (const_tree t)
+TypeEscaper::_walk_REFERENCE_TYPE_pre (tree t)
 {
   _update (t);
 }
 
 void
-TypeEscaper::_walk_RECORD_TYPE_pre (const_tree t)
+TypeEscaper::_walk_RECORD_TYPE_pre (tree t)
 {
   // we are entering a record
   _inside_record++;
@@ -2114,7 +2114,7 @@ TypeEscaper::_walk_RECORD_TYPE_pre (const_tree t)
 }
 
 void
-TypeEscaper::_walk_RECORD_TYPE_post (const_tree t)
+TypeEscaper::_walk_RECORD_TYPE_post (tree t)
 {
   _update (t); // This is in case there was a union
   // we are exiting a record
@@ -2125,7 +2125,7 @@ TypeEscaper::_walk_RECORD_TYPE_post (const_tree t)
  * and propagate up and down.
  */
 void
-TypeEscaper::_walk_UNION_TYPE_pre (const_tree t)
+TypeEscaper::_walk_UNION_TYPE_pre (tree t)
 {
   _inside_union++;
   bool is_escaping = _inside_union > 0;
@@ -2137,13 +2137,13 @@ TypeEscaper::_walk_UNION_TYPE_pre (const_tree t)
  * and down.
  */
 void
-TypeEscaper::_walk_field_pre (const_tree t)
+TypeEscaper::_walk_field_pre (tree t)
 {
   _reason.type_is_in_union |= DECL_BIT_FIELD (t);
 }
 
 void
-TypeEscaper::_walk_UNION_TYPE_post (const_tree t)
+TypeEscaper::_walk_UNION_TYPE_post (tree t)
 {
   _inside_union--;
   _update (t);
@@ -2153,7 +2153,7 @@ TypeEscaper::_walk_UNION_TYPE_post (const_tree t)
  * propagate up and down.
  */
 void
-TypeEscaper::_walk_FUNCTION_TYPE_pre (__attribute__ ((unused)) const_tree t)
+TypeEscaper::_walk_FUNCTION_TYPE_pre (__attribute__ ((unused)) tree t)
 {
   _reason.type_is_in_union |= _inside_record > 0;
 }
@@ -2162,7 +2162,7 @@ TypeEscaper::_walk_FUNCTION_TYPE_pre (__attribute__ ((unused)) const_tree t)
  * propagate up and down.
  */
 void
-TypeEscaper::_walk_METHOD_TYPE_pre (__attribute__ ((unused)) const_tree t)
+TypeEscaper::_walk_METHOD_TYPE_pre (__attribute__ ((unused)) tree t)
 {
   _reason.type_is_in_union |= _inside_record > 0;
 }
@@ -2174,7 +2174,7 @@ TypeEscaper::print_reasons ()
   TypeStringifier stringifier;
   for (typemap::iterator i = calc.begin (), e = calc.end (); i != e; ++i)
     {
-      const_tree t = i->first;
+      tree t = i->first;
       std::string name = stringifier.stringify (t);
       Reason r = i->second;
       log ("%s reason: ", name.c_str ());
@@ -2196,7 +2196,7 @@ ExprEscaper::print_reasons ()
 
 /* Propagate reason to subexpressions.  */
 void
-ExprEscaper::update (const_tree t, Reason r)
+ExprEscaper::update (tree t, Reason r)
 {
   gcc_assert (t);
   _r = r;
@@ -2205,26 +2205,26 @@ ExprEscaper::update (const_tree t, Reason r)
 
 /* Propagate reason to type of subexpressions.  */
 void
-ExprEscaper::_walk_pre (const_tree e)
+ExprEscaper::_walk_pre (tree e)
 {
   _stack.push (e);
-  const_tree t = TREE_TYPE (e);
+  tree t = TREE_TYPE (e);
 
   gcc_assert (t);
   typeEscaper.update (t, _r);
 }
 
 void
-ExprEscaper::_walk_post (__attribute__ ((unused)) const_tree e)
+ExprEscaper::_walk_post (__attribute__ ((unused)) tree e)
 {
   _stack.pop ();
 }
 
 /* Capture casting on LHS.  */
 void
-ExprEscaper::_walk_SSA_NAME_pre (const_tree e)
+ExprEscaper::_walk_SSA_NAME_pre (tree e)
 {
-  const_tree ssa_type = TREE_TYPE (e);
+  tree ssa_type = TREE_TYPE (e);
 
   if (_stack.size () < 4)
     return;
@@ -2232,11 +2232,11 @@ ExprEscaper::_walk_SSA_NAME_pre (const_tree e)
   // TODO:
   // It appears that we have a bug, where we are
   // storing expressions twice on the stack
-  const_tree this_expr = _stack.top ();
+  tree this_expr = _stack.top ();
   _stack.pop ();
-  const_tree twice = _stack.top ();
+  tree twice = _stack.top ();
   _stack.pop ();
-  const_tree prev_expr = _stack.top ();
+  tree prev_expr = _stack.top ();
   _stack.push (twice);
   _stack.push (this_expr);
   if (TREE_CODE (prev_expr) != MEM_REF)
@@ -2244,7 +2244,7 @@ ExprEscaper::_walk_SSA_NAME_pre (const_tree e)
 
   tree op1 = TREE_OPERAND (prev_expr, 1);
   gcc_assert (TREE_CODE (op1) == INTEGER_CST);
-  const_tree mref_type = TREE_TYPE (op1);
+  tree mref_type = TREE_TYPE (op1);
 
   Reason old_reason = _r;
   TypeIncompleteEquality structuralEquality;
@@ -2260,7 +2260,7 @@ ExprEscaper::_walk_SSA_NAME_pre (const_tree e)
 
 /* Mark constructors as escaping.  */
 void
-ExprEscaper::_walk_CONSTRUCTOR_pre (const_tree e)
+ExprEscaper::_walk_CONSTRUCTOR_pre (tree e)
 {
   if (TREE_CLOBBER_P (e))
     return;
@@ -2270,7 +2270,7 @@ ExprEscaper::_walk_CONSTRUCTOR_pre (const_tree e)
   // a this has a constructor.
   // Or better yet... modify the constructors!
   _r.global_is_visible = true;
-  const_tree t = TREE_TYPE (e);
+  tree t = TREE_TYPE (e);
   typeEscaper.update (t, _r);
 }
 
@@ -2298,7 +2298,7 @@ GimpleEscaper::_init ()
       if (filter)
 	continue;
 
-      const_tree decl = cnode->decl;
+      tree decl = cnode->decl;
       gcc_assert (decl);
       undefined.insert (decl);
     }
@@ -2307,7 +2307,7 @@ GimpleEscaper::_init ()
     {
       gcc_assert (cnode);
       cnode->get_untransformed_body ();
-      const_tree decl = cnode->decl;
+      tree decl = cnode->decl;
       gcc_assert (decl);
       undefined.erase (decl);
     }
@@ -2327,7 +2327,7 @@ GimpleEscaper::is_function_escaping (cgraph_node *cnode)
 /* Mark fndecl as escaping is they are externally visible or
  * there is no fndecl.  */
 bool
-GimpleEscaper::is_function_escaping (const_tree fndecl)
+GimpleEscaper::is_function_escaping (tree fndecl)
 {
   if (!fndecl)
     return true;
@@ -2354,7 +2354,7 @@ void
 GimpleEscaper::_walk_global (varpool_node *vnode)
 {
   gcc_assert (vnode);
-  const_tree var_decl = vnode->decl;
+  tree var_decl = vnode->decl;
   Reason reason;
   const bool is_escaping = is_variable_escaping (vnode);
   reason.global_is_visible = is_escaping;
@@ -2376,7 +2376,7 @@ GimpleEscaper::_walk_global (varpool_node *vnode)
 
 /* Return true if FNDECL is a known function.  */
 bool
-GimpleEscaper::filter_known_function (const_tree fndecl)
+GimpleEscaper::filter_known_function (tree fndecl)
 {
   assert_is_type (fndecl, FUNCTION_DECL);
   if (fndecl_built_in_p (fndecl))
@@ -2409,7 +2409,7 @@ GimpleEscaper::filter_known_function (cgraph_node *node)
 
 /* Mark Variable declaration of unknown location as escaping.  */
 void
-GimpleEscaper::_walk_pre_tree (const_tree t)
+GimpleEscaper::_walk_pre_tree (tree t)
 {
   // Is any global variable escaping?
   Reason reason;
@@ -2434,22 +2434,22 @@ GimpleEscaper::_walk_pre_gassign (gassign *s)
     {
     case GIMPLE_TERNARY_RHS:
       {
-	const_tree rhs3 = gimple_assign_rhs3 (s);
+	tree rhs3 = gimple_assign_rhs3 (s);
 	exprEscaper.update (rhs3, reason);
       }
     /* fall-through */
     case GIMPLE_BINARY_RHS:
       {
-	const_tree rhs2 = gimple_assign_rhs2 (s);
+	tree rhs2 = gimple_assign_rhs2 (s);
 	exprEscaper.update (rhs2, reason);
       }
     /* fall-through */
     case GIMPLE_UNARY_RHS:
     case GIMPLE_SINGLE_RHS:
       {
-	const_tree rhs1 = gimple_assign_rhs1 (s);
+	tree rhs1 = gimple_assign_rhs1 (s);
 	exprEscaper.update (rhs1, reason);
-	const_tree lhs = gimple_assign_lhs (s);
+	tree lhs = gimple_assign_lhs (s);
 	if (!lhs)
 	  break;
 	exprEscaper.update (lhs, reason);
@@ -2465,7 +2465,7 @@ void
 GimpleEscaper::_walk_pre_greturn (greturn *s)
 {
   Reason reason;
-  const_tree val = gimple_return_retval (s);
+  tree val = gimple_return_retval (s);
   if (!val)
     return;
   exprEscaper.update (val, reason);
@@ -2475,8 +2475,8 @@ void
 GimpleEscaper::_walk_pre_gcond (gcond *s)
 {
   Reason reason;
-  const_tree lhs = gimple_cond_lhs (s);
-  const_tree rhs = gimple_cond_rhs (s);
+  tree lhs = gimple_cond_lhs (s);
+  tree rhs = gimple_cond_rhs (s);
   gcc_assert (lhs && rhs);
   exprEscaper.update (lhs, reason);
   exprEscaper.update (rhs, reason);
@@ -2485,7 +2485,7 @@ GimpleEscaper::_walk_pre_gcond (gcond *s)
 void
 GimpleEscaper::_walk_pre_gcall (gcall *s)
 {
-  const_tree fn = gimple_call_fndecl (s);
+  tree fn = gimple_call_fndecl (s);
   // gcc_assert (fn);
   // The above will not always be true
   // It will be false when we have an indirect function
@@ -2503,7 +2503,7 @@ GimpleEscaper::_walk_pre_gcall (gcall *s)
   unsigned n = gimple_call_num_args (s);
   for (unsigned i = 0; i < n; i++)
     {
-      const_tree a = gimple_call_arg (s, i);
+      tree a = gimple_call_arg (s, i);
       gcc_assert (a);
       if (arg_reason.is_escaping ())
 	{
@@ -2513,7 +2513,7 @@ GimpleEscaper::_walk_pre_gcall (gcall *s)
       exprEscaper.typeEscaper.update (TREE_TYPE (a), arg_reason);
     }
 
-  const_tree lhs = gimple_call_lhs (s);
+  tree lhs = gimple_call_lhs (s);
   if (!lhs)
     return;
   Reason return_reason;
@@ -2525,14 +2525,14 @@ GimpleEscaper::_walk_pre_gcall (gcall *s)
 /* Determine if cast comes from a known function.
  * Do this by following the use-def chain.  */
 bool
-GimpleCaster::follow_def_to_find_if_really_cast (const_tree rhs)
+GimpleCaster::follow_def_to_find_if_really_cast (tree rhs)
 {
   gimple *def_for_rhs = SSA_NAME_DEF_STMT (rhs);
   gcall *is_call = dyn_cast<gcall *> (def_for_rhs);
   if (!is_call)
     return true;
 
-  const_tree fn = gimple_call_fndecl (is_call);
+  tree fn = gimple_call_fndecl (is_call);
   if (!fn)
     return true;
 
@@ -2552,12 +2552,12 @@ GimpleCaster::_walk_pre_gassign (gassign *s)
   // but that proved to be insufficient...
   // So we have to use our equality comparison...
   TypeIncompleteEquality equality;
-  const_tree lhs = gimple_assign_lhs (s);
-  const_tree rhs = gimple_assign_rhs1 (s);
+  tree lhs = gimple_assign_lhs (s);
+  tree rhs = gimple_assign_rhs1 (s);
   gcc_assert (lhs && rhs);
   Reason reason;
-  const_tree t_lhs = TREE_TYPE (lhs);
-  const_tree t_rhs = TREE_TYPE (rhs);
+  tree t_lhs = TREE_TYPE (lhs);
+  tree t_rhs = TREE_TYPE (rhs);
   gcc_assert (t_lhs && t_rhs);
   bool is_cast = !equality.equal (TYPE_MAIN_VARIANT(t_lhs), TYPE_MAIN_VARIANT(t_rhs));
   // If it is cast, we might need to look at the definition of rhs
@@ -2613,14 +2613,14 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
 
   if (!node && currently_walking->inlined_to) return;
 
-  const_tree f_t = TREE_TYPE (fn);
+  tree f_t = TREE_TYPE (fn);
   TypeIncompleteEquality equality;
 
   unsigned i = 0;
   TypeStringifier stringifier;
   for (tree a = TYPE_ARG_TYPES (f_t); NULL_TREE != a; a = TREE_CHAIN (a))
     {
-      const_tree formal_t = TREE_VALUE (a);
+      tree formal_t = TREE_VALUE (a);
       //if (formal_t == ptr_type_node) continue;
       //if (formal_t == void_type_node) continue;
       // There seems to be a final VOID_TYPE at the end of some functions?
@@ -2629,8 +2629,8 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
       if (is_void)
 	continue;
 
-      const_tree real = gimple_call_arg (s, i);
-      const_tree real_t = TREE_TYPE (real);
+      tree real = gimple_call_arg (s, i);
+      tree real_t = TREE_TYPE (real);
       const bool is_casted = !equality.equal (formal_t, real_t);
       log("arg %s is casted: %s\n", stringifier.stringify(real_t).c_str(), is_casted ? "T" : "F");
       Reason arg_reason;
@@ -2639,12 +2639,12 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
       i++;
     }
 
-  const_tree lhs = gimple_call_lhs (s);
+  tree lhs = gimple_call_lhs (s);
   if (!lhs)
     return;
 
-  const_tree r_t = TREE_TYPE (f_t);
-  const_tree l_t TREE_TYPE (lhs);
+  tree r_t = TREE_TYPE (f_t);
+  tree l_t TREE_TYPE (lhs);
   const bool is_casted = !equality.equal (r_t, l_t);
   Reason ret_reason;
   ret_reason.type_is_casted = is_casted;
@@ -2652,14 +2652,14 @@ GimpleCaster::_walk_pre_gcall (gcall *s)
 }
 
 bool
-TypeAccessor::is_memoized (const_tree t)
+TypeAccessor::is_memoized (tree t)
 {
   return memoized_map.find (t) != memoized_map.end ();
 }
 
 /* Add all fields in struct to memoized map.  */
 void
-TypeAccessor::_walk_RECORD_TYPE_pre (const_tree t)
+TypeAccessor::_walk_RECORD_TYPE_pre (tree t)
 {
   add_all_fields_in_struct (t);
   memoized_map.insert (t);
@@ -2667,7 +2667,7 @@ TypeAccessor::_walk_RECORD_TYPE_pre (const_tree t)
 
 /* Initialize all fields as neither read nor written.  */
 void
-TypeAccessor::add_all_fields_in_struct (const_tree t)
+TypeAccessor::add_all_fields_in_struct (tree t)
 {
   const enum tree_code c = TREE_CODE (t);
   const bool is_record = RECORD_TYPE == c;
@@ -2698,27 +2698,27 @@ ExprAccessor::get_map ()
 }
 
 void
-ExprAccessor::add_all_fields_in_struct (const_tree t)
+ExprAccessor::add_all_fields_in_struct (tree t)
 {
   _typeAccessor.walk (t);
 }
 
 void
-ExprAccessor::_walk_pre (const_tree e)
+ExprAccessor::_walk_pre (tree e)
 {
   _stack.push (e);
-  const_tree t = TREE_TYPE (e);
+  tree t = TREE_TYPE (e);
   add_all_fields_in_struct (t);
 }
 
 void
-ExprAccessor::_walk_post (__attribute__ ((unused)) const_tree e)
+ExprAccessor::_walk_post (__attribute__ ((unused)) tree e)
 {
   _stack.pop ();
 }
 
 void
-ExprAccessor::update (const_tree e, unsigned access)
+ExprAccessor::update (tree e, unsigned access)
 {
   _access = access;
   walk (e);
@@ -2737,7 +2737,7 @@ ExprAccessor::update (const_tree e, unsigned access)
  * read.
  */
 void
-ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) const_tree e)
+ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
 {
   log ("expr accessor mem ref\n");
   log ("stack size = %d\n", _stack.size ());
@@ -2746,11 +2746,11 @@ ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) const_tree e)
     return;
 
   // TODO: Fix error with double pushing
-  const_tree addr_expr = _stack.top ();
+  tree addr_expr = _stack.top ();
   _stack.pop ();
-  const_tree twice = _stack.top ();
+  tree twice = _stack.top ();
   _stack.pop ();
-  const_tree prev_expr = _stack.top ();
+  tree prev_expr = _stack.top ();
   _stack.push (addr_expr);
   _stack.push (twice);
   log ("prev_expr code = %s\n", get_tree_code_name (TREE_CODE (prev_expr)));
@@ -2758,7 +2758,7 @@ ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) const_tree e)
     return;
 
   tree op_0 = TREE_OPERAND (addr_expr, 0);
-  const_tree addr_expr_t = TREE_TYPE (op_0);
+  tree addr_expr_t = TREE_TYPE (op_0);
 
   TypeStringifier stringifier;
   std::string name = stringifier.stringify (addr_expr_t);
@@ -2768,7 +2768,7 @@ ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) const_tree e)
 
   // We are accessing a field of a record through pointer arithmetic...
   // So what field offset are we computing...
-  const_tree mref_expr = prev_expr;
+  tree mref_expr = prev_expr;
   tree offset = TREE_OPERAND (mref_expr, 1);
   gcc_assert (TREE_CODE (offset) == INTEGER_CST);
   tree type_size_tree = TYPE_SIZE_UNIT (addr_expr_t);
@@ -2816,13 +2816,13 @@ ExprAccessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) const_tree e)
  * RECORD_TYPE should be marked as READ for safety.
  */
 void
-ExprAccessor::_walk_COMPONENT_REF_pre (const_tree e)
+ExprAccessor::_walk_COMPONENT_REF_pre (tree e)
 {
   log ("in component_ref pre\n");
   assert_is_type (e, COMPONENT_REF);
-  const_tree op0 = TREE_OPERAND (e, 0);
+  tree op0 = TREE_OPERAND (e, 0);
   gcc_assert (op0);
-  const_tree op0_t = TREE_TYPE (op0);
+  tree op0_t = TREE_TYPE (op0);
   gcc_assert (op0_t);
   // op0_t can either be a RECORD_TYPE or a UNION_TYPE.
   const enum tree_code code = TREE_CODE (op0_t);
@@ -2831,7 +2831,7 @@ ExprAccessor::_walk_COMPONENT_REF_pre (const_tree e)
   const bool valid = is_record != is_union;
   gcc_assert (valid);
 
-  const_tree op1 = TREE_OPERAND (e, 1);
+  tree op1 = TREE_OPERAND (e, 1);
   assert_is_type (op1, FIELD_DECL);
   log ("%s.%s\n", TypeStringifier::get_type_identifier (op0_t),
        TypeStringifier::get_field_identifier (op1));
@@ -2850,18 +2850,18 @@ ExprAccessor::_walk_COMPONENT_REF_pre (const_tree e)
   if (_stack.size () < 4)
     return;
 
-  const_tree this_expr = _stack.top ();
+  tree this_expr = _stack.top ();
   _stack.pop ();
-  const_tree twice = _stack.top ();
+  tree twice = _stack.top ();
   _stack.pop ();
-  const_tree prev_expr = _stack.top ();
+  tree prev_expr = _stack.top ();
   _stack.push (twice);
   _stack.push (this_expr);
   if (TREE_CODE (prev_expr) != ADDR_EXPR)
     return;
 
   log ("we are taking address of a component?\n");
-  const_tree t = op0_t;
+  tree t = op0_t;
   if (TREE_CODE (t) != RECORD_TYPE)
     return;
 
@@ -2888,19 +2888,19 @@ ExprAccessor::_walk_COMPONENT_REF_pre (const_tree e)
 void
 ExprAccessor::print_accesses ()
 {
-  for (std::map<const_tree, field_access_map_t>::const_iterator i
+  for (std::map<tree, field_access_map_t>::const_iterator i
        = record_field_map.begin (),
        e = record_field_map.end ();
        i != e; ++i)
     {
-      const_tree record = i->first;
+      tree record = i->first;
       field_access_map_t field_map = i->second;
-      for (std::map<const_tree, unsigned>::const_iterator j
+      for (std::map<tree, unsigned>::const_iterator j
 	   = field_map.begin (),
 	   f = field_map.end ();
 	   j != f; ++j)
 	{
-	  const_tree field = j->first;
+	  tree field = j->first;
 	  const std::string name_r
 	    = TypeStringifier::get_type_identifier (record);
 	  const std::string name_f
@@ -2936,14 +2936,14 @@ GimpleAccesser::_walk_pre_gassign (gassign *s)
     {
     case GIMPLE_TERNARY_RHS:
       {
-	const_tree rhs3 = gimple_assign_rhs3 (s);
+	tree rhs3 = gimple_assign_rhs3 (s);
 	gcc_assert (rhs3);
 	exprAccessor.update (rhs3, Read);
       }
     /* fall-through */
     case GIMPLE_BINARY_RHS:
       {
-	const_tree rhs2 = gimple_assign_rhs2 (s);
+	tree rhs2 = gimple_assign_rhs2 (s);
 	gcc_assert (rhs2);
 	exprAccessor.update (rhs2, Read);
       }
@@ -2951,9 +2951,9 @@ GimpleAccesser::_walk_pre_gassign (gassign *s)
     case GIMPLE_UNARY_RHS:
     case GIMPLE_SINGLE_RHS:
       {
-	const_tree rhs1 = gimple_assign_rhs1 (s);
+	tree rhs1 = gimple_assign_rhs1 (s);
 	exprAccessor.update (rhs1, Read);
-	const_tree lhs = gimple_assign_lhs (s);
+	tree lhs = gimple_assign_lhs (s);
 	if (!lhs)
 	  break;
 	exprAccessor.update (lhs, Write);
@@ -2972,12 +2972,12 @@ GimpleAccesser::_walk_pre_gcall (gcall *s)
   unsigned n = gimple_call_num_args (s);
   for (unsigned i = 0; i < n; i++)
     {
-      const_tree a = gimple_call_arg (s, i);
+      tree a = gimple_call_arg (s, i);
       gcc_assert (a);
       exprAccessor.update (a, Read);
     }
 
-  const_tree lhs = gimple_call_lhs (s);
+  tree lhs = gimple_call_lhs (s);
   if (!lhs)
     return;
   exprAccessor.update (lhs, Write);
@@ -2987,7 +2987,7 @@ GimpleAccesser::_walk_pre_gcall (gcall *s)
 void
 GimpleAccesser::_walk_pre_greturn (greturn *s)
 {
-  const_tree val = gimple_return_retval (s);
+  tree val = gimple_return_retval (s);
   if (!val)
     return;
   exprAccessor.update (val, Read);
@@ -2997,8 +2997,8 @@ GimpleAccesser::_walk_pre_greturn (greturn *s)
 void
 GimpleAccesser::_walk_pre_gcond (gcond *s)
 {
-  const_tree lhs = gimple_cond_lhs (s);
-  const_tree rhs = gimple_cond_rhs (s);
+  tree lhs = gimple_cond_lhs (s);
+  tree rhs = gimple_cond_rhs (s);
   gcc_assert (lhs && rhs);
   exprAccessor.update (lhs, Read);
   exprAccessor.update (rhs, Read);
@@ -3046,7 +3046,7 @@ Reason::operator|= (const Reason &other)
 
 /* Insert TYPE into a partition depending on IN_POINTS_TO_RECORD.  */
 void
-type_partitions_s::insert (const_tree type, bool in_points_to_record)
+type_partitions_s::insert (tree type, bool in_points_to_record)
 {
   gcc_assert (type);
   this->universe.insert (type);
@@ -3061,7 +3061,7 @@ type_partitions_s::insert (const_tree type, bool in_points_to_record)
 
 /* Find out whether TYPE is already in universe.  */
 bool
-type_partitions_s::in_universe (const_tree type) const
+type_partitions_s::in_universe (tree type) const
 {
   gcc_assert (type);
   const bool seen_before = this->universe.find (type) != this->universe.end ();
@@ -3070,7 +3070,7 @@ type_partitions_s::in_universe (const_tree type) const
 
 /* Find out whether TYPE is in points_to_record partition.  */
 bool
-type_partitions_s::in_points_to_record (const_tree type) const
+type_partitions_s::in_points_to_record (tree type) const
 {
   gcc_assert (type);
   const bool seen_before
@@ -3080,7 +3080,7 @@ type_partitions_s::in_points_to_record (const_tree type) const
 
 /* Find out whether TYPE is not in points to record partition.  */
 bool
-type_partitions_s::in_complement (const_tree type) const
+type_partitions_s::in_complement (tree type) const
 {
   gcc_assert (type);
   const bool seen_before
@@ -3090,7 +3090,7 @@ type_partitions_s::in_complement (const_tree type) const
 
 /* Stringify a type.  */
 std::string
-TypeStringifier::stringify (const_tree t)
+TypeStringifier::stringify (tree t)
 {
   if (!dump_file)
     return std::string ("");
@@ -3103,49 +3103,49 @@ TypeStringifier::stringify (const_tree t)
 }
 
 void
-TypeStringifier::_walk_VOID_TYPE_pre (const_tree t)
+TypeStringifier::_walk_VOID_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_INTEGER_TYPE_pre (const_tree t)
+TypeStringifier::_walk_INTEGER_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_REAL_TYPE_pre (const_tree t)
+TypeStringifier::_walk_REAL_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_FIXED_POINT_TYPE_pre (const_tree t)
+TypeStringifier::_walk_FIXED_POINT_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_COMPLEX_TYPE_pre (const_tree t)
+TypeStringifier::_walk_COMPLEX_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_OFFSET_TYPE_pre (const_tree t)
+TypeStringifier::_walk_OFFSET_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_walk_BOOLEAN_TYPE_pre (const_tree t)
+TypeStringifier::_walk_BOOLEAN_TYPE_pre (tree t)
 {
   _stringify_simple (t);
 }
 
 void
-TypeStringifier::_stringify_simple (const_tree t)
+TypeStringifier::_stringify_simple (tree t)
 {
   gcc_assert (t);
   const enum tree_code code = TREE_CODE (t);
@@ -3153,52 +3153,52 @@ TypeStringifier::_stringify_simple (const_tree t)
 }
 
 void
-TypeStringifier::_walk_POINTER_TYPE_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_POINTER_TYPE_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("*");
 }
 
 void
-TypeStringifier::_walk_ARRAY_TYPE_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_ARRAY_TYPE_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("[]");
 }
 
 void
 TypeStringifier::_walk_REFERENCE_TYPE_post (__attribute__ ((unused))
-					    const_tree t)
+					    tree t)
 {
   this->_stringification += std::string ("&");
 }
 
 void
-TypeStringifier::_walk_UNION_TYPE_pre (const_tree t)
+TypeStringifier::_walk_UNION_TYPE_pre (tree t)
 {
   this->_stringification += std::string (" union ");
   _stringify_aggregate_pre (t);
 }
 
 void
-TypeStringifier::_walk_UNION_TYPE_post (const_tree t)
+TypeStringifier::_walk_UNION_TYPE_post (tree t)
 {
   _stringify_aggregate_post (t);
 }
 
 void
-TypeStringifier::_walk_RECORD_TYPE_pre (const_tree t)
+TypeStringifier::_walk_RECORD_TYPE_pre (tree t)
 {
   this->_stringification += std::string (" record ");
   _stringify_aggregate_pre (t);
 }
 
 void
-TypeStringifier::_walk_RECORD_TYPE_post (const_tree t)
+TypeStringifier::_walk_RECORD_TYPE_post (tree t)
 {
   _stringify_aggregate_post (t);
 }
 
 void
-TypeStringifier::_stringify_aggregate_pre (const_tree t)
+TypeStringifier::_stringify_aggregate_pre (tree t)
 {
   this->_stringification
     += TypeStringifier::get_type_identifier (t) + std::string (" {");
@@ -3206,13 +3206,13 @@ TypeStringifier::_stringify_aggregate_pre (const_tree t)
 
 void
 TypeStringifier::_stringify_aggregate_post (__attribute__ ((unused))
-					    const_tree t)
+					    tree t)
 {
   this->_stringification += std::string ("}");
 }
 
 void
-TypeStringifier::_walk_field_post (const_tree t)
+TypeStringifier::_walk_field_post (tree t)
 {
   this->_stringification += std::string (" ")
 			    + TypeStringifier::get_field_identifier (t)
@@ -3220,73 +3220,73 @@ TypeStringifier::_walk_field_post (const_tree t)
 }
 
 void
-TypeStringifier::_walk_METHOD_TYPE_pre (const_tree t)
+TypeStringifier::_walk_METHOD_TYPE_pre (tree t)
 {
   _stringify_fm_pre (t);
 }
 
 void
-TypeStringifier::_walk_METHOD_TYPE_post (const_tree t)
+TypeStringifier::_walk_METHOD_TYPE_post (tree t)
 {
   _stringify_fm_post (t);
 }
 
 void
-TypeStringifier::_walk_FUNCTION_TYPE_pre (const_tree t)
+TypeStringifier::_walk_FUNCTION_TYPE_pre (tree t)
 {
   _stringify_fm_pre (t);
 }
 
 void
-TypeStringifier::_walk_FUNCTION_TYPE_post (const_tree t)
+TypeStringifier::_walk_FUNCTION_TYPE_post (tree t)
 {
   _stringify_fm_post (t);
 }
 
 void
-TypeStringifier::_stringify_fm_pre (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_stringify_fm_pre (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("function { ");
 }
 
 void
-TypeStringifier::_stringify_fm_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_stringify_fm_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("}");
 }
 
 void
-TypeStringifier::_walk_return_pre (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_return_pre (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("(");
 }
 
 void
-TypeStringifier::_walk_return_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_return_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string (")");
 }
 
 void
-TypeStringifier::_walk_args_pre (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_args_pre (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string ("(");
 }
 
 void
-TypeStringifier::_walk_args_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_args_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string (")");
 }
 
 void
-TypeStringifier::_walk_arg_post (__attribute__ ((unused)) const_tree t)
+TypeStringifier::_walk_arg_post (__attribute__ ((unused)) tree t)
 {
   this->_stringification += std::string (", ");
 }
 
 std::string
-TypeStringifier::get_type_identifier (const_tree t)
+TypeStringifier::get_type_identifier (tree t)
 {
   if (detected_incompatible_syntax)
     return std::string("");
@@ -3308,10 +3308,10 @@ TypeStringifier::get_type_identifier (const_tree t)
 }
 
 std::string
-TypeStringifier::get_field_identifier (const_tree t)
+TypeStringifier::get_field_identifier (tree t)
 {
   assert_is_type (t, FIELD_DECL);
-  const_tree decl_name = DECL_NAME (t);
+  tree decl_name = DECL_NAME (t);
   if (!decl_name)
     return std::string ("");
 
@@ -3321,13 +3321,13 @@ TypeStringifier::get_field_identifier (const_tree t)
 
 /* Return true if L and R have equal structural equalities.  */
 bool
-TypeStructuralEquality::equal (const_tree l, const_tree r)
+TypeStructuralEquality::equal (tree l, tree r)
 {
   return _equal (l, r);
 }
 
 bool
-TypeStructuralEquality::_equal (const_tree l, const_tree r)
+TypeStructuralEquality::_equal (tree l, tree r)
 {
   bool valid_inputs = l && r;
   if (!valid_inputs)
@@ -3386,7 +3386,7 @@ TypeStructuralEquality::_equal (const_tree l, const_tree r)
 }
 
 bool
-TypeStructuralEquality::_equal_code (const_tree l, const_tree r)
+TypeStructuralEquality::_equal_code (tree l, tree r)
 {
   const enum tree_code code_l = TREE_CODE (l);
   const enum tree_code code_r = TREE_CODE (r);
@@ -3398,7 +3398,7 @@ TypeStructuralEquality::_equal_code (const_tree l, const_tree r)
 }
 
 #define TSE_FUNC_DEF_SIMPLE(code) 					  \
-  bool TypeStructuralEquality::_walk_##code (const_tree l, const_tree r)  \
+  bool TypeStructuralEquality::_walk_##code (tree l, tree r)  \
   {									  \
     return _equal_code (l, r);						  \
   }
@@ -3413,17 +3413,17 @@ TSE_FUNC_DEF_SIMPLE (OFFSET_TYPE)
 TSE_FUNC_DEF_SIMPLE (COMPLEX_TYPE)
 
 bool
-TypeStructuralEquality::_equal_wrapper (const_tree l, const_tree r)
+TypeStructuralEquality::_equal_wrapper (tree l, tree r)
 {
-  const_tree inner_l = TREE_TYPE (l);
+  tree inner_l = TREE_TYPE (l);
   if (TREE_CODE(inner_l) == ARRAY_TYPE && TREE_CODE(TREE_TYPE(inner_l)) == POINTER_TYPE ) inner_l = TREE_TYPE(inner_l);
-  const_tree inner_r = TREE_TYPE (r);
+  tree inner_r = TREE_TYPE (r);
   if (TREE_CODE(inner_r) == ARRAY_TYPE && TREE_CODE(TREE_TYPE(inner_r)) == POINTER_TYPE ) inner_r = TREE_TYPE(inner_r);
   return _equal (inner_l, inner_r);
 }
 
 #define TSE_FUNC_DEF_WRAPPER(code)					 \
-  bool TypeStructuralEquality::_walk_##code (const_tree l, const_tree r) \
+  bool TypeStructuralEquality::_walk_##code (tree l, tree r) \
   {									 \
     return _equal_wrapper (l, r);					 \
   }
@@ -3433,10 +3433,10 @@ TSE_FUNC_DEF_WRAPPER (ARRAY_TYPE)
 TSE_FUNC_DEF_WRAPPER (POINTER_TYPE)
 
 #define TSE_FUNC_DEF_CONTAINER(code)					 \
-  bool TypeStructuralEquality::_walk_##code (const_tree l, const_tree r) \
+  bool TypeStructuralEquality::_walk_##code (tree l, tree r) \
   {									 \
-    const_tree field_l = TYPE_FIELDS (l);				 \
-    const_tree field_r = TYPE_FIELDS (r);				 \
+    tree field_l = TYPE_FIELDS (l);				 \
+    tree field_r = TYPE_FIELDS (r);				 \
     bool efield_l = field_l;						 \
     bool efield_r = field_r;						 \
     bool still_equal = efield_l == efield_r;				 \
@@ -3445,8 +3445,8 @@ TSE_FUNC_DEF_WRAPPER (POINTER_TYPE)
 									 \
     while (field_l && field_r && still_equal) 				 \
       {									 \
-	const_tree tfield_l = TREE_TYPE (field_l);			 \
-	const_tree tfield_r = TREE_TYPE (field_r);			 \
+	tree tfield_l = TREE_TYPE (field_l);			 \
+	tree tfield_r = TREE_TYPE (field_r);			 \
 	still_equal &= _equal (tfield_l, tfield_r);			 \
 	field_l = DECL_CHAIN (field_l);					 \
 	field_r = DECL_CHAIN (field_r);					 \
@@ -3461,23 +3461,23 @@ TSE_FUNC_DEF_CONTAINER (RECORD_TYPE)
 TSE_FUNC_DEF_CONTAINER (UNION_TYPE)
 
 #define TSE_FUNC_DEF_FUNC(code)						 \
-  bool TypeStructuralEquality::_walk_##code (const_tree l, const_tree r) \
+  bool TypeStructuralEquality::_walk_##code (tree l, tree r) \
   {									 \
-    const_tree tret_l = TREE_TYPE (l);					 \
-    const_tree tret_r = TREE_TYPE (r);					 \
+    tree tret_l = TREE_TYPE (l);					 \
+    tree tret_r = TREE_TYPE (r);					 \
     bool still_equal = _equal (tret_l, tret_r);				 \
     if (!still_equal)							 \
       return still_equal;						 \
 									 \
-    const_tree arg_l = TYPE_ARG_TYPES (l);				 \
-    const_tree arg_r = TYPE_ARG_TYPES (r);				 \
+    tree arg_l = TYPE_ARG_TYPES (l);				 \
+    tree arg_r = TYPE_ARG_TYPES (r);				 \
     bool earg_l = arg_l;						 \
     bool earg_r = arg_r;						 \
     still_equal &= earg_l == earg_r;					 \
     while (arg_l && arg_r && still_equal)				 \
       {									 \
-	const_tree targ_l = TREE_VALUE (arg_l);				 \
-	const_tree targ_r = TREE_VALUE (arg_r);				 \
+	tree targ_l = TREE_VALUE (arg_l);				 \
+	tree targ_r = TREE_VALUE (arg_r);				 \
 	still_equal &= _equal (targ_l, targ_r);				 \
 	arg_l = TREE_CHAIN (arg_l);					 \
 	arg_r = TREE_CHAIN (arg_r);					 \
@@ -3493,7 +3493,7 @@ TSE_FUNC_DEF_FUNC (METHOD_TYPE)
 
 /* Used for comparing incomplete types.  */
 bool
-TypeIncompleteEquality::_equal (const_tree l, const_tree r)
+TypeIncompleteEquality::_equal (tree l, tree r)
 {
   bool valid_inputs = l && r;
   if (!valid_inputs)
@@ -3509,8 +3509,8 @@ TypeIncompleteEquality::_equal (const_tree l, const_tree r)
 
   // Before comparing with identifiers
   // make last attempt to compare using main variants.
-  const_tree m_l = TYPE_MAIN_VARIANT (l);
-  const_tree m_r = TYPE_MAIN_VARIANT (r);
+  tree m_l = TYPE_MAIN_VARIANT (l);
+  tree m_r = TYPE_MAIN_VARIANT (r);
   gcc_assert (m_l && m_r);
   can_compare_structurally = m_l == m_r;
   if (can_compare_structurally)
@@ -3533,20 +3533,20 @@ fix_escaping_types_in_set (tpartitions_t &types)
   TypeIncompleteEquality structuralEquality;
   do
     {
-      std::vector<const_tree> fixes;
+      std::vector<tree> fixes;
       fixed_point_reached = true;
-      for (std::set<const_tree>::const_iterator i = types.escaping.begin (),
+      for (std::set<tree>::const_iterator i = types.escaping.begin (),
 						e = types.escaping.end ();
 	   i != e; ++i)
 	{
-	  for (std::set<const_tree>::const_iterator j
+	  for (std::set<tree>::const_iterator j
 	       = types.non_escaping.begin (),
 	       f = types.non_escaping.end ();
 	       j != f; ++j)
 	    {
-	      const_tree type_esc = *i;
+	      tree type_esc = *i;
 	      gcc_assert (type_esc);
-	      const_tree type_non = *j;
+	      tree type_non = *j;
 	      gcc_assert (type_non);
 	      // There can be cases where incomplete types are marked as
 	      // non-escaping and complete types counter parts are marked as
@@ -3563,11 +3563,11 @@ fix_escaping_types_in_set (tpartitions_t &types)
 	    }
 	}
 
-      for (std::vector<const_tree>::const_iterator i = fixes.begin (),
+      for (std::vector<tree>::const_iterator i = fixes.begin (),
 						   e = fixes.end ();
 	   i != e; ++i)
 	{
-	  const_tree escaping_type = *i;
+	  tree escaping_type = *i;
 	  types.escaping.insert (escaping_type);
 	  types.non_escaping.erase (escaping_type);
 	}
