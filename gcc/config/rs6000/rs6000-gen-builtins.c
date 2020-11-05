@@ -379,6 +379,8 @@ struct bifdata {
 static bifdata bifs[MAXBIFS];
 static int num_bifs;
 static int curr_bif;
+static int *bif_order;
+static int bif_index = 0;
 
 /* Stanzas are groupings of built-in functions and overloads by some
    common feature/attribute.  These definitions are for overload stanzas.  */
@@ -437,6 +439,10 @@ enum parse_codes {
 static rbt_strings bif_rbt;
 static rbt_strings ovld_rbt;
 static rbt_strings fntype_rbt;
+
+/* Another red-black tree containing a mapping from built-in function
+   identifiers to the order in which they were encountered.  */
+static rbt_strings bifo_rbt;
 
 /* Mapping from type tokens to type node names.  */
 struct typemap
@@ -1748,6 +1754,22 @@ parse_bif_entry ()
       return PC_PARSEFAIL;
     }
 
+  /* Append a number representing the order in which this function
+     was encountered to its name, and save in another lookup
+     structure.  */
+  int orig_len = strlen (bifs[curr_bif].idname);
+  char *buf = (char *) malloc (orig_len + 7);
+  strcpy (buf, bifs[curr_bif].idname);
+  buf[orig_len] = ':';
+  char numstr[6];
+  sprintf (numstr, "%05d", curr_bif);
+  strcpy (&buf[orig_len + 1], numstr);
+  if (!rbt_insert (&bifo_rbt, buf))
+    {
+      (*diag) ("internal error inserting '%s' in bifo_rbt\n", buf);
+      return PC_PARSEFAIL;
+    }
+
   /* Now the pattern name.  */
   consume_whitespace ();
   bifs[curr_bif].patname = match_identifier ();
@@ -1834,6 +1856,24 @@ parse_bif ()
   if (result == PC_EOFILE)
     return PC_OK;
   return result;
+}
+
+/* Callback function for create_bif_order.  */
+void set_bif_order (char *str)
+{
+  int num = 0;
+  char *colon = strchr (str, ':');
+  sscanf (++colon, "%d", &num);
+  bif_order[bif_index++] = num;
+}
+
+/* Create a mapping from function IDs in their final order to the order
+   they appear in the built-in function file.  */
+static void
+create_bif_order ()
+{
+  bif_order = (int *) malloc (curr_bif  * sizeof (int));
+  rbt_inorder_callback (&bifo_rbt, bifo_rbt.rbt_root, set_bif_order);
 }
 
 /* Parse one two-line entry in the overload file.  */
@@ -2339,6 +2379,98 @@ write_header_file ()
   return 1;
 }
 
+/* Write the decl and initializer for rs6000_builtin_info_x[].  */
+static void
+write_bif_static_init ()
+{
+  const char *res[3];
+  fprintf (init_file, "bifdata rs6000_builtin_info_x[RS6000_BIF_MAX] =\n");
+  fprintf (init_file, "  {\n");
+  fprintf (init_file, "    { /* RS6000_BIF_NONE: */\n");
+  fprintf (init_file, "      \"\", ENB_ALWAYS, 0, CODE_FOR_nothing, 0,\n");
+  fprintf (init_file, "      0, {0, 0, 0}, {RES_NONE, RES_NONE, RES_NONE},\n");
+  fprintf (init_file, "      {0, 0, 0}, {0, 0, 0}, \"\"\n");
+  fprintf (init_file, "    },\n");
+  for (int i = 0; i <= curr_bif; i++)
+    {
+      bifdata *bifp = &bifs[bif_order[i]];
+      fprintf (init_file, "    { /* RS6000_BIF_%s: */\n", bifp->idname);
+      fprintf (init_file, "      /* bifname */\t\"%s\",\n",
+	       bifp->proto.bifname);
+      fprintf (init_file, "      /* enable*/\t%s,\n",
+	       enable_string[bifp->stanza]);
+      /* Type must be instantiated at run time.  */
+      fprintf (init_file, "      /* fntype */\t0,\n");
+      fprintf (init_file, "      /* icode */\tCODE_FOR_%s,\n",
+	       bifp->patname);
+      fprintf (init_file, "      /* nargs */\t%d,\n",
+	       bifp->proto.nargs);
+      fprintf (init_file, "      /* bifattrs */\t0");
+      if (bifp->attrs.isinit)
+	fprintf (init_file, " | bif_init_bit");
+      if (bifp->attrs.isset)
+	fprintf (init_file, " | bif_set_bit");
+      if (bifp->attrs.isextract)
+	fprintf (init_file, " | bif_extract_bit");
+      if (bifp->attrs.isnosoft)
+	fprintf (init_file, " | bif_nosoft_bit");
+      if (bifp->attrs.isldvec)
+	fprintf (init_file, " | bif_ldvec_bit");
+      if (bifp->attrs.isstvec)
+	fprintf (init_file, " | bif_stvec_bit");
+      if (bifp->attrs.isreve)
+	fprintf (init_file, " | bif_reve_bit");
+      if (bifp->attrs.ispred)
+	fprintf (init_file, " | bif_pred_bit");
+      if (bifp->attrs.ishtm)
+	fprintf (init_file, " | bif_htm_bit");
+      if (bifp->attrs.ishtmspr)
+	fprintf (init_file, " | bif_htmspr_bit");
+      if (bifp->attrs.ishtmcr)
+	fprintf (init_file, " | bif_htmcr_bit");
+      if (bifp->attrs.ismma)
+	fprintf (init_file, " | bif_mma_bit");
+      if (bifp->attrs.isquad)
+	fprintf (init_file, " | bif_quad_bit");
+      if (bifp->attrs.ispair)
+	fprintf (init_file, " | bif_pair_bit");
+      if (bifp->attrs.isno32bit)
+	fprintf (init_file, " | bif_no32bit_bit");
+      if (bifp->attrs.iscpu)
+	fprintf (init_file, " | bif_cpu_bit");
+      if (bifp->attrs.isldstmask)
+	fprintf (init_file, " | bif_ldstmask_bit");
+      if (bifp->attrs.islxvr)
+	fprintf (init_file, " | bif_lxvr_bit");
+      fprintf (init_file, ",\n");
+      fprintf (init_file, "      /* restr_opnd */\t{%d, %d, %d},\n",
+	       bifp->proto.restr_opnd[0], bifp->proto.restr_opnd[1],
+	       bifp->proto.restr_opnd[2]);
+      for (int j = 0; j < 3; j++)
+	res[j] = (bifp->proto.restr_opnd[j] == 0 ? "RES_NONE"
+		  : (bifp->proto.restr[j] == RES_BITS ? "RES_BITS"
+		     : (bifp->proto.restr[j] == RES_RANGE ? "RES_RANGE"
+			: (bifp->proto.restr[j] == RES_VALUES ? "RES_VALUES"
+			   : (bifp->proto.restr[j] == RES_VAR_RANGE
+			      ? "RES_VAR_RANGE" : "ERROR")))));
+      fprintf (init_file, "      /* restr */\t{%s, %s, %s},\n",
+	       res[0], res[1], res[2]);
+      fprintf (init_file, "      /* restr_val1 */\t{%d, %d, %d},\n",
+	       bifp->proto.restr_val1[0], bifp->proto.restr_val1[1],
+	       bifp->proto.restr_val1[2]);
+      fprintf (init_file, "      /* restr_val2 */\t{%d, %d, %d},\n",
+	       bifp->proto.restr_val2[0], bifp->proto.restr_val2[1],
+	       bifp->proto.restr_val2[2]);
+      fprintf (init_file, "      /* attr_string */\t\"%s\"\n",
+	       (bifp->kind == FNK_CONST ? "= const"
+		: (bifp->kind == FNK_PURE ? "= pure"
+		   : (bifp->kind == FNK_FPMATH ? "= fp, const"
+		      : ""))));
+      fprintf (init_file, "    },\n");
+    }
+  fprintf (init_file, "  };\n\n");
+}
+
 /* Write code to initialize the built-in function table.  */
 static void
 write_init_bif_table ()
@@ -2346,104 +2478,9 @@ write_init_bif_table ()
   for (int i = 0; i <= curr_bif; i++)
     {
       fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].bifname"
-	       "\n    = \"%s\";\n",
-	       bifs[i].idname, bifs[i].proto.bifname);
-      fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].enable"
-	       "\n    = %s;\n",
-	       bifs[i].idname, enable_string[bifs[i].stanza]);
-      fprintf (init_file,
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
 	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
-      fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].nargs"
-	       "\n    = %d;\n",
-	       bifs[i].idname, bifs[i].proto.nargs);
-      fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].icode"
-	       "\n    = CODE_FOR_%s;\n",
-	       bifs[i].idname, bifs[i].patname);
-      fprintf (init_file,
-	       "  rs6000_builtin_info_x[RS6000_BIF_%s].bifattrs"
-	       "\n    = 0",
-	       bifs[i].idname);
-      if (bifs[i].attrs.isinit)
-	fprintf (init_file, " | bif_init_bit");
-      if (bifs[i].attrs.isset)
-	fprintf (init_file, " | bif_set_bit");
-      if (bifs[i].attrs.isextract)
-	fprintf (init_file, " | bif_extract_bit");
-      if (bifs[i].attrs.isnosoft)
-	fprintf (init_file, " | bif_nosoft_bit");
-      if (bifs[i].attrs.isldvec)
-	fprintf (init_file, " | bif_ldvec_bit");
-      if (bifs[i].attrs.isstvec)
-	fprintf (init_file, " | bif_stvec_bit");
-      if (bifs[i].attrs.isreve)
-	fprintf (init_file, " | bif_reve_bit");
-      if (bifs[i].attrs.ispred)
-	fprintf (init_file, " | bif_pred_bit");
-      if (bifs[i].attrs.ishtm)
-	fprintf (init_file, " | bif_htm_bit");
-      if (bifs[i].attrs.ishtmspr)
-	fprintf (init_file, " | bif_htmspr_bit");
-      if (bifs[i].attrs.ishtmcr)
-	fprintf (init_file, " | bif_htmcr_bit");
-      if (bifs[i].attrs.ismma)
-	fprintf (init_file, " | bif_mma_bit");
-      if (bifs[i].attrs.isquad)
-	fprintf (init_file, " | bif_quad_bit");
-      if (bifs[i].attrs.ispair)
-	fprintf (init_file, " | bif_pair_bit");
-      if (bifs[i].attrs.isno32bit)
-	fprintf (init_file, " | bif_no32bit_bit");
-      if (bifs[i].attrs.iscpu)
-	fprintf (init_file, " | bif_cpu_bit");
-      if (bifs[i].attrs.isldstmask)
-	fprintf (init_file, " | bif_ldstmask_bit");
-      if (bifs[i].attrs.islxvr)
-	fprintf (init_file, " | bif_lxvr_bit");
-      fprintf (init_file, ";\n");
-      for (int j = 0; j < MAXRESTROPNDS; j++)
-	{
-	  fprintf (init_file,
-		   "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_opnd[%d]"
-		   "\n    = %d;\n",
-		   bifs[i].idname, j, bifs[i].proto.restr_opnd[j]);
-	  if (bifs[i].proto.restr_opnd[j])
-	    {
-	      const char *res
-		= (bifs[i].proto.restr[j] == RES_BITS ? "RES_BITS"
-		   : (bifs[i].proto.restr[j] == RES_RANGE ? "RES_RANGE"
-		      : (bifs[i].proto.restr[j] == RES_VALUES ? "RES_VALUES"
-			 : (bifs[i].proto.restr[j] == RES_VAR_RANGE
-			    ? "RES_VAR_RANGE" : "ERROR"))));
-	      fprintf (init_file,
-		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr[%d]"
-		       "\n    = %s;\n",
-		       bifs[i].idname, j, res);
-	      fprintf (init_file,
-		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val1[%d]"
-		       "\n    = %d;\n",
-		       bifs[i].idname, j, bifs[i].proto.restr_val1[j]);
-	      fprintf (init_file,
-		       "  rs6000_builtin_info_x[RS6000_BIF_%s].restr_val2[%d]"
-		       "\n    = %d;\n",
-		       bifs[i].idname, j, bifs[i].proto.restr_val2[j]);
-	    }
-	  fprintf (init_file,
-		   "  rs6000_builtin_info_x[RS6000_BIF_%s].attr_string"
-		   "\n    = %s;\n",
-		   bifs[i].idname,
-		   bifs[i].kind == FNK_CONST ? "\"= const\""
-		   : (bifs[i].kind == FNK_PURE ? "\"= pure\""
-		      : (bifs[i].kind == FNK_FPMATH ? "\"= fp, const\""
-			 : "\"\"")));
-	  fprintf (init_file, "\n");
-	}
-
       fprintf (init_file,
 	       "  bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",
 	       bifs[i].idname);
@@ -2580,8 +2617,8 @@ write_init_file ()
   fprintf (init_file, "int new_builtins_are_live = 0;\n\n");
 #endif
 
-  fprintf (init_file,
-	   "bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");
+  write_bif_static_init ();
+
   fprintf (init_file,
 	   "ovlddata rs6000_overload_info[RS6000_OVLD_MAX"
 	   " - RS6000_BIF_MAX];\n\n");
@@ -2738,6 +2775,12 @@ main (int argc, const char **argv)
   fntype_rbt.rbt_nil->color = RBT_BLACK;
   fntype_rbt.rbt_root = fntype_rbt.rbt_nil;
 
+  /* Initialize another balanced three that contains a map from built-in
+     function ids to the order they were encountered.  */
+  bifo_rbt.rbt_nil = (rbt_string_node *) malloc (sizeof (rbt_string_node));
+  bifo_rbt.rbt_nil->color = RBT_BLACK;
+  bifo_rbt.rbt_root = bifo_rbt.rbt_nil;
+
   /* Parse the built-in function file.  */
   num_bifs = 0;
   line = 0;
@@ -2748,6 +2791,10 @@ main (int argc, const char **argv)
       exit (EC_PARSEBIF);
     }
   fclose (bif_file);
+
+  /* Create a mapping from function IDs in their final order to
+     the order they appear in the built-in function file.  */
+  create_bif_order ();
 
 #ifdef DEBUG
   fprintf (stderr, "\nFunction ID list:\n");
