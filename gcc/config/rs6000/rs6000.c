@@ -3996,6 +3996,15 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_QUAD_MEMORY;
     }
 
+  /* Quad add/subtract requires at least power8 and 64-bit.  */
+  if (TARGET_QUAD_ARITHMETIC && !TARGET_VADDUQM)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_QUAD_ARITHMETIC) != 0)
+	warning (0, N_("%<-mquad-add-subtract%> needs power8 and 64-bit"));
+
+      rs6000_isa_flags &= ~OPTION_MASK_QUAD_ARITHMETIC;
+    }
+
   /* Assume if the user asked for normal quad memory instructions, they want
      the atomic versions as well, unless they explicity told us not to use quad
      word atomic instructions.  */
