@@ -141,6 +141,12 @@ __thread
 #endif
 struct indirect_call_tuple __gcov_indirect_call;
 
+// TODO: move to a proper place
+#if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
+__thread
+#endif
+int __gcov_block_malloc;
+
 /* By default, the C++ compiler will use function addresses in the
    vtable entries.  Setting TARGET_VTABLE_USES_DESCRIPTORS to nonzero
    tells the compiler to use function descriptors instead.  The value

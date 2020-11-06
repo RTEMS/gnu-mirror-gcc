@@ -33,4 +33,12 @@ extern void __gcov_reset (void);
 
 extern void __gcov_dump (void);
 
+/* Prevent from calling malloc.  */
+
+extern void __gcov_supress_malloc (void);
+
+/* Allow calling malloc.  */
+
+extern void __gcov_allow_malloc (void);
+
 #endif /* GCC_GCOV_H */

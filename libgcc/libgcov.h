@@ -247,6 +247,12 @@ struct indirect_call_tuple
   /* Pointer to counters.  */
   gcov_type *counters;
 };
+
+extern
+#if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
+__thread
+#endif
+int __gcov_block_malloc;
   
 /* Exactly one of these will be active in the process.  */
 extern struct gcov_master __gcov_master;
@@ -428,7 +434,12 @@ allocate_gcov_kvp (void)
 #endif
 
   if (new_node == NULL)
-    new_node = (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
+    {
+#if !defined(IN_GCOV_TOOL)
+      if (!__gcov_block_malloc)
+	new_node = (struct gcov_kvp *)xcalloc (1, sizeof (struct gcov_kvp));
+#endif
+    }
 
   return new_node;
 }

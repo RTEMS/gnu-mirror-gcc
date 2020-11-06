@@ -36,6 +36,14 @@ void __gcov_reset (void) {}
 void __gcov_dump (void) {}
 #endif
 
+#ifdef L_gcov_supress_malloc
+void __gcov_supress_malloc (void) {}
+#endif
+
+#ifdef L_gcov_allow_malloc
+void __gcov_allow_malloc (void) {}
+#endif
+
 #else
 
 extern __gthread_mutex_t __gcov_mx ATTRIBUTE_HIDDEN;
@@ -173,6 +181,20 @@ __gcov_dump (void)
 }
 
 #endif /* L_gcov_dump */
+
+#ifdef L_gcov_supress_malloc
+void __gcov_supress_malloc (void)
+{
+  __gcov_block_malloc = 1;
+}
+#endif /* L_gcov_supress_malloc */
+
+#ifdef L_gcov_allow_malloc
+void __gcov_allow_malloc (void)
+{
+  __gcov_block_malloc = 0;
+}
+#endif /* L_gcov_block_malloc */
 
 #ifdef L_gcov_fork
 /* A wrapper for the fork function.  We reset counters in the child
