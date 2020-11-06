@@ -1,0 +1,106 @@
+name: build-gcc
+
+# Run this workflow on every new commit and pull request
+on: [push, pull_request]
+
+# Run this workflow every time a new commit pushed to your repository
+# on: push
+
+jobs:    
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+      - run: | 
+          git log -1
+          dir
+          ls -a
+      
+      - name: Test ls
+        working-directory: gcc
+        run: | 
+          git log -1 
+          dir
+          ls -a
+          
+      - name: Run build script
+        run: | 
+          chmod +x .github/scripts/build-gcc.sh
+          .github/scripts/build-gcc.sh
+        shell: bash
+      
+     # - name: Upload gengtype-lex.c for packaging
+     #   uses: actions/upload-artifact@v2
+     #   with:
+    #      name: gengtype-lex
+     #     path: objdir/gcc/gengtype-lex.c
+        
+  package:
+    runs-on: ubuntu-18.04
+    needs: [build]
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+   #   - name: Download gengtype-lex.c from build step
+  #      uses: actions/download-artifact@v2
+   #     with:
+   #       name: gengtype-lex
+                      
+    #  - name: Move gengtype-lex.c into gcc directory
+    #    shell: bash
+   #     run: |
+    #      mv gengtype-lex.c gcc/gcc
+      
+      
+          
+      - name: Bump version and push tag
+        id: tagaction
+        uses: mathieudutour/github-tag-action@v4.5
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+           
+          
+      - name: Rename gcc folder to gcc-9.1.0
+        run: mv gcc gcc-9.1.0
+          
+      - name: Package sources into tar
+        run: XZ_OPT=-e9T0 tar -cJf gcc-9.1.0.tar.xz gcc-9.1.0
+        shell: bash          
+      - name: upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: gccTar
+          path: gcc-9.1.0.tar.xz
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tagaction.outputs.new_tag }}
+          release_name: Release ${{ steps.tagaction.outputs.new_tag }}
+          draft: false
+          prerelease: false
+          
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: gcc-9.1.0.tar.xz
+          asset_name: gcc-9.1.0.tar.xz
+          asset_content_type: application/zip
+      - name: Print download URL
+        run: echo "Download URL= ${{ steps.create_release.outputs.download_url }}"
