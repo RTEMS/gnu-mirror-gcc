@@ -14,8 +14,6 @@ sudo update-alternatives --set cc /usr/bin/gcc
 sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 30
 sudo update-alternatives --set c++ /usr/bin/g++
 
-cd gcc
-
 sudo apt install -y texinfo
 sudo apt-get install -y dejagnu
 ./contrib/download_prerequisites
@@ -23,7 +21,7 @@ sudo apt-get install -y dejagnu
 cd ..
 mkdir objdir
 cd objdir
-$PWD/../gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++
+$PWD/../test-gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++
 exit_code=$?
 if [ $exit_code != 0 ]; then
     exit $exit_code
@@ -43,4 +41,4 @@ if [ $exit_code != 0 ]; then
 fi
 
 make -k check -j 16
-../gcc/contrib/testsuite-management/validate_failures.py
+../test-gcc/contrib/testsuite-management/validate_failures.py
