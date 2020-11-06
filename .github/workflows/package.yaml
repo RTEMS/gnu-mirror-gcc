@@ -1,0 +1,29 @@
+name: package-gcc
+
+# Disable for now since packaging needs to run after the build.
+# Run this workflow on every new commit
+# on: [push]
+
+jobs:    
+  package:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+      
+     # This name step is needed for the Mariner build system because they look for the gcc-9.1.0 after the file is untarred  
+      - name: Rename gcc folder to gcc-9.1.0
+        run: mv gcc gcc-9.1.0
+          
+      - name: Package sources into tar
+        run: XZ_OPT=-e9T0 tar -cJf gcc-9.1.0.tar.xz gcc-9.1.0
+        shell: bash          
+      - name: upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: gccTar
+          path: gcc-9.1.0.tar.xz
