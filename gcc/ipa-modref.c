@@ -24,7 +24,7 @@ along with GCC; see the file COPYING3.  If not see
    described in ipa-modref-tree.h.
 
    This file contains a tree pass and an IPA pass.  Both performs the same
-   analys however tree pass is executed during early and late optimization
+   analysis however tree pass is executed during early and late optimization
    passes to propagate info downwards in the compilation order.  IPA pass
    propagates across the callgraph and is able to handle recursion and works on
    whole program during link-time analysis.
@@ -59,9 +59,50 @@ along with GCC; see the file COPYING3.  If not see
 #include "value-range.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
+#include "attr-fnspec.h"
+#include "symtab-clones.h"
+
+/* We record fnspec specifiers for call edges since they depends on actual
+   gimple statements.  */
+
+class fnspec_summary
+{
+public:
+  char *fnspec;
+
+  fnspec_summary ()
+  : fnspec (NULL)
+  {
+  }
+
+  ~fnspec_summary ()
+  {
+    free (fnspec);
+  }
+};
+
+/* Summary holding fnspec string for a given call.  */
+
+class fnspec_summaries_t : public call_summary <fnspec_summary *>
+{
+public:
+  fnspec_summaries_t (symbol_table *symtab)
+      : call_summary <fnspec_summary *> (symtab) {}
+  /* Hook that is called by summary when an edge is duplicated.  */
+  virtual void duplicate (cgraph_edge *,
+			  cgraph_edge *,
+			  fnspec_summary *src,
+			  fnspec_summary *dst)
+  {
+    dst->fnspec = xstrdup (src->fnspec);
+  }
+};
+
+static fnspec_summaries_t *fnspec_summaries = NULL;
 
 /* Class (from which there is one global instance) that holds modref summaries
    for all analyzed functions.  */
+
 class GTY((user)) modref_summaries
   : public fast_function_summary <modref_summary *, va_gc>
 {
@@ -84,6 +125,7 @@ class modref_summary_lto;
 
 /* Class (from which there is one global instance) that holds modref summaries
    for all analyzed functions.  */
+
 class GTY((user)) modref_summaries_lto
   : public fast_function_summary <modref_summary_lto *, va_gc>
 {
@@ -106,23 +148,26 @@ public:
 
 /* Global variable holding all modref summaries
    (from analysis to IPA propagation time).  */
+
 static GTY(()) fast_function_summary <modref_summary *, va_gc>
 	 *summaries;
 
-/* Global variable holding all modref optimizaiton summaries
+/* Global variable holding all modref optimization summaries
    (from IPA propagation time or used by local optimization pass).  */
+
 static GTY(()) fast_function_summary <modref_summary *, va_gc>
 	 *optimization_summaries;
 
 /* LTO summaries hold info from analysis to LTO streaming or from LTO
    stream-in through propagation to LTO stream-out.  */
+
 static GTY(()) fast_function_summary <modref_summary_lto *, va_gc>
 	 *summaries_lto;
 
 /* Summary for a single function which this pass produces.  */
 
 modref_summary::modref_summary ()
-  : loads (NULL), stores (NULL)
+  : loads (NULL), stores (NULL), writes_errno (NULL)
 {
 }
 
@@ -159,6 +204,7 @@ struct GTY(()) modref_summary_lto
      more verbose and thus more likely to hit the limits.  */
   modref_records_lto *loads;
   modref_records_lto *stores;
+  bool writes_errno;
 
   modref_summary_lto ();
   ~modref_summary_lto ();
@@ -169,7 +215,7 @@ struct GTY(()) modref_summary_lto
 /* Summary for a single function which this pass produces.  */
 
 modref_summary_lto::modref_summary_lto ()
-  : loads (NULL), stores (NULL)
+  : loads (NULL), stores (NULL), writes_errno (NULL)
 {
 }
 
@@ -314,10 +360,18 @@ dump_lto_records (modref_records_lto *tt, FILE *out)
 void
 modref_summary::dump (FILE *out)
 {
-  fprintf (out, "  loads:\n");
-  dump_records (loads, out);
-  fprintf (out, "  stores:\n");
-  dump_records (stores, out);
+  if (loads)
+    {
+      fprintf (out, "  loads:\n");
+      dump_records (loads, out);
+    }
+  if (stores)
+    {
+      fprintf (out, "  stores:\n");
+      dump_records (stores, out);
+    }
+  if (writes_errno)
+    fprintf (out, "  Writes errno\n");
 }
 
 /* Dump summary.  */
@@ -329,6 +383,8 @@ modref_summary_lto::dump (FILE *out)
   dump_lto_records (loads, out);
   fprintf (out, "  stores:\n");
   dump_lto_records (stores, out);
+  if (writes_errno)
+    fprintf (out, "  Writes errno\n");
 }
 
 /* Get function summary for FUNC if it exists, return NULL otherwise.  */
@@ -511,6 +567,46 @@ ignore_stores_p (tree caller, int flags)
   return false;
 }
 
+/* Determine parm_map for argument I of STMT.  */
+
+modref_parm_map
+parm_map_for_arg (gimple *stmt, int i)
+{
+  tree op = gimple_call_arg (stmt, i);
+  bool offset_known;
+  poly_int64 offset;
+  struct modref_parm_map parm_map;
+
+  parm_map.parm_offset_known = false;
+  parm_map.parm_offset = 0;
+
+  offset_known = unadjusted_ptr_and_unit_offset (op, &op, &offset);
+  if (TREE_CODE (op) == SSA_NAME
+      && SSA_NAME_IS_DEFAULT_DEF (op)
+      && TREE_CODE (SSA_NAME_VAR (op)) == PARM_DECL)
+    {
+      int index = 0;
+      for (tree t = DECL_ARGUMENTS (current_function_decl);
+	   t != SSA_NAME_VAR (op); t = DECL_CHAIN (t))
+	{
+	  if (!t)
+	    {
+	      index = -1;
+	      break;
+	    }
+	  index++;
+	}
+      parm_map.parm_index = index;
+      parm_map.parm_offset_known = offset_known;
+      parm_map.parm_offset = offset;
+    }
+  else if (points_to_local_or_readonly_memory_p (op))
+    parm_map.parm_index = -2;
+  else
+    parm_map.parm_index = -1;
+  return parm_map;
+}
+
 /* Merge side effects of call STMT to function with CALLEE_SUMMARY
    int CUR_SUMMARY.  Return true if something changed.
    If IGNORE_STORES is true, do not merge stores.  */
@@ -527,37 +623,21 @@ merge_call_side_effects (modref_summary *cur_summary,
     fprintf (dump_file, " - Merging side effects of %s with parm map:",
 	     callee_node->dump_name ());
 
+  /* We can not safely optimize based on summary of callee if it does
+     not always bind to current def: it is possible that memory load
+     was optimized out earlier which may not happen in the interposed
+     variant.  */
+  if (!callee_node->binds_to_current_def_p ())
+    {
+      if (dump_file)
+	fprintf (dump_file, " - May be interposed: collapsing loads.\n");
+      cur_summary->loads->collapse ();
+    }
+
   parm_map.safe_grow_cleared (gimple_call_num_args (stmt));
   for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
     {
-      tree op = gimple_call_arg (stmt, i);
-      bool offset_known;
-      poly_int64 offset;
-
-      offset_known = unadjusted_ptr_and_unit_offset (op, &op, &offset);
-      if (TREE_CODE (op) == SSA_NAME
-	  && SSA_NAME_IS_DEFAULT_DEF (op)
-	  && TREE_CODE (SSA_NAME_VAR (op)) == PARM_DECL)
-	{
-	  int index = 0;
-	  for (tree t = DECL_ARGUMENTS (current_function_decl);
-	       t != SSA_NAME_VAR (op); t = DECL_CHAIN (t))
-	    {
-	      if (!t)
-		{
-		  index = -1;
-		  break;
-		}
-	      index++;
-	    }
-	  parm_map[i].parm_index = index;
-	  parm_map[i].parm_offset_known = offset_known;
-	  parm_map[i].parm_offset = offset;
-	}
-      else if (points_to_local_or_readonly_memory_p (op))
-	parm_map[i].parm_index = -2;
-      else
-	parm_map[i].parm_index = -1;
+      parm_map[i] = parm_map_for_arg (stmt, i);
       if (dump_file)
 	{
 	  fprintf (dump_file, " %i", parm_map[i].parm_index);
@@ -575,17 +655,203 @@ merge_call_side_effects (modref_summary *cur_summary,
   /* Merge with callee's summary.  */
   changed |= cur_summary->loads->merge (callee_summary->loads, &parm_map);
   if (!ignore_stores)
-    changed |= cur_summary->stores->merge (callee_summary->stores,
-					   &parm_map);
+    {
+      changed |= cur_summary->stores->merge (callee_summary->stores,
+					     &parm_map);
+      if (!cur_summary->writes_errno
+	  && callee_summary->writes_errno)
+	{
+	  cur_summary->writes_errno = true;
+	  changed = true;
+	}
+    }
   return changed;
+}
+
+/* Return access mode for argument I of call STMT with FNSPEC.  */
+
+static modref_access_node
+get_access_for_fnspec (gcall *call, attr_fnspec &fnspec,
+		       unsigned int i, modref_parm_map &map)
+{
+  tree size = NULL_TREE;
+  unsigned int size_arg;
+
+  if (!fnspec.arg_specified_p (i))
+    ;
+  else if (fnspec.arg_max_access_size_given_by_arg_p (i, &size_arg))
+    size = gimple_call_arg (call, size_arg);
+  else if (fnspec.arg_access_size_given_by_type_p (i))
+    {
+      tree callee = gimple_call_fndecl (call);
+      tree t = TYPE_ARG_TYPES (TREE_TYPE (callee));
+
+      for (unsigned int p = 0; p < i; p++)
+	t = TREE_CHAIN (t);
+      size = TYPE_SIZE_UNIT (TREE_TYPE (TREE_VALUE (t)));
+    }
+  modref_access_node a = {0, -1, -1,
+			  map.parm_offset, map.parm_index,
+			  map.parm_offset_known};
+  poly_int64 size_hwi;
+  if (size
+      && poly_int_tree_p (size, &size_hwi)
+      && coeffs_in_range_p (size_hwi, 0,
+			    HOST_WIDE_INT_MAX / BITS_PER_UNIT))
+    {
+      a.size = -1;
+      a.max_size = size_hwi << LOG2_BITS_PER_UNIT;
+    }
+  return a;
+}
+
+/* Collapse loads and return true if something changed.  */
+
+static bool
+collapse_loads (modref_summary *cur_summary,
+		modref_summary_lto *cur_summary_lto)
+{
+  bool changed = false;
+
+  if (cur_summary && !cur_summary->loads->every_base)
+    {
+      cur_summary->loads->collapse ();
+      changed = true;
+    }
+  if (cur_summary_lto
+      && !cur_summary_lto->loads->every_base)
+    {
+      cur_summary_lto->loads->collapse ();
+      changed = true;
+    }
+  return changed;
+}
+
+/* Collapse loads and return true if something changed.  */
+
+static bool
+collapse_stores (modref_summary *cur_summary,
+		modref_summary_lto *cur_summary_lto)
+{
+  bool changed = false;
+
+  if (cur_summary && !cur_summary->stores->every_base)
+    {
+      cur_summary->stores->collapse ();
+      changed = true;
+    }
+  if (cur_summary_lto
+      && !cur_summary_lto->stores->every_base)
+    {
+      cur_summary_lto->stores->collapse ();
+      changed = true;
+    }
+  return changed;
+}
+
+
+/* Apply side effects of call STMT to CUR_SUMMARY using FNSPEC.
+   If IGNORE_STORES is true ignore them.
+   Return false if no useful summary can be produced.   */
+
+static bool
+process_fnspec (modref_summary *cur_summary,
+		modref_summary_lto *cur_summary_lto,
+		gcall *call, bool ignore_stores)
+{
+  attr_fnspec fnspec = gimple_call_fnspec (call);
+  if (!fnspec.known_p ())
+    {
+      if (dump_file && gimple_call_builtin_p (call, BUILT_IN_NORMAL))
+	fprintf (dump_file, "      Builtin with no fnspec: %s\n",
+		 IDENTIFIER_POINTER (DECL_NAME (gimple_call_fndecl (call))));
+      if (ignore_stores)
+	{
+	  collapse_loads (cur_summary, cur_summary_lto);
+	  return true;
+	}
+      return false;
+    }
+  if (fnspec.global_memory_read_p ())
+    collapse_loads (cur_summary, cur_summary_lto);
+  else
+    {
+      for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
+	if (!POINTER_TYPE_P (TREE_TYPE (gimple_call_arg (call, i))))
+	  ;
+	else if (!fnspec.arg_specified_p (i)
+		 || fnspec.arg_maybe_read_p (i))
+	  {
+	    modref_parm_map map = parm_map_for_arg (call, i);
+
+	    if (map.parm_index == -2)
+	      continue;
+	    if (map.parm_index == -1)
+	      {
+		collapse_loads (cur_summary, cur_summary_lto);
+		break;
+	      }
+	    if (cur_summary)
+	      cur_summary->loads->insert (0, 0,
+					  get_access_for_fnspec (call,
+								 fnspec, i,
+								 map));
+	    if (cur_summary_lto)
+	      cur_summary_lto->loads->insert (0, 0,
+					      get_access_for_fnspec (call,
+								     fnspec, i,
+								     map));
+	  }
+    }
+  if (ignore_stores)
+    return true;
+  if (fnspec.global_memory_written_p ())
+    collapse_stores (cur_summary, cur_summary_lto);
+  else
+    {
+      for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
+	if (!POINTER_TYPE_P (TREE_TYPE (gimple_call_arg (call, i))))
+	  ;
+	else if (!fnspec.arg_specified_p (i)
+		 || fnspec.arg_maybe_written_p (i))
+	  {
+	    modref_parm_map map = parm_map_for_arg (call, i);
+
+	    if (map.parm_index == -2)
+	      continue;
+	    if (map.parm_index == -1)
+	      {
+		collapse_stores (cur_summary, cur_summary_lto);
+		break;
+	      }
+	    if (cur_summary)
+	      cur_summary->stores->insert (0, 0,
+					   get_access_for_fnspec (call,
+								  fnspec, i,
+								  map));
+	    if (cur_summary_lto)
+	      cur_summary_lto->stores->insert (0, 0,
+					       get_access_for_fnspec (call,
+								      fnspec, i,
+								      map));
+	  }
+      if (fnspec.errno_maybe_written_p () && flag_errno_math)
+	{
+	  if (cur_summary)
+	    cur_summary->writes_errno = true;
+	  if (cur_summary_lto)
+	    cur_summary_lto->writes_errno = true;
+	}
+    }
+  return true;
 }
 
 /* Analyze function call STMT in function F.
    Remember recursive calls in RECURSIVE_CALLS.  */
 
 static bool
-analyze_call (modref_summary *cur_summary,
-	      gimple *stmt, vec <gimple *> *recursive_calls)
+analyze_call (modref_summary *cur_summary, modref_summary_lto *cur_summary_lto,
+	      gcall *stmt, vec <gimple *> *recursive_calls)
 {
   /* Check flags on the function call.  In certain cases, analysis can be
      simplified.  */
@@ -610,34 +876,15 @@ analyze_call (modref_summary *cur_summary,
   /* Check if this is an indirect call.  */
   if (!callee)
     {
-      /* If the indirect call does not write memory, our store summary is
-	 unaffected, but we have to discard our loads summary (we don't know
-	 anything about the loads that the called function performs).  */
-      if (ignore_stores)
-	{
-	  if (dump_file)
-	    fprintf (dump_file, " - Indirect call which does not write memory, "
-		    "discarding loads.\n");
-	  cur_summary->loads->collapse ();
-	  return true;
-	}
       if (dump_file)
-	fprintf (dump_file, " - Indirect call.\n");
-      return false;
+	fprintf (dump_file, gimple_call_internal_p (stmt)
+		 ? " - Internal call" : " - Indirect call.\n");
+      return process_fnspec (cur_summary, cur_summary_lto, stmt, ignore_stores);
     }
+  /* We only need to handle internal calls in IPA mode.  */
+  gcc_checking_assert (!cur_summary_lto);
 
   struct cgraph_node *callee_node = cgraph_node::get_create (callee);
-
-  /* We can not safely optimize based on summary of callee if it does
-     not always bind to current def: it is possible that memory load
-     was optimized out earlier which may not happen in the interposed
-     variant.  */
-  if (!callee_node->binds_to_current_def_p ())
-    {
-      if (dump_file)
-	fprintf (dump_file, " - May be interposed: collapsing loads.\n");
-      cur_summary->loads->collapse ();
-    }
 
   /* If this is a recursive call, the target summary is the same as ours, so
      there's nothing to do.  */
@@ -656,16 +903,9 @@ analyze_call (modref_summary *cur_summary,
   callee_node = callee_node->function_symbol (&avail);
   if (avail <= AVAIL_INTERPOSABLE)
     {
-      /* Keep stores summary, but discard all loads for interposable function
-	 symbols.  */
-      if (ignore_stores)
-	{
-	  cur_summary->loads->collapse ();
-	  return true;
-	}
       if (dump_file)
 	fprintf (dump_file, " - Function availability <= AVAIL_INTERPOSABLE.\n");
-      return false;
+      return process_fnspec (cur_summary, cur_summary_lto, stmt, ignore_stores);
     }
 
   /* Get callee's modref summary.  As above, if there's no summary, we either
@@ -673,14 +913,9 @@ analyze_call (modref_summary *cur_summary,
   modref_summary *callee_summary = optimization_summaries->get (callee_node);
   if (!callee_summary)
     {
-      if (ignore_stores)
-	{
-	  cur_summary->loads->collapse ();
-	  return true;
-	}
       if (dump_file)
 	fprintf (dump_file, " - No modref summary available for callee.\n");
-      return false;
+      return process_fnspec (cur_summary, cur_summary_lto, stmt, ignore_stores);
     }
 
   merge_call_side_effects (cur_summary, stmt, callee_summary, ignore_stores,
@@ -689,7 +924,7 @@ analyze_call (modref_summary *cur_summary,
   return true;
 }
 
-/* Support analyzis in non-lto and lto mode in parallel.  */
+/* Support analysis in non-lto and lto mode in parallel.  */
 
 struct summary_ptrs
 {
@@ -760,10 +995,10 @@ static bool
 analyze_stmt (modref_summary *summary, modref_summary_lto *summary_lto,
 	      gimple *stmt, bool ipa, vec <gimple *> *recursive_calls)
 {
-  /* In general we can not ignore clobbers because they are barries for code
-     motion, however after inlining it is safe to do becuase local optimization
+  /* In general we can not ignore clobbers because they are barriers for code
+     motion, however after inlining it is safe to do because local optimization
      passes do not consider clobbers from other functions.
-     Similar logic is in ipa-pure-consts.  */
+     Similar logic is in ipa-pure-const.c.  */
   if ((ipa || cfun->after_inlining) && gimple_clobber_p (stmt))
     return true;
 
@@ -785,8 +1020,24 @@ analyze_stmt (modref_summary *summary, modref_summary_lto *summary_lto,
 	       "which clobbers memory.\n");
      return false;
    case GIMPLE_CALL:
-     if (!ipa)
-       return analyze_call (summary, stmt, recursive_calls);
+     if (!ipa || gimple_call_internal_p (stmt))
+       return analyze_call (summary, summary_lto,
+			    as_a <gcall *> (stmt), recursive_calls);
+     else
+      {
+	attr_fnspec fnspec = gimple_call_fnspec (as_a <gcall *>(stmt));
+
+	if (fnspec.known_p ()
+	    && (!fnspec.global_memory_read_p ()
+		|| !fnspec.global_memory_written_p ()))
+	  {
+	    fnspec_summaries->get_create
+		 (cgraph_node::get (current_function_decl)->get_edge (stmt))
+			->fnspec = xstrdup (fnspec.get_str ());
+	    if (dump_file)
+	      fprintf (dump_file, "  Recorded fnspec %s\n", fnspec.get_str ());
+	  }
+      }
      return true;
    default:
      /* Nothing to do for other types of statements.  */
@@ -870,7 +1121,7 @@ analyze_function (function *f, bool ipa)
       summary = optimization_summaries->get_create (cgraph_node::get (f->decl));
       gcc_checking_assert (nolto && !lto);
     }
-  /* In IPA mode we analyze every function precisely once.  Asser that.  */
+  /* In IPA mode we analyze every function precisely once.  Assert that.  */
   else
     {
       if (nolto)
@@ -889,6 +1140,8 @@ analyze_function (function *f, bool ipa)
 	    summaries_lto->remove (cgraph_node::get (f->decl));
 	  summary_lto = summaries_lto->get_create (cgraph_node::get (f->decl));
 	}
+      if (!fnspec_summaries)
+	fnspec_summaries = new fnspec_summaries_t (symtab);
      }
 
 
@@ -905,6 +1158,7 @@ analyze_function (function *f, bool ipa)
       summary->stores = modref_records::create_ggc (param_modref_max_bases,
 						    param_modref_max_refs,
 						    param_modref_max_accesses);
+      summary->writes_errno = false;
     }
   if (lto)
     {
@@ -918,6 +1172,7 @@ analyze_function (function *f, bool ipa)
 				 (param_modref_max_bases,
 				  param_modref_max_refs,
 				  param_modref_max_accesses);
+      summary_lto->writes_errno = false;
     }
   int ecf_flags = flags_from_decl_or_type (current_function_decl);
   auto_vec <gimple *, 32> recursive_calls;
@@ -1054,7 +1309,7 @@ modref_summaries::duplicate (cgraph_node *, cgraph_node *dst,
 			     modref_summary *src_data,
 			     modref_summary *dst_data)
 {
-  /* Do not duplicte optimization summaries; we do not handle parameter
+  /* Do not duplicate optimization summaries; we do not handle parameter
      transforms on them.  */
   if (this == optimization_summaries)
     {
@@ -1071,6 +1326,7 @@ modref_summaries::duplicate (cgraph_node *, cgraph_node *dst,
 			 src_data->loads->max_refs,
 			 src_data->loads->max_accesses);
   dst_data->loads->copy_from (src_data->loads);
+  dst_data->writes_errno = src_data->writes_errno;
 }
 
 /* Called when new clone is inserted to callgraph late.  */
@@ -1080,6 +1336,9 @@ modref_summaries_lto::duplicate (cgraph_node *, cgraph_node *,
 				 modref_summary_lto *src_data,
 				 modref_summary_lto *dst_data)
 {
+  /* Be sure that no further cloning happens after ipa-modref.  If it does
+     we will need to update signatures for possible param changes.  */
+  gcc_checking_assert (!((modref_summaries_lto *)summaries_lto)->propagated);
   dst_data->stores = modref_records_lto::create_ggc
 			(src_data->stores->max_bases,
 			 src_data->stores->max_refs,
@@ -1090,6 +1349,7 @@ modref_summaries_lto::duplicate (cgraph_node *, cgraph_node *,
 			 src_data->loads->max_refs,
 			 src_data->loads->max_accesses);
   dst_data->loads->copy_from (src_data->loads);
+  dst_data->writes_errno = src_data->writes_errno;
 }
 
 namespace
@@ -1353,7 +1613,6 @@ modref_write ()
 
       if (cnode && cnode->definition && !cnode->alias)
 	{
-
 	  modref_summary_lto *r = summaries_lto->get (cnode);
 
 	  if (!r || !r->useful_p (flags_from_decl_or_type (cnode->decl)))
@@ -1363,6 +1622,28 @@ modref_write ()
 
 	  write_modref_records (r->loads, ob);
 	  write_modref_records (r->stores, ob);
+
+	  struct bitpack_d bp = bitpack_create (ob->main_stream);
+	  bp_pack_value (&bp, r->writes_errno, 1);
+	  if (!flag_wpa)
+	    {
+	      for (cgraph_edge *e = cnode->indirect_calls;
+		   e; e = e->next_callee)
+		{
+		  class fnspec_summary *sum = fnspec_summaries->get (e);
+		  bp_pack_value (&bp, sum != NULL, 1);
+		  if (sum)
+		    bp_pack_string (ob, &bp, sum->fnspec, true);
+		}
+	      for (cgraph_edge *e = cnode->callees; e; e = e->next_callee)
+		{
+		  class fnspec_summary *sum = fnspec_summaries->get (e);
+		  bp_pack_value (&bp, sum != NULL, 1);
+		  if (sum)
+		    bp_pack_string (ob, &bp, sum->fnspec, true);
+		}
+	    }
+	  streamer_write_bitpack (&bp);
 	}
     }
   streamer_write_char_stream (ob->main_stream, 0);
@@ -1405,9 +1686,13 @@ read_section (struct lto_file_decl_data *file_data, const char *data,
       modref_summary_lto *modref_sum_lto = summaries_lto
 					   ? summaries_lto->get_create (node)
 					   : NULL;
-
       if (optimization_summaries)
 	modref_sum = optimization_summaries->get_create (node);
+
+      if (modref_sum)
+	modref_sum->writes_errno = false;
+      if (modref_sum_lto)
+	modref_sum_lto->writes_errno = false;
 
       gcc_assert (!modref_sum || (!modref_sum->loads
 				  && !modref_sum->stores));
@@ -1419,6 +1704,33 @@ read_section (struct lto_file_decl_data *file_data, const char *data,
       read_modref_records (&ib, data_in,
 			   modref_sum ? &modref_sum->stores : NULL,
 			   modref_sum_lto ? &modref_sum_lto->stores : NULL);
+      struct bitpack_d bp = streamer_read_bitpack (&ib);
+      if (bp_unpack_value (&bp, 1))
+	{
+	  if (modref_sum)
+	    modref_sum->writes_errno = true;
+	  if (modref_sum_lto)
+	    modref_sum_lto->writes_errno = true;
+	}
+      if (!flag_ltrans)
+	{
+	  for (cgraph_edge *e = node->indirect_calls; e; e = e->next_callee)
+	    {
+	      if (bp_unpack_value (&bp, 1))
+		{
+		  class fnspec_summary *sum = fnspec_summaries->get_create (e);
+		  sum->fnspec = xstrdup (bp_unpack_string (data_in, &bp));
+		}
+	    }
+	  for (cgraph_edge *e = node->callees; e; e = e->next_callee)
+	    {
+	      if (bp_unpack_value (&bp, 1))
+		{
+		  class fnspec_summary *sum = fnspec_summaries->get_create (e);
+		  sum->fnspec = xstrdup (bp_unpack_string (data_in, &bp));
+		}
+	    }
+	}
       if (dump_file)
 	{
 	  fprintf (dump_file, "Read modref for %s\n",
@@ -1455,6 +1767,8 @@ modref_read (void)
 	  || (flag_incremental_link == INCREMENTAL_LINK_LTO
 	      && flag_fat_lto_objects))
 	summaries = modref_summaries::create_ggc (symtab);
+      if (!fnspec_summaries)
+	fnspec_summaries = new fnspec_summaries_t (symtab);
     }
 
   while ((file_data = file_data_vec[j++]))
@@ -1474,43 +1788,21 @@ modref_read (void)
     }
 }
 
-/* Update parameter indexes in TT according to MAP.  */
-
-void
-remap_arguments (vec <int> *map, modref_records *tt)
-{
-  size_t i;
-  modref_base_node <alias_set_type> *base_node;
-  FOR_EACH_VEC_SAFE_ELT (tt->bases, i, base_node)
-    {
-      size_t j;
-      modref_ref_node <alias_set_type> *ref_node;
-      FOR_EACH_VEC_SAFE_ELT (base_node->refs, j, ref_node)
-	{
-	  size_t k;
-	  modref_access_node *access_node;
-	  FOR_EACH_VEC_SAFE_ELT (ref_node->accesses, k, access_node)
-	    if (access_node->parm_index > 0)
-	      {
-		if (access_node->parm_index < (int)map->length ())
-		  access_node->parm_index = (*map)[access_node->parm_index];
-		else
-		  access_node->parm_index = -1;
-	      }
-	}
-    }
-}
-
 /* If signature changed, update the summary.  */
 
-static unsigned int
-modref_transform (struct cgraph_node *node)
+static void
+update_signature (struct cgraph_node *node)
 {
-  if (!node->clone.param_adjustments || !optimization_summaries)
-    return 0;
-  modref_summary *r = optimization_summaries->get (node);
-  if (!r)
-    return 0;
+  clone_info *info = clone_info::get (node);
+  if (!info || !info->param_adjustments)
+    return;
+
+  modref_summary *r = optimization_summaries
+		      ? optimization_summaries->get (node) : NULL;
+  modref_summary_lto *r_lto = summaries_lto
+			      ? summaries_lto->get (node) : NULL;
+  if (!r && !r_lto)
+    return;
   if (dump_file)
     {
       fprintf (dump_file, "Updating summary for %s from:\n",
@@ -1521,9 +1813,9 @@ modref_transform (struct cgraph_node *node)
   size_t i, max = 0;
   ipa_adjusted_param *p;
 
-  FOR_EACH_VEC_SAFE_ELT (node->clone.param_adjustments->m_adj_params, i, p)
+  FOR_EACH_VEC_SAFE_ELT (info->param_adjustments->m_adj_params, i, p)
     {
-      int idx = node->clone.param_adjustments->get_original_index (i);
+      int idx = info->param_adjustments->get_original_index (i);
       if (idx > (int)max)
 	max = idx;
     }
@@ -1533,20 +1825,31 @@ modref_transform (struct cgraph_node *node)
   map.reserve (max + 1);
   for (i = 0; i <= max; i++)
     map.quick_push (-1);
-  FOR_EACH_VEC_SAFE_ELT (node->clone.param_adjustments->m_adj_params, i, p)
+  FOR_EACH_VEC_SAFE_ELT (info->param_adjustments->m_adj_params, i, p)
     {
-      int idx = node->clone.param_adjustments->get_original_index (i);
+      int idx = info->param_adjustments->get_original_index (i);
       if (idx >= 0)
 	map[idx] = i;
     }
-  remap_arguments (&map, r->loads);
-  remap_arguments (&map, r->stores);
+  if (r)
+    {
+      r->loads->remap_params (&map);
+      r->stores->remap_params (&map);
+    }
+  if (r_lto)
+    {
+      r_lto->loads->remap_params (&map);
+      r_lto->stores->remap_params (&map);
+    }
   if (dump_file)
     {
       fprintf (dump_file, "to:\n");
-      r->dump (dump_file);
+      if (r)
+	r->dump (dump_file);
+      if (r_lto)
+	r_lto->dump (dump_file);
     }
-  return 0;
+  return;
 }
 
 /* Definition of the modref IPA pass.  */
@@ -1575,7 +1878,7 @@ public:
 		      modref_read,     /* read_optimization_summary */
 		      NULL,            /* stmt_fixup */
 		      0,               /* function_transform_todo_flags_start */
-		      modref_transform,/* function_transform */
+		      NULL,	       /* function_transform */
 		      NULL)            /* variable_transform */
   {}
 
@@ -1631,9 +1934,9 @@ ignore_edge (struct cgraph_edge *e)
 	     & (ECF_CONST | ECF_NOVOPS));
 }
 
-/* Compute parm_map for CALLE_EDGE.  */
+/* Compute parm_map for CALLEE_EDGE.  */
 
-static void
+static bool
 compute_parm_map (cgraph_edge *callee_edge, vec<modref_parm_map> *parm_map)
 {
   class ipa_edge_args *args;
@@ -1654,7 +1957,7 @@ compute_parm_map (cgraph_edge *callee_edge, vec<modref_parm_map> *parm_map)
 					: callee_edge->caller);
       callee_pi = IPA_NODE_REF (callee);
 
-      (*parm_map).safe_grow (count);
+      (*parm_map).safe_grow_cleared (count);
 
       for (i = 0; i < count; i++)
 	{
@@ -1715,7 +2018,9 @@ compute_parm_map (cgraph_edge *callee_edge, vec<modref_parm_map> *parm_map)
 	    fprintf (dump_file, " %i", (*parm_map)[i].parm_index);
 	  fprintf (dump_file, "\n");
 	}
+      return true;
     }
+  return false;
 }
 
 /* Call EDGE was inlined; merge summary from callee to the caller.  */
@@ -1826,26 +2131,171 @@ ipa_merge_modref_summary_after_inlining (cgraph_edge *edge)
   return;
 }
 
-/* Collapse loads and return true if something changed.  */
+/* Get parameter type from DECL.  This is only safe for special cases
+   like builtins we create fnspec for because the type match is checked
+   at fnspec creation time.  */
 
-bool
-collapse_loads (modref_summary *cur_summary,
-		modref_summary_lto *cur_summary_lto)
+static tree
+get_parm_type (tree decl, unsigned int i)
+{
+  tree t = TYPE_ARG_TYPES (TREE_TYPE (decl));
+
+  for (unsigned int p = 0; p < i; p++)
+    t = TREE_CHAIN (t);
+  return TREE_VALUE (t);
+}
+
+/* Return access mode for argument I of call E with FNSPEC.  */
+
+static modref_access_node
+get_access_for_fnspec (cgraph_edge *e, attr_fnspec &fnspec,
+		       unsigned int i, modref_parm_map &map)
+{
+  tree size = NULL_TREE;
+  unsigned int size_arg;
+
+  if (!fnspec.arg_specified_p (i))
+    ;
+  else if (fnspec.arg_max_access_size_given_by_arg_p (i, &size_arg))
+    {
+      cgraph_node *node = e->caller->inlined_to
+			  ? e->caller->inlined_to : e->caller;
+      class ipa_node_params *caller_parms_info = IPA_NODE_REF (node);
+      class ipa_edge_args *args = IPA_EDGE_REF (e);
+      struct ipa_jump_func *jf = ipa_get_ith_jump_func (args, size_arg);
+
+      if (jf)
+	size = ipa_value_from_jfunc (caller_parms_info, jf,
+				     get_parm_type (e->callee->decl, size_arg));
+    }
+  else if (fnspec.arg_access_size_given_by_type_p (i))
+    size = TYPE_SIZE_UNIT (get_parm_type (e->callee->decl, i));
+  modref_access_node a = {0, -1, -1,
+			  map.parm_offset, map.parm_index,
+			  map.parm_offset_known};
+  poly_int64 size_hwi;
+  if (size
+      && poly_int_tree_p (size, &size_hwi)
+      && coeffs_in_range_p (size_hwi, 0,
+			    HOST_WIDE_INT_MAX / BITS_PER_UNIT))
+    {
+      a.size = -1;
+      a.max_size = size_hwi << LOG2_BITS_PER_UNIT;
+    }
+  return a;
+}
+
+/* Call E in NODE with ECF_FLAGS has no summary; update MODREF_SUMMARY and
+   CUR_SUMMARY_LTO accordingly.  Return true if something changed.  */
+
+static bool
+propagate_unknown_call (cgraph_node *node,
+			cgraph_edge *e, int ecf_flags,
+			modref_summary **cur_summary_ptr,
+			modref_summary_lto **cur_summary_lto_ptr)
 {
   bool changed = false;
+  modref_summary *cur_summary = cur_summary_ptr ? *cur_summary_ptr : NULL;
+  modref_summary_lto *cur_summary_lto = cur_summary_lto_ptr
+					? *cur_summary_lto_ptr : NULL;
+  class fnspec_summary *fnspec_sum = fnspec_summaries->get (e);
+  auto_vec <modref_parm_map, 32> parm_map;
+  if (fnspec_sum
+      && compute_parm_map (e, &parm_map))
+    {
+      attr_fnspec fnspec (fnspec_sum->fnspec);
 
-  if (cur_summary && !cur_summary->loads->every_base)
-    {
-      cur_summary->loads->collapse ();
-      changed = true;
+      gcc_checking_assert (fnspec.known_p ());
+      if (fnspec.global_memory_read_p ())
+	collapse_loads (cur_summary, cur_summary_lto);
+      else
+	{
+	  tree t = TYPE_ARG_TYPES (TREE_TYPE (e->callee->decl));
+	  for (unsigned i = 0; i < parm_map.length () && t;
+	       i++, t = TREE_CHAIN (t))
+	    if (!POINTER_TYPE_P (TREE_VALUE (t)))
+	      ;
+	  else if (!fnspec.arg_specified_p (i)
+		   || fnspec.arg_maybe_read_p (i))
+	    {
+	      modref_parm_map map = parm_map[i];
+	      if (map.parm_index == -2)
+		continue;
+	      if (map.parm_index == -1)
+		{
+		  collapse_loads (cur_summary, cur_summary_lto);
+		  break;
+		}
+	      if (cur_summary)
+		changed |= cur_summary->loads->insert
+		  (0, 0, get_access_for_fnspec (e, fnspec, i, map));
+	      if (cur_summary_lto)
+		changed |= cur_summary_lto->loads->insert
+		  (0, 0, get_access_for_fnspec (e, fnspec, i, map));
+	    }
+	}
+      if (ignore_stores_p (node->decl, ecf_flags))
+	;
+      else if (fnspec.global_memory_written_p ())
+	collapse_stores (cur_summary, cur_summary_lto);
+      else
+	{
+	  tree t = TYPE_ARG_TYPES (TREE_TYPE (e->callee->decl));
+	  for (unsigned i = 0; i < parm_map.length () && t;
+	       i++, t = TREE_CHAIN (t))
+	    if (!POINTER_TYPE_P (TREE_VALUE (t)))
+	      ;
+	  else if (!fnspec.arg_specified_p (i)
+		   || fnspec.arg_maybe_written_p (i))
+	    {
+	      modref_parm_map map = parm_map[i];
+	      if (map.parm_index == -2)
+		continue;
+	      if (map.parm_index == -1)
+		{
+		  collapse_stores (cur_summary, cur_summary_lto);
+		  break;
+		}
+	      if (cur_summary)
+		changed |= cur_summary->stores->insert
+		  (0, 0, get_access_for_fnspec (e, fnspec, i, map));
+	      if (cur_summary_lto)
+		changed |= cur_summary_lto->stores->insert
+		  (0, 0, get_access_for_fnspec (e, fnspec, i, map));
+	    }
+	}
+      if (fnspec.errno_maybe_written_p () && flag_errno_math)
+	{
+	  if (cur_summary && !cur_summary->writes_errno)
+	    {
+	      cur_summary->writes_errno = true;
+	      changed = true;
+	    }
+	  if (cur_summary_lto && !cur_summary_lto->writes_errno)
+	    {
+	      cur_summary_lto->writes_errno = true;
+	      changed = true;
+	    }
+	}
+      return changed;
     }
-  if (cur_summary_lto
-      && !cur_summary_lto->loads->every_base)
+  if (ignore_stores_p (node->decl, ecf_flags))
     {
-      cur_summary_lto->loads->collapse ();
-      changed = true;
+      if (dump_file)
+	fprintf (dump_file, "      collapsing loads\n");
+      return collapse_loads (cur_summary, cur_summary_lto);
     }
-  return changed;
+  if (optimization_summaries)
+    optimization_summaries->remove (node);
+  if (summaries_lto)
+    summaries_lto->remove (node);
+  if (cur_summary_ptr)
+    *cur_summary_ptr = NULL;
+  if (cur_summary_lto_ptr)
+    *cur_summary_lto_ptr = NULL;
+  if (dump_file)
+    fprintf (dump_file, "    Giving up\n");
+  return true;
 }
 
 /* Perform iterative dataflow on SCC component starting in COMPONENT_NODE.  */
@@ -1883,26 +2333,14 @@ modref_propagate_in_scc (cgraph_node *component_node)
 	    {
 	      if (e->indirect_info->ecf_flags & (ECF_CONST | ECF_NOVOPS))
 		continue;
-	      if (ignore_stores_p (cur->decl, e->indirect_info->ecf_flags))
-		{
-		  if (dump_file)
-		    fprintf (dump_file, "    Indirect call: "
-			     "collapsing loads\n");
-		  changed |= collapse_loads (cur_summary, cur_summary_lto);
-		}
-	      else
-		{
-		  if (dump_file)
-		    fprintf (dump_file, "    Indirect call: giving up\n");
-		  if (optimization_summaries)
-		    optimization_summaries->remove (node);
-		  if (summaries_lto)
-		    summaries_lto->remove (node);
-		  changed = true;
-		  cur_summary = NULL;
-		  cur_summary_lto = NULL;
-		  break;
-		}
+	      if (dump_file)
+		fprintf (dump_file, "    Indirect call"
+			 "collapsing loads\n");
+	      changed |= propagate_unknown_call
+			   (node, e, e->indirect_info->ecf_flags,
+			    &cur_summary, &cur_summary_lto);
+	      if (!cur_summary && !cur_summary_lto)
+		break;
 	    }
 
 	  if (!cur_summary && !cur_summary_lto)
@@ -1941,30 +2379,15 @@ modref_propagate_in_scc (cgraph_node *component_node)
 
 	      if (avail <= AVAIL_INTERPOSABLE)
 		{
-		  if (!ignore_stores)
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      Call target interposable"
-				 " or not available\n");
-
-		      if (optimization_summaries)
-			optimization_summaries->remove (node);
-		      if (summaries_lto)
-			summaries_lto->remove (node);
-		      cur_summary = NULL;
-		      cur_summary_lto = NULL;
-		      changed = true;
-		      break;
-		    }
-		  else
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      Call target interposable"
-				 " or not available; collapsing loads\n");
-
-		      changed |= collapse_loads (cur_summary, cur_summary_lto);
-		      continue;
-		    }
+		  if (dump_file)
+		    fprintf (dump_file, "      Call target interposable"
+			     " or not available\n");
+		  changed |= propagate_unknown_call
+			       (node, callee_edge, flags,
+				&cur_summary, &cur_summary_lto);
+		  if (!cur_summary && !cur_summary_lto)
+		    break;
+		  continue;
 		}
 
 	      /* We don't know anything about CALLEE, hence we cannot tell
@@ -1973,52 +2396,24 @@ modref_propagate_in_scc (cgraph_node *component_node)
 	      if (cur_summary
 		  && !(callee_summary = optimization_summaries->get (callee)))
 		{
-		  if (!ignore_stores)
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      No call target summary\n");
-
-		      optimization_summaries->remove (node);
-		      cur_summary = NULL;
-		      changed = true;
-		    }
-		  else
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      No call target summary;"
-				 " collapsing loads\n");
-
-		      if (!cur_summary->loads->every_base)
-			{
-			  cur_summary->loads->collapse ();
-			  changed = true;
-			}
-		    }
+		  if (dump_file)
+		    fprintf (dump_file, "      No call target summary\n");
+		  changed |= propagate_unknown_call
+			       (node, callee_edge, flags,
+				&cur_summary, NULL);
+		  if (!cur_summary && !cur_summary_lto)
+		    break;
 		}
 	      if (cur_summary_lto
 		  && !(callee_summary_lto = summaries_lto->get (callee)))
 		{
-		  if (!ignore_stores)
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      No call target summary\n");
-
-		      summaries_lto->remove (node);
-		      cur_summary_lto = NULL;
-		      changed = true;
-		    }
-		  else
-		    {
-		      if (dump_file)
-			fprintf (dump_file, "      No call target summary;"
-				 " collapsing loads\n");
-
-		      if (!cur_summary_lto->loads->every_base)
-			{
-			  cur_summary_lto->loads->collapse ();
-			  changed = true;
-			}
-		    }
+		  if (dump_file)
+		    fprintf (dump_file, "      No call target summary\n");
+		  changed |= propagate_unknown_call
+			       (node, callee_edge, flags,
+				NULL, &cur_summary_lto);
+		  if (!cur_summary && !cur_summary_lto)
+		    break;
 		}
 
 	      /* We can not safely optimize based on summary of callee if it
@@ -2044,16 +2439,32 @@ modref_propagate_in_scc (cgraph_node *component_node)
 		  changed |= cur_summary->loads->merge
 				  (callee_summary->loads, &parm_map);
 		  if (!ignore_stores)
-		    changed |= cur_summary->stores->merge
-				    (callee_summary->stores, &parm_map);
+		    {
+		      changed |= cur_summary->stores->merge
+				      (callee_summary->stores, &parm_map);
+		      if (!cur_summary->writes_errno
+			  && callee_summary->writes_errno)
+			{
+			  cur_summary->writes_errno = true;
+			  changed = true;
+			}
+		    }
 		}
 	      if (callee_summary_lto)
 		{
 		  changed |= cur_summary_lto->loads->merge
 				  (callee_summary_lto->loads, &parm_map);
 		  if (!ignore_stores)
-		    changed |= cur_summary_lto->stores->merge
-				    (callee_summary_lto->stores, &parm_map);
+		    {
+		      changed |= cur_summary_lto->stores->merge
+				      (callee_summary_lto->stores, &parm_map);
+		      if (!cur_summary_lto->writes_errno
+			  && callee_summary_lto->writes_errno)
+			{
+			  cur_summary_lto->writes_errno = true;
+			  changed = true;
+			}
+		    }
 		}
 	      if (dump_file && changed)
 		{
@@ -2137,10 +2548,15 @@ pass_ipa_modref::execute (function *)
 
       modref_propagate_in_scc (component_node);
     }
+  cgraph_node *node;
+  FOR_EACH_FUNCTION (node)
+    update_signature (node);
   if (summaries_lto)
     ((modref_summaries_lto *)summaries_lto)->propagated = true;
   ipa_free_postorder_info ();
   free (order);
+  delete fnspec_summaries;
+  fnspec_summaries = NULL;
   return 0;
 }
 
@@ -2158,6 +2574,9 @@ ipa_modref_c_finalize ()
       ggc_delete (summaries_lto);
       summaries_lto = NULL;
     }
+  if (fnspec_summaries)
+    delete fnspec_summaries;
+  fnspec_summaries = NULL;
 }
 
 #include "gt-ipa-modref.h"

@@ -65,6 +65,8 @@ static tree handle_no_sanitize_undefined_attribute (tree *, tree, tree, int,
 static tree handle_asan_odr_indicator_attribute (tree *, tree, tree, int,
 						 bool *);
 static tree handle_stack_protect_attribute (tree *, tree, tree, int, bool *);
+static tree handle_no_stack_protector_function_attribute (tree *, tree,
+							tree, int, bool *);
 static tree handle_noinline_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noclone_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nocf_check_attribute (tree *, tree, tree, int, bool *);
@@ -138,6 +140,8 @@ static tree handle_target_clones_attribute (tree *, tree, tree, int, bool *);
 static tree handle_optimize_attribute (tree *, tree, tree, int, bool *);
 static tree ignore_attribute (tree *, tree, tree, int, bool *);
 static tree handle_no_split_stack_attribute (tree *, tree, tree, int, bool *);
+static tree handle_zero_call_used_regs_attribute (tree *, tree, tree, int,
+						  bool *);
 static tree handle_argspec_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fnspec_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_unused_attribute (tree *, tree, tree, int, bool *);
@@ -248,6 +252,14 @@ static const struct attribute_spec::exclusions attr_noinit_exclusions[] =
   ATTR_EXCL (NULL, false, false, false),
 };
 
+static const struct attribute_spec::exclusions attr_stack_protect_exclusions[] =
+{
+  ATTR_EXCL ("stack_protect", true, false, false),
+  ATTR_EXCL ("no_stack_protector", true, false, false),
+  ATTR_EXCL (NULL, false, false, false),
+};
+
+
 /* Table of machine-independent attributes common to all C-like languages.
 
    Current list of processed common attributes: nonnull.  */
@@ -275,7 +287,11 @@ const struct attribute_spec c_common_attribute_table[] =
   { "volatile",               0, 0, true,  false, false, false,
 			      handle_noreturn_attribute, NULL },
   { "stack_protect",          0, 0, true,  false, false, false,
-			      handle_stack_protect_attribute, NULL },
+			      handle_stack_protect_attribute,
+			      attr_stack_protect_exclusions },
+  { "no_stack_protector",     0, 0, true, false, false, false,
+			      handle_no_stack_protector_function_attribute,
+			      attr_stack_protect_exclusions },
   { "noinline",               0, 0, true,  false, false, false,
 			      handle_noinline_attribute,
 	                      attr_noinline_exclusions },
@@ -437,6 +453,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      ignore_attribute, NULL },
   { "no_split_stack",	      0, 0, true,  false, false, false,
 			      handle_no_split_stack_attribute, NULL },
+  { "zero_call_used_regs",    1, 1, true, false, false, false,
+			      handle_zero_call_used_regs_attribute, NULL },
   /* For internal use only (marking of function arguments).
      The name contains a space to prevent its usage in source code.  */
   { "arg spec",		      1, -1, true, false, false, false,
@@ -1146,6 +1164,22 @@ handle_asan_odr_indicator_attribute (tree *, tree, tree, int, bool *)
 static tree
 handle_stack_protect_attribute (tree *node, tree name, tree, int,
 				bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* Handle a "no_stack_protector" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_no_stack_protector_function_attribute (tree *node, tree name, tree,
+					      int, bool *no_add_attrs)
 {
   if (TREE_CODE (*node) != FUNCTION_DECL)
     {
@@ -4958,6 +4992,53 @@ handle_no_split_stack_attribute (tree *node, tree name,
     {
       error_at (DECL_SOURCE_LOCATION (decl),
 		"cannot set %qE attribute after definition", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* Handle a "zero_call_used_regs" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_zero_call_used_regs_attribute (tree *node, tree name, tree args,
+				      int ARG_UNUSED (flags),
+				      bool *no_add_attrs)
+{
+  tree decl = *node;
+  tree id = TREE_VALUE (args);
+
+  if (TREE_CODE (decl) != FUNCTION_DECL)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE attribute applies only to functions", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  if (TREE_CODE (id) != STRING_CST)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE argument not a string", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  bool found = false;
+  for (unsigned int i = 0; zero_call_used_regs_opts[i].name != NULL; ++i)
+    if (strcmp (TREE_STRING_POINTER (id),
+		zero_call_used_regs_opts[i].name) == 0)
+      {
+	found = true;
+	break;
+      }
+
+  if (!found)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"unrecognized %qE attribute argument %qs",
+		name, TREE_STRING_POINTER (id));
       *no_add_attrs = true;
     }
 

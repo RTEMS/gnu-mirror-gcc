@@ -28,6 +28,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    VxWorks kernels.  */
 
 #include "gthr.h"
+
+#if __GTHREADS_CXX0X
+
 #include <taskLib.h>
 #include <stdlib.h>
 
@@ -384,3 +387,5 @@ __gthread_detach (__gthread_t __threadid)
 
   return OK;
 }
+
+#endif

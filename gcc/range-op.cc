@@ -428,9 +428,9 @@ operator_equal::fold_range (irange &r, tree type,
     {
       // If ranges do not intersect, we know the range is not equal,
       // otherwise we don't know anything for sure.
-      r = op1;
-      r.intersect (op2);
-      if (r.undefined_p ())
+      int_range_max tmp = op1;
+      tmp.intersect (op2);
+      if (tmp.undefined_p ())
 	r = range_false (type);
       else
 	r = range_true_and_false (type);
@@ -513,9 +513,9 @@ operator_not_equal::fold_range (irange &r, tree type,
     {
       // If ranges do not intersect, we know the range is not equal,
       // otherwise we don't know anything for sure.
-      r = op1;
-      r.intersect (op2);
-      if (r.undefined_p ())
+      int_range_max tmp = op1;
+      tmp.intersect (op2);
+      if (tmp.undefined_p ())
 	r = range_true (type);
       else
 	r = range_true_and_false (type);
@@ -1577,7 +1577,17 @@ operator_lshift::op1_range (irange &r,
   if (op2.singleton_p (&shift_amount))
     {
       wide_int shift = wi::to_wide (shift_amount);
-      gcc_checking_assert (wi::gt_p (shift, 0, SIGNED));
+      if (wi::lt_p (shift, 0, SIGNED))
+	return false;
+      if (wi::ge_p (shift, wi::uhwi (TYPE_PRECISION (type),
+				     TYPE_PRECISION (op2.type ())),
+		    UNSIGNED))
+	return false;
+      if (shift == 0)
+	{
+	  r = lhs;
+	  return true;
+	}
 
       // Work completely in unsigned mode to start.
       tree utype = type;
@@ -1632,6 +1642,11 @@ operator_rshift::op1_range (irange &r,
 		    wi::uhwi (prec, TYPE_PRECISION (TREE_TYPE (shift))),
 		    UNSIGNED))
 	return false;
+      if (wi::to_wide (shift) == 0)
+	{
+	  r = lhs;
+	  return true;
+	}
 
       // Folding the original operation may discard some impossible
       // ranges from the LHS.
@@ -3063,6 +3078,14 @@ pointer_plus_operator::wi_fold (irange &r, tree type,
 				const wide_int &rh_lb,
 				const wide_int &rh_ub) const
 {
+  // Check for [0,0] + const, and simply return the const.
+  if (lh_lb == 0 && lh_ub == 0 && rh_lb == rh_ub)
+    {
+      tree val = wide_int_to_tree (type, rh_lb);
+      r.set (val, val);
+      return;
+    }
+
   // For pointer types, we are really only interested in asserting
   // whether the expression evaluates to non-NULL.
   //
@@ -3657,13 +3680,26 @@ range_tests ()
   // Test 1-bit signed integer union.
   // [-1,-1] U [0,0] = VARYING.
   tree one_bit_type = build_nonstandard_integer_type (1, 0);
+  tree one_bit_min = vrp_val_min (one_bit_type);
+  tree one_bit_max = vrp_val_max (one_bit_type);
   {
-    tree one_bit_min = vrp_val_min (one_bit_type);
-    tree one_bit_max = vrp_val_max (one_bit_type);
     int_range<2> min (one_bit_min, one_bit_min);
     int_range<2> max (one_bit_max, one_bit_max);
     max.union_ (min);
     ASSERT_TRUE (max.varying_p ());
+  }
+
+  // Test inversion of 1-bit signed integers.
+  {
+    int_range<2> min (one_bit_min, one_bit_min);
+    int_range<2> max (one_bit_max, one_bit_max);
+    int_range<2> t;
+    t = min;
+    t.invert ();
+    ASSERT_TRUE (t == max);
+    t = max;
+    t.invert ();
+    ASSERT_TRUE (t == min);
   }
 
   // Test that NOT(255) is [0..254] in 8-bit land.

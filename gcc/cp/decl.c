@@ -138,7 +138,7 @@ static location_t smallest_type_location (const cp_decl_specifier_seq*);
 tree cp_global_trees[CPTI_MAX];
 
 /* A list of objects which have constructors or destructors
-   which reside in the global scope.  The decl is stored in
+   which reside in namespace scope.  The decl is stored in
    the TREE_VALUE slot and the initializer is stored
    in the TREE_PURPOSE slot.  */
 tree static_aggregates;
@@ -1002,7 +1002,7 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
 
       /* A new declaration doesn't match a built-in one unless it
 	 is also extern "C".  */
-      if (DECL_IS_BUILTIN (olddecl)
+      if (DECL_IS_UNDECLARED_BUILTIN (olddecl)
 	  && DECL_EXTERN_C_P (olddecl) && !DECL_EXTERN_C_P (newdecl))
 	return 0;
 
@@ -1205,7 +1205,7 @@ check_redeclaration_exception_specification (tree new_decl,
      all declarations, including the definition and an explicit
      specialization, of that function shall have an
      exception-specification with the same set of type-ids.  */
-  if (! DECL_IS_BUILTIN (old_decl)
+  if (! DECL_IS_UNDECLARED_BUILTIN (old_decl)
       && !comp_except_specs (new_exceptions, old_exceptions, ce_normal))
     {
       const char *const msg
@@ -1465,7 +1465,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
   /* Check for redeclaration and other discrepancies.  */
   if (TREE_CODE (olddecl) == FUNCTION_DECL
-      && DECL_UNDECLARED_BUILTIN_P (olddecl))
+      && DECL_IS_UNDECLARED_BUILTIN (olddecl))
     {
       if (TREE_CODE (newdecl) != FUNCTION_DECL)
 	{
@@ -1517,7 +1517,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
 	      /* A new declaration doesn't match a built-in one unless it
 		 is also extern "C".  */
-	      gcc_assert (DECL_IS_BUILTIN (olddecl));
+	      gcc_assert (DECL_IS_UNDECLARED_BUILTIN (olddecl));
 	      gcc_assert (DECL_EXTERN_C_P (olddecl));
 	      if (!DECL_EXTERN_C_P (newdecl))
 		return NULL_TREE;
@@ -1627,11 +1627,11 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  /* Replace the old RTL to avoid problems with inlining.  */
 	  COPY_DECL_RTL (newdecl, olddecl);
 	}
-      /* Even if the types match, prefer the new declarations type for
-	 built-ins which have not been explicitly declared, for
-	 exception lists, etc...  */
-      else if (DECL_IS_BUILTIN (olddecl))
+      else 
 	{
+	  /* Even if the types match, prefer the new declarations type
+	     for built-ins which have not been explicitly declared,
+	     for exception lists, etc...  */
 	  tree type = TREE_TYPE (newdecl);
 	  tree attribs = (*targetm.merge_type_attributes)
 	    (TREE_TYPE (olddecl), type);
@@ -1776,7 +1776,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 			newdecl);
 	      inform (olddecl_loc,
 		      "previous declaration %q#D", olddecl);
-	      return NULL_TREE;
+	      return error_mark_node;
 	    }
 	  /* For function versions, params and types match, but they
 	     are not ambiguous.  */
@@ -2000,6 +2000,9 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
   if (TREE_CODE (olddecl) == TYPE_DECL
       && (DECL_IMPLICIT_TYPEDEF_P (olddecl)
 	  || DECL_IMPLICIT_TYPEDEF_P (newdecl)))
+    return NULL_TREE;
+
+  if (DECL_TEMPLATE_PARM_P (olddecl) != DECL_TEMPLATE_PARM_P (newdecl))
     return NULL_TREE;
 
   if (!validate_constexpr_redeclaration (olddecl, newdecl))
@@ -2468,22 +2471,27 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  DECL_NOT_REALLY_EXTERN (newdecl) |= DECL_NOT_REALLY_EXTERN (olddecl);
 	  DECL_COMDAT (newdecl) |= DECL_COMDAT (olddecl);
 	}
-      DECL_TEMPLATE_INSTANTIATED (newdecl)
-	|= DECL_TEMPLATE_INSTANTIATED (olddecl);
-      DECL_ODR_USED (newdecl) |= DECL_ODR_USED (olddecl);
 
-      /* If the OLDDECL is an instantiation and/or specialization,
-	 then the NEWDECL must be too.  But, it may not yet be marked
-	 as such if the caller has created NEWDECL, but has not yet
-	 figured out that it is a redeclaration.  */
-      if (!DECL_USE_TEMPLATE (newdecl))
-	DECL_USE_TEMPLATE (newdecl) = DECL_USE_TEMPLATE (olddecl);
+      if (TREE_CODE (newdecl) != TYPE_DECL)
+	{
+	  DECL_TEMPLATE_INSTANTIATED (newdecl)
+	    |= DECL_TEMPLATE_INSTANTIATED (olddecl);
+	  DECL_ODR_USED (newdecl) |= DECL_ODR_USED (olddecl);
+
+	  /* If the OLDDECL is an instantiation and/or specialization,
+	     then the NEWDECL must be too.  But, it may not yet be marked
+	     as such if the caller has created NEWDECL, but has not yet
+	     figured out that it is a redeclaration.  */
+	  if (!DECL_USE_TEMPLATE (newdecl))
+	    DECL_USE_TEMPLATE (newdecl) = DECL_USE_TEMPLATE (olddecl);
+
+	  DECL_INITIALIZED_IN_CLASS_P (newdecl)
+	    |= DECL_INITIALIZED_IN_CLASS_P (olddecl);
+	}
 
       /* Don't really know how much of the language-specific
 	 values we should copy from old to new.  */
       DECL_IN_AGGR_P (newdecl) = DECL_IN_AGGR_P (olddecl);
-      DECL_INITIALIZED_IN_CLASS_P (newdecl)
-	|= DECL_INITIALIZED_IN_CLASS_P (olddecl);
 
       if (LANG_DECL_HAS_MIN (newdecl))
 	{
@@ -2643,19 +2651,20 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  if (DECL_BUILT_IN_CLASS (newdecl) == BUILT_IN_NORMAL)
 	    {
 	      enum built_in_function fncode = DECL_FUNCTION_CODE (newdecl);
-	      switch (fncode)
+	      if (builtin_decl_explicit_p (fncode))
 		{
-		  /* If a compatible prototype of these builtin functions
-		     is seen, assume the runtime implements it with the
-		     expected semantics.  */
-		case BUILT_IN_STPCPY:
-		  if (builtin_decl_explicit_p (fncode))
-		    set_builtin_decl_implicit_p (fncode, true);
-		  break;
-		default:
-		  if (builtin_decl_explicit_p (fncode))
-		    set_builtin_decl_declared_p (fncode, true);
-		  break;
+		  /* A compatible prototype of these builtin functions
+		     is seen, assume the runtime implements it with
+		     the expected semantics.  */
+		  switch (fncode)
+		    {
+		    case BUILT_IN_STPCPY:
+		      set_builtin_decl_implicit_p (fncode, true);
+		      break;
+		    default:
+		      set_builtin_decl_declared_p (fncode, true);
+		      break;
+		    }
 		}
 
 	      copy_attributes_to_builtin (newdecl);
@@ -2910,6 +2919,16 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
       struct symtab_node *snode = symtab_node::get (newdecl);
       if (snode)
 	snode->remove ();
+    }
+
+  if (TREE_CODE (olddecl) == FUNCTION_DECL)
+    {
+      tree clone;
+      FOR_EACH_CLONE (clone, olddecl)
+	{
+	  DECL_ATTRIBUTES (clone) = DECL_ATTRIBUTES (olddecl);
+	  DECL_PRESERVE_P (clone) |= DECL_PRESERVE_P (olddecl);
+	}
     }
 
   /* Remove the associated constraints for newdecl, if any, before
@@ -4242,6 +4261,8 @@ initialize_predefined_identifiers (void)
     {"heap uninit", &heap_uninit_identifier, cik_normal},
     {"heap ", &heap_identifier, cik_normal},
     {"heap deleted", &heap_deleted_identifier, cik_normal},
+    {"heap [] uninit", &heap_vec_uninit_identifier, cik_normal},
+    {"heap []", &heap_vec_identifier, cik_normal},
     {NULL, NULL, cik_normal}
   };
 
@@ -4372,6 +4393,9 @@ cxx_init_decl_processing (void)
 
   init_list_type_node = make_node (LANG_TYPE);
   record_unknown_type (init_list_type_node, "init list");
+
+  /* Used when parsing to distinguish parameter-lists () and (void).  */
+  explicit_void_list_node = build_void_list_node ();
 
   {
     /* Make sure we get a unique function type, so we can give
@@ -5447,20 +5471,17 @@ start_decl (const cp_declarator *declarator,
 void
 start_decl_1 (tree decl, bool initialized)
 {
-  tree type;
-  bool complete_p;
-  bool aggregate_definition_p;
-
-  gcc_assert (!processing_template_decl);
+  gcc_checking_assert (!processing_template_decl);
 
   if (error_operand_p (decl))
     return;
 
-  gcc_assert (VAR_P (decl));
+  gcc_checking_assert (VAR_P (decl));
 
-  type = TREE_TYPE (decl);
-  complete_p = COMPLETE_TYPE_P (type);
-  aggregate_definition_p = MAYBE_CLASS_TYPE_P (type) && !DECL_EXTERNAL (decl);
+  tree type = TREE_TYPE (decl);
+  bool complete_p = COMPLETE_TYPE_P (type);
+  bool aggregate_definition_p
+    = MAYBE_CLASS_TYPE_P (type) && !DECL_EXTERNAL (decl);
 
   /* If an explicit initializer is present, or if this is a definition
      of an aggregate, then we need a complete type at this point.
@@ -5485,6 +5506,7 @@ start_decl_1 (tree decl, bool initialized)
 				   : TCTX_STATIC_STORAGE);
       verify_type_context (input_location, context, TREE_TYPE (decl));
     }
+
   if (initialized)
     /* Is it valid for this decl to have an initializer at all?  */
     {
@@ -12034,8 +12056,17 @@ grokdeclarator (const cp_declarator *declarator,
 	       && inner_declarator->u.id.qualifying_scope
 	       && (MAYBE_CLASS_TYPE_P (type)
 		   || TREE_CODE (type) == ENUMERAL_TYPE)))
-	warning_at (declarator->parenthesized, OPT_Wparentheses,
-		    "unnecessary parentheses in declaration of %qs", name);
+	{
+	  if (warning_at (declarator->parenthesized, OPT_Wparentheses,
+			  "unnecessary parentheses in declaration of %qs",
+			  name))
+	    {
+	      gcc_rich_location iloc (declarator->parenthesized);
+	      iloc.add_fixit_remove (get_start (declarator->parenthesized));
+	      iloc.add_fixit_remove (get_finish (declarator->parenthesized));
+	      inform (&iloc, "remove parentheses");
+	    }
+	}
       if (declarator->kind == cdk_id || declarator->kind == cdk_decomp)
 	break;
 
@@ -14019,7 +14050,7 @@ grokparms (tree parmlist, tree *parms)
       tree init = TREE_PURPOSE (parm);
       tree decl = TREE_VALUE (parm);
 
-      if (parm == void_list_node)
+      if (parm == void_list_node || parm == explicit_void_list_node)
 	break;
 
       if (! decl || TREE_TYPE (decl) == error_mark_node)
@@ -14857,7 +14888,6 @@ lookup_and_check_tag (enum tag_types tag_code, tree name,
   else
     decl = lookup_elaborated_type (name, how);
 
-
   if (!decl)
     /* We found nothing.  */
     return NULL_TREE;
@@ -14878,8 +14908,8 @@ lookup_and_check_tag (enum tag_types tag_code, tree name,
   if (TREE_CODE (decl) != TYPE_DECL)
     /* Found not-a-type.  */
     return NULL_TREE;
-
-    /* Look for invalid nested type:
+  
+  /* Look for invalid nested type:
      class C {
      class C {};
      };  */

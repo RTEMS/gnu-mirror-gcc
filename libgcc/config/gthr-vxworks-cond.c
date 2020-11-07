@@ -27,6 +27,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    exposed by gthr-vxworks.h.  */
 
 #include "gthr.h"
+
+#if __GTHREAD_HAS_COND
+
 #include <taskLib.h>
 
 /* --------------------------- Condition Variables ------------------------ */
@@ -79,3 +82,5 @@ __gthread_cond_wait_recursive (__gthread_cond_t *cond,
 {
   return __gthread_cond_wait (cond, mutex);
 }
+
+#endif

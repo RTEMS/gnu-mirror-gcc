@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "omp-offload.h"
 #include "context.h"
+#include "tree-nested.h"
 
 /* Hash set of poisoned variables in a bind expr.  */
 static hash_set<tree> *asan_poisoned_variables = NULL;
@@ -959,7 +960,8 @@ unshare_body (tree fndecl)
   delete visited;
 
   if (cgn)
-    for (cgn = cgn->nested; cgn; cgn = cgn->next_nested)
+    for (cgn = first_nested_function (cgn); cgn;
+	 cgn = next_nested_function (cgn))
       unshare_body (cgn->decl);
 }
 
@@ -1002,7 +1004,8 @@ unvisit_body (tree fndecl)
   unmark_visited (&DECL_SIZE_UNIT (DECL_RESULT (fndecl)));
 
   if (cgn)
-    for (cgn = cgn->nested; cgn; cgn = cgn->next_nested)
+    for (cgn = first_nested_function (cgn);
+	 cgn; cgn = next_nested_function (cgn))
       unvisit_body (cgn->decl);
 }
 
@@ -9705,6 +9708,28 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	  omp_add_variable (ctx, decl, GOVD_NONTEMPORAL);
 	  break;
 
+	case OMP_CLAUSE_ALLOCATE:
+	  decl = OMP_CLAUSE_DECL (c);
+	  if (error_operand_p (decl))
+	    {
+	      remove = true;
+	      break;
+	    }
+	  if (gimplify_expr (&OMP_CLAUSE_ALLOCATE_ALLOCATOR (c), pre_p, NULL,
+			     is_gimple_val, fb_rvalue) == GS_ERROR)
+	    {
+	      remove = true;
+	      break;
+	    }
+	  else if (code == OMP_TASKLOOP
+		   && OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
+		   && (TREE_CODE (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c))
+		       != INTEGER_CST))
+	    OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
+	      = get_initialized_tmp_var (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c),
+					 pre_p, NULL, false);
+	  break;
+
 	case OMP_CLAUSE_DEFAULT:
 	  ctx->default_kind = OMP_CLAUSE_DEFAULT_KIND (c);
 	  break;
@@ -10615,6 +10640,7 @@ gimplify_adjust_omp_clauses (gimple_seq *pre_p, gimple_seq body, tree *list_p,
 	case OMP_CLAUSE_FINALIZE:
 	case OMP_CLAUSE_INCLUSIVE:
 	case OMP_CLAUSE_EXCLUSIVE:
+	case OMP_CLAUSE_ALLOCATE:
 	  break;
 
 	default:
@@ -12101,6 +12127,20 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
       tree *gtask_clauses_ptr = &task_clauses;
       tree outer_for_clauses = NULL_TREE;
       tree *gforo_clauses_ptr = &outer_for_clauses;
+      bitmap lastprivate_uids = NULL;
+      if (omp_find_clause (c, OMP_CLAUSE_ALLOCATE))
+	{
+	  c = omp_find_clause (c, OMP_CLAUSE_LASTPRIVATE);
+	  if (c)
+	    {
+	      lastprivate_uids = BITMAP_ALLOC (NULL);
+	      for (; c; c = omp_find_clause (OMP_CLAUSE_CHAIN (c),
+					     OMP_CLAUSE_LASTPRIVATE))
+		bitmap_set_bit (lastprivate_uids,
+				DECL_UID (OMP_CLAUSE_DECL (c)));
+	    }
+	  c = *gfor_clauses_ptr;
+	}
       for (; c; c = OMP_CLAUSE_CHAIN (c))
 	switch (OMP_CLAUSE_CODE (c))
 	  {
@@ -12146,7 +12186,7 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
 	    *gforo_clauses_ptr = c;
 	    gforo_clauses_ptr = &OMP_CLAUSE_CHAIN (c);
 	    break;
-	  /* Taskloop clause we duplicate on both taskloops.  */
+	  /* Collapse clause we duplicate on both taskloops.  */
 	  case OMP_CLAUSE_COLLAPSE:
 	    *gfor_clauses_ptr = c;
 	    gfor_clauses_ptr = &OMP_CLAUSE_CHAIN (c);
@@ -12188,12 +12228,43 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
 	    gtask_clauses_ptr
 	      = &OMP_CLAUSE_CHAIN (*gtask_clauses_ptr);
 	    break;
+	  /* Allocate clause we duplicate on task and inner taskloop
+	     if the decl is lastprivate, otherwise just put on task.  */
+	  case OMP_CLAUSE_ALLOCATE:
+	    if (lastprivate_uids
+		&& bitmap_bit_p (lastprivate_uids,
+				 DECL_UID (OMP_CLAUSE_DECL (c))))
+	      {
+		if (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
+		    && DECL_P (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)))
+		  {
+		    /* Additionally, put firstprivate clause on task
+		       for the allocator if it is not constant.  */
+		    *gtask_clauses_ptr
+		      = build_omp_clause (OMP_CLAUSE_LOCATION (c),
+					  OMP_CLAUSE_FIRSTPRIVATE);
+		    OMP_CLAUSE_DECL (*gtask_clauses_ptr)
+		      = OMP_CLAUSE_ALLOCATE_ALLOCATOR (c);
+		    gtask_clauses_ptr = &OMP_CLAUSE_CHAIN (*gtask_clauses_ptr);
+		  }
+		*gfor_clauses_ptr = c;
+		gfor_clauses_ptr = &OMP_CLAUSE_CHAIN (c);
+		*gtask_clauses_ptr = copy_node (c);
+		gtask_clauses_ptr = &OMP_CLAUSE_CHAIN (*gtask_clauses_ptr);
+	      }
+	    else
+	      {
+		*gtask_clauses_ptr = c;
+		gtask_clauses_ptr = &OMP_CLAUSE_CHAIN (c);
+	      }
+	    break;
 	  default:
 	    gcc_unreachable ();
 	  }
       *gfor_clauses_ptr = NULL_TREE;
       *gtask_clauses_ptr = NULL_TREE;
       *gforo_clauses_ptr = NULL_TREE;
+      BITMAP_FREE (lastprivate_uids);
       g = gimple_build_bind (NULL_TREE, gfor, NULL_TREE);
       g = gimple_build_omp_task (g, task_clauses, NULL_TREE, NULL_TREE,
 				 NULL_TREE, NULL_TREE, NULL_TREE);
