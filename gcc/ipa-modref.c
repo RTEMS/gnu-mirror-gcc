@@ -1137,10 +1137,7 @@ modref_summaries::insert (struct cgraph_node *node, modref_summary *)
       optimization_summaries->remove (node);
       return;
     }
-  /* If funtion is not in giple form yet or the pass is disabled, make
-     sure we do not keep stale summary.  */
-  if (!DECL_STRUCT_FUNCTION (node->decl)
-      || !opt_for_fn (node->decl, flag_ipa_modref))
+  if (!DECL_STRUCT_FUNCTION (node->decl))
     {
       summaries->remove (node);
       return;
@@ -1159,8 +1156,7 @@ modref_summaries_lto::insert (struct cgraph_node *node, modref_summary_lto *)
      propagated.  This is done only by SIMD cloning that is not very
      critical.  */
   if (!DECL_STRUCT_FUNCTION (node->decl)
-      || propagated
-      || !opt_for_fn (node->decl, flag_ipa_modref))
+      || propagated)
     {
       summaries_lto->remove (node);
       return;
