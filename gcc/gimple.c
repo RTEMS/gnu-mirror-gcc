@@ -1487,30 +1487,23 @@ gimple_call_flags (const gimple *stmt)
 
 /* Return the "fn spec" string for call STMT.  */
 
-attr_fnspec
+static const_tree
 gimple_call_fnspec (const gcall *stmt)
 {
   tree type, attr;
 
   if (gimple_call_internal_p (stmt))
-    {
-      const_tree spec = internal_fn_fnspec (gimple_call_internal_fn (stmt));
-      if (spec)
-	return spec;
-      else
-	return "";
-    }
+    return internal_fn_fnspec (gimple_call_internal_fn (stmt));
 
   type = gimple_call_fntype (stmt);
-  if (type)
-    {
-      attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
-      if (attr)
-	return TREE_VALUE (TREE_VALUE (attr));
-    }
-  if (gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
-    return builtin_fnspec (gimple_call_fndecl (stmt));
-  return "";
+  if (!type)
+    return NULL_TREE;
+
+  attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
+  if (!attr)
+    return NULL_TREE;
+
+  return TREE_VALUE (TREE_VALUE (attr));
 }
 
 /* Detects argument flags for argument number ARG on call STMT.  */
@@ -1518,12 +1511,13 @@ gimple_call_fnspec (const gcall *stmt)
 int
 gimple_call_arg_flags (const gcall *stmt, unsigned arg)
 {
-  attr_fnspec fnspec = gimple_call_fnspec (stmt);
+  const_tree attr = gimple_call_fnspec (stmt);
 
-  if (!fnspec.known_p ())
+  if (!attr)
     return 0;
 
   int flags = 0;
+  attr_fnspec fnspec (attr);
 
   if (!fnspec.arg_specified_p (arg))
     ;
@@ -1546,10 +1540,15 @@ gimple_call_arg_flags (const gcall *stmt, unsigned arg)
 int
 gimple_call_return_flags (const gcall *stmt)
 {
+  const_tree attr;
+
   if (gimple_call_flags (stmt) & ECF_MALLOC)
     return ERF_NOALIAS;
 
-  attr_fnspec fnspec = gimple_call_fnspec (stmt);
+  attr = gimple_call_fnspec (stmt);
+  if (!attr)
+    return 0;
+  attr_fnspec fnspec (attr);
 
   unsigned int arg_no;
   if (fnspec.returns_arg (&arg_no))

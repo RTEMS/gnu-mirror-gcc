@@ -27,19 +27,11 @@
      '.'	specifies that nothing is known.
    character 1  specifies additional function properties
      ' '        specifies that nothing is known
-     'p' or 'P' specifies that function is pure except for described side
-		effects.
-     'c' or 'C' specifies that function is const except for described side
-		effects.
-     'b'	specifies that functions is a memory barrier.
-   The uppercase letter in addition specifies that function clobbers errno.
 
    character 2+2i specifies properties of argument number i as follows:
      'x' or 'X' specifies that parameter is unused.
      'r' or 'R' specifies that the memory pointed to by the parameter is only
 		read and does not escape
-     'o' or 'O' specifies that the memory pointed to by the parameter is only
-		written and does not escape
      'w' or 'W' specifies that the memory pointed to by the parameter does not
 		escape
      '.'	specifies that nothing is known.
@@ -50,10 +42,6 @@
    character 3+2i specifies additional properties of argument number i
    as follows:
      ' '        nothing is known
-     't'	the size of value written/read corresponds to the size of
-		of the pointed-to type of the argument type
-     '1'...'9'  the size of value written/read is given by the specified
-		argument
  */
 
 #ifndef ATTR_FNSPEC_H
@@ -84,29 +72,12 @@ public:
     if (flag_checking)
       verify ();
   }
-  attr_fnspec (const char *str)
-  : str (str), len (strlen (str))
-  {
-    if (flag_checking)
-      verify ();
-  }
   attr_fnspec (const_tree identifier)
   : str (TREE_STRING_POINTER (identifier)),
     len (TREE_STRING_LENGTH (identifier))
   {
     if (flag_checking)
       verify ();
-  }
-  attr_fnspec ()
-  : str (NULL), len (0)
-  {
-  }
-
-  /* Return true if fn spec is known.  */
-  bool
-  known_p ()
-  {
-    return len;
   }
 
   /* Return true if arg I is specified.  */
@@ -123,7 +94,7 @@ public:
   {
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
-    return str[idx] == 'R' || str[idx] == 'O' || str[idx] == 'W';
+    return str[idx] == 'R' || str[idx] == 'W';
   }
 
   /* True if argument is used.  */
@@ -144,56 +115,6 @@ public:
     return str[idx] == 'r' || str[idx] == 'R';
   }
 
-  /* True if memory reached by the argument is read.
-     Valid only if all loads are known.  */
-  bool
-  arg_read_p (unsigned int i)
-  {
-    unsigned int idx = arg_idx (i);
-    gcc_checking_assert (arg_specified_p (i));
-    gcc_checking_assert (loads_known_p ());
-    return str[idx] == 'r' || str[idx] == 'R'
-	   || str[idx] == 'w' || str[idx] == 'W';
-  }
-
-  /* True if memory reached by the argument is read.
-     Valid only if all loads are known.  */
-  bool
-  arg_written_p (unsigned int i)
-  {
-    unsigned int idx = arg_idx (i);
-    gcc_checking_assert (arg_specified_p (i));
-    gcc_checking_assert (stores_known_p ());
-    return str[idx] == 'w' || str[idx] == 'W'
-	   || str[idx] == 'o' || str[idx] == 'O';
-  }
-
-  /* Return true if load of memory pointed to by argument I is specified
-     by another argument.  In this case set ARG.  */
-  bool
-  arg_access_size_given_by_arg_p (unsigned int i, unsigned int *arg)
-  {
-    unsigned int idx = arg_idx (i);
-    gcc_checking_assert (arg_specified_p (i));
-    if (str[idx + 1] >= '1' && str[idx + 1] <= '9')
-      {
-	*arg = str[idx + 1] - '1';
-	return true;
-      }
-    else
-      return false;
-  }
-
-  /* Return true if the pointed-to type of the argument correspond to the
-     size of the memory acccess.  */
-  bool
-  arg_single_access_p (unsigned int i)
-  {
-    unsigned int idx = arg_idx (i);
-    gcc_checking_assert (arg_specified_p (i));
-    return str[idx + 1] == 't';
-  }
-
   /* True if the argument does not escape.  */
   bool
   arg_noescape_p (unsigned int i)
@@ -201,8 +122,7 @@ public:
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
     return str[idx] == 'w' || str[idx] == 'W'
-	   || str[idx] == 'r' || str[idx] == 'R'
-	   || str[idx] == 'o' || str[idx] == 'O';
+	   || str[idx] == 'R' || str[idx] == 'r';
   }
 
   /* Return true if function returns value of its parameter.  If ARG_NO is
@@ -227,39 +147,8 @@ public:
     return str[0] == 'm';
   }
 
-  /* Return true if all memory read by the function is specified by fnspec.  */
-  bool
-  loads_known_p ()
-  {
-    return str[1] == 'c' || str[1] == 'C';
-  }
-
-  /* Retun true if function is memory barrier.  */
-  bool
-  barrier_p ()
-  {
-    return str[1] == 'b';
-  }
-
-  /* Return true if all memory written by the function 
-     is specified by fnspec.  */
-  bool
-  stores_known_p ()
-  {
-    return str[1] == 'c' || str[1] == 'C' || str[1] == 'p' || str[1] == 'P';
-  }
-
-  bool
-  clobbers_errno_p ()
-  {
-    return str[1] == 'C' || str[1] == 'P';
-  }
-
   /* Check validity of the string.  */
   void verify ();
 };
-
-extern attr_fnspec gimple_call_fnspec (const gcall *stmt);
-extern attr_fnspec builtin_fnspec (tree);
 
 #endif /* ATTR_FNSPEC_H  */
