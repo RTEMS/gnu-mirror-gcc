@@ -2045,9 +2045,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 
       DEBUG_L("Mini-Pass on Function %s:\n", lang_hooks.decl_printable_name ( func->decl, 2));
       
-      //DEBUG_L("\n");
-      //DEBUG_F( wolf_fence, info);
-
       // We need a map of old ssa_name to new ssa_name. Not currently used.
       std::map <tree,tree> ssa_map;
 
@@ -2173,8 +2170,6 @@ str_reorg_instance_interleave_trans ( Info *info)
       
       DEBUG_L("Dangling Types for Function Local (default defs).\n");
       INDENT(4);
-      //DEBUG_L("\n");
-      //DEBUG_F( wolf_fence, info);
       
       // For locals
       //
@@ -2233,8 +2228,6 @@ str_reorg_instance_interleave_trans ( Info *info)
       
       // Normal ssa name case
       DEBUG_L("Dangling Types for Normal SSA Names:\n");
-      //DEBUG_L("\n");
-      //DEBUG_F( wolf_fence, info);
       
       INDENT(4);
       // We use len instead of using func->length() in the for loop test
@@ -4125,11 +4118,19 @@ analyze_access ( tree access, acc_info_t *acc_info)
 static void
 create_new_types ( Info_t *info)
 {
+  DEBUG_L("create_new_types:\n");
   std::map < tree, BoolPair_t>::iterator tmi;
   for( tmi = info->struct_types->begin ();
        tmi != info->struct_types->end ();
        tmi++ ) {
-    if ( !tmi->second.processed ) create_a_new_type ( info, tmi->first);
+    if ( !tmi->second.processed )
+      {
+	create_a_new_type ( info, tmi->first);
+      }
+    else
+      {
+	DEBUG_A("processed\n");
+      }
   }    
 }
 
@@ -4139,6 +4140,9 @@ create_a_new_type ( Info_t *info, tree type)
   bool layout_changed = false;
   // skip if already processed  		   
   if ( ( *( info->struct_types))[type].processed ) return;
+
+  DEBUG_L("create_a_new_type: ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
 
   // Implementation note: Check this for infinite recursion.
   // I don't think it's possible in a sane universe but
@@ -4166,9 +4170,9 @@ create_a_new_type ( Info_t *info, tree type)
     tree reorg_type_prime = lang_hooks.types.make_type (RECORD_TYPE);
 
     ri->reorg_ver_type = reorg_type_prime;
-    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p, ", TYPE_SIZE(reorg_type_prime));
-    //DEBUG_F( print_generic_expr, stderr, TYPE_SIZE(reorg_type_prime), (dump_flags_t)-1);
-    //DEBUG("\n");
+    DEBUG_L("TYPE_SIZE(reorg_type_prime): %p, ", TYPE_SIZE(reorg_type_prime));
+    DEBUG_F( print_generic_expr, stderr, TYPE_SIZE(reorg_type_prime), (dump_flags_t)-1);
+    DEBUG("\n");
     
     /* Multi-pool only
     // Create pointer_rep
@@ -4195,8 +4199,8 @@ create_a_new_type ( Info_t *info, tree type)
 
     tree pointer_rep = make_signed_type ( TYPE_PRECISION ( pointer_sized_int_node));
     TYPE_MAIN_VARIANT ( pointer_rep) = TYPE_MAIN_VARIANT ( pointer_sized_int_node);
-    //DEBUG("Issue with gcc_ of reorg\n");
-    //DEBUG_F(print_reorg, stderr, 2, ri);
+    DEBUG("Issue with gcc_ of reorg\n");
+    DEBUG_F(print_reorg, stderr, 2, ri);
     const char *gcc_name =
       identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
     size_t len =
@@ -4206,12 +4210,10 @@ create_a_new_type ( Info_t *info, tree type)
     strcat ( name, gcc_name);
     TYPE_NAME ( pointer_rep) = get_identifier ( name);
     ri->pointer_rep = pointer_rep;
-    //DEBUG_L("pointer_rep = ");
-    //DEBUG_F( print_generic_expr, stderr, pointer_rep, (dump_flags_t)-1);
-    //DEBUG("\n");
-    //DEBUG_A("TYPE_MAIN_VARIANT ( pointer_rep) = ");
-    //DEBUG_F( print_generic_expr, stderr, TYPE_MAIN_VARIANT ( pointer_rep), (dump_flags_t)-1);
-    //DEBUG("\n");
+    DEBUG_L("pointer_rep = ");
+    DEBUG_F(flexible_print, stderr, pointer_rep, 1, (dump_flags_t)-1);
+    DEBUG_A("TYPE_MAIN_VARIANT ( pointer_rep) = ");
+    DEBUG_F(flexible_print, stderr, TYPE_MAIN_VARIANT (pointer_rep), 1, (dump_flags_t)-1);
 
     // Note, we also declare a base type variable (globally.)
     // This variable also belong in the ReorgType.

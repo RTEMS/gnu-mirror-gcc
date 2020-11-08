@@ -185,6 +185,10 @@ ipa_structure_reorg ( void)
       }
     if ( flag_ipa_structure_reorg || flag_ipa_instance_interleave )
       {
+
+	//DEBUG_L("\n");
+	//DEBUG_F( wolf_fence, &info);
+	
 	//DEBUG_L("before str_reorg_instance_interleave_qual\n");
 	str_reorg_instance_interleave_qual ( &info);
 	//DEBUG_L("after str_reorg_instance_interleave_qual\n");
@@ -275,6 +279,9 @@ reorg_analysis ( Info *info)
   struct cgraph_node *node;
 
   find_decls_and_types ( info);
+
+  //DEBUG_L("\n");
+  //DEBUG_F( wolf_fence, info);
 
   // Skip computing numbOfGlobalArrays initially.
 
@@ -559,12 +566,18 @@ find_decls_and_types ( Info *info)
 	   !=
 	   escaping_nonescaping_sets.non_escaping.end ())
 	{
-	  tree base = base_type_of ( type);
-	  // The types are a bit redundant here so ignore
-	  // duplicates.
-	  if ( get_reorgtype_info ( base, info) ) continue;
-	  add_reorg_type ( base, false, info);
-	  //typeset.insert ( type);
+	  tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
+	  
+	  // Check for incomplete types and ignore them.
+	  if ( TYPE_SIZE ( canonical) == NULL ) continue;
+	  if ( TYPE_FIELDS ( canonical) == NULL ) continue;
+	  
+	  // The types here are highly redundant so ignore
+	  // the duplicates.
+	  if ( get_reorgtype_info ( canonical, info) ) continue;
+	  
+	  add_reorg_type ( canonical, false, info);
+	  typeset.insert ( canonical);
 	}
     }
 
@@ -1641,10 +1654,10 @@ modify_func_decl_core ( struct function *func, Info *info)
       //INDENT(-4);
       return false;
     }
-  //DEBUG_A("pointer_rep = ");
-  //DEBUG_F( flexible_print, stderr, ri->pointer_rep, 1, (dump_flags_t)0);
-  //DEBUG_A("TYPE_MAIN_VARIANT( pointer_rep) = ");
-  //DEBUG_F( flexible_print, stderr, TYPE_MAIN_VARIANT( ri->pointer_rep), 1, (dump_flags_t)0);
+  DEBUG_A("pointer_rep = ");
+  DEBUG_F( flexible_print, stderr, ri->pointer_rep, 1, (dump_flags_t)0);
+  DEBUG_A("TYPE_MAIN_VARIANT( pointer_rep) = ");
+  DEBUG_F( flexible_print, stderr, TYPE_MAIN_VARIANT( ri->pointer_rep), 1, (dump_flags_t)0);
   
   int levels = number_of_levels ( func_type);
 
@@ -1751,17 +1764,17 @@ modify_decl_core ( tree *location, Info *info)
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  //DEBUG_L("before modify_decl_core: ");
-  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  DEBUG_L("before modify_decl_core: ");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
   
   //tree type = *location;
   tree type = TREE_TYPE ( *location);
   
-  //DEBUG_A("type = ");
-  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  DEBUG_A("type = ");
+  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   tree base = base_type_of ( type);
-  //DEBUG_A(", base = ");
-  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  DEBUG_A(", base = ");
+  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
@@ -2903,10 +2916,17 @@ print_base_reorg ( FILE *file, int leading_space, ReorgType_t *reorg, bool detai
   // synthesize and display absolute_effect & raw_effect
   
   // Note, the following is a stub.
-  const char *text
-    = identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( reorg->gcc_type)));
-  fprintf ( file, "%*s{ type:%s, #%d, ", leading_space, "",text, reorg->id);
-
+  if ( reorg->gcc_type != NULL && TYPE_NAME ( reorg->gcc_type) != NULL  )
+    {
+      const char *text
+	= identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( reorg->gcc_type)));
+      fprintf ( file, "%*s{ type:%s, #%d, ", leading_space, "",text, reorg->id);
+    }
+  else
+    {
+      fprintf ( file, "%*s{ type:NONAME, #%d, ", leading_space, "",reorg->id);
+    }
+      
   if ( reorg->do_dead_field_elim )
     {
       fprintf ( file, "elim:{ ");
@@ -2934,16 +2954,20 @@ print_base_reorg ( FILE *file, int leading_space, ReorgType_t *reorg, bool detai
     {
       fprintf ( file, "no interleave, ");
     }
-  
-  if ( reorg->reorg_ver_type != NULL )
+
+  DEBUG_L("reorg->reorg_ver_type = %p\n", reorg->reorg_ver_type);
+
+  if ( reorg->reorg_ver_type != NULL && TYPE_NAME ( reorg->reorg_ver_type) != NULL )
     {
       // TBD does this belong here? How will the clone be done with elim and
       // reorder
+      DEBUG_A("%p, %p\n", reorg->reorg_ver_type, TYPE_NAME ( reorg->reorg_ver_type));
       const char *clone_name =
 	identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( reorg->reorg_ver_type)));
       fprintf ( file, "%s%s", clone_name, reorg->pointer_rep ? ", " : "");
     }
-  if ( reorg->pointer_rep != NULL )
+  
+  if ( reorg->pointer_rep != NULL && TYPE_NAME ( reorg->pointer_rep) != NULL )
     {
       // TBD does this belong here? How will the clone be done with elim and
       // reorder
@@ -2953,7 +2977,7 @@ print_base_reorg ( FILE *file, int leading_space, ReorgType_t *reorg, bool detai
     }
   
   fprintf ( file, "}\n");
-  if ( detailed )
+  if ( detailed && reorg->reorg_ver_type != NULL )
     {
       tree field;
       for ( field = TYPE_FIELDS( reorg->reorg_ver_type); 
@@ -3474,7 +3498,9 @@ wf_func ( tree *slot, tree *dummy)
   gcc_assert( t_val->ssa_name.var);
   return 0;
 }
+#endif
 
+#if 0
 void
 wolf_fence (
 	     Info *info // Pass level gobal info (might not use it)
@@ -3538,6 +3564,7 @@ wolf_fence (
 }
 #endif
 
+#if 0
 void
 wolf_fence (
 	     Info *info // Pass level gobal info (might not use it)
@@ -3550,6 +3577,25 @@ wolf_fence (
     }
 
   fprintf( stderr, "No Wolf\n");  
+}
+#endif
+
+void
+wolf_fence (
+	     Info *info // Pass level gobal info (might not use it)
+	   )
+{
+  for ( auto ri = info->reorg_type->begin ();
+	ri != info->reorg_type->end ();
+	ri++                                                              )
+    {
+      if ( ri->reorg_ver_type != NULL )
+	{
+	  fprintf ( stderr, "Wolf!\n");
+	  gcc_assert (0);
+	}
+    }
+  fprintf( stderr, "No Wolf\n");
 }
 
 // returns true for failure
