@@ -1,3 +1,19 @@
+work024.patch014
+2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-call.c (init_cumulative_args): Only set gnu
+	attribute #4 if the return type is long double, and not an
+	explicit __float128 or __ibm128 type.
+	(rs6000_function_arg_advance_1): Only set gnu attribute #4 if the
+	argument is long double and not an explicit __float128 or __ibm128
+	type.
+
+work024.patch013
+2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_move): Delete broken code
+	that tried to set gnu attribute #4 if long double was used.
+
 work024.patch008
 2020-11-04  Michael Meissner  <meissner@linux.ibm.com>
 
