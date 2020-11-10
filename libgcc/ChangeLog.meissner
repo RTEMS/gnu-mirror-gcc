@@ -1,3 +1,17 @@
+work025.patch004
+2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR libgcc/97543
+	PR libgcc/97643
+	* config/rs6000/t-linux (IBM128_STATIC_OBJS): New make variable.
+	Set all objects to use the explicit IBM format.
+	(IBM128_SHARD_CFLAGS): New make variable. Set all objects to use
+	the explicit IBM format.
+	(IBM128_SHARED_CFLAGS): New make variable.
+	(IBM128_STATIC_CFLAGS): New make variable.
+	(gcc_s_compile): Add -mno-gnu-attribute to all shared library
+	modules.
+
 2020-11-10   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
