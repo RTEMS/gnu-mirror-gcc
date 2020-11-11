@@ -1,3 +1,12 @@
+work025.patch006
+2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-longdouble-math.c: New test.
+	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
+	* gcc.target/powerpc/float128-math.c: Adjust test for new name
+	being generated.  Add support for running test on power10.  Add
+	support for running if long double defaults to 64-bits.
+
 work025.patch003
 2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
 

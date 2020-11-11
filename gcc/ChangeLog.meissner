@@ -1,3 +1,10 @@
+work025.patch006
+2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
+	support for mapping built-in function names for long double
+	built-in functions if long double is IEEE 128-bit.
+
 work025.patch003
 2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
 
