@@ -26,7 +26,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* FINE_GRAINED_LIBRARIES is used so we can isolate just to tf_to_dd conversion
    function from dp-bits.c.  */
 #define FINE_GRAINED_LIBRARIES	1
-#define L_df_to_dd		1
+#define L_tf_to_dd		1
 #define WIDTH			64
 
 #if !defined(__LONG_DOUBLE_128__) || !defined(__LONG_DOUBLE_IEEE128__)
