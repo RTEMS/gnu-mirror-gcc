@@ -9,7 +9,7 @@ work025.patch007
 	-mlong-double-128.
 
 work025.patch006
-2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
 	support for mapping built-in function names for long double

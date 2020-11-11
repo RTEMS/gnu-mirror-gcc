@@ -1,5 +1,5 @@
 work025.patch006
-2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-longdouble-math.c: New test.
 	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
@@ -8,7 +8,7 @@ work025.patch006
 	support for running if long double defaults to 64-bits.
 
 work025.patch005
-2020-11-12  Michael Meissner  <meissner@linux.ibm.com>
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/97791
 	* gcc.target/powerpc/gnuattr1.c: Delete.
