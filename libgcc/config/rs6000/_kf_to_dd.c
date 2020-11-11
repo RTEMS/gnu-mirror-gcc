@@ -40,17 +40,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #if ((__GLIBC__ * 1000) + __GLIBC_MINOR__) < 2032
 
 #include <stdlib.h>
-extern _Decimal64 __dpd_extendkfdd (long double);
+extern _Decimal64 __dpd_trunckfdd (long double);
 
 _Decimal64
-__dpd_extendkfdd (long double x __attribute__ ((unused)))
+__dpd_trunckfdd (long double x __attribute__ ((unused)))
 {
   abort ();
 }
 
 #else
 /* Map the external name to the float128 default.  */
-#define __dpd_trunctdtf		__dpd_trunctdkf
+#define __dpd_trunctfdd		__dpd_trunckfdd
 
 /* Use dfp-bit.c to do the real work.  */
 #include "dfp-bit.c"
