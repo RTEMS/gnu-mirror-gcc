@@ -7,6 +7,14 @@ work025.patch006
 	being generated.  Add support for running test on power10.  Add
 	support for running if long double defaults to 64-bits.
 
+work025.patch005
+2020-11-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/97791
+	* gcc.target/powerpc/gnuattr1.c: Delete.
+	* gcc.target/powerpc/gnuattr2.c: Delete.
+	* gcc.target/powerpc/gnuattr3.c: Delete.
+
 work025.patch003
 2020-11-10  Michael Meissner  <meissner@linux.ibm.com>
 
