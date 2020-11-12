@@ -2678,6 +2678,8 @@ write_init_file ()
 static int
 write_defines_file ()
 {
+  fprintf (defines_file, "#ifndef _RS6000_VECDEFINES_H\n");
+  fprintf (defines_file, "#define _RS6000_VECDEFINES_H 1\n\n");
   for (int i = 0; i < num_ovld_stanzas; i++)
     if (strcmp (ovld_stanzas[i].extern_name, "SKIP"))
       {
@@ -2689,6 +2691,7 @@ write_defines_file ()
 	if (ovld_stanzas[i].ifdef)
 	  fprintf (defines_file, "#endif\n");
       }
+  fprintf (defines_file, "\n#endif\n");
   return 1;
 }
 

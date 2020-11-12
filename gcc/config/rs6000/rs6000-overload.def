@@ -166,6 +166,18 @@
   vuq __builtin_vec_addc (vuq, vuq);
     VADDCUQ  VADDCUQ_VUQ
 
+; TODO: Note that the entry for VEC_ADDE currently gets ignored in
+; altivec_resolve_overloaded_builtin.  There are also forms for
+; vsi and vui arguments, but rather than building a define_expand
+; for the instruction sequence generated for those, we do some RTL
+; hackery.  Revisit whether we can remove that.  For now, keep this
+; much of the entry here to generate the #define, at least.
+[VEC_ADDE, vec_adde, __builtin_vec_adde]
+  vsq __builtin_vec_adde (vsq, vsq, vsq);
+    VADDEUQM  VADDEUQM_VSQ
+  vuq __builtin_vec_adde (vuq, vuq, vuq);
+    VADDEUQM  VADDEUQM_VUQ
+
 ; TODO: Note that the entry for VEC_ADDEC currently gets ignored in
 ; altivec_resolve_overloaded_builtin.  There are also forms for
 ; vsi and vui arguments, but rather than building a define_expand
@@ -191,6 +203,36 @@
     VADDUWS
   vsi __builtin_vec_adds (vsi, vsi);
     VADDSWS
+
+[VEC_AND, vec_and, __builtin_vec_and]
+  vsc __builtin_vec_and (vsc, vsc);
+    VAND_V16QI
+  vuc __builtin_vec_and (vuc, vuc);
+    VAND_V16QI_UNS  VAND_VUC
+  vbc __builtin_vec_and (vbc, vbc);
+    VAND_V16QI_UNS  VAND_VBC
+  vss __builtin_vec_and (vss, vss);
+    VAND_V8HI
+  vus __builtin_vec_and (vus, vus);
+    VAND_V8HI_UNS  VAND_VUS
+  vbs __builtin_vec_and (vbs, vbs);
+    VAND_V8HI_UNS  VAND_VBS
+  vsi __builtin_vec_and (vsi, vsi);
+    VAND_V4SI
+  vui __builtin_vec_and (vui, vui);
+    VAND_V4SI_UNS  VAND_VUI
+  vbi __builtin_vec_and (vbi, vbi);
+    VAND_V4SI_UNS  VAND_VBI
+  vsll __builtin_vec_and (vsll, vsll);
+    VAND_V2DI
+  vull __builtin_vec_and (vull, vull);
+    VAND_V2DI_UNS  VAND_VULL
+  vbll __builtin_vec_and (vbll, vbll);
+    VAND_V2DI_UNS  VAND_VBLL
+  vf __builtin_vec_and (vf, vf);
+    VAND_V4SF
+  vd __builtin_vec_and (vd, vd);
+    VAND_V2DF
 
 [VEC_ANDC, vec_andc, __builtin_vec_andc]
   vbc __builtin_vec_andc (vbc, vbc);
@@ -987,6 +1029,9 @@
   signed int __builtin_vec_vextractm (vuq);
     VEXTRACTMQ
 
+; There is no entry for vec_extract.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000.c.
+
 [VEC_EXTRACT_FP_FROM_SHORTH, vec_extract_fp32_from_shorth, __builtin_vec_vextract_fp_from_shorth, _ARCH_PWR9]
   vf __builtin_vec_vextract_fp_from_shorth (vus);
     VEXTRACT_FP_FROM_SHORTH
@@ -1188,6 +1233,9 @@
 [VEC_GNB, vec_gnb, __builtin_vec_gnb, _ARCH_PWR10]
   vull __builtin_vec_gnb (vuq, unsigned char);
     VGNB
+
+; There is no entry for vec_insert.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000.c.
 
 [VEC_INSERTH, vec_inserth, __builtin_vec_inserth, _ARCH_PWR10]
   vuc __builtin_vec_inserth (unsigned char, vuc, unsigned int);
@@ -1697,6 +1745,10 @@
   vd __builtin_vec_vmrgow (vd, vd);
     VMRGOW_V2DF
 
+[VEC_MFVSCR, vec_mfvscr, __builtin_vec_mfvscr]
+  vus __builtin_vec_mfvscr ();
+    MFVSCR
+
 [VEC_MIN, vec_min, __builtin_vec_min]
   vsc __builtin_vec_min (vsc, vsc);
     VMINSB
@@ -2015,17 +2067,31 @@
 
 [VEC_PACKS, vec_packs, __builtin_vec_packs]
   vuc __builtin_vec_packs (vus, vus);
-    VPKUHUS
+    VPKUHUS  VPKUHUS_S
   vsc __builtin_vec_packs (vss, vss);
     VPKSHSS
   vus __builtin_vec_packs (vui, vui);
-    VPKUWUS
+    VPKUWUS  VPKUWUS_S
   vss __builtin_vec_packs (vsi, vsi);
     VPKSWSS
   vui __builtin_vec_packs (vull, vull);
-    VPKUDUS
+    VPKUDUS  VPKUDUS_S
   vsi __builtin_vec_packs (vsll, vsll);
     VPKSDSS
+
+[VEC_PACKSU, vec_packsu, __builtin_vec_packsu]
+  vuc __builtin_vec_packsu (vus, vus);
+    VPKUHUS  VPKUHUS_U
+  vuc __builtin_vec_packsu (vss, vss);
+    VPKSHUS
+  vus __builtin_vec_packsu (vui, vui);
+    VPKUWUS  VPKUWUS_U
+  vus __builtin_vec_packsu (vsi, vsi);
+    VPKSWUS
+  vui __builtin_vec_packsu (vull, vull);
+    VPKUDUS  VPKUDUS_U
+  vui __builtin_vec_packsu (vsll, vsll);
+    VPKSDUS
 
 [VEC_PDEP, vec_pdep, __builtin_vec_vpdepd, _ARCH_PWR10]
   vull __builtin_vec_vpdepd (vull, vull);
@@ -2138,6 +2204,9 @@
     VPRTYBQ  VPRTYBQ_S
   vuq __builtin_vec_vparity_lsbb (vuq);
     VPRTYBQ  VPRTYBQ_U
+
+; There is no entry for vec_promote.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000.c.
 
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
@@ -2261,7 +2330,9 @@
   vull __builtin_vec_rlmi (vull, vull, vull);
     VRLDMI
 
-[VEC_RLNM, vec_rlnm, __builtin_vec_rlnm]
+; We SKIP vec_rlnm so that altivec.h can define it as the three-operand
+; form we expose to the users.
+[VEC_RLNM, SKIP, __builtin_vec_rlnm]
   vui __builtin_vec_rlnm (vui, vui);
     VRLWNM
   vull __builtin_vec_rlnm (vull, vull);
@@ -2362,6 +2433,10 @@
 [VEC_SIGNED2, vec_signed2, __builtin_vec_vsigned2]
   vsi __builtin_vec_vsigned2 (vd, vd);
     VEC_VSIGNED2_V2DF
+
+[VEC_SIGNEDE, vec_signede, __builtin_vec_vsignede]
+  vui __builtin_vec_vsignede (vd);
+    VEC_VSIGNEDE_V2DF
 
 [VEC_SIGNEDO, vec_signedo, __builtin_vec_vsignedo]
   vui __builtin_vec_vsignedo (vd);
@@ -2551,6 +2626,21 @@
   vbll __builtin_vec_splat (vbll, signed int);
     XXSPLTD_V2DI  XXSPLTD_VBLL
 
+[VEC_SPLAT_S8, vec_splat_s8, __builtin_vec_splat_s8]
+  vsc __builtin_vec_splat_s8 (signed int);
+    VSPLTISB
+
+[VEC_SPLAT_S16, vec_splat_s16, __builtin_vec_splat_s16]
+  vss __builtin_vec_splat_s16 (signed int);
+    VSPLTISH
+
+[VEC_SPLAT_S32, vec_splat_s32, __builtin_vec_splat_s32]
+  vsi __builtin_vec_splat_s32 (signed int);
+    VSPLTISW
+
+; There are no entries for vec_splat_u{8,16,32}.  These are handled
+; in altivec.h with a #define and a cast.
+
 [VEC_SPLATI, vec_splati, __builtin_vec_xxspltiw, _ARCH_PWR10]
   vsi __builtin_vec_xxspltiw (signed int);
     VXXSPLTIW_V4SI
@@ -2568,6 +2658,9 @@
     VXXSPLTI32DX_V4SI  VXXSPLTI32DX_VUI
   vf __builtin_vec_xxsplti32dx (vf, const int, float);
     VXXSPLTI32DX_V4SF
+
+; There is no entry for vec_splats.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000.c.
 
 [VEC_SQRT, vec_sqrt, __builtin_vec_sqrt, __VSX__]
   vf __builtin_vec_sqrt (vf);
@@ -3117,6 +3210,30 @@
   vuq __builtin_vec_subc (vuq, vuq);
     VSUBCUQ  VSUBCUQ_VUQ
 
+; TODO: Note that the entry for VEC_SUBE currently gets ignored in
+; altivec_resolve_overloaded_builtin.  There are also forms for
+; vsi and vui arguments, but rather than building a define_expand
+; for the instruction sequence generated for those, we do some RTL
+; hackery.  Revisit whether we can remove that.  For now, keep this
+; much of the entry here to generate the #define, at least.
+[VEC_SUBE, vec_sube, __builtin_vec_sube]
+  vsq __builtin_vec_sube (vsq, vsq, vsq);
+    VSUBEUQM  VSUBEUQM_VSQ
+  vuq __builtin_vec_sube (vuq, vuq, vuq);
+    VSUBEUQM  VSUBEUQM_VUQ
+
+; TODO: Note that the entry for VEC_SUBEC currently gets ignored in
+; altivec_resolve_overloaded_builtin.  There are also forms for
+; vsi and vui arguments, but rather than building a define_expand
+; for the instruction sequence generated for those, we do some RTL
+; hackery.  Revisit whether we can remove that.  For now, keep this
+; much of the entry here to generate the #define, at least.
+[VEC_SUBEC, vec_subec, __builtin_vec_subec]
+  vsq __builtin_vec_subec (vsq, vsq, vsq);
+    VSUBECUQ  VSUBECUQ_VSQ
+  vuq __builtin_vec_subec (vuq, vuq, vuq);
+    VSUBECUQ  VSUBECUQ_VUQ
+
 [VEC_SUBS, vec_subs, __builtin_vec_subs]
   vuc __builtin_vec_subs (vuc, vuc);
     VSUBUBS
@@ -3243,38 +3360,13 @@
   vsi __builtin_vec_vunsigned2 (vd, vd);
     VEC_VUNSIGNED2_V2DF
 
+[VEC_UNSIGNEDE, vec_unsignede, __builtin_vec_vunsignede]
+  vui __builtin_vec_vunsignede (vd);
+    VEC_VUNSIGNEDE_V2DF
+
 [VEC_UNSIGNEDO, vec_unsignedo, __builtin_vec_vunsignedo]
   vui __builtin_vec_vunsignedo (vd);
     VEC_VUNSIGNEDO_V2DF
-
-; Not sure this should exist, but it does.  This group is redundant with
-; vec_addec, but the next three don't have an alias.
-[VEC_VADDECUQ, vec_vaddecuq, __builtin_vec_vaddecuq]
-  vsq __builtin_vec_vaddecuq (vsq, vsq, vsq);
-    VADDECUQ  VADDECUQ_VSQ2
-  vuq __builtin_vec_vaddecuq (vuq, vuq, vuq);
-    VADDECUQ  VADDECUQ_VUQ2
-
-; Not sure this should exist, but it does.
-[VEC_VADDEUQM, vec_vaddeuqm, __builtin_vec_vaddeuqm]
-  vsq __builtin_vec_vaddeuqm (vsq, vsq, vsq);
-    VADDEUQM  VADDEUQM_VSQ
-  vuq __builtin_vec_vaddeuqm (vuq, vuq, vuq);
-    VADDEUQM  VADDEUQM_VUQ
-
-; Not sure this should exist, but it does.
-[VEC_VSUBECUQ, vec_vsubecuq, __builtin_vec_vsubecuq]
-  vsq __builtin_vec_vsubecuq (vsq, vsq, vsq);
-    VSUBECUQ  VSUBECUQ_VSQ
-  vuq __builtin_vec_vsubecuq (vuq, vuq, vuq);
-    VSUBECUQ  VSUBECUQ_VUQ
-
-; Not sure this should exist, but it does.
-[VEC_VSUBEUQM, vec_vsubeuqm, __builtin_vec_vsubeuqm]
-  vsq __builtin_vec_vsubeuqm (vsq, vsq, vsq);
-    VSUBEUQM  VSUBEUQM_VSQ
-  vuq __builtin_vec_vsubeuqm (vuq, vuq, vuq);
-    VSUBEUQM  VSUBEUQM_VUQ
 
 [VEC_VEE, vec_extract_exp, __builtin_vec_extract_exp, _ARCH_PWR9]
   vui __builtin_vec_extract_exp (vf);
