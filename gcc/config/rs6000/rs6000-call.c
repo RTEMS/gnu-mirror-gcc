@@ -6539,11 +6539,8 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	    {
 	      rs6000_passes_float = true;
 	      if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-		  && (FLOAT128_IBM_P (return_mode)
-		      || FLOAT128_IEEE_P (return_mode)
-		      || (return_type != NULL
-			  && (TYPE_MAIN_VARIANT (return_type)
-			      == long_double_type_node))))
+		  && return_type != NULL
+		  && TYPE_MAIN_VARIANT (return_type) == long_double_type_node)
 		rs6000_passes_long_double = true;
 
 	      /* Note if we passed or return a IEEE 128-bit type.  We changed
@@ -7001,10 +6998,8 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	{
 	  rs6000_passes_float = true;
 	  if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-	      && (FLOAT128_IBM_P (mode)
-		  || FLOAT128_IEEE_P (mode)
-		  || (type != NULL
-		      && TYPE_MAIN_VARIANT (type) == long_double_type_node)))
+	      && type != NULL
+	      && TYPE_MAIN_VARIANT (type) == long_double_type_node)
 	    rs6000_passes_long_double = true;
 
 	  /* Note if we passed or return a IEEE 128-bit type.  We changed the
