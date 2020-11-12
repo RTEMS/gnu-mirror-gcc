@@ -1,3 +1,255 @@
+2020-11-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/bias2.adb: New test.
+
+2020-11-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/opt89.adb: New test.
+
+2020-11-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/shift1.adb: New test.
+
+2020-11-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-11  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/97797
+	* gcc.dg/torture/ssa-fre-5.c: Use __SIZETYPE__ where
+	appropriate.
+	* gcc.dg/torture/ssa-fre-6.c: Likewise.
+
+2020-11-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/97768
+	* gfortran.dg/pr97768_1.f90: New test.
+	* gfortran.dg/pr97768_2.f90: New test.
+
+2020-11-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/97764
+	* gcc.c-torture/execute/pr97764.c: New test.
+
+2020-11-09  Sudakshina Das  <sudi.das@arm.com>
+
+	Backported from master:
+	2020-11-02  Sudakshina Das  <sudi.das@arm.com>
+
+	PR target/97638
+	* gcc.target/aarch64/pr97638.c: New test.a
+
+2020-11-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-10-21  Martin Liska  <mliska@suse.cz>
+		    Andrew MacLeod  <amacleod@redhat.com>
+
+	PR target/97360
+	* gcc.target/powerpc/pr97360.c: New test.
+
+2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr64505.c: Run everywhere.  Use correct minimized
+	test case.
+
+2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gfortran.dg/goacc/loop-2-parallel-3.f95: Adjust.
+
+2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gfortran.dg/goacc/loop-6.f95: Remove.
+
+2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gfortran.dg/goacc/loop-5.f95: Remove.
+
+2020-11-05  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2020-10-13  Martin Liska  <mliska@suse.cz>
+
+	PR middle-end/97392
+	* g++.dg/asan/asan_test.C: Disable -Wstringop-overflow.
+	* gcc.dg/asan/pr80166.c: Likewise.
+
+2020-11-04  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* gcc.target/aarch64/advsimd-intrinsics/arm-neon-ref.h
+	(hbfloat16_t): Define type.
+	(CHECK_FP): Make it working for bfloat types.
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vstN_lane_1.c: New file.
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vstN_lane_2.c: Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst2_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst2q_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst3_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst3q_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst4_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vst4q_lane_bf16_indices_1.c:
+	Likewise.
+
+2020-11-04  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vldN_lane_1.c: New
+	testcase.
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vldN_lane_2.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld2_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld2q_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld3_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld3q_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld4_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vld4q_lane_bf16_indices_1.c:
+	Likewise.
+
+2020-11-04  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vect_copy_lane_1.c:
+	New test.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopy_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopy_lane_bf16_indices_2.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopy_laneq_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopy_laneq_bf16_indices_2.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopyq_lane_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopyq_lane_bf16_indices_2.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopyq_laneq_bf16_indices_1.c:
+	Likewise.
+	* gcc.target/aarch64/advsimd-intrinsics/vcopyq_laneq_bf16_indices_2.c:
+	Likewise.
+
+2020-11-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-10-27  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/value_8.f90: New test.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/pr92793-1.c: Extend.
+	* gfortran.dg/goacc/pr92793-1.f90: Likewise.
+
+2020-11-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-03  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/97688
+	* gcc.dg/vect/tree-vect.h (check_vect): Fix the x86 cpuid
+	check to always specify subleaf zero.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/nested-reductions-1-kernels.c: Extend.
+	* c-c++-common/goacc/nested-reductions-2-kernels.c: Likewise.
+	* gfortran.dg/goacc/nested-reductions-1-kernels.f90: Likewise.
+	* gfortran.dg/goacc/nested-reductions-2-kernels.f90: Likewise.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/nested-reductions.c: Split file into...
+	* c-c++-common/goacc/nested-reductions-1-kernels.c: ... this...
+	* c-c++-common/goacc/nested-reductions-1-parallel.c: ..., this...
+	* c-c++-common/goacc/nested-reductions-1-routine.c: ..., and this.
+	* c-c++-common/goacc/nested-reductions-warn.c: Split file into...
+	* c-c++-common/goacc/nested-reductions-2-kernels.c: ... this...
+	* c-c++-common/goacc/nested-reductions-2-parallel.c: ..., this...
+	* c-c++-common/goacc/nested-reductions-2-routine.c: ..., and this.
+	* gfortran.dg/goacc/nested-reductions.f90: Split file into...
+	* gfortran.dg/goacc/nested-reductions-1-kernels.f90: ... this...
+	* gfortran.dg/goacc/nested-reductions-1-parallel.f90: ..., this...
+	* gfortran.dg/goacc/nested-reductions-1-routine.f90: ..., and
+	this.
+	* gfortran.dg/goacc/nested-reductions-warn.f90: Split file into...
+	* gfortran.dg/goacc/nested-reductions-2-kernels.f90: ... this...
+	* gfortran.dg/goacc/nested-reductions-2-parallel.f90: ..., this...
+	* gfortran.dg/goacc/nested-reductions-2-routine.f90: ..., and
+	this.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/92793
+	* gfortran.dg/goacc/pr92793-1.f90: Adjust.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/pr92793-1.c: Extend.
+	* gfortran.dg/goacc/pr92793-1.f90: Likewise.
+
+2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/92793
+	* gfortran.dg/goacc/pr92793-1.f90: Adjust.
+
+2020-10-30  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/97412
+	* g++.dg/cpp2a/concepts-variadic2.C: New test.
+
+2020-10-30  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-10-30  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/92793
+	* c-c++-common/goacc/clause-locations.c: Rewrite into...
+	* c-c++-common/goacc/pr92793-1.c: ... this.
+	* gfortran.dg/goacc/clause-locations.f90: Rewrite into...
+	* gfortran.dg/goacc/pr92793-1.f90: ... this.
+
 2020-10-28  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

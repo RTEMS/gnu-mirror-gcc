@@ -1,3 +1,80 @@
+2020-11-11  Paul Scharnofske  <asynts@gmail.com>
+
+	Backported from master:
+	2020-11-11  Paul Scharnofske  <asynts@gmail.com>
+
+	* include/std/thread (jthread::operator=(jthread&&)): Transfer
+	any existing state to a temporary that will request a stop and
+	then join.
+	* testsuite/30_threads/jthread/jthread.cc: Test move assignment.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96269
+	* include/std/optional (operator==, operator!=, operator<)
+	(operator>, operator<=, operator>=): Fix types used in
+	SFINAE constraints.
+	* testsuite/20_util/optional/relops/96269.cc: New test.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97731
+	* src/filesystem/dir.cc (recursive_directory_iterator): Call the
+	right overload of _Dir::advance.
+	* testsuite/experimental/filesystem/iterators/97731.cc: New test.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97362
+	* doc/html/manual/source_code_style.html: Regenerate.
+	* doc/xml/manual/appendix_contributing.xml: Add __deref to
+	BADNAMES.
+	* include/debug/functions.h (_Irreflexive_checker::__deref):
+	Rename to __ref.
+	* testsuite/17_intro/badnames.cc: Check __deref.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92285
+	* doc/xml/manual/evolution.xml: Document change to base class.
+	* doc/html/manual/api.html: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Document new C++20 headers.
+	* doc/html/*: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Document deprecation of
+	__is_nullptr_t and removal of std::allocator members.
+	* doc/html/manual/api.html: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/containers.xml: Replace <xref> with <link>.
+	* doc/xml/manual/evolution.xml: Likewise.
+	* doc/html/manual/api.html: Regenerate.
+	* doc/html/manual/containers.html: Regenerate.
+
 2020-10-29  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

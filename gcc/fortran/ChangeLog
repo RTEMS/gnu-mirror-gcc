@@ -1,3 +1,59 @@
+2020-11-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/97768
+	* misc.c (gfc_typename): Use ex->value.character.length only if
+	ex->expr_type == EXPR_CONSTANT.  If ex->ts.deferred, print : instead
+	of length.  If ex->ts.u.cl && ex->ts.u.cl->length == NULL, print *
+	instead of length.  Otherwise if character length is non-constant,
+	print just CHARACTER or CHARACTER(KIND=N).
+
+2020-11-06  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2020-11-06  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/97652
+	* module.c (mio_symbol): Fix symbol name for pdt_type.
+
+2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* openmp.c (oacc_is_parallel, resolve_oacc_params_in_parallel):
+	Remove.
+	(resolve_oacc_loop_blocks): Don't call the former.
+
+2020-11-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-10-27  Harald Anlauf  <anlauf@gmx.de>
+
+	* resolve.c (gfc_impure_variable): A dummy argument with the VALUE
+	attribute may be redefined without making a procedure impure.
+
+2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-03  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/92793
+	* trans-openmp.c (gfc_trans_omp_clauses): More precise location
+	information for OpenACC 'gang', 'worker', 'vector' clauses with
+	argument.
+
+2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR fortran/92793
+	* trans.c (gfc_set_backend_locus): Use 'gfc_get_location'.
+	(gfc_restore_backend_locus): Adjust.
+
 2020-10-22  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
