@@ -1,3 +1,37 @@
+work026.patch006
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-longdouble-math.c: New test.
+	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
+	* gcc.target/powerpc/float128-math.c: Adjust test for new name
+	being generated.  Add support for running test on power10.  Add
+	support for running if long double defaults to 64-bits.
+
+work026.patch005
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/97791
+	* gcc.target/powerpc/gnuattr1.c: Delete.
+	* gcc.target/powerpc/gnuattr2.c: Delete.
+	* gcc.target/powerpc/gnuattr3.c: Delete.
+
+work026.patch003
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
+work026.patch002
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-cmove.c: New test.
+	* gcc.target/powerpc/float128-minmax-3.c: New test.
+
+work026.patch001
+2020-11-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
 2020-11-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
