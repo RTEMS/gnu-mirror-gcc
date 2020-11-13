@@ -41,13 +41,6 @@
 		written and does not escape
      'w' or 'W' specifies that the memory pointed to by the parameter does not
 		escape
-     'c' or 'C' specifies that the memory pointed to by the parameter is
-		copied to memory pointed to by different parameter
-		(as in memcpy).  The index of the destination parmeter is
-		specified by following character i.e. "C1" means that memory is
-		copied to parameter pointed to by parameter 1.
-		Size of block copied is determined by size specifier of the
-		destination parameter.
      '.'	specifies that nothing is known.
    The uppercase letter in addition specifies that the memory pointed to
    by the parameter is not dereferenced.  For 'r' only read applies
@@ -58,11 +51,8 @@
      ' '        nothing is known
      't'	the size of value written/read corresponds to the size of
 		of the pointed-to type of the argument type
-     '1'...'9'  preceeded by 'o', 'O', 'w' or 'W'
-		specifies the size of value written/read is given by the
-		specified argument
-     '1'...'9'  preceeded by 'c', or 'c'
-		specifies the argument data is copied to
+     '1'...'9'  the size of value written/read is given by the specified
+		argument
  */
 
 #ifndef ATTR_FNSPEC_H
@@ -132,8 +122,7 @@ public:
   {
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
-    return str[idx] == 'R' || str[idx] == 'O'
-	   || str[idx] == 'W' || str[idx] == 'C';
+    return str[idx] == 'R' || str[idx] == 'O' || str[idx] == 'W';
   }
 
   /* True if argument is used.  */
@@ -172,7 +161,6 @@ public:
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
     return str[idx] != 'r' && str[idx] != 'R'
-	   && str[idx] != 'c' && str[idx] != 'C'
 	   && str[idx] != 'x' && str[idx] != 'X';
   }
 
@@ -183,8 +171,6 @@ public:
   {
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
-    if (str[idx] == 'c' || str[idx] == 'C')
-      return arg_max_access_size_given_by_arg_p (str[idx + 1] - '1', arg);
     if (str[idx + 1] >= '1' && str[idx + 1] <= '9')
       {
 	*arg = str[idx + 1] - '1';
@@ -201,25 +187,8 @@ public:
   {
     unsigned int idx = arg_idx (i);
     gcc_checking_assert (arg_specified_p (i));
-    /* We could handle 'c' 'C' but then we would need to have way to check
-       that both points to sizes are same.  */
     return str[idx + 1] == 't';
   }
-
-  /* Return true if memory pointer to by argument is copied to a memory
-     pointed to by a different argument (as in memcpy).
-     In this case set ARG.  */
-  bool
-  arg_copied_to_arg_p (unsigned int i, unsigned int *arg)
-  {
-    unsigned int idx = arg_idx (i);
-    gcc_checking_assert (arg_specified_p (i));
-    if (str[idx] != 'c' && str[idx] == 'C')
-      return false;
-    *arg = str[idx + 1] - '1';
-    return true;
-  }
-
 
   /* True if the argument does not escape.  */
   bool
@@ -261,7 +230,7 @@ public:
     return str[1] != 'c' && str[1] != 'C';
   }
 
-  /* Return true if all memory written by the function
+  /* Return true if all memory written by the function 
      is specified by fnspec.  */
   bool
   global_memory_written_p ()

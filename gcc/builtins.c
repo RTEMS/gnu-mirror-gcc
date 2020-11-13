@@ -12939,15 +12939,16 @@ builtin_fnspec (tree callee)
 	 argument.  */
       case BUILT_IN_STRCAT:
       case BUILT_IN_STRCAT_CHK:
+	return "1cW R ";
       case BUILT_IN_STRNCAT:
       case BUILT_IN_STRNCAT_CHK:
-	return "1cW C1";
+	return "1cW R3";
       case BUILT_IN_STRCPY:
       case BUILT_IN_STRCPY_CHK:
-	return "1cO C1";
+	return "1cO R ";
       case BUILT_IN_STPCPY:
       case BUILT_IN_STPCPY_CHK:
-	return ".cO C1";
+	return ".cO R ";
       case BUILT_IN_STRNCPY:
       case BUILT_IN_MEMCPY:
       case BUILT_IN_MEMMOVE:
@@ -12956,15 +12957,15 @@ builtin_fnspec (tree callee)
       case BUILT_IN_STRNCPY_CHK:
       case BUILT_IN_MEMCPY_CHK:
       case BUILT_IN_MEMMOVE_CHK:
-	return "1cO3C1";
+	return "1cO3R3";
       case BUILT_IN_MEMPCPY:
       case BUILT_IN_MEMPCPY_CHK:
-	return ".cO3C1";
+	return ".cO3R3";
       case BUILT_IN_STPNCPY:
       case BUILT_IN_STPNCPY_CHK:
-	return ".cO3C1";
+	return ".cO3R3";
       case BUILT_IN_BCOPY:
-	return ".cC2O3";
+	return ".cR3O3";
       case BUILT_IN_BZERO:
 	return ".cO2";
       case BUILT_IN_MEMCMP:

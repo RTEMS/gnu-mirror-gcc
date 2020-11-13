@@ -3797,8 +3797,6 @@ attr_fnspec::verify ()
       default:
 	err = true;
     }
-  if (err)
-    internal_error ("invalid fn spec attribute \"%s\"", str);
 
   /* Now check all parameters.  */
   for (unsigned int i = 0; arg_specified_p (i); i++)
@@ -3815,39 +3813,21 @@ attr_fnspec::verify ()
 	  case 'w':
 	  case 'W':
 	  case '.':
-	    if ((str[idx + 1] >= '1' && str[idx + 1] <= '9')
-		|| str[idx + 1] == 't')
-	      {
-		if (str[idx] != 'r' && str[idx] != 'R'
-		    && str[idx] != 'w' && str[idx] != 'W'
-		    && str[idx] != 'o' && str[idx] != 'O')
-		  err = true;
-		if (str[idx] != 't'
-		    /* Size specified is scalar, so it should be described
-		       by ". " if specified at all.  */
-		    && (arg_specified_p (str[idx + 1] - '1')
-			&& str[arg_idx (str[idx + 1] - '1')] != '.'))
-		  err = true;
-	      }
-	    else if (str[idx + 1] != ' ')
-	      err = true;
-	    break;
-	  case 'c':
-	  case 'C':
-	    /* Copied arugment should specify the argument being copied
-	       that should be specified output argument.  */
-	    if (str[idx + 1] < '1' || str[idx + 1] > '9'
-		|| !arg_specified_p (str[idx + 1] - '1')
-		|| (str[arg_idx (str[idx + 1] - '1')] != 'W'
-		    && str[arg_idx (str[idx + 1] - '1')] != 'w'
-		    && str[arg_idx (str[idx + 1] - '1')] != 'O'
-		    && str[arg_idx (str[idx + 1] - '1')] != 'o'))
-	      err = true;
 	    break;
 	  default:
 	    err = true;
 	}
-      if (err)
-	internal_error ("invalid fn spec attribute \"%s\" arg %i", str, i);
+      if ((str[idx + 1] >= '1' && str[idx + 1] <= '9')
+	  || str[idx + 1] == 't')
+	{
+	  if (str[idx] != 'r' && str[idx] != 'R'
+	      && str[idx] != 'w' && str[idx] != 'W'
+	      && str[idx] != 'o' && str[idx] != 'O')
+	    err = true;
+	}
+      else if (str[idx + 1] != ' ')
+	err = true;
     }
+  if (err)
+    internal_error ("invalid fn spec attribute \"%s\"", str);
 }
