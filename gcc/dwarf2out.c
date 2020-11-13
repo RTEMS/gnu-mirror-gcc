@@ -991,7 +991,12 @@ dwarf2out_do_cfi_startproc (bool second)
 	 in the assembler.  Further, the assembler can't handle any
 	 of the weirder relocation types.  */
       if (enc & DW_EH_PE_indirect)
-	ref = dw2_force_const_mem (ref, true);
+	{
+	  if (targetm.asm_out.make_eh_symbol_indirect != NULL)
+	    ref = targetm.asm_out.make_eh_symbol_indirect (ref, true);
+	  else
+	    ref = dw2_force_const_mem (ref, true);
+	}
 
       fprintf (asm_out_file, "\t.cfi_personality %#x,", enc);
       output_addr_const (asm_out_file, ref);
@@ -1009,7 +1014,12 @@ dwarf2out_do_cfi_startproc (bool second)
       SYMBOL_REF_FLAGS (ref) = SYMBOL_FLAG_LOCAL;
 
       if (enc & DW_EH_PE_indirect)
-	ref = dw2_force_const_mem (ref, true);
+	{
+	  if (targetm.asm_out.make_eh_symbol_indirect != NULL)
+	    ref = targetm.asm_out.make_eh_symbol_indirect (ref, true);
+	  else
+	    ref = dw2_force_const_mem (ref, true);
+	}
 
       fprintf (asm_out_file, "\t.cfi_lsda %#x,", enc);
       output_addr_const (asm_out_file, ref);
@@ -22183,6 +22193,9 @@ gen_enumeration_type_die (tree type, dw_die_ref context_die)
 	  dw_die_ref enum_die = new_die (DW_TAG_enumerator, type_die, link);
 	  tree value = TREE_VALUE (link);
 
+	  if (DECL_P (value))
+	    equate_decl_number_to_die (value, enum_die);
+
 	  gcc_assert (!ENUM_IS_OPAQUE (type));
 	  add_name_attribute (enum_die,
 			      IDENTIFIER_POINTER (TREE_PURPOSE (link)));
@@ -22849,6 +22862,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
           available.
   */
   int declaration = (current_function_decl != decl
+		     || (!DECL_INITIAL (decl) && !origin)
 		     || class_or_namespace_scope_p (context_die));
 
   /* A declaration that has been previously dumped needs no
@@ -25236,6 +25250,10 @@ gen_member_die (tree type, dw_die_ref context_die)
 		  splice = false;
 		}
 	    }
+	  else if (child->die_tag == DW_TAG_enumerator)
+	    /* Enumerators remain under their enumeration even if
+	       their names are introduced in the enclosing scope.  */
+	    splice = false;
 
 	  if (splice)
 	    splice_child_die (context_die, child);
@@ -26147,6 +26165,13 @@ force_decl_die (tree decl)
 	    decl_die = comp_unit_die ();
 	  break;
 
+	case CONST_DECL:
+	  /* Enumerators shouldn't need force_decl_die.  */
+	  gcc_assert (DECL_CONTEXT (decl) == NULL_TREE
+		      || TREE_CODE (DECL_CONTEXT (decl)) != ENUMERAL_TYPE);
+	  gen_decl_die (decl, NULL, NULL, context_die);
+	  break;
+
 	case TRANSLATION_UNIT_DECL:
 	  decl_die = comp_unit_die ();
 	  break;
@@ -26732,7 +26757,7 @@ dwarf2out_imported_module_or_decl_1 (tree decl,
   else
     xloc = expand_location (input_location);
 
-  if (TREE_CODE (decl) == TYPE_DECL || TREE_CODE (decl) == CONST_DECL)
+  if (TREE_CODE (decl) == TYPE_DECL)
     {
       at_import_die = force_type_die (TREE_TYPE (decl));
       /* For namespace N { typedef void T; } using N::T; base_type_die

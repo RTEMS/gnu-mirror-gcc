@@ -2039,12 +2039,12 @@ vn_walk_cb_data::push_partial_def (pd_data pd,
 	}
       else
 	{
-	  size = MIN (size, (HOST_WIDE_INT) needed_len * BITS_PER_UNIT);
 	  if (pd.offset >= 0)
 	    {
 	      /* LSB of this_buffer[0] byte should be at pd.offset bits
 		 in buffer.  */
 	      unsigned int msk;
+	      size = MIN (size, (HOST_WIDE_INT) needed_len * BITS_PER_UNIT);
 	      amnt = pd.offset % BITS_PER_UNIT;
 	      if (amnt)
 		shift_bytes_in_array_left (this_buffer, len + 1, amnt);
@@ -2073,6 +2073,9 @@ vn_walk_cb_data::push_partial_def (pd_data pd,
 	  else
 	    {
 	      amnt = (unsigned HOST_WIDE_INT) pd.offset % BITS_PER_UNIT;
+	      if (amnt)
+		size -= BITS_PER_UNIT - amnt;
+	      size = MIN (size, (HOST_WIDE_INT) needed_len * BITS_PER_UNIT);
 	      if (amnt)
 		shift_bytes_in_array_left (this_buffer, len + 1, amnt);
 	    }
@@ -4123,12 +4126,26 @@ vn_nary_op_insert_stmt (gimple *stmt, tree result)
 static inline hashval_t
 vn_phi_compute_hash (vn_phi_t vp1)
 {
-  inchash::hash hstate (EDGE_COUNT (vp1->block->preds) > 2
-			? vp1->block->index : EDGE_COUNT (vp1->block->preds));
+  inchash::hash hstate;
   tree phi1op;
   tree type;
   edge e;
   edge_iterator ei;
+
+  hstate.add_int (EDGE_COUNT (vp1->block->preds));
+  switch (EDGE_COUNT (vp1->block->preds))
+    {
+    case 1:
+      break;
+    case 2:
+      if (vp1->block->loop_father->header == vp1->block)
+	;
+      else
+	break;
+      /* Fallthru.  */
+    default:
+      hstate.add_int (vp1->block->index);
+    }
 
   /* If all PHI arguments are constants we need to distinguish
      the PHI node via its type.  */
@@ -4274,11 +4291,12 @@ vn_phi_eq (const_vn_phi_t const vp1, const_vn_phi_t const vp2)
 
   /* Any phi in the same block will have it's arguments in the
      same edge order, because of how we store phi nodes.  */
-  for (unsigned i = 0; i < EDGE_COUNT (vp1->block->preds); ++i)
+  unsigned nargs = EDGE_COUNT (vp1->block->preds);
+  for (unsigned i = 0; i < nargs; ++i)
     {
       tree phi1op = vp1->phiargs[i];
       tree phi2op = vp2->phiargs[i];
-      if (phi1op == VN_TOP || phi2op == VN_TOP)
+      if (phi1op == phi2op)
 	continue;
       if (!expressions_equal_p (phi1op, phi2op))
 	return false;
@@ -5609,8 +5627,8 @@ expressions_equal_p (tree e1, tree e2)
   if (e1 == VN_TOP || e2 == VN_TOP)
     return true;
 
-  /* If only one of them is null, they cannot be equal.  */
-  if (!e1 || !e2)
+  /* SSA_NAME compare pointer equal.  */
+  if (TREE_CODE (e1) == SSA_NAME || TREE_CODE (e2) == SSA_NAME)
     return false;
 
   /* Now perform the actual comparison.  */
@@ -5843,8 +5861,9 @@ eliminate_dom_walker::eliminate_insert (basic_block bb,
   else
     {
       gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
-      VN_INFO (res)->valnum = val;
-      VN_INFO (res)->visited = true;
+      vn_ssa_aux_t vn_info = VN_INFO (res);
+      vn_info->valnum = val;
+      vn_info->visited = true;
     }
 
   insertions++;
@@ -5884,10 +5903,12 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
 	     it has an expression it wants to use as replacement,
 	     insert that.  */
 	  tree val = VN_INFO (lhs)->valnum;
+	  vn_ssa_aux_t vn_info;
 	  if (val != VN_TOP
 	      && TREE_CODE (val) == SSA_NAME
-	      && VN_INFO (val)->needs_insertion
-	      && VN_INFO (val)->expr != NULL
+	      && (vn_info = VN_INFO (val), true)
+	      && vn_info->needs_insertion
+	      && vn_info->expr != NULL
 	      && (sprime = eliminate_insert (b, gsi, val)) != NULL_TREE)
 	    eliminate_push_avail (b, sprime);
 	}
@@ -6274,8 +6295,9 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
 		       only process new ones.  */
 		    if (! has_VN_INFO (def))
 		      {
-			VN_INFO (def)->valnum = def;
-			VN_INFO (def)->visited = true;
+			vn_ssa_aux_t vn_info = VN_INFO (def);
+			vn_info->valnum = def;
+			vn_info->visited = true;
 		      }
 		if (gsi_stmt (prev) == gsi_stmt (*gsi))
 		  break;

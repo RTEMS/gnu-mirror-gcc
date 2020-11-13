@@ -438,6 +438,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       REINTERPRET_CAST_P (in NOP_EXPR)
       ALIGNOF_EXPR_STD_P (in ALIGNOF_EXPR)
       OVL_DEDUP_P (in OVERLOAD)
+      ATOMIC_CONSTR_MAP_INSTANTIATED_P (in ATOMIC_CONSTR)
    1: IDENTIFIER_KIND_BIT_1 (in IDENTIFIER_NODE)
       TI_PENDING_TEMPLATE_FLAG.
       TEMPLATE_PARMS_FOR_INLINE.
@@ -487,7 +488,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       DECL_TINFO_P (in VAR_DECL)
       FUNCTION_REF_QUALIFIED (in FUNCTION_TYPE, METHOD_TYPE)
       OVL_LOOKUP_P (in OVERLOAD)
-      LOOKUP_FOUND_P (in RECORD_TYPE, UNION_TYPE, NAMESPACE_DECL)
+      LOOKUP_FOUND_P (in RECORD_TYPE, UNION_TYPE, ENUMERAL_TYPE, NAMESPACE_DECL)
    5: IDENTIFIER_VIRTUAL_P (in IDENTIFIER_NODE)
       FUNCTION_RVALUE_QUALIFIED (in FUNCTION_TYPE, METHOD_TYPE)
       CALL_EXPR_REVERSE_ARGS (in CALL_EXPR, AGGR_INIT_EXPR)
@@ -528,6 +529,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       TEMPLATE_DECL_COMPLEX_ALIAS_P (in TEMPLATE_DECL)
       DECL_INSTANTIATING_NSDMI_P (in a FIELD_DECL)
       LABEL_DECL_CDTOR (in LABEL_DECL)
+      USING_DECL_UNRELATED_P (in USING_DECL)
    3: DECL_IN_AGGR_P.
    4: DECL_C_BIT_FIELD (in a FIELD_DECL)
       DECL_ANON_UNION_VAR_P (in a VAR_DECL)
@@ -745,9 +747,10 @@ typedef struct ptrmem_cst * ptrmem_cst_t;
     && flag_hosted)
 
 /* Lookup walker marking.  */
-#define LOOKUP_SEEN_P(NODE) TREE_VISITED(NODE)
+#define LOOKUP_SEEN_P(NODE) TREE_VISITED (NODE)
 #define LOOKUP_FOUND_P(NODE) \
-  TREE_LANG_FLAG_4 (TREE_CHECK3(NODE,RECORD_TYPE,UNION_TYPE,NAMESPACE_DECL))
+  TREE_LANG_FLAG_4 (TREE_CHECK4 (NODE,RECORD_TYPE,UNION_TYPE,ENUMERAL_TYPE,\
+				 NAMESPACE_DECL))
 
 /* These two accessors should only be used by OVL manipulators.
    Other users should use iterators and convenience functions.  */
@@ -1595,6 +1598,12 @@ check_constraint_info (tree t)
 /* The parameter mapping for an atomic constraint. */
 #define ATOMIC_CONSTR_MAP(NODE) \
   TREE_OPERAND (TREE_CHECK (NODE, ATOMIC_CONSTR), 0)
+
+/* Whether the parameter mapping of this atomic constraint
+   is already instantiated with concrete template arguments.
+   Used only in satisfy_atom and in the satisfaction cache.  */
+#define ATOMIC_CONSTR_MAP_INSTANTIATED_P(NODE) \
+  TREE_LANG_FLAG_0 (ATOMIC_CONSTR_CHECK (NODE))
 
 /* The expression of an atomic constraint. */
 #define ATOMIC_CONSTR_EXPR(NODE) \
@@ -3400,6 +3409,16 @@ struct GTY(()) lang_decl {
 
 /* Non zero if the using decl refers to a dependent type.  */
 #define USING_DECL_TYPENAME_P(NODE) DECL_LANG_FLAG_1 (USING_DECL_CHECK (NODE))
+
+/* True if member using decl NODE refers to a non-inherited NODE.  */
+#define USING_DECL_UNRELATED_P(NODE) DECL_LANG_FLAG_2 (USING_DECL_CHECK (NODE))
+
+/* True iff the CONST_DECL is a class-scope clone from C++20 using enum,
+   created by handle_using_decl.  */
+#define CONST_DECL_USING_P(NODE)			\
+  (TREE_CODE (NODE) == CONST_DECL			\
+   && TREE_CODE (TREE_TYPE (NODE)) == ENUMERAL_TYPE	\
+   && DECL_CONTEXT (NODE) != TREE_TYPE (NODE))
 
 /* In a FUNCTION_DECL, this is nonzero if this function was defined in
    the class definition.  We have saved away the text of the function,
@@ -7226,7 +7245,7 @@ extern bool cxx_omp_create_clause_info		(tree, tree, bool, bool,
 						 bool, bool);
 extern tree baselink_for_fns                    (tree);
 extern void finish_static_assert                (tree, tree, location_t,
-                                                 bool);
+						 bool, bool);
 extern tree finish_decltype_type                (tree, bool, tsubst_flags_t);
 extern tree finish_trait_expr			(location_t, enum cp_trait_kind, tree, tree);
 extern tree build_lambda_expr                   (void);
@@ -7453,7 +7472,7 @@ extern int comp_cv_qualification		(const_tree, const_tree);
 extern int comp_cv_qualification		(int, int);
 extern int comp_cv_qual_signature		(tree, tree);
 extern tree cxx_sizeof_or_alignof_expr		(location_t, tree,
-						 enum tree_code, bool);
+						 enum tree_code, bool, bool);
 extern tree cxx_sizeof_or_alignof_type		(location_t, tree,
 						 enum tree_code, bool, bool);
 extern tree cxx_alignas_expr                    (tree);
@@ -7837,6 +7856,21 @@ extern bool atomic_constraints_identical_p	(tree, tree);
 extern hashval_t iterative_hash_constraint      (tree, hashval_t);
 extern hashval_t hash_atomic_constraint         (tree);
 extern void diagnose_constraints                (location_t, tree, tree);
+
+/* A structural hasher for ATOMIC_CONSTRs.  */
+
+struct atom_hasher : default_hash_traits<tree>
+{
+  static hashval_t hash (tree t)
+  {
+    return hash_atomic_constraint (t);
+  }
+
+  static bool equal (tree t1, tree t2)
+  {
+    return atomic_constraints_identical_p (t1, t2);
+  }
+};
 
 /* in logic.cc */
 extern bool subsumes                            (tree, tree);

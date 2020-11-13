@@ -1214,7 +1214,7 @@ get_expr_source_range (tree expr)
 extern void protected_set_expr_location (tree, location_t);
 extern void protected_set_expr_location_if_unset (tree, location_t);
 
-extern tree maybe_wrap_with_location (tree, location_t);
+WARN_UNUSED_RESULT extern tree maybe_wrap_with_location (tree, location_t);
 
 extern int suppress_location_wrappers;
 
@@ -4281,6 +4281,7 @@ extern tree decl_comdat_group (const_tree);
 extern tree decl_comdat_group_id (const_tree);
 extern const char *decl_section_name (const_tree);
 extern void set_decl_section_name (tree, const char *);
+extern void set_decl_section_name (tree, const_tree);
 extern enum tls_model decl_tls_model (const_tree);
 extern void set_decl_tls_model (tree, enum tls_model);
 

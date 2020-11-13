@@ -10666,10 +10666,6 @@ build_asm_expr (location_t loc, tree string, tree outputs, tree inputs,
       TREE_VALUE (tail) = input;
     }
 
-  /* ASMs with labels cannot have outputs.  This should have been
-     enforced by the parser.  */
-  gcc_assert (outputs == NULL || labels == NULL);
-
   args = build_stmt (loc, ASM_EXPR, string, outputs, inputs, clobbers, labels);
 
   /* asm statements without outputs, including simple ones, are treated
@@ -13584,11 +13580,7 @@ handle_omp_array_sections (tree c, enum c_omp_region_type ort)
       if (ort != C_ORT_OMP && ort != C_ORT_ACC)
 	OMP_CLAUSE_SET_MAP_KIND (c2, GOMP_MAP_POINTER);
       else if (TREE_CODE (t) == COMPONENT_REF)
-	{
-	  gomp_map_kind k = (ort == C_ORT_ACC) ? GOMP_MAP_ATTACH_DETACH
-					       : GOMP_MAP_ALWAYS_POINTER;
-	  OMP_CLAUSE_SET_MAP_KIND (c2, k);
-	}
+	OMP_CLAUSE_SET_MAP_KIND (c2, GOMP_MAP_ATTACH_DETACH);
       else
 	OMP_CLAUSE_SET_MAP_KIND (c2, GOMP_MAP_FIRSTPRIVATE_POINTER);
       if (OMP_CLAUSE_MAP_KIND (c2) != GOMP_MAP_FIRSTPRIVATE_POINTER
@@ -14711,7 +14703,9 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		break;
 	      if (VAR_P (t) || TREE_CODE (t) == PARM_DECL)
 		{
-		  if (bitmap_bit_p (&map_field_head, DECL_UID (t)))
+		  if (bitmap_bit_p (&map_field_head, DECL_UID (t))
+		      || (ort == C_ORT_OMP
+			  && bitmap_bit_p (&map_head, DECL_UID (t))))
 		    break;
 		}
 	    }
@@ -14780,7 +14774,9 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      else
 		bitmap_set_bit (&generic_head, DECL_UID (t));
 	    }
-	  else if (bitmap_bit_p (&map_head, DECL_UID (t)))
+	  else if (bitmap_bit_p (&map_head, DECL_UID (t))
+		   && (ort != C_ORT_OMP
+		       || !bitmap_bit_p (&map_field_head, DECL_UID (t))))
 	    {
 	      if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_MAP)
 		error_at (OMP_CLAUSE_LOCATION (c),
@@ -14794,7 +14790,13 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      remove = true;
 	    }
 	  else if (bitmap_bit_p (&generic_head, DECL_UID (t))
-		   || bitmap_bit_p (&firstprivate_head, DECL_UID (t)))
+		   && ort == C_ORT_ACC)
+	    {
+	      error_at (OMP_CLAUSE_LOCATION (c),
+			"%qD appears more than once in data clauses", t);
+	      remove = true;
+	    }
+	  else if (bitmap_bit_p (&firstprivate_head, DECL_UID (t)))
 	    {
 	      if (ort == C_ORT_ACC)
 		error_at (OMP_CLAUSE_LOCATION (c),
@@ -15193,7 +15195,8 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		      OMP_CLAUSE_LINEAR_STEP (c));
 	    remove = true;
 	  }
-	else if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_REDUCTION)
+	else if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_REDUCTION
+		 && reduction_seen == -2)
 	  OMP_CLAUSE_REDUCTION_INSCAN (c) = 0;
 
 	if (remove)
