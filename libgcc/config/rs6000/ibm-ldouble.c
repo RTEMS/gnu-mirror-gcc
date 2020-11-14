@@ -58,10 +58,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define nonfinite(a) unlikely (! isless (fabs (a), inf ()))
 
 /* If we have __float128/_Float128, use __ibm128 instead of long double.  On
-   other systems, use long double, because __ibm128 might not have been
-   created.  */
-#ifdef __FLOAT128__
+   other systems, we might have defined __ibm128 to map into long double, so
+   use __ibm128 in that case also.  */
+#if defined (__FLOAT128__) || defined (__ibm128)
 #define IBM128_TYPE __ibm128
+#define HAVE_IBM128 1
 #else
 #define IBM128_TYPE long double
 #endif
@@ -102,9 +103,8 @@ __asm__ (".symver __gcc_qadd,_xlqadd@GCC_3.4\n\t"
 static inline IBM128_TYPE
 pack_ldouble (double dh, double dl)
 {
-#if defined (__LONG_DOUBLE_128__) && defined (__LONG_DOUBLE_IBM128__)	\
-    && !(defined (_SOFT_FLOAT) || defined (__NO_FPRS__))
-  return __builtin_pack_longdouble (dh, dl);
+#ifdef HAVE_IBM128
+  return __builtin_pack_ibm128 (dh, dl);
 #else
   union
   {

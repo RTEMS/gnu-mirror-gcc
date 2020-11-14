@@ -695,6 +695,16 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define ("__builtin_huge_valq=__builtin_huge_valf128");
     }
 
+  /* If we don't support __float128, we don't create the __ibm128 type, nor do
+     we enable the pack and unpack built-in functions.  However, if long double
+     is IBM 128-bit, just map these into the long double versions.  */
+  if (!TARGET_FLOAT128_TYPE && FLOAT128_IBM_P (TFmode) && TARGET_HARD_FLOAT)
+    {
+      builtin_define ("__ibm128=long double");
+      builtin_define ("__builtin_pack_ieee128=__builtin_pack_longdouble");
+      builtin_define ("__builtin_unpack_ieee128=__builtin_unpack_longdouble");
+    }
+
   /* Tell users they can use __builtin_bswap{16,64}.  */
   builtin_define ("__HAVE_BSWAP__");
 
