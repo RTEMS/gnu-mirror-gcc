@@ -1131,7 +1131,7 @@ _mm_cvtpi16_ps (__m64 __A)
   __vector float vf1;
 
   vs8 = (__vector signed short) (__vector unsigned long long) { __A, __A };
-  vi4 = vec_vupklsh (vs8);
+  vi4 = vec_unpackl (vs8);
   vf1 = (__vector float) vec_ctf (vi4, 0);
 
   return (__m128) vf1;
@@ -1169,8 +1169,8 @@ _mm_cvtpi8_ps (__m64 __A)
   __vector float vf1;
 
   vc16 = (__vector signed char) (__vector unsigned long long) { __A, __A };
-  vs8 = vec_vupkhsb (vc16);
-  vi4 = vec_vupkhsh (vs8);
+  vs8 = vec_unpackh (vc16);
+  vi4 = vec_unpackh (vs8);
   vf1 = (__vector float) vec_ctf (vi4, 0);
 
   return (__m128) vf1;
@@ -1277,14 +1277,14 @@ _mm_shuffle_ps (__m128  __A, __m128  __B, int const __mask)
 extern __inline __m128 __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_unpackhi_ps (__m128 __A, __m128 __B)
 {
-  return (__m128) vec_vmrglw ((__v4sf) __A, (__v4sf)__B);
+  return (__m128) vec_mergel ((__v4sf) __A, (__v4sf)__B);
 }
 
 /* Selects and interleaves the lower two SPFP values from A and B.  */
 extern __inline __m128 __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_unpacklo_ps (__m128 __A, __m128 __B)
 {
-  return (__m128) vec_vmrghw ((__v4sf) __A, (__v4sf)__B);
+  return (__m128) vec_mergeh ((__v4sf) __A, (__v4sf)__B);
 }
 
 /* Sets the upper two SPFP values with 64-bits of data loaded from P;
@@ -1363,8 +1363,8 @@ _mm_movemask_ps (__m128  __A)
     };
 
   result = ((__vector unsigned long long)
-	    vec_vbpermq ((__vector unsigned char) __A,
-			 (__vector unsigned char) perm_mask));
+	    vec_bperm ((__vector unsigned char) __A,
+		       (__vector unsigned char) perm_mask));
 
 #ifdef __LITTLE_ENDIAN__
   return result[1];
@@ -1626,8 +1626,8 @@ _mm_mulhi_pu16 (__m64 __A, __m64 __B)
   a = (__vector unsigned short)vec_splats (__A);
   b = (__vector unsigned short)vec_splats (__B);
 
-  w0 = vec_vmuleuh (a, b);
-  w1 = vec_vmulouh (a, b);
+  w0 = vec_mule (a, b);
+  w1 = vec_mulo (a, b);
   c = (__vector unsigned short)vec_perm (w0, w1, xform1);
 
   return (__m64) ((__vector long long) c)[0];
@@ -1856,10 +1856,10 @@ _mm_pause (void)
 #define _MM_TRANSPOSE4_PS(row0, row1, row2, row3)			\
 do {									\
   __v4sf __r0 = (row0), __r1 = (row1), __r2 = (row2), __r3 = (row3);	\
-  __v4sf __t0 = vec_vmrghw (__r0, __r1);			\
-  __v4sf __t1 = vec_vmrghw (__r2, __r3);			\
-  __v4sf __t2 = vec_vmrglw (__r0, __r1);			\
-  __v4sf __t3 = vec_vmrglw (__r2, __r3);			\
+  __v4sf __t0 = vec_mergeh (__r0, __r1);			\
+  __v4sf __t1 = vec_mergeh (__r2, __r3);			\
+  __v4sf __t2 = vec_mergel (__r0, __r1);			\
+  __v4sf __t3 = vec_mergel (__r2, __r3);			\
   (row0) = (__v4sf)vec_mergeh ((__vector long long)__t0, 	\
 			       (__vector long long)__t1);	\
   (row1) = (__v4sf)vec_mergel ((__vector long long)__t0,	\
