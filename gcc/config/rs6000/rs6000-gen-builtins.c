@@ -2309,8 +2309,10 @@ map_token_to_type_node (char *tok)
 
 /* Write the type node corresponding to TOK.  */
 static void
-write_type_node (char *tok)
+write_type_node (char *tok, bool indent)
 {
+  if (indent)
+    fprintf (init_file, "  ");
   const char *str = map_token_to_type_node (tok);
   fprintf (init_file, "%s_type_node", str);
 }
@@ -2321,13 +2323,22 @@ write_fntype_init (char *str)
 {
   char *tok;
 
+  /* Check whether we have a "tf" token in this string, representing
+     a float128_type_node.  It's possible that float128_type_node is
+     undefined (occurs for -maltivec -mno-vsx, for example), so we
+     must guard against that.  */
+  int tf_found = strstr (str, "tf") != NULL;
+
   /* Avoid side effects of strtok on the original string by using a copy.  */
   char *buf = (char *) malloc (strlen (str) + 1);
   strcpy (buf, str);
 
+  if (tf_found)
+    fprintf (init_file, "  if (float128_type_node)\n  ");
+
   fprintf (init_file, "  %s\n    = build_function_type_list (", buf);
   tok = strtok (buf, "_");
-  write_type_node (tok);
+  write_type_node (tok, tf_found);
   tok = strtok (0, "_");
   assert (tok);
   assert (!strcmp (tok, "ftype"));
@@ -2339,7 +2350,7 @@ write_fntype_init (char *str)
   /* Note:  A function with no arguments ends with '_ftype_v'.  */
   while (tok && strcmp (tok, "v"))
     {
-      write_type_node (tok);
+      write_type_node (tok, tf_found);
       tok = strtok (0, "_");
       fprintf (init_file, ",\n\t\t\t\t");
     }
