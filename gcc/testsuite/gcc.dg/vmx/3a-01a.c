@@ -5,7 +5,7 @@
 vector unsigned int
 f(vector unsigned int a, vector unsigned int b)
 {
-  return vec_vaddcuw(a,b);
+  return __builtin_altivec_vaddcuw(a,b);
 }
 
 void test()

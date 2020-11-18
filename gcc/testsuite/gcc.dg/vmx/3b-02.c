@@ -3,7 +3,7 @@
 vector unsigned char
 f(vector unsigned char a, vector unsigned char b) 
 {
-  return vec_vsububs(a,b);
+  return __builtin_altivec_vsububs(a,b);
 }
 
 static void test()
