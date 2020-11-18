@@ -5167,13 +5167,12 @@ aarch64_print_operand (FILE *f, rtx x, int code)
     case 'd':
     case 'q':
       /* Print a scalar FP/SIMD register name.  */
-      if (REG_P (x) && FP_REGNUM_P (REGNO (x)))
-	asm_fprintf (f, "%c%d", code, REGNO (x) - V0_REGNUM);
-      else if (REG_P (x) && GP_REGNUM_P (REGNO (x)))
-	asm_fprintf (f, "%c%d", code, REGNO (x) - R0_REGNUM);
-      else
-	output_operand_lossage ("incompatible register operand for '%%%c'",
-				code);
+      if (!REG_P (x) || !FP_REGNUM_P (REGNO (x)))
+       {
+         output_operand_lossage ("incompatible floating point / vector register operand for '%%%c'", code);
+         return;
+       }
+      asm_fprintf (f, "%c%d", code, REGNO (x) - V0_REGNUM);
       break;
 
     case 'S':
@@ -5191,12 +5190,13 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 
     case 'R':
       /* Print a scalar FP/SIMD register name + 1.  */
-      if (!REG_P (x) || !FP_REGNUM_P (REGNO (x)))
-	{
-	  output_operand_lossage ("incompatible floating point / vector register operand for '%%%c'", code);
-	  return;
-	}
-      asm_fprintf (f, "q%d", REGNO (x) - V0_REGNUM + 1);
+      if (REG_P (x) && FP_REGNUM_P (REGNO (x)))
+        asm_fprintf (f, "q%d", REGNO (x) - V0_REGNUM + 1);
+      else if (REG_P (x) && GP_REGNUM_P (REGNO (x)))
+        asm_fprintf (f, "x%d", REGNO (x) - R0_REGNUM + 1);
+      else
+        output_operand_lossage ("incompatible register operand for '%%%c'",
+                                code);
       break;
 
     case 'X':
