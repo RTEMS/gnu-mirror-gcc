@@ -439,6 +439,7 @@ static const char *greater_than_spec_func (int, const char **);
 static const char *debug_level_greater_than_spec_func (int, const char **);
 static const char *dwarf_version_greater_than_spec_func (int, const char **);
 static const char *find_fortran_preinclude_file (int, const char **);
+static const char *save_driver_cmdline (int, const char **);
 static char *convert_white_space (char *);
 static char *quote_spec (char *);
 static char *quote_spec_arg (char *);
@@ -1261,7 +1262,9 @@ static const char *cc1_options =
  %{coverage:-fprofile-arcs -ftest-coverage}\
  %{fprofile-arcs|fprofile-generate*|coverage:\
    %{!fprofile-update=single:\
-     %{pthread:-fprofile-update=prefer-atomic}}}";
+     %{pthread:-fprofile-update=prefer-atomic}}}\
+ %{frecord-gcc-switches-format=driver:-frecord-gcc-switches-file=%:save-driver-cmdline(%g.cmdline)\
+   %<-frecord-gcc-switches-format=driver}";
 
 static const char *asm_options =
 "%{-target-help:%:print-asm-header()} "
@@ -1753,6 +1756,7 @@ static const struct spec_function static_spec_functions[] =
   { "debug-level-gt",		debug_level_greater_than_spec_func },
   { "dwarf-version-gt",		dwarf_version_greater_than_spec_func },
   { "fortran-preinclude-file",	find_fortran_preinclude_file},
+  { "save-driver-cmdline",	save_driver_cmdline},
 #ifdef EXTRA_SPEC_FUNCTIONS
   EXTRA_SPEC_FUNCTIONS
 #endif
@@ -3874,28 +3878,6 @@ set_source_date_epoch_envvar ()
   setenv ("SOURCE_DATE_EPOCH", source_date_epoch, 0);
 }
 
-/* Set GCC_DRIVER_COMMAND_LINE enviromental variable that is later
-   used by -frecord-gcc-switches option.  */
-
-static void
-set_driver_command_line_envvar ()
-{
-  unsigned int length = 0;
-  for (unsigned int i = 0; i < driver_gcc_argc; i++)
-    length += strlen (driver_gcc_argv[i]) + 1;
-
-  char *buffer = (char *)xmalloc (length);
-  char *ptr = buffer;
-  for (unsigned int i = 0; i < driver_gcc_argc; i++)
-    {
-      unsigned l = sprintf (ptr, i == 0 ? "%s" : " %s", driver_gcc_argv[i]);
-      ptr += l;
-    }
-
-  setenv ("GCC_DRIVER_COMMAND_LINE", buffer, 0);
-  free (buffer);
-}
-
 /* Handle an option DECODED that is unknown to the option-processing
    machinery.  */
 
@@ -4483,8 +4465,6 @@ driver_handle_option (struct gcc_options *opts,
 	 handled by specs.  */
       break;
     }
-
-  set_driver_command_line_envvar ();
 
   if (do_save)
     save_switch (decoded->canonical_option[0],
@@ -10810,6 +10790,19 @@ find_fortran_preinclude_file (int argc, const char **argv)
   path_prefix_reset (&prefixes);
   return result;
 }
+
+static const char *
+save_driver_cmdline (int argc ATTRIBUTE_UNUSED,
+		     const char **argv)
+{
+  FILE *f = fopen (argv[0], "w");
+  for (unsigned int i = 0; i < driver_gcc_argc; i++)
+    fprintf (f, i == 0 ? "%s" : " %s", driver_gcc_argv[i]);
+  fclose (f);
+
+  return argv[0];
+}
+
 
 /* If any character in ORIG fits QUOTE_P (_, P), reallocate the string
    so as to precede every one of them with a backslash.  Return the
