@@ -171,6 +171,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-type-escape-analysis.h"
 #include "ipa-dfe.h"
 
+#define ABORT_IF_NOT_C true
+
+bool detected_incompatible_syntax = false;
+
 // Main function that drives dfe.
 static unsigned int
 lto_dfe_execute ();
@@ -262,13 +266,15 @@ lto_dead_field_elimination ()
     if (cnode->inlined_to) continue;
     cnode->get_body();
   }
+
+  detected_incompatible_syntax = false;
   tpartitions_t escaping_nonescaping_sets
     = partition_types_into_escaping_nonescaping ();
   record_field_map_t record_field_map = find_fields_accessed ();
   record_field_offset_map_t record_field_offset_map
     = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
 					    record_field_map, OPT_Wdfa);
-  if (record_field_offset_map.empty ())
+  if (detected_incompatible_syntax || record_field_offset_map.empty ())
     return;
 
     // Prepare for transformation.
@@ -588,6 +594,7 @@ type_walker::_walk (tree type)
   // Improve, verify that having a type is an invariant.
   // I think there was a specific example which didn't
   // allow for it
+  if (detected_incompatible_syntax) return;
   if (!type)
     return;
 
@@ -641,9 +648,9 @@ type_walker::_walk (tree type)
     case POINTER_TYPE:
       this->walk_POINTER_TYPE (type);
       break;
-    case REFERENCE_TYPE:
-      this->walk_REFERENCE_TYPE (type);
-      break;
+    //case REFERENCE_TYPE:
+    //  this->walk_REFERENCE_TYPE (type);
+    //  break;
     case ARRAY_TYPE:
       this->walk_ARRAY_TYPE (type);
       break;
@@ -653,18 +660,24 @@ type_walker::_walk (tree type)
     case FUNCTION_TYPE:
       this->walk_FUNCTION_TYPE (type);
       break;
-    case METHOD_TYPE:
-      this->walk_METHOD_TYPE (type);
-      break;
+    //case METHOD_TYPE:
+      //this->walk_METHOD_TYPE (type);
+      //break;
     // Since we are dealing only with C at the moment,
     // we don't care about QUAL_UNION_TYPE nor LANG_TYPEs
     // So fail early.
+    case REFERENCE_TYPE:
+    case METHOD_TYPE:
     case QUAL_UNION_TYPE:
     case LANG_TYPE:
     default:
       {
 	log ("missing %s\n", get_tree_code_name (code));
+#ifdef ABORT_IF_NOT_C
+	detected_incompatible_syntax = true;
+#else
 	gcc_unreachable ();
+#endif
       }
       break;
     }
@@ -847,6 +860,7 @@ type_walker::_walk_arg (tree t)
 void
 expr_walker::walk (tree e)
 {
+  if (detected_incompatible_syntax) return;
   _walk_pre (e);
   _walk (e);
   _walk_post (e);
@@ -931,7 +945,11 @@ expr_walker::_walk (tree e)
     default:
       {
 	log ("missing %s\n", get_tree_code_name (code));
+#ifdef ABORT_IF_NOT_C
+	detected_incompatible_syntax = true;
+#else
 	gcc_unreachable ();
+#endif
       }
       break;
     }
@@ -1164,6 +1182,7 @@ gimple_walker::walk ()
   cgraph_node *node = NULL;
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
     {
+      if (detected_incompatible_syntax) return;
       node->get_untransformed_body ();
       tree decl = node->decl;
       gcc_assert (decl);
@@ -1410,7 +1429,11 @@ gimple_walker::_walk_gimple (gimple *stmt)
   // Break if something is unexpected.
   const char *name = gimple_code_name[code];
   log ("gimple code name %s\n", name);
+#ifdef ABORT_IF_NOT_C
+  detected_incompatible_syntax = true;
+#else
   gcc_unreachable ();
+#endif
 }
 
 void
@@ -2960,6 +2983,8 @@ type_stringifier::stringify (tree t)
     return std::string ("");
   _stringification.clear ();
   gcc_assert (t);
+  if (detected_incompatible_syntax)
+    return std::string ("");
   walk (t);
   return _stringification;
 }
@@ -3150,14 +3175,19 @@ type_stringifier::_walk_arg_post (__attribute__ ((unused)) tree t)
 std::string
 type_stringifier::get_type_identifier (tree t)
 {
+  if (detected_incompatible_syntax)
+    return std::string ("");
   tree name = TYPE_NAME (t);
-  const bool no_name = NULL_TREE == name;
+  bool no_name = NULL_TREE == name;
   if (no_name)
     return std::string ("");
 
   const enum tree_code name_code = TREE_CODE (name);
   const bool is_name_type_decl = TYPE_DECL == name_code;
   name = is_name_type_decl ? DECL_NAME (name) : name;
+  no_name = NULL_TREE == name;
+  if (no_name)
+    return std::string ("");
   const char *identifier_ptr = IDENTIFIER_POINTER (name);
   gcc_assert (identifier_ptr);
   return std::string (identifier_ptr);
@@ -3227,7 +3257,12 @@ type_structural_equality::_equal (tree l, tree r)
       TSE_CASE (FUNCTION_TYPE);
       TSE_CASE (METHOD_TYPE);
     default:
-      gcc_unreachable ();
+#ifdef ABORT_IF_NOT_C
+	detected_incompatible_syntax = true;
+	return false;
+#else
+	gcc_unreachable ();
+#endif
       break;
     }
 
@@ -3426,3 +3461,4 @@ make_pass_ipa_type_escape_analysis (gcc::context *ctx)
 {
   return new pass_ipa_type_escape_analysis (ctx);
 }
+
