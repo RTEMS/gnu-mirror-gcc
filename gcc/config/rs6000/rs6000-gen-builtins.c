@@ -2108,7 +2108,11 @@ write_decls ()
   fprintf (header_file, "enum rs6000_gen_builtins\n{\n  RS6000_BIF_NONE,\n");
   for (int i = 0; i <= curr_bif; i++)
     fprintf (header_file, "  RS6000_BIF_%s,\n", bifs[bif_order[i]].idname);
-  fprintf (header_file, "  RS6000_BIF_MAX\n};\n\n");
+  fprintf (header_file, "  RS6000_BIF_MAX,\n");
+  fprintf (header_file, "  RS6000_OVLD_NONE,\n");
+  for (int i = 0; i < num_ovlds; i++)
+    fprintf (header_file, "  RS6000_OVLD_%s,\n", ovlds[i].ovld_id_name);
+  fprintf (header_file, "  RS6000_OVLD_MAX\n};\n\n");
 
   fprintf (header_file, "enum restriction {\n");
   fprintf (header_file, "  RES_NONE,\n");
@@ -2230,12 +2234,6 @@ write_decls ()
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "extern hash_table<rs6000_bif_hasher> bif_hash;\n\n");
-
-  fprintf (header_file, "enum rs6000_gen_overloads\n{\n");
-  fprintf (header_file, "  RS6000_OVLD_NONE,\n");
-  for (int i = 0; i < num_ovlds; i++)
-    fprintf (header_file, "  RS6000_OVLD_%s,\n", ovlds[i].ovld_id_name);
-  fprintf (header_file, "  RS6000_OVLD_MAX\n};\n\n");
 
   fprintf (header_file, "struct ovlddata\n");
   fprintf (header_file, "{\n");
@@ -2570,10 +2568,12 @@ write_init_bif_table ()
 static void
 write_init_ovld_table ()
 {
+  fprintf (init_file, "  int base = RS6000_OVLD_NONE;\n\n");
+
   for (int i = 0; i <= curr_ovld; i++)
     {
       fprintf (init_file,
-	       "  rs6000_overload_info[RS6000_OVLD_%s].fntype"
+	       "  rs6000_overload_info[RS6000_OVLD_%s - base].fntype"
 	       "\n    = %s;\n",
 	       ovlds[i].ovld_id_name, ovlds[i].fndecl);
 
@@ -2582,7 +2582,7 @@ write_init_ovld_table ()
 	  fprintf (init_file, "\n");
 	  fprintf (init_file,
 		   "  ovldaddr = &rs6000_overload_info"
-		   "[RS6000_OVLD_%s];\n",
+		   "[RS6000_OVLD_%s - base];\n",
 		   ovlds[i].ovld_id_name);
 	  fprintf (init_file,
 		   "  hash = rs6000_ovld_hasher::hash (ovldaddr);\n");
@@ -2596,6 +2596,26 @@ write_init_ovld_table ()
 	  fprintf (init_file,
 		   "  *oslot = ovldaddr;\n\n");
 	}
+
+      fprintf (init_file,
+	       "  if (new_builtins_are_live)\n");
+      fprintf (init_file, "    {\n");
+      fprintf (init_file,
+	       "      rs6000_builtin_decls[(int)RS6000_OVLD_%s] = t\n",
+	       ovlds[i].ovld_id_name);
+      fprintf (init_file,
+	       "        = add_builtin_function (\"%s\",\n",
+	       ovlds[i].proto.bifname);
+      fprintf (init_file,
+	       "                                %s,\n",
+	       ovlds[i].fndecl);
+      fprintf (init_file,
+	       "                                (int)RS6000_OVLD_%s,"
+	       " BUILT_IN_MD,\n",
+	       ovlds[i].ovld_id_name);
+      fprintf (init_file,
+	       "                                NULL, NULL_TREE);\n");
+      fprintf (init_file, "    }\n\n");
     }
 }
 
