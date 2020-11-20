@@ -104,6 +104,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <map>
 #include <stack>
 #include <string>
+#include <queue>
 
 #include "config.h"
 #include "system.h"
@@ -249,6 +250,99 @@ lto_dfe_execute ()
   return 0;
 }
 
+/* Heuristic to determine if casting is allowed in a function.
+ * This heuristic attempts to allow casting in functions which follow the
+ * pattern where a struct pointer or array pointer is casted to void* or 
+ * char*.  The heuristic works as follows:
+ *
+ * There is a simple per-function analysis that determines whether there
+ * is more than 1 type of struct referenced in the body of the method.
+ * If there is more than 1 type of struct referenced in the body,
+ * then the layout of the structures referenced within the body
+ * cannot be casted.  However, if there's only one type of struct referenced
+ * in the body of the function, casting is allowed in the function itself.
+ * The logic behind this is that the if the code follows good programming
+ * practices, the only way the memory should be accessed is via a singular
+ * type. There is also another requisite to this per-function analysis, and
+ * that is that the function can only call colored functions or functions
+ * which are available in the linking unit.
+ *
+ * Using this per-function analysis, we then start coloring leaf nodes in the
+ * call graph as ``safe'' or ``unsafe''.  The color is propagated to the 
+ * callers of the functions until a fixed point is reached.
+ */
+std::map<tree, bool>
+get_whitelisted_nodes ()
+{
+  cgraph_node *node = NULL;
+  std::set<cgraph_node *> nodes;
+  std::set<cgraph_node *> leaf_nodes;
+  std::set<tree> leaf_nodes_decl;
+  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
+  {
+    node->get_untransformed_body ();
+    nodes.insert(node);
+    if (node->callees) continue;
+
+    leaf_nodes.insert (node);
+    leaf_nodes_decl.insert (node->decl);
+  }
+
+  std::queue<cgraph_node *> worklist;
+  for (std::set<cgraph_node*>::iterator i = leaf_nodes.begin (),
+    e = leaf_nodes.end (); i != e; ++i)
+  {
+    if (dump_file) fprintf (dump_file, "is a leaf node %s\n", (*i)->name ());
+    worklist.push (*i);
+  }
+
+  for (std::set<cgraph_node*>::iterator i = nodes.begin (),
+    e = nodes.end (); i != e; ++i)
+  {
+    worklist.push (*i);
+  }
+
+  std::map<tree, bool> map;
+  while (!worklist.empty ())
+  {
+
+    if (detected_incompatible_syntax) return map;
+    cgraph_node *i = worklist.front ();
+    worklist.pop ();
+    if (dump_file) fprintf (dump_file, "analyzing %s %p\n", i->name (), (void*)i);
+    gimple_white_lister whitelister;
+    whitelister._walk_cnode (i);
+    bool no_external = whitelister.does_not_call_external_functions (i, map);
+    bool before_in_map = map.find (i->decl) != map.end ();
+    bool place_callers_in_worklist = !before_in_map;
+    if (!before_in_map)
+    {
+      map.insert(std::pair<tree, bool>(i->decl, no_external));
+    } else
+    {
+      map[i->decl] = no_external;
+    }
+    bool previous_value = map[i->decl];
+    place_callers_in_worklist |= previous_value != no_external;
+    if (previous_value != no_external)
+    {
+       // This ensures we are having a total order
+       // from no_external -> !no_external
+       gcc_assert (!previous_value);
+       gcc_assert (no_external);
+    }
+
+    for (cgraph_edge *e = i->callers; place_callers_in_worklist && e;
+      e = e->next_caller)
+    {
+      worklist.push (e->caller);
+    }
+  }
+
+  return map;
+
+}
+
 /*
  * Perform dead field elimination at link-time.
  * This transformation is composed of two main stages:
@@ -266,13 +360,15 @@ lto_dead_field_elimination ()
     if (cnode->inlined_to) continue;
     cnode->get_body();
   }
-
   detected_incompatible_syntax = false;
+  std::map<tree, bool> whitelisted = get_whitelisted_nodes ();
   tpartitions_t escaping_nonescaping_sets
-    = partition_types_into_escaping_nonescaping ();
+    = partition_types_into_escaping_nonescaping (whitelisted);
+  if (detected_incompatible_syntax) return;
   record_field_map_t record_field_map = find_fields_accessed ();
+  if (detected_incompatible_syntax) return;
   record_field_offset_map_t record_field_offset_map
-    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
+    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets, 
 					    record_field_map, OPT_Wdfa);
   if (detected_incompatible_syntax || record_field_offset_map.empty ())
     return;
@@ -308,11 +404,12 @@ partition_types_into_record_reaching_or_non_record_reaching ()
  * which types are escaping AND are being casted.
  */
 tpartitions_t
-partition_types_into_escaping_nonescaping ()
+partition_types_into_escaping_nonescaping (std::map<tree, bool> &whitelisted)
 {
   tpartitions_t partitions
     = partition_types_into_record_reaching_or_non_record_reaching ();
-  gimple_caster caster (partitions);
+  if (detected_incompatible_syntax) return partitions;
+  gimple_caster caster (partitions, whitelisted);
   caster.walk ();
   caster.print_reasons ();
 
@@ -1194,6 +1291,7 @@ gimple_walker::walk ()
 
       if (dump_file)
 	dump_function_to_file (node->decl, dump_file, TDF_NONE);
+
       _walk_cnode (node);
       fndecls.insert (decl);
     }
@@ -1252,6 +1350,7 @@ void
 gimple_walker::_walk_cnode (cgraph_node *cnode)
 {
   gcc_assert (cnode);
+  currently_walking = cnode;
   _walk_decl (cnode);
   _walk_locals (cnode);
   _walk_ssa_names (cnode);
@@ -1534,7 +1633,6 @@ gimple_walker::_walk_gphi (__attribute__((unused)) gphi *g)
 {
 }
 
-
 void
 type_collector::collect (tree t)
 {
@@ -1749,6 +1847,7 @@ type_collector::_walk_RECORD_TYPE_post (tree t)
       i->second = true;
     }
   _collect_simple (t);
+
 }
 
 void
@@ -1796,9 +1895,30 @@ type_collector::_walk_METHOD_TYPE_pre (tree t)
 inline void
 expr_collector::_walk_pre (tree e)
 {
+  if (!e) return;
   tree t = TREE_TYPE (e);
   gcc_assert (t);
   _type_collector.collect (t);
+
+  if (RECORD_TYPE != TREE_CODE (t)) return;
+
+  if (_type_collector.ptrset.records.empty ()) {
+    _type_collector.ptrset.records.insert (TYPE_MAIN_VARIANT (t));
+    return;
+  }
+
+  for (std::set<tree>::iterator
+	i = _type_collector.ptrset.records.begin (),
+	e = _type_collector.ptrset.records.end (); i != e; ++i)
+  {
+    tree r = *i;
+    type_incomplete_equality structuralEquality;
+    bool is_same = structuralEquality.equal (TYPE_MAIN_VARIANT (r), TYPE_MAIN_VARIANT (t));
+    if (is_same) continue;
+
+    type_stringifier stringifier;
+    _type_collector.ptrset.records.insert (TYPE_MAIN_VARIANT (t));
+  }
 }
 
 /*
@@ -1812,6 +1932,7 @@ expr_collector::_walk_pre (tree e)
 void
 gimple_type_collector::_walk_pre_tree (tree t)
 {
+  if (!t) return;
   _expr_collector.walk (t);
 }
 
@@ -1886,6 +2007,17 @@ gimple_type_collector::_walk_pre_gcall (gcall *s)
     return;
 
   _expr_collector.walk (lhs);
+}
+
+void
+gimple_type_collector::_walk_pre_gdebug (gdebug *s)
+{
+  if (!gimple_debug_bind_p(s)) return;
+  tree var = gimple_debug_bind_get_var(s);
+  if (var) {
+	  gcc_assert(TREE_TYPE(var));
+	  _expr_collector.walk(var);
+  }
 }
 
 // Print working set.
@@ -2154,6 +2286,15 @@ expr_escaper::_walk_SSA_NAME_pre (tree e)
   if (TREE_CODE (TREE_TYPE (mref_type)) == INTEGER_TYPE)
     return;
 
+  bool in_map = curr_node && _whitelisted.find (curr_node->decl) != _whitelisted.end ();
+  bool whitelisted = in_map && _whitelisted[curr_node->decl];
+  if (whitelisted) return;
+
+  if (dump_file) print_generic_stmt(dump_file, e);
+  log ("\n");
+  if (dump_file) print_generic_stmt(dump_file, prev_expr);
+  log ("\n");
+
   _r.type_is_casted = !structuralEquality.equal (mref_type, ssa_type);
   type_stringifier stringifier;
   log ("mref_type is casted %s = %s\n", stringifier.stringify(mref_type).c_str(), _r.type_is_casted ? "T" : "F");
@@ -2277,6 +2418,7 @@ gimple_escaper::_walk_global (varpool_node *vnode)
   reason.global_is_visible
     |= constructor || error_mark; // static initialization...
 
+  _expr_escaper.curr_node = currently_walking;
   _expr_escaper.update (var_decl, reason);
   gimple_walker::_walk_global (vnode);
 }
@@ -2329,6 +2471,7 @@ gimple_escaper::_walk_pre_tree (tree t)
 	// TODO: Maybe add a new reason instead of overloading is_indirect.
 	reason.is_indirect = true;
     }
+  _expr_escaper.curr_node = currently_walking;
   _expr_escaper.update (t, reason);
 }
 
@@ -2336,6 +2479,7 @@ void
 gimple_escaper::_walk_pre_gassign (gassign *s)
 {
   Reason reason;
+  _expr_escaper.curr_node = currently_walking;
   const enum gimple_rhs_class code = gimple_assign_rhs_class (s);
   switch (code)
     {
@@ -2372,6 +2516,7 @@ void
 gimple_escaper::_walk_pre_greturn (greturn *s)
 {
   Reason reason;
+  _expr_escaper.curr_node = currently_walking;
   tree val = gimple_return_retval (s);
   if (!val)
     return;
@@ -2385,6 +2530,7 @@ gimple_escaper::_walk_pre_gcond (gcond *s)
   tree lhs = gimple_cond_lhs (s);
   tree rhs = gimple_cond_rhs (s);
   gcc_assert (lhs && rhs);
+  _expr_escaper.curr_node = currently_walking;
   _expr_escaper.update (lhs, reason);
   _expr_escaper.update (rhs, reason);
 }
@@ -2393,6 +2539,7 @@ void
 gimple_escaper::_walk_pre_gcall (gcall *s)
 {
   tree fn = gimple_call_fndecl (s);
+  _expr_escaper.curr_node = currently_walking;
   // gcc_assert (fn);
   // The above will not always be true
   // It will be false when we have an indirect function
@@ -2475,10 +2622,17 @@ gimple_caster::_walk_pre_gassign (gassign *s)
   is_cast = is_cast && is_ssa ? follow_def_to_find_if_really_cast (rhs) : is_cast;
   // we allow casts to pointers...
   is_cast = is_cast && !(t_lhs == ptr_type_node);
+  log ("is_casted %s = %s\n", stringifier.stringify(t_rhs).c_str(), is_cast ? "T" : "F"); 
+  log ("is_casted %s = %s\n", stringifier.stringify(t_lhs).c_str(), is_cast ? "T" : "F"); 
   reason.type_is_casted = is_cast;
+  bool in_map = _whitelisted.find (currently_walking->decl) != _whitelisted.end ();
+  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  if (whitelisted) goto escaper_label;
+  _expr_escaper.curr_node = currently_walking;
   _expr_escaper._type_escaper.update (TREE_TYPE (lhs), reason);
   _expr_escaper._type_escaper.update (TREE_TYPE (rhs), reason);
 
+escaper_label:
   gimple_escaper::_walk_pre_gassign (s);
 }
 
@@ -2501,10 +2655,20 @@ gimple_caster::_walk_pre_gcall (gcall *s)
     return;
 
   tree f_t = TREE_TYPE (fn);
+  if (_whitelisted.find(fn) != _whitelisted.end() && _whitelisted[fn]) return;
+  bool in_map = _whitelisted.find(currently_walking->decl) != _whitelisted.end();
+  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  if (whitelisted) return;
+
+  if (!currently_walking->callers) return;
+
+  if (!node && currently_walking->inlined_to) return;
+
   type_incomplete_equality equality;
 
   unsigned i = 0;
   type_stringifier stringifier;
+  _expr_escaper.curr_node = currently_walking;
   for (tree a = TYPE_ARG_TYPES (f_t); NULL_TREE != a; a = TREE_CHAIN (a))
     {
       tree formal_t = TREE_VALUE (a);
@@ -3277,7 +3441,12 @@ type_structural_equality::_equal_code (tree l, tree r)
   const enum tree_code code_l = TREE_CODE (l);
   const enum tree_code code_r = TREE_CODE (r);
   const bool equal = code_l == code_r;
-  return equal;
+  bool array_or_ptr_l = TREE_CODE (l) == ARRAY_TYPE
+    || TREE_CODE (l) == POINTER_TYPE;
+  bool array_or_ptr_r = TREE_CODE (r) == ARRAY_TYPE
+    || TREE_CODE (r) == POINTER_TYPE;
+  bool array_or_ptr = array_or_ptr_l && array_or_ptr_r;
+  return equal || array_or_ptr;
 }
 
 #define TSE_FUNC_DEF_SIMPLE(code) 					  \
@@ -3299,7 +3468,17 @@ bool
 type_structural_equality::_equal_wrapper (tree l, tree r)
 {
   tree inner_l = TREE_TYPE (l);
+  if (TREE_CODE (inner_l) == ARRAY_TYPE 
+    && TREE_CODE (TREE_TYPE (inner_l)) == POINTER_TYPE ) 
+  {
+    inner_l = TREE_TYPE(inner_l);
+  }
   tree inner_r = TREE_TYPE (r);
+  if (TREE_CODE (inner_r) == ARRAY_TYPE
+    && TREE_CODE(TREE_TYPE (inner_r)) == POINTER_TYPE )
+  {
+    inner_r = TREE_TYPE(inner_r);
+  }
   return _equal (inner_l, inner_r);
 }
 

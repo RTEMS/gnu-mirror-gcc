@@ -588,8 +588,9 @@ lto_fr_execute ()
   log ("here in field reordering \n");
   // Analysis.
   detected_incompatible_syntax = false;
+  std::map<tree, bool> whitelisted = get_whitelisted_nodes();
   tpartitions_t escaping_nonescaping_sets
-    = partition_types_into_escaping_nonescaping ();
+    = partition_types_into_escaping_nonescaping (whitelisted);
   record_field_map_t record_field_map = find_fields_accessed ();
   record_field_offset_map_t record_field_offset_map
     = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
