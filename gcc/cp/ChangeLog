@@ -1,3 +1,124 @@
+2020-11-19  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (struct spec_entry): Moved from pt.c.
+	(walk_specializations, match_mergeable_specialization)
+	(get_mergeable_specialization_flags)
+	(add_mergeable_specialization): Declare.
+	* pt.c (struct spec_entry): Moved to cp-tree.h.
+	(walk_specializations, match_mergeable_specialization)
+	(get_mergeable_specialization_flags)
+	(add_mergeable_specialization): New.
+
+2020-11-19  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (struct constexpr_fundef): Moved from constexpr.c.
+	(maybe_save_constexpr_fundef): Declare.
+	(register_constexpr_fundef): Take constexpr_fundef object, return
+	void.
+	* decl.c (mabe_save_function_definition): Delete, functionality
+	moved to maybe_save_constexpr_fundef.
+	(emit_coro_helper, finish_function): Adjust.
+	* constexpr.c (struct constexpr_fundef): Moved to cp-tree.h.
+	(constexpr_fundef_hasher::equal): Constify.
+	(constexpr_fundef_hasher::hash): Constify.
+	(retrieve_constexpr_fundef): Make non-static.
+	(maybe_save_constexpr_fundef): Break out checking and duplication
+	from ...
+	(register_constexpr_fundef): ... here.  Just register the constexpr.
+
+2020-11-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97523
+	* init.c (build_new): When value-initializing an array new,
+	leave the INIT as an empty vector.
+
+2020-11-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97895
+	* pt.c (do_auto_deduction): Don't crash when the constructor has
+	zero elements.
+
+2020-11-19  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/97905
+	* decl.c (duplicate_decls): Relax new assert.
+
+2020-11-18  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* parser.c (cp_parser_objc_valid_prefix_attributes): Check
+	for empty attributes.
+
+2020-11-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* Make-lang.in (c++.serial): New goal.
+	(.PHONY): Add c++.serial c++.prev.
+	(cc1plus$(exeext)): Depend on c++.prev.  Call LINK_PROGRESS.
+
+2020-11-17  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/97877
+	* decl.c (duplicate_decls): Deal with duplicated DECL_LOCAL_DECL_P
+	decls.  Extend decl_lang_specific checking assert.
+
+2020-11-17  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (enum cp_tree_index): Reorder to place lazy fields
+	after newly-added CPTI_MODULE_HWM.
+
+2020-11-17  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/97871
+	* parser.c (cp_parser_declaration): Remove checking assert.
+
+2020-11-15  Jason Merrill  <jason@redhat.com>
+
+	* decl.c (cp_finish_decl): Only check abstractness on definition.
+	(require_complete_types_for_parms): Check abstractness here.
+	(create_array_type_for_decl): Not here.
+	(grokdeclarator, grokparms, complete_vars): Not here.
+	* pt.c (tsubst, tsubst_arg_types, tsubst_function_type): Not here.
+	* typeck2.c (struct pending_abstract_type): Remove.
+	(struct abstract_type_hasher): Remove.
+	(abstract_pending_vars, complete_type_check_abstract): Remove.
+	(abstract_virtuals_error_sfinae): Handle arrays.
+	* call.c (conv_is_prvalue): Split out from...
+	(conv_binds_ref_to_prvalue): ...here.
+	(implicit_conversion_1): Rename from implicit_conversion.
+	(implicit_conversion): An abstract prvalue is bad.
+	(convert_like_internal): Don't complain if expr is already
+	error_mark_node.
+
+2020-11-13  Jason Merrill  <jason@redhat.com>
+
+	* cp-tree.h (USING_DECL_UNRELATED_P): New.
+	(CONST_DECL_USING_P): New.
+	* class.c (handle_using_decl): If USING_DECL_UNRELATED_P,
+	clone the CONST_DECL.
+	* name-lookup.c (supplement_binding_1): A clone hides its
+	using-declaration.
+	(lookup_using_decl): Rewrite to separate lookup and validation.
+	(do_class_using_decl): Adjust.
+	(finish_nonmember_using_decl): Adjust.
+	* parser.c (make_location): Add cp_token overload.
+	(finish_using_decl): Split out from...
+	(cp_parser_using_declaration): ...here.  Don't look through enums.
+	(cp_parser_using_enum): New.
+	(cp_parser_block_declaration): Call it.
+	(cp_parser_member_declaration): Call it.
+	* semantics.c (finish_id_expression_1): Handle enumerator
+	used from class scope.
+
+2020-11-13  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* parser.c (cp_parser_asm_definition): Parse outputs for asm
+	goto too.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/77404
+	* parser.c (cp_parser_objc_class_interface): Pass the
+	location of the class name to the interface declaration.
+
 2020-11-13  Patrick Palka  <ppalka@redhat.com>
 
 	* semantics.c (finish_compound_literal): Don't wrap the original

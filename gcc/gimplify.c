@@ -3384,6 +3384,20 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
 	cfun->calls_eh_return = true;
 	break;
 
+      case BUILT_IN_CLEAR_PADDING:
+	if (call_expr_nargs (*expr_p) == 1)
+	  {
+	    /* Remember the original type of the argument in an internal
+	       dummy second argument, as in GIMPLE pointer conversions are
+	       useless.  */
+	    p = CALL_EXPR_ARG (*expr_p, 0);
+	    *expr_p
+	      = build_call_expr_loc (EXPR_LOCATION (*expr_p), fndecl, 2, p,
+				     build_zero_cst (TREE_TYPE (p)));
+	    return GS_OK;
+	  }
+	break;
+
       default:
         ;
       }
@@ -5517,6 +5531,19 @@ gimplify_modify_expr_rhs (tree *expr_p, tree *from_p, tree *to_p,
 	      *expr_p = wrap;
 	    return GS_OK;
 	  }
+
+	case NOP_EXPR:
+	  /* Pull out compound literal expressions from a NOP_EXPR.
+	     Those are created in the C FE to drop qualifiers during
+	     lvalue conversion.  */
+	  if ((TREE_CODE (TREE_OPERAND (*from_p, 0)) == COMPOUND_LITERAL_EXPR)
+	      && tree_ssa_useless_type_conversion (*from_p))
+	    {
+	      *from_p = TREE_OPERAND (*from_p, 0);
+	      ret = GS_OK;
+	      changed = true;
+	    }
+	  break;
 
 	case COMPOUND_LITERAL_EXPR:
 	  {
@@ -12463,22 +12490,22 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
 	  /* Allocate clause we duplicate on task and inner taskloop
 	     if the decl is lastprivate, otherwise just put on task.  */
 	  case OMP_CLAUSE_ALLOCATE:
+	    if (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
+		&& DECL_P (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)))
+	      {
+		/* Additionally, put firstprivate clause on task
+		   for the allocator if it is not constant.  */
+		*gtask_clauses_ptr
+		  = build_omp_clause (OMP_CLAUSE_LOCATION (c),
+				      OMP_CLAUSE_FIRSTPRIVATE);
+		OMP_CLAUSE_DECL (*gtask_clauses_ptr)
+		  = OMP_CLAUSE_ALLOCATE_ALLOCATOR (c);
+		gtask_clauses_ptr = &OMP_CLAUSE_CHAIN (*gtask_clauses_ptr);
+	      }
 	    if (lastprivate_uids
 		&& bitmap_bit_p (lastprivate_uids,
 				 DECL_UID (OMP_CLAUSE_DECL (c))))
 	      {
-		if (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
-		    && DECL_P (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)))
-		  {
-		    /* Additionally, put firstprivate clause on task
-		       for the allocator if it is not constant.  */
-		    *gtask_clauses_ptr
-		      = build_omp_clause (OMP_CLAUSE_LOCATION (c),
-					  OMP_CLAUSE_FIRSTPRIVATE);
-		    OMP_CLAUSE_DECL (*gtask_clauses_ptr)
-		      = OMP_CLAUSE_ALLOCATE_ALLOCATOR (c);
-		    gtask_clauses_ptr = &OMP_CLAUSE_CHAIN (*gtask_clauses_ptr);
-		  }
 		*gfor_clauses_ptr = c;
 		gfor_clauses_ptr = &OMP_CLAUSE_CHAIN (c);
 		*gtask_clauses_ptr = copy_node (c);

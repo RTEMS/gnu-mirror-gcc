@@ -13564,6 +13564,19 @@ initializers of variables usable in constant expressions.   For more details
 refer to the latest revision of the C++ standard.
 @end deftypefn
 
+@deftypefn {Built-in Function} void __builtin_clear_padding (@var{ptr})
+The built-in function @code{__builtin_clear_padding} function clears
+padding bits inside of the object representation of object pointed by
+@var{ptr}, which has to be a pointer.  The value representation of the
+object is not affected.  The type of the object is assumed to be the type
+the pointer points to.  Inside of a union, the only cleared bits are
+bits that are padding bits for all the union members.
+
+This built-in-function is useful if the padding bits of an object might
+have intederminate values and the object representation needs to be
+bitwise compared to some other object, for example for atomic operations.
+@end deftypefn
+
 @deftypefn {Built-in Function} long __builtin_expect (long @var{exp}, long @var{c})
 @opindex fprofile-arcs
 You may use @code{__builtin_expect} to provide the compiler with
@@ -14154,6 +14167,7 @@ instructions, but allow the compiler to schedule those calls.
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
 * PowerPC Matrix-Multiply Assist Built-in Functions::
+* PRU Built-in Functions::
 * RISC-V Built-in Functions::
 * RX Built-in Functions::
 * S/390 System z Built-in Functions::
@@ -21933,6 +21947,33 @@ void __builtin_mma_disassemble_pair (void *, __vector_pair *);
 vec_t __builtin_vsx_xvcvspbf16 (vec_t);
 vec_t __builtin_vsx_xvcvbf16spn (vec_t);
 @end smallexample
+
+@node PRU Built-in Functions
+@subsection PRU Built-in Functions
+
+GCC provides a couple of special builtin functions to aid in utilizing
+special PRU instructions.
+
+The built-in functions supported are:
+
+@table @code
+@item __delay_cycles (long long @var{cycles})
+This inserts an instruction sequence that takes exactly @var{cycles}
+cycles (between 0 and 0xffffffff) to complete.  The inserted sequence
+may use jumps, loops, or no-ops, and does not interfere with any other
+instructions.  Note that @var{cycles} must be a compile-time constant
+integer - that is, you must pass a number, not a variable that may be
+optimized to a constant later.  The number of cycles delayed by this
+builtin is exact.
+
+@item __halt (void)
+This inserts a HALT instruction to stop processor execution.
+
+@item unsigned int __lmbd (unsigned int @var{wordval}, unsigned int @var{bitval})
+This inserts LMBD instruction to calculate the left-most bit with value
+@var{bitval} in value @var{wordval}.  Only the least significant bit
+of @var{bitval} is taken into account.
+@end table
 
 @node RISC-V Built-in Functions
 @subsection RISC-V Built-in Functions

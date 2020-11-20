@@ -12973,18 +12973,19 @@ base_type_die (tree type, bool reverse)
 	  break;
 
 	case fixed_point_scale_factor_arbitrary:
-	  /* Arbitrary scale factors cannot be described in standard DWARF,
-	     yet.  */
+	  /* Arbitrary scale factors cannot be described in standard DWARF.  */
 	  if (!dwarf_strict)
 	    {
 	      /* Describe the scale factor as a rational constant.  */
 	      const dw_die_ref scale_factor
 		= new_die (DW_TAG_constant, comp_unit_die (), type);
 
-	      add_AT_unsigned (scale_factor, DW_AT_GNU_numerator,
-			       fpt_info.scale_factor.arbitrary.numerator);
-	      add_AT_int (scale_factor, DW_AT_GNU_denominator,
-			  fpt_info.scale_factor.arbitrary.denominator);
+	      add_scalar_info (scale_factor, DW_AT_GNU_numerator,
+			       fpt_info.scale_factor.arbitrary.numerator,
+			       dw_scalar_form_constant, NULL);
+	      add_scalar_info (scale_factor, DW_AT_GNU_denominator,
+			       fpt_info.scale_factor.arbitrary.denominator,
+			       dw_scalar_form_constant, NULL);
 
 	      add_AT_die_ref (base_type_result, DW_AT_small, scale_factor);
 	    }
@@ -22779,6 +22780,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
   tree origin = decl_ultimate_origin (decl);
   dw_die_ref subr_die;
   dw_die_ref old_die = lookup_decl_die (decl);
+  bool old_die_had_no_children = false;
 
   /* This function gets called multiple times for different stages of
      the debug process.  For example, for func() in this code:
@@ -22869,6 +22871,9 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
      additional information.  */
   if (old_die && declaration)
     return;
+
+  if (in_lto_p && old_die && old_die->die_child == NULL)
+    old_die_had_no_children = true;
 
   /* Now that the C++ front end lazily declares artificial member fns, we
      might need to retrofit the declaration into its class.  */
@@ -23389,6 +23394,10 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	  else if (DECL_INITIAL (decl) == NULL_TREE)
 	    gen_unspecified_parameters_die (decl, subr_die);
 	}
+      else if ((subr_die != old_die || old_die_had_no_children)
+	       && prototype_p (TREE_TYPE (decl))
+	       && stdarg_p (TREE_TYPE (decl)))
+	gen_unspecified_parameters_die (decl, subr_die);
     }
 
   if (subr_die != old_die)

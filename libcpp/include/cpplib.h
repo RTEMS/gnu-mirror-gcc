@@ -308,6 +308,15 @@ enum cpp_normalize_level {
   normalized_none
 };
 
+enum cpp_main_search 
+{
+  CMS_none,    /* A regular source file.  */
+  CMS_header,  /* Is a directly-specified header file (eg PCH or
+		  header-unit).  */
+  CMS_user,    /* Search the user INCLUDE path.  */
+  CMS_system,  /* Search the system INCLUDE path.  */
+};
+
 /* This structure is nested inside struct cpp_reader, and
    carries all the options visible to the command line.  */
 struct cpp_options
@@ -487,6 +496,9 @@ struct cpp_options
   /* Nonzero for the '::' token.  */
   unsigned char scope;
 
+  /* Nonzero means tokenize C++20 module directives.  */
+  unsigned char module_directives;
+
   /* Holds the name of the target (execution) character set.  */
   const char *narrow_charset;
 
@@ -528,6 +540,9 @@ struct cpp_options
        one.  */
     bool phony_targets;
 
+    /* Generate dependency info for modules.  */
+    bool modules;
+
     /* If true, no dependency is generated on the main file.  */
     bool ignore_main_file;
 
@@ -560,6 +575,8 @@ struct cpp_options
 
   /* The maximum depth of the nested #include.  */
   unsigned int max_include_depth;
+
+  cpp_main_search main_search : 8;
 };
 
 /* Diagnostic levels.  To get a diagnostic without associating a
@@ -680,6 +697,9 @@ struct cpp_callbacks
   /* Callback that can change a user lazy into normal macro.  */
   void (*user_lazy_macro) (cpp_reader *, cpp_macro *, unsigned);
 
+  /* Callback to handle deferred cpp_macros.  */
+  cpp_macro *(*user_deferred_macro) (cpp_reader *, location_t, cpp_hashnode *);
+
   /* Callback to parse SOURCE_DATE_EPOCH from environment.  */
   time_t (*get_source_date_epoch) (cpp_reader *);
 
@@ -698,6 +718,11 @@ struct cpp_callbacks
   /* Callback for filename remapping in __FILE__ and __BASE_FILE__ macro
      expansions.  */
   const char *(*remap_filename) (const char*);
+
+  /* Maybe translate a #include into something else.  Return a
+     cpp_buffer containing the translation if translating.  */
+  char *(*translate_include) (cpp_reader *, line_maps *, location_t,
+			      const char *path);
 };
 
 #ifdef VMS
@@ -831,6 +856,7 @@ struct GTY(()) cpp_macro {
 #define NODE_USED	(1 << 5)	/* Dumped with -dU.  */
 #define NODE_CONDITIONAL (1 << 6)	/* Conditional macro */
 #define NODE_WARN_OPERATOR (1 << 7)	/* Warn about C++ named operator.  */
+#define NODE_MODULE (1 << 8)		/* C++-20 module-related name.  */
 
 /* Different flavors of hash node.  */
 enum node_type
@@ -889,11 +915,11 @@ struct GTY(()) cpp_hashnode {
   unsigned int directive_index : 7;	/* If is_directive,
 					   then index into directive table.
 					   Otherwise, a NODE_OPERATOR.  */
-  unsigned char rid_code;		/* Rid code - for front ends.  */
+  unsigned int rid_code : 8;		/* Rid code - for front ends.  */
+  unsigned int flags : 9;		/* CPP flags.  */
   ENUM_BITFIELD(node_type) type : 2;	/* CPP node type.  */
-  unsigned int flags : 8;		/* CPP flags.  */
 
-  /* 6 bits spare (plus another 32 on 64-bit hosts).  */
+  /* 5 bits spare (plus another 32 on 64-bit hosts).  */
 
   union _cpp_hashnode_value GTY ((desc ("%1.type"))) value;
 };
@@ -972,6 +998,9 @@ extern cpp_callbacks *cpp_get_callbacks (cpp_reader *) ATTRIBUTE_PURE;
 extern void cpp_set_callbacks (cpp_reader *, cpp_callbacks *);
 extern class mkdeps *cpp_get_deps (cpp_reader *) ATTRIBUTE_PURE;
 
+extern const char *cpp_find_header_unit (cpp_reader *, const char *file,
+					 bool angle_p,  location_t);
+
 /* This function reads the file, but does not start preprocessing.  It
    returns the name of the original file; this is the same as the
    input file, except for preprocessed input.  This will generate at
@@ -979,6 +1008,10 @@ extern class mkdeps *cpp_get_deps (cpp_reader *) ATTRIBUTE_PURE;
    too.  If there was an error opening the file, it returns NULL.  */
 extern const char *cpp_read_main_file (cpp_reader *, const char *,
 				       bool injecting = false);
+extern location_t cpp_main_loc (const cpp_reader *);
+
+/* Adjust for the main file to be an include.  */
+extern void cpp_retrofit_as_include (cpp_reader *);
 
 /* Set up built-ins with special behavior.  Use cpp_init_builtins()
    instead unless your know what you are doing.  */

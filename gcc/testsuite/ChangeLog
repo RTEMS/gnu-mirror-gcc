@@ -1,3 +1,824 @@
+2020-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91029
+	* gcc.dg/tree-ssa/pr91029-1.c: New test.
+	* gcc.dg/tree-ssa/pr91029-2.c: New test.
+
+2020-11-19  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/tree-ssa/pr93781-1.c: New.
+	* gcc.dg/tree-ssa/pr93781-2.c: New.
+	* gcc.dg/tree-ssa/pr93781-3.c: New.
+
+2020-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/97860
+	* gcc.dg/pr97860.c: New test.
+
+2020-11-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97523
+	* g++.dg/expr/anew5.C: New test.
+	* g++.dg/expr/anew6.C: New test.
+
+2020-11-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97895
+	* g++.dg/cpp0x/auto54.C: New test.
+
+2020-11-19  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/97905
+	* g++.dg/lookup/pr97905.C: New.
+
+2020-11-19  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* gcc.target/pru/halt.c: New test.
+	* gcc.target/pru/lmbd.c: New test.
+
+2020-11-19  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/vect-cost-model-1.c: New test.
+	* gcc.dg/vect/vect-cost-model-2.c: Likewise.
+	* gcc.dg/vect/vect-cost-model-3.c: Likewise.
+	* gcc.dg/vect/vect-cost-model-4.c: Likewise.
+	* gcc.dg/vect/vect-cost-model-5.c: Likewise.
+	* gcc.dg/vect/vect-cost-model-6.c: Likewise.
+
+2020-11-19  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/pr97897.c: Add dg-options.
+
+2020-11-19  Joel Hutton  <joel.hutton@arm.com>
+
+	* gcc.target/aarch64/vect-widen-lshift.c: New test.
+
+2020-11-19  Joel Hutton  <joel.hutton@arm.com>
+
+	* gcc.target/aarch64/vect-widen-add.c: New test.
+	* gcc.target/aarch64/vect-widen-sub.c: New test.
+
+2020-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97901
+	* gcc.dg/torture/pr97901.c: New testcase.
+
+2020-11-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97897
+	* gcc.dg/pr97897.c: New testcase.
+
+2020-11-19  Uroš Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/pr97887.c: New test.
+
+2020-11-18  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR middle-end/85811
+	* gcc.dg/pr85811.c: New test.
+	* gcc.dg/fold-isfinite-1.c: New test.
+	* gcc.dg/fold-isfinite-2.c: New test.
+	* gcc.dg/fold-isinf-1.c: New test.
+	* gcc.dg/fold-isinf-2.c: New test.
+	* gcc.dg/fold-isnan-1.c: New test.
+	* gcc.dg/fold-isnan-2.c: New test.
+
+2020-11-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91029
+	PR tree-optimization/97888
+	* gcc.dg/pr91029.c: Add comment with PR number.
+	(f2): Use > 0 rather than >= 0.
+	* gcc.c-torture/execute/pr97888-1.c: New test.
+	* gcc.c-torture/execute/pr97888-2.c: New test.
+
+2020-11-18  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/97893
+	* gcc.dg/analyzer/malloc-1.c: Add CWE-690 and CWE-476 codes to
+	expected output.
+
+2020-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/bb-slp-pr68892.c: Don't XFAIL the profitability
+	test for aarch64*-*-*.  Allow the "BB vectorization with gaps"
+	message to be printed more than once.
+
+2020-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/slp-21.c: Expect 4 SLP instances to be vectorized
+	on arm* and aarch64* targets.
+
+2020-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/fast-math-vect-call-1.c: Only expect SLP to be used
+	on vect_perm3_int targets.
+	* gcc.dg/vect/slp-perm-6.c: Likewise.  Only XFAIL the LOAD/STORE_LANES
+	tests on vect_perm3_int targets.
+
+2020-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/vect-epilogues.c: XFAIL test for epilogue loop
+	vectorization if vect_partial_vectors_usage_2.
+
+2020-11-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/vect-sdiv-pow2-1.c (main): Add an asm to the
+	set-up loop.
+
+2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/97843
+	* gdc.dg/torture/pr97843.d: New test.
+
+2020-11-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/97862
+	* c-c++-common/gomp/pr97862.c: New test.
+
+2020-11-18  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/arch-9.c: New.
+	* gcc.target/riscv/arch-10.c: Ditto.
+	* gcc.target/riscv/arch-11.c: Ditto.
+	* gcc.target/riscv/attribute-6.c: Remove, we don't support G
+	with version anymore.
+	* gcc.target/riscv/attribute-8.c: Reorder arch string to fit canonical
+	ordering.
+	* gcc.target/riscv/attribute-9.c: We don't emit version for
+	unknown extensions now.
+	* gcc.target/riscv/attribute-11.c: Add -misa-spec=2.2 flags.
+	* gcc.target/riscv/attribute-12.c: Ditto.
+	* gcc.target/riscv/attribute-13.c: Ditto.
+	* gcc.target/riscv/attribute-14.c: Ditto.
+	* gcc.target/riscv/attribute-15.c: New.
+	* gcc.target/riscv/attribute-16.c: Ditto.
+	* gcc.target/riscv/attribute-17.c: Ditto.
+
+2020-11-18  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/arch-8.c: New.
+	* gcc.target/riscv/attribute-14.c: Ditto.
+
+2020-11-18  Jiufu Guo   <guojiufu@linux.ibm.com>
+
+	* gcc.dg/tree-ssa/loopclosedphi.c: New test.
+
+2020-11-17  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/pr91029.c: New.
+
+2020-11-17  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/97877
+	* g++.dg/lookup/pr97877.C: New.
+
+2020-11-17  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/pr83072.c: New.
+
+2020-11-17  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/cr-decimal-dig-3.c: New test.
+
+2020-11-17  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c11-float-6.c, gcc.dg/c2x-float-10.c: New tests.
+
+2020-11-17  David Edelsohn  <dje.gcc@gmail.com>
+
+	* gcc.dg/pr25376.c: Allow .opd section.
+
+2020-11-17  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/31799
+	* gcc.target/i386/pr31799.c: New test.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/cond_cnot_1.c: Remove XFAIL.
+	* gcc.target/aarch64/sve/cond_unary_1.c: Likewise.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/97693
+	* gcc.dg/vect/pr97693.c: New test.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/slp-46.c: XFAIL test for SLP on vect_load_lanes targets.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/aligned-section-anchors-nest-1.c: XFAIL alignment
+	test if vect_element_align_preferred.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/bb-slp-subgroups-3.c: XFAIL for variable-length vectors.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/pr65947-8.c: Expect the loop to be vectorized for SVE.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/pr97678.c: XFAIL test for SLP vectorization
+	for variable-length vectors.
+	* gcc.dg/vect/pr97835.c: Likewise.
+	* gcc.dg/vect/slp-49.c: Likewise.
+	* gcc.dg/vect/vect-outer-slp-1.c: Likewise.
+	* gcc.dg/vect/vect-outer-slp-2.c: Likewise.
+	* gcc.dg/vect/vect-outer-slp-3.c: Likewise.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/slp-reduc-4.c: XFAIL test for SLP vectorization
+	for variable-length SVE.
+	* gcc.dg/vect/slp-reduc-7.c: Likewise.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/bb-slp-43.c: Remove XFAIL for vect_variable_length.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/vect/pr91750.c: Allow "[]," inside a vector(...) lane count.
+
+2020-11-17  Liu Hao  <lh_mouse@126.com>
+
+	* gcc.dg/format/ms_c99-printf-3.c: Update tests.
+
+2020-11-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/90628
+	* gcc.dg/builtin-arith-overflow-4.c: New test.
+
+2020-11-17  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/guality/pr59776.c (foo): Use noipa attribute instead of
+	noinline, noclone.
+
+2020-11-17  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/avx2-vec-set-1.c: New test.
+	* gcc.target/i386/avx2-vec-set-2.c: New test.
+	* gcc.target/i386/avx512bw-vec-set-1.c: New test.
+	* gcc.target/i386/avx512bw-vec-set-2.c: New test.
+	* gcc.target/i386/avx512f-vec-set-2.c: New test.
+	* gcc.target/i386/avx512vl-vec-set-2.c: New test.
+
+2020-11-17  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/95673
+	* gcc.dg/Wstring-compare-3.c: New test.
+
+2020-11-17  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/dfp/c2x-float-dfp-7.c, gcc.dg/dfp/c2x-float-dfp-8.c: New
+	tests.
+	* gcc.dg/c2x-float-no-dfp-3.c: Also check that DEC32_SNAN,
+	DEC64_SNAN and DEC128_SNAN are not defined.
+
+2020-11-17  Joseph Myers  <joseph@codesourcery.com>
+
+	* lib/target-supports.exp (check_effective_target_inff): New.
+	* gcc.dg/c11-float-4.c, gcc.dg/c11-float-5.c,
+	gcc.dg/c11-float-dfp-2.c, gcc.dg/c2x-float-2.c,
+	gcc.dg/c2x-float-3.c, gcc.dg/c2x-float-4.c, gcc.dg/c2x-float-5.c,
+	gcc.dg/c2x-float-6.c, gcc.dg/c2x-float-7.c, gcc.dg/c2x-float-8.c,
+	gcc.dg/c2x-float-9.c, gcc.dg/c2x-float-no-dfp-3.c,
+	gcc.dg/c2x-float-no-dfp-4.c, gcc.dg/dfp/c2x-float-dfp-4.c,
+	gcc.dg/dfp/c2x-float-dfp-5.c, gcc.dg/dfp/c2x-float-dfp-6.c,
+	gcc.dg/torture/float128-nan-floath.c,
+	gcc.dg/torture/float128x-nan-floath.c,
+	gcc.dg/torture/float16-nan-floath.c,
+	gcc.dg/torture/float32-nan-floath.c,
+	gcc.dg/torture/float32x-nan-floath.c,
+	gcc.dg/torture/float64-nan-floath.c,
+	gcc.dg/torture/float64x-nan-floath.c,
+	gcc.dg/torture/floatn-nan-floath.h: New tests.
+
+2020-11-16  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/92180
+	* gcc.target/i386/pr92180.c: New test.
+
+2020-11-16  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/pr48958.f90: New test.
+
+2020-11-16  Jan Hubicka  <jh@suse.cz>
+
+	* g++.dg/warn/uninit-1.C: New test.
+
+2020-11-16  Ilya Leoshkevich  <iii@linux.ibm.com>
+
+	* gcc.target/s390/s390.exp (check_effective_target_s390_z14_hw):
+	New predicate.
+	* gcc.target/s390/vector/long-double-caller-abi-run.c: Use the
+	new predicate.
+	* gcc.target/s390/vector/long-double-copysign.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-double.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-float.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-i16.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-i32.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-i64.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-i8.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-u16.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-u32.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-u64.c: Likewise.
+	* gcc.target/s390/vector/long-double-from-u8.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-double.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-float.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-i16.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-i32.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-i64.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-i8.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-u16.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-u32.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-u64.c: Likewise.
+	* gcc.target/s390/vector/long-double-to-u8.c: Likewise.
+	* gcc.target/s390/vector/long-double-wfaxb.c: Likewise.
+	* gcc.target/s390/vector/long-double-wfdxb.c: Likewise.
+	* gcc.target/s390/vector/long-double-wfsxb-1.c: Likewise.
+
+2020-11-16  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR testsuite/97803
+	* c-c++-common/asan/pointer-compare-1.c (global1): Add
+	__attribute__((used))
+	(global2): Likewise.
+	(small_global): Likewise.
+	(large_global): Likewise.
+
+2020-11-16  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* gcc.dg/profile-info-section.c: New test.
+
+2020-11-16  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97838
+	* gcc.dg/vect/pr97838.c: New testcase.
+
+2020-11-16  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/97736
+	* gcc.dg/tree-ssa/switch-1.c: Prefer bit tests.
+	* g++.dg/tree-ssa/pr97736.C: New test.
+
+2020-11-16  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97835
+	* gcc.dg/vect/pr97835.c: New testcase.
+
+2020-11-16  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97830
+	* gcc.dg/pr97830.c: New testcase.
+
+2020-11-15  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* gcc.target/msp430/rtx-cost-Os-f5series.c: Adjust test to use new
+	hwmult library function name.
+
+2020-11-15  David Edelsohn  <dje.gcc@gmail.com>
+
+	* gcc.dg/ipa/modref-2.c: Add ilp32 expected result.
+
+2020-11-15  David Edelsohn  <dje.gcc@gmail.com>
+
+	* lib/scanasm.exp (parse_section_of_symbols): Also look for AIX
+	XCOFF CSECT notation.
+	* g++.dg/opt/const4.C: Also look for AIX XCOFF "[RO]".
+	* gcc.dg/20021029-1.c: Likewise.
+	* gcc.dg/array-quals-1.c: Likewise and "[RW]".
+	* g++.dg/gomp/tls-5.C: Also look for AIX XCOFF "[TL]".
+	* gcc.dg/pr25376.c: Accept AIX decoration around named section
+	and function descriptor.
+
+2020-11-15  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* gcc.target/vax/bswapdi-1.c (dg-options): New setting.
+
+2020-11-15  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/other/abstract1.C: Adjust.
+	* g++.dg/other/abstract2.C: Adjust.
+	* g++.dg/other/abstract4.C: Adjust.
+	* g++.dg/other/abstract5.C: Adjust.
+	* g++.dg/other/abstract8.C: New test.
+	* g++.dg/template/sfinae-dr657.C: Adjust.
+	* g++.old-deja/g++.other/decl3.C: Adjust.
+
+2020-11-15  Jan Hubicka  <jh@suse.cz>
+
+	* gcc.c-torture/execute/pr97836.c: New test.
+
+2020-11-14  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* objc.dg/pr23214.m: Use Object as the root object before
+	Darwin12 (and NSObject after).
+
+2020-11-14  Jan Hubicka  <jh@suse.cz>
+
+	* gcc.dg/torture/pta-ptrarith-1.c: Escape parameters.
+
+2020-11-14  Matthew Glazar  <strager.nds@gmail.com>
+
+	* lib/scanasm.exp (dg-scan): Extract file globbing code ...
+	(dg_glob_remote): ... into this new procedure.
+	(scan-assembler-symbol-section): Define.
+	(scan-symbol-section): Define.
+	* g++.dg/gomp/tls-5.C: Add symbol section test.
+	* g++.dg/opt/const4.C: Likewise.
+	* gcc.dg/20021029-1.c: Likewise.
+	* gcc.dg/array-quals-1.c: Likewise.
+	* gcc.dg/darwin-sections.c: Likewise.
+	* gcc.dg/pr25376.c: Likewise.
+	* gcc.test-framework/test-framework.exp: Load scanasm and test .S files.
+	* gcc.test-framework/dg-scan-symbol-section-1-exp-F.S: New test.
+	* gcc.test-framework/dg-scan-symbol-section-2-exp-F.S: New test.
+	* gcc.test-framework/dg-scan-symbol-section-3-exp-F.S: New test.
+	* gcc.test-framework/dg-scan-symbol-section-exp-P.S: New test.
+
+2020-11-14  Monk Chiang  <monk.chiang@sifive.com>
+
+	PR target/97682
+	* g++.target/riscv/pr97682.C: New test.
+	* gcc.target/riscv/interrupt-3.c: Check register for t0.
+	* gcc.target/riscv/interrupt-4.c: Likewise.
+
+2020-11-13  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/binary-constants-2.c, gcc.dg/binary-constants-3.c,
+	gcc.dg/system-binary-constants-1.c: Update expected diagnostics.
+	* gcc.dg/c11-binary-constants-1.c,
+	gcc.dg/c11-binary-constants-2.c, gcc.dg/c2x-binary-constants-1.c,
+	gcc.dg/c2x-binary-constants-2.c, gcc.dg/c2x-binary-constants-3.c:
+	New tests.
+
+2020-11-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/guality/redeclaration1.C (p): New variable.
+	(S::f): Increment what p points to before storing S::i into l.  Adjust
+	gdb-test line numbers.
+	(main): Initialize p to address of an automatic variable.
+
+2020-11-13  Gergö Barany  <gergo@codesourcery.com>
+	    Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/kernels-decompose-1.c: New.
+	* c-c++-common/goacc/kernels-decompose-2.c: New.
+	* c-c++-common/goacc/kernels-decompose-ice-1.c: New.
+	* c-c++-common/goacc/kernels-decompose-ice-2.c: New.
+	* gfortran.dg/goacc/kernels-decompose-1.f95: New.
+	* gfortran.dg/goacc/kernels-decompose-2.f95: New.
+	* c-c++-common/goacc/if-clause-2.c: Adjust.
+	* gfortran.dg/goacc/kernels-tree.f95: Likewise.
+
+2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/classify-parallel.c: Adjust.
+	* gfortran.dg/goacc/classify-parallel.f95: Likewise.
+	* c-c++-common/goacc/classify-serial.c: New.
+	* gfortran.dg/goacc/classify-serial.f95: Likewise.
+
+2020-11-13  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/cpp2a/feat-cxx2a.C: Check it.
+
+2020-11-13  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/cpp0x/inh-ctor28.C: Adjust expected diagnostic.
+	* g++.dg/cpp0x/inh-ctor33.C: Likewise.
+	* g++.dg/cpp0x/using-enum-1.C: Add comment.
+	* g++.dg/cpp0x/using-enum-2.C: Allowed in C++20.
+	* g++.dg/cpp0x/using-enum-3.C: Likewise.
+	* g++.dg/cpp1z/class-deduction69.C: Adjust diagnostic.
+	* g++.dg/inherit/using5.C: Likewise.
+	* g++.dg/cpp2a/using-enum-1.C: New test.
+	* g++.dg/cpp2a/using-enum-2.C: New test.
+	* g++.dg/cpp2a/using-enum-3.C: New test.
+	* g++.dg/cpp2a/using-enum-4.C: New test.
+	* g++.dg/cpp2a/using-enum-5.C: New test.
+	* g++.dg/cpp2a/using-enum-6.C: New test.
+	* g++.dg/debug/dwarf2/using-enum.C: New test.
+
+2020-11-13  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* c-c++-common/asmgoto-2.c: Permit output in asm goto.
+	* gcc.c-torture/compile/asmgoto-2.c: New.
+	* gcc.c-torture/compile/asmgoto-3.c: New.
+	* gcc.c-torture/compile/asmgoto-4.c: New.
+	* gcc.c-torture/compile/asmgoto-5.c: New.
+
+2020-11-13  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/tree-ssa/evrp20.c
+	* gcc.dg/tree-ssa/evrp21.c
+	* gcc.dg/tree-ssa/evrp22.c
+
+2020-11-13  Martin Liska  <mliska@suse.cz>
+
+	PR testsuite/97788
+	* g++.dg/ubsan/pr61272.C: Move expected error location.
+
+2020-11-13  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* gcc.c-torture/execute/index-1.c: Skip for the default MSP430 430X ISA.
+
+2020-11-13  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* gcc.target/msp430/rtx-cost-O3-default.c: New test.
+	* gcc.target/msp430/rtx-cost-O3-f5series.c: New test.
+	* gcc.target/msp430/rtx-cost-Os-default.c: New test.
+	* gcc.target/msp430/rtx-cost-Os-f5series.c: New test.
+
+2020-11-13  Jan Hubicka  <jh@suse.cz>
+
+	* c-c++-common/Wstringop-overflow-2.c: Disable ICF.
+	* g++.dg/warn/Warray-bounds-8.C: Disable ICF.
+
+2020-11-13  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/tree-ssa/pr78655.c: New.
+
+2020-11-13  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* gdc.dg/pr92216.d: Update scan-assember.
+
+2020-11-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97812
+	* gcc.dg/torture/pr97812.c: New testcase.
+
+2020-11-13  Sudakshina Das  <sudi.das@arm.com>
+
+	* g++.dg/tree-ssa/pr90883.C: Remove xfail for aarch64.
+	* gcc.dg/tree-prof/stringop-2.c: Add xfail for aarch64.
+	* gcc.target/aarch64/memset-corner-cases.c: New test.
+	* gcc.target/aarch64/memset-q-reg.c: New test.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/90707
+	* obj-c++.dg/property/at-property-4.mm: Add basic nullability
+	tests.
+	* objc.dg/property/at-property-4.m: Likewise.
+	* obj-c++.dg/attributes/nullability-00.mm: New test.
+	* obj-c++.dg/property/nullability-00.mm: New test.
+	* objc.dg/attributes/nullability-00.m: New test.
+	* objc.dg/property/nullability-00.m: New test.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/77404
+	* obj-c++.dg/attributes/class-attribute-1.mm:
+	Add Wno-objc-root-class.
+	* obj-c++.dg/attributes/class-attribute-2.mm: Likewise.
+	* obj-c++.dg/attributes/class-attribute-3.mm: Likewise.
+	* obj-c++.dg/attributes/method-deprecated-1.mm: Likewise.
+	* obj-c++.dg/attributes/method-deprecated-2.mm: Likewise.
+	* obj-c++.dg/attributes/method-deprecated-3.mm: Likewise.
+	* obj-c++.dg/attributes/method-format-1.mm: Likewise.
+	* obj-c++.dg/attributes/method-nonnull-1.mm: Likewise.
+	* obj-c++.dg/attributes/method-noreturn-1.mm: Likewise.
+	* obj-c++.dg/attributes/method-sentinel-1.mm: Likewise.
+	* obj-c++.dg/attributes/nsobject-01.mm: Likewise.
+	* obj-c++.dg/attributes/parameter-attribute-1.mm: Likewise.
+	* obj-c++.dg/attributes/parameter-attribute-2.mm: Likewise.
+	* obj-c++.dg/attributes/proto-attribute-1.mm: Likewise.
+	* obj-c++.dg/attributes/proto-attribute-3.mm: Likewise.
+	* obj-c++.dg/attributes/proto-attribute-4.mm: Likewise.
+	* obj-c++.dg/attributes/unused-parameter-1.mm: Likewise.
+	* obj-c++.dg/bad-receiver-type.mm: Likewise.
+	* obj-c++.dg/bitfield-3.mm: Likewise.
+	* obj-c++.dg/bitfield-5.mm: Likewise.
+	* obj-c++.dg/class-extension-1.mm: Likewise.
+	* obj-c++.dg/class-extension-2.mm: Likewise.
+	* obj-c++.dg/class-extension-3.mm: Likewise.
+	* obj-c++.dg/class-extension-4.mm: Likewise.
+	* obj-c++.dg/class-protocol-1.mm: Likewise.
+	* obj-c++.dg/comp-types-1.mm: Likewise.
+	* obj-c++.dg/comp-types-10.mm: Likewise.
+	* obj-c++.dg/comp-types-2.mm: Likewise.
+	* obj-c++.dg/comp-types-3.mm: Likewise.
+	* obj-c++.dg/comp-types-5.mm: Likewise.
+	* obj-c++.dg/comp-types-6.mm: Likewise.
+	* obj-c++.dg/comp-types-7.mm: Likewise.
+	* obj-c++.dg/comp-types-8.mm: Likewise.
+	* obj-c++.dg/demangle-2.mm: Likewise.
+	* obj-c++.dg/demangle-3.mm: Likewise.
+	* obj-c++.dg/duplicate-class-1.mm: Likewise.
+	* obj-c++.dg/encode-1-next.mm: Likewise.
+	* obj-c++.dg/encode-1.mm: Likewise.
+	* obj-c++.dg/enhanced-proto-2.mm: Likewise.
+	* obj-c++.dg/exceptions-1.mm: Likewise.
+	* obj-c++.dg/exceptions-3.mm: Likewise.
+	* obj-c++.dg/exceptions-4.mm: Likewise.
+	* obj-c++.dg/exceptions-5.mm: Likewise.
+	* obj-c++.dg/extern-c-1.mm: Likewise.
+	* obj-c++.dg/fobjc-std-1.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-class-meta.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-class.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-ivar.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-method.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-objc.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-objc_msg_lookup.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-object.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-property.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-protocol.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-resolve-method.mm: Likewise.
+	* obj-c++.dg/gnu-api-2-sel.mm: Likewise.
+	* obj-c++.dg/invalid-method-2.mm: Likewise.
+	* obj-c++.dg/ivar-invalid-type-1.mm: Likewise.
+	* obj-c++.dg/ivar-problem-1.mm: Likewise.
+	* obj-c++.dg/lto/lto.exp: Likewise.
+	* obj-c++.dg/lto/trivial-1_0.mm: Likewise.
+	* obj-c++.dg/method-1.mm: Likewise.
+	* obj-c++.dg/method-12.mm: Likewise.
+	* obj-c++.dg/method-18.mm: Likewise.
+	* obj-c++.dg/method-19.mm: Likewise.
+	* obj-c++.dg/method-20.mm: Likewise.
+	* obj-c++.dg/method-3.mm: Likewise.
+	* obj-c++.dg/method-4.mm: Likewise.
+	* obj-c++.dg/method-5.mm: Likewise.
+	* obj-c++.dg/method-8.mm: Likewise.
+	* obj-c++.dg/method-9.mm: Likewise.
+	* obj-c++.dg/method-namespace-1.mm: Likewise.
+	* obj-c++.dg/plugin/diagnostic-test-expressions-1.mm:
+	Likewise.
+	* obj-c++.dg/pr23709.mm: Likewise.
+	* obj-c++.dg/pragma-2.mm: Likewise.
+	* obj-c++.dg/private-1.mm: Likewise.
+	* obj-c++.dg/private-2.mm: Likewise.
+	* obj-c++.dg/property/property.exp: Likewise.
+	* obj-c++.dg/proto-lossage-1.mm: Likewise.
+	* obj-c++.dg/proto-lossage-5.mm: Likewise.
+	* obj-c++.dg/proto-qual-1.mm: Likewise.
+	* obj-c++.dg/protocol-inheritance-1.mm: Likewise.
+	* obj-c++.dg/protocol-inheritance-2.mm: Likewise.
+	* obj-c++.dg/protocol-optional-1.mm: Likewise.
+	* obj-c++.dg/selector-1.mm: Likewise.
+	* obj-c++.dg/selector-2.mm: Likewise.
+	* obj-c++.dg/selector-3.mm: Likewise.
+	* obj-c++.dg/selector-4.mm: Likewise.
+	* obj-c++.dg/strings/strings.exp: Likewise.
+	* obj-c++.dg/stubify-1.mm: Likewise.
+	* obj-c++.dg/stubify-2.mm: Likewise.
+	* obj-c++.dg/super-dealloc-1.mm: Likewise.
+	* obj-c++.dg/super-dealloc-2.mm: Likewise.
+	* obj-c++.dg/sync-3.mm: Likewise.
+	* obj-c++.dg/syntax-error-2.mm: Likewise.
+	* obj-c++.dg/syntax-error-4.mm: Likewise.
+	* obj-c++.dg/syntax-error-7.mm: Likewise.
+	* obj-c++.dg/syntax-error-9.mm: Likewise.
+	* obj-c++.dg/template-4.mm: Likewise.
+	* obj-c++.dg/template-7.mm: Likewise.
+	* obj-c++.dg/template-8.mm: Likewise.
+	* obj-c++.dg/threedotthree-abi-1.mm: Likewise.
+	* obj-c++.dg/torture/dg-torture.exp: Likewise.
+	* obj-c++.dg/torture/strings/strings.exp: Likewise.
+	* obj-c++.dg/try-catch-12.mm: Likewise.
+	* obj-c++.dg/try-catch-13.mm: Likewise.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/77404
+	* objc.dg/anon-1.m: Add Wno-objc-root-class.
+	* objc.dg/attributes/class-attribute-1.m: Likewise.
+	* objc.dg/attributes/class-attribute-2.m: Likewise.
+	* objc.dg/attributes/class-attribute-3.m: Likewise.
+	* objc.dg/attributes/method-deprecated-1.m: Likewise.
+	* objc.dg/attributes/method-deprecated-2.m: Likewise.
+	* objc.dg/attributes/method-deprecated-3.m: Likewise.
+	* objc.dg/attributes/method-format-1.m: Likewise.
+	* objc.dg/attributes/method-nonnull-1.m: Likewise.
+	* objc.dg/attributes/method-noreturn-1.m: Likewise.
+	* objc.dg/attributes/method-sentinel-1.m: Likewise.
+	* objc.dg/attributes/nsobject-01.m: Likewise.
+	* objc.dg/attributes/objc-exception-1.m: Likewise.
+	* objc.dg/attributes/parameter-attribute-1.m: Likewise.
+	* objc.dg/attributes/parameter-attribute-2.m: Likewise.
+	* objc.dg/attributes/proto-attribute-1.m: Likewise.
+	* objc.dg/attributes/proto-attribute-2.m: Likewise.
+	* objc.dg/attributes/proto-attribute-3.m: Likewise.
+	* objc.dg/attributes/proto-attribute-4.m: Likewise.
+	* objc.dg/bitfield-2.m: Likewise.
+	* objc.dg/break-in-ifstmt.m: Likewise.
+	* objc.dg/class-1.m: Likewise.
+	* objc.dg/class-extension-1.m: Likewise.
+	* objc.dg/class-extension-2.m: Likewise.
+	* objc.dg/class-extension-3.m: Likewise.
+	* objc.dg/class-extension-4.m: Likewise.
+	* objc.dg/class-protocol-1.m: Likewise.
+	* objc.dg/comp-types-7.m: Likewise.
+	* objc.dg/demangle-1.m: Likewise.
+	* objc.dg/duplicate-class-1.m: Likewise.
+	* objc.dg/encode-6-next.m: Likewise.
+	* objc.dg/encode-6.m: Likewise.
+	* objc.dg/enhanced-proto-2.m: Likewise.
+	* objc.dg/exceptions-1.m: Likewise.
+	* objc.dg/exceptions-3.m: Likewise.
+	* objc.dg/exceptions-4.m: Likewise.
+	* objc.dg/exceptions-5.m: Likewise.
+	* objc.dg/fobjc-std-1.m: Likewise.
+	* objc.dg/foreach-2.m: Likewise.
+	* objc.dg/foreach-4.m: Likewise.
+	* objc.dg/foreach-5.m: Likewise.
+	* objc.dg/fsyntax-only.m: Likewise.
+	* objc.dg/gnu-api-2-class-meta.m: Likewise.
+	* objc.dg/gnu-api-2-class.m: Likewise.
+	* objc.dg/gnu-api-2-ivar.m: Likewise.
+	* objc.dg/gnu-api-2-method.m: Likewise.
+	* objc.dg/gnu-api-2-objc.m: Likewise.
+	* objc.dg/gnu-api-2-objc_msg_lookup.m: Likewise.
+	* objc.dg/gnu-api-2-object.m: Likewise.
+	* objc.dg/gnu-api-2-property.m: Likewise.
+	* objc.dg/gnu-api-2-protocol.m: Likewise.
+	* objc.dg/gnu-api-2-resolve-method.m: Likewise.
+	* objc.dg/gnu-api-2-sel.m: Likewise.
+	* objc.dg/incomplete-type-1.m: Likewise.
+	* objc.dg/instancetype-0.m: Likewise.
+	* objc.dg/invalid-method-2.m: Likewise.
+	* objc.dg/ivar-invalid-type-1.m: Likewise.
+	* objc.dg/ivar-problem-1.m: Likewise.
+	* objc.dg/ivar-scope-1.m: Likewise.
+	* objc.dg/ivar-scope-2.m: Likewise.
+	* objc.dg/ivar-scope-4.m: Likewise.
+	* objc.dg/ivar-visibility-1.m: Likewise.
+	* objc.dg/ivar-visibility-2.m: Likewise.
+	* objc.dg/ivar-visibility-3.m: Likewise.
+	* objc.dg/ivar-visibility-4.m: Likewise.
+	* objc.dg/local-decl-1.m: Likewise.
+	* objc.dg/lto/lto.exp: Likewise.
+	* objc.dg/lto/trivial-1_0.m: Likewise.
+	* objc.dg/method-1.m: Likewise.
+	* objc.dg/method-12.m: Likewise.
+	* objc.dg/method-13.m: Likewise.
+	* objc.dg/method-14.m: Likewise.
+	* objc.dg/missing-proto-3.m: Likewise.
+	* objc.dg/next-runtime-1.m: Likewise.
+	* objc.dg/objc-foreach-1.m: Likewise.
+	* objc.dg/objc-foreach-2.m: Likewise.
+	* objc.dg/objc-foreach-3.m: Likewise.
+	* objc.dg/objc-nofilename-1.m: Likewise.
+	* objc.dg/param-1.m: Likewise.
+	* objc.dg/pch/pch.exp: Likewise.
+	* objc.dg/plugin/diagnostic-test-expressions-1.m: Likewise.
+	* objc.dg/pr23709.m: Likewise.
+	* objc.dg/private-1.m: Likewise.
+	* objc.dg/private-2.m: Likewise.
+	* objc.dg/property/property.exp: Likewise.
+	* objc.dg/proto-hier-1.m: Likewise.
+	* objc.dg/proto-hier-2.m: Likewise.
+	* objc.dg/proto-lossage-1.m: Likewise.
+	* objc.dg/proto-lossage-5.m: Likewise.
+	* objc.dg/proto-qual-1.m: Likewise.
+	* objc.dg/protocol-inheritance-1.m: Likewise.
+	* objc.dg/protocol-inheritance-2.m: Likewise.
+	* objc.dg/protocol-optional-1.m: Likewise.
+	* objc.dg/selector-1.m: Likewise.
+	* objc.dg/selector-2.m: Likewise.
+	* objc.dg/selector-3.m: Likewise.
+	* objc.dg/selector-4.m: Likewise.
+	* objc.dg/shadow-1.m: Likewise.
+	* objc.dg/shadow-2.m: Likewise.
+	* objc.dg/special/load-category-1.m: Likewise.
+	* objc.dg/special/load-category-2.m: Likewise.
+	* objc.dg/special/load-category-3.m: Likewise.
+	* objc.dg/special/special.exp: Likewise.
+	* objc.dg/special/unclaimed-category-1.h: Likewise.
+	* objc.dg/special/unclaimed-category-1.m: Likewise.
+	* objc.dg/stabs-1.m: Likewise.
+	* objc.dg/strings/strings.exp: Likewise.
+	* objc.dg/stubify-1.m: Likewise.
+	* objc.dg/stubify-2.m: Likewise.
+	* objc.dg/super-class-2.m: Likewise.
+	* objc.dg/super-dealloc-1.m: Likewise.
+	* objc.dg/super-dealloc-2.m: Likewise.
+	* objc.dg/sync-3.m: Likewise.
+	* objc.dg/threedotthree-abi-1.m: Likewise.
+	* objc.dg/torture/dg-torture.exp: Likewise.
+	* objc.dg/torture/strings/strings.exp: Likewise.
+	* objc.dg/try-catch-11.m: Likewise.
+	* objc.dg/try-catch-12.m: Likewise.
+	* objc.dg/type-size-2.m: Likewise.
+	* objc.dg/type-size-3.m: Likewise.
+	* objc.dg/type-size-4.m: Likewise.
+	* objc.dg/type-size-5.m: Likewise.
+	* objc.dg/undeclared-selector.m: Likewise.
+	* objc.dg/volatile-1.m: Likewise.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/77404
+	* objc.dg/attributes/root-class-01.m: New test.
+	* objc.dg/root-class-00.m: New test.
+	* obj-c++.dg/attributes/root-class-01.mm: New test.
+	* obj-c++.dg/root-class-00.mm: New test.
+
 2020-11-13  Patrick Palka  <ppalka@redhat.com>
 
 	* g++.dg/cpp2a/concepts-decltype3.C: New test.

@@ -58,13 +58,25 @@ namespace
   std::atomic<bool> futex_clock_realtime_unavailable;
   std::atomic<bool> futex_clock_monotonic_unavailable;
 
+#if defined(SYS_futex_time64) && SYS_futex_time64 != SYS_futex
+  // Userspace knows about the new time64 syscalls, so it's possible that
+  // userspace has also updated timespec to use a 64-bit tv_sec.
+  // The SYS_futex syscall still uses the old definition of timespec
+  // where tv_sec is 32 bits, so define a type that matches that.
+  struct syscall_timespec { long tv_sec; long tv_nsec; };
+  using syscall_time_t = long;
+#else
+  using syscall_timespec = ::timespec;
+  using syscall_time_t = time_t;
+#endif
+
   // Return the relative duration from (now_s + now_ns) to (abs_s + abs_ns)
-  // as a timespec.
-  struct timespec
+  // as a timespec suitable for syscalls.
+  syscall_timespec
   relative_timespec(chrono::seconds abs_s, chrono::nanoseconds abs_ns,
 		    time_t now_s, long now_ns)
   {
-    struct timespec rt;
+    syscall_timespec rt;
 
     // Did we already time out?
     if (now_s > abs_s.count())
@@ -73,21 +85,23 @@ namespace
 	return rt;
       }
 
-    auto rel_s = abs_s.count() - now_s;
+    const auto rel_s = abs_s.count() - now_s;
 
-    // Avoid overflows
-    if (rel_s > __int_traits<time_t>::__max) [[unlikely]]
-      rel_s = __int_traits<time_t>::__max;
-    else if (rel_s < __int_traits<time_t>::__min) [[unlikely]]
-      rel_s = __int_traits<time_t>::__min;
-
-    // Convert the absolute timeout value to a relative timeout
-    rt.tv_sec = rel_s;
-    rt.tv_nsec = abs_ns.count() - now_ns;
-    if (rt.tv_nsec < 0)
+    // Convert the absolute timeout to a relative timeout, without overflow.
+    if (rel_s > __int_traits<syscall_time_t>::__max) [[unlikely]]
       {
-	rt.tv_nsec += 1000000000;
-	--rt.tv_sec;
+	rt.tv_sec = __int_traits<syscall_time_t>::__max;
+	rt.tv_nsec = 999999999;
+      }
+    else
+      {
+	rt.tv_sec = rel_s;
+	rt.tv_nsec = abs_ns.count() - now_ns;
+	if (rt.tv_nsec < 0)
+	  {
+	    rt.tv_nsec += 1000000000;
+	    --rt.tv_sec;
+	  }
       }
 
     return rt;
@@ -117,9 +131,9 @@ namespace
 	    if (__s.count() < 0)
 	      return false;
 
-	    struct timespec rt;
-	    if (__s.count() > __int_traits<time_t>::__max) [[unlikely]]
-	      rt.tv_sec = __int_traits<time_t>::__max;
+	    syscall_timespec rt;
+	    if (__s.count() > __int_traits<syscall_time_t>::__max) [[unlikely]]
+	      rt.tv_sec = __int_traits<syscall_time_t>::__max;
 	    else
 	      rt.tv_sec = __s.count();
 	    rt.tv_nsec = __ns.count();
@@ -193,9 +207,9 @@ namespace
 	    if (__s.count() < 0) [[unlikely]]
 	      return false;
 
-	    struct timespec rt;
-	    if (__s.count() > __int_traits<time_t>::__max) [[unlikely]]
-	      rt.tv_sec = __int_traits<time_t>::__max;
+	    syscall_timespec rt;
+	    if (__s.count() > __int_traits<syscall_time_t>::__max) [[unlikely]]
+	      rt.tv_sec = __int_traits<syscall_time_t>::__max;
 	    else
 	      rt.tv_sec = __s.count();
 	    rt.tv_nsec = __ns.count();

@@ -588,7 +588,7 @@ _cpp_builtin_macro_text (cpp_reader *pfile, cpp_hashnode *node,
 	 (c) we are not in strictly conforming mode, then it has the
 	 value 0.  (b) and (c) are already checked in cpp_init_builtins.  */
     case BT_STDC:
-      if (cpp_in_system_header (pfile))
+      if (_cpp_in_system_header (pfile))
 	number = 0;
       else
 	number = 1;
@@ -2217,7 +2217,7 @@ replace_args (cpp_reader *pfile, cpp_hashnode *node, cpp_macro *macro,
 	      = (const cpp_token **) tokens_buff_last_token_ptr (buff);
 	}
       else if (CPP_PEDANTIC (pfile) && ! CPP_OPTION (pfile, c99)
-	       && ! macro->syshdr && ! cpp_in_system_header (pfile))
+	       && ! macro->syshdr && ! _cpp_in_system_header (pfile))
 	{
 	  if (CPP_OPTION (pfile, cplusplus))
 	    cpp_pedwarning (pfile, CPP_W_PEDANTIC,
@@ -2236,7 +2236,7 @@ replace_args (cpp_reader *pfile, cpp_hashnode *node, cpp_macro *macro,
 	}
       else if (CPP_OPTION (pfile, cpp_warn_c90_c99_compat) > 0
 	       && ! CPP_OPTION (pfile, cplusplus)
-	       && ! macro->syshdr && ! cpp_in_system_header (pfile))
+	       && ! macro->syshdr && ! _cpp_in_system_header (pfile))
 	cpp_warning (pfile, CPP_W_C90_C99_COMPAT,
 		     "invoking macro %s argument %d: "
 		     "empty macro arguments are undefined"
@@ -2963,6 +2963,85 @@ cpp_get_token_1 (cpp_reader *pfile, location_t *location)
     }
 
   pfile->about_to_expand_macro_p = saved_about_to_expand_macro;
+
+  if (pfile->state.directive_file_token
+      && !pfile->state.parsing_args
+      && !(result->type == CPP_PADDING || result->type == CPP_COMMENT)
+      && !(15 & --pfile->state.directive_file_token))
+    {
+      /* Do header-name frobbery.  Concatenate < ... > as approprate.
+	 Do header search if needed, and finally drop the outer <> or
+	 "".  */
+      pfile->state.angled_headers = false;
+
+      /* Do angle-header reconstitution.  Then do include searching.
+	 We'll always end up with a ""-quoted header-name in that
+	 case.  If searching finds nothing, we emit a diagnostic and
+	 an empty string.  */
+      size_t len = 0;
+      char *fname = NULL;
+
+      cpp_token *tmp = _cpp_temp_token (pfile);
+      *tmp = *result;
+
+      tmp->type = CPP_HEADER_NAME;
+      bool need_search = !pfile->state.directive_file_token;
+      pfile->state.directive_file_token = 0;
+
+      bool angle = result->type != CPP_STRING;
+      if (result->type == CPP_HEADER_NAME
+	  || (result->type == CPP_STRING && result->val.str.text[0] != 'R'))
+	{
+	  len = result->val.str.len - 2;
+	  fname = XNEWVEC (char, len + 1);
+	  memcpy (fname, result->val.str.text + 1, len);
+	  fname[len] = 0;
+	}
+      else if (result->type == CPP_LESS)
+	fname = _cpp_bracket_include (pfile);
+
+      if (fname)
+	{
+	  /* We have a header-name.  Look it up.  This will emit an
+	     unfound diagnostic.  Canonicalize the found name.  */
+	  const char *found = fname;
+
+	  if (need_search)
+	    {
+	      found = cpp_find_header_unit (pfile, fname, angle, tmp->src_loc);
+	      if (!found)
+		found = "";
+	      len = strlen (found);
+	    }
+	  /* Force a leading './' if it's not absolute.  */
+	  bool dotme = (found[0] == '.' ? !IS_DIR_SEPARATOR (found[1])
+			: found[0] && !IS_ABSOLUTE_PATH (found));
+
+	  if (BUFF_ROOM (pfile->u_buff) < len + 1 + dotme * 2)
+	    _cpp_extend_buff (pfile, &pfile->u_buff, len + 1 + dotme * 2);
+	  unsigned char *buf = BUFF_FRONT (pfile->u_buff);
+	  size_t pos = 0;
+	      
+	  if (dotme)
+	    {
+	      buf[pos++] = '.';
+	      /* Apparently '/' is unconditional.  */
+	      buf[pos++] = '/';
+	    }
+	  memcpy (&buf[pos], found, len);
+	  pos += len;
+	  buf[pos] = 0;
+
+	  tmp->val.str.len = pos;
+	  tmp->val.str.text = buf;
+
+	  tmp->type = CPP_HEADER_NAME;
+	  XDELETEVEC (fname);
+	  
+	  result = tmp;
+	}
+    }
+
   return result;
 }
 

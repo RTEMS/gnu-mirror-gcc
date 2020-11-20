@@ -128,12 +128,8 @@ enum cp_tree_index
     CPTI_EXPLICIT_VOID_LIST,
     CPTI_VTBL_TYPE,
     CPTI_VTBL_PTR_TYPE,
-    CPTI_STD,
-    CPTI_ABI,
     CPTI_GLOBAL,
     CPTI_GLOBAL_TYPE,
-    CPTI_CONST_TYPE_INFO_TYPE,
-    CPTI_TYPE_INFO_PTR_TYPE,
     CPTI_ABORT_FNDECL,
     CPTI_AGGR_TAG,
     CPTI_CONV_OP_MARKER,
@@ -190,8 +186,28 @@ enum cp_tree_index
     CPTI_NOEXCEPT_FALSE_SPEC,
     CPTI_NOEXCEPT_DEFERRED_SPEC,
 
+    CPTI_NULLPTR,
+    CPTI_NULLPTR_TYPE,
+
+    CPTI_ANY_TARG,
+
+    CPTI_MODULE_HWM,
+    /* Nodes after here change during compilation, or should not be in
+       the module's global tree table.  */
+
+    /* We must find these via the global namespace.  */
+    CPTI_STD,
+    CPTI_ABI,
+
+    /* These are created at init time, but the library/headers provide
+       definitions.  */
+    CPTI_ALIGN_TYPE,
+    CPTI_CONST_TYPE_INFO_TYPE,
+    CPTI_TYPE_INFO_PTR_TYPE,
     CPTI_TERMINATE_FN,
     CPTI_CALL_UNEXPECTED_FN,
+
+    /* These are lazily inited.  */
     CPTI_GET_EXCEPTION_PTR_FN,
     CPTI_BEGIN_CATCH_FN,
     CPTI_END_CATCH_FN,
@@ -203,13 +219,6 @@ enum cp_tree_index
     CPTI_ATEXIT,
     CPTI_DSO_HANDLE,
     CPTI_DCAST,
-
-    CPTI_NULLPTR,
-    CPTI_NULLPTR_TYPE,
-
-    CPTI_ALIGN_TYPE,
-
-    CPTI_ANY_TARG,
 
     CPTI_SOURCE_LOCATION_IMPL,
 
@@ -5394,6 +5403,14 @@ public:
   hash_map<tree, tree> *saved;
 };
 
+/* Entry in the specialization hash table.  */
+struct GTY((for_user)) spec_entry
+{
+  tree tmpl;  /* The general template this is a specialization of.  */
+  tree args;  /* The args for this (maybe-partial) specialization.  */
+  tree spec;  /* The specialization itself.  */
+};
+
 /* in class.c */
 
 extern int current_class_depth;
@@ -6985,6 +7002,15 @@ extern bool copy_guide_p			(const_tree);
 extern bool template_guide_p			(const_tree);
 extern bool builtin_guide_p			(const_tree);
 extern void store_explicit_specifier		(tree, tree);
+extern void walk_specializations		(bool,
+						 void (*)(bool, spec_entry *,
+							  void *),
+						 void *);
+extern tree match_mergeable_specialization	(bool is_decl, tree tmpl,
+						 tree args, tree spec);
+extern unsigned get_mergeable_specialization_flags (tree tmpl, tree spec);
+extern void add_mergeable_specialization        (tree tmpl, tree args,
+						 tree spec, unsigned);
 extern tree add_outermost_template_args		(tree, tree);
 extern tree add_extra_args			(tree, tree);
 extern tree build_extra_args			(tree, tree, tsubst_flags_t);
@@ -7886,9 +7912,20 @@ extern void vtv_recover_class_info              (void);
 extern void vtv_build_vtable_verify_fndecl      (void);
 
 /* In constexpr.c */
+/* Representation of entries in the constexpr function definition table.  */
+
+struct GTY((for_user)) constexpr_fundef {
+  tree decl;
+  tree body;
+  tree parms;
+  tree result;
+};
+
 extern void fini_constexpr			(void);
 extern bool literal_type_p                      (tree);
-extern tree register_constexpr_fundef           (tree, tree);
+extern void maybe_save_constexpr_fundef		(tree);
+extern void register_constexpr_fundef		(const constexpr_fundef &);
+extern constexpr_fundef *retrieve_constexpr_fundef	(tree);
 extern bool is_valid_constexpr_fn		(tree, bool);
 extern bool check_constexpr_ctor_body           (tree, tree, bool);
 extern tree constexpr_fn_retval		(tree);

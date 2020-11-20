@@ -1,3 +1,33 @@
+2020-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/97860
+	* c-decl.c (get_parm_array_spec): Bail out of nelts is
+	error_operand_p.
+
+2020-11-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* Make-lang.in (c.serial): New goal.
+	(.PHONY): Add c.serial c.prev.
+	(cc1$(exeext)): Call LINK_PROGRESS.
+
+2020-11-13  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* c-parser.c (c_parser_asm_statement): Parse outputs for asm
+	goto too.
+	* c-typeck.c (build_asm_expr): Remove an assert checking output
+	absence for asm goto.
+
+2020-11-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-typeck.c (c_finish_omp_clauses): Don't clear
+	OMP_CLAUSE_REDUCTION_INSCAN unless reduction_seen == -2.
+
+2020-11-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR objc/77404
+	* c-parser.c (c_parser_objc_class_definition): Pass the
+	location of the class name to the interface declaration.
+
 2020-11-10  Strager Neds  <strager.nds@gmail.com>
 
 	* c-decl.c (merge_decls): Use new overload of

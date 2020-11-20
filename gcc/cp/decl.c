@@ -2452,6 +2452,20 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
   if (! DECL_COMDAT (olddecl))
     DECL_COMDAT (newdecl) = 0;
 
+  if (VAR_OR_FUNCTION_DECL_P (newdecl) && DECL_LOCAL_DECL_P (newdecl))
+    {
+      if (!DECL_LOCAL_DECL_P (olddecl))
+	/* This can happen if olddecl was brought in from the
+	   enclosing namespace via a using-decl.  The new decl is
+	   then not a block-scope extern at all.  */
+	DECL_LOCAL_DECL_P (newdecl) = false;
+      else
+	{
+	  retrofit_lang_decl (newdecl);
+	  DECL_LOCAL_DECL_ALIAS (newdecl) = DECL_LOCAL_DECL_ALIAS (olddecl);
+	}
+    }
+
   new_template_info = NULL_TREE;
   if (DECL_LANG_SPECIFIC (newdecl) && DECL_LANG_SPECIFIC (olddecl))
     {
@@ -2735,8 +2749,8 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
      with that from NEWDECL below.  */
   if (DECL_LANG_SPECIFIC (olddecl))
     {
-      gcc_assert (DECL_LANG_SPECIFIC (olddecl)
-		  != DECL_LANG_SPECIFIC (newdecl));
+      gcc_checking_assert (DECL_LANG_SPECIFIC (olddecl)
+			   != DECL_LANG_SPECIFIC (newdecl));
       ggc_free (DECL_LANG_SPECIFIC (olddecl));
     }
 
@@ -7926,10 +7940,9 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 
       make_rtl_for_nonlocal_decl (decl, init, asmspec);
 
-      /* Check for abstractness of the type. Notice that there is no
-	 need to strip array types here since the check for those types
-	 is already done within create_array_type_for_decl.  */
-      abstract_virtuals_error (decl, type);
+      /* Check for abstractness of the type.  */
+      if (var_definition_p)
+	abstract_virtuals_error (decl, type);
 
       if (TREE_TYPE (decl) == error_mark_node)
 	/* No initialization required.  */
@@ -10701,11 +10714,6 @@ create_array_type_for_decl (tree name, tree type, tree size, location_t loc)
     itype = compute_array_index_type_loc (loc, name, size,
 					  tf_warning_or_error);
 
-  /* [dcl.array]
-     T is called the array element type; this type shall not be [...] an
-     abstract class type.  */
-  abstract_virtuals_error (name, type);
-
   return build_cplus_array_type (type, itype);
 }
 
@@ -12096,11 +12104,6 @@ grokdeclarator (const cp_declarator *declarator,
 	    int funcdecl_p;
 
 	    /* Declaring a function type.  */
-
-	    {
-	      iloc_sentinel ils (declspecs->locations[ds_type_spec]);
-	      abstract_virtuals_error (ACU_RETURN, type);
-	    }
 
 	    /* Pick up type qualifiers which should be applied to `this'.  */
 	    memfn_quals = declarator->u.function.qualifiers;
@@ -13872,6 +13875,7 @@ require_complete_types_for_parms (tree parms)
 	  relayout_decl (parms);
 	  DECL_ARG_TYPE (parms) = type_passed_as (TREE_TYPE (parms));
 
+	  abstract_virtuals_error (parms, TREE_TYPE (parms));
 	  maybe_warn_parm_abi (TREE_TYPE (parms),
 			       DECL_SOURCE_LOCATION (parms));
 	}
@@ -14109,9 +14113,6 @@ grokparms (tree parmlist, tree *parms)
 	      type = build_pointer_type (type);
 	      TREE_TYPE (decl) = type;
 	    }
-	  else if (abstract_virtuals_error (decl, type))
-	    /* Ignore any default argument.  */
-	    init = NULL_TREE;
 	  else if (cxx_dialect < cxx17 && INDIRECT_TYPE_P (type))
 	    {
 	      /* Before C++17 DR 393:
@@ -16871,20 +16872,6 @@ record_key_method_defined (tree fndecl)
     }
 }
 
-/* Subroutine of finish_function.
-   Save the body of constexpr functions for possible
-   future compile time evaluation.  */
-
-static void
-maybe_save_function_definition (tree fun)
-{
-  if (!processing_template_decl
-      && DECL_DECLARED_CONSTEXPR_P (fun)
-      && !cp_function_chain->invalid_constexpr
-      && !DECL_CLONED_FUNCTION_P (fun))
-    register_constexpr_fundef (fun, DECL_SAVED_TREE (fun));
-}
-
 /* Attempt to add a fix-it hint to RICHLOC suggesting the insertion
    of "return *this;" immediately before its location, using FNDECL's
    first statement (if any) to give the indentation, if appropriate.  */
@@ -16918,7 +16905,7 @@ emit_coro_helper (tree helper)
   allocate_struct_function (helper, false);
   cfun->language = ggc_cleared_alloc<language_function> ();
   poplevel (1, 0, 1);
-  maybe_save_function_definition (helper);
+  maybe_save_constexpr_fundef (helper);
   /* We must start each function with a clear fold cache.  */
   clear_fold_cache ();
   cp_fold_function (helper);
@@ -17152,7 +17139,7 @@ finish_function (bool inline_p)
 
   /* Save constexpr function body before it gets munged by
      the NRV transformation.   */
-  maybe_save_function_definition (fndecl);
+  maybe_save_constexpr_fundef (fndecl);
 
   /* Invoke the pre-genericize plugin before we start munging things.  */
   if (!processing_template_decl)
@@ -17427,9 +17414,6 @@ complete_vars (tree type)
       else
 	ix++;
     }
-
-  /* Check for pending declarations which may have abstract type.  */
-  complete_type_check_abstract (type);
 }
 
 /* If DECL is of a type which needs a cleanup, build and return an
