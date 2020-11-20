@@ -8115,7 +8115,7 @@ This option can be ignored by this target hook.
 The hook's return value must be zero.  Other return values may be
 supported in the future.
 
-By default this hook is set to NULL, but an example implementation is
+aBy default this hook is set to NULL, but an example implementation is
 provided for ELF based targets.  Called @var{elf_record_gcc_switches},
 it records the switches as ASCII text inside a new, string mergeable
 section in the assembler output file.  The name of the new section is
