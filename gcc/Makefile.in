@@ -1430,6 +1430,7 @@ OBJS = \
 	init-regs.o \
 	internal-fn.o \
 	ipa-type-escape-analysis.o \
+	ipa-dfe.o \
 	ipa-cp.o \
 	ipa-sra.o \
 	ipa-devirt.o \

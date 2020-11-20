@@ -94,6 +94,16 @@ assert_is_gimple_rhs_class (const gimple *stmt,
   gcc_assert (succeeds);
 }
 
+/* There are some cases where I need to change a tree to a tree.
+ * Some of these are part of the way the API is written.  To avoid
+ * warnings, always use this function for casting away const-ness.
+ */
+inline static tree
+tree_to_tree (tree t)
+{
+  return (tree) t;
+}
+
 // TODO: Rename?
 // TSET_T stands for type set.
 typedef std::set<tree> tset_t;
@@ -632,11 +642,11 @@ public:
   /* Holds the result after collecting from all trees.  */
   tpartitions_t get_record_reaching_trees ()
   {
-    return typeCollector.get_record_reaching_trees ();
+    return _type_collector.get_record_reaching_trees ();
   }
 
 private:
-  type_collector typeCollector;
+  type_collector _type_collector;
 
   /* Catch all callback for all nested expressions E.  */
   virtual void _walk_pre (tree e);

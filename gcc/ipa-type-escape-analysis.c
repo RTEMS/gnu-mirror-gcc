@@ -168,6 +168,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 
 #include "ipa-type-escape-analysis.h"
+#include "ipa-dfe.h"
 
 // Main function that drives dfe.
 static unsigned int
@@ -210,16 +211,6 @@ bitpos_of_field (const tree fdecl)
 
   return (tree_to_shwi (DECL_FIELD_OFFSET (fdecl)) * BITS_PER_UNIT
 	  + tree_to_shwi (DECL_FIELD_BIT_OFFSET (fdecl)));
-}
-
-/* There are some cases where I need to change a tree to a tree.
- * Some of these are part of the way the API is written.  To avoid
- * warnings, always use this function for casting away const-ness.
- */
-inline static tree
-tree_to_tree (tree t)
-{
-  return (tree) t;
 }
 
 namespace {
@@ -287,6 +278,17 @@ lto_dead_field_elimination ()
 					    record_field_map);
   if (record_field_offset_map.empty ())
     return;
+
+    // Prepare for transformation.
+  std::set<tree> to_modify
+    = get_all_types_pointing_to (record_field_offset_map,
+				 escaping_nonescaping_sets);
+  reorg_maps_t replacements
+    = get_types_replacement (record_field_offset_map, to_modify);
+  reorg_record_map_t map = replacements.first;
+  reorg_field_map_t field_map = replacements.second;
+  // Transformation.
+  substitute_types_in_program (map, field_map);
 
 }
 
@@ -1779,7 +1781,7 @@ expr_collector::_walk_pre (tree e)
 {
   tree t = TREE_TYPE (e);
   gcc_assert (t);
-  typeCollector.collect (t);
+  _type_collector.collect (t);
 }
 
 /*
