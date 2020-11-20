@@ -757,8 +757,7 @@ directive to annotate @var{symbol} as used.  The Darwin target uses the\n\
 DEFHOOK
 (record_gcc_switches,
  "Provides the target with the ability to record the gcc command line\n\
-switches that have been passed to the compiler, and options that are\n\
-enabled.\n\
+switches provided as argument.\n\
 \n\
 By default this hook is set to NULL, but an example implementation is\n\
 provided for ELF based targets.  Called @var{elf_record_gcc_switches},\n\
@@ -766,7 +765,7 @@ it records the switches as ASCII text inside a new, string mergeable\n\
 section in the assembler output file.  The name of the new section is\n\
 provided by the @code{TARGET_ASM_RECORD_GCC_SWITCHES_SECTION} target\n\
 hook.",
- void, (void),
+ void, (const char *),
  NULL)
 
 /* The name of the section that the example ELF implementation of

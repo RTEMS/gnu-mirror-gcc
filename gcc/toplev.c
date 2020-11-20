@@ -727,7 +727,23 @@ init_asm_output (const char *name)
       if (flag_record_gcc_switches)
 	{
 	  if (targetm.asm_out.record_gcc_switches)
-	    targetm.asm_out.record_gcc_switches ();
+	    {
+	      if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
+		{
+		  const char *str = concat (version_string, " ",
+					    get_driver_command_line (), NULL);
+		  targetm.asm_out.record_gcc_switches (str);
+		  free (CONST_CAST (char *, str));
+		}
+	      else
+		{
+		  const char *str
+		    = get_producer_string (lang_hooks.name,
+					   save_decoded_options,
+					   save_decoded_options_count);
+		  targetm.asm_out.record_gcc_switches (str);
+		}
+	    }
 	  else
 	    inform (UNKNOWN_LOCATION,
 		    "%<-frecord-gcc-switches%> is not supported by "
@@ -739,12 +755,9 @@ init_asm_output (const char *name)
 	  print_version (asm_out_file, ASM_COMMENT_START, true);
 	  fputs (ASM_COMMENT_START, asm_out_file);
 	  fputc (' ', asm_out_file);
-	  if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
-	    fputs (get_driver_command_line (), asm_out_file);
-	  else
-	    fputs (get_producer_string (lang_hooks.name, save_decoded_options,
-					save_decoded_options_count),
-		   asm_out_file);
+	  fputs (get_producer_string (lang_hooks.name, save_decoded_options,
+				      save_decoded_options_count),
+		 asm_out_file);
 	  fputc ('\n', asm_out_file);
 	}
     }

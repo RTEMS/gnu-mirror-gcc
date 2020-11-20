@@ -8017,28 +8017,13 @@ output_object_blocks (void)
    ASM_OUTPUT_SKIP.  */
 
 void
-elf_record_gcc_switches ()
+elf_record_gcc_switches (const char *options)
 {
   section *sec = get_section (targetm.asm_out.record_gcc_switches_section,
 			      SECTION_DEBUG | SECTION_MERGE
 			      | SECTION_STRINGS | (SECTION_ENTSIZE & 1), NULL);
   switch_to_section (sec);
-
-  if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
-    {
-      ASM_OUTPUT_ASCII (asm_out_file, version_string, strlen (version_string));
-      ASM_OUTPUT_ASCII (asm_out_file, " ", 1);
-      const char *cmdline = get_driver_command_line ();
-      ASM_OUTPUT_ASCII (asm_out_file, cmdline, strlen (cmdline) + 1);
-    }
-  else
-    {
-      const char *producer_string
-	= get_producer_string (lang_hooks.name, save_decoded_options,
-			       save_decoded_options_count);
-      ASM_OUTPUT_ASCII (asm_out_file, producer_string,
-			strlen (producer_string) + 1);
-    }
+  ASM_OUTPUT_ASCII (asm_out_file, options, strlen (options) + 1);
 }
 
 /* Emit text to declare externally defined symbols. It is needed to
