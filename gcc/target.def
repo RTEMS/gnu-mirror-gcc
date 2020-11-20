@@ -795,7 +795,7 @@ supported in the future.\n\
 \n\
 aBy default this hook is set to NULL, but an example implementation is\n\
 provided for ELF based targets.  Called @var{elf_record_gcc_switches},\n\
-it records the switches as ASCII text inside a new, string mergeable\n\
+	 it records the switches as ASCII text inside a new, string mergeable\n\
 section in the assembler output file.  The name of the new section is\n\
 provided by the @code{TARGET_ASM_RECORD_GCC_SWITCHES_SECTION} target\n\
 hook.",
