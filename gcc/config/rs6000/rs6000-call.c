@@ -14263,7 +14263,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 
       /* We're disassembling an accumulator into a different type, so we need
 	 to emit a xxmfacc instruction now, since we cannot do it later.  */
-      new_decl = rs6000_builtin_decls[RS6000_BIF_XXMFACC_INTERNAL];
+      new_decl = rs6000_builtin_decls_x[RS6000_BIF_XXMFACC_INTERNAL];
       new_call = gimple_build_call (new_decl, 1, src);
       src = make_ssa_name (vector_quad_type_node);
       gimple_call_set_lhs (new_call, src);
@@ -14292,7 +14292,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 
   /* Convert this built-in into an internal version that uses pass-by-value
      arguments.  The internal built-in follows immediately after this one.  */
-  new_decl = rs6000_builtin_decls[fncode + 1];
+  new_decl = rs6000_builtin_decls_x[fncode + 1];
   tree lhs, op[MAX_MMA_OPERANDS];
   tree acc = gimple_call_arg (stmt, 0);
   push_gimplify_context (true);
@@ -16070,6 +16070,7 @@ rs6000_init_builtins (void)
 }
 
 /* Returns the rs6000 builtin decl for CODE.  */
+/* #### TODO: Rewrite this.  */
 
 tree
 rs6000_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
