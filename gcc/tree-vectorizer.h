@@ -27,6 +27,7 @@ typedef class _stmt_vec_info *stmt_vec_info;
 #include "tree-hash-traits.h"
 #include "target.h"
 #include "alloc-pool.h"
+#include "internal-fn.h"
 
 
 /* Used for naming of new temporaries.  */
@@ -1994,6 +1995,7 @@ extern void duplicate_and_interleave (vec_info *, gimple_seq *, tree,
 extern int vect_get_place_in_interleaving_chain (stmt_vec_info, stmt_vec_info);
 extern bool vect_update_shared_vectype (stmt_vec_info, tree);
 extern slp_tree vect_create_new_slp_node (vec<stmt_vec_info>, unsigned);
+extern void vect_free_slp_tree (slp_tree);
 
 /* In tree-vect-patterns.c.  */
 extern void
@@ -2009,5 +2011,68 @@ unsigned vectorize_loops (void);
 void vect_free_loop_info_assumptions (class loop *);
 gimple *vect_loop_vectorized_call (class loop *, gcond **cond = NULL);
 bool vect_stmt_dominates_stmt_p (gimple *, gimple *);
+
+/* SLP Pattern matcher types, tree-vect-slp-patterns.c.  */
+
+/* Forward declaration of possible two operands operation that can be matched
+   by the complex numbers pattern matchers.  */
+enum _complex_operation : unsigned;
+
+/* Cache from nodes to the load permutation they represent.  */
+typedef hash_map <slp_tree, load_permutation_t >
+  slp_tree_to_load_perm_map_t;
+
+/* Vector pattern matcher base class.  All SLP pattern matchers must inherit
+   from this type.  */
+
+class vect_pattern
+{
+  protected:
+    /* The number of arguments that the IFN requires.  */
+    unsigned m_num_args;
+
+    /* The internal function that will be used when a pattern is created.  */
+    internal_fn m_ifn;
+
+    /* The current node being inspected.  */
+    slp_tree *m_node;
+
+    /* The list of operands to be the children for the node produced when the
+       internal function is created.  */
+    vec<slp_tree> m_ops;
+
+    /* Default constructor where NODE is the root of the tree to inspect.  */
+    vect_pattern (slp_tree *node, vec<slp_tree> *m_ops, internal_fn ifn)
+    {
+      this->m_ifn = ifn;
+      this->m_node = node;
+      this->m_ops.create (0);
+      this->m_ops.safe_splice (*m_ops);
+    }
+
+  public:
+
+    /* Create a new instance of the pattern matcher class of the given type.  */
+    static vect_pattern* recognize (slp_tree_to_load_perm_map_t *, slp_tree *);
+
+    /* Build the pattern from the data collected so far.  */
+    virtual void build (slp_tree_to_load_perm_map_t *, vec_info *) = 0;
+
+    /* Default destructor.  */
+    virtual ~vect_pattern ()
+    {
+	this->m_ops.release ();
+    }
+};
+
+/* Function pointer to create a new pattern matcher from a generic type.  */
+typedef vect_pattern* (*vect_pattern_decl_t) (slp_tree_to_load_perm_map_t *,
+					      slp_tree *);
+
+/* List of supported pattern matchers.  */
+extern vect_pattern_decl_t slp_patterns[];
+
+/* Number of supported pattern matchers.  */
+extern size_t num__slp_patterns;
 
 #endif  /* GCC_TREE_VECTORIZER_H  */

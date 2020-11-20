@@ -105,7 +105,7 @@ _slp_tree::~_slp_tree ()
 
 /* Recursively free the memory allocated for the SLP tree rooted at NODE.  */
 
-static void
+void
 vect_free_slp_tree (slp_tree node)
 {
   int i;
@@ -148,7 +148,7 @@ vect_free_slp_instance (slp_instance instance)
 
 /* Create an SLP node for SCALAR_STMTS.  */
 
-slp_tree
+static slp_tree
 vect_create_new_slp_node (slp_tree node,
 			  vec<stmt_vec_info> scalar_stmts, unsigned nops)
 {
@@ -165,7 +165,7 @@ vect_create_new_slp_node (slp_tree node,
 
 /* Create an SLP node for SCALAR_STMTS.  */
 
-static slp_tree
+slp_tree
 vect_create_new_slp_node (vec<stmt_vec_info> scalar_stmts, unsigned nops)
 {
   return vect_create_new_slp_node (new _slp_tree, scalar_stmts, nops);
@@ -2175,6 +2175,84 @@ calculate_unrolling_factor (poly_uint64 nunits, unsigned int group_size)
   return exact_div (common_multiple (nunits, group_size), group_size);
 }
 
+/* Helper function of vect_match_slp_patterns.
+
+   Attempts to match patterns against the slp tree rooted in REF_NODE using
+   VINFO.  Patterns are matched in post-order traversal.
+
+   If matching is successful the value in REF_NODE is updated and returned, if
+   not then it is returned unchanged.  */
+
+static bool
+vect_match_slp_patterns_2 (slp_tree *ref_node, vec_info *vinfo,
+			   slp_tree_to_load_perm_map_t *perm_cache,
+			   hash_set<slp_tree> *visited)
+{
+  unsigned i;
+  slp_tree node = *ref_node;
+  bool found_p = false;
+  if (!node || visited->add (node))
+    return false;
+
+  slp_tree child;
+  FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
+    found_p |= vect_match_slp_patterns_2 (&SLP_TREE_CHILDREN (node)[i],
+					  vinfo, perm_cache, visited);
+
+  for (unsigned x = 0; x < num__slp_patterns; x++)
+    {
+      vect_pattern *pattern = slp_patterns[x] (perm_cache, ref_node);
+      if (pattern)
+	{
+	  pattern->build (perm_cache, vinfo);
+	  delete pattern;
+	  found_p = true;
+	}
+    }
+
+  return found_p;
+}
+
+/* Applies pattern matching to the given SLP tree rooted in REF_NODE using
+   vec_info VINFO.
+
+   The modified tree is returned.  Patterns are tried in order and multiple
+   patterns may match.  */
+
+static bool
+vect_match_slp_patterns (slp_instance instance, vec_info *vinfo,
+			 hash_set<slp_tree> *visited,
+			 slp_tree_to_load_perm_map_t *perm_cache,
+			 scalar_stmts_to_slp_tree_map_t * /* bst_map */)
+{
+  DUMP_VECT_SCOPE ("vect_match_slp_patterns");
+  slp_tree *ref_node = &SLP_INSTANCE_TREE (instance);
+
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "Analyzing SLP tree %p for patterns\n",
+		     SLP_INSTANCE_TREE (instance));
+
+  bool found_p
+    = vect_match_slp_patterns_2 (ref_node, vinfo, perm_cache, visited);
+
+  if (found_p)
+    {
+      if (dump_enabled_p ())
+	{
+	  dump_printf_loc (MSG_NOTE, vect_location,
+			   "Pattern matched SLP tree\n");
+	  vect_print_slp_graph (MSG_NOTE, vect_location, *ref_node);
+	}
+    }
+
+  return found_p;
+}
+
+/* Analyze an SLP instance starting from a group of grouped stores.  Call
+   vect_build_slp_tree to build a tree of packed stmts if possible.
+   Return FALSE if it's impossible to SLP any stmt in the loop.  */
+
 static bool
 vect_analyze_slp_instance (vec_info *vinfo,
 			   scalar_stmts_to_slp_tree_map_t *bst_map,
@@ -2540,6 +2618,7 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 {
   unsigned int i;
   stmt_vec_info first_element;
+  slp_instance instance;
 
   DUMP_VECT_SCOPE ("vect_analyze_slp");
 
@@ -2585,6 +2664,13 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 	vect_analyze_slp_instance (vinfo, bst_map, loop_vinfo->reductions[0],
 				   slp_inst_kind_reduc_group, max_tree_size);
     }
+
+  hash_set<slp_tree> visited_patterns;
+  slp_tree_to_load_perm_map_t perm_cache;
+  /* See if any patterns can be found in the SLP tree.  */
+  FOR_EACH_VEC_ELT (LOOP_VINFO_SLP_INSTANCES (vinfo), i, instance)
+    vect_match_slp_patterns (instance, vinfo, &visited_patterns, &perm_cache,
+			     bst_map);
 
   /* The map keeps a reference on SLP nodes built, release that.  */
   for (scalar_stmts_to_slp_tree_map_t::iterator it = bst_map->begin ();
