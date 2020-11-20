@@ -1431,6 +1431,7 @@ OBJS = \
 	internal-fn.o \
 	ipa-type-escape-analysis.o \
 	ipa-dfe.o \
+	ipa-field-reorder.o \
 	ipa-cp.o \
 	ipa-sra.o \
 	ipa-devirt.o \

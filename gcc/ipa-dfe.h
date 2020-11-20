@@ -69,7 +69,8 @@ typedef std::map<tree, std::pair<tree, bool> > reorg_field_map_t;
 class type_reconstructor : public type_walker
 {
 public:
-  type_reconstructor (record_field_offset_map_t records) : _records (records)
+  type_reconstructor (record_field_offset_map_t records, const char *suffix)
+    : _records (records), _suffix (suffix)
   {};
 
   /* Whether a type has already been modified.  */
@@ -84,7 +85,8 @@ public:
   /* Map RECORD_TYPE -> is_modified.  */
   typedef std::map<tree, bool> is_modified_map_t;
 
-private:
+protected:
+  const char *get_new_suffix ();
 
   // Modifications to the current sub_type
   std::stack<tree> in_progress;
@@ -104,6 +106,9 @@ private:
 
   // Which records can be modified.
   record_field_offset_map_t _records;
+
+  // The new suffix
+  const char *_suffix;
 
   // Which fields will be deleted.
   field_tuple_list_stack_t field_list_stack;
@@ -127,6 +132,7 @@ private:
   // If the type has been modified.
   bool get_is_modified (tree);
 
+private:
   // Compute new FIELD_DECL list.
   virtual void _walk_field_pre (tree);
   virtual void _walk_field_post (tree);
@@ -150,8 +156,9 @@ private:
 class expr_type_rewriter : public expr_walker
 {
 public:
-  expr_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2)
-    : _delete (false), _map (map), _map2 (map2)
+  expr_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2,
+		    bool can_delete)
+    : _delete (false), _can_delete (can_delete), _map (map), _map2 (map2)
   {
     /* Create an inverse map new RECORD_TYPE -> old RECORD_TYPE.  */
     for (reorg_record_map_t::iterator i = map.begin (),
@@ -178,6 +185,7 @@ public:
   // Delete statement.
   bool delete_statement ();
   bool _delete;
+  bool _can_delete;
 
 private:
   // Old RECORD_TYPE -> new RECORD_TYPE.
@@ -207,8 +215,9 @@ private:
 class gimple_type_rewriter : public gimple_walker
 {
 public:
-  gimple_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2)
-    : exprTypeRewriter (map, map2)
+  gimple_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2,
+		      bool can_delete)
+    : exprTypeRewriter (map, map2, can_delete)
   {};
 
   void _rewrite_function_decl ();
@@ -242,6 +251,9 @@ get_types_replacement (record_field_offset_map_t record_field_offset_map,
 // Substitute types.
 void
 substitute_types_in_program (reorg_record_map_t map,
-			     reorg_field_map_t field_map);
+			     reorg_field_map_t field_map, bool _delete);
+
+tree
+get_new_identifier (tree type, const char *suffix);
 
 #endif /* GCC_IPA_DFE */

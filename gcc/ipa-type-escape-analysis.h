@@ -1132,10 +1132,11 @@ public:
   /* Get final results.  */
   record_field_map_t get_map ();
 
-private:
+protected:
   /* Navigate expressions in gimple statements.  */
   expr_accessor _expr_accessor;
 
+private:
   /* Mark all RHS expressions reachable from S as Read.
      all all LHS expressions reachable from S as Written.  */
   virtual void _walk_pre_gcall (gcall *s);
@@ -1158,5 +1159,14 @@ typedef std::set<unsigned> field_offsets_t;
 
 typedef std::map<tree, field_offsets_t> record_field_offset_map_t;
 
+// Partition types into escaping or non escaping sets.
+tpartitions_t
+partition_types_into_escaping_nonescaping ();
+
+// Compute set of not escaping unaccessed fields
+record_field_offset_map_t
+obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
+				      record_field_map_t record_field_map,
+				      int warning);
 
 #endif /* GCC_IPA_TYPE_ESCAPE_ANALYSIS_H */

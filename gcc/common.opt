@@ -3502,4 +3502,8 @@ Wdfa
 Common Var(warn_dfa) Init(1) Warning
 Warn about dead fields at link time.
 
+fipa-field-reorder
+Common Report Var(flag_ipa_field_reorder) Optimization
+Reorder fields.
+
 ; This comment is to ensure we retain the blank line above.

@@ -166,6 +166,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "gimple-ssa.h"
 #include "gimple-pretty-print.h"
+#include "tree-cfg.h"
 
 #include "ipa-type-escape-analysis.h"
 #include "ipa-dfe.h"
@@ -178,10 +179,6 @@ lto_dfe_execute ();
 static tpartitions_t
 partition_types_into_record_reaching_or_non_record_reaching ();
 
-// Partition types into escaping or non escaping sets.
-static tpartitions_t
-partition_types_into_escaping_nonescaping ();
-
 // Perform dead field elimination.
 static void
 lto_dead_field_elimination ();
@@ -193,11 +190,6 @@ fix_escaping_types_in_set (tpartitions_t &types);
 // Find which fields are accessed.
 static record_field_map_t
 find_fields_accessed ();
-
-// Obtain intersection of unaccessed and non escaping types.
-static record_field_offset_map_t
-obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
-				      record_field_map_t record_field_map);
 
 // TODO:
 // This was copy pasted from tree-ssa-structalias.c
@@ -275,7 +267,7 @@ lto_dead_field_elimination ()
   record_field_map_t record_field_map = find_fields_accessed ();
   record_field_offset_map_t record_field_offset_map
     = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
-					    record_field_map);
+					    record_field_map, OPT_Wdfa);
   if (record_field_offset_map.empty ())
     return;
 
@@ -288,8 +280,7 @@ lto_dead_field_elimination ()
   reorg_record_map_t map = replacements.first;
   reorg_field_map_t field_map = replacements.second;
   // Transformation.
-  substitute_types_in_program (map, field_map);
-
+  substitute_types_in_program (map, field_map, true);
 }
 
 /* Iterate all gimple bodies and collect trees
@@ -310,7 +301,7 @@ partition_types_into_record_reaching_or_non_record_reaching ()
 /* Iterate over all gimple bodies and find out
  * which types are escaping AND are being casted.
  */
-static tpartitions_t
+tpartitions_t
 partition_types_into_escaping_nonescaping ()
 {
   tpartitions_t partitions
@@ -330,8 +321,7 @@ partition_types_into_escaping_nonescaping ()
  * which fields are accessed for all RECORD_TYPE
  * types.
  */
-static record_field_map_t
-find_fields_accessed ()
+record_field_map_t static find_fields_accessed ()
 {
   gimple_accessor accesser;
   accesser.walk ();
@@ -497,9 +487,10 @@ mark_escaping_types_to_be_deleted (
 }
 
 // Obtain nonescaping unaccessed fields
-static record_field_offset_map_t
+record_field_offset_map_t
 obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
-				      record_field_map_t record_field_map)
+				      record_field_map_t record_field_map,
+				      int _warning)
 {
   bool has_fields_that_can_be_deleted = false;
   record_field_offset_map_t record_field_offset_map;
@@ -559,10 +550,11 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 	       type_stringifier::get_type_identifier (record).c_str (),
 	       type_stringifier::get_field_identifier (field).c_str ());
 
-	  if (OPT_Wdfa == 0) continue;
+	  if (_warning == 0)
+	    continue;
 	  // Anonymous fields? (Which the record can be!).
-	    warning (OPT_Wdfa, "RECORD_TYPE %qE has dead field %qE in LTO.\n",
-		record, field);
+	  warning (_warning, "RECORD_TYPE %qE has dead field %qE in LTO.\n",
+		   record, field);
 	}
       record_field_offset_map[record] = field_offset;
     }
@@ -1181,6 +1173,8 @@ gimple_walker::walk ()
       if (already_in_set)
 	continue;
 
+      if (dump_file)
+	dump_function_to_file (node->decl, dump_file, TDF_NONE);
       _walk_cnode (node);
       fndecls.insert (decl);
     }
@@ -1402,8 +1396,8 @@ gimple_walker::_walk_gimple (gimple *stmt)
   const enum gimple_code code = gimple_code (stmt);
   switch (code)
     {
-    case GIMPLE_PREDICT:
     case GIMPLE_DEBUG:
+    case GIMPLE_PREDICT:
     case GIMPLE_NOP:
       // I think it is safe to skip these
       // but it would also be nice to walk their sub-trees
@@ -2656,9 +2650,13 @@ expr_accessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
   for (field = TYPE_FIELDS (addr_expr_t); field; field = DECL_CHAIN (field))
     {
       log ("ever inside?\n");
+      // This is a weird result...
       unsigned f_byte_offset = tree_to_uhwi (DECL_FIELD_OFFSET (field));
-      unsigned f_offset = f_byte_offset;
-      log ("offset field %d, offset by pointer %d\n", f_offset, offset_int);
+      unsigned f_bit_offset = tree_to_uhwi (DECL_FIELD_BIT_OFFSET (field)) / 8;
+      unsigned f_offset = f_byte_offset + f_bit_offset;
+      // unsigned f_offset = bitpos_of_field (field);
+      log ("offset field %d %d, offset by pointer %d \n ", f_offset,
+	   f_bit_offset, offset_int);
 
       // NOTE: ALL FIELDS BEFORE THIS ONE NEED TO EXIST
       // Otherwise, this pointer arithmetic is invalid...
