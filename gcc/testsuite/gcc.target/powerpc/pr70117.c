@@ -9,12 +9,9 @@
    128-bit floating point, because the type is not enabled on those
    systems.  */
 #define LDOUBLE __ibm128
-#define IBM128_MAX (((long double) 0x1.fffffffffffffp+1023)		\
-		    + ((long double) 0x1.ffffffffffffep+969));
 
 #elif defined(__LONG_DOUBLE_IBM128__)
 #define LDOUBLE long double
-#define IBM128_MAX LDBL_MAX
 
 #else
 #error "long double must be either IBM 128-bit or IEEE 128-bit"
@@ -78,10 +75,10 @@ main (void)
   if (__builtin_isnormal (ld))
     __builtin_abort ();
 
-  ld = IBM128_MAX;
+  ld = LDBL_MAX;
   if (!__builtin_isnormal (ld))
     __builtin_abort ();
-  ld = -IBM128_MAX;
+  ld = -LDBL_MAX;
   if (!__builtin_isnormal (ld))
     __builtin_abort ();
 
