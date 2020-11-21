@@ -278,7 +278,7 @@ struct thread_stats_d thread_stats;
    Also remove all outgoing edges except the edge which reaches DEST_BB.
    If DEST_BB is NULL, then remove all outgoing edges.  */
 
-void
+static void
 remove_ctrl_stmt_and_useless_edges (basic_block bb, basic_block dest_bb)
 {
   gimple_stmt_iterator gsi;
@@ -1253,7 +1253,7 @@ ssa_fixup_template_block (struct redirection_data **slot,
 /* Hash table traversal callback to redirect each incoming edge
    associated with this hash table element to its new destination.  */
 
-int
+static int
 ssa_redirect_edges (struct redirection_data **slot,
 		    ssa_local_info_t *local_info)
 {

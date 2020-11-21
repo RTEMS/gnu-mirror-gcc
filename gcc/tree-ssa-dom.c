@@ -863,70 +863,27 @@ make_pass_dominator (gcc::context *ctxt)
   return new pass_dominator (ctxt);
 }
 
-/* A hack until we remove threading from tree-vrp.c and bring the
-   simplification routine into the dom_opt_dom_walker class.  */
-static class vr_values *x_vr_values;
-
-/* A trivial wrapper so that we can present the generic jump
-   threading code with a simple API for simplifying statements.
-
-   ?? This should be cleaned up.  There's a virtually identical copy
-   of this function in tree-vrp.c.  */
-
-static tree
-simplify_stmt_for_jump_threading (gimple *stmt,
-				  gimple *within_stmt ATTRIBUTE_UNUSED,
-				  class avail_exprs_stack *avail_exprs_stack,
-				  basic_block bb ATTRIBUTE_UNUSED)
+class dom_jump_threader_simplifier : public jump_threader_simplifier
 {
-  /* First query our hash table to see if the expression is available
-     there.  A non-NULL return value will be either a constant or another
-     SSA_NAME.  */
+public:
+  dom_jump_threader_simplifier (vr_values *v) : jump_threader_simplifier (v) {}
+
+private:
+  tree simplify (gimple *, gimple *, avail_exprs_stack *, basic_block);
+};
+
+tree
+dom_jump_threader_simplifier::simplify (gimple *stmt, gimple *within_stmt,
+					avail_exprs_stack *avail_exprs_stack,
+					basic_block bb)
+{
+  /* First see if the conditional is in the hash table.  */
   tree cached_lhs =  avail_exprs_stack->lookup_avail_expr (stmt, false, true);
   if (cached_lhs)
     return cached_lhs;
 
-  /* If the hash table query failed, query VRP information.  This is
-     essentially the same as tree-vrp's simplification routine.  The
-     copy in tree-vrp is scheduled for removal in gcc-9.  */
-  if (gcond *cond_stmt = dyn_cast <gcond *> (stmt))
-    {
-      simplify_using_ranges simplifier (x_vr_values);
-      return simplifier.vrp_evaluate_conditional (gimple_cond_code (cond_stmt),
-						  gimple_cond_lhs (cond_stmt),
-						  gimple_cond_rhs (cond_stmt),
-						  within_stmt);
-    }
-
-  if (gswitch *switch_stmt = dyn_cast <gswitch *> (stmt))
-    {
-      tree op = gimple_switch_index (switch_stmt);
-      if (TREE_CODE (op) != SSA_NAME)
-	return NULL_TREE;
-
-      const value_range_equiv *vr = x_vr_values->get_value_range (op);
-      return find_case_label_range (switch_stmt, vr);
-    }
-
-  if (gassign *assign_stmt = dyn_cast <gassign *> (stmt))
-    {
-      tree lhs = gimple_assign_lhs (assign_stmt);
-      if (TREE_CODE (lhs) == SSA_NAME
-	  && (INTEGRAL_TYPE_P (TREE_TYPE (lhs))
-	      || POINTER_TYPE_P (TREE_TYPE (lhs)))
-	  && stmt_interesting_for_vrp (stmt))
-	{
-	  edge dummy_e;
-	  tree dummy_tree;
-	  value_range_equiv new_vr;
-	  x_vr_values->extract_range_from_stmt (stmt, &dummy_e,
-						&dummy_tree, &new_vr);
-	  tree singleton;
-	  if (new_vr.singleton_p (&singleton))
-	    return singleton;
-	}
-    }
-  return NULL;
+  return jump_threader_simplifier::simplify (stmt, within_stmt,
+					     avail_exprs_stack, bb);
 }
 
 /* Valueize hook for gimple_fold_stmt_to_constant_1.  */
@@ -1500,12 +1457,11 @@ dom_opt_dom_walker::before_dom_children (basic_block bb)
 void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
-  x_vr_values = &evrp_range_analyzer;
+  dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
   thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
 			 m_avail_exprs_stack,
 			 &evrp_range_analyzer,
-			 simplify_stmt_for_jump_threading);
-  x_vr_values = NULL;
+			 jthread_simplifier);
 
   /* These remove expressions local to BB from the tables.  */
   m_avail_exprs_stack->pop_to_marker ();

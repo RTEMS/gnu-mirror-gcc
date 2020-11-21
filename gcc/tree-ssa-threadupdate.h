@@ -42,11 +42,34 @@ public:
   enum jump_thread_edge_type type;
 };
 
+// Step 2.
+class jump_thread_path
+{
+public:
+  jump_thread_path ();
+  void add (jump_thread_edge);	 // safe_push
+  jump_thread_edge &operator[] (int i);
+  void operator delete (void *); // delete_jump_thread_path
+
+private:
+  vec<jump_thread_edge *> m_path;
+};
+
+// Step 1.
+class jump_thread_paths
+{
+public:
+  bool thread_through_all_blocks (bool);
+  void register_jump_thread (jump_thread_path &);
+  void remove_jump_threads_including (edge);
+
+private:
+  vec<jump_thread_paths> m_paths;
+};
+
 extern void register_jump_thread (vec <class jump_thread_edge *> *);
 extern void remove_jump_threads_including (edge);
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
-extern void remove_ctrl_stmt_and_useless_edges (basic_block, basic_block);
-extern void free_dom_edge_info (edge);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 
 enum bb_dom_status
@@ -60,5 +83,8 @@ enum bb_dom_status
 };
 
 enum bb_dom_status determine_bb_domination_status (class loop *, basic_block);
+
+// In tree-ssa-dom.c
+extern void free_dom_edge_info (edge);
 
 #endif

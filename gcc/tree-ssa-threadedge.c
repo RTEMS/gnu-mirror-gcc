@@ -49,10 +49,6 @@ static int stmt_count;
 /* Array to record value-handles per SSA_NAME.  */
 vec<tree> ssa_name_values;
 
-typedef tree (pfn_simplify) (gimple *, gimple *,
-			     class avail_exprs_stack *,
-			     basic_block);
-
 /* Set the value for the SSA name NAME to VALUE.  */
 
 void
@@ -83,7 +79,7 @@ threadedge_finalize_values (void)
 /* Return TRUE if we may be able to thread an incoming edge into
    BB to an outgoing edge from BB.  Return FALSE otherwise.  */
 
-bool
+static bool
 potentially_threadable_block (basic_block bb)
 {
   gimple_stmt_iterator gsi;
@@ -227,7 +223,7 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
     const_and_copies *const_and_copies,
     avail_exprs_stack *avail_exprs_stack,
     evrp_range_analyzer *evrp_range_analyzer,
-    pfn_simplify simplify)
+    jump_threader_simplifier &simplify)
 {
   gimple *stmt = NULL;
   gimple_stmt_iterator gsi;
@@ -390,7 +386,8 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
 		    SET_USE (use_p, tmp);
 		}
 
-	      cached_lhs = (*simplify) (stmt, stmt, avail_exprs_stack, e->src);
+	      cached_lhs = simplify.simplify (stmt, stmt, avail_exprs_stack,
+					      e->src);
 
 	      /* Restore the statement's original uses/defs.  */
 	      i = 0;
@@ -413,7 +410,8 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
 static tree simplify_control_stmt_condition_1 (edge, gimple *,
 					       class avail_exprs_stack *,
 					       tree, enum tree_code, tree,
-					       gcond *, pfn_simplify,
+					       gcond *,
+					       jump_threader_simplifier &,
 					       unsigned);
 
 /* Simplify the control statement at the end of the block E->dest.
@@ -435,7 +433,7 @@ simplify_control_stmt_condition (edge e,
 				 gimple *stmt,
 				 class avail_exprs_stack *avail_exprs_stack,
 				 gcond *dummy_cond,
-				 pfn_simplify simplify)
+				 jump_threader_simplifier &simplify)
 {
   tree cond, cached_lhs;
   enum gimple_code code = gimple_code (stmt);
@@ -551,12 +549,13 @@ simplify_control_stmt_condition (edge e,
 		 the label that is proven to be taken.  */
 	      gswitch *dummy_switch = as_a<gswitch *> (gimple_copy (stmt));
 	      gimple_switch_set_index (dummy_switch, cached_lhs);
-	      cached_lhs = (*simplify) (dummy_switch, stmt,
-					avail_exprs_stack, e->src);
+	      cached_lhs = simplify.simplify (dummy_switch, stmt,
+					      avail_exprs_stack, e->src);
 	      ggc_free (dummy_switch);
 	    }
 	  else
-	    cached_lhs = (*simplify) (stmt, stmt, avail_exprs_stack, e->src);
+	    cached_lhs = simplify.simplify (stmt, stmt, avail_exprs_stack,
+					    e->src);
 	}
 
       /* We couldn't find an invariant.  But, callers of this
@@ -581,7 +580,7 @@ simplify_control_stmt_condition_1 (edge e,
 				   enum tree_code cond_code,
 				   tree op1,
 				   gcond *dummy_cond,
-				   pfn_simplify simplify,
+				   jump_threader_simplifier &simplify,
 				   unsigned limit)
 {
   if (limit == 0)
@@ -738,7 +737,7 @@ simplify_control_stmt_condition_1 (edge e,
      then use the pass specific callback to simplify the condition.  */
   if (!res
       || !is_gimple_min_invariant (res))
-    res = (*simplify) (dummy_cond, stmt, avail_exprs_stack, e->src);
+    res = simplify.simplify (dummy_cond, stmt, avail_exprs_stack, e->src);
 
   return res;
 }
@@ -896,7 +895,7 @@ static bool
 thread_around_empty_blocks (edge taken_edge,
 			    gcond *dummy_cond,
 			    class avail_exprs_stack *avail_exprs_stack,
-			    pfn_simplify simplify,
+			    jump_threader_simplifier &simplify,
 			    bitmap visited,
 			    vec<jump_thread_edge *> *path)
 {
@@ -1040,7 +1039,7 @@ thread_through_normal_block (edge e,
 			     const_and_copies *const_and_copies,
 			     avail_exprs_stack *avail_exprs_stack,
 			     evrp_range_analyzer *evrp_range_analyzer,
-			     pfn_simplify simplify,
+			     jump_threader_simplifier &simplify,
 			     vec<jump_thread_edge *> *path,
 			     bitmap visited)
 {
@@ -1238,7 +1237,7 @@ thread_across_edge (gcond *dummy_cond,
 		    class const_and_copies *const_and_copies,
 		    class avail_exprs_stack *avail_exprs_stack,
 		    class evrp_range_analyzer *evrp_range_analyzer,
-		    pfn_simplify simplify)
+		    jump_threader_simplifier &simplify)
 {
   bitmap visited = BITMAP_ALLOC (NULL);
 
@@ -1422,9 +1421,7 @@ thread_outgoing_edges (basic_block bb, gcond *dummy_cond,
 		       class const_and_copies *const_and_copies,
 		       class avail_exprs_stack *avail_exprs_stack,
 		       class evrp_range_analyzer *evrp_range_analyzer,
-		       tree (*simplify) (gimple *, gimple *,
-					 class avail_exprs_stack *,
-					 basic_block))
+		       jump_threader_simplifier &simplify)
 {
   int flags = (EDGE_IGNORE | EDGE_COMPLEX | EDGE_ABNORMAL);
   gimple *last;
@@ -1464,4 +1461,48 @@ thread_outgoing_edges (basic_block bb, gcond *dummy_cond,
 			    const_and_copies, avail_exprs_stack,
 			    evrp_range_analyzer, simplify);
     }
+}
+
+tree
+jump_threader_simplifier::simplify (gimple *stmt,
+				    gimple *within_stmt,
+				    avail_exprs_stack *,
+				    basic_block)
+{
+  if (gcond *cond_stmt = dyn_cast <gcond *> (stmt))
+    {
+      simplify_using_ranges simplifier (m_vr_values);
+      return simplifier.vrp_evaluate_conditional (gimple_cond_code (cond_stmt),
+						  gimple_cond_lhs (cond_stmt),
+						  gimple_cond_rhs (cond_stmt),
+						  within_stmt);
+    }
+  if (gswitch *switch_stmt = dyn_cast <gswitch *> (stmt))
+    {
+      tree op = gimple_switch_index (switch_stmt);
+      if (TREE_CODE (op) != SSA_NAME)
+	return NULL_TREE;
+
+      const value_range_equiv *vr = m_vr_values->get_value_range (op);
+      return find_case_label_range (switch_stmt, vr);
+    }
+   if (gassign *assign_stmt = dyn_cast <gassign *> (stmt))
+    {
+      tree lhs = gimple_assign_lhs (assign_stmt);
+      if (TREE_CODE (lhs) == SSA_NAME
+	  && (INTEGRAL_TYPE_P (TREE_TYPE (lhs))
+	      || POINTER_TYPE_P (TREE_TYPE (lhs)))
+	  && stmt_interesting_for_vrp (stmt))
+	{
+	  edge dummy_e;
+	  tree dummy_tree;
+	  value_range_equiv new_vr;
+	  m_vr_values->extract_range_from_stmt (stmt, &dummy_e, &dummy_tree,
+						&new_vr);
+	  tree singleton;
+	  if (new_vr.singleton_p (&singleton))
+	    return singleton;
+	}
+    }
+   return NULL;
 }
