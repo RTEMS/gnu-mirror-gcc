@@ -590,16 +590,17 @@ class dom_opt_dom_walker : public dom_walker
 {
 public:
   dom_opt_dom_walker (cdi_direction direction,
-		      class const_and_copies *const_and_copies,
-		      class avail_exprs_stack *avail_exprs_stack)
+		      jump_threader *threader,
+		      const_and_copies *const_and_copies,
+		      avail_exprs_stack *avail_exprs_stack)
     : dom_walker (direction, REACHABLE_BLOCKS),
-      m_const_and_copies (const_and_copies),
-      m_avail_exprs_stack (avail_exprs_stack),
-      evrp_range_analyzer (true),
-      threader (const_and_copies, avail_exprs_stack)
+      evrp_range_analyzer (true)
     {
       m_dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
 					integer_zero_node, NULL, NULL);
+      m_const_and_copies = const_and_copies;
+      m_avail_exprs_stack = avail_exprs_stack;
+      m_threader = threader;
     }
 
   virtual edge before_dom_children (basic_block);
@@ -626,7 +627,7 @@ private:
 
   void test_for_singularity (gimple *, avail_exprs_stack *);
 
-  jump_threader threader;
+  jump_threader *m_threader;
 };
 
 /* Jump threading, redundancy elimination and const/copy propagation.
@@ -721,7 +722,11 @@ pass_dominator::execute (function *fun)
     record_edge_info (bb);
 
   /* Recursively walk the dominator tree optimizing statements.  */
-  dom_opt_dom_walker walker (CDI_DOMINATORS, const_and_copies,
+  jump_thread_registry registry;
+  jump_threader threader (const_and_copies, avail_exprs_stack);
+  dom_opt_dom_walker walker (CDI_DOMINATORS,
+			     &threader,
+			     const_and_copies,
 			     avail_exprs_stack);
   walker.walk (fun->cfg->x_entry_block_ptr);
 
@@ -775,7 +780,7 @@ pass_dominator::execute (function *fun)
   free_all_edge_infos ();
 
   /* Thread jumps, creating duplicate blocks as needed.  */
-  cfg_altered |= thread_through_all_blocks (may_peel_loop_headers_p);
+  cfg_altered |= registry.thread_through_all_blocks (may_peel_loop_headers_p);
 
   if (cfg_altered)
     free_dominance_info (CDI_DOMINATORS);
@@ -1457,9 +1462,9 @@ void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
   dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
-  threader.thread_outgoing_edges (bb,
-				  &evrp_range_analyzer,
-				  jthread_simplifier);
+  m_threader->thread_outgoing_edges (bb,
+				     &evrp_range_analyzer,
+				     jthread_simplifier);
 
   /* These remove expressions local to BB from the tables.  */
   m_avail_exprs_stack->pop_to_marker ();

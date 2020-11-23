@@ -2513,7 +2513,7 @@ remove_jump_threads_including (edge_def *e)
    Returns true if one or more edges were threaded, false otherwise.  */
 
 bool
-thread_through_all_blocks (bool may_peel_loop_headers)
+jump_thread_registry::thread_through_all_blocks (bool may_peel_loop_headers)
 {
   bool retval = false;
   unsigned int i;

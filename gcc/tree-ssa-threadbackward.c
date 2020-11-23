@@ -815,14 +815,15 @@ pass_thread_jumps::execute (function *fun)
   loop_optimizer_init (LOOPS_HAVE_PREHEADERS | LOOPS_HAVE_SIMPLE_LATCHES);
 
   /* Try to thread each block with more than one successor.  */
-  thread_jumps threader;
+  jump_thread_registry registry;
+  thread_jumps backwards_threader;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
       if (EDGE_COUNT (bb->succs) > 1)
-	threader.find_jump_threads_backwards (bb, true);
+	backwards_threader.find_jump_threads_backwards (bb, true);
     }
-  bool changed = thread_through_all_blocks (true);
+  bool changed = registry.thread_through_all_blocks (true);
 
   loop_optimizer_finalize ();
   return changed ? TODO_cleanup_cfg : 0;
@@ -876,14 +877,15 @@ pass_early_thread_jumps::execute (function *fun)
   loop_optimizer_init (AVOID_CFG_MODIFICATIONS);
 
   /* Try to thread each block with more than one successor.  */
-  thread_jumps threader;
+  jump_thread_registry registry;
+  thread_jumps backwards_threader;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
       if (EDGE_COUNT (bb->succs) > 1)
-	threader.find_jump_threads_backwards (bb, false);
+	backwards_threader.find_jump_threads_backwards (bb, false);
     }
-  thread_through_all_blocks (true);
+  registry.thread_through_all_blocks (true);
 
   loop_optimizer_finalize ();
   return 0;

@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #define _TREE_SSA_THREADUPDATE_H 1
 
 /* In tree-ssa-threadupdate.c.  */
-extern bool thread_through_all_blocks (bool);
 enum jump_thread_edge_type
 {
   EDGE_START_JUMP_THREAD,
@@ -60,11 +59,8 @@ class jump_thread_registry
 {
 public:
   bool thread_through_all_blocks (bool);
-  void register_jump_thread (jump_thread_path &);
-  void remove_jump_threads_including (edge);
-
-private:
-  vec<jump_thread_path> m_paths;
+  //void register_jump_thread (jump_thread_path &);
+  //void remove_jump_threads_including (edge);
 };
 
 extern void register_jump_thread (vec <class jump_thread_edge *> *);

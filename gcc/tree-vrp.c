@@ -4489,6 +4489,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
 
   /* We must identify jump threading opportunities before we release
      the datastructures built by VRP.  */
+  jump_thread_registry registry;
   vrp_jump_threader threader (fun, &vrp_vr_values);
   threader.thread_jumps ();
 
@@ -4528,7 +4529,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
 
      Note the SSA graph update will occur during the normal TODO
      processing by the pass manager.  */
-  thread_through_all_blocks (false);
+  registry.thread_through_all_blocks (false);
 
   scev_finalize ();
   loop_optimizer_finalize ();
