@@ -43,13 +43,15 @@ class jump_threader
 public:
   jump_threader ();
   ~jump_threader ();
-  void thread_outgoing_edges (basic_block, gcond *,
+  void thread_outgoing_edges (basic_block,
 			      const_and_copies *,
 			      avail_exprs_stack *,
 			      class evrp_range_analyzer *,
 			      jump_threader_simplifier &);
 
 private:
+  // Dummy condition to avoid creating lots of throw away statements.
+  gcond *dummy_cond;
   class jump_thread_paths *blah_blah_m_paths;
 };
 

@@ -63,9 +63,12 @@ set_ssa_name_value (tree name, tree value)
 
 jump_threader::jump_threader ()
 {
-  /* Initialize the per SSA_NAME value-handles array.  Returns it.  */
+  /* Initialize the per SSA_NAME value-handles array.  */
   gcc_assert (!ssa_name_values.exists ());
   ssa_name_values.create (num_ssa_names);
+
+  dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
+				  integer_zero_node, NULL, NULL);
 }
 
 jump_threader::~jump_threader (void)
@@ -1404,9 +1407,6 @@ thread_across_edge (gcond *dummy_cond,
 /* Examine the outgoing edges from BB and conditionally
    try to thread them.
 
-   DUMMY_COND is a shared cond_expr used by condition simplification as scratch,
-   to avoid allocating memory.
-
    CONST_AND_COPIES is used to undo temporary equivalences created during the
    walk of E->dest.
 
@@ -1415,7 +1415,7 @@ thread_across_edge (gcond *dummy_cond,
    SIMPLIFY is a pass-specific function used to simplify statements.  */
 
 void
-jump_threader::thread_outgoing_edges (basic_block bb, gcond *dummy_cond,
+jump_threader::thread_outgoing_edges (basic_block bb,
 				      const_and_copies *const_and_copies,
 				      avail_exprs_stack *avail_exprs_stack,
 				      evrp_range_analyzer *evrp_range_analyzer,

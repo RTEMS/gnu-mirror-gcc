@@ -4192,7 +4192,6 @@ private:
   const_and_copies *m_const_and_copies;
   avail_exprs_stack *m_avail_exprs_stack;
   hash_table<expr_elt_hasher> *m_avail_exprs;
-  gcond *m_dummy_cond;
   jump_threader threader;
 };
 
@@ -4215,7 +4214,6 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
      that might be recorded.  */
   m_const_and_copies = new const_and_copies ();
 
-  m_dummy_cond = NULL;
   m_fun = fun;
   m_vr_values = v;
   m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
@@ -4327,13 +4325,8 @@ vrp_jump_threader_simplifier::simplify (gimple *stmt,
 void
 vrp_jump_threader::after_dom_children (basic_block bb)
 {
-  if (!m_dummy_cond)
-    m_dummy_cond = gimple_build_cond (NE_EXPR,
-				      integer_zero_node, integer_zero_node,
-				      NULL, NULL);
-
   vrp_jump_threader_simplifier jthread_simplifier (m_vr_values);
-  threader.thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
+  threader.thread_outgoing_edges (bb, m_const_and_copies,
 				  m_avail_exprs_stack, NULL,
 				  jthread_simplifier);
 

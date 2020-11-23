@@ -591,13 +591,15 @@ class dom_opt_dom_walker : public dom_walker
 public:
   dom_opt_dom_walker (cdi_direction direction,
 		      class const_and_copies *const_and_copies,
-		      class avail_exprs_stack *avail_exprs_stack,
-		      gcond *dummy_cond)
+		      class avail_exprs_stack *avail_exprs_stack)
     : dom_walker (direction, REACHABLE_BLOCKS),
       m_const_and_copies (const_and_copies),
       m_avail_exprs_stack (avail_exprs_stack),
-      evrp_range_analyzer (true),
-      m_dummy_cond (dummy_cond) { }
+      evrp_range_analyzer (true)
+    {
+      m_dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
+					integer_zero_node, NULL, NULL);
+    }
 
   virtual edge before_dom_children (basic_block);
   virtual void after_dom_children (basic_block);
@@ -619,6 +621,9 @@ private:
      the statement is a conditional with a statically determined
      value.  */
   edge optimize_stmt (basic_block, gimple_stmt_iterator *, bool *);
+
+
+  void test_for_singularity (gimple *, avail_exprs_stack *);
 
   jump_threader threader;
 };
@@ -714,12 +719,9 @@ pass_dominator::execute (function *fun)
   FOR_EACH_BB_FN (bb, fun)
     record_edge_info (bb);
 
-  gcond *dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
-					 integer_zero_node, NULL, NULL);
-
   /* Recursively walk the dominator tree optimizing statements.  */
   dom_opt_dom_walker walker (CDI_DOMINATORS, const_and_copies,
-			     avail_exprs_stack, dummy_cond);
+			     avail_exprs_stack);
   walker.walk (fun->cfg->x_entry_block_ptr);
 
   /* Look for blocks where we cleared EDGE_EXECUTABLE on an outgoing
@@ -1454,7 +1456,7 @@ void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
   dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
-  threader.thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
+  threader.thread_outgoing_edges (bb, m_const_and_copies,
 				  m_avail_exprs_stack,
 				  &evrp_range_analyzer,
 				  jthread_simplifier);
@@ -1801,9 +1803,9 @@ cprop_into_stmt (gimple *stmt, vr_values *vr_values)
 
    This is similar to code in VRP.  */
 
-static void
-test_for_singularity (gimple *stmt, gcond *dummy_cond,
-		      avail_exprs_stack *avail_exprs_stack)
+void
+dom_opt_dom_walker::test_for_singularity (gimple *stmt,
+					  avail_exprs_stack *avail_exprs_stack)
 {
   /* We want to support gimple conditionals as well as assignments
      where the RHS contains a conditional.  */
@@ -1849,11 +1851,12 @@ test_for_singularity (gimple *stmt, gcond *dummy_cond,
 	    test_code = GE_EXPR;
 
 	  /* Update the dummy statement so we can query the hash tables.  */
-	  gimple_cond_set_code (dummy_cond, test_code);
-	  gimple_cond_set_lhs (dummy_cond, lhs);
-	  gimple_cond_set_rhs (dummy_cond, rhs);
+	  gimple_cond_set_code (m_dummy_cond, test_code);
+	  gimple_cond_set_lhs (m_dummy_cond, lhs);
+	  gimple_cond_set_rhs (m_dummy_cond, rhs);
 	  tree cached_lhs
-	    = avail_exprs_stack->lookup_avail_expr (dummy_cond, false, false);
+	    = avail_exprs_stack->lookup_avail_expr (m_dummy_cond,
+						    false, false);
 
 	  /* If the lookup returned 1 (true), then the expression we
 	     queried was in the hash table.  As a result there is only
@@ -2088,7 +2091,7 @@ dom_opt_dom_walker::optimize_stmt (basic_block bb, gimple_stmt_iterator *si,
       /* If this statement was not redundant, we may still be able to simplify
 	 it, which may in turn allow other part of DOM or other passes to do
 	 a better job.  */
-      test_for_singularity (stmt, m_dummy_cond, m_avail_exprs_stack);
+      test_for_singularity (stmt, m_avail_exprs_stack);
     }
 
   /* Record any additional equivalences created by this statement.  */
