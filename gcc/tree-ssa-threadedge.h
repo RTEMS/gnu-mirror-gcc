@@ -20,32 +20,20 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_SSA_THREADEDGE_H
 #define GCC_TREE_SSA_THREADEDGE_H
 
-class jump_threader_simplifier
-{
-public:
-  jump_threader_simplifier (class vr_values *v) : m_vr_values (v) { }
-  virtual tree simplify (gimple *, gimple *,
-			 class avail_exprs_stack *, basic_block);
-protected:
-  class vr_values *m_vr_values;
-};
-
-extern vec<tree> ssa_name_values;
-#define SSA_NAME_VALUE(x) \
-    (SSA_NAME_VERSION (x) < ssa_name_values.length () \
-     ? ssa_name_values[SSA_NAME_VERSION (x)] \
-     : NULL_TREE)
-extern void set_ssa_name_value (tree, tree);
-extern void propagate_threaded_block_debug_into (basic_block, basic_block);
+class jump_thread_edge;
+class jump_threader_simplifier;
+class vr_values;
+class const_and_copies;
+class avail_exprs_stack;
+class evrp_range_analyzer;
 
 class jump_threader
 {
 public:
-  jump_threader (class const_and_copies *,
-		 class avail_exprs_stack *);
+  jump_threader (const_and_copies *, avail_exprs_stack *);
   ~jump_threader ();
   void thread_outgoing_edges (basic_block,
-			      class evrp_range_analyzer *,
+			      evrp_range_analyzer *,
 			      jump_threader_simplifier &);
 
 private:
@@ -62,17 +50,17 @@ private:
   bool thread_around_empty_blocks (edge,
 				   jump_threader_simplifier &,
 				   bitmap visited,
-				   vec<class jump_thread_edge *> *path);
+				   vec<jump_thread_edge *> *path);
   int thread_through_normal_block (edge,
-				   class evrp_range_analyzer *,
+				   evrp_range_analyzer *,
 				   jump_threader_simplifier &,
-				   vec<class jump_thread_edge *> *path,
+				   vec<jump_thread_edge *> *path,
 				   bitmap visited);
   void thread_across_edge (edge,
-			   class evrp_range_analyzer *,
+			   evrp_range_analyzer *,
 			   jump_threader_simplifier &simplify);
   bool record_temporary_equivalences_from_phis (edge,
-						class evrp_range_analyzer *);
+						evrp_range_analyzer *);
   gimple *record_temporary_equivalences_from_stmts_at_dest (edge,
     evrp_range_analyzer *,
     jump_threader_simplifier &);
@@ -83,5 +71,22 @@ private:
   class const_and_copies *m_const_and_copies;
   class avail_exprs_stack *m_avail_exprs_stack;
 };
+
+class jump_threader_simplifier
+{
+public:
+  jump_threader_simplifier (vr_values *v) : m_vr_values (v) { }
+  virtual tree simplify (gimple *, gimple *, avail_exprs_stack *, basic_block);
+protected:
+  vr_values *m_vr_values;
+};
+
+extern vec<tree> ssa_name_values;
+#define SSA_NAME_VALUE(x) \
+    (SSA_NAME_VERSION (x) < ssa_name_values.length () \
+     ? ssa_name_values[SSA_NAME_VERSION (x)] \
+     : NULL_TREE)
+extern void set_ssa_name_value (tree, tree);
+extern void propagate_threaded_block_debug_into (basic_block, basic_block);
 
 #endif /* GCC_TREE_SSA_THREADEDGE_H */
