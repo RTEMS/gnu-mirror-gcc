@@ -145,6 +145,7 @@ jump_thread_path_registry::jump_thread_path_registry ()
   paths.create (5);
   m_removed_edges = new hash_table<struct removed_edges> (17);
   m_num_threaded_edges = 0;
+  m_redirection_data = NULL;
 }
 
 jump_thread_path_registry::~jump_thread_path_registry ()
@@ -347,10 +348,6 @@ create_block_for_threading (basic_block bb,
   if (duplicate_blocks)
     bitmap_set_bit (*duplicate_blocks, rd->dup_blocks[count]->index);
 }
-
-/* Main data structure to hold information for duplicates of BB.  */
-
-static hash_table<redirection_data> *m_redirection_data;
 
 /* Given an outgoing edge E lookup and return its entry in our hash table.
 

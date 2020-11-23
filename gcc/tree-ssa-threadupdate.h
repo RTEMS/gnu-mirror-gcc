@@ -99,6 +99,9 @@ private:
 
   // Jump threading statistics.
   unsigned long m_num_threaded_edges;
+
+  // Main data structure to hold information for duplicates of BB.
+  hash_table<redirection_data> *m_redirection_data;
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
