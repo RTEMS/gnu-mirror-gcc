@@ -723,7 +723,7 @@ pass_dominator::execute (function *fun)
 
   /* Recursively walk the dominator tree optimizing statements.  */
   jump_thread_registry registry;
-  jump_threader threader (const_and_copies, avail_exprs_stack);
+  jump_threader threader (&registry, const_and_copies, avail_exprs_stack);
   dom_opt_dom_walker walker (CDI_DOMINATORS,
 			     &threader,
 			     const_and_copies,

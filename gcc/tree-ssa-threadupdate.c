@@ -140,6 +140,16 @@ struct redirection_data : free_ptr_hash<redirection_data>
   static inline int equal (const redirection_data *, const redirection_data *);
 };
 
+jump_thread_registry::jump_thread_registry ()
+{
+  paths.create (100);
+}
+
+jump_thread_registry::~jump_thread_registry ()
+{
+  paths.release ();
+}
+
 /* Dump a jump threading path, including annotations about each
    edge in the path.  */
 
@@ -252,12 +262,6 @@ struct ssa_local_info_t
      profile insanities.  */
   bool need_profile_correction;
 };
-
-/* Passes which use the jump threading code register jump threading
-   opportunities as they are discovered.  We keep the registered
-   jump threading opportunities in this vector as edge pairs
-   (original_edge, target_edge).  */
-static vec<vec<jump_thread_edge *> *> paths;
 
 /* When we start updating the CFG for threading, data necessary for jump
    threading is attached to the AUX field for the incoming edge.  Use these
@@ -1868,8 +1872,8 @@ count_stmts_and_phis_in_block (basic_block bb)
    discover blocks which need processing and avoids unnecessary
    hash table lookups to map from threaded edge to new target.  */
 
-static void
-mark_threaded_blocks (bitmap threaded_blocks)
+void
+jump_thread_registry::mark_threaded_blocks (bitmap threaded_blocks)
 {
   unsigned int i;
   bitmap_iterator bi;
@@ -2137,8 +2141,8 @@ bb_in_bbs (basic_block bb, basic_block *bbs, int n)
   return false;
 }
 
-DEBUG_FUNCTION void
-debug_path (FILE *dump_file, int pathno)
+void
+jump_thread_registry::debug_path (FILE *dump_file, int pathno)
 {
   vec<jump_thread_edge *> *p = paths[pathno];
   fprintf (dump_file, "path: ");
@@ -2148,8 +2152,8 @@ debug_path (FILE *dump_file, int pathno)
   fprintf (dump_file, "\n");
 }
 
-DEBUG_FUNCTION void
-debug_all_paths ()
+void
+jump_thread_registry::debug_paths ()
 {
   for (unsigned i = 0; i < paths.length (); ++i)
     debug_path (stderr, i);
@@ -2163,8 +2167,9 @@ debug_all_paths ()
 
    Returns TRUE if we were able to successfully rewire the edge.  */
 
-static bool
-rewire_first_differing_edge (unsigned path_num, unsigned edge_num)
+bool
+jump_thread_registry::rewire_first_differing_edge (unsigned path_num,
+						   unsigned edge_num)
 {
   vec<jump_thread_edge *> *path = paths[path_num];
   edge &e = (*path)[edge_num]->e;
@@ -2208,8 +2213,8 @@ rewire_first_differing_edge (unsigned path_num, unsigned edge_num)
    CURR_PATH_NUM is an index into the global paths table.  It
    specifies the path that was just threaded.  */
 
-static void
-adjust_paths_after_duplication (unsigned curr_path_num)
+void
+jump_thread_registry::adjust_paths_after_duplication (unsigned curr_path_num)
 {
   vec<jump_thread_edge *> *curr_path = paths[curr_path_num];
   gcc_assert ((*curr_path)[0]->type == EDGE_FSM_THREAD);
@@ -2312,9 +2317,12 @@ adjust_paths_after_duplication (unsigned curr_path_num)
 
    Returns false if it is unable to copy the region, true otherwise.  */
 
-static bool
-duplicate_thread_path (edge entry, edge exit, basic_block *region,
-		       unsigned n_region, unsigned current_path_no)
+bool
+jump_thread_registry::duplicate_thread_path (edge entry,
+					     edge exit,
+					     basic_block *region,
+					     unsigned n_region,
+					     unsigned current_path_no)
 {
   unsigned i;
   class loop *loop = entry->dest->loop_father;

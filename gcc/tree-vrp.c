@@ -4175,7 +4175,7 @@ vrp_folder::fold_stmt (gimple_stmt_iterator *si)
 class vrp_jump_threader : public dom_walker
 {
 public:
-  vrp_jump_threader (struct function *, vr_values *);
+  vrp_jump_threader (function *, vr_values *, jump_thread_registry *);
   ~vrp_jump_threader ();
 
   void thread_jumps ()
@@ -4195,7 +4195,9 @@ private:
   jump_threader *m_threader;
 };
 
-vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
+vrp_jump_threader::vrp_jump_threader (struct function *fun,
+				      vr_values *v,
+				      jump_thread_registry *registry)
   : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
 {
   /* Ugh.  When substituting values earlier in this pass we can wipe
@@ -4219,7 +4221,9 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
   m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
 
-  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack);
+  m_threader = new jump_threader (registry,
+				  m_const_and_copies,
+				  m_avail_exprs_stack);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()
@@ -4490,7 +4494,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
   /* We must identify jump threading opportunities before we release
      the datastructures built by VRP.  */
   jump_thread_registry registry;
-  vrp_jump_threader threader (fun, &vrp_vr_values);
+  vrp_jump_threader threader (fun, &vrp_vr_values, &registry);
   threader.thread_jumps ();
 
   /* A comparison of an SSA_NAME against a constant where the SSA_NAME

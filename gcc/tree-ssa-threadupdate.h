@@ -55,12 +55,31 @@ private:
 };
 */
 
+// FIXME: rename to jump_threader_registry
 class jump_thread_registry
 {
 public:
+  jump_thread_registry ();
+  ~jump_thread_registry ();
   bool thread_through_all_blocks (bool);
   void register_jump_thread (vec <class jump_thread_edge *> *);
   void remove_jump_threads_including (edge);
+  void debug_paths ();
+
+private:
+  void debug_path (FILE *, int pathno);
+  void mark_threaded_blocks (bitmap threaded_blocks);
+  bool rewire_first_differing_edge (unsigned path_num, unsigned edge_num);
+  void adjust_paths_after_duplication (unsigned curr_path_num);
+  bool duplicate_thread_path (edge entry,
+			      edge exit,
+			      basic_block *region,
+			      unsigned n_region,
+			      unsigned current_path_no);
+
+  /* We keep the registered jump threading opportunities in this
+     vector as edge pairs (original_edge, target_edge).  */
+  vec<vec<jump_thread_edge *> *> paths;
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);

@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_SSA_THREADEDGE_H
 #define GCC_TREE_SSA_THREADEDGE_H
 
+class jump_thread_registry;
 class jump_thread_edge;
 class jump_threader_simplifier;
 class vr_values;
@@ -30,7 +31,9 @@ class evrp_range_analyzer;
 class jump_threader
 {
 public:
-  jump_threader (const_and_copies *, avail_exprs_stack *);
+  jump_threader (jump_thread_registry *,
+		 const_and_copies *,
+		 avail_exprs_stack *);
   ~jump_threader ();
   void thread_outgoing_edges (basic_block,
 			      evrp_range_analyzer *,
