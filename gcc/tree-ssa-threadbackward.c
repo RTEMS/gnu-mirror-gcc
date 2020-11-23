@@ -827,6 +827,9 @@ pass_thread_jumps::execute (function *fun)
       if (EDGE_COUNT (bb->succs) > 1)
 	backwards_threader.find_jump_threads_backwards (bb, true);
     }
+  // FIXME: Put registry in thread_jumps and call thread_through_all_blocks
+  // from the destructor?  Is it ok to call thread_through_all_blocks
+  // before loop_optimizer_finalize below?
   bool changed = registry.thread_through_all_blocks (true);
 
   loop_optimizer_finalize ();
@@ -889,6 +892,9 @@ pass_early_thread_jumps::execute (function *fun)
       if (EDGE_COUNT (bb->succs) > 1)
 	backwards_threader.find_jump_threads_backwards (bb, false);
     }
+  // FIXME: Put registry in thread_jumps and call thread_through_all_blocks
+  // from the destructor?  Is it ok to call thread_through_all_blocks
+  // before loop_optimizer_finalize below?
   registry.thread_through_all_blocks (true);
 
   loop_optimizer_finalize ();
