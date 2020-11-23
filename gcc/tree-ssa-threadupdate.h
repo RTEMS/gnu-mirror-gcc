@@ -39,29 +39,9 @@ public:
   enum jump_thread_edge_type type;
 };
 
-// Rather than search all the edges in jump thread paths each time DOM
-// is able to simply if control statement, we build a hash table with
-// the deleted edges.  We only care about the address of the edge, not
-// its contents.
-struct removed_edges : nofree_ptr_hash<edge_def>
-{
-  static hashval_t hash (edge e) { return htab_hash_pointer (e); }
-  static bool equal (edge e1, edge e2) { return e1 == e2; }
-};
-
-/*
 class jump_thread_path
 {
-public:
-  jump_thread_path ();
-  void add (jump_thread_edge);	 // safe_push
-  jump_thread_edge &operator[] (int i);
-  void operator delete (void *); // delete_jump_thread_path
-
-private:
-  vec<jump_thread_edge *> m_path;
 };
-*/
 
 class jump_thread_path_registry
 {
@@ -93,13 +73,23 @@ private:
   // vector as edge pairs (original_edge, target_edge).
   vec<vec<jump_thread_edge *> *> paths;
 
-  hash_table<removed_edges> *m_removed_edges;
+  hash_table<struct removed_edges> *m_removed_edges;
 
   // Main data structure to hold information for duplicates of BB.
   hash_table<redirection_data> *m_redirection_data;
 
   // Jump threading statistics.
   unsigned long m_num_threaded_edges;
+};
+
+// Rather than search all the edges in jump thread paths each time DOM
+// is able to simply if control statement, we build a hash table with
+// the deleted edges.  We only care about the address of the edge, not
+// its contents.
+struct removed_edges : nofree_ptr_hash<edge_def>
+{
+  static hashval_t hash (edge e) { return htab_hash_pointer (e); }
+  static bool equal (edge e1, edge e2) { return e1 == e2; }
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
