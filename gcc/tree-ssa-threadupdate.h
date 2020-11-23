@@ -43,11 +43,18 @@ class jump_thread_path
 {
 public:
   jump_thread_path () { m_path = new vec<jump_thread_edge *> (); }
-  void release () { m_path->release (); }
   jump_thread_edge *&operator[] (int i) { return (*m_path)[i]; }
   void safe_push (jump_thread_edge *e) { m_path->safe_push (e); }
   unsigned length () { return m_path->length (); }
-  //  void delete_jump_thread_path ();
+  void release ()
+  {
+    for (unsigned int i = 0; i < m_path->length (); i++)
+      delete (*m_path)[i];
+    m_path->release();
+    memset (m_path, 0x13, sizeof (*m_path));
+    delete m_path;
+    m_path = 0;
+  }
 
 private:
   vec<jump_thread_edge *> *m_path;
