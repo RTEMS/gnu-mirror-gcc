@@ -419,15 +419,12 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
 
    Return the simplified condition or NULL if simplification could
    not be performed.  When simplifying a GIMPLE_SWITCH, we may return
-   the CASE_LABEL_EXPR that will be taken.
-
-   The available expression table is referenced via AVAIL_EXPRS_STACK.  */
+   the CASE_LABEL_EXPR that will be taken.  */
 
 tree
 jump_threader::simplify_control_stmt_condition
 			(edge e,
 			 gimple *stmt,
-			 avail_exprs_stack *avail_exprs_stack,
 			 jump_threader_simplifier &simplify)
 {
   tree cond, cached_lhs;
@@ -472,7 +469,7 @@ jump_threader::simplify_control_stmt_condition
       const unsigned recursion_limit = 4;
 
       cached_lhs
-	= simplify_control_stmt_condition_1 (e, stmt, avail_exprs_stack,
+	= simplify_control_stmt_condition_1 (e, stmt,
 					     op0, cond_code, op1,
 					     simplify,
 					     recursion_limit);
@@ -545,11 +542,11 @@ jump_threader::simplify_control_stmt_condition
 	      gswitch *dummy_switch = as_a<gswitch *> (gimple_copy (stmt));
 	      gimple_switch_set_index (dummy_switch, cached_lhs);
 	      cached_lhs = simplify.simplify (dummy_switch, stmt,
-					      avail_exprs_stack, e->src);
+					      m_avail_exprs_stack, e->src);
 	      ggc_free (dummy_switch);
 	    }
 	  else
-	    cached_lhs = simplify.simplify (stmt, stmt, avail_exprs_stack,
+	    cached_lhs = simplify.simplify (stmt, stmt, m_avail_exprs_stack,
 					    e->src);
 	}
 
@@ -571,7 +568,6 @@ tree
 jump_threader::simplify_control_stmt_condition_1
 					(edge e,
 					 gimple *stmt,
-					 avail_exprs_stack *avail_exprs_stack,
 					 tree op0,
 					 enum tree_code cond_code,
 					 tree op1,
@@ -611,7 +607,7 @@ jump_threader::simplify_control_stmt_condition_1
 
 	  /* Is A != 0 ?  */
 	  const tree res1
-	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
+	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs1, NE_EXPR, op1,
 						 simplify, limit - 1);
 	  if (res1 == NULL_TREE)
@@ -637,7 +633,7 @@ jump_threader::simplify_control_stmt_condition_1
 
 	  /* Is B != 0 ?  */
 	  const tree res2
-	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
+	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs2, NE_EXPR, op1,
 						 simplify, limit - 1);
 	  if (res2 == NULL_TREE)
@@ -701,7 +697,7 @@ jump_threader::simplify_control_stmt_condition_1
 	    new_cond = invert_tree_comparison (new_cond, false);
 
 	  tree res
-	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
+	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs1, new_cond, rhs2,
 						 simplify, limit - 1);
 	  if (res != NULL_TREE && is_gimple_min_invariant (res))
@@ -729,7 +725,7 @@ jump_threader::simplify_control_stmt_condition_1
      then use the pass specific callback to simplify the condition.  */
   if (!res
       || !is_gimple_min_invariant (res))
-    res = simplify.simplify (dummy_cond, stmt, avail_exprs_stack, e->src);
+    res = simplify.simplify (dummy_cond, stmt, m_avail_exprs_stack, e->src);
 
   return res;
 }
@@ -952,9 +948,7 @@ jump_threader::thread_around_empty_blocks
     return false;
 
   /* Extract and simplify the condition.  */
-  cond = simplify_control_stmt_condition (taken_edge, stmt,
-					  avail_exprs_stack,
-					  simplify);
+  cond = simplify_control_stmt_condition (taken_edge, stmt, simplify);
 
   /* If the condition can be statically computed and we have not already
      visited the destination edge, then add the taken edge to our thread
@@ -1081,8 +1075,7 @@ jump_threader::thread_through_normal_block
       tree cond;
 
       /* Extract and simplify the condition.  */
-      cond = simplify_control_stmt_condition (e, stmt, avail_exprs_stack,
-					      simplify);
+      cond = simplify_control_stmt_condition (e, stmt, simplify);
 
       if (!cond)
 	return 0;
