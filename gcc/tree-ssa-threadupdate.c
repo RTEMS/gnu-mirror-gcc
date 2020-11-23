@@ -143,11 +143,13 @@ struct redirection_data : free_ptr_hash<redirection_data>
 jump_thread_path_registry::jump_thread_path_registry ()
 {
   paths.create (5);
+  m_removed_edges = new hash_table<struct removed_edges> (17);
 }
 
 jump_thread_path_registry::~jump_thread_path_registry ()
 {
   paths.release ();
+  delete m_removed_edges;
 }
 
 /* Dump a jump threading path, including annotations about each
@@ -219,18 +221,6 @@ redirection_data::equal (const redirection_data *p1, const redirection_data *p2)
 
   return true;
 }
-
-/* Rather than search all the edges in jump thread paths each time
-   DOM is able to simply if control statement, we build a hash table
-   with the deleted edges.  We only care about the address of the edge,
-   not its contents.  */
-struct removed_edges : nofree_ptr_hash<edge_def>
-{
-  static hashval_t hash (edge e) { return htab_hash_pointer (e); }
-  static bool equal (edge e1, edge e2) { return e1 == e2; }
-};
-
-static hash_table<removed_edges> *removed_edges;
 
 /* Data structure of information to pass to hash table traversal routines.  */
 struct ssa_local_info_t
@@ -2503,10 +2493,7 @@ jump_thread_path_registry::remove_jump_threads_including (edge_def *e)
   if (!paths.exists ())
     return;
 
-  if (!removed_edges)
-    removed_edges = new hash_table<struct removed_edges> (17);
-
-  edge *slot = removed_edges->find_slot (e, INSERT);
+  edge *slot = m_removed_edges->find_slot (e, INSERT);
   *slot = e;
 }
 
@@ -2540,7 +2527,7 @@ jump_thread_path_registry::thread_through_all_blocks
   memset (&thread_stats, 0, sizeof (thread_stats));
 
   /* Remove any paths that referenced removed edges.  */
-  if (removed_edges)
+  if (m_removed_edges)
     for (i = 0; i < paths.length (); )
       {
 	unsigned int j;
@@ -2549,7 +2536,7 @@ jump_thread_path_registry::thread_through_all_blocks
 	for (j = 0; j < path->length (); j++)
 	  {
 	    edge e = (*path)[j]->e;
-	    if (removed_edges->find_slot (e, NO_INSERT))
+	    if (m_removed_edges->find_slot (e, NO_INSERT))
 	      break;
 	  }
 
@@ -2699,8 +2686,6 @@ jump_thread_path_registry::thread_through_all_blocks
     loops_state_set (LOOPS_NEED_FIXUP);
 
  out:
-  delete removed_edges;
-  removed_edges = NULL;
   return retval;
 }
 

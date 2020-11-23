@@ -41,6 +41,16 @@ public:
   enum jump_thread_edge_type type;
 };
 
+/* Rather than search all the edges in jump thread paths each time
+   DOM is able to simply if control statement, we build a hash table
+   with the deleted edges.  We only care about the address of the edge,
+   not its contents.  */
+struct removed_edges : nofree_ptr_hash<edge_def>
+{
+  static hashval_t hash (edge e) { return htab_hash_pointer (e); }
+  static bool equal (edge e1, edge e2) { return e1 == e2; }
+};
+
 /*
 class jump_thread_path
 {
@@ -79,6 +89,8 @@ private:
   // We keep the registered jump threading opportunities in this
   // vector as edge pairs (original_edge, target_edge).
   vec<vec<jump_thread_edge *> *> paths;
+
+  hash_table<removed_edges> *m_removed_edges;
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
