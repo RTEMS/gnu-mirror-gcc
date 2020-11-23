@@ -30,13 +30,15 @@ enum jump_thread_edge_type
   EDGE_NO_COPY_SRC_BLOCK
 };
 
+// We keep the registered jump threading opportunities in this
+// vector as edge pairs (original_edge, target_edge).
 class jump_thread_edge
 {
 public:
   jump_thread_edge (edge e, jump_thread_edge_type t) : e (e), type (t) {}
 
   edge e;
-  enum jump_thread_edge_type type;
+  jump_thread_edge_type type;
 };
 
 class jump_thread_path
@@ -44,6 +46,7 @@ class jump_thread_path
 public:
   jump_thread_path () { m_path = new vec<jump_thread_edge *> (); }
   jump_thread_edge *&operator[] (int i) { return (*m_path)[i]; }
+  jump_thread_edge *&last (void) { return m_path->last (); }
   void safe_push (jump_thread_edge *e) { m_path->safe_push (e); }
   unsigned length () { return m_path->length (); }
   void release ()
@@ -66,7 +69,7 @@ public:
   jump_thread_path_registry ();
   ~jump_thread_path_registry ();
   bool thread_through_all_blocks (bool);
-  void register_jump_thread (vec <class jump_thread_edge *> *);
+  void register_jump_thread (vec <jump_thread_edge *> *);
   void remove_jump_threads_including (edge);
   void debug_paths ();
 
@@ -86,8 +89,6 @@ private:
 				   bool may_peel_loop_headers);
   class redirection_data *lookup_redirection_data (edge e, enum insert_option);
 
-  // We keep the registered jump threading opportunities in this
-  // vector as edge pairs (original_edge, target_edge).
   vec<vec<jump_thread_edge *> *> m_paths;
 
   hash_table<struct removed_edges> *m_removed_edges;
@@ -109,7 +110,7 @@ struct removed_edges : nofree_ptr_hash<edge_def>
   static bool equal (edge e1, edge e2) { return e1 == e2; }
 };
 
-extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
+extern void delete_jump_thread_path (vec <jump_thread_edge *> *);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 
 enum bb_dom_status
