@@ -61,18 +61,16 @@ set_ssa_name_value (tree name, tree value)
   ssa_name_values[SSA_NAME_VERSION (name)] = value;
 }
 
-/* Initialize the per SSA_NAME value-handles array.  Returns it.  */
-static void
-threadedge_initialize_values (void)
+jump_threader::jump_threader ()
 {
+  /* Initialize the per SSA_NAME value-handles array.  Returns it.  */
   gcc_assert (!ssa_name_values.exists ());
   ssa_name_values.create (num_ssa_names);
 }
 
-/* Free the per SSA_NAME value-handle array.  */
-static void
-threadedge_finalize_values (void)
+jump_threader::~jump_threader (void)
 {
+  /* Free the per SSA_NAME value-handle array.  */
   ssa_name_values.release ();
 }
 
@@ -1505,14 +1503,4 @@ jump_threader_simplifier::simplify (gimple *stmt,
 	}
     }
    return NULL;
-}
-
-jump_threader::jump_threader ()
-{
-  threadedge_initialize_values ();
-}
-
-jump_threader::~jump_threader ()
-{
-  threadedge_finalize_values ();
 }
