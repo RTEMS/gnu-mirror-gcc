@@ -540,7 +540,7 @@ enum reg_class
 /* Define this if it is the responsibility of the caller to
    allocate the area reserved for arguments passed in registers.
    If `ACCUMULATE_OUTGOING_ARGS' is also defined, the only effect
-   of this macro is to determine whether the space is included in
+   of this macro is to detebrmine whether the space is included in
    `crtl->outgoing_args_size'.  */
 #define OUTGOING_REG_PARM_STACK_SPACE(FNTYPE) 1
 
