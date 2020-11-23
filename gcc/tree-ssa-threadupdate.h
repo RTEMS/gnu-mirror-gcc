@@ -41,6 +41,16 @@ public:
 
 class jump_thread_path
 {
+public:
+  jump_thread_path () { m_path = new vec<jump_thread_edge *> (); }
+  void release () { m_path->release (); }
+  jump_thread_edge *&operator[] (int i) { return (*m_path)[i]; }
+  void safe_push (jump_thread_edge *e) { m_path->safe_push (e); }
+  unsigned length () { return m_path->length (); }
+  //  void delete_jump_thread_path ();
+
+private:
+  vec<jump_thread_edge *> *m_path;
 };
 
 class jump_thread_path_registry
@@ -71,7 +81,7 @@ private:
 
   // We keep the registered jump threading opportunities in this
   // vector as edge pairs (original_edge, target_edge).
-  vec<vec<jump_thread_edge *> *> paths;
+  vec<vec<jump_thread_edge *> *> m_paths;
 
   hash_table<struct removed_edges> *m_removed_edges;
 
