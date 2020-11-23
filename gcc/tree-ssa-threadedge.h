@@ -64,13 +64,11 @@ private:
 				   bitmap visited,
 				   vec<class jump_thread_edge *> *path);
   int thread_through_normal_block (edge,
-				   class const_and_copies *,
 				   class evrp_range_analyzer *,
 				   jump_threader_simplifier &,
 				   vec<class jump_thread_edge *> *path,
 				   bitmap visited);
   void thread_across_edge (edge,
-			   class const_and_copies *,
 			   class evrp_range_analyzer *,
 			   jump_threader_simplifier &simplify);
 

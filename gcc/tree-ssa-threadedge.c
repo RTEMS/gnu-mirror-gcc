@@ -1011,27 +1011,26 @@ jump_threader::thread_around_empty_blocks
 int
 jump_threader::thread_through_normal_block
 				(edge e,
-				 const_and_copies *const_and_copies,
 				 evrp_range_analyzer *evrp_range_analyzer,
 				 jump_threader_simplifier &simplify,
 				 vec<jump_thread_edge *> *path,
 				 bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
-  record_temporary_equivalences (e, const_and_copies, m_avail_exprs_stack);
+  record_temporary_equivalences (e, m_const_and_copies, m_avail_exprs_stack);
 
   /* PHIs create temporary equivalences.
      Note that if we found a PHI that made the block non-threadable, then
      we need to bubble that up to our caller in the same manner we do
      when we prematurely stop processing statements below.  */
-  if (!record_temporary_equivalences_from_phis (e, const_and_copies,
+  if (!record_temporary_equivalences_from_phis (e, m_const_and_copies,
 					        evrp_range_analyzer))
     return -1;
 
   /* Now walk each statement recording any context sensitive
      temporary equivalences we can detect.  */
   gimple *stmt
-    = record_temporary_equivalences_from_stmts_at_dest (e, const_and_copies,
+    = record_temporary_equivalences_from_stmts_at_dest (e, m_const_and_copies,
 							m_avail_exprs_stack,
 							evrp_range_analyzer,
 							simplify);
@@ -1189,20 +1188,16 @@ edge_forwards_cmp_to_conditional_jump_through_empty_bb_p (edge e)
 /* We are exiting E->src, see if E->dest ends with a conditional
    jump which has a known value when reached via E.
 
-   CONST_AND_COPIES is used to undo temporary equivalences created during the
-   walk of E->dest.
-
    SIMPLIFY is a pass-specific function used to simplify statements.  */
 
 void
 jump_threader::thread_across_edge (edge e,
-				   const_and_copies *const_and_copies,
 				   evrp_range_analyzer *evrp_range_analyzer,
 				   jump_threader_simplifier &simplify)
 {
   bitmap visited = BITMAP_ALLOC (NULL);
 
-  const_and_copies->push_marker ();
+  m_const_and_copies->push_marker ();
   m_avail_exprs_stack->push_marker ();
   if (evrp_range_analyzer)
     evrp_range_analyzer->push_marker ();
@@ -1217,7 +1212,6 @@ jump_threader::thread_across_edge (edge e,
   int threaded;
   if ((e->flags & EDGE_DFS_BACK) == 0)
     threaded = thread_through_normal_block (e,
-					    const_and_copies,
 					    evrp_range_analyzer,
 					    simplify, path,
 					    visited);
@@ -1228,7 +1222,7 @@ jump_threader::thread_across_edge (edge e,
     {
       propagate_threaded_block_debug_into (path->last ()->e->dest,
 					   e->dest);
-      const_and_copies->pop_to_marker ();
+      m_const_and_copies->pop_to_marker ();
       m_avail_exprs_stack->pop_to_marker ();
       if (evrp_range_analyzer)
 	evrp_range_analyzer->pop_to_marker ();
@@ -1255,7 +1249,7 @@ jump_threader::thread_across_edge (edge e,
       if (threaded < 0)
 	{
 	  BITMAP_FREE (visited);
-	  const_and_copies->pop_to_marker ();
+	  m_const_and_copies->pop_to_marker ();
           m_avail_exprs_stack->pop_to_marker ();
 	  if (evrp_range_analyzer)
 	    evrp_range_analyzer->pop_to_marker ();
@@ -1284,7 +1278,7 @@ jump_threader::thread_across_edge (edge e,
     FOR_EACH_EDGE (taken_edge, ei, e->dest->succs)
       if (taken_edge->flags & EDGE_COMPLEX)
 	{
-	  const_and_copies->pop_to_marker ();
+	  m_const_and_copies->pop_to_marker ();
           m_avail_exprs_stack->pop_to_marker ();
 	  if (evrp_range_analyzer)
 	    evrp_range_analyzer->pop_to_marker ();
@@ -1301,7 +1295,7 @@ jump_threader::thread_across_edge (edge e,
 
 	/* Push a fresh marker so we can unwind the equivalences created
 	   for each of E->dest's successors.  */
-	const_and_copies->push_marker ();
+	m_const_and_copies->push_marker ();
 	m_avail_exprs_stack->push_marker ();
 	if (evrp_range_analyzer)
 	  evrp_range_analyzer->push_marker ();
@@ -1327,7 +1321,6 @@ jump_threader::thread_across_edge (edge e,
 
 	if (!found)
 	  found = thread_through_normal_block (path->last ()->e,
-					       const_and_copies,
 					       evrp_range_analyzer,
 					       simplify, path,
 					       visited) > 0;
@@ -1349,22 +1342,19 @@ jump_threader::thread_across_edge (edge e,
 	if (evrp_range_analyzer)
 	  evrp_range_analyzer->pop_to_marker ();
 	m_avail_exprs_stack->pop_to_marker ();
-	const_and_copies->pop_to_marker ();
+	m_const_and_copies->pop_to_marker ();
       }
     BITMAP_FREE (visited);
   }
 
   if (evrp_range_analyzer)
     evrp_range_analyzer->pop_to_marker ();
-  const_and_copies->pop_to_marker ();
+  m_const_and_copies->pop_to_marker ();
   m_avail_exprs_stack->pop_to_marker ();
 }
 
 /* Examine the outgoing edges from BB and conditionally
    try to thread them.
-
-   CONST_AND_COPIES is used to undo temporary equivalences created during the
-   walk of E->dest.
 
    SIMPLIFY is a pass-specific function used to simplify statements.  */
 
@@ -1385,7 +1375,6 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       && potentially_threadable_block (single_succ (bb)))
     {
       thread_across_edge (single_succ_edge (bb),
-			  m_const_and_copies,
 			  evrp_range_analyzer, simplify);
     }
   else if ((last = last_stmt (bb))
@@ -1401,15 +1390,11 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       /* Only try to thread the edge if it reaches a target block with
 	 more than one predecessor and more than one successor.  */
       if (potentially_threadable_block (true_edge->dest))
-	thread_across_edge (true_edge,
-			    m_const_and_copies,
-			    evrp_range_analyzer, simplify);
+	thread_across_edge (true_edge, evrp_range_analyzer, simplify);
 
       /* Similarly for the ELSE arm.  */
       if (potentially_threadable_block (false_edge->dest))
-	thread_across_edge (false_edge,
-			    m_const_and_copies,
-			    evrp_range_analyzer, simplify);
+	thread_across_edge (false_edge, evrp_range_analyzer, simplify);
     }
 }
 
