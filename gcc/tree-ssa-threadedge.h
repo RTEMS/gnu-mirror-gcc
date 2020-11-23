@@ -71,6 +71,11 @@ private:
   void thread_across_edge (edge,
 			   class evrp_range_analyzer *,
 			   jump_threader_simplifier &simplify);
+  bool record_temporary_equivalences_from_phis (edge,
+						class evrp_range_analyzer *);
+  gimple *record_temporary_equivalences_from_stmts_at_dest (edge,
+    evrp_range_analyzer *,
+    jump_threader_simplifier &);
 
   // Dummy condition to avoid creating lots of throw away statements.
   gcond *dummy_cond;

@@ -117,15 +117,13 @@ potentially_threadable_block (basic_block bb)
 }
 
 /* Record temporary equivalences created by PHIs at the target of the
-   edge E.  Record unwind information for the equivalences into
-   CONST_AND_COPIES and EVRP_RANGE_DATA.
+   edge E.
 
    If a PHI which prevents threading is encountered, then return FALSE
    indicating we should not thread this edge, else return TRUE.  */
 
-static bool
-record_temporary_equivalences_from_phis (edge e,
-    const_and_copies *const_and_copies,
+bool
+jump_threader::record_temporary_equivalences_from_phis (edge e,
     evrp_range_analyzer *evrp_range_analyzer)
 {
   gphi_iterator gsi;
@@ -153,7 +151,7 @@ record_temporary_equivalences_from_phis (edge e,
       if (!virtual_operand_p (dst))
 	stmt_count++;
 
-      const_and_copies->record_const_or_copy (dst, src);
+      m_const_and_copies->record_const_or_copy (dst, src);
 
       /* Also update the value range associated with DST, using
 	 the range from SRC.
@@ -223,10 +221,8 @@ threadedge_valueize (tree t)
    a context sensitive equivalence which may help us simplify
    later statements in E->dest.  */
 
-static gimple *
-record_temporary_equivalences_from_stmts_at_dest (edge e,
-    const_and_copies *const_and_copies,
-    avail_exprs_stack *avail_exprs_stack,
+gimple *
+jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
     evrp_range_analyzer *evrp_range_analyzer,
     jump_threader_simplifier &simplify)
 {
@@ -391,7 +387,7 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
 		    SET_USE (use_p, tmp);
 		}
 
-	      cached_lhs = simplify.simplify (stmt, stmt, avail_exprs_stack,
+	      cached_lhs = simplify.simplify (stmt, stmt, m_avail_exprs_stack,
 					      e->src);
 
 	      /* Restore the statement's original uses/defs.  */
@@ -406,8 +402,8 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
       if (cached_lhs
 	  && (TREE_CODE (cached_lhs) == SSA_NAME
 	      || is_gimple_min_invariant (cached_lhs)))
-	const_and_copies->record_const_or_copy (gimple_get_lhs (stmt),
-						cached_lhs);
+	m_const_and_copies->record_const_or_copy (gimple_get_lhs (stmt),
+						  cached_lhs);
     }
   return stmt;
 }
@@ -1023,15 +1019,13 @@ jump_threader::thread_through_normal_block
      Note that if we found a PHI that made the block non-threadable, then
      we need to bubble that up to our caller in the same manner we do
      when we prematurely stop processing statements below.  */
-  if (!record_temporary_equivalences_from_phis (e, m_const_and_copies,
-					        evrp_range_analyzer))
+  if (!record_temporary_equivalences_from_phis (e, evrp_range_analyzer))
     return -1;
 
   /* Now walk each statement recording any context sensitive
      temporary equivalences we can detect.  */
   gimple *stmt
-    = record_temporary_equivalences_from_stmts_at_dest (e, m_const_and_copies,
-							m_avail_exprs_stack,
+    = record_temporary_equivalences_from_stmts_at_dest (e,
 							evrp_range_analyzer,
 							simplify);
 
