@@ -408,17 +408,7 @@ record_temporary_equivalences_from_stmts_at_dest (edge e,
   return stmt;
 }
 
-static tree simplify_control_stmt_condition_1 (edge, gimple *,
-					       class avail_exprs_stack *,
-					       tree, enum tree_code, tree,
-					       gcond *,
-					       jump_threader_simplifier &,
-					       unsigned);
-
 /* Simplify the control statement at the end of the block E->dest.
-
-   To avoid allocating memory unnecessarily, a scratch GIMPLE_COND
-   is available to use/clobber in DUMMY_COND.
 
    Use SIMPLIFY (a pointer to a callback function) to further simplify
    a condition using pass specific information.
@@ -480,7 +470,7 @@ jump_threader::simplify_control_stmt_condition
       cached_lhs
 	= simplify_control_stmt_condition_1 (e, stmt, avail_exprs_stack,
 					     op0, cond_code, op1,
-					     dummy_cond, simplify,
+					     simplify,
 					     recursion_limit);
 
       /* If we were testing an integer/pointer against a constant, then
@@ -573,16 +563,16 @@ jump_threader::simplify_control_stmt_condition
 
 /* Recursive helper for simplify_control_stmt_condition.  */
 
-static tree
-simplify_control_stmt_condition_1 (edge e,
-				   gimple *stmt,
-				   class avail_exprs_stack *avail_exprs_stack,
-				   tree op0,
-				   enum tree_code cond_code,
-				   tree op1,
-				   gcond *dummy_cond,
-				   jump_threader_simplifier &simplify,
-				   unsigned limit)
+tree
+jump_threader::simplify_control_stmt_condition_1
+					(edge e,
+					 gimple *stmt,
+					 avail_exprs_stack *avail_exprs_stack,
+					 tree op0,
+					 enum tree_code cond_code,
+					 tree op1,
+					 jump_threader_simplifier &simplify,
+					 unsigned limit)
 {
   if (limit == 0)
     return NULL_TREE;
@@ -619,8 +609,7 @@ simplify_control_stmt_condition_1 (edge e,
 	  const tree res1
 	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
 						 rhs1, NE_EXPR, op1,
-						 dummy_cond, simplify,
-						 limit - 1);
+						 simplify, limit - 1);
 	  if (res1 == NULL_TREE)
 	    ;
 	  else if (rhs_code == BIT_AND_EXPR && integer_zerop (res1))
@@ -646,8 +635,7 @@ simplify_control_stmt_condition_1 (edge e,
 	  const tree res2
 	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
 						 rhs2, NE_EXPR, op1,
-						 dummy_cond, simplify,
-						 limit - 1);
+						 simplify, limit - 1);
 	  if (res2 == NULL_TREE)
 	    ;
 	  else if (rhs_code == BIT_AND_EXPR && integer_zerop (res2))
@@ -711,8 +699,7 @@ simplify_control_stmt_condition_1 (edge e,
 	  tree res
 	    = simplify_control_stmt_condition_1 (e, def_stmt, avail_exprs_stack,
 						 rhs1, new_cond, rhs2,
-						 dummy_cond, simplify,
-						 limit - 1);
+						 simplify, limit - 1);
 	  if (res != NULL_TREE && is_gimple_min_invariant (res))
 	    return res;
 	}
@@ -887,9 +874,6 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
    returning TRUE from the toplevel call.   Otherwise do nothing and
    return false.
 
-   DUMMY_COND, SIMPLIFY are used to try and simplify the condition at the
-   end of TAKEN_EDGE->dest.
-
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
 bool
@@ -1015,9 +999,6 @@ jump_threader::thread_around_empty_blocks
    the end of E->dest.  Threading opportunities are severely
    limited in that case to avoid short-circuiting the loop
    incorrectly.
-
-   DUMMY_COND is a shared cond_expr used by condition simplification as scratch,
-   to avoid allocating memory.
 
    STACK is used to undo temporary equivalences created during the walk of
    E->dest.
@@ -1218,9 +1199,6 @@ edge_forwards_cmp_to_conditional_jump_through_empty_bb_p (edge e)
 
 /* We are exiting E->src, see if E->dest ends with a conditional
    jump which has a known value when reached via E.
-
-   DUMMY_COND is a shared cond_expr used by condition simplification as scratch,
-   to avoid allocating memory.
 
    CONST_AND_COPIES is used to undo temporary equivalences created during the
    walk of E->dest.

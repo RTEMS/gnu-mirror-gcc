@@ -53,6 +53,15 @@ private:
   tree simplify_control_stmt_condition (edge, gimple *,
 					class avail_exprs_stack *,
 					jump_threader_simplifier &);
+  tree simplify_control_stmt_condition_1 (edge,
+					  gimple *,
+					  class avail_exprs_stack *,
+					  tree op0,
+					  tree_code cond_code,
+					  tree op1,
+					  jump_threader_simplifier &simplify,
+					  unsigned limit);
+
   bool thread_around_empty_blocks (edge,
 				   class avail_exprs_stack *,
 				   jump_threader_simplifier &,
