@@ -62,7 +62,7 @@ set_ssa_name_value (tree name, tree value)
 }
 
 /* Initialize the per SSA_NAME value-handles array.  Returns it.  */
-void
+static void
 threadedge_initialize_values (void)
 {
   gcc_assert (!ssa_name_values.exists ());
@@ -70,7 +70,7 @@ threadedge_initialize_values (void)
 }
 
 /* Free the per SSA_NAME value-handle array.  */
-void
+static void
 threadedge_finalize_values (void)
 {
   ssa_name_values.release ();
@@ -1417,11 +1417,11 @@ thread_across_edge (gcond *dummy_cond,
    SIMPLIFY is a pass-specific function used to simplify statements.  */
 
 void
-thread_outgoing_edges (basic_block bb, gcond *dummy_cond,
-		       class const_and_copies *const_and_copies,
-		       class avail_exprs_stack *avail_exprs_stack,
-		       class evrp_range_analyzer *evrp_range_analyzer,
-		       jump_threader_simplifier &simplify)
+jump_threader::thread_outgoing_edges (basic_block bb, gcond *dummy_cond,
+				      const_and_copies *const_and_copies,
+				      avail_exprs_stack *avail_exprs_stack,
+				      evrp_range_analyzer *evrp_range_analyzer,
+				      jump_threader_simplifier &simplify)
 {
   int flags = (EDGE_IGNORE | EDGE_COMPLEX | EDGE_ABNORMAL);
   gimple *last;
@@ -1505,4 +1505,14 @@ jump_threader_simplifier::simplify (gimple *stmt,
 	}
     }
    return NULL;
+}
+
+jump_threader::jump_threader ()
+{
+  threadedge_initialize_values ();
+}
+
+jump_threader::~jump_threader ()
+{
+  threadedge_finalize_values ();
 }

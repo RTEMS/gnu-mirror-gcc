@@ -36,21 +36,13 @@ extern vec<tree> ssa_name_values;
      ? ssa_name_values[SSA_NAME_VERSION (x)] \
      : NULL_TREE)
 extern void set_ssa_name_value (tree, tree);
-extern void threadedge_initialize_values (void);
-extern void threadedge_finalize_values (void);
 extern void propagate_threaded_block_debug_into (basic_block, basic_block);
-extern void thread_outgoing_edges (basic_block, gcond *,
-				   const_and_copies *,
-				   avail_exprs_stack *,
-				   class evrp_range_analyzer *,
-				   jump_threader_simplifier &);
 
-// Step 0.
 class jump_threader
 {
 public:
-  jump_threader () { threadedge_initialize_values (); }
-  ~jump_threader () { threadedge_finalize_values (); }
+  jump_threader ();
+  ~jump_threader ();
   void thread_outgoing_edges (basic_block, gcond *,
 			      const_and_copies *,
 			      avail_exprs_stack *,
@@ -58,7 +50,7 @@ public:
 			      jump_threader_simplifier &);
 
 private:
-  class jump_thread_paths *m_paths;
+  class jump_thread_paths *blah_blah_m_paths;
 };
 
 #endif /* GCC_TREE_SSA_THREADEDGE_H */

@@ -619,6 +619,8 @@ private:
      the statement is a conditional with a statically determined
      value.  */
   edge optimize_stmt (basic_block, gimple_stmt_iterator *, bool *);
+
+  jump_threader threader;
 };
 
 /* Jump threading, redundancy elimination and const/copy propagation.
@@ -696,9 +698,6 @@ pass_dominator::execute (function *fun)
      missing.  We should improve jump threading in future then
      LOOPS_HAVE_PREHEADERS won't be needed here.  */
   loop_optimizer_init (LOOPS_HAVE_PREHEADERS | LOOPS_HAVE_SIMPLE_LATCHES);
-
-  /* Initialize the value-handle array.  */
-  threadedge_initialize_values ();
 
   /* We need accurate information regarding back edges in the CFG
      for jump threading; this may include back edges that are not part of
@@ -848,9 +847,6 @@ pass_dominator::execute (function *fun)
   need_noreturn_fixup.release ();
   delete avail_exprs_stack;
   delete const_and_copies;
-
-  /* Free the value-handle array.  */
-  threadedge_finalize_values ();
 
   return 0;
 }
@@ -1458,10 +1454,10 @@ void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
   dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
-  thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
-			 m_avail_exprs_stack,
-			 &evrp_range_analyzer,
-			 jthread_simplifier);
+  threader.thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
+				  m_avail_exprs_stack,
+				  &evrp_range_analyzer,
+				  jthread_simplifier);
 
   /* These remove expressions local to BB from the tables.  */
   m_avail_exprs_stack->pop_to_marker ();

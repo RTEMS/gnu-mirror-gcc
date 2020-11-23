@@ -4193,6 +4193,7 @@ private:
   avail_exprs_stack *m_avail_exprs_stack;
   hash_table<expr_elt_hasher> *m_avail_exprs;
   gcond *m_dummy_cond;
+  jump_threader threader;
 };
 
 vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
@@ -4332,9 +4333,9 @@ vrp_jump_threader::after_dom_children (basic_block bb)
 				      NULL, NULL);
 
   vrp_jump_threader_simplifier jthread_simplifier (m_vr_values);
-  thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
-			 m_avail_exprs_stack, NULL,
-			 jthread_simplifier);
+  threader.thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
+				  m_avail_exprs_stack, NULL,
+				  jthread_simplifier);
 
   m_avail_exprs_stack->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();
@@ -4458,8 +4459,6 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
   vrp_asserts assert_engine (fun);
   assert_engine.insert_range_assertions ();
 
-  threadedge_initialize_values ();
-
   /* For visiting PHI nodes we need EDGE_DFS_BACK computed.  */
   mark_dfs_back_edges ();
 
@@ -4536,8 +4535,6 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
      Note the SSA graph update will occur during the normal TODO
      processing by the pass manager.  */
   thread_through_all_blocks (false);
-
-  threadedge_finalize_values ();
 
   scev_finalize ();
   loop_optimizer_finalize ();
