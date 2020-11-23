@@ -41,7 +41,7 @@ public:
   enum jump_thread_edge_type type;
 };
 
-// Step 2.
+/*
 class jump_thread_path
 {
 public:
@@ -53,8 +53,8 @@ public:
 private:
   vec<jump_thread_edge *> m_path;
 };
+*/
 
-// Step 1.
 class jump_thread_registry
 {
 public:
