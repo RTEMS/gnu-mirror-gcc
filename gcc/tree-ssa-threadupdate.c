@@ -140,12 +140,12 @@ struct redirection_data : free_ptr_hash<redirection_data>
   static inline int equal (const redirection_data *, const redirection_data *);
 };
 
-jump_thread_registry::jump_thread_registry ()
+jump_thread_path_registry::jump_thread_path_registry ()
 {
   paths.create (100);
 }
 
-jump_thread_registry::~jump_thread_registry ()
+jump_thread_path_registry::~jump_thread_path_registry ()
 {
   paths.release ();
 }
@@ -1873,7 +1873,7 @@ count_stmts_and_phis_in_block (basic_block bb)
    hash table lookups to map from threaded edge to new target.  */
 
 void
-jump_thread_registry::mark_threaded_blocks (bitmap threaded_blocks)
+jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 {
   unsigned int i;
   bitmap_iterator bi;
@@ -2142,7 +2142,7 @@ bb_in_bbs (basic_block bb, basic_block *bbs, int n)
 }
 
 void
-jump_thread_registry::debug_path (FILE *dump_file, int pathno)
+jump_thread_path_registry::debug_path (FILE *dump_file, int pathno)
 {
   vec<jump_thread_edge *> *p = paths[pathno];
   fprintf (dump_file, "path: ");
@@ -2153,7 +2153,7 @@ jump_thread_registry::debug_path (FILE *dump_file, int pathno)
 }
 
 void
-jump_thread_registry::debug_paths ()
+jump_thread_path_registry::debug_paths ()
 {
   for (unsigned i = 0; i < paths.length (); ++i)
     debug_path (stderr, i);
@@ -2168,8 +2168,8 @@ jump_thread_registry::debug_paths ()
    Returns TRUE if we were able to successfully rewire the edge.  */
 
 bool
-jump_thread_registry::rewire_first_differing_edge (unsigned path_num,
-						   unsigned edge_num)
+jump_thread_path_registry::rewire_first_differing_edge (unsigned path_num,
+							unsigned edge_num)
 {
   vec<jump_thread_edge *> *path = paths[path_num];
   edge &e = (*path)[edge_num]->e;
@@ -2214,7 +2214,8 @@ jump_thread_registry::rewire_first_differing_edge (unsigned path_num,
    specifies the path that was just threaded.  */
 
 void
-jump_thread_registry::adjust_paths_after_duplication (unsigned curr_path_num)
+jump_thread_path_registry::adjust_paths_after_duplication
+	(unsigned curr_path_num)
 {
   vec<jump_thread_edge *> *curr_path = paths[curr_path_num];
   gcc_assert ((*curr_path)[0]->type == EDGE_FSM_THREAD);
@@ -2318,11 +2319,11 @@ jump_thread_registry::adjust_paths_after_duplication (unsigned curr_path_num)
    Returns false if it is unable to copy the region, true otherwise.  */
 
 bool
-jump_thread_registry::duplicate_thread_path (edge entry,
-					     edge exit,
-					     basic_block *region,
-					     unsigned n_region,
-					     unsigned current_path_no)
+jump_thread_path_registry::duplicate_thread_path (edge entry,
+						  edge exit,
+						  basic_block *region,
+						  unsigned n_region,
+						  unsigned current_path_no)
 {
   unsigned i;
   class loop *loop = entry->dest->loop_father;
@@ -2497,7 +2498,7 @@ valid_jump_thread_path (vec<jump_thread_edge *> *path)
    DOM/VRP rather than for every case where DOM optimizes away a COND_EXPR.  */
 
 void
-jump_thread_registry::remove_jump_threads_including (edge_def *e)
+jump_thread_path_registry::remove_jump_threads_including (edge_def *e)
 {
   if (!paths.exists ())
     return;
@@ -2521,7 +2522,8 @@ jump_thread_registry::remove_jump_threads_including (edge_def *e)
    Returns true if one or more edges were threaded, false otherwise.  */
 
 bool
-jump_thread_registry::thread_through_all_blocks (bool may_peel_loop_headers)
+jump_thread_path_registry::thread_through_all_blocks
+	(bool may_peel_loop_headers)
 {
   bool retval = false;
   unsigned int i;
@@ -2723,7 +2725,7 @@ delete_jump_thread_path (vec<jump_thread_edge *> *path)
    after fixing the SSA graph.  */
 
 void
-jump_thread_registry::register_jump_thread (vec<jump_thread_edge *> *path)
+jump_thread_path_registry::register_jump_thread (vec<jump_thread_edge *> *path)
 {
   if (!dbg_cnt (registered_jump_thread))
     {

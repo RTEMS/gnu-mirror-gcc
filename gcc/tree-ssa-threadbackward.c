@@ -40,7 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 class thread_jumps
 {
  public:
-  thread_jumps (jump_thread_registry *r) : m_registry (r) { }
+  thread_jumps (jump_thread_path_registry *r) : m_registry (r) { }
   void find_jump_threads_backwards (basic_block bb, bool speed_p);
 
  private:
@@ -68,7 +68,7 @@ class thread_jumps
      code path.  */
   bool m_speed_p;
 
-  jump_thread_registry *m_registry;
+  jump_thread_path_registry *m_registry;
 };
 
 /* Simple helper to get the last statement from BB, which is assumed
@@ -819,7 +819,7 @@ pass_thread_jumps::execute (function *fun)
   loop_optimizer_init (LOOPS_HAVE_PREHEADERS | LOOPS_HAVE_SIMPLE_LATCHES);
 
   /* Try to thread each block with more than one successor.  */
-  jump_thread_registry registry;
+  jump_thread_path_registry registry;
   thread_jumps backwards_threader (&registry);
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -881,7 +881,7 @@ pass_early_thread_jumps::execute (function *fun)
   loop_optimizer_init (AVOID_CFG_MODIFICATIONS);
 
   /* Try to thread each block with more than one successor.  */
-  jump_thread_registry registry;
+  jump_thread_path_registry registry;
   thread_jumps backwards_threader (&registry);
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)

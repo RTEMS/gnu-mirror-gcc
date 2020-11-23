@@ -61,7 +61,7 @@ set_ssa_name_value (tree name, tree value)
   ssa_name_values[SSA_NAME_VERSION (name)] = value;
 }
 
-jump_threader::jump_threader (jump_thread_registry *registry,
+jump_threader::jump_threader (jump_thread_path_registry *registry,
 			      const_and_copies *copies,
 			      avail_exprs_stack *avails)
 {

@@ -722,7 +722,7 @@ pass_dominator::execute (function *fun)
     record_edge_info (bb);
 
   /* Recursively walk the dominator tree optimizing statements.  */
-  jump_thread_registry registry;
+  jump_thread_path_registry registry;
   jump_threader threader (&registry, const_and_copies, avail_exprs_stack);
   dom_opt_dom_walker walker (CDI_DOMINATORS,
 			     &threader,
