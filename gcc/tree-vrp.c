@@ -4192,7 +4192,7 @@ private:
   const_and_copies *m_const_and_copies;
   avail_exprs_stack *m_avail_exprs_stack;
   hash_table<expr_elt_hasher> *m_avail_exprs;
-  jump_threader threader;
+  jump_threader *m_threader;
 };
 
 vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
@@ -4218,6 +4218,8 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   m_vr_values = v;
   m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
   m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
+
+  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()
@@ -4228,6 +4230,7 @@ vrp_jump_threader::~vrp_jump_threader ()
   delete m_const_and_copies;
   delete m_avail_exprs;
   delete m_avail_exprs_stack;
+  delete m_threader;
 }
 
 /* Called before processing dominator children of BB.  We want to look
@@ -4326,9 +4329,7 @@ void
 vrp_jump_threader::after_dom_children (basic_block bb)
 {
   vrp_jump_threader_simplifier jthread_simplifier (m_vr_values);
-  threader.thread_outgoing_edges (bb, m_const_and_copies,
-				  m_avail_exprs_stack, NULL,
-				  jthread_simplifier);
+  m_threader->thread_outgoing_edges (bb, NULL, jthread_simplifier);
 
   m_avail_exprs_stack->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();

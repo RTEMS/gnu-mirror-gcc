@@ -595,7 +595,8 @@ public:
     : dom_walker (direction, REACHABLE_BLOCKS),
       m_const_and_copies (const_and_copies),
       m_avail_exprs_stack (avail_exprs_stack),
-      evrp_range_analyzer (true)
+      evrp_range_analyzer (true),
+      threader (const_and_copies, avail_exprs_stack)
     {
       m_dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
 					integer_zero_node, NULL, NULL);
@@ -1456,8 +1457,7 @@ void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
   dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
-  threader.thread_outgoing_edges (bb, m_const_and_copies,
-				  m_avail_exprs_stack,
+  threader.thread_outgoing_edges (bb,
 				  &evrp_range_analyzer,
 				  jthread_simplifier);
 

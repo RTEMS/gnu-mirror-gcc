@@ -61,7 +61,8 @@ set_ssa_name_value (tree name, tree value)
   ssa_name_values[SSA_NAME_VERSION (name)] = value;
 }
 
-jump_threader::jump_threader ()
+jump_threader::jump_threader (const_and_copies *copies,
+			      avail_exprs_stack *avails)
 {
   /* Initialize the per SSA_NAME value-handles array.  */
   gcc_assert (!ssa_name_values.exists ());
@@ -69,6 +70,9 @@ jump_threader::jump_threader ()
 
   dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
 				  integer_zero_node, NULL, NULL);
+
+  m_const_and_copies = copies;
+  m_avail_exprs_stack = avails;
 }
 
 jump_threader::~jump_threader (void)
@@ -1389,8 +1393,6 @@ jump_threader::thread_across_edge (edge e,
 
 void
 jump_threader::thread_outgoing_edges (basic_block bb,
-				      const_and_copies *const_and_copies,
-				      avail_exprs_stack *avail_exprs_stack,
 				      evrp_range_analyzer *evrp_range_analyzer,
 				      jump_threader_simplifier &simplify)
 {
@@ -1406,7 +1408,7 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       && potentially_threadable_block (single_succ (bb)))
     {
       thread_across_edge (single_succ_edge (bb),
-			  const_and_copies, avail_exprs_stack,
+			  m_const_and_copies, m_avail_exprs_stack,
 			  evrp_range_analyzer, simplify);
     }
   else if ((last = last_stmt (bb))
@@ -1423,13 +1425,13 @@ jump_threader::thread_outgoing_edges (basic_block bb,
 	 more than one predecessor and more than one successor.  */
       if (potentially_threadable_block (true_edge->dest))
 	thread_across_edge (true_edge,
-			    const_and_copies, avail_exprs_stack,
+			    m_const_and_copies, m_avail_exprs_stack,
 			    evrp_range_analyzer, simplify);
 
       /* Similarly for the ELSE arm.  */
       if (potentially_threadable_block (false_edge->dest))
 	thread_across_edge (false_edge,
-			    const_and_copies, avail_exprs_stack,
+			    m_const_and_copies, m_avail_exprs_stack,
 			    evrp_range_analyzer, simplify);
     }
 }

@@ -41,11 +41,10 @@ extern void propagate_threaded_block_debug_into (basic_block, basic_block);
 class jump_threader
 {
 public:
-  jump_threader ();
+  jump_threader (class const_and_copies *,
+		 class avail_exprs_stack *);
   ~jump_threader ();
   void thread_outgoing_edges (basic_block,
-			      const_and_copies *,
-			      avail_exprs_stack *,
 			      class evrp_range_analyzer *,
 			      jump_threader_simplifier &);
 
@@ -82,7 +81,9 @@ private:
 
   // Dummy condition to avoid creating lots of throw away statements.
   gcond *dummy_cond;
-  class jump_thread_paths *blah_blah_m_paths;
+
+  class const_and_copies *m_const_and_copies;
+  class avail_exprs_stack *m_avail_exprs_stack;
 };
 
 #endif /* GCC_TREE_SSA_THREADEDGE_H */
