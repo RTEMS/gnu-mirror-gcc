@@ -33,7 +33,7 @@ enum jump_thread_edge_type
 class jump_thread_edge
 {
 public:
-  jump_thread_edge (edge e, jump_thread_edge_type type) : e (e), type (type) {}
+  jump_thread_edge (edge e, jump_thread_edge_type t) : e (e), type (t) {}
 
   edge e;
   enum jump_thread_edge_type type;
