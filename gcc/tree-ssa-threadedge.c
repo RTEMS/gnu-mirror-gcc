@@ -73,12 +73,13 @@ jump_threader::jump_threader (const_and_copies *copies,
 
   m_const_and_copies = copies;
   m_avail_exprs_stack = avails;
+  m_registry = new jump_thread_registry ();
 }
 
 jump_threader::~jump_threader (void)
 {
-  /* Free the per SSA_NAME value-handle array.  */
   ssa_name_values.release ();
+  delete m_registry;
 }
 
 /* Return TRUE if we may be able to thread an incoming edge into
@@ -1218,7 +1219,7 @@ jump_threader::thread_across_edge (edge e,
       if (evrp_range_analyzer)
 	evrp_range_analyzer->pop_to_marker ();
       BITMAP_FREE (visited);
-      register_jump_thread (path);
+      m_registry->register_jump_thread (path);
       return;
     }
   else
@@ -1324,7 +1325,7 @@ jump_threader::thread_across_edge (edge e,
 	    if (taken_edge->dest != path->last ()->e->dest)
 	      propagate_threaded_block_debug_into (path->last ()->e->dest,
 						   taken_edge->dest);
-	    register_jump_thread (path);
+	    m_registry->register_jump_thread (path);
 	  }
 	else
 	  delete_jump_thread_path (path);

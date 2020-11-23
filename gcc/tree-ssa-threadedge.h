@@ -70,6 +70,8 @@ private:
 
   class const_and_copies *m_const_and_copies;
   class avail_exprs_stack *m_avail_exprs_stack;
+
+  class jump_thread_registry *m_registry;
 };
 
 class jump_threader_simplifier

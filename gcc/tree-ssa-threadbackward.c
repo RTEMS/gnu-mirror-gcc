@@ -40,7 +40,9 @@ along with GCC; see the file COPYING3.  If not see
 class thread_jumps
 {
  public:
+  thread_jumps (jump_thread_registry *r) : m_registry (r) { }
   void find_jump_threads_backwards (basic_block bb, bool speed_p);
+
  private:
   edge profitable_jump_thread_path (basic_block bbi, tree name, tree arg,
 				    bool *creates_irreducible_loop);
@@ -65,6 +67,8 @@ class thread_jumps
   /* Indicate that we could increase code size to improve the
      code path.  */
   bool m_speed_p;
+
+  jump_thread_registry *m_registry;
 };
 
 /* Simple helper to get the last statement from BB, which is assumed
@@ -473,7 +477,7 @@ thread_jumps::convert_and_register_current_path (edge taken_edge)
     = new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
   jump_thread_path->safe_push (x);
 
-  register_jump_thread (jump_thread_path);
+  m_registry->register_jump_thread (jump_thread_path);
   --m_max_threaded_paths;
 }
 
@@ -816,7 +820,7 @@ pass_thread_jumps::execute (function *fun)
 
   /* Try to thread each block with more than one successor.  */
   jump_thread_registry registry;
-  thread_jumps backwards_threader;
+  thread_jumps backwards_threader (&registry);
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
@@ -878,7 +882,7 @@ pass_early_thread_jumps::execute (function *fun)
 
   /* Try to thread each block with more than one successor.  */
   jump_thread_registry registry;
-  thread_jumps backwards_threader;
+  thread_jumps backwards_threader (&registry);
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {

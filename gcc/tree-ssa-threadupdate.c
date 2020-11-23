@@ -2715,7 +2715,7 @@ delete_jump_thread_path (vec<jump_thread_edge *> *path)
    after fixing the SSA graph.  */
 
 void
-register_jump_thread (vec<jump_thread_edge *> *path)
+jump_thread_registry::register_jump_thread (vec<jump_thread_edge *> *path)
 {
   if (!dbg_cnt (registered_jump_thread))
     {
