@@ -756,7 +756,7 @@ pass_dominator::execute (function *fun)
 	     containing any edge leaving BB.  */
 	  if (found)
 	    FOR_EACH_EDGE (e, ei, bb->succs)
-	      remove_jump_threads_including (e);
+	      registry.remove_jump_threads_including (e);
 	}
     }
 

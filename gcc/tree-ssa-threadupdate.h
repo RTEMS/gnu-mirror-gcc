@@ -60,10 +60,9 @@ class jump_thread_registry
 public:
   bool thread_through_all_blocks (bool);
   void register_jump_thread (vec <class jump_thread_edge *> *);
-  //void remove_jump_threads_including (edge);
+  void remove_jump_threads_including (edge);
 };
 
-extern void remove_jump_threads_including (edge);
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 

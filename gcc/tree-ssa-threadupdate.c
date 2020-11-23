@@ -2489,7 +2489,7 @@ valid_jump_thread_path (vec<jump_thread_edge *> *path)
    DOM/VRP rather than for every case where DOM optimizes away a COND_EXPR.  */
 
 void
-remove_jump_threads_including (edge_def *e)
+jump_thread_registry::remove_jump_threads_including (edge_def *e)
 {
   if (!paths.exists ())
     return;
