@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef _TREE_SSA_THREADUPDATE_H
 #define _TREE_SSA_THREADUPDATE_H 1
 
-/* In tree-ssa-threadupdate.c.  */
 enum jump_thread_edge_type
 {
   EDGE_START_JUMP_THREAD,
@@ -34,17 +33,16 @@ enum jump_thread_edge_type
 class jump_thread_edge
 {
 public:
-  jump_thread_edge (edge e, enum jump_thread_edge_type type)
-    : e (e), type (type) {}
+  jump_thread_edge (edge e, jump_thread_edge_type type) : e (e), type (type) {}
 
   edge e;
   enum jump_thread_edge_type type;
 };
 
-/* Rather than search all the edges in jump thread paths each time
-   DOM is able to simply if control statement, we build a hash table
-   with the deleted edges.  We only care about the address of the edge,
-   not its contents.  */
+// Rather than search all the edges in jump thread paths each time DOM
+// is able to simply if control statement, we build a hash table with
+// the deleted edges.  We only care about the address of the edge, not
+// its contents.
 struct removed_edges : nofree_ptr_hash<edge_def>
 {
   static hashval_t hash (edge e) { return htab_hash_pointer (e); }
@@ -97,11 +95,11 @@ private:
 
   hash_table<removed_edges> *m_removed_edges;
 
-  // Jump threading statistics.
-  unsigned long m_num_threaded_edges;
-
   // Main data structure to hold information for duplicates of BB.
   hash_table<redirection_data> *m_redirection_data;
+
+  // Jump threading statistics.
+  unsigned long m_num_threaded_edges;
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);
@@ -119,7 +117,7 @@ enum bb_dom_status
 
 enum bb_dom_status determine_bb_domination_status (class loop *, basic_block);
 
-// In tree-ssa-dom.c
+// In tree-ssa-dom.c.
 extern void free_dom_edge_info (edge);
 
 #endif
