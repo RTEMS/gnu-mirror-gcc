@@ -56,7 +56,7 @@ private:
 };
 
 // Step 1.
-class jump_thread_paths
+class jump_thread_registry
 {
 public:
   bool thread_through_all_blocks (bool);
@@ -64,7 +64,7 @@ public:
   void remove_jump_threads_including (edge);
 
 private:
-  vec<jump_thread_paths> m_paths;
+  vec<jump_thread_path> m_paths;
 };
 
 extern void register_jump_thread (vec <class jump_thread_edge *> *);
