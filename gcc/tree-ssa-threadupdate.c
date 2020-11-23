@@ -350,7 +350,7 @@ create_block_for_threading (basic_block bb,
 
 /* Main data structure to hold information for duplicates of BB.  */
 
-static hash_table<redirection_data> *redirection_data;
+static hash_table<redirection_data> *m_redirection_data;
 
 /* Given an outgoing edge E lookup and return its entry in our hash table.
 
@@ -358,8 +358,9 @@ static hash_table<redirection_data> *redirection_data;
    it is not already present.  INCOMING_EDGE is added to the list of incoming
    edges associated with E in the hash table.  */
 
-static struct redirection_data *
-lookup_redirection_data (edge e, enum insert_option insert)
+redirection_data *
+jump_thread_path_registry::lookup_redirection_data (edge e,
+						    enum insert_option insert)
 {
   struct redirection_data **slot;
   struct redirection_data *elt;
@@ -373,7 +374,7 @@ lookup_redirection_data (edge e, enum insert_option insert)
   elt->dup_blocks[1] = NULL;
   elt->incoming_edges = NULL;
 
-  slot = redirection_data->find_slot (elt, insert);
+  slot = m_redirection_data->find_slot (elt, insert);
 
   /* This will only happen if INSERT is false and the entry is not
      in the hash table.  */
@@ -1363,7 +1364,7 @@ jump_thread_path_registry::thread_block_1 (basic_block bb,
      use a hash table.  For normal code there should be no noticeable
      difference.  However, if we have a block with a large number of
      incoming and outgoing edges such linear searches can get expensive.  */
-  redirection_data
+  m_redirection_data
     = new hash_table<struct redirection_data> (EDGE_COUNT (bb->succs));
 
   /* Record each unique threaded destination into a hash table for
@@ -1482,7 +1483,7 @@ jump_thread_path_registry::thread_block_1 (basic_block bb,
   local_info.template_block = NULL;
   local_info.bb = bb;
   local_info.jumps_threaded = false;
-  redirection_data->traverse <ssa_local_info_t *, ssa_create_duplicates>
+  m_redirection_data->traverse <ssa_local_info_t *, ssa_create_duplicates>
 			    (&local_info);
 
   /* The template does not have an outgoing edge.  Create that outgoing
@@ -1490,19 +1491,19 @@ jump_thread_path_registry::thread_block_1 (basic_block bb,
 
      We do this after creating all the duplicates to avoid creating
      unnecessary edges.  */
-  redirection_data->traverse <ssa_local_info_t *, ssa_fixup_template_block>
+  m_redirection_data->traverse <ssa_local_info_t *, ssa_fixup_template_block>
 			    (&local_info);
 
   /* The hash table traversals above created the duplicate blocks (and the
      statements within the duplicate blocks).  This loop creates PHI nodes for
      the duplicated blocks and redirects the incoming edges into BB to reach
      the duplicates of BB.  */
-  redirection_data->traverse <ssa_local_info_t *, ssa_redirect_edges>
+  m_redirection_data->traverse <ssa_local_info_t *, ssa_redirect_edges>
 			    (&local_info);
 
   /* Done with this block.  Clear REDIRECTION_DATA.  */
-  delete redirection_data;
-  redirection_data = NULL;
+  delete m_redirection_data;
+  m_redirection_data = NULL;
 
   if (noloop_only
       && bb == bb->loop_father->header)

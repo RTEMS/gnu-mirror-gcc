@@ -89,6 +89,7 @@ private:
   bool thread_block (basic_block, bool noloop_only);
   bool thread_through_loop_header (class loop *loop,
 				   bool may_peel_loop_headers);
+  class redirection_data *lookup_redirection_data (edge e, enum insert_option);
 
   // We keep the registered jump threading opportunities in this
   // vector as edge pairs (original_edge, target_edge).
