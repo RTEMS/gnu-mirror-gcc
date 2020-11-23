@@ -11948,6 +11948,80 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
     error ("%qs is not supported with the current options", name);
 }
 
+/* Raise an error message for a builtin function that is called without the
+   appropriate target options being set.  */
+
+static void
+rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
+{
+  size_t uns_fncode = (size_t) fncode;
+  const char *name = rs6000_builtin_info_x[uns_fncode].bifname;
+
+  switch (rs6000_builtin_info_x[uns_fncode].enable)
+    {
+    case ENB_P5:
+      error ("%qs requires the %qs option", name, "-mcpu=power5");
+      break;
+    case ENB_P6:
+      error ("%qs requires the %qs option", name, "-mcpu=power6");
+      break;
+    case ENB_ALTIVEC:
+      error ("%qs requires the %qs option", name, "-maltivec");
+      break;
+    case ENB_CELL:
+      error ("%qs is only valid for the cell processor", name);
+      break;
+    case ENB_VSX:
+      error ("%qs requires the %qs option", name, "-mvsx");
+      break;
+    case ENB_P7:
+      error ("%qs requires the %qs option", name, "-mcpu=power7");
+      break;
+    case ENB_P7_64:
+      error ("%qs requires the %qs option and either the %qs or %qs option",
+	     name, "-mcpu=power7", "-m64", "-mpowerpc64");
+      break;
+    case ENB_P8:
+      error ("%qs requires the %qs option", name, "-mcpu=power8");
+      break;
+    case ENB_P8V:
+      error ("%qs requires the %qs option", name, "-mpower8-vector");
+      break;
+    case ENB_P9:
+      error ("%qs requires the %qs option", name, "-mcpu=power9");
+      break;
+    case ENB_P9_64:
+      error ("%qs requires the %qs option and either the %qs or %qs option",
+	     name, "-mcpu=power9", "-m64", "-mpowerpc64");
+      break;
+    case ENB_P9V:
+      error ("%qs requires the %qs option", name, "-mpower9-vector");
+      break;
+    case ENB_IEEE128_HW:
+      error ("%qs requires ISA 3.0 IEEE 128-bit floating point", name);
+      break;
+    case ENB_DFP:
+      error ("%qs requires the %qs option", name, "-mhard-dfp");
+      break;
+    case ENB_CRYPTO:
+      error ("%qs requires the %qs option", name, "-mcrypto");
+      break;
+    case ENB_HTM:
+      error ("%qs requires the %qs option", name, "-mhtm");
+      break;
+    case ENB_P10:
+      error ("%qs requires the %qs option", name, "-mcpu=power10");
+      break;
+    case ENB_MMA:
+      error ("%qs requires the %qs option", name, "-mmma");
+      break;
+    default:
+    case ENB_ALWAYS:
+      gcc_unreachable ();
+    };
+  gcc_unreachable ();
+}
+
 /* Target hook for early folding of built-ins, shamelessly stolen
    from ia64.c.  */
 
@@ -16069,12 +16143,31 @@ rs6000_init_builtins (void)
 #endif
 }
 
+static tree
+rs6000_new_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
+{
+  rs6000_gen_builtins fcode = (rs6000_gen_builtins) code;
+
+  if (fcode >= RS6000_OVLD_MAX)
+    return error_mark_node;
+
+  if (!rs6000_new_builtin_is_supported_p (fcode))
+    {
+      rs6000_invalid_new_builtin (fcode);
+      return error_mark_node;
+    }
+
+  return rs6000_builtin_decls_x[code];
+}
+
 /* Returns the rs6000 builtin decl for CODE.  */
-/* #### TODO: Rewrite this.  */
 
 tree
 rs6000_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
 {
+  if (new_builtins_are_live)
+    return rs6000_new_builtin_decl (code, initialize_p);
+  
   HOST_WIDE_INT fnmask;
 
   if (code >= RS6000_BUILTIN_COUNT)

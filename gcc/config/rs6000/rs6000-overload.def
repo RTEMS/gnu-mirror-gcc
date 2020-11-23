@@ -171,7 +171,8 @@
 ; vsi and vui arguments, but rather than building a define_expand
 ; for the instruction sequence generated for those, we do some RTL
 ; hackery.  Revisit whether we can remove that.  For now, keep this
-; much of the entry here to generate the #define, at least.
+; much of the entry here to generate the #define, at least.  Also
+; these entries are needed anyway by the rs6000-c.c logic.
 [VEC_ADDE, vec_adde, __builtin_vec_adde]
   vsq __builtin_vec_adde (vsq, vsq, vsq);
     VADDEUQM  VADDEUQM_VSQ
@@ -1017,20 +1018,10 @@
   vf __builtin_vec_expte (vf);
     VEXPTEFP
 
-[VEC_EXTRACTM, vec_extractm, __builtin_vec_vextractm, _ARCH_PWR10]
-  signed int __builtin_vec_vextractm (vuc);
-    VEXTRACTMB
-  signed int __builtin_vec_vextractm (vus);
-    VEXTRACTMH
-  signed int __builtin_vec_vextractm (vui);
-    VEXTRACTMW
-  signed int __builtin_vec_vextractm (vull);
-    VEXTRACTMD
-  signed int __builtin_vec_vextractm (vuq);
-    VEXTRACTMQ
-
-; There is no entry for vec_extract.  There is special handling for
-; this in altivec_resolve_overloaded_builtin in rs6000.c.
+; There are no actual builtins for vec_extract.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
+; is replaced by "pointer tricks."
+[VEC_EXTRACT, vec_extract, __builtin_vec_extract]
 
 [VEC_EXTRACT_FP_FROM_SHORTH, vec_extract_fp32_from_shorth, __builtin_vec_vextract_fp_from_shorth, _ARCH_PWR9]
   vf __builtin_vec_vextract_fp_from_shorth (vus);
@@ -1059,6 +1050,18 @@
     VEXTRACTWL
   vull __builtin_vec_extractl (vull, vull, unsigned char);
     VEXTRACTDL
+
+[VEC_EXTRACTM, vec_extractm, __builtin_vec_vextractm, _ARCH_PWR10]
+  signed int __builtin_vec_vextractm (vuc);
+    VEXTRACTMB
+  signed int __builtin_vec_vextractm (vus);
+    VEXTRACTMH
+  signed int __builtin_vec_vextractm (vui);
+    VEXTRACTMW
+  signed int __builtin_vec_vextractm (vull);
+    VEXTRACTMD
+  signed int __builtin_vec_vextractm (vuq);
+    VEXTRACTMQ
 
 [VEC_EXTRACT4B, vec_extract4b, __builtin_vec_extract4b, _ARCH_PWR9]
   vull __builtin_vec_extract4b (vuc, const int);
@@ -1234,8 +1237,10 @@
   vull __builtin_vec_gnb (vuq, unsigned char);
     VGNB
 
-; There is no entry for vec_insert.  There is special handling for
-; this in altivec_resolve_overloaded_builtin in rs6000.c.
+; There are no actual builtins for vec_insert.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
+; is replaced by "pointer tricks."
+[VEC_INSERT, vec_insert, __builtin_vec_insert]
 
 [VEC_INSERTH, vec_inserth, __builtin_vec_inserth, _ARCH_PWR10]
   vuc __builtin_vec_inserth (unsigned char, vuc, unsigned int);
@@ -1833,9 +1838,17 @@
   void __builtin_vec_mtvscr (vui);
     MTVSCR  MTVSCR_VUI
 
-; Note that there is no entry for VEC_MUL.  See rs6000-c.c:
-; altivec_resolve_overloaded_builtin, where there is special-case
-; code for VEC_MUL.  TODO: Is this really necessary?  Investigate.
+; Note that the entries for VEC_MUL are currently ignored.  See rs6000-c.c:
+; altivec_resolve_overloaded_builtin, where there is special-case code for
+; VEC_MUL.  TODO: Is this really necessary?  Investigate.  Seven missing
+; prototypes here...no corresponding builtins.
+[VEC_MUL, vec_mul, __builtin_vec_mul]
+  vsll __builtin_vec_mul (vsll, vsll);
+    MUL_V2DI
+  vf __builtin_vec_mul (vf, vf);
+    XVMULSP
+  vd __builtin_vec_mul (vd, vd);
+    XVMULDP
 
 [VEC_MULE, vec_mule, __builtin_vec_mule]
   vss __builtin_vec_mule (vsc, vsc);
@@ -2205,8 +2218,10 @@
   vuq __builtin_vec_vparity_lsbb (vuq);
     VPRTYBQ  VPRTYBQ_U
 
-; There is no entry for vec_promote.  There is special handling for
-; this in altivec_resolve_overloaded_builtin in rs6000.c.
+; There are no actual builtins for vec_promote.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
+; is replaced by a constructor.
+[VEC_PROMOTE, vec_promote, __builtin_vec_promote]
 
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
@@ -2659,8 +2674,10 @@
   vf __builtin_vec_xxsplti32dx (vf, const int, float);
     VXXSPLTI32DX_V4SF
 
-; There is no entry for vec_splats.  There is special handling for
-; this in altivec_resolve_overloaded_builtin in rs6000.c.
+; There are no actual builtins for vec_splats.  There is special handling for
+; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
+; is replaced by a constructor.
+[VEC_SPLATS, vec_splats, __builtin_vec_splats]
 
 [VEC_SQRT, vec_sqrt, __builtin_vec_sqrt, __VSX__]
   vf __builtin_vec_sqrt (vf);
@@ -2887,6 +2904,10 @@
     STVEWX  STVEWX_BU
   void __builtin_vec_ste (vf, signed long long, float *);
     STVEWX  STVEWX_F
+
+; There are no builtins for VEC_STEP; this is handled directly
+; with a constant replacement in rs6000_resolve_overloaded_builtin.
+[VEC_STEP, vec_step, __builtin_vec_step]
 
 [VEC_STL, vec_stl, __builtin_vec_stl]
   void __builtin_vec_stl (vsc, signed long long, vsc *);
@@ -3428,13 +3449,13 @@
 
 [VEC_VSIE, scalar_insert_exp, __builtin_vec_scalar_insert_exp, _ARCH_PWR9]
   double __builtin_vec_scalar_insert_exp (unsigned int, unsigned int);
-    VSIEDP  VSIEDP_UI
+    VSIEDP
   double __builtin_vec_scalar_insert_exp (double, unsigned int);
-    VSIEDP  VSIEDP_D
+    VSIEDPF
   _Float128 __builtin_vec_scalar_insert_exp (unsigned long long, unsigned long long);
-    VSIEQP  VSIEQP_ULL
+    VSIEQP
   _Float128 __builtin_vec_scalar_insert_exp (_Float128, unsigned long long);
-    VSIEQP  VSIEQP_F128
+    VSIEQPF
 
 [VEC_VSTDC, scalar_test_data_class, __builtin_vec_scalar_test_data_class, _ARCH_PWR9]
   bool __builtin_vec_scalar_test_data_class (float, signed int);

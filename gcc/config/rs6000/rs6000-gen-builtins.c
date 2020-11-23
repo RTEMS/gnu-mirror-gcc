@@ -408,6 +408,7 @@ struct ovlddata {
 static ovlddata ovlds[MAXOVLDS];
 static int num_ovlds;
 static int curr_ovld;
+static int max_ovld_args = 0;
 
 /* Exit codes for the shell.  */
 enum exit_codes {
@@ -1899,6 +1900,9 @@ parse_ovld_entry ()
   if (parse_prototype (&ovlds[curr_ovld].proto) == PC_PARSEFAIL)
     return PC_PARSEFAIL;
 
+  if (ovlds[curr_ovld].proto.nargs > max_ovld_args)
+    max_ovld_args = ovlds[curr_ovld].proto.nargs;
+
   /* Build a function type descriptor identifier from the return type
      and argument types, and store it if it does not already exist.  */
   ovlds[curr_ovld].fndecl = construct_fntype_id (&ovlds[curr_ovld].proto);
@@ -2110,12 +2114,20 @@ write_decls ()
     fprintf (header_file, "  RS6000_BIF_%s,\n", bifs[bif_order[i]].idname);
   fprintf (header_file, "  RS6000_BIF_MAX,\n");
   fprintf (header_file, "  RS6000_OVLD_NONE,\n");
-  for (int i = 0; i < num_ovlds; i++)
-    fprintf (header_file, "  RS6000_OVLD_%s,\n", ovlds[i].ovld_id_name);
+  for (int i = 0; i < num_ovld_stanzas; i++)
+    fprintf (header_file, "  RS6000_OVLD_%s,\n", ovld_stanzas[i].stanza_id);
   fprintf (header_file, "  RS6000_OVLD_MAX\n};\n\n");
 
   fprintf (header_file,
 	   "extern tree rs6000_builtin_decls_x[RS6000_OVLD_MAX];\n\n");
+
+  fprintf (header_file,
+	   "enum rs6000_ovld_instances\n{\n  RS6000_INST_NONE,\n");
+  for (int i = 0; i <= curr_ovld; i++)
+    fprintf (header_file, "  RS6000_INST_%s,\n", ovlds[i].ovld_id_name);
+  fprintf (header_file, "  RS6000_INST_MAX\n};\n\n");
+
+  fprintf (header_file, "#define MAX_OVLD_ARGS %d\n", max_ovld_args);
 
   fprintf (header_file, "enum restriction {\n");
   fprintf (header_file, "  RES_NONE,\n");
@@ -2228,16 +2240,6 @@ write_decls ()
      be removed as we progress.  */
   fprintf (header_file, "extern bifdata rs6000_builtin_info_x[];\n\n");
 
-  fprintf (header_file,
-	   "struct rs6000_bif_hasher : nofree_ptr_hash<bifdata>\n");
-  fprintf (header_file, "{\n");
-  fprintf (header_file, "  typedef const char *compare_type;\n\n");
-  fprintf (header_file, "  static hashval_t hash (bifdata *);\n");
-  fprintf (header_file, "  static bool equal (bifdata *, const char *);\n");
-  fprintf (header_file, "};\n\n");
-
-  fprintf (header_file, "extern hash_table<rs6000_bif_hasher> bif_hash;\n\n");
-
   fprintf (header_file, "struct ovlddata\n");
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
@@ -2246,20 +2248,22 @@ write_decls ()
   fprintf (header_file, "  ovlddata *next;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file, "extern ovlddata rs6000_overload_info[];\n\n");
-
-  fprintf (header_file,
-	   "struct rs6000_ovld_hasher : nofree_ptr_hash<ovlddata>\n");
+  fprintf (header_file, "struct ovldrecord\n");
   fprintf (header_file, "{\n");
-  fprintf (header_file, "  typedef const char *compare_type;\n\n");
-  fprintf (header_file, "  static hashval_t hash (ovlddata *);\n");
-  fprintf (header_file, "  static bool equal (ovlddata *, const char *);\n");
+  fprintf (header_file, "  const char *ovld_name;\n");
+  fprintf (header_file, "  ovlddata *first_instance;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file,
-	   "extern hash_table<rs6000_ovld_hasher> ovld_hash;\n\n");
+  fprintf (header_file, "extern ovlddata rs6000_instance_info[];\n");
+  fprintf (header_file, "extern ovldrecord rs6000_overload_info[];\n\n");
 
   fprintf (header_file, "extern void rs6000_autoinit_builtins ();\n\n");
+  fprintf (header_file,
+	   "extern bool rs6000_new_builtin_is_supported_p "
+	   "(rs6000_gen_builtins);\n");
+  fprintf (header_file,
+	   "extern tree rs6000_builtin_decl (unsigned, "
+	   "bool ATTRIBUTE_UNUSED);\n");
 }
 
 /* Callback functions used for generating trees for function types.  */
@@ -2466,18 +2470,38 @@ write_bif_static_init ()
   fprintf (init_file, "  };\n\n");
 }
 
-/* Write the decl and initializer for rs6000_overload_info[].  */
+/* Write the decls and initializers for rs6000_overload_info[] and
+   rs6000_instance_info[].  */
 static void
 write_ovld_static_init ()
 {
-  fprintf (init_file, "ovlddata rs6000_overload_info[RS6000_OVLD_MAX] =\n");
+  fprintf (init_file,
+	   "ovldrecord rs6000_overload_info[RS6000_OVLD_MAX "
+	   "- RS6000_OVLD_NONE] =\n");
   fprintf (init_file, "  {\n");
   fprintf (init_file, "    { /* RS6000_OVLD_NONE: */\n");
+  fprintf (init_file, "      \"\", NULL\n");
+  fprintf (init_file, "    },\n");
+  for (int i = 0; i <= curr_ovld_stanza; i++)
+    {
+      fprintf (init_file, "    { /* RS6000_OVLD_%s: */\n",
+	       ovld_stanzas[i].stanza_id);
+      fprintf (init_file, "      /* ovld_name */\t\"%s\",\n",
+	       ovld_stanzas[i].intern_name);
+      /* First-instance must currently be instantiated at run time.  */
+      fprintf (init_file, "      /* first_instance */\tNULL\n");
+      fprintf (init_file, "    },\n");
+    }
+  fprintf (init_file, "  };\n\n");
+
+  fprintf (init_file, "ovlddata rs6000_instance_info[RS6000_INST_MAX] =\n");
+  fprintf (init_file, "  {\n");
+  fprintf (init_file, "    { /* RS6000_INST_NONE: */\n");
   fprintf (init_file, "      \"\", RS6000_BIF_NONE, NULL_TREE, NULL\n");
   fprintf (init_file, "    },\n");
   for (int i = 0; i <= curr_ovld; i++)
     {
-      fprintf (init_file, "    { /* RS6000_OVLD_%s: */\n",
+      fprintf (init_file, "    { /* RS6000_INST_%s: */\n",
 	       ovlds[i].ovld_id_name);
       fprintf (init_file, "      /* bifname */\t\"%s\",\n",
 	       ovlds[i].proto.bifname);
@@ -2489,7 +2513,7 @@ write_ovld_static_init ()
       if (i < curr_ovld
 	  && !strcmp (ovlds[i+1].proto.bifname, ovlds[i].proto.bifname))
 	fprintf (init_file,
-		 "&rs6000_overload_info[RS6000_OVLD_%s]\n",
+		 "&rs6000_instance_info[RS6000_INST_%s]\n",
 		 ovlds[i+1].ovld_id_name);
       else
 	fprintf (init_file, "NULL\n");
@@ -2508,20 +2532,6 @@ write_init_bif_table ()
 	       "  rs6000_builtin_info_x[RS6000_BIF_%s].fntype"
 	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
-      fprintf (init_file,
-	       "  bifaddr = &rs6000_builtin_info_x[RS6000_BIF_%s];\n",
-	       bifs[i].idname);
-      fprintf (init_file,
-	       "  hash = rs6000_bif_hasher::hash (bifaddr);\n");
-      fprintf (init_file,
-	       "  slot = bif_hash.find_slot_with_hash (\n");
-      fprintf (init_file,
-	       "           \"%s\", hash, INSERT\n",
-	       bifs[i].proto.bifname);
-      fprintf (init_file,
-	       "         );\n");
-      fprintf (init_file,
-	       "  *slot = bifaddr;\n\n");
 
       fprintf (init_file,
 	       "  if (new_builtins_are_live)\n");
@@ -2573,49 +2583,46 @@ write_init_ovld_table ()
   for (int i = 0; i <= curr_ovld; i++)
     {
       fprintf (init_file,
-	       "  rs6000_overload_info[RS6000_OVLD_%s - base].fntype"
+	       "  rs6000_instance_info[RS6000_INST_%s].fntype"
 	       "\n    = %s;\n",
 	       ovlds[i].ovld_id_name, ovlds[i].fndecl);
 
       if (i == 0 || ovlds[i].stanza != ovlds[i-1].stanza)
 	{
+	  ovld_stanza *stanza = &ovld_stanzas[ovlds[i].stanza];
 	  fprintf (init_file, "\n");
-	  fprintf (init_file,
-		   "  ovldaddr = &rs6000_overload_info"
-		   "[RS6000_OVLD_%s - base];\n",
-		   ovlds[i].ovld_id_name);
-	  fprintf (init_file,
-		   "  hash = rs6000_ovld_hasher::hash (ovldaddr);\n");
-	  fprintf (init_file,
-		   "  oslot = ovld_hash.find_slot_with_hash (\n");
-	  fprintf (init_file,
-		   "            \"%s\", hash, INSERT\n",
-		   ovlds[i].proto.bifname);
-	  fprintf (init_file,
-		   "         );\n");
-	  fprintf (init_file,
-		   "  *oslot = ovldaddr;\n\n");
-	}
 
-      fprintf (init_file,
-	       "  if (new_builtins_are_live)\n");
-      fprintf (init_file, "    {\n");
-      fprintf (init_file,
-	       "      rs6000_builtin_decls_x[(int)RS6000_OVLD_%s] = t\n",
-	       ovlds[i].ovld_id_name);
-      fprintf (init_file,
-	       "        = add_builtin_function (\"%s\",\n",
-	       ovlds[i].proto.bifname);
-      fprintf (init_file,
-	       "                                %s,\n",
-	       ovlds[i].fndecl);
-      fprintf (init_file,
-	       "                                (int)RS6000_OVLD_%s,"
-	       " BUILT_IN_MD,\n",
-	       ovlds[i].ovld_id_name);
-      fprintf (init_file,
-	       "                                NULL, NULL_TREE);\n");
-      fprintf (init_file, "    }\n\n");
+	  /* The fndecl for an overload is arbitrarily the first one
+	     for the overload.  We sort out the real types when
+	     processing the overload in the gcc front end.  */
+	  fprintf (init_file,
+		   "  if (new_builtins_are_live)\n");
+	  fprintf (init_file, "    {\n");
+	  fprintf (init_file,
+		   "      rs6000_builtin_decls_x[(int)RS6000_OVLD_%s] = t\n",
+		   stanza->stanza_id);
+	  fprintf (init_file,
+		   "        = add_builtin_function (\"%s\",\n",
+		   stanza->extern_name);
+	  fprintf (init_file,
+		   "                                %s,\n",
+		   ovlds[i].fndecl);
+	  fprintf (init_file,
+		   "                                (int)RS6000_OVLD_%s,"
+		   " BUILT_IN_MD,\n",
+		   stanza->stanza_id);
+	  fprintf (init_file,
+		   "                                NULL, NULL_TREE);\n");
+	  fprintf (init_file, "    }\n\n");
+
+	  fprintf (init_file,
+		   "  rs6000_overload_info[RS6000_OVLD_%s - base]"
+		   ".first_instance\n",
+		   stanza->stanza_id);
+	  fprintf (init_file,
+		   "    = &rs6000_instance_info[RS6000_INST_%s];\n\n",
+		   ovlds[i].ovld_id_name);
+	}
     }
 }
 
@@ -2651,45 +2658,10 @@ write_init_file ()
   rbt_inorder_callback (&fntype_rbt, fntype_rbt.rbt_root, write_fntype);
   fprintf (init_file, "\n");
 
-  fprintf (init_file, "hashval_t\n");
-  fprintf (init_file, "rs6000_bif_hasher::hash (bifdata *bd)\n");
-  fprintf (init_file, "{\n");
-  fprintf (init_file, "  return htab_hash_string (bd->bifname);\n");
-  fprintf (init_file, "}\n\n");
-
-  fprintf (init_file, "bool\n");
-  fprintf (init_file,
-	   "rs6000_bif_hasher::equal (bifdata *bd, const char *name)\n");
-  fprintf (init_file, "{\n");
-  fprintf (init_file, "  return bd && name && !strcmp (bd->bifname, name);\n");
-  fprintf (init_file, "}\n\n");
-
-  fprintf (init_file, "hash_table<rs6000_bif_hasher> bif_hash (1024);\n\n");
-
-  fprintf (init_file, "hashval_t\n");
-  fprintf (init_file, "rs6000_ovld_hasher::hash (ovlddata *od)\n");
-  fprintf (init_file, "{\n");
-  fprintf (init_file, "  return htab_hash_string (od->bifname);\n");
-  fprintf (init_file, "}\n\n");
-
-  fprintf (init_file, "bool\n");
-  fprintf (init_file,
-	   "rs6000_ovld_hasher::equal (ovlddata *od, const char *name)\n");
-  fprintf (init_file, "{\n");
-  fprintf (init_file, "  return od && name && !strcmp (od->bifname, name);\n");
-  fprintf (init_file, "}\n\n");
-
-  fprintf (init_file, "hash_table<rs6000_ovld_hasher> ovld_hash (512);\n\n");
-
   fprintf (init_file, "void\n");
   fprintf (init_file, "rs6000_autoinit_builtins ()\n");
   fprintf (init_file, "{\n");
   fprintf (init_file, "  tree t;\n");
-  fprintf (init_file, "  bifdata **slot;\n");
-  fprintf (init_file, "  bifdata *bifaddr;\n");
-  fprintf (init_file, "  hashval_t hash;\n");
-  fprintf (init_file, "  ovlddata **oslot;\n");
-  fprintf (init_file, "  ovlddata *ovldaddr;\n\n");
   fprintf (init_file, "  timevar_start (TV_BILL);\n");
   rbt_inorder_callback (&fntype_rbt, fntype_rbt.rbt_root, write_fntype_init);
   fprintf (init_file, "\n");

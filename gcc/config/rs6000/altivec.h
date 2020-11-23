@@ -61,12 +61,6 @@
 /* Functions that are resolved by the backend to one of the
    typed builtins.  */
 #define vec_rlnm(a,b,c) (__builtin_vec_rlnm((a),((c)<<8)|(b)))
-#define vec_mul __builtin_vec_mul
-
-#define vec_extract __builtin_vec_extract
-#define vec_insert __builtin_vec_insert
-#define vec_splats __builtin_vec_splats
-#define vec_promote __builtin_vec_promote
 
 #ifdef __VSX__
 /* VSX additions */
