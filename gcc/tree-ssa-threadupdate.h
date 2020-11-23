@@ -85,12 +85,19 @@ private:
 			      basic_block *region,
 			      unsigned n_region,
 			      unsigned current_path_no);
+  bool thread_block_1 (basic_block, bool noloop_only, bool joiners);
+  bool thread_block (basic_block, bool noloop_only);
+  bool thread_through_loop_header (class loop *loop,
+				   bool may_peel_loop_headers);
 
   // We keep the registered jump threading opportunities in this
   // vector as edge pairs (original_edge, target_edge).
   vec<vec<jump_thread_edge *> *> paths;
 
   hash_table<removed_edges> *m_removed_edges;
+
+  // Jump threading statistics.
+  unsigned long m_num_threaded_edges;
 };
 
 extern void delete_jump_thread_path (vec <class jump_thread_edge *> *);

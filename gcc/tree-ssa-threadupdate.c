@@ -144,6 +144,7 @@ jump_thread_path_registry::jump_thread_path_registry ()
 {
   paths.create (5);
   m_removed_edges = new hash_table<struct removed_edges> (17);
+  m_num_threaded_edges = 0;
 }
 
 jump_thread_path_registry::~jump_thread_path_registry ()
@@ -251,22 +252,15 @@ struct ssa_local_info_t
      final destinations, then we may need to correct for potential
      profile insanities.  */
   bool need_profile_correction;
+
+  // Jump threading statistics.
+  unsigned long num_threaded_edges;
 };
 
 /* When we start updating the CFG for threading, data necessary for jump
    threading is attached to the AUX field for the incoming edge.  Use these
    macros to access the underlying structure attached to the AUX field.  */
 #define THREAD_PATH(E) ((vec<jump_thread_edge *> *)(E)->aux)
-
-/* Jump threading statistics.  */
-
-struct thread_stats_d
-{
-  unsigned long num_threaded_edges;
-};
-
-struct thread_stats_d thread_stats;
-
 
 /* Remove the last statement in block BB if it is a control statement
    Also remove all outgoing edges except the edge which reaches DEST_BB.
@@ -1267,7 +1261,7 @@ ssa_redirect_edges (struct redirection_data **slot,
       next = el->next;
       free (el);
 
-      thread_stats.num_threaded_edges++;
+      local_info->num_threaded_edges++;
 
       if (rd->dup_blocks[0])
 	{
@@ -1350,8 +1344,10 @@ redirection_block_p (basic_block bb)
 
    If JOINERS is true, then thread through joiner blocks as well.  */
 
-static bool
-thread_block_1 (basic_block bb, bool noloop_only, bool joiners)
+bool
+jump_thread_path_registry::thread_block_1 (basic_block bb,
+					   bool noloop_only,
+					   bool joiners)
 {
   /* E is an incoming edge into BB that we may or may not want to
      redirect to a duplicate of BB.  */
@@ -1361,6 +1357,7 @@ thread_block_1 (basic_block bb, bool noloop_only, bool joiners)
 
   local_info.duplicate_blocks = BITMAP_ALLOC (NULL);
   local_info.need_profile_correction = false;
+  local_info.num_threaded_edges = 0;
 
   /* To avoid scanning a linear array for the element we need we instead
      use a hash table.  For normal code there should be no noticeable
@@ -1514,6 +1511,8 @@ thread_block_1 (basic_block bb, bool noloop_only, bool joiners)
   BITMAP_FREE (local_info.duplicate_blocks);
   local_info.duplicate_blocks = NULL;
 
+  m_num_threaded_edges += local_info.num_threaded_edges;
+
   /* Indicate to our caller whether or not any jumps were threaded.  */
   return local_info.jumps_threaded;
 }
@@ -1526,8 +1525,8 @@ thread_block_1 (basic_block bb, bool noloop_only, bool joiners)
    not worry that copying a joiner block will create a jump threading
    opportunity.  */
 
-static bool
-thread_block (basic_block bb, bool noloop_only)
+bool
+jump_thread_path_registry::thread_block (basic_block bb, bool noloop_only)
 {
   bool retval;
   retval = thread_block_1 (bb, noloop_only, false);
@@ -1607,8 +1606,10 @@ determine_bb_domination_status (class loop *loop, basic_block bb)
    If MAY_PEEL_LOOP_HEADERS is false, we avoid threading from entry edges
    to the inside of the loop.  */
 
-static bool
-thread_through_loop_header (class loop *loop, bool may_peel_loop_headers)
+bool
+jump_thread_path_registry::thread_through_loop_header
+				(class loop *loop,
+				 bool may_peel_loop_headers)
 {
   basic_block header = loop->header;
   edge e, tgt_edge, latch = loop_latch_edge (loop);
@@ -2524,7 +2525,7 @@ jump_thread_path_registry::thread_through_all_blocks
       goto out;
     }
 
-  memset (&thread_stats, 0, sizeof (thread_stats));
+  m_num_threaded_edges = 0;
 
   /* Remove any paths that referenced removed edges.  */
   if (m_removed_edges)
@@ -2594,7 +2595,7 @@ jump_thread_path_registry::thread_through_all_blocks
 	  free_dominance_info (CDI_DOMINATORS);
 	  visited_starting_edges.add (entry);
 	  retval = true;
-	  thread_stats.num_threaded_edges++;
+	  m_num_threaded_edges++;
 	}
 
       delete_jump_thread_path (path);
@@ -2675,8 +2676,7 @@ jump_thread_path_registry::thread_through_all_blocks
 	gcc_assert (e->aux == NULL);
     }
 
-  statistics_counter_event (cfun, "Jumps threaded",
-			    thread_stats.num_threaded_edges);
+  statistics_counter_event (cfun, "Jumps threaded", m_num_threaded_edges);
 
   free_original_copy_tables ();
 
