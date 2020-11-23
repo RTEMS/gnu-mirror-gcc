@@ -429,12 +429,12 @@ static tree simplify_control_stmt_condition_1 (edge, gimple *,
 
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
-static tree
-simplify_control_stmt_condition (edge e,
-				 gimple *stmt,
-				 class avail_exprs_stack *avail_exprs_stack,
-				 gcond *dummy_cond,
-				 jump_threader_simplifier &simplify)
+tree
+jump_threader::simplify_control_stmt_condition
+			(edge e,
+			 gimple *stmt,
+			 avail_exprs_stack *avail_exprs_stack,
+			 jump_threader_simplifier &simplify)
 {
   tree cond, cached_lhs;
   enum gimple_code code = gimple_code (stmt);
@@ -892,13 +892,13 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
 
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
-static bool
-thread_around_empty_blocks (edge taken_edge,
-			    gcond *dummy_cond,
-			    class avail_exprs_stack *avail_exprs_stack,
-			    jump_threader_simplifier &simplify,
-			    bitmap visited,
-			    vec<jump_thread_edge *> *path)
+bool
+jump_threader::thread_around_empty_blocks
+			(edge taken_edge,
+			 avail_exprs_stack *avail_exprs_stack,
+			 jump_threader_simplifier &simplify,
+			 bitmap visited,
+			 vec<jump_thread_edge *> *path)
 {
   basic_block bb = taken_edge->dest;
   gimple_stmt_iterator gsi;
@@ -944,7 +944,6 @@ thread_around_empty_blocks (edge taken_edge,
 	      path->safe_push (x);
 	      bitmap_set_bit (visited, taken_edge->dest->index);
 	      return thread_around_empty_blocks (taken_edge,
-						 dummy_cond,
 						 avail_exprs_stack,
 						 simplify,
 						 visited,
@@ -966,7 +965,7 @@ thread_around_empty_blocks (edge taken_edge,
 
   /* Extract and simplify the condition.  */
   cond = simplify_control_stmt_condition (taken_edge, stmt,
-					  avail_exprs_stack, dummy_cond,
+					  avail_exprs_stack,
 					  simplify);
 
   /* If the condition can be statically computed and we have not already
@@ -994,7 +993,6 @@ thread_around_empty_blocks (edge taken_edge,
       path->safe_push (x);
 
       thread_around_empty_blocks (taken_edge,
-				  dummy_cond,
 				  avail_exprs_stack,
 				  simplify,
 				  visited,
@@ -1034,15 +1032,15 @@ thread_around_empty_blocks (edge taken_edge,
    negative indicates the block should not be duplicated and thus is not
    suitable for a joiner in a jump threading path.  */
 
-static int
-thread_through_normal_block (edge e,
-			     gcond *dummy_cond,
-			     const_and_copies *const_and_copies,
-			     avail_exprs_stack *avail_exprs_stack,
-			     evrp_range_analyzer *evrp_range_analyzer,
-			     jump_threader_simplifier &simplify,
-			     vec<jump_thread_edge *> *path,
-			     bitmap visited)
+int
+jump_threader::thread_through_normal_block
+				(edge e,
+				 const_and_copies *const_and_copies,
+				 avail_exprs_stack *avail_exprs_stack,
+				 evrp_range_analyzer *evrp_range_analyzer,
+				 jump_threader_simplifier &simplify,
+				 vec<jump_thread_edge *> *path,
+				 bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
   record_temporary_equivalences (e, const_and_copies, avail_exprs_stack);
@@ -1099,7 +1097,7 @@ thread_through_normal_block (edge e,
 
       /* Extract and simplify the condition.  */
       cond = simplify_control_stmt_condition (e, stmt, avail_exprs_stack,
-					      dummy_cond, simplify);
+					      simplify);
 
       if (!cond)
 	return 0;
@@ -1146,7 +1144,6 @@ thread_through_normal_block (edge e,
 	  bitmap_set_bit (visited, dest->index);
 	  bitmap_set_bit (visited, e->dest->index);
 	  thread_around_empty_blocks (taken_edge,
-				      dummy_cond,
 				      avail_exprs_stack,
 				      simplify,
 				      visited,
@@ -1232,13 +1229,12 @@ edge_forwards_cmp_to_conditional_jump_through_empty_bb_p (edge e)
 
    SIMPLIFY is a pass-specific function used to simplify statements.  */
 
-static void
-thread_across_edge (gcond *dummy_cond,
-		    edge e,
-		    class const_and_copies *const_and_copies,
-		    class avail_exprs_stack *avail_exprs_stack,
-		    class evrp_range_analyzer *evrp_range_analyzer,
-		    jump_threader_simplifier &simplify)
+void
+jump_threader::thread_across_edge (edge e,
+				   const_and_copies *const_and_copies,
+				   avail_exprs_stack *avail_exprs_stack,
+				   evrp_range_analyzer *evrp_range_analyzer,
+				   jump_threader_simplifier &simplify)
 {
   bitmap visited = BITMAP_ALLOC (NULL);
 
@@ -1256,7 +1252,7 @@ thread_across_edge (gcond *dummy_cond,
 
   int threaded;
   if ((e->flags & EDGE_DFS_BACK) == 0)
-    threaded = thread_through_normal_block (e, dummy_cond,
+    threaded = thread_through_normal_block (e,
 					    const_and_copies,
 					    avail_exprs_stack,
 					    evrp_range_analyzer,
@@ -1362,14 +1358,13 @@ thread_across_edge (gcond *dummy_cond,
         x = new jump_thread_edge (taken_edge, EDGE_COPY_SRC_JOINER_BLOCK);
 	path->safe_push (x);
 	found = thread_around_empty_blocks (taken_edge,
-					    dummy_cond,
 					    avail_exprs_stack,
 					    simplify,
 					    visited,
 					    path);
 
 	if (!found)
-	  found = thread_through_normal_block (path->last ()->e, dummy_cond,
+	  found = thread_through_normal_block (path->last ()->e,
 					       const_and_copies,
 					       avail_exprs_stack,
 					       evrp_range_analyzer,
@@ -1432,7 +1427,7 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       && (single_succ_edge (bb)->flags & flags) == 0
       && potentially_threadable_block (single_succ (bb)))
     {
-      thread_across_edge (dummy_cond, single_succ_edge (bb),
+      thread_across_edge (single_succ_edge (bb),
 			  const_and_copies, avail_exprs_stack,
 			  evrp_range_analyzer, simplify);
     }
@@ -1449,13 +1444,13 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       /* Only try to thread the edge if it reaches a target block with
 	 more than one predecessor and more than one successor.  */
       if (potentially_threadable_block (true_edge->dest))
-	thread_across_edge (dummy_cond, true_edge,
+	thread_across_edge (true_edge,
 			    const_and_copies, avail_exprs_stack,
 			    evrp_range_analyzer, simplify);
 
       /* Similarly for the ELSE arm.  */
       if (potentially_threadable_block (false_edge->dest))
-	thread_across_edge (dummy_cond, false_edge,
+	thread_across_edge (false_edge,
 			    const_and_copies, avail_exprs_stack,
 			    evrp_range_analyzer, simplify);
     }
