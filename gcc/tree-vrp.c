@@ -4533,6 +4533,10 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
 
      Note the SSA graph update will occur during the normal TODO
      processing by the pass manager.  */
+  // FIXME: the registry could be put in vrp_jump_threader and have
+  // its destructor call thread_through_all_blocks.  This would cause
+  // thread_through_all_blocks to happen after scev_finalize and
+  // loop_optimizer_finalize below.  Is this ok?
   registry.thread_through_all_blocks (false);
 
   scev_finalize ();

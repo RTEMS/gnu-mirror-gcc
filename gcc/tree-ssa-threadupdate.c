@@ -142,7 +142,7 @@ struct redirection_data : free_ptr_hash<redirection_data>
 
 jump_thread_path_registry::jump_thread_path_registry ()
 {
-  paths.create (100);
+  paths.create (5);
 }
 
 jump_thread_path_registry::~jump_thread_path_registry ()
