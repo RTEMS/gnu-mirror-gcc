@@ -38,8 +38,8 @@ class jump_threader
 public:
   jump_threader (const_and_copies *,
 		 avail_exprs_stack *,
-		 evrp_range_analyzer *,
-		 jump_threader_simplifier *);
+		 jump_threader_simplifier *,
+  		 evrp_range_analyzer * = NULL);
   ~jump_threader ();
   // Entry point to calculate and register threadable paths.
   void thread_outgoing_edges (basic_block);

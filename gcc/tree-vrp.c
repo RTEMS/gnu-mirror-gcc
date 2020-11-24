@@ -4277,7 +4277,7 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   m_simplifier = new vrp_jump_threader_simplifier (m_vr_values,
 						   m_avail_exprs_stack);
   m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack,
-				  NULL, m_simplifier);
+				  m_simplifier);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()

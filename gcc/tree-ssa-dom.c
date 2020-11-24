@@ -748,8 +748,8 @@ pass_dominator::execute (function *fun)
   /* Recursively walk the dominator tree optimizing statements.  */
   evrp_range_analyzer analyzer (true);
   dom_jump_threader_simplifier simplifier (&analyzer, avail_exprs_stack);
-  jump_threader threader (const_and_copies, avail_exprs_stack, &analyzer,
-			  &simplifier);
+  jump_threader threader (const_and_copies, avail_exprs_stack,
+			  &simplifier, &analyzer);
   dom_opt_dom_walker walker (CDI_DOMINATORS,
 			     &threader,
 			     &analyzer,

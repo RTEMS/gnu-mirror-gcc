@@ -63,8 +63,8 @@ set_ssa_name_value (tree name, tree value)
 
 jump_threader::jump_threader (const_and_copies *copies,
 			      avail_exprs_stack *avails,
-			      evrp_range_analyzer *analyzer,
-			      jump_threader_simplifier *simplifier)
+			      jump_threader_simplifier *simplifier,
+			      evrp_range_analyzer *analyzer)
 {
   /* Initialize the per SSA_NAME value-handles array.  */
   gcc_assert (!ssa_name_values.exists ());
