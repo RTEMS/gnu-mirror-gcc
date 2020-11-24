@@ -93,7 +93,10 @@ public:
   jump_thread_edge *&last (void) { return m_path.last (); }
   void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
   unsigned length () { return m_path.length (); }
+  // FIXME: remove
+  // FIXME: remove extern delete_jump_thread_path
   void release () { m_path.release (); }
+  // FIXME: remove
   void block_remove (unsigned ix, unsigned len)
   {
     return m_path.block_remove (ix, len);
@@ -102,6 +105,8 @@ public:
   void dump (FILE *f) { dump (f, true); }
 
 private:
+  // FIXME: should be in an obstack and automatically freed by pass
+  // that created it.
   vec<jump_thread_edge *> m_path;
 };
 
