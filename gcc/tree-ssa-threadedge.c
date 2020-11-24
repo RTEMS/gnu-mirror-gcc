@@ -879,9 +879,9 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
 bool
-jump_threader::thread_around_empty_blocks (edge taken_edge,
-					   bitmap visited,
-					   jump_thread_path *path)
+jump_threader::thread_around_empty_blocks (jump_thread_path *path,
+					   edge taken_edge,
+					   bitmap visited)
 {
   basic_block bb = taken_edge->dest;
   gimple_stmt_iterator gsi;
@@ -926,7 +926,7 @@ jump_threader::thread_around_empty_blocks (edge taken_edge,
 		= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
 	      path->safe_push (x);
 	      bitmap_set_bit (visited, taken_edge->dest->index);
-	      return thread_around_empty_blocks (taken_edge, visited, path);
+	      return thread_around_empty_blocks (path, taken_edge, visited);
 	    }
 	}
 
@@ -969,7 +969,7 @@ jump_threader::thread_around_empty_blocks (edge taken_edge,
 	= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
       path->safe_push (x);
 
-      thread_around_empty_blocks (taken_edge, visited, path);
+      thread_around_empty_blocks (path, taken_edge, visited);
       return true;
     }
 
@@ -1001,9 +1001,8 @@ jump_threader::thread_around_empty_blocks (edge taken_edge,
    suitable for a joiner in a jump threading path.  */
 
 int
-jump_threader::thread_through_normal_block (edge e,
-					    jump_thread_path *path,
-					    bitmap visited)
+jump_threader::thread_through_normal_block (jump_thread_path *path,
+					    edge e, bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
   record_temporary_equivalences (e, m_const_and_copies, m_avail_exprs_stack);
@@ -1100,7 +1099,7 @@ jump_threader::thread_through_normal_block (edge e,
  	     visited.  This may be overly conservative.  */
 	  bitmap_set_bit (visited, dest->index);
 	  bitmap_set_bit (visited, e->dest->index);
-	  thread_around_empty_blocks (taken_edge, visited, path);
+	  thread_around_empty_blocks (path, taken_edge, visited);
 	  return 1;
 	}
     }
@@ -1191,7 +1190,7 @@ jump_threader::thread_across_edge (edge e)
 
   int threaded;
   if ((e->flags & EDGE_DFS_BACK) == 0)
-    threaded = thread_through_normal_block (e, path, visited);
+    threaded = thread_through_normal_block (path, e, visited);
   else
     threaded = 0;
 
@@ -1291,12 +1290,11 @@ jump_threader::thread_across_edge (edge e)
 
         x = new jump_thread_edge (taken_edge, EDGE_COPY_SRC_JOINER_BLOCK);
 	path->safe_push (x);
-	found = thread_around_empty_blocks (taken_edge, visited, path);
+	found = thread_around_empty_blocks (path, taken_edge, visited);
 
 	if (!found)
-	  found = thread_through_normal_block (path->last ()->e,
-					       path,
-					       visited) > 0;
+	  found = thread_through_normal_block (path,
+					       path->last ()->e, visited) > 0;
 
 	/* If we were able to thread through a successor of E->dest, then
 	   record the jump threading opportunity.  */

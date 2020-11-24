@@ -49,13 +49,10 @@ private:
 					  tree op1,
 					  unsigned limit);
 
-  // FIXME: Change order of arguments with these 2 funcs.
-  bool thread_around_empty_blocks (edge,
-				   bitmap visited,
-				   class jump_thread_path *path);
-  int thread_through_normal_block (edge,
-				   jump_thread_path *path,
-				   bitmap visited);
+  bool thread_around_empty_blocks (class jump_thread_path *path,
+				   edge, bitmap visited);
+  int thread_through_normal_block (jump_thread_path *path,
+				   edge, bitmap visited);
   void thread_across_edge (edge);
   bool record_temporary_equivalences_from_phis (edge);
   gimple *record_temporary_equivalences_from_stmts_at_dest (edge);
