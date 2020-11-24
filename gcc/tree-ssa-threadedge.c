@@ -61,8 +61,7 @@ set_ssa_name_value (tree name, tree value)
   ssa_name_values[SSA_NAME_VERSION (name)] = value;
 }
 
-jump_threader::jump_threader (jump_thread_path_registry *registry,
-			      const_and_copies *copies,
+jump_threader::jump_threader (const_and_copies *copies,
 			      avail_exprs_stack *avails)
 {
   /* Initialize the per SSA_NAME value-handles array.  */
@@ -74,12 +73,25 @@ jump_threader::jump_threader (jump_thread_path_registry *registry,
 
   m_const_and_copies = copies;
   m_avail_exprs_stack = avails;
-  m_registry = registry;
+  m_registry = new jump_thread_path_registry ();
 }
 
 jump_threader::~jump_threader (void)
 {
   ssa_name_values.release ();
+  delete m_registry;
+}
+
+void
+jump_threader::remove_jump_threads_including (edge_def *e)
+{
+  m_registry->remove_jump_threads_including (e);
+}
+
+bool
+jump_threader::thread_through_all_blocks (bool may_peel_loop_headers)
+{
+  return m_registry->thread_through_all_blocks (may_peel_loop_headers);
 }
 
 /* Return TRUE if we may be able to thread an incoming edge into

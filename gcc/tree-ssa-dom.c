@@ -722,8 +722,7 @@ pass_dominator::execute (function *fun)
     record_edge_info (bb);
 
   /* Recursively walk the dominator tree optimizing statements.  */
-  jump_thread_path_registry registry;
-  jump_threader threader (&registry, const_and_copies, avail_exprs_stack);
+  jump_threader threader (const_and_copies, avail_exprs_stack);
   dom_opt_dom_walker walker (CDI_DOMINATORS,
 			     &threader,
 			     const_and_copies,
@@ -756,7 +755,7 @@ pass_dominator::execute (function *fun)
 	     containing any edge leaving BB.  */
 	  if (found)
 	    FOR_EACH_EDGE (e, ei, bb->succs)
-	      registry.remove_jump_threads_including (e);
+	      threader.remove_jump_threads_including (e);
 	}
     }
 
@@ -780,7 +779,7 @@ pass_dominator::execute (function *fun)
   free_all_edge_infos ();
 
   /* Thread jumps, creating duplicate blocks as needed.  */
-  cfg_altered |= registry.thread_through_all_blocks (may_peel_loop_headers_p);
+  cfg_altered |= threader.thread_through_all_blocks (may_peel_loop_headers_p);
 
   if (cfg_altered)
     free_dominance_info (CDI_DOMINATORS);

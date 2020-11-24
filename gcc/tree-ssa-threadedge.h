@@ -31,13 +31,15 @@ class evrp_range_analyzer;
 class jump_threader
 {
 public:
-  jump_threader (jump_thread_path_registry *,
-		 const_and_copies *,
-		 avail_exprs_stack *);
+  jump_threader (const_and_copies *, avail_exprs_stack *);
   ~jump_threader ();
   void thread_outgoing_edges (basic_block,
 			      evrp_range_analyzer *,
 			      jump_threader_simplifier &);
+  // ?? Temporary convenience functions that call through the
+  // registry.  This avoids having to expose the registry.
+  void remove_jump_threads_including (edge_def *);
+  bool thread_through_all_blocks (bool may_peel_loop_headers);
 
 private:
   tree simplify_control_stmt_condition (edge, gimple *,

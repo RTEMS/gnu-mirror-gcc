@@ -4175,12 +4175,18 @@ vrp_folder::fold_stmt (gimple_stmt_iterator *si)
 class vrp_jump_threader : public dom_walker
 {
 public:
-  vrp_jump_threader (function *, vr_values *, jump_thread_path_registry *);
+  vrp_jump_threader (function *, vr_values *);
   ~vrp_jump_threader ();
 
   void thread_jumps ()
   {
     walk (m_fun->cfg->x_entry_block_ptr);
+  }
+
+  void thread_through_all_blocks ()
+  {
+    // FIXME: Put this in the destructor?
+    m_threader->thread_through_all_blocks (false);
   }
 
 private:
@@ -4195,9 +4201,7 @@ private:
   jump_threader *m_threader;
 };
 
-vrp_jump_threader::vrp_jump_threader (struct function *fun,
-				      vr_values *v,
-				      jump_thread_path_registry *registry)
+vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
 {
   /* Ugh.  When substituting values earlier in this pass we can wipe
@@ -4221,9 +4225,7 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun,
   m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
   m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
 
-  m_threader = new jump_threader (registry,
-				  m_const_and_copies,
-				  m_avail_exprs_stack);
+  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()
@@ -4492,8 +4494,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
 
   /* We must identify jump threading opportunities before we release
      the datastructures built by VRP.  */
-  jump_thread_path_registry registry;
-  vrp_jump_threader threader (fun, &vrp_vr_values, &registry);
+  vrp_jump_threader threader (fun, &vrp_vr_values);
   threader.thread_jumps ();
 
   /* A comparison of an SSA_NAME against a constant where the SSA_NAME
@@ -4532,11 +4533,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
 
      Note the SSA graph update will occur during the normal TODO
      processing by the pass manager.  */
-  // FIXME: the registry could be put in vrp_jump_threader and have
-  // its destructor call thread_through_all_blocks.  This would cause
-  // thread_through_all_blocks to happen after scev_finalize and
-  // loop_optimizer_finalize below.  Is this ok?
-  registry.thread_through_all_blocks (false);
+  threader.thread_through_all_blocks ();
 
   scev_finalize ();
   loop_optimizer_finalize ();
