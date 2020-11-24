@@ -881,7 +881,7 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
 bool
 jump_threader::thread_around_empty_blocks (edge taken_edge,
 					   bitmap visited,
-					   vec<jump_thread_edge *> *path)
+					   jump_thread_path *path)
 {
   basic_block bb = taken_edge->dest;
   gimple_stmt_iterator gsi;
@@ -1002,7 +1002,7 @@ jump_threader::thread_around_empty_blocks (edge taken_edge,
 
 int
 jump_threader::thread_through_normal_block (edge e,
-					    vec<jump_thread_edge *> *path,
+					    jump_thread_path *path,
 					    bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
@@ -1184,7 +1184,7 @@ jump_threader::thread_across_edge (edge e)
 
   stmt_count = 0;
 
-  vec<jump_thread_edge *> *path = new vec<jump_thread_edge *> ();
+  jump_thread_path *path = new jump_thread_path ();
   bitmap_clear (visited);
   bitmap_set_bit (visited, e->src->index);
   bitmap_set_bit (visited, e->dest->index);
@@ -1282,7 +1282,7 @@ jump_threader::thread_across_edge (edge e)
 	bitmap_set_bit (visited, e->src->index);
 	bitmap_set_bit (visited, e->dest->index);
 	bitmap_set_bit (visited, taken_edge->dest->index);
-        vec<jump_thread_edge *> *path = new vec<jump_thread_edge *> ();
+	jump_thread_path *path = new jump_thread_path ();
 
 	/* Record whether or not we were able to thread through a successor
 	   of E->dest.  */

@@ -464,7 +464,7 @@ thread_jumps::profitable_jump_thread_path (basic_block bbi, tree name,
 void
 thread_jumps::convert_and_register_current_path (edge taken_edge)
 {
-  vec<jump_thread_edge *> *jump_thread_path = new vec<jump_thread_edge *> ();
+  jump_thread_path *path = new jump_thread_path ();
 
   /* Record the edges between the blocks in PATH.  */
   for (unsigned int j = 0; j + 1 < m_path.length (); j++)
@@ -475,15 +475,15 @@ thread_jumps::convert_and_register_current_path (edge taken_edge)
       edge e = find_edge (bb1, bb2);
       gcc_assert (e);
       jump_thread_edge *x = new jump_thread_edge (e, EDGE_FSM_THREAD);
-      jump_thread_path->safe_push (x);
+      path->safe_push (x);
     }
 
   /* Add the edge taken when the control variable has value ARG.  */
   jump_thread_edge *x
     = new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
-  jump_thread_path->safe_push (x);
+  path->safe_push (x);
 
-  m_registry.register_jump_thread (jump_thread_path);
+  m_registry.register_jump_thread (path);
   --m_max_threaded_paths;
 }
 

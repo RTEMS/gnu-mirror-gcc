@@ -30,7 +30,7 @@ class jump_thread_path_registry
 public:
   jump_thread_path_registry ();
   ~jump_thread_path_registry ();
-  void register_jump_thread (vec <class jump_thread_edge *> *);
+  void register_jump_thread (class jump_thread_path *);
   void remove_jump_threads_including (edge);
   // Perform CFG changes after all threadable candidates have been
   // registered.
@@ -53,7 +53,7 @@ private:
 				   bool may_peel_loop_headers);
   class redirection_data *lookup_redirection_data (edge e, enum insert_option);
 
-  vec<vec<jump_thread_edge *> *> m_paths;
+  vec<class jump_thread_path *> m_paths;
 
   hash_table<struct removed_edges> *m_removed_edges;
 
@@ -88,23 +88,19 @@ public:
 class jump_thread_path
 {
 public:
-  jump_thread_path () { m_path = new vec<jump_thread_edge *> (); }
-  jump_thread_edge *&operator[] (int i) { return (*m_path)[i]; }
-  jump_thread_edge *&last (void) { return m_path->last (); }
-  void safe_push (jump_thread_edge *e) { m_path->safe_push (e); }
-  unsigned length () { return m_path->length (); }
-  void release ()
+  jump_thread_path () { m_path.create (5); }
+  jump_thread_edge *&operator[] (int i) { return m_path[i]; }
+  jump_thread_edge *&last (void) { return m_path.last (); }
+  void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
+  unsigned length () { return m_path.length (); }
+  void release () { m_path.release (); }
+  void block_remove (unsigned ix, unsigned len)
   {
-    for (unsigned int i = 0; i < m_path->length (); i++)
-      delete (*m_path)[i];
-    m_path->release();
-    memset (m_path, 0x13, sizeof (*m_path));
-    delete m_path;
-    m_path = 0;
+    return m_path.block_remove (ix, len);
   }
 
 private:
-  vec<jump_thread_edge *> *m_path;
+  vec<jump_thread_edge *> m_path;
 };
 
 // Rather than search all the edges in jump thread paths each time DOM
@@ -117,7 +113,7 @@ struct removed_edges : nofree_ptr_hash<edge_def>
   static bool equal (edge e1, edge e2) { return e1 == e2; }
 };
 
-extern void delete_jump_thread_path (vec <jump_thread_edge *> *);
+extern void delete_jump_thread_path (jump_thread_path *);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 
 enum bb_dom_status
