@@ -36,12 +36,11 @@ class evrp_range_analyzer;
 class jump_threader
 {
 public:
-  jump_threader (const_and_copies *, avail_exprs_stack *);
+  jump_threader (const_and_copies *, avail_exprs_stack *,
+		 jump_threader_simplifier *);
   ~jump_threader ();
   // Entry point to calculate and register threadable paths.
-  void thread_outgoing_edges (basic_block,
-			      evrp_range_analyzer *,
-			      jump_threader_simplifier &);
+  void thread_outgoing_edges (basic_block, evrp_range_analyzer *);
   void remove_jump_threads_including (edge_def *);
   // Perform CFG changes after all threadable candidates have been
   // registered.
@@ -54,41 +53,34 @@ public:
   bool thread_through_all_blocks (bool may_peel_loop_headers);
 
 private:
-  tree simplify_control_stmt_condition (edge, gimple *,
-					jump_threader_simplifier &);
+  tree simplify_control_stmt_condition (edge, gimple *);
   tree simplify_control_stmt_condition_1 (edge,
 					  gimple *,
 					  tree op0,
 					  tree_code cond_code,
 					  tree op1,
-					  jump_threader_simplifier &simplify,
 					  unsigned limit);
 
   bool thread_around_empty_blocks (edge,
-				   jump_threader_simplifier &,
 				   bitmap visited,
 				   vec<jump_thread_edge *> *path);
   int thread_through_normal_block (edge,
 				   evrp_range_analyzer *,
-				   jump_threader_simplifier &,
 				   vec<jump_thread_edge *> *path,
 				   bitmap visited);
-  void thread_across_edge (edge,
-			   evrp_range_analyzer *,
-			   jump_threader_simplifier &simplify);
+  void thread_across_edge (edge, evrp_range_analyzer *);
   bool record_temporary_equivalences_from_phis (edge,
 						evrp_range_analyzer *);
   gimple *record_temporary_equivalences_from_stmts_at_dest (edge,
-    evrp_range_analyzer *,
-    jump_threader_simplifier &);
+    evrp_range_analyzer *);
 
   // Dummy condition to avoid creating lots of throw away statements.
   gcond *dummy_cond;
 
   class const_and_copies *m_const_and_copies;
   class avail_exprs_stack *m_avail_exprs_stack;
-
   class jump_thread_path_registry *m_registry;
+  jump_threader_simplifier *m_simplifier;
 };
 
 // Statement simplifier callback for the jump threader.
@@ -101,6 +93,7 @@ public:
     : m_vr_values (v),
       m_avail_exprs_stack (avails)
   { }
+  virtual ~jump_threader_simplifier () { }
   virtual tree simplify (gimple *, gimple *, basic_block);
 
 protected:

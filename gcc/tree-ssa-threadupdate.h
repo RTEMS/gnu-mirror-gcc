@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef _TREE_SSA_THREADUPDATE_H
 #define _TREE_SSA_THREADUPDATE_H 1
 
+// FIXME: put this in jump_thread_edge
 enum jump_thread_edge_type
 {
   EDGE_START_JUMP_THREAD,

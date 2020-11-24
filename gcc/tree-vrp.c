@@ -4152,133 +4152,6 @@ vrp_folder::fold_stmt (gimple_stmt_iterator *si)
   return simplifier.simplify (si);
 }
 
-/* Blocks which have more than one predecessor and more than
-   one successor present jump threading opportunities, i.e.,
-   when the block is reached from a specific predecessor, we
-   may be able to determine which of the outgoing edges will
-   be traversed.  When this optimization applies, we are able
-   to avoid conditionals at runtime and we may expose secondary
-   optimization opportunities.
-
-   This class is effectively a driver for the generic jump
-   threading code.  It basically just presents the generic code
-   with edges that may be suitable for jump threading.
-
-   Unlike DOM, we do not iterate VRP if jump threading was successful.
-   While iterating may expose new opportunities for VRP, it is expected
-   those opportunities would be very limited and the compile time cost
-   to expose those opportunities would be significant.
-
-   As jump threading opportunities are discovered, they are registered
-   for later realization.  */
-
-class vrp_jump_threader : public dom_walker
-{
-public:
-  vrp_jump_threader (function *, vr_values *);
-  ~vrp_jump_threader ();
-
-  void thread_jumps ()
-  {
-    walk (m_fun->cfg->x_entry_block_ptr);
-  }
-
-  void thread_through_all_blocks ()
-  {
-    // FIXME: Put this in the destructor?
-    m_threader->thread_through_all_blocks (false);
-  }
-
-private:
-  virtual edge before_dom_children (basic_block);
-  virtual void after_dom_children (basic_block);
-
-  function *m_fun;
-  vr_values *m_vr_values;
-  const_and_copies *m_const_and_copies;
-  avail_exprs_stack *m_avail_exprs_stack;
-  hash_table<expr_elt_hasher> *m_avail_exprs;
-  jump_threader *m_threader;
-};
-
-vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
-  : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
-{
-  /* Ugh.  When substituting values earlier in this pass we can wipe
-     the dominance information.  So rebuild the dominator information
-     as we need it within the jump threading code.  */
-  calculate_dominance_info (CDI_DOMINATORS);
-
-  /* We do not allow VRP information to be used for jump threading
-     across a back edge in the CFG.  Otherwise it becomes too
-     difficult to avoid eliminating loop exit tests.  Of course
-     EDGE_DFS_BACK is not accurate at this time so we have to
-     recompute it.  */
-  mark_dfs_back_edges ();
-
-  /* Allocate our unwinder stack to unwind any temporary equivalences
-     that might be recorded.  */
-  m_const_and_copies = new const_and_copies ();
-
-  m_fun = fun;
-  m_vr_values = v;
-  m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
-  m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
-
-  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack);
-}
-
-vrp_jump_threader::~vrp_jump_threader ()
-{
-  /* We do not actually update the CFG or SSA graphs at this point as
-     ASSERT_EXPRs are still in the IL and cfg cleanup code does not
-     yet handle ASSERT_EXPRs gracefully.  */
-  delete m_const_and_copies;
-  delete m_avail_exprs;
-  delete m_avail_exprs_stack;
-  delete m_threader;
-}
-
-/* Called before processing dominator children of BB.  We want to look
-   at ASSERT_EXPRs and record information from them in the appropriate
-   tables.
-
-   We could look at other statements here.  It's not seen as likely
-   to significantly increase the jump threads we discover.  */
-
-edge
-vrp_jump_threader::before_dom_children (basic_block bb)
-{
-  gimple_stmt_iterator gsi;
-
-  m_avail_exprs_stack->push_marker ();
-  m_const_and_copies->push_marker ();
-  for (gsi = gsi_start_nondebug_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      gimple *stmt = gsi_stmt (gsi);
-      if (gimple_assign_single_p (stmt)
-         && TREE_CODE (gimple_assign_rhs1 (stmt)) == ASSERT_EXPR)
-	{
-	  tree rhs1 = gimple_assign_rhs1 (stmt);
-	  tree cond = TREE_OPERAND (rhs1, 1);
-	  tree inverted = invert_truthvalue (cond);
-	  vec<cond_equivalence> p;
-	  p.create (3);
-	  record_conditions (&p, cond, inverted);
-	  for (unsigned int i = 0; i < p.length (); i++)
-	    m_avail_exprs_stack->record_cond (&p[i]);
-
-	  tree lhs = gimple_assign_lhs (stmt);
-	  m_const_and_copies->record_const_or_copy (lhs,
-						    TREE_OPERAND (rhs1, 0));
-	  p.release ();
-	  continue;
-	}
-      break;
-    }
-  return NULL;
-}
-
 class vrp_jump_threader_simplifier : public jump_threader_simplifier
 {
 public:
@@ -4327,15 +4200,144 @@ vrp_jump_threader_simplifier::simplify (gimple *stmt,
   return jump_threader_simplifier::simplify (stmt, within_stmt, bb);
 }
 
+/* Blocks which have more than one predecessor and more than
+   one successor present jump threading opportunities, i.e.,
+   when the block is reached from a specific predecessor, we
+   may be able to determine which of the outgoing edges will
+   be traversed.  When this optimization applies, we are able
+   to avoid conditionals at runtime and we may expose secondary
+   optimization opportunities.
+
+   This class is effectively a driver for the generic jump
+   threading code.  It basically just presents the generic code
+   with edges that may be suitable for jump threading.
+
+   Unlike DOM, we do not iterate VRP if jump threading was successful.
+   While iterating may expose new opportunities for VRP, it is expected
+   those opportunities would be very limited and the compile time cost
+   to expose those opportunities would be significant.
+
+   As jump threading opportunities are discovered, they are registered
+   for later realization.  */
+
+class vrp_jump_threader : public dom_walker
+{
+public:
+  vrp_jump_threader (function *, vr_values *);
+  ~vrp_jump_threader ();
+
+  void thread_jumps ()
+  {
+    walk (m_fun->cfg->x_entry_block_ptr);
+  }
+
+  void thread_through_all_blocks ()
+  {
+    // FIXME: Put this in the destructor?
+    m_threader->thread_through_all_blocks (false);
+  }
+
+private:
+  virtual edge before_dom_children (basic_block);
+  virtual void after_dom_children (basic_block);
+
+  function *m_fun;
+  vr_values *m_vr_values;
+  const_and_copies *m_const_and_copies;
+  avail_exprs_stack *m_avail_exprs_stack;
+  hash_table<expr_elt_hasher> *m_avail_exprs;
+  vrp_jump_threader_simplifier *m_simplifier;
+  jump_threader *m_threader;
+};
+
+vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
+  : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
+{
+  /* Ugh.  When substituting values earlier in this pass we can wipe
+     the dominance information.  So rebuild the dominator information
+     as we need it within the jump threading code.  */
+  calculate_dominance_info (CDI_DOMINATORS);
+
+  /* We do not allow VRP information to be used for jump threading
+     across a back edge in the CFG.  Otherwise it becomes too
+     difficult to avoid eliminating loop exit tests.  Of course
+     EDGE_DFS_BACK is not accurate at this time so we have to
+     recompute it.  */
+  mark_dfs_back_edges ();
+
+  /* Allocate our unwinder stack to unwind any temporary equivalences
+     that might be recorded.  */
+  m_const_and_copies = new const_and_copies ();
+
+  m_fun = fun;
+  m_vr_values = v;
+  m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
+  m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
+
+  m_simplifier = new vrp_jump_threader_simplifier (m_vr_values,
+						   m_avail_exprs_stack);
+  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack,
+				  m_simplifier);
+}
+
+vrp_jump_threader::~vrp_jump_threader ()
+{
+  /* We do not actually update the CFG or SSA graphs at this point as
+     ASSERT_EXPRs are still in the IL and cfg cleanup code does not
+     yet handle ASSERT_EXPRs gracefully.  */
+  delete m_const_and_copies;
+  delete m_avail_exprs;
+  delete m_avail_exprs_stack;
+  delete m_simplifier;
+  delete m_threader;
+}
+
+/* Called before processing dominator children of BB.  We want to look
+   at ASSERT_EXPRs and record information from them in the appropriate
+   tables.
+
+   We could look at other statements here.  It's not seen as likely
+   to significantly increase the jump threads we discover.  */
+
+edge
+vrp_jump_threader::before_dom_children (basic_block bb)
+{
+  gimple_stmt_iterator gsi;
+
+  m_avail_exprs_stack->push_marker ();
+  m_const_and_copies->push_marker ();
+  for (gsi = gsi_start_nondebug_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      if (gimple_assign_single_p (stmt)
+         && TREE_CODE (gimple_assign_rhs1 (stmt)) == ASSERT_EXPR)
+	{
+	  tree rhs1 = gimple_assign_rhs1 (stmt);
+	  tree cond = TREE_OPERAND (rhs1, 1);
+	  tree inverted = invert_truthvalue (cond);
+	  vec<cond_equivalence> p;
+	  p.create (3);
+	  record_conditions (&p, cond, inverted);
+	  for (unsigned int i = 0; i < p.length (); i++)
+	    m_avail_exprs_stack->record_cond (&p[i]);
+
+	  tree lhs = gimple_assign_lhs (stmt);
+	  m_const_and_copies->record_const_or_copy (lhs,
+						    TREE_OPERAND (rhs1, 0));
+	  p.release ();
+	  continue;
+	}
+      break;
+    }
+  return NULL;
+}
+
 /* Called after processing dominator children of BB.  This is where we
    actually call into the threader.  */
 void
 vrp_jump_threader::after_dom_children (basic_block bb)
 {
-  vrp_jump_threader_simplifier jthread_simplifier (m_vr_values,
-						   m_avail_exprs_stack);
-  m_threader->thread_outgoing_edges (bb, NULL, jthread_simplifier);
-
+  m_threader->thread_outgoing_edges (bb, NULL);
   m_avail_exprs_stack->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();
 }

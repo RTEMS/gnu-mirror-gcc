@@ -62,7 +62,8 @@ set_ssa_name_value (tree name, tree value)
 }
 
 jump_threader::jump_threader (const_and_copies *copies,
-			      avail_exprs_stack *avails)
+			      avail_exprs_stack *avails,
+			      jump_threader_simplifier *simplifier)
 {
   /* Initialize the per SSA_NAME value-handles array.  */
   gcc_assert (!ssa_name_values.exists ());
@@ -74,6 +75,7 @@ jump_threader::jump_threader (const_and_copies *copies,
   m_const_and_copies = copies;
   m_avail_exprs_stack = avails;
   m_registry = new jump_thread_path_registry ();
+  m_simplifier = simplifier;
 }
 
 jump_threader::~jump_threader (void)
@@ -237,8 +239,7 @@ threadedge_valueize (tree t)
 
 gimple *
 jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
-    evrp_range_analyzer *evrp_range_analyzer,
-    jump_threader_simplifier &simplifier)
+    evrp_range_analyzer *evrp_range_analyzer)
 {
   gimple *stmt = NULL;
   gimple_stmt_iterator gsi;
@@ -401,7 +402,7 @@ jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
 		    SET_USE (use_p, tmp);
 		}
 
-	      cached_lhs = simplifier.simplify (stmt, stmt, e->src);
+	      cached_lhs = m_simplifier->simplify (stmt, stmt, e->src);
 
 	      /* Restore the statement's original uses/defs.  */
 	      i = 0;
@@ -431,10 +432,7 @@ jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
    the CASE_LABEL_EXPR that will be taken.  */
 
 tree
-jump_threader::simplify_control_stmt_condition
-			(edge e,
-			 gimple *stmt,
-			 jump_threader_simplifier &simplifier)
+jump_threader::simplify_control_stmt_condition (edge e, gimple *stmt)
 {
   tree cond, cached_lhs;
   enum gimple_code code = gimple_code (stmt);
@@ -478,9 +476,7 @@ jump_threader::simplify_control_stmt_condition
       const unsigned recursion_limit = 4;
 
       cached_lhs
-	= simplify_control_stmt_condition_1 (e, stmt,
-					     op0, cond_code, op1,
-					     simplifier,
+	= simplify_control_stmt_condition_1 (e, stmt, op0, cond_code, op1,
 					     recursion_limit);
 
       /* If we were testing an integer/pointer against a constant, then
@@ -550,11 +546,11 @@ jump_threader::simplify_control_stmt_condition
 		 the label that is proven to be taken.  */
 	      gswitch *dummy_switch = as_a<gswitch *> (gimple_copy (stmt));
 	      gimple_switch_set_index (dummy_switch, cached_lhs);
-	      cached_lhs = simplifier.simplify (dummy_switch, stmt, e->src);
+	      cached_lhs = m_simplifier->simplify (dummy_switch, stmt, e->src);
 	      ggc_free (dummy_switch);
 	    }
 	  else
-	    cached_lhs = simplifier.simplify (stmt, stmt, e->src);
+	    cached_lhs = m_simplifier->simplify (stmt, stmt, e->src);
 	}
 
       /* We couldn't find an invariant.  But, callers of this
@@ -578,7 +574,6 @@ jump_threader::simplify_control_stmt_condition_1
 					 tree op0,
 					 enum tree_code cond_code,
 					 tree op1,
-					 jump_threader_simplifier &simplifier,
 					 unsigned limit)
 {
   if (limit == 0)
@@ -616,7 +611,7 @@ jump_threader::simplify_control_stmt_condition_1
 	  const tree res1
 	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs1, NE_EXPR, op1,
-						 simplifier, limit - 1);
+						 limit - 1);
 	  if (res1 == NULL_TREE)
 	    ;
 	  else if (rhs_code == BIT_AND_EXPR && integer_zerop (res1))
@@ -642,7 +637,7 @@ jump_threader::simplify_control_stmt_condition_1
 	  const tree res2
 	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs2, NE_EXPR, op1,
-						 simplifier, limit - 1);
+						 limit - 1);
 	  if (res2 == NULL_TREE)
 	    ;
 	  else if (rhs_code == BIT_AND_EXPR && integer_zerop (res2))
@@ -706,7 +701,7 @@ jump_threader::simplify_control_stmt_condition_1
 	  tree res
 	    = simplify_control_stmt_condition_1 (e, def_stmt,
 						 rhs1, new_cond, rhs2,
-						 simplifier, limit - 1);
+						 limit - 1);
 	  if (res != NULL_TREE && is_gimple_min_invariant (res))
 	    return res;
 	}
@@ -732,7 +727,7 @@ jump_threader::simplify_control_stmt_condition_1
      then use the pass specific callback to simplify the condition.  */
   if (!res
       || !is_gimple_min_invariant (res))
-    res = simplifier.simplify (dummy_cond, stmt, e->src);
+    res = m_simplifier->simplify (dummy_cond, stmt, e->src);
 
   return res;
 }
@@ -884,11 +879,9 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
 bool
-jump_threader::thread_around_empty_blocks
-			(edge taken_edge,
-			 jump_threader_simplifier &simplifier,
-			 bitmap visited,
-			 vec<jump_thread_edge *> *path)
+jump_threader::thread_around_empty_blocks (edge taken_edge,
+					   bitmap visited,
+					   vec<jump_thread_edge *> *path)
 {
   basic_block bb = taken_edge->dest;
   gimple_stmt_iterator gsi;
@@ -933,10 +926,7 @@ jump_threader::thread_around_empty_blocks
 		= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
 	      path->safe_push (x);
 	      bitmap_set_bit (visited, taken_edge->dest->index);
-	      return thread_around_empty_blocks (taken_edge,
-						 simplifier,
-						 visited,
-						 path);
+	      return thread_around_empty_blocks (taken_edge, visited, path);
 	    }
 	}
 
@@ -953,7 +943,7 @@ jump_threader::thread_around_empty_blocks
     return false;
 
   /* Extract and simplify the condition.  */
-  cond = simplify_control_stmt_condition (taken_edge, stmt, simplifier);
+  cond = simplify_control_stmt_condition (taken_edge, stmt);
 
   /* If the condition can be statically computed and we have not already
      visited the destination edge, then add the taken edge to our thread
@@ -979,7 +969,7 @@ jump_threader::thread_around_empty_blocks
 	= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
       path->safe_push (x);
 
-      thread_around_empty_blocks (taken_edge, simplifier, visited, path);
+      thread_around_empty_blocks (taken_edge, visited, path);
       return true;
     }
 
@@ -1002,8 +992,6 @@ jump_threader::thread_around_empty_blocks
    STACK is used to undo temporary equivalences created during the walk of
    E->dest.
 
-   SIMPLIFIER is a pass-specific function used to simplify statements.
-
    Our caller is responsible for restoring the state of the expression
    and const_and_copies stacks.
 
@@ -1016,7 +1004,6 @@ int
 jump_threader::thread_through_normal_block
 				(edge e,
 				 evrp_range_analyzer *evrp_range_analyzer,
-				 jump_threader_simplifier &simplifier,
 				 vec<jump_thread_edge *> *path,
 				 bitmap visited)
 {
@@ -1034,8 +1021,7 @@ jump_threader::thread_through_normal_block
      temporary equivalences we can detect.  */
   gimple *stmt
     = record_temporary_equivalences_from_stmts_at_dest (e,
-							evrp_range_analyzer,
-							simplifier);
+							evrp_range_analyzer);
 
   /* There's two reasons STMT might be null, and distinguishing
      between them is important.
@@ -1072,7 +1058,7 @@ jump_threader::thread_through_normal_block
       tree cond;
 
       /* Extract and simplify the condition.  */
-      cond = simplify_control_stmt_condition (e, stmt, simplifier);
+      cond = simplify_control_stmt_condition (e, stmt);
 
       if (!cond)
 	return 0;
@@ -1118,7 +1104,7 @@ jump_threader::thread_through_normal_block
  	     visited.  This may be overly conservative.  */
 	  bitmap_set_bit (visited, dest->index);
 	  bitmap_set_bit (visited, e->dest->index);
-	  thread_around_empty_blocks (taken_edge, simplifier, visited, path);
+	  thread_around_empty_blocks (taken_edge, visited, path);
 	  return 1;
 	}
     }
@@ -1188,14 +1174,11 @@ edge_forwards_cmp_to_conditional_jump_through_empty_bb_p (edge e)
 }
 
 /* We are exiting E->src, see if E->dest ends with a conditional
-   jump which has a known value when reached via E.
-
-   SIMPLIFIER is a pass-specific function used to simplify statements.  */
+   jump which has a known value when reached via E.  */
 
 void
 jump_threader::thread_across_edge (edge e,
-				   evrp_range_analyzer *evrp_range_analyzer,
-				   jump_threader_simplifier &simplifier)
+				   evrp_range_analyzer *evrp_range_analyzer)
 {
   bitmap visited = BITMAP_ALLOC (NULL);
 
@@ -1213,10 +1196,8 @@ jump_threader::thread_across_edge (edge e,
 
   int threaded;
   if ((e->flags & EDGE_DFS_BACK) == 0)
-    threaded = thread_through_normal_block (e,
-					    evrp_range_analyzer,
-					    simplifier, path,
-					    visited);
+    threaded = thread_through_normal_block (e, evrp_range_analyzer,
+					    path, visited);
   else
     threaded = 0;
 
@@ -1316,15 +1297,12 @@ jump_threader::thread_across_edge (edge e,
 
         x = new jump_thread_edge (taken_edge, EDGE_COPY_SRC_JOINER_BLOCK);
 	path->safe_push (x);
-	found = thread_around_empty_blocks (taken_edge,
-					    simplifier,
-					    visited,
-					    path);
+	found = thread_around_empty_blocks (taken_edge, visited, path);
 
 	if (!found)
 	  found = thread_through_normal_block (path->last ()->e,
 					       evrp_range_analyzer,
-					       simplifier, path,
+					       path,
 					       visited) > 0;
 
 	/* If we were able to thread through a successor of E->dest, then
@@ -1356,14 +1334,11 @@ jump_threader::thread_across_edge (edge e,
 }
 
 /* Examine the outgoing edges from BB and conditionally
-   try to thread them.
-
-   SIMPLIFIER is a pass-specific function used to simplify statements.  */
+   try to thread them.  */
 
 void
 jump_threader::thread_outgoing_edges (basic_block bb,
-				      evrp_range_analyzer *evrp_range_analyzer,
-				      jump_threader_simplifier &simplifier)
+				      evrp_range_analyzer *evrp_range_analyzer)
 {
   int flags = (EDGE_IGNORE | EDGE_COMPLEX | EDGE_ABNORMAL);
   gimple *last;
@@ -1376,8 +1351,7 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       && (single_succ_edge (bb)->flags & flags) == 0
       && potentially_threadable_block (single_succ (bb)))
     {
-      thread_across_edge (single_succ_edge (bb),
-			  evrp_range_analyzer, simplifier);
+      thread_across_edge (single_succ_edge (bb), evrp_range_analyzer);
     }
   else if ((last = last_stmt (bb))
 	   && gimple_code (last) == GIMPLE_COND
@@ -1392,11 +1366,11 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       /* Only try to thread the edge if it reaches a target block with
 	 more than one predecessor and more than one successor.  */
       if (potentially_threadable_block (true_edge->dest))
-	thread_across_edge (true_edge, evrp_range_analyzer, simplifier);
+	thread_across_edge (true_edge, evrp_range_analyzer);
 
       /* Similarly for the ELSE arm.  */
       if (potentially_threadable_block (false_edge->dest))
-	thread_across_edge (false_edge, evrp_range_analyzer, simplifier);
+	thread_across_edge (false_edge, evrp_range_analyzer);
     }
 }
 
