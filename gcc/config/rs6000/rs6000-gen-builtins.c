@@ -1873,7 +1873,7 @@ void set_bif_order (char *str)
 static void
 create_bif_order ()
 {
-  bif_order = (int *) malloc (curr_bif  * sizeof (int));
+  bif_order = (int *) malloc ((curr_bif + 1)  * sizeof (int));
   rbt_inorder_callback (&bifo_rbt, bifo_rbt.rbt_root, set_bif_order);
 }
 

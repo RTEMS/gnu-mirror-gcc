@@ -2353,35 +2353,65 @@
   const vsll __builtin_altivec_vupklsw (vsi);
     VUPKLSW altivec_vupklsw {}
 
-  const vsq __builtin_bcdadd (vsq, vsq, const int<1>);
-    BCDADD bcdadd {}
+  const vsq __builtin_bcdadd_v1ti (vsq, vsq, const int<1>);
+    BCDADD_V1TI bcdadd_v1ti {}
 
-  const signed int __builtin_bcdadd_eq (vsq, vsq, const int<1>);
-    BCDADD_EQ bcdadd_eq {}
+  const vuc __builtin_bcdadd (vuc, vuc, const int<1>);
+    BCDADD_V16QI bcdadd_v16qi {}
 
-  const signed int __builtin_bcdadd_gt (vsq, vsq, const int<1>);
-    BCDADD_GT bcdadd_gt {}
+  const signed int __builtin_bcdadd_eq_v1ti (vsq, vsq, const int<1>);
+    BCDADD_EQ_V1TI bcdadd_eq_v1ti {}
 
-  const signed int __builtin_bcdadd_lt (vsq, vsq, const int<1>);
-    BCDADD_LT bcdadd_lt {}
+  const signed int __builtin_bcdadd_eq_v16qi (vuc, vuc, const int<1>);
+    BCDADD_EQ_V16QI bcdadd_eq_v16qi {}
 
-  const signed int __builtin_bcdadd_ov (vsq, vsq, const int<1>);
-    BCDADD_OV bcdadd_unordered {}
+  const signed int __builtin_bcdadd_gt_v1ti (vsq, vsq, const int<1>);
+    BCDADD_GT_V1TI bcdadd_gt_v1ti {}
 
-  const vsq __builtin_bcdsub (vsq, vsq, const int<1>);
-    BCDSUB bcdsub {}
+  const signed int __builtin_bcdadd_gt_v16qi (vuc, vuc, const int<1>);
+    BCDADD_GT_V16QI bcdadd_gt_v16qi {}
 
-  const signed int __builtin_bcdsub_eq (vsq, vsq, const int<1>);
-    BCDSUB_EQ bcdsub_eq {}
+  const signed int __builtin_bcdadd_lt_v1ti (vsq, vsq, const int<1>);
+    BCDADD_LT_V1TI bcdadd_lt_v1ti {}
 
-  const signed int __builtin_bcdsub_gt (vsq, vsq, const int<1>);
-    BCDSUB_GT bcdsub_gt {}
+  const signed int __builtin_bcdadd_lt_v16qi (vuc, vuc, const int<1>);
+    BCDADD_LT_V16QI bcdadd_lt_v16qi {}
 
-  const signed int __builtin_bcdsub_lt (vsq, vsq, const int<1>);
-    BCDSUB_LT bcdsub_lt {}
+  const signed int __builtin_bcdadd_ov_v1ti (vsq, vsq, const int<1>);
+    BCDADD_OV_V1TI bcdadd_unordered_v1ti {}
 
-  const signed int __builtin_bcdsub_ov (vsq, vsq, const int<1>);
-    BCDSUB_OV bcdsub_unordered {}
+  const signed int __builtin_bcdadd_ov_v16qi (vuc, vuc, const int<1>);
+    BCDADD_OV_V16QI bcdadd_unordered_v16qi {}
+
+  const vsq __builtin_bcdsub_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_V1TI bcdsub_v1ti {}
+
+  const vuc __builtin_bcdsub (vuc, vuc, const int<1>);
+    BCDSUB_V16QI bcdsub_v16qi {}
+
+  const signed int __builtin_bcdsub_eq_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_EQ_V1TI bcdsub_eq_v1ti {}
+
+  const signed int __builtin_bcdsub_eq_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_EQ_V16QI bcdsub_eq_v16qi {}
+
+  const signed int __builtin_bcdsub_gt_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_GT_V1TI bcdsub_gt_v1ti {}
+
+  const signed int __builtin_bcdsub_gt_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_GT_V16QI bcdsub_gt_v16qi {}
+
+  const signed int __builtin_bcdsub_lt_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_LT_V1TI bcdsub_lt_v1ti {}
+
+  const signed int __builtin_bcdsub_lt_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_LT_V16QI bcdsub_lt_v16qi {}
+
+  const signed int __builtin_bcdsub_ov_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_OV_V1TI bcdsub_unordered_v1ti {}
+
+  const signed int __builtin_bcdsub_ov_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_OV_V16QI bcdsub_unordered_v16qi {}
 
   const vuc __builtin_crypto_vpermxor_v16qi (vuc, vuc, vuc);
     VPERMXOR_V16QI crypto_vpermxor_v16qi {}
