@@ -20,38 +20,24 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_SSA_THREADEDGE_H
 #define GCC_TREE_SSA_THREADEDGE_H
 
-class jump_thread_path_registry;
-class jump_thread_edge;
-class jump_threader_simplifier;
-class vr_values;
-class const_and_copies;
-class avail_exprs_stack;
-class evrp_range_analyzer;
-
 // This is the high level threader.  The entry point is
-// thread_outgoing_edges(), which calculates and registers path to be
+// thread_outgoing_edges(), which calculates and registers paths to be
 // threaded.  When all candidates have been registered,
 // thread_through_all_blocks() is called to actually change the CFG.
 
 class jump_threader
 {
 public:
-  jump_threader (const_and_copies *,
+  jump_threader (class const_and_copies *,
 		 avail_exprs_stack *,
-		 jump_threader_simplifier *,
-  		 evrp_range_analyzer * = NULL);
+		 class jump_threader_simplifier *,
+		 class evrp_range_analyzer * = NULL);
   ~jump_threader ();
   // Entry point to calculate and register threadable paths.
   void thread_outgoing_edges (basic_block);
   void remove_jump_threads_including (edge_def *);
   // Perform CFG changes after all threadable candidates have been
   // registered.
-  //
-  // TODO: Audit all calls to jump_threader::thread_through_all_blocks
-  // to see if we can remove this method, and call
-  // registry->thread_through_all_blocks() from the jump_threader
-  // destructor.  I'm just not 100% sure if this can be called after
-  // scev_finalize() and loop_optimizer_finalize(), etc.
   bool thread_through_all_blocks (bool may_peel_loop_headers);
 
 private:
@@ -65,7 +51,7 @@ private:
 
   bool thread_around_empty_blocks (edge,
 				   bitmap visited,
-				   vec<jump_thread_edge *> *path);
+				   vec<class jump_thread_edge *> *path);
   int thread_through_normal_block (edge,
 				   vec<jump_thread_edge *> *path,
 				   bitmap visited);
@@ -76,8 +62,8 @@ private:
   // Dummy condition to avoid creating lots of throw away statements.
   gcond *dummy_cond;
 
-  class const_and_copies *m_const_and_copies;
-  class avail_exprs_stack *m_avail_exprs_stack;
+  const_and_copies *m_const_and_copies;
+  avail_exprs_stack *m_avail_exprs_stack;
   class jump_thread_path_registry *m_registry;
   jump_threader_simplifier *m_simplifier;
   evrp_range_analyzer *m_evrp_range_analyzer;
@@ -88,7 +74,7 @@ private:
 class jump_threader_simplifier
 {
 public:
-  jump_threader_simplifier (vr_values *v,
+  jump_threader_simplifier (class vr_values *v,
 			    avail_exprs_stack *avails)
     : m_vr_values (v),
       m_avail_exprs_stack (avails)
