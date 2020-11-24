@@ -39,11 +39,11 @@ along with GCC; see the file COPYING3.  If not see
 
 class thread_jumps
 {
- public:
-  thread_jumps (jump_thread_path_registry *r) : m_registry (r) { }
+public:
   void find_jump_threads_backwards (basic_block bb, bool speed_p);
+  bool thread_through_all_blocks ();
 
- private:
+private:
   edge profitable_jump_thread_path (basic_block bbi, tree name, tree arg,
 				    bool *creates_irreducible_loop);
   void convert_and_register_current_path (edge taken_edge);
@@ -68,8 +68,14 @@ class thread_jumps
      code path.  */
   bool m_speed_p;
 
-  jump_thread_path_registry *m_registry;
+  jump_thread_path_registry m_registry;
 };
+
+bool
+thread_jumps::thread_through_all_blocks ()
+{
+  return m_registry.thread_through_all_blocks (true);
+}
 
 /* Simple helper to get the last statement from BB, which is assumed
    to be a control statement.   Return NULL if the last statement is
@@ -477,7 +483,7 @@ thread_jumps::convert_and_register_current_path (edge taken_edge)
     = new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
   jump_thread_path->safe_push (x);
 
-  m_registry->register_jump_thread (jump_thread_path);
+  m_registry.register_jump_thread (jump_thread_path);
   --m_max_threaded_paths;
 }
 
@@ -819,18 +825,14 @@ pass_thread_jumps::execute (function *fun)
   loop_optimizer_init (LOOPS_HAVE_PREHEADERS | LOOPS_HAVE_SIMPLE_LATCHES);
 
   /* Try to thread each block with more than one successor.  */
-  jump_thread_path_registry registry;
-  thread_jumps backwards_threader (&registry);
+  thread_jumps threader;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
       if (EDGE_COUNT (bb->succs) > 1)
-	backwards_threader.find_jump_threads_backwards (bb, true);
+	threader.find_jump_threads_backwards (bb, true);
     }
-  // FIXME: Put registry in thread_jumps and call thread_through_all_blocks
-  // from the destructor?  Is it ok to call thread_through_all_blocks
-  // before loop_optimizer_finalize below?
-  bool changed = registry.thread_through_all_blocks (true);
+  bool changed = threader.thread_through_all_blocks ();
 
   loop_optimizer_finalize ();
   return changed ? TODO_cleanup_cfg : 0;
@@ -884,18 +886,14 @@ pass_early_thread_jumps::execute (function *fun)
   loop_optimizer_init (AVOID_CFG_MODIFICATIONS);
 
   /* Try to thread each block with more than one successor.  */
-  jump_thread_path_registry registry;
-  thread_jumps backwards_threader (&registry);
+  thread_jumps threader;
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
       if (EDGE_COUNT (bb->succs) > 1)
-	backwards_threader.find_jump_threads_backwards (bb, false);
+	threader.find_jump_threads_backwards (bb, false);
     }
-  // FIXME: Put registry in thread_jumps and call thread_through_all_blocks
-  // from the destructor?  Is it ok to call thread_through_all_blocks
-  // before loop_optimizer_finalize below?
-  registry.thread_through_all_blocks (true);
+  threader.thread_through_all_blocks ();
 
   loop_optimizer_finalize ();
   return 0;
