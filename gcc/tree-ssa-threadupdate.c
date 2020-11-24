@@ -156,37 +156,36 @@ jump_thread_path_registry::~jump_thread_path_registry ()
 /* Dump a jump threading path, including annotations about each
    edge in the path.  */
 
-static void
-dump_jump_thread_path (FILE *dump_file, jump_thread_path path,
-		       bool registering)
+void
+jump_thread_path::dump (FILE *dump_file, bool registering)
 {
   fprintf (dump_file,
 	   "  %s%s jump thread: (%d, %d) incoming edge; ",
 	   (registering ? "Registering" : "Cancelling"),
-	   (path[0]->type == EDGE_FSM_THREAD ? " FSM": ""),
-	   path[0]->e->src->index, path[0]->e->dest->index);
+	   (m_path[0]->type == EDGE_FSM_THREAD ? " FSM": ""),
+	   m_path[0]->e->src->index, m_path[0]->e->dest->index);
 
-  for (unsigned int i = 1; i < path.length (); i++)
+  for (unsigned int i = 1; i < m_path.length (); i++)
     {
       /* We can get paths with a NULL edge when the final destination
 	 of a jump thread turns out to be a constant address.  We dump
 	 those paths when debugging, so we have to be prepared for that
 	 possibility here.  */
-      if (path[i]->e == NULL)
+      if (m_path[i]->e == NULL)
 	continue;
 
-      if (path[i]->type == EDGE_COPY_SRC_JOINER_BLOCK)
+      if (m_path[i]->type == EDGE_COPY_SRC_JOINER_BLOCK)
 	fprintf (dump_file, " (%d, %d) joiner; ",
-		 path[i]->e->src->index, path[i]->e->dest->index);
-      if (path[i]->type == EDGE_COPY_SRC_BLOCK)
+		 m_path[i]->e->src->index, m_path[i]->e->dest->index);
+      if (m_path[i]->type == EDGE_COPY_SRC_BLOCK)
        fprintf (dump_file, " (%d, %d) normal;",
-		 path[i]->e->src->index, path[i]->e->dest->index);
-      if (path[i]->type == EDGE_NO_COPY_SRC_BLOCK)
+		 m_path[i]->e->src->index, m_path[i]->e->dest->index);
+      if (m_path[i]->type == EDGE_NO_COPY_SRC_BLOCK)
        fprintf (dump_file, " (%d, %d) nocopy;",
-		 path[i]->e->src->index, path[i]->e->dest->index);
-      if (path[0]->type == EDGE_FSM_THREAD)
+		 m_path[i]->e->src->index, m_path[i]->e->dest->index);
+      if (m_path[0]->type == EDGE_FSM_THREAD)
 	fprintf (dump_file, " (%d, %d) ",
-		 path[i]->e->src->index, path[i]->e->dest->index);
+		 m_path[i]->e->src->index, m_path[i]->e->dest->index);
     }
   fputc ('\n', dump_file);
 }
@@ -1922,7 +1921,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 	    {
 	      m_paths.unordered_remove (i);
 	      if (dump_file && (dump_flags & TDF_DETAILS))
-		dump_jump_thread_path (dump_file, *path, false);
+		path->dump (dump_file, false);
 	      delete_jump_thread_path (path);
 	    }
 	}
@@ -1959,7 +1958,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 	      e->aux = NULL;
 	      m_paths.unordered_remove (i);
 	      if (dump_file && (dump_flags & TDF_DETAILS))
-		dump_jump_thread_path (dump_file, *path, false);
+		path->dump (dump_file, false);
 	      delete_jump_thread_path (path);
 	    }
 	}
@@ -2007,7 +2006,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 		if (j != path->length ())
 		  {
 		    if (dump_file && (dump_flags & TDF_DETAILS))
-		      dump_jump_thread_path (dump_file, *path, 0);
+		      path->dump (dump_file, false);
 		    delete_jump_thread_path (path);
 		    e->aux = NULL;
 		  }
@@ -2725,7 +2724,7 @@ jump_thread_path_registry::register_jump_thread (jump_thread_path *path)
 	    {
 	      fprintf (dump_file,
 		       "Found NULL edge in jump threading path.  Cancelling jump thread:\n");
-	      dump_jump_thread_path (dump_file, *path, false);
+	      path->dump (dump_file, false);
 	    }
 
 	  delete_jump_thread_path (path);
@@ -2740,7 +2739,7 @@ jump_thread_path_registry::register_jump_thread (jump_thread_path *path)
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    dump_jump_thread_path (dump_file, *path, true);
+    path->dump (dump_file, true);
 
   if (!m_paths.exists ())
     m_paths.create (5);

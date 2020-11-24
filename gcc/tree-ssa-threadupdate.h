@@ -98,6 +98,8 @@ public:
   {
     return m_path.block_remove (ix, len);
   }
+  void dump (FILE *, bool registering);
+  void dump (FILE *f) { dump (f, true); }
 
 private:
   vec<jump_thread_edge *> m_path;
