@@ -63,6 +63,7 @@ set_ssa_name_value (tree name, tree value)
 
 jump_threader::jump_threader (const_and_copies *copies,
 			      avail_exprs_stack *avails,
+			      evrp_range_analyzer *analyzer,
 			      jump_threader_simplifier *simplifier)
 {
   /* Initialize the per SSA_NAME value-handles array.  */
@@ -76,6 +77,7 @@ jump_threader::jump_threader (const_and_copies *copies,
   m_avail_exprs_stack = avails;
   m_registry = new jump_thread_path_registry ();
   m_simplifier = simplifier;
+  m_evrp_range_analyzer = analyzer;
 }
 
 jump_threader::~jump_threader (void)
@@ -139,8 +141,7 @@ potentially_threadable_block (basic_block bb)
    indicating we should not thread this edge, else return TRUE.  */
 
 bool
-jump_threader::record_temporary_equivalences_from_phis (edge e,
-    evrp_range_analyzer *evrp_range_analyzer)
+jump_threader::record_temporary_equivalences_from_phis (edge e)
 {
   gphi_iterator gsi;
 
@@ -174,12 +175,12 @@ jump_threader::record_temporary_equivalences_from_phis (edge e,
 
 	 Note that even if SRC is a constant we need to set a suitable
 	 output range so that VR_UNDEFINED ranges do not leak through.  */
-      if (evrp_range_analyzer)
+      if (m_evrp_range_analyzer)
 	{
 	  /* Get an empty new VR we can pass to update_value_range and save
 	     away in the VR stack.  */
 	  value_range_equiv *new_vr
-			  = evrp_range_analyzer->allocate_value_range_equiv ();
+	    = m_evrp_range_analyzer->allocate_value_range_equiv ();
 	  new (new_vr) value_range_equiv ();
 
 	  /* There are three cases to consider:
@@ -193,14 +194,14 @@ jump_threader::record_temporary_equivalences_from_phis (edge e,
 	       Otherwise set NEW_VR to varying.  This may be overly
 	       conservative.  */
 	  if (TREE_CODE (src) == SSA_NAME)
-	    new_vr->deep_copy (evrp_range_analyzer->get_value_range (src));
+	    new_vr->deep_copy (m_evrp_range_analyzer->get_value_range (src));
 	  else if (TREE_CODE (src) == INTEGER_CST)
 	    new_vr->set (src);
 	  else
 	    new_vr->set_varying (TREE_TYPE (src));
 
 	  /* This is a temporary range for DST, so push it.  */
-	  evrp_range_analyzer->push_value_range (dst, new_vr);
+	  m_evrp_range_analyzer->push_value_range (dst, new_vr);
 	}
     }
   return true;
@@ -238,8 +239,7 @@ threadedge_valueize (tree t)
    later statements in E->dest.  */
 
 gimple *
-jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
-    evrp_range_analyzer *evrp_range_analyzer)
+jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e)
 {
   gimple *stmt = NULL;
   gimple_stmt_iterator gsi;
@@ -300,8 +300,8 @@ jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
 
       /* These are temporary ranges, do nto reflect them back into
 	 the global range data.  */
-      if (evrp_range_analyzer)
-	evrp_range_analyzer->record_ranges_from_stmt (stmt, true);
+      if (m_evrp_range_analyzer)
+	m_evrp_range_analyzer->record_ranges_from_stmt (stmt, true);
 
       /* If this is not a statement that sets an SSA_NAME to a new
 	 value, then do not try to simplify this statement as it will
@@ -1001,11 +1001,9 @@ jump_threader::thread_around_empty_blocks (edge taken_edge,
    suitable for a joiner in a jump threading path.  */
 
 int
-jump_threader::thread_through_normal_block
-				(edge e,
-				 evrp_range_analyzer *evrp_range_analyzer,
-				 vec<jump_thread_edge *> *path,
-				 bitmap visited)
+jump_threader::thread_through_normal_block (edge e,
+					    vec<jump_thread_edge *> *path,
+					    bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
   record_temporary_equivalences (e, m_const_and_copies, m_avail_exprs_stack);
@@ -1014,14 +1012,12 @@ jump_threader::thread_through_normal_block
      Note that if we found a PHI that made the block non-threadable, then
      we need to bubble that up to our caller in the same manner we do
      when we prematurely stop processing statements below.  */
-  if (!record_temporary_equivalences_from_phis (e, evrp_range_analyzer))
+  if (!record_temporary_equivalences_from_phis (e))
     return -1;
 
   /* Now walk each statement recording any context sensitive
      temporary equivalences we can detect.  */
-  gimple *stmt
-    = record_temporary_equivalences_from_stmts_at_dest (e,
-							evrp_range_analyzer);
+  gimple *stmt = record_temporary_equivalences_from_stmts_at_dest (e);
 
   /* There's two reasons STMT might be null, and distinguishing
      between them is important.
@@ -1177,15 +1173,14 @@ edge_forwards_cmp_to_conditional_jump_through_empty_bb_p (edge e)
    jump which has a known value when reached via E.  */
 
 void
-jump_threader::thread_across_edge (edge e,
-				   evrp_range_analyzer *evrp_range_analyzer)
+jump_threader::thread_across_edge (edge e)
 {
   bitmap visited = BITMAP_ALLOC (NULL);
 
   m_const_and_copies->push_marker ();
   m_avail_exprs_stack->push_marker ();
-  if (evrp_range_analyzer)
-    evrp_range_analyzer->push_marker ();
+  if (m_evrp_range_analyzer)
+    m_evrp_range_analyzer->push_marker ();
 
   stmt_count = 0;
 
@@ -1196,8 +1191,7 @@ jump_threader::thread_across_edge (edge e,
 
   int threaded;
   if ((e->flags & EDGE_DFS_BACK) == 0)
-    threaded = thread_through_normal_block (e, evrp_range_analyzer,
-					    path, visited);
+    threaded = thread_through_normal_block (e, path, visited);
   else
     threaded = 0;
 
@@ -1207,8 +1201,8 @@ jump_threader::thread_across_edge (edge e,
 					   e->dest);
       m_const_and_copies->pop_to_marker ();
       m_avail_exprs_stack->pop_to_marker ();
-      if (evrp_range_analyzer)
-	evrp_range_analyzer->pop_to_marker ();
+      if (m_evrp_range_analyzer)
+	m_evrp_range_analyzer->pop_to_marker ();
       BITMAP_FREE (visited);
       m_registry->register_jump_thread (path);
       return;
@@ -1234,8 +1228,8 @@ jump_threader::thread_across_edge (edge e,
 	  BITMAP_FREE (visited);
 	  m_const_and_copies->pop_to_marker ();
           m_avail_exprs_stack->pop_to_marker ();
-	  if (evrp_range_analyzer)
-	    evrp_range_analyzer->pop_to_marker ();
+	  if (m_evrp_range_analyzer)
+	    m_evrp_range_analyzer->pop_to_marker ();
 	  return;
 	}
     }
@@ -1263,8 +1257,8 @@ jump_threader::thread_across_edge (edge e,
 	{
 	  m_const_and_copies->pop_to_marker ();
           m_avail_exprs_stack->pop_to_marker ();
-	  if (evrp_range_analyzer)
-	    evrp_range_analyzer->pop_to_marker ();
+	  if (m_evrp_range_analyzer)
+	    m_evrp_range_analyzer->pop_to_marker ();
 	  BITMAP_FREE (visited);
 	  return;
 	}
@@ -1280,8 +1274,8 @@ jump_threader::thread_across_edge (edge e,
 	   for each of E->dest's successors.  */
 	m_const_and_copies->push_marker ();
 	m_avail_exprs_stack->push_marker ();
-	if (evrp_range_analyzer)
-	  evrp_range_analyzer->push_marker ();
+	if (m_evrp_range_analyzer)
+	  m_evrp_range_analyzer->push_marker ();
 
 	/* Avoid threading to any block we have already visited.  */
 	bitmap_clear (visited);
@@ -1301,7 +1295,6 @@ jump_threader::thread_across_edge (edge e,
 
 	if (!found)
 	  found = thread_through_normal_block (path->last ()->e,
-					       evrp_range_analyzer,
 					       path,
 					       visited) > 0;
 
@@ -1319,16 +1312,16 @@ jump_threader::thread_across_edge (edge e,
 	  delete_jump_thread_path (path);
 
 	/* And unwind the equivalence table.  */
-	if (evrp_range_analyzer)
-	  evrp_range_analyzer->pop_to_marker ();
+	if (m_evrp_range_analyzer)
+	  m_evrp_range_analyzer->pop_to_marker ();
 	m_avail_exprs_stack->pop_to_marker ();
 	m_const_and_copies->pop_to_marker ();
       }
     BITMAP_FREE (visited);
   }
 
-  if (evrp_range_analyzer)
-    evrp_range_analyzer->pop_to_marker ();
+  if (m_evrp_range_analyzer)
+    m_evrp_range_analyzer->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();
   m_avail_exprs_stack->pop_to_marker ();
 }
@@ -1337,8 +1330,7 @@ jump_threader::thread_across_edge (edge e,
    try to thread them.  */
 
 void
-jump_threader::thread_outgoing_edges (basic_block bb,
-				      evrp_range_analyzer *evrp_range_analyzer)
+jump_threader::thread_outgoing_edges (basic_block bb)
 {
   int flags = (EDGE_IGNORE | EDGE_COMPLEX | EDGE_ABNORMAL);
   gimple *last;
@@ -1351,7 +1343,7 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       && (single_succ_edge (bb)->flags & flags) == 0
       && potentially_threadable_block (single_succ (bb)))
     {
-      thread_across_edge (single_succ_edge (bb), evrp_range_analyzer);
+      thread_across_edge (single_succ_edge (bb));
     }
   else if ((last = last_stmt (bb))
 	   && gimple_code (last) == GIMPLE_COND
@@ -1366,11 +1358,11 @@ jump_threader::thread_outgoing_edges (basic_block bb,
       /* Only try to thread the edge if it reaches a target block with
 	 more than one predecessor and more than one successor.  */
       if (potentially_threadable_block (true_edge->dest))
-	thread_across_edge (true_edge, evrp_range_analyzer);
+	thread_across_edge (true_edge);
 
       /* Similarly for the ELSE arm.  */
       if (potentially_threadable_block (false_edge->dest))
-	thread_across_edge (false_edge, evrp_range_analyzer);
+	thread_across_edge (false_edge);
     }
 }
 

@@ -748,7 +748,8 @@ pass_dominator::execute (function *fun)
   /* Recursively walk the dominator tree optimizing statements.  */
   evrp_range_analyzer analyzer (true);
   dom_jump_threader_simplifier simplifier (&analyzer, avail_exprs_stack);
-  jump_threader threader (const_and_copies, avail_exprs_stack, &simplifier);
+  jump_threader threader (const_and_copies, avail_exprs_stack, &analyzer,
+			  &simplifier);
   dom_opt_dom_walker walker (CDI_DOMINATORS,
 			     &threader,
 			     &analyzer,
@@ -1464,9 +1465,7 @@ dom_opt_dom_walker::before_dom_children (basic_block bb)
 void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
-  m_threader->thread_outgoing_edges (bb, m_evrp_range_analyzer);
-
-  /* These remove expressions local to BB from the tables.  */
+  m_threader->thread_outgoing_edges (bb);
   m_avail_exprs_stack->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();
   m_evrp_range_analyzer->leave (bb);

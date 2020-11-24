@@ -4277,7 +4277,7 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   m_simplifier = new vrp_jump_threader_simplifier (m_vr_values,
 						   m_avail_exprs_stack);
   m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack,
-				  m_simplifier);
+				  NULL, m_simplifier);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()
@@ -4337,7 +4337,7 @@ vrp_jump_threader::before_dom_children (basic_block bb)
 void
 vrp_jump_threader::after_dom_children (basic_block bb)
 {
-  m_threader->thread_outgoing_edges (bb, NULL);
+  m_threader->thread_outgoing_edges (bb);
   m_avail_exprs_stack->pop_to_marker ();
   m_const_and_copies->pop_to_marker ();
 }
