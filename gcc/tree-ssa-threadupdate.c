@@ -2142,7 +2142,7 @@ jump_thread_path_registry::debug_path (FILE *dump_file, int pathno)
 }
 
 void
-jump_thread_path_registry::debug_paths ()
+jump_thread_path_registry::dump ()
 {
   for (unsigned i = 0; i < m_paths.length (); ++i)
     debug_path (stderr, i);

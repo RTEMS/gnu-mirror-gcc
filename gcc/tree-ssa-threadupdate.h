@@ -68,10 +68,10 @@ class jump_thread_path_registry
 public:
   jump_thread_path_registry ();
   ~jump_thread_path_registry ();
-  bool thread_through_all_blocks (bool);
   void register_jump_thread (vec <jump_thread_edge *> *);
   void remove_jump_threads_including (edge);
-  void debug_paths ();
+  bool thread_through_all_blocks (bool);
+  void dump ();
 
 private:
   void debug_path (FILE *, int pathno);

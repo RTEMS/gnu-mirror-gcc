@@ -79,6 +79,7 @@ jump_threader::jump_threader (const_and_copies *copies,
 jump_threader::~jump_threader (void)
 {
   ssa_name_values.release ();
+  ggc_free (dummy_cond);
   delete m_registry;
 }
 
