@@ -870,24 +870,26 @@ make_pass_dominator (gcc::context *ctxt)
 class dom_jump_threader_simplifier : public jump_threader_simplifier
 {
 public:
-  dom_jump_threader_simplifier (vr_values *v) : jump_threader_simplifier (v) {}
+  dom_jump_threader_simplifier (vr_values *v,
+				avail_exprs_stack *avails)
+    : jump_threader_simplifier (v, avails) {}
 
 private:
-  tree simplify (gimple *, gimple *, avail_exprs_stack *, basic_block);
+  tree simplify (gimple *, gimple *, basic_block);
 };
 
 tree
-dom_jump_threader_simplifier::simplify (gimple *stmt, gimple *within_stmt,
-					avail_exprs_stack *avail_exprs_stack,
+dom_jump_threader_simplifier::simplify (gimple *stmt,
+					gimple *within_stmt,
 					basic_block bb)
 {
   /* First see if the conditional is in the hash table.  */
-  tree cached_lhs =  avail_exprs_stack->lookup_avail_expr (stmt, false, true);
+  tree cached_lhs =  m_avail_exprs_stack->lookup_avail_expr (stmt,
+							     false, true);
   if (cached_lhs)
     return cached_lhs;
 
-  return jump_threader_simplifier::simplify (stmt, within_stmt,
-					     avail_exprs_stack, bb);
+  return jump_threader_simplifier::simplify (stmt, within_stmt, bb);
 }
 
 /* Valueize hook for gimple_fold_stmt_to_constant_1.  */
@@ -1461,7 +1463,8 @@ dom_opt_dom_walker::before_dom_children (basic_block bb)
 void
 dom_opt_dom_walker::after_dom_children (basic_block bb)
 {
-  dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer);
+  dom_jump_threader_simplifier jthread_simplifier (&evrp_range_analyzer,
+						   m_avail_exprs_stack);
   m_threader->thread_outgoing_edges (bb,
 				     &evrp_range_analyzer,
 				     jthread_simplifier);

@@ -388,8 +388,7 @@ jump_threader::record_temporary_equivalences_from_stmts_at_dest (edge e,
 		    SET_USE (use_p, tmp);
 		}
 
-	      cached_lhs = simplifier.simplify (stmt, stmt,
-						m_avail_exprs_stack, e->src);
+	      cached_lhs = simplifier.simplify (stmt, stmt, e->src);
 
 	      /* Restore the statement's original uses/defs.  */
 	      i = 0;
@@ -538,13 +537,11 @@ jump_threader::simplify_control_stmt_condition
 		 the label that is proven to be taken.  */
 	      gswitch *dummy_switch = as_a<gswitch *> (gimple_copy (stmt));
 	      gimple_switch_set_index (dummy_switch, cached_lhs);
-	      cached_lhs = simplifier.simplify (dummy_switch, stmt,
-						m_avail_exprs_stack, e->src);
+	      cached_lhs = simplifier.simplify (dummy_switch, stmt, e->src);
 	      ggc_free (dummy_switch);
 	    }
 	  else
-	    cached_lhs = simplifier.simplify (stmt, stmt, m_avail_exprs_stack,
-					      e->src);
+	    cached_lhs = simplifier.simplify (stmt, stmt, e->src);
 	}
 
       /* We couldn't find an invariant.  But, callers of this
@@ -722,7 +719,7 @@ jump_threader::simplify_control_stmt_condition_1
      then use the pass specific callback to simplify the condition.  */
   if (!res
       || !is_gimple_min_invariant (res))
-    res = simplifier.simplify (dummy_cond, stmt, m_avail_exprs_stack, e->src);
+    res = simplifier.simplify (dummy_cond, stmt, e->src);
 
   return res;
 }
@@ -1393,7 +1390,6 @@ jump_threader::thread_outgoing_edges (basic_block bb,
 tree
 jump_threader_simplifier::simplify (gimple *stmt,
 				    gimple *within_stmt,
-				    avail_exprs_stack *,
 				    basic_block)
 {
   if (gcond *cond_stmt = dyn_cast <gcond *> (stmt))

@@ -4280,21 +4280,20 @@ vrp_jump_threader::before_dom_children (basic_block bb)
 class vrp_jump_threader_simplifier : public jump_threader_simplifier
 {
 public:
-  vrp_jump_threader_simplifier (vr_values *v) : jump_threader_simplifier (v) {}
+  vrp_jump_threader_simplifier (vr_values *v, avail_exprs_stack *avails)
+    : jump_threader_simplifier (v, avails) {}
 
 private:
-  tree simplify (gimple *, gimple *, avail_exprs_stack *,
-		 basic_block) OVERRIDE;
+  tree simplify (gimple *, gimple *, basic_block) OVERRIDE;
 };
 
 tree
 vrp_jump_threader_simplifier::simplify (gimple *stmt,
 					gimple *within_stmt,
-					avail_exprs_stack *avail_exprs_stack,
 					basic_block bb)
 {
   /* First see if the conditional is in the hash table.  */
-  tree cached_lhs = avail_exprs_stack->lookup_avail_expr (stmt, false, true);
+  tree cached_lhs = m_avail_exprs_stack->lookup_avail_expr (stmt, false, true);
   if (cached_lhs && is_gimple_min_invariant (cached_lhs))
     return cached_lhs;
 
@@ -4323,8 +4322,7 @@ vrp_jump_threader_simplifier::simplify (gimple *stmt,
       return find_case_label_range (switch_stmt, vr);
     }
 
-  return jump_threader_simplifier::simplify (stmt, within_stmt,
-					     avail_exprs_stack, bb);
+  return jump_threader_simplifier::simplify (stmt, within_stmt, bb);
 }
 
 /* Called after processing dominator children of BB.  This is where we
@@ -4332,7 +4330,8 @@ vrp_jump_threader_simplifier::simplify (gimple *stmt,
 void
 vrp_jump_threader::after_dom_children (basic_block bb)
 {
-  vrp_jump_threader_simplifier jthread_simplifier (m_vr_values);
+  vrp_jump_threader_simplifier jthread_simplifier (m_vr_values,
+						   m_avail_exprs_stack);
   m_threader->thread_outgoing_edges (bb, NULL, jthread_simplifier);
 
   m_avail_exprs_stack->pop_to_marker ();

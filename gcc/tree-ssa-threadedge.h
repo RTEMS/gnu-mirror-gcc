@@ -80,10 +80,16 @@ private:
 class jump_threader_simplifier
 {
 public:
-  jump_threader_simplifier (vr_values *v) : m_vr_values (v) { }
-  virtual tree simplify (gimple *, gimple *, avail_exprs_stack *, basic_block);
+  jump_threader_simplifier (vr_values *v,
+			    avail_exprs_stack *avails)
+    : m_vr_values (v),
+      m_avail_exprs_stack (avails)
+  { }
+  virtual tree simplify (gimple *, gimple *, basic_block);
+
 protected:
   vr_values *m_vr_values;
+  avail_exprs_stack *m_avail_exprs_stack;
 };
 
 extern vec<tree> ssa_name_values;
