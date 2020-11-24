@@ -32,6 +32,7 @@ enum jump_thread_edge_type
 
 // We keep the registered jump threading opportunities in this
 // vector as edge pairs (original_edge, target_edge).
+
 class jump_thread_edge
 {
 public:

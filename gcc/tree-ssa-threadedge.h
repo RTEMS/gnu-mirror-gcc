@@ -91,6 +91,8 @@ private:
   class jump_thread_path_registry *m_registry;
 };
 
+// Statement simplifier callback for the jump threader.
+
 class jump_threader_simplifier
 {
 public:
