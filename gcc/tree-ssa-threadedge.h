@@ -28,6 +28,11 @@ class const_and_copies;
 class avail_exprs_stack;
 class evrp_range_analyzer;
 
+// This is the high level threader.  The entry point is
+// thread_outgoing_edges(), which calculates and registers path to be
+// threaded.  When all candidates have been registered,
+// thread_through_all_blocks() is called to actually change the CFG.
+
 class jump_threader
 {
 public:

@@ -63,6 +63,10 @@ private:
   vec<jump_thread_edge *> *m_path;
 };
 
+// This is the underlying jump thread registry.  When all candidates
+// have been registered with register_jump_thread(),
+// thread_through_all_blocks() is called to actually change the CFG.
+
 class jump_thread_path_registry
 {
 public:
