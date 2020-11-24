@@ -21,49 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef _TREE_SSA_THREADUPDATE_H
 #define _TREE_SSA_THREADUPDATE_H 1
 
-// This is the underlying jump thread registry.  When all candidates
-// have been registered with register_jump_thread(),
-// thread_through_all_blocks() is called to actually change the CFG.
-
-class jump_thread_path_registry
-{
-public:
-  jump_thread_path_registry ();
-  ~jump_thread_path_registry ();
-  void register_jump_thread (class jump_thread_path *);
-  void remove_jump_threads_including (edge);
-  // Perform CFG changes after all threadable candidates have been
-  // registered.
-  bool thread_through_all_blocks (bool);
-  void dump ();
-
-private:
-  void debug_path (FILE *, int pathno);
-  void mark_threaded_blocks (bitmap threaded_blocks);
-  bool rewire_first_differing_edge (unsigned path_num, unsigned edge_num);
-  void adjust_paths_after_duplication (unsigned curr_path_num);
-  bool duplicate_thread_path (edge entry,
-			      edge exit,
-			      basic_block *region,
-			      unsigned n_region,
-			      unsigned current_path_no);
-  bool thread_block_1 (basic_block, bool noloop_only, bool joiners);
-  bool thread_block (basic_block, bool noloop_only);
-  bool thread_through_loop_header (class loop *loop,
-				   bool may_peel_loop_headers);
-  class redirection_data *lookup_redirection_data (edge e, enum insert_option);
-
-  vec<class jump_thread_path *> m_paths;
-
-  hash_table<struct removed_edges> *m_removed_edges;
-
-  // Main data structure to hold information for duplicates of BB.
-  hash_table<redirection_data> *m_redirection_data;
-
-  // Jump threading statistics.
-  unsigned long m_num_threaded_edges;
-};
-
 enum jump_thread_edge_type
 {
   EDGE_START_JUMP_THREAD,
@@ -108,6 +65,49 @@ private:
   // FIXME: should be in an obstack and automatically freed by pass
   // that created it.
   vec<jump_thread_edge *> m_path;
+};
+
+// This is the underlying jump thread registry.  When all candidates
+// have been registered with register_jump_thread(),
+// thread_through_all_blocks() is called to actually change the CFG.
+
+class jump_thread_path_registry
+{
+public:
+  jump_thread_path_registry ();
+  ~jump_thread_path_registry ();
+  void register_jump_thread (jump_thread_path *);
+  void remove_jump_threads_including (edge);
+  // Perform CFG changes after all threadable candidates have been
+  // registered.
+  bool thread_through_all_blocks (bool);
+  void dump ();
+
+private:
+  void debug_path (FILE *, int pathno);
+  void mark_threaded_blocks (bitmap threaded_blocks);
+  bool rewire_first_differing_edge (unsigned path_num, unsigned edge_num);
+  void adjust_paths_after_duplication (unsigned curr_path_num);
+  bool duplicate_thread_path (edge entry,
+			      edge exit,
+			      basic_block *region,
+			      unsigned n_region,
+			      unsigned current_path_no);
+  bool thread_block_1 (basic_block, bool noloop_only, bool joiners);
+  bool thread_block (basic_block, bool noloop_only);
+  bool thread_through_loop_header (class loop *loop,
+				   bool may_peel_loop_headers);
+  class redirection_data *lookup_redirection_data (edge e, enum insert_option);
+
+  vec<jump_thread_path *> m_paths;
+
+  hash_table<struct removed_edges> *m_removed_edges;
+
+  // Main data structure to hold information for duplicates of BB.
+  hash_table<redirection_data> *m_redirection_data;
+
+  // Jump threading statistics.
+  unsigned long m_num_threaded_edges;
 };
 
 // Rather than search all the edges in jump thread paths each time DOM
