@@ -39,6 +39,11 @@ public:
   // ?? Temporary convenience functions that call through the
   // registry.  This avoids having to expose the registry.
   void remove_jump_threads_including (edge_def *);
+  // TODO: Audit all calls to jump_threader::thread_through_all_blocks
+  // to see if we can remove this method, and call
+  // registry->thread_through_all_blocks() from the jump_threader
+  // destructor.  I'm just not 100% sure if this can be called after
+  // scev_finalize() and loop_optimizer_finalize(), etc.
   bool thread_through_all_blocks (bool may_peel_loop_headers);
 
 private:
