@@ -38,12 +38,14 @@ class jump_threader
 public:
   jump_threader (const_and_copies *, avail_exprs_stack *);
   ~jump_threader ();
+  // Entry point to calculate and register threadable paths.
   void thread_outgoing_edges (basic_block,
 			      evrp_range_analyzer *,
 			      jump_threader_simplifier &);
-  // ?? Temporary convenience functions that call through the
-  // registry.  This avoids having to expose the registry.
   void remove_jump_threads_including (edge_def *);
+  // Perform CFG changes after all threadable candidates have been
+  // registered.
+  //
   // TODO: Audit all calls to jump_threader::thread_through_all_blocks
   // to see if we can remove this method, and call
   // registry->thread_through_all_blocks() from the jump_threader

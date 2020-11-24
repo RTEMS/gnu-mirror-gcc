@@ -74,6 +74,8 @@ public:
   ~jump_thread_path_registry ();
   void register_jump_thread (vec <jump_thread_edge *> *);
   void remove_jump_threads_including (edge);
+  // Perform CFG changes after all threadable candidates have been
+  // registered.
   bool thread_through_all_blocks (bool);
   void dump ();
 
