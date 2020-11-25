@@ -82,12 +82,18 @@ protected:
   avail_exprs_stack *m_avail_exprs_stack;
 };
 
+extern void propagate_threaded_block_debug_into (basic_block, basic_block);
+
+// ?? All this ssa_name_values stuff is the store of values for
+// avail_exprs_stack and const_and_copies, so it really belongs in the
+// jump_threader class.  However, it's probably not worth touching
+// this, since all this windable state is slated to go with the
+// ranger.
 extern vec<tree> ssa_name_values;
 #define SSA_NAME_VALUE(x) \
     (SSA_NAME_VERSION (x) < ssa_name_values.length () \
      ? ssa_name_values[SSA_NAME_VERSION (x)] \
      : NULL_TREE)
 extern void set_ssa_name_value (tree, tree);
-extern void propagate_threaded_block_debug_into (basic_block, basic_block);
 
 #endif /* GCC_TREE_SSA_THREADEDGE_H */
