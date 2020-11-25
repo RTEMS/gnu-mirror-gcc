@@ -67,6 +67,18 @@ private:
   vec<jump_thread_edge *> m_path;
 };
 
+class jump_thread_path_allocator
+{
+public:
+  jump_thread_path_allocator ();
+  ~jump_thread_path_allocator ();
+  jump_thread_edge *allocate_thread_edge (edge, jump_thread_edge_type);
+  jump_thread_path *allocate_thread_path ();
+private:
+  DISABLE_COPY_AND_ASSIGN (jump_thread_path_allocator);
+  obstack m_obstack;
+};
+
 // This is the underlying jump thread registry.  When all candidates
 // have been registered with register_jump_thread(),
 // thread_through_all_blocks() is called to actually change the CFG.
@@ -78,10 +90,10 @@ public:
   ~jump_thread_path_registry ();
   void register_jump_thread (jump_thread_path *);
   void remove_jump_threads_including (edge);
-  // Perform CFG changes after all threadable candidates have been
-  // registered.
   bool thread_through_all_blocks (bool);
   void dump ();
+  jump_thread_edge *allocate_thread_edge (edge e, jump_thread_edge_type t);
+  jump_thread_path *allocate_thread_path ();
 
 private:
   void debug_path (FILE *, int pathno);
@@ -108,6 +120,8 @@ private:
 
   // Jump threading statistics.
   unsigned long m_num_threaded_edges;
+
+  jump_thread_path_allocator m_allocator;
 };
 
 // Rather than search all the edges in jump thread paths each time DOM

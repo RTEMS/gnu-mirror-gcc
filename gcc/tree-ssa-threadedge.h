@@ -33,11 +33,8 @@ public:
 		 class jump_threader_simplifier *,
 		 class evrp_range_analyzer * = NULL);
   ~jump_threader ();
-  // Entry point to calculate and register threadable paths.
   void thread_outgoing_edges (basic_block);
   void remove_jump_threads_including (edge_def *);
-  // Perform CFG changes after all threadable candidates have been
-  // registered.
   bool thread_through_all_blocks (bool may_peel_loop_headers);
 
 private:

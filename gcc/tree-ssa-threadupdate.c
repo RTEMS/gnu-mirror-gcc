@@ -139,6 +139,35 @@ struct redirection_data : free_ptr_hash<redirection_data>
   static inline int equal (const redirection_data *, const redirection_data *);
 };
 
+jump_thread_path_allocator::jump_thread_path_allocator ()
+{
+  obstack_init (&m_obstack);
+}
+
+jump_thread_path_allocator::~jump_thread_path_allocator ()
+{
+  obstack_free (&m_obstack, NULL);
+}
+
+jump_thread_edge *
+jump_thread_path_allocator::allocate_thread_edge (edge e,
+						  jump_thread_edge_type type)
+{
+  return new jump_thread_edge (e, type); // FIXME
+
+  void *r = obstack_alloc (&m_obstack, sizeof (jump_thread_edge));
+  return new (r) jump_thread_edge (e, type);
+}
+
+jump_thread_path *
+jump_thread_path_allocator::allocate_thread_path ()
+{
+  return new jump_thread_path (); // FIXME
+
+  void *r = obstack_alloc (&m_obstack, sizeof (jump_thread_path));
+  return new (r) jump_thread_path ();
+}
+
 jump_thread_path_registry::jump_thread_path_registry ()
 {
   m_paths.create (5);
@@ -151,6 +180,19 @@ jump_thread_path_registry::~jump_thread_path_registry ()
 {
   m_paths.release ();
   delete m_removed_edges;
+}
+
+jump_thread_edge *
+jump_thread_path_registry::allocate_thread_edge (edge e,
+						 jump_thread_edge_type t)
+{
+  return m_allocator.allocate_thread_edge (e, t);
+}
+
+jump_thread_path *
+jump_thread_path_registry::allocate_thread_path ()
+{
+  return m_allocator.allocate_thread_path ();
 }
 
 /* Dump a jump threading path, including annotations about each
