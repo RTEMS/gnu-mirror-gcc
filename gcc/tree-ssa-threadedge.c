@@ -1311,7 +1311,7 @@ jump_threader::thread_across_edge (edge e)
 	    m_registry->register_jump_thread (path);
 	  }
 	else
-	  delete_jump_thread_path (path);
+	  path->release ();
 
 	/* And unwind the equivalence table.  */
 	if (m_evrp_range_analyzer)

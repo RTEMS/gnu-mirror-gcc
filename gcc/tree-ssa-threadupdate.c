@@ -1320,7 +1320,7 @@ ssa_redirect_edges (struct redirection_data **slot,
 
       /* Go ahead and clear E->aux.  It's not needed anymore and failure
 	 to clear it will cause all kinds of unpleasant problems later.  */
-      delete_jump_thread_path (path);
+      path->release ();
       e->aux = NULL;
 
     }
@@ -1438,7 +1438,7 @@ jump_thread_path_registry::thread_block_1 (basic_block bb,
 	      /* Since this case is not handled by our special code
 		 to thread through a loop header, we must explicitly
 		 cancel the threading request here.  */
-	      delete_jump_thread_path (path);
+	      path->release ();
 	      e->aux = NULL;
 	      continue;
 	    }
@@ -1477,7 +1477,7 @@ jump_thread_path_registry::thread_block_1 (basic_block bb,
 
 	      if (i != path->length ())
 		{
-		  delete_jump_thread_path (path);
+		  path->release ();
 		  e->aux = NULL;
 		  continue;
 		}
@@ -1836,7 +1836,7 @@ fail:
 
       if (path)
 	{
-	  delete_jump_thread_path (path);
+	  path->release ();
 	  e->aux = NULL;
 	}
     }
@@ -1966,7 +1966,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 	      m_paths.unordered_remove (i);
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		path->dump (dump_file, false);
-	      delete_jump_thread_path (path);
+	      path->release ();
 	    }
 	}
       else
@@ -2003,7 +2003,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 	      m_paths.unordered_remove (i);
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		path->dump (dump_file, false);
-	      delete_jump_thread_path (path);
+	      path->release ();
 	    }
 	}
       else
@@ -2051,7 +2051,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 		  {
 		    if (dump_file && (dump_flags & TDF_DETAILS))
 		      path->dump (dump_file, false);
-		    delete_jump_thread_path (path);
+		    path->release ();
 		    e->aux = NULL;
 		  }
 		else
@@ -2098,7 +2098,7 @@ jump_thread_path_registry::mark_threaded_blocks (bitmap threaded_blocks)
 
 		  if (e2 && !phi_args_equal_on_edges (e2, final_edge))
 		    {
-		      delete_jump_thread_path (path);
+		      path->release ();
 		      e->aux = NULL;
 		    }
 		}
@@ -2321,7 +2321,7 @@ jump_thread_path_registry::adjust_paths_after_duplication
 	    remove_candidate_from_list:
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		fprintf (dump_file, "adjusted candidate: [EMPTY]\n");
-	      delete_jump_thread_path (cand_path);
+	      cand_path->release ();
 	      m_paths.unordered_remove (cand_path_num);
 	      continue;
 	    }
@@ -2583,7 +2583,7 @@ jump_thread_path_registry::thread_through_all_blocks
 
 	if (j != path->length ())
 	  {
-	    delete_jump_thread_path (path);
+	    path->release ();
 	    m_paths.unordered_remove (i);
 	    continue;
 	  }
@@ -2617,7 +2617,7 @@ jump_thread_path_registry::thread_through_all_blocks
 	  || !valid_jump_thread_path (path))
 	{
 	  /* Remove invalid FSM jump-thread paths.  */
-	  delete_jump_thread_path (path);
+	  path->release ();
 	  m_paths.unordered_remove (i);
 	  continue;
 	}
@@ -2638,7 +2638,7 @@ jump_thread_path_registry::thread_through_all_blocks
 	  m_num_threaded_edges++;
 	}
 
-      delete_jump_thread_path (path);
+      path->release ();
       m_paths.unordered_remove (i);
       free (region);
     }
@@ -2653,7 +2653,7 @@ jump_thread_path_registry::thread_through_all_blocks
       /* Do not jump-thread twice from the same block.  */
       if (visited_starting_edges.contains (entry))
 	{
-	  delete_jump_thread_path (path);
+	  path->release ();
 	  m_paths.unordered_remove (i);
 	}
       else
@@ -2729,15 +2729,6 @@ jump_thread_path_registry::thread_through_all_blocks
   return retval;
 }
 
-/* Delete the jump threading path PATH.  We have to explicitly delete
-   each entry in the vector, then the container.  */
-
-void
-delete_jump_thread_path (jump_thread_path *path)
-{
-  path->release();
-}
-
 /* Register a jump threading opportunity.  We queue up all the jump
    threading opportunities discovered by a pass and update the CFG
    and SSA form all at once.
@@ -2751,7 +2742,7 @@ jump_thread_path_registry::register_jump_thread (jump_thread_path *path)
 {
   if (!dbg_cnt (registered_jump_thread))
     {
-      delete_jump_thread_path (path);
+      path->release ();
       return;
     }
 
@@ -2768,7 +2759,7 @@ jump_thread_path_registry::register_jump_thread (jump_thread_path *path)
 	      path->dump (dump_file, false);
 	    }
 
-	  delete_jump_thread_path (path);
+	  path->release ();
 	  return;
 	}
 

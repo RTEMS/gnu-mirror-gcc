@@ -51,13 +51,17 @@ public:
   jump_thread_edge *&last (void) { return m_path.last (); }
   void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
   unsigned length () { return m_path.length (); }
-  void release () { m_path.release (); }
   void dump (FILE *, bool registering);
   void dump (FILE *);
   void block_remove (unsigned ix, unsigned len)
   {
     return m_path.block_remove (ix, len);
   }
+  // ?? Is this method really necessary?  I mean, the pointers in
+  // m_path live in an obstack that gets automatically cleaned up.  So
+  // technically we'd only leave the container up for the GC to
+  // cleanup.
+  void release () { m_path.release (); }
 
 private:
   DISABLE_COPY_AND_ASSIGN (jump_thread_path);
@@ -131,8 +135,6 @@ struct removed_edges : nofree_ptr_hash<edge_def>
   static bool equal (edge e1, edge e2) { return e1 == e2; }
 };
 
-// FIXME: remove
-extern void delete_jump_thread_path (jump_thread_path *);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 
 enum bb_dom_status
