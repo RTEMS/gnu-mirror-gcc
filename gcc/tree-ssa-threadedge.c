@@ -923,7 +923,8 @@ jump_threader::thread_around_empty_blocks (jump_thread_path *path,
 	  if (!bitmap_bit_p (visited, taken_edge->dest->index))
 	    {
 	      jump_thread_edge *x
-		= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
+		= m_registry->allocate_thread_edge (taken_edge,
+						    EDGE_NO_COPY_SRC_BLOCK);
 	      path->safe_push (x);
 	      bitmap_set_bit (visited, taken_edge->dest->index);
 	      return thread_around_empty_blocks (path, taken_edge, visited);
@@ -966,7 +967,8 @@ jump_threader::thread_around_empty_blocks (jump_thread_path *path,
       bitmap_set_bit (visited, taken_edge->dest->index);
 
       jump_thread_edge *x
-	= new jump_thread_edge (taken_edge, EDGE_NO_COPY_SRC_BLOCK);
+	= m_registry->allocate_thread_edge (taken_edge,
+					    EDGE_NO_COPY_SRC_BLOCK);
       path->safe_push (x);
 
       thread_around_empty_blocks (path, taken_edge, visited);
@@ -1083,12 +1085,13 @@ jump_threader::thread_through_normal_block (jump_thread_path *path,
 	  if (path->length () == 0)
 	    {
               jump_thread_edge *x
-	        = new jump_thread_edge (e, EDGE_START_JUMP_THREAD);
+	        = m_registry->allocate_thread_edge (e, EDGE_START_JUMP_THREAD);
 	      path->safe_push (x);
 	    }
 
 	  jump_thread_edge *x
-	    = new jump_thread_edge (taken_edge, EDGE_COPY_SRC_BLOCK);
+	    = m_registry->allocate_thread_edge (taken_edge,
+						EDGE_COPY_SRC_BLOCK);
 	  path->safe_push (x);
 
 	  /* See if we can thread through DEST as well, this helps capture
@@ -1285,10 +1288,12 @@ jump_threader::thread_across_edge (edge e)
 
 	/* Record whether or not we were able to thread through a successor
 	   of E->dest.  */
-        jump_thread_edge *x = new jump_thread_edge (e, EDGE_START_JUMP_THREAD);
+        jump_thread_edge *x
+	  = m_registry->allocate_thread_edge (e, EDGE_START_JUMP_THREAD);
 	path->safe_push (x);
 
-        x = new jump_thread_edge (taken_edge, EDGE_COPY_SRC_JOINER_BLOCK);
+        x = m_registry->allocate_thread_edge (taken_edge,
+					      EDGE_COPY_SRC_JOINER_BLOCK);
 	path->safe_push (x);
 	found = thread_around_empty_blocks (path, taken_edge, visited);
 
