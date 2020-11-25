@@ -45,23 +45,19 @@ public:
 class jump_thread_path
 {
 public:
-  jump_thread_path () { m_path.create (5); }
-  jump_thread_edge *&operator[] (int i) { return m_path[i]; }
-  const jump_thread_edge *last (void) { return m_path.last (); }
-  void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
-  unsigned length () { return m_path.length (); }
+  jump_thread_path ();
+  jump_thread_edge *&operator[] (int);
+  jump_thread_edge *last ();
+  void safe_push (jump_thread_edge *);
+  unsigned length ();
   void dump (FILE *, bool registering);
   void dump (FILE *);
-  void block_remove (unsigned ix, unsigned len)
-  {
-    return m_path.block_remove (ix, len);
-  }
+  void block_remove (unsigned ix, unsigned len);
   // ?? Is this method really necessary?  I mean, the pointers in
   // m_path live in an obstack that gets automatically cleaned up.  So
   // technically we'd only leave the container up for the GC to
   // cleanup.
-  // FIXME: put this back VVVVVVVVVVVVVVVVVVV
-  void release () { } //m_path.release (); }
+  void release ();
 
 private:
   DISABLE_COPY_AND_ASSIGN (jump_thread_path);
@@ -124,6 +120,49 @@ private:
 
   jump_thread_path_allocator m_allocator;
 };
+
+inline
+jump_thread_path::jump_thread_path ()
+{
+  m_path.create (5);
+}
+
+inline jump_thread_edge *&
+jump_thread_path::operator[] (int i)
+{
+  return m_path[i];
+}
+
+inline jump_thread_edge *
+jump_thread_path::last ()
+{
+  return m_path.last ();
+}
+
+inline void
+jump_thread_path::safe_push (jump_thread_edge *e)
+{
+  m_path.safe_push (e);
+}
+
+inline unsigned
+jump_thread_path::length ()
+{
+  return m_path.length ();
+}
+
+inline void
+jump_thread_path::block_remove (unsigned ix, unsigned len)
+{
+  return m_path.block_remove (ix, len);
+}
+
+inline void
+jump_thread_path::release ()
+{
+  // FIXME: put this back
+  //m_path.release ();
+}
 
 // Rather than search all the edges in jump thread paths each time DOM
 // is able to simply if control statement, we build a hash table with
