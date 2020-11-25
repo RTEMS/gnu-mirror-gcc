@@ -61,7 +61,8 @@ public:
   // m_path live in an obstack that gets automatically cleaned up.  So
   // technically we'd only leave the container up for the GC to
   // cleanup.
-  void release () { m_path.release (); }
+  // FIXME: put this back VVVVVVVVVVVVVVVVVVV
+  void release () { } //m_path.release (); }
 
 private:
   DISABLE_COPY_AND_ASSIGN (jump_thread_path);
