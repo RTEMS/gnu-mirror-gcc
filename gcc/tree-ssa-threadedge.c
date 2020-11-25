@@ -1085,7 +1085,7 @@ jump_threader::thread_through_normal_block (jump_thread_path *path,
 	  if (path->length () == 0)
 	    {
               jump_thread_edge *x
-	        = m_registry->allocate_thread_edge (e, EDGE_START_JUMP_THREAD);
+		= m_registry->allocate_thread_edge (e, EDGE_START_JUMP_THREAD);
 	      path->safe_push (x);
 	    }
 
@@ -1228,7 +1228,7 @@ jump_threader::thread_across_edge (edge e)
 	{
 	  BITMAP_FREE (visited);
 	  m_const_and_copies->pop_to_marker ();
-          m_avail_exprs_stack->pop_to_marker ();
+	  m_avail_exprs_stack->pop_to_marker ();
 	  if (m_evrp_range_analyzer)
 	    m_evrp_range_analyzer->pop_to_marker ();
 	  return;
@@ -1257,7 +1257,7 @@ jump_threader::thread_across_edge (edge e)
       if (taken_edge->flags & EDGE_COMPLEX)
 	{
 	  m_const_and_copies->pop_to_marker ();
-          m_avail_exprs_stack->pop_to_marker ();
+	  m_avail_exprs_stack->pop_to_marker ();
 	  if (m_evrp_range_analyzer)
 	    m_evrp_range_analyzer->pop_to_marker ();
 	  BITMAP_FREE (visited);
@@ -1287,11 +1287,11 @@ jump_threader::thread_across_edge (edge e)
 
 	/* Record whether or not we were able to thread through a successor
 	   of E->dest.  */
-        jump_thread_edge *x
+	jump_thread_edge *x
 	  = m_registry->allocate_thread_edge (e, EDGE_START_JUMP_THREAD);
 	path->safe_push (x);
 
-        x = m_registry->allocate_thread_edge (taken_edge,
+	x = m_registry->allocate_thread_edge (taken_edge,
 					      EDGE_COPY_SRC_JOINER_BLOCK);
 	path->safe_push (x);
 	found = thread_around_empty_blocks (path, taken_edge, visited);
