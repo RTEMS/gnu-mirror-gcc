@@ -153,8 +153,6 @@ jump_thread_edge *
 jump_thread_path_allocator::allocate_thread_edge (edge e,
 						  jump_thread_edge_type type)
 {
-  return new jump_thread_edge (e, type); // FIXME
-
   void *r = obstack_alloc (&m_obstack, sizeof (jump_thread_edge));
   return new (r) jump_thread_edge (e, type);
 }
@@ -162,8 +160,6 @@ jump_thread_path_allocator::allocate_thread_edge (edge e,
 jump_thread_path *
 jump_thread_path_allocator::allocate_thread_path ()
 {
-  return new jump_thread_path (); // FIXME
-
   void *r = obstack_alloc (&m_obstack, sizeof (jump_thread_path));
   return new (r) jump_thread_path ();
 }
