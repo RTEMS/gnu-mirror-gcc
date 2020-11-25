@@ -2025,6 +2025,7 @@ void
 gimple_type_collector::print_collected ()
 {
   tpartitions_t sets = get_record_reaching_trees ();
+  // TODO: I think previously we were printing info here for tests
 }
 
 /* Walk over LHS and RHS of conditions.  */
@@ -2833,6 +2834,11 @@ expr_accessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
   field_access_map_t field_map;
   field_map = record_already_in_map ? record_field_map[addr_expr_t] : field_map;
 
+  // UNSAFE! But it is necesseary for testing...
+  // Unless there is someone who is smarter that finds another way to test this.
+  if (flag_ipa_dlo_tests)
+    return;
+
   tree field = NULL;
   for (field = TYPE_FIELDS (addr_expr_t); field; field = DECL_CHAIN (field))
     {
@@ -2921,6 +2927,11 @@ expr_accessor::_walk_COMPONENT_REF_pre (tree e)
    * TODO: Maybe add a flag to enable and disable this for debugging and
    * testing.
    */
+  // UNSAFE! But it is necesseary for testing...
+  // Unless there is someone who is smarter that finds another way to test this.
+  if (flag_ipa_dlo_tests)
+    return;
+
   for (tree field = TYPE_FIELDS (t); field; field = DECL_CHAIN (field))
   {
       log ("ever inside?\n");

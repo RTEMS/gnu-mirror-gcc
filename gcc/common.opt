@@ -3506,4 +3506,8 @@ fipa-field-reorder
 Common Report Var(flag_ipa_field_reorder) Optimization
 Reorder fields.
 
+fipa-dlo-tests
+Common Report Var(flag_ipa_dlo_tests)
+A flag to make it easier to test
+
 ; This comment is to ensure we retain the blank line above.
