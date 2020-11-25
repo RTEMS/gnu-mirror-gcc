@@ -1186,7 +1186,7 @@ jump_threader::thread_across_edge (edge e)
 
   stmt_count = 0;
 
-  jump_thread_path *path = new jump_thread_path ();
+  jump_thread_path *path = m_registry->allocate_thread_path ();
   bitmap_clear (visited);
   bitmap_set_bit (visited, e->src->index);
   bitmap_set_bit (visited, e->dest->index);
@@ -1284,7 +1284,7 @@ jump_threader::thread_across_edge (edge e)
 	bitmap_set_bit (visited, e->src->index);
 	bitmap_set_bit (visited, e->dest->index);
 	bitmap_set_bit (visited, taken_edge->dest->index);
-	jump_thread_path *path = new jump_thread_path ();
+	jump_thread_path *path = m_registry->allocate_thread_path ();
 
 	/* Record whether or not we were able to thread through a successor
 	   of E->dest.  */

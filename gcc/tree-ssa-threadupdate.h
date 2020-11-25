@@ -91,9 +91,9 @@ public:
   void register_jump_thread (jump_thread_path *);
   void remove_jump_threads_including (edge);
   bool thread_through_all_blocks (bool);
-  void dump ();
   jump_thread_edge *allocate_thread_edge (edge e, jump_thread_edge_type t);
   jump_thread_path *allocate_thread_path ();
+  void dump ();
 
 private:
   void debug_path (FILE *, int pathno);
