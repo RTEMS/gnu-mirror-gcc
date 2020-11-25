@@ -42,7 +42,6 @@ public:
   jump_thread_edge_type type;
 };
 
-// FIXME: audit callers.  most should take a const.
 class jump_thread_path
 {
 public:

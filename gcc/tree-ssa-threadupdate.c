@@ -2773,9 +2773,6 @@ jump_thread_path_registry::register_jump_thread (jump_thread_path *path)
   if (dump_file && (dump_flags & TDF_DETAILS))
     path->dump (dump_file, true);
 
-  if (!m_paths.exists ())
-    m_paths.create (5);
-
   m_paths.safe_push (path);
 }
 
