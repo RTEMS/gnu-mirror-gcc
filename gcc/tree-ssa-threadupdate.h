@@ -48,7 +48,7 @@ class jump_thread_path
 public:
   jump_thread_path () { m_path.create (5); }
   jump_thread_edge *&operator[] (int i) { return m_path[i]; }
-  jump_thread_edge *&last (void) { return m_path.last (); }
+  const jump_thread_edge *last (void) { return m_path.last (); }
   void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
   unsigned length () { return m_path.length (); }
   void dump (FILE *, bool registering);
