@@ -56,7 +56,8 @@ public:
   // ?? Is this method really necessary?  I mean, the pointers in
   // m_path live in an obstack that gets automatically cleaned up.  So
   // technically we'd only leave the container up for the GC to
-  // cleanup.
+  // cleanup.  I've changed this method to a NOP with no adverse
+  // effects.
   void release ();
 
 private:
@@ -160,8 +161,7 @@ jump_thread_path::block_remove (unsigned ix, unsigned len)
 inline void
 jump_thread_path::release ()
 {
-  // FIXME: put this back
-  //m_path.release ();
+  m_path.release ();
 }
 
 // Rather than search all the edges in jump thread paths each time DOM
