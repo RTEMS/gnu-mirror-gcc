@@ -232,6 +232,12 @@ jump_thread_path::dump (FILE *dump_file, bool registering)
   fputc ('\n', dump_file);
 }
 
+void
+jump_thread_path::dump (FILE *f)
+{
+  dump (f, true);
+}
+
 /* Simple hashing function.  For any given incoming edge E, we're going
    to be most concerned with the final destination of its jump thread
    path.  So hash on the block index of the final edge in the path.  */

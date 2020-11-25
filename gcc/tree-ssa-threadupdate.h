@@ -42,6 +42,7 @@ public:
   jump_thread_edge_type type;
 };
 
+// FIXME: audit callers.  most should take a const.
 class jump_thread_path
 {
 public:
@@ -50,20 +51,16 @@ public:
   jump_thread_edge *&last (void) { return m_path.last (); }
   void safe_push (jump_thread_edge *e) { m_path.safe_push (e); }
   unsigned length () { return m_path.length (); }
-  // FIXME: remove
-  // FIXME: remove extern delete_jump_thread_path
   void release () { m_path.release (); }
-  // FIXME: remove
+  void dump (FILE *, bool registering);
+  void dump (FILE *);
   void block_remove (unsigned ix, unsigned len)
   {
     return m_path.block_remove (ix, len);
   }
-  void dump (FILE *, bool registering);
-  void dump (FILE *f) { dump (f, true); }
 
 private:
-  // FIXME: should be in an obstack and automatically freed by pass
-  // that created it.
+  DISABLE_COPY_AND_ASSIGN (jump_thread_path);
   vec<jump_thread_edge *> m_path;
 };
 
@@ -134,6 +131,7 @@ struct removed_edges : nofree_ptr_hash<edge_def>
   static bool equal (edge e1, edge e2) { return e1 == e2; }
 };
 
+// FIXME: remove
 extern void delete_jump_thread_path (jump_thread_path *);
 extern unsigned int estimate_threading_killed_stmts (basic_block);
 
