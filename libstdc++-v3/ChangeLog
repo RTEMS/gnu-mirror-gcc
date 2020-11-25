@@ -1,3 +1,208 @@
+2020-11-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/29_atomics/atomic_float/value_init.cc: Use float
+	instead of double so that __atomic_load_8 isn't needed.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92546
+	* include/std/regex (pmr::smatch, pmr::wsmatch): Declare using
+	underlying __normal_iterator type, not nested typedef
+	basic_string::const_iterator.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97876
+	* include/std/stop_token (_Stop_state_t): Define default
+	constructor as user-provided not defaulted.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/95989
+	* config/os/gnu-linux/os_defines.h (_GLIBCXX_NATIVE_THREAD_ID):
+	Define new macro to get reliable thread ID.
+	* include/std/stop_token (_Stop_state_t::_M_request_stop):
+	Use new macro if it's defined.
+	(_Stop_state_t::_M_remove_callback): Likewise.
+	* include/std/thread (this_thread::get_id): Likewise.
+	* testsuite/30_threads/jthread/95989.cc: New test.
+	* testsuite/30_threads/this_thread/95989.cc: New test.
+
+2020-11-18  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-11-18  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (join_view::_Iterator::_M_satisfy): Uglify
+	local variable inner.
+	(join_view::_Iterator::operator->): Use _Inner_iter instead of
+	_Outer_iter in the function signature as per LWG 3500.
+	* testsuite/std/ranges/adaptors/join.cc (test08): Test it.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (join_view): Remove deduction guide.
+	(views::join): Add explicit template argument list to prevent
+	deducing the wrong type.
+	* testsuite/std/ranges/adaptors/join.cc: Move test for LWG 3474
+	here, from ...
+	* testsuite/std/ranges/adaptors/join_lwg3474.cc: Removed.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (join_view): Add deduction guide (LWG 3474).
+	* testsuite/std/ranges/adaptors/join_lwg3474.cc: New test.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/version (__cpp_lib_array_constexpr)
+	(__cpp_lib_constexpr_char_traits): Only define C++17 value when
+	compiling C++17.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/char_traits.h (__cpp_lib_constexpr_char_traits):
+	Update value for C++20.
+	* include/std/version (__cpp_lib_constexpr_char_traits): Likewise.
+	* testsuite/21_strings/char_traits/requirements/constexpr_functions_c++17.cc:
+	Update expected value.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97869
+	* include/precompiled/stdc++.h: Include <coroutine>.
+	* include/std/version (__cpp_lib_span): Check __cpp_lib_concepts
+	before defining.
+
+2020-11-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-11-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/97828
+	* include/bits/ranges_algo.h (__search_n_fn::operator()): Check
+	random_access_iterator before using the backtracking
+	implementation.  When the backwards scan fails prematurely,
+	reset __remainder appropriately.
+	* testsuite/25_algorithms/search_n/97828.cc: New test.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93456
+	* src/c++11/futex.cc (relative_timespec): Remove redundant check
+	negative values.
+	* testsuite/30_threads/future/members/93456.cc: New.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/futex.cc (relative_timespec): New function to
+	create relative time from two absolute times.
+	(__atomic_futex_unsigned_base::_M_futex_wait_until): Use
+	relative_timespec.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/future (future::wait_for): Do not wait for
+	durations less than or equal to zero.
+	* testsuite/30_threads/future/members/poll.cc: New test.
+
+2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97798
+	* include/ext/numeric_traits.h (__glibcxx_signed)
+	(__glibcxx_digits, __glibcxx_min, __glibcxx_max): Remove
+	macros.
+	(__is_integer_nonstrict::__width): Define new constant.
+	(__numeric_traits_integer): Define constants in terms of each
+	other and __is_integer_nonstrict::__width, rather than the
+	removed macros.
+	(_GLIBCXX_INT_N_TRAITS): Macro to define explicit
+	specializations for non-standard integer types.
+
+2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96042
+	* testsuite/std/ranges/iota/96042.cc: Only assert that the
+	difference type is wider than long long if __int128 is
+	supported.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/iterator_concepts.h [__STRICT_ANSI__]
+	(incrementable_traits<__int128>): Define specialization.
+	(incrementable_traits<unsigned __int128>): Likewise.
+	* testsuite/std/ranges/iota/96042.cc: Test iota_view with
+	__int128.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-19  Jonathan Wakely  <jwakely@redhat.com>
+		    Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/96042
+	* include/bits/range_access.h (__detail::__to_unsigned_like):
+	Do not use make_unsigned_t<T> in the return type, as it can
+	result in an error before the integral<T> constraint is checked.
+	[__STRICT_ANSI__]: Add overloads for 128-bit integer types.
+	(__detail::__make_unsigned_like_t): Define as the return type
+	of __to_unsigned_like.
+	* testsuite/std/ranges/subrange/96042.cc: New test.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96042
+	* include/ext/numeric_traits.h (__is_integer_nonstrict): New
+	trait which is true for 128-bit integers even in strict modes.
+	(__numeric_traits_integer, __numeric_traits): Use
+	__is_integer_nonstrict instead of __is_integer.
+	* include/std/limits [__STRICT_ANSI__ && __SIZEOF_INT128__]
+	(numeric_limits<__int128>, (numeric_limits<unsigned __int128>):
+	Define.
+	* testsuite/std/ranges/iota/96042.cc: New test.
+
 2020-11-11  Paul Scharnofske  <asynts@gmail.com>
 
 	Backported from master:

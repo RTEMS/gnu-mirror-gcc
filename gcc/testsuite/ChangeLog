@@ -1,3 +1,200 @@
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97918
+	* g++.dg/debug/localclass2.C: New test.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR debug/97060
+	* gcc.dg/debug/dwarf2/pr97060.c: New test.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96805
+	* g++.dg/cpp0x/alias-decl-pr96805.C: New test.
+
+2020-11-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.dg/pr97534.c: New test.
+
+2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* lib/gcc-dg.exp (dg-optimized, dg-missed): Use 'saved-dg-warning'
+	instead of 'saved-dg-error'.
+
+2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* lib/gcc-dg.exp (dg-optimized, dg-missed): Fix 'process-message'
+	call.
+	* gcc.dg/vect/nodump-vect-opt-info-1.c: Demonstrate.
+	* gcc.dg/vect/nodump-vect-opt-info-2.c: Likewise.
+
+2020-11-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-11-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/97889
+	* gdc.dg/pr97889.d: New test.
+
+2020-11-20  Andrea Corallo  <andrea.corallo@arm.com>
+
+	PR target/97727
+	* gcc.target/aarch64/advsimd-intrinsics/bf16_vstN_lane_2.c: Relax
+	regexps.
+
+2020-11-19  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2020-11-12  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/97730
+	* gcc.target/aarch64/sve2/bcax_1.c (OP): Add missing bitwise not
+	to match correct bcax semantics.
+	* gcc.dg/vect/pr97730.c: New test.
+
+2020-11-19  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/97887
+	* gcc.target/i386/pr97887.c: New test.
+
+2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/97843
+	* gdc.dg/pr97843.d: New test.
+
+2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/97842
+	* gdc.test/fail_compilation/fail18970.d: New test.
+	* gdc.test/fail_compilation/imports/test21164a.d: New test.
+	* gdc.test/fail_compilation/imports/test21164b.d: New test.
+	* gdc.test/fail_compilation/imports/test21164c.d: New test.
+	* gdc.test/fail_compilation/imports/test21164d.d: New test.
+	* gdc.test/fail_compilation/test21164.d: New test.
+
+2020-11-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2020-10-27  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* gdc.test/compilable/imports/test21299/func.d: New test.
+	* gdc.test/compilable/imports/test21299/mtype.d: New test.
+	* gdc.test/compilable/imports/test21299/rootstringtable.d: New test.
+	* gdc.test/compilable/test21299a.d: New test.
+	* gdc.test/compilable/test21299b.d: New test.
+	* gdc.test/compilable/test21299c.d: New test.
+	* gdc.test/compilable/test21299d.d: New test.
+
+2020-11-17  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2020-10-28  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/97535
+	* gcc.target/aarch64/pr97535.c: Exclude ILP32.
+
+2020-11-17  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/97535
+	* gcc.target/aarch64/pr97535.c: New test.
+
+2020-11-17  Monk Chiang  <monk.chiang@sifive.com>
+
+	Backported from master:
+	2020-11-14  Monk Chiang  <monk.chiang@sifive.com>
+
+	PR target/97682
+	* g++.target/riscv/pr97682.C: New test.
+	* gcc.target/riscv/interrupt-3.c: Check register for t0.
+	* gcc.target/riscv/interrupt-4.c: Likewise.
+
+2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/classify-parallel.c: Adjust.
+	* gfortran.dg/goacc/classify-parallel.f95: Likewise.
+	* c-c++-common/goacc/classify-serial.c: New.
+	* gfortran.dg/goacc/classify-serial.f95: Likewise.
+
+2020-11-12  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	* gcc.target/powerpc/mma-alignment.c: New test.
+
+2020-11-12  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2020-11-12  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/97782
+	* gfortran.dg/goacc/classify-kernels-unparallelized.f95: Move dg-message
+	one line up.
+	* gfortran.dg/goacc/classify-kernels.f95: Likewise.
+
+2020-11-12  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2020-11-10  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/95847
+	* gfortran.dg/coverage.f90: New test.
+
+2020-11-12  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2020-11-12  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* gfortran.dg/entry_23.f: New test.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97790
+	* g++.dg/cpp2a/constexpr-dtor9.C: New test.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/97748
+	* c-c++-common/Wunused-value-1.c: New test.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/67453
+	* g++.dg/ext/attr-used-2.C: New test.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97663
+	* g++.dg/cpp1z/class-deduction75.C: New test.
+
 2020-11-11  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* gnat.dg/bias2.adb: New test.

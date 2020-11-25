@@ -1,3 +1,120 @@
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97918
+	* dwarf2out.c (dwarf2out_early_finish): flush_limbo_die_list
+	after gen_scheduled_generic_parms_dies.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR debug/97060
+	* dwarf2out.c (gen_subprogram_die): It's a declaration
+	if DECL_INITIAL isn't set.
+
+2020-11-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/97534
+	* config/arm/arm.c (arm_split_atomic_op): Use gen_int_mode when
+	negating a const_int.
+
+2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* omp-expand.c (expand_oacc_for): More explicit checking of which
+	OMP constructs we're expecting.
+
+2020-11-23  Matthew Malcomson  <matthew.malcomson@arm.com>
+
+	* doc/install.texi: Document bootstrap-asan option.
+
+2020-11-19  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2020-11-12  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/97730
+	* config/aarch64/aarch64-sve2.md (@aarch64_sve2_bcax<mode>):
+	Change to define_expand, add missing (trivially-predicated) not
+	rtx to fix wrong code bug.
+	(*aarch64_sve2_bcax<mode>): New.
+
+2020-11-19  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/97887
+	* config/i386/i386.md (*<absneg:code><mode>2_i387_1):
+	Disable for TARGET_SSE_MATH modes.
+
+2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	Backported from master:
+	2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc: add configure flags --with-{cpu,arch,tune}-{32,64}
+	as alias flags for --with-{cpu,arch,tune} on AArch64.
+	* doc/install.texi: Document new flags for aarch64.
+
+2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	Backported from master:
+	2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc: Add --with-tune to AArch64 configure flags.
+
+2020-11-17  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/97535
+	* config/aarch64/aarch64.c (aarch64_expand_cpymem): Use unsigned
+	arithmetic in check.
+
+2020-11-17  Monk Chiang  <monk.chiang@sifive.com>
+
+	Backported from master:
+	2020-11-14  Monk Chiang  <monk.chiang@sifive.com>
+
+	PR target/97682
+	* config/riscv/riscv.h (RISCV_PROLOGUE_TEMP_REGNUM): Change register
+	to t0.
+	(RISCV_CALL_ADDRESS_TEMP_REGNUM): New Marco, define t1 register.
+	(RISCV_CALL_ADDRESS_TEMP): Use it for call instructions.
+	* config/riscv/riscv.c (riscv_legitimize_call_address): Use
+	RISCV_CALL_ADDRESS_TEMP.
+	(riscv_compute_frame_info): Change temporary register to t0 form t1.
+	(riscv_trampoline_init): Adjust comment.
+
+2020-11-16  Cui,Lili  <lili.cui@intel.com>
+
+	* config/i386/i386.h: Add PREFETCHW to march=broadwell.
+	* doc/invoke.texi: Put PREFETCHW back to relation arch.
+
+2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* omp-low.c (scan_sharing_clauses, scan_omp_for)
+	(lower_oacc_reductions, lower_omp_target): More explicit checking
+	of which OMP constructs we're expecting.
+
+2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-13  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* omp-expand.c (expand_omp_target): Attach an attribute to all
+	outlined OpenACC compute regions.
+	* omp-offload.c (execute_oacc_device_lower): Adjust.
+
+2020-11-12  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	* config/rs6000/rs6000.h (BIGGEST_ALIGNMENT): Revert previous commit
+	so as not to break the ABI.
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Set the ABI
+	mandated alignment for __vector_pair and __vector_quad types.
+
 2020-11-11  liuhongt  <hongtao.liu@intel.com>
 
 	* config/i386/i386-options.c (ix86_option_override_internal):
