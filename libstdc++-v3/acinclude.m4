@@ -1381,8 +1381,7 @@ dnl
 dnl --enable-libstdcxx-time
 dnl --enable-libstdcxx-time=yes
 dnl        checks for the availability of monotonic and realtime clocks,
-dnl        nanosleep and sched_yield in libc and libposix4 and, if needed,
-dnl        links in the latter.
+dnl        nanosleep and sched_yield in libc.
 dnl --enable-libstdcxx-time=rt
 dnl        also searches (and, if needed, links) librt.  Note that this is
 dnl        not always desirable because, in glibc 2.16 and earlier, for
@@ -1455,7 +1454,6 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
         ac_has_nanosleep=yes
         ;;
       solaris*)
-        GLIBCXX_LIBS="$GLIBCXX_LIBS -lrt"
         ac_has_clock_monotonic=yes
         ac_has_clock_realtime=yes
         ac_has_nanosleep=yes
@@ -1469,11 +1467,11 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
   elif test x"$enable_libstdcxx_time" != x"no"; then
 
     if test x"$enable_libstdcxx_time" = x"rt"; then
-      AC_SEARCH_LIBS(clock_gettime, [rt posix4])
-      AC_SEARCH_LIBS(nanosleep, [rt posix4])
+      AC_SEARCH_LIBS(clock_gettime, [rt])
+      AC_SEARCH_LIBS(nanosleep, [rt])
     else
-      AC_SEARCH_LIBS(clock_gettime, [posix4])
-      AC_SEARCH_LIBS(nanosleep, [posix4])
+      AC_CHECK_FUNC(clock_gettime)
+      AC_CHECK_FUNC(nanosleep)
     fi
 
     case "$ac_cv_search_clock_gettime" in
@@ -1485,13 +1483,9 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
       ;;
     esac
 
-    AC_SEARCH_LIBS(sched_yield, [rt posix4])
+    AC_SEARCH_LIBS(sched_yield, [rt])
 
     case "$ac_cv_search_sched_yield" in
-      -lposix4*)
-      GLIBCXX_LIBS="$GLIBCXX_LIBS $ac_cv_search_sched_yield"
-      ac_has_sched_yield=yes
-      ;;
       -lrt*)
       if test x"$enable_libstdcxx_time" = x"rt"; then
 	GLIBCXX_LIBS="$GLIBCXX_LIBS $ac_cv_search_sched_yield"
@@ -4088,6 +4082,43 @@ AC_DEFUN([GLIBCXX_CHECK_GTHREADS], [
              [#include "gthr.h"])
     fi
   fi
+
+  AC_CHECK_HEADER(semaphore.h, [
+    AC_MSG_CHECKING([for POSIX Semaphores and sem_timedwait])
+    AC_TRY_COMPILE([
+	#include <unistd.h>
+	#include <semaphore.h>
+	#include <limits.h>
+      ],
+      [
+	#if !defined _POSIX_TIMEOUTS || _POSIX_TIMEOUTS <= 0
+	# error "POSIX Timeouts option not supported"
+	#elif !defined _POSIX_SEMAPHORES || _POSIX_SEMAPHORES <= 0
+	# error "POSIX Semaphores option not supported"
+	#else
+	#if defined SEM_VALUE_MAX
+	constexpr int sem_value_max = SEM_VALUE_MAX;
+	#elif defined _POSIX_SEM_VALUE_MAX
+	constexpr int sem_value_max = _POSIX_SEM_VALUE_MAX;
+	#else
+	# error "SEM_VALUE_MAX not available"
+	#endif
+	sem_t sem;
+	sem_init(&sem, 0, sem_value_max);
+	struct timespec ts = { 0 };
+	sem_timedwait(&sem, &ts);
+	#endif
+      ],
+      [ac_have_posix_semaphore=yes],
+      [ac_have_posix_semaphore=no])],
+      [ac_have_posix_semaphore=no])
+
+  if test $ac_have_posix_semaphore = yes ; then
+    AC_DEFINE(_GLIBCXX_HAVE_POSIX_SEMAPHORE,
+	      1,
+	      [Define to 1 if POSIX Semaphores with sem_timedwait are available in <semaphore.h>.])
+  fi
+  AC_MSG_RESULT([$ac_have_posix_semaphore])
 
   CXXFLAGS="$ac_save_CXXFLAGS"
   AC_LANG_RESTORE

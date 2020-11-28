@@ -1,3 +1,46 @@
+2020-11-25  Martin Sebor  <msebor@redhat.com>
+
+	PR bootstrap/94982
+	* c-attribs.c (handle_patchable_function_entry_attribute): Avoid
+	-Wformat-diag.
+
+2020-11-24  Martin Sebor  <msebor@redhat.com>
+
+	* c-warn.c (warn_parm_array_mismatch): Avoid invalid redeclarations.
+
+2020-11-23  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* c-attribs.c (handle_special_var_sec_attribute): New.
+	(handle_noinit_attribute): Remove.
+	(attr_noinit_exclusions): Rename to...
+	(attr_section_exclusions): ...this, and add "persistent" attribute
+	exclusion.
+	(c_common_attribute_table): Add "persistent" attribute.
+
+2020-11-21  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* c-pretty-print.c (c_pretty_printer::simple_type_specifier):
+	Treat opaque types like other types.
+	(c_pretty_printer::direct_abstract_declarator): Opaque types are
+	supported types.
+
+2020-11-20  Martin Sebor  <msebor@redhat.com>
+
+	* c-warn.c (warn_parm_array_mismatch): Bail on invalid redeclarations
+	with fewer arguments.
+
+2020-11-20  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/97879
+	* c-attribs.c (handle_access_attribute): Handle ATTR_FLAG_INTERNAL.
+	Error out on invalid modes.
+
+2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/88101
+	* c-common.c (check_builtin_function_arguments): Handle
+	BUILT_IN_CLEAR_PADDING.
+
 2020-11-18  Nathan Sidwell  <nathan@acm.org>
 
 	* c-lex.c (c_lex_with_flags): CPP_HEADER_NAMEs can now be seen.

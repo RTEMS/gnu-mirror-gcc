@@ -1,3 +1,17 @@
+2020-11-25  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/85796
+	* resolve.c (traverse_data_list): Fix copy&paste errors; catch
+	step=0 in implied do loop.
+
+2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/97911
+	* Make-lang.in (fortran.serial): Change from goal to a variable.
+	(.PHONY): Drop fortran.serial and fortran.prev.
+	(f951$(exeext)): Depend on $(fortran.serial) rather than
+	fortran.serial.
+
 2020-11-18  Jakub Jelinek  <jakub@redhat.com>
 
 	* Make-lang.in (fortran.serial): New goal.

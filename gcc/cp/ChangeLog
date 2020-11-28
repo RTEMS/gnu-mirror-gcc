@@ -1,3 +1,115 @@
+2020-11-27  Martin Sebor  <msebor@redhat.com>
+
+	* error.c (add_quotes): Revert previous change and use pragma to
+	suppress -Wformat-diag.
+
+2020-11-26  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* g++spec.c (TIMELIB, TIME_LIBRARY): Remove.
+	(lang_specific_driver): Remove TIME_LIBRARY handling.
+
+2020-11-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* parser.c (cp_parser_omp_var_list_no_open): Assert that array
+	section's 'low_bound', 'length' are not location wrapper nodes.
+	(cp_parser_oacc_all_clauses, cp_parser_oacc_cache): Instantiate
+	'auto_suppress_location_wrappers'.
+
+2020-11-25  Martin Sebor  <msebor@redhat.com>
+
+	PR bootstrap/94982
+	* constraint.cc (debug_argument_list): Avoid -Wformat-diag.
+	* error.c (function_category): Same.
+	(print_template_differences): Same.
+	* logic.cc (debug): Same.
+	* name-lookup.c (lookup_using_decl): Same.
+	* parser.c (maybe_add_cast_fixit): Same.
+	(cp_parser_template_introduction): Same.
+	* typeck.c (access_failure_info::add_fixit_hint): Same.
+
+2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* pt.c (tsubst_omp_clauses): Handle 'OMP_CLAUSE__CACHE_'.
+	(tsubst_expr): Handle 'OACC_CACHE'.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97899
+	* typeck2.c (store_init_value): Don't split_nonconstant_init in a
+	template.
+
+2020-11-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/96929
+	* constexpr.c (cxx_eval_binary_expression): For shifts by constant
+	with MSB set, emulate older wide_int_binop behavior to preserve
+	diagnostics and -fpermissive behavior.
+
+2020-11-23  Nathan Sidwell  <nathan@acm.org>
+
+	* module.cc: New dummy file.
+	* Make-lang.in: Add rules to build module.o
+
+2020-11-23  Jozef Lawrynowicz  <jozef.l@mittosystems.com>
+
+	* decl.c (start_decl): Set DECL_INITIAL for initialized decls
+	before attribute processing.
+
+2020-11-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR c++/97904
+	* pt.c (tsubst): Use verify_type_context to check the type
+	of an array element.
+
+2020-11-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/94695
+	* parser.c (warn_for_range_copy): Warn when the loop variable is
+	initialized with a value of a different type resulting in a copy.
+
+2020-11-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97846
+	* constexpr.c (potential_constant_expression_1): Reject
+	LABEL_EXPRs that use non-artifical LABEL_DECLs.
+
+2020-11-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97881
+	* parser.c (warn_about_ambiguous_parse): Only assume "int" if we
+	actually saw any type-specifiers.
+
+2020-11-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97839
+	* parser.c (cp_parser_lambda_declarator_opt): Don't require ().
+
+2020-11-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97427
+	* constexpr.c (cxx_set_object_constness): New function.
+	(cxx_eval_call_expression): Set new_obj for destructors too.
+	Call cxx_set_object_constness to set/unset TREE_READONLY of
+	the object under construction/destruction.
+
+2020-11-21  Aaron Sawdey  <acsawdey@linux.ibm.com>
+
+	* error.c (dump_type): Handle opaque types.
+	(dump_type_prefix): Handle opaque types.
+	(dump_type_suffix): Handle opaque types.
+	(dump_expr): Handle opaque types.
+	* pt.c (tsubst): Allow opaque types in templates.
+	(unify): Allow opaque types in templates.
+	* typeck.c (structural_comptypes): Handle comparison
+	of opaque types.
+
+2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/97911
+	* Make-lang.in (c++.serial): Change from goal to a variable.
+	(.PHONY): Drop c++.serial and c++.prev.
+	(cc1plus$(exeext)): Depend on $(c++.serial) rather than c++.serial.
+
 2020-11-19  Nathan Sidwell  <nathan@acm.org>
 
 	* cp-tree.h (struct spec_entry): Moved from pt.c.

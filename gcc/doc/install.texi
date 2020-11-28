@@ -464,6 +464,9 @@ Necessary when modifying @command{gperf} input files, e.g.@:
 @item DejaGnu 1.4.4
 @itemx Expect
 @itemx Tcl
+@c Once Tcl 8.5 or higher is required, remove any obsolete
+@c compatibility workarounds:
+@c     git grep 'compatibility with earlier Tcl releases'
 
 Necessary to run the GCC testsuite; see the section on testing for
 details.
@@ -2256,11 +2259,10 @@ instrumentation, see @option{-fcf-protection} option.  When
 to add @option{-fcf-protection} and, if needed, other target
 specific options to a set of building options.
 
-The option is disabled by default.  When @code{--enable-cet=auto}
-is used, it is enabled on Linux/x86 if target binutils
-supports @code{Intel CET} instructions and disabled otherwise.
-In this case the target libraries are configured to get additional
-@option{-fcf-protection} option.
+@code{--enable-cet=auto} is default.  CET is enabled on Linux/x86 if
+target binutils supports @code{Intel CET} instructions and disabled
+otherwise.  In this case, the target libraries are configured to get
+additional @option{-fcf-protection} option.
 
 @item --with-riscv-attribute=@samp{yes}, @samp{no} or @samp{default}
 Generate RISC-V attribute by default, in order to record extra build
@@ -2797,6 +2799,15 @@ assumes that the host supports Intel CET (e.g.@: GNU assembler version
 Arranges for the run time of each program started by the GCC driver,
 built in any stage, to be logged to @file{time.log}, in the top level of
 the build tree.
+
+@item @samp{bootstrap-asan}
+Compiles GCC itself using Address Sanitization in order to catch invalid memory
+accesses within the GCC code.
+
+@item @samp{bootstrap-hwasan}
+Compiles GCC itself using HWAddress Sanitization in order to catch invalid
+memory accesses within the GCC code.  This option is only available on AArch64
+systems that are running Linux kernel version 5.4 or later.
 
 @end table
 

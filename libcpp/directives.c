@@ -667,7 +667,8 @@ do_undef (cpp_reader *pfile)
 				   pfile->directive_line, 0,
 				   "undefining \"%s\"", NODE_NAME (node));
 
-	  if (CPP_OPTION (pfile, warn_unused_macros))
+	  if (node->value.macro
+	      && CPP_OPTION (pfile, warn_unused_macros))
 	    _cpp_warn_if_unused_macro (pfile, node, NULL);
 
 	  _cpp_free_definition (node);
@@ -914,12 +915,11 @@ read_flag (cpp_reader *pfile, unsigned int last)
 /* Subroutine of do_line and do_linemarker.  Convert a number in STR,
    of length LEN, to binary; store it in NUMP, and return false if the
    number was well-formed, true if not. WRAPPED is set to true if the
-   number did not fit into 'unsigned long'.  */
+   number did not fit into 'linenum_type'.  */
 static bool
 strtolinenum (const uchar *str, size_t len, linenum_type *nump, bool *wrapped)
 {
   linenum_type reg = 0;
-  linenum_type reg_prev = 0;
 
   uchar c;
   *wrapped = false;
@@ -928,11 +928,12 @@ strtolinenum (const uchar *str, size_t len, linenum_type *nump, bool *wrapped)
       c = *str++;
       if (!ISDIGIT (c))
 	return true;
-      reg *= 10;
-      reg += c - '0';
-      if (reg < reg_prev) 
+      if (reg > ((linenum_type) -1) / 10)
 	*wrapped = true;
-      reg_prev = reg;
+      reg *= 10;
+      if (reg > ((linenum_type) -1) - (c - '0'))
+	*wrapped = true;
+      reg += c - '0';
     }
   *nump = reg;
   return false;
@@ -1981,8 +1982,10 @@ do_ifdef (cpp_reader *pfile)
       if (node)
 	{
 	  skip = !_cpp_defined_macro_p (node);
+	  if (!_cpp_maybe_notify_macro_use (pfile, node, pfile->directive_line))
+	    /* It wasn't a macro after all.  */
+	    skip = true;
 	  _cpp_mark_macro_used (node);
-	  _cpp_maybe_notify_macro_use (pfile, node, pfile->directive_line);
 	  if (pfile->cb.used)
 	    pfile->cb.used (pfile, pfile->directive_line, node);
 	  check_eol (pfile, false);
@@ -2006,8 +2009,10 @@ do_ifndef (cpp_reader *pfile)
       if (node)
 	{
 	  skip = _cpp_defined_macro_p (node);
+	  if (!_cpp_maybe_notify_macro_use (pfile, node, pfile->directive_line))
+	    /* It wasn't a macro after all.  */
+	    skip = false;
 	  _cpp_mark_macro_used (node);
-	  _cpp_maybe_notify_macro_use (pfile, node, pfile->directive_line);
 	  if (pfile->cb.used)
 	    pfile->cb.used (pfile, pfile->directive_line, node);
 	  check_eol (pfile, false);
