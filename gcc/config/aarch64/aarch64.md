@@ -138,6 +138,11 @@
     UNSPEC_CRC32X
     UNSPEC_FCVTZS
     UNSPEC_FCVTZU
+    UNSPEC_FJCVTZS
+    UNSPEC_FRINT32Z
+    UNSPEC_FRINT32X
+    UNSPEC_FRINT64Z
+    UNSPEC_FRINT64X
     UNSPEC_URECPE
     UNSPEC_FRECPE
     UNSPEC_FRECPS
@@ -246,6 +251,8 @@
     UNSPECV_BTI_C		; Represent BTI c.
     UNSPECV_BTI_J		; Represent BTI j.
     UNSPECV_BTI_JC		; Represent BTI jc.
+    UNSPEC_RNDR			; Represent RNDR
+    UNSPEC_RNDRRS		; Represent RNDRRS
   ]
 )
 
@@ -6836,6 +6843,16 @@
   [(set_attr "length" "0")]
 )
 
+(define_insn "aarch64_fjcvtzs"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(unspec:SI [(match_operand:DF 1 "register_operand" "w")]
+		   UNSPEC_FJCVTZS))
+   (clobber (reg:CC CC_REGNUM))]
+  "TARGET_JSCVT"
+  "fjcvtzs\\t%w0, %d1"
+  [(set_attr "type" "f_cvtf2i")]
+)
+
 ;; Pointer authentication patterns are always provided.  In architecture
 ;; revisions prior to ARMv8.3-A these HINT instructions operate as NOPs.
 ;; This lets the user write portable software which authenticates pointers
@@ -7257,6 +7274,36 @@
   [(set_attr "type" "block")
    (set_attr "length" "12")
    (set_attr "speculation_barrier" "true")]
+)
+
+(define_insn "aarch64_<frintnzs_op><mode>"
+  [(set (match_operand:VSFDF 0 "register_operand" "=w")
+	(unspec:VSFDF [(match_operand:VSFDF 1 "register_operand" "w")]
+		      FRINTNZX))]
+  "TARGET_FRINT && TARGET_FLOAT
+   && !(VECTOR_MODE_P (<MODE>mode) && !TARGET_SIMD)"
+  "<frintnzs_op>\\t%<v>0<Vmtype>, %<v>1<Vmtype>"
+  [(set_attr "type" "f_rint<stype>")]
+)
+
+(define_insn "aarch64_rndr"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_RNDR))
+   (set (reg:CC_Z CC_REGNUM)
+	(unspec_volatile:CC_Z [(const_int 0)] UNSPEC_RNDR))]
+  "TARGET_RNG"
+  "mrs\t%0, RNDR"
+  [(set_attr "type" "mrs")]
+)
+
+(define_insn "aarch64_rndrrs"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_RNDRRS))
+   (set (reg:CC_Z CC_REGNUM)
+	(unspec_volatile:CC_Z [(const_int 0)] UNSPEC_RNDRRS))]
+  "TARGET_RNG"
+  "mrs\t%0, RNDRRS"
+  [(set_attr "type" "mrs")]
 )
 
 ;; AdvSIMD Stuff

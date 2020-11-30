@@ -1122,6 +1122,58 @@ static const struct tune_params neoversen1_tunings =
   &generic_prefetch_tune
 };
 
+static const struct tune_params neoversev1_tunings =
+{
+  &cortexa57_extra_costs,
+  &generic_addrcost_table,
+  &generic_regmove_cost,
+  &cortexa57_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  SVE_256, /* sve_width  */
+  4, /* memmov_cost  */
+  3, /* issue_rate  */
+  AARCH64_FUSE_AES_AESMC, /* fusible_ops  */
+  "32:16",      /* function_align.  */
+  "32:16",      /* jump_align.  */
+  "32:16",      /* loop_align.  */
+  2,    /* int_reassoc_width.  */
+  4,    /* fp_reassoc_width.  */
+  2,    /* vec_reassoc_width.  */
+  2,    /* min_div_recip_mul_sf.  */
+  2,    /* min_div_recip_mul_df.  */
+  0,    /* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,     /* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),    /* tune_flags.  */
+  &generic_prefetch_tune
+};
+
+static const struct tune_params neoversen2_tunings =
+{
+  &cortexa57_extra_costs,
+  &generic_addrcost_table,
+  &generic_regmove_cost,
+  &cortexa57_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  SVE_128, /* sve_width  */
+  4, /* memmov_cost  */
+  3, /* issue_rate  */
+  AARCH64_FUSE_AES_AESMC, /* fusible_ops  */
+  "32:16",      /* function_align.  */
+  "32:16",      /* jump_align.  */
+  "32:16",      /* loop_align.  */
+  2,    /* int_reassoc_width.  */
+  4,    /* fp_reassoc_width.  */
+  2,    /* vec_reassoc_width.  */
+  2,    /* min_div_recip_mul_sf.  */
+  2,    /* min_div_recip_mul_df.  */
+  0,    /* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,     /* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),    /* tune_flags.  */
+  &generic_prefetch_tune
+};
+
 static const struct tune_params a64fx_tunings =
 {
   &generic_extra_costs,
@@ -14300,7 +14352,12 @@ aarch64_simd_container_mode (scalar_mode mode, poly_int64 width)
 static machine_mode
 aarch64_preferred_simd_mode (scalar_mode mode)
 {
-  poly_int64 bits = TARGET_SVE ? BITS_PER_SVE_VECTOR : 128;
+  /* If current tuning prefers Advanced SIMD, bypass SVE.  */
+  bool use_sve
+    = TARGET_SVE
+      && !(aarch64_tune_params.extra_tuning_flags
+	   & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC);
+  poly_int64 bits = use_sve ? BITS_PER_SVE_VECTOR : 128;
   return aarch64_simd_container_mode (mode, bits);
 }
 
@@ -14309,7 +14366,11 @@ aarch64_preferred_simd_mode (scalar_mode mode)
 static void
 aarch64_autovectorize_vector_sizes (vector_sizes *sizes)
 {
-  if (TARGET_SVE)
+  bool use_sve
+    = TARGET_SVE
+      && !(aarch64_tune_params.extra_tuning_flags
+	   & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC);
+  if (use_sve)
     sizes->safe_push (BYTES_PER_SVE_VECTOR);
   sizes->safe_push (16);
   sizes->safe_push (8);
@@ -17316,6 +17377,8 @@ aarch64_copy_one_block_and_progress_pointers (rtx *src, rtx *dst,
 bool
 aarch64_expand_movmem (rtx *operands)
 {
+  /* These need to be signed as we need to perform arithmetic on n as
+     signed operations.  */
   int n, mode_bits;
   rtx dst = operands[0];
   rtx src = operands[1];
@@ -17326,20 +17389,23 @@ aarch64_expand_movmem (rtx *operands)
   /* When optimizing for size, give a better estimate of the length of a
      memcpy call, but use the default otherwise.  Moves larger than 8 bytes
      will always require an even number of instructions to do now.  And each
-     operation requires both a load+store, so devide the max number by 2.  */
-  int max_num_moves = (speed_p ? 16 : AARCH64_CALL_RATIO) / 2;
+     operation requires both a load+store, so divide the max number by 2.  */
+  unsigned int max_num_moves = (speed_p ? 16 : AARCH64_CALL_RATIO) / 2;
 
   /* We can't do anything smart if the amount to copy is not constant.  */
   if (!CONST_INT_P (operands[2]))
     return false;
 
-  n = INTVAL (operands[2]);
+  unsigned HOST_WIDE_INT tmp = INTVAL (operands[2]);
 
   /* Try to keep the number of instructions low.  For all cases we will do at
      most two moves for the residual amount, since we'll always overlap the
      remainder.  */
-  if (((n / 16) + (n % 16 ? 2 : 0)) > max_num_moves)
+  if (((tmp / 16) + (tmp % 16 ? 2 : 0)) > max_num_moves)
     return false;
+
+  /* At this point tmp is known to have to fit inside an int.  */
+  n = tmp;
 
   base = copy_to_mode_reg (Pmode, XEXP (dst, 0));
   dst = adjust_automodify_address (dst, VOIDmode, base, 0);
