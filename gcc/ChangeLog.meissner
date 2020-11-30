@@ -1,3 +1,12 @@
+work029.patch003
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* config/rs6000/predicates.md (ds_form_memory): New predicate.
+	* config/rs6000/vsx.md (concatv2di_store): New insn.
+	(dupv2di_store): New insn.
+
+work029.patch002
 2020-11-30 Michael Meissner  <meissner@linux.ibm.com>
 
         * config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
@@ -15,6 +24,7 @@
         (xxsel<mode>): Add IEEE 128-bit fp support.  Enable generator to
         build te RTL.
 
+work029.patch001
 2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
