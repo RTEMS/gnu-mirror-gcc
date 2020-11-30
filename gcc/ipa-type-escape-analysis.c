@@ -181,8 +181,8 @@ static unsigned int
 lto_dfe_execute ();
 
 // Partition types into reching record or non reaching record sets.
-static tpartitions_t
-partition_types_into_record_reaching_or_non_record_reaching ();
+static void
+partition_types_into_record_reaching_or_non_record_reaching (tpartitions2_t &p);
 
 // Perform dead field elimination.
 static void
@@ -190,11 +190,11 @@ lto_dead_field_elimination ();
 
 // Fixed point calculating to determine escaping types.
 static void
-fix_escaping_types_in_set (tpartitions_t &types);
+fix_escaping_types_in_set (tpartitions2_t &types);
 
 // Find which fields are accessed.
-static record_field_map_t
-find_fields_accessed ();
+static void
+find_fields_accessed (record_field_map4_t &f);
 
 // TODO:
 // This was copy pasted from tree-ssa-structalias.c
@@ -271,58 +271,54 @@ lto_dfe_execute ()
  * call graph as ``safe'' or ``unsafe''.  The color is propagated to the 
  * callers of the functions until a fixed point is reached.
  */
-std::map<tree, bool>
-get_whitelisted_nodes ()
+hash_map<tree, bool>*
+get_whitelisted_nodes2 ()
 {
   cgraph_node *node = NULL;
-  std::set<cgraph_node *> nodes;
-  std::set<cgraph_node *> leaf_nodes;
-  std::set<tree> leaf_nodes_decl;
+  hash_set<cgraph_node *> nodes;
+  hash_set<cgraph_node *> leaf_nodes;
+  hash_set<tree> leaf_nodes_decl;
+
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
   {
-    node->get_untransformed_body ();
-    nodes.insert(node);
+    node->get_untransformed_body();
+    nodes.add(node);
     if (node->callees) continue;
 
-    leaf_nodes.insert (node);
-    leaf_nodes_decl.insert (node->decl);
+    leaf_nodes.add (node);
+    leaf_nodes_decl.add (node->decl);
   }
 
-  std::queue<cgraph_node *> worklist;
-  for (std::set<cgraph_node*>::iterator i = leaf_nodes.begin (),
-    e = leaf_nodes.end (); i != e; ++i)
+  vec<cgraph_node *> worklist = vNULL;
+  for (hash_set<cgraph_node*>::iterator i = leaf_nodes.begin(), e = leaf_nodes.end (); i != e; ++i)
   {
     if (dump_file) fprintf (dump_file, "is a leaf node %s\n", (*i)->name ());
-    worklist.push (*i);
+    worklist.safe_push (*i);
   }
 
-  for (std::set<cgraph_node*>::iterator i = nodes.begin (),
+  for (hash_set<cgraph_node*>::iterator i = nodes.begin (),
     e = nodes.end (); i != e; ++i)
   {
-    worklist.push (*i);
+    worklist.safe_push (*i);
   }
 
-  std::map<tree, bool> map;
-  while (!worklist.empty ())
+  hash_map<tree, bool> *map = new hash_map<tree, bool>;
+  while (!worklist.is_empty ())
   {
 
     if (detected_incompatible_syntax) return map;
-    cgraph_node *i = worklist.front ();
-    worklist.pop ();
+    cgraph_node *i = worklist[0];
+    worklist.ordered_remove (0);
     if (dump_file) fprintf (dump_file, "analyzing %s %p\n", i->name (), (void*)i);
-    gimple_white_lister whitelister;
+    tpartitions2_t temp;
+    gimple_white_lister whitelister(temp);
     whitelister._walk_cnode (i);
-    bool no_external = whitelister.does_not_call_external_functions (i, map);
-    bool before_in_map = map.find (i->decl) != map.end ();
+    bool no_external = whitelister.does_not_call_external_functions2 (i, map);
+    bool before_in_map = map->get (i->decl);
     bool place_callers_in_worklist = !before_in_map;
-    if (!before_in_map)
-    {
-      map.insert(std::pair<tree, bool>(i->decl, no_external));
-    } else
-    {
-      map[i->decl] = no_external;
-    }
-    bool previous_value = map[i->decl];
+    map->put(i->decl, no_external);
+    bool *previous_value_ptr = map->get(i->decl);
+    bool previous_value = *previous_value_ptr;
     place_callers_in_worklist |= previous_value != no_external;
     if (previous_value != no_external)
     {
@@ -335,12 +331,11 @@ get_whitelisted_nodes ()
     for (cgraph_edge *e = i->callers; place_callers_in_worklist && e;
       e = e->next_caller)
     {
-      worklist.push (e->caller);
+      worklist.safe_push (e->caller);
     }
   }
 
   return map;
-
 }
 
 /*
@@ -361,28 +356,32 @@ lto_dead_field_elimination ()
     cnode->get_body();
   }
   detected_incompatible_syntax = false;
-  std::map<tree, bool> whitelisted = get_whitelisted_nodes ();
-  tpartitions_t escaping_nonescaping_sets
-    = partition_types_into_escaping_nonescaping (whitelisted);
+  hash_map<tree, bool> *whitelisted2 = get_whitelisted_nodes2 ();
+  tpartitions2_t escaping_nonescaping_sets;
+  partition_types_into_escaping_nonescaping (escaping_nonescaping_sets, whitelisted2);
   if (detected_incompatible_syntax) return;
-  record_field_map_t record_field_map = find_fields_accessed ();
+  record_field_map4_t record_field_map;
+  find_fields_accessed (record_field_map);
   if (detected_incompatible_syntax) return;
-  record_field_offset_map_t record_field_offset_map
-    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets, 
-					    record_field_map, OPT_Wdfa);
-  if (detected_incompatible_syntax || record_field_offset_map.empty ())
+  record_field_offset_map4_t record_field_offset_map;
+  obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets, 
+					    record_field_map, OPT_Wdfa, record_field_offset_map);
+  if (detected_incompatible_syntax || record_field_offset_map.is_empty ())
     return;
 
     // Prepare for transformation.
-  std::set<tree> to_modify
-    = get_all_types_pointing_to (record_field_offset_map,
-				 escaping_nonescaping_sets);
+  hash_set<tree> to_modify2;
+  get_all_types_pointing_to (record_field_offset_map,
+				 escaping_nonescaping_sets, to_modify2);
+  reorg_record_map2_t a;
+  reorg_field_map2_t b;
   reorg_maps_t replacements
-    = get_types_replacement (record_field_offset_map, to_modify);
-  reorg_record_map_t map = replacements.first;
-  reorg_field_map_t field_map = replacements.second;
+    = get_types_replacement (record_field_offset_map, to_modify2, a, b);
+  reorg_record_map2_t *map = replacements.first;
+  reorg_field_map2_t *field_map = replacements.second;
+  gcc_assert(map && field_map);
   // Transformation.
-  substitute_types_in_program (map, field_map, true);
+  substitute_types_in_program (*map, *field_map, true);
 }
 
 /* Iterate all gimple bodies and collect trees
@@ -391,48 +390,39 @@ lto_dead_field_elimination ()
  * pointer, array, reference, union, field, etc...).
  * Let's call these trees record_reaching_trees.
  */
-static tpartitions_t
-partition_types_into_record_reaching_or_non_record_reaching ()
+void
+partition_types_into_record_reaching_or_non_record_reaching (tpartitions2_t &partitions)
 {
-  gimple_type_collector collector;
+  gimple_type_collector collector(partitions);
   collector.walk ();
-  tpartitions_t partitions = collector.get_record_reaching_trees ();
-  return partitions;
 }
 
 /* Iterate over all gimple bodies and find out
  * which types are escaping AND are being casted.
  */
-tpartitions_t
-partition_types_into_escaping_nonescaping (std::map<tree, bool> &whitelisted)
+void
+partition_types_into_escaping_nonescaping (tpartitions2_t &partitions, hash_map<tree, bool> *whitelisted2)
 {
-  tpartitions_t partitions
-    = partition_types_into_record_reaching_or_non_record_reaching ();
-  if (detected_incompatible_syntax) return partitions;
-  gimple_caster caster (partitions, whitelisted);
+  partition_types_into_record_reaching_or_non_record_reaching (partitions);
+  if (detected_incompatible_syntax) return;
+  gimple_caster caster (partitions, whitelisted2);
   caster.walk ();
   caster.print_reasons ();
 
-  partitions = caster.get_sets ();
+  caster.fix_sets ();
   // Unify results from different trees representing the same type
   // until a fixed point is reached.
   fix_escaping_types_in_set (partitions);
-  return partitions;
 }
 
 /* Iterate over all gimple bodies and find out
  * which fields are accessed for all RECORD_TYPE
  * types.
  */
-record_field_map_t static find_fields_accessed ()
+static void find_fields_accessed (record_field_map4_t &record_field_map)
 {
-  gimple_accessor accesser;
+  gimple_accessor accesser (record_field_map) ;
   accesser.walk ();
-
-  // This record_field_map holds
-  // RECORD_TYPE -> (FIELD_DECL -> how field is accessed)
-  record_field_map_t record_field_map = accesser.get_map ();
-  return record_field_map;
 }
 
 /* Find equivalent RECORD_TYPE trees to tree r_i.
@@ -443,22 +433,21 @@ record_field_map_t static find_fields_accessed ()
  * and it is a tree for which this method is going to find the rest of
  * equivalent trees found in record_field_map.
  */
-static std::vector<tree>
-find_equivalent_trees (tree r_i, record_field_map_t record_field_map,
-		       tpartitions_t casting)
+static vec<tree>*
+find_equivalent_trees (tree r_i, record_field_map4_t &record_field_map,
+		       tpartitions2_t casting)
 {
   type_incomplete_equality equality;
-  std::vector<tree> equivalence;
+  vec<tree> *equivalence = new vec<tree> ();
   bool is_rin_record = casting.in_points_to_record (r_i);
   if (!is_rin_record)
     return equivalence;
 
-  for (std::map<tree, field_access_map_t>::const_iterator j
-       = record_field_map.begin (),
+  for (auto j = record_field_map.begin (),
        f = record_field_map.end ();
-       j != f; j++)
+       j != f; ++j)
     {
-      tree r_j = j->first;
+      tree r_j = (*j).first;
       const bool pointer_equal = r_i == r_j;
       if (pointer_equal)
 	continue;
@@ -472,7 +461,7 @@ find_equivalent_trees (tree r_i, record_field_map_t record_field_map,
       if (!are_equal)
 	continue;
 
-      equivalence.push_back (r_j);
+      equivalence->safe_push(r_j);
     }
   return equivalence;
 }
@@ -484,8 +473,9 @@ find_equivalent_trees (tree r_i, record_field_map_t record_field_map,
  */
 static void
 add_offset_only_if_read (tree field, unsigned access,
-			 field_offsets_t &field_offset)
+			 field_offsets2_t &field_offset2)
 {
+  gcc_assert(field);
   assert_is_type (field, FIELD_DECL);
   const bool is_read = access & Read;
   if (!is_read)
@@ -493,7 +483,7 @@ add_offset_only_if_read (tree field, unsigned access,
 
   tree _field = tree_to_tree (field);
   unsigned f_offset = bitpos_of_field (_field);
-  field_offset.insert (f_offset);
+  field_offset2.add (f_offset);
 }
 
 /*
@@ -504,14 +494,12 @@ add_offset_only_if_read (tree field, unsigned access,
  * tree (RECORD_TYPE) -> bitpos_of_field for read fields).
  */
 static void
-keep_only_read_fields_from_field_map (field_access_map_t &field_map,
-				      field_offsets_t &field_offset)
+keep_only_read_fields_from_field_map (field_access_map2_t &field_map,
+				      field_offsets2_t &field_offset2)
 {
-  for (std::map<tree, unsigned>::iterator j = field_map.begin (),
-						f = field_map.end ();
-       j != f; ++j)
+  for (auto j = field_map.begin (), f = field_map.end (); j != f; ++j)
     {
-      add_offset_only_if_read (j->first, j->second, field_offset);
+      add_offset_only_if_read ((*j).first, (*j).second, field_offset2);
     }
 }
 
@@ -521,16 +509,16 @@ keep_only_read_fields_from_field_map (field_access_map_t &field_map,
  */
 static void
 keep_only_read_fields_from_equivalent_field_maps (
-  std::vector<tree> equivalent, record_field_map_t &record_field_map,
-  field_offsets_t &field_offset)
+  vec<tree> *equivalent, record_field_map4_t &record_field_map,
+  field_offsets2_t &field_offset2)
 {
-  for (std::vector<tree>::iterator j = equivalent.begin (),
-					 f = equivalent.end ();
+  for (auto j = equivalent->begin (),
+					 f = equivalent->end ();
        j != f; j++)
     {
       tree r_j = *j;
-      field_access_map_t equivalent_field_map = record_field_map[r_j];
-      keep_only_read_fields_from_field_map (equivalent_field_map, field_offset);
+      field_access_map2_t *equivalent_field_map = *record_field_map.get(r_j);
+      keep_only_read_fields_from_field_map (*equivalent_field_map, field_offset2);
     }
 }
 
@@ -540,28 +528,27 @@ keep_only_read_fields_from_equivalent_field_maps (
  */
 static void
 erase_if_no_fields_can_be_deleted (
-  record_field_offset_map_t &record_field_offset_map,
-  std::set<tree> &to_keep, std::set<tree> &to_erase)
+  record_field_offset_map4_t &record_field_offset_map,
+  hash_set<tree> &to_keep, hash_set<tree> &to_erase)
 {
-  for (std::map<tree, field_offsets_t>::iterator i
+  for (hash_map<tree, field_offsets2_t*>::iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      tree record = i->first;
-      const bool keep = to_keep.find (record) != to_keep.end ();
+      tree record = (*i).first;
+      const bool keep = to_keep.contains (record);
       if (keep)
 	continue;
 
-      to_erase.insert (record);
+      to_erase.add (record);
     }
 
-  for (std::set<tree>::iterator i = to_erase.begin (),
-				      e = to_erase.end ();
+  for (auto i = to_erase.begin (), e = to_erase.end ();
        i != e; ++i)
     {
       tree record = *i;
-      record_field_offset_map.erase (record);
+      record_field_offset_map.remove (record);
     }
 }
 
@@ -571,82 +558,84 @@ erase_if_no_fields_can_be_deleted (
  */
 static void
 mark_escaping_types_to_be_deleted (
-  record_field_offset_map_t &record_field_offset_map,
-  std::set<tree> &to_erase, tpartitions_t casting)
+  record_field_offset_map4_t &record_field_offset_map,
+  hash_set<tree> &to_erase, tpartitions2_t casting)
 {
-  const tset_t &non_escaping = casting.non_escaping;
-  for (std::map<tree, field_offsets_t>::iterator i
+  tset2_t &non_escaping = casting.non_escaping;
+  for (hash_map<tree, field_offsets2_t*>::iterator i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      tree record = i->first;
-      const bool in_set = non_escaping.find (record) != non_escaping.end ();
+      tree record = (*i).first;
+      const bool in_set = non_escaping.contains (record);
       if (in_set)
 	continue;
 
-      to_erase.insert (record);
+      to_erase.add (record);
     }
 }
 
 // Obtain nonescaping unaccessed fields
-record_field_offset_map_t
-obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
-				      record_field_map_t record_field_map,
-				      int _warning)
+void
+obtain_nonescaping_unaccessed_fields (tpartitions2_t casting,
+				      record_field_map4_t &record_field_map,
+				      int _warning,
+				      record_field_offset_map4_t &record_field_offset_map)
 {
   bool has_fields_that_can_be_deleted = false;
-  record_field_offset_map_t record_field_offset_map;
-  for (std::map<tree, field_access_map_t>::iterator i
+  for (hash_map<tree, field_access_map2_t*>::iterator i
        = record_field_map.begin (),
        e = record_field_map.end ();
        i != e; ++i)
     {
-      tree r_i = i->first;
-      std::vector<tree> equivalence
+      tree r_i = (*i).first;
+      vec<tree>* equivalence
 	= find_equivalent_trees (r_i, record_field_map, casting);
-      field_offsets_t field_offset;
-      field_access_map_t original_field_map = record_field_map[r_i];
-      keep_only_read_fields_from_field_map (original_field_map, field_offset);
+      field_offsets2_t *field_offset = new field_offsets2_t;
+      field_access_map2_t *original_field_map = (*i).second;
+      gcc_assert(original_field_map);
+      keep_only_read_fields_from_field_map (*original_field_map, *field_offset);
       keep_only_read_fields_from_equivalent_field_maps (equivalence,
 							record_field_map,
-							field_offset);
+							*field_offset);
       // These map holds the following:
       // RECORD_TYPE -> unsigned (bit_pos_offset which has been read)
-      record_field_offset_map[r_i] = field_offset;
+      record_field_offset_map.put(r_i, field_offset);
+      delete equivalence;
     }
 
   // So now that we only have the FIELDS which are read,
   // we need to compute the complement...
 
   // Improve: This is tightly coupled, I need to decouple it...
-  std::set<tree> to_erase;
-  std::set<tree> to_keep;
+  hash_set<tree> to_erase;
+  hash_set<tree> to_keep;
   mark_escaping_types_to_be_deleted (record_field_offset_map, to_erase,
 				     casting);
-  for (std::map<tree, field_offsets_t>::iterator i
+  for (auto i
        = record_field_offset_map.begin (),
        e = record_field_offset_map.end ();
        i != e; ++i)
     {
-      tree record = i->first;
-      const bool will_be_erased = to_erase.find (record) != to_erase.end ();
+      tree record = (*i).first;
+      const bool will_be_erased = to_erase.contains (record);
       // No need to compute which fields can be deleted if type is escaping
       if (will_be_erased)
 	continue;
 
-      field_offsets_t field_offset = i->second;
+      field_offsets2_t *field_offset = (*i).second;
       for (tree field = TYPE_FIELDS (record); field; field = DECL_CHAIN (field))
 	{
 	  unsigned f_offset = bitpos_of_field (field);
-	  bool in_set2 = field_offset.find (f_offset) != field_offset.end ();
+	  bool in_set2 = field_offset->contains(f_offset);
 	  if (in_set2)
 	    {
-	      field_offset.erase (f_offset);
+	      field_offset->remove (f_offset);
 	      continue;
 	    }
-	  to_keep.insert (record);
-	  field_offset.insert (f_offset);
+	  to_keep.add (record);
+	  field_offset->add (f_offset);
 	  has_fields_that_can_be_deleted = true;
 	  // NOTE: With anonymous fields this might be weird to print.
 	  log ("%s.%s may be deleted\n",
@@ -659,20 +648,17 @@ obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
 	  warning (_warning, "RECORD_TYPE %qE has dead field %qE in LTO.\n",
 		   record, field);
 	}
-      record_field_offset_map[record] = field_offset;
+      record_field_offset_map.put(record, field_offset);
     }
 
-  // Improve: Make this more elegant.
-  if (!has_fields_that_can_be_deleted)
-    {
-      record_field_offset_map_t empty;
-      return empty;
-    }
+  if (!has_fields_that_can_be_deleted) {
+	  record_field_offset_map.empty();
+	  return;
+  }
 
   erase_if_no_fields_can_be_deleted (record_field_offset_map, to_keep,
 				     to_erase);
 
-  return record_field_offset_map;
 }
 
 // Main interface to TypeWalker
@@ -681,7 +667,7 @@ void
 type_walker::walk (tree t)
 {
   gcc_assert (t);
-  this->tset.clear ();
+  this->tset2.empty ();
   this->_walk (t);
 }
 
@@ -707,11 +693,11 @@ type_walker::_walk (tree type)
   // of trees and therefore we need a way to
   // avoid loops in this graph.
   // Imrpove: Outline finding if it is recursive?
-  const bool is_recursing = tset.find (type) != tset.end ();
+  const bool is_recursing = tset2.contains (type);
   if (is_recursing)
     return;
 
-  tset.insert (type);
+  tset2.add (type);
   const enum tree_code code = TREE_CODE (type);
   switch (code)
     {
@@ -778,7 +764,7 @@ type_walker::_walk (tree type)
       }
       break;
     }
-  tset.erase (type);
+  tset2.remove (type);
 }
 
 // This is used to walk over subtrees.
@@ -1275,7 +1261,7 @@ void
 gimple_walker::walk ()
 {
   _walk_globals ();
-  std::set<tree> fndecls;
+  hash_set<tree> fndecls2;
   cgraph_node *node = NULL;
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
     {
@@ -1283,7 +1269,7 @@ gimple_walker::walk ()
       node->get_untransformed_body ();
       tree decl = node->decl;
       gcc_assert (decl);
-      const bool already_in_set = fndecls.find (decl) != fndecls.end ();
+      const bool already_in_set = fndecls2.contains (decl);
       // I think it is possible for different nodes to point to the same
       // declaration.
       if (already_in_set)
@@ -1293,7 +1279,7 @@ gimple_walker::walk ()
 	dump_function_to_file (node->decl, dump_file, TDF_NONE);
 
       _walk_cnode (node);
-      fndecls.insert (decl);
+      fndecls2.add (decl);
     }
 }
 
@@ -1636,7 +1622,7 @@ gimple_walker::_walk_gphi (__attribute__((unused)) gphi *g)
 void
 type_collector::collect (tree t)
 {
-  const bool in_set = ptrset.in_universe (t);
+  const bool in_set = ptrset2.in_universe (t);
   // Early memoization...
 
   if (in_set)
@@ -1653,7 +1639,7 @@ type_collector::collect (tree t)
   // The boolean will be updated to show
   // whether a record is reachable from
   // the type.
-  gcc_assert (ptr.empty ());
+  gcc_assert (ptr2.is_empty ());
   walk (t);
 }
 
@@ -1661,12 +1647,12 @@ type_collector::collect (tree t)
 void
 type_collector::_sanity_check ()
 {
-  for (tset_t::iterator i = ptrset.points_to_record.begin (),
-	    e = ptrset.points_to_record.end ();
+  for (auto i = ptrset2.points_to_record.begin (),
+	    e = ptrset2.points_to_record.end ();
        i != e; ++i)
     {
-      for (tset_t::iterator j = ptrset.complement.begin (),
-	    f = ptrset.complement.end ();
+      for (auto j = ptrset2.complement.begin (),
+	    f = ptrset2.complement.end ();
 	   j != f; ++j)
 	{
 	  tree type_ptr = *i;
@@ -1692,18 +1678,18 @@ bool
 type_collector::is_memoized (tree t)
 {
   /* If we haven't seen it then no.  */
-  const bool in_set = ptrset.in_universe (t);
+  const bool in_set = ptrset2.in_universe (t);
   if (!in_set)
     return false;
 
   // If the memoized type points to a record
   // we must update all types that can refer
   // to memoized type.
-  const bool points_to_record = ptrset.in_points_to_record (t);
-  for (std::map<tree, bool>::iterator i = ptr.begin (),
-	e = ptr.end (); i != e; ++i)
+  const bool points_to_record = ptrset2.in_points_to_record (t);
+  for (auto i = ptr2.begin (),
+	e = ptr2.end (); i != e; ++i)
     {
-      i->second |= points_to_record;
+      (*i).second |= points_to_record;
     }
   return true;
 }
@@ -1711,7 +1697,7 @@ type_collector::is_memoized (tree t)
 void
 type_collector::_walk_VOID_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1723,7 +1709,7 @@ type_collector::_walk_VOID_TYPE_post (tree t)
 void
 type_collector::_walk_INTEGER_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1735,7 +1721,7 @@ type_collector::_walk_INTEGER_TYPE_post (tree t)
 void
 type_collector::_walk_REAL_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1747,7 +1733,7 @@ type_collector::_walk_REAL_TYPE_post (tree t)
 void
 type_collector::_walk_FIXED_POINT_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1759,7 +1745,7 @@ type_collector::_walk_FIXED_POINT_TYPE_post (tree t)
 void
 type_collector::_walk_COMPLEX_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1771,7 +1757,7 @@ type_collector::_walk_COMPLEX_TYPE_post (tree t)
 void
 type_collector::_walk_ENUMERAL_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1783,7 +1769,7 @@ type_collector::_walk_ENUMERAL_TYPE_post (tree t)
 void
 type_collector::_walk_BOOLEAN_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1796,15 +1782,15 @@ void
 type_collector::_collect_simple (tree t)
 {
   // Insert into persistent set.
-  ptrset.insert (t, ptr[t]);
+  ptrset2.insert (t, *ptr2.get(t));
   // erase from current working set.
-  ptr.erase (t);
+  ptr2.remove (t);
 }
 
 void
 type_collector::_walk_ARRAY_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1816,7 +1802,7 @@ type_collector::_walk_ARRAY_TYPE_post (tree t)
 void
 type_collector::_walk_POINTER_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1828,7 +1814,7 @@ type_collector::_walk_POINTER_TYPE_post (tree t)
 void
 type_collector::_walk_REFERENCE_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1841,10 +1827,10 @@ void
 type_collector::_walk_RECORD_TYPE_post (tree t)
 {
   // All in ptr point to record
-  for (std::map<tree, bool>::iterator i = ptr.begin (),
-	e = ptr.end (); i != e; ++i)
+  for (auto i = ptr2.begin (),
+	e = ptr2.end (); i != e; ++i)
     {
-      i->second = true;
+      (*i).second = true;
     }
   _collect_simple (t);
 
@@ -1853,13 +1839,13 @@ type_collector::_walk_RECORD_TYPE_post (tree t)
 void
 type_collector::_walk_RECORD_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
 type_collector::_walk_UNION_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1877,7 +1863,7 @@ type_collector::_walk_FUNCTION_TYPE_post (tree t)
 void
 type_collector::_walk_FUNCTION_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 void
@@ -1889,7 +1875,7 @@ type_collector::_walk_METHOD_TYPE_post (tree t)
 void
 type_collector::_walk_METHOD_TYPE_pre (tree t)
 {
-  ptr[t] = false;
+  ptr2.put(t, false);
 }
 
 inline void
@@ -1902,14 +1888,14 @@ expr_collector::_walk_pre (tree e)
 
   if (RECORD_TYPE != TREE_CODE (t)) return;
 
-  if (_type_collector.ptrset.records.empty ()) {
-    _type_collector.ptrset.records.insert (TYPE_MAIN_VARIANT (t));
+  if (_type_collector.ptrset2.records.is_empty ()) {
+    _type_collector.ptrset2.records.add (TYPE_MAIN_VARIANT (t));
     return;
   }
 
-  for (std::set<tree>::iterator
-	i = _type_collector.ptrset.records.begin (),
-	e = _type_collector.ptrset.records.end (); i != e; ++i)
+  for (auto
+	i = _type_collector.ptrset2.records.begin (),
+	e = _type_collector.ptrset2.records.end (); i != e; ++i)
   {
     tree r = *i;
     type_incomplete_equality structuralEquality;
@@ -1917,7 +1903,7 @@ expr_collector::_walk_pre (tree e)
     if (is_same) continue;
 
     type_stringifier stringifier;
-    _type_collector.ptrset.records.insert (TYPE_MAIN_VARIANT (t));
+    _type_collector.ptrset2.records.add (TYPE_MAIN_VARIANT (t));
   }
 }
 
@@ -2024,7 +2010,7 @@ gimple_type_collector::_walk_pre_gdebug (gdebug *s)
 void
 gimple_type_collector::print_collected ()
 {
-  tpartitions_t sets = get_record_reaching_trees ();
+  tpartitions2_t sets = get_record_reaching_trees ();
   // TODO: I think previously we were printing info here for tests
 }
 
@@ -2047,12 +2033,13 @@ type_escaper::is_memoized (__attribute__ ((unused)) tree t)
   return false;
 }
 
-tpartitions_t
-type_escaper::get_sets ()
+void
+type_escaper::fix_sets ()
 {
   place_escaping_types_in_set ();
-  return _ptrset;
+  //return _ptrset2;
 }
+
 
 /* From a map of TREE -> BOOL, the key represents a tree type
  * and the value represents whether the tree escapes.
@@ -2062,20 +2049,20 @@ void
 type_escaper::place_escaping_types_in_set ()
 {
   type_stringifier stringifier;
-  for (typemap::iterator i = calc.begin (), e = calc.end (); i != e; ++i)
+  for (auto i = calc2.begin (), e = calc2.end (); i != e; ++i)
     {
-      tree type = i->first;
+      tree type = (*i).first;
 
       // We should only track interesting types
       // Types which are not in points_to_record are the ones
       // that are pointed to by records.
       // I think it is possible to prune them ahead of time...
-      if (!_ptrset.in_points_to_record (type))
+      if (!_ptrset2.in_points_to_record (type))
 	continue;
 
-      const Reason reason = i->second;
-      reason.is_escaping () ? _ptrset.escaping.insert (type)
-			    : _ptrset.non_escaping.insert (type);
+      const Reason reason = (*i).second;
+      reason.is_escaping () ? _ptrset2.escaping.add (type)
+			    : _ptrset2.non_escaping.add (type);
     }
 }
 
@@ -2099,7 +2086,7 @@ void
 type_escaper::_update (tree t)
 {
   gcc_assert (t);
-  const bool already_in_typemap = calc.find (t) != calc.end ();
+  const bool already_in_typemap = calc2.get (t);
   // Do we have to invalidate all types which point to a volatile type?
   // Or do we have to invalidate all types pointed to by a volatile type?
   // Or do we only invalidate all types which are volatile.
@@ -2109,7 +2096,9 @@ type_escaper::_update (tree t)
   _is_volatile.type_is_volatile = is_volatile;
   Reason _inner = _reason | _is_volatile;
   // always OR
-  already_in_typemap ? calc[t] |= _inner : calc[t] = _inner;
+  Reason temp;
+  temp = already_in_typemap ? *calc2.get(t) | _inner : _inner;
+  calc2.put(t, temp);
 }
 
 void
@@ -2209,20 +2198,20 @@ void
 type_escaper::print_reasons ()
 {
   type_stringifier stringifier;
-  for (typemap::iterator i = calc.begin (), e = calc.end (); i != e; ++i)
+  for (auto i = calc2.begin (), e = calc2.end (); i != e; ++i)
     {
-      tree t = i->first;
+      tree t = (*i).first;
       std::string name = stringifier.stringify (t);
-      Reason r = i->second;
+      Reason r = (*i).second;
       log ("%s reason: ", name.c_str ());
       r.print ();
     }
 }
 
-tpartitions_t
-expr_escaper::get_sets ()
+void
+expr_escaper::fix_sets ()
 {
-  return _type_escaper.get_sets ();
+  _type_escaper.fix_sets ();
 }
 
 void
@@ -2244,7 +2233,7 @@ expr_escaper::update (tree t, Reason r)
 void
 expr_escaper::_walk_pre (tree e)
 {
-  _stack.push (e);
+  _stack2.safe_push (e);
   tree t = TREE_TYPE (e);
 
   gcc_assert (t);
@@ -2254,7 +2243,7 @@ expr_escaper::_walk_pre (tree e)
 void
 expr_escaper::_walk_post (__attribute__ ((unused)) tree e)
 {
-  _stack.pop ();
+  _stack2.pop ();
 }
 
 /* Capture casting on LHS.  */
@@ -2264,16 +2253,16 @@ expr_escaper::_walk_SSA_NAME_pre (tree e)
   tree ssa_type = TREE_TYPE (e);
 
 
-  if (_stack.size () < 4)
+  if (_stack2.length () < 4)
     return;
 
-  tree this_expr = _stack.top ();
-  _stack.pop ();
-  tree twice = _stack.top ();
-  _stack.pop ();
-  tree prev_expr = _stack.top ();
-  _stack.push (twice);
-  _stack.push (this_expr);
+  tree this_expr = _stack2.last ();
+  _stack2.pop ();
+  tree twice = _stack2.last ();
+  _stack2.pop ();
+  tree prev_expr = _stack2.last ();
+  _stack2.safe_push (twice);
+  _stack2.safe_push (this_expr);
   if (TREE_CODE (prev_expr) != MEM_REF)
     return;
 
@@ -2287,8 +2276,8 @@ expr_escaper::_walk_SSA_NAME_pre (tree e)
   if (TREE_CODE (TREE_TYPE (mref_type)) == INTEGER_TYPE)
     return;
 
-  bool in_map = curr_node && _whitelisted.find (curr_node->decl) != _whitelisted.end ();
-  bool whitelisted = in_map && _whitelisted[curr_node->decl];
+  bool in_map = curr_node && _whitelisted2->get (curr_node->decl);
+  bool whitelisted = in_map && *_whitelisted2->get (curr_node->decl);
   if (whitelisted) return;
 
   if (dump_file) print_generic_stmt(dump_file, e);
@@ -2321,11 +2310,11 @@ expr_escaper::_walk_CONSTRUCTOR_pre (tree e)
   _type_escaper.update (t, _r);
 }
 
-tpartitions_t
-gimple_escaper::get_sets ()
+void
+gimple_escaper::fix_sets ()
 {
   _expr_escaper.curr_node = NULL;
-  return _expr_escaper.get_sets ();
+  return _expr_escaper.fix_sets ();
 }
 
 void
@@ -2349,7 +2338,8 @@ gimple_escaper::_init ()
 
       tree decl = cnode->decl;
       gcc_assert (decl);
-      undefined.insert (decl);
+      //undefined.insert (decl);
+      undefined2.add (decl);
     }
 
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (cnode)
@@ -2358,7 +2348,8 @@ gimple_escaper::_init ()
       cnode->get_untransformed_body ();
       tree decl = cnode->decl;
       gcc_assert (decl);
-      undefined.erase (decl);
+      //undefined.erase (decl);
+      undefined2.remove (decl);
     }
 }
 
@@ -2548,7 +2539,7 @@ gimple_escaper::_walk_pre_gcall (gcall *s)
   type_stringifier stringifier;
   const bool _is_function_escaping
     = node ? is_function_escaping (node) : is_function_escaping (fn);
-  const bool is_undefined = undefined.find (fn) != undefined.end ();
+  const bool is_undefined = undefined2.contains (fn);
   log ("is undefined %s\n", is_undefined ? "t" : "f");
   const bool _is_escaping = is_undefined || _is_function_escaping;
 
@@ -2626,8 +2617,8 @@ gimple_caster::_walk_pre_gassign (gassign *s)
   log ("is_casted %s = %s\n", stringifier.stringify(t_rhs).c_str(), is_cast ? "T" : "F"); 
   log ("is_casted %s = %s\n", stringifier.stringify(t_lhs).c_str(), is_cast ? "T" : "F"); 
   reason.type_is_casted = is_cast;
-  bool in_map = _whitelisted.find (currently_walking->decl) != _whitelisted.end ();
-  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  bool in_map = _whitelisted2->get (currently_walking->decl);
+  bool whitelisted = in_map && *_whitelisted2->get(currently_walking->decl);
   if (whitelisted) goto escaper_label;
   _expr_escaper.curr_node = currently_walking;
   _expr_escaper._type_escaper.update (TREE_TYPE (lhs), reason);
@@ -2656,9 +2647,9 @@ gimple_caster::_walk_pre_gcall (gcall *s)
     return;
 
   tree f_t = TREE_TYPE (fn);
-  if (_whitelisted.find(fn) != _whitelisted.end() && _whitelisted[fn]) return;
-  bool in_map = _whitelisted.find(currently_walking->decl) != _whitelisted.end();
-  bool whitelisted = in_map && _whitelisted[currently_walking->decl];
+  if (_whitelisted2->get(fn) && *_whitelisted2->get(fn)) return;
+  bool in_map = _whitelisted2->get (currently_walking->decl);
+  bool whitelisted = in_map && *_whitelisted2->get(currently_walking->decl);
   if (whitelisted) return;
 
   if (!currently_walking->callers) return;
@@ -2704,9 +2695,33 @@ gimple_caster::_walk_pre_gcall (gcall *s)
 }
 
 bool
+type_accessor::is_in_record_field_map(tree t)
+{
+  return _map4.get (t);
+}
+
+field_access_map2_t*
+type_accessor::get_from_record_field_map(tree t)
+{
+  gcc_assert (_map4.get (t));
+  field_access_map2_t *value = *_map4.get(t);
+  return value;
+}
+
+void
+type_accessor::put_in_record_field_map(tree t, field_access_map2_t* f)
+{
+  if (_map4.get (t) && (*_map4.get (t) != f))
+  {
+    delete *(_map4.get(t));
+  }
+  _map4.put(t, f);
+}
+
+bool
 type_accessor::is_memoized (tree t)
 {
-  return memoized_map.find (t) != memoized_map.end ();
+  return memoized_map2.contains (t);
 }
 
 /* Add all fields in struct to memoized map.  */
@@ -2714,7 +2729,7 @@ void
 type_accessor::_walk_RECORD_TYPE_pre (tree t)
 {
   add_all_fields_in_struct (t);
-  memoized_map.insert (t);
+  memoized_map2.add (t);
 }
 
 /* Initialize all fields as neither read nor written.  */
@@ -2726,27 +2741,21 @@ type_accessor::add_all_fields_in_struct (tree t)
   if (!is_record)
     return;
 
-  const bool record_already_in_map = _map.find (t) != _map.end ();
-  field_access_map_t field_map;
-  field_map = record_already_in_map ? _map[t] : field_map;
+  const bool record_already_in_map = is_in_record_field_map(t);
+  field_access_map2_t *field_map;
+  field_map = record_already_in_map ? get_from_record_field_map(t) : new field_access_map2_t;
 
   // Let's add all fields to the field map as empty.
   for (tree field = TYPE_FIELDS (t); field; field = DECL_CHAIN (field))
     {
       const bool field_already_in_map_2
-	= field_map.find (field) != field_map.end ();
+	= field_map->get (field);
       if (field_already_in_map_2)
 	continue;
-      field_map[field] = Empty;
+      field_map->put(field, Empty);
     }
 
-  _map[t] = field_map;
-}
-
-record_field_map_t
-expr_accessor::get_map ()
-{
-  return record_field_map;
+  put_in_record_field_map(t, field_map);
 }
 
 void
@@ -2758,7 +2767,7 @@ expr_accessor::add_all_fields_in_struct (tree t)
 void
 expr_accessor::_walk_pre (tree e)
 {
-  _stack.push (e);
+  _stack2.safe_push (e);
   tree t = TREE_TYPE (e);
   add_all_fields_in_struct (t);
 }
@@ -2766,7 +2775,7 @@ expr_accessor::_walk_pre (tree e)
 void
 expr_accessor::_walk_post (__attribute__ ((unused)) tree e)
 {
-  _stack.pop ();
+  _stack2.pop ();
 }
 
 void
@@ -2792,19 +2801,19 @@ void
 expr_accessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
 {
   log ("expr accessor mem ref\n");
-  log ("stack size = %d\n", _stack.size ());
+  log ("stack size = %d\n", _stack2.length ());
 
-  if (_stack.size () < 4)
+  if (_stack2.length () < 4)
     return;
 
   // TODO: Fix error with double pushing
-  tree addr_expr = _stack.top ();
-  _stack.pop ();
-  tree twice = _stack.top ();
-  _stack.pop ();
-  tree prev_expr = _stack.top ();
-  _stack.push (addr_expr);
-  _stack.push (twice);
+  tree addr_expr = _stack2.last ();
+  _stack2.pop ();
+  tree twice = _stack2.last ();
+  _stack2.pop ();
+  tree prev_expr = _stack2.last ();
+  _stack2.safe_push (addr_expr);
+  _stack2.safe_push (twice);
   log ("prev_expr code = %s\n", get_tree_code_name (TREE_CODE (prev_expr)));
   if (TREE_CODE (prev_expr) != MEM_REF)
     return;
@@ -2830,9 +2839,9 @@ expr_accessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
   unsigned offset_int = tree_to_uhwi (offset) % type_size_int;
   // We need to get the field that corresponds to the offset_int
   const bool record_already_in_map
-    = record_field_map.find (addr_expr_t) != record_field_map.end ();
-  field_access_map_t field_map;
-  field_map = record_already_in_map ? record_field_map[addr_expr_t] : field_map;
+    = _type_accessor.is_in_record_field_map (addr_expr_t);
+  field_access_map2_t *field_map;
+  field_map = record_already_in_map ? _type_accessor.get_from_record_field_map(addr_expr_t) : new field_access_map2_t;
 
   // UNSAFE! But it is necesseary for testing...
   // Unless there is someone who is smarter that finds another way to test this.
@@ -2855,13 +2864,13 @@ expr_accessor::_walk_ADDR_EXPR_pre (__attribute__ ((unused)) tree e)
       // Otherwise, this pointer arithmetic is invalid...
       // After the transformation
       const bool field_already_in_map
-	= field_map.find (field) != field_map.end ();
-      unsigned prev_access = field_already_in_map ? field_map[field] : Empty;
+	= field_map->get (field);
+      unsigned prev_access = field_already_in_map ? *field_map->get(field) : Empty;
 
       prev_access |= Read;
-      field_map[field] = prev_access;
+      field_map->put(field, prev_access);
       add_all_fields_in_struct (addr_expr_t);
-      record_field_map[addr_expr_t] = field_map;
+      _type_accessor.put_in_record_field_map(addr_expr_t, field_map);
 
       if (f_offset == offset_int)
 	break;
@@ -2893,27 +2902,27 @@ expr_accessor::_walk_COMPONENT_REF_pre (tree e)
   log ("%s.%s\n", type_stringifier::get_type_identifier (op0_t).c_str(),
        type_stringifier::get_field_identifier (op1).c_str());
   const bool record_already_in_map
-    = record_field_map.find (op0_t) != record_field_map.end ();
-  field_access_map_t field_map;
-  field_map = record_already_in_map ? record_field_map[op0_t] : field_map;
-  const bool field_already_in_map = field_map.find (op1) != field_map.end ();
-  unsigned prev_access = field_already_in_map ? field_map[op1] : Empty;
+    = _type_accessor.is_in_record_field_map (op0_t);
+  field_access_map2_t *field_map;
+  field_map = record_already_in_map ? _type_accessor.get_from_record_field_map(op0_t) : new field_access_map2_t;
+  const bool field_already_in_map = field_map->get(op1);
+  unsigned prev_access = field_already_in_map ? *field_map->get(op1) : Empty;
 
   prev_access |= _access;
-  field_map[op1] = prev_access;
+  field_map->put(op1, prev_access);
   add_all_fields_in_struct (op0_t);
-  record_field_map[op0_t] = field_map;
+  _type_accessor.put_in_record_field_map(op0_t, field_map);
 
-  if (_stack.size () < 4)
+  if (_stack2.length () < 4)
     return;
 
-  tree this_expr = _stack.top ();
-  _stack.pop ();
-  tree twice = _stack.top ();
-  _stack.pop ();
-  tree prev_expr = _stack.top ();
-  _stack.push (twice);
-  _stack.push (this_expr);
+  tree this_expr = _stack2.last ();
+  _stack2.pop ();
+  tree twice = _stack2.last ();
+  _stack2.pop ();
+  tree prev_expr = _stack2.last ();
+  _stack2.safe_push (twice);
+  _stack2.safe_push (this_expr);
   if (TREE_CODE (prev_expr) != ADDR_EXPR)
     return;
 
@@ -2936,13 +2945,13 @@ expr_accessor::_walk_COMPONENT_REF_pre (tree e)
   {
       log ("ever inside?\n");
       const bool field_already_in_map
-	= field_map.find (field) != field_map.end ();
-      unsigned prev_access = field_already_in_map ? field_map[field] : Empty;
+	= field_map->get(field);
+      unsigned prev_access = field_already_in_map ? *field_map->get(field) : Empty;
 
       prev_access |= Read;
-      field_map[field] = prev_access;
+      field_map->put(field, prev_access);
       add_all_fields_in_struct (t);
-      record_field_map[t] = field_map;
+      _type_accessor.put_in_record_field_map(t, field_map);
   }
 }
 
@@ -2950,9 +2959,10 @@ expr_accessor::_walk_COMPONENT_REF_pre (tree e)
 void
 expr_accessor::print_accesses ()
 {
+	/*
   for (std::map<tree, field_access_map_t>::const_iterator i
-       = record_field_map.begin (),
-       e = record_field_map.end ();
+       = _type_accessor.get_map_ref().begin (),
+       e = _type_accessor.get_map_ref().end ();
        i != e; ++i)
     {
       tree record = i->first;
@@ -2971,15 +2981,7 @@ expr_accessor::print_accesses ()
 	  log ("%s.%s = 0x%04x\n", name_r.c_str (), name_f.c_str (), access);
 	}
     }
-}
-
-/* RECORD_TYPE -> (FIELD_DECL -> bitflag)
- * bitflag specifies if field is read, written or neither.
- */
-record_field_map_t
-gimple_accessor::get_map ()
-{
-  return _expr_accessor.get_map ();
+    */
 }
 
 void
@@ -3108,45 +3110,42 @@ Reason::operator|= (const Reason &other)
 
 /* Insert TYPE into a partition depending on IN_POINTS_TO_RECORD.  */
 void
-type_partitions_s::insert (tree type, bool in_points_to_record)
+type_partitions2_s::insert (tree type, bool in_points_to_record)
 {
   gcc_assert (type);
-  this->universe.insert (type);
-  in_points_to_record ? this->points_to_record.insert (type)
-		      : this->complement.insert (type);
-  const bool in_points_to_set = this->in_points_to_record (type);
+  this->universe.add (type);
+  in_points_to_record ? this->points_to_record.add (type)
+	              : this->complement.add (type);
+  const bool in_points_to_set = this->in_points_to_record(type);
   const bool in_complement = this->in_complement (type);
   const bool _xor = in_points_to_set != in_complement;
-  // sanity check...
   gcc_assert (_xor);
 }
 
 /* Find out whether TYPE is already in universe.  */
 bool
-type_partitions_s::in_universe (tree type) const
+type_partitions2_s::in_universe (tree type)
 {
   gcc_assert (type);
-  const bool seen_before = this->universe.find (type) != this->universe.end ();
+  const bool seen_before = this->universe.contains (type);
   return seen_before;
 }
 
 /* Find out whether TYPE is in points_to_record partition.  */
 bool
-type_partitions_s::in_points_to_record (tree type) const
+type_partitions2_s::in_points_to_record (tree type)
 {
   gcc_assert (type);
-  const bool seen_before
-    = this->points_to_record.find (type) != this->points_to_record.end ();
+  const bool seen_before = this->points_to_record.contains (type);
   return seen_before;
 }
 
 /* Find out whether TYPE is not in points to record partition.  */
 bool
-type_partitions_s::in_complement (tree type) const
+type_partitions2_s::in_complement (tree type)
 {
   gcc_assert (type);
-  const bool seen_before
-    = this->complement.find (type) != this->complement.end ();
+  const bool seen_before = this->complement.contains (type);
   return seen_before;
 }
 
@@ -3398,15 +3397,14 @@ type_structural_equality::_equal (tree l, tree r)
   if (!equal_codes)
     return equal_codes;
 
-  bool recurse_l = set_l.find (l) != set_l.end ();
-  bool recurse_r = set_r.find (r) != set_r.end ();
-  // Verify that this the case every time.
-  bool recurse = recurse_l || recurse_r;
+  bool recurse2_l = set2_l.contains (l);
+  bool recurse2_r = set2_r.contains (r);
+  bool recurse = recurse2_l || recurse2_r;
   if (recurse)
     return recurse;
 
-  set_l.insert (l);
-  set_r.insert (r);
+  set2_l.add (l);
+  set2_r.add (r);
   const enum tree_code code = TREE_CODE (l);
   bool equal_children = false;
   switch (code)
@@ -3441,8 +3439,8 @@ type_structural_equality::_equal (tree l, tree r)
       break;
     }
 
-  set_l.erase (l);
-  set_r.erase (r);
+  set2_l.remove (l);
+  set2_r.remove (r);
   return equal_children;
 }
 
@@ -3598,19 +3596,19 @@ type_incomplete_equality::_equal (tree l, tree r)
  * Perform this until a fixed point is reached.
  */
 static void
-fix_escaping_types_in_set (tpartitions_t &types)
+fix_escaping_types_in_set (tpartitions2_t &types)
 {
   bool fixed_point_reached = false;
   type_incomplete_equality structuralEquality;
   do
     {
-      std::vector<tree> fixes;
+      vec<tree> fixes2 = vNULL;
       fixed_point_reached = true;
-      for (std::set<tree>::const_iterator i = types.escaping.begin (),
+      for (auto i = types.escaping.begin (),
 						e = types.escaping.end ();
 	   i != e; ++i)
 	{
-	  for (std::set<tree>::const_iterator j
+	  for (auto j
 	       = types.non_escaping.begin (),
 	       f = types.non_escaping.end ();
 	       j != f; ++j)
@@ -3630,17 +3628,15 @@ fix_escaping_types_in_set (tpartitions_t &types)
 	      // Add incomplete to escaping
 	      // delete incomplete from non_escaping
 	      // We shouldn't do that inside our iteration loop.
-	      fixes.push_back (type_non);
+	      fixes2.safe_push (type_non);
 	    }
 	}
 
-      for (std::vector<tree>::const_iterator i = fixes.begin (),
-						   e = fixes.end ();
-	   i != e; ++i)
+      for (auto i = fixes2.begin (), e = fixes2.end (); i != e; ++i)
 	{
 	  tree escaping_type = *i;
-	  types.escaping.insert (escaping_type);
-	  types.non_escaping.erase (escaping_type);
+	  types.escaping.add (escaping_type);
+	  types.non_escaping.remove (escaping_type);
 	}
     }
   while (!fixed_point_reached);

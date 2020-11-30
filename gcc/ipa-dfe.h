@@ -29,21 +29,20 @@ class specific_type_collector : public type_walker
 {
 public:
   /* C is the set of types that are to be looked for.  */
-  specific_type_collector (std::set<tree> &c) : _collect_these_types (c)
+  specific_type_collector (hash_set<tree> *c2) : _collect_these_types2 (c2)
   {};
 
   /* Get final result of all types which point to types in C.  */
-  std::set<tree> get_set ();
+  hash_set<tree> get_set2 ();
 
 private:
-  /* _collect_these_types holds the input.  */
-  const std::set<tree> &_collect_these_types;
+  hash_set<tree> *_collect_these_types2;
 
   /* Working set that holds final result.  */
-  std::set<tree> to_return;
+  hash_set<tree> to_return2;
 
   /* Sets which reach current subtype.  */
-  std::set<tree> path;
+  hash_set<tree> path2;
 
   /* Push or pop from path.  */
   virtual void _walk_ARRAY_TYPE_pre (tree t);
@@ -59,68 +58,68 @@ private:
 };
 
 /* Map old RECORD_TYPE -> new RECORD_TYPE.  */
-typedef std::map<tree, tree> reorg_record_map_t;
+typedef hash_map<tree, tree> reorg_record_map2_t;
 
 /* Map RECORD_TYPE -> (FIELD_DECL -> delete).  */
-typedef std::map<tree, std::pair<tree, bool> > reorg_field_map_t;
+typedef hash_map<tree, std::pair<tree, bool> > reorg_field_map2_t;
 
 /* Class used to create new types derived from types that have fields
  * that can be deleted.  */
 class type_reconstructor : public type_walker
 {
 public:
-  type_reconstructor (record_field_offset_map_t records, const char *suffix)
-    : _records (records), _suffix (suffix)
-  {};
+  type_reconstructor (record_field_offset_map4_t &records, const char *suffix, reorg_record_map2_t &a, reorg_field_map2_t &b)
+    : _records2(records), _suffix (suffix), in_progress2(vNULL), for_reference2(vNULL), field_list2_stack2 (vNULL), _reorg_map2(a), _reorg_fields2(b)
+  {
+    modified_map2 = new is_modified_map2_t;
+  };
+  ~type_reconstructor()
+  {
+    delete modified_map2;
+  }
 
   /* Whether a type has already been modified.  */
   virtual bool is_memoized (tree t);
 
-  // Final result for record map.
-  reorg_record_map_t get_map ();
-
-  /* Final result for field map.  */
-  reorg_field_map_t get_field_map ();
-
   /* Map RECORD_TYPE -> is_modified.  */
-  typedef std::map<tree, bool> is_modified_map_t;
+  typedef hash_map<tree, bool> is_modified_map2_t;
 
 protected:
-  const char *get_new_suffix ();
+  // Which records can be modified.
+  record_field_offset_map4_t& _records2;
+
+  // The new suffix
+  const char *_suffix;
 
   // Modifications to the current sub_type
-  std::stack<tree> in_progress;
+  vec<tree> in_progress2;
 
   // Path to current subtype
-  std::stack<tree> for_reference;
+  vec<tree> for_reference2;
 
   // OLD FIELD -> new FIELD
   typedef std::pair<tree, tree> field_tuple_t;
 
   // list of fields for new type
-  typedef std::vector<field_tuple_t> field_tuple_list_t;
+  typedef vec<field_tuple_t> field_tuple_list2_t;
 
   // to deal with nested structures we need to have a stack
   // of field_tuple_list_t
-  typedef std::stack<field_tuple_list_t> field_tuple_list_stack_t;
+  typedef vec<field_tuple_list2_t> field_tuple_list2_stack2_t;
 
-  // Which records can be modified.
-  record_field_offset_map_t _records;
-
-  // The new suffix
-  const char *_suffix;
+  const char *get_new_suffix ();
 
   // Which fields will be deleted.
-  field_tuple_list_stack_t field_list_stack;
+  field_tuple_list2_stack2_t field_list2_stack2;
 
   // old RECORD_TYPE -> new RECORD_TYPE
-  reorg_record_map_t _reorg_map;
+  reorg_record_map2_t &_reorg_map2;
 
   // old FIELD_DECL -> new FIELD_DECL
-  reorg_field_map_t _reorg_fields;
+  reorg_field_map2_t &_reorg_fields2;
 
   // old RECORD_TYPE -> is_modified
-  is_modified_map_t modified_map;
+  is_modified_map2_t *modified_map2;
 
   // Keep track of which types may need to be modified
   // defaults to not modified.
@@ -156,18 +155,21 @@ private:
 class expr_type_rewriter : public expr_walker
 {
 public:
-  expr_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2,
+  expr_type_rewriter (reorg_record_map2_t &map, reorg_field_map2_t &map2,
 		    bool can_delete)
-    : _delete (false), _can_delete (can_delete), _map (map), _map2 (map2)
+    : _delete (false), _can_delete (can_delete), _map2(map), _fields2(map2)
   {
     /* Create an inverse map new RECORD_TYPE -> old RECORD_TYPE.  */
-    for (reorg_record_map_t::iterator i = map.begin (),
-	e = map.end (); i != e; ++i)
+    for (auto i = map.begin (), e = map.end (); i != e; ++i)
       {
-	tree original = i->first;
-	tree modified = i->second;
-	_imap[modified] = original;
+	tree original = (*i).first;
+	tree modified = (*i).second;
+	_imap2.put (modified, original);
       }
+  };
+
+  ~expr_type_rewriter()
+  {
   };
 
   // Handle pointer arithmetic with constants.
@@ -189,13 +191,14 @@ public:
 
 private:
   // Old RECORD_TYPE -> new RECORD_TYPE.
-  reorg_record_map_t _map;
+  reorg_record_map2_t& _map2;
 
   // Old FIELD_DECL -> new FIELD_DECL.
-  reorg_field_map_t _map2;
+  reorg_field_map2_t& _fields2;
 
   // New RECORD_TYPE -> old RECORD_TYPE.
-  std::map<tree, tree> _imap;
+  hash_map<tree, tree> _imap2;
+
   void _walk_post (tree e);
 
   // Substitute types and create new offset.
@@ -215,7 +218,7 @@ private:
 class gimple_type_rewriter : public gimple_walker
 {
 public:
-  gimple_type_rewriter (reorg_record_map_t map, reorg_field_map_t map2,
+  gimple_type_rewriter (reorg_record_map2_t &map, reorg_field_map2_t &map2,
 		      bool can_delete)
     : exprTypeRewriter (map, map2, can_delete)
   {};
@@ -237,21 +240,24 @@ private:
 };
 
 // Get a set of all types pointing to types in RECORD_FIELD_OFFSET_MAP.
-std::set<tree>
-get_all_types_pointing_to (record_field_offset_map_t record_field_offset_map,
-			   tpartitions_t casting);
+void
+get_all_types_pointing_to (record_field_offset_map4_t &record_field_offset_map,
+			   tpartitions2_t casting,
+			   hash_set<tree> &to_modify);
 
-typedef std::pair<reorg_record_map_t, reorg_field_map_t> reorg_maps_t;
+typedef std::pair<reorg_record_map2_t*, reorg_field_map2_t*> reorg_maps_t;
 
 // Compute the replacement types.
 reorg_maps_t
-get_types_replacement (record_field_offset_map_t record_field_offset_map,
-		       std::set<tree> to_modify);
+get_types_replacement (record_field_offset_map4_t &record_field_offset_map,
+		       hash_set<tree> &to_modify,
+		       reorg_record_map2_t &,
+		       reorg_field_map2_t &);
 
 // Substitute types.
 void
-substitute_types_in_program (reorg_record_map_t map,
-			     reorg_field_map_t field_map, bool _delete);
+substitute_types_in_program (reorg_record_map2_t &map,
+			     reorg_field_map2_t &field_map, bool _delete);
 
 tree
 get_new_identifier (tree type, const char *suffix);

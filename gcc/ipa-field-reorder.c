@@ -142,7 +142,7 @@ bitpos_of_field (const tree fdecl)
 class GimpleAccesserFieldReordering : public gimple_accessor
 {
 public:
-  GimpleAccesserFieldReordering ()
+  GimpleAccesserFieldReordering (record_field_map4_t &map) : gimple_accessor (map)
   {};
 
 private:
@@ -170,9 +170,10 @@ private:
 class TypeReconstructorFieldReordering : public type_reconstructor
 {
 public:
-  TypeReconstructorFieldReordering (record_field_offset_map_t records,
-				    const char *suffix)
-    : type_reconstructor (records, suffix)
+  TypeReconstructorFieldReordering (record_field_offset_map4_t &records,
+				    const char *suffix,
+				    reorg_record_map2_t &a, reorg_field_map2_t &b)
+    : type_reconstructor (records, suffix, a, b)
   {};
 
 private:
@@ -221,14 +222,14 @@ compare_FIELD_DECLs_TYPE_SIZE (tree _l, tree _r)
 void
 TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
 {
-  tree t2 = for_reference.top ();
+  tree t2 = for_reference2.last ();
   gcc_assert (t2 == t);
-  for_reference.pop ();
+  for_reference2.pop ();
 
-  tree copy = in_progress.top ();
-  in_progress.pop ();
-  field_tuple_list_t field_tuple_list = field_list_stack.top ();
-  field_list_stack.pop ();
+  tree copy = in_progress2.last ();
+  in_progress2.pop ();
+  field_tuple_list2_t field_tuple_list2 = field_list2_stack2.last ();
+  field_list2_stack2.pop ();
 
   // So, here all the work has been done to make sure
   // that the fields produced a field_tuple_list_t
@@ -237,10 +238,10 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
   // So, now we want to do a couple of things.
   // First, collect all fields in a struct and make a copy of them
   bool is_modified = get_is_modified (t);
-  std::vector<tree> to_reorder;
+  vec<tree> to_reorder2 = vNULL;
   is_modified = true;
-  for (field_tuple_list_t::iterator i = field_tuple_list.begin (),
-	e = field_tuple_list.end ();
+  for (auto i = field_tuple_list2.begin (),
+	e = field_tuple_list2.end ();
 	i != e; ++i)
     {
       field_tuple_t field_tuple = *i;
@@ -255,7 +256,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
       log ("we can reorder %s ? %s\n",
 	   type_stringifier::get_field_identifier (field_tuple.first).c_str (),
 	   !modified_field ? "true" : "false");
-      to_reorder.push_back (
+      to_reorder2.safe_push(
 	(tree) copy_node (tree_to_tree (field_tuple.first)));
     }
 
@@ -264,12 +265,12 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
       tree prev_field = NULL;
       bool entered_loop = false;
       // Sort them
-      std::sort (to_reorder.begin (), to_reorder.end (),
+      std::sort (to_reorder2.begin (), to_reorder2.end (),
 		 compare_FIELD_DECLs_TYPE_SIZE);
       is_modified = false;
 
-      for (field_tuple_list_t::iterator i = field_tuple_list.begin (),
-	   e = field_tuple_list.end ();
+      for (auto i = field_tuple_list2.begin (),
+	   e = field_tuple_list2.end ();
 	   i != e; ++i)
 	{
 	  field_tuple_t field_tuple = *i;
@@ -290,8 +291,8 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
 
 	  gcc_assert (!modified_field && is_modified);
 	  // Create new TYPE_FIELDS with the order we want
-	  for (std::vector<tree>::iterator j = to_reorder.begin (),
-		f = to_reorder.end (); j != f; ++j)
+	  for (auto j = to_reorder2.begin (),
+		f = to_reorder2.end (); j != f; ++j)
 	    {
 	      entered_loop = true;
 	      tree current_field_inner = *j;
@@ -313,8 +314,8 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
 	}
 
       // Modify _reorg_fields map
-      for (std::vector<tree>::iterator i = to_reorder.begin (),
-		e = to_reorder.end (); i != e; ++i)
+      for (auto i = to_reorder2.begin (),
+		e = to_reorder2.end (); i != e; ++i)
 	{
 	  tree to_find = *i;
 	  unsigned to_find_i = bitpos_of_field (tree_to_tree (to_find));
@@ -329,8 +330,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
 	      unsigned haystack_i = bitpos_of_field (field);
 	      if (haystack_i == to_find_i)
 		{
-		  _reorg_fields[field]
-		    = std::make_pair (tree_to_tree (to_find), false);
+		  _reorg_fields2.put(field, std::make_pair (tree_to_tree (to_find), false));
 		  log ("substituting %s for %s\n", to_find_str, haystack);
 		}
 	    }
@@ -342,7 +342,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
   if (!is_main_variant)
     {
       tree main = TYPE_MAIN_VARIANT (t);
-      tree main_reorg = _reorg_map[main];
+      tree main_reorg = *_reorg_map2.get(main);
       tree copy_variant = build_distinct_type_copy (main_reorg);
       TYPE_NAME (copy_variant)
 	= get_new_identifier (copy, this->get_new_suffix ());
@@ -350,7 +350,7 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
       TYPE_ALIAS_SET (copy_variant) = -1;
       layout_type (copy_variant);
       TYPE_MAIN_VARIANT (copy_variant) = main_reorg;
-      _reorg_map[t] = copy_variant;
+      _reorg_map2.put (t, copy_variant);
     }
   else
     {
@@ -366,10 +366,10 @@ TypeReconstructorFieldReordering::_walk_RECORD_TYPE_post (tree t)
       if (is_modified)
 	layout_type (copy);
       tree _t = tree_to_tree (t);
-      _reorg_map[t] = is_modified ? copy : _t;
+      _reorg_map2.put (t, is_modified ? copy : _t);
     }
 
-  tree record = _reorg_map[t];
+  tree record = *_reorg_map2.get(t);
   for (tree field = TYPE_FIELDS (record); field; field = DECL_CHAIN (field))
     {
       relayout_decl (field);
@@ -461,8 +461,8 @@ GimpleAccesserFieldReordering::_walk_pre_gcond (gcond *s)
 static unsigned int
 lto_fr_execute ();
 
-static record_field_map_t
-find_fields_accessed ();
+static void
+find_fields_accessed (record_field_map4_t &f);
 
 namespace {
 const pass_data pass_data_ipa_field_reorder = {
@@ -495,15 +495,10 @@ public:
 };
 } // namespace
 
-record_field_map_t static find_fields_accessed ()
+static void find_fields_accessed (record_field_map4_t &r)
 {
-  GimpleAccesserFieldReordering accesser;
+  GimpleAccesserFieldReordering accesser (r);
   accesser.walk ();
-
-  // This record_field_map holds
-  // RECORD_TYPE -> (FIELD_DECL -> how field is accessed)
-  record_field_map_t record_field_map = accesser.get_map ();
-  return record_field_map;
 }
 
 /* record_field_offset_map holds information on which FIELD_DECLs might be
@@ -520,14 +515,15 @@ record_field_map_t static find_fields_accessed ()
  * The second maps old FIELD_DECLs trees to the new FIELD_DECLs.
  */
 reorg_maps_t
-get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
-			  std::set<tree> to_modify)
+get_reordered_field_maps (record_field_offset_map4_t &record_field_offset_map2,
+			  hash_set<tree> & to_modify,
+			  reorg_record_map2_t &map2, reorg_field_map2_t &field_map2)
 {
   type_stringifier stringifier;
 
-  TypeReconstructorFieldReordering reconstructor (record_field_offset_map,
-						  "reorder");
-  for (std::set<tree>::const_iterator i = to_modify.begin (),
+  TypeReconstructorFieldReordering reconstructor (record_field_offset_map2,
+						  "reorder", map2, field_map2);
+  for (hash_set<tree>::iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
@@ -535,7 +531,7 @@ get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
       reconstructor.walk (TYPE_MAIN_VARIANT (record));
     }
 
-  for (std::set<tree>::const_iterator i = to_modify.begin (),
+  for (hash_set<tree>::iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
     {
@@ -543,21 +539,20 @@ get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
       reconstructor.walk (record);
     }
 
-  reorg_record_map_t map = reconstructor.get_map ();
-  reorg_field_map_t field_map = reconstructor.get_field_map ();
+  typedef hash_map<tree, tree> reorg_record_map2_t;
 
   // Here, we are just making sure that we are not doing anything too crazy.
   // Also, we found some types for which TYPE_CACHED_VALUES_P is not being
   // rewritten.  This is probably indicative of a bug in
   // TypeReconstructorFieldReordering.
-  for (std::map<tree, tree>::const_iterator i = map.begin (),
-						  e = map.end ();
+  for (reorg_record_map2_t::iterator i = map2.begin (),
+						  e = map2.end ();
        i != e; ++i)
     {
-      tree o_record = i->first;
+      tree o_record = (*i).first;
       std::string o_name = stringifier.stringify (o_record);
       log ("original: %s\n", o_name.c_str ());
-      tree r_record = i->second;
+      tree r_record = (*i).second;
       std::string r_name
 	= r_record ? stringifier.stringify (r_record) : std::string ("");
       log ("modified: %s\n", r_name.c_str ());
@@ -569,16 +564,17 @@ get_reordered_field_maps (record_field_offset_map_t record_field_offset_map,
       TYPE_CACHED_VALUES_P (_o_record) = false;
       TYPE_CACHED_VALUES_P (m_record) = false;
 
-      bool in_map = map.find (m_record) != map.end ();
+      bool in_map = map2.get (m_record);
       if (!in_map)
 	continue;
-      tree mm_record = map[m_record];
+      tree mm_record = *map2.get(m_record);
       // Info: I think this is no longer needed...
       // Please verify
       TYPE_MAIN_VARIANT (r_record) = mm_record;
     }
 
-  return std::make_pair (map, field_map);
+  // TODO: change this to return the GCC types...
+  return std::make_pair (&map2, &field_map2);
 }
 
 /* Top level function.  */
@@ -588,27 +584,31 @@ lto_fr_execute ()
   log ("here in field reordering \n");
   // Analysis.
   detected_incompatible_syntax = false;
-  std::map<tree, bool> whitelisted = get_whitelisted_nodes();
-  tpartitions_t escaping_nonescaping_sets
-    = partition_types_into_escaping_nonescaping (whitelisted);
-  record_field_map_t record_field_map = find_fields_accessed ();
-  record_field_offset_map_t record_field_offset_map
-    = obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
-					    record_field_map, 0);
+  hash_map<tree, bool> *whitelisted2 = get_whitelisted_nodes2();
+  tpartitions2_t escaping_nonescaping_sets;
+  partition_types_into_escaping_nonescaping (escaping_nonescaping_sets, whitelisted2);
+  record_field_map4_t record_field_map;
+  find_fields_accessed (record_field_map);
+  record_field_offset_map4_t record_field_offset_map;
+  obtain_nonescaping_unaccessed_fields (escaping_nonescaping_sets,
+					    record_field_map, 0, record_field_offset_map);
 
-  if (detected_incompatible_syntax || record_field_offset_map.empty ())
+  if (detected_incompatible_syntax || record_field_offset_map.is_empty ())
     return 0;
 
   // Prepare for transformation.
-  std::set<tree> to_modify
-    = get_all_types_pointing_to (record_field_offset_map,
-				 escaping_nonescaping_sets);
+  hash_set<tree> to_modify;
+  get_all_types_pointing_to (record_field_offset_map,
+				 escaping_nonescaping_sets, to_modify);
 
+  reorg_record_map2_t a;
+  reorg_field_map2_t b;
   reorg_maps_t replacements
-    = get_reordered_field_maps (record_field_offset_map, to_modify);
-  reorg_record_map_t map = replacements.first;
-  reorg_field_map_t field_map = replacements.second;
-  substitute_types_in_program (map, field_map, false);
+    = get_reordered_field_maps (record_field_offset_map, to_modify, a, b);
+  reorg_record_map2_t *map = replacements.first;
+  reorg_field_map2_t *field_map = replacements.second;
+  gcc_assert(map && field_map);
+  substitute_types_in_program (*map, *field_map, false);
 
   gimple_walker walker;
   walker.walk ();

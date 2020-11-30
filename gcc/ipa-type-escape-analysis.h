@@ -106,7 +106,7 @@ tree_to_tree (tree t)
 
 // TODO: Rename?
 // TSET_T stands for type set.
-typedef std::set<tree> tset_t;
+typedef hash_set<tree> tset2_t;
 
 /* Base class used for visiting tree nodes starting with root T.
  * It can handle recursive cases in the tree graph by holding
@@ -130,7 +130,7 @@ public:
 protected:
 
   /* Typeset holds previously visited nodes.  */
-  tset_t tset;
+  tset2_t tset2;
 
   /* Inner walking method, used to recurse.  */
   void _walk (tree t);
@@ -421,40 +421,40 @@ protected:
 
  * Ideally 1 union 2 should be universe and 3 union 4 should be universe.
  */
-struct type_partitions_s
+struct type_partitions2_s
 {
   /* The set of all types which have been seen.  */
-  tset_t universe;
+  tset2_t universe;
 
   /* The set of all types which somehow refer to a RECORD_TYPE.  */
-  tset_t points_to_record;
+  tset2_t points_to_record;
 
   /* The complement of points_to_record.  */
-  tset_t complement;
+  tset2_t complement;
 
   /* The set of all escaping types.  */
-  tset_t escaping;
+  tset2_t escaping;
 
   /* The set of all non escaping types.  */
-  tset_t non_escaping;
+  tset2_t non_escaping;
 
   /* The set of all records. */
-  tset_t records;
+  tset2_t records;
 
   /* Determine if we have seen this type before.  */
-  bool in_universe (tree) const;
+  bool in_universe (tree);
 
   /* Determine if tree points to a record.  */
-  bool in_points_to_record (tree) const;
+  bool in_points_to_record (tree);
 
   /* Determine if tree does not point to a record.  */
-  bool in_complement (tree) const;
+  bool in_complement (tree);
 
   /* Insert either in points to record or complement.  */
   void insert (tree, bool);
 };
 
-typedef struct type_partitions_s tpartitions_t;
+typedef struct type_partitions2_s tpartitions2_t;
 
 /* TypeCollector is a derived class from TypeWalker
  * that collects all types reachable from T into the partitions
@@ -463,17 +463,17 @@ typedef struct type_partitions_s tpartitions_t;
 class type_collector : public type_walker
 {
 public:
-  type_collector ()
+  type_collector (tpartitions2_t &ptrset)
+  : ptrset2(ptrset)
   {};
 
   /* Main interface.  */
   void collect (tree t);
 
   /* Collect the result after walking all trees.  */
-  tpartitions_t get_record_reaching_trees ()
+  tpartitions2_t& get_record_reaching_trees ()
   {
-    _sanity_check ();
-    return ptrset;
+    return ptrset2;
   }
 
 private:
@@ -488,7 +488,7 @@ private:
    * In other words, the contents are reset after every
    * call to collect.
    */
-  std::map<tree, bool> ptr;
+  hash_map<tree, bool> ptr2;
 
   /* The type partition set that will hold partitions for
    * points to record or does not point to record.
@@ -497,7 +497,7 @@ private:
    * This datastructure persists across calls to collect.
    */
 public:
-  tpartitions_t ptrset;
+  tpartitions2_t& ptrset2;
 
 private:
 
@@ -644,11 +644,12 @@ private:
 class expr_collector : public expr_walker
 {
 public:
-  expr_collector ()
+  expr_collector (tpartitions2_t &p)
+  : _type_collector (p)
   {};
 
   /* Holds the result after collecting from all trees.  */
-  tpartitions_t get_record_reaching_trees ()
+  tpartitions2_t get_record_reaching_trees ()
   {
     return _type_collector.get_record_reaching_trees ();
   }
@@ -668,11 +669,12 @@ private:
 class gimple_type_collector : public gimple_walker
 {
 public:
-  gimple_type_collector ()
+  gimple_type_collector (tpartitions2_t &p)
+  : _expr_collector(p)
   {};
 
   /* This holds the result after walking the whole program.  */
-  tpartitions_t get_record_reaching_trees ()
+  tpartitions2_t get_record_reaching_trees ()
   {
     return _expr_collector.get_record_reaching_trees ();
   }
@@ -708,12 +710,12 @@ private:
 class gimple_white_lister : gimple_type_collector
 {
 public:
-  gimple_white_lister ()
+  gimple_white_lister (tpartitions2_t &t)
+  : gimple_type_collector (t)
   {};
 
   bool _no_external = true;
-  bool does_not_call_external_functions (cgraph_node *c,
-	std::map<tree, bool> &whitelisted)
+  bool does_not_call_external_functions2 (cgraph_node *c, hash_map<tree, bool> *whitelisted)
   {
     gcc_assert(c);
 
@@ -721,18 +723,15 @@ public:
     {
        cgraph_node *callee = edge->callee;
        if (callee == c) continue;
-       bool in_map = whitelisted.find (callee->decl) != whitelisted.end();
+       bool in_map = whitelisted->get (callee->decl);
        if (!in_map) {
 	       return false;
        }
-       bool w = whitelisted[callee->decl];
-       if (!w) {
-	       return false;
-       }
+       return *whitelisted->get(callee->decl);
     }
 
     unsigned int how_many_records = 
-	    _expr_collector._type_collector.ptrset.records.size ();
+	    _expr_collector._type_collector.ptrset2.records.elements ();
     return how_many_records <= 1;
 
   }
@@ -804,7 +803,7 @@ struct Reason
 {};
 };
 
-typedef std::map<tree, Reason> typemap;
+typedef hash_map<tree, Reason> typemap2;
 
 /* Type Escaper propagates information on whether a type escapes
  * to all types reachable by a root type.  It also propagates
@@ -817,19 +816,19 @@ typedef std::map<tree, Reason> typemap;
 class type_escaper : public type_walker
 {
 public:
-  type_escaper (tpartitions_t &p)
-    : _ptrset (p), _inside_union (0), _inside_record (0)
+  type_escaper (tpartitions2_t &p)
+    : _ptrset2 (p), _inside_union (0), _inside_record (0)
   {};
 
   // Hold the partitions for escaping non escaping.
-  tpartitions_t &_ptrset;
+  tpartitions2_t &_ptrset2;
 
   // Have information that matches a tree type with
   // why a type is escaping.
-  typemap calc;
+  typemap2 calc2;
 
   // Get partitions after calculating escaping types.
-  tpartitions_t get_sets ();
+  void fix_sets ();
 
   // Print reasons why a type is escaping.
   void print_reasons ();
@@ -885,7 +884,7 @@ private:
 class expr_escaper : public expr_walker
 {
 public:
-  expr_escaper (tpartitions_t &types, std::map<tree, bool> &whitelisted) : _type_escaper (types), _whitelisted(whitelisted)
+  expr_escaper (tpartitions2_t &types, hash_map<tree, bool> *whitelisted2) : _type_escaper (types), _whitelisted2(whitelisted2), _stack2(vNULL)
   {};
 
   /* Main interface: T escapes because R.  */
@@ -894,10 +893,10 @@ public:
   /* Will be used to propagate escaping reasons to Types.  */
   type_escaper _type_escaper;
 
-  std::map<tree, bool> &_whitelisted;
+  hash_map<tree, bool> *_whitelisted2;
 
   /* Holds the end result.  */
-  tpartitions_t get_sets ();
+  void fix_sets ();
 
   /* Print end result.  */
   void print_reasons ();
@@ -909,7 +908,7 @@ private:
   // is the subexpression being examined.
   // The bottom of the stack is the expression called on the update
   // function.
-  std::stack<tree> _stack;
+  vec<tree> _stack2;
 
   // Reason to propagate across all subexpressions.
   Reason _r;
@@ -947,13 +946,13 @@ protected:
 
 private:
   // Use to limit recursion if we are revisiting a node
-  typedef std::set<tree> tset_t;
+  typedef hash_set<tree> tset2_t;
 
   // Limit recursion for LHS
-  tset_t set_l;
+  tset2_t set2_l;
 
   // Limit recursion for RHS
-  tset_t set_r;
+  tset2_t set2_r;
 
   // Determine if the code is equal
   bool _equal_code (tree a, tree b);
@@ -1002,7 +1001,7 @@ protected:
 class gimple_escaper : public gimple_walker
 {
 public:
-  gimple_escaper (tpartitions_t &types, std::map<tree, bool> &whitelisted) : _expr_escaper (types, whitelisted)
+  gimple_escaper (tpartitions2_t &types, hash_map<tree, bool> *whitelisted2) : _expr_escaper (types, whitelisted2)
   {
     _init ();
   };
@@ -1011,7 +1010,7 @@ public:
   expr_escaper _expr_escaper;
 
   /* Obtain final result.  */
-  tpartitions_t get_sets ();
+  void fix_sets ();
 
   /* Print final result.  */
   void print_reasons ();
@@ -1019,8 +1018,8 @@ public:
 protected:
   /* Set of undefined functions, this set is filled with
    * functions obtained via FOR_EACH_FUNCTION_WITH_GIMPLE_BODY.  */
-  typedef std::set<tree> undefset;
-  undefset undefined;
+  typedef hash_set<tree> undefset2;
+  undefset2 undefined2;
 
   /* Initializes undefined.  */
   void _init ();
@@ -1068,12 +1067,12 @@ protected:
 class gimple_caster : public gimple_escaper
 {
 public:
-  gimple_caster (tpartitions_t &types, std::map<tree, bool> &whitelisted) : gimple_escaper (types, whitelisted), _whitelisted(whitelisted)
+  gimple_caster (tpartitions2_t &types, hash_map<tree, bool> *whitelisted2) : gimple_escaper (types, whitelisted2), _whitelisted2(whitelisted2)
 {};
 
 private:
 
-  std::map<tree, bool> &_whitelisted;
+  hash_map<tree, bool> *_whitelisted2;
 
   /* Determine if cast comes from a known function.  */
   static bool follow_def_to_find_if_really_cast (tree);
@@ -1099,24 +1098,33 @@ const unsigned Read = 0x01u;
 const unsigned Write = 0x02u;
 
 // maps FIELD_DECL -> bitflag.
-typedef std::map<tree, unsigned> field_access_map_t;
+typedef hash_map<tree, unsigned> field_access_map2_t;
 
 // maps RECORD_TYPE -> (FIELD_DECL -> bitflag).
-typedef std::map<tree, field_access_map_t> record_field_map_t;
+typedef hash_map<tree, field_access_map2_t*> record_field_map4_t;
 
 // Class used to determine if a FIELD is read, written or never accessed.
 class type_accessor : public type_walker
 {
 public:
-  type_accessor (record_field_map_t &map) : _map (map)
+  type_accessor (record_field_map4_t &map) : _map4(map)
   {};
 
+  ~type_accessor()
+  {
+  };
+
+  bool is_in_record_field_map(tree t);
+  field_access_map2_t* get_from_record_field_map(tree t);
+  void put_in_record_field_map(tree t, field_access_map2_t*);
+
 private:
+
   // maps RECORD -> (FIELD_DECL -> bitflag).
-  record_field_map_t &_map;
+  record_field_map4_t &_map4;
 
   // set of trees which are memoized and we don't need to look into them.
-  std::set<tree> memoized_map;
+  hash_set<tree> memoized_map2;
 
   // If a RECORD_TYPE is walked into, add all fields in struct to
   // record_field_map.
@@ -1131,7 +1139,7 @@ private:
 class expr_accessor : public expr_walker
 {
 public:
-  expr_accessor () : _type_accessor (record_field_map)
+  expr_accessor (record_field_map4_t &map) : _type_accessor (map), _stack2 (vNULL)
   {};
 
   // Expr E is accessed in A manner.
@@ -1143,21 +1151,15 @@ public:
   // Add all fields to map.  Initialize with empty.
   void add_all_fields_in_struct (tree t);
 
-  // Get final results.
-  record_field_map_t get_map ();
+  // Aids expr-accessor in updating types.
+  type_accessor _type_accessor;
 
 private:
   // Access {"Read", "Write", "Neither"} to propagate to all subexpressions.
   unsigned _access;
 
   // Stack to keep track of how current subexpression was reached.
-  std::stack<tree> _stack;
-
-  // Holds main results.
-  record_field_map_t record_field_map;
-
-  // Aids expr-accessor in updating types.
-  type_accessor _type_accessor;
+  vec<tree> _stack2;
 
   // Mark FIELD_DECL as read.
   // If ADDR_EXPR is parent expression that means
@@ -1186,14 +1188,12 @@ private:
 class gimple_accessor : public gimple_walker
 {
 public:
-  gimple_accessor ()
+  gimple_accessor (record_field_map4_t &map)
+  : _expr_accessor(map)
   {};
 
   /* Print final results.  */
   void print_accesses ();
-
-  /* Get final results.  */
-  record_field_map_t get_map ();
 
 protected:
   /* Navigate expressions in gimple statements.  */
@@ -1218,21 +1218,21 @@ private:
   // But we might need a gswitch.
 };
 
-typedef std::set<unsigned> field_offsets_t;
-
-typedef std::map<tree, field_offsets_t> record_field_offset_map_t;
+typedef hash_set<int_hash <int , -1, -2>> field_offsets2_t;
+typedef hash_map<tree, field_offsets2_t*> record_field_offset_map4_t;
 
 // Partition types into escaping or non escaping sets.
-tpartitions_t
-partition_types_into_escaping_nonescaping (std::map<tree, bool>&);
+void
+partition_types_into_escaping_nonescaping (tpartitions2_t &p, hash_map<tree, bool>*);
 
 // Compute set of not escaping unaccessed fields
-record_field_offset_map_t
-obtain_nonescaping_unaccessed_fields (tpartitions_t casting,
-				      record_field_map_t record_field_map,
-				      int warning);
+void
+obtain_nonescaping_unaccessed_fields (tpartitions2_t casting,
+				      record_field_map4_t& record_field_map,
+				      int warning,
+				      record_field_offset_map4_t &a);
 
 extern bool detected_incompatible_syntax;
-std::map<tree, bool> get_whitelisted_nodes();
+hash_map<tree, bool> *get_whitelisted_nodes2();
 
 #endif /* GCC_IPA_TYPE_ESCAPE_ANALYSIS_H */
