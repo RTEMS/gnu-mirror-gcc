@@ -1,3 +1,11 @@
+work029.patch005
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/97791
+	* gcc.target/powerpc/gnuattr1.c: Mark as XFAIL.
+	* gcc.target/powerpc/gnuattr2.c: Mark as XFAIL.
+	* gcc.target/powerpc/gnuattr3.c: Mark as XFAIL.
+
 work029.patch003
 2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
 
