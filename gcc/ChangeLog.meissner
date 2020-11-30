@@ -1,3 +1,20 @@
+work029.patch007
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If the
+	user explicitly used -mabi=ieeelongdouble or -mabi=ibmlongdouble,
+	set the long double size to 128.
+	* doc/invoke.texi (PowerPC options): Document that an explicit
+	-mabi=ieeelongdouble or -mabi=ibmlongdouble implicitly sets
+	-mlong-double-128.
+
+work029.patch006
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_decl_assembler_name): Add
+	support for mapping built-in function names for long double
+	built-in functions if long double is IEEE 128-bit.
+
 work029.patch005
 2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
 

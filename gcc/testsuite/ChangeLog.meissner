@@ -1,3 +1,35 @@
+work029.patch011
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* c-c++-common/dfp/convert-bfp-11.c: Require IBM 128-bit long
+	double.
+
+work029.patch010
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/70117
+	* gcc.target/powerpc/pr70117.c: Only run the test if long double
+	uses the IBM extended double format.
+
+work029.patch009
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* lib/target-supports.exp (check_ppc_long_double_ibm): New
+	function.
+	(check_ppc_long_double_ieee): New function.
+	(check_ppc_long_double_64bit): New function.
+	(is-effective-target): Add ppc_long_double_ibm,
+	ppc_long_double_ieee, and ppc_long_double_64bit.
+
+work029.patch006
+2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-longdouble-math.c: New test.
+	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
+	* gcc.target/powerpc/float128-math.c: Adjust test for new name
+	being generated.  Add support for running test on power10.  Add
+	support for running if long double defaults to 64-bits.
+
 work029.patch005
 2020-11-30  Michael Meissner  <meissner@linux.ibm.com>
 
