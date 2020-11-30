@@ -73,8 +73,14 @@ static double cut_off_eq_single_pool( double);
 static double alignment_effect( unsigned HOST_WIDE_INT);
 static void tell_me_about_ssa_name ( tree, int);
 static void analyze_access ( tree , acc_info_t *);
+static void create_pointer_reps ( Info_t *);
+static void create_base_vars ( Info_t *);
+static void create_a_pointer_rep ( Info_t *, tree);
+static void create_a_base_var ( Info_t *, tree);
+#if 0
 static void create_new_types ( Info_t *);
 static void create_a_new_type ( Info_t *, tree);
+#endif
 static unsigned int reorg_perf_qual ( Info *);
 static tree find_coresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
@@ -191,6 +197,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      {
 		//DEBUG_L("No Transfrom on: ");
 		//DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
+
+		// NEW STUFF
+		// Find assigns that are basically element assigns.
+		// If their type is modified then adjust the gimple.
+		
 	      }
 	    else
 	      {
@@ -1174,16 +1185,16 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  tree base_field =
 			      find_coresponding_field ( base, field);
 
-			  //DEBUG_L("base_field: %p\n", base_field);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("base_field: %p\n", base_field);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, base_field, (dump_flags_t)0);
+			  DEBUG("\n");
 
 			  tree base_field_type = TREE_TYPE( base_field);
-			  //DEBUG_L("base_field_type: %p\n", base_field_type);
-			  //DEBUG_A("  : ");
-			  //DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
-			  //DEBUG("\n");
+			  DEBUG_L("base_field_type: %p\n", base_field_type);
+			  DEBUG_A("  : ");
+			  DEBUG_F(print_generic_expr, stderr, base_field_type, (dump_flags_t)0);
+			  DEBUG("\n");
 			  
 			  gimple_stmt_iterator gsi = gsi_start_bb ( new_bb);
 			  // Note, switching the order of edge creation and
@@ -2031,8 +2042,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 
   DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
   
-  //DEBUG ("INTERNALS PRINT\n");
-  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  DEBUG ("INTERNALS PRINT\n");
+  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
 
   // A mini-pass to fixup dangling SSA temps.
   
@@ -2252,7 +2263,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  bool no_defining_stmt = defining_stmt == NULL;
 	  bool defined_by_nop = defining_stmt && gimple_code ( defining_stmt) == GIMPLE_NOP;
 	  tree type = TREE_TYPE ( ssa_name);
-	  tree bottom_type = base_type_of ( type);
+	  int levels;
+	  tree bottom_type = base_type_with_levels ( type, &levels);
 	  ReorgType_t *ri = get_reorgtype_info ( bottom_type, info);
 	  DEBUG_L("ssa_name = ");
 	  DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
@@ -2276,6 +2288,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  if ( a_default_def )
 	    {
 	      DEBUG_L("Skip default_def\n");
+	      continue;
+	    }
+
+	  // TBD CHECK FOR pointer to record.
+
+	  if ( levels != 1 )
+	    {
+	      DEBUG_L("Skip not one level pointer to record\n");
 	      continue;
 	    }
 
@@ -2392,8 +2412,8 @@ str_reorg_instance_interleave_trans ( Info *info)
   //DEBUG_F ( print_program, info->reorg_dump_file, PRINT_FORMAT, 4, info);
 
   // TBD Should this be a diagnostic or not?
-  //DEBUG ("INTERNALS PRINT\n");
-  //DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
+  DEBUG ("INTERNALS PRINT\n");
+  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
   
   // NOTE, spinning through all the functions and recomputing all the
   // dominace info here is a really bad idea.
@@ -2436,7 +2456,10 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, info);
 	
 	gimple *temp_set;
+	gimple *middle_set;
 	gimple *final_set;
+
+	bool middle = false;
 	
 	if ( ro_on_left )
 	  {
@@ -2444,8 +2467,30 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    // Generate:
 	    
 	    //           temp = rhs
-	    temp_set = gimple_build_assign( field_val_temp, rhs);
-	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
+	    tree field_type = TREE_TYPE ( lhs);
+	    int level;
+	    tree base_type = base_type_with_levels ( field_type, &level);
+	    if (    integer_zerop ( rhs)
+		 && is_reorg_type ( base_type, info)
+		 && level == 1                       )
+	      {
+		// Detected a zero value set to a pointer.
+		middle = true;
+		tree mid_temp = 
+		  make_temp_ssa_name( ri->pointer_rep, NULL, "mid_temp");
+		tree new_rhs = TYPE_MAX_VALUE ( ri->pointer_rep);
+		temp_set = gimple_build_assign ( mid_temp, new_rhs);
+		SSA_NAME_DEF_STMT ( mid_temp) = temp_set;
+		middle_set =
+		  gimple_build_assign ( field_val_temp, CONVERT_EXPR, mid_temp);
+		SSA_NAME_DEF_STMT ( field_val_temp) = middle_set;
+	      }
+	    else
+	      {
+		temp_set = gimple_build_assign( field_val_temp, rhs);
+		SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
+	      }
+	    //SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
 	    
 	    ////           field_array[index] = temp
 	    //tree elem_to_set =
@@ -2497,6 +2542,7 @@ element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	
 	gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
 	gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
+	if ( middle ) gsi_insert_before( &gsi, middle_set, GSI_SAME_STMT);
 	gsi_insert_before( &gsi, final_set, GSI_SAME_STMT);
 	
 	//delete stmt
@@ -2885,7 +2931,15 @@ str_reorg_instance_interleave_qual_part ( Info *info)
 static void
 str_reorg_instance_interleave_type_part ( Info *info)
 {
+  #if 0
   create_new_types ( info);
+  #endif
+  
+  create_pointer_reps ( info); // TBD
+
+  find_and_create_all_modified_types ( info); // Modify
+
+  create_base_vars ( info); // TBD
 }
 
 // Typse for performance qualification
@@ -4108,7 +4162,45 @@ analyze_access ( tree access, acc_info_t *acc_info)
   an_ac_helper ( access, 4, &already, acc_info);
 }
 
+static void
+create_pointer_reps ( Info_t *info)
+{
+  DEBUG_L("create_pointer_reps:\n");
+  std::map < tree, BoolPair_t>::iterator tmi;
+  for( tmi = info->struct_types->begin ();
+       tmi != info->struct_types->end ();
+       tmi++ ) {
+    if ( !tmi->second.processed )
+      {
+	create_a_pointer_rep ( info, tmi->first);
+      }
+    else
+      {
+	DEBUG_A("processed\n");
+      }
+  }    
+}
 
+static void
+create_base_vars ( Info_t *info)
+{
+  DEBUG_L("create_base_vars:\n");
+  std::map < tree, BoolPair_t>::iterator tmi;
+  for( tmi = info->struct_types->begin ();
+       tmi != info->struct_types->end ();
+       tmi++ ) {
+    if ( !tmi->second.processed )
+      {
+	create_a_base_var ( info, tmi->first);
+      }
+    else
+      {
+	DEBUG_A("processed\n");
+      }
+  }    
+}
+
+#if 0
 // create_new_types has to crawl "all" the
 // types, create new types and transform
 // other types that must be changed.
@@ -4132,6 +4224,440 @@ create_new_types ( Info_t *info)
 	DEBUG_A("processed\n");
       }
   }    
+}
+#endif
+
+static void
+create_a_pointer_rep ( Info_t *info, tree type)
+{
+  bool layout_changed = false;
+  // skip if already processed  		   
+  if ( ( *( info->struct_types))[type].processed ) return;
+
+  DEBUG_L("create_a_pointer_rep: ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+
+  #if 0
+  // Implementation note: Check this for infinite recursion.
+  // I don't think it's possible in a sane universe but
+  // pointers to reorganized types can occur, so does that
+  // an issue (not necessarily here.)
+  // Also, is this even necessary? Singletons don't expand
+  // and static arrays are not allowed "yet."
+  tree field;
+  tree new_fields = NULL;
+  for ( field = TYPE_FIELDS ( type); // ??? I speced reorg_type_prime here???
+        field; 
+        field = DECL_CHAIN ( field))
+    {
+      // make sure all the interior types are processed
+      // before processing this type
+      if ( TREE_CODE ( field) == RECORD_TYPE )
+	{
+	  create_a_new_type ( info, field);
+	}
+    }
+  #endif
+	 
+  ReorgType_t *ri = get_reorgtype_info ( type, info);
+  if ( ri != NULL ) {
+    // Create the new record type of the reorg type
+    tree reorg_type_prime = lang_hooks.types.make_type (RECORD_TYPE);
+
+    ri->reorg_ver_type = reorg_type_prime;
+    DEBUG_L("TYPE_SIZE(reorg_type_prime): %p, ", TYPE_SIZE(reorg_type_prime));
+    DEBUG_F( print_generic_expr, stderr, TYPE_SIZE(reorg_type_prime), (dump_flags_t)-1);
+    DEBUG("\n");
+    
+    /* Multi-pool only
+    // Create pointer_rep
+    // this will be a long and a pointer to the 
+    // reorg_type_prime
+    tree pointer_rep = 
+    lang_hooks.types.make_type( RECORD_TYPE);
+    
+    tree index_name = get_identifier("index");
+    tree index_field = build_decl( BUILTINS_LOCATION, 
+    FIELD_DECL, 
+    index_name, 
+    long_integer_type_node);
+    tree base_name = get_identifier("base");
+    tree base_field = build_decl( BUILTINS_LOCATION, 
+    FIELD_DECL, 
+    base_name, 
+    reorg_type_prime);
+    insert_field_into_struct( pointer_rep, index_field);
+    insert_field_into_struct( pointer_rep, base);
+    
+    reorg_type->pointer_rep = pointer_rep;
+    */
+
+    tree pointer_rep = make_signed_type ( TYPE_PRECISION ( pointer_sized_int_node));
+    TYPE_MAIN_VARIANT ( pointer_rep) = TYPE_MAIN_VARIANT ( pointer_sized_int_node);
+    DEBUG("Issue with gcc_ of reorg\n");
+    DEBUG_F(print_reorg, stderr, 2, ri);
+    const char *gcc_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    size_t len =
+      strlen ( REORG_SP_PTR_PREFIX) + strlen ( gcc_name);
+    char *name = ( char *)alloca(len + 1);
+    strcpy ( name, REORG_SP_PTR_PREFIX);
+    strcat ( name, gcc_name);
+    TYPE_NAME ( pointer_rep) = get_identifier ( name);
+    ri->pointer_rep = pointer_rep;
+    DEBUG_L("pointer_rep = ");
+    DEBUG_F(flexible_print, stderr, pointer_rep, 1, (dump_flags_t)-1);
+    DEBUG_A("TYPE_MAIN_VARIANT ( pointer_rep) = ");
+    DEBUG_F(flexible_print, stderr, TYPE_MAIN_VARIANT (pointer_rep), 1, (dump_flags_t)-1);
+
+    #if 0
+    // Note, we also declare a base type variable (globally.)
+    // This variable also belong in the ReorgType.
+    
+    // Set name of reorg_type_prime
+    const char *base_type_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    len = strlen ( REORG_SP_PREFIX) + strlen ( base_type_name);
+    char *rec_name = ( char*)alloca ( len + 1);
+    strcpy ( rec_name, REORG_SP_PREFIX);
+    strcat ( rec_name, base_type_name);
+    
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    
+    // Build the new pointer type fields
+    TYPE_NAME ( reorg_type_prime) = get_identifier ( rec_name);
+    tree field;
+    tree new_fields = NULL;
+    for ( field = TYPE_FIELDS ( type); field; field = DECL_CHAIN ( field))
+      {
+	//DEBUG_F( print_generic_decl, stderr, field, TDF_DETAILS); // example
+	tree tree_type = TREE_TYPE ( field);
+	tree new_fld_type = build_pointer_type ( tree_type);
+	tree new_decl =
+	  build_decl ( DECL_SOURCE_LOCATION (field),
+		       FIELD_DECL, DECL_NAME (field), new_fld_type);
+	DECL_CONTEXT ( new_decl) = reorg_type_prime;
+	layout_decl ( new_decl, 0);
+	
+	// We might be missing a bunch of attributes (see
+	// tree-nested.c:899) But we seem without without them!
+	
+	DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
+	new_fields = new_decl;
+	//DEBUG( "built new pointer type field:");
+	//DEBUG_F( print_generic_decl, stderr, new_decl, TDF_DETAILS);
+	//DEBUG( "\n");
+      }
+
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    
+    // store reversed fields into reorg_type_prime
+    TYPE_FIELDS ( reorg_type_prime) = NULL;
+    tree next_fld;
+    for ( field = new_fields;
+	  field; 
+	  field = next_fld    )
+      {
+	next_fld = DECL_CHAIN ( field);
+	DECL_CHAIN ( field) = TYPE_FIELDS ( reorg_type_prime);
+	TYPE_FIELDS ( reorg_type_prime) = field;
+      }
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    // Fix-up the layout
+    layout_type ( reorg_type_prime);
+
+    // HERE
+    // Create the base element for a reorg type. This is for the single
+    // pool case only.
+    tree base_var =
+      build_decl ( UNKNOWN_LOCATION, VAR_DECL, NULL_TREE, ri->reorg_ver_type);
+    // We don't want to manually set DECL_INITIAL here!
+    
+    const char *type_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    size_t tlen = strlen ( REORG_SP_BASE_PREFIX) + strlen ( type_name);
+    char *base_name = ( char*)alloca ( tlen + 1);
+    strcpy ( base_name, REORG_SP_BASE_PREFIX);
+    //DECL_NAME ( base_var) = get_identifier ( base_name);
+    
+    strcat ( base_name, type_name);
+    
+    DECL_NAME ( base_var) = get_identifier ( base_name); // wrong spot above???
+    
+    TREE_STATIC ( base_var) = 1;
+    TREE_ADDRESSABLE  ( base_var) = 1;
+    DECL_NONALIASED ( base_var) = 1;
+    SET_DECL_ALIGN ( base_var, TYPE_ALIGN ( ri->reorg_ver_type));
+    
+    varpool_node::finalize_decl ( base_var);
+
+    relayout_decl ( base_var);
+    
+    ri->instance_interleave.base = base_var;
+    #endif
+  }
+
+  #if 0
+  // Mess with the original type too because it might
+  // have base_type_fld interior elements that are modified.
+  for ( field = TYPE_FIELDS ( type); 
+       field; 
+       field = DECL_CHAIN ( field))
+    {
+      if ( TREE_CODE ( field) == RECORD_TYPE )
+	{
+	  layout_changed =
+	    layout_changed || ( *( info->struct_types)) [ field].layout_changed;
+	}
+      else
+	{
+	  // process pointers to reorg types
+	  if ( POINTER_TYPE_P ( field) )
+	    {
+	      tree field_type = TREE_TYPE ( field);
+	      if ( is_reorg_type ( field_type, info) )
+		{
+		  // Change field type.
+		  
+		  // If multi-pool then set layout_changed to true.
+		  
+		  // The type pointed to changes for single-pool.
+		  ReorgType_t *ri =
+		    get_reorgtype_info ( field_type, info);
+		  gcc_assert ( ri->pointer_rep);
+		  TREE_TYPE ( field) = ri->pointer_rep;
+		}
+	      tree base = base_type_of ( field);
+	      if ( is_reorg_type ( base, info) )
+		{
+		  // strip off a layer of pointers
+		  gcc_assert ( TREE_TYPE ( TREE_TYPE( field)));
+		  TREE_TYPE ( field) = TREE_TYPE ( TREE_TYPE( field));
+		}
+	    }
+	}
+    }
+
+  // Mark the type as processed
+  ( *( info->struct_types)) [ type] = { true, layout_changed};
+  #endif
+}
+
+
+static void
+create_a_base_var ( Info_t *info, tree type)
+{
+  bool layout_changed = false;
+  // skip if already processed  		   
+  if ( ( *( info->struct_types))[type].processed ) return;
+
+  DEBUG_L("create_a_base_var: ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+
+  // I think the type modification stuff should catch this
+  #if 0
+  // Implementation note: Check this for infinite recursion.
+  // I don't think it's possible in a sane universe but
+  // pointers to reorganized types can occur, so does that
+  // an issue (not necessarily here.)
+  // Also, is this even necessary? Singletons don't expand
+  // and static arrays are not allowed "yet."
+  tree field;
+  tree new_fields = NULL;
+  for ( field = TYPE_FIELDS ( type); // ??? I speced reorg_type_prime here???
+        field; 
+        field = DECL_CHAIN ( field))
+    {
+      // make sure all the interior types are processed
+      // before processing this type
+      if ( TREE_CODE ( field) == RECORD_TYPE )
+	{
+	  create_a_new_type ( info, field);
+	}
+    }
+  #endif
+
+  ReorgType_t *ri = get_reorgtype_info ( type, info);
+  if ( ri != NULL ) {
+    // Create the new record type of the reorg type
+    tree reorg_type_prime = lang_hooks.types.make_type (RECORD_TYPE);
+
+    ri->reorg_ver_type = reorg_type_prime;
+    #if 0
+    DEBUG_L("TYPE_SIZE(reorg_type_prime): %p, ", TYPE_SIZE(reorg_type_prime));
+    DEBUG_F( print_generic_expr, stderr, TYPE_SIZE(reorg_type_prime), (dump_flags_t)-1);
+    DEBUG("\n");
+    
+    /* Multi-pool only
+    // Create pointer_rep
+    // this will be a long and a pointer to the 
+    // reorg_type_prime
+    tree pointer_rep = 
+    lang_hooks.types.make_type( RECORD_TYPE);
+    
+    tree index_name = get_identifier("index");
+    tree index_field = build_decl( BUILTINS_LOCATION, 
+    FIELD_DECL, 
+    index_name, 
+    long_integer_type_node);
+    tree base_name = get_identifier("base");
+    tree base_field = build_decl( BUILTINS_LOCATION, 
+    FIELD_DECL, 
+    base_name, 
+    reorg_type_prime);
+    insert_field_into_struct( pointer_rep, index_field);
+    insert_field_into_struct( pointer_rep, base);
+    
+    reorg_type->pointer_rep = pointer_rep;
+    */
+
+    tree pointer_rep = make_signed_type ( TYPE_PRECISION ( pointer_sized_int_node));
+    TYPE_MAIN_VARIANT ( pointer_rep) = TYPE_MAIN_VARIANT ( pointer_sized_int_node);
+    DEBUG("Issue with gcc_ of reorg\n");
+    DEBUG_F(print_reorg, stderr, 2, ri);
+    const char *gcc_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    size_t len =
+      strlen ( REORG_SP_PTR_PREFIX) + strlen ( gcc_name);
+    char *name = ( char *)alloca(len + 1);
+    strcpy ( name, REORG_SP_PTR_PREFIX);
+    strcat ( name, gcc_name);
+    TYPE_NAME ( pointer_rep) = get_identifier ( name);
+    ri->pointer_rep = pointer_rep;
+    DEBUG_L("pointer_rep = ");
+    DEBUG_F(flexible_print, stderr, pointer_rep, 1, (dump_flags_t)-1);
+    DEBUG_A("TYPE_MAIN_VARIANT ( pointer_rep) = ");
+    DEBUG_F(flexible_print, stderr, TYPE_MAIN_VARIANT (pointer_rep), 1, (dump_flags_t)-1);
+    #endif
+
+    // Note, we also declare a base type variable (globally.)
+    // This variable also belong in the ReorgType.
+    
+    // Set name of reorg_type_prime
+    const char *base_type_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    size_t len = strlen ( REORG_SP_PREFIX) + strlen ( base_type_name);
+    char *rec_name = ( char*)alloca ( len + 1);
+    strcpy ( rec_name, REORG_SP_PREFIX);
+    strcat ( rec_name, base_type_name);
+    
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    
+    // Build the new pointer type fields
+    TYPE_NAME ( reorg_type_prime) = get_identifier ( rec_name);
+    tree field;
+    tree new_fields = NULL;
+    for ( field = TYPE_FIELDS ( type); field; field = DECL_CHAIN ( field))
+      {
+	//DEBUG_F( print_generic_decl, stderr, field, TDF_DETAILS); // example
+	tree tree_type = TREE_TYPE ( field);
+	tree new_fld_type = build_pointer_type ( tree_type);
+	tree new_decl =
+	  build_decl ( DECL_SOURCE_LOCATION (field),
+		       FIELD_DECL, DECL_NAME (field), new_fld_type);
+	DECL_CONTEXT ( new_decl) = reorg_type_prime;
+	layout_decl ( new_decl, 0);
+	
+	// We might be missing a bunch of attributes (see
+	// tree-nested.c:899) But we seem without without them!
+	
+	DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
+	new_fields = new_decl;
+	//DEBUG( "built new pointer type field:");
+	//DEBUG_F( print_generic_decl, stderr, new_decl, TDF_DETAILS);
+	//DEBUG( "\n");
+      }
+
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    
+    // store reversed fields into reorg_type_prime
+    TYPE_FIELDS ( reorg_type_prime) = NULL;
+    tree next_fld;
+    for ( field = new_fields;
+	  field; 
+	  field = next_fld    )
+      {
+	next_fld = DECL_CHAIN ( field);
+	DECL_CHAIN ( field) = TYPE_FIELDS ( reorg_type_prime);
+	TYPE_FIELDS ( reorg_type_prime) = field;
+      }
+    //DEBUG_L("TYPE_SIZE(reorg_type_prime): %p\n", TYPE_SIZE(reorg_type_prime));
+    // Fix-up the layout
+    layout_type ( reorg_type_prime);
+
+    // HERE
+    // Create the base element for a reorg type. This is for the single
+    // pool case only.
+    tree base_var =
+      build_decl ( UNKNOWN_LOCATION, VAR_DECL, NULL_TREE, ri->reorg_ver_type);
+    // We don't want to manually set DECL_INITIAL here!
+    
+    const char *type_name =
+      identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( ri->gcc_type)));
+    size_t tlen = strlen ( REORG_SP_BASE_PREFIX) + strlen ( type_name);
+    char *base_name = ( char*)alloca ( tlen + 1);
+    strcpy ( base_name, REORG_SP_BASE_PREFIX);
+    //DECL_NAME ( base_var) = get_identifier ( base_name);
+    
+    strcat ( base_name, type_name);
+    
+    DECL_NAME ( base_var) = get_identifier ( base_name); // wrong spot above???
+    
+    TREE_STATIC ( base_var) = 1;
+    TREE_ADDRESSABLE  ( base_var) = 1;
+    DECL_NONALIASED ( base_var) = 1;
+    SET_DECL_ALIGN ( base_var, TYPE_ALIGN ( ri->reorg_ver_type));
+    
+    varpool_node::finalize_decl ( base_var);
+
+    relayout_decl ( base_var);
+    
+    ri->instance_interleave.base = base_var;
+  }
+
+  // Mess with the original type too because it might
+  // have base_type_fldinterior elements that are modified.
+  tree field;
+  for ( field = TYPE_FIELDS ( type); 
+       field; 
+       field = DECL_CHAIN ( field))
+    {
+      if ( TREE_CODE ( field) == RECORD_TYPE )
+	{
+	  layout_changed =
+	    layout_changed || ( *( info->struct_types)) [ field].layout_changed;
+	}
+      else
+	{
+	  // process pointers to reorg types
+	  if ( POINTER_TYPE_P ( field) )
+	    {
+	      tree field_type = TREE_TYPE ( field);
+	      if ( is_reorg_type ( field_type, info) )
+		{
+		  // Change field type.
+		  
+		  // If multi-pool then set layout_changed to true.
+		  
+		  // The type pointed to changes for single-pool.
+		  ReorgType_t *ri =
+		    get_reorgtype_info ( field_type, info);
+		  gcc_assert ( ri->pointer_rep);
+		  TREE_TYPE ( field) = ri->pointer_rep;
+		}
+	      tree base = base_type_of ( field);
+	      if ( is_reorg_type ( base, info) )
+		{
+		  // strip off a layer of pointers
+		  gcc_assert ( TREE_TYPE ( TREE_TYPE( field)));
+		  TREE_TYPE ( field) = TREE_TYPE ( TREE_TYPE( field));
+		}
+	    }
+	}
+    }
+
+  // Mark the type as processed
+  ( *( info->struct_types)) [ type] = { true, layout_changed};
 }
 
 static void

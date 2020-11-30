@@ -52,6 +52,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "tree-ssanames.h"
 
+#if 0
+typedef struct type_holder TypeHolder;
+
+struct type_holder
+{
+  std::vector <tree> refed_types;
+  std::vector <tree> rec_types;
+};
+#endif
+
 static void setup_debug_flags ( Info *);
 static void initial_debug_info ( Info *);
 static void final_debug_info ( Info *);
@@ -59,6 +69,17 @@ static unsigned int reorg_analysis ( Info *);
 static unsigned number_of_executions ( gimple *, struct cgraph_node *);
 static void reorg_analysis_debug ( Info *, ReorgType *);
 static bool find_decls_and_types ( Info *);
+#if 1
+static void find_all_record_types ( tree type, Info_t *);
+#if 0
+static void find_all_record_types ( std::map <tree,TypeHolder> *, tree type, Info_t *);
+static void find_and_create_all_modified_types ( std::map <tree,TypeHolder> *, Info_t *);
+#endif
+static std::vector<tree>::iterator find_in_type_vec ( std::vector<tree> *, tree);
+static void dump_modified_types ( FILE *, Info_t *);
+#else
+static bool possibly_modify_pointer_types ( tree, Info_t *);
+#endif
 #if USE_REORG_TYPES
 static void add_reorg_type( tree, bool, Info *);
 #endif
@@ -127,7 +148,9 @@ ipa_structure_reorg ( void)
   std::vector <ReorgType_t>     Saved_Reorg_Type;
   std::vector <ProgDecl_t>      Prog_Decl;
   std::map    <tree,BoolPair_t> StructTypes; // TBD horrible type name
-
+  std::vector <two_trees_t>     Modified_Types;
+  std::set    <tree>            Dont_Modify;
+  std::map <tree,TypeHolder>    Type_Mod_Info;
   DEBUG("SAMPLE DEGUG\n");
   //DEBUG_L( "Running ipa_structure_reorg\n");
   //INDENT(2);
@@ -140,7 +163,13 @@ ipa_structure_reorg ( void)
   // Why not make this a class and avoid having all these parameters
   // to initialize?
   // Also, all functions should be references and not pointers...
-  Info info(&Reorg_Type, &Saved_Reorg_Type, &Prog_Decl, &StructTypes);
+  Info info ( &Reorg_Type,
+	      &Saved_Reorg_Type,
+	      &Prog_Decl,
+	      &StructTypes,
+	      &Modified_Types,
+	      &Dont_Modify,
+	      &Type_Mod_Info);
   //DEBUG_L("At init dum_deleted %d\n",info.num_deleted);
 
   cgraph_node* node;
@@ -557,17 +586,28 @@ find_decls_and_types ( Info *info)
       return false;
     }
   std::set<tree> typeset; // ???
+  std::map <tree,TypeHolder> type_mod_info;
 
   for ( auto typei = escaping_nonescaping_sets.points_to_record.begin ();
 	typei != escaping_nonescaping_sets.points_to_record.end (); typei++ )
     {
       tree type = *typei;
+      tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
+
+      // This is here as a convenience.
+      #if 1
+      #if 0
+      find_all_record_types( &type_mod_info, canonical, info);
+      #endif
+      find_all_record_types( canonical, info);
+      #else
+      possibly_modify_pointer_types ( canonical, info);
+      #endif
+      
       if ( escaping_nonescaping_sets.non_escaping.find ( type)
 	   !=
 	   escaping_nonescaping_sets.non_escaping.end ())
 	{
-	  tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
-	  
 	  // Check for incomplete types and ignore them.
 	  if ( TYPE_SIZE ( canonical) == NULL ) continue;
 	  if ( TYPE_FIELDS ( canonical) == NULL ) continue;
@@ -580,6 +620,38 @@ find_decls_and_types ( Info *info)
 	  typeset.insert ( canonical);
 	}
     }
+
+  // We are have to look at the globals because we created some new types
+  // for them
+  varpool_node *var;
+  FOR_EACH_VARIABLE ( var)
+  {
+    tree decl = var->decl;
+    tree canonical  = TYPE_MAIN_VARIANT ( base_type_of ( decl));
+
+    #if 0
+    find_all_record_types( &type_mod_info, canonical, info);
+    #endif
+    find_all_record_types( canonical, info);
+
+    if ( escaping_nonescaping_sets.non_escaping.find ( decl)
+	   !=
+	   escaping_nonescaping_sets.non_escaping.end ())
+	{
+	  // Check for incomplete types and ignore them.
+	  if ( TYPE_SIZE ( canonical) == NULL ) continue;
+	  if ( TYPE_FIELDS ( canonical) == NULL ) continue;
+	  
+	  // The types here are highly redundant so ignore
+	  // the duplicates.
+	  if ( get_reorgtype_info ( canonical, info) ) continue;
+	  
+	  add_reorg_type ( canonical, false, info);
+	  typeset.insert ( canonical);
+	}
+  }
+
+
 
   // Don't keep any structure types if they aren't
   // used in an array or have a pointer type (which
@@ -617,19 +689,21 @@ find_decls_and_types ( Info *info)
     print_reorgs ( info->reorg_dump_file, 2, info);
   }
       
-  // Scan all types in ReorgTypes for structure fields
-  // and if they are pointers to a type Q in ReorgTypes
-  // then clear the deletion mark of Q. Note, at this
-  // point in the execution ReorgTypes is all the structure
-  // types.
+  // Scan all types in ReorgTypes for structure fields and if they are
+  // pointers to a type Q in ReorgTypes then clear the deletion mark
+  // of Q. Note, at this point in the execution ReorgTypes is all the
+  // structure types.
   //
-  // It would be a bit nuts to allocate memory and hang it
-  // off of pointer in a structure, but it's still possible.
-  // Note, if there are no pointers to a structure of a type
-  // then it is impossible to dynamically allocate memory of
-  // that type. This of course assumes sane programming
-  // practices and if they violate those structure reorg has
-  // every right to punt.
+  // It would be a bit nuts to allocate memory and hang it off of
+  // pointer in a structure, but it's still possible.  More, likely is
+  // just that they are simply pointers into the array of reorg types
+  // but the other bit is what counts here.
+  //
+  // Note, if there are no pointers to a structure of a type then it
+  // is impossible to dynamically allocate memory of that type. This
+  // of course assumes sane programming practices and if they violate
+  // those structure reorg has every right to punt.
+  
   //DEBUG_L( "Examine imbedded pointers\n");
   //INDENT(2);
   for ( std::vector<ReorgType_t>::iterator ri = info->reorg_type->begin ();
@@ -689,7 +763,6 @@ find_decls_and_types ( Info *info)
   // so use FOR_EACH_VARIABLE instead. I'm not 100% this is the thing
   // actuall do here... but...
   //DEBUG_L( "ProgDecl global declarations:\n");
-  varpool_node *var;
   FOR_EACH_VARIABLE ( var)
   {
     tree decl = var->decl;
@@ -716,6 +789,10 @@ find_decls_and_types ( Info *info)
     fprintf ( info->reorg_dump_file, "ProgDecls:\n");
     print_progdecls ( info->reorg_dump_file, 2, info);
   }
+
+  #if 0
+  find_and_create_all_modified_types ( &type_mod_info, info);
+  #endif
 
   return true;
 }
@@ -1009,6 +1086,563 @@ find_decls_and_types ( Info *info)
 }
 #endif
 
+// Note, these replace possibly_modify_pointer_types.
+#if 0
+static void
+find_all_record_types ( std::map <tree,TypeHolder> *types, tree type, Info_t *info){}
+#endif
+static void
+find_all_record_types ( tree type, Info_t *info)
+{
+  std::map <tree,TypeHolder> *types = info->type_mod_info;
+  // Get cannonical form of record type
+  tree base = base_type_of ( type);
+
+  if( TREE_CODE ( base) != RECORD_TYPE ) return;
+  
+  tree canonocal = TYPE_MAIN_VARIANT ( base);
+
+  // Add it to the set if need be
+  if( types->find ( canonocal) == types->end () )
+    {
+      TypeHolder holder;
+      (*types)[ canonocal] = holder;
+    }
+}
+
+#if 0
+static void
+find_and_create_all_modified_types ( std::map <tree,TypeHolder> *types, Info_t *info) {}
+#endif
+void
+find_and_create_all_modified_types ( Info_t *info)
+{
+  std::map <tree,TypeHolder> *types = info->type_mod_info;
+  std::deque <tree> rec_types_work_list;
+  DEBUG_L("find_and_create_all_modified_types:\n");
+
+  DEBUG_A("At start:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+  INDENT(4);
+  
+  // Fill out the references to each type from each type
+  for ( auto typei = types->begin (); typei != types->end (); typei++ )
+    {
+      tree type = typei->first;
+      TypeHolder *holder = &(typei->second);
+      tree canonical_type = TYPE_MAIN_VARIANT ( base_type_of ( type));
+      DEBUG_A( "canonical_type = ");
+      DEBUG_F(flexible_print, stderr, canonical_type, 1, (dump_flags_t)0);
+      INDENT(4);
+      
+      // For each record type create an entry
+      for ( tree field = TYPE_FIELDS ( canonical_type); 
+	    field; 
+	    field = DECL_CHAIN ( field) )
+	{
+	  tree field_type = TREE_TYPE ( field);
+	  tree canonical_field_type = TYPE_MAIN_VARIANT ( base_type_of (field_type));
+	  DEBUG_A( "canonical_field_type = ");
+	  DEBUG_F(flexible_print, stderr, canonical_field_type, 1, (dump_flags_t)0);
+	  
+	  rec_types_work_list.push_back ( canonical_type);
+	  
+	  if ( TREE_CODE ( canonical_field_type) == RECORD_TYPE)
+	    {
+	      DEBUG_A("TREE_CODE ( canonical_field_type) == RECORD_TYPE\n");
+	      auto referenced = types->find ( canonical_field_type);
+	      gcc_assert ( referenced != types->end ());
+
+	      auto foundi =
+		find_in_type_vec ( &referenced->second.refed_types, canonical_type);
+	      if ( foundi == referenced->second.refed_types.end () )
+		{
+		  DEBUG_A("referenced->second.refed_types.push_back ( canonical_type)\n");
+		  referenced->second.refed_types.push_back ( canonical_type);
+		}
+	    }
+	  if ( TREE_CODE ( field_type) == RECORD_TYPE )
+	    {
+	      DEBUG_A("TREE_CODE ( field_type) == RECORD_TYPE\n");
+	      auto foundi = find_in_type_vec ( &holder->rec_types, canonical_type);
+	      if ( foundi == holder->rec_types.end () )
+		{
+		  DEBUG_A("holder->rec_types.push_back ( field_type)\n");
+		  holder->rec_types.push_back ( field_type);
+		}
+	    }
+	}
+      INDENT(-4);
+      // Having an interior record means it can't be processed initally.
+      // That is because this is done bottom up starting with types
+      // that have no modified interior records.
+      if ( holder->rec_types.empty () )
+	{
+	  DEBUG_A( "rec_types_work_list <- ");
+	  DEBUG_F(flexible_print, stderr, canonical_type, 1, (dump_flags_t)0);
+	  rec_types_work_list.push_back ( canonical_type);
+	}
+    }
+  INDENT(-4);
+
+  DEBUG_A("Before modification setup:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+
+  //
+  // Propagate The Modifications
+  //
+  std::vector <tree> needs_modification;
+  std::deque <tree> work_list;
+  
+  // setup up initial modifications
+  for ( auto typei = types->begin (); typei != types->end (); typei++ )
+    {
+      tree type = typei->first;
+      for ( tree field = TYPE_FIELDS ( type); 
+	    field; 
+	    field = DECL_CHAIN ( field) )
+	{
+	  tree field_type = TREE_TYPE ( field);
+	  tree canonical_field_type = TYPE_MAIN_VARIANT ( base_type_of (field_type));
+	  if (    TREE_CODE ( canonical_field_type) == RECORD_TYPE
+		  && is_reorg_type ( canonical_field_type, info) )
+	    {
+	      // Need to replace the type if found and the one found is incomplete.
+	      // But then we probably don't also need to mess with the work list.
+	      auto foundtype = find_in_type_vec ( &needs_modification, canonical_field_type);
+	      if( foundtype == needs_modification.end () )
+		{
+		  DEBUG_L("needs_modification, insert canonical_field_type %p = ", canonical_field_type);
+		  DEBUG_F(flexible_print, stderr, canonical_field_type, 1, (dump_flags_t)0);
+		  DEBUG_A("  TYPE_FIELDS = %p\n", TYPE_FIELDS(canonical_field_type));
+		  needs_modification.push_back ( canonical_field_type);
+		  work_list.push_back ( canonical_field_type);
+		}
+	      else
+		{
+		  // If the found type is incomplete repalce it.
+		  if ( TYPE_FIELDS ( *foundtype) == NULL )
+		    {
+		      *foundtype = canonical_field_type;
+		    }
+		}
+	    }
+	}
+    }
+
+  DEBUG_A("Before propogation:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+
+  // propigate
+  while ( !work_list.empty () )
+    {
+      tree item = work_list.front ();
+      work_list.pop_front ();
+      
+      TypeHolder *holder = &(types->find (item)->second);
+      for ( auto ref_typei = holder->refed_types.begin ();
+	    ref_typei != holder->refed_types.end ();
+	    ref_typei++ )
+	{
+	  tree ref_type = *ref_typei;
+	  tree canonical_ref_type = TYPE_MAIN_VARIANT ( base_type_of (ref_type));
+	  DEBUG_A("ref_type %p = ", canonical_ref_type);
+	  DEBUG_F(flexible_print, stderr, canonical_ref_type, 1, (dump_flags_t)0);
+	  DEBUG_A("  TYPE_FIELDS = %p\n", TYPE_FIELDS(canonical_ref_type));
+	  auto foundtype = find_in_type_vec ( &needs_modification, canonical_ref_type);
+	  if ( foundtype == needs_modification.end () )
+	    {
+	      DEBUG_A("  Inserted\n");
+	      needs_modification.push_back ( canonical_ref_type);
+	      work_list.push_back ( canonical_ref_type);
+	    }
+	  else
+	    {
+	      // If the found type is incomplete repalce it.
+	      if ( TYPE_FIELDS ( *foundtype) == NULL )
+		{
+		  *foundtype = canonical_ref_type;
+		}
+	    }
+	}
+    }
+
+  // Create The Modifications
+
+  DEBUG_A("Before doing the modifications:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+
+  // Just create the type, the fields are created afterwards
+  for ( auto type2modi = needs_modification.begin ();
+	type2modi != needs_modification.end (); type2modi++ )
+    {
+      tree type_to_modify = *type2modi;
+      DEBUG_A("type_to_modify (from needs_modification) = ");
+      DEBUG_F(flexible_print, stderr, type_to_modify, 1, (dump_flags_t)0);
+      // Create new record type
+      tree modified_type = lang_hooks.types.make_type (RECORD_TYPE);
+      //(*(info->modified_types))[ type_to_modify] = modified_type;
+      two_trees_t entry = { type_to_modify, modified_type};
+      info->modified_types->push_back ( entry);
+      
+      const char *old_type_name =
+	identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( type_to_modify)));
+      size_t len = strlen ( "_modif_") + strlen ( old_type_name);
+      char *rec_name = ( char*)alloca ( len + 1);
+      strcpy ( rec_name, "_modif_");
+      strcat ( rec_name, old_type_name);
+    
+      // Build the new pointer type fields
+      TYPE_NAME ( modified_type) = get_identifier ( rec_name);
+    }
+  DEBUG_A("Before field creation:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+
+  // Create the fields but the types must be created in a bottom up
+  // manner where the types include types as elements that are below
+  // them.
+  while ( !rec_types_work_list.empty () )
+    {
+      tree type = rec_types_work_list.front ();
+      rec_types_work_list.pop_front ();
+      DEBUG_A("type (rec_types_work_list.front) = ");
+      DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+      //auto pairi = info->modified_types->find (type);
+      auto peari = find_in_vec_of_two_types ( info->modified_types, type);
+      //gcc_assert( peari != info->modified_types->end ());
+      // The is a possibility the type on the work list does need to
+      // be modified. If found skip this type.
+      // This situtaion can likely be avoided but it might not be worth
+      // the effort.
+      if ( peari == info->modified_types->end ()) continue;
+      
+      // The sane type should be complete! (I hope)
+      tree sane_type = peari->first;
+      gcc_assert( TYPE_FIELDS ( sane_type) != NULL );
+      DEBUG_A("sane_type (TYPE_FIELDS %p) = ", TYPE_FIELDS ( sane_type));
+      DEBUG_F(flexible_print, stderr, sane_type, 1, (dump_flags_t)0);
+      tree modified_type = peari->second;
+
+      tree field;
+      tree new_fields = NULL;
+      for ( field = TYPE_FIELDS ( sane_type); field; field = DECL_CHAIN ( field))
+	{
+	  tree field_type = TREE_TYPE ( field);
+	  tree new_fld_type;
+	  DEBUG_A("transforming field = ");
+	  DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
+	  tree canoncl_fld_type = TYPE_MAIN_VARIANT ( base_type_of (field_type));
+
+	  // TBD Do I need a canonical type here instead?
+	  //auto is_modified = info->modified_types->find ( type);
+	  //auto is_modified = find_in_vec_of_two_types ( info->modified_types, sane_type); // ???
+	  auto is_modified = find_in_vec_of_two_types ( info->modified_types, canoncl_fld_type);
+	  DEBUG_A("is_modified = %s\n", is_modified != info->modified_types->end () ? "T" : "F");
+	  if ( is_modified != info->modified_types->end () )
+	    {
+	      if ( POINTER_TYPE_P ( field_type))
+		{
+		  ReorgType_t *ri = get_reorgtype_info ( canoncl_fld_type, info);
+		  int levels = number_of_levels ( field_type);
+		  DEBUG_A("ri = %p, levels = %d\n", ri, levels);
+		  if ( ri == NULL )
+		    {
+		      new_fld_type = make_multilevel ( is_modified->second, levels);
+		    }
+		  else
+		    {
+		      new_fld_type = make_multilevel ( ri->pointer_rep, levels - 1);
+		    }
+		}
+	      else
+		{
+		  new_fld_type = is_modified->second;
+		}
+	    }
+	  else
+	    {
+	      // This field doesn't need to be modified.
+	      new_fld_type = field_type;
+	    }
+	  tree new_decl =
+	    build_decl ( DECL_SOURCE_LOCATION (field),
+			 FIELD_DECL, DECL_NAME (field), new_fld_type);
+	  DECL_CONTEXT ( new_decl) = modified_type;
+	  
+	  DEBUG_A("new_fld_type = ");
+	  DEBUG_F(flexible_print, stderr, new_fld_type, 1, (dump_flags_t)0);
+	  DEBUG_A("new_decl = ");
+	  DEBUG_F(flexible_print, stderr, new_decl, 1, (dump_flags_t)0);
+	  
+	  layout_decl ( new_decl, 0);
+	  
+	  // We might be missing a bunch of attributes (see
+	  // tree-nested.c:899) But we seem without without them!
+	  
+	  DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
+	  new_fields = new_decl;
+	}
+
+      // Reverse fields. Note, a some point try nreverse here instead.
+      TYPE_FIELDS ( modified_type) = NULL;
+      tree next_fld;
+      for ( field = new_fields;
+	    field; 
+	    field = next_fld    )
+	{
+	  next_fld = DECL_CHAIN ( field);
+	  DECL_CHAIN ( field) = TYPE_FIELDS ( modified_type);
+	  TYPE_FIELDS ( modified_type) = field;
+	}
+
+      DEBUG_A("Before lay_type:\n");
+      DEBUG_F( dump_modified_types, stderr, info);
+
+      // Lay it out
+      layout_type ( modified_type);
+
+      TypeHolder *holder = &(types->find ( sane_type)->second);
+      // Add new types to the work list if possible
+      for ( auto refingi = holder->refed_types.begin ();
+	    refingi != holder->refed_types.end ();
+	    refingi++  )
+	{
+	  tree refing_type = *refingi;
+	  TypeHolder *refing_holder = &(types->find ( sane_type)->second);
+	  for ( auto record_typei = refing_holder->rec_types.begin ();
+		record_typei != refing_holder->rec_types.end ();
+		record_typei++ )
+	    {
+	      tree record_type = *record_typei;
+	      if ( TYPE_FIELDS (record_type) == NULL ) goto dont_add;
+	    }
+	  // Only add to the work list if all the necessary
+	  // structure ypes have already been processed.
+	  // Note, this is only added once when the last
+	  // structure type necessary has its fields created
+	  // above.
+	  rec_types_work_list.push_back (refing_type);
+	  
+	dont_add:
+	  ;
+	}
+    }
+  DEBUG_A("End results:\n");
+  DEBUG_F( dump_modified_types, stderr, info);
+}
+
+static std::vector<tree>::iterator
+find_in_type_vec ( std::vector<tree> *types, tree type)
+{
+  for ( auto looki = types->begin (); looki != types->end (); looki++)
+    {
+      tree look = *looki;
+      if ( same_type_p ( look, type) ) return looki;
+    }
+  return types->end ();
+}
+
+static void
+dump_modified_types (FILE *file, Info_t *info)
+{
+  DEBUG_A("");
+  fprintf ( file, "dump_modified_types:%s\n",
+	    info->modified_types->begin () == info->modified_types->end ()
+	    ? " (empty)" : "");
+  for ( auto modifi = info->modified_types->begin ();
+	modifi != info->modified_types->end (); modifi++ )
+    {
+      tree field;
+      tree orig_type = modifi->first;
+      tree new_type = modifi->second;
+      DEBUG_A("");
+      fprintf ( file, "  %p, ", TYPE_FIELDS ( orig_type));
+      flexible_print ( file, orig_type, 1, (dump_flags_t)0);
+      for ( field = TYPE_FIELDS ( orig_type);
+	    field; field = DECL_CHAIN ( field))
+	{
+	  DEBUG_A("");
+	  fprintf ( file, "    ", TYPE_FIELDS ( new_type));
+	  flexible_print ( file, field, 1, (dump_flags_t)0);
+	}
+      DEBUG_A("");
+      fprintf ( file, "  %p, ", TYPE_FIELDS ( new_type));
+      flexible_print ( file, new_type, 1, (dump_flags_t)0);
+      for ( field = TYPE_FIELDS ( new_type);
+	    field; field = DECL_CHAIN ( field))
+	{
+	  DEBUG_A("");
+	  fprintf ( file, "    ");
+	  flexible_print ( file, field, 1, (dump_flags_t)0);
+	}
+    }
+}
+
+#if 0
+// A type needs to be in modified_types iff one or more fields is a
+// reorg pointer or a modified record and should involve creating the
+// modified types. The process is recursive and natural in that
+// attempting to classify the type results in the creation of the
+// modified types and also create and note any interior types that
+// must be modified. This returns true if modified.
+static bool
+possibly_modify_pointer_types ( tree type, Info_t *info)
+{
+  bool modified = false;
+
+  if ( TREE_CODE( type) != RECORD_TYPE )
+    return false;
+  
+  DEBUG_L("possibly_modify_pointer_types: ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  INDENT(4);
+
+  if ( TYPE_SIZE ( type) == NULL || TYPE_FIELDS ( type) == NULL)
+    {
+      DEBUG_A("Incomplete type\n");
+      INDENT(-4);
+      return false;
+    }
+
+  // NOPE
+  if ( info->modified_types->find ( type) != info->modified_types->end () )
+    {
+      DEBUG_A("Already modified\n");
+      INDENT(-4);
+      return true;
+    }
+  if ( info->dont_modify->find ( type) != info->dont_modify->end () )
+    {
+      DEBUG_A("Marked to not modify\n");
+      INDENT(-4);
+      return false;
+    }
+  for ( tree field = TYPE_FIELDS ( type); 
+	  field; 
+	  field = DECL_CHAIN ( field) )
+    {
+      tree field_type = TREE_TYPE ( field);
+      tree canonical_field_type = TYPE_MAIN_VARIANT ( base_type_of (field_type));
+      bool pointer = POINTER_TYPE_P ( field_type);
+      bool record = TREE_CODE( canonical_field_type) == RECORD_TYPE;
+      DEBUG_A("Field: ");
+      DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
+      DEBUG_A("  pointer %s, record %s\n", pointer ? "T" : "F", record ? "T" :"F");
+      if ( pointer && record )
+	{
+	  bool is_reorg = is_reorg_type ( canonical_field_type, info);
+	  if ( is_reorg )
+	    {
+	      modified = true;
+	    }
+	  else
+	    if ( possibly_modify_pointer_types ( canonical_field_type, info) )
+	      {
+		modified = true;
+	      }
+	}
+      else
+	{
+	  // ??? non record types?
+	  if ( possibly_modify_pointer_types ( canonical_field_type, info) )
+	    {
+	      modified = true;
+	    }
+	}
+    }
+
+  if ( modified )
+    {
+      // Create new record type
+      tree modified_type = lang_hooks.types.make_type (RECORD_TYPE);
+      //(*(info->modified_types))[ type] = modified_type;
+      two_trees_t entry = { type, modified_type};
+      info->modified_types->push_back ( entry);
+
+      const char *old_type_name =
+	identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( type)));
+      size_t len = strlen ( "_modif_") + strlen ( old_type_name);
+      char *rec_name = ( char*)alloca ( len + 1);
+      strcpy ( rec_name, "_modif_");
+      strcat ( rec_name, old_type_name);
+    
+      // Build the new pointer type fields
+      TYPE_NAME ( modified_type) = get_identifier ( rec_name);
+
+      // TBD Create its fields by walking the old type.
+      tree field;
+      tree new_fields = NULL;
+      for ( field = TYPE_FIELDS ( type); field; field = DECL_CHAIN ( field))
+	{
+	  tree field_type = TREE_TYPE ( field);
+	  tree new_fld_type;
+
+	  // TBD Do I need a canonical type here instead?
+	  //auto is_modified = info->modified_types->find ( type);
+	  auto is_modified = find_in_vec_of_two_types ( info->modified_types, type);
+	  if ( is_modified != info->modified_types->end () )
+	    {
+	      if ( POINTER_TYPE_P ( field_type))
+		{
+		  ReorgType_t *ri = get_reorgtype_info ( field_type, info);
+		  int levels = number_of_levels ( field_type);
+		  if ( ri == NULL )
+		    {
+		      new_fld_type = make_multilevel ( is_modified->second, levels);
+		    }
+		  else
+		    {
+		      new_fld_type = make_multilevel ( ri->pointer_rep, levels - 1);
+		    }
+		}
+	      else
+		{
+		  new_fld_type = is_modified->second;
+		}
+	    }
+	  else
+	    {
+	      // This field doesn't need to be modified.
+	      new_fld_type = field_type;
+	    }
+	  tree new_decl =
+	    build_decl ( DECL_SOURCE_LOCATION (field),
+			 FIELD_DECL, DECL_NAME (field), new_fld_type);
+	  DECL_CONTEXT ( new_decl) = modified_type;
+	  layout_decl ( new_decl, 0);
+	  
+	  // We might be missing a bunch of attributes (see
+	  // tree-nested.c:899) But we seem without without them!
+	  
+	  DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
+	  new_fields = new_decl;
+	}
+
+      // Reverse fields. Note, a some point try nreverse here instead.
+      TYPE_FIELDS ( modified_type) = NULL;
+      tree next_fld;
+      for ( field = new_fields;
+	    field; 
+	    field = next_fld    )
+	{
+	  next_fld = DECL_CHAIN ( field);
+	  DECL_CHAIN ( field) = TYPE_FIELDS ( modified_type);
+	  TYPE_FIELDS ( modified_type) = field;
+	}
+
+      // Lay it out
+      layout_type ( modified_type);
+    }
+  else
+    {
+      info->dont_modify->insert ( type);
+    }
+  DEBUG_A("Was %smodidied\n", modified ? "" : "not ");
+  INDENT(-4);
+  return modified;
+}
+#endif
+
 #if USE_REORG_TYPES
 static void
 add_reorg_type (
@@ -1024,8 +1658,8 @@ add_reorg_type (
     { 0, del, tmv_type, NULL, NULL, false, false, false,
       { 0}, { 0}, { 0, 0, 0, NULL, 0.0, 0.0, false}};
 
-  DEBUG_L("add_reorg_type: ");
-  DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
+  //DEBUG_L("add_reorg_type: ");
+  //DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
   info->reorg_type->push_back ( rt);
   #if !USE_ESCAPE_ANALYSIS
   // Remember the intial assumption is the type added will be deleted
@@ -1588,9 +2222,16 @@ reverse_args( tree args )
   return reveresed;
 }
 	
-	
-  
-  
+std::vector<two_trees_t>::iterator
+find_in_vec_of_two_types ( std::vector<two_trees_t> *types, tree type)
+{
+  for ( auto looki = types->begin (); looki != types->end (); looki++)
+    {
+      tree look = looki->first;
+      if ( same_type_p ( look, type) ) return looki;
+    }
+  return types->end ();
+}
 
 int
 number_of_levels ( tree type)
@@ -1608,25 +2249,25 @@ tree prev_type;
 }
 
 tree
-make_multilevel( tree base_type, int levels_indirection)
+make_multilevel ( tree base_type, int levels_indirection)
 {
-  //DEBUG_A("make_multilevel %d levels of ", levels_indirection);
-  //DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
-  //INDENT(4);
+  DEBUG_A("make_multilevel %d levels of ", levels_indirection);
+  DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+  INDENT(4);
   if ( levels_indirection == 0 )
     {
-      //INDENT(-4);
-      //DEBUG_A("returns: ");
-      //DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
+      INDENT(-4);
+      DEBUG_A("returns: ");
+      DEBUG_F( flexible_print, stderr, base_type, 1, (dump_flags_t)0);
       return base_type;
     }
   else
     {
       tree lower = make_multilevel ( base_type, levels_indirection - 1);
       tree returns = build_pointer_type ( lower);
-      //INDENT(-4);
-      //DEBUG_A("returns: ");
-      //DEBUG_F( flexible_print, stderr, returns, 1, (dump_flags_t)0);
+      INDENT(-4);
+      DEBUG_A("returns: ");
+      DEBUG_F( flexible_print, stderr, returns, 1, (dump_flags_t)0);
       return returns;
     }
 }
@@ -1654,10 +2295,10 @@ modify_func_decl_core ( struct function *func, Info *info)
       //INDENT(-4);
       return false;
     }
-  DEBUG_A("pointer_rep = ");
-  DEBUG_F( flexible_print, stderr, ri->pointer_rep, 1, (dump_flags_t)0);
-  DEBUG_A("TYPE_MAIN_VARIANT( pointer_rep) = ");
-  DEBUG_F( flexible_print, stderr, TYPE_MAIN_VARIANT( ri->pointer_rep), 1, (dump_flags_t)0);
+  //DEBUG_A("pointer_rep = ");
+  //DEBUG_F( flexible_print, stderr, ri->pointer_rep, 1, (dump_flags_t)0);
+  //DEBUG_A("TYPE_MAIN_VARIANT( pointer_rep) = ");
+  //DEBUG_F( flexible_print, stderr, TYPE_MAIN_VARIANT( ri->pointer_rep), 1, (dump_flags_t)0);
   
   int levels = number_of_levels ( func_type);
 
@@ -1764,17 +2405,17 @@ modify_decl_core ( tree *location, Info *info)
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  DEBUG_L("before modify_decl_core: ");
-  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  //DEBUG_L("before modify_decl_core: ");
+  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
   
   //tree type = *location;
   tree type = TREE_TYPE ( *location);
   
-  DEBUG_A("type = ");
-  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  //DEBUG_A("type = ");
+  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   tree base = base_type_of ( type);
-  DEBUG_A(", base = ");
-  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  //DEBUG_A(", base = ");
+  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
@@ -1870,7 +2511,7 @@ undelete_reorgtype ( ReorgType_t *rt, Info *info )
 static ReorgTransformation
 reorg_recognize_ret_action( ReorgTransformation val, unsigned ln)
 {
-  #if DEBUGGING
+  #if DEBUGGING && 0
   fprintf ( stderr, "L# %4d: %*s  returns %s\n",
 	    ln, debug_indenting, "", reorgtrans_to_str (val));
   #endif
@@ -1880,28 +2521,28 @@ reorg_recognize_ret_action( ReorgTransformation val, unsigned ln)
 ReorgTransformation
 reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 {
-  DEBUG_L ( "ReorgTransformation reorg_recognize for: ");
-  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
-  INDENT(2);
+  //DEBUG_L ( "ReorgTransformation reorg_recognize for: ");
+  //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  //INDENT(2);
   switch (  gimple_code( stmt) )
   {
   case  GIMPLE_ASSIGN:
     {
-      DEBUG_L("GIMPLE_ASSIGN:\n");
+      //DEBUG_L("GIMPLE_ASSIGN:\n");
       tree lhs = gimple_assign_lhs ( stmt);
       enum tree_code rhs_code = gimple_assign_rhs_code ( stmt);
       
       if ( gimple_assign_single_p ( stmt) )
       {
-	DEBUG_L("gimple_assign_single_p() = true\n");
-	INDENT(2);
+	//DEBUG_L("gimple_assign_single_p() = true\n");
+	//INDENT(2);
 	tree rhs = gimple_assign_rhs1 ( stmt);
 	enum ReorgOpTrans lhs_op = recognize_op ( lhs, true, info);
 	switch ( lhs_op )
 	{
 	case ReorgOpT_Pointer:     // "a"
-	  DEBUG_L("case ReorgOpT_Pointer\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Pointer\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Scalar:
@@ -1935,8 +2576,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Struct:      // "s"
-	  DEBUG_L("case ReorgOpT_Struct\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Struct\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Deref:     // "*a"
@@ -1952,8 +2593,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Deref:       // "*a"
-	  DEBUG_L("case ReorgOpT_Deref\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Deref\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Deref:     // "*a"
@@ -1964,8 +2605,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	case ReorgOpT_Array:       // "x[i]"
-	  DEBUG_L("case ReorgOpT_Array\n");
-	  INDENT(-4);
+	  //DEBUG_L("case ReorgOpT_Array\n");
+	  //INDENT(-4);
 	  switch ( recognize_op ( rhs, true, info) )
 	  {
 	  case ReorgOpT_Struct:    // "s"
@@ -1978,8 +2619,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	case ReorgOpT_Temp:        // t
 	case ReorgOpT_Scalar:      // "z"
 	  {
-	    DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Temp ? "Temp" : "Scalar");
-	    INDENT(-4);
+	    //DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Temp ? "Temp" : "Scalar");
+	    //INDENT(-4);
 	    switch ( recognize_op( rhs, true, info) )
 	      {
 	      case ReorgOpT_Scalar:      // "z"
@@ -2002,8 +2643,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	case ReorgOpT_Indirect:    // "a->f"
 	case ReorgOpT_AryDir:      // "x[i].f"
 	  {
-	    DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Indirect ? "Indirect" : "AryDir");
-	    INDENT(-4);
+	    //DEBUG_L("case ReorgOpT_%s\n", lhs_op == ReorgOpT_Indirect ? "Indirect" : "AryDir");
+	    //INDENT(-4);
 	    switch ( recognize_op ( rhs, true, info) )
 	      {
 	      case ReorgOpT_Cst:       // k
@@ -2032,24 +2673,24 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  return REORG_RECOG_RET_ACT ( Not_Supported);
 	} // switch ( recognize_op ( lhs, true, info) )
       } else {
-	DEBUG_L("gimple_assign_single_p() = false\n");
-	INDENT(2);
+	//DEBUG_L("gimple_assign_single_p() = false\n");
+	//INDENT(2);
 	tree op1 = gimple_assign_rhs1 ( stmt);
 	tree op2 = gimple_assign_rhs2 ( stmt);
-	DEBUG_L("op1 = %p, op2 = %p\n", op1, op2);
-	DEBUG_A("");
-	DEBUG_F( flexible_print, stderr, op1, 1, TDF_DETAILS);
+	//DEBUG_L("op1 = %p, op2 = %p\n", op1, op2);
+	//DEBUG_A("");
+	//DEBUG_F( flexible_print, stderr, op1, 1, TDF_DETAILS);
 	if ( CONVERT_EXPR_CODE_P ( gimple_assign_rhs_code ( stmt)))
 	  {
-	    DEBUG_L("CONVERT_EXPR_CODE_P (...)\n");
-	    INDENT(-4);
+	    //DEBUG_L("CONVERT_EXPR_CODE_P (...)\n");
+	    //INDENT(-4);
 	    return REORG_RECOG_RET_ACT ( ReorgT_Convert);
 	  }
 
 	if ( gimple_assign_rhs3 ( stmt) != NULL )
 	  {
-	    DEBUG_L("gimple_assign_rhs3 ( stmt) != NULL\n");
-	    INDENT(-4);
+	    //DEBUG_L("gimple_assign_rhs3 ( stmt) != NULL\n");
+	    //INDENT(-4);
 	    return REORG_RECOG_RET_ACT ( Not_Supported);
 	  }
 	
@@ -2059,8 +2700,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	  (    (POINTER_TYPE_P ( TREE_TYPE( op1)) && integer_zerop ( op2))
 	    || (POINTER_TYPE_P ( TREE_TYPE( op2)) && integer_zerop ( op1)))
        && ( integer_zerop ( op1) || integer_zerop ( op2) );
-	DEBUG_L("zero_case = %s\n", zero_case ? "true" : "false" );
-	INDENT(-4);
+	//DEBUG_L("zero_case = %s\n", zero_case ? "true" : "false" );
+	//INDENT(-4);
 	switch ( rhs_code )
 	{
 	case POINTER_PLUS_EXPR:
@@ -2086,8 +2727,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
     }
   case GIMPLE_COND:  // Similar to assign cases
     {
-      DEBUG_L("GIMPLE_COND:\n");
-      INDENT(-2);
+      //DEBUG_L("GIMPLE_COND:\n");
+      //INDENT(-2);
       //tree op1 = gimple_assign_rhs1 ( stmt);
       //tree op2 = gimple_assign_rhs2( stmt);
       tree op1 = gimple_cond_lhs ( stmt);
@@ -2118,17 +2759,17 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
     }
   case  GIMPLE_CALL:
     {
-      DEBUG_L("GIMPLE_CALL:\n");
+      //DEBUG_L("GIMPLE_CALL:\n");
       struct cgraph_edge *edge = node->get_edge ( stmt);
       gcc_assert( edge);
-      DEBUG_L("called function %s gimple_body\n",
-      	      edge->callee->has_gimple_body_p() ? "has a" : "has no");
-      DEBUG_L("called function inline_to %s\n",
-      	      edge->callee->inlined_to ? "true" : "false");
-      DEBUG_L("called function external %s\n",
-      	      edge->callee->get_partitioning_class() == SYMBOL_EXTERNAL ? "true" : "false");
+      //DEBUG_L("called function %s gimple_body\n",
+      //	      edge->callee->has_gimple_body_p() ? "has a" : "has no");
+      //DEBUG_L("called function inline_to %s\n",
+      //	      edge->callee->inlined_to ? "true" : "false");
+      //DEBUG_L("called function external %s\n",
+      //	      edge->callee->get_partitioning_class() == SYMBOL_EXTERNAL ? "true" : "false");
       
-      INDENT(-2);
+      //INDENT(-2);
       if ( gimple_call_builtin_p( stmt, BUILT_IN_CALLOC ) ) return REORG_RECOG_RET_ACT ( ReorgT_Calloc);
       if ( gimple_call_builtin_p( stmt, BUILT_IN_MALLOC ) ) return REORG_RECOG_RET_ACT ( ReorgT_Malloc);
       if ( gimple_call_builtin_p( stmt, BUILT_IN_REALLOC) ) return REORG_RECOG_RET_ACT ( ReorgT_Realloc);
@@ -2141,7 +2782,7 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 
       if ( is_user_function ( stmt, node, info) )
 	{
-	  DEBUG_A("  ReorgT_UserFunc\n");
+	  //DEBUG_A("  ReorgT_UserFunc\n");
 	  return REORG_RECOG_RET_ACT ( ReorgT_UserFunc);
 	}
       //DEBUG_A("  Not_supported\n");
@@ -2150,15 +2791,15 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
     }
     break;
   case GIMPLE_RETURN:
-    DEBUG_L("GIMPLE_RETURN:\n");
-    INDENT(-2);
+    //DEBUG_L("GIMPLE_RETURN:\n");
+    //INDENT(-2);
     return REORG_RECOG_RET_ACT ( ReorgT_Return);
     break;
   default:
-    DEBUG_L ( "didn't support: ");
-    DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
-    DEBUG( "\n");
-    INDENT(-2);
+    //DEBUG_L ( "didn't support: ");
+    //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+    //DEBUG( "\n");
+    //INDENT(-2);
     return REORG_RECOG_RET_ACT ( Not_Supported);
   }
 }
@@ -2272,10 +2913,10 @@ recognize_op_ret_action ( enum ReorgOpTrans e )
 enum ReorgOpTrans
 recognize_op ( tree op,  bool lie, Info *info)
 {
-  DEBUG_L("recognize_op: ");
-  DEBUG_F( flexible_print, stderr, op, 1, TDF_DETAILS);
+  //DEBUG_L("recognize_op: ");
+  //DEBUG_F( flexible_print, stderr, op, 1, TDF_DETAILS);
   enum tree_code op_code = TREE_CODE ( op);
-  DEBUG_A("opcode = %s\n", code_str( op_code));
+  //DEBUG_A("opcode = %s\n", code_str( op_code));
   switch ( op_code )
     {
     case INTEGER_CST:
@@ -2302,8 +2943,8 @@ recognize_op ( tree op,  bool lie, Info *info)
     }
   
   tree type = TREE_TYPE ( op);
-  DEBUG_A("type: ");
-  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  //DEBUG_A("type: ");
+  //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
   
   // This type bases approach seems like crap.
   // I'm turning it off to see what breaks.
@@ -2405,20 +3046,20 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     case COMPONENT_REF:
       {
-	DEBUG_L("process: COMPONENT_REF\n");
+	//DEBUG_L("process: COMPONENT_REF\n");
 	tree inner_op1 = TREE_OPERAND( op, 1);
 	enum tree_code inner_op1_code = TREE_CODE ( inner_op1);
 	
-	DEBUG_L("inner_op1 = ");
-	DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
-	DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
+	//DEBUG_L("inner_op1 = ");
+	//DEBUG_F(flexible_print, stderr, inner_op1, 0, (dump_flags_t)0);
+	//DEBUG(", TREE_CODE = %s\n", code_str( inner_op1_code));
 
 	// Note, a reorg type can only occurr at the bottom or
 	// the top, that is "rt.a.b..." or "a.b...z.rt".
 	if ( tree deep_type = multilevel_component_ref ( op) )
 	  {
-	    DEBUG_L("Is multilevel component ref: deep_type is ");
-	    DEBUG_F(flexible_print, stderr, deep_type, 1, (dump_flags_t)0);
+	    //DEBUG_L("Is multilevel component ref: deep_type is ");
+	    //DEBUG_F(flexible_print, stderr, deep_type, 1, (dump_flags_t)0);
 	    
 	    bool a_deep_reorg = is_reorg_type ( base_type_of ( deep_type), info);
 	    if ( a_deep_reorg || !lie )
@@ -2430,12 +3071,12 @@ recognize_op ( tree op,  bool lie, Info *info)
 	  }
 	if ( tree_contains_a_reorgtype_p ( op, info))
 	  {
-	    DEBUG_A("POINTER_TYPE_P ( type) : %s\n",
-		    POINTER_TYPE_P ( type) ? "true" : "false");
+	    //DEBUG_A("POINTER_TYPE_P ( type) : %s\n",
+	    //	    POINTER_TYPE_P ( type) ? "true" : "false");
 	    if ( POINTER_TYPE_P ( type))
 	      {
-		DEBUG_A("TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE : %s\n",
-			TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE ? "true" : "false");
+		//DEBUG_A("TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE : %s\n",
+		//	TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE ? "true" : "false");
 	      }
 	  }
 	if (    tree_contains_a_reorgtype_p ( op, info)
@@ -2447,7 +3088,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	  }
 	if ( inner_op0_code == INDIRECT_REF )
 	  {
-	    DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
+	    //DEBUG_L("TREE_CODE( inner_op) == INDIRECT_REF\n");
 	    bool a_base_reorg = is_reorg_type ( base_type_of ( type), info);
 	    if ( a_base_reorg || !lie )
 	      {
@@ -2457,7 +3098,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    return recognize_op_ret_action ( ReorgOpT_Scalar);
 	  }
 	if ( inner_op0_code == MEM_REF ) {
-	  DEBUG_L("TREE_CODE( inner_op) == MEM_REF\n");
+	  //DEBUG_L("TREE_CODE( inner_op) == MEM_REF\n");
 	  bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
 	  if ( a_reorg || !lie )
 	    {
@@ -2468,14 +3109,14 @@ recognize_op ( tree op,  bool lie, Info *info)
 	}
 	if ( inner_op0_code == COMPONENT_REF )
 	  {
-	    DEBUG_L("TREE_CODE( inner_op) == COMPONENT_REF\n");
+	    //DEBUG_L("TREE_CODE( inner_op) == COMPONENT_REF\n");
 	    tree inner_op0_0 = TREE_OPERAND ( inner_op0, 0);
 	    tree inner_op0_0_type = TREE_TYPE ( inner_op0_0);
-	    DEBUG_L("inner_op0_0 = ");
-	    DEBUG_F(flexible_print, stderr, inner_op0_0, 0, (dump_flags_t)0);
-	    DEBUG(" type = ");
-	    DEBUG_F(flexible_print, stderr, inner_op0_0_type, 0, (dump_flags_t)0);
-	    DEBUG(", TREE_CODE = %s\n", code_str( inner_op0_code));
+	    //DEBUG_L("inner_op0_0 = ");
+	    //DEBUG_F(flexible_print, stderr, inner_op0_0, 0, (dump_flags_t)0);
+	    //DEBUG(" type = ");
+	    //DEBUG_F(flexible_print, stderr, inner_op0_0_type, 0, (dump_flags_t)0);
+	    //DEBUG(", TREE_CODE = %s\n", code_str( inner_op0_code));
 	    
 	    bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_0_type), info);
 	    if ( a_reorg || !lie )
@@ -2485,7 +3126,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    // Just normal field reference otherwise...
 	    return recognize_op_ret_action ( ReorgOpT_Scalar);
 	  }
-	DEBUG_L("TREE_CODE( inner_op) not indirect, component or mem ref\n");
+	//DEBUG_L("TREE_CODE( inner_op) not indirect, component or mem ref\n");
 	// Note, doesn't this ignore ARRAY_REF of this?
 	// I think it's OK at least until we start supporting
 	// multi-pools.
@@ -2501,20 +3142,20 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     case ARRAY_REF:
       {
-	DEBUG_L("process: ARRAY_REF\n");
+	//DEBUG_L("process: ARRAY_REF\n");
 	tree inner_op1 = TREE_OPERAND( op, 1);
 	tree inner_op1_type = TREE_TYPE ( inner_op1);
-	DEBUG_A("inner_op0, inner_op0_type = ");
-	DEBUG_F(flexible_print, stderr, inner_op0, 2, (dump_flags_t)0);
-	DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
+	//DEBUG_A("inner_op0, inner_op0_type = ");
+	//DEBUG_F(flexible_print, stderr, inner_op0, 2, (dump_flags_t)0);
+	//DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
 	
-	DEBUG_A("inner_op1, inner_op1_type = ");
-	DEBUG_F(flexible_print, stderr, inner_op1, 2, (dump_flags_t)0);
-	DEBUG_F(flexible_print, stderr, inner_op1_type, 1, (dump_flags_t)0);
+	//DEBUG_A("inner_op1, inner_op1_type = ");
+	//DEBUG_F(flexible_print, stderr, inner_op1, 2, (dump_flags_t)0);
+	//DEBUG_F(flexible_print, stderr, inner_op1_type, 1, (dump_flags_t)0);
 	
 	if ( tree deep_type = multilevel_component_ref ( op) )
 	  {
-	    DEBUG_L("Is multilevel component ref (with array)\n");
+	    //DEBUG_L("Is multilevel component ref (with array)\n");
 	    bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
 	    if ( a_reorg || !lie )
 	      {
@@ -2533,7 +3174,7 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     case INDIRECT_REF:
       {
-	DEBUG_L("process: INDIRECT_REF\n");
+	//DEBUG_L("process: INDIRECT_REF\n");
 	//  Do we want to chase the base type?
 	// No, we care about (and transform) just
 	// *r and not **...r (where r is a ReorgType.)
@@ -2546,10 +3187,10 @@ recognize_op ( tree op,  bool lie, Info *info)
       }
     case MEM_REF:
       {
-	DEBUG_L("process: MEF_REF\n");
-	DEBUG_A("inner_op0, inner_op0_type = ");
-	DEBUG_F( flexible_print, stderr, inner_op0, 0, TDF_DETAILS);
-	DEBUG_F( flexible_print, stderr, inner_op0_type, 1, TDF_DETAILS);
+	//DEBUG_L("process: MEF_REF\n");
+	//DEBUG_A("inner_op0, inner_op0_type = ");
+	//DEBUG_F( flexible_print, stderr, inner_op0, 0, TDF_DETAILS);
+	//DEBUG_F( flexible_print, stderr, inner_op0_type, 1, TDF_DETAILS);
 	bool a_reorg = is_reorg_type ( type, info);
 	if( a_reorg || !lie )
 	  {
@@ -2565,16 +3206,16 @@ recognize_op ( tree op,  bool lie, Info *info)
 tree
 multilevel_component_ref ( tree op)
 {
-  DEBUG_A("multilevel_component_ref: ");
-  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
-  INDENT(2);
+  //DEBUG_A("multilevel_component_ref: ");
+  //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  //INDENT(2);
   tree inner_op0 = TREE_OPERAND( op, 0);
   //tree inner_op1 = TREE_OPERAND( op, 1);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
   if ( inner_op0_code == COMPONENT_REF || inner_op0_code == ARRAY_REF )
     {
       tree ret =  multilevel_component_ref ( inner_op0);
-      INDENT(-2);
+      //INDENT(-2);
       return ret;
     }
   else
@@ -2583,14 +3224,14 @@ multilevel_component_ref ( tree op)
 	if ( TREE_CODE ( op) == COMPONENT_REF )
 	  {
 	    tree type = TREE_TYPE (inner_op0);
-	    DEBUG_A("  found: %s, type: \n", code_str (inner_op0_code));
-	    DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
-	    INDENT(-2);
+	    //DEBUG_A("  found: %s, type: \n", code_str (inner_op0_code));
+	    //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+	    //INDENT(-2);
 	    return type;
 	  }
       }
-  DEBUG_A("  found: no deep type\n");
-  INDENT(-2);
+  //DEBUG_A("  found: no deep type\n");
+  //INDENT(-2);
   return NULL;
 }
 
@@ -2712,16 +3353,15 @@ apply_to_all_gimple ( bool (*function)(gimple *, void *), bool phis_too, void *d
 // What's dicey about this is it may sort of work but then I
 // can see places where it wouldn't... The language has a say
 // in what types are equal so maybe language hooks are involved???
-bool same_type_p(
-		 tree a, tree b
-		 )
+bool
+same_type_p ( tree a, tree b )
 {
-  DEBUG( "same_type_p:\n");
-  DEBUG( " a: TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(a)),TYPE_NAME(a));
-  DEBUG_F( print_generic_expr, stderr, a, (dump_flags_t)-1);
-  DEBUG( "\n b TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(b)),TYPE_NAME(b));
-  DEBUG_F( print_generic_expr, stderr, b, (dump_flags_t)-1);
-  DEBUG( "\n");
+  //DEBUG( "same_type_p:\n");
+  //DEBUG( " a: TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(a)),TYPE_NAME(a));
+  //DEBUG_F( print_generic_expr, stderr, a, (dump_flags_t)-1);
+  //DEBUG( "\n b TREE_CODE = %s, name = %p\n  ",code_str(TREE_CODE(b)),TYPE_NAME(b));
+  //DEBUG_F( print_generic_expr, stderr, b, (dump_flags_t)-1);
+  //DEBUG( "\n");
 
   // This replaces part of the below
   bool a_rec = TREE_CODE ( a ) == RECORD_TYPE;
@@ -2742,7 +3382,7 @@ bool same_type_p(
 	      
   bool ret = TYPE_NAME ( a) == TYPE_NAME ( b);
   
-  DEBUG( "returns %s\n", ret ? "true" : "false");
+  //DEBUG( "returns %s\n", ret ? "true" : "false");
   
   return ret;
 }
@@ -2753,8 +3393,8 @@ bool same_type_p(
 ReorgType_t *
 get_reorgtype_info ( tree type, Info* info)
 {
-  DEBUG_L( "get_reorgtype_info: type = ");
-  DEBUG_F(  flexible_print, stderr, type, 1, (dump_flags_t)0);
+  //DEBUG_L( "get_reorgtype_info: type = ");
+  //DEBUG_F(  flexible_print, stderr, type, 1, (dump_flags_t)0);
   
   // Note, I'm going to use the most stupid and slowest possible way
   // to do this. The advanage is it will be super easy and almost
@@ -2772,9 +3412,9 @@ get_reorgtype_info ( tree type, Info* info)
     // so this is just a place holder until I can get an answer
     // from the gcc community. Note, this is a big issue.
     // Remember, the same_type_p here is my own temporary hack.
-    DEBUG_L("");
-    DEBUG_F( print_generic_expr, stderr, type, TDF_DETAILS);
-    DEBUG("\n");
+    //DEBUG_L("");
+    //DEBUG_F( print_generic_expr, stderr, type, TDF_DETAILS);
+    //DEBUG("\n");
     if ( same_type_p ( ri->gcc_type, type2check ) )
     {
       //DEBUG_A( "  returns %p\n", &(*ri));
@@ -2782,7 +3422,7 @@ get_reorgtype_info ( tree type, Info* info)
       return &(*ri);
     }
   }
-  DEBUG_A( "  returns NULL\n");
+  //DEBUG_A( "  returns NULL\n");
   return NULL;
 }
 
@@ -2955,13 +3595,13 @@ print_base_reorg ( FILE *file, int leading_space, ReorgType_t *reorg, bool detai
       fprintf ( file, "no interleave, ");
     }
 
-  DEBUG_L("reorg->reorg_ver_type = %p\n", reorg->reorg_ver_type);
+  //DEBUG_L("reorg->reorg_ver_type = %p\n", reorg->reorg_ver_type);
 
   if ( reorg->reorg_ver_type != NULL && TYPE_NAME ( reorg->reorg_ver_type) != NULL )
     {
       // TBD does this belong here? How will the clone be done with elim and
       // reorder
-      DEBUG_A("%p, %p\n", reorg->reorg_ver_type, TYPE_NAME ( reorg->reorg_ver_type));
+      //DEBUG_A("%p, %p\n", reorg->reorg_ver_type, TYPE_NAME ( reorg->reorg_ver_type));
       const char *clone_name =
 	identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( reorg->reorg_ver_type)));
       fprintf ( file, "%s%s", clone_name, reorg->pointer_rep ? ", " : "");

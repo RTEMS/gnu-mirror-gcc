@@ -162,6 +162,20 @@ struct BoolPair {
   bool layout_changed;
 };
 
+typedef struct two_trees two_trees_t;
+struct two_trees {
+  tree first;
+  tree second;
+};
+
+typedef struct type_holder TypeHolder;
+
+struct type_holder
+{
+  std::vector <tree> refed_types;
+  std::vector <tree> rec_types;
+};
+
 typedef struct Info Info_t;
 struct Info {
   // TODO: What is the meaning of reorg type?
@@ -175,9 +189,13 @@ struct Info {
   // Gcc doesn't have global decls readily available
   // so this holds them
   std::map <tree,BoolPair_t>     *struct_types; // desing bug fix
+  // For pointer modification
+  std::vector <two_trees_t>      *modified_types;
+  std::set <tree>                *dont_modify;
   int                             num_deleted;
   double                          total_cache_accesses;
   FILE                           *reorg_dump_file;
+  std::map <tree,TypeHolder>     *type_mod_info;
   // Debug flags
   bool                            show_all_reorg_cands;
   bool                            show_all_reorg_cands_in_detail;
@@ -189,14 +207,20 @@ struct Info {
   bool                            show_bounds;
   bool                            is_non_escaping_set_empty();
 
-  Info (std::vector <ReorgType_t> *v1,
-        std::vector <ReorgType_t> *v2,
-	std::vector <ProgDecl_t> *v3,
-	std::map <tree, BoolPair_t> *v4)
+  Info (std::vector <ReorgType_t>     *v1,
+        std::vector <ReorgType_t>     *v2,
+	std::vector <ProgDecl_t>      *v3,
+	std::map    <tree,BoolPair_t> *v4,
+	std::vector <two_trees_t>     *v5,
+	std::set    <tree>            *v6,
+	std::map <tree,TypeHolder>    *v7)
   : reorg_type(v1)
   , saved_reorg_type(v2)
   , prog_decl(v3)
   , struct_types(v4)
+  , modified_types(v5)
+  , dont_modify(v6)
+  , type_mod_info(v7) 
   , num_deleted(0)
   , total_cache_accesses(0)
   , reorg_dump_file(NULL)
@@ -227,7 +251,8 @@ extern int str_reorg_dead_field_eliminate ( Info *);
 extern int str_reorg_field_reorder ( Info *);
 extern int str_reorg_instance_interleave ( Info *);
 #endif
-
+extern void find_and_create_all_modified_types ( Info_t *);
+extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types ( std::vector<two_trees_t> *, tree);
 extern int number_of_levels ( tree);
 extern tree make_multilevel( tree, int);
 extern bool modify_decl_core ( tree *, Info *);
@@ -241,6 +266,7 @@ extern ReorgTransformation reorg_recognize ( gimple *,
 					     cgraph_node *,
 					     Info_t *);
 extern void apply_to_all_gimple ( bool (*)(gimple *, void *), bool, void *);
+extern bool same_type_p( tree, tree);
 extern ReorgType_t *get_reorgtype_info ( tree, Info_t *);
 extern void print_reorg_with_msg ( FILE *, ReorgType_t *, int, const char *);
 extern ReorgType_t *contains_a_reorgtype ( gimple *, Info *);
