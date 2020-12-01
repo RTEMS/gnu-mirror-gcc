@@ -89,6 +89,26 @@ work029.patch012
 	CXXABI_IEEE128_1.3.13 too.
 	* testsuite/26_numerics/complex/abi_tag.cc: Add u9__ieee128 to
 	regex matching expected symbols.
+	* include/bits/c++config: Regenerate.
+	* libsupc++/Makefile.in: Regenerate.
+	* src/c++11/Makefile.in: Regenerate.
+	* src/c++11/compatibility-ldbl-alt128-cxx11.cc: Regenerate.
+	* src/c++11/compatibility-ldbl-alt128.cc: Regenerate.
+	* src/c++11/compatibility-ldbl-facets-aliases.h: Regenerate.
+	* src/c++11/cow-locale_init.cc: Regenerate.
+	* src/c++11/cxx11-locale-inst.cc: Regenerate.
+	* src/c++11/cxx11-wlocale-inst.cc: Regenerate.
+	* src/c++11/locale-inst-monetary.h: Regenerate.
+	* src/c++11/locale-inst-numeric.h: Regenerate.
+	* src/c++11/locale-inst.cc: Regenerate.
+	* src/c++11/wlocale-inst.cc: Regenerate.
+	* src/c++17/Makefile.am: Regenerate.
+	* src/c++17/Makefile.in: Regenerate.
+	* src/c++17/floating_from_chars.cc: Regenerate.
+	* src/c++20/Makefile.in: Regenerate.
+	* src/c++98/Makefile.in: Regenerate.
+	* src/c++98/locale_init.cc: Regenerate.
+	* src/c++98/localename.cc: Regenerate.
 
 2020-11-30   Michael Meissner  <meissner@linux.ibm.com>
 
