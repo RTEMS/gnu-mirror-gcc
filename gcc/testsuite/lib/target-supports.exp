@@ -8445,3 +8445,496 @@ proc check_effective_target_arm_coproc4_ok { } {
     return [check_cached_effective_target arm_coproc4_ok \
 		check_effective_target_arm_coproc4_ok_nocache]
 }
+
+# Return 1 if the target supports the auto_inc_dec optimization pass.
+proc check_effective_target_autoincdec { } {
+    if { ![check_no_compiler_messages auto_incdec assembly { void f () { }
+	 } "-O2 -fdump-rtl-auto_inc_dec" ] } {
+      return 0
+    }
+
+    set dumpfile [glob -nocomplain "auto_incdec[pid].c.\[0-9\]\[0-9\]\[0-9\]r.auto_inc_dec"]
+    if { [file exists $dumpfile ] } {
+	file delete $dumpfile
+	return 1
+    }
+    return 0
+}
+
+# Return 1 if the target has support for stack probing designed
+# to avoid stack-clash style attacks.
+#
+# This is used to restrict the stack-clash mitigation tests to
+# just those targets that have been explicitly supported.
+# 
+# In addition to the prologue work on those targets, each target's
+# properties should be described in the functions below so that
+# tests do not become a mess of unreadable target conditions.
+# 
+proc check_effective_target_supports_stack_clash_protection { } {
+
+    if { [istarget x86_64-*-*] || [istarget i?86-*-*] 
+	  || [istarget powerpc*-*-*] || [istarget rs6000*-*-*]
+	  || [istarget aarch64*-**] || [istarget s390*-*-*] } {
+	return 1
+    }
+  return 0
+}
+
+# Return 1 if the target creates a frame pointer for non-leaf functions
+# Note we ignore cases where we apply tail call optimization here.
+proc check_effective_target_frame_pointer_for_non_leaf { } {
+  # Solaris/x86 defaults to -fno-omit-frame-pointer.
+  if { [istarget i?86-*-solaris*] || [istarget x86_64-*-solaris*] } {
+    return 1
+  }
+
+  return 0
+}
+
+# Return 1 if the target's calling sequence or its ABI
+# create implicit stack probes at or prior to function entry.
+proc check_effective_target_caller_implicit_probes { } {
+
+  # On x86/x86_64 the call instruction itself pushes the return
+  # address onto the stack.  That is an implicit probe of *sp.
+  if { [istarget x86_64-*-*] || [istarget i?86-*-*] } {
+	return 1
+  }
+
+  # On PPC, the ABI mandates that the address of the outer
+  # frame be stored at *sp.  Thus each allocation of stack
+  # space is itself an implicit probe of *sp.
+  if { [istarget powerpc*-*-*] || [istarget rs6000*-*-*] } {
+	return 1
+  }
+
+  # s390's ABI has a register save area allocated by the
+  # caller for use by the callee.  The mere existence does
+  # not constitute a probe by the caller, but when the slots
+  # used by the callee those stores are implicit probes.
+  if { [istarget s390*-*-*] } {
+	return 1
+  }
+
+  # Not strictly true on aarch64, but we have agreed that we will
+  # consider any function that pushes SP more than 3kbytes into
+  # the guard page as broken.  This essentially means that we can
+  # consider the aarch64 as having a caller implicit probe at
+  # *(sp + 1k).
+  if { [istarget aarch64*-*-*] } {
+	return 1;
+  }
+
+  return 0
+}
+
+# Targets that potentially realign the stack pointer often cause residual
+# stack allocations and make it difficult to elimination loops or residual
+# allocations for dynamic stack allocations
+proc check_effective_target_callee_realigns_stack { } {
+  if { [istarget x86_64-*-*] || [istarget i?86-*-*] } {
+	return 1
+  }
+  return 0
+}
+
+# Return 1 if CET instructions can be compiled.
+proc check_effective_target_cet { } {
+    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+	return 0
+    }
+    return [check_no_compiler_messages cet object {
+	void foo (void)
+	{
+	  asm ("setssbsy");
+	}
+    } "-O2 -fcf-protection" ]
+}
+
+# Return 1 if target supports floating point "infinite"
+proc check_effective_target_inf { } {
+    return [check_no_compiler_messages supports_inf assembly {
+        const double pinf = __builtin_inf ();
+    }]
+}
+
+# Return 1 if target supports floating point "infinite" for float.
+proc check_effective_target_inff { } {
+    return [check_no_compiler_messages supports_inff assembly {
+        const float pinf = __builtin_inff ();
+    }]
+}
+
+# Return 1 if the target supports ARMv8.3 Adv.SIMD Complex instructions
+# instructions, 0 otherwise.  The test is valid for ARM and for AArch64.
+# Record the command line options needed.
+
+proc check_effective_target_arm_v8_3a_complex_neon_ok_nocache { } {
+    global et_arm_v8_3a_complex_neon_flags
+    set et_arm_v8_3a_complex_neon_flags ""
+
+    if { ![istarget arm*-*-*] && ![istarget aarch64*-*-*] } {
+        return 0;
+    }
+
+    # Iterate through sets of options to find the compiler flags that
+    # need to be added to the -march option.
+    foreach flags {"" "-mfloat-abi=softfp -mfpu=auto" "-mfloat-abi=hard -mfpu=auto"} {
+        if { [check_no_compiler_messages_nocache \
+                  arm_v8_3a_complex_neon_ok object {
+            #if !defined (__ARM_FEATURE_COMPLEX)
+            #error "__ARM_FEATURE_COMPLEX not defined"
+            #endif
+        } "$flags -march=armv8.3-a"] } {
+            set et_arm_v8_3a_complex_neon_flags "$flags -march=armv8.3-a"
+            return 1
+        }
+    }
+
+    return 0;
+}
+
+proc check_effective_target_arm_v8_3a_complex_neon_ok { } {
+    return [check_cached_effective_target arm_v8_3a_complex_neon_ok \
+                check_effective_target_arm_v8_3a_complex_neon_ok_nocache]
+}
+
+proc add_options_for_arm_v8_3a_complex_neon { flags } {
+    if { ! [check_effective_target_arm_v8_3a_complex_neon_ok] } {
+        return "$flags"
+    }
+    global et_arm_v8_3a_complex_neon_flags
+    return "$flags $et_arm_v8_3a_complex_neon_flags"
+}
+
+# Return 1 if the target supports executing AdvSIMD instructions from ARMv8.3
+# with the complex instruction extension, 0 otherwise.  The test is valid for
+# ARM and for AArch64.
+
+proc check_effective_target_arm_v8_3a_complex_neon_hw { } {
+    if { ![check_effective_target_arm_v8_3a_complex_neon_ok] } {
+        return 0;
+    }
+    return [check_runtime arm_v8_3a_complex_neon_hw_available {
+        #include "arm_neon.h"
+        int
+        main (void)
+        {
+
+          float32x2_t results = {-4.0,5.0};
+          float32x2_t a = {1.0,3.0};
+          float32x2_t b = {2.0,5.0};
+
+          #ifdef __ARM_ARCH_ISA_A64
+          asm ("fcadd %0.2s, %1.2s, %2.2s, #90"
+               : "=w"(results)
+               : "w"(a), "w"(b)
+               : /* No clobbers.  */);
+
+          #else
+          asm ("vcadd.f32 %P0, %P1, %P2, #90"
+               : "=w"(results)
+               : "w"(a), "w"(b)
+               : /* No clobbers.  */);
+          #endif
+
+          return (results[0] == 8 && results[1] == 24) ? 1 : 0;
+        }
+    } [add_options_for_arm_v8_3a_complex_neon ""]]
+}
+
+# Return 1 if the assembler supports assembling the Armv8.3 pointer authentication B key directive
+proc check_effective_target_arm_v8_3a_bkey_directive { } {
+	return [check_no_compiler_messages cet object {
+		int main(void) {
+			asm (".cfi_b_key_frame");
+			return 0;
+		}
+	}]
+}
+
+# Return 1 if the target supports executing the Armv8.1-M Mainline Low
+# Overhead Loop, 0 otherwise.  The test is valid for ARM.
+
+proc check_effective_target_arm_v8_1_lob_ok { } {
+    if { ![check_effective_target_arm_cortex_m] } {
+        return 0;
+    } else {
+	return [check_runtime arm_v8_1_lob_hw_available {
+		int
+		main (void)
+	        { int i = 0;
+		  asm  ("movw r3, #10\n\t" /* movs? */
+			"dls lr, r3" : : : "r3", "lr");
+		 loop:
+		  i++;
+		  asm goto ("le lr, %l0" : : : "lr" : loop);
+		  return i != 10;
+		}
+	} "-march=armv8.1-m.main -mthumb" ]
+    }
+}
+
+# Return 1 is this is an ARM target where -mthumb causes Thumb-2 to be
+# used and the target does not support executing the Armv8.1-M
+# Mainline Low Overhead Loop, 0 otherwise.  The test is valid for ARM.
+
+proc check_effective_target_arm_thumb2_ok_no_arm_v8_1_lob { } {
+    if { [check_effective_target_arm_thumb2_ok]
+	 && ![check_effective_target_arm_v8_1_lob_ok] } {
+	return 1
+    }
+    return 0
+}
+
+# Returns 1 if the target is using glibc, 0 otherwise.
+
+proc check_effective_target_glibc { } {
+    return [check_no_compiler_messages glibc_object assembly {
+  #include <stdlib.h>
+	#if !defined(__GLIBC__)
+	#error undefined
+	#endif
+    }]
+}
+
+# Return 1 if the target plus current options supports a vector
+# complex addition with rotate of half and single float modes, 0 otherwise.
+#
+# This won't change for different subtargets so cache the result.
+
+foreach N {hf sf} {
+    eval [string map [list N $N] {
+        proc check_effective_target_vect_complex_rot_N { } {
+            return [check_cached_effective_target_indexed vect_complex_rot_N {
+            expr { [istarget aarch64*-*-*]
+                    || [istarget arm*-*-*] }}]
+        }
+    }]
+}
+
+# Return 1 if the target plus current options supports a vector
+# complex addition with rotate of double float modes, 0 otherwise.
+#
+# This won't change for different subtargets so cache the result.
+
+foreach N {df} {
+    eval [string map [list N $N] {
+        proc check_effective_target_vect_complex_rot_N { } {
+            return [check_cached_effective_target_indexed vect_complex_rot_N {
+            expr { [istarget aarch64*-*-*] }}]
+        }
+    }]
+}
+
+# Return 1 if this target uses an LLVM assembler and/or linker
+proc check_effective_target_llvm_binutils { } {
+    return [check_cached_effective_target llvm_binutils {
+	      expr { [istarget amdgcn*-*-*]
+		     || [check_effective_target_offload_gcn] }}]
+}
+
+# Return 1 if the compiler supports '-mfentry'.
+
+proc check_effective_target_mfentry { } {
+    if { !([istarget i?86-*-*] || [istarget x86_64-*-*]) } {
+        return 0
+    }
+    return [check_no_compiler_messages mfentry object {
+	        void foo (void) { }
+    } "-mfentry"]
+}
+
+# Return 1 if this target supports indirect calls
+proc check_effective_target_indirect_calls { } {
+  if { [istarget bpf-*-*] } {
+        return 0
+  }
+  return 1
+}
+
+# Return 1 if we can use the -lgccjit option, 0 otherwise.
+
+proc check_effective_target_lgccjit { } {
+  if { [info procs jit_target_compile] == "" } then {
+    global GCC_UNDER_TEST
+    if ![info exists GCC_UNDER_TEST] {
+      set GCC_UNDER_TEST "[find_gcc]"
+    }
+    proc jit_target_compile { source dest type options } [info body gcc_target_compile]
+  }
+  return [check_no_compiler_messages lgccjit executable {
+     int main() { return 0; }
+  } "-lgccjit"]
+}
+
+# Return 1 if the MSP430 small memory model is in use.
+proc check_effective_target_msp430_small {} {
+    return [check_no_compiler_messages msp430_small assembly {
+	#if (!defined __MSP430__ || defined __MSP430X_LARGE__)
+	#error !msp430 || __MSP430X_LARGE__
+	#endif
+    } ""]
+}
+
+# Return 1 if the MSP430 large memory model is in use.
+proc check_effective_target_msp430_large {} {
+    return [check_no_compiler_messages msp430_large assembly {
+	#ifndef __MSP430X_LARGE__
+	#error __MSP430X_LARGE__
+	#endif
+    } ""]
+}
+
+# Return 1 if the target has an efficient means to encode large initializers
+# in the assembly.
+
+proc check_effective_target_large_initializer { } {
+    if { [istarget nvptx*-*-*] } {
+	return 0
+    }
+
+    return 1
+}
+
+# Return 1 if the target allows function prototype mismatches
+# in the assembly.
+
+proc check_effective_target_non_strict_prototype { } {
+    if { [istarget nvptx*-*-*] } {
+	return 0
+    }
+
+    return 1
+}
+
+# Returns 1 if the target toolchain supports extended
+# syntax of .symver directive, 0 otherwise.
+
+proc check_symver_available { } {
+    return [check_no_compiler_messages symver_available object {
+	    int foo(void) { return 0; }
+	    int main (void) {
+		asm volatile (".symver foo,foo@VER_1, local");
+		return 0;
+	    }
+	}]
+}
+
+# Return 1 if emitted assembly contains .ident directive.
+
+proc check_effective_target_ident_directive {} {
+    return [check_no_messages_and_pattern ident_directive \
+		"(?n)^\[\t\]+\\.ident" assembly {
+	int i;
+    }]
+}
+
+# Return 1 if we're able to assemble movdiri and movdir64b
+
+proc check_effective_target_movdir { } {
+    return [check_no_compiler_messages movdir object {
+	void
+	foo (unsigned int *d, unsigned int s)
+	{
+	  __builtin_ia32_directstoreu_u32 (d, s);
+	}
+	void
+	bar (void *d, const void *s)
+	{
+	  __builtin_ia32_movdir64b (d, s);
+	}
+    } "-mmovdiri -mmovdir64b" ]
+}
+
+# Return 1 if target is not support address sanitize, 1 otherwise.
+
+proc check_effective_target_no_fsanitize_address {} {
+    if ![check_no_compiler_messages fsanitize_address executable {
+	int main (void) { return 0; }
+    }] {
+	return 1;
+    }
+    return 0;
+}
+
+# Return 1 if this target supports 'R' flag in .section directive, 0
+# otherwise.  Cache the result.
+
+proc check_effective_target_R_flag_in_section { } {
+    global tool
+    global GCC_UNDER_TEST
+
+    # Need auto-host.h to check linker support.
+    if { ![file exists ../../auto-host.h ] } {
+	return 0
+    }
+
+    return [check_cached_effective_target R_flag_in_section {
+
+	set src pie[pid].c
+	set obj pie[pid].o
+
+	set f [open $src "w"]
+	puts $f "#include \"../../auto-host.h\""
+	puts $f "#if HAVE_GAS_SHF_GNU_RETAIN == 0"
+	puts $f "# error Assembler does not support 'R' flag in .section directive."
+	puts $f "#endif"
+	close $f
+
+	verbose "check_effective_target_R_flag_in_section compiling testfile $src" 2
+	set lines [${tool}_target_compile $src $obj assembly ""]
+
+	file delete $src
+	file delete $obj
+
+	if [string match "" $lines] then {
+	    verbose "check_effective_target_R_flag_in_section testfile compilation passed" 2
+	    return 1
+	} else {
+	    verbose "check_effective_target_R_flag_in_section testfile compilation failed" 2
+	    return 0
+	}
+    }]
+}
+
+# Return 1 if this target supports 'o' flag in .section directive, 0
+# otherwise.  Cache the result.
+
+proc check_effective_target_o_flag_in_section { } {
+    global tool
+    global GCC_UNDER_TEST
+
+    # Need auto-host.h to check linker support.
+    if { ![file exists ../../auto-host.h ] } {
+	return 0
+    }
+
+    return [check_cached_effective_target o_flag_in_section {
+
+	set src pie[pid].c
+	set obj pie[pid].o
+
+	set f [open $src "w"]
+	puts $f "#include \"../../auto-host.h\""
+	puts $f "#if HAVE_GAS_SECTION_LINK_ORDER == 0"
+	puts $f "# error Assembler does not support 'o' flag in .section directive."
+	puts $f "#endif"
+	close $f
+
+	verbose "check_effective_target_o_flag_in_section compiling testfile $src" 2
+	set lines [${tool}_target_compile $src $obj object ""]
+
+	file delete $src
+	file delete $obj
+
+	if [string match "" $lines] then {
+	    verbose "check_effective_target_o_flag_in_section testfile compilation passed" 2
+	    return 1
+	} else {
+	    verbose "check_effective_target_o_flag_in_section testfile compilation failed" 2
+	    return 0
+	}
+    }]
+}
