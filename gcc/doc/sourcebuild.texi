@@ -2072,6 +2072,15 @@ Target uses natural alignment (aligned to type size) for types of
 @item nonpic
 Target does not generate PIC by default.
 
+@item o_flag_in_section
+Target supports the 'o' flag in .section directive in assembly inputs.
+
+@item offload_gcn
+Target has been configured for OpenACC/OpenMP offloading on AMD GCN.
+
+@item persistent
+Target supports the @code{persistent} variable attribute.
+
 @item pie_enabled
 Target generates PIE by default.
 

@@ -6398,6 +6398,10 @@ default_elf_asm_named_section (const char *name, unsigned int flags,
 	*f++ = TLS_SECTION_ASM_FLAG;
       if (HAVE_COMDAT_GROUP && (flags & SECTION_LINKONCE))
 	*f++ = 'G';
+      if (flags & SECTION_RETAIN)
+	*f++ = 'R';
+      if (flags & SECTION_LINK_ORDER)
+	*f++ = 'o';
 #ifdef MACH_DEP_SECTION_ASM_FLAG
       if (flags & SECTION_MACH_DEP)
 	*f++ = MACH_DEP_SECTION_ASM_FLAG;
@@ -6426,6 +6430,14 @@ default_elf_asm_named_section (const char *name, unsigned int flags,
 
       if (flags & SECTION_ENTSIZE)
 	fprintf (asm_out_file, ",%d", flags & SECTION_ENTSIZE);
+      if (flags & SECTION_LINK_ORDER)
+	{
+	  tree id = DECL_ASSEMBLER_NAME (decl);
+	  ultimate_transparent_alias_target (&id);
+	  const char *name = IDENTIFIER_POINTER (id);
+	  name = targetm.strip_name_encoding (name);
+	  fprintf (asm_out_file, ",%s", name);
+	}
       if (HAVE_COMDAT_GROUP && (flags & SECTION_LINKONCE))
 	{
 	  if (TREE_CODE (decl) == IDENTIFIER_NODE)
