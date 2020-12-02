@@ -14308,24 +14308,24 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
   gimple *new_call;
   tree new_decl;
 
-  /* #### Get rid of the adjacency dependency.  */
-  if (rs6000_builtin_info_x[fncode + 1].icode == CODE_FOR_nothing)
+  if (fncode == RS6000_BIF_DISASSEMBLE_ACC
+      || fncode == RS6000_BIF_DISASSEMBLE_PAIR)
     {
       /* This is an MMA disassemble built-in function.  */
-      gcc_assert (fncode == RS6000_BIF_DISASSEMBLE_ACC
-		  || fncode == RS6000_BIF_DISASSEMBLE_PAIR);
-
       push_gimplify_context (true);
+      unsigned nvec = (fncode == MMA_BUILTIN_DISASSEMBLE_ACC) ? 4 : 2;
       tree dst_ptr = gimple_call_arg (stmt, 0);
       tree src_ptr = gimple_call_arg (stmt, 1);
       tree src_type = TREE_TYPE (src_ptr);
       tree src = make_ssa_name (TREE_TYPE (src_type));
       gimplify_assign (src, build_simple_mem_ref (src_ptr), &new_seq);
 
-      /* If we are not disassembling an accumulator or our destination is
-	 another accumulator, then just copy the entire thing as is.  */
-      if (fncode != RS6000_BIF_DISASSEMBLE_ACC
-	  || TREE_TYPE (TREE_TYPE (dst_ptr)) == vector_quad_type_node)
+      /* If we are not disassembling an accumulator/pair or our destination is
+	 another accumulator/pair, then just copy the entire thing as is.  */
+      if ((fncode == RS6000_BIF_DISASSEMBLE_ACC
+	   && TREE_TYPE (TREE_TYPE (dst_ptr)) == vector_quad_type_node)
+	  || (fncode == RS6000_BIF_DISASSEMBLE_PAIR
+	      && TREE_TYPE (TREE_TYPE (dst_ptr)) == vector_pair_type_node))
 	{
 	  tree dst = build_simple_mem_ref (build1 (VIEW_CONVERT_EXPR,
 						   src_type, dst_ptr));
@@ -14335,29 +14335,34 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 	  return true;
 	}
 
-      /* We're disassembling an accumulator into a different type, so we need
+      /* If we're disassembling an accumulator into a different type, we need
 	 to emit a xxmfacc instruction now, since we cannot do it later.  */
-      new_decl = rs6000_builtin_decls_x[RS6000_BIF_XXMFACC_INTERNAL];
-      new_call = gimple_build_call (new_decl, 1, src);
-      src = make_ssa_name (vector_quad_type_node);
-      gimple_call_set_lhs (new_call, src);
-      gimple_seq_add_stmt (&new_seq, new_call);
+      if (fncode == RS6000_BIF_DISASSEMBLE_ACC)
+	{
+	  new_decl = rs6000_builtin_decls[RS6000_BIF_XXMFACC_INTERNAL];
+	  new_call = gimple_build_call (new_decl, 1, src);
+	  src = make_ssa_name (vector_quad_type_node);
+	  gimple_call_set_lhs (new_call, src);
+	  gimple_seq_add_stmt (&new_seq, new_call);
+	}
 
-      /* Copy the accumulator vector by vector.  */
+      /* Copy the accumulator/pair vector by vector.  */
+      /* #### TODO: Break the adjacency dependency.  */
+      new_decl = rs6000_builtin_decls[fncode + 1];
       tree dst_type = build_pointer_type_for_mode (unsigned_V16QI_type_node,
 						   ptr_mode, true);
       tree dst_base = build1 (VIEW_CONVERT_EXPR, dst_type, dst_ptr);
-      tree array_type = build_array_type_nelts (unsigned_V16QI_type_node, 4);
-      tree src_array = build1 (VIEW_CONVERT_EXPR, array_type, src);
-      for (unsigned i = 0; i < 4; i++)
+      for (unsigned i = 0; i < nvec; i++)
 	{
-	  unsigned index = WORDS_BIG_ENDIAN ? i : 3 - i;
-	  tree ref = build4 (ARRAY_REF, unsigned_V16QI_type_node, src_array,
-			     build_int_cst (size_type_node, i),
-			     NULL_TREE, NULL_TREE);
+	  unsigned index = WORDS_BIG_ENDIAN ? i : nvec - 1 - i;
 	  tree dst = build2 (MEM_REF, unsigned_V16QI_type_node, dst_base,
 			     build_int_cst (dst_type, index * 16));
-	  gimplify_assign (dst, ref, &new_seq);
+	  tree dstssa = make_ssa_name (unsigned_V16QI_type_node);
+	  new_call = gimple_build_call (new_decl, 2, src,
+					build_int_cstu (uint16_type_node, i));
+	  gimple_call_set_lhs (new_call, dstssa);
+	  gimple_seq_add_stmt (&new_seq, new_call);
+	  gimplify_assign (dst, dstssa, &new_seq);
 	}
       pop_gimplify_context (NULL);
       gsi_replace_with_seq (gsi, new_seq, true);
@@ -15430,6 +15435,22 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       case CODE_FOR_xsiexpqp_kf:	icode = CODE_FOR_xsiexpqp_tf;	break;
       case CODE_FOR_xsiexpqpf_kf:	icode = CODE_FOR_xsiexpqpf_tf;	break;
       case CODE_FOR_xststdcqp_kf:	icode = CODE_FOR_xststdcqp_tf;	break;
+
+      case CODE_FOR_xscmpexpqp_eq_kf:
+	icode = CODE_FOR_xscmpexpqp_eq_tf;
+	break;
+
+      case CODE_FOR_xscmpexpqp_lt_kf:
+	icode = CODE_FOR_xscmpexpqp_lt_tf;
+	break;
+
+      case CODE_FOR_xscmpexpqp_gt_kf:
+	icode = CODE_FOR_xscmpexpqp_gt_tf;
+	break;
+
+      case CODE_FOR_xscmpexpqp_unordered_kf:
+	icode = CODE_FOR_xscmpexpqp_unordered_tf;
+	break;
       }
 
   bifdata *bifaddr = &rs6000_builtin_info_x[uns_fcode];
