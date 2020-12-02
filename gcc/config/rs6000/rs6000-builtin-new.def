@@ -2356,7 +2356,7 @@
   const vsq __builtin_bcdadd_v1ti (vsq, vsq, const int<1>);
     BCDADD_V1TI bcdadd_v1ti {}
 
-  const vuc __builtin_bcdadd (vuc, vuc, const int<1>);
+  const vuc __builtin_bcdadd_v16qi (vuc, vuc, const int<1>);
     BCDADD_V16QI bcdadd_v16qi {}
 
   const signed int __builtin_bcdadd_eq_v1ti (vsq, vsq, const int<1>);
@@ -2383,10 +2383,22 @@
   const signed int __builtin_bcdadd_ov_v16qi (vuc, vuc, const int<1>);
     BCDADD_OV_V16QI bcdadd_unordered_v16qi {}
 
+  const vuc __builtin_bcddiv10_v16qi (vuc);
+    BCDDIV10_V16QI bcddiv10_v16qi {}
+
+  const signed int __builtin_bcdinvalid_v1ti (vsq);
+    BCDINVALID_V1TI bcdinvalid_v1ti {}
+
+  const signed int __builtin_bcdinvalid_v16qi (vuc);
+    BCDINVALID_V16QI bcdinvalid_v16qi {}
+
+  const vuc __builtin_bcdmul10_v16qi (vuc);
+    BCDMUL10_V16QI bcdmul10_v16qi {}
+
   const vsq __builtin_bcdsub_v1ti (vsq, vsq, const int<1>);
     BCDSUB_V1TI bcdsub_v1ti {}
 
-  const vuc __builtin_bcdsub (vuc, vuc, const int<1>);
+  const vuc __builtin_bcdsub_v16qi (vuc, vuc, const int<1>);
     BCDSUB_V16QI bcdsub_v16qi {}
 
   const signed int __builtin_bcdsub_eq_v1ti (vsq, vsq, const int<1>);
@@ -2424,6 +2436,9 @@
 
   const vus __builtin_crypto_vpermxor_v8hi (vus, vus, vus);
     VPERMXOR_V8HI crypto_vpermxor_v8hi {}
+
+  const _Decimal128 __builtin_denb2dfp_v16qi (vuc);
+    DENB2DFP_V16QI dfp_denbcd_v16qi {}
 
 ; Note: these four have incorrect return types per the way the
 ; instructions work, but this matches the old signatures that

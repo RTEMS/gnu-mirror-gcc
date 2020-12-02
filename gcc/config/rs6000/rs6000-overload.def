@@ -74,6 +74,84 @@
 ; a semicolon are also treated as blank lines.
 
 
+[BCDADD, __builtin_bcdadd, __builtin_vec_bcdadd]
+  vsq __builtin_vec_bcdadd (vsq, vsq, const int);
+    BCDADD_V1TI
+  vuc __builtin_vec_bcdadd (vuc, vuc, const int);
+    BCDADD_V16QI
+
+[BCDADD_EQ, __builtin_bcdadd_eq, __builtin_vec_bcdadd_eq]
+  signed int __builtin_vec_bcdadd_eq (vsq, vsq, const int);
+    BCDADD_EQ_V1TI
+  signed int __builtin_vec_bcdadd_eq (vuc, vuc, const int);
+    BCDADD_EQ_V16QI
+
+[BCDADD_GT, __builtin_bcdadd_gt, __builtin_vec_bcdadd_gt]
+  signed int __builtin_vec_bcdadd_gt (vsq, vsq, const int);
+    BCDADD_GT_V1TI
+  signed int __builtin_vec_bcdadd_gt (vuc, vuc, const int);
+    BCDADD_GT_V16QI
+
+[BCDADD_LT, __builtin_bcdadd_lt, __builtin_vec_bcdadd_lt]
+  signed int __builtin_vec_bcdadd_lt (vsq, vsq, const int);
+    BCDADD_LT_V1TI
+  signed int __builtin_vec_bcdadd_lt (vuc, vuc, const int);
+    BCDADD_LT_V16QI
+
+[BCDADD_OV, __builtin_bcdadd_ov, __builtin_vec_bcdadd_ov]
+  signed int __builtin_vec_bcdadd_ov (vsq, vsq, const int);
+    BCDADD_OV_V1TI
+  signed int __builtin_vec_bcdadd_ov (vuc, vuc, const int);
+    BCDADD_OV_V16QI
+
+[BCDDIV10, __builtin_bcddiv10, __builtin_vec_bcddiv10]
+  vuc __builtin_vec_bcddiv10 (vuc);
+    BCDDIV10_V16QI
+
+[BCDINVALID, __builtin_bcdinvalid, __builtin_vec_bcdinvalid]
+  signed int __builtin_vec_bcdinvalid (vsq);
+    BCDINVALID_V1TI
+  signed int __builtin_vec_bcdinvalid (vuc);
+    BCDINVALID_V16QI
+
+[BCDMUL10, __builtin_bcdmul10, __builtin_vec_bcdmul10]
+  vuc __builtin_vec_bcdmul10 (vuc);
+    BCDMUL10_V16QI
+
+[BCDSUB, __builtin_bcdsub, __builtin_vec_bcdsub]
+  vsq __builtin_vec_bcdsub (vsq, vsq, const int);
+    BCDSUB_V1TI
+  vuc __builtin_vec_bcdsub (vuc, vuc, const int);
+    BCDSUB_V16QI
+
+[BCDSUB_EQ, __builtin_bcdsub_eq, __builtin_vec_bcdsub_eq]
+  signed int __builtin_vec_bcdsub_eq (vsq, vsq, const int);
+    BCDSUB_EQ_V1TI
+  signed int __builtin_vec_bcdsub_eq (vuc, vuc, const int);
+    BCDSUB_EQ_V16QI
+
+[BCDSUB_GT, __builtin_bcdsub_gt, __builtin_vec_bcdsub_gt]
+  signed int __builtin_vec_bcdsub_gt (vsq, vsq, const int);
+    BCDSUB_GT_V1TI
+  signed int __builtin_vec_bcdsub_gt (vuc, vuc, const int);
+    BCDSUB_GT_V16QI
+
+[BCDSUB_LT, __builtin_bcdsub_lt, __builtin_vec_bcdsub_lt]
+  signed int __builtin_vec_bcdsub_lt (vsq, vsq, const int);
+    BCDSUB_LT_V1TI
+  signed int __builtin_vec_bcdsub_lt (vuc, vuc, const int);
+    BCDSUB_LT_V16QI
+
+[BCDSUB_OV, __builtin_bcdsub_ov, __builtin_vec_bcdsub_ov]
+  signed int __builtin_vec_bcdsub_ov (vsq, vsq, const int);
+    BCDSUB_OV_V1TI
+  signed int __builtin_vec_bcdsub_ov (vuc, vuc, const int);
+    BCDSUB_OV_V16QI
+
+[BCD2DFP, __builtin_bcd2dfp, __builtin_vec_denb2dfp]
+  _Decimal128 __builtin_vec_denb2dfp (vuc);
+    DENB2DFP_V16QI
+
 [CRYPTO_PERMXOR, SKIP, __builtin_crypto_vpermxor]
   vuc __builtin_crypto_vpermxor (vuc, vuc, vuc);
     VPERMXOR_V16QI
