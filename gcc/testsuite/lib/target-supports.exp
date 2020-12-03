@@ -8445,3 +8445,8 @@ proc check_effective_target_arm_coproc4_ok { } {
     return [check_cached_effective_target arm_coproc4_ok \
 		check_effective_target_arm_coproc4_ok_nocache]
 }
+
+# Return 1 if GCC was configured with --with-tune=cortex-a76
+proc check_effective_target_tune_cortex_a76 { } {
+    return [check_configured_with "with-tune=cortex-a76"]
+}

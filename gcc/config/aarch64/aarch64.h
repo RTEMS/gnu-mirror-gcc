@@ -926,12 +926,14 @@ extern enum aarch64_code_model aarch64_cmodel;
 #define ENDIAN_LANE_N(mode, n)  \
   (BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode) - 1 - n : n)
 
-/* Support for a configure-time default CPU, etc.  We currently support
-   --with-arch and --with-cpu.  Both are ignored if either is specified
-   explicitly on the command line at run time.  */
+/* Support for configure-time --with-arch, --with-cpu and --with-tune.
+   --with-arch and --with-cpu are ignored if either -mcpu or -march is used.
+   --with-tune is ignored if either -mtune or -mcpu is used (but is not
+   affected by -march).  */
 #define OPTION_DEFAULT_SPECS				\
   {"arch", "%{!march=*:%{!mcpu=*:-march=%(VALUE)}}" },	\
-  {"cpu",  "%{!march=*:%{!mcpu=*:-mcpu=%(VALUE)}}" },
+  {"cpu",  "%{!march=*:%{!mcpu=*:-mcpu=%(VALUE)}}" },   \
+  {"tune", "%{!mcpu=*:%{!mtune=*:-mtune=%(VALUE)}}"},
 
 #define MCPU_TO_MARCH_SPEC \
    " %{mcpu=*:-march=%:rewrite_mcpu(%{mcpu=*:%*})}"
