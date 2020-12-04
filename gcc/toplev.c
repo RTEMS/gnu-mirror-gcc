@@ -731,11 +731,21 @@ init_asm_output (const char *name)
 	{
 	  if (targetm.asm_out.record_gcc_switches)
 	    {
-	      const char *str
-		= gen_producer_string (lang_hooks.name,
-				       save_decoded_options,
-				       save_decoded_options_count);
-	      targetm.asm_out.record_gcc_switches (str);
+	      if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
+		{
+		  const char *str = concat (version_string, " ",
+					    get_driver_command_line (), NULL);
+		  targetm.asm_out.record_gcc_switches (str);
+		  free (CONST_CAST (char *, str));
+		}
+	      else
+		{
+		  const char *str
+		    = gen_producer_string (lang_hooks.name,
+					   save_decoded_options,
+					   save_decoded_options_count);
+		  targetm.asm_out.record_gcc_switches (str);
+		}
 	    }
 	  else
 	    inform (UNKNOWN_LOCATION,
@@ -1384,8 +1394,11 @@ process_options (void)
       if (!quiet_flag)
 	{
 	  fputs ("options passed: ", stderr);
-	  fputs (gen_command_line_string (save_decoded_options,
-					  save_decoded_options_count), stderr);
+	  if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
+	    fputs (get_driver_command_line (), stderr);
+	  else
+	    fputs (gen_command_line_string (save_decoded_options,
+					    save_decoded_options_count), stderr);
 	  fputc ('\n', stderr);
 	}
     }
