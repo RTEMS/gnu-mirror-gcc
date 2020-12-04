@@ -2348,6 +2348,128 @@ proc check_effective_target_ppc_ieee128_ok { } {
     }]
 }
 
+# See if the target is a powerpc with the long double format that uses the IBM
+# extended double format.
+
+proc check_effective_target_ppc_long_double_ibm { } {
+    return [check_cached_effective_target ppc_long_double_ibm {
+	int main()
+	{
+	  #if !defined(_ARCH_PPC) || !defined(__LONG_DOUBLE_IBM128__)
+	    return 1;
+	  #else
+	    return 0;
+	  #endif
+	}
+    }]
+}
+
+# See if the target is a powerpc with the long double format that uses the IEEE
+# 128-bit format.
+
+proc check_effective_target_ppc_long_double_ieee { } {
+    return [check_cached_effective_target ppc_long_double_ieee {
+	int main()
+	{
+	  #if !defined(_ARCH_PPC) || !defined(__LONG_DOUBLE_IEEE128__)
+	    return 1;
+	  #else
+	    return 0;
+	  #endif
+	}
+    }]
+}
+
+# Like check_effective_target_ppc_long_double_ibm, but check if we can
+# explicitly override the long double format to use the IBM 128-bit extended
+# double format, and GLIBC supports doing this override by switching the
+# sprintf to handle long double.
+
+proc check_effective_target_ppc_long_double_override_ibm { } {
+    set options "-mlong-double-128 -mabi=ibmlongdouble -Wno-psabi"
+    check_runtime_nocache ppc_long_double_ovveride_ibm {
+	#include <string.h>
+	#include <stdio.h>
+	volatile __ibm128 a = (__ibm128) 3.0;
+	volatile long double one = 1.0L;
+	volatile long double two = 2.0L;
+	volatile long double b;
+	char buffer[20];
+	int main()
+	{
+	  #if !defined(_ARCH_PPC) || !defined(__LONG_DOUBLE_IBM128__)
+	    return 1;
+	  #else
+	    b = one + two;
+	    if (memcmp ((void *)&a, (void *)&b, sizeof (long double)) != 0)
+	      return 1;
+	    sprintf (buffer, "%lg", b);
+	    return strcmp (buffer, "3") != 0;
+	  #endif
+	}
+    } $options
+}
+
+# Like check_effective_target_ppc_long_double_ieee, but check if we can
+# explicitly override the long double format to use the IEEE 128-bit format,
+# and GLIBC supports doing this override by switching the sprintf to handle
+# long double.
+
+proc check_effective_target_ppc_long_double_override_ieee { } {
+    set options "-mlong-double-128 -mabi=ieeelongdouble -Wno-psabi"
+    check_runtime_nocache ppc_long_double_ovveride_ieee {
+	#include <string.h>
+	#include <stdio.h>
+	volatile _Float128 a = 3.0f128;
+	volatile long double one = 1.0L;
+	volatile long double two = 2.0L;
+	volatile long double b;
+	char buffer[20];
+	int main()
+	{
+	  #if !defined(_ARCH_PPC) || !defined(__LONG_DOUBLE_IEEE128__)
+	    return 1;
+	  #else
+	    b = one + two;
+	    if (memcmp ((void *)&a, (void *)&b, sizeof (long double)) != 0)
+	      return 1;
+	    sprintf (buffer, "%lg", b);
+	    return strcmp (buffer, "3") != 0;
+	  #endif
+	}
+    } $options
+}
+
+# See if the target is a powerpc with the long double format that is 128-bits.
+
+proc check_effective_target_ppc_long_double_128bit { } {
+    return [check_cached_effective_target ppc_long_double_128bit {
+	int main()
+	{
+	  #ifndef _ARCH_PPC
+	    return 1;
+	  #else
+	    return sizeof (long double) != 16;
+	    #endif
+	}
+    }]
+}
+
+# See if the target is a powerpc with the long double format that is 64-bit.
+
+proc check_effective_target_ppc_long_double_64bit { } {
+    return [check_cached_effective_target ppc_long_double_64bit {
+	int main()
+	{
+	  #ifndef _ARCH_PPC
+	    return 1;
+	  #else
+	    return sizeof (long double) != 8;
+	  #endif
+	}
+    }]
+}
+
 # Return 1 if the target supports executing VSX instructions, 0
 # otherwise.  Cache the result.
 
