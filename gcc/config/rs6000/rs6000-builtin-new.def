@@ -1718,8 +1718,8 @@
 
 ; Need to pick one or the other here!!  ####
 ; Second one is used in the overload table (old and new) for VEC_FLOAT.
-  const vf __builtin_vsx_xvcvsxwsp (vsi);
-    XVCVSXWSP vsx_floatv4siv4sf2 {}
+;  const vf __builtin_vsx_xvcvsxwsp (vsi);
+;    XVCVSXWSP vsx_floatv4siv4sf2 {}
   const vf __builtin_vsx_xvcvsxwsp (vsi);
     XVCVSXWSP_V4SF vsx_xvcvsxwdp {}
 
@@ -1741,8 +1741,8 @@
 
 ; Need to pick one or the other here!! ####
 ; Second one is used in the overload table (old and new) for VEC_FLOAT.
-  const vf __builtin_vsx_xvcvuxwsp (vui);
-    XVCVUXWSP vsx_floatunsv4siv4sf2 {}
+;  const vf __builtin_vsx_xvcvuxwsp (vui);
+;    XVCVUXWSP vsx_floatunsv4siv4sf2 {}
   const vf __builtin_vsx_xvcvuxwsp (vui);
     XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
 

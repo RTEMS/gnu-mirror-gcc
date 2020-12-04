@@ -12352,7 +12352,8 @@ bool
 rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 {
   if (new_builtins_are_live)
-    rs6000_gimple_fold_new_builtin (gsi);
+    return rs6000_gimple_fold_new_builtin (gsi);
+
   gimple *stmt = gsi_stmt (*gsi);
   tree fndecl = gimple_call_fndecl (stmt);
   gcc_checking_assert (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_MD);
@@ -14285,7 +14286,7 @@ rs6000_new_builtin_is_supported_p (enum rs6000_gen_builtins fncode)
 	return false;
       break;
     };
-  gcc_unreachable ();
+  return true;
 }
 
 /* Expand the MMA built-ins early, so that we can convert the pass-by-reference
@@ -14297,6 +14298,9 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 {
   gimple *stmt = gsi_stmt (*gsi);
   size_t fncode = (size_t) fn_code;
+
+  if (!bif_is_mma (rs6000_builtin_info_x[fncode]))
+    return false;
 
   /* #### Need an attribute to mark only the first of each of the
      mma builtin pairs as being eligible for folding.  This used to

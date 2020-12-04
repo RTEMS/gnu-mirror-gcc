@@ -2590,6 +2590,10 @@ write_init_ovld_table ()
       if (i == 0 || ovlds[i].stanza != ovlds[i-1].stanza)
 	{
 	  ovld_stanza *stanza = &ovld_stanzas[ovlds[i].stanza];
+
+	  if (!strcmp(stanza->extern_name, "SKIP"))
+	    continue;
+
 	  fprintf (init_file, "\n");
 
 	  /* The fndecl for an overload is arbitrarily the first one
@@ -2644,11 +2648,13 @@ write_init_file ()
   fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
 
-#ifdef DEBUG_NEW_BUILTINS
+  /*#ifdef DEBUG_NEW_BUILTINS */
   fprintf (init_file, "int new_builtins_are_live = 1;\n\n");
+  /*
 #else
   fprintf (init_file, "int new_builtins_are_live = 0;\n\n");
 #endif
+  */
 
   fprintf (init_file, "tree rs6000_builtin_decls_x[RS6000_OVLD_MAX];\n\n");
 
