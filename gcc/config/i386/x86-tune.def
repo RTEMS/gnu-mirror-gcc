@@ -376,7 +376,7 @@ DEF_TUNE (X86_TUNE_SSE_UNALIGNED_STORE_OPTIMAL, "sse_unaligned_store_optimal",
 /* X86_TUNE_SSE_PACKED_SINGLE_INSN_OPTIMAL: Use packed single
    precision 128bit instructions instead of double where possible.   */
 DEF_TUNE (X86_TUNE_SSE_PACKED_SINGLE_INSN_OPTIMAL, "sse_packed_single_insn_optimal",
-	  m_BDVER | m_ZNVER)
+	  m_BDVER)
 
 /* X86_TUNE_SSE_TYPELESS_STORES: Always movaps/movups for 128bit stores.   */
 DEF_TUNE (X86_TUNE_SSE_TYPELESS_STORES, "sse_typeless_stores",
