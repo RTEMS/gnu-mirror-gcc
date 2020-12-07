@@ -1,3 +1,192 @@
+2020-12-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/97865
+	* configure: Regenerate.
+
+2020-12-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/80780
+	* testsuite/18_support/source_location/1.cc (main): Adjust for
+	__builtin_source_location using __PRETTY_FUNCTION__-like names instead
+	__FUNCTION__-like.
+	* testsuite/18_support/source_location/consteval.cc (main): Likewise.
+
+2020-12-03  Martin Sebor  <msebor@redhat.com>
+
+	* testsuite/ext/vstring/modifiers/clear/56166.cc: Suppress a false
+	positive warning.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/26_numerics/bit/bit.cast/bit_cast.cc: Remove stray
+	word from copy&paste.
+	* testsuite/26_numerics/bit/bit.cast/version.cc: Likewise.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2020.xml: Update C++20 status.
+	* doc/html/*: Regenerate.
+
+2020-12-03  JeanHeyd Meneide  <phdofthehouse@gmail.com>
+
+	* doc/doxygen/user.cfg.in (INPUT): Add <source_location>.
+	* include/Makefile.am: Add <source_location>.
+	* include/Makefile.in: Regenerate.
+	* include/std/version (__cpp_lib_source_location): Define.
+	* include/std/source_location: New file.
+	* testsuite/18_support/source_location/1.cc: New test.
+	* testsuite/18_support/source_location/consteval.cc: New test.
+	* testsuite/18_support/source_location/srcloc.h: New test.
+	* testsuite/18_support/source_location/version.cc: New test.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93121
+	* include/std/bit (__cpp_lib_bit_cast, bit_cast): Define.
+	* include/std/version (__cpp_lib_bit_cast): Define.
+	* testsuite/26_numerics/bit/bit.cast/bit_cast.cc: New test.
+	* testsuite/26_numerics/bit/bit.cast/version.cc: New test.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/abi/post/powerpc-linux-gnu/baseline_symbols.txt:
+	Update.
+	* config/abi/post/powerpc64-linux-gnu/32/baseline_symbols.txt:
+	Update.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/array (array::operator[](size_t) const, array::front() const)
+	(array::back() const) [__cplusplus == 201103]: Disable
+	assertions.
+	* testsuite/23_containers/array/element_access/constexpr_element_access.cc:
+	Check for correct values.
+	* testsuite/23_containers/array/tuple_interface/get_neg.cc:
+	Adjust dg-error line numbers.
+	* testsuite/23_containers/array/debug/constexpr_c++11.cc: New test.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/65480
+	PR libstdc++/68735
+	* python/libstdcxx/v6/printers.py (function_pointer_to_name):
+	New helper function to get the name of a function from its
+	address.
+	(StdExpAnyPrinter.__init__): Use it.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/lib/dg-options.exp (add_options_for_libatomic):
+	Replace powerpc-ibm-aix* and powerpc*-*-darwin* with check for
+	powerpc && ilp32.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/basic_istream/ignore/char/94749.cc: Add
+	dg-timeout-factor for ilp32 targets.
+	* testsuite/27_io/basic_istream/ignore/wchar_t/94749.cc:
+	Likewise.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/ext/rope (rope::_S_concat_char_iter)
+	(rope::_S_destr_concat_char_iter): Add allocator parameter.
+	(rope::push_back, rope::append, rope::insert, operator+):
+	Pass allocator.
+	* include/ext/ropeimpl.h (rope::_S_concat_char_iter)
+	(rope::_S_destr_concat_char_iter): Add allocator parameter
+	and use it.
+	(_Rope_char_ref_proxy::operator=(_CharT)): Pass allocator.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/ext/rope: Fix indentation of access specifiers.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/atomic_timed_wait.h: Use #if instead of #ifdef.
+	* include/bits/semaphore_base.h: Likewise.
+	* include/std/version: Remove trailing whitespace.
+
+2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (StdExpPathPrinter): Store the
+	name of the type and pass it to the iterator.
+	(StdPathPrinter): Likewise.
+	* testsuite/libstdc++-prettyprinters/filesystem-ts.cc: New test.
+
+2020-12-01  Thomas Rodgers  <trodgers@redhat.com>
+
+	* include/bits/atomic_base.h: Replace usage of
+	_GLIBCXX_HAVE_ATOMIC_WAIT with __cpp_lib_atomic_wait.
+	* include/bits/atomic_timed_wait.h: Likewise.
+	* include/bits/atomic_wait.h: Define __cpp_lib_atomic_wait
+	feature test macro.
+	* include/bits/semaphore_base.h: Replace usage of
+	_GLIBCXX_HAVE_ATOMIC_WAIT with __cpp_lib_atomic_wait.
+	* include/std/atomic: Likewise.
+	* include/std/latch: Likewise.
+	* include/std/semaphore: Likewise.
+	* include/std/version: Define __cpp_lib_atomic wait
+	feature test macro and replace usage of
+	_GLIBCXX_HAVE_ATOMIC_WAIT.
+	* testsuite/29_atomics/atomic/wait_notify/1.cc: New test.
+	* testsuite/29_atomics/atomic/wait_notify/2.cc: Likewise.
+
+2020-12-01  Michael Weghorn  <m.weghorn@posteo.de>
+
+	* python/libstdcxx/v6/printers.py (StdBitIteratorPrinter)
+	(StdBitReferencePrinter): Add pretty-printers for
+	_Bit_reference, _Bit_iterator and _Bit_const_iterator.
+	* testsuite/libstdc++-prettyprinters/simple.cc: Test
+	std::_Bit_reference, std::_Bit_iterator and
+	std::_Bit_const_iterator.
+	* testsuite/libstdc++-prettyprinters/simple11.cc: Likewise.
+
+2020-12-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (_GLIBCXX_HAS_BUILTIN): Define macro to
+	work around different implementations of __has_builtin.
+	(_GLIBCXX_HAVE_BUILTIN_HAS_UNIQ_OBJ_REP)
+	(_GLIBCXX_HAVE_BUILTIN_IS_AGGREGATE)
+	(_GLIBCXX_HAVE_BUILTIN_IS_CONSTANT_EVALUATED)
+	(_GLIBCXX_HAVE_BUILTIN_IS_SAME, _GLIBCXX_HAVE_BUILTIN_LAUNDER):
+	Define using _GLIBCXX_HAS_BUILTIN.
+
+2020-12-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/basic_istream/get/char/lwg3464.cc: Add
+	dg-timeout-factor directive.
+	* testsuite/27_io/basic_istream/get/wchar_t/lwg3464.cc:
+	Likewise.
+
+2020-12-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/98003
+	* testsuite/27_io/basic_syncbuf/sync_ops/1.cc: Add options for
+	libatomic.
+
+2020-11-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (INPUT): Add <latch> and <semaphore>.
+
+2020-11-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/lib/libstdc++.exp (libstdc++_init): Reduce
+	default tool_timeout to 360.
+
+2020-11-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/specialized_algorithms/pstl/*: Add
+	dg-timeout-factor.
+	* testsuite/25_algorithms/pstl/*: Likewise.
+	* testsuite/26_numerics/pstl/*: Likewise.
+	* testsuite/28_regex/*: Likewise.
+
+2020-11-29  John David Anglin  <danglin@gcc.gnu.org>
+
+	* configure: Regenerate.
+
 2020-11-27  Jonathan Wakely  <jwakely@redhat.com>
 
 	* testsuite/lib/libstdc++.exp (v3_try_preprocess): Define

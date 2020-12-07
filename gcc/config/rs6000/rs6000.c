@@ -3808,9 +3808,10 @@ rs6000_option_override_internal (bool global_init_p)
     }
 
   /* If little-endian, default to -mstrict-align on older processors.
-     Testing for htm matches power8 and later.  */
+     Testing for direct_move matches power8 and later.  */
   if (!BYTES_BIG_ENDIAN
-      && !(processor_target_table[tune_index].target_enable & OPTION_MASK_HTM))
+      && !(processor_target_table[tune_index].target_enable
+	   & OPTION_MASK_DIRECT_MOVE))
     rs6000_isa_flags |= ~rs6000_isa_flags_explicit & OPTION_MASK_STRICT_ALIGN;
 
   if (!rs6000_fold_gimple)
@@ -3862,6 +3863,12 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "before defaults", rs6000_isa_flags);
+
+#ifdef XCOFF_DEBUGGING_INFO
+  /* For AIX default to 64-bit DWARF.  */
+  if (!global_options_set.x_dwarf_offset_size)
+    dwarf_offset_size = POINTER_SIZE_UNITS;
+#endif
 
   /* Handle explicit -mno-{altivec,vsx,power8-vector,power9-vector} and turn
      off all of the options that depend on those flags.  */

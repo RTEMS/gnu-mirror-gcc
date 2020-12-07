@@ -22,7 +22,9 @@ along with GCC; see the file COPYING3.  If not see
 /* Known bugs or deficiencies include:
 
      all methods must be provided in header files; can't use a source
-     file that contains only the method templates and "just win".  */
+     file that contains only the method templates and "just win".
+
+     Fixed by: C++20 modules.  */
 
 #include "config.h"
 #include "system.h"
@@ -4428,7 +4430,7 @@ build_template_parm_index (int index,
    parameter.  Returns the canonical type parameter, which may be TYPE
    if no such parameter existed.  */
 
-static tree
+tree
 canonical_type_parameter (tree type)
 {
   int idx = TEMPLATE_TYPE_IDX (type);
@@ -6039,6 +6041,14 @@ push_template_decl (tree decl, bool is_friend)
 	      decl = DECL_TEMPLATE_RESULT (pushed);
 	      tmpl = NULL_TREE;
 	    }
+	}
+      else if (is_friend)
+	{
+	  /* Record this decl as belonging to the current class.  It's
+	     not chained onto anything else.  */
+	  DECL_UNINSTANTIATED_TEMPLATE_FRIEND_P (tmpl) = true;
+	  gcc_checking_assert (!DECL_CHAIN (tmpl));
+	  DECL_CHAIN (tmpl) = current_scope ();
 	}
     }
   else if (tmpl)
@@ -8256,7 +8266,7 @@ convert_template_argument (tree parm,
 
   /* When determining whether an argument pack expansion is a template,
      look at the pattern.  */
-  if (TREE_CODE (arg) == TYPE_PACK_EXPANSION)
+  if (PACK_EXPANSION_P (arg))
     arg = PACK_EXPANSION_PATTERN (arg);
 
   /* Deal with an injected-class-name used as a template template arg.  */
@@ -11049,6 +11059,7 @@ tsubst_friend_function (tree decl, tree args)
   DECL_USE_TEMPLATE (new_friend) = 0;
   if (TREE_CODE (new_friend) == TEMPLATE_DECL)
     {
+      DECL_UNINSTANTIATED_TEMPLATE_FRIEND_P (new_friend) = false;
       DECL_USE_TEMPLATE (DECL_TEMPLATE_RESULT (new_friend)) = 0;
       DECL_SAVED_TREE (DECL_TEMPLATE_RESULT (new_friend))
 	= DECL_SAVED_TREE (DECL_TEMPLATE_RESULT (decl));
@@ -13208,19 +13219,24 @@ tsubst_argument_pack (tree orig_arg, tree args, tsubst_flags_t complain,
 		      tree in_decl)
 {
   /* Substitute into each of the arguments.  */
-  tree new_arg = TYPE_P (orig_arg)
-    ? cxx_make_type (TREE_CODE (orig_arg))
-    : make_node (TREE_CODE (orig_arg));
-
   tree pack_args = tsubst_template_args (ARGUMENT_PACK_ARGS (orig_arg),
 					 args, complain, in_decl);
-  if (pack_args == error_mark_node)
-    new_arg = error_mark_node;
-  else
-    SET_ARGUMENT_PACK_ARGS (new_arg, pack_args);
+  tree new_arg = error_mark_node;
+  if (pack_args != error_mark_node)
+    {
+      if (TYPE_P (orig_arg))
+	{
+	  new_arg = cxx_make_type (TREE_CODE (orig_arg));
+	  SET_TYPE_STRUCTURAL_EQUALITY (new_arg);
+	}
+      else
+	{
+	  new_arg = make_node (TREE_CODE (orig_arg));
+	  TREE_CONSTANT (new_arg) = TREE_CONSTANT (orig_arg);
+	}
 
-  if (TREE_CODE (new_arg) == NONTYPE_ARGUMENT_PACK)
-    TREE_CONSTANT (new_arg) = TREE_CONSTANT (orig_arg);
+      SET_ARGUMENT_PACK_ARGS (new_arg, pack_args);
+    }
 
   return new_arg;
 }
@@ -16727,6 +16743,13 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	return build1 (code, type, op0);
       }
 
+    case BIT_CAST_EXPR:
+      {
+	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	tree op0 = tsubst_copy (TREE_OPERAND (t, 0), args, complain, in_decl);
+	return cp_build_bit_cast (EXPR_LOCATION (t), type, op0, complain);
+      }
+
     case SIZEOF_EXPR:
       if (PACK_EXPANSION_P (TREE_OPERAND (t, 0))
 	  || ARGUMENT_PACK_P (TREE_OPERAND (t, 0)))
@@ -19829,6 +19852,8 @@ tsubst_copy_and_build (tree t,
 	   parameter packs are of length zero.  */
 	if (init == NULL_TREE && TREE_OPERAND (t, 3) == NULL_TREE)
 	  init_vec = NULL;
+	else if (init == error_mark_node)
+	  RETURN (error_mark_node);
 	else
 	  {
 	    init_vec = make_tree_vector ();
@@ -28988,6 +29013,12 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
   if (DECL_TEMPLATE_TEMPLATE_PARM_P (tmpl))
     return ptype;
 
+  /* Initializing one placeholder from another.  */
+  if (init && TREE_CODE (init) == TEMPLATE_PARM_INDEX
+      && is_auto (TREE_TYPE (init))
+      && CLASS_PLACEHOLDER_TEMPLATE (TREE_TYPE (init)) == tmpl)
+    return cp_build_qualified_type (TREE_TYPE (init), cp_type_quals (ptype));
+
   /* Look through alias templates that just rename another template.  */
   tmpl = get_underlying_template (tmpl);
   if (!ctad_template_p (tmpl))
@@ -29003,10 +29034,6 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
 	pedwarn (input_location, 0, "alias template deduction only available "
 		 "with %<-std=c++20%> or %<-std=gnu++20%>");
     }
-
-  if (init && TREE_TYPE (init) == ptype)
-    /* Using the template parm as its own argument.  */
-    return ptype;
 
   tree type = TREE_TYPE (tmpl);
 
@@ -29255,7 +29282,7 @@ do_auto_deduction (tree type, tree init, tree auto_node,
       /* We don't recurse here because we can't deduce from a nested
 	 initializer_list.  */
       if (CONSTRUCTOR_ELTS (init))
-	for (constructor_elt &elt : *CONSTRUCTOR_ELTS (init))
+	for (constructor_elt &elt : CONSTRUCTOR_ELTS (init))
 	  elt.value = resolve_nondeduced_context (elt.value, complain);
     }
   else
