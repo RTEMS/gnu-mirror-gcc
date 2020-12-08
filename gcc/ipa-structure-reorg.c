@@ -80,6 +80,7 @@ static void dump_modified_types ( FILE *, Info_t *);
 #else
 static bool possibly_modify_pointer_types ( tree, Info_t *);
 #endif
+static tree find_deepest_comp_ref_type ( tree);
 #if USE_REORG_TYPES
 static void add_reorg_type( tree, bool, Info *);
 #endif
@@ -1643,6 +1644,71 @@ possibly_modify_pointer_types ( tree type, Info_t *info)
 }
 #endif
 
+tree
+find_modified ( tree type, Info_t *info )
+{
+  DEBUG_A("find_modified: ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  auto resulti = find_in_vec_of_two_types ( info->modified_types, type);
+  if ( resulti == info->modified_types->end () )
+    {
+      return NULL;
+    }
+  return resulti->second;
+}
+
+tree
+contains_a_modified ( gimple *stmt, Info_t *info )
+{
+  DEBUG_A("contains_a_modified: ");
+  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  // For an assign check both sides component refs.
+  if ( gimple_code ( stmt) == GIMPLE_ASSIGN )
+    {
+      tree lhs = gimple_assign_lhs( stmt);
+      tree rhs = NULL;
+      gassign *gass = static_cast <gassign *> (stmt);
+      // A simple 
+      if ( get_gimple_rhs_class ((enum tree_code)gass->subcode)
+	   ==
+	   GIMPLE_SINGLE_RHS)
+	{
+	  rhs = gimple_assign_rhs1 ( stmt);
+	}
+      // Use find_deepest_comp_ref on both sides. It's safe in
+      // meaningless circumstances.
+      tree l_deepest_type = find_deepest_comp_ref_type ( lhs);
+      tree r_deepest_type;
+      //If a side has a deepest component ref check to see if
+      // modified.
+      if ( l_deepest_type )
+	{
+	  if ( find_modified ( l_deepest_type, info) )
+	    return l_deepest_type;
+	  // Just having a componet ref means we don't
+	  // have to look at the other side
+	  return NULL;
+	}
+      if (    rhs
+	   && (r_deepest_type = find_deepest_comp_ref_type ( rhs))
+	   && find_modified ( r_deepest_type, info) )
+	return r_deepest_type;
+    }
+  // Otherwise,
+  return NULL;
+}
+
+static tree
+find_deepest_comp_ref_type ( tree op )
+{
+  if ( op == NULL ) return NULL;
+  tree comp_ref = find_deepest_comp_ref ( op);
+  if ( comp_ref == NULL ) return NULL;
+  tree type = TREE_TYPE ( TREE_OPERAND( comp_ref, 0));
+  tree canonical_type = TYPE_MAIN_VARIANT ( base_type_of ( type));
+  return canonical_type;
+}
+
 #if USE_REORG_TYPES
 static void
 add_reorg_type (
@@ -2906,7 +2972,7 @@ remove_deleted_types ( Info *info, ReorgFn reorg_fn)
 static enum ReorgOpTrans
 recognize_op_ret_action ( enum ReorgOpTrans e )
 {
-  DEBUG_A("  returns %s\n", optrans_to_str ( e));
+  DEBUG_A("  recognize_op returns %s\n", optrans_to_str ( e));
   return e;
 }
 
@@ -4296,13 +4362,20 @@ ssa_check ( FILE *file, Display display, Failure failure, bool types, bool heade
 void
 flexible_print( FILE *f, tree t, int nl, dump_flags_t d)
 {
-  if ( DECL_P( t) )
+  if ( t == NULL )
     {
-      print_generic_decl(f,t,d);
+      fprintf ( f, "(nil)");
     }
   else
     {
-      print_generic_expr(f,t,d);
+      if ( DECL_P( t) )
+	{
+	  print_generic_decl(f,t,d);
+	}
+      else
+	{
+	  print_generic_expr(f,t,d);
+	}
     }
   if ( nl == 1 ) fprintf ( f, "\n");
   if ( nl == 2 ) fprintf ( f, ", ");
