@@ -184,10 +184,10 @@
   void __builtin_cpu_init ();
     CPU_INIT nothing {cpu}
 
-  bool __builtin_cpu_is (const char *);
+  bool __builtin_cpu_is (string);
     CPU_IS nothing {cpu}
 
-  bool __builtin_cpu_supports (const char *);
+  bool __builtin_cpu_supports (string);
     CPU_SUPPORTS nothing {cpu}
 
   unsigned long long __builtin_ppc_get_timebase ();
@@ -285,16 +285,16 @@
   void __builtin_altivec_dssall ();
     DSSALL altivec_dssall {}
 
-  void __builtin_altivec_dst (const void *, const int, const int<2>);
+  void __builtin_altivec_dst (void *, const int, const int<2>);
     DST altivec_dst {}
 
-  void __builtin_altivec_dstst (const void *, const int, const int<2>);
+  void __builtin_altivec_dstst (void *, const int, const int<2>);
     DSTST altivec_dstst {}
 
-  void __builtin_altivec_dststt (const void *, const int, const int<2>);
+  void __builtin_altivec_dststt (void *, const int, const int<2>);
     DSTSTT altivec_dststt {}
 
-  void __builtin_altivec_dstt (const void *, const int, const int<2>);
+  void __builtin_altivec_dstt (void *, const int, const int<2>);
     DSTT altivec_dstt {}
 
   fpmath vsi __builtin_altivec_fix_sfsi (vf);
@@ -1358,25 +1358,25 @@
 ; (e.g, vsx_ld_elemrev_v1ti).  We need to move the choice into a separate
 ; pattern for each of these instead.  Right now I only list the little-
 ; endian pattern here.  TBD.
-  pure vsq __builtin_vsx_ld_elemrev_v1ti (signed long long, void *);
+  pure vsq __builtin_vsx_ld_elemrev_v1ti (signed long long, const void *);
     LD_ELEMREV_V1TI vsx_ld_elemrev_v1ti {ldvec}
 
-  pure vd __builtin_vsx_ld_elemrev_v2df (signed long long, void *);
+  pure vd __builtin_vsx_ld_elemrev_v2df (signed long long, const void *);
     LD_ELEMREV_V2DF vsx_ld_elemrev_v2df {ldvec}
 
-  pure vsll __builtin_vsx_ld_elemrev_v2di (signed long long, void *);
+  pure vsll __builtin_vsx_ld_elemrev_v2di (signed long long, const void *);
     LD_ELEMREV_V2DI vsx_ld_elemrev_v2di {ldvec}
 
-  pure vf __builtin_vsx_ld_elemrev_v4sf (signed long long, void *);
+  pure vf __builtin_vsx_ld_elemrev_v4sf (signed long long, const void *);
     LD_ELEMREV_V4SF vsx_ld_elemrev_v4sf {ldvec}
 
-  pure vsi __builtin_vsx_ld_elemrev_v4si (signed long long, void *);
+  pure vsi __builtin_vsx_ld_elemrev_v4si (signed long long, const void *);
     LD_ELEMREV_V4SI vsx_ld_elemrev_v4si {ldvec}
 
-  pure vss __builtin_vsx_ld_elemrev_v8hi (signed long long, void *);
+  pure vss __builtin_vsx_ld_elemrev_v8hi (signed long long, const void *);
     LD_ELEMREV_V8HI vsx_ld_elemrev_v8hi {ldvec}
 
-  pure vsc __builtin_vsx_ld_elemrev_v16qi (signed long long, void *);
+  pure vsc __builtin_vsx_ld_elemrev_v16qi (signed long long, const void *);
     LD_ELEMREV_V16QI vsx_ld_elemrev_v16qi {ldvec}
 
 ; There is apparent intent in rs6000-builtin.def to have RS6000_BTC_SPECIAL
@@ -1384,25 +1384,25 @@
 ; for any of them.  At some point, we may want to add a set of built-ins for
 ; whichever vector types make sense for these.
 
-  pure vsq __builtin_vsx_lxvd2x_v1ti (signed long long, void *);
+  pure vsq __builtin_vsx_lxvd2x_v1ti (signed long long, const void *);
     LXVD2X_V1TI vsx_load_v1ti {ldvec}
 
-  pure vd __builtin_vsx_lxvd2x_v2df (signed long long, void *);
+  pure vd __builtin_vsx_lxvd2x_v2df (signed long long, const void *);
     LXVD2X_V2DF vsx_load_v2df {ldvec}
 
-  pure vsll __builtin_vsx_lxvd2x_v2di (signed long long, void *);
+  pure vsll __builtin_vsx_lxvd2x_v2di (signed long long, const void *);
     LXVD2X_V2DI vsx_load_v2di {ldvec}
 
-  pure vsc __builtin_vsx_lxvw4x_v16qi (signed long long, void *);
+  pure vsc __builtin_vsx_lxvw4x_v16qi (signed long long, const void *);
     LXVW4X_V16QI vsx_load_v16qi {ldvec}
 
-  pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, void *);
+  pure vf __builtin_vsx_lxvw4x_v4sf (signed long long, const void *);
     LXVW4X_V4SF vsx_load_v4sf {ldvec}
 
-  pure vsi __builtin_vsx_lxvw4x_v4si (signed long long, void *);
+  pure vsi __builtin_vsx_lxvw4x_v4si (signed long long, const void *);
     LXVW4X_V4SI vsx_load_v4si {ldvec}
 
-  pure vss __builtin_vsx_lxvw4x_v8hi (signed long long, void *);
+  pure vss __builtin_vsx_lxvw4x_v8hi (signed long long, const void *);
     LXVW4X_V8HI vsx_load_v8hi {ldvec}
 
   const vd __builtin_vsx_mergeh_2df (vd, vd);
@@ -2839,7 +2839,7 @@
   const signed int __builtin_scalar_byte_in_set (unsigned char, unsigned long long);
     CMPEQB cmpeqb {}
 
-  pure vop __builtin_vsx_lxvl (void *, unsigned long long);
+  pure vop __builtin_vsx_lxvl (const void *, unsigned long long);
     LXVL lxvl {}
 
   const unsigned int __builtin_vsx_scalar_extract_exp (double);
@@ -3101,16 +3101,16 @@
   const vui __builtin_altivec_mtvsrwm (unsigned long long);
     MTVSRWM vec_mtvsr_v4si {}
 
-  pure vsq __builtin_altivec_se_lxvrbx (signed long long, signed char *);
+  pure vsq __builtin_altivec_se_lxvrbx (signed long long, const signed char *);
     SE_LXVRBX nothing {lxvr}
 
-  pure vsq __builtin_altivec_se_lxvrhx (signed long long, signed short *);
+  pure vsq __builtin_altivec_se_lxvrhx (signed long long, const signed short *);
     SE_LXVRHX nothing {lxvr}
 
-  pure vsq __builtin_altivec_se_lxvrwx (signed long long, signed int *);
+  pure vsq __builtin_altivec_se_lxvrwx (signed long long, const signed int *);
     SE_LXVRWX nothing {lxvr}
 
-  pure vsq __builtin_altivec_se_lxvrdx (signed long long, signed long long *);
+  pure vsq __builtin_altivec_se_lxvrdx (signed long long, const signed long long *);
     SE_LXVRDX nothing {lxvr}
 
   void __builtin_altivec_tr_stxvrbx (vsq, signed long long, signed char *);
@@ -3421,16 +3421,16 @@
   const vss __builtin_vsx_xxpermx_v8hi (vss, vss, vuc, const int<3>);
     XXPERMX_V8HI xxpermx {}
 
-  pure vuq __builtin_altivec_ze_lxvrbx (signed long long, unsigned char *);
+  pure vuq __builtin_altivec_ze_lxvrbx (signed long long, const unsigned char *);
     ZE_LXVRBX nothing {lxvr}
 
-  pure vuq __builtin_altivec_ze_lxvrhx (signed long long, unsigned short *);
+  pure vuq __builtin_altivec_ze_lxvrhx (signed long long, const unsigned short *);
     ZE_LXVRHX nothing {lxvr}
 
-  pure vuq __builtin_altivec_ze_lxvrwx (signed long long, unsigned int *);
+  pure vuq __builtin_altivec_ze_lxvrwx (signed long long, const unsigned int *);
     ZE_LXVRWX nothing {lxvr}
 
-  pure vuq __builtin_altivec_ze_lxvrdx (signed long long, unsigned long long *);
+  pure vuq __builtin_altivec_ze_lxvrdx (signed long long, const unsigned long long *);
     ZE_LXVRDX nothing {lxvr}
 
 

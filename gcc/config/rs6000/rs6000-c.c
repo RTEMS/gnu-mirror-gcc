@@ -39,7 +39,7 @@
 
 
 static tree
-altivec_build_new_resolved_builtin (tree *, int, bifdata *,
+altivec_build_new_resolved_builtin (tree *, int, tree,
 				    rs6000_gen_builtins, rs6000_gen_builtins);
 static tree
 altivec_resolve_new_overloaded_builtin (location_t, tree, void *);
@@ -821,20 +821,38 @@ rs6000_new_builtin_type_compatible (tree t, tree u)
 {
   if (t == error_mark_node)
     return false;
+
   if (INTEGRAL_TYPE_P (t) && INTEGRAL_TYPE_P (u))
     return true;
-  else if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+
+  if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
 	   && is_float128_p (t) && is_float128_p (u))
     return true;
-  else
-    return lang_hooks.types_compatible_p (t, u);
+
+  if (POINTER_TYPE_P (t) && POINTER_TYPE_P (u))
+    {
+      t = TREE_TYPE (t);
+      u = TREE_TYPE (u);
+      if (TYPE_READONLY (u))
+	t = build_qualified_type (t, TYPE_QUAL_CONST);
+    }
+
+  return lang_hooks.types_compatible_p (t, u);
 }
 
 static inline bool
 rs6000_builtin_type_compatible (tree t, int id)
 {
   tree builtin_type = rs6000_builtin_type (id);
-  return rs6000_new_builtin_type_compatible (t, builtin_type);
+  if (t == error_mark_node)
+    return false;
+  if (INTEGRAL_TYPE_P (t) && INTEGRAL_TYPE_P (builtin_type))
+    return true;
+  else if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+	   && is_float128_p (t) && is_float128_p (builtin_type))
+    return true;
+  else
+    return lang_hooks.types_compatible_p (t, builtin_type);
 }
 
 
@@ -1937,12 +1955,12 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
    a small exception for vec_{all,any}_{ge,le} predicates. */
 
 static tree
-altivec_build_new_resolved_builtin (tree *args, int n, bifdata *fndata,
+altivec_build_new_resolved_builtin (tree *args, int n, tree fntype,
 				    rs6000_gen_builtins bif_id,
 				    rs6000_gen_builtins ovld_id)
 {
-  tree ret_type = TREE_VALUE (fndata->fntype);
-  tree argtypes = TREE_CHAIN (fndata->fntype);
+  tree ret_type = TREE_TYPE (fntype);
+  tree argtypes = TYPE_ARG_TYPES (fntype);
   tree arg_type[MAX_OVLD_ARGS];
   tree fndecl = rs6000_builtin_decls_x[bif_id];
   tree call;
@@ -2027,6 +2045,8 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
   /* Return immediately if this isn't an overload.  */
   if (fcode <= RS6000_OVLD_NONE)
     return NULL_TREE;
+
+  unsigned int adj_fcode = fcode - RS6000_OVLD_NONE;
 
   if (TARGET_DEBUG_BUILTIN)
     fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
@@ -2785,7 +2805,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
     bool unsupported_builtin = false;
     enum rs6000_gen_builtins overloaded_code;
     tree result = NULL;
-    ovlddata *instance = rs6000_overload_info[fcode].first_instance;
+    ovlddata *instance = rs6000_overload_info[adj_fcode].first_instance;
     gcc_assert (instance != NULL);
 
     /* Need to special case __builtin_cmpb because the overloaded forms
@@ -2825,17 +2845,16 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  instance = instance->next;
 
 	gcc_assert (instance != NULL);
-	bifdata *fndata = &rs6000_builtin_info_x[instance->bifid];
-	tree fntype = fndata->fntype;
-	tree parmtype0 = TREE_VALUE (TREE_CHAIN (fntype));
-	tree parmtype1 = TREE_VALUE (TREE_CHAIN (TREE_CHAIN (fntype)));
+	tree fntype = instance->fntype;
+	tree parmtype0 = TREE_VALUE (TYPE_ARG_TYPES (fntype));
+	tree parmtype1 = TREE_VALUE (TREE_CHAIN (parmtype0));
 
 	if (rs6000_new_builtin_type_compatible (types[0], parmtype0)
 	    && rs6000_new_builtin_type_compatible (types[1], parmtype1))
 	  {
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      return altivec_build_new_resolved_builtin (args, n, fndata,
+	      return altivec_build_new_resolved_builtin (args, n, fntype,
 							 instance->bifid,
 							 fcode);
 	    else
@@ -2880,17 +2899,16 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  instance = instance->next;
 
 	gcc_assert (instance != NULL);
-	bifdata *fndata = &rs6000_builtin_info_x[instance->bifid];
-	tree fntype = fndata->fntype;
-	tree parmtype0 = TREE_VALUE (TREE_CHAIN (fntype));
-	tree parmtype1 = TREE_VALUE (TREE_CHAIN (TREE_CHAIN (fntype)));
+	tree fntype = instance->fntype;
+	tree parmtype0 = TREE_VALUE (TYPE_ARG_TYPES (fntype));
+	tree parmtype1 = TREE_VALUE (TREE_CHAIN (parmtype0));
 
 	if (rs6000_new_builtin_type_compatible (types[0], parmtype0)
 	    && rs6000_new_builtin_type_compatible (types[1], parmtype1))
 	  {
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      return altivec_build_new_resolved_builtin (args, n, fndata,
+	      return altivec_build_new_resolved_builtin (args, n, fntype,
 							 instance->bifid,
 							 fcode);
 	    else
@@ -2902,11 +2920,10 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	for (; instance != NULL; instance = instance->next)
 	  {
 	    bool mismatch = false;
-	    bifdata *fndata = &rs6000_builtin_info_x[instance->bifid];
-	    tree nextparm = TREE_CHAIN (fndata->fntype);
+	    tree nextparm = TYPE_ARG_TYPES (instance->fntype);
 
-	    for (int arg_i = 0;
-		 arg_i < fndata->nargs && nextparm != NULL;
+	    for (unsigned int arg_i = 0;
+		 arg_i < nargs && nextparm != NULL;
 		 arg_i++)
 	      {
 		tree parmtype = TREE_VALUE (nextparm);
@@ -2924,7 +2941,8 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      return altivec_build_new_resolved_builtin (args, n, fndata,
+	      return altivec_build_new_resolved_builtin (args, n,
+							 instance->fntype,
 							 instance->bifid,
 							 fcode);
 	    else
@@ -2938,7 +2956,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 
     if (unsupported_builtin)
       {
-	const char *name = rs6000_overload_info[fcode].ovld_name;
+	const char *name = rs6000_overload_info[adj_fcode].ovld_name;
 	if (result != NULL)
 	  {
 	    const char *internal_name
@@ -2959,7 +2977,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
   }
  bad:
   {
-    const char *name = rs6000_overload_info[fcode].ovld_name;
+    const char *name = rs6000_overload_info[adj_fcode].ovld_name;
     error ("invalid parameter combination for AltiVec intrinsic %qs", name);
     return error_mark_node;
   }

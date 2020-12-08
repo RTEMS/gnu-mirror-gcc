@@ -283,6 +283,7 @@ enum basetype {
   BT_INT128,
   BT_FLOAT128,
   BT_BOOL,
+  BT_STRING,
   BT_DECIMAL32,
   BT_DECIMAL64,
   BT_DECIMAL128,
@@ -457,53 +458,90 @@ struct typemap
    maps tokens from a fntype string to a tree type.  For example,
    in "si_ftype_hi" we would map "si" to "intSI_type_node" and
    map "hi" to "intHI_type_node".  */
-#define TYPE_MAP_SIZE 44
+#define TYPE_MAP_SIZE 81
 static typemap type_map[TYPE_MAP_SIZE] =
   {
-    { "bi",	"bool_int" },
-    { "bv16qi",	"bool_V16QI" },
-    { "bv2di",	"bool_V2DI" },
-    { "bv4si",	"bool_V4SI" },
-    { "bv8hi",	"bool_V8HI" },
-    { "dd",	"dfloat64" },
-    { "df",	"double" },
-    { "di",	"intDI" },
-    { "hi",	"intHI" },
-    { "if",	"ibm128_float" },
-    { "ld",	"long_double" },
-    { "lg",	"long_integer" },
-    { "opaque", "opaque_V4SI" },
-    { "pcvoid",	"pcvoid" },
-    { "pv",	"ptr" },
-    { "qi",	"intQI" },
-    { "sd",	"dfloat32" },
-    { "sf",	"float" },
-    { "si",	"intSI" },
-    { "td",	"dfloat128" },
-    { "tf",	"float128" },
-    { "ti",	"intTI" },
-    { "udi",	"unsigned_intDI" },
-    { "uhi",	"unsigned_intHI" },
-    { "ulg",	"long_unsigned" },
-    { "uqi",	"unsigned_intQI" },
-    { "usi",	"unsigned_intSI" },
-    { "uti",	"unsigned_intTI" },
-    { "uv16qi",	"unsigned_V16QI" },
-    { "uv1ti",	"unsigned_V1TI" },
-    { "uv2di",	"unsigned_V2DI" },
-    { "uv4si",	"unsigned_V4SI" },
-    { "uv8hi",	"unsigned_V8HI" },
-    { "v",	"void" },
-    { "v16qi",	"V16QI" },
-    { "v1poi",	"vector_pair" },
-    { "v1pxi",	"vector_quad" },
-    { "v1ti",	"V1TI" },
-    { "v2df",	"V2DF" },
-    { "v2di",	"V2DI" },
-    { "v4sf",	"V4SF" },
-    { "v4si",	"V4SI" },
-    { "v8hi",	"V8HI" },
-    { "vp8hi",	"pixel_V8HI" },
+    { "bi",		"bool_int" },
+    { "bv16qi",		"bool_V16QI" },
+    { "bv2di",		"bool_V2DI" },
+    { "bv4si",		"bool_V4SI" },
+    { "bv8hi",		"bool_V8HI" },
+    { "dd",		"dfloat64" },
+    { "df",		"double" },
+    { "di",		"intDI" },
+    { "hi",		"intHI" },
+    { "if",		"ibm128_float" },
+    { "ld",		"long_double" },
+    { "lg",		"long_integer" },
+    { "opaque", 	"opaque_V4SI" },
+    { "pbv16qi",	"ptr_bool_V16QI" },
+    { "pbv2di",		"ptr_bool_V2DI" },
+    { "pbv4si",		"ptr_bool_V4SI" },
+    { "pbv8hi",		"ptr_bool_V8HI" },
+    { "pcvoid",		"pcvoid" },
+    { "pdd",		"ptr_dfloat64" },
+    { "pdf",		"ptr_double" },
+    { "pdi",		"ptr_intDI" },
+    { "phi",		"ptr_intHI" },
+    { "pif",		"ptr_ibm128_float" },
+    { "pld",		"ptr_long_double" },
+    { "pqi",		"ptr_intQI" },
+    { "psf",		"ptr_float" },
+    { "psi",		"ptr_intSI" },
+    { "ptd",		"ptr_dfloat128" },
+    { "ptf",		"ptr_float128" },
+    { "pti",		"ptr_intTI" },
+    { "pudi",		"ptr_uintDI" },
+    { "puhi",		"ptr_uintHI" },
+    { "puqi",		"ptr_uintQI" },
+    { "pusi",		"ptr_uintSI" },
+    { "puti",		"ptr_uintTI" },
+    { "puv16qi",	"ptr_unsigned_V16QI" },
+    { "puv1ti",		"ptr_unsigned_V1TI" },
+    { "puv2di",		"ptr_unsigned_V2DI" },
+    { "puv4si",		"ptr_unsigned_V4SI" },
+    { "puv8hi",		"ptr_unsigned_V8HI" },
+    { "pv",		"ptr" },
+    { "pv16qi",		"ptr_V16QI" },
+    { "pv1poi",		"ptr_vector_pair" },
+    { "pv1pxi",		"ptr_vector_quad" },
+    { "pv1ti",		"ptr_V1TI" },
+    { "pv2df",		"ptr_V2DF" },
+    { "pv2di",		"ptr_V2DI" },
+    { "pv4sf",		"ptr_V4SF" },
+    { "pv4si",		"ptr_V4SI" },
+    { "pv8hi",		"ptr_V8HI" },
+    { "pvp8hi",		"ptr_pixel_V8HI" },
+    { "qi",		"intQI" },
+    { "sd",		"dfloat32" },
+    { "sf",		"float" },
+    { "si",		"intSI" },
+    { "st",		"const_str" },
+    { "td",		"dfloat128" },
+    { "tf",		"float128" },
+    { "ti",		"intTI" },
+    { "udi",		"unsigned_intDI" },
+    { "uhi",		"unsigned_intHI" },
+    { "ulg",		"long_unsigned" },
+    { "uqi",		"unsigned_intQI" },
+    { "usi",		"unsigned_intSI" },
+    { "uti",		"unsigned_intTI" },
+    { "uv16qi",		"unsigned_V16QI" },
+    { "uv1ti",		"unsigned_V1TI" },
+    { "uv2di",		"unsigned_V2DI" },
+    { "uv4si",		"unsigned_V4SI" },
+    { "uv8hi",		"unsigned_V8HI" },
+    { "v",		"void" },
+    { "v16qi",		"V16QI" },
+    { "v1poi",		"vector_pair" },
+    { "v1pxi",		"vector_quad" },
+    { "v1ti",		"V1TI" },
+    { "v2df",		"V2DF" },
+    { "v2di",		"V2DI" },
+    { "v4sf",		"V4SF" },
+    { "v4si",		"V4SI" },
+    { "v8hi",		"V8HI" },
+    { "vp8hi",		"pixel_V8HI" },
   };
 
 /* Pointer to a diagnostic function.  */
@@ -719,6 +757,10 @@ match_basetype (typeinfo *typedata)
     typedata->base = BT_FLOAT128;
   else if (!strcmp (token, "bool"))
     typedata->base = BT_BOOL;
+  /* A "string" is a special "const char *" -- we need it because it
+     cannot match either signed or unsigned char *.  */
+  else if (!strcmp (token, "string"))
+    typedata->base = BT_STRING;
   else if (!strcmp (token, "_Decimal32"))
     typedata->base = BT_DECIMAL32;
   else if (!strcmp (token, "_Decimal64"))
@@ -1139,61 +1181,27 @@ match_type (typeinfo *typedata, int voidok)
       return 1;
     }
 
+  if (!typedata->issigned && !typedata->isunsigned)
+    pos = oldpos;
+  if (!match_basetype (typedata))
+    return 0;
+
   if (typedata->isconst)
     {
-      consume_whitespace ();
-      pos = oldpos;
-      token = match_identifier ();
-      if (!strcmp (token, "char"))
+      if (typedata->ispointer)
+	return 1;
+      if (typedata->base != BT_INT)
 	{
-	  typedata->base = BT_CHAR;
-	  handle_pointer (typedata);
-	  return 1;
-	}
-      else if (!strcmp (token, "signed"))
-	{
-	  typedata->issigned = 1;
-	  consume_whitespace ();
-	  oldpos = pos;
-	  token = match_identifier ();
-	  if (strcmp (token, "int"))
-	    {
-	      (*diag) ("'signed' not followed by 'int' at column %d.\n",
-		       oldpos + 1);
-	      return 0;
-	    }
-	}
-      else if (!strcmp (token, "unsigned"))
-	{
-	  typedata->isunsigned = 1;
-	  consume_whitespace ();
-	  oldpos = pos;
-	  token = match_identifier ();
-	  if (strcmp (token, "int"))
-	    {
-	      (*diag) ("'unsigned' not followed by 'int' at column %d.\n",
-		       oldpos + 1);
-	      return 0;
-	    }
-	}
-      else if (strcmp (token, "int"))
-	{
-	  (*diag) ("'const' not followed by 'int' at column %d.\n",
-		   oldpos + 1);
+	  (*diag)("'const' at %d requires pointer or integer type",
+		  oldpos + 1);
 	  return 0;
 	}
-
-      typedata->base = BT_INT;
-
       consume_whitespace ();
       if (linebuf[pos] == '<' || linebuf[pos] == '{' || linebuf[pos] == '[')
 	return match_const_restriction (typedata);
-
-      return 1;
     }
 
-  consume_whitespace ();
-  return match_basetype (typedata);
+  return 1;
 }
 
 /* Parse the argument list.  */
@@ -1484,6 +1492,9 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
     case BT_BOOL:
       memcpy (&buf[*bufi], "bi", 2);
       break;
+    case BT_STRING:
+      memcpy (&buf[*bufi], "st", 2);
+      break;
     case BT_DECIMAL32:
       memcpy (&buf[*bufi], "sd", 2);
       break;
@@ -1511,27 +1522,25 @@ static char *
 construct_fntype_id (prototype *protoptr)
 {
   /* Determine the maximum space for a function type descriptor id.
-     Each type requires at most 8 characters (6 for the mode*, 1 for
-     the optional 'u' preceding the mode, and 1 for an underscore
-     following the mode).  We also need 5 characters for the string
-     "ftype" that separates the return mode from the argument modes.
-     The last argument doesn't need a trailing underscore, but we
-     count that as the one trailing "ftype" instead.  For the special
-     case of zero arguments, we need 8 for the return type and 7
-     for "ftype_v".  Finally, we need one character for the
-     terminating null.  Thus for a function with N arguments, we
-     need at most 8N+14 characters for N>0, otherwise 16.
+     Each type requires at most 9 characters (6 for the mode*, 1 for
+     the optional 'u' preceding the mode, 1 for the optional 'p'
+     preceding the mode, and 1 for an underscore following the mode).
+     We also need 5 characters for the string "ftype" that separates
+     the return mode from the argument modes.  The last argument doesn't
+     need a trailing underscore, but we count that as the one trailing
+     "ftype" instead.  For the special case of zero arguments, we need 9
+     for the return type and 7 for "ftype_v".  Finally, we need one
+     character for the terminating null.  Thus for a function with N
+     arguments, we need at most 9N+14 characters for N>0, otherwise 17.
      ----
        *Worst case is bv16qi for "vector bool char".  */
-  int len = protoptr->nargs ? (protoptr->nargs + 1) * 8 + 6 : 16;
+  int len = protoptr->nargs ? (protoptr->nargs + 1) * 9 + 6 : 17;
   char *buf = (char *) malloc (len);
   int bufi = 0;
 
   if (protoptr->rettype.ispointer)
-    {
-      assert (protoptr->rettype.isvoid);
-      buf[bufi++] = 'p';
-    }
+    buf[bufi++] = 'p';
+
   if (protoptr->rettype.isvoid)
     buf[bufi++] = 'v';
   else
@@ -1569,33 +1578,36 @@ construct_fntype_id (prototype *protoptr)
 	  buf[bufi++] = '_';
 	  if (argptr->info.ispointer)
 	    {
-	      if (argptr->info.isconst)
+	      if (argptr->info.isvoid)
 		{
-		  memcpy (&buf[bufi], "pcvoid", 6);
-		  bufi += 6;
+		  if (argptr->info.isconst)
+		    {
+		      memcpy (&buf[bufi], "pcvoid", 6);
+		      bufi += 6;
+		    }
+		  else
+		    {
+		      buf[bufi++] = 'p';
+		      buf[bufi++] = 'v';
+		    }
 		}
 	      else
-		{
-		  buf[bufi++] = 'p';
-		  buf[bufi++] = 'v';
-		}
+		buf[bufi++] = 'p';
+	    }
+	  if (argptr->info.isopaque)
+	    {
+	      assert (!argptr->info.ispointer);
+	      memcpy (&buf[bufi], "opaque", 6);
+	      bufi += 6;
 	    }
 	  else
 	    {
-	      if (argptr->info.isopaque)
-		{
-		  memcpy (&buf[bufi], "opaque", 6);
-		  bufi += 6;
-		}
+	      if (argptr->info.isunsigned)
+		buf[bufi++] = 'u';
+	      if (argptr->info.isvector)
+		complete_vector_type (&argptr->info, buf, &bufi);
 	      else
-		{
-		  if (argptr->info.isunsigned)
-		    buf[bufi++] = 'u';
-		  if (argptr->info.isvector)
-		    complete_vector_type (&argptr->info, buf, &bufi);
-		  else
-		    complete_base_type (&argptr->info, buf, &bufi);
-		}
+		complete_base_type (&argptr->info, buf, &bufi);
 	    }
 	  argptr = argptr->next;
 	}
@@ -2590,10 +2602,6 @@ write_init_ovld_table ()
       if (i == 0 || ovlds[i].stanza != ovlds[i-1].stanza)
 	{
 	  ovld_stanza *stanza = &ovld_stanzas[ovlds[i].stanza];
-
-	  if (!strcmp(stanza->extern_name, "SKIP"))
-	    continue;
-
 	  fprintf (init_file, "\n");
 
 	  /* The fndecl for an overload is arbitrarily the first one
@@ -2607,7 +2615,7 @@ write_init_ovld_table ()
 		   stanza->stanza_id);
 	  fprintf (init_file,
 		   "        = add_builtin_function (\"%s\",\n",
-		   stanza->extern_name);
+		   stanza->intern_name);
 	  fprintf (init_file,
 		   "                                %s,\n",
 		   ovlds[i].fndecl);

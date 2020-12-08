@@ -547,29 +547,28 @@
 
 ; We skip generating a #define because of the C-versus-C++ complexity
 ; in altivec.h.  Look there for the template-y details.
-; Also, cmpge is the same as cmpgt for all cases except floating point.
-; There is further code to deal with this special case in
-; altivec_build_resolved_builtin.  TODO: Make sure this is still true.
-[VEC_CMPGE_P, SKIP, __builtin_vec_vcmpgt_p]
-  signed int __builtin_vec_vcmpgt_p (signed int, vuc, vuc);
+; See altivec_build_resolved_builtin for how we deal with VEC_CMPGE_P.
+; It's quite strange and horrible!
+[VEC_CMPGE_P, SKIP, __builtin_vec_vcmpge_p]
+  signed int __builtin_vec_vcmpge_p (signed int, vuc, vuc);
     VCMPGTUB_P  VCMPGTUB_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vsc, vsc);
+  signed int __builtin_vec_vcmpge_p (signed int, vsc, vsc);
     VCMPGTSB_P  VCMPGTSB_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vus, vus);
+  signed int __builtin_vec_vcmpge_p (signed int, vus, vus);
     VCMPGTUH_P  VCMPGTUH_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vss, vss);
+  signed int __builtin_vec_vcmpge_p (signed int, vss, vss);
     VCMPGTSH_P  VCMPGTSH_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vui, vui);
+  signed int __builtin_vec_vcmpge_p (signed int, vui, vui);
     VCMPGTUW_P  VCMPGTUW_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vsi, vsi);
+  signed int __builtin_vec_vcmpge_p (signed int, vsi, vsi);
     VCMPGTSW_P  VCMPGTSW_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vull, vull);
+  signed int __builtin_vec_vcmpge_p (signed int, vull, vull);
     VCMPGTUD_P  VCMPGTUD_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vsll, vsll);
+  signed int __builtin_vec_vcmpge_p (signed int, vsll, vsll);
     VCMPGTSD_P  VCMPGTSD_PR
-  signed int __builtin_vec_vcmpgt_p (signed int, vf, vf);
+  signed int __builtin_vec_vcmpge_p (signed int, vf, vf);
     XVCMPGESP_P
-  signed int __builtin_vec_vcmpgt_p (signed int, vd, vd);
+  signed int __builtin_vec_vcmpge_p (signed int, vd, vd);
     XVCMPGEDP_P
 
 [VEC_CMPGT, vec_cmpgt, __builtin_vec_cmpgt]
@@ -1359,139 +1358,139 @@
     INSERT4B  INSERT4B_U
 
 [VEC_LD, vec_ld, __builtin_vec_ld]
-  vsc __builtin_vec_ld (signed long long, vsc *);
+  vsc __builtin_vec_ld (signed long long, const vsc *);
     LVX_V16QI  LVX_V16QI_VSC
-  vsc __builtin_vec_ld (signed long long, signed char *);
+  vsc __builtin_vec_ld (signed long long, const signed char *);
     LVX_V16QI  LVX_V16QI_SC
-  vuc __builtin_vec_ld (signed long long, vuc *);
+  vuc __builtin_vec_ld (signed long long, const vuc *);
     LVX_V16QI  LVX_V16QI_VUC
-  vuc __builtin_vec_ld (signed long long, unsigned char *);
+  vuc __builtin_vec_ld (signed long long, const unsigned char *);
     LVX_V16QI  LVX_V16QI_UC
-  vbc __builtin_vec_ld (signed long long, vbc *);
+  vbc __builtin_vec_ld (signed long long, const vbc *);
     LVX_V16QI  LVX_V16QI_VBC
-  vss __builtin_vec_ld (signed long long, vss *);
+  vss __builtin_vec_ld (signed long long, const vss *);
     LVX_V8HI  LVX_V8HI_VSS
-  vss __builtin_vec_ld (signed long long, signed short *);
+  vss __builtin_vec_ld (signed long long, const signed short *);
     LVX_V8HI  LVX_V8HI_SS
-  vus __builtin_vec_ld (signed long long, vus *);
+  vus __builtin_vec_ld (signed long long, const vus *);
     LVX_V8HI  LVX_V8HI_VUS
-  vus __builtin_vec_ld (signed long long, unsigned short *);
+  vus __builtin_vec_ld (signed long long, const unsigned short *);
     LVX_V8HI  LVX_V8HI_US
-  vbs __builtin_vec_ld (signed long long, vbs *);
+  vbs __builtin_vec_ld (signed long long, const vbs *);
     LVX_V8HI  LVX_V8HI_VBS
-  vp __builtin_vec_ld (signed long long, vp *);
+  vp __builtin_vec_ld (signed long long, const vp *);
     LVX_V8HI  LVX_V8HI_VP
-  vsi __builtin_vec_ld (signed long long, vsi *);
+  vsi __builtin_vec_ld (signed long long, const vsi *);
     LVX_V4SI  LVX_V4SI_VSI
-  vsi __builtin_vec_ld (signed long long, signed int *);
+  vsi __builtin_vec_ld (signed long long, const signed int *);
     LVX_V4SI  LVX_V4SI_SI
-  vui __builtin_vec_ld (signed long long, vui *);
+  vui __builtin_vec_ld (signed long long, const vui *);
     LVX_V4SI  LVX_V4SI_VUI
-  vui __builtin_vec_ld (signed long long, unsigned int *);
+  vui __builtin_vec_ld (signed long long, const unsigned int *);
     LVX_V4SI  LVX_V4SI_UI
-  vbi __builtin_vec_ld (signed long long, vbi *);
+  vbi __builtin_vec_ld (signed long long, const vbi *);
     LVX_V4SI  LVX_V4SI_VBI
-  vsll __builtin_vec_ld (signed long long, vsll *);
+  vsll __builtin_vec_ld (signed long long, const vsll *);
     LVX_V2DI  LVX_V2DI_VSLL
-  vsll __builtin_vec_ld (signed long long, signed long long *);
+  vsll __builtin_vec_ld (signed long long, const signed long long *);
     LVX_V2DI  LVX_V2DI_SLL
-  vull __builtin_vec_ld (signed long long, vull *);
+  vull __builtin_vec_ld (signed long long, const vull *);
     LVX_V2DI  LVX_V2DI_VULL
-  vull __builtin_vec_ld (signed long long, unsigned long long *);
+  vull __builtin_vec_ld (signed long long, const unsigned long long *);
     LVX_V2DI  LVX_V2DI_ULL
-  vbll __builtin_vec_ld (signed long long, vbll *);
+  vbll __builtin_vec_ld (signed long long, const vbll *);
     LVX_V2DI  LVX_V2DI_VBLL
   vsq __builtin_vec_ld (signed long long, const vsq *);
     LVX_V1TI  LVX_V1TI_VSQ
   vuq __builtin_vec_ld (signed long long, const vuq *);
     LVX_V1TI  LVX_V1TI_VUQ
-  vsq __builtin_vec_ld (signed long long, __int128 *);
+  vsq __builtin_vec_ld (signed long long, const __int128 *);
     LVX_V1TI  LVX_V1TI_TI
-  vuq __builtin_vec_ld (signed long long, unsigned __int128 *);
+  vuq __builtin_vec_ld (signed long long, const unsigned __int128 *);
     LVX_V1TI  LVX_V1TI_UTI
-  vf __builtin_vec_ld (signed long long, vf *);
+  vf __builtin_vec_ld (signed long long, const vf *);
     LVX_V4SF  LVX_V4SF_VF
-  vf __builtin_vec_ld (signed long long, float *);
+  vf __builtin_vec_ld (signed long long, const float *);
     LVX_V4SF  LVX_V4SF_F
-  vd __builtin_vec_ld (signed long long, vd *);
+  vd __builtin_vec_ld (signed long long, const vd *);
     LVX_V2DF  LVX_V2DF_VD
-  vd __builtin_vec_ld (signed long long, double *);
+  vd __builtin_vec_ld (signed long long, const double *);
     LVX_V2DF  LVX_V2DF_D
 
 [VEC_LDE, vec_lde, __builtin_vec_lde]
-  vsc __builtin_vec_lde (signed long long, signed char *);
+  vsc __builtin_vec_lde (signed long long, const signed char *);
     LVEBX  LVEBX_SC
-  vuc __builtin_vec_lde (signed long long, unsigned char *);
+  vuc __builtin_vec_lde (signed long long, const unsigned char *);
     LVEBX  LVEBX_UC
-  vss __builtin_vec_lde (signed long long, signed short *);
+  vss __builtin_vec_lde (signed long long, const signed short *);
     LVEHX  LVEHX_SS
-  vus __builtin_vec_lde (signed long long, unsigned short *);
+  vus __builtin_vec_lde (signed long long, const unsigned short *);
     LVEHX  LVEHX_US
-  vsi __builtin_vec_lde (signed long long, signed int *);
+  vsi __builtin_vec_lde (signed long long, const signed int *);
     LVEWX  LVEWX_SI
-  vui __builtin_vec_lde (signed long long, unsigned int *);
+  vui __builtin_vec_lde (signed long long, const unsigned int *);
     LVEWX  LVEWX_UI
-  vf __builtin_vec_lde (signed long long, float *);
+  vf __builtin_vec_lde (signed long long, const float *);
     LVEWX  LVEWX_F
 
 [VEC_LDL, vec_ldl, __builtin_vec_ldl]
-  vsc __builtin_vec_ldl (signed long long, vsc *);
+  vsc __builtin_vec_ldl (signed long long, const vsc *);
     LVXL_V16QI  LVXL_V16QI_VSC
-  vsc __builtin_vec_ldl (signed long long, signed char *);
+  vsc __builtin_vec_ldl (signed long long, const signed char *);
     LVXL_V16QI  LVXL_V16QI_SC
-  vuc __builtin_vec_ldl (signed long long, vuc *);
+  vuc __builtin_vec_ldl (signed long long, const vuc *);
     LVXL_V16QI  LVXL_V16QI_VUC
-  vuc __builtin_vec_ldl (signed long long, unsigned char *);
+  vuc __builtin_vec_ldl (signed long long, const unsigned char *);
     LVXL_V16QI  LVXL_V16QI_UC
-  vbc __builtin_vec_ldl (signed long long, vbc *);
+  vbc __builtin_vec_ldl (signed long long, const vbc *);
     LVXL_V16QI  LVXL_V16QI_VBC
-  vss __builtin_vec_ldl (signed long long, vss *);
+  vss __builtin_vec_ldl (signed long long, const vss *);
     LVXL_V8HI  LVXL_V8HI_VSS
-  vss __builtin_vec_ldl (signed long long, signed short *);
+  vss __builtin_vec_ldl (signed long long, const signed short *);
     LVXL_V8HI  LVXL_V8HI_SS
-  vus __builtin_vec_ldl (signed long long, vus *);
+  vus __builtin_vec_ldl (signed long long, const vus *);
     LVXL_V8HI  LVXL_V8HI_VUS
-  vus __builtin_vec_ldl (signed long long, unsigned short *);
+  vus __builtin_vec_ldl (signed long long, const unsigned short *);
     LVXL_V8HI  LVXL_V8HI_US
-  vbs __builtin_vec_ldl (signed long long, vbs *);
+  vbs __builtin_vec_ldl (signed long long, const vbs *);
     LVXL_V8HI  LVXL_V8HI_VBS
-  vp __builtin_vec_ldl (signed long long, vp *);
+  vp __builtin_vec_ldl (signed long long, const vp *);
     LVXL_V8HI  LVXL_V8HI_VP
-  vsi __builtin_vec_ldl (signed long long, vsi *);
+  vsi __builtin_vec_ldl (signed long long, const vsi *);
     LVXL_V4SI  LVXL_V4SI_VSI
-  vsi __builtin_vec_ldl (signed long long, signed int *);
+  vsi __builtin_vec_ldl (signed long long, const signed int *);
     LVXL_V4SI  LVXL_V4SI_SI
-  vui __builtin_vec_ldl (signed long long, vui *);
+  vui __builtin_vec_ldl (signed long long, const vui *);
     LVXL_V4SI  LVXL_V4SI_VUI
-  vui __builtin_vec_ldl (signed long long, unsigned int *);
+  vui __builtin_vec_ldl (signed long long, const unsigned int *);
     LVXL_V4SI  LVXL_V4SI_UI
-  vbi __builtin_vec_ldl (signed long long, vbi *);
+  vbi __builtin_vec_ldl (signed long long, const vbi *);
     LVXL_V4SI  LVXL_V4SI_VBI
-  vsll __builtin_vec_ldl (signed long long, vsll *);
+  vsll __builtin_vec_ldl (signed long long, const vsll *);
     LVXL_V2DI  LVXL_V2DI_VSLL
-  vsll __builtin_vec_ldl (signed long long, signed long long *);
+  vsll __builtin_vec_ldl (signed long long, const signed long long *);
     LVXL_V2DI  LVXL_V2DI_SLL
-  vull __builtin_vec_ldl (signed long long, vull *);
+  vull __builtin_vec_ldl (signed long long, const vull *);
     LVXL_V2DI  LVXL_V2DI_VULL
-  vull __builtin_vec_ldl (signed long long, unsigned long long *);
+  vull __builtin_vec_ldl (signed long long, const unsigned long long *);
     LVXL_V2DI  LVXL_V2DI_ULL
-  vbll __builtin_vec_ldl (signed long long, vbll *);
+  vbll __builtin_vec_ldl (signed long long, const vbll *);
     LVXL_V2DI  LVXL_V2DI_VBLL
   vsq __builtin_vec_ldl (signed long long, const vsq *);
     LVXL_V1TI  LVXL_V1TI_VSQ
   vuq __builtin_vec_ldl (signed long long, const vuq *);
     LVXL_V1TI  LVXL_V1TI_VUQ
-  vsq __builtin_vec_ldl (signed long long, __int128 *);
+  vsq __builtin_vec_ldl (signed long long, const __int128 *);
     LVXL_V1TI  LVXL_V1TI_TI
-  vuq __builtin_vec_ldl (signed long long, unsigned __int128 *);
+  vuq __builtin_vec_ldl (signed long long, const unsigned __int128 *);
     LVXL_V1TI  LVXL_V1TI_UTI
-  vf __builtin_vec_ldl (signed long long, vf *);
+  vf __builtin_vec_ldl (signed long long, const vf *);
     LVXL_V4SF  LVXL_V4SF_VF
-  vf __builtin_vec_ldl (signed long long, float *);
+  vf __builtin_vec_ldl (signed long long, const float *);
     LVXL_V4SF  LVXL_V4SF_F
-  vd __builtin_vec_ldl (signed long long, vd *);
+  vd __builtin_vec_ldl (signed long long, const vd *);
     LVXL_V2DF  LVXL_V2DF_VD
-  vd __builtin_vec_ldl (signed long long, double *);
+  vd __builtin_vec_ldl (signed long long, const double *);
     LVXL_V2DF  LVXL_V2DF_D
 
 [VEC_LOGE, vec_loge, __builtin_vec_loge]
@@ -1499,193 +1498,193 @@
     VLOGEFP
 
 [VEC_LVLX, vec_lvlx, __builtin_vec_lvlx, __PPU__]
-  vbc __builtin_vec_lvlx (signed long long, vbc *);
+  vbc __builtin_vec_lvlx (signed long long, const vbc *);
     LVLX  LVLX_VBC
-  vsc __builtin_vec_lvlx (signed long long, vsc *);
+  vsc __builtin_vec_lvlx (signed long long, const vsc *);
     LVLX  LVLX_VSC
-  vsc __builtin_vec_lvlx (signed long long, signed char *);
+  vsc __builtin_vec_lvlx (signed long long, const signed char *);
     LVLX  LVLX_SC
-  vuc __builtin_vec_lvlx (signed long long, vuc *);
+  vuc __builtin_vec_lvlx (signed long long, const vuc *);
     LVLX  LVLX_VUC
-  vuc __builtin_vec_lvlx (signed long long, unsigned char *);
+  vuc __builtin_vec_lvlx (signed long long, const unsigned char *);
     LVLX  LVLX_UC
-  vbs __builtin_vec_lvlx (signed long long, vbs *);
+  vbs __builtin_vec_lvlx (signed long long, const vbs *);
     LVLX  LVLX_VBS
-  vss __builtin_vec_lvlx (signed long long, vss *);
+  vss __builtin_vec_lvlx (signed long long, const vss *);
     LVLX  LVLX_VSS
-  vss __builtin_vec_lvlx (signed long long, signed short *);
+  vss __builtin_vec_lvlx (signed long long, const signed short *);
     LVLX  LVLX_SS
-  vus __builtin_vec_lvlx (signed long long, vus *);
+  vus __builtin_vec_lvlx (signed long long, const vus *);
     LVLX  LVLX_VUS
-  vus __builtin_vec_lvlx (signed long long, unsigned short *);
+  vus __builtin_vec_lvlx (signed long long, const unsigned short *);
     LVLX  LVLX_US
-  vp __builtin_vec_lvlx (signed long long, vp *);
+  vp __builtin_vec_lvlx (signed long long, const vp *);
     LVLX  LVLX_VP
-  vbi __builtin_vec_lvlx (signed long long, vbi *);
+  vbi __builtin_vec_lvlx (signed long long, const vbi *);
     LVLX  LVLX_VBI
-  vsi __builtin_vec_lvlx (signed long long, vsi *);
+  vsi __builtin_vec_lvlx (signed long long, const vsi *);
     LVLX  LVLX_VSI
-  vsi __builtin_vec_lvlx (signed long long, signed int *);
+  vsi __builtin_vec_lvlx (signed long long, const signed int *);
     LVLX  LVLX_SI
-  vui __builtin_vec_lvlx (signed long long, vui *);
+  vui __builtin_vec_lvlx (signed long long, const vui *);
     LVLX  LVLX_VUI
-  vui __builtin_vec_lvlx (signed long long, unsigned int *);
+  vui __builtin_vec_lvlx (signed long long, const unsigned int *);
     LVLX  LVLX_UI
-  vf __builtin_vec_lvlx (signed long long, vf *);
+  vf __builtin_vec_lvlx (signed long long, const vf *);
     LVLX  LVLX_VF
-  vf __builtin_vec_lvlx (signed long long, float *);
+  vf __builtin_vec_lvlx (signed long long, const float *);
     LVLX  LVLX_F
 
 [VEC_LVLXL, vec_lvlxl, __builtin_vec_lvlxl, __PPU__]
-  vbc __builtin_vec_lvlxl (signed long long, vbc *);
+  vbc __builtin_vec_lvlxl (signed long long, const vbc *);
     LVLXL  LVLXL_VBC
-  vsc __builtin_vec_lvlxl (signed long long, vsc *);
+  vsc __builtin_vec_lvlxl (signed long long, const vsc *);
     LVLXL  LVLXL_VSC
-  vsc __builtin_vec_lvlxl (signed long long, signed char *);
+  vsc __builtin_vec_lvlxl (signed long long, const signed char *);
     LVLXL  LVLXL_SC
-  vuc __builtin_vec_lvlxl (signed long long, vuc *);
+  vuc __builtin_vec_lvlxl (signed long long, const vuc *);
     LVLXL  LVLXL_VUC
-  vuc __builtin_vec_lvlxl (signed long long, unsigned char *);
+  vuc __builtin_vec_lvlxl (signed long long, const unsigned char *);
     LVLXL  LVLXL_UC
-  vbs __builtin_vec_lvlxl (signed long long, vbs *);
+  vbs __builtin_vec_lvlxl (signed long long, const vbs *);
     LVLXL  LVLXL_VBS
-  vss __builtin_vec_lvlxl (signed long long, vss *);
+  vss __builtin_vec_lvlxl (signed long long, const vss *);
     LVLXL  LVLXL_VSS
-  vss __builtin_vec_lvlxl (signed long long, signed short *);
+  vss __builtin_vec_lvlxl (signed long long, const signed short *);
     LVLXL  LVLXL_SS
-  vus __builtin_vec_lvlxl (signed long long, vus *);
+  vus __builtin_vec_lvlxl (signed long long, const vus *);
     LVLXL  LVLXL_VUS
-  vus __builtin_vec_lvlxl (signed long long, unsigned short *);
+  vus __builtin_vec_lvlxl (signed long long, const unsigned short *);
     LVLXL  LVLXL_US
-  vp __builtin_vec_lvlxl (signed long long, vp *);
+  vp __builtin_vec_lvlxl (signed long long, const vp *);
     LVLXL  LVLXL_VP
-  vbi __builtin_vec_lvlxl (signed long long, vbi *);
+  vbi __builtin_vec_lvlxl (signed long long, const vbi *);
     LVLXL  LVLXL_VBI
-  vsi __builtin_vec_lvlxl (signed long long, vsi *);
+  vsi __builtin_vec_lvlxl (signed long long, const vsi *);
     LVLXL  LVLXL_VSI
-  vsi __builtin_vec_lvlxl (signed long long, signed int *);
+  vsi __builtin_vec_lvlxl (signed long long, const signed int *);
     LVLXL  LVLXL_SI
-  vui __builtin_vec_lvlxl (signed long long, vui *);
+  vui __builtin_vec_lvlxl (signed long long, const vui *);
     LVLXL  LVLXL_VUI
-  vui __builtin_vec_lvlxl (signed long long, unsigned int *);
+  vui __builtin_vec_lvlxl (signed long long, const unsigned int *);
     LVLXL  LVLXL_UI
-  vf __builtin_vec_lvlxl (signed long long, vf *);
+  vf __builtin_vec_lvlxl (signed long long, const vf *);
     LVLXL  LVLXL_VF
-  vf __builtin_vec_lvlxl (signed long long, float *);
+  vf __builtin_vec_lvlxl (signed long long, const float *);
     LVLXL  LVLXL_F
 
 [VEC_LVRX, vec_lvrx, __builtin_vec_lvrx, __PPU__]
-  vbc __builtin_vec_lvrx (signed long long, vbc *);
+  vbc __builtin_vec_lvrx (signed long long, const vbc *);
     LVRX  LVRX_VBC
-  vsc __builtin_vec_lvrx (signed long long, vsc *);
+  vsc __builtin_vec_lvrx (signed long long, const vsc *);
     LVRX  LVRX_VSC
-  vsc __builtin_vec_lvrx (signed long long, signed char *);
+  vsc __builtin_vec_lvrx (signed long long, const signed char *);
     LVRX  LVRX_SC
-  vuc __builtin_vec_lvrx (signed long long, vuc *);
+  vuc __builtin_vec_lvrx (signed long long, const vuc *);
     LVRX  LVRX_VUC
-  vuc __builtin_vec_lvrx (signed long long, unsigned char *);
+  vuc __builtin_vec_lvrx (signed long long, const unsigned char *);
     LVRX  LVRX_UC
-  vbs __builtin_vec_lvrx (signed long long, vbs *);
+  vbs __builtin_vec_lvrx (signed long long, const vbs *);
     LVRX  LVRX_VBS
-  vss __builtin_vec_lvrx (signed long long, vss *);
+  vss __builtin_vec_lvrx (signed long long, const vss *);
     LVRX  LVRX_VSS
-  vss __builtin_vec_lvrx (signed long long, signed short *);
+  vss __builtin_vec_lvrx (signed long long, const signed short *);
     LVRX  LVRX_SS
-  vus __builtin_vec_lvrx (signed long long, vus *);
+  vus __builtin_vec_lvrx (signed long long, const vus *);
     LVRX  LVRX_VUS
-  vus __builtin_vec_lvrx (signed long long, unsigned short *);
+  vus __builtin_vec_lvrx (signed long long, const unsigned short *);
     LVRX  LVRX_US
-  vp __builtin_vec_lvrx (signed long long, vp *);
+  vp __builtin_vec_lvrx (signed long long, const vp *);
     LVRX  LVRX_VP
-  vbi __builtin_vec_lvrx (signed long long, vbi *);
+  vbi __builtin_vec_lvrx (signed long long, const vbi *);
     LVRX  LVRX_VBI
-  vsi __builtin_vec_lvrx (signed long long, vsi *);
+  vsi __builtin_vec_lvrx (signed long long, const vsi *);
     LVRX  LVRX_VSI
-  vsi __builtin_vec_lvrx (signed long long, signed int *);
+  vsi __builtin_vec_lvrx (signed long long, const signed int *);
     LVRX  LVRX_SI
-  vui __builtin_vec_lvrx (signed long long, vui *);
+  vui __builtin_vec_lvrx (signed long long, const vui *);
     LVRX  LVRX_VUI
-  vui __builtin_vec_lvrx (signed long long, unsigned int *);
+  vui __builtin_vec_lvrx (signed long long, const unsigned int *);
     LVRX  LVRX_UI
-  vf __builtin_vec_lvrx (signed long long, vf *);
+  vf __builtin_vec_lvrx (signed long long, const vf *);
     LVRX  LVRX_VF
-  vf __builtin_vec_lvrx (signed long long, float *);
+  vf __builtin_vec_lvrx (signed long long, const float *);
     LVRX  LVRX_F
 
 [VEC_LVRXL, vec_lvrxl, __builtin_vec_lvrxl, __PPU__]
-  vbc __builtin_vec_lvrxl (signed long long, vbc *);
+  vbc __builtin_vec_lvrxl (signed long long, const vbc *);
     LVRXL  LVRXL_VBC
-  vsc __builtin_vec_lvrxl (signed long long, vsc *);
+  vsc __builtin_vec_lvrxl (signed long long, const vsc *);
     LVRXL  LVRXL_VSC
-  vsc __builtin_vec_lvrxl (signed long long, signed char *);
+  vsc __builtin_vec_lvrxl (signed long long, const signed char *);
     LVRXL  LVRXL_SC
-  vuc __builtin_vec_lvrxl (signed long long, vuc *);
+  vuc __builtin_vec_lvrxl (signed long long, const vuc *);
     LVRXL  LVRXL_VUC
-  vuc __builtin_vec_lvrxl (signed long long, unsigned char *);
+  vuc __builtin_vec_lvrxl (signed long long, const unsigned char *);
     LVRXL  LVRXL_UC
-  vbs __builtin_vec_lvrxl (signed long long, vbs *);
+  vbs __builtin_vec_lvrxl (signed long long, const vbs *);
     LVRXL  LVRXL_VBS
-  vss __builtin_vec_lvrxl (signed long long, vss *);
+  vss __builtin_vec_lvrxl (signed long long, const vss *);
     LVRXL  LVRXL_VSS
-  vss __builtin_vec_lvrxl (signed long long, signed short *);
+  vss __builtin_vec_lvrxl (signed long long, const signed short *);
     LVRXL  LVRXL_SS
-  vus __builtin_vec_lvrxl (signed long long, vus *);
+  vus __builtin_vec_lvrxl (signed long long, const vus *);
     LVRXL  LVRXL_VUS
-  vus __builtin_vec_lvrxl (signed long long, unsigned short *);
+  vus __builtin_vec_lvrxl (signed long long, const unsigned short *);
     LVRXL  LVRXL_US
-  vp __builtin_vec_lvrxl (signed long long, vp *);
+  vp __builtin_vec_lvrxl (signed long long, const vp *);
     LVRXL  LVRXL_VP
-  vbi __builtin_vec_lvrxl (signed long long, vbi *);
+  vbi __builtin_vec_lvrxl (signed long long, const vbi *);
     LVRXL  LVRXL_VBI
-  vsi __builtin_vec_lvrxl (signed long long, vsi *);
+  vsi __builtin_vec_lvrxl (signed long long, const vsi *);
     LVRXL  LVRXL_VSI
-  vsi __builtin_vec_lvrxl (signed long long, signed int *);
+  vsi __builtin_vec_lvrxl (signed long long, const signed int *);
     LVRXL  LVRXL_SI
-  vui __builtin_vec_lvrxl (signed long long, vui *);
+  vui __builtin_vec_lvrxl (signed long long, const vui *);
     LVRXL  LVRXL_VUI
-  vui __builtin_vec_lvrxl (signed long long, unsigned int *);
+  vui __builtin_vec_lvrxl (signed long long, const unsigned int *);
     LVRXL  LVRXL_UI
-  vf __builtin_vec_lvrxl (signed long long, vf *);
+  vf __builtin_vec_lvrxl (signed long long, const vf *);
     LVRXL  LVRXL_VF
-  vf __builtin_vec_lvrxl (signed long long, float *);
+  vf __builtin_vec_lvrxl (signed long long, const float *);
     LVRXL  LVRXL_F
 
 [VEC_LVSL, vec_lvsl, __builtin_vec_lvsl]
-  vuc __builtin_vec_lvsl (signed long long, unsigned char *);
+  vuc __builtin_vec_lvsl (signed long long, const unsigned char *);
     LVSL  LVSL_UC
-  vuc __builtin_vec_lvsl (signed long long, signed char *);
+  vuc __builtin_vec_lvsl (signed long long, const signed char *);
     LVSL  LVSL_SC
 
 [VEC_LVSR, vec_lvsr, __builtin_vec_lvsr]
-  vuc __builtin_vec_lvsr (signed long long, unsigned char *);
+  vuc __builtin_vec_lvsr (signed long long, const unsigned char *);
     LVSR  LVSR_UC
-  vuc __builtin_vec_lvsr (signed long long, signed char *);
+  vuc __builtin_vec_lvsr (signed long long, const signed char *);
     LVSR  LVSR_SC
 
 [VEC_LXVL, vec_xl_len, __builtin_vec_lxvl, _ARCH_PPC64_PWR9]
-  vsc __builtin_vec_lxvl (signed char *, unsigned long long);
+  vsc __builtin_vec_lxvl (const signed char *, unsigned long long);
     LXVL  LXVL_VSC
-  vuc __builtin_vec_lxvl (unsigned char *, unsigned long long);
+  vuc __builtin_vec_lxvl (const unsigned char *, unsigned long long);
     LXVL  LXVL_VUC
-  vss __builtin_vec_lxvl (signed short *, unsigned long long);
+  vss __builtin_vec_lxvl (const signed short *, unsigned long long);
     LXVL  LXVL_VSS
-  vus __builtin_vec_lxvl (unsigned short *, unsigned long long);
+  vus __builtin_vec_lxvl (const unsigned short *, unsigned long long);
     LXVL  LXVL_VUS
-  vsi __builtin_vec_lxvl (signed int *, unsigned long long);
+  vsi __builtin_vec_lxvl (const signed int *, unsigned long long);
     LXVL  LXVL_VSI
-  vui __builtin_vec_lxvl (unsigned int *, unsigned long long);
+  vui __builtin_vec_lxvl (const unsigned int *, unsigned long long);
     LXVL  LXVL_VUI
-  vsll __builtin_vec_lxvl (signed long long *, unsigned long long);
+  vsll __builtin_vec_lxvl (const signed long long *, unsigned long long);
     LXVL  LXVL_VSLL
-  vull __builtin_vec_lxvl (unsigned long long *, unsigned long long);
+  vull __builtin_vec_lxvl (const unsigned long long *, unsigned long long);
     LXVL  LXVL_VULL
-  vsq __builtin_vec_lxvl (signed __int128 *, unsigned long long);
+  vsq __builtin_vec_lxvl (const signed __int128 *, unsigned long long);
     LXVL  LXVL_VSQ
-  vuq __builtin_vec_lxvl (unsigned __int128 *, unsigned long long);
+  vuq __builtin_vec_lxvl (const unsigned __int128 *, unsigned long long);
     LXVL  LXVL_VUQ
-  vf __builtin_vec_lxvl (float *, unsigned long long);
+  vf __builtin_vec_lxvl (const float *, unsigned long long);
     LXVL  LXVL_VF
-  vd __builtin_vec_lxvl (double *, unsigned long long);
+  vd __builtin_vec_lxvl (const double *, unsigned long long);
     LXVL  LXVL_VD
 
 [VEC_MADD, vec_madd, __builtin_vec_madd]
@@ -3558,121 +3557,121 @@
     VTDCDP
 
 [VEC_XL, vec_xl, __builtin_vec_vsx_ld, __VSX__]
-  vsc __builtin_vec_vsx_ld (signed long long, vsc *);
+  vsc __builtin_vec_vsx_ld (signed long long, const vsc *);
     LXVW4X_V4SI  LXVW4X_VSC
-  vsc __builtin_vec_vsx_ld (signed long long, signed char *);
+  vsc __builtin_vec_vsx_ld (signed long long, const signed char *);
     LXVW4X_V4SI  LXVW4X_SC
-  vuc __builtin_vec_vsx_ld (signed long long, vuc *);
+  vuc __builtin_vec_vsx_ld (signed long long, const vuc *);
     LXVW4X_V4SI  LXVW4X_VUC
-  vuc __builtin_vec_vsx_ld (signed long long, unsigned char *);
+  vuc __builtin_vec_vsx_ld (signed long long, const unsigned char *);
     LXVW4X_V4SI  LXVW4X_UC
-  vss __builtin_vec_vsx_ld (signed long long, vss *);
+  vss __builtin_vec_vsx_ld (signed long long, const vss *);
     LXVW4X_V4SI  LXVW4X_VSS
-  vss __builtin_vec_vsx_ld (signed long long, signed short *);
+  vss __builtin_vec_vsx_ld (signed long long, const signed short *);
     LXVW4X_V4SI  LXVW4X_SS
-  vus __builtin_vec_vsx_ld (signed long long, vus *);
+  vus __builtin_vec_vsx_ld (signed long long, const vus *);
     LXVW4X_V4SI  LXVW4X_VUS
-  vus __builtin_vec_vsx_ld (signed long long, unsigned short *);
+  vus __builtin_vec_vsx_ld (signed long long, const unsigned short *);
     LXVW4X_V4SI  LXVW4X_US
-  vsi __builtin_vec_vsx_ld (signed long long, vsi *);
+  vsi __builtin_vec_vsx_ld (signed long long, const vsi *);
     LXVW4X_V4SI  LXVW4X_VSI
-  vsi __builtin_vec_vsx_ld (signed long long, signed int *);
+  vsi __builtin_vec_vsx_ld (signed long long, const signed int *);
     LXVW4X_V4SI  LXVW4X_SI
-  vui __builtin_vec_vsx_ld (signed long long, vui *);
+  vui __builtin_vec_vsx_ld (signed long long, const vui *);
     LXVW4X_V4SI  LXVW4X_VUI
-  vui __builtin_vec_vsx_ld (signed long long, unsigned int *);
+  vui __builtin_vec_vsx_ld (signed long long, const unsigned int *);
     LXVW4X_V4SI  LXVW4X_UI
-  vsll __builtin_vec_vsx_ld (signed long long, vsll *);
+  vsll __builtin_vec_vsx_ld (signed long long, const vsll *);
     LXVD2X_V2DI  LXVD2X_VSLL
-  vsll __builtin_vec_vsx_ld (signed long long, signed long long *);
+  vsll __builtin_vec_vsx_ld (signed long long, const signed long long *);
     LXVD2X_V2DI  LXVD2X_SLL
-  vull __builtin_vec_vsx_ld (signed long long, vull *);
+  vull __builtin_vec_vsx_ld (signed long long, const vull *);
     LXVD2X_V2DI  LXVD2X_VULL
-  vull __builtin_vec_vsx_ld (signed long long, unsigned long long *);
+  vull __builtin_vec_vsx_ld (signed long long, const unsigned long long *);
     LXVD2X_V2DI  LXVD2X_ULL
-  vsq __builtin_vec_vsx_ld (signed long long, vsq *);
+  vsq __builtin_vec_vsx_ld (signed long long, const vsq *);
     LXVD2X_V1TI  LXVD2X_VSQ
-  vsq __builtin_vec_vsx_ld (signed long long, signed __int128 *);
+  vsq __builtin_vec_vsx_ld (signed long long, const signed __int128 *);
     LXVD2X_V1TI  LXVD2X_SQ
-  vuq __builtin_vec_vsx_ld (signed long long, unsigned __int128 *);
+  vuq __builtin_vec_vsx_ld (signed long long, const unsigned __int128 *);
     LXVD2X_V1TI  LXVD2X_UQ
-  vf __builtin_vec_vsx_ld (signed long long, vf *);
+  vf __builtin_vec_vsx_ld (signed long long, const vf *);
     LXVW4X_V4SF  LXVW4X_VF
-  vf __builtin_vec_vsx_ld (signed long long, float *);
+  vf __builtin_vec_vsx_ld (signed long long, const float *);
     LXVW4X_V4SF  LXVW4X_F
-  vd __builtin_vec_vsx_ld (signed long long, vd *);
+  vd __builtin_vec_vsx_ld (signed long long, const vd *);
     LXVD2X_V2DF  LXVD2X_VD
-  vd __builtin_vec_vsx_ld (signed long long, double *);
+  vd __builtin_vec_vsx_ld (signed long long, const double *);
     LXVD2X_V2DF  LXVD2X_D
 
 [VEC_XL_BE, vec_xl_be, __builtin_vec_xl_be, __VSX__]
-  vsc __builtin_vec_xl_be (signed long long, vsc *);
+  vsc __builtin_vec_xl_be (signed long long, const vsc *);
     LD_ELEMREV_V16QI  LD_ELEMREV_VSC
-  vsc __builtin_vec_xl_be (signed long long, signed char *);
+  vsc __builtin_vec_xl_be (signed long long, const signed char *);
     LD_ELEMREV_V16QI  LD_ELEMREV_SC
-  vuc __builtin_vec_xl_be (signed long long, vuc *);
+  vuc __builtin_vec_xl_be (signed long long, const vuc *);
     LD_ELEMREV_V16QI  LD_ELEMREV_VUC
-  vuc __builtin_vec_xl_be (signed long long, unsigned char *);
+  vuc __builtin_vec_xl_be (signed long long, const unsigned char *);
     LD_ELEMREV_V16QI  LD_ELEMREV_UC
-  vss __builtin_vec_xl_be (signed long long, vss *);
+  vss __builtin_vec_xl_be (signed long long, const vss *);
     LD_ELEMREV_V8HI  LD_ELEMREV_VSS
-  vss __builtin_vec_xl_be (signed long long, signed short *);
+  vss __builtin_vec_xl_be (signed long long, const signed short *);
     LD_ELEMREV_V8HI  LD_ELEMREV_SS
-  vus __builtin_vec_xl_be (signed long long, vus *);
+  vus __builtin_vec_xl_be (signed long long, const vus *);
     LD_ELEMREV_V8HI  LD_ELEMREV_VUS
-  vus __builtin_vec_xl_be (signed long long, unsigned short *);
+  vus __builtin_vec_xl_be (signed long long, const unsigned short *);
     LD_ELEMREV_V8HI  LD_ELEMREV_US
-  vsi __builtin_vec_xl_be (signed long long, vsi *);
+  vsi __builtin_vec_xl_be (signed long long, const vsi *);
     LD_ELEMREV_V4SI  LD_ELEMREV_VSI
-  vsi __builtin_vec_xl_be (signed long long, signed int *);
+  vsi __builtin_vec_xl_be (signed long long, const signed int *);
     LD_ELEMREV_V4SI  LD_ELEMREV_SI
-  vui __builtin_vec_xl_be (signed long long, vui *);
+  vui __builtin_vec_xl_be (signed long long, const vui *);
     LD_ELEMREV_V4SI  LD_ELEMREV_VUI
-  vui __builtin_vec_xl_be (signed long long, unsigned int *);
+  vui __builtin_vec_xl_be (signed long long, const unsigned int *);
     LD_ELEMREV_V4SI  LD_ELEMREV_UI
-  vsll __builtin_vec_xl_be (signed long long, vsll *);
+  vsll __builtin_vec_xl_be (signed long long, const vsll *);
     LD_ELEMREV_V2DI  LD_ELEMREV_VSLL
-  vsll __builtin_vec_xl_be (signed long long, signed long long *);
+  vsll __builtin_vec_xl_be (signed long long, const signed long long *);
     LD_ELEMREV_V2DI  LD_ELEMREV_SLL
-  vull __builtin_vec_xl_be (signed long long, vull *);
+  vull __builtin_vec_xl_be (signed long long, const vull *);
     LD_ELEMREV_V2DI  LD_ELEMREV_VULL
-  vull __builtin_vec_xl_be (signed long long, unsigned long long *);
+  vull __builtin_vec_xl_be (signed long long, const unsigned long long *);
     LD_ELEMREV_V2DI  LD_ELEMREV_ULL
-  vsq __builtin_vec_xl_be (signed long long, signed __int128 *);
+  vsq __builtin_vec_xl_be (signed long long, const signed __int128 *);
     LD_ELEMREV_V1TI  LD_ELEMREV_SQ
-  vuq __builtin_vec_xl_be (signed long long, unsigned __int128 *);
+  vuq __builtin_vec_xl_be (signed long long, const unsigned __int128 *);
     LD_ELEMREV_V1TI  LD_ELEMREV_UQ
-  vf __builtin_vec_xl_be (signed long long, vf *);
+  vf __builtin_vec_xl_be (signed long long, const vf *);
     LD_ELEMREV_V4SF  LD_ELEMREV_VF
-  vf __builtin_vec_xl_be (signed long long, float *);
+  vf __builtin_vec_xl_be (signed long long, const float *);
     LD_ELEMREV_V4SF  LD_ELEMREV_F
-  vd __builtin_vec_xl_be (signed long long, vd *);
+  vd __builtin_vec_xl_be (signed long long, const vd *);
     LD_ELEMREV_V2DF  LD_ELEMREV_VD
-  vd __builtin_vec_xl_be (signed long long, double *);
+  vd __builtin_vec_xl_be (signed long long, const double *);
     LD_ELEMREV_V2DF  LD_ELEMREV_DD
 
 [VEC_XL_LEN_R, vec_xl_len_r, __builtin_vec_xl_len_r, _ARCH_PPC64_PWR9]
-  vuc __builtin_vsx_xl_len_r (unsigned char *, unsigned long long);
+  vuc __builtin_vsx_xl_len_r (const unsigned char *, unsigned long long);
     XL_LEN_R
 
 [VEC_XL_SEXT, vec_xl_sext, __builtin_vec_xl_sext, _ARCH_PWR10]
-  vsq __builtin_vec_xl_sext (signed long long, signed char *);
+  vsq __builtin_vec_xl_sext (signed long long, const signed char *);
     SE_LXVRBX
-  vsq __builtin_vec_xl_sext (signed long long, signed short *);
+  vsq __builtin_vec_xl_sext (signed long long, const signed short *);
     SE_LXVRHX
-  vsq __builtin_vec_xl_sext (signed long long, signed int *);
+  vsq __builtin_vec_xl_sext (signed long long, const signed int *);
     SE_LXVRWX
-  vsq __builtin_vec_xl_sext (signed long long, signed long long *);
+  vsq __builtin_vec_xl_sext (signed long long, const signed long long *);
     SE_LXVRDX
 
 [VEC_XL_ZEXT, vec_xl_zext, __builtin_vec_xl_zext, _ARCH_PWR10]
-  vsq __builtin_vec_xl_zext (signed long long, signed char *);
+  vsq __builtin_vec_xl_zext (signed long long, const signed char *);
     ZE_LXVRBX
-  vsq __builtin_vec_xl_zext (signed long long, signed short *);
+  vsq __builtin_vec_xl_zext (signed long long, const signed short *);
     ZE_LXVRHX
-  vsq __builtin_vec_xl_zext (signed long long, signed int *);
+  vsq __builtin_vec_xl_zext (signed long long, const signed int *);
     ZE_LXVRWX
-  vsq __builtin_vec_xl_zext (signed long long, signed long long *);
+  vsq __builtin_vec_xl_zext (signed long long, const signed long long *);
     ZE_LXVRDX
 
 [VEC_XOR, vec_xor, __builtin_vec_xor]
