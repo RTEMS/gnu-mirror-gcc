@@ -175,6 +175,7 @@ along with GCC; see the file COPYING3.  If not see
 #define ABORT_IF_NOT_C true
 
 bool detected_incompatible_syntax = false;
+bool still_whitelisting = true;
 
 // Main function that drives dfe.
 static unsigned int
@@ -292,7 +293,6 @@ get_whitelisted_nodes2 ()
   vec<cgraph_node *> worklist = vNULL;
   for (hash_set<cgraph_node*>::iterator i = leaf_nodes.begin(), e = leaf_nodes.end (); i != e; ++i)
   {
-    if (dump_file) fprintf (dump_file, "is a leaf node %s\n", (*i)->name ());
     worklist.safe_push (*i);
   }
 
@@ -309,7 +309,6 @@ get_whitelisted_nodes2 ()
     if (detected_incompatible_syntax) return map;
     cgraph_node *i = worklist[0];
     worklist.ordered_remove (0);
-    if (dump_file) fprintf (dump_file, "analyzing %s %p\n", i->name (), (void*)i);
     tpartitions2_t temp;
     gimple_white_lister whitelister(temp);
     whitelister._walk_cnode (i);
@@ -335,6 +334,7 @@ get_whitelisted_nodes2 ()
     }
   }
 
+  still_whitelisting = false;
   return map;
 }
 
@@ -1888,22 +1888,32 @@ expr_collector::_walk_pre (tree e)
 
   if (RECORD_TYPE != TREE_CODE (t)) return;
 
-  if (_type_collector.ptrset2.records.is_empty ()) {
-    _type_collector.ptrset2.records.add (TYPE_MAIN_VARIANT (t));
+  if (!still_whitelisting) return;
+
+  if (ptrset3->is_empty ()) {
+    gcc_assert (TYPE_P (t));
+    gcc_assert (TYPE_P (TYPE_MAIN_VARIANT (t)));
+    ptrset3->add (TYPE_MAIN_VARIANT (t));
+    log ("we are adding something to whitelisting for the very first time!\n");
     return;
   }
 
-  for (auto
-	i = _type_collector.ptrset2.records.begin (),
-	e = _type_collector.ptrset2.records.end (); i != e; ++i)
+  bool same = true;
+  for (hash_set<tree>::iterator
+	i = ptrset3->begin (),
+	e = ptrset3->end (); i != e; ++i)
   {
     tree r = *i;
     type_incomplete_equality structuralEquality;
-    bool is_same = structuralEquality.equal (TYPE_MAIN_VARIANT (r), TYPE_MAIN_VARIANT (t));
-    if (is_same) continue;
+    // WHY!?!?!?!
+    gcc_assert (TYPE_P (r));
+    gcc_assert (TYPE_MAIN_VARIANT (r));
+    same &= structuralEquality.equal (TYPE_MAIN_VARIANT (r), TYPE_MAIN_VARIANT (t));
+    if (!same) break;
+  }
 
-    type_stringifier stringifier;
-    _type_collector.ptrset2.records.add (TYPE_MAIN_VARIANT (t));
+  if (!same) {
+    ptrset3->add (TYPE_MAIN_VARIANT (t));
   }
 }
 
@@ -2280,9 +2290,9 @@ expr_escaper::_walk_SSA_NAME_pre (tree e)
   bool whitelisted = in_map && *_whitelisted2->get (curr_node->decl);
   if (whitelisted) return;
 
-  if (dump_file) print_generic_stmt(dump_file, e);
+  //if (dump_file) print_generic_stmt(dump_file, e);
   log ("\n");
-  if (dump_file) print_generic_stmt(dump_file, prev_expr);
+  //if (dump_file) print_generic_stmt(dump_file, prev_expr);
   log ("\n");
 
   _r.type_is_casted = !structuralEquality.equal (mref_type, ssa_type);
@@ -3153,7 +3163,7 @@ type_partitions2_s::in_complement (tree type)
 std::string
 type_stringifier::stringify (tree t)
 {
-  if (!dump_file)
+  if (!dump_file || !t)
     return std::string ("");
   _stringification.clear ();
   gcc_assert (t);
@@ -3350,18 +3360,18 @@ std::string
 type_stringifier::get_type_identifier (tree t)
 {
   if (detected_incompatible_syntax)
-    return std::string ("");
+    return std::string ("incompatible syntax");
   tree name = TYPE_NAME (t);
   bool no_name = NULL_TREE == name;
   if (no_name)
-    return std::string ("");
+    return std::string ("NULL_TREE == name");
 
   const enum tree_code name_code = TREE_CODE (name);
   const bool is_name_type_decl = TYPE_DECL == name_code;
   name = is_name_type_decl ? DECL_NAME (name) : name;
   no_name = NULL_TREE == name;
   if (no_name)
-    return std::string ("");
+    return std::string ("NULL_TREE == name");
   const char *identifier_ptr = IDENTIFIER_POINTER (name);
   gcc_assert (identifier_ptr);
   return std::string (identifier_ptr);

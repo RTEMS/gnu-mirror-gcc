@@ -189,16 +189,25 @@ get_types_replacement (record_field_offset_map4_t &record_field_offset_map2,
   type_stringifier stringifier;
 
   type_reconstructor reconstructor (record_field_offset_map2, "reorg", map2, field_map2);
+
+  std::set<tree> temp;
   for (hash_set<tree>::iterator i = to_modify.begin (),
 					    e = to_modify.end ();
+       i != e; ++i)
+    {
+      temp.insert (*i);
+    }
+
+  for (std::set<tree>::const_iterator i = temp.begin (),
+					    e = temp.end ();
        i != e; ++i)
     {
       tree record = *i;
       reconstructor.walk (TYPE_MAIN_VARIANT (record));
     }
 
-  for (hash_set<tree>::iterator i = to_modify.begin (),
-					    e = to_modify.end ();
+  for (std::set<tree>::const_iterator i = temp.begin (),
+					    e = temp.end ();
        i != e; ++i)
     {
       tree record = *i;
@@ -678,8 +687,10 @@ type_reconstructor::_walk_field_post (tree t)
   tree record = for_reference2.last ();
 
   field_offsets2_t **field_offsets_ptr = _records2.get(record);
-  if (!field_offsets_ptr) return;
-  field_offsets2_t *field_offsets = *field_offsets_ptr;
+  field_offsets2_t *field_offsets = field_offsets_ptr ? *field_offsets_ptr : new field_offsets2_t;
+  if (!field_offsets_ptr) {
+   _records2.put(record, field_offsets);
+  }
   // What's the field offset?
   unsigned f_byte_offset = tree_to_uhwi (DECL_FIELD_OFFSET (t));
   unsigned f_bit_offset = tree_to_uhwi (DECL_FIELD_BIT_OFFSET (t));
@@ -1080,8 +1091,7 @@ expr_type_rewriter::handle_pointer_arithmetic_constants (gimple *s, tree p,
 
   if (!is_valid_input)
     {
-      if (dump_file)
-	print_gimple_expr (dump_file, s, 0);
+      //if (dump_file)	print_gimple_expr (dump_file, s, 0);
       log ("\n%d  = %d / %d * %d\n", new_integer_cst_int, old_integer_cst_int,
 	   old_size_int, new_size_int);
     }
@@ -1095,12 +1105,65 @@ expr_type_rewriter::_walk_post (tree e)
   gcc_assert (e);
   tree t = TREE_TYPE (e);
   const bool in_map = _map2.get(t);
+  if (dump_file && TREE_CODE(e) == ARRAY_REF) 
+  {
+   print_generic_expr (dump_file, e, TDF_NONE);
+   fprintf(dump_file, "\n");
+   fprintf(dump_file, "type: %s\n", type_stringifier::get_type_identifier(t).c_str());
+   type_stringifier _ts;
+   fprintf(dump_file, "long type: %s\n", _ts.stringify(TREE_TYPE(t)).c_str());
+  }
+
+  if (TREE_CODE(e) == ARRAY_REF && dump_file)
+  {
+    tree op_0 = TREE_OPERAND (e, 0);
+   fprintf(dump_file, "op_0: \n");
+   print_generic_expr (dump_file, op_0, TDF_NONE);
+   fprintf(dump_file, "\n");
+   fprintf(dump_file, "type: %s\n", type_stringifier::get_type_identifier(TREE_TYPE(op_0)).c_str());
+   type_stringifier _ts;
+   fprintf(dump_file, "long type: %s\n", _ts.stringify(TREE_TYPE(op_0)).c_str());
+   fprintf(dump_file, "code: %s\n", get_tree_code_name( TREE_CODE(op_0)));
+    tree op_1 = TREE_OPERAND (e, 1);
+   fprintf(dump_file, "op_1: \n");
+   print_generic_expr (dump_file, op_1, TDF_NONE);
+   fprintf(dump_file, "\n");
+   fprintf(dump_file, "type: %s\n", type_stringifier::get_type_identifier(TREE_TYPE(op_1)).c_str());
+   fprintf(dump_file, "code: %s\n", get_tree_code_name( TREE_CODE(op_1)));
+
+  }
   if (!in_map)
     return;
 
+  if (dump_file) fprintf(dump_file, "in map\n");
   tree r_t = *_map2.get(t);
   tree _e = tree_to_tree (e);
   TREE_TYPE (_e) = r_t;
+
+  if (TREE_CODE(e) == ARRAY_REF)
+  {
+   tree op_0 = TREE_OPERAND (_e, 0);
+   if (op_0) {
+     TREE_TYPE(TREE_TYPE(op_0)) = r_t;
+   }
+  }
+  if (TREE_CODE(e) == ARRAY_REF && dump_file)
+  {
+   tree op_0 = TREE_OPERAND (_e, 0);
+   fprintf(dump_file, "op_0: \n");
+   print_generic_expr (dump_file, op_0, TDF_NONE);
+   fprintf(dump_file, "\n");
+   type_stringifier _ts;
+   fprintf(dump_file, "type: %s\n", type_stringifier::get_type_identifier(TREE_TYPE(op_0)).c_str());
+   fprintf(dump_file, "long type: %s\n", _ts.stringify(TREE_TYPE(op_0)).c_str());
+   fprintf(dump_file, "code: %s\n", get_tree_code_name( TREE_CODE(op_0)));
+    tree op_1 = TREE_OPERAND (e, 1);
+   fprintf(dump_file, "op_1: \n");
+   print_generic_expr (dump_file, op_1, TDF_NONE);
+   fprintf(dump_file, "\n");
+   fprintf(dump_file, "type: %s\n", type_stringifier::get_type_identifier(TREE_TYPE(op_1)).c_str());
+   fprintf(dump_file, "code: %s\n", get_tree_code_name( TREE_CODE(op_1)));
+  }
 }
 
 /* Rewrite Field.  */
@@ -1273,12 +1336,10 @@ gimple_type_rewriter::_walk_pre_gassign (gassign *s)
     case POINTER_PLUS_EXPR:
     case POINTER_DIFF_EXPR:
       log ("am i handling pointer arithmetic?\n");
-      if (dump_file)
-	print_gimple_stmt (dump_file, s, 0);
+      //if (dump_file) print_gimple_stmt (dump_file, s, 0);
       log ("\n");
       handle_pointer_arithmetic (s);
-      if (dump_file)
-	print_gimple_stmt (dump_file, s, 0);
+      //if (dump_file) print_gimple_stmt (dump_file, s, 0);
       log ("\n");
       break;
     default:

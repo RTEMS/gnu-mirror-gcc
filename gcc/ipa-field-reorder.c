@@ -523,6 +523,7 @@ get_reordered_field_maps (record_field_offset_map4_t &record_field_offset_map2,
 
   TypeReconstructorFieldReordering reconstructor (record_field_offset_map2,
 						  "reorder", map2, field_map2);
+
   for (hash_set<tree>::iterator i = to_modify.begin (),
 					    e = to_modify.end ();
        i != e; ++i)
@@ -584,7 +585,7 @@ lto_fr_execute ()
   log ("here in field reordering \n");
   // Analysis.
   detected_incompatible_syntax = false;
-  hash_map<tree, bool> *whitelisted2 = get_whitelisted_nodes2();
+  hash_map<tree, bool> *whitelisted2 = get_whitelisted_nodes2 ();
   tpartitions2_t escaping_nonescaping_sets;
   partition_types_into_escaping_nonescaping (escaping_nonescaping_sets, whitelisted2);
   record_field_map4_t record_field_map;
@@ -598,6 +599,7 @@ lto_fr_execute ()
 
   // Prepare for transformation.
   hash_set<tree> to_modify;
+
   get_all_types_pointing_to (record_field_offset_map,
 				 escaping_nonescaping_sets, to_modify);
 

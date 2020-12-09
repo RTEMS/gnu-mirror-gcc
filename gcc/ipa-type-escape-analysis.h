@@ -27,7 +27,7 @@ void log (const char *const fmt, ...) __attribute__((format(printf, 1, 0)));
 inline void
 log (const char *const fmt, ...) 
 {
-  if (!dump_file)
+  //if (!dump_file)
     return;
 
   va_list args;
@@ -438,9 +438,6 @@ struct type_partitions2_s
   /* The set of all non escaping types.  */
   tset2_t non_escaping;
 
-  /* The set of all records. */
-  tset2_t records;
-
   /* Determine if we have seen this type before.  */
   bool in_universe (tree);
 
@@ -465,7 +462,11 @@ class type_collector : public type_walker
 public:
   type_collector (tpartitions2_t &ptrset)
   : ptrset2(ptrset)
-  {};
+  {
+  };
+  ~type_collector()
+  {
+  };
 
   /* Main interface.  */
   void collect (tree t);
@@ -645,8 +646,14 @@ class expr_collector : public expr_walker
 {
 public:
   expr_collector (tpartitions2_t &p)
-  : _type_collector (p)
-  {};
+  : _type_collector (p), ptrset3(NULL)
+  {
+    ptrset3 = new hash_set<tree>();
+  };
+  ~expr_collector ()
+  {
+    delete ptrset3;
+  };
 
   /* Holds the result after collecting from all trees.  */
   tpartitions2_t get_record_reaching_trees ()
@@ -654,6 +661,7 @@ public:
     return _type_collector.get_record_reaching_trees ();
   }
 
+  hash_set<tree> *ptrset3;
   type_collector _type_collector;
 
 private:
@@ -731,7 +739,7 @@ public:
     }
 
     unsigned int how_many_records = 
-	    _expr_collector._type_collector.ptrset2.records.elements ();
+	    _expr_collector.ptrset3->elements ();
     return how_many_records <= 1;
 
   }
