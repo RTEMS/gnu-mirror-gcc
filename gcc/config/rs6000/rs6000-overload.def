@@ -1097,8 +1097,12 @@
 
 ; There are no actual builtins for vec_extract.  There is special handling for
 ; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
-; is replaced by "pointer tricks."
+; is replaced by "pointer tricks."  The single overload here causes
+; __builtin_vec_extract to be registered with the front end so this can
+; happen.
 [VEC_EXTRACT, vec_extract, __builtin_vec_extract]
+  vsi __builtin_vec_extract (vsi, signed int);
+    VSPLTW  EXTRACT_FAKERY
 
 [VEC_EXTRACT_FP_FROM_SHORTH, vec_extract_fp32_from_shorth, __builtin_vec_vextract_fp_from_shorth, _ARCH_PWR9]
   vf __builtin_vec_vextract_fp_from_shorth (vus);
@@ -1316,8 +1320,11 @@
 
 ; There are no actual builtins for vec_insert.  There is special handling for
 ; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
-; is replaced by "pointer tricks."
+; is replaced by "pointer tricks."  The single overload here causes
+; __builtin_vec_insert to be registered with the front end so this can happen.
 [VEC_INSERT, vec_insert, __builtin_vec_insert]
+  vsi __builtin_vec_extract (vsi, vsi, signed int);
+    XXPERMDI_4SI  INSERT_FAKERY
 
 [VEC_INSERTH, vec_inserth, __builtin_vec_inserth, _ARCH_PWR10]
   vuc __builtin_vec_inserth (unsigned char, vuc, unsigned int);
@@ -2297,8 +2304,11 @@
 
 ; There are no actual builtins for vec_promote.  There is special handling for
 ; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
-; is replaced by a constructor.
+; is replaced by a constructor.  The single overload here causes
+; __builtin_vec_promote to be registered with the front end so that can happen.
 [VEC_PROMOTE, vec_promote, __builtin_vec_promote]
+  vsi __builtin_vec_promote (vsi);
+    ABS_V4SI PROMOTE_FAKERY
 
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
@@ -2753,8 +2763,11 @@
 
 ; There are no actual builtins for vec_splats.  There is special handling for
 ; this in altivec_resolve_overloaded_builtin in rs6000-c.c, where the call
-; is replaced by a constructor.
+; is replaced by a constructor.  The single overload here causes
+; __builtin_vec_splats to be registered with the front end so that can happen.
 [VEC_SPLATS, vec_splats, __builtin_vec_splats]
+  vsi __builtin_vec_splats (vsi);
+    ABS_V4SI SPLATS_FAKERY
 
 [VEC_SQRT, vec_sqrt, __builtin_vec_sqrt, __VSX__]
   vf __builtin_vec_sqrt (vf);
@@ -2984,7 +2997,11 @@
 
 ; There are no builtins for VEC_STEP; this is handled directly
 ; with a constant replacement in rs6000_resolve_overloaded_builtin.
+; The single overload registers __builtin_vec_step with the front end
+; so this can happen.
 [VEC_STEP, vec_step, __builtin_vec_step]
+  signed int __builtin_vec_step (vsi);
+    VCLZLSBB_V4SI  STEP_FAKERY
 
 [VEC_STL, vec_stl, __builtin_vec_stl]
   void __builtin_vec_stl (vsc, signed long long, vsc *);
