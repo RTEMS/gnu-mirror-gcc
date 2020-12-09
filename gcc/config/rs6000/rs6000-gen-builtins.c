@@ -458,7 +458,7 @@ struct typemap
    maps tokens from a fntype string to a tree type.  For example,
    in "si_ftype_hi" we would map "si" to "intSI_type_node" and
    map "hi" to "intHI_type_node".  */
-#define TYPE_MAP_SIZE 81
+#define TYPE_MAP_SIZE 82
 static typemap type_map[TYPE_MAP_SIZE] =
   {
     { "bi",		"bool_int" },
@@ -466,6 +466,7 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "bv2di",		"bool_V2DI" },
     { "bv4si",		"bool_V4SI" },
     { "bv8hi",		"bool_V8HI" },
+    { "ci",		"integer" },
     { "dd",		"dfloat64" },
     { "df",		"double" },
     { "di",		"intDI" },
@@ -1572,10 +1573,16 @@ construct_fntype_id (prototype *protoptr)
   else
     {
       typelist *argptr = protoptr->args;
-      for (int i = 0; i < protoptr->nargs; i++)
+      for (int i = 0; i < protoptr->nargs; i++, argptr = argptr->next)
 	{
 	  assert (argptr);
 	  buf[bufi++] = '_';
+	  if (argptr->info.isconst && argptr->info.base == BT_INT)
+	    {
+	      buf[bufi++] = 'c';
+	      buf[bufi++] = 'i';
+	      continue;
+	    }
 	  if (argptr->info.ispointer)
 	    {
 	      if (argptr->info.isvoid)
@@ -1584,11 +1591,13 @@ construct_fntype_id (prototype *protoptr)
 		    {
 		      memcpy (&buf[bufi], "pcvoid", 6);
 		      bufi += 6;
+		      continue;
 		    }
 		  else
 		    {
 		      buf[bufi++] = 'p';
 		      buf[bufi++] = 'v';
+		      continue;
 		    }
 		}
 	      else
@@ -1609,7 +1618,6 @@ construct_fntype_id (prototype *protoptr)
 	      else
 		complete_base_type (&argptr->info, buf, &bufi);
 	    }
-	  argptr = argptr->next;
 	}
       assert (!argptr);
       }

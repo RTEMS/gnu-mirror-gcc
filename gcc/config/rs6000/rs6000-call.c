@@ -15582,18 +15582,28 @@ rs6000_expand_new_builtin (tree exp, rtx target,
   tree arg[MAX_BUILTIN_ARGS];
   rtx op[MAX_BUILTIN_ARGS];
   machine_mode mode[MAX_BUILTIN_ARGS + 1];
+  bool void_func = TREE_TYPE (TREE_TYPE (fndecl)) == void_type_node;
+  int k;
 
   int nargs = bifaddr->nargs;
   gcc_assert (nargs <= MAX_BUILTIN_ARGS);
 
-  mode[0] = insn_data[icode].operand[0].mode;
+  if (void_func)
+    k = 0;
+  else
+    {
+      k = 1;
+      mode[0] = insn_data[icode].operand[0].mode;
+    }
+
   for (int i = 0; i < nargs; i++)
     {
       arg[i] = CALL_EXPR_ARG (exp, i);
       if (arg[i] == error_mark_node)
 	return const0_rtx;
+      STRIP_NOPS (arg[i]);
       op[i] = expand_normal (arg[i]);
-      mode[i+1] = insn_data[icode].operand[i+1].mode;
+      mode[i+k] = insn_data[icode].operand[i+k].mode;
     }
 
   /* Check for restricted constant arguments.  */
@@ -15706,14 +15716,16 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       uns_fcode = (size_t)fcode;
     }
 
-  if (target == 0
-      || GET_MODE (target) != mode[0]
-      || !(*insn_data[icode].operand[0].predicate) (target, mode[0]))
+  if (TREE_TYPE (TREE_TYPE (fndecl)) == void_type_node)
+    target = NULL_RTX;
+  else if (target == 0
+	   || GET_MODE (target) != mode[0]
+	   || !(*insn_data[icode].operand[0].predicate) (target, mode[0]))
     target = gen_reg_rtx (mode[0]);
 
   for (int i = 0; i < nargs; i++)
-    if (! (*insn_data[icode].operand[i+1].predicate) (op[i], mode[i+1]))
-      op[i] = copy_to_mode_reg (mode[i+1], op[i]);
+    if (! (*insn_data[icode].operand[i+k].predicate) (op[i], mode[i+k]))
+      op[i] = copy_to_mode_reg (mode[i+k], op[i]);
 
   switch (nargs)
     {
@@ -15721,22 +15733,34 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       gcc_assert (MAX_BUILTIN_ARGS == 5);
       gcc_unreachable ();
     case 0:
-      pat = GEN_FCN (icode) (target);
+      pat = (void_func
+	     ? GEN_FCN (icode) ()
+	     : GEN_FCN (icode) (target));
       break;
     case 1:
-      pat = GEN_FCN (icode) (target, op[0]);
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0])
+	     : GEN_FCN (icode) (target, op[0]));
       break;
     case 2:
-      pat = GEN_FCN (icode) (target, op[0], op[1]);
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0], op[1])
+	     : GEN_FCN (icode) (target, op[0], op[1]));
       break;
     case 3:
-      pat = GEN_FCN (icode) (target, op[0], op[1], op[2]);
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0], op[1], op[2])
+	     : GEN_FCN (icode) (target, op[0], op[1], op[2]));
       break;
     case 4:
-      pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3]);
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0], op[1], op[2], op[3])
+	     : GEN_FCN (icode) (target, op[0], op[1], op[2], op[3]));
       break;
     case 5:
-      pat = GEN_FCN (icode) (target, op[0], op[1], op[2], op[3], op[4]);
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4])
+	     : GEN_FCN (icode) (target, op[0], op[1], op[2], op[3], op[4]));
       break;
     }
 
