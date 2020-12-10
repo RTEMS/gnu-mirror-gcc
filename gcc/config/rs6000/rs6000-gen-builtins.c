@@ -2553,9 +2553,22 @@ write_init_bif_table ()
 	       "\n    = %s;\n",
 	       bifs[i].idname, bifs[i].fndecl);
 
+      /* Check whether we have a "tf" token in this string, representing
+	 a float128_type_node.  It's possible that float128_type_node is
+	 undefined (occurs for -maltivec -mno-vsx, for example), so we
+	 must guard against that.  */
+      int tf_found = strstr (bifs[i].fndecl, "tf") != NULL;
+
       fprintf (init_file,
 	       "  if (new_builtins_are_live)\n");
       fprintf (init_file, "    {\n");
+
+      if (tf_found)
+	{
+	  fprintf (init_file, "      if (float128_type_node)\n");
+	  fprintf (init_file, "        {\n");
+	}
+
       fprintf (init_file,
 	       "      rs6000_builtin_decls_x[(int)RS6000_BIF_%s] = t\n",
 	       bifs[i].idname);
@@ -2588,6 +2601,16 @@ write_init_bif_table ()
 	  fprintf (init_file, "        {\n");
 	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
+	  fprintf (init_file, "        }\n");
+	}
+
+      if (tf_found)
+	{
+	  fprintf (init_file, "        }\n");
+	  fprintf (init_file, "      else\n");
+	  fprintf (init_file, "        {\n");
+	  fprintf (init_file, "          rs6000_builtin_decls_x"
+		   "[(int)RS6000_BIF_%s] = NULL_TREE;\n", bifs[i].idname);
 	  fprintf (init_file, "        }\n");
 	}
       fprintf (init_file, "    }\n\n");
