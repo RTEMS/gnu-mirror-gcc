@@ -427,7 +427,7 @@ case "$target" in
       powerpc*-*-linux*)
 	LONG_DOUBLE_COMPAT_FLAGS="$LONG_DOUBLE_COMPAT_FLAGS -mno-gnu-attribute"
         # Check for IEEE128 support in libm:
-        AC_CHECK_LIB(m, frexpf128,
+        AC_CHECK_LIB(m, __frexpieee128,
                      [ac_ldbl_ieee128_in_libc=yes],
                      [ac_ldbl_ieee128_in_libc=no])
         if test $ac_ldbl_ieee128_in_libc = yes; then

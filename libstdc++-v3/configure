@@ -75722,9 +75722,9 @@ $as_echo "#define _GLIBCXX_LONG_DOUBLE_COMPAT 1" >>confdefs.h
       powerpc*-*-linux*)
 	LONG_DOUBLE_COMPAT_FLAGS="$LONG_DOUBLE_COMPAT_FLAGS -mno-gnu-attribute"
         # Check for IEEE128 support in libm:
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for frexpf128 in -lm" >&5
-$as_echo_n "checking for frexpf128 in -lm... " >&6; }
-if ${ac_cv_lib_m_frexpf128+:} false; then :
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __frexpieee128 in -lm" >&5
+$as_echo_n "checking for __frexpieee128 in -lm... " >&6; }
+if ${ac_cv_lib_m___frexpieee128+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
@@ -75741,27 +75741,27 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char frexpf128 ();
+char __frexpieee128 ();
 int
 main ()
 {
-return frexpf128 ();
+return __frexpieee128 ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_m_frexpf128=yes
+  ac_cv_lib_m___frexpieee128=yes
 else
-  ac_cv_lib_m_frexpf128=no
+  ac_cv_lib_m___frexpieee128=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_frexpf128" >&5
-$as_echo "$ac_cv_lib_m_frexpf128" >&6; }
-if test "x$ac_cv_lib_m_frexpf128" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m___frexpieee128" >&5
+$as_echo "$ac_cv_lib_m___frexpieee128" >&6; }
+if test "x$ac_cv_lib_m___frexpieee128" = xyes; then :
   ac_ldbl_ieee128_in_libc=yes
 else
   ac_ldbl_ieee128_in_libc=no
