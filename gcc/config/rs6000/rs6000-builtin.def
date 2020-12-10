@@ -729,15 +729,12 @@
 		    CODE_FOR_ ## ICODE)			/* ICODE */
 
 /* 128-bit __ibm128 floating point builtins (use -mfloat128 to indicate that
-   __ibm128 is available).  We allow the two __ibm128 builtins to also work if
-   long double uses the 128-bit IBM extended double representation, even if the
-   __ibm128 type is not provided.  */
+   __ibm128 is available).  */
 #define BU_IBM128_2(ENUM, NAME, ATTR, ICODE)				\
   RS6000_BUILTIN_2 (MISC_BUILTIN_ ## ENUM,		/* ENUM */	\
 		    "__builtin_" NAME,			/* NAME */	\
 		    (RS6000_BTM_HARD_FLOAT		/* MASK */	\
-		     | RS6000_BTM_FLOAT128				\
-		     | RS6000_BTM_LDBL128),				\
+		     | RS6000_BTM_FLOAT128),				\
 		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
 		     | RS6000_BTC_BINARY),				\
 		    CODE_FOR_ ## ICODE)			/* ICODE */
