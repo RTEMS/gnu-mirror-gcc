@@ -1,3 +1,10 @@
+work029.patch018
+2020-12-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* configure.ac (powerpc*-*-linux*): Check for __frexpieee128
+	instead of frexpf128, so that older GLIBCs can be used.
+	* configure: Regenerate.
+
 work029.patch012
 2020-12-01  Jonathan Wakely  <jwakely@redhat.com>
 
