@@ -32,7 +32,7 @@ void log (const char *const fmt, ...) __attribute__((format(printf, 1, 0)));
 inline void
 log (const char *const fmt, ...) 
 {
-  if (!dump_file)
+  //if (!dump_file)
     return;
 
   va_list args;

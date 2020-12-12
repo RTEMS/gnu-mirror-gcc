@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #define BYPASS_TRANSFORM false
 // Use Erick's escape analysis
 #define USE_ESCAPE_ANALYSIS 1
+#define USE_DO_INSTANCE_INTERLEAVE 0
 
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;
@@ -254,6 +255,7 @@ extern int str_reorg_instance_interleave ( Info *);
 extern void find_and_create_all_modified_types ( Info_t *);
 extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types ( std::vector<two_trees_t> *, tree);
 extern tree find_modified ( tree, Info_t *);
+extern bool new_contains_a_modified ( gimple *, tree *, tree *, Info_t *);
 extern tree contains_a_modified ( gimple *, Info_t *);
 extern tree find_deepest_comp_ref ( tree);
 extern int number_of_levels ( tree);

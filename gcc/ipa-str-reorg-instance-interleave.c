@@ -19,6 +19,9 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define GATE1 0
+#define GATE2 0
+
 #include <vector>
 #include <map>
 #include <set>
@@ -62,6 +65,7 @@ static void wrangle_ssa_type( tree, Info_t*);
 static void str_reorg_instance_interleave_qual_part ( Info *);
 static void str_reorg_instance_interleave_type_part ( Info *);
 static void header ( bool);
+static void reorg_perf_qual_debug ( Info *, ReorgType *);
 static void print_var_infos ( FILE *, std::vector<varInfo_t> &);
 static void compress_acc_infos ( std::vector <acc_info_t>);
 static void print_acc_info ( FILE *, acc_info_t *);
@@ -198,13 +202,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    ReorgType_t *ri = contains_a_reorgtype( stmt, info);
 	    if ( ri == NULL )
 	      {
-		//DEBUG_L("No Transfrom on: ");
-		//DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
-
 		// NEW STUFF
 		// Find assigns that are basically element assigns.
 		// If their type is modified then adjust the gimple.
 		#if 1
+		// Shouldn't this use new_contains_a_modified instead?
 		tree modified = contains_a_modified ( stmt, info);
 		if ( modified )
 		  {
@@ -227,6 +229,17 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      }
 	    else
 	      {
+		#if USE_DO_INSTANCE_INTERLEAVE
+		if ( !ri->do_instance_interleave )
+		  {
+		    //DEBUG_L("No Transfrom on: ");
+		    //DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
+		    DEBUG_L("SITUATION: ");
+		    DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
+		    continue;
+		  }
+		#endif
+		
 		//DEBUG_F( print_reorg_with_msg, stderr, ri, 0,
 		//	 "reorg from str_reorg_instance_interleave_trans");
 		
@@ -399,7 +412,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      element_assign_transformation (stmt, ri, info);
 		      #endif
 
-		      //INDENT(-2);
+		      INDENT(-2);
 		    } // end ReorgT_ElemAssign case
 		    break;
 		  case ReorgT_If_Null:
@@ -2261,7 +2274,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		}
 	    }
 	}
-      //INDENT(-4);      
+      INDENT(-4);      
       
       // Normal ssa name case
       DEBUG_L("Dangling Types for Normal SSA Names:\n");
@@ -2597,13 +2610,24 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 {
   gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
   
-  DEBUG_L("new_element_assign_transformation: ");
+  DEBUG_A("new_element_assign_transformation: ");
   DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-  tree modif_type = contains_a_modified ( stmt, info);
-  DEBUG_A("Modification for = ");
-  DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
-  
   INDENT(2);
+
+  #if GATE1
+  tree modif_type = contains_a_modified ( stmt, info);
+  #else
+  tree lhs_mod;
+  tree rhs_mod;
+  bool has_modification =
+    new_contains_a_modified ( stmt, &lhs_mod, &rhs_mod, info );
+  
+  DEBUG_A("lhs_mod = ");
+  DEBUG_F(flexible_print, stderr, lhs_mod, 1, (dump_flags_t)0);
+  DEBUG_A("rhs_mod = ");
+  DEBUG_F(flexible_print, stderr, rhs_mod, 1, (dump_flags_t)0);
+  #endif
+  
   // Needed for helloworld
   tree lhs = gimple_assign_lhs( stmt);
   tree rhs = gimple_assign_rhs1( stmt);
@@ -2627,8 +2651,14 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	tree ref_expr;
 	tree field_val_temp;
 	gimple_seq ref_seq = NULL;
-	
+
+	#if GATE1
 	new_make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, modif_type, info);
+	#else
+	new_make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp,
+				   ro_on_left ? lhs_mod : rhs_mod,
+				   info);
+	#endif
 	
 	gimple *temp_set;
 	gimple *middle_set;
@@ -2860,12 +2890,16 @@ new_make_transformed_ref ( tree ref_in,
 {
   DEBUG_A("new_make_transformed_ref:\n");
   INDENT(2);
+  
   tree gcc_type = ri->gcc_type;
+  
   DEBUG_A("gcc_type = ");
   DEBUG_F(flexible_print, stderr, gcc_type, 1, (dump_flags_t)0);
   DEBUG_A("modif_type = ");
   DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
+  
   tree mod_gcc_type = find_modified ( gcc_type, info);
+  
   DEBUG_A("mod_gcc_type = ");
   DEBUG_F(flexible_print, stderr, mod_gcc_type, 1, (dump_flags_t)0);
   tree reorg_ver_type = ri->reorg_ver_type;
@@ -2879,6 +2913,8 @@ new_make_transformed_ref ( tree ref_in,
   // For deeply nested case we need the lowest.
   tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
   gcc_assert ( lowest_comp_ref);
+  DEBUG_A("lowest_comp_ref = ");
+  DEBUG_F(flexible_print, stderr, lowest_comp_ref, 1, (dump_flags_t)0);
 
   tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
   tree field_type = TREE_TYPE ( orig_field);
@@ -2907,8 +2943,24 @@ new_make_transformed_ref ( tree ref_in,
   *field_val_temp =
     make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
   
+  // NOTE. Things get weird fast if inner_op is a decl.
   tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
+  #if GATE2
   inner_op = TREE_OPERAND( inner_op, 0);
+  #else
+  // Note before I had the following here which fails wheter or
+  // not inner_op is a decl.
+  // inner_op = TREE_OPERAND( inner_op, 0);
+  if ( TREE_CODE ( inner_op) == MEM_REF )
+    {
+      DEBUG_A("peeled MEM_REF off of inner_op\n");
+      inner_op = TREE_OPERAND( inner_op, 0);
+    }
+  #endif
+  
+  DEBUG_A("inner_op = ");
+  DEBUG_F(flexible_print, stderr, inner_op, 1, (dump_flags_t)0);
+  DEBUG_A("TREE_CODE(inner_op) = %s\n", code_str( TREE_CODE(inner_op)));
   
   // For either case generate common code:
   
@@ -2938,6 +2990,9 @@ new_make_transformed_ref ( tree ref_in,
   gimple *get_index =
     gimple_build_assign( index, CONVERT_EXPR, inner_op);
   SSA_NAME_DEF_STMT ( index) = get_index;
+
+  DEBUG_A("get_index stmt = ");
+  DEBUG_F ( print_gimple_stmt, stderr, get_index, TDF_DETAILS);
 
   // offset = index * size_of_field
   
@@ -2976,60 +3031,78 @@ new_make_transformed_ref ( tree ref_in,
 }
 
 
+// This is oddly close to multilevel_component_ref
 tree
 find_deepest_comp_ref ( tree comp_ref_expr )
 {
   DEBUG_A("find_deepest_comp_ref of ");
   DEBUG_F(flexible_print, stderr, comp_ref_expr, 2, (dump_flags_t)0);
   DEBUG("tree code of %s\n", code_str( TREE_CODE(comp_ref_expr)));
-  #if 1
+  INDENT(2);
+
   enum tree_code code = TREE_CODE ( comp_ref_expr);
   if ( code != COMPONENT_REF && code != ARRAY_REF && code != MEM_REF )
     {
+      DEBUG_A("disqualified returns NULL\n");
+      INDENT(-2);
       return NULL;
     }
-  #else
-  if ( TREE_CODE(comp_ref_expr) == SSA_NAME ) return NULL;
-  #endif
+
   tree inner_op0 = TREE_OPERAND( comp_ref_expr, 0);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
+  DEBUG_A("inner_op0_code = %s\n", code_str ( inner_op0_code) );
   if ( inner_op0_code == COMPONENT_REF )
     {
-      return find_deepest_comp_ref ( inner_op0);
+      tree ret = find_deepest_comp_ref ( inner_op0);
+      INDENT(-2);
+      return ret;
     }
-  else if ( inner_op0_code == MEM_REF )
+  else if ( inner_op0_code == MEM_REF || inner_op0_code == VAR_DECL )
       {
+	DEBUG_A("bottom\n");
+	INDENT(-2);
 	return comp_ref_expr;
       }
+  DEBUG_A("fell through returns NULL\n");
+  INDENT(-2);
   return NULL;
 }
 
 static tree
-create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
+create_deep_ref ( tree ref_in, tree field_type, tree field_addr )
 {
-  //DEBUG_A("create_deep_ref: ");
-  //DEBUG_F(flexible_print, stderr, old_ref, 1, (dump_flags_t)0);
-  //INDENT(4);
-  tree inner_op0 = TREE_OPERAND( old_ref, 0);
+  DEBUG_A("create_deep_ref: ");
+  DEBUG_F(flexible_print, stderr, ref_in, 1, (dump_flags_t)0);
+  INDENT(4);
+  enum tree_code top_code = TREE_CODE ( ref_in);
+  DEBUG_A("TREE_CODE ( ref_in) = %s\n", code_str( top_code));
+  tree inner_op0 = TREE_OPERAND( ref_in, 0);
   enum tree_code inner_op0_code = TREE_CODE ( inner_op0);
-  enum tree_code top_code = TREE_CODE ( old_ref);
   if ( inner_op0_code == MEM_REF )
     {
+      DEBUG_A("MEM_REF\n");
       tree deepest =
 	build2 ( MEM_REF, field_type, field_addr,
 		 build_int_cst (ptr_type_node, 0));
       
-      //INDENT(-4);
-      //DEBUG_A("returns deepest: ");
-      //DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
+      DEBUG_A("returns deepest: ");
+      DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
+      INDENT(-4);
       
       return deepest;
     }
+  else if ( inner_op0_code == VAR_DECL )
+    {
+      // In this situation we are seeing var.field
+      // but that is not something to be transformed.
+      gcc_assert (0);
+    }
   else if ( top_code == COMPONENT_REF )
     {
+      DEBUG_A("COMPONENT_REF\n");
       tree lower_comp_part =
 	create_deep_ref ( inner_op0, field_type, field_addr);
-      tree level_field = TREE_OPERAND( old_ref, 1);;
+      tree level_field = TREE_OPERAND( ref_in, 1);;
       tree level_field_type = TREE_TYPE ( level_field);
       tree component_layer =
 	build3 ( COMPONENT_REF,
@@ -3038,19 +3111,20 @@ create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 		 level_field,
 		 NULL_TREE);
 
-      //INDENT(-4);
-      //DEBUG_A("returns component_layer: ");
-      //DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
+      DEBUG_A("returns component_layer: ");
+      DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
+      INDENT(-4);
 
       return component_layer;
     }
   else if ( top_code == ARRAY_REF )
     {
+      DEBUG_A("ARRAY_REF\n");
       tree lower_array_part =
 	create_deep_ref ( inner_op0, field_type, field_addr);
 
-      tree array_index = TREE_OPERAND( old_ref, 1);
-      tree elem_type = TREE_TYPE ( old_ref);
+      tree array_index = TREE_OPERAND( ref_in, 1);
+      tree elem_type = TREE_TYPE ( ref_in);
       
       tree array_layer =
 	build4 ( ARRAY_REF,
@@ -3059,9 +3133,9 @@ create_deep_ref ( tree old_ref, tree field_type, tree field_addr )
 		 array_index,
 		 NULL_TREE, NULL_TREE);
 
-      //INDENT(-4);
-      //DEBUG_A("returns array_layer: ");
-      //DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
+      DEBUG_A("returns array_layer: ");
+      DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
+      INDENT(-4);
       
       return array_layer;
     }
@@ -3334,7 +3408,7 @@ reorg_perf_qual ( Info *info)
       fprintf ( info->reorg_dump_file, "Doing Performance Qualification\n");
     }
   DEBUG_L("reorg_perf_qual:\n");
-  #if 1
+  #if USE_DO_INSTANCE_INTERLEAVE
   // TBD use design in doc but mark ReorgTypes
   // (do_instance_interleave) that qualify instead of deleting them
   // unless both dead field elimination and field reorderig are not
@@ -3432,7 +3506,11 @@ reorg_perf_qual ( Info *info)
 		INDENT(4);
 		
 		if ( gimple_code ( stmt) == GIMPLE_LABEL  ||
-		     gimple_code ( stmt) == GIMPLE_SWITCH    ) continue;
+		     gimple_code ( stmt) == GIMPLE_SWITCH    )
+		  {
+		    INDENT(-4);
+		    continue;
+		  }
 		  		
 		unsigned n_ops = gimple_num_ops( stmt);
 		tree op;
@@ -3860,7 +3938,11 @@ reorg_perf_qual ( Info *info)
 			       (dump_flags_t)0);
 	      fprintf ( info->reorg_dump_file, ": Doesn't occur in any meaningful loop.\n");
 	    }
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = false;
+	  #else
+	  delete_reorgtype ( &(*reorgi), info);
+	  #endif
 	  continue;
 	}
       
@@ -3890,7 +3972,11 @@ reorg_perf_qual ( Info *info)
 			"    raw_effect %5.4f < SINGLE_POOL_RAW_SKIP_IT %5.4f\n",
 			raw_effect, SINGLE_POOL_RAW_SKIP_IT);
 	    }
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = false;
+	  #else
+	  delete_reorgtype ( &(*reorgi), info);
+	  #endif
 	  continue;
 	}
       // the relative effect is big enough do it anyway
@@ -3908,8 +3994,9 @@ reorg_perf_qual ( Info *info)
 			"    raw_effect %5.4f >= SINGLE_POOL_RAW_DO_IT_ALWAYS %5.4f\n",
 			raw_effect, SINGLE_POOL_RAW_DO_IT_ALWAYS);
 	    }
-	  
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = true;
+	  #endif
 	  continue;
 	}
       if ( absolute_effect < SINGLE_POOL_ABS_SKIP_IT )
@@ -3926,7 +4013,11 @@ reorg_perf_qual ( Info *info)
 			absolute_effect, SINGLE_POOL_ABS_SKIP_IT);
 	    }
 	  
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = false;
+	  #else
+	  delete_reorgtype ( &(*reorgi), info);
+	  #endif
 	  continue;
 	}
       if ( absolute_effect >= SINGLE_POOL_ABS_DO_IT_ALWAYS )
@@ -3942,8 +4033,10 @@ reorg_perf_qual ( Info *info)
 			"    absolute_effect %5.4f >= SINGLE_POOL_ABS_DO_IT_ALWAYS %5.4f\n",
 			absolute_effect, SINGLE_POOL_ABS_DO_IT_ALWAYS);
 	    }
-	  
+
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = true;
+	  #endif
 	  continue;
 	}
       
@@ -3965,7 +4058,11 @@ reorg_perf_qual ( Info *info)
 			raw_effect, cut_off);
 	    }
 	  
+	  #if USE_DO_INSTANCE_INTERLEAVE
 	  reorgi->do_instance_interleave = false;
+	  #else
+	  delete_reorgtype ( &(*reorgi), info);
+	  #endif
 	  continue;
 	}
 
@@ -3981,7 +4078,22 @@ reorg_perf_qual ( Info *info)
 	}
       
     }
+
+  #if USE_DO_INSTANCE_INTERLEAVE
+  remove_deleted_types ( info, reorg_perf_qual_debug);
   #endif
+
+  #endif
+}
+
+static void
+reorg_perf_qual_debug ( Info *info, ReorgType *reorg )
+{
+  if ( info->show_delete )
+  {
+    print_reorg_with_msg ( info->reorg_dump_file, reorg, 2,
+			   "Was not allocated");
+  }
 }
 
 static void
@@ -4262,7 +4374,7 @@ account_for_access ( tree access, tree field, std::vector <acc_info_t> *acc_info
 static void
 tmasn_helper ( tree t, int indent, std::set<tree> *already )
 {
-  //DEBUG_A("");
+  DEBUG_A("");
   fprintf( stderr, "%*s", indent, " ");
   indent += 4;
   flexible_print ( stderr, t, 0, (dump_flags_t)0);
@@ -4337,6 +4449,7 @@ tmasn_helper ( tree t, int indent, std::set<tree> *already )
       return;
     }
   if ( TREE_CODE ( t) == INTEGER_CST ) return;
+  if ( TREE_CODE ( t) == ADDR_EXPR ) return;
   fprintf ( stderr, "unanticipated TREE_CODE\n");
   gcc_assert ( 0);
 }
