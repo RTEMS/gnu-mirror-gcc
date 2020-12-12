@@ -1,3 +1,18 @@
+2020-12-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR libgcc/97543, PR libgcc/97643
+	Backport from trunk.
+
+	2020-12-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-linux (IBM128_STATIC_OBJS): New make variable.
+	(IBM128_SHARED_OBJS): New make variable.
+	(IBM128_OBJS): New make variable.  Set all objects to use the
+	explicit IBM format, and disable gnu attributes.
+	(IBM128_CFLAGS): New make variable.
+	(gcc_s_compile): Add -mno-gnu-attribute to all shared library
+	modules.
+
 2020-12-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
