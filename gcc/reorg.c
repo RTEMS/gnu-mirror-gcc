@@ -1152,8 +1152,6 @@ steal_delay_list_from_fallthrough (rtx_insn *insn, rtx condition,
       rtx_insn *trial = seq->insn (i);
       rtx_insn *prior_insn;
 
-      /* If TRIAL sets CC0, stealing it will move it too far from the use
-	 of CC0.  */
       if (insn_references_resource_p (trial, sets, false)
 	  || insn_sets_resource_p (trial, needed, false)
 	  || insn_sets_resource_p (trial, sets, false))
@@ -1245,7 +1243,6 @@ try_merge_delay_insns (rtx_insn *insn, rtx_insn *thread)
 	continue;
 
       if (GET_CODE (next_to_match) == GET_CODE (trial)
-	  /* We can't share an insn that sets cc0.  */
 	  && ! insn_references_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, &needed, true)
@@ -1478,8 +1475,8 @@ redundant_insn (rtx insn, rtx_insn *target, const vec<rtx_insn *> &delay_list)
   if (trial == 0)
     return 0;
 
-  /* See what resources this insn sets and needs.  If they overlap, or
-     if this insn references CC0, it can't be redundant.  */
+  /* See what resources this insn sets and needs.  If they overlap, it
+     can't be redundant.  */
 
   CLEAR_RESOURCE (&needed);
   CLEAR_RESOURCE (&set);
@@ -1979,7 +1976,6 @@ fill_simple_delay_slots (int non_jumps_p)
 					     filter_flags ? &fset : &set,
 					     true)
 		  && ! insn_sets_resource_p (trial, &needed, true)
-		  /* Can't separate set of cc0 from its use.  */
 		  && ! can_throw_internal (trial))
 		{
 		  trial = try_split (pat, trial, 1);
@@ -2375,8 +2371,7 @@ fill_slots_from_thread (rtx_jump_insn *insn, rtx condition,
       if (GET_CODE (trial) == DEBUG_INSN)
 	continue;
 
-      /* If TRIAL conflicts with the insns ahead of it, we lose.  Also,
-	 don't separate or copy insns that set and use CC0.  */
+      /* If TRIAL conflicts with the insns ahead of it, we lose.  */
       if (! insn_references_resource_p (trial, &set, true)
 	  && ! insn_sets_resource_p (trial, filter_flags ? &fset : &set, true)
 	  && ! insn_sets_resource_p (trial, &needed, true)
