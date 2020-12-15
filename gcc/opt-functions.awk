@@ -107,6 +107,7 @@ function switch_flags (flags)
 	result = result \
 	  test_flag("Common", flags, " | CL_COMMON") \
 	  test_flag("Target", flags, " | CL_TARGET") \
+	  test_flag("NewTarget", flags, " | CL_TARGET") \
 	  test_flag("PchIgnore", flags, " | CL_PCH_IGNORE") \
 	  test_flag("Driver", flags, " | CL_DRIVER") \
 	  test_flag("Joined", flags, " | CL_JOINED") \
@@ -205,7 +206,7 @@ function global_state_p(flags)
 # associated with it.
 function needs_state_p(flags)
 {
-	return (flag_set_p("Target", flags) \
+	return ((flag_set_p("Target", flags) || flag_set_p("NewTarget", flags)) \
 		&& !flag_set_p("Alias.*", flags) \
 		&& !flag_set_p("Ignore", flags))
 }
