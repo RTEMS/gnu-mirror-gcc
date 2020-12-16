@@ -86,6 +86,7 @@ struct riscv_builtin_description {
 };
 
 AVAIL (hard_float, TARGET_HARD_FLOAT)
+AVAIL (always,     (!0))
 
 /* Construct a riscv_builtin_description from the given arguments.
 
@@ -129,7 +130,8 @@ AVAIL (hard_float, TARGET_HARD_FLOAT)
 
 static const struct riscv_builtin_description riscv_builtins[] = {
   DIRECT_BUILTIN (frflags, RISCV_USI_FTYPE, hard_float),
-  DIRECT_NO_TARGET_BUILTIN (fsflags, RISCV_VOID_FTYPE_USI, hard_float)
+  DIRECT_NO_TARGET_BUILTIN (fsflags, RISCV_VOID_FTYPE_USI, hard_float),
+  DIRECT_NO_TARGET_BUILTIN (pause, RISCV_VOID_FTYPE, always),
 };
 
 /* Index I is the function declaration for riscv_builtins[I], or null if the
