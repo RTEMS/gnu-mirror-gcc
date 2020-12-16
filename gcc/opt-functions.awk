@@ -224,6 +224,8 @@ function static_var(name, flags)
 # Return the type of variable that should be associated with the given flags.
 function var_type(flags)
 {
+#	if (flag_set_p("Boolean", flags))
+#		return "bool "
 	if (flag_set_p("Defer", flags))
 		return "void *"
 	else if (flag_set_p("Enum.*", flags)) {
@@ -245,6 +247,8 @@ function var_type(flags)
 # type instead of int to save space.
 function var_type_struct(flags)
 {
+	if (flag_set_p("Boolean", flags))
+	    return "bool "
 	if (flag_set_p("UInteger", flags)) {
 		if (host_wide_int[var_name(flags)] == "yes")
 			return "HOST_WIDE_INT ";
@@ -356,9 +360,11 @@ function search_var_name(name, opt_numbers, opts, flags, n_opts)
     return ""
 }
 
-function integer_range_info(range_option, init, option)
+function integer_range_info(range_option, init, option, flags)
 {
     if (range_option != "") {
+	if (flag_set_p("Boolean", flags))
+	    print "#error IntegerRange cannot be combined with Boolean keyword"
 	ival = init + 0;
 	start = nth_arg(0, range_option) + 0;
 	end = nth_arg(1, range_option) + 0;
@@ -366,6 +372,8 @@ function integer_range_info(range_option, init, option)
 	  print "#error initial value " init " of '" option "' must be in range [" start "," end "]"
 	return start ", " end
     }
+    else if (flag_set_p("Boolean", flags))
+	return "0, 1"
     else
         return "-1, -1"
 }

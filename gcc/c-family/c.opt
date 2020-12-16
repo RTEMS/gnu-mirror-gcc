@@ -1817,7 +1817,7 @@ fnonnull-objects
 C++ ObjC++ WarnRemoved
 
 fnothrow-opt
-C++ ObjC++ Optimization Var(flag_nothrow_opt)
+C++ ObjC++ Optimization Boolean Var(flag_nothrow_opt)
 Treat a throw() exception specification as noexcept to improve code size.
 
 fobjc-abi-version=
@@ -1926,7 +1926,7 @@ C++ ObjC++ Var(flag_pretty_templates) Init(1)
 Do not pretty-print template specializations as the template signature followed by the arguments.
 
 fprintf-return-value
-C ObjC C++ ObjC++ LTO Optimization Var(flag_printf_return_value) Init(1)
+C ObjC C++ ObjC++ LTO Optimization Boolean Var(flag_printf_return_value) Init(1)
 Treat known sprintf return values as constants.
 
 freplace-objc-classes
@@ -1938,15 +1938,15 @@ C++ ObjC++ WarnRemoved
 Removed in GCC 10.  This switch has no effect.
 
 frtti
-C++ ObjC++ Optimization Var(flag_rtti) Init(1)
+C++ ObjC++ Optimization Boolean Var(flag_rtti) Init(1)
 Generate run time type descriptor information.
 
 fshort-enums
-C ObjC C++ ObjC++ LTO Optimization Var(flag_short_enums)
+C ObjC C++ ObjC++ LTO Optimization Boolean Var(flag_short_enums)
 Use the narrowest integer type possible for enumeration types.
 
 fshort-wchar
-C ObjC C++ ObjC++ LTO Optimization Var(flag_short_wchar)
+C ObjC C++ ObjC++ LTO Optimization Boolean Var(flag_short_wchar)
 Force the underlying type for \"wchar_t\" to be \"unsigned short\".
 
 fsigned-bitfields
@@ -1985,7 +1985,7 @@ C++ ObjC++ Var(flag_detailed_statistics)
 Display statistics accumulated during compilation.
 
 fstrict-enums
-C++ ObjC++ Optimization Var(flag_strict_enums)
+C++ ObjC++ Optimization Boolean Var(flag_strict_enums)
 Assume that values of enumeration type are always within the minimum range of that type.
 
 fstrict-prototype
@@ -2028,7 +2028,7 @@ fthis-is-variable
 C++ ObjC++ WarnRemoved
 
 fthreadsafe-statics
-C++ ObjC++ Optimization Var(flag_threadsafe_statics) Init(1)
+C++ ObjC++ Optimization Boolean Var(flag_threadsafe_statics) Init(1)
 -fno-threadsafe-statics	Do not generate thread-safe code for initializing local statics.
 
 funsigned-bitfields

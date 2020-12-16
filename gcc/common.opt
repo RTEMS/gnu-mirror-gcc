@@ -465,19 +465,19 @@ N
 Driver
 
 O
-Common JoinedOrMissing Optimization
+Common JoinedOrMissing Optimization Boolean
 -O<number>	Set optimization level to <number>.
 
 Os
-Common Optimization
+Common Optimization Boolean
 Optimize for space rather than speed.
 
 Ofast
-Common Optimization
+Common Optimization Boolean
 Optimize for speed disregarding exact standards compliance.
 
 Og
-Common Optimization
+Common Optimization Boolean
 Optimize for debugging experience rather than speed or size.
 
 Q
@@ -630,7 +630,7 @@ Common Var(warn_implicit_fallthrough) RejectNegative Joined UInteger Warning Int
 Warn when a switch case falls through.
 
 Winline
-Common Var(warn_inline) Warning Optimization
+Common Var(warn_inline) Warning Optimization Boolean
 Warn when an inlined function cannot be inlined.
 
 Winvalid-memory-model
@@ -978,42 +978,42 @@ Common Joined RejectNegative UInteger Var(flag_abi_version) Init(0)
 The version of the C++ ABI in use.
 
 faggressive-loop-optimizations
-Common Var(flag_aggressive_loop_optimizations) Optimization Init(1)
+Common Var(flag_aggressive_loop_optimizations) Optimization Boolean Init(1)
 Aggressively optimize loops using language constraints.
 
 falign-functions
-Common Var(flag_align_functions) Optimization
+Common Var(flag_align_functions) Optimization Boolean
 Align the start of functions.
 
 falign-functions=
 Common RejectNegative Joined Var(str_align_functions) Optimization
 
 flimit-function-alignment
-Common Var(flag_limit_function_alignment) Optimization Init(0)
+Common Var(flag_limit_function_alignment) Optimization Boolean Init(0)
 
 falign-jumps
-Common Var(flag_align_jumps) Optimization
+Common Var(flag_align_jumps) Optimization Boolean
 Align labels which are only reached by jumping.
 
 falign-jumps=
 Common RejectNegative Joined Var(str_align_jumps) Optimization
 
 falign-labels
-Common Var(flag_align_labels) Optimization
+Common Var(flag_align_labels) Optimization Boolean
 Align all labels.
 
 falign-labels=
 Common RejectNegative Joined Var(str_align_labels) Optimization
 
 falign-loops
-Common Var(flag_align_loops) Optimization
+Common Var(flag_align_loops) Optimization Boolean
 Align the start of loops.
 
 falign-loops=
 Common RejectNegative Joined Var(str_align_loops) Optimization
 
 fallow-store-data-races
-Common Var(flag_store_data_races) Optimization
+Common Var(flag_store_data_races) Optimization Boolean
 Allow the compiler to introduce new data races on stores.
 
 fanalyzer
@@ -1073,7 +1073,7 @@ Common Var(flag_asynchronous_unwind_tables) Optimization
 Generate unwind tables that are exact at each instruction boundary.
 
 fauto-inc-dec
-Common Var(flag_auto_inc_dec) Init(1) Optimization
+Common Var(flag_auto_inc_dec) Init(1) Optimization Boolean
 Generate auto-inc/dec instructions.
 
 fauto-profile
@@ -1095,11 +1095,11 @@ Common Var(flag_bounds_check)
 Generate code to check bounds before indexing arrays.
 
 fbranch-count-reg
-Common Var(flag_branch_on_count_reg) Optimization
+Common Var(flag_branch_on_count_reg) Optimization Boolean
 Replace add, compare, branch with branch on count register.
 
 fbranch-probabilities
-Common Var(flag_branch_probabilities) Optimization
+Common Var(flag_branch_probabilities) Optimization Boolean
 Use profiling information for branch probabilities.
 
 fbranch-target-load-optimize
@@ -1134,7 +1134,7 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 ; be saved across function calls, if that produces overall better code.
 ; Optional now, so people can test it.
 fcaller-saves
-Common Var(flag_caller_saves) Optimization
+Common Var(flag_caller_saves) Optimization Boolean
 Save registers around function calls.
 
 fcheck-data-deps
@@ -1154,11 +1154,11 @@ Common Joined RejectNegative UInteger Var(flag_checking)
 Perform internal consistency checkings.
 
 fcode-hoisting
-Common Var(flag_code_hoisting) Optimization
+Common Var(flag_code_hoisting) Optimization Boolean
 Enable code hoisting.
 
 fcombine-stack-adjustments
-Common Var(flag_combine_stack_adjustments) Optimization
+Common Var(flag_combine_stack_adjustments) Optimization Boolean
 Looks for opportunities to reduce stack adjustments and stack references.
 
 fcommon
@@ -1178,23 +1178,23 @@ Common Driver RejectNegative Var(flag_compare_debug)
 Run only the second compilation of -fcompare-debug.
 
 fcompare-elim
-Common Var(flag_compare_elim_after_reload) Optimization
+Common Var(flag_compare_elim_after_reload) Optimization Boolean
 Perform comparison elimination after register allocation has finished.
 
 fconserve-stack
-Common Var(flag_conserve_stack) Optimization
+Common Var(flag_conserve_stack) Optimization Boolean
 Do not perform optimizations increasing noticeably stack usage.
 
 fcprop-registers
-Common Var(flag_cprop_registers) Optimization
+Common Var(flag_cprop_registers) Optimization Boolean
 Perform a register copy-propagation optimization pass.
 
 fcrossjumping
-Common Var(flag_crossjumping) Optimization
+Common Var(flag_crossjumping) Optimization Boolean
 Perform cross-jumping optimization.
 
 fcse-follow-jumps
-Common Var(flag_cse_follow_jumps) Optimization
+Common Var(flag_cse_follow_jumps) Optimization Boolean
 When running CSE, follow jumps to their targets.
 
 fcse-skip-blocks
@@ -1202,11 +1202,11 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 fcx-limited-range
-Common Var(flag_cx_limited_range) Optimization SetByCombined
+Common Var(flag_cx_limited_range) Optimization Boolean SetByCombined
 Omit range reduction step when performing complex division.
 
 fcx-fortran-rules
-Common Var(flag_cx_fortran_rules) Optimization
+Common Var(flag_cx_fortran_rules) Optimization Boolean
 Complex multiplication and division follow Fortran rules.
 
 fdata-sections
@@ -1236,15 +1236,15 @@ Output .debug_types section when using DWARF v4 debuginfo.
 ; Nonzero for -fdefer-pop: don't pop args after each function call
 ; instead save them up to pop many calls' args with one insns.
 fdefer-pop
-Common Var(flag_defer_pop) Optimization
+Common Var(flag_defer_pop) Optimization Boolean
 Defer popping functions args from stack until later.
 
 fdelayed-branch
-Common Var(flag_delayed_branch) Optimization
+Common Var(flag_delayed_branch) Optimization Boolean
 Attempt to fill delay slots of branch instructions.
 
 fdelete-dead-exceptions
-Common Var(flag_delete_dead_exceptions) Init(0) Optimization
+Common Var(flag_delete_dead_exceptions) Init(0) Optimization Boolean
 Delete dead instructions that may throw exceptions.
 
 fdelete-null-pointer-checks
@@ -1256,11 +1256,11 @@ Common Var(flag_ltrans_devirtualize)
 Stream extra data to support more aggressive devirtualization in LTO local transformation mode.
 
 fdevirtualize-speculatively
-Common Var(flag_devirtualize_speculatively) Optimization
+Common Var(flag_devirtualize_speculatively) Optimization Boolean
 Perform speculative devirtualization.
 
 fdevirtualize
-Common Var(flag_devirtualize) Optimization
+Common Var(flag_devirtualize) Optimization Boolean
 Try to convert virtual calls to direct ones.
 
 fdiagnostics-show-location=
@@ -1471,7 +1471,7 @@ Common Var(flag_dwarf2_cfi_asm) Init(HAVE_GAS_CFI_DIRECTIVE)
 Enable CFI tables via GAS assembler directives.
 
 fearly-inlining
-Common Var(flag_early_inlining) Init(1) Optimization
+Common Var(flag_early_inlining) Init(1) Optimization Boolean
 Perform early inlining.
 
 feliminate-dwarf2-dups
@@ -1479,7 +1479,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 fipa-sra
-Common Var(flag_ipa_sra) Init(0) Optimization
+Common Var(flag_ipa_sra) Init(0) Optimization Boolean
 Perform interprocedural reduction of aggregates.
 
 feliminate-unused-debug-symbols
@@ -1495,11 +1495,11 @@ Common Var(flag_emit_class_debug_always) Init(0)
 Do not suppress C++ class debug information.
 
 fexceptions
-Common Var(flag_exceptions) Optimization
+Common Var(flag_exceptions) Optimization Boolean
 Enable exception handling.
 
 fexpensive-optimizations
-Common Var(flag_expensive_optimizations) Optimization
+Common Var(flag_expensive_optimizations) Optimization Boolean
 Perform a number of minor, expensive optimizations.
 
 fexcess-precision=
@@ -1531,18 +1531,18 @@ EnumValue
 Enum(permitted_flt_eval_methods) String(ts-18661-3) Value(PERMITTED_FLT_EVAL_METHODS_TS_18661)
 
 ffast-math
-Common Optimization
+Common Optimization Boolean
 
 ffat-lto-objects
 Common Var(flag_fat_lto_objects)
 Output lto objects containing both the intermediate language and binary output.
 
 ffinite-math-only
-Common Var(flag_finite_math_only) Optimization SetByCombined
+Common Var(flag_finite_math_only) Optimization Boolean SetByCombined
 Assume no NaNs or infinities are generated.
 
 ffinite-loops
-Common Var(flag_finite_loops) Optimization Init(0)
+Common Var(flag_finite_loops) Optimization Boolean Init(0)
 Assume that loops with an exit will terminate and not loop indefinitely.
 
 ffixed-
@@ -1550,7 +1550,7 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 -ffixed-<register>	Mark <register> as being unavailable to the compiler.
 
 ffloat-store
-Common Var(flag_float_store) Optimization
+Common Var(flag_float_store) Optimization Boolean
 Don't allocate floats and doubles in extended-precision registers.
 
 fforce-addr
@@ -1558,7 +1558,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 fforward-propagate
-Common Var(flag_forward_propagate) Optimization
+Common Var(flag_forward_propagate) Optimization Boolean
 Perform a forward propagation pass on RTL.
 
 ffp-contract=
@@ -1579,14 +1579,14 @@ EnumValue
 Enum(fp_contract_mode) String(fast) Value(FP_CONTRACT_FAST)
 
 ffp-int-builtin-inexact
-Common Var(flag_fp_int_builtin_inexact) Init(1) Optimization
+Common Var(flag_fp_int_builtin_inexact) Init(1) Optimization Boolean
 Allow built-in functions ceil, floor, round, trunc to raise \"inexact\" exceptions.
 
 ; Nonzero means don't put addresses of constant functions in registers.
 ; Used for compiling the Unix kernel, where strange substitutions are
 ; done on the assembly output.
 ffunction-cse
-Common Var(flag_no_function_cse,0) Optimization
+Common Var(flag_no_function_cse,0) Optimization Boolean
 Allow function addresses to be held in registers.
 
 ffunction-sections
@@ -1594,24 +1594,24 @@ Common Var(flag_function_sections)
 Place each function into its own section.
 
 fgcse
-Common Var(flag_gcse) Optimization
+Common Var(flag_gcse) Optimization Boolean
 Perform global common subexpression elimination.
 
 fgcse-lm
-Common Var(flag_gcse_lm) Init(1) Optimization
+Common Var(flag_gcse_lm) Init(1) Optimization Boolean
 Perform enhanced load motion during global common subexpression elimination.
 
 fgcse-sm
-Common Var(flag_gcse_sm) Init(0) Optimization
+Common Var(flag_gcse_sm) Init(0) Optimization Boolean
 Perform store motion after global common subexpression elimination.
 
 fgcse-las
-Common Var(flag_gcse_las) Init(0) Optimization
+Common Var(flag_gcse_las) Init(0) Optimization Boolean
 Perform redundant load after store elimination in global common subexpression
 elimination.
 
 fgcse-after-reload
-Common Var(flag_gcse_after_reload) Optimization
+Common Var(flag_gcse_after_reload) Optimization Boolean
 Perform global common subexpression elimination after register allocation has
 finished.
 
@@ -1633,20 +1633,20 @@ Common Enum(dwarf_gnat_encodings) Joined RejectNegative Undocumented Var(gnat_en
 
 ; This option is not documented yet as its semantics will change.
 fgraphite
-Common Var(flag_graphite) Optimization
+Common Var(flag_graphite) Optimization Boolean
 Enable in and out of Graphite representation.
 
 fgraphite-identity
-Common Var(flag_graphite_identity) Optimization
+Common Var(flag_graphite_identity) Optimization Boolean
 Enable Graphite Identity transformation.
 
 fhoist-adjacent-loads
-Common Var(flag_hoist_adjacent_loads) Optimization
+Common Var(flag_hoist_adjacent_loads) Optimization Boolean
 Enable hoisting adjacent loads to encourage generating conditional move
 instructions.
 
 fkeep-gc-roots-live
-Common Undocumented Var(flag_keep_gc_roots_live) Optimization
+Common Undocumented Var(flag_keep_gc_roots_live) Optimization Boolean
 ; Always keep a pointer to a live memory block
 
 flarge-source-files
@@ -1655,7 +1655,7 @@ Improve GCC's ability to track column numbers in large source files,
 at the expense of slower compilation.
 
 floop-parallelize-all
-Common Var(flag_loop_parallelize_all) Optimization
+Common Var(flag_loop_parallelize_all) Optimization Boolean
 Mark all loops as parallel.
 
 floop-strip-mine
@@ -1663,7 +1663,7 @@ Common Alias(floop-nest-optimize)
 Enable loop nest transforms.  Same as -floop-nest-optimize.
 
 floop-interchange
-Common Var(flag_loop_interchange) Optimization
+Common Var(flag_loop_interchange) Optimization Boolean
 Enable loop interchange on trees.
 
 floop-block
@@ -1671,7 +1671,7 @@ Common Alias(floop-nest-optimize)
 Enable loop nest transforms.  Same as -floop-nest-optimize.
 
 floop-unroll-and-jam
-Common Var(flag_unroll_jam) Optimization
+Common Var(flag_unroll_jam) Optimization Boolean
 Perform unroll-and-jam on loops.
 
 fgnu-tm
@@ -1687,7 +1687,7 @@ Common Ignore
 Does nothing. Preserved for backward compatibility.
 
 floop-nest-optimize
-Common Var(flag_loop_nest_optimize) Optimization
+Common Var(flag_loop_nest_optimize) Optimization Boolean
 Enable the loop nest optimizer.
 
 fstrict-volatile-bitfields
@@ -1695,11 +1695,11 @@ Common Var(flag_strict_volatile_bitfields) Init(-1) Optimization
 Force bitfield accesses to match their type width.
 
 fstore-merging
-Common Var(flag_store_merging) Optimization
+Common Var(flag_store_merging) Optimization Boolean
 Merge adjacent stores.
 
 fguess-branch-probability
-Common Var(flag_guess_branch_prob) Optimization
+Common Var(flag_guess_branch_prob) Optimization Boolean
 Enable guessing of branch probabilities.
 
 ; Nonzero means ignore `#ident' directives.  0 means handle them.
@@ -1711,11 +1711,11 @@ Common Var(flag_no_ident,0)
 Process #ident directives.
 
 fif-conversion
-Common Var(flag_if_conversion) Optimization
+Common Var(flag_if_conversion) Optimization Boolean
 Perform conversion of conditional jumps to branchless equivalents.
 
 fif-conversion2
-Common Var(flag_if_conversion2) Optimization
+Common Var(flag_if_conversion2) Optimization Boolean
 Perform conversion of conditional jumps to conditional execution.
 
 fstack-reuse=
@@ -1751,25 +1751,25 @@ Common Var(flag_inhibit_size_directive)
 Do not generate .size directives.
 
 findirect-inlining
-Common Var(flag_indirect_inlining) Optimization
+Common Var(flag_indirect_inlining) Optimization Boolean
 Perform indirect inlining.
 
 ; General flag to enable inlining.  Specifying -fno-inline will disable
 ; all inlining apart from always-inline functions.
 finline
-Common Var(flag_no_inline,0) Init(0) Optimization
+Common Var(flag_no_inline,0) Init(0) Optimization Boolean
 Enable inlining of function declared \"inline\", disabling disables all inlining.
 
 finline-small-functions
-Common Var(flag_inline_small_functions) Optimization
+Common Var(flag_inline_small_functions) Optimization Boolean
 Integrate functions into their callers when code size is known not to grow.
 
 finline-functions
-Common Var(flag_inline_functions) Optimization
+Common Var(flag_inline_functions) Optimization Boolean
 Integrate functions not declared \"inline\" into their callers when profitable.
 
 finline-functions-called-once
-Common Var(flag_inline_functions_called_once) Optimization
+Common Var(flag_inline_functions_called_once) Optimization Boolean
 Integrate functions only required by their single caller.
 
 finline-limit-
@@ -1780,7 +1780,7 @@ Common RejectNegative Joined UInteger
 -finline-limit=<number>	Limit the size of inlined functions to <number>.
 
 finline-atomics
-Common Var(flag_inline_atomics) Init(1) Optimization
+Common Var(flag_inline_atomics) Init(1) Optimization Boolean
 Inline __atomic operations when a lock free instruction sequence is available.
 
 fcf-protection
@@ -1822,11 +1822,11 @@ Common RejectNegative Joined
 -finstrument-functions-exclude-file-list=filename,...	Do not instrument functions listed in files.
 
 fipa-cp
-Common Var(flag_ipa_cp) Optimization
+Common Var(flag_ipa_cp) Optimization Boolean
 Perform interprocedural constant propagation.
 
 fipa-cp-clone
-Common Var(flag_ipa_cp_clone) Optimization
+Common Var(flag_ipa_cp_clone) Optimization Boolean
 Perform cloning to make Interprocedural constant propagation stronger.
 
 fipa-cp-alignment
@@ -1834,47 +1834,47 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 fipa-bit-cp
-Common Var(flag_ipa_bit_cp) Optimization
+Common Var(flag_ipa_bit_cp) Optimization Boolean
 Perform interprocedural bitwise constant propagation.
 
 fipa-modref
-Common Var(flag_ipa_modref) Optimization
+Common Var(flag_ipa_modref) Optimization Boolean
 Perform interprocedural modref analysis.
 
 fipa-profile
-Common Var(flag_ipa_profile) Init(0) Optimization
+Common Var(flag_ipa_profile) Init(0) Optimization Boolean
 Perform interprocedural profile propagation.
 
 fipa-pta
-Common Var(flag_ipa_pta) Init(0) Optimization
+Common Var(flag_ipa_pta) Init(0) Optimization Boolean
 Perform interprocedural points-to analysis.
 
 fipa-pure-const
-Common Var(flag_ipa_pure_const) Init(0) Optimization
+Common Var(flag_ipa_pure_const) Init(0) Optimization Boolean
 Discover pure and const functions.
 
 fipa-icf
-Common Var(flag_ipa_icf) Optimization
+Common Var(flag_ipa_icf) Optimization Boolean
 Perform Identical Code Folding for functions and read-only variables.
 
 fipa-icf-functions
-Common Var(flag_ipa_icf_functions) Optimization
+Common Var(flag_ipa_icf_functions) Optimization Boolean
 Perform Identical Code Folding for functions.
 
 fipa-icf-variables
-Common Var(flag_ipa_icf_variables) Optimization
+Common Var(flag_ipa_icf_variables) Optimization Boolean
 Perform Identical Code Folding for variables.
 
 fipa-reference
-Common Var(flag_ipa_reference) Init(0) Optimization
+Common Var(flag_ipa_reference) Init(0) Optimization Boolean
 Discover read-only and non addressable static variables.
 
 fipa-reference-addressable
-Common Var(flag_ipa_reference_addressable) Init(0) Optimization
+Common Var(flag_ipa_reference_addressable) Init(0) Optimization Boolean
 Discover read-only, write-only and non-addressable static variables.
 
 fipa-stack-alignment
-Common Var(flag_ipa_stack_alignment) Init(1) Optimization
+Common Var(flag_ipa_stack_alignment) Init(1) Optimization Boolean
 Reduce stack alignment on call sites if possible.
 
 fipa-matrix-reorg
@@ -1886,7 +1886,7 @@ Common Ignore
 Does nothing. Preserved for backward compatibility.
 
 fipa-vrp
-Common Var(flag_ipa_vrp) Optimization
+Common Var(flag_ipa_vrp) Optimization Boolean
 Perform IPA Value Range Propagation.
 
 fira-algorithm=
@@ -1919,21 +1919,21 @@ EnumValue
 Enum(ira_region) String(mixed) Value(IRA_REGION_MIXED)
 
 fira-hoist-pressure
-Common Var(flag_ira_hoist_pressure) Init(1) Optimization
+Common Var(flag_ira_hoist_pressure) Init(1) Optimization Boolean
 Use IRA based register pressure calculation
 in RTL hoist optimizations.
 
 fira-loop-pressure
-Common Var(flag_ira_loop_pressure) Optimization
+Common Var(flag_ira_loop_pressure) Optimization Boolean
 Use IRA based register pressure calculation
 in RTL loop optimizations.
 
 fira-share-save-slots
-Common Var(flag_ira_share_save_slots) Init(1) Optimization
+Common Var(flag_ira_share_save_slots) Init(1) Optimization Boolean
 Share slots for saving different hard registers.
 
 fira-share-spill-slots
-Common Var(flag_ira_share_spill_slots) Init(1) Optimization
+Common Var(flag_ira_share_spill_slots) Init(1) Optimization Boolean
 Share stack slots for spilled pseudo-registers.
 
 fira-verbose=
@@ -1941,15 +1941,15 @@ Common RejectNegative Joined UInteger Var(flag_ira_verbose) Init(5)
 -fira-verbose=<number>	Control IRA's level of diagnostic messages.
 
 fivopts
-Common Var(flag_ivopts) Init(1) Optimization
+Common Var(flag_ivopts) Init(1) Optimization Boolean
 Optimize induction variables on trees.
 
 fjump-tables
-Common Var(flag_jump_tables) Init(1) Optimization
+Common Var(flag_jump_tables) Init(1) Optimization Boolean
 Use jump tables for sufficiently large switch statements.
 
 fbit-tests
-Common Var(flag_bit_tests) Init(1) Optimization
+Common Var(flag_bit_tests) Init(1) Optimization Boolean
 Use bit tests for sufficiently large switch statements.
 
 fkeep-inline-functions
@@ -1973,7 +1973,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 flra-remat
-Common Var(flag_lra_remat) Optimization
+Common Var(flag_lra_remat) Optimization Boolean
 Do CFG-sensitive rematerialization in LRA.
 
 flto
@@ -2024,7 +2024,7 @@ Common Var(flag_lto_report_wpa) Init(0)
 Report various link-time optimization statistics for WPA only.
 
 fmath-errno
-Common Var(flag_errno_math) Init(1) Optimization SetByCombined
+Common Var(flag_errno_math) Init(1) Optimization Boolean SetByCombined
 Set errno after built-in math functions.
 
 fmax-errors=
@@ -2059,31 +2059,31 @@ Common RejectNegative Joined UInteger
 -fmessage-length=<number>	Limit diagnostics to <number> characters per line.  0 suppresses line-wrapping.
 
 fmodulo-sched
-Common Var(flag_modulo_sched) Optimization
+Common Var(flag_modulo_sched) Optimization Boolean
 Perform SMS based modulo scheduling before the first scheduling pass.
 
 fmodulo-sched-allow-regmoves
-Common Var(flag_modulo_sched_allow_regmoves) Optimization
+Common Var(flag_modulo_sched_allow_regmoves) Optimization Boolean
 Perform SMS based modulo scheduling with register moves allowed.
 
 fmove-loop-invariants
-Common Var(flag_move_loop_invariants) Optimization
+Common Var(flag_move_loop_invariants) Optimization Boolean
 Move loop invariant computations out of loops.
 
 fdce
-Common Var(flag_dce) Init(1) Optimization
+Common Var(flag_dce) Init(1) Optimization Boolean
 Use the RTL dead code elimination pass.
 
 fdse
-Common Var(flag_dse) Init(0) Optimization
+Common Var(flag_dse) Init(0) Optimization Boolean
 Use the RTL dead store elimination pass.
 
 freschedule-modulo-scheduled-loops
-Common Var(flag_resched_modulo_sched) Optimization
+Common Var(flag_resched_modulo_sched) Optimization Boolean
 Enable/Disable the traditional scheduling in loops that already passed modulo scheduling.
 
 fnon-call-exceptions
-Common Var(flag_non_call_exceptions) Optimization
+Common Var(flag_non_call_exceptions) Optimization Boolean
 Support synchronous non-call exceptions.
 
 foffload=
@@ -2104,11 +2104,11 @@ EnumValue
 Enum(offload_abi) String(lp64) Value(OFFLOAD_ABI_LP64)
 
 fomit-frame-pointer
-Common Var(flag_omit_frame_pointer) Optimization
+Common Var(flag_omit_frame_pointer) Optimization Boolean
 When possible do not generate stack frames.
 
 fopt-info
-Common Var(flag_opt_info) Optimization
+Common Var(flag_opt_info) Optimization Boolean
 Enable all optimization info dumps on stderr.
 
 fopt-info-
@@ -2116,7 +2116,7 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 -fopt-info[-<type>=filename]	Dump compiler optimization details.
 
 fsave-optimization-record
-Common Var(flag_save_optimization_record) Optimization
+Common Var(flag_save_optimization_record) Optimization Boolean
 Write a SRCFILE.opt-record.json file detailing what optimizations were performed.
 
 foptimize-register-move
@@ -2124,11 +2124,11 @@ Common Ignore
 Does nothing. Preserved for backward compatibility.
 
 foptimize-sibling-calls
-Common Var(flag_optimize_sibling_calls) Optimization
+Common Var(flag_optimize_sibling_calls) Optimization Boolean
 Optimize sibling and tail recursive calls.
 
 fpartial-inlining
-Common Var(flag_partial_inlining) Optimization
+Common Var(flag_partial_inlining) Optimization Boolean
 Perform partial inlining.
 
 fpre-ipa-mem-report
@@ -2140,11 +2140,11 @@ Common Var(post_ipa_mem_report)
 Report on memory allocation before interprocedural optimization.
 
 fpack-struct
-Common Var(flag_pack_struct) Optimization
+Common Var(flag_pack_struct) Optimization Boolean
 Pack structure members together without holes.
 
 fpack-struct=
-Common RejectNegative Joined UInteger Optimization
+Common RejectNegative Joined UInteger Optimization Boolean
 -fpack-struct=<number>	Set initial maximum structure member alignment.
 
 fpcc-struct-return
@@ -2152,15 +2152,15 @@ Common Var(flag_pcc_struct_return,1) Init(DEFAULT_PCC_STRUCT_RETURN)
 Return small aggregates in memory, not registers.
 
 fpeel-loops
-Common Var(flag_peel_loops) Optimization
+Common Var(flag_peel_loops) Optimization Boolean
 Perform loop peeling.
 
 fpeephole
-Common Var(flag_no_peephole,0) Optimization
+Common Var(flag_no_peephole,0) Optimization Boolean
 Enable machine specific peephole optimizations.
 
 fpeephole2
-Common Var(flag_peephole2) Optimization
+Common Var(flag_peephole2) Optimization Boolean
 Enable an RTL peephole pass before sched2.
 
 fPIC
@@ -2180,7 +2180,7 @@ Common Var(flag_pie,1) Negative(fPIC) Init(-1)
 Generate position-independent code for executables if possible (small mode).
 
 fplt
-Common Var(flag_plt) Init(1) Optimization
+Common Var(flag_plt) Init(1) Optimization Boolean
 Use PLT for PIC calls (-fno-plt: load the address from GOT at call site).
 
 fplugin=
@@ -2192,7 +2192,7 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 -fplugin-arg-<name>-<key>[=<value>]	Specify argument <key>=<value> for plugin <name>.
 
 fpredictive-commoning
-Common Var(flag_predictive_commoning) Optimization
+Common Var(flag_predictive_commoning) Optimization Boolean
 Run predictive commoning optimization.
 
 fprefetch-loop-arrays
@@ -2285,7 +2285,7 @@ Common Joined RejectNegative Var(profile_info_section)
 Register the profile information in the specified section instead of using a constructor/destructor.
 
 fprofile-partial-training
-Common Var(flag_profile_partial_training) Optimization
+Common Var(flag_profile_partial_training) Optimization Boolean
 Do not assume that functions never executed during the train run are cold.
 
 fprofile-use
@@ -2305,11 +2305,11 @@ Common Var(profile_report)
 Report on consistency of profile.
 
 fprofile-reorder-functions
-Common Var(flag_profile_reorder_functions) Optimization
+Common Var(flag_profile_reorder_functions) Optimization Boolean
 Enable function reordering that improves code placement.
 
 fpatchable-function-entry=
-Common Joined Optimization
+Common Joined Optimization Boolean
 Insert NOP instructions at each function entry.
 
 frandom-seed
@@ -2330,7 +2330,7 @@ Common Var(flag_record_gcc_switches)
 Record gcc command line switches in the object file.
 
 freg-struct-return
-Common Var(flag_pcc_struct_return,0) Optimization
+Common Var(flag_pcc_struct_return,0) Optimization Boolean
 Return small aggregates in registers.
 
 fregmove
@@ -2346,7 +2346,7 @@ flifetime-dse=
 Common Joined RejectNegative UInteger Var(flag_lifetime_dse) Optimization IntegerRange(0, 2)
 
 flive-patching
-Common RejectNegative Alias(flive-patching=,inline-clone) Optimization
+Common RejectNegative Alias(flive-patching=,inline-clone) Optimization Boolean
 
 flive-patching=
 Common Joined RejectNegative Enum(live_patching_level) Var(flag_live_patching) Init(LIVE_PATCHING_NONE) Optimization
@@ -2364,11 +2364,11 @@ EnumValue
 Enum(live_patching_level) String(inline-clone) Value(LIVE_PATCHING_INLINE_CLONE)
 
 fallocation-dce
-Common Var(flag_allocation_dce) Init(1) Optimization
+Common Var(flag_allocation_dce) Init(1) Optimization Boolean
 Tell DCE to remove unused C++ allocations.
 
 flive-range-shrinkage
-Common Var(flag_live_range_shrinkage) Init(0) Optimization
+Common Var(flag_live_range_shrinkage) Init(0) Optimization Boolean
 Relief of register pressure through live range shrinkage.
 
 frename-registers
@@ -2380,7 +2380,7 @@ Common Var(flag_schedule_fusion) Init(2) Optimization
 Perform a target dependent instruction fusion optimization pass.
 
 freorder-blocks
-Common Var(flag_reorder_blocks) Optimization
+Common Var(flag_reorder_blocks) Optimization Boolean
 Reorder basic blocks to improve code placement.
 
 freorder-blocks-algorithm=
@@ -2397,15 +2397,15 @@ EnumValue
 Enum(reorder_blocks_algorithm) String(stc) Value(REORDER_BLOCKS_ALGORITHM_STC)
 
 freorder-blocks-and-partition
-Common Var(flag_reorder_blocks_and_partition) Optimization
+Common Var(flag_reorder_blocks_and_partition) Optimization Boolean
 Reorder basic blocks and partition into hot and cold sections.
 
 freorder-functions
-Common Var(flag_reorder_functions) Optimization
+Common Var(flag_reorder_functions) Optimization Boolean
 Reorder functions to improve code placement.
 
 frerun-cse-after-loop
-Common Var(flag_rerun_cse_after_loop) Optimization
+Common Var(flag_rerun_cse_after_loop) Optimization Boolean
 Add a common subexpression elimination pass after loop optimizations.
 
 frerun-loop-opt
@@ -2417,23 +2417,23 @@ Common Var(flag_rounding_math) Optimization SetByCombined
 Disable optimizations that assume default FP rounding behavior.
 
 fsched-interblock
-Common Var(flag_schedule_interblock) Init(1) Optimization
+Common Var(flag_schedule_interblock) Init(1) Optimization Boolean
 Enable scheduling across basic blocks.
 
 fsched-pressure
-Common Var(flag_sched_pressure) Init(0) Optimization
+Common Var(flag_sched_pressure) Init(0) Optimization Boolean
 Enable register pressure sensitive insn scheduling.
 
 fsched-spec
-Common Var(flag_schedule_speculative) Init(1) Optimization
+Common Var(flag_schedule_speculative) Init(1) Optimization Boolean
 Allow speculative motion of non-loads.
 
 fsched-spec-load
-Common Var(flag_schedule_speculative_load) Optimization
+Common Var(flag_schedule_speculative_load) Optimization Boolean
 Allow speculative motion of some loads.
 
 fsched-spec-load-dangerous
-Common Var(flag_schedule_speculative_load_dangerous) Optimization
+Common Var(flag_schedule_speculative_load_dangerous) Optimization Boolean
 Allow speculative motion of more loads.
 
 fsched-verbose=
@@ -2441,7 +2441,7 @@ Common RejectNegative Joined UInteger Var(sched_verbose_param) Init(1)
 -fsched-verbose=<number>	Set the verbosity level of the scheduler.
 
 fsched2-use-superblocks
-Common Var(flag_sched2_use_superblocks) Optimization
+Common Var(flag_sched2_use_superblocks) Optimization Boolean
 If scheduling post reload, do superblock scheduling.
 
 fsched2-use-traces
@@ -2449,22 +2449,22 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 fschedule-insns
-Common Var(flag_schedule_insns) Optimization
+Common Var(flag_schedule_insns) Optimization Boolean
 Reschedule instructions before register allocation.
 
 fschedule-insns2
-Common Var(flag_schedule_insns_after_reload) Optimization
+Common Var(flag_schedule_insns_after_reload) Optimization Boolean
 Reschedule instructions after register allocation.
 
 ; This flag should be on when a target implements non-trivial
 ; scheduling hooks, maybe saving some information for its own sake.
 ; On IA64, for example, this is used for correct bundling.
 fselective-scheduling
-Common Var(flag_selective_scheduling) Optimization
+Common Var(flag_selective_scheduling) Optimization Boolean
 Schedule instructions using selective scheduling algorithm.
 
 fselective-scheduling2
-Common Var(flag_selective_scheduling2) Optimization
+Common Var(flag_selective_scheduling2) Optimization Boolean
 Run selective scheduling after reload.
 
 fself-test=
@@ -2472,15 +2472,15 @@ Common Undocumented Joined Var(flag_self_test)
 Run self-tests, using the given path to locate test files.
 
 fsel-sched-pipelining
-Common Var(flag_sel_sched_pipelining) Init(0) Optimization
+Common Var(flag_sel_sched_pipelining) Init(0) Optimization Boolean
 Perform software pipelining of inner loops during selective scheduling.
 
 fsel-sched-pipelining-outer-loops
-Common Var(flag_sel_sched_pipelining_outer_loops) Init(0) Optimization
+Common Var(flag_sel_sched_pipelining_outer_loops) Init(0) Optimization Boolean
 Perform software pipelining of outer loops during selective scheduling.
 
 fsel-sched-reschedule-pipelined
-Common Var(flag_sel_sched_reschedule_pipelined) Init(0) Optimization
+Common Var(flag_sel_sched_reschedule_pipelined) Init(0) Optimization Boolean
 Reschedule pipelined regions without pipelining.
 
 fsemantic-interposition
@@ -2490,11 +2490,11 @@ Allow interposing function (or variables) by ones with different semantics (or i
 ; sched_stalled_insns means that insns can be moved prematurely from the queue
 ; of stalled insns into the ready list.
 fsched-stalled-insns
-Common Var(flag_sched_stalled_insns) Optimization UInteger
+Common Var(flag_sched_stalled_insns) Optimization Boolean UInteger
 Allow premature scheduling of queued insns.
 
 fsched-stalled-insns=
-Common RejectNegative Joined UInteger Optimization
+Common RejectNegative Joined UInteger Optimization Boolean
 -fsched-stalled-insns=<number>	Set number of queued insns that can be prematurely scheduled.
 
 ; sched_stalled_insns_dep controls how many recently scheduled cycles will
@@ -2502,39 +2502,39 @@ Common RejectNegative Joined UInteger Optimization
 ; premature removal from the queue of stalled insns into the ready list (has
 ; an effect only if the flag 'sched_stalled_insns' is set).
 fsched-stalled-insns-dep
-Common Var(flag_sched_stalled_insns_dep,1) Init(1) Optimization UInteger
+Common Var(flag_sched_stalled_insns_dep,1) Init(1) Optimization Boolean UInteger
 Set dependence distance checking in premature scheduling of queued insns.
 
 fsched-stalled-insns-dep=
-Common RejectNegative Joined UInteger Optimization
+Common RejectNegative Joined UInteger Optimization Boolean
 -fsched-stalled-insns-dep=<number>	Set dependence distance checking in premature scheduling of queued insns.
 
 fsched-group-heuristic
-Common Var(flag_sched_group_heuristic) Init(1) Optimization
+Common Var(flag_sched_group_heuristic) Init(1) Optimization Boolean
 Enable the group heuristic in the scheduler.
 
 fsched-critical-path-heuristic
-Common Var(flag_sched_critical_path_heuristic) Init(1) Optimization
+Common Var(flag_sched_critical_path_heuristic) Init(1) Optimization Boolean
 Enable the critical path heuristic in the scheduler.
 
 fsched-spec-insn-heuristic
-Common Var(flag_sched_spec_insn_heuristic) Init(1) Optimization
+Common Var(flag_sched_spec_insn_heuristic) Init(1) Optimization Boolean
 Enable the speculative instruction heuristic in the scheduler.
 
 fsched-rank-heuristic
-Common Var(flag_sched_rank_heuristic) Init(1) Optimization
+Common Var(flag_sched_rank_heuristic) Init(1) Optimization Boolean
 Enable the rank heuristic in the scheduler.
 
 fsched-last-insn-heuristic
-Common Var(flag_sched_last_insn_heuristic) Init(1) Optimization
+Common Var(flag_sched_last_insn_heuristic) Init(1) Optimization Boolean
 Enable the last instruction heuristic in the scheduler.
 
 fsched-dep-count-heuristic
-Common Var(flag_sched_dep_count_heuristic) Init(1) Optimization
+Common Var(flag_sched_dep_count_heuristic) Init(1) Optimization Boolean
 Enable the dependent count heuristic in the scheduler.
 
 fsection-anchors
-Common Var(flag_section_anchors) Optimization
+Common Var(flag_section_anchors) Optimization Boolean
 Access data in the same section from shared anchor points.
 
 fsee
@@ -2546,7 +2546,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 free
-Common Var(flag_ree) Init(0) Optimization
+Common Var(flag_ree) Init(0) Optimization Boolean
 Turn on Redundant Extensions Elimination pass.
 
 fshow-column
@@ -2554,28 +2554,28 @@ Common Var(flag_show_column) Init(1)
 Show column numbers in diagnostics, when available.  Default on.
 
 fshrink-wrap
-Common Var(flag_shrink_wrap) Optimization
+Common Var(flag_shrink_wrap) Optimization Boolean
 Emit function prologues only before parts of the function that need it,
 rather than at the top of the function.
 
 fshrink-wrap-separate
-Common Var(flag_shrink_wrap_separate) Init(1) Optimization
+Common Var(flag_shrink_wrap_separate) Init(1) Optimization Boolean
 Shrink-wrap parts of the prologue and epilogue separately.
 
 fsignaling-nans
-Common Var(flag_signaling_nans) Optimization SetByCombined
+Common Var(flag_signaling_nans) Optimization Boolean SetByCombined
 Disable optimizations observable by IEEE signaling NaNs.
 
 fsigned-zeros
-Common Var(flag_signed_zeros) Init(1) Optimization SetByCombined
+Common Var(flag_signed_zeros) Init(1) Optimization Boolean SetByCombined
 Disable floating point optimizations that ignore the IEEE signedness of zero.
 
 fsingle-precision-constant
-Common Var(flag_single_precision_constant) Optimization
+Common Var(flag_single_precision_constant) Optimization Boolean
 Convert floating point constants to single precision constants.
 
 fsplit-ivs-in-unroller
-Common Var(flag_split_ivs_in_unroller) Init(1) Optimization
+Common Var(flag_split_ivs_in_unroller) Init(1) Optimization Boolean
 Split lifetimes of induction variables when loops are unrolled.
 
 fsplit-stack
@@ -2583,31 +2583,31 @@ Common Var(flag_split_stack) Init(-1)
 Generate discontiguous stack frames.
 
 fsplit-wide-types
-Common Var(flag_split_wide_types) Optimization
+Common Var(flag_split_wide_types) Optimization Boolean
 Split wide types into independent registers.
 
 fsplit-wide-types-early
-Common Var(flag_split_wide_types_early) Optimization
+Common Var(flag_split_wide_types_early) Optimization Boolean
 Split wide types into independent registers earlier.
 
 fssa-backprop
-Common Var(flag_ssa_backprop) Init(1) Optimization
+Common Var(flag_ssa_backprop) Init(1) Optimization Boolean
 Enable backward propagation of use properties at the SSA level.
 
 fssa-phiopt
-Common Var(flag_ssa_phiopt) Optimization
+Common Var(flag_ssa_phiopt) Optimization Boolean
 Optimize conditional patterns using SSA PHI nodes.
 
 fstdarg-opt
-Common Var(flag_stdarg_opt) Init(1) Optimization
+Common Var(flag_stdarg_opt) Init(1) Optimization Boolean
 Optimize amount of stdarg registers saved to stack at start of function.
 
 fvariable-expansion-in-unroller
-Common Var(flag_variable_expansion_in_unroller) Optimization
+Common Var(flag_variable_expansion_in_unroller) Optimization Boolean
 Apply variable expansion when loops are unrolled.
 
 fstack-check=
-Common RejectNegative Joined Optimization
+Common RejectNegative Joined Optimization Boolean
 -fstack-check=[no|generic|specific]	Insert stack checking code into the program.
 
 fstack-check
@@ -2615,7 +2615,7 @@ Common Alias(fstack-check=, specific, no)
 Insert stack checking code into the program.  Same as -fstack-check=specific.
 
 fstack-clash-protection
-Common Var(flag_stack_clash_protection) Optimization
+Common Var(flag_stack_clash_protection) Optimization Boolean
 Insert code to probe each page of stack space as it is allocated to protect
 from stack-clash style attacks.
 
@@ -2659,7 +2659,7 @@ Does nothing.  Preserved for backward compatibility.
 ; types do not alias expressions of certain other types.  Only used
 ; if alias analysis (in general) is enabled.
 fstrict-aliasing
-Common Var(flag_strict_aliasing) Optimization
+Common Var(flag_strict_aliasing) Optimization Boolean
 Assume strict aliasing rules apply.
 
 fstrict-overflow
@@ -2679,7 +2679,7 @@ Common Var(flag_test_coverage)
 Create data files needed by \"gcov\".
 
 fthread-jumps
-Common Var(flag_thread_jumps) Optimization
+Common Var(flag_thread_jumps) Optimization Boolean
 Perform jump threading optimizations.
 
 ftime-report
@@ -2714,7 +2714,7 @@ Common Var(flag_toplevel_reorder) Init(2) Optimization
 Reorder top level functions, variables, and asms.
 
 ftracer
-Common Var(flag_tracer) Optimization
+Common Var(flag_tracer) Optimization Boolean
 Perform superblock formation via tail duplication.
 
 ftrampolines
@@ -2726,19 +2726,19 @@ generate them instead of using descriptors.
 ; (user-visible) trap.  This is the case, for example, in nonstop
 ; IEEE 754 arithmetic.
 ftrapping-math
-Common Var(flag_trapping_math) Init(1) Optimization SetByCombined
+Common Var(flag_trapping_math) Init(1) Optimization Boolean SetByCombined
 Assume floating-point operations can trap.
 
 ftrapv
-Common Var(flag_trapv) Optimization
+Common Var(flag_trapv) Optimization Boolean
 Trap for signed overflow in addition, subtraction and multiplication.
 
 ftree-ccp
-Common Var(flag_tree_ccp) Optimization
+Common Var(flag_tree_ccp) Optimization Boolean
 Enable SSA-CCP optimization on trees.
 
 ftree-bit-ccp
-Common Var(flag_tree_bit_ccp) Optimization
+Common Var(flag_tree_bit_ccp) Optimization Boolean
 Enable SSA-BIT-CCP optimization on trees.
 
 ftree-store-ccp
@@ -2746,7 +2746,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 ftree-ch
-Common Var(flag_tree_ch) Optimization
+Common Var(flag_tree_ch) Optimization Boolean
 Enable loop header copying on trees.
 
 ftree-coalesce-inlined-vars
@@ -2754,7 +2754,7 @@ Common Ignore RejectNegative
 Does nothing.  Preserved for backward compatibility.
 
 ftree-coalesce-vars
-Common Var(flag_tree_coalesce_vars) Optimization
+Common Var(flag_tree_coalesce_vars) Optimization Boolean
 Enable SSA coalescing of user variables.
 
 ftree-copyrename
@@ -2762,7 +2762,7 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 ftree-copy-prop
-Common Var(flag_tree_copy_prop) Optimization
+Common Var(flag_tree_copy_prop) Optimization Boolean
 Enable copy propagation on trees.
 
 ftree-store-copy-prop
@@ -2774,60 +2774,60 @@ Common Var(flag_tree_cselim) Init(2) Optimization
 Transform condition stores into unconditional ones.
 
 ftree-switch-conversion
-Common Var(flag_tree_switch_conversion) Optimization
+Common Var(flag_tree_switch_conversion) Optimization Boolean
 Perform conversions of switch initializations.
 
 ftree-dce
-Common Var(flag_tree_dce) Optimization
+Common Var(flag_tree_dce) Optimization Boolean
 Enable SSA dead code elimination optimization on trees.
 
 ftree-dominator-opts
-Common Var(flag_tree_dom) Optimization
+Common Var(flag_tree_dom) Optimization Boolean
 Enable dominator optimizations.
 
 ftree-tail-merge
-Common Var(flag_tree_tail_merge) Optimization
+Common Var(flag_tree_tail_merge) Optimization Boolean
 Enable tail merging on trees.
 
 ftree-dse
-Common Var(flag_tree_dse) Optimization
+Common Var(flag_tree_dse) Optimization Boolean
 Enable dead store elimination.
 
 ftree-forwprop
-Common Var(flag_tree_forwprop) Init(1) Optimization
+Common Var(flag_tree_forwprop) Init(1) Optimization Boolean
 Enable forward propagation on trees.
 
 ftree-fre
-Common Var(flag_tree_fre) Optimization
+Common Var(flag_tree_fre) Optimization Boolean
 Enable Full Redundancy Elimination (FRE) on trees.
 
 foptimize-strlen
-Common Var(flag_optimize_strlen) Optimization
+Common Var(flag_optimize_strlen) Optimization Boolean
 Enable string length optimizations on trees.
 
 fisolate-erroneous-paths-dereference
-Common Var(flag_isolate_erroneous_paths_dereference) Optimization
+Common Var(flag_isolate_erroneous_paths_dereference) Optimization Boolean
 Detect paths that trigger erroneous or undefined behavior due to
 dereferencing a null pointer.  Isolate those paths from the main control
 flow and turn the statement with erroneous or undefined behavior into a trap.
 
 fisolate-erroneous-paths-attribute
-Common Var(flag_isolate_erroneous_paths_attribute) Optimization
+Common Var(flag_isolate_erroneous_paths_attribute) Optimization Boolean
 Detect paths that trigger erroneous or undefined behavior due to a null value
 being used in a way forbidden by a returns_nonnull or nonnull
 attribute.  Isolate those paths from the main control flow and turn the
 statement with erroneous or undefined behavior into a trap.
 
 ftree-loop-distribution
-Common Var(flag_tree_loop_distribution) Optimization
+Common Var(flag_tree_loop_distribution) Optimization Boolean
 Enable loop distribution on trees.
 
 ftree-loop-distribute-patterns
-Common Var(flag_tree_loop_distribute_patterns) Optimization
+Common Var(flag_tree_loop_distribute_patterns) Optimization Boolean
 Enable loop distribution for patterns transformed into a library call.
 
 ftree-loop-im
-Common Var(flag_tree_loop_im) Init(1) Optimization
+Common Var(flag_tree_loop_im) Init(1) Optimization Boolean
 Enable loop invariant motion on trees.
 
 ftree-loop-linear
@@ -2835,11 +2835,11 @@ Common Alias(floop-nest-optimize)
 Enable loop nest transforms.  Same as -floop-nest-optimize.
 
 ftree-loop-ivcanon
-Common Var(flag_tree_loop_ivcanon) Init(1) Optimization
+Common Var(flag_tree_loop_ivcanon) Init(1) Optimization Boolean
 Create canonical induction variables in loops.
 
 ftree-loop-optimize
-Common Var(flag_tree_loop_optimize) Init(1) Optimization
+Common Var(flag_tree_loop_optimize) Init(1) Optimization Boolean
 Enable loop optimizations on tree level.
 
 ftree-parallelize-loops=
@@ -2847,23 +2847,23 @@ Common Joined RejectNegative UInteger Var(flag_tree_parallelize_loops) Init(1) O
 -ftree-parallelize-loops=<number>	Enable automatic parallelization of loops.
 
 ftree-phiprop
-Common Var(flag_tree_phiprop) Init(1) Optimization
+Common Var(flag_tree_phiprop) Init(1) Optimization Boolean
 Enable hoisting loads from conditional pointers.
 
 ftree-pre
-Common Var(flag_tree_pre) Optimization
+Common Var(flag_tree_pre) Optimization Boolean
 Enable SSA-PRE optimization on trees.
 
 ftree-partial-pre
-Common Var(flag_tree_partial_pre) Optimization
+Common Var(flag_tree_partial_pre) Optimization Boolean
 In SSA-PRE optimization on trees, enable partial-partial redundancy elimination.
 
 ftree-pta
-Common Var(flag_tree_pta) Optimization
+Common Var(flag_tree_pta) Optimization Boolean
 Perform function-local points-to analysis on trees.
 
 ftree-reassoc
-Common Var(flag_tree_reassoc) Init(1) Optimization
+Common Var(flag_tree_reassoc) Init(1) Optimization Boolean
 Enable reassociation on tree level.
 
 ftree-salias
@@ -2871,35 +2871,35 @@ Common Ignore
 Does nothing.  Preserved for backward compatibility.
 
 ftree-sink
-Common Var(flag_tree_sink) Optimization
+Common Var(flag_tree_sink) Optimization Boolean
 Enable SSA code sinking on trees.
 
 ftree-slsr
-Common Var(flag_tree_slsr) Optimization
+Common Var(flag_tree_slsr) Optimization Boolean
 Perform straight-line strength reduction.
 
 ftree-sra
-Common Var(flag_tree_sra) Optimization
+Common Var(flag_tree_sra) Optimization Boolean
 Perform scalar replacement of aggregates.
 
 ftree-ter
-Common Var(flag_tree_ter) Optimization
+Common Var(flag_tree_ter) Optimization Boolean
 Replace temporary expressions in the SSA->normal pass.
 
 ftree-lrs
-Common Var(flag_tree_live_range_split) Optimization
+Common Var(flag_tree_live_range_split) Optimization Boolean
 Perform live range splitting during the SSA->normal pass.
 
 ftree-vrp
-Common Var(flag_tree_vrp) Init(0) Optimization
+Common Var(flag_tree_vrp) Init(0) Optimization Boolean
 Perform Value Range Propagation on trees.
 
 fsplit-paths
-Common Var(flag_split_paths) Init(0) Optimization
+Common Var(flag_split_paths) Init(0) Optimization Boolean
 Split paths leading to loop backedges.
 
 funconstrained-commons
-Common Var(flag_unconstrained_commons) Optimization
+Common Var(flag_unconstrained_commons) Optimization Boolean
 Assume common declarations may be overridden with ones with a larger
 trailing array.
 
@@ -2908,15 +2908,15 @@ Common Var(flag_unit_at_a_time) Init(1)
 Compile whole compilation unit at a time.
 
 funroll-loops
-Common Var(flag_unroll_loops) Optimization
+Common Var(flag_unroll_loops) Optimization Boolean
 Perform loop unrolling when iteration count is known.
 
 funroll-all-loops
-Common Var(flag_unroll_all_loops) Optimization
+Common Var(flag_unroll_all_loops) Optimization Boolean
 Perform loop unrolling for all loops.
 
 funroll-completely-grow-size
-Undocumented Var(flag_cunroll_grow_size) Optimization
+Undocumented Var(flag_cunroll_grow_size) Optimization Boolean
 ; Internal undocumented flag, allow size growth during complete unrolling
 
 ; Nonzero means that loop optimizer may assume that the induction variables
@@ -2932,7 +2932,7 @@ Allow optimization for floating-point arithmetic which may change the
 result of the operation due to rounding.
 
 freciprocal-math
-Common Var(flag_reciprocal_math) SetByCombined Optimization
+Common Var(flag_reciprocal_math) SetByCombined Optimization Boolean
 Same as -fassociative-math for expressions which include division.
 
 ; Nonzero means that unsafe floating-point math optimizations are allowed
@@ -2940,23 +2940,23 @@ Same as -fassociative-math for expressions which include division.
 ; are allowed to assume that their arguments and results are "normal"
 ; (e.g., nonnegative for SQRT).
 funsafe-math-optimizations
-Common Var(flag_unsafe_math_optimizations) Optimization SetByCombined
+Common Var(flag_unsafe_math_optimizations) Optimization Boolean SetByCombined
 Allow math optimizations that may violate IEEE or ISO standards.
 
 funswitch-loops
-Common Var(flag_unswitch_loops) Optimization
+Common Var(flag_unswitch_loops) Optimization Boolean
 Perform loop unswitching.
 
 fsplit-loops
-Common Var(flag_split_loops) Optimization
+Common Var(flag_split_loops) Optimization Boolean
 Perform loop splitting.
 
 fversion-loops-for-strides
-Common Var(flag_version_loops_for_strides) Optimization
+Common Var(flag_version_loops_for_strides) Optimization Boolean
 Version loops based on whether indices have a stride of one.
 
 funwind-tables
-Common Var(flag_unwind_tables) Optimization
+Common Var(flag_unwind_tables) Optimization Boolean
 Just generate unwind tables for exception handling.
 
 fuse-ld=bfd
@@ -3007,7 +3007,7 @@ Perform variable tracking and also tag variables that are uninitialized.
 
 ; Alias to enable both -ftree-loop-vectorize and -ftree-slp-vectorize.
 ftree-vectorize
-Common Optimization
+Common Optimization Boolean
 Enable vectorization on trees.
 
 ftree-vectorizer-verbose=
@@ -3015,11 +3015,11 @@ Common Joined RejectNegative Ignore
 Does nothing.  Preserved for backward compatibility.
 
 ftree-loop-vectorize
-Common Var(flag_tree_loop_vectorize) Optimization EnabledBy(ftree-vectorize)
+Common Var(flag_tree_loop_vectorize) Optimization Boolean EnabledBy(ftree-vectorize)
 Enable loop vectorization on trees.
 
 ftree-slp-vectorize
-Common Var(flag_tree_slp_vectorize) Optimization EnabledBy(ftree-vectorize)
+Common Var(flag_tree_slp_vectorize) Optimization Boolean EnabledBy(ftree-vectorize)
 Enable basic block vectorization (SLP) on trees.
 
 fvect-cost-model=
@@ -3054,7 +3054,7 @@ Common Ignore
 Does nothing. Preserved for backward compatibility.
 
 ftree-scev-cprop
-Common Var(flag_tree_scev_cprop) Init(1) Optimization
+Common Var(flag_tree_scev_cprop) Init(1) Optimization Boolean
 Enable copy propagation of scalar-evolution information.
 
 ; -fverbose-asm causes extra commentary information to be produced in
@@ -3111,7 +3111,7 @@ Common Var(flag_vtv_debug)
 Output vtable verification pointer sets information.
 
 fvpt
-Common Var(flag_value_profile_transformations) Optimization
+Common Var(flag_value_profile_transformations) Optimization Boolean
 Use expression value profiles in optimizations.
 
 fweb
@@ -3119,7 +3119,7 @@ Common Var(flag_web) Init(2) Optimization
 Construct webs and split unrelated uses of single variable.
 
 ftree-builtin-call-dce
-Common Var(flag_tree_builtin_call_dce) Init(0) Optimization
+Common Var(flag_tree_builtin_call_dce) Init(0) Optimization Boolean
 Enable conditional dead code elimination for builtin calls.
 
 fwhole-program
@@ -3127,11 +3127,11 @@ Common Var(flag_whole_program) Init(0)
 Perform whole program optimizations.
 
 fwrapv-pointer
-Common Var(flag_wrapv_pointer) Optimization
+Common Var(flag_wrapv_pointer) Optimization Boolean
 Assume pointer overflow wraps around.
 
 fwrapv
-Common Var(flag_wrapv) Optimization
+Common Var(flag_wrapv) Optimization Boolean
 Assume signed arithmetic overflow wraps around.
 
 fzero-initialized-in-bss
@@ -3491,7 +3491,7 @@ z
 Driver Joined Separate
 
 fipa-ra
-Common Var(flag_ipa_ra) Optimization
+Common Var(flag_ipa_ra) Optimization Boolean
 Use caller save register across calls if possible.
 
 ; This comment is to ensure we retain the blank line above.
