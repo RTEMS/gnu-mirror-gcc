@@ -15599,7 +15599,11 @@ rs6000_expand_new_builtin (tree exp, rtx target,
 	return const0_rtx;
       STRIP_NOPS (arg[i]);
       op[i] = expand_normal (arg[i]);
-      mode[i+k] = insn_data[icode].operand[i+k].mode;
+      /* We have a couple of pesky patterns that don't specify the mode...  */
+      if (!insn_data[icode].operand[i+k].mode)
+	mode[i+k] = TARGET_64BIT ? Pmode : SImode;
+      else
+	mode[i+k] = insn_data[icode].operand[i+k].mode;
     }
 
   /* Check for restricted constant arguments.  */
