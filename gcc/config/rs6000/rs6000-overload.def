@@ -1661,12 +1661,56 @@
     LVSL  LVSL_UC
   vuc __builtin_vec_lvsl (signed long long, const signed char *);
     LVSL  LVSL_SC
+  vuc __builtin_vec_lvsl (signed long long, const char *);
+    LVSL  LVSL_STR
+  vuc __builtin_vec_lvsl (signed long long, const unsigned short *);
+    LVSL  LVSL_US
+  vuc __builtin_vec_lvsl (signed long long, const signed short *);
+    LVSL  LVSL_SS
+  vuc __builtin_vec_lvsl (signed long long, const unsigned int *);
+    LVSL  LVSL_UI
+  vuc __builtin_vec_lvsl (signed long long, const signed int *);
+    LVSL  LVSL_SI
+  vuc __builtin_vec_lvsl (signed long long, const unsigned long *);
+    LVSL  LVSL_UL
+  vuc __builtin_vec_lvsl (signed long long, const signed long *);
+    LVSL  LVSL_SL
+  vuc __builtin_vec_lvsl (signed long long, const unsigned long long *);
+    LVSL  LVSL_ULL
+  vuc __builtin_vec_lvsl (signed long long, const signed long long *);
+    LVSL  LVSL_SLL
+  vuc __builtin_vec_lvsl (signed long long, const float *);
+    LVSL  LVSL_F
+  vuc __builtin_vec_lvsl (signed long long, const double *);
+    LVSL  LVSL_D
 
 [VEC_LVSR, vec_lvsr, __builtin_vec_lvsr]
   vuc __builtin_vec_lvsr (signed long long, const unsigned char *);
     LVSR  LVSR_UC
   vuc __builtin_vec_lvsr (signed long long, const signed char *);
     LVSR  LVSR_SC
+  vuc __builtin_vec_lvsr (signed long long, const char *);
+    LVSR  LVSR_STR
+  vuc __builtin_vec_lvsr (signed long long, const unsigned short *);
+    LVSR  LVSR_US
+  vuc __builtin_vec_lvsr (signed long long, const signed short *);
+    LVSR  LVSR_SS
+  vuc __builtin_vec_lvsr (signed long long, const unsigned int *);
+    LVSR  LVSR_UI
+  vuc __builtin_vec_lvsr (signed long long, const signed int *);
+    LVSR  LVSR_SI
+  vuc __builtin_vec_lvsr (signed long long, const unsigned long *);
+    LVSR  LVSR_UL
+  vuc __builtin_vec_lvsr (signed long long, const signed long *);
+    LVSR  LVSR_SL
+  vuc __builtin_vec_lvsr (signed long long, const unsigned long long *);
+    LVSR  LVSR_ULL
+  vuc __builtin_vec_lvsr (signed long long, const signed long long *);
+    LVSR  LVSR_SLL
+  vuc __builtin_vec_lvsr (signed long long, const float *);
+    LVSR  LVSR_F
+  vuc __builtin_vec_lvsr (signed long long, const double *);
+    LVSR  LVSR_D
 
 [VEC_LXVL, vec_xl_len, __builtin_vec_lxvl, _ARCH_PPC64_PWR9]
   vsc __builtin_vec_lxvl (const signed char *, unsigned long long);

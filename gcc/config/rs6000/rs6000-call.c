@@ -1483,8 +1483,6 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTQI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVSL, ALTIVEC_BUILTIN_LVSL,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_INTQI, 0 },
-  /* The rest of LVSL instances are deprecated, not in
-     rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_LVSL, ALTIVEC_BUILTIN_LVSL,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTHI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVSL, ALTIVEC_BUILTIN_LVSL,
@@ -1514,8 +1512,6 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTQI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVSR, ALTIVEC_BUILTIN_LVSR,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_INTQI, 0 },
-  /* The rest of LVSR instances are deprecated, not in
-     rs6000-builtin-new.def.  */
   { ALTIVEC_BUILTIN_VEC_LVSR, ALTIVEC_BUILTIN_LVSR,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTHI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVSR, ALTIVEC_BUILTIN_LVSR,
