@@ -800,6 +800,12 @@ public:
      bbf description in the comment below).  */
   void fix_phi_nodes (edge e1f, edge e2f, basic_block bbf);
 
+  /* Analyze default BB.  */
+  void analyze_default_bb ();
+
+  /* Return true if PHI leads only to a return statement.  */
+  bool phi_leads_to_return (gphi *phi);
+
   /* Creates a check whether the switch expression value actually falls into the
      range given by all the cases.  If it does not, the temporaries are loaded
      with default values instead.  */
@@ -868,6 +874,14 @@ public:
   /* True if default case is not used for any value between range_min and
      range_max inclusive.  */
   bool m_contiguous_range;
+
+  /* True if default case is unreachable.  */
+  bool m_default_unreachable;
+
+  /* True if default BB misses return statement for non-void functions.  */
+  bool m_missing_return_in_default;
+
+  bool m_inbound_check_needed;
 
   /* True if default case does not have the required shape for other case
      labels.  */

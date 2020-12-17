@@ -64,7 +64,9 @@ using namespace tree_switch_conversion;
 switch_conversion::switch_conversion (): m_final_bb (NULL),
   m_constructors (NULL), m_default_values (NULL),
   m_arr_ref_first (NULL), m_arr_ref_last (NULL),
-  m_reason (NULL), m_default_case_nonstandard (false), m_cfg_altered (false)
+  m_reason (NULL), m_default_unreachable (false),
+  m_missing_return_in_default (false), m_inbound_check_needed (true),
+  m_default_case_nonstandard (false), m_cfg_altered (false)
 {
 }
 
@@ -90,6 +92,8 @@ switch_conversion::collect (gswitch *swtch)
   m_default_bb = e_default->dest;
   m_default_prob = e_default->probability;
 
+  analyze_default_bb ();
+
   /* Get upper and lower bounds of case values, and the covered range.  */
   min_case = gimple_switch_label (swtch, 1);
   max_case = gimple_switch_label (swtch, branch_num - 1);
@@ -113,7 +117,9 @@ switch_conversion::collect (gswitch *swtch)
       last = CASE_HIGH (elt) ? CASE_HIGH (elt) : CASE_LOW (elt);
     }
 
-  if (m_contiguous_range)
+  if (m_contiguous_range
+      || m_default_unreachable
+      || m_missing_return_in_default)
     e_first = gimple_switch_edge (cfun, swtch, 1);
   else
     e_first = e_default;
@@ -142,7 +148,7 @@ switch_conversion::collect (gswitch *swtch)
 	    && single_succ (e->dest) == m_final_bb)
 	  continue;
 
-	if (e == e_default && m_contiguous_range)
+	if (e == e_default && (m_contiguous_range || m_default_unreachable))
 	  {
 	    m_default_case_nonstandard = true;
 	    continue;
@@ -209,6 +215,9 @@ switch_conversion::check_all_empty_except_final ()
   FOR_EACH_EDGE (e, ei, m_switch_bb->succs)
     {
       if (e->dest == m_final_bb)
+	continue;
+
+      if (e == e_default && m_default_unreachable)
 	continue;
 
       if (!empty_block_p (e->dest))
@@ -572,6 +581,24 @@ switch_conversion::array_value_type (tree type, int num)
   return smaller_type;
 }
 
+/* Return true if PHI leads only to a return statement.  */
+
+bool
+switch_conversion::phi_leads_to_return (gphi *phi)
+{
+  use_operand_p use_p;
+  imm_use_iterator iterator;
+
+  FOR_EACH_IMM_USE_FAST (use_p, iterator, PHI_RESULT (phi))
+    {
+      gimple *stmt = USE_STMT (use_p);
+      if (!is_a<greturn *> (stmt) && !is_gimple_debug (stmt))
+	return false;
+    }
+
+  return true;
+}
+
 /* Create an appropriate array type and declaration and assemble a static
    array variable.  Also create a load statement that initializes
    the variable in question with a value from the static array.  SWTCH is
@@ -608,6 +635,10 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
 	fprintf (dump_file, "Linear transformation with A = %" PRId64
 		 " and B = %" PRId64 "\n", coeff_a.to_shwi (),
 		 coeff_b.to_shwi ());
+
+      if (m_phi_count == 1 && phi_leads_to_return (phi)
+	  && m_missing_return_in_default)
+	m_inbound_check_needed = false;
 
       /* We must use type of constructor values.  */
       gimple_seq seq = NULL;
@@ -807,6 +838,34 @@ switch_conversion::fix_phi_nodes (edge e1f, edge e2f, basic_block bbf)
     }
 }
 
+/* Analyze default BB.  */
+
+void
+switch_conversion::analyze_default_bb ()
+{
+  gimple_seq stmts = bb_seq (m_default_bb);
+  if (gimple_seq_unreachable_p (stmts))
+    m_default_unreachable = true;
+
+  gimple_stmt_iterator gsi = gsi_last (stmts);
+  greturn *ret = dyn_cast<greturn *> (gsi_stmt (gsi));
+  if (ret == NULL
+      || gimple_return_retval (ret) != NULL_TREE
+      || VOID_TYPE_P (TREE_TYPE (TREE_TYPE (current_function_decl))))
+    return;
+
+  for (gsi_prev (&gsi); !gsi_end_p (gsi); gsi_prev (&gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      if (gimple_code (stmt) != GIMPLE_LABEL
+	  && !is_gimple_debug (stmt)
+	  && !gimple_clobber_p (stmt))
+	return;
+    }
+
+  m_missing_return_in_default = true;
+}
+
 /* Creates a check whether the switch expression value actually falls into the
    range given by all the cases.  If it does not, the temporaries are loaded
    with default values instead.  */
@@ -841,7 +900,11 @@ switch_conversion::gen_inbound_check ()
   gsi_next (&gsi);
 
   bound = fold_convert_loc (loc, utype, m_range_size);
-  cond_stmt = gimple_build_cond (LE_EXPR, tidx, bound, NULL_TREE, NULL_TREE);
+  if (m_default_unreachable || !m_inbound_check_needed)
+    cond_stmt = gimple_build_cond (EQ_EXPR, integer_one_node, integer_one_node,
+				   NULL_TREE, NULL_TREE);
+  else
+    cond_stmt = gimple_build_cond (LE_EXPR, tidx, bound, NULL_TREE, NULL_TREE);
   gsi_insert_before (&gsi, cond_stmt, GSI_SAME_STMT);
   update_stmt (cond_stmt);
 
@@ -990,13 +1053,6 @@ switch_conversion::expand (gswitch *swtch)
       && bit_test_cluster::is_beneficial (m_count, m_uniq))
     {
       m_reason = "expanding as bit test is preferable";
-      return;
-    }
-
-  if (m_uniq <= 2)
-    {
-      /* This will be expanded as a decision tree .  */
-      m_reason = "expanding as jumps is preferable";
       return;
     }
 
