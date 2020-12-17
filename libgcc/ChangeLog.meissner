@@ -1,3 +1,30 @@
+work030.patch013:
+libgcc/
+2020-12-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ibm128 instead of __builtin_pack_longdouble.
+
+work030.patch008:
+libgcc/
+2020-12-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (fp128_dec_funcs): New macro.
+	(ibm128_dec_funcs): New macro.
+	(fp128_ppc_funcs): Add the Decimal <-> __float128 conversions.
+	(fp128_dec_objs): Force Decimal <-> __float128 conversions to be
+	compiled with -mabi=ieeelongdouble.
+	(ibm128_dec_objs): Force Decimal <-> __float128 conversions to be
+	compiled with -mabi=ieeelongdouble.
+	(FP128_CFLAGS_DECIMAL): New macro.
+	(IBM128_CFLAGS_DECIMAL): New macro.
+	* config/rs6000/_dd_to_kf.c: New file.
+	* config/rs6000/_kf_to_dd.c: New file.
+	* config/rs6000/_kf_to_sd.c: New file.
+	* config/rs6000/_kf_to_td.c: New file.
+	* config/rs6000/_sd_to_kf.c: New file.
+	* config/rs6000/_td_to_kf.c: New file.
+
 2020-12-16   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
