@@ -800,6 +800,9 @@ public:
      bbf description in the comment below).  */
   void fix_phi_nodes (edge e1f, edge e2f, basic_block bbf);
 
+  /* Return true if inbound check is needed.*/
+  bool inbound_check_needed ();
+
   /* Creates a check whether the switch expression value actually falls into the
      range given by all the cases.  If it does not, the temporaries are loaded
      with default values instead.  */

@@ -807,6 +807,35 @@ switch_conversion::fix_phi_nodes (edge e1f, edge e2f, basic_block bbf)
     }
 }
 
+
+/* Return true if inbound check is needed.*/
+
+bool
+switch_conversion::inbound_check_needed ()
+{
+  gimple_seq stmts = bb_seq (m_default_bb);
+  if (gimple_seq_unreachable_p (stmts))
+    return false;
+
+  gimple_stmt_iterator gsi = gsi_last (stmts);
+  greturn *ret = dyn_cast<greturn *> (gsi_stmt (gsi));
+  if (ret == NULL
+      || gimple_return_retval (ret) != NULL_TREE
+      || VOID_TYPE_P (TREE_TYPE (TREE_TYPE (current_function_decl))))
+    return true;
+
+  for (gsi_prev (&gsi); !gsi_end_p (gsi); gsi_prev (&gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      if (gimple_code (stmt) != GIMPLE_LABEL
+	  && !is_gimple_debug (stmt)
+	  && !gimple_clobber_p (stmt))
+      return true;
+    }
+
+  return false;
+}
+
 /* Creates a check whether the switch expression value actually falls into the
    range given by all the cases.  If it does not, the temporaries are loaded
    with default values instead.  */
@@ -841,7 +870,11 @@ switch_conversion::gen_inbound_check ()
   gsi_next (&gsi);
 
   bound = fold_convert_loc (loc, utype, m_range_size);
-  cond_stmt = gimple_build_cond (LE_EXPR, tidx, bound, NULL_TREE, NULL_TREE);
+  if (inbound_check_needed ())
+    cond_stmt = gimple_build_cond (LE_EXPR, tidx, bound, NULL_TREE, NULL_TREE);
+  else
+    cond_stmt = gimple_build_cond (EQ_EXPR, integer_one_node, integer_one_node,
+				   NULL_TREE, NULL_TREE);
   gsi_insert_before (&gsi, cond_stmt, GSI_SAME_STMT);
   update_stmt (cond_stmt);
 
@@ -990,13 +1023,6 @@ switch_conversion::expand (gswitch *swtch)
       && bit_test_cluster::is_beneficial (m_count, m_uniq))
     {
       m_reason = "expanding as bit test is preferable";
-      return;
-    }
-
-  if (m_uniq <= 2)
-    {
-      /* This will be expanded as a decision tree .  */
-      m_reason = "expanding as jumps is preferable";
       return;
     }
 
