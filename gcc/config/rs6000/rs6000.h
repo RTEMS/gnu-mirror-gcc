@@ -509,6 +509,12 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
+/* Whether the '__ibm128' keywork is enabled.  We enable __ibm128 either if the
+   IEEE 128-bit floating point support is enabled or if the long double support
+   uses the 128-bit IBM extended double format.  */
+#define TARGET_IBM128	(TARGET_FLOAT128_TYPE				\
+			 || (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128))
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
