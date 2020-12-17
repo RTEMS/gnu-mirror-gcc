@@ -2555,9 +2555,9 @@
     VSEL_2DI_UNS  VSEL_2DI_BB
   vbll __builtin_vec_sel (vbll, vbll, vull);
     VSEL_2DI_UNS  VSEL_2DI_BU
-  vf __builtin_vec_sel (vf, vf, vbll);
+  vf __builtin_vec_sel (vf, vf, vbi);
     VSEL_4SF  VSEL_4SF_B
-  vf __builtin_vec_sel (vf, vf, vull);
+  vf __builtin_vec_sel (vf, vf, vui);
     VSEL_4SF  VSEL_4SF_U
   vd __builtin_vec_sel (vd, vd, vbll);
     VSEL_2DF  VSEL_2DF_B
