@@ -1,5 +1,4 @@
-/* { dg-require-effective-target dfp } */
-/* { dg-require-effective-target ppc_long_double_ibm } */
+/* { dg-skip-if "" { ! "powerpc*-*-linux*" } } */
 
 /* Test decimal float conversions to and from IBM 128-bit long double. 
    Checks are skipped at runtime if long double is not 128 bits.
