@@ -456,6 +456,7 @@
     VCMPBFP
 
 [VEC_CMPEQ, vec_cmpeq, __builtin_vec_cmpeq]
+; #### XVCMPEQSP{TARGET_VSX};VCMPEQFP
   vbc __builtin_vec_cmpeq (vsc, vsc);
     VCMPEQUB  VCMPEQUB_VSC
   vbc __builtin_vec_cmpeq (vuc, vuc);
@@ -481,12 +482,13 @@
   vbll __builtin_vec_cmpeq (vbll, vbll);
     VCMPEQUD  VCMPEQUD_VBLL
   vbi __builtin_vec_cmpeq (vf, vf);
-    XVCMPEQSP
+    VCMPEQFP
   vbll __builtin_vec_cmpeq (vd, vd);
     XVCMPEQDP
 
 ; We skip generating a #define because of the C-versus-C++ complexity
 ; in altivec.h.  Look there for the template-y details.
+; #### XVCMPEQSP_P{TARGET_VSX};VCMPEQFP_P
 [VEC_CMPEQ_P, SKIP, __builtin_vec_vcmpeq_p]
   signed int __builtin_vec_vcmpeq_p (signed int, vuc, vuc);
     VCMPEQUB_P  VCMPEQUB_PU
@@ -515,7 +517,7 @@
   signed int __builtin_vec_vcmpeq_p (signed int, vbll, vbll);
     VCMPEQUD_P  VCMPEQUD_PB
   signed int __builtin_vec_vcmpeq_p (signed int, vf, vf);
-    XVCMPEQSP_P
+    VCMPEQFP_P
   signed int __builtin_vec_vcmpeq_p (signed int, vd, vd);
     XVCMPEQDP_P
 
@@ -523,6 +525,7 @@
   signed int __builtin_byte_in_set (unsigned char,  unsigned long long);
     CMPEQB
 
+; #### XVCMPGESP{TARGET_VSX};VCMPGEFP
 [VEC_CMPGE, vec_cmpge, __builtin_vec_cmpge]
   vbc __builtin_vec_cmpge (vsc, vsc);
     CMPGE_16QI  CMPGE_16QI_VSC
@@ -541,7 +544,7 @@
   vbll __builtin_vec_cmpge (vull, vull);
     CMPGE_2DI  CMPGE_2DI_VULL
   vbi __builtin_vec_cmpge (vf, vf);
-    XVCMPGESP
+    VCMPGEFP
   vbll __builtin_vec_cmpge (vd, vd);
     XVCMPGEDP
 
@@ -549,6 +552,7 @@
 ; in altivec.h.  Look there for the template-y details.
 ; See altivec_build_resolved_builtin for how we deal with VEC_CMPGE_P.
 ; It's quite strange and horrible!
+; #### XVCMPGESP_P{TARGET_VSX};VCMPGEFP_P
 [VEC_CMPGE_P, SKIP, __builtin_vec_vcmpge_p]
   signed int __builtin_vec_vcmpge_p (signed int, vuc, vuc);
     VCMPGTUB_P  VCMPGTUB_PR
@@ -567,10 +571,11 @@
   signed int __builtin_vec_vcmpge_p (signed int, vsll, vsll);
     VCMPGTSD_P  VCMPGTSD_PR
   signed int __builtin_vec_vcmpge_p (signed int, vf, vf);
-    XVCMPGESP_P
+    VCMPGEFP_P
   signed int __builtin_vec_vcmpge_p (signed int, vd, vd);
     XVCMPGEDP_P
 
+; #### XVCMPGTSP{TARGET_VSX};VCMPGTFP
 [VEC_CMPGT, vec_cmpgt, __builtin_vec_cmpgt]
   vbc __builtin_vec_cmpgt (vsc, vsc);
     VCMPGTSB
@@ -589,12 +594,13 @@
   vbll __builtin_vec_cmpgt (vull, vull);
     VCMPGTUD
   vbi __builtin_vec_cmpgt (vf, vf);
-    XVCMPGTSP
+    VCMPGTFP
   vbll __builtin_vec_cmpgt (vd, vd);
     XVCMPGTDP
 
 ; We skip generating a #define because of the C-versus-C++ complexity
 ; in altivec.h.  Look there for the template-y details.
+; #### XVCMPGTSP_P{TARGET_VSX};VCMPGTFP_P
 [VEC_CMPGT_P, SKIP, __builtin_vec_vcmpgt_p]
   signed int __builtin_vec_vcmpgt_p (signed int, vuc, vuc);
     VCMPGTUB_P
@@ -613,7 +619,7 @@
   signed int __builtin_vec_vcmpgt_p (signed int, vsll, vsll);
     VCMPGTSD_P
   signed int __builtin_vec_vcmpgt_p (signed int, vf, vf);
-    XVCMPGTSP_P
+    VCMPGTFP_P
   signed int __builtin_vec_vcmpgt_p (signed int, vd, vd);
     XVCMPGTDP_P
 
@@ -2084,9 +2090,10 @@
   vd __builtin_vec_nmadd (vd, vd, vd);
     XVNMADDDP
 
+; #### XVNMSUBDP{TARGET_VSX};VNMSUBFP
 [VEC_NMSUB, vec_nmsub, __builtin_vec_nmsub]
   vf __builtin_vec_nmsub (vf, vf, vf);
-    XVNMSUBSP
+    VNMSUBFP
   vd __builtin_vec_nmsub (vd, vd, vd);
     XVNMSUBDP
 
@@ -2354,9 +2361,13 @@
   vsi __builtin_vec_promote (vsi);
     ABS_V4SI PROMOTE_FAKERY
 
+; Opportunity for improvement: We can use XVRESP instead of VREFP for
+; TARGET_VSX.  We would need conditional dispatch to allow two possibilities.
+; Some syntax like "XVRESP{TARGET_VSX};VREFP".
+; TODO. ####
 [VEC_RE, vec_re, __builtin_vec_re]
   vf __builtin_vec_re (vf);
-    XVRESP
+    VREFP
   vd __builtin_vec_re (vd);
     XVREDP
 

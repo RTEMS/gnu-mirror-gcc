@@ -306,13 +306,13 @@
   fpmath vf __builtin_altivec_float_sisf (vsi);
     FLOAT_V4SI_V4SF floatv4siv4sf2 {}
 
-  pure vop __builtin_altivec_lvebx (signed long long, const void *);
+  pure vsc __builtin_altivec_lvebx (signed long long, const void *);
     LVEBX altivec_lvebx {ldvec}
 
-  pure vop __builtin_altivec_lvehx (signed long long, const void *);
+  pure vss __builtin_altivec_lvehx (signed long long, const void *);
     LVEHX altivec_lvehx {ldvec}
 
-  pure vop __builtin_altivec_lvewx (signed long long, const void *);
+  pure vsi __builtin_altivec_lvewx (signed long long, const void *);
     LVEWX altivec_lvewx {ldvec}
 
   pure vuc __builtin_altivec_lvsl (signed long long, const void *);

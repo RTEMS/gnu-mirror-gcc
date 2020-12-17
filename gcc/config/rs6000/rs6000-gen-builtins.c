@@ -930,6 +930,7 @@ match_type (typeinfo *typedata, int voidok)
 
        [const] [[signed|unsigned] <basetype> | <vectype>] [*]
 
+       #### Lie below ####
      where "const" applies only to a <basetype> of "int".  Legal values
      of <basetype> are (for now):
 
@@ -1577,7 +1578,9 @@ construct_fntype_id (prototype *protoptr)
 	{
 	  assert (argptr);
 	  buf[bufi++] = '_';
-	  if (argptr->info.isconst && argptr->info.base == BT_INT)
+	  if (argptr->info.isconst
+	      && argptr->info.base == BT_INT
+	      && !argptr->info.ispointer)
 	    {
 	      buf[bufi++] = 'c';
 	      buf[bufi++] = 'i';
