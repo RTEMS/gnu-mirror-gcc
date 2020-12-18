@@ -1271,7 +1271,8 @@ pass_optimize_bswap::execute (function *fun)
   tree bswap32_type = NULL_TREE, bswap64_type = NULL_TREE;
 
   bswap32_p = (builtin_decl_explicit_p (BUILT_IN_BSWAP32)
-	       && optab_handler (bswap_optab, SImode) != CODE_FOR_nothing);
+	       && (optab_handler (bswap_optab, SImode) != CODE_FOR_nothing
+		   || optab_handler (bswap_optab, DImode) != CODE_FOR_nothing));
   bswap64_p = (builtin_decl_explicit_p (BUILT_IN_BSWAP64)
 	       && (optab_handler (bswap_optab, DImode) != CODE_FOR_nothing
 		   || (bswap32_p && word_mode == SImode)));
