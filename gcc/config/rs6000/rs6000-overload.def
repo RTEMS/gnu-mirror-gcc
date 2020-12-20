@@ -3630,21 +3630,21 @@
 
 [VEC_XL, vec_xl, __builtin_vec_vsx_ld, __VSX__]
   vsc __builtin_vec_vsx_ld (signed long long, const vsc *);
-    LXVW4X_V4SI  LXVW4X_VSC
+    LXVW4X_V16QI  LXVW4X_VSC
   vsc __builtin_vec_vsx_ld (signed long long, const signed char *);
-    LXVW4X_V4SI  LXVW4X_SC
+    LXVW4X_V16QI  LXVW4X_SC
   vuc __builtin_vec_vsx_ld (signed long long, const vuc *);
-    LXVW4X_V4SI  LXVW4X_VUC
+    LXVW4X_V16QI  LXVW4X_VUC
   vuc __builtin_vec_vsx_ld (signed long long, const unsigned char *);
-    LXVW4X_V4SI  LXVW4X_UC
+    LXVW4X_V16QI  LXVW4X_UC
   vss __builtin_vec_vsx_ld (signed long long, const vss *);
-    LXVW4X_V4SI  LXVW4X_VSS
+    LXVW4X_V8HI  LXVW4X_VSS
   vss __builtin_vec_vsx_ld (signed long long, const signed short *);
-    LXVW4X_V4SI  LXVW4X_SS
+    LXVW4X_V8HI  LXVW4X_SS
   vus __builtin_vec_vsx_ld (signed long long, const vus *);
-    LXVW4X_V4SI  LXVW4X_VUS
+    LXVW4X_V8HI  LXVW4X_VUS
   vus __builtin_vec_vsx_ld (signed long long, const unsigned short *);
-    LXVW4X_V4SI  LXVW4X_US
+    LXVW4X_V8HI  LXVW4X_US
   vsi __builtin_vec_vsx_ld (signed long long, const vsi *);
     LXVW4X_V4SI  LXVW4X_VSI
   vsi __builtin_vec_vsx_ld (signed long long, const signed int *);

@@ -2854,7 +2854,8 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  {
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      return altivec_build_new_resolved_builtin (args, n, fntype,
+	      return altivec_build_new_resolved_builtin (args, n,
+							 instance->fntype,
 							 instance->bifid,
 							 fcode);
 	    else
@@ -2908,7 +2909,8 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  {
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      return altivec_build_new_resolved_builtin (args, n, fntype,
+	      return altivec_build_new_resolved_builtin (args, n,
+							 instance->fntype,
 							 instance->bifid,
 							 fcode);
 	    else
@@ -2941,12 +2943,10 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
 		&& rs6000_new_builtin_is_supported_p (instance->bifid))
-	      {
-		tree fntype = rs6000_builtin_info_x[instance->bifid].fntype;
-		return altivec_build_new_resolved_builtin (args, n, fntype,
-							   instance->bifid,
-							   fcode);
-	      }
+	      return altivec_build_new_resolved_builtin (args, n,
+							 instance->fntype,
+							 instance->bifid,
+							 fcode);
 	    else
 	      {
 		unsupported_builtin = true;
