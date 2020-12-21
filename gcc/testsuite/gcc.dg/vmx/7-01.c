@@ -20,8 +20,8 @@ haar (vector signed char a, vector signed char b, vector signed char c,
     low = (vector unsigned char) (vec_mergel (load(image, i+XX),
 					      load(image, i)));
 
-    store (vec_vpacks (vec_msum (a, high, zero),
-		       vec_msum (a, low, zero)),
+    store (vec_packs (vec_msum (a, high, zero),
+		      vec_msum (a, low, zero)),
 	   band, i);
     store (vec_packs (vec_msum (b, high, zero),
 		      vec_msum (b, low, zero)),

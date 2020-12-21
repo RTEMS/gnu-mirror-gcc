@@ -13805,6 +13805,12 @@ ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
 	      || icode == CODE_FOR_altivec_lvlxl
 	      || icode == CODE_FOR_altivec_lvrx
 	      || icode == CODE_FOR_altivec_lvrxl);
+
+  if (target == 0
+      || GET_MODE (target) != tmode
+      || ! (*insn_data[icode].operand[0].predicate) (target, tmode))
+    target = gen_reg_rtx (tmode);
+
   op[1] = copy_to_mode_reg (Pmode, op[1]);
 
   /* For LVX, express the RTL accurately by ANDing the address with -16.

@@ -208,6 +208,7 @@
   vsi __builtin_vec_abss (vsi);
     ABSS_V4SI
 
+; XVADDSP{TARGET_VSX};VADDFP
 [VEC_ADD, vec_add, __builtin_vec_add]
   vsc __builtin_vec_add (vsc, vsc);
     VADDUBM  VADDUBM_VSC
@@ -230,7 +231,7 @@
   vuq __builtin_vec_add (vuq, vuq);
     VADDUQM  VADDUQM_VUQ
   vf __builtin_vec_add (vf, vf);
-    XVADDSP
+    VADDFP
   vd __builtin_vec_add (vd, vd);
     XVADDDP
 
@@ -387,9 +388,10 @@
   vuc __builtin_vec_vbperm_api (vuc, vuc);
     VBPERMQ2
 
+; #### XVRSPIP{TARGET_VSX};VRFIP
 [VEC_CEIL, vec_ceil, __builtin_vec_ceil]
   vf __builtin_vec_ceil (vf);
-    XVRSPIP
+    VRFIP
   vd __builtin_vec_ceil (vd);
     XVRDPIP
 
@@ -1744,6 +1746,7 @@
   vd __builtin_vec_lxvl (const double *, unsigned long long);
     LXVL  LXVL_VD
 
+; #### XVMADDSP(TARGET_VSX);VMADDFP
 [VEC_MADD, vec_madd, __builtin_vec_madd]
   vss __builtin_vec_madd (vss, vss, vss);
     VMLADDUHM  VMLADDUHM_VSS
@@ -1754,7 +1757,7 @@
   vus __builtin_vec_madd (vss, vus, vus);
     VMLADDUHM  VMLADDUHM_VUS
   vf __builtin_vec_madd (vf, vf, vf);
-    XVMADDSP
+    VMADDFP
   vd __builtin_vec_madd (vd, vd, vd);
     XVMADDDP
 
@@ -3344,6 +3347,7 @@
   void __builtin_vec_stxvl (vd, double *, unsigned long long);
     STXVL  STXVL_VD
 
+; #### XVSUBSP{TARGET_VSX};VSUBFP
 [VEC_SUB, vec_sub, __builtin_vec_sub]
   vsc __builtin_vec_sub (vsc, vsc);
     VSUBUBM  VSUBUBM_VSC
@@ -3366,7 +3370,7 @@
   vuq __builtin_vec_sub (vuq, vuq);
     VSUBUQM  VSUBUQM_VUQ
   vf __builtin_vec_sub (vf, vf);
-    XVSUBSP
+    VSUBFP
   vd __builtin_vec_sub (vd, vd);
     XVSUBDP
 
