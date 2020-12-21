@@ -2790,9 +2790,6 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
   if (!VOID_TYPE_P (TREE_VALUE (fnargs)) || n < nargs)
     return NULL;
 
-  if (n == 0)
-    abort ();
-
   if (fcode == RS6000_OVLD_VEC_STEP)
     {
       if (TREE_CODE (types[0]) != VECTOR_TYPE)
@@ -2925,6 +2922,10 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
       }
     else
       {
+	/* Functions with no arguments can have only one overloaded
+	   instance.  */
+	gcc_assert (n > 0 || !instance->next);
+
 	for (; instance != NULL; instance = instance->next)
 	  {
 	    bool mismatch = false;
