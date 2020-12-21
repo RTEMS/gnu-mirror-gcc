@@ -1345,3 +1345,21 @@ proc scan-symbol-not { args } {
 
 set additional_prunes ""
 set dg_runtest_extra_prunes ""
+
+proc pytest-execute { dgargs } {
+    verbose "dg-pytest-execute: ${dgargs}" 2
+    set script [lindex $dgargs 0]
+    verbose "  script: ${script}" 2
+
+    spawn -noecho pytest --color=no -rA -s --tb=no $script
+
+    set prefix "\[^\r\n\]*"
+    expect {
+      -re "FAILED($prefix)" {
+       fail "$expect_out(1,string)"
+      }
+      -re "PASSED($prefix)" {
+       pass "$expect_out(1,string)"
+      }
+    }
+}
