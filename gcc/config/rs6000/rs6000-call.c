@@ -12015,7 +12015,6 @@ rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
     case ENB_ALWAYS:
       gcc_unreachable ();
     };
-  gcc_unreachable ();
 }
 
 /* Target hook for early folding of built-ins, shamelessly stolen

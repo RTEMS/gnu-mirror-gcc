@@ -4,7 +4,7 @@ static vector float
 f(vector float f32a, vector float f32b, vector float f32c)
 {
   f32c = vec_ceil(f32a);
-  return vec_vmaddfp(f32a, f32b, f32c);
+  return vec_madd(f32a, f32b, f32c);
 }
 
 static void test()

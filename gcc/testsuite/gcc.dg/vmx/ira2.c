@@ -11,10 +11,10 @@ void test()
 {
   u8c  = vec_add(u8a, u8b);
   f32c = vec_ceil(f32a);
-  f32d = vec_vcfux(u32a, 31U);
+  f32d = vec_ctf(u32a, 31U);
   s16c = vec_splat_s16(-16);
-  u8d  = vec_vsldoi(u8a, u8b, 15);
-  f32e = vec_vmaddfp(f32a, f32b, f32c);
+  u8d  = vec_sld(u8a, u8b, 15);
+  f32e = vec_madd(f32a, f32b, f32c);
   /* vec_dstst(u8ptr, i, 3U); */
   vec_dss(3);
   vec_dssall();

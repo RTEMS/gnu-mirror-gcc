@@ -1485,6 +1485,8 @@
     LVXL_V2DI  LVXL_V2DI_VSLL
   vsll __builtin_vec_ldl (signed long long, const signed long long *);
     LVXL_V2DI  LVXL_V2DI_SLL
+  vsll __builtin_vec_ldl (signed long long, const long long *);
+    LVXL_V2DI  LVXL_V2DI_LL
   vull __builtin_vec_ldl (signed long long, const vull *);
     LVXL_V2DI  LVXL_V2DI_VULL
   vull __builtin_vec_ldl (signed long long, const unsigned long long *);
@@ -1765,6 +1767,7 @@
   vss __builtin_vec_madds (vss, vss, vss);
     VMHADDSHS
 
+; #### XVMAXSP{TARGET_VSX};VMAXFP
 [VEC_MAX, vec_max, __builtin_vec_max]
   vsc __builtin_vec_max (vsc, vsc);
     VMAXSB
@@ -1783,7 +1786,7 @@
   vull __builtin_vec_max (vull, vull);
     VMAXUD
   vf __builtin_vec_max (vf, vf);
-    XVMAXSP
+    VMAXFP
   vd __builtin_vec_max (vd, vd);
     XVMAXDP
 
@@ -1891,6 +1894,7 @@
   vus __builtin_vec_mfvscr ();
     MFVSCR
 
+; #### XVMINSP{TARGET_VSX};VMINFP
 [VEC_MIN, vec_min, __builtin_vec_min]
   vsc __builtin_vec_min (vsc, vsc);
     VMINSB
@@ -1909,7 +1913,7 @@
   vull __builtin_vec_min (vull, vull);
     VMINUD
   vf __builtin_vec_min (vf, vf);
-    XVMINSP
+    VMINFP
   vd __builtin_vec_min (vd, vd);
     XVMINDP
 
@@ -2510,9 +2514,10 @@
   vd __builtin_vec_rsqrt (vd);
     RSQRT_2DF
 
+; #### XVRSQRTESP{TARGET_VSX};VRSQRTEFP
 [VEC_RSQRTE, vec_rsqrte, __builtin_vec_rsqrte]
   vf __builtin_vec_rsqrte (vf);
-    XVRSQRTESP
+    VRSQRTEFP
   vd __builtin_vec_rsqrte (vd);
     XVRSQRTEDP
 

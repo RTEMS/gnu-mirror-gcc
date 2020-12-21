@@ -38,34 +38,34 @@ static vector unsigned char permute_128(vector unsigned char input)
   vector unsigned char result, new_bit;
 
   /* and now the code */
-  result = vec_vperm(input, input, control1);
+  result = vec_perm(input, input, control1);
   result = vec_rl(result, rotate1);
 
-  new_bit = vec_vperm(input, input, control2);
+  new_bit = vec_perm(input, input, control2);
   new_bit = vec_rl(new_bit, rotate2);
   result = vec_sel(result, new_bit, select2);
 
-  new_bit = vec_vperm(input, input, control3);
+  new_bit = vec_perm(input, input, control3);
   new_bit = vec_rl(new_bit, rotate3);
   result = vec_sel(result, new_bit, select3);
 
-  new_bit = vec_vperm(input, input, control4);
+  new_bit = vec_perm(input, input, control4);
   new_bit = vec_rl(new_bit, rotate4);
   result = vec_sel(result, new_bit, select4);
 
-  new_bit = vec_vperm(input, input, control5);
+  new_bit = vec_perm(input, input, control5);
   new_bit = vec_rl(new_bit, rotate5);
   result = vec_sel(result, new_bit, select5);
 
-  new_bit = vec_vperm(input, input, control6);
+  new_bit = vec_perm(input, input, control6);
   new_bit = vec_rl(new_bit, rotate6);
   result = vec_sel(result, new_bit, select6);
 
-  new_bit = vec_vperm(input, input, control7);
+  new_bit = vec_perm(input, input, control7);
   new_bit = vec_rl(new_bit, rotate7);
   result = vec_sel(result, new_bit, select7);
 
-  new_bit = vec_vperm(input, input, control8);
+  new_bit = vec_perm(input, input, control8);
   new_bit = vec_rl(new_bit, rotate8);
   result = vec_sel(result, new_bit, select8);
 
