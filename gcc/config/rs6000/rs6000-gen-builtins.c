@@ -2142,7 +2142,7 @@ write_decls ()
   fprintf (header_file, "  RS6000_OVLD_MAX\n};\n\n");
 
   fprintf (header_file,
-	   "extern tree rs6000_builtin_decls_x[RS6000_OVLD_MAX];\n\n");
+	   "extern GTY(()) tree rs6000_builtin_decls_x[RS6000_OVLD_MAX];\n\n");
 
   fprintf (header_file,
 	   "enum rs6000_ovld_instances\n{\n  RS6000_INST_NONE,\n");
@@ -2184,7 +2184,7 @@ write_decls ()
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define PPC_MAXRESTROPNDS 3\n");
-  fprintf (header_file, "struct bifdata\n");
+  fprintf (header_file, "struct GTY((user)) bifdata\n");
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
   fprintf (header_file, "  bif_enable enable;\n");
@@ -2261,9 +2261,9 @@ write_decls ()
   /* #### Note that the _x is added for now to avoid conflict with
      the existing rs6000_builtin_info[] file while testing.  It will
      be removed as we progress.  */
-  fprintf (header_file, "extern bifdata rs6000_builtin_info_x[];\n\n");
+  fprintf (header_file, "extern GTY(()) bifdata rs6000_builtin_info_x[];\n\n");
 
-  fprintf (header_file, "struct ovlddata\n");
+  fprintf (header_file, "struct GTY((user)) ovlddata\n");
   fprintf (header_file, "{\n");
   fprintf (header_file, "  const char *bifname;\n");
   fprintf (header_file, "  rs6000_gen_builtins bifid;\n");
@@ -2277,7 +2277,7 @@ write_decls ()
   fprintf (header_file, "  ovlddata *first_instance;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file, "extern ovlddata rs6000_instance_info[];\n");
+  fprintf (header_file, "extern GTY(()) ovlddata rs6000_instance_info[];\n");
   fprintf (header_file, "extern ovldrecord rs6000_overload_info[];\n\n");
 
   fprintf (header_file, "extern void rs6000_autoinit_builtins ();\n\n");
@@ -2286,14 +2286,28 @@ write_decls ()
 	   "(rs6000_gen_builtins);\n");
   fprintf (header_file,
 	   "extern tree rs6000_builtin_decl (unsigned, "
-	   "bool ATTRIBUTE_UNUSED);\n");
+	   "bool ATTRIBUTE_UNUSED);\n\n");
+  fprintf (header_file,
+	   "extern void gt_ggc_mx (bifdata *bd);\n");
+  fprintf (header_file,
+	   "extern void gt_pch_nx (bifdata *bd);\n");
+  fprintf (header_file,
+	   "extern void gt_pch_nx (bifdata *bd, gt_pointer_operator op, "
+	   "void *cookie);\n");
+  fprintf (header_file,
+	   "extern void gt_ggc_mx (ovlddata *od);\n");
+  fprintf (header_file,
+	   "extern void gt_pch_nx (ovlddata *od);\n");
+  fprintf (header_file,
+	   "extern void gt_pch_nx (ovlddata *od, gt_pointer_operator op, "
+	   "void *cookie);\n");
 }
 
 /* Callback functions used for generating trees for function types.  */
 void
 write_extern_fntype (char *str)
 {
-  fprintf (header_file, "extern tree %s;\n", str);
+  fprintf (header_file, "extern GTY(()) tree %s;\n", str);
 }
 
 void
@@ -2725,7 +2739,35 @@ write_init_file ()
   write_init_ovld_table ();
 
   fprintf (init_file, "  timevar_stop (TV_BILL);\n");
-  fprintf (init_file, "}\n");
+  fprintf (init_file, "}\n\n");
+
+  fprintf (init_file,
+	   "void gt_ggc_mx (bifdata *bd)\n");
+  fprintf (init_file,
+	   "{\n  gt_ggc_mx (bd->fntype);\n}\n\n");
+  fprintf (init_file,
+	   "void gt_pch_nx (bifdata *bd)\n");
+  fprintf (init_file,
+	   "{\n  gt_pch_nx (bd->fntype);\n}\n\n");
+  fprintf (init_file,
+	   "void gt_pch_nx (bifdata *bd, gt_pointer_operator op, "
+	   "void *cookie)\n");
+  fprintf (init_file,
+	   "{\n  op(&(bd->fntype), cookie);\n}\n\n");
+  fprintf (init_file,
+	   "void gt_ggc_mx (ovlddata *od)\n");
+  fprintf (init_file,
+	   "{\n  gt_ggc_mx (od->fntype);\n}\n\n");
+  fprintf (init_file,
+	   "void gt_pch_nx (ovlddata *od)\n");
+  fprintf (init_file,
+	   "{\n  gt_pch_nx (od->fntype);\n}\n\n");
+  fprintf (init_file,
+	   "void gt_pch_nx (ovlddata *od, gt_pointer_operator op, "
+	   "void *cookie)\n");
+  fprintf (init_file,
+	   "{\n  op(&(od->fntype), cookie);\n}\n");
+
   return 1;
 }
 
