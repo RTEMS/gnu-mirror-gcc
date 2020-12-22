@@ -37,10 +37,10 @@ permute_128(vector unsigned char input)
   vector unsigned char rotate7 = ((vector unsigned char){5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5});
   vector unsigned char rotate8 = ((vector unsigned char){7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7});
 
-  result = vec_pperm(input, input, control1);
+  result = vec_perm(input, input, control1);
   result = vec_rl(result, rotate1);
 
-  new_bit = vec_pperm(input, input, control2);
+  new_bit = vec_perm(input, input, control2);
   new_bit = vec_rl(new_bit, rotate2);
   result = vec_sel(result, new_bit, select2);
 

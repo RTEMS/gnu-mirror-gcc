@@ -2801,7 +2801,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
   {
     bool unsupported_builtin = false;
     enum rs6000_gen_builtins overloaded_code;
-    tree result = NULL;
+    bool supported = false;
     ovlddata *instance = rs6000_overload_info[adj_fcode].first_instance;
     gcc_assert (instance != NULL);
 
@@ -2948,8 +2948,9 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	    if (mismatch)
 	      continue;
 
+	    supported = rs6000_new_builtin_is_supported_p (instance->bifid);
 	    if (rs6000_builtin_decl (instance->bifid, false) != error_mark_node
-		&& rs6000_new_builtin_is_supported_p (instance->bifid))
+		&& supported)
 	      {
 		tree fntype = rs6000_builtin_info_x[instance->bifid].fntype;
 		tree ret_type = TREE_TYPE (instance->fntype);
@@ -2970,7 +2971,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
     if (unsupported_builtin)
       {
 	const char *name = rs6000_overload_info[adj_fcode].ovld_name;
-	if (result != NULL)
+	if (supported)
 	  {
 	    const char *internal_name
 	      = rs6000_builtin_info_x[instance->bifid].bifname;
@@ -2985,7 +2986,10 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  error ("%qs is not supported in this compiler configuration", name);
 	/* If an error-representing  result tree was returned from
 	   altivec_build_resolved_builtin above, use it.  */
+	/*
 	return (result != NULL) ? result : error_mark_node;
+	*/
+	return error_mark_node;
       }
   }
  bad:

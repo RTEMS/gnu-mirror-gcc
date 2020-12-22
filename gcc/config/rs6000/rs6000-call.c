@@ -15804,9 +15804,13 @@ rs6000_init_builtins (void)
 	     (TARGET_ALTIVEC)	   ? ", altivec" : "",
 	     (TARGET_VSX)	   ? ", vsx"	 : "");
 
-  V2DI_type_node = rs6000_vector_type (TARGET_POWERPC64 ? "__vector long"
-				       : "__vector long long",
-				       long_long_integer_type_node, 2);
+  if (new_builtins_are_live)
+    V2DI_type_node = rs6000_vector_type ("__vector long long",
+					 long_long_integer_type_node, 2);
+  else
+    V2DI_type_node = rs6000_vector_type (TARGET_POWERPC64 ? "__vector long"
+					 : "__vector long long",
+					 long_long_integer_type_node, 2);
   ptr_V2DI_type_node
     = build_pointer_type (build_qualified_type (V2DI_type_node,
 						TYPE_QUAL_CONST));
@@ -15964,6 +15968,14 @@ rs6000_init_builtins (void)
   ptr_dfloat128_type_node
     = build_pointer_type (build_qualified_type (dfloat128_type_internal_node,
 						TYPE_QUAL_CONST));
+  ptr_long_long_integer_type_node
+    = build_pointer_type
+	(build_qualified_type (long_long_integer_type_internal_node,
+			       TYPE_QUAL_CONST));
+  ptr_long_long_unsigned_type_node
+    = build_pointer_type
+	(build_qualified_type (long_long_unsigned_type_internal_node,
+			       TYPE_QUAL_CONST));
 
   /* 128-bit floating point support.  KFmode is IEEE 128-bit floating point.
      IFmode is the IBM extended 128-bit format that is a pair of doubles.

@@ -2507,6 +2507,8 @@ enum rs6000_builtin_type_index
   RS6000_BTI_ptr_ibm128_float,
   RS6000_BTI_ptr_vector_pair,
   RS6000_BTI_ptr_vector_quad,
+  RS6000_BTI_ptr_long_long,
+  RS6000_BTI_ptr_long_long_unsigned,
   RS6000_BTI_MAX
 };
 
@@ -2598,6 +2600,8 @@ enum rs6000_builtin_type_index
 #define ptr_ibm128_float_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_ibm128_float])
 #define ptr_vector_pair_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_vector_pair])
 #define ptr_vector_quad_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_vector_quad])
+#define ptr_long_long_integer_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_long])
+#define ptr_long_long_unsigned_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_long_unsigned])
 
 extern GTY(()) tree rs6000_builtin_types[RS6000_BTI_MAX];
 extern GTY(()) tree rs6000_builtin_decls[RS6000_BUILTIN_COUNT];

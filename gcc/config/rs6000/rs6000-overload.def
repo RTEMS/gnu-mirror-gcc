@@ -1485,8 +1485,6 @@
     LVXL_V2DI  LVXL_V2DI_VSLL
   vsll __builtin_vec_ldl (signed long long, const signed long long *);
     LVXL_V2DI  LVXL_V2DI_SLL
-  vsll __builtin_vec_ldl (signed long long, const long long *);
-    LVXL_V2DI  LVXL_V2DI_LL
   vull __builtin_vec_ldl (signed long long, const vull *);
     LVXL_V2DI  LVXL_V2DI_VULL
   vull __builtin_vec_ldl (signed long long, const unsigned long long *);
