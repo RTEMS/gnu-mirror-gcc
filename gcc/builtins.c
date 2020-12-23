@@ -13410,7 +13410,7 @@ warn_dealloc_offset (location_t loc, tree exp, const access_ref &aref)
 	  if (is_gimple_call (def_stmt))
 	    {
 	      tree alloc_decl = gimple_call_fndecl (def_stmt);
-	      if (!DECL_IS_OPERATOR_NEW_P (alloc_decl))
+	      if (alloc_decl == NULL_TREE || !DECL_IS_OPERATOR_NEW_P (alloc_decl))
 		return false;
 	    }
 	}
