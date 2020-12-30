@@ -1868,16 +1868,22 @@
 
 ;; Conditional branches
 
-(define_insn "*branch<mode>_equals_zero"
+(define_insn "*branch<ANYI:mode><P:mode>_equals_zero"
   [(set (pc)
 	(if_then_else
 	 (match_operator 1 "equality_operator"
 			 [(match_operand:ANYI 2 "register_operand" "r")
 			  (const_int 0)])
 	 (label_ref (match_operand 0 "" ""))
-	 (pc)))]
+	 (pc)))
+   (clobber (match_scratch:P 3 "=r"))]
   "!partial_subreg_p(operands[2])"
-  "b%C1\t%2,zero,%0"
+{
+  if (get_attr_length (insn) == 12)
+    return "b%N1\t%2,zero,1f; jump\t%l0,%3; 1:";
+
+  return "b%C1\t%2,zero,%0";
+}
   [(set_attr "type" "branch")
    (set_attr "mode" "none")])
 
