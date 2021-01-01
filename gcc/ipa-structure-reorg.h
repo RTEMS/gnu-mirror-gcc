@@ -32,7 +32,14 @@ along with GCC; see the file COPYING3.  If not see
 #define BYPASS_TRANSFORM false
 // Use Erick's escape analysis
 #define USE_ESCAPE_ANALYSIS 1
+// Enables old code sequence (this breaks things)
 #define USE_DO_INSTANCE_INTERLEAVE 0
+// Testing reversing the sense of modification comparison.
+// This is because the decl types are modified before
+// compoment reference expressions are modified so to
+// detect something needing modification we need to the
+// determine the decl was modified.
+#define ALLOW_REVERSE 1
 
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;
@@ -254,10 +261,25 @@ extern int str_reorg_instance_interleave ( Info *);
 #endif
 extern void find_and_create_all_modified_types ( Info_t *);
 extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types ( std::vector<two_trees_t> *, tree);
-extern tree find_modified ( tree, Info_t *);
+extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types_2nd ( std::vector<two_trees_t> *, tree);
+extern tree find_modified ( tree,
+			    #if ALLOW_REVERSE
+			    bool,
+			    #endif
+			    Info_t *);
+extern tree find_deepest_comp_ref_type ( tree);
 extern bool new_contains_a_modified ( gimple *, tree *, tree *, Info_t *);
-extern tree contains_a_modified ( gimple *, Info_t *);
+extern tree contains_a_modified ( gimple *,
+				  #if ALLOW_REVERSE
+				  bool,
+				  #endif
+				  Info_t *);
 extern tree find_deepest_comp_ref ( tree);
+#if 0
+extern void modify_local_declarations ( Info *);
+#endif
+extern void modify_global_declarations ( Info *);
+extern void modify_parameter_declarations ( Info *);
 extern int number_of_levels ( tree);
 extern tree make_multilevel( tree, int);
 extern bool modify_decl_core ( tree *, Info *);
@@ -265,7 +287,7 @@ extern void delete_reorgtype ( ReorgType_t *, Info_t *);
 extern void undelete_reorgtype ( ReorgType_t *, Info_t *);
 extern void clear_deleted_types( Info *);
 extern void restore_deleted_types ( Info *);
-extern void remove_deleted_types ( Info *, ReorgFn);
+extern void remove_deleted_types ( Info *, char *, ReorgFn);
 extern enum ReorgOpTrans recognize_op ( tree,  bool, Info_t *);
 extern ReorgTransformation reorg_recognize ( gimple *,
 					     cgraph_node *,
@@ -282,7 +304,7 @@ extern bool is_reorg_type ( tree, Info_t *);
 extern tree base_type_of ( tree);
 extern tree base_type_with_levels ( tree, int *);
 extern void print_reorg ( FILE *, int, ReorgType_t *);
-extern void print_program ( FILE *, bool, int, Info_t *);
+extern void print_program ( FILE *, bool, bool, int, Info_t *);
 extern void print_type ( FILE *, tree);
 extern void modify_ssa_name_type ( tree, tree);
 extern bool print_internals (gimple *, void *);
@@ -294,8 +316,7 @@ extern bool is_assign_from_ssa ( gimple *);
 
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be
-// converted to dump file information.
-
+// converted to dump file information.0
 #define DEBUGGING 0
 #if DEBUGGING
 enum Display {
@@ -316,6 +337,10 @@ extern const char *code_str( enum tree_code);
 extern void wolf_fence( Info *);
 extern bool ssa_check ( FILE *, Display, Failure, bool, bool);
 
+// File and line numbered followed by DEBUG_A on next line
+#define DEBUG_FLA(...) { fprintf( stderr, "L# %s:%4d: \n%*s", __FILE__, __LINE__, debug_indenting + 7, ""); fprintf( stderr, __VA_ARGS__); }
+// Line numbered followed by DEBUG_A on next line
+#define DEBUG_LA(...) { fprintf( stderr, "L# %4d: \n%*s", __LINE__, debug_indenting + 7, ""); fprintf( stderr, __VA_ARGS__); }
 // Line numbered
 #define DEBUG_L(...) { fprintf( stderr, "L# %4d: %*s", __LINE__, debug_indenting, ""); fprintf( stderr, __VA_ARGS__); }
 // Alinged with line numbered
@@ -325,6 +350,8 @@ extern bool ssa_check ( FILE *, Display, Failure, bool, bool);
 #define DEBUG_F(f,...) f( __VA_ARGS__)
 #define INDENT(a) handle_debug_indenting(a)
 #else
+#define DEBUG_FLA(...)
+#define DEBUG_LA(...)
 #define DEBUG_L(...)
 #define DEBUG_A(...)
 #define DEBUG(...)

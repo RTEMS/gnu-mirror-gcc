@@ -286,7 +286,11 @@ get_whitelisted_nodes()
     if (detected_incompatible_syntax) return map;
     cgraph_node *i = worklist.front();
     worklist.pop();
+    #if 0
     if (dump_file) fprintf(dump_file, "analyzing %s %p\n", i->name(), i);
+    #else
+    if (dump_file) fprintf(dump_file, "analyzing %s\n", i->name());
+    #endif
     GimpleWhiteLister whitelister;
     whitelister._walk_cnode(i);
     bool no_external = whitelister.does_not_call_external_functions(i, map);
