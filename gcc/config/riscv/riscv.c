@@ -3630,6 +3630,30 @@ riscv_far_jump_used_p ()
   return cfun->machine->far_jump_used;
 }
 
+/* Return true, if the current function must save the incoming return
+   address.  */
+
+static bool
+riscv_save_return_addr_reg_p (void)
+{
+  /* The $ra register is call-clobbered: if this is not a leaf function,
+     save it.  */
+  if (!crtl->is_leaf)
+    return true;
+
+  /* We need to save the incoming return address if __builtin_eh_return
+     is being used to set a different return address.  */
+  if (crtl->calls_eh_return)
+    return true;
+
+  /* Far jumps/branches use $ra as a temporary to set up the target jump
+     location (clobbering the incoming return address).  */
+  if (riscv_far_jump_used_p ())
+    return true;
+
+  return false;
+}
+
 /* Return true if the current function must save register REGNO.  */
 
 static bool
@@ -3645,10 +3669,7 @@ riscv_save_reg_p (unsigned int regno)
   if (regno == HARD_FRAME_POINTER_REGNUM && frame_pointer_needed)
     return true;
 
-  if (regno == RETURN_ADDR_REGNUM && crtl->calls_eh_return)
-    return true;
-
-  if (regno == RETURN_ADDR_REGNUM && riscv_far_jump_used_p ())
+  if (regno == RETURN_ADDR_REGNUM && riscv_save_return_addr_reg_p ())
     return true;
 
   /* If this is an interrupt handler, then must save extra registers.  */
