@@ -13236,6 +13236,24 @@ The number of Newton iterations for calculating the reciprocal for double type.
 The precision of division is propotional to this param when division
 approximation is enabled.  The default value is 2.
 
+@item aarch64-autovec-preference
+Force an ISA selection strategy for auto-vectorization.  Accepts values from
+0 to 4, inclusive.
+@table @samp
+@item 0
+Use the default heuristics.
+@item 1
+Use only Advanced SIMD for auto-vectorization.
+@item 2
+Use only SVE for auto-vectorization.
+@item 3
+Use both Advanced SIMD and SVE.  Prefer Advanced SIMD when the costs are
+deemed equal.
+@item 4
+Use both Advanced SIMD and SVE.  Prefer SVE when the costs are deemed equal.
+@end table
+The default value is 0.
+
 @end table
 
 @end table
@@ -16976,8 +16994,8 @@ performance of the code.  Permissible values for this option are:
 @samp{cortex-a57}, @samp{cortex-a72}, @samp{cortex-a73}, @samp{cortex-a75},
 @samp{cortex-a76}, @samp{cortex-a76ae}, @samp{cortex-a77},
 @samp{cortex-a65}, @samp{cortex-a65ae}, @samp{cortex-a34},
-@samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor},
-@samp{neoverse-e1},@samp{neoverse-n1},@samp{neoverse-v1},@samp{qdf24xx},
+@samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor}, @samp{neoverse-e1},
+@samp{neoverse-n1}, @samp{neoverse-n2}, @samp{neoverse-v1}, @samp{qdf24xx},
 @samp{saphira}, @samp{phecda}, @samp{xgene1}, @samp{vulcan}, @samp{octeontx},
 @samp{octeontx81},  @samp{octeontx83},
 @samp{octeontx2}, @samp{octeontx2t98}, @samp{octeontx2t96}
@@ -18824,9 +18842,9 @@ Permissible names are: @samp{arm7tdmi}, @samp{arm7tdmi-s}, @samp{arm710t},
 @samp{cortex-m35p}, @samp{cortex-m55},
 @samp{cortex-m1.small-multiply}, @samp{cortex-m0.small-multiply},
 @samp{cortex-m0plus.small-multiply}, @samp{exynos-m1}, @samp{marvell-pj4},
-@samp{neoverse-n1}, @samp{xscale}, @samp{iwmmxt}, @samp{iwmmxt2},
-@samp{ep9312}, @samp{fa526}, @samp{fa626}, @samp{fa606te}, @samp{fa626te},
-@samp{fmp626}, @samp{fa726te}, @samp{xgene1}.
+@samp{neoverse-n1}, @samp{neoverse-n2}, @samp{neoverse-v1}, @samp{xscale},
+@samp{iwmmxt}, @samp{iwmmxt2}, @samp{ep9312}, @samp{fa526}, @samp{fa626},
+@samp{fa606te}, @samp{fa626te}, @samp{fmp626}, @samp{fa726te}, @samp{xgene1}.
 
 Additionally, this option can specify that GCC should tune the performance
 of the code for a big.LITTLE system.  Permissible names are:
@@ -27046,7 +27064,7 @@ system representing a certain processor type.  Possible values for
 @var{cpu-type} are @samp{z900}/@samp{arch5}, @samp{z990}/@samp{arch6},
 @samp{z9-109}, @samp{z9-ec}/@samp{arch7}, @samp{z10}/@samp{arch8},
 @samp{z196}/@samp{arch9}, @samp{zEC12}, @samp{z13}/@samp{arch11},
-@samp{z14}/@samp{arch12}, and @samp{native}.
+@samp{z14}/@samp{arch12}, @samp{z15}/@samp{arch13}, and @samp{native}.
 
 The default is @option{-march=z900}.
 
@@ -28689,14 +28707,14 @@ BMI, BMI2 and F16C instruction set support.
 
 @item broadwell
 Intel Broadwell CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
-SSE4.1, SSE4.2, POPCNT, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA,
-BMI, BMI2, F16C, RDSEED, ADCX and PREFETCHW instruction set support.
+SSE4.1, SSE4.2, POPCNT, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA, BMI, BMI2,
+F16C, RDSEED ADCX and PREFETCHW instruction set support.
 
 @item skylake
 Intel Skylake CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
 SSE4.1, SSE4.2, POPCNT, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA,
-BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, CLFLUSHOPT, XSAVEC and
-XSAVES instruction set support.
+BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, CLFLUSHOPT, XSAVEC and XSAVES
+instruction set support.
 
 @item bonnell
 Intel Bonnell CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3 and SSSE3
@@ -28704,34 +28722,36 @@ instruction set support.
 
 @item silvermont
 Intel Silvermont CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
-SSE4.1, SSE4.2, POPCNT, AES, PCLMUL and RDRND instruction set support.
+SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL and RDRND instruction set support.
 
 @item goldmont
 Intel Goldmont CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
-SSE4.1, SSE4.2, POPCNT, AES, PCLMUL, RDRND, XSAVE, XSAVEOPT and FSGSBASE
-instruction set support.
+SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC, XSAVES,
+XSAVEOPT and FSGSBASE instruction set support.
 
 @item goldmont-plus
 Intel Goldmont Plus CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
-SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PCLMUL, RDRND, XSAVE, XSAVEOPT, FSGSBASE,
-PTWRITE, RDPID, SGX and UMIP instruction set support.
+SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
+XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX and UMIP instruction set support.
 
 @item tremont
 Intel Tremont CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
-SSE4.1, SSE4.2, POPCNT, AES, PCLMUL, RDRND, XSAVE, XSAVEOPT, FSGSBASE, PTWRITE,
-RDPID, SGX, UMIP, GFNI-SSE, CLWB and ENCLV instruction set support.
+SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC, XSAVES,
+XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, UMIP, GFNI-SSE, CLWB, MOVDIRI,
+MOVDIR64B, CLDEMOTE and WAITPKG instruction set support.
 
 @item knl
 Intel Knight's Landing CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
 SSSE3, SSE4.1, SSE4.2, POPCNT, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA,
-BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, AVX512F, AVX512PF, AVX512ER and
-AVX512CD instruction set support.
+BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, PREFETCHWT1, AVX512F, AVX512PF,
+AVX512ER and AVX512CD instruction set support.
 
 @item knm
 Intel Knights Mill CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
 SSSE3, SSE4.1, SSE4.2, POPCNT, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA,
-BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, AVX512F, AVX512PF, AVX512ER, AVX512CD,
-AVX5124VNNIW, AVX5124FMAPS and AVX512VPOPCNTDQ instruction set support.
+BMI, BMI2, F16C, RDSEED, ADCX, PREFETCHW, PREFETCHWT1, AVX512F, AVX512PF,
+AVX512ER, AVX512CD, AVX5124VNNIW, AVX5124FMAPS and AVX512VPOPCNTDQ instruction
+set support.
 
 @item skylake-avx512
 Intel Skylake Server CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
@@ -28782,8 +28802,8 @@ SSE4.1, SSE4.2, POPCNT, PKU, AVX, AVX2, AES, PCLMUL, FSGSBASE, RDRND, FMA, BMI,
 BMI2, F16C, RDSEED, ADCX, PREFETCHW, CLFLUSHOPT, XSAVEC, XSAVES, AVX512F,
 AVX512VL, AVX512BW, AVX512DQ, AVX512CD, AVX512VBMI, AVX512IFMA, SHA, CLWB, UMIP,
 RDPID, GFNI, AVX512VBMI2, AVX512VPOPCNTDQ, AVX512BITALG, AVX512VNNI, VPCLMULQDQ,
-VAES, PCONFIG, WBNOINVD, MOVDIRI, MOVDIR64B and  AVX512VP2INTERSECT instruction
-set support.
+VAES, PCONFIG, WBNOINVD, MOVDIRI, MOVDIR64B, AVX512VP2INTERSECT and KEYLOCKER
+instruction set support.
 
 @item k6
 AMD K6 CPU with MMX instruction set support.

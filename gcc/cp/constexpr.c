@@ -1301,6 +1301,12 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       case BUILT_IN_STRSTR:
 	strops = 2;
 	strret = 1;
+	break;
+      case BUILT_IN_ASAN_POINTER_COMPARE:
+      case BUILT_IN_ASAN_POINTER_SUBTRACT:
+	/* These builtins shall be ignored during constant expression
+	   evaluation.  */
+	return void_node;
       default:
 	break;
       }
@@ -1458,7 +1464,7 @@ unshare_constructor (tree t MEM_STAT_DECL)
       vec<constructor_elt, va_gc> *v = CONSTRUCTOR_ELTS (n);
       constructor_elt *ce;
       for (HOST_WIDE_INT i = 0; vec_safe_iterate (v, i, &ce); ++i)
-	if (TREE_CODE (ce->value) == CONSTRUCTOR)
+	if (ce->value && TREE_CODE (ce->value) == CONSTRUCTOR)
 	  ptrs.safe_push (&ce->value);
     }
   return t;
@@ -2234,9 +2240,10 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	      tree arg = CALL_EXPR_ARG (t, i);
 	      arg = cxx_eval_constant_expression (ctx, arg, false,
 						  non_constant_p, overflow_p);
-	      VERIFY_CONSTANT (arg);
 	      if (i == 1)
 		arg1 = arg;
+	      else
+		VERIFY_CONSTANT (arg);
 	    }
 	  gcc_assert (arg1);
 	  return arg1;
@@ -3548,15 +3555,22 @@ cxx_eval_array_reference (const constexpr_ctx *ctx, tree t,
      initializer, it's initialized from {}.  But use build_value_init
      directly for non-aggregates to avoid creating a garbage CONSTRUCTOR.  */
   tree val;
+  constexpr_ctx new_ctx;
   if (CP_AGGREGATE_TYPE_P (elem_type))
     {
       tree empty_ctor = build_constructor (init_list_type_node, NULL);
       val = digest_init (elem_type, empty_ctor, tf_warning_or_error);
+      new_ctx = *ctx;
+      new_ctx.ctor = build_constructor (elem_type, NULL);
+      ctx = &new_ctx;
     }
   else
     val = build_value_init (elem_type, tf_warning_or_error);
-  return cxx_eval_constant_expression (ctx, val, lval, non_constant_p,
-				       overflow_p);
+  t = cxx_eval_constant_expression (ctx, val, lval, non_constant_p,
+				    overflow_p);
+  if (CP_AGGREGATE_TYPE_P (elem_type) && t != ctx->ctor)
+    free_constructor (ctx->ctor);
+  return t;
 }
 
 /* Subroutine of cxx_eval_constant_expression.
@@ -3845,7 +3859,8 @@ init_subob_ctx (const constexpr_ctx *ctx, constexpr_ctx &new_ctx,
   new_ctx = *ctx;
 
   if (index && TREE_CODE (index) != INTEGER_CST
-      && TREE_CODE (index) != FIELD_DECL)
+      && TREE_CODE (index) != FIELD_DECL
+      && TREE_CODE (index) != RANGE_EXPR)
     /* This won't have an element in the new CONSTRUCTOR.  */
     return;
 
@@ -3858,7 +3873,13 @@ init_subob_ctx (const constexpr_ctx *ctx, constexpr_ctx &new_ctx,
      update object to refer to the subobject and ctor to refer to
      the (newly created) sub-initializer.  */
   if (ctx->object)
-    new_ctx.object = build_ctor_subob_ref (index, type, ctx->object);
+    {
+      if (index == NULL_TREE || TREE_CODE (index) == RANGE_EXPR)
+	/* There's no well-defined subobject for this index.  */
+	new_ctx.object = NULL_TREE;
+      else
+	new_ctx.object = build_ctor_subob_ref (index, type, ctx->object);
+    }
   tree elt = build_constructor (type, NULL);
   CONSTRUCTOR_NO_CLEARING (elt) = true;
   new_ctx.ctor = elt;
@@ -4118,7 +4139,7 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
 	  eltinit = cxx_eval_constant_expression (&new_ctx, eltinit, lval,
 						  non_constant_p, overflow_p);
 	}
-      if (*non_constant_p && !ctx->quiet)
+      if (*non_constant_p)
 	break;
       if (new_ctx.ctor != ctx->ctor)
 	{
@@ -5832,8 +5853,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	/* Evaluate the cleanups.  */
 	FOR_EACH_VEC_ELT_REVERSE (cleanups, i, cleanup)
 	  cxx_eval_constant_expression (ctx, cleanup, false,
-					non_constant_p, overflow_p,
-					jump_target);
+					non_constant_p, overflow_p);
       }
       break;
 
@@ -5844,29 +5864,20 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
       if (!*non_constant_p)
 	/* Also evaluate the cleanup.  */
 	cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 1), true,
-				      non_constant_p, overflow_p,
-				      jump_target);
+				      non_constant_p, overflow_p);
       break;
 
     case CLEANUP_STMT:
-      {
-	tree initial_jump_target = jump_target ? *jump_target : NULL_TREE;
-	r = cxx_eval_constant_expression (ctx, CLEANUP_BODY (t), lval,
-					  non_constant_p, overflow_p,
-					  jump_target);
-	if (!CLEANUP_EH_ONLY (t) && !*non_constant_p)
-	  {
-	    iloc_sentinel ils (loc);
-	    /* Also evaluate the cleanup.  If we weren't skipping at the
-	       start of the CLEANUP_BODY, change jump_target temporarily
-	       to &initial_jump_target, so that even a return or break or
-	       continue in the body doesn't skip the cleanup.  */
-	    cxx_eval_constant_expression (ctx, CLEANUP_EXPR (t), true,
-					  non_constant_p, overflow_p,
-					  jump_target ? &initial_jump_target
-					  : NULL);
-	  }
-      }
+      r = cxx_eval_constant_expression (ctx, CLEANUP_BODY (t), lval,
+					non_constant_p, overflow_p,
+					jump_target);
+      if (!CLEANUP_EH_ONLY (t) && !*non_constant_p)
+	{
+	  iloc_sentinel ils (loc);
+	  /* Also evaluate the cleanup.  */
+	  cxx_eval_constant_expression (ctx, CLEANUP_EXPR (t), true,
+					non_constant_p, overflow_p);
+	}
       break;
 
       /* These differ from cxx_eval_unary_expression in that this doesn't

@@ -1,3 +1,590 @@
+2021-01-03  Iain Sandoe  <iain@sandoe.co.uk>
+	    Jakub Jelinek   <jakub@redhat.com>
+
+	PR target/97865
+	* configure: Regenerate.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/abi/post/powerpc-linux-gnu/baseline_symbols.txt:
+	Update.
+	* config/abi/post/powerpc64-linux-gnu/32/baseline_symbols.txt:
+	Update.
+
+2020-12-01  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95322
+	* include/std/ranges (take_view::_CI): Define this alias
+	template as per LWG 3449 and remove ...
+	(take_view::_Sentinel::_CI): ... this type alias.
+	(take_view::_Sentinel::operator==): Adjust use of _CI
+	accordingly.  Define a second overload that accepts an iterator
+	of the opposite constness as per LWG 3449.
+	(take_while_view::_Sentinel::operator==): Likewise.
+	* testsuite/std/ranges/adaptors/95322.cc: Add tests for LWG 3449.
+
+2020-11-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/98001
+	* testsuite/ext/stdio_filebuf/char/79820.cc: Do not pass invalid
+	FILE* to constructor.
+
+2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97935
+	* include/bits/iterator_concepts.h (__detail::__iter_without_category):
+	New helper concept.
+	(__iterator_traits::__cat): Use __detail::__iter_without_category.
+	* testsuite/24_iterators/associated_types/iterator.traits.cc: New test.
+
+2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/iterator_concepts.h (__detail::__ptr, __detail::__ref)
+	(__detail::__cat, __detail::__diff): Move to class scope in the
+	relevant __iterator_traits specializations.
+	(__iterator_traits<>): Use nested class templates instead of ones from
+	namespace __detail.
+	* include/bits/stl_iterator.h (__detail::__common_iter_ptr): Move to
+	class scope in iterator_traits<common_iterator<I, S>>.
+	(iterator_traits<common_iterator<I, S>>): Use nested class template
+	instead of __detail::__common_iter_ptr.
+
+2020-11-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/29_atomics/atomic_float/value_init.cc: Use float
+	instead of double so that __atomic_load_8 isn't needed.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92546
+	* include/std/regex (pmr::smatch, pmr::wsmatch): Declare using
+	underlying __normal_iterator type, not nested typedef
+	basic_string::const_iterator.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97876
+	* include/std/stop_token (_Stop_state_t): Define default
+	constructor as user-provided not defaulted.
+
+2020-11-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/95989
+	* config/os/gnu-linux/os_defines.h (_GLIBCXX_NATIVE_THREAD_ID):
+	Define new macro to get reliable thread ID.
+	* include/std/stop_token (_Stop_state_t::_M_request_stop):
+	Use new macro if it's defined.
+	(_Stop_state_t::_M_remove_callback): Likewise.
+	* include/std/thread (this_thread::get_id): Likewise.
+	* testsuite/30_threads/jthread/95989.cc: New test.
+	* testsuite/30_threads/this_thread/95989.cc: New test.
+
+2020-11-18  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-11-18  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (join_view::_Iterator::_M_satisfy): Uglify
+	local variable inner.
+	(join_view::_Iterator::operator->): Use _Inner_iter instead of
+	_Outer_iter in the function signature as per LWG 3500.
+	* testsuite/std/ranges/adaptors/join.cc (test08): Test it.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (join_view): Remove deduction guide.
+	(views::join): Add explicit template argument list to prevent
+	deducing the wrong type.
+	* testsuite/std/ranges/adaptors/join.cc: Move test for LWG 3474
+	here, from ...
+	* testsuite/std/ranges/adaptors/join_lwg3474.cc: Removed.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (join_view): Add deduction guide (LWG 3474).
+	* testsuite/std/ranges/adaptors/join_lwg3474.cc: New test.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/version (__cpp_lib_array_constexpr)
+	(__cpp_lib_constexpr_char_traits): Only define C++17 value when
+	compiling C++17.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/char_traits.h (__cpp_lib_constexpr_char_traits):
+	Update value for C++20.
+	* include/std/version (__cpp_lib_constexpr_char_traits): Likewise.
+	* testsuite/21_strings/char_traits/requirements/constexpr_functions_c++17.cc:
+	Update expected value.
+
+2020-11-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97869
+	* include/precompiled/stdc++.h: Include <coroutine>.
+	* include/std/version (__cpp_lib_span): Check __cpp_lib_concepts
+	before defining.
+
+2020-11-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-11-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/97828
+	* include/bits/ranges_algo.h (__search_n_fn::operator()): Check
+	random_access_iterator before using the backtracking
+	implementation.  When the backwards scan fails prematurely,
+	reset __remainder appropriately.
+	* testsuite/25_algorithms/search_n/97828.cc: New test.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93456
+	* src/c++11/futex.cc (relative_timespec): Remove redundant check
+	negative values.
+	* testsuite/30_threads/future/members/93456.cc: New.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/futex.cc (relative_timespec): New function to
+	create relative time from two absolute times.
+	(__atomic_futex_unsigned_base::_M_futex_wait_until): Use
+	relative_timespec.
+
+2020-11-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/future (future::wait_for): Do not wait for
+	durations less than or equal to zero.
+	* testsuite/30_threads/future/members/poll.cc: New test.
+
+2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97798
+	* include/ext/numeric_traits.h (__glibcxx_signed)
+	(__glibcxx_digits, __glibcxx_min, __glibcxx_max): Remove
+	macros.
+	(__is_integer_nonstrict::__width): Define new constant.
+	(__numeric_traits_integer): Define constants in terms of each
+	other and __is_integer_nonstrict::__width, rather than the
+	removed macros.
+	(_GLIBCXX_INT_N_TRAITS): Macro to define explicit
+	specializations for non-standard integer types.
+
+2020-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96042
+	* testsuite/std/ranges/iota/96042.cc: Only assert that the
+	difference type is wider than long long if __int128 is
+	supported.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/iterator_concepts.h [__STRICT_ANSI__]
+	(incrementable_traits<__int128>): Define specialization.
+	(incrementable_traits<unsigned __int128>): Likewise.
+	* testsuite/std/ranges/iota/96042.cc: Test iota_view with
+	__int128.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-19  Jonathan Wakely  <jwakely@redhat.com>
+		    Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/96042
+	* include/bits/range_access.h (__detail::__to_unsigned_like):
+	Do not use make_unsigned_t<T> in the return type, as it can
+	result in an error before the integral<T> constraint is checked.
+	[__STRICT_ANSI__]: Add overloads for 128-bit integer types.
+	(__detail::__make_unsigned_like_t): Define as the return type
+	of __to_unsigned_like.
+	* testsuite/std/ranges/subrange/96042.cc: New test.
+
+2020-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96042
+	* include/ext/numeric_traits.h (__is_integer_nonstrict): New
+	trait which is true for 128-bit integers even in strict modes.
+	(__numeric_traits_integer, __numeric_traits): Use
+	__is_integer_nonstrict instead of __is_integer.
+	* include/std/limits [__STRICT_ANSI__ && __SIZEOF_INT128__]
+	(numeric_limits<__int128>, (numeric_limits<unsigned __int128>):
+	Define.
+	* testsuite/std/ranges/iota/96042.cc: New test.
+
+2020-11-11  Paul Scharnofske  <asynts@gmail.com>
+
+	Backported from master:
+	2020-11-11  Paul Scharnofske  <asynts@gmail.com>
+
+	* include/std/thread (jthread::operator=(jthread&&)): Transfer
+	any existing state to a temporary that will request a stop and
+	then join.
+	* testsuite/30_threads/jthread/jthread.cc: Test move assignment.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96269
+	* include/std/optional (operator==, operator!=, operator<)
+	(operator>, operator<=, operator>=): Fix types used in
+	SFINAE constraints.
+	* testsuite/20_util/optional/relops/96269.cc: New test.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97731
+	* src/filesystem/dir.cc (recursive_directory_iterator): Call the
+	right overload of _Dir::advance.
+	* testsuite/experimental/filesystem/iterators/97731.cc: New test.
+
+2020-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97362
+	* doc/html/manual/source_code_style.html: Regenerate.
+	* doc/xml/manual/appendix_contributing.xml: Add __deref to
+	BADNAMES.
+	* include/debug/functions.h (_Irreflexive_checker::__deref):
+	Rename to __ref.
+	* testsuite/17_intro/badnames.cc: Check __deref.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92285
+	* doc/xml/manual/evolution.xml: Document change to base class.
+	* doc/html/manual/api.html: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Document new C++20 headers.
+	* doc/html/*: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Document deprecation of
+	__is_nullptr_t and removal of std::allocator members.
+	* doc/html/manual/api.html: Regenerate.
+
+2020-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/containers.xml: Replace <xref> with <link>.
+	* doc/xml/manual/evolution.xml: Likewise.
+	* doc/html/manual/api.html: Regenerate.
+	* doc/html/manual/containers.html: Regenerate.
+
+2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	* testsuite/25_algorithms/lexicographical_compare/constrained.cc:
+	(test03): Fix initializing the vector vy with the array y of size 4.
+
+2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-23  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (single_view::single_view): Mark the
+	in place constructor explicit as per LWG 3428.
+	(take_view): Remove the constraint on the deduction guide's
+	template parameter as per LWG 3447.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/span (span::front): Remove static_assert.
+	(span::back): Likewise.
+	(span::operator[]): Likewise.
+	* testsuite/23_containers/span/back_neg.cc: Rewrite to verify
+	that we check the preconditions of back() only when it's called.
+	* testsuite/23_containers/span/front_neg.cc: Likewise for
+	front().
+	* testsuite/23_containers/span/index_op_neg.cc: Likewise for
+	operator[].
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-12  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (take_while_view::begin): Constrain the
+	const overload further as per LWG 3450.
+	(take_while_view::end): Likewise.
+	* testsuite/std/ranges/adaptors/take_while.cc: Add test for LWG
+	3450.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (__sample): Exit early when the
+	input range is empty.
+	* testsuite/25_algorithms/sample/3.cc: New test.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_algo.h (for_each_n): Mark constexpr for C++20.
+	(search): Likewise for the overload that takes a searcher.
+	* testsuite/25_algorithms/for_each/constexpr.cc: Test constexpr
+	std::for_each_n.
+	* testsuite/25_algorithms/search/constexpr.cc: Test constexpr
+	std::search overload that takes a searcher.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95322
+	* include/std/ranges (transform_view::sentinel::__distance_from):
+	Give this a deduced return type.
+	(transform_view::sentinel::operator-): Adjust the return type so
+	that it's based on the constness of the iterator rather than
+	that of the sentinel.
+	* testsuite/std/ranges/adaptors/95322.cc: Refer to LWG 3488.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (elements_view::begin): Adjust constraints.
+	(elements_view::end): Likewise.
+	(elements_view::_Sentinel::operator==): Templatize to take both
+	_Iterator<true> and _Iterator<false>.
+	(elements_view::_Sentinel::operator-): Likewise.
+	* testsuite/std/ranges/adaptors/elements.cc: Add testcase for
+	the example from P1994R1.
+	* testsuite/std/ranges/adaptors/lwg3406.cc: New test.
+
+2020-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-08-27  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (elements_view::end): Replace these two
+	overloads with four new overloads.
+	(elements_view::_Iterator::operator==): Remove.
+	(elements_view::_Iterator::operator-): Likewise.
+	(elements_view::_Sentinel): Define.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (UniquePointerPrinter.__init__):
+	Use gdb.Type.strip_typedefs().
+	* testsuite/libstdc++-prettyprinters/compat.cc: Use a typedef in
+	the emulated old type.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h [!_GLIBCXX_USE_CXX11_ABI]
+	(basic_string(const _CharT*, const _Alloc&)): Constrain to
+	require an allocator-like type to fix CTAD ambiguity (LWG 3706).
+	Define inline.
+	* include/bits/basic_string.tcc [!_GLIBCXX_USE_CXX11_ABI]
+	(basic_string(const _CharT*, const _Alloc&)): Remove non-inline
+	definition.
+	* testsuite/21_strings/basic_string/cons/char/deduction.cc:
+	Remove dg-skip-if.
+	* testsuite/21_strings/basic_string/cons/wchar_t/deduction.cc:
+	Likewise.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/21_strings/basic_string/allocator/char/minimal.cc:
+	Do not require cxx11-abi effective target.
+	* testsuite/21_strings/basic_string/allocator/wchar_t/minimal.cc:
+	Likewise.
+	* testsuite/27_io/basic_fstream/cons/base.cc: Likewise.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ios_base.h (ios_base::failure): Add constructors
+	takeing error_code argument. Add code() member function.
+	* testsuite/27_io/ios_base/failure/cxx11.cc: Allow test to
+	run for the old ABI but do not check for derivation from
+	std::system_error.
+	* testsuite/27_io/ios_base/failure/error_code.cc: New test.
+
+2020-10-20  Nuno Lopes  <nuno.lopes@ist.utl.pt>
+
+	Backported from master:
+	2020-10-13  Nuno Lopes  <nuno.lopes@ist.utl.pt>
+
+	* include/bits/stl_algo.h (any_of): Fix incorrect description
+	in comment.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_algobase.h (copy, move, copy_backward)
+	(move_backward): Fix documentation for returned iterator.
+
+2020-10-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/configure.xml: Correct name of option.
+	* doc/html/*: Regenerate.
+
+2020-10-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-09-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97132
+	* include/std/memory (assume_aligned): Do not use
+	__builtin_assume_aligned during constant evaluation.
+	* testsuite/20_util/assume_aligned/1.cc: Improve test.
+	* testsuite/20_util/assume_aligned/97132.cc: New test.
+
+2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/concepts: Fix typos in copyright notice.
+	* include/std/ranges: Likewise.
+
+2020-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2020.xml: Remove red background for
+	completed feature.
+	* doc/html/manual/status.html: Regenerate.
+
+2020-10-13  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95788
+	* include/bits/ranges_uninitialized.h:
+	(__construct_at_fn::operator()): Rewrite in terms of
+	std::construct_at.  Declare it conditionally noexcept.  Qualify
+	calls to declval in its requires-clause.
+	* testsuite/20_util/specialized_algorithms/construct_at/95788.cc:
+	New test.
+
+2020-10-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/random.h (seed_seq(initializer_list<T>)): Rename
+	parameter to use reserved name.
+	* include/bits/ranges_algo.h (shift_left, shift_right): Rename
+	template parameters to use reserved name.
+	* testsuite/17_intro/names.cc: Check "il". Do not check "d" and
+	"y" in C++20 mode.
+
+2020-10-06  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-02  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_iterator.h (reverse_iterator::iter_move):
+	Define for C++20 as per P0896.
+	(reverse_iterator::iter_swap): Likewise.
+	(move_iterator::operator*): Apply P0896 changes for C++20.
+	(move_iterator::operator[]): Likewise.
+	* testsuite/24_iterators/reverse_iterator/cust.cc: New test.
+
 2020-09-22  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:

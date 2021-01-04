@@ -2975,14 +2975,17 @@ pop:
 	  fail = true;
 	  break;
 	}
-      /* Check there's only a single stmt the op is used on inside
-         of the loop.  */
+      /* Check there's only a single stmt the op is used on.  For the
+	 not value-changing tail and the last stmt allow out-of-loop uses.
+	 ???  We could relax this and handle arbitrary live stmts by
+	 forcing a scalar epilogue for example.  */
       imm_use_iterator imm_iter;
       gimple *op_use_stmt;
       unsigned cnt = 0;
       FOR_EACH_IMM_USE_STMT (op_use_stmt, imm_iter, op)
 	if (!is_gimple_debug (op_use_stmt)
-	    && flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt)))
+	    && (*code != ERROR_MARK
+		|| flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt))))
 	  {
 	    /* We want to allow x + x but not x < 1 ? x : 2.  */
 	    if (is_gimple_assign (op_use_stmt)
@@ -4376,7 +4379,8 @@ info_for_reduction (stmt_vec_info stmt_info)
 {
   stmt_info = vect_orig_stmt (stmt_info);
   gcc_assert (STMT_VINFO_REDUC_DEF (stmt_info));
-  if (!is_a <gphi *> (stmt_info->stmt))
+  if (!is_a <gphi *> (stmt_info->stmt)
+      || !VECTORIZABLE_CYCLE_DEF (STMT_VINFO_DEF_TYPE (stmt_info)))
     stmt_info = STMT_VINFO_REDUC_DEF (stmt_info);
   gphi *phi = as_a <gphi *> (stmt_info->stmt);
   if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def)
@@ -8334,11 +8338,52 @@ scale_profile_for_vect_loop (class loop *loop, unsigned vf)
     scale_bbs_frequencies (&loop->latch, 1, exit_l->probability / prob);
 }
 
+/* For a vectorized stmt DEF_STMT_INFO adjust all vectorized PHI
+   latch edge values originally defined by it.  */
+
+static void
+maybe_set_vectorized_backedge_value (loop_vec_info loop_vinfo,
+				     stmt_vec_info def_stmt_info)
+{
+  tree def = gimple_get_lhs (vect_orig_stmt (def_stmt_info)->stmt);
+  if (!def || TREE_CODE (def) != SSA_NAME)
+    return;
+  stmt_vec_info phi_info;
+  imm_use_iterator iter;
+  use_operand_p use_p;
+  FOR_EACH_IMM_USE_FAST (use_p, iter, def)
+    if (gphi *phi = dyn_cast <gphi *> (USE_STMT (use_p)))
+      if (gimple_bb (phi)->loop_father->header == gimple_bb (phi)
+	  && (phi_info = loop_vinfo->lookup_stmt (phi))
+	  && VECTORIZABLE_CYCLE_DEF (STMT_VINFO_DEF_TYPE (phi_info))
+	  && STMT_VINFO_REDUC_TYPE (phi_info) != FOLD_LEFT_REDUCTION
+	  && STMT_VINFO_REDUC_TYPE (phi_info) != EXTRACT_LAST_REDUCTION)
+	{
+	  loop_p loop = gimple_bb (phi)->loop_father;
+	  edge e = loop_latch_edge (loop);
+	  if (PHI_ARG_DEF_FROM_EDGE (phi, e) == def)
+	    {
+	      stmt_vec_info phi_vec_info = STMT_VINFO_VEC_STMT (phi_info);
+	      stmt_vec_info def_vec_info = STMT_VINFO_VEC_STMT (def_stmt_info);
+	      do
+		{
+		  add_phi_arg (as_a <gphi *> (phi_vec_info->stmt),
+			       gimple_get_lhs (def_vec_info->stmt), e,
+			       gimple_phi_arg_location (phi, e->dest_idx));
+		  phi_vec_info = STMT_VINFO_RELATED_STMT (phi_vec_info);
+		  def_vec_info = STMT_VINFO_RELATED_STMT (def_vec_info);
+		}
+	      while (phi_vec_info);
+	      gcc_assert (!def_vec_info);
+	    }
+	}
+}
+
 /* Vectorize STMT_INFO if relevant, inserting any new instructions before GSI.
    When vectorizing STMT_INFO as a store, set *SEEN_STORE to its
    stmt_vec_info.  */
 
-static void
+static bool
 vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 			  gimple_stmt_iterator *gsi, stmt_vec_info *seen_store)
 {
@@ -8354,7 +8399,7 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 
   if (!STMT_VINFO_RELEVANT_P (stmt_info)
       && !STMT_VINFO_LIVE_P (stmt_info))
-    return;
+    return false;
 
   if (STMT_VINFO_VECTYPE (stmt_info))
     {
@@ -8371,13 +8416,15 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
   /* Pure SLP statements have already been vectorized.  We still need
      to apply loop vectorization to hybrid SLP statements.  */
   if (PURE_SLP_STMT (stmt_info))
-    return;
+    return false;
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location, "transform statement.\n");
 
   if (vect_transform_stmt (stmt_info, gsi, NULL, NULL))
     *seen_store = stmt_info;
+
+  return true;
 }
 
 /* Helper function to pass to simplify_replace_tree to enable replacing tree's
@@ -8704,7 +8751,7 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 
       for (gphi_iterator si = gsi_start_phis (bb); !gsi_end_p (si);
 	   gsi_next (&si))
-        {
+	{
 	  gphi *phi = si.phi ();
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_NOTE, vect_location,
@@ -8737,6 +8784,27 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 		dump_printf_loc (MSG_NOTE, vect_location, "transform phi.\n");
 	      vect_transform_stmt (stmt_info, NULL, NULL, NULL);
 	    }
+	}
+
+      for (gphi_iterator si = gsi_start_phis (bb); !gsi_end_p (si);
+	   gsi_next (&si))
+	{
+	  gphi *phi = si.phi ();
+	  stmt_info = loop_vinfo->lookup_stmt (phi);
+	  if (!stmt_info)
+	    continue;
+
+	  if (!STMT_VINFO_RELEVANT_P (stmt_info)
+	      && !STMT_VINFO_LIVE_P (stmt_info))
+	    continue;
+
+	  if ((STMT_VINFO_DEF_TYPE (stmt_info) == vect_induction_def
+	       || STMT_VINFO_DEF_TYPE (stmt_info) == vect_reduction_def
+	       || STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def
+	       || STMT_VINFO_DEF_TYPE (stmt_info) == vect_nested_cycle
+	       || STMT_VINFO_DEF_TYPE (stmt_info) == vect_internal_def)
+	      && ! PURE_SLP_STMT (stmt_info))
+	    maybe_set_vectorized_backedge_value (loop_vinfo, stmt_info);
 	}
 
       for (gimple_stmt_iterator si = gsi_start_bb (bb);
@@ -8773,11 +8841,18 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			}
 		      stmt_vec_info pat_stmt_info
 			= STMT_VINFO_RELATED_STMT (stmt_info);
-		      vect_transform_loop_stmt (loop_vinfo, pat_stmt_info, &si,
-						&seen_store);
+		      if (vect_transform_loop_stmt (loop_vinfo, pat_stmt_info,
+						    &si, &seen_store))
+			maybe_set_vectorized_backedge_value (loop_vinfo,
+							     pat_stmt_info);
 		    }
-		  vect_transform_loop_stmt (loop_vinfo, stmt_info, &si,
-					    &seen_store);
+		  else
+		    {
+		      if (vect_transform_loop_stmt (loop_vinfo, stmt_info, &si,
+						    &seen_store))
+			maybe_set_vectorized_backedge_value (loop_vinfo,
+							     stmt_info);
+		    }
 		}
 	      gsi_next (&si);
 	      if (seen_store)

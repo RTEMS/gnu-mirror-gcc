@@ -1,3 +1,240 @@
+2021-01-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2020-10-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/97438
+	* coroutines.cc (struct coroutine_info): Add a field to
+	record that we emitted a promise type error.
+	(coro_promise_type_found_p): Check for the case that the
+	promise type contains both return_void and return_value.
+	Emit an error if so, with information about the wrong
+	type methods.
+
+2020-12-23  Jason Merrill  <jason@redhat.com>
+
+	PR c++/98332
+	* constexpr.c (unshare_constructor): Check for NULL.
+	(cxx_eval_vec_init_1): Always exit early if non-constant.
+
+2020-12-23  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90254
+	PR c++/93711
+	* cp-tree.h (unsafe_return_slot_p): Declare.
+	* call.c (is_base_field_ref): Rename to unsafe_return_slot_p.
+	(build_over_call): Check unsafe_return_slot_p.
+	(build_special_member_call): Likewise.
+	* init.c (expand_default_init): Likewise.
+	* typeck2.c (split_nonconstant_init_1): Likewise.
+
+2020-12-16  Nathan Sidwell  <nathan@acm.org>
+
+	* parser.c (cp_parser_elaborated_type_specifier): Test
+	BOUND_TEMPLATE_TEMPLATE_PARM before checking for instantiation.
+
+2020-12-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-07-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/64194
+	* pt.c (resolve_overloaded_unification): If the function
+	template specialization has a placeholder return type,
+	then instantiate it before attempting unification.
+
+2020-12-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/93083
+	* pt.c (convert_template_argument): Handle equivalent placeholders.
+	(do_class_deduction): Look through EXPR_PACK_EXPANSION, too.
+
+2020-12-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-11-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR c++/97904
+	* pt.c (tsubst): Use verify_type_context to check the type
+	of an array element.
+
+2020-11-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* parser.c (cp_parser_omp_var_list_no_open): Assert that array
+	section's 'low_bound', 'length' are not location wrapper nodes.
+	(cp_parser_oacc_all_clauses, cp_parser_oacc_cache): Instantiate
+	'auto_suppress_location_wrappers'.
+
+2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* pt.c (tsubst_omp_clauses): Handle 'OMP_CLAUSE__CACHE_'.
+	(tsubst_expr): Handle 'OACC_CACHE'.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96805
+	PR c++/96199
+	* pt.c (tsubst_aggr_type): Don't build a TYPENAME_TYPE when
+	entering_scope.
+	(tsubst_template_decl): Use tsubst_aggr_type.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97790
+	* constexpr.c (cxx_eval_constant_expression) <case CLEANUP_POINT_EXPR,
+	case TRY_FINALLY_EXPR, case CLEANUP_STMT>: Don't pass jump_target to
+	cxx_eval_constant_expression when evaluating the cleanups.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/97748
+	* cvt.c (convert_to_void): Check (complain & tf_warning) in the outer
+	if rather than twice times in the inner one.  Use warn_if_unused_value.
+	Formatting fix.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/67453
+	* decl.c (duplicate_decls): Propagate DECL_ATTRIBUTES and
+	DECL_PRESERVE_P from olddecl to its clones if any.
+
+2020-11-12  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97663
+	* parser.c (cp_parser_init_declarator): Don't try to parse
+	C++17 deduction guides if there are any type specifiers even when
+	type is NULL.
+
+2020-10-30  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/97412
+	* constraint.cc (normalize_concept_check): Don't call
+	tsubst_template_args when 'args' is NULL.
+
+2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/95132
+	* decl2.c (mark_used): Move up the constraints_satisfied_p check
+	so that we check constraints before calling maybe_instantiate_decl.
+
+2020-10-24  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-10-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/96241
+	* constexpr.c (cxx_eval_array_reference): Set up ctx->ctor if we
+	are initializing an aggregate.  Call free_constructor on the new
+	CONSTRUCTOR if it isn't returned from cxx_eval_constant_expression.
+
+2020-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/97328
+	* constexpr.c (init_subob_ctx): Don't punt on RANGE_EXPR
+	indexes, instead build a sub-aggregate initialization context
+	with no subobject.
+
+2020-10-20  Marek Polacek  <polacek@redhat.com>
+
+	* pt.c (tsubst_copy_and_build): Use cxx2a.
+
+2020-10-20  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2020-10-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/97010
+	* pt.c (tsubst_copy_and_build) <case TEMPLATE_ID_EXPR>: Call
+	tsubst_copy_and_build explicitly instead of using the RECUR macro.
+	Handle a TEMPLATE_ID_EXPR with an IDENTIFIER_NODE as its operand.
+	<case CALL_EXPR>: Perform ADL for a TEMPLATE_ID_EXPR with an
+	IDENTIFIER_NODE as its operand.
+
+2020-10-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-10-05  Richard Biener  <rguenther@suse.de>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97197
+	* error.c (dump_expr): Handle TARGET_MEM_REF.
+
+2020-10-13  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/96229
+	* parser.c (cp_parser_class_specifier_1): Move call to
+	associate_classtype_constraints from here to ...
+	(cp_parser_class_head): ... here.
+	* pt.c (is_compatible_template_arg): Correct documentation to
+	say "argument is _no_ more constrained than the parameter".
+
+2020-10-08  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/88115
+	PR libstdc++/97273
+	* tree.c (cp_tree_equal) <case ALIGNOF_EXPR>: Return false if
+	ALIGNOF_EXPR_STD_P differ.
+
+2020-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/96994
+	* call.c (build_over_call): If obj_arg is non-NULL, return INIT_EXPR
+	setting obj_arg to call.
+
+2020-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97195
+	* constexpr.c (cxx_eval_call_expression): Don't VERIFY_CONSTANT the
+	second argument.
+
+2020-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-09-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/97145
+	* constexpr.c (cxx_eval_builtin_function_call): Return void_node for
+	calls to __sanitize_ptr_{sub,cmp} builtins.
+
 2020-09-11  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:

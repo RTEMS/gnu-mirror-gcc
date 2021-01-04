@@ -18997,7 +18997,9 @@ cp_parser_elaborated_type_specifier (cp_parser* parser,
       if (TREE_CODE (type) == TYPENAME_TYPE)
 	warning (OPT_Wattributes,
 		 "attributes ignored on uninstantiated type");
-      else if (tag_type != enum_type && CLASSTYPE_TEMPLATE_INSTANTIATION (type)
+      else if (tag_type != enum_type
+	       && TREE_CODE (type) != BOUND_TEMPLATE_TEMPLATE_PARM
+	       && CLASSTYPE_TEMPLATE_INSTANTIATION (type)
 	       && ! processing_explicit_instantiation)
 	warning (OPT_Wattributes,
 		 "attributes ignored on template instantiation");
@@ -20622,6 +20624,7 @@ cp_parser_init_declarator (cp_parser* parser,
     {
       /* Handle C++17 deduction guides.  */
       if (!decl_specifiers->type
+	  && !decl_specifiers->any_type_specifiers_p
 	  && ctor_dtor_or_conv_p <= 0
 	  && cxx_dialect >= cxx17)
 	{
@@ -23869,10 +23872,6 @@ cp_parser_class_specifier_1 (cp_parser* parser)
     = parser->in_unbraced_linkage_specification_p;
   parser->in_unbraced_linkage_specification_p = false;
 
-  // Associate constraints with the type.
-  if (flag_concepts)
-    type = associate_classtype_constraints (type);
-
   /* Start the class.  */
   if (nested_name_specifier_p)
     {
@@ -24634,6 +24633,10 @@ cp_parser_class_head (cp_parser* parser,
       cplus_decl_attributes (&type, attributes, (int)ATTR_FLAG_TYPE_IN_PLACE);
       fixup_attribute_variants (type);
     }
+
+  /* Associate constraints with the type.  */
+  if (flag_concepts)
+    type = associate_classtype_constraints (type);
 
   /* We will have entered the scope containing the class; the names of
      base classes should be looked up in that context.  For example:
@@ -34327,7 +34330,11 @@ cp_parser_omp_var_list_no_open (cp_parser *parser, enum omp_clause_code kind,
 		  parser->colon_corrects_to_scope_p = false;
 		  cp_lexer_consume_token (parser->lexer);
 		  if (!cp_lexer_next_token_is (parser->lexer, CPP_COLON))
-		    low_bound = cp_parser_expression (parser);
+		    {
+		      low_bound = cp_parser_expression (parser);
+		      /* Later handling is not prepared to see through these.  */
+		      gcc_checking_assert (!location_wrapper_p (low_bound));
+		    }
 		  if (!colon)
 		    parser->colon_corrects_to_scope_p
 		      = saved_colon_corrects_to_scope_p;
@@ -34347,7 +34354,11 @@ cp_parser_omp_var_list_no_open (cp_parser *parser, enum omp_clause_code kind,
 			cp_parser_commit_to_tentative_parse (parser);
 		      if (!cp_lexer_next_token_is (parser->lexer,
 						   CPP_CLOSE_SQUARE))
-			length = cp_parser_expression (parser);
+			{
+			  length = cp_parser_expression (parser);
+			  /* Later handling is not prepared to see through these.  */
+			  gcc_checking_assert (!location_wrapper_p (length));
+			}
 		    }
 		  /* Look for the closing `]'.  */
 		  if (!cp_parser_require (parser, CPP_CLOSE_SQUARE,
@@ -36953,6 +36964,9 @@ cp_parser_oacc_all_clauses (cp_parser *parser, omp_clause_mask mask,
 {
   tree clauses = NULL;
   bool first = true;
+
+  /* Don't create location wrapper nodes within OpenACC clauses.  */
+  auto_suppress_location_wrappers sentinel;
 
   while (cp_lexer_next_token_is_not (parser->lexer, CPP_PRAGMA_EOL))
     {
@@ -40845,6 +40859,10 @@ check_clauses:
 static tree
 cp_parser_oacc_cache (cp_parser *parser, cp_token *pragma_tok)
 {
+  /* Don't create location wrapper nodes within 'OMP_CLAUSE__CACHE_'
+     clauses.  */
+  auto_suppress_location_wrappers sentinel;
+
   tree stmt, clauses;
 
   clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE__CACHE_, NULL_TREE);

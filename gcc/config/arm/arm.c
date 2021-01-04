@@ -3407,6 +3407,20 @@ arm_configure_build_target (struct arm_build_target *target,
       bitmap_ior (target->isa, target->isa, fpu_bits);
     }
 
+  /* There may be implied bits which we still need to enable. These are
+     non-named features which are needed to complete other sets of features,
+     but cannot be enabled from arm-cpus.in due to being shared between
+     multiple fgroups. Each entry in all_implied_fbits is of the form
+     ante -> cons, meaning that if the feature "ante" is enabled, we should
+     implicitly enable "cons".  */
+  const struct fbit_implication *impl = all_implied_fbits;
+  while (impl->ante)
+    {
+      if (bitmap_bit_p (target->isa, impl->ante))
+	bitmap_set_bit (target->isa, impl->cons);
+      impl++;
+    }
+
   if (!arm_selected_tune)
     arm_selected_tune = arm_selected_cpu;
   else /* Validate the features passed to -mtune.  */
@@ -3431,8 +3445,9 @@ arm_option_override (void)
 {
   static const enum isa_feature fpu_bitlist_internal[]
     = { ISA_ALL_FPU_INTERNAL, isa_nobit };
+  /* isa_bit_mve_float is also part of FP bit list for arch v8.1-m.main.  */
   static const enum isa_feature fp_bitlist[]
-    = { ISA_ALL_FP, isa_nobit };
+    = { ISA_ALL_FP, isa_bit_mve_float, isa_nobit };
   static const enum isa_feature quirk_bitlist[] = { ISA_ALL_QUIRKS, isa_nobit};
   cl_target_option opts;
 
@@ -13252,14 +13267,18 @@ arm_coproc_mem_operand_wb (rtx op, int wb_level)
 
   /* Match:
      (plus (reg)
-	   (const)).  */
+	   (const))
+
+     The encoded immediate for 16-bit modes is multiplied by 2,
+     while the encoded immediate for 32-bit and 64-bit modes is
+     multiplied by 4.  */
+  int factor = MIN (GET_MODE_SIZE (GET_MODE (op)), 4);
   if (GET_CODE (ind) == PLUS
       && REG_P (XEXP (ind, 0))
       && REG_MODE_OK_FOR_BASE_P (XEXP (ind, 0), VOIDmode)
       && CONST_INT_P (XEXP (ind, 1))
-      && INTVAL (XEXP (ind, 1)) > -1024
-      && INTVAL (XEXP (ind, 1)) <  1024
-      && (INTVAL (XEXP (ind, 1)) & 3) == 0)
+      && IN_RANGE (INTVAL (XEXP (ind, 1)), -255 * factor, 255 * factor)
+      && (INTVAL (XEXP (ind, 1)) & (factor - 1)) == 0)
     return TRUE;
 
   return FALSE;
@@ -13356,6 +13375,7 @@ mve_vector_mem_operand (machine_mode mode, rtx op, bool strict)
 	    if (val % 4 == 0 && val >= 0 && val <= 1020)
 	      return ((reg_no < LAST_ARM_REGNUM && reg_no != SP_REGNUM)
 		      || (!strict && reg_no >= FIRST_PSEUDO_REGISTER));
+	    return FALSE;
 	  default:
 	    return FALSE;
 	}
@@ -13410,7 +13430,9 @@ neon_vector_mem_operand (rtx op, int type, bool strict)
   /* Allow post-increment by register for VLDn */
   if (type == 2 && GET_CODE (ind) == POST_MODIFY
       && GET_CODE (XEXP (ind, 1)) == PLUS
-      && REG_P (XEXP (XEXP (ind, 1), 1)))
+      && REG_P (XEXP (XEXP (ind, 1), 1))
+      && REG_P (XEXP (ind, 0))
+      && rtx_equal_p (XEXP (ind, 0), XEXP (XEXP (ind, 1), 0)))
      return true;
 
   /* Match:
@@ -30563,7 +30585,7 @@ arm_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
     case MINUS:
       if (CONST_INT_P (value))
 	{
-	  value = GEN_INT (-INTVAL (value));
+	  value = gen_int_mode (-INTVAL (value), wmode);
 	  code = PLUS;
 	}
       /* FALLTHRU */
@@ -33514,18 +33536,5 @@ arm_mode_base_reg_class (machine_mode mode)
 }
 
 struct gcc_target targetm = TARGET_INITIALIZER;
-
-bool
-arm_mve_mode_and_operands_type_check (machine_mode mode, rtx op0, rtx op1)
-{
-  if (!(TARGET_HAVE_MVE || TARGET_HAVE_MVE_FLOAT))
-    return true;
-  else if (mode == E_BFmode)
-    return false;
-  else if ((s_register_operand (op0, mode) && MEM_P (op1))
-	   || (s_register_operand (op1, mode) && MEM_P (op0)))
-    return false;
-  return true;
-}
 
 #include "gt-arm.h"

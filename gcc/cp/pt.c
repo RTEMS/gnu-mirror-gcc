@@ -8087,9 +8087,10 @@ canonicalize_expr_argument (tree arg, tsubst_flags_t complain)
   return canon;
 }
 
-// A template declaration can be substituted for a constrained
-// template template parameter only when the argument is more
-// constrained than the parameter.
+/* A template declaration can be substituted for a constrained
+   template template parameter only when the argument is no more
+   constrained than the parameter.  */
+
 static bool
 is_compatible_template_arg (tree parm, tree arg)
 {
@@ -8204,7 +8205,7 @@ convert_template_argument (tree parm,
 
   /* When determining whether an argument pack expansion is a template,
      look at the pattern.  */
-  if (TREE_CODE (arg) == TYPE_PACK_EXPANSION)
+  if (PACK_EXPANSION_P (arg))
     arg = PACK_EXPANSION_PATTERN (arg);
 
   /* Deal with an injected-class-name used as a template template arg.  */
@@ -13396,7 +13397,8 @@ tsubst_aggr_type (tree t,
 					 complain, in_decl);
 	  if (argvec == error_mark_node)
 	    r = error_mark_node;
-	  else if (cxx_dialect >= cxx2a && dependent_scope_p (context))
+	  else if (!entering_scope
+		   && cxx_dialect >= cxx2a && dependent_scope_p (context))
 	    {
 	      /* See maybe_dependent_member_ref.  */
 	      tree name = TYPE_IDENTIFIER (t);
@@ -14081,7 +14083,11 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
     {
       tree new_type;
       ++processing_template_decl;
-      new_type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+      if (CLASS_TYPE_P (TREE_TYPE (t)))
+	new_type = tsubst_aggr_type (TREE_TYPE (t), args, complain,
+				     in_decl, /*entering*/1);
+      else
+	new_type = tsubst (TREE_TYPE (t), args, complain, in_decl);
       --processing_template_decl;
       if (new_type == error_mark_node)
 	return error_mark_node;
@@ -15793,6 +15799,10 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	    return error_mark_node;
 	  }
 
+	if (!verify_type_context (input_location, TCTX_ARRAY_ELEMENT, type,
+				  !(complain & tf_error)))
+	  return error_mark_node;
+
 	if (abstract_virtuals_error_sfinae (ACU_ARRAY, type, complain))
 	  return error_mark_node;
 
@@ -17171,6 +17181,7 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 	case OMP_CLAUSE_FROM:
 	case OMP_CLAUSE_TO:
 	case OMP_CLAUSE_MAP:
+	case OMP_CLAUSE__CACHE_:
 	case OMP_CLAUSE_NONTEMPORAL:
 	case OMP_CLAUSE_USE_DEVICE_PTR:
 	case OMP_CLAUSE_USE_DEVICE_ADDR:
@@ -18648,6 +18659,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
       add_stmt (t);
       break;
 
+    case OACC_CACHE:
     case OACC_ENTER_DATA:
     case OACC_EXIT_DATA:
     case OACC_UPDATE:
@@ -19182,7 +19194,8 @@ out:
 }
 
 /* Like tsubst but deals with expressions and performs semantic
-   analysis.  FUNCTION_P is true if T is the "F" in "F (ARGS)".  */
+   analysis.  FUNCTION_P is true if T is the "F" in "F (ARGS)" or
+   "F<TARGS> (ARGS)".  */
 
 tree
 tsubst_copy_and_build (tree t,
@@ -19264,7 +19277,10 @@ tsubst_copy_and_build (tree t,
     case TEMPLATE_ID_EXPR:
       {
 	tree object;
-	tree templ = RECUR (TREE_OPERAND (t, 0));
+	tree templ = tsubst_copy_and_build (TREE_OPERAND (t, 0), args,
+					    complain, in_decl,
+					    function_p,
+					    integral_constant_expression_p);
 	tree targs = TREE_OPERAND (t, 1);
 
 	if (targs)
@@ -19311,13 +19327,21 @@ tsubst_copy_and_build (tree t,
 	  }
 	else
 	  object = NULL_TREE;
-	templ = lookup_template_function (templ, targs);
+
+	tree tid = lookup_template_function (templ, targs);
 
 	if (object)
-	  RETURN (build3 (COMPONENT_REF, TREE_TYPE (templ),
-			 object, templ, NULL_TREE));
+	  RETURN (build3 (COMPONENT_REF, TREE_TYPE (tid),
+			 object, tid, NULL_TREE));
+	else if (identifier_p (templ))
+	  {
+	    /* C++20 P0846: we can encounter an IDENTIFIER_NODE here when
+	       name lookup found nothing when parsing the template name.  */
+	    gcc_assert (cxx_dialect >= cxx2a || seen_error ());
+	    RETURN (tid);
+	  }
 	else
-	  RETURN (baselink_for_fns (templ));
+	  RETURN (baselink_for_fns (tid));
       }
 
     case INDIRECT_REF:
@@ -19904,14 +19928,17 @@ tsubst_copy_and_build (tree t,
 
 	/* We do not perform argument-dependent lookup if normal
 	   lookup finds a non-function, in accordance with the
-	   expected resolution of DR 218.  */
+	   resolution of DR 218.  */
 	if (koenig_p
 	    && ((is_overloaded_fn (function)
 		 /* If lookup found a member function, the Koenig lookup is
 		    not appropriate, even if an unqualified-name was used
 		    to denote the function.  */
 		 && !DECL_FUNCTION_MEMBER_P (get_first_fn (function)))
-		|| identifier_p (function))
+		|| identifier_p (function)
+		/* C++20 P0846: Lookup found nothing.  */
+		|| (TREE_CODE (function) == TEMPLATE_ID_EXPR
+		    && identifier_p (TREE_OPERAND (function, 0))))
 	    /* Only do this when substitution turns a dependent call
 	       into a non-dependent call.  */
 	    && type_dependent_expression_p_push (t)
@@ -19919,9 +19946,13 @@ tsubst_copy_and_build (tree t,
 	  function = perform_koenig_lookup (function, call_args, tf_none);
 
 	if (function != NULL_TREE
-	    && identifier_p (function)
+	    && (identifier_p (function)
+		|| (TREE_CODE (function) == TEMPLATE_ID_EXPR
+		    && identifier_p (TREE_OPERAND (function, 0))))
 	    && !any_type_dependent_arguments_p (call_args))
 	  {
+	    if (TREE_CODE (function) == TEMPLATE_ID_EXPR)
+	      function = TREE_OPERAND (function, 0);
 	    if (koenig_p && (complain & tf_warning_or_error))
 	      {
 		/* For backwards compatibility and good diagnostics, try
@@ -22209,6 +22240,13 @@ resolve_overloaded_unification (tree tparms,
 	      fn = instantiate_template (fn, subargs, tf_none);
 	      if (!constraints_satisfied_p (fn))
 		continue;
+	      if (undeduced_auto_decl (fn))
+		{
+		  /* Instantiate the function to deduce its return type.  */
+		  ++function_depth;
+		  instantiate_decl (fn, /*defer*/false, /*class*/false);
+		  --function_depth;
+		}
 
 	      elem = TREE_TYPE (fn);
 	      if (try_one_overload (tparms, targs, tempargs, parm,
@@ -28834,6 +28872,12 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
   if (DECL_TEMPLATE_TEMPLATE_PARM_P (tmpl))
     return ptype;
 
+  /* Initializing one placeholder from another.  */
+  if (init && TREE_CODE (init) == TEMPLATE_PARM_INDEX
+      && is_auto (TREE_TYPE (init))
+      && CLASS_PLACEHOLDER_TEMPLATE (TREE_TYPE (init)) == tmpl)
+    return cp_build_qualified_type (TREE_TYPE (init), cp_type_quals (ptype));
+
   /* Look through alias templates that just rename another template.  */
   tmpl = get_underlying_template (tmpl);
   if (!ctad_template_p (tmpl))
@@ -28849,10 +28893,6 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
 	pedwarn (input_location, 0, "alias template deduction only available "
 		 "with %<-std=c++2a%> or %<-std=gnu++2a%>");
     }
-
-  if (init && TREE_TYPE (init) == ptype)
-    /* Using the template parm as its own argument.  */
-    return ptype;
 
   tree type = TREE_TYPE (tmpl);
 
