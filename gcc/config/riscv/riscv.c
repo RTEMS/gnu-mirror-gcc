@@ -3663,6 +3663,10 @@ riscv_save_reg_p (unsigned int regno)
   bool might_clobber = crtl->saves_all_registers
 		       || df_regs_ever_live_p (regno);
 
+  /* The $zero register is always zero.  */
+  if (regno == GP_REG_FIRST)
+    return false;
+
   if (call_saved && might_clobber)
     return true;
 
@@ -3675,10 +3679,6 @@ riscv_save_reg_p (unsigned int regno)
   /* If this is an interrupt handler, then must save extra registers.  */
   if (cfun->machine->interrupt_handler_p)
     {
-      /* zero register is always zero.  */
-      if (regno == GP_REG_FIRST)
-	return false;
-
       /* The function will return the stack pointer to its original value.  */
       if (regno == STACK_POINTER_REGNUM)
 	return false;
