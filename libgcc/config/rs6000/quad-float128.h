@@ -171,6 +171,11 @@ extern TFtype __trunctfkf2 (IBM128_TYPE);
 extern TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype);
 
+/* Convert IEEE 128-bit floating point to/from string.  */
+extern TFtype __strtokf (const char *, char **);
+extern int __strfromkf (char *restrict, unsigned long, const char *restrict,
+			TFtype);
+
 /* Implementation of conversions between __ibm128 and __float128, to allow the
    same code to be used on systems with IEEE 128-bit emulation and with IEEE
    128-bit hardware support.  */
