@@ -1023,10 +1023,7 @@ riscv_load_store_insns (rtx mem, rtx_insn *insn)
   bool might_split_p;
   rtx set;
 
-  /* XXX Not sure why this is being called with !MEM_P (mem).  */
-  if (!MEM_P (mem))
-    return 2;
-
+  gcc_assert (MEM_P (mem));
   mode = GET_MODE (mem);
 
   /* Try to prove that INSN does not need to be split.  */
