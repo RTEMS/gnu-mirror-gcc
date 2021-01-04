@@ -1,3 +1,29 @@
+work031-patches/work031.patch005:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/97791
+	* gcc.target/powerpc/gnuattr1.c: Mark as XFAIL.
+	* gcc.target/powerpc/gnuattr2.c: Mark as XFAIL.
+	* gcc.target/powerpc/gnuattr3.c: Mark as XFAIL.
+
+work031-patches/work031.patch003:
+2021-01-04-60  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* gcc.target/powerpc/pr81594.c: New test.
+
+work031-patches/work031.patch002:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+        * gcc.target/powerpc/float128-cmove.c: New test.
+        * gcc.target/powerpc/float128-minmax-3.c: New test.
+
+work031-patches/work031.patch001:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
+
 2021-01-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

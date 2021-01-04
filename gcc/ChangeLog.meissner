@@ -1,3 +1,56 @@
+work031-patches/work031.patch005:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR gcc/97791
+	* config/rs6000/rs6000.c (rs6000_emit_move): Delete code that sets
+	whether long double was passed based on the modes used in moves.
+
+work031-patches/work031.patch004:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+            Alan Modra  <amodra@gmail.com>
+
+	PR gcc/97791
+	* config/rs6000/rs6000-call.c (init_cumulative_args): Only set
+	that long double was returned if the type is actually long
+	double.
+	(rs6000_function_arg_advance_1): Only set that long double was
+	passed if the type is actually long double.
+
+work031-patches/work031.patch003:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* config/rs6000/predicates.md (ds_form_memory): New predicate.
+	* config/rs6000/vsx.md (concatv2di_store): New insn.
+	(dupv2di_store): New insn.
+
+work031-patches/work031.patch002:
+2021-01-04 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
+        128-bit floating point types.
+        * config/rs6000/rs6000.md (FPMASK): New iterator.
+        (FPMASK2): New iterator.
+        (Fv mode attribute): Add KFmode and TFmode.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_p9.  Add IEEE 128-bit fp support.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_invert_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add IEEE 128-bit fp
+        support.
+        (fpmask<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+        (xxsel<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+
+work031-patches/work031.patch001:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs60000.h (FLOAT128_MIN_MAX_FPMASK_P): New macro.
+	* config/rs6000/rs6000.md (s<minmax><mode>3): Add support for the
+	ISA 3.1 IEEE 128-bit minimum and maximum instructions.
+
 2021-01-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
