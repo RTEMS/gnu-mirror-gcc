@@ -262,6 +262,7 @@ extern int str_reorg_instance_interleave ( Info *);
 extern void find_and_create_all_modified_types ( Info_t *);
 extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types ( std::vector<two_trees_t> *, tree);
 extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types_2nd ( std::vector<two_trees_t> *, tree);
+extern void dump_record (FILE *, tree, bool);
 extern tree find_modified ( tree,
 			    #if ALLOW_REVERSE
 			    bool,
@@ -312,7 +313,7 @@ extern const char *optrans_to_str ( enum ReorgOpTrans);
 extern char *reorgtrans_to_str ( enum ReorgTransformation);
 extern bool is_assign_from_ssa ( gimple *);
 
-
+//extern bool use_dump_record; // To use for a debugging hack
 
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be

@@ -1294,6 +1294,9 @@ find_and_create_all_modified_types ( Info_t *info)
     
       // Build the new pointer type fields
       TYPE_NAME ( modified_type) = get_identifier ( rec_name);
+
+      // Make sure this is does (this might be unnecessary)
+      TYPE_FIELDS (modified_type) = NULL;
     }
   //DEBUG_A("Before field creation:\n");
   //DEBUG_F( dump_modified_types, stderr, false, info);
@@ -1305,8 +1308,12 @@ find_and_create_all_modified_types ( Info_t *info)
     {
       tree type = rec_types_work_list.front ();
       rec_types_work_list.pop_front ();
-      //DEBUG_A("type (rec_types_work_list.front) = ");
-      //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+      DEBUG_A("type (rec_types_work_list.front) = ");
+      DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+
+      // Already processed, skip.
+      if ( TYPE_FIELDS ( type) != NULL ) continue;
+      
       //auto pairi = info->modified_types->find (type);
       auto peari = find_in_vec_of_two_types ( info->modified_types, type);
       //gcc_assert( peari != info->modified_types->end ());
@@ -1432,11 +1439,18 @@ find_and_create_all_modified_types ( Info_t *info)
       
       //TYPE_ARTIFICIAL ( modified_type) = 1;  // ???
 
+      //use_dump_record = true; // enables my debugging code added to layout_type
       layout_type ( modified_type);
+      //use_dump_record = false;
       #endif
+
+      //DEBUG_LA("modified_type (right after layout) = \n");
+      //DEBUG_F( dump_record, stderr, modified_type, true);
 
       TypeHolder *holder = &(types->find ( sane_type)->second);
       // Add new types to the work list if possible
+      // Note, this code is adding types to the work list too
+      // agressively and multiple entries are the result.
       for ( auto refingi = holder->refed_types.begin ();
 	    refingi != holder->refed_types.end ();
 	    refingi++  )
@@ -1478,11 +1492,14 @@ find_in_type_vec ( std::vector<tree> *types, tree type)
   return types->end ();
 }
 
+bool use_dump_record = false;
+
 void
-dump_record (FILE *file, tree record_type, bool extra_details, Info_t *info)
+dump_record (FILE *file, tree record_type, bool extra_details) 
 {
-  //DEBUG_A("dump_record:>\n");
+  fprintf ( stderr, "dump_record:>\n");
   tree field;
+  fprintf ( file, "  %p, ", record_type);
   flexible_print ( file, record_type, 1, (dump_flags_t)0);
   for ( field = TYPE_FIELDS ( record_type);
 	field; field = DECL_CHAIN ( field))
@@ -1495,12 +1512,14 @@ dump_record (FILE *file, tree record_type, bool extra_details, Info_t *info)
 	  if ( off )
 	    {
 	      fprintf ( file, "    ");
-	      flexible_print ( file, off, 1, (dump_flags_t)0);
+	      flexible_print ( file, off, 0, (dump_flags_t)0);
 	    }
 	  else
 	    {
-	      fprintf ( file, "    (nil)\n");
+	      fprintf ( file, "    (nil)");
 	    }
+	  fprintf ( file, ", %p", &DECL_FIELD_OFFSET ( field));
+	  fprintf ( file, "\n");
 	}
     }
 }
@@ -1509,7 +1528,7 @@ static void
 dump_modified_types (FILE *file, bool extra_details, Info_t *info)
 {
   //DEBUG_A("");
-  fprintf ( file, "dump_modified_types:%s\n",
+  fprintf ( file, "dump_modified_types:> %s\n",
 	    info->modified_types->begin () == info->modified_types->end ()
 	    ? " (empty)" : "");
   for ( auto modifi = info->modified_types->begin ();
@@ -1519,9 +1538,8 @@ dump_modified_types (FILE *file, bool extra_details, Info_t *info)
       tree orig_type = modifi->first;
       tree new_type = modifi->second;
       //DEBUG_A("");
-      fprintf ( file, "  %p, ", TYPE_FIELDS ( orig_type));
       #if 1
-      dump_record (file, orig_type, extra_details, info);
+      dump_record (file, orig_type, extra_details);
       #else
       flexible_print ( file, orig_type, 1, (dump_flags_t)0);
       for ( field = TYPE_FIELDS ( orig_type);
@@ -1546,9 +1564,8 @@ dump_modified_types (FILE *file, bool extra_details, Info_t *info)
 	}
       #endif
       //DEBUG_A("");
-      fprintf ( file, "  %p, ", TYPE_FIELDS ( new_type));
       #if 1
-      dump_record (file, new_type, extra_details, info);
+      dump_record (file, new_type, extra_details);
       #else
       flexible_print ( file, new_type, 1, (dump_flags_t)0);
       for ( field = TYPE_FIELDS ( new_type);
