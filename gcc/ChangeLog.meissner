@@ -1,3 +1,32 @@
+work031-patches/work031.patch013:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If the
+	user explicitly used -mabi=ieeelongdouble or -mabi=ibmlongdouble,
+	set the long double size to 128.
+	* doc/invoke.texi (PowerPC options): Document that an explicit
+	-mabi=ieeelongdouble or -mabi=ibmlongdouble implicitly sets
+	-mlong-double-128.
+
+work031-patches/work031.patch011:
+2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
 work031-patches/work031.patch006:
 2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
 
@@ -7,15 +36,6 @@ work031-patches/work031.patch006:
 	function names for long double built-in functions if long double is
 	IEEE 128-bit to catch all of the built-in functions that take or
 	return long double arguments.
-
-gcc/testsuite/
-2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
-
-	* gcc.target/powerpc/float128-longdouble-math.c: New test.
-	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
-	* gcc.target/powerpc/float128-math.c: Adjust test for new name
-	being generated.  Add support for running test on power10.  Add
-	support for running if long double defaults to 64-bits.
 
 work031-patches/work031.patch005:
 2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
