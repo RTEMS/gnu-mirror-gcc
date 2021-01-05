@@ -287,32 +287,72 @@
 [VEC_AND, vec_and, __builtin_vec_and]
   vsc __builtin_vec_and (vsc, vsc);
     VAND_V16QI
+  vsc __builtin_vec_and (vsc, vbc);
+    VAND_V16QI  VAND_VSC_VBC
+  vsc __builtin_vec_and (vbc, vsc);
+    VAND_V16QI  VAND_VBC_VSC
   vuc __builtin_vec_and (vuc, vuc);
     VAND_V16QI_UNS  VAND_VUC
   vbc __builtin_vec_and (vbc, vbc);
     VAND_V16QI_UNS  VAND_VBC
+  vuc __builtin_vec_and (vuc, vbc);
+    VAND_V16QI_UNS  VAND_VUC_VBC
+  vuc __builtin_vec_and (vbc, vuc);
+    VAND_V16QI_UNS  VAND_VBC_VUC
   vss __builtin_vec_and (vss, vss);
     VAND_V8HI
+  vss __builtin_vec_and (vss, vbs);
+    VAND_V8HI  VAND_VSS_VBS
+  vss __builtin_vec_and (vss, vbs);
+    VAND_V8HI  VAND_VBS_VSS
   vus __builtin_vec_and (vus, vus);
     VAND_V8HI_UNS  VAND_VUS
   vbs __builtin_vec_and (vbs, vbs);
     VAND_V8HI_UNS  VAND_VBS
+  vus __builtin_vec_and (vus, vbs);
+    VAND_V8HI_UNS  VAND_VUS_VBS
+  vus __builtin_vec_and (vbs, vus);
+    VAND_V8HI_UNS  VAND_VBS_VUS
   vsi __builtin_vec_and (vsi, vsi);
     VAND_V4SI
+  vsi __builtin_vec_and (vsi, vbi);
+    VAND_V4SI  VAND_VSI_VBI
+  vsi __builtin_vec_and (vbi, vsi);
+    VAND_V4SI  VAND_VBI_VSI
   vui __builtin_vec_and (vui, vui);
     VAND_V4SI_UNS  VAND_VUI
   vbi __builtin_vec_and (vbi, vbi);
     VAND_V4SI_UNS  VAND_VBI
+  vui __builtin_vec_and (vui, vbi);
+    VAND_V4SI_UNS  VAND_VUI_VBI
+  vui __builtin_vec_and (vbi, vui);
+    VAND_V4SI_UNS  VAND_VBI_VUI
   vsll __builtin_vec_and (vsll, vsll);
     VAND_V2DI
+  vsll __builtin_vec_and (vsll, vbll);
+    VAND_V2DI  VAND_VSLL_VBLL
+  vsll __builtin_vec_and (vbll, vsll);
+    VAND_V2DI  VAND_VBLL_VSLL
   vull __builtin_vec_and (vull, vull);
     VAND_V2DI_UNS  VAND_VULL
   vbll __builtin_vec_and (vbll, vbll);
     VAND_V2DI_UNS  VAND_VBLL
+  vull __builtin_vec_and (vull, vbll);
+    VAND_V2DI_UNS  VAND_VULL_VBLL
+  vull __builtin_vec_and (vbll, vull);
+    VAND_V2DI_UNS  VAND_VBLL_VULL
   vf __builtin_vec_and (vf, vf);
     VAND_V4SF
+  vf __builtin_vec_and (vf, vbi);
+    VAND_V4SF  VAND_VF_VBI
+  vf __builtin_vec_and (vbi, vf);
+    VAND_V4SF  VAND_VBI_VF
   vd __builtin_vec_and (vd, vd);
     VAND_V2DF
+  vd __builtin_vec_and (vd, vbll);
+    VAND_V2DF  VAND_VD_VBLL
+  vd __builtin_vec_and (vbll, vd);
+    VAND_V2DF  VAND_VBLL_VD
 
 [VEC_ANDC, vec_andc, __builtin_vec_andc]
   vbc __builtin_vec_andc (vbc, vbc);
