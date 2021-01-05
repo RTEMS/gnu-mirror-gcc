@@ -27312,7 +27312,7 @@ rs6000_mangle_decl_assembler_name (tree decl, tree id)
 	      else if (identifier_ends_in_suffix (id, "l_r"))
 		{
 		  int len_m3 = len - 3;		/* eliminate 'l_r'.  */
-		  new_name = xasprintf ("__%.*sieee128", len_m3, name);
+		  new_name = xasprintf ("__%.*sieee128_r", len_m3, name);
 		}
 	      else
 		warning (0, "No IEEE 128-bit %qs built-in function", name);
