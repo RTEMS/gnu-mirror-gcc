@@ -51,7 +51,7 @@ rs6000-gen-builtins: rs6000-gen-builtins.o rbtree.o
 	$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
 	    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)
 
-# TODO: Whenever GNU make 4.3 is the minimum required, we should us
+# TODO: Whenever GNU make 4.3 is the minimum required, we should use
 # grouped targets on this:
 #    rs6000-builtins.c rs6000-builtins.h rs6000-vecdefines.h &: <deps>
 #       <recipe>
@@ -62,8 +62,8 @@ rs6000-builtins.c: rs6000-gen-builtins \
 		$(srcdir)/config/rs6000/rs6000-overload.def rs6000-builtins.h \
 		rs6000-builtins.c rs6000-vecdefines.h
 
-# Theoretical race here, but because rs6000-vecdefines.h is only needed
-# at install time, that does not matter in practice.
+rs6000-builtins.h: rs6000-builtins.c
+
 EXTRA_HEADERS += rs6000-vecdefines.h
 rs6000-vecdefines.h : rs6000-builtins.c
 

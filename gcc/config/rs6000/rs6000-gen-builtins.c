@@ -2261,7 +2261,11 @@ write_decls ()
   /* #### Note that the _x is added for now to avoid conflict with
      the existing rs6000_builtin_info[] file while testing.  It will
      be removed as we progress.  */
-  fprintf (header_file, "extern GTY(()) bifdata rs6000_builtin_info_x[];\n\n");
+  /* #### Cannot mark this as a GC root because only pointer types can
+     be marked as GTY((user)) and be GC roots.  All trees in here are
+     kept alive by other globals, but not sure what to do with this.  */
+  fprintf (header_file,
+	   "extern bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");
 
   fprintf (header_file, "struct GTY((user)) ovlddata\n");
   fprintf (header_file, "{\n");
@@ -2277,7 +2281,11 @@ write_decls ()
   fprintf (header_file, "  ovlddata *first_instance;\n");
   fprintf (header_file, "};\n\n");
 
-  fprintf (header_file, "extern GTY(()) ovlddata rs6000_instance_info[];\n");
+  /* #### Cannot mark this as a GC root because only pointer types can
+     be marked as GTY((user)) and be GC roots.  All trees in here are
+     kept alive by other globals, but not sure what to do with this.  */
+  fprintf (header_file,
+	   "extern ovlddata rs6000_instance_info[RS6000_INST_MAX];\n");
   fprintf (header_file, "extern ovldrecord rs6000_overload_info[];\n\n");
 
   fprintf (header_file, "extern void rs6000_autoinit_builtins ();\n\n");

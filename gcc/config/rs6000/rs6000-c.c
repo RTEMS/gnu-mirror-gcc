@@ -2971,7 +2971,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
     if (unsupported_builtin)
       {
 	const char *name = rs6000_overload_info[adj_fcode].ovld_name;
-	if (supported)
+	if (!supported)
 	  {
 	    const char *internal_name
 	      = rs6000_builtin_info_x[instance->bifid].bifname;
