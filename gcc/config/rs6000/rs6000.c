@@ -27095,172 +27095,6 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
 #endif
 
 
-/* If long double uses the IEEE 128-bit representation, return the name used
-   within GLIBC for the IEEE 128-bit long double built-in, instead of the
-   default IBM 128-bit long double built-in.  Or return NULL if the built-in
-   function does not use long double.  */
-
-static const char *
-ieee128_builtin_name (built_in_function fn)
-{
-  switch (fn)
-    {
-    default:			return NULL;
-    case BUILT_IN_ACOSHL:	return "__acoshieee128";
-    case BUILT_IN_ACOSL:	return "__acosieee128";
-    case BUILT_IN_ASINHL:	return "__asinhieee128";
-    case BUILT_IN_ASINL:	return "__asinieee128";
-    case BUILT_IN_ATAN2L:	return "__atan2ieee128";
-    case BUILT_IN_ATANHL:	return "__atanhieee128";
-    case BUILT_IN_ATANL:	return "__atanieee128";
-    case BUILT_IN_CABSL:	return "__cabsieee128";
-    case BUILT_IN_CACOSHL:	return "__cacoshieee128";
-    case BUILT_IN_CACOSL:	return "__cacosieee128";
-    case BUILT_IN_CARGL:	return "__cargieee128";
-    case BUILT_IN_CASINHL:	return "__casinhieee128";
-    case BUILT_IN_CASINL:	return "__casinieee128";
-    case BUILT_IN_CATANHL:	return "__catanhieee128";
-    case BUILT_IN_CATANL:	return "__catanieee128";
-    case BUILT_IN_CBRTL:	return "__cbrtieee128";
-    case BUILT_IN_CCOSHL:	return "__ccoshieee128";
-    case BUILT_IN_CCOSL:	return "__ccosieee128";
-    case BUILT_IN_CEILL:	return "__ceilieee128";
-    case BUILT_IN_CEXPL:	return "__cexpieee128";
-    case BUILT_IN_CIMAGL:	return "__cimagieee128";
-    case BUILT_IN_CLOG10L:	return "__clog10ieee128";
-    case BUILT_IN_CLOGL:	return "__clogieee128";
-    case BUILT_IN_CONJL:	return "__conjieee128";
-    case BUILT_IN_COPYSIGNL:	return "__copysignieee128";
-    case BUILT_IN_COSHL:	return "__coshieee128";
-    case BUILT_IN_COSL:		return "__cosieee128";
-    case BUILT_IN_CPOWL:	return "__cpowieee128";
-    case BUILT_IN_CPROJL:	return "__cprojieee128";
-    case BUILT_IN_CREALL:	return "__crealieee128";
-    case BUILT_IN_CSINHL:	return "__csinhieee128";
-    case BUILT_IN_CSINL:	return "__csinieee128";
-    case BUILT_IN_CSQRTL:	return "__csqrtieee128";
-    case BUILT_IN_CTANHL:	return "__ctanhieee128";
-    case BUILT_IN_CTANL:	return "__ctanieee128";
-    case BUILT_IN_DREML:	return "__remainderieee128";
-    case BUILT_IN_ERFCL:	return "__erfcieee128";
-    case BUILT_IN_ERFL:		return "__erfieee128";
-    case BUILT_IN_EXP10L:	return "__exp10ieee128";
-    case BUILT_IN_EXP2L:	return "__exp2ieee128";
-    case BUILT_IN_EXPL:		return "__expieee128";
-    case BUILT_IN_EXPM1L:	return "__expm1ieee128";
-    case BUILT_IN_FABSL:	return "__fabsieee128";
-    case BUILT_IN_FDIML:	return "__fdimieee128";
-    case BUILT_IN_FINITEL:	return "__finiteieee128";
-    case BUILT_IN_FLOORL:	return "__floorieee128";
-    case BUILT_IN_FMAL:		return "__fmaieee128";
-    case BUILT_IN_FMAXL:	return "__fmaxieee128";
-    case BUILT_IN_FMINL:	return "__fminieee128";
-    case BUILT_IN_FMODL:	return "__fmodieee128";
-    case BUILT_IN_FPRINTF:	return "__fprintfieee128";
-    case BUILT_IN_FREXPL:	return "__frexpieee128";
-    case BUILT_IN_FSCANF:	return "__isoc99_fscanfieee128";
-    case BUILT_IN_GAMMAL:	return "__lgammaieee128";
-    case BUILT_IN_GAMMAL_R:	return "__lgammaieee128_r";
-    case BUILT_IN_HYPOTL:	return "__hypotieee128";
-    case BUILT_IN_ILOGBL:	return "__ilogbieee128";
-    case BUILT_IN_ISINFL:	return "__isinfieee128";
-    case BUILT_IN_ISNANL:	return "__isnanieee128";
-    case BUILT_IN_J0L:		return "__j0ieee128";
-    case BUILT_IN_J1L:		return "__j1ieee128";
-    case BUILT_IN_JNL:		return "__jnieee128";
-    case BUILT_IN_LDEXPL:	return "__ldexpieee128";
-    case BUILT_IN_LGAMMAL:	return "__lgammaieee128";
-    case BUILT_IN_LGAMMAL_R:	return "__lgammaieee128_r";
-    case BUILT_IN_LLRINTL:	return "__llrintieee128";
-    case BUILT_IN_LLROUNDL:	return "__llroundieee128";
-    case BUILT_IN_LOG10L:	return "__log10ieee128";
-    case BUILT_IN_LOG1PL:	return "__log1pieee128";
-    case BUILT_IN_LOG2L:	return "__log2ieee128";
-    case BUILT_IN_LOGBL:	return "__logbieee128";
-    case BUILT_IN_LOGL:		return "__logieee128";
-    case BUILT_IN_LRINTL:	return "__lrintieee128";
-    case BUILT_IN_LROUNDL:	return "__lroundieee128";
-    case BUILT_IN_MODFL:	return "__modfieee128";
-    case BUILT_IN_NEARBYINTL:	return "__nearbyintieee128";
-    case BUILT_IN_NEXTAFTERL:	return "__nextafterieee128";
-    case BUILT_IN_NEXTTOWARD:	return "__nexttoward_to_ieee128";
-    case BUILT_IN_NEXTTOWARDF:	return "__nexttowardf_to_ieee128";
-    case BUILT_IN_NEXTTOWARDL:	return "__nexttowardieee128";
-    case BUILT_IN_POW10L:	return "__exp10ieee128";
-    case BUILT_IN_POWL:		return "__powieee128";
-    case BUILT_IN_PRINTF:	return "__printfieee128";
-    case BUILT_IN_REMAINDERL:	return "__remainderieee128";
-    case BUILT_IN_REMQUOL:	return "__remquoieee128";
-    case BUILT_IN_RINTL:	return "__rintieee128";
-    case BUILT_IN_ROUNDEVENL:	return "__roundevenieee128";
-    case BUILT_IN_ROUNDL:	return "__roundieee128";
-    case BUILT_IN_SCALBL:	return "__scalbieee128";
-    case BUILT_IN_SCALBLNL:	return "__scalblnieee128";
-    case BUILT_IN_SCALBNL:	return "__scalbnieee128";
-    case BUILT_IN_SCANF:	return "__isoc99_scanfieee128";
-    case BUILT_IN_SIGNBITL:	return "__signbitieee128";
-    case BUILT_IN_SIGNIFICANDL:	return "__significandieee128";
-    case BUILT_IN_SINCOSL:	return "__sincosieee128";
-    case BUILT_IN_SINHL:	return "__sinhieee128";
-    case BUILT_IN_SINL:		return "__sinieee128";
-    case BUILT_IN_SNPRINTF:	return "__snprintfieee128";
-    case BUILT_IN_SPRINTF:	return "__sprintfieee128";
-    case BUILT_IN_SQRTL:	return "__sqrtieee128";
-    case BUILT_IN_SSCANF:	return "__isoc99_sscanfieee128";
-    case BUILT_IN_TANHL:	return "__tanhieee128";
-    case BUILT_IN_TANL:		return "__tanieee128";
-    case BUILT_IN_TGAMMAL:	return "__tgammaieee128";
-    case BUILT_IN_TRUNCL:	return "__truncieee128";
-    case BUILT_IN_VFPRINTF:	return "__vfprintfieee128";
-    case BUILT_IN_VFSCANF:	return "__isoc99_vfscanfieee128";
-    case BUILT_IN_VPRINTF:	return "__vprintfieee128";
-    case BUILT_IN_VSCANF:	return "__isoc99_vscanfieee128";
-    case BUILT_IN_VSNPRINTF:	return "__vsnprintfieee128";
-    case BUILT_IN_VSPRINTF:	return "__vsprintfieee128";
-    case BUILT_IN_VSSCANF:	return "__isoc99_vsscanfieee128";
-    case BUILT_IN_Y0L:		return "__y0ieee128";
-    case BUILT_IN_Y1L:		return "__y1ieee128";
-    case BUILT_IN_YNL:		return "__ynieee128";
-    }
-}
-
-/* Return true if a built-in function returns or passes a long double type.  */
-static bool
-built_in_uses_long_double (tree decl)
-{
-  tree type = TREE_TYPE (decl);
-  machine_mode ret_mode = TYPE_MODE (type);
-
-  /* See if the function returns a long double type.  */
-  if (ret_mode == TFmode || ret_mode == TCmode)
-    return true;
-
-  function_args_iterator args_iter;
-  tree arg;
-
-  /* See if the function passes a long double type.  */
-  FOREACH_FUNCTION_ARGS (type, arg, args_iter)
-    {
-      machine_mode arg_mode = TYPE_MODE (arg);
-      if (arg_mode == TFmode || arg_mode == TCmode)
-	return true;
-    }
-
-  return false;
-}
-
-/* Return true if an identifier ends in a specific suffix.  */
-static bool
-identifier_ends_in_suffix (tree id, const char *suffix)
-{
-  size_t suffix_len = strlen (suffix);
-  size_t id_len = IDENTIFIER_LENGTH (id);
-
-  return (id_len > suffix_len
-	  && strcmp (IDENTIFIER_POINTER (id), suffix) == 0);
-}
-
-
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
    function names from <foo>l to <foo>f128 if the default long double type is
    IEEE 128-bit.  Typically, with the C and C++ languages, the standard math.h
@@ -27281,61 +27115,51 @@ identifier_ends_in_suffix (tree id, const char *suffix)
 static tree
 rs6000_mangle_decl_assembler_name (tree decl, tree id)
 {
-  if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+  if (!TARGET_IEEEQUAD_DEFAULT && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
       && TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_IS_UNDECLARED_BUILTIN (decl)
-      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
+      && DECL_IS_UNDECLARED_BUILTIN (decl))
     {
-      const char *ieee_name = ieee128_builtin_name (DECL_FUNCTION_CODE (decl));
-      tree id_orig = id;
+      size_t len = IDENTIFIER_LENGTH (id);
+      const char *name = IDENTIFIER_POINTER (id);
 
-      if (ieee_name)
-	id = get_identifier (ieee_name);
-
-      /* If we did not get an IEEE 128-bit built-in name, check to see if a new
-	 math built-in function that is passed or returns long double arguments.
-	 If it ends in 'l' or 'l_r', convert the name the GLIBC IEEE 128-bit
-	 built-in name.  */
-      if (!ieee_name)
+      if (name[len - 1] == 'l')
 	{
-	  const char *name = IDENTIFIER_POINTER (id);
-	  char *new_name = NULL;
-	  size_t len = IDENTIFIER_LENGTH (id);
+	  bool uses_ieee128_p = false;
+	  tree type = TREE_TYPE (decl);
+	  machine_mode ret_mode = TYPE_MODE (type);
 
-	  if (built_in_uses_long_double (decl))
+	  /* See if the function returns a IEEE 128-bit floating point type or
+	     complex type.  */
+	  if (ret_mode == TFmode || ret_mode == TCmode)
+	    uses_ieee128_p = true;
+	  else
 	    {
-	      if (identifier_ends_in_suffix (id, "l"))
+	      function_args_iterator args_iter;
+	      tree arg;
+
+	      /* See if the function passes a IEEE 128-bit floating point type
+		 or complex type.  */
+	      FOREACH_FUNCTION_ARGS (type, arg, args_iter)
 		{
-		  int len_m1 = len - 1;		/* eliminate 'l'.  */
-		  new_name = xasprintf ("__%.*sieee128", len_m1, name);
+		  machine_mode arg_mode = TYPE_MODE (arg);
+		  if (arg_mode == TFmode || arg_mode == TCmode)
+		    {
+		      uses_ieee128_p = true;
+		      break;
+		    }
 		}
-	      else if (identifier_ends_in_suffix (id, "l_r"))
-		{
-		  int len_m3 = len - 3;		/* eliminate 'l_r'.  */
-		  new_name = xasprintf ("__%.*sieee128_r", len_m3, name);
-		}
-	      else
-		warning (0, "No IEEE 128-bit %qs built-in function", name);
 	    }
 
-	  /* Check that no new printf/scanf functions were added.  */
-	  else if (identifier_ends_in_suffix (id, "printf"))
-	    new_name = xasprintf ("__%sieee128", name);
-
-	  else if (identifier_ends_in_suffix (id, "scanf"))
-	    new_name = xasprintf ("__isoc99_%sieee128", name);
-
-	  if (new_name)
+	  /* If we passed or returned an IEEE 128-bit floating point type,
+	     change the name.  */
+	  if (uses_ieee128_p)
 	    {
-	      id = get_identifier (new_name);
-	      free ((void *)new_name);
+	      char *name2 = (char *) alloca (len + 4);
+	      memcpy (name2, name, len - 1);
+	      strcpy (name2 + len - 1, "f128");
+	      id = get_identifier (name2);
 	    }
 	}
-
-      if (id != id_orig && TARGET_DEBUG_BUILTIN)
-	fprintf (stderr, "Map %s => %s\n",
-		 IDENTIFIER_POINTER (id_orig),
-		 IDENTIFIER_POINTER (id));
     }
 
   return id;
