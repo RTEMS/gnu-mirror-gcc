@@ -2263,7 +2263,10 @@ write_decls ()
      be removed as we progress.  */
   /* #### Cannot mark this as a GC root because only pointer types can
      be marked as GTY((user)) and be GC roots.  All trees in here are
-     kept alive by other globals, but not sure what to do with this.  */
+     kept alive by other globals, so not a big deal.  Alternatively,
+     we could change the enum fields to ints and cast them in and out
+     to avoid requiring a GTY((user)) designation, but that seems
+     unnecessarily gross.  */
   fprintf (header_file,
 	   "extern bifdata rs6000_builtin_info_x[RS6000_BIF_MAX];\n\n");
 
@@ -2283,7 +2286,10 @@ write_decls ()
 
   /* #### Cannot mark this as a GC root because only pointer types can
      be marked as GTY((user)) and be GC roots.  All trees in here are
-     kept alive by other globals, but not sure what to do with this.  */
+     kept alive by other globals, so not a big deal.  Alternatively,
+     we could change the enum fields to ints and cast them in and out
+     to avoid requiring a GTY((user)) designation, but that seems
+     unnecessarily gross.  */
   fprintf (header_file,
 	   "extern ovlddata rs6000_instance_info[RS6000_INST_MAX];\n");
   fprintf (header_file, "extern ovldrecord rs6000_overload_info[];\n\n");
