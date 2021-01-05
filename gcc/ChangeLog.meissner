@@ -28,10 +28,11 @@ work031-patches/work031.patch011:
 	RS6000_BTM_FLOAT128.
 
 work031-patches/work031.patch006:
-2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-05  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (ieee128_builtin_name): New function.
 	(built_in_uses_long_double): New function.
+	(identifier_ends_in_suffix): New function.
 	(rs6000_mangle_decl_assembler_name): Update support for mapping built-in
 	function names for long double built-in functions if long double is
 	IEEE 128-bit to catch all of the built-in functions that take or

@@ -23,7 +23,7 @@ work031-patches/work031.patch008:
 	(check_effective_target_ppc_long_double_64bit): New function.
 
 work031-patches/work031.patch006:
-2021-01-04  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-05  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-longdouble-math.c: New test.
 	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
