@@ -645,6 +645,9 @@ private:
 class expr_collector : public expr_walker
 {
 public:
+  type_collector _type_collector;
+  hash_set<tree> *ptrset3;
+
   expr_collector (tpartitions2_t &p)
   : _type_collector (p), ptrset3(NULL)
   {
@@ -660,9 +663,6 @@ public:
   {
     return _type_collector.get_record_reaching_trees ();
   }
-
-  hash_set<tree> *ptrset3;
-  type_collector _type_collector;
 
 private:
   /* Catch all callback for all nested expressions E.  */
@@ -774,27 +774,27 @@ struct Reason
   }
 
   // Escapes because a global variable is visible.
-  bool global_is_visible : 1;
+  bool global_is_visible;
 
   // Escapes because a parameter is used in an
   // externally visible function.
-  bool parameter_is_visible : 1;
+  bool parameter_is_visible;
 
   // Escapes because return value is from
   // an externally visible function.
-  bool return_is_visible : 1;
+  bool return_is_visible;
 
   // Escapes because of casting.
-  bool type_is_casted : 1;
+  bool type_is_casted;
 
   // Escapes because it is volatile.
-  bool type_is_volatile : 1;
+  bool type_is_volatile;
 
   // Escapes because it is in union.
-  bool type_is_in_union : 1;
+  bool type_is_in_union;
 
   // Escapes because is in indirect function call.
-  bool is_indirect : 1;
+  bool is_indirect;
 
   // Merge two reason.
   Reason operator| (const Reason &);
@@ -805,9 +805,9 @@ struct Reason
 
   // Initialize as non-escaping by default.
   Reason ()
-    : global_is_visible (0), parameter_is_visible (0), return_is_visible (0),
-      type_is_casted (0), type_is_volatile (0), type_is_in_union (0),
-      is_indirect (0)
+    : global_is_visible (false), parameter_is_visible (false), return_is_visible (false),
+      type_is_casted (false), type_is_volatile (false), type_is_in_union (false),
+      is_indirect (false)
 {};
 };
 
@@ -824,12 +824,12 @@ typedef hash_map<tree, Reason> typemap2;
 class type_escaper : public type_walker
 {
 public:
+  // Hold the partitions for escaping non escaping.
+  tpartitions2_t &_ptrset2;
+
   type_escaper (tpartitions2_t &p)
     : _ptrset2 (p), _inside_union (0), _inside_record (0)
   {};
-
-  // Hold the partitions for escaping non escaping.
-  tpartitions2_t &_ptrset2;
 
   // Have information that matches a tree type with
   // why a type is escaping.
