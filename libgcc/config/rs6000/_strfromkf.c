@@ -39,26 +39,24 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #error "Long double is not IBM 128-bit"
 #endif
 
-/* If the user is using GLIBC 2.32, we can use the __strfromieee128 function.
+/* If the user is using GLIBC 2.32, we can use the __snprintfieee128 function.
 
    If we are linked against an earlier library, we will have fake it by
    converting the value to long double, and using snprinf to do the conversion.
    This isn't ideal, as IEEE 128-bit has more exponent range than IBM
    128-bit.  */
 
-extern int __strfromieee128 (char *restrict, size_t, const char *restrict,
-			     TFtype)
-  __attribute__ ((__weak__));
+typedef int snprintf_type (char *restrict, size_t, const char *restrict, ...);
+
+extern snprintf_type __snprintfieee128 __attribute__ ((__weak__));
 
 int __strfromkf (char *restrict string,
-		 unsigned long size,
+		 size_t size,
 		 const char *restrict format,
-		 TFtype number)
+		 _Float128 number)
 {
-  size_t size2 = size;
+  if (__snprintfieee128)
+    return __snprintfieee128 (string, size, format, number);
 
-  if (__strfromieee128)
-    return __strfromieee128 (string, size2, format, number);
-
-  return snprintf (string, size2, format, (long double)number);
+  return snprintf (string, size, format, (long double)number);
 }

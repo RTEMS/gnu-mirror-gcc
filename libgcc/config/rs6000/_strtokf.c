@@ -41,9 +41,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    __float128.  This isn't ideal, as IEEE 128-bit has more exponent range than
    IBM 128-bit.  */
 
-extern TFtype __strtoieee128 (const char *, char **) __attribute__ ((__weak__));
+extern _Float128 __strtoieee128 (const char *, char **) __attribute__ ((__weak__));
 
-TFtype
+_Float128
 __strtokf (const char *string, char **endptr)
 {
   long double num;
@@ -52,5 +52,5 @@ __strtokf (const char *string, char **endptr)
     return __strtoieee128 (string, endptr);
 
   num = strtold (string, endptr);
-  return (TFtype) num;
+  return (_Float128) num;
 }
