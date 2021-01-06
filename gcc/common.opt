@@ -3495,7 +3495,7 @@ Common Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
 
 fipa-type-escape-analysis
-Common Report Var(flag_ipa_type_escape_analysis) Optimization
+Common Var(flag_ipa_type_escape_analysis) Optimization
 This flag is only used for debugging the type escape analysis
 
 Wdfa
@@ -3503,11 +3503,11 @@ Common Var(warn_dfa) Init(1) Warning
 Warn about dead fields at link time.
 
 fipa-field-reorder
-Common Report Var(flag_ipa_field_reorder) Optimization
+Common Var(flag_ipa_field_reorder) Optimization
 Reorder fields.
 
 fipa-dlo-tests
-Common Report Var(flag_ipa_dlo_tests)
+Common Var(flag_ipa_dlo_tests)
 A flag to make it easier to test
 
 ; This comment is to ensure we retain the blank line above.
