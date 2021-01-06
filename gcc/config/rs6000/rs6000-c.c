@@ -2902,7 +2902,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	gcc_assert (instance != NULL);
 	tree fntype = rs6000_builtin_info_x[instance->bifid].fntype;
 	tree parmtype0 = TREE_VALUE (TYPE_ARG_TYPES (fntype));
-	tree parmtype1 = TREE_VALUE (TREE_CHAIN (parmtype0));
+	tree parmtype1 = TREE_VALUE (TREE_CHAIN (TYPE_ARG_TYPES (fntype)));
 
 	if (rs6000_new_builtin_type_compatible (types[0], parmtype0)
 	    && rs6000_new_builtin_type_compatible (types[1], parmtype1))

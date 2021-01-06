@@ -192,42 +192,8 @@ void f2() {
   *var_vec_b16++ = vec_splat(var_vec_b16[0], 7);
 }
 void f3() {
-  *var_vec_b16++ = vec_srl(var_vec_b16[0], var_vec_u16[1]);
-  *var_vec_b16++ = vec_srl(var_vec_b16[0], var_vec_u32[1]);
-  *var_vec_b16++ = vec_srl(var_vec_b16[0], var_vec_u8[1]);
   *var_vec_b16++ = vec_unpackh(var_vec_b8[0]);
   *var_vec_b16++ = vec_unpackl(var_vec_b8[0]);
-  *var_vec_b16++ = vec_vand(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vandc(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vcmpequh(var_vec_s16[0], var_vec_s16[1]);
-  *var_vec_b16++ = vec_vcmpequh(var_vec_u16[0], var_vec_u16[1]);
-  *var_vec_b16++ = vec_vcmpgtsh(var_vec_s16[0], var_vec_s16[1]);
-  *var_vec_b16++ = vec_vcmpgtuh(var_vec_u16[0], var_vec_u16[1]);
-  *var_vec_b16++ = vec_vmrghh(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vmrglh(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vnor(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vor(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b16++ = vec_vperm(var_vec_b16[0], var_vec_b16[1], var_vec_u8[2]);
-  *var_vec_b16++ = vec_vpkuwum(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b16++ = vec_vsel(var_vec_b16[0], var_vec_b16[1], var_vec_b16[2]);
-  *var_vec_b16++ = vec_vsel(var_vec_b16[0], var_vec_b16[1], var_vec_u16[2]);
-  *var_vec_b16++ = vec_vsl(var_vec_b16[0], var_vec_u16[1]);
-  *var_vec_b16++ = vec_vsl(var_vec_b16[0], var_vec_u32[1]);
-  *var_vec_b16++ = vec_vsl(var_vec_b16[0], var_vec_u8[1]);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 0);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 1);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 2);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 3);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 4);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 5);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 6);
-  *var_vec_b16++ = vec_vsplth(var_vec_b16[0], 7);
-  *var_vec_b16++ = vec_vsr(var_vec_b16[0], var_vec_u16[1]);
-  *var_vec_b16++ = vec_vsr(var_vec_b16[0], var_vec_u32[1]);
-  *var_vec_b16++ = vec_vsr(var_vec_b16[0], var_vec_u8[1]);
-  *var_vec_b16++ = vec_vupkhsb(var_vec_b8[0]);
-  *var_vec_b16++ = vec_vupklsb(var_vec_b8[0]);
-  *var_vec_b16++ = vec_vxor(var_vec_b16[0], var_vec_b16[1]);
   *var_vec_b16++ = vec_xor(var_vec_b16[0], var_vec_b16[1]);
   *var_vec_b32++ = vec_and(var_vec_b32[0], var_vec_b32[1]);
   *var_vec_b32++ = vec_andc(var_vec_b32[0], var_vec_b32[1]);
@@ -255,40 +221,8 @@ void f3() {
   *var_vec_b32++ = vec_splat(var_vec_b32[0], 3);
 }
 void f4() {
-  *var_vec_b32++ = vec_srl(var_vec_b32[0], var_vec_u16[1]);
-  *var_vec_b32++ = vec_srl(var_vec_b32[0], var_vec_u32[1]);
-  *var_vec_b32++ = vec_srl(var_vec_b32[0], var_vec_u8[1]);
   *var_vec_b32++ = vec_unpackh(var_vec_b16[0]);
   *var_vec_b32++ = vec_unpackl(var_vec_b16[0]);
-  *var_vec_b32++ = vec_vand(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vandc(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vcmpeqfp(var_vec_f32[0], var_vec_f32[1]);
-  *var_vec_b32++ = vec_vcmpequw(var_vec_s32[0], var_vec_s32[1]);
-  *var_vec_b32++ = vec_vcmpequw(var_vec_u32[0], var_vec_u32[1]);
-  *var_vec_b32++ = vec_vcmpgefp(var_vec_f32[0], var_vec_f32[1]);
-  *var_vec_b32++ = vec_vcmpgtfp(var_vec_f32[0], var_vec_f32[1]);
-  *var_vec_b32++ = vec_vcmpgtsw(var_vec_s32[0], var_vec_s32[1]);
-  *var_vec_b32++ = vec_vcmpgtuw(var_vec_u32[0], var_vec_u32[1]);
-  *var_vec_b32++ = vec_vmrghw(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vmrglw(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vnor(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vor(var_vec_b32[0], var_vec_b32[1]);
-  *var_vec_b32++ = vec_vperm(var_vec_b32[0], var_vec_b32[1], var_vec_u8[2]);
-  *var_vec_b32++ = vec_vsel(var_vec_b32[0], var_vec_b32[1], var_vec_b32[2]);
-  *var_vec_b32++ = vec_vsel(var_vec_b32[0], var_vec_b32[1], var_vec_u32[2]);
-  *var_vec_b32++ = vec_vsl(var_vec_b32[0], var_vec_u16[1]);
-  *var_vec_b32++ = vec_vsl(var_vec_b32[0], var_vec_u32[1]);
-  *var_vec_b32++ = vec_vsl(var_vec_b32[0], var_vec_u8[1]);
-  *var_vec_b32++ = vec_vspltw(var_vec_b32[0], 0);
-  *var_vec_b32++ = vec_vspltw(var_vec_b32[0], 1);
-  *var_vec_b32++ = vec_vspltw(var_vec_b32[0], 2);
-  *var_vec_b32++ = vec_vspltw(var_vec_b32[0], 3);
-  *var_vec_b32++ = vec_vsr(var_vec_b32[0], var_vec_u16[1]);
-  *var_vec_b32++ = vec_vsr(var_vec_b32[0], var_vec_u32[1]);
-  *var_vec_b32++ = vec_vsr(var_vec_b32[0], var_vec_u8[1]);
-  *var_vec_b32++ = vec_vupkhsh(var_vec_b16[0]);
-  *var_vec_b32++ = vec_vupklsh(var_vec_b16[0]);
-  *var_vec_b32++ = vec_vxor(var_vec_b32[0], var_vec_b32[1]);
   *var_vec_b32++ = vec_xor(var_vec_b32[0], var_vec_b32[1]);
   *var_vec_b8++ = vec_and(var_vec_b8[0], var_vec_b8[1]);
   *var_vec_b8++ = vec_andc(var_vec_b8[0], var_vec_b8[1]);
@@ -324,46 +258,6 @@ void f5() {
   *var_vec_b8++ = vec_splat(var_vec_b8[0], 13);
   *var_vec_b8++ = vec_splat(var_vec_b8[0], 14);
   *var_vec_b8++ = vec_splat(var_vec_b8[0], 15);
-  *var_vec_b8++ = vec_srl(var_vec_b8[0], var_vec_u16[1]);
-  *var_vec_b8++ = vec_srl(var_vec_b8[0], var_vec_u32[1]);
-  *var_vec_b8++ = vec_srl(var_vec_b8[0], var_vec_u8[1]);
-  *var_vec_b8++ = vec_vand(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vandc(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vcmpequb(var_vec_s8[0], var_vec_s8[1]);
-  *var_vec_b8++ = vec_vcmpequb(var_vec_u8[0], var_vec_u8[1]);
-  *var_vec_b8++ = vec_vcmpgtsb(var_vec_s8[0], var_vec_s8[1]);
-  *var_vec_b8++ = vec_vcmpgtub(var_vec_u8[0], var_vec_u8[1]);
-  *var_vec_b8++ = vec_vmrghb(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vmrglb(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vnor(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vor(var_vec_b8[0], var_vec_b8[1]);
-  *var_vec_b8++ = vec_vperm(var_vec_b8[0], var_vec_b8[1], var_vec_u8[2]);
-  *var_vec_b8++ = vec_vpkuhum(var_vec_b16[0], var_vec_b16[1]);
-  *var_vec_b8++ = vec_vsel(var_vec_b8[0], var_vec_b8[1], var_vec_b8[2]);
-  *var_vec_b8++ = vec_vsel(var_vec_b8[0], var_vec_b8[1], var_vec_u8[2]);
-  *var_vec_b8++ = vec_vsl(var_vec_b8[0], var_vec_u16[1]);
-  *var_vec_b8++ = vec_vsl(var_vec_b8[0], var_vec_u32[1]);
-  *var_vec_b8++ = vec_vsl(var_vec_b8[0], var_vec_u8[1]);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 0);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 1);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 2);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 3);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 4);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 5);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 6);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 7);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 8);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 9);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 10);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 11);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 12);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 13);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 14);
-  *var_vec_b8++ = vec_vspltb(var_vec_b8[0], 15);
-  *var_vec_b8++ = vec_vsr(var_vec_b8[0], var_vec_u16[1]);
-  *var_vec_b8++ = vec_vsr(var_vec_b8[0], var_vec_u32[1]);
-  *var_vec_b8++ = vec_vsr(var_vec_b8[0], var_vec_u8[1]);
-  *var_vec_b8++ = vec_vxor(var_vec_b8[0], var_vec_b8[1]);
   *var_vec_b8++ = vec_xor(var_vec_b8[0], var_vec_b8[1]);
 }
 void f6() {
@@ -525,8 +419,6 @@ void f9() {
   *var_vec_p16++ = vec_splat(var_vec_p16[0], 5);
   *var_vec_p16++ = vec_splat(var_vec_p16[0], 6);
   *var_vec_p16++ = vec_splat(var_vec_p16[0], 7);
-  *var_vec_p16++ = vec_srl(var_vec_p16[0], var_vec_u16[1]);
-  *var_vec_p16++ = vec_srl(var_vec_p16[0], var_vec_u32[1]);
   *var_vec_p16++ = vec_srl(var_vec_p16[0], var_vec_u8[1]);
   *var_vec_p16++ = vec_sro(var_vec_p16[0], var_vec_s8[1]);
   *var_vec_p16++ = vec_sro(var_vec_p16[0], var_vec_u8[1]);
@@ -631,8 +523,6 @@ void f11() {
   *var_vec_s16++ = vec_splat_s16(-16);
   *var_vec_s16++ = vec_sr(var_vec_s16[0], var_vec_u16[1]);
   *var_vec_s16++ = vec_sra(var_vec_s16[0], var_vec_u16[1]);
-  *var_vec_s16++ = vec_srl(var_vec_s16[0], var_vec_u16[1]);
-  *var_vec_s16++ = vec_srl(var_vec_s16[0], var_vec_u32[1]);
   *var_vec_s16++ = vec_srl(var_vec_s16[0], var_vec_u8[1]);
   *var_vec_s16++ = vec_sro(var_vec_s16[0], var_vec_s8[1]);
   *var_vec_s16++ = vec_sro(var_vec_s16[0], var_vec_u8[1]);
@@ -771,8 +661,6 @@ void f14() {
 }
 void f15() {
   *var_vec_s32++ = vec_sra(var_vec_s32[0], var_vec_u32[1]);
-  *var_vec_s32++ = vec_srl(var_vec_s32[0], var_vec_u16[1]);
-  *var_vec_s32++ = vec_srl(var_vec_s32[0], var_vec_u32[1]);
   *var_vec_s32++ = vec_srl(var_vec_s32[0], var_vec_u8[1]);
   *var_vec_s32++ = vec_sro(var_vec_s32[0], var_vec_s8[1]);
   *var_vec_s32++ = vec_sro(var_vec_s32[0], var_vec_u8[1]);
@@ -891,8 +779,6 @@ void f18() {
   *var_vec_s8++ = vec_splat_s8(-16);
   *var_vec_s8++ = vec_sr(var_vec_s8[0], var_vec_u8[1]);
   *var_vec_s8++ = vec_sra(var_vec_s8[0], var_vec_u8[1]);
-  *var_vec_s8++ = vec_srl(var_vec_s8[0], var_vec_u16[1]);
-  *var_vec_s8++ = vec_srl(var_vec_s8[0], var_vec_u32[1]);
   *var_vec_s8++ = vec_srl(var_vec_s8[0], var_vec_u8[1]);
   *var_vec_s8++ = vec_sro(var_vec_s8[0], var_vec_s8[1]);
   *var_vec_s8++ = vec_sro(var_vec_s8[0], var_vec_u8[1]);
@@ -1002,8 +888,6 @@ void f21() {
   *var_vec_u16++ = vec_splat_u16(-16);
   *var_vec_u16++ = vec_sr(var_vec_u16[0], var_vec_u16[1]);
   *var_vec_u16++ = vec_sra(var_vec_u16[0], var_vec_u16[1]);
-  *var_vec_u16++ = vec_srl(var_vec_u16[0], var_vec_u16[1]);
-  *var_vec_u16++ = vec_srl(var_vec_u16[0], var_vec_u32[1]);
   *var_vec_u16++ = vec_srl(var_vec_u16[0], var_vec_u8[1]);
   *var_vec_u16++ = vec_sro(var_vec_u16[0], var_vec_s8[1]);
   *var_vec_u16++ = vec_sro(var_vec_u16[0], var_vec_u8[1]);
@@ -1140,8 +1024,6 @@ void f23() {
   *var_vec_u32++ = vec_sra(var_vec_u32[0], var_vec_u32[1]);
 }
 void f24() {
-  *var_vec_u32++ = vec_srl(var_vec_u32[0], var_vec_u16[1]);
-  *var_vec_u32++ = vec_srl(var_vec_u32[0], var_vec_u32[1]);
   *var_vec_u32++ = vec_srl(var_vec_u32[0], var_vec_u8[1]);
   *var_vec_u32++ = vec_sro(var_vec_u32[0], var_vec_s8[1]);
   *var_vec_u32++ = vec_sro(var_vec_u32[0], var_vec_u8[1]);
@@ -1274,8 +1156,6 @@ void f27() {
   *var_vec_u8++ = vec_splat_u8(-16);
   *var_vec_u8++ = vec_sr(var_vec_u8[0], var_vec_u8[1]);
   *var_vec_u8++ = vec_sra(var_vec_u8[0], var_vec_u8[1]);
-  *var_vec_u8++ = vec_srl(var_vec_u8[0], var_vec_u16[1]);
-  *var_vec_u8++ = vec_srl(var_vec_u8[0], var_vec_u32[1]);
   *var_vec_u8++ = vec_srl(var_vec_u8[0], var_vec_u8[1]);
   *var_vec_u8++ = vec_sro(var_vec_u8[0], var_vec_s8[1]);
   *var_vec_u8++ = vec_sro(var_vec_u8[0], var_vec_u8[1]);

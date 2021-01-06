@@ -2175,32 +2175,72 @@
 [VEC_OR, vec_or, __builtin_vec_or]
   vsc __builtin_vec_or (vsc, vsc);
     VOR_V16QI
+  vsc __builtin_vec_or (vsc, vbc);
+    VOR_V16QI  VOR_VSC_VBC
+  vsc __builtin_vec_or (vbc, vsc);
+    VOR_V16QI  VOR_VBC_VSC
   vuc __builtin_vec_or (vuc, vuc);
     VOR_V16QI_UNS  VOR_V16QI_U
   vbc __builtin_vec_or (vbc, vbc);
     VOR_V16QI_UNS  VOR_V16QI_B
+  vuc __builtin_vec_or (vuc, vbc);
+    VOR_V16QI_UNS  VOR_V16QI_UB
+  vuc __builtin_vec_or (vbc, vuc);
+    VOR_V16QI_UNS  VOR_V16QI_BU
   vss __builtin_vec_or (vss, vss);
     VOR_V8HI
+  vss __builtin_vec_or (vss, vbs);
+    VOR_V8HI  VOR_VSS_VBS
+  vss __builtin_vec_or (vbs, vss);
+    VOR_V8HI  VOR_VBS_VSS
   vus __builtin_vec_or (vus, vus);
     VOR_V8HI_UNS  VOR_V8HI_U
   vbs __builtin_vec_or (vbs, vbs);
     VOR_V8HI_UNS  VOR_V8HI_B
+  vus __builtin_vec_or (vus, vbs);
+    VOR_V8HI_UNS  VOR_V8HI_UB
+  vus __builtin_vec_or (vbs, vus);
+    VOR_V8HI_UNS  VOR_V8HI_BU
   vsi __builtin_vec_or (vsi, vsi);
     VOR_V4SI
+  vsi __builtin_vec_or (vsi, vbi);
+    VOR_V4SI  VOR_VSI_VBI
+  vsi __builtin_vec_or (vbi, vsi);
+    VOR_V4SI  VOR_VBI_VSI
   vui __builtin_vec_or (vui, vui);
     VOR_V4SI_UNS  VOR_V4SI_U
   vbi __builtin_vec_or (vbi, vbi);
     VOR_V4SI_UNS  VOR_V4SI_B
+  vui __builtin_vec_or (vui, vbi);
+    VOR_V4SI_UNS  VOR_V4SI_UB
+  vui __builtin_vec_or (vui, vbi);
+    VOR_V4SI_UNS  VOR_V4SI_BU
   vsll __builtin_vec_or (vsll, vsll);
     VOR_V2DI
+  vsll __builtin_vec_or (vsll, vbll);
+    VOR_V2DI  VOR_VSLL_VBLL
+  vsll __builtin_vec_or (vbll, vsll);
+    VOR_V2DI  VOR_VBLL_VSLL
   vull __builtin_vec_or (vull, vull);
     VOR_V2DI_UNS  VOR_V2DI_U
   vbll __builtin_vec_or (vbll, vbll);
     VOR_V2DI_UNS  VOR_V2DI_B
+  vull __builtin_vec_or (vull, vbll);
+    VOR_V2DI_UNS  VOR_V2DI_UB
+  vull __builtin_vec_or (vbll, vull);
+    VOR_V2DI_UNS  VOR_V2DI_BU
   vf __builtin_vec_or (vf, vf);
     VOR_V4SF
+  vf __builtin_vec_or (vf, vbi);
+    VOR_V4SF  VOR_VF_VBI
+  vf __builtin_vec_or (vbi, vf);
+    VOR_V4SF  VOR_VBI_VF
   vd __builtin_vec_or (vd, vd);
     VOR_V2DF
+  vd __builtin_vec_or (vd, vbll);
+    VOR_V2DF  VOR_VD_VBLL
+  vd __builtin_vec_or (vbll, vd);
+    VOR_V2DF  VOR_VBLL_VD
 
 [VEC_ORC, vec_orc, __builtin_vec_orc, _ARCH_PWR8]
   vsc __builtin_vec_orc (vsc, vsc);
@@ -3625,7 +3665,7 @@
   signed int __builtin_vec_scalar_cmp_exp_lt (_Float128, _Float128);
     VSCEQPLT
 
-[VEC_VSCEUO, scalar_cmp_exp_unordered, __builtin_vec_scalar_cmp_exp_unordered, ARCH_PWR9]
+[VEC_VSCEUO, scalar_cmp_exp_unordered, __builtin_vec_scalar_cmp_exp_unordered, _ARCH_PWR9]
   signed int __builtin_vec_scalar_cmp_exp_unordered (double, double);
     VSCEDPUO
   signed int __builtin_vec_scalar_cmp_exp_unordered (_Float128, _Float128);
@@ -3638,17 +3678,17 @@
     VSEEQP
 
 [VEC_VSES, scalar_extract_sig, __builtin_vec_scalar_extract_sig, _ARCH_PWR9]
-  unsigned int __builtin_vec_scalar_extract_sig (double);
+  unsigned long long __builtin_vec_scalar_extract_sig (double);
     VSESDP
-  unsigned int __builtin_vec_scalar_extract_sig (_Float128);
+  unsigned __int128 __builtin_vec_scalar_extract_sig (_Float128);
     VSESQP
 
 [VEC_VSIE, scalar_insert_exp, __builtin_vec_scalar_insert_exp, _ARCH_PWR9]
-  double __builtin_vec_scalar_insert_exp (unsigned int, unsigned int);
+  double __builtin_vec_scalar_insert_exp (unsigned long long, unsigned long long);
     VSIEDP
-  double __builtin_vec_scalar_insert_exp (double, unsigned int);
+  double __builtin_vec_scalar_insert_exp (double, unsigned long long);
     VSIEDPF
-  _Float128 __builtin_vec_scalar_insert_exp (unsigned long long, unsigned long long);
+  _Float128 __builtin_vec_scalar_insert_exp (unsigned __int128, unsigned long long);
     VSIEQP
   _Float128 __builtin_vec_scalar_insert_exp (_Float128, unsigned long long);
     VSIEQPF
