@@ -2257,6 +2257,8 @@ modify_parameter_declarations ( Info *info)
 void
 modify_global_declarations ( Info *info)
 {
+  DEBUG_A("modify_global_declarations:>\n");
+  INDENT(2);
   // For the moment we ignore initializations assuming
   // all potential reorg types that had initialized
   // arrays were disqualified. Note, it's the way
@@ -2339,6 +2341,7 @@ modify_global_declarations ( Info *info)
     }
 
   // Note, do not relayout functions decls....
+  INDENT(-2);
 }
 
 static void
@@ -2665,18 +2668,19 @@ modify_func_decl_core ( struct function *func, Info *info)
 bool
 modify_decl_core ( tree *location, Info *info)
 {
-  //DEBUG_L("modify_decl_core:> ");
-  //DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  DEBUG_A("modify_decl_core:> ");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  INDENT(2);
   
   tree type = TREE_TYPE ( *location);
   
-  //DEBUG_A("type = ");
-  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  DEBUG_A("type = ");
+  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   
   tree base = base_type_of ( type);
   
-  //DEBUG_A(", base = ");
-  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  DEBUG(", base = ");
+  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
 
   #if 1
   // Look for a modified type
@@ -2685,25 +2689,30 @@ modify_decl_core ( tree *location, Info *info)
 				     false,
 				     #endif
 				     info);
+  DEBUG_A(", modified_to = ");
+  DEBUG_F( flexible_print, stderr, modified_to, 1, (dump_flags_t)0);
+  
   bool use_mod = false;
   #endif
   
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
     {
-      #if 1
       use_mod = modified_to != NULL;
-      if( !use_mod ) return false;
-      #endif
-      return false;
+      if( !use_mod )
+	{
+	  DEBUG_A( "!use_mod && ri == NULL... return\n");
+	  INDENT(-2);
+	  return false;
+	}
     }
   
   tree prev_type;
   int levels = number_of_levels ( type);
 
-  #if 1
   if ( use_mod )
     {
+      DEBUG_A( "use_mod %s\n", levels == 0 ? "&& levels == 0" : "");
       if ( levels == 0 )
 	{
 	  TREE_TYPE(*location) = TYPE_MAIN_VARIANT ( modified_to);
@@ -2720,49 +2729,27 @@ modify_decl_core ( tree *location, Info *info)
       // that it seems like it will build one too many levels because
       // the arguement is off by one. Remember that transforming to
       // reorg pointer strips off one level of indirection!
-      
+
       // Fakes this for levels == 1
       if ( levels == 0)
 	{
-	  //DEBUG_A("Not a pointer, don't modify it!\n");
+	  DEBUG_A("Not a pointer, don't modify it!\n");
 	  return false;
 	}
       // This also happens with other similar uses of make_multilevel.
       if ( levels == 1)
 	{
-	  //DEBUG_A( "LEVEL  ONE\n");
+	  DEBUG_A( "LEVEL  ONE\n");
 	  gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
 	  TREE_TYPE(*location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
 	}
       else
 	{
-	  //DEBUG_L( "LEVEL > ONE\n");
+	  DEBUG_L( "LEVEL > ONE\n");
 	  TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
 	}
     }
 
-  #else
-  // Fakes this for levels == 1
-  if ( levels == 0)
-    {
-      //DEBUG_A("Not a pointer, don't modify it!\n");
-      return false;
-    }
-  // This also happens with other similar uses of make_multilevel.
-  if ( levels == 1)
-    {
-      //DEBUG_A( "LEVEL  ONE\n");
-      gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
-      TREE_TYPE(*location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
-    }
-  else
-    {
-      //DEBUG_L( "LEVEL > ONE\n");
-      TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
-   }
-  #endif
-
-  #if 1
   // I'm not sure what this does!
   if ( use_mod )
     {
@@ -2777,20 +2764,14 @@ modify_decl_core ( tree *location, Info *info)
 	// Note this assumes the levels code above is not general
 	DECL_INITIAL ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
       }
-  #else
-  if ( DECL_INITIAL ( *location) != NULL )
-    {
-      // Note this assumes the levels code above is not general
-      DECL_INITIAL ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
-    }
-  #endif
 
   relayout_decl ( *location);
 
-  //DEBUG_L(" after modify_decl_core");
-  //DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
-  //DEBUG("\n");
-  
+  DEBUG_L(" after modify_decl_core");
+  DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
+  DEBUG("\n");
+
+  INDENT(-2);
   return true;
 }
 
