@@ -208,7 +208,7 @@ public:
   /* Branches from blocks that end on this line.  */
   vector<arc_info *> branches;
 
-  /* blocks which start on this line.  Used in all-blocks mode.  */
+  /* Blocks which contain this line.  */
   vector<block_info *> blocks;
 
   unsigned exists : 1;
@@ -1785,6 +1785,7 @@ read_graph_file (void)
       else if (fn && tag == GCOV_TAG_ARCS)
 	{
 	  unsigned src = gcov_read_unsigned ();
+	  /* Mark ID of a source block.  */
 	  fn->blocks[src].id = src;
 	  unsigned num_dests = GCOV_TAG_ARCS_NUM (length);
 	  block_info *src_blk = &fn->blocks[src];
@@ -1804,6 +1805,8 @@ read_graph_file (void)
 	      arc = XCNEW (arc_info);
 
 	      arc->dst = &fn->blocks[dest];
+	      /* Mark ID of target block, needed for EXIT_BB.  */
+	      fn->blocks[dest].id = dest;
 	      arc->src = src_blk;
 
 	      arc->count = 0;
@@ -2639,6 +2642,8 @@ add_line_counts (coverage_info *coverage, function_info *fn)
 			line->has_unexecuted_block = 1;
 		    }
 		  line->count += block->count;
+		  gcc_assert (!line->has_block (block));
+		  line->blocks.push_back (block);
 		}
 	      else
 		{
@@ -2659,6 +2664,8 @@ add_line_counts (coverage_info *coverage, function_info *fn)
 			line->has_unexecuted_block = 1;
 		    }
 		  line->count += block->count;
+		  gcc_assert (!line->has_block (block));
+		  line->blocks.push_back (block);
 		}
 	    }
 
@@ -2668,8 +2675,6 @@ add_line_counts (coverage_info *coverage, function_info *fn)
 	    /* Entry or exit block.  */;
 	  else if (line != NULL)
 	    {
-	      line->blocks.push_back (block);
-
 	      if (flag_branches)
 		{
 		  arc_info *arc;
