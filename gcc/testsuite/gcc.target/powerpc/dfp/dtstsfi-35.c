@@ -9,7 +9,7 @@ int doTestBCDSignificance (_Decimal128 *p)
 {
   _Decimal128 source = *p;
 
-  return __builtin_dfp_dtstsfi_gt_td (5, source);
+  return __builtin_dfp_dtstsfi_gt (5, source);
 }
 
 /* { dg-final { scan-assembler	   "dtstsfiq" } } */

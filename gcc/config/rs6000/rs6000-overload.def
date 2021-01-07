@@ -3548,27 +3548,27 @@
     XVRDPIZ
 
 [VEC_TSTSFI_GT, SKIP, __builtin_dfp_dtstsfi_gt]
-  signed int __builtin_dfp_dtstsfi_gt (unsigned int, _Decimal64);
+  signed int __builtin_dfp_dtstsfi_gt (const int, _Decimal64);
     TSTSFI_GT_DD
-  signed int __builtin_dfp_dtstsfi_gt (unsigned int, _Decimal128);
+  signed int __builtin_dfp_dtstsfi_gt (const int, _Decimal128);
     TSTSFI_GT_TD
 
 [VEC_TSTSFI_EQ, SKIP, __builtin_dfp_dtstsfi_eq]
-  signed int __builtin_dfp_dtstsfi_eq (unsigned int, _Decimal64);
+  signed int __builtin_dfp_dtstsfi_eq (const int, _Decimal64);
     TSTSFI_EQ_DD
-  signed int __builtin_dfp_dtstsfi_eq (unsigned int, _Decimal128);
+  signed int __builtin_dfp_dtstsfi_eq (const int, _Decimal128);
     TSTSFI_EQ_TD
 
 [VEC_TSTSFI_LT, SKIP, __builtin_dfp_dtstsfi_lt]
-  signed int __builtin_dfp_dtstsfi_lt (unsigned int, _Decimal64);
+  signed int __builtin_dfp_dtstsfi_lt (const int, _Decimal64);
     TSTSFI_LT_DD
-  signed int __builtin_dfp_dtstsfi_lt (unsigned int, _Decimal128);
+  signed int __builtin_dfp_dtstsfi_lt (const int, _Decimal128);
     TSTSFI_LT_TD
 
 [VEC_TSTSFI_OV, SKIP, __builtin_dfp_dtstsfi_ov]
-  signed int __builtin_dfp_dtstsfi_ov (unsigned int, _Decimal64);
+  signed int __builtin_dfp_dtstsfi_ov (const int, _Decimal64);
     TSTSFI_OV_DD
-  signed int __builtin_dfp_dtstsfi_ov (unsigned int, _Decimal128);
+  signed int __builtin_dfp_dtstsfi_ov (const int, _Decimal128);
     TSTSFI_OV_TD
 
 [VEC_UNPACKH, vec_unpackh, __builtin_vec_unpackh]
@@ -3637,7 +3637,7 @@
   vull __builtin_vec_extract_sig (vd);
     VESDP
 
-[VEC_VIE, vec_insert_exp, __builtin_vec_insert_exp, ARCH_PWR9]
+[VEC_VIE, vec_insert_exp, __builtin_vec_insert_exp, _ARCH_PWR9]
   vf __builtin_vec_insert_exp (vf, vui);
     VIESP  VIESP_VF
   vf __builtin_vec_insert_exp (vui, vui);
@@ -3694,25 +3694,25 @@
     VSIEQPF
 
 [VEC_VSTDC, scalar_test_data_class, __builtin_vec_scalar_test_data_class, _ARCH_PWR9]
-  bool __builtin_vec_scalar_test_data_class (float, signed int);
+  unsigned int __builtin_vec_scalar_test_data_class (float, const int);
     VSTDCSP
-  bool __builtin_vec_scalar_test_data_class (double, signed int);
+  unsigned int __builtin_vec_scalar_test_data_class (double, const int);
     VSTDCDP
-  bool __builtin_vec_scalar_test_data_class (_Float128, signed int);
+  unsigned int __builtin_vec_scalar_test_data_class (_Float128, const int);
     VSTDCQP
 
 [VEC_VSTDCN, scalar_test_neg, __builtin_vec_scalar_test_neg, _ARCH_PWR9]
-  bool __builtin_vec_scalar_test_neg (float);
+  unsigned int __builtin_vec_scalar_test_neg (float);
     VSTDCNSP
-  bool __builtin_vec_scalar_test_neg (double);
+  unsigned int __builtin_vec_scalar_test_neg (double);
     VSTDCNDP
-  bool __builtin_vec_scalar_test_neg (_Float128);
+  unsigned int __builtin_vec_scalar_test_neg (_Float128);
     VSTDCNQP
 
 [VEC_VTDC, vec_test_data_class, __builtin_vec_test_data_class, _ARCH_PWR9]
-  vbi __builtin_vec_test_data_class (vf, signed int);
+  vbi __builtin_vec_test_data_class (vf, const int);
     VTDCSP
-  vbll __builtin_vec_test_data_class (vd, signed int);
+  vbll __builtin_vec_test_data_class (vd, const int);
     VTDCDP
 
 [VEC_XL, vec_xl, __builtin_vec_vsx_ld, __VSX__]

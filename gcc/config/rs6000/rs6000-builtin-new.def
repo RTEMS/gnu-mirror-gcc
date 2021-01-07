@@ -2734,10 +2734,10 @@
   const signed int __builtin_vsx_scalar_cmp_exp_dp_unordered (double, double);
     VSCEDPUO xscmpexpdp_unordered {}
 
-  const unsigned int __builtin_vsx_scalar_test_data_class_dp (double, signed int);
+  const unsigned int __builtin_vsx_scalar_test_data_class_dp (double, const int<7>);
     VSTDCDP xststdcdp {}
 
-  const unsigned int __builtin_vsx_scalar_test_data_class_sp (float, signed int);
+  const unsigned int __builtin_vsx_scalar_test_data_class_sp (float, const int<7>);
     VSTDCSP xststdcsp {}
 
   const unsigned int __builtin_vsx_scalar_test_neg_dp (double);
@@ -2746,10 +2746,10 @@
   const unsigned int __builtin_vsx_scalar_test_neg_sp (float);
     VSTDCNSP xststdcnegsp {}
 
-  const vbll __builtin_vsx_test_data_class_dp (vd, signed int);
+  const vbll __builtin_vsx_test_data_class_dp (vd, const int<7>);
     VTDCDP xvtstdcdp {}
 
-  const vbi __builtin_vsx_test_data_class_sp (vf, signed int);
+  const vbi __builtin_vsx_test_data_class_sp (vf, const int<7>);
     VTDCSP xvtstdcsp {}
 
   const vf __builtin_vsx_vextract_fp_from_shorth (vus);
@@ -2794,28 +2794,28 @@
   double __builtin_mffsl ();
     MFFSL rs6000_mffsl {}
 
-  const signed int __builtin_dtstsfi_eq_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_eq_dd (const int<6>, _Decimal64);
     TSTSFI_EQ_DD dfptstsfi_eq_dd {}
 
-  const signed int __builtin_dtstsfi_eq_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_eq_td (const int<6>, _Decimal128);
     TSTSFI_EQ_TD dfptstsfi_eq_td {}
 
-  const signed int __builtin_dtstsfi_gt_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_gt_dd (const int<6>, _Decimal64);
     TSTSFI_GT_DD dfptstsfi_gt_dd {}
 
-  const signed int __builtin_dtstsfi_gt_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_gt_td (const int<6>, _Decimal128);
     TSTSFI_GT_TD dfptstsfi_gt_td {}
 
-  const signed int __builtin_dtstsfi_lt_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_lt_dd (const int<6>, _Decimal64);
     TSTSFI_LT_DD dfptstsfi_lt_dd {}
 
-  const signed int __builtin_dtstsfi_lt_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_lt_td (const int<6>, _Decimal128);
     TSTSFI_LT_TD dfptstsfi_lt_td {}
 
-  const signed int __builtin_dtstsfi_ov_dd (unsigned int, _Decimal64);
+  const signed int __builtin_dtstsfi_ov_dd (const int<6>, _Decimal64);
     TSTSFI_OV_DD dfptstsfi_unordered_dd {}
 
-  const signed int __builtin_dtstsfi_ov_td (unsigned int, _Decimal128);
+  const signed int __builtin_dtstsfi_ov_td (const int<6>, _Decimal128);
     TSTSFI_OV_TD dfptstsfi_unordered_td {}
 
 
@@ -2905,7 +2905,7 @@
   const _Float128 __builtin_vsx_scalar_insert_exp_qp (_Float128, unsigned long long);
     VSIEQPF xsiexpqpf_kf {}
 
-  const unsigned int __builtin_vsx_scalar_test_data_class_qp (_Float128, signed int);
+  const unsigned int __builtin_vsx_scalar_test_data_class_qp (_Float128, const int<7>);
     VSTDCQP xststdcqp_kf {}
 
   const unsigned int __builtin_vsx_scalar_test_neg_qp (_Float128);

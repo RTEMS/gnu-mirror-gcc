@@ -8,7 +8,7 @@ int doTestBCDSignificance (_Decimal64 *p)
 {
   _Decimal64 source = *p;
 
-  if (__builtin_dfp_dtstsfi_ov_dd (63, source))
+  if (__builtin_dfp_dtstsfi_ov (63, source))
     return 3;
   else
     return 5;
