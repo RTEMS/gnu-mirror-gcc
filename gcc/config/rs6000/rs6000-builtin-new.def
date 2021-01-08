@@ -933,7 +933,7 @@
   const vsi __builtin_altivec_vspltw (vsi, const int<2>);
     VSPLTW altivec_vspltw {}
 
-  const vop __builtin_altivec_vsr (vop, vuc);
+  const vop __builtin_altivec_vsr (vop, vop);
     VSR altivec_vsr {}
 
   const vsc __builtin_altivec_vsrab (vsc, vuc);
@@ -951,7 +951,7 @@
   const vss __builtin_altivec_vsrh (vss, vus);
     VSRH vlshrv8hi3 {}
 
-  const vop __builtin_altivec_vsro (vop, vuc);
+  const vop __builtin_altivec_vsro (vop, vop);
     VSRO altivec_vsro {}
 
   const vsi __builtin_altivec_vsrw (vsi, vui);
