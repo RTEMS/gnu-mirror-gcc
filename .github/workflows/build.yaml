@@ -1,0 +1,79 @@
+# This needs to match the string returned in GetGccBuildName() in common.py
+name: build
+
+# Run this workflow on every new commit and pull request
+on: 
+  push:
+    branches:
+      - current
+      - test
+      - 'releases/**'
+      - 'develop/**'
+      - 'gcc**'
+  pull_request:
+    branches:
+      - current
+      - test
+      - 'releases/**'
+      - 'develop/**'
+      - 'gcc**'
+
+jobs:    
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+          
+      # Install requests package which is used in downloadBuildArtifact.py 
+      # We need this since python will import packages and even though we aren't using this script in this workflow,
+      # the GCC workflow relies on the download script so the script will end up getting pulled in
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+
+      # Setup config
+      - name: Setup config
+        id: setupconfig
+        run: |
+          chmod +x .github/scripts/gccWorkflow.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Init(sys.argv[1], sys.argv[2])' "${GITHUB_CONTEXT}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # build.yaml creates the gccBuild artifact
+      - name: Build gcc
+        run: | 
+          chmod +x .github/scripts/gccWorkflow.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Build(sys.argv[1])' "${CONFIG_JSON}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
+
+      - name: Move objdir to be in repo so it can be uploaded
+        run: mv ../objdir objdir
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v2
+        with:
+          name: gccBuild
+          path: objdir

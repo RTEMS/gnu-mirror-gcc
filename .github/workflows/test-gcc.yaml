@@ -1,0 +1,120 @@
+# This workflow creates a tag and a release for the checkin on the listed branches
+name: test-gcc
+
+# Run this workflow when a build run finishes on the branches listed
+on:  
+  # We use the push and pull_request events instead of the workflow_run event
+  # so that this workflow will show up during the PR
+  push:
+    branches:
+      - current
+      - test
+      - 'releases/**'
+      - 'develop/**'
+      - 'gcc**'
+  pull_request:
+    branches:
+      - current
+      - test
+      - 'releases/**'
+      - 'develop/**'
+      - 'gcc**'
+  # the problem with workflow_run is that the run isn't associated with a PR and won't show up in a PR
+  #workflow_run:
+  #  workflows: ["build"]
+  #  types:
+  #    - completed
+
+jobs:
+  init:
+    runs-on: ubuntu-18.04
+    outputs:
+      config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      # Install requests package so we can use it for downloading the build artifacts in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+
+      # Setup config
+      - name: Setup config
+        id: setupconfig
+        run: |
+          chmod +x .github/scripts/gccWorkflow.py
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Init(sys.argv[1], sys.argv[2])' "${GITHUB_CONTEXT}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # This should be the last step on this machine since it will clear out fields in the config json
+      - name: Print No Secret Json
+        id: printNoSecretJson
+        run: |
+          chmod +x .github/scripts/config.py
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJson(sys.argv[1])' "${CONFIG_JSON}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
+  test:
+    needs: init
+    strategy:
+      matrix:
+        testSet: [check-target-libstdc++-v3, check-gcc-c++, check-gcc-c, check-target-libgomp, check-target-libitm, check-target-libatomic]
+      # Avoid cancelling other matrix chunks even if one fails
+      fail-fast: false        
+    runs-on: ubuntu-18.04
+    steps:
+      - run: echo ${{needs.init.outputs.output1}} ${{needs.init.outputs.output2}}
+      - run: echo $GITHUB_CONTEXT
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+          
+      # Install requests package so we can use it for downloading the build artifacts in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+
+      # build.yaml creates the gccBuild artifact
+      - name: Download build and run tests
+        run: | 
+          chmod +x .github/scripts/gccWorkflow.py
+          echo ${{needs.init.outputs.config}}
+          echo "$PYTHONPATH"
+          echo "$CONFIG_JSON"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Test(sys.argv[1], sys.argv[2], sys.argv[3])' "${CONFIG_JSON}" "${TEST_SET}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{needs.init.outputs.config}}
+          TEST_SET: ${{ matrix.testSet }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
