@@ -61,7 +61,7 @@ check_cmple()
   vector float a = {1.0, 2.0, 3.0, 4.0};
   vector float b = {1.0, 3.0, 2.0, 5.0};
   vector bool int aux;
-  vector bool int le = (vector bool int){-1, -1, 0, -1};
+  vector signed int le = {-1, -1, 0, -1};
 
   aux = vec_cmple (a, b);
 

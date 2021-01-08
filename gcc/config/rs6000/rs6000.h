@@ -2498,6 +2498,8 @@ enum rs6000_builtin_type_index
   RS6000_BTI_ptr_UINTDI,
   RS6000_BTI_ptr_INTTI,
   RS6000_BTI_ptr_UINTTI,
+  RS6000_BTI_ptr_long_integer,
+  RS6000_BTI_ptr_long_unsigned,
   RS6000_BTI_ptr_float,
   RS6000_BTI_ptr_double,
   RS6000_BTI_ptr_long_double,
@@ -2591,6 +2593,8 @@ enum rs6000_builtin_type_index
 #define ptr_uintDI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_UINTDI])
 #define ptr_intTI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_INTTI])
 #define ptr_uintTI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_UINTTI])
+#define ptr_long_integer_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_integer])
+#define ptr_long_unsigned_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_unsigned])
 #define ptr_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_float])
 #define ptr_double_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_double])
 #define ptr_long_double_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_double])

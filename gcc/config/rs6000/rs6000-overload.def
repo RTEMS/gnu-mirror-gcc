@@ -234,6 +234,39 @@
     VADDFP
   vd __builtin_vec_add (vd, vd);
     XVADDDP
+; The following variants are deprecated.
+  vsc __builtin_vec_add (vbc, vsc);
+    VADDUBM  VADDUBM_VBC_VSC
+  vsc __builtin_vec_add (vsc, vbc);
+    VADDUBM  VADDUBM_VSC_VBC
+  vuc __builtin_vec_add (vbc, vuc);
+    VADDUBM  VADDUBM_VBC_VUC
+  vuc __builtin_vec_add (vuc, vbc);
+    VADDUBM  VADDUBM_VUC_VBC
+  vss __builtin_vec_add (vbs, vss);
+    VADDUHM  VADDUHM_VBS_VSS
+  vss __builtin_vec_add (vss, vbs);
+    VADDUHM  VADDUHM_VSS_VBS
+  vus __builtin_vec_add (vbs, vus);
+    VADDUHM  VADDUHM_VBS_VUS
+  vus __builtin_vec_add (vus, vbs);
+    VADDUHM  VADDUHM_VUS_VBS
+  vsi __builtin_vec_add (vbi, vsi);
+    VADDUWM  VADDUWM_VBI_VSI
+  vsi __builtin_vec_add (vsi, vbi);
+    VADDUWM  VADDUWM_VSI_VBI
+  vui __builtin_vec_add (vbi, vui);
+    VADDUWM  VADDUWM_VBI_VUI
+  vui __builtin_vec_add (vbi, vui);
+    VADDUWM  VADDUWM_VUI_VBI
+  vsll __builtin_vec_add (vbll, vsll);
+    VADDUDM  VADDUDM_VBLL_VSLL
+  vsll __builtin_vec_add (vsll, vbll);
+    VADDUDM  VADDUDM_VSLL_VBLL
+  vull __builtin_vec_add (vbll, vull);
+    VADDUDM  VADDUDM_VBLL_VULL
+  vull __builtin_vec_add (vull, vbll);
+    VADDUDM  VADDUDM_VULL_VBLL
 
 [VEC_ADDC, vec_addc, __builtin_vec_addc]
   vsi __builtin_vec_addc (vsi, vsi);
@@ -283,72 +316,98 @@
     VADDUWS
   vsi __builtin_vec_adds (vsi, vsi);
     VADDSWS
+; The following variants are deprecated.
+  vuc __builtin_vec_adds (vbc, vuc);
+    VADDUBS  VADDUBS_BU
+  vuc __builtin_vec_adds (vuc, vbc);
+    VADDUBS  VADDUBS_UB
+  vsc __builtin_vec_adds (vbc, vsc);
+    VADDSBS  VADDSBS_BS
+  vsc __builtin_vec_adds (vsc, vbc);
+    VADDSBS  VADDSBS_SB
+  vus __builtin_vec_adds (vbs, vus);
+    VADDUHS  VADDUHS_BU
+  vus __builtin_vec_adds (vus, vbs);
+    VADDUHS  VADDUHS_UB
+  vss __builtin_vec_adds (vbs, vss);
+    VADDSHS  VADDSHS_BS
+  vss __builtin_vec_adds (vss, vbs);
+    VADDSHS  VADDSHS_SB
+  vui __builtin_vec_adds (vbi, vui);
+    VADDUWS  VADDUWS_BU
+  vui __builtin_vec_adds (vui, vbi);
+    VADDUWS  VADDUWS_UB
+  vsi __builtin_vec_adds (vbi, vsi);
+    VADDSWS  VADDSWS_BS
+  vsi __builtin_vec_adds (vsi, vbi);
+    VADDSWS  VADDSWS_SB
 
 [VEC_AND, vec_and, __builtin_vec_and]
   vsc __builtin_vec_and (vsc, vsc);
     VAND_V16QI
-  vsc __builtin_vec_and (vsc, vbc);
-    VAND_V16QI  VAND_VSC_VBC
-  vsc __builtin_vec_and (vbc, vsc);
-    VAND_V16QI  VAND_VBC_VSC
   vuc __builtin_vec_and (vuc, vuc);
     VAND_V16QI_UNS  VAND_VUC
   vbc __builtin_vec_and (vbc, vbc);
     VAND_V16QI_UNS  VAND_VBC
-  vuc __builtin_vec_and (vuc, vbc);
-    VAND_V16QI_UNS  VAND_VUC_VBC
-  vuc __builtin_vec_and (vbc, vuc);
-    VAND_V16QI_UNS  VAND_VBC_VUC
   vss __builtin_vec_and (vss, vss);
     VAND_V8HI
-  vss __builtin_vec_and (vss, vbs);
-    VAND_V8HI  VAND_VSS_VBS
-  vss __builtin_vec_and (vss, vbs);
-    VAND_V8HI  VAND_VBS_VSS
   vus __builtin_vec_and (vus, vus);
     VAND_V8HI_UNS  VAND_VUS
   vbs __builtin_vec_and (vbs, vbs);
     VAND_V8HI_UNS  VAND_VBS
-  vus __builtin_vec_and (vus, vbs);
-    VAND_V8HI_UNS  VAND_VUS_VBS
-  vus __builtin_vec_and (vbs, vus);
-    VAND_V8HI_UNS  VAND_VBS_VUS
   vsi __builtin_vec_and (vsi, vsi);
     VAND_V4SI
-  vsi __builtin_vec_and (vsi, vbi);
-    VAND_V4SI  VAND_VSI_VBI
-  vsi __builtin_vec_and (vbi, vsi);
-    VAND_V4SI  VAND_VBI_VSI
   vui __builtin_vec_and (vui, vui);
     VAND_V4SI_UNS  VAND_VUI
   vbi __builtin_vec_and (vbi, vbi);
     VAND_V4SI_UNS  VAND_VBI
-  vui __builtin_vec_and (vui, vbi);
-    VAND_V4SI_UNS  VAND_VUI_VBI
-  vui __builtin_vec_and (vbi, vui);
-    VAND_V4SI_UNS  VAND_VBI_VUI
   vsll __builtin_vec_and (vsll, vsll);
     VAND_V2DI
-  vsll __builtin_vec_and (vsll, vbll);
-    VAND_V2DI  VAND_VSLL_VBLL
-  vsll __builtin_vec_and (vbll, vsll);
-    VAND_V2DI  VAND_VBLL_VSLL
   vull __builtin_vec_and (vull, vull);
     VAND_V2DI_UNS  VAND_VULL
   vbll __builtin_vec_and (vbll, vbll);
     VAND_V2DI_UNS  VAND_VBLL
+  vf __builtin_vec_and (vf, vf);
+    VAND_V4SF
+  vd __builtin_vec_and (vd, vd);
+    VAND_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_and (vsc, vbc);
+    VAND_V16QI  VAND_VSC_VBC
+  vsc __builtin_vec_and (vbc, vsc);
+    VAND_V16QI  VAND_VBC_VSC
+  vuc __builtin_vec_and (vuc, vbc);
+    VAND_V16QI_UNS  VAND_VUC_VBC
+  vuc __builtin_vec_and (vbc, vuc);
+    VAND_V16QI_UNS  VAND_VBC_VUC
+  vss __builtin_vec_and (vss, vbs);
+    VAND_V8HI  VAND_VSS_VBS
+  vss __builtin_vec_and (vss, vbs);
+    VAND_V8HI  VAND_VBS_VSS
+  vus __builtin_vec_and (vus, vbs);
+    VAND_V8HI_UNS  VAND_VUS_VBS
+  vus __builtin_vec_and (vbs, vus);
+    VAND_V8HI_UNS  VAND_VBS_VUS
+  vsi __builtin_vec_and (vsi, vbi);
+    VAND_V4SI  VAND_VSI_VBI
+  vsi __builtin_vec_and (vbi, vsi);
+    VAND_V4SI  VAND_VBI_VSI
+  vui __builtin_vec_and (vui, vbi);
+    VAND_V4SI_UNS  VAND_VUI_VBI
+  vui __builtin_vec_and (vbi, vui);
+    VAND_V4SI_UNS  VAND_VBI_VUI
+  vsll __builtin_vec_and (vsll, vbll);
+    VAND_V2DI  VAND_VSLL_VBLL
+  vsll __builtin_vec_and (vbll, vsll);
+    VAND_V2DI  VAND_VBLL_VSLL
   vull __builtin_vec_and (vull, vbll);
     VAND_V2DI_UNS  VAND_VULL_VBLL
   vull __builtin_vec_and (vbll, vull);
     VAND_V2DI_UNS  VAND_VBLL_VULL
-  vf __builtin_vec_and (vf, vf);
-    VAND_V4SF
   vf __builtin_vec_and (vf, vbi);
     VAND_V4SF  VAND_VF_VBI
   vf __builtin_vec_and (vbi, vf);
     VAND_V4SF  VAND_VBI_VF
-  vd __builtin_vec_and (vd, vd);
-    VAND_V2DF
   vd __builtin_vec_and (vd, vbll);
     VAND_V2DF  VAND_VD_VBLL
   vd __builtin_vec_and (vbll, vd);
@@ -383,6 +442,47 @@
     VANDC_V4SF
   vd __builtin_vec_andc (vd, vd);
     VANDC_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_andc (vsc, vbc);
+    VANDC_V16QI  VANDC_VSC_VBC
+  vsc __builtin_vec_andc (vbc, vsc);
+    VANDC_V16QI  VANDC_VBC_VSC
+  vuc __builtin_vec_andc (vuc, vbc);
+    VANDC_V16QI_UNS VANDC_VUC_VBC
+  vuc __builtin_vec_andc (vbc, vuc);
+    VANDC_V16QI_UNS VANDC_VBC_VUC
+  vss __builtin_vec_andc (vss, vbs);
+    VANDC_V8HI  VANDC_VSS_VBS
+  vss __builtin_vec_andc (vbs, vss);
+    VANDC_V8HI  VANDC_VBS_VSS
+  vus __builtin_vec_andc (vus, vbs);
+    VANDC_V8HI_UNS VANDC_VUS_VBS
+  vus __builtin_vec_andc (vbs, vus);
+    VANDC_V8HI_UNS VANDC_VBS_VUS
+  vsi __builtin_vec_andc (vsi, vbi);
+    VANDC_V4SI  VANDC_VSI_VBI
+  vsi __builtin_vec_andc (vbi, vsi);
+    VANDC_V4SI  VANDC_VBI_VSI
+  vui __builtin_vec_andc (vui, vbi);
+    VANDC_V4SI_UNS VANDC_VUI_VBI
+  vui __builtin_vec_andc (vbi, vui);
+    VANDC_V4SI_UNS VANDC_VBI_VUI
+  vsll __builtin_vec_andc (vsll, vbll);
+    VANDC_V2DI  VANDC_VSLL_VBLL
+  vsll __builtin_vec_andc (vbll, vsll);
+    VANDC_V2DI  VANDC_VBLL_VSLL
+  vull __builtin_vec_andc (vull, vbll);
+    VANDC_V2DI_UNS VANDC_VULL_VBLL
+  vull __builtin_vec_andc (vbll, vull);
+    VANDC_V2DI_UNS VANDC_VBLL_VULL
+  vf __builtin_vec_andc (vf, vbi);
+    VANDC_V4SF  VANDC_VF_VBI
+  vf __builtin_vec_andc (vbi, vf);
+    VANDC_V4SF  VANDC_VBI_VF
+  vd __builtin_vec_andc (vd, vbll);
+    VANDC_V2DF  VANDC_VD_VBLL
+  vd __builtin_vec_andc (vbll, vd);
+    VANDC_V2DF  VANDC_VBLL_VD
 
 [VEC_AVG, vec_avg, __builtin_vec_avg]
   vsc __builtin_vec_avg (vsc, vsc);
@@ -492,6 +592,39 @@
     VCMPAEFP_P
   signed int __builtin_vec_vcmpae_p (vd, vd);
     VCMPAEDP_P
+; The following variants are deprecated.
+  signed int __builtin_vec_vcmpae_p (signed int, vbc, vuc);
+    VCMPAEB_P  VCMPAEB_P_BU
+  signed int __builtin_vec_vcmpae_p (signed int, vuc, vbc);
+    VCMPAEB_P  VCMPAEB_P_UB
+  signed int __builtin_vec_vcmpae_p (signed int, vbc, vsc);
+    VCMPAEB_P  VCMPAEB_P_BS
+  signed int __builtin_vec_vcmpae_p (signed int, vsc, vbc);
+    VCMPAEB_P  VCMPAEB_P_SB
+  signed int __builtin_vec_vcmpae_p (signed int, vbs, vus);
+    VCMPAEH_P  VCMPAEH_P_BU
+  signed int __builtin_vec_vcmpae_p (signed int, vus, vbs);
+    VCMPAEH_P  VCMPAEH_P_UB
+  signed int __builtin_vec_vcmpae_p (signed int, vbs, vss);
+    VCMPAEH_P  VCMPAEH_P_BS
+  signed int __builtin_vec_vcmpae_p (signed int, vss, vbs);
+    VCMPAEH_P  VCMPAEH_P_SB
+  signed int __builtin_vec_vcmpae_p (signed int, vbi, vui);
+    VCMPAEW_P  VCMPAEW_P_BU
+  signed int __builtin_vec_vcmpae_p (signed int, vui, vbi);
+    VCMPAEW_P  VCMPAEW_P_UB
+  signed int __builtin_vec_vcmpae_p (signed int, vbi, vsi);
+    VCMPAEW_P  VCMPAEW_P_BS
+  signed int __builtin_vec_vcmpae_p (signed int, vsi, vbi);
+    VCMPAEW_P  VCMPAEW_P_SB
+  signed int __builtin_vec_vcmpae_p (signed int, vbll, vull);
+    VCMPAED_P  VCMPAED_P_BU
+  signed int __builtin_vec_vcmpae_p (signed int, vull, vbll);
+    VCMPAED_P  VCMPAED_P_UB
+  signed int __builtin_vec_vcmpae_p (signed int, vbll, vsll);
+    VCMPAED_P  VCMPAED_P_BS
+  signed int __builtin_vec_vcmpae_p (signed int, vbll, vsll);
+    VCMPAED_P  VCMPAED_P_SB
 
 [VEC_CMPB, vec_cmpb, __builtin_vec_cmpb]
   vsi __builtin_vec_cmpb (vf, vf);
@@ -562,6 +695,39 @@
     VCMPEQFP_P
   signed int __builtin_vec_vcmpeq_p (signed int, vd, vd);
     XVCMPEQDP_P
+; The following variants are deprecated.
+  signed int __builtin_vec_vcmpeq_p (signed int, vbc, vuc);
+    VCMPEQUB_P  VCMPEQUB_P_BU
+  signed int __builtin_vec_vcmpeq_p (signed int, vuc, vbc);
+    VCMPEQUB_P  VCMPEQUB_P_UB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbc, vsc);
+    VCMPEQUB_P  VCMPEQUB_P_BS
+  signed int __builtin_vec_vcmpeq_p (signed int, vsc, vbc);
+    VCMPEQUB_P  VCMPEQUB_P_SB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbs, vus);
+    VCMPEQUH_P  VCMPEQUH_P_BU
+  signed int __builtin_vec_vcmpeq_p (signed int, vus, vbs);
+    VCMPEQUH_P  VCMPEQUH_P_UB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbs, vss);
+    VCMPEQUH_P  VCMPEQUH_P_BS
+  signed int __builtin_vec_vcmpeq_p (signed int, vss, vbs);
+    VCMPEQUH_P  VCMPEQUH_P_SB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbi, vui);
+    VCMPEQUW_P  VCMPEQUW_P_BU
+  signed int __builtin_vec_vcmpeq_p (signed int, vui, vbi);
+    VCMPEQUW_P  VCMPEQUW_P_UB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbi, vsi);
+    VCMPEQUW_P  VCMPEQUW_P_BS
+  signed int __builtin_vec_vcmpeq_p (signed int, vsi, vbi);
+    VCMPEQUW_P  VCMPEQUW_P_SB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbll, vull);
+    VCMPEQUD_P  VCMPEQUD_P_BU
+  signed int __builtin_vec_vcmpeq_p (signed int, vull, vbll);
+    VCMPEQUD_P  VCMPEQUD_P_UB
+  signed int __builtin_vec_vcmpeq_p (signed int, vbll, vsll);
+    VCMPEQUD_P  VCMPEQUD_P_BS
+  signed int __builtin_vec_vcmpeq_p (signed int, vbll, vsll);
+    VCMPEQUD_P  VCMPEQUD_P_SB
 
 [VEC_CMPEQB, SKIP, __builtin_byte_in_set]
   signed int __builtin_byte_in_set (unsigned char,  unsigned long long);
@@ -616,6 +782,39 @@
     VCMPGEFP_P
   signed int __builtin_vec_vcmpge_p (signed int, vd, vd);
     XVCMPGEDP_P
+; The following variants are deprecated.
+  signed int __builtin_vec_vcmpge_p (signed int, vbc, vuc);
+    VCMPGTUB_P  VCMPGTUB_PR_BU
+  signed int __builtin_vec_vcmpge_p (signed int, vuc, vbc);
+    VCMPGTUB_P  VCMPGTUB_PR_UB
+  signed int __builtin_vec_vcmpge_p (signed int, vbc, vsc);
+    VCMPGTSB_P  VCMPGTSB_PR_BS
+  signed int __builtin_vec_vcmpge_p (signed int, vsc, vbc);
+    VCMPGTSB_P  VCMPGTSB_PR_SB
+  signed int __builtin_vec_vcmpge_p (signed int, vbs, vus);
+    VCMPGTUH_P  VCMPGTUH_PR_BU
+  signed int __builtin_vec_vcmpge_p (signed int, vus, vbs);
+    VCMPGTUH_P  VCMPGTUH_PR_UB
+  signed int __builtin_vec_vcmpge_p (signed int, vbs, vss);
+    VCMPGTSH_P  VCMPGTSH_PR_BS
+  signed int __builtin_vec_vcmpge_p (signed int, vss, vbs);
+    VCMPGTSH_P  VCMPGTSH_PR_SB
+  signed int __builtin_vec_vcmpge_p (signed int, vbi, vui);
+    VCMPGTUW_P  VCMPGTUW_PR_BU
+  signed int __builtin_vec_vcmpge_p (signed int, vui, vbi);
+    VCMPGTUW_P  VCMPGTUW_PR_UB
+  signed int __builtin_vec_vcmpge_p (signed int, vbi, vsi);
+    VCMPGTSW_P  VCMPGTSW_PR_BS
+  signed int __builtin_vec_vcmpge_p (signed int, vsi, vbi);
+    VCMPGTSW_P  VCMPGTSW_PR_SB
+  signed int __builtin_vec_vcmpge_p (signed int, vbll, vull);
+    VCMPGTUD_P  VCMPGTUD_PR_BU
+  signed int __builtin_vec_vcmpge_p (signed int, vull, vbll);
+    VCMPGTUD_P  VCMPGTUD_PR_UB
+  signed int __builtin_vec_vcmpge_p (signed int, vbll, vsll);
+    VCMPGTSD_P  VCMPGTSD_PR_BS
+  signed int __builtin_vec_vcmpge_p (signed int, vsll, vbll);
+    VCMPGTSD_P  VCMPGTSD_PR_SB
 
 ; #### XVCMPGTSP{TARGET_VSX};VCMPGTFP
 [VEC_CMPGT, vec_cmpgt, __builtin_vec_cmpgt]
@@ -664,6 +863,39 @@
     VCMPGTFP_P
   signed int __builtin_vec_vcmpgt_p (signed int, vd, vd);
     XVCMPGTDP_P
+; The following variants are deprecated.
+  signed int __builtin_vec_vcmpgt_p (signed int, vbc, vuc);
+    VCMPGTUB_P  VCMPGTUB_P_BU
+  signed int __builtin_vec_vcmpgt_p (signed int, vuc, vbc);
+    VCMPGTUB_P  VCMPGTUB_P_UB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbc, vsc);
+    VCMPGTSB_P  VCMPGTSB_P_BS
+  signed int __builtin_vec_vcmpgt_p (signed int, vsc, vbc);
+    VCMPGTSB_P  VCMPGTSB_P_SB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbs, vus);
+    VCMPGTUH_P  VCMPGTUH_P_BU
+  signed int __builtin_vec_vcmpgt_p (signed int, vus, vbs);
+    VCMPGTUH_P  VCMPGTUH_P_UB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbs, vss);
+    VCMPGTSH_P  VCMPGTSH_P_BS
+  signed int __builtin_vec_vcmpgt_p (signed int, vss, vbs);
+    VCMPGTSH_P  VCMPGTSH_P_SB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbi, vui);
+    VCMPGTUW_P  VCMPGTUW_P_BU
+  signed int __builtin_vec_vcmpgt_p (signed int, vui, vbi);
+    VCMPGTUW_P  VCMPGTUW_P_UB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbi, vsi);
+    VCMPGTSW_P  VCMPGTSW_P_BS
+  signed int __builtin_vec_vcmpgt_p (signed int, vsi, vbi);
+    VCMPGTSW_P  VCMPGTSW_P_SB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbll, vull);
+    VCMPGTUD_P  VCMPGTUD_P_BU
+  signed int __builtin_vec_vcmpgt_p (signed int, vull, vbll);
+    VCMPGTUD_P  VCMPGTUD_P_UB
+  signed int __builtin_vec_vcmpgt_p (signed int, vbll, vsll);
+    VCMPGTSD_P  VCMPGTSD_P_BS
+  signed int __builtin_vec_vcmpgt_p (signed int, vsll, vbll);
+    VCMPGTSD_P  VCMPGTSD_P_SB
 
 ; Note that there is no entry for VEC_CMPLE.  VEC_CMPLE is implemented
 ; using VEC_CMPGE with reversed arguments in altivec.h.
@@ -724,6 +956,39 @@
     VCMPNEFP_P
   signed int __builtin_vec_vcmpne_p (vd, vd);
     VCMPNEDP_P
+; The following variants are deprecated.
+  signed int __builtin_vec_vcmpne_p (signed int, vbc, vuc);
+    VCMPNEB_P  VCMPNEB_P_BU
+  signed int __builtin_vec_vcmpne_p (signed int, vuc, vbc);
+    VCMPNEB_P  VCMPNEB_P_UB
+  signed int __builtin_vec_vcmpne_p (signed int, vbc, vsc);
+    VCMPNEB_P  VCMPNEB_P_BS
+  signed int __builtin_vec_vcmpne_p (signed int, vsc, vbc);
+    VCMPNEB_P  VCMPNEB_P_SB
+  signed int __builtin_vec_vcmpne_p (signed int, vbs, vus);
+    VCMPNEH_P  VCMPNEH_P_BU
+  signed int __builtin_vec_vcmpne_p (signed int, vus, vbs);
+    VCMPNEH_P  VCMPNEH_P_UB
+  signed int __builtin_vec_vcmpne_p (signed int, vbs, vss);
+    VCMPNEH_P  VCMPNEH_P_BS
+  signed int __builtin_vec_vcmpne_p (signed int, vss, vbs);
+    VCMPNEH_P  VCMPNEH_P_SB
+  signed int __builtin_vec_vcmpne_p (signed int, vbi, vui);
+    VCMPNEW_P  VCMPNEW_P_BU
+  signed int __builtin_vec_vcmpne_p (signed int, vui, vbi);
+    VCMPNEW_P  VCMPNEW_P_UB
+  signed int __builtin_vec_vcmpne_p (signed int, vbi, vsi);
+    VCMPNEW_P  VCMPNEW_P_BS
+  signed int __builtin_vec_vcmpne_p (signed int, vsi, vbi);
+    VCMPNEW_P  VCMPNEW_P_SB
+  signed int __builtin_vec_vcmpne_p (signed int, vbll, vull);
+    VCMPNED_P  VCMPNED_P_BU
+  signed int __builtin_vec_vcmpne_p (signed int, vull, vbll);
+    VCMPNED_P  VCMPNED_P_UB
+  signed int __builtin_vec_vcmpne_p (signed int, vbll, vsll);
+    VCMPNED_P  VCMPNED_P_BS
+  signed int __builtin_vec_vcmpne_p (signed int, vbll, vsll);
+    VCMPNED_P  VCMPNED_P_SB
 
 [VEC_CMPNEZ, vec_cmpnez, __builtin_vec_cmpnez, _ARCH_PWR9]
   vbc __builtin_vec_cmpnez (vsc, vsc);
@@ -942,6 +1207,10 @@
     DST  DST_UI
   void __builtin_vec_dst (signed int *, const int, const int);
     DST  DST_SI
+  void __builtin_vec_dst (unsigned long *, const int, const int);
+    DST  DST_UL
+  void __builtin_vec_dst (signed long *, const int, const int);
+    DST  DST_SL
   void __builtin_vec_dst (unsigned long long *, const int, const int);
     DST  DST_ULL
   void __builtin_vec_dst (signed long long *, const int, const int);
@@ -984,6 +1253,10 @@
     DSTST  DSTST_UI
   void __builtin_vec_dstst (signed int *, const int, const int);
     DSTST  DSTST_SI
+  void __builtin_vec_dstst (unsigned long *, const int, const int);
+    DSTST  DSTST_UL
+  void __builtin_vec_dstst (signed long *, const int, const int);
+    DSTST  DSTST_SL
   void __builtin_vec_dstst (unsigned long long *, const int, const int);
     DSTST  DSTST_ULL
   void __builtin_vec_dstst (signed long long *, const int, const int);
@@ -1026,6 +1299,10 @@
     DSTSTT  DSTSTT_UI
   void __builtin_vec_dststt (signed int *, const int, const int);
     DSTSTT  DSTSTT_SI
+  void __builtin_vec_dststt (unsigned long *, const int, const int);
+    DSTSTT  DSTSTT_UL
+  void __builtin_vec_dststt (signed long *, const int, const int);
+    DSTSTT  DSTSTT_SL
   void __builtin_vec_dststt (unsigned long long *, const int, const int);
     DSTSTT  DSTSTT_ULL
   void __builtin_vec_dststt (signed long long *, const int, const int);
@@ -1068,6 +1345,10 @@
     DSTT  DSTT_UI
   void __builtin_vec_dstt (signed int *, const int, const int);
     DSTT  DSTT_SI
+  void __builtin_vec_dstt (unsigned long *, const int, const int);
+    DSTT  DSTT_UL
+  void __builtin_vec_dstt (signed long *, const int, const int);
+    DSTT  DSTT_SL
   void __builtin_vec_dstt (unsigned long long *, const int, const int);
     DSTT  DSTT_ULL
   void __builtin_vec_dstt (signed long long *, const int, const int);
@@ -1126,6 +1407,39 @@
     EQV_V4SF
   vd __builtin_vec_eqv (vd, vd);
     EQV_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_eqv (vbc, vsc);
+    EQV_V16QI  EQV_VBC_VSC
+  vsc __builtin_vec_eqv (vsc, vbc);
+    EQV_V16QI  EQV_VSC_VBC
+  vuc __builtin_vec_eqv (vbc, vuc);
+    EQV_V16QI_UNS  EQV_VBC_VUC
+  vuc __builtin_vec_eqv (vuc, vbc);
+    EQV_V16QI_UNS  EQV_VUC_VBC
+  vss __builtin_vec_eqv (vbs, vss);
+    EQV_V8HI  EQV_VBS_VSS
+  vss __builtin_vec_eqv (vss, vbs);
+    EQV_V8HI  EQV_VSS_VBS
+  vus __builtin_vec_eqv (vbs, vus);
+    EQV_V8HI_UNS  EQV_VBS_VUS
+  vus __builtin_vec_eqv (vus, vbs);
+    EQV_V8HI_UNS  EQV_VUS_VBS
+  vsi __builtin_vec_eqv (vbi, vsi);
+    EQV_V4SI  EQV_VBI_VSI
+  vsi __builtin_vec_eqv (vsi, vbi);
+    EQV_V4SI  EQV_VSI_VBI
+  vui __builtin_vec_eqv (vbi, vui);
+    EQV_V4SI_UNS  EQV_VBI_VUI
+  vui __builtin_vec_eqv (vui, vbi);
+    EQV_V4SI_UNS  EQV_VUI_VBI
+  vsll __builtin_vec_eqv (vbll, vsll);
+    EQV_V2DI  EQV_VBLL_VSLL
+  vsll __builtin_vec_eqv (vsll, vbll);
+    EQV_V2DI  EQV_VSLL_VBLL
+  vull __builtin_vec_eqv (vbll, vull);
+    EQV_V2DI_UNS  EQV_VBLL_VULL
+  vull __builtin_vec_eqv (vull, vbll);
+    EQV_V2DI_UNS  EQV_VULL_VBLL
 
 [VEC_EXPANDM, vec_expandm, __builtin_vec_vexpandm, _ARCH_PWR10]
   vuc __builtin_vec_vexpandm (vuc);
@@ -1471,6 +1785,11 @@
     LVX_V2DF  LVX_V2DF_VD
   vd __builtin_vec_ld (signed long long, const double *);
     LVX_V2DF  LVX_V2DF_D
+; The following variants are deprecated.
+  vsi __builtin_vec_ld (signed long long, const long *);
+    LVX_V4SI  LVX_V4SI_SL
+  vui __builtin_vec_ld (signed long long, const unsigned long *);
+    LVX_V4SI  LVX_V4SI_UL
 
 [VEC_LDE, vec_lde, __builtin_vec_lde]
   vsc __builtin_vec_lde (signed long long, const signed char *);
@@ -1487,6 +1806,11 @@
     LVEWX  LVEWX_UI
   vf __builtin_vec_lde (signed long long, const float *);
     LVEWX  LVEWX_F
+; The following variants are deprecated.
+  vsi __builtin_vec_lde (signed long long, const long *);
+    LVEWX  LVEWX_SL
+  vui __builtin_vec_lde (signed long long, const unsigned long *);
+    LVEWX  LVEWX_UL
 
 [VEC_LDL, vec_ldl, __builtin_vec_ldl]
   vsc __builtin_vec_ldl (signed long long, const vsc *);
@@ -1827,6 +2151,39 @@
     VMAXFP
   vd __builtin_vec_max (vd, vd);
     XVMAXDP
+; The following variants are deprecated.
+  vsc __builtin_vec_max (vsc, vbc);
+    VMAXSB  VMAXSB_SB
+  vsc __builtin_vec_max (vbc, vsc);
+    VMAXSB  VMAXSB_BS
+  vuc __builtin_vec_max (vuc, vbc);
+    VMAXUB  VMAXUB_UB
+  vuc __builtin_vec_max (vbc, vuc);
+    VMAXUB  VMAXUB_BU
+  vss __builtin_vec_max (vss, vbs);
+    VMAXSH  VMAXSH_SB
+  vss __builtin_vec_max (vbs, vss);
+    VMAXSH  VMAXSH_BS
+  vus __builtin_vec_max (vus, vbs);
+    VMAXUH  VMAXUH_UB
+  vus __builtin_vec_max (vbs, vus);
+    VMAXUH  VMAXUH_BU
+  vsi __builtin_vec_max (vsi, vbi);
+    VMAXSW  VMAXSW_SB
+  vsi __builtin_vec_max (vbi, vsi);
+    VMAXSW  VMAXSW_BS
+  vui __builtin_vec_max (vui, vbi);
+    VMAXUW  VMAXUW_UB
+  vui __builtin_vec_max (vbi, vui);
+    VMAXUW  VMAXUW_BU
+  vsll __builtin_vec_max (vsll, vbll);
+    VMAXSD  VMAXSD_SB
+  vsll __builtin_vec_max (vbll, vsll);
+    VMAXSD  VMAXSD_BS
+  vull __builtin_vec_max (vull, vbll);
+    VMAXUD  VMAXUD_UB
+  vull __builtin_vec_max (vbll, vull);
+    VMAXUD  VMAXUD_BU
 
 [VEC_MERGEE, vec_mergee, __builtin_vec_vmrgew]
   vsi __builtin_vec_vmrgew (vsi, vsi);
@@ -1877,6 +2234,15 @@
     VMRGHW  VMRGHW_VF
   vd __builtin_vec_mergeh (vd, vd);
     VEC_MERGEH_V2DF
+; The following variants are deprecated.
+  vsll __builtin_vec_mergeh (vsll, vbll);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VSLL_VBLL
+  vsll __builtin_vec_mergeh (vbll, vsll);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VBLL_VSLL
+  vull __builtin_vec_mergeh (vull, vbll);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VULL_VBLL
+  vull __builtin_vec_mergeh (vbll, vull);
+    VEC_MERGEH_V2DI  VEC_MERGEH_VBLL_VULL
 
 [VEC_MERGEL, vec_mergel, __builtin_vec_mergel]
   vbc __builtin_vec_mergel (vbc, vbc);
@@ -1909,6 +2275,15 @@
     VMRGLW  VMRGLW_VF
   vd __builtin_vec_mergel (vd, vd);
     VEC_MERGEL_V2DF
+; The following variants are deprecated.
+  vsll __builtin_vec_mergel (vsll, vbll);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VSLL_VBLL
+  vsll __builtin_vec_mergel (vbll, vsll);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VBLL_VSLL
+  vull __builtin_vec_mergel (vull, vbll);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VULL_VBLL
+  vull __builtin_vec_mergel (vbll, vull);
+    VEC_MERGEL_V2DI  VEC_MERGEL_VBLL_VULL
 
 [VEC_MERGEO, vec_mergeo, __builtin_vec_vmrgow]
   vsi __builtin_vec_vmrgow (vsi, vsi);
@@ -1954,6 +2329,39 @@
     VMINFP
   vd __builtin_vec_min (vd, vd);
     XVMINDP
+; The following variants are deprecated.
+  vsc __builtin_vec_min (vsc, vbc);
+    VMINSB  VMINSB_SB
+  vsc __builtin_vec_min (vbc, vsc);
+    VMINSB  VMINSB_BS
+  vuc __builtin_vec_min (vuc, vbc);
+    VMINUB  VMINUB_UB
+  vuc __builtin_vec_min (vbc, vuc);
+    VMINUB  VMINUB_BU
+  vss __builtin_vec_min (vss, vbs);
+    VMINSH  VMINSH_SB
+  vss __builtin_vec_min (vbs, vss);
+    VMINSH  VMINSH_BS
+  vus __builtin_vec_min (vus, vbs);
+    VMINUH  VMINUH_UB
+  vus __builtin_vec_min (vbs, vus);
+    VMINUH  VMINUH_BU
+  vsi __builtin_vec_min (vsi, vbi);
+    VMINSW  VMINSW_SB
+  vsi __builtin_vec_min (vbi, vsi);
+    VMINSW  VMINSW_BS
+  vui __builtin_vec_min (vui, vbi);
+    VMINUW  VMINUW_UB
+  vui __builtin_vec_min (vbi, vui);
+    VMINUW  VMINUW_BU
+  vsll __builtin_vec_min (vsll, vbll);
+    VMINSD  VMINSD_SB
+  vsll __builtin_vec_min (vbll, vsll);
+    VMINSD  VMINSD_BS
+  vull __builtin_vec_min (vull, vbll);
+    VMINUD  VMINUD_UB
+  vull __builtin_vec_min (vbll, vull);
+    VMINUD  VMINUD_BU
 
 [VEC_MLADD, vec_mladd, __builtin_vec_mladd]
   vss __builtin_vec_mladd (vss, vss, vss);
@@ -2100,6 +2508,39 @@
     NAND_V4SF
   vd __builtin_vec_nand (vd, vd);
     NAND_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_nand (vbc, vsc);
+    NAND_V16QI  NAND_VBC_VSC
+  vsc __builtin_vec_nand (vsc, vbc);
+    NAND_V16QI  NAND_VSC_VBC
+  vuc __builtin_vec_nand (vbc, vuc);
+    NAND_V16QI_UNS  NAND_VBC_VUC
+  vuc __builtin_vec_nand (vuc, vbc);
+    NAND_V16QI_UNS  NAND_VUC_VBC
+  vss __builtin_vec_nand (vbs, vss);
+    NAND_V8HI  NAND_VBS_VSS
+  vss __builtin_vec_nand (vss, vbs);
+    NAND_V8HI  NAND_VSS_VBS
+  vus __builtin_vec_nand (vbs, vus);
+    NAND_V8HI_UNS  NAND_VBS_VUS
+  vus __builtin_vec_nand (vus, vbs);
+    NAND_V8HI_UNS  NAND_VUS_VBS
+  vsi __builtin_vec_nand (vbi, vsi);
+    NAND_V4SI  NAND_VBI_VSI
+  vsi __builtin_vec_nand (vsi, vbi);
+    NAND_V4SI  NAND_VSI_VBI
+  vui __builtin_vec_nand (vbi, vui);
+    NAND_V4SI_UNS  NAND_VBI_VUI
+  vui __builtin_vec_nand (vui, vbi);
+    NAND_V4SI_UNS  NAND_VUI_VBI
+  vsll __builtin_vec_nand (vbll, vsll);
+    NAND_V2DI  NAND_VBLL_VSLL
+  vsll __builtin_vec_nand (vsll, vbll);
+    NAND_V2DI  NAND_VSLL_VBLL
+  vull __builtin_vec_nand (vbll, vull);
+    NAND_V2DI_UNS  NAND_VBLL_VULL
+  vull __builtin_vec_nand (vull, vbll);
+    NAND_V2DI_UNS  NAND_VULL_VBLL
 
 [VEC_NCIPHER_BE, vec_ncipher_be, __builtin_vec_vncipher_be, _ARCH_PWR8]
   vuc __builtin_vec_vncipher_be (vuc, vuc);
@@ -2171,72 +2612,82 @@
     VNOR_V4SF
   vd __builtin_vec_nor (vd, vd);
     VNOR_V2DF
+; The following variants are deprecated.
+  vsll __builtin_vec_nor (vsll, vbll);
+    VNOR_V2DI  VNOR_VSLL_VBLL
+  vsll __builtin_vec_nor (vbll, vsll);
+    VNOR_V2DI  VNOR_VBLL_VSLL
+  vull __builtin_vec_nor (vull, vbll);
+    VNOR_V2DI_UNS  VNOR_VULL_VBLL
+  vull __builtin_vec_nor (vbll, vull);
+    VNOR_V2DI_UNS  VNOR_VBLL_VULL
 
 [VEC_OR, vec_or, __builtin_vec_or]
   vsc __builtin_vec_or (vsc, vsc);
     VOR_V16QI
-  vsc __builtin_vec_or (vsc, vbc);
-    VOR_V16QI  VOR_VSC_VBC
-  vsc __builtin_vec_or (vbc, vsc);
-    VOR_V16QI  VOR_VBC_VSC
   vuc __builtin_vec_or (vuc, vuc);
     VOR_V16QI_UNS  VOR_V16QI_U
   vbc __builtin_vec_or (vbc, vbc);
     VOR_V16QI_UNS  VOR_V16QI_B
-  vuc __builtin_vec_or (vuc, vbc);
-    VOR_V16QI_UNS  VOR_V16QI_UB
-  vuc __builtin_vec_or (vbc, vuc);
-    VOR_V16QI_UNS  VOR_V16QI_BU
   vss __builtin_vec_or (vss, vss);
     VOR_V8HI
-  vss __builtin_vec_or (vss, vbs);
-    VOR_V8HI  VOR_VSS_VBS
-  vss __builtin_vec_or (vbs, vss);
-    VOR_V8HI  VOR_VBS_VSS
   vus __builtin_vec_or (vus, vus);
     VOR_V8HI_UNS  VOR_V8HI_U
   vbs __builtin_vec_or (vbs, vbs);
     VOR_V8HI_UNS  VOR_V8HI_B
-  vus __builtin_vec_or (vus, vbs);
-    VOR_V8HI_UNS  VOR_V8HI_UB
-  vus __builtin_vec_or (vbs, vus);
-    VOR_V8HI_UNS  VOR_V8HI_BU
   vsi __builtin_vec_or (vsi, vsi);
     VOR_V4SI
-  vsi __builtin_vec_or (vsi, vbi);
-    VOR_V4SI  VOR_VSI_VBI
-  vsi __builtin_vec_or (vbi, vsi);
-    VOR_V4SI  VOR_VBI_VSI
   vui __builtin_vec_or (vui, vui);
     VOR_V4SI_UNS  VOR_V4SI_U
   vbi __builtin_vec_or (vbi, vbi);
     VOR_V4SI_UNS  VOR_V4SI_B
-  vui __builtin_vec_or (vui, vbi);
-    VOR_V4SI_UNS  VOR_V4SI_UB
-  vui __builtin_vec_or (vui, vbi);
-    VOR_V4SI_UNS  VOR_V4SI_BU
   vsll __builtin_vec_or (vsll, vsll);
     VOR_V2DI
-  vsll __builtin_vec_or (vsll, vbll);
-    VOR_V2DI  VOR_VSLL_VBLL
-  vsll __builtin_vec_or (vbll, vsll);
-    VOR_V2DI  VOR_VBLL_VSLL
   vull __builtin_vec_or (vull, vull);
     VOR_V2DI_UNS  VOR_V2DI_U
   vbll __builtin_vec_or (vbll, vbll);
     VOR_V2DI_UNS  VOR_V2DI_B
+  vf __builtin_vec_or (vf, vf);
+    VOR_V4SF
+  vd __builtin_vec_or (vd, vd);
+    VOR_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_or (vsc, vbc);
+    VOR_V16QI  VOR_VSC_VBC
+  vsc __builtin_vec_or (vbc, vsc);
+    VOR_V16QI  VOR_VBC_VSC
+  vuc __builtin_vec_or (vuc, vbc);
+    VOR_V16QI_UNS  VOR_V16QI_UB
+  vuc __builtin_vec_or (vbc, vuc);
+    VOR_V16QI_UNS  VOR_V16QI_BU
+  vss __builtin_vec_or (vss, vbs);
+    VOR_V8HI  VOR_VSS_VBS
+  vss __builtin_vec_or (vbs, vss);
+    VOR_V8HI  VOR_VBS_VSS
+  vus __builtin_vec_or (vus, vbs);
+    VOR_V8HI_UNS  VOR_V8HI_UB
+  vus __builtin_vec_or (vbs, vus);
+    VOR_V8HI_UNS  VOR_V8HI_BU
+  vsi __builtin_vec_or (vsi, vbi);
+    VOR_V4SI  VOR_VSI_VBI
+  vsi __builtin_vec_or (vbi, vsi);
+    VOR_V4SI  VOR_VBI_VSI
+  vui __builtin_vec_or (vui, vbi);
+    VOR_V4SI_UNS  VOR_V4SI_UB
+  vui __builtin_vec_or (vbi, vui);
+    VOR_V4SI_UNS  VOR_V4SI_BU
+  vsll __builtin_vec_or (vsll, vbll);
+    VOR_V2DI  VOR_VSLL_VBLL
+  vsll __builtin_vec_or (vbll, vsll);
+    VOR_V2DI  VOR_VBLL_VSLL
   vull __builtin_vec_or (vull, vbll);
     VOR_V2DI_UNS  VOR_V2DI_UB
   vull __builtin_vec_or (vbll, vull);
     VOR_V2DI_UNS  VOR_V2DI_BU
-  vf __builtin_vec_or (vf, vf);
-    VOR_V4SF
   vf __builtin_vec_or (vf, vbi);
     VOR_V4SF  VOR_VF_VBI
   vf __builtin_vec_or (vbi, vf);
     VOR_V4SF  VOR_VBI_VF
-  vd __builtin_vec_or (vd, vd);
-    VOR_V2DF
   vd __builtin_vec_or (vd, vbll);
     VOR_V2DF  VOR_VD_VBLL
   vd __builtin_vec_or (vbll, vd);
@@ -2271,6 +2722,39 @@
     ORC_V4SF
   vd __builtin_vec_orc (vd, vd);
     ORC_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_orc (vbc, vsc);
+    ORC_V16QI  ORC_VBC_VSC
+  vsc __builtin_vec_orc (vsc, vbc);
+    ORC_V16QI  ORC_VSC_VBC
+  vuc __builtin_vec_orc (vbc, vuc);
+    ORC_V16QI_UNS  ORC_VBC_VUC
+  vuc __builtin_vec_orc (vuc, vbc);
+    ORC_V16QI_UNS  ORC_VUC_VBC
+  vss __builtin_vec_orc (vbs, vss);
+    ORC_V8HI  ORC_VBS_VSS
+  vss __builtin_vec_orc (vss, vbs);
+    ORC_V8HI  ORC_VSS_VBS
+  vus __builtin_vec_orc (vbs, vus);
+    ORC_V8HI_UNS  ORC_VBS_VUS
+  vus __builtin_vec_orc (vus, vbs);
+    ORC_V8HI_UNS  ORC_VUS_VBS
+  vsi __builtin_vec_orc (vbi, vsi);
+    ORC_V4SI  ORC_VBI_VSI
+  vsi __builtin_vec_orc (vsi, vbi);
+    ORC_V4SI  ORC_VSI_VBI
+  vui __builtin_vec_orc (vbi, vui);
+    ORC_V4SI_UNS  ORC_VBI_VUI
+  vui __builtin_vec_orc (vui, vbi);
+    ORC_V4SI_UNS  ORC_VUI_VBI
+  vsll __builtin_vec_orc (vbll, vsll);
+    ORC_V2DI  ORC_VBLL_VSLL
+  vsll __builtin_vec_orc (vsll, vbll);
+    ORC_V2DI  ORC_VSLL_VBLL
+  vull __builtin_vec_orc (vbll, vull);
+    ORC_V2DI_UNS  ORC_VBLL_VULL
+  vull __builtin_vec_orc (vull, vbll);
+    ORC_V2DI_UNS  ORC_VULL_VBLL
 
 [VEC_PACK, vec_pack, __builtin_vec_pack]
   vsc __builtin_vec_pack (vss, vss);
@@ -2361,6 +2845,11 @@
     VPERM_4SF
   vd __builtin_vec_perm (vd, vd, vuc);
     VPERM_2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_perm (vsc, vuc, vuc);
+    VPERM_16QI  VPERM_VSC_VUC_VUC
+  vbc __builtin_vec_perm (vbc, vbc, vbc);
+    VPERM_16QI  VPERM_VBC_VBC_VBC
 
 [VEC_PERMX, vec_permx, __builtin_vec_xxpermx, _ARCH_PWR10]
   vsc __builtin_vec_xxpermx (vsc, vsc, vuc, const int);
@@ -2511,6 +3000,19 @@
     REVB_V4SF
   vd __builtin_vec_revb (vd);
     REVB_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_revb (vsc);
+    REVB_V16QI  REVB_VSC
+  vuc __builtin_vec_revb (vuc);
+    REVB_V16QI  REVB_VUC
+  vbc __builtin_vec_revb (vbc);
+    REVB_V16QI  REVB_VBC
+  vbs __builtin_vec_revb (vbs);
+    REVB_V8HI  REVB_VBS
+  vbi __builtin_vec_revb (vbi);
+    REVB_V4SI  REVB_VBI
+  vbll __builtin_vec_revb (vbll);
+    REVB_V2DI  REVB_VBLL
 
 [VEC_REVE, vec_reve, __builtin_vec_vreve]
   vsc __builtin_vec_vreve (vsc);
@@ -2660,6 +3162,19 @@
     VSEL_2DF  VSEL_2DF_B
   vd __builtin_vec_sel (vd, vd, vull);
     VSEL_2DF  VSEL_2DF_U
+; The following variants are deprecated.
+  vsll __builtin_vec_sel (vsll, vsll, vsll);
+    VSEL_2DI_B  VSEL_2DI_S
+  vull __builtin_vec_sel (vull, vull, vsll);
+    VSEL_2DI_UNS  VSEL_2DI_US
+  vf __builtin_vec_sel (vf, vf, vf);
+    VSEL_4SF  VSEL_4SF_F
+  vf __builtin_vec_sel (vf, vf, vsi);
+    VSEL_4SF  VSEL_4SF_S
+  vd __builtin_vec_sel (vd, vd, vsll);
+    VSEL_2DF  VSEL_2DF_S
+  vd __builtin_vec_sel (vd, vd, vd);
+    VSEL_2DF  VSEL_2DF_D
 
 [VEC_SHASIGMA_BE, vec_shasigma_be, __builtin_crypto_vshasigma]
   vui __builtin_crypto_vshasigma (vui, const int, const int);
@@ -2790,6 +3305,59 @@
     VSL  VSL_VSLL
   vull __builtin_vec_sll (vull, vuc);
     VSL  VSL_VULL
+; The following variants are deprecated.
+  vsc __builtin_vec_sll (vsc, vus);
+    VSL  VSL_VSC_VUS
+  vsc __builtin_vec_sll (vsc, vui);
+    VSL  VSL_VSC_VUI
+  vuc __builtin_vec_sll (vuc, vus);
+    VSL  VSL_VUC_VUS
+  vuc __builtin_vec_sll (vuc, vui);
+    VSL  VSL_VUC_VUI
+  vbc __builtin_vec_sll (vbc, vuc);
+    VSL  VSL_VBC_VUC
+  vbc __builtin_vec_sll (vbc, vus);
+    VSL  VSL_VBC_VUS
+  vbc __builtin_vec_sll (vbc, vui);
+    VSL  VSL_VBC_VUI
+  vss __builtin_vec_sll (vss, vus);
+    VSL  VSL_VSS_VUS
+  vss __builtin_vec_sll (vss, vui);
+    VSL  VSL_VSS_VUI
+  vus __builtin_vec_sll (vus, vus);
+    VSL  VSL_VUS_VUS
+  vus __builtin_vec_sll (vus, vui);
+    VSL  VSL_VUS_VUI
+  vbs __builtin_vec_sll (vbs, vuc);
+    VSL  VSL_VBS_VUC
+  vbs __builtin_vec_sll (vbs, vus);
+    VSL  VSL_VBS_VUS
+  vbs __builtin_vec_sll (vbs, vui);
+    VSL  VSL_VBS_VUI
+  vp __builtin_vec_sll (vp, vus);
+    VSL  VSL_VP_VUS
+  vp __builtin_vec_sll (vp, vui);
+    VSL  VSL_VP_VUI
+  vsi __builtin_vec_sll (vsi, vus);
+    VSL  VSL_VSI_VUS
+  vsi __builtin_vec_sll (vsi, vui);
+    VSL  VSL_VSI_VUI
+  vui __builtin_vec_sll (vui, vus);
+    VSL  VSL_VUI_VUS
+  vui __builtin_vec_sll (vui, vui);
+    VSL  VSL_VUI_VUI
+  vbi __builtin_vec_sll (vbi, vuc);
+    VSL  VSL_VBI_VUC
+  vbi __builtin_vec_sll (vbi, vus);
+    VSL  VSL_VBI_VUS
+  vbi __builtin_vec_sll (vbi, vui);
+    VSL  VSL_VBI_VUI
+  vbll __builtin_vec_sll (vbll, vuc);
+    VSL  VSL_VBLL_VUC
+  vbll __builtin_vec_sll (vbll, vus);
+    VSL  VSL_VBLL_VUS
+  vbll __builtin_vec_sll (vbll, vui);
+    VSL  VSL_VBLL_VUI
 
 [VEC_SLO, vec_slo, __builtin_vec_slo]
   vsc __builtin_vec_slo (vsc, vsc);
@@ -2989,6 +3557,53 @@
     VSR  VSR_VSLL
   vull __builtin_vec_srl (vull, vuc);
     VSR  VSR_VULL
+; The following variants are deprecated.
+  vsc __builtin_vec_srl (vsc, vus);
+    VSR  VSR_VSC_VUS
+  vsc __builtin_vec_srl (vsc, vui);
+    VSR  VSR_VSC_VUI
+  vuc __builtin_vec_srl (vuc, vus);
+    VSR  VSR_VUC_VUS
+  vuc __builtin_vec_srl (vuc, vui);
+    VSR  VSR_VUC_VUI
+  vbc __builtin_vec_srl (vbc, vuc);
+    VSR  VSR_VBC_VUC
+  vbc __builtin_vec_srl (vbc, vus);
+    VSR  VSR_VBC_VUS
+  vbc __builtin_vec_srl (vbc, vui);
+    VSR  VSR_VBC_VUI
+  vss __builtin_vec_srl (vss, vus);
+    VSR  VSR_VSS_VUS
+  vss __builtin_vec_srl (vss, vui);
+    VSR  VSR_VSS_VUI
+  vus __builtin_vec_srl (vus, vus);
+    VSR  VSR_VUS_VUS
+  vus __builtin_vec_srl (vus, vui);
+    VSR  VSR_VUS_VUI
+  vbs __builtin_vec_srl (vbs, vuc);
+    VSR  VSR_VBS_VUC
+  vbs __builtin_vec_srl (vbs, vus);
+    VSR  VSR_VBS_VUS
+  vbs __builtin_vec_srl (vbs, vui);
+    VSR  VSR_VBS_VUI
+  vp __builtin_vec_srl (vp, vus);
+    VSR  VSR_VP_VUS
+  vp __builtin_vec_srl (vp, vui);
+    VSR  VSR_VP_VUI
+  vsi __builtin_vec_srl (vsi, vus);
+    VSR  VSR_VSI_VUS
+  vsi __builtin_vec_srl (vsi, vui);
+    VSR  VSR_VSI_VUI
+  vui __builtin_vec_srl (vui, vus);
+    VSR  VSR_VUI_VUS
+  vui __builtin_vec_srl (vui, vui);
+    VSR  VSR_VUI_VUI
+  vbi __builtin_vec_srl (vbi, vuc);
+    VSR  VSR_VBI_VUC
+  vbi __builtin_vec_srl (vbi, vus);
+    VSR  VSR_VBI_VUS
+  vbi __builtin_vec_srl (vbi, vui);
+    VSR  VSR_VBI_VUI
 
 [VEC_SRO, vec_sro, __builtin_vec_sro]
   vsc __builtin_vec_sro (vsc, vsc);
@@ -3071,10 +3686,14 @@
     STVX_V4SI  STVX_VSI
   void __builtin_vec_st (vsi, signed long long, signed int *);
     STVX_V4SI  STVX_SI
+  void __builtin_vec_st (vsi, signed long long, signed long *);
+    STVX_V4SI  STVX_SL
   void __builtin_vec_st (vui, signed long long, vui *);
     STVX_V4SI  STVX_VUI
   void __builtin_vec_st (vui, signed long long, unsigned int *);
     STVX_V4SI  STVX_UI
+  void __builtin_vec_st (vui, signed long long, unsigned long *);
+    STVX_V4SI  STVX_UL
   void __builtin_vec_st (vbi, signed long long, vbi *);
     STVX_V4SI  STVX_VBI
   void __builtin_vec_st (vbi, signed long long, signed int *);
@@ -3091,10 +3710,6 @@
     STVX_V2DI  STVX_ULL
   void __builtin_vec_st (vbll, signed long long, vbll *);
     STVX_V2DI  STVX_VBLL
-  void __builtin_vec_st (vbll, signed long long, signed long long *);
-    STVX_V2DI  STVX_SLL_B
-  void __builtin_vec_st (vbll, signed long long, unsigned long long *);
-    STVX_V2DI  STVX_ULL_B
   void __builtin_vec_st (vf, signed long long, vf *);
     STVX_V4SF  STVX_VF
   void __builtin_vec_st (vf, signed long long, float *);
@@ -3103,6 +3718,11 @@
     STVX_V2DF  STVX_VD
   void __builtin_vec_st (vd, signed long long, double *);
     STVX_V2DF  STVX_D
+; The following variants are deprecated.
+  void __builtin_vec_st (vbll, signed long long, signed long long *);
+    STVX_V2DI  STVX_SLL_B
+  void __builtin_vec_st (vbll, signed long long, unsigned long long *);
+    STVX_V2DI  STVX_ULL_B
 
 [VEC_STE, vec_ste, __builtin_vec_ste]
   void __builtin_vec_ste (vsc, signed long long, signed char *);
@@ -3456,6 +4076,39 @@
     VSUBFP
   vd __builtin_vec_sub (vd, vd);
     XVSUBDP
+; The following variants are deprecated.
+  vsc __builtin_vec_sub (vsc, vbc);
+    VSUBUBM  VSUBUBM_VSC_VBC
+  vsc __builtin_vec_sub (vbc, vsc);
+    VSUBUBM  VSUBUBM_VBC_VSC
+  vuc __builtin_vec_sub (vuc, vbc);
+    VSUBUBM  VSUBUBM_VUC_VBC
+  vuc __builtin_vec_sub (vbc, vuc);
+    VSUBUBM  VSUBUBM_VBC_VUC
+  vss __builtin_vec_sub (vss, vbs);
+    VSUBUHM  VSUBUHM_VSS_VBS
+  vss __builtin_vec_sub (vbs, vss);
+    VSUBUHM  VSUBUHM_VBS_VSS
+  vus __builtin_vec_sub (vus, vbs);
+    VSUBUHM  VSUBUHM_VUS_VBS
+  vus __builtin_vec_sub (vbs, vus);
+    VSUBUHM  VSUBUHM_VBS_VUS
+  vsi __builtin_vec_sub (vsi, vbi);
+    VSUBUWM  VSUBUWM_VSI_VBI
+  vsi __builtin_vec_sub (vbi, vsi);
+    VSUBUWM  VSUBUWM_VBI_VSI
+  vui __builtin_vec_sub (vui, vbi);
+    VSUBUWM  VSUBUWM_VUI_VBI
+  vui __builtin_vec_sub (vbi, vui);
+    VSUBUWM  VSUBUWM_VBI_VUI
+  vsll __builtin_vec_sub (vsll, vbll);
+    VSUBUDM  VSUBUDM_VSLL_VBLL
+  vsll __builtin_vec_sub (vbll, vsll);
+    VSUBUDM  VSUBUDM_VBLL_VSLL
+  vull __builtin_vec_sub (vull, vbll);
+    VSUBUDM  VSUBUDM_VULL_VBLL
+  vull __builtin_vec_sub (vbll, vull);
+    VSUBUDM  VSUBUDM_VBLL_VULL
 
 [VEC_SUBC, vec_subc, __builtin_vec_subc]
   vsi __builtin_vec_subc (vsi, vsi);
@@ -3504,6 +4157,31 @@
     VSUBUWS
   vsi __builtin_vec_subs (vsi, vsi);
     VSUBSWS
+; The following variants are deprecated.
+  vuc __builtin_vec_subs (vuc, vbc);
+    VSUBUBS  VSUBUBS_UB
+  vuc __builtin_vec_subs (vbc, vuc);
+    VSUBUBS  VSUBUBS_BU
+  vsc __builtin_vec_subs (vsc, vbc);
+    VSUBSBS  VSUBSBS_SB
+  vsc __builtin_vec_subs (vbc, vsc);
+    VSUBSBS  VSUBSBS_BS
+  vus __builtin_vec_subs (vus, vbs);
+    VSUBUHS  VSUBUHS_UB
+  vus __builtin_vec_subs (vbs, vus);
+    VSUBUHS  VSUBUHS_BU
+  vss __builtin_vec_subs (vss, vbs);
+    VSUBSHS  VSUBSHS_SB
+  vss __builtin_vec_subs (vbs, vss);
+    VSUBSHS  VSUBSHS_BS
+  vui __builtin_vec_subs (vui, vbi);
+    VSUBUWS  VSUBUWS_UB
+  vui __builtin_vec_subs (vbi, vui);
+    VSUBUWS  VSUBUWS_BU
+  vsi __builtin_vec_subs (vsi, vbi);
+    VSUBSWS  VSUBSWS_SB
+  vsi __builtin_vec_subs (vbi, vsi);
+    VSUBSWS  VSUBSWS_BS
 
 [VEC_SUM2S, vec_sum2s, __builtin_vec_sum2s]
   vsi __builtin_vec_sum2s (vsi, vsi);
@@ -3862,6 +4540,51 @@
     VXOR_V4SF
   vd __builtin_vec_xor (vd, vd);
     VXOR_V2DF
+; The following variants are deprecated.
+  vsc __builtin_vec_xor (vsc, vbc);
+    VXOR_V16QI  VXOR_VSC_VBC
+  vsc __builtin_vec_xor (vbc, vsc);
+    VXOR_V16QI  VXOR_VBC_VSC
+  vsc __builtin_vec_xor (vsc, vuc);
+    VXOR_V16QI  VXOR_VSC_VUC
+  vuc __builtin_vec_xor (vuc, vbc);
+    VXOR_V16QI_UNS  VXOR_VUC_VBC
+  vuc __builtin_vec_xor (vbc, vuc);
+    VXOR_V16QI_UNS  VXOR_VBC_VUC
+  vuc __builtin_vec_xor (vuc, vsc);
+    VXOR_V16QI_UNS  VXOR_VUC_VSC
+  vss __builtin_vec_xor (vss, vbs);
+    VXOR_V8HI  VXOR_VSS_VBS
+  vss __builtin_vec_xor (vbs, vss);
+    VXOR_V8HI  VXOR_VBS_VSS
+  vus __builtin_vec_xor (vus, vbs);
+    VXOR_V8HI_UNS  VXOR_VUS_VBS
+  vus __builtin_vec_xor (vbs, vus);
+    VXOR_V8HI_UNS  VXOR_VBS_VUS
+  vsi __builtin_vec_xor (vsi, vbi);
+    VXOR_V4SI  VXOR_VSI_VBI
+  vsi __builtin_vec_xor (vbi, vsi);
+    VXOR_V4SI  VXOR_VBI_VSI
+  vui __builtin_vec_xor (vui, vbi);
+    VXOR_V4SI_UNS  VXOR_VUI_VBI
+  vui __builtin_vec_xor (vbi, vui);
+    VXOR_V4SI_UNS  VXOR_VBI_VUI
+  vsll __builtin_vec_xor (vsll, vbll);
+    VXOR_V2DI  VXOR_VSLL_VBLL
+  vsll __builtin_vec_xor (vbll, vsll);
+    VXOR_V2DI  VXOR_VBLL_VSLL
+  vull __builtin_vec_xor (vull, vbll);
+    VXOR_V2DI_UNS  VXOR_VULL_VBLL
+  vull __builtin_vec_xor (vbll, vull);
+    VXOR_V2DI_UNS  VXOR_VBLL_VULL
+  vf __builtin_vec_xor (vf, vbi);
+    VXOR_V4SF  VXOR_VF_VBI
+  vf __builtin_vec_xor (vbi, vf);
+    VXOR_V4SF  VXOR_VBI_VF
+  vd __builtin_vec_xor (vd, vbll);
+    VXOR_V2DF  VXOR_VD_VBLL
+  vd __builtin_vec_xor (vbll, vd);
+    VXOR_V2DF  VXOR_VBLL_VD
 
 [VEC_XST, vec_xst, __builtin_vec_vsx_st, __VSX__]
   void __builtin_vec_vsx_st (vsc, signed long long, vsc *);
