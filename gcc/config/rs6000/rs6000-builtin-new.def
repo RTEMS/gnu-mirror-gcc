@@ -2214,7 +2214,7 @@
   const vsll __builtin_altivec_vcmpgtud (vull, vull);
     VCMPGTUD vector_gtuv2di {}
 
-  const int __builtin_altivec_vcmpgtud_p (vull, vull);
+  const int __builtin_altivec_vcmpgtud_p (int, vull, vull);
     VCMPGTUD_P vector_gtu_v2di_p {pred}
 
   const vsll __builtin_altivec_vmaxsd (vsll, vsll);
@@ -2582,49 +2582,49 @@
     VCTZLSBB_V8HI vctzlsbb_v8hi {}
 
   const signed int __builtin_altivec_vcmpaeb_p (vsc, vsc);
-    VCMPAEB_P vector_ae_v16qi_p {pred}
+    VCMPAEB_P vector_ae_v16qi_p {}
 
   const signed int __builtin_altivec_vcmpaed_p (vsll, vsll);
-    VCMPAED_P vector_ae_v2di_p {pred}
+    VCMPAED_P vector_ae_v2di_p {}
 
   const signed int __builtin_altivec_vcmpaedp_p (vd, vd);
-    VCMPAEDP_P vector_ae_v2df_p {pred}
+    VCMPAEDP_P vector_ae_v2df_p {}
 
   const signed int __builtin_altivec_vcmpaefp_p (vf, vf);
-    VCMPAEFP_P vector_ae_v4sf_p {pred}
+    VCMPAEFP_P vector_ae_v4sf_p {}
 
   const signed int __builtin_altivec_vcmpaeh_p (vss, vss);
-    VCMPAEH_P vector_ae_v8hi_p {pred}
+    VCMPAEH_P vector_ae_v8hi_p {}
 
   const signed int __builtin_altivec_vcmpaew_p (vsi, vsi);
-    VCMPAEW_P vector_ae_v4si_p {pred}
+    VCMPAEW_P vector_ae_v4si_p {}
 
   const vsc __builtin_altivec_vcmpneb (vsc, vsc);
     VCMPNEB vcmpneb {}
 
   const signed int __builtin_altivec_vcmpneb_p (vsc, vsc);
-    VCMPNEB_P vector_ne_v16qi_p {pred}
+    VCMPNEB_P vector_ne_v16qi_p {}
 
   const signed int __builtin_altivec_vcmpned_p (vsll, vsll);
-    VCMPNED_P vector_ne_v2di_p {pred}
+    VCMPNED_P vector_ne_v2di_p {}
 
   const signed int __builtin_altivec_vcmpnedp_p (vd, vd);
-    VCMPNEDP_P vector_ne_v2df_p {pred}
+    VCMPNEDP_P vector_ne_v2df_p {}
 
   const signed int __builtin_altivec_vcmpnefp_p (vf, vf);
-    VCMPNEFP_P vector_ne_v4sf_p {pred}
+    VCMPNEFP_P vector_ne_v4sf_p {}
 
   const vss __builtin_altivec_vcmpneh (vss, vss);
     VCMPNEH vcmpneh {}
 
   const signed int __builtin_altivec_vcmpneh_p (vss, vss);
-    VCMPNEH_P vector_ne_v8hi_p {pred}
+    VCMPNEH_P vector_ne_v8hi_p {}
 
   const vsi __builtin_altivec_vcmpnew (vsi, vsi);
     VCMPNEW vcmpnew {}
 
   const signed int __builtin_altivec_vcmpnew_p (vsi, vsi);
-    VCMPNEW_P vector_ne_v4si_p {pred}
+    VCMPNEW_P vector_ne_v4si_p {}
 
   const vsc __builtin_altivec_vcmpnezb (vsc, vsc);
     CMPNEZB vcmpnezb {}

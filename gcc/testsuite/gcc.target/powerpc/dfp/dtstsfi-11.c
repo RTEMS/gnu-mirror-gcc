@@ -8,6 +8,6 @@ int doTestBCDSignificance (_Decimal64 *p)
 {
   _Decimal64 source = *p;
 
-  return __builtin_dfp_dtstsfi_lt (5, source);	/* { dg-error "'__builtin_dtstsfi_lt' requires" } */
+  return __builtin_dfp_dtstsfi_lt (5, source);	/* { dg-error "'__builtin_dtstsfi_lt' requires" } */ /* { dg-error "'__builtin_dtstsfi_lt_dd' requires" }  */
 }
 
