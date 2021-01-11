@@ -55,7 +55,7 @@ INSTALL := $(srcdir)/build-aux/install-sh
 CXXFLAGS := @CXXFLAGS@
 CXXINC := $(filter -I%,@CXX@)
 CXXOPTS := $(CXXFLAGS) @PICFLAG@
-ifeq ($(notdir $(firstword $(CXX))),g++)
+ifneq (,$(findstring g++, $(notdir $(firstword $(CXX)))))
 # It's GCC, or pretending to be it -- so it better smell like it!
 # Code generation
 CXXOPTS += -fno-enforce-eh-specs
