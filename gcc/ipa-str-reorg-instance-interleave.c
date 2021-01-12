@@ -138,6 +138,7 @@ static basic_block make_bb ( char *, basic_block);
 int
 str_reorg_instance_interleave_qual ( Info *info)
 {
+  DEBUG_A("str_reorg_instance_interleave_qual:>\n");
   // this is the qualification code for instance interleaving
   //
   str_reorg_instance_interleave_qual_part ( info);
@@ -152,6 +153,7 @@ str_reorg_instance_interleave_qual ( Info *info)
 int
 str_reorg_instance_interleave_trans ( Info *info)
 {
+  DEBUG_A("str_reorg_instance_interleave_trans:>\n");
   if ( BYPASS_TRANSFORM )
     {
 
@@ -161,8 +163,9 @@ str_reorg_instance_interleave_trans ( Info *info)
   
   if ( info->show_all_reorg_cands )
   {
-    fprintf ( info->reorg_dump_file, "Start of str_reorg_instance_interleave_trans:\n");
-    print_program ( info->reorg_dump_file, PRINT_FORMAT, false, 4, info);
+    print_program ( info->reorg_dump_file,
+		    "Start of str_reorg_instance_interleave_trans",
+		    PRINT_FORMAT, false, 4, info);
   }
 
   //DEBUG ("INTERNALS PRINT\n");
@@ -2081,16 +2084,14 @@ str_reorg_instance_interleave_trans ( Info *info)
     pop_cfun ();
   }
 
-  DEBUG_L("After bulk of transformations\n");
+  DEBUG_F ( print_program, info->reorg_dump_file,
+	    "After bulk of transformations",
+	    PRINT_FORMAT, false, 4, info);
 
-  DEBUG_F( print_program, info->reorg_dump_file, PRINT_FORMAT, false, 4, info);
-
-  DEBUG ("INTERNALS PRINT\n");
-  #if 0
-  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
-  #else
-  print_program ( stderr, true, true, 0, info);
-  #endif
+  // With internals
+  DEBUG_F ( print_program, stderr,
+	    "After bulk of transformations",
+	    true, true, 0, info);
 
   // Experiment... Seems OK
   modify_global_declarations ( info);
@@ -2457,17 +2458,19 @@ str_reorg_instance_interleave_trans ( Info *info)
 
   // This used to be off of.. "if ( info->show_all_reorg_cands ) { ..."
   // I'm leaning towards deleting this as redundnt.
-  //DEBUG ( info->reorg_dump_file,
-  //  "\nEnd of str_reorg_instance_interleave_trans (after mini-psasses):\n\n");
-  //DEBUG_F ( print_program, info->reorg_dump_file, PRINT_FORMAT, false, 4, info);
+  //DEBUG_F ( print_program, info->reorg_dump_file,
+  //	    "End of str_reorg_instance_interleave_trans (after mini-psasses)",
+  //	    PRINT_FORMAT, false, 4, info);
 
   // TBD Should this be a diagnostic or not?
-  DEBUG ("INTERNALS PRINT\n");
-  #if 0
-  DEBUG_F (apply_to_all_gimple, print_internals, true, (void *)info);
-  #else
-  print_program ( stderr, true, true, 0, info);
-  #endif
+  DEBUG_F ( print_program, stderr,
+	    "At end of str_reorg_instance_interleave_trans"
+	    PRINT_FORMAT, false, 0, info);
+  
+  // With internals
+  DEBUG_F ( print_program, stderr,
+	    "At end of str_reorg_instance_interleave_trans"
+	    true, false, 0, info);
   
   // NOTE, spinning through all the functions and recomputing all the
   // dominace info here is a really bad idea.
@@ -2677,6 +2680,16 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	new_make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp,
 				   ro_on_left ? lhs_mod : rhs_mod,
 				   info);
+
+	// TBD What is ref_expr?
+	DEBUG_A(" All about ref_expr!\n");
+	INDENT(2);
+	DEBUG_A("print it... ");
+	DEBUG_F(flexible_print, stderr, ref_expr, 1, (dump_flags_t)0);
+	DEBUG_A("its type... ");
+	DEBUG_F(flexible_print, stderr, TREE_TYPE(ref_expr), 1, (dump_flags_t)0);
+
+	INDENT(-2);	
 	
 	gimple *temp_set;
 	gimple *middle_set;
@@ -2804,6 +2817,7 @@ make_transformed_ref ( tree ref_in,
 		       tree *field_val_temp,
 		       Info_t *info )
 {
+  DEBUG_A("make_transformed_ref:>\n");
   // For deeply nested case we need the lowest.
   tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
   gcc_assert ( lowest_comp_ref);
@@ -3152,9 +3166,9 @@ new_make_transformed_ref ( tree ref_in,
 tree
 find_deepest_comp_ref ( tree comp_ref_expr )
 {
-  //DEBUG_A("find_deepest_comp_ref:> of ");
-  //DEBUG_F(flexible_print, stderr, comp_ref_expr, 2, (dump_flags_t)0);
-  //DEBUG("tree code of %s\n", code_str( TREE_CODE(comp_ref_expr)));
+  DEBUG_A("find_deepest_comp_ref:> of ");
+  DEBUG_F(flexible_print, stderr, comp_ref_expr, 2, (dump_flags_t)0);
+  DEBUG("tree code of %s\n", code_str( TREE_CODE(comp_ref_expr)));
   //INDENT(2);
 
   enum tree_code code = TREE_CODE ( comp_ref_expr);
@@ -3229,7 +3243,7 @@ create_deep_ref_aux ( tree    ref_in,
   if ( inner_op0_code == MEM_REF )
     {
       // TBD print: inner_op0, inner_op1, inner_op0_op0, inner_op0_op1,
-      tree inner_op1 = TREE_OPERAND( ref_in, 1);;
+      tree inner_op1 = TREE_OPERAND( ref_in, 1);
       tree inner_op0_op0 = TREE_OPERAND( inner_op0, 0);
       tree inner_op0_op0_type = TREE_TYPE ( inner_op0_op0);
       tree inner_op0_op1 = TREE_OPERAND( inner_op0, 1);
@@ -3334,10 +3348,52 @@ create_deep_ref_aux ( tree    ref_in,
 				false,
 				#endif
 				info);
+      DEBUG_A("ref_type = ");
+      DEBUG_F(flexible_print, stderr, ref_type, 1, (dump_flags_t)0);
+      DEBUG_A("to = ");
+      DEBUG_F(flexible_print, stderr, to, 1, (dump_flags_t)0);
+
       *lower_type_to = to;
       *lower_type_from = to ? ref_type : NULL;
-      INDENT(-2);
-      return ref_in;
+
+      // Note, at this time ref_in has the correct type. No!
+      // TBD so how did the gimple show the wrong type!? It didn't!
+      // Build a new ref!
+      tree inner_op1 = TREE_OPERAND( ref_in, 1);
+
+      DEBUG_A("inner_op0 = ");
+      DEBUG_F(flexible_print, stderr, inner_op0, 1, (dump_flags_t)0);
+      DEBUG_A("inner_op1 = ");
+      DEBUG_F(flexible_print, stderr, inner_op1, 1, (dump_flags_t)0);
+
+      // Find if it needs a type modification
+      tree var_type = TREE_TYPE(inner_op0);
+      DEBUG_A("var_type = ");
+      DEBUG_F(flexible_print, stderr, var_type, 1, (dump_flags_t)0);
+      tree modified_var_type = find_modified ( var_type, false, info);
+      if ( modified_var_type != NULL )
+	{
+	  tree new_ref;
+	  tree new_field = find_coresponding_field ( modified_var_type, inner_op1);
+
+	  // Technically new_field isn't an element of inner_op0 but
+	  // modify_global_declarations should fix that... Hopefully.
+	  new_ref  =
+	    build3 ( COMPONENT_REF,
+		     field_type, 
+		     inner_op0,
+		     new_field,
+		     NULL_TREE);
+	  
+	  INDENT(-2);
+	  return new_ref;
+
+	}
+      else
+	{
+	  INDENT(-2);
+	  return ref_in;
+	}
     }
   else if ( top_code == COMPONENT_REF )
     {
@@ -3622,6 +3678,7 @@ print_internals (gimple *stmt, void *data)
 static void
 str_reorg_instance_interleave_qual_part ( Info *info)
 {
+  DEBUG_A("str_reorg_instance_interleave_qual_part:>\n");
   // TBD save the return value so we can bypass further
   // instance interleaving if none of it is profitable.
   reorg_perf_qual ( info);
@@ -3630,6 +3687,7 @@ str_reorg_instance_interleave_qual_part ( Info *info)
 static void
 str_reorg_instance_interleave_type_part ( Info *info)
 {
+  DEBUG_A("str_reorg_instance_interleave_type_part:>\n");
   #if 0
   create_new_types ( info);
   #endif
@@ -4657,10 +4715,10 @@ is_array_access( tree acc)
 static void
 account_for_access ( tree access, tree field, std::vector <acc_info_t> *acc_info, Info_t *info)
 {
-  //DEBUG_A("account_for_use var: ");
-  //DEBUG_F(flexible_print, stderr, access, 0, (dump_flags_t)0);
-  //DEBUG(", field: ");
-  //DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
+  DEBUG_A("account_for_access:> var ");
+  DEBUG_F(flexible_print, stderr, access, 0, (dump_flags_t)0);
+  DEBUG(", field: ");
+  DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
   
   // assert might eventually make sense but not yet
   //gcc_assert ( TREE_CODE ( ssa_var) == SSA_NAME);
@@ -5474,6 +5532,10 @@ make_bb ( char *msg, basic_block prev_bb )
   return ret;
 }
 
+
+// Degugging functions called from other parts of
+// gcc as an easier way of getting at interesting debug
+// code.
 void
 sneak_tree ( tree x)
 {

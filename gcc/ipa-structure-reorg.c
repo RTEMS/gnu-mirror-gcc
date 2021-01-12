@@ -283,7 +283,7 @@ initial_debug_info ( Info *info)
 {
   if ( info->reorg_dump_file ) 
   {
-    print_program ( info->reorg_dump_file, PRINT_FORMAT, false, 0, info);
+    print_program ( info->reorg_dump_file, "Initial State", PRINT_FORMAT, false, 0, info);
    }
 }
 
@@ -292,7 +292,7 @@ final_debug_info ( Info *info)
 {
   if ( info->reorg_dump_file ) 
   {
-    print_program ( info->reorg_dump_file, PRINT_FORMAT, false, 0, info);
+    print_program ( info->reorg_dump_file, "Final State", PRINT_FORMAT, false, 0, info);
   }
 }
 
@@ -563,7 +563,7 @@ reorg_analysis_debug ( Info *info, ReorgType *reorg )
 static bool
 find_decls_and_types ( Info *info)
 {
-  //DEBUG_L("find_decls_and_types:> entered\n");
+  DEBUG_L("find_decls_and_types:> entered\n");
 
   detected_incompatible_syntax = false;
   std::map<tree, bool> whitelisted = get_whitelisted_nodes();
@@ -776,6 +776,7 @@ find_decls_and_types ( Info *info)
       //DEBUG_F( print_progdecl, stderr, 2, &decl_info);
     }
   }
+
   
   if ( info->show_all_reorg_cands_in_detail )
   {
@@ -800,7 +801,7 @@ find_decls_and_types ( Info *info)
 static bool
 find_decls_and_types ( Info *info)
 {
-  //DEBUG_L("find_decls_and_types:> entered\n");
+  DEBUG_L("find_decls_and_types:> entered\n");
   
   // Don't keep any structure types if they aren't
   // used in an array or have a pointer type (which
@@ -1094,6 +1095,7 @@ find_all_record_types ( std::map <tree,TypeHolder> *types, tree type, Info_t *in
 static void
 find_all_record_types ( tree type, Info_t *info)
 {
+  DEBUG_A("find_all_record_types:>\n");
   std::map <tree,TypeHolder> *types = info->type_mod_info;
   // Get cannonical form of record type
   tree base = base_type_of ( type);
@@ -1119,7 +1121,7 @@ find_and_create_all_modified_types ( Info_t *info)
 {
   std::map <tree,TypeHolder> *types = info->type_mod_info;
   std::deque <tree> rec_types_work_list;
-  //DEBUG_L("find_and_create_all_modified_types:>\n");
+  DEBUG_L("find_and_create_all_modified_types:>\n");
 
   //DEBUG_A("At start:\n");
   //DEBUG_F( dump_modified_types, stderr, false, info);
@@ -1482,13 +1484,17 @@ find_and_create_all_modified_types ( Info_t *info)
 static std::vector<tree>::iterator
 find_in_type_vec ( std::vector<tree> *types, tree type)
 {
-  INDENT(2);
+  //INDENT(2);
   for ( auto looki = types->begin (); looki != types->end (); looki++)
     {
       tree look = *looki;
-      if ( same_type_p ( look, type) ) return looki;
+      if ( same_type_p ( look, type) )
+	{
+	  //INDENT(-2);
+	  return looki;
+	}
     }
-  INDENT(-2);
+  //INDENT(-2);
   return types->end ();
 }
 
@@ -1764,8 +1770,8 @@ find_modified ( tree type,
 		#endif
 		Info_t *info )
 {
-  DEBUG_A("find_modified:> ");
-  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  //DEBUG_A("find_modified:> ");
+  //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
   // Use canonical type
   tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
   tree ret_val = NULL;
@@ -1794,8 +1800,8 @@ find_modified ( tree type,
     }
   #endif
   
-  DEBUG_A("  returns... ");
-  DEBUG_F(flexible_print, stderr, ret_val, 1, (dump_flags_t)0);
+  //DEBUG_A("  returns... ");
+  //DEBUG_F(flexible_print, stderr, ret_val, 1, (dump_flags_t)0);
   
   return ret_val;
 }
@@ -1863,8 +1869,8 @@ contains_a_modified ( gimple *stmt,
 		      #endif
 		      Info_t *info )
 {
-  //DEBUG_A("contains_a_modified:> ");
-  //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_A("contains_a_modified:> ");
+  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   // For an assign check both sides component refs.
   if ( gimple_code ( stmt) == GIMPLE_ASSIGN )
     {
@@ -1952,7 +1958,7 @@ disqualify_struct_in_struct_or_union ( Info *info)
   varpool_node *var;
   std::set<tree> typeset;
   
-  //DEBUG_L( "disqualify_struct_in_struct_or_union:>\n");
+  DEBUG_L( "disqualify_struct_in_struct_or_union:>\n");
   //INDENT(2);
   
   FOR_EACH_VARIABLE ( var)
@@ -2038,7 +2044,7 @@ disq_str_in_str_or_union_helper ( tree type,
 				  std::set<tree> *typeset,
 				  Info *info )
 {
-  //DEBUG_L( "disq_str_in_str_or_union_helper:> (possibele deletes)\n");
+  DEBUG_L( "disq_str_in_str_or_union_helper:> (possibele deletes)\n");
   //INDENT(2);
   
   if ( typeset->find ( type) != typeset->end ()) return;
@@ -2123,6 +2129,7 @@ Info::is_non_escaping_set_empty()
 bool 
 transformation_legality ( Info *info)
 {
+  DEBUG_A("transformation_legality:>\n");
   //TODO: Gary, for my purposes, I need to start running the
   // code related to dead field eliminate. So, I'll add this bit
   //
@@ -2269,12 +2276,30 @@ modify_global_declarations ( Info *info)
   // lend themselves to any necessary reorg transformation.
   // Note, it's possible to preserve them, if that makes sense,
   // in remove_unreferenced_decls.
+  #if 0
   std::vector<ProgDecl_t>::iterator pv;
   for ( pv = info->prog_decl->begin ();
 	pv != info->prog_decl->end (); pv++ )
     {
       modify_decl_core ( &( pv->gcc_decl), info);
     }
+  #else
+  // The prog_decls are obsolete
+  varpool_node *var;
+  FOR_EACH_VARIABLE ( var)
+  {
+    tree decl = var->decl;
+    tree type = base_type_of ( decl);
+    
+    bool do_reorg = 
+      TREE_CODE ( type ) == RECORD_TYPE && get_reorgtype_info ( type, info) != NULL;
+    bool do_modify = find_modified ( type, false, info) != NULL;
+      if ( do_reorg || do_modify )
+    {
+      modify_decl_core ( &decl, info);
+    }
+  }
+  #endif
 
   // NOTE, Call modufy_decl_core breaks hello world!
   
@@ -2347,7 +2372,7 @@ modify_global_declarations ( Info *info)
 static void
 disqualify_all_reorgtypes_of ( gimple *stmt, int num, Info *info)
 {
-  //DEBUG_L("disqualify %d reorgtypes of:> ", num);
+  DEBUG_L("disqualify %d reorgtypes of:> ", num);
   //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   if ( info->show_all_reorg_cands_in_detail )
     {
@@ -2389,6 +2414,7 @@ adjust_result_decl ( struct function *func)
 static tree
 modify_func_type ( struct function *func, Info *info )
 {
+  DEBUG_A("modify_func_type:>\n");
   tree func_type = TREE_TYPE ( func->decl);
   //DEBUG_L("old func_type = ");
   //DEBUG_F( flexible_print, stderr, func_type, 1, (dump_flags_t)0);
@@ -2488,6 +2514,7 @@ modify_func_type ( struct function *func, Info *info )
 static bool
 needs_modification_p ( struct function *func, Info *info )
 {
+  DEBUG_A("needs_modification_p:>\n");
   tree func_type = TREE_TYPE ( func->decl);
   tree ret_type = TREE_TYPE ( func_type);
   tree base = base_type_of ( ret_type);
@@ -2603,7 +2630,7 @@ make_multilevel ( tree base_type, int levels_indirection)
 static bool
 modify_func_decl_core ( struct function *func, Info *info)
 {
-  //DEBUG_L("modify_func_decl_core:>\n");
+  DEBUG_L("modify_func_decl_core:>\n");
   //INDENT(4);
   //DEBUG_A("func->decl = %p, ", func->decl);
   //DEBUG_F( flexible_print, stderr, func->decl, 1, (dump_flags_t)0);
@@ -2664,36 +2691,59 @@ modify_func_decl_core ( struct function *func, Info *info)
   return true;
 }
 
+void
+xxx( tree x )
+{
+  DEBUG_A("XXX  decl = ");
+  DEBUG_F( flexible_print, stderr, x, 1, (dump_flags_t)0);
+  if ( TREE_CODE ( x) == PARM_DECL )
+    {
+      DEBUG_A("XXX  decl_arg_type = ");
+      DEBUG_F( flexible_print, stderr, DECL_ARG_TYPE(x), 1, (dump_flags_t)0);
+    }
+}
+
 // Returns true if a modification occurred
 bool
 modify_decl_core ( tree *location, Info *info)
 {
   DEBUG_A("modify_decl_core:> ");
   DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
-  INDENT(2);
-  
+  INDENT(4);
+
+  tree decl = *location;
   tree type = TREE_TYPE ( *location);
   
-  DEBUG_A("type = ");
-  DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
+  DEBUG_A("OLD:\n");
+  DEBUG_A("  decl = ");
+  DEBUG_F( flexible_print, stderr, decl, 1, (dump_flags_t)0);
+  if ( TREE_CODE ( decl) == PARM_DECL )
+    {
+      DEBUG_A("  decl_arg_type = ");
+      DEBUG_F( flexible_print, stderr, DECL_ARG_TYPE(decl), 1, (dump_flags_t)0);
+    }
+  
+  //DEBUG_A("type = ");
+  //DEBUG_F( flexible_print, stderr, type, 0, (dump_flags_t)0);
   
   tree base = base_type_of ( type);
   
-  DEBUG(", base = ");
-  DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
+  //DEBUG(", base = ");
+  //DEBUG_F( flexible_print, stderr, base, 1, (dump_flags_t)0);
 
-  #if 1
   // Look for a modified type
   tree modified_to = find_modified ( base,
 				     #if ALLOW_REVERSE
 				     false,
 				     #endif
 				     info);
-  DEBUG_A(", modified_to = ");
-  DEBUG_F( flexible_print, stderr, modified_to, 1, (dump_flags_t)0);
+  tree mtv_modified_to =
+    modified_to == NULL ? NULL : TYPE_MAIN_VARIANT ( modified_to);
+  //DEBUG_A("Before Modify_Decl_Core\n");
+  //DEBUG_A("  modified_to = ");
+  //DEBUG_F( flexible_print, stderr, modified_to, 1, (dump_flags_t)0);
   
   bool use_mod = false;
-  #endif
   
   ReorgType_t *ri = get_reorgtype_info ( base, info);
   if ( ri == NULL )
@@ -2702,20 +2752,22 @@ modify_decl_core ( tree *location, Info *info)
       if( !use_mod )
 	{
 	  DEBUG_A( "!use_mod && ri == NULL... return\n");
-	  INDENT(-2);
+	  INDENT(-4);
 	  return false;
 	}
     }
   
   tree prev_type;
   int levels = number_of_levels ( type);
+  //DEBUG_A( "levels = %d\n", levels);
 
+  DEBUG_A("Modify TREE_TYPE\n");
   if ( use_mod )
     {
-      DEBUG_A( "use_mod %s\n", levels == 0 ? "&& levels == 0" : "");
+      //DEBUG_A( "  use_mod \n");
       if ( levels == 0 )
 	{
-	  TREE_TYPE(*location) = TYPE_MAIN_VARIANT ( modified_to);
+	  TREE_TYPE(*location) = mtv_modified_to;
 	}
       else
 	{
@@ -2724,6 +2776,7 @@ modify_decl_core ( tree *location, Info *info)
     }
   else
     {
+      //DEBUG_A( "  !use_mod \n");
       // TBD, I have some doubt that this actually works right for more
       // that one level... It's not that make_multilevel is wrong, it's
       // that it seems like it will build one too many levels because
@@ -2733,45 +2786,68 @@ modify_decl_core ( tree *location, Info *info)
       // Fakes this for levels == 1
       if ( levels == 0)
 	{
-	  DEBUG_A("Not a pointer, don't modify it!\n");
+	  DEBUG_A("  Not a pointer, don't modify it!\n");
 	  return false;
 	}
       // This also happens with other similar uses of make_multilevel.
       if ( levels == 1)
 	{
-	  DEBUG_A( "LEVEL  ONE\n");
+	  //DEBUG_A( "  LEVEL  ONE\n");
 	  gcc_assert ( TYPE_MAIN_VARIANT ( ri->pointer_rep));
 	  TREE_TYPE(*location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
 	}
       else
 	{
-	  DEBUG_L( "LEVEL > ONE\n");
-	  TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels);
+	  //DEBUG_L( "  LEVEL > ONE\n");
+	  TREE_TYPE(*location) = make_multilevel ( ri->pointer_rep, levels -1); // changed here
 	}
     }
 
+  //DEBUG_A("Modify DECL_INITIAL\n");
+  /// TBD !!! Add levels to this!
   // I'm not sure what this does!
   if ( use_mod )
     {
+      //DEBUG_A( "  use_mod \n");
       if ( DECL_INITIAL ( *location) != NULL )
 	{
-	  DECL_INITIAL ( *location) = TYPE_MAIN_VARIANT ( modified_to);
+	  if ( levels == 0 )
+	    {
+	      DECL_INITIAL ( *location) = mtv_modified_to;
+	    }
+	  else
+	    {
+	      DECL_INITIAL ( *location) =
+		make_multilevel ( mtv_modified_to, levels);
+	    }
 	}
     }
   else
     if ( DECL_INITIAL ( *location) != NULL )
       {
-	// Note this assumes the levels code above is not general
-	DECL_INITIAL ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
+	//DEBUG_A( "  !use_mod \n");
+	if ( levels == 1 )
+	  {
+	    DECL_INITIAL ( *location) = TYPE_MAIN_VARIANT ( ri->pointer_rep);
+	  }
+	else
+	  {
+	    DECL_INITIAL ( *location) =
+	      make_multilevel ( ri->pointer_rep, levels -1); // changed here
+	  }
       }
 
   relayout_decl ( *location);
 
-  DEBUG_L(" after modify_decl_core");
-  DEBUG_F( print_generic_decl, stderr, *location, (dump_flags_t)0);
-  DEBUG("\n");
-
-  INDENT(-2);
+  DEBUG_A("NEW:\n");
+  DEBUG_A("  decl = ");
+  DEBUG_F( flexible_print, stderr, *location, 1, (dump_flags_t)0);
+  if ( TREE_CODE ( *location) == PARM_DECL )
+    {
+      DEBUG_A("  decl_arg_type = ");
+      DEBUG_F( flexible_print, stderr, DECL_ARG_TYPE(*location), 1, (dump_flags_t)0);
+    }
+  INDENT(-4);
   return true;
 }
 
@@ -3152,7 +3228,7 @@ reorg_forbidden ( gimple *stmt, Info *info )
 void 
 remove_deleted_types ( Info *info, char *where, ReorgFn reorg_fn)
 {
-  //DEBUG_LA( "remove_deleted_types:> %d to delete of %d types\n", info->num_deleted, info->reorg_type->size ());
+  DEBUG_LA( "remove_deleted_types:> %d to delete of %d types\n", info->num_deleted, info->reorg_type->size ());
   if ( info->show_delete )
   {
     fprintf ( info->reorg_dump_file, "DELETING REORG TYPES (%s):\n", where);
@@ -3519,7 +3595,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 tree
 multilevel_component_ref ( tree op)
 {
-  //DEBUG_A("multilevel_component_ref:> ");
+  DEBUG_A("multilevel_component_ref:> ");
   //DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
   //INDENT(2);
   tree inner_op0 = TREE_OPERAND( op, 0);
@@ -3529,7 +3605,7 @@ multilevel_component_ref ( tree op)
   if ( inner_op0_code == COMPONENT_REF || inner_op0_code == ARRAY_REF )
     {
       tree ret =  multilevel_component_ref ( inner_op0);
-      INDENT(-2);
+      //INDENT(-2);
       return ret;
     }
   else
@@ -3758,6 +3834,7 @@ struct hidden_info {
 static tree
 detect_reorg ( tree *tp, int *dummy, void *data)
 {
+  //DEBUG_A("detect_reorg:>\n");
   struct walk_stmt_info *walk_data = ( struct walk_stmt_info *)data;
   hidden_info_t *hi = ( hidden_info_t *)walk_data->info;
   //DEBUG_L( "*tp = ");
@@ -3776,7 +3853,7 @@ detect_reorg ( tree *tp, int *dummy, void *data)
 ReorgType_t *
 contains_a_reorgtype ( gimple *stmt, Info *info)
 {
-  //DEBUG_L ( "contains_a_reorgtype:> ");
+  DEBUG_L ( "contains_a_reorgtype:> ");
   //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   //INDENT(2);
 
@@ -3805,6 +3882,7 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
 static tree
 detect_reorg_in_expr ( tree *tp, int *w_s, void *data)
 {
+  //DEBUG_A("detect_reorg_in_expr:>\n");
   //DEBUG_L("*tp = ");
   //DEBUG_F(  flexible_print, stderr, *tp, 1, (dump_flags_t)0);
   hidden_info_t *tre_hi = ( hidden_info_t *)data;
@@ -4017,10 +4095,13 @@ print_progdecl ( FILE *file, int leading_space, ProgDecl_t *progdecl )
 }
 
 void
-print_program ( FILE *file, bool my_format,  bool internal, int leading_space, Info_t *info)
+print_program ( FILE *file, char *msg, bool my_format,  bool internal, int leading_space, Info_t *info)
 {
   struct cgraph_node *node;
-  fprintf ( file, "%*sProgram:\n", leading_space, "");
+  fprintf ( file, "%*s%s%s%s%s:\n",
+	    leading_space, "",
+	    my_format && internal ? "Program-with-internals" : "Program",
+	    msg ? " (" : "", msg ? msg : "", msg ? ")" : "");
   
   // Print Global Decls
   //
@@ -4156,8 +4237,8 @@ print_function ( FILE *file,
 ReorgType_t *
 get_reorgtype( gimple *stmt, Info *info, int i)
 {
-  //DEBUG_A("get_reorgtype:> i = %d, stmt = ", i);
-  //DEBUG_F(print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_A("get_reorgtype:> i = %d, stmt = ", i);
+  DEBUG_F(print_gimple_stmt, stderr, stmt, 0);
   // Looking at operands of statement, when we get to
   // the ith one, return it.
   int num_reorgs = 0;
@@ -4206,8 +4287,8 @@ get_reorgtype( gimple *stmt, Info *info, int i)
 int
 num_reorgtypes( gimple *stmt, Info *info)
 {
-  //DEBUG_LA("num_reorgtypes:> ");
-  //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_LA("num_reorgtypes:> ");
+  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   // Looking at operands of statement, count
   // the number that have reorg types.
   // Note, they may be (most likely are) the same as other

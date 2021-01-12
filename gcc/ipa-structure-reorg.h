@@ -305,7 +305,7 @@ extern bool is_reorg_type ( tree, Info_t *);
 extern tree base_type_of ( tree);
 extern tree base_type_with_levels ( tree, int *);
 extern void print_reorg ( FILE *, int, ReorgType_t *);
-extern void print_program ( FILE *, bool, bool, int, Info_t *);
+extern void print_program ( FILE *, char *, bool, bool, int, Info_t *);
 extern void print_type ( FILE *, tree);
 extern void modify_ssa_name_type ( tree, tree);
 extern bool print_internals (gimple *, void *);
@@ -317,7 +317,7 @@ extern bool is_assign_from_ssa ( gimple *);
 
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be
-// converted to dump file information.0
+// converted to dump file information.
 #define DEBUGGING 0
 #if DEBUGGING
 enum Display {
