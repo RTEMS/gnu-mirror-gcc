@@ -730,7 +730,7 @@
     VCMPEQUD_P  VCMPEQUD_P_SB
 
 [VEC_CMPEQB, SKIP, __builtin_byte_in_set]
-  signed int __builtin_byte_in_set (unsigned char,  unsigned long long);
+  signed int __builtin_byte_in_set (unsigned int,  unsigned long long);
     CMPEQB
 
 ; #### XVCMPGESP{TARGET_VSX};VCMPGEFP
@@ -738,19 +738,19 @@
   vbc __builtin_vec_cmpge (vsc, vsc);
     CMPGE_16QI  CMPGE_16QI_VSC
   vbc __builtin_vec_cmpge (vuc, vuc);
-    CMPGE_16QI  CMPGE_16QI_VUC
+    CMPGE_U16QI  CMPGE_16QI_VUC
   vbs __builtin_vec_cmpge (vss, vss);
     CMPGE_8HI  CMPGE_8HI_VSS
   vbs __builtin_vec_cmpge (vus, vus);
-    CMPGE_8HI  CMPGE_8HI_VUS
+    CMPGE_U8HI  CMPGE_8HI_VUS
   vbi __builtin_vec_cmpge (vsi, vsi);
     CMPGE_4SI  CMPGE_4SI_VSI
   vbi __builtin_vec_cmpge (vui, vui);
-    CMPGE_4SI  CMPGE_4SI_VUI
+    CMPGE_U4SI  CMPGE_4SI_VUI
   vbll __builtin_vec_cmpge (vsll, vsll);
     CMPGE_2DI  CMPGE_2DI_VSLL
   vbll __builtin_vec_cmpge (vull, vull);
-    CMPGE_2DI  CMPGE_2DI_VULL
+    CMPGE_U2DI  CMPGE_2DI_VULL
   vbi __builtin_vec_cmpge (vf, vf);
     VCMPGEFP
   vbll __builtin_vec_cmpge (vd, vd);
@@ -1021,11 +1021,11 @@
     VCMPNEZW_P  VCMPNEZW_VUI_P
 
 [VEC_CMPRB, SKIP, __builtin_byte_in_range]
-  signed int __builtin_byte_in_range (unsigned char,  unsigned int);
+  signed int __builtin_byte_in_range (unsigned int, unsigned int);
     CMPRB
 
 [VEC_CMPRB2, SKIP, __builtin_byte_in_either_range]
-  signed int __builtin_byte_in_range (unsigned char,  unsigned int);
+  signed int __builtin_byte_in_range (unsigned int, unsigned int);
     CMPRB2
 
 [VEC_CNTLZ, vec_cntlz, __builtin_vec_vclz, _ARCH_PWR8]
@@ -4640,6 +4640,10 @@
     STXVD2X_V2DI  STXVD2X_ULL
   void __builtin_vec_vsx_st (vbll, signed long long, vbll *);
     STXVD2X_V2DI  STXVD2X_VBLL
+  void __builtin_vec_vsx_st (vsq, signed long long, signed __int128 *);
+    STXVD2X_V1TI  STXVD2X_SQ
+  void __builtin_vec_vsx_st (vuq, signed long long, unsigned __int128 *);
+    STXVD2X_V1TI  STXVD2X_UQ
   void __builtin_vec_vsx_st (vf, signed long long, vf *);
     STXVW4X_V4SF  STXVW4X_VF
   void __builtin_vec_vsx_st (vf, signed long long, float *);
@@ -4651,67 +4655,49 @@
 
 [VEC_XST_BE, vec_xst_be, __builtin_vec_xst_be, __VSX__]
   void __builtin_vec_xst_be (vsc, signed long long, vsc *);
-    STXVW4X_V16QI  STXVW4X_VSC_BE
+    ST_ELEMREV_V16QI  ST_ELEMREV_VSC
   void __builtin_vec_xst_be (vsc, signed long long, signed char *);
-    STXVW4X_V16QI  STXVW4X_SC_BE
+    ST_ELEMREV_V16QI  ST_ELEMREV_SC_
   void __builtin_vec_xst_be (vuc, signed long long, vuc *);
-    STXVW4X_V16QI  STXVW4X_VUC_BE
+    ST_ELEMREV_V16QI  ST_ELEMREV_VUC
   void __builtin_vec_xst_be (vuc, signed long long, unsigned char *);
-    STXVW4X_V16QI  STXVW4X_UC_BE
-  void __builtin_vec_xst_be (vbc, signed long long, vbc *);
-    STXVW4X_V16QI  STXVW4X_VBC_BE
-  void __builtin_vec_xst_be (vbc, signed long long, signed char *);
-    STXVW4X_V16QI  STXVW4X_VBC_S_BE
-  void __builtin_vec_xst_be (vbc, signed long long, unsigned char *);
-    STXVW4X_V16QI  STXVW4X_VBC_U_BE
+    ST_ELEMREV_V16QI  ST_ELEMREV_UC
   void __builtin_vec_xst_be (vss, signed long long, vss *);
-    STXVW4X_V8HI  STXVW4X_VSS_BE
+    ST_ELEMREV_V8HI  ST_ELEMREV_VSS
   void __builtin_vec_xst_be (vss, signed long long, signed short *);
-    STXVW4X_V8HI  STXVW4X_SS_BE
+    ST_ELEMREV_V8HI  ST_ELEMREV_SS
   void __builtin_vec_xst_be (vus, signed long long, vus *);
-    STXVW4X_V8HI  STXVW4X_VUS_BE
+    ST_ELEMREV_V8HI  ST_ELEMREV_VUS
   void __builtin_vec_xst_be (vus, signed long long, unsigned short *);
-    STXVW4X_V8HI  STXVW4X_US_BE
-  void __builtin_vec_xst_be (vbs, signed long long, vbs *);
-    STXVW4X_V8HI  STXVW4X_VBS_BE
-  void __builtin_vec_xst_be (vbs, signed long long, signed short *);
-    STXVW4X_V8HI  STXVW4X_VBS_S_BE
-  void __builtin_vec_xst_be (vbs, signed long long, unsigned short *);
-    STXVW4X_V8HI  STXVW4X_VBS_U_BE
-  void __builtin_vec_xst_be (vp, signed long long, vp *);
-    STXVW4X_V8HI  STXVW4X_VP_BE
+    ST_ELEMREV_V8HI  ST_ELEMREV_US
   void __builtin_vec_xst_be (vsi, signed long long, vsi *);
-    STXVW4X_V4SI  STXVW4X_VSI_BE
+    ST_ELEMREV_V4SI  ST_ELEMREV_VSI
   void __builtin_vec_xst_be (vsi, signed long long, signed int *);
-    STXVW4X_V4SI  STXVW4X_SI_BE
+    ST_ELEMREV_V4SI  ST_ELEMREV_SI
   void __builtin_vec_xst_be (vui, signed long long, vui *);
-    STXVW4X_V4SI  STXVW4X_VUI_BE
+    ST_ELEMREV_V4SI  ST_ELEMREV_VUI
   void __builtin_vec_xst_be (vui, signed long long, unsigned int *);
-    STXVW4X_V4SI  STXVW4X_UI_BE
-  void __builtin_vec_xst_be (vbi, signed long long, vbi *);
-    STXVW4X_V4SI  STXVW4X_VBI_BE
-  void __builtin_vec_xst_be (vbi, signed long long, signed int *);
-    STXVW4X_V4SI  STXVW4X_VBI_S_BE
-  void __builtin_vec_xst_be (vbi, signed long long, unsigned int *);
-    STXVW4X_V4SI  STXVW4X_VBI_U_BE
+    ST_ELEMREV_V4SI  ST_ELEMREV_UI
   void __builtin_vec_xst_be (vsll, signed long long, vsll *);
-    STXVD2X_V2DI  STXVD2X_VSLL_BE
+    ST_ELEMREV_V2DI  ST_ELEMREV_VSLL
   void __builtin_vec_xst_be (vsll, signed long long, signed long long *);
-    STXVD2X_V2DI  STXVD2X_SLL_BE
+    ST_ELEMREV_V2DI  ST_ELEMREV_SLL
   void __builtin_vec_xst_be (vull, signed long long, vull *);
-    STXVD2X_V2DI  STXVD2X_VULL_BE
+    ST_ELEMREV_V2DI  ST_ELEMREV_VULL
   void __builtin_vec_xst_be (vull, signed long long, unsigned long long *);
-    STXVD2X_V2DI  STXVD2X_ULL_BE
-  void __builtin_vec_xst_be (vbll, signed long long, vbll *);
-    STXVD2X_V2DI  STXVD2X_VBLL_BE
+    ST_ELEMREV_V2DI  ST_ELEMREV_ULL
+  void __builtin_vec_xst_be (vsq, signed long long, signed __int128 *);
+    ST_ELEMREV_V1TI  ST_ELEMREV_SQ
+  void __builtin_vec_xst_be (vuq, signed long long, unsigned __int128 *);
+    ST_ELEMREV_V1TI  ST_ELEMREV_UQ
   void __builtin_vec_xst_be (vf, signed long long, vf *);
-    STXVW4X_V4SF  STXVW4X_VF_BE
+    ST_ELEMREV_V4SF  ST_ELEMREV_VF
   void __builtin_vec_xst_be (vf, signed long long, float *);
-    STXVW4X_V4SF  STXVW4X_F_BE
+    ST_ELEMREV_V4SF  ST_ELEMREV_F
   void __builtin_vec_xst_be (vd, signed long long, vd *);
-    STXVD2X_V2DF  STXVD2X_VD_BE
+    ST_ELEMREV_V2DF  ST_ELEMREV_VD
   void __builtin_vec_xst_be (vd, signed long long, double *);
-    STXVD2X_V2DF  STXVD2X_D_BE
+    ST_ELEMREV_V2DF  ST_ELEMREV_D
 
 [VEC_XST_LEN_R, vec_xst_len_r, __builtin_vec_xst_len_r, _ARCH_PPC64_PWR9]
   void __builtin_vsx_xst_len_r (vuc, unsigned char *, unsigned long long);

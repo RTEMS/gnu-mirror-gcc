@@ -41,7 +41,6 @@ int main ()
   *vecushort++ = vec_xor((vector bool short)vecshort[0], vecushort[1]);
   *vecushort++ = vec_xor(vecushort[0], (vector bool short)vecshort[1]);
   *vecuint++ = vec_ld(var_int[0], uintp[1]);
-  *vecuint++ = vec_lvx(var_int[0], uintp[1]);
   *vecuint++ = vec_msum(vecuchar[0], vecuchar[1], vecuint[2]);
   *vecuchar++ = vec_xor(vecuchar[0], (vector unsigned char)vecchar[1]);
 
@@ -79,10 +78,10 @@ int main ()
      vec_ld                         lvx
 */
 
-/* { dg-final { scan-assembler-times "vpkpx" 2 } } */
+/* { dg-final { scan-assembler-times "vpkpx" 1 } } */
 /* { dg-final { scan-assembler-times "vmulesb" 1 } } */
 /* { dg-final { scan-assembler-times "vmulosb" 1 } } */
-/* { dg-final { scan-assembler-times {\mlvx\M} 42 { target { ! powerpc_vsx } } } } */
+/* { dg-final { scan-assembler-times {\mlvx\M} 39 { target { ! powerpc_vsx } } } } */
 /* { dg-final { scan-assembler-times {\mlxv} 0 { target { ! powerpc_vsx } } } } */
 /* { dg-final { scan-assembler-times {\mlvx\M} 0 { target powerpc_vsx } } } */
 /* { dg-final { scan-assembler-times {\mlxv} 42 { target powerpc_vsx } } } */

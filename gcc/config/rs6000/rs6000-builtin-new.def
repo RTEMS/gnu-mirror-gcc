@@ -1087,28 +1087,28 @@
 
 ; Cell builtins.
 [cell]
-  pure vuc __builtin_altivec_lvlx (signed long long, const void *);
+  pure vsc __builtin_altivec_lvlx (signed long long, const void *);
     LVLX altivec_lvlx {ldvec}
 
-  pure vuc __builtin_altivec_lvlxl (signed long long, const void *);
+  pure vsc __builtin_altivec_lvlxl (signed long long, const void *);
     LVLXL altivec_lvlxl {ldvec}
 
-  pure vuc __builtin_altivec_lvrx (signed long long, const void *);
+  pure vsc __builtin_altivec_lvrx (signed long long, const void *);
     LVRX altivec_lvrx {ldvec}
 
-  pure vuc __builtin_altivec_lvrxl (signed long long, const void *);
+  pure vsc __builtin_altivec_lvrxl (signed long long, const void *);
     LVRXL altivec_lvrxl {ldvec}
 
-  void __builtin_altivec_stvlx (vuc, signed long long, void *);
+  void __builtin_altivec_stvlx (vsc, signed long long, void *);
     STVLX altivec_stvlx {stvec}
 
-  void __builtin_altivec_stvlxl (vuc, signed long long, void *);
+  void __builtin_altivec_stvlxl (vsc, signed long long, void *);
     STVLXL altivec_stvlxl {stvec}
 
-  void __builtin_altivec_stvrx (vuc, signed long long, void *);
+  void __builtin_altivec_stvrx (vsc, signed long long, void *);
     STVRX altivec_stvrx {stvec}
 
-  void __builtin_altivec_stvrxl (vuc, signed long long, void *);
+  void __builtin_altivec_stvrxl (vsc, signed long long, void *);
     STVRXL altivec_stvrxl {stvec}
 
 
@@ -2681,10 +2681,10 @@
   const vuc __builtin_altivec_vsrv (vuc, vuc);
     VSRV vsrv {}
 
-  const signed int __builtin_scalar_byte_in_range (unsigned char, unsigned int);
+  const signed int __builtin_scalar_byte_in_range (unsigned int, unsigned int);
     CMPRB cmprb {}
 
-  const signed int __builtin_scalar_byte_in_either_range (unsigned char, unsigned int);
+  const signed int __builtin_scalar_byte_in_either_range (unsigned int, unsigned int);
     CMPRB2 cmprb2 {}
 
   const vull __builtin_vsx_extract4b (vuc, const int[0,12]);
@@ -2825,7 +2825,7 @@
   void __builtin_altivec_stxvl (vuc, void *, long long);
     STXVL stxvl {}
 
-  const signed int __builtin_scalar_byte_in_set (unsigned char, unsigned long long);
+  const signed int __builtin_scalar_byte_in_set (unsigned int, unsigned long long);
     CMPEQB cmpeqb {}
 
   pure vuc __builtin_vsx_lxvl (const void *, unsigned long long);
@@ -2904,10 +2904,10 @@
 
 ; Decimal floating-point builtins.
 [dfp]
-  const _Decimal64 __builtin_ddedpd (const int<0,2>, _Decimal64);
+  const _Decimal64 __builtin_ddedpd (const int<2>, _Decimal64);
     DDEDPD dfp_ddedpd_dd {}
 
-  const _Decimal128 __builtin_ddedpdq (const int<0,2>, _Decimal128);
+  const _Decimal128 __builtin_ddedpdq (const int<2>, _Decimal128);
     DDEDPDQ dfp_ddedpd_td {}
 
   const _Decimal64 __builtin_denbcd (const int<1>, _Decimal64);

@@ -11818,6 +11818,10 @@ rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
     case ENB_P10:
       error ("%qs requires the %qs option", name, "-mcpu=power10");
       break;
+    case ENB_P10_64:
+      error ("%qs requires the %qs option and either the %qs or %qs option",
+	     name, "-mcpu=power10", "-m64", "-mpowerpc64");
+      break;
     case ENB_MMA:
       error ("%qs requires the %qs option", name, "-mmma");
       break;
@@ -14092,6 +14096,10 @@ rs6000_new_builtin_is_supported_p (enum rs6000_gen_builtins fncode)
       if (!TARGET_POWER10)
 	return false;
       break;
+    case ENB_P10_64:
+      if (!TARGET_POWER10 || !TARGET_POWERPC64)
+	return false;
+      break;
     case ENB_MMA:
       if (!TARGET_MMA)
 	return false;
@@ -15351,6 +15359,10 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       if (!TARGET_POWER10)
 	return const0_rtx;
       break;
+    case ENB_P10_64:
+      if (!TARGET_POWER10 || !TARGET_POWERPC64)
+	return const0_rtx;
+      break;
     case ENB_MMA:
       if (!TARGET_MMA)
 	return const0_rtx;
@@ -15999,6 +16011,8 @@ rs6000_init_builtins (void)
 	  if (e == ENB_HTM && !TARGET_HTM)
 	    continue;
 	  if (e == ENB_P10 && !TARGET_POWER10)
+	    continue;
+	  if (e == ENB_P10_64 && (!TARGET_POWER10 || !TARGET_POWERPC64))
 	    continue;
 	  if (e == ENB_MMA && !TARGET_MMA)
 	    continue;
