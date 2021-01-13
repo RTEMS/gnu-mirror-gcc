@@ -253,6 +253,10 @@ extern struct gcov_master __gcov_master;
 extern struct gcov_kvp __gcov_kvp_pool[GCOV_PREALLOCATED_KVP];
 extern unsigned __gcov_kvp_pool_index;
 
+extern struct gcov_kvp *__gcov_kvp_dynamic_pool;
+extern unsigned __gcov_kvp_dynamic_pool_index;
+extern unsigned __gcov_kvp_dynamic_pool_size;
+
 /* Dump a set of gcov objects.  */
 extern void __gcov_dump_one (struct gcov_root *) ATTRIBUTE_HIDDEN;
 
@@ -412,6 +416,7 @@ allocate_gcov_kvp (void)
 {
   struct gcov_kvp *new_node = NULL;
 
+  /* Try static pre-allocated pool if available.  */
 #if !defined(IN_GCOV_TOOL) && !defined(L_gcov_merge_topn)
   if (__gcov_kvp_pool_index < GCOV_PREALLOCATED_KVP)
     {
@@ -424,6 +429,21 @@ allocate_gcov_kvp (void)
 #endif
       if (index < GCOV_PREALLOCATED_KVP)
 	new_node = &__gcov_kvp_pool[index];
+    }
+
+  /* Try dynamic pre-allocated pool if available.  */
+  if (new_node == NULL && __gcov_kvp_dynamic_pool != NULL)
+    {
+      unsigned index;
+#if GCOV_SUPPORTS_ATOMIC
+      index
+	= __atomic_fetch_add (&__gcov_kvp_dynamic_pool_index, 1,
+			      __ATOMIC_RELAXED);
+#else
+      index = __gcov_kvp_dynamic_pool_index++;
+#endif
+      if (index < __gcov_kvp_dynamic_pool_size)
+	new_node = &__gcov_kvp_dynamic_pool[index];
     }
 #endif
 

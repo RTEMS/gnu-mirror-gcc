@@ -588,11 +588,20 @@ struct gcov_root __gcov_root;
 struct gcov_master __gcov_master = 
   {GCOV_VERSION, 0};
 
-/* Pool of pre-allocated gcov_kvp strutures.  */
+/* Pool of pre-allocated gcov_kvp structures.  */
 struct gcov_kvp __gcov_kvp_pool[GCOV_PREALLOCATED_KVP];
 
 /* Index to first free gcov_kvp in the pool.  */
 unsigned __gcov_kvp_pool_index;
+
+/* Dynamic pre-allocated gcov_kvp structures.  */
+struct gcov_kvp *__gcov_kvp_dynamic_pool;
+
+/* Index into __gcov_kvp_dynamic_pool array.  */
+unsigned __gcov_kvp_dynamic_pool_index;
+
+/* Size of _gcov_kvp_dynamic_pool array.  */
+unsigned __gcov_kvp_dynamic_pool_size;
 
 void
 __gcov_exit (void)
@@ -614,6 +623,19 @@ __gcov_exit (void)
 void
 __gcov_init (struct gcov_info *info)
 {
+  const char *prealloc_size = getenv("GCOV_KVP_PREALLOC_SIZE");
+  if (prealloc_size != NULL)
+    {
+      __gcov_kvp_dynamic_pool_size  = atoi (prealloc_size);
+      if (__gcov_kvp_dynamic_pool_size > 0)
+	{
+	  __gcov_kvp_dynamic_pool
+	    = calloc (__gcov_kvp_dynamic_pool_size, sizeof (struct gcov_kvp));
+//	  fprintf (stderr, "GCOV_KVP_PREALLOC_SIZE allocates: %d\n",
+//		   __gcov_kvp_dynamic_pool_size);
+	}
+    }
+
   if (!info->version || !info->n_functions)
     return;
   if (gcov_version (info, info->version, 0))
