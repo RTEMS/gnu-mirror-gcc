@@ -2965,7 +2965,6 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 		break;
 	      }
 	  }
-	gcc_assert (unsupported_builtin);
       }
 
     if (unsupported_builtin)

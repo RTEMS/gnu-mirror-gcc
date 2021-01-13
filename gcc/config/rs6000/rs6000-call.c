@@ -15671,6 +15671,7 @@ rs6000_init_builtins (void)
     = build_pointer_type (build_qualified_type (unsigned_V4SI_type_node,
 						TYPE_QUAL_CONST));
 
+  /* #### Should just always be long long???  */
   unsigned_V2DI_type_node = rs6000_vector_type (TARGET_POWERPC64
 				       ? "__vector unsigned long"
 				       : "__vector unsigned long long",
@@ -15758,10 +15759,10 @@ rs6000_init_builtins (void)
     = build_pointer_type (build_qualified_type (uintDI_type_internal_node,
 						TYPE_QUAL_CONST));
   ptr_intTI_type_node
-    = build_pointer_type (build_qualified_type (intDI_type_internal_node,
+    = build_pointer_type (build_qualified_type (intTI_type_internal_node,
 						TYPE_QUAL_CONST));
   ptr_uintTI_type_node
-    = build_pointer_type (build_qualified_type (uintDI_type_internal_node,
+    = build_pointer_type (build_qualified_type (uintTI_type_internal_node,
 						TYPE_QUAL_CONST));
   ptr_long_integer_type_node
     = build_pointer_type

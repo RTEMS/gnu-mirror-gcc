@@ -257,7 +257,7 @@
     VADDUWM  VADDUWM_VSI_VBI
   vui __builtin_vec_add (vbi, vui);
     VADDUWM  VADDUWM_VBI_VUI
-  vui __builtin_vec_add (vbi, vui);
+  vui __builtin_vec_add (vui, vbi);
     VADDUWM  VADDUWM_VUI_VBI
   vsll __builtin_vec_add (vbll, vsll);
     VADDUDM  VADDUDM_VBLL_VSLL
@@ -382,7 +382,7 @@
     VAND_V16QI_UNS  VAND_VBC_VUC
   vss __builtin_vec_and (vss, vbs);
     VAND_V8HI  VAND_VSS_VBS
-  vss __builtin_vec_and (vss, vbs);
+  vss __builtin_vec_and (vbs, vss);
     VAND_V8HI  VAND_VBS_VSS
   vus __builtin_vec_and (vus, vbs);
     VAND_V8HI_UNS  VAND_VUS_VBS
@@ -1606,9 +1606,9 @@
 
 [VEC_FLOAT, vec_float, __builtin_vec_float]
   vf __builtin_vec_float (vsi);
-    XVCVSXWSP_V4SF
+    XVCVSXWSP
   vf __builtin_vec_float (vui);
-    XVCVUXWSP_V4SF
+    XVCVUXWSP
 
 [VEC_FLOAT2, vec_float2, __builtin_vec_float2]
   vf __builtin_vec_float2 (vsll, vsll);
@@ -1634,9 +1634,10 @@
   vf __builtin_vec_floato (vd);
     FLOATO_V2DF
 
+; #### XVRSPIM{TARGET_VSX}; VRFIM
 [VEC_FLOOR, vec_floor, __builtin_vec_floor]
   vf __builtin_vec_floor (vf);
-    XVRSPIM
+    VRFIM
   vd __builtin_vec_floor (vd);
     XVRDPIM
 
@@ -2118,7 +2119,7 @@
     VMLADDUHM  VMLADDUHM_VSSVUS
   vss __builtin_vec_madd (vus, vss, vss);
     VMLADDUHM  VMLADDUHM_VUSVSS
-  vus __builtin_vec_madd (vss, vus, vus);
+  vus __builtin_vec_madd (vus, vus, vus);
     VMLADDUHM  VMLADDUHM_VUS
   vf __builtin_vec_madd (vf, vf, vf);
     VMADDFP
@@ -2896,19 +2897,19 @@
     VPMSUMD  VPMSUMD_V
 
 [VEC_POPCNT, vec_popcnt, __builtin_vec_vpopcnt, _ARCH_PWR8]
-  vsc __builtin_vec_vpopcnt (vsc);
+  vuc __builtin_vec_vpopcnt (vsc);
     VPOPCNTB
   vuc __builtin_vec_vpopcnt (vuc);
     VPOPCNTUB
-  vss __builtin_vec_vpopcnt (vss);
+  vus __builtin_vec_vpopcnt (vss);
     VPOPCNTH
   vus __builtin_vec_vpopcnt (vus);
     VPOPCNTUH
-  vsi __builtin_vec_vpopcnt (vsi);
+  vui __builtin_vec_vpopcnt (vsi);
     VPOPCNTW
   vui __builtin_vec_vpopcnt (vui);
     VPOPCNTUW
-  vsll __builtin_vec_vpopcnt (vsll);
+  vull __builtin_vec_vpopcnt (vsll);
     VPOPCNTD
   vull __builtin_vec_vpopcnt (vull);
     VPOPCNTUD
@@ -3082,9 +3083,10 @@
   vull __builtin_vec_rlnm (vull, vull);
     VRLDNM
 
+; #### XVRSPI{TARGET_VSX};VRFIN
 [VEC_ROUND, vec_round, __builtin_vec_round]
   vf __builtin_vec_round (vf);
-    XVRSPI
+    VRFIN
   vd __builtin_vec_round (vd);
     XVRDPI
 
@@ -3193,11 +3195,11 @@
     VEC_VSIGNED2_V2DF
 
 [VEC_SIGNEDE, vec_signede, __builtin_vec_vsignede]
-  vui __builtin_vec_vsignede (vd);
+  vsi __builtin_vec_vsignede (vd);
     VEC_VSIGNEDE_V2DF
 
 [VEC_SIGNEDO, vec_signedo, __builtin_vec_vsignedo]
-  vui __builtin_vec_vsignedo (vd);
+  vsi __builtin_vec_vsignedo (vd);
     VEC_VSIGNEDO_V2DF
 
 [VEC_SL, vec_sl, __builtin_vec_sl]
@@ -3356,8 +3358,8 @@
     VSL  VSL_VBLL_VUC
   vbll __builtin_vec_sll (vbll, vus);
     VSL  VSL_VBLL_VUS
-  vbll __builtin_vec_sll (vbll, vui);
-    VSL  VSL_VBLL_VUI
+  vbll __builtin_vec_sll (vbll, vull);
+    VSL  VSL_VBLL_VULL
 
 [VEC_SLO, vec_slo, __builtin_vec_slo]
   vsc __builtin_vec_slo (vsc, vsc);
@@ -3686,14 +3688,10 @@
     STVX_V4SI  STVX_VSI
   void __builtin_vec_st (vsi, signed long long, signed int *);
     STVX_V4SI  STVX_SI
-  void __builtin_vec_st (vsi, signed long long, signed long *);
-    STVX_V4SI  STVX_SL
   void __builtin_vec_st (vui, signed long long, vui *);
     STVX_V4SI  STVX_VUI
   void __builtin_vec_st (vui, signed long long, unsigned int *);
     STVX_V4SI  STVX_UI
-  void __builtin_vec_st (vui, signed long long, unsigned long *);
-    STVX_V4SI  STVX_UL
   void __builtin_vec_st (vbi, signed long long, vbi *);
     STVX_V4SI  STVX_VBI
   void __builtin_vec_st (vbi, signed long long, signed int *);
@@ -4190,7 +4188,7 @@
 [VEC_SUM4S, vec_sum4s, __builtin_vec_sum4s]
   vui __builtin_vec_sum4s (vuc, vui);
     VSUM4UBS
-  vsi __builtin_vec_sum4s (vsc, vui);
+  vsi __builtin_vec_sum4s (vsc, vsi);
     VSUM4SBS
   vsi __builtin_vec_sum4s (vss, vsi);
     VSUM4SHS
@@ -4219,9 +4217,10 @@
   signed int __builtin_vec_xvtlsbb_all_zeros (vuc);
     XVTLSBB_ZEROS
 
+; #### XVRSPIZ{TARGET_VSX}; VRFIZ
 [VEC_TRUNC, vec_trunc, __builtin_vec_trunc]
   vf __builtin_vec_trunc (vf);
-    XVRSPIZ
+    VRFIZ
   vd __builtin_vec_trunc (vd);
     XVRDPIZ
 
@@ -4286,13 +4285,13 @@
     DOUBLEL_V4SF VUPKLF
 
 [VEC_UNSIGNED, vec_unsigned, __builtin_vec_vunsigned]
-  vsi __builtin_vec_vunsigned (vf);
+  vui __builtin_vec_vunsigned (vf);
     VEC_VUNSIGNED_V4SF
-  vsll __builtin_vec_vunsigned (vd);
+  vull __builtin_vec_vunsigned (vd);
     VEC_VUNSIGNED_V2DF
 
 [VEC_UNSIGNED2, vec_unsigned2, __builtin_vec_vunsigned2]
-  vsi __builtin_vec_vunsigned2 (vd, vd);
+  vui __builtin_vec_vunsigned2 (vd, vd);
     VEC_VUNSIGNED2_V2DF
 
 [VEC_UNSIGNEDE, vec_unsignede, __builtin_vec_vunsignede]

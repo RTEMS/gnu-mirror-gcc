@@ -317,7 +317,6 @@ struct typeinfo {
   char isbool;
   char ispixel;
   char ispointer;
-  char isopaque;
   basetype base;
   restriction restr;
   int val1;
@@ -474,7 +473,6 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "if",		"ibm128_float" },
     { "ld",		"long_double" },
     { "lg",		"long_integer" },
-    { "opaque", 	"opaque_V4SI" },
     { "pbv16qi",	"ptr_bool_V16QI" },
     { "pbv2di",		"ptr_bool_V2DI" },
     { "pbv4si",		"ptr_bool_V4SI" },
@@ -972,7 +970,6 @@ match_type (typeinfo *typedata, int voidok)
        vd	vector double
        v256	__vector_pair
        v512	__vector_quad
-       vop	opaque vector (matches all vectors)
 
      For simplicity, We don't support "short int" and "long long int".
      We don't support a <basetype> of "bool", "long double", or "_Float16",
@@ -1154,11 +1151,6 @@ match_type (typeinfo *typedata, int voidok)
       typedata->isvector = 1;
       typedata->base = BT_VQUAD;
       handle_pointer (typedata);
-      return 1;
-    }
-  else if (!strcmp (token, "vop"))
-    {
-      typedata->isopaque = 1;
       return 1;
     }
   else if (!strcmp (token, "signed"))
@@ -1549,20 +1541,12 @@ construct_fntype_id (prototype *protoptr)
     buf[bufi++] = 'v';
   else
     {
-      if (protoptr->rettype.isopaque)
-	{
-	  memcpy (&buf[bufi], "opaque", 6);
-	  bufi += 6;
-	}
+      if (protoptr->rettype.isunsigned)
+	buf[bufi++] = 'u';
+      if (protoptr->rettype.isvector)
+	complete_vector_type (&protoptr->rettype, buf, &bufi);
       else
-	{
-	  if (protoptr->rettype.isunsigned)
-	    buf[bufi++] = 'u';
-	  if (protoptr->rettype.isvector)
-	    complete_vector_type (&protoptr->rettype, buf, &bufi);
-	  else
-	    complete_base_type (&protoptr->rettype, buf, &bufi);
-	}
+	complete_base_type (&protoptr->rettype, buf, &bufi);
     }
 
   memcpy (&buf[bufi], "_ftype", 6);
@@ -1608,21 +1592,13 @@ construct_fntype_id (prototype *protoptr)
 	      else
 		buf[bufi++] = 'p';
 	    }
-	  if (argptr->info.isopaque)
-	    {
-	      assert (!argptr->info.ispointer);
-	      memcpy (&buf[bufi], "opaque", 6);
-	      bufi += 6;
-	    }
+
+	  if (argptr->info.isunsigned)
+	    buf[bufi++] = 'u';
+	  if (argptr->info.isvector)
+	    complete_vector_type (&argptr->info, buf, &bufi);
 	  else
-	    {
-	      if (argptr->info.isunsigned)
-		buf[bufi++] = 'u';
-	      if (argptr->info.isvector)
-		complete_vector_type (&argptr->info, buf, &bufi);
-	      else
-		complete_base_type (&argptr->info, buf, &bufi);
-	    }
+	    complete_base_type (&argptr->info, buf, &bufi);
 	}
       assert (!argptr);
       }
@@ -1965,8 +1941,7 @@ parse_ovld_entry ()
 
   /* Check for an optional overload id.  Usually we use the builtin
      function id for that purpose, but sometimes we need multiple
-     overload entries for the same builtin id when we use opaque
-     vector parameter and return types, and it needs to be unique.  */
+     overload entries for the same builtin id, and it needs to be unique.  */
   consume_whitespace ();
   if (linebuf[pos] != '\n')
     {

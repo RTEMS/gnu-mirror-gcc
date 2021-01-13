@@ -26,25 +26,23 @@ int main ()
 {
   *vecfloat++ = vec_andc((vector bool int)vecint[0], vecfloat[1]);
   *vecfloat++ = vec_andc(vecfloat[0], (vector bool int)vecint[1]);
-  *vecfloat++ = vec_vxor((vector bool int)vecint[0], vecfloat[1]);
-  *vecfloat++ = vec_vxor(vecfloat[0], (vector bool int)vecint[1]);
+  *vecfloat++ = vec_xor((vector bool int)vecint[0], vecfloat[1]);
+  *vecfloat++ = vec_xor(vecfloat[0], (vector bool int)vecint[1]);
   *varpixel++ = vec_packpx(vecuint[0], vecuint[1]);
-  *varpixel++ = vec_vpkpx(vecuint[0], vecuint[1]);
-  *vecshort++ = vec_vmulesb(vecchar[0], vecchar[1]);
-  *vecshort++ = vec_vmulosb(vecchar[0], vecchar[1]);
+  *vecshort++ = vec_mule(vecchar[0], vecchar[1]);
+  *vecshort++ = vec_mulo(vecchar[0], vecchar[1]);
   *vecint++ = vec_ld(var_int[0], intp[1]);
   *vecint++ = vec_lde(var_int[0], intp[1]);
   *vecint++ = vec_ldl(var_int[0], intp[1]);
-  *vecint++ = vec_lvewx(var_int[0], intp[1]);
   *vecint++ = vec_unpackh(vecshort[0]);
   *vecint++ = vec_unpackl(vecshort[0]);
   *vecushort++ = vec_andc((vector bool short)vecshort[0], vecushort[1]);
   *vecushort++ = vec_andc(vecushort[0], (vector bool short)vecshort[1]);
-  *vecushort++ = vec_vxor((vector bool short)vecshort[0], vecushort[1]);
-  *vecushort++ = vec_vxor(vecushort[0], (vector bool short)vecshort[1]);
+  *vecushort++ = vec_xor((vector bool short)vecshort[0], vecushort[1]);
+  *vecushort++ = vec_xor(vecushort[0], (vector bool short)vecshort[1]);
   *vecuint++ = vec_ld(var_int[0], uintp[1]);
   *vecuint++ = vec_lvx(var_int[0], uintp[1]);
-  *vecuint++ = vec_vmsumubm(vecuchar[0], vecuchar[1], vecuint[2]);
+  *vecuint++ = vec_msum(vecuchar[0], vecuchar[1], vecuint[2]);
   *vecuchar++ = vec_xor(vecuchar[0], (vector unsigned char)vecchar[1]);
 
   *vecubi++ = vec_unpackh(vecubsi[0]);
@@ -62,11 +60,10 @@ int main ()
 
 /* Expected results:
      vec_packpx                     vpkpx
-     vec_vmulosb                    vmulesb
+     vec_mulo                       vmulesb
      vec_ld                         lxv2x
      vec_lde                        lvewx
      vec_ldl                        lxvl
-     vec_lvewx                      lvewx
      vec_unpackh                    vupklsh
      vec_unpackh                    vupklpx
      vec_unpackh                    vupklsb
@@ -75,10 +72,10 @@ int main ()
      vec_unpackl                    vupkhsb
      vec_andc                       xxlnor (vnor AIX)
                                     xxland (vand AIX)
-     vec_vxor                       xxlxor
-     vec_vmsumubm                   vmsumubm
-     vec_vmulesb                    vmulosb
-     vec_vmulosb                    vmulesb
+     vec_xor                        xxlxor
+     vec_msum                       vmsumubm
+     vec_mule                       vmulosb
+     vec_mulo                       vmulesb
      vec_ld                         lvx
 */
 
@@ -89,7 +86,7 @@ int main ()
 /* { dg-final { scan-assembler-times {\mlxv} 0 { target { ! powerpc_vsx } } } } */
 /* { dg-final { scan-assembler-times {\mlvx\M} 0 { target powerpc_vsx } } } */
 /* { dg-final { scan-assembler-times {\mlxv} 42 { target powerpc_vsx } } } */
-/* { dg-final { scan-assembler-times "lvewx" 2 } } */
+/* { dg-final { scan-assembler-times "lvewx" 1 } } */
 /* { dg-final { scan-assembler-times "lvxl" 1 } } */
 /* { dg-final { scan-assembler-times "vupklsh" 2 } } */
 /* { dg-final { scan-assembler-times "vupkhsh" 2 } } */

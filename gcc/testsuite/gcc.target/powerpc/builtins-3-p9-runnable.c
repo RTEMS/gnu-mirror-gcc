@@ -73,10 +73,10 @@ int main() {
          abort();
    }
    vfexpt = (vector float){1.0, -2.0, 0.0, 8.5};
-   vfr = vec_extract_fp_from_shorth(vusha);
+   vfr = vec_extract_fp32_from_shorth(vusha);
 
 #ifdef DEBUG
-   printf ("vec_extract_fp_from_shorth\n");
+   printf ("vec_extract_fp32_from_shorth\n");
    for (i=0; i<4; i++)
      printf("result[%d] = %f; expected[%d] = %f\n",
 	    i, vfr[i], i, vfexpt[i]);
@@ -88,10 +88,10 @@ int main() {
    }
 
    vfexpt = (vector float){1.5, 0.5, 1.25, -0.25};
-   vfr = vec_extract_fp_from_shortl(vusha);
+   vfr = vec_extract_fp32_from_shortl(vusha);
 
 #ifdef DEBUG
-   printf ("\nvec_extract_fp_from_shortl\n");
+   printf ("\nvec_extract_fp32_from_shortl\n");
    for (i=0; i<4; i++)
      printf("result[%d] = %f; expected[%d] = %f\n",
 	    i, vfr[i], i, vfexpt[i]);

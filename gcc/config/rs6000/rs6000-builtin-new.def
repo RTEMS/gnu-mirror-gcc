@@ -81,7 +81,6 @@
 ;   vp		vector pixel
 ;   vf		vector float
 ;   vd		vector double
-;   vop		opaque vector (matches all vectors)
 ;
 ; For simplicity, We don't support "short int" and "long long int".
 ; We don't currently support a <basetype> of "bool", "long double",
@@ -127,30 +126,20 @@
 ;
 ; It is important to note that each entry's <bif-name> must be
 ; unique.  The code generated from this file will call def_builtin
-; for each entry, and this can only happen once per name.  This
-; means that in some cases we currently retain some tricks from
-; the old builtin support to aid with overloading.  This 
-; unfortunately seems to be necessary for backward compatibility.
+; for each entry, and this can only happen once per name.
 ;
-; The two tricks at our disposal are the void pointer and the "vop"
-; vector type.  We use void pointers anywhere that pointer types
-; are accepted (primarily for vector load/store built-ins).  In
-; practice this means that we accept pointers to anything, not
-; just to the types that we intend.  We use the "vop" vector type
-; anytime that a built-in must accept vector types that have
-; different modes.  This is an opaque type that will match any
-; vector type, which may mean matching vector types that we don't
-; intend.
+; The type signature for the builtin must match the modes of the RTL
+; pattern <bif-pattern>.  When a builtin is used only as a basis for
+; overloading, you can use an arbitrary type for each mode (for example,
+; for V8HImode, you could use vp, vss, vus, or vbs).  The overloading
+; machinery takes care of adding appropriate casts between vectors to
+; satisfy impedance matching.  The overloaded prototypes are the ones
+; that must match what users expect.  Thus you will often have a small
+; number of entries in this file that correspond to a much greater
+; number of entries in rs6000-overload.def.
 ;
-; We can improve on "vop" when a vector argument or return type is
-; limited to one mode.  For example, "vsll" and "vull" both map to
-; V2DImode.  In this case, we can arbitrarily pick one of the
-; acceptable types to use in the prototype.  The signature used by
-; def_builtin is based on modes, not types, so this works well.
-; Only use "vop" when there is no alternative.  When there is a
-; choice, best practice is to use the signed type ("vsll" in the
-; example above) unless the choices are unsigned and bool, in
-; which case the unsigned type should be used.
+; However, builtins in this file that are expected to be directly called
+; by users must have one version for each expected type combination.
 ;
 ; Eventually we want to automatically generate built-in documentation
 ; from the entries in this file.  Documenting of built-ins with more
@@ -354,11 +343,23 @@
   vuc __builtin_altivec_mask_for_load (const void *);
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
 
-  vus __builtin_altivec_mfvscr ();
+  vss __builtin_altivec_mfvscr ();
     MFVSCR altivec_mfvscr {}
 
-  void __builtin_altivec_mtvscr (vop);
+  void __builtin_altivec_mtvscr (vsi);
     MTVSCR altivec_mtvscr {}
+
+  const vsll __builtin_altivec_vmulesw (vsi, vsi);
+    VMULESW vec_widen_smult_even_v4si {}
+
+  const vull __builtin_altivec_vmuleuw (vui, vui);
+    VMULEUW vec_widen_umult_even_v4si {}
+
+  const vsll __builtin_altivec_vmulosw (vsi, vsi);
+    VMULOSW vec_widen_smult_odd_v4si {}
+
+  const vull __builtin_altivec_vmulouw (vui, vui);
+    VMULOUW vec_widen_umult_odd_v4si {}
 
   const vsc __builtin_altivec_nabs_v16qi (vsc);
     NABS_V16QI nabsv16qi2 {}
@@ -441,7 +442,7 @@
   const vus __builtin_altivec_vadduhs (vus, vus);
     VADDUHS altivec_vadduhs {}
 
-  const vui __builtin_altivec_vadduwm (vui, vui);
+  const vsi __builtin_altivec_vadduwm (vsi, vsi);
     VADDUWM addv4si3 {}
 
   const vui __builtin_altivec_vadduws (vui, vui);
@@ -528,19 +529,19 @@
   const vsc __builtin_altivec_vcmpequb (vuc, vuc);
     VCMPEQUB vector_eqv16qi {}
 
-  const int __builtin_altivec_vcmpequb_p (int, vuc, vuc);
+  const int __builtin_altivec_vcmpequb_p (int, vsc, vsc);
     VCMPEQUB_P vector_eq_v16qi_p {pred}
 
   const vss __builtin_altivec_vcmpequh (vus, vus);
     VCMPEQUH vector_eqv8hi {}
 
-  const int __builtin_altivec_vcmpequh_p (int, vus, vus);
+  const int __builtin_altivec_vcmpequh_p (int, vss, vss);
     VCMPEQUH_P vector_eq_v8hi_p {pred}
 
   const vsi __builtin_altivec_vcmpequw (vui, vui);
     VCMPEQUW vector_eqv4si {}
 
-  const int __builtin_altivec_vcmpequw_p (int, vui, vui);
+  const int __builtin_altivec_vcmpequw_p (int, vsi, vsi);
     VCMPEQUW_P vector_eq_v4si_p {pred}
 
   const vf __builtin_altivec_vcmpgefp (vf, vf);
@@ -576,19 +577,19 @@
   const vsc __builtin_altivec_vcmpgtub (vuc, vuc);
     VCMPGTUB vector_gtuv16qi {}
 
-  const int __builtin_altivec_vcmpgtub_p (int, vuc, vuc);
+  const int __builtin_altivec_vcmpgtub_p (int, vsc, vsc);
     VCMPGTUB_P vector_gtu_v16qi_p {pred}
 
   const vss __builtin_altivec_vcmpgtuh (vus, vus);
     VCMPGTUH vector_gtuv8hi {}
 
-  const int __builtin_altivec_vcmpgtuh_p (int, vus, vus);
+  const int __builtin_altivec_vcmpgtuh_p (int, vss, vss);
     VCMPGTUH_P vector_gtu_v8hi_p {pred}
 
   const vsi __builtin_altivec_vcmpgtuw (vui, vui);
     VCMPGTUW vector_gtuv4si {}
 
-  const int __builtin_altivec_vcmpgtuw_p (int, vui, vui);
+  const int __builtin_altivec_vcmpgtuw_p (int, vsi, vsi);
     VCMPGTUW_P vector_gtu_v4si_p {pred}
 
   const vsi __builtin_altivec_vctsxs (vf, const int<5>);
@@ -873,7 +874,7 @@
   const vuq __builtin_altivec_vsel_1ti_uns (vuq, vuq, vuq);
     VSEL_1TI_UNS vector_select_v1ti_uns {}
 
-  const vf __builtin_altivec_vsel_4sf (vf, vf, vui);
+  const vf __builtin_altivec_vsel_4sf (vf, vf, vf);
     VSEL_4SF vector_select_v4sf {}
 
   const vsi __builtin_altivec_vsel_4si (vsi, vsi, vui);
@@ -888,7 +889,7 @@
   const vus __builtin_altivec_vsel_8hi_uns (vus, vus, vus);
     VSEL_8HI_UNS vector_select_v8hi_uns {}
 
-  const vop __builtin_altivec_vsl (vop, vuc);
+  const vsi __builtin_altivec_vsl (vsi, vsi);
     VSL altivec_vsl {}
 
   const vsc __builtin_altivec_vslb (vsc, vuc);
@@ -909,7 +910,7 @@
   const vss __builtin_altivec_vslh (vss, vus);
     VSLH vashlv8hi3 {}
 
-  const vop __builtin_altivec_vslo (vop, vuc);
+  const vsi __builtin_altivec_vslo (vsi, vsi);
     VSLO altivec_vslo {}
 
   const vsi __builtin_altivec_vslw (vsi, vui);
@@ -933,7 +934,7 @@
   const vsi __builtin_altivec_vspltw (vsi, const int<2>);
     VSPLTW altivec_vspltw {}
 
-  const vop __builtin_altivec_vsr (vop, vop);
+  const vsi __builtin_altivec_vsr (vsi, vsi);
     VSR altivec_vsr {}
 
   const vsc __builtin_altivec_vsrab (vsc, vuc);
@@ -951,7 +952,7 @@
   const vss __builtin_altivec_vsrh (vss, vus);
     VSRH vlshrv8hi3 {}
 
-  const vop __builtin_altivec_vsro (vop, vop);
+  const vsi __builtin_altivec_vsro (vsi, vsi);
     VSRO altivec_vsro {}
 
   const vsi __builtin_altivec_vsrw (vsi, vui);
@@ -1086,28 +1087,28 @@
 
 ; Cell builtins.
 [cell]
-  pure vop __builtin_altivec_lvlx (signed long long, const void *);
+  pure vuc __builtin_altivec_lvlx (signed long long, const void *);
     LVLX altivec_lvlx {ldvec}
 
-  pure vop __builtin_altivec_lvlxl (signed long long, const void *);
+  pure vuc __builtin_altivec_lvlxl (signed long long, const void *);
     LVLXL altivec_lvlxl {ldvec}
 
-  pure vop __builtin_altivec_lvrx (signed long long, const void *);
+  pure vuc __builtin_altivec_lvrx (signed long long, const void *);
     LVRX altivec_lvrx {ldvec}
 
-  pure vop __builtin_altivec_lvrxl (signed long long, const void *);
+  pure vuc __builtin_altivec_lvrxl (signed long long, const void *);
     LVRXL altivec_lvrxl {ldvec}
 
-  void __builtin_altivec_stvlx (vop, signed long long, void *);
+  void __builtin_altivec_stvlx (vuc, signed long long, void *);
     STVLX altivec_stvlx {stvec}
 
-  void __builtin_altivec_stvlxl (vop, signed long long, void *);
+  void __builtin_altivec_stvlxl (vuc, signed long long, void *);
     STVLXL altivec_stvlxl {stvec}
 
-  void __builtin_altivec_stvrx (vop, signed long long, void *);
+  void __builtin_altivec_stvrx (vuc, signed long long, void *);
     STVRX altivec_stvrx {stvec}
 
-  void __builtin_altivec_stvrxl (vop, signed long long, void *);
+  void __builtin_altivec_stvrxl (vuc, signed long long, void *);
     STVRXL altivec_stvrxl {stvec}
 
 
@@ -1166,6 +1167,24 @@
 
   const vull __builtin_altivec_vandc_v2di_uns (vull, vull);
     VANDC_V2DI_UNS andcv2di3 {}
+
+  const vbll __builtin_altivec_vcmpequd (vull, vull);
+    VCMPEQUD vector_eqv2di {}
+
+  const int __builtin_altivec_vcmpequd_p (int, vsll, vsll);
+    VCMPEQUD_P vector_eq_v2di_p {pred}
+
+  const vsll __builtin_altivec_vcmpgtsd (vsll, vsll);
+    VCMPGTSD vector_gtv2di {}
+
+  const int __builtin_altivec_vcmpgtsd_p (int, vsll, vsll);
+    VCMPGTSD_P vector_gt_v2di_p {pred}
+
+  const vsll __builtin_altivec_vcmpgtud (vull, vull);
+    VCMPGTUD vector_gtuv2di {}
+
+  const int __builtin_altivec_vcmpgtud_p (int, vull, vull);
+    VCMPGTUD_P vector_gtu_v2di_p {pred}
 
   const vd __builtin_altivec_vnor_v2df (vd, vd);
     VNOR_V2DF norv2df3 {}
@@ -1717,11 +1736,11 @@
     XVCVSXWDP vsx_xvcvsxwdp {}
 
 ; Need to pick one or the other here!!  ####
-; Second one is used in the overload table (old and new) for VEC_FLOAT.
-;  const vf __builtin_vsx_xvcvsxwsp (vsi);
-;    XVCVSXWSP vsx_floatv4siv4sf2 {}
+; The first is needed to make vec_float work correctly.
   const vf __builtin_vsx_xvcvsxwsp (vsi);
-    XVCVSXWSP_V4SF vsx_xvcvsxwdp {}
+    XVCVSXWSP vsx_floatv4siv4sf2 {}
+;  const vf __builtin_vsx_xvcvsxwsp (vsi);
+;    XVCVSXWSP_V4SF vsx_xvcvsxwdp {}
 
   const vd __builtin_vsx_xvcvuxddp (vull);
     XVCVUXDDP vsx_floatunsv2div2df2 {}
@@ -1740,11 +1759,11 @@
     XVCVUXWDP vsx_xvcvuxwdp {}
 
 ; Need to pick one or the other here!! ####
-; Second one is used in the overload table (old and new) for VEC_FLOAT.
-;  const vf __builtin_vsx_xvcvuxwsp (vui);
-;    XVCVUXWSP vsx_floatunsv4siv4sf2 {}
+; The first is needed to make vec_float work correctly.
   const vf __builtin_vsx_xvcvuxwsp (vui);
-    XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
+    XVCVUXWSP vsx_floatunsv4siv4sf2 {}
+;  const vf __builtin_vsx_xvcvuxwsp (vui);
+;    XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
 
   fpmath vd __builtin_vsx_xvdivdp (vd, vd);
     XVDIVDP divv2df3 {}
@@ -2199,24 +2218,6 @@
   const vuc __builtin_altivec_vbpermq2 (vuc, vuc);
     VBPERMQ2 altivec_vbpermq2 {}
 
-  const vbll __builtin_altivec_vcmpequd (vull, vull);
-    VCMPEQUD vector_eqv2di {}
-
-  const int __builtin_altivec_vcmpequd_p (int, vsll, vsll);
-    VCMPEQUD_P vector_eq_v2di_p {pred}
-
-  const vsll __builtin_altivec_vcmpgtsd (vsll, vsll);
-    VCMPGTSD vector_gtv2di {}
-
-  const int __builtin_altivec_vcmpgtsd_p (int, vsll, vsll);
-    VCMPGTSD_P vector_gt_v2di_p {pred}
-
-  const vsll __builtin_altivec_vcmpgtud (vull, vull);
-    VCMPGTUD vector_gtuv2di {}
-
-  const int __builtin_altivec_vcmpgtud_p (int, vull, vull);
-    VCMPGTUD_P vector_gtu_v2di_p {pred}
-
   const vsll __builtin_altivec_vmaxsd (vsll, vsll);
     VMAXSD smaxv2di3 {}
 
@@ -2253,18 +2254,6 @@
   const vsi __builtin_altivec_vmrgow_v4si (vsi, vsi);
     VMRGOW_V4SI p8_vmrgow_v4si {}
 
-  const vsll __builtin_altivec_vmulesw (vsi, vsi);
-    VMULESW vec_widen_smult_even_v4si {}
-
-  const vull __builtin_altivec_vmuleuw (vui, vui);
-    VMULEUW vec_widen_umult_even_v4si {}
-
-  const vsll __builtin_altivec_vmulosw (vsi, vsi);
-    VMULOSW vec_widen_smult_odd_v4si {}
-
-  const vull __builtin_altivec_vmulouw (vui, vui);
-    VMULOUW vec_widen_umult_odd_v4si {}
-
   const vsc __builtin_altivec_vpermxor (vsc, vsc, vsc);
     VPERMXOR altivec_vpermxor {}
 
@@ -2296,13 +2285,13 @@
 ;  const vull __builtin_altivec_vpmsumw (vui, vui);
 ;    VPMSUMW crypto_vpmsumw {}
 
-  const vsc __builtin_altivec_vpopcntb (vsc);
+  const vuc __builtin_altivec_vpopcntb (vsc);
     VPOPCNTB popcountv16qi2 {}
 
-  const vsll __builtin_altivec_vpopcntd (vsll);
+  const vull __builtin_altivec_vpopcntd (vsll);
     VPOPCNTD popcountv2di2 {}
 
-  const vss __builtin_altivec_vpopcnth (vss);
+  const vus __builtin_altivec_vpopcnth (vss);
     VPOPCNTH popcountv8hi2 {}
 
   const vuc __builtin_altivec_vpopcntub (vuc);
@@ -2317,7 +2306,7 @@
   const vui __builtin_altivec_vpopcntuw (vui);
     VPOPCNTUW popcountv4si2 {}
 
-  const vsi __builtin_altivec_vpopcntw (vsi);
+  const vui __builtin_altivec_vpopcntw (vsi);
     VPOPCNTW popcountv4si2 {}
 
   const vsll __builtin_altivec_vrld (vsll, vull);
@@ -2716,10 +2705,10 @@
   const vuc __builtin_vsx_insert4b (vsi, vuc, const int[0,12]);
     INSERT4B insert4b {}
 
-  const vd __builtin_vsx_insert_exp_dp (vop, vull);
+  const vd __builtin_vsx_insert_exp_dp (vd, vd);
     VIEDP xviexpdp {}
 
-  const vf __builtin_vsx_insert_exp_sp (vop, vui);
+  const vf __builtin_vsx_insert_exp_sp (vf, vf);
     VIESP xviexpsp {}
 
   const signed int __builtin_vsx_scalar_cmp_exp_dp_eq (double, double);
@@ -2833,13 +2822,13 @@
   void __builtin_altivec_xst_len_r (vsc, void *, long long);
     XST_LEN_R xst_len_r {}
 
-  void __builtin_altivec_stxvl (vop, void *, long long);
+  void __builtin_altivec_stxvl (vuc, void *, long long);
     STXVL stxvl {}
 
   const signed int __builtin_scalar_byte_in_set (unsigned char, unsigned long long);
     CMPEQB cmpeqb {}
 
-  pure vop __builtin_vsx_lxvl (const void *, unsigned long long);
+  pure vuc __builtin_vsx_lxvl (const void *, unsigned long long);
     LXVL lxvl {}
 
   const unsigned int __builtin_vsx_scalar_extract_exp (double);
@@ -3374,7 +3363,7 @@
   const vus __builtin_vsx_xxblend_v8hi (vus, vus, vus);
     VXXBLEND_V8HI xxblend_v8hi {}
 
-  const vop __builtin_vsx_xxeval (vop, vop, vop, const int <8>);
+  const vull __builtin_vsx_xxeval (vull, vull, vull, const int <8>);
     XXEVAL xxeval {}
 
   const vuc __builtin_vsx_xxgenpcvm_v16qi (vuc, const int <2>);
