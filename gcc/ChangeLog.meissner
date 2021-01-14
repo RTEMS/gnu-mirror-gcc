@@ -1,5 +1,5 @@
 work032.patch013:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): If the
 	user explicitly used -mabi=ieeelongdouble or -mabi=ibmlongdouble,
@@ -9,7 +9,7 @@ work032.patch013:
 	-mlong-double-128.
 
 work032.patch011:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
 	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
@@ -28,7 +28,7 @@ work032.patch011:
 	RS6000_BTM_FLOAT128.
 
 work032.patch006:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (ieee128_builtin_name): New function.
 	(built_in_uses_long_double): New function.
@@ -39,14 +39,14 @@ work032.patch006:
 	return long double arguments.
 
 work032.patch005:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR gcc/97791
 	* config/rs6000/rs6000.c (rs6000_emit_move): Delete code that sets
 	whether long double was passed based on the modes used in moves.
 
 work032.patch004:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
             Alan Modra  <amodra@gmail.com>
 
 	PR gcc/97791
@@ -57,7 +57,7 @@ work032.patch004:
 	passed if the type is actually long double.
 
 work032.patch003:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/81594
 	* config/rs6000/predicates.md (ds_form_memory): New predicate.
@@ -65,7 +65,7 @@ work032.patch003:
 	(dupv2di_store): New insn.
 
 work032.patch002:
-2021-01-13 Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14 Michael Meissner  <meissner@linux.ibm.com>
 
         * config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
         128-bit floating point types.
@@ -83,7 +83,7 @@ work032.patch002:
         build te RTL.
 
 work032.patch001:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
 	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.

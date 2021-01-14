@@ -1,11 +1,11 @@
 work032.patch012:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
 	__builtin_pack_ibm128 instead of __builtin_pack_longdouble.
 
 work032.patch007:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/_dd_to_kf.c: New file.
 	* config/rs6000/_kf_to_dd.c: New file.

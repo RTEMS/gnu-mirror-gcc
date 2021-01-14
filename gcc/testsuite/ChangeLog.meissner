@@ -1,18 +1,34 @@
 work032.patch010:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* c-c++-common/dfp/convert-bfp-11.c: Force using IBM 128-bit long
 	double.  Remove check for 64-bit long double.
 
 work032.patch009:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/70117
 	* gcc.target/powerpc/pr70117.c: Force the long double type to use
 	the IBM 128-bit format.
 
 work032.patch008:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* lib/target-supports.exp
+	(check_effective_target_ppc_long_double_ibm128): New function.
+	(check_effective_target_ppc_long_double_ieee128): New function.
+	(check_effective_target_ppc_long_double_64bit): New function.
+	(add_options_for_ppc_long_double_override_ibm128): New function.
+	(check_effective_target_ppc_long_double_override_ibm128): New
+	function.
+	(add_options_for_ppc_long_double_override_ieee128): New function.
+	(check_effective_target_ppc_long_double_override_ieee128): New
+	function.
+	(add_options_for_ppc_long_double_override_64bit): New function.
+	(check_effective_target_ppc_long_double_override_64bit): New
+	function.
+
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* lib/target-supports.exp
 	(check_effective_target_ppc_long_double_ibm): New function.
@@ -23,7 +39,7 @@ work032.patch008:
 	(check_effective_target_ppc_long_double_64bit): New function.
 
 work032.patch006:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-longdouble-math.c: New test.
 	* gcc.target/powerpc/float128-longdouble-stdio.c: New test.
@@ -32,7 +48,7 @@ work032.patch006:
 	support for running if long double defaults to 64-bits.
 
 work032.patch005:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/97791
 	* gcc.target/powerpc/gnuattr1.c: Mark as XFAIL.
@@ -40,23 +56,23 @@ work032.patch005:
 	* gcc.target/powerpc/gnuattr3.c: Mark as XFAIL.
 
 work032.patch003:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/81594
 	* gcc.target/powerpc/pr81594.c: New test.
 
 work032.patch002:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
         * gcc.target/powerpc/float128-cmove.c: New test.
         * gcc.target/powerpc/float128-minmax-3.c: New test.
 
 work032.patch001:
-2021-01-13  Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-minmax-2.c: New test.
 
-2021-01-13   Michael Meissner  <meissner@linux.ibm.com>
+2021-01-14   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
 
