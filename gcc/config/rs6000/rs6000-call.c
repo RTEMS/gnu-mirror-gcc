@@ -6554,12 +6554,14 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	  if (SCALAR_FLOAT_MODE_P (return_mode))
 	    {
 	      rs6000_passes_float = true;
+
+	      /* If GNU attributes are enabled, mark if the function returns
+		 long double.  We do not mark if the function returns a type
+		 such as __ibm128 that uses the same modes as the current long
+		 double type, only if an actual long double type was used.  */
 	      if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-		  && (FLOAT128_IBM_P (return_mode)
-		      || FLOAT128_IEEE_P (return_mode)
-		      || (return_type != NULL
-			  && (TYPE_MAIN_VARIANT (return_type)
-			      == long_double_type_node))))
+		  && return_type != NULL
+		  && TYPE_MAIN_VARIANT (return_type) == long_double_type_node)
 		rs6000_passes_long_double = true;
 
 	      /* Note if we passed or return a IEEE 128-bit type.  We changed
@@ -6994,11 +6996,14 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
       if (SCALAR_FLOAT_MODE_P (mode))
 	{
 	  rs6000_passes_float = true;
+
+	  /* If GNU attributes are enabled, mark if the function passes long
+	     double.  We do not mark if the function returns a type such as
+	     __ibm128 that uses the same modes as the current long double type,
+	     only if an actual long double type was used.  */
 	  if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-	      && (FLOAT128_IBM_P (mode)
-		  || FLOAT128_IEEE_P (mode)
-		  || (type != NULL
-		      && TYPE_MAIN_VARIANT (type) == long_double_type_node)))
+	      && type != NULL
+	      && TYPE_MAIN_VARIANT (type) == long_double_type_node)
 	    rs6000_passes_long_double = true;
 
 	  /* Note if we passed or return a IEEE 128-bit type.  We changed the
