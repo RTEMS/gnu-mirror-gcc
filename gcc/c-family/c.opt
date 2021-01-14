@@ -1701,6 +1701,10 @@ flax-vector-conversions
 C ObjC C++ ObjC++ Var(flag_lax_vector_conversions)
 Allow implicit conversions between vectors with differing numbers of subparts and/or differing element types.
 
+fmissing-return-undefined
+C Var(flag_missing_return_undefined) Init(1)
+A missing return statement for a non-return function is undefined.
+
 fmodules-ts
 C++ ObjC++ Var(flag_modules) Integer Init(0)
 Enable C++ modules-ts (experimental).

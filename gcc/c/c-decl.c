@@ -10180,9 +10180,7 @@ finish_function (location_t end_loc)
 
   /* Complain if there's no return statement only if option specified on
      command line.  */
-  if (warn_return_type > 0
-      && TREE_CODE (TREE_TYPE (TREE_TYPE (fndecl))) != VOID_TYPE
-      && !current_function_returns_value && !current_function_returns_null
+  if (TREE_CODE (TREE_TYPE (TREE_TYPE (fndecl))) != VOID_TYPE
       /* Don't complain if we are no-return.  */
       && !current_function_returns_abnormally
       /* Don't complain if we are declared noreturn.  */
@@ -10191,13 +10189,20 @@ finish_function (location_t end_loc)
       && !MAIN_NAME_P (DECL_NAME (fndecl))
       /* Or if they didn't actually specify a return type.  */
       && !C_FUNCTION_IMPLICIT_INT (fndecl)
+      && targetm.warn_func_return (fndecl))
+    {
       /* Normally, with -Wreturn-type, flow will complain, but we might
          optimize out static functions.  */
-      && !TREE_PUBLIC (fndecl)
-      && targetm.warn_func_return (fndecl)
-      && warning (OPT_Wreturn_type,
-		  "no return statement in function returning non-void"))
-    TREE_NO_WARNING (fndecl) = 1;
+      if (!current_function_returns_value && !current_function_returns_null
+	  && warn_return_type > 0
+	  && !TREE_PUBLIC (fndecl)
+	  && warning (OPT_Wreturn_type,
+		      "no return statement in function returning non-void"))
+	TREE_NO_WARNING (fndecl) = 1;
+
+      if (flag_missing_return_undefined)
+	maybe_instrument_return (fndecl);
+    }
 
   /* Complain about parameters that are only set, but never otherwise used.  */
   if (warn_unused_but_set_parameter)

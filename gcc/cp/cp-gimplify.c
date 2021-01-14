@@ -1610,70 +1610,7 @@ cp_maybe_instrument_return (tree fndecl)
       || !targetm.warn_func_return (fndecl))
     return;
 
-  if (!sanitize_flags_p (SANITIZE_RETURN, fndecl)
-      /* Don't add __builtin_unreachable () if not optimizing, it will not
-	 improve any optimizations in that case, just break UB code.
-	 Don't add it if -fsanitize=unreachable -fno-sanitize=return either,
-	 UBSan covers this with ubsan_instrument_return above where sufficient
-	 information is provided, while the __builtin_unreachable () below
-	 if return sanitization is disabled will just result in hard to
-	 understand runtime error without location.  */
-      && (!optimize
-	  || sanitize_flags_p (SANITIZE_UNREACHABLE, fndecl)))
-    return;
-
-  tree t = DECL_SAVED_TREE (fndecl);
-  while (t)
-    {
-      switch (TREE_CODE (t))
-	{
-	case BIND_EXPR:
-	  t = BIND_EXPR_BODY (t);
-	  continue;
-	case TRY_FINALLY_EXPR:
-	case CLEANUP_POINT_EXPR:
-	  t = TREE_OPERAND (t, 0);
-	  continue;
-	case STATEMENT_LIST:
-	  {
-	    tree_stmt_iterator i = tsi_last (t);
-	    while (!tsi_end_p (i))
-	      {
-		tree p = tsi_stmt (i);
-		if (TREE_CODE (p) != DEBUG_BEGIN_STMT)
-		  break;
-		tsi_prev (&i);
-	      }
-	    if (!tsi_end_p (i))
-	      {
-		t = tsi_stmt (i);
-		continue;
-	      }
-	  }
-	  break;
-	case RETURN_EXPR:
-	  return;
-	default:
-	  break;
-	}
-      break;
-    }
-  if (t == NULL_TREE)
-    return;
-  tree *p = &DECL_SAVED_TREE (fndecl);
-  if (TREE_CODE (*p) == BIND_EXPR)
-    p = &BIND_EXPR_BODY (*p);
-
-  location_t loc = DECL_SOURCE_LOCATION (fndecl);
-  if (sanitize_flags_p (SANITIZE_RETURN, fndecl))
-    t = ubsan_instrument_return (loc);
-  else
-    {
-      tree fndecl = builtin_decl_explicit (BUILT_IN_UNREACHABLE);
-      t = build_call_expr_loc (BUILTINS_LOCATION, fndecl, 0);
-    }
-
-  append_to_statement_list (t, p);
+  maybe_instrument_return (fndecl);
 }
 
 void
