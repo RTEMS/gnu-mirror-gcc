@@ -84,7 +84,7 @@ int main ()
 /* { dg-final { scan-assembler-times {\mlvx\M} 39 { target { ! powerpc_vsx } } } } */
 /* { dg-final { scan-assembler-times {\mlxv} 0 { target { ! powerpc_vsx } } } } */
 /* { dg-final { scan-assembler-times {\mlvx\M} 0 { target powerpc_vsx } } } */
-/* { dg-final { scan-assembler-times {\mlxv} 42 { target powerpc_vsx } } } */
+/* { dg-final { scan-assembler-times {\mlxv} 39 { target powerpc_vsx } } } */
 /* { dg-final { scan-assembler-times "lvewx" 1 } } */
 /* { dg-final { scan-assembler-times "lvxl" 1 } } */
 /* { dg-final { scan-assembler-times "vupklsh" 2 } } */

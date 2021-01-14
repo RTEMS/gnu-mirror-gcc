@@ -3830,7 +3830,7 @@
   void __builtin_vec_stl (vd, signed long long, double *);
     STVXL_V2DF  STVXL_D
 
-[VEC_STRIL, vec_stril, __builtin_vec_stril, ARCH_PWR10]
+[VEC_STRIL, vec_stril, __builtin_vec_stril, _ARCH_PWR10]
   vuc __builtin_vec_stril (vuc);
     VSTRIBL  VSTRIBL_U
   vsc __builtin_vec_stril (vsc);
@@ -3860,7 +3860,7 @@
   vss __builtin_vec_strir (vss);
     VSTRIHR  VSTRIHR_S
 
-[VEC_STRIR_P, vec_strir_p, __builtin_vec_strir_p, ARCH_PWR10]
+[VEC_STRIR_P, vec_strir_p, __builtin_vec_strir_p, _ARCH_PWR10]
   signed int __builtin_vec_strir_p (vuc);
     VSTRIBR_P  VSTRIBR_PU
   signed int __builtin_vec_strir_p (vsc);
@@ -4131,11 +4131,8 @@
     VSUBEUQM  VSUBEUQM_VUQ
 
 ; TODO: Note that the entry for VEC_SUBEC currently gets ignored in
-; altivec_resolve_overloaded_builtin.  There are also forms for
-; vsi and vui arguments, but rather than building a define_expand
-; for the instruction sequence generated for those, we do some RTL
-; hackery.  Revisit whether we can remove that.  For now, keep this
-; much of the entry here to generate the #define, at least.
+; altivec_resolve_overloaded_builtin.  Revisit whether we can remove
+; that.  We still need to register the legal builtin forms here.
 [VEC_SUBEC, vec_subec, __builtin_vec_subec]
   vsq __builtin_vec_subec (vsq, vsq, vsq);
     VSUBECUQ  VSUBECUQ_VSQ

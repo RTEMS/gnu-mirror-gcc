@@ -66,6 +66,8 @@
 /* VSX additions */
 #define vec_vsx_ld __builtin_vec_vsx_ld
 #define vec_vsx_st __builtin_vec_vsx_st
+#define __builtin_vec_xl __builtin_vec_vsx_ld
+#define __builtin_vec_xst __builtin_vec_vsx_st
 
 #define __builtin_bcdadd_ofl __builtin_vec_bcdadd_ov
 #define __builtin_bcdsub_ofl __builtin_vec_bcdsub_ov

@@ -805,13 +805,13 @@
   const vus __builtin_altivec_vpkswus (vsi, vsi);
     VPKSWUS altivec_vpkswus {}
 
-  const vuc __builtin_altivec_vpkuhum (vus, vus);
+  const vsc __builtin_altivec_vpkuhum (vss, vss);
     VPKUHUM altivec_vpkuhum {}
 
   const vuc __builtin_altivec_vpkuhus (vus, vus);
     VPKUHUS altivec_vpkuhus {}
 
-  const vus __builtin_altivec_vpkuwum (vui, vui);
+  const vss __builtin_altivec_vpkuwum (vsi, vsi);
     VPKUWUM altivec_vpkuwum {}
 
   const vus __builtin_altivec_vpkuwus (vui, vui);
@@ -1219,7 +1219,7 @@
   const vsll __builtin_altivec_vreve_v2di (vsll);
     VREVE_V2DI altivec_vrevev2di2 {}
 
-  const vd __builtin_altivec_vsel_2df (vd, vd, vull);
+  const vd __builtin_altivec_vsel_2df (vd, vd, vd);
     VSEL_2DF vector_select_v2df {}
 
   const vsll __builtin_altivec_vsel_2di (vsll, vsll, vull);
@@ -2263,7 +2263,7 @@
   const vui __builtin_altivec_vpksdus (vsll, vsll);
     VPKSDUS altivec_vpksdus {}
 
-  const vui __builtin_altivec_vpkudum (vull, vull);
+  const vsi __builtin_altivec_vpkudum (vsll, vsll);
     VPKUDUM altivec_vpkudum {}
 
   const vui __builtin_altivec_vpkudus (vull, vull);
@@ -2285,13 +2285,13 @@
 ;  const vull __builtin_altivec_vpmsumw (vui, vui);
 ;    VPMSUMW crypto_vpmsumw {}
 
-  const vuc __builtin_altivec_vpopcntb (vsc);
+  const vsc __builtin_altivec_vpopcntb (vsc);
     VPOPCNTB popcountv16qi2 {}
 
-  const vull __builtin_altivec_vpopcntd (vsll);
+  const vsll __builtin_altivec_vpopcntd (vsll);
     VPOPCNTD popcountv2di2 {}
 
-  const vus __builtin_altivec_vpopcnth (vss);
+  const vss __builtin_altivec_vpopcnth (vss);
     VPOPCNTH popcountv8hi2 {}
 
   const vuc __builtin_altivec_vpopcntub (vuc);
@@ -2306,16 +2306,16 @@
   const vui __builtin_altivec_vpopcntuw (vui);
     VPOPCNTUW popcountv4si2 {}
 
-  const vui __builtin_altivec_vpopcntw (vsi);
+  const vsi __builtin_altivec_vpopcntw (vsi);
     VPOPCNTW popcountv4si2 {}
 
-  const vsll __builtin_altivec_vrld (vsll, vull);
+  const vsll __builtin_altivec_vrld (vsll, vsll);
     VRLD vrotlv2di3 {}
 
-  const vsll __builtin_altivec_vsld (vsll, vull);
+  const vsll __builtin_altivec_vsld (vsll, vsll);
     VSLD vashlv2di3 {}
 
-  const vsll __builtin_altivec_vsrad (vsll, vull);
+  const vsll __builtin_altivec_vsrad (vsll, vsll);
     VSRAD vashrv2di3 {}
 
   const vsll __builtin_altivec_vsrd (vsll, vull);
@@ -2330,7 +2330,7 @@
   const vuq __builtin_altivec_vsubeuqm (vuq, vuq, vuq);
     VSUBEUQM altivec_vsubeuqm {}
 
-  const vull __builtin_altivec_vsubudm (vull, vull);
+  const vsll __builtin_altivec_vsubudm (vsll, vsll);
     VSUBUDM subv2di3 {}
 
   const vuq __builtin_altivec_vsubuqm (vuq, vuq);
