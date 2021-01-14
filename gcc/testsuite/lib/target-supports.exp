@@ -2357,7 +2357,7 @@ proc check_effective_target_ppc_ieee128_ok { } {
 # See if the target is a powerpc with the long double format that uses the IBM
 # extended double format.
 
-proc check_effective_target_ppc_long_double_ibm { } {
+proc check_effective_target_ppc_long_double_ibm128 { } {
     return [check_cached_effective_target ppc_long_double_ibm {
 	int main()
 	{
@@ -2373,7 +2373,7 @@ proc check_effective_target_ppc_long_double_ibm { } {
 # See if the target is a powerpc with the long double format that uses the IEEE
 # 128-bit format.
 
-proc check_effective_target_ppc_long_double_ieee { } {
+proc check_effective_target_ppc_long_double_ieee128 { } {
     return [check_cached_effective_target ppc_long_double_ieee {
 	int main()
 	{
@@ -2386,14 +2386,35 @@ proc check_effective_target_ppc_long_double_ieee { } {
     }]
 }
 
-# Like check_effective_target_ppc_long_double_ibm, but check if we can
+# See if the target is a powerpc with the long double format that is 64-bit.
+
+proc check_effective_target_ppc_long_double_64bit { } {
+    return [check_cached_effective_target ppc_long_double_64bit {
+	int main()
+	{
+	  #ifndef _ARCH_PPC
+	    return 1;
+	  #else
+	    return sizeof (long double) != 8;
+	  #endif
+	}
+    }]
+}
+
+# Like check_effective_target_ppc_long_double_ibm128, but check if we can
 # explicitly override the long double format to use the IBM 128-bit extended
 # double format, and GLIBC supports doing this override by switching the
 # sprintf to handle long double.
 
-proc check_effective_target_ppc_long_double_override_ibm { } {
-    set options "-mlong-double-128 -mabi=ibmlongdouble -Wno-psabi"
-    check_runtime_nocache ppc_long_double_ovveride_ibm {
+proc add_options_for_ppc_long_double_override_ibm128 { flags } {
+    if { [istarget powerpc*-*-*] } {
+	return "$flags -mlong-double-128 -Wno-psabi -mabi=ibmlongdouble"
+    }
+    return "$flags"
+}
+
+proc check_effective_target_ppc_long_double_override_ibm128 { } {
+    return [check_runtime_nocache ppc_long_double_ovveride_ibm128 {
 	#include <string.h>
 	#include <stdio.h>
 	volatile __ibm128 a = (__ibm128) 3.0;
@@ -2413,7 +2434,7 @@ proc check_effective_target_ppc_long_double_override_ibm { } {
 	    return strcmp (buffer, "3") != 0;
 	  #endif
 	}
-    } $options
+    } [add_options_for_ppc_long_double_override_ibm128 ""]]
 }
 
 # Like check_effective_target_ppc_long_double_ieee, but check if we can
@@ -2421,9 +2442,15 @@ proc check_effective_target_ppc_long_double_override_ibm { } {
 # and GLIBC supports doing this override by switching the sprintf to handle
 # long double.
 
-proc check_effective_target_ppc_long_double_override_ieee { } {
-    set options "-mlong-double-128 -mabi=ieeelongdouble -Wno-psabi"
-    check_runtime_nocache ppc_long_double_ovveride_ieee {
+proc add_options_for_ppc_long_double_override_ieee128 { flags } {
+    if { [istarget powerpc*-*-*] } {
+	return "$flags -mlong-double-128 -Wno-psabi -mabi=ieeelongdouble"
+    }
+    return "$flags"
+}
+
+proc check_effective_target_ppc_long_double_override_ieee128 { } {
+    return [check_runtime_nocache ppc_long_double_ovveride_ieee128 {
 	#include <string.h>
 	#include <stdio.h>
 	volatile _Float128 a = 3.0f128;
@@ -2443,37 +2470,43 @@ proc check_effective_target_ppc_long_double_override_ieee { } {
 	    return strcmp (buffer, "3") != 0;
 	  #endif
 	}
-    } $options
+    }  [add_options_for_ppc_long_double_override_ieee128 ""]]
 }
 
-# See if the target is a powerpc with the long double format that is 128-bits.
+# Like check_effective_target_ppc_long_double_64bit, but override the long
+# double format to be 64-bit explicitly.
 
-proc check_effective_target_ppc_long_double_128bit { } {
-    return [check_cached_effective_target ppc_long_double_128bit {
-	int main()
-	{
-	  #ifndef _ARCH_PPC
-	    return 1;
-	  #else
-	    return sizeof (long double) != 16;
-	    #endif
-	}
-    }]
+proc add_options_for_ppc_long_double_override_64bit { flags } {
+    if { [istarget powerpc*-*-*] } {
+	return "$flags -mlong-double-64"
+    }
+    return "$flags"
 }
 
-# See if the target is a powerpc with the long double format that is 64-bit.
-
-proc check_effective_target_ppc_long_double_64bit { } {
-    return [check_cached_effective_target ppc_long_double_64bit {
+proc check_effective_target_ppc_long_double_override_64bit { } {
+    return [check_runtime_nocache ppc_long_double_ovveride_64bit {
+	#include <string.h>
+	#include <stdio.h>
+	volatile double a = 3.0;
+	volatile long double one = 1.0L;
+	volatile long double two = 2.0L;
+	volatile long double b;
+	char buffer[20];
 	int main()
 	{
-	  #ifndef _ARCH_PPC
+	  #if !defined(_ARCH_PPC) || defined(__LONG_DOUBLE_128__)
 	    return 1;
 	  #else
-	    return sizeof (long double) != 8;
+	    if (sizeof (long double) != sizeof (double))
+	      return 1;
+	    b = one + two;
+	    if (memcmp ((void *)&a, (void *)&b, sizeof (long double)) != 0)
+	      return 1;
+	    sprintf (buffer, "%lg", b);
+	    return strcmp (buffer, "3") != 0;
 	  #endif
 	}
-    }]
+    }  [add_options_for_ppc_long_double_override_64bit ""]]
 }
 
 # Return 1 if the target supports executing VSX instructions, 0

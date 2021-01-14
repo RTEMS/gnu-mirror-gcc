@@ -1,6 +1,7 @@
 /* { dg-do run } */
-/* { dg-require-effective-target ppc_long_double_override_ibm } */
-/* { dg-options "-std=c99 -O2 -mlong-double-128 -mabi=ibmlongdouble -Wno-psabi" } */
+/* { dg-require-effective-target ppc_long_double_override_ibm128 } */
+/* { dg-options "-std=c99 -O2" } */
+/* { dg-add-options ppc_long_double_override_ibm128 } */
 
 #include <float.h>
 

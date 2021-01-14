@@ -1,6 +1,6 @@
 /* { dg-require-effective-target dfp } */
-/* { dg-require-effective-target ppc_long_double_override_ibm } */
-/* { dg-options "-O2 -mlong-double-128 -mabi=ibmlongdouble -Wno-psabi" } */
+/* { dg-require-effective-target ppc_long_double_override_ibm128 } */
+/* { dg-add-options ppc_long_double_override_ibm128 } */
 
 /* We force the long double type to be IBM 128-bit because the CONVERT_TO_PINF
    tests will fail if we use IEEE 128-bit floating point.  This is due to IEEE
