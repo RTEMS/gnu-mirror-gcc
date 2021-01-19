@@ -582,7 +582,6 @@ Objective-C and Objective-C++ Dialects}.
 -fprofile-note=@var{path} -fprofile-prefix-path=@var{path} @gol
 -fprofile-update=@var{method} -fprofile-filter-files=@var{regex} @gol
 -fprofile-exclude-files=@var{regex} @gol
--fprofile-reproducible=@r{[}multithreaded@r{|}parallel-runs@r{|}serial@r{]} @gol
 -fsanitize=@var{style}  -fsanitize-recover  -fsanitize-recover=@var{style} @gol
 -fasan-shadow-offset=@var{number}  -fsanitize-sections=@var{s1},@var{s2},... @gol
 -fsanitize-undefined-trap-on-error  -fbounds-check @gol
@@ -14639,35 +14638,6 @@ any of the regular expressions (separated by semi-colons).
 
 For example, @option{-fprofile-exclude-files=/usr/.*} will prevent instrumentation
 of all files that are located in the @file{/usr/} folder.
-
-@item -fprofile-reproducible=@r{[}multithreaded@r{|}parallel-runs@r{|}serial@r{]}
-@opindex fprofile-reproducible
-Control level of reproducibility of profile gathered by
-@code{-fprofile-generate}.  This makes it possible to rebuild program
-with same outcome which is useful, for example, for distribution
-packages.
-
-With @option{-fprofile-reproducible=serial} the profile gathered by
-@option{-fprofile-generate} is reproducible provided the trained program
-behaves the same at each invocation of the train run, it is not
-multi-threaded and profile data streaming is always done in the same
-order.  Note that profile streaming happens at the end of program run but
-also before @code{fork} function is invoked.
-
-Note that it is quite common that execution counts of some part of
-programs depends, for example, on length of temporary file names or
-memory space randomization (that may affect hash-table collision rate).
-Such non-reproducible part of programs may be annotated by
-@code{no_instrument_function} function attribute. @command{gcov-dump} with
-@option{-l} can be used to dump gathered data and verify that they are
-indeed reproducible.
-
-With @option{-fprofile-reproducible=parallel-runs} collected profile
-stays reproducible regardless the order of streaming of the data into
-gcda files.  This setting makes it possible to run multiple instances of
-instrumented program in parallel (such as with @code{make -j}). This
-reduces quality of gathered data, in particular of indirect call
-profiling.
 
 @item -fsanitize=address
 @opindex fsanitize=address

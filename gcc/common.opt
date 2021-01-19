@@ -2236,21 +2236,9 @@ fprofile-exclude-files=
 Common Joined RejectNegative Var(flag_profile_exclude_files)
 Instrument only functions from files whose name does not match any of the regular expressions (separated by semi-colons).
 
-Enum
-Name(profile_reproducibility) Type(enum profile_reproducibility) UnknownError(unknown profile reproducibility method %qs)
-
-EnumValue
-Enum(profile_reproducibility) String(serial) Value(PROFILE_REPRODUCIBILITY_SERIAL)
-
-EnumValue
-Enum(profile_reproducibility) String(parallel-runs) Value(PROFILE_REPRODUCIBILITY_PARALLEL_RUNS)
-
-EnumValue
-Enum(profile_reproducibility) String(multithreaded) Value(PROFILE_REPRODUCIBILITY_MULTITHREADED)
-
 fprofile-reproducible
-Common Joined RejectNegative Var(flag_profile_reproducible) Enum(profile_reproducibility) Init(PROFILE_REPRODUCIBILITY_SERIAL)
--fprofile-reproducible=[serial|parallel-runs|multithreaded]	Control level of reproducibility of profile gathered by -fprofile-generate.
+Common Ignore Joined RejectNegative
+Does nothing. Preserved for backward compatibility.
 
 Enum
 Name(profile_update) Type(enum profile_update) UnknownError(unknown profile update method %qs)
