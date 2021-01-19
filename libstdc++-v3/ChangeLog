@@ -1,3 +1,122 @@
+2021-01-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/98605
+	* include/std/mutex (call_once): Use NOLINT to suppress clang
+	analyzer warnings.
+
+2021-01-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (StdExpPathPrinter): Store the
+	name of the type and pass it to the iterator.
+	(StdPathPrinter): Likewise.
+	* testsuite/libstdc++-prettyprinters/filesystem-ts.cc: New test.
+
+2021-01-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-12-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96083
+	* include/ext/throw_allocator.h: Use __has_builtin to check for
+	__builtin_sprintf support, and use std::sprintf if necessary.
+
+2021-01-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/65480
+	PR libstdc++/68735
+	* python/libstdcxx/v6/printers.py (function_pointer_to_name):
+	New helper function to get the name of a function from its
+	address.
+	(StdExpAnyPrinter.__init__): Use it.
+
+2021-01-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-07-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/experimental/filesystem/filesystem_error/cons.cc:
+	Remove -std=gnu++17 option.
+
+2021-01-08  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2020-07-17  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* include/std/coroutine: Mark the methods of the
+	trivial awaitables as constexpr.
+
+2021-01-03  Iain Sandoe  <iain@sandoe.co.uk>
+	    Jakub Jelinek   <jakub@redhat.com>
+
+	PR target/97865
+	* configure: Regenerate.
+
+2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/abi/post/powerpc-linux-gnu/baseline_symbols.txt:
+	Update.
+	* config/abi/post/powerpc64-linux-gnu/32/baseline_symbols.txt:
+	Update.
+
+2020-12-01  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95322
+	* include/std/ranges (take_view::_CI): Define this alias
+	template as per LWG 3449 and remove ...
+	(take_view::_Sentinel::_CI): ... this type alias.
+	(take_view::_Sentinel::operator==): Adjust use of _CI
+	accordingly.  Define a second overload that accepts an iterator
+	of the opposite constness as per LWG 3449.
+	(take_while_view::_Sentinel::operator==): Likewise.
+	* testsuite/std/ranges/adaptors/95322.cc: Add tests for LWG 3449.
+
+2020-11-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/98001
+	* testsuite/ext/stdio_filebuf/char/79820.cc: Do not pass invalid
+	FILE* to constructor.
+
+2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97935
+	* include/bits/iterator_concepts.h (__detail::__iter_without_category):
+	New helper concept.
+	(__iterator_traits::__cat): Use __detail::__iter_without_category.
+	* testsuite/24_iterators/associated_types/iterator.traits.cc: New test.
+
+2020-11-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-06-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/iterator_concepts.h (__detail::__ptr, __detail::__ref)
+	(__detail::__cat, __detail::__diff): Move to class scope in the
+	relevant __iterator_traits specializations.
+	(__iterator_traits<>): Use nested class templates instead of ones from
+	namespace __detail.
+	* include/bits/stl_iterator.h (__detail::__common_iter_ptr): Move to
+	class scope in iterator_traits<common_iterator<I, S>>.
+	(iterator_traits<common_iterator<I, S>>): Use nested class template
+	instead of __detail::__common_iter_ptr.
+
 2020-11-24  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:
