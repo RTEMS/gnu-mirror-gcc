@@ -1765,17 +1765,14 @@ possibly_modify_pointer_types ( tree type, Info_t *info)
 
 tree
 find_modified ( tree type,
-		#if ALLOW_REVERSE
 		bool reverse,
-		#endif
 		Info_t *info )
 {
-  //DEBUG_A("find_modified:> ");
-  //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  DEBUG_A("find_modified:> ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
   // Use canonical type
   tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
   tree ret_val = NULL;
-  #if ALLOW_REVERSE
   if ( reverse )
     {
       auto resulti = find_in_vec_of_two_types_2nd ( info->modified_types, canonical);
@@ -1792,16 +1789,9 @@ find_modified ( tree type,
 	  ret_val = resulti->second;
 	}
     }
-  #else
-  auto resulti = find_in_vec_of_two_types ( info->modified_types, canonical);
-  if ( resulti != info->modified_types->end () )
-    {
-      ret_val resulti->second;
-    }
-  #endif
   
-  //DEBUG_A("  returns... ");
-  //DEBUG_F(flexible_print, stderr, ret_val, 1, (dump_flags_t)0);
+  DEBUG_A("  returns... ");
+  DEBUG_F(flexible_print, stderr, ret_val, 1, (dump_flags_t)0);
   
   return ret_val;
 }
@@ -1837,9 +1827,7 @@ new_contains_a_modified ( gimple *stmt, tree *lhs_mod, tree *rhs_mod, Info_t *in
       if ( l_deepest_type )
 	{
 	  if ( find_modified ( l_deepest_type,
-			       #if ALLOW_REVERSE
 			       false,
-			       #endif
 			       info) )
 	    {
 	      *lhs_mod = l_deepest_type;
@@ -1849,9 +1837,7 @@ new_contains_a_modified ( gimple *stmt, tree *lhs_mod, tree *rhs_mod, Info_t *in
       if (    rhs
 	   && (r_deepest_type = find_deepest_comp_ref_type ( rhs))
 	   && find_modified ( r_deepest_type,
-			      #if ALLOW_REVERSE
 			      false,
-			      #endif
 			      info) )
 	{
 	  *rhs_mod = r_deepest_type;
@@ -1864,16 +1850,16 @@ new_contains_a_modified ( gimple *stmt, tree *lhs_mod, tree *rhs_mod, Info_t *in
 
 tree
 contains_a_modified ( gimple *stmt,
-		      #if ALLOW_REVERSE
 		      bool reverse, // reverse sense of modification
-		      #endif
 		      Info_t *info )
 {
   DEBUG_A("contains_a_modified:> ");
   DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  INDENT(2);
   // For an assign check both sides component refs.
   if ( gimple_code ( stmt) == GIMPLE_ASSIGN )
     {
+      DEBUG_A("Is GIMPLE_ASSIGN\n");
       tree lhs = gimple_assign_lhs( stmt);
       tree rhs = NULL;
       gassign *gass = static_cast <gassign *> (stmt);
@@ -1893,36 +1879,52 @@ contains_a_modified ( gimple *stmt,
       if ( l_deepest_type )
 	{
 	  if ( find_modified ( l_deepest_type,
-		               #if ALLOW_REVERSE
 			       reverse,
-			       #endif
 			       info) )
-	    return l_deepest_type;
+	    {
+	      INDENT(-2);
+	      return l_deepest_type;
+	    }
 	  // Just having a componet ref means we don't
 	  // have to look at the other side
+	  INDENT(-2);
 	  return NULL;
 	}
       if (    rhs
 	   && (r_deepest_type = find_deepest_comp_ref_type ( rhs))
 	   && find_modified ( r_deepest_type,
-		              #if ALLOW_REVERSE
 		              reverse,
-                              #endif
 		              info) )
-	return r_deepest_type;
+	{
+	  INDENT(-2);
+	  return r_deepest_type;
+	}
     }
   // Otherwise,
+  INDENT(-2);
   return NULL;
 }
 
 tree
 find_deepest_comp_ref_type ( tree op )
 {
-  if ( op == NULL ) return NULL;
+  DEBUG_A("find_deepest_comp_ref_type:> ");
+  DEBUG_F(flexible_print, stderr, op, 1, (dump_flags_t)0);
+  INDENT(2);
+  if ( op == NULL )
+    {
+      INDENT(-2);
+      return NULL;
+    }
   tree comp_ref = find_deepest_comp_ref ( op);
-  if ( comp_ref == NULL ) return NULL;
+  if ( comp_ref == NULL )
+    {
+      INDENT(-2);
+      return NULL;
+    }
   tree type = TREE_TYPE ( TREE_OPERAND( comp_ref, 0));
   tree canonical_type = TYPE_MAIN_VARIANT ( base_type_of ( type));
+  INDENT(-2);
   return canonical_type;
 }
 
@@ -2557,10 +2559,15 @@ reverse_args( tree args )
 std::vector<two_trees_t>::iterator
 find_in_vec_of_two_types ( std::vector<two_trees_t> *types, tree type)
 {
+  DEBUG_A("find_in_vec_of_two_types_2nd:> ");
+  DEBUG_F( flexible_print, stderr, type, 1, (dump_flags_t)0);
   INDENT(2);
   for ( auto looki = types->begin (); looki != types->end (); looki++)
     {
       tree look = looki->first;
+      DEBUG_A("look = ");
+      DEBUG_F( flexible_print, stderr, look, 1, (dump_flags_t)0);
+
       if ( same_type_p ( look, type) )
 	{
 	  INDENT(-2);
@@ -2574,10 +2581,15 @@ find_in_vec_of_two_types ( std::vector<two_trees_t> *types, tree type)
 std::vector<two_trees_t>::iterator
 find_in_vec_of_two_types_2nd ( std::vector<two_trees_t> *types, tree type)
 {
+  DEBUG_A("find_in_vec_of_two_types_2nd:> ");
+  DEBUG_F( flexible_print, stderr, type, 1, (dump_flags_t)0);
   INDENT(2);
   for ( auto looki = types->begin (); looki != types->end (); looki++)
     {
       tree look = looki->second;
+      DEBUG_A("look = ");
+      DEBUG_F( flexible_print, stderr, look, 1, (dump_flags_t)0);
+
       if ( same_type_p ( look, type) )
 	{
 	  INDENT(-2);
@@ -2733,9 +2745,7 @@ modify_decl_core ( tree *location, Info *info)
 
   // Look for a modified type
   tree modified_to = find_modified ( base,
-				     #if ALLOW_REVERSE
 				     false,
-				     #endif
 				     info);
   tree mtv_modified_to =
     modified_to == NULL ? NULL : TYPE_MAIN_VARIANT ( modified_to);
@@ -3783,6 +3793,21 @@ same_type_p ( tree a, tree b )
   return ret;
 }
 
+bool
+is_reorg_pointer_type ( tree type, Info* info)
+{
+  for ( std::vector<ReorgType_t>::iterator ri = info->reorg_type->begin ();
+	ri != info->reorg_type->end ();
+	ri++                                                              )
+    {
+      // This deliberately doesn't use same_type_p because the reorg pointer
+      // type's main type variant is a long int and it would be a disater to
+      // look for that.
+      if ( ri->pointer_rep == type ) return true;
+    }
+  return false;
+}
+
 // May need to add secondary map container to
 // look them up or even modify the container
 // type of ReorgType
@@ -3854,7 +3879,7 @@ ReorgType_t *
 contains_a_reorgtype ( gimple *stmt, Info *info)
 {
   DEBUG_L ( "contains_a_reorgtype:> ");
-  //DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   //INDENT(2);
 
   if ( gimple_code ( stmt) == GIMPLE_PHI )

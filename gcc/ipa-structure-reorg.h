@@ -34,12 +34,6 @@ along with GCC; see the file COPYING3.  If not see
 #define USE_ESCAPE_ANALYSIS 1
 // Enables old code sequence (this breaks things)
 #define USE_DO_INSTANCE_INTERLEAVE 0
-// Testing reversing the sense of modification comparison.
-// This is because the decl types are modified before
-// compoment reference expressions are modified so to
-// detect something needing modification we need to the
-// determine the decl was modified.
-#define ALLOW_REVERSE 1
 
 typedef struct RT_Elim       RT_Elim;
 typedef struct RT_Reorder    RT_Reorder;
@@ -264,16 +258,12 @@ extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types ( std::vector
 extern std::vector<two_trees_t>::iterator find_in_vec_of_two_types_2nd ( std::vector<two_trees_t> *, tree);
 extern void dump_record (FILE *, tree, bool);
 extern tree find_modified ( tree,
-			    #if ALLOW_REVERSE
 			    bool,
-			    #endif
 			    Info_t *);
 extern tree find_deepest_comp_ref_type ( tree);
 extern bool new_contains_a_modified ( gimple *, tree *, tree *, Info_t *);
 extern tree contains_a_modified ( gimple *,
-				  #if ALLOW_REVERSE
 				  bool,
-				  #endif
 				  Info_t *);
 extern tree find_deepest_comp_ref ( tree);
 #if 0
@@ -295,6 +285,7 @@ extern ReorgTransformation reorg_recognize ( gimple *,
 					     Info_t *);
 extern void apply_to_all_gimple ( bool (*)(gimple *, void *), bool, void *);
 extern bool same_type_p( tree, tree);
+extern bool is_reorg_pointer_type ( tree, Info*);
 extern ReorgType_t *get_reorgtype_info ( tree, Info_t *);
 extern void print_reorg_with_msg ( FILE *, ReorgType_t *, int, const char *);
 extern ReorgType_t *contains_a_reorgtype ( gimple *, Info *);
@@ -318,7 +309,7 @@ extern bool is_assign_from_ssa ( gimple *);
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be
 // converted to dump file information.
-#define DEBUGGING 0
+#define DEBUGGING 1
 #if DEBUGGING
 enum Display {
   Show_nothing,

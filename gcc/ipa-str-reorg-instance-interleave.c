@@ -82,11 +82,8 @@ static void create_new_types ( Info_t *);
 static void create_a_new_type ( Info_t *, tree);
 #endif
 static unsigned int reorg_perf_qual ( Info *);
-static tree find_coresponding_field ( tree, tree);
+static tree find_corresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
-#if 0
-static void element_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
-#endif
 static void new_element_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
 static void element_assign_modif_trans ( gimple *, tree, Info_t *);
 #if 0
@@ -97,6 +94,7 @@ static void new_make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *
 
 static tree new_create_deep_ref ( tree, tree, tree, Info_t *);
 static tree create_deep_ref_aux ( tree, tree, tree, tree *, tree *, Info_t *);
+static tree possibly_modify ( tree, Info *);
 static tree create_deep_ref ( tree, tree, tree);
 static void set_lhs_for ( gimple *, tree);
 static basic_block make_bb ( char *, basic_block);
@@ -213,22 +211,34 @@ str_reorg_instance_interleave_trans ( Info *info)
 		// If their type is modified then adjust the gimple.
 		#if 1
 		// Shouldn't this use new_contains_a_modified instead?
+		// - probably not...
+		
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// Might need to flip true to false for MCF, this got
+		// messed up and might be wrong!
 		tree modified = contains_a_modified ( stmt,
-						      #if ALLOW_REVERSE
 						      true,
-						      #endif
+						      //false,
 						      info);
+		DEBUG_LA("");
 		if ( modified )
 		  {
 		    enum ReorgTransformation trans = 
 		      reorg_recognize ( stmt, node, info);
+		    DEBUG_LA("");
 		    switch ( trans)
 		      { 
 		      case ReorgT_StrAssign:
 			fprintf ( stderr, "TBD at %s:%d\n", __FILE__, __LINE__);
 			break;
 		      case ReorgT_ElemAssign:
-			fprintf ( stderr, "TBD at %s:%d\n", __FILE__, __LINE__);
+			DEBUG_L("ReorgT_ElemAssign: (Modify type)");
+			DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+			INDENT(2);
+
+			new_element_assign_transformation (stmt, NULL, info);
+
+			INDENT(-2);
 			break;
 		      default:
 			DEBUG_LA ("No Transfrom on: ");
@@ -788,7 +798,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  //  }
 			    
 			  tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 
 			  //DEBUG_L("base_field: %p\n", base_field);
 			  //DEBUG_A("  : ");
@@ -1035,7 +1045,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			   field = DECL_CHAIN( field)) {
 
 			tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 			tree base_field_type = TREE_TYPE( base_field);
 			
 			gcc_assert ( base_field_type);
@@ -1235,7 +1245,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  //  }
 			    
 			  tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 
 			  DEBUG_L("base_field: %p\n", base_field);
 			  DEBUG_A("  : ");
@@ -1473,7 +1483,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			   field = DECL_CHAIN( field)) {
 
 			tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 			tree base_field_type = TREE_TYPE( base_field);
 			
 			gcc_assert ( base_field_type);
@@ -1651,7 +1661,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  new_bb->count = prev_order->count;
 			    
 			  tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 
 			  //DEBUG_L("base_field: %p\n", base_field);
 			  //DEBUG_A("  : ");
@@ -1873,7 +1883,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			   field = DECL_CHAIN( field)) {
 
 			tree base_field =
-			      find_coresponding_field ( base, field);
+			      find_corresponding_field ( base, field);
 			tree base_field_type = TREE_TYPE( base_field);
 			
 			gcc_assert ( base_field_type);
@@ -1954,7 +1964,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			{
 			  
 			  tree base_field =
-			    find_coresponding_field ( base, field);
+			    find_corresponding_field ( base, field);
 			  tree base_field_type = TREE_TYPE( base_field);
 			  
 			  gcc_assert ( base_field_type);
@@ -2464,12 +2474,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 
   // TBD Should this be a diagnostic or not?
   DEBUG_F ( print_program, stderr,
-	    "At end of str_reorg_instance_interleave_trans"
+	    "At end of str_reorg_instance_interleave_trans",
 	    PRINT_FORMAT, false, 0, info);
   
   // With internals
   DEBUG_F ( print_program, stderr,
-	    "At end of str_reorg_instance_interleave_trans"
+	    "At end of str_reorg_instance_interleave_trans",
 	    true, false, 0, info);
   
   // NOTE, spinning through all the functions and recomputing all the
@@ -2479,154 +2489,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 }
 
 #if 0
-static void
-element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
-{
-  gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
-  
-  DEBUG_L("element_assign_transformation:> ");
-  DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
-  tree modif_type = contains_a_modified ( stmt,
-					  #if ALLOW_REVERSE
-					  false,
-					  #endif
-					  info);
-  DEBUG_A("Modification for = ");
-  DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
-  
-  INDENT(2);
-  // Needed for helloworld
-  tree lhs = gimple_assign_lhs( stmt);
-  tree rhs = gimple_assign_rhs1( stmt);
-
-  // Just looking at the type is insufficient because
-  // the field itself can be a reorg type. Instead
-  // look at it's shape.
-  //bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
-  bool ro_on_left = find_deepest_comp_ref ( lhs) != NULL;
-		      
-  tree ro_side = ro_on_left ? lhs : rhs;
-  tree nonro_side = ro_on_left ? rhs : lhs;
-
-  DEBUG_A("ro_side = ");
-  DEBUG_F(flexible_print, stderr, ro_side, 1, (dump_flags_t)0);
-  enum ReorgOpTrans optype = recognize_op ( ro_side, true, info);
-  switch ( optype )  // "a->f"
-    {
-    case ReorgOpT_Indirect:
-      {
-	tree ref_expr;
-	tree field_val_temp;
-	gimple_seq ref_seq = NULL;
-
-	make_transformed_ref ( ro_side, ri, &ref_expr, &ref_seq, &field_val_temp, info);
-	
-	gimple *temp_set;
-	gimple *middle_set;
-	gimple *final_set;
-
-	bool middle = false;
-	
-	if ( ro_on_left )
-	  {
-	    // With:    a->f = rhs
-	    // Generate:
-	    
-	    //           temp = rhs
-	    tree field_type = TREE_TYPE ( lhs);
-	    int level;
-	    tree base_type = base_type_with_levels ( field_type, &level);
-	    if (    integer_zerop ( rhs)
-		 && is_reorg_type ( base_type, info)
-		 && level == 1                       )
-	      {
-		// Detected a zero value set to a pointer.
-		middle = true;
-		tree mid_temp = 
-		  make_temp_ssa_name( ri->pointer_rep, NULL, "mid_temp");
-		tree new_rhs = TYPE_MAX_VALUE ( ri->pointer_rep);
-		temp_set = gimple_build_assign ( mid_temp, new_rhs);
-		SSA_NAME_DEF_STMT ( mid_temp) = temp_set;
-		middle_set =
-		  gimple_build_assign ( field_val_temp, CONVERT_EXPR, mid_temp);
-		SSA_NAME_DEF_STMT ( field_val_temp) = middle_set;
-	      }
-	    else
-	      {
-		temp_set = gimple_build_assign( field_val_temp, rhs);
-		SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-	      }
-	    //SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-	    
-	    ////           field_array[index] = temp
-	    //tree elem_to_set =
-	    //  build4 ( ARRAY_REF, field_type, field_arry_addr, index,
-	    //	   NULL_TREE, NULL_TREE);
-	    //final_set =
-	    //  gimple_build_assign( elem_to_set, field_val_temp);
-	    
-	    //                 *field_addr = temp
-	    tree lhs_ref = ref_expr;
-	    
-	    final_set =
-	      gimple_build_assign( lhs_ref, field_val_temp);
-	  }
-	else
-	  {
-	    // With:    lhs = a->f
-	    // Generate:
-	    
-	    tree rhs_ref = ref_expr;
-	    
-	    // If these will actually print then things are likely sane
-	    DEBUG_L("rhs_ref: ");
-	    DEBUG_F(print_generic_expr, stderr, rhs_ref, (dump_flags_t)0);
-	    DEBUG("\n");
-	    
-	    // These are here for debugging
-	    tree op0 = TREE_OPERAND ( rhs_ref, 0);
-	    tree op1 = TREE_OPERAND ( rhs_ref, 1);
-	    tree op1type = TYPE_MAIN_VARIANT (TREE_TYPE (op1));
-	    tree op1type_type = TREE_TYPE ( op1type);
-	    
-	    temp_set =
-	      gimple_build_assign( field_val_temp, rhs_ref);
-	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-	    
-	    //          lhs = temp
-	    final_set = gimple_build_assign( lhs, field_val_temp);
-	    SSA_NAME_DEF_STMT ( lhs) = final_set;
-	  }
-	
-	DEBUG_L("temp_set: ");
-	DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
-	DEBUG("\n");
-	
-	DEBUG_L("final_set: ");
-	DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
-	DEBUG("\n");
-	
-	gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
-	gsi_insert_before( &gsi, temp_set, GSI_SAME_STMT);
-	if ( middle ) gsi_insert_before( &gsi, middle_set, GSI_SAME_STMT);
-	gsi_insert_before( &gsi, final_set, GSI_SAME_STMT);
-	
-	//delete stmt
-	gsi_remove ( &gsi, true);
-      } // end ReorgOpT_Indirect case
-      break;
-    case ReorgOpT_AryDir:  // "x[i].f"
-      // Not implemented in single pool
-      internal_error ( "ReorgOpT_AryDir not possible");
-    default:
-      internal_error (
-		      "Reached tree operand default for "
-		      "ReorgT_ElemAssign (%s)", optrans_to_str ( optype));
-      
-    } // end recognize_op ( rhs, info) switch
-  
-  INDENT(-2);
-}
 #endif
 
 static void
@@ -2638,6 +2500,7 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
   INDENT(2);
   DEBUG_A("stmt = ");
   DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_F(print_internals, stmt, (void*)info);
   DEBUG_A("ri = ");
   DEBUG_F( print_reorg, stderr, 0, ri);
 
@@ -2688,6 +2551,9 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	DEBUG_F(flexible_print, stderr, ref_expr, 1, (dump_flags_t)0);
 	DEBUG_A("its type... ");
 	DEBUG_F(flexible_print, stderr, TREE_TYPE(ref_expr), 1, (dump_flags_t)0);
+	DEBUG_A("field_val_temp ");
+	DEBUG_F(flexible_print, stderr, field_val_temp, 1, (dump_flags_t)0);
+	
 
 	INDENT(-2);	
 	
@@ -2699,6 +2565,8 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	
 	if ( ro_on_left )
 	  {
+	    DEBUG_A("ro_on_left\n");
+	    
 	    // With:    a->f = rhs
 	    // Generate:
 	    
@@ -2737,12 +2605,14 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    
 	    //                 *field_addr = temp
 	    tree lhs_ref = ref_expr;
-	    
+
 	    final_set =
 	      gimple_build_assign( lhs_ref, field_val_temp);
 	  }
 	else
 	  {
+	    DEBUG_A("!ro_on_left\n");
+	    
 	    // With:    lhs = a->f
 	    // Generate:
 	    
@@ -2762,7 +2632,7 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    temp_set =
 	      gimple_build_assign( field_val_temp, rhs_ref);
 	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
-	    
+
 	    //          lhs = temp
 	    final_set = gimple_build_assign( lhs, field_val_temp);
 	    SSA_NAME_DEF_STMT ( lhs) = final_set;
@@ -2770,10 +2640,12 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	
 	DEBUG_L("temp_set: ");
 	DEBUG_F( print_gimple_stmt, stderr, temp_set, 0);
+	DEBUG_F(print_internals, temp_set, (void*)info);
 	DEBUG("\n");
 	
 	DEBUG_L("final_set: ");
 	DEBUG_F( print_gimple_stmt, stderr, final_set, 0);
+	DEBUG_F(print_internals, final_set, (void*)info);
 	DEBUG("\n");
 	
 	gsi_insert_seq_before ( &gsi, ref_seq, GSI_SAME_STMT);
@@ -2806,110 +2678,6 @@ element_assign_modif_trans ( gimple *stmt, tree type, Info_t *info)
   gcc_assert(0);
 }
 
-#if 0
-// For ref_in which is a ReorgOpT_Indirect, create gimple
-// sequence to setup a transformed ref and the ref itself.
-static void
-make_transformed_ref ( tree ref_in,
-		       ReorgType_t *ri,
-		       tree *ref_out,
-		       gimple_seq *pre_ref_seq,
-		       tree *field_val_temp,
-		       Info_t *info )
-{
-  DEBUG_A("make_transformed_ref:>\n");
-  // For deeply nested case we need the lowest.
-  tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
-  gcc_assert ( lowest_comp_ref);
-
-  tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
-  tree field_type = TREE_TYPE ( orig_field);
-  tree base = ri->instance_interleave.base;
-	
-  tree base_field =
-    find_coresponding_field ( base, orig_field);
-  
-  tree base_field_type = TREE_TYPE( base_field);
-  
-  // The this changes because it the lowest field now
-  tree top_field_type = TREE_TYPE ( ref_in);
-  
-  *field_val_temp =
-    make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
-  
-  tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
-  inner_op = TREE_OPERAND( inner_op, 0);
-  
-  // For either case generate common code:
-  
-  // field_array = _base.f
-  gcc_assert ( base_field_type);
-  // Note, this looks like trouble because this is a structure
-  // type for a deeply nested type. Maybe wrap it it in a
-  // pointer if deeply nested???
-  tree field_arry_addr =
-    make_temp_ssa_name( base_field_type, NULL, "field_arry_addr");
-  
-  tree rhs_faa = build3 ( COMPONENT_REF,
-			  base_field_type, 
-			  base,
-			  base_field,
-			  NULL_TREE);
-  
-  // Use this to access the array of element.
-  gimple *get_field_arry_addr =
-    gimple_build_assign( field_arry_addr, rhs_faa);
-  SSA_NAME_DEF_STMT ( field_arry_addr) = get_field_arry_addr;
-  
-  // index = a
-  gcc_assert ( sizetype);
-  tree index =
-    make_temp_ssa_name( sizetype, NULL, "index");
-  gimple *get_index =
-    gimple_build_assign( index, CONVERT_EXPR, inner_op);
-  SSA_NAME_DEF_STMT ( index) = get_index;
-
-  #if 0
-  gimple *temp_set;
-  gimple *final_set;
-  #endif
-  
-  // offset = index * size_of_field
-  
-  // Note base_field_type is a pointer and we want the size of what's
-  // pointed to.
-  tree size_of_field = TYPE_SIZE_UNIT ( field_type);
-
-  // I'm pretty sure this is not necessary... revert it
-  #if 0
-  tree unsigned_long_type = TYPE_MAIN_VARIANT ( pointer_sized_int_node);
-  tree offset = make_temp_ssa_name( unsigned_long_type, NULL, "offset");
-  #else
-  gcc_assert ( sizetype);
-  tree offset = make_temp_ssa_name( sizetype, NULL, "offset");
-  #endif
-	
-  gimple *get_offset = gimple_build_assign ( offset, MULT_EXPR, index, size_of_field);
-  SSA_NAME_DEF_STMT ( offset) = get_offset;
-  
-  // field_addr = field_array + offset
-  gcc_assert ( base_field_type);
-  tree field_addr =
-    make_temp_ssa_name( base_field_type, NULL, "field_addr");
-  
-  gimple *get_field_addr = 
-    gimple_build_assign ( field_addr, POINTER_PLUS_EXPR, field_arry_addr, offset);
-  SSA_NAME_DEF_STMT ( field_addr) = get_field_addr;
-  
-  *ref_out = create_deep_ref ( ref_in, field_type, field_addr);
-  
-  gimple_seq_add_stmt ( pre_ref_seq, get_field_arry_addr);
-  gimple_seq_add_stmt ( pre_ref_seq, get_index);
-  gimple_seq_add_stmt ( pre_ref_seq, get_offset);
-  gimple_seq_add_stmt ( pre_ref_seq, get_field_addr);
-}
-#endif
-
 // For ref_in which is a ReorgOpT_Indirect, create gimple
 // sequence to setup a transformed ref and the ref itself.
 static void
@@ -2924,33 +2692,34 @@ new_make_transformed_ref ( tree ref_in,
   DEBUG_LA("new_make_transformed_ref:> ");
   DEBUG_F(flexible_print, stderr, ref_in, 1, (dump_flags_t)0);
   INDENT(2);
-  
+
+  #if 0
   tree gcc_type = ri->gcc_type;
-  
   tree mod_gcc_type = find_modified ( gcc_type,
-				      #if ALLOW_REVERSE
 				      false,
-				      #endif
 				      info);
-  
+  #endif
+
+  #if 0
   tree reorg_ver_type = ri->reorg_ver_type;
   
   tree mod_ver_type = find_modified ( reorg_ver_type,
-				      #if ALLOW_REVERSE
 				      false,
-				      #endif
 				      info);
-  DEBUG_A("gcc_type = ");
-  DEBUG_F(flexible_print, stderr, gcc_type, 1, (dump_flags_t)0);
+  #endif
+
   DEBUG_A("modif_type = ");
   DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
+  #if 0
+  DEBUG_A("gcc_type = ");
+  DEBUG_F(flexible_print, stderr, gcc_type, 1, (dump_flags_t)0);
   DEBUG_A("mod_gcc_type = ");
   DEBUG_F(flexible_print, stderr, mod_gcc_type, 1, (dump_flags_t)0);
   DEBUG_A("reorg_ver_type = ");
   DEBUG_F(flexible_print, stderr, reorg_ver_type, 1, (dump_flags_t)0);
   DEBUG_A("mod_ver_type = ");
   DEBUG_F(flexible_print, stderr, mod_ver_type, 1, (dump_flags_t)0);
-
+  #endif
   
   // For deeply nested case we need the lowest.
   tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
@@ -2958,7 +2727,7 @@ new_make_transformed_ref ( tree ref_in,
 
   tree orig_field = TREE_OPERAND ( lowest_comp_ref, 1);
   tree field_type = TREE_TYPE ( orig_field);
-  tree base = ri->instance_interleave.base;
+  tree base = ri == NULL ? NULL : ri->instance_interleave.base;
   
   DEBUG_A("lowest_comp_ref = ");
   DEBUG_F(flexible_print, stderr, lowest_comp_ref, 1, (dump_flags_t)0);
@@ -2984,9 +2753,7 @@ new_make_transformed_ref ( tree ref_in,
   if ( !a_reorg && modif_type != NULL )
     {
       tree mod_mod_ver_type = find_modified ( modif_type,
-				              #if ALLOW_REVERSE
 				              false,
-				              #endif
 					      info);
       if ( mod_mod_ver_type != NULL )
 	{
@@ -3016,7 +2783,7 @@ new_make_transformed_ref ( tree ref_in,
     DEBUG_A("inner_op0_type = ");
     DEBUG_F(flexible_print, stderr, inner_op0_type, 1, (dump_flags_t)0);
     tree inner_op0_type_base = base_type_of ( inner_op0_type);
-    if ( is_reorg_type ( inner_op0_type_base, info) )
+    if ( ri != NULL && is_reorg_type ( inner_op0_type_base, info) )
       {
 	create_addr_expr_stmts_for_reorg = true;
       }
@@ -3025,20 +2792,36 @@ new_make_transformed_ref ( tree ref_in,
   tree field_addr = NULL;
   
   tree base_field =
-    find_coresponding_field ( look_in_struct_type, orig_field);
+    find_corresponding_field ( look_in_struct_type, orig_field);
       
-  tree base_field_type = TREE_TYPE( base_field);
+  tree exposed_field_type = TREE_TYPE( base_field);
   
   DEBUG_A("base_field = ");
   DEBUG_F(flexible_print, stderr, base_field, 1, (dump_flags_t)0);
-  DEBUG_A("base_field_type = ");
-  DEBUG_F(flexible_print, stderr, base_field_type, 1, (dump_flags_t)0);
+  DEBUG_A("exposed_field_type = ");
+  DEBUG_F(flexible_print, stderr, exposed_field_type, 1, (dump_flags_t)0);
 
+  #if 0
   // The this changes because it the lowest field now
   tree top_field_type = TREE_TYPE ( ref_in);
-  
+
+  DEBUG_A("top_field_type = ");
+  DEBUG_F(flexible_print, stderr, top_field_type, 1, (dump_flags_t)0);
+
+  // Maybe this should go at the bottom near new_create_deep_ref
+  // and use use_this_field_type insteaad of top_field_type
+  // Note, exposed_field_type seems to also work... let's try it.
+
+  #if 0
   *field_val_temp =
     make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
+  #else
+  // This doesn't work either but it seems closer that other versions
+  // and I need to determine the exact nature of the failure.
+  *field_val_temp =
+    make_temp_ssa_name( exposed_field_type, NULL, "field_val_temp");
+  #endif
+  #endif
 
   DEBUG_A("create_addr_expr_stmts_for_reorg = %s\n",
 	  create_addr_expr_stmts_for_reorg ? "true" : "false");
@@ -3078,16 +2861,16 @@ new_make_transformed_ref ( tree ref_in,
       // For either case generate common code:
       
       // field_array = _base.f
-      gcc_assert ( base_field_type);
+      gcc_assert ( exposed_field_type);
       // Note, this looks like trouble because this is a structure
       // type for a deeply nested type. Maybe wrap it it in a
       // pointer if deeply nested???
       tree field_arry_addr =
-	make_temp_ssa_name( base_field_type, NULL, "field_arry_addr");
+	make_temp_ssa_name( exposed_field_type, NULL, "field_arry_addr");
       
       tree rhs_faa = build3 ( COMPONENT_REF,
-			      base_field_type, 
-			      base,
+			      exposed_field_type, 
+			      base, // <<<===============!!!!!
 			      base_field,
 			      NULL_TREE);
       
@@ -3106,11 +2889,12 @@ new_make_transformed_ref ( tree ref_in,
       
       DEBUG_A("get_index stmt = ");
       DEBUG_F ( print_gimple_stmt, stderr, get_index, TDF_DETAILS);
+      DEBUG_F(print_internals, get_index, (void*)info);
       
       // offset = index * size_of_field
       
-      // Note base_field_type is a pointer and we want the size of what's
-      // pointed to.
+      // Note exposed_field_type is a pointer and we want the size of what's
+      // pointed to. (???)
       tree size_of_field = TYPE_SIZE_UNIT ( field_type);
       
       gcc_assert ( sizetype);
@@ -3121,15 +2905,16 @@ new_make_transformed_ref ( tree ref_in,
       
       DEBUG_LA("get_offset stmt = ");
       DEBUG_F ( print_gimple_stmt, stderr, get_offset, TDF_DETAILS);
+      DEBUG_F(print_internals, get_offset, (void*)info);
       
       // field_addr = field_array + offset
-      gcc_assert ( base_field_type);
+      gcc_assert ( exposed_field_type);
       field_addr =
-	make_temp_ssa_name( base_field_type, NULL, "field_addr");
+	make_temp_ssa_name( exposed_field_type, NULL, "field_addr");
       DEBUG_A("field_addr = ");
       DEBUG_F(flexible_print, stderr, field_addr, 1, (dump_flags_t)0);
       DEBUG_A("  its type = ");
-      DEBUG_F(flexible_print, stderr, base_field_type, 1, (dump_flags_t)0);
+      DEBUG_F(flexible_print, stderr, exposed_field_type, 1, (dump_flags_t)0);
       
       gimple *get_field_addr = 
 	gimple_build_assign ( field_addr, POINTER_PLUS_EXPR, field_arry_addr, offset);
@@ -3137,6 +2922,7 @@ new_make_transformed_ref ( tree ref_in,
       
       DEBUG_A("get_field stmt = ");
       DEBUG_F ( print_gimple_stmt, stderr, get_field_addr, TDF_DETAILS);
+      DEBUG_F(print_internals, get_field_addr, (void*)info);
 
       gimple_seq_add_stmt ( pre_ref_seq, get_field_arry_addr);
       gimple_seq_add_stmt ( pre_ref_seq, get_index);
@@ -3144,16 +2930,122 @@ new_make_transformed_ref ( tree ref_in,
       gimple_seq_add_stmt ( pre_ref_seq, get_field_addr);
     }
 
-  // Since this is a base field get rid of the extra pointer type
-  tree derefed_base_field_type = TREE_TYPE( base_field_type);
+  #define ABUGFIX 1
+  #if 1
+  tree use_this_field_type;
+  #if ABUGFIX
+  DEBUG_A("tree_code(ref_in) = %s\n", code_str( TREE_CODE(ref_in)));
+  tree topmost_field;
+  bool its_an_array = TREE_CODE(ref_in) == ARRAY_REF;
+  tree array_type = NULL;
+  if ( its_an_array )
+    {
+      tree ref_in_0 = TREE_OPERAND ( ref_in, 0);
+      DEBUG_A("ref_in_0 = ");
+      DEBUG_F(flexible_print, stderr, ref_in_0, 1, (dump_flags_t)0);
+      tree ref_in_0_1 = TREE_OPERAND ( ref_in_0, 1);
+      DEBUG_A("ref_in_0_1 = ");
+      DEBUG_F(flexible_print, stderr, ref_in_0_1, 1, (dump_flags_t)0);
+      tree ref_in_0_1_type = TREE_TYPE ( TREE_TYPE ( ref_in_0_1));
+      DEBUG_A("ref_in_0_1_type = ");
+      DEBUG_F(flexible_print, stderr, ref_in_0_1_type, 1, (dump_flags_t)0);
+      array_type = ref_in_0_1_type;
+      
+      //topmost_field = ref_in_0_1_type;
+      topmost_field = ref_in_0_1;
+    }
+  else
+    {
+      topmost_field = TREE_OPERAND ( ref_in, 1);
+    }
+  DEBUG_A("topmost_field = ");
+  DEBUG_F(flexible_print, stderr, topmost_field, 1, (dump_flags_t)0);
+  #endif
 
-  DEBUG_A("derefed_base_field_type = ");
-  DEBUG_F(flexible_print, stderr, derefed_base_field_type, 1, (dump_flags_t)0);
+  
+  DEBUG_A("modif_type = ");
+  DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
+
+  if ( modif_type )
+    {
+      // find corresponding field
+      tree struct_type_to_use =
+	find_modified ( modif_type, false, info);
+      #if ABUGFIX
+      // TBD instead of orig_field use the actual topmost
+      // field. orig_field is the bottom-most.
+      tree field_to_use =
+	find_corresponding_field ( struct_type_to_use, topmost_field);
+      #else
+      tree field_to_use =
+	find_corresponding_field ( struct_type_to_use, orig_field);
+      #endif
+      use_this_field_type = TREE_TYPE ( field_to_use);
+    }
+  else
+    {
+      gcc_assert ( ri);
+
+      // This works only because it's not been modified!
+      #if ABUGFIX
+      if ( its_an_array )
+	{
+	  use_this_field_type = array_type;
+	}
+      else
+	{
+	  use_this_field_type = TREE_TYPE ( topmost_field);
+	}
+      #else
+      use_this_field_type = TREE_TYPE ( orig_field);
+      #endif
+    }
+  #endif
+
+  #if 0
+  #if 0
+  // Since this is a base field get rid of the extra pointer type
+  tree derefed_exposed_field_type = TREE_TYPE( exposed_field_type);
+
+  DEBUG_A("derefed_exposed_field_type = ");
+  DEBUG_F(flexible_print, stderr, derefed_exposed_field_type, 1, (dump_flags_t)0);
   
   // Of course if the field is a reorg pointer type then there  is
   // no extra pointer type level!
+  // Note, I don't this is sufficient to gaurantee that use_this...
+  // is set correctly based on it being a reorg type or not.
   tree use_this_field_type =
-    derefed_base_field_type != NULL ? derefed_base_field_type : base_field_type;
+    derefed_base_field_type != NULL ? derefed_base_field_type : exposed_field_type;
+  #else
+  tree use_this_field_type = exposed_field_type;
+  tree base_of_exposed = base_type_of ( exposed_field_type);
+  DEBUG_A("base_of_exposed = ");
+  DEBUG_F(flexible_print, stderr, base_of_exposed, 1, (dump_flags_t)0);
+
+  if ( is_reorg_pointer_type ( base_of_exposed, info) )
+    {
+      DEBUG_A("was a reorg ptr type\n");
+      tree derefed_exposed_field_type = TREE_TYPE( exposed_field_type);
+      DEBUG_A("derefed_exposed_field_type = ");
+      DEBUG_F(flexible_print, stderr, derefed_exposed_field_type, 1, (dump_flags_t)0);
+
+      if ( derefed_exposed_field_type != NULL )
+	{
+	  use_this_field_type = derefed_exposed_field_type;
+	}
+    }
+  #endif
+  #endif
+  DEBUG_A("use_this_field_type = ");
+  DEBUG_F(flexible_print, stderr, use_this_field_type, 1, (dump_flags_t)0);
+  
+  // Wait to enable this... try it now
+  #if 1
+  *field_val_temp =
+    make_temp_ssa_name( use_this_field_type, NULL, "field_val_temp");
+  DEBUG_A("created field_val_temp = ");
+  DEBUG_F(flexible_print, stderr, *field_val_temp, 1, (dump_flags_t)0);
+  #endif
   
   *ref_out =
     new_create_deep_ref ( ref_in, use_this_field_type, field_addr, info);
@@ -3231,8 +3123,10 @@ create_deep_ref_aux ( tree    ref_in,
 		      tree   *lower_type_from,
 		      Info_t *info        )
 {
-  DEBUG_LA("create_deep_ref_aux:>\n");\
+  DEBUG_LA("create_deep_ref_aux:>\n");
   INDENT(2);
+  DEBUG_A("ref_in = ");
+  DEBUG_F(flexible_print, stderr, ref_in, 1, (dump_flags_t)0);
   enum tree_code top_code = TREE_CODE ( ref_in);
 
   tree inner_op0 = TREE_OPERAND( ref_in, 0);
@@ -3242,7 +3136,8 @@ create_deep_ref_aux ( tree    ref_in,
   
   if ( inner_op0_code == MEM_REF )
     {
-      // TBD print: inner_op0, inner_op1, inner_op0_op0, inner_op0_op1,
+      DEBUG_A("MEM_REF... TREE_OPERAND( ref_in, 0)\n");
+      
       tree inner_op1 = TREE_OPERAND( ref_in, 1);
       tree inner_op0_op0 = TREE_OPERAND( inner_op0, 0);
       tree inner_op0_op0_type = TREE_TYPE ( inner_op0_op0);
@@ -3266,9 +3161,7 @@ create_deep_ref_aux ( tree    ref_in,
 	  // TBD lower_type_to and from are certainly WRONG!
 	  // Or they at least should be!
 	  tree to = find_modified ( field_type,
-				    #if ALLOW_REVERSE
 				    false,
-				    #endif
 				    info);
 	  *lower_type_to = to;
 	  //*lower_type_from = to ? field_type : NULL;
@@ -3276,9 +3169,7 @@ create_deep_ref_aux ( tree    ref_in,
 	  if ( to == NULL )
 	    {
 	      to = find_modified ( field_type,
-				    #if ALLOW_REVERSE
 				    true,
-				    #endif
 				    info);
 	      *lower_type_to = field_type;
 	      *lower_type_from = to;
@@ -3292,16 +3183,19 @@ create_deep_ref_aux ( tree    ref_in,
 
 	  // This is the in_ref with a new field and field type.
 	  tree new_field =
-	    find_coresponding_field ( modified_struct_type, inner_op1);
+	    find_corresponding_field ( modified_struct_type, inner_op1);
 	  
 	  tree new_comp_ref =
 	    build3 ( COMPONENT_REF,
-		     field_type, 
+		     field_type, // TBD problematic
 		     inner_op0,
 		     new_field, // ??? corresponding field?
 		     NULL_TREE);
 
-	  DEBUG_A("WHAT WE JUST BUILT...\n");
+	  DEBUG_A("WHAT WE JUST BUILT...  ");
+	  DEBUG_F(flexible_print, stderr, new_comp_ref, 1, (dump_flags_t)0);
+	  DEBUG_A("Its type...  ");
+	  DEBUG_F(flexible_print, stderr, TREE_TYPE(new_comp_ref), 1, (dump_flags_t)0);
 	  tree new_op0 = TREE_OPERAND( new_comp_ref, 0);
 	  tree new_op1 = TREE_OPERAND( new_comp_ref, 1);;
 	  tree new_op0_op0 = TREE_OPERAND( new_op0, 0);
@@ -3321,17 +3215,44 @@ create_deep_ref_aux ( tree    ref_in,
 	{
 	  // This case doesn'ty seem to happen
 	  DEBUG_A("field_addr != NULL\n");
+	  tree type_to_use;
+	  #define FIX_FIELD_TYPE 1
+	  #if FIX_FIELD_TYPE
+	  // TBD type modifications are needed here
+	  // (including reorg stuff!)
+	  tree inner_op1_type = TREE_TYPE ( inner_op1);
+	  type_to_use = possibly_modify ( inner_op1_type, info);
+	  #else
+	  type_to_use = field_type;
+	  #endif
 	  tree deepest =
-	    build2 ( MEM_REF, field_type, field_addr,
+	    build2 ( MEM_REF, type_to_use, field_addr,
 		     build_int_cst (ptr_type_node, 0));
 	  
 	  tree to = find_modified ( field_type,
-				    #if ALLOW_REVERSE
 				    false,
-				    #endif
 				    info);
+	  // ???
 	  *lower_type_to = to;
 	  *lower_type_from = to ? field_type : NULL;
+
+	  tree new_op0 = TREE_OPERAND( deepest, 0);
+	  tree new_op0_type = TREE_TYPE ( new_op0);
+	  tree new_op1 = TREE_OPERAND( deepest, 1);
+	  tree new_op1_type = TREE_TYPE ( new_op1);
+	  DEBUG_A("WHAT WE JUST BUILT...  ");
+	  DEBUG_F(flexible_print, stderr, deepest, 1, (dump_flags_t)0);
+	  DEBUG_A("Its type...  ");
+	  DEBUG_F(flexible_print, stderr, TREE_TYPE ( deepest), 1, (dump_flags_t)0);
+	  DEBUG_A("new_op0 = ");
+	  DEBUG_F(flexible_print, stderr, new_op0, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op0_type = ");
+	  DEBUG_F(flexible_print, stderr, new_op0_type, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op1 = ");
+	  DEBUG_F(flexible_print, stderr, new_op1, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op1_type = ");
+	  DEBUG_F(flexible_print, stderr, new_op1_type, 1, (dump_flags_t)0);
+
 	  INDENT(-2);
 	  // TBD Wrap the above with a component ref (if it ever happens)
 	  return deepest;
@@ -3339,14 +3260,14 @@ create_deep_ref_aux ( tree    ref_in,
     }
   else if ( inner_op0_code == VAR_DECL )
     {
+      DEBUG_A("VAR_DECL... TREE_OPERAND( ref_in, 0)\n");
+
       // The var decl type should already be modified???
       // But we still need to pass up so find_modified
       // needs to find the from and not the to!
       tree ref_type = TREE_TYPE ( ref_in);
       tree to = find_modified ( ref_type,
-				#if ALLOW_REVERSE
 				false,
-				#endif
 				info);
       DEBUG_A("ref_type = ");
       DEBUG_F(flexible_print, stderr, ref_type, 1, (dump_flags_t)0);
@@ -3374,7 +3295,7 @@ create_deep_ref_aux ( tree    ref_in,
       if ( modified_var_type != NULL )
 	{
 	  tree new_ref;
-	  tree new_field = find_coresponding_field ( modified_var_type, inner_op1);
+	  tree new_field = find_corresponding_field ( modified_var_type, inner_op1);
 
 	  // Technically new_field isn't an element of inner_op0 but
 	  // modify_global_declarations should fix that... Hopefully.
@@ -3384,6 +3305,23 @@ create_deep_ref_aux ( tree    ref_in,
 		     inner_op0,
 		     new_field,
 		     NULL_TREE);
+
+	  tree new_op0 = TREE_OPERAND( new_ref, 0);
+	  tree new_op0_type = TREE_TYPE ( new_op0);
+	  tree new_op1 = TREE_OPERAND( new_ref, 1);
+	  tree new_op1_type = TREE_TYPE ( new_op1);
+	  DEBUG_A("WHAT WE JUST BUILT...  ");
+	  DEBUG_F(flexible_print, stderr, new_ref, 1, (dump_flags_t)0);
+	  DEBUG_A("Its type...  ");
+	  DEBUG_F(flexible_print, stderr, TREE_TYPE ( new_ref), 1, (dump_flags_t)0);
+	  DEBUG_A("new_op0 = ");
+	  DEBUG_F(flexible_print, stderr, new_op0, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op0_type = ");
+	  DEBUG_F(flexible_print, stderr, new_op0_type, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op1 = ");
+	  DEBUG_F(flexible_print, stderr, new_op1, 1, (dump_flags_t)0);
+	  DEBUG_A("new_op1_type = ");
+	  DEBUG_F(flexible_print, stderr, new_op1_type, 1, (dump_flags_t)0);
 	  
 	  INDENT(-2);
 	  return new_ref;
@@ -3391,6 +3329,7 @@ create_deep_ref_aux ( tree    ref_in,
 	}
       else
 	{
+	  DEBUG_A("NOTHING BUILT\n");
 	  INDENT(-2);
 	  return ref_in;
 	}
@@ -3422,7 +3361,7 @@ create_deep_ref_aux ( tree    ref_in,
       else
 	{
 	  tree mod_field =
-	    find_coresponding_field ( lower_to, this_field);
+	    find_corresponding_field ( lower_to, this_field);
 	  level_field = mod_field;
 	  level_field_type = TREE_TYPE ( level_field);
 	}
@@ -3434,6 +3373,23 @@ create_deep_ref_aux ( tree    ref_in,
 		 level_field,
 		 NULL_TREE);
 
+       tree new_op0 = TREE_OPERAND( component_layer, 0);
+       tree new_op0_type = TREE_TYPE ( new_op0);
+       tree new_op1 = TREE_OPERAND( component_layer, 1);
+       tree new_op1_type = TREE_TYPE ( new_op1);
+       DEBUG_A("WHAT WE JUST BUILT...  ");
+       DEBUG_F(flexible_print, stderr, component_layer, 1, (dump_flags_t)0);
+       DEBUG_A("Its type...  ");
+       DEBUG_F(flexible_print, stderr, TREE_TYPE ( component_layer), 1, (dump_flags_t)0);
+       DEBUG_A("new_op0 = ");
+       DEBUG_F(flexible_print, stderr, new_op0, 1, (dump_flags_t)0);
+       DEBUG_A("new_op0_type = ");
+       DEBUG_F(flexible_print, stderr, new_op0_type, 1, (dump_flags_t)0);
+       DEBUG_A("new_op1 = ");
+       DEBUG_F(flexible_print, stderr, new_op1, 1, (dump_flags_t)0);
+       DEBUG_A("new_op1_type = ");
+       DEBUG_F(flexible_print, stderr, new_op1_type, 1, (dump_flags_t)0);
+
        INDENT(-2);
        // TBD Set lower_type_to & lower_type_from!
        *lower_type_to = lower_to == NULL ? NULL : level_field;
@@ -3442,6 +3398,7 @@ create_deep_ref_aux ( tree    ref_in,
     }
   else if ( top_code == ARRAY_REF )
     {
+      DEBUG_A("ARRAY_REF...\n");
       tree lower_to;
       tree lower_from;
       tree lower_array_part =
@@ -3473,11 +3430,52 @@ create_deep_ref_aux ( tree    ref_in,
       // TBD Set lower_type_to & lower_type_from!
       *lower_type_to = lower_to == NULL ? NULL : elem_type;
       *lower_type_from = this_elem_type;
+
+      tree new_op0 = TREE_OPERAND( array_layer, 0);
+      tree new_op0_type = TREE_TYPE ( new_op0);
+      tree new_op1 = TREE_OPERAND( array_layer, 1);
+      tree new_op1_type = TREE_TYPE ( new_op1);
+      DEBUG_A("WHAT WE JUST BUILT...  ");
+      DEBUG_F(flexible_print, stderr, array_layer, 1, (dump_flags_t)0);
+      DEBUG_A("Its type...  ");
+      DEBUG_F(flexible_print, stderr, TREE_TYPE ( array_layer), 1, (dump_flags_t)0);
+      DEBUG_A("new_op0 = ");
+      DEBUG_F(flexible_print, stderr, new_op0, 1, (dump_flags_t)0);
+      DEBUG_A("new_op0_type = ");
+      DEBUG_F(flexible_print, stderr, new_op0_type, 1, (dump_flags_t)0);
+      DEBUG_A("new_op1 = ");
+      DEBUG_F(flexible_print, stderr, new_op1, 1, (dump_flags_t)0);
+      DEBUG_A("new_op1_type = ");
+      DEBUG_F(flexible_print, stderr, new_op1_type, 1, (dump_flags_t)0);
+      
       return array_layer;
     }
   gcc_assert (0);
 }
 
+static tree
+possibly_modify ( tree type, Info *info)
+{
+  tree canonical_type = TYPE_MAIN_VARIANT ( base_type_of ( type));
+  ReorgType_t *ri = get_reorgtype_info ( canonical_type, info);
+  tree modified = find_modified ( canonical_type, false, info);
+  if ( ri != NULL )
+    {
+      // It's gauranteed that type is a pointer
+      gcc_assert ( POINTER_TYPE_P ( type));
+      int levels = number_of_levels ( type);
+      tree new_type = make_multilevel ( ri->pointer_rep, levels - 1);
+      return new_type;
+    }
+  else if ( modified )
+    {
+      return modified;
+    }
+  else
+    {
+      return type;
+    }
+}
 
 static tree
 create_deep_ref ( tree ref_in, tree field_type, tree field_addr )
@@ -5107,9 +5105,7 @@ create_a_base_var ( Info_t *info, tree type_in)
   tree type;
   // Change to type to use modified type if it exists
   tree modified = find_modified ( type_in,
-				  #if ALLOW_REVERSE
 				  false,
-				  #endif
 				  info);
   if ( modified != NULL )
     {
@@ -5469,11 +5465,11 @@ create_a_new_type ( Info_t *info, tree type)
 }
 
 static tree
-find_coresponding_field ( tree base_decl, tree field)
+find_corresponding_field ( tree base_decl, tree field)
 {
   const char *field_name =
     lang_hooks.decl_printable_name ( field, 2);
-  DEBUG_A("find_coresponding_field:> field_name = %s\n", field_name);
+  DEBUG_A("find_corresponding_field:> field_name = %s\n", field_name);
   INDENT(2);
   tree struct_type;
   tree type_of = TREE_TYPE ( base_decl);
@@ -5502,7 +5498,7 @@ find_coresponding_field ( tree base_decl, tree field)
 	    return reorg_field;
 	  }
       }
-  internal_error ( "find_coresponding_field: found no field");
+  internal_error ( "find_corresponding_field: found no field");
 }
 
 static void
