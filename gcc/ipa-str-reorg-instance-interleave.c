@@ -96,6 +96,7 @@ static tree new_create_deep_ref ( tree, tree, tree, Info_t *);
 static tree create_deep_ref_aux ( tree, tree, tree, tree *, tree *, Info_t *);
 static tree possibly_modify ( tree, Info *);
 static tree create_deep_ref ( tree, tree, tree);
+static void pointer_conditional_transfer_transformation ( gimple *, Info *);
 static void set_lhs_for ( gimple *, tree);
 static basic_block make_bb ( char *, basic_block);
 
@@ -243,6 +244,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 
 			INDENT(-2);
 			break;
+
+			// TBD If cases here too!
+			
 		      default:
 			DEBUG_LA ("No Transfrom on: ");
 			DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
@@ -476,8 +480,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_IfPtrGT:
 		  case ReorgT_IfPtrLE:
 		  case ReorgT_IfPtrGE:
-		    //DEBUG_L("ReorgT_IfPtr*\n");
-		    // Not needed for single pool. TBD test this
+		    DEBUG_L("ReorgT_IfPtr*\n");
+		    // Not needed for single pool. Wrong!
+		    
+		    // If there is a reorg or a modified type
+		    // check to see the types are the same.
+		    // If not transform to a to a conversion
+		    // assignment stmt followed by an if stmt.
+		    pointer_conditional_transfer_transformation ( stmt, info);
 		    break;
 		  case ReorgT_PtrPlusInt:   // "a = b + i"
 		    {
@@ -2303,6 +2313,8 @@ str_reorg_instance_interleave_trans ( Info *info)
       
       // Normal ssa name case
       DEBUG_L("Dangling Types for Normal SSA Names:\n");
+
+      #define MOD_DANG 1
       
       INDENT(4);
       // We use len instead of using func->length() in the for loop test
@@ -2329,6 +2341,14 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  tree type = TREE_TYPE ( ssa_name);
 	  int levels;
 	  tree bottom_type = base_type_with_levels ( type, &levels);
+	  
+
+	  #if MOD_DANG
+	  // Find if modified here.
+	  tree canonical_type = TYPE_MAIN_VARIANT ( bottom_type);
+	  tree modified = find_modified ( canonical_type, false, info);
+	  #endif
+	  
 	  ReorgType_t *ri = get_reorgtype_info ( bottom_type, info);
 	  DEBUG_L("ssa_name = ");
 	  DEBUG_F(print_generic_expr, stderr, ssa_name, (dump_flags_t)0);
@@ -2341,12 +2361,21 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
 	  DEBUG(", ri = %p\n",ri);
 
+	  #if MOD_DANG
+	  // Next test shouldn't skip if modified
+	  if ( ri == NULL && modified == NULL )
+	    {
+	      DEBUG_L("Skip, ri == NULL\n");
+	      continue;
+	    }
+	  #else
 	  // If it's not a dangling type we don't care
 	  if ( ri == NULL )
 	    {
 	      DEBUG_L("Skip, ri == NULL\n");
 	      continue;
 	    }
+	  #endif
 
 	  // A default def is processed seperately
 	  if ( a_default_def )
@@ -2355,13 +2384,23 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      continue;
 	    }
 
-	  // TBD CHECK FOR pointer to record.
+	  #if MOD_DANG
+	  // We must not do this for modified types too!
 
+	  if ( modified == NULL && levels == 0 )
+	    {
+	      DEBUG_L("Skip not one level pointer to record\n");
+	      continue;
+	    }
+	  #else
+	  // TBD CHECK FOR pointer to record.
+	  // QUESTION aren't levels > 1 also a possibility?
 	  if ( levels != 1 )
 	    {
 	      DEBUG_L("Skip not one level pointer to record\n");
 	      continue;
 	    }
+	  #endif
 
 	  gcc_assert ( !no_defining_stmt);
 	  gcc_assert ( !defined_by_nop);
@@ -2369,7 +2408,21 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  DEBUG_L("Defining stmt: ");
 	  DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
 
+	  #if MOD_DANG
+	  // new_type can also be the result of a modified type!
+	  // Note, the levels
+	  tree new_type;
+	  if ( ri == NULL )
+	    {
+	      new_type = make_multilevel ( modified, levels);
+	    }
+	  else
+	    {
+	      new_type = make_multilevel ( ri->pointer_rep, levels - 1);
+	    }
+	  #else
 	  tree new_type = ri->pointer_rep;
+	  #endif
 	  tree new_ssa_name = make_temp_ssa_name( new_type, NULL, "dedangled");
 	  DEBUG_L("new_ssa_name = ");
 	  DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);
@@ -2507,6 +2560,10 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
   DEBUG_A("ri = ");
   DEBUG_F( print_reorg, stderr, 0, ri);
 
+  // This is never set to true! What is going on
+  bool is_convert = CONVERT_EXPR_CODE_P ( gimple_assign_rhs_code (stmt));
+  DEBUG_A("is_convert = %s\n", is_convert ? "T" : "F");
+
   tree lhs_mod;
   tree rhs_mod;
   bool has_modification =
@@ -2637,7 +2694,14 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
 
 	    //          lhs = temp
-	    final_set = gimple_build_assign( lhs, field_val_temp);
+	    if ( same_type_p ( TREE_TYPE ( lhs), TREE_TYPE ( field_val_temp)) )
+	      {
+		final_set = gimple_build_assign( lhs, field_val_temp);
+	      }
+	    else
+	      {
+		final_set = gimple_build_assign( lhs, CONVERT_EXPR, field_val_temp);
+	      }
 	    SSA_NAME_DEF_STMT ( lhs) = final_set;
 	  }
 	
@@ -3579,6 +3643,87 @@ create_deep_ref ( tree ref_in, tree field_type, tree field_addr )
       return array_layer;
     }
   gcc_assert (0);
+}
+
+static void
+pointer_conditional_transfer_transformation ( gimple *stmt, Info *info)
+{
+  DEBUG_A( "pointer_conditional_transfer_transformation:>\n");
+  
+  gcond *cond_stmt = as_a <gcond *> (stmt);
+  enum tree_code code = gimple_cond_code ( stmt);
+  tree cond_op1 = gimple_cond_lhs ( cond_stmt);
+  tree cond_op2 = gimple_cond_rhs ( cond_stmt);
+  tree op1_type = TREE_TYPE ( cond_op1);
+  tree op2_type = TREE_TYPE ( cond_op2);
+  tree op1_canonical_type = 
+    TYPE_MAIN_VARIANT ( base_type_of ( op1_type));
+  tree op2_canonical_type =
+    TYPE_MAIN_VARIANT ( base_type_of ( op2_type));
+
+  // This only does a transformation if the types are  different
+  if ( same_type_p ( op1_canonical_type, op2_canonical_type) )
+    {
+      return;
+    }
+
+  // Find out which is what
+  tree op1_modify = find_modified ( op1_canonical_type, false, info);;
+  tree op2_modify = find_modified ( op2_canonical_type, false, info);;
+
+  ReorgType_t *op1_ri = get_reorgtype_info ( op1_canonical_type, info);
+  ReorgType_t *op2_ri = get_reorgtype_info ( op2_canonical_type, info);
+
+  // Pick a side to add the conversion to.
+  // Leave the unchanging side alone and if both are changing
+  // leave the reorg alone.
+  bool convert_1st;
+  if ( !op1_modify && !op1_ri )
+    {
+      convert_1st = false;
+    }
+  else if ( !op2_modify && !op2_ri )
+    {
+      convert_1st = true;
+    }
+  else
+    {
+      convert_1st = !op2_ri;
+    }
+  
+  // TBD Emit new instructions
+  tree convert_dest;
+  tree convert_source;
+  tree new_cond_op1;
+  tree new_cond_op2;
+  if ( convert_1st )
+    {
+      convert_dest =
+	make_temp_ssa_name( op2_type, NULL, "cond_temp");;
+      convert_source = cond_op1;
+      new_cond_op1 = convert_dest;
+      new_cond_op2 = cond_op2;
+    }
+  else
+    {
+      convert_dest = 
+      	make_temp_ssa_name( op1_type, NULL, "cond_temp");;
+      convert_source = cond_op2;
+      new_cond_op1 = cond_op1;
+      new_cond_op2 = convert_dest;
+    }
+
+  gimple *gcond_cast =
+    gimple_build_assign ( convert_dest, CONVERT_EXPR, convert_source);
+  SSA_NAME_DEF_STMT ( convert_dest) = gcond_cast;
+
+  gimple *gcond_stmt =
+    gimple_build_cond ( code, new_cond_op1, new_cond_op2, NULL, NULL);
+
+  gimple_stmt_iterator gsi = gsi_for_stmt ( stmt);
+  gsi_insert_before ( &gsi, gcond_cast, GSI_SAME_STMT);
+  gsi_insert_before ( &gsi, gcond_stmt, GSI_SAME_STMT);
+  gsi_remove ( &gsi, true);
 }
 
 // Note, the following code might be a bit overly simplistic.
