@@ -747,11 +747,8 @@ gimple_divmod_fixed_value (gassign *stmt, tree value, profile_probability prob,
 
    abs (counters[0]) is the number of executions
    for i in 0 ... TOPN-1
-     counters[2 * i + 1] is target
-     abs (counters[2 * i + 2]) is corresponding hitrate counter.
-
-   Value of counters[0] negative when counter became
-   full during merging and some values are lost.  */
+     counters[2 * i + 2] is target
+     counters[2 * i + 3] is corresponding hitrate counter.  */
 
 bool
 get_nth_most_common_value (gimple *stmt, const char *counter_type,
@@ -765,15 +762,16 @@ get_nth_most_common_value (gimple *stmt, const char *counter_type,
   *count = 0;
   *value = 0;
 
-  gcov_type read_all = abs_hwi (hist->hvalue.counters[0]);
+  gcov_type read_all = hist->hvalue.counters[0];
+  gcov_type covered = 0;
+  for (unsigned i = 0; i < counters; ++i)
+    covered += hist->hvalue.counters[2 * i + 3];
 
   gcov_type v = hist->hvalue.counters[2 * n + 2];
   gcov_type c = hist->hvalue.counters[2 * n + 3];
 
-  if (hist->hvalue.counters[0] < 0
-      && (flag_profile_reproducible == PROFILE_REPRODUCIBILITY_PARALLEL_RUNS
-	  || (flag_profile_reproducible
-	      == PROFILE_REPRODUCIBILITY_MULTITHREADED)))
+  if (read_all != covered
+      && flag_profile_reproducible != PROFILE_REPRODUCIBILITY_SERIAL)
     return false;
 
   /* Indirect calls can't be verified.  */
