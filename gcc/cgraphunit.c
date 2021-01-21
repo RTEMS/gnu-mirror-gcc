@@ -1961,8 +1961,9 @@ expand_all_functions (void)
       }
 
   /* First output functions with time profile in specified order.  */
-  qsort (tp_first_run_order, tp_first_run_order_pos,
-	 sizeof (cgraph_node *), tp_first_run_node_cmp);
+  if (flag_profile_reproducible == PROFILE_REPRODUCIBILITY_SERIAL)
+    qsort (tp_first_run_order, tp_first_run_order_pos,
+	   sizeof (cgraph_node *), tp_first_run_node_cmp);
   for (i = 0; i < tp_first_run_order_pos; i++)
     {
       node = tp_first_run_order[i];

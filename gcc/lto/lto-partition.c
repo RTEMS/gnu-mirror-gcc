@@ -509,7 +509,8 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
      unit tends to import a lot of global trees defined there.  We should
      get better about minimizing the function bounday, but until that
      things works smoother if we order in source order.  */
-  order.qsort (tp_first_run_node_cmp);
+  if (flag_profile_reproducible == PROFILE_REPRODUCIBILITY_SERIAL)
+    order.qsort (tp_first_run_node_cmp);
   noreorder.qsort (node_cmp);
 
   if (dump_file)
