@@ -1,3 +1,15 @@
+work032.patch014:
+2021-01-20  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/93230
+	* gcc.target/powerpc/fold-vec-extract-char.p8.c: Adjust
+	instruction counts.
+	* gcc.target/powerpc/fold-vec-extract-int.p8.c: Adjust
+	instruction counts.
+	* gcc.target/powerpc/fold-vec-extract-short.p8.c: Adjust
+	instruction counts.
+	* gcc.target/powerpc/pcrel-opt-inc-di.c: Fix typo.
+
 work032.patch010:
 2021-01-14  Michael Meissner  <meissner@linux.ibm.com>
 
