@@ -24,7 +24,7 @@
 /* { dg-final { scan-assembler-times "mfvsrd" 6 { target lp64 } } } */
 /* { dg-final { scan-assembler-times "srdi" 3 { target lp64 } } } */
 /* { dg-final { scan-assembler-times "extsh" 2 { target lp64 } } } */
-/* { dg-final { scan-assembler-times "rlwinm" 4 { target lp64 } } } */
+/* { dg-final { scan-assembler-times "rlwinm" 2 { target lp64 } } } */
 
 /* -m32 codegen tests. */
 /* { dg-final { scan-assembler-times {\mli\M} 6 { target ilp32 } } } */
