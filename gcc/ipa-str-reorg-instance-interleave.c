@@ -216,9 +216,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		// Might need to flip true to false for MCF, this got
 		// messed up and might be wrong!
+		// Note, I flipped them and it makes no difference for
+		// Mcf!
+		// Investigate this when I get time!
 		tree modified = contains_a_modified ( stmt,
-						      true,
-						      //false,
+						      //true,
+						      false,
 						      info);
 		DEBUG_LA("");
 		if ( modified )
@@ -3168,6 +3171,7 @@ create_deep_ref_aux ( tree    ref_in,
 	  *lower_type_from = field_type;
 	  if ( to == NULL )
 	    {
+	      DEBUG_A("to == NULL\n");
 	      to = find_modified ( field_type,
 				    true,
 				    info);
@@ -3178,12 +3182,22 @@ create_deep_ref_aux ( tree    ref_in,
 	  // TBD I'm sure ome of the stuff above here is crap!
 
 	  tree base = base_type_of ( inner_op0_op0_type);
+
+	  DEBUG_A("base = ");
+	  DEBUG_F(flexible_print, stderr, base, 1, (dump_flags_t)0);
+	  
 	  tree modified_struct_type =
 	    find_modified ( base, false, info); // ??? inner_op1
+
+	  DEBUG_A("modified_struct_type = ");
+	  DEBUG_F(flexible_print, stderr, modified_struct_type, 1, (dump_flags_t)0);
 
 	  // This is the in_ref with a new field and field type.
 	  tree new_field =
 	    find_corresponding_field ( modified_struct_type, inner_op1);
+
+	  DEBUG_A("new_field = ");
+	  DEBUG_F(flexible_print, stderr, new_field, 1, (dump_flags_t)0);
 	  
 	  tree new_comp_ref =
 	    build3 ( COMPONENT_REF,
@@ -3222,6 +3236,9 @@ create_deep_ref_aux ( tree    ref_in,
 	  // (including reorg stuff!)
 	  tree inner_op1_type = TREE_TYPE ( inner_op1);
 	  type_to_use = possibly_modify ( inner_op1_type, info);
+	  DEBUG_A("type_to_use = ");
+	  DEBUG_F(flexible_print, stderr, type_to_use, 1, (dump_flags_t)0);
+
 	  #else
 	  type_to_use = field_type;
 	  #endif
@@ -3456,23 +3473,36 @@ create_deep_ref_aux ( tree    ref_in,
 static tree
 possibly_modify ( tree type, Info *info)
 {
+  DEBUG_A("possibly_modify:> ");
+  DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
+  INDENT(2);
   tree canonical_type = TYPE_MAIN_VARIANT ( base_type_of ( type));
+  DEBUG_A("canonical_type = ");
+  DEBUG_F(flexible_print, stderr, canonical_type, 1, (dump_flags_t)0);
   ReorgType_t *ri = get_reorgtype_info ( canonical_type, info);
+  DEBUG_A("ri %s= NULL\n", ri ? "!" : "=");
   tree modified = find_modified ( canonical_type, false, info);
+  DEBUG_A("modified = ");
+  DEBUG_F(flexible_print, stderr, modified, 1, (dump_flags_t)0);
   if ( ri != NULL )
     {
       // It's gauranteed that type is a pointer
       gcc_assert ( POINTER_TYPE_P ( type));
       int levels = number_of_levels ( type);
       tree new_type = make_multilevel ( ri->pointer_rep, levels - 1);
+      INDENT(-2);
       return new_type;
     }
   else if ( modified )
     {
-      return modified;
+      int levels = number_of_levels ( type);
+      tree new_type = make_multilevel ( modified, levels);
+      INDENT(-2);
+      return new_type;
     }
   else
     {
+      INDENT(-2);
       return type;
     }
 }

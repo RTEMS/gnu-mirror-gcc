@@ -309,7 +309,7 @@ extern bool is_assign_from_ssa ( gimple *);
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be
 // converted to dump file information.
-#define DEBUGGING 1
+#define DEBUGGING 0
 #if DEBUGGING
 enum Display {
   Show_nothing,
