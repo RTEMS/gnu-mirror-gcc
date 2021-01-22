@@ -897,7 +897,10 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	      node->tp_first_run = 0;
 	    }
 
-          if (dump_file)
+	  /* Drop profile for -fprofile-reproducible=multithreaded.  */
+	  if (flag_profile_reproducible == PROFILE_REPRODUCIBILITY_MULTITHREADED)
+	    node->tp_first_run = 0;
+	  else if (dump_file)
             fprintf (dump_file, "Read tp_first_run: %d\n", node->tp_first_run);
         }
     }
