@@ -213,6 +213,63 @@ static struct gcov_fn_buffer *fn_buffer;
 /* Including system dependent components. */
 #include "libgcov-driver-system.c"
 
+/* Prune TOP N value COUNTERS.  It's needed in order to preserve
+   reproducibility of builds.  */
+
+static void
+prune_topn_counter (gcov_type *counters)
+{
+  gcov_type total = counters[0];
+  gcov_type threshold = total / GCOV_TOPN_MAXIMUM_TRACKED_VALUES;
+  gcov_type *nodes = &counters[1];
+
+  struct gcov_kvp **prev = (struct gcov_kvp **)(intptr_t)&counters[2];
+
+  for (struct gcov_kvp *node = *prev; node != NULL; node = node->next)
+    /* Count is small in this run, skip it.  */
+    {
+      if (node->count < threshold)
+	{
+	  --(*nodes);
+	  /* Skip the node from linked list.  */
+	  *prev = node->next;
+	}
+      else
+	prev = &node->next;
+    }
+}
+
+/* Prune counters so that they are ready to store or merge.  */
+
+static void
+prune_counters (struct gcov_info *gi)
+{
+  for (unsigned i = 0; i < gi->n_functions; i++)
+    {
+      const struct gcov_fn_info *gfi = gi->functions[i];
+      const struct gcov_ctr_info *ci = gfi->ctrs;
+
+      for (unsigned j = 0; j < GCOV_COUNTERS; j++)
+	{
+	  if (gi->merge[j] == NULL)
+	    continue;
+
+	  if (gi->merge[j] == __gcov_merge_topn)
+	    {
+	      gcc_assert (!(ci->num % GCOV_TOPN_MEM_COUNTERS));
+	      for (unsigned k = 0; k < (ci->num / GCOV_TOPN_MEM_COUNTERS); k++)
+		{
+		  gcov_type *counters
+		    = ci->values + (k * GCOV_TOPN_MEM_COUNTERS);
+		  prune_topn_counter (counters);
+		}
+	    }
+	  ci++;
+	}
+    }
+}
+
+
 /* This function merges counters in GI_PTR to an existing gcda file.
    Return 0 on success.
    Return -1 on error. In this case, caller will goto read_fatal.  */
@@ -474,6 +531,9 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
   int error;
   gcov_unsigned_t tag;
   fn_buffer = 0;
+
+  /* Prune current counters before we merge them.  */
+  prune_counters (gi_ptr);
 
   error = gcov_exit_open_gcda_file (gi_ptr, gf);
   if (error == -1)
