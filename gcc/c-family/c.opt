@@ -864,6 +864,10 @@ Wsizeof-array-argument
 C ObjC C++ ObjC++ Var(warn_sizeof_array_argument) Warning Init(1)
 Warn when sizeof is applied on a parameter declared as an array.
 
+Wsize_t-literals
+C ObjC C++ ObjC++ CPP(size_t_literals) CppReason(CPP_W_SIZE_T_LITERALS) Var(warn_size_t_literals) Init(1) Warning LangEnabledBy(C ObjC C++ ObjC++)
+Warn when \"z\" or \"Z\" is used as a numeric literal suffix for C or C++yy, yy <= 20.
+
 Wstring-compare
 C ObjC C++ LTO ObjC++ Warning Var(warn_string_compare) Warning LangEnabledBy(C ObjC C++ ObjC++, Wextra)
 Warn about calls to strcmp and strncmp used in equality expressions that
