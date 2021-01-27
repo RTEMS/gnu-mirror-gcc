@@ -555,7 +555,7 @@
   vuc __builtin_vec_clrl (vuc, unsigned int);
     VCLRLB  VCLRLB_U
 
-[VEC_CLRR, vec_clrr, __builtin_vec_clrr, ARCH_PWR10]
+[VEC_CLRR, vec_clrr, __builtin_vec_clrr, _ARCH_PWR10]
   vsc __builtin_vec_clrr (vsc, unsigned int);
     VCLRRB  VCLRRB_S
   vuc __builtin_vec_clrr (vuc, unsigned int);
@@ -1054,7 +1054,7 @@
 
 [VEC_CNTTZM, vec_cnttzm, __builtin_vec_vctzdm, _ARCH_PWR10]
   vull __builtin_vec_vctzdm (vull, vull);
-    CNTTZDM
+    VCTZDM
 
 [VEC_CNTLZ_LSBB, vec_cntlz_lsbb, __builtin_vec_vclzlsbb, _ARCH_PWR9]
   signed int __builtin_vec_vclzlsbb (vsc);
@@ -1680,7 +1680,7 @@
     XXGENPCVM_V2DI
 
 [VEC_GNB, vec_gnb, __builtin_vec_gnb, _ARCH_PWR10]
-  vull __builtin_vec_gnb (vuq, unsigned char);
+  unsigned long long __builtin_vec_gnb (vuq, const int);
     VGNB
 
 ; There are no actual builtins for vec_insert.  There is special handling for
@@ -2856,25 +2856,25 @@
 
 [VEC_PERMX, vec_permx, __builtin_vec_xxpermx, _ARCH_PWR10]
   vsc __builtin_vec_xxpermx (vsc, vsc, vuc, const int);
-    XXPERMX_V16QI
+    XXPERMX_UV2DI  XXPERMX_VSC
   vuc __builtin_vec_xxpermx (vuc, vuc, vuc, const int);
-    XXPERMX_UV16QI
+    XXPERMX_UV2DI  XXPERMX_VUC
   vss __builtin_vec_xxpermx (vss, vss, vuc, const int);
-    XXPERMX_V8HI
+    XXPERMX_UV2DI  XXPERMX_VSS
   vus __builtin_vec_xxpermx (vus, vus, vuc, const int);
-    XXPERMX_UV8HI
+    XXPERMX_UV2DI  XXPERMX_VUS
   vsi __builtin_vec_xxpermx (vsi, vsi, vuc, const int);
-    XXPERMX_V4SI
+    XXPERMX_UV2DI  XXPERMX_VSI
   vui __builtin_vec_xxpermx (vui, vui, vuc, const int);
-    XXPERMX_UV4SI
+    XXPERMX_UV2DI  XXPERMX_VUI
   vsll __builtin_vec_xxpermx (vsll, vsll, vuc, const int);
-    XXPERMX_V2DI
+    XXPERMX_UV2DI  XXPERMX_VSLL
   vull __builtin_vec_xxpermx (vull, vull, vuc, const int);
-    XXPERMX_UV2DI
+    XXPERMX_UV2DI  XXPERMX_VULL
   vf __builtin_vec_xxpermx (vf, vf, vuc, const int);
-    XXPERMX_V4SF
+    XXPERMX_UV2DI  XXPERMX_VF
   vd __builtin_vec_xxpermx (vd, vd, vuc, const int);
-    XXPERMX_V2DF
+    XXPERMX_UV2DI  XXPERMX_VD
 
 [VEC_PERMXOR, vec_permxor, __builtin_vec_vpermxor]
   vsc __builtin_vec_vpermxor (vsc, vsc, vsc);
@@ -2917,17 +2917,17 @@
     VPOPCNTUD
 
 [VEC_PARITY_LSBB, vec_parity_lsbb, __builtin_vec_vparity_lsbb, _ARCH_PWR9]
-  vsi __builtin_vec_vparity_lsbb (vsi);
+  vui __builtin_vec_vparity_lsbb (vsi);
     VPRTYBW  VPRTYBW_S
-  vsi __builtin_vec_vparity_lsbb (vui);
+  vui __builtin_vec_vparity_lsbb (vui);
     VPRTYBW  VPRTYBW_U
-  vsll __builtin_vec_vparity_lsbb (vsll);
+  vull __builtin_vec_vparity_lsbb (vsll);
     VPRTYBD  VPRTYBD_S
-  vsll __builtin_vec_vparity_lsbb (vull);
+  vull __builtin_vec_vparity_lsbb (vull);
     VPRTYBD  VPRTYBD_U
-  vsq __builtin_vec_vparity_lsbb (vsq);
+  vuq __builtin_vec_vparity_lsbb (vsq);
     VPRTYBQ  VPRTYBQ_S
-  vsq __builtin_vec_vparity_lsbb (vuq);
+  vuq __builtin_vec_vparity_lsbb (vuq);
     VPRTYBQ  VPRTYBQ_U
 
 ; There are no actual builtins for vec_promote.  There is special handling for

@@ -14,7 +14,7 @@ doAbsoluteDifferenceUnsignedMacro (__vector unsigned short *p,
   source_1 = *p;
   source_2 = *q;
 
-  result = vec_absdh (source_1, source_2);
+  result = vec_absd (source_1, source_2);
   return result;
 }
 

@@ -203,7 +203,7 @@
   const __ibm128 __builtin_pack_ibm128 (double, double);
     PACK_IF packif {}
 
-  void __builtin_set_fpscr_rn (const int[0,7]);
+  void __builtin_set_fpscr_rn (const int[0,3]);
     SET_FPSCR_RN rs6000_set_fpscr_rn {}
 
   const double __builtin_unpack_ibm128 (__ibm128, const int<1>);
@@ -3186,22 +3186,22 @@
   const unsigned long long __builtin_altivec_vgnb (vuq, const int <2,7>);
     VGNB vgnb {}
 
-  const vuc __builtin_altivec_vinsgubvlx (unsigned char, vuc, unsigned int);
+  const vuc __builtin_altivec_vinsgubvlx (unsigned int, vuc, unsigned int);
     VINSERTGPRBL vinsertgl_v16qi {}
 
-  const vuc __builtin_altivec_vinsgubvrx (unsigned char, vuc, unsigned int);
+  const vuc __builtin_altivec_vinsgubvrx (unsigned int, vuc, unsigned int);
     VINSERTGPRBR vinsertgr_v16qi {}
 
-  const vull __builtin_altivec_vinsgudvlx (unsigned long long, vull, unsigned int);
+  const vull __builtin_altivec_vinsgudvlx (unsigned int, vull, unsigned int);
     VINSERTGPRDL vinsertgl_v2di {}
 
-  const vull __builtin_altivec_vinsgudvrx (unsigned long long, vull, unsigned int);
+  const vull __builtin_altivec_vinsgudvrx (unsigned int, vull, unsigned int);
     VINSERTGPRDR vinsertgr_v2di {}
 
-  const vus __builtin_altivec_vinsguhvlx (unsigned short, vus, unsigned int);
+  const vus __builtin_altivec_vinsguhvlx (unsigned int, vus, unsigned int);
     VINSERTGPRHL vinsertgl_v8hi {}
 
-  const vus __builtin_altivec_vinsguhvrx (unsigned short, vus, unsigned int);
+  const vus __builtin_altivec_vinsguhvrx (unsigned int, vus, unsigned int);
     VINSERTGPRHR vinsertgr_v8hi {}
 
   const vui __builtin_altivec_vinsguwvlx (unsigned int, vui, unsigned int);

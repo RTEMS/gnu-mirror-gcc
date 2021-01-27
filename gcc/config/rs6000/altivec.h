@@ -267,8 +267,8 @@ __altivec_scalar_pred(vec_any_nle,
 /* Deprecated interfaces.  */
 #ifdef _ARCH_PWR9
 #define __builtin_vec_vadub __builtin_vec_vadu
-#define __builtin_vec_vaduh __builtin_vec_vaduh
-#define __builtin_vec_vaduw __builtin_vec_vaduw
+#define __builtin_vec_vaduh __builtin_vec_vadu
+#define __builtin_vec_vaduw __builtin_vec_vadu
 #endif
 
 #ifdef _ARCH_PWR10

@@ -15,7 +15,7 @@ doAbsoluteDifferenceUnsigned (__vector unsigned char *p,
   source_1 = *p;
   source_2 = *q;
 
-  uc_result = vec_absdb (source_1, source_2);
+  uc_result = vec_absd (source_1, source_2);
   return uc_result;
 }
 
