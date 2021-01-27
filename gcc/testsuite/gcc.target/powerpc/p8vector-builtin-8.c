@@ -112,7 +112,6 @@ void foo (vector signed char *vscr,
   *vsir++ = vec_sum4s (vsca, vsib);
   *vsir++ = vec_sum4s (vssa, vsib);
   *vuir++ = vec_sum4s (vuca, vuib);
-
 }
 
 /* { dg-final { scan-assembler-times "vaddcuq" 2 } } */
@@ -125,7 +124,8 @@ void foo (vector signed char *vscr,
 /* { dg-final { scan-assembler-times "vsubecuq" 2 } } */
 /* { dg-final { scan-assembler-times "vsubcuw" 4 } } */
 /* { dg-final { scan-assembler-times "vsubuwm" 4 } } */
-/* { dg-final { scan-assembler-times "vbpermq" 2 } } */
+/* { dg-final { scan-assembler-times "vbpermq" 1 } } */
+/* { dg-final { scan-assembler-times "vbpermd" 1 } } */
 /* { dg-final { scan-assembler-times "xxleqv" 4 } } */
 /* { dg-final { scan-assembler-times "vgbbd" 1 } } */
 /* { dg-final { scan-assembler-times "xxlnand" 4 } } */

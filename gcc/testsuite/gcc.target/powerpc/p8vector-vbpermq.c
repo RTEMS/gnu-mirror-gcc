@@ -17,11 +17,11 @@
 
 long foos (vector signed char a, vector signed char b)
 {
-  return vec_extract (vec_vbpermq (a, b), OFFSET);
+  return vec_extract (vec_bperm (a, b), OFFSET);
 }
 
 long foou (vector unsigned char a, vector unsigned char b)
 {
-  return vec_extract (vec_vbpermq (a, b), OFFSET);
+  return vec_extract (vec_bperm (a, b), OFFSET);
 }
 

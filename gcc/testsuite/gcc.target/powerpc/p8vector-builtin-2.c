@@ -214,17 +214,17 @@ v_bshort vbshort_ne (v_bshort a, v_bshort b)
 }
 
 
-/* { dg-final { scan-assembler-times "vaddudm" 	5 } } */
-/* { dg-final { scan-assembler-times "vsubudm" 	6 } } */
-/* { dg-final { scan-assembler-times "vmaxsd"  	4 } } */
-/* { dg-final { scan-assembler-times "vminsd"  	3 } } */
-/* { dg-final { scan-assembler-times "vmaxud"  	2 } } */
-/* { dg-final { scan-assembler-times "vminud"  	2 } } */
+/* { dg-final { scan-assembler-times "vaddudm" 	3 } } */
+/* { dg-final { scan-assembler-times "vsubudm" 	4 } } */
+/* { dg-final { scan-assembler-times "vmaxsd"  	3 } } */
+/* { dg-final { scan-assembler-times "vminsd"  	2 } } */
+/* { dg-final { scan-assembler-times "vmaxud"  	1 } } */
+/* { dg-final { scan-assembler-times "vminud"  	1 } } */
 /* { dg-final { scan-assembler-times "vcmpequd" 6 } } */
 /* { dg-final { scan-assembler-times "vcmpgtsd" 1 } } */
 /* { dg-final { scan-assembler-times "vcmpgtud" 1 } } */
 /* { dg-final { scan-assembler-times "vrld"     3 } } */
-/* { dg-final { scan-assembler-times "vsld"     5 } } */
-/* { dg-final { scan-assembler-times "vsrad"    3 } } */
+/* { dg-final { scan-assembler-times "vsld"     3 } } */
+/* { dg-final { scan-assembler-times "vsrad"    2 } } */
 /* { dg-final { scan-assembler-times "vcmpequb" 3 } } */
 /* { dg-final { scan-assembler-times "vcmpequw" 6 } } */

@@ -203,7 +203,7 @@
   const __ibm128 __builtin_pack_ibm128 (double, double);
     PACK_IF packif {}
 
-  void __builtin_set_fpscr_rn (signed long long);
+  void __builtin_set_fpscr_rn (const int[0,7]);
     SET_FPSCR_RN rs6000_set_fpscr_rn {}
 
   const double __builtin_unpack_ibm128 (__ibm128, const int<1>);
@@ -1698,7 +1698,7 @@
   const vull __builtin_vsx_xvcvdpuxds (vd);
     XVCVDPUXDS vsx_fixuns_truncv2dfv2di2 {}
 
-  const vull __builtin_vsx_xvcvdpuxds_scale (vd, const int);
+  const vsll __builtin_vsx_xvcvdpuxds_scale (vd, const int);
     XVCVDPUXDS_SCALE vsx_xvcvdpuxds_scale {}
 
 ; Redundant with __builtin_vsx_xvcvdpuxds
@@ -2946,7 +2946,7 @@
   const _Decimal128 __builtin_pack_dec128 (unsigned long long, unsigned long long);
     PACK_TD packtd {}
 
-  void __builtin_set_fpscr_drn (signed long long);
+  void __builtin_set_fpscr_drn (const int[0,7]);
     SET_FPSCR_DRN rs6000_set_fpscr_drn {}
 
   const unsigned long long __builtin_unpack_dec128 (_Decimal128, const int<1>);
@@ -3348,13 +3348,13 @@
   const vuc __builtin_vsx_xxblend_v16qi (vuc, vuc, vuc);
     VXXBLEND_V16QI xxblend_v16qi {}
 
-  const vd __builtin_vsx_xxblend_v2df (vd, vd, vull);
+  const vd __builtin_vsx_xxblend_v2df (vd, vd, vd);
     VXXBLEND_V2DF xxblend_v2df {}
 
   const vull __builtin_vsx_xxblend_v2di (vull, vull, vull);
     VXXBLEND_V2DI xxblend_v2di {}
 
-  const vf __builtin_vsx_xxblend_v4sf (vf, vf, vui);
+  const vf __builtin_vsx_xxblend_v4sf (vf, vf, vf);
     VXXBLEND_V4SF xxblend_v4sf {}
 
   const vui __builtin_vsx_xxblend_v4si (vui, vui, vui);

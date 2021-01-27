@@ -5583,29 +5583,29 @@ rs6000_new_builtin_md_vectorized_function (tree fndecl, tree type_out,
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
   in_n = TYPE_VECTOR_SUBPARTS (type_in);
 
-  enum rs6000_builtins fn
-    = (enum rs6000_builtins) DECL_MD_FUNCTION_CODE (fndecl);
+  enum rs6000_gen_builtins fn
+    = (enum rs6000_gen_builtins) DECL_MD_FUNCTION_CODE (fndecl);
   switch (fn)
     {
-    case RS6000_BUILTIN_RSQRTF:
+    case RS6000_BIF_RSQRTF:
       if (VECTOR_UNIT_ALTIVEC_OR_VSX_P (V4SFmode)
 	  && out_mode == SFmode && out_n == 4
 	  && in_mode == SFmode && in_n == 4)
 	return rs6000_builtin_decls_x[RS6000_BIF_VRSQRTFP];
       break;
-    case RS6000_BUILTIN_RSQRT:
+    case RS6000_BIF_RSQRT:
       if (VECTOR_UNIT_VSX_P (V2DFmode)
 	  && out_mode == DFmode && out_n == 2
 	  && in_mode == DFmode && in_n == 2)
 	return rs6000_builtin_decls_x[RS6000_BIF_RSQRT_2DF];
       break;
-    case RS6000_BUILTIN_RECIPF:
+    case RS6000_BIF_RECIPF:
       if (VECTOR_UNIT_ALTIVEC_OR_VSX_P (V4SFmode)
 	  && out_mode == SFmode && out_n == 4
 	  && in_mode == SFmode && in_n == 4)
 	return rs6000_builtin_decls_x[RS6000_BIF_VRECIPFP];
       break;
-    case RS6000_BUILTIN_RECIP:
+    case RS6000_BIF_RECIP:
       if (VECTOR_UNIT_VSX_P (V2DFmode)
 	  && out_mode == DFmode && out_n == 2
 	  && in_mode == DFmode && in_n == 2)

@@ -77,8 +77,8 @@ vll_sign vll_unpack_lo_2 (vi_sign a)
   return vec_unpackl (a);
 }
 
-/* { dg-final { scan-assembler-times "vpkudum" 4 } } */
-/* { dg-final { scan-assembler-times "vpkuwum" 3 } } */
-/* { dg-final { scan-assembler-times "vpkuhum" 3 } } */
+/* { dg-final { scan-assembler-times "vpkudum" 3 } } */
+/* { dg-final { scan-assembler-times "vpkuwum" 2 } } */
+/* { dg-final { scan-assembler-times "vpkuhum" 2 } } */
 /* { dg-final { scan-assembler-times "vupklsw" 3 } } */
-/* { dg-final { scan-assembler-times "vupkhsw" 3 } } */
+/* { dg-final { scan-assembler-times "vupkhsw" 1 } } */

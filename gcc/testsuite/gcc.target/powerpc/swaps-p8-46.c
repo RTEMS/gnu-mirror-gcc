@@ -2,6 +2,7 @@
 /* { dg-require-effective-target powerpc_p8vector_ok } */
 /* { dg-options "-mdejagnu-cpu=power8 -O2 " } */
 
+#include <altivec.h>
 typedef __attribute__ ((__aligned__ (8))) unsigned long long __m64;
 typedef float __m128 __attribute__ ((__vector_size__ (16), __may_alias__));
 
@@ -17,8 +18,8 @@ _mm_movemask_ps (__m128 *__A)
     };
 
   result = (__vector __m64)
-    __builtin_vec_vbpermq ((__vector unsigned char) (*__A),
-			   (__vector unsigned char) perm_mask);
+    vec_bperm ((__vector unsigned char) (*__A),
+	       (__vector unsigned char) perm_mask);
   return result[1];
 }
 

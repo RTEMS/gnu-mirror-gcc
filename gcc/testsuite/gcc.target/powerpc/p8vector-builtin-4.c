@@ -156,14 +156,14 @@ vc_uns vc_gbb_3 (vc_uns a)
   return vec_gb (a);
 }
 
-/* { dg-final { scan-assembler-times "vclzd" 	5 } } */
-/* { dg-final { scan-assembler-times "vclzw" 	5 } } */
-/* { dg-final { scan-assembler-times "vclzh" 	5 } } */
-/* { dg-final { scan-assembler-times "vclzb" 	5 } } */
+/* { dg-final { scan-assembler-times "vclzd" 	3 } } */
+/* { dg-final { scan-assembler-times "vclzw" 	3 } } */
+/* { dg-final { scan-assembler-times "vclzh" 	3 } } */
+/* { dg-final { scan-assembler-times "vclzb" 	3 } } */
 
-/* { dg-final { scan-assembler-times "vpopcntd" 5 } } */
-/* { dg-final { scan-assembler-times "vpopcntw" 5 } } */
-/* { dg-final { scan-assembler-times "vpopcnth" 5 } } */
-/* { dg-final { scan-assembler-times "vpopcntb" 5 } } */
+/* { dg-final { scan-assembler-times "vpopcntd" 3 } } */
+/* { dg-final { scan-assembler-times "vpopcntw" 3 } } */
+/* { dg-final { scan-assembler-times "vpopcnth" 3 } } */
+/* { dg-final { scan-assembler-times "vpopcntb" 3 } } */
 
 /* { dg-final { scan-assembler-times "vgbbd"    3 } } */

@@ -264,6 +264,13 @@ __altivec_scalar_pred(vec_any_nle,
    to #define vec_step to __builtin_vec_step.  */
 #define vec_step(x) __builtin_vec_step (* (__typeof__ (x) *) 0)
 
+/* Deprecated interfaces.  */
+#ifdef _ARCH_PWR9
+#define __builtin_vec_vadub __builtin_vec_vadu
+#define __builtin_vec_vaduh __builtin_vec_vaduh
+#define __builtin_vec_vaduw __builtin_vec_vaduw
+#endif
+
 #ifdef _ARCH_PWR10
 /* #### TODO:  Deal with Carl's new builtins.  */
 #define vec_mulh(a, b) __builtin_vec_mulh ((a), (b))
@@ -271,6 +278,4 @@ __altivec_scalar_pred(vec_any_nle,
 #define vec_mod(a, b) __builtin_vec_mod ((a), (b))
 #endif
 
-=======
->>>>>>> rs6000: Revise altivec.h to use rs6000-vecdefines.h
 #endif /* _ALTIVEC_H */

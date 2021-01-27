@@ -433,7 +433,7 @@
   vui __builtin_vec_andc (vui, vui);
     VANDC_V4SI_UNS VANDC_VUI
   vbll __builtin_vec_andc (vbll, vbll);
-    VANDC_V4SI_UNS VANDC_VBLL
+    VANDC_V2DI_UNS VANDC_VBLL
   vsll __builtin_vec_andc (vsll, vsll);
     VANDC_V2DI
   vull __builtin_vec_andc (vull, vull);
@@ -526,7 +526,9 @@
   vull __builtin_vec_vbperm_api (vuq, vuc);
     VBPERMD  VBPERMD_VUQ
   vuc __builtin_vec_vbperm_api (vuc, vuc);
-    VBPERMQ2
+    VBPERMQ2  VBPERMQ2_U
+  vsc __builtin_vec_vbperm_api (vsc, vsc);
+    VBPERMQ2  VBPERMQ2_S
 
 ; #### XVRSPIP{TARGET_VSX};VRFIP
 [VEC_CEIL, vec_ceil, __builtin_vec_ceil]
@@ -2915,17 +2917,17 @@
     VPOPCNTUD
 
 [VEC_PARITY_LSBB, vec_parity_lsbb, __builtin_vec_vparity_lsbb, _ARCH_PWR9]
-  vui __builtin_vec_vparity_lsbb (vsi);
+  vsi __builtin_vec_vparity_lsbb (vsi);
     VPRTYBW  VPRTYBW_S
-  vui __builtin_vec_vparity_lsbb (vui);
+  vsi __builtin_vec_vparity_lsbb (vui);
     VPRTYBW  VPRTYBW_U
-  vull __builtin_vec_vparity_lsbb (vsll);
+  vsll __builtin_vec_vparity_lsbb (vsll);
     VPRTYBD  VPRTYBD_S
-  vull __builtin_vec_vparity_lsbb (vull);
+  vsll __builtin_vec_vparity_lsbb (vull);
     VPRTYBD  VPRTYBD_U
-  vuq __builtin_vec_vparity_lsbb (vsq);
+  vsq __builtin_vec_vparity_lsbb (vsq);
     VPRTYBQ  VPRTYBQ_S
-  vuq __builtin_vec_vparity_lsbb (vuq);
+  vsq __builtin_vec_vparity_lsbb (vuq);
     VPRTYBQ  VPRTYBQ_U
 
 ; There are no actual builtins for vec_promote.  There is special handling for
@@ -3276,17 +3278,17 @@
   vuc __builtin_vec_sldw (vuc, vuc, const int);
     XXSLDWI_16QI  XXSLDWI_VUC
   vss __builtin_vec_sldw (vss, vss, const int);
-    XXSLDWI_16QI  XXSLDWI_VSS
+    XXSLDWI_8HI  XXSLDWI_VSS
   vus __builtin_vec_sldw (vus, vus, const int);
-    XXSLDWI_16QI  XXSLDWI_VUS
+    XXSLDWI_8HI  XXSLDWI_VUS
   vsi __builtin_vec_sldw (vsi, vsi, const int);
-    XXSLDWI_16QI  XXSLDWI_VSI
+    XXSLDWI_4SI  XXSLDWI_VSI
   vui __builtin_vec_sldw (vui, vui, const int);
-    XXSLDWI_16QI  XXSLDWI_VUI
+    XXSLDWI_4SI  XXSLDWI_VUI
   vsll __builtin_vec_sldw (vsll, vsll, const int);
-    XXSLDWI_16QI  XXSLDWI_VSLL
+    XXSLDWI_2DI  XXSLDWI_VSLL
   vull __builtin_vec_sldw (vull, vull, const int);
-    XXSLDWI_16QI  XXSLDWI_VULL
+    XXSLDWI_2DI  XXSLDWI_VULL
 
 [VEC_SLL, vec_sll, __builtin_vec_sll]
   vsc __builtin_vec_sll (vsc, vuc);
@@ -4119,11 +4121,8 @@
     VSUBCUQ  VSUBCUQ_VUQ
 
 ; TODO: Note that the entry for VEC_SUBE currently gets ignored in
-; altivec_resolve_overloaded_builtin.  There are also forms for
-; vsi and vui arguments, but rather than building a define_expand
-; for the instruction sequence generated for those, we do some RTL
-; hackery.  Revisit whether we can remove that.  For now, keep this
-; much of the entry here to generate the #define, at least.
+; altivec_resolve_overloaded_builtin.  Revisit whether we can remove
+; that.  We still need to register the legal builtin forms here.
 [VEC_SUBE, vec_sube, __builtin_vec_sube]
   vsq __builtin_vec_sube (vsq, vsq, vsq);
     VSUBEUQM  VSUBEUQM_VSQ
@@ -4406,6 +4405,8 @@
     LXVW4X_V8HI  LXVW4X_VUS
   vus __builtin_vec_vsx_ld (signed long long, const unsigned short *);
     LXVW4X_V8HI  LXVW4X_US
+  vp __builtin_vec_vsx_ld (signed long long, const vp *);
+    LXVW4X_V8HI  LXVW4X_P
   vsi __builtin_vec_vsx_ld (signed long long, const vsi *);
     LXVW4X_V4SI  LXVW4X_VSI
   vsi __builtin_vec_vsx_ld (signed long long, const signed int *);

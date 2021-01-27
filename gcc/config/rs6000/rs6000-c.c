@@ -2247,10 +2247,9 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 							     params);
 	    }
 	  /* For {un}signed __int128s use the vaddeuqm/vsubeuqm instruction
-	     directly.  This is done by the normal processing.  */
+	     directly.  */
 	  case E_TImode:
-	    {
-	    }
+	    break;
 
 	  /* Types other than {un}signed int and {un}signed __int128
 		are errors.  */
@@ -2347,8 +2346,8 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  /* For {un}signed __int128s use the vaddecuq/vsubbecuq
 	     instructions.  This occurs through normal processing.  */
 	  case E_TImode:
-	    {
-	    }
+	    break;
+
 	  /* Types other than {un}signed int and {un}signed __int128
 		are errors.  */
 	  default:

@@ -132,7 +132,7 @@ main (void)
 
       v_reg_in1 = (V_TYPE) { s_reg_in1 };
       v_reg_in2 = (V_TYPE) { s_reg_in2 };
-      v_reg_res = vec_vadduqm (v_reg_in1, v_reg_in2);
+      v_reg_res = vec_add (v_reg_in1, v_reg_in2);
       reg_errors += compare (s_reg_res, v_reg_res, "", "reg, res");
 
       s_mem_in1 = s_reg_in1;
@@ -144,7 +144,7 @@ main (void)
       mem_errors += compare (s_mem_in2, (V_TYPE) { s_mem_in2 }, "", "mem, in2");
 
       s_mem_res = s_mem_in1 + s_mem_in2;
-      v_mem_res = vec_vadduqm (v_mem_in1, v_mem_in2);
+      v_mem_res = vec_add (v_mem_in1, v_mem_in2);
       mem_errors += compare (s_mem_res, v_mem_res, "", "mem, res");
 
       nl = "\n";
