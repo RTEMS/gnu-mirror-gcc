@@ -296,7 +296,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #elif BFP_KIND == 5
 #define BFP_TYPE _Float128
-#define BFP_FMT "%.21Le"
+#define BFP_FMT "%.36Le"
 #define BFP_VIA_TYPE _Float128
 #define STR_TO_BFP __strtokf
 #include <_strtokf.h>
