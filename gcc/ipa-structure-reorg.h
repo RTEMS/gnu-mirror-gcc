@@ -289,6 +289,7 @@ extern bool is_reorg_pointer_type ( tree, Info*);
 extern ReorgType_t *get_reorgtype_info ( tree, Info_t *);
 extern void print_reorg_with_msg ( FILE *, ReorgType_t *, int, const char *);
 extern ReorgType_t *contains_a_reorgtype ( gimple *, Info *);
+extern tree function_return_type ( gimple *, Info *);
 extern bool tree_contains_a_reorgtype_p ( tree, Info *);
 extern ReorgType_t *tree_contains_a_reorgtype ( tree, Info *);
 extern tree multilevel_component_ref ( tree);
@@ -309,7 +310,7 @@ extern bool is_assign_from_ssa ( gimple *);
 // I have no intention of leaving these debugging marcos or uses of
 // them in the code. However, some of the uses should obviously be
 // converted to dump file information.
-#define DEBUGGING 0
+#define DEBUGGING 1
 #if DEBUGGING
 enum Display {
   Show_nothing,

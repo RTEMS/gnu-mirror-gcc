@@ -112,6 +112,7 @@ static void reorg_forbidden ( gimple *, Info *);
 static bool is_user_function ( gimple *, cgraph_node *, Info *);
 static bool is_reorg_alloc_trigger ( gimple *);
 static ReorgType_t *find_struct_type_ptr_to_struct ( tree, Info *);
+static ReorgType_t *the_reorg_walker ( gimple *, Info *);
 //static ReorgType_t *get_reorgtype_info ( tree, Info *);
 //static void print_reorg_with_msg ( FILE *, ReorgType_t *, int, const char *);
 static void dump_reorg ( ReorgType_t *reorg);
@@ -294,6 +295,7 @@ final_debug_info ( Info *info)
   {
     print_program ( info->reorg_dump_file, "Final State", PRINT_FORMAT, false, 0, info);
   }
+  DEBUG_F( print_program, stderr, "Final Internal State", true, true, 0, info);
 }
 
 static unsigned int
@@ -3859,19 +3861,20 @@ struct hidden_info {
 static tree
 detect_reorg ( tree *tp, int *dummy, void *data)
 {
-  //DEBUG_A("detect_reorg:>\n");
+  DEBUG_A("detect_reorg:>\n");
   struct walk_stmt_info *walk_data = ( struct walk_stmt_info *)data;
   hidden_info_t *hi = ( hidden_info_t *)walk_data->info;
-  //DEBUG_L( "*tp = ");
-  //DEBUG_F( print_generic_expr, stderr, *tp, (dump_flags_t)-1);
-  //DEBUG("\n");
+  DEBUG_L( "*tp = ");
+  DEBUG_F(  flexible_print, stderr, *tp, 1, (dump_flags_t)-1);
   tree operand = base_type_of ( TREE_TYPE ( *tp));
   ReorgType_t *ri = get_reorgtype_info ( operand, hi->info);
   if ( ri != NULL )
     {
+      DEBUG_A("found\n");
       hi->found_reorg = ri;
     }
-  
+
+  DEBUG_A("not found\n");
   return NULL_TREE;
 }
 
@@ -3888,8 +3891,33 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
       tree base = base_type_of ( TREE_TYPE ( PHI_RESULT ( stmt)));
       return get_reorgtype_info ( base, info);
     }
+  else if ( is_gimple_call ( stmt) )
+    {
+      DEBUG_A("a call\n");
+      ReorgType_t *just_walker = the_reorg_walker ( stmt, info);
+      if ( just_walker != NULL )
+	{
+	  DEBUG_A("walker found something\n");
+	  return just_walker;
+	}
+      tree return_type = function_return_type ( stmt, info);
+      DEBUG_A("return_type = ");
+      DEBUG_F(  flexible_print, stderr, return_type, 1, (dump_flags_t)0);
+      //if ( TREE_CODE ( return_type) == VOID_TYPE)
+      if ( VOID_TYPE_P ( return_type) )
+	{
+	  DEBUG_A("VOID\n");
+	  return NULL;
+	}
+      else
+	{
+	  DEBUG_A("Not VOID.. looking it up\n");
+	  return get_reorgtype_info ( return_type, info );
+	}
+    }
   else
     {
+      #if 0
       // Note walk_stmt_info is compilcated, use it's info
       // field for hidden_info
       hidden_info_t hi = { NULL, info };
@@ -3901,7 +3929,27 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
 		       &walk_info);
       //INDENT(-2);
       return hi.found_reorg;
+      #else
+      return the_reorg_walker ( stmt, info);
+      #endif
+      
     }
+}
+
+static ReorgType_t *
+the_reorg_walker ( gimple *stmt, Info *info )
+{
+  // Note walk_stmt_info is compilcated, use it's info
+  // field for hidden_info
+  hidden_info_t hi = { NULL, info };
+  struct walk_stmt_info walk_info;     // expt
+  memset ( &walk_info, 0, sizeof ( walk_info));
+  walk_info.info = ( void*)&hi; //expt
+  walk_gimple_op ( stmt,
+		   detect_reorg,
+		   &walk_info);
+  //INDENT(-2);
+  return hi.found_reorg;
 }
 
 static tree
@@ -3928,6 +3976,66 @@ detect_reorg_in_expr ( tree *tp, int *w_s, void *data)
     }
   
   return NULL_TREE;
+}
+
+// If this gets a void it goes looking for the effective type
+tree
+function_return_type ( gimple *stmt, Info *info )
+{
+  DEBUG_A( "function_return_type:> ");
+  DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+  INDENT(2);
+  tree bt = void_type_node; // default to void
+  // next line has issues but the mechanism is sound
+  tree t = *gimple_call_lhs_ptr ( stmt);
+  DEBUG_A( "t %p\n", t);
+  // Calls to a function returning void are skipped.
+  if ( t != NULL )
+    {
+      DEBUG_A( "t: ");
+      DEBUG_F( flexible_print, stderr, t, 1, (dump_flags_t)0);
+      tree type = TREE_TYPE( t);
+      DEBUG_A( "type: ");
+      DEBUG_F( flexible_print, stderr, type, 1, (dump_flags_t)0);
+
+      tree bt = base_type_of ( type);
+      if ( TREE_CODE( bt) == VOID_TYPE )
+	{
+	  // Find the use of lhs.  If is an assign
+	  // get use the base type of it's lhs.
+	  // Otherwise never mind. Note, there
+	  // can be multiple uses but find the "one"
+	  // that's a simple assignment to a typed
+	  // variable.
+	  
+	  tree ssa_name = gimple_call_lhs( stmt);
+	  gimple *use_stmt;
+	  imm_use_iterator iter;
+	  int num_bt = 0; // Use future
+	  FOR_EACH_IMM_USE_STMT ( use_stmt, iter, ssa_name)
+	    {
+	      DEBUG_A("use_stmt: ");
+	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      if ( is_assign_from_ssa ( use_stmt ) )
+		{
+		  DEBUG_A("is assign from ssa\n");
+		  tree lhs_assign = gimple_assign_lhs( use_stmt);
+		  tree lhs_type = TREE_TYPE ( lhs_assign);
+		  tree lhs_base_type = base_type_of ( lhs_type);
+		  //if ( TREE_CODE( lhs_base_type) != VOID_TYPE )
+		  if ( !VOID_TYPE_P ( lhs_base_type) )
+		    {
+		      DEBUG_A("not void\n");
+		      return lhs_base_type;
+		      //num_bt++;
+		      //bt = lhs_base_type;
+		    }
+		}
+	    }
+	}
+    }
+  INDENT(-2);
+  return bt;
 }
 
 bool

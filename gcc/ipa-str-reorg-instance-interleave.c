@@ -448,8 +448,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		  case ReorgT_If_Null:
 		  case ReorgT_If_NotNull:
 		    {
-		      //DEBUG_L("ReorgT_If_(Not)Null: ");
-		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      DEBUG_L("ReorgT_If_(Not)Null: ");
+		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      /*
 			gimple_cond_set_rhs( stmt, 
 			TYPE_MAX_VALUE( pointer_sized_int_node));
@@ -464,14 +464,26 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //tree max = TYPE_MAX_VALUE ( TREE_TYPE ( ri->pointer_rep));
 		      tree max = TYPE_MAX_VALUE ( ri->pointer_rep);
 		      
-		      //DEBUG_L("max: ");
-		      //DEBUG_F(print_generic_expr, stderr, max, (dump_flags_t)0);
-		      //DEBUG("\n");
+		      DEBUG_L("max: ");
+		      DEBUG_F(print_generic_expr, stderr, max, (dump_flags_t)0);
+		      DEBUG("\n");
+
+		      tree cond_op1 = gimple_cond_lhs ( cond_stmt);
+
+		      tree convert_dest  =
+			make_temp_ssa_name( ri->pointer_rep, NULL, "cond_cast");
 		      
+		      gimple *gcond_cast =
+			gimple_build_assign ( convert_dest, CONVERT_EXPR, cond_op1);
+		      SSA_NAME_DEF_STMT ( convert_dest) = gcond_cast;
+		      
+		      gimple_cond_set_lhs( cond_stmt, convert_dest);
 		      gimple_cond_set_rhs( cond_stmt, max);
+
+		      gsi_insert_before( &gsi, gcond_cast, GSI_SAME_STMT);
 		      
-		      //DEBUG_L("after: ");
-		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      DEBUG_L("after: ");
+		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		    }
 		    break;
 		  case ReorgT_IfPtrEQ:
@@ -491,8 +503,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    break;
 		  case ReorgT_PtrPlusInt:   // "a = b + i"
 		    {
-		      //DEBUG_L("ReorgT_PtrPlusInt: ");
-		      //DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      DEBUG_L("ReorgT_PtrPlusInt: ");
+		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
 		      // Needed for hellowotrld
 		      
 		      // Does the type of stmt need to be adjusted? I assume so.
@@ -514,6 +526,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      tree rhs1 = gimple_assign_rhs1( stmt);
 		      tree rhs2 = gimple_assign_rhs2( stmt);
 
+		      DEBUG_L("\n");
+
 		      gcc_assert ( type);
 		      tree PPI_rhs1_cast = make_temp_ssa_name( type, NULL, "PPI_rhs1_cast");
 		      gimple *gPPI_rhs1_cast = gimple_build_assign ( PPI_rhs1_cast, CONVERT_EXPR, rhs1);
@@ -523,6 +537,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      gimple *gPPI_rhs2_cast = gimple_build_assign ( PPI_rhs2_cast, CONVERT_EXPR, rhs2);
 		      SSA_NAME_DEF_STMT ( PPI_rhs2_cast) = gPPI_rhs2_cast;
 
+		      DEBUG_L("\n");
+		      
 		      tree PPI_adj =  make_temp_ssa_name( type, NULL, "PtrPlusInt_Adj");
 		      gimple *gPPI_adj =
 			gimple_build_assign ( PPI_adj, TRUNC_DIV_EXPR, PPI_rhs2_cast, str_siz);
@@ -533,9 +549,13 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      	gimple_build_assign ( ptrplusint, PLUS_EXPR, PPI_rhs1_cast, PPI_adj);
 		      SSA_NAME_DEF_STMT ( ptrplusint) = gPPI;
 		      
+		      DEBUG_L("\n");
+		      
 		      gimple *gPPI_cast = 
 			gimple_build_assign ( PPI_orig_lhs, CONVERT_EXPR, ptrplusint);
 		      SSA_NAME_DEF_STMT ( PPI_orig_lhs) = gPPI_cast;
+		      
+		      DEBUG_L("\n");
 		      
 		      //gimple_set_op( stmt, 2, tmp);
 		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
@@ -545,16 +565,18 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      gsi_insert_before( &gsi, gPPI, GSI_SAME_STMT);
 		      gsi_insert_before( &gsi, gPPI_cast, GSI_SAME_STMT);
 
+		      DEBUG_L("\n");
+		      
 		      gsi_remove ( &gsi, true);
 
-		      //DEBUG_L("");
-		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_rhs2_cast, 0);
-		      //DEBUG_L("");
-		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_adj, 0);
-		      //DEBUG_L("");
-		      //DEBUG_F( print_gimple_stmt, stderr, gPPI, 0);
-		      //DEBUG_L("");
-		      //DEBUG_F( print_gimple_stmt, stderr, gPPI_cast, 0);
+		      DEBUG_A("gPPI_rhs2_cast: ");
+		      DEBUG_F( print_gimple_stmt, stderr, gPPI_rhs2_cast, 0);
+		      DEBUG_A("gPPI_adj");
+		      DEBUG_F( print_gimple_stmt, stderr, gPPI_adj, 0);
+		      DEBUG_A("gPPI");
+		      DEBUG_F( print_gimple_stmt, stderr, gPPI, 0);
+		      DEBUG_A("gPPI_cast");
+		      DEBUG_F( print_gimple_stmt, stderr, gPPI_cast, 0);
 		    }
 		    break;
 		  case ReorgT_Ptr2Zero:   //  "a = 0"
@@ -3707,7 +3729,7 @@ pointer_conditional_transfer_transformation ( gimple *stmt, Info *info)
   else
     {
       convert_dest = 
-      	make_temp_ssa_name( op1_type, NULL, "cond_temp");;
+      	make_temp_ssa_name( op1_type, NULL, "cond_temp");
       convert_source = cond_op2;
       new_cond_op1 = cond_op1;
       new_cond_op2 = convert_dest;
