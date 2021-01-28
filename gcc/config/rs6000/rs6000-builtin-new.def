@@ -3183,7 +3183,7 @@
   const signed int __builtin_altivec_vextractmw (vui);
     VEXTRACTMW vec_extract_v4si {}
 
-  const unsigned long long __builtin_altivec_vgnb (vuq, const int <2,7>);
+  const unsigned long long __builtin_altivec_vgnb (vull, const int <2,7>);
     VGNB vgnb {}
 
   const vuc __builtin_altivec_vinsgubvlx (unsigned int, vuc, unsigned int);

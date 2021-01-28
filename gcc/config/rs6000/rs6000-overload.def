@@ -3071,7 +3071,7 @@
   vull __builtin_vec_rl (vull, vull);
     VRLD  VRLD_VULL
 
-[VEC_RLMI, vec_rlmi, __builtin_vec_rlmi]
+[VEC_RLMI, vec_rlmi, __builtin_vec_rlmi, _ARCH_PWR9]
   vui __builtin_vec_rlmi (vui, vui, vui);
     VRLWMI
   vull __builtin_vec_rlmi (vull, vull, vull);
@@ -3079,7 +3079,7 @@
 
 ; We SKIP vec_rlnm so that altivec.h can define it as the three-operand
 ; form we expose to the users.
-[VEC_RLNM, SKIP, __builtin_vec_rlnm]
+[VEC_RLNM, SKIP, __builtin_vec_rlnm, _ARCH_PWR9]
   vui __builtin_vec_rlnm (vui, vui);
     VRLWNM
   vull __builtin_vec_rlnm (vull, vull);
@@ -4319,6 +4319,26 @@
     VIEDP  VIEDP_VD
   vd __builtin_vec_insert_exp (vull, vull);
     VIEDP  VIEDP_VULL
+
+; It is truly unfortunate that vec_vprtyb has an incompatible set of
+; interfaces with vec_parity_lsbb.  So we can't even deprecate this.
+[VEC_VPRTYB, vec_vprtyb, __builtin_vec_vprtyb, _ARCH_PWR9]
+  vsi __builtin_vec_vprtyb (vsi);
+    VPRTYBW  VPRTYB_VSI
+  vui __builtin_vec_vprtyb (vui);
+    VPRTYBW  VPRTYB_VUI
+  vsll __builtin_vec_vprtyb (vsll);
+    VPRTYBD  VPRTYB_VSLL
+  vull __builtin_vec_vprtyb (vull);
+    VPRTYBD  VPRTYB_VULL
+  vsq __builtin_vec_vprtyb (vsq);
+    VPRTYBQ  VPRTYB_VSQ
+  vuq __builtin_vec_vprtyb (vuq);
+    VPRTYBQ  VPRTYB_VUQ
+  signed __int128 __builtin_vec_vprtyb (signed __int128);
+    VPRTYBQ  VPRTYB_SQ
+  unsigned __int128 __builtin_vec_vprtyb (unsigned __int128);
+    VPRTYBQ  VPRTYB_UQ
 
 [VEC_VSCEEQ, scalar_cmp_exp_eq, __builtin_vec_scalar_cmp_exp_eq, _ARCH_PWR9]
   signed int __builtin_vec_scalar_cmp_exp_eq (double, double);

@@ -57,6 +57,21 @@
 
 #include "rs6000-vecdefines.h"
 
+/* Deprecated interfaces.  */
+#define vec_vsld vec_sld
+#define vec_vsrad vec_srad
+#define vec_vsrd vec_srd
+
+#ifdef _ARCH_PWR9
+#define __builtin_vec_vadub __builtin_vec_vadu
+#define __builtin_vec_vaduh __builtin_vec_vadu
+#define __builtin_vec_vaduw __builtin_vec_vadu
+#define __builtin_vec_vprtybw __builtin_vec_vprtyb
+#define __builtin_vec_vprtybd __builtin_vec_vprtyb
+#define __builtin_vec_vprtybq __builtin_vec_vprtyb
+#define vec_vrlnm vec_rlnm
+#endif
+
 /* Synonyms.  */
 /* Functions that are resolved by the backend to one of the
    typed builtins.  */
@@ -263,13 +278,6 @@ __altivec_scalar_pred(vec_any_nle,
 /* This also accepts a type for its parameter, so it is not enough
    to #define vec_step to __builtin_vec_step.  */
 #define vec_step(x) __builtin_vec_step (* (__typeof__ (x) *) 0)
-
-/* Deprecated interfaces.  */
-#ifdef _ARCH_PWR9
-#define __builtin_vec_vadub __builtin_vec_vadu
-#define __builtin_vec_vaduh __builtin_vec_vadu
-#define __builtin_vec_vaduw __builtin_vec_vadu
-#endif
 
 #ifdef _ARCH_PWR10
 /* #### TODO:  Deal with Carl's new builtins.  */
