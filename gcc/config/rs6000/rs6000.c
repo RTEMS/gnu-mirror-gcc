@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM RS/6000.
-   Copyright (C) 1991-2020 Free Software Foundation, Inc.
+   Copyright (C) 1991-2021 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
    This file is part of GCC.
@@ -4430,6 +4430,13 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_MMA) == 0)
     rs6000_isa_flags |= OPTION_MASK_MMA;
 
+  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION;
+
+  if (TARGET_POWER10 &&
+      (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
+
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
@@ -6806,17 +6813,9 @@ rs6000_expand_vector_init (rtx target, rtx vals)
       /* Force the values into word_mode registers.  */
       for (i = 0; i < n_elts; i++)
 	{
-	  rtx tmp = force_reg (GET_MODE_INNER (mode), XVECEXP (vals, 0, i));
-	  if (TARGET_POWERPC64)
-	    {
-	      op[i] = gen_reg_rtx (DImode);
-	      emit_insn (gen_zero_extendqidi2 (op[i], tmp));
-	    }
-	  else
-	    {
-	      op[i] = gen_reg_rtx (SImode);
-	      emit_insn (gen_zero_extendqisi2 (op[i], tmp));
-	    }
+	  rtx tmp = force_reg (inner_mode, XVECEXP (vals, 0, i));
+	  machine_mode tmode = TARGET_POWERPC64 ? DImode : SImode;
+	  op[i] = simplify_gen_subreg (tmode, tmp, inner_mode, 0);
 	}
 
       /* Take unsigned char big endianness on 64bit as example for below
@@ -7001,6 +7000,12 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
 
   if (VECTOR_MEM_VSX_P (mode))
     {
+      if (!CONST_INT_P (elt_rtx))
+	{
+	  rs6000_expand_vector_set_var (target, val, elt_rtx);
+	  return;
+	}
+
       rtx insn = NULL_RTX;
 
       if (mode == V2DFmode)
@@ -7089,6 +7094,166 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
     }
 
   emit_insn (gen_rtx_SET (target, x));
+}
+
+/* Insert VAL into IDX of TARGET, VAL size is same of the vector element, IDX
+   is variable and also counts by vector element size for p9 and above.  */
+
+void
+rs6000_expand_vector_set_var_p9 (rtx target, rtx val, rtx idx)
+{
+  machine_mode mode = GET_MODE (target);
+
+  gcc_assert (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (idx));
+
+  gcc_assert (GET_MODE (idx) == E_SImode);
+
+  machine_mode inner_mode = GET_MODE (val);
+
+  rtx tmp = gen_reg_rtx (GET_MODE (idx));
+  int width = GET_MODE_SIZE (inner_mode);
+
+  gcc_assert (width >= 1 && width <= 8);
+
+  int shift = exact_log2 (width);
+  /* Generate the IDX for permute shift, width is the vector element size.
+     idx = idx * width.  */
+  emit_insn (gen_ashlsi3 (tmp, idx, GEN_INT (shift)));
+
+  tmp = convert_modes (DImode, SImode, tmp, 1);
+
+  /*  lvsr    v1,0,idx.  */
+  rtx pcvr = gen_reg_rtx (V16QImode);
+  emit_insn (gen_altivec_lvsr_reg (pcvr, tmp));
+
+  /*  lvsl    v2,0,idx.  */
+  rtx pcvl = gen_reg_rtx (V16QImode);
+  emit_insn (gen_altivec_lvsl_reg (pcvl, tmp));
+
+  rtx sub_target = simplify_gen_subreg (V16QImode, target, mode, 0);
+
+  rtx permr
+    = gen_altivec_vperm_v8hiv16qi (sub_target, sub_target, sub_target, pcvr);
+  emit_insn (permr);
+
+  rs6000_expand_vector_set (target, val, const0_rtx);
+
+  rtx perml
+    = gen_altivec_vperm_v8hiv16qi (sub_target, sub_target, sub_target, pcvl);
+  emit_insn (perml);
+}
+
+/* Insert VAL into IDX of TARGET, VAL size is same of the vector element, IDX
+   is variable and also counts by vector element size for p8.  */
+
+void
+rs6000_expand_vector_set_var_p8 (rtx target, rtx val, rtx idx)
+{
+  machine_mode mode = GET_MODE (target);
+
+  gcc_assert (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (idx));
+
+  gcc_assert (GET_MODE (idx) == E_SImode);
+
+  machine_mode inner_mode = GET_MODE (val);
+  HOST_WIDE_INT mode_mask = GET_MODE_MASK (inner_mode);
+
+  rtx tmp = gen_reg_rtx (GET_MODE (idx));
+  int width = GET_MODE_SIZE (inner_mode);
+
+  gcc_assert (width >= 1 && width <= 4);
+
+  if (!BYTES_BIG_ENDIAN)
+    {
+      /*  idx = idx * width.  */
+      emit_insn (gen_mulsi3 (tmp, idx, GEN_INT (width)));
+      /*  idx = idx + 8.  */
+      emit_insn (gen_addsi3 (tmp, tmp, GEN_INT (8)));
+    }
+  else
+    {
+      emit_insn (gen_mulsi3 (tmp, idx, GEN_INT (width)));
+      emit_insn (gen_subsi3 (tmp, GEN_INT (24 - width), tmp));
+    }
+
+  /*  lxv vs33, mask.
+      DImode: 0xffffffffffffffff0000000000000000
+      SImode: 0x00000000ffffffff0000000000000000
+      HImode: 0x000000000000ffff0000000000000000.
+      QImode: 0x00000000000000ff0000000000000000.  */
+  rtx mask = gen_reg_rtx (V16QImode);
+  rtx mask_v2di = gen_reg_rtx (V2DImode);
+  rtvec v = rtvec_alloc (2);
+  if (!BYTES_BIG_ENDIAN)
+    {
+      RTVEC_ELT (v, 0) = gen_rtx_CONST_INT (DImode, 0);
+      RTVEC_ELT (v, 1) = gen_rtx_CONST_INT (DImode, mode_mask);
+    }
+  else
+    {
+      RTVEC_ELT (v, 0) = gen_rtx_CONST_INT (DImode, mode_mask);
+      RTVEC_ELT (v, 1) = gen_rtx_CONST_INT (DImode, 0);
+    }
+  emit_insn (gen_vec_initv2didi (mask_v2di, gen_rtx_PARALLEL (V2DImode, v)));
+  rtx sub_mask = simplify_gen_subreg (V16QImode, mask_v2di, V2DImode, 0);
+  emit_insn (gen_rtx_SET (mask, sub_mask));
+
+  /*  mtvsrd[wz] f0,tmp_val.  */
+  rtx tmp_val = gen_reg_rtx (SImode);
+  if (inner_mode == E_SFmode)
+    emit_insn (gen_movsi_from_sf (tmp_val, val));
+  else
+    tmp_val = force_reg (SImode, val);
+
+  rtx val_v16qi = gen_reg_rtx (V16QImode);
+  rtx val_v2di = gen_reg_rtx (V2DImode);
+  rtvec vec_val = rtvec_alloc (2);
+  if (!BYTES_BIG_ENDIAN)
+  {
+    RTVEC_ELT (vec_val, 0) = gen_rtx_CONST_INT (DImode, 0);
+    RTVEC_ELT (vec_val, 1) = tmp_val;
+  }
+  else
+  {
+    RTVEC_ELT (vec_val, 0) = tmp_val;
+    RTVEC_ELT (vec_val, 1) = gen_rtx_CONST_INT (DImode, 0);
+  }
+  emit_insn (
+    gen_vec_initv2didi (val_v2di, gen_rtx_PARALLEL (V2DImode, vec_val)));
+  rtx sub_val = simplify_gen_subreg (V16QImode, val_v2di, V2DImode, 0);
+  emit_insn (gen_rtx_SET (val_v16qi, sub_val));
+
+  /*  lvsl    13,0,idx.  */
+  tmp = convert_modes (DImode, SImode, tmp, 1);
+  rtx pcv = gen_reg_rtx (V16QImode);
+  emit_insn (gen_altivec_lvsl_reg (pcv, tmp));
+
+  /*  vperm 1,1,1,13.  */
+  /*  vperm 0,0,0,13.  */
+  rtx val_perm = gen_reg_rtx (V16QImode);
+  rtx mask_perm = gen_reg_rtx (V16QImode);
+  emit_insn (gen_altivec_vperm_v8hiv16qi (val_perm, val_v16qi, val_v16qi, pcv));
+  emit_insn (gen_altivec_vperm_v8hiv16qi (mask_perm, mask, mask, pcv));
+
+  rtx target_v16qi = simplify_gen_subreg (V16QImode, target, mode, 0);
+
+  /*  xxsel 34,34,32,33.  */
+  emit_insn (
+    gen_vector_select_v16qi (target_v16qi, target_v16qi, val_perm, mask_perm));
+}
+
+/* Insert VAL into IDX of TARGET, VAL size is same of the vector element, IDX
+   is variable and also counts by vector element size.  */
+
+void
+rs6000_expand_vector_set_var (rtx target, rtx val, rtx idx)
+{
+  machine_mode mode = GET_MODE (target);
+  machine_mode inner_mode = GET_MODE_INNER (mode);
+  if (TARGET_P9_VECTOR || GET_MODE_SIZE (inner_mode) == 8)
+    rs6000_expand_vector_set_var_p9 (target, val, idx);
+  else
+    rs6000_expand_vector_set_var_p8 (target, val, idx);
 }
 
 /* Extract field ELT from VEC into TARGET.  */
@@ -9940,10 +10105,8 @@ rs6000_emit_le_vsx_load (rtx dest, rtx source, machine_mode mode)
 void
 rs6000_emit_le_vsx_store (rtx dest, rtx source, machine_mode mode)
 {
-  /* This should never be called during or after LRA, because it does
-     not re-permute the source register.  It is intended only for use
-     during expand.  */
-  gcc_assert (!lra_in_progress && !reload_completed);
+  /* This should never be called after LRA.  */
+  gcc_assert (can_create_pseudo_p ());
 
   /* Use V2DImode to do swaps of types with 128-bit scalar parts (TImode,
      V1TImode).  */
@@ -9954,7 +10117,7 @@ rs6000_emit_le_vsx_store (rtx dest, rtx source, machine_mode mode)
       source = gen_lowpart (V2DImode, source);
     }
 
-  rtx tmp = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (source) : source;
+  rtx tmp = gen_reg_rtx_and_attrs (source);
   rs6000_emit_le_vsx_permute (tmp, source, mode);
   rs6000_emit_le_vsx_permute (dest, tmp, mode);
 }
@@ -22954,6 +23117,16 @@ rs6000_vectorize_vec_perm_const (machine_mode vmode, rtx target, rtx op0,
   if (TARGET_ALTIVEC && testing_p)
     return true;
 
+  if (op0)
+    {
+      rtx nop0 = force_reg (vmode, op0);
+      if (op0 == op1)
+        op1 = nop0;
+      op0 = nop0;
+    }
+  if (op1)
+    op1 = force_reg (vmode, op1);
+
   /* Check for ps_merge* or xxpermdi insns.  */
   if ((vmode == V2DFmode || vmode == V2DImode) && VECTOR_MEM_VSX_P (vmode))
     {
@@ -23621,6 +23794,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "power9-minmax",		OPTION_MASK_P9_MINMAX,		false, true  },
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },
   { "power9-vector",		OPTION_MASK_P9_VECTOR,		false, true  },
+  { "power10-fusion",		OPTION_MASK_P10_FUSION,		false, true  },
   { "powerpc-gfxopt",		OPTION_MASK_PPC_GFXOPT,		false, true  },
   { "powerpc-gpopt",		OPTION_MASK_PPC_GPOPT,		false, true  },
   { "prefixed",			OPTION_MASK_PREFIXED,		false, true  },
@@ -25710,6 +25884,50 @@ address_to_insn_form (rtx addr,
     }
 
   return INSN_FORM_BAD;
+}
+
+/* Given address rtx ADDR for a load of MODE, is this legitimate for a
+   non-prefixed D-form or X-form instruction?  NON_PREFIXED_FORMAT is
+   given NON_PREFIXED_D or NON_PREFIXED_DS to indicate whether we want
+   a D-form or DS-form instruction.  X-form and base_reg are always
+   allowed.  */
+bool
+address_is_non_pfx_d_or_x (rtx addr, machine_mode mode,
+			   enum non_prefixed_form non_prefixed_format)
+{
+  enum insn_form result_form;
+
+  result_form = address_to_insn_form (addr, mode, non_prefixed_format);
+
+  switch (non_prefixed_format)
+    {
+    case NON_PREFIXED_D:
+      switch (result_form)
+	{
+	case INSN_FORM_X:
+	case INSN_FORM_D:
+	case INSN_FORM_DS:
+	case INSN_FORM_BASE_REG:
+	  return true;
+	default:
+	  return false;
+	}
+      break;
+    case NON_PREFIXED_DS:
+      switch (result_form)
+	{
+	case INSN_FORM_X:
+	case INSN_FORM_DS:
+	case INSN_FORM_BASE_REG:
+	  return true;
+	default:
+	  return false;
+	}
+      break;
+    default:
+      break;
+    }
+  return false;
 }
 
 /* Helper function to see if we're potentially looking at lfs/stfs.

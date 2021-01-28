@@ -1,5 +1,5 @@
 /* Output routines for GCC for ARM.
-   Copyright (C) 1991-2020 Free Software Foundation, Inc.
+   Copyright (C) 1991-2021 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -11889,7 +11889,8 @@ xscale_sched_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep,
 	 instruction we depend on is another ALU instruction, then we may
 	 have to account for an additional stall.  */
       if (shift_opnum != 0
-	  && (attr_type == TYPE_ALU_SHIFT_IMM
+	  && (attr_type == TYPE_ALU_SHIFT_IMM_LSL_1TO4
+	      || attr_type == TYPE_ALU_SHIFT_IMM_OTHER
 	      || attr_type == TYPE_ALUS_SHIFT_IMM
 	      || attr_type == TYPE_LOGIC_SHIFT_IMM
 	      || attr_type == TYPE_LOGICS_SHIFT_IMM
@@ -29130,6 +29131,8 @@ arm_preferred_simd_mode (scalar_mode mode)
   if (TARGET_NEON)
     switch (mode)
       {
+      case E_HFmode:
+	return TARGET_NEON_VECTORIZE_DOUBLE ? V4HFmode : V8HFmode;
       case E_SFmode:
 	return TARGET_NEON_VECTORIZE_DOUBLE ? V2SFmode : V4SFmode;
       case E_SImode:
@@ -31479,6 +31482,15 @@ arm_vectorize_vec_perm_const (machine_mode vmode, rtx target, rtx op0, rtx op1,
     return false;
 
   d.target = target;
+  if (op0)
+    {
+      rtx nop0 = force_reg (vmode, op0);
+      if (op0 == op1)
+        op1 = nop0;
+      op0 = nop0;
+    }
+  if (op1)
+    op1 = force_reg (vmode, op1);
   d.op0 = op0;
   d.op1 = op1;
 
