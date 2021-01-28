@@ -819,8 +819,8 @@ cpp_classify_number (cpp_reader *pfile, const cpp_token *token,
 	  && !CPP_OPTION (pfile, size_t_literals))
        {
 	  const char *message = (result & CPP_N_UNSIGNED) == CPP_N_UNSIGNED
-				? N_("use of C++2b size_t integer constant")
-				: N_("use of C++2b ptrdiff_t integer constant");
+				? N_("use of C++23 size_t integer constant")
+				: N_("use of C++23 ptrdiff_t integer constant");
 	  cpp_warning_with_line (pfile, CPP_W_SIZE_T_LITERALS,
 				 virtual_location, 0, message);
        }

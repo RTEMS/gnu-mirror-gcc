@@ -500,7 +500,7 @@ struct cpp_options
   /* Nonzero means tokenize C++20 module directives.  */
   unsigned char module_directives;
 
-  /* Nonzero for C++2b ptrdiff_t and size_t literals.  */
+  /* Nonzero for C++23 ptrdiff_t and size_t literals.  */
   unsigned char size_t_literals;
 
   /* Holds the name of the target (execution) character set.  */
@@ -1215,9 +1215,9 @@ struct cpp_num
 #define CPP_N_FLOATN	0x400000 /* _FloatN types.  */
 #define CPP_N_FLOATNX	0x800000 /* _FloatNx types.  */
 
-#define CPP_N_USERDEF	0x1000000 /* C++0x user-defined literal.  */
+#define CPP_N_USERDEF	0x1000000 /* C++11 user-defined literal.  */
 
-#define CPP_N_SIZE_T	0x2000000 /* C++2b size_t or ptrdiff_t literal  */
+#define CPP_N_SIZE_T	0x2000000 /* C++23 size_t or ptrdiff_t literal  */
 
 #define CPP_N_WIDTH_FLOATN_NX	0xF0000000 /* _FloatN / _FloatNx value
 					      of N, divided by 16.  */

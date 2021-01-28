@@ -540,10 +540,10 @@
 #  error "__cpp_using_enum != 201907"
 #endif
 
-// C++2b features:
+// C++23 features:
 
 #ifndef __cpp_size_t_suffix
 #  error "__cpp_size_t_suffix"
-#elif __cpp_size_t_suffix != 202006L
-#  error "__cpp_size_t_suffix != 202006L"
+#elif __cpp_size_t_suffix != 202006
+#  error "__cpp_size_t_suffix != 202006"
 #endif
