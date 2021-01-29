@@ -153,6 +153,7 @@ int
 str_reorg_instance_interleave_trans ( Info *info)
 {
   DEBUG_A("str_reorg_instance_interleave_trans:>\n");
+
   if ( BYPASS_TRANSFORM )
     {
 
@@ -197,6 +198,8 @@ str_reorg_instance_interleave_trans ( Info *info)
 	gimple_stmt_iterator next_gsi;
 	for ( outer_gsi = gsi_start_bb ( bb); !gsi_end_p ( outer_gsi); outer_gsi = next_gsi )
 	  {
+	    //DEBUG_L("at start transform loop\n");
+
 	    next_gsi = outer_gsi;
 	    gsi_next ( &next_gsi);
 	    // Every statement that uses a reorg type needs to
@@ -224,11 +227,18 @@ str_reorg_instance_interleave_trans ( Info *info)
 						      //true,
 						      false,
 						      info);
+		//DEBUG_L("");
+		//DEBUG_F(wolf_fence, info);
+
 		DEBUG_LA("");
 		if ( modified )
 		  {
 		    enum ReorgTransformation trans = 
 		      reorg_recognize ( stmt, node, info);
+
+		    //DEBUG_L("");
+		    //DEBUG_F(wolf_fence, info);
+
 		    DEBUG_LA("");
 		    switch ( trans)
 		      { 
@@ -279,6 +289,10 @@ str_reorg_instance_interleave_trans ( Info *info)
 		
 		enum ReorgTransformation trans = 
 		  reorg_recognize ( stmt, node, info);
+		
+		//DEBUG_L("");
+		//DEBUG_F(wolf_fence, info);
+
 		// print out trans and stmt if dumping
 		if ( info->show_transforms )
 		  {
@@ -2128,6 +2142,9 @@ str_reorg_instance_interleave_trans ( Info *info)
       }
     pop_cfun ();
   }
+
+  DEBUG_L("After transformations\n");
+  //DEBUG_F( wolf_fence, info);
 
   DEBUG_F ( print_program, info->reorg_dump_file,
 	    "After bulk of transformations",

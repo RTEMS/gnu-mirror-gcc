@@ -188,7 +188,7 @@ ipa_structure_reorg ( void)
   //DEBUG_L("after reorg_analysis\n");
 
   bool qualified = reorg_qualification(&info);
-  //DEBUG_L("after reorg_qualification\n");
+  DEBUG_L("after reorg_qualification\n");
   //DEBUG_L("");
   //DEBUG_F(wolf_fence, &info);
 
@@ -210,12 +210,12 @@ ipa_structure_reorg ( void)
     if ( flag_ipa_structure_reorg || flag_ipa_instance_interleave )
       {
 
-	//DEBUG_L("\n");
+	//DEBUG_L("");
 	//DEBUG_F( wolf_fence, &info);
 	
 	//DEBUG_L("before str_reorg_instance_interleave_qual\n");
 	str_reorg_instance_interleave_qual ( &info);
-	//DEBUG_L("after str_reorg_instance_interleave_qual\n");
+	DEBUG_L("after str_reorg_instance_interleave_qual\n");
 	//DEBUG_L("");
 	//DEBUG_F(wolf_fence, &info);
 
@@ -230,7 +230,7 @@ ipa_structure_reorg ( void)
       }
 
     reorg_common_middle_code( &info); // ??? might not amount to anything
-    //DEBUG_L("after reorg_common_middle_code\n");
+    DEBUG_L("after reorg_common_middle_code\n");
     //DEBUG_L("");
     //DEBUG_F(wolf_fence, &info);
       
@@ -246,6 +246,9 @@ ipa_structure_reorg ( void)
       {
         str_reorg_instance_interleave_trans ( &info);
       }
+    DEBUG_L("after optimizations\n");
+    //DEBUG_L("");
+    //DEBUG_F(wolf_fence, &info);
   }
 
   final_debug_info ( &info);
@@ -3895,12 +3898,20 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
     {
       DEBUG_A("a call\n");
       ReorgType_t *just_walker = the_reorg_walker ( stmt, info);
+      
+      //DEBUG_L("");
+      //wolf_fence ( info);
+
       if ( just_walker != NULL )
 	{
 	  DEBUG_A("walker found something\n");
 	  return just_walker;
 	}
       tree return_type = function_return_type ( stmt, info);
+
+      //DEBUG_L("");
+      //wolf_fence ( info);
+
       DEBUG_A("return_type = ");
       DEBUG_F(  flexible_print, stderr, return_type, 1, (dump_flags_t)0);
       //if ( TREE_CODE ( return_type) == VOID_TYPE)
@@ -3912,7 +3923,11 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
       else
 	{
 	  DEBUG_A("Not VOID.. looking it up\n");
-	  return get_reorgtype_info ( return_type, info );
+	  ReorgType_t *ret_val = get_reorgtype_info ( return_type, info );
+	  //DEBUG_L("");
+	  //wolf_fence ( info);
+
+	  return ret_val;
 	}
     }
   else
@@ -3988,6 +4003,10 @@ function_return_type ( gimple *stmt, Info *info )
   tree bt = void_type_node; // default to void
   // next line has issues but the mechanism is sound
   tree t = *gimple_call_lhs_ptr ( stmt);
+  
+  //DEBUG_L("");
+  //wolf_fence ( info);
+
   DEBUG_A( "t %p\n", t);
   // Calls to a function returning void are skipped.
   if ( t != NULL )
@@ -3999,6 +4018,9 @@ function_return_type ( gimple *stmt, Info *info )
       DEBUG_F( flexible_print, stderr, type, 1, (dump_flags_t)0);
 
       tree bt = base_type_of ( type);
+      //DEBUG_L("");
+      //wolf_fence ( info);
+
       if ( TREE_CODE( bt) == VOID_TYPE )
 	{
 	  // Find the use of lhs.  If is an assign
@@ -4009,32 +4031,58 @@ function_return_type ( gimple *stmt, Info *info )
 	  // variable.
 	  
 	  tree ssa_name = gimple_call_lhs( stmt);
+
+	  //DEBUG_L("");
+	  //wolf_fence ( info);
+
 	  gimple *use_stmt;
 	  imm_use_iterator iter;
-	  int num_bt = 0; // Use future
+	  int num_bt = 0; // future use
 	  FOR_EACH_IMM_USE_STMT ( use_stmt, iter, ssa_name)
 	    {
 	      DEBUG_A("use_stmt: ");
 	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+	      //DEBUG_L("");
+	      //wolf_fence ( info);
+
 	      if ( is_assign_from_ssa ( use_stmt ) )
 		{
 		  DEBUG_A("is assign from ssa\n");
 		  tree lhs_assign = gimple_assign_lhs( use_stmt);
+		  //DEBUG_L("");
+		  //wolf_fence ( info);
+
 		  tree lhs_type = TREE_TYPE ( lhs_assign);
+		  //DEBUG_L("");
+		  //wolf_fence ( info);
+
 		  tree lhs_base_type = base_type_of ( lhs_type);
+		  DEBUG_A( "lhs_base_type = ");
+		  DEBUG_F( flexible_print, stderr, lhs_base_type, 1, (dump_flags_t)0);
+
+		  //DEBUG_L("");
+		  //wolf_fence ( info);
+
 		  //if ( TREE_CODE( lhs_base_type) != VOID_TYPE )
 		  if ( !VOID_TYPE_P ( lhs_base_type) )
 		    {
 		      DEBUG_A("not void\n");
-		      return lhs_base_type;
-		      //num_bt++;
-		      //bt = lhs_base_type;
+		      INDENT(-2);
+		      //DEBUG_L("");
+		      //wolf_fence ( info);
+
+		      //return lhs_base_type;
+		      num_bt++;
+		      bt = lhs_base_type;
 		    }
 		}
 	    }
 	}
     }
   INDENT(-2);
+  DEBUG_A( "bt = ");
+  DEBUG_F( flexible_print, stderr, bt, 1, (dump_flags_t)0);
+
   return bt;
 }
 
@@ -4787,6 +4835,7 @@ wolf_fence (
 }
 #endif
 
+#if 0
 void
 wolf_fence (
 	     Info *info // Pass level gobal info (might not use it)
@@ -4801,6 +4850,56 @@ wolf_fence (
 	  fprintf ( stderr, "Wolf!\n");
 	  gcc_assert (0);
 	}
+    }
+  fprintf( stderr, "No Wolf\n");
+}
+#endif
+
+void
+wolf_fence (
+	     Info *info // Pass level gobal info (might not use it)
+	   )
+{
+  struct cgraph_node *node;
+  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY ( node)
+    {
+      struct function *func = DECL_STRUCT_FUNCTION ( node->decl);
+      push_cfun ( func);
+      basic_block bb;
+      FOR_EACH_BB_FN ( bb, func)
+	{
+	  gimple_stmt_iterator gsi;
+	  for ( gsi = gsi_start_bb ( bb); !gsi_end_p ( gsi); gsi_next ( &gsi) )
+	    {
+	      gimple *stmt = gsi_stmt ( gsi);
+
+	      if ( !is_gimple_call ( stmt) ) continue;
+	      
+	      DEBUG_L("stmt = ");
+	      DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
+
+	      imm_use_iterator iter;
+	      use_operand_p use_p;
+	      tree var = gimple_call_lhs( stmt);
+	      if ( var == NULL ) continue;
+
+	      DEBUG_A("var = ");
+	      DEBUG_F(  flexible_print, stderr, var, 1, (dump_flags_t)0);
+
+	      FOR_EACH_IMM_USE_FAST (use_p, iter, var)
+		{
+		  gimple *use_stmt = USE_STMT (use_p);
+		  if ( use_stmt == (gimple *)0x40ec8348e5894855 )
+		    {
+		      fprintf ( stderr, "Wolf!\n");
+		      gcc_assert (0);
+		    }
+		  DEBUG_L("use_stmt = ");
+		  DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
+		}
+	    }
+	}
+      pop_cfun ();
     }
   fprintf( stderr, "No Wolf\n");
 }
