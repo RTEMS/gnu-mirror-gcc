@@ -2690,7 +2690,9 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	      }
 	    else
 	      {
-		temp_set = gimple_build_assign( field_val_temp, rhs);
+		// Changing this to a CONVERT_EXPR got Mcf to compile to
+		// completion (it, is crashing now instead of the compiler.)
+		temp_set = gimple_build_assign( field_val_temp, CONVERT_EXPR, rhs);
 		SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
 	      }
 	    //SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
@@ -2729,7 +2731,7 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
 	    tree op1type_type = TREE_TYPE ( op1type);
 	    
 	    temp_set =
-	      gimple_build_assign( field_val_temp, rhs_ref);
+	      gimple_build_assign( field_val_temp, rhs_ref); // <======== Here too?
 	    SSA_NAME_DEF_STMT ( field_val_temp) = temp_set;
 
 	    //          lhs = temp
@@ -2976,7 +2978,7 @@ new_make_transformed_ref ( tree ref_in,
       
       tree rhs_faa = build3 ( COMPONENT_REF,
 			      exposed_field_type, 
-			      base, // <<<===============!!!!!
+			      base,
 			      base_field,
 			      NULL_TREE);
       

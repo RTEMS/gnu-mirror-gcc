@@ -3923,7 +3923,8 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
       else
 	{
 	  DEBUG_A("Not VOID.. looking it up\n");
-	  ReorgType_t *ret_val = get_reorgtype_info ( return_type, info );
+	  tree base = base_type_of ( return_type);
+	  ReorgType_t *ret_val = get_reorgtype_info ( base, info );
 	  //DEBUG_L("");
 	  //wolf_fence ( info);
 
@@ -4000,26 +4001,27 @@ function_return_type ( gimple *stmt, Info *info )
   DEBUG_A( "function_return_type:> ");
   DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   INDENT(2);
-  tree bt = void_type_node; // default to void
+  tree frt = void_type_node; // default to void
   // next line has issues but the mechanism is sound
   tree t = *gimple_call_lhs_ptr ( stmt);
   
-  //DEBUG_L("");
-  //wolf_fence ( info);
-
   DEBUG_A( "t %p\n", t);
   // Calls to a function returning void are skipped.
   if ( t != NULL )
     {
-      DEBUG_A( "t: ");
+      DEBUG_A( "t = ");
       DEBUG_F( flexible_print, stderr, t, 1, (dump_flags_t)0);
+      
       tree type = TREE_TYPE( t);
-      DEBUG_A( "type: ");
+      DEBUG_A( "type = ");
       DEBUG_F( flexible_print, stderr, type, 1, (dump_flags_t)0);
 
+      //tree frt = base_type_of ( type);
+      frt = type;
+      DEBUG_A( "frt = ");
+      DEBUG_F( flexible_print, stderr, frt, 1, (dump_flags_t)0);
       tree bt = base_type_of ( type);
-      //DEBUG_L("");
-      //wolf_fence ( info);
+      bool found = false;
 
       if ( TREE_CODE( bt) == VOID_TYPE )
 	{
@@ -4031,59 +4033,53 @@ function_return_type ( gimple *stmt, Info *info )
 	  // variable.
 	  
 	  tree ssa_name = gimple_call_lhs( stmt);
-
-	  //DEBUG_L("");
-	  //wolf_fence ( info);
+	  DEBUG_A( "ssa_name = ");
+	  DEBUG_F( flexible_print, stderr, ssa_name, 1, (dump_flags_t)0);
 
 	  gimple *use_stmt;
 	  imm_use_iterator iter;
-	  int num_bt = 0; // future use
 	  FOR_EACH_IMM_USE_STMT ( use_stmt, iter, ssa_name)
 	    {
+	      if ( found ) continue;
 	      DEBUG_A("use_stmt: ");
 	      DEBUG_F ( print_gimple_stmt, stderr, use_stmt, 0);
-	      //DEBUG_L("");
-	      //wolf_fence ( info);
 
 	      if ( is_assign_from_ssa ( use_stmt ) )
 		{
 		  DEBUG_A("is assign from ssa\n");
 		  tree lhs_assign = gimple_assign_lhs( use_stmt);
-		  //DEBUG_L("");
-		  //wolf_fence ( info);
+		  DEBUG_A( "lhs_assign = ");
+		  DEBUG_F( flexible_print, stderr, lhs_assign, 1, (dump_flags_t)0);
 
 		  tree lhs_type = TREE_TYPE ( lhs_assign);
-		  //DEBUG_L("");
-		  //wolf_fence ( info);
+		  DEBUG_A( "lhs_type = ");
+		  DEBUG_F( flexible_print, stderr, lhs_type, 1, (dump_flags_t)0);
 
 		  tree lhs_base_type = base_type_of ( lhs_type);
 		  DEBUG_A( "lhs_base_type = ");
 		  DEBUG_F( flexible_print, stderr, lhs_base_type, 1, (dump_flags_t)0);
-
-		  //DEBUG_L("");
-		  //wolf_fence ( info);
 
 		  //if ( TREE_CODE( lhs_base_type) != VOID_TYPE )
 		  if ( !VOID_TYPE_P ( lhs_base_type) )
 		    {
 		      DEBUG_A("not void\n");
 		      INDENT(-2);
-		      //DEBUG_L("");
-		      //wolf_fence ( info);
 
-		      //return lhs_base_type;
-		      num_bt++;
-		      bt = lhs_base_type;
+		      // Do not a return in a FOR_EACH_IMM_USE_STMT loop
+		      frt = lhs_type;
+		      DEBUG_A( "frt (from lhs_type) = ");
+		      DEBUG_F( flexible_print, stderr, frt, 1, (dump_flags_t)0);
+		      found = true;
 		    }
 		}
 	    }
 	}
     }
   INDENT(-2);
-  DEBUG_A( "bt = ");
-  DEBUG_F( flexible_print, stderr, bt, 1, (dump_flags_t)0);
+  DEBUG_A( "return frt = ");
+  DEBUG_F( flexible_print, stderr, frt, 1, (dump_flags_t)0);
 
-  return bt;
+  return frt;
 }
 
 bool
