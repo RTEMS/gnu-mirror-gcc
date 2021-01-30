@@ -253,7 +253,7 @@ in the following sections.
 -Weffc++  -Wno-exceptions -Wextra-semi  -Wno-inaccessible-base @gol
 -Wno-inherited-variadic-ctor  -Wno-init-list-lifetime @gol
 -Winvalid-imported-macros @gol
--Wno-invalid-offsetof  -Wno-literal-suffix -Wsize_t-literals @gol
+-Wno-invalid-offsetof  -Wno-literal-suffix @gol
 -Wno-mismatched-new-delete -Wmismatched-tags @gol
 -Wmultiple-inheritance  -Wnamespaces  -Wnarrowing @gol
 -Wnoexcept  -Wnoexcept-type  -Wnon-virtual-dtor @gol
@@ -3586,16 +3586,6 @@ begin with an underscore. Literal suffix identifiers that don't begin
 with an underscore are reserved for future standardization.
 
 These warnings are enabled by default.
- 
-@item -Wsize_t-literals @r{(C, Objective-C, C++, and Objective-C++)}
-@opindex Wsize_t-literals
-@opindex Wno-size_t-literals
-Warn when \"z\" or \"Z\" is used in a numeric literal suffix for C or C++yy,
-for yy <= 20. This suffix can be combined with \"u\" or \"U\" for a size_t
-literal.
-
-This warning is enabled by default.
-
 
 @item -Wno-narrowing @r{(C++ and Objective-C++ only)}
 @opindex Wnarrowing
