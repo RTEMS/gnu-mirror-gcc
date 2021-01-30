@@ -1,3 +1,148 @@
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/98331
+	* cfgbuild.c (find_bb_boundaries): Reset debug_insn when seeing
+	a BARRIER.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98853
+	* config/aarch64/aarch64.md (*aarch64_bfxilsi_uxtw): Use
+	%w0, %w1 and %2 instead of %0, %1 and %2.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98681
+	* config/aarch64/aarch64.c (aarch64_mask_and_shift_for_ubfiz_p):
+	Use UINTVAL (shft_amnt) and UINTVAL (mask) instead of INTVAL (shft_amnt)
+	and INTVAL (mask).  Add && INTVAL (mask) > 0 condition.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/98771
+	* fold-const-call.c (host_size_t_cst_p): Renamed to ...
+	(size_t_cst_p): ... this.  Check and store unsigned HOST_WIDE_INT
+	value rather than host size_t.
+	(fold_const_call): Change type of s2 from size_t to
+	unsigned HOST_WIDE_INT.  Use size_t_cst_p instead of
+	host_size_t_cst_p.  For strncmp calls, pass MIN (s2, SIZE_MAX)
+	instead of s2 as last argument.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/97301
+	* config/rs6000/mmintrin.h (__m64): Add __may_alias__ attribute.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/90248
+	* match.pd (X cmp 0.0 ? 1.0 : -1.0 -> copysign(1, +-X),
+	X cmp 0.0 ? -1.0 : +1.0 -> copysign(1, -+X)): Remove
+	simplifications.
+	(X * (X cmp 0.0 ? 1.0 : -1.0) -> +-abs(X),
+	X * (X cmp 0.0 ? -1.0 : 1.0) -> +-abs(X)): New simplifications.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/98255
+	* tree-dfa.c (get_ref_base_and_extent): For ARRAY_REFs, sign
+	extend index - low_bound from sizetype's precision rather than index
+	precision.
+	(get_addr_base_and_unit_offset_1): Likewise.
+	* tree-ssa-sccvn.c (ao_ref_init_from_vn_reference): Likewise.
+	* gimple-fold.c (fold_const_aggregate_ref_1): Likewise.
+
+2021-01-29  Bin Cheng  <bin.cheng@linux.alibaba.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97627
+	* tree-ssa-loop-niter.c (number_of_iterations_exit_assumptions):
+	Do not analyze fake edges.
+
+2021-01-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2021-01-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR tree-optimization/98766
+	* tree-ssa-math-opts.c (convert_mult_to_fma): Use maybe_le when
+	comparing against type size with param_avoid_fma_max_bits.
+
+2021-01-26  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/98739
+	* common.opt: Add missing equal symbol.
+
+2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backported from master:
+	2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rtems.h (STARTFILE_SPEC): Remove qnolinkcmds.
+	(ENDFILE_SPEC): Evaluate qnolinkcmds.
+
+2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backported from master:
+	2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rtems.h (STARTFILE_SPEC): Remove nostdlib and
+	nostartfiles handling since this is already done by
+	LINK_COMMAND_SPEC.  Evaluate qnolinkcmds.
+	(ENDFILE_SPEC): Remove nostdlib and nostartfiles handling since this
+	is already done by LINK_COMMAND_SPEC.
+	(LIB_SPECS): Remove nostdlib and nodefaultlibs handling since
+	this is already done by LINK_COMMAND_SPEC.  Remove qnolinkcmds
+	evaluation.
+
+2021-01-25  Claudiu Zissulescu  <claziss@gmail.com>
+
+	Backported from master:
+	2020-12-11  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc.md (mpyd<su_optab>_arcv2hs): New template
+	pattern.
+	(*pmpyd<su_optab>_arcv2hs): Likewise.
+	(*pmpyd<su_optab>_imm_arcv2hs): Likewise.
+	(mpyd_arcv2hs): Moved into above template.
+	(mpyd_imm_arcv2hs): Moved into above template.
+	(mpydu_arcv2hs): Likewise.
+	(mpydu_imm_arcv2hs): Likewise.
+	(su_optab): New optab prefix for sign/zero-extending operations.
+
+2021-01-22  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/98535
+	* tree-vect-slp.c (duplicate_and_interleave): Use quick_grow_cleared.
+	If the high and low permutes are the same, remove the high permutes
+	from the working set and only continue with the low ones.
+
+2021-01-21  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* config/arm/arm_mve.h (__arm_vcmpneq_s8): Fix return type.
+
+2021-01-19  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-01-19  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/98690
+	* ipa-sra.c (ssa_name_only_returned_p): New parameter fun.  Check
+	whether non-call exceptions allow removal of a statement.
+	(isra_analyze_call): Pass the appropriate function to
+	ssa_name_only_returned_p.
+
+2021-01-19  Daniel Hellstrom  <daniel@gaisler.com>
+
+	Backported from master:
+	2021-01-19  Daniel Hellstrom  <daniel@gaisler.com>
+
+	* config/sparc/rtemself.h (TARGET_OS_CPP_BUILTINS): Add
+	built-in define __FIX_LEON3FT_TN0018.
+
 2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
 
 	Backported from master:
