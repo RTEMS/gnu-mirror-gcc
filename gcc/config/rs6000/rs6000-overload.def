@@ -992,7 +992,7 @@
   signed int __builtin_vec_vcmpne_p (signed int, vbll, vsll);
     VCMPNED_P  VCMPNED_P_SB
 
-[VEC_CMPNEZ, vec_cmpnez, __builtin_vec_cmpnez, _ARCH_PWR9]
+[VEC_CMPNEZ, vec_cmpnez, __builtin_vec_vcmpnez, _ARCH_PWR9]
   vbc __builtin_vec_cmpnez (vsc, vsc);
     CMPNEZB  CMPNEZB_S
   vbc __builtin_vec_cmpnez (vuc, vuc);
@@ -1654,19 +1654,19 @@
     MTVSRBM
 
 [VEC_GENHM, vec_genhm, __builtin_vec_mtvsrhm, _ARCH_PWR10]
-  vuc __builtin_vec_mtvsrhm (unsigned long long);
+  vus __builtin_vec_mtvsrhm (unsigned long long);
     MTVSRHM
 
 [VEC_GENWM, vec_genwm, __builtin_vec_mtvsrwm, _ARCH_PWR10]
-  vuc __builtin_vec_mtvsrwm (unsigned long long);
+  vui __builtin_vec_mtvsrwm (unsigned long long);
     MTVSRWM
 
 [VEC_GENDM, vec_gendm, __builtin_vec_mtvsrdm, _ARCH_PWR10]
-  vuc __builtin_vec_mtvsrdm (unsigned long long);
+  vull __builtin_vec_mtvsrdm (unsigned long long);
     MTVSRDM
 
 [VEC_GENQM, vec_genqm, __builtin_vec_mtvsrqm, _ARCH_PWR10]
-  vuc __builtin_vec_mtvsrqm (unsigned long long);
+  vuq __builtin_vec_mtvsrqm (unsigned long long);
     MTVSRQM
 
 [VEC_GENPCVM, vec_genpcvm, __builtin_vec_xxgenpcvm, _ARCH_PWR10]
@@ -3462,7 +3462,7 @@
   vf __builtin_vec_xxspltiw (float);
     VXXSPLTIW_V4SF
 
-[VEC_SPLATID, vec_splatid, __builtin_vec_xxspltid, ARCH_PWR10]
+[VEC_SPLATID, vec_splatid, __builtin_vec_xxspltid, _ARCH_PWR10]
   vd __builtin_vec_xxspltid (float);
     VXXSPLTIDP
 
@@ -4417,6 +4417,8 @@
     LXVW4X_V16QI  LXVW4X_VUC
   vuc __builtin_vec_vsx_ld (signed long long, const unsigned char *);
     LXVW4X_V16QI  LXVW4X_UC
+  vbc __builtin_vec_vsx_ld (signed long long, const vbc *);
+    LXVW4X_V16QI  LXVW4X_VBC
   vss __builtin_vec_vsx_ld (signed long long, const vss *);
     LXVW4X_V8HI  LXVW4X_VSS
   vss __builtin_vec_vsx_ld (signed long long, const signed short *);
@@ -4425,6 +4427,8 @@
     LXVW4X_V8HI  LXVW4X_VUS
   vus __builtin_vec_vsx_ld (signed long long, const unsigned short *);
     LXVW4X_V8HI  LXVW4X_US
+  vbs __builtin_vec_vsx_ld (signed long long, const vbs *);
+    LXVW4X_V8HI  LXVW4X_VBS
   vp __builtin_vec_vsx_ld (signed long long, const vp *);
     LXVW4X_V8HI  LXVW4X_P
   vsi __builtin_vec_vsx_ld (signed long long, const vsi *);
@@ -4435,6 +4439,8 @@
     LXVW4X_V4SI  LXVW4X_VUI
   vui __builtin_vec_vsx_ld (signed long long, const unsigned int *);
     LXVW4X_V4SI  LXVW4X_UI
+  vbi __builtin_vec_vsx_ld (signed long long, const vbi *);
+    LXVW4X_V4SI  LXVW4X_VBI
   vsll __builtin_vec_vsx_ld (signed long long, const vsll *);
     LXVD2X_V2DI  LXVD2X_VSLL
   vsll __builtin_vec_vsx_ld (signed long long, const signed long long *);
@@ -4443,6 +4449,8 @@
     LXVD2X_V2DI  LXVD2X_VULL
   vull __builtin_vec_vsx_ld (signed long long, const unsigned long long *);
     LXVD2X_V2DI  LXVD2X_ULL
+  vbll __builtin_vec_vsx_ld (signed long long, const vbll *);
+    LXVD2X_V2DI  LXVD2X_VBLL
   vsq __builtin_vec_vsx_ld (signed long long, const vsq *);
     LXVD2X_V1TI  LXVD2X_VSQ
   vsq __builtin_vec_vsx_ld (signed long long, const signed __int128 *);
@@ -4519,13 +4527,13 @@
     SE_LXVRDX
 
 [VEC_XL_ZEXT, vec_xl_zext, __builtin_vec_xl_zext, _ARCH_PWR10]
-  vsq __builtin_vec_xl_zext (signed long long, const signed char *);
+  vuq __builtin_vec_xl_zext (signed long long, const unsigned char *);
     ZE_LXVRBX
-  vsq __builtin_vec_xl_zext (signed long long, const signed short *);
+  vuq __builtin_vec_xl_zext (signed long long, const unsigned short *);
     ZE_LXVRHX
-  vsq __builtin_vec_xl_zext (signed long long, const signed int *);
+  vuq __builtin_vec_xl_zext (signed long long, const unsigned int *);
     ZE_LXVRWX
-  vsq __builtin_vec_xl_zext (signed long long, const signed long long *);
+  vuq __builtin_vec_xl_zext (signed long long, const unsigned long long *);
     ZE_LXVRDX
 
 [VEC_XOR, vec_xor, __builtin_vec_xor]

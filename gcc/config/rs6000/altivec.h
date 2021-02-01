@@ -58,18 +58,20 @@
 #include "rs6000-vecdefines.h"
 
 /* Deprecated interfaces.  */
-#define vec_vsld vec_sld
-#define vec_vsrad vec_srad
-#define vec_vsrd vec_srd
+#ifdef _ARCH_PWR8
+#define vec_vsld vec_sl
+#define vec_vsrd vec_sr
+#define vec_vsrad vec_sra
+#endif
 
 #ifdef _ARCH_PWR9
 #define __builtin_vec_vadub __builtin_vec_vadu
 #define __builtin_vec_vaduh __builtin_vec_vadu
 #define __builtin_vec_vaduw __builtin_vec_vadu
-#define __builtin_vec_vprtybw __builtin_vec_vprtyb
-#define __builtin_vec_vprtybd __builtin_vec_vprtyb
-#define __builtin_vec_vprtybq __builtin_vec_vprtyb
-#define vec_vrlnm vec_rlnm
+#define vec_vprtybw vec_vprtyb
+#define vec_vprtybd vec_vprtyb
+#define vec_vprtybq vec_vprtyb
+#define vec_vrlnm __builtin_vec_rlnm
 #endif
 
 /* Synonyms.  */

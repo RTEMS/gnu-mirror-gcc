@@ -1647,37 +1647,37 @@
   fpmath vf __builtin_vsx_xvaddsp (vf, vf);
     XVADDSP addv4sf3 {}
 
-  const vbll __builtin_vsx_xvcmpeqdp (vd, vd);
+  const vd __builtin_vsx_xvcmpeqdp (vd, vd);
     XVCMPEQDP vector_eqv2df {}
 
   const signed int __builtin_vsx_xvcmpeqdp_p (signed int, vd, vd);
     XVCMPEQDP_P vector_eq_v2df_p {pred}
 
-  const vbi __builtin_vsx_xvcmpeqsp (vf, vf);
+  const vf __builtin_vsx_xvcmpeqsp (vf, vf);
     XVCMPEQSP vector_eqv4sf {}
 
   const signed int __builtin_vsx_xvcmpeqsp_p (signed int, vf, vf);
     XVCMPEQSP_P vector_eq_v4sf_p {pred}
 
-  const vbll __builtin_vsx_xvcmpgedp (vd, vd);
+  const vd __builtin_vsx_xvcmpgedp (vd, vd);
     XVCMPGEDP vector_gev2df {}
 
   const signed int __builtin_vsx_xvcmpgedp_p (signed int, vd, vd);
     XVCMPGEDP_P vector_ge_v2df_p {pred}
 
-  const vbi __builtin_vsx_xvcmpgesp (vf, vf);
+  const vf __builtin_vsx_xvcmpgesp (vf, vf);
     XVCMPGESP vector_gev4sf {}
 
   const signed int __builtin_vsx_xvcmpgesp_p (signed int, vf, vf);
     XVCMPGESP_P vector_ge_v4sf_p {pred}
 
-  const vbll __builtin_vsx_xvcmpgtdp (vd, vd);
+  const vd __builtin_vsx_xvcmpgtdp (vd, vd);
     XVCMPGTDP vector_gtv2df {}
 
   const signed int __builtin_vsx_xvcmpgtdp_p (signed int, vd, vd);
     XVCMPGTDP_P vector_gt_v2df_p {pred}
 
-  const vbi __builtin_vsx_xvcmpgtsp (vf, vf);
+  const vf __builtin_vsx_xvcmpgtsp (vf, vf);
     XVCMPGTSP vector_gtv4sf {}
 
   const signed int __builtin_vsx_xvcmpgtsp_p (signed int, vf, vf);
@@ -1927,25 +1927,25 @@
   const vsi __builtin_vsx_xxmrglw_4si (vsi, vsi);
     XXMRGLW_4SI vsx_xxmrglw_v4si {}
 
-  const vsc __builtin_vsx_xxpermdi_16qi (vsc, vsc, const int<1>);
+  const vsc __builtin_vsx_xxpermdi_16qi (vsc, vsc, const int<2>);
     XXPERMDI_16QI vsx_xxpermdi_v16qi {}
 
-  const vsq __builtin_vsx_xxpermdi_1ti (vsq, vsq, const int<1>);
+  const vsq __builtin_vsx_xxpermdi_1ti (vsq, vsq, const int<2>);
     XXPERMDI_1TI vsx_xxpermdi_v1ti {}
 
-  const vd __builtin_vsx_xxpermdi_2df (vd, vd, const int<1>);
+  const vd __builtin_vsx_xxpermdi_2df (vd, vd, const int<2>);
     XXPERMDI_2DF vsx_xxpermdi_v2df {}
 
-  const vsll __builtin_vsx_xxpermdi_2di (vsll, vsll, const int<1>);
+  const vsll __builtin_vsx_xxpermdi_2di (vsll, vsll, const int<2>);
     XXPERMDI_2DI vsx_xxpermdi_v2di {}
 
-  const vf __builtin_vsx_xxpermdi_4sf (vf, vf, const int<1>);
+  const vf __builtin_vsx_xxpermdi_4sf (vf, vf, const int<2>);
     XXPERMDI_4SF vsx_xxpermdi_v4sf {}
 
-  const vsi __builtin_vsx_xxpermdi_4si (vsi, vsi, const int<1>);
+  const vsi __builtin_vsx_xxpermdi_4si (vsi, vsi, const int<2>);
     XXPERMDI_4SI vsx_xxpermdi_v4si {}
 
-  const vss __builtin_vsx_xxpermdi_8hi (vss, vss, const int<1>);
+  const vss __builtin_vsx_xxpermdi_8hi (vss, vss, const int<2>);
     XXPERMDI_8HI vsx_xxpermdi_v8hi {}
 
   const vsc __builtin_vsx_xxsel_16qi (vsc, vsc, vsc);
