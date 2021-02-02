@@ -3414,9 +3414,63 @@ rs6000_builtin_mask_calculate (void)
 
 static rtx_insn *
 rs6000_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
-		      vec<const char *> &/*constraints*/,
+		      vec<const char *> &constraints,
 		      vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs)
 {
+  /* If prefixed addresses are allowed, change the "m" constraint to "em" and
+     the "o" constraint to "eo".  The "em" and "eo" constraints do not allow
+     prefixed memory.  */
+  if (TARGET_PREFIXED)
+    {
+      size_t max_len = 0;
+      for (unsigned i = 0; i < constraints.length (); ++i)
+	{
+	  size_t len = strlen (constraints[i]);
+	  if (len > max_len)
+	    max_len = len;
+	}
+
+      char *buffer = (char *) alloca (2 * max_len + 1);
+      for (unsigned i = 0; i < constraints.length (); ++i)
+	{
+	  const char *constraint = constraints[i];
+	  char *new_constraint = buffer;
+	  char ch;
+	  bool found_m_or_o = false;
+
+	  while ((ch = *constraint++) != '\0')
+	    switch (ch)
+	      {
+	      default:
+		*new_constraint++ = ch;
+		break;
+
+		/* If we found 'm' or 'o', convert it to 'em' or 'eo' so that
+		   prefixed memory is not allowed.  */
+	      case 'm':
+	      case 'o':
+		found_m_or_o = true;
+		*new_constraint++ = 'e';
+		*new_constraint++ = ch;
+		break;
+
+		/* 'e' and 'w' begin two letter constraints.  */
+	      case 'e':
+	      case 'w':
+		*new_constraint++ = ch;
+		*new_constraint++ = *constraint++;
+		break;
+	      }
+
+	  /* If we had 'm' or 'o', update the constraints.  */
+	  if (found_m_or_o)
+	    {
+	      *new_constraint = '\0';
+	      constraints[i] = xstrdup (buffer);
+	    }
+	}
+    }
+
   clobbers.safe_push (gen_rtx_REG (SImode, CA_REGNO));
   SET_HARD_REG_BIT (clobbered_regs, CA_REGNO);
   return NULL;

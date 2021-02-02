@@ -3369,6 +3369,15 @@ are now only allowed when @code{<} or @code{>} is used, @code{es} is
 basically the same as @code{m} without @code{<} and @code{>}.
 @end ifset
 
+@item em
+A memory operand that is not prefixed.
+
+@item eo
+A memory operand that is offsettable but it is not prefixed.
+
+@item ep
+A memory operand that is prefixed.
+
 @item Q
 A memory operand addressed by just a base register.
 

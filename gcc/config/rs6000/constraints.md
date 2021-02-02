@@ -245,6 +245,25 @@
   (and (match_code "mem")
        (match_test "GET_RTX_CLASS (GET_CODE (XEXP (op, 0))) != RTX_AUTOINC")))
 
+;; Non-prefixed memory
+(define_memory_constraint "em"
+  "@internal Memory operand that is not prefixed."
+  (and (match_code "mem")
+       (not (match_operand 0 "prefixed_memory"))))
+
+;; Non-prefixed memory that is also offsettable
+(define_memory_constraint "eo"
+  "@internal Memory operand that is not prefixed but is offsettable."
+  (and (match_code "mem")
+       (not (match_operand 0 "prefixed_memory"))
+       (match_operand 0 "offsettable_mem_operand")))
+
+;; prefixed memory
+(define_memory_constraint "ep"
+  "@internal Memory operand that is prefixed."
+  (and (match_code "mem")
+       (match_operand 0 "prefixed_memory")))
+
 (define_memory_constraint "Q"
   "A memory operand addressed by just a base register."
   (and (match_code "mem")
