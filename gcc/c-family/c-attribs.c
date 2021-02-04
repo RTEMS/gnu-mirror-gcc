@@ -5347,7 +5347,8 @@ handle_optimize_attribute (tree *node, tree name, tree args,
 				 TREE_OPTIMIZATION (old_opts));
 
       /* Parse options, and update the vector.  */
-      parse_optimize_options (args, true);
+      parse_optimize_and_target_options (&global_options, &global_options_set,
+					 args, true, false);
       DECL_FUNCTION_SPECIFIC_OPTIMIZATION (*node)
 	= build_optimization_node (&global_options, &global_options_set);
 

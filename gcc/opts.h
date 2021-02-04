@@ -490,6 +490,10 @@ extern char *gen_producer_string (const char *language_string,
 				  cl_decoded_option *options,
 				  unsigned int options_count);
 
+void parse_optimize_and_target_options (gcc_options *opts,
+					gcc_options *opts_set, tree args,
+					bool attr_p, bool is_target);
+
 /* Set OPTION in OPTS to VALUE if the option is not set in OPTS_SET.  */
 
 #define SET_OPTION_IF_UNSET(OPTS, OPTS_SET, OPTION, VALUE) \

@@ -1061,8 +1061,6 @@ extern bool c_cpp_diagnostic (cpp_reader *, enum cpp_diagnostic_level,
 extern int c_common_has_attribute (cpp_reader *, bool);
 extern int c_common_has_builtin (cpp_reader *);
 
-extern bool parse_optimize_options (tree, bool);
-
 /* Positive if an implicit `extern "C"' scope has just been entered;
    negative if such a scope has just been exited.  */
 extern GTY(()) int pending_lang_change;

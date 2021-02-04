@@ -2705,6 +2705,7 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/internal-fn.h \
   $(srcdir)/calls.c \
   $(srcdir)/omp-general.h \
+  $(srcdir)/opts-global.c \
   @all_gtfiles@
 
 # Compute the list of GT header files from the corresponding C sources,

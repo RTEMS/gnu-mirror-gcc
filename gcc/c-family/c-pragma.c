@@ -984,7 +984,8 @@ handle_pragma_optimize (cpp_reader *ARG_UNUSED(dummy))
       /* put arguments in the order the user typed them.  */
       args = nreverse (args);
 
-      parse_optimize_options (args, false);
+      parse_optimize_and_target_options (&global_options, &global_options_set,
+					 args, false, false);
       current_optimize_pragma = chainon (current_optimize_pragma, args);
       optimization_current_node
 	= build_optimization_node (&global_options, &global_options_set);

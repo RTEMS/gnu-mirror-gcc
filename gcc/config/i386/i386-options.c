@@ -1313,10 +1313,14 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
   memset (&enum_opts_set, 0, sizeof (enum_opts_set));
 
   /* Process each of the options on the chain.  */
+  /*
   if (!ix86_valid_target_attribute_inner_p (fndecl, args, option_strings, opts,
 					    opts_set, &enum_opts_set,
 					    target_clone_attr))
     return error_mark_node;
+*/
+
+  parse_optimize_and_target_options (opts, opts_set, args, true, true);
 
   /* If the changed options are different from the default, rerun
      ix86_option_override_internal, and then save the options away.
@@ -1328,7 +1332,8 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
       || option_strings[IX86_FUNCTION_SPECIFIC_ARCH]
       || option_strings[IX86_FUNCTION_SPECIFIC_TUNE]
       || enum_opts_set.x_ix86_fpmath
-      || enum_opts_set.x_prefer_vector_width_type)
+      || enum_opts_set.x_prefer_vector_width_type
+      || true) // TODO: do it conditionally
     {
       /* If we are using the default tune= or arch=, undo the string assigned,
 	 and use the default.  */
