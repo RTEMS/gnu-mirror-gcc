@@ -2456,14 +2456,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 	}
       INDENT(-4);
 
-      // Might be a bad idea.
-      #if 0
-      for ( auto iter = ssa_to_delete.begin ();iter != ssa_to_delete.end (); iter++ )
-	{
-	  remove_default_def ( *iter, func);
-	}
-      #endif
-
       pop_cfun ();
     }
 
@@ -2488,9 +2480,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 
   return 0;
 }
-
-#if 0
-#endif
 
 static void
 new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
@@ -2758,33 +2747,8 @@ new_make_transformed_ref ( tree ref_in,
   DEBUG_F(flexible_print, stderr, ref_in, 1, (dump_flags_t)0);
   INDENT(2);
 
-  #if 0
-  tree gcc_type = ri->gcc_type;
-  tree mod_gcc_type = find_modified ( gcc_type,
-				      false,
-				      info);
-  #endif
-
-  #if 0
-  tree reorg_ver_type = ri->reorg_ver_type;
-  
-  tree mod_ver_type = find_modified ( reorg_ver_type,
-				      false,
-				      info);
-  #endif
-
   DEBUG_A("modif_type = ");
   DEBUG_F(flexible_print, stderr, modif_type, 1, (dump_flags_t)0);
-  #if 0
-  DEBUG_A("gcc_type = ");
-  DEBUG_F(flexible_print, stderr, gcc_type, 1, (dump_flags_t)0);
-  DEBUG_A("mod_gcc_type = ");
-  DEBUG_F(flexible_print, stderr, mod_gcc_type, 1, (dump_flags_t)0);
-  DEBUG_A("reorg_ver_type = ");
-  DEBUG_F(flexible_print, stderr, reorg_ver_type, 1, (dump_flags_t)0);
-  DEBUG_A("mod_ver_type = ");
-  DEBUG_F(flexible_print, stderr, mod_ver_type, 1, (dump_flags_t)0);
-  #endif
   
   // For deeply nested case we need the lowest.
   tree lowest_comp_ref = find_deepest_comp_ref ( ref_in);
@@ -2866,28 +2830,6 @@ new_make_transformed_ref ( tree ref_in,
   DEBUG_A("exposed_field_type = ");
   DEBUG_F(flexible_print, stderr, exposed_field_type, 1, (dump_flags_t)0);
 
-  #if 0
-  // The this changes because it the lowest field now
-  tree top_field_type = TREE_TYPE ( ref_in);
-
-  DEBUG_A("top_field_type = ");
-  DEBUG_F(flexible_print, stderr, top_field_type, 1, (dump_flags_t)0);
-
-  // Maybe this should go at the bottom near new_create_deep_ref
-  // and use use_this_field_type insteaad of top_field_type
-  // Note, exposed_field_type seems to also work... let's try it.
-
-  #if 0
-  *field_val_temp =
-    make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
-  #else
-  // This doesn't work either but it seems closer that other versions
-  // and I need to determine the exact nature of the failure.
-  *field_val_temp =
-    make_temp_ssa_name( exposed_field_type, NULL, "field_val_temp");
-  #endif
-  #endif
-
   DEBUG_A("create_addr_expr_stmts_for_reorg = %s\n",
 	  create_addr_expr_stmts_for_reorg ? "true" : "false");
       
@@ -2899,14 +2841,6 @@ new_make_transformed_ref ( tree ref_in,
       // We are punting on this for thr grins of it for now.... I want to
       // see what breaks.
 
-      #if 0
-      // The this changes because it the lowest field now
-      tree top_field_type = TREE_TYPE ( ref_in);
-      
-      *field_val_temp =
-	make_temp_ssa_name( top_field_type, NULL, "field_val_temp");
-      #endif
-      
       // NOTE. Things get weird fast if inner_op is a decl.
       tree inner_op = TREE_OPERAND( lowest_comp_ref, 0);
       
@@ -2995,10 +2929,7 @@ new_make_transformed_ref ( tree ref_in,
       gimple_seq_add_stmt ( pre_ref_seq, get_field_addr);
     }
 
-  #define ABUGFIX 1
-  #if 1
   tree use_this_field_type;
-  #if ABUGFIX
   DEBUG_A("tree_code(ref_in) = %s\n", code_str( TREE_CODE(ref_in)));
   tree topmost_field;
   bool its_an_array = TREE_CODE(ref_in) == ARRAY_REF;
@@ -3025,7 +2956,6 @@ new_make_transformed_ref ( tree ref_in,
     }
   DEBUG_A("topmost_field = ");
   DEBUG_F(flexible_print, stderr, topmost_field, 1, (dump_flags_t)0);
-  #endif
 
   
   DEBUG_A("modif_type = ");
@@ -3036,15 +2966,12 @@ new_make_transformed_ref ( tree ref_in,
       // find corresponding field
       tree struct_type_to_use =
 	find_modified ( modif_type, false, info);
-      #if ABUGFIX
+
       // TBD instead of orig_field use the actual topmost
       // field. orig_field is the bottom-most.
       tree field_to_use =
 	find_corresponding_field ( struct_type_to_use, topmost_field);
-      #else
-      tree field_to_use =
-	find_corresponding_field ( struct_type_to_use, orig_field);
-      #endif
+
       use_this_field_type = TREE_TYPE ( field_to_use);
     }
   else
@@ -3052,7 +2979,6 @@ new_make_transformed_ref ( tree ref_in,
       gcc_assert ( ri);
 
       // This works only because it's not been modified!
-      #if ABUGFIX
       if ( its_an_array )
 	{
 	  use_this_field_type = array_type;
@@ -3061,56 +2987,15 @@ new_make_transformed_ref ( tree ref_in,
 	{
 	  use_this_field_type = TREE_TYPE ( topmost_field);
 	}
-      #else
-      use_this_field_type = TREE_TYPE ( orig_field);
-      #endif
     }
-  #endif
 
-  #if 0
-  #if 0
-  // Since this is a base field get rid of the extra pointer type
-  tree derefed_exposed_field_type = TREE_TYPE( exposed_field_type);
-
-  DEBUG_A("derefed_exposed_field_type = ");
-  DEBUG_F(flexible_print, stderr, derefed_exposed_field_type, 1, (dump_flags_t)0);
-  
-  // Of course if the field is a reorg pointer type then there  is
-  // no extra pointer type level!
-  // Note, I don't this is sufficient to gaurantee that use_this...
-  // is set correctly based on it being a reorg type or not.
-  tree use_this_field_type =
-    derefed_base_field_type != NULL ? derefed_base_field_type : exposed_field_type;
-  #else
-  tree use_this_field_type = exposed_field_type;
-  tree base_of_exposed = base_type_of ( exposed_field_type);
-  DEBUG_A("base_of_exposed = ");
-  DEBUG_F(flexible_print, stderr, base_of_exposed, 1, (dump_flags_t)0);
-
-  if ( is_reorg_pointer_type ( base_of_exposed, info) )
-    {
-      DEBUG_A("was a reorg ptr type\n");
-      tree derefed_exposed_field_type = TREE_TYPE( exposed_field_type);
-      DEBUG_A("derefed_exposed_field_type = ");
-      DEBUG_F(flexible_print, stderr, derefed_exposed_field_type, 1, (dump_flags_t)0);
-
-      if ( derefed_exposed_field_type != NULL )
-	{
-	  use_this_field_type = derefed_exposed_field_type;
-	}
-    }
-  #endif
-  #endif
   DEBUG_A("use_this_field_type = ");
   DEBUG_F(flexible_print, stderr, use_this_field_type, 1, (dump_flags_t)0);
   
-  // Wait to enable this... try it now
-  #if 1
   *field_val_temp =
     make_temp_ssa_name( use_this_field_type, NULL, "field_val_temp");
   DEBUG_A("created field_val_temp = ");
   DEBUG_F(flexible_print, stderr, *field_val_temp, 1, (dump_flags_t)0);
-  #endif
   
   *ref_out =
     new_create_deep_ref ( ref_in, use_this_field_type, field_addr, info);
@@ -3292,8 +3177,7 @@ create_deep_ref_aux ( tree    ref_in,
 	  // This case doesn'ty seem to happen
 	  DEBUG_A("field_addr != NULL\n");
 	  tree type_to_use;
-	  #define FIX_FIELD_TYPE 1
-	  #if FIX_FIELD_TYPE
+
 	  // TBD type modifications are needed here
 	  // (including reorg stuff!)
 	  tree inner_op1_type = TREE_TYPE ( inner_op1);
@@ -3301,9 +3185,6 @@ create_deep_ref_aux ( tree    ref_in,
 	  DEBUG_A("type_to_use = ");
 	  DEBUG_F(flexible_print, stderr, type_to_use, 1, (dump_flags_t)0);
 
-	  #else
-	  type_to_use = field_type;
-	  #endif
 	  tree deepest =
 	    build2 ( MEM_REF, type_to_use, field_addr,
 		     build_int_cst (ptr_type_node, 0));
@@ -3859,19 +3740,10 @@ static void
 str_reorg_instance_interleave_type_part ( Info *info)
 {
   DEBUG_A("str_reorg_instance_interleave_type_part:>\n");
-  #if 0
-  create_new_types ( info);
-  #endif
 
-  #if 1
   create_pointer_reps ( info); // TBD
-  #endif
 
   find_and_create_all_modified_types ( info); // Modify
-
-  #if 0
-  create_pointer_reps ( info); // TBD
-  #endif
 
   create_base_vars ( info); // TBD
 }
@@ -3955,7 +3827,7 @@ reorg_perf_qual ( Info *info)
       (*(info->reorg_type))[i].do_instance_interleave = true;
     }
   #endif
-  #if 1
+
   // We are doing a quick and dirty version of performance
   // qualification for testing purposes and possibly the
   // initial version of for the main branch.
@@ -3994,13 +3866,11 @@ reorg_perf_qual ( Info *info)
     // However, the dominace calculations other things need it.
     push_cfun ( func);
 
-    #if 1
     if ( dom_info_available_p ( CDI_DOMINATORS) )
       {
 	free_dominance_info ( CDI_DOMINATORS);
       }
     calculate_dominance_info (CDI_DOMINATORS);
-    #endif
 
     if ( info->show_perf_qualify )
       {
@@ -4616,8 +4486,6 @@ reorg_perf_qual ( Info *info)
   #if !USE_DO_INSTANCE_INTERLEAVE
   remove_deleted_types ( info, "performance qualification", reorg_perf_qual_debug);
   #endif
-
-  #endif
 }
 
 static void
@@ -5172,33 +5040,6 @@ create_base_vars ( Info_t *info)
       }
   }    
 }
-
-#if 0
-// create_new_types has to crawl "all" the
-// types, create new types and transform
-// other types that must be changed.
-// A type will change when it's a
-// a pointer to a ReorgType or it contains
-// an interior pointer to one. 
-static void
-create_new_types ( Info_t *info)
-{
-  DEBUG_LA ("create_new_types:>\n");
-  std::map < tree, BoolPair_t>::iterator tmi;
-  for( tmi = info->struct_types->begin ();
-       tmi != info->struct_types->end ();
-       tmi++ ) {
-    if ( !tmi->second.processed )
-      {
-	create_a_new_type ( info, tmi->first);
-      }
-    else
-      {
-	DEBUG_A("processed\n");
-      }
-  }    
-}
-#endif
 
 static void
 create_a_pointer_rep ( Info_t *info, tree type)

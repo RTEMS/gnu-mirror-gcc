@@ -1473,171 +1473,6 @@ dump_modified_types (FILE *file, bool extra_details, Info_t *info)
     }
 }
 
-#if 0
-// A type needs to be in modified_types iff one or more fields is a
-// reorg pointer or a modified record and should involve creating the
-// modified types. The process is recursive and natural in that
-// attempting to classify the type results in the creation of the
-// modified types and also create and note any interior types that
-// must be modified. This returns true if modified.
-static bool
-possibly_modify_pointer_types ( tree type, Info_t *info)
-{
-  bool modified = false;
-
-  if ( TREE_CODE( type) != RECORD_TYPE )
-    return false;
-  
-  //DEBUG_L("possibly_modify_pointer_types:> ");
-  //DEBUG_F(flexible_print, stderr, type, 1, (dump_flags_t)0);
-  //INDENT(4);
-
-  if ( TYPE_SIZE ( type) == NULL || TYPE_FIELDS ( type) == NULL)
-    {
-      //DEBUG_A("Incomplete type\n");
-      INDENT(-4);
-      return false;
-    }
-
-  // NOPE
-  if ( info->modified_types->find ( type) != info->modified_types->end () )
-    {
-      //DEBUG_A("Already modified\n");
-      //INDENT(-4);
-      return true;
-    }
-  if ( info->dont_modify->find ( type) != info->dont_modify->end () )
-    {
-      //DEBUG_A("Marked to not modify\n");
-      //INDENT(-4);
-      return false;
-    }
-  for ( tree field = TYPE_FIELDS ( type); 
-	  field; 
-	  field = DECL_CHAIN ( field) )
-    {
-      tree field_type = TREE_TYPE ( field);
-      tree canonical_field_type = TYPE_MAIN_VARIANT ( base_type_of (field_type));
-      bool pointer = POINTER_TYPE_P ( field_type);
-      bool record = TREE_CODE( canonical_field_type) == RECORD_TYPE;
-      //DEBUG_A("Field: ");
-      //DEBUG_F(flexible_print, stderr, field, 1, (dump_flags_t)0);
-      //DEBUG_A("  pointer %s, record %s\n", pointer ? "T" : "F", record ? "T" :"F");
-      if ( pointer && record )
-	{
-	  bool is_reorg = is_reorg_type ( canonical_field_type, info);
-	  if ( is_reorg )
-	    {
-	      modified = true;
-	    }
-	  else
-	    if ( possibly_modify_pointer_types ( canonical_field_type, info) )
-	      {
-		modified = true;
-	      }
-	}
-      else
-	{
-	  // ??? non record types?
-	  if ( possibly_modify_pointer_types ( canonical_field_type, info) )
-	    {
-	      modified = true;
-	    }
-	}
-    }
-
-  if ( modified )
-    {
-      // Create new record type
-      tree modified_type = lang_hooks.types.make_type (RECORD_TYPE);
-      //(*(info->modified_types))[ type] = modified_type;
-      two_trees_t entry = { type, modified_type};
-      info->modified_types->push_back ( entry);
-
-      const char *old_type_name =
-	identifier_to_locale ( IDENTIFIER_POINTER ( TYPE_NAME ( type)));
-      size_t len = strlen ( "_modif_") + strlen ( old_type_name);
-      char *rec_name = ( char*)alloca ( len + 1);
-      strcpy ( rec_name, "_modif_");
-      strcat ( rec_name, old_type_name);
-    
-      // Build the new pointer type fields
-      TYPE_NAME ( modified_type) = get_identifier ( rec_name);
-
-      // TBD Create its fields by walking the old type.
-      tree field;
-      tree new_fields = NULL;
-      for ( field = TYPE_FIELDS ( type); field; field = DECL_CHAIN ( field))
-	{
-	  tree field_type = TREE_TYPE ( field);
-	  tree new_fld_type;
-
-	  // TBD Do I need a canonical type here instead?
-	  //auto is_modified = info->modified_types->find ( type);
-	  auto is_modified = find_in_vec_of_two_types ( info->modified_types, type);
-	  if ( is_modified != info->modified_types->end () )
-	    {
-	      if ( POINTER_TYPE_P ( field_type))
-		{
-		  ReorgType_t *ri = get_reorgtype_info ( field_type, info);
-		  int levels = number_of_levels ( field_type);
-		  if ( ri == NULL )
-		    {
-		      new_fld_type = make_multilevel ( is_modified->second, levels);
-		    }
-		  else
-		    {
-		      new_fld_type = make_multilevel ( ri->pointer_rep, levels - 1);
-		    }
-		}
-	      else
-		{
-		  new_fld_type = is_modified->second;
-		}
-	    }
-	  else
-	    {
-	      // This field doesn't need to be modified.
-	      new_fld_type = field_type;
-	    }
-	  tree new_decl =
-	    build_decl ( DECL_SOURCE_LOCATION (field),
-			 FIELD_DECL, DECL_NAME (field), new_fld_type);
-	  DECL_CONTEXT ( new_decl) = modified_type;
-	  layout_decl ( new_decl, 0);
-	  
-	  // We might be missing a bunch of attributes (see
-	  // tree-nested.c:899) But we seem without without them!
-	  
-	  DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
-	  new_fields = new_decl;
-	}
-
-      // Reverse fields. Note, a some point try nreverse here instead.
-      TYPE_FIELDS ( modified_type) = NULL;
-      tree next_fld;
-      for ( field = new_fields;
-	    field; 
-	    field = next_fld    )
-	{
-	  next_fld = DECL_CHAIN ( field);
-	  DECL_CHAIN ( field) = TYPE_FIELDS ( modified_type);
-	  TYPE_FIELDS ( modified_type) = field;
-	}
-
-      // Lay it out
-      layout_type ( modified_type);
-    }
-  else
-    {
-      info->dont_modify->insert ( type);
-    }
-  //DEBUG_A("Was %smodidied\n", modified ? "" : "not ");
-  //INDENT(-4);
-  return modified;
-}
-#endif
-
 tree
 find_modified ( tree type,
 		bool reverse,
@@ -2111,10 +1946,8 @@ static void
 reorg_common_middle_code ( Info *info)
 {
   if ( BYPASS_TRANSFORM ) return;
-  #if 0
-  modify_declarations( info);
-  #endif
-  ;
+
+  // Useed to modify_declarations here
 }
 
 static void
@@ -2122,21 +1955,6 @@ modify_declarations ( Info *info)
 {
   modify_global_declarations (info);
 }
-
-// Not parctical!
-#if 0
-void
-modify_local_declarations ( Info *info)
-{
-  ;
-}
-
-void
-modify_parameter_declarations ( Info *info)
-{
-  ;
-}
-#endif
 
 void
 modify_global_declarations ( Info *info)
@@ -2153,14 +1971,7 @@ modify_global_declarations ( Info *info)
   // lend themselves to any necessary reorg transformation.
   // Note, it's possible to preserve them, if that makes sense,
   // in remove_unreferenced_decls.
-  #if 0
-  std::vector<ProgDecl_t>::iterator pv;
-  for ( pv = info->prog_decl->begin ();
-	pv != info->prog_decl->end (); pv++ )
-    {
-      modify_decl_core ( &( pv->gcc_decl), info);
-    }
-  #else
+
   // The prog_decls are obsolete
   varpool_node *var;
   FOR_EACH_VARIABLE ( var)
@@ -2176,7 +1987,6 @@ modify_global_declarations ( Info *info)
       modify_decl_core ( &decl, info);
     }
   }
-  #endif
 
   // NOTE, Call modufy_decl_core breaks hello world!
   
@@ -2201,10 +2011,6 @@ modify_global_declarations ( Info *info)
       push_cfun ( func); // Is this necessary?
       tree curr_func_type = TREE_TYPE ( func->decl);
       
-      #if 0
-      modify_func_decl_core ( func, info);
-      #else
-
       // TBD Check cached function type. If the decl's type
       // has been modified use the cached new type.
       auto location = fncache.find ( curr_func_type);
@@ -2238,7 +2044,7 @@ modify_global_declarations ( Info *info)
 	  // Add the type to the cache.
 	  fncache [ curr_func_type] = new_func_type;
 	}
-      #endif
+
       pop_cfun ();
     }
 
@@ -2304,10 +2110,7 @@ modify_func_type ( struct function *func, Info *info )
   if ( ri != NULL )
     {
       int levels = number_of_levels ( func_ret_type );
-      // TBD debug why top approach fails...
-      #if 0
-      func_ret_type = make_multilevel ( ri->pointer_rep, levels);
-      #else
+
       if ( levels == 1 )
 	{
 	  func_ret_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -2316,7 +2119,6 @@ modify_func_type ( struct function *func, Info *info )
 	{
 	  func_ret_type = make_multilevel ( ri->pointer_rep, levels);
 	}
-      #endif
     }
 
   tree interim_args = void_list_node;
@@ -2348,9 +2150,7 @@ modify_func_type ( struct function *func, Info *info )
 	  if ( ri != NULL )
 	    {
 	      int levels = number_of_levels ( type_of_arg );
-	      #if 0
-	      new_arg_type = make_multilevel ( ri->pointer_rep, levels);
-	      #else
+
 	      if ( number_of_levels ( type_of_arg ) == 1 )
 		{
 		  new_arg_type = TYPE_MAIN_VARIANT ( ri->pointer_rep);
@@ -2359,7 +2159,6 @@ modify_func_type ( struct function *func, Info *info )
 		{
 		  new_arg_type = make_multilevel ( ri->pointer_rep, levels);
 		}
-	      #endif
 	    }
 	  else
 	    {
@@ -2544,10 +2343,6 @@ modify_func_decl_core ( struct function *func, Info *info)
   
   int levels = number_of_levels ( func_type);
 
-  #if 0
-  TREE_TYPE ( TREE_TYPE ( func->decl)) =
-    make_multilevel ( ri->pointer_rep, levels);
-  #else
   if ( levels == 1 )
     {
       //DEBUG_A( "levels == 1\n");
@@ -2564,7 +2359,6 @@ modify_func_decl_core ( struct function *func, Info *info)
       TREE_TYPE ( TREE_TYPE ( func->decl)) =
 	make_multilevel ( ri->pointer_rep, levels);
     }
-  #endif
 
   //DEBUG_L("AFTER modify_func_decl_core:\n");
   //DEBUG_A("func->decl = %p, ", func->decl);
@@ -2814,13 +2608,10 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 		  return REORG_RECOG_RET_ACT ( ReorgT_Ptr2Zero);
 		}
 	      // If we get here this is clearly really odd code
-	      // so we need to bail out.
-	      #if 1
+	      // so we need to bail out... Nope!
+
 	      // If seems that this code occurrs in "nature"... sigh...
 	      return REORG_RECOG_RET_ACT ( ReorgT_Ignore);
-	      #else
-	      return REORG_RECOG_RET_ACT ( Not_Supported);
-	      #endif
 	    }
 	  case ReorgOpT_Temp:      // t
 	    return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
@@ -3213,25 +3004,6 @@ recognize_op ( tree op,  bool lie, Info *info)
   DEBUG_A ( "type: ");
   DEBUG_F ( flexible_print, stderr, type, 1, (dump_flags_t)0);
   
-  // This type bases approach seems like crap.
-  // I'm turning it off to see what breaks.
-  #if 0
-  if ( type != NULL && POINTER_TYPE_P (type) )
-  {
-    DEBUG_L("POINTER_TYPE_P (type) = true\n");
-    bool a_reorg = is_reorg_type ( type, info);
-    if ( a_reorg || !lie )
-    {
-      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
-    } else {
-      // This would be for when 
-      // the field of a struct element
-      // is a pointer that's not a reorg
-      // point. I.e. ReorgT_ElemAssign.
-      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
-    }
-  }
-  #endif
   // From the ifdefed off code above it's probably
   // reasonable to retain the check for a reorg type
   bool a_reorg = is_reorg_type ( type, info);
@@ -3334,18 +3106,13 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    
 	    bool a_deep_reorg = is_reorg_type ( base_type, info);
 	    // TBD Test for modified too!
-	    #if 1
+
 	    bool modified = find_modified ( base_type, false, info);
 	    if ( a_deep_reorg || modified || !lie )
 	      {
 		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
-	    #else
-	    if ( a_deep_reorg || !lie )
-	      {
-		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
-	      }
-	    #endif
+
 	    // Just normal field reference otherwise...
 	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	  }
@@ -3479,7 +3246,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	DEBUG_F ( flexible_print, stderr, inner_op0, 1, TDF_DETAILS);
 	DEBUG_A ( "inner_op0_type = ");
 	DEBUG_F ( flexible_print, stderr, inner_op0_type, 1, TDF_DETAILS);
-	#if 1
+
 	tree base_type = base_type_of ( type);
 	DEBUG_A ( "base_type = ");
 	DEBUG_F ( flexible_print, stderr, base_type, 1, TDF_DETAILS);
@@ -3488,12 +3255,9 @@ recognize_op ( tree op,  bool lie, Info *info)
 	  {
 	    DEBUG_LA ( "DELTA 1!\n");
 	  }
-	#else
-	bool a_reorg = is_reorg_type ( type, info);
-	#endif
+
 	if( a_reorg || !lie )
 	  {
-	    #if 1
 	    if ( POINTER_TYPE_P ( type) )
 	      {
 		DEBUG_LA ( "DELTA 2!\n");
@@ -3503,9 +3267,6 @@ recognize_op ( tree op,  bool lie, Info *info)
 	      {
 		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Struct);
 	      }
-	    #else
-	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Struct);
-	    #endif
 	  }
 	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
@@ -3842,22 +3603,7 @@ contains_a_reorgtype ( gimple *stmt, Info *info)
     }
   else
     {
-      #if 0
-      // Note walk_stmt_info is compilcated, use it's info
-      // field for hidden_info
-      hidden_info_t hi = { NULL, info };
-      struct walk_stmt_info walk_info;     // expt
-      memset ( &walk_info, 0, sizeof ( walk_info));
-      walk_info.info = ( void*)&hi; //expt
-      walk_gimple_op ( stmt,
-		       detect_reorg,
-		       &walk_info);
-      //INDENT(-2);
-      return hi.found_reorg;
-      #else
       return the_reorg_walker ( stmt, info);
-      #endif
-      
     }
 }
 
