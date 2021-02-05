@@ -2906,9 +2906,13 @@ reorg_recognize_ret_action( ReorgTransformation val, unsigned ln)
   return val;
 }
 
+int trigger = 0;
+
 ReorgTransformation
 reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 {
+  DEBUG("trigger = %d\n",trigger);
+  trigger++;
   DEBUG_FLA ( "ReorgTransformation reorg_recognize for:> ");
   DEBUG_F ( print_gimple_stmt, stderr, stmt, 0);
   INDENT(2);
@@ -2952,10 +2956,8 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    return REORG_RECOG_RET_ACT ( ReorgT_ElemAssign);
 	  case ReorgOpT_Address:   // "&x[i]"
 	    return REORG_RECOG_RET_ACT ( ReorgT_Adr2Ptr);
-	    //--
 	  case ReorgOpT_Pointer:
-	    return REORG_RECOG_RET_ACT ( ReorgT_Ignore);
-	    //--
+	    return REORG_RECOG_RET_ACT ( ReorgT_PtrAssign);
 	  case ReorgOpT_Cst0:
 	    return REORG_RECOG_RET_ACT ( ReorgT_Ptr2Zero);
 	  case ReorgOpT_Indirect:
@@ -3011,12 +3013,12 @@ reorg_recognize ( gimple *stmt, cgraph_node* node, Info_t *info )
 	    INDENT(-4);
 	    switch ( recognize_op( rhs, true, info) )
 	      {
-	      case ReorgOpT_Scalar:      // "z"
-	      case ReorgOpT_Temp:      // "t"
-		//-- provisional
 		// The type on the lhs is that of the rhs (by
 		// definition) so its moving a pointer to a pointer.
 	      case ReorgOpT_Pointer:  // p
+	      case ReorgOpT_Scalar:      // "z"
+	      case ReorgOpT_Temp:      // "t"
+		//-- provisional
 		//--
 	      case ReorgOpT_Clobber:
 	      case ReorgOpT_Cst0:
@@ -3291,10 +3293,15 @@ remove_deleted_types ( Info *info, char *where, ReorgFn reorg_fn)
   }
 }
 
+#define RECOGNIZE_OP_RET_ACTION(e) recognize_op_ret_action(e,__LINE__)
+
 static enum ReorgOpTrans
-recognize_op_ret_action ( enum ReorgOpTrans e )
+recognize_op_ret_action ( enum ReorgOpTrans e, unsigned ln )
 {
-  DEBUG_A("  recognize_op returns %s\n", optrans_to_str ( e));
+  #if DEBUGGING && 1
+  fprintf ( stderr, "L# %4d: %*s  recognize_op returns %s\n",
+	    ln, debug_indenting, "", optrans_to_str (e));
+  #endif
   return e;
 }
 
@@ -3311,19 +3318,20 @@ recognize_op ( tree op,  bool lie, Info *info)
     case INTEGER_CST:
       if ( integer_zerop ( op) )
 	{
-	  return recognize_op_ret_action ( ReorgOpT_Cst0);
+	  return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Cst0);
 	}
     case REAL_CST:
     case FIXED_CST:
     case STRING_CST:
     case COMPLEX_CST:
     case VECTOR_CST:
+    //case DEBUG_EXPR_DECL: // Debugging doesn't play well with reorg!
       {
-	return recognize_op_ret_action ( ReorgOpT_Cst);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Cst);
       }
     case CONSTRUCTOR:
       {
-	return recognize_op_ret_action ( ReorgOpT_Clobber);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Clobber);
       }
     default:
       // Just drop through because we were simply picking
@@ -3344,13 +3352,13 @@ recognize_op ( tree op,  bool lie, Info *info)
     bool a_reorg = is_reorg_type ( type, info);
     if ( a_reorg || !lie )
     {
-      return recognize_op_ret_action ( ReorgOpT_Pointer);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
     } else {
       // This would be for when 
       // the field of a struct element
       // is a pointer that's not a reorg
       // point. I.e. ReorgT_ElemAssign.
-      return recognize_op_ret_action ( ReorgOpT_Scalar);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
     }
   }
   #endif
@@ -3366,14 +3374,14 @@ recognize_op ( tree op,  bool lie, Info *info)
 	  if ( TREE_CODE ( lower_type) == RECORD_TYPE
 	       && is_reorg_type ( lower_type, info))
 	    {
-	      return recognize_op_ret_action ( ReorgOpT_Pointer);
+	      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
 	    }
 	}
       // We tried returning ReorgOpT_Scalar.
       // It caused an assertion failue because
       // it was incorrectly triggering the ReorgT_Ptr2Zero
       // case with a bogus RHS.
-      return recognize_op_ret_action ( ReorgOpT_Temp);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Temp);
     }
   
   // This might not occur in practice
@@ -3381,7 +3389,7 @@ recognize_op ( tree op,  bool lie, Info *info)
     {
       // The assumption here is that this
       // is a reorg type.
-      return recognize_op_ret_action ( ReorgOpT_Struct);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Struct);
     }
   if ( op_code == VAR_DECL )
     {
@@ -3392,7 +3400,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	  //bool a_reorg = is_reorg_type ( type, info);
 	  if ( a_reorg || !lie )
 	    {
-	      return recognize_op_ret_action ( ReorgOpT_Pointer);
+	      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
 	    }
 	  else
 	    {
@@ -3400,10 +3408,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 	      // element is a pointer that's not a reorg
 	      // pointer. I.e. ReorgT_ElemAssign. That is
 	      // this is while lie for a good purpose.	    
-	      return recognize_op_ret_action ( ReorgOpT_Scalar);
+	      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	    }
 	}
-      return recognize_op_ret_action ( ReorgOpT_Scalar);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
     }
   tree inner_op0 = TREE_OPERAND( op, 0);
   tree inner_op0_type = TREE_TYPE ( inner_op0);
@@ -3418,7 +3426,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool a_reorg = is_reorg_type ( inner_op0, info);
 	    if ( a_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Address);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Address);
 	      }
 	  }
 	// TBD shouldn't we be testing for a reorg???
@@ -3428,10 +3436,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool a_reorg = is_reorg_type ( var_type, info);
 	    if ( a_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Address);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Address);
 	      }
 	  }
-	return recognize_op_ret_action ( ReorgOpT_Scalar);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
     case COMPONENT_REF:
       {
@@ -3460,16 +3468,16 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool modified = find_modified ( base_type, false, info);
 	    if ( a_deep_reorg || modified || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Indirect);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
 	    #else
 	    if ( a_deep_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Indirect);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
 	    #endif
 	    // Just normal field reference otherwise...
-	    return recognize_op_ret_action ( ReorgOpT_Scalar);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	  }
 	if ( tree_contains_a_reorgtype_p ( op, info))
 	  {
@@ -3486,7 +3494,7 @@ recognize_op ( tree op,  bool lie, Info *info)
 	     && TREE_CODE ( TREE_TYPE( type)) == RECORD_TYPE )
 	  {
 	    
-	    return recognize_op_ret_action ( ReorgOpT_Pointer);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
 	  }
 	if ( inner_op0_code == INDIRECT_REF )
 	  {
@@ -3494,20 +3502,23 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool a_base_reorg = is_reorg_type ( base_type_of ( type), info);
 	    if ( a_base_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Indirect);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
 	    // Just normal field reference otherwise...
-	    return recognize_op_ret_action ( ReorgOpT_Scalar);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	  }
 	if ( inner_op0_code == MEM_REF ) {
 	  DEBUG_LA ( "TREE_CODE( inner_op) == MEM_REF\n");
+	  tree base_of_inner_op0_type = base_type_of ( inner_op0_type);
+	  DEBUG_A ( "base_of_inner_op0_type = ");
+	  DEBUG_F ( flexible_print, stderr, base_of_inner_op0_type, 0, (dump_flags_t)0);
 	  bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_type), info);
 	  if ( a_reorg || !lie )
 	    {
-	      return recognize_op_ret_action ( ReorgOpT_Indirect);
+	      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	    }
 	  // Just normal field reference otherwise...
-	  return recognize_op_ret_action ( ReorgOpT_Scalar);
+	  return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	}
 	if ( inner_op0_code == COMPONENT_REF )
 	  {
@@ -3523,10 +3534,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool a_reorg = is_reorg_type ( base_type_of ( inner_op0_0_type), info);
 	    if ( a_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Indirect);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
 	    // Just normal field reference otherwise...
-	    return recognize_op_ret_action ( ReorgOpT_Scalar);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	  }
 	DEBUG_LA ( "TREE_CODE( inner_op) not indirect, component or mem ref\n");
 	// Note, doesn't this ignore ARRAY_REF of this?
@@ -3537,10 +3548,10 @@ recognize_op ( tree op,  bool lie, Info *info)
 
 	if ( ( !a_reorg && a_base_reorg) || !lie )
 	  {
-	    return recognize_op_ret_action ( ReorgOpT_AryDir);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_AryDir);
 	  }
 	// Just normal field reference otherwise...
-	return recognize_op_ret_action ( ReorgOpT_Scalar);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
     case ARRAY_REF:
       {
@@ -3561,18 +3572,18 @@ recognize_op ( tree op,  bool lie, Info *info)
 	    bool a_reorg = is_reorg_type ( base_type_of ( deep_type), info);
 	    if ( a_reorg || !lie )
 	      {
-		return recognize_op_ret_action ( ReorgOpT_Indirect);
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Indirect);
 	      }
 	    // Just normal field reference otherwise...
-	    return recognize_op_ret_action ( ReorgOpT_Scalar);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
 	  }
 	
 	bool a_reorg = is_reorg_type( base_type_of ( type), info);
 	if ( a_reorg || !lie )
 	  {
-	    return recognize_op_ret_action ( ReorgOpT_Array);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Array);
 	  }
-	return recognize_op_ret_action ( ReorgOpT_Scalar);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
     case INDIRECT_REF:
       {
@@ -3583,25 +3594,53 @@ recognize_op ( tree op,  bool lie, Info *info)
 	bool a_reorg = is_reorg_type ( type, info);
 	if( a_reorg || !lie )
 	  {
-	    return recognize_op_ret_action ( ReorgOpT_Deref);
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Deref);
 	  }
-	return recognize_op_ret_action ( ReorgOpT_Scalar);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
     case MEM_REF:
       {
+	// This needs to acknowledge that something is a reorgtype or
+	// even a modified type and simply return ReorgOpT_Scalar
+	// won't suffice (bug on *w_26(D) = iplus_25 where *w_26(D)
+	// is ** to a reorg is where I'm seeing a problem.)
 	DEBUG_LA ( "process... MEF_REF\n");
-	DEBUG_A ( "inner_op0, inner_op0_type = ");
-	DEBUG_F ( flexible_print, stderr, inner_op0, 0, TDF_DETAILS);
+	DEBUG_A ( "inner_op0 = ");
+	DEBUG_F ( flexible_print, stderr, inner_op0, 1, TDF_DETAILS);
+	DEBUG_A ( "inner_op0_type = ");
 	DEBUG_F ( flexible_print, stderr, inner_op0_type, 1, TDF_DETAILS);
+	#if 1
+	tree base_type = base_type_of ( type);
+	DEBUG_A ( "base_type = ");
+	DEBUG_F ( flexible_print, stderr, base_type, 1, TDF_DETAILS);
+	bool a_reorg = is_reorg_type ( base_type, info);
+	if ( a_reorg != is_reorg_type ( type, info) )
+	  {
+	    DEBUG_LA ( "DELTA 1!\n");
+	  }
+	#else
 	bool a_reorg = is_reorg_type ( type, info);
+	#endif
 	if( a_reorg || !lie )
 	  {
-	    return recognize_op_ret_action ( ReorgOpT_Struct);
+	    #if 1
+	    if ( POINTER_TYPE_P ( type) )
+	      {
+		DEBUG_LA ( "DELTA 2!\n");
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Pointer);
+	      }
+	    else
+	      {
+		return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Struct);
+	      }
+	    #else
+	    return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Struct);
+	    #endif
 	  }
-	return recognize_op_ret_action ( ReorgOpT_Scalar);
+	return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
       }
     default:
-      return recognize_op_ret_action ( ReorgOpT_Scalar);
+      return RECOGNIZE_OP_RET_ACTION ( ReorgOpT_Scalar);
     }
 }
 
@@ -4611,6 +4650,8 @@ code_str( enum tree_code tc)
     return "INDIRECT_REF";
   case MEM_REF:
     return "MEM_REF";
+  case DEBUG_EXPR_DECL: // We should never ever see this!
+    return "DEBUG_EXPR_DECL";
   default:
     return get_tree_code_name ( tc);
   }
@@ -4669,6 +4710,8 @@ reorgtrans_to_str ( enum ReorgTransformation t)
       return "ReorgT_StrAssign";
     case ReorgT_ElemAssign:
       return "ReorgT_ElemAssign";
+    case ReorgT_PtrAssign:
+      return "ReorgT_PtrAssign";
     case ReorgT_If_Null:
       return "ReorgT_If_Null";
     case ReorgT_If_NotNull:

@@ -85,6 +85,7 @@ static unsigned int reorg_perf_qual ( Info *);
 static tree find_corresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
 static void new_element_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
+static void pointer_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
 static void element_assign_modif_trans ( gimple *, tree, Info_t *);
 #if 0
 static void make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *, tree *, Info_t *);
@@ -457,7 +458,18 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      new_element_assign_transformation (stmt, ri, info);
 
 		      INDENT(-2);
-		    } // end ReorgT_ElemAssign case
+		    }
+		    break;
+		  case ReorgT_PtrAssign:
+		    {
+		      DEBUG_L("ReorgT_PtrAssign: ");
+		      DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+		      INDENT(2);
+
+		      pointer_assign_transformation (stmt, ri, info);
+
+		      INDENT(-2);
+		    }
 		    break;
 		  case ReorgT_If_Null:
 		  case ReorgT_If_NotNull:
@@ -1149,6 +1161,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    //break;
 		    goto exit_after_spilting_a_block;
 		  case ReorgT_Calloc:
+		    #define FIX_CALLOC 1
 		    {
 		      DEBUG_L("Transform ReorgT_Calloc\n");
 		      //INDENT(2);
@@ -1176,11 +1189,20 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      // each comment starting with "FROM."
 		      ReorgType_t *ri = contains_a_reorgtype( stmt, info);
 
-		      tree size_arg = gimple_call_arg( stmt, 0); // Likely not needed!
+		      #if FIX_CALLOC
+		      tree num_arg = gimple_call_arg( stmt, 0); // Likely not needed! //
+		      #else
+		      tree size_arg = gimple_call_arg( stmt, 0); // Likely not needed! //
+		      #endif
 		      
 		      // Note the num_arg is either a const or an ssa name so it
 		      // can be used as is in the calloc for each field;
+
+		      #if FIX_CALLOC
+		      tree size_arg = gimple_call_arg( stmt, 1);
+		      #else
 		      tree num_arg = gimple_call_arg( stmt, 1);
+		      #endif
 
 		      tree val = gimple_call_lhs( stmt);
 		      //DEBUG_L("val is: ");
@@ -1410,7 +1432,11 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
 			  //DEBUG("\n");
 
+			  #if FIX_CALLOC
+			  gcall *calloc_call = gimple_build_call( fndecl_calloc, 2, num_arg, field_size);
+			  #else
 			  gcall *calloc_call = gimple_build_call( fndecl_calloc, 2, field_size, num_arg);
+			  #endif
 			  gimple_call_set_lhs( calloc_call, res);
 			  SSA_NAME_DEF_STMT ( res) = calloc_call;
 
@@ -2778,6 +2804,57 @@ new_element_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
   INDENT(-2);
 }
 
+static void
+pointer_assign_transformation ( gimple *stmt, ReorgType_t *ri, Info_t *info)
+{
+  gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
+  
+  DEBUG_LA("pointer_assign_transformation:>\n");
+  INDENT(2);
+  DEBUG_A("stmt = ");
+  DEBUG_F( print_gimple_stmt, stderr, stmt, 0);
+  DEBUG_F(print_internals, stmt, (void*)info);
+  DEBUG_A("ri = ");
+  DEBUG_F( print_reorg, stderr, 0, ri);\
+
+  tree lhs = gimple_assign_lhs( stmt);
+  tree rhs = gimple_assign_rhs1( stmt);
+
+  tree lhs_type = TREE_TYPE ( lhs);
+  int levels;
+  tree base_type = base_type_with_levels ( lhs_type, &levels);
+  tree new_lhs_type = make_multilevel ( ri->pointer_rep, levels - 1);
+
+  enum tree_code lhs_code = TREE_CODE ( lhs);
+  DEBUG_A(" lhs_code = %s\n", code_str (lhs_code));
+
+  tree op1 = TREE_OPERAND( lhs, 0);
+  DEBUG_A("op1 = ");
+  DEBUG_F(flexible_print, stderr, op1, 1, (dump_flags_t)0);
+
+  tree new_lhs;
+  // TBD create new lhs
+  new_lhs = build2 ( MEM_REF, new_lhs_type, op1,
+		     build_int_cst (ptr_type_node, 0));
+
+  // create temp
+  tree ptr_temp = make_temp_ssa_name( new_lhs_type, NULL, "mid_temp");
+
+  // create convert
+  gimple *gptr_temp_set =
+    gimple_build_assign ( ptr_temp, CONVERT_EXPR, rhs);
+  SSA_NAME_DEF_STMT ( ptr_temp) = gptr_temp_set;
+
+  // create new assign
+  gimple *gptr_assign = gimple_build_assign( new_lhs, ptr_temp);
+
+  // insert new statements  
+  gsi_insert_before( &gsi, gptr_temp_set, GSI_SAME_STMT);
+  gsi_insert_before( &gsi, gptr_assign, GSI_SAME_STMT);
+  
+  // delete old assign
+  gsi_remove ( &gsi, true);
+}
 
 static void
 element_assign_modif_trans ( gimple *stmt, tree type, Info_t *info)

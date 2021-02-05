@@ -126,6 +126,7 @@ enum ReorgTransformation {
   // Ultimately what is the purpose of these?
   ReorgT_StrAssign,    // "*a = x[i]", "x[i] = y[j]", "s = *a", etc.
   ReorgT_ElemAssign,   // "a->f = z", "z = x[i].f", etc.
+  ReorgT_PtrAssign,    // "**a = **b", etc. Just type changes
   ReorgT_If_Null,      // "if(a == 0)..."
   ReorgT_If_NotNull,   // "if(a != 0)..."
   ReorgT_IfPtrEQ,      // "if(a == b)..."
