@@ -207,7 +207,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 		// NEW STUFF
 		// Find assigns that are basically element assigns.
 		// If their type is modified then adjust the gimple.
-		#if 1
+
 		// Shouldn't this use new_contains_a_modified instead?
 		// - probably not...
 		
@@ -263,8 +263,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    DEBUG_LA ("Not modified or needing reorg: ");
 		    DEBUG_F( print_gimple_stmt, stderr, stmt, 4, TDF_SLIM);
 		  }
-		#endif
-		
 	      }
 	    else
 	      {
@@ -1044,7 +1042,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //gimple *gafter_label = gimple_build_label( after_label_L);
 		      //gsi_insert_after( &gsi, gafter_label, GSI_SAME_STMT);
 
-
 		      // failure_bb code here
 
 		      //
@@ -1123,7 +1120,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 		    //break;
 		    goto exit_after_spilting_a_block;
 		  case ReorgT_Calloc:
-		    #define FIX_CALLOC 1
 		    {
 		      DEBUG_L("Transform ReorgT_Calloc\n");
 		      //INDENT(2);
@@ -1443,7 +1439,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      SSA_NAME_DEF_STMT ( val) = gc_cast_phi_val;
 
 		      gsi_insert_before( &gsi, gc_cast_phi_val, GSI_NEW_STMT);
-
 
 		      // failure_bb code here
 
@@ -2794,7 +2789,6 @@ new_make_transformed_ref ( tree ref_in,
     }
   DEBUG_A("use_modified = %s\n", use_modified ? "true" : "false");
 
-
   // TBD figure out when this is actually true!
   bool create_addr_expr_stmts_for_reorg = false;
 
@@ -3002,7 +2996,6 @@ new_make_transformed_ref ( tree ref_in,
 
   INDENT(-2);
 }
-
 
 // This is oddly close to multilevel_component_ref
 tree
@@ -4257,20 +4250,13 @@ reorg_perf_qual ( Info *info)
 		    DEBUG_L("\n");
 		    DEBUG_A("nrbo = 1, increment accum to %f\n", accum);
 		  }
-		#if 1	
+
 		double amount = accum / nrbo;
 		double product = amount * loop_count;
 		regular_nca += product;
 		DEBUG_L("\n");
 		DEBUG_A("Add loop_count*accum/nrbo (%f*%f/%d = %f) to regular_nca (now %e)\n",
 			loop_count, accum, nrbo, product, regular_nca);
-		#else
-		double amount = accum / nrbo;
-		regular_nca += amount;
-		DEBUG_L("\n");
-		DEBUG_A("Add accum/nrbo (%f/%d = %f) to regular_nca (now %e)\n",
-			accum, nrbo, amount, regular_nca);
-		#endif
 	      } // 739
 	    sbitmap_free ( cache_model);
 	    
@@ -4580,7 +4566,6 @@ print_acc_infos ( FILE *file, std::vector <acc_info_t> ainfo )
       print_acc_info ( file, &ainfo[i]);
     }
 }
-
 
 // decls < default defs < defined by function
 static bool
@@ -5105,7 +5090,6 @@ create_a_pointer_rep ( Info_t *info, tree type)
 
 }
 
-
 static void
 create_a_base_var ( Info_t *info, tree type_in)
 {
@@ -5541,7 +5525,6 @@ make_bb ( char *msg, basic_block prev_bb )
   //	   ret->next_bb->index, ret->next_bb);
   return ret;
 }
-
 
 // Degugging functions called from other parts of
 // gcc as an easier way of getting at interesting debug
