@@ -77,19 +77,12 @@ static void create_pointer_reps ( Info_t *);
 static void create_base_vars ( Info_t *);
 static void create_a_pointer_rep ( Info_t *, tree);
 static void create_a_base_var ( Info_t *, tree);
-#if 0
-static void create_new_types ( Info_t *);
-static void create_a_new_type ( Info_t *, tree);
-#endif
 static unsigned int reorg_perf_qual ( Info *);
 static tree find_corresponding_field ( tree, tree);
 static void remove_default_def ( tree, struct function *);
 static void new_element_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
 static void pointer_assign_transformation ( gimple *, ReorgType_t *, Info_t *);
 static void element_assign_modif_trans ( gimple *, tree, Info_t *);
-#if 0
-static void make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *, tree *, Info_t *);
-#endif
 static void new_make_transformed_ref ( tree, ReorgType_t *, tree *, gimple_seq *, tree *, tree, Info_t *);
 //static tree find_deepest_comp_ref ( tree);
 
@@ -371,37 +364,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 			recognize_op ( lhs, true, info);
 		      enum ReorgOpTrans right_op_trans =
 			recognize_op ( rhs, true, info);
-
-		      // TBD lets rethink these
-		      #if 0
-		      // Ignore meaningless case
-		      if (    right_op_trans == ReorgOpT_Scalar 
-			   && left_op_trans == ReorgOpT_Scalar  )
-			break;
-
-		      // TBD Do these make sense?
-		      if ( ( left_op_trans != ReorgOpT_Scalar
-			     &&
-			     left_op_trans != ReorgOpT_Indirect )
-			   ||
-			   ( right_op_trans != ReorgOpT_Scalar
-			     &&
-			     right_op_trans != ReorgOpT_Indirect ))
-			{
-			  if ( left_op_trans   == ReorgOpT_AryDir ||
-			       right_op_trans  == ReorgOpT_AryDir    )
-			    {
-			      // Not implemented in single pool
-			      internal_error ( "ReorgOpT_AryDir not possible");
-			    }
-			  else
-			    {
-			      internal_error (
-					      "Reached tree operand default for "
-					      "ReorgT_StrAssign");
-			    }
-			}
-		      #endif
 
 		      bool ro_on_left = tree_contains_a_reorgtype_p ( lhs, info);
 		      bool ro_on_right = tree_contains_a_reorgtype_p ( rhs, info);
@@ -1189,20 +1151,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      // each comment starting with "FROM."
 		      ReorgType_t *ri = contains_a_reorgtype( stmt, info);
 
-		      #if FIX_CALLOC
 		      tree num_arg = gimple_call_arg( stmt, 0); // Likely not needed! //
-		      #else
-		      tree size_arg = gimple_call_arg( stmt, 0); // Likely not needed! //
-		      #endif
 		      
 		      // Note the num_arg is either a const or an ssa name so it
 		      // can be used as is in the calloc for each field;
 
-		      #if FIX_CALLOC
 		      tree size_arg = gimple_call_arg( stmt, 1);
-		      #else
-		      tree num_arg = gimple_call_arg( stmt, 1);
-		      #endif
 
 		      tree val = gimple_call_lhs( stmt);
 		      //DEBUG_L("val is: ");
@@ -1210,36 +1164,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 		      //DEBUG(", tree code type: %s\n", code_str(TREE_CODE(TREE_TYPE(val))));
 
 		      gcc_assert( TREE_CODE( TREE_TYPE(val)) == POINTER_TYPE);
-		      #if 0
-		      tree size = TYPE_SIZE_UNIT( TREE_TYPE( TREE_TYPE( val)));
-		      #endif
 
-		      #if 0
-		      tree int_ptrsize_type = signed_type_for ( ptr_type_node);
-		      //DEBUG_L("int_ptrsize_type = %p\n", TREE_TYPE ( size));
-		      gcc_assert ( TREE_TYPE ( size));
-		      tree len = make_temp_ssa_name ( TREE_TYPE ( size), NULL, "malloc_len");
-		      #endif
-		      
 		      gimple_stmt_iterator gsi = gsi_for_stmt( stmt);
 
-		      #if 0
-		      // Cast arg to compatible type
-		      gcc_assert( TREE_TYPE ( size));
-		      TREE_TYPE (arg) = TREE_TYPE ( size);
-		      tree cast_arg =
-			    make_temp_ssa_name( TREE_TYPE ( size), NULL, "cast_arg");
-		      gimple *gcast_arg = gimple_build_assign ( cast_arg, CONVERT_EXPR, arg);
-		      SSA_NAME_DEF_STMT ( cast_arg) = gcast_arg;
-		      gsi_insert_before( &gsi, gcast_arg, GSI_SAME_STMT);
-			
-		      gimple *glen = 
-			gimple_build_assign ( len, TRUNC_DIV_EXPR, cast_arg, size);
-		      SSA_NAME_DEF_STMT ( len) = glen;
-		      
-		      gsi_insert_before( &gsi, glen, GSI_SAME_STMT);
-		      #endif
-		      
 		      // Note in other places in this doc this would
 		      // be "insert glen before stmt" instead of this but
 		      // here we need to create new basic blocks.
@@ -1384,12 +1311,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  //DEBUG_F(print_generic_expr, stderr, lhs_ass_type, (dump_flags_t)0);
 			  //DEBUG("\n");
 
-			  #if 0
-			  gcc_assert ( sizetype);
-			  tree mem_size = 
-			    make_temp_ssa_name( sizetype, NULL, "malloc_mem_size");
-			  #endif
-			  
 			  // We need field_size to be of the correct type so
 			  // we type cast.
 			  //tree field_size =
@@ -1408,16 +1329,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 						  TYPE_SIZE_UNIT ( TREE_TYPE ( field)));
 			  SSA_NAME_DEF_STMT ( field_size) = gfield_size;
 
-			  #if 0
-			  // Move gsize here
-			  gimple *gsize = 
-			    gimple_build_assign ( mem_size,
-						  MULT_EXPR,
-						  field_size,
-						  len);
-			  SSA_NAME_DEF_STMT ( mem_size) = gsize;
-			  #endif
-
 			  gcc_assert ( ptr_type_node);
 			  tree res = 
 			    make_temp_ssa_name ( ptr_type_node, NULL, "res");
@@ -1432,11 +1343,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 			  //DEBUG_F(print_generic_expr, stderr, res_type, (dump_flags_t)0);
 			  //DEBUG("\n");
 
-			  #if FIX_CALLOC
 			  gcall *calloc_call = gimple_build_call( fndecl_calloc, 2, num_arg, field_size);
-			  #else
-			  gcall *calloc_call = gimple_build_call( fndecl_calloc, 2, field_size, num_arg);
-			  #endif
 			  gimple_call_set_lhs( calloc_call, res);
 			  SSA_NAME_DEF_STMT ( res) = calloc_call;
 
@@ -2379,8 +2286,6 @@ str_reorg_instance_interleave_trans ( Info *info)
       // Normal ssa name case
       DEBUG_L("Dangling Types for Normal SSA Names:\n");
 
-      #define MOD_DANG 1
-      
       INDENT(4);
       // We use len instead of using func->length() in the for loop test
       // because new ssa names are created in the loop body and we
@@ -2407,12 +2312,9 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  int levels;
 	  tree bottom_type = base_type_with_levels ( type, &levels);
 	  
-
-	  #if MOD_DANG
 	  // Find if modified here.
 	  tree canonical_type = TYPE_MAIN_VARIANT ( bottom_type);
 	  tree modified = find_modified ( canonical_type, false, info);
-	  #endif
 	  
 	  ReorgType_t *ri = get_reorgtype_info ( bottom_type, info);
 	  DEBUG_L("ssa_name = ");
@@ -2426,21 +2328,12 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  DEBUG_F(print_generic_expr, stderr, bottom_type, (dump_flags_t)0);
 	  DEBUG(", ri = %p\n",ri);
 
-	  #if MOD_DANG
-	  // Next test shouldn't skip if modified
+	  // This test shouldn't skip if modified
 	  if ( ri == NULL && modified == NULL )
 	    {
 	      DEBUG_L("Skip, ri == NULL\n");
 	      continue;
 	    }
-	  #else
-	  // If it's not a dangling type we don't care
-	  if ( ri == NULL )
-	    {
-	      DEBUG_L("Skip, ri == NULL\n");
-	      continue;
-	    }
-	  #endif
 
 	  // A default def is processed seperately
 	  if ( a_default_def )
@@ -2449,7 +2342,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      continue;
 	    }
 
-	  #if MOD_DANG
 	  // We must not do this for modified types too!
 
 	  if ( modified == NULL && levels == 0 )
@@ -2457,15 +2349,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 	      DEBUG_L("Skip not one level pointer to record\n");
 	      continue;
 	    }
-	  #else
-	  // TBD CHECK FOR pointer to record.
-	  // QUESTION aren't levels > 1 also a possibility?
-	  if ( levels != 1 )
-	    {
-	      DEBUG_L("Skip not one level pointer to record\n");
-	      continue;
-	    }
-	  #endif
 
 	  gcc_assert ( !no_defining_stmt);
 	  gcc_assert ( !defined_by_nop);
@@ -2473,7 +2356,6 @@ str_reorg_instance_interleave_trans ( Info *info)
 	  DEBUG_L("Defining stmt: ");
 	  DEBUG_F ( print_gimple_stmt, stderr, defining_stmt, 0);
 
-	  #if MOD_DANG
 	  // new_type can also be the result of a modified type!
 	  // Note, the levels
 	  tree new_type;
@@ -2485,9 +2367,7 @@ str_reorg_instance_interleave_trans ( Info *info)
 	    {
 	      new_type = make_multilevel ( ri->pointer_rep, levels - 1);
 	    }
-	  #else
-	  tree new_type = ri->pointer_rep;
-	  #endif
+
 	  tree new_ssa_name = make_temp_ssa_name( new_type, NULL, "dedangled");
 	  DEBUG_L("new_ssa_name = ");
 	  DEBUG_F(print_generic_expr, stderr, new_ssa_name, (dump_flags_t)0);

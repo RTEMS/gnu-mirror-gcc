@@ -52,16 +52,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "tree-ssanames.h"
 
-#if 0
-typedef struct type_holder TypeHolder;
-
-struct type_holder
-{
-  std::vector <tree> refed_types;
-  std::vector <tree> rec_types;
-};
-#endif
-
 static void setup_debug_flags ( Info *);
 static void initial_debug_info ( Info *);
 static void final_debug_info ( Info *);
@@ -374,30 +364,6 @@ reorg_analysis ( Info *info)
 		// that's a simple assignment to a typed
 		// variable.
 
-		#if 0
-		gimple *use_stmt;
-		use_operand_p immuse;
-		bool yup_a_use = single_imm_use ( t, &immuse, &use_stmt);
-		DEBUG_A("VOID case: %sa single imm use, ", yup_a_use ? "" : "not ");
-		DEBUG("%san assign\n",
-			yup_a_use && is_gimple_assign ( use_stmt) ? "" : "not ");
-		if ( TREE_CODE ( t) == SSA_NAME
-		     && yup_a_use
-		     && is_gimple_assign ( use_stmt) )
-		  {
-		    tree use_lhs = gimple_assign_lhs ( use_stmt);
-		    bt = base_type_of ( TREE_TYPE ( use_lhs));
-		    //DEBUG_A("found bt: ");
-		    //DEBUG_F(flexible_print, stderr, bt, 1, (dump_flags_t)0);
-		  }
-		else
-		  {
-		    //DEBUG_A("bailed on base type of complicated case\n");
-		    //INDENT(-2);
-		    continue;
-		  }
-		#endif
-		
 		tree ssa_name = gimple_call_lhs( stmt);
 		gimple *use_stmt;
 		imm_use_iterator iter;
@@ -593,14 +559,7 @@ find_decls_and_types ( Info *info)
       tree canonical = TYPE_MAIN_VARIANT ( base_type_of ( type));
 
       // This is here as a convenience.
-      #if 1
-      #if 0
-      find_all_record_types( &type_mod_info, canonical, info);
-      #endif
       find_all_record_types( canonical, info);
-      #else
-      possibly_modify_pointer_types ( canonical, info);
-      #endif
       
       if ( escaping_nonescaping_sets.non_escaping.find ( type)
 	   !=
@@ -632,9 +591,6 @@ find_decls_and_types ( Info *info)
     tree decl = var->decl;
     tree canonical  = TYPE_MAIN_VARIANT ( base_type_of ( decl));
 
-    #if 0
-    find_all_record_types( &type_mod_info, canonical, info);
-    #endif
     find_all_record_types( canonical, info);
 
     if ( escaping_nonescaping_sets.non_escaping.find ( decl)
@@ -794,10 +750,6 @@ find_decls_and_types ( Info *info)
     fprintf ( info->reorg_dump_file, "ProgDecls:\n");
     print_progdecls ( info->reorg_dump_file, 2, info);
   }
-
-  #if 0
-  find_and_create_all_modified_types ( &type_mod_info, info);
-  #endif
 
   return true;
 }
@@ -1093,10 +1045,6 @@ find_decls_and_types ( Info *info)
 #endif
 
 // Note, these replace possibly_modify_pointer_types.
-#if 0
-static void
-find_all_record_types ( std::map <tree,TypeHolder> *types, tree type, Info_t *info){}
-#endif
 static void
 find_all_record_types ( tree type, Info_t *info)
 {
@@ -1117,10 +1065,6 @@ find_all_record_types ( tree type, Info_t *info)
     }
 }
 
-#if 0
-static void
-find_and_create_all_modified_types ( std::map <tree,TypeHolder> *types, Info_t *info) {}
-#endif
 void
 find_and_create_all_modified_types ( Info_t *info)
 {
@@ -1388,14 +1332,6 @@ find_and_create_all_modified_types ( Info_t *info)
 	  //DEBUG_A("new_decl = ");
 	  //DEBUG_F(flexible_print, stderr, new_decl, 1, (dump_flags_t)0);
 
-	  // Doesn't actually seem to be needed !?!
-	  #if 0
-	  layout_decl ( new_decl, 0);
-	  #endif
-	  
-	  // We might be missing a bunch of attributes (see
-	  // tree-nested.c:899) But we seem without without them!
-	  
 	  DECL_CHAIN ( new_decl) = new_fields; // <- bug: need decl, not type
 	  new_fields = new_decl;
 	}
@@ -1416,17 +1352,6 @@ find_and_create_all_modified_types ( Info_t *info)
       //DEBUG_F( dump_modified_types, stderr, false, info);
 
       // Lay it out
-      #if 0
-      
-      #if 0
-      layout_type ( modified_type);
-      #else
-      // from stor-layout.c:finish_builtin_struct (NOPE!)
-      TYPE_STUB_DECL ( modified_type) = TYPE_NAME ( modified_type);
-      layout_decl ( TYPE_NAME ( modified_type), 0);
-      #endif
-
-      #else
 
       // From ubsan.c:ubsan_get_type_descriptor_type
       // This doesn't break anything but it doesn't help either!
@@ -1437,19 +1362,9 @@ find_and_create_all_modified_types ( Info_t *info)
 				    TYPE_NAME ( modified_type),
 				    modified_type);
       
-      //DECL_IGNORED_P (type_decl) = 1;   // ???
-      //DECL_ARTIFICIAL (type_decl) = 1;  // ???
-
-      // TYPE_NAME ( modified_type) = type_decl; // ??? What the FUCK!
-      
       TYPE_STUB_DECL ( modified_type) = type_decl;
       
-      //TYPE_ARTIFICIAL ( modified_type) = 1;  // ???
-
-      //use_dump_record = true; // enables my debugging code added to layout_type
       layout_type ( modified_type);
-      //use_dump_record = false;
-      #endif
 
       //DEBUG_LA("modified_type (right after layout) = \n");
       //DEBUG_F( dump_record, stderr, modified_type, true);
@@ -1549,57 +1464,12 @@ dump_modified_types (FILE *file, bool extra_details, Info_t *info)
       tree orig_type = modifi->first;
       tree new_type = modifi->second;
       //DEBUG_A("");
-      #if 1
+
       dump_record (file, orig_type, extra_details);
-      #else
-      flexible_print ( file, orig_type, 1, (dump_flags_t)0);
-      for ( field = TYPE_FIELDS ( orig_type);
-	    field; field = DECL_CHAIN ( field))
-	{
-	  //DEBUG_A("");
-	  fprintf ( file, "    ", TYPE_FIELDS ( new_type));
-	  flexible_print ( file, field, 1, (dump_flags_t)0);
-	  if ( extra_details )
-	    {
-	      tree off = DECL_FIELD_OFFSET ( field);
-	      if ( off )
-		{
-		  fprintf ( file, "      ");
-		  flexible_print ( file, off, 1, (dump_flags_t)0);
-		}
-	      else
-		{
-		  fprintf ( file, "      (nil)\n");
-		}
-	    }
-	}
-      #endif
+
       //DEBUG_A("");
-      #if 1
+
       dump_record (file, new_type, extra_details);
-      #else
-      flexible_print ( file, new_type, 1, (dump_flags_t)0);
-      for ( field = TYPE_FIELDS ( new_type);
-	    field; field = DECL_CHAIN ( field))
-	{
-	  //DEBUG_A("");
-	  fprintf ( file, "    ");
-	  flexible_print ( file, field, 1, (dump_flags_t)0);
-	  if ( extra_details )
-	    {
-	      tree off = DECL_FIELD_OFFSET ( field);
-	      if ( off )
-		{
-		  fprintf ( file, "      ");
-		  flexible_print ( file, off, 1, (dump_flags_t)0);
-		}
-	      else
-		{
-		  fprintf ( file, "      (nil)\n");
-		}
-	    }
-	}
-      #endif
     }
 }
 
