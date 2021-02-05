@@ -235,6 +235,12 @@ static int verbose_only_flag;
 
 static int print_subprocess_help;
 
+/* argc and argv provided to the driver.  Necessary to keep for when
+   -frecord-gcc-switches-format=driver is given.  */
+
+static unsigned int driver_gcc_argc;
+static const char **driver_gcc_argv;
+
 /* Linker suffix passed to -fuse-ld=... */
 static const char *use_ld;
 
@@ -433,6 +439,7 @@ static const char *greater_than_spec_func (int, const char **);
 static const char *debug_level_greater_than_spec_func (int, const char **);
 static const char *dwarf_version_greater_than_spec_func (int, const char **);
 static const char *find_fortran_preinclude_file (int, const char **);
+static const char *save_driver_cmdline (int, const char **);
 static char *convert_white_space (char *);
 static char *quote_spec (char *);
 static char *quote_spec_arg (char *);
@@ -1277,7 +1284,9 @@ static const char *cc1_options =
  %{coverage:-fprofile-arcs -ftest-coverage}\
  %{fprofile-arcs|fprofile-generate*|coverage:\
    %{!fprofile-update=single:\
-     %{pthread:-fprofile-update=prefer-atomic}}}";
+     %{pthread:-fprofile-update=prefer-atomic}}}\
+ %{frecord-gcc-switches-format=driver:-frecord-gcc-switches-file=%:save-driver-cmdline(%g.cmdline)\
+   %<-frecord-gcc-switches-format=driver}";
 
 static const char *asm_options =
 "%{-target-help:%:print-asm-header()} "
@@ -1769,6 +1778,7 @@ static const struct spec_function static_spec_functions[] =
   { "debug-level-gt",		debug_level_greater_than_spec_func },
   { "dwarf-version-gt",		dwarf_version_greater_than_spec_func },
   { "fortran-preinclude-file",	find_fortran_preinclude_file},
+  { "save-driver-cmdline",	save_driver_cmdline},
 #ifdef EXTRA_SPEC_FUNCTIONS
   EXTRA_SPEC_FUNCTIONS
 #endif
@@ -8007,6 +8017,7 @@ driver::main (int argc, char **argv)
 
   set_progname (argv[0]);
   expand_at_files (&argc, &argv);
+  set_commandline (argc, const_cast <const char **> (argv));
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
   build_multilib_strings ();
@@ -8048,6 +8059,15 @@ driver::set_progname (const char *argv0) const
   progname = p;
 
   xmalloc_set_program_name (progname);
+}
+
+/* Keep the command line for -frecord-gcc-switches-format=driver.  */
+
+void
+driver::set_commandline (int argc, const char **argv) const
+{
+  driver_gcc_argc = argc;
+  driver_gcc_argv = argv;
 }
 
 /* Expand any @ files within the command-line args,
@@ -10816,6 +10836,21 @@ find_fortran_preinclude_file (int argc, const char **argv)
   path_prefix_reset (&prefixes);
   return result;
 }
+
+/* Save driver options to a temporary file.  */
+
+static const char *
+save_driver_cmdline (int argc ATTRIBUTE_UNUSED,
+		     const char **argv)
+{
+  FILE *f = fopen (argv[0], "w");
+  for (unsigned int i = 0; i < driver_gcc_argc; i++)
+    fprintf (f, i == 0 ? "%s" : " %s", driver_gcc_argv[i]);
+  fclose (f);
+
+  return argv[0];
+}
+
 
 /* If any character in ORIG fits QUOTE_P (_, P), reallocate the string
    so as to precede every one of them with a backslash.  Return the

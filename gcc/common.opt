@@ -2326,8 +2326,25 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 ; records information in the assembler output file as comments, so
 ; they never reach the object file.
 frecord-gcc-switches
-Common Var(flag_record_gcc_switches)
+Common Driver Var(flag_record_gcc_switches)
 Record gcc command line switches in the object file.
+
+Enum
+Name(record_gcc_switches_format) Type(enum record_gcc_switches_format)
+
+EnumValue
+Enum(record_gcc_switches_format) String(processed) Value(RECORD_GCC_SWITCHES_PROCESSED)
+
+EnumValue
+Enum(record_gcc_switches_format) String(driver) Value(RECORD_GCC_SWITCHES_DRIVER)
+
+frecord-gcc-switches-format=
+Common Joined RejectNegative Var(flag_record_gcc_switches_format) Enum(record_gcc_switches_format) Init(RECORD_GCC_SWITCHES_PROCESSED)
+-frecord-gcc-switches-format=[processed|driver]	Format of recorded gcc command line switches.
+
+frecord-gcc-switches-file=
+Common Joined RejectNegative Var(flag_record_gcc_switches_file) Undocumented
+Path to file that contains driver command line options.
 
 freg-struct-return
 Common Var(flag_pcc_struct_return,0) Optimization

@@ -427,6 +427,13 @@ enum openacc_kernels
   OPENACC_KERNELS_PARLOOPS
 };
 
+/* Record GCC options type.  */
+enum record_gcc_switches_format
+{
+  RECORD_GCC_SWITCHES_PROCESSED = 0,
+  RECORD_GCC_SWITCHES_DRIVER
+};
+
 #endif
 
 #endif /* ! GCC_FLAG_TYPES_H */

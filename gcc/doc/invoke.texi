@@ -654,7 +654,7 @@ Objective-C and Objective-C++ Dialects}.
 -finhibit-size-directive  -fcommon  -fno-ident @gol
 -fpcc-struct-return  -fpic  -fPIC  -fpie  -fPIE  -fno-plt @gol
 -fno-jump-tables -fno-bit-tests @gol
--frecord-gcc-switches @gol
+-frecord-gcc-switches -frecord-gcc-switches-format @gol
 -freg-struct-return  -fshort-enums  -fshort-wchar @gol
 -fverbose-asm  -fpack-struct[=@var{n}]  @gol
 -fleading-underscore  -ftls-model=@var{model} @gol
@@ -16358,6 +16358,27 @@ switch only records information in the assembler output file as
 comments, so it never reaches the object file.
 See also @option{-grecord-gcc-switches} for another
 way of storing compiler options into the object file.
+
+@item -frecord-gcc-switches-format=@var{format}
+@opindex frecord-gcc-switches-format
+This switch controls the output format of options that record
+the command line.  The affected options are @option{-frecord-gcc-switches},
+@option{-grecord-gcc-switches} and @option{-fverbose-asm}.
+
+The @var{format} argument should be one of the following:
+
+@table @samp
+
+@item processed
+
+Options are printed after processing by the compiler driver.
+It is the default option value.
+
+@item driver
+
+Options are printed as provided to the compiler driver.
+
+@end table
 
 @item -fpic
 @opindex fpic

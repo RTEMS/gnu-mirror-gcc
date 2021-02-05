@@ -3303,6 +3303,7 @@ gen_command_line_string (cl_decoded_option *options,
       case OPT_SPECIAL_input_file:
       case OPT_grecord_gcc_switches:
       case OPT_frecord_gcc_switches:
+      case OPT_frecord_gcc_switches_format_:
       case OPT__output_pch_:
       case OPT_fdiagnostics_show_location_:
       case OPT_fdiagnostics_show_option:
@@ -3386,6 +3387,36 @@ gen_producer_string (const char *language_string, cl_decoded_option *options,
 {
   return concat (language_string, " ", version_string, " ",
 		 gen_command_line_string (options, options_count), NULL);
+}
+
+/* Return value of env variable GCC_DRIVER_COMMAND_LINE if exists.
+   Otherwise return empty string.  */
+
+const char *
+get_driver_command_line ()
+{
+  static char *cmdline = NULL;
+
+  if (cmdline != NULL)
+    return cmdline;
+
+  FILE *f = fopen (flag_record_gcc_switches_file, "r");
+  if (f == NULL)
+    fatal_error (UNKNOWN_LOCATION, "cannot open %s: %m", flag_record_gcc_switches_file);
+
+  fseek(f, 0, SEEK_END);
+  unsigned int size = ftell (f);
+  fseek(f, 0, SEEK_SET);
+
+  cmdline = XNEWVEC (char, size + 1);
+
+  unsigned int read;
+  char *ptr = cmdline;
+  while ((read = fread (ptr, 4096, 1, f)))
+    ptr += read;
+
+  cmdline[size] = '\0';
+  return cmdline;
 }
 
 #if CHECKING_P

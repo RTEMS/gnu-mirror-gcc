@@ -32149,13 +32149,20 @@ dwarf2out_early_finish (const char *filename)
      header compilation, so always fill it with empty string initially
      and overwrite only here.  */
   dw_attr_node *producer = get_AT (comp_unit_die (), DW_AT_producer);
+  producer_string = concat (lang_hooks.name, " ", version_string, NULL);
 
   if (dwarf_record_gcc_switches)
-    producer_string = gen_producer_string (lang_hooks.name,
-					   save_decoded_options,
-					   save_decoded_options_count);
-  else
-    producer_string = concat (lang_hooks.name, " ", version_string, NULL);
+    {
+      char *producer_string_old = producer_string;
+      if (flag_record_gcc_switches_format == RECORD_GCC_SWITCHES_DRIVER)
+	producer_string = concat (producer_string, " ",
+				  get_driver_command_line (), NULL);
+      else
+	producer_string = gen_producer_string (lang_hooks.name,
+					       save_decoded_options,
+					       save_decoded_options_count);
+      free (producer_string_old);
+    }
 
   producer->dw_attr_val.v.val_str->refcount--;
   producer->dw_attr_val.v.val_str = find_AT_string (producer_string);
