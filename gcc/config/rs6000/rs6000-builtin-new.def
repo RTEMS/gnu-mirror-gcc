@@ -1735,12 +1735,8 @@
   const vd __builtin_vsx_xvcvsxwdp (vsi);
     XVCVSXWDP vsx_xvcvsxwdp {}
 
-; Need to pick one or the other here!!  ####
-; The first is needed to make vec_float work correctly.
   const vf __builtin_vsx_xvcvsxwsp (vsi);
     XVCVSXWSP vsx_floatv4siv4sf2 {}
-;  const vf __builtin_vsx_xvcvsxwsp (vsi);
-;    XVCVSXWSP_V4SF vsx_xvcvsxwdp {}
 
   const vd __builtin_vsx_xvcvuxddp (vull);
     XVCVUXDDP vsx_floatunsv2div2df2 {}
@@ -1758,12 +1754,8 @@
   const vd __builtin_vsx_xvcvuxwdp (vsi);
     XVCVUXWDP vsx_xvcvuxwdp {}
 
-; Need to pick one or the other here!! ####
-; The first is needed to make vec_float work correctly.
   const vf __builtin_vsx_xvcvuxwsp (vui);
     XVCVUXWSP vsx_floatunsv4siv4sf2 {}
-;  const vf __builtin_vsx_xvcvuxwsp (vui);
-;    XVCVUXWSP_V4SF vsx_xvcvuxwsp {}
 
   fpmath vd __builtin_vsx_xvdivdp (vd, vd);
     XVDIVDP divv2df3 {}

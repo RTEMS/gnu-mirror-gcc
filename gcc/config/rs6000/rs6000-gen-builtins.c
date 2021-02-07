@@ -2691,7 +2691,6 @@ write_init_file ()
   fprintf (init_file, "#include \"tree.h\"\n");
   fprintf (init_file, "#include \"langhooks.h\"\n");
   fprintf (init_file, "#include \"insn-codes.h\"\n");
-  fprintf (init_file, "#include \"timevar.h\"\n");
   fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
 
@@ -2715,7 +2714,6 @@ write_init_file ()
   fprintf (init_file, "rs6000_autoinit_builtins ()\n");
   fprintf (init_file, "{\n");
   fprintf (init_file, "  tree t;\n");
-  fprintf (init_file, "  timevar_start (TV_BILL);\n");
   rbt_inorder_callback (&fntype_rbt, fntype_rbt.rbt_root, write_fntype_init);
   fprintf (init_file, "\n");
 
@@ -2729,7 +2727,6 @@ write_init_file ()
   write_init_bif_table ();
   write_init_ovld_table ();
 
-  fprintf (init_file, "  timevar_stop (TV_BILL);\n");
   fprintf (init_file, "}\n\n");
 
   fprintf (init_file,
