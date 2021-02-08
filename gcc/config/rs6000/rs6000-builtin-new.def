@@ -3121,6 +3121,30 @@
   const vull __builtin_altivec_vctzdm (vull, vull);
     VCTZDM vctzdm {}
 
+  const vsll __builtin_altivec_vdivesd (vsll, vsll);
+    VDIVESD dives_v2di {}
+
+  const vsi __builtin_altivec_vdivesw (vsi, vsi);
+    VDIVESW dives_v4si {}
+
+  const vull __builtin_altivec_vdiveud (vull, vull);
+    VDIVEUD diveu_v2di {}
+
+  const vui __builtin_altivec_vdiveuw (vui, vui);
+    VDIVEUW diveu_v4si {}
+
+  const vsll __builtin_altivec_vdivsd (vsll, vsll);
+    VDIVSD divv2di3 {}
+
+  const vsi __builtin_altivec_vdivsw (vsi, vsi);
+    VDIVSW divv4si3 {}
+
+  const vull __builtin_altivec_vdivud (vull, vull);
+    VDIVUD udivv2di3 {}
+
+  const vui __builtin_altivec_vdivuw (vui, vui);
+    VDIVUW udivv4si3 {}
+
   const vuc __builtin_altivec_vexpandmb (vuc);
     VEXPANDMB vec_expand_v16qi {}
 
@@ -3219,6 +3243,33 @@
 
   const vui __builtin_altivec_vinsvuwvrx (vui, vui, unsigned int);
     VINSERTVPRWR vinsertvr_v4si {}
+
+  const vsll __builtin_altivec_vmodsd (vsll, vsll);
+    VMODSD mods_v2di {}
+
+  const vsi __builtin_altivec_vmodsw (vsi, vsi);
+    VMODSW mods_v4si {}
+
+  const vull __builtin_altivec_vmodud (vull, vull);
+    VMODUD modu_v2di {}
+
+  const vui __builtin_altivec_vmoduw (vui, vui);
+    VMODUW modu_v4si {}
+
+  const vsll __builtin_altivec_vmulhsd (vsll, vsll);
+    VMULHSD mulhs_v2di {}
+
+  const vsi __builtin_altivec_vmulhsw (vsi, vsi);
+    VMULHSW mulhs_v4si {}
+
+  const vull __builtin_altivec_vmulhud (vull, vull);
+    VMULHUD mulhu_v2di {}
+
+  const vui __builtin_altivec_vmulhuw (vui, vui);
+    VMULHUW mulhu_v4si {}
+
+  const vsll __builtin_altivec_vmulld (vsll, vsll);
+    VMULLD mulv2di3 {}
 
   const vull __builtin_altivec_vpdepd (vull, vull);
     VPDEPD vpdepd {}

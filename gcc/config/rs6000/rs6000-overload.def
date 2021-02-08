@@ -1149,6 +1149,10 @@
     XVCVDPUXDS_SCALE
 
 [VEC_DIV, vec_div, __builtin_vec_div, __VSX__]
+  vsi __builtin_vec_div (vsi, vsi);
+    VDIVSW
+  vui __builtin_vec_div (vui, vui);
+    VDIVUW
   vsll __builtin_vec_div (vsll, vsll);
     DIV_V2DI
   vull __builtin_vec_div (vull, vull);
@@ -1157,6 +1161,16 @@
     XVDIVSP
   vd __builtin_vec_div (vd, vd);
     XVDIVDP
+
+[VEC_DIVE, vec_dive, __builtin_vec_dive, _ARCH_PWR10]
+  vsi __builtin_vec_dive (vsi, vsi);
+    VDIVESW
+  vui __builtin_vec_dive (vui, vui);
+    VDIVEUW
+  vsll __builtin_vec_dive (vsll, vsll);
+    VDIVESD
+  vull __builtin_vec_dive (vull, vull);
+    VDIVEUD
 
 [VEC_DOUBLE, vec_double, __builtin_vec_double]
   vd __builtin_vec_double (vsll);
@@ -2376,6 +2390,16 @@
   vus __builtin_vec_mladd (vus, vus, vus);
     VMLADDUHM  VMLADDUHM_VUS2
 
+[VEC_MOD, vec_mod, __builtin_vec_mod, _ARCH_PWR10]
+  vsi __builtin_vec_mod (vsi, vsi);
+    VMODSW
+  vui __builtin_vec_mod (vui, vui);
+    VMODUW
+  vsll __builtin_vec_mod (vsll, vsll);
+    VMODSD
+  vull __builtin_vec_mod (vull, vull);
+    VMODUD
+
 [VEC_MRADDS, vec_mradds, __builtin_vec_mradds]
   vss __builtin_vec_mradds (vss, vss, vss);
     VMHRADDSHS
@@ -2431,7 +2455,8 @@
 ; Note that the entries for VEC_MUL are currently ignored.  See rs6000-c.c:
 ; altivec_resolve_overloaded_builtin, where there is special-case code for
 ; VEC_MUL.  TODO: Is this really necessary?  Investigate.  Seven missing
-; prototypes here...no corresponding builtins.
+; prototypes here...no corresponding builtins.  Also added "vmulld" in P10
+; which could be used instead of MUL_V2DI, conditionally?
 [VEC_MUL, vec_mul, __builtin_vec_mul]
   vsll __builtin_vec_mul (vsll, vsll);
     MUL_V2DI
@@ -2453,6 +2478,16 @@
     VMULESW
   vull __builtin_vec_mule (vui, vui);
     VMULEUW
+
+[VEC_MULH, vec_mulh, __builtin_vec_mulh, _ARCH_PWR10]
+  vsi __builtin_vec_mulh (vsi, vsi);
+    VMULHSW
+  vui __builtin_vec_mulh (vui, vui);
+    VMULHUW
+  vsll __builtin_vec_mulh (vsll, vsll);
+    VMULHSD
+  vull __builtin_vec_mulh (vull, vull);
+    VMULHUD
 
 [VEC_MULO, vec_mulo, __builtin_vec_mulo]
   vss __builtin_vec_mulo (vsc, vsc);
