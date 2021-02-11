@@ -786,6 +786,32 @@ static const struct tune_params neoversev1_tunings =
   &generic_prefetch_tune
 };
 
+static const struct tune_params neoversen2_tunings =
+{
+  &cortexa57_extra_costs,
+  &generic_addrcost_table,
+  &cortexa57_regmove_cost,
+  &cortexa57_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  4, /* memmov_cost  */
+  3, /* issue_rate  */
+  (AARCH64_FUSE_AES_AESMC | AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_ADRP_ADD
+   | AARCH64_FUSE_MOVK_MOVK), /* fusible_ops  */
+  16,	/* function_align.  */
+  4,	/* jump_align.  */
+  8,	/* loop_align.  */
+  2,	/* int_reassoc_width.  */
+  4,	/* fp_reassoc_width.  */
+  1,	/* vec_reassoc_width.  */
+  2,	/* min_div_recip_mul_sf.  */
+  2,	/* min_div_recip_mul_df.  */
+  0,	/* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),	/* tune_flags.  */
+  &generic_prefetch_tune
+};
+
 static const struct tune_params cortexa73_tunings =
 {
   &cortexa57_extra_costs,
@@ -4420,6 +4446,17 @@ aarch64_return_address_signing_enabled (void)
   /* This function should only be called after frame laid out.   */
   gcc_assert (cfun->machine->frame.laid_out);
 
+  /* Turn return address signing off in any function that uses
+     __builtin_eh_return.  The address passed to __builtin_eh_return
+     is not signed so either it has to be signed (with original sp)
+     or the code path that uses it has to avoid authenticating it.
+     Currently eh return introduces a return to anywhere gadget, no
+     matter what we do here since it uses ret with user provided
+     address. An ideal fix for that is to use indirect branch which
+     can be protected with BTI j (to some extent).  */
+  if (crtl->calls_eh_return)
+    return false;
+
   /* If signing scope is AARCH64_FUNCTION_NON_LEAF, we only sign a leaf function
      if it's LR is pushed onto stack.  */
   return (aarch64_ra_sign_scope == AARCH64_FUNCTION_ALL
@@ -7598,6 +7635,24 @@ aarch64_initial_elimination_offset (unsigned from, unsigned to)
   return cfun->machine->frame.frame_size;
 }
 
+
+/* Get return address without mangling.  */
+
+rtx
+aarch64_return_addr_rtx (void)
+{
+  rtx val = get_hard_reg_initial_val (Pmode, LR_REGNUM);
+  /* Note: aarch64_return_address_signing_enabled only
+     works after cfun->machine->frame.laid_out is set,
+     so here we don't know if the return address will
+     be signed or not.  */
+  rtx lr = gen_rtx_REG (Pmode, LR_REGNUM);
+  emit_move_insn (lr, val);
+  emit_insn (GEN_FCN (CODE_FOR_xpaclri) ());
+  return lr;
+}
+
+
 /* Implement RETURN_ADDR_RTX.  We do not support moving back to a
    previous frame.  */
 
@@ -7606,7 +7661,7 @@ aarch64_return_addr (int count, rtx frame ATTRIBUTE_UNUSED)
 {
   if (count != 0)
     return const0_rtx;
-  return get_hard_reg_initial_val (Pmode, LR_REGNUM);
+  return aarch64_return_addr_rtx ();
 }
 
 
@@ -11956,26 +12011,31 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	     the offset does not cause overflow of the final address.  But
 	     we have no way of knowing the address of symbol at compile time
 	     so we can't accurately say if the distance between the PC and
-	     symbol + offset is outside the addressible range of +/-1M in the
-	     TINY code model.  So we rely on images not being greater than
-	     1M and cap the offset at 1M and anything beyond 1M will have to
-	     be loaded using an alternative mechanism.  Furthermore if the
-	     symbol is a weak reference to something that isn't known to
-	     resolve to a symbol in this module, then force to memory.  */
-	  if ((SYMBOL_REF_WEAK (x)
-	       && !aarch64_symbol_binds_local_p (x))
-	      || !IN_RANGE (offset, -1048575, 1048575))
+	     symbol + offset is outside the addressible range of +/-1MB in the
+	     TINY code model.  So we limit the maximum offset to +/-64KB and
+	     assume the offset to the symbol is not larger than +/-(1MB - 64KB).
+	     If offset_within_block_p is true we allow larger offsets.
+	     Furthermore force to memory if the symbol is a weak reference to
+	     something that doesn't resolve to a symbol in this module.  */
+
+	  if (SYMBOL_REF_WEAK (x) && !aarch64_symbol_binds_local_p (x))
 	    return SYMBOL_FORCE_TO_MEM;
+	  if (!(IN_RANGE (offset, -0x10000, 0x10000)
+		|| offset_within_block_p (x, offset)))
+	    return SYMBOL_FORCE_TO_MEM;
+
 	  return SYMBOL_TINY_ABSOLUTE;
 
 	case AARCH64_CMODEL_SMALL:
 	  /* Same reasoning as the tiny code model, but the offset cap here is
-	     4G.  */
-	  if ((SYMBOL_REF_WEAK (x)
-	       && !aarch64_symbol_binds_local_p (x))
-	      || !IN_RANGE (offset, HOST_WIDE_INT_C (-4294967263),
-			    HOST_WIDE_INT_C (4294967264)))
+	     1MB, allowing +/-3.9GB for the offset to the symbol.  */
+
+	  if (SYMBOL_REF_WEAK (x) && !aarch64_symbol_binds_local_p (x))
 	    return SYMBOL_FORCE_TO_MEM;
+	  if (!(IN_RANGE (offset, -0x100000, 0x100000)
+		|| offset_within_block_p (x, offset)))
+	    return SYMBOL_FORCE_TO_MEM;
+
 	  return SYMBOL_SMALL_ABSOLUTE;
 
 	case AARCH64_CMODEL_TINY_PIC:
@@ -15942,7 +16002,7 @@ aarch64_copy_one_block_and_progress_pointers (rtx *src, rtx *dst,
 bool
 aarch64_expand_movmem (rtx *operands)
 {
-  unsigned int n;
+  unsigned HOST_WIDE_INT n;
   rtx dst = operands[0];
   rtx src = operands[1];
   rtx base;

@@ -1,3 +1,238 @@
+2021-02-08  Matthias Klose  <doko@ubuntu.com>
+
+	Backported from master:
+	2020-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97236
+	* gcc.dg/vect/pr97236.c: New testcase.
+
+2021-02-03  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97528
+	* gcc.target/arm/pr97528.c: New test.
+
+2021-01-28  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-01-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/86470
+	* gfortran.dg/gomp/pr86470.f90: New test.
+
+2021-01-21  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	Backported from master:
+	2019-10-16  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/98618
+	* gcc.target/aarch64/symbol-range.c: Improve testcase.
+	* gcc.target/aarch64/symbol-range-tiny.c: Likewise.
+
+2020-12-28  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* gcc.target/i386/pr96793-2.c: New test.
+
+2020-12-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* gcc.target/i386/pr96793-1.c: New test.
+
+2020-12-24  Roman Zhuykov  <zhroma@ispras.ru>
+
+	Backported from master:
+	2020-12-05  Roman Zhuykov  <zhroma@ispras.ru>
+
+	PR rtl-optimization/97421
+	* gcc.c-torture/execute/pr97421-1.c: New test.
+	* gcc.c-torture/execute/pr97421-2.c: New test.
+	* gcc.c-torture/execute/pr97421-3.c: New test.
+
+2020-12-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/98307
+	* gfortran.dg/forall_19.f90: New test.
+
+2020-12-23  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* gcc.target/i386/pr96793.c: New test.
+
+2020-12-16  Nathan Sidwell  <nathan@acm.org>
+
+	* g++.dg/template/pr98297.C: New.
+
+2020-12-14  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* lib/target-supports.exp (check_effective_target_tune_cortex_a76): New
+	effective target test.
+	* gcc.target/aarch64/with-tune-config.c: New test.
+	* gcc.target/aarch64/with-tune-march.c: Likewise.
+	* gcc.target/aarch64/with-tune-mcpu.c: Likewise.
+	* gcc.target/aarch64/with-tune-mtune.c: Likewise.
+
+2020-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-11-29  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/pr98017.f90: New test.
+
+2020-12-10  Ed Schonberg  <schonberg@adacore.com>
+
+	* gnat.dg/modular6.adb: New test.
+
+2020-12-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91953
+	* g++.dg/cpp1z/constexpr-if12.C: Remove error.
+	* g++.dg/cpp0x/constexpr-empty14.C: New test.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/94947
+	* gcc.dg/torture/pr94947-1.c: New testcase.
+	* gcc.dg/torture/pr94947-2.c: Likewise.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/95133
+	* gcc.dg/pr95133.c: New testcase.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-26  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/98002
+	* gcc.dg/strncmp-2.c: Call mprotect again before free.
+
+2020-11-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	PR target/91816
+	* gcc.target/arm/pr91816.c: New test.
+
+2020-11-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/cache-3-1.c: New.
+	* c-c++-common/goacc/cache-3-2.c: Likewise.
+	* c-c++-common/goacc/data-clause-1.c: Likewise.
+	* c-c++-common/goacc/data-clause-2.c: Likewise.
+	* c-c++-common/gomp/map-1.c: Adjust.
+	* c-c++-common/gomp/map-2.c: Likewise.
+	* g++.dg/goacc/cache-3-1.C: New.
+	* g++.dg/goacc/cache-3-2.C: Likewise.
+	* g++.dg/goacc/data-clause-1.C: Likewise.
+	* g++.dg/goacc/data-clause-2.C: Likewise.
+	* g++.dg/gomp/map-1.C: Adjust.
+	* g++.dg/gomp/map-2.C: Likewise.
+
+2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* g++.dg/gomp/map-1.C: New.
+	* g++.dg/gomp/map-2.C: Likewise.
+	* c-c++-common/gomp/map-1.c: Adjust.
+	* c-c++-common/gomp/map-2.c: Likewise.
+
+2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/cache-1.c: Update.
+	* c-c++-common/goacc/cache-2.c: Likewise.
+	* g++.dg/goacc/cache-1.C: New.
+	* g++.dg/goacc/cache-2.C: Likewise.
+
+2020-11-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* gcc.target/aarch64/return_address_sign_1.c: Update test.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97918
+	* g++.dg/debug/localclass2.C: New test.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/95158
+	* g++.dg/template/virtual5.C: New test.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/96191
+	* gcc.target/aarch64/stack-protector-1.c: New test.
+	* gcc.target/aarch64/stack-protector-2.c: Likewise.
+
+2020-11-17  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/97535
+	* gcc.target/aarch64/pr97535.c: New test.
+
+2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2020-11-06  Peter Bergner  <bergner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr64505.c: Run everywhere.  Use correct minimized
+	test case.
+
+2020-11-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-03  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/97688
+	* gcc.dg/vect/tree-vect.h (check_vect): Fix the x86 cpuid
+	check to always specify subleaf zero.
+
+2020-10-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2020-10-18  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/matmul_20.f90: New test.
+
+2020-10-22  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backported from master:
+	2020-10-22  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* gcc.dg/dfp/pr97439.c: New test.
+
+2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/97349
+	* gcc.target/aarch64/simd/pr97349.c: New test.
+
 2020-10-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
 
 	Backported from master:

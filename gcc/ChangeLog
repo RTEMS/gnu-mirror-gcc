@@ -1,3 +1,239 @@
+2021-02-08  Matthias Klose  <doko@ubuntu.com>
+
+	Backported from master:
+	2020-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97236
+	* tree-vect-stmts.c (get_group_load_store_type): Keep
+	VMAT_ELEMENTWISE for single-element vectors.
+
+2021-02-03  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97528
+	* config/arm/arm.c (neon_vector_mem_operand): For POST_MODIFY, require
+	first POST_MODIFY operand is a REG and is equal to the first operand
+	of PLUS.
+
+2021-01-21  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	Backported from master:
+	2019-10-16  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/98618
+	* config/aarch64/aarch64.c (aarch64_classify_symbol):
+	Apply reasonable limit to symbol offsets.
+
+2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	Backported from master:
+	2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	* config.gcc [$target == *-*-gnu*]: Enable
+	'default_gnu_indirect_function'.
+
+2020-12-28  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_rint):
+	Remove the sign of the intermediate value for flag_rounding_math.
+
+2020-12-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_truncdf_32):
+	Remove the sign of the intermediate value for flag_rounding_math.
+
+2020-12-24  Roman Zhuykov  <zhroma@ispras.ru>
+
+	Backported from master:
+	2020-12-05  Roman Zhuykov  <zhroma@ispras.ru>
+
+	PR rtl-optimization/97421
+	* modulo-sched.c (generate_prolog_epilog): Remove forward
+	declaration, adjust last argument name and type.
+	(const_iteration_count): Add bool pointer parameter to return
+	whether count register is read in pre-header after its
+	initialization.
+	(sms_schedule): Fix count register initialization adjustment
+	procedure according to what const_iteration_count said.
+
+2020-12-23  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_floorceil):
+	Remove the sign of the intermediate value for flag_rounding_math.
+	(ix86_expand_floorceildf_32): Ditto.
+
+2020-12-14  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config.gcc (aarch64*-*-*): Add --with-tune. Support --with-cpu=native.
+	* config/aarch64/aarch64.h (OPTION_DEFAULT_SPECS): Add --with-tune.
+
+2020-12-14  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc (aarch64*-*-*): Remove --with-{cpu,arch,tune}-32 flags.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-07  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/94947
+	* tree-ssa-structalias.c (refered_from_nonlocal_fn): Use
+	DECL_EXTERNAL || TREE_PUBLIC instead of externally_visible.
+	(refered_from_nonlocal_var): Likewise.
+	(ipa_pta_execute): Likewise.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/94947
+	* tree-ssa-structalias.c (ipa_pta_execute): Use
+	varpool_node::externally_visible_p ().
+	(refered_from_nonlocal_var): Likewise.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-06  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/94964
+	* cfgloopmanip.c (create_preheader): Require non-complex
+	preheader edge for CP_SIMPLE_PREHEADERS.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-05-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/95133
+	* gimple-ssa-split-paths.c
+	(find_block_to_duplicate_for_splitting_paths): Check for
+	normal edges.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-10-26  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/97554
+	* sbitmap.c (sbitmap_vector_alloc): Use size_t for byte
+	quantities to avoid overflow.
+
+2020-11-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	PR target/91816
+	* config/arm/arm-protos.h: New function arm_gen_far_branch prototype.
+	* config/arm/arm.c (arm_gen_far_branch): New function
+	arm_gen_far_branch.
+	* config/arm/arm.md: Update b<cond> for Thumb2 range checks.
+
+2020-11-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/aarch64/aarch64-c.c (aarch64_update_cpp_builtins): Add
+	__ARM_FEATURE_PAC_DEFAULT support.
+
+2020-11-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* doc/extend.texi: Update the text for  __builtin_return_address.
+
+2020-11-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	* config/aarch64/aarch64.c (aarch64_return_address_signing_enabled):
+	Disable return address signing if __builtin_eh_return is used.
+
+2020-11-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	Backported from master:
+	2020-07-13  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/94891
+	PR target/94791
+	* config/aarch64/aarch64-protos.h (aarch64_return_addr_rtx): Declare.
+	* config/aarch64/aarch64.c (aarch64_return_addr_rtx): New.
+	(aarch64_return_addr): Use aarch64_return_addr_rtx.
+	* config/aarch64/aarch64.h (PROFILE_HOOK): Likewise.
+
+2020-11-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97918
+	* dwarf2out.c (dwarf2out_early_finish): flush_limbo_die_list
+	after gen_scheduled_generic_parms_dies.
+
+2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	Backported from master:
+	2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc: add configure flags --with-{cpu,arch,tune}-{32,64}
+	as alias flags for --with-{cpu,arch,tune} on AArch64.
+	* doc/install.texi: Document new flags for aarch64.
+
+2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	Backported from master:
+	2020-11-17  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc: Add --with-tune to AArch64 configure flags.
+
+2020-11-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-08-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/96191
+	* config/aarch64/aarch64.md (stack_protect_test_<mode>): Set the
+	CC register directly, instead of a GPR.  Replace the original GPR
+	destination with an extra scratch register.  Zero out operand 3
+	after use.
+	(stack_protect_test): Update accordingly.
+
+2020-11-17  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/97535
+	* config/aarch64/aarch64.c (aarch64_expand_movme): Use
+	unsigned HOST_WIDE_INT.
+
+2020-10-22  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	Backported from master:
+	2020-10-22  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR rtl-optimization/97439
+	* dfp.c (decimal_real_maxval): Set the sign flag in the
+	generated number.
+
+2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (neoversen2_tunings): Define.
+	* config/aarch64/aarch64-cores.def (neoverse-n2): Use it.
+
+2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2020-10-13  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/97349
+	* config/aarch64/arm_neon.h (vdupq_n_p8, vdupq_n_p16,
+	vdupq_n_p64, vdupq_n_s8, vdupq_n_s16, vdupq_n_u8, vdupq_n_u16):
+	Fix argument type.
+
 2020-10-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
 
 	Backported from master:
@@ -432,12 +668,6 @@
 
 	Backported from master:
 	2020-04-29  Richard Sandiford  <richard.sandiford@arm.com>
-
-	* config/arm/arm-builtins.c (arm_atomic_assign_expand_fenv): Use
-	TARGET_EXPR instead of MODIFY_EXPR for the first assignments to
-	fenv_var and new_fenv_var.
-
-2020-04-29  Richard Sandiford  <richard.sandiford@arm.com>
 
 	* config/arm/arm-builtins.c (arm_atomic_assign_expand_fenv): Use
 	TARGET_EXPR instead of MODIFY_EXPR for the first assignments to

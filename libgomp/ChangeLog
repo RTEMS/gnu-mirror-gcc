@@ -1,3 +1,33 @@
+2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR libgomp/65099
+	* plugin/configfrag.ac (PLUGIN_NVPTX): Restrict to supported
+	configurations.
+	* configure: Regenerate.
+	* plugin/plugin-nvptx.c (nvptx_get_num_devices): Remove 64-bit
+	check.
+
+2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.oacc-c++/cache-1.C: New.
+	* testsuite/libgomp.oacc-c-c++-common/cache-1.c: Update.
+
+2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2020-11-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/80219
+	PR testsuite/85303
+	* testsuite/lib/libgomp.exp (libgomp_init): Set
+	'gcc_warning_prefix', 'gcc_error_prefix'.
+
 2020-09-17  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:
