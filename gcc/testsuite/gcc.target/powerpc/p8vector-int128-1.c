@@ -13,49 +13,49 @@
 TYPE
 do_addcuq (TYPE p, TYPE q)
 {
-  return vec_addc (p, q);
+  return __builtin_vec_vaddcuq (p, q);
 }
 
 TYPE
 do_adduqm (TYPE p, TYPE q)
 {
-  return vec_add (p, q);
+  return __builtin_vec_add (p, q);
 }
 
 TYPE
 do_addeuqm (TYPE p, TYPE q, TYPE r)
 {
-  return vec_adde (p, q, r);
+  return __builtin_vec_vaddeuqm (p, q, r);
 }
 
 TYPE
 do_addecuq (TYPE p, TYPE q, TYPE r)
 {
-  return vec_addec (p, q, r);
+  return __builtin_vec_vaddecuq (p, q, r);
 }
 
 TYPE
 do_subeuqm (TYPE p, TYPE q, TYPE r)
 {
-  return vec_sube (p, q, r);
+  return __builtin_vec_vsubeuqm (p, q, r);
 }
 
 TYPE
 do_subecuq (TYPE p, TYPE q, TYPE r)
 {
-  return vec_subec (p, q, r);
+  return __builtin_vec_vsubecuq (p, q, r);
 }
 
 TYPE
 do_subcuq (TYPE p, TYPE q)
 {
-  return vec_subc (p, q);
+  return __builtin_vec_vsubcuq (p, q);
 }
 
 TYPE
 do_subuqm (TYPE p, TYPE q)
 {
-  return vec_sub (p, q);
+  return __builtin_vec_vsubuqm (p, q);
 }
 
 TYPE

@@ -5,8 +5,7 @@
 vector float
 f(vector float a, vector float b, vector float c) 
 {
-  return __builtin_altivec_vmaddfp(a, __builtin_altivec_vrefp(b),
-    __builtin_altivec_vmaxfp(c, __builtin_altivec_vexptefp(a)));
+  return vec_vmaddfp(a, vec_vrefp(b), vec_vmaxfp(c, vec_vexptefp(a)));
 }
 
 static void test()

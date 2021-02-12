@@ -37,6 +37,11 @@ vi_uns vi_pack_3 (vll_uns a, vll_uns b)
   return vec_pack (a, b);
 }
 
+vi_sign vi_pack_4 (vll_sign a, vll_sign b)
+{
+  return vec_vpkudum (a, b);
+}
+
 vs_sign vs_pack_1 (vi_sign a, vi_sign b)
 {
   return __builtin_altivec_vpkuwum (a, b);
@@ -47,6 +52,11 @@ vs_sign vs_pack_2 (vi_sign a, vi_sign b)
   return vec_pack (a, b);
 }
 
+vs_sign vs_pack_3 (vi_sign a, vi_sign b)
+{
+  return vec_vpkuwum (a, b);
+}
+
 vc_sign vc_pack_1 (vs_sign a, vs_sign b)
 {
   return __builtin_altivec_vpkuhum (a, b);
@@ -55,6 +65,11 @@ vc_sign vc_pack_1 (vs_sign a, vs_sign b)
 vc_sign vc_pack_2 (vs_sign a, vs_sign b)
 {
   return vec_pack (a, b);
+}
+
+vc_sign vc_pack_3 (vs_sign a, vs_sign b)
+{
+  return vec_vpkuhum (a, b);
 }
 
 vll_sign vll_unpack_hi_1 (vi_sign a)
@@ -69,7 +84,12 @@ vll_sign vll_unpack_hi_2 (vi_sign a)
 
 vll_sign vll_unpack_hi_3 (vi_sign a)
 {
-  return __builtin_altivec_vupkhsw (a);
+  return __builtin_vec_vupkhsw (a);
+}
+
+vll_sign vll_unpack_lo_1 (vi_sign a)
+{
+  return vec_vupklsw (a);
 }
 
 vll_sign vll_unpack_lo_2 (vi_sign a)
@@ -77,8 +97,13 @@ vll_sign vll_unpack_lo_2 (vi_sign a)
   return vec_unpackl (a);
 }
 
-/* { dg-final { scan-assembler-times "vpkudum" 3 } } */
-/* { dg-final { scan-assembler-times "vpkuwum" 2 } } */
-/* { dg-final { scan-assembler-times "vpkuhum" 2 } } */
+vll_sign vll_unpack_lo_3 (vi_sign a)
+{
+  return vec_vupklsw (a);
+}
+
+/* { dg-final { scan-assembler-times "vpkudum" 4 } } */
+/* { dg-final { scan-assembler-times "vpkuwum" 3 } } */
+/* { dg-final { scan-assembler-times "vpkuhum" 3 } } */
 /* { dg-final { scan-assembler-times "vupklsw" 3 } } */
-/* { dg-final { scan-assembler-times "vupkhsw" 1 } } */
+/* { dg-final { scan-assembler-times "vupkhsw" 3 } } */

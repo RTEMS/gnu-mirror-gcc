@@ -892,8 +892,8 @@ _mm_cvtpd_epi32 (__m128d __A)
 #else
   temp = vec_mergee (temp, temp);
 #endif
-  result = (__v4si) vec_pack ((__vector long long) temp,
-			      (__vector long long) vzero);
+  result = (__v4si) vec_vpkudum ((__vector long long) temp,
+				 (__vector long long) vzero);
 #else
   {
     const __v16qu pkperm = {0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
@@ -931,8 +931,8 @@ _mm_cvtpd_ps (__m128d __A)
 #else
   temp = vec_mergee (temp, temp);
 #endif
-  result = (__v4sf) vec_pack ((__vector long long) temp,
-			      (__vector long long) vzero);
+  result = (__v4sf) vec_vpkudum ((__vector long long) temp,
+				 (__vector long long) vzero);
 #else
   {
     const __v16qu pkperm = {0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
@@ -964,8 +964,8 @@ _mm_cvttpd_epi32 (__m128d __A)
 #else
   temp = vec_mergee (temp, temp);
 #endif
-  result = (__v4si) vec_pack ((__vector long long) temp,
-			      (__vector long long) vzero);
+  result = (__v4si) vec_vpkudum ((__vector long long) temp,
+				 (__vector long long) vzero);
 #else
   {
     const __v16qu pkperm = {0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
@@ -1254,8 +1254,8 @@ _mm_movemask_pd (__m128d  __A)
     };
 
   result = ((__vector unsigned long long)
-	    vec_bperm ((__vector unsigned char) __A,
-		       (__vector unsigned char) perm_mask));
+	    vec_vbpermq ((__vector unsigned char) __A,
+			 (__vector unsigned char) perm_mask));
 
 #ifdef __LITTLE_ENDIAN__
   return result[1];
@@ -1434,7 +1434,7 @@ _mm_madd_epi16 (__m128i __A, __m128i __B)
 {
   __vector signed int zero = {0, 0, 0, 0};
 
-  return (__m128i) vec_msum ((__v8hi)__A, (__v8hi)__B, zero);
+  return (__m128i) vec_vmsumshm ((__v8hi)__A, (__v8hi)__B, zero);
 }
 
 extern __inline __m128i __attribute__((__gnu_inline__, __always_inline__, __artificial__))
@@ -1452,8 +1452,8 @@ _mm_mulhi_epi16 (__m128i __A, __m128i __B)
 #endif
     };
 
-  w0 = vec_mule ((__v8hi)__A, (__v8hi)__B);
-  w1 = vec_mulo ((__v8hi)__A, (__v8hi)__B);
+  w0 = vec_vmulesh ((__v8hi)__A, (__v8hi)__B);
+  w1 = vec_vmulosh ((__v8hi)__A, (__v8hi)__B);
   return (__m128i) vec_perm (w0, w1, xform1);
 }
 
@@ -2046,8 +2046,8 @@ _mm_movemask_epi8 (__m128i __A)
     };
 
   result = ((__vector unsigned long long)
-	    vec_bperm ((__vector unsigned char) __A,
-		       (__vector unsigned char) perm_mask));
+	    vec_vbpermq ((__vector unsigned char) __A,
+			 (__vector unsigned char) perm_mask));
 
 #ifdef __LITTLE_ENDIAN__
   return result[1];
@@ -2071,8 +2071,8 @@ _mm_mulhi_epu16 (__m128i __A, __m128i __B)
 #endif
     };
 
-  w0 = vec_mule ((__v8hu)__A, (__v8hu)__B);
-  w1 = vec_mulo ((__v8hu)__A, (__v8hu)__B);
+  w0 = vec_vmuleuh ((__v8hu)__A, (__v8hu)__B);
+  w1 = vec_vmulouh ((__v8hu)__A, (__v8hu)__B);
   return (__m128i) vec_perm (w0, w1, xform1);
 }
 

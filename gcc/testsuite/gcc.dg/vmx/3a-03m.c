@@ -5,8 +5,7 @@
 vector float
 f(vector float a, vector float b, vector float c) 
 {
-  return vec_nmsub(a, __builtin_altivec_vrefp(b),
-		   vec_nmsub(b, c, __builtin_altivec_vexptefp(a)));
+  return vec_nmsub(a, vec_vrefp(b), vec_nmsub(b, c, vec_vexptefp(a)));
 }
 
 static void test()

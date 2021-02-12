@@ -27,11 +27,17 @@ void f13() {
   *var_vec_s32++ = vec_ld(var_int[0], var_long_ptr[1]);
   *var_vec_s32++ = vec_lde(var_int[0], var_long_ptr[1]);
   *var_vec_s64++ = vec_ldl(var_int[0], var_long_long_ptr[1]);
+  *var_vec_s32++ = vec_lvewx(var_int[0], var_long_ptr[1]);
+  *var_vec_s32++ = vec_lvx(var_int[0], var_long_ptr[1]);
+  *var_vec_s64++ = vec_lvxl(var_int[0], var_long_long_ptr[1]);
 }
 void f22() {
   *var_vec_u32++ = vec_ld(var_int[0], var_unsigned_long_ptr[1]);
   *var_vec_u32++ = vec_lde(var_int[0], var_unsigned_long_ptr[1]);
   *var_vec_u64++ = vec_ldl(var_int[0], var_unsigned_long_long_ptr[1]);
+  *var_vec_u32++ = vec_lvewx(var_int[0], var_unsigned_long_ptr[1]);
+  *var_vec_u32++ = vec_lvx(var_int[0], var_unsigned_long_ptr[1]);
+  *var_vec_u64++ = vec_lvxl(var_int[0], var_unsigned_long_long_ptr[1]);
 }
 void f25() {
   *var_vec_u8++ = vec_lvsl(var_int[0], var_long_ptr[1]);

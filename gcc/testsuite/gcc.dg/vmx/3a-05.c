@@ -6,7 +6,7 @@ vector float
 f(vector float a, vector float b, vector float c) 
 {
   vector float q = vec_expte(a);
-  vector float r = __builtin_altivec_vsubfp(c, q);
+  vector float r = vec_vsubfp(c, q);
   vector float s = vec_re(b);
   vector float t = vec_nmsub(s, c, r);
   return t;

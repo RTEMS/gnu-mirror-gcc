@@ -58,20 +58,64 @@
 #include "rs6000-vecdefines.h"
 
 /* Deprecated interfaces.  */
+#define vec_lvx vec_ld
+#define vec_lvxl vec_ldl
+#define vec_stvx vec_st
+#define vec_stvxl vec_stl
+#define vec_vaddcuw vec_addc
+#define vec_vand vec_and
+#define vec_vandc vec_andc
+#define vec_vcmpbfp vec_cmpb
+#define vec_vcmpgefp vec_cmpge
+#define vec_vctsxs vec_cts
+#define vec_vctuxs vec_ctu
+#define vec_vexptefp vec_expte
+#define vec_vlogefp vec_loge
+#define vec_vmaddfp vec_madd
+#define vec_vmhaddshs vec_madds
+#define vec_vmhraddshs vec_mradds
+#define vec_vmladduhm vec_mladd
+#define vec_vnmsubfp vec_nmsub
+#define vec_vnor vec_nor
+#define vec_vor vec_or
+#define vec_vperm vec_perm
+#define vec_vpkpx vec_packpx
+#define vec_vrefp vec_re
+#define vec_vrfim vec_floor
+#define vec_vrfin vec_round
+#define vec_vrfip vec_ceil
+#define vec_vrfiz vec_trunc
+#define vec_vrsqrtefp vec_rsqrte
+#define vec_vsel vec_sel
+#define vec_vsldoi vec_sld
+#define vec_vsl vec_sll
+#define vec_vslo vec_slo
+#define vec_vspltisb vec_splat_s8
+#define vec_vspltish vec_splat_s16
+#define vec_vspltisw vec_splat_s32
+#define vec_vsr vec_srl
+#define vec_vsro vec_sro
+#define vec_vsubcuw vec_subc
+#define vec_vsum2sws vec_sum2s
+#define vec_vsumsws vec_sums
+#define vec_vxor vec_xor
+
 #ifdef _ARCH_PWR8
+#define vec_vclz vec_cntlz
+#define vec_vgbbd vec_gb
+#define vec_vmrgew vec_mergee
+#define vec_vmrgow vec_mergeo
+#define vec_vpopcnt vec_popcnt
+#define vec_vrld vec_rl
 #define vec_vsld vec_sl
 #define vec_vsrd vec_sr
 #define vec_vsrad vec_sra
 #endif
 
 #ifdef _ARCH_PWR9
-#define __builtin_vec_vadub __builtin_vec_vadu
-#define __builtin_vec_vaduh __builtin_vec_vadu
-#define __builtin_vec_vaduw __builtin_vec_vadu
-#define vec_vprtybw vec_vprtyb
-#define vec_vprtybd vec_vprtyb
-#define vec_vprtybq vec_vprtyb
-#define vec_vrlnm __builtin_vec_rlnm
+#define vec_extract_fp_from_shorth vec_extract_fp32_from_shorth
+#define vec_extract_fp_from_shortl vec_extract_fp32_from_shortl
+#define vec_vctz vec_cnttz
 #endif
 
 /* Synonyms.  */
@@ -280,12 +324,5 @@ __altivec_scalar_pred(vec_any_nle,
 /* This also accepts a type for its parameter, so it is not enough
    to #define vec_step to __builtin_vec_step.  */
 #define vec_step(x) __builtin_vec_step (* (__typeof__ (x) *) 0)
-
-#ifdef _ARCH_PWR10
-/* #### TODO:  Deal with Carl's new builtins.  */
-#define vec_mulh(a, b) __builtin_vec_mulh ((a), (b))
-#define vec_dive(a, b) __builtin_vec_dive ((a), (b))
-#define vec_mod(a, b) __builtin_vec_mod ((a), (b))
-#endif
 
 #endif /* _ALTIVEC_H */

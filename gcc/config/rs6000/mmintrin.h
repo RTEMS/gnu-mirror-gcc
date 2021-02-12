@@ -1084,7 +1084,7 @@ _mm_madd_pi16 (__m64 __m1, __m64 __m2)
 
   a = (__vector signed short)vec_splats (__m1);
   b = (__vector signed short)vec_splats (__m2);
-  c = vec_msums (a, b, zero);
+  c = vec_vmsumshm (a, b, zero);
   return (__m64) ((__vector long long) c)[0];
 }
 
@@ -1114,8 +1114,8 @@ _mm_mulhi_pi16 (__m64 __m1, __m64 __m2)
   a = (__vector signed short)vec_splats (__m1);
   b = (__vector signed short)vec_splats (__m2);
 
-  w0 = vec_mule (a, b);
-  w1 = vec_mulo (a, b);
+  w0 = vec_vmulesh (a, b);
+  w1 = vec_vmulosh (a, b);
   c = (__vector signed short)vec_perm (w0, w1, xform1);
 
   return (__m64) ((__vector long long) c)[0];

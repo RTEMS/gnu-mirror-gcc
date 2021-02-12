@@ -1702,7 +1702,7 @@
 ; is replaced by "pointer tricks."  The single overload here causes
 ; __builtin_vec_insert to be registered with the front end so this can happen.
 [VEC_INSERT, vec_insert, __builtin_vec_insert]
-  vsi __builtin_vec_extract (vsi, vsi, signed int);
+  vsi __builtin_vec_insert (vsi, vsi, signed int);
     XXPERMDI_4SI  INSERT_FAKERY
 
 [VEC_INSERTH, vec_inserth, __builtin_vec_inserth, _ARCH_PWR10]
@@ -2202,7 +2202,7 @@
   vull __builtin_vec_max (vbll, vull);
     VMAXUD  VMAXUD_BU
 
-[VEC_MERGEE, vec_mergee, __builtin_vec_vmrgew]
+[VEC_MERGEE, vec_mergee, __builtin_vec_vmrgew, _ARCH_PWR8]
   vsi __builtin_vec_vmrgew (vsi, vsi);
     VMRGEW_V4SI  VMRGEW_VSI
   vui __builtin_vec_vmrgew (vui, vui);
@@ -2302,7 +2302,7 @@
   vull __builtin_vec_mergel (vbll, vull);
     VEC_MERGEL_V2DI  VEC_MERGEL_VBLL_VULL
 
-[VEC_MERGEO, vec_mergeo, __builtin_vec_vmrgow]
+[VEC_MERGEO, vec_mergeo, __builtin_vec_vmrgow, _ARCH_PWR8]
   vsi __builtin_vec_vmrgow (vsi, vsi);
     VMRGOW_V4SI  VMRGOW_VSI
   vui __builtin_vec_vmrgow (vui, vui);
@@ -2934,19 +2934,19 @@
     VPMSUMD  VPMSUMD_V
 
 [VEC_POPCNT, vec_popcnt, __builtin_vec_vpopcnt, _ARCH_PWR8]
-  vuc __builtin_vec_vpopcnt (vsc);
+  vsc __builtin_vec_vpopcnt (vsc);
     VPOPCNTB
   vuc __builtin_vec_vpopcnt (vuc);
     VPOPCNTUB
-  vus __builtin_vec_vpopcnt (vss);
+  vss __builtin_vec_vpopcnt (vss);
     VPOPCNTH
   vus __builtin_vec_vpopcnt (vus);
     VPOPCNTUH
-  vui __builtin_vec_vpopcnt (vsi);
+  vsi __builtin_vec_vpopcnt (vsi);
     VPOPCNTW
   vui __builtin_vec_vpopcnt (vui);
     VPOPCNTUW
-  vull __builtin_vec_vpopcnt (vsll);
+  vsll __builtin_vec_vpopcnt (vsll);
     VPOPCNTD
   vull __builtin_vec_vpopcnt (vull);
     VPOPCNTUD
@@ -3112,9 +3112,7 @@
   vull __builtin_vec_rlmi (vull, vull, vull);
     VRLDMI
 
-; We SKIP vec_rlnm so that altivec.h can define it as the three-operand
-; form we expose to the users.
-[VEC_RLNM, SKIP, __builtin_vec_rlnm, _ARCH_PWR9]
+[VEC_RLNM, vec_vrlnm, __builtin_vec_rlnm, _ARCH_PWR9]
   vui __builtin_vec_rlnm (vui, vui);
     VRLWNM
   vull __builtin_vec_rlnm (vull, vull);
@@ -4825,3 +4823,1177 @@
     XXSLDWI_4SF  XXSLDWI_VF2
   vd __builtin_vsx_xxsldwi (vd, vd, const int);
     XXSLDWI_2DF  XXSLDWI_VD2
+
+
+; **************************************************************************
+; **************************************************************************
+; ****    Deprecated overloads that should never have existed at all    ****
+; **************************************************************************
+; **************************************************************************
+
+[VEC_LVEBX, vec_lvebx, __builtin_vec_lvebx]
+  vsc __builtin_vec_lvebx (signed long long, signed char *);
+    LVEBX  LVEBX_DEPR1
+  vuc __builtin_vec_lvebx (signed long long, unsigned char *);
+    LVEBX  LVEBX_DEPR2
+
+[VEC_LVEHX, vec_lvehx, __builtin_vec_lvehx]
+  vss __builtin_vec_lvehx (signed long long, signed short *);
+    LVEHX  LVEHX_DEPR1
+  vus __builtin_vec_lvehx (signed long long, unsigned short *);
+    LVEHX  LVEHX_DEPR2
+
+[VEC_LVEWX, vec_lvewx, __builtin_vec_lvewx]
+  vf __builtin_vec_lvewx (signed long long, float *);
+    LVEWX  LVEWX_DEPR1
+  vsi __builtin_vec_lvewx (signed long long, signed int *);
+    LVEWX  LVEWX_DEPR2
+  vui __builtin_vec_lvewx (signed long long, unsigned int *);
+    LVEWX  LVEWX_DEPR3
+  vsi __builtin_vec_lvewx (signed long long, signed long *);
+    LVEWX  LVEWX_DEPR4
+  vui __builtin_vec_lvewx (signed long long, unsigned long *);
+    LVEWX  LVEWX_DEPR5
+
+[VEC_STVEBX, vec_stvebx, __builtin_vec_stvebx]
+  void __builtin_vec_stvebx (vsc, signed long long, signed char *);
+    STVEBX  STVEBX_DEPR1
+  void __builtin_vec_stvebx (vuc, signed long long, unsigned char *);
+    STVEBX  STVEBX_DEPR2
+  void __builtin_vec_stvebx (vbc, signed long long, signed char *);
+    STVEBX  STVEBX_DEPR3
+  void __builtin_vec_stvebx (vbc, signed long long, signed char *);
+    STVEBX  STVEBX_DEPR4
+  void __builtin_vec_stvebx (vsc, signed long long, void *);
+    STVEBX  STVEBX_DEPR5
+  void __builtin_vec_stvebx (vuc, signed long long, void *);
+    STVEBX  STVEBX_DEPR6
+
+[VEC_STVEHX, vec_stvehx, __builtin_vec_stvehx]
+  void __builtin_vec_stvehx (vss, signed long long, signed short *);
+    STVEHX  STVEHX_DEPR1
+  void __builtin_vec_stvehx (vus, signed long long, unsigned short *);
+    STVEHX  STVEHX_DEPR2
+  void __builtin_vec_stvehx (vbs, signed long long, signed short *);
+    STVEHX  STVEHX_DEPR3
+  void __builtin_vec_stvehx (vbs, signed long long, signed short *);
+    STVEHX  STVEHX_DEPR4
+  void __builtin_vec_stvehx (vss, signed long long, void *);
+    STVEHX  STVEHX_DEPR5
+  void __builtin_vec_stvehx (vus, signed long long, void *);
+    STVEHX  STVEHX_DEPR6
+
+[VEC_STVEWX, vec_stvewx, __builtin_vec_stvewx]
+  void __builtin_vec_stvewx (vf, signed long long, float *);
+    STVEWX  STVEWX_DEPR1
+  void __builtin_vec_stvewx (vsi, signed long long, signed int *);
+    STVEWX  STVEWX_DEPR2
+  void __builtin_vec_stvewx (vui, signed long long, unsigned int *);
+    STVEWX  STVEWX_DEPR3
+  void __builtin_vec_stvewx (vbi, signed long long, signed int *);
+    STVEWX  STVEWX_DEPR4
+  void __builtin_vec_stvewx (vbi, signed long long, unsigned int *);
+    STVEWX  STVEWX_DEPR5
+  void __builtin_vec_stvewx (vf, signed long long, void *);
+    STVEWX  STVEWX_DEPR6
+  void __builtin_vec_stvewx (vsi, signed long long, void *);
+    STVEWX  STVEWX_DEPR7
+  void __builtin_vec_stvewx (vui, signed long long, void *);
+    STVEWX  STVEWX_DEPR8
+
+[VEC_TSTSFI_EQ_DD, SKIP, __builtin_dfp_dtstsfi_eq_dd, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_eq_dd (const int, _Decimal64);
+    TSTSFI_EQ_DD  TSTSFI_EQ_DD_DEPR1
+
+[VEC_TSTSFI_EQ_TD, SKIP, __builtin_dfp_dtstsfi_eq_td, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_eq_td (const int, _Decimal128);
+    TSTSFI_EQ_TD  TSTSFI_EQ_TD_DEPR1
+
+[VEC_TSTSFI_GT_DD, SKIP, __builtin_dfp_dtstsfi_gt_dd, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_gt_dd (const int, _Decimal64);
+    TSTSFI_GT_DD  TSTSFI_GT_DD_DEPR1
+
+[VEC_TSTSFI_GT_TD, SKIP, __builtin_dfp_dtstsfi_gt_td, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_gt_td (const int, _Decimal128);
+    TSTSFI_GT_TD  TSTSFI_GT_TD_DEPR1
+
+[VEC_TSTSFI_LT_DD, SKIP, __builtin_dfp_dtstsfi_lt_dd, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_lt_dd (const int, _Decimal64);
+    TSTSFI_LT_DD  TSTSFI_LT_DD_DEPR1
+
+[VEC_TSTSFI_LT_TD, SKIP, __builtin_dfp_dtstsfi_lt_td, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_lt_td (const int, _Decimal128);
+    TSTSFI_LT_TD  TSTSFI_LT_TD_DEPR1
+
+[VEC_TSTSFI_OV_DD, SKIP, __builtin_dfp_dtstsfi_ov_dd, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_ov_dd (const int, _Decimal64);
+    TSTSFI_OV_DD  TSTSFI_OV_DD_DEPR1
+
+[VEC_TSTSFI_OV_TD, SKIP, __builtin_dfp_dtstsfi_ov_td, _ARCH_PWR9]
+  signed int __builtin_dfp_dtstsfi_ov_td (const int, _Decimal128);
+    TSTSFI_OV_TD  TSTSFI_OV_TD_DEPR1
+
+[VEC_VADDCUQ, vec_vaddcuq, __builtin_vec_vaddcuq, _ARCH_PWR8]
+  vsq __builtin_vec_vaddcuq (vsq, vsq);
+    VADDCUQ  VADDCUQ_DEPR1
+  vuq __builtin_vec_vaddcuq (vuq, vuq);
+    VADDCUQ  VADDCUQ_DEPR2
+
+[VEC_VADDECUQ, vec_vaddecuq, __builtin_vec_vaddecuq, _ARCH_PWR8]
+  vsq __builtin_vec_vaddecuq (vsq, vsq, vsq);
+    VADDECUQ  VADDECUQ_DEPR1
+  vuq __builtin_vec_vaddecuq (vuq, vuq, vuq);
+    VADDECUQ  VADDECUQ_DEPR2
+
+[VEC_VADDEUQM, vec_vaddeuqm, __builtin_vec_vaddeuqm, _ARCH_PWR8]
+  vsq __builtin_vec_vaddeuqm (vsq, vsq, vsq);
+    VADDEUQM  VADDEUQM_DEPR1
+  vuq __builtin_vec_vaddeuqm (vuq, vuq, vuq);
+    VADDEUQM  VADDEUQM_DEPR2
+
+[VEC_VADDFP, vec_vaddfp, __builtin_vec_vaddfp]
+  vf __builtin_vec_vaddfp (vf, vf);
+    VADDFP  VADDFP_DEPR1
+
+[VEC_VADDSBS, vec_vaddsbs, __builtin_vec_vaddsbs]
+  vsc __builtin_vec_vaddsbs (vsc, vsc);
+    VADDSBS  VADDSBS_DEPR1
+  vsc __builtin_vec_vaddsbs (vbc, vsc);
+    VADDSBS  VADDSBS_DEPR2
+  vsc __builtin_vec_vaddsbs (vsc, vbc);
+    VADDSBS  VADDSBS_DEPR3
+
+[VEC_VADDSHS, vec_vaddshs, __builtin_vec_vaddshs]
+  vss __builtin_vec_vaddshs (vss, vss);
+    VADDSHS  VADDSHS_DEPR1
+  vss __builtin_vec_vaddshs (vbs, vss);
+    VADDSHS  VADDSHS_DEPR2
+  vss __builtin_vec_vaddshs (vss, vbs);
+    VADDSHS  VADDSHS_DEPR3
+
+[VEC_VADDSWS, vec_vaddsws, __builtin_vec_vaddsws]
+  vsi __builtin_vec_vaddsws (vsi, vsi);
+    VADDSWS  VADDSWS_DEPR1
+  vsi __builtin_vec_vaddsws (vbi, vsi);
+    VADDSWS  VADDSWS_DEPR2
+  vsi __builtin_vec_vaddsws (vsi, vbi);
+    VADDSWS  VADDSWS_DEPR3
+
+[VEC_VADDUBM, vec_vaddubm, __builtin_vec_vaddubm]
+  vsc __builtin_vec_vaddubm (vsc, vsc);
+    VADDUBM  VADDUBM_DEPR1
+  vuc __builtin_vec_vaddubm (vsc, vuc);
+    VADDUBM  VADDUBM_DEPR2
+  vuc __builtin_vec_vaddubm (vuc, vsc);
+    VADDUBM  VADDUBM_DEPR3
+  vuc __builtin_vec_vaddubm (vuc, vuc);
+    VADDUBM  VADDUBM_DEPR4
+  vsc __builtin_vec_vaddubm (vbc, vsc);
+    VADDUBM  VADDUBM_DEPR5
+  vsc __builtin_vec_vaddubm (vsc, vbc);
+    VADDUBM  VADDUBM_DEPR6
+  vuc __builtin_vec_vaddubm (vbc, vuc);
+    VADDUBM  VADDUBM_DEPR7
+  vuc __builtin_vec_vaddubm (vuc, vbc);
+    VADDUBM  VADDUBM_DEPR8
+
+[VEC_VADDUBS, vec_vaddubs, __builtin_vec_vaddubs]
+  vuc __builtin_vec_vaddubs (vsc, vuc);
+    VADDUBS  VADDUBS_DEPR1
+  vuc __builtin_vec_vaddubs (vuc, vsc);
+    VADDUBS  VADDUBS_DEPR2
+  vuc __builtin_vec_vaddubs (vuc, vuc);
+    VADDUBS  VADDUBS_DEPR3
+  vuc __builtin_vec_vaddubs (vbc, vuc);
+    VADDUBS  VADDUBS_DEPR4
+  vuc __builtin_vec_vaddubs (vuc, vbc);
+    VADDUBS  VADDUBS_DEPR5
+
+[VEC_VADDUDM, vec_vaddudm, __builtin_vec_vaddudm, _ARCH_PWR8]
+  vsll __builtin_vec_vaddudm (vbll, vsll);
+    VADDUDM  VADDUDM_DEPR1
+  vsll __builtin_vec_vaddudm (vsll, vbll);
+    VADDUDM  VADDUDM_DEPR2
+  vsll __builtin_vec_vaddudm (vsll, vsll);
+    VADDUDM  VADDUDM_DEPR3
+  vull __builtin_vec_vaddudm (vbll, vull);
+    VADDUDM  VADDUDM_DEPR4
+  vull __builtin_vec_vaddudm (vull, vbll);
+    VADDUDM  VADDUDM_DEPR5
+  vull __builtin_vec_vaddudm (vull, vull);
+    VADDUDM  VADDUDM_DEPR6
+
+[VEC_VADDUHM, vec_vadduhm, __builtin_vec_vadduhm]
+  vss __builtin_vec_vadduhm (vss, vss);
+    VADDUHM  VADDUHM_DEPR1
+  vus __builtin_vec_vadduhm (vss, vus);
+    VADDUHM  VADDUHM_DEPR2
+  vus __builtin_vec_vadduhm (vus, vss);
+    VADDUHM  VADDUHM_DEPR3
+  vus __builtin_vec_vadduhm (vus, vus);
+    VADDUHM  VADDUHM_DEPR4
+  vss __builtin_vec_vadduhm (vbs, vss);
+    VADDUHM  VADDUHM_DEPR5
+  vss __builtin_vec_vadduhm (vss, vbs);
+    VADDUHM  VADDUHM_DEPR6
+  vus __builtin_vec_vadduhm (vbs, vus);
+    VADDUHM  VADDUHM_DEPR7
+  vus __builtin_vec_vadduhm (vus, vbs);
+    VADDUHM  VADDUHM_DEPR8
+
+[VEC_VADDUHS, vec_vadduhs, __builtin_vec_vadduhs]
+  vus __builtin_vec_vadduhs (vss, vus);
+    VADDUHS  VADDUHS_DEPR1
+  vus __builtin_vec_vadduhs (vus, vss);
+    VADDUHS  VADDUHS_DEPR2
+  vus __builtin_vec_vadduhs (vus, vus);
+    VADDUHS  VADDUHS_DEPR3
+  vus __builtin_vec_vadduhs (vbs, vus);
+    VADDUHS  VADDUHS_DEPR4
+  vus __builtin_vec_vadduhs (vus, vbs);
+    VADDUHS  VADDUHS_DEPR5
+
+[VEC_VADDUQM, vec_vadduqm, __builtin_vec_vadduqm, _ARCH_PWR8]
+  vsq __builtin_vec_vadduqm (vsq, vsq);
+    VADDUQM  VADDUQM_DEPR1
+  vuq __builtin_vec_vadduqm (vuq, vuq);
+    VADDUQM  VADDUQM_DEPR2
+
+[VEC_VADDUWM, vec_vadduwm, __builtin_vec_vadduwm]
+  vsi __builtin_vec_vadduwm (vsi, vsi);
+    VADDUWM  VADDUWM_DEPR1
+  vui __builtin_vec_vadduwm (vsi, vui);
+    VADDUWM  VADDUWM_DEPR2
+  vui __builtin_vec_vadduwm (vui, vsi);
+    VADDUWM  VADDUWM_DEPR3
+  vui __builtin_vec_vadduwm (vui, vui);
+    VADDUWM  VADDUWM_DEPR4
+  vsi __builtin_vec_vadduwm (vbi, vsi);
+    VADDUWM  VADDUWM_DEPR5
+  vsi __builtin_vec_vadduwm (vsi, vbi);
+    VADDUWM  VADDUWM_DEPR6
+  vui __builtin_vec_vadduwm (vbi, vui);
+    VADDUWM  VADDUWM_DEPR7
+  vui __builtin_vec_vadduwm (vui, vbi);
+    VADDUWM  VADDUWM_DEPR8
+
+[VEC_VADDUWS, vec_vadduws, __builtin_vec_vadduws]
+  vui __builtin_vec_vadduws (vsi, vui);
+    VADDUWS  VADDUWS_DEPR1
+  vui __builtin_vec_vadduws (vui, vsi);
+    VADDUWS  VADDUWS_DEPR2
+  vui __builtin_vec_vadduws (vui, vui);
+    VADDUWS  VADDUWS_DEPR3
+  vui __builtin_vec_vadduws (vbi, vui);
+    VADDUWS  VADDUWS_DEPR4
+  vui __builtin_vec_vadduws (vui, vbi);
+    VADDUWS  VADDUWS_DEPR5
+
+[VEC_VADUB, vec_absdb, __builtin_vec_vadub]
+  vuc __builtin_vec_vadub (vuc, vuc);
+    VADUB  VADUB_DEPR1
+
+[VEC_VADUH, vec_absdh, __builtin_vec_vaduh]
+  vus __builtin_vec_vaduh (vus, vus);
+    VADUH  VADUH_DEPR1
+
+[VEC_VADUW, vec_absdw, __builtin_vec_vaduw]
+  vui __builtin_vec_vaduw (vui, vui);
+    VADUW  VADUW_DEPR1
+
+[VEC_VAVGSB, vec_vavgsb, __builtin_vec_vavgsb]
+  vsc __builtin_vec_vavgsb (vsc, vsc);
+    VAVGSB  VAVGSB_DEPR1
+
+[VEC_VAVGSH, vec_vavgsh, __builtin_vec_vavgsh]
+  vss __builtin_vec_vavgsh (vss, vss);
+    VAVGSH  VAVGSH_DEPR1
+
+[VEC_VAVGSW, vec_vavgsw, __builtin_vec_vavgsw]
+  vsi __builtin_vec_vavgsw (vsi, vsi);
+    VAVGSW  VAVGSW_DEPR1
+
+[VEC_VAVGUB, vec_vavgub, __builtin_vec_vavgub]
+  vsc __builtin_vec_vavgub (vsc, vsc);
+    VAVGUB  VAVGUB_DEPR1
+
+[VEC_VAVGUH, vec_vavguh, __builtin_vec_vavguh]
+  vss __builtin_vec_vavguh (vss, vss);
+    VAVGUH  VAVGUH_DEPR1
+
+[VEC_VAVGUW, vec_vavguw, __builtin_vec_vavguw]
+  vsi __builtin_vec_vavguw (vsi, vsi);
+    VAVGUW  VAVGUW_DEPR1
+
+[VEC_VBPERMQ, vec_vbpermq, __builtin_vec_vbpermq, _ARCH_PWR8]
+  vull __builtin_vec_vbpermq (vull, vuc);
+    VBPERMQ  VBPERMQ_DEPR1
+  vsll __builtin_vec_vbpermq (vsc, vsc);
+    VBPERMQ  VBPERMQ_DEPR2
+  vull __builtin_vec_vbpermq (vuc, vuc);
+    VBPERMQ  VBPERMQ_DEPR3
+  vull __builtin_vec_vbpermq (vuq, vuc);
+    VBPERMQ  VBPERMQ_DEPR4
+
+[VEC_VCFSX, vec_vcfsx, __builtin_vec_vcfsx]
+  vf __builtin_vec_vcfsx (vsi, const int);
+    VCFSX  VCFSX_DEPR1
+
+[VEC_VCFUX, vec_vcfux, __builtin_vec_vcfux]
+  vf __builtin_vec_vcfux (vui, const int);
+    VCFUX  VCFUX_DEPR1
+
+[VEC_VCLZB, vec_vclzb, __builtin_vec_vclzb, _ARCH_PWR8]
+  vsc __builtin_vec_vclzb (vsc);
+    VCLZB  VCLZB_DEPR1
+  vuc __builtin_vec_vclzb (vuc);
+    VCLZB  VCLZB_DEPR2
+
+[VEC_VCLZD, vec_vclzd, __builtin_vec_vclzd, _ARCH_PWR8]
+  vsll __builtin_vec_vclzd (vsll);
+    VCLZD  VCLZD_DEPR1
+  vull __builtin_vec_vclzd (vull);
+    VCLZD  VCLZD_DEPR2
+
+[VEC_VCLZH, vec_vclzh, __builtin_vec_vclzh, _ARCH_PWR8]
+  vss __builtin_vec_vclzh (vss);
+    VCLZH  VCLZH_DEPR1
+  vus __builtin_vec_vclzh (vus);
+    VCLZH  VCLZH_DEPR2
+
+[VEC_VCLZW, vec_vclzw, __builtin_vec_vclzw, _ARCH_PWR8]
+  vsi __builtin_vec_vclzw (vsi);
+    VCLZW  VCLZW_DEPR1
+  vui __builtin_vec_vclzw (vui);
+    VCLZW  VCLZW_DEPR2
+
+[VEC_VCMPEQFP, vec_vcmpeqfp, __builtin_vec_vcmpeqfp]
+  vbi __builtin_vec_vcmpeqfp (vf, vf);
+    VCMPEQFP  VCMPEQFP_DEPR1
+
+[VEC_VCMPEQUB, vec_vcmpequb, __builtin_vec_vcmpequb]
+  vbc __builtin_vec_vcmpequb (vsc, vsc);
+    VCMPEQUB  VCMPEQUB_DEPR1
+  vbc __builtin_vec_vcmpequb (vuc, vuc);
+    VCMPEQUB  VCMPEQUB_DEPR2
+
+[VEC_VCMPEQUH, vec_vcmpequh, __builtin_vec_vcmpequh]
+  vbs __builtin_vec_vcmpequh (vss, vss);
+    VCMPEQUH  VCMPEQUH_DEPR1
+  vbs __builtin_vec_vcmpequh (vus, vus);
+    VCMPEQUH  VCMPEQUH_DEPR2
+
+[VEC_VCMPEQUW, vec_vcmpequw, __builtin_vec_vcmpequw]
+  vbi __builtin_vec_vcmpequw (vsi, vsi);
+    VCMPEQUW  VCMPEQUW_DEPR1
+  vbi __builtin_vec_vcmpequw (vui, vui);
+    VCMPEQUW  VCMPEQUW_DEPR2
+
+[VEC_VCMPGTFP, vec_vcmpgtfp, __builtin_vec_vcmpgtfp]
+  vbi __builtin_vec_vcmpgtfp (vf, vf);
+    VCMPGTFP  VCMPGTFP_DEPR1
+
+[VEC_VCMPGTSB, vec_vcmpgtsb, __builtin_vec_vcmpgtsb]
+  vbc __builtin_vec_vcmpgtsb (vsc, vsc);
+    VCMPGTSB  VCMPGTSB_DEPR1
+
+[VEC_VCMPGTSH, vec_vcmpgtsh, __builtin_vec_vcmpgtsh]
+  vbs __builtin_vec_vcmpgtsh (vss, vss);
+    VCMPGTSH  VCMPGTSH_DEPR1
+
+[VEC_VCMPGTSW, vec_vcmpgtsw, __builtin_vec_vcmpgtsw]
+  vbi __builtin_vec_vcmpgtsw (vsi, vsi);
+    VCMPGTSW  VCMPGTSW_DEPR1
+
+[VEC_VCMPGTUB, vec_vcmpgtub, __builtin_vec_vcmpgtub]
+  vbc __builtin_vec_vcmpgtub (vuc, vuc);
+    VCMPGTUB  VCMPGTUB_DEPR1
+
+[VEC_VCMPGTUH, vec_vcmpgtuh, __builtin_vec_vcmpgtuh]
+  vbs __builtin_vec_vcmpgtuh (vus, vus);
+    VCMPGTUH  VCMPGTUH_DEPR1
+
+[VEC_VCMPGTUW, vec_vcmpgtuw, __builtin_vec_vcmpgtuw]
+  vbi __builtin_vec_vcmpgtuw (vui, vui);
+    VCMPGTUW  VCMPGTUW_DEPR1
+
+[VEC_VCTZB, vec_vctzb, __builtin_vec_vctzb, _ARCH_PWR9]
+  vsc __builtin_vec_vctzb (vsc);
+    VCTZB  VCTZB_DEPR1
+  vuc __builtin_vec_vctzb (vuc);
+    VCTZB  VCTZB_DEPR2
+
+[VEC_VCTZD, vec_vctzd, __builtin_vec_vctzd, _ARCH_PWR9]
+  vsll __builtin_vec_vctzd (vsll);
+    VCTZD  VCTZD_DEPR1
+  vull __builtin_vec_vctzd (vull);
+    VCTZD  VCTZD_DEPR2
+
+[VEC_VCTZH, vec_vctzh, __builtin_vec_vctzh, _ARCH_PWR9]
+  vss __builtin_vec_vctzh (vss);
+    VCTZH  VCTZH_DEPR1
+  vus __builtin_vec_vctzh (vus);
+    VCTZH  VCTZH_DEPR2
+
+[VEC_VCTZW, vec_vctzw, __builtin_vec_vctzw, _ARCH_PWR9]
+  vsi __builtin_vec_vctzw (vsi);
+    VCTZW  VCTZW_DEPR1
+  vui __builtin_vec_vctzw (vui);
+    VCTZW  VCTZW_DEPR2
+
+[VEC_VMAXFP, vec_vmaxfp, __builtin_vec_vmaxfp]
+  vf __builtin_vec_vmaxfp (vf, vf);
+    VMAXFP  VMAXFP_DEPR1
+
+[VEC_VMAXSB, vec_vmaxsb, __builtin_vec_vmaxsb]
+  vsc __builtin_vec_vmaxsb (vsc, vsc);
+    VMAXSB  VMAXSB_DEPR1
+  vsc __builtin_vec_vmaxsb (vbc, vsc);
+    VMAXSB  VMAXSB_DEPR2
+  vsc __builtin_vec_vmaxsb (vsc, vbc);
+    VMAXSB  VMAXSB_DEPR3
+
+[VEC_VMAXSD, vec_vmaxsd, __builtin_vec_vmaxsd]
+  vsll __builtin_vec_vmaxsd (vsll, vsll);
+    VMAXSD  VMAXSD_DEPR1
+  vsll __builtin_vec_vmaxsd (vbll, vsll);
+    VMAXSD  VMAXSD_DEPR2
+  vsll __builtin_vec_vmaxsd (vsll, vbll);
+    VMAXSD  VMAXSD_DEPR3
+
+[VEC_VMAXSH, vec_vmaxsh, __builtin_vec_vmaxsh]
+  vss __builtin_vec_vmaxsh (vss, vss);
+    VMAXSH  VMAXSH_DEPR1
+  vss __builtin_vec_vmaxsh (vbs, vss);
+    VMAXSH  VMAXSH_DEPR2
+  vss __builtin_vec_vmaxsh (vss, vbs);
+    VMAXSH  VMAXSH_DEPR3
+
+[VEC_VMAXSW, vec_vmaxsw, __builtin_vec_vmaxsw]
+  vsi __builtin_vec_vmaxsw (vsi, vsi);
+    VMAXSW  VMAXSW_DEPR1
+  vsi __builtin_vec_vmaxsw (vbi, vsi);
+    VMAXSW  VMAXSW_DEPR2
+  vsi __builtin_vec_vmaxsw (vsi, vbi);
+    VMAXSW  VMAXSW_DEPR3
+
+[VEC_VMAXUB, vec_vmaxub, __builtin_vec_vmaxub]
+  vuc __builtin_vec_vmaxub (vsc, vuc);
+    VMAXUB  VMAXUB_DEPR1
+  vuc __builtin_vec_vmaxub (vuc, vsc);
+    VMAXUB  VMAXUB_DEPR2
+  vuc __builtin_vec_vmaxub (vuc, vuc);
+    VMAXUB  VMAXUB_DEPR3
+  vuc __builtin_vec_vmaxub (vbc, vuc);
+    VMAXUB  VMAXUB_DEPR4
+  vuc __builtin_vec_vmaxub (vuc, vbc);
+    VMAXUB  VMAXUB_DEPR5
+
+[VEC_VMAXUD, vec_vmaxud, __builtin_vec_vmaxud]
+  vsll __builtin_vec_vmaxud (vsll, vsll);
+    VMAXUD  VMAXUD_DEPR1
+  vsll __builtin_vec_vmaxud (vbll, vsll);
+    VMAXUD  VMAXUD_DEPR2
+  vsll __builtin_vec_vmaxud (vsll, vbll);
+    VMAXUD  VMAXUD_DEPR3
+
+[VEC_VMAXUH, vec_vmaxuh, __builtin_vec_vmaxuh]
+  vus __builtin_vec_vmaxuh (vss, vus);
+    VMAXUH  VMAXUH_DEPR1
+  vus __builtin_vec_vmaxuh (vus, vss);
+    VMAXUH  VMAXUH_DEPR2
+  vus __builtin_vec_vmaxuh (vus, vus);
+    VMAXUH  VMAXUH_DEPR3
+  vus __builtin_vec_vmaxuh (vbs, vus);
+    VMAXUH  VMAXUH_DEPR4
+  vus __builtin_vec_vmaxuh (vus, vbs);
+    VMAXUH  VMAXUH_DEPR5
+
+[VEC_VMAXUW, vec_vmaxuw, __builtin_vec_vmaxuw]
+  vui __builtin_vec_vmaxuw (vsi, vui);
+    VMAXUW  VMAXUW_DEPR1
+  vui __builtin_vec_vmaxuw (vui, vsi);
+    VMAXUW  VMAXUW_DEPR2
+  vui __builtin_vec_vmaxuw (vui, vui);
+    VMAXUW  VMAXUW_DEPR3
+  vui __builtin_vec_vmaxuw (vbi, vui);
+    VMAXUW  VMAXUW_DEPR4
+  vui __builtin_vec_vmaxuw (vui, vbi);
+    VMAXUW  VMAXUW_DEPR5
+
+[VEC_VMINFP, vec_vminfp, __builtin_vec_vminfp]
+  vf __builtin_vec_vminfp (vf, vf);
+    VMINFP  VMINFP_DEPR1
+
+[VEC_VMINSB, vec_vminsb, __builtin_vec_vminsb]
+  vsc __builtin_vec_vminsb (vsc, vsc);
+    VMINSB  VMINSB_DEPR1
+  vsc __builtin_vec_vminsb (vbc, vsc);
+    VMINSB  VMINSB_DEPR2
+  vsc __builtin_vec_vminsb (vsc, vbc);
+    VMINSB  VMINSB_DEPR3
+
+[VEC_VMINSD, vec_vminsd, __builtin_vec_vminsd]
+  vsll __builtin_vec_vminsd (vsll, vsll);
+    VMINSD  VMINSD_DEPR1
+  vsll __builtin_vec_vminsd (vbll, vsll);
+    VMINSD  VMINSD_DEPR2
+  vsll __builtin_vec_vminsd (vsll, vbll);
+    VMINSD  VMINSD_DEPR3
+
+[VEC_VMINSH, vec_vminsh, __builtin_vec_vminsh]
+  vss __builtin_vec_vminsh (vss, vss);
+    VMINSH  VMINSH_DEPR1
+  vss __builtin_vec_vminsh (vbs, vss);
+    VMINSH  VMINSH_DEPR2
+  vss __builtin_vec_vminsh (vss, vbs);
+    VMINSH  VMINSH_DEPR3
+
+[VEC_VMINSW, vec_vminsw, __builtin_vec_vminsw]
+  vsi __builtin_vec_vminsw (vsi, vsi);
+    VMINSW  VMINSW_DEPR1
+  vsi __builtin_vec_vminsw (vbi, vsi);
+    VMINSW  VMINSW_DEPR2
+  vsi __builtin_vec_vminsw (vsi, vbi);
+    VMINSW  VMINSW_DEPR3
+
+[VEC_VMINUB, vec_vminub, __builtin_vec_vminub]
+  vuc __builtin_vec_vminub (vsc, vuc);
+    VMINUB  VMINUB_DEPR1
+  vuc __builtin_vec_vminub (vuc, vsc);
+    VMINUB  VMINUB_DEPR2
+  vuc __builtin_vec_vminub (vuc, vuc);
+    VMINUB  VMINUB_DEPR3
+  vuc __builtin_vec_vminub (vbc, vuc);
+    VMINUB  VMINUB_DEPR4
+  vuc __builtin_vec_vminub (vuc, vbc);
+    VMINUB  VMINUB_DEPR5
+
+[VEC_VMINUD, vec_vminud, __builtin_vec_vminud]
+  vsll __builtin_vec_vminud (vsll, vsll);
+    VMINUD  VMINUD_DEPR1
+  vsll __builtin_vec_vminud (vbll, vsll);
+    VMINUD  VMINUD_DEPR2
+  vsll __builtin_vec_vminud (vsll, vbll);
+    VMINUD  VMINUD_DEPR3
+
+[VEC_VMINUH, vec_vminuh, __builtin_vec_vminuh]
+  vus __builtin_vec_vminuh (vss, vus);
+    VMINUH  VMINUH_DEPR1
+  vus __builtin_vec_vminuh (vus, vss);
+    VMINUH  VMINUH_DEPR2
+  vus __builtin_vec_vminuh (vus, vus);
+    VMINUH  VMINUH_DEPR3
+  vus __builtin_vec_vminuh (vbs, vus);
+    VMINUH  VMINUH_DEPR4
+  vus __builtin_vec_vminuh (vus, vbs);
+    VMINUH  VMINUH_DEPR5
+
+[VEC_VMINUW, vec_vminuw, __builtin_vec_vminuw]
+  vui __builtin_vec_vminuw (vsi, vui);
+    VMINUW  VMINUW_DEPR1
+  vui __builtin_vec_vminuw (vui, vsi);
+    VMINUW  VMINUW_DEPR2
+  vui __builtin_vec_vminuw (vui, vui);
+    VMINUW  VMINUW_DEPR3
+  vui __builtin_vec_vminuw (vbi, vui);
+    VMINUW  VMINUW_DEPR4
+  vui __builtin_vec_vminuw (vui, vbi);
+    VMINUW  VMINUW_DEPR5
+
+[VEC_VMRGHB, vec_vmrghb, __builtin_vec_vmrghb]
+  vsc __builtin_vec_vmrghb (vsc, vsc);
+    VMRGHB  VMRGHB_DEPR1
+  vuc __builtin_vec_vmrghb (vuc, vuc);
+    VMRGHB  VMRGHB_DEPR2
+  vbc __builtin_vec_vmrghb (vbc, vbc);
+    VMRGHB  VMRGHB_DEPR3
+
+[VEC_VMRGHH, vec_vmrghh, __builtin_vec_vmrghh]
+  vss __builtin_vec_vmrghh (vss, vss);
+    VMRGHH  VMRGHH_DEPR1
+  vus __builtin_vec_vmrghh (vus, vus);
+    VMRGHH  VMRGHH_DEPR2
+  vbs __builtin_vec_vmrghh (vbs, vbs);
+    VMRGHH  VMRGHH_DEPR3
+  vp __builtin_vec_vmrghh (vp, vp);
+    VMRGHH  VMRGHH_DEPR4
+
+[VEC_VMRGHW, vec_vmrghw, __builtin_vec_vmrghw]
+  vf __builtin_vec_vmrghw (vf, vf);
+    VMRGHW  VMRGHW_DEPR1
+  vsi __builtin_vec_vmrghw (vsi, vsi);
+    VMRGHW  VMRGHW_DEPR2
+  vui __builtin_vec_vmrghw (vui, vui);
+    VMRGHW  VMRGHW_DEPR3
+  vbi __builtin_vec_vmrghw (vbi, vbi);
+    VMRGHW  VMRGHW_DEPR4
+
+[VEC_VMRGLB, vec_vmrglb, __builtin_vec_vmrglb]
+  vsc __builtin_vec_vmrglb (vsc, vsc);
+    VMRGLB  VMRGLB_DEPR1
+  vuc __builtin_vec_vmrglb (vuc, vuc);
+    VMRGLB  VMRGLB_DEPR2
+  vbc __builtin_vec_vmrglb (vbc, vbc);
+    VMRGLB  VMRGLB_DEPR3
+
+[VEC_VMRGLH, vec_vmrglh, __builtin_vec_vmrglh]
+  vss __builtin_vec_vmrglh (vss, vss);
+    VMRGLH  VMRGLH_DEPR1
+  vus __builtin_vec_vmrglh (vus, vus);
+    VMRGLH  VMRGLH_DEPR2
+  vbs __builtin_vec_vmrglh (vbs, vbs);
+    VMRGLH  VMRGLH_DEPR3
+  vp __builtin_vec_vmrglh (vp, vp);
+    VMRGLH  VMRGLH_DEPR4
+
+[VEC_VMRGLW, vec_vmrglw, __builtin_vec_vmrglw]
+  vf __builtin_vec_vmrglw (vf, vf);
+    VMRGLW  VMRGLW_DEPR1
+  vsi __builtin_vec_vmrglw (vsi, vsi);
+    VMRGLW  VMRGLW_DEPR2
+  vui __builtin_vec_vmrglw (vui, vui);
+    VMRGLW  VMRGLW_DEPR3
+  vbi __builtin_vec_vmrglw (vbi, vbi);
+    VMRGLW  VMRGLW_DEPR4
+
+[VEC_VMSUMMBM, vec_vmsummbm, __builtin_vec_vmsummbm]
+  vsi __builtin_vec_vmsummbm (vsc, vuc, vsi);
+    VMSUMMBM  VMSUMMBM_DEPR1
+
+[VEC_VMSUMSHM, vec_vmsumshm, __builtin_vec_vmsumshm]
+  vsi __builtin_vec_vmsumshm (vss, vss, vsi);
+    VMSUMSHM  VMSUMSHM_DEPR1
+
+[VEC_VMSUMSHS, vec_vmsumshs, __builtin_vec_vmsumshs]
+  vsi __builtin_vec_vmsumshs (vss, vss, vsi);
+    VMSUMSHS  VMSUMSHS_DEPR1
+
+[VEC_VMSUMUBM, vec_vmsumubm, __builtin_vec_vmsumubm]
+  vui __builtin_vec_vmsumubm (vuc, vuc, vui);
+    VMSUMUBM  VMSUMUBM_DEPR1
+
+[VEC_VMSUMUHM, vec_vmsumuhm, __builtin_vec_vmsumuhm]
+  vui __builtin_vec_vmsumuhm (vus, vus, vui);
+    VMSUMUHM  VMSUMUHM_DEPR1
+
+[VEC_VMSUMUHS, vec_vmsumuhs, __builtin_vec_vmsumuhs]
+  vui __builtin_vec_vmsumuhs (vus, vus, vui);
+    VMSUMUHS  VMSUMUHS_DEPR1
+
+[VEC_VMULESB, vec_vmulesb, __builtin_vec_vmulesb]
+  vss __builtin_vec_vmulesb (vsc, vsc);
+    VMULESB  VMULESB_DEPR1
+
+[VEC_VMULESH, vec_vmulesh, __builtin_vec_vmulesh]
+  vsi __builtin_vec_vmulesh (vss, vss);
+    VMULESH  VMULESH_DEPR1
+
+[VEC_VMULESW, SKIP, __builtin_vec_vmulesw]
+  vsll __builtin_vec_vmulesw (vsi, vsi);
+    VMULESW  VMULESW_DEPR1
+
+[VEC_VMULEUB, vec_vmuleub, __builtin_vec_vmuleub]
+  vus __builtin_vec_vmuleub (vuc, vuc);
+    VMULEUB  VMULEUB_DEPR1
+
+[VEC_VMULEUH, vec_vmuleuh, __builtin_vec_vmuleuh]
+  vui __builtin_vec_vmuleuh (vus, vus);
+    VMULEUH  VMULEUH_DEPR1
+
+[VEC_VMULEUW, SKIP, __builtin_vec_vmuleuw]
+  vull __builtin_vec_vmuleuw (vui, vui);
+    VMULEUW  VMULEUW_DEPR1
+
+[VEC_VMULOSB, vec_vmulosb, __builtin_vec_vmulosb]
+  vss __builtin_vec_vmulosb (vsc, vsc);
+    VMULOSB  VMULOSB_DEPR1
+
+[VEC_VMULOSH, vec_vmulosh, __builtin_vec_vmulosh]
+  vsi __builtin_vec_vmulosh (vss, vss);
+    VMULOSH  VMULOSH_DEPR1
+
+[VEC_VMULOSW, SKIP, __builtin_vec_vmulosw]
+  vsll __builtin_vec_vmulosw (vsi, vsi);
+    VMULOSW  VMULOSW_DEPR1
+
+[VEC_VMULOUB, vec_vmuloub, __builtin_vec_vmuloub]
+  vus __builtin_vec_vmuloub (vuc, vuc);
+    VMULOUB  VMULOUB_DEPR1
+
+[VEC_VMULOUH, vec_vmulouh, __builtin_vec_vmulouh]
+  vui __builtin_vec_vmulouh (vus, vus);
+    VMULOUH  VMULOUH_DEPR1
+
+[VEC_VMULOUW, SKIP, __builtin_vec_vmulouw]
+  vull __builtin_vec_vmulouw (vui, vui);
+    VMULOUW  VMULOUW_DEPR1
+
+[VEC_VPKSDSS, vec_vpksdss, __builtin_vec_vpksdss, _ARCH_PWR8]
+  vsi __builtin_vec_vpksdss (vsll, vsll);
+    VPKSDSS  VPKSDSS_DEPR1
+
+[VEC_VPKSDUS, vec_vpksdus, __builtin_vec_vpksdus, _ARCH_PWR8]
+  vui __builtin_vec_vpksdus (vsll, vsll);
+    VPKSDUS  VPKSDUS_DEPR1
+
+[VEC_VPKSHSS, vec_vpkshss, __builtin_vec_vpkshss]
+  vsc __builtin_vec_vpkshss (vss, vss);
+    VPKSHSS  VPKSHSS_DEPR1
+
+[VEC_VPKSHUS, vec_vpkshus, __builtin_vec_vpkshus]
+  vuc __builtin_vec_vpkshus (vss, vss);
+    VPKSHUS  VPKSHUS_DEPR1
+
+[VEC_VPKSWSS, vec_vpkswss, __builtin_vec_vpkswss]
+  vss __builtin_vec_vpkswss (vsi, vsi);
+    VPKSWSS  VPKSWSS_DEPR1
+
+[VEC_VPKSWUS, vec_vpkswus, __builtin_vec_vpkswus]
+  vus __builtin_vec_vpkswus (vsi, vsi);
+    VPKSWUS  VPKSWUS_DEPR1
+
+[VEC_VPKUDUM, vec_vpkudum, __builtin_vec_vpkudum, _ARCH_PWR8]
+  vsi __builtin_vec_vpkudum (vsll, vsll);
+    VPKUDUM  VPKUDUM_DEPR1
+  vui __builtin_vec_vpkudum (vull, vull);
+    VPKUDUM  VPKUDUM_DEPR2
+  vbi __builtin_vec_vpkudum (vbll, vbll);
+    VPKUDUM  VPKUDUM_DEPR3
+
+[VEC_VPKUDUS, vec_vpkudus, __builtin_vec_vpkudus, _ARCH_PWR8]
+  vui __builtin_vec_vpkudus (vull, vull);
+    VPKUDUS  VPKUDUS_DEPR1
+
+[VEC_VPKUHUM, vec_vpkuhum, __builtin_vec_vpkuhum]
+  vsc __builtin_vec_vpkuhum (vss, vss);
+    VPKUHUM  VPKUHUM_DEPR1
+  vuc __builtin_vec_vpkuhum (vus, vus);
+    VPKUHUM  VPKUHUM_DEPR2
+  vbc __builtin_vec_vpkuhum (vbs, vbs);
+    VPKUHUM  VPKUHUM_DEPR3
+
+[VEC_VPKUHUS, vec_vpkuhus, __builtin_vec_vpkuhus]
+  vuc __builtin_vec_vpkuhus (vus, vus);
+    VPKUHUS  VPKUHUS_DEPR1
+
+[VEC_VPKUWUM, vec_vpkuwum, __builtin_vec_vpkuwum]
+  vss __builtin_vec_vpkuwum (vsi, vsi);
+    VPKUWUM  VPKUWUM_DEPR1
+  vus __builtin_vec_vpkuwum (vui, vui);
+    VPKUWUM  VPKUWUM_DEPR2
+  vbs __builtin_vec_vpkuwum (vbi, vbi);
+    VPKUWUM  VPKUWUM_DEPR3
+
+[VEC_VPKUWUS, vec_vpkuwus, __builtin_vec_vpkuwus]
+  vus __builtin_vec_vpkuwus (vui, vui);
+    VPKUWUS  VPKUWUS_DEPR1
+
+[VEC_VPOPCNTB, vec_vpopcntb, __builtin_vec_vpopcntb, _ARCH_PWR8]
+  vsc __builtin_vec_vpopcntb (vsc);
+    VPOPCNTB  VPOPCNTB_DEPR1
+  vuc __builtin_vec_vpopcntb (vuc);
+    VPOPCNTB  VPOPCNTB_DEPR2
+
+[VEC_VPOPCNTD, vec_vpopcntd, __builtin_vec_vpopcntd, _ARCH_PWR8]
+  vsll __builtin_vec_vpopcntd (vsll);
+    VPOPCNTD  VPOPCNTD_DEPR1
+  vull __builtin_vec_vpopcntd (vull);
+    VPOPCNTD  VPOPCNTD_DEPR2
+
+[VEC_VPOPCNTH, vec_vpopcnth, __builtin_vec_vpopcnth, _ARCH_PWR8]
+  vss __builtin_vec_vpopcnth (vss);
+    VPOPCNTH  VPOPCNTH_DEPR1
+  vus __builtin_vec_vpopcnth (vus);
+    VPOPCNTH  VPOPCNTH_DEPR2
+
+[VEC_VPOPCNTU, SKIP, __builtin_vec_vpopcntu, _ARCH_PWR8]
+  vuc __builtin_vec_vpopcntu (vsc);
+    VPOPCNTUB  VPOPCNTU_DEPR1
+  vuc __builtin_vec_vpopcntu (vuc);
+    VPOPCNTUB  VPOPCNTU_DEPR2
+  vus __builtin_vec_vpopcntu (vss);
+    VPOPCNTUH  VPOPCNTU_DEPR3
+  vus __builtin_vec_vpopcntu (vus);
+    VPOPCNTUH  VPOPCNTU_DEPR4
+  vui __builtin_vec_vpopcntu (vsi);
+    VPOPCNTUW  VPOPCNTU_DEPR5
+  vui __builtin_vec_vpopcntu (vui);
+    VPOPCNTUW  VPOPCNTU_DEPR6
+  vull __builtin_vec_vpopcntu (vsll);
+    VPOPCNTUD  VPOPCNTU_DEPR7
+  vull __builtin_vec_vpopcntu (vull);
+    VPOPCNTUD  VPOPCNTU_DEPR8
+
+[VEC_VPOPCNTW, vec_vpopcntw, __builtin_vec_vpopcntw, _ARCH_PWR8]
+  vsi __builtin_vec_vpopcntw (vsi);
+    VPOPCNTW  VPOPCNTW_DEPR1
+  vui __builtin_vec_vpopcntw (vui);
+    VPOPCNTW  VPOPCNTW_DEPR2
+
+[VEC_VPRTYBD, vec_vprtybd, __builtin_vec_vprtybd, _ARCH_PWR9]
+  vsll __builtin_vec_vprtybd (vsll);
+    VPRTYBD  VPRTYBD_DEPR1
+  vull __builtin_vec_vprtybd (vull);
+    VPRTYBD  VPRTYBD_DEPR2
+
+[VEC_VPRTYBQ, vec_vprtybq, __builtin_vec_vprtybq, _ARCH_PPC64_PWR9]
+  vsq __builtin_vec_vprtybq (vsq);
+    VPRTYBQ  VPRTYBQ_DEPR1
+  vuq __builtin_vec_vprtybq (vuq);
+    VPRTYBQ  VPRTYBQ_DEPR2
+  signed __int128 __builtin_vec_vprtybq (signed __int128);
+    VPRTYBQ  VPRTYBQ_DEPR3
+  unsigned __int128 __builtin_vec_vprtybq (unsigned __int128);
+    VPRTYBQ  VPRTYBQ_DEPR4
+
+[VEC_VPRTYBW, vec_vprtybw, __builtin_vec_vprtybw, _ARCH_PWR9]
+  vsi __builtin_vec_vprtybw (vsi);
+    VPRTYBW  VPRTYBW_DEPR1
+  vui __builtin_vec_vprtybw (vui);
+    VPRTYBW  VPRTYBW_DEPR2
+
+[VEC_VRLB, vec_vrlb, __builtin_vec_vrlb]
+  vsc __builtin_vec_vrlb (vsc, vuc);
+    VRLB  VRLB_DEPR1
+  vuc __builtin_vec_vrlb (vuc, vuc);
+    VRLB  VRLB_DEPR2
+
+[VEC_VRLD, SKIP, __builtin_vec_vrld, _ARCH_PWR8]
+  vsll __builtin_vec_vrld (vsll, vull);
+    VRLD  VRLD_DEPR1
+  vull __builtin_vec_vrld (vull, vull);
+    VRLD  VRLD_DEPR2
+
+[VEC_VRLH, vec_vrlh, __builtin_vec_vrlh]
+  vss __builtin_vec_vrlh (vss, vus);
+    VRLH  VRLH_DEPR1
+  vus __builtin_vec_vrlh (vus, vus);
+    VRLH  VRLH_DEPR2
+
+[VEC_VRLW, vec_vrlw, __builtin_vec_vrlw]
+  vsi __builtin_vec_vrlw (vsi, vui);
+    VRLW  VRLW_DEPR1
+  vui __builtin_vec_vrlw (vui, vui);
+    VRLW  VRLW_DEPR2
+
+[VEC_VSLB, vec_vslb, __builtin_vec_vslb]
+  vsc __builtin_vec_vslb (vsc, vuc);
+    VSLB  VSLB_DEPR1
+  vuc __builtin_vec_vslb (vuc, vuc);
+    VSLB  VSLB_DEPR2
+
+[VEC_VSLD, SKIP, __builtin_vec_vsld, _ARCH_PWR8]
+  vsll __builtin_vec_vsld (vsll, vull);
+    VSLD  VSLD_DEPR1
+  vull __builtin_vec_vsld (vull, vull);
+    VSLD  VSLD_DEPR2
+
+[VEC_VSLH, vec_vslh, __builtin_vec_vslh]
+  vss __builtin_vec_vslh (vss, vus);
+    VSLH  VSLH_DEPR1
+  vus __builtin_vec_vslh (vus, vus);
+    VSLH  VSLH_DEPR2
+
+[VEC_VSLW, vec_vslw, __builtin_vec_vslw]
+  vsi __builtin_vec_vslw (vsi, vui);
+    VSLW  VSLW_DEPR1
+  vui __builtin_vec_vslw (vui, vui);
+    VSLW  VSLW_DEPR2
+
+[VEC_VSPLTB, vec_vspltb, __builtin_vec_vspltb]
+  vsc __builtin_vec_vspltb (vsc, const int);
+    VSPLTB  VSPLTB_DEPR1
+  vuc __builtin_vec_vspltb (vuc, const int);
+    VSPLTB  VSPLTB_DEPR2
+  vbc __builtin_vec_vspltb (vbc, const int);
+    VSPLTB  VSPLTB_DEPR3
+
+[VEC_VSPLTH, vec_vsplth, __builtin_vec_vsplth]
+  vss __builtin_vec_vsplth (vss, const int);
+    VSPLTH  VSPLTH_DEPR1
+  vus __builtin_vec_vsplth (vus, const int);
+    VSPLTH  VSPLTH_DEPR2
+  vbs __builtin_vec_vsplth (vbs, const int);
+    VSPLTH  VSPLTH_DEPR3
+  vp __builtin_vec_vsplth (vp, const int);
+    VSPLTH  VSPLTH_DEPR4
+
+[VEC_VSPLTW, vec_vspltw, __builtin_vec_vspltw]
+  vsi __builtin_vec_vspltw (vsi, const int);
+    VSPLTW  VSPLTW_DEPR1
+  vui __builtin_vec_vspltw (vui, const int);
+    VSPLTW  VSPLTW_DEPR2
+  vbi __builtin_vec_vspltw (vbi, const int);
+    VSPLTW  VSPLTW_DEPR3
+
+[VEC_VSRAB, vec_vsrab, __builtin_vec_vsrab]
+  vsc __builtin_vec_vsrab (vsc, vuc);
+    VSRAB  VSRAB_DEPR1
+  vuc __builtin_vec_vsrab (vuc, vuc);
+    VSRAB  VSRAB_DEPR2
+
+[VEC_VSRAD, SKIP, __builtin_vec_vsrad, _ARCH_PWR8]
+  vsll __builtin_vec_vsrad (vsll, vull);
+    VSRAD  VSRAD_DEPR1
+  vull __builtin_vec_vsrad (vull, vull);
+    VSRAD  VSRAD_DEPR2
+
+[VEC_VSRAH, vec_vsrah, __builtin_vec_vsrah]
+  vss __builtin_vec_vsrah (vss, vus);
+    VSRAH  VSRAH_DEPR1
+  vus __builtin_vec_vsrah (vus, vus);
+    VSRAH  VSRAH_DEPR2
+
+[VEC_VSRAW, vec_vsraw, __builtin_vec_vsraw]
+  vsi __builtin_vec_vsraw (vsi, vui);
+    VSRAW  VSRAW_DEPR1
+  vui __builtin_vec_vsraw (vui, vui);
+    VSRAW  VSRAW_DEPR2
+
+[VEC_VSRB, vec_vsrb, __builtin_vec_vsrb]
+  vsc __builtin_vec_vsrb (vsc, vuc);
+    VSRB  VSRB_DEPR1
+  vuc __builtin_vec_vsrb (vuc, vuc);
+    VSRB  VSRB_DEPR2
+
+[VEC_VSRD, SKIP, __builtin_vec_vsrd, _ARCH_PWR8]
+  vsll __builtin_vec_vsrd (vsll, vull);
+    VSRD  VSRD_DEPR1
+  vull __builtin_vec_vsrd (vull, vull);
+    VSRD  VSRD_DEPR2
+
+[VEC_VSRH, vec_vsrh, __builtin_vec_vsrh]
+  vss __builtin_vec_vsrh (vss, vus);
+    VSRH  VSRH_DEPR1
+  vus __builtin_vec_vsrh (vus, vus);
+    VSRH  VSRH_DEPR2
+
+[VEC_VSRW, vec_vsrw, __builtin_vec_vsrw]
+  vsi __builtin_vec_vsrw (vsi, vui);
+    VSRW  VSRW_DEPR1
+  vui __builtin_vec_vsrw (vui, vui);
+    VSRW  VSRW_DEPR2
+
+[VEC_VSUBCUQ, vec_vsubcuqP, __builtin_vec_vsubcuq]
+  vsq __builtin_vec_vsubcuq (vsq, vsq);
+    VSUBCUQ  VSUBCUQ_DEPR1
+  vuq __builtin_vec_vsubcuq (vuq, vuq);
+    VSUBCUQ  VSUBCUQ_DEPR2
+
+[VEC_VSUBECUQ, vec_vsubecuq, __builtin_vec_vsubecuq, ARCH_PWR8]
+  vsq __builtin_vec_vsubecuq (vsq, vsq, vsq);
+    VSUBECUQ  VSUBECUQ_DEPR1
+  vuq __builtin_vec_vsubecuq (vuq, vuq, vuq);
+    VSUBECUQ  VSUBECUQ_DEPR2
+
+[VEC_VSUBEUQM, vec_vsubeuqm, __builtin_vec_vsubeuqm, _ARCH_PWR8]
+  vsq __builtin_vec_vsubeuqm (vsq, vsq, vsq);
+    VSUBEUQM  VSUBEUQM_DEPR1
+  vuq __builtin_vec_vsubeuqm (vuq, vuq, vuq);
+    VSUBEUQM  VSUBEUQM_DEPR2
+
+[VEC_VSUBFP, vec_vsubfp, __builtin_vec_vsubfp]
+  vf __builtin_vec_vsubfp (vf, vf);
+    VSUBFP  VSUBFP_DEPR1
+
+[VEC_VSUBSBS, vec_vsubsbs, __builtin_vec_vsubsbs]
+  vsc __builtin_vec_vsubsbs (vsc, vsc);
+    VSUBSBS  VSUBSBS_DEPR1
+  vsc __builtin_vec_vsubsbs (vbc, vsc);
+    VSUBSBS  VSUBSBS_DEPR2
+  vsc __builtin_vec_vsubsbs (vsc, vbc);
+    VSUBSBS  VSUBSBS_DEPR3
+
+[VEC_VSUBSHS, vec_vsubshs, __builtin_vec_vsubshs]
+  vss __builtin_vec_vsubshs (vss, vss);
+    VSUBSHS  VSUBSHS_DEPR1
+  vss __builtin_vec_vsubshs (vbs, vss);
+    VSUBSHS  VSUBSHS_DEPR2
+  vss __builtin_vec_vsubshs (vss, vbs);
+    VSUBSHS  VSUBSHS_DEPR3
+
+[VEC_VSUBSWS, vec_vsubsws, __builtin_vec_vsubsws]
+  vsi __builtin_vec_vsubsws (vsi, vsi);
+    VSUBSWS  VSUBSWS_DEPR1
+  vsi __builtin_vec_vsubsws (vbi, vsi);
+    VSUBSWS  VSUBSWS_DEPR2
+  vsi __builtin_vec_vsubsws (vsi, vbi);
+    VSUBSWS  VSUBSWS_DEPR3
+
+[VEC_VSUBUBM, vec_vsububm, __builtin_vec_vsububm]
+  vsc __builtin_vec_vsububm (vsc, vsc);
+    VSUBUBM  VSUBUBM_DEPR1
+  vuc __builtin_vec_vsububm (vsc, vuc);
+    VSUBUBM  VSUBUBM_DEPR2
+  vuc __builtin_vec_vsububm (vuc, vsc);
+    VSUBUBM  VSUBUBM_DEPR3
+  vuc __builtin_vec_vsububm (vuc, vuc);
+    VSUBUBM  VSUBUBM_DEPR4
+  vsc __builtin_vec_vsububm (vbc, vsc);
+    VSUBUBM  VSUBUBM_DEPR5
+  vsc __builtin_vec_vsububm (vsc, vbc);
+    VSUBUBM  VSUBUBM_DEPR6
+  vuc __builtin_vec_vsububm (vbc, vuc);
+    VSUBUBM  VSUBUBM_DEPR7
+  vuc __builtin_vec_vsububm (vuc, vbc);
+    VSUBUBM  VSUBUBM_DEPR8
+
+[VEC_VSUBUBS, vec_vsububs, __builtin_vec_vsububs]
+  vsc __builtin_vec_vsububs (vsc, vsc);
+    VSUBUBS  VSUBUBS_DEPR1
+  vsc __builtin_vec_vsububs (vbc, vsc);
+    VSUBUBS  VSUBUBS_DEPR2
+  vsc __builtin_vec_vsububs (vsc, vbc);
+    VSUBUBS  VSUBUBS_DEPR3
+  vuc __builtin_vec_vsububs (vsc, vuc);
+    VSUBUBS  VSUBUBS_DEPR4
+  vuc __builtin_vec_vsububs (vuc, vsc);
+    VSUBUBS  VSUBUBS_DEPR5
+  vuc __builtin_vec_vsububs (vuc, vuc);
+    VSUBUBS  VSUBUBS_DEPR6
+  vuc __builtin_vec_vsububs (vbc, vuc);
+    VSUBUBS  VSUBUBS_DEPR7
+  vuc __builtin_vec_vsububs (vuc, vbc);
+    VSUBUBS  VSUBUBS_DEPR8
+
+[VEC_VSUBUDM, vec_vsubudm, __builtin_vec_vsubudm, _ARCH_PWR8]
+  vsll __builtin_vec_vsubudm (vbll, vsll);
+    VSUBUDM  VSUBUDM_DEPR1
+  vsll __builtin_vec_vsubudm (vsll, vbll);
+    VSUBUDM  VSUBUDM_DEPR2
+  vsll __builtin_vec_vsubudm (vsll, vsll);
+    VSUBUDM  VSUBUDM_DEPR3
+  vull __builtin_vec_vsubudm (vbll, vull);
+    VSUBUDM  VSUBUDM_DEPR4
+  vull __builtin_vec_vsubudm (vull, vbll);
+    VSUBUDM  VSUBUDM_DEPR5
+  vull __builtin_vec_vsubudm (vull, vull);
+    VSUBUDM  VSUBUDM_DEPR6
+
+[VEC_VSUBUHM, vec_vsubuhm, __builtin_vec_vsubuhm]
+  vss __builtin_vec_vsubuhm (vss, vss);
+    VSUBUHM  VUSBUHM_DEPR1
+  vus __builtin_vec_vsubuhm (vss, vus);
+    VSUBUHM  VUSBUHM_DEPR2
+  vus __builtin_vec_vsubuhm (vus, vss);
+    VSUBUHM  VUSBUHM_DEPR3
+  vus __builtin_vec_vsubuhm (vus, vus);
+    VSUBUHM  VUSBUHM_DEPR4
+  vss __builtin_vec_vsubuhm (vbs, vss);
+    VSUBUHM  VUSBUHM_DEPR5
+  vss __builtin_vec_vsubuhm (vss, vbs);
+    VSUBUHM  VUSBUHM_DEPR6
+  vus __builtin_vec_vsubuhm (vbs, vus);
+    VSUBUHM  VUSBUHM_DEPR7
+  vus __builtin_vec_vsubuhm (vus, vbs);
+    VSUBUHM  VUSBUHM_DEPR8
+
+[VEC_VSUBUHS, vec_vsubuhs, __builtin_vec_vsubuhs]
+  vus __builtin_vec_vsubuhs (vss, vus);
+    VSUBUHS  VSUBUHS_DEPR1
+  vus __builtin_vec_vsubuhs (vus, vss);
+    VSUBUHS  VSUBUHS_DEPR2
+  vus __builtin_vec_vsubuhs (vus, vus);
+    VSUBUHS  VSUBUHS_DEPR3
+  vus __builtin_vec_vsubuhs (vbs, vus);
+    VSUBUHS  VSUBUHS_DEPR4
+  vus __builtin_vec_vsubuhs (vus, vbs);
+    VSUBUHS  VSUBUHS_DEPR5
+
+[VEC_VSUBUQM, vec_vsubuqm, __builtin_vec_vsubuqm, _ARCH_PWR8]
+  vsq __builtin_vec_vsubuqm (vsq, vsq);
+    VSUBUQM  VSUBUQM_DEPR1
+  vuq __builtin_vec_vsubuqm (vuq, vuq);
+    VSUBUQM  VSUBUQM_DEPR2
+
+[VEC_VSUBUWM, vec_vsubuwm, __builtin_vec_vsubuwm]
+  vsi __builtin_vec_vsubuwm (vbi, vsi);
+    VSUBUWM  VSUBUWM_DEPR1
+  vsi __builtin_vec_vsubuwm (vsi, vbi);
+    VSUBUWM  VSUBUWM_DEPR2
+  vui __builtin_vec_vsubuwm (vbi, vui);
+    VSUBUWM  VSUBUWM_DEPR3
+  vui __builtin_vec_vsubuwm (vui, vbi);
+    VSUBUWM  VSUBUWM_DEPR4
+  vsi __builtin_vec_vsubuwm (vsi, vsi);
+    VSUBUWM  VSUBUWM_DEPR5
+  vui __builtin_vec_vsubuwm (vsi, vui);
+    VSUBUWM  VSUBUWM_DEPR6
+  vui __builtin_vec_vsubuwm (vui, vsi);
+    VSUBUWM  VSUBUWM_DEPR7
+  vui __builtin_vec_vsubuwm (vui, vui);
+    VSUBUWM  VSUBUWM_DEPR8
+
+[VEC_VSUBUWS, vec_vsubuws, __builtin_vec_vsubuws]
+  vui __builtin_vec_vsubuws (vsi, vui);
+    VSUBUWS  VSUBUWS_DEPR1
+  vui __builtin_vec_vsubuws (vui, vsi);
+    VSUBUWS  VSUBUWS_DEPR2
+  vui __builtin_vec_vsubuws (vui, vui);
+    VSUBUWS  VSUBUWS_DEPR3
+  vui __builtin_vec_vsubuws (vbi, vui);
+    VSUBUWS  VSUBUWS_DEPR4
+  vui __builtin_vec_vsubuws (vui, vbi);
+    VSUBUWS  VSUBUWS_DEPR5
+
+[VEC_VSUM4SBS, vec_vsum4sbs, __builtin_vec_vsum4sbs]
+  vsi __builtin_vec_vsum4sbs (vsc, vsi);
+    VSUM4SBS  VSUM4SBS_DEPR1
+
+[VEC_VSUM4SHS, vec_vsum4shs, __builtin_vec_vsum4shs]
+  vsi __builtin_vec_vsum4shs (vss, vsi);
+    VSUM4SHS  VSUM4SHS_DEPR1
+
+[VEC_VSUM4UBS, vec_vsum4ubs, __builtin_vec_vsum4ubs]
+  vui __builtin_vec_vsum4ubs (vuc, vui);
+    VSUM4UBS  VSUM4UBS_DEPR1
+
+[VEC_VUPKHPX, vec_vupkhpx, __builtin_vec_vupkhpx]
+  vui __builtin_vec_vupkhpx (vus);
+    VUPKHPX  VUPKHPX_DEPR1
+  vui __builtin_vec_vupkhpx (vp);
+    VUPKHPX  VUPKHPX_DEPR2
+
+[VEC_VUPKHSB, vec_vupkhsb, __builtin_vec_vupkhsb]
+  vss __builtin_vec_vupkhsb (vsc);
+    VUPKHSB  VUPKHSB_DEPR1
+  vbs __builtin_vec_vupkhsb (vbc);
+    VUPKHSB  VUPKHSB_DEPR2
+
+[VEC_VUPKHSH, vec_vupkhsh, __builtin_vec_vupkhsh]
+  vsi __builtin_vec_vupkhsh (vss);
+    VUPKHSH  VUPKHSH_DEPR1
+  vbi __builtin_vec_vupkhsh (vbs);
+    VUPKHSH  VUPKHSH_DEPR2
+
+[VEC_VUPKHSW, vec_vupkhsw, __builtin_vec_vupkhsw, _ARCH_PWR8]
+  vsll __builtin_vec_vupkhsw (vsi);
+    VUPKHSW  VUPKHSW_DEPR1
+  vbll __builtin_vec_vupkhsw (vbi);
+    VUPKHSW  VUPKHSW_DEPR2
+
+[VEC_VUPKLPX, vec_vupklpx, __builtin_vec_vupklpx]
+  vui __builtin_vec_vupklpx (vus);
+    VUPKLPX  VUPKLPX_DEPR1
+  vui __builtin_vec_vupklpx (vp);
+    VUPKLPX  VUPKLPX_DEPR2
+
+[VEC_VUPKLSB, vec_vupklsb, __builtin_vec_vupklsb]
+  vss __builtin_vec_vupklsb (vsc);
+    VUPKLSB  VUPKLSB_DEPR1
+  vbs __builtin_vec_vupklsb (vbc);
+    VUPKLSB  VUPKLSB_DEPR2
+
+[VEC_VUPKLSH, vec_vupklsh, __builtin_vec_vupklsh]
+  vsi __builtin_vec_vupklsh (vss);
+    VUPKLSH  VUPKLSH_DEPR1
+  vbi __builtin_vec_vupklsh (vbs);
+    VUPKLSH  VUPKLSH_DEPR2
+
+[VEC_VUPKLSW, vec_vupklsw, __builtin_vec_vupklsw, _ARCH_PWR8]
+  vsll __builtin_vec_vupklsw (vsi);
+    VUPKLSW  VUPKLSW_DEPR1
+  vbll __builtin_vec_vupklsw (vbi);
+    VUPKLSW  VUPKLSW_DEPR2
+

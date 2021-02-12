@@ -25,4 +25,10 @@ void f37() {
   vec_ste(var_vec_u32[0], var_int[1], var_unsigned_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
   vec_stl(var_vec_s32[0], var_int[1], var_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
   vec_stl(var_vec_u32[0], var_int[1], var_unsigned_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvewx(var_vec_s32[0], var_int[1], var_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvewx(var_vec_u32[0], var_int[1], var_unsigned_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvx(var_vec_s32[0], var_int[1], var_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvx(var_vec_u32[0], var_int[1], var_unsigned_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvxl(var_vec_s32[0], var_int[1], var_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
+  vec_stvxl(var_vec_u32[0], var_int[1], var_unsigned_long_ptr[2]); /* { dg-error "invalid parameter combination" } */
 }

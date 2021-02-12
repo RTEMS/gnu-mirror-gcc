@@ -10,5 +10,11 @@ test_sra (vector unsigned long long x, vector unsigned long long y)
   return vec_sra (x, y);
 }
 
-/* { dg-final { scan-assembler-times {\mvsrad\M} 1 } } */
+vector unsigned long long
+test_vsrad (vector unsigned long long x, vector unsigned long long y)
+{
+  return vec_vsrad (x, y);
+}
+
+/* { dg-final { scan-assembler-times {\mvsrad\M} 2 } } */
 

@@ -2204,7 +2204,7 @@
   const vsq __builtin_altivec_vadduqm (vsq, vsq);
     VADDUQM altivec_vadduqm {}
 
-  const vull __builtin_altivec_vbpermq (vuq, vuc);
+  const vull __builtin_altivec_vbpermq (vuc, vuc);
     VBPERMQ altivec_vbpermq {}
 
   const vuc __builtin_altivec_vbpermq2 (vuc, vuc);
