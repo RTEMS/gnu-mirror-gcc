@@ -1,4 +1,148 @@
+work036.patch013
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/93230
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Remove
+	support for handling MEM, users call rs6000_adjust_vec_address
+	directly.
+	* config/rs6000/vsx.md (VSX_EX_FL): New mode attribute.
+	(vsx_extract_v4sf_<mode>_load): Rename to vsx_extract_v4sf_load.
+	(vsx_extract_v4sf_to_df_load): New insn to combine vec_extract of
+	SFmode from memory being converted to DFmode.
+	(vsx_extract_v4si_<su><mode>_load): New insn to support V4SI
+	vec_extract from memory being converted to DImode directly without
+	an extra sign/zero extension.
+	(vsx_extract_v8hi_<su><mode>_load): New insn to support V8HI
+	vec_extract from memory being converted to DImode directly without
+	an extra sign/zero extension.
+	(vsx_extract_v16qi_u<mode>_load): New insn to support V16QI
+	vec_extract from memory being converted to DImode directly without
+	an extra zero extension.
+	(vsx_extract_v4si_var_load): Split V4SI extract from other small
+	integers, and add support for loading up vector registers with
+	sign/zero extension directly.
+	(vsx_extract_<mode>_var_load, VSX_EXTRACT_I2 iterator): Split
+	V8HI/V16QI vector extract from memory to handle loading vector
+	registers in addition to GPR registers.
+	(vsx_extract_<mode>_uns_di_var): New insn to optimize extracting a
+	small integer from a vector in a register and zero extending it to
+	DImode.
+	(vsx_extract_v4si_<su><mode>_var_load): New insns to support
+	combining a V4SI variable vector extract from memory with sign or
+	zero extension.
+	(vsx_extract_v8hi_<su><mode>_var_load): New insns to support
+	combining a V8HI variable vector extract from memory with sign or
+	zero extension.
+	(vsx_extract_v4si_u<mode>_var_load): New insns to support
+	combining a V16QI variable vector extract from memory with zero
+	extension.
+	(vsx_ext_v4si_fl_<mode>_load): New insn to support a V4SI vector
+	extract that is converted to floating point to avoid doing a
+	direct move.
+	(vsx_ext_v4si_ufl_<mode>_load):  New insn to support an unsigned
+	V4SI vector extract that is converted to floating point to avoid
+	doing a direct move.
+	(vsx_ext_v4si_fl_<mode>_var_load): New insn to support a V4SI
+	variable vector extract that is converted to floating point to
+	avoid doing a direct move.
+	(vsx_ext_v4si_ufl_<mode>_var_load): New insn to support an
+	unsigned V4SI variable vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_load): New insns
+	to support a V8HI/V16QI vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_load): New insns
+	to support an unsigned V8HI/V16QI vector extract that is converted
+	to floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_vl): New insns to
+	support a variable V8HI/V16QI vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_vl): New insns
+	to support an unsigned variable V8HI/V16QI vector extract that is
+	converted to floating point to avoid doing a direct move.
+
+work036.patch012
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/81594
+	* config/rs6000/predicates.md (ds_form_memory): New predicate.
+	* config/rs6000/vsx.md (concatv2di_store): New insn.
+	(dupv2di_store): New insn.
+
+work036.patch011
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If the
+	user explicitly used -mabi=ieeelongdouble or -mabi=ibmlongdouble,
+	set the long double size to 128.
+	* doc/invoke.texi (PowerPC options): Document that an explicit
+	-mabi=ieeelongdouble or -mabi=ibmlongdouble implicitly sets
+	-mlong-double-128.
+
+work036.patch010
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR gcc/97791
+	* config/rs6000/rs6000.c (rs6000_emit_move): Delete code that sets
+	whether long double was passed based on the modes used in moves.
+
+work036.patch009
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+            Alan Modra  <amodra@gmail.com>
+
+	PR gcc/97791
+	* config/rs6000/rs6000-call.c (init_cumulative_args): Only set
+	that long double was returned if the type is actually long
+	double.
+	(rs6000_function_arg_advance_1): Only set that long double was
+	passed if the type is actually long double.
+
+work036.patch007
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
+work036.patch003
+2021-02-12 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
+        128-bit floating point types.
+        * config/rs6000/rs6000.md (FPMASK): New iterator.
+        (FPMASK2): New iterator.
+        (Fv mode attribute): Add KFmode and TFmode.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_p9.  Add IEEE 128-bit fp support.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_invert_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add IEEE 128-bit fp
+        support.
+        (fpmask<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+        (xxsel<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+
+work036.patch002
+2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs60000.h (FLOAT128_MIN_MAX_FPMASK_P): New macro.
+	* config/rs6000/rs6000.md (s<minmax><mode>3): Add support for the
+	ISA 3.1 IEEE 128-bit minimum and maximum instructions.
+
 2021-02-12   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
