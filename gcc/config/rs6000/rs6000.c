@@ -4138,8 +4138,13 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* Use long double size to select the appropriate long double.  We use
      TYPE_PRECISION to differentiate the 3 different long double types.  We map
-     128 into the precision used for TFmode.  */
-  int default_long_double_size = (RS6000_DEFAULT_LONG_DOUBLE_SIZE == 64
+     128 into the precision used for TFmode.
+
+     If the user explicitly used -mabi=ieeelongdouble or -mabi=ibmlongdouble,
+     but the compiler was configured for default 64-bit long doubles, set the
+     long double to be 128.  */
+  int default_long_double_size = ((RS6000_DEFAULT_LONG_DOUBLE_SIZE == 64
+				   && !global_options_set.x_rs6000_ieeequad)
 				  ? 64
 				  : FLOAT_PRECISION_TFmode);
 
