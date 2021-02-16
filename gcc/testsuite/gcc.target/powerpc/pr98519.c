@@ -8,7 +8,7 @@ int
 get (void)
 {
   int a;
-  __asm__ ("lw%U1%X1 %0,%1" : "=r" (a) : "m" (x)); /* { dg-warning "Asm constraint" } */
+  __asm__ ("lwz%U1%X1 %0,%1" : "=r" (a) : "m" (x)); /* { dg-warning "Asm constraint" } */
   return a;
 }
 
