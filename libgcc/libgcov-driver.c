@@ -337,7 +337,7 @@ read_error:
 /* Store all TOP N counters where each has a dynamic length.  */
 
 static void
-write_top_counters (const struct gcov_ctr_info *ci_ptr,
+write_topn_counters (const struct gcov_ctr_info *ci_ptr,
 		    unsigned t_ix,
 		    gcov_unsigned_t n_counts)
 {
@@ -347,22 +347,42 @@ write_top_counters (const struct gcov_ctr_info *ci_ptr,
   for (unsigned i = 0; i < counters; i++)
     pair_total += ci_ptr->values[GCOV_TOPN_MEM_COUNTERS * i + 1];
   unsigned disk_size = GCOV_TOPN_DISK_COUNTERS * counters + 2 * pair_total;
-  gcov_write_tag_length (GCOV_TAG_FOR_COUNTER (t_ix),
-			 GCOV_TAG_COUNTER_LENGTH (disk_size));
+
+  /* It can happen in multi-threaded environment that number of counters is smaller.
+     Because of that we build a buffer which we stream latter in this function.  */
+  gcov_type *buffer
+    = (gcov_type *) xmalloc (disk_size * sizeof (gcov_type));
+  gcov_type *ptr = buffer;
 
   for (unsigned i = 0; i < counters; i++)
     {
-      gcov_type pair_count = ci_ptr->values[GCOV_TOPN_MEM_COUNTERS * i + 1];
-      gcov_write_counter (ci_ptr->values[GCOV_TOPN_MEM_COUNTERS * i]);
-      gcov_write_counter (pair_count);
+      (*ptr++) = ci_ptr->values[GCOV_TOPN_MEM_COUNTERS * i];
+      /* Skip pair count for now.  */
+      gcov_type *pair_count_ptr = ptr;
+      ++ptr;
+
+      unsigned pair_count = 0;
       gcov_type start = ci_ptr->values[GCOV_TOPN_MEM_COUNTERS * i + 2];
       for (struct gcov_kvp *node = (struct gcov_kvp *)(intptr_t)start;
-	   node != NULL; node = node->next)
+	   node != NULL; node = node->next, ++pair_count)
 	{
-	  gcov_write_counter (node->value);
-	  gcov_write_counter (node->count);
+	  (*ptr++) = node->value;
+	  (*ptr++) = node->count;
 	}
+
+      *pair_count_ptr = pair_count;
     }
+
+  unsigned int length = ptr - buffer;
+  gcc_assert (length <= disk_size);
+  gcov_write_tag_length (GCOV_TAG_FOR_COUNTER (t_ix),
+			 GCOV_TAG_COUNTER_LENGTH (length));
+
+  /* FIXME: use a block store  */
+  for (unsigned i = 0; i < length; i++)
+    gcov_write_counter (buffer[i]);
+
+  free (buffer);
 }
 
 /* Write counters in GI_PTR and the summary in PRG to a gcda file. In
@@ -425,7 +445,7 @@ write_one_data (const struct gcov_info *gi_ptr,
 	  n_counts = ci_ptr->num;
 
 	  if (t_ix == GCOV_COUNTER_V_TOPN || t_ix == GCOV_COUNTER_V_INDIR)
-	    write_top_counters (ci_ptr, t_ix, n_counts);
+	    write_topn_counters (ci_ptr, t_ix, n_counts);
 	  else
 	    {
 	      /* Do not stream when all counters are zero.  */

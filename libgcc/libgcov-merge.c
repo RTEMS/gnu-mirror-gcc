@@ -109,6 +109,7 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
       /* First value is number of total executions of the profiler.  */
       gcov_type all = gcov_get_counter_ignore_scaling (-1);
       gcov_type n = gcov_get_counter_ignore_scaling (-1);
+      gcc_assert (n <= GCOV_TOPN_MAXIMUM_TRACKED_VALUES);
 
       unsigned full = all < 0;
       gcov_type *total = &counters[GCOV_TOPN_MEM_COUNTERS * i];
