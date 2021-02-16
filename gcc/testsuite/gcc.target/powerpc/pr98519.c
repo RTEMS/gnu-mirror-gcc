@@ -15,6 +15,6 @@ get (void)
 void
 put (int a)
 {
-  __asm__ ("stw%U1%X1 %0,%1" : "=m" (x) : "r" (a)); /* { dg-warning "Asm constraint" } */
+  __asm__ ("stw%U1%X1 %1,%0" : "=m" (x) : "r" (a)); /* { dg-warning "Asm constraint" } */
   return a;
 }
