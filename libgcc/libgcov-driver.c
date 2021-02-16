@@ -246,13 +246,6 @@ merge_one_data (const char *filename,
     }
 
   tag = gcov_read_unsigned ();
-  if (tag != GCOV_TAG_OBJECT_SUMMARY)
-    goto read_mismatch;
-  length = gcov_read_unsigned ();
-  gcc_assert (length > 0);
-  gcov_read_summary (summary);
-
-  tag = gcov_read_unsigned ();
   /* Merge execution counts for each function.  */
   for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions;
        f_ix++, tag = gcov_read_unsigned ())
@@ -260,7 +253,9 @@ merge_one_data (const char *filename,
       const struct gcov_ctr_info *ci_ptr;
       const struct gcov_fn_info *gfi_ptr = gi_ptr->functions[f_ix];
 
-      if (tag != GCOV_TAG_FUNCTION)
+      if (tag == GCOV_TAG_OBJECT_SUMMARY)
+	break;
+      else if (tag != GCOV_TAG_FUNCTION)
         goto read_mismatch;
 
       length = gcov_read_unsigned ();
@@ -320,6 +315,14 @@ merge_one_data (const char *filename,
 	}
       if ((error = gcov_is_error ()))
 	goto read_error;
+    }
+
+  if (tag == GCOV_TAG_OBJECT_SUMMARY)
+    {
+      length = gcov_read_unsigned ();
+      gcc_assert (length > 0);
+      gcov_read_summary (summary);
+      tag = gcov_read_unsigned ();
     }
 
   if (tag)
@@ -410,15 +413,14 @@ write_topn_counters (const struct gcov_ctr_info *ci_ptr,
 
 static void
 write_one_data (const struct gcov_info *gi_ptr,
-		const struct gcov_summary *prg_p)
+		struct gcov_summary *summary,
+		unsigned run_counted ATTRIBUTE_UNUSED)
 {
   unsigned f_ix;
 
   gcov_write_tag_length (GCOV_DATA_MAGIC, GCOV_VERSION);
   gcov_write_unsigned (gi_ptr->stamp);
-
-  /* Generate whole program statistics.  */
-  gcov_write_summary (GCOV_TAG_OBJECT_SUMMARY, prg_p);
+  gcov_type run_max = 0;
 
   /* Write execution counts for each function.  */
   for (f_ix = 0; f_ix != gi_ptr->n_functions; f_ix++)
@@ -463,6 +465,14 @@ write_one_data (const struct gcov_info *gi_ptr,
 
 	  n_counts = ci_ptr->num;
 
+	  /* Compute run_max of this program run.  */
+	  if (t_ix == GCOV_COUNTER_ARCS)
+	    {
+	      for (unsigned i = 0; i < n_counts; i++)
+		if (run_max < ci_ptr->values[i])
+		  run_max = ci_ptr->values[i];
+	    }
+
 	  if (t_ix == GCOV_COUNTER_V_TOPN || t_ix == GCOV_COUNTER_V_INDIR)
 	    write_topn_counters (ci_ptr, t_ix, n_counts);
 	  else
@@ -494,6 +504,14 @@ write_one_data (const struct gcov_info *gi_ptr,
         fn_buffer = free_fn_data (gi_ptr, fn_buffer, GCOV_COUNTERS);
     }
 
+  /* Generate whole program statistics.  */
+#if !IN_GCOV_TOOL
+  if (!run_counted)
+    summary->sum_max += run_max;
+#endif
+
+  gcov_write_summary (GCOV_TAG_OBJECT_SUMMARY, summary);
+
   gcov_write_unsigned (0);
 }
 
@@ -506,8 +524,7 @@ write_one_data (const struct gcov_info *gi_ptr,
 
 static void
 dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
-	       unsigned run_counted ATTRIBUTE_UNUSED,
-	       gcov_type run_max ATTRIBUTE_UNUSED)
+	       unsigned run_counted ATTRIBUTE_UNUSED)
 {
   struct gcov_summary summary = {};
   int error;
@@ -537,15 +554,12 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
 
 #if !IN_GCOV_TOOL
   if (!run_counted)
-    {
-      summary.runs++;
-      summary.sum_max += run_max;
-    }
+    summary.runs++;
 #else
   summary = gi_ptr->summary;
 #endif
 
-  write_one_data (gi_ptr, &summary);
+  write_one_data (gi_ptr, &summary, run_counted);
   /* fall through */
 
 read_fatal:;
@@ -573,25 +587,12 @@ gcov_do_dump (struct gcov_info *list, int run_counted)
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
 
-  /* Compute run_max of this program run.  */
-  gcov_type run_max = 0;
-  for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
-    for (unsigned f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions; f_ix++)
-      {
-	const struct gcov_ctr_info *cinfo
-	  = &gi_ptr->functions[f_ix]->ctrs[GCOV_COUNTER_ARCS];
-
-	for (unsigned i = 0; i < cinfo->num; i++)
-	  if (run_max < cinfo->values[i])
-	    run_max = cinfo->values[i];
-      }
-
   allocate_filename_struct (&gf);
 
   /* Now merge each file.  */
   for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
     {
-      dump_one_gcov (gi_ptr, &gf, run_counted, run_max);
+      dump_one_gcov (gi_ptr, &gf, run_counted);
       free (gf.filename);
     }
 
