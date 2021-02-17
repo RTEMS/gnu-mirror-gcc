@@ -22,6 +22,47 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_GIMPLE_RANGE_GORI_H
 #define GCC_GIMPLE_RANGE_GORI_H
 
+// RANGE_DEF_CHAIN is used to determine what SSA names in a block can
+// have range information calculated for them, and what the
+// dependencies on each other are.
+
+class range_def_chain
+{
+public:
+  range_def_chain ();
+  ~range_def_chain ();
+  bool has_def_chain (tree name);
+  bitmap get_def_chain (tree name);
+  bool in_chain_p (tree name, tree def);
+private:
+  vec<bitmap> m_def_chain;	// SSA_NAME : def chain components.
+  void build_def_chain (tree name, bitmap result, basic_block bb);
+};
+
+// GORI_MAP is used to accumulate what SSA names in a block can
+// generate range information, and provides tools for the block ranger
+// to enable it to efficiently calculate these ranges.
+
+class gori_map : public range_def_chain
+{
+public:
+  gori_map ();
+  ~gori_map ();
+
+  bool is_export_p (tree name, basic_block bb = NULL);
+  bool def_chain_in_export_p (tree name, basic_block bb);
+  bitmap exports (basic_block bb);
+  void set_range_invariant (tree name);
+
+  void dump (FILE *f);
+  void dump (FILE *f, basic_block bb);
+private:
+  bitmap_obstack m_bitmaps;
+  vec<bitmap> m_outgoing;	// BB: Outgoing ranges calculatable on edges
+  bitmap m_maybe_variant;	// Names which might have outgoing ranges.
+  void maybe_add_gori (tree name, basic_block bb);
+  void calculate_gori (basic_block bb);
+};
 
 // This class is used to determine which SSA_NAMES can have ranges
 // calculated for them on outgoing edges from basic blocks.  This represents
@@ -57,15 +98,15 @@ along with GCC; see the file COPYING3.  If not see
 // If there is any known range for b_4 coming into this block, it can refine
 // the results.  This allows for cascading results to be propogated.
 // if b_4 is [100, 200] on entry to the block, feeds into the calculation
-// of a_2 = [92, 192], and finally on the true edge the range would be 
+// of a_2 = [92, 192], and finally on the true edge the range would be
 // an empty range [] because it is not possible for the true edge to be taken.
 //
-// expr_range_in_bb is simply a wrapper which calls ssa_range_in_bb for 
+// expr_range_in_bb is simply a wrapper which calls ssa_range_in_bb for
 // SSA_NAMES and otherwise simply calculates the range of the expression.
 //
 // The remaining routines are internal use only.
 
-class gori_compute 
+class gori_compute
 {
 public:
   gori_compute ();
@@ -94,6 +135,8 @@ protected:
 			const class tf_range &op2_range);
   int_range<2> m_bool_zero;           // Boolean false cached.
   int_range<2> m_bool_one;            // Boolean true cached.
+  class gori_map *m_gori_map;
+  outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
 
 private:
   bool compute_operand_range_switch (irange &r, gswitch *stmt,
@@ -107,8 +150,6 @@ private:
   bool compute_operand1_and_operand2_range (irange &r, gimple *stmt,
 					    const irange &lhs, tree name);
 
-  class gori_map *m_gori_map;
-  outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
 };
 
 

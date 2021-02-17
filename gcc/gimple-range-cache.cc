@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ssa.h"
 #include "gimple-pretty-print.h"
 #include "gimple-range.h"
+#include "value-relation.h"
 
 // During contructor, allocate the vector of ssa_names.
 
@@ -623,10 +624,12 @@ ranger_cache::ranger_cache (gimple_ranger &q) : query (q)
   m_poor_value_list.safe_grow_cleared (20);
   m_poor_value_list.truncate (0);
   m_temporal = new temporal_cache;
+  m_oracle = new relation_oracle ();
 }
 
 ranger_cache::~ranger_cache ()
 {
+  delete m_oracle;
   delete m_temporal;
   m_poor_value_list.release ();
   m_workback.release ();
@@ -654,6 +657,7 @@ void
 ranger_cache::dump (FILE *f, basic_block bb)
 {
   m_on_entry.dump (f, bb);
+  m_oracle->dump (f, bb);
 }
 
 // Get the global range for NAME, and return in R.  Return false if the
@@ -1144,5 +1148,171 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 	  propagate_updated_value (name, calc_bb);
 	}
     }
+}
+
+
+bool
+ranger_cache::process_relations (gimple *s, irange &lhs_range,
+				 tree op1, const irange &range1)
+{
+  range_operator *handler = gimple_range_handler (s);
+  if (!handler)
+    return false;
+  relation_kind relation = VREL_NONE;
+
+  tree lhs = gimple_get_lhs (s);
+
+  if (lhs && gimple_range_ssa_p (op1))
+    {
+      relation = handler->lhs_op1_relation (lhs_range, range1, range1);
+      if (relation != VREL_NONE)
+	m_oracle->register_relation (s, relation, lhs, op1);
+    }
+  return false;
+}
+
+void
+ranger_cache::process_edge_relations (edge e)
+{
+  if (!single_pred_p (e->dest))
+    return;
+
+  bitmap b = m_gori_map->exports (e->src);
+  bitmap_iterator bi;
+  unsigned y;
+  int_range_max r;
+
+  EXECUTE_IF_SET_IN_BITMAP (b, 1, y, bi)
+    {
+      tree name = ssa_name (y);
+      if (name && TREE_CODE (TREE_TYPE (name)) == BOOLEAN_TYPE
+	  && outgoing_edge_range_p (r, e, name) && r.singleton_p ())
+	{
+	  gimple *stmt = SSA_NAME_DEF_STMT (name);
+	  range_operator *handler = gimple_range_handler (stmt);
+	  if (!handler)
+	    return;
+	  tree ssa1 = gimple_range_ssa_p (gimple_range_operand1 (stmt));
+	  tree ssa2 = gimple_range_ssa_p (gimple_range_operand2 (stmt));
+	  if (ssa1 && ssa2)
+	    {
+	      relation_kind relation = handler->op1_op2_relation (r);
+	      m_oracle->register_relation (e, relation, ssa1, ssa2);
+	    }
+	}
+    }
+}
+
+
+bool
+ranger_cache::process_relations (gimple *s, irange &lhs_range,
+				 tree op1, const irange &range1,
+				 tree op2, const irange& range2)
+{
+  relation_kind relation = VREL_NONE;
+  range_operator *handler = gimple_range_handler (s);
+  if (!handler)
+    return false;
+
+  tree lhs = gimple_get_lhs (s);
+  tree ssa1 = gimple_range_ssa_p (op1);
+  tree ssa2 = gimple_range_ssa_p (op2);
+
+  if (lhs && ssa1)
+    {
+      relation = handler->lhs_op1_relation (lhs_range, range1, range2);
+      if (relation != VREL_NONE)
+	m_oracle->register_relation (s, relation, lhs, ssa1);
+    }
+
+  if (lhs && ssa2)
+    {
+      relation = handler->lhs_op2_relation (lhs_range, range1, range2);
+      if (relation != VREL_NONE)
+	m_oracle->register_relation (s, relation, lhs, ssa2);
+    }
+
+  // If this is a conditional branch, register any outgoing edge relations.
+  if (is_a<gcond *> (s))
+    {
+      basic_block bb = gimple_bb (s);
+      gcc_checking_assert (EDGE_COUNT (bb->succs) == 2);
+      gcc_checking_assert (!lhs);
+
+      edge e0 = EDGE_SUCC (bb, 0);
+      edge e1 = EDGE_SUCC (bb, 1);
+      // first, check for a non-boolean condition, ie if a_3 < b_4
+      if (ssa1 && ssa2)
+	{
+	  relation = handler->op1_op2_relation (m_bool_one);
+	  if (e0->flags & EDGE_FALSE_VALUE)
+	    relation = relation_negate (relation);
+	  if (relation != VREL_NONE)
+	    {
+	      m_oracle->register_relation (e0, relation, ssa1, ssa2);
+	      relation = relation_negate (relation);
+	      m_oracle->register_relation (e1, relation, ssa1, ssa2);
+	    }
+	}
+      // Assume that if there are 2 symbolics, there are no conditions
+      // higher up in the block we care about.
+      else
+	{
+	  process_edge_relations (e0);
+	  process_edge_relations (e1);
+	}
+    }
+
+
+  // IF LHS is already a constant, the result is already folded.
+  if (lhs_range.singleton_p ())
+    return false;
+
+  // Check if this stmt cares about a relation between operands.
+  relation_kind from_stmt = VREL_NONE;
+  if (ssa1 && ssa2)
+    from_stmt = handler->op1_op2_relation (m_bool_one);
+  if (from_stmt == VREL_NONE)
+    return false;
+
+  // See if there is any known relationship.
+  relation_kind from_query = m_oracle->query_relation (gimple_bb (s), ssa1,
+						       ssa2);
+  if (from_query == VREL_NONE)
+    return false;
+
+  // Union the known condition and the statement. if the result is the same
+  // as whats on the statement, then the result is TRUE
+  if (relation_union (from_stmt, from_query) == from_stmt)
+    {
+      int_range<2> nr = int_range<2> (boolean_true_node, boolean_true_node);
+      range_cast (nr, lhs_range.type ());
+      lhs_range.intersect (nr);
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file, "Process_relations changing TRUE result to ");
+	  lhs_range.dump (dump_file);
+	  fprintf (dump_file, "\n");
+	}
+      return true;
+    }
+
+  // NOw check for the false condition. If the stmt range intersected with
+  // the known range is empty, then its always false.
+  if (relation_intersect (from_stmt, from_query) == VREL_EMPTY)
+    {
+      int_range<2> nr = int_range<2> (boolean_false_node, boolean_false_node);
+      range_cast (nr, lhs_range.type ());
+      lhs_range.intersect (nr);
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file, "Process_relations changing FALSE result to ");
+	  lhs_range.dump (dump_file);
+	  fprintf (dump_file, "\n");
+	}
+      return true;
+    }
+
+  return false;
 }
 

@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "wide-int.h"
 #include "range-op.h"
+#include "value-relation.h"
 
 // Return the upper limit for a type.
 
@@ -194,6 +195,29 @@ range_operator::op2_range (irange &r ATTRIBUTE_UNUSED,
   return false;
 }
 
+// The default relation routines return VREL_NONE.
+
+enum tree_code
+range_operator::lhs_op1_relation (const irange &lhs ATTRIBUTE_UNUSED,
+				  const irange &op1 ATTRIBUTE_UNUSED,
+				  const irange &op2 ATTRIBUTE_UNUSED) const
+{
+  return VREL_NONE;
+}
+
+enum tree_code
+range_operator::lhs_op2_relation (const irange &lhs ATTRIBUTE_UNUSED,
+				  const irange &op1 ATTRIBUTE_UNUSED,
+				  const irange &op2 ATTRIBUTE_UNUSED) const
+{
+  return VREL_NONE;
+}
+
+enum tree_code
+range_operator::op1_op2_relation (const irange &lhs ATTRIBUTE_UNUSED) const
+{
+  return VREL_NONE;
+}
 
 // Create and return a range from a pair of wide-ints that are known
 // to have overflowed (or underflowed).
@@ -399,7 +423,20 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &val) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_equal;
+
+enum tree_code
+operator_equal::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return NE_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return EQ_EXPR;
+  return VREL_NONE;
+}
 
 bool
 operator_equal::fold_range (irange &r, tree type,
@@ -471,7 +508,6 @@ operator_equal::op2_range (irange &r, tree type,
   return operator_equal::op1_range (r, type, lhs, op1);
 }
 
-
 class operator_not_equal : public range_operator
 {
 public:
@@ -484,7 +520,20 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_not_equal;
+
+enum tree_code
+operator_not_equal::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return EQ_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return NE_EXPR;
+  return VREL_NONE;
+}
 
 bool
 operator_not_equal::fold_range (irange &r, tree type,
@@ -615,7 +664,20 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_lt;
+
+enum tree_code
+operator_lt::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return GE_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return LT_EXPR;
+  return VREL_NONE;
+}
 
 bool
 operator_lt::fold_range (irange &r, tree type,
@@ -692,7 +754,20 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_le;
+
+enum tree_code
+operator_le::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return GT_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return LE_EXPR;
+  return VREL_NONE;
+}
 
 bool
 operator_le::fold_range (irange &r, tree type,
@@ -769,7 +844,21 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_gt;
+
+enum tree_code
+operator_gt::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return LE_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return GT_EXPR;
+  return VREL_NONE;
+}
+
 
 bool
 operator_gt::fold_range (irange &r, tree type,
@@ -844,7 +933,20 @@ public:
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 } op_ge;
+
+enum tree_code
+operator_ge::op1_op2_relation (const irange &lhs) const
+{
+  if (lhs.undefined_p ())
+    return VREL_EMPTY;
+  if (lhs.zero_p ())
+    return LT_EXPR;
+  if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+    return GE_EXPR;
+  return VREL_NONE;
+}
 
 bool
 operator_ge::fold_range (irange &r, tree type,
@@ -923,7 +1025,56 @@ public:
 		        const wide_int &lh_ub,
 		        const wide_int &rh_lb,
 		        const wide_int &rh_ub) const;
+  virtual enum tree_code lhs_op1_relation (const irange &lhs, const irange &op1,
+					   const irange &op2) const;
+  virtual enum tree_code lhs_op2_relation (const irange &lhs, const irange &op1,
+					   const irange &op2) const;
 } op_plus;
+
+enum tree_code
+operator_plus::lhs_op1_relation (const irange &lhs,
+				 const irange &op1 ATTRIBUTE_UNUSED,
+				 const irange &op2) const
+{
+  if (lhs.undefined_p () || op2.undefined_p ())
+    return VREL_NONE;
+  
+  tree type = lhs.type ();
+  unsigned prec = TYPE_PRECISION (type);
+
+  if (op2.zero_p ())
+    return EQ_EXPR;
+
+  // If its unsigned, there are overflows, punt on < and > for now.
+  if (TYPE_SIGN (type) != UNSIGNED)
+    {
+      // Positive op2 lower bound means lhs larger than op1.
+      if (wi::gt_p (op2.lower_bound (), wi::zero (prec), SIGNED))
+	return GT_EXPR;
+      if (wi::ge_p (op2.lower_bound (), wi::zero (prec), SIGNED))
+	return GE_EXPR;
+
+      // Negative op2 upper bound means lhs smaller than op1.
+      if (wi::lt_p (op2.upper_bound (), wi::zero (prec), SIGNED))
+	return LT_EXPR;
+      if (wi::le_p (op2.upper_bound (), wi::zero (prec), SIGNED))
+	return LE_EXPR;
+    }
+
+  if (!range_includes_zero_p (&op2))
+    return NE_EXPR;
+
+  return VREL_NONE;
+}
+
+// PLUS is symmetrical, so we can simply call lhs_op1_relation with reversed
+// operands.
+enum tree_code
+operator_plus::lhs_op2_relation (const irange &lhs, const irange &op1,
+				 const irange &op2) const
+{
+  return lhs_op1_relation (lhs, op2, op1);
+}
 
 void
 operator_plus::wi_fold (irange &r, tree type,
@@ -1742,6 +1893,10 @@ public:
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op2) const;
+  virtual enum tree_code lhs_op1_relation (const irange &lhs,
+					   const irange &op1,
+					   const irange &op2) const;
+
 private:
   bool truncating_cast_p (const irange &inner, const irange &outer) const;
   bool inside_domain_p (const wide_int &min, const wide_int &max,
@@ -1749,6 +1904,25 @@ private:
   void fold_pair (irange &r, unsigned index, const irange &inner,
 			   const irange &outer) const;
 } op_convert;
+
+enum tree_code
+operator_cast::lhs_op1_relation (const irange &lhs,
+				 const irange &op1,
+				 const irange &op2 ATTRIBUTE_UNUSED) const
+{
+  if (op1.undefined_p ())
+    return VREL_NONE;
+  // We can't make larger types equivalent to smaller types because we can
+  // miss sign extensions in a chain of casts.
+  // u32 = 0xfffff
+  // s32 = (s32) u32
+  // s64 = (s64) s32
+  // we cant simply "convert" s64 = (s64)u32  or we get positive 0xffff
+  // value instead of sign extended negative value.
+  if (TYPE_PRECISION (lhs.type ()) == TYPE_PRECISION (op1.type ()))
+    return EQ_EXPR;
+  return VREL_NONE;
+}
 
 // Return TRUE if casting from INNER to OUTER is a truncating cast.
 
@@ -2899,7 +3073,20 @@ public:
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op2) const;
+  virtual enum tree_code lhs_op1_relation (const irange &lhs,
+					   const irange &op1,
+					   const irange &op2) const;
 } op_identity;
+
+enum tree_code
+operator_identity::lhs_op1_relation (const irange &lhs,
+				     const irange &op1 ATTRIBUTE_UNUSED,
+				     const irange &op2 ATTRIBUTE_UNUSED) const
+{
+  if (lhs.undefined_p ())
+    return VREL_NONE;
+  return EQ_EXPR;
+}
 
 bool
 operator_identity::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,

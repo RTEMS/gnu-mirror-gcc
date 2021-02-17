@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "alloc-pool.h"
 #include "vr-values.h"
 #include "gimple-range.h"
+#include "value-relation.h"
 
 
 // Adjust the range for a pointer difference where the operands came
@@ -438,10 +439,18 @@ gimple_ranger::range_of_range_op (irange &r, gimple *s)
   if (range_of_expr (range1, op1, s))
     {
       if (!op2)
-	return gimple_range_fold (r, s, range1);
+	{
+	  gimple_range_fold (r, s, range1);
+	  m_cache.process_relations (s, r, op1, range1);
+	  return true;
+	}
 
       if (range_of_expr (range2, op2, s))
-	return gimple_range_fold (r, s, range1, range2);
+	{
+	  gimple_range_fold (r, s, range1, range2);
+	  m_cache.process_relations (s, r, op1, range1, op2, range2);
+	  return true;
+	}
     }
   r.set_varying (type);
   return true;

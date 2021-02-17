@@ -72,6 +72,16 @@ public:
 			  const irange &lhs,
 			  const irange &op1) const;
 
+  // The following routines are used to represent relations between the
+  // various operations.  If the caller knows where the symbolics are,
+  // it can query for relationships between them given known ranges.
+  virtual enum tree_code lhs_op1_relation (const irange &lhs,
+					   const irange &op1,
+					   const irange &op2) const;
+  virtual enum tree_code lhs_op2_relation (const irange &lhs,
+					   const irange &op1,
+					   const irange &op2) const;
+  virtual enum tree_code op1_op2_relation (const irange &lhs) const;
 protected:
   // Perform an integral operation between 2 sub-ranges and return it.
   virtual void wi_fold (irange &r, tree type,

@@ -64,21 +64,6 @@ along with GCC; see the file COPYING3.  If not see
     so a def chain will only span statements for which the range
     engine implements operations for.  */
 
-
-class range_def_chain
-{
-public:
-  range_def_chain ();
-  ~range_def_chain ();
-  bool has_def_chain (tree name);
-  bitmap get_def_chain (tree name);
-  bool in_chain_p (tree name, tree def);
-private:
-  vec<bitmap> m_def_chain;	// SSA_NAME : def chain components.
-  void build_def_chain (tree name, bitmap result, basic_block bb);
-};
-
-
 // Construct a range_def_chain.
 
 range_def_chain::range_def_chain ()
@@ -222,28 +207,6 @@ range_def_chain::get_def_chain (tree name)
    Generally speaking, the m_outgoing vector is the union of the
    entire def_chain of all SSA names used in the last statement of the
    block which generate ranges.  */
-
-class gori_map : public range_def_chain
-{
-public:
-  gori_map ();
-  ~gori_map ();
-
-  bool is_export_p (tree name, basic_block bb = NULL);
-  bool def_chain_in_export_p (tree name, basic_block bb);
-  bitmap exports (basic_block bb);
-  void set_range_invariant (tree name);
-
-  void dump (FILE *f);
-  void dump (FILE *f, basic_block bb);
-private:
-  bitmap_obstack m_bitmaps;
-  vec<bitmap> m_outgoing;	// BB: Outgoing ranges calculatable on edges
-  bitmap m_maybe_variant;	// Names which might have outgoing ranges.
-  void maybe_add_gori (tree name, basic_block bb);
-  void calculate_gori (basic_block bb);
-};
-
 
 // Initialize a gori-map structure.
 
@@ -431,11 +394,7 @@ gori_map::dump (FILE *f)
 {
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
-    {
-      dump (f, bb);
-      if (m_outgoing[bb->index])
-	fprintf (f, "\n");
-    }
+    dump (f, bb);
 }
 
 DEBUG_FUNCTION void

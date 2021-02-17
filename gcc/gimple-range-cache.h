@@ -101,11 +101,19 @@ public:
   void set_global_range (tree name, const irange &r);
   void register_dependency (tree name, tree dep);
 
+  void process_edge_relations (edge e);
+  bool process_relations (gimple *s, irange &lhs_range,
+			  tree op1, const irange &range1);
+  bool process_relations (gimple *s, irange &lhs_range,
+			  tree op1, const irange &range1,
+			  tree op2, const irange& range2);
+
   non_null_ref m_non_null;
 
   void dump (FILE *f, bool dump_gori = true);
   void dump (FILE *f, basic_block bb);
 private:
+  class relation_oracle *m_oracle;
   ssa_global_cache m_globals;
   block_range_cache m_on_entry;
   class temporal_cache *m_temporal;
