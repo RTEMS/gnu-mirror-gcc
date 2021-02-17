@@ -13075,7 +13075,7 @@ should be removed when the delay slot code is rewritten to maintain the
 control-flow graph.
 
 @item max-gcse-memory
-The approximate maximum amount of memory that can be allocated in
+The approximate maximum amount of memory in @code{kB} that can be allocated in
 order to perform the global common subexpression elimination
 optimization.  If more memory than specified is required, the
 optimization is not done.
@@ -13307,6 +13307,14 @@ do so.
 @item max-stores-to-merge
 The maximum number of stores to attempt to merge into wider stores in the store
 merging pass.
+
+@item max-store-chains-to-track
+The maximum number of store chains to track at the same time in the attempt
+to merge them into wider stores in the store merging pass.
+
+@item max-stores-to-track
+The maximum number of stores to track at the same time in the attemt to
+to merge them into wider stores in the store merging pass.
 
 @item max-unrolled-insns
 The maximum number of instructions that a loop may have to be unrolled.
@@ -27509,9 +27517,10 @@ SVR4 ABI)@.
 @item -mabi=@var{abi-type}
 @opindex mabi
 Extend the current ABI with a particular extension, or remove such extension.
-Valid values are @samp{altivec}, @samp{no-altivec},
+Valid values are: @samp{altivec}, @samp{no-altivec},
 @samp{ibmlongdouble}, @samp{ieeelongdouble},
-@samp{elfv1}, @samp{elfv2}@.
+@samp{elfv1}, @samp{elfv2},
+and for AIX: @samp{vec-extabi}, @samp{vec-default}@.
 
 @item -mabi=ibmlongdouble
 @opindex mabi=ibmlongdouble

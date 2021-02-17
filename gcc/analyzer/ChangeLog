@@ -1,3 +1,86 @@
+2021-02-12  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/98969
+	* engine.cc (readability): Add names for the various arbitrary
+	values.  Handle NOP_EXPR and INTEGER_CST.
+	(readability_comparator): Combine the readability tests for
+	tree and stack depth, rather than performing them sequentially.
+	(impl_region_model_context::on_state_leak): Strip off top-level
+	casts.
+	* region-model.cc (region_model::get_representative_path_var): Add
+	type-checking, moving the bulk of the implementation to...
+	(region_model::get_representative_path_var_1): ...here.  Respect
+	types in casts by recursing and re-adding the cast, rather than
+	merely stripping them off.  Use the correct type when handling
+	region_svalue.
+	(region_model::get_representative_tree): Strip off any top-level
+	cast.
+	(region_model::get_representative_path_var): Add type-checking,
+	moving the bulk of the implementation to...
+	(region_model::get_representative_path_var_1): ...here.
+	* region-model.h (region_model::get_representative_path_var_1):
+	New decl
+	(region_model::get_representative_path_var_1): New decl.
+	* store.cc (append_pathvar_with_type): New.
+	(binding_cluster::get_representative_path_vars): Cast path_vars
+	to the correct type when adding them to *OUT_PVS.
+
+2021-02-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/98575
+	* sm-file.cc (is_file_using_fn_p): Support "_IO_"-prefixed
+	variants.
+
+2021-02-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/98575
+	* store.cc (store::set_value): Treat a pointer written to *UNKNOWN
+	as having escaped.
+
+2021-02-02  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93355
+	PR analyzer/96374
+	* engine.cc (toplevel_function_p): Simplify so that
+	we only reject functions with a "__analyzer_" prefix.
+	(add_any_callbacks): Delete.
+	(exploded_graph::build_initial_worklist): Update for
+	dropped param of toplevel_function_p.
+	(exploded_graph::build_initial_worklist): Don't bother
+	looking for callbacks that are reachable from global
+	initializers.
+
+2021-02-01  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/98918
+	* region-model-manager.cc
+	(region_model_manager::get_or_create_initial_value):
+	Fold the initial value of *UNKNOWN_PTR to an UNKNOWN value.
+	(region_model_manager::get_field_region): Fold the value
+	of UNKNOWN_PTR->FIELD to *UNKNOWN_PTR_OF_&FIELD_TYPE.
+
+2021-01-29  David Malcolm  <dmalcolm@redhat.com>
+
+	* checker-path.cc (event_kind_to_string): Handle
+	EK_START_CONSOLIDATED_CFG_EDGES and
+	EK_END_CONSOLIDATED_CFG_EDGES.
+	(start_consolidated_cfg_edges_event::get_desc): New.
+	(checker_path::cfg_edge_pair_at_p): New.
+	* checker-path.h (enum event_kind): Add
+	EK_START_CONSOLIDATED_CFG_EDGES and
+	EK_END_CONSOLIDATED_CFG_EDGES.
+	(class start_consolidated_cfg_edges_event): New class.
+	(class end_consolidated_cfg_edges_event): New class.
+	(checker_path::delete_events): New.
+	(checker_path::replace_event): New.
+	(checker_path::cfg_edge_pair_at_p): New decl.
+	* diagnostic-manager.cc (diagnostic_manager::prune_path): Call
+	consolidate_conditions.
+	(same_line_as_p): New.
+	(diagnostic_manager::consolidate_conditions): New.
+	* diagnostic-manager.h
+	(diagnostic_manager::consolidate_conditions): New decl.
+
 2021-01-18  David Malcolm  <dmalcolm@redhat.com>
 
 	* analyzer.h (is_std_named_call_p): New decl.
