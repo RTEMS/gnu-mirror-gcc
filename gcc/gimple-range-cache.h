@@ -120,11 +120,12 @@ private:
   void add_to_update (basic_block bb);
   void fill_block_cache (tree name, basic_block bb, basic_block def_bb);
   void propagate_cache (tree name);
-
+  bool process_equivs (irange &r, tree name, basic_block bb);
   void propagate_updated_value (tree name, basic_block bb);
 
   vec<basic_block> m_workback;
   vec<basic_block> m_update_list;
+  vec <tree> m_equiv_edge_check;
 
   // Iterative "poor value" calculations.
   struct update_record

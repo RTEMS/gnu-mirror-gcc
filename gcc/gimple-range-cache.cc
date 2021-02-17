@@ -623,6 +623,9 @@ ranger_cache::ranger_cache (gimple_ranger &q) : query (q)
   m_poor_value_list.create (0);
   m_poor_value_list.safe_grow_cleared (20);
   m_poor_value_list.truncate (0);
+  m_equiv_edge_check.create (0);
+  m_equiv_edge_check.safe_grow_cleared (20);
+  m_equiv_edge_check.truncate (0);
   m_temporal = new temporal_cache;
   m_oracle = new relation_oracle ();
 }
@@ -631,6 +634,7 @@ ranger_cache::~ranger_cache ()
 {
   delete m_oracle;
   delete m_temporal;
+  m_equiv_edge_check.release ();
   m_poor_value_list.release ();
   m_workback.release ();
   m_update_list.release ();
@@ -858,6 +862,55 @@ ranger_cache::add_to_update (basic_block bb)
     m_update_list.quick_push (bb);
 }
 
+// Check for equivalencies of NAME.  If there are some that have
+// live on entry ranges in BB, and set R to the intersection of all such
+// ranges.  ANy equivalences which do not have a range-on-entry set, push
+// them into the edge-check vector.
+// Return true if R contains a range to be used.
+
+bool
+ranger_cache::process_equivs (irange &r, tree name, basic_block bb)
+{
+  bool ret = false;
+  m_equiv_edge_check.truncate (0);
+
+  const_bitmap equivs = m_oracle->equiv_set (name, bb);
+  if (!equivs)
+    return false;
+
+  int_range_max equiv_range;
+
+  r.set_varying (TREE_TYPE (name));
+  bitmap_iterator bi;
+  unsigned i;
+  EXECUTE_IF_SET_IN_BITMAP (equivs, 0, i ,bi)
+    {
+      tree equiv_name = ssa_name (i);
+      if (!equiv_name || equiv_name == name)
+	continue;
+      // If there is a range on entry set, the equivalence has already
+      // been processed on all the incoming edges, pick up that range.
+      // Otherwise add name to the edge check list.
+      if (m_on_entry.get_bb_range (equiv_range, equiv_name, bb))
+	{
+	  if (DEBUG_RANGE_CACHE)
+	    {
+	      fprintf (dump_file, "  Equivalence ");
+	      print_generic_expr (dump_file, equiv_name, TDF_SLIM);
+	      fprintf (dump_file, " range in block :");
+	      equiv_range.dump (dump_file);
+	      fprintf (dump_file, "\n");
+	    }
+	  range_cast (equiv_range, TREE_TYPE (name));
+	  r.intersect (equiv_range);
+	  ret = true;
+	}
+      else
+	m_equiv_edge_check.safe_push (equiv_name);
+    }
+  return ret;
+}
+
 // If there is anything in the propagation update_list, continue
 // processing NAME until the list of blocks is empty.
 
@@ -867,9 +920,13 @@ ranger_cache::propagate_cache (tree name)
   basic_block bb;
   edge_iterator ei;
   edge e;
+  unsigned x;
   int_range_max new_range;
   int_range_max current_range;
-  int_range_max e_range;
+  int_range_max edge_range;
+  int_range_max equiv_range;
+  int_range_max tmp_range;
+  bool has_equivs;
 
   // Process each block by seeing if its calculated range on entry is
   // the same as its cached value. If there is a difference, update
@@ -883,37 +940,6 @@ ranger_cache::propagate_cache (tree name)
       gcc_checking_assert (m_on_entry.bb_range_p (name, bb));
       m_on_entry.get_bb_range (current_range, name, bb);
 
-      // Calculate the "new" range on entry by unioning the pred edges.
-      new_range.set_undefined ();
-      FOR_EACH_EDGE (e, ei, bb->preds)
-	{
-	  if (DEBUG_RANGE_CACHE)
-	    fprintf (dump_file, "   edge %d->%d :", e->src->index, bb->index);
-	  // Get whatever range we can for this edge.
-	  if (!outgoing_edge_range_p (e_range, e, name))
-	    {
-	      ssa_range_in_bb (e_range, name, e->src);
-	      if (DEBUG_RANGE_CACHE)
-		{
-		  fprintf (dump_file, "No outgoing edge range, picked up ");
-		  e_range.dump(dump_file);
-		  fprintf (dump_file, "\n");
-		}
-	    }
-	  else
-	    {
-	      if (DEBUG_RANGE_CACHE)
-		{
-		  fprintf (dump_file, "outgoing range :");
-		  e_range.dump(dump_file);
-		  fprintf (dump_file, "\n");
-		}
-	    }
-	  new_range.union_ (e_range);
-	  if (new_range.varying_p ())
-	    break;
-	}
-
       if (DEBUG_RANGE_CACHE)
 	{
 	  fprintf (dump_file, "FWD visiting block %d for ", bb->index);
@@ -922,6 +948,63 @@ ranger_cache::propagate_cache (tree name)
 	  current_range.dump (dump_file);
 	  fprintf (dump_file, "\n");
 	}
+
+      has_equivs = process_equivs (equiv_range, name, bb);
+
+      // Calculate the "new" range on entry by unioning the pred edges.
+      new_range.set_undefined ();
+      FOR_EACH_EDGE (e, ei, bb->preds)
+	{
+	  if (DEBUG_RANGE_CACHE)
+	    fprintf (dump_file, "   edge %d->%d :", e->src->index, bb->index);
+	  // Get whatever range we can for this edge.
+	  if (!outgoing_edge_range_p (edge_range, e, name))
+	    {
+	      ssa_range_in_bb (edge_range, name, e->src);
+	      if (DEBUG_RANGE_CACHE)
+		{
+		  fprintf (dump_file, "No outgoing edge range, picked up ");
+		  edge_range.dump(dump_file);
+		  fprintf (dump_file, "\n");
+		}
+	      // Check for any equivalency ranges on this edge.
+	      for (x = 0; x < m_equiv_edge_check.length (); x++)
+		{
+		  tree e_name = m_equiv_edge_check[x];
+		  if (outgoing_edge_range_p (tmp_range, e, e_name))
+		    {
+		      // And instersect them with the edge range so far.
+		      range_cast (tmp_range, TREE_TYPE (name));
+		      edge_range.intersect (tmp_range);
+		      if (DEBUG_RANGE_CACHE)
+			{
+			  fprintf (dump_file, "  Intersect equiv range for ");
+			  print_generic_expr (dump_file, e_name, TDF_SLIM);
+			  fprintf (dump_file, " : ");
+			  tmp_range.dump (dump_file);
+			  fprintf (dump_file, " producing ");
+			  edge_range.dump (dump_file);
+			  fprintf (dump_file, "\n");
+			}
+		    }
+		}
+	    }
+	  else
+	    {
+	      if (DEBUG_RANGE_CACHE)
+		{
+		  fprintf (dump_file, "outgoing range :");
+		  edge_range.dump(dump_file);
+		  fprintf (dump_file, "\n");
+		}
+	    }
+	  new_range.union_ (edge_range);
+	  if (new_range.varying_p ())
+	    break;
+	}
+
+      if (has_equivs)
+	new_range.intersect (equiv_range);
 
       // If the range on entry has changed, update it.
       if (new_range != current_range)
