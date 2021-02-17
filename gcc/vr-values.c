@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "range.h"
 #include "vr-values.h"
 #include "cfghooks.h"
+#include "value-relation.h"
 #include "range-op.h"
 #include "gimple-range.h"
 

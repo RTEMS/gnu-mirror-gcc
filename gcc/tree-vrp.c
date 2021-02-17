@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "vr-values.h"
 #include "builtins.h"
+#include "value-relation.h"
 #include "range-op.h"
 #include "value-range-equiv.h"
 #include "gimple-array-bounds.h"

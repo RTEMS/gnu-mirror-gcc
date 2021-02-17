@@ -52,7 +52,8 @@ public:
   // Perform an operation between 2 ranges and return it.
   virtual bool fold_range (irange &r, tree type,
 			   const irange &lh,
-			   const irange &rh) const;
+			   const irange &rh,
+			   relation_kind rel = VREL_NONE) const;
 
   // Return the range for op[12] in the general case.  LHS is the range for
   // the LHS of the expression, OP[12]is the range for the other
@@ -67,10 +68,12 @@ public:
   // is re-formed as R = [LHS] - OP2.
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
-			  const irange &op2) const;
+			  const irange &op2,
+			  relation_kind rel = VREL_NONE) const;
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
-			  const irange &op1) const;
+			  const irange &op1,
+			  relation_kind rel = VREL_NONE) const;
 
   // The following routines are used to represent relations between the
   // various operations.  If the caller knows where the symbolics are,
@@ -89,6 +92,11 @@ protected:
 		        const wide_int &lh_ub,
 		        const wide_int &rh_lb,
 		        const wide_int &rh_ub) const;
+  // Side effect of relation for generic fold_range clients.
+  virtual bool op1_op2_relation_effect (irange &lhs_range, tree type,
+					const irange &op1_range,
+					const irange &op2_range,
+					relation_kind rel) const;
 };
 
 extern range_operator *range_op_handler (enum tree_code code, tree type);

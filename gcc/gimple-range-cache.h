@@ -106,6 +106,7 @@ public:
   bool process_relations (gimple *s, irange &lhs_range,
 			  tree op1, const irange &range1,
 			  tree op2, const irange& range2);
+  relation_kind query_relation (gimple *s, tree op1, tree op2);
 
   non_null_ref m_non_null;
 

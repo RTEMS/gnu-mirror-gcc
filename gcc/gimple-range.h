@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 
 
 #include "range.h"
+#include "value-relation.h"
 #include "range-op.h"
 #include "gimple-range-edge.h"
 #include "gimple-range-gori.h"
@@ -80,7 +81,8 @@ extern bool gimple_range_fold (irange &res, const gimple *s,
 			       const irange &r1);
 extern bool gimple_range_fold (irange &res, const gimple *s,
 			       const irange &r1,
-			       const irange &r2);
+			       const irange &r2,
+			       relation_kind rel = VREL_NONE);
 extern bool gimple_range_calc_op1 (irange &r, const gimple *s,
 				   const irange &lhs_range);
 extern bool gimple_range_calc_op1 (irange &r, const gimple *s,

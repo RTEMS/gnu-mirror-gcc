@@ -97,6 +97,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-eh.h"
 #include "ssa.h"
 #include "internal-fn.h"
+#include "value-relation.h"
 #include "range-op.h"
 #include "vr-values.h"
 

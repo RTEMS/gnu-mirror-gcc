@@ -1210,6 +1210,18 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 }
 
 
+// Query if there is a realtion between OP1 and OP2 on stmt S.
+
+relation_kind
+ranger_cache::query_relation (gimple *s, tree op1, tree op2)
+{
+  // If they aren't both ssa names, there is no relation.
+  if (!gimple_range_ssa_p (op1) || !gimple_range_ssa_p (op2))
+    return VREL_NONE;
+  return m_oracle->query_relation (gimple_bb (s), op1, op2);
+}
+
+
 bool
 ranger_cache::process_relations (gimple *s, irange &lhs_range,
 				 tree op1, const irange &range1)
@@ -1326,51 +1338,6 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
   // IF LHS is already a constant, the result is already folded.
   if (lhs_range.singleton_p ())
     return false;
-
-  // Check if this stmt cares about a relation between operands.
-  relation_kind from_stmt = VREL_NONE;
-  if (ssa1 && ssa2)
-    from_stmt = handler->op1_op2_relation (m_bool_one);
-  if (from_stmt == VREL_NONE)
-    return false;
-
-  // See if there is any known relationship.
-  relation_kind from_query = m_oracle->query_relation (gimple_bb (s), ssa1,
-						       ssa2);
-  if (from_query == VREL_NONE)
-    return false;
-
-  // Union the known condition and the statement. if the result is the same
-  // as whats on the statement, then the result is TRUE
-  if (relation_union (from_stmt, from_query) == from_stmt)
-    {
-      int_range<2> nr = int_range<2> (boolean_true_node, boolean_true_node);
-      range_cast (nr, lhs_range.type ());
-      lhs_range.intersect (nr);
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	{
-	  fprintf (dump_file, "Process_relations changing TRUE result to ");
-	  lhs_range.dump (dump_file);
-	  fprintf (dump_file, "\n");
-	}
-      return true;
-    }
-
-  // NOw check for the false condition. If the stmt range intersected with
-  // the known range is empty, then its always false.
-  if (relation_intersect (from_stmt, from_query) == VREL_EMPTY)
-    {
-      int_range<2> nr = int_range<2> (boolean_false_node, boolean_false_node);
-      range_cast (nr, lhs_range.type ());
-      lhs_range.intersect (nr);
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	{
-	  fprintf (dump_file, "Process_relations changing FALSE result to ");
-	  lhs_range.dump (dump_file);
-	  fprintf (dump_file, "\n");
-	}
-      return true;
-    }
 
   return false;
 }

@@ -214,12 +214,12 @@ gimple_range_fold (irange &res, const gimple *stmt, const irange &r1)
 
 bool
 gimple_range_fold (irange &res, const gimple *stmt,
-		   const irange &r1, const irange &r2)
+		   const irange &r1, const irange &r2, relation_kind rel)
 {
   gcc_checking_assert (gimple_range_handler (stmt));
 
   gimple_range_handler (stmt)->fold_range (res, gimple_expr_type (stmt),
-					   r1, r2);
+					   r1, r2, rel);
 
   // If there are any gimple lookups, do those now.
   gimple_range_adjustment (res, stmt);
@@ -447,7 +447,14 @@ gimple_ranger::range_of_range_op (irange &r, gimple *s)
 
       if (range_of_expr (range2, op2, s))
 	{
-	  gimple_range_fold (r, s, range1, range2);
+	  relation_kind rel = m_cache.query_relation (s, op1, op2);
+	  if (dump_file && (dump_flags & TDF_DETAILS) && rel != VREL_NONE)
+	    {
+	      fprintf (dump_file, " folding with relation ");
+	      print_relation (dump_file, rel);
+	      fputc ('\n', dump_file);
+	    }
+	  gimple_range_fold (r, s, range1, range2, rel);
 	  m_cache.process_relations (s, r, op1, range1, op2, range2);
 	  return true;
 	}
