@@ -26262,11 +26262,15 @@ static bool next_insn_prefixed_p;
    insn is a prefixed insn where we need to emit a 'p' before the insn.
 
    In addition, if the insn is part of a PC-relative reference to an external
-   label optimization, this is recorded also.  */
+   label optimization, this is recorded also.
+
+   While XXSPLTIW, XXSPLTIDP, and XXSPLTI32DX are prefixed instructions, they
+   don't have a leading 'p'.  */
 void
 rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
-  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
+  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO
+			  && get_attr_type (insn) != TYPE_VECSIMPLE);
   return;
 }
 
