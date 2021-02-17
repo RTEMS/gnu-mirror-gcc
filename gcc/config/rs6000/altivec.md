@@ -826,7 +826,8 @@
 		     UNSPEC_XXSPLTIW))]
  "TARGET_POWER10"
  "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")])
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_expand "xxspltiw_v4sf"
   [(set (match_operand:V4SF 0 "register_operand" "=wa")
@@ -845,7 +846,8 @@
 		     UNSPEC_XXSPLTIW))]
  "TARGET_POWER10"
  "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")])
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )
@@ -864,7 +866,8 @@
 		     UNSPEC_XXSPLTID))]
   "TARGET_POWER10"
   "xxspltidp %x0,%1"
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_expand "xxsplti32dx_v4si"
   [(set (match_operand:V4SI 0 "register_operand" "=wa")
@@ -883,7 +886,8 @@
 					 GEN_INT (index), operands[3]));
    DONE;
 }
- [(set_attr "type" "vecsimple")])
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_insn "xxsplti32dx_v4si_inst"
   [(set (match_operand:V4SI 0 "register_operand" "=wa")
@@ -893,7 +897,8 @@
 		     UNSPEC_XXSPLTI32DX))]
   "TARGET_POWER10"
   "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_expand "xxsplti32dx_v4sf"
   [(set (match_operand:V4SF 0 "register_operand" "=wa")
@@ -921,7 +926,8 @@
 		     UNSPEC_XXSPLTI32DX))]
   "TARGET_POWER10"
   "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "special")])
 
 (define_insn "xxblend_<mode>"
   [(set (match_operand:VM3 0 "register_operand" "=wa")

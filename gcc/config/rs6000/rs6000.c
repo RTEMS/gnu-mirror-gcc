@@ -22031,7 +22031,7 @@ rs6000_insn_cost (rtx_insn *insn, bool speed)
   if (n == 0)
     {
       int length = get_attr_length (insn);
-      if (get_attr_prefixed (insn) == PREFIXED_YES)
+      if (get_attr_prefixed (insn) != PREFIXED_NO)
 	{
 	  int adjust = 0;
 	  ADJUST_INSN_LENGTH (insn, adjust);
@@ -26212,11 +26212,16 @@ static bool next_insn_prefixed_p;
    insn is a prefixed insn where we need to emit a 'p' before the insn.
 
    In addition, if the insn is part of a PC-relative reference to an external
-   label optimization, this is recorded also.  */
+   label optimization, this is recorded also.
+
+   Some prefixed instructions (xxspltiw, xxspltidp, xxsplti32dp, etc.) do not
+   have a leading 'p'.  Setting the prefix attribute to special does not the 'p'
+   prefix.  */
 void
 rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
-  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
+  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO
+			  && get_attr_prefixed (insn) != PREFIXED_SPECIAL);
   return;
 }
 
@@ -26253,7 +26258,7 @@ rs6000_adjust_insn_length (rtx_insn *insn, int length)
     {
       rtx pattern = PATTERN (insn);
       if (GET_CODE (pattern) != USE && GET_CODE (pattern) != CLOBBER
-	  && get_attr_prefixed (insn) == PREFIXED_YES)
+	  && get_attr_prefixed (insn) != PREFIXED_NO)
 	{
 	  int num_prefixed = get_attr_max_prefixed_insns (insn);
 	  length += 4 * (num_prefixed + 1);
