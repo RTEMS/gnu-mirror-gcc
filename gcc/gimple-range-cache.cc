@@ -1275,6 +1275,71 @@ ranger_cache::process_edge_relations (edge e)
 }
 
 
+void
+ranger_cache::boolean_fold (gimple *s, irange& lhs_range, tree lhs, tree ssa1,
+			    tree ssa2)
+{
+  // Already folded.
+  if (lhs_range.singleton_p ())
+    return;
+
+  enum tree_code code = gimple_expr_code (s);
+  bool is_and = false;
+  if (code == BIT_AND_EXPR || code == TRUTH_AND_EXPR)
+    is_and = true;
+  else if (code != BIT_IOR_EXPR && code != TRUTH_OR_EXPR)
+    return;
+
+  // Now we know its a boolean AND or OR expression with boolean operands.
+  // Ideally we search dependencies for common names, and see what pops out.
+  // until then, simply try to resolve direct dependencies.
+
+  // Both names will need to have 2 direct dependencies.
+  if (!depend2 (ssa1) || !depend2 (ssa2))
+    return;
+
+  // Make sure they are the same dependencies.
+  bool reverse_op2 = true;
+  if (depend1 (ssa1) == depend1 (ssa2) && depend2 (ssa1) == depend2 (ssa2))
+    reverse_op2 = false;
+  else if (depend1 (ssa1) != depend2 (ssa2) || depend2 (ssa1) != depend1 (ssa2))
+    return;
+
+  range_operator *handler1 = gimple_range_handler (SSA_NAME_DEF_STMT (ssa1));
+  range_operator *handler2 = gimple_range_handler (SSA_NAME_DEF_STMT (ssa2));
+
+  relation_kind relation1 = handler1->op1_op2_relation (m_bool_one);
+  relation_kind relation2 = handler2->op1_op2_relation (m_bool_one);
+  if (relation1 == VREL_NONE || relation2 == VREL_NONE)
+    return;
+
+  if (reverse_op2)
+    relation2 = relation_negate (relation2);
+
+  // x && y is false if the relation intersection of the true cases is NULL.
+  if (is_and && relation_intersect (relation1, relation2) == VREL_EMPTY)
+    lhs_range = int_range<2> (boolean_false_node, boolean_false_node);
+  // x || y is true if the union of the true cases is NO-RELATION..
+  // ie, one or the other being true covers the full range of possibilties.
+  else if (!is_and && relation_union (relation1, relation2) == VREL_NONE)
+    lhs_range = int_range<2> (boolean_true_node, boolean_true_node);
+  else return;
+
+  range_cast (lhs_range, TREE_TYPE (lhs));
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "  Relation adjustment: ");
+      print_generic_expr (dump_file, ssa1, TDF_SLIM);
+      fprintf (dump_file, "  and ");
+      print_generic_expr (dump_file, ssa2, TDF_SLIM);
+      fprintf (dump_file, "  combine to produce ");
+      lhs_range.dump (dump_file);
+      fputc ('\n', dump_file);
+    }
+
+  return;
+}
+
 bool
 ranger_cache::process_relations (gimple *s, irange &lhs_range,
 				 tree op1, const irange &range1,
@@ -1333,6 +1398,12 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
 	  process_edge_relations (e1);
 	}
     }
+
+  if (lhs && ssa1 && ssa2
+      && (TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
+      && (TREE_CODE (TREE_TYPE (ssa1)) == BOOLEAN_TYPE)
+      && (TREE_CODE (TREE_TYPE (ssa2)) == BOOLEAN_TYPE))
+    boolean_fold (s, lhs_range, lhs, ssa1, ssa2);
 
 
   // IF LHS is already a constant, the result is already folded.

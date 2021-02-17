@@ -123,6 +123,9 @@ private:
   bool process_equivs (irange &r, tree name, basic_block bb);
   void propagate_updated_value (tree name, basic_block bb);
 
+  void boolean_fold (gimple *s, irange& lhs_range, tree lhs, tree ssa1,
+		     tree ssa2);
+
   vec<basic_block> m_workback;
   vec<basic_block> m_update_list;
   vec <tree> m_equiv_edge_check;
