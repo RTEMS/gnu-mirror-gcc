@@ -1,3 +1,9 @@
+work036.patch015
+2021-02-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/98519
+	* gcc.target/powerpc/pr98519.c: New test.
+
 work036.patch013
 2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
 

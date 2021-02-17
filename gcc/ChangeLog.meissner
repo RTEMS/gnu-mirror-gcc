@@ -1,3 +1,31 @@
+work036.patch016
+2021-02-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/99133
+	* config/rs6000/altivec.md (xxspltiw_v4si): Set prefixed
+	attribute.
+	(xxspltiw_v4sf): Set prefixed attribute.
+	(xxspltidp_v2df): Set prefixed attribute.
+	(xxsplti32dx_v4si): Set prefixed attribute.
+	(xxsplti32dx_v4si_inst): Set prefixed attribute.
+	(xxsplti32dx_v4sf): Set prefixed attribute.
+	* config/rs6000/rs6000.c (rs6000_insn_cost): Add support for
+	setting prefixed attribute to special.
+	(rs6000_final_prescan_insn): If prefixed attribute is special, do
+	not emit a leading 'p' before the instruction.
+	(rs6000_adjust_insn_length): Add support for setting prefixed
+	attribute to special.
+	* config/rs6000/rs6000.md (prefixed attribute): Add 'special' case
+	for prefixed instructions that do not use a leading 'p'.
+
+work036.patch015
+2021-02-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/98519
+	* config/rs6000/rs6000.c (rs6000_md_asm_adjust): If prefixed
+	addresses are allowed, warn about using the 'm' and 'o'
+	constraints.
+
 work036.patch014
 2021-02-12  Michael Meissner  <meissner@linux.ibm.com>
 
