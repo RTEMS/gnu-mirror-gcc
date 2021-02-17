@@ -176,6 +176,7 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
+   UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
@@ -819,34 +820,34 @@
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
 
-;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI/V4SF constants.
 (define_insn "xxspltiw_v4si"
-  [(set (match_operand:V4SI 0 "register_operand" "=v,wa,wa,wa")
-	(vec_duplicate:V4SI
-	 (match_operand:SI 1 "s32bit_cint_operand" "wB,O,wM,n")))]
+  [(set (match_operand:V4SI 0 "register_operand" "=wa")
+	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
  "TARGET_POWER10"
- "@
-  vspltisw %0,%1
-  xxspltib %x0,0
-  xxspltib %x0,255
-  xxspltiw %x0,%1"
+ "xxspltiw %x0,%1"
  [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "*,*,*,special")])
+  (set_attr "prefixed" "special")])
 
-(define_insn "xxspltiw_v4sf"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa,wa")
-	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "const_double_operand" "O,F")))]
-  "TARGET_POWER10"
+(define_expand "xxspltiw_v4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SF 1 "const_double_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
 {
-  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (operands[1]));
-  if (INTVAL (operands[2]) == 0)	/* optimize 0.0f.  */
-    return "xxspltib %x0,0";
+  long long value = rs6000_const_f32_to_i32 (operands[1]);
+  emit_insn (gen_xxspltiw_v4sf_inst (operands[0], GEN_INT (value)));
+  DONE;
+})
 
-  return "xxspltiw %x0,%2";
-}
+(define_insn "xxspltiw_v4sf_inst"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
+ "xxspltiw %x0,%1"
  [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "*,special")])
+  (set_attr "prefixed" "special")])
 
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )

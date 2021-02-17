@@ -6354,57 +6354,6 @@ gen_easy_altivec_constant (rtx op)
   gcc_unreachable ();
 }
 
-/* Return the constant if OP is of the given MODE and can be generated with the
-   ISA 3.1 XXSPLTIW instruction.  Or return NULL_RTX if the XXSPLTIW instruction
-   can't be used.  */
-
-rtx
-xxspltiw_constant_p (rtx op, machine_mode mode)
-{
-  if (!TARGET_POWER10)
-    return NULL_RTX;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  else if (mode != GET_MODE (op))
-    return NULL_RTX;
-
-  if (mode != V4SImode && mode != V4SFmode)
-    return NULL_RTX;
-
-  rtx element;
-
-  /* Handle (vec_duplicate <constant>).  */
-  if (GET_CODE (op) == VEC_DUPLICATE)
-    element = XEXP (op, 0);
-
-  /* Handle (const_vector [...]).  */
-  else if (GET_CODE (op) == CONST_VECTOR)
-    {
-      size_t nunits = GET_MODE_NUNITS (mode);
-      element = CONST_VECTOR_ELT (op, 0);
-
-      for (size_t i = 1; i < nunits; i++)
-	if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-	  return NULL_RTX;
-    }
-
-  else
-    return NULL_RTX;
-
-  if (mode == V4SImode && CONST_INT_P (element))
-    ;
-
-  else if (mode == V4SFmode && CONST_DOUBLE_P (element))
-    ;
-
-  else
-    return NULL_RTX;
-
-  return element;
-}
-
 /* Return true if OP is of the given MODE and can be synthesized with ISA 3.0
    instructions (xxspltib, vupkhsb/vextsb2w/vextb2d).
 
@@ -6429,11 +6378,6 @@ xxspltib_constant_p (rtx op,
   *constant_ptr = 256;
 
   if (!TARGET_P9_VECTOR)
-    return false;
-
-  /* If we can handle the constant directly with XXSPLTIW, don't both using
-     XXSPLTIB and vector extend.  */
-  if (xxspltiw_constant_p (op, mode))
     return false;
 
   if (mode == VOIDmode)
@@ -6540,35 +6484,6 @@ output_vec_const_move (rtx *operands)
   dest = operands[0];
   vec = operands[1];
   mode = GET_MODE (dest);
-
-  /* See if we can generate a XXSPLTIW directly.  */
-  if (TARGET_POWER10)
-    {
-      rtx element = xxspltiw_constant_p (vec, mode);
-      if (element)
-	{
-	  if (CONST_INT_P (element))
-	    operands[2] = element;
-	  else if (CONST_DOUBLE_P (element))
-	    operands[2] = GEN_INT (rs6000_const_f32_to_i32 (element));
-	  else
-	    gcc_unreachable ();
-
-	  HOST_WIDE_INT value = INTVAL (operands[2]);
-	  if (IN_RANGE (value, -16, 15)
-		   && ALTIVEC_REGNO_P (reg_or_subregno (dest)))
-	    return "vspltisw %0,%2";
-
-	  else if (value == 0)
-	    return "xxspltib %x0,0";
-
-	  else if (value == -1)
-	    return "xxspltib %x0,255";
-
-	  else
-	    return "xxspltiw %x0,%2";
-	}
-    }
 
   if (TARGET_VSX)
     {
@@ -6684,15 +6599,6 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 
   if (n_var == 0)
     {
-      /* Generate XXSPLTIW if we can.  */
-      if (TARGET_POWER10 && all_same
-	  && (mode == V4SImode || mode == V4SFmode))
-	{
-	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
-	  emit_insn (gen_rtx_SET (target, dup));							 
-	  return;
-	}
-
       rtx const_vec = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
       bool int_vector_p = (GET_MODE_CLASS (mode) == MODE_VECTOR_INT);
       if ((int_vector_p || TARGET_VSX) && all_const_zero)
