@@ -152,8 +152,15 @@ gimple_range_global (tree name)
       return value_range (type, min, max, kind);
     }
 #endif
- // Otherwise return range for the type.
- return value_range (type);
+  // If this is a local automatic with no definition, use undefined for a
+  // starting value.
+  if (SSA_NAME_IS_DEFAULT_DEF (name)
+     && TREE_CODE (SSA_NAME_VAR (name)) != PARM_DECL
+     && TREE_CODE (SSA_NAME_VAR (name)) != RESULT_DECL)
+    return value_range ();
+
+  // Otherwise return range for the type.
+  return value_range (type);
 }
 
 
