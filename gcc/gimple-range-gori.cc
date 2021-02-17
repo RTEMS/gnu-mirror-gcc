@@ -950,20 +950,75 @@ gori_compute::compute_operand1_and_operand2_range
 bool
 gori_compute::has_edge_range_p (tree name, edge e)
 {
+  tree dep1 = depend1 (name);
+  tree dep2 = depend2 (name);
+
   // If no edge is specified, check if NAME is an export on any edge.
   if (!e)
-    return is_export_p (name);
+    {
+      if (is_export_p (name) || (dep1 && is_export_p (dep1))
+	  || (dep2 && is_export_p (dep2)))
+	return true;
+      return false;
+    }
 
-  return (is_export_p (name, e->src)
-	  || def_chain_in_bitmap_p (name, exports (e->src)));
+  if (is_export_p (name, e->src)
+      || def_chain_in_bitmap_p (name, exports (e->src)))
+    return true;
+
+  if (dep1 && is_export_p (dep1, e->src))
+    return true;
+  if (dep2 && is_export_p (dep2, e->src))
+    return true;
+
+  return false;
 }
 
-// Dump what is known to GORI computes to listing file F.
-
-void
-gori_compute::dump (FILE *f)
+bool
+gori_compute::recompute (irange &r, edge e, tree name)
 {
-  gori_map::dump (f);
+  gimple *def_stmt = SSA_NAME_DEF_STMT (name);
+  range_operator *handler = gimple_range_handler (def_stmt);
+  if (!handler)
+    return false;
+
+  if (DEBUG_RANGE_CACHE)
+    {
+      fprintf (dump_file, "recomputation attempt on edge %d->%d for ",
+	       e->src->index, e->dest->index);
+      print_generic_expr (dump_file, name, TDF_SLIM);
+    }
+
+  // If one of the dependencies changes on this edge, recalculate.
+  tree op1 = gimple_range_operand1 (def_stmt);
+  tree op2 = gimple_range_operand2 (def_stmt);
+  tree type = gimple_expr_type (def_stmt);
+  int_range_max r1;
+  int_range_max r2 (type);
+
+  if (!gimple_range_ssa_p (op1)
+      || !outgoing_edge_range_p (r1, e,op1, false))
+    expr_range_in_bb (r1, op1, e->src);
+
+  if (op2)
+    {
+      if (!gimple_range_ssa_p (op2)
+	  || !outgoing_edge_range_p (r2, e, op2, false))
+	expr_range_in_bb (r2, op2, e->src);
+    }
+
+  handler->fold_range (r, type, r1, r2);
+  if (DEBUG_RANGE_CACHE)
+    {
+      fprintf (dump_file, " : op1 ");
+      r1.dump (dump_file);
+      fprintf (dump_file, ", op2 ");
+      r2.dump (dump_file);
+      fprintf (dump_file, " : result :");
+      r.dump (dump_file);
+      fputc ('\n', dump_file);
+    }
+  return true;
 }
 
 // Calculate a range on edge E and return it in R.  Try to evaluate a
@@ -971,7 +1026,8 @@ gori_compute::dump (FILE *f)
 // control edge or NAME is not defined by this edge.
 
 bool
-gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name)
+gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name,
+				     bool recalc)
 {
   int_range_max lhs;
 
@@ -997,7 +1053,28 @@ gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name)
 	  return true;
 	}
     }
+
+  if (recalc)
+    {
+      // If any direct dependencies are exported from this block, try to
+      // recompute the result using those values..
+      tree dep1 = depend1 (name);
+      tree dep2 = depend2 (name);
+      if ((dep1 && is_export_p (dep1, e->src))
+	  || (dep2 && is_export_p (dep2, e->src)))
+	return recompute (r, e, name);
+    }
+
   return false;
+}
+
+
+// Dump what is known to GORI computes to listing file F.
+
+void
+gori_compute::dump (FILE *f)
+{
+  gori_map::dump (f);
 }
 
 // --------------------------------------------------------------------------

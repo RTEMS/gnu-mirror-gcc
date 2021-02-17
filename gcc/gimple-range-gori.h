@@ -140,7 +140,7 @@ class gori_compute : public gori_map
 public:
   gori_compute ();
   ~gori_compute ();
-  bool outgoing_edge_range_p (irange &r, edge e, tree name);
+  bool outgoing_edge_range_p (irange &r, edge e, tree name, bool recalc = true);
   bool has_edge_range_p (tree name, edge e = NULL);
   void dump (FILE *f);
 protected:
@@ -166,6 +166,7 @@ protected:
   outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
 
 private:
+  bool recompute (irange &r, edge e, tree name);
   bool compute_operand_range_switch (irange &r, gswitch *stmt,
 				     const irange &lhs, tree name);
   bool compute_name_range_op (irange &r, gimple *stmt, const irange &lhs,
