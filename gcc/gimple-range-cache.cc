@@ -116,16 +116,17 @@ non_null_ref::process_name (tree name)
 // set for a block, the cache simply points to this cached one rather
 // than create a new one each time.
 
-class ssa_block_ranges
+class ssa_range_cache
 {
 public:
-  ssa_block_ranges (tree t, irange_allocator *allocator);
-  ~ssa_block_ranges ();
+  ssa_range_cache (tree t, irange_allocator *allocator);
+  ~ssa_range_cache ();
 
-  void set_bb_range (const basic_block bb, const irange &r);
-  void set_bb_varying (const basic_block bb);
-  bool get_bb_range (irange &r, const basic_block bb);
-  bool bb_range_p (const basic_block bb);
+  void set_varying (const basic_block bb);
+  void set_range (const basic_block bb, const irange &r);
+  void set_range (const basic_block dest, const basic_block src);
+  bool get_range_p (const basic_block bb) const;
+  bool get_range_p (irange &r, const basic_block bb) const;
 
   void dump(FILE *f);
 private:
@@ -138,7 +139,7 @@ private:
 
 // Initialize a block cache for an ssa_name of type T.
 
-ssa_block_ranges::ssa_block_ranges (tree t, irange_allocator *allocator)
+ssa_range_cache::ssa_range_cache (tree t, irange_allocator *allocator)
 {
   gcc_checking_assert (TYPE_P (t));
   m_type = t;
@@ -156,7 +157,7 @@ ssa_block_ranges::ssa_block_ranges (tree t, irange_allocator *allocator)
 
 // Destruct block range.
 
-ssa_block_ranges::~ssa_block_ranges ()
+ssa_range_cache::~ssa_range_cache ()
 {
   m_tab.release ();
 }
@@ -164,17 +165,29 @@ ssa_block_ranges::~ssa_block_ranges ()
 // Set the range for block BB to be R.
 
 void
-ssa_block_ranges::set_bb_range (const basic_block bb, const irange &r)
+ssa_range_cache::set_range (const basic_block bb, const irange &r)
 {
   gcc_checking_assert ((unsigned) bb->index < m_tab.length ());
   irange *m = m_irange_allocator->allocate (r);
   m_tab[bb->index] = m;
 }
 
+// Set the range of DEST to be the same pointer as SRC.  This is typically so
+// we do not need to allocate new ranges when a block is the same as its
+// dominator... 
+
+inline void
+ssa_range_cache::set_range (const basic_block dest, const basic_block src)
+{
+  gcc_checking_assert ((unsigned) dest->index < m_tab.length ());
+  gcc_checking_assert ((unsigned) src->index < m_tab.length ());
+  m_tab[dest->index] = m_tab[src->index];
+}
+
 // Set the range for block BB to the range for the type.
 
-void
-ssa_block_ranges::set_bb_varying (const basic_block bb)
+inline void
+ssa_range_cache::set_varying (const basic_block bb)
 {
   gcc_checking_assert ((unsigned) bb->index < m_tab.length ());
   m_tab[bb->index] = m_type_range;
@@ -183,10 +196,11 @@ ssa_block_ranges::set_bb_varying (const basic_block bb)
 // Return the range associated with block BB in R.  Return false if
 // there is no range.
 
-bool
-ssa_block_ranges::get_bb_range (irange &r, const basic_block bb)
+inline bool
+ssa_range_cache::get_range_p (irange &r, const basic_block bb) const
 {
-  gcc_checking_assert ((unsigned) bb->index < m_tab.length ());
+  if ((unsigned) bb->index >= m_tab.length ())
+    return false;
   irange *m = m_tab[bb->index];
   if (m)
     {
@@ -198,10 +212,11 @@ ssa_block_ranges::get_bb_range (irange &r, const basic_block bb)
 
 // Return true if a range is present.
 
-bool
-ssa_block_ranges::bb_range_p (const basic_block bb)
+inline bool
+ssa_range_cache::get_range_p (const basic_block bb) const
 {
-  gcc_checking_assert ((unsigned) bb->index < m_tab.length ());
+  if ((unsigned) bb->index >= m_tab.length ())
+    return false;
   return m_tab[bb->index] != NULL;
 }
 
@@ -209,13 +224,13 @@ ssa_block_ranges::bb_range_p (const basic_block bb)
 // Print the list of known ranges for file F in a nice format.
 
 void
-ssa_block_ranges::dump (FILE *f)
+ssa_range_cache::dump (FILE *f)
 {
   basic_block bb;
   int_range_max r;
 
   FOR_EACH_BB_FN (bb, cfun)
-    if (get_bb_range (r, bb))
+    if (get_range_p (r, bb))
       {
 	fprintf (f, "BB%d  -> ", bb->index);
 	r.dump (f);
@@ -252,7 +267,7 @@ block_range_cache::~block_range_cache ()
 // Return a reference to the ssa_block_cache for NAME.  If it has not been
 // accessed yet, allocate it first.
 
-ssa_block_ranges &
+ssa_range_cache &
 block_range_cache::get_block_ranges (tree name)
 {
   unsigned v = SSA_NAME_VERSION (name);
@@ -260,7 +275,7 @@ block_range_cache::get_block_ranges (tree name)
     m_ssa_ranges.safe_grow_cleared (num_ssa_names + 1);
 
   if (!m_ssa_ranges[v])
-    m_ssa_ranges[v] = new ssa_block_ranges (TREE_TYPE (name),
+    m_ssa_ranges[v] = new ssa_range_cache (TREE_TYPE (name),
 					    m_irange_allocator);
   return *(m_ssa_ranges[v]);
 }
@@ -269,8 +284,8 @@ block_range_cache::get_block_ranges (tree name)
 // Return a pointer to the ssa_block_cache for NAME.  If it has not been
 // accessed yet, return NULL.
 
-ssa_block_ranges *
-block_range_cache::query_block_ranges (tree name)
+ssa_range_cache *
+block_range_cache::query_block_ranges (tree name) const
 {
   unsigned v = SSA_NAME_VERSION (name);
   if (v >= m_ssa_ranges.length () || !m_ssa_ranges[v])
@@ -284,37 +299,46 @@ void
 block_range_cache::set_bb_range (tree name, const basic_block bb,
 				 const irange &r)
 {
-  return get_block_ranges (name).set_bb_range (bb, r);
+  return get_block_ranges (name).set_range (bb, r);
 }
 
+// Set the range for NAME on entry of block DEST to SRC.
+
+void
+block_range_cache::set_bb_range (tree name, const basic_block dest,
+				 basic_block src)
+{
+  return get_block_ranges (name).set_range (dest, src);
+}
 // Set the range for NAME on entry to block BB to varying.
 
 void
 block_range_cache::set_bb_varying (tree name, const basic_block bb)
 {
-  return get_block_ranges (name).set_bb_varying (bb);
+  return get_block_ranges (name).set_varying (bb);
 }
 
 // Return the range for NAME on entry to BB in R.  Return true if there
 // is one.
 
 bool
-block_range_cache::get_bb_range (irange &r, tree name, const basic_block bb)
+block_range_cache::get_bb_range_p (irange &r, tree name,
+				 const basic_block bb)  const
 {
-  ssa_block_ranges *ptr = query_block_ranges (name);
+  ssa_range_cache *ptr = query_block_ranges (name);
   if (ptr)
-    return ptr->get_bb_range (r, bb);
+    return ptr->get_range_p (r, bb);
   return false;
 }
 
 // Return true if NAME has a range set in block BB.
 
 bool
-block_range_cache::bb_range_p (tree name, const basic_block bb)
+block_range_cache::bb_range_p (tree name, const basic_block bb) const
 {
-  ssa_block_ranges *ptr = query_block_ranges (name);
+  ssa_range_cache *ptr = query_block_ranges (name);
   if (ptr)
-    return ptr->bb_range_p (bb);
+    return ptr->get_range_p (bb);
   return false;
 }
 
@@ -349,7 +373,7 @@ block_range_cache::dump (FILE *f, basic_block bb, bool print_varying)
     {
       if (!gimple_range_ssa_p (ssa_name (x)))
 	continue;
-      if (m_ssa_ranges[x] && m_ssa_ranges[x]->get_bb_range (r, bb))
+      if (m_ssa_ranges[x] && m_ssa_ranges[x]->get_range_p (r, bb))
 	{
 	  if (!print_varying && r.varying_p ())
 	    {
@@ -370,7 +394,7 @@ block_range_cache::dump (FILE *f, basic_block bb, bool print_varying)
 	{
 	  if (!gimple_range_ssa_p (ssa_name (x)))
 	    continue;
-	  if (m_ssa_ranges[x] && m_ssa_ranges[x]->get_bb_range (r, bb))
+	  if (m_ssa_ranges[x] && m_ssa_ranges[x]->get_range_p (r, bb))
 	    {
 	      if (r.varying_p ())
 		{
@@ -480,18 +504,6 @@ ssa_global_cache::dump (FILE *f)
 // --------------------------------------------------------------------------
 
 
-// This struct provides a timestamp for a global range calculation.
-// it contains the time counter, as well as a limited number of ssa-names
-// that it is dependent upon.  If the timestamp for any of the dependent names
-// Are newer, then this range could need updating.
-
-struct range_timestamp
-{
-  unsigned time;
-  unsigned ssa1;
-  unsigned ssa2;
-};
-
 // This class will manage the timestamps for each ssa_name.
 // When a value is calcualted, its timestamp is set to the current time.
 // The ssanames it is dependent on have already been calculated, so they will
@@ -501,24 +513,22 @@ struct range_timestamp
 class temporal_cache
 {
 public:
-  temporal_cache ();
+  temporal_cache (range_def_chain &dc);
   ~temporal_cache ();
   bool current_p (tree name) const;
   void set_timestamp (tree name);
-  void set_dependency (tree name, tree dep);
   void set_always_current (tree name);
 private:
   unsigned temporal_value (unsigned ssa) const;
-  const range_timestamp *get_timestamp (unsigned ssa) const;
-  range_timestamp *get_timestamp (unsigned ssa);
 
   unsigned m_current_time;
-  vec <range_timestamp> m_timestamp;
+  vec <unsigned> m_timestamp;
+  range_def_chain &defs;
 };
 
 
 inline
-temporal_cache::temporal_cache ()
+temporal_cache::temporal_cache (range_def_chain &dc) : defs (dc)
 {
   m_current_time = 1;
   m_timestamp.create (0);
@@ -531,51 +541,14 @@ temporal_cache::~temporal_cache ()
   m_timestamp.release ();
 }
 
-// Return a pointer to the timetamp for ssa-name at index SSA, if there is
-// one, otherwise return NULL.
-
-inline const range_timestamp *
-temporal_cache::get_timestamp (unsigned ssa) const
-{
-  if (ssa >= m_timestamp.length ())
-    return NULL;
-  return &(m_timestamp[ssa]);
-}
-
-// Return a reference to the timetamp for ssa-name at index SSA.  If the index
-// is past the end of the vector, extend the vector.
-
-inline range_timestamp *
-temporal_cache::get_timestamp (unsigned ssa)
-{
-  if (ssa >= m_timestamp.length ())
-    m_timestamp.safe_grow_cleared (num_ssa_names + 20);
-  return &(m_timestamp[ssa]);
-}
-
-// This routine will fill NAME's next operand slot with DEP if DEP is a valid
-// SSA_NAME and there is a free slot.
-
-inline void
-temporal_cache::set_dependency (tree name, tree dep)
-{
-  if (dep && TREE_CODE (dep) == SSA_NAME)
-    {
-      gcc_checking_assert (get_timestamp (SSA_NAME_VERSION (name)));
-      range_timestamp& ts = *(get_timestamp (SSA_NAME_VERSION (name)));
-      if (!ts.ssa1)
-	ts.ssa1 = SSA_NAME_VERSION (dep);
-      else if (!ts.ssa2 && ts.ssa1 != SSA_NAME_VERSION (name))
-	ts.ssa2 = SSA_NAME_VERSION (dep);
-    }
-}
 
 // Return the timestamp value for SSA, or 0 if there isnt one.
 inline unsigned
 temporal_cache::temporal_value (unsigned ssa) const
 {
-  const range_timestamp *ts = get_timestamp (ssa);
-  return ts ? ts->time : 0;
+  if (ssa >= m_timestamp.length ())
+    return 0;
+  return m_timestamp[ssa];
 }
 
 // Return TRUE if the timestampe for NAME is newer than any of its dependents.
@@ -583,13 +556,22 @@ temporal_cache::temporal_value (unsigned ssa) const
 bool
 temporal_cache::current_p (tree name) const
 {
-  const range_timestamp *ts = get_timestamp (SSA_NAME_VERSION (name));
-  if (!ts || ts->time == 0)
+  tree dep;
+  unsigned ts = temporal_value (SSA_NAME_VERSION (name));
+  if (ts == 0)
     return true;
+
   // Any non-registered dependencies will have a value of 0 and thus be older.
   // Return true if time is newer than either dependent.
-  return ts->time > temporal_value (ts->ssa1)
-	 && ts->time > temporal_value (ts->ssa2);
+
+  dep = defs.depend1 (name);
+  if (dep && ts < temporal_value (SSA_NAME_VERSION (dep)))
+    return false;
+  dep = defs.depend2 (name);
+  if (dep && ts < temporal_value (SSA_NAME_VERSION (dep)))
+    return false;
+
+  return true;
 }
 
 // This increments the global timer and sets the timestamp for NAME.
@@ -597,8 +579,10 @@ temporal_cache::current_p (tree name) const
 inline void
 temporal_cache::set_timestamp (tree name)
 {
-  gcc_checking_assert (get_timestamp (SSA_NAME_VERSION (name)));
-  get_timestamp (SSA_NAME_VERSION (name))->time = ++m_current_time;
+  unsigned v = SSA_NAME_VERSION (name);
+  if (v >= m_timestamp.length ())
+    m_timestamp.safe_grow_cleared (num_ssa_names + 20);
+  m_timestamp[v] = ++m_current_time;
 }
 
 // Set the timestamp to 0, marking it as "always up to date".
@@ -606,8 +590,10 @@ temporal_cache::set_timestamp (tree name)
 inline void
 temporal_cache::set_always_current (tree name)
 {
-  gcc_checking_assert (get_timestamp (SSA_NAME_VERSION (name)));
-  get_timestamp (SSA_NAME_VERSION (name))->time = 0;
+  unsigned v = SSA_NAME_VERSION (name);
+  if (v >= m_timestamp.length ())
+    m_timestamp.safe_grow_cleared (num_ssa_names + 20);
+  m_timestamp[v] = 0;
 }
 
 
@@ -626,7 +612,7 @@ ranger_cache::ranger_cache (gimple_ranger &q) : query (q)
   m_equiv_edge_check.create (0);
   m_equiv_edge_check.safe_grow_cleared (20);
   m_equiv_edge_check.truncate (0);
-  m_temporal = new temporal_cache;
+  m_temporal = new temporal_cache (*this);
   m_oracle = new relation_oracle ();
 }
 
@@ -720,16 +706,6 @@ ranger_cache::set_global_range (tree name, const irange &r)
   m_temporal->set_timestamp (name);
 }
 
-// Register a dependency on DEP to name.  If the timestamp for DEP is ever
-// greateer than the timestamp for NAME, then it is newer and NAMEs value
-// becomes stale.
-
-void
-ranger_cache::register_dependency (tree name, tree dep)
-{
-  m_temporal->set_dependency (name, dep);
-}
-
 // Push a request for a new lookup in block BB of name.  Return true if
 // the request is actually made (ie, isn't a duplicate).
 
@@ -785,7 +761,7 @@ ranger_cache::ssa_range_in_bb (irange &r, tree name, basic_block bb)
 	 }
     }
   // Look for the on-entry value of name in BB from the cache.
-  else if (!m_on_entry.get_bb_range (r, name, bb))
+  else if (!m_on_entry.get_bb_range_p (r, name, bb))
     {
       // If it has no entry but should, then mark this as a poor value.
       // Its not a poor value if it does not have *any* edge ranges,
@@ -850,7 +826,7 @@ ranger_cache::block_range (irange &r, basic_block bb, tree name, bool calc)
       fill_block_cache (name, bb, def_bb);
       gcc_checking_assert (m_on_entry.bb_range_p (name, bb));
     }
-  return m_on_entry.get_bb_range (r, name, bb);
+  return m_on_entry.get_bb_range_p (r, name, bb);
 }
 
 // Add BB to the list of blocks to update, unless it's already in the list.
@@ -891,7 +867,7 @@ ranger_cache::process_equivs (irange &r, tree name, basic_block bb)
       // If there is a range on entry set, the equivalence has already
       // been processed on all the incoming edges, pick up that range.
       // Otherwise add name to the edge check list.
-      if (m_on_entry.get_bb_range (equiv_range, equiv_name, bb))
+      if (m_on_entry.get_bb_range_p (equiv_range, equiv_name, bb))
 	{
 	  if (DEBUG_RANGE_CACHE)
 	    {
@@ -938,7 +914,7 @@ ranger_cache::propagate_cache (tree name)
     {
       bb = m_update_list.pop ();
       gcc_checking_assert (m_on_entry.bb_range_p (name, bb));
-      m_on_entry.get_bb_range (current_range, name, bb);
+      m_on_entry.get_bb_range_p (current_range, name, bb);
 
       if (DEBUG_RANGE_CACHE)
 	{
@@ -1162,7 +1138,7 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 
 	  // If the pred block already has a range, or if it can contribute
 	  // something new. Ie, the edge generates a range of some sort.
-	  if (m_on_entry.get_bb_range (r, name, pred))
+	  if (m_on_entry.get_bb_range_p (r, name, pred))
 	    {
 	      if (DEBUG_RANGE_CACHE)
 		fprintf (dump_file, "has cache, ");
@@ -1260,7 +1236,7 @@ ranger_cache::process_edge_relations (edge e)
   if (!single_pred_p (e->dest))
     return;
 
-  bitmap b = m_gori_map->exports (e->src);
+  bitmap b = exports (e->src);
   bitmap_iterator bi;
   unsigned y;
   int_range_max r;

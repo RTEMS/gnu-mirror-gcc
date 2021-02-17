@@ -51,16 +51,17 @@ public:
   ~block_range_cache ();
 
   void set_bb_range (tree name, const basic_block bb, const irange &r);
+  void set_bb_range (tree name, const basic_block dest, const basic_block src);
   void set_bb_varying (tree name, const basic_block bb);
-  bool get_bb_range (irange &r, tree name, const basic_block bb);
-  bool bb_range_p (tree name, const basic_block bb);
+  bool get_bb_range_p (irange &r, tree name, const basic_block bb) const;
+  bool bb_range_p (tree name, const basic_block bb) const;
 
   void dump (FILE *f);
   void dump (FILE *f, basic_block bb, bool print_varying = true);
 private:
-  vec<class ssa_block_ranges *> m_ssa_ranges;
-  ssa_block_ranges &get_block_ranges (tree name);
-  ssa_block_ranges *query_block_ranges (tree name);
+  vec<class ssa_range_cache *> m_ssa_ranges;
+  ssa_range_cache &get_block_ranges (tree name);
+  ssa_range_cache *query_block_ranges (tree name) const;
   irange_allocator *m_irange_allocator;
 };
 
@@ -99,8 +100,6 @@ public:
   bool get_global_range (irange &r, tree name) const;
   bool get_non_stale_global_range (irange &r, tree name);
   void set_global_range (tree name, const irange &r);
-  void register_dependency (tree name, tree dep);
-
   void process_edge_relations (edge e);
   bool process_relations (gimple *s, irange &lhs_range,
 			  tree op1, const irange &range1);

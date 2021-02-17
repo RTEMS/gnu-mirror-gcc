@@ -26,18 +26,49 @@ along with GCC; see the file COPYING3.  If not see
 // have range information calculated for them, and what the
 // dependencies on each other are.
 
+struct rdc {
+ tree ssa1;
+ tree ssa2;
+ bitmap bm;
+};
+
 class range_def_chain
 {
 public:
   range_def_chain ();
   ~range_def_chain ();
-  bool has_def_chain (tree name);
-  bitmap get_def_chain (tree name);
+  tree depend1 (tree name) const;
+  tree depend2 (tree name) const;
   bool in_chain_p (tree name, tree def);
+  void register_dependency (tree name, tree ssa1, basic_block bb = NULL);
+  void dump (FILE *f, basic_block bb, const char *prefix = NULL);
+protected:
+  bool has_def_chain (tree name);
+  bool def_chain_in_bitmap_p (tree name, bitmap b);
+  void add_def_chain_to_bitmap (bitmap b, tree name);
+  bitmap_obstack m_bitmaps;
 private:
-  vec<bitmap> m_def_chain;	// SSA_NAME : def chain components.
-  void build_def_chain (tree name, bitmap result, basic_block bb);
+  vec<rdc> m_def_chain;	// SSA_NAME : def chain components.
+  bitmap get_def_chain (tree name);
 };
+
+inline tree
+range_def_chain::depend1 (tree name) const
+{
+  unsigned v = SSA_NAME_VERSION (name);
+  if (v >= m_def_chain.length ())
+    return NULL_TREE;
+  return m_def_chain[v].ssa1;
+}
+
+inline tree
+range_def_chain::depend2 (tree name) const
+{
+  unsigned v = SSA_NAME_VERSION (name);
+  if (v >= m_def_chain.length ())
+    return NULL_TREE;
+  return m_def_chain[v].ssa2;
+}
 
 // GORI_MAP is used to accumulate what SSA names in a block can
 // generate range information, and provides tools for the block ranger
@@ -50,14 +81,12 @@ public:
   ~gori_map ();
 
   bool is_export_p (tree name, basic_block bb = NULL);
-  bool def_chain_in_export_p (tree name, basic_block bb);
   bitmap exports (basic_block bb);
   void set_range_invariant (tree name);
 
   void dump (FILE *f);
   void dump (FILE *f, basic_block bb);
 private:
-  bitmap_obstack m_bitmaps;
   vec<bitmap> m_outgoing;	// BB: Outgoing ranges calculatable on edges
   bitmap m_maybe_variant;	// Names which might have outgoing ranges.
   void maybe_add_gori (tree name, basic_block bb);
@@ -106,14 +135,13 @@ private:
 //
 // The remaining routines are internal use only.
 
-class gori_compute
+class gori_compute : public gori_map
 {
 public:
   gori_compute ();
   ~gori_compute ();
   bool outgoing_edge_range_p (irange &r, edge e, tree name);
   bool has_edge_range_p (tree name, edge e = NULL);
-  void set_range_invariant (tree name);
   void dump (FILE *f);
 protected:
   virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb);
@@ -135,7 +163,6 @@ protected:
 			const class tf_range &op2_range);
   int_range<2> m_bool_zero;           // Boolean false cached.
   int_range<2> m_bool_one;            // Boolean true cached.
-  class gori_map *m_gori_map;
   outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
 
 private:
