@@ -3414,41 +3414,9 @@ rs6000_builtin_mask_calculate (void)
 
 static rtx_insn *
 rs6000_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
-		      vec<const char *> &constraints,
+		      vec<const char *> &/*constraints*/,
 		      vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs)
 {
-  /* If prefixed addresses are allowed, warn about using "m" and "o" constraints
-     that might generate prefixed instruction.  */
-  if (TARGET_PREFIXED)
-    {
-      for (unsigned i = 0; i < constraints.length (); ++i)
-	{
-	  const char *constraint = constraints[i];
-	  char ch;
-
-	  while ((ch = *constraint++) != '\0')
-	    switch (ch)
-	      {
-	      default:
-		break;
-
-		/* If we found 'm' or 'o', emit a warning.  */
-	      case 'm':
-	      case 'o':
-		warning (0,
-			 "Asm constraint %qc used when prefixed addresses "
-			 "are enabled.", ch);
-		break;
-
-		/* 'e' and 'w' begin two letter constraints.  */
-	      case 'e':
-	      case 'w':
-		constraint++;
-		break;
-	      }
-	}
-    }
-
   clobbers.safe_push (gen_rtx_REG (SImode, CA_REGNO));
   SET_HARD_REG_BIT (clobbered_regs, CA_REGNO);
   return NULL;
