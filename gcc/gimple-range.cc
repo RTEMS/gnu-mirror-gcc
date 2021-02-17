@@ -1108,32 +1108,33 @@ gimple_ranger::export_global_ranges ()
     {
       tree name = ssa_name (x);
       if (name && !SSA_NAME_IN_FREE_LIST (name)
+	  && !POINTER_TYPE_P (TREE_TYPE (name))
 	  && gimple_range_ssa_p (name)
 	  && m_cache.get_global_range (r, name)
 	  && !r.varying_p())
 	{
-	  // Make sure the new range is a subset of the old range.
-	  int_range_max old_range;
-	  old_range = gimple_range_global (name);
-	  old_range.intersect (r);
-	  /* Disable this while we fix tree-ssa/pr61743-2.c.  */
-	  //gcc_checking_assert (old_range == r);
-
-	  // WTF? Can't write non-null pointer ranges?? stupid set_range_info!
-	  if (!POINTER_TYPE_P (TREE_TYPE (name)) && !r.undefined_p ())
+	  // If a global range already exists, incorporate it.
+	  if (SSA_NAME_RANGE_INFO (name))
 	    {
-	      value_range vr = r;
-	      set_range_info (name, vr);
-	      if (dump_file)
-		{
-		  print_generic_expr (dump_file, name , TDF_SLIM);
-		  fprintf (dump_file, " --> ");
-		  vr.dump (dump_file);
-		  fprintf (dump_file, "\n");
-		  fprintf (dump_file, "         irange : ");
-		  r.dump (dump_file);
-		  fprintf (dump_file, "\n");
-		}
+	      wide_int min, max;
+	      enum value_range_kind kind = get_range_info (name, &min, &max);
+	      value_range glob (TREE_TYPE (name), min, max, kind);
+	      r.intersect (glob);
+	    }
+	  if (r.undefined_p ())
+	    continue;
+	  // Set the SSA_NAME global range.
+	  value_range vr = r;
+	  set_range_info (name, vr);
+	  if (dump_file)
+	    {
+	      print_generic_expr (dump_file, name , TDF_SLIM);
+	      fprintf (dump_file, " --> ");
+	      vr.dump (dump_file);
+	      fprintf (dump_file, "\n");
+	      fprintf (dump_file, "         irange : ");
+	      r.dump (dump_file);
+	      fprintf (dump_file, "\n");
 	    }
 	}
     }

@@ -129,6 +129,7 @@ public:
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
       m_ranger->dump (dump_file);
+    m_ranger->export_global_ranges ();
     delete m_ranger;
   }
 
@@ -196,6 +197,7 @@ public:
   {
     if (dump_file && (dump_flags & TDF_DETAILS))
       m_ranger->dump (dump_file);
+    m_ranger->export_global_ranges ();
     delete m_ranger;
   }
 
