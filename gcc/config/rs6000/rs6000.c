@@ -6124,10 +6124,6 @@ vspltis_constant (rtx op, unsigned step, unsigned copies)
   if (EASY_VECTOR_15 (splat_val))
     ;
 
-  /* Power10 added xxspltiw.  */
-  else if (TARGET_POWER10 && mode == V4SImode)
-    ;
-
   /* Also check if we can splat, and then add the result to itself.  Do so if
      the value is positive, of if the splat instruction is using OP's mode;
      for splat_val < 0, the splat and the add should use the same mode.  */
@@ -6402,11 +6398,6 @@ xxspltib_constant_p (rtx op,
 	return false;
 
       value = INTVAL (element);
-      /* If we have the Power10 XXSPLTIW instruction, don't load the constant
-	 via XXSPLTIB and VEXTSB2W.  */
-      if (TARGET_POWER10 && mode == V4SImode)
-	return false;
-
       if (!IN_RANGE (value, -128, 127))
 	return false;
     }
@@ -6423,11 +6414,6 @@ xxspltib_constant_p (rtx op,
 	return false;
 
       value = INTVAL (element);
-      /* If we have the Power10 XXSPLTIW instruction, don't load the constant
-	 via XXSPLTIB and VEXTSB2W.  */
-      if (TARGET_POWER10 && mode == V4SImode)
-	return false;
-
       if (!IN_RANGE (value, -128, 127))
 	return false;
 
@@ -6530,42 +6516,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      if (TARGET_POWER10 && mode == V4SImode)
-	{
-	  rtx element = NULL_RTX;
-	  bool use_xxsplitiw = false;
-
-	  /* Handle const_vector.  */
-	  if (GET_CODE (vec) == CONST_VECTOR
-	      && CONST_INT_P (CONST_VECTOR_ELT (vec, 0)))
-	    {
-	      element = CONST_VECTOR_ELT (vec, 0);
-	      use_xxsplitiw = true;
-	      for (size_t i = 1; i < GET_MODE_NUNITS (mode); i++)
-		if (!rtx_equal_p (element, CONST_VECTOR_ELT (vec, i)))
-		  {
-		    use_xxsplitiw = false;
-		    break;
-		  }
-	    }
-
-	  /* Handle vec_duplicate.  */
-	  else if (GET_CODE (vec) == VEC_DUPLICATE
-		   && CONST_INT_P (XEXP (vec, 0)))
-	    {
-	      element = XEXP (vec, 0);
-	      use_xxsplitiw = true;
-	    }
-
-	  if (use_xxsplitiw)
-	    {
-	      operands[2] = element;
-	      return (dest_vmx_p && IN_RANGE (INTVAL (element), -16, 15)
-		      ? "vspltisw %0,%2"
-		      : "xxspltiw %x0,%2");
-	    }
 	}
 
       if (TARGET_P9_VECTOR
@@ -26262,15 +26212,11 @@ static bool next_insn_prefixed_p;
    insn is a prefixed insn where we need to emit a 'p' before the insn.
 
    In addition, if the insn is part of a PC-relative reference to an external
-   label optimization, this is recorded also.
-
-   While XXSPLTIW, XXSPLTIDP, and XXSPLTI32DX are prefixed instructions, they
-   don't have a leading 'p'.  */
+   label optimization, this is recorded also.  */
 void
 rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
-  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO
-			  && get_attr_type (insn) != TYPE_VECSIMPLE);
+  next_insn_prefixed_p = (get_attr_prefixed (insn) != PREFIXED_NO);
   return;
 }
 

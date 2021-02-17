@@ -5092,18 +5092,6 @@
    lxvwsx %x0,%y1"
   [(set_attr "type" "vecperm,vecload")])
 
-;; Power10 adds support for splatting a 32-bit constant
-(define_insn "*vsx_splat_v4si_constant"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=v,wa")
-	(vec_duplicate:V4SI (match_operand 1 "s32bit_cint_operand" "wB,i")))]
-  "TARGET_POWER10"
-  "@
-   vspltisw %0,%1
-   xxspltiw %x0,%1"
-  [(set_attr "type" "vecsimple")
-   (set_attr "length" "4,12")
-   (set_attr "prefixed" "no,yes")])
-
 ;; SImode is not currently allowed in vector registers.  This pattern
 ;; allows us to use direct move to get the value in a vector register
 ;; so that we can use XXSPLTW
