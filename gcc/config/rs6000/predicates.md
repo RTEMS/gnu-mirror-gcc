@@ -653,6 +653,9 @@
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
 	return true;
 
+      if (TARGET_POWER10 && xxspltiw_constant_p (op, mode))
+	return true;
+
       if (TARGET_P9_VECTOR
           && xxspltib_constant_p (op, mode, &num_insns, &value))
 	return true;
