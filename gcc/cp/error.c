@@ -1362,7 +1362,10 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case LABEL_DECL:
-      pp_cxx_tree_identifier (pp, DECL_NAME (t));
+      if (DECL_NAME (t))
+	pp_cxx_tree_identifier (pp, DECL_NAME (t));
+      else
+	pp_printf (pp, "<L%d>", (int) LABEL_DECL_UID (t));
       break;
 
     case CONST_DECL:
