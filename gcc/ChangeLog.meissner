@@ -13,7 +13,7 @@ work036.patch017
 	declaration.
 	* config/rs6000/rs6000.c (xxspltiw_constant_p): New function.
 	(xxspltib_constant_p): If xxsplitw_constant_p returns true, don't
-	return true to use xxspltib and extend.
+	return true.
 	(output_vec_const_move): Add support to generate XXSPLITW if
 	possible.
 	(rs6000_expand_vector_init): Generate XXSPLITW instructions if we

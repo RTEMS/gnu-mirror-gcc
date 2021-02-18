@@ -1,10 +1,11 @@
 work036.patch016
 2021-02-17  Michael Meissner  <meissner@linux.ibm.com>
 
-	* gcc.target/powerpc/xxspltiw-1.c: New test.
-	* gcc.target/powerpc/xxspltiw-2.c: New test.
-	* gcc.target/powerpc/xxspltiw-3.c: New test.
-	* gcc.target/powerpc/xxspltiw-4.c: New test.
+	* gcc.target/powerpc/vec-splati-1.c: New test.
+	* gcc.target/powerpc/vec-splati-2.c: New test.
+	* gcc.target/powerpc/vec-splati-3.c: New test.
+	* gcc.target/powerpc/vec-splati-4.c: New test.
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn count.
 
 work036.patch015
 2021-02-17  Michael Meissner  <meissner@linux.ibm.com>
