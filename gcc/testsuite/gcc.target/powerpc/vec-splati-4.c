@@ -17,5 +17,5 @@ splat_3 (void)
   return vec_splats (3.0f);	/* xxspltisw.  */
 }
 
-/* { dg-final { scan-assembler {\mvspltisw|xxspltib\M} } } */
-/* { dg-final { scan-assembler {\mxxspltiw\M}          } } */
+/* { dg-final { scan-assembler {\mvspltisw\M|\mxxspltib\M} } } */
+/* { dg-final { scan-assembler {\mxxspltiw\M}              } } */

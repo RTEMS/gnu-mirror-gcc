@@ -15,5 +15,5 @@ init_3 (void)
   return (vector float) { 3.0f, 3.0f, 3.0f, 3.0f };	/* xxspltisw.  */
 }
 
-/* { dg-final { scan-assembler {\mvspltisw|xxspltib\M} } } */
-/* { dg-final { scan-assembler {\mxxspltiw\M}          } } */
+/* { dg-final { scan-assembler {\mvspltisw\M|\mxxspltib\M} } } */
+/* { dg-final { scan-assembler {\mxxspltiw\M}              } } */

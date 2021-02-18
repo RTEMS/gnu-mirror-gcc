@@ -53,6 +53,6 @@ splat_m1_fpr (vector int *p)
   *p = v;
 }
 
-/* { dg-final { scan-assembler-times {\mvspltisw|xxspltib\M} 5 } } */
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}          2 } } */
-/* { dg-final { scan-assembler-not   {\mvextsb2w\M}            } } */
+/* { dg-final { scan-assembler-times {\mvspltisw\M|\mxxspltib\M} 5 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M}              2 } } */
+/* { dg-final { scan-assembler-not   {\mvextsb2w\M}                } } */
