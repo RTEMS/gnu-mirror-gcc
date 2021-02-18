@@ -160,6 +160,8 @@ main (int argc, char *argv [])
   return 0;
 }
 
-/* { dg-final { scan-assembler-times {\mvspltisw\M|\mxxspltiw\M} 7 } } */
-/* { dg-final { scan-assembler-times {\mxxspltidp\M}             2 } } */
-/* { dg-final { scan-assembler-times {\mxxsplti32dx\M}           3 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mxxsplti32dx\M} 3 } } */
+
+
