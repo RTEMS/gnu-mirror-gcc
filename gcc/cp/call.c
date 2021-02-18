@@ -8386,8 +8386,14 @@ get_function_version_dispatcher (tree fn)
 	      && DECL_FUNCTION_VERSIONED (fn));
 
   gcc_assert (targetm.get_function_versions_dispatcher);
-  dispatcher_decl = targetm.get_function_versions_dispatcher (fn);
+  if (cgraph_node::get (fn) == NULL)
+    {
+      error_at (DECL_SOURCE_LOCATION (fn), "missing declaration "
+		"for a multiversioned function");
+      return NULL;
+    }
 
+  dispatcher_decl = targetm.get_function_versions_dispatcher (fn);
   if (dispatcher_decl == NULL)
     {
       error_at (input_location, "use of multiversioned function "
