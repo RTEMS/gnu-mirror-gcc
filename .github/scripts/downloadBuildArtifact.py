@@ -55,13 +55,13 @@ def WaitOnGccBuild(commit, accessToken):
                 RaiseWorkflowError("Build run ID " + str(latestBuildId) + " failed")
         else:
             # Sleep for 30 seconds
-            sleepTime = 30
-            logger.error("Sleeping for " + str(sleepTime) + " seconds while waiting on build number " + str(latestBuildId) + " to finish")
-            time.sleep(sleepTime) # Sleep takes parameter in seconds
+            sleepTimeSeconds = 30
+            logger.error("Sleeping for " + str(sleepTimeSeconds) + " seconds while waiting on build number " + str(latestBuildId) + " to finish")
+            time.sleep(sleepTimeSeconds)
 
     logger.info("Workflow run ID = " + str(workflowRunID))
 
-    numArtifactRetries = 1
+    numArtifactRetries = 60
     # Add error checking for the number of artifacts
     while True:
         res = requests.get("https://api.github.com/repos/microsoft/test-gcc/actions/runs/" + str(workflowRunID) + "/artifacts", headers={'Authorization': "token " + accessToken})
@@ -81,12 +81,12 @@ def WaitOnGccBuild(commit, accessToken):
         numArtifactRetries = numArtifactRetries-1
 
         # We need this sleep here because even if the build job status is "completed", the gccBuild artifacts aren't
-        # immediately ready. If for some reason they aren't, sleep for a bit and retry once more.
+        # immediately ready. If for some reason they aren't, sleep for a bit and retry.
         
-        # Sleep for 3 minutes
-        sleepTime = 3
-        logger.info("Sleeping for " + str(sleepTime) + " minutes while waiting on artifacts for workflow run ID " + str(workflowRunID))
-        time.sleep(sleepTime * 60) # Sleep takes parameter in seconds
+        # Sleep for 30 seconds
+        sleepTimeSeconds = 30
+        logger.info("Sleeping for " + str(sleepTimeSeconds) + " seconds while waiting on artifacts for workflow run ID " + str(workflowRunID))
+        time.sleep(sleepTimeSeconds)
 
     logger.info("GCC Build artifact ID = " + str(gccBuildArtifactID))
 
@@ -95,7 +95,6 @@ def WaitOnGccBuild(commit, accessToken):
 def DownloadBuildArtifact():
     logger = GetLogger()
     gccBuildArtifactID = globals.configObj.gccBuildArtifactID
-
     # TODO: Support downloading build artifact without a config object setup so the script can be used outside of workflows by developers
     res = requests.get("https://api.github.com/repos/microsoft/test-gcc/actions/artifacts/" + str(gccBuildArtifactID) +"/zip", headers={'Authorization': "token " + globals.configObj.accessToken})
     
@@ -105,6 +104,6 @@ def DownloadBuildArtifact():
 
     logger.info("Unzipping zip")
     with zipfile.ZipFile('gccBuild.zip', 'r') as zip_ref:
-        zip_ref.extractall('gccBuild')   
+        zip_ref.extractall('gccBuild')
 
     logger.info("Done downloading")

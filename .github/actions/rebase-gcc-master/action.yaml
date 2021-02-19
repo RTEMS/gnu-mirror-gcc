@@ -1,0 +1,24 @@
+# Composite yaml to rebase to upstream gcc master
+runs:
+  using: "composite"
+  steps: 
+    - name: Add remote
+      run: |
+        git remote add gcc git://gcc.gnu.org/git/gcc.git
+      shell: bash
+    - name: Fetch
+      run: |
+        git fetch gcc master
+      shell: bash
+    - name: Rebase
+      run: |
+        git log gcc/master -1
+        git config --global user.email "erozen@microsoft.com"
+        git config --global user.name "Eugene Rozenfeld"
+        git rebase gcc/master
+      shell: bash
+    - name: Check commits
+      run: |
+        git status
+        git log -15
+      shell: bash

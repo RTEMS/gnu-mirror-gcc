@@ -1,0 +1,19 @@
+# Composite yaml that's re-usable in multiple workflows to build gcc
+inputs:
+  configjson:
+    description: 'Config object converted into json'
+    required: true
+    default: ''
+runs:
+  using: "composite"
+  steps: 
+    - name: Build gcc
+      run: | 
+        chmod +x .github/scripts/gccWorkflow.py
+        echo "$PYTHONPATH"
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        echo "$PYTHONPATH"
+        python -c 'import sys; from gccWorkflow import *; GccWorkflow.Build(sys.argv[1])' "${CONFIG_JSON}"
+      shell: bash
+      env:
+        CONFIG_JSON: ${{ inputs.configJson }}

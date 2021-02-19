@@ -7,7 +7,79 @@ on:
   workflow_dispatch:
 
 jobs:    
-  fetch-rebase-test:
+  fetch-rebase-build:
+    runs-on: ubuntu-18.04
+    outputs:
+      config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+          ref: current 
+    
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+        
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+        
+      - uses: ./.github/actions/rebase-gcc-master
+      
+        # Setup config
+      - name: Setup config
+        id: setupconfig
+        run: |
+          chmod +x .github/scripts/gccWorkflow.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Init(sys.argv[1], sys.argv[2], True)' "${GITHUB_CONTEXT}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - uses: ./.github/actions/build-composite
+        with: 
+          configjson: ${{ steps.setupconfig.outputs.configJson }}
+
+      - name: Move objdir to be in repo so it can be uploaded
+        run: mv ../objdir objdir
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v2
+        with:
+          name: gccBuild
+          path: objdir
+
+      # This should be the last step on this machine since it will clear out fields in the config json
+      - name: Print No Secret Json
+        id: printNoSecretJson
+        run: |
+          chmod +x .github/scripts/config.py
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJson(sys.argv[1])' "${CONFIG_JSON}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
+
+  fetch-rebase-test: 
+    needs: fetch-rebase-build
+    strategy:
+      matrix:
+        # If this test is updated, make sure you update the duplicate line in test-gcc.yaml
+        testSet: [check-target-libstdc++-v3, check-gcc-c++, check-gcc-c, check-target-libgomp, check-target-libitm, check-target-libatomic]
+      # Avoid cancelling other matrix chunks even if one fails
+      fail-fast: false        
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout
@@ -16,26 +88,34 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           lfs: true
-          ref: current
-      - name: Add remote
+          ref: current 
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+        
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
         run: |
-          git remote add gcc git://gcc.gnu.org/git/gcc.git          
-      - name: Fetch
-        run: |
-          git fetch gcc master
-      - name: Rebase
-        run: |
-          git log gcc/master -1
-          git config --global user.email "erozen@microsoft.com"
-          git config --global user.name "Eugene Rozenfeld"
-          git rebase gcc/master
-      - name: Check commits
-        run: |
-          git status
-          git log -15
-                
-      - name: Run build script
-        run: | 
-          chmod +x .github/scripts/build-gcc.sh
-          .github/scripts/build-gcc.sh
+          python -m pip install requests
         shell: bash
+        
+      - uses: ./.github/actions/rebase-gcc-master
+
+      - name: Download gccBuild from fetch-rebase-build step
+        uses: actions/download-artifact@v2
+        with:
+          name: gccBuild
+          path: objdir
+
+      - name: Move objdir up one directory
+        run: mv objdir ../objdir
+        
+      # build.yaml creates the gccBuild artifact
+      - uses: ./.github/actions/test-composite
+        with: 
+          configjson: ${{needs.fetch-rebase-build.outputs.config}}
+          testSet: ${{ matrix.testSet }}
+          githubtoken: ${{ secrets.GITHUB_TOKEN }}
+          buildDownloaded: True

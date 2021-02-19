@@ -19,7 +19,7 @@ class Config(object):
         logger.info('creating an instance of Config')
 
     @staticmethod
-    def Setup(githubObject, accessToken):
+    def Setup(githubObject, accessToken, isBuild):
         logger = GetLogger()
         
         logger.debug("In Setup")
@@ -34,8 +34,8 @@ class Config(object):
         logger.info("SHA = " + commit)
         workflowName = githubJson["workflow"]
 
-        # If this isn't the GCC build, wait for the GCC build to complete with the needed artifacts
-        if (workflowName != GetGccBuildName()):
+        # If this isn't a GCC build, wait for the GCC build to complete with the needed artifacts
+        if (not isBuild):
             gccBuildArtifactID = WaitOnGccBuild(commit, accessToken)
         else:
             gccBuildArtifactID = 0

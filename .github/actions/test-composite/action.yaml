@@ -1,0 +1,36 @@
+# Composite yaml that's re-usable in multiple workflows to run gcc tests
+inputs:
+  configjson:
+    description: 'Config object converted into json'
+    required: true
+    default: ''
+  testSet:
+    description: 'gcc test set to run'
+    required: true
+    default: ''
+  githubtoken:
+    description: 'GitHub auth token'
+    required: true
+    default: ''
+  buildDownloaded:
+    description: 'Whether the build is already available on the machine this composite action is running on'
+    required: true
+    default: true
+runs:
+  using: "composite"
+  steps: 
+    - name: Download build and run tests
+      run: | 
+        chmod +x .github/scripts/gccWorkflow.py
+        echo "$PYTHONPATH"
+        echo "$CONFIG_JSON"
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        echo "$PYTHONPATH"
+        echo "$BUILD_DOWNLOADED"
+        python -c 'import sys; from gccWorkflow import *; GccWorkflow.Test(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])' "${CONFIG_JSON}" "${TEST_SET}" "${GITHUB_TOKEN}" "${BUILD_DOWNLOADED}"
+      shell: bash
+      env:
+        CONFIG_JSON: ${{ inputs.configJson }}
+        TEST_SET: ${{ inputs.testSet }}
+        GITHUB_TOKEN: ${{ inputs.githubtoken }}
+        BUILD_DOWNLOADED: ${{ inputs.buildDownloaded }}
