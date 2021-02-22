@@ -105,7 +105,7 @@
 #define vec_vgbbd vec_gb
 #define vec_vmrgew vec_mergee
 #define vec_vmrgow vec_mergeo
-#define vec_vpopcnt vec_popcnt
+#define vec_vpopcntu vec_popcnt
 #define vec_vrld vec_rl
 #define vec_vsld vec_sl
 #define vec_vsrd vec_sr

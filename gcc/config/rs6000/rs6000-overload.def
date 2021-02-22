@@ -2933,22 +2933,22 @@
   vuq __builtin_vec_vpmsum (vull, vull);
     VPMSUMD  VPMSUMD_V
 
-[VEC_POPCNT, vec_popcnt, __builtin_vec_vpopcnt, _ARCH_PWR8]
-  vsc __builtin_vec_vpopcnt (vsc);
+[VEC_POPCNT, vec_popcnt, __builtin_vec_vpopcntu, _ARCH_PWR8]
+  vuc __builtin_vec_vpopcntu (vsc);
     VPOPCNTB
-  vuc __builtin_vec_vpopcnt (vuc);
+  vuc __builtin_vec_vpopcntu (vuc);
     VPOPCNTUB
-  vss __builtin_vec_vpopcnt (vss);
+  vus __builtin_vec_vpopcntu (vss);
     VPOPCNTH
-  vus __builtin_vec_vpopcnt (vus);
+  vus __builtin_vec_vpopcntu (vus);
     VPOPCNTUH
-  vsi __builtin_vec_vpopcnt (vsi);
+  vui __builtin_vec_vpopcntu (vsi);
     VPOPCNTW
-  vui __builtin_vec_vpopcnt (vui);
+  vui __builtin_vec_vpopcntu (vui);
     VPOPCNTUW
-  vsll __builtin_vec_vpopcnt (vsll);
+  vull __builtin_vec_vpopcntu (vsll);
     VPOPCNTD
-  vull __builtin_vec_vpopcnt (vull);
+  vull __builtin_vec_vpopcntu (vull);
     VPOPCNTUD
 
 [VEC_PARITY_LSBB, vec_parity_lsbb, __builtin_vec_vparity_lsbb, _ARCH_PWR9]
@@ -5114,15 +5114,15 @@
     VAVGSW  VAVGSW_DEPR1
 
 [VEC_VAVGUB, vec_vavgub, __builtin_vec_vavgub]
-  vsc __builtin_vec_vavgub (vsc, vsc);
+  vuc __builtin_vec_vavgub (vuc, vuc);
     VAVGUB  VAVGUB_DEPR1
 
 [VEC_VAVGUH, vec_vavguh, __builtin_vec_vavguh]
-  vss __builtin_vec_vavguh (vss, vss);
+  vus __builtin_vec_vavguh (vus, vus);
     VAVGUH  VAVGUH_DEPR1
 
 [VEC_VAVGUW, vec_vavguw, __builtin_vec_vavguw]
-  vsi __builtin_vec_vavguw (vsi, vsi);
+  vui __builtin_vec_vavguw (vui, vui);
     VAVGUW  VAVGUW_DEPR1
 
 [VEC_VBPERMQ, vec_vbpermq, __builtin_vec_vbpermq, _ARCH_PWR8]
@@ -5290,11 +5290,11 @@
     VMAXUB  VMAXUB_DEPR5
 
 [VEC_VMAXUD, vec_vmaxud, __builtin_vec_vmaxud]
-  vsll __builtin_vec_vmaxud (vsll, vsll);
+  vull __builtin_vec_vmaxud (vull, vull);
     VMAXUD  VMAXUD_DEPR1
-  vsll __builtin_vec_vmaxud (vbll, vsll);
+  vull __builtin_vec_vmaxud (vbll, vull);
     VMAXUD  VMAXUD_DEPR2
-  vsll __builtin_vec_vmaxud (vsll, vbll);
+  vull __builtin_vec_vmaxud (vull, vbll);
     VMAXUD  VMAXUD_DEPR3
 
 [VEC_VMAXUH, vec_vmaxuh, __builtin_vec_vmaxuh]
@@ -5370,11 +5370,11 @@
     VMINUB  VMINUB_DEPR5
 
 [VEC_VMINUD, vec_vminud, __builtin_vec_vminud]
-  vsll __builtin_vec_vminud (vsll, vsll);
+  vull __builtin_vec_vminud (vull, vull);
     VMINUD  VMINUD_DEPR1
-  vsll __builtin_vec_vminud (vbll, vsll);
+  vull __builtin_vec_vminud (vbll, vull);
     VMINUD  VMINUD_DEPR2
-  vsll __builtin_vec_vminud (vsll, vbll);
+  vull __builtin_vec_vminud (vull, vbll);
     VMINUD  VMINUD_DEPR3
 
 [VEC_VMINUH, vec_vminuh, __builtin_vec_vminuh]
@@ -5589,6 +5589,24 @@
   vus __builtin_vec_vpkuwus (vui, vui);
     VPKUWUS  VPKUWUS_DEPR1
 
+[VEC_VPOPCNT, vec_vpopcnt, __builtin_vec_vpopcnt, _ARCH_PWR8]
+  vsc __builtin_vec_vpopcnt (vsc);
+    VPOPCNTB  VPOPCNT_DEPR1
+  vuc __builtin_vec_vpopcnt (vuc);
+    VPOPCNTB  VPOPCNT_DEPR2
+  vss __builtin_vec_vpopcnt (vss);
+    VPOPCNTH  VPOPCNT_DEPR3
+  vus __builtin_vec_vpopcnt (vus);
+    VPOPCNTH  VPOPCNT_DEPR4
+  vsi __builtin_vec_vpopcnt (vsi);
+    VPOPCNTW  VPOPCNT_DEPR5
+  vui __builtin_vec_vpopcnt (vui);
+    VPOPCNTW  VPOPCNT_DEPR6
+  vsll __builtin_vec_vpopcnt (vsll);
+    VPOPCNTD  VPOPCNT_DEPR7
+  vull __builtin_vec_vpopcnt (vull);
+    VPOPCNTD  VPOPCNT_DEPR8
+
 [VEC_VPOPCNTB, vec_vpopcntb, __builtin_vec_vpopcntb, _ARCH_PWR8]
   vsc __builtin_vec_vpopcntb (vsc);
     VPOPCNTB  VPOPCNTB_DEPR1
@@ -5606,24 +5624,6 @@
     VPOPCNTH  VPOPCNTH_DEPR1
   vus __builtin_vec_vpopcnth (vus);
     VPOPCNTH  VPOPCNTH_DEPR2
-
-[VEC_VPOPCNTU, SKIP, __builtin_vec_vpopcntu, _ARCH_PWR8]
-  vuc __builtin_vec_vpopcntu (vsc);
-    VPOPCNTUB  VPOPCNTU_DEPR1
-  vuc __builtin_vec_vpopcntu (vuc);
-    VPOPCNTUB  VPOPCNTU_DEPR2
-  vus __builtin_vec_vpopcntu (vss);
-    VPOPCNTUH  VPOPCNTU_DEPR3
-  vus __builtin_vec_vpopcntu (vus);
-    VPOPCNTUH  VPOPCNTU_DEPR4
-  vui __builtin_vec_vpopcntu (vsi);
-    VPOPCNTUW  VPOPCNTU_DEPR5
-  vui __builtin_vec_vpopcntu (vui);
-    VPOPCNTUW  VPOPCNTU_DEPR6
-  vull __builtin_vec_vpopcntu (vsll);
-    VPOPCNTUD  VPOPCNTU_DEPR7
-  vull __builtin_vec_vpopcntu (vull);
-    VPOPCNTUD  VPOPCNTU_DEPR8
 
 [VEC_VPOPCNTW, vec_vpopcntw, __builtin_vec_vpopcntw, _ARCH_PWR8]
   vsi __builtin_vec_vpopcntw (vsi);
@@ -5726,6 +5726,8 @@
     VSPLTW  VSPLTW_DEPR2
   vbi __builtin_vec_vspltw (vbi, const int);
     VSPLTW  VSPLTW_DEPR3
+  vf __builtin_vec_vspltw (vf, const int);
+    VSPLTW  VSPLTW_DEPR4
 
 [VEC_VSRAB, vec_vsrab, __builtin_vec_vsrab]
   vsc __builtin_vec_vsrab (vsc, vuc);
