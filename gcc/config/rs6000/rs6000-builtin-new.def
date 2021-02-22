@@ -3083,28 +3083,28 @@
     MTVSRWM vec_mtvsr_v4si {}
 
   pure vsq __builtin_altivec_se_lxvrbx (signed long long, const signed char *);
-    SE_LXVRBX nothing {lxvr}
+    SE_LXVRBX vsx_lxvrbx {lxvr}
 
   pure vsq __builtin_altivec_se_lxvrhx (signed long long, const signed short *);
-    SE_LXVRHX nothing {lxvr}
+    SE_LXVRHX vsx_lxvrhx {lxvr}
 
   pure vsq __builtin_altivec_se_lxvrwx (signed long long, const signed int *);
-    SE_LXVRWX nothing {lxvr}
+    SE_LXVRWX vsx_lxvrwx {lxvr}
 
   pure vsq __builtin_altivec_se_lxvrdx (signed long long, const signed long long *);
-    SE_LXVRDX nothing {lxvr}
+    SE_LXVRDX vsx_lxvrdx {lxvr}
 
   void __builtin_altivec_tr_stxvrbx (vsq, signed long long, signed char *);
-    TR_STXVRBX nothing {stvec}
+    TR_STXVRBX vsx_stxvrbx {stvec}
 
   void __builtin_altivec_tr_stxvrhx (vsq, signed long long, signed int *);
-    TR_STXVRHX nothing {stvec}
+    TR_STXVRHX vsx_stxvrhx {stvec}
 
   void __builtin_altivec_tr_stxvrwx (vsq, signed long long, signed short *);
-    TR_STXVRWX nothing {stvec}
+    TR_STXVRWX vsx_stxvrwx {stvec}
 
   void __builtin_altivec_tr_stxvrdx (vsq, signed long long, signed long long *);
-    TR_STXVRDX nothing {stvec}
+    TR_STXVRDX vsx_stxvrdx {stvec}
 
   const vull __builtin_altivec_vcfuged (vull, vull);
     VCFUGED vcfuged {}

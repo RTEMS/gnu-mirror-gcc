@@ -13558,10 +13558,69 @@ ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
 }
 
 static rtx
+lxvr_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode,
+		     machine_mode smode)
+{
+  rtx pat, addr;
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  if (op[0] == const0_rtx)
+    addr = gen_rtx_MEM (tmode, op[1]);
+  else
+    {
+      op[0] = copy_to_mode_reg (tmode, op[0]);
+      addr = gen_rtx_MEM (smode,
+			  gen_rtx_PLUS (Pmode, op[1], op[0]));
+    }
+
+  if (icode == CODE_FOR_vsx_lxvrbx
+      || icode == CODE_FOR_vsx_lxvrhx
+      || icode == CODE_FOR_vsx_lxvrwx
+      || icode == CODE_FOR_vsx_lxvrdx)
+    {
+      rtx discratch = gen_reg_rtx (DImode);
+      rtx tiscratch = gen_reg_rtx (TImode);
+
+      /* Emit the lxvr*x insn.  */
+      pat = GEN_FCN (icode) (tiscratch, addr);
+      if (!pat)
+	return 0;
+      emit_insn (pat);
+
+      /* Emit a sign extension from QI,HI,WI to double (DI).  */
+      rtx scratch = gen_lowpart (smode, tiscratch);
+      if (icode == CODE_FOR_vsx_lxvrbx)
+	emit_insn (gen_extendqidi2 (discratch, scratch));
+      else if (icode == CODE_FOR_vsx_lxvrhx)
+	emit_insn (gen_extendhidi2 (discratch, scratch));
+      else if (icode == CODE_FOR_vsx_lxvrwx)
+	emit_insn (gen_extendsidi2 (discratch, scratch));
+      /*  Assign discratch directly if scratch is already DI.  */
+      if (icode == CODE_FOR_vsx_lxvrdx)
+	discratch = scratch;
+
+      /* Emit the sign extension from DI (double) to TI (quad).  */
+      emit_insn (gen_extendditi2 (target, discratch));
+
+      return target;
+    }
+  else
+    {
+      /* Zero extend.  */
+      pat = GEN_FCN (icode) (target, addr);
+      if (!pat)
+	return 0;
+      emit_insn (pat);
+      return target;
+    }
+  return 0;
+}
+
+static rtx
 stv_expand_builtin (insn_code icode, rtx *op,
 		    machine_mode tmode, machine_mode smode)
 {
-  rtx pat, addr, rawaddr;
+  rtx pat, addr, rawaddr, truncrtx;
   op[2] = copy_to_mode_reg (Pmode, op[2]);
 
   /* For STVX, express the RTL accurately by ANDing the address with -16.
@@ -13586,6 +13645,25 @@ stv_expand_builtin (insn_code icode, rtx *op,
       addr = gen_rtx_MEM (tmode, addr);
       op[0] = copy_to_mode_reg (tmode, op[0]);
       emit_insn (gen_rtx_SET (addr, op[0]));
+    }
+  else if (icode == CODE_FOR_vsx_stxvrbx
+	   || icode == CODE_FOR_vsx_stxvrhx
+	   || icode == CODE_FOR_vsx_stxvrwx
+	   || icode == CODE_FOR_vsx_stxvrdx)
+    {
+      truncrtx = gen_rtx_TRUNCATE (tmode, op[0]);
+      op[0] = copy_to_mode_reg (E_TImode, truncrtx);
+
+      if (op[1] == const0_rtx)
+	addr = gen_rtx_MEM (Pmode, op[2]);
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op[2], op[1]));
+	}
+      pat = GEN_FCN (icode) (addr, op[0]);
+      if (pat)
+	emit_insn (pat);
     }
   else
     {
@@ -15411,6 +15489,9 @@ rs6000_expand_new_builtin (tree exp, rtx target,
 	icode = elemrev_icode (fcode);
       return ldv_expand_builtin (target, icode, op, mode[0]);
     }
+
+  if (bif_is_lxvr (*bifaddr))
+    return lxvr_expand_builtin (target, icode, op, mode[0], mode[1]);
 
   if (bif_is_mma (*bifaddr))
     return new_mma_expand_builtin (exp, target, icode);
