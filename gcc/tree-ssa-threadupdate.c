@@ -167,7 +167,7 @@ jump_thread_path_allocator::allocate_thread_path ()
 jump_thread_path_registry::jump_thread_path_registry ()
 {
   m_paths.create (5);
-  m_removed_edges = new hash_table<struct removed_edges> (17);
+  m_removed_edges = NULL;
   m_num_threaded_edges = 0;
   m_redirection_data = NULL;
 }
@@ -175,7 +175,8 @@ jump_thread_path_registry::jump_thread_path_registry ()
 jump_thread_path_registry::~jump_thread_path_registry ()
 {
   m_paths.release ();
-  delete m_removed_edges;
+  if (m_removed_edges)
+    delete m_removed_edges;
 }
 
 jump_thread_edge *
@@ -980,7 +981,7 @@ update_profile (edge epath, edge edup, profile_count path_in_count,
 /* Wire up the outgoing edges from the duplicate blocks and
    update any PHIs as needed.  Also update the profile counts
    on the original and duplicate blocks and edges.  */
-void
+static void
 ssa_fix_duplicate_block_edges (struct redirection_data *rd,
 			       ssa_local_info_t *local_info)
 {
@@ -1124,7 +1125,7 @@ ssa_fix_duplicate_block_edges (struct redirection_data *rd,
 
 /* Hash table traversal callback routine to create duplicate blocks.  */
 
-int
+static int
 ssa_create_duplicates (struct redirection_data **slot,
 		       ssa_local_info_t *local_info)
 {
@@ -1256,7 +1257,7 @@ ssa_create_duplicates (struct redirection_data **slot,
    block creation.  This hash table traversal callback creates the
    outgoing edge for the template block.  */
 
-inline int
+static inline int
 ssa_fixup_template_block (struct redirection_data **slot,
 			  ssa_local_info_t *local_info)
 {
@@ -2533,6 +2534,9 @@ jump_thread_path_registry::remove_jump_threads_including (edge_def *e)
 {
   if (!m_paths.exists ())
     return;
+
+  if (!m_removed_edges)
+    m_removed_edges = new hash_table<struct removed_edges> (17);
 
   edge *slot = m_removed_edges->find_slot (e, INSERT);
   *slot = e;
