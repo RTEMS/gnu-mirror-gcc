@@ -3083,16 +3083,16 @@
   const vui __builtin_altivec_mtvsrwm (unsigned long long);
     MTVSRWM vec_mtvsr_v4si {}
 
-  pure vsq __builtin_altivec_se_lxvrbx (signed long long, const signed char *);
+  pure signed __int128 __builtin_altivec_se_lxvrbx (signed long long, const signed char *);
     SE_LXVRBX vsx_lxvrbx {lxvrse}
 
-  pure vsq __builtin_altivec_se_lxvrhx (signed long long, const signed short *);
+  pure signed __int128 __builtin_altivec_se_lxvrhx (signed long long, const signed short *);
     SE_LXVRHX vsx_lxvrhx {lxvrse}
 
-  pure vsq __builtin_altivec_se_lxvrwx (signed long long, const signed int *);
+  pure signed __int128 __builtin_altivec_se_lxvrwx (signed long long, const signed int *);
     SE_LXVRWX vsx_lxvrwx {lxvrse}
 
-  pure vsq __builtin_altivec_se_lxvrdx (signed long long, const signed long long *);
+  pure signed __int128 __builtin_altivec_se_lxvrdx (signed long long, const signed long long *);
     SE_LXVRDX vsx_lxvrdx {lxvrse}
 
   void __builtin_altivec_tr_stxvrbx (vsq, signed long long, signed char *);
@@ -3454,16 +3454,16 @@
   const vss __builtin_vsx_xxpermx_v8hi (vss, vss, vuc, const int<3>);
     XXPERMX_V8HI xxpermx {}
 
-  pure vuq __builtin_altivec_ze_lxvrbx (signed long long, const unsigned char *);
+  pure unsigned __int128 __builtin_altivec_ze_lxvrbx (signed long long, const unsigned char *);
     ZE_LXVRBX vsx_lxvrbx {lxvrze}
 
-  pure vuq __builtin_altivec_ze_lxvrhx (signed long long, const unsigned short *);
+  pure unsigned __int128 __builtin_altivec_ze_lxvrhx (signed long long, const unsigned short *);
     ZE_LXVRHX vsx_lxvrhx {lxvrze}
 
-  pure vuq __builtin_altivec_ze_lxvrwx (signed long long, const unsigned int *);
+  pure unsigned __int128 __builtin_altivec_ze_lxvrwx (signed long long, const unsigned int *);
     ZE_LXVRWX vsx_lxvrwx {lxvrze}
 
-  pure vuq __builtin_altivec_ze_lxvrdx (signed long long, const unsigned long long *);
+  pure unsigned __int128 __builtin_altivec_ze_lxvrdx (signed long long, const unsigned long long *);
     ZE_LXVRDX vsx_lxvrdx {lxvrze}
 
 
