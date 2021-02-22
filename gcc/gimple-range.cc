@@ -1115,11 +1115,26 @@ gimple_ranger::export_global_ranges ()
     {
       tree name = ssa_name (x);
       if (name && !SSA_NAME_IN_FREE_LIST (name)
-	  && !POINTER_TYPE_P (TREE_TYPE (name))
 	  && gimple_range_ssa_p (name)
 	  && m_cache.get_global_range (r, name)
 	  && !r.varying_p())
 	{
+	  // Check for non-null pointers.
+	  if (POINTER_TYPE_P (TREE_TYPE (name)))
+	    {
+	      if (r.nonzero_p ())
+		{
+		  set_ptr_nonnull (name);
+		  if (dump_file)
+		    {
+		      print_generic_expr (dump_file, name , TDF_SLIM);
+		      fprintf (dump_file, " --> ");
+		      r.dump (dump_file);
+		      fprintf (dump_file, "\n");
+		    }
+		}
+	      continue;
+	    }
 	  // If a global range already exists, incorporate it.
 	  if (SSA_NAME_RANGE_INFO (name))
 	    {
@@ -1139,9 +1154,13 @@ gimple_ranger::export_global_ranges ()
 	      fprintf (dump_file, " --> ");
 	      vr.dump (dump_file);
 	      fprintf (dump_file, "\n");
-	      fprintf (dump_file, "         irange : ");
-	      r.dump (dump_file);
-	      fprintf (dump_file, "\n");
+	      int_range_max same = vr;
+	      if (same != r)
+		{
+		  fprintf (dump_file, "         irange : ");
+		  r.dump (dump_file);
+		  fprintf (dump_file, "\n");
+		}
 	    }
 	}
     }
