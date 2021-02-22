@@ -13558,8 +13558,8 @@ ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
 }
 
 static rtx
-lxvr_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode,
-		     machine_mode smode)
+lxvrse_expand_builtin (rtx target, insn_code icode, rtx *op,
+		       machine_mode tmode, machine_mode smode)
 {
   rtx pat, addr;
   op[1] = copy_to_mode_reg (Pmode, op[1]);
@@ -13568,52 +13568,59 @@ lxvr_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode,
     addr = gen_rtx_MEM (tmode, op[1]);
   else
     {
-      op[0] = copy_to_mode_reg (tmode, op[0]);
+      op[0] = copy_to_mode_reg (Pmode, op[0]);
       addr = gen_rtx_MEM (smode,
 			  gen_rtx_PLUS (Pmode, op[1], op[0]));
     }
 
-  if (icode == CODE_FOR_vsx_lxvrbx
-      || icode == CODE_FOR_vsx_lxvrhx
-      || icode == CODE_FOR_vsx_lxvrwx
-      || icode == CODE_FOR_vsx_lxvrdx)
-    {
-      rtx discratch = gen_reg_rtx (DImode);
-      rtx tiscratch = gen_reg_rtx (TImode);
+  rtx discratch = gen_reg_rtx (DImode);
+  rtx tiscratch = gen_reg_rtx (TImode);
 
-      /* Emit the lxvr*x insn.  */
-      pat = GEN_FCN (icode) (tiscratch, addr);
-      if (!pat)
-	return 0;
-      emit_insn (pat);
+  /* Emit the lxvr*x insn.  */
+  pat = GEN_FCN (icode) (tiscratch, addr);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
 
-      /* Emit a sign extension from QI,HI,WI to double (DI).  */
-      rtx scratch = gen_lowpart (smode, tiscratch);
-      if (icode == CODE_FOR_vsx_lxvrbx)
-	emit_insn (gen_extendqidi2 (discratch, scratch));
-      else if (icode == CODE_FOR_vsx_lxvrhx)
-	emit_insn (gen_extendhidi2 (discratch, scratch));
-      else if (icode == CODE_FOR_vsx_lxvrwx)
-	emit_insn (gen_extendsidi2 (discratch, scratch));
-      /*  Assign discratch directly if scratch is already DI.  */
-      if (icode == CODE_FOR_vsx_lxvrdx)
-	discratch = scratch;
+  /* Emit a sign extension from QI,HI,WI to double (DI).  */
+  rtx scratch = gen_lowpart (smode, tiscratch);
+  if (icode == CODE_FOR_vsx_lxvrbx)
+    emit_insn (gen_extendqidi2 (discratch, scratch));
+  else if (icode == CODE_FOR_vsx_lxvrhx)
+    emit_insn (gen_extendhidi2 (discratch, scratch));
+  else if (icode == CODE_FOR_vsx_lxvrwx)
+    emit_insn (gen_extendsidi2 (discratch, scratch));
+  /*  Assign discratch directly if scratch is already DI.  */
+  if (icode == CODE_FOR_vsx_lxvrdx)
+    discratch = scratch;
 
-      /* Emit the sign extension from DI (double) to TI (quad).  */
-      emit_insn (gen_extendditi2 (target, discratch));
+  /* Emit the sign extension from DI (double) to TI (quad).  */
+  emit_insn (gen_extendditi2 (target, discratch));
 
-      return target;
-    }
+  return target;
+}
+
+static rtx
+lxvrze_expand_builtin (rtx target, insn_code icode, rtx *op,
+		       machine_mode tmode, machine_mode smode)
+{
+  rtx pat, addr;
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  if (op[0] == const0_rtx)
+    addr = gen_rtx_MEM (tmode, op[1]);
   else
     {
-      /* Zero extend.  */
-      pat = GEN_FCN (icode) (target, addr);
-      if (!pat)
-	return 0;
-      emit_insn (pat);
-      return target;
+      op[0] = copy_to_mode_reg (Pmode, op[0]);
+      addr = gen_rtx_MEM (smode,
+			  gen_rtx_PLUS (Pmode, op[1], op[0]));
     }
-  return 0;
+
+  pat = GEN_FCN (icode) (target, addr);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
+  return target;
 }
 
 static rtx
@@ -15490,8 +15497,11 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       return ldv_expand_builtin (target, icode, op, mode[0]);
     }
 
-  if (bif_is_lxvr (*bifaddr))
-    return lxvr_expand_builtin (target, icode, op, mode[0], mode[1]);
+  if (bif_is_lxvrse (*bifaddr))
+    return lxvrse_expand_builtin (target, icode, op, mode[0], mode[1]);
+
+  if (bif_is_lxvrze (*bifaddr))
+    return lxvrze_expand_builtin (target, icode, op, mode[0], mode[1]);
 
   if (bif_is_mma (*bifaddr))
     return new_mma_expand_builtin (exp, target, icode);

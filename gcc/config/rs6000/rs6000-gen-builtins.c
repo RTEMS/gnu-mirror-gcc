@@ -87,7 +87,8 @@ along with GCC; see the file COPYING3.  If not see
      no32bit  Not valid for TARGET_32BIT
      cpu      This is a "cpu_is" or "cpu_supports" builtin
      ldstmask Altivec mask for load or store
-     lxvr     Needs special handling for load-rightmost
+     lxvrse   Needs special handling for load-rightmost, sign-extended
+     lxvrze   Needs special handling for load-rightmost, zero-extended
 
    An example stanza might look like this:
 
@@ -348,7 +349,8 @@ struct attrinfo {
   char isno32bit;
   char iscpu;
   char isldstmask;
-  char islxvr;
+  char islxvrse;
+  char islxvrze;
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
@@ -1340,8 +1342,10 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->iscpu = 1;
 	else if (!strcmp (attrname, "ldstmask"))
 	  attrptr->isldstmask = 1;
-	else if (!strcmp (attrname, "lxvr"))
-	  attrptr->islxvr = 1;
+	else if (!strcmp (attrname, "lxvrse"))
+	  attrptr->islxvrse = 1;
+	else if (!strcmp (attrname, "lxvrze"))
+	  attrptr->islxvrze = 1;
 	else
 	  {
 	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
@@ -1374,13 +1378,13 @@ parse_bif_attrs (attrinfo *attrptr)
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
 nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, \
 htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, no32bit = %d, \
-cpu = %d, ldstmask = %d, lxvr = %d.\n",
+cpu = %d, ldstmask = %d, lxvrse = %d, lxvrze = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
 	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
 	   attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attrptr->ispair,
 	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask,
-	   attrptr->islxvr);
+	   attrptr->islxvrse, attrptr->islxvrze);
 #endif
 
   return PC_OK;
@@ -2193,7 +2197,8 @@ write_decls ()
   fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00004000)\n");
   fprintf (header_file, "#define bif_cpu_bit\t\t(0x00008000)\n");
   fprintf (header_file, "#define bif_ldstmask_bit\t(0x00010000)\n");
-  fprintf (header_file, "#define bif_lxvr_bit\t\t(0x00020000)\n");
+  fprintf (header_file, "#define bif_lxvrse_bit\t\t(0x00020000)\n");
+  fprintf (header_file, "#define bif_lxvrze_bit\t\t(0x00040000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -2231,8 +2236,11 @@ write_decls ()
 	   "#define bif_is_ldstmask(x)\t((x).bifattrs "
 	   "& bif_ldstmask_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_lxvr(x)\t((x).bifattrs "
-	   "& bif_lxvr_bit)\n");
+	   "#define bif_is_lxvrse(x)\t((x).bifattrs "
+	   "& bif_lxvrse_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_lxvrze(x)\t((x).bifattrs "
+	   "& bif_lxvrze_bit)\n");
   fprintf (header_file, "\n");
 
   /* #### Note that the _x is added for now to avoid conflict with
@@ -2467,8 +2475,10 @@ write_bif_static_init ()
 	fprintf (init_file, " | bif_cpu_bit");
       if (bifp->attrs.isldstmask)
 	fprintf (init_file, " | bif_ldstmask_bit");
-      if (bifp->attrs.islxvr)
-	fprintf (init_file, " | bif_lxvr_bit");
+      if (bifp->attrs.islxvrse)
+	fprintf (init_file, " | bif_lxvrse_bit");
+      if (bifp->attrs.islxvrze)
+	fprintf (init_file, " | bif_lxvrze_bit");
       fprintf (init_file, ",\n");
       fprintf (init_file, "      /* restr_opnd */\t{%d, %d, %d},\n",
 	       bifp->proto.restr_opnd[0], bifp->proto.restr_opnd[1],

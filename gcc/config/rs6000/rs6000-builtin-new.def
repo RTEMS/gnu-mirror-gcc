@@ -118,7 +118,8 @@
 ;   no32bit  Not valid for TARGET_32BIT
 ;   cpu      This is a "cpu_is" or "cpu_supports" builtin
 ;   ldstmask Altivec mask for load or store
-;   lxvr     Needs special handling for load-rightmost
+;   lxvrse   Needs special handling for load-rightmost, sign-extended
+;   lxvrze   Needs special handling for load-rightmost, zero-extended
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -3083,16 +3084,16 @@
     MTVSRWM vec_mtvsr_v4si {}
 
   pure vsq __builtin_altivec_se_lxvrbx (signed long long, const signed char *);
-    SE_LXVRBX vsx_lxvrbx {lxvr}
+    SE_LXVRBX vsx_lxvrbx {lxvrse}
 
   pure vsq __builtin_altivec_se_lxvrhx (signed long long, const signed short *);
-    SE_LXVRHX vsx_lxvrhx {lxvr}
+    SE_LXVRHX vsx_lxvrhx {lxvrse}
 
   pure vsq __builtin_altivec_se_lxvrwx (signed long long, const signed int *);
-    SE_LXVRWX vsx_lxvrwx {lxvr}
+    SE_LXVRWX vsx_lxvrwx {lxvrse}
 
   pure vsq __builtin_altivec_se_lxvrdx (signed long long, const signed long long *);
-    SE_LXVRDX vsx_lxvrdx {lxvr}
+    SE_LXVRDX vsx_lxvrdx {lxvrse}
 
   void __builtin_altivec_tr_stxvrbx (vsq, signed long long, signed char *);
     TR_STXVRBX vsx_stxvrbx {stvec}
@@ -3454,16 +3455,16 @@
     XXPERMX_V8HI xxpermx {}
 
   pure vuq __builtin_altivec_ze_lxvrbx (signed long long, const unsigned char *);
-    ZE_LXVRBX nothing {lxvr}
+    ZE_LXVRBX vsx_lxvrbx {lxvrze}
 
   pure vuq __builtin_altivec_ze_lxvrhx (signed long long, const unsigned short *);
-    ZE_LXVRHX nothing {lxvr}
+    ZE_LXVRHX vsx_lxvrhx {lxvrze}
 
   pure vuq __builtin_altivec_ze_lxvrwx (signed long long, const unsigned int *);
-    ZE_LXVRWX nothing {lxvr}
+    ZE_LXVRWX vsx_lxvrwx {lxvrze}
 
   pure vuq __builtin_altivec_ze_lxvrdx (signed long long, const unsigned long long *);
-    ZE_LXVRDX nothing {lxvr}
+    ZE_LXVRDX vsx_lxvrdx {lxvrze}
 
 
 [power10-64]
