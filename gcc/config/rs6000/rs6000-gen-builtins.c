@@ -2178,6 +2178,7 @@ write_decls ()
   fprintf (header_file, "  int  restr_val1[PPC_MAXRESTROPNDS];\n");
   fprintf (header_file, "  int  restr_val2[PPC_MAXRESTROPNDS];\n");
   fprintf (header_file, "  const char *attr_string;\n");
+  fprintf (header_file, "  rs6000_gen_builtins assoc_bif;\n");
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define bif_init_bit\t\t(0x00000001)\n");
@@ -2424,7 +2425,7 @@ write_bif_static_init ()
   fprintf (init_file, "    { /* RS6000_BIF_NONE: */\n");
   fprintf (init_file, "      \"\", ENB_ALWAYS, 0, CODE_FOR_nothing, 0,\n");
   fprintf (init_file, "      0, {0, 0, 0}, {RES_NONE, RES_NONE, RES_NONE},\n");
-  fprintf (init_file, "      {0, 0, 0}, {0, 0, 0}, \"\"\n");
+  fprintf (init_file, "      {0, 0, 0}, {0, 0, 0}, \"\", RS6000_BIF_NONE\n");
   fprintf (init_file, "    },\n");
   for (int i = 0; i <= curr_bif; i++)
     {
@@ -2498,11 +2499,15 @@ write_bif_static_init ()
       fprintf (init_file, "      /* restr_val2 */\t{%d, %d, %d},\n",
 	       bifp->proto.restr_val2[0], bifp->proto.restr_val2[1],
 	       bifp->proto.restr_val2[2]);
-      fprintf (init_file, "      /* attr_string */\t\"%s\"\n",
+      fprintf (init_file, "      /* attr_string */\t\"%s\",\n",
 	       (bifp->kind == FNK_CONST ? "= const"
 		: (bifp->kind == FNK_PURE ? "= pure"
 		   : (bifp->kind == FNK_FPMATH ? "= fp, const"
 		      : ""))));
+      bool no_icode = !strcmp (bifp->patname, "nothing");
+      fprintf (init_file, "      /* assoc_bif */\tRS6000_BIF_%s%s\n",
+	       bifp->attrs.ismma && no_icode ? bifp->idname : "NONE",
+	       bifp->attrs.ismma && no_icode ? "_INTERNAL" : "");
       fprintf (init_file, "    },\n");
     }
   fprintf (init_file, "  };\n\n");

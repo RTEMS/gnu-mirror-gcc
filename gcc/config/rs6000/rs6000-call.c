@@ -13706,7 +13706,7 @@ new_mma_expand_builtin (tree exp, rtx target, insn_code icode)
   bool void_func = TREE_TYPE (TREE_TYPE (fndecl)) == void_type_node;
   machine_mode tmode = VOIDmode;
 
-  if (TREE_TYPE (TREE_TYPE (fndecl)) != void_type_node)
+  if (!void_func)
     {
       tmode = insn_data[icode].operand[0].mode;
       if (!target
@@ -14093,9 +14093,11 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
   if (!bif_is_mma (rs6000_builtin_info_x[fncode]))
     return false;
 
-  /* #### Need an attribute to mark only the first of each of the
-     mma builtin pairs as being eligible for folding.  This used to
-     be done with RS6000_BTC_GIMPLE.  */
+  /* Each call that can be gimple-expanded has an associated built-in
+     function that it will expand into.  If this one doesn't, we have
+     already expanded it!  */
+  if (rs6000_builtin_info_x[fncode].assoc_bif == RS6000_BIF_NONE)
+    return false;
 
   bifdata *bd = &rs6000_builtin_info_x[fncode];
   unsigned nopnds = bd->nargs;
@@ -14134,7 +14136,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 	 to emit a xxmfacc instruction now, since we cannot do it later.  */
       if (fncode == RS6000_BIF_DISASSEMBLE_ACC)
 	{
-	  new_decl = rs6000_builtin_decls[RS6000_BIF_XXMFACC_INTERNAL];
+	  new_decl = rs6000_builtin_decls_x[RS6000_BIF_XXMFACC_INTERNAL];
 	  new_call = gimple_build_call (new_decl, 1, src);
 	  src = make_ssa_name (vector_quad_type_node);
 	  gimple_call_set_lhs (new_call, src);
@@ -14142,8 +14144,8 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 	}
 
       /* Copy the accumulator/pair vector by vector.  */
-      /* #### TODO: Break the adjacency dependency.  */
-      new_decl = rs6000_builtin_decls[fncode + 1];
+      new_decl
+	= rs6000_builtin_decls_x[rs6000_builtin_info_x[fncode].assoc_bif];
       tree dst_type = build_pointer_type_for_mode (unsigned_V16QI_type_node,
 						   ptr_mode, true);
       tree dst_base = build1 (VIEW_CONVERT_EXPR, dst_type, dst_ptr);
@@ -14165,8 +14167,8 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
     }
 
   /* Convert this built-in into an internal version that uses pass-by-value
-     arguments.  The internal built-in follows immediately after this one.  */
-  new_decl = rs6000_builtin_decls_x[fncode + 1];
+     arguments.  The internal built-in is found in the assoc_bif field.  */
+  new_decl = rs6000_builtin_decls_x[rs6000_builtin_info_x[fncode].assoc_bif];
   tree lhs, op[MAX_MMA_OPERANDS];
   tree acc = gimple_call_arg (stmt, 0);
   push_gimplify_context (true);
@@ -15373,7 +15375,7 @@ rs6000_expand_new_builtin (tree exp, rtx target,
     return new_htm_expand_builtin (bifaddr, fcode, exp, target);
 
   rtx pat;
-  const int MAX_BUILTIN_ARGS = 5;
+  const int MAX_BUILTIN_ARGS = 6;
   tree arg[MAX_BUILTIN_ARGS];
   rtx op[MAX_BUILTIN_ARGS];
   machine_mode mode[MAX_BUILTIN_ARGS + 1];
@@ -15535,7 +15537,7 @@ rs6000_expand_new_builtin (tree exp, rtx target,
   switch (nargs)
     {
     default:
-      gcc_assert (MAX_BUILTIN_ARGS == 5);
+      gcc_assert (MAX_BUILTIN_ARGS == 6);
       gcc_unreachable ();
     case 0:
       pat = (void_func
@@ -15566,6 +15568,12 @@ rs6000_expand_new_builtin (tree exp, rtx target,
       pat = (void_func
 	     ? GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4])
 	     : GEN_FCN (icode) (target, op[0], op[1], op[2], op[3], op[4]));
+      break;
+    case 6:
+      pat = (void_func
+	     ? GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4], op[5])
+	     : GEN_FCN (icode) (target, op[0], op[1],
+				op[2], op[3], op[4], op[5]));
       break;
     }
 
