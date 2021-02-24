@@ -15264,82 +15264,135 @@ rs6000_expand_new_builtin (tree exp, rtx target,
     case ENB_P5:
       if (!TARGET_POPCNTB)
 	{
-	  error ("%qs requires at least %qs\n",
-		 bifaddr->bifname, "-mcpu=power5");
+	  rs6000_invalid_new_builtin (fcode);
 	  return expand_call (exp, target, ignore);
 	}
       break;
     case ENB_P6:
       if (!TARGET_CMPB)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_ALTIVEC:
       if (!TARGET_ALTIVEC)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_CELL:
       if (!TARGET_ALTIVEC || rs6000_cpu != PROCESSOR_CELL)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_VSX:
       if (!TARGET_VSX)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P7:
       if (!TARGET_POPCNTD)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P7_64:
       if (!TARGET_POPCNTD || !TARGET_POWERPC64)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P8:
       if (!TARGET_DIRECT_MOVE)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P8V:
       if (!TARGET_P8_VECTOR)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P9:
       if (!TARGET_MODULO)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P9_64:
       if (!TARGET_MODULO || !TARGET_POWERPC64)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P9V:
       if (!TARGET_P9_VECTOR)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_IEEE128_HW:
       if (!TARGET_FLOAT128_HW)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_DFP:
       if (!TARGET_DFP)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_CRYPTO:
       if (!TARGET_CRYPTO)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_HTM:
       if (!TARGET_HTM)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P10:
       if (!TARGET_POWER10)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_P10_64:
       if (!TARGET_POWER10 || !TARGET_POWERPC64)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     case ENB_MMA:
       if (!TARGET_MMA)
-	return const0_rtx;
+	{
+	  rs6000_invalid_new_builtin (fcode);
+	  return expand_call (exp, target, ignore);
+	}
       break;
     };
 

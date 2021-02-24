@@ -1727,7 +1727,7 @@
   const vd __builtin_vsx_xvcvsxddp (vsll);
     XVCVSXDDP vsx_floatv2div2df2 {}
 
-  const vd __builtin_vsx_xvcvsxddp_scale (vsll, const int);
+  const vd __builtin_vsx_xvcvsxddp_scale (vsll, const int<5>);
     XVCVSXDDP_SCALE vsx_xvcvsxddp_scale {}
 
   const vf __builtin_vsx_xvcvsxdsp (vsll);
@@ -1742,7 +1742,7 @@
   const vd __builtin_vsx_xvcvuxddp (vull);
     XVCVUXDDP vsx_floatunsv2div2df2 {}
 
-  const vd __builtin_vsx_xvcvuxddp_scale (vull, const int);
+  const vd __builtin_vsx_xvcvuxddp_scale (vull, const int<5>);
     XVCVUXDDP_SCALE vsx_xvcvuxddp_scale {}
 
 ; Redundant with __builtin_vsx_xvcvuxddp
@@ -3484,17 +3484,6 @@
     PEXTD pextd {}
 
 
-; TODO: Land-mine alert.
-;
-; The original built-in support has code that assumes the internal
-; copy of an MMA built-in function appears immediately after the
-; external copy in the built-in table.  This is fragile.  For the
-; new support, we should transition this to do a name lookup in
-; the built-in hash table, but to start with we will honor the
-; positioning of the built-ins in the table.  Note that right now
-; there is going to be breakage with __builtin_mma_disassemble_{acc,pair}
-; since they each require a blank builtin to follow them with icode
-; CODE_FOR_nothing.
 [mma]
   void __builtin_mma_assemble_acc (v512 *, vuc, vuc, vuc, vuc);
     ASSEMBLE_ACC nothing {mma}
