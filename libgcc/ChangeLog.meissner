@@ -1,3 +1,21 @@
+work039.patch001
+2021-02-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_sprintfkf.c: Do not include stdio.h.
+	(sprintf): Add declaration.
+	* config/rs6000/t-float128 (fp128_dec_funcs): Move to
+	t-float128-dec.
+	(fp128_decstr_funcs): Move to t-float128-dec.
+	(ibm128_dec_funcs): Move to t-float128-dec.
+	(fp128_dec_objs): Move to t-float128-dec.
+	(fp128_decstr_objs): Move to t-float128-dec.
+	(ibm128_dec_objs): Move to t-float128-dec.
+	(FP128_CFLAGS_DECIMAL): Move to t-float128-dec.
+	(IBM128_CFLAGS_DECIMAL): Move to t-float128-dec.
+	* config/rs6000/t-float128-dec: New file.
+	* configure.ac (libgcc_cv_powerpc_float128_dec): New variable, set
+	to yes if both _Float128 and Decimal support are available.
+
 2021-02-25   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
