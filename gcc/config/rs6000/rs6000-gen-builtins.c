@@ -2625,6 +2625,8 @@ write_init_bif_table ()
 	  fprintf (init_file, "          DECL_PURE_P (t) = 1;\n");
 	  fprintf (init_file, "          DECL_IS_NOVOPS (t) = 1;\n");
 	  fprintf (init_file, "        }\n");
+	  fprintf (init_file, "      else\n");
+	  fprintf (init_file, "        TREE_READONLY (t) = 1;\n");
 	}
 
       if (tf_found)

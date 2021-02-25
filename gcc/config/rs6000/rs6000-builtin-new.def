@@ -341,7 +341,7 @@
   pure vss __builtin_altivec_lvxl_v8hi (signed long long, const void *);
     LVXL_V8HI altivec_lvxl_v8hi {ldvec}
 
-  vuc __builtin_altivec_mask_for_load (const void *);
+  const vsc __builtin_altivec_mask_for_load (const void *);
     MASK_FOR_LOAD altivec_lvsr_direct {ldstmask}
 
   vss __builtin_altivec_mfvscr ();
