@@ -1526,9 +1526,6 @@
   vull __builtin_vec_extract4b (vuc, const int);
     EXTRACT4B
 
-; TODO: Look like invalid return type conversions here (present before also).
-; Need versions of __builtin_altivec_vextu*[lr]x that return signed values
-; and floats.
 [VEC_EXTULX, vec_xlx, __builtin_vec_vextulx, _ARCH_PWR9]
   signed char __builtin_vec_vextulx (unsigned int, vsc);
     VEXTUBLX  VEXTUBLX_S
@@ -1545,9 +1542,6 @@
   float __builtin_vec_vextulx (unsigned int, vf);
     VEXTUWLX  VEXTUWLX_F
 
-; TODO: Look like invalid return type conversions here (present before also).
-; Need versions of __builtin_altivec_vextu*[lr]x that return signed values
-; and floats.
 [VEC_EXTURX, vec_xrx, __builtin_vec_vexturx, _ARCH_PWR9]
   signed char __builtin_vec_vexturx (unsigned int, vsc);
     VEXTUBRX  VEXTUBRX_S

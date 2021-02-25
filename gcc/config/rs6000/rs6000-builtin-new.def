@@ -171,6 +171,12 @@
 ; Builtins that have been around since time immemorial or are just
 ; considered available everywhere.
 [always]
+; __builtin_cfstring is for Darwin, which will replace the decl we
+; create here with another one during subtarget processing.  We just
+; need to ensure it has a slot in the builtin enumeration.
+  void __builtin_cfstring ();
+    CFSTRING nothing {}
+
   void __builtin_cpu_init ();
     CPU_INIT nothing {cpu}
 
@@ -2262,21 +2268,17 @@
   const vui __builtin_altivec_vpkudus (vull, vull);
     VPKUDUS altivec_vpkudus {}
 
-; #### Following are duplicates of __builtin_crypto_vpmsum*.  This
-; can't have ever worked properly!  However, these have the right
-; result types, and the others have wrong ones!!  Whatwhatwhat...
-;
-;  const vus __builtin_altivec_vpmsumb (vuc, vuc);
-;    VPMSUMB crypto_vpmsumb {}
-;
-;  const vuq __builtin_altivec_vpmsumd (vull, vull);
-;    VPMSUMD crypto_vpmsumd {}
-;
-;  const vui __builtin_altivec_vpmsumh (vus, vus);
-;    VPMSUMH crypto_vpmsumh {}
-;
-;  const vull __builtin_altivec_vpmsumw (vui, vui);
-;    VPMSUMW crypto_vpmsumw {}
+  const vus __builtin_altivec_vpmsumb (vuc, vuc);
+    VPMSUMB_A crypto_vpmsumb {}
+
+  const vuq __builtin_altivec_vpmsumd (vull, vull);
+    VPMSUMD_A crypto_vpmsumd {}
+
+  const vui __builtin_altivec_vpmsumh (vus, vus);
+    VPMSUMH_A crypto_vpmsumh {}
+
+  const vull __builtin_altivec_vpmsumw (vui, vui);
+    VPMSUMW_A crypto_vpmsumw {}
 
   const vsc __builtin_altivec_vpopcntb (vsc);
     VPOPCNTB popcountv16qi2 {}
@@ -2419,9 +2421,6 @@
   const vus __builtin_crypto_vpermxor_v8hi (vus, vus, vus);
     VPERMXOR_V8HI crypto_vpermxor_v8hi {}
 
-; Note: these four have incorrect return types per the way the
-; instructions work, but this matches the old signatures that
-; have been around for too long.
   const vuc __builtin_crypto_vpmsumb (vuc, vuc);
     VPMSUMB crypto_vpmsumb {}
 
@@ -2809,9 +2808,6 @@
 ; 32 bits, and the return value is DImode, so it seems that
 ; TARGET_64BIT (actually TARGET_POWERPC64) is justified.  TBD. ####
 [power9-64]
-; The following two are inexplicably named __builtin_altivec_* while
-; their load counterparts are __builtin_vsx_*.  Need to deprecate
-; these interfaces in favor of the other naming scheme (or vice versa).
   void __builtin_altivec_xst_len_r (vsc, void *, long long);
     XST_LEN_R xst_len_r {}
 
@@ -3877,8 +3873,3 @@
 
 
 
-; #### We don't yet have the Darwin CfString builtin supported, but
-; that has its own special handling so it should go in there, I guess.
-;
-; BU_SPECIAL_X (RS6000_BUILTIN_CFSTRING, "__builtin_cfstring", RS6000_BTM_ALWAYS,
-;	      RS6000_BTC_MISC)
