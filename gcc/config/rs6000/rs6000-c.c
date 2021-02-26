@@ -1993,7 +1993,7 @@ altivec_build_new_resolved_builtin (tree *args, int n, tree fntype,
   /* If the number of arguments to an overloaded function increases,
      we must expand this switch.  */
   gcc_assert (MAX_OVLD_ARGS <= 4);
-  
+
   switch (n)
     {
     case 0:
@@ -2051,7 +2051,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
   if (TARGET_DEBUG_BUILTIN)
     fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
 	     (int)fcode, IDENTIFIER_POINTER (DECL_NAME (fndecl)));
- 
+
   /* vec_lvsl and vec_lvsr are deprecated for use with LE element order.  */
   if (fcode == RS6000_OVLD_VEC_LVSL && !BYTES_BIG_ENDIAN)
     warning (OPT_Wdeprecated,
@@ -2734,7 +2734,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	return error_mark_node;
 
       if (n >= MAX_OVLD_ARGS)
-        abort ();
+	abort ();
 
       arg = default_conversion (arg);
 
@@ -2749,7 +2749,7 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 					    ptr_type_node))
 	{
 	  arg = TREE_OPERAND (arg, 0);
-          type = TREE_TYPE (arg);
+	  type = TREE_TYPE (arg);
 	}
 
       /* Remove the const from the pointers to simplify the overload
@@ -2758,10 +2758,10 @@ altivec_resolve_new_overloaded_builtin (location_t loc, tree fndecl,
 	  && POINTER_TYPE_P (type)
 	  && TYPE_QUALS (TREE_TYPE (type)) != 0)
 	{
-          if (TYPE_READONLY (TREE_TYPE (type))
+	  if (TYPE_READONLY (TREE_TYPE (type))
 	      && !TYPE_READONLY (TREE_TYPE (decl_type)))
 	    warning (0, "passing argument %d of %qE discards qualifiers from "
-		        "pointer target type", n + 1, fndecl);
+		     "pointer target type", n + 1, fndecl);
 	  type = build_pointer_type (build_qualified_type (TREE_TYPE (type),
 							   0));
 	  arg = fold_convert (type, arg);

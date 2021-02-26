@@ -10579,7 +10579,7 @@ cpu_expand_builtin (enum rs6000_builtins fcode, tree exp ATTRIBUTE_UNUSED,
 #else
   warning (0, "builtin %qs needs GLIBC (2.23 and newer) that exports hardware "
 	   "capability bits", rs6000_builtin_info[(size_t) fcode].name);
-  
+
   /* For old LIBCs, always return FALSE.  */
   emit_move_insn (target, GEN_INT (0));
 #endif /* TARGET_LIBC_PROVIDES_HWCAP_IN_TCB */
@@ -16233,7 +16233,7 @@ rs6000_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
 {
   if (new_builtins_are_live)
     return rs6000_new_builtin_decl (code, initialize_p);
-  
+
   HOST_WIDE_INT fnmask;
 
   if (code >= RS6000_BUILTIN_COUNT)
