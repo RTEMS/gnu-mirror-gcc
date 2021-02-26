@@ -1,5 +1,5 @@
 /* Generate built-in function initialization and recognition for Power.
-   Copyright (C) 2020 Free Software Foundation, Inc.
+   Copyright (C) 2020-21 Free Software Foundation, Inc.
    Contributed by Bill Schmidt, IBM <wschmidt@linux.ibm.com>
 
 This file is part of GCC.
@@ -119,17 +119,33 @@ along with GCC; see the file COPYING3.  If not see
 
      <return-type> <internal-name> (<argument-list>);
 
-   The second line contains only one token: the <bif-id> that this
-   particular instance of the overloaded function maps to.  It must
-   match a token that appears in the bif file.
+   The second line contains the <bif-id> that this particular instance of
+   the overloaded function maps to.  It must match a token that appears in
+   rs6000-builtin-new.def.  Optionally, a second token may appear.  If only
+   one token is on the line, it is also used to build the unique identifier
+   for the overloaded function.  If a second token is present, the second
+   token is used instead for this purpose.  This is necessary in cases
+   where a built-in function accepts more than one type signature.  It is
+   common to have a built-in function that, for example, specifies a
+   "vector signed char" argument, but accepts "vector unsigned char" and
+   "vector bool char" as well because only the mode matters.  Note that
+   the overload resolution mechanism has always handled these cases by
+   performing fold_convert on vector arguments to hide type mismatches,
+   and it will continue to do so.
 
-   An example stanza might look like this:
+   As a concrete example, __builtin_altivec_mtvscr uses an opaque argument
+   type for the source operand.  Its built-in function id is MTVSCR.  The
+   overloaded function __builtin_vec_mtvscr takes a variety of specific
+   types, but not all vector types.  Each of these maps to the same
+   __builtin_altivec_mtvscr built-in function, but the overload ID must
+   be unique, so we must specify the second token as shown here.
 
-[VEC_ABS, vec_abs, __builtin_vec_abs]
-  vsc __builtin_vec_abs (vsc);
-    ABS_V16QI
-  vss __builtin_vec_abs (vss);
-    ABS_V8HI
+    [VEC_MTVSCR, vec_mtvscr, __builtin_vec_mtvscr]
+      void __builtin_vec_mtvscr (vbc);
+	MTVSCR  MTVSCR_VBC
+      void __builtin_vec_mtvscr (vsc);
+	MTVSCR  MTVSCR_VSC
+      ...
 
   Blank lines may be used as desired in these files between the lines as
   defined above; that is, you can introduce as many extra newlines as you
@@ -932,9 +948,7 @@ match_type (typeinfo *typedata, int voidok)
 
        [const] [[signed|unsigned] <basetype> | <vectype>] [*]
 
-       #### Lie below ####
-     where "const" applies only to a <basetype> of "int".  Legal values
-     of <basetype> are (for now):
+     Legal values of <basetype> are (for now):
 
        char
        short
@@ -974,11 +988,9 @@ match_type (typeinfo *typedata, int voidok)
        v512	__vector_quad
 
      For simplicity, We don't support "short int" and "long long int".
-     We don't support a <basetype> of "bool", "long double", or "_Float16",
-     but will add these if builtins require it.  "signed" and "unsigned"
-     only apply to integral base types.  The optional * indicates a pointer
-     type, which can be used with any base type, but is treated for type
-     signature purposes as a pointer to void.  */
+     We don't currently support a <basetype> of "_Float16".  "signed"
+     and "unsigned" only apply to integral base types.  The optional *
+     indicates a pointer type.  */
 
   consume_whitespace ();
   memset (typedata, 0, sizeof(*typedata));

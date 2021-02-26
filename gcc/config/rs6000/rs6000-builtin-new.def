@@ -23,8 +23,16 @@
 ; all built-ins in a given stanza are enabled together.  Each stanza
 ; starts with a line identifying the circumstances in which the group of
 ; functions is permitted, with the gating predicate in square brackets.
-; This is the only information allowed on the stanza header line, other
-; than whitespace.
+; For example, this could be
+;
+;     [altivec]
+;
+;   or it could be
+;
+;     [power9]
+;
+; The bracketed gating predicate is the only information allowed on
+; the stanza header line, other than whitespace.
 ;
 ; Following the stanza header are two lines for each function: the
 ; prototype line and the attributes line.  The prototype line has
@@ -81,13 +89,13 @@
 ;   vp		vector pixel
 ;   vf		vector float
 ;   vd		vector double
+;   v256	__vector_pair
+;   v512	__vector_quad
 ;
 ; For simplicity, We don't support "short int" and "long long int".
-; We don't currently support a <basetype> of "bool", "long double",
-; or "_Float16".  "signed" and "unsigned" only apply to integral base
-; types.  The optional * indicates a pointer type, which can be used
-; only with "void" and "const char" in this file.  (More specific
-; pointer types are allowed in overload prototypes.)
+; We don't currently support a <basetype> of "_Float16".  "signed"
+; and "unsigned" only apply to integral base types.  The optional *
+; indicates a pointer type.
 ;
 ; The attributes line looks like this:
 ;
@@ -115,6 +123,8 @@
 ;   htmspr   HTM function using an SPR
 ;   htmcr    HTM function using a CR
 ;   mma      Needs special handling for MMA
+;   quad     MMA instruction using a register quad as an input operand
+;   pair     MMA instruction using a register pair as an input operand
 ;   no32bit  Not valid for TARGET_32BIT
 ;   cpu      This is a "cpu_is" or "cpu_supports" builtin
 ;   ldstmask Altivec mask for load or store
@@ -1379,11 +1389,6 @@
   const vf __builtin_vsx_floato_v2di (vsll);
     FLOATO_V2DI floatov2di {}
 
-; #### For the following, currently the pattern is selected differently
-; depending on big-endian (e.g., vsx_load_v1ti) versus little-endian
-; (e.g, vsx_ld_elemrev_v1ti).  We need to move the choice into a separate
-; pattern for each of these instead.  Right now I only list the little-
-; endian pattern here.  TBD.
   pure vsq __builtin_vsx_ld_elemrev_v1ti (signed long long, const void *);
     LD_ELEMREV_V1TI vsx_ld_elemrev_v1ti {ldvec}
 
@@ -1470,11 +1475,6 @@
   const vull __builtin_vsx_splat_2di_uns (unsigned long long);
     SPLAT_2DI_UNS vsx_splat_v2di {}
 
-; #### For the following, currently the pattern is selected differently
-; depending on big-endian (e.g., vsx_store_v1ti) versus little-endian
-; (e.g, vsx_st_elemrev_v1ti).  We need to move the choice into a separate
-; pattern for each of these instead.  Right now I only list the little-
-; endian pattern here.  TBD.
   void __builtin_vsx_st_elemrev_v1ti (vsq, signed long long, void *);
     ST_ELEMREV_V1TI vsx_st_elemrev_v1ti {stvec}
 
@@ -1547,8 +1547,6 @@
   const vuc __builtin_vsx_vperm_16qi_uns (vuc, vuc, vuc);
     VPERM_16QI_UNS_X altivec_vperm_v16qi_uns {}
 
-; Following two are missing from their respective overloads; be
-; sure to add them.
   const vsq __builtin_vsx_vperm_1ti (vsq, vsq, vuc);
     VPERM_1TI_X altivec_vperm_v1ti {}
 
@@ -3418,8 +3416,6 @@
   const vus __builtin_vsx_xxgenpcvm_v8hi (vus, const int <2>);
     XXGENPCVM_V8HI xxgenpcvm_v8hi {}
 
-; TODO: This was quite hackish in the original code, and we may need to add
-; mode-specific expansions rather than using CODE_FOR_xxpermx throughout.
   const vuc __builtin_vsx_xxpermx_uv16qi (vuc, vuc, vuc, const int<3>);
     XXPERMX_UV16QI xxpermx {}
 

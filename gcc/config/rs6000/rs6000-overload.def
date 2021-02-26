@@ -23,14 +23,15 @@
 ; where all built-ins in a given stanza have the same overloaded function
 ; name:
 ;
-;   [<overload-id>, <abi-name>, <builtin-name>]
+;   [<overload-id>, <abi-name>, <builtin-name>[[, <ifdef>]] ]
 ;
-; Here the square brackets are part of the syntax, <overload-id> is a
-; unique internal identifier for the overload that will be used as part
-; of an enumeration of all overloaded functions; <abi-name> is the name
-; that will appear as a #define in altivec.h; and <builtin-name> is the
-; name that is overloaded in the back end.  If no #define is desired,
-; the <abi-name> should be replaced with the token SKIP.
+; Here the single square brackets are part of the syntax, <overload-id>
+; is a unique internal identifier for the overload that will be used as
+; part of an enumeration of all overloaded functions; <abi-name> is the
+; name that will appear as a #define in altivec.h; <builtin-name> is the
+; name that is overloaded in the back end; and <ifdef> is an optional
+; token used to guard the #define with an #ifdef in altivec.h.  If no
+; #define is desired, the <abi-name> should be replaced with the token SKIP.
 ;
 ; Each function entry has two lines.  The first line is a prototype line.
 ; See rs6000-builtin-new.def for a description of the prototype line.
@@ -45,12 +46,11 @@
 ; one token is on the line, it is also used to build the unique identifier
 ; for the overloaded function.  If a second token is present, the second
 ; token is used instead for this purpose.  This is necessary in cases
-; where a built-in function accepts more than one type signature.  For
-; example, opaque vector types accept any vector type.  It is also common
-; to have a built-in function that, for example, specifies a "vector
-; signed char" argument, but accepts "vector unsigned char" and "vector
-; bool char" as well because only the mode matters.  Note that the
-; overload resolution mechanism has always handled these cases by
+; where a built-in function accepts more than one type signature.  It is
+; common to have a built-in function that, for example, specifies a
+; "vector signed char" argument, but accepts "vector unsigned char" and
+; "vector bool char" as well because only the mode matters.  Note that
+; the overload resolution mechanism has always handled these cases by
 ; performing fold_convert on vector arguments to hide type mismatches,
 ; and it will continue to do so.
 ;
@@ -2877,6 +2877,10 @@
     VPERM_4SF
   vd __builtin_vec_perm (vd, vd, vuc);
     VPERM_2DF
+  vsq __builtin_vec_perm (vsq, vsq, vuc);
+    VPERM_1TI
+  vuq __builtin_vec_perm (vuq, vuq, vuc);
+    VPERM_1TI_UNS
 ; The following variants are deprecated.
   vsc __builtin_vec_perm (vsc, vuc, vuc);
     VPERM_16QI  VPERM_VSC_VUC_VUC
