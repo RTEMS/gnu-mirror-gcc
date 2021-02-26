@@ -13002,7 +13002,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 {
   if (new_builtins_are_live)
     return rs6000_expand_new_builtin (exp, target, subtarget, mode, ignore);
-  
+
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
   enum rs6000_builtins fcode
     = (enum rs6000_builtins) DECL_MD_FUNCTION_CODE (fndecl);
@@ -13435,7 +13435,7 @@ new_cpu_expand_builtin (enum rs6000_gen_builtins fcode,
 #else
   warning (0, "builtin %qs needs GLIBC (2.23 and newer) that exports hardware "
 	   "capability bits", rs6000_builtin_info_x[(size_t) fcode].bifname);
-  
+
   /* For old LIBCs, always return FALSE.  */
   emit_move_insn (target, GEN_INT (0));
 #endif /* TARGET_LIBC_PROVIDES_HWCAP_IN_TCB */
