@@ -22,6 +22,7 @@ TM_H += $(srcdir)/config/rs6000/rs6000-builtin.def
 TM_H += $(srcdir)/config/rs6000/rs6000-cpus.def
 TM_H += $(srcdir)/config/rs6000/rs6000-modes.h
 PASSES_EXTRA += $(srcdir)/config/rs6000/rs6000-passes.def
+OUT_FILE_DEPS += rs6000-builtins.h
 
 rs6000-string.o: $(srcdir)/config/rs6000/rs6000-string.c
 	$(COMPILE) $<
@@ -78,15 +79,6 @@ rs6000-call.o: $(srcdir)/config/rs6000/rs6000-call.c rs6000-builtins.c
 rs6000-c.o: $(srcdir)/config/rs6000/rs6000-c.c rs6000-builtins.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
-
-# We need a dependency from rs6000.c on rs6000-builtins.h, but
-# apparently rs6000.c is automatically generated, so not sure
-# what to do about this.  #### TODO.  The following "works" but
-# generates a warning about ignoring the old recipe for rs6000.o.
-# Better to try to figure out what that recipe is...
-#rs6000.o: $(srcdir)/config/rs6000/rs6000.c rs6000-builtins.c
-#	$(COMPILE) $<
-#	$(POSTCOMPILE)
 
 #$(srcdir)/config/rs6000/fusion.md: $(srcdir)/config/rs6000/genfusion.pl
 #	$(srcdir)/config/rs6000/genfusion.pl > $(srcdir)/config/rs6000/fusion.md
