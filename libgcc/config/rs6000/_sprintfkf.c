@@ -27,7 +27,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <stdlib.h>
 #include <soft-fp.h>
 #include <quad-float128.h>
-#include <_sprintfkf.h>
 #include <stdio.h>
 
 /* This function must be built with IBM 128-bit as long double, so that we can
