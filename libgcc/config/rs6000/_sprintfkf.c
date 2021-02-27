@@ -27,7 +27,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <stdlib.h>
 #include <soft-fp.h>
 #include <quad-float128.h>
-#include <stdio.h>
 #include <_sprintfkf.h>
 
 /* This function must be built with IBM 128-bit as long double, so that we can
@@ -42,7 +41,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    If we are linked against an earlier library, we will have fake it by
    converting the value to long double, and using sprintf to do the conversion.
    This isn't ideal, as IEEE 128-bit has more exponent range than IBM
-   128-bit.  */
+   128-bit.
+
+   We use __builtin_sprintf so that we don't have to include stdio.h to define
+   sprintf.  Stdio.h might not be present for freestanding cross compilers that
+   do not need to include a library.  */
 
 extern int __sprintfieee128 (char *restrict, const char *restrict, ...)
   __attribute__ ((__weak__));
@@ -54,5 +57,5 @@ int __sprintfkf (char *restrict string,
   if (__sprintfieee128)
     return __sprintfieee128 (string, format, number);
 
-  return sprintf (string, format, (long double) number);
+  return __builtin_sprintf (string, format, (long double) number);
 }
