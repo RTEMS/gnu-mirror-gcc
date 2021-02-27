@@ -1,0 +1,4 @@
+# Enable building the Float128/Decimal conversion routines.  If decimal support
+# is not enabled, this makefile fragment is not included.
+
+FP128_DECIMAL_CONVERT	= yes

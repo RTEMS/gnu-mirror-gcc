@@ -1217,6 +1217,12 @@ powerpc*-*-linux*)
 	esac
 
 	if test $libgcc_cv_powerpc_float128 = yes; then
+		# Enable building the decimal/Float128 conversions if decimal
+		# arithmetic is supported in the compiler.
+		if test $libgcc_cv_powerpc_float128_dec = yes; then
+			tmake_file="${tmake_file} rs6000/t-float128-dec"
+		fi
+
 		tmake_file="${tmake_file} rs6000/t-float128"
 	fi
 
