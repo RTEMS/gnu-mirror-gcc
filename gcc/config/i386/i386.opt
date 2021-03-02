@@ -585,7 +585,7 @@ Target Alias(mprefer-vector-width=, 128, 256)
 Use 128-bit AVX instructions instead of 256-bit AVX instructions in the auto-vectorizer.
 
 mprefer-vector-width=
-Target RejectNegative Joined Var(prefer_vector_width_type) Enum(prefer_vector_width) Init(PVW_NONE) Save
+NewTarget RejectNegative Joined Var(ix86_prefer_vector_width) Enum(prefer_vector_width) Init(PVW_NONE) PerFunction
 Use given register vector width instructions instead of maximum register width in the auto-vectorizer.
 
 Enum

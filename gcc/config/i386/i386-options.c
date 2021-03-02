@@ -355,9 +355,10 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 		    int flags, int flags2,
 		    const char *arch, const char *tune,
 		    enum fpmath_unit fpmath,
-		    enum prefer_vector_width pvw,
 		    bool add_nl_p, bool add_abi_p)
 {
+  // TODO: -mprefer-vector-width and others are missing
+
   /* Flag options.  */
   static struct ix86_target_opts flag_opts[] =
   {
@@ -533,29 +534,6 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 	}
     }
 
-  /* Add -mprefer-vector-width= option.  */
-  if (pvw)
-    {
-      opts[num][0] = "-mprefer-vector-width=";
-      switch ((int) pvw)
-	{
-	case PVW_AVX128:
-	  opts[num++][1] = "128";
-	  break;
-
-	case PVW_AVX256:
-	  opts[num++][1] = "256";
-	  break;
-
-	case PVW_AVX512:
-	  opts[num++][1] = "512";
-	  break;
-
-	default:
-	  gcc_unreachable ();
-	}
-    }
-
   /* Any options?  */
   if (num == 0)
     return NULL;
@@ -620,7 +598,7 @@ ix86_debug_options (void)
   char *opts = ix86_target_string (ix86_isa_flags, ix86_isa_flags2,
 				   target_flags, ix86_target_flags,
 				   ix86_arch_string, ix86_tune_string,
-				   ix86_fpmath, prefer_vector_width_type,
+				   ix86_fpmath,
 				   true, true);
 
   if (opts)
@@ -882,7 +860,7 @@ ix86_function_specific_print (FILE *file, int indent,
     = ix86_target_string (ptr->x_ix86_isa_flags, ptr->x_ix86_isa_flags2,
 			  ptr->x_target_flags, ptr->x_ix86_target_flags,
 			  NULL, NULL, ptr->x_ix86_fpmath,
-			  ptr->x_prefer_vector_width_type, false, true);
+			  false, true);
 
   gcc_assert (ptr->arch < PROCESSOR_max);
   fprintf (file, "%*sarch = %d (%s)\n",
@@ -1301,7 +1279,6 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
   const char *orig_arch_string = opts->x_ix86_arch_string;
   const char *orig_tune_string = opts->x_ix86_tune_string;
   enum fpmath_unit orig_fpmath_set = opts_set->x_ix86_fpmath;
-  enum prefer_vector_width orig_pvw_set = opts_set->x_prefer_vector_width_type;
   int orig_tune_defaulted = ix86_tune_defaulted;
   int orig_arch_specified = ix86_arch_specified;
   char *option_strings[IX86_FUNCTION_SPECIFIC_MAX] = { NULL, NULL };
@@ -1332,7 +1309,7 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
       || option_strings[IX86_FUNCTION_SPECIFIC_ARCH]
       || option_strings[IX86_FUNCTION_SPECIFIC_TUNE]
       || enum_opts_set.x_ix86_fpmath
-      || enum_opts_set.x_prefer_vector_width_type
+      || enum_opts_set.x_ix86_prefer_vector_width
       || true) // TODO: do it conditionally
     {
       /* If we are using the default tune= or arch=, undo the string assigned,
@@ -1352,8 +1329,8 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
       /* If fpmath= is not set, and we now have sse2 on 32-bit, use it.  */
       if (enum_opts_set.x_ix86_fpmath)
 	opts_set->x_ix86_fpmath = (enum fpmath_unit) 1;
-      if (enum_opts_set.x_prefer_vector_width_type)
-	opts_set->x_prefer_vector_width_type = (enum prefer_vector_width) 1;
+      if (enum_opts_set.x_ix86_prefer_vector_width)
+	opts_set->x_ix86_prefer_vector_width = (enum prefer_vector_width) 1;
 
       /* Do any overrides, such as arch=xxx, or tune=xxx support.  */
       bool r = ix86_option_override_internal (false, opts, opts_set);
@@ -1381,7 +1358,6 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
       opts->x_ix86_arch_string = orig_arch_string;
       opts->x_ix86_tune_string = orig_tune_string;
       opts_set->x_ix86_fpmath = orig_fpmath_set;
-      opts_set->x_prefer_vector_width_type = orig_pvw_set;
       opts->x_ix86_excess_precision = orig_ix86_excess_precision;
       opts->x_ix86_unsafe_math_optimizations
 	= orig_ix86_unsafe_math_optimizations;
@@ -2844,14 +2820,14 @@ ix86_option_override_internal (bool main_args_p,
   /* Enable 128-bit AVX instruction generation
      for the auto-vectorizer.  */
   if (ix86_tune_features[X86_TUNE_AVX128_OPTIMAL]
-      && (opts_set->x_prefer_vector_width_type == PVW_NONE))
-    opts->x_prefer_vector_width_type = PVW_AVX128;
+      && (opts_set->x_ix86_prefer_vector_width == PVW_NONE))
+    opts->x_ix86_prefer_vector_width = PVW_AVX128;
 
   /* Use 256-bit AVX instruction generation
      in the auto-vectorizer.  */
   if (ix86_tune_features[X86_TUNE_AVX256_OPTIMAL]
-      && (opts_set->x_prefer_vector_width_type == PVW_NONE))
-    opts->x_prefer_vector_width_type = PVW_AVX256;
+      && (opts_set->x_ix86_prefer_vector_width == PVW_NONE))
+    opts->x_ix86_prefer_vector_width = PVW_AVX256;
 
   if (opts->x_ix86_recip_name)
     {

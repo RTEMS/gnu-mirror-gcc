@@ -3034,10 +3034,10 @@ extern void debug_dispatch_window (int);
 #define TARGET_RECIP_VEC_SQRT	((recip_mask & RECIP_MASK_VEC_SQRT) != 0)
 
 /* Use 128-bit AVX instructions in the auto-vectorizer.  */
-#define TARGET_PREFER_AVX128	(prefer_vector_width_type == PVW_AVX128)
+#define TARGET_PREFER_AVX128	(ix86_prefer_vector_width == PVW_AVX128)
 /* Use 256-bit AVX instructions in the auto-vectorizer.  */
 #define TARGET_PREFER_AVX256	(TARGET_PREFER_AVX128 \
-				 || prefer_vector_width_type == PVW_AVX256)
+				 || ix86_prefer_vector_width == PVW_AVX256)
 
 #define TARGET_INDIRECT_BRANCH_REGISTER \
   (ix86_indirect_branch_register \
