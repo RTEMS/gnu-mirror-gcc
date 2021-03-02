@@ -3,7 +3,7 @@ cd ../objdir
 chmod +x $PWD -R
 
 make -k $1 -j$(nproc) #RUNTESTFLAGS="-v -v"
-../test-gcc/contrib/testsuite-management/validate_failures.py
+../gcc/contrib/testsuite-management/validate_failures.py
 
 exit_code=$?
 if [ $exit_code != 0 ]; then

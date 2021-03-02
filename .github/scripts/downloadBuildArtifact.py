@@ -17,7 +17,7 @@ def WaitOnGccBuild(commit, accessToken):
     logger.info("Looking for a gcc build for " + commit)
     
     reqArgs = {'check_name': GetGccBuildName()}
-    res = requests.get("https://api.github.com/repos/microsoft/test-gcc/commits/" + commit + "/check-runs", params=reqArgs, headers={'Authorization': "token " + accessToken})
+    res = requests.get("https://api.github.com/repos/microsoft/gcc/commits/" + commit + "/check-runs", params=reqArgs, headers={'Authorization': "token " + accessToken})
 
     checkruns = res.json()['check_runs']
     count = 0
@@ -41,7 +41,7 @@ def WaitOnGccBuild(commit, accessToken):
     buildStatus = ''
     while True:
         # Get the run ID
-        res = requests.get("https://api.github.com/repos/microsoft/test-gcc/actions/jobs/" + str(latestBuildId), headers={'Authorization': "token " + accessToken})
+        res = requests.get("https://api.github.com/repos/microsoft/gcc/actions/jobs/" + str(latestBuildId), headers={'Authorization': "token " + accessToken})
         jobJson = res.json()
         workflowRunID = jobJson['run_id']
         buildStatus = jobJson['status']
@@ -64,7 +64,7 @@ def WaitOnGccBuild(commit, accessToken):
     numArtifactRetries = 60
     # Add error checking for the number of artifacts
     while True:
-        res = requests.get("https://api.github.com/repos/microsoft/test-gcc/actions/runs/" + str(workflowRunID) + "/artifacts", headers={'Authorization': "token " + accessToken})
+        res = requests.get("https://api.github.com/repos/microsoft/gcc/actions/runs/" + str(workflowRunID) + "/artifacts", headers={'Authorization': "token " + accessToken})
 
         logger.debug("Artifact Json:" + json.dumps(res.json()))
 
@@ -96,7 +96,7 @@ def DownloadBuildArtifact():
     logger = GetLogger()
     gccBuildArtifactID = globals.configObj.gccBuildArtifactID
     # TODO: Support downloading build artifact without a config object setup so the script can be used outside of workflows by developers
-    res = requests.get("https://api.github.com/repos/microsoft/test-gcc/actions/artifacts/" + str(gccBuildArtifactID) +"/zip", headers={'Authorization': "token " + globals.configObj.accessToken})
+    res = requests.get("https://api.github.com/repos/microsoft/gcc/actions/artifacts/" + str(gccBuildArtifactID) +"/zip", headers={'Authorization': "token " + globals.configObj.accessToken})
     
     logger.info("Downloading gccBuild zip from artifact ID" + str(gccBuildArtifactID))
     with open('gccBuild.zip', 'wb') as f:

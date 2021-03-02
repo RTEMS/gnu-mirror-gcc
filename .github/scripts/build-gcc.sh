@@ -1,6 +1,6 @@
 
 cd ../objdir
-$PWD/../test-gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++
+$PWD/../gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++
 
 exit_code=$?
 if [ $exit_code != 0 ]; then
