@@ -1433,6 +1433,7 @@ print "}";
 print "void";
 print "cl_optimization_compare (gcc_options *ptr1, gcc_options *ptr2)"
 print "{"
+print "return;"
 
 # all these options are mentioned in PR92860
 checked_options["flag_merge_constants"]++
