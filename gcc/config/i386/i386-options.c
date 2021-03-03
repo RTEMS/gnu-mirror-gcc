@@ -611,11 +611,7 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   ptr->x_ix86_branch_cost = opts->x_ix86_branch_cost;
   ptr->x_ix86_dump_tunes = opts->x_ix86_dump_tunes;
   ptr->x_ix86_force_drap = opts->x_ix86_force_drap;
-  ptr->x_ix86_pmode = opts->x_ix86_pmode;
-  ptr->x_ix86_preferred_stack_boundary_arg = opts->x_ix86_preferred_stack_boundary_arg;
-  ptr->x_ix86_recip_name = opts->x_ix86_recip_name;
   ptr->x_ix86_section_threshold = opts->x_ix86_section_threshold;
-  ptr->x_ix86_stack_protector_guard = opts->x_ix86_stack_protector_guard;
   ptr->x_ix86_stringop_alg = opts->x_ix86_stringop_alg;
   ptr->x_ix86_tls_dialect = opts->x_ix86_tls_dialect;
   ptr->x_ix86_tune_ctrl_string = opts->x_ix86_tune_ctrl_string;
@@ -741,11 +737,7 @@ ix86_function_specific_restore (struct gcc_options *opts,
   opts->x_ix86_branch_cost = ptr->x_ix86_branch_cost;
   opts->x_ix86_dump_tunes = ptr->x_ix86_dump_tunes;
   opts->x_ix86_force_drap = ptr->x_ix86_force_drap;
-  opts->x_ix86_pmode = ptr->x_ix86_pmode;
-  opts->x_ix86_preferred_stack_boundary_arg = ptr->x_ix86_preferred_stack_boundary_arg;
-  opts->x_ix86_recip_name = ptr->x_ix86_recip_name;
   opts->x_ix86_section_threshold = ptr->x_ix86_section_threshold;
-  opts->x_ix86_stack_protector_guard = ptr->x_ix86_stack_protector_guard;
   opts->x_ix86_stringop_alg = ptr->x_ix86_stringop_alg;
   opts->x_ix86_tls_dialect = ptr->x_ix86_tls_dialect;
   opts->x_ix86_tune_ctrl_string = ptr->x_ix86_tune_ctrl_string;
@@ -780,6 +772,8 @@ ix86_function_specific_restore (struct gcc_options *opts,
 void
 ix86_function_specific_post_stream_in (struct cl_target_option *ptr)
 {
+  // FIXME
+#if 0
   /* flag_pic is a global option, but ix86_cmodel is target saved option
      partly computed from flag_pic.  If flag_pic is on, adjust x_ix86_cmodel
      for PIC, or error out.  */
@@ -823,6 +817,7 @@ ix86_function_specific_post_stream_in (struct cl_target_option *ptr)
       default:
 	break;
       }
+#endif
 }
 
 /* Print the current options */
