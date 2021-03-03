@@ -321,7 +321,7 @@ Target Mask(FLOAT_RETURNS) Save
 Return values of functions in FPU registers.
 
 mfpmath=
-Target RejectNegative Joined Var(ix86_fpmath) Enum(fpmath_unit) Init(FPMATH_387) Save
+NewTarget RejectNegative Joined Var(ix86_fpmath) Enum(fpmath_unit) Init(FPMATH_387) PerFunction
 Generate floating point mathematics using given instruction set.
 
 Enum
@@ -918,7 +918,7 @@ Target Mask(ISA_PREFETCHWT1) Var(ix86_isa_flags) Save
 Support PREFETCHWT1 built-in functions and code generation.
 
 mfentry
-Target Save Var(flag_fentry)
+NewTarget Var(flag_fentry) PerFunction
 Emit profiling counter call at function entry before prologue.
 
 mrecord-mcount
@@ -1144,5 +1144,5 @@ Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, and
 AVXVNNI built-in functions and code generation.
 
 mneeded
-Target Var(ix86_needed) Save
+NewTarget Var(ix86_needed) PerFunction
 Emit GNU_PROPERTY_X86_ISA_1_NEEDED GNU property.

@@ -645,6 +645,7 @@ ix86_pragma_target_parse (tree args, tree pop_target)
   enum processor_type prev_tune;
   enum processor_type cur_arch;
   enum processor_type cur_tune;
+  enum fpmath_unit prev_fpmath = ix86_fpmath;
 
   if (! args)
     {
@@ -666,6 +667,7 @@ ix86_pragma_target_parse (tree args, tree pop_target)
     }
 
   target_option_current_node = cur_tree;
+  enum fpmath_unit cur_fpmath = ix86_fpmath;
   ix86_reset_previous_fndecl ();
 
   /* Figure out the previous/current isa, arch, tune and the differences.  */
@@ -695,7 +697,7 @@ ix86_pragma_target_parse (tree args, tree pop_target)
 			       prev_isa2 & diff_isa2,
 			       prev_arch,
 			       prev_tune,
-			       (enum fpmath_unit) prev_opt->x_ix86_fpmath,
+			       prev_fpmath,
 			       cpp_undef);
 
   /* For the definitions, ensure all newly defined macros are considered
@@ -710,7 +712,7 @@ ix86_pragma_target_parse (tree args, tree pop_target)
 			       cur_isa2 & diff_isa2,
 			       cur_arch,
 			       cur_tune,
-			       (enum fpmath_unit) cur_opt->x_ix86_fpmath,
+			       cur_fpmath,
 			       cpp_define);
 
   cpp_opts->warn_unused_macros = saved_warn_unused_macros;

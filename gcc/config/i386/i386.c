@@ -602,6 +602,8 @@ ix86_can_inline_p (tree caller, tree callee)
   else if (!always_inline && caller_opts->tune != callee_opts->tune)
     ret = false;
 
+  // FIXME:
+#if 0
   else if (caller_opts->x_ix86_fpmath != callee_opts->x_ix86_fpmath
 	   /* If the calle doesn't use FP expressions differences in
 	      ix86_fpmath can be ignored.  We are called from FEs
@@ -611,6 +613,7 @@ ix86_can_inline_p (tree caller, tree callee)
 	       || ipa_fn_summaries->get (callee_node) == NULL
 	       || ipa_fn_summaries->get (callee_node)->fp_expressions))
     ret = false;
+#endif
 
   else if (!always_inline
 	   && caller_opts->branch_cost != callee_opts->branch_cost)
@@ -1224,7 +1227,7 @@ ix86_function_sseregparm (const_tree type, const_tree decl, bool warn)
      (and DFmode for SSE2) arguments in SSE registers.  */
   if (target
       /* TARGET_SSE_MATH */
-      && (target_opts_for_fn (target->decl)->x_ix86_fpmath & FPMATH_SSE)
+      && (opts_for_fn (target->decl)->x_ix86_fpmath & FPMATH_SSE)
       && opt_for_fn (target->decl, optimize)
       && !(profile_flag && !flag_fentry))
     {

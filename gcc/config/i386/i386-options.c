@@ -354,7 +354,6 @@ char *
 ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 		    int flags, int flags2,
 		    const char *arch, const char *tune,
-		    enum fpmath_unit fpmath,
 		    bool add_nl_p, bool add_abi_p)
 {
   // TODO: -mprefer-vector-width and others are missing
@@ -511,29 +510,6 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
       sprintf (flags2_other, "(other flags2: %#x)", flags2);
     }
 
-  /* Add -mfpmath= option.  */
-  if (fpmath)
-    {
-      opts[num][0] = "-mfpmath=";
-      switch ((int) fpmath)
-	{
-	case FPMATH_387:
-	  opts[num++][1] = "387";
-	  break;
-
-	case FPMATH_SSE:
-	  opts[num++][1] = "sse";
-	  break;
-
-	case FPMATH_387 | FPMATH_SSE:
-	  opts[num++][1] = "sse+387";
-	  break;
-
-	default:
-	  gcc_unreachable ();
-	}
-    }
-
   /* Any options?  */
   if (num == 0)
     return NULL;
@@ -598,7 +574,6 @@ ix86_debug_options (void)
   char *opts = ix86_target_string (ix86_isa_flags, ix86_isa_flags2,
 				   target_flags, ix86_target_flags,
 				   ix86_arch_string, ix86_tune_string,
-				   ix86_fpmath,
 				   true, true);
 
   if (opts)
@@ -859,7 +834,7 @@ ix86_function_specific_print (FILE *file, int indent,
   char *target_string
     = ix86_target_string (ptr->x_ix86_isa_flags, ptr->x_ix86_isa_flags2,
 			  ptr->x_target_flags, ptr->x_ix86_target_flags,
-			  NULL, NULL, ptr->x_ix86_fpmath,
+			  NULL, NULL,
 			  false, true);
 
   gcc_assert (ptr->arch < PROCESSOR_max);
