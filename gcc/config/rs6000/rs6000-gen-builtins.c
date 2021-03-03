@@ -215,6 +215,21 @@ enum basetype {
   BT_VQUAD
 };
 
+/* Ways in which a const int value can be restricted.  RES_BITS indicates
+   that the integer is restricted to val1 bits, interpreted as an unsigned
+   number.  RES_RANGE indicates that the integer is restricted to values
+   between val1 and val2, inclusive.  RES_VAR_RANGE is like RES_RANGE, but
+   the argument may be variable, so it can only be checked if it is constant.
+   RES_VALUES indicates that the integer must have one of the values val1
+   or val2.  */
+enum restriction {
+  RES_NONE,
+  RES_BITS,
+  RES_RANGE,
+  RES_VAR_RANGE,
+  RES_VALUES
+};
+
 /* Type modifiers for an argument or return type.  */
 struct typeinfo {
   char isvoid;
@@ -226,6 +241,7 @@ struct typeinfo {
   char ispixel;
   char ispointer;
   basetype base;
+  restriction restr;
   int val1;
   int val2;
 };
@@ -478,6 +494,126 @@ match_basetype (typeinfo *typedata)
 static int
 match_const_restriction (typeinfo *typedata)
 {
+  int oldpos = pos;
+  if (linebuf[pos] == '<')
+    {
+      safe_inc_pos ();
+      oldpos = pos;
+      int x = match_integer ();
+      if (x == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      consume_whitespace ();
+      if (linebuf[pos] == '>')
+	{
+	  typedata->restr = RES_BITS;
+	  typedata->val1 = x;
+	  safe_inc_pos ();
+	  return 1;
+	}
+      else if (linebuf[pos] != ',')
+	{
+	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+      oldpos = pos;
+      int y = match_integer ();
+      if (y == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      typedata->restr = RES_RANGE;
+      typedata->val1 = x;
+      typedata->val2 = y;
+
+      consume_whitespace ();
+      if (linebuf[pos] != '>')
+	{
+	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+    }
+  else if (linebuf[pos] == '{')
+    {
+      safe_inc_pos ();
+      oldpos = pos;
+      int x = match_integer ();
+      if (x == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      consume_whitespace ();
+      if (linebuf[pos] != ',')
+	{
+	  (*diag) ("missing comma at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+      consume_whitespace ();
+      oldpos = pos;
+      int y = match_integer ();
+      if (y == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      typedata->restr = RES_VALUES;
+      typedata->val1 = x;
+      typedata->val2 = y;
+
+      consume_whitespace ();
+      if (linebuf[pos] != '}')
+	{
+	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+    }
+  else
+    {
+      assert (linebuf[pos] == '[');
+      safe_inc_pos ();
+      oldpos = pos;
+      int x = match_integer ();
+      if (x == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      consume_whitespace ();
+      if (linebuf[pos] != ',')
+	{
+	  (*diag) ("missing comma at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+      consume_whitespace ();
+      oldpos = pos;
+      int y = match_integer ();
+      if (y == MININT)
+	{
+	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  return 0;
+	}
+      typedata->restr = RES_VAR_RANGE;
+      typedata->val1 = x;
+      typedata->val2 = y;
+
+      consume_whitespace ();
+      if (linebuf[pos] != ']')
+	{
+	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  return 0;
+	}
+      safe_inc_pos ();
+    }
+
   return 1;
 }
 
