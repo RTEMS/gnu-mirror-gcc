@@ -558,6 +558,7 @@ TM_MULTILIB_CONFIG=@TM_MULTILIB_CONFIG@
 TM_MULTILIB_EXCEPTIONS_CONFIG=@TM_MULTILIB_EXCEPTIONS_CONFIG@
 out_file=$(srcdir)/config/@out_file@
 out_object_file=@out_object_file@
+OUT_FILE_DEPS=
 common_out_file=$(srcdir)/common/config/@common_out_file@
 common_out_object_file=@common_out_object_file@
 md_file=$(srcdir)/common.md $(srcdir)/config/@md_file@
@@ -2359,7 +2360,7 @@ pass-instances.def: $(srcdir)/passes.def $(PASSES_EXTRA) \
 	$(AWK) -f $(srcdir)/gen-pass-instances.awk \
 	  $(srcdir)/passes.def $(PASSES_EXTRA) > pass-instances.def
 
-$(out_object_file): $(out_file)
+$(out_object_file): $(out_file) $(OUT_FILE_DEPS)
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
