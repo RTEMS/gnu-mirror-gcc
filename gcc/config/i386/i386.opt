@@ -132,10 +132,6 @@ int x_ix86_section_threshold
 TargetSave
 enum stringop_alg x_ix86_stringop_alg
 
-;; -mtls-dialect=
-TargetSave
-enum tls_dialect x_ix86_tls_dialect
-
 ;; -mtune-ctrl=
 TargetSave
 const char *x_ix86_tune_ctrl_string
@@ -457,7 +453,7 @@ EnumValue
 Enum(stringop_alg) String(vector_loop) Value(vector_loop)
 
 mtls-dialect=
-Target RejectNegative Joined Var(ix86_tls_dialect) Enum(tls_dialect) Init(TLS_DIALECT_GNU)
+NewTarget RejectNegative Joined Var(ix86_tls_dialect) Enum(tls_dialect) Init(TLS_DIALECT_GNU)
 Use given thread-local storage dialect.
 
 Enum
