@@ -8450,6 +8450,10 @@ get_function_version_dispatcher (tree fn)
 {
   tree dispatcher_decl = NULL;
 
+  if (DECL_LOCAL_DECL_P (fn)
+      && DECL_LOCAL_DECL_ALIAS (fn) != NULL_TREE)
+    fn = DECL_LOCAL_DECL_ALIAS (fn);
+
   gcc_assert (TREE_CODE (fn) == FUNCTION_DECL
 	      && DECL_FUNCTION_VERSIONED (fn));
 

@@ -1108,6 +1108,23 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
   return types_match;
 }
 
+/* Register function version for DECL that would point to VERSION.
+   If RECORD set to true, register function version in call graph.  */
+
+static void
+record_function_versions (tree decl, tree version, bool record)
+{
+  if (!DECL_FUNCTION_VERSIONED (version))
+    {
+      DECL_FUNCTION_VERSIONED (version) = 1;
+      if (DECL_ASSEMBLER_NAME_SET_P (version))
+	mangle_decl (version);
+    }
+
+  if (record && decl != version)
+    cgraph_node::record_function_versions (decl, version);
+}
+
 /* NEWDECL and OLDDECL have identical signatures.  If they are
    different versions adjust them and return true.
    If RECORD is set to true, record function versions.  */
@@ -1118,22 +1135,15 @@ maybe_version_functions (tree newdecl, tree olddecl, bool record)
   if (!targetm.target_option.function_versions (newdecl, olddecl))
     return false;
 
-  if (!DECL_FUNCTION_VERSIONED (olddecl))
-    {
-      DECL_FUNCTION_VERSIONED (olddecl) = 1;
-      if (DECL_ASSEMBLER_NAME_SET_P (olddecl))
-	mangle_decl (olddecl);
-    }
+  record_function_versions (olddecl, olddecl, record);
+  if (DECL_LOCAL_DECL_P (olddecl)
+      && DECL_LOCAL_DECL_ALIAS (olddecl) != NULL_TREE)
+    record_function_versions (olddecl, DECL_LOCAL_DECL_ALIAS (olddecl), true);
 
-  if (!DECL_FUNCTION_VERSIONED (newdecl))
-    {
-      DECL_FUNCTION_VERSIONED (newdecl) = 1;
-      if (DECL_ASSEMBLER_NAME_SET_P (newdecl))
-	mangle_decl (newdecl);
-    }
-
-  if (record)
-    cgraph_node::record_function_versions (olddecl, newdecl);
+  record_function_versions (olddecl, newdecl, record);
+  if (DECL_LOCAL_DECL_P (newdecl)
+      && DECL_LOCAL_DECL_ALIAS (newdecl) != NULL_TREE)
+    record_function_versions (olddecl, DECL_LOCAL_DECL_ALIAS (newdecl), true);
 
   return true;
 }
