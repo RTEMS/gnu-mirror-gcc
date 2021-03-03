@@ -1178,6 +1178,102 @@ base = %d, restr = %d, val1 = %d, val2 = %d, pos = %d.\n",
 static parse_codes
 parse_bif_attrs (attrinfo *attrptr)
 {
+  consume_whitespace ();
+  if (linebuf[pos] != '{')
+    {
+      (*diag) ("missing attribute set at column %d.\n", pos + 1);
+      return PC_PARSEFAIL;
+    }
+  safe_inc_pos ();
+
+  memset (attrptr, 0, sizeof (*attrptr));
+  char *attrname = NULL;
+
+  do {
+    consume_whitespace ();
+    int oldpos = pos;
+    attrname = match_identifier ();
+    if (attrname)
+      {
+	if (!strcmp (attrname, "init"))
+	  attrptr->isinit = 1;
+	else if (!strcmp (attrname, "set"))
+	  attrptr->isset = 1;
+	else if (!strcmp (attrname, "extract"))
+	  attrptr->isextract = 1;
+	else if (!strcmp (attrname, "nosoft"))
+	  attrptr->isnosoft = 1;
+	else if (!strcmp (attrname, "ldvec"))
+	  attrptr->isldvec = 1;
+	else if (!strcmp (attrname, "stvec"))
+	  attrptr->isstvec = 1;
+	else if (!strcmp (attrname, "reve"))
+	  attrptr->isreve = 1;
+	else if (!strcmp (attrname, "pred"))
+	  attrptr->ispred = 1;
+	else if (!strcmp (attrname, "htm"))
+	  attrptr->ishtm = 1;
+	else if (!strcmp (attrname, "htmspr"))
+	  attrptr->ishtmspr = 1;
+	else if (!strcmp (attrname, "htmcr"))
+	  attrptr->ishtmcr = 1;
+	else if (!strcmp (attrname, "mma"))
+	  attrptr->ismma = 1;
+	else if (!strcmp (attrname, "quad"))
+	  attrptr->isquad = 1;
+	else if (!strcmp (attrname, "pair"))
+	  attrptr->ispair = 1;
+	else if (!strcmp (attrname, "no32bit"))
+	  attrptr->isno32bit = 1;
+	else if (!strcmp (attrname, "cpu"))
+	  attrptr->iscpu = 1;
+	else if (!strcmp (attrname, "ldstmask"))
+	  attrptr->isldstmask = 1;
+	else if (!strcmp (attrname, "lxvrse"))
+	  attrptr->islxvrse = 1;
+	else if (!strcmp (attrname, "lxvrze"))
+	  attrptr->islxvrze = 1;
+	else
+	  {
+	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
+	    return PC_PARSEFAIL;
+	  }
+
+	consume_whitespace ();
+	if (linebuf[pos] == ',')
+	  safe_inc_pos ();
+	else if (linebuf[pos] != '}')
+	  {
+	    (*diag) ("arg not followed by ',' or '}' at column %d.\n",
+		     pos + 1);
+	    return PC_PARSEFAIL;
+	  }
+      }
+    else
+      {
+	pos = oldpos;
+	if (linebuf[pos] != '}')
+	  {
+	    (*diag) ("badly terminated attr set at column %d.\n", pos + 1);
+	    return PC_PARSEFAIL;
+	  }
+	safe_inc_pos ();
+      }
+  } while (attrname);
+
+#ifdef DEBUG
+  (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
+nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, \
+htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, no32bit = %d, \
+cpu = %d, ldstmask = %d, lxvrse = %d, lxvrze = %d.\n",
+	   attrptr->isinit, attrptr->isset, attrptr->isextract,
+	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
+	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
+	   attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attrptr->ispair,
+	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask,
+	   attrptr->islxvrse, attrptr->islxvrze);
+#endif
+
   return PC_OK;
 }
 
