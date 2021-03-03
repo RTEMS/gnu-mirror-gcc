@@ -1115,6 +1115,14 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
 bool
 maybe_version_functions (tree newdecl, tree olddecl, bool record)
 {
+  if (DECL_LOCAL_DECL_P (olddecl)
+      && DECL_LOCAL_DECL_ALIAS (olddecl) != NULL_TREE)
+    olddecl = DECL_LOCAL_DECL_ALIAS (olddecl);
+
+  if (DECL_LOCAL_DECL_P (newdecl)
+      && DECL_LOCAL_DECL_ALIAS (newdecl) != NULL_TREE)
+    newdecl = DECL_LOCAL_DECL_ALIAS (newdecl);
+
   if (!targetm.target_option.function_versions (newdecl, olddecl))
     return false;
 
