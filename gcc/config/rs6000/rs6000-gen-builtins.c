@@ -2029,6 +2029,33 @@ write_init_file ()
 static int
 write_defines_file ()
 {
+  fprintf (defines_file, "#ifndef _RS6000_VECDEFINES_H\n");
+  fprintf (defines_file, "#define _RS6000_VECDEFINES_H 1\n\n");
+  fprintf (defines_file, "#if defined(_ARCH_PPC64) && defined (_ARCH_PWR9)\n");
+  fprintf (defines_file, "  #define _ARCH_PPC64_PWR9 1\n");
+  fprintf (defines_file, "#endif\n\n");
+  for (int i = 0; i < num_ovld_stanzas; i++)
+    if (strcmp (ovld_stanzas[i].extern_name, "SKIP"))
+      {
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#ifdef %s\n", ovld_stanzas[i].ifdef);
+	fprintf (defines_file, "#define %s %s\n",
+		 ovld_stanzas[i].extern_name,
+		 ovld_stanzas[i].intern_name);
+	if (ovld_stanzas[i].ifdef)
+	  fprintf (defines_file, "#endif\n");
+      }
+
+  /* Write some temporary defines to use until we make the switch.  */
+  fprintf (defines_file, "\n/* #### TEMPORARY ####  */\n");
+  fprintf (defines_file,
+	   "#define __builtin_vec_splat_s8 __builtin_altivec_vspltisb\n");
+  fprintf (defines_file,
+	   "#define __builtin_vec_splat_s16 __builtin_altivec_vspltish\n");
+  fprintf (defines_file,
+	   "#define __builtin_vec_splat_s32 __builtin_altivec_vspltisw\n");
+
+  fprintf (defines_file, "\n#endif\n");
   return 1;
 }
 
