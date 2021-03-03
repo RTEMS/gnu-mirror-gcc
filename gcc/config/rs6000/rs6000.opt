@@ -502,6 +502,14 @@ mpower10-fusion-2logical
 Target Undocumented Mask(P10_FUSION_2LOGICAL) Var(rs6000_isa_flags)
 Fuse certain integer operations together for better performance on power10.
 
+mpower10-fusion-logical-add
+Target Undocumented Mask(P10_FUSION_LOGADD) Var(rs6000_isa_flags)
+Fuse certain integer operations together for better performance on power10.
+
+mpower10-fusion-add-logical
+Target Undocumented Mask(P10_FUSION_ADDLOG) Var(rs6000_isa_flags)
+Fuse certain integer operations together for better performance on power10.
+
 mpower10-fusion-2add
 Target Undocumented Mask(P10_FUSION_2ADD) Var(rs6000_isa_flags)
 Fuse certain add operations together for better performance on power10.
