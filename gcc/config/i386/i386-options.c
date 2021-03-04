@@ -809,13 +809,7 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
      when we copy the save structure.  */
 //  if (opts->x_ix86_isa_flags != def->x_ix86_isa_flags
 //      || opts->x_ix86_isa_flags2 != def->x_ix86_isa_flags2
-  if (
-      opts->x_target_flags != def->x_target_flags
-      || option_strings[IX86_FUNCTION_SPECIFIC_ARCH]
-      || option_strings[IX86_FUNCTION_SPECIFIC_TUNE]
-      || enum_opts_set.x_ix86_fpmath
-      || enum_opts_set.x_ix86_prefer_vector_width
-      || true) // TODO: do it conditionally
+  // FIXME
     {
       /* If we are using the default tune= or arch=, undo the string assigned,
 	 and use the default.  */

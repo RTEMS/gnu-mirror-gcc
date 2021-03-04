@@ -114,7 +114,6 @@ print "};"
 print "extern struct gcc_options global_options;"
 print "extern const struct gcc_options global_options_init;"
 print "extern struct gcc_options global_options_set;"
-print "#define target_flags_explicit global_options_set.x_target_flags"
 print "#endif"
 print "#endif"
 print ""
@@ -243,7 +242,7 @@ if (have_save) {
 		if (flag_set_p("Save", flags[i])) {
 			name = var_name(flags[i])
 			if(name == "")
-				name = "target_flags";
+			  continue;
 
 			if(name in var_save_seen)
 				continue;

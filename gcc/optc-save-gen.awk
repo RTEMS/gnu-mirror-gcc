@@ -517,7 +517,7 @@ if (have_save) {
 		if (flag_set_p("Save", flags[i])) {
 			name = var_name(flags[i])
 			if(name == "")
-				name = "target_flags";
+				continue;
 
 			if(name in var_save_seen)
 				continue;
@@ -556,8 +556,6 @@ if (have_save) {
 		}
 	}
 } else {
-	var_target_int[n_target_int++] = "target_flags";
-	var_target_explicit_mask["target_flags"] = 1;
 }
 
 have_assert = 0;
@@ -1070,7 +1068,7 @@ if (have_save) {
 		if (flag_set_p("Save", flags[i])) {
 			name = var_name(flags[i])
 			if(name == "")
-				name = "target_flags";
+				continue;
 
 			if(name in var_list_seen)
 				continue;
@@ -1086,8 +1084,6 @@ if (have_save) {
 		}
 	}
 } else {
-	var_target_val_type[n_target_val] = "int";
-	var_target_val[n_target_val++] = "x_target_flags";
 }
 
 for (i = 0; i < n_target_str; i++) {
