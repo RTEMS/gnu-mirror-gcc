@@ -298,8 +298,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define BFP_TYPE _Float128
 #define BFP_FMT "%.36Le"
 #define BFP_VIA_TYPE _Float128
-#define STR_TO_BFP __strtoieee128
-extern _Float128 __strtoieee128 (const char *, char **);
+#define STR_TO_BFP __strtokf
+#include <_strtokf.h>
 
 #endif /* BFP_KIND */
 
@@ -647,8 +647,8 @@ extern DFP_C_TYPE BFP_TO_DFP (BFP_TYPE);
 
 #elif defined (L_kf_to_sd) || defined (L_kf_to_dd) || defined (L_kf_to_td)
 extern DFP_C_TYPE BFP_TO_DFP (BFP_TYPE);
-extern int __sprintfieee128 (char *restrict, const char *restrict, ...)
-#define BFP_SPRINTF __sprintfieee128
+#include <_sprintfkf.h>
+#define BFP_SPRINTF __sprintfkf
 #endif
 
 #endif /* _DFPBIT_H */
