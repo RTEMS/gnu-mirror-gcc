@@ -598,7 +598,6 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   ptr->schedule = ix86_schedule;
   ptr->prefetch_sse = ix86_prefetch_sse;
   ptr->tune = ix86_tune;
-  ptr->branch_cost = ix86_branch_cost;
   ptr->tune_defaulted = ix86_tune_defaulted;
   ptr->arch_specified = ix86_arch_specified;
   ptr->x_ix86_isa_flags_explicit = opts->x_ix86_isa_flags_explicit;
@@ -606,12 +605,9 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   ptr->x_recip_mask_explicit = opts->x_recip_mask_explicit;
   ptr->x_ix86_arch_string = opts->x_ix86_arch_string;
   ptr->x_ix86_tune_string = opts->x_ix86_tune_string;
-  ptr->x_ix86_abi = opts->x_ix86_abi;
-  ptr->x_ix86_branch_cost = opts->x_ix86_branch_cost;
   ptr->x_ix86_dump_tunes = opts->x_ix86_dump_tunes;
   ptr->x_ix86_force_drap = opts->x_ix86_force_drap;
   ptr->x_ix86_section_threshold = opts->x_ix86_section_threshold;
-  ptr->x_ix86_stringop_alg = opts->x_ix86_stringop_alg;
   ptr->x_ix86_tune_ctrl_string = opts->x_ix86_tune_ctrl_string;
   ptr->x_ix86_tune_memcpy_strategy = opts->x_ix86_tune_memcpy_strategy;
   ptr->x_ix86_tune_memset_strategy = opts->x_ix86_tune_memset_strategy;
@@ -622,7 +618,6 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   gcc_assert (ptr->arch == ix86_arch);
   gcc_assert (ptr->schedule == ix86_schedule);
   gcc_assert (ptr->tune == ix86_tune);
-  gcc_assert (ptr->branch_cost == ix86_branch_cost);
 }
 
 /* Feature tests against the various architecture variations, used to create
@@ -730,12 +725,9 @@ ix86_function_specific_restore (struct gcc_options *opts,
   opts->x_recip_mask_explicit = ptr->x_recip_mask_explicit;
   opts->x_ix86_arch_string = ptr->x_ix86_arch_string;
   opts->x_ix86_tune_string = ptr->x_ix86_tune_string;
-  opts->x_ix86_abi = ptr->x_ix86_abi;
-  opts->x_ix86_branch_cost = ptr->x_ix86_branch_cost;
   opts->x_ix86_dump_tunes = ptr->x_ix86_dump_tunes;
   opts->x_ix86_force_drap = ptr->x_ix86_force_drap;
   opts->x_ix86_section_threshold = ptr->x_ix86_section_threshold;
-  opts->x_ix86_stringop_alg = ptr->x_ix86_stringop_alg;
   opts->x_ix86_tune_ctrl_string = ptr->x_ix86_tune_ctrl_string;
   opts->x_ix86_tune_memcpy_strategy = ptr->x_ix86_tune_memcpy_strategy;
   opts->x_ix86_tune_memset_strategy = ptr->x_ix86_tune_memset_strategy;
@@ -837,8 +829,6 @@ ix86_function_specific_print (FILE *file, int indent,
   fprintf (file, "%*stune = %d (%s)\n",
 	   indent, "",
 	   ptr->tune, processor_names[ptr->tune]);
-
-  fprintf (file, "%*sbranch_cost = %d\n", indent, "", ptr->branch_cost);
 
   if (target_string)
     {

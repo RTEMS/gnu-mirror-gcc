@@ -613,11 +613,12 @@ ix86_can_inline_p (tree caller, tree callee)
 	       || ipa_fn_summaries->get (callee_node) == NULL
 	       || ipa_fn_summaries->get (callee_node)->fp_expressions))
     ret = false;
-#endif
+
 
   else if (!always_inline
 	   && caller_opts->branch_cost != callee_opts->branch_cost)
     ret = false;
+#endif
 
   else
     ret = true;

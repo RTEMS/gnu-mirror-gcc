@@ -52,7 +52,7 @@ int x_recip_mask_explicit
 ;; A copy of flag_excess_precision as a target variable that should
 ;; force a different DECL_FUNCTION_SPECIFIC_TARGET upon
 ;; flag_excess_precision changes.
-TargetVariable
+NewTargetVariable
 enum excess_precision ix86_excess_precision = EXCESS_PRECISION_DEFAULT
 
 ;; Similarly for flag_unsafe_math_optimizations.
@@ -84,10 +84,6 @@ unsigned char schedule
 TargetSave
 unsigned char prefetch_sse
 
-;; branch cost
-TargetSave
-unsigned char branch_cost
-
 ;; which flags were passed by the user
 TargetSave
 HOST_WIDE_INT x_ix86_isa_flags2_explicit
@@ -104,14 +100,6 @@ unsigned char tune_defaulted
 TargetSave
 unsigned char arch_specified
 
-;; -mabi=
-TargetSave
-enum calling_abi x_ix86_abi
-
-;; -mbranch-cost=
-TargetSave
-int x_ix86_branch_cost
-
 ;; -mdump-tune-features=
 TargetSave
 int x_ix86_dump_tunes
@@ -123,10 +111,6 @@ int x_ix86_force_drap
 ;; -mlarge-data-threshold=
 TargetSave
 int x_ix86_section_threshold
-
-;; -mstringop-strategy=
-TargetSave
-enum stringop_alg x_ix86_stringop_alg
 
 ;; -mtune-ctrl=
 TargetSave
@@ -229,7 +213,7 @@ EnumValue
 Enum(asm_dialect) String(att) Value(ASM_ATT)
 
 mbranch-cost=
-Target RejectNegative Joined UInteger Var(ix86_branch_cost) IntegerRange(0, 5)
+NewTarget RejectNegative Joined UInteger Var(ix86_branch_cost) IntegerRange(0, 5) PerFunction
 Branches are this expensive (arbitrary units).
 
 mlarge-data-threshold=
@@ -417,7 +401,7 @@ Target RejectNegative Joined Var(ix86_tune_memset_strategy)
 Specify memset expansion strategy when expected size is known.
 
 mstringop-strategy=
-Target RejectNegative Joined Enum(stringop_alg) Var(ix86_stringop_alg) Init(no_stringop)
+NewTarget RejectNegative Joined Enum(stringop_alg) Var(ix86_stringop_alg) Init(no_stringop) PerFunction
 Chose strategy to generate stringop using.
 
 Enum
@@ -486,7 +470,7 @@ Target Mask(IAMCU)
 Generate code that conforms to Intel MCU psABI.
 
 mabi=
-Target RejectNegative Joined Var(ix86_abi) Enum(calling_abi) Init(SYSV_ABI)
+NewTarget RejectNegative Joined Var(ix86_abi) Enum(calling_abi) Init(SYSV_ABI) PerFunction
 Generate code that conforms to the given ABI.
 
 Enum
