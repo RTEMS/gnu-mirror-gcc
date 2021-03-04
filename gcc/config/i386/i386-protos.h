@@ -331,10 +331,6 @@ extern enum rtx_code ix86_fp_compare_code_to_integer (enum rtx_code);
 #endif
 extern int asm_preferred_eh_data_format (int, int);
 
-#ifdef HAVE_ATTR_cpu
-extern enum attr_cpu ix86_schedule;
-#endif
-
 extern const char * ix86_output_call_insn (rtx_insn *insn, rtx call_op);
 extern const char * ix86_output_indirect_jmp (rtx call_op);
 extern const char * ix86_output_function_return (bool long_p);

@@ -28,8 +28,6 @@ char *ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 			  bool add_nl_p,
 			  bool add_abi_p);
 
-extern enum attr_cpu ix86_schedule;
-
 extern enum processor_type ix86_tune;
 extern enum processor_type ix86_arch;
 extern unsigned char ix86_prefetch_sse;

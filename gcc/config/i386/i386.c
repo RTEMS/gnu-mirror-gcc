@@ -337,9 +337,6 @@ struct GTY(()) stack_local_entry {
   struct stack_local_entry *next;
 };
 
-/* Which cpu are we scheduling for.  */
-enum attr_cpu ix86_schedule;
-
 /* Which cpu are we optimizing for.  */
 enum processor_type ix86_tune;
 

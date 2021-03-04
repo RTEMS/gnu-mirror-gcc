@@ -74,11 +74,11 @@ TargetSave
 const char *x_ix86_tune_string
 
 ;; CPU schedule model
-TargetSave
-unsigned char schedule
+NewTargetVariable
+unsigned char ix86_schedule
 
 ;; True if processor has SSE prefetch instruction.
-TargetSave
+NewTargetVariable
 unsigned char prefetch_sse
 
 ;; which flags were passed by the user
@@ -100,18 +100,6 @@ unsigned char arch_specified
 ;; -mtune-ctrl=
 TargetSave
 const char *x_ix86_tune_ctrl_string
-
-;; -mmemcpy-strategy=
-TargetSave
-const char *x_ix86_tune_memcpy_strategy
-
-;; -mmemset-strategy=
-TargetSave
-const char *x_ix86_tune_memset_strategy
-
-;; -mno-default=
-TargetSave
-int x_ix86_tune_no_default
 
 ;; x86 options
 m128bit-long-double
@@ -378,11 +366,11 @@ Target Mask(STACK_PROBE) Save
 Enable stack probing.
 
 mmemcpy-strategy=
-Target RejectNegative Joined Var(ix86_tune_memcpy_strategy)
+NewTarget RejectNegative Joined Var(ix86_tune_memcpy_strategy) PerFunction
 Specify memcpy expansion strategy when expected size is known.
 
 mmemset-strategy=
-Target RejectNegative Joined Var(ix86_tune_memset_strategy)
+NewTarget RejectNegative Joined Var(ix86_tune_memset_strategy) PerFunction
 Specify memset expansion strategy when expected size is known.
 
 mstringop-strategy=
@@ -444,7 +432,7 @@ Target RejectNegative Joined Var(ix86_tune_ctrl_string)
 Fine grain control of tune features.
 
 mno-default
-Target RejectNegative Var(ix86_tune_no_default)
+NewTarget RejectNegative Var(ix86_tune_no_default) PerFunction
 Clear all tune features.
 
 mdump-tune-features

@@ -595,8 +595,6 @@ ix86_function_specific_save (struct cl_target_option *ptr,
 			     struct gcc_options */* opts_set */)
 {
   ptr->arch = ix86_arch;
-  ptr->schedule = ix86_schedule;
-  ptr->prefetch_sse = ix86_prefetch_sse;
   ptr->tune = ix86_tune;
   ptr->tune_defaulted = ix86_tune_defaulted;
   ptr->arch_specified = ix86_arch_specified;
@@ -605,14 +603,10 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   ptr->x_ix86_arch_string = opts->x_ix86_arch_string;
   ptr->x_ix86_tune_string = opts->x_ix86_tune_string;
   ptr->x_ix86_tune_ctrl_string = opts->x_ix86_tune_ctrl_string;
-  ptr->x_ix86_tune_memcpy_strategy = opts->x_ix86_tune_memcpy_strategy;
-  ptr->x_ix86_tune_memset_strategy = opts->x_ix86_tune_memset_strategy;
-  ptr->x_ix86_tune_no_default = opts->x_ix86_tune_no_default;
 
   /* The fields are char but the variables are not; make sure the
      values fit in the fields.  */
   gcc_assert (ptr->arch == ix86_arch);
-  gcc_assert (ptr->schedule == ix86_schedule);
   gcc_assert (ptr->tune == ix86_tune);
 }
 
@@ -711,9 +705,7 @@ ix86_function_specific_restore (struct gcc_options *opts,
   opts->x_flag_pic = flag_pic;
 
   ix86_arch = (enum processor_type) ptr->arch;
-  ix86_schedule = (enum attr_cpu) ptr->schedule;
   ix86_tune = (enum processor_type) ptr->tune;
-  ix86_prefetch_sse = ptr->prefetch_sse;
   ix86_tune_defaulted = ptr->tune_defaulted;
   ix86_arch_specified = ptr->arch_specified;
   opts->x_ix86_isa_flags_explicit = ptr->x_ix86_isa_flags_explicit;
@@ -721,9 +713,6 @@ ix86_function_specific_restore (struct gcc_options *opts,
   opts->x_ix86_arch_string = ptr->x_ix86_arch_string;
   opts->x_ix86_tune_string = ptr->x_ix86_tune_string;
   opts->x_ix86_tune_ctrl_string = ptr->x_ix86_tune_ctrl_string;
-  opts->x_ix86_tune_memcpy_strategy = ptr->x_ix86_tune_memcpy_strategy;
-  opts->x_ix86_tune_memset_strategy = ptr->x_ix86_tune_memset_strategy;
-  opts->x_ix86_tune_no_default = ptr->x_ix86_tune_no_default;
   ix86_tune_cost = processor_cost_table[ix86_tune];
   /* TODO: ix86_cost should be chosen at instruction or function granuality
      so for cold code we use size_cost even in !optimize_size compilation.  */
