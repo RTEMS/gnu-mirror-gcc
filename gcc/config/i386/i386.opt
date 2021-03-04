@@ -30,15 +30,11 @@ HOST_WIDE_INT ix86_isa_flags2 = 0
 
 ; A mask of ix86_isa_flags that includes bit X if X was set or cleared
 ; on the command line.
-Variable
+NewTargetVariable
 HOST_WIDE_INT ix86_isa_flags_explicit
 
-Variable
+NewTargetVariable
 HOST_WIDE_INT ix86_isa_flags2_explicit
-
-; Additional target flags
-Variable
-int ix86_target_flags
 
 NewTargetVariable
 int recip_mask = RECIP_MASK_DEFAULT
@@ -72,14 +68,6 @@ unsigned char ix86_schedule
 ;; True if processor has SSE prefetch instruction.
 NewTargetVariable
 unsigned char prefetch_sse
-
-;; which flags were passed by the user
-TargetSave
-HOST_WIDE_INT x_ix86_isa_flags2_explicit
-
-;; which flags were passed by the user
-TargetSave
-HOST_WIDE_INT x_ix86_isa_flags_explicit
 
 ;; whether -mtune was not specified
 NewTargetVariable
@@ -927,7 +915,7 @@ mmitigate-rop
 Target WarnRemoved
 
 mgeneral-regs-only
-Target RejectNegative Mask(GENERAL_REGS_ONLY) Var(ix86_target_flags) Save
+NewTarget RejectNegative Mask(GENERAL_REGS_ONLY) Var(ix86_target_flags) PerFunction
 Generate code which uses only the general registers.
 
 mshstk

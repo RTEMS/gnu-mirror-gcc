@@ -594,8 +594,6 @@ ix86_function_specific_save (struct cl_target_option *ptr,
 			     struct gcc_options *opts,
 			     struct gcc_options */* opts_set */)
 {
-  ptr->x_ix86_isa_flags_explicit = opts->x_ix86_isa_flags_explicit;
-  ptr->x_ix86_isa_flags2_explicit = opts->x_ix86_isa_flags2_explicit;
 }
 
 /* Feature tests against the various architecture variations, used to create
@@ -689,8 +687,6 @@ ix86_function_specific_restore (struct gcc_options *opts,
   /* We don't change -fPIC.  */
   opts->x_flag_pic = flag_pic;
 
-  opts->x_ix86_isa_flags_explicit = ptr->x_ix86_isa_flags_explicit;
-  opts->x_ix86_isa_flags2_explicit = ptr->x_ix86_isa_flags2_explicit;
   ix86_tune_cost = processor_cost_table[ix86_tune];
   /* TODO: ix86_cost should be chosen at instruction or function granuality
      so for cold code we use size_cost even in !optimize_size compilation.  */
@@ -762,7 +758,7 @@ ix86_function_specific_print (FILE *file, int indent,
 {
   char *target_string
     = ix86_target_string (ptr->x_ix86_isa_flags, ptr->x_ix86_isa_flags2,
-			  ptr->x_target_flags, ptr->x_ix86_target_flags,
+			  NULL, NULL,
 			  NULL, NULL,
 			  false, true);
 
