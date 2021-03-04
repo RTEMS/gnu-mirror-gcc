@@ -1887,9 +1887,9 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       new_target = TREE_TARGET_OPTION (target_node);
       gcc_assert (new_target);
       
-      if (new_target->arch_specified && new_target->arch > 0)
+      if (arch_specified && ix86_arch > 0)
 	for (i = 0; i < pta_size; i++)
-	  if (processor_alias_table[i].processor == new_target->arch)
+	  if (processor_alias_table[i].processor == ix86_arch)
 	    {
 	      const pta *arch_info = &processor_alias_table[i];
 	      switch (arch_info->priority)
@@ -1899,7 +1899,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 		  priority = arch_info->priority;
 		  break;
 		case P_PROC_DYNAMIC:
-		  switch (new_target->arch)
+		  switch (ix86_arch)
 		    {
 		    case PROCESSOR_NEHALEM:
 		      if (TARGET_PCLMUL_P (new_target->x_ix86_isa_flags))

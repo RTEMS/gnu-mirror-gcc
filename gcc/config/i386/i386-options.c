@@ -594,20 +594,10 @@ ix86_function_specific_save (struct cl_target_option *ptr,
 			     struct gcc_options *opts,
 			     struct gcc_options */* opts_set */)
 {
-  ptr->arch = ix86_arch;
-  ptr->tune = ix86_tune;
-  ptr->tune_defaulted = ix86_tune_defaulted;
-  ptr->arch_specified = ix86_arch_specified;
   ptr->x_ix86_isa_flags_explicit = opts->x_ix86_isa_flags_explicit;
   ptr->x_ix86_isa_flags2_explicit = opts->x_ix86_isa_flags2_explicit;
   ptr->x_ix86_arch_string = opts->x_ix86_arch_string;
   ptr->x_ix86_tune_string = opts->x_ix86_tune_string;
-  ptr->x_ix86_tune_ctrl_string = opts->x_ix86_tune_ctrl_string;
-
-  /* The fields are char but the variables are not; make sure the
-     values fit in the fields.  */
-  gcc_assert (ptr->arch == ix86_arch);
-  gcc_assert (ptr->tune == ix86_tune);
 }
 
 /* Feature tests against the various architecture variations, used to create
@@ -686,8 +676,7 @@ ix86_option_override_internal (bool main_args_p,
 			       struct gcc_options *opts,
 			       struct gcc_options *opts_set);
 static void
-set_ix86_tune_features (struct gcc_options *opts,
-			enum processor_type ix86_tune, bool dump);
+set_ix86_tune_features (struct gcc_options *opts, bool dump);
 
 /* Restore the current options */
 
@@ -696,23 +685,16 @@ ix86_function_specific_restore (struct gcc_options *opts,
 				struct gcc_options */* opts_set */,
 				struct cl_target_option *ptr)
 {
-  enum processor_type old_tune = ix86_tune;
-  enum processor_type old_arch = ix86_arch;
   unsigned HOST_WIDE_INT ix86_arch_mask;
   int i;
 
   /* We don't change -fPIC.  */
   opts->x_flag_pic = flag_pic;
 
-  ix86_arch = (enum processor_type) ptr->arch;
-  ix86_tune = (enum processor_type) ptr->tune;
-  ix86_tune_defaulted = ptr->tune_defaulted;
-  ix86_arch_specified = ptr->arch_specified;
   opts->x_ix86_isa_flags_explicit = ptr->x_ix86_isa_flags_explicit;
   opts->x_ix86_isa_flags2_explicit = ptr->x_ix86_isa_flags2_explicit;
   opts->x_ix86_arch_string = ptr->x_ix86_arch_string;
   opts->x_ix86_tune_string = ptr->x_ix86_tune_string;
-  opts->x_ix86_tune_ctrl_string = ptr->x_ix86_tune_ctrl_string;
   ix86_tune_cost = processor_cost_table[ix86_tune];
   /* TODO: ix86_cost should be chosen at instruction or function granuality
      so for cold code we use size_cost even in !optimize_size compilation.  */
@@ -720,19 +702,6 @@ ix86_function_specific_restore (struct gcc_options *opts,
     ix86_cost = &ix86_size_cost;
   else
     ix86_cost = ix86_tune_cost;
-
-  /* Recreate the arch feature tests if the arch changed */
-  if (old_arch != ix86_arch)
-    {
-      ix86_arch_mask = HOST_WIDE_INT_1U << ix86_arch;
-      for (i = 0; i < X86_ARCH_LAST; ++i)
-	ix86_arch_features[i]
-	  = !!(initial_ix86_arch_features[i] & ix86_arch_mask);
-    }
-
-  /* Recreate the tune optimization tests */
-  if (old_tune != ix86_tune)
-    set_ix86_tune_features (opts, ix86_tune, false);
 }
 
 /* Adjust target options after streaming them in.  This is mainly about
@@ -800,16 +769,6 @@ ix86_function_specific_print (FILE *file, int indent,
 			  ptr->x_target_flags, ptr->x_ix86_target_flags,
 			  NULL, NULL,
 			  false, true);
-
-  gcc_assert (ptr->arch < PROCESSOR_max);
-  fprintf (file, "%*sarch = %d (%s)\n",
-	   indent, "",
-	   ptr->arch, processor_names[ptr->arch]);
-
-  gcc_assert (ptr->tune < PROCESSOR_max);
-  fprintf (file, "%*stune = %d (%s)\n",
-	   indent, "",
-	   ptr->tune, processor_names[ptr->tune]);
 
   if (target_string)
     {
@@ -1190,8 +1149,7 @@ parse_mtune_ctrl_str (struct gcc_options *opts, bool dump)
    processor type.  */
 
 static void
-set_ix86_tune_features (struct gcc_options *opts,
-			enum processor_type ix86_tune, bool dump)
+set_ix86_tune_features (struct gcc_options *opts, bool dump)
 {
   unsigned HOST_WIDE_INT ix86_tune_mask = HOST_WIDE_INT_1U << ix86_tune;
   int i;
@@ -2021,7 +1979,7 @@ ix86_option_override_internal (bool main_args_p,
       XDELETEVEC (s);
     }
 
-  set_ix86_tune_features (opts, ix86_tune, opts->x_ix86_dump_tunes);
+  set_ix86_tune_features (opts, opts->x_ix86_dump_tunes);
 
   ix86_recompute_optlev_based_flags (opts, opts_set);
 

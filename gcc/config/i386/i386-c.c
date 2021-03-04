@@ -646,6 +646,8 @@ ix86_pragma_target_parse (tree args, tree pop_target)
   enum processor_type cur_arch;
   enum processor_type cur_tune;
   enum fpmath_unit prev_fpmath = ix86_fpmath;
+  prev_arch  = (enum processor_type)ix86_arch;
+  prev_tune = (enum processor_type)ix86_tune;
 
   if (! args)
     {
@@ -679,10 +681,8 @@ ix86_pragma_target_parse (tree args, tree pop_target)
   prev_isa2  = prev_opt->x_ix86_isa_flags2;
   cur_isa2   = cur_opt->x_ix86_isa_flags2;
   diff_isa2  = (prev_isa2 ^ cur_isa2);
-  prev_arch = (enum processor_type) prev_opt->arch;
-  prev_tune = (enum processor_type) prev_opt->tune;
-  cur_arch  = (enum processor_type) cur_opt->arch;
-  cur_tune  = (enum processor_type) cur_opt->tune;
+  cur_arch  = (enum processor_type)ix86_arch;
+  cur_tune = (enum processor_type)ix86_tune;
 
   /* If the same processor is used for both previous and current options, don't
      change the macros.  */
@@ -771,8 +771,8 @@ ix86_target_macros (void)
 
   ix86_target_macros_internal (ix86_isa_flags,
 			       ix86_isa_flags2,
-			       ix86_arch,
-			       ix86_tune,
+			       (enum processor_type)ix86_arch,
+			       (enum processor_type)ix86_tune,
 			       ix86_fpmath,
 			       cpp_define);
 

@@ -58,12 +58,12 @@ bool ix86_unsafe_math_optimizations = false
 
 ;; Definitions to add to the cl_target_option structure
 ;; -march= processor
-TargetSave
-unsigned char arch
+NewTargetVariable
+unsigned char ix86_arch
 
 ;; -mtune= processor
-TargetSave
-unsigned char tune
+NewTargetVariable
+unsigned char ix86_tune
 
 ;; -march= processor-string
 TargetSave
@@ -90,16 +90,16 @@ TargetSave
 HOST_WIDE_INT x_ix86_isa_flags_explicit
 
 ;; whether -mtune was not specified
-TargetSave
+NewTargetVariable
 unsigned char tune_defaulted
 
 ;; whether -march was specified
-TargetSave
+NewTargetVariable
 unsigned char arch_specified
 
 ;; -mtune-ctrl=
-TargetSave
-const char *x_ix86_tune_ctrl_string
+NewTargetVariable
+const char *ix86_tune_ctrl_string
 
 ;; x86 options
 m128bit-long-double

@@ -2587,9 +2587,6 @@ extern unsigned int const num_arch_names;
 
 #endif
 
-extern enum processor_type ix86_tune;
-extern enum processor_type ix86_arch;
-
 /* Size of the RED_ZONE area.  */
 #define RED_ZONE_SIZE 128
 /* Reserved area of the red zone for temporaries.  */

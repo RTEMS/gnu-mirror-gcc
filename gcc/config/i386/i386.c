@@ -337,12 +337,6 @@ struct GTY(()) stack_local_entry {
   struct stack_local_entry *next;
 };
 
-/* Which cpu are we optimizing for.  */
-enum processor_type ix86_tune;
-
-/* Which instruction set architecture to use.  */
-enum processor_type ix86_arch;
-
 /* True if processor has SSE prefetch instruction.  */
 unsigned char ix86_prefetch_sse;
 
@@ -592,6 +586,8 @@ ix86_can_inline_p (tree caller, tree callee)
 	       != (callee_opts->x_target_flags & ~always_inline_safe_mask))
     ret = false;
 
+  // FIXME:
+#if 0
   /* See if arch, tune, etc. are the same.  */
   else if (caller_opts->arch != callee_opts->arch)
     ret = false;
@@ -599,8 +595,6 @@ ix86_can_inline_p (tree caller, tree callee)
   else if (!always_inline && caller_opts->tune != callee_opts->tune)
     ret = false;
 
-  // FIXME:
-#if 0
   else if (caller_opts->x_ix86_fpmath != callee_opts->x_ix86_fpmath
 	   /* If the calle doesn't use FP expressions differences in
 	      ix86_fpmath can be ignored.  We are called from FEs
