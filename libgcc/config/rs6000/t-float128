@@ -23,12 +23,14 @@ fp128_softfp_shared_obj	= $(addsuffix -sw_s$(objext),$(fp128_softfp_funcs))
 fp128_softfp_obj	= $(fp128_softfp_static_obj) $(fp128_softfp_shared_obj)
 
 # Decimal <-> _Float128 conversions
+ifeq ($(decimal_float),yes)
 fp128_dec_funcs		= _kf_to_sd _kf_to_dd _kf_to_td \
 			  _sd_to_kf _dd_to_kf _td_to_kf
 
 # _Float128 to/from string conversions that must be compiled with IBM 128-bit
 # long double.
 fp128_decstr_funcs	= _strtokf _sprintfkf
+endif
 
 # Decimal <-> __ibm128 conversions
 ibm128_dec_funcs	= _tf_to_sd _tf_to_dd _tf_to_td \
