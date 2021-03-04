@@ -22,8 +22,11 @@ BEGIN {
 	n_opts = 0
 	n_langs = 0
 	n_target_save = 0
+	n_new_target_save = 0
+	n_extra_vars = 0
 	n_extra_vars = 0
 	n_extra_target_vars = 0
+	n_extra_new_target_vars = 0
 	n_extra_masks = 0
 	n_extra_c_includes = 0
 	n_extra_h_includes = 0
@@ -73,6 +76,24 @@ BEGIN {
 			extra_target_vars[n_extra_target_vars] = name
 			extra_target_var_types[n_extra_target_vars] = type
 			n_extra_target_vars++
+		}
+		else if ($1 == "NewTargetVariable") {
+			extra_vars[n_extra_vars] = $2
+			n_extra_vars++
+
+			var = $2
+			sub(" *=.*", "", var)
+			orig_var = var
+			name = var
+			type = var
+			sub("^.*[ *]", "", name)
+			sub(" *" name "$", "", type)
+			new_target_save_decl[n_new_target_save] = type " x_" name
+			n_new_target_save++
+
+			extra_new_target_vars[n_extra_new_target_vars] = name
+			extra_new_target_var_types[n_extra_new_target_vars] = type
+			n_extra_new_target_vars++
 		}
 		else if ($1 == "HeaderInclude") {
 			extra_h_includes[n_extra_h_includes++] = $2;

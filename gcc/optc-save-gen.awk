@@ -142,8 +142,12 @@ for (i = 0; i < n_opt_char; i++) {
 	if (var_opt_range[name] != "")
 		print "  gcc_assert (IN_RANGE (opts->x_" name ", " var_opt_range[name] "));";
 }
-
 print "";
+
+for (i = 0; i < n_extra_new_target_vars; i++) {
+	print "  ptr->x_" extra_new_target_vars[i] " = opts->x_" extra_new_target_vars[i] ";";
+}
+
 for (i = 0; i < n_opt_other; i++) {
 	print "  ptr->x_" var_opt_other[i] " = opts->x_" var_opt_other[i] ";";
 }
@@ -251,6 +255,10 @@ print "void";
 print "cl_optimization_restore (struct gcc_options *opts, struct gcc_options *opts_set,";
 print "			 struct cl_optimization *ptr)";
 print "{";
+
+for (i = 0; i < n_extra_new_target_vars; i++) {
+	print "  opts->x_" extra_new_target_vars[i] " = ptr->x_" extra_new_target_vars[i] ";";
+}
 
 for (i = 0; i < n_opt_other; i++) {
 	print "  opts->x_" var_opt_other[i] " = ptr->x_" var_opt_other[i] ";";

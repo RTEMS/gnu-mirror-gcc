@@ -2888,6 +2888,7 @@ ix86_set_current_function (tree fndecl)
       else
 	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
     }
+  /* FIXME
   else if (flag_unsafe_math_optimizations
 	   != TREE_TARGET_OPTION (new_tree)->x_ix86_unsafe_math_optimizations
 	   || (flag_excess_precision
@@ -2906,6 +2907,7 @@ ix86_set_current_function (tree fndecl)
       else
 	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
     }
+    */
   ix86_previous_fndecl = fndecl;
 
   static bool prev_no_caller_saved_registers;

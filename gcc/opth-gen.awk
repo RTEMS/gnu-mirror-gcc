@@ -172,6 +172,11 @@ for (i = 0; i < n_opts; i++) {
 	}
 }
 
+# FIXME: sort by type - likely
+for (i = 0; i < n_new_target_save; i++) {
+	print "  " new_target_save_decl[i] ";";
+}
+
 for (i = 0; i < n_opt_other; i++) {
 	print "  " var_opt_other[i] ";";
 }
