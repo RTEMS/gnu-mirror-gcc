@@ -376,10 +376,11 @@ gori_map::dump (FILE *f, basic_block bb)
   fprintf (f, "bb<%-4u> exports: ",bb->index);
   // Dump the export vector.
   EXECUTE_IF_SET_IN_BITMAP (m_outgoing[bb->index], 0, y, bi)
-    {
-      print_generic_expr (f, ssa_name (y), TDF_SLIM);
-      fprintf (f, "  ");
-    }
+    if (ssa_name (y))
+      {
+	print_generic_expr (f, ssa_name (y), TDF_SLIM);
+	fprintf (f, "  ");
+      }
 
   range_def_chain::dump (f, bb, "         ");
   fputc ('\n', f);
@@ -1076,6 +1077,69 @@ gori_compute::dump (FILE *f)
 {
   gori_map::dump (f);
 }
+
+
+// Initialize a gori export stmt iterator on edge e.
+// This is different than just bitmap iteration because a stmt fo the form
+// if (x_4 < a_8) will have no defs, but we want to return this expresion.
+//
+gimple *
+gori_cond_iter_init (gori_export_iterator &iter, irange &r, edge e)
+{
+  iter.b = iter.gori.exports (e->src);
+  // No exports, means no stmts.
+  if (!iter.b)
+    return NULL;
+
+  // Set the bitmap iterator up.
+  bmp_iter_set_init (&iter.bi, iter.b, 1, &iter.y);
+  // Check first for a condition on the stmt.. ie if (a_3 > b_6)
+  gimple *s = gimple_outgoing_range_stmt_p (e->src);
+  if (s && is_a<gcond *> (s)
+      && gimple_range_ssa_p (gimple_cond_rhs (s))
+      && gimple_range_ssa_p (gimple_cond_lhs (s)))
+    {
+      // This will be the only stmt if the arguments aren't boolean.
+      // No point in iterating over the other names.
+      if (TREE_CODE (TREE_TYPE (gimple_cond_lhs (s))) != BOOLEAN_TYPE)
+	iter.b = NULL;
+      // Set the LHS range from the edge.
+      if (e->flags & EDGE_TRUE_VALUE)
+	r = int_range<2> (boolean_true_node, boolean_true_node);
+      else
+	r = int_range<2> (boolean_false_node, boolean_false_node);
+      return s;
+    }
+  // Otherwise start with the first iteration result.
+  return gori_cond_iter_next (iter, r, e);
+}
+
+// Return the next stmt in iterator ITER, setting the range of the LHS ro R
+gimple *
+gori_cond_iter_next (gori_export_iterator &iter, irange &r, edge e)
+{
+  if (!iter.b)
+    return NULL;
+  // Just follow bitmap iteration, and return NULL when done.
+  for ( ; bmp_iter_set (&iter.bi, &iter.y); bmp_iter_next (&iter.bi, &iter.y))
+    {
+      tree name = ssa_name (iter.y);
+      if (name && (TREE_CODE (TREE_TYPE (name)) == BOOLEAN_TYPE)
+	  && iter.gori.outgoing_edge_range_p (r, e, name) && r.singleton_p ())
+	{
+	  gimple *stmt = SSA_NAME_DEF_STMT (name);
+	  // Ignore default defs and such, just actual defining stmts.
+	  if (gimple_get_lhs (stmt) == name)
+	    {
+	      bmp_iter_next (&iter.bi, &iter.y);
+	      return stmt;
+	    }
+	}
+    }
+  return NULL;
+}
+
+
 
 // --------------------------------------------------------------------------
 

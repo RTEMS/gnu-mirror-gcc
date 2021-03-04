@@ -181,6 +181,43 @@ private:
 };
 
 
+// Used to assist with iterating over the GORI export list in various ways
+class gori_export_iterator {
+public:
+  inline gori_export_iterator (gori_compute &g) : gori (g)  { }
+  bitmap_iterator bi;
+  unsigned y;
+  bitmap b;
+  gori_compute& gori;
+};
+
+// For each name possibly exported from block BB.
+#define FOR_EACH_GORI_EXPORT_NAME(iter, bb, name)		\
+  (iter).b = (iter).gori.exports (bb);				\
+  if ((iter).b)							\
+    EXECUTE_IF_SET_IN_BITMAP ((iter).b, 1, (iter).y, (iter).bi)	\
+      if ((name) = ssa_name((iter).y))				\
+
+
+// For each name exported on edge e that calculates a range.
+#define FOR_EACH_GORI_EXPORT_RANGE(iter, e, name, r)		\
+  (iter).b = (iter).gori.exports ((e)->src);			\
+  if ((iter).b)							\
+    EXECUTE_IF_SET_IN_BITMAP ((iter).b, 1, (iter).y, (iter).bi)	\
+      if (((name) = ssa_name((iter).y))				\
+	  && outgoing_edge_range_p ((r), (e), (name)))
+
+
+// For each stmt that resolves to a TRUE or FALSE result on an edge.
+#define FOR_EACH_GORI_EXPORT_COND(iter, e, stmt, r)		\
+  for ((stmt) = gori_cond_iter_init ((iter), (r), (e));		\
+       (stmt);							\
+       (stmt) = gori_cond_iter_next ((iter), (r), (e)))
+
+gimple *gori_cond_iter_next (gori_export_iterator &iter, irange &r, edge e);
+gimple *gori_cond_iter_init (gori_export_iterator &iter, irange &r, edge e);
+
+
 // This class adds a cache to gori_computes for logical expressions.
 //       bool result = x && y
 // requires calcuation of both X and Y for both true and false results.

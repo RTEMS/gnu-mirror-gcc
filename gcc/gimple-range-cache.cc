@@ -1248,28 +1248,22 @@ ranger_cache::process_edge_relations (edge e)
   if (!single_pred_p (e->dest))
     return;
 
-  bitmap b = exports (e->src);
-  bitmap_iterator bi;
-  unsigned y;
+  gori_export_iterator iter (*this);
   int_range_max r;
+  gimple *stmt;
 
-  EXECUTE_IF_SET_IN_BITMAP (b, 1, y, bi)
+  FOR_EACH_GORI_EXPORT_COND (iter, e, stmt, r)
     {
-      tree name = ssa_name (y);
-      if (name && TREE_CODE (TREE_TYPE (name)) == BOOLEAN_TYPE
-	  && outgoing_edge_range_p (r, e, name) && r.singleton_p ())
+      range_operator *handler = gimple_range_handler (stmt);
+      if (!handler)
+	return;
+      tree ssa1 = gimple_range_ssa_p (gimple_range_operand1 (stmt));
+      tree ssa2 = gimple_range_ssa_p (gimple_range_operand2 (stmt));
+      if (ssa1 && ssa2)
 	{
-	  gimple *stmt = SSA_NAME_DEF_STMT (name);
-	  range_operator *handler = gimple_range_handler (stmt);
-	  if (!handler)
-	    return;
-	  tree ssa1 = gimple_range_ssa_p (gimple_range_operand1 (stmt));
-	  tree ssa2 = gimple_range_ssa_p (gimple_range_operand2 (stmt));
-	  if (ssa1 && ssa2)
-	    {
-	      relation_kind relation = handler->op1_op2_relation (r);
-	      m_oracle->register_relation (e, relation, ssa1, ssa2);
-	    }
+	  relation_kind relation = handler->op1_op2_relation (r);
+	  if (relation != VREL_NONE)
+	    m_oracle->register_relation (e, relation, ssa1, ssa2);
 	}
     }
 }
@@ -1372,33 +1366,11 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
   if (is_a<gcond *> (s))
     {
       basic_block bb = gimple_bb (s);
-      gcc_checking_assert (EDGE_COUNT (bb->succs) == 2);
-      gcc_checking_assert (!lhs);
-
-      edge e0 = EDGE_SUCC (bb, 0);
-      edge e1 = EDGE_SUCC (bb, 1);
-      // first, check for a non-boolean condition, ie if a_3 < b_4
-      if (ssa1 && ssa2)
-	{
-	  relation = handler->op1_op2_relation (m_bool_one);
-	  if (e0->flags & EDGE_FALSE_VALUE)
-	    relation = relation_negate (relation);
-	  if (relation != VREL_NONE)
-	    {
-	      m_oracle->register_relation (e0, relation, ssa1, ssa2);
-	      relation = relation_negate (relation);
-	      m_oracle->register_relation (e1, relation, ssa1, ssa2);
-	    }
-	}
-      // Assume that if there are 2 symbolics, there are no conditions
-      // higher up in the block we care about.
-      else
-	{
-	  process_edge_relations (e0);
-	  process_edge_relations (e1);
-	}
+      process_edge_relations (EDGE_SUCC (bb, 0));
+      process_edge_relations (EDGE_SUCC (bb, 1));
     }
 
+  // Deal with || and && when thre is a full set of symbolics.
   if (lhs && ssa1 && ssa2
       && (TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
       && (TREE_CODE (TREE_TYPE (ssa1)) == BOOLEAN_TYPE)
