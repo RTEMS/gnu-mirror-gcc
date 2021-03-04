@@ -65,14 +65,6 @@ unsigned char ix86_arch
 NewTargetVariable
 unsigned char ix86_tune
 
-;; -march= processor-string
-TargetSave
-const char *x_ix86_arch_string
-
-;; -mtune= processor-string
-TargetSave
-const char *x_ix86_tune_string
-
 ;; CPU schedule model
 NewTargetVariable
 unsigned char ix86_schedule
@@ -168,7 +160,7 @@ EnumValue
 Enum(ix86_align_data) String(cacheline) Value(ix86_align_data_type_cacheline)
 
 march=
-Target RejectNegative Negative(march=) Joined Var(ix86_arch_string)
+NewTarget RejectNegative Negative(march=) Joined Var(ix86_arch_string) PerFunction
 Generate code for given CPU.
 
 masm=
@@ -424,7 +416,7 @@ Target Mask(TLS_DIRECT_SEG_REFS)
 Use direct references against %gs when accessing tls data.
 
 mtune=
-Target RejectNegative Negative(mtune=) Joined Var(ix86_tune_string)
+NewTarget RejectNegative Negative(mtune=) Joined Var(ix86_tune_string) PerFunction
 Schedule code for given CPU.
 
 mtune-ctrl=
