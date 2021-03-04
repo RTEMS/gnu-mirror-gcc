@@ -108,10 +108,6 @@ unsigned char arch_specified
 TargetSave
 enum calling_abi x_ix86_abi
 
-;; -masm=
-TargetSave
-enum asm_dialect x_ix86_asm_dialect
-
 ;; -mbranch-cost=
 TargetSave
 int x_ix86_branch_cost
@@ -219,7 +215,7 @@ Target RejectNegative Negative(march=) Joined Var(ix86_arch_string)
 Generate code for given CPU.
 
 masm=
-Target RejectNegative Joined Enum(asm_dialect) Var(ix86_asm_dialect) Init(ASM_ATT)
+NewTarget RejectNegative Joined Enum(asm_dialect) Var(ix86_asm_dialect) Init(ASM_ATT) PerFunction
 Use given assembler dialect.
 
 Enum
