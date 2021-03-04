@@ -648,6 +648,8 @@ ix86_pragma_target_parse (tree args, tree pop_target)
   enum fpmath_unit prev_fpmath = ix86_fpmath;
   prev_arch  = (enum processor_type)ix86_arch;
   prev_tune = (enum processor_type)ix86_tune;
+  prev_isa  = ix86_isa_flags;
+  prev_isa2  = ix86_isa_flags2;
 
   if (! args)
     {
@@ -675,11 +677,9 @@ ix86_pragma_target_parse (tree args, tree pop_target)
   /* Figure out the previous/current isa, arch, tune and the differences.  */
   prev_opt  = TREE_TARGET_OPTION (prev_tree);
   cur_opt   = TREE_TARGET_OPTION (cur_tree);
-  prev_isa  = prev_opt->x_ix86_isa_flags;
-  cur_isa   = cur_opt->x_ix86_isa_flags;
   diff_isa  = (prev_isa ^ cur_isa);
-  prev_isa2  = prev_opt->x_ix86_isa_flags2;
-  cur_isa2   = cur_opt->x_ix86_isa_flags2;
+  cur_isa   = ix86_isa_flags;
+  cur_isa2   = ix86_isa_flags2;
   diff_isa2  = (prev_isa2 ^ cur_isa2);
   cur_arch  = (enum processor_type)ix86_arch;
   cur_tune = (enum processor_type)ix86_tune;

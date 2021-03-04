@@ -573,6 +573,8 @@ ix86_can_inline_p (tree caller, tree callee)
   /* Callee's isa options should be a subset of the caller's, i.e. a SSE4
      function can inline a SSE2 function but a SSE2 function can't inline
      a SSE4 function.  */
+  // FIXME:
+#if 0
   if (((caller_opts->x_ix86_isa_flags & callee_opts->x_ix86_isa_flags)
        != callee_opts->x_ix86_isa_flags)
       || ((caller_opts->x_ix86_isa_flags2 & callee_opts->x_ix86_isa_flags2)
@@ -586,8 +588,6 @@ ix86_can_inline_p (tree caller, tree callee)
 	       != (callee_opts->x_target_flags & ~always_inline_safe_mask))
     ret = false;
 
-  // FIXME:
-#if 0
   /* See if arch, tune, etc. are the same.  */
   else if (caller_opts->arch != callee_opts->arch)
     ret = false;
@@ -609,9 +609,9 @@ ix86_can_inline_p (tree caller, tree callee)
   else if (!always_inline
 	   && caller_opts->branch_cost != callee_opts->branch_cost)
     ret = false;
-#endif
 
   else
+#endif
     ret = true;
 
   return ret;
@@ -1234,7 +1234,7 @@ ix86_function_sseregparm (const_tree type, const_tree decl, bool warn)
 	     See PR66047  */
 	  if (!TARGET_SSE && warn)
 	    return -1;
-	  return TARGET_SSE2_P (target_opts_for_fn (target->decl)
+	  return TARGET_SSE2_P (opts_for_fn (target->decl)
 				->x_ix86_isa_flags) ? 2 : 1;
 	}
     }

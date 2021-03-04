@@ -22,10 +22,10 @@ HeaderInclude
 config/i386/i386-opts.h
 
 ; Bit flags that specify the ISA we are compiling for.
-Variable
+NewTargetVariable
 HOST_WIDE_INT ix86_isa_flags = TARGET_64BIT_DEFAULT | TARGET_SUBTARGET_ISA_DEFAULT
 
-Variable
+NewTargetVariable
 HOST_WIDE_INT ix86_isa_flags2 = 0
 
 ; A mask of ix86_isa_flags that includes bit X if X was set or cleared
@@ -512,63 +512,63 @@ Enum(prefer_vector_width) String(512) Value(PVW_AVX512)
 ;; ISA support
 
 m32
-Target RejectNegative Negative(m64) InverseMask(ISA_64BIT) Var(ix86_isa_flags) Save
+NewTarget RejectNegative Negative(m64) InverseMask(ISA_64BIT) Var(ix86_isa_flags) PerFunction
 Generate 32bit i386 code.
 
 m64
-Target RejectNegative Negative(mx32) Mask(ABI_64) Var(ix86_isa_flags) Save
+NewTarget RejectNegative Negative(mx32) Mask(ABI_64) Var(ix86_isa_flags) PerFunction
 Generate 64bit x86-64 code.
 
 mx32
-Target RejectNegative Negative(m16) Mask(ABI_X32) Var(ix86_isa_flags) Save
+NewTarget RejectNegative Negative(m16) Mask(ABI_X32) Var(ix86_isa_flags) PerFunction
 Generate 32bit x86-64 code.
 
 m16
-Target RejectNegative Negative(m32) Mask(CODE16) InverseMask(ISA_64BIT) Var(ix86_isa_flags) Save
+NewTarget RejectNegative Negative(m32) Mask(CODE16) InverseMask(ISA_64BIT) Var(ix86_isa_flags) PerFunction
 Generate 16bit i386 code.
 
 mmmx
-Target Mask(ISA_MMX) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_MMX) Var(ix86_isa_flags) PerFunction
 Support MMX built-in functions.
 
 m3dnow
-Target Mask(ISA_3DNOW) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_3DNOW) Var(ix86_isa_flags) PerFunction
 Support 3DNow! built-in functions.
 
 m3dnowa
-Target Mask(ISA_3DNOW_A) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_3DNOW_A) Var(ix86_isa_flags) PerFunction
 Support Athlon 3Dnow! built-in functions.
 
 msse
-Target Mask(ISA_SSE) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE) Var(ix86_isa_flags) PerFunction
 Support MMX and SSE built-in functions and code generation.
 
 msse2
-Target Mask(ISA_SSE2) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE2) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE and SSE2 built-in functions and code generation.
 
 msse3
-Target Mask(ISA_SSE3) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE3) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2 and SSE3 built-in functions and code generation.
 
 mssse3
-Target Mask(ISA_SSSE3) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSSE3) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3 and SSSE3 built-in functions and code generation.
 
 msse4.1
-Target Mask(ISA_SSE4_1) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE4_1) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3 and SSE4.1 built-in functions and code generation.
 
 msse4.2
-Target Mask(ISA_SSE4_2) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE4_2) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1 and SSE4.2 built-in functions and code generation.
 
 msse4
-Target RejectNegative Mask(ISA_SSE4_2) Var(ix86_isa_flags) Save
+NewTarget RejectNegative Mask(ISA_SSE4_2) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1 and SSE4.2 built-in functions and code generation.
 
 mno-sse4
-Target RejectNegative InverseMask(ISA_SSE4_1) Var(ix86_isa_flags) Save
+NewTarget RejectNegative InverseMask(ISA_SSE4_1) Var(ix86_isa_flags) PerFunction
 Do not support SSE4.1 and SSE4.2 built-in functions and code generation.
 
 msse5
@@ -576,230 +576,230 @@ Target Undocumented Alias(mavx) Warn(%<-msse5%> was removed)
 ;; Deprecated
 
 mavx
-Target Mask(ISA_AVX) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2 and AVX built-in functions and code generation.
 
 mavx2
-Target Mask(ISA_AVX2) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX2) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX and AVX2 built-in functions and code generation.
 
 mavx512f
-Target Mask(ISA_AVX512F) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512F) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F built-in functions and code generation.
 
 mavx512pf
-Target Mask(ISA_AVX512PF) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512PF) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512PF built-in functions and code generation.
 
 mavx512er
-Target Mask(ISA_AVX512ER) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512ER) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512ER built-in functions and code generation.
 
 mavx512cd
-Target Mask(ISA_AVX512CD) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512CD) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512CD built-in functions and code generation.
 
 mavx512dq
-Target Mask(ISA_AVX512DQ) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512DQ) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512DQ built-in functions and code generation.
 
 mavx512bw
-Target Mask(ISA_AVX512BW) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512BW) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512BW built-in functions and code generation.
 
 mavx512vl
-Target Mask(ISA_AVX512VL) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512VL) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512VL built-in functions and code generation.
 
 mavx512ifma
-Target Mask(ISA_AVX512IFMA) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512IFMA) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512IFMA built-in functions and code generation.
 
 mavx512vbmi
-Target Mask(ISA_AVX512VBMI) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512VBMI) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2 and AVX512F and AVX512VBMI built-in functions and code generation.
 
 mavx5124fmaps
-Target Mask(ISA2_AVX5124FMAPS) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AVX5124FMAPS) Var(ix86_isa_flags2) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and AVX5124FMAPS built-in functions and code generation.
 
 mavx5124vnniw
-Target Mask(ISA2_AVX5124VNNIW) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AVX5124VNNIW) Var(ix86_isa_flags2) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and AVX5124VNNIW built-in functions and code generation.
 
 mavx512vpopcntdq
-Target Mask(ISA_AVX512VPOPCNTDQ) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512VPOPCNTDQ) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and AVX512VPOPCNTDQ built-in functions and code generation.
 
 mavx512vbmi2
-Target Mask(ISA_AVX512VBMI2) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512VBMI2) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and AVX512VBMI2 built-in functions and code generation.
 
 mavx512vnni
-Target Mask(ISA_AVX512VNNI) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512VNNI) Var(ix86_isa_flags) PerFunction
 Support AVX512VNNI built-in functions and code generation.
 
 mavx512bitalg
-Target Mask(ISA_AVX512BITALG) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AVX512BITALG) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and AVX512BITALG built-in functions and code generation.
 
 mavx512vp2intersect
-Target Mask(ISA2_AVX512VP2INTERSECT) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AVX512VP2INTERSECT) Var(ix86_isa_flags2) PerFunction
 Support AVX512VP2INTERSECT built-in functions and code generation.
 
 mfma
-Target Mask(ISA_FMA) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_FMA) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX and FMA built-in functions and code generation.
 
 msse4a
-Target Mask(ISA_SSE4A) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SSE4A) Var(ix86_isa_flags) PerFunction
 Support MMX, SSE, SSE2, SSE3 and SSE4A built-in functions and code generation.
 
 mfma4
-Target Mask(ISA_FMA4) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_FMA4) Var(ix86_isa_flags) PerFunction
 Support FMA4 built-in functions and code generation.
 
 mxop
-Target Mask(ISA_XOP) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_XOP) Var(ix86_isa_flags) PerFunction
 Support XOP built-in functions and code generation.
 
 mlwp
-Target Mask(ISA_LWP) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_LWP) Var(ix86_isa_flags) PerFunction
 Support LWP built-in functions and code generation.
 
 mabm
-Target Mask(ISA_ABM) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_ABM) Var(ix86_isa_flags) PerFunction
 Support code generation of Advanced Bit Manipulation (ABM) instructions.
 
 mpopcnt
-Target Mask(ISA_POPCNT) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_POPCNT) Var(ix86_isa_flags) PerFunction
 Support code generation of popcnt instruction.
 
 mpconfig
-Target Mask(ISA2_PCONFIG) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_PCONFIG) Var(ix86_isa_flags2) PerFunction
 Support PCONFIG built-in functions and code generation.
 
 mwbnoinvd
-Target Mask(ISA2_WBNOINVD) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_WBNOINVD) Var(ix86_isa_flags2) PerFunction
 Support WBNOINVD built-in functions and code generation.
 
 mptwrite
-Target Mask(ISA2_PTWRITE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_PTWRITE) Var(ix86_isa_flags2) PerFunction
 Support PTWRITE built-in functions and code generation.
 
 muintr
-Target Mask(ISA2_UINTR) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_UINTR) Var(ix86_isa_flags2) PerFunction
 Support UINTR built-in functions and code generation.
 
 msgx
-Target Mask(ISA2_SGX) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_SGX) Var(ix86_isa_flags2) PerFunction
 Support SGX built-in functions and code generation.
 
 mrdpid
-Target Mask(ISA2_RDPID) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_RDPID) Var(ix86_isa_flags2) PerFunction
 Support RDPID built-in functions and code generation.
 
 mgfni
-Target Mask(ISA_GFNI) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_GFNI) Var(ix86_isa_flags) PerFunction
 Support GFNI built-in functions and code generation.
 
 mvaes
-Target Mask(ISA2_VAES) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_VAES) Var(ix86_isa_flags2) PerFunction
 Support VAES built-in functions and code generation.
 
 mvpclmulqdq
-Target Mask(ISA_VPCLMULQDQ) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_VPCLMULQDQ) Var(ix86_isa_flags) PerFunction
 Support VPCLMULQDQ built-in functions and code generation.
 
 mbmi
-Target Mask(ISA_BMI) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_BMI) Var(ix86_isa_flags) PerFunction
 Support BMI built-in functions and code generation.
 
 mbmi2
-Target Mask(ISA_BMI2) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_BMI2) Var(ix86_isa_flags) PerFunction
 Support BMI2 built-in functions and code generation.
 
 mlzcnt
-Target Mask(ISA_LZCNT) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_LZCNT) Var(ix86_isa_flags) PerFunction
 Support LZCNT built-in function and code generation.
 
 mhle
-Target Mask(ISA2_HLE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_HLE) Var(ix86_isa_flags2) PerFunction
 Support Hardware Lock Elision prefixes.
 
 mrdseed
-Target Mask(ISA_RDSEED) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_RDSEED) Var(ix86_isa_flags) PerFunction
 Support RDSEED instruction.
 
 mprfchw
-Target Mask(ISA_PRFCHW) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_PRFCHW) Var(ix86_isa_flags) PerFunction
 Support PREFETCHW instruction.
 
 madx
-Target Mask(ISA_ADX) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_ADX) Var(ix86_isa_flags) PerFunction
 Support flag-preserving add-carry instructions.
 
 mclflushopt
-Target Mask(ISA_CLFLUSHOPT) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_CLFLUSHOPT) Var(ix86_isa_flags) PerFunction
 Support CLFLUSHOPT instructions.
 
 mclwb
-Target Mask(ISA_CLWB) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_CLWB) Var(ix86_isa_flags) PerFunction
 Support CLWB instruction.
 
 mpcommit
 Target WarnRemoved
 
 mfxsr
-Target Mask(ISA_FXSR) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_FXSR) Var(ix86_isa_flags) PerFunction
 Support FXSAVE and FXRSTOR instructions.
 
 mxsave
-Target Mask(ISA_XSAVE) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_XSAVE) Var(ix86_isa_flags) PerFunction
 Support XSAVE and XRSTOR instructions.
 
 mxsaveopt
-Target Mask(ISA_XSAVEOPT) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_XSAVEOPT) Var(ix86_isa_flags) PerFunction
 Support XSAVEOPT instruction.
 
 mxsavec
-Target Mask(ISA_XSAVEC) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_XSAVEC) Var(ix86_isa_flags) PerFunction
 Support XSAVEC instructions.
 
 mxsaves
-Target Mask(ISA_XSAVES) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_XSAVES) Var(ix86_isa_flags) PerFunction
 Support XSAVES and XRSTORS instructions.
 
 mtbm
-Target Mask(ISA_TBM) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_TBM) Var(ix86_isa_flags) PerFunction
 Support TBM built-in functions and code generation.
 
 mcx16
-Target Mask(ISA2_CX16) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_CX16) Var(ix86_isa_flags2) PerFunction
 Support code generation of cmpxchg16b instruction.
 
 msahf
-Target Mask(ISA_SAHF) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SAHF) Var(ix86_isa_flags) PerFunction
 Support code generation of sahf instruction in 64bit x86-64 code.
 
 mmovbe
-Target Mask(ISA2_MOVBE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_MOVBE) Var(ix86_isa_flags2) PerFunction
 Support code generation of movbe instruction.
 
 mcrc32
-Target Mask(ISA_CRC32) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_CRC32) Var(ix86_isa_flags) PerFunction
 Support code generation of crc32 instruction.
 
 maes
-Target Mask(ISA_AES) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_AES) Var(ix86_isa_flags) PerFunction
 Support AES built-in functions and code generation.
 
 msha
-Target Mask(ISA_SHA) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SHA) Var(ix86_isa_flags) PerFunction
 Support SHA1 and SHA256 built-in functions and code generation.
 
 mpclmul
-Target Mask(ISA_PCLMUL) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_PCLMUL) Var(ix86_isa_flags) PerFunction
 Support PCLMUL built-in functions and code generation.
 
 msse2avx
@@ -807,19 +807,19 @@ NewTarget Var(ix86_sse2avx)
 Encode SSE instructions with VEX prefix.
 
 mfsgsbase
-Target Mask(ISA_FSGSBASE) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_FSGSBASE) Var(ix86_isa_flags) PerFunction
 Support FSGSBASE built-in functions and code generation.
 
 mrdrnd
-Target Mask(ISA_RDRND) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_RDRND) Var(ix86_isa_flags) PerFunction
 Support RDRND built-in functions and code generation.
 
 mf16c
-Target Mask(ISA_F16C) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_F16C) Var(ix86_isa_flags) PerFunction
 Support F16C built-in functions and code generation.
 
 mprefetchwt1
-Target Mask(ISA_PREFETCHWT1) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_PREFETCHWT1) Var(ix86_isa_flags) PerFunction
 Support PREFETCHWT1 built-in functions and code generation.
 
 mfentry
@@ -860,7 +860,7 @@ Target Mask(AVX256_SPLIT_UNALIGNED_STORE) Save
 Split 32-byte AVX unaligned store.
 
 mrtm
-Target Mask(ISA_RTM) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_RTM) Var(ix86_isa_flags) PerFunction
 Support RTM built-in functions and code generation.
 
 mmpx
@@ -868,15 +868,15 @@ Target WarnRemoved
 Removed in GCC 9.  This switch has no effect.
 
 mmwaitx
-Target Mask(ISA2_MWAITX) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_MWAITX) Var(ix86_isa_flags2) PerFunction
 Support MWAITX and MONITORX built-in functions and code generation.
 
 mclzero
-Target Mask(ISA2_CLZERO) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_CLZERO) Var(ix86_isa_flags2) PerFunction
 Support CLZERO built-in functions and code generation.
 
 mpku
-Target Mask(ISA_PKU) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_PKU) Var(ix86_isa_flags) PerFunction
 Support PKU built-in functions and code generation.
 
 mstack-protector-guard=
@@ -919,7 +919,7 @@ NewTarget RejectNegative Mask(GENERAL_REGS_ONLY) Var(ix86_target_flags) PerFunct
 Generate code which uses only the general registers.
 
 mshstk
-Target Mask(ISA_SHSTK) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_SHSTK) Var(ix86_isa_flags) PerFunction
 Enable shadow stack built-in functions from Control-flow Enforcement
 Technology (CET).
 
@@ -966,19 +966,19 @@ Target Var(ix86_indirect_branch_register) Init(0)
 Force indirect call and jump via register.
 
 mmovdiri
-Target Mask(ISA_MOVDIRI) Var(ix86_isa_flags) Save
+NewTarget Mask(ISA_MOVDIRI) Var(ix86_isa_flags) PerFunction
 Support MOVDIRI built-in functions and code generation.
 
 mmovdir64b
-Target Mask(ISA2_MOVDIR64B) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_MOVDIR64B) Var(ix86_isa_flags2) PerFunction
 Support MOVDIR64B built-in functions and code generation.
 
 mwaitpkg
-Target Mask(ISA2_WAITPKG) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_WAITPKG) Var(ix86_isa_flags2) PerFunction
 Support WAITPKG built-in functions and code generation.
 
 mcldemote
-Target Mask(ISA2_CLDEMOTE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_CLDEMOTE) Var(ix86_isa_flags2) PerFunction
 Support CLDEMOTE built-in functions and code generation.
 
 minstrument-return=
@@ -1003,48 +1003,48 @@ Target Var(ix86_flag_record_return) Init(0)
 Generate a __return_loc section pointing to all return instrumentation code.
 
 mavx512bf16
-Target Mask(ISA2_AVX512BF16) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AVX512BF16) Var(ix86_isa_flags2) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, AVX512F and
 AVX512BF16 built-in functions and code generation.
 
 menqcmd
-Target Mask(ISA2_ENQCMD) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_ENQCMD) Var(ix86_isa_flags2) PerFunction
 Support ENQCMD built-in functions and code generation.
 
 mserialize
-Target Mask(ISA2_SERIALIZE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_SERIALIZE) Var(ix86_isa_flags2) PerFunction
 Support SERIALIZE built-in functions and code generation.
 
 mtsxldtrk
-Target Mask(ISA2_TSXLDTRK) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_TSXLDTRK) Var(ix86_isa_flags2) PerFunction
 Support TSXLDTRK built-in functions and code generation.
 
 mamx-tile
-Target Mask(ISA2_AMX_TILE) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AMX_TILE) Var(ix86_isa_flags2) PerFunction
 Support AMX-TILE built-in functions and code generation.
 
 mamx-int8
-Target Mask(ISA2_AMX_INT8) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AMX_INT8) Var(ix86_isa_flags2) PerFunction
 Support AMX-INT8 built-in functions and code generation.
 
 mamx-bf16
-Target Mask(ISA2_AMX_BF16) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AMX_BF16) Var(ix86_isa_flags2) PerFunction
 Support AMX-BF16 built-in functions and code generation.
 
 mhreset
-Target Mask(ISA2_HRESET) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_HRESET) Var(ix86_isa_flags2) PerFunction
 Support HRESET built-in functions and code generation.
 
 mkl
-Target Mask(ISA2_KL) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_KL) Var(ix86_isa_flags2) PerFunction
 Support KL built-in functions and code generation.
 
 mwidekl
-Target Mask(ISA2_WIDEKL) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_WIDEKL) Var(ix86_isa_flags2) PerFunction
 Support WIDEKL built-in functions and code generation.
 
 mavxvnni
-Target Mask(ISA2_AVXVNNI) Var(ix86_isa_flags2) Save
+NewTarget Mask(ISA2_AVXVNNI) Var(ix86_isa_flags2) PerFunction
 Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AVX2, and
 AVXVNNI built-in functions and code generation.
 

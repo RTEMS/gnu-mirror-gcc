@@ -757,7 +757,7 @@ ix86_function_specific_print (FILE *file, int indent,
 			      struct cl_target_option *ptr)
 {
   char *target_string
-    = ix86_target_string (ptr->x_ix86_isa_flags, ptr->x_ix86_isa_flags2,
+    = ix86_target_string (0, 0,
 			  NULL, NULL,
 			  NULL, NULL,
 			  false, true);
@@ -807,9 +807,10 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
      ix86_option_override_internal, and then save the options away.
      The string options are attribute options, and will be undone
      when we copy the save structure.  */
-  if (opts->x_ix86_isa_flags != def->x_ix86_isa_flags
-      || opts->x_ix86_isa_flags2 != def->x_ix86_isa_flags2
-      || opts->x_target_flags != def->x_target_flags
+//  if (opts->x_ix86_isa_flags != def->x_ix86_isa_flags
+//      || opts->x_ix86_isa_flags2 != def->x_ix86_isa_flags2
+  if (
+      opts->x_target_flags != def->x_target_flags
       || option_strings[IX86_FUNCTION_SPECIFIC_ARCH]
       || option_strings[IX86_FUNCTION_SPECIFIC_TUNE]
       || enum_opts_set.x_ix86_fpmath

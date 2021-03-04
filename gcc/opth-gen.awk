@@ -143,6 +143,12 @@ var_opt_char[1] = "unsigned char x_optimize_size";
 var_opt_char[2] = "unsigned char x_optimize_debug";
 var_opt_char[3] = "unsigned char x_optimize_fast";
 
+# FIXME: sort by type - likely
+for (i = 0; i < n_new_target_save; i++) {
+	print "  " new_target_save_decl[i] ";";
+}
+
+
 for (i = 0; i < n_opts; i++) {
 	if (flag_set_p("(Optimization|PerFunction)", flags[i])) {
 		name = var_name(flags[i])
@@ -150,6 +156,10 @@ for (i = 0; i < n_opts; i++) {
 			continue;
 
 		if(name in var_opt_seen)
+			continue;
+
+		# FIXME
+		if(name == "ix86_isa_flags" || name == "ix86_isa_flags2")
 			continue;
 
 		var_opt_seen[name]++;
@@ -170,11 +180,6 @@ for (i = 0; i < n_opts; i++) {
 		else
 			var_opt_other[n_opt_other++] = otype "x_" name;
 	}
-}
-
-# FIXME: sort by type - likely
-for (i = 0; i < n_new_target_save; i++) {
-	print "  " new_target_save_decl[i] ";";
 }
 
 for (i = 0; i < n_opt_other; i++) {
@@ -397,6 +402,9 @@ for (i = 0; i < n_opts; i++) {
 		vname = var_name(flags[i])
 		mask = "MASK_"
 		mask_1 = "1U"
+		# FIXME
+		if (vname == "ix86_isa_flags" || vname == "ix86_isa_flags2")
+			mask_1 = "HOST_WIDE_INT_1U"
 		if (vname != "") {
 			mask = "OPTION_MASK_"
 			if (host_wide_int[vname] == "yes")
@@ -417,12 +425,13 @@ for (var in masknum) {
 		print "#error too many masks for " var
 		print "#endif"
 	}
-	else if (masknum[var] > 32) {
-		if (var == "")
-			print "#error too many target masks"
-		else
-			print "#error too many masks for " var
-	}
+	#FIXME
+#	else if (masknum[var] > 32) {
+#		if (var == "")
+#			print "#error too many target masks"
+#		else
+#			print "#error too many masks for " var
+#	}
 }
 print ""
 

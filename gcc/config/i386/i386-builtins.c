@@ -1444,8 +1444,8 @@ static tree ix86_get_builtin (enum ix86_builtins code)
 
   opts = TREE_TARGET_OPTION (target_tree);
 
-  if ((ix86_builtins_isa[(int) code].isa & opts->x_ix86_isa_flags)
-      || (ix86_builtins_isa[(int) code].isa2 & opts->x_ix86_isa_flags2))
+  if ((ix86_builtins_isa[(int) code].isa & ix86_isa_flags)
+      || (ix86_builtins_isa[(int) code].isa2 & ix86_isa_flags2))
     return ix86_builtin_decl (code, true);
   else
     return NULL_TREE;
@@ -1902,7 +1902,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 		  switch (ix86_arch)
 		    {
 		    case PROCESSOR_NEHALEM:
-		      if (TARGET_PCLMUL_P (new_target->x_ix86_isa_flags))
+		      if (TARGET_PCLMUL_P (ix86_isa_flags))
 			{
 			  arg_str = "westmere";
 			  priority = P_PCLMUL;
@@ -1918,14 +1918,14 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 			}
 		      break;
 		    case PROCESSOR_SANDYBRIDGE:
-		      if (TARGET_F16C_P (new_target->x_ix86_isa_flags))
+		      if (TARGET_F16C_P (ix86_isa_flags))
 			arg_str = "ivybridge";
 		      else
 			arg_str = "sandybridge";
 		      priority = P_PROC_AVX;
 		      break;
 		    case PROCESSOR_HASWELL:
-		      if (TARGET_ADX_P (new_target->x_ix86_isa_flags))
+		      if (TARGET_ADX_P (ix86_isa_flags))
 			arg_str = "broadwell";
 		      else
 			arg_str = "haswell";
