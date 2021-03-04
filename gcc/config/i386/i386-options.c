@@ -602,12 +602,8 @@ ix86_function_specific_save (struct cl_target_option *ptr,
   ptr->arch_specified = ix86_arch_specified;
   ptr->x_ix86_isa_flags_explicit = opts->x_ix86_isa_flags_explicit;
   ptr->x_ix86_isa_flags2_explicit = opts->x_ix86_isa_flags2_explicit;
-  ptr->x_recip_mask_explicit = opts->x_recip_mask_explicit;
   ptr->x_ix86_arch_string = opts->x_ix86_arch_string;
   ptr->x_ix86_tune_string = opts->x_ix86_tune_string;
-  ptr->x_ix86_dump_tunes = opts->x_ix86_dump_tunes;
-  ptr->x_ix86_force_drap = opts->x_ix86_force_drap;
-  ptr->x_ix86_section_threshold = opts->x_ix86_section_threshold;
   ptr->x_ix86_tune_ctrl_string = opts->x_ix86_tune_ctrl_string;
   ptr->x_ix86_tune_memcpy_strategy = opts->x_ix86_tune_memcpy_strategy;
   ptr->x_ix86_tune_memset_strategy = opts->x_ix86_tune_memset_strategy;
@@ -722,12 +718,8 @@ ix86_function_specific_restore (struct gcc_options *opts,
   ix86_arch_specified = ptr->arch_specified;
   opts->x_ix86_isa_flags_explicit = ptr->x_ix86_isa_flags_explicit;
   opts->x_ix86_isa_flags2_explicit = ptr->x_ix86_isa_flags2_explicit;
-  opts->x_recip_mask_explicit = ptr->x_recip_mask_explicit;
   opts->x_ix86_arch_string = ptr->x_ix86_arch_string;
   opts->x_ix86_tune_string = ptr->x_ix86_tune_string;
-  opts->x_ix86_dump_tunes = ptr->x_ix86_dump_tunes;
-  opts->x_ix86_force_drap = ptr->x_ix86_force_drap;
-  opts->x_ix86_section_threshold = ptr->x_ix86_section_threshold;
   opts->x_ix86_tune_ctrl_string = ptr->x_ix86_tune_ctrl_string;
   opts->x_ix86_tune_memcpy_strategy = ptr->x_ix86_tune_memcpy_strategy;
   opts->x_ix86_tune_memset_strategy = ptr->x_ix86_tune_memset_strategy;

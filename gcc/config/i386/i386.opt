@@ -40,14 +40,11 @@ HOST_WIDE_INT ix86_isa_flags2_explicit
 Variable
 int ix86_target_flags
 
-TargetVariable
+NewTargetVariable
 int recip_mask = RECIP_MASK_DEFAULT
 
-Variable
+NewTargetVariable
 int recip_mask_explicit
-
-TargetSave
-int x_recip_mask_explicit
 
 ;; A copy of flag_excess_precision as a target variable that should
 ;; force a different DECL_FUNCTION_SPECIFIC_TARGET upon
@@ -99,18 +96,6 @@ unsigned char tune_defaulted
 ;; whether -march was specified
 TargetSave
 unsigned char arch_specified
-
-;; -mdump-tune-features=
-TargetSave
-int x_ix86_dump_tunes
-
-;; -mforce-drap=
-TargetSave
-int x_ix86_force_drap
-
-;; -mlarge-data-threshold=
-TargetSave
-int x_ix86_section_threshold
 
 ;; -mtune-ctrl=
 TargetSave
@@ -217,7 +202,7 @@ NewTarget RejectNegative Joined UInteger Var(ix86_branch_cost) IntegerRange(0, 5
 Branches are this expensive (arbitrary units).
 
 mlarge-data-threshold=
-Target RejectNegative Joined UInteger Var(ix86_section_threshold) Init(DEFAULT_LARGE_SECTION_THRESHOLD)
+NewTarget RejectNegative Joined UInteger Var(ix86_section_threshold) Init(DEFAULT_LARGE_SECTION_THRESHOLD) PerFunction
 -mlarge-data-threshold=<number>	Data greater than given threshold will go into .ldata section in x86-64 medium model.
 
 mcmodel=
@@ -265,7 +250,7 @@ Target RejectNegative InverseMask(NO_FANCY_MATH_387, USE_FANCY_MATH_387) Save
 Generate sin, cos, sqrt for FPU.
 
 mforce-drap
-Target Var(ix86_force_drap)
+NewTarget Var(ix86_force_drap) PerFunction
 Always use Dynamic Realigned Argument Pointer (DRAP) to realign stack.
 
 mfp-ret-in-387
@@ -463,7 +448,7 @@ Target RejectNegative Var(ix86_tune_no_default)
 Clear all tune features.
 
 mdump-tune-features
-Target RejectNegative Var(ix86_dump_tunes)
+NewTarget RejectNegative Var(ix86_dump_tunes) PerFunction
 
 miamcu
 Target Mask(IAMCU)
