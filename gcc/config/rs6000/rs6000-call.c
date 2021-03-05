@@ -14581,12 +14581,114 @@ new_cpu_expand_builtin (enum rs6000_gen_builtins fcode,
 static insn_code
 elemrev_icode (rs6000_gen_builtins fcode)
 {
+  switch (fcode)
+    {
+    default:
+      gcc_unreachable ();
+    case RS6000_BIF_ST_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v1ti
+	      : CODE_FOR_vsx_st_elemrev_v1ti);
+    case RS6000_BIF_ST_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2df
+	      : CODE_FOR_vsx_st_elemrev_v2df);
+    case RS6000_BIF_ST_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v2di
+	      : CODE_FOR_vsx_st_elemrev_v2di);
+    case RS6000_BIF_ST_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4sf
+	      : CODE_FOR_vsx_st_elemrev_v4sf);
+    case RS6000_BIF_ST_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v4si
+	      : CODE_FOR_vsx_st_elemrev_v4si);
+    case RS6000_BIF_ST_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v8hi
+	      : CODE_FOR_vsx_st_elemrev_v8hi);
+    case RS6000_BIF_ST_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_store_v16qi
+	      : CODE_FOR_vsx_st_elemrev_v16qi);
+    case RS6000_BIF_LD_ELEMREV_V2DF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2df
+	      : CODE_FOR_vsx_ld_elemrev_v2df);
+    case RS6000_BIF_LD_ELEMREV_V1TI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v1ti
+	      : CODE_FOR_vsx_ld_elemrev_v1ti);
+    case RS6000_BIF_LD_ELEMREV_V2DI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v2di
+	      : CODE_FOR_vsx_ld_elemrev_v2di);
+    case RS6000_BIF_LD_ELEMREV_V4SF:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4sf
+	      : CODE_FOR_vsx_ld_elemrev_v4sf);
+    case RS6000_BIF_LD_ELEMREV_V4SI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v4si
+	      : CODE_FOR_vsx_ld_elemrev_v4si);
+    case RS6000_BIF_LD_ELEMREV_V8HI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v8hi
+	      : CODE_FOR_vsx_ld_elemrev_v8hi);
+    case RS6000_BIF_LD_ELEMREV_V16QI:
+      return (BYTES_BIG_ENDIAN ? CODE_FOR_vsx_load_v16qi
+	      : CODE_FOR_vsx_ld_elemrev_v16qi);
+    }
+  gcc_unreachable ();
   return (insn_code) 0;
 }
 
 static rtx
 ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
 {
+  rtx pat, addr;
+  bool blk = (icode == CODE_FOR_altivec_lvlx
+	      || icode == CODE_FOR_altivec_lvlxl
+	      || icode == CODE_FOR_altivec_lvrx
+	      || icode == CODE_FOR_altivec_lvrxl);
+
+  if (target == 0
+      || GET_MODE (target) != tmode
+      || ! (*insn_data[icode].operand[0].predicate) (target, tmode))
+    target = gen_reg_rtx (tmode);
+
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  /* For LVX, express the RTL accurately by ANDing the address with -16.
+     LVXL and LVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_lvx_v1ti
+      || icode == CODE_FOR_altivec_lvx_v2df
+      || icode == CODE_FOR_altivec_lvx_v2di
+      || icode == CODE_FOR_altivec_lvx_v4sf
+      || icode == CODE_FOR_altivec_lvx_v4si
+      || icode == CODE_FOR_altivec_lvx_v8hi
+      || icode == CODE_FOR_altivec_lvx_v16qi)
+    {
+      rtx rawaddr;
+      if (op[0] == const0_rtx)
+	rawaddr = op[1];
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[1], op[0]);
+	}
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (blk ? BLKmode : tmode, addr);
+
+      emit_insn (gen_rtx_SET (target, addr));
+    }
+  else
+    {
+      if (op[0] == const0_rtx)
+	addr = gen_rtx_MEM (blk ? BLKmode : tmode, op[1]);
+      else
+	{
+	  op[0] = copy_to_mode_reg (Pmode, op[0]);
+	  addr = gen_rtx_MEM (blk ? BLKmode : tmode,
+			      gen_rtx_PLUS (Pmode, op[1], op[0]));
+	}
+
+      pat = GEN_FCN (icode) (target, addr);
+      if (! pat)
+	return 0;
+      emit_insn (pat);
+    }
+
   return target;
 }
 
@@ -14594,6 +14696,42 @@ static rtx
 lxvrse_expand_builtin (rtx target, insn_code icode, rtx *op,
 		       machine_mode tmode, machine_mode smode)
 {
+  rtx pat, addr;
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  if (op[0] == const0_rtx)
+    addr = gen_rtx_MEM (tmode, op[1]);
+  else
+    {
+      op[0] = copy_to_mode_reg (Pmode, op[0]);
+      addr = gen_rtx_MEM (smode,
+			  gen_rtx_PLUS (Pmode, op[1], op[0]));
+    }
+
+  rtx discratch = gen_reg_rtx (DImode);
+  rtx tiscratch = gen_reg_rtx (TImode);
+
+  /* Emit the lxvr*x insn.  */
+  pat = GEN_FCN (icode) (tiscratch, addr);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
+
+  /* Emit a sign extension from QI,HI,WI to double (DI).  */
+  rtx scratch = gen_lowpart (smode, tiscratch);
+  if (icode == CODE_FOR_vsx_lxvrbx)
+    emit_insn (gen_extendqidi2 (discratch, scratch));
+  else if (icode == CODE_FOR_vsx_lxvrhx)
+    emit_insn (gen_extendhidi2 (discratch, scratch));
+  else if (icode == CODE_FOR_vsx_lxvrwx)
+    emit_insn (gen_extendsidi2 (discratch, scratch));
+  /*  Assign discratch directly if scratch is already DI.  */
+  if (icode == CODE_FOR_vsx_lxvrdx)
+    discratch = scratch;
+
+  /* Emit the sign extension from DI (double) to TI (quad).  */
+  emit_insn (gen_extendditi2 (target, discratch));
+
   return target;
 }
 
@@ -14601,6 +14739,22 @@ static rtx
 lxvrze_expand_builtin (rtx target, insn_code icode, rtx *op,
 		       machine_mode tmode, machine_mode smode)
 {
+  rtx pat, addr;
+  op[1] = copy_to_mode_reg (Pmode, op[1]);
+
+  if (op[0] == const0_rtx)
+    addr = gen_rtx_MEM (tmode, op[1]);
+  else
+    {
+      op[0] = copy_to_mode_reg (Pmode, op[0]);
+      addr = gen_rtx_MEM (smode,
+			  gen_rtx_PLUS (Pmode, op[1], op[0]));
+    }
+
+  pat = GEN_FCN (icode) (target, addr);
+  if (!pat)
+    return 0;
+  emit_insn (pat);
   return target;
 }
 
@@ -14608,6 +14762,69 @@ static rtx
 stv_expand_builtin (insn_code icode, rtx *op,
 		    machine_mode tmode, machine_mode smode)
 {
+  rtx pat, addr, rawaddr, truncrtx;
+  op[2] = copy_to_mode_reg (Pmode, op[2]);
+
+  /* For STVX, express the RTL accurately by ANDing the address with -16.
+     STVXL and STVE*X expand to use UNSPECs to hide their special behavior,
+     so the raw address is fine.  */
+  if (icode == CODE_FOR_altivec_stvx_v2df
+      || icode == CODE_FOR_altivec_stvx_v2di
+      || icode == CODE_FOR_altivec_stvx_v4sf
+      || icode == CODE_FOR_altivec_stvx_v4si
+      || icode == CODE_FOR_altivec_stvx_v8hi
+      || icode == CODE_FOR_altivec_stvx_v16qi)
+    {
+      if (op[1] == const0_rtx)
+	rawaddr = op[2];
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  rawaddr = gen_rtx_PLUS (Pmode, op[2], op[1]);
+	}
+
+      addr = gen_rtx_AND (Pmode, rawaddr, gen_rtx_CONST_INT (Pmode, -16));
+      addr = gen_rtx_MEM (tmode, addr);
+      op[0] = copy_to_mode_reg (tmode, op[0]);
+      emit_insn (gen_rtx_SET (addr, op[0]));
+    }
+  else if (icode == CODE_FOR_vsx_stxvrbx
+	   || icode == CODE_FOR_vsx_stxvrhx
+	   || icode == CODE_FOR_vsx_stxvrwx
+	   || icode == CODE_FOR_vsx_stxvrdx)
+    {
+      truncrtx = gen_rtx_TRUNCATE (tmode, op[0]);
+      op[0] = copy_to_mode_reg (E_TImode, truncrtx);
+
+      if (op[1] == const0_rtx)
+	addr = gen_rtx_MEM (Pmode, op[2]);
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op[2], op[1]));
+	}
+      pat = GEN_FCN (icode) (addr, op[0]);
+      if (pat)
+	emit_insn (pat);
+    }
+  else
+    {
+      if (! (*insn_data[icode].operand[1].predicate) (op[0], smode))
+	op[0] = copy_to_mode_reg (smode, op[0]);
+
+      if (op[1] == const0_rtx)
+	addr = gen_rtx_MEM (tmode, op[2]);
+      else
+	{
+	  op[1] = copy_to_mode_reg (Pmode, op[1]);
+	  addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op[2], op[1]));
+	}
+
+      pat = GEN_FCN (icode) (addr, op[0]);
+      if (pat)
+	emit_insn (pat);
+    }
+
   return NULL_RTX;
 }
 
