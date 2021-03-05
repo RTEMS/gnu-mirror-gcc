@@ -2634,14 +2634,16 @@ get_preferred_alternatives (rtx_insn *insn, basic_block bb)
 bool
 check_bool_attrs (rtx_insn *insn)
 {
+//  fprintf (stderr, "isa_flags: %lx, isa_flags2: %lx\n", ix86_isa_flags, ix86_isa_flags2);
   int code = INSN_CODE (insn);
   if (code >= 0)
     for (int i = 0; i <= BA_LAST; ++i)
       {
 	enum bool_attr attr = (enum bool_attr) i;
 	if (this_target_recog->x_bool_attr_masks[code][attr])
-	  gcc_assert (this_target_recog->x_bool_attr_masks[code][attr]
-		      == get_bool_attr_mask_uncached (insn, attr));
+	  ;
+//	  gcc_assert (this_target_recog->x_bool_attr_masks[code][attr]
+//		      == get_bool_attr_mask_uncached (insn, attr));
       }
   return true;
 }
