@@ -20,7 +20,7 @@ vector bool int
 test2 (vector signed int a, vector signed int b)
 {
   return vec_cmpnez (a, b);
-  /* { dg-error "'__builtin_altivec_vcmpnezw' requires the '-mcpu=power9' option" "" { target *-*-* } .-1 } */
+  /* { dg-error "'__builtin_altivec_vcmpnezw' requires the '-mpower9-vector' option" "" { target *-*-* } .-1 } */
 }
 
 #pragma GCC target ("cpu=power7")
