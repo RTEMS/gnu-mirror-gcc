@@ -12748,44 +12748,16 @@ build_optimization_node (struct gcc_options *opts,
   return t;
 }
 
-/* Build a TARGET_OPTION_NODE based on the options in OPTS and OPTS_SET.  */
-
-tree
-build_target_option_node (struct gcc_options *opts,
-			  struct gcc_options *opts_set)
-{
-  tree t;
-
-  /* Use the cache of optimization nodes.  */
-
-  cl_target_option_save (TREE_TARGET_OPTION (cl_target_option_node),
-			 opts, opts_set);
-
-  tree *slot = cl_option_hash_table->find_slot (cl_target_option_node, INSERT);
-  t = *slot;
-  if (!t)
-    {
-      /* Insert this one into the hash table.  */
-      t = cl_target_option_node;
-      *slot = t;
-
-      /* Make a new node for next time round.  */
-      cl_target_option_node = make_node (TARGET_OPTION_NODE);
-    }
-
-  return t;
-}
-
 /* Clear TREE_TARGET_GLOBALS of all TARGET_OPTION_NODE trees,
    so that they aren't saved during PCH writing.  */
 
 void
-prepare_target_option_nodes_for_pch (void)
+prepare_optimization_nodes_for_pch (void)
 {
   hash_table<cl_option_hasher>::iterator iter = cl_option_hash_table->begin ();
   for (; iter != cl_option_hash_table->end (); ++iter)
-    if (TREE_CODE (*iter) == TARGET_OPTION_NODE)
-      TREE_TARGET_GLOBALS (*iter) = NULL;
+    if (TREE_CODE (*iter) == OPTIMIZATION_NODE)
+      TREE_OPTIMIZATION_GLOBALS (*iter) = NULL;
 }
 
 /* Determine the "ultimate origin" of a block.  */

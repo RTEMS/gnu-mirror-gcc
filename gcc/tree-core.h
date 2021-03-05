@@ -1952,6 +1952,9 @@ struct GTY(()) tree_optimization_option {
   /* The optimization options used by the user.  */
   struct cl_optimization *opts;
 
+  /* Target globals for the corresponding target option.  */
+  class target_globals *globals;
+
   /* Target optabs for this set of optimization options.  This is of
      type `struct target_optabs *'.  */
   void *GTY ((atomic)) optabs;
@@ -1969,9 +1972,6 @@ class GTY(()) target_globals;
 
 struct GTY(()) tree_target_option {
   struct tree_base base;
-
-  /* Target globals for the corresponding target option.  */
-  class target_globals *globals;
 
   /* The optimization options used by the user.  */
   struct cl_target_option *opts;

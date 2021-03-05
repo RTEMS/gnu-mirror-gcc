@@ -631,10 +631,8 @@ static bool
 ix86_pragma_target_parse (tree args, tree pop_target)
 {
   tree prev_tree
-    = build_target_option_node (&global_options, &global_options_set);
+    = build_optimization_node (&global_options, &global_options_set);
   tree cur_tree;
-  struct cl_target_option *prev_opt;
-  struct cl_target_option *cur_opt;
   HOST_WIDE_INT prev_isa;
   HOST_WIDE_INT cur_isa;
   HOST_WIDE_INT diff_isa;
@@ -653,9 +651,9 @@ ix86_pragma_target_parse (tree args, tree pop_target)
 
   if (! args)
     {
-      cur_tree = (pop_target ? pop_target : target_option_default_node);
-      cl_target_option_restore (&global_options, &global_options_set,
-				TREE_TARGET_OPTION (cur_tree));
+      cur_tree = (pop_target ? pop_target : optimization_default_node);
+      cl_optimization_restore (&global_options, &global_options_set,
+			       TREE_OPTIMIZATION (cur_tree));
     }
   else
     {
@@ -663,20 +661,18 @@ ix86_pragma_target_parse (tree args, tree pop_target)
 						   &global_options,
 						   &global_options_set, 0);
       if (!cur_tree || cur_tree == error_mark_node)
-       {
-         cl_target_option_restore (&global_options, &global_options_set,
-                                   TREE_TARGET_OPTION (prev_tree));
-         return false;
-       }
+	{
+	  cl_optimization_restore (&global_options, &global_options_set,
+				   TREE_OPTIMIZATION (prev_tree));
+	  return false;
+	}
     }
 
-  target_option_current_node = cur_tree;
+  optimization_current_node = cur_tree;
   enum fpmath_unit cur_fpmath = ix86_fpmath;
   ix86_reset_previous_fndecl ();
 
   /* Figure out the previous/current isa, arch, tune and the differences.  */
-  prev_opt  = TREE_TARGET_OPTION (prev_tree);
-  cur_opt   = TREE_TARGET_OPTION (cur_tree);
   cur_isa   = ix86_isa_flags;
   cur_isa2   = ix86_isa_flags2;
   diff_isa  = (prev_isa ^ cur_isa);

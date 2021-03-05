@@ -170,7 +170,7 @@ c_common_write_pch (void)
 
   (*debug_hooks->handle_pch) (1);
 
-  prepare_target_option_nodes_for_pch ();
+  prepare_optimization_nodes_for_pch ();
 
   cpp_write_pch_deps (parse_in, pch_outfile);
 

@@ -771,15 +771,6 @@ ix86_function_specific_print (FILE *file, int indent,
 
 
 
-/* Release allocated strings.  */
-static void
-release_options_strings (char **option_strings)
-{
-  /* Free up memory allocated to hold the strings */
-  for (unsigned i = 0; i < IX86_FUNCTION_SPECIFIC_MAX; i++)
-    free (option_strings[i]);
-}
-
 /* Return a TARGET_OPTION_NODE tree of the target options listed or NULL.  */
 
 tree
@@ -788,83 +779,19 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
 				  struct gcc_options *opts_set,
 				  bool target_clone_attr)
 {
-  const char *orig_arch_string = opts->x_ix86_arch_string;
-  const char *orig_tune_string = opts->x_ix86_tune_string;
-  enum fpmath_unit orig_fpmath_set = opts_set->x_ix86_fpmath;
-  int orig_tune_defaulted = ix86_tune_defaulted;
-  int orig_arch_specified = ix86_arch_specified;
-  char *option_strings[IX86_FUNCTION_SPECIFIC_MAX] = { NULL, NULL };
-  tree t = NULL_TREE;
-  struct cl_target_option *def
-    = TREE_TARGET_OPTION (target_option_default_node);
-  struct gcc_options enum_opts_set;
-
-  memset (&enum_opts_set, 0, sizeof (enum_opts_set));
-
   parse_optimize_and_target_options (opts, opts_set, args, true, true);
 
-  /* If the changed options are different from the default, rerun
-     ix86_option_override_internal, and then save the options away.
-     The string options are attribute options, and will be undone
-     when we copy the save structure.  */
-//  if (opts->x_ix86_isa_flags != def->x_ix86_isa_flags
-//      || opts->x_ix86_isa_flags2 != def->x_ix86_isa_flags2
-  // FIXME
-    {
-      /* If we are using the default tune= or arch=, undo the string assigned,
-	 and use the default.  */
-      if (option_strings[IX86_FUNCTION_SPECIFIC_ARCH])
-	opts->x_ix86_arch_string
-	  = ggc_strdup (option_strings[IX86_FUNCTION_SPECIFIC_ARCH]);
-      else if (!orig_arch_specified)
-	opts->x_ix86_arch_string = NULL;
+  /* Do any overrides, such as arch=xxx, or tune=xxx support.  */
+  bool r = ix86_option_override_internal (false, opts, opts_set);
+  if (!r)
+    return error_mark_node;
 
-      if (option_strings[IX86_FUNCTION_SPECIFIC_TUNE])
-	opts->x_ix86_tune_string
-	  = ggc_strdup (option_strings[IX86_FUNCTION_SPECIFIC_TUNE]);
-      else if (orig_tune_defaulted)
-	opts->x_ix86_tune_string = NULL;
+  /* Add any builtin functions with the new isa if any.  */
+  ix86_add_new_builtins (opts->x_ix86_isa_flags, opts->x_ix86_isa_flags2);
 
-      /* If fpmath= is not set, and we now have sse2 on 32-bit, use it.  */
-      if (enum_opts_set.x_ix86_fpmath)
-	opts_set->x_ix86_fpmath = (enum fpmath_unit) 1;
-      if (enum_opts_set.x_ix86_prefer_vector_width)
-	opts_set->x_ix86_prefer_vector_width = (enum prefer_vector_width) 1;
-
-      /* Do any overrides, such as arch=xxx, or tune=xxx support.  */
-      bool r = ix86_option_override_internal (false, opts, opts_set);
-      if (!r)
-	{
-	  release_options_strings (option_strings);
-	  return error_mark_node;
-	}
-
-      /* Add any builtin functions with the new isa if any.  */
-      ix86_add_new_builtins (opts->x_ix86_isa_flags, opts->x_ix86_isa_flags2);
-
-      enum excess_precision orig_ix86_excess_precision
-	= opts->x_ix86_excess_precision;
-      bool orig_ix86_unsafe_math_optimizations
-	= opts->x_ix86_unsafe_math_optimizations;
-      opts->x_ix86_excess_precision = opts->x_flag_excess_precision;
-      opts->x_ix86_unsafe_math_optimizations
-	= opts->x_flag_unsafe_math_optimizations;
-
-      /* Save the current options unless we are validating options for
-	 #pragma.  */
-      t = build_target_option_node (opts, opts_set);
-
-      opts->x_ix86_arch_string = orig_arch_string;
-      opts->x_ix86_tune_string = orig_tune_string;
-      opts_set->x_ix86_fpmath = orig_fpmath_set;
-      opts->x_ix86_excess_precision = orig_ix86_excess_precision;
-      opts->x_ix86_unsafe_math_optimizations
-	= orig_ix86_unsafe_math_optimizations;
-
-      release_options_strings (option_strings);
-    }
-
-  return t;
+  /* Save the current options unless we are validating options for
+#pragma.  */
+  return build_optimization_node (opts, opts_set);
 }
 
 /* Hook to validate attribute((target("string"))).  */
@@ -905,29 +832,17 @@ ix86_valid_target_attribute_p (tree fndecl,
   cl_optimization_restore (&func_options, &func_options_set,
 			   TREE_OPTIMIZATION (func_optimize));
 
-  /* Initialize func_options to the default before its target options can
-     be set.  */
-  cl_target_option_restore (&func_options, &func_options_set,
-			    TREE_TARGET_OPTION (target_option_default_node));
-
   /* FLAGS == 1 is used for target_clones attribute.  */
-  new_target
+  new_optimize
     = ix86_valid_target_attribute_tree (fndecl, args, &func_options,
 					&func_options_set, flags == 1);
 
-  new_optimize = build_optimization_node (&func_options, &func_options_set);
-
   // FIXME
-  if (new_target == error_mark_node)
+  if (new_optimize == error_mark_node)
     ret = false;
 
-  else if (fndecl && new_target)
-    {
-      DECL_FUNCTION_SPECIFIC_TARGET (fndecl) = new_target;
-
-      if (old_optimize != new_optimize)
-	DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl) = new_optimize;
-    }
+  else if (fndecl && new_optimize)
+    DECL_FUNCTION_SPECIFIC_OPTIMIZATION (fndecl) = new_optimize;
 
   return ret;
 }
@@ -2491,8 +2406,8 @@ ix86_option_override_internal (bool main_args_p,
 	= opts->x_flag_excess_precision;
       opts->x_ix86_unsafe_math_optimizations
 	= opts->x_flag_unsafe_math_optimizations;
-      target_option_default_node = target_option_current_node
-        = build_target_option_node (opts, opts_set);
+      optimization_default_node = optimization_current_node
+        = build_optimization_node (opts, opts_set);
     }
 
   if (opts->x_flag_cf_protection != CF_NONE)
@@ -2535,15 +2450,15 @@ static GTY(()) tree ix86_previous_fndecl;
 void
 ix86_reset_previous_fndecl (void)
 {
-  tree new_tree = target_option_current_node;
-  cl_target_option_restore (&global_options, &global_options_set,
-			    TREE_TARGET_OPTION (new_tree));
-  if (TREE_TARGET_GLOBALS (new_tree))
-    restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
-  else if (new_tree == target_option_default_node)
+  tree new_tree = optimization_current_node;
+  cl_optimization_restore (&global_options, &global_options_set,
+			   TREE_OPTIMIZATION (new_tree));
+  if (TREE_OPTIMIZATION_GLOBALS (new_tree))
+    restore_target_globals (TREE_OPTIMIZATION_GLOBALS (new_tree));
+  else if (new_tree == optimization_default_node)
     restore_target_globals (&default_target_globals);
   else
-    TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
+    TREE_OPTIMIZATION_GLOBALS (new_tree) = save_target_globals_default_opts ();
   ix86_previous_fndecl = NULL_TREE;
 }
 
@@ -2798,12 +2713,12 @@ ix86_set_current_function (tree fndecl)
     {
       cl_target_option_restore (&global_options, &global_options_set,
 				TREE_TARGET_OPTION (new_tree));
-      if (TREE_TARGET_GLOBALS (new_tree))
-	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
+      if (TREE_OPTIMIZATION_GLOBALS (new_tree))
+	restore_target_globals (TREE_OPTIMIZATION_GLOBALS (new_tree));
       else if (new_tree == target_option_default_node)
 	restore_target_globals (&default_target_globals);
       else
-	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
+	TREE_OPTIMIZATION_GLOBALS (new_tree) = save_target_globals_default_opts ();
     }
   /* FIXME
   else if (flag_unsafe_math_optimizations
@@ -2817,12 +2732,12 @@ ix86_set_current_function (tree fndecl)
       ix86_unsafe_math_optimizations = flag_unsafe_math_optimizations;
       DECL_FUNCTION_SPECIFIC_TARGET (fndecl) = new_tree
 	= build_target_option_node (&global_options, &global_options_set);
-      if (TREE_TARGET_GLOBALS (new_tree))
-	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
+      if (TREE_OPTIMIZATION_GLOBALS (new_tree))
+	restore_target_globals (TREE_OPTIMIZATION_GLOBALS (new_tree));
       else if (new_tree == target_option_default_node)
 	restore_target_globals (&default_target_globals);
       else
-	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
+	TREE_OPTIMIZATION_GLOBALS (new_tree) = save_target_globals_default_opts ();
     }
     */
   ix86_previous_fndecl = fndecl;

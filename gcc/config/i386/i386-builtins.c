@@ -1431,7 +1431,6 @@ ix86_builtin_decl (unsigned code, bool)
 
 static tree ix86_get_builtin (enum ix86_builtins code)
 {
-  struct cl_target_option *opts;
   tree target_tree = NULL_TREE;
 
   /* Determine the isa flags of current_function_decl.  */
@@ -1441,8 +1440,6 @@ static tree ix86_get_builtin (enum ix86_builtins code)
 
   if (target_tree == NULL)
     target_tree = target_option_default_node;
-
-  opts = TREE_TARGET_OPTION (target_tree);
 
   if ((ix86_builtins_isa[(int) code].isa & ix86_isa_flags)
       || (ix86_builtins_isa[(int) code].isa2 & ix86_isa_flags2))
@@ -1838,9 +1835,9 @@ unsigned int
 get_builtin_code_for_version (tree decl, tree *predicate_list)
 {
   tree attrs;
-  struct cl_target_option cur_target;
-  tree target_node;
-  struct cl_target_option *new_target;
+  struct cl_optimization cur_optimization;
+  tree optimization_node;
+  struct cl_optimization *new_optimization;
   const char *arg_str = NULL;
   const char *attrs_str = NULL;
   char *tok_str = NULL;
@@ -1875,17 +1872,17 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
      before the ssse3 version. */
   if (strstr (attrs_str, "arch=") != NULL)
     {
-      cl_target_option_save (&cur_target, &global_options,
-			     &global_options_set);
-      target_node
+      cl_optimization_save (&cur_optimization, &global_options,
+			    &global_options_set);
+      optimization_node
 	= ix86_valid_target_attribute_tree (decl, attrs, &global_options,
 					    &global_options_set, 0);
     
-      gcc_assert (target_node);
-      if (target_node == error_mark_node)
+      gcc_assert (optimization_node);
+      if (optimization_node == error_mark_node)
 	return 0;
-      new_target = TREE_TARGET_OPTION (target_node);
-      gcc_assert (new_target);
+      new_optimization = TREE_OPTIMIZATION (optimization_node);
+      gcc_assert (new_optimization);
       
       if (arch_specified && ix86_arch > 0)
 	for (i = 0; i < pta_size; i++)
@@ -1945,8 +1942,8 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	      break;
 	    }
 
-      cl_target_option_restore (&global_options, &global_options_set,
-				&cur_target);
+      cl_optimization_restore (&global_options, &global_options_set,
+			       &cur_optimization);
 	
       if (predicate_list && arg_str == NULL)
 	{

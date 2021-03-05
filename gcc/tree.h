@@ -3326,6 +3326,11 @@ extern vec<tree, va_gc> **decl_debug_args_insert (tree);
 #define TREE_OPTIMIZATION_BASE_OPTABS(NODE) \
   (OPTIMIZATION_NODE_CHECK (NODE)->optimization.base_optabs)
 
+#define TREE_OPTIMIZATION_GLOBALS(NODE) \
+  (OPTIMIZATION_NODE_CHECK (NODE)->optimization.globals)
+
+extern void prepare_optimization_nodes_for_pch (void);
+
 /* Return a tree node that encapsulates the optimization options in OPTS
    and OPTS_SET.  */
 extern tree build_optimization_node (struct gcc_options *opts,
@@ -3333,16 +3338,6 @@ extern tree build_optimization_node (struct gcc_options *opts,
 
 #define TREE_TARGET_OPTION(NODE) \
   (TARGET_OPTION_NODE_CHECK (NODE)->target_option.opts)
-
-#define TREE_TARGET_GLOBALS(NODE) \
-  (TARGET_OPTION_NODE_CHECK (NODE)->target_option.globals)
-
-/* Return a tree node that encapsulates the target options in OPTS and
-   OPTS_SET.  */
-extern tree build_target_option_node (struct gcc_options *opts,
-				      struct gcc_options *opts_set);
-
-extern void prepare_target_option_nodes_for_pch (void);
 
 #if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
 

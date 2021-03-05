@@ -1000,7 +1000,6 @@ handle_pragma_optimize (cpp_reader *ARG_UNUSED(dummy))
    strings that will be added to the function's attribute list.  */
 struct GTY(()) opt_stack {
   struct opt_stack *prev;
-  tree target_binary;
   tree target_strings;
   tree optimize_binary;
   tree optimize_strings;
@@ -1037,8 +1036,6 @@ handle_pragma_push_options (cpp_reader *ARG_UNUSED(dummy))
     }
   p->optimize_binary = build_optimization_node (&global_options,
 						&global_options_set);
-  p->target_binary = build_target_option_node (&global_options,
-					       &global_options_set);
 
   /* Save optimization and target flags in string list format.  */
   p->optimize_strings = copy_list (current_optimize_pragma);
@@ -1072,12 +1069,6 @@ handle_pragma_pop_options (cpp_reader *ARG_UNUSED(dummy))
 
   p = options_stack;
   options_stack = p->prev;
-
-  if (p->target_binary != target_option_current_node)
-    {
-      (void) targetm.target_option.pragma_parse (NULL_TREE, p->target_binary);
-      target_option_current_node = p->target_binary;
-    }
 
   if (p->optimize_binary != optimization_current_node)
     {
