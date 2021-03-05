@@ -14927,11 +14927,171 @@ new_mma_expand_builtin (tree exp, rtx target, insn_code icode)
   return target;
 }
 
+/* Return the appropriate SPR number associated with the given builtin.  */
+static inline HOST_WIDE_INT
+new_htm_spr_num (enum rs6000_gen_builtins code)
+{
+  if (code == RS6000_BIF_GET_TFHAR
+      || code == RS6000_BIF_SET_TFHAR)
+    return TFHAR_SPR;
+  else if (code == RS6000_BIF_GET_TFIAR
+	   || code == RS6000_BIF_SET_TFIAR)
+    return TFIAR_SPR;
+  else if (code == RS6000_BIF_GET_TEXASR
+	   || code == RS6000_BIF_SET_TEXASR)
+    return TEXASR_SPR;
+  gcc_assert (code == RS6000_BIF_GET_TEXASRU
+	      || code == RS6000_BIF_SET_TEXASRU);
+  return TEXASRU_SPR;
+}
+
 /* Expand the HTM builtin in EXP and store the result in TARGET.  */
 static rtx
 new_htm_expand_builtin (bifdata *bifaddr, rs6000_gen_builtins fcode,
 			tree exp, rtx target)
 {
+  tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+  bool nonvoid = TREE_TYPE (TREE_TYPE (fndecl)) != void_type_node;
+
+  if (!TARGET_POWERPC64
+      && (fcode == RS6000_BIF_TABORTDC
+	  || fcode == RS6000_BIF_TABORTDCI))
+    {
+      error ("builtin %qs is only valid in 64-bit mode", bifaddr->bifname);
+      return const0_rtx;
+    }
+
+  rtx op[MAX_HTM_OPERANDS], pat;
+  int nopnds = 0;
+  tree arg;
+  call_expr_arg_iterator iter;
+  insn_code icode = bifaddr->icode;
+  bool uses_spr = bif_is_htmspr (*bifaddr);
+  rtx cr = NULL_RTX;
+
+  if (uses_spr)
+    icode = rs6000_htm_spr_icode (nonvoid);
+  const insn_operand_data *insn_op = &insn_data[icode].operand[0];
+
+  if (nonvoid)
+    {
+      machine_mode tmode = (uses_spr) ? insn_op->mode : E_SImode;
+      if (!target
+	  || GET_MODE (target) != tmode
+	  || (uses_spr && !(*insn_op->predicate) (target, tmode)))
+	target = gen_reg_rtx (tmode);
+      if (uses_spr)
+	op[nopnds++] = target;
+    }
+
+  FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
+    {
+      if (arg == error_mark_node || nopnds >= MAX_HTM_OPERANDS)
+	return const0_rtx;
+
+      insn_op = &insn_data[icode].operand[nopnds];
+      op[nopnds] = expand_normal (arg);
+
+      if (!(*insn_op->predicate) (op[nopnds], insn_op->mode))
+	{
+	  if (!strcmp (insn_op->constraint, "n"))
+	    {
+	      int arg_num = (nonvoid) ? nopnds : nopnds + 1;
+	      if (!CONST_INT_P (op[nopnds]))
+		error ("argument %d must be an unsigned literal", arg_num);
+	      else
+		error ("argument %d is an unsigned literal that is "
+		       "out of range", arg_num);
+	      return const0_rtx;
+	    }
+	  op[nopnds] = copy_to_mode_reg (insn_op->mode, op[nopnds]);
+	}
+
+      nopnds++;
+    }
+
+  /* Handle the builtins for extended mnemonics.  These accept
+     no arguments, but map to builtins that take arguments.  */
+  switch (fcode)
+    {
+    case RS6000_BIF_TENDALL:  /* Alias for: tend. 1  */
+    case RS6000_BIF_TRESUME:  /* Alias for: tsr. 1  */
+      op[nopnds++] = GEN_INT (1);
+      break;
+    case RS6000_BIF_TSUSPEND: /* Alias for: tsr. 0  */
+      op[nopnds++] = GEN_INT (0);
+      break;
+    default:
+      break;
+    }
+
+  /* If this builtin accesses SPRs, then pass in the appropriate
+     SPR number and SPR regno as the last two operands.  */
+  if (uses_spr)
+    {
+      machine_mode mode = (TARGET_POWERPC64) ? DImode : SImode;
+      op[nopnds++] = gen_rtx_CONST_INT (mode, new_htm_spr_num (fcode));
+    }
+  /* If this builtin accesses a CR, then pass in a scratch
+     CR as the last operand.  */
+  else if (bif_is_htmcr (*bifaddr))
+    {
+      cr = gen_reg_rtx (CCmode);
+      op[nopnds++] = cr;
+    }
+
+  switch (nopnds)
+    {
+    case 1:
+      pat = GEN_FCN (icode) (op[0]);
+      break;
+    case 2:
+      pat = GEN_FCN (icode) (op[0], op[1]);
+      break;
+    case 3:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2]);
+      break;
+    case 4:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3]);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  if (!pat)
+    return NULL_RTX;
+  emit_insn (pat);
+
+  if (bif_is_htmcr (*bifaddr))
+    {
+      if (fcode == RS6000_BIF_TBEGIN)
+	{
+	  /* Emit code to set TARGET to true or false depending on
+	     whether the tbegin. instruction successfully or failed
+	     to start a transaction.  We do this by placing the 1's
+	     complement of CR's EQ bit into TARGET.  */
+	  rtx scratch = gen_reg_rtx (SImode);
+	  emit_insn (gen_rtx_SET (scratch,
+				  gen_rtx_EQ (SImode, cr,
+					      const0_rtx)));
+	  emit_insn (gen_rtx_SET (target,
+				  gen_rtx_XOR (SImode, scratch,
+					       GEN_INT (1))));
+	}
+      else
+	{
+	  /* Emit code to copy the 4-bit condition register field
+	     CR into the least significant end of register TARGET.  */
+	  rtx scratch1 = gen_reg_rtx (SImode);
+	  rtx scratch2 = gen_reg_rtx (SImode);
+	  rtx subreg = simplify_gen_subreg (CCmode, scratch1, SImode, 0);
+	  emit_insn (gen_movcc (subreg, cr));
+	  emit_insn (gen_lshrsi3 (scratch2, scratch1, GEN_INT (28)));
+	  emit_insn (gen_andsi3 (target, scratch2, GEN_INT (0xf)));
+	}
+    }
+
+  if (nonvoid)
+    return target;
   return const0_rtx;
 }
 
