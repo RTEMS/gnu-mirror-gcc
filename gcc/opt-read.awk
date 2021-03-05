@@ -47,6 +47,7 @@ BEGIN {
 			n_langs++;
 		}
 		else if ($1 == "TargetSave") {
+			# FIXME: reject these???
 			# Make sure the declarations are put in source order
 			target_save_decl[n_target_save] = $2
 			n_target_save++
