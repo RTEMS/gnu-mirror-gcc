@@ -917,6 +917,7 @@ ix86_valid_target_attribute_p (tree fndecl,
 
   new_optimize = build_optimization_node (&func_options, &func_options_set);
 
+  // FIXME
   if (new_target == error_mark_node)
     ret = false;
 

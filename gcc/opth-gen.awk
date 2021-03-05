@@ -142,10 +142,13 @@ var_opt_char[1] = "unsigned char x_optimize_size";
 var_opt_char[2] = "unsigned char x_optimize_debug";
 var_opt_char[3] = "unsigned char x_optimize_fast";
 
+print "  /* Target variables */"
 # FIXME: sort by type - likely
 for (i = 0; i < n_new_target_save; i++) {
 	print "  " new_target_save_decl[i] ";";
 }
+print "  /* End target variables */"
+print ""
 
 
 for (i = 0; i < n_opts; i++) {

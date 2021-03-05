@@ -1321,6 +1321,21 @@ for (i = 0; i < n_opt_val; i++) {
 	else
 		print "  hstate.add_hwi (ptr->" name");";
 }
+
+for (i = 0; i < n_extra_new_target_vars; i++) {
+	otype = extra_new_target_var_types[i];
+	name = "x_" extra_new_target_vars[i]
+	if (otype ~ "^const char \\**$")
+	{
+		print "  if (ptr->" name")";
+		print "    hstate.add (ptr->" name", strlen (ptr->" name"));";
+		print "  else";
+		print "    hstate.add_int (0);";
+	}
+	else
+		print "  hstate.add_hwi (ptr->" name ");";
+}
+
 print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
 print "    hstate.add_hwi (ptr->explicit_mask[i]);";
 print "  return hstate.end ();";
@@ -1350,6 +1365,25 @@ for (i = 0; i < n_opt_val; i++) {
 		print "    return false;";
 	}
 }
+
+for (i = 0; i < n_extra_new_target_vars; i++) {
+	name = "x_" extra_new_target_vars[i]
+	otype = extra_new_target_var_types[i];
+	if (otype ~ "^const char \\**$")
+	{
+		print "  if (ptr1->" name" != ptr2->" name;
+		print "      && (!ptr1->" name" || !ptr2->" name
+		print "          || strcmp (ptr1->" name", ptr2->" name ")))";
+		print "    return false;";
+	}
+	else
+	{
+		print "  if (ptr1->" name" != ptr2->" name ")";
+		print "    return false;";
+	}
+}
+
+
 print "  for (size_t i = 0; i < sizeof (ptr1->explicit_mask) / sizeof (ptr1->explicit_mask[0]); i++)";
 print "    if (ptr1->explicit_mask[i] != ptr2->explicit_mask[i])";
 print "      return false;"
