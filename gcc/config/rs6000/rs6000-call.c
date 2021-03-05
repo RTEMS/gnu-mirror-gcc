@@ -12819,6 +12819,97 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   return false;
 }
 
+/* Check whether a builtin function is supported in this target
+   configuration.  */
+bool
+rs6000_new_builtin_is_supported_p (enum rs6000_gen_builtins fncode)
+{
+  switch (rs6000_builtin_info_x[(size_t) fncode].enable)
+    {
+    default:
+      gcc_unreachable ();
+    case ENB_ALWAYS:
+      return true;
+    case ENB_P5:
+      if (!TARGET_POPCNTB)
+	return false;
+      break;
+    case ENB_P6:
+      if (!TARGET_CMPB)
+	return false;
+      break;
+    case ENB_ALTIVEC:
+      if (!TARGET_ALTIVEC)
+	return false;
+      break;
+    case ENB_CELL:
+      if (!TARGET_ALTIVEC || rs6000_cpu != PROCESSOR_CELL)
+	return false;
+      break;
+    case ENB_VSX:
+      if (!TARGET_VSX)
+	return false;
+      break;
+    case ENB_P7:
+      if (!TARGET_POPCNTD)
+	return false;
+      break;
+    case ENB_P7_64:
+      if (!TARGET_POPCNTD || !TARGET_POWERPC64)
+	return false;
+      break;
+    case ENB_P8:
+      if (!TARGET_DIRECT_MOVE)
+	return false;
+      break;
+    case ENB_P8V:
+      if (!TARGET_P8_VECTOR)
+	return false;
+      break;
+    case ENB_P9:
+      if (!TARGET_MODULO)
+	return false;
+      break;
+    case ENB_P9_64:
+      if (!TARGET_MODULO || !TARGET_POWERPC64)
+	return false;
+      break;
+    case ENB_P9V:
+      if (!TARGET_P9_VECTOR)
+	return false;
+      break;
+    case ENB_IEEE128_HW:
+      if (!TARGET_FLOAT128_HW)
+	return false;
+      break;
+    case ENB_DFP:
+      if (!TARGET_DFP)
+	return false;
+      break;
+    case ENB_CRYPTO:
+      if (!TARGET_CRYPTO)
+	return false;
+      break;
+    case ENB_HTM:
+      if (!TARGET_HTM)
+	return false;
+      break;
+    case ENB_P10:
+      if (!TARGET_POWER10)
+	return false;
+      break;
+    case ENB_P10_64:
+      if (!TARGET_POWER10 || !TARGET_POWERPC64)
+	return false;
+      break;
+    case ENB_MMA:
+      if (!TARGET_MMA)
+	return false;
+      break;
+    };
+  return true;
+}
+
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
    (and in mode MODE if that's convenient).
