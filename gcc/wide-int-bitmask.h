@@ -38,6 +38,9 @@ public:
   uint64_t low, high;
 };
 
+#define WIDE_INT_BITMASK_FROM_NTH(N) (N < 64 ? wide_int_bitmask (0, 1ULL << N) \
+				      : wide_int_bitmask (1ULL << (N - 64), 0))
+
 constexpr
 wide_int_bitmask::wide_int_bitmask ()
 : low (0), high (0)
