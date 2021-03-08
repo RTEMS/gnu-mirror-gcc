@@ -15753,6 +15753,9 @@ rs6000_init_builtins (void)
 				       ? "__vector unsigned long"
 				       : "__vector unsigned long long",
 				       long_long_unsigned_type_node, 2);
+  ptr_unsigned_V2DI_type_node
+    = build_pointer_type (build_qualified_type (unsigned_V2DI_type_node,
+						TYPE_QUAL_CONST));
 
   opaque_V4SI_type_node = build_opaque_vector_type (intSI_type_node, 4);
 
