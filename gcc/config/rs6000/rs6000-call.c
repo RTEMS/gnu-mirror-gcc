@@ -13173,7 +13173,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
     {
       /* This is an MMA disassemble built-in function.  */
       push_gimplify_context (true);
-      unsigned nvec = (fncode == MMA_BUILTIN_DISASSEMBLE_ACC) ? 4 : 2;
+      unsigned nvec = (fncode == RS6000_BIF_DISASSEMBLE_ACC) ? 4 : 2;
       tree dst_ptr = gimple_call_arg (stmt, 0);
       tree src_ptr = gimple_call_arg (stmt, 1);
       tree src_type = TREE_TYPE (src_ptr);
