@@ -130,11 +130,23 @@
   signed int __builtin_vec_bcdsub_eq (vuc, vuc, const int);
     BCDSUB_EQ_V16QI
 
+[BCDSUB_GE, __builtin_bcdsub_ge, __builtin_vec_bcdsub_ge]
+  signed int __builtin_vec_bcdsub_ge (vsq, vsq, const int);
+    BCDSUB_GE_V1TI
+  signed int __builtin_vec_bcdsub_ge (vuc, vuc, const int);
+    BCDSUB_GE_V16QI
+
 [BCDSUB_GT, __builtin_bcdsub_gt, __builtin_vec_bcdsub_gt]
   signed int __builtin_vec_bcdsub_gt (vsq, vsq, const int);
     BCDSUB_GT_V1TI
   signed int __builtin_vec_bcdsub_gt (vuc, vuc, const int);
     BCDSUB_GT_V16QI
+
+[BCDSUB_LE, __builtin_bcdsub_le, __builtin_vec_bcdsub_le]
+  signed int __builtin_vec_bcdsub_le (vsq, vsq, const int);
+    BCDSUB_LE_V1TI
+  signed int __builtin_vec_bcdsub_le (vuc, vuc, const int);
+    BCDSUB_LE_V16QI
 
 [BCDSUB_LT, __builtin_bcdsub_lt, __builtin_vec_bcdsub_lt]
   signed int __builtin_vec_bcdsub_lt (vsq, vsq, const int);

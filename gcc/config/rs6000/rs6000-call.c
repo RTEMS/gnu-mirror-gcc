@@ -13160,8 +13160,16 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
   gimple *new_call;
   tree new_decl;
 
+  /* Compatibility built-ins; we used to call these
+     __builtin_mma_{dis,}assemble_pair, but now we call them
+     __builtin_vsx_{dis,}assemble_pair.  Handle the old verions.  */
+  if (fncode == RS6000_BIF_ASSEMBLE_PAIR)
+    fncode = RS6000_BIF_ASSEMBLE_PAIR_V;
+  else if (fncode == RS6000_BIF_DISASSEMBLE_PAIR)
+    fncode = RS6000_BIF_DISASSEMBLE_PAIR_V;
+
   if (fncode == RS6000_BIF_DISASSEMBLE_ACC
-      || fncode == RS6000_BIF_DISASSEMBLE_PAIR)
+      || fncode == RS6000_BIF_DISASSEMBLE_PAIR_V)
     {
       /* This is an MMA disassemble built-in function.  */
       push_gimplify_context (true);
@@ -13176,7 +13184,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
 	 another accumulator/pair, then just copy the entire thing as is.  */
       if ((fncode == RS6000_BIF_DISASSEMBLE_ACC
 	   && TREE_TYPE (TREE_TYPE (dst_ptr)) == vector_quad_type_node)
-	  || (fncode == RS6000_BIF_DISASSEMBLE_PAIR
+	  || (fncode == RS6000_BIF_DISASSEMBLE_PAIR_V
 	      && TREE_TYPE (TREE_TYPE (dst_ptr)) == vector_pair_type_node))
 	{
 	  tree dst = build_simple_mem_ref (build1 (VIEW_CONVERT_EXPR,
@@ -13279,7 +13287,7 @@ rs6000_gimple_fold_new_mma_builtin (gimple_stmt_iterator *gsi,
       gcc_unreachable ();
     }
 
-  if (fncode == RS6000_BIF_ASSEMBLE_PAIR)
+  if (fncode == RS6000_BIF_ASSEMBLE_PAIR_V)
     lhs = make_ssa_name (vector_pair_type_node);
   else
     lhs = make_ssa_name (vector_quad_type_node);
