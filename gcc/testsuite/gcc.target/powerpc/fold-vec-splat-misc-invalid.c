@@ -17,7 +17,6 @@ vector unsigned short
 testss_2 (signed int si)
 {
   return vec_splat_u16 (si);/* { dg-error "argument 1 must be a literal between -16 and 15, inclusive" } */
-  return vec_splat_u16 (si);/* { dg-error "argument 1 must be a literal between -16 and 15, inclusive" } */
 }
 
 vector signed char

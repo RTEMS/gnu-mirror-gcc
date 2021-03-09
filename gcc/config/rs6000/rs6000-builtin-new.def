@@ -2389,11 +2389,23 @@
   const signed int __builtin_bcdsub_eq_v16qi (vuc, vuc, const int<1>);
     BCDSUB_EQ_V16QI bcdsub_eq_v16qi {}
 
+  const signed int __builtin_bcdsub_ge_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_GE_V1TI bcdsub_ge_v1ti {}
+
+  const signed int __builtin_bcdsub_ge_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_GE_V16QI bcdsub_ge_v16qi {}
+
   const signed int __builtin_bcdsub_gt_v1ti (vsq, vsq, const int<1>);
     BCDSUB_GT_V1TI bcdsub_gt_v1ti {}
 
   const signed int __builtin_bcdsub_gt_v16qi (vuc, vuc, const int<1>);
     BCDSUB_GT_V16QI bcdsub_gt_v16qi {}
+
+  const signed int __builtin_bcdsub_le_v1ti (vsq, vsq, const int<1>);
+    BCDSUB_LE_V1TI bcdsub_le_v1ti {}
+
+  const signed int __builtin_bcdsub_le_v16qi (vuc, vuc, const int<1>);
+    BCDSUB_LE_V16QI bcdsub_le_v16qi {}
 
   const signed int __builtin_bcdsub_lt_v1ti (vsq, vsq, const int<1>);
     BCDSUB_LT_V1TI bcdsub_lt_v1ti {}
@@ -2903,7 +2915,7 @@
   const _Decimal128 __builtin_denbcdq (const int<1>, _Decimal128);
     DENBCDQ dfp_denbcd_td {}
 
-  const _Decimal128 __builtin_denb2dfp_v16qi (const int<1>, vuc);
+  const _Decimal128 __builtin_denb2dfp_v16qi (vuc);
     DENB2DFP_V16QI dfp_denbcd_v16qi {}
 
   const _Decimal64 __builtin_diex (signed long long, _Decimal64);
@@ -3866,3 +3878,15 @@
 
   v512 __builtin_mma_xxsetaccz_internal ();
     XXSETACCZ_INTERNAL mma_xxsetaccz {mma}
+
+  void __builtin_vsx_assemble_pair (v256 *, vuc, vuc);
+    ASSEMBLE_PAIR_V nothing {mma}
+
+  v256 __builtin_vsx_assemble_pair_internal (vuc, vuc);
+    ASSEMBLE_PAIR_V_INTERNAL vsx_assemble_pair {mma}
+
+  void __builtin_vsx_disassemble_pair (void *, v256 *);
+    DISASSEMBLE_PAIR_V nothing {mma,pair}
+
+  vuc __builtin_vsx_disassemble_pair_internal (v256, const int<2>);
+    DISASSEMBLE_PAIR_V_INTERNAL vsx_disassemble_pair {mma}
