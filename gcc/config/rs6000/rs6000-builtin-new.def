@@ -3504,7 +3504,7 @@
   void __builtin_mma_disassemble_acc (void *, v512 *);
     DISASSEMBLE_ACC nothing {mma,quad}
 
-  vuc __builtin_mma_disassemble_acc_internal (v512, const int<1>);
+  vuc __builtin_mma_disassemble_acc_internal (v512, const int<2>);
     DISASSEMBLE_ACC_INTERNAL mma_disassemble_acc {mma}
 
   void __builtin_mma_disassemble_pair (void *, v256 *);
