@@ -2802,16 +2802,6 @@ write_defines_file ()
 	if (ovld_stanzas[i].ifdef)
 	  fprintf (defines_file, "#endif\n");
       }
-
-  /* Write some temporary defines to use until we make the switch.  */
-  fprintf (defines_file, "\n/* #### TEMPORARY ####  */\n");
-  fprintf (defines_file,
-	   "#define __builtin_vec_splat_s8 __builtin_altivec_vspltisb\n");
-  fprintf (defines_file,
-	   "#define __builtin_vec_splat_s16 __builtin_altivec_vspltish\n");
-  fprintf (defines_file,
-	   "#define __builtin_vec_splat_s32 __builtin_altivec_vspltisw\n");
-
   fprintf (defines_file, "\n#endif\n");
   return 1;
 }
