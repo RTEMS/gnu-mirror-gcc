@@ -14460,9 +14460,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
     case ALTIVEC_BUILTIN_VCFSX:
     case ALTIVEC_BUILTIN_VCTUXS:
     case ALTIVEC_BUILTIN_VCTSXS:
-      /* TODO: Replace this nonsense with a separate built-in for the
-	 vectorizer to use, which I believe is the only way we get
-	 into this situation.  */
       /* FIXME: There's got to be a nicer way to handle this case than
 	 constructing a new CALL_EXPR.  */
       if (call_expr_nargs (exp) == 1)
