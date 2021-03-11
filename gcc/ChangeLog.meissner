@@ -1,3 +1,10 @@
+work041-patch011:
+2021-03-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE-128 map the nanq built-in functions to the long
+	double function, not the f128 function.
+
 work041-patch010:
 2021-03-11  Michael Meissner  <meissner@linux.ibm.com>
 
