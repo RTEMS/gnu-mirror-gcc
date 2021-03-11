@@ -1248,11 +1248,10 @@ ranger_cache::process_edge_relations (edge e)
   if (!single_pred_p (e->dest))
     return;
 
-  gori_export_iterator iter (*this);
   int_range_max r;
   gimple *stmt;
 
-  FOR_EACH_GORI_EXPORT_COND (iter, e, stmt, r)
+  FOR_EACH_GORI_EXPORT_COND (*this, e, stmt, r)
     {
       range_operator *handler = gimple_range_handler (stmt);
       if (!handler)

@@ -1078,69 +1078,6 @@ gori_compute::dump (FILE *f)
   gori_map::dump (f);
 }
 
-
-// Initialize a gori export stmt iterator on edge e.
-// This is different than just bitmap iteration because a stmt fo the form
-// if (x_4 < a_8) will have no defs, but we want to return this expresion.
-//
-gimple *
-gori_cond_iter_init (gori_export_iterator &iter, irange &r, edge e)
-{
-  iter.b = iter.gori.exports (e->src);
-  // No exports, means no stmts.
-  if (!iter.b)
-    return NULL;
-
-  // Set the bitmap iterator up.
-  bmp_iter_set_init (&iter.bi, iter.b, 1, &iter.y);
-  // Check first for a condition on the stmt.. ie if (a_3 > b_6)
-  gimple *s = gimple_outgoing_range_stmt_p (e->src);
-  if (s && is_a<gcond *> (s)
-      && gimple_range_ssa_p (gimple_cond_rhs (s))
-      && gimple_range_ssa_p (gimple_cond_lhs (s)))
-    {
-      // This will be the only stmt if the arguments aren't boolean.
-      // No point in iterating over the other names.
-      if (TREE_CODE (TREE_TYPE (gimple_cond_lhs (s))) != BOOLEAN_TYPE)
-	iter.b = NULL;
-      // Set the LHS range from the edge.
-      if (e->flags & EDGE_TRUE_VALUE)
-	r = int_range<2> (boolean_true_node, boolean_true_node);
-      else
-	r = int_range<2> (boolean_false_node, boolean_false_node);
-      return s;
-    }
-  // Otherwise start with the first iteration result.
-  return gori_cond_iter_next (iter, r, e);
-}
-
-// Return the next stmt in iterator ITER, setting the range of the LHS ro R
-gimple *
-gori_cond_iter_next (gori_export_iterator &iter, irange &r, edge e)
-{
-  if (!iter.b)
-    return NULL;
-  // Just follow bitmap iteration, and return NULL when done.
-  for ( ; bmp_iter_set (&iter.bi, &iter.y); bmp_iter_next (&iter.bi, &iter.y))
-    {
-      tree name = ssa_name (iter.y);
-      if (name && (TREE_CODE (TREE_TYPE (name)) == BOOLEAN_TYPE)
-	  && iter.gori.outgoing_edge_range_p (r, e, name) && r.singleton_p ())
-	{
-	  gimple *stmt = SSA_NAME_DEF_STMT (name);
-	  // Ignore default defs and such, just actual defining stmts.
-	  if (gimple_get_lhs (stmt) == name)
-	    {
-	      bmp_iter_next (&iter.bi, &iter.y);
-	      return stmt;
-	    }
-	}
-    }
-  return NULL;
-}
-
-
-
 // --------------------------------------------------------------------------
 
 // Cache for SSAs that appear on the RHS of a boolean assignment.
@@ -1449,4 +1386,127 @@ gori_compute_cache::cache_stmt (gimple *stmt)
 	m_cache->set_range (lhs, cached_name,
 			    tf_range (r_true_side, r_false_side));
     }
+}
+
+// ------------------------------------------------------------------------
+//  GORI iterators.
+
+// Construct a basic iterator over an export bitmap.
+
+gori_export_iterator::gori_export_iterator (bitmap b)
+{
+  bm = b;
+  if (b)
+    bmp_iter_set_init (&bi, b, 1, &y);
+}
+
+
+// Move to the next export bitmap spot.
+
+void
+gori_export_iterator::next ()
+{
+  bmp_iter_next (&bi, &y);
+}
+
+
+// Fetch the name of the next export in the export list.  Return NULL if
+// iteration is done.
+
+tree
+gori_export_iterator::get_name ()
+{
+  if (!bm)
+    return NULL_TREE;
+
+  while (bmp_iter_set (&bi, &y))
+    {
+      tree t = ssa_name (y);
+      if (t)
+	return t;
+      next ();
+    }
+  return NULL_TREE;
+}
+
+
+// Fetch the name and range of the next export which actually has a non-varying
+// outgoing range calculation on edge E.
+
+tree
+gori_export_iterator::get_range (gori_compute &gori, edge e, irange &r)
+{
+  while (bmp_iter_set (&bi, &y))
+    {
+      tree name = ssa_name (y);
+      if (name && gori.outgoing_edge_range_p (r, e, name))
+	return name;
+      next ();
+    }
+  return NULL_TREE;
+}
+
+
+// Instantiate a "resolved condition" iterator over edge E.
+// Utilize a basic iterator once the intial condition is resolved.
+
+gori_cond_iterator::gori_cond_iterator (gori_compute &gori, edge e)
+				: gori_export_iterator (gori.exports (e->src))
+{
+  // Initialze initial state to nothing.
+  m_stmt = NULL;
+  if (!bm)
+    return;
+
+  // Check first for a condition on the stmt.. ie if (a_3 > b_6)
+  // as this will have no LHS with a condition register.
+  gimple *s = gimple_outgoing_range_stmt_p (e->src);
+  if (s && is_a<gcond *> (s)
+      && gimple_range_ssa_p (gimple_cond_rhs (s))
+      && gimple_range_ssa_p (gimple_cond_lhs (s)))
+    {
+      // This will be the only stmt if the arguments aren't boolean.
+      // No point in iterating over the other names.
+      if (TREE_CODE (TREE_TYPE (gimple_cond_lhs (s))) != BOOLEAN_TYPE)
+	bm = NULL;
+      m_stmt = s;
+    }
+}
+
+
+// Return any stmt which the LHS is a boolean which resolved to either
+// TRUE or FALSE on edge E.  Return the range in R.
+
+gimple *
+gori_cond_iterator::get_stmt (gori_compute &gori, edge e, irange &r)
+{
+  tree name;
+  // If there is an initial stmt set up, proicess it first.
+  if (m_stmt)
+    {
+      // Set the LHS range from the edge.
+      if (e->flags & EDGE_TRUE_VALUE)
+	r = int_range<2> (boolean_true_node, boolean_true_node);
+      else
+	r = int_range<2> (boolean_false_node, boolean_false_node);
+      // Clear the initial state now.
+      gimple *tmp = m_stmt;
+      m_stmt = NULL;
+      return tmp;
+    }
+
+  // Continue with basic iteration over exports with existing ranges,
+  // and return only the ones which are boolean and resolve to a constant.
+  for ( ; bm && (name = get_range (gori, e, r)); next ())
+    {
+      if (name && TREE_CODE (TREE_TYPE (name)) == BOOLEAN_TYPE
+	  && r.singleton_p ())
+	{
+	  gimple *stmt = SSA_NAME_DEF_STMT (name);
+	  // Ignore default defs and such, just actual defining stmts.
+	  if (gimple_get_lhs (stmt) == name)
+	    return stmt;
+	}
+    }
+  return NULL;
 }
