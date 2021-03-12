@@ -1,3 +1,50 @@
+work041-patch015:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v4sf): Rewrite to use VEC_DUPLICATE.
+	(xxspltiw_v4sf_inst): Delete.
+	* config/rs6000/rs6000.c (rs6000_expand_vector_init): Use XXSPLTIW
+	to load vector float constants that are all the same.
+
+work041-patch014:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Rewrite insn to use
+	VEC_DUPLICATE.
+	* config/rs6000/predicates.md (easy_vector_constant): Test to see
+	if we can use XXSPLTIW to load up vector constants.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): New function.
+	(xxspltib_constant_p): If we can generate XXSPLTIW, don't return
+	true.
+	(rs6000_expand_vector_init): Generate XXSPLTIW for V4SImode
+	constant vectors.
+
+work041-patch013:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Set prefixed and
+	prefixed_prepend_p attributes.
+	(xxspltiw_v4sf): Set prefixed and prefixed_prepend_p attributes.
+	(xxspltidp_v2df): Set prefixed and prefixed_prepend_p attributes.
+	(xxsplti32dx_v4si): Set prefixed and prefixed_prepend_p
+	attributes.
+	(xxsplti32dx_v4sf): Set prefixed and prefixed_prepend_p
+	attributes.
+	* config/rs6000/rs6000.c (rs6000_final_prescan_insn): If the
+	prefixed_prepend_p attribute is no, do not add a leading 'p'.
+	* config/rs6000/rs6000.md (prefixed_prepend_p): New attribute.
+
+work041-patch012:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_const_f32_to_i32): Change
+	return type to long.
+	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
+	type to long.
+
 work041-patch011:
 2021-03-11  Michael Meissner  <meissner@linux.ibm.com>
 
