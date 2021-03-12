@@ -1,3 +1,8 @@
+work041-patch016:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Adjust insn counts.
+
 work041-patch007:
 2021-03-08  Michael Meissner  <meissner@linux.ibm.com>
 
