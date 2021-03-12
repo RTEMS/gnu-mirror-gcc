@@ -2063,6 +2063,9 @@ simplify_parameter_variable (gfc_expr *p, int type)
 
   e->rank = p->rank;
 
+  if (e->ts.type == BT_CHARACTER && p->ts.u.cl)
+    e->ts = p->ts;
+
   /* Do not copy subobject refs for constant.  */
   if (e->expr_type != EXPR_CONSTANT && p->ref != NULL)
     e->ref = gfc_copy_ref (p->ref);
@@ -2278,7 +2281,7 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
   gfc_constructor *ci, *new_ctor;
   gfc_expr *expr, *old;
   int n, i, rank[5], array_arg;
-  int errors = 0;
+  gfc_expr *p;
 
   if (e == NULL)
     return false;
@@ -2346,8 +2349,6 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
       n++;
     }
 
-  gfc_get_errors (NULL, &errors);
-
   /* Using the array argument as the master, step through the array
      calling the function for each element and advancing the array
      constructors together.  */
@@ -2381,8 +2382,12 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
       /* Simplify the function calls.  If the simplification fails, the
 	 error will be flagged up down-stream or the library will deal
 	 with it.  */
-      if (errors == 0)
-	gfc_simplify_expr (new_ctor->expr, 0);
+      p = gfc_copy_expr (new_ctor->expr);
+
+      if (!gfc_simplify_expr (p, init_flag))
+	gfc_free_expr (p);
+      else
+	gfc_replace_expr (new_ctor->expr, p);
 
       for (i = 0; i < n; i++)
 	if (args[i])

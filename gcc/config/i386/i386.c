@@ -11492,11 +11492,6 @@ ix86_compute_frame_layout (void)
   offset += frame->nregs * UNITS_PER_WORD;
   frame->reg_save_offset = offset;
 
-  /* On SEH target, registers are pushed just before the frame pointer
-     location.  */
-  if (TARGET_SEH)
-    frame->hard_frame_pointer_offset = offset;
-
   /* Calculate the size of the va-arg area (not including padding, if any).  */
   frame->va_arg_size = ix86_varargs_gpr_size + ix86_varargs_fpr_size;
 
@@ -11659,14 +11654,22 @@ ix86_compute_frame_layout (void)
      the unwind data structure.  */
   if (TARGET_SEH)
     {
-      HOST_WIDE_INT diff;
+      /* Force the frame pointer to point at or below the lowest register save
+	 area, see the SEH code in config/i386/winnt.c for the rationale.  */
+      frame->hard_frame_pointer_offset = frame->sse_reg_save_offset;
 
-      /* If we can leave the frame pointer where it is, do so.  Also, returns
-	 the establisher frame for __builtin_frame_address (0).  */
-      diff = frame->stack_pointer_offset - frame->hard_frame_pointer_offset;
-      if (diff <= SEH_MAX_FRAME_SIZE
-	  && (diff > 240 || (diff & 15) != 0)
-	  && !crtl->accesses_prior_frames)
+      /* If we can leave the frame pointer where it is, do so.  Also, return
+	 the establisher frame for __builtin_frame_address (0) or else if the
+	 frame overflows the SEH maximum frame size.  */
+      const HOST_WIDE_INT diff
+	= frame->stack_pointer_offset - frame->hard_frame_pointer_offset;
+      if (diff <= 255)
+	{
+	  /* The resulting diff will be a multiple of 16 lower than 255,
+	     i.e. at most 240 as required by the unwind data structure.  */
+	  frame->hard_frame_pointer_offset += (diff & 15);
+	}
+      else if (diff <= SEH_MAX_FRAME_SIZE && !crtl->accesses_prior_frames)
 	{
 	  /* Ideally we'd determine what portion of the local stack frame
 	     (within the constraint of the lowest 240) is most heavily used.
@@ -11675,6 +11678,8 @@ ix86_compute_frame_layout (void)
 	     frame that is addressable with 8-bit offsets.  */
 	  frame->hard_frame_pointer_offset = frame->stack_pointer_offset - 128;
 	}
+      else
+	frame->hard_frame_pointer_offset = frame->hfp_save_offset;
     }
 }
 
@@ -13478,17 +13483,6 @@ ix86_expand_prologue (void)
          slower on all targets.  Also sdb didn't like it.  */
       insn = emit_insn (gen_push (hard_frame_pointer_rtx));
       RTX_FRAME_RELATED_P (insn) = 1;
-
-      /* Push registers now, before setting the frame pointer
-	 on SEH target.  */
-      if (!int_registers_saved
-	  && TARGET_SEH
-	  && !frame.save_regs_using_mov)
-	{
-	  ix86_emit_save_regs ();
-	  int_registers_saved = true;
-	  gcc_assert (m->fs.sp_offset == frame.reg_save_offset);
-	}
 
       if (m->fs.sp_offset == frame.hard_frame_pointer_offset)
 	{
@@ -44424,40 +44418,18 @@ ix86_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &/*inputs*/,
 	  continue;
 	}
 
-      if (dest_mode == DImode && !TARGET_64BIT)
-	dest_mode = SImode;
-
-      if (dest_mode != QImode)
-	{
-	  rtx destqi = gen_reg_rtx (QImode);
-	  emit_insn (gen_rtx_SET (destqi, x));
-
-	  if (TARGET_ZERO_EXTEND_WITH_AND
-	      && optimize_function_for_speed_p (cfun))
-	    {
-	      x = force_reg (dest_mode, const0_rtx);
-
-	      emit_insn (gen_movstrictqi (gen_lowpart (QImode, x), destqi));
-	    }
-	  else
-	    {
-	      x = gen_rtx_ZERO_EXTEND (dest_mode, destqi);
-	      if (dest_mode == GET_MODE (dest)
-		  && !register_operand (dest, GET_MODE (dest)))
-		x = force_reg (dest_mode, x);
-	    }
-	}
-
-      if (dest_mode != GET_MODE (dest))
-	{
-	  rtx tmp = gen_reg_rtx (SImode);
-
-	  emit_insn (gen_rtx_SET (tmp, x));
-	  emit_insn (gen_zero_extendsidi2 (dest, tmp));
-	}
-      else
+      if (dest_mode == QImode)
 	emit_insn (gen_rtx_SET (dest, x));
+      else
+	{
+	  rtx reg = gen_reg_rtx (QImode);
+	  emit_insn (gen_rtx_SET (reg, x));
+
+	  reg = convert_to_mode (dest_mode, reg, 1);
+	  emit_move_insn (dest, reg);
+	}
     }
+
   rtx_insn *seq = get_insns ();
   end_sequence ();
 
@@ -45490,7 +45462,7 @@ ix86_expand_rint (rtx operand0, rtx operand1)
         return copysign (xa, operand1);
    */
   machine_mode mode = GET_MODE (operand0);
-  rtx res, xa, TWO52, two52, mask;
+  rtx res, xa, TWO52, mask;
   rtx_code_label *label;
 
   res = gen_reg_rtx (mode);
@@ -45503,16 +45475,18 @@ ix86_expand_rint (rtx operand0, rtx operand1)
   TWO52 = ix86_gen_TWO52 (mode);
   label = ix86_expand_sse_compare_and_jump (UNLE, TWO52, xa, false);
 
-  two52 = TWO52;
   if (flag_rounding_math)
     {
-      two52 = gen_reg_rtx (mode);
-      ix86_sse_copysign_to_positive (two52, TWO52, res, mask);
+      ix86_sse_copysign_to_positive (TWO52, TWO52, res, mask);
       xa = res;
     }
 
-  xa = expand_simple_binop (mode, PLUS, xa, two52, NULL_RTX, 0, OPTAB_DIRECT);
-  xa = expand_simple_binop (mode, MINUS, xa, two52, xa, 0, OPTAB_DIRECT);
+  xa = expand_simple_binop (mode, PLUS, xa, TWO52, NULL_RTX, 0, OPTAB_DIRECT);
+  xa = expand_simple_binop (mode, MINUS, xa, TWO52, xa, 0, OPTAB_DIRECT);
+
+  /* Remove the sign with FE_DOWNWARD, where x - x = -0.0.  */
+  if (HONOR_SIGNED_ZEROS (mode) && flag_rounding_math)
+    xa = ix86_expand_sse_fabs (xa, NULL);
 
   ix86_sse_copysign_to_positive (res, xa, res, mask);
 
@@ -45533,12 +45507,14 @@ ix86_expand_floorceildf_32 (rtx operand0, rtx operand1, bool do_floor)
           return x;
         xa = xa + TWO52 - TWO52;
         x2 = copysign (xa, x);
+
      Compensate.  Floor:
         if (x2 > x)
           x2 -= 1;
      Compensate.  Ceil:
         if (x2 < x)
           x2 += 1;
+
 	if (HONOR_SIGNED_ZEROS (mode))
 	  x2 = copysign (x2, x);
 	return x2;
@@ -45575,8 +45551,14 @@ ix86_expand_floorceildf_32 (rtx operand0, rtx operand1, bool do_floor)
   emit_insn (gen_rtx_SET (tmp, gen_rtx_AND (mode, one, tmp)));
   tmp = expand_simple_binop (mode, do_floor ? MINUS : PLUS,
 			     xa, tmp, NULL_RTX, 0, OPTAB_DIRECT);
-  if (!do_floor && HONOR_SIGNED_ZEROS (mode))
-    ix86_sse_copysign_to_positive (tmp, tmp, res, mask);
+  if (HONOR_SIGNED_ZEROS (mode))
+    {
+      /* Remove the sign with FE_DOWNWARD, where x - x = -0.0.  */
+      if (do_floor && flag_rounding_math)
+	tmp = ix86_expand_sse_fabs (tmp, NULL);
+
+      ix86_sse_copysign_to_positive (tmp, tmp, res, mask);
+    }
   emit_move_insn (res, tmp);
 
   emit_label (label);
@@ -45595,12 +45577,14 @@ ix86_expand_floorceil (rtx operand0, rtx operand1, bool do_floor)
         if (!isless (xa, TWO52))
           return x;
 	x2 = (double)(long)x;
+
      Compensate.  Floor:
 	if (x2 > x)
 	  x2 -= 1;
      Compensate.  Ceil:
 	if (x2 < x)
 	  x2 += 1;
+
 	if (HONOR_SIGNED_ZEROS (mode))
 	  return copysign (x2, x);
 	return x2;
@@ -45635,10 +45619,15 @@ ix86_expand_floorceil (rtx operand0, rtx operand1, bool do_floor)
   emit_insn (gen_rtx_SET (tmp, gen_rtx_AND (mode, one, tmp)));
   tmp = expand_simple_binop (mode, do_floor ? MINUS : PLUS,
 			     xa, tmp, NULL_RTX, 0, OPTAB_DIRECT);
-  emit_move_insn (res, tmp);
-
   if (HONOR_SIGNED_ZEROS (mode))
-    ix86_sse_copysign_to_positive (res, res, force_reg (mode, operand1), mask);
+    {
+      /* Remove the sign with FE_DOWNWARD, where x - x = -0.0.  */
+      if (do_floor && flag_rounding_math)
+	tmp = ix86_expand_sse_fabs (tmp, NULL);
+
+      ix86_sse_copysign_to_positive (tmp, tmp, res, mask);
+    }
+  emit_move_insn (res, tmp);
 
   emit_label (label);
   LABEL_NUSES (label) = 1;
@@ -45769,7 +45758,7 @@ void
 ix86_expand_truncdf_32 (rtx operand0, rtx operand1)
 {
   machine_mode mode = GET_MODE (operand0);
-  rtx xa, mask, TWO52, one, res, smask, tmp;
+  rtx xa, xa2, TWO52, tmp, one, res, mask;
   rtx_code_label *label;
 
   /* C code for SSE variant we expand below.
@@ -45792,28 +45781,29 @@ ix86_expand_truncdf_32 (rtx operand0, rtx operand1)
   emit_move_insn (res, operand1);
 
   /* xa = abs (operand1) */
-  xa = ix86_expand_sse_fabs (res, &smask);
+  xa = ix86_expand_sse_fabs (res, &mask);
 
   /* if (!isless (xa, TWO52)) goto label; */
   label = ix86_expand_sse_compare_and_jump (UNLE, TWO52, xa, false);
 
-  /* res = xa + TWO52 - TWO52; */
-  tmp = expand_simple_binop (mode, PLUS, xa, TWO52, NULL_RTX, 0, OPTAB_DIRECT);
-  tmp = expand_simple_binop (mode, MINUS, tmp, TWO52, tmp, 0, OPTAB_DIRECT);
-  emit_move_insn (res, tmp);
+  /* xa2 = xa + TWO52 - TWO52; */
+  xa2 = expand_simple_binop (mode, PLUS, xa, TWO52, NULL_RTX, 0, OPTAB_DIRECT);
+  xa2 = expand_simple_binop (mode, MINUS, xa2, TWO52, xa2, 0, OPTAB_DIRECT);
 
   /* generate 1.0 */
   one = force_reg (mode, const_double_from_real_value (dconst1, mode));
 
-  /* Compensate: res = xa2 - (res > xa ? 1 : 0)  */
-  mask = ix86_expand_sse_compare_mask (UNGT, res, xa, false);
-  emit_insn (gen_rtx_SET (mask, gen_rtx_AND (mode, mask, one)));
+  /* Compensate: xa2 = xa2 - (xa2 > xa ? 1 : 0)  */
+  tmp = ix86_expand_sse_compare_mask (UNGT, xa2, xa, false);
+  emit_insn (gen_rtx_SET (tmp, gen_rtx_AND (mode, one, tmp)));
   tmp = expand_simple_binop (mode, MINUS,
-			     res, mask, NULL_RTX, 0, OPTAB_DIRECT);
-  emit_move_insn (res, tmp);
+			     xa2, tmp, NULL_RTX, 0, OPTAB_DIRECT);
+  /* Remove the sign with FE_DOWNWARD, where x - x = -0.0.  */
+  if (HONOR_SIGNED_ZEROS (mode) && flag_rounding_math)
+    tmp = ix86_expand_sse_fabs (tmp, NULL);
 
-  /* res = copysign (res, operand1) */
-  ix86_sse_copysign_to_positive (res, res, force_reg (mode, operand1), smask);
+  /* res = copysign (xa2, operand1) */
+  ix86_sse_copysign_to_positive (res, tmp, res, mask);
 
   emit_label (label);
   LABEL_NUSES (label) = 1;

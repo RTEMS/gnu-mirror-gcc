@@ -1,3 +1,251 @@
+2021-03-07  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/85074
+	* config/pa/pa.c (TARGET_ASM_CAN_OUTPUT_MI_THUNK): Define as
+	hook_bool_const_tree_hwi_hwi_const_tree_true.
+	(pa_asm_output_mi_thunk): Add support for nonzero vcall_offset.
+
+2021-03-03  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/99234
+	* config/i386/i386.c (ix86_compute_frame_layout): For a SEH target,
+	point back the hard frame pointer to its default location when the
+	frame is larger than SEH_MAX_FRAME_SIZE.
+
+2021-03-01  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/99234
+	* config/i386/i386.c (ix86_compute_frame_layout): For a SEH target,
+	point the hard frame pointer to the SSE register save area instead
+	of the general register save area.  Perform only minimal adjustment
+	for small frames if it is initially not correctly aligned.
+	(ix86_expand_prologue): Remove early saves for a SEH target.
+	* config/i386/winnt.c (struct seh_frame_state): Document constraint.
+
+2021-02-23  Qian Jianhua  <qianjh@cn.fujitsu.com>
+
+	Backported from master:
+	2021-02-23  Qian Jianhua  <qianjh@cn.fujitsu.com>
+
+	* config/aarch64/aarch64-cost-tables.h (a64fx_extra_costs): New.
+	* config/aarch64/aarch64.c (a64fx_addrcost_table): New.
+	(a64fx_regmove_cost, a64fx_vector_cost): New.
+	(a64fx_tunings): Use the new added cost tables.
+
+2021-02-15  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* df-core.c (df_worklist_dataflow_doublequeue): Use proper cast.
+
+2021-02-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/i386/winnt.c (i386_pe_seh_unwind_emit): When switching to
+	the cold section, emit a nop before the directive if the previous
+	active instruction can throw.
+
+2021-02-05  Matthias Klose  <doko@ubuntu.com>
+
+	Backported from master:
+	2020-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97236
+	* tree-vect-stmts.c (get_group_load_store_type): Keep
+	VMAT_ELEMENTWISE for single-element vectors.
+
+2021-02-03  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97528
+	* config/arm/arm.c (neon_vector_mem_operand): For POST_MODIFY, require
+	first POST_MODIFY operand is a REG and is equal to the first operand
+	of PLUS.
+
+2021-01-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-29  Bin Cheng  <bin.cheng@linux.alibaba.com>
+		    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97627
+	* tree-ssa-loop-niter.c (number_of_iterations_exit_assumptions):
+	Do not analyze fake edges.
+
+2021-01-21  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	Backported from master:
+	2019-10-16  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/98618
+	* config/aarch64/aarch64.c (aarch64_classify_symbol):
+	Apply reasonable limit to symbol offsets.
+
+2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	Backported from master:
+	2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	* config.gcc [$target == *-*-gnu*]: Enable
+	'default_gnu_indirect_function'.
+
+2021-01-06  2019-07-10  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR testsuite/90806
+	Backport from mainline
+	* wide-int.h (wi::lshift): Reject negative values for the fast path.
+
+2020-12-28  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_rint):
+	Remove the sign of the intermediate value for flag_rounding_math.
+
+2020-12-28  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	Backported from master:
+	2020-12-16  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	* config.gcc (powerpc*le-*-freebsd*): Add.
+	* configure.ac (powerpc*le-*-freebsd*): Ditto.
+	* configure: Regenerate.
+	* config/rs6000/freebsd64.h (ASM_SPEC_COMMON): Use ENDIAN_SELECT.
+	(DEFAULT_ASM_ENDIAN): Add little endian support.
+	(LINK_OS_FREEBSD_SPEC64): Ditto.
+
+2020-12-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_truncdf_32):
+	Remove the sign of the intermediate value for flag_rounding_math.
+
+2020-12-24  Roman Zhuykov  <zhroma@ispras.ru>
+
+	Backported from master:
+	2020-12-05  Roman Zhuykov  <zhroma@ispras.ru>
+
+	PR rtl-optimization/97421
+	* modulo-sched.c (generate_prolog_epilog): Remove forward
+	declaration, adjust last argument name and type.
+	(const_iteration_count): Add bool pointer parameter to return
+	whether count register is read in pre-header after its
+	initialization.
+	(sms_schedule): Fix count register initialization adjustment
+	procedure according to what const_iteration_count said.
+
+2020-12-23  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/96793
+	* config/i386/i386.c (ix86_expand_floorceil):
+	Remove the sign of the intermediate value for flag_rounding_math.
+	(ix86_expand_floorceildf_32): Ditto.
+
+2020-12-14  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config.gcc (aarch64*-*-*): Add --with-tune. Support --with-cpu=native.
+	* config/aarch64/aarch64.h (OPTION_DEFAULT_SPECS): Add --with-tune.
+
+2020-12-14  Sebastian Pop  <spop@amazon.com>
+
+	* config.gcc (aarch64*-*-*): Remove --with-{cpu,arch,tune}-32 flags.
+
+2020-12-03  Uroš Bizjak  <ubizjak@gmail.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98086
+	* config/i386/i386.c (ix86_md_asm_adjustmd): Rewrite
+	zero-extension part to use convert_to_mode.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96075
+	* tree-vect-data-refs.c (vect_compute_data_ref_alignment): Use
+	TYPE_SIZE_UNIT of the vector component type instead of DR_STEP
+	for the misalignment calculation for negative step.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-31  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/96369
+	* fold-const.c (fold_range_test): Special-case constant
+	LHS for short-circuiting operations.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97812
+	* tree-vrp.c (register_edge_assert_for_2): Extend the range
+	according to its sign before seeing whether it fits.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-10-01  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97255
+	* tree-vect-patterns.c (vect_recog_bool_pattern): Also handle
+	VIEW_CONVERT_EXPR.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-09-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97081
+	* tree-vect-patterns.c (vect_recog_rotate_pattern): Use the
+	precision of the shifted operand to determine the mask.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-08-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96579
+	* tree-ssa-reassoc.c (linearize_expr_tree): If we expand
+	rhs via special ops make sure to swap operands.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96370
+	* tree-ssa-reassoc.c (rewrite_expr_tree): Add operation
+	code parameter and use it instead of picking it up from
+	the stmt that is being rewritten.
+	(reassociate_bb): Pass down the operation code.
+
+2020-12-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-08-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96514
+	* tree-if-conv.c (if_convertible_bb_p): If the last stmt
+	is a call that is control-altering, fail.
+
+2020-12-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-10-26  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/97554
+	* sbitmap.c (sbitmap_vector_alloc): Use size_t for byte
+	quantities to avoid overflow.
+
+2020-11-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	* config/arm/arm-protos.h: New function arm_gen_far_branch prototype.
+	* config/arm/arm.c (arm_gen_far_branch): New function
+	arm_gen_far_branch.
+	* config/arm/arm.md: Update b<cond> for Thumb2 range checks.
+
 2020-11-28  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR target/97939
