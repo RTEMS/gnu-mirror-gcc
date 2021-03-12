@@ -6652,7 +6652,8 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   if (n_var == 0)
     {
       /* Generate XXSPLTIW if we can.  */
-      if (TARGET_POWER10 && all_same && mode == V4SImode)
+      if (TARGET_POWER10 && all_same
+	  && (mode == V4SImode || mode == V4SFmode))
 	{
 	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
 	  emit_insn (gen_rtx_SET (target, dup));							 
