@@ -820,15 +820,20 @@
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
 
+;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI/V4SF constants.
 (define_insn "xxspltiw_v4si"
-  [(set (match_operand:V4SI 0 "register_operand" "=wa")
-	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
+  [(set (match_operand:V4SI 0 "register_operand" "=v,wa,wa,wa")
+	(vec_duplicate:V4SI
+	 (match_operand:SI 1 "s32bit_cint_operand" "wB,O,wM,n")))]
  "TARGET_POWER10"
- "xxspltiw %x0,%1"
+ "@
+  vspltisw %0,%1
+  xxspltib %x0,0
+  xxspltib %x0,255
+  xxspltiw %x0,%1"
  [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "yes")
-  (set_attr "prefixed_prepend_p" "no")])
+  (set_attr "prefixed" "*,*,*,yes")
+  (set_attr "prefixed_prepend_p" "*,*,*,no")])
 
 (define_expand "xxspltiw_v4sf"
   [(set (match_operand:V4SF 0 "register_operand" "=wa")

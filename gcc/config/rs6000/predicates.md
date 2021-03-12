@@ -649,8 +649,12 @@
     {
       int value = 256;
       int num_insns = -1;
+      rtx constant;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
+	return true;
+
+      if (TARGET_POWER10 && xxspltiw_constant_p (op, mode, &constant))
 	return true;
 
       if (TARGET_P9_VECTOR
