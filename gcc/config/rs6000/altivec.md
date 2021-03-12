@@ -837,7 +837,7 @@
 (define_insn "xxspltiw_v4sf"
   [(set (match_operand:V4SF 0 "register_operand" "=wa,wa")
 	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "const_double_operand" "j,n")))]
+	 (match_operand:SF 1 "const_double_operand" "j,F")))]
  "TARGET_POWER10"
 {
   if (operands[1] == CONST0_RTX (SFmode))
