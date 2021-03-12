@@ -646,6 +646,7 @@ ranger_cache::dump (FILE *f, bool gori_dump)
 void
 ranger_cache::dump (FILE *f, basic_block bb)
 {
+  gori_map::dump (f, bb, false);
   m_on_entry.dump (f, bb);
   m_oracle->dump (f, bb);
 }

@@ -30,6 +30,7 @@ struct rdc {
  tree ssa1;
  tree ssa2;
  bitmap bm;
+ bitmap m_import;
 };
 
 class range_def_chain
@@ -40,6 +41,7 @@ public:
   tree depend1 (tree name) const;
   tree depend2 (tree name) const;
   bool in_chain_p (tree name, tree def);
+  bitmap get_imports (tree name);
   void register_dependency (tree name, tree ssa1, basic_block bb = NULL);
   void dump (FILE *f, basic_block bb, const char *prefix = NULL);
 protected:
@@ -50,6 +52,7 @@ protected:
 private:
   vec<rdc> m_def_chain;	// SSA_NAME : def chain components.
   bitmap get_def_chain (tree name);
+  void set_import (struct rdc &data, tree imp, bitmap b);
 };
 
 inline tree
@@ -82,12 +85,14 @@ public:
 
   bool is_export_p (tree name, basic_block bb = NULL);
   bitmap exports (basic_block bb);
+  bitmap imports (basic_block bb);
   void set_range_invariant (tree name);
 
   void dump (FILE *f);
-  void dump (FILE *f, basic_block bb);
+  void dump (FILE *f, basic_block bb, bool verbose = true);
 private:
   vec<bitmap> m_outgoing;	// BB: Outgoing ranges calculatable on edges
+  vec<bitmap> m_incoming;	// BB: Incoming ranges which can affect exports.
   bitmap m_maybe_variant;	// Names which might have outgoing ranges.
   void maybe_add_gori (tree name, basic_block bb);
   void calculate_gori (basic_block bb);
@@ -208,6 +213,12 @@ private:
   class logical_stmt_cache *m_cache;
 };
 
+
+// For each name that is an import into BB's exports..
+#define FOR_EACH_GORI_IMPORT_NAME(gori, bb, name)			\
+  for (gori_export_iterator iter ((gori).imports ((bb)));	\
+       ((name) = iter.get_name ());				\
+       iter.next ())
 
 // For each name possibly exported from block BB.
 #define FOR_EACH_GORI_EXPORT_NAME(gori, bb, name)		\

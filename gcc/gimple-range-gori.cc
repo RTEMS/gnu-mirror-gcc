@@ -110,6 +110,39 @@ range_def_chain::has_def_chain (tree name)
   return (m_def_chain[v].ssa1 != 0);
 }
 
+
+// Add either IMP or the import list B to the import set of DATA.
+
+void
+range_def_chain::set_import (struct rdc &data, tree imp, bitmap b)
+{
+  // If there is no imports, just return
+  if (imp == NULL_TREE && !b)
+    return;
+  if (!data.m_import)
+    data.m_import = BITMAP_ALLOC (&m_bitmaps);
+  if (imp != NULL_TREE)
+    bitmap_set_bit (data.m_import, SSA_NAME_VERSION (imp));
+  else
+    bitmap_ior_into (data.m_import, b);
+}
+
+
+// Return the import list for NAME.
+
+bitmap
+range_def_chain::get_imports (tree name)
+{
+  if (!has_def_chain (name))
+    get_def_chain (name);
+  bitmap i = m_def_chain[SSA_NAME_VERSION (name)].m_import;
+  // Either this is a default def,  OR import smust be a subset of exports.
+  gcc_checking_assert (!get_def_chain (name) || !i
+		       || !bitmap_intersect_compl_p (i, get_def_chain (name)));
+  return i;
+}
+
+
 // Build def_chains for NAME if it is in BB.  Copy the def chain into RESULT.
 
 void
@@ -120,9 +153,21 @@ range_def_chain::register_dependency (tree name, tree dep, basic_block bb)
 
   unsigned v = SSA_NAME_VERSION (name);
   struct rdc &src = m_def_chain[v];
-  gimple *def_stmt = SSA_NAME_DEF_STMT (dep);
+  gimple *dep_stmt = SSA_NAME_DEF_STMT (dep);
   unsigned dep_v = SSA_NAME_VERSION (dep);
   bitmap b;
+
+  // Set the direct dependency cache entries.
+  if (!src.ssa1)
+    src.ssa1 = dep;
+  else if (!src.ssa2 && src.ssa1 != dep)
+    src.ssa2 = dep;
+
+  // Don't calculate imports or export/dep chains if BB isnt provided.
+  // This is usually the case for when the temporal cache wants the direct
+  // dependencies of a stmt.
+  if (!bb)
+    return;
 
   if (!src.bm)
     src.bm = BITMAP_ALLOC (&m_bitmaps);
@@ -130,19 +175,19 @@ range_def_chain::register_dependency (tree name, tree dep, basic_block bb)
   // Add this operand into the result.
   bitmap_set_bit (src.bm, dep_v);
 
-  if (!src.ssa1)
-    src.ssa1 = dep;
-  else if (!src.ssa2 && src.ssa1 != dep)
-    src.ssa2 = dep;
-
-  if (bb && gimple_bb (def_stmt) == bb && !is_a<gphi *>(def_stmt))
+  if (gimple_bb (dep_stmt) == bb && !is_a<gphi *>(dep_stmt))
     {
       // Get the def chain for the operand.
       b = get_def_chain (dep);
       // If there was one, copy it into result.
       if (b)
 	bitmap_ior_into (src.bm, b);
+      // And copy the import list.
+      set_import (src, NULL_TREE, get_imports (dep));
     }
+  else
+    // Originated outside the block, so it's an import.
+    set_import (src, dep, NULL);
 }
 
 bool
@@ -180,7 +225,11 @@ range_def_chain::get_def_chain (tree name)
 
   // No definition chain for default defs.
   if (SSA_NAME_IS_DEFAULT_DEF (name))
-    return NULL;
+    {
+      // A Default def is always an import.
+      set_import (m_def_chain[v], name, NULL);
+      return NULL;
+    }
 
   gimple *stmt = SSA_NAME_DEF_STMT (name);
   if (gimple_range_handler (stmt))
@@ -198,11 +247,18 @@ range_def_chain::get_def_chain (tree name)
       ssa3 = gimple_assign_rhs3 (st);
     }
   else
-    return NULL;
+    {
+      // Stmts not understood are always imports.
+      set_import (m_def_chain[v], name, NULL);
+      return NULL;
+    }
 
   register_dependency (name, ssa1, gimple_bb (stmt));
   register_dependency (name, ssa2, gimple_bb (stmt));
   register_dependency (name, ssa3, gimple_bb (stmt));
+  // Stmts with no understandable operands are also imports.
+  if (!ssa1 && !ssa2 & !ssa3)
+    set_import (m_def_chain[v], name, NULL);
   return m_def_chain[v].bm;
 }
 
@@ -230,9 +286,13 @@ range_def_chain::dump (FILE *f, basic_block bb, const char *prefix)
 	  fprintf (f, prefix);
 	  print_generic_expr (f, name, TDF_SLIM);
 	  fprintf (f, " : ");
+
+	  bitmap imports = get_imports (name);
 	  EXECUTE_IF_SET_IN_BITMAP (chain, 0, y, bi)
 	    {
 	      print_generic_expr (f, ssa_name (y), TDF_SLIM);
+	      if (imports && bitmap_bit_p (imports, y))
+		fprintf (f, "(I)");
 	      fprintf (f, "  ");
 	    }
 	  fprintf (f, "\n");
@@ -267,6 +327,8 @@ gori_map::gori_map ()
 {
   m_outgoing.create (0);
   m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
+  m_incoming.create (0);
+  m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
   m_maybe_variant = BITMAP_ALLOC (&m_bitmaps);
 }
 
@@ -274,6 +336,7 @@ gori_map::gori_map ()
 
 gori_map::~gori_map ()
 {
+  m_incoming.release ();
   m_outgoing.release ();
 }
 
@@ -282,10 +345,35 @@ gori_map::~gori_map ()
 bitmap
 gori_map::exports (basic_block bb)
 {
-  if (!m_outgoing[bb->index])
+  if (bb->index >= (signed int)m_outgoing.length () || !m_outgoing[bb->index])
     calculate_gori (bb);
   return m_outgoing[bb->index];
 }
+
+
+// Return the bitmap vector of all imports to BB.  Calculate if necessary.
+
+bitmap
+gori_map::imports (basic_block bb)
+{
+  // If the import doesnt exist, calculate it.
+  if (bb->index >= (signed int)m_incoming.length ())
+    m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
+  if (!m_incoming[bb->index])
+    {
+      m_incoming[bb->index] = BITMAP_ALLOC (&m_bitmaps);
+
+      tree name;
+      FOR_EACH_GORI_EXPORT_NAME (*this, bb, name)
+	{
+	  bitmap imp = get_imports (name);
+	  if (imp)
+	    bitmap_ior_into (m_incoming[bb->index], imp);
+	}
+    }
+  return m_incoming[bb->index];
+}
+
 
 // Return true if NAME is can have ranges generated for it from basic
 // block BB.
@@ -364,26 +452,42 @@ gori_map::calculate_gori (basic_block bb)
 // Dump the table information for BB to file F.
 
 void
-gori_map::dump (FILE *f, basic_block bb)
+gori_map::dump (FILE *f, basic_block bb, bool verbose)
 {
-  unsigned y;
-  bitmap_iterator bi;
-
   // BB was not processed.
-  if (!m_outgoing[bb->index])
+  if (!m_outgoing[bb->index] || bitmap_empty_p (m_outgoing[bb->index]))
     return;
 
-  fprintf (f, "bb<%-4u> exports: ",bb->index);
+  tree name;
+
+  bitmap imp = imports (bb);
+  if (!bitmap_empty_p (imp))
+    {
+      if (verbose)
+	fprintf (f, "bb<%u> Imports: ",bb->index);
+      else
+	fprintf (f, "Imports: ");
+      FOR_EACH_GORI_IMPORT_NAME (*this, bb, name)
+	{
+	  print_generic_expr (f, name, TDF_SLIM);
+	  fprintf (f, "  ");
+	}
+      fputc ('\n', f);
+    }
+
+  if (verbose)
+    fprintf (f, "bb<%u> Exports: ",bb->index);
+  else
+    fprintf (f, "Exports: ");
   // Dump the export vector.
-  EXECUTE_IF_SET_IN_BITMAP (m_outgoing[bb->index], 0, y, bi)
-    if (ssa_name (y))
-      {
-	print_generic_expr (f, ssa_name (y), TDF_SLIM);
-	fprintf (f, "  ");
-      }
+  FOR_EACH_GORI_EXPORT_NAME (*this, bb, name)
+    {
+      print_generic_expr (f, name, TDF_SLIM);
+      fprintf (f, "  ");
+    }
+  fputc ('\n', f);
 
   range_def_chain::dump (f, bb, "         ");
-  fputc ('\n', f);
 }
 
 // Dump the entire GORI map structure to file F.

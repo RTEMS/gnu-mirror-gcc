@@ -1242,7 +1242,7 @@ gimple_ranger::dump (FILE *f)
 	}
     }
 
-  m_cache.dump (dump_file, (dump_flags & TDF_DETAILS) != 0);
+  m_cache.dump (dump_file, false);
 }
 
 // If SCEV has any information about phi node NAME, return it as a range in R.
