@@ -1,3 +1,21 @@
+work041-patch017:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTID): Delete.
+	(xxspltiw_v2df): Use UNSPEC_XXSPLTIDP instead of UNSPEC_XXSPLTID.
+	(xxspltiw_v2df_inst): Use UNSPEC_XXSPLTIDP instead of
+	UNSPEC_XXSPLTID.
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (xxspltidp_operand): New predicate.
+	(easy_fp_constant): If the constant can be loaded with XXSPLTIDP,
+	it is an easy floating point constant.
+	* config/rs6000/rs6000.md (UNSPEC_XXSPLTIDP): New unspec.
+	(SF mode define_split): Convert constants loaded via XXSPLTIDP
+	into a form for generating the instruction.
+	(xxspltidpsf): New insn.
+	(movsf_hardfloat): Add support for loading SFmode constants via
+	XXSPLTIDP.
+
 work041-patch015:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
