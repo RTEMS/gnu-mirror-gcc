@@ -1,3 +1,9 @@
+work041-patch023:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/p10-v4si-const.c: New test.
+	* gcc.target/powerpc/p10-v4sf-const.c: New test.
+
 work041-patch021:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
