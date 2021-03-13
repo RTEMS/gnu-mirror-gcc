@@ -2,7 +2,7 @@
 /* { dg-require-effective-target power10_ok } */
 /* { dg-options "-O2 -mdejagnu-cpu=power10" } */
 
-/* Test loading SF floating point constants.  */
+/* Test loading SF floating point constants using either XXLOR or XXSPLTIDP.  */
 
 float zero (void)
 {
@@ -29,7 +29,6 @@ float subnormal (void)
   return 0x1p-149f;		/* PLFS, PLXSSP  */
 }
 
-/* { dg-final { scan-assembler-times {\mxxlxor\|vsplitsw\|xxspltib\M} 1 } } */
-/* { dg-final { scan-assembler-times {\mxxspltidp\M}                  3 } } */
-/* { dg-final { scan-assembler-times {\mp?lfs|p?lxsspx?\M}            1 } } */
-
+/* { dg-final { scan-assembler-times {\mxxlxor|vsplitsw|xxspltib\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M}                3 } } */
+/* { dg-final { scan-assembler-times {\mp?lfs|p?lxsspx?\M}          1 } } */
