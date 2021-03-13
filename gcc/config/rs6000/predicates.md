@@ -565,6 +565,43 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
+;; Return 1 if operand is a CONST_DOUBLE that can be loaded via the ISA 3.1
+;; XXSPLTIDP instruction.  Note, if the immediate specifies a single-precision
+;; denormal value (i.e., bits 1:8 equal to 0 and bits 9:31 not equal to 0), the
+;; result is undefined.  We handle both floating point constants and integer
+;; constants to allow this predicate to be used after the insn is split to get
+;; the integer value.
+(define_predicate "xxspltidp_operand"
+  (match_code "const_double,const_int")
+{
+  long value;
+
+  if (!TARGET_POWER10)
+    return 0;
+
+  /* For now do not handle DFmode constants that could be represented as SFmode
+     values.  */
+  if (mode == SFmode && CONST_DOUBLE_P (op))
+    value = rs6000_const_f32_to_i32 (op);
+
+  else if (CONST_INT_P (op))
+    value = INTVAL (op);
+
+  else
+    return 0;
+
+  /* Do not return true for 0.0, since it can get loaded with the smaller
+     XXSPLTIB instruction.  */
+  if (value == 0)
+    return 0;
+  
+  /* Test for SFmode denormal.  */
+  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
+    return 0;
+
+  return 1;
+})
+
 ;; Return 1 if operand is a CONST_DOUBLE that can be set in a register
 ;; with no more than one instruction per word.
 (define_predicate "easy_fp_constant"
@@ -599,6 +636,11 @@
 
   /* The constant 0.0 is easy under VSX.  */
   if (TARGET_VSX && op == CONST0_RTX (mode))
+    return 1;
+
+  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
+     be loaded with that instruction.  */
+  if (xxspltidp_operand (op, mode))
     return 1;
 
   /* Otherwise consider floating point constants hard, so that the

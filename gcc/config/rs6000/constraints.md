@@ -213,6 +213,10 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
+(define_constraint "eF"
+  "A floating point constant that can be loaded with XXSPLTIDP."
+  (match_operand 0 "xxspltidp_operand"))
+
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
