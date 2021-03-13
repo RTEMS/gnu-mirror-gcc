@@ -574,7 +574,7 @@
 {
   long value;
 
-  if (!TARGET_POWER10)
+  if (!TARGET_POWER10 || !TARGET_VSX)
     return 0;
 
   if (mode != SFmode && mode != DFmode)
