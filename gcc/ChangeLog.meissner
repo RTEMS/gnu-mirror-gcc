@@ -1,3 +1,15 @@
+work041-patch018:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltidp_operand): Remove code
+	handling CONST_INT.  Add support for DFmode.
+	* config/rs6000/rs6000.md (SF/DF mode splitter): Add DFmode
+	support to split an insn loading a constant with XXSPLTIDP.
+	(xxspltiw_v2df): Use UNSPEC_XXSPLTIDP instead of UNSPEC_XXSPLTID.
+	(xxspltidpsf): Replace with xxspltidp<mode>.
+	(mov<mode>_hardfloat64): Add support to load up DFmode constants
+	with XXSPLTIDP.
+
 work041-patch017:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
