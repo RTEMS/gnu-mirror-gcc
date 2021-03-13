@@ -1,3 +1,9 @@
+work041-patch022:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Add TARGET_VSX.
+	(xxspltiw_v4sf): Likewise.
+
 work041-patch020:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 

@@ -1,3 +1,13 @@
+work041-patch021:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/p10-df-const.c: New test.
+	* gcc.target/powerpc/p10-sf-const.c: New test.
+	* gcc.target/powerpc/xxspltidp-df.c: Delete.
+	* gcc.target/powerpc/xxspltidp-sf.c: Delete.
+	* gcc.target/powerpc/vec-splati-runnable.c: Update XXSPLTIDP
+	count.
+
 work041-patch018:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
