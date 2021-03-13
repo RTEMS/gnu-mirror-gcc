@@ -565,37 +565,33 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
-;; Return 1 if operand is a CONST_DOUBLE that can be loaded via the ISA 3.1
-;; XXSPLTIDP instruction.  Note, if the immediate specifies a single-precision
-;; denormal value (i.e., bits 1:8 equal to 0 and bits 9:31 not equal to 0), the
-;; result is undefined.  We handle both floating point constants and integer
-;; constants to allow this predicate to be used after the insn is split to get
-;; the integer value.
+;; Return 1 if operand is a SF/DF CONST_DOUBLE that can be loaded via the ISA
+;; 3.1 XXSPLTIDP instruction.  This function has to check, if the immediate
+;; specifies a single-precision denormal value (i.e., bits 1:8 equal to 0 and
+;; bits 9:31 not equal to 0), since the result is undefined in the hardware.
 (define_predicate "xxspltidp_operand"
-  (match_code "const_double,const_int")
+  (match_code "const_double")
 {
   long value;
 
   if (!TARGET_POWER10)
     return 0;
 
-  /* For now do not handle DFmode constants that could be represented as SFmode
-     values.  */
-  if (mode == SFmode && CONST_DOUBLE_P (op))
-    value = rs6000_const_f32_to_i32 (op);
-
-  else if (CONST_INT_P (op))
-    value = INTVAL (op);
-
-  else
+  if (mode != SFmode && mode != DFmode)
     return 0;
 
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  if (!exact_real_truncate (SFmode, rv))
+    return 0;
+
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+
   /* Do not return true for 0.0, since it can get loaded with the smaller
-     XXSPLTIB instruction.  */
+     XXSPLTIB/VSPLTIW/XXLXOR instruction to clear the register.  */
   if (value == 0)
     return 0;
   
-  /* Test for SFmode denormal.  */
+  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
   if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
     return 0;
 
