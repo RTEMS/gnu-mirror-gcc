@@ -1,3 +1,20 @@
+work041-patch020:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltidp_operand): Require VSX.
+	* config/rs6000/rs6000.md (SF/DF mode splitter): Allow the split
+	before reload again.  Require VSX.
+	(xxspltidp<mode>): Require VSX.
+
+work041-patch019:
+2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (SF/DF mode splitter): Do the split
+	after reload.  Use vsx_register_operand instead of
+	gpc_reg_operand.
+	(xxspltidp<mode>): Use vsx_register_operand instead of
+	gpc_reg_operand.
+
 work041-patch018:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
