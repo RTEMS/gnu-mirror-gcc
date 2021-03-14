@@ -45,8 +45,8 @@ splat_500 (void)
   return vec_splats (e);				/* XXSPLTIW  */
 }
 
-/* { dg-final { scan-assembler-times {\mvsplitsw\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltidp\M} 4 } } */
+/* { dg-final { scan-assembler-times {\mvspltisw\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M}  4 } } */
 /* { dg-final { scan-assembler-not   {\mxxspltib\M}    } } */
 /* { dg-final { scan-assembler-not   {\mvextsb2w\M}    } } */
 /* { dg-final { scan-assembler-not   {\mp?lxvx?\M}     } } */

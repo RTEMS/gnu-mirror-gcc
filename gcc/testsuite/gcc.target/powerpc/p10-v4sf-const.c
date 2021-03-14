@@ -32,6 +32,6 @@ splat_one (void)
   return vec_splats (e);				/* XXSPLTIW  */
 }
 
-/* { dg-final { scan-assembler-times {\mxxlxor|vspltiw|xxsplitib\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}                  2 } } */
-/* { dg-final { scan-assembler-not   {\mp?lxvx?\M}                     } } */
+/* { dg-final { scan-assembler-times {\mxxlxor|vspltiw|xxspltib\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M}                 2 } } */
+/* { dg-final { scan-assembler-not   {\mp?lxvx?\M}                    } } */
