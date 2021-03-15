@@ -356,24 +356,10 @@ gori_map::exports (basic_block bb)
 bitmap
 gori_map::imports (basic_block bb)
 {
-  // If the import doesnt exist, calculate it.
-  if (bb->index >= (signed int)m_incoming.length ())
-    m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
-  if (!m_incoming[bb->index])
-    {
-      m_incoming[bb->index] = BITMAP_ALLOC (&m_bitmaps);
-
-      tree name;
-      FOR_EACH_GORI_EXPORT_NAME (*this, bb, name)
-	{
-	  bitmap imp = get_imports (name);
-	  if (imp)
-	    bitmap_ior_into (m_incoming[bb->index], imp);
-	}
-    }
+  if (bb->index >= (signed int)m_outgoing.length () || !m_outgoing[bb->index])
+    calculate_gori (bb);
   return m_incoming[bb->index];
 }
-
 
 // Return true if NAME is can have ranges generated for it from basic
 // block BB.
@@ -404,15 +390,26 @@ gori_map::maybe_add_gori (tree name, basic_block bb)
   if (name)
     {
       gimple *s = SSA_NAME_DEF_STMT (name);
+      bitmap imp = NULL;
       // Check if there is a def chain, and it is in this block.
       if (gimple_bb (s) == bb)
-	add_def_chain_to_bitmap (m_outgoing[bb->index], name);
+	{
+	  add_def_chain_to_bitmap (m_outgoing[bb->index], name);
+	  // Check for any imports.
+	  imp = get_imports (name);
+	}
+      // If there were imports, add them, otherwise this name is an import.
+      if (imp)
+	bitmap_ior_into (m_incoming[bb->index], imp);
+      else
+	bitmap_set_bit (m_incoming[bb->index], SSA_NAME_VERSION (name));
 
       // Def chain doesn't include itself, and even if there isn't a
       // def chain, this name should be added to exports.
       bitmap_set_bit (m_outgoing[bb->index], SSA_NAME_VERSION (name));
     }
 }
+
 
 // Calculate all the required information for BB.
 
@@ -421,9 +418,13 @@ gori_map::calculate_gori (basic_block bb)
 {
   tree name;
   if (bb->index >= (signed int)m_outgoing.length ())
-    m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
+    {
+      m_outgoing.safe_grow_cleared (last_basic_block_for_fn (cfun));
+      m_incoming.safe_grow_cleared (last_basic_block_for_fn (cfun));
+    }
   gcc_checking_assert (m_outgoing[bb->index] == NULL);
   m_outgoing[bb->index] = BITMAP_ALLOC (&m_bitmaps);
+  m_incoming[bb->index] = BITMAP_ALLOC (&m_bitmaps);
 
   // If this block's last statement may generate range informaiton, go
   // calculate it.
