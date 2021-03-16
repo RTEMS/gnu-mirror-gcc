@@ -613,12 +613,16 @@ ranger_cache::ranger_cache (gimple_ranger &q) : query (q)
   m_equiv_edge_check.safe_grow_cleared (20);
   m_equiv_edge_check.truncate (0);
   m_temporal = new temporal_cache (*this);
-  m_oracle = new relation_oracle ();
+  if (dom_info_available_p (CDI_DOMINATORS))
+    m_oracle = new relation_oracle ();
+  else
+    m_oracle = NULL;
 }
 
 ranger_cache::~ranger_cache ()
 {
-  delete m_oracle;
+  if (m_oracle)
+    delete m_oracle;
   delete m_temporal;
   m_equiv_edge_check.release ();
   m_poor_value_list.release ();
@@ -648,7 +652,8 @@ ranger_cache::dump (FILE *f, basic_block bb)
 {
   gori_map::dump (f, bb, false);
   m_on_entry.dump (f, bb);
-  m_oracle->dump (f, bb);
+  if (m_oracle)
+    m_oracle->dump (f, bb);
 }
 
 // Get the global range for NAME, and return in R.  Return false if the
@@ -851,6 +856,8 @@ ranger_cache::process_equivs (irange &r, tree name, basic_block bb)
   bool ret = false;
   m_equiv_edge_check.truncate (0);
 
+  if (!m_oracle)
+    return false;
   const_bitmap equivs = m_oracle->equiv_set (name, bb);
   if (!equivs)
     return false;
@@ -1216,6 +1223,8 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 relation_kind
 ranger_cache::query_relation (gimple *s, tree op1, tree op2)
 {
+  if (!m_oracle)
+    return VREL_NONE;
   // If they aren't both ssa names, there is no relation.
   if (!gimple_range_ssa_p (op1) || !gimple_range_ssa_p (op2))
     return VREL_NONE;
@@ -1228,7 +1237,7 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
 				 tree op1, const irange &range1)
 {
   range_operator *handler = gimple_range_handler (s);
-  if (!handler)
+  if (!m_oracle || !handler)
     return false;
   relation_kind relation = VREL_NONE;
 
@@ -1246,7 +1255,7 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
 void
 ranger_cache::process_edge_relations (edge e)
 {
-  if (!single_pred_p (e->dest))
+  if (!m_oracle || !single_pred_p (e->dest))
     return;
 
   int_range_max r;
@@ -1341,7 +1350,7 @@ ranger_cache::process_relations (gimple *s, irange &lhs_range,
 {
   relation_kind relation = VREL_NONE;
   range_operator *handler = gimple_range_handler (s);
-  if (!handler)
+  if (!m_oracle || !handler)
     return false;
 
   tree lhs = gimple_get_lhs (s);
