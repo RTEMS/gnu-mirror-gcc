@@ -41,17 +41,18 @@ public:
   tree depend1 (tree name) const;
   tree depend2 (tree name) const;
   bool in_chain_p (tree name, tree def);
-  bitmap get_imports (tree name);
+  bool chain_import_p (tree name, tree import);
   void register_dependency (tree name, tree ssa1, basic_block bb = NULL);
   void dump (FILE *f, basic_block bb, const char *prefix = NULL);
 protected:
   bool has_def_chain (tree name);
   bool def_chain_in_bitmap_p (tree name, bitmap b);
   void add_def_chain_to_bitmap (bitmap b, tree name);
+  bitmap get_def_chain (tree name);
+  bitmap get_imports (tree name);
   bitmap_obstack m_bitmaps;
 private:
   vec<rdc> m_def_chain;	// SSA_NAME : def chain components.
-  bitmap get_def_chain (tree name);
   void set_import (struct rdc &data, tree imp, bitmap b);
 };
 
@@ -84,6 +85,7 @@ public:
   ~gori_map ();
 
   bool is_export_p (tree name, basic_block bb = NULL);
+  bool is_import_p (tree name, basic_block bb);
   bitmap exports (basic_block bb);
   bitmap imports (basic_block bb);
   void set_range_invariant (tree name);
@@ -154,18 +156,13 @@ protected:
 				      const irange &lhs, tree name);
 
   void expr_range_in_bb (irange &r, tree expr, basic_block bb);
-  bool compute_logical_operands (irange &r, gimple *stmt,
-				 const irange &lhs,
-				 tree name);
-  void compute_logical_operands_in_chain (class tf_range &range,
-					  gimple *stmt, const irange &lhs,
-					  tree name, tree op,
-					  bool op_in_chain);
-  bool optimize_logical_operands (tf_range &range, gimple *stmt,
-				  const irange &lhs, tree name, tree op);
+  void compute_logical_operands (irange &true_range, irange &false_range,
+				 gimple *stmt, const irange &lhs,
+				 tree name, tree op,
+				 bool op_in_chain);
   bool logical_combine (irange &r, enum tree_code code, const irange &lhs,
-			const class tf_range &op1_range,
-			const class tf_range &op2_range);
+			const irange &op1_true, const irange &op1_false,
+			const irange &op2_true, const irange &op2_false);
   int_range<2> m_bool_zero;           // Boolean false cached.
   int_range<2> m_bool_one;            // Boolean true cached.
   outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
@@ -174,8 +171,6 @@ private:
   bool recompute (irange &r, edge e, tree name);
   bool compute_operand_range_switch (irange &r, gswitch *stmt,
 				     const irange &lhs, tree name);
-  bool compute_name_range_op (irange &r, gimple *stmt, const irange &lhs,
-			      tree name);
   bool compute_operand1_range (irange &r, gimple *stmt, const irange &lhs,
 			       tree name);
   bool compute_operand2_range (irange &r, gimple *stmt, const irange &lhs,
