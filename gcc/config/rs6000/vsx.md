@@ -1188,7 +1188,7 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
-                vecsimple, *,         *,         vecstore,  vecload,   vecsimple")
+                vecsimple, *,         *,         vecstore,  vecload,   vecperm")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
@@ -1236,7 +1236,7 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
-                vecsimple, vecsimple, vecsimple, *,         *,        vecsimple,
+                vecsimple, vecsimple, vecsimple, *,         *,        vecperm,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,

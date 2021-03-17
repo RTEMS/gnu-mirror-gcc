@@ -829,7 +829,7 @@
   xxspltib %x0,0
   xxspltib %x0,255
   xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")
+ [(set_attr "type" "vecsimple,vecsimple,vecsimple,vecperm")
   (set_attr "prefixed" "*,*,*,yes")
   (set_attr "prefixed_prepend_p" "*,*,*,no")])
 
@@ -845,7 +845,7 @@
   operands[2] = GEN_INT (rs6000_const_f32_to_i32 (operands[1]));
   return "xxspltiw %x0,%2";
 }
- [(set_attr "type" "vecsimple")
+ [(set_attr "type" "vecsimple,vecperm")
   (set_attr "prefixed" "*,yes")
   (set_attr "prefixed_prepend_p" "*,no")])
 
@@ -866,7 +866,7 @@
 		     UNSPEC_XXSPLTIDP))]
   "TARGET_POWER10"
   "xxspltidp %x0,%1"
-  [(set_attr "type" "vecsimple")
+  [(set_attr "type" "vecperm")
   (set_attr "prefixed" "yes")
   (set_attr "prefixed_prepend_p" "no")])
 
@@ -887,7 +887,7 @@
 					 GEN_INT (index), operands[3]));
    DONE;
 }
- [(set_attr "type" "vecsimple")])
+ [(set_attr "type" "vecperm")])
 
 (define_insn "xxsplti32dx_v4si_inst"
   [(set (match_operand:V4SI 0 "register_operand" "=wa")
@@ -897,7 +897,7 @@
 		     UNSPEC_XXSPLTI32DX))]
   "TARGET_POWER10"
   "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")
+  [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")
    (set_attr "prefixed_prepend_p" "no")])
 
@@ -927,7 +927,7 @@
 		     UNSPEC_XXSPLTI32DX))]
   "TARGET_POWER10"
   "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")
+  [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")
    (set_attr "prefixed_prepend_p" "no")])
 
@@ -939,7 +939,7 @@
 		    UNSPEC_XXBLEND))]
   "TARGET_POWER10"
   "xxblendv<VM3_char> %x0,%x1,%x2,%x3"
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecperm")])
 
 (define_expand "xxpermx"
   [(set (match_operand:V2DI 0 "register_operand" "+wa")
@@ -972,7 +972,7 @@
 
   DONE;
 }
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecperm")])
 
 (define_insn "xxpermx_inst"
   [(set (match_operand:V2DI 0 "register_operand" "+v")
@@ -983,7 +983,7 @@
 		     UNSPEC_XXPERMX))]
   "TARGET_POWER10"
   "xxpermx %x0,%x1,%x2,%x3,%4"
-  [(set_attr "type" "vecsimple")])
+  [(set_attr "type" "vecperm")])
 
 (define_expand "vstrir_<mode>"
   [(set (match_operand:VIshort 0 "altivec_register_operand")
