@@ -565,22 +565,47 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
-;; Return 1 if operand is a SF/DF CONST_DOUBLE that can be loaded via the ISA
-;; 3.1 XXSPLTIDP instruction.  This function has to check, if the immediate
-;; specifies a single-precision denormal value (i.e., bits 1:8 equal to 0 and
-;; bits 9:31 not equal to 0), since the result is undefined in the hardware.
+;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
+;; loaded via the ISA 3.1 XXSPLTIDP instruction.  This function has to check,
+;; if the immediate specifies a single-precision denormal value (i.e., bits 1:8
+;; equal to 0 and bits 9:31 not equal to 0), since the result is undefined in
+;; the hardware.
 (define_predicate "xxspltidp_operand"
-  (match_code "const_double")
+  (match_code "const_double,const_vector,vec_duplicate")
 {
   long value;
+  rtx element;
 
   if (!TARGET_POWER10 || !TARGET_VSX)
     return 0;
 
-  if (mode != SFmode && mode != DFmode)
+  if (mode == V2DFmode)
+    {
+      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
+      if (GET_CODE (op) == VEC_DUPLICATE)
+	element = XEXP (op, 0);
+
+      else if (GET_CODE (op) == CONST_VECTOR)
+	{
+	  element = CONST_VECTOR_ELT (op, 0);
+	  if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+	    return 0;
+	}
+
+      else
+	return 0;
+    }
+
+  else if (mode == SFmode || mode == DFmode)
+    element = op;
+
+  else
     return 0;
 
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  if (!CONST_DOUBLE_P (element))
+    return 0;
+
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
   if (!exact_real_truncate (SFmode, rv))
     return 0;
 
@@ -692,7 +717,9 @@
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
 	return true;
 
-      if (TARGET_POWER10 && xxspltiw_constant_p (op, mode, &constant))
+      if (TARGET_POWER10
+	  && (xxspltiw_constant_p (op, mode, &constant)
+	      || xxspltidp_operand (op, mode)))
 	return true;
 
       if (TARGET_P9_VECTOR
