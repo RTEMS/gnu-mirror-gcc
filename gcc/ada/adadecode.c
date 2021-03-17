@@ -29,8 +29,9 @@
  *                                                                          *
  ****************************************************************************/
 
+#include "config.h"
+#include "system.h"
 #include "runtime.h"
-#include <string.h>
 #include <stdio.h>
 #include <ctype.h>
 
@@ -47,7 +48,6 @@
 #include "adadecode.h"
 
 static void add_verbose (const char *, char *);
-static int has_prefix (const char *, const char *);
 static int has_suffix (const char *, const char *);
 
 /* This is a safe version of strcpy that can be used with overlapped
@@ -66,14 +66,6 @@ static void add_verbose (const char *text, char *ada_name)
   strcat (ada_name, text);
 
   verbose_info = 1;
-}
-
-/* Returns 1 if NAME starts with PREFIX.  */
-
-static int
-has_prefix (const char *name, const char *prefix)
-{
-  return strncmp (name, prefix, strlen (prefix)) == 0;
 }
 
 /* Returns 1 if NAME ends with SUFFIX.  */
@@ -167,7 +159,7 @@ __gnat_decode (const char *coded_name, char *ada_name, int verbose)
     }
 
   /* Check for library level subprogram.  */
-  else if (has_prefix (coded_name, "_ada_"))
+  else if (startswith (coded_name, "_ada_"))
     {
       strcpy (ada_name, coded_name + 5);
       lib_subprog = 1;

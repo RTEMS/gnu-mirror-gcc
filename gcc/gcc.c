@@ -1900,7 +1900,7 @@ init_spec (void)
        when given the proper command line arguments.  */
     while (*p)
       {
-	if (in_sep && *p == '-' && strncmp (p, "-lgcc", 5) == 0)
+	if (in_sep && *p == '-' && startswith (p, "-lgcc"))
 	  {
 	    init_gcc_specs (&obstack,
 			    "-lgcc_s"
@@ -1923,7 +1923,7 @@ init_spec (void)
 	    p += 5;
 	    in_sep = 0;
 	  }
-	else if (in_sep && *p == 'l' && strncmp (p, "libgcc.a%s", 10) == 0)
+	else if (in_sep && *p == 'l' && startswith (p, "libgcc.a%s"))
 	  {
 	    /* Ug.  We don't know shared library extensions.  Hope that
 	       systems that use this form don't do shared libraries.  */

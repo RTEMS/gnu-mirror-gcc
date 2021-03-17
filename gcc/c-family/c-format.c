@@ -5104,7 +5104,7 @@ convert_format_name_to_system_name (const char *attr_name)
   int i;
 
   if (attr_name == NULL || *attr_name == 0
-      || strncmp (attr_name, "gcc_", 4) == 0)
+      || startswith (attr_name, "gcc_"))
     return attr_name;
 #ifdef TARGET_OVERRIDES_FORMAT_INIT
   TARGET_OVERRIDES_FORMAT_INIT ();

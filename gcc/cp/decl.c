@@ -7569,9 +7569,9 @@ omp_declare_variant_finalize_one (tree decl, tree attr)
 	  return true;
 	}
       if (fndecl_built_in_p (variant)
-	  && (strncmp (varname, "__builtin_", strlen ("__builtin_")) == 0
-	      || strncmp (varname, "__sync_", strlen ("__sync_")) == 0
-	      || strncmp (varname, "__atomic_", strlen ("__atomic_")) == 0))
+	  && (startswith (varname, "__builtin_")
+	      || startswith (varname, "__sync_")
+	      || startswith (varname, "__atomic_")))
 	{
 	  error_at (varid_loc, "variant %qD is a built-in", variant);
 	  return true;

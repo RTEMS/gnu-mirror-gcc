@@ -2111,10 +2111,10 @@ __gnat_install_handler (void)
       prefix for vxsim when running on Linux and Windows.  */
   {
     char *model = sysModel ();
-    if ((strncmp (model, "Linux", 5) == 0)
-        || (strncmp (model, "Windows", 7) == 0)
-        || (strncmp (model, "SIMLINUX", 8) == 0) /* vx7 */
-        || (strncmp (model, "SIMNT", 5) == 0)) /* ditto */
+    if ((startswith(model, "Linux")
+        || startswith (model, "Windows")
+        || startswith (model, "SIMLINUX") /* vx7 */
+	|| startswith (model, "SIMNT")) /* ditto */
       __gnat_set_is_vxsim (TRUE);
   }
 #endif

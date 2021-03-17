@@ -4419,7 +4419,7 @@ static void
 write_guarded_var_name (const tree variable)
 {
   if (DECL_NAME (variable)
-      && strncmp (IDENTIFIER_POINTER (DECL_NAME (variable)), "_ZGR", 4) == 0)
+      && startswith (IDENTIFIER_POINTER (DECL_NAME (variable)), "_ZGR"))
     /* The name of a guard variable for a reference temporary should refer
        to the reference, not the temporary.  */
     write_string (IDENTIFIER_POINTER (DECL_NAME (variable)) + 4);

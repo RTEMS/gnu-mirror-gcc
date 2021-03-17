@@ -4670,7 +4670,7 @@ static bool builtin_function_disabled_p (const char *);
 void
 disable_builtin_function (const char *name)
 {
-  if (strncmp (name, "__builtin_", strlen ("__builtin_")) == 0)
+  if (startswith (name, "__builtin_"))
     error ("cannot disable built-in function %qs", name);
   else
     {
