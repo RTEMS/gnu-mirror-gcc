@@ -5024,8 +5024,8 @@ resolve_array_ref (gfc_array_ref *ar)
 }
 
 
-static bool
-resolve_substring (gfc_ref *ref, bool *equal_length)
+bool
+gfc_resolve_substring (gfc_ref *ref, bool *equal_length)
 {
   int k = gfc_validate_kind (BT_INTEGER, gfc_charlen_int_kind, false);
 
@@ -5236,7 +5236,7 @@ gfc_resolve_ref (gfc_expr *expr)
 
       case REF_SUBSTRING:
 	equal_length = false;
-	if (!resolve_substring (*prev, &equal_length))
+	if (!gfc_resolve_substring (*prev, &equal_length))
 	  return false;
 
 	if (expr->expr_type != EXPR_SUBSTRING && equal_length)
@@ -11005,7 +11005,7 @@ resolve_ordinary_assign (gfc_code *code, gfc_namespace *ns)
 
   /* Make sure there is a vtable and, in particular, a _copy for the
      rhs type.  */
-  if (UNLIMITED_POLY (lhs) && lhs->rank && rhs->ts.type != BT_CLASS)
+  if (lhs->ts.type == BT_CLASS && rhs->ts.type != BT_CLASS)
     gfc_find_vtab (&rhs->ts);
 
   bool caf_convert_to_send = flag_coarray == GFC_FCOARRAY_LIB
@@ -12378,7 +12378,8 @@ resolve_charlen (gfc_charlen *cl)
 	}
 
       /* cl->length has been resolved.  It should have an integer type.  */
-      if (cl->length->ts.type != BT_INTEGER || cl->length->rank != 0)
+      if (cl->length
+	  && (cl->length->ts.type != BT_INTEGER || cl->length->rank != 0))
 	{
 	  gfc_error ("Scalar INTEGER expression expected at %L",
 		     &cl->length->where);
@@ -12983,6 +12984,7 @@ static bool
 resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
 {
   gfc_formal_arglist *arg;
+  bool allocatable_or_pointer;
 
   if (sym->attr.function
       && !resolve_fl_var_and_proc (sym, mp_flag))
@@ -13167,8 +13169,16 @@ resolve_fl_procedure (gfc_symbol *sym, int mp_flag)
   /* F2018, C15100: "The result of an elemental function shall be scalar,
      and shall not have the POINTER or ALLOCATABLE attribute."  The scalar
      pointer is tested and caught elsewhere.  */
+  if (sym->result)
+    allocatable_or_pointer = sym->result->ts.type == BT_CLASS
+			     && CLASS_DATA (sym->result) ?
+			     (CLASS_DATA (sym->result)->attr.allocatable
+			      || CLASS_DATA (sym->result)->attr.pointer) :
+			     (sym->result->attr.allocatable
+			      || sym->result->attr.pointer);
+
   if (sym->attr.elemental && sym->result
-      && (sym->result->attr.allocatable || sym->result->attr.pointer))
+      && allocatable_or_pointer)
     {
       gfc_error ("Function result variable %qs at %L of elemental "
 		 "function %qs shall not have an ALLOCATABLE or POINTER "
@@ -14326,7 +14336,7 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
   /* F2008, C448.  */
   if (c->ts.type == BT_CLASS)
     {
-      if (CLASS_DATA (c))
+      if (c->attr.class_ok && CLASS_DATA (c))
 	{
 	  attr = &(CLASS_DATA (c)->attr);
 

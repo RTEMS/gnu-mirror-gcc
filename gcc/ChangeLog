@@ -1,3 +1,832 @@
+2021-03-16  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-03-05  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/98078
+	* cgraph.c (cgraph_edge::set_call_stmt): Do not update all
+	corresponding speculative edges if we are about to resolve
+	sepculation.  Make edge direct (and so resolve speculations) before
+	removing it from call_site_hash.
+	(cgraph_edge::make_direct): Relax the initial assert to allow calling
+	the function on speculative direct edges.
+
+2021-03-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-02-24  Richard Biener  <rguenther@suse.de>
+
+	PR c/99224
+	* builtins.c (fold_builtin_next_arg): Avoid NULL arg.
+
+2021-03-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-02-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/99253
+	* tree-vect-loop.c (check_reduction_path): First compute
+	code, then verify out-of-loop uses.
+
+2021-03-15  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2021-03-08  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/97927
+	* tree-nested.c (convert_local_reference_stmt): Avoid calling
+	lookup_field_for_decl for Fortran module (= namespace context).
+
+2021-03-15  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	Backported from master:
+	2021-02-22  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	PR rtl-optimization/98791
+	* ira-conflicts.c (process_regs_for_copy): Don't create allocno copies
+	for unordered modes.
+
+2021-03-12  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (neoversen2_tunings): Set
+	AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC tune_flags.
+
+2021-03-11  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-03-04  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99381
+	* config/aarch64/aarch64-sve-builtins.cc
+	(function_resolver::require_vector_type): Handle error_mark_node.
+
+2021-03-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-03-08  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/98959
+	* config/rs6000/rs6000.c (rs6000_emit_le_vsx_permute): Add an assert
+	to ensure we do not have an Altivec style address.
+	* config/rs6000/vsx.md (*vsx_le_perm_load_<mode>): Disable if passed
+	an Altivec style address.
+	(*vsx_le_perm_store_<mode>): Likewise.
+	(splitters after *vsx_le_perm_store_<mode>): Likewise.
+	(vsx_load_<mode>): Disable special expander if passed an Altivec
+	style address.
+	(vsx_store_<mode>): Likewise.
+
+2021-03-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-02-26  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/99279
+	* config/rs6000/rs6000-call.c (rs6000_init_builtins): Replace assert
+	with an "if" test.
+
+2021-03-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-02-23  Peter Bergner  <bergner@linux.ibm.com>
+
+	* config/rs6000/mma.md (mma_assemble_pair): Rename from this...
+	(vsx_assemble_pair): ...to this.
+	* config/rs6000/rs6000-builtin.def (BU_MMA_V2, BU_MMA_V3,
+	BU_COMPAT): New macros.
+	(mma_assemble_pair): Rename from this...
+	(vsx_assemble_pair): ...to this.
+	(mma_disassemble_pair): Rename from this...
+	(vsx_disassemble_pair): ...to this.
+	(mma_assemble_pair): New compatibility built-in.
+	(mma_disassemble_pair): Likewise.
+	* config/rs6000/rs6000-call.c (struct builtin_compatibility): New.
+	(RS6000_BUILTIN_COMPAT): Define.
+	(bdesc_compat): New.
+	(rs6000_gimple_fold_mma_builtin): Use VSX_BUILTIN_ASSEMBLE_PAIR.
+	(rs6000_init_builtins): Register compatibility built-ins.
+	(mma_init_builtins): Use VSX_BUILTIN_ASSEMBLE_PAIR,
+	and VSX_BUILTIN_DISASSEMBLE_PAIR.
+	* doc/extend.texi (__builtin_mma_assemble_pair): Rename from this...
+	(__builtin_vsx_assemble_pair): ...to this.
+	(__builtin_mma_disassemble_pair): Rename from this...
+	(__builtin_vsx_disassemble_pair): ...to this.
+
+2021-03-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-02-11  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/99041
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Restrict
+	memory addresses that are legal for quad word accesses.
+
+2021-03-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR c++/90448
+	* calls.c (initialize_argument_information): When the argument
+	is passed by reference, do not make a copy in a thunk only if
+	the argument is already in memory.  Remove redundant test for
+	the case of callee copy.
+
+2021-03-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-tuning-flags.def (cse_sve_vl_constants):
+	Define.
+	* config/aarch64/aarch64.md (add<mode>3): Force CONST_POLY_INT immediates
+	into a register when the above is enabled.
+	* config/aarch64/aarch64.c (neoversev1_tunings):
+	AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS.
+	(aarch64_rtx_costs): Use AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS.
+
+2021-03-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96078
+	* cgraphunit.c (process_function_and_variable_attributes): Don't
+	warn about flatten on an alias if the target also has it.
+	* cgraph.h (symtab_node::get_alias_target_tree): New.
+
+2021-03-03  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/99234
+	* config/i386/i386.c (ix86_compute_frame_layout): For a SEH target,
+	point back the hard frame pointer to its default location when the
+	frame is larger than SEH_MAX_FRAME_SIZE.
+
+2021-03-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98758
+	* tree-data-ref.c (int_divides_p): Use lambda_int arguments.
+	(lambda_matrix_right_hermite): Avoid undefinedness with
+	signed integer abs and multiplication.
+	(analyze_subscript_affine_affine): Use lambda_int.
+
+2021-03-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98640
+	* tree-ssa-sccvn.c (visit_nary_op): Do not try to
+	handle plus or minus from a truncated operand to be
+	sign-extended.
+
+2021-03-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98526
+	* tree-vect-loop.c (vect_model_reduction_cost): Remove costing
+	of the actual reduction op for the regular case.
+	(vectorizable_reduction): Cost the stmts
+	vect_transform_reduction produces here.
+
+2021-03-03  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97897
+	* tree-complex.c (complex_propagate::visit_stmt): Make sure
+	abnormally used SSA names are VARYING.
+	(complex_propagate::visit_phi): Likewise.
+
+2021-03-03  Tom de Vries  <tdevries@suse.de>
+
+	Backported from master:
+	2021-02-05  Tom de Vries  <tdevries@suse.de>
+
+	PR debug/98656
+	* tree-switch-conversion.c (jump_table_cluster::emit): Add loc
+	argument.
+	(bit_test_cluster::emit): Reuse location_t for newly created
+	gswitch statement.
+	(switch_decision_tree::try_switch_expansion): Preserve
+	location_t.
+	* tree-switch-conversion.h: Change function signatures.
+
+2021-03-02  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2021-03-01  Jan Hubicka  <jh@suse.cz>
+
+	PR ipa/98338
+	* ipa-fnsummary.c (compute_fn_summary): Fix sanity check.
+
+2021-03-02  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-07-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/riscv.md (get_thread_pointer<mode>): New.
+	(TP_REGNUM): Ditto.
+	* doc/extend.texi (Target Builtins): Add RISC-V built-in section.
+	Document __builtin_thread_pointer.
+
+2021-03-01  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/99271
+	* config/arm/thumb2.md (nonsecure_call_reg_thumb2_fpcxt): New pattern.
+	(nonsecure_call_value_reg_thumb2_fpcxt): Likewise.
+	(nonsecure_call_reg_thumb2): Restrict to using r4 for the callee
+	address and disable when the FPCXT is not available.
+	(nonsecure_call_value_reg_thumb2): Likewise.
+
+2021-03-01  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/99234
+	* config/i386/i386.c (ix86_compute_frame_layout): For a SEH target,
+	point the hard frame pointer to the SSE register save area instead
+	of the general register save area.  Perform only minimal adjustment
+	for small frames if it is initially not correctly aligned.
+	(ix86_expand_prologue): Remove early saves for a SEH target.
+	* config/i386/winnt.c (struct seh_frame_state): Document constraint.
+
+2021-02-23  Qian Jianhua  <qianjh@cn.fujitsu.com>
+
+	* config/aarch64/aarch64-cost-tables.h (a64fx_extra_costs): New.
+	* config/aarch64/aarch64.c (a64fx_addrcost_table): New.
+	(a64fx_regmove_cost, a64fx_vector_cost): New.
+	(a64fx_tunings): Use the new added cost tables.
+
+2021-02-22  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/85074
+	* config/pa/pa.c (TARGET_ASM_CAN_OUTPUT_MI_THUNK): Define as
+	hook_bool_const_tree_hwi_hwi_const_tree_true.
+	(pa_asm_output_mi_thunk): Add support for nonzero vcall_offset.
+
+2021-02-19  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-tuning-flags.def (prefer_advsimd_autovec): Define.
+	* config/aarch64/aarch64.c (neoversev1_tunings): Use it.
+	(aarch64_override_options_internal): Adjust aarch64_autovec_preference
+	param when prefer_advsimd_autovec is enabled.
+
+2021-02-15  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* df-core.c (df_worklist_dataflow_doublequeue): Use proper cast.
+
+2021-02-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/i386/winnt.c (i386_pe_seh_unwind_emit): When switching to
+	the cold section, emit a nop before the directive if the previous
+	active instruction can throw.
+
+2021-02-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/96015
+	* reorg.c (skip_consecutive_labels): Minor comment tweaks.
+	(relax_delay_slots): When deleting a jump to the next active
+	instruction over a barrier, first delete the barrier if the
+	jump is the only way to reach the target label.
+
+2021-02-04  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/97701
+	* lra-constraints.c (in_class_p): Don't narrow class only for REG
+	or MEM.
+
+2021-02-03  Richard Biener  <rguenther@suse.de>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/98863
+	* config/i386/i386-features.c (remove_partial_avx_dependency):
+	Do not perform DF analysis.
+	(pass_data_remove_partial_avx_dependency): Remove
+	TODO_df_finish.
+
+2021-02-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-02-01  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/98863
+	* config/i386/i386-features.c (convert_scalars_to_vector):
+	Set DF_RD_PRUNE_DEAD_DEFS.
+
+2021-02-03  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-29  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/98144
+	* df.h (df_mir_bb_info): Add con_visited member.
+	* df-problems.c (df_mir_alloc): Initialize con_visited,
+	do not fully populate IN and OUT.
+	(df_mir_reset): Likewise.
+	(df_mir_confluence_0): Set con_visited.
+	(df_mir_confluence_n): Properly handle implicitely
+	fully populated IN and OUT as designated by con_visited
+	and update con_visited accordingly.
+
+2021-02-01  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-29  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/98863
+	* gcse.c (gcse_or_cprop_is_too_expensive): Use unsigned
+	HOST_WIDE_INT for the memory estimate.
+
+2021-02-01  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2020-11-06  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/96307
+	* toplev.c (process_options): Remove param_asan_stack checking for kasan
+	option checking.
+
+2021-01-31  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* system.h (SIZE_MAX): Define if not already defined.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/98331
+	* cfgbuild.c (find_bb_boundaries): Reset debug_insn when seeing
+	a BARRIER.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98853
+	* config/aarch64/aarch64.md (*aarch64_bfxilsi_uxtw): Use
+	%w0, %w1 and %2 instead of %0, %1 and %2.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98681
+	* config/aarch64/aarch64.c (aarch64_mask_and_shift_for_ubfiz_p):
+	Use UINTVAL (shft_amnt) and UINTVAL (mask) instead of INTVAL (shft_amnt)
+	and INTVAL (mask).  Add && INTVAL (mask) > 0 condition.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/98771
+	* fold-const-call.c (host_size_t_cst_p): Renamed to ...
+	(size_t_cst_p): ... this.  Check and store unsigned HOST_WIDE_INT
+	value rather than host size_t.
+	(fold_const_call): Change type of s2 from size_t to
+	unsigned HOST_WIDE_INT.  Use size_t_cst_p instead of
+	host_size_t_cst_p.  For strncmp calls, pass MIN (s2, SIZE_MAX)
+	instead of s2 as last argument.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/97301
+	* config/rs6000/mmintrin.h (__m64): Add __may_alias__ attribute.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/90248
+	* match.pd (X cmp 0.0 ? 1.0 : -1.0 -> copysign(1, +-X),
+	X cmp 0.0 ? -1.0 : +1.0 -> copysign(1, -+X)): Remove
+	simplifications.
+	(X * (X cmp 0.0 ? 1.0 : -1.0) -> +-abs(X),
+	X * (X cmp 0.0 ? -1.0 : 1.0) -> +-abs(X)): New simplifications.
+
+2021-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/98255
+	* tree-dfa.c (get_ref_base_and_extent): For ARRAY_REFs, sign
+	extend index - low_bound from sizetype's precision rather than index
+	precision.
+	(get_addr_base_and_unit_offset_1): Likewise.
+	* tree-ssa-sccvn.c (ao_ref_init_from_vn_reference): Likewise.
+	* gimple-fold.c (fold_const_aggregate_ref_1): Likewise.
+
+2021-01-29  Bin Cheng  <bin.cheng@linux.alibaba.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97627
+	* tree-ssa-loop-niter.c (number_of_iterations_exit_assumptions):
+	Do not analyze fake edges.
+
+2021-01-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2021-01-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR tree-optimization/98766
+	* tree-ssa-math-opts.c (convert_mult_to_fma): Use maybe_le when
+	comparing against type size with param_avoid_fma_max_bits.
+
+2021-01-26  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/98739
+	* common.opt: Add missing equal symbol.
+
+2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backported from master:
+	2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rtems.h (STARTFILE_SPEC): Remove qnolinkcmds.
+	(ENDFILE_SPEC): Evaluate qnolinkcmds.
+
+2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backported from master:
+	2021-01-25  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rtems.h (STARTFILE_SPEC): Remove nostdlib and
+	nostartfiles handling since this is already done by
+	LINK_COMMAND_SPEC.  Evaluate qnolinkcmds.
+	(ENDFILE_SPEC): Remove nostdlib and nostartfiles handling since this
+	is already done by LINK_COMMAND_SPEC.
+	(LIB_SPECS): Remove nostdlib and nodefaultlibs handling since
+	this is already done by LINK_COMMAND_SPEC.  Remove qnolinkcmds
+	evaluation.
+
+2021-01-25  Claudiu Zissulescu  <claziss@gmail.com>
+
+	Backported from master:
+	2020-12-11  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc.md (mpyd<su_optab>_arcv2hs): New template
+	pattern.
+	(*pmpyd<su_optab>_arcv2hs): Likewise.
+	(*pmpyd<su_optab>_imm_arcv2hs): Likewise.
+	(mpyd_arcv2hs): Moved into above template.
+	(mpyd_imm_arcv2hs): Moved into above template.
+	(mpydu_arcv2hs): Likewise.
+	(mpydu_imm_arcv2hs): Likewise.
+	(su_optab): New optab prefix for sign/zero-extending operations.
+
+2021-01-22  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/98535
+	* tree-vect-slp.c (duplicate_and_interleave): Use quick_grow_cleared.
+	If the high and low permutes are the same, remove the high permutes
+	from the working set and only continue with the low ones.
+
+2021-01-21  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* config/arm/arm_mve.h (__arm_vcmpneq_s8): Fix return type.
+
+2021-01-19  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-01-19  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/98690
+	* ipa-sra.c (ssa_name_only_returned_p): New parameter fun.  Check
+	whether non-call exceptions allow removal of a statement.
+	(isra_analyze_call): Pass the appropriate function to
+	ssa_name_only_returned_p.
+
+2021-01-19  Daniel Hellstrom  <daniel@gaisler.com>
+
+	Backported from master:
+	2021-01-19  Daniel Hellstrom  <daniel@gaisler.com>
+
+	* config/sparc/rtemself.h (TARGET_OS_CPP_BUILTINS): Add
+	built-in define __FIX_LEON3FT_TN0018.
+
+2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* config/gcn/mkoffload.c (main): Create an offload image only in
+	64-bit configurations.
+
+2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	Backported from master:
+	2021-01-13  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+	* config.gcc [$target == *-*-gnu*]: Enable
+	'default_gnu_indirect_function'.
+
+2021-01-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98513
+	* value-range.cc (intersect_ranges): Compare the upper bounds
+	for the expected relation.
+
+2021-01-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98282
+	* tree-ssa-sccvn.c (vn_get_stmt_kind): Classify tcc_reference on
+	invariants as VN_NARY.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-12-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/94994
+	* tree-vect-data-refs.c (vect_vfa_align): Use dr_alignment.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-04  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/95401
+	* config/aarch64/aarch64-sve-builtins.cc
+	(gimple_folder::load_store_cookie): Use bits rather than bytes
+	for the alignment argument to IFN_MASK_LOAD and IFN_MASK_STORE.
+	* gimple-fold.c (gimple_fold_mask_load_store_mem_ref): Likewise.
+	* tree-vect-stmts.c (vectorizable_store): Likewise.
+	(vectorizable_load): Likewise.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/97144
+	* recog.c (constrain_operands): Initialize matching_operand
+	for each alternative, rather than only doing it once.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-12-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/98214
+	* genmodes.c (emit_insn_modes_h): Emit a definition of CONST_MODE_MASK.
+	(emit_mode_mask): Treat mode_mask_array as non-constant if adj_nunits.
+	(emit_mode_adjustments): Update GET_MODE_MASK when updating
+	GET_MODE_NUNITS.
+	* machmode.h (mode_mask_array): Use CONST_MODE_MASK.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-12-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/98302
+	* tree-vect-patterns.c (vect_determine_precisions_from_users): Make
+	sure that the precision remains greater than the shift count.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/98371
+	* tree-vect-loop.c (vect_reanalyze_as_main_loop): New function.
+	(vect_analyze_loop): If an epilogue loop appears to be cheaper
+	than the main loop, re-analyze it as a main loop before adopting
+	it as a main loop.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-01-04  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/89057
+	* config/aarch64/aarch64-simd.md (aarch64_combine<mode>): Accept
+	aarch64_simd_reg_or_zero for operand 2.  Use the combinez patterns
+	to handle zero operands.
+
+2021-01-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2020-12-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_preferred_simd_mode): Use
+	aarch64_full_sve_mode and aarch64_vq_mode directly, instead of
+	going via aarch64_simd_container_mode.
+
+2021-01-12  Andreas Krebbel  <krebbel@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-11  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR tree-optimization/98221
+	* tree-ssa-forwprop.c (simplify_vector_constructor): For
+	big-endian, use UNPACK[_FLOAT]_HI.
+
+2021-01-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-12-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98117
+	* tree-vect-loop-manip.c (vect_gen_vector_loop_niters):
+	Properly handle degenerate niter when setting the vector
+	loop IV range.
+
+2021-01-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97623
+	* tree-ssa-pre.c (insert): Move hoist insertion after PRE
+	insertion iteration and do not iterate it.
+	(create_expression_by_pieces): Guard NEW_SETS access.
+	(insert_into_preds_of_block): Likewise.
+
+2021-01-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-10-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97623
+	* tree-ssa-pre.c (insert): First do hoist insertion in
+	a backward walk.
+
+2021-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/98556
+	* tree-cfg.c (verify_gimple_assign_binary): Allow lhs of
+	POINTER_DIFF_EXPR to be any integral type.
+
+2021-01-07  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	Backported from master:
+	2020-12-11  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc-protos.h (arc_scheduling_not_expected): Remove
+	it.
+	(arc_sets_cc_p): Likewise.
+	(arc_need_delay): Likewise.
+	* config/arc/arc.c (arc_sets_cc_p): Likewise.
+	(arc_need_delay): Likewise.
+	(arc_scheduling_not_expected): Likewise.
+	* config/arc/arc.md: Convert adc/sbc patterns to simple
+	instruction definitions.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-01-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/98514
+	* tree-ssa-reassoc.c (bb_rank): Change type from long * to
+	int64_t *.
+	(operand_rank): Change type from hash_map<tree, long> to
+	hash_map<tree, int64_t>.
+	(phi_rank): Change return type from long to int64_t.
+	(loop_carried_phi): Change block_rank variable type from long to
+	int64_t.
+	(propagate_rank): Change return type, rank parameter type and
+	op_rank variable type from long to int64_t.
+	(find_operand_rank): Change return type from long to int64_t
+	and change slot variable type from long * to int64_t *.
+	(insert_operand_rank): Change rank parameter type from long to
+	int64_t.
+	(get_rank): Change return type and rank variable type from long to
+	int64_t.  Use PRId64 instead of ld to print the rank.
+	(init_reassoc): Change rank variable type from long to int64_t
+	and adjust correspondingly bb_rank and operand_rank initialization.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/98474
+	* wide-int.cc (wi::to_mpz): If wide_int has MSB set, but type
+	is unsigned and excess negative, append set bits after len until
+	precision.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/98353
+	* gimplify.c (gimplify_init_ctor_eval_range): Gimplify value before
+	storing it into cref.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/98383
+	* gimplify.c (struct gimplify_omp_ctx): Add in_for_exprs flag.
+	(gimple_add_tmp_var): For addressable temporaries appearing in
+	simd lb, b or incr expressions, don't add a private clause unless
+	it is seen also outside of those expressions in the simd body.
+	(omp_notice_variable): Likewise.
+	(gimplify_omp_for): Set and reset in_for_exprs around gimplification
+	of lb, b or incr expressions.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimplify.c (struct gimplify_omp_ctx): Add has_depend member.
+	(gimplify_scan_omp_clauses): Set it to true if OMP_CLAUSE_DEPEND
+	appears on OMP_TASK.
+	(gimplify_adjust_omp_clauses_1, gimplify_adjust_omp_clauses): Force
+	GOVD_WRITTEN on shared variables if task construct has depend clause.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/98183
+	* omp-low.c (lower_omp_target): Don't add OMP_RETURN for
+	data regions.
+	* omp-expand.c (expand_omp_target): Don't try to remove
+	OMP_RETURN for data regions.
+	(build_omp_regions_1, omp_make_gimple_edges): Don't expect
+	OMP_RETURN for data regions.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/98205
+	* omp-expand.c (expand_omp_for_generic): Fix up broken_loop handling.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/94440
+	* config/i386/i386.opt (ix86_excess_precision,
+	ix86_unsafe_math_optimizations): New TargetVariables.
+	* config/i386/i386.h (X87_ENABLE_ARITH, X87_ENABLE_FLOAT): Use
+	ix86_unsafe_math_optimizations instead of
+	flag_unsafe_math_optimizations and ix86_excess_precision instead of
+	flag_excess_precision.
+	* config/i386/i386.c (ix86_excess_precision): Rename to ...
+	(ix86_get_excess_precision): ... this.
+	(TARGET_C_EXCESS_PRECISION): Define to ix86_get_excess_precision.
+	* config/i386/i386-options.c (ix86_valid_target_attribute_tree,
+	ix86_option_override_internal): Update ix86_unsafe_math_optimization
+	from flag_unsafe_math_optimizations and ix86_excess_precision
+	from flag_excess_precision when constructing target option nodes.
+	(ix86_set_current_function): If flag_unsafe_math_optimizations
+	or flag_excess_precision is different from the one recorded
+	in TARGET_OPTION_NODE, create a new target option node for the
+	current function and switch to that.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98100
+	* cfgexpand.c (expand_gimple_basic_block): For vars with
+	vector type, use TYPE_MODE rather than DECL_MODE.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2out.c (add_scalar_info): Only use add_AT_wide for 128-bit
+	constants and only in dwarf-5 or later, where DW_FORM_data16 is
+	available.  Otherwise use DW_FORM_block*/DW_FORM_exprloc with
+	DW_OP_implicit_value to describe the constant.
+
+2021-01-06  Scott Snyder  <sss@li-snyder.org>
+
+	Backported from master:
+	2020-12-02  Scott Snyder  <sss@li-snyder.org>
+
+	PR plugins/98059
+	* vec.h (auto_delete_vec): Use
+	DISABLE_COPY_AND_ASSIGN(auto_delete_vec) instead of
+	DISABLE_COPY_AND_ASSIGN(auto_delete_vec<T>) to make it valid C++20
+	after DR2237.
+
+2021-01-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2020-12-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/98063
+	* config/i386/i386-expand.c (ix86_expand_call): Handle non-plt
+	CM_LARGE_PIC calls.
+
+2021-01-05  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/98522
+	* config/i386/sse.md (sse_cvtps2pi): Redefine as define_insn_and_split.
+	Clear the top 64 bytes of the input XMM register.
+	(sse_cvttps2pi): Ditto.
+
+2021-01-05  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/98521
+	* config/i386/xopintrin.h (_mm256_cmov_si256): New.
+
 2021-01-03  Iain Sandoe  <iain@sandoe.co.uk>
 	    Jakub Jelinek   <jakub@redhat.com>
 

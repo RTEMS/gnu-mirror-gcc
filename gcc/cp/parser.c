@@ -8679,7 +8679,7 @@ cp_parser_has_attribute_expression (cp_parser *parser)
     {
       if (oper == error_mark_node)
 	/* Nothing.  */;
-      else if (type_dependent_expression_p (oper))
+      else if (processing_template_decl && uses_template_parms (oper))
 	sorry_at (atloc, "%<__builtin_has_attribute%> with dependent argument "
 		  "not supported yet");
       else
@@ -11088,7 +11088,12 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	= cp_parser_exception_specification_opt (parser, CP_PARSER_FLAGS_NONE,
 						 quals);
 
-      std_attrs = cp_parser_std_attribute_spec_seq (parser);
+      /* GCC 8 accepted attributes here, and this is the place for standard
+	 C++11 attributes that appertain to the function type.  */
+      if (cp_next_tokens_can_be_gnu_attribute_p (parser))
+	gnu_attrs = cp_parser_gnu_attributes_opt (parser);
+      else
+	std_attrs = cp_parser_std_attribute_spec_seq (parser);
 
       /* Parse optional trailing return type.  */
       if (cp_lexer_next_token_is (parser->lexer, CPP_DEREF))
@@ -11097,8 +11102,10 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
           return_type = cp_parser_trailing_type_id (parser);
         }
 
+      /* Also allow GNU attributes at the very end of the declaration, the
+	 usual place for GNU attributes.  */
       if (cp_next_tokens_can_be_gnu_attribute_p (parser))
-	gnu_attrs = cp_parser_gnu_attributes_opt (parser);
+	gnu_attrs = chainon (gnu_attrs, cp_parser_gnu_attributes_opt (parser));
 
       /* Parse optional trailing requires clause.  */
       trailing_requires_clause = cp_parser_requires_clause_opt (parser, false);
@@ -36936,7 +36943,7 @@ cp_parser_oacc_clause_async (cp_parser *parser, tree list)
       matching_parens parens;
       parens.consume_open (parser);
 
-      t = cp_parser_expression (parser);
+      t = cp_parser_assignment_expression (parser);
       if (t == error_mark_node
 	  || !parens.require_close (parser))
 	cp_parser_skip_to_closing_parenthesis (parser, /*recovering=*/true,
@@ -38206,6 +38213,8 @@ cp_parser_omp_depobj (cp_parser *parser, cp_token *pragma_tok)
       cp_lexer_consume_token (parser->lexer);
       if (!strcmp ("depend", p))
 	{
+	  /* Don't create location wrapper nodes within the depend clause.  */
+	  auto_suppress_location_wrappers sentinel;
 	  clause = cp_parser_omp_clause_depend (parser, NULL_TREE, c_loc);
 	  if (clause)
 	    clause = finish_omp_clauses (clause, C_ORT_OMP);
@@ -39859,6 +39868,9 @@ cp_parser_omp_parallel (cp_parser *parser, cp_token *pragma_tok,
 	  cclauses = cclauses_buf;
 
 	  cp_lexer_consume_token (parser->lexer);
+	  if (!flag_openmp)  /* flag_openmp_simd  */
+	    return cp_parser_omp_master (parser, pragma_tok, p_name, mask,
+					 cclauses, if_p);
 	  block = begin_omp_parallel ();
 	  save = cp_parser_begin_omp_structured_block (parser);
 	  tree ret = cp_parser_omp_master (parser, pragma_tok, p_name, mask,

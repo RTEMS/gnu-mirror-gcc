@@ -464,6 +464,22 @@ static const struct cpu_addrcost_table qdf24xx_addrcost_table =
   2, /* imm_offset  */
 };
 
+static const struct cpu_addrcost_table a64fx_addrcost_table =
+{
+    {
+      1, /* hi  */
+      1, /* si  */
+      1, /* di  */
+      2, /* ti  */
+    },
+  0, /* pre_modify  */
+  0, /* post_modify  */
+  2, /* register_offset  */
+  3, /* register_sextend  */
+  3, /* register_zextend  */
+  0, /* imm_offset  */
+};
+
 static const struct cpu_regmove_cost generic_regmove_cost =
 {
   1, /* GP2GP  */
@@ -557,6 +573,16 @@ static const struct cpu_regmove_cost tsv110_regmove_cost =
   2, /* GP2FP  */
   3, /* FP2GP  */
   2  /* FP2FP  */
+};
+
+static const struct cpu_regmove_cost a64fx_regmove_cost =
+{
+  1, /* GP2GP  */
+  /* Avoid the use of slow int<->fp moves for spilling by setting
+     their cost higher than memmov_cost.  */
+  5, /* GP2FP  */
+  7, /* FP2GP  */
+  2 /* FP2FP  */
 };
 
 /* Generic costs for vector insn classes.  */
@@ -734,6 +760,25 @@ static const struct cpu_vector_cost thunderx3t110_vector_cost =
   4, /* vec_store_cost  */
   2, /* cond_taken_branch_cost  */
   1  /* cond_not_taken_branch_cost  */
+};
+
+static const struct cpu_vector_cost a64fx_vector_cost =
+{
+  1, /* scalar_int_stmt_cost  */
+  5, /* scalar_fp_stmt_cost  */
+  4, /* scalar_load_cost  */
+  1, /* scalar_store_cost  */
+  2, /* vec_int_stmt_cost  */
+  5, /* vec_fp_stmt_cost  */
+  3, /* vec_permute_cost  */
+  13, /* vec_to_scalar_cost  */
+  4, /* scalar_to_vec_cost  */
+  6, /* vec_align_load_cost  */
+  6, /* vec_unalign_load_cost  */
+  1, /* vec_unalign_store_cost  */
+  1, /* vec_store_cost  */
+  3, /* cond_taken_branch_cost  */
+  1 /* cond_not_taken_branch_cost  */
 };
 
 
@@ -1358,7 +1403,8 @@ static const struct tune_params neoversev1_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC
+   | AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS),	/* tune_flags.  */
   &generic_prefetch_tune
 };
 
@@ -1384,16 +1430,16 @@ static const struct tune_params neoversen2_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),	/* tune_flags.  */
   &generic_prefetch_tune
 };
 
 static const struct tune_params a64fx_tunings =
 {
-  &generic_extra_costs,
-  &generic_addrcost_table,
-  &generic_regmove_cost,
-  &generic_vector_cost,
+  &a64fx_extra_costs,
+  &a64fx_addrcost_table,
+  &a64fx_regmove_cost,
+  &a64fx_vector_cost,
   &generic_branch_cost,
   &generic_approx_modes,
   SVE_512, /* sve_width  */
@@ -11968,10 +12014,11 @@ aarch64_mask_and_shift_for_ubfiz_p (scalar_int_mode mode, rtx mask,
 				    rtx shft_amnt)
 {
   return CONST_INT_P (mask) && CONST_INT_P (shft_amnt)
-	 && INTVAL (shft_amnt) < GET_MODE_BITSIZE (mode)
-	 && exact_log2 ((INTVAL (mask) >> INTVAL (shft_amnt)) + 1) >= 0
-	 && (INTVAL (mask)
-	     & ((HOST_WIDE_INT_1U << INTVAL (shft_amnt)) - 1)) == 0;
+	 && INTVAL (mask) > 0
+	 && UINTVAL (shft_amnt) < GET_MODE_BITSIZE (mode)
+	 && exact_log2 ((UINTVAL (mask) >> UINTVAL (shft_amnt)) + 1) >= 0
+	 && (UINTVAL (mask)
+	     & ((HOST_WIDE_INT_1U << UINTVAL (shft_amnt)) - 1)) == 0;
 }
 
 /* Return true if the masks and a shift amount from an RTX of the form
@@ -12486,8 +12533,18 @@ cost_plus:
 	    *cost += rtx_cost (op0, mode, PLUS, 0, speed);
 
 	    if (speed)
-	      /* ADD (immediate).  */
-	      *cost += extra_cost->alu.arith;
+	      {
+		/* ADD (immediate).  */
+		*cost += extra_cost->alu.arith;
+
+		/* Some tunings prefer to not use the VL-based scalar ops.
+		   Increase the cost of the poly immediate to prevent their
+		   formation.  */
+		if (GET_CODE (op1) == CONST_POLY_INT
+		    && (aarch64_tune_params.extra_tuning_flags
+			& AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS))
+		  *cost += COSTS_N_INSNS (1);
+	      }
 	    return true;
 	  }
 
@@ -14496,6 +14553,14 @@ aarch64_override_options_internal (struct gcc_options *opts)
      the *options_set structs anyway.  */
   SET_OPTION_IF_UNSET (opts, &global_options_set,
 		       param_sched_autopref_queue_depth, queue_depth);
+
+  /* If the core wants only AdvancedSIMD autovectorization, do this through
+     aarch64_autovec_preference.  If the user set it explicitly, they should
+     know what they want.  */
+  if (aarch64_tune_params.extra_tuning_flags
+      & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC)
+    SET_OPTION_IF_UNSET (opts, &global_options_set,
+			 aarch64_autovec_preference, 1);
 
   /* If using Advanced SIMD only for autovectorization disable SVE vector costs
      comparison.  */
@@ -17379,10 +17444,11 @@ aarch64_preferred_simd_mode (scalar_mode mode)
 {
   /* Take into account explicit auto-vectorization ISA preferences through
      aarch64_cmp_autovec_modes.  */
-  poly_int64 bits
-    = (TARGET_SVE && aarch64_cmp_autovec_modes (VNx16QImode, V16QImode))
-       ? BITS_PER_SVE_VECTOR : 128;
-  return aarch64_simd_container_mode (mode, bits);
+  if (TARGET_SVE && aarch64_cmp_autovec_modes (VNx16QImode, V16QImode))
+    return aarch64_full_sve_mode (mode).else_mode (word_mode);
+  if (TARGET_SIMD)
+    return aarch64_vq_mode (mode).else_mode (word_mode);
+  return word_mode;
 }
 
 /* Return a list of possible vector sizes for the vectorizer

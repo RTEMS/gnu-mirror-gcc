@@ -2473,6 +2473,45 @@ vect_joust_loop_vinfos (loop_vec_info new_loop_vinfo,
   return true;
 }
 
+/* If LOOP_VINFO is already a main loop, return it unmodified.  Otherwise
+   try to reanalyze it as a main loop.  Return the loop_vinfo on success
+   and null on failure.  */
+
+static loop_vec_info
+vect_reanalyze_as_main_loop (loop_vec_info loop_vinfo, unsigned int *n_stmts)
+{
+  if (!LOOP_VINFO_EPILOGUE_P (loop_vinfo))
+    return loop_vinfo;
+
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "***** Reanalyzing as a main loop with vector mode %s\n",
+		     GET_MODE_NAME (loop_vinfo->vector_mode));
+
+  struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
+  vec_info_shared *shared = loop_vinfo->shared;
+  opt_loop_vec_info main_loop_vinfo = vect_analyze_loop_form (loop, shared);
+  gcc_assert (main_loop_vinfo);
+
+  main_loop_vinfo->vector_mode = loop_vinfo->vector_mode;
+
+  bool fatal = false;
+  bool res = vect_analyze_loop_2 (main_loop_vinfo, fatal, n_stmts);
+  loop->aux = NULL;
+  if (!res)
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location,
+			 "***** Failed to analyze main loop with vector"
+			 " mode %s\n",
+			 GET_MODE_NAME (loop_vinfo->vector_mode));
+      delete main_loop_vinfo;
+      return NULL;
+    }
+  LOOP_VINFO_VECTORIZABLE_P (main_loop_vinfo) = 1;
+  return main_loop_vinfo;
+}
+
 /* Function vect_analyze_loop.
 
    Apply a set of analyses on LOOP, and create a loop_vec_info struct
@@ -2620,9 +2659,25 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
 	      if (vinfos.is_empty ()
 		  && vect_joust_loop_vinfos (loop_vinfo, first_loop_vinfo))
 		{
-		  delete first_loop_vinfo;
-		  first_loop_vinfo = opt_loop_vec_info::success (NULL);
-		  LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo) = NULL;
+		  loop_vec_info main_loop_vinfo
+		    = vect_reanalyze_as_main_loop (loop_vinfo, &n_stmts);
+		  if (main_loop_vinfo == loop_vinfo)
+		    {
+		      delete first_loop_vinfo;
+		      first_loop_vinfo = opt_loop_vec_info::success (NULL);
+		    }
+		  else if (main_loop_vinfo
+			   && vect_joust_loop_vinfos (main_loop_vinfo,
+						      first_loop_vinfo))
+		    {
+		      delete first_loop_vinfo;
+		      first_loop_vinfo = opt_loop_vec_info::success (NULL);
+		      delete loop_vinfo;
+		      loop_vinfo
+			= opt_loop_vec_info::success (main_loop_vinfo);
+		    }
+		  else
+		    delete main_loop_vinfo;
 		}
 	    }
 
@@ -2975,34 +3030,6 @@ pop:
 	  fail = true;
 	  break;
 	}
-      /* Check there's only a single stmt the op is used on.  For the
-	 not value-changing tail and the last stmt allow out-of-loop uses.
-	 ???  We could relax this and handle arbitrary live stmts by
-	 forcing a scalar epilogue for example.  */
-      imm_use_iterator imm_iter;
-      gimple *op_use_stmt;
-      unsigned cnt = 0;
-      FOR_EACH_IMM_USE_STMT (op_use_stmt, imm_iter, op)
-	if (!is_gimple_debug (op_use_stmt)
-	    && (*code != ERROR_MARK
-		|| flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt))))
-	  {
-	    /* We want to allow x + x but not x < 1 ? x : 2.  */
-	    if (is_gimple_assign (op_use_stmt)
-		&& gimple_assign_rhs_code (op_use_stmt) == COND_EXPR)
-	      {
-		use_operand_p use_p;
-		FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
-		  cnt++;
-	      }
-	    else
-	      cnt++;
-	  }
-      if (cnt != 1)
-	{
-	  fail = true;
-	  break;
-	}
       tree_code use_code = gimple_assign_rhs_code (use_stmt);
       if (use_code == MINUS_EXPR)
 	{
@@ -3028,6 +3055,34 @@ pop:
       else if ((use_code == MIN_EXPR
 		|| use_code == MAX_EXPR)
 	       && sign != TYPE_SIGN (TREE_TYPE (gimple_assign_lhs (use_stmt))))
+	{
+	  fail = true;
+	  break;
+	}
+      /* Check there's only a single stmt the op is used on.  For the
+	 not value-changing tail and the last stmt allow out-of-loop uses.
+	 ???  We could relax this and handle arbitrary live stmts by
+	 forcing a scalar epilogue for example.  */
+      imm_use_iterator imm_iter;
+      gimple *op_use_stmt;
+      unsigned cnt = 0;
+      FOR_EACH_IMM_USE_STMT (op_use_stmt, imm_iter, op)
+	if (!is_gimple_debug (op_use_stmt)
+	    && (*code != ERROR_MARK
+		|| flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt))))
+	  {
+	    /* We want to allow x + x but not x < 1 ? x : 2.  */
+	    if (is_gimple_assign (op_use_stmt)
+		&& gimple_assign_rhs_code (op_use_stmt) == COND_EXPR)
+	      {
+		use_operand_p use_p;
+		FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
+		  cnt++;
+	      }
+	    else
+	      cnt++;
+	  }
+      if (cnt != 1)
 	{
 	  fail = true;
 	  break;
@@ -3909,8 +3964,8 @@ have_whole_vector_shift (machine_mode mode)
 /* Function vect_model_reduction_cost.
 
    Models cost for a reduction operation, including the vector ops
-   generated within the strip-mine loop, the initial definition before
-   the loop, and the epilogue code that must be generated.  */
+   generated within the strip-mine loop in some cases, the initial
+   definition before the loop, and the epilogue code that must be generated.  */
 
 static void
 vect_model_reduction_cost (stmt_vec_info stmt_info, internal_fn reduc_fn,
@@ -3973,10 +4028,6 @@ vect_model_reduction_cost (stmt_vec_info stmt_info, internal_fn reduc_fn,
       prologue_cost += record_stmt_cost (cost_vec, prologue_stmts,
 					 scalar_to_vec, stmt_info, 0,
 					 vect_prologue);
-
-      /* Cost of reduction op inside loop.  */
-      inside_cost = record_stmt_cost (cost_vec, ncopies, vector_stmt,
-				      stmt_info, 0, vect_body);
     }
 
   /* Determine cost of epilogue code.
@@ -6720,6 +6771,15 @@ vectorizable_reduction (stmt_vec_info stmt_info, slp_tree slp_node,
 
   vect_model_reduction_cost (stmt_info, reduc_fn, reduction_type, ncopies,
 			     cost_vec);
+  /* Cost the reduction op inside the loop if transformed via
+     vect_transform_reduction.  Otherwise this is costed by the
+     separate vectorizable_* routines.  */
+  if (single_defuse_cycle
+      || code == DOT_PROD_EXPR
+      || code == WIDEN_SUM_EXPR
+      || code == SAD_EXPR)
+    record_stmt_cost (cost_vec, ncopies, vector_stmt, stmt_info, 0, vect_body);
+
   if (dump_enabled_p ()
       && reduction_type == FOLD_LEFT_REDUCTION)
     dump_printf_loc (MSG_NOTE, vect_location,

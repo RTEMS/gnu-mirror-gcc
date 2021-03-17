@@ -543,7 +543,8 @@ vn_get_stmt_kind (gimple *stmt)
 		     || code == IMAGPART_EXPR
 		     || code == VIEW_CONVERT_EXPR
 		     || code == BIT_FIELD_REF)
-		    && TREE_CODE (TREE_OPERAND (rhs1, 0)) == SSA_NAME)
+		    && (TREE_CODE (TREE_OPERAND (rhs1, 0)) == SSA_NAME
+			|| is_gimple_min_invariant (TREE_OPERAND (rhs1, 0))))
 		  return VN_NARY;
 
 		/* Fallthrough.  */
@@ -1102,7 +1103,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	      poly_offset_int woffset
 		= wi::sext (wi::to_poly_offset (op->op0)
 			    - wi::to_poly_offset (op->op1),
-			    TYPE_PRECISION (TREE_TYPE (op->op0)));
+			    TYPE_PRECISION (sizetype));
 	      woffset *= wi::to_offset (op->op2) * vn_ref_op_align_unit (op);
 	      woffset <<= LOG2_BITS_PER_UNIT;
 	      offset += woffset;
@@ -4649,7 +4650,7 @@ visit_copy (tree lhs, tree rhs)
    is the same.  */
 
 static tree
-valueized_wider_op (tree wide_type, tree op)
+valueized_wider_op (tree wide_type, tree op, bool allow_truncate)
 {
   if (TREE_CODE (op) == SSA_NAME)
     op = vn_valueize (op);
@@ -4663,7 +4664,7 @@ valueized_wider_op (tree wide_type, tree op)
     return tem;
 
   /* Or the op is truncated from some existing value.  */
-  if (TREE_CODE (op) == SSA_NAME)
+  if (allow_truncate && TREE_CODE (op) == SSA_NAME)
     {
       gimple *def = SSA_NAME_DEF_STMT (op);
       if (is_gimple_assign (def)
@@ -4728,12 +4729,15 @@ visit_nary_op (tree lhs, gassign *stmt)
 		  || gimple_assign_rhs_code (def) == MULT_EXPR))
 	    {
 	      tree ops[3] = {};
+	      /* When requiring a sign-extension we cannot model a
+		 previous truncation with a single op so don't bother.  */
+	      bool allow_truncate = TYPE_UNSIGNED (TREE_TYPE (rhs1));
 	      /* Either we have the op widened available.  */
-	      ops[0] = valueized_wider_op (type,
-					   gimple_assign_rhs1 (def));
+	      ops[0] = valueized_wider_op (type, gimple_assign_rhs1 (def),
+					   allow_truncate);
 	      if (ops[0])
-		ops[1] = valueized_wider_op (type,
-					     gimple_assign_rhs2 (def));
+		ops[1] = valueized_wider_op (type, gimple_assign_rhs2 (def),
+					     allow_truncate);
 	      if (ops[0] && ops[1])
 		{
 		  ops[0] = vn_nary_op_lookup_pieces
