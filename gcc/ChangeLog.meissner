@@ -1,3 +1,41 @@
+work041-patch026:
+2021-03-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Use vecperm instead of
+	vecsimple.
+	(xxspltiw_v4sf): Likewise.
+	(xxspltidp_v2df_inst): Likewise.
+	(xxsplti32dx_v4si): Likewise.
+	(xxsplti32dx_v4si_inst): Likewise.
+	(xxsplti32dx_v4sf_inst): Likewise.
+	(xxblend_<mode>): Likewise.
+	(xxpermx): Likewise.
+	(xxpermx_inst): Likewise.
+	* config/rs6000/rs6000.md (xxspltidp<mode>): Use vecperm instead
+	of vecsimple.
+	(mov<mode>_hardfloat6): Likewise.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Use vecperm instead
+	of vecsimple.
+	(vsx_mov<mode>_32bit): Likewise.
+
+work041-patch025:
+2021-03-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltidp_operand): Add support for
+	V2DFmode.
+	(easy_vector_constant): Ditto.
+	* config/rs6000/rs6000.c (rs6000_expand_vector_init): Ditto.
+	* config/rs6000/rs6000.md (SF_DF_V2DF): New iterator.
+	(xxspltidp splitter): Add support for V2DF.
+	(xxspltidp<mode>): Ditto.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	vector constants loaded with XXSPLTIDP.
+	(vsx_mov<mode>_32bit): Ditto.
+
+gcc/testsuite/
+2021-03-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/p10-v2df-const.c: New test.
 work041-patch022:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
