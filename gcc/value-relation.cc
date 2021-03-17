@@ -805,9 +805,9 @@ relation_oracle::dump (FILE *f, basic_block bb) const
   relation_chain *ptr = m_relations[bb->index].m_head;
   for (; ptr; ptr = ptr->m_next)
     {
-      fprintf (dump_file, "Relational : ");
-      ptr->dump (dump_file);
-      fprintf (dump_file, "\n");
+      fprintf (f, "Relational : ");
+      ptr->dump (f);
+      fprintf (f, "\n");
     }
 }
 
