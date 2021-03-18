@@ -859,12 +859,6 @@
   rtx op1 = operands[1];
   const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op1);
 
-  if (op1 == CONST0_RTX (SFmode))
-    {
-      emit_move_insn (op0, CONST0_RTX (V2DFmode));
-      DONE;
-    }
-
   /* If the value is not denormal, convert to vec_duplicate.  */
   if (xxspltidp_operand (op1, SFmode))
     {
@@ -874,7 +868,9 @@
       DONE;
     }
 
-  /* If the value is denormal, create an insn with the int value.  */
+  /* If the value is denormal, create an insn with the int value.  There is a
+     warning for this condition when the built-in was expanded in
+     rs6000_expand_unop_builtin.  */
   long value;
   REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
   emit_insn (gen_xxspltidp_v2df_denormal (op0, GEN_INT (value)));
