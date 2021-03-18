@@ -1149,7 +1149,11 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 	  if (m_on_entry.get_bb_range_p (r, name, pred))
 	    {
 	      if (DEBUG_RANGE_CACHE)
-		fprintf (dump_file, "has cache, ");
+		{
+		  fprintf (dump_file, "has cache ");
+		  r.dump (dump_file);
+		  fprintf (dump_file, ", ");
+		}
 	      if (!r.undefined_p () || has_edge_range_p (name, e))
 		{
 		  add_to_update (node);

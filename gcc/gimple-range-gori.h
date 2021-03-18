@@ -153,12 +153,13 @@ public:
 protected:
   virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb);
   virtual bool compute_operand_range (irange &r, gimple *stmt,
-				      const irange &lhs, tree name);
+				      const irange &lhs, tree name,
+				      basic_block bb);
 
   void expr_range_in_bb (irange &r, tree expr, basic_block bb);
   void compute_logical_operands (irange &true_range, irange &false_range,
 				 gimple *stmt, const irange &lhs,
-				 tree name, tree op,
+				 tree name, basic_block bb, tree op,
 				 bool op_in_chain);
   bool logical_combine (irange &r, enum tree_code code, const irange &lhs,
 			const irange &op1_true, const irange &op1_false,
@@ -170,13 +171,15 @@ protected:
 private:
   bool recompute (irange &r, edge e, tree name);
   bool compute_operand_range_switch (irange &r, gswitch *stmt,
-				     const irange &lhs, tree name);
+				     const irange &lhs, tree name,
+				     basic_block bb);
   bool compute_operand1_range (irange &r, gimple *stmt, const irange &lhs,
-			       tree name);
+			       tree name, basic_block bb);
   bool compute_operand2_range (irange &r, gimple *stmt, const irange &lhs,
-			       tree name);
+			       tree name, basic_block bb);
   bool compute_operand1_and_operand2_range (irange &r, gimple *stmt,
-					    const irange &lhs, tree name);
+					    const irange &lhs, tree name,
+					    basic_block bb);
 
 };
 
@@ -201,7 +204,8 @@ public:
   ~gori_compute_cache ();
 protected:
   virtual bool compute_operand_range (irange &r, gimple *stmt,
-				      const irange &lhs, tree name);
+				      const irange &lhs, tree name,
+				      basic_block bb);
 private:
   void cache_stmt (gimple *);
   typedef gori_compute super;
