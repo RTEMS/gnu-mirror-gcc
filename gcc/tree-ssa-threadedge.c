@@ -1334,6 +1334,15 @@ jump_threader::thread_across_edge (edge e)
   m_avail_exprs_stack->pop_to_marker ();
 }
 
+bool
+potentially_threadable_single_succ_block (basic_block bb)
+{
+  int flags = (EDGE_IGNORE | EDGE_COMPLEX | EDGE_ABNORMAL);
+  return (single_succ_p (bb)
+	  && (single_succ_edge (bb)->flags & flags) == 0
+	  && potentially_threadable_block (single_succ (bb)));
+}
+
 /* Examine the outgoing edges from BB and conditionally
    try to thread them.  */
 
@@ -1347,9 +1356,7 @@ jump_threader::thread_outgoing_edges (basic_block bb)
      outgoing edges, then we may be able to thread the edge, i.e., we
      may be able to statically determine which of the outgoing edges
      will be traversed when the incoming edge from BB is traversed.  */
-  if (single_succ_p (bb)
-      && (single_succ_edge (bb)->flags & flags) == 0
-      && potentially_threadable_block (single_succ (bb)))
+  if (potentially_threadable_single_succ_block (bb))
     {
       thread_across_edge (single_succ_edge (bb));
     }
