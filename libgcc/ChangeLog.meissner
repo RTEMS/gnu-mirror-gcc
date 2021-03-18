@@ -1,3 +1,30 @@
+work042.patch009:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ibm128 instead of __builtin_pack_longdouble.
+
+work042.patch002:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (fp128_dec_funcs): Do not set if
+	--disable-decimal-float.
+	(fp128_dec_objs): Do not set if --disable-decimal-float.
+
+work042.patch001:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (fp128_decstr_funcs): Delete.
+	(fp128_ppc_funcs): Do not add $(fp128_decstr_funcs).
+	(fp128_decstr_objs): Delete.
+	* dfp-bit.h: Call __sprintfieee128 to do conversions from
+	_Float128 to a Decimal type.  Call __strtoieee128 to do
+	conversions from a Decimal type to _Float128.
+	* config/rs6000/_sprintfkf.c: Delete file.
+	* config/rs6000/_sprintfkf.h: Delete file.
+	* config/rs6000/_strtokf.c: Delete file.
+	* config/rs6000/_strtokf.h: Delete file.
+
 2021-03-18   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
