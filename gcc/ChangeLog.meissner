@@ -1,3 +1,44 @@
+work041-patch030:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltidp_v2df): Delete special
+	handling of 0.0.  Add comment about the denormal.
+
+work041-patch029:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltidp_v2df): Convert constant to
+	use vec_duplicate if it is not denormal.  If it is denormal,
+	generate a special insn with the int value.
+	(xxspltidp_v2df_denormal): Rename from xxspltidp_v2df_inst.
+	* config/rs6000/predicates.md (xxspltidp_operand): Do not special
+	case 0.0.
+	* config/rs6000/rs6000-call.c (rs6000_expand_unop_builtin): Move
+	the warning about XXSPLTIDP being undefined here, from the
+	insn generation.
+	* config/rs6000/rs6000-protos.h (rs6000_emit_xxspltidp_v2df):
+	Delete.
+	* config/rs6000/rs6000.c (rs6000_emit_xxspltidp_v2df): Delete.
+	* config/rs6000/rs6000.md (SF_DF_V2DF): Delete.
+	(splitter for XXSPLTIDP constants): Don't handle V2DF here.
+	(xxspltidpv2df_dup): Delete.
+	(xxspltidp<mode>): Use SFDF, not SF_DF_V2DF.
+	* config/rs6000/vsx.md (vsx_splat_<mode>): Don't force constants
+	that can be handled with XXSPLTIDP into registers.
+	(vsx_splat_v2df_const): New insn.
+
+work041-patch028:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (xxspltidpv2df_dup): New insn and
+	split.
+
+work041-patch027:
+2021-03-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_expand_vector_init): Don't form
+	vector constants with VEC_DUPLICATE.
+
 work041-patch026:
 2021-03-17  Michael Meissner  <meissner@linux.ibm.com>
 
