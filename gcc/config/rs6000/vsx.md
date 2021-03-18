@@ -4487,6 +4487,9 @@
   rtx op1 = operands[1];
   if (MEM_P (op1))
     operands[1] = rs6000_force_indexed_or_indirect_mem (op1);
+  else if (TARGET_POWER10 && <MODE>mode == V2DFmode
+	   && xxspltidp_operand (op1, <MODE>mode))
+    ;
   else if (!REG_P (op1))
     op1 = force_reg (<VSX_D:VS_scalar>mode, op1);
 })
@@ -4508,6 +4511,26 @@
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "lxvdsx %x0,%y1"
   [(set_attr "type" "vecload")])
+
+;; Load V2DFmode constant via the ISA 3.1 XXSPLTIDP instruction
+(define_insn "*vsx_splat_v2df_const"
+  [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
+	(vec_duplicate:V2DF (match_operand:DF 1 "xxspltidp_operand" "j,eF")))]
+  "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  if (op1 == CONST0_RTX (DFmode))
+    return "xxspltib %x0,0";
+
+  long value;
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op1);
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+  operands[2] = GEN_INT (value);
+  return "xxspltidp %x0,%2";
+}
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "*,yes")
+   (set_attr "prefixed_prepend_p" "*,no")])
 
 ;; V4SI splat support
 (define_insn "vsx_splat_v4si"

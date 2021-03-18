@@ -611,11 +611,6 @@
 
   REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
 
-  /* Do not return true for 0.0, since it can get loaded with the smaller
-     XXSPLTIB/VSPLTIW/XXLXOR instruction to clear the register.  */
-  if (value == 0)
-    return 0;
-  
   /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
   if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
     return 0;

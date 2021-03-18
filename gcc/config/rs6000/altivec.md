@@ -850,19 +850,40 @@
   (set_attr "prefixed_prepend_p" "*,no")])
 
 (define_expand "xxspltidp_v2df"
-  [(set (match_operand:V2DF 0 "register_operand" )
+  [(set (match_operand:V2DF 0 "register_operand")
 	(unspec:V2DF [(match_operand:SF 1 "const_double_operand")]
 		     UNSPEC_XXSPLTIDP))]
- "TARGET_POWER10"
+  "TARGET_POWER10"
 {
-  long value = rs6000_const_f32_to_i32 (operands[1]);
-  rs6000_emit_xxspltidp_v2df (operands[0], value);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op1);
+
+  if (op1 == CONST0_RTX (SFmode))
+    {
+      emit_move_insn (op0, CONST0_RTX (V2DFmode));
+      DONE;
+    }
+
+  /* If the value is not denormal, convert to vec_duplicate.  */
+  if (xxspltidp_operand (op1, SFmode))
+    {
+      rtx op1_df = const_double_from_real_value (*rv, DFmode);
+      rtx dup = gen_rtx_VEC_DUPLICATE (V2DFmode, op1_df);
+      emit_insn (gen_rtx_SET (op0, dup));
+      DONE;
+    }
+
+  /* If the value is denormal, create an insn with the int value.  */
+  long value;
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+  emit_insn (gen_xxspltidp_v2df_denormal (op0, GEN_INT (value)));
   DONE;
 })
 
-(define_insn "xxspltidp_v2df_inst"
+(define_insn "xxspltidp_v2df_denormal"
   [(set (match_operand:V2DF 0 "register_operand" "=wa")
-	(unspec:V2DF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+	(unspec:V2DF [(match_operand 1 "const_int_operand" "n")]
 		     UNSPEC_XXSPLTIDP))]
   "TARGET_POWER10"
   "xxspltidp %x0,%1"
