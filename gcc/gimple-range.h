@@ -55,6 +55,7 @@ public:
   virtual void range_on_exit (irange &r, basic_block bb, tree name);
   void export_global_ranges ();
   void dump (FILE *f);
+  void dump_bb (FILE *f, basic_block bb);
 protected:
   bool calc_stmt (irange &r, gimple *s, tree name = NULL_TREE);
   bool range_of_range_op (irange &r, gimple *s);
