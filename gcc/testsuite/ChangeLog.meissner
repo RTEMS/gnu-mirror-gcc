@@ -1,3 +1,9 @@
+work041-patch031:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Add call to abort for
+	checking the error condition.  Update insn counts.
+
 work041-patch024:
 2021-03-12  Michael Meissner  <meissner@linux.ibm.com>
 
