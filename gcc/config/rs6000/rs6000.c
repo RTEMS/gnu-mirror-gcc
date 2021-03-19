@@ -6338,7 +6338,7 @@ xxspltiw_constant_p (rtx op, machine_mode mode, rtx *constant_ptr)
   else if (mode != GET_MODE (op))
     return false;
 
-  if (mode != V4SImode)
+  if (mode != V4SImode && mode != V4SFmode)
     return false;
 
   rtx element;
@@ -6541,11 +6541,13 @@ output_vec_const_move (rtx *operands)
 	{
 	  if (CONST_INT_P (element))
 	    operands[2] = element;
+	  else if (CONST_DOUBLE_P (element))
+	    operands[2] = GEN_INT (rs6000_const_f32_to_i32 (element));
 	  else
 	    gcc_unreachable ();
 
 	  HOST_WIDE_INT value = INTVAL (operands[2]);
-	  if (IN_RANGE (value, -16, 15) && dest_vmx_p)
+	  if (IN_RANGE (value, -16, 15) && dest_vmx_p && mode == V4SImode)
 	    return "vspltisw %0,%2";
 
 	  else
@@ -6634,7 +6636,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   if (n_var == 0)
     {
       /* Generate XXSPLTIW if we can.  */
-      if (TARGET_POWER10 && all_same && mode == V4SImode)
+      if (TARGET_POWER10 && all_same && (mode == V4SImode || mode == V4SFmode))
 	{
 	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
 	  emit_insn (gen_rtx_SET (target, dup));							 
