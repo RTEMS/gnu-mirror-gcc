@@ -819,7 +819,33 @@
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
 
-;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI constants.
+;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI/V8HI/V4SF constants.
+(define_insn "*xxspltiw_v8hi"
+  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
+       (vec_duplicate:V8HI
+        (match_operand 1 "short_cint_operand" "O,wM,wB,n")))]
+ "TARGET_POWER10"
+{
+  int value = INTVAL (operands[1]);
+
+  if (value == 0)
+    return "xxspltib %x0,0";
+
+  else if (value == -1)
+    return "xxspltib %x0,255";
+
+  int r = reg_or_subregno (operands[0]);
+  if (IN_RANGE (value, -16, 15) && ALTIVEC_REGNO_P (r))
+    return "vspltish %0,%1";
+
+  int tmp = value & 0xffff;
+  operands[2] = GEN_INT ((tmp << 16) | tmp);
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,*,*,yes")
+  (set_attr "prefixed_prepend_p" "*,*,*,no")])
+
 (define_insn "xxspltiw_v4si"
   [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
        (vec_duplicate:V4SI
