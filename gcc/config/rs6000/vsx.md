@@ -1158,6 +1158,20 @@
   [(set_attr "type" "vecperm")
    (set_attr "length" "8")])
 
+;; Split V2DF vector constants that can be loaded with XXSPLTIDP.
+;; Xxspltidp_operand will match either VEC_DUPLICATE or CONST_VECTOR, but we
+;; don't have to split the VEC_DUPLICATE case.  The move pattern handles
+;; setting the vector to 0.
+(define_split
+  [(set (match_operand:V2DF 0 "vsx_register_operand")
+	(match_operand:V2DF 1 "xxspltidp_operand"))]
+  "TARGET_POWER10 && TARGET_VSX && GET_CODE (operands[1]) == CONST_VECTOR
+   && operands[1] != CONST0_RTX (V2DFmode)"
+  [(set (match_dup 0)
+	(vec_duplicate:V2DF (match_dup 2)))]
+{
+  operands[2] = CONST_VECTOR_ELT (operands[1], 0);
+})
 
 ;; Prefer using vector registers over GPRs.  Prefer using ISA 3.0's XXSPLTISB
 ;; or Altivec VSPLITW 0/-1 over XXLXOR/XXLORC to set a register to all 0's or
