@@ -1,3 +1,53 @@
+work042.patch019:
+2021-03-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v8hi): New insn.
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): Add support for
+	V8HImode constants.
+	(output_vec_const_move): Add support for V8HImode constants.
+	(rs6000_expand_vector_init): Use VEC_DUPLICATE for identical
+	vector V8HI constants.
+
+work042.patch018:
+2021-03-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v4sf): Rewrite to use VEC_DUPLICATE.
+	(xxspltiw_v4sf_inst): Delete.
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): Add V4SFmode
+	support.
+	(output_vec_const_move): Add support for V4SFmode constants.
+	(rs6000_expand_vector_init): If we have XXSPLTIW, use
+	VEC_DUPLICATE to create a vector of SF constants that are all the
+	same.
+
+work042.patch015:
+2021-03-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Rewrite to use
+	vec_duplicate.
+	* config/rs6000/predicates.md (easy_vector_constant): Add support
+	for constants we can create with XXSPLTIW.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): New function.
+	(xxspltib_constant_p): If we can generate XXSPLTIW don't return
+	true for generating XXSPLTIB and extend operations.
+	(output_vec_const_move): Add support for generating XXSPLTIW for
+	V4SI moves.
+	(rs6000_expand_vector_init): Add support for generating XXSPLTIW
+	for V4SI moves.
+
+work042.patch014:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Use vecperm
+	attribute.
+	(xxspltiw_v4sf_inst): Use vecperm attribute.
+	(xxspltidp_v2df_inst): Use vecperm attribute.
+	(xxsplti32dx_v4si_inst): Use vecperm attribute.
+	(xxsplti32dx_v4sf_inst): Use vecperm attribute.
+
 work042.patch013:
 2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
 
