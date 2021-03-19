@@ -4044,7 +4044,7 @@ write_local (outf_p output_header, type_p structures)
 	   || ((s)->gc_used == GC_MAYBE_POINTED_TO			\
 	       && s->u.s.line.file != NULL)				\
 	   || ((s)->gc_used == GC_USED					\
-	       && strncmp (s->u.s.tag, "anonymous", strlen ("anonymous"))) \
+	       && !startswith (s->u.s.tag, "anonymous"))		\
 	   || (s->u.s.base_class && opts_have (s->u.s.opt, "tag")))))
 
 

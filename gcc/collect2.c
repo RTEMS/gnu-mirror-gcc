@@ -956,7 +956,7 @@ main (int argc, char **argv)
       {
 	if (! strcmp (argv[i], "-debug"))
 	  debug = true;
-	else if (!strncmp (argv[i], "-fno-lto", 8))
+	else if (!startswith (argv[i], "-fno-lto"))
 	  lto_mode = LTO_MODE_NONE;
         else if (! strcmp (argv[i], "-plugin"))
 	  {
@@ -2307,13 +2307,9 @@ has_lto_section (void *data, const char *name ATTRIBUTE_UNUSED,
 {
   int *found = (int *) data;
 
-  if (strncmp (name, LTO_SECTION_NAME_PREFIX,
-	       sizeof (LTO_SECTION_NAME_PREFIX) - 1) != 0)
-    {
-      if (strncmp (name, OFFLOAD_SECTION_NAME_PREFIX,
-	           sizeof (OFFLOAD_SECTION_NAME_PREFIX) - 1) != 0)
-        return 1;
-    }
+  if (!startswith (name, LTO_SECTION_NAME_PREFIX)
+      && !startswith (name, OFFLOAD_SECTION_NAME_PREFIX))
+    return 1;
 
   *found = 1;
 

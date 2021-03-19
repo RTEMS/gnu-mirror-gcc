@@ -1609,8 +1609,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
 		  if (name[0] == '_'
 		      && name[1] == '_'
-		      && (strncmp (name + 2, "builtin_",
-				   strlen ("builtin_")) == 0
+		      && (startswith (name + 2, "builtin_")
 			  || (len = strlen (name)) <= strlen ("___chk")
 			  || memcmp (name + len - strlen ("_chk"),
 				     "_chk", strlen ("_chk") + 1) != 0))
@@ -4840,7 +4839,7 @@ cxx_builtin_function (tree decl)
     /* In the user's namespace, it must be declared before use.  */
     hiding = true;
   else if (IDENTIFIER_LENGTH (id) > strlen ("___chk")
-	   && 0 != strncmp (name + 2, "builtin_", strlen ("builtin_"))
+	   && !startswith (name + 2, "builtin_")
 	   && 0 == memcmp (name + IDENTIFIER_LENGTH (id) - strlen ("_chk"),
 			   "_chk", strlen ("_chk") + 1))
     /* Treat __*_chk fortification functions as anticipated as well,
@@ -9821,8 +9820,8 @@ grokfndecl (tree ctype,
 	  || (IDENTIFIER_LENGTH (declarator) > 10
 	      && IDENTIFIER_POINTER (declarator)[0] == '_'
 	      && IDENTIFIER_POINTER (declarator)[1] == '_'
-	      && strncmp (IDENTIFIER_POINTER (declarator)+2,
-			  "builtin_", 8) == 0)
+	      && startswith (IDENTIFIER_POINTER (declarator) + 2,
+			     "builtin_"))
 	  || (targetcm.cxx_implicit_extern_c
 	      && (targetcm.cxx_implicit_extern_c
 		  (IDENTIFIER_POINTER (declarator))))))

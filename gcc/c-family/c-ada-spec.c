@@ -2977,9 +2977,9 @@ dump_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
 	    return 0;
 
 	  /* Only consider complete constructors and deleting destructors.  */
-	  if (strncmp (IDENTIFIER_POINTER (decl_name), "__ct_comp", 9) != 0
-	      && strncmp (IDENTIFIER_POINTER (decl_name), "__dt_comp", 9) != 0
-	      && strncmp (IDENTIFIER_POINTER (decl_name), "__dt_del", 8) != 0)
+	  if (!startswith (IDENTIFIER_POINTER (decl_name), "__ct_comp")
+	      && !startswith (IDENTIFIER_POINTER (decl_name), "__dt_comp")
+	      && !startswith (IDENTIFIER_POINTER (decl_name), "__dt_del"))
 	    return 0;
 	}
 
