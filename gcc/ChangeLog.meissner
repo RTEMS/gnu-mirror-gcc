@@ -1,3 +1,14 @@
+work041-patch033:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (V2DF constant splitter): New insn.
+
+work041-patch032:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (mov{sf,df} splitter): Delete special
+	handling of 0.0.
+
 work041-patch030:
 2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
 
