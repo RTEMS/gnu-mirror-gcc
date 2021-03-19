@@ -1,3 +1,26 @@
+work042.patch013:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Set prefixed and
+	prefixed_prepend_p attributes.
+	(xxspltiw_v4sf): Set prefixed and prefixed_prepend_p attributes.
+	(xxspltidp_v2df): Set prefixed and prefixed_prepend_p attributes.
+	(xxsplti32dx_v4si): Set prefixed and prefixed_prepend_p
+	attributes.
+	(xxsplti32dx_v4sf): Set prefixed and prefixed_prepend_p
+	attributes.
+	* config/rs6000/rs6000.c (rs6000_final_prescan_insn): If the
+	prefixed_prepend_p attribute is no, do not add a leading 'p'.
+	* config/rs6000/rs6000.md (prefixed_prepend_p): New attribute.
+
+work042.patch012:
+2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_const_f32_to_i32): Change
+	return type to long.
+	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
+	type to long.
+
 work042.patch011:
 2021-03-18  Michael Meissner  <meissner@linux.ibm.com>
 
