@@ -176,6 +176,7 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
+   UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
@@ -819,62 +820,36 @@
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
 
-;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI/V8HI/V4SF constants.
-(define_insn "*xxspltiw_v8hi"
-  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
-       (vec_duplicate:V8HI
-        (match_operand 1 "short_cint_operand" "O,wM,wB,n")))]
- "TARGET_POWER10"
-{
-  int value = INTVAL (operands[1]);
-
-  if (value == 0)
-    return "xxspltib %x0,0";
-
-  else if (value == -1)
-    return "xxspltib %x0,255";
-
-  int r = reg_or_subregno (operands[0]);
-  if (IN_RANGE (value, -16, 15) && ALTIVEC_REGNO_P (r))
-    return "vspltish %0,%1";
-
-  int tmp = value & 0xffff;
-  operands[2] = GEN_INT ((tmp << 16) | tmp);
-  return "xxspltiw %x0,%2";
-}
- [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "*,*,*,yes")
-  (set_attr "prefixed_prepend_p" "*,*,*,no")])
-
 (define_insn "xxspltiw_v4si"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
-       (vec_duplicate:V4SI
-        (match_operand:SI 1 "s32bit_cint_operand" "O,wM,wB,n")))]
+  [(set (match_operand:V4SI 0 "register_operand" "=wa")
+	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
  "TARGET_POWER10"
- "@
-  xxspltib %x0,0
-  xxspltib %x0,255
-  vspltisw %0,%1
-  xxspltiw %x0,%1"
+ "xxspltiw %x0,%1"
  [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "*,*,*,yes")
-  (set_attr "prefixed_prepend_p" "*,*,*,no")])
+  (set_attr "prefixed" "yes")
+  (set_attr "prefixed_prepend_p" "no")])
 
-(define_insn "xxspltiw_v4sf"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa,wa")
-	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "const_double_operand" "j,F")))]
+(define_expand "xxspltiw_v4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SF 1 "const_double_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
  "TARGET_POWER10"
 {
-  if (operands[1] == CONST0_RTX (SFmode))
-    return "xxspltib %x0,0";
+  long long value = rs6000_const_f32_to_i32 (operands[1]);
+  emit_insn (gen_xxspltiw_v4sf_inst (operands[0], GEN_INT (value)));
+  DONE;
+})
 
-  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (operands[1]));
-  return "xxspltiw %x0,%2";
-}
+(define_insn "xxspltiw_v4sf_inst"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
+ "xxspltiw %x0,%1"
  [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "*,yes")
-  (set_attr "prefixed_prepend_p" "*,no")])
+  (set_attr "prefixed" "yes")
+  (set_attr "prefixed_prepend_p" "no")])
 
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )
