@@ -17065,12 +17065,12 @@ toc_hasher::equal (toc_hash_struct *h1, toc_hash_struct *h2)
    instead, there should be some programmatic way of inquiring as
    to whether or not an object is a vtable.  */
 
-#define VTABLE_NAME_P(NAME)				\
-  (strncmp ("_vt.", name, strlen ("_vt.")) == 0		\
-  || strncmp ("_ZTV", name, strlen ("_ZTV")) == 0	\
-  || strncmp ("_ZTT", name, strlen ("_ZTT")) == 0	\
-  || strncmp ("_ZTI", name, strlen ("_ZTI")) == 0	\
-  || strncmp ("_ZTC", name, strlen ("_ZTC")) == 0)
+#define VTABLE_NAME_P(NAME)	  \
+  (startswith (name, "_vt.")	  \
+  || startswith (name, "_ZTV")	  \
+  || startswith (name, "_ZTT")	  \
+  || startswith (name, "_ZTI")	  \
+  || startswith (name, "_ZTC"))
 
 #ifdef NO_DOLLAR_IN_LABEL
 /* Return a GGC-allocated character string translating dollar signs in
@@ -23983,7 +23983,7 @@ rs6000_inner_target_options (tree args, bool attr_p)
 	  const char *cpu_opt = NULL;
 
 	  p = NULL;
-	  if (strncmp (q, "cpu=", 4) == 0)
+	  if (startswith (q, "cpu="))
 	    {
 	      int cpu_index = rs6000_cpu_name_lookup (q+4);
 	      if (cpu_index >= 0)
@@ -23994,7 +23994,7 @@ rs6000_inner_target_options (tree args, bool attr_p)
 		  cpu_opt = q+4;
 		}
 	    }
-	  else if (strncmp (q, "tune=", 5) == 0)
+	  else if (startswith (q, "tune="))
 	    {
 	      int tune_index = rs6000_cpu_name_lookup (q+5);
 	      if (tune_index >= 0)
@@ -24012,7 +24012,7 @@ rs6000_inner_target_options (tree args, bool attr_p)
 	      char *r = q;
 
 	      error_p = true;
-	      if (strncmp (r, "no-", 3) == 0)
+	      if (startswith (r, "no-"))
 		{
 		  invert = true;
 		  r += 3;

@@ -38,13 +38,6 @@ static int digit (char c)
   return c >= '0' && c <= '9';
 }
 
-static int
-str_prefix_p (const char *str, const char *prefix)
-{
-  return strncmp (str, prefix, strlen (prefix)) == 0;
-}
-
-
 /* Used by string comparator to group MCUs by their
    name prefix like "attiny" or "atmega".  */
 
@@ -59,7 +52,7 @@ c_prefix (const char *str)
   int i, n = (int) (sizeof (prefixes) / sizeof (*prefixes));
 
   for (i = 0; i < n; i++)
-    if (str_prefix_p (str, prefixes[i]))
+    if (startswith (str, prefixes[i]))
       return i;
 
   return n;
