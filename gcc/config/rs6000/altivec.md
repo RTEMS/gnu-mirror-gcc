@@ -880,12 +880,30 @@
 		     UNSPEC_XXSPLTID))]
  "TARGET_POWER10"
 {
-  long value = rs6000_const_f32_to_i32 (operands[1]);
-  emit_insn (gen_xxspltidp_v2df_inst (operands[0], GEN_INT (value)));
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op1);
+
+  /* If the value is not denormal, convert it to DFmode and generate a
+     vec_duplicate.  */
+  if (xxspltidp_operand (op1, SFmode))
+    {
+      rtx op1_df = const_double_from_real_value (*rv, DFmode);
+      rtx dup = gen_rtx_VEC_DUPLICATE (V2DFmode, op1_df);
+      emit_insn (gen_rtx_SET (op0, dup));
+      DONE;
+    }
+
+  /* If the value is denormal, create an insn with the int value.  There is a
+     warning for this condition when the built-in was expanded in
+     rs6000_expand_unop_builtin.  */
+  long value;
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+  emit_insn (gen_xxspltidp_v2df_denormal (op0, GEN_INT (value)));
   DONE;
 })
 
-(define_insn "xxspltidp_v2df_inst"
+(define_insn "xxspltidp_v2df_denormal"
   [(set (match_operand:V2DF 0 "register_operand" "=wa")
 	(unspec:V2DF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
 		     UNSPEC_XXSPLTID))]
