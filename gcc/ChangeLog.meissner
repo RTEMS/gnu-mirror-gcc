@@ -52,9 +52,9 @@ work042.patch022:
 work042.patch021:
 2021-03-19  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/altivec.md (UNSPEC_XXSPLTI{X,32DX}): Move to
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTI{D,32DX}): Move to
 	rs6000.md.
-	* config/rs6000/rs6000.md (UNSPEC_XXSPLTI{X,32DX}): Move from
+	* config/rs6000/rs6000.md (UNSPEC_XXSPLTI{D,32DX}): Move from
 	altivec.md.
 
 work042.patch019:
