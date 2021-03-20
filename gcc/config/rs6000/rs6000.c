@@ -6671,6 +6671,15 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	  return;
 	}
 
+      /* Generate XXSPLTIDP if we can.  */
+      if (TARGET_POWER10 && all_same && mode == V2DFmode
+	  && xxspltidp_operand (XVECEXP (vals, 0, 0), DFmode))
+	{
+	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
+	  emit_insn (gen_rtx_SET (target, dup));							 
+	  return;
+	}
+
       rtx const_vec = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
       bool int_vector_p = (GET_MODE_CLASS (mode) == MODE_VECTOR_INT);
       if ((int_vector_p || TARGET_VSX) && all_const_zero)
