@@ -536,7 +536,7 @@
   vull __builtin_vec_vbperm_api (vull, vuc);
     VBPERMD  VBPERMD_VULL
   vull __builtin_vec_vbperm_api (vuq, vuc);
-    VBPERMD  VBPERMD_VUQ
+    VBPERMQ  VBPERMQ_VUQ
   vuc __builtin_vec_vbperm_api (vuc, vuc);
     VBPERMQ2  VBPERMQ2_U
   vsc __builtin_vec_vbperm_api (vsc, vsc);

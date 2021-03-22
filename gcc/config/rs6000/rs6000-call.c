@@ -15454,6 +15454,48 @@ rs6000_expand_new_builtin (tree exp, rtx target,
   if (bif_is_htm (*bifaddr))
     return new_htm_expand_builtin (bifaddr, fcode, exp, target);
 
+  if (bif_is_32bit (*bifaddr) && TARGET_32BIT)
+    {
+      if (fcode == RS6000_BIF_MFTB)
+	icode = CODE_FOR_rs6000_mftb_si;
+      else
+	gcc_unreachable ();
+    }
+
+  if (bif_is_endian (*bifaddr) && BYTES_BIG_ENDIAN)
+    {
+      if (fcode == RS6000_BIF_LD_ELEMREV_V1TI)
+	icode = CODE_FOR_vsx_load_v1ti;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V2DF)
+	icode = CODE_FOR_vsx_load_v2df;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V2DI)
+	icode = CODE_FOR_vsx_load_v2di;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V4SF)
+	icode = CODE_FOR_vsx_load_v4sf;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V4SI)
+	icode = CODE_FOR_vsx_load_v4si;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V8HI)
+	icode = CODE_FOR_vsx_load_v8hi;
+      else if (fcode == RS6000_BIF_LD_ELEMREV_V16QI)
+	icode = CODE_FOR_vsx_load_v16qi;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V1TI)
+	icode = CODE_FOR_vsx_store_v1ti;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V2DF)
+	icode = CODE_FOR_vsx_store_v2df;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V2DI)
+	icode = CODE_FOR_vsx_store_v2di;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V4SF)
+	icode = CODE_FOR_vsx_store_v4sf;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V4SI)
+	icode = CODE_FOR_vsx_store_v4si;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V8HI)
+	icode = CODE_FOR_vsx_store_v8hi;
+      else if (fcode == RS6000_BIF_ST_ELEMREV_V16QI)
+	icode = CODE_FOR_vsx_store_v16qi;
+      else
+	gcc_unreachable ();
+    }
+
   rtx pat;
   const int MAX_BUILTIN_ARGS = 6;
   tree arg[MAX_BUILTIN_ARGS];
@@ -15930,34 +15972,31 @@ rs6000_init_builtins (void)
     ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
 
   /* Vector pair and vector quad support.  */
-  if (TARGET_EXTRA_BUILTINS)
-    {
-      vector_pair_type_node = make_node (OPAQUE_TYPE);
-      SET_TYPE_MODE (vector_pair_type_node, OOmode);
-      TYPE_SIZE (vector_pair_type_node) = bitsize_int (GET_MODE_BITSIZE (OOmode));
-      TYPE_PRECISION (vector_pair_type_node) = GET_MODE_BITSIZE (OOmode);
-      TYPE_SIZE_UNIT (vector_pair_type_node) = size_int (GET_MODE_SIZE (OOmode));
-      SET_TYPE_ALIGN (vector_pair_type_node, 256);
-      TYPE_USER_ALIGN (vector_pair_type_node) = 0;
-      lang_hooks.types.register_builtin_type (vector_pair_type_node,
-					      "__vector_pair");
-      ptr_vector_pair_type_node
-	= build_pointer_type (build_qualified_type (vector_pair_type_node,
-						    TYPE_QUAL_CONST));
+  vector_pair_type_node = make_node (OPAQUE_TYPE);
+  SET_TYPE_MODE (vector_pair_type_node, OOmode);
+  TYPE_SIZE (vector_pair_type_node) = bitsize_int (GET_MODE_BITSIZE (OOmode));
+  TYPE_PRECISION (vector_pair_type_node) = GET_MODE_BITSIZE (OOmode);
+  TYPE_SIZE_UNIT (vector_pair_type_node) = size_int (GET_MODE_SIZE (OOmode));
+  SET_TYPE_ALIGN (vector_pair_type_node, 256);
+  TYPE_USER_ALIGN (vector_pair_type_node) = 0;
+  lang_hooks.types.register_builtin_type (vector_pair_type_node,
+					  "__vector_pair");
+  ptr_vector_pair_type_node
+    = build_pointer_type (build_qualified_type (vector_pair_type_node,
+						TYPE_QUAL_CONST));
 
-      vector_quad_type_node = make_node (OPAQUE_TYPE);
-      SET_TYPE_MODE (vector_quad_type_node, XOmode);
-      TYPE_SIZE (vector_quad_type_node) = bitsize_int (GET_MODE_BITSIZE (XOmode));
-      TYPE_PRECISION (vector_quad_type_node) = GET_MODE_BITSIZE (XOmode);
-      TYPE_SIZE_UNIT (vector_quad_type_node) = size_int (GET_MODE_SIZE (XOmode));
-      SET_TYPE_ALIGN (vector_quad_type_node, 512);
-      TYPE_USER_ALIGN (vector_quad_type_node) = 0;
-      lang_hooks.types.register_builtin_type (vector_quad_type_node,
-					      "__vector_quad");
-      ptr_vector_quad_type_node
-	= build_pointer_type (build_qualified_type (vector_quad_type_node,
-						    TYPE_QUAL_CONST));
-    }
+  vector_quad_type_node = make_node (OPAQUE_TYPE);
+  SET_TYPE_MODE (vector_quad_type_node, XOmode);
+  TYPE_SIZE (vector_quad_type_node) = bitsize_int (GET_MODE_BITSIZE (XOmode));
+  TYPE_PRECISION (vector_quad_type_node) = GET_MODE_BITSIZE (XOmode);
+  TYPE_SIZE_UNIT (vector_quad_type_node) = size_int (GET_MODE_SIZE (XOmode));
+  SET_TYPE_ALIGN (vector_quad_type_node, 512);
+  TYPE_USER_ALIGN (vector_quad_type_node) = 0;
+  lang_hooks.types.register_builtin_type (vector_quad_type_node,
+					  "__vector_quad");
+  ptr_vector_quad_type_node
+    = build_pointer_type (build_qualified_type (vector_quad_type_node,
+						TYPE_QUAL_CONST));
 
   /* Initialize the modes for builtin_function_type, mapping a machine mode to
      tree type node.  */

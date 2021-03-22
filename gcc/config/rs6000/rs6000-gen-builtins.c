@@ -85,10 +85,12 @@ along with GCC; see the file COPYING3.  If not see
      quad     MMA instruction using a register quad as an input operand
      pair     MMA instruction using a register pair as an input operand
      no32bit  Not valid for TARGET_32BIT
+     32bit    Requires different handling for TARGET_32BIT
      cpu      This is a "cpu_is" or "cpu_supports" builtin
      ldstmask Altivec mask for load or store
      lxvrse   Needs special handling for load-rightmost, sign-extended
      lxvrze   Needs special handling for load-rightmost, zero-extended
+     endian   Needs special handling for endianness
 
    An example stanza might look like this:
 
@@ -363,10 +365,12 @@ struct attrinfo {
   char isquad;
   char ispair;
   char isno32bit;
+  char is32bit;
   char iscpu;
   char isldstmask;
   char islxvrse;
   char islxvrze;
+  char isendian;
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
@@ -1350,6 +1354,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->ispair = 1;
 	else if (!strcmp (attrname, "no32bit"))
 	  attrptr->isno32bit = 1;
+	else if (!strcmp (attrname, "32bit"))
+	  attrptr->is32bit = 1;
 	else if (!strcmp (attrname, "cpu"))
 	  attrptr->iscpu = 1;
 	else if (!strcmp (attrname, "ldstmask"))
@@ -1358,6 +1364,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->islxvrse = 1;
 	else if (!strcmp (attrname, "lxvrze"))
 	  attrptr->islxvrze = 1;
+	else if (!strcmp (attrname, "endian"))
+	  attrptr->isendian = 1;
 	else
 	  {
 	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
@@ -1390,13 +1398,15 @@ parse_bif_attrs (attrinfo *attrptr)
   (*diag) ("attribute set: init = %d, set = %d, extract = %d, \
 nosoft = %d, ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, \
 htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, no32bit = %d, \
-cpu = %d, ldstmask = %d, lxvrse = %d, lxvrze = %d.\n",
+32bit = %d, cpu = %d, ldstmask = %d, lxvrse = %d, lxvrze = %d, \
+endian = %d.\n",
 	   attrptr->isinit, attrptr->isset, attrptr->isextract,
 	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
 	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
 	   attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attrptr->ispair,
-	   attrptr->isno32bit, attrptr->iscpu, attrptr->isldstmask,
-	   attrptr->islxvrse, attrptr->islxvrze);
+	   attrptr->isno32bit, attrptr->is32bit, attrptr->iscpu,
+	   attrptr->isldstmask, attrptr->islxvrse, attrptr->islxvrze,
+	   attrptr->isendian);
 #endif
 
   return PC_OK;
@@ -2208,10 +2218,12 @@ write_decls ()
   fprintf (header_file, "#define bif_quad_bit\t\t(0x00001000)\n");
   fprintf (header_file, "#define bif_pair_bit\t\t(0x00002000)\n");
   fprintf (header_file, "#define bif_no32bit_bit\t\t(0x00004000)\n");
-  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00008000)\n");
-  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00010000)\n");
-  fprintf (header_file, "#define bif_lxvrse_bit\t\t(0x00020000)\n");
-  fprintf (header_file, "#define bif_lxvrze_bit\t\t(0x00040000)\n");
+  fprintf (header_file, "#define bif_32bit_bit\t\t(0x00008000)\n");
+  fprintf (header_file, "#define bif_cpu_bit\t\t(0x00010000)\n");
+  fprintf (header_file, "#define bif_ldstmask_bit\t(0x00020000)\n");
+  fprintf (header_file, "#define bif_lxvrse_bit\t\t(0x00040000)\n");
+  fprintf (header_file, "#define bif_lxvrze_bit\t\t(0x00080000)\n");
+  fprintf (header_file, "#define bif_endian_bit\t\t(0x00100000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -2244,16 +2256,17 @@ write_decls ()
   fprintf (header_file,
 	   "#define bif_is_no32bit(x)\t((x).bifattrs & bif_no32bit_bit)\n");
   fprintf (header_file,
+	   "#define bif_is_32bit(x)\t((x).bifattrs & bif_32bit_bit)\n");
+  fprintf (header_file,
 	   "#define bif_is_cpu(x)\t\t((x).bifattrs & bif_cpu_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_ldstmask(x)\t((x).bifattrs "
-	   "& bif_ldstmask_bit)\n");
+	   "#define bif_is_ldstmask(x)\t((x).bifattrs & bif_ldstmask_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_lxvrse(x)\t((x).bifattrs "
-	   "& bif_lxvrse_bit)\n");
+	   "#define bif_is_lxvrse(x)\t((x).bifattrs & bif_lxvrse_bit)\n");
   fprintf (header_file,
-	   "#define bif_is_lxvrze(x)\t((x).bifattrs "
-	   "& bif_lxvrze_bit)\n");
+	   "#define bif_is_lxvrze(x)\t((x).bifattrs & bif_lxvrze_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_endian(x)\t((x).bifattrs & bif_endian_bit)\n");
   fprintf (header_file, "\n");
 
   /* #### Note that the _x is added for now to avoid conflict with
@@ -2484,6 +2497,8 @@ write_bif_static_init ()
 	fprintf (init_file, " | bif_pair_bit");
       if (bifp->attrs.isno32bit)
 	fprintf (init_file, " | bif_no32bit_bit");
+      if (bifp->attrs.is32bit)
+	fprintf (init_file, " | bif_32bit_bit");
       if (bifp->attrs.iscpu)
 	fprintf (init_file, " | bif_cpu_bit");
       if (bifp->attrs.isldstmask)
@@ -2492,6 +2507,8 @@ write_bif_static_init ()
 	fprintf (init_file, " | bif_lxvrse_bit");
       if (bifp->attrs.islxvrze)
 	fprintf (init_file, " | bif_lxvrze_bit");
+      if (bifp->attrs.isendian)
+	fprintf (init_file, " | bif_endian_bit");
       fprintf (init_file, ",\n");
       fprintf (init_file, "      /* restr_opnd */\t{%d, %d, %d},\n",
 	       bifp->proto.restr_opnd[0], bifp->proto.restr_opnd[1],

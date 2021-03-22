@@ -126,10 +126,12 @@
 ;   quad     MMA instruction using a register quad as an input operand
 ;   pair     MMA instruction using a register pair as an input operand
 ;   no32bit  Not valid for TARGET_32BIT
+;   32bit    Requires different handling for TARGET_32BIT
 ;   cpu      This is a "cpu_is" or "cpu_supports" builtin
 ;   ldstmask Altivec mask for load or store
 ;   lxvrse   Needs special handling for load-rightmost, sign-extended
 ;   lxvrze   Needs special handling for load-rightmost, zero-extended
+;   endian   Needs special handling for endianness
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -206,7 +208,7 @@
 ; expanded to rs6000_mftb_di in 64-bit mode, and rs6000_mftb_si in
 ; 32-bit mode.  Use of "long" for this builtin is sanctioned.
   unsigned long __builtin_ppc_mftb ();
-    MFTB rs6000_mftb_di {}
+    MFTB rs6000_mftb_di {32bit}
 
   void __builtin_mtfsb0 (const int<5>);
     MTFSB0 rs6000_mtfsb0 {}
@@ -1390,25 +1392,25 @@
     FLOATO_V2DI floatov2di {}
 
   pure vsq __builtin_vsx_ld_elemrev_v1ti (signed long, const void *);
-    LD_ELEMREV_V1TI vsx_ld_elemrev_v1ti {ldvec}
+    LD_ELEMREV_V1TI vsx_ld_elemrev_v1ti {ldvec,endian}
 
   pure vd __builtin_vsx_ld_elemrev_v2df (signed long, const void *);
-    LD_ELEMREV_V2DF vsx_ld_elemrev_v2df {ldvec}
+    LD_ELEMREV_V2DF vsx_ld_elemrev_v2df {ldvec,endian}
 
   pure vsll __builtin_vsx_ld_elemrev_v2di (signed long, const void *);
-    LD_ELEMREV_V2DI vsx_ld_elemrev_v2di {ldvec}
+    LD_ELEMREV_V2DI vsx_ld_elemrev_v2di {ldvec,endian}
 
   pure vf __builtin_vsx_ld_elemrev_v4sf (signed long, const void *);
-    LD_ELEMREV_V4SF vsx_ld_elemrev_v4sf {ldvec}
+    LD_ELEMREV_V4SF vsx_ld_elemrev_v4sf {ldvec,endian}
 
   pure vsi __builtin_vsx_ld_elemrev_v4si (signed long, const void *);
-    LD_ELEMREV_V4SI vsx_ld_elemrev_v4si {ldvec}
+    LD_ELEMREV_V4SI vsx_ld_elemrev_v4si {ldvec,endian}
 
   pure vss __builtin_vsx_ld_elemrev_v8hi (signed long, const void *);
-    LD_ELEMREV_V8HI vsx_ld_elemrev_v8hi {ldvec}
+    LD_ELEMREV_V8HI vsx_ld_elemrev_v8hi {ldvec,endian}
 
   pure vsc __builtin_vsx_ld_elemrev_v16qi (signed long, const void *);
-    LD_ELEMREV_V16QI vsx_ld_elemrev_v16qi {ldvec}
+    LD_ELEMREV_V16QI vsx_ld_elemrev_v16qi {ldvec,endian}
 
 ; There is apparent intent in rs6000-builtin.def to have RS6000_BTC_SPECIAL
 ; processing for LXSDX, LXVDSX, and STXSDX, but there are no def_builtin calls
@@ -1476,25 +1478,25 @@
     SPLAT_2DI_UNS vsx_splat_v2di {}
 
   void __builtin_vsx_st_elemrev_v1ti (vsq, signed long, void *);
-    ST_ELEMREV_V1TI vsx_st_elemrev_v1ti {stvec}
+    ST_ELEMREV_V1TI vsx_st_elemrev_v1ti {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v2df (vd, signed long, void *);
-    ST_ELEMREV_V2DF vsx_st_elemrev_v2df {stvec}
+    ST_ELEMREV_V2DF vsx_st_elemrev_v2df {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v2di (vsll, signed long, void *);
-    ST_ELEMREV_V2DI vsx_st_elemrev_v2di {stvec}
+    ST_ELEMREV_V2DI vsx_st_elemrev_v2di {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v4sf (vf, signed long, void *);
-    ST_ELEMREV_V4SF vsx_st_elemrev_v4sf {stvec}
+    ST_ELEMREV_V4SF vsx_st_elemrev_v4sf {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v4si (vsi, signed long, void *);
-    ST_ELEMREV_V4SI vsx_st_elemrev_v4si {stvec}
+    ST_ELEMREV_V4SI vsx_st_elemrev_v4si {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v8hi (vss, signed long, void *);
-    ST_ELEMREV_V8HI vsx_st_elemrev_v8hi {stvec}
+    ST_ELEMREV_V8HI vsx_st_elemrev_v8hi {stvec,endian}
 
   void __builtin_vsx_st_elemrev_v16qi (vsc, signed long, void *);
-    ST_ELEMREV_V16QI vsx_st_elemrev_v16qi {stvec}
+    ST_ELEMREV_V16QI vsx_st_elemrev_v16qi {stvec,endian}
 
   void __builtin_vsx_stxvd2x_v1ti (vsq, signed long, void *);
     STXVD2X_V1TI vsx_store_v1ti {stvec}
@@ -2991,28 +2993,28 @@
 
 
 [htm]
-  unsigned long long __builtin_get_texasr ();
+  unsigned long __builtin_get_texasr ();
     GET_TEXASR nothing {htm,htmspr}
 
-  unsigned long long __builtin_get_texasru ();
+  unsigned long __builtin_get_texasru ();
     GET_TEXASRU nothing {htm,htmspr}
 
-  unsigned long long __builtin_get_tfhar ();
+  unsigned long __builtin_get_tfhar ();
     GET_TFHAR nothing {htm,htmspr}
 
-  unsigned long long __builtin_get_tfiar ();
+  unsigned long __builtin_get_tfiar ();
     GET_TFIAR nothing {htm,htmspr}
 
-  void __builtin_set_texasr (unsigned long long);
+  void __builtin_set_texasr (unsigned long);
     SET_TEXASR nothing {htm,htmspr}
 
-  void __builtin_set_texasru (unsigned long long);
+  void __builtin_set_texasru (unsigned long);
     SET_TEXASRU nothing {htm,htmspr}
 
-  void __builtin_set_tfhar (unsigned long long);
+  void __builtin_set_tfhar (unsigned long);
     SET_TFHAR nothing {htm,htmspr}
 
-  void __builtin_set_tfiar (unsigned long long);
+  void __builtin_set_tfiar (unsigned long);
     SET_TFIAR nothing {htm,htmspr}
 
   unsigned int __builtin_tabort (unsigned int);
