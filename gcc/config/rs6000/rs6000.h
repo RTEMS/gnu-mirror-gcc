@@ -334,7 +334,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define FLOAT128_IBM_P(MODE)						\
   ((!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128				\
     && ((MODE) == TFmode || (MODE) == TCmode))				\
-   || (TARGET_HARD_FLOAT && ((MODE) == IFmode || (MODE) == ICmode)))
+   || (TARGET_HARD_FLOAT && TARGET_IBM128				\
+       && ((MODE) == IFmode || (MODE) == ICmode)))
 
 /* Helper macros to say whether a 128-bit floating point type can go in a
    single vector register, or whether it needs paired scalar values.  */
@@ -508,12 +509,6 @@ extern int rs6000_vector_align[];
    answers if the arguments are not in the normal range.  */
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
-
-/* Whether the '__ibm128' keywork is enabled.  We enable __ibm128 either if the
-   IEEE 128-bit floating point support is enabled or if the long double support
-   uses the 128-bit IBM extended double format.  */
-#define TARGET_IBM128	(TARGET_FLOAT128_TYPE				\
-			 || (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128))
 
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map

@@ -112,6 +112,13 @@ unsigned char x_TARGET_FLOAT128_TYPE
 Variable
 unsigned char TARGET_FLOAT128_TYPE
 
+;; Whether to enable the __ibm128 support
+TargetSave
+unsigned char x_TARGET_IBM128
+
+Variable
+unsigned char TARGET_IBM128
+
 ;; This option existed in the past, but now is always on.
 mpowerpc
 Target RejectNegative Undocumented Ignore
