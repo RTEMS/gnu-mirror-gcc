@@ -4153,7 +4153,17 @@ rs6000_option_override_internal (bool global_init_p)
       else
 	rs6000_long_double_type_size = default_long_double_size;
     }
-  else if (rs6000_long_double_type_size == 128)
+  /* C and C++ have 3 128-bit floating point types (__float128, __ibm128, and
+     long double).  In rs6000-modes.h and rs6000-modes.def, we define the
+     precision for these types so that we don't get unwanted promotion from
+     __ibm128 or __float128 to long double if long double is the opposite type.
+
+     However, Fortran really wants the precision for the 128-bit floating point
+     type to be 128.  It does not have methods to access either explicit
+     __float128 or __ibm128 types.  So make the precision of long double 128 for
+     Fortran unless the long double type is IEEE 128-bit. */
+  else if (rs6000_long_double_type_size == 128
+	   && (!lang_GNU_Fortran () || !TARGET_IEEEQUAD_DEFAULT))
     rs6000_long_double_type_size = FLOAT_PRECISION_TFmode;
   else if (global_options_set.x_rs6000_ieeequad)
     {
