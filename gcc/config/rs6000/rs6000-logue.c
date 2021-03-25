@@ -595,19 +595,21 @@ rs6000_savres_strategy (rs6000_stack_t *info,
 		+---------------------------------------+
 		| Parameter save area (+padding*) (P)	|  32
 		+---------------------------------------+
-		| Alloca space (A)			|  32+P
+		| Optional ROP check slot (R)		|  32+P
 		+---------------------------------------+
-		| Local variable space (L)		|  32+P+A
+		| Alloca space (A)			|  32+P+R
 		+---------------------------------------+
-		| Save area for AltiVec registers (W)	|  32+P+A+L
+		| Local variable space (L)		|  32+P+R+A
 		+---------------------------------------+
-		| AltiVec alignment padding (Y)		|  32+P+A+L+W
+		| Save area for AltiVec registers (W)	|  32+P+R+A+L
 		+---------------------------------------+
-		| Save area for GP registers (G)	|  32+P+A+L+W+Y
+		| AltiVec alignment padding (Y)		|  32+P+R+A+L+W
 		+---------------------------------------+
-		| Save area for FP registers (F)	|  32+P+A+L+W+Y+G
+		| Save area for GP registers (G)	|  32+P+R+A+L+W+Y
 		+---------------------------------------+
-	old SP->| back chain to caller's caller		|  32+P+A+L+W+Y+G+F
+		| Save area for FP registers (F)	|  32+P+R+A+L+W+Y+G
+		+---------------------------------------+
+	old SP->| back chain to caller's caller		|  32+P+R+A+L+W+Y+G+F
 		+---------------------------------------+
 
      * If the alloca area is present, the parameter save area is
@@ -717,6 +719,19 @@ rs6000_stack_info (void)
   /* Does this function call anything (apart from sibling calls)?  */
   info->calls_p = (!crtl->is_leaf || cfun->machine->ra_needs_full_frame);
 
+  if (TARGET_POWER10 && info->calls_p
+      && DEFAULT_ABI == ABI_ELFv2 && rs6000_rop_protect)
+    info->rop_check_size = 8;
+  else if (rs6000_rop_protect && DEFAULT_ABI != ABI_ELFv2)
+    {
+      /* We can't check this in rs6000_option_override_internal since
+	 DEFAULT_ABI isn't established yet.  */
+      error ("%qs requires the ELFv2 ABI", "-mrop-protect");
+      info->rop_check_size = 0;
+    }
+  else
+    info->rop_check_size = 0;
+
   /* Determine if we need to save the condition code registers.  */
   if (save_reg_p (CR2_REGNO)
       || save_reg_p (CR3_REGNO)
@@ -806,8 +821,14 @@ rs6000_stack_info (void)
 	  gcc_assert (info->altivec_size == 0
 		      || info->altivec_save_offset % 16 == 0);
 
-	  /* Adjust for AltiVec case.  */
-	  info->ehrd_offset = info->altivec_save_offset - ehrd_size;
+	  if (info->rop_check_size != 0)
+	    {
+	      info->rop_check_save_offset
+		= info->altivec_save_offset - info->rop_check_size;
+	      info->ehrd_offset = info->rop_check_save_offset - ehrd_size;
+	    }
+	  else
+	    info->ehrd_offset = info->altivec_save_offset - ehrd_size;
 	}
       else
 	info->ehrd_offset = info->gp_save_offset - ehrd_size;
@@ -849,6 +870,7 @@ rs6000_stack_info (void)
 				  + info->gp_size
 				  + info->altivec_size
 				  + info->altivec_padding_size
+				  + info->rop_check_size
 				  + ehrd_size
 				  + ehcr_size
 				  + info->cr_size
@@ -987,6 +1009,10 @@ debug_stack_info (rs6000_stack_t *info)
     fprintf (stderr, "\tvrsave_save_offset  = %5d\n",
 	     info->vrsave_save_offset);
 
+  if (info->rop_check_size)
+    fprintf (stderr, "\trop_check_save_offset = %5d\n",
+	     info->rop_check_save_offset);
+
   if (info->lr_save_p)
     fprintf (stderr, "\tlr_save_offset      = %5d\n", info->lr_save_offset);
 
@@ -1025,6 +1051,9 @@ debug_stack_info (rs6000_stack_t *info)
   if (info->altivec_padding_size)
     fprintf (stderr, "\taltivec_padding_size= %5d\n",
 	     info->altivec_padding_size);
+
+  if (info->rop_check_size)
+    fprintf (stderr, "\trop_check_size      = %5d\n", info->rop_check_size);
 
   if (info->cr_size)
     fprintf (stderr, "\tcr_size             = %5d\n", info->cr_size);
@@ -3044,7 +3073,6 @@ rs6000_emit_prologue (void)
 	cfun->machine->r2_setup_needed = true;
     }
 
-
   if (flag_stack_usage_info)
     current_function_static_stack_size = info->total_size;
 
@@ -3105,7 +3133,8 @@ rs6000_emit_prologue (void)
 		  && (!crtl->calls_eh_return
 		      || info->ehrd_offset == -432)
 		  && info->vrsave_save_offset == -224
-		  && info->altivec_save_offset == -416);
+		  && info->altivec_save_offset == -416
+		  && !rs6000_rop_protect);
 
       treg = gen_rtx_REG (SImode, 11);
       emit_move_insn (treg, GEN_INT (-info->total_size));
@@ -3250,6 +3279,24 @@ rs6000_emit_prologue (void)
 				NULL_RTX, NULL_RTX);
 	  END_USE (0);
 	}
+    }
+
+  /* The ROP hash store must occur before a stack frame is created.  */
+  /* NOTE: The hashst isn't needed if we're going to do a sibcall,
+     but there's no way to know that here.  Harmless except for
+     performance, of course.  */
+  if (TARGET_POWER10 && rs6000_rop_protect && info->rop_check_size != 0)
+    {
+      gcc_assert (DEFAULT_ABI == ABI_ELFv2);
+      rtx stack_ptr = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
+      rtx addr = gen_rtx_PLUS (Pmode, stack_ptr,
+			       GEN_INT (info->rop_check_save_offset));
+      rtx mem = gen_rtx_MEM (Pmode, addr);
+      rtx reg0 = gen_rtx_REG (Pmode, 0);
+      if (rs6000_privileged)
+	emit_insn (gen_hashstp (mem, reg0));
+      else
+	emit_insn (gen_hashst (mem, reg0));
     }
 
   /* If we need to save CR, put it into r12 or r11.  Choose r12 except when
@@ -4978,6 +5025,23 @@ rs6000_emit_epilogue (enum epilogue_type epilogue_type)
     {
       rtx sa = EH_RETURN_STACKADJ_RTX;
       emit_insn (gen_add3_insn (sp_reg_rtx, sp_reg_rtx, sa));
+    }
+
+  /* The ROP hash check must occur after the stack pointer is restored,
+     and is not performed for a sibcall.  */
+  if (TARGET_POWER10 && rs6000_rop_protect && info->rop_check_size != 0
+      && epilogue_type != EPILOGUE_TYPE_SIBCALL)
+    {
+      gcc_assert (DEFAULT_ABI == ABI_ELFv2);
+      rtx stack_ptr = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
+      rtx addr = gen_rtx_PLUS (Pmode, stack_ptr,
+			       GEN_INT (info->rop_check_save_offset));
+      rtx mem = gen_rtx_MEM (Pmode, addr);
+      rtx reg0 = gen_rtx_REG (Pmode, 0);
+      if (rs6000_privileged)
+	emit_insn (gen_hashchkp (reg0, mem));
+      else
+	emit_insn (gen_hashchk (reg0, mem));
     }
 
   if (epilogue_type != EPILOGUE_TYPE_SIBCALL && restoring_FPRs_inline)
