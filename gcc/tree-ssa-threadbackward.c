@@ -469,7 +469,7 @@ thread_jumps::profitable_jump_thread_path (basic_block bbi, tree name,
 void
 thread_jumps::convert_and_register_current_path (edge taken_edge)
 {
-  jump_thread_path *path = m_registry.allocate_thread_path ();
+  vec<jump_thread_edge *> *path = m_registry.allocate_thread_path ();
 
   /* Record the edges between the blocks in PATH.  */
   for (unsigned int j = 0; j + 1 < m_path.length (); j++)

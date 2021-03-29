@@ -42,36 +42,13 @@ public:
   jump_thread_edge_type type;
 };
 
-class jump_thread_path
-{
-public:
-  jump_thread_path ();
-  jump_thread_edge *&operator[] (int);
-  jump_thread_edge *last ();
-  void safe_push (jump_thread_edge *);
-  unsigned length ();
-  void dump (FILE *, bool registering);
-  void dump (FILE *);
-  void block_remove (unsigned ix, unsigned len);
-  // ?? Is this method really necessary?  I mean, the pointers in
-  // m_path live in an obstack that gets automatically cleaned up.  So
-  // technically we'd only leave the container up for the GC to
-  // cleanup.  I've changed this method to a NOP with no adverse
-  // effects.
-  void release ();
-
-private:
-  DISABLE_COPY_AND_ASSIGN (jump_thread_path);
-  vec<jump_thread_edge *> m_path;
-};
-
 class jump_thread_path_allocator
 {
 public:
   jump_thread_path_allocator ();
   ~jump_thread_path_allocator ();
   jump_thread_edge *allocate_thread_edge (edge, jump_thread_edge_type);
-  jump_thread_path *allocate_thread_path ();
+  vec<jump_thread_edge *> *allocate_thread_path ();
 private:
   DISABLE_COPY_AND_ASSIGN (jump_thread_path_allocator);
   obstack m_obstack;
@@ -86,11 +63,11 @@ class jump_thread_path_registry
 public:
   jump_thread_path_registry ();
   ~jump_thread_path_registry ();
-  void register_jump_thread (jump_thread_path *);
+  void register_jump_thread (vec<jump_thread_edge *> *);
   void remove_jump_threads_including (edge);
   bool thread_through_all_blocks (bool);
   jump_thread_edge *allocate_thread_edge (edge e, jump_thread_edge_type t);
-  jump_thread_path *allocate_thread_path ();
+  vec<jump_thread_edge *> *allocate_thread_path ();
   void dump ();
 
 private:
@@ -109,7 +86,7 @@ private:
 				   bool may_peel_loop_headers);
   class redirection_data *lookup_redirection_data (edge e, enum insert_option);
 
-  vec<jump_thread_path *> m_paths;
+  vec<vec<jump_thread_edge *> *> m_paths;
 
   hash_table<struct removed_edges> *m_removed_edges;
 
@@ -121,48 +98,6 @@ private:
 
   jump_thread_path_allocator m_allocator;
 };
-
-inline
-jump_thread_path::jump_thread_path ()
-{
-  m_path.create (5);
-}
-
-inline jump_thread_edge *&
-jump_thread_path::operator[] (int i)
-{
-  return m_path[i];
-}
-
-inline jump_thread_edge *
-jump_thread_path::last ()
-{
-  return m_path.last ();
-}
-
-inline void
-jump_thread_path::safe_push (jump_thread_edge *e)
-{
-  m_path.safe_push (e);
-}
-
-inline unsigned
-jump_thread_path::length ()
-{
-  return m_path.length ();
-}
-
-inline void
-jump_thread_path::block_remove (unsigned ix, unsigned len)
-{
-  return m_path.block_remove (ix, len);
-}
-
-inline void
-jump_thread_path::release ()
-{
-  m_path.release ();
-}
 
 // Rather than search all the edges in jump thread paths each time DOM
 // is able to simply if control statement, we build a hash table with

@@ -46,9 +46,9 @@ private:
 					  tree op1,
 					  unsigned limit);
 
-  bool thread_around_empty_blocks (class jump_thread_path *path,
+  bool thread_around_empty_blocks (vec<class jump_thread_edge *> *path,
 				   edge, bitmap visited);
-  int thread_through_normal_block (jump_thread_path *path,
+  int thread_through_normal_block (vec<jump_thread_edge *> *path,
 				   edge, bitmap visited);
   void thread_across_edge (edge);
   bool record_temporary_equivalences_from_phis (edge);

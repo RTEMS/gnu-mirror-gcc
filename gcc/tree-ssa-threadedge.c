@@ -885,7 +885,7 @@ propagate_threaded_block_debug_into (basic_block dest, basic_block src)
    The available expression table is referenced via AVAIL_EXPRS_STACK.  */
 
 bool
-jump_threader::thread_around_empty_blocks (jump_thread_path *path,
+jump_threader::thread_around_empty_blocks (vec<jump_thread_edge *> *path,
 					   edge taken_edge,
 					   bitmap visited)
 {
@@ -1009,7 +1009,7 @@ jump_threader::thread_around_empty_blocks (jump_thread_path *path,
    suitable for a joiner in a jump threading path.  */
 
 int
-jump_threader::thread_through_normal_block (jump_thread_path *path,
+jump_threader::thread_through_normal_block (vec<jump_thread_edge *> *path,
 					    edge e, bitmap visited)
 {
   /* We want to record any equivalences created by traversing E.  */
@@ -1192,7 +1192,7 @@ jump_threader::thread_across_edge (edge e)
 
   stmt_count = 0;
 
-  jump_thread_path *path = m_registry->allocate_thread_path ();
+  vec<jump_thread_edge *> *path = m_registry->allocate_thread_path ();
   bitmap_clear (visited);
   bitmap_set_bit (visited, e->src->index);
   bitmap_set_bit (visited, e->dest->index);
@@ -1289,7 +1289,7 @@ jump_threader::thread_across_edge (edge e)
 	bitmap_set_bit (visited, e->src->index);
 	bitmap_set_bit (visited, e->dest->index);
 	bitmap_set_bit (visited, taken_edge->dest->index);
-	jump_thread_path *path = m_registry->allocate_thread_path ();
+	vec<jump_thread_edge *> *path = m_registry->allocate_thread_path ();
 
 	/* Record whether or not we were able to thread through a successor
 	   of E->dest.  */
