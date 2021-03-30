@@ -1,3 +1,9 @@
+work043.patch001:
+2021-03-29  Florian Weimer  <fweimer@redhat.com>
+	    Michael Meissner  <meissner@linux.ibm.com>
+        * config/rs6000/t-float128 (fp128_ppc_funcs): Add decimal floating
+        point functions for $(decimal_float) only.
+
 2021-03-29   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
