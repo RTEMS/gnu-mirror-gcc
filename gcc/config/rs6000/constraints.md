@@ -229,6 +229,10 @@
   (and (match_code "const_double")
        (match_test "num_insns_constant (op, mode) == 3")))
 
+(define_constraint "eF"
+  "A floating point constant that can be loaded with XXSPLTIDP."
+  (match_operand 0 "xxspltidp_operand"))
+
 ;; Memory constraints
 
 ; Actually defined in common.md:
