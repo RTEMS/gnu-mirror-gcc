@@ -576,7 +576,7 @@
   long value;
   rtx element;
 
-  if (!TARGET_XXSPLTIDP)
+  if (!TARGET_POWER10 || !TARGET_VSX)
     return 0;
 
   if (mode == V2DFmode)

@@ -822,7 +822,7 @@
   [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
 	(vec_duplicate:V8HI
 	 (match_operand 1 "short_cint_operand" "O,wM,wB,n")))]
- "TARGET_XXSPLTIW"
+ "TARGET_POWER10"
 {
   int value = INTVAL (operands[1]);
 
@@ -848,7 +848,7 @@
   [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
        (vec_duplicate:V4SI
         (match_operand:SI 1 "s32bit_cint_operand" "O,wM,wB,n")))]
- "TARGET_XXSPLTIW"
+ "TARGET_POWER10"
  "@
   xxspltib %x0,0
   xxspltib %x0,255
@@ -862,7 +862,7 @@
   [(set (match_operand:V4SF 0 "register_operand" "=wa,wa")
 	(vec_duplicate:V4SF
 	 (match_operand:SF 1 "const_double_operand" "j,F")))]
- "TARGET_XXSPLTIW"
+ "TARGET_POWER10"
 {
   if (operands[1] == CONST0_RTX (SFmode))
     return "xxspltib %x0,0";
