@@ -1,3 +1,28 @@
+work043.patch025:
+2021-03-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v8hi): Add support for
+	-mno-xxspltiw.
+	(xxspltiw_v4si): Add support for -mno-xxspltiw.
+	(xxspltiw_v4sf): Add support for -mno-xxspltiw.
+	* config/rs6000/predicates.md (xxspltidp_operand): Add support for
+	-mno-xxspltidp.
+	* config/rs6000/rs6000-cpus.def (ISA_3_1_MASKS_SERVER): Add
+	support for -mno-xxspltiw and -mno-xxspltidp.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mno-xxspltiw and -mno-xxspltidp.
+	(xxspltiw_constant_p): Add support for -mno-xxspltiw.
+	(rs6000_expand_vector_init): Add support for -mno-xxspltiw and
+	-mno-xxspltidp.
+	(rs6000_opt_masks): Add support for -mno-xxspltiw and
+	-mno-xxspltidp.
+	* config/rs6000/rs6000.md (mov{sf,df} splitter for XXSPLTIDP): Add
+	support for -mno-xxspltidp.
+	(xxspltidp<mode>): Add support for -mno-xxspltidp.
+	* config/rs6000/rs6000.opt (-mxxspltiw): Add support for
+	-mno-xxspltiw.
+	(-mxxspltiwdp): Add support for -mno-xxspltidp.
+
 work043.patch021:
 2021-03-30  Michael Meissner  <meissner@linux.ibm.com>
 
