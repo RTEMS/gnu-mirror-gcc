@@ -820,8 +820,8 @@
 ;; Generate VSPLTIW, XXSPLITB, or XXSPLTIW to load up V4SI/V8HI/V4SF constants.
 (define_insn "*xxspltiw_v8hi"
   [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
-       (vec_duplicate:V8HI
-        (match_operand 1 "short_cint_operand" "O,wM,wB,n")))]
+	(vec_duplicate:V8HI
+	 (match_operand 1 "short_cint_operand" "O,wM,wB,n")))]
  "TARGET_POWER10"
 {
   int value = INTVAL (operands[1]);
