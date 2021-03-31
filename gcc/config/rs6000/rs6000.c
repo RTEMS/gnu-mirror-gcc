@@ -6408,7 +6408,7 @@ xxspltiw_constant_p (rtx op, machine_mode mode, rtx *constant_ptr)
   else if (mode != GET_MODE (op))
     return false;
 
-  if (mode != V4SImode && mode != V4SFmode)
+  if (mode != V4SImode && mode != V4SFmode && mode != V8HImode)
     return false;
 
   rtx element;
@@ -6606,22 +6606,49 @@ output_vec_const_move (rtx *operands)
 	    gcc_unreachable ();
 	}
 
-      /* See if we can generate a XXSPLTIW directly.  */
+      /* See if we can use the ISA 3.1 XXSPLTIW instruction.  Generate the
+	 shorter VSPLTISH/VSPLTISW if possible.  */
       if (TARGET_POWER10 && xxspltiw_constant_p (vec, mode, &element))
 	{
+	  HOST_WIDE_INT value, tmp;
+
 	  if (CONST_INT_P (element))
-	    operands[2] = element;
+	    value = INTVAL (element);
 	  else if (CONST_DOUBLE_P (element))
-	    operands[2] = GEN_INT (rs6000_const_f32_to_i32 (element));
+	    value = rs6000_const_f32_to_i32 (element);
 	  else
 	    gcc_unreachable ();
 
-	  HOST_WIDE_INT value = INTVAL (operands[2]);
-	  if (IN_RANGE (value, -16, 15) && dest_vmx_p && mode == V4SImode)
-	    return "vspltisw %0,%2";
+	  switch (mode)
+	    {
+	    case E_V8HImode:
+	      if (IN_RANGE (value, -16, 15) && dest_vmx_p)
+		{
+		  operands[2] = GEN_INT (value);
+		  return "vspltish %0,%2";
+		}
 
-	  else
-	    return "xxspltiw %x0,%2";
+	      tmp = value & 0xffff;
+	      operands[2] = GEN_INT ((tmp << 16) | tmp);
+	      return "xxspltiw %x0,%2";
+
+	    case E_V4SImode:
+	      if (IN_RANGE (value, -16, 15) && dest_vmx_p)
+		{
+		  operands[2] = GEN_INT (value);
+		  return "vspltisw %0,%2";
+		}
+
+	      operands[2] = GEN_INT (value & 0xffffffff);
+	      return "xxspltiw %x0,%2";
+
+	    case E_V4SFmode:
+	      operands[2] = GEN_INT (value & 0xffffffff);
+	      return "xxspltiw %x0,%2";
+
+	    default:
+	      break;
+	    }
 	}
 
       if (TARGET_P9_VECTOR
@@ -6706,7 +6733,8 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   if (n_var == 0)
     {
       /* Generate XXSPLTIW if we can.  */
-      if (TARGET_POWER10 && all_same && (mode == V4SImode || mode == V4SFmode))
+      if (TARGET_POWER10 && all_same
+	  && (mode == V4SImode || mode == V4SFmode || mode == V8HImode))
 	{
 	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
 	  emit_insn (gen_rtx_SET (target, dup));							 
