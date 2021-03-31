@@ -4507,8 +4507,15 @@ rs6000_option_override_internal (bool global_init_p)
       (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
 
-  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2LOGICAL) == 0)
-    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2LOGICAL;
+  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
+    rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
+
+  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
+    rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
+
+  if (TARGET_POWER10 &&
+      (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
 
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
@@ -6399,7 +6406,7 @@ xxspltiw_constant_p (rtx op, machine_mode mode, rtx *constant_ptr)
 {
   *constant_ptr = NULL_RTX;
 
-  if (!TARGET_POWER10)
+  if (!TARGET_XXSPLTIW)
     return false;
 
   if (mode == VOIDmode)
@@ -6733,7 +6740,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   if (n_var == 0)
     {
       /* Generate XXSPLTIW if we can.  */
-      if (TARGET_POWER10 && all_same
+      if (TARGET_XXSPLTIW && all_same
 	  && (mode == V4SImode || mode == V4SFmode || mode == V8HImode))
 	{
 	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
@@ -6742,7 +6749,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	}
 
       /* Generate XXSPLTIDP if we can.  */
-      if (TARGET_POWER10 && all_same && mode == V2DFmode
+      if (TARGET_XXSPLTIDP && all_same && mode == V2DFmode
 	  && xxspltidp_operand (XVECEXP (vals, 0, 0), DFmode))
 	{
 	  rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
@@ -24090,6 +24097,8 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
+  { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
+  { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
