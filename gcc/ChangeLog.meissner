@@ -1,3 +1,85 @@
+work044.patch011:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_const_f32_to_i32): Change
+	return type to long.
+	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
+	type to long.
+
+work044.patch010:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR fortran/96983
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add more
+	debugging for __float128, __ibm128 support.
+	(rs6000_option_override_internal): Do not enable __float128 and
+	__ibm128 support for Fortran.  On Fortran, make the default long
+	double precision to be 128.  Add error messages if the user tries
+	to change the long double type between IBM/IEEE on Fortran.
+	(rs6000_init_libfuncs): Do not enable __ibm128 support if it is
+	disabled.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Do not return true if
+	__ibm128 was disabled for IFmode/ICmode.
+	* config/rs6000/rs6000.md (FP iterator): Do not enable IF mode if
+	__ibm128 is disabled.
+	(FLOAT128 iterator): Likewise.
+	* config/rs6000/rs6000.opt (x_TARGET_IBM128): New variables to
+	record whether __ibm128 is supported or not.
+	(TARGET_IBM128): Likewise.
+
+work044.patch009:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Do not set
+	LINK_OS_EXTRA_SPEC32 or LINK_OS_EXTRA_SPEC664 for the Advance
+	Toolchain.
+
+work044.patch007:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
+work044.patch003:
+2021-04-01 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (have_compare_and_set_mask): Add IEEE
+        128-bit floating point types.
+        * config/rs6000/rs6000.md (FPMASK): New iterator.
+        (FPMASK2): New iterator.
+        (Fv mode attribute): Add KFmode and TFmode.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_p9.  Add IEEE 128-bit fp support.
+        (mov<FPMASK:mode><FPMASK2:mode>cc_invert_fpmask): Replace
+        mov<SFDF:mode><SFDF2:mode>cc_invert_p9.  Add IEEE 128-bit fp
+        support.
+        (fpmask<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+        (xxsel<mode>): Add IEEE 128-bit fp support.  Enable generator to
+        build te RTL.
+
+work044.patch002:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs60000.h (FLOAT128_MIN_MAX_FPMASK_P): New macro.
+	* config/rs6000/rs6000.md (s<minmax><mode>3): Add support for the
+	ISA 3.1 IEEE 128-bit minimum and maximum instructions.
+
 2021-04-01   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
