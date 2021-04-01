@@ -411,11 +411,13 @@ gori_map::maybe_add_gori (tree name, basic_block bb)
       add_def_chain_to_bitmap (m_outgoing[bb->index], name);
       // Check for any imports.
       bitmap imp = get_imports (name);
-      // If there were imports, add them, otherwise this name is an import.
+      // If there were imports, add them so we can recompute
       if (imp)
 	bitmap_ior_into (m_incoming[bb->index], imp);
-      else
+      // and this name is always an import.
+      if (gimple_bb (SSA_NAME_DEF_STMT (name)) != bb)
 	bitmap_set_bit (m_incoming[bb->index], SSA_NAME_VERSION (name));
+
 
       // Def chain doesn't include itself, and even if there isn't a
       // def chain, this name should be added to exports.
@@ -629,6 +631,10 @@ gori_compute::compute_operand_range (irange &r, gimple *stmt,
 				     const irange &lhs, tree name,
 				     basic_block bb)
 {
+  // If the lhs doesn't tell us anything, neither will unwinding further.
+  if (lhs.varying_p ())
+    return false;
+
   // Empty ranges are viral as they are on an unexecutable path.
   if (lhs.undefined_p ())
     {
