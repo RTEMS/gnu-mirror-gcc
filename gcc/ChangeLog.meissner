@@ -1,3 +1,41 @@
+work044.patch015:
+2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): Add V4SFmode
+	support.
+	* config/rs6000/vsx.md (XXSPLTIW): Add V4SFmode.
+
+work044.patch014:
+2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltiw_operand): Add support for
+	loading up V8HImode constants.
+	* config/rs6000/rs6000.c (xxspltib_constant_p): Add support for
+	loading up V8HImode constants with XXSPLTIW.
+	(xxspltiw_constant_p): Add V8HImode support.
+	* config/rs6000/vsx.md (XXSPLTIW): New iterator.
+	(xxspltiw<mode>, xxspltiwv4si): Convert xxspltiwv4si into
+	xxspltiw<mode> and handle V8HImode constants as well.
+
+work044.patch013:
+2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): Add XXSPLTIW support.
+	* config/rs6000/rs6000-cpus.def (ISA_3_1_MASKS_SERVER): Add
+	-mxxspltiw.
+	(POWERPC_MASKS): Add -mxxspltiw.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Set up
+	-mxxspltiw.
+	(xxspltib_constant_p): Don't return true if we could use XXSPLTIW
+	instead of a 2 instruction sequence.
+	(xxspltiw_constant_p): New function.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New option.
+	* config/rs6000/vsx.md (xxspltiwv4si): New insn.
+
+
 work044.patch011:
 2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
 

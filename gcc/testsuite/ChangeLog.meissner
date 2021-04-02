@@ -1,3 +1,14 @@
+work044.patch017:
+2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn count.
+
+work044.patch012:
+2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Add missing abort
+	call.  Use -O2 optimization.
+
 work044.patch006:
 2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
 
