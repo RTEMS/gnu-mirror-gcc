@@ -1159,6 +1159,23 @@
    (set_attr "length" "8")])
 
 
+;; XXSPLTIW support.
+(define_insn "*xxspltiwv4si"
+  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa")
+	(match_operand:V4SI 1 "xxspltiw_operand"))]
+  "TARGET_XXSPLTIW"
+{
+  long value = 0;
+
+  if (!xxspltiw_constant_p (operands[1], V4SImode, &value))
+    gcc_unreachable ();
+
+  operands[2] = GEN_INT (value);
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "yes")])
+
 ;; Prefer using vector registers over GPRs.  Prefer using ISA 3.0's XXSPLTISB
 ;; or Altivec VSPLITW 0/-1 over XXLXOR/XXLORC to set a register to all 0's or
 ;; all 1's, since the machine does not have to wait for the previous
