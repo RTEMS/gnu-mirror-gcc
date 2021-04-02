@@ -6,27 +6,6 @@ work044.patch011:
 	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
 	type to long.
 
-work044.patch010:
-2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR fortran/96983
-	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add more
-	debugging for __float128, __ibm128 support.
-	(rs6000_option_override_internal): Do not enable __float128 and
-	__ibm128 support for Fortran.  On Fortran, make the default long
-	double precision to be 128.  Add error messages if the user tries
-	to change the long double type between IBM/IEEE on Fortran.
-	(rs6000_init_libfuncs): Do not enable __ibm128 support if it is
-	disabled.
-	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Do not return true if
-	__ibm128 was disabled for IFmode/ICmode.
-	* config/rs6000/rs6000.md (FP iterator): Do not enable IF mode if
-	__ibm128 is disabled.
-	(FLOAT128 iterator): Likewise.
-	* config/rs6000/rs6000.opt (x_TARGET_IBM128): New variables to
-	record whether __ibm128 is supported or not.
-	(TARGET_IBM128): Likewise.
-
 work044.patch009:
 2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
 

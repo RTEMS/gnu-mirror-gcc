@@ -2571,11 +2571,6 @@ rs6000_debug_reg_global (void)
 	       TARGET_IEEEQUAD ? "IEEE" : "IBM");
       fprintf (stderr, DEBUG_FMT_S, "default long double type",
 	       TARGET_IEEEQUAD_DEFAULT ? "IEEE" : "IBM");
-      if (TARGET_FLOAT128_TYPE)
-	fprintf (stderr, DEBUG_FMT_S, "IEEE 128-bit support",
-		 TARGET_FLOAT128_KEYWORD ? "keyword" : "type");
-      if (TARGET_IBM128)
-	fprintf (stderr, DEBUG_FMT_S, "__ibm128 keyword", "true");
     }
   fprintf (stderr, DEBUG_FMT_D, "sched_restricted_insns_priority",
 	   (int)rs6000_sched_restricted_insns_priority);
@@ -4161,20 +4156,12 @@ rs6000_option_override_internal (bool global_init_p)
 	rs6000_isa_flags &= ~OPTION_MASK_BLOCK_OPS_VECTOR_PAIR;
     }
 
-  /* Use long double size to select the appropriate long double.
-
-     On C/C++, We use TYPE_PRECISION to differentiate the 3 different long
-     double types.  We map 128 into the precision used for TFmode.
-
-     Fortran does not have support for the types __float128 and __ibm128, just
-     the default long double type.  For Fortran, we use the precision 128 for
-     the long double type.  */
-  bool is_fortran = lang_GNU_Fortran ();
+  /* Use long double size to select the appropriate long double.  We use
+     TYPE_PRECISION to differentiate the 3 different long double types.  We map
+     128 into the precision used for TFmode.  */
   int default_long_double_size = (RS6000_DEFAULT_LONG_DOUBLE_SIZE == 64
 				  ? 64
-				  : (is_fortran
-				     ? 128
-				     : FLOAT_PRECISION_TFmode));
+				  : FLOAT_PRECISION_TFmode);
 
   /* Set long double size before the IEEE 128-bit tests.  */
   if (!global_options_set.x_rs6000_long_double_type_size)
@@ -4186,7 +4173,7 @@ rs6000_option_override_internal (bool global_init_p)
       else
 	rs6000_long_double_type_size = default_long_double_size;
     }
-  else if (rs6000_long_double_type_size == 128 && !is_fortran)
+  else if (rs6000_long_double_type_size == 128)
     rs6000_long_double_type_size = FLOAT_PRECISION_TFmode;
   else if (global_options_set.x_rs6000_ieeequad)
     {
@@ -4217,25 +4204,17 @@ rs6000_option_override_internal (bool global_init_p)
 	     2.32 or newer.  Only issue one warning.  */
 	  static bool warned_change_long_double;
 
-	  if (!warned_change_long_double)
+	  if (!warned_change_long_double
+	      && (!glibc_supports_ieee_128bit ()
+		  || (!lang_GNU_C () && !lang_GNU_CXX ())))
 	    {
 	      warned_change_long_double = true;
-	      if (is_fortran)
-		error ("Fortran does not support %qs to change the default "
-		       "long double type",
-		       (TARGET_IEEEQUAD
-			? "-mabi=ieeelongdouble"
-			: "-mabi=ibmlongdouble"));
-
-	      else if (!glibc_supports_ieee_128bit ())
-		{
-		  if (TARGET_IEEEQUAD)
-		    warning (OPT_Wpsabi, "Using IEEE extended precision "
-			     "%<long double%>");
-		  else
-		    warning (OPT_Wpsabi, "Using IBM extended precision "
-			     "%<long double%>");
-		}
+	      if (TARGET_IEEEQUAD)
+		warning (OPT_Wpsabi, "Using IEEE extended precision "
+			 "%<long double%>");
+	      else
+		warning (OPT_Wpsabi, "Using IBM extended precision "
+			 "%<long double%>");
 	    }
 	}
     }
@@ -4244,13 +4223,8 @@ rs6000_option_override_internal (bool global_init_p)
      sytems.  In GCC 7, we would enable the IEEE 128-bit floating point
      infrastructure (-mfloat128-type) but not enable the actual __float128 type
      unless the user used the explicit -mfloat128.  In GCC 8, we enable both
-     the keyword as well as the type.
-
-     Fortran does not support separate 128-bit floating point types other than
-     long double, we only enable TARGET_FLOAT128_TYPE if the default long double
-     for Fortran is IEEE-128 bit.  */
-  TARGET_FLOAT128_TYPE = (TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX
-			  && (!is_fortran || TARGET_IEEEQUAD));
+     the keyword as well as the type.  */
+  TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
 
   /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
@@ -4264,13 +4238,6 @@ rs6000_option_override_internal (bool global_init_p)
 	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_KEYWORD
 				| OPTION_MASK_FLOAT128_HW);
 	}
-      else if (is_fortran)
-	{
-	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
-	    error ("Fortran does not support %qs", "-mfloat128");
-
-	  rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_KEYWORD;
-	}
       else if (!TARGET_FLOAT128_TYPE)
 	{
 	  TARGET_FLOAT128_TYPE = 1;
@@ -4278,22 +4245,8 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
-  /* Whether the '__ibm128' keywork is enabled.  We enable __ibm128 either if the
-   IEEE 128-bit floating point support is enabled or if the long double support
-   uses the 128-bit IBM extended double format.
-
-   However, we don't enable __ibm128 if the language is Fortran.  Fortran
-   doesn't have the notion of separate types for __ibm128 and __float128, and it
-   wants the precision for the 16 byte floating point type to be 128.  With the
-   3 128-bit types enabled, we use the precision field to identify the separate
-   types.  */
-  TARGET_IBM128 = (!is_fortran
-		   && (TARGET_FLOAT128_TYPE
-		       || (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)));
-
-
-  /* Enable the __float128 keyword under Linux by default for C/C++.  */
-  if (TARGET_FLOAT128_TYPE && !TARGET_FLOAT128_KEYWORD && !is_fortran
+  /* Enable the __float128 keyword under Linux by default.  */
+  if (TARGET_FLOAT128_TYPE && !TARGET_FLOAT128_KEYWORD
       && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
     rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
 
@@ -11105,11 +11058,10 @@ rs6000_init_libfuncs (void)
 {
   /* __float128 support.  */
   if (TARGET_FLOAT128_TYPE)
-    init_float128_ieee (KFmode);
-
-  /* __ibm128 support.  */
-  if (TARGET_IBM128)
-    init_float128_ibm (IFmode);
+    {
+      init_float128_ibm (IFmode);
+      init_float128_ieee (KFmode);
+    }
 
   /* AIX/Darwin/64-bit Linux quad floating point routines.  */
   if (TARGET_LONG_DOUBLE_128)
