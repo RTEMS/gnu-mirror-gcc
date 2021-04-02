@@ -6491,7 +6491,7 @@ xxspltiw_constant_p (rtx op,
   if (mode == VOIDmode)
     mode = GET_MODE (op);
 
-  if (mode != V8HImode && mode != V4SImode)
+  if (mode != V8HImode && mode != V4SImode && mode != V4SFmode)
     return false;
 
   rtx element = op;
@@ -6508,18 +6508,25 @@ xxspltiw_constant_p (rtx op,
 	  return false;
     }
 
-  if (!CONST_INT_P (element))
-    return false;
-
-  HOST_WIDE_INT value = INTVAL (element);
-  if (!SIGNED_INTEGER_NBIT_P (value, 32))
-    return false;
-
-  if (mode == V8HImode)
+  HOST_WIDE_INT value;
+  if (CONST_INT_P (element))
     {
-      value &= 0xffff;
-      value |= value << 16;
+      value = INTVAL (element);
+      if (!SIGNED_INTEGER_NBIT_P (value, 32))
+	return false;
+
+      if (mode == V8HImode)
+	{
+	  value &= 0xffff;
+	  value |= value << 16;
+	}
     }
+
+  else if (CONST_DOUBLE_P (element))
+    value = rs6000_const_f32_to_i32 (element);
+
+  else
+    return false;
 
   *constant_ptr = value;
   return true;

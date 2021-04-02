@@ -210,7 +210,7 @@
 (define_mode_iterator VSINT_842 [V8HI V4SI V2DI])
 
 ;; Iterator for loading constants with xxspltiw
-(define_mode_iterator XXSPLTIW [V8HI V4SI])
+(define_mode_iterator XXSPLTIW [V8HI V4SI V4SF])
 
 ;; Vector reverse byte modes
 (define_mode_iterator VEC_REVB [V8HI V4SI V2DI V4SF V2DF V1TI])
