@@ -209,6 +209,9 @@
 (define_mode_iterator VSINT_84  [V4SI V2DI DI SI])
 (define_mode_iterator VSINT_842 [V8HI V4SI V2DI])
 
+;; Iterator for loading constants with xxspltiw
+(define_mode_iterator XXSPLTIW [V8HI V4SI])
+
 ;; Vector reverse byte modes
 (define_mode_iterator VEC_REVB [V8HI V4SI V2DI V4SF V2DF V1TI])
 
@@ -1160,14 +1163,14 @@
 
 
 ;; XXSPLTIW support.
-(define_insn "*xxspltiwv4si"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa")
-	(match_operand:V4SI 1 "xxspltiw_operand"))]
+(define_insn "*xxspltiw<mode>"
+  [(set (match_operand:XXSPLTIW 0 "vsx_register_operand" "=wa")
+	(match_operand:XXSPLTIW 1 "xxspltiw_operand"))]
   "TARGET_XXSPLTIW"
 {
   long value = 0;
 
-  if (!xxspltiw_constant_p (operands[1], V4SImode, &value))
+  if (!xxspltiw_constant_p (operands[1], <MODE>mode, &value))
     gcc_unreachable ();
 
   operands[2] = GEN_INT (value);

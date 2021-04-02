@@ -6462,7 +6462,8 @@ xxspltib_constant_p (rtx op,
 
   /* If XXSPLTIW is available, don't return true if we can use that
      instruction instead of doing 2 instructions. */
-  else if (TARGET_XXSPLTIW && mode == V4SImode)
+  else if (TARGET_XXSPLTIW
+	   && (mode == V4SImode || mode == V8HImode))
     return false;
 
   else
@@ -6490,7 +6491,7 @@ xxspltiw_constant_p (rtx op,
   if (mode == VOIDmode)
     mode = GET_MODE (op);
 
-  if (mode != V4SImode)
+  if (mode != V8HImode && mode != V4SImode)
     return false;
 
   rtx element = op;
@@ -6510,10 +6511,17 @@ xxspltiw_constant_p (rtx op,
   if (!CONST_INT_P (element))
     return false;
 
-  if (!SIGNED_INTEGER_NBIT_P (INTVAL (element), 32))
+  HOST_WIDE_INT value = INTVAL (element);
+  if (!SIGNED_INTEGER_NBIT_P (value, 32))
     return false;
 
-  *constant_ptr = INTVAL (element);
+  if (mode == V8HImode)
+    {
+      value &= 0xffff;
+      value |= value << 16;
+    }
+
+  *constant_ptr = value;
   return true;
 }
 

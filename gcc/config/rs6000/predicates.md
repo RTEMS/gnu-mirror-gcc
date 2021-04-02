@@ -651,6 +651,10 @@
   if (!xxspltiw_constant_p (op, mode, &value))
     return false;
 
+  /* xxspltiw_constant_p returns V8HI as (element | (element << 16)).  */
+  if (mode == V8HImode)
+    value = ((value & 0xffff) ^ 0x8000) - 0x8000;
+
   return !EASY_VECTOR_15 (value);
 })
 
