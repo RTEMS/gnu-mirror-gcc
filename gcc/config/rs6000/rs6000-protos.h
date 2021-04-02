@@ -32,7 +32,6 @@ extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int, int,
 
 extern bool easy_altivec_constant (rtx, machine_mode);
 extern bool xxspltib_constant_p (rtx, machine_mode, int *, int *);
-extern bool xxspltiw_constant_p (rtx, machine_mode, long *);
 extern int vspltis_shifted (rtx);
 extern HOST_WIDE_INT const_vector_elt_as_int (rtx, unsigned int);
 extern bool macho_lo_sum_memory_operand (rtx, machine_mode);

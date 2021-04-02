@@ -4472,10 +4472,6 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
     }
 
-  if (TARGET_POWER10 && TARGET_VSX
-      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
-    rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
-
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
@@ -6460,57 +6456,10 @@ xxspltib_constant_p (rtx op,
   else if (IN_RANGE (value, -1, 0))
     *num_insns_ptr = 1;
 
-  /* If XXSPLTIW is available, don't return true if we can use that
-     instruction instead of doing 2 instructions. */
-  else if (TARGET_XXSPLTIW && mode == V4SImode)
-    return false;
-
   else
     *num_insns_ptr = 2;
 
   *constant_ptr = (int) value;
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIW instruction, possibly with an sign extension.
-
-   Return the constant that is being split via CONSTANT_PTR.  */
-
-bool
-xxspltiw_constant_p (rtx op,
-		     machine_mode mode,
-		     long *constant_ptr)
-{
-  *constant_ptr = 0;
-
-  if (!TARGET_XXSPLTIW)
-    return false;
-
-  if (mode != SImode && mode != V4SImode)
-    return false;
-
-  rtx element = op;
-  if (GET_CODE (op) == VEC_DUPLICATE)
-    element = op;
-
-  else if (GET_CODE (op) == CONST_VECTOR)
-    {
-      size_t nunits = GET_MODE_NUNITS (mode);
-      element = CONST_VECTOR_ELT (op, 0);
-
-      for (size_t i = 1; i < nunits; i++)
-	if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-	  return false;
-    }
-
-  if (!CONST_INT_P (element))
-    return false;
-
-  if (!SIGNED_INTEGER_NBIT_P (INTVAL (element), 32))
-    return false;
-
-  *constant_ptr = INTVAL (element);
   return true;
 }
 
