@@ -1,3 +1,11 @@
+work044.patch018:
+2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v4si): Rewrite to load a vector constant.
+	(xxspltiw_v4sf): Rewrite to load a vector constant.
+	(xxspltiw_v4sf_inst): Delete.
+
 work044.patch015:
 2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
 
