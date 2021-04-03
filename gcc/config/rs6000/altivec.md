@@ -176,7 +176,6 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
-   UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
@@ -820,34 +819,29 @@
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
 
-(define_insn "xxspltiw_v4si"
-  [(set (match_operand:V4SI 0 "register_operand" "=wa")
-	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
- "TARGET_POWER10"
- "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "yes")])
-
-(define_expand "xxspltiw_v4sf"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:SF 1 "const_double_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
+(define_expand "xxspltiw_v4si"
+  [(use (match_operand:V4SI 0 "register_operand"))
+   (use (match_operand:SI 1 "s32bit_cint_operand"))]
  "TARGET_POWER10"
 {
-  long long value = rs6000_const_f32_to_i32 (operands[1]);
-  emit_insn (gen_xxspltiw_v4sf_inst (operands[0], GEN_INT (value)));
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1, op1);
+  rtx cv = gen_rtx_CONST_VECTOR (V4SImode, rv);
+  emit_move_insn (operands[0], cv);
   DONE;
 })
 
-(define_insn "xxspltiw_v4sf_inst"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
+(define_expand "xxspltiw_v4sf"
+  [(use (match_operand:V4SF 0 "register_operand"))
+   (use (match_operand:SF 1 "const_double_operand"))]
  "TARGET_POWER10"
- "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "yes")])
+{
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1, op1);
+  rtx cv = gen_rtx_CONST_VECTOR (V4SFmode, rv);
+  emit_move_insn (operands[0], cv);
+  DONE;
+})
 
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )
