@@ -6236,3 +6236,29 @@
   "TARGET_POWER10"
   "vmulld %0,%1,%2"
   [(set_attr "type" "veccomplex")])
+
+
+;; XXSPLTIW support
+(define_expand "xxspltiw_v4si"
+  [(use (match_operand:V4SI 0 "register_operand"))
+   (use (match_operand:SI 1 "s32bit_cint_operand"))]
+ "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1, op1);
+  rtx cv = gen_rtx_CONST_VECTOR (V4SImode, rv);
+  emit_move_insn (operands[0], cv);
+  DONE;
+})
+
+(define_expand "xxspltiw_v4sf"
+  [(use (match_operand:V4SF 0 "register_operand"))
+   (use (match_operand:SF 1 "const_double_operand"))]
+ "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1, op1);
+  rtx cv = gen_rtx_CONST_VECTOR (V4SFmode, rv);
+  emit_move_insn (operands[0], cv);
+  DONE;
+})
