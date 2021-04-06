@@ -565,19 +565,39 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
-;; Return 1 if operand is a SF/DF CONST_DOUBLE that can be loaded via the ISA
-;; 3.1 XXSPLTIDP instruction.  This function has to check, if the immediate
-;; specifies a single-precision denormal value (i.e., bits 1:8 equal to 0 and
-;; bits 9:31 not equal to 0), since the result is undefined in the hardware.
+;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
+;; loaded via the ISA 3.1 XXSPLTIDP instruction.  This function has to check,
+;; if the immediate specifies a single-precision denormal value (i.e., bits 1:8
+;; equal to 0 and bits 9:31 not equal to 0), since the result is undefined in
+;; the hardware.
 (define_predicate "xxspltidp_operand"
-  (match_code "const_double")
+  (match_code "const_double,const_vector,vec_duplicate")
 {
   long value;
 
   if (!TARGET_XXSPLTIDP)
     return 0;
 
-  if (mode != SFmode && mode != DFmode)
+  if (mode == V2DFmode)
+    {
+      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
+      if (GET_CODE (op) == VEC_DUPLICATE)
+       op = XEXP (op, 0);
+
+      else if (GET_CODE (op) == CONST_VECTOR)
+       {
+         rtx element = CONST_VECTOR_ELT (op, 0);
+         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+           return 0;
+
+	 op = element;
+       }
+
+      else
+       return 0;
+    }
+
+  else if (mode != SFmode && mode != DFmode)
     return 0;
 
   if (!CONST_DOUBLE_P (op))
@@ -708,6 +728,9 @@
 	return true;
 
       if (xxspltiw_operand (op, mode))
+	return true;
+
+      if (xxspltidp_operand (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR

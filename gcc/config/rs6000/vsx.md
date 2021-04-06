@@ -1164,6 +1164,20 @@
   [(set_attr "type" "vecperm")
    (set_attr "length" "8")])
 
+;; Split V2DF vector constants that can be loaded with XXSPLTIDP.
+;; Xxspltidp_operand will match either VEC_DUPLICATE or CONST_VECTOR, but we
+;; don't have to split the VEC_DUPLICATE case.  The move pattern handles
+;; setting the vector to 0.
+(define_split
+  [(set (match_operand:V2DF 0 "vsx_register_operand")
+	(match_operand:V2DF 1 "xxspltidp_operand"))]
+  "TARGET_POWER10 && TARGET_VSX && GET_CODE (operands[1]) == CONST_VECTOR
+   && operands[1] != CONST0_RTX (V2DFmode)"
+  [(set (match_dup 0)
+	(vec_duplicate:V2DF (match_dup 2)))]
+{
+  operands[2] = CONST_VECTOR_ELT (operands[1], 0);
+})
 
 ;; XXSPLTIW support.
 (define_insn "*xxspltiw<mode>"
@@ -1190,17 +1204,17 @@
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
-;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
+;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)  XXSPLTIDP
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
-                ?wa,       v,         <??r>,     wZ,        v")
+                ?wa,       v,         <??r>,     wZ,        v,         wa")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
                 wQ,        Y,         r,         r,         wE,        jwM,
-                ?jwM,      W,         <nW>,      v,         wZ"))]
+                ?jwM,      W,         <nW>,      v,         wZ,        eF"))]
 
   "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
    && (register_operand (operands[0], <MODE>mode) 
@@ -1211,36 +1225,40 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
-                vecsimple, *,         *,         vecstore,  vecload")
+                vecsimple, *,         *,         vecstore,  vecload,   vecperm")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         5,         2,         *,         *")
+                *,         5,         2,         *,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         *,         *,         *,         *")
+                *,         *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *")
+                *,         20,        8,         *,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
-                <VSisa>,   *,         *,         *,         *")])
+                <VSisa>,   *,         *,         *,         *,         p10")
+   (set_attr "prefixed"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         yes")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
-;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
+;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const  XXSPLTIDP
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
-                wa,        v,         ?wa,       v,         <??r>,
+                wa,        v,         ?wa,       v,         <??r>,     wa,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
-                wE,        jwM,       ?jwM,      W,         <nW>,
+                wE,        jwM,       ?jwM,      W,         <nW>,      eF,
                 v,         wZ"))]
 
   "!TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
@@ -1251,15 +1269,19 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
-                vecsimple, vecsimple, vecsimple, *,         *,
+                vecsimple, vecsimple, vecsimple, *,         *,        vecperm,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
-                *,         *,         *,         20,        16,
+                *,         *,         *,         20,        16,        *,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p9v,       *,         <VSisa>,   *,         *,
+                p9v,       *,         <VSisa>,   *,         *,         p10,
+                *,         *")
+   (set_attr "prefixed"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         yes,
                 *,         *")])
 
 ;; Explicit  load/store expanders for the builtin functions
@@ -4494,6 +4516,9 @@
   rtx op1 = operands[1];
   if (MEM_P (op1))
     operands[1] = rs6000_force_indexed_or_indirect_mem (op1);
+  else if (TARGET_POWER10 && <MODE>mode == V2DFmode
+	   && xxspltidp_operand (op1, <MODE>mode))
+    ;
   else if (!REG_P (op1))
     op1 = force_reg (<VSX_D:VS_scalar>mode, op1);
 })
@@ -4515,6 +4540,25 @@
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "lxvdsx %x0,%y1"
   [(set_attr "type" "vecload")])
+
+;; Load V2DFmode constant via the ISA 3.1 XXSPLTIDP instruction
+(define_insn "*vsx_splat_v2df_const"
+  [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
+	(vec_duplicate:V2DF (match_operand:DF 1 "xxspltidp_operand" "j,eF")))]
+  "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  if (op1 == CONST0_RTX (DFmode))
+    return "xxspltib %x0,0";
+
+  long value;
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op1);
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+  operands[2] = GEN_INT (value);
+  return "xxspltidp %x0,%2";
+}
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "*,yes")])
 
 ;; V4SI splat support
 (define_insn "vsx_splat_v4si"
