@@ -573,47 +573,9 @@
 (define_predicate "xxspltidp_operand"
   (match_code "const_double,const_vector,vec_duplicate")
 {
-  long value;
+  rtx value = NULL_RTX;
 
-  if (!TARGET_XXSPLTIDP)
-    return 0;
-
-  if (mode == V2DFmode)
-    {
-      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
-      if (GET_CODE (op) == VEC_DUPLICATE)
-       op = XEXP (op, 0);
-
-      else if (GET_CODE (op) == CONST_VECTOR)
-       {
-         rtx element = CONST_VECTOR_ELT (op, 0);
-         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
-           return 0;
-
-	 op = element;
-       }
-
-      else
-       return 0;
-    }
-
-  else if (mode != SFmode && mode != DFmode)
-    return 0;
-
-  if (!CONST_DOUBLE_P (op))
-    return 0;
-
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
-
-  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
-  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
-    return 0;
-
-  return 1;
+  return xxspltidp_constant_p (op, mode, &value);
 })
 
 ;; Return 1 if operand is a CONST_DOUBLE that can be set in a register

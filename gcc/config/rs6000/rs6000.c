@@ -6536,6 +6536,57 @@ xxspltiw_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTIDP instruction.
+
+   Return the constant that is being split via CONSTANT_PTR.  */
+
+bool
+xxspltidp_constant_p (rtx op,
+		      machine_mode mode,
+		      rtx *constant_ptr)
+{
+  *constant_ptr = NULL_RTX;
+
+  rtx element = op;
+  if (mode == V2DFmode)
+    {
+      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
+      if (GET_CODE (op) == VEC_DUPLICATE)
+       element = XEXP (op, 0);
+
+      else if (GET_CODE (op) == CONST_VECTOR)
+       {
+         element = CONST_VECTOR_ELT (op, 0);
+         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+           return false;
+       }
+
+      else
+       return false;
+    }
+
+  else if (mode != SFmode && mode != DFmode)
+    return false;
+
+  if (!CONST_DOUBLE_P (element))
+    return false;
+
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
+  if (!exact_real_truncate (SFmode, rv))
+    return 0;
+
+  long value;
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+
+  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
+  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
+    return false;
+
+  *constant_ptr = element;
+  return true;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6588,6 +6639,13 @@ output_vec_const_move (rtx *operands)
 		  && IN_RANGE (xxspltiw_value, -16, 15)
 		  ? "vspltisw %0,%2"
 		  : "xxspltiw %x0,%2");
+	}
+
+      rtx xxspltidp_value = NULL_RTX;
+      if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
+	{
+	  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (xxspltidp_value));
+	  return "xxspltiw %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
