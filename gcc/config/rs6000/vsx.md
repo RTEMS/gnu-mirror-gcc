@@ -6287,6 +6287,31 @@
   [(set_attr "type" "vecsimple")
    (set_attr "prefixed" "yes")])
 
+;; Convert a load of a SFmode/DFmode constant to use the ISA 3.1 XXSPLTIDP
+;; instruction if we can.  We don't do this for 0.0 to allow the move patterns
+;; to generate the smaller XXSPLTIB/VSPLTISW/XXLXOR to zero the register.
+(define_split
+  [(set (match_operand:SFDF 0 "vsx_register_operand")
+       (match_operand:SFDF 1 "xxspltidp_operand"))]
+  "TARGET_XXSPLTIDP && operands[1] != CONST0_RTX (<MODE>mode)"
+  [(set (match_dup 0)
+	(unspec:SFDF [(match_dup 2)] UNSPEC_XXSPLTID))]
+{
+  long value;
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (operands[1]);
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+  operands[2] = GEN_INT (value);
+})
+
+(define_insn "*xxspltidp<mode>"
+  [(set (match_operand:SFDF 0 "vsx_register_operand" "=wa")
+       (unspec:SFDF [(match_operand 1 "const_int_operand" "n")]
+		    UNSPEC_XXSPLTID))]
+  "TARGET_XXSPLTIDP"
+  "xxspltidp %x0,%1"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
+
 ;; XXSPLTI32DX support
 (define_expand "xxsplti32dx_v4si"
   [(set (match_operand:V4SI 0 "register_operand" "=wa")

@@ -4476,6 +4476,10 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
     rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
 
+  if (TARGET_POWER10 && TARGET_VSX
+      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
+    rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
+
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
@@ -24049,6 +24053,8 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
+  { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
+  { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
