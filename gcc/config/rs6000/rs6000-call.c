@@ -9440,6 +9440,15 @@ rs6000_expand_unop_builtin (enum insn_code icode, tree exp, rtx target)
 	}
     }
 
+  /* The XXSPLTIDP instruction is undefined if the 32-bit float value is
+     denormal.  Warn the user that this might produce an undefined value at
+     runtime.  */
+  else if (icode == CODE_FOR_xxspltidp_v2df
+	   && !xxspltidp_operand (op0, mode0))
+    inform (input_location,
+	    "the result for the xxspltidp instruction is undefined for "
+	    "subnormal input values");
+
   if (target == 0
       || GET_MODE (target) != tmode
       || ! (*insn_data[icode].operand[0].predicate) (target, tmode))

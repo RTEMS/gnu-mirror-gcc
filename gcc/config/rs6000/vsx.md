@@ -6274,7 +6274,7 @@
  "TARGET_POWER10"
 {
   long value = rs6000_const_f32_to_i32 (operands[1]);
-  rs6000_emit_xxspltidp_v2df (operands[0], value);
+  emit_insn (gen_xxspltidp_v2df_inst (operands[0], GEN_INT (value)));
   DONE;
 })
 
@@ -6284,7 +6284,7 @@
 		     UNSPEC_XXSPLTID))]
   "TARGET_POWER10"
   "xxspltidp %x0,%1"
-  [(set_attr "type" "vecsimple")
+  [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")])
 
 ;; Convert a load of a SFmode/DFmode constant to use the ISA 3.1 XXSPLTIDP
