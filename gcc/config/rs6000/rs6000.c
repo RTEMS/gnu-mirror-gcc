@@ -6539,14 +6539,15 @@ xxspltiw_constant_p (rtx op,
 /* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
    XXSPLTIDP instruction.
 
-   Return the constant that is being split via CONSTANT_PTR.  */
+   Return the constant that is being split via CONSTANT_PTR to use in the
+   XXSPLTIDP instruction.  */
 
 bool
 xxspltidp_constant_p (rtx op,
 		      machine_mode mode,
-		      rtx *constant_ptr)
+		      long *constant_ptr)
 {
-  *constant_ptr = NULL_RTX;
+  *constant_ptr = 0;
 
   rtx element = op;
   if (mode == V2DFmode)
@@ -6583,7 +6584,7 @@ xxspltidp_constant_p (rtx op,
   if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
     return false;
 
-  *constant_ptr = element;
+  *constant_ptr = value;
   return true;
 }
 
@@ -6653,10 +6654,10 @@ output_vec_const_move (rtx *operands)
 	  return "xxspltiw %x0,%2";
 	}
 
-      rtx xxspltidp_value = NULL_RTX;
+      long xxspltidp_value = 0;
       if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
 	{
-	  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (xxspltidp_value));
+	  operands[2] = GEN_INT (xxspltidp_value);
 	  return "xxspltidp %x0,%2";
 	}
 

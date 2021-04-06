@@ -573,8 +573,7 @@
 (define_predicate "xxspltidp_operand"
   (match_code "const_double,const_vector,vec_duplicate")
 {
-  rtx value = NULL_RTX;
-
+  long value = 0;
   return xxspltidp_constant_p (op, mode, &value);
 })
 
