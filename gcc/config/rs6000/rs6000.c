@@ -6634,11 +6634,23 @@ output_vec_const_move (rtx *operands)
       long xxspltiw_value = 0;
       if (xxspltiw_constant_p (vec, mode, &xxspltiw_value))
 	{
+	  /* Generate the smaller VSPLTIS{H,W} if we can.  */
+	  if (dest_vmx_p && mode == V8HImode)
+	    {
+	      long hi_value = ((xxspltiw_value & 0xffff) ^ 0x8000) - 0x8000;
+	      if (IN_RANGE (hi_value, -16, 15))
+		{
+		  operands[2] = GEN_INT (hi_value);
+		  return "vspltish %0,%2";
+		}
+	    }
+
 	  operands[2] = GEN_INT (xxspltiw_value);
-	  return (mode == V4SImode && dest_vmx_p
-		  && IN_RANGE (xxspltiw_value, -16, 15)
-		  ? "vspltisw %0,%2"
-		  : "xxspltiw %x0,%2");
+	  if (dest_vmx_p && mode == V4SImode
+	      && IN_RANGE (xxspltiw_value, -16, 15))
+	    return "vspltisw %0,%2";
+
+	  return "xxspltiw %x0,%2";
 	}
 
       rtx xxspltidp_value = NULL_RTX;
