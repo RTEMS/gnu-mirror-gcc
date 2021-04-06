@@ -6580,6 +6580,16 @@ output_vec_const_move (rtx *operands)
 	    gcc_unreachable ();
 	}
 
+      long xxspltiw_value = 0;
+      if (xxspltiw_constant_p (vec, mode, &xxspltiw_value))
+	{
+	  operands[2] = GEN_INT (xxspltiw_value);
+	  return (mode == V4SImode && dest_vmx_p
+		  && IN_RANGE (xxspltiw_value, -16, 15)
+		  ? "vspltisw %0,%2"
+		  : "xxspltiw %x0,%2");
+	}
+
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
 	{
