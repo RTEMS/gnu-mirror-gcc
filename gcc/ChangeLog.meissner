@@ -1,3 +1,135 @@
+work044.patch032:
+2021-04-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltidp_operand): Adapt to new
+	xxspltid_constant_p.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): Update
+	calling signature.
+	* config/rs6000/rs6000.c (xxspltidp_constant_p): Return a long
+	instead of rtx.
+	(output_vec_const_move): Update xxspltidp_constant_p call.
+	* config/rs6000/vsx.md (xxspltidp<mode>): New insn for XXSPLTIDP
+	support.
+
+work044.patch031:
+2021-04-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (output_vec_const_move): Generate
+	VSPLTISH if we can.
+
+work044.patch030:
+2021-04-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs60000/predicates.md (xxspltidp_operand): Use
+	xxspltidp_constant_p for processing.
+	* config/rs6000/rs6000-prototypes.h (xxspltidp_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (xxspltidp_constant_p): New function.
+	(output_vec_const_move): Add XXSPLTIDP support.
+
+work044.patch028:
+2021-04-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltidp_v2df): Use vec_duplicate for
+	normal inputs.  Handle denormal inputs specially.
+	(xxspltidp_v2df_denormal): Rename from xxspltidp_v2df_inst.
+
+work044.patch027:
+2021-04-06  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltidp_operand): Add V2DF
+	support.
+	* config/rs6000/rs6000.c (rs6000_expand_vector_init): If we can,
+	load up a V2DF vector constant with VEC_DUPLICATE.
+	* config/rs6000/vsx.md (V2DF constant splitter): New splitter.
+	(vsx_mov<mode>_64bit): Support loading V2DF constants via the
+	XXSPLTIDP instruction.
+	(vsx_mov<mode>_32bit): Support loading V2DF constants via the
+	XXSPLTIDP instruction.
+	(vsx_splat_v2df_const): New insn.
+
+work044.patch026:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (xxspltidp_v2df): Call the RTL generation
+	function directly, instead of using a middle man function.
+	* config/rs6000/rs6000-call.c (rs6000_expand_unop_builtin): Move
+	warning hear about using the XXSPLTID instruction with a denormal
+	immediate value.
+	* config/rs6000/rs6000-protos.c (rs6000_emit_xxspltidp_v2df):
+	Delete.
+	* config/rs6000/rs6000.c (rs6000_emit_xxspltidp_v2df): Delete.
+
+work044.patch025:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eF constraint): New constraint.
+	* config/rs6000/predicates.md (xxspltidp_operand): New predicate.
+	(easy_fp_constant): Constants that we can load with XXSPLTIDP are
+	considered easy constants.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mxxspltidp.
+	(rs6000_opt_masks): Add -mxxspltiw, -mxxspltidp.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	loading constants with XXSPLTIDP.
+	(mov<mode>_hardfloat32): Add support for loading constants with
+	XXSPLTIDP.
+	(mov<mode>_hardfloat64): Add support for loading constants with
+	XXSPLTIDP.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New option.
+	* config/rs6000/vsx.md (SF/DF load constant splitter): New
+	splitter for constants loaded with XXSPLTIDP.
+	(xxspltidp<mode>): New insn to emit XXSPLTIDP.
+
+work044.patch024:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/99921
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(xxeval): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(xxeval): Move from altivec.md.
+
+work044.patch023:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(xxeval): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(xxeval): Move from altivec.md.
+
+work044.patch022:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTI32DX): Move to vsx.md.
+	(xxsplti32dx_v4si): Move to vsx.md.
+	(xxsplti32dx_v4si_inst): Move to vsx.md.
+	(xxsplti32dx_v4sf): Move to vsx.md.
+	(xxsplti32dx_v4sf_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX): Move from altivec.md.
+	(xxsplti32dx_v4si): Move from altivec.md.
+	(xxsplti32dx_v4si_inst): Move from altivec.md.
+	(xxsplti32dx_v4sf): Move from altivec.md.
+	(xxsplti32dx_v4sf_inst): Move from altivec.md.
+
+work044.patch021:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTID): Move to vsx.md.
+	(xxspltidp_v2df): Move to vsx.md.
+	(xxspltidp_v2df_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTID): Move from altivec.md.
+	(xxspltidp_v2df): Move from altivec.md.
+	(xxspltidp_v2df_inst): Move from altivec.md.
+
+work044.patch020:
+2021-04-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (xxspltiw_v4si): Move to vsx.md.
+	(xxspltiw_v4sf): Move to vsx.md.
+	* config/rs6000/vsx.md (xxspltiw_v4si): Move from altivec.md.
+	(xxspltiw_v4sf): Move from altivec.md.
+
 work044.patch018:
 2021-04-02  Michael Meissner  <meissner@linux.ibm.com>
 
