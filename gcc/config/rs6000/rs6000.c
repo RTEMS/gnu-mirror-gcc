@@ -6645,7 +6645,7 @@ output_vec_const_move (rtx *operands)
       if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
 	{
 	  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (xxspltidp_value));
-	  return "xxspltiw %x0,%2";
+	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
