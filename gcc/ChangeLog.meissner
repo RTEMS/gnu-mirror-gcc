@@ -1,3 +1,39 @@
+work046.patch011:
+2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Move to vsx.md.
+	(xxspltiw_v4si): Move to vsx.md and re-implement.
+	(xxspltiw_v4sf): Move to vsx.md and re-implement.
+	(xxspltiw_v4sf_inst): Delete.
+	* config/rs6000/constraints.md (eW): New constraint.
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIW, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mxxspltiw support.
+	(POWERPC_MASKS): Add -mxxspltiw support.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltiw support.
+	(xxspltib_constant_p): If we can generate XXSPLTIW, don't generate
+	XXSPLTIB and a vector extend instruction.
+	(xxspltiw_constant_p): New function.
+	(output_vec_const_move): Add support for XXSPLTIW.
+	(rs6000_opt_masks): Add -mxxspltiw support.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIW): Move here from
+	altivec.md.
+	(vsx_mov<mode>_64bit): Add XXSPLTIW support.
+	(vsx_mov<mode>_32bit): Add XXSPLTIW support.
+	(XXSPLTIW): New mode iterator.
+	(xxspltiw_<mode>_internal1): New define_insn_and_split.
+	(xxspltiw_<mode>_internal2): New define_insn.
+	(xxspltiw_v4si): Move to vsx.md from altivec.md.  Re-implement to
+	use the new constant format.
+	(xxspltiw_v4sf): Move to vsx.md from altivec.md.  Re-implement to
+	use the new constant format.
+
 work046.patch010:
 2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
 
