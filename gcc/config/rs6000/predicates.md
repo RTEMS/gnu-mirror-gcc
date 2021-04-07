@@ -565,6 +565,18 @@
   (ior (match_operand 0 "vsx_register_operand")
        (match_operand 0 "reg_or_logical_cint_operand")))
 
+;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
+;; loaded via the ISA 3.1 XXSPLTIDP instruction.  This function has to check,
+;; if the immediate specifies a single-precision denormal value (i.e., bits 1:8
+;; equal to 0 and bits 9:31 not equal to 0), since the result is undefined in
+;; the hardware.
+(define_predicate "xxspltidp_operand"
+  (match_code "const_double,const_vector,vec_duplicate")
+{
+  HOST_WIDE_INT value = 0;
+  return xxspltidp_constant_p (op, mode, &value);
+})
+
 ;; Return 1 if operand is a CONST_DOUBLE that can be set in a register
 ;; with no more than one instruction per word.
 (define_predicate "easy_fp_constant"
@@ -599,6 +611,11 @@
 
   /* The constant 0.0 is easy under VSX.  */
   if (TARGET_VSX && op == CONST0_RTX (mode))
+    return 1;
+
+  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
+     be loaded with that instruction.  */
+  if (xxspltidp_operand (op, mode))
     return 1;
 
   /* Otherwise consider floating point constants hard, so that the
@@ -673,6 +690,9 @@
 	return true;
 
       if (xxspltiw_operand (op, mode))
+	return true;
+
+      if (xxspltidp_operand (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR

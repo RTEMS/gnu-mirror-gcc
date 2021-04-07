@@ -4480,6 +4480,10 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
     rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
 
+  if (TARGET_POWER10 && TARGET_VSX
+      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
+    rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
+
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
@@ -6545,7 +6549,7 @@ xxspltiw_constant_p (rtx op,
 bool
 xxspltidp_constant_p (rtx op,
 		      machine_mode mode,
-		      long *constant_ptr)
+		      HOST_WIDE_INT *constant_ptr)
 {
   *constant_ptr = 0;
 
@@ -6565,14 +6569,25 @@ xxspltidp_constant_p (rtx op,
 
       else
        return false;
+
+      mode = DFmode;
     }
 
-  else if (mode != SFmode && mode != DFmode)
+  if (mode != SFmode && mode != DFmode)
+    return false;
+
+  if (GET_MODE (element) != mode)
     return false;
 
   if (!CONST_DOUBLE_P (element))
     return false;
 
+  /* Don't return true for 0.0 since that is easy to create without
+     XXSPLTIDP.  */
+  if (element == CONST0_RTX (mode))
+    return false;
+
+  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
   const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
   if (!exact_real_truncate (SFmode, rv))
     return 0;
@@ -6652,6 +6667,13 @@ output_vec_const_move (rtx *operands)
 	    return "vspltisw %0,%2";
 
 	  return "xxspltiw %x0,%2";
+	}
+
+      HOST_WIDE_INT xxspltidp_value = 0;
+      if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
+	{
+	  operands[2] = GEN_INT (xxspltidp_value);
+	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -6735,6 +6757,14 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 
   if (n_var == 0)
     {
+      /* Generate XXSPLTIDP if we can.  */
+      if (all_same && mode == V2DFmode && xxspltidp_operand (vals, V2DFmode))
+       {
+         rtx dup = gen_rtx_VEC_DUPLICATE (mode, XVECEXP (vals, 0, 0));
+         emit_insn (gen_rtx_SET (target, dup));                                                         
+         return;
+       }
+
       rtx const_vec = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
       bool int_vector_p = (GET_MODE_CLASS (mode) == MODE_VECTOR_INT);
       if ((int_vector_p || TARGET_VSX) && all_const_zero)
@@ -24152,6 +24182,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
   { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
+  { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },

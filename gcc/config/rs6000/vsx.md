@@ -373,7 +373,6 @@
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
    UNSPEC_XXSPLTIW
-   UNSPEC_XXSPLTID
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -1188,17 +1187,17 @@
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
-;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
+;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)  XXSPLTIDP
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
-                ?wa,       v,         <??r>,     wZ,        v")
+                ?wa,       v,         <??r>,     wZ,        v,         wa")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
                 wQ,        Y,         r,         r,         wE,        jwM,
-                ?jwM,      W,         <nW>,      v,         wZ"))]
+                ?jwM,      W,         <nW>,      v,         wZ,        eF"))]
 
   "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
    && (register_operand (operands[0], <MODE>mode) 
@@ -1209,36 +1208,40 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
-                vecsimple, *,         *,         vecstore,  vecload")
+                vecsimple, *,         *,         vecstore,  vecload,   vecperm")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         5,         2,         *,         *")
+                *,         5,         2,         *,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         *,         *,         *,         *")
+                *,         *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *")
+                *,         20,        8,         *,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
-                <VSisa>,   *,         *,         *,         *")])
+                <VSisa>,   *,         *,         *,         *,         p10")
+   (set_attr "prefixed"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         yes")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
-;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
+;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const  XXSPLTIDP
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
-                wa,        v,         ?wa,       v,         <??r>,
+                wa,        v,         ?wa,       v,         <??r>,     wa,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
-                wE,        jwM,       ?jwM,      W,         <nW>,
+                wE,        jwM,       ?jwM,      W,         <nW>,      eF,
                 v,         wZ"))]
 
   "!TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
@@ -1249,15 +1252,19 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
-                vecsimple, vecsimple, vecsimple, *,         *,
+                vecsimple, vecsimple, vecsimple, *,         *,        vecperm,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
-                *,         *,         *,         20,        16,
+                *,         *,         *,         20,        16,        *,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p9v,       *,         <VSisa>,   *,         *,
+                p9v,       *,         <VSisa>,   *,         *,         p10,
+                *,         *")
+   (set_attr "prefixed"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         *,         *,         yes,
                 *,         *")])
 
 ;; Explicit  load/store expanders for the builtin functions
@@ -4492,6 +4499,9 @@
   rtx op1 = operands[1];
   if (MEM_P (op1))
     operands[1] = rs6000_force_indexed_or_indirect_mem (op1);
+  else if (TARGET_POWER10 && <MODE>mode == V2DFmode
+	   && xxspltidp_operand (op1, <MODE>mode))
+    ;
   else if (!REG_P (op1))
     op1 = force_reg (<VSX_D:VS_scalar>mode, op1);
 })
@@ -6265,23 +6275,13 @@
   DONE;
 })
 
-;; XXSPLTIDP support
+;; Support for the XXSPLTIDP built-in function
 (define_expand "xxspltidp_v2df"
-  [(set (match_operand:V2DF 0 "register_operand" )
-	(unspec:V2DF [(match_operand:SF 1 "const_double_operand")]
-		     UNSPEC_XXSPLTID))]
+  [(use (match_operand:V2DF 0 "register_operand" ))
+   (use (match_operand:SF 1 "const_double_operand"))]
  "TARGET_POWER10"
 {
   long value = rs6000_const_f32_to_i32 (operands[1]);
   rs6000_emit_xxspltidp_v2df (operands[0], value);
   DONE;
 })
-
-(define_insn "xxspltidp_v2df_inst"
-  [(set (match_operand:V2DF 0 "register_operand" "=wa")
-	(unspec:V2DF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTID))]
-  "TARGET_POWER10"
-  "xxspltidp %x0,%1"
-  [(set_attr "type" "vecsimple")
-   (set_attr "prefixed" "yes")])
