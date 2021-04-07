@@ -4476,14 +4476,6 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
     }
 
-  if (TARGET_POWER10 && TARGET_VSX
-      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
-    rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
-
-  if (TARGET_POWER10 && TARGET_VSX
-      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
-    rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
-
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
@@ -6468,139 +6460,10 @@ xxspltib_constant_p (rtx op,
   else if (IN_RANGE (value, -1, 0))
     *num_insns_ptr = 1;
 
-  /* If XXSPLTIW is available, don't return true if we can use that
-     instruction instead of doing 2 instructions. */
-  else if (TARGET_XXSPLTIW
-	   && (mode == V4SImode || mode == V8HImode))
-    return false;
-
   else
     *num_insns_ptr = 2;
 
   *constant_ptr = (int) value;
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIW instruction, possibly with an sign extension.
-
-   Return the constant that is being split via CONSTANT_PTR.  */
-
-bool
-xxspltiw_constant_p (rtx op,
-		     machine_mode mode,
-		     HOST_WIDE_INT *constant_ptr)
-{
-  *constant_ptr = 0;
-
-  if (!TARGET_XXSPLTIW)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (mode != V8HImode && mode != V4SImode && mode != V4SFmode)
-    return false;
-
-  rtx element = op;
-  if (GET_CODE (op) == VEC_DUPLICATE)
-    element = op;
-
-  else if (GET_CODE (op) == CONST_VECTOR)
-    {
-      size_t nunits = GET_MODE_NUNITS (mode);
-      element = CONST_VECTOR_ELT (op, 0);
-
-      for (size_t i = 1; i < nunits; i++)
-	if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-	  return false;
-    }
-
-  HOST_WIDE_INT value;
-  if (CONST_INT_P (element))
-    {
-      value = INTVAL (element);
-      if (!SIGNED_INTEGER_NBIT_P (value, 32))
-	return false;
-
-      /* For V8HImode, return the value setting 2 elements of the constant.  */
-      if (mode == V8HImode)
-	{
-	  value &= 0xffff;
-	  value |= value << 16;
-	}
-    }
-
-  else if (CONST_DOUBLE_P (element))
-    value = rs6000_const_f32_to_i32 (element);
-
-  else
-    return false;
-
-  *constant_ptr = value;
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIDP instruction.
-
-   Return the constant that is being split via CONSTANT_PTR to use in the
-   XXSPLTIDP instruction.  */
-
-bool
-xxspltidp_constant_p (rtx op,
-		      machine_mode mode,
-		      HOST_WIDE_INT *constant_ptr)
-{
-  *constant_ptr = 0;
-
-  rtx element = op;
-  if (mode == V2DFmode)
-    {
-      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
-      if (GET_CODE (op) == VEC_DUPLICATE)
-       element = XEXP (op, 0);
-
-      else if (GET_CODE (op) == CONST_VECTOR)
-       {
-         element = CONST_VECTOR_ELT (op, 0);
-         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
-           return false;
-       }
-
-      else
-       return false;
-
-      mode = DFmode;
-    }
-
-  if (mode != SFmode && mode != DFmode)
-    return false;
-
-  if (GET_MODE (element) != mode)
-    return false;
-
-  if (!CONST_DOUBLE_P (element))
-    return false;
-
-  /* Don't return true for 0.0 since that is easy to create without
-     XXSPLTIDP.  */
-  if (element == CONST0_RTX (mode))
-    return false;
-
-  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  long value;
-  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
-
-  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
-  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
-    return false;
-
-  *constant_ptr = value;
   return true;
 }
 
@@ -6646,35 +6509,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      HOST_WIDE_INT xxspltiw_value = 0;
-      if (xxspltiw_constant_p (vec, mode, &xxspltiw_value))
-	{
-	  /* Generate the smaller VSPLTIS{H,W} if we can.  */
-	  if (dest_vmx_p && mode == V8HImode)
-	    {
-	      long hi_value = ((xxspltiw_value & 0xffff) ^ 0x8000) - 0x8000;
-	      if (IN_RANGE (hi_value, -16, 15))
-		{
-		  operands[2] = GEN_INT (hi_value);
-		  return "vspltish %0,%2";
-		}
-	    }
-
-	  operands[2] = GEN_INT (xxspltiw_value);
-	  if (dest_vmx_p && mode == V4SImode
-	      && IN_RANGE (xxspltiw_value, -16, 15))
-	    return "vspltisw %0,%2";
-
-	  return "xxspltiw %x0,%2";
-	}
-
-      HOST_WIDE_INT xxspltidp_value = 0;
-      if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
-	{
-	  operands[2] = GEN_INT (xxspltidp_value);
-	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -24174,8 +24008,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
-  { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
-  { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
@@ -28001,7 +27833,7 @@ rs6000_emit_xxspltidp_v2df (rtx dst, long value)
     inform (input_location,
 	    "the result for the xxspltidp instruction "
 	    "is undefined for subnormal input values");
-  emit_insn( gen_xxspltidp_v2df_internal2 (dst, GEN_INT (value)));
+  emit_insn( gen_xxspltidp_v2df_inst (dst, GEN_INT (value)));
 }
 
 /* Implement TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC.  */
