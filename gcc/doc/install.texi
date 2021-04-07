@@ -109,7 +109,7 @@ Free Documentation License}''.
 
 @c Part 4 Top node, Master Menu, and/or Table of Contents
 @ifinfo
-@node    Top, , , (dir)
+@node    Top
 @comment node-name, next,          Previous, up
 
 @menu
@@ -135,7 +135,7 @@ Free Documentation License}''.
 @c ***Installing GCC**********************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Installing GCC, Binaries, , Top
+@node    Installing GCC
 @end ifnothtml
 @ifset indexhtml
 @ifnothtml
@@ -224,7 +224,7 @@ not yet been merged into the main part of this manual.
 @c ***Prerequisites**************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Prerequisites, Downloading the source, , Installing GCC
+@node    Prerequisites
 @end ifnothtml
 @ifset prerequisiteshtml
 @ifnothtml
@@ -543,7 +543,7 @@ own sources.
 @c ***Downloading the source**************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Downloading the source, Configuration, Prerequisites, Installing GCC
+@node    Downloading the source
 @end ifnothtml
 @ifset downloadhtml
 @ifnothtml
@@ -595,7 +595,7 @@ respectively (or use symbolic links with the same name).
 @c ***Configuration***********************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Configuration, Building, Downloading the source, Installing GCC
+@node    Configuration
 @end ifnothtml
 @ifset configurehtml
 @ifnothtml
@@ -2572,7 +2572,7 @@ to be available for each multilib variant, unless configured with
 @c ***Building****************************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Building, Testing, Configuration, Installing GCC
+@node    Building
 @end ifnothtml
 @ifset buildhtml
 @ifnothtml
@@ -2959,7 +2959,7 @@ the code quality may be much worse.
 @c ***Testing*****************************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Testing, Final install, Building, Installing GCC
+@node    Testing
 @end ifnothtml
 @ifset testhtml
 @ifnothtml
@@ -3193,7 +3193,7 @@ messages may be automatically processed.
 @c ***Final install***********************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Final install, , Testing, Installing GCC
+@node    Final install
 @end ifnothtml
 @ifset finalinstallhtml
 @ifnothtml
@@ -3352,7 +3352,7 @@ If you would like to generate online HTML documentation, do @samp{cd
 @c ***Binaries****************************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Binaries, Specific, Installing GCC, Top
+@node    Binaries
 @end ifnothtml
 @ifset binarieshtml
 @ifnothtml
@@ -3440,7 +3440,7 @@ links to GNU Fortran binaries for several platforms.
 @c ***Specific****************************************************************
 @ifnothtml
 @comment node-name,     next,          previous, up
-@node    Specific, Old, Binaries, Top
+@node    Specific
 @end ifnothtml
 @ifset specifichtml
 @ifnothtml
@@ -5162,7 +5162,7 @@ automatically.
 @c Part 6 The End of the Document
 @ifinfo
 @comment node-name,     next,          previous, up
-@node    Concept Index, , GNU Free Documentation License, Top
+@node    Concept Index
 @end ifinfo
 
 @ifinfo
