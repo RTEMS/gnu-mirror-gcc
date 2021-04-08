@@ -1,3 +1,74 @@
+work046.patch018:
+2021-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/contraints.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the constant with a pair of XXSPLTI32DX instructions, it is easy.
+	(xxsplti32dx_operand): New predicate.
+	(easy_vector_constant): If we can load the constant with a pair of
+	XXSPLTI32DX instructions, it is easy.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mxxsplti32dx.
+	(POWERPC_MASKS): Add -mxxsplti32dx.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxsplti32dx support.
+	(xxsplti32dx_constant_p): New helper function.
+	(output_vec_const_move): Split constants that need XXSPLTI32DX.
+	(rs6000_opt_masks): Add -mxxsplti32dx.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	loading constants with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Add support for loading
+	constants with XXSPLTI32DX.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Add support for loading
+	constants with XXSPLTI32DX.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(vsx_mov<mode>_64bit): Add support for loading constants with
+	XXSPLTI32DX.
+	(vsx_mov<mode>_32bit): Add support for loading constants with
+	XXSPLTI32DX.
+	(XXSPLTI32DX): New mode iterator.
+	(xxsplti32dx_<mode>): New insn and splits.
+	(xxsplti32dx_<mode>_first): New insns.
+	(xxsplti32dx_<mode>_second): New insns.
+
+work046.patch017:
+2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(xxeval): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(xxeval): Move from altivec.md.
+
+
+work046.patch016:
+2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXPERMX): Move to vsx.md.
+	(xxpermx): Move to vsx.md.
+	(xxpermx_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXPERMX): Move from altivec.md.
+	(xxpermx): Move from altivec.md.
+	(xxpermx_inst): Move from altivec.md.
+
+
+work046.patch015:
+2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTI32DX): Move to vsx.md.
+	(xxsplti32dx_v4si): Move to vsx.md.
+	(xxsplti32dx_v4si_inst): Move to vsx.md.
+	(xxsplti32dx_v4sf): Move to vsx.md.
+	(xxsplti32dx_v4sf_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX): Move from
+	altivec.md.
+	(xxsplti32dx_v4si): Move from altivec.md.
+	(xxsplti32dx_v4si_inst): Move from altivec.md.
+	(xxsplti32dx_v4sf): Move from altivec.md.
+	(xxsplti32dx_v4sf_inst): Move from altivec.md.
+
 work046.patch013:
 2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
 
