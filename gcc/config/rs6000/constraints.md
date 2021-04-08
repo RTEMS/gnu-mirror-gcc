@@ -208,12 +208,6 @@
   (and (match_code "const_int")
        (match_test "((- (unsigned HOST_WIDE_INT) ival) + 0x8000) < 0x10000")))
 
-;; SF/DF/V2DF/DI/V2DI scalar or vector constant that can be loaded with a pair
-;; of XXSPLTI32DX instructions.
-(define_constraint "eD"
-  "A vector constant that can be loaded with XXSPLTI32DX instructions."
-  (match_operand 0 "xxsplti32dx_operand"))
-
 ;; SF/DF/V2DF scalar or vector constant that can be loaded with XXSPLTIDP
 (define_constraint "eF"
   "A vector constant that can be loaded with the XXSPLTIDP instruction."
