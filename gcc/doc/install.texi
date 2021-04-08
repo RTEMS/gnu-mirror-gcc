@@ -599,10 +599,10 @@ respectively (or use symbolic links with the same name).
 @end ifnothtml
 @ifset configurehtml
 @ifnothtml
-@chapter Installing GCC: Configuration
+@chapter Configuration
 @end ifnothtml
 @cindex Configuration
-@cindex Installing GCC: Configuration
+@cindex Configuration
 
 Like most GNU software, GCC must be configured before it can be built.
 This document describes the recommended configuration procedure
@@ -2578,7 +2578,7 @@ to be available for each multilib variant, unless configured with
 @ifnothtml
 @chapter Building
 @end ifnothtml
-@cindex Installing GCC: Building
+@cindex Building
 
 Now that GCC is configured, you are ready to build the compiler and
 runtime libraries.
@@ -2963,10 +2963,10 @@ the code quality may be much worse.
 @end ifnothtml
 @ifset testhtml
 @ifnothtml
-@chapter Installing GCC: Testing
+@chapter Testing
 @end ifnothtml
 @cindex Testing
-@cindex Installing GCC: Testing
+@cindex Testing
 @cindex Testsuite
 
 Before you install GCC, we encourage you to run the testsuites and to
@@ -3197,7 +3197,7 @@ messages may be automatically processed.
 @end ifnothtml
 @ifset finalinstallhtml
 @ifnothtml
-@chapter Installing GCC: Final installation
+@chapter Final installation
 @end ifnothtml
 
 Now that GCC has been built (and optionally tested), you can install it with
@@ -3356,10 +3356,10 @@ If you would like to generate online HTML documentation, do @samp{cd
 @end ifnothtml
 @ifset binarieshtml
 @ifnothtml
-@chapter Installing GCC: Binaries
+@chapter Binaries
 @end ifnothtml
 @cindex Binaries
-@cindex Installing GCC: Binaries
+@cindex Binaries
 
 We are often asked about pre-compiled versions of GCC@.  While we cannot
 provide these for all platforms, below you'll find links to binaries for
