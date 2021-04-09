@@ -149,3 +149,18 @@ FAIL: experimental/filesystem/operations/is_empty.cc execution test
 FAIL: experimental/filesystem/operations/remove.cc execution test
 FAIL: experimental/filesystem/operations/remove_all.cc execution test
 FAIL: experimental/filesystem/operations/temp_directory_path.cc execution test
+FAIL: gcc.c-torture/execute/fprintf-2.c -O3 -g  (test for excess errors)
+FAIL: gcc.c-torture/execute/printf-2.c -O3 -g  (test for excess errors)
+FAIL: gcc.c-torture/execute/user-printf.c -O3 -g  (test for excess errors)
+FAIL: gcc.dg/guality/inline-params-2.c -O2  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/inline-params-2.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION execution test
+FAIL: gcc.dg/guality/inline-params-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION execution test
+FAIL: gcc.dg/guality/inline-params-2.c -O3 -g  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/inline-params-2.c -Os  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/pr41447-1.c -O2  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/pr41447-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION execution test
+FAIL: gcc.dg/guality/pr41447-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION execution test
+FAIL: gcc.dg/guality/pr41447-1.c -O3 -g  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/pr41447-1.c -Os  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.target/i386/pr97642-2.c (test for excess errors)
+UNRESOLVED: gcc.target/i386/pr97642-2.c compilation failed to produce executable
