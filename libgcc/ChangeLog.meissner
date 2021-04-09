@@ -1,3 +1,10 @@
+work046.patch019:
+2021-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/98952
+	* config/rs6000/tramp.S (__trampoline_setup): Fix trampoline size
+	comparison in 32-bit.
+
 work046.patch008:
 2021-04-07  Michael Meissner  <meissner@linux.ibm.com>
 
