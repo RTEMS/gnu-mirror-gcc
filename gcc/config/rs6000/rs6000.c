@@ -4484,6 +4484,10 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
     rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
 
+  if (TARGET_POWER10 && TARGET_VSX
+      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTI32DX) == 0)
+    rs6000_isa_flags |= OPTION_MASK_XXSPLTI32DX;
+
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
@@ -6610,6 +6614,92 @@ xxspltidp_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTI32DX instruction.  If the instruction can be synthesized with
+   XXSPLTIDP or is 0/-1, return false.
+
+   Return the 64-bit constant to use in the two XXSPLTI32DX instructions via
+   CONSTANT_PTR.  */
+
+bool
+xxsplti32dx_constant_p (rtx op,
+			machine_mode mode,
+			HOST_WIDE_INT *constant_ptr)
+{
+  *constant_ptr = 0;
+
+  if (!TARGET_XXSPLTI32DX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (op == CONST0_RTX (mode))
+    return false;
+
+  rtx element = op;
+  if (mode == V2DFmode || mode == V2DImode)
+    {
+      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
+      if (GET_CODE (op) == VEC_DUPLICATE)
+	element = XEXP (op, 0);
+
+      else if (GET_CODE (op) == CONST_VECTOR)
+       {
+         element = CONST_VECTOR_ELT (op, 0);
+         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+           return false;
+       }
+
+      else
+       return false;
+
+      mode = GET_MODE_INNER (mode);
+    }
+
+  if (GET_MODE (element) != mode)
+    return false;
+
+  /* Handle floating point constants.  */
+  if (mode == SFmode || mode == DFmode)
+    {
+      HOST_WIDE_INT xxspltidp_value = 0;
+
+      if (!CONST_DOUBLE_P (element))
+	return false;
+
+      if (xxspltidp_constant_p (element, mode, &xxspltidp_value))
+	return false;
+
+      long high_low[2];
+      const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
+      REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
+
+      if (!BYTES_BIG_ENDIAN)
+	std::swap (high_low[0], high_low[1]);
+
+      *constant_ptr = (high_low[0] << 32) | (high_low[1] & 0xffffffff);
+      return true;
+    }
+
+  /* Handle integer constants.  */
+  else if (mode == DImode)
+    {
+      if (!CONST_INT_P (element))
+	return false;
+
+      HOST_WIDE_INT value = INTVAL (element);
+      if (value == -1)
+	return false;
+
+      *constant_ptr = value;
+      return true;
+    }
+
+  else
+    return false;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6682,6 +6772,9 @@ output_vec_const_move (rtx *operands)
 	  operands[2] = GEN_INT (xxspltidp_value);
 	  return "xxspltidp %x0,%2";
 	}
+
+      if (xxsplti32dx_operand (vec, mode))
+	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -24182,6 +24275,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "vsx",			OPTION_MASK_VSX,		false, true  },
   { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
   { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
+  { "xxsplti32dx",		OPTION_MASK_XXSPLTI32DX,	false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
