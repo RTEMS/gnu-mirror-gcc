@@ -1,3 +1,13 @@
+work046.patch021:
+2021-04-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (xxsplti32dx_constant_p): Add support for
+	V4SImode and V4SFmode.
+	* config/rs6000/vsx.md (XXSPLTI32DX): Extend iterator to include
+	V4SImode and V4SFmode.
+	(xxsplti32dx_<mode>): Properly handle optimizing the second word
+	being all 1's.
+
 work046.patch020:
 2021-04-09  Michael Meissner  <meissner@linux.ibm.com>
 
