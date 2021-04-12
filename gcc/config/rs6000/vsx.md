@@ -6348,8 +6348,9 @@
   DONE;
 })
 
-;; XXSPLTI32DX used to create 64-bit constants
-(define_mode_iterator XXSPLTI32DX [SF DF V2DF V2DI])
+;; XXSPLTI32DX used to create 64-bit constants or 32-bit vector constants where
+;; the even elements match and the odd elements match.
+(define_mode_iterator XXSPLTI32DX [SF DF V4SF V4SI V2DF V2DI])
 
 (define_insn_and_split "*xxsplti32dx_<mode>"
   [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
@@ -6371,11 +6372,11 @@
     gcc_unreachable ();
 
   HOST_WIDE_INT high = value >> 32;
-  HOST_WIDE_INT low = value & 0xffffffff;
+  HOST_WIDE_INT low = ((value & 0xffffffff) ^ 0x80000000) - 0x80000000;
 
-  /* If the low bits are 0/-1, initialize that word first.  This way we can
-     use a smaller XXSPLTIB instruction instead the first XXSPLTI32DX.  */
-  if (low == 0 || low == -1)
+  /* If the low bits are 0 or all 1s, initialize that word first.  This way we
+     can use a smaller XXSPLTIB instruction instead the first XXSPLTI32DX.  */
+  if (low == 0 || low ==  -1)
     {
       operands[2] = const1_rtx;
       operands[3] = GEN_INT (low);
