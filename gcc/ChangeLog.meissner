@@ -1,10 +1,26 @@
+work047.patch019:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXBLEND): Move to vsx.md.
+	(VM3): Move to vsx.md and rename to VBLEND.
+	(VM3_char): Move to vsx.md and rename to VBLEND_char.
+	(xxblend_<mode>): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(VBLEND): Move from altivec.md and rename VM3 to VBLEND.
+	(VBLEND_char): Move from altivec.md and rename VM3_char to
+	VBLEND_char.
+	(xxblend_<mode>): Move from altivec.md.  Use vsx_register_operand
+	instead of register operand.  Change the insn type from vecsimple
+	to vecperm.
+
 work047.patch018:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
 	(xxeval): Move to vsx.md.
 	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
-	(xxeval): Move from altivec.md.
+	(xxeval): Move from altivec.md.  Change altivec_register_operand
+	to vsx_register_operand.  Change insn type to vecperm.
 
 work047.patch017:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
@@ -13,8 +29,12 @@ work047.patch017:
 	(xxpermx): Move to vsx.md.
 	(xxpermx_inst): Move to vsx.md.
 	* config/rs6000/vsx.md (UNSPEC_XXPERMX): Move from altivec.md.
-	(xxpermx): Move from altivec.md.
-	(xxpermx_inst): Move from altivec.md.
+	(xxpermx): Move from altivec.md.  Use vsx_register_operand
+	instead of register_operand.  Remove setting the insn attribute
+	"type" on the expander.
+	(xxpermx_inst): Move from altivec.md.  Use vsx_register_operand
+	instead of register_operand.  Change the constraint from "v" to
+	"wa" to match the instruction.  Change insn type to vecperm.
 
 work047.patch016:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
