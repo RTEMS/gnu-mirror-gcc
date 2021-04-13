@@ -1,3 +1,10 @@
+work047.patch011:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Do not set
+	LINK_OS_EXTRA_SPEC664 for the Advance Toolchain.  Continue to set
+	LINK_OS_EXTRA_SPEC32.
+
 work047.patch009:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
 
