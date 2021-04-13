@@ -1,3 +1,42 @@
+work047.patch014:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTID): Move to vsx.md and
+	rename to UNSPEC_XXSPLTID.
+	(xxspltidp_v2df): Move to vsx.md and re-implement.
+	(xxspltidp_v2df_inst): Move to vsx.md and re-implement.
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the scalar constant with XXSPLTIDP, return true.
+	(xxspltidp_operand): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mxxspltidp support.
+	(POWERPC_MASKS): Add -mxxspltidp support.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltidp support.
+	(xxspltidp_constant_p): New function.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(rs6000_opt_masks): Add -mxxspltidp support.
+	(rs6000_emit_xxspltidp_v2df): Change function to implement the
+	XXSPLTIDP instruction.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add XXSPLTIDP
+	support.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Add XXSPLTIDP support.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Add XXSPLTIDP support.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIDP): Move here from
+	altivec.md.  Rename it to UNSPEC_XXSPLTIDP to match the
+	instruction.
+	(XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_internal1): New define_insn_and_split.
+	(xxspltidp_<mode>_internal2): New define_insn.
+	(xxspltidp_v2df): Move to vsx.md from altivec.md.  Re-implement to
+	use the new constant format.
+
 work047.patch012:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
 
