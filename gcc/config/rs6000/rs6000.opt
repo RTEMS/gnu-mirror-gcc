@@ -619,7 +619,3 @@ Generate (do not generate) MMA instructions.
 
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
-
-mxxspltiw
-Target Undocumented Mask(XXSPLTIW) Var(rs6000_isa_flags)
-Generate (do not generate) XXSPLTIW instructions.
