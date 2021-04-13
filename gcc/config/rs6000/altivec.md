@@ -175,7 +175,6 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
-   UNSPEC_XXBLEND
 ])
 
 (define_c_enum "unspecv"
@@ -215,21 +214,6 @@
 			   V1TI
 			   (KF "FLOAT128_VECTOR_P (KFmode)")
 			   (TF "FLOAT128_VECTOR_P (TFmode)")])
-
-;; Like VM2, just do char, short, int, long, float and double
-(define_mode_iterator VM3 [V4SI
-			   V8HI
-			   V16QI
-			   V4SF
-			   V2DF
-			   V2DI])
-
-(define_mode_attr VM3_char [(V2DI "d")
-			   (V4SI "w")
-			   (V8HI "h")
-			   (V16QI "b")
-			   (V2DF  "d")
-			   (V4SF  "w")])
 
 ;; Map the Vector convert single precision to double precision for integer
 ;; versus floating point
@@ -814,17 +798,6 @@
   "TARGET_POWER10"
   "vs<SLDB_lr>dbi %0,%1,%2,%3"
   [(set_attr "type" "vecsimple")])
-
-(define_insn "xxblend_<mode>"
-  [(set (match_operand:VM3 0 "register_operand" "=wa")
-	(unspec:VM3 [(match_operand:VM3 1 "register_operand" "wa")
-		     (match_operand:VM3 2 "register_operand" "wa")
-		     (match_operand:VM3 3 "register_operand" "wa")]
-		    UNSPEC_XXBLEND))]
-  "TARGET_POWER10"
-  "xxblendv<VM3_char> %x0,%x1,%x2,%x3"
-  [(set_attr "type" "vecsimple")
-   (set_attr "prefixed" "yes")])
 
 (define_expand "vstrir_<mode>"
   [(set (match_operand:VIshort 0 "altivec_register_operand")
