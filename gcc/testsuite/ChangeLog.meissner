@@ -1,3 +1,12 @@
+work047.patch013:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Set optimization level
+	to -O2.  Add missing abort call.  Update insn counts.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+
 work047.patch005:
 2021-04-01  Michael Meissner  <meissner@linux.ibm.com>
 

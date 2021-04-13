@@ -1,3 +1,32 @@
+work047.patch012:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v4si): Move to vsx.md and rewrite.
+	(xxspltiw_v4sf): Move to vsx.md and rewrite.
+	(xxspltiw_v4sf_inst): Delete.
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): If we can use XXSPLTIW, the vector
+	constant is easy.
+	* config/rs6000/rs6000-cpus.def (ISA_3_1_MASKS_SERVER): Add
+	-mxxspltiw support.
+	(POWERPC_MASKS): Add -mxxspltiw support.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltiw support.
+	(xxspltib_constant_p): If we can generate XXSPLTIW, don't generate
+	a XXSPLTIB and an extend instruction.
+	(output_vec_const_move): Add support for XXSPLTIW vector
+	constants.
+	(rs6000_opt_masks): Add -mxxspltiw.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (xxspltiw_v8hi): New insn.
+	(xxspltiw_v4si): Move from altivec.md and reimplement to use
+	VEC_DUPLICATE.
+	(xxspltiw_v4sf): Move from altivec.md and reimplement to use
+	VEC_DUPLICATE.
+	(XXSPLTIW): New mode iterator.
+	(XXSPLTIW splitter): New insn splitter for XXSPLTIW.
+
 work047.patch011:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
 
