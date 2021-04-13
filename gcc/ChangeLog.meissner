@@ -1,3 +1,21 @@
+work047.patch018:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(xxeval): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(xxeval): Move from altivec.md.
+
+work047.patch017:
+2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXPERMX): Move to vsx.md.
+	(xxpermx): Move to vsx.md.
+	(xxpermx_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXPERMX): Move from altivec.md.
+	(xxpermx): Move from altivec.md.
+	(xxpermx_inst): Move from altivec.md.
+
 work047.patch016:
 2021-04-13  Michael Meissner  <meissner@linux.ibm.com>
 
