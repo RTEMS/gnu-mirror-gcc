@@ -6255,7 +6255,7 @@
 
   int r = reg_or_subregno (operands[0]);
   if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
-    return "vspltih %0,%1";
+    return "vspltish %0,%1";
 
   operands[2] = GEN_INT ((uns_value << 16) | uns_value);
   return "xxspltiw %0,%2";
