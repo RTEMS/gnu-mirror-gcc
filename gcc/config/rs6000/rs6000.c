@@ -15922,8 +15922,8 @@ rs6000_emit_vector_cond_expr (rtx dest, rtx op_true, rtx op_false,
   return 1;
 }
 
-/* Possibly emit the xsmaxc{dp,qp} and xsminc{dp,qp} instructions to emit a
-   maximum or minimum with "C" semantics.
+/* Possibly emit the xsmaxcdp and xsmincdp instructions to emit a maximum or
+   minimum with "C" semantics.
 
    Unless you use -ffast-math, you can't use these instructions to replace
    conditions that implicitly reverse the condition because the comparison
@@ -16058,10 +16058,6 @@ have_compare_and_set_mask (machine_mode mode)
     case E_SFmode:
     case E_DFmode:
       return TARGET_P9_MINMAX;
-
-    case E_KFmode:
-    case E_TFmode:
-      return FLOAT128_MIN_MAX_FPMASK_P (mode);
 
     default:
       break;
@@ -16331,8 +16327,7 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
   /* VSX/altivec have direct min/max insns.  */
   if ((code == SMAX || code == SMIN)
       && (VECTOR_UNIT_ALTIVEC_OR_VSX_P (mode)
-	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))
-	  || FLOAT128_MIN_MAX_FPMASK_P (mode)))
+	  || (mode == SFmode && VECTOR_UNIT_VSX_P (DFmode))))
     {
       emit_insn (gen_rtx_SET (dest, gen_rtx_fmt_ee (code, mode, op0, op1)));
       return;
