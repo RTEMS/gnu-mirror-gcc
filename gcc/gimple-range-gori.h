@@ -150,6 +150,7 @@ public:
   bool has_edge_range_p (tree name, edge e = NULL);
   void dump (FILE *f);
 protected:
+  bool may_recompute_p (tree name, edge e = NULL);
   virtual void ssa_range_in_bb (irange &r, tree name, basic_block bb);
   virtual bool compute_operand_range (irange &r, gimple *stmt,
 				      const irange &lhs, tree name,

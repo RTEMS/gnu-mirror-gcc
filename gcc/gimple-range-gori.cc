@@ -979,33 +979,34 @@ gori_compute::compute_logical_operands (irange &true_range, irange &false_range,
 }
 
 
+// Return TRUE if NAME can be recomputed on edge E.
+
+bool
+gori_compute::may_recompute_p (tree name, edge e)
+{
+  tree dep1 = depend1 (name);
+  tree dep2 = depend2 (name);
+
+  // If edge is specified, check if NAME can be recalculated on that edge.
+  if (e)
+    return ((dep1 && is_export_p (dep1, e->src))
+	    || (dep2 && is_export_p (dep2, e->src)));
+
+  return (dep1 && is_export_p (dep1)) || (dep2 && is_export_p (dep2));
+}
+
+
 // Return TRUE if a range can be calcalated for NAME on edge E.
 
 bool
 gori_compute::has_edge_range_p (tree name, edge e)
 {
-  tree dep1 = depend1 (name);
-  tree dep2 = depend2 (name);
 
-  // If no edge is specified, check if NAME is an export on any edge.
-  if (!e)
-    {
-      if (is_export_p (name) || (dep1 && is_export_p (dep1))
-	  || (dep2 && is_export_p (dep2)))
-	return true;
-      return false;
-    }
+  // If edge is specified, check if NAME is an export or recalc on that edge.
+  if (e)
+    return is_export_p (name, e->src) || may_recompute_p (name, e);
+  return is_export_p (name) || may_recompute_p (name);
 
-  if (is_export_p (name, e->src)
-      || def_chain_in_bitmap_p (name, exports (e->src)))
-    return true;
-
-  if (dep1 && is_export_p (dep1, e->src))
-    return true;
-  if (dep2 && is_export_p (dep2, e->src))
-    return true;
-
-  return false;
 }
 
 bool
@@ -1088,16 +1089,8 @@ gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name,
 	}
     }
 
-  if (recalc)
-    {
-      // If any direct dependencies are exported from this block, try to
-      // recompute the result using those values..
-      tree dep1 = depend1 (name);
-      tree dep2 = depend2 (name);
-      if ((dep1 && is_export_p (dep1, e->src))
-	  || (dep2 && is_export_p (dep2, e->src)))
-	return recompute (r, e, name);
-    }
+  if (recalc && may_recompute_p (name, e))
+    return recompute (r, e, name);
 
   return false;
 }
