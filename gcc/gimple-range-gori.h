@@ -224,18 +224,6 @@ private:
        ((name) = iter.get_name ());				\
        iter.next ())
 
-// For each name exported on edge e that calculates a range.
-#define FOR_EACH_GORI_EXPORT_RANGE(gori, e, name, r)		\
-  for (gori_export_iterator iter ((gori).exports ((e)->src));	\
-       ((name) = iter.get_range ((gori), (e), (r)));		\
-       iter.next ())
-
-// For each stmt that resolves to a TRUE or FALSE result on an edge.
-#define FOR_EACH_GORI_EXPORT_COND(gori, e, stmt, r)		\
-  for (gori_cond_iterator iter ((gori), (e));			\
-       ((stmt) = iter.get_stmt ((gori), (e), (r)));		\
-       iter.next ())
-
 // Used to assist with iterating over the GORI export list in various ways
 class gori_export_iterator {
 public:
@@ -247,15 +235,6 @@ protected:
   bitmap bm;
   bitmap_iterator bi;
   unsigned y;
-};
-
-class gori_cond_iterator : public gori_export_iterator
-{
-public:
-  gori_cond_iterator (gori_compute &gori, edge e);
-  gimple *get_stmt (gori_compute &gori, edge e, irange &r);
-protected:
-  gimple *m_stmt;
 };
 
 #endif // GCC_GIMPLE_RANGE_GORI_H
