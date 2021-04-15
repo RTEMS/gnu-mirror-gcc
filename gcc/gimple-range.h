@@ -58,18 +58,8 @@ public:
   void dump (FILE *f);
   void dump_bb (FILE *f, basic_block bb);
 protected:
-  bool calc_stmt (irange &r, gimple *s, tree name = NULL_TREE);
-  bool range_of_range_op (irange &r, gimple *s);
-  bool range_of_call (irange &r, gcall *call);
-  bool range_of_cond_expr (irange &r, gassign* cond);
   ranger_cache m_cache;
 private:
-  bool range_of_phi (irange &r, gphi *phi);
-  bool range_of_address (irange &r, gimple *s);
-  bool range_of_builtin_call (irange &r, gcall *call);
-  bool range_with_loop_info (irange &r, tree name);
-  void range_of_ssa_name_with_loop_info (irange &, tree, class loop *,
-					 gphi *);
 };
 
 // Calculate a basic range for a tree expression.
