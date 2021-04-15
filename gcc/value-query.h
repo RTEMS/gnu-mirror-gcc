@@ -22,6 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_QUERY_H
 #define GCC_QUERY_H
 
+#include "value-relation.h"
+
 // The value_query class is used by optimization passes that require
 // valueizing SSA names in terms of a tree value, but have no neeed
 // for ranges.
@@ -91,15 +93,21 @@ public:
   virtual bool range_on_edge (irange &r, edge, tree name);
   virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL);
 
+  relation_kind query_relation (gimple *s, tree ssa1, tree ssa2,
+				bool get_range = true);
+  relation_kind query_relation (edge e, tree ssa1, tree ssa2,
+				bool get_range = true);
+  inline relation_oracle *oracle () const  { return m_oracle; }
+
   // DEPRECATED: This method is used from vr-values.  The plan is to
   // rewrite all uses of it to the above API.
   virtual const class value_range_equiv *get_value_range (const_tree,
 							  gimple * = NULL);
-
 protected:
   class value_range_equiv *allocate_value_range_equiv ();
   void free_value_range_equiv (class value_range_equiv *);
 
+  class relation_oracle *m_oracle;
 private:
   class equiv_allocator *equiv_alloc;
 };
