@@ -208,6 +208,11 @@
   (and (match_code "const_int")
        (match_test "((- (unsigned HOST_WIDE_INT) ival) + 0x8000) < 0x10000")))
 
+;; SF/DF/V2DF scalar or vector constant that can be loaded with XXSPLTIDP
+(define_constraint "eF"
+  "A vector constant that can be loaded with the XXSPLTIDP instruction."
+  (match_operand 0 "xxspltidp_operand"))
+
 ;; 34-bit signed integer constant
 (define_constraint "eI"
   "A signed 34-bit integer constant if prefixed instructions are supported."
