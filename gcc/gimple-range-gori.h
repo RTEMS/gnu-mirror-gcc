@@ -166,7 +166,7 @@ protected:
 			const irange &op2_true, const irange &op2_false);
   int_range<2> m_bool_zero;           // Boolean false cached.
   int_range<2> m_bool_one;            // Boolean true cached.
-  outgoing_range outgoing;	// Edge values for COND_EXPR & SWITCH_EXPR.
+  gimple_outgoing_range m_edge_const_range;
 
 private:
   bool recompute (irange &r, edge e, tree name);

@@ -1082,7 +1082,7 @@ gori_compute::outgoing_edge_range_p (irange &r, edge e, tree name,
 
   gcc_checking_assert (gimple_range_ssa_p (name));
   // Determine if there is an outgoing edge.
-  gimple *stmt = outgoing.edge_range_p (lhs, e);
+  gimple *stmt = m_edge_const_range.edge_range_p (lhs, e);
   if (!stmt)
     return false;
 

@@ -47,6 +47,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "vr-values.h"
 #include "gimple-range.h"
 #include "value-relation.h"
+#include "gimple-range-fold.h"
 
 
 // Adjust the range for a pointer difference where the operands came
@@ -359,10 +360,21 @@ gimple_range_calc_op2 (irange &r, const gimple *stmt,
 						 op1_range);
 }
 
-// Calculate a range for statement S and return it in R. If NAME is provided it
-// represents the SSA_NAME on the LHS of the statement. It is only required
-// if there is more than one lhs/output.  If a range cannot
-// be calculated, return false.
+
+gimple_ranger::gimple_ranger () : m_cache (*this)
+{
+  if (dom_info_available_p (CDI_DOMINATORS))
+    m_oracle = new relation_oracle ();
+  else
+    m_oracle = NULL;
+}
+
+
+gimple_ranger::~gimple_ranger ()
+{
+  if (m_oracle)
+    delete m_oracle;
+}
 
 bool
 gimple_ranger::calc_stmt (irange &r, gimple *s, tree name)
@@ -441,13 +453,13 @@ gimple_ranger::range_of_range_op (irange &r, gimple *s)
       if (!op2)
 	{
 	  gimple_range_fold (r, s, range1);
-	  m_cache.process_relations (s, r, op1, range1);
+//	  m_cache.process_relations (s, r, op1, range1);
 	  return true;
 	}
 
       if (range_of_expr (range2, op2, s))
 	{
-	  relation_kind rel = m_cache.query_relation (s, op1, op2);
+	  relation_kind rel = query_relation (s, op1, op2, false);
 	  if (dump_file && (dump_flags & TDF_DETAILS) && rel != VREL_NONE)
 	    {
 	      fprintf (dump_file, " folding with relation ");
@@ -455,7 +467,7 @@ gimple_ranger::range_of_range_op (irange &r, gimple *s)
 	      fputc ('\n', dump_file);
 	    }
 	  gimple_range_fold (r, s, range1, range2, rel);
-	  m_cache.process_relations (s, r, op1, range1, op2, range2);
+//	  m_cache.process_relations (s, r, op1, range1, op2, range2);
 	  return true;
 	}
     }
@@ -1054,6 +1066,15 @@ gimple_ranger::range_on_edge (irange &r, edge e, tree name)
   return true;
 }
 
+// fold wrapper for range_of_stmt to use.
+static inline bool
+fold_range (range_query &q, gori_compute *g, irange &r, gimple *s, tree name)
+{
+  fold_using_range f;
+  op_source src (q, g, NULL, s);
+  return f.fold_stmt (r, s, src, name);
+}
+
 // Calculate a range for statement S and return it in R.  If NAME is
 // provided it represents the SSA_NAME on the LHS of the statement.
 // It is only required if there is more than one lhs/output.  Check
@@ -1070,7 +1091,7 @@ gimple_ranger::range_of_stmt (irange &r, gimple *s, tree name)
 
   // If no name, simply call the base routine.
   if (!name)
-    return calc_stmt (r, s, NULL_TREE);
+    return fold_range (*this, &m_cache, r, s, NULL_TREE);
 
   if (!gimple_range_ssa_p (name))
     return false;
@@ -1081,7 +1102,7 @@ gimple_ranger::range_of_stmt (irange &r, gimple *s, tree name)
 
   // Otherwise calculate a new value.
   int_range_max tmp;
-  calc_stmt (tmp, s, name);
+  fold_range (*this, &m_cache, tmp ,s, name);
 
   // Combine the new value with the old value.  This is required because
   // the way value propagation works, when the IL changes on the fly we
