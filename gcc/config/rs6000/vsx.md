@@ -271,19 +271,6 @@
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
 (define_mode_iterator VIlong [V2DI V4SI])
 
-;; Modes for XXBLEND
-(define_mode_iterator VBLEND [V16QI V8HI V4SI V4SF V2DF V2DI])
-
-;; XXBLEND type
-(define_mode_attr VBLEND_char [(V16QI "b")
-			       (V8HI  "h")
-			       (V4SI  "w")
-			       (V4SF  "w")
-			       (V2DF  "d")
-			       (V2DI  "d")])
-
-
-
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -387,7 +374,6 @@
    UNSPEC_XXSPLTI32DX_CONST
    UNSPEC_XXPERMX
    UNSPEC_XXEVAL
-   UNSPEC_XXBLEND
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -6536,15 +6522,3 @@
    "xxeval %0,%1,%2,%3,%4"
    [(set_attr "type" "vecperm")
     (set_attr "prefixed" "yes")])
-
-;; XXBLEND built-in function support.
-(define_insn "xxblend_<mode>"
-  [(set (match_operand:VBLEND 0 "vsx_register_operand" "=wa")
-	(unspec:VBLEND [(match_operand:VBLEND 1 "vsx_register_operand" "wa")
-			(match_operand:VBLEND 2 "vsx_register_operand" "wa")
-			(match_operand:VBLEND 3 "vsx_register_operand" "wa")]
-		       UNSPEC_XXBLEND))]
-  "TARGET_POWER10"
-  "xxblendv<Blenc_char> %x0,%x1,%x2,%x3"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
