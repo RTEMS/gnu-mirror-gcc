@@ -1,14 +1,13 @@
 work048.patch019:
-2021-04-15  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-19  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXBLEND): Move to vsx.md.
-	(VM3): Move to vsx.md and rename to VBLEND.
-	(VM3_char): Move to vsx.md and rename to VBLEND_char.
+	(VM3): Move to vsx.md.
+	(VM3_char): Move to vsx.md.
 	(xxblend_<mode>): Move to vsx.md.
 	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
-	(VBLEND): Move from altivec.md and rename VM3 to VBLEND.
-	(VBLEND_char): Move from altivec.md and rename VM3_char to
-	VBLEND_char.
+	(VM3): Move from altivec.md.
+	(VM3_char): Move from altivec.md.
 	(xxblend_<mode>): Move from altivec.md.  Use vsx_register_operand
 	instead of register operand.  Change the insn type from vecsimple
 	to vecperm.
