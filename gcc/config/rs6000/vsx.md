@@ -6216,3 +6216,71 @@
   "TARGET_POWER10"
   "vmulld %0,%1,%2"
   [(set_attr "type" "veccomplex")])
+
+
+;; XXSPLTIW support
+(define_insn "*xxspltiw_v8hi"
+  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
+	(vec_duplicate:V8HI
+	 (match_operand:HI 1 "const_int_operand" "O,wM,wB,n")))]
+ "TARGET_XXSPLTIW"
+{
+  HOST_WIDE_INT uns_value = INTVAL (operands[1]) & 0xffff;
+  HOST_WIDE_INT sign_value = (uns_value ^ 0x8000) - 0x8000;
+
+  if (sign_value == 0)
+    return "xxspltib %x0,0";
+
+  if (sign_value == -1)
+    return "xxspltib %x0,255";
+
+  int r = reg_or_subregno (operands[0]);
+  if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
+    return "vspltish %0,%1";
+
+  operands[2] = GEN_INT ((uns_value << 16) | uns_value);
+  return "xxspltiw %0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,*,*,yes")])
+
+(define_insn "xxspltiw_v4si"
+  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
+	(vec_duplicate:V4SI
+	 (match_operand:SI 1 "s32bit_cint_operand" "O,wM,wB,n")))]
+ "TARGET_XXSPLTIW"
+ "@
+  xxspltib %x0,0
+  xxspltib %x0,255
+  vspltisw %0,%1
+  xxspltiw %x0,%1"
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,*,*,yes")])
+
+(define_insn "xxspltiw_v4sf"
+  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa")
+	(vec_duplicate:V4SF
+	 (match_operand:SF 1 "const_double_operand" "O,F")))]
+ "TARGET_XXSPLTIW"
+{
+  if (operands[1] == CONST0_RTX (SFmode))
+    return "xxspltib %x0,0";
+
+  operands[2] = GEN_INT (rs6000_const_f32_to_i32 (operands[1]));
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "*,yes")])
+
+(define_mode_iterator XXSPLTIW [V8HI V4SI V4SF])
+
+(define_split
+  [(set (match_operand:XXSPLTIW 0 "vsx_register_operand")
+	(match_operand:XXSPLTIW 1 "xxspltiw_operand"))]
+  "TARGET_XXSPLTIW"
+  [(set (match_dup 0)
+	(vec_duplicate:<MODE> (match_dup 2)))]
+{
+  operands[2] = CONST_VECTOR_ELT (operands[1], 0);
+})
+
