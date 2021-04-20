@@ -369,6 +369,7 @@
    UNSPEC_REPLACE_UN
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
+   UNSPEC_XXSPLTIDP
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -6284,3 +6285,44 @@
   operands[2] = CONST_VECTOR_ELT (operands[1], 0);
 })
 
+;; XXSPLTIDP support.
+(define_mode_iterator XXSPLTIDP [SF DF V2DF])
+
+(define_insn_and_split "*xxspltidp_<mode>_internal1"
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand" "=wa")
+	(match_operand:XXSPLTIDP 1 "xxspltidp_operand"))]
+  "TARGET_XXSPLTIDP"
+  "#"
+  "&& 1"
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand")
+	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
+{
+  HOST_WIDE_INT value = 0;
+
+  if (!xxspltidp_constant_p (operands[1], <MODE>mode, &value))
+    gcc_unreachable ();
+
+  operands[2] = GEN_INT (value);
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "yes")])
+
+(define_insn "xxspltidp_<mode>_internal2"
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand" "=wa")
+	(unspec:XXSPLTIDP [(match_operand 1 "const_int_operand" "n")]
+			  UNSPEC_XXSPLTIDP))]
+  "TARGET_XXSPLTIDP"
+  "xxspltidp %x0,%1"
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "yes")])
+
+;; XXSPLTIDP built-in function support.
+(define_expand "xxspltidp_v2df"
+  [(use (match_operand:V2DF 0 "register_operand" ))
+   (use (match_operand:SF 1 "const_double_operand"))]
+ "TARGET_POWER10"
+{
+  long value = rs6000_const_f32_to_i32 (operands[1]);
+  rs6000_emit_xxspltidp_v2df (operands[0], value);
+  DONE;
+})
