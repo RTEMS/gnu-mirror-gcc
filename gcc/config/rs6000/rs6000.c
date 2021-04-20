@@ -4481,6 +4481,9 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (TARGET_POWER10 && TARGET_VSX)
     {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTI32DX) == 0)
+	rs6000_isa_flags |= OPTION_MASK_XXSPLTI32DX;
+
       if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
 
@@ -4488,7 +4491,9 @@ rs6000_option_override_internal (bool global_init_p)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
     }
   else
-    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW | OPTION_MASK_XXSPLTIDP);
+    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW
+			  | OPTION_MASK_XXSPLTIDP
+			  | OPTION_MASK_XXSPLTI32DX);
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
@@ -6549,6 +6554,128 @@ xxspltidp_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTI32DX instruction.  If the instruction can be synthesized with
+   XXSPLTIDP or is 0/-1, return false.
+
+   Return the 64-bit constant to use in the two XXSPLTI32DX instructions via
+   CONSTANT_PTR.  */
+
+bool
+xxsplti32dx_constant_p (rtx op,
+			machine_mode mode,
+			HOST_WIDE_INT *constant_ptr)
+{
+  *constant_ptr = 0;
+
+  if (!TARGET_XXSPLTI32DX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (op == CONST0_RTX (mode))
+    return false;
+
+  rtx element = op;
+  if (mode == V2DFmode || mode == V2DImode)
+    {
+      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
+      if (GET_CODE (op) == VEC_DUPLICATE)
+	element = XEXP (op, 0);
+
+      else if (GET_CODE (op) == CONST_VECTOR)
+       {
+         element = CONST_VECTOR_ELT (op, 0);
+         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+           return false;
+       }
+
+      else
+       return false;
+
+      mode = GET_MODE_INNER (mode);
+    }
+
+  else if (mode == V4SImode || mode == V4SFmode)
+    {
+      /* For V4SI/V4SF, the XXSPLTI32DX instruction pair can represent vectors
+	 where the two even elements are equal and the two odd elements are
+	 equal.  */
+      if (GET_CODE (op) != CONST_VECTOR)
+	return false;
+
+      rtx op0 = CONST_VECTOR_ELT (op, 0);
+      if (!rtx_equal_p (op0, CONST_VECTOR_ELT (op, 2)))
+	return false;
+
+      rtx op1 = CONST_VECTOR_ELT (op, 1);
+      if (!rtx_equal_p (op1, CONST_VECTOR_ELT (op, 3)))
+	return false;
+
+      if (rtx_equal_p (op0, op1))
+	return false;
+
+      long op0_value;
+      long op1_value;
+      if (mode == V4SImode)
+	{
+	  op0_value = INTVAL (op0);
+	  op1_value = INTVAL (op1);
+	}
+      else
+	{
+	  op0_value = rs6000_const_f32_to_i32 (op0);
+	  op1_value = rs6000_const_f32_to_i32 (op1);
+	}
+
+      *constant_ptr = (op0_value << 32) | (op1_value & 0xffffffff);
+      return true;
+    }
+
+  if (GET_MODE (element) != mode)
+    return false;
+
+  /* Handle floating point constants.  */
+  if (mode == SFmode || mode == DFmode)
+    {
+      HOST_WIDE_INT xxspltidp_value = 0;
+
+      if (!CONST_DOUBLE_P (element))
+	return false;
+
+      if (xxspltidp_constant_p (element, mode, &xxspltidp_value))
+	return false;
+
+      long high_low[2];
+      const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
+      REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
+
+      if (!BYTES_BIG_ENDIAN)
+	std::swap (high_low[0], high_low[1]);
+
+      *constant_ptr = (high_low[0] << 32) | (high_low[1] & 0xffffffff);
+      return true;
+    }
+
+  /* Handle integer constants.  */
+  else if (mode == DImode)
+    {
+      if (!CONST_INT_P (element))
+	return false;
+
+      HOST_WIDE_INT value = INTVAL (element);
+      if (value == -1)
+	return false;
+
+      *constant_ptr = value;
+      return true;
+    }
+
+  else
+    return false;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6595,6 +6722,9 @@ output_vec_const_move (rtx *operands)
 
       if (xxspltiw_operand (vec, mode)
 	  || xxspltidp_operand (vec, mode))
+	return "#";
+
+      if (xxsplti32dx_operand (vec, mode))
 	return "#";
 
       if (TARGET_P9_VECTOR
@@ -24124,6 +24254,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
+  { "xxsplti32dx",		OPTION_MASK_XXSPLTI32DX,	false, true  },
   { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
   { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
