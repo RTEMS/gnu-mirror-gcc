@@ -1,5 +1,7 @@
-/* { dg-do run { target { powerpc*-*-linux* powerpc*-*-darwin* powerpc*-*-aix* rs6000-*-* } } } */
-/* { dg-options "-std=c99 -mlong-double-128 -O2" } */
+/* { dg-do run } */
+/* { dg-require-effective-target ppc_long_double_override_ibm128 } */
+/* { dg-options "-std=c99 -O2" } */
+/* { dg-add-options ppc_long_double_override_ibm128 } */
 
 #include <float.h>
 
