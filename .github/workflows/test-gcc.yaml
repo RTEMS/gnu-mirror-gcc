@@ -110,4 +110,13 @@ jobs:
           testSet: ${{ matrix.testSet }}
           githubtoken: ${{ secrets.GITHUB_TOKEN }}
           buildDownloaded: False
+
+      - name: Move objdir to be in repo so logs inside can be uploaded
+        run: mv ../objdir objdir
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.testSet }}_logs
+          path: objdir/logs
       

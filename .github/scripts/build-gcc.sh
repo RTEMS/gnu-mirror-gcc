@@ -1,6 +1,6 @@
 
 cd ../objdir
-$PWD/../gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++
+$PWD/../gcc/configure --prefix=$HOME/GCC --enable-languages=c,c++,fortran
 
 exit_code=$?
 if [ $exit_code != 0 ]; then

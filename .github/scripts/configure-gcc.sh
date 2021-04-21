@@ -1,7 +1,7 @@
 sudo apt update
 
 # Install gcc 7 and g++ 7
-sudo apt-get install gcc-7 g++-7 g++-7-multilib libstdc++-7-doc  binutils-doc build-essential cpp-doc gcc-7-doc libstdc++6-7-dbg lib32stdc++6-7-dbg libx32stdc++6-7-dbg make autoconf automake libtool flex bison gdb gcc-doc libgcc1-dbg libgomp1-dbg libitm1-dbg libatomic1-dbg libasan4-dbg liblsan0-dbg libtsan0-dbg libubsan0-dbg libcilkrts5-dbg libmpx2-dbg libquadmath0-dbg glibc-doc python
+sudo apt-get install gcc-7 g++-7 g++-7-multilib libstdc++-7-doc  binutils-doc build-essential cpp-doc gcc-7-doc libstdc++6-7-dbg lib32stdc++6-7-dbg libx32stdc++6-7-dbg make autoconf automake libtool flex bison gdb gawk gcc-doc gfortran libgfortran3 libgcc1-dbg libgomp1-dbg libitm1-dbg libatomic1-dbg libasan4-dbg liblsan0-dbg libtsan0-dbg libubsan0-dbg libcilkrts5-dbg libmpx2-dbg libquadmath0-dbg glibc-doc python -y
 
 # Redirect gcc and g++ to the installed versions
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 
