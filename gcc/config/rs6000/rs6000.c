@@ -4479,17 +4479,6 @@ rs6000_option_override_internal (bool global_init_p)
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
-  if (TARGET_POWER10 && TARGET_VSX)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
-	rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
-
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
-	rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
-    }
-  else
-    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW | OPTION_MASK_XXSPLTIDP);
-
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -6459,11 +6448,9 @@ xxspltib_constant_p (rtx op,
 
   /* See if we could generate vspltisw/vspltish directly instead of xxspltib +
      sign extend.  Special case 0/-1 to allow getting any VSX register instead
-     of an Altivec register.  Also if we can generate a XXSPLTIW instruction,
-     don't emit a XXSPLTIB and an extend instruction.  */
-  if ((mode == V4SImode || mode == V8HImode)
-      && !IN_RANGE (value, -1, 0)
-      && (EASY_VECTOR_15 (value) || TARGET_XXSPLTIW))
+     of an Altivec register.  */
+  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0)
+      && EASY_VECTOR_15 (value))
     return false;
 
   /* Return # of instructions and the constant byte for XXSPLTIB.  */
@@ -6477,75 +6464,6 @@ xxspltib_constant_p (rtx op,
     *num_insns_ptr = 2;
 
   *constant_ptr = (int) value;
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIDP instruction.
-
-   Return the constant that is being split via CONSTANT_PTR to use in the
-   XXSPLTIDP instruction.  */
-
-bool
-xxspltidp_constant_p (rtx op,
-		      machine_mode mode,
-		      HOST_WIDE_INT *constant_ptr)
-{
-  *constant_ptr = 0;
-
-  if (!TARGET_XXSPLTIDP)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  rtx element = op;
-  if (mode == V2DFmode)
-    {
-      /* Handle VEC_DUPLICATE and CONST_VECTOR.  */
-      if (GET_CODE (op) == VEC_DUPLICATE)
-       element = XEXP (op, 0);
-
-      else if (GET_CODE (op) == CONST_VECTOR)
-       {
-         element = CONST_VECTOR_ELT (op, 0);
-         if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
-           return false;
-       }
-
-      else
-       return false;
-
-      mode = DFmode;
-    }
-
-  if (mode != SFmode && mode != DFmode)
-    return false;
-
-  if (GET_MODE (element) != mode)
-    return false;
-
-  if (!CONST_DOUBLE_P (element))
-    return false;
-
-  /* Don't return true for 0.0 since that is easy to create without
-     XXSPLTIDP.  */
-  if (element == CONST0_RTX (mode))
-    return false;
-
-  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  long value;
-  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
-
-  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
-  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
-    return false;
-
-  *constant_ptr = value;
   return true;
 }
 
@@ -6592,10 +6510,6 @@ output_vec_const_move (rtx *operands)
 	  else
 	    gcc_unreachable ();
 	}
-
-      if (xxspltiw_operand (vec, mode)
-	  || xxspltidp_operand (vec, mode))
-	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -24124,8 +24038,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
-  { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
-  { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
@@ -27951,7 +27863,7 @@ rs6000_emit_xxspltidp_v2df (rtx dst, long value)
     inform (input_location,
 	    "the result for the xxspltidp instruction "
 	    "is undefined for subnormal input values");
-  emit_insn( gen_xxspltidp_v2df_internal2 (dst, GEN_INT (value)));
+  emit_insn( gen_xxspltidp_v2df_inst (dst, GEN_INT (value)));
 }
 
 /* Implement TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC.  */
