@@ -1,5 +1,5 @@
 work049.patch016:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splati-runnable.c: Update insn count.
 	* gcc.target/powerpc/vec-splat-constant-sf.c: Update insn count.
@@ -8,14 +8,14 @@ work049.patch016:
 	count.
 
 work049.patch015:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
 
 work049.patch013:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splati-runnable.c: Set optimization level
 	to -O2.  Add missing abort call.  Update insn counts.

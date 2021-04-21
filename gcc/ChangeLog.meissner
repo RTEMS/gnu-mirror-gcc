@@ -1,5 +1,5 @@
 work049.patch019:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXBLEND): Move to vsx.md.
 	(VM3): Move to vsx.md.
@@ -13,7 +13,7 @@ work049.patch019:
 	to vecperm.
 
 work049.patch018:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
 	(xxeval): Move to vsx.md.
@@ -22,7 +22,7 @@ work049.patch018:
 	to vsx_register_operand.  Change insn type to vecperm.
 
 work049.patch017:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXPERMX): Move to vsx.md.
 	(xxpermx): Move to vsx.md.
@@ -36,7 +36,7 @@ work049.patch017:
 	"wa" to match the instruction.  Change insn type to vecperm.
 
 work049.patch016:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.me (UNSPEC_XXSPLTI32DX): Move to vsx.md.
 	(xxsplti32dx_v4si): Move to vsx.md.
@@ -83,7 +83,7 @@ work049.patch016:
 	(xxsplti32dx_v4sf_inst): Move here from altivec.md.
 
 work049.patch014:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXSPLTID): Move to vsx.md and
 	rename to UNSPEC_XXSPLTID.
@@ -122,7 +122,7 @@ work049.patch014:
 	use the new constant format.
 
 work049.patch012:
-2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/altivec.md (UNSPEC_XXSPLTIW): Delete.
 	(xxspltiw_v4si): Move to vsx.md and rewrite.
@@ -215,4 +215,3 @@ work049.patch001:
 2021-04-20   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
