@@ -886,13 +886,22 @@ fold_using_range::range_of_ssa_name_with_loop_info (irange &r, tree name,
   tree min, max, type = TREE_TYPE (name);
   if (bounds_of_var_in_loop (&min, &max, &(src.m_query), l, phi, name))
     {
-      // ?? We could do better here.  Since MIN/MAX can only be an
-      // SSA, SSA +- INTEGER_CST, or INTEGER_CST, we could easily call
-      // the ranger and solve anything not an integer.
       if (TREE_CODE (min) != INTEGER_CST)
-	min = vrp_val_min (type);
+	{
+	  src.m_query.range_of_expr (r, min, phi);
+	  if (r.undefined_p ())
+	    min = vrp_val_min (type);
+	  else
+	    min = wide_int_to_tree (type, r.lower_bound ());
+	}
       if (TREE_CODE (max) != INTEGER_CST)
-	max = vrp_val_max (type);
+	{
+	  src.m_query.range_of_expr (r, max, phi);
+	  if (r.undefined_p ())
+	    max = vrp_val_max (type);
+	  else
+	    max = wide_int_to_tree (type, r.upper_bound ());
+	}
       r.set (min, max);
     }
   else
