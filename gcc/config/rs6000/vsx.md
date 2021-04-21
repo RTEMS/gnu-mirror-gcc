@@ -271,6 +271,21 @@
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
 (define_mode_iterator VIlong [V2DI V4SI])
 
+;; Like VM2 in altivec.md, just do char, short, int, long, float and double
+(define_mode_iterator VM3 [V4SI
+			   V8HI
+			   V16QI
+			   V4SF
+			   V2DF
+			   V2DI])
+
+(define_mode_attr VM3_char [(V2DI "d")
+			   (V4SI "w")
+			   (V8HI "h")
+			   (V16QI "b")
+			   (V2DF  "d")
+			   (V4SF  "w")])
+
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -373,6 +388,7 @@
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXPERMX
    UNSPEC_XXEVAL
+   UNSPEC_XXBLEND
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -6447,3 +6463,15 @@
    "xxeval %0,%1,%2,%3,%4"
    [(set_attr "type" "vecperm")
     (set_attr "prefixed" "yes")])
+
+;; XXBLEND support.
+(define_insn "xxblend_<mode>"
+  [(set (match_operand:VM3 0 "vsx_register_operand" "=wa")
+	(unspec:VM3 [(match_operand:VM3 1 "vsx_register_operand" "wa")
+		     (match_operand:VM3 2 "vsx_register_operand" "wa")
+		     (match_operand:VM3 3 "vsx_register_operand" "wa")]
+		    UNSPEC_XXBLEND))]
+  "TARGET_POWER10"
+  "xxblendv<VM3_char> %x0,%x1,%x2,%x3"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
