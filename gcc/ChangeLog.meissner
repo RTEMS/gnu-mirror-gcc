@@ -1,3 +1,33 @@
+work049.patch021:
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with XXSPLTI32DX, it is easy.
+	(xxsplti32dx_operand): New predicate.
+	(easy_vector_constant): If the constant can be loaded with
+	XXSPLTI32DX, it is easy.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mxxsplti32dx.
+	(+xxsplti32dx_constant_p): New function.
+	(output_vec_const_move): If the operand can be loaded with
+	XXSPLTI32DX, split it.
+	(rs6000_opt_masks): Add -mxxsplti32dx.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat64, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New option.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(XXSPLTI32DX): New mode iterator.
+	(xxsplti32dx_<mode>): New insn and splitter for XXSPLTI32DX.
+	(xxsplti32dx_<mode>_first): New insn.
+	(xxsplti32dx_<mode>_second): New insn.
+
 work049.patch019:
 2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
@@ -38,49 +68,17 @@ work049.patch017:
 work049.patch016:
 2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/altivec.me (UNSPEC_XXSPLTI32DX): Move to vsx.md.
+	* config/rs6000/altivec.md (UNSPEC_XXSPLTI32DX): Move to vsx.md.
 	(xxsplti32dx_v4si): Move to vsx.md.
 	(xxsplti32dx_v4si_inst): Move to vsx.md.
 	(xxsplti32dx_v4sf): Move to vsx.md.
 	(xxsplti32dx_v4sf_inst): Move to vsx.md.
-	* config/rs6000/contraints.md (eD): New constraint.
-	* config/rs6000/predicates.md (easy_fp_constant): If we can load
-	the constant with a pair of XXSPLTI32DX instructions, it is easy.
-	(xxsplti32dx_operand): New predicate.
-	(easy_vector_constant): If we can load the constant with a pair of
-	XXSPLTI32DX instructions, it is easy.
-	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
-	-mxxsplti32dx.
-	(POWERPC_MASKS): Add -mxxsplti32dx.
-	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
-	declaration.
-	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
-	-mxxsplti32dx support.
-	(xxsplti32dx_constant_p): New helper function.
-	(output_vec_const_move): Split constants that need XXSPLTI32DX.
-	(rs6000_opt_masks): Add -mxxsplti32dx.
-	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
-	loading constants with XXSPLTI32DX.
-	(mov<mode>_hardfloat32, FMOVE64 iterator): Add support for loading
-	constants with XXSPLTI32DX.
-	(mov<mode>_hardfloat64, FMOVE64 iterator): Add support for loading
-	constants with XXSPLTI32DX.
-	* config/rs6000/rs6000.opt (-mxxsplti32dx): New switch.
-	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX): Move unspec here from
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX): Move from
 	altivec.md.
-	(UNSPEC_XXSPLTI32DX_CONST): New unspec.
-	(vsx_mov<mode>_64bit): Bump up size of 'W' vector constants to
-	accomidate a pair of XXSPLTI32DX instructions.
-	(vsx_mov<mode>_32bit): Bump up size of 'W' vector constants to
-	accomidate a pair of XXSPLTI32DX instructions.
-	(XXSPLTI32DX): New mode iterator.
-	(xxsplti32dx_<mode>): New insn and splits.
-	(xxsplti32dx_<mode>_first): New insns.
-	(xxsplti32dx_<mode>_second): New insns.
-	(xxsplti32dx_v4si): Move here from altivec.md.
-	(xxsplti32dx_v4si_inst): Move here from altivec.md.
-	(xxsplti32dx_v4sf): Move here from altivec.md.
-	(xxsplti32dx_v4sf_inst): Move here from altivec.md.
+	(xxsplti32dx_v4si): Move from altivec.md.
+	(xxsplti32dx_v4si_inst): Move from altivec_md.
+	(xxsplti32dx_v4sf): Move from altivec.md.
+	(xxsplti32dx_v4sf_inst): Move from altivec.md.
 
 work049.patch014:
 2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
