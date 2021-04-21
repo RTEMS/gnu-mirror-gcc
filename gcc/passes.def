@@ -209,6 +209,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_fre, true /* may_iterate */);
       NEXT_PASS (pass_merge_phi);
       NEXT_PASS (pass_thread_jumps);
+      NEXT_PASS (pass_late_evrp);
       NEXT_PASS (pass_vrp, true /* warn_array_bounds_p */);
       NEXT_PASS (pass_dce);
       NEXT_PASS (pass_stdarg);
@@ -330,6 +331,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_dominator, false /* may_peel_loop_headers_p */);
       NEXT_PASS (pass_strlen);
       NEXT_PASS (pass_thread_jumps);
+      NEXT_PASS (pass_late_evrp);
       NEXT_PASS (pass_vrp, false /* warn_array_bounds_p */);
       /* Threading can leave many const/copy propagations in the IL.
 	 Clean them up.  */

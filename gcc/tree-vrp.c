@@ -4142,15 +4142,73 @@ vrp_folder::fold_predicate_in (gimple_stmt_iterator *si)
   return false;
 }
 
+static void
+dump_folded_conditional_context (gimple *stmt,
+				 tree lhs, irange &lhs_range,
+				 tree rhs, irange &rhs_range)
+{
+  if (cfun && cfun->decl)
+    {
+      fprintf (dump_file, "\nFUNCTION: ");
+      print_generic_expr (dump_file, cfun->decl);
+      fprintf (dump_file, "\n");
+    }
+
+  basic_block bb = gimple_bb (stmt);
+  dump_bb (dump_file, bb, 0, TDF_DETAILS);
+
+  fprintf (dump_file, "\tlhs = ");
+  print_generic_expr (dump_file, lhs);
+  fprintf (dump_file, ": ");
+  lhs_range.dump (dump_file);
+  fprintf (dump_file, "\n");
+
+  fprintf (dump_file, "\trhs = ");
+  print_generic_expr (dump_file, rhs);
+  fprintf (dump_file, ": ");
+  rhs_range.dump (dump_file);
+  fprintf (dump_file, "\n");
+}
+
+bool
+folded_cond_p (gimple *stmt)
+{
+  if (is_a<gcond *> (stmt))
+    return (TREE_CODE (gimple_cond_lhs (stmt)) == INTEGER_CST
+	    && TREE_CODE (gimple_cond_rhs (stmt)) == INTEGER_CST);
+  return false;
+}
+
 /* Callback for substitute_and_fold folding the stmt at *SI.  */
 
 bool
 vrp_folder::fold_stmt (gimple_stmt_iterator *si)
 {
-  if (fold_predicate_in (si))
-    return true;
+  gimple *stmt = gsi_stmt (*si);
+  tree lhs = NULL, rhs = NULL;
+  value_range lhs_range, rhs_range;
 
-  return simplifier.simplify (si);
+  if (dump_file && is_a<gcond *> (stmt))
+    {
+      lhs = gimple_cond_lhs (stmt);
+      rhs = gimple_cond_rhs (stmt);
+      m_vr_values->range_of_expr (lhs_range, lhs, NULL);
+      m_vr_values->range_of_expr (rhs_range, rhs, NULL);
+    }
+
+  bool ret = false;
+  if (fold_predicate_in (si))
+    ret = true;
+  else
+    ret = simplifier.simplify (si);
+
+  if (dump_file && ret && folded_cond_p (stmt))
+    {
+      if (param_evrp_mode == EVRP_MODE_RVRP_ONLY)
+	dump_folded_conditional_context (stmt, lhs, lhs_range, rhs, rhs_range);
+      fprintf (dump_file, "XXFOLDED CONDITIONAL\n");
+    }
+  return ret;
 }
 
 class vrp_jump_threader_simplifier : public jump_threader_simplifier

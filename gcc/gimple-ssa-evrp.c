@@ -474,7 +474,15 @@ public:
 
   bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
   {
-    return m_simplifier.simplify (gsi);
+    bool ret = m_simplifier.simplify (gsi);
+    if (dump_file && ret)
+      {
+	extern bool folded_cond_p (gimple *);
+	gimple *stmt = gsi_stmt (*gsi);
+	if (folded_cond_p (stmt))
+	  fprintf (dump_file, "XXFOLDED CONDITIONAL\n");
+      }
+    return ret;
   }
 
 private:
@@ -742,6 +750,19 @@ const pass_data pass_data_early_vrp =
   ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
 };
 
+const pass_data pass_data_late_evrp =
+{
+  GIMPLE_PASS, /* type */
+  "late-evrp", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_EARLY_VRP, /* tv_id */
+  PROP_ssa, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
+};
+
 class pass_early_vrp : public gimple_opt_pass
 {
 public:
@@ -759,10 +780,44 @@ public:
     { return execute_early_vrp (); }
 
 }; // class pass_vrp
+
+// This is a different class than pass_late_evrp so -fdisable-tree-evrp works in
+// tests, instead of having to specify -fdisable-tree-evrp1.
+//
+// These passes are disabled by default and must be explicitly enabled with
+// -fenable-tree-late-evrp[12] that match their -ftree-vrp[12] counterparts.
+class pass_late_evrp : public gimple_opt_pass
+{
+public:
+  pass_late_evrp (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_late_evrp, ctxt)
+    {}
+
+  virtual opt_pass * clone () OVERRIDE
+  {
+    return new pass_late_evrp (m_ctxt);
+  }
+  virtual bool gate (function *) OVERRIDE
+    {
+      // Must be explicitly enabled with -fenable-tree-late-evrp[12].
+      return 0;
+    }
+  virtual unsigned int execute (function *) OVERRIDE
+    {
+      return execute_early_vrp ();
+    }
+};
+
 } // anon namespace
 
 gimple_opt_pass *
 make_pass_early_vrp (gcc::context *ctxt)
 {
   return new pass_early_vrp (ctxt);
+}
+
+gimple_opt_pass *
+make_pass_late_evrp (gcc::context *ctxt)
+{
+  return new pass_late_evrp (ctxt);
 }
