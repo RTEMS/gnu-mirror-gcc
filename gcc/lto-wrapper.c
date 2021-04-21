@@ -1285,7 +1285,11 @@ run_gcc (unsigned argc, char *argv[])
   static char current_dir[] = { '.', DIR_SEPARATOR, '\0' };
 
   /* Number of CPUs that can be used for parallel LTRANS phase.  */
-  unsigned long nthreads_var = std::thread::hardware_concurrency ();
+  unsigned long nthreads_var = 0;
+
+#ifdef _GLIBCXX_HAS_GTHREADS
+  nthreads_var = std::thread::hardware_concurrency ();
+#endif
 
   /* Get the driver and options.  */
   collect_gcc = getenv ("COLLECT_GCC");
