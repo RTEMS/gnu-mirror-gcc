@@ -271,21 +271,6 @@
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
 (define_mode_iterator VIlong [V2DI V4SI])
 
-;; Like VM2 in altivec.md, just do char, short, int, long, float and double
-(define_mode_iterator VM3 [V4SI
-			   V8HI
-			   V16QI
-			   V4SF
-			   V2DF
-			   V2DI])
-
-(define_mode_attr VM3_char [(V2DI "d")
-			   (V4SI "w")
-			   (V8HI "h")
-			   (V16QI "b")
-			   (V2DF  "d")
-			   (V4SF  "w")])
-
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -385,11 +370,6 @@
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
    UNSPEC_XXSPLTIDP
-   UNSPEC_XXSPLTI32DX
-   UNSPEC_XXSPLTI32DX_CONST
-   UNSPEC_XXPERMX
-   UNSPEC_XXEVAL
-   UNSPEC_XXBLEND
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -1213,7 +1193,7 @@
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         6,         2,         *,         *")
+                *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
@@ -1221,7 +1201,7 @@
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
-                *,         24,        8,         *,         *")
+                *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
@@ -1253,7 +1233,7 @@
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
-                *,         *,         *,         24,        16,
+                *,         *,         *,         20,        16,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
@@ -6346,210 +6326,3 @@
   rs6000_emit_xxspltidp_v2df (operands[0], value);
   DONE;
 })
-
-;; XXSPLTI32DX used to create 64-bit constants or 32-bit vector constants where
-;; the even elements match and the odd elements match.
-(define_mode_iterator XXSPLTI32DX [SF DF V4SF V4SI V2DF V2DI])
-
-(define_insn_and_split "*xxsplti32dx_<mode>"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
-	(match_operand:XXSPLTI32DX 1 "xxsplti32dx_operand"))]
-  "TARGET_XXSPLTI32DX"
-  "#"
-  "&& 1"
-  [(set (match_dup 0)
-	(unspec:XXSPLTI32DX [(match_dup 2)
-			     (match_dup 3)] UNSPEC_XXSPLTI32DX_CONST))
-   (set (match_dup 0)
-	(unspec:XXSPLTI32DX [(match_dup 0)
-			     (match_dup 4)
-			     (match_dup 5)] UNSPEC_XXSPLTI32DX_CONST))]
-{
-  HOST_WIDE_INT value = 0;
-
-  if (!xxsplti32dx_constant_p (operands[1], <MODE>mode, &value))
-    gcc_unreachable ();
-
-  HOST_WIDE_INT high = value >> 32;
-  HOST_WIDE_INT low = ((value & 0xffffffff) ^ 0x80000000) - 0x80000000;
-
-  if (!BYTES_BIG_ENDIAN)
-    std::swap (high, low);
-
-  /* If the low bits are 0 or all 1s, initialize that word first.  This way we
-     can use a smaller XXSPLTIB instruction instead the first XXSPLTI32DX.  */
-  if (low == 0 || low ==  -1)
-    {
-      operands[2] = const1_rtx;
-      operands[3] = GEN_INT (low);
-      operands[4] = const0_rtx;
-      operands[5] = GEN_INT (high);
-    }
-  else
-    {
-      operands[2] = const0_rtx;
-      operands[3] = GEN_INT (high);
-      operands[4] = const1_rtx;
-      operands[5] = GEN_INT (low);
-    }
-}
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")
-   (set_attr "num_insns" "2")
-   (set_attr "max_prefixed_insns" "2")])
-
-;; First word of XXSPLTI32DX
-(define_insn "*xxsplti32dx_<mode>_first"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa,wa,wa")
-	(unspec:XXSPLTI32DX [(match_operand 1 "u1bit_cint_operand" "n,n,n")
-			     (match_operand 2 "const_int_operand" "O,wM,n")]
-			    UNSPEC_XXSPLTI32DX_CONST))]
-  "TARGET_XXSPLTI32DX"
-  "@
-   xxspltib %x0,0
-   xxspltib %x0,255
-   xxsplti32dx %x0,%1,%2"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "*,*,yes")])
-
-;; Second word of XXSPLTI32DX
-(define_insn "*xxsplti32dx_<mode>_second"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
-	(unspec:XXSPLTI32DX [(match_operand:XXSPLTI32DX 1 "vsx_register_operand" "0")
-			     (match_operand 2 "u1bit_cint_operand" "n")
-			     (match_operand 3 "const_int_operand" "n")]
-			    UNSPEC_XXSPLTI32DX_CONST))]
-  "TARGET_XXSPLTI32DX"
-  "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
-
-;; XXSPLTI32DX built-in support.
-(define_expand "xxsplti32dx_v4si"
-  [(set (match_operand:V4SI 0 "register_operand" "=wa")
-	(unspec:V4SI [(match_operand:V4SI 1 "register_operand" "0")
-		      (match_operand:QI 2 "u1bit_cint_operand" "n")
-		      (match_operand:SI 3 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTI32DX))]
- "TARGET_POWER10"
-{
-  int index = INTVAL (operands[2]);
-
-  if (!BYTES_BIG_ENDIAN)
-    index = 1 - index;
-
-   emit_insn (gen_xxsplti32dx_v4si_inst (operands[0], operands[1],
-					 GEN_INT (index), operands[3]));
-   DONE;
-}
- [(set_attr "type" "vecsimple")])
-
-(define_insn "xxsplti32dx_v4si_inst"
-  [(set (match_operand:V4SI 0 "register_operand" "=wa")
-	(unspec:V4SI [(match_operand:V4SI 1 "register_operand" "0")
-		      (match_operand:QI 2 "u1bit_cint_operand" "n")
-		      (match_operand:SI 3 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTI32DX))]
-  "TARGET_POWER10"
-  "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")
-   (set_attr "prefixed" "yes")])
-
-(define_expand "xxsplti32dx_v4sf"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:V4SF 1 "register_operand" "0")
-		      (match_operand:QI 2 "u1bit_cint_operand" "n")
-		      (match_operand:SF 3 "const_double_operand" "n")]
-		     UNSPEC_XXSPLTI32DX))]
-  "TARGET_POWER10"
-{
-  int index = INTVAL (operands[2]);
-  long value = rs6000_const_f32_to_i32 (operands[3]);
-  if (!BYTES_BIG_ENDIAN)
-    index = 1 - index;
-
-   emit_insn (gen_xxsplti32dx_v4sf_inst (operands[0], operands[1],
-					 GEN_INT (index), GEN_INT (value)));
-   DONE;
-})
-
-(define_insn "xxsplti32dx_v4sf_inst"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:V4SF 1 "register_operand" "0")
-		      (match_operand:QI 2 "u1bit_cint_operand" "n")
-		      (match_operand:SI 3 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTI32DX))]
-  "TARGET_POWER10"
-  "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecsimple")
-   (set_attr "prefixed" "yes")])
-
-;; XXPERMX built-in function support.
-(define_expand "xxpermx"
-  [(set (match_operand:V2DI 0 "vsx_register_operand" "+wa")
-	(unspec:V2DI [(match_operand:V2DI 1 "vsx_register_operand" "wa")
-		      (match_operand:V2DI 2 "vsx_register_operand" "wa")
-		      (match_operand:V16QI 3 "vsx_register_operand" "wa")
-		      (match_operand:QI 4 "u8bit_cint_operand" "n")]
-		     UNSPEC_XXPERMX))]
-  "TARGET_POWER10"
-{
-  if (BYTES_BIG_ENDIAN)
-    emit_insn (gen_xxpermx_inst (operands[0], operands[1],
-				 operands[2], operands[3],
-				 operands[4]));
-  else
-    {
-      /* Reverse value of byte element indexes by XORing with 0xFF.
-	 Reverse the 32-byte section identifier match by subracting bits [0:2]
-	 of elemet from 7.  */
-      int value = INTVAL (operands[4]);
-      rtx vreg = gen_reg_rtx (V16QImode);
-
-      emit_insn (gen_xxspltib_v16qi (vreg, GEN_INT (-1)));
-      emit_insn (gen_xorv16qi3 (operands[3], operands[3], vreg));
-      value = 7 - value;
-      emit_insn (gen_xxpermx_inst (operands[0], operands[2],
-				   operands[1], operands[3],
-				   GEN_INT (value)));
-    }
-
-  DONE;
-})
-
-(define_insn "xxpermx_inst"
-  [(set (match_operand:V2DI 0 "vsx_register_operand" "+wa")
-	(unspec:V2DI [(match_operand:V2DI 1 "vsx_register_operand" "wa")
-		      (match_operand:V2DI 2 "vsx_register_operand" "wa")
-		      (match_operand:V16QI 3 "vsx_register_operand" "wa")
-		      (match_operand:QI 4 "u3bit_cint_operand" "n")]
-		     UNSPEC_XXPERMX))]
-  "TARGET_POWER10"
-  "xxpermx %x0,%x1,%x2,%x3,%4"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
-
-;; XXEVAL built-in function support.
-(define_insn "xxeval"
-  [(set (match_operand:V2DI 0 "vsx_register_operand" "=wa")
-	(unspec:V2DI [(match_operand:V2DI 1 "vsx_register_operand" "wa")
-		      (match_operand:V2DI 2 "vsx_register_operand" "wa")
-		      (match_operand:V2DI 3 "vsx_register_operand" "wa")
-		      (match_operand:QI 4 "u8bit_cint_operand" "n")]
-		     UNSPEC_XXEVAL))]
-   "TARGET_POWER10"
-   "xxeval %0,%1,%2,%3,%4"
-   [(set_attr "type" "vecperm")
-    (set_attr "prefixed" "yes")])
-
-;; XXBLEND support.
-(define_insn "xxblend_<mode>"
-  [(set (match_operand:VM3 0 "vsx_register_operand" "=wa")
-	(unspec:VM3 [(match_operand:VM3 1 "vsx_register_operand" "wa")
-		     (match_operand:VM3 2 "vsx_register_operand" "wa")
-		     (match_operand:VM3 3 "vsx_register_operand" "wa")]
-		    UNSPEC_XXBLEND))]
-  "TARGET_POWER10"
-  "xxblendv<VM3_char> %x0,%x1,%x2,%x3"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
