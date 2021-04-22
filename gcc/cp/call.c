@@ -1434,7 +1434,9 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
       tree fbase = class_of_this_parm (fromfn);
       tree tbase = class_of_this_parm (tofn);
 
-      if (!DERIVED_FROM_P (fbase, tbase))
+      /* If FBASE and TBASE are equivalent but incomplete, DERIVED_FROM_P
+	 yields false.  But a pointer to member of incomplete class is OK.  */
+      if (!same_type_p (fbase, tbase) && !DERIVED_FROM_P (fbase, tbase))
 	return NULL;
 
       tree fstat = static_fn_type (fromfn);
@@ -4392,6 +4394,9 @@ build_converted_constant_expr_internal (tree type, tree expr,
 	  && processing_template_decl)
 	conv = next_conversion (conv);
 
+      /* Issuing conversion warnings for value-dependent expressions is
+	 likely too noisy.  */
+      warning_sentinel w (warn_conversion);
       conv->check_narrowing = true;
       conv->check_narrowing_const_only = true;
       expr = convert_like (conv, expr, complain);
@@ -5474,8 +5479,6 @@ build_conditional_expr_1 (const op_location_t &loc,
       && same_type_p (arg2_type, arg3_type))
     {
       result_type = arg2_type;
-      arg2 = mark_lvalue_use (arg2);
-      arg3 = mark_lvalue_use (arg3);
       goto valid_operands;
     }
 
@@ -5904,6 +5907,15 @@ op_is_ordered (tree_code code)
     case LSHIFT_EXPR:
       // 8. a >> b
     case RSHIFT_EXPR:
+      // a && b
+      // Predates P0145R3.
+    case TRUTH_ANDIF_EXPR:
+      // a || b
+      // Predates P0145R3.
+    case TRUTH_ORIF_EXPR:
+      // a , b
+      // Predates P0145R3.
+    case COMPOUND_EXPR:
       return (flag_strong_eval_order ? 1 : 0);
 
     default:
@@ -7123,6 +7135,14 @@ build_temp (tree expr, tree type, int flags,
       && !type_has_nontrivial_copy_init (TREE_TYPE (expr)))
     return get_target_expr_sfinae (expr, complain);
 
+  /* In decltype, we might have decided not to wrap this call in a TARGET_EXPR.
+     But it turns out to be a subexpression, so perform temporary
+     materialization now.  */
+  if (TREE_CODE (expr) == CALL_EXPR
+      && CLASS_TYPE_P (type)
+      && same_type_ignoring_top_level_qualifiers_p (type, TREE_TYPE (expr)))
+    expr = build_cplus_new (type, expr, complain);
+
   savew = warningcount + werrorcount, savee = errorcount;
   releasing_vec args (make_tree_vector_single (expr));
   expr = build_special_member_call (NULL_TREE, complete_ctor_identifier,
@@ -7285,6 +7305,27 @@ maybe_warn_array_conv (location_t loc, conversion *c, tree expr)
 	     "are only available with %<-std=c++2a%> or %<-std=gnu++2a%>");
 }
 
+/* Return true if converting FROM to TO is unsafe in a template.  */
+
+static bool
+conv_unsafe_in_template_p (tree to, tree from)
+{
+  /* Converting classes involves TARGET_EXPR.  */
+  if (CLASS_TYPE_P (to) || CLASS_TYPE_P (from))
+    return true;
+
+  /* Converting real to integer produces FIX_TRUNC_EXPR which tsubst
+     doesn't handle.  */
+  if (SCALAR_FLOAT_TYPE_P (from) && INTEGRAL_OR_ENUMERATION_TYPE_P (to))
+    return true;
+
+  /* Converting integer to real isn't a trivial conversion, either.  */
+  if (INTEGRAL_OR_ENUMERATION_TYPE_P (from) && SCALAR_FLOAT_TYPE_P (to))
+    return true;
+
+  return false;
+}
+
 /* Wrapper for convert_like_real_1 that handles creating IMPLICIT_CONV_EXPR.  */
 
 static tree
@@ -7300,7 +7341,7 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
   tree conv_expr = NULL_TREE;
   if (processing_template_decl
       && convs->kind != ck_identity
-      && (CLASS_TYPE_P (convs->type) || CLASS_TYPE_P (TREE_TYPE (expr))))
+      && conv_unsafe_in_template_p (convs->type, TREE_TYPE (expr)))
     {
       conv_expr = build1 (IMPLICIT_CONV_EXPR, convs->type, expr);
       if (convs->kind != ck_ref_bind)
@@ -9161,6 +9202,9 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	      || !current_binding_level->immediate_fn_ctx_p))
 	{
 	  tree obj_arg = NULL_TREE;
+	  /* Undo convert_from_reference called by build_cxx_call.  */
+	  if (REFERENCE_REF_P (call))
+	    call = TREE_OPERAND (call, 0);
 	  if (DECL_CONSTRUCTOR_P (fndecl))
 	    obj_arg = cand->first_arg ? cand->first_arg : (*args)[0];
 	  if (obj_arg && is_dummy_object (obj_arg))
@@ -9184,6 +9228,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	  call = cxx_constant_value (call, obj_arg);
 	  if (obj_arg && !error_operand_p (call))
 	    call = build2 (INIT_EXPR, void_type_node, obj_arg, call);
+	  call = convert_from_reference (call);
 	}
     }
   return call;

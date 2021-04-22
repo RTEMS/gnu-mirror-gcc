@@ -4999,10 +4999,16 @@ gfc_match_call (void)
   sym = st->n.sym;
 
   /* If this is a variable of derived-type, it probably starts a type-bound
-     procedure call.  */
-  if ((sym->attr.flavor != FL_PROCEDURE
-       || gfc_is_function_return_value (sym, gfc_current_ns))
-      && (sym->ts.type == BT_DERIVED || sym->ts.type == BT_CLASS))
+     procedure call. Associate variable targets have to be resolved for the
+     target type.  */
+  if (((sym->attr.flavor != FL_PROCEDURE
+	|| gfc_is_function_return_value (sym, gfc_current_ns))
+       && (sym->ts.type == BT_DERIVED || sym->ts.type == BT_CLASS))
+		||
+      (sym->assoc && sym->assoc->target
+       && gfc_resolve_expr (sym->assoc->target)
+       && (sym->assoc->target->ts.type == BT_DERIVED
+	   || sym->assoc->target->ts.type == BT_CLASS)))
     return match_typebound_call (st);
 
   /* If it does not seem to be callable (include functions so that the
@@ -6305,7 +6311,7 @@ select_intrinsic_set_tmp (gfc_typespec *ts)
 static void
 select_type_set_tmp (gfc_typespec *ts)
 {
-  char name[GFC_MAX_SYMBOL_LEN];
+  char name[GFC_MAX_SYMBOL_LEN + 12 + 1];
   gfc_symtree *tmp = NULL;
   gfc_symbol *selector = select_type_stack->selector;
   gfc_symbol *sym;
@@ -6384,7 +6390,7 @@ gfc_match_select_type (void)
 {
   gfc_expr *expr1, *expr2 = NULL;
   match m;
-  char name[GFC_MAX_SYMBOL_LEN];
+  char name[GFC_MAX_SYMBOL_LEN + 1];
   bool class_array;
   gfc_symbol *sym;
   gfc_namespace *ns = gfc_current_ns;
@@ -6609,7 +6615,7 @@ gfc_match_select_rank (void)
 {
   gfc_expr *expr1, *expr2 = NULL;
   match m;
-  char name[GFC_MAX_SYMBOL_LEN];
+  char name[GFC_MAX_SYMBOL_LEN + 1];
   gfc_symbol *sym, *sym2;
   gfc_namespace *ns = gfc_current_ns;
   gfc_array_spec *as = NULL;

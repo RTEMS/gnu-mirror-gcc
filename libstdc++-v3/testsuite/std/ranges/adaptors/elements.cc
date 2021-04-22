@@ -66,9 +66,49 @@ test02()
   VERIFY( ranges::equal(v2, (std::pair<char, int>[]){{1,2}}) );
 }
 
+struct X
+{
+  using Iter = __gnu_test::forward_iterator_wrapper<std::pair<int, X>>;
+
+  friend auto operator-(Iter l, Iter r) { return l.ptr - r.ptr; }
+};
+
+void
+test03()
+{
+  // LWG 3483
+  std::pair<int, X> x[3];
+  __gnu_test::test_forward_range<std::pair<int, X>> r(x);
+  auto v = views::elements<1>(r);
+  auto b = begin(v);
+  static_assert( !ranges::random_access_range<decltype(r)> );
+  static_assert( std::sized_sentinel_for<decltype(b), decltype(b)> );
+  VERIFY( (next(b, 1) - b) == 1 );
+  const auto v_const = v;
+  auto b_const = begin(v_const);
+  VERIFY( (next(b_const, 2) - b_const) == 2 );
+}
+
+void
+test05()
+{
+  // LWG 3502
+  std::vector<int> vec = {42};
+  auto r1 = vec
+    | views::transform([](auto c) { return std::make_tuple(c, c); })
+    | views::keys;
+  VERIFY( ranges::equal(r1, (int[]){42}) );
+
+  std::tuple<int, int> a[] = {{1,2},{3,4}};
+  auto r2 = a | views::keys;
+  VERIFY( r2[0] == 1 && r2[1] == 3 );
+}
+
 int
 main()
 {
   test01();
   test02();
+  test03();
+  test05();
 }

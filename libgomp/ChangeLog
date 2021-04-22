@@ -1,3 +1,47 @@
+2021-04-18  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	Backported from master:
+	2021-04-11  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	PR middle-end/98088
+	* testsuite/libgomp.oacc-c-c++-common/collapse-2.c: Add check
+	for loop with GT/GE condition.
+	* testsuite/libgomp.oacc-c-c++-common/collapse-3.c: Likewise.
+
+2021-04-09  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-04-09  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR middle-end/84991
+	PR middle-end/84992
+	PR middle-end/90779
+	* testsuite/libgomp.oacc-c-c++-common/static-variable-1.c: New.
+
+2021-04-08  Release Manager
+
+	* GCC 10.3.0 released.
+
+2021-03-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-03-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* plugin/plugin-hsa.c (init_enviroment_variables): Don't prepend
+	the 'HSA_RUNTIME_LIB' path to 'libhsa-runtime64.so'.
+	* plugin/plugin-gcn.c (init_environment_variables): Likewise.
+	* plugin/configfrag.ac (HSA_RUNTIME_LIB): Clean up.
+	* config.h.in: Regenerate.
+	* configure: Likewise.
+
+2021-02-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2021-02-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/99171
+	* testsuite/libgomp.fortran/dummy-procs-1.f90: New test.
+
 2021-01-14  Thomas Schwinge  <thomas@codesourcery.com>
 
 	Backported from master:

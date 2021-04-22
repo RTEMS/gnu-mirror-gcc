@@ -464,6 +464,22 @@ static const struct cpu_addrcost_table qdf24xx_addrcost_table =
   2, /* imm_offset  */
 };
 
+static const struct cpu_addrcost_table a64fx_addrcost_table =
+{
+    {
+      1, /* hi  */
+      1, /* si  */
+      1, /* di  */
+      2, /* ti  */
+    },
+  0, /* pre_modify  */
+  0, /* post_modify  */
+  2, /* register_offset  */
+  3, /* register_sextend  */
+  3, /* register_zextend  */
+  0, /* imm_offset  */
+};
+
 static const struct cpu_regmove_cost generic_regmove_cost =
 {
   1, /* GP2GP  */
@@ -557,6 +573,16 @@ static const struct cpu_regmove_cost tsv110_regmove_cost =
   2, /* GP2FP  */
   3, /* FP2GP  */
   2  /* FP2FP  */
+};
+
+static const struct cpu_regmove_cost a64fx_regmove_cost =
+{
+  1, /* GP2GP  */
+  /* Avoid the use of slow int<->fp moves for spilling by setting
+     their cost higher than memmov_cost.  */
+  5, /* GP2FP  */
+  7, /* FP2GP  */
+  2 /* FP2FP  */
 };
 
 /* Generic costs for vector insn classes.  */
@@ -736,6 +762,25 @@ static const struct cpu_vector_cost thunderx3t110_vector_cost =
   1  /* cond_not_taken_branch_cost  */
 };
 
+static const struct cpu_vector_cost a64fx_vector_cost =
+{
+  1, /* scalar_int_stmt_cost  */
+  5, /* scalar_fp_stmt_cost  */
+  4, /* scalar_load_cost  */
+  1, /* scalar_store_cost  */
+  2, /* vec_int_stmt_cost  */
+  5, /* vec_fp_stmt_cost  */
+  3, /* vec_permute_cost  */
+  13, /* vec_to_scalar_cost  */
+  4, /* scalar_to_vec_cost  */
+  6, /* vec_align_load_cost  */
+  6, /* vec_unalign_load_cost  */
+  1, /* vec_unalign_store_cost  */
+  1, /* vec_store_cost  */
+  3, /* cond_taken_branch_cost  */
+  1 /* cond_not_taken_branch_cost  */
+};
+
 
 /* Generic costs for branch instructions.  */
 static const struct cpu_branch_cost generic_branch_cost =
@@ -901,7 +946,10 @@ static const struct tune_params generic_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  /* Enabling AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS significantly benefits
+     Neoverse V1.  It does not have a noticeable effect on A64FX and should
+     have at most a very minor effect on SVE2 cores.  */
+  (AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS),	/* tune_flags.  */
   &generic_prefetch_tune
 };
 
@@ -1358,7 +1406,8 @@ static const struct tune_params neoversev1_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC
+   | AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS),	/* tune_flags.  */
   &generic_prefetch_tune
 };
 
@@ -1384,16 +1433,16 @@ static const struct tune_params neoversen2_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC),	/* tune_flags.  */
   &generic_prefetch_tune
 };
 
 static const struct tune_params a64fx_tunings =
 {
-  &generic_extra_costs,
-  &generic_addrcost_table,
-  &generic_regmove_cost,
-  &generic_vector_cost,
+  &a64fx_extra_costs,
+  &a64fx_addrcost_table,
+  &a64fx_regmove_cost,
+  &a64fx_vector_cost,
   &generic_branch_cost,
   &generic_approx_modes,
   SVE_512, /* sve_width  */
@@ -4521,7 +4570,7 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 	  if (can_create_pseudo_p ())
 	    {
 	      rtx coeff1 = gen_int_mode (factor, mode);
-	      val = expand_mult (mode, val, coeff1, NULL_RTX, false, true);
+	      val = expand_mult (mode, val, coeff1, NULL_RTX, true, true);
 	    }
 	  else
 	    {
@@ -5018,12 +5067,12 @@ aarch64_expand_sve_const_pred_trn (rtx target, rtx_vector_builder &builder,
 	}
     }
 
-  /* Emit the TRN1 itself.  */
+  /* Emit the TRN1 itself.  We emit a TRN that operates on VNx16BI
+     operands but permutes them as though they had mode MODE.  */
   machine_mode mode = aarch64_sve_pred_mode (permute_size).require ();
-  target = aarch64_target_reg (target, mode);
-  emit_insn (gen_aarch64_sve (UNSPEC_TRN1, mode, target,
-			      gen_lowpart (mode, a),
-			      gen_lowpart (mode, b)));
+  target = aarch64_target_reg (target, GET_MODE (a));
+  rtx type_reg = CONST0_RTX (mode);
+  emit_insn (gen_aarch64_sve_trn1_conv (mode, target, a, b, type_reg));
   return target;
 }
 
@@ -12487,8 +12536,18 @@ cost_plus:
 	    *cost += rtx_cost (op0, mode, PLUS, 0, speed);
 
 	    if (speed)
-	      /* ADD (immediate).  */
-	      *cost += extra_cost->alu.arith;
+	      {
+		/* ADD (immediate).  */
+		*cost += extra_cost->alu.arith;
+
+		/* Some tunings prefer to not use the VL-based scalar ops.
+		   Increase the cost of the poly immediate to prevent their
+		   formation.  */
+		if (GET_CODE (op1) == CONST_POLY_INT
+		    && (aarch64_tune_params.extra_tuning_flags
+			& AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS))
+		  *cost += COSTS_N_INSNS (1);
+	      }
 	    return true;
 	  }
 
@@ -14360,6 +14419,19 @@ aarch64_parse_override_string (const char* input_string,
   free (string_root);
 }
 
+/* Adjust CURRENT_TUNE (a generic tuning struct) with settings that
+   are best for a generic target with the currently-enabled architecture
+   extensions.  */
+static void
+aarch64_adjust_generic_arch_tuning (struct tune_params &current_tune)
+{
+  /* Neoverse V1 is the only core that is known to benefit from
+     AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS.  There is therefore no
+     point enabling it for SVE2 and above.  */
+  if (TARGET_SVE2)
+    current_tune.extra_tuning_flags
+      &= ~AARCH64_EXTRA_TUNE_CSE_SVE_VL_CONSTANTS;
+}
 
 static void
 aarch64_override_options_after_change_1 (struct gcc_options *opts)
@@ -14430,6 +14502,8 @@ aarch64_override_options_internal (struct gcc_options *opts)
      we may later overwrite.  */
   aarch64_tune_params = *(selected_tune->tune);
   aarch64_architecture_version = selected_arch->architecture_version;
+  if (selected_tune->tune == &generic_tunings)
+    aarch64_adjust_generic_arch_tuning (aarch64_tune_params);
 
   if (opts->x_aarch64_override_tune_string)
     aarch64_parse_override_string (opts->x_aarch64_override_tune_string,
@@ -14497,6 +14571,14 @@ aarch64_override_options_internal (struct gcc_options *opts)
      the *options_set structs anyway.  */
   SET_OPTION_IF_UNSET (opts, &global_options_set,
 		       param_sched_autopref_queue_depth, queue_depth);
+
+  /* If the core wants only AdvancedSIMD autovectorization, do this through
+     aarch64_autovec_preference.  If the user set it explicitly, they should
+     know what they want.  */
+  if (aarch64_tune_params.extra_tuning_flags
+      & AARCH64_EXTRA_TUNE_PREFER_ADVSIMD_AUTOVEC)
+    SET_OPTION_IF_UNSET (opts, &global_options_set,
+			 aarch64_autovec_preference, 1);
 
   /* If using Advanced SIMD only for autovectorization disable SVE vector costs
      comparison.  */
@@ -22966,11 +23048,17 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
       return 0;
     }
 
-  for (t = DECL_ARGUMENTS (node->decl); t; t = DECL_CHAIN (t))
-    {
-      arg_type = TREE_TYPE (t);
+  int i;
+  tree type_arg_types = TYPE_ARG_TYPES (TREE_TYPE (node->decl));
+  bool decl_arg_p = (node->definition || type_arg_types == NULL_TREE);
 
-      if (!currently_supported_simd_type (arg_type, base_type))
+  for (t = (decl_arg_p ? DECL_ARGUMENTS (node->decl) : type_arg_types), i = 0;
+       t && t != void_list_node; t = TREE_CHAIN (t), i++)
+    {
+      tree arg_type = decl_arg_p ? TREE_TYPE (t) : TREE_VALUE (t);
+
+      if (clonei->args[i].arg_type != SIMD_CLONE_ARG_TYPE_UNIFORM
+	  && !currently_supported_simd_type (arg_type, base_type))
 	{
 	  if (TYPE_SIZE (arg_type) != TYPE_SIZE (base_type))
 	    warning_at (DECL_SOURCE_LOCATION (node->decl), 0,

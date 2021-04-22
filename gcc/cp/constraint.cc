@@ -554,7 +554,7 @@ map_arguments (tree parms, tree args)
 	TREE_PURPOSE (p) = TMPL_ARG (args, level, index);
       }
     else
-      TREE_PURPOSE (p) = TREE_VALUE (p);
+      TREE_PURPOSE (p) = template_parm_to_arg (p);
 
   return parms;
 }
@@ -840,6 +840,8 @@ get_normalized_constraints_from_decl (tree d, bool diag = false)
   if (!diag)
     if (tree *p = hash_map_safe_get (normalized_map, tmpl))
       return *p;
+
+  push_nested_class_guard pncs (DECL_CONTEXT (d));
 
   tree args = generic_targs_for (tmpl);
   tree ci = get_constraints (decl);
@@ -1275,7 +1277,6 @@ build_concept_check_arguments (tree arg, tree rest)
     }
   else
     {
-      gcc_assert (rest != NULL_TREE);
       args = rest;
     }
   return args;
@@ -1374,13 +1375,6 @@ build_concept_check (tree target, tree args, tsubst_flags_t complain)
 tree
 build_concept_check (tree decl, tree arg, tree rest, tsubst_flags_t complain)
 {
-  if (arg == NULL_TREE && rest == NULL_TREE)
-    {
-      tree id = build_nt (TEMPLATE_ID_EXPR, decl, rest);
-      error ("invalid use concept %qE", id);
-      return error_mark_node;
-    }
-
   tree args = build_concept_check_arguments (arg, rest);
 
   if (standard_concept_p (decl))
@@ -1426,7 +1420,9 @@ tree
 build_type_constraint (tree decl, tree args, tsubst_flags_t complain)
 {
   tree wildcard = build_nt (WILDCARD_DECL);
+  ++processing_template_decl;
   tree check = build_concept_check (decl, wildcard, args, complain);
+  --processing_template_decl;
   if (check == error_mark_node)
     return error_mark_node;
   return unpack_concept_check (check);
@@ -1491,7 +1487,7 @@ finish_shorthand_constraint (tree decl, tree constr)
 
   /* Get the argument and overload used for the requirement
      and adjust it if we're going to expand later.  */
-  tree arg = template_parm_to_arg (build_tree_list (NULL_TREE, decl));
+  tree arg = template_parm_to_arg (decl);
   if (apply_to_each_p && declared_pack_p)
     arg = PACK_EXPANSION_PATTERN (TREE_VEC_ELT (ARGUMENT_PACK_ARGS (arg), 0));
 
@@ -2634,7 +2630,8 @@ satisfy_atom (tree t, tree args, subst_info info)
     result = cxx_constant_value (result);
   else
     {
-      result = maybe_constant_value (result);
+      result = maybe_constant_value (result, NULL_TREE,
+				     /*manifestly_const_eval=*/true);
       if (!TREE_CONSTANT (result))
 	result = error_mark_node;
     }
