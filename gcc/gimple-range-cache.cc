@@ -923,7 +923,12 @@ ranger_cache::propagate_cache (tree name)
   int_range_max edge_range;
   int_range_max equiv_range;
   int_range_max tmp_range;
+  int_range_max global_range;
+  bool has_global = false;
   bool has_equivs;
+
+  if (m_globals.get_global_range (global_range, name))
+    has_global = true;
 
   // Process each block by seeing if its calculated range on entry is
   // the same as its cached value. If there is a difference, update
@@ -958,6 +963,11 @@ ranger_cache::propagate_cache (tree name)
 	  if (!outgoing_edge_range_p (edge_range, e, name))
 	    {
 	      ssa_range_in_bb (edge_range, name, e->src);
+	      // This will allow new globals to be propagated into cycles
+	      // Without this, the old value can feed into a block
+	      // and prevent propagation.
+	      if (has_global)
+		edge_range.intersect (global_range);
 	      if (DEBUG_RANGE_CACHE)
 		{
 		  fprintf (dump_file, "No outgoing edge range, picked up ");
@@ -1177,7 +1187,7 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
 	    }
 
 	  if (DEBUG_RANGE_CACHE)
-	    fprintf (dump_file, "pushing undefined pred block. ");
+	    fprintf (dump_file, "pushing undefined pred block.\n");
 	  // If the pred hasn't been visited (has no range), add it to
 	  // the list.
 	  gcc_checking_assert (!m_on_entry.bb_range_p (name, pred));
