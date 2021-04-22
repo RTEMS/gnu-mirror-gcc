@@ -443,7 +443,10 @@ public:
 
   tree value_on_edge (edge e, tree name) OVERRIDE
   {
-    return m_ranger->value_on_edge (e, name);
+    tree ret = m_ranger->value_on_edge (e, name);
+    if (!ret && TREE_CODE (name) == SSA_NAME)
+      ret = m_points_to_analyzer->get_points_to (name);
+    return ret;
   }
 
   tree value_of_stmt (gimple *s, tree name = NULL) OVERRIDE
