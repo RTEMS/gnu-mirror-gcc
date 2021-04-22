@@ -885,24 +885,8 @@ ranger_cache::process_equivs (irange &r, tree name, basic_block bb)
       tree equiv_name = ssa_name (i);
       if (!equiv_name || equiv_name == name)
 	continue;
-      // If there is a range on entry set, the equivalence has already
-      // been processed on all the incoming edges, pick up that range.
-      // Otherwise add name to the edge check list.
-      if (m_on_entry.get_bb_range_p (equiv_range, equiv_name, bb))
-	{
-	  if (DEBUG_RANGE_CACHE)
-	    {
-	      fprintf (dump_file, "  Equivalence ");
-	      print_generic_expr (dump_file, equiv_name, TDF_SLIM);
-	      fprintf (dump_file, " range in block :");
-	      equiv_range.dump (dump_file);
-	      fprintf (dump_file, "\n");
-	    }
-	  range_cast (equiv_range, TREE_TYPE (name));
-	  r.intersect (equiv_range);
-	  ret = true;
-	}
-      else
+      // If the equiv may have been adjusted, add it to the check list.
+      if (has_edge_range_p (equiv_name))
 	m_equiv_edge_check.safe_push (equiv_name);
     }
   return ret;
