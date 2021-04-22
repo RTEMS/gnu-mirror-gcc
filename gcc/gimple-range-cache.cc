@@ -60,7 +60,17 @@ non_null_ref::non_null_deref_p (tree name, basic_block bb)
   if (!m_nn[v])
     process_name (name);
 
-  return bitmap_bit_p (m_nn[v], bb->index);
+  if (bitmap_bit_p (m_nn[v], bb->index))
+    return true;
+
+  // See if any dominator has set non-zero.
+  if (dom_info_available_p (CDI_DOMINATORS))
+    {
+      for ( ; bb; bb = get_immediate_dominator (CDI_DOMINATORS, bb))
+	if (bitmap_bit_p (m_nn[v], bb->index))
+	  return true;
+    }
+  return false;
 }
 
 // Allocate an populate the bitmap for NAME.  An ON bit for a block
