@@ -11,7 +11,11 @@ work049.patch021:
 	declaration.
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
 	support for -mxxsplti32dx.
-	(+xxsplti32dx_constant_p): New function.
+	(const_vector_element_all_same): New helper function.
+	(xxspltidp_constant_p): Move CONST_VECTOR and VEC_DUPLICATE code
+	into const_vector_element_all_same and call it.
+	(xxsplti32dx_constant_float_p): New helper function.
+	(xxsplti32dx_constant_p): New function.
 	(output_vec_const_move): If the operand can be loaded with
 	XXSPLTI32DX, split it.
 	(rs6000_opt_masks): Add -mxxsplti32dx.
