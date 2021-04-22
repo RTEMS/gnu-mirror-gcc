@@ -185,6 +185,10 @@ fold_using_range::fold_stmt (irange &r, gimple *s, op_source &src, tree name)
   if (!name)
     name = gimple_get_lhs (s);
 
+  if (gimple_code (s) == GIMPLE_ASSIGN
+      && gimple_assign_rhs_code (s) == ADDR_EXPR)
+    return range_of_address (r, s, src);
+
   if (gimple_range_handler (s))
     {
       res = range_of_range_op (r, s, src);
@@ -243,10 +247,6 @@ fold_using_range::range_of_range_op (irange &r, gimple *s, op_source &src)
   tree lhs = gimple_get_lhs (s);
   tree op1 = gimple_range_operand1 (s);
   tree op2 = gimple_range_operand2 (s);
-
-  if (gimple_code (s) == GIMPLE_ASSIGN
-      && gimple_assign_rhs_code (s) == ADDR_EXPR)
-    return range_of_address (r, s, src);
 
   if (src.get_operand (range1, op1))
     {
