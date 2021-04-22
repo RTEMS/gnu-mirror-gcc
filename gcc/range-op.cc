@@ -1130,39 +1130,49 @@ operator_plus::lhs_op1_relation (const irange &lhs,
   
   tree type = lhs.type ();
   unsigned prec = TYPE_PRECISION (type);
+  wi::overflow_type ovf1, ovf2;
+  signop sign = TYPE_SIGN (type);
 
   if (op2.zero_p ())
     return EQ_EXPR;
 
   if (TYPE_OVERFLOW_WRAPS (type))
     {
-      wi::overflow_type ovf1, ovf2;
-      signop sign = TYPE_SIGN (type);
-
-      // For a never wrapping addition, lhs > op1.
-      wi::add (op1.upper_bound (), op2.upper_bound (), sign, &ovf1);
-      if (!ovf1)
-	return GT_EXPR;
-
-      // For an always wrapping addition, lhs < op1.
       wi::add (op1.lower_bound (), op2.lower_bound (), sign, &ovf1);
-      wi::add (op1.lower_bound (), op2.upper_bound (), sign, &ovf2);
-      if (ovf1 && ovf2)
-	return LT_EXPR;
+      wi::add (op1.upper_bound (), op2.upper_bound (), sign, &ovf2);
     }
   else
+    ovf1 = ovf2 = wi::OVF_NONE;
+
+  // Never wrapping additions.
+  if (!ovf1 && !ovf2)
     {
-      // Positive op2 lower bound means lhs larger than op1.
-      if (wi::gt_p (op2.lower_bound (), wi::zero (prec), SIGNED))
+      // Positive op2 means lhs > op1.
+      if (wi::gt_p (op2.lower_bound (), wi::zero (prec), sign))
 	return GT_EXPR;
-      if (wi::ge_p (op2.lower_bound (), wi::zero (prec), SIGNED))
+      if (wi::ge_p (op2.lower_bound (), wi::zero (prec), sign))
 	return GE_EXPR;
 
-      // Negative op2 upper bound means lhs smaller than op1.
-      if (wi::lt_p (op2.upper_bound (), wi::zero (prec), SIGNED))
+      // Negative op2 means lhs < op1.
+      if (wi::lt_p (op2.upper_bound (), wi::zero (prec), sign))
 	return LT_EXPR;
-      if (wi::le_p (op2.upper_bound (), wi::zero (prec), SIGNED))
+      if (wi::le_p (op2.upper_bound (), wi::zero (prec), sign))
 	return LE_EXPR;
+    }
+  // Always wrapping additions.
+  else if (ovf1 && ovf1 == ovf2)
+    {
+      // Positive op2 means lhs < op1.
+      if (wi::gt_p (op2.lower_bound (), wi::zero (prec), sign))
+	return LT_EXPR;
+      if (wi::ge_p (op2.lower_bound (), wi::zero (prec), sign))
+	return LE_EXPR;
+
+      // Negative op2 means lhs > op1.
+      if (wi::lt_p (op2.upper_bound (), wi::zero (prec), sign))
+	return GT_EXPR;
+      if (wi::le_p (op2.upper_bound (), wi::zero (prec), sign))
+	return GE_EXPR;
     }
 
   if (!range_includes_zero_p (&op2))
