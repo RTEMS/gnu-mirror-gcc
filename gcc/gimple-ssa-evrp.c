@@ -166,9 +166,6 @@ points_to_analyzer::set_cond_points_to (tree pointer, tree pointee)
 tree
 points_to_analyzer::get_points_to (tree name) const
 {
-  if (getenv("PTA_OFF"))
-    return NULL;
-
   gcc_checking_assert (TREE_CODE (name) == SSA_NAME);
   if (tree ret = m_global_points[SSA_NAME_VERSION (name)])
     return ret;
@@ -284,7 +281,9 @@ pta_gimple_fold_valueize (tree name)
   tree ret
     = x_fold_context.m_ranger->value_of_expr (name, x_fold_context.m_stmt);
 
-  if (!ret && TREE_CODE (name) == SSA_NAME)
+  if (!ret
+      && TREE_CODE (name) == SSA_NAME
+      && POINTER_TYPE_P (TREE_TYPE (name)))
     ret = x_fold_context.m_points_to_analyzer->get_points_to (name);
 
   return ret ? ret : name;
@@ -436,7 +435,9 @@ public:
   tree value_of_expr (tree name, gimple *s = NULL) OVERRIDE
   {
     tree ret = m_ranger->value_of_expr (name, s);
-    if (!ret && TREE_CODE (name) == SSA_NAME)
+    if (!ret
+	&& TREE_CODE (name) == SSA_NAME
+	&& POINTER_TYPE_P (TREE_TYPE (name)))
       ret = m_points_to_analyzer->get_points_to (name);
     return ret;
   }
@@ -444,7 +445,9 @@ public:
   tree value_on_edge (edge e, tree name) OVERRIDE
   {
     tree ret = m_ranger->value_on_edge (e, name);
-    if (!ret && TREE_CODE (name) == SSA_NAME)
+    if (!ret
+	&& TREE_CODE (name) == SSA_NAME
+	&& POINTER_TYPE_P (TREE_TYPE (name)))
       ret = m_points_to_analyzer->get_points_to (name);
     return ret;
   }
@@ -579,7 +582,9 @@ hybrid_folder::value_of_expr (tree op, gimple *stmt)
 {
   tree evrp_ret = evrp_folder::value_of_expr (op, stmt);
   tree ranger_ret = m_ranger->value_of_expr (op, stmt);
-  if (!ranger_ret && TREE_CODE (op) == SSA_NAME)
+  if (!ranger_ret
+      && TREE_CODE (op) == SSA_NAME
+      && POINTER_TYPE_P (TREE_TYPE (op)))
     ranger_ret = m_points_to_analyzer->get_points_to (op);
   return choose_value (evrp_ret, ranger_ret, op, stmt);
 }
@@ -591,7 +596,9 @@ hybrid_folder::value_on_edge (edge e, tree op)
   // via hybrid_folder::value_of_expr, but without an edge.
   tree evrp_ret = evrp_folder::value_of_expr (op, NULL);
   tree ranger_ret = m_ranger->value_on_edge (e, op);
-  if (!ranger_ret && TREE_CODE (op) == SSA_NAME)
+  if (!ranger_ret
+      && TREE_CODE (op) == SSA_NAME
+      && POINTER_TYPE_P (TREE_TYPE (op)))
     ranger_ret = m_points_to_analyzer->get_points_to (op);
   return choose_value (evrp_ret, ranger_ret, op);
 }
