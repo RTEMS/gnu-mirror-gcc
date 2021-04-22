@@ -12340,6 +12340,9 @@ Use @option{-flto=auto} to use GNU make's job server, if available,
 or otherwise fall back to autodetection of the number of CPU threads
 present in your system.
 
+If you specify @option{-flto=jobserver} and make's job server can't be detected,
+then well fall back to the number of CPU threads present in your system.
+
 @item -flto-partition=@var{alg}
 @opindex flto-partition
 Specify the partitioning algorithm used by the link-time optimizer.
