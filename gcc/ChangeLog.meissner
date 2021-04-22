@@ -1,3 +1,11 @@
+work049.patch023:
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (xxsplti32dx_constant_p): Add support for
+	V4SImode and V4SFmode.
+	* config/rs6000/vsx.md (XXSPLTI32DX): Add support for V4SImode and
+	V4SFmode.
+
 work049.patch021:
 2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 

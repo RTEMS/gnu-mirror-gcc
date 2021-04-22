@@ -1,3 +1,9 @@
+work049.patch023:
+2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-v4sf-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si-2.c: New test.
+
 work049.patch022:
 2021-04-21  Michael Meissner  <meissner@linux.ibm.com>
 
