@@ -6349,7 +6349,7 @@
 
 ;; XXSPLTI32DX used to create 64-bit constants or vector constants where the
 ;; even elements match and the odd elements match.
-(define_mode_iterator XXSPLTI32DX [SF DF V2DF V2DI])
+(define_mode_iterator XXSPLTI32DX [SF DF V2DF V2DI V4SI V4SF])
 
 (define_insn_and_split "*xxsplti32dx_<mode>"
   [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")

@@ -6683,6 +6683,40 @@ xxsplti32dx_constant_p (rtx op,
 	*low_ptr = value & 0xffffffff;
 	return true;
       }
+
+    case E_V4SImode:
+    case E_V4SFmode:
+      {
+	/* For V4SI/V4SF, the XXSPLTI32DX instruction pair can represent vectors
+	   where the two even elements are equal and the two odd elements are
+	   equal.  */
+	if (GET_CODE (op) != CONST_VECTOR)
+	  return false;
+
+	rtx op0 = CONST_VECTOR_ELT (op, 0);
+	if (!rtx_equal_p (op0, CONST_VECTOR_ELT (op, 2)))
+	  return false;
+
+	rtx op1 = CONST_VECTOR_ELT (op, 1);
+	if (!rtx_equal_p (op1, CONST_VECTOR_ELT (op, 3)))
+	  return false;
+
+	if (rtx_equal_p (op0, op1))
+	  return false;
+
+	if (mode == V4SImode)
+	  {
+	    *high_ptr = INTVAL (op0);
+	    *low_ptr = INTVAL (op1);
+	  }
+	else
+	  {
+	    *high_ptr = rs6000_const_f32_to_i32 (op0);
+	    *low_ptr = rs6000_const_f32_to_i32 (op1);
+	  }
+
+	return true;
+      }
     }
 
   return false;
