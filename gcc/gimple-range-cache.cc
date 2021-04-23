@@ -66,7 +66,9 @@ non_null_ref::non_null_deref_p (tree name, basic_block bb)
   // See if any dominator has set non-zero.
   if (dom_info_available_p (CDI_DOMINATORS))
     {
-      for ( ; bb; bb = get_immediate_dominator (CDI_DOMINATORS, bb))
+      basic_block def_bb = gimple_bb (SSA_NAME_DEF_STMT (name));
+      basic_block def_dom = def_bb ? get_immediate_dominator (CDI_DOMINATORS, def_bb) : NULL;
+      for ( ; bb && bb != def_dom; bb = get_immediate_dominator (CDI_DOMINATORS, bb))
 	if (bitmap_bit_p (m_nn[v], bb->index))
 	  return true;
     }
