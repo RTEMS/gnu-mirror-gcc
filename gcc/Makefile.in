@@ -1755,7 +1755,7 @@ MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  insn-output.c insn-recog.c insn-emit.c insn-extract.c insn-peep.c \
  insn-attr.h insn-attr-common.h insn-attrtab.c insn-dfatab.c \
  insn-latencytab.c insn-opinit.c insn-opinit.h insn-preds.c insn-constants.h \
- tm-preds.h tm-constrs.h checksum-options gimple-match.c generic-match.c \
+ tm-preds.h tm-constrs.h gimple-match.c generic-match.c \
  tree-check.h min-insn-modes.c insn-modes.c insn-modes.h insn-modes-inline.h \
  genrtl.h gt-*.h gtype-*.h gtype-desc.c gtyp-input.list \
  case-cfn-macros.h cfn-operators.pd \
@@ -2135,10 +2135,6 @@ $(SPECS): xgcc$(exeext)
 # Also create gcc-cross, so that install-common will install properly.
 gcc-cross$(exeext): xgcc$(exeext)
 	cp xgcc$(exeext) gcc-cross$(exeext)
-
-checksum-options:
-	echo "$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS)" > checksum-options.tmp \
-	&& $(srcdir)/../move-if-change checksum-options.tmp checksum-options
 
 #
 # Build libgcc.a.
