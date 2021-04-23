@@ -110,9 +110,12 @@ main (int argc, char ** argv)
     dosum (&ctx, argv[i]);
   md5_finish_ctx (&ctx, result);
 
-  puts ("#include \"config.h\"");
-  puts ("#include \"system.h\"");
-  fputs ("EXPORTED_CONST unsigned char executable_checksum[16] = { ", stdout);
+  puts ("/* Checksum based on the following files:\n");
+  for (i = 1; i < argc; i++)
+    printf ("  %s\n", argv[i]);
+  puts ("*/\n");
+
+  fputs ("constexpr unsigned char executable_checksum[] = { ", stdout);
   for (i = 0; i < 16; i++)
     printf ("0x%02x%s", result[i], i == 15 ? " };\n" : ", ");
 

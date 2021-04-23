@@ -57,7 +57,7 @@ C_AND_OBJC_OBJS = attribs.o c/c-errors.o c/c-decl.o c/c-typeck.o \
 
 # Language-specific object files for C.
 C_OBJS = c/c-lang.o c-family/stub-objc.o $(C_AND_OBJC_OBJS)
-c_OBJS = $(C_OBJS) cc1-checksum.o c/gccspec.o
+c_OBJS = $(C_OBJS) c/gccspec.o
 
 # Use strict warnings for this front end.
 c-warn = $(STRICT_WARN)
@@ -68,24 +68,10 @@ $(C_OBJS): ALL_COMPILERFLAGS += -fauto-profile=cc1.fda
 $(C_OBJS): cc1.fda
 endif
 
-# compute checksum over all object files and the options
-# re-use the checksum from the prev-final stage so it passes
-# the bootstrap comparison and allows comparing of the cc1 binary
-cc1-checksum.c : build/genchecksum$(build_exeext) checksum-options \
-	$(C_OBJS) $(BACKEND) $(LIBDEPS) 
-	if [ -f ../stage_final ] \
-	   && cmp -s ../stage_current ../stage_final; then \
-	  cp ../prev-gcc/cc1-checksum.c cc1-checksum.c; \
-	else \
-	  build/genchecksum$(build_exeext) $(C_OBJS) $(BACKEND) $(LIBDEPS) \
-                     checksum-options > cc1-checksum.c.tmp && 		 \
-	  $(srcdir)/../move-if-change cc1-checksum.c.tmp cc1-checksum.c; \
-	fi
-
-cc1$(exeext): $(C_OBJS) cc1-checksum.o $(BACKEND) $(LIBDEPS)
+cc1$(exeext): $(C_OBJS) checksum.h $(BACKEND) $(LIBDEPS)
 	@$(call LINK_PROGRESS,$(INDEX.c),start)
 	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ $(C_OBJS) \
-	  cc1-checksum.o $(BACKEND) $(LIBS) $(BACKENDLIBS)
+	  $(BACKEND) $(LIBS) $(BACKENDLIBS)
 	@$(call LINK_PROGRESS,$(INDEX.c),end)
 
 cc1.fda: ../stage1-gcc/cc1$(exeext) ../prev-gcc/$(PERF_DATA)

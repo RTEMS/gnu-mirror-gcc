@@ -112,29 +112,15 @@ endif
 # Language-specific object files for C++.
 CXX_OBJS = cp/cp-lang.o c-family/stub-objc.o $(CXX_AND_OBJCXX_OBJS)
 
-c++_OBJS = $(CXX_OBJS) cc1plus-checksum.o cp/g++spec.o
+c++_OBJS = $(CXX_OBJS) cp/g++spec.o
 
 # Use strict warnings for this front end.
 cp-warn = $(STRICT_WARN)
 
-# compute checksum over all object files and the options
-# re-use the checksum from the prev-final stage so it passes
-# the bootstrap comparison and allows comparing of the cc1 binary
-cc1plus-checksum.c : build/genchecksum$(build_exeext) checksum-options \
-	$(CXX_OBJS) $(BACKEND) $(CODYLIB) $(LIBDEPS) 
-	if [ -f ../stage_final ] \
-	   && cmp -s ../stage_current ../stage_final; then \
-	   cp ../prev-gcc/cc1plus-checksum.c cc1plus-checksum.c; \
-	else \
-	  build/genchecksum$(build_exeext) $(CXX_OBJS) $(BACKEND) $(CODYLIB) $(LIBDEPS) \
-                     checksum-options > cc1plus-checksum.c.tmp &&	   \
-	  $(srcdir)/../move-if-change cc1plus-checksum.c.tmp cc1plus-checksum.c; \
-	fi
-
-cc1plus$(exeext): $(CXX_OBJS) cc1plus-checksum.o $(BACKEND) $(CODYLIB) $(LIBDEPS) $(c++.prev)
+cc1plus$(exeext): $(CXX_OBJS) checksum.h $(BACKEND) $(CODYLIB) $(LIBDEPS) $(c++.prev)
 	@$(call LINK_PROGRESS,$(INDEX.c++),start)
 	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
-	      $(CXX_OBJS) cc1plus-checksum.o $(BACKEND) $(CODYLIB) $(NETLIBS) \
+	      $(CXX_OBJS) $(BACKEND) $(CODYLIB) $(NETLIBS) \
 		$(LIBS) $(BACKENDLIBS)
 	@$(call LINK_PROGRESS,$(INDEX.c++),end)
 

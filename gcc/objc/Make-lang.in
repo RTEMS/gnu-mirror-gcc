@@ -55,19 +55,13 @@ OBJC_OBJS = objc/objc-lang.o objc/objc-act.o hash-table.o \
    objc/objc-encoding.o \
    objc/objc-map.o
 
-objc_OBJS = $(OBJC_OBJS) cc1obj-checksum.o
+objc_OBJS = $(OBJC_OBJS)
 
-cc1obj-checksum.c : build/genchecksum$(build_exeext) checksum-options \
-        $(OBJC_OBJS) $(C_AND_OBJC_OBJS) $(BACKEND) $(LIBDEPS)
-	build/genchecksum$(build_exeext) $(OBJC_OBJS) $(C_AND_OBJC_OBJS) \
-        $(BACKEND) $(LIBDEPS) checksum-options > cc1obj-checksum.c.tmp && \
-	$(srcdir)/../move-if-change cc1obj-checksum.c.tmp cc1obj-checksum.c
-
-cc1obj$(exeext): $(OBJC_OBJS) $(C_AND_OBJC_OBJS) cc1obj-checksum.o $(BACKEND) \
+cc1obj$(exeext): $(OBJC_OBJS) version.h $(C_AND_OBJC_OBJS) $(BACKEND) \
 		 $(LIBDEPS) $(objc.prev)
 	@$(call LINK_PROGRESS,$(INDEX.objc),start)
 	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
-	      $(OBJC_OBJS) $(C_AND_OBJC_OBJS) cc1obj-checksum.o \
+	      $(OBJC_OBJS) $(C_AND_OBJC_OBJS) \
 	      $(BACKEND) $(LIBS) $(BACKENDLIBS)
 	@$(call LINK_PROGRESS,$(INDEX.objc),end)
 

@@ -1765,7 +1765,7 @@ MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  gcc-ranlib$(exeext) \
  genversion$(build_exeext) gcov$(exeext) gcov-dump$(exeext) \
  gcov-tool$(exeect) \
- gengtype$(exeext) *.[0-9][0-9].* *.[si] *-checksum.c libbackend.a \
+ gengtype$(exeext) genchecksum$(exeext) *.[0-9][0-9].* *.[si] libbackend.a \
  libcommon-target.a libcommon.a libgcc.mk perf.data
 
 # This symlink makes the full installation name of the driver be available
@@ -2814,7 +2814,6 @@ build/genautomata.o : genautomata.c $(RTL_BASE_H) $(OBSTACK_H)		\
 build/gencheck.o : gencheck.c all-tree.def $(BCONFIG_H) $(GTM_H)	\
 	$(SYSTEM_H) $(CORETYPES_H) tree.def c-family/c-common.def	\
 	$(lang_tree_files) gimple.def
-build/genchecksum.o : genchecksum.c $(BCONFIG_H) $(SYSTEM_H) $(MD5_H)
 build/gencodes.o : gencodes.c $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(GENSUPPORT_H)
 build/genconditions.o : genconditions.c $(RTL_BASE_H) $(BCONFIG_H)	\
@@ -3036,6 +3035,13 @@ s-version: build/genversion$(build_exeext)
 	build/genversion$(build_exeext) > tmp-version.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-version.h version.h
 	$(STAMP) s-version
+
+build/genchecksum.o : genchecksum.c $(BCONFIG_H) $(SYSTEM_H) $(MD5_H)
+
+checksum.h: s-checksum; @true
+s-checksum: build/genchecksum$(build_exeext) s-gtype auto-host.h
+	build/genchecksum$(build_exeext) gt-*.h auto-host.h > tmp-checksum.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-checksum.h checksum.h
 
 # gcov.o needs $(ZLIBINC) added to the include flags.
 CFLAGS-gcov.o += $(ZLIBINC)
@@ -3505,8 +3511,6 @@ mostlyclean: lang.mostlyclean
 	-rm -f gtype-*
 	-rm -f gt-*
 	-rm -f gtype.state
-# Delete genchecksum outputs
-	-rm -f *-checksum.c
 # Delete lock-and-run bits
 	-rm -rf linkfe.lck lock-stamp.*
 
