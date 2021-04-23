@@ -396,22 +396,24 @@ gimple_ranger::range_of_expr (irange &r, tree expr, gimple *stmt)
 
   // If name is defined in this block, try to get an range from S.
   if (def_stmt && gimple_bb (def_stmt) == bb)
-    range_of_stmt (r, def_stmt, expr);
+    {
+      range_of_stmt (r, def_stmt, expr);
+
+      // No range yet, see if there is a dereference in the block.
+      // We don't care if it's between the def and a use within a block
+      // because the entire block must be executed anyway.
+      // FIXME:?? For non-call exceptions we could have a statement throw
+      // which causes an early block exit.
+      // in which case we may need to walk from S back to the def/top of block
+      // to make sure the deref happens between S and there before claiming
+      // there is a deref.   Punt for now.
+      if (!cfun->can_throw_non_call_exceptions && r.varying_p () &&
+	  m_cache.m_non_null.non_null_deref_p (expr, bb))
+	r = range_nonzero (TREE_TYPE (expr));
+    }
   else
     // Otherwise OP comes from outside this block, use range on entry.
     range_on_entry (r, bb, expr);
-
-  // No range yet, see if there is a dereference in the block.
-  // We don't care if it's between the def and a use within a block
-  // because the entire block must be executed anyway.
-  // FIXME:?? For non-call exceptions we could have a statement throw
-  // which causes an early block exit.
-  // in which case we may need to walk from S back to the def/top of block
-  // to make sure the deref happens between S and there before claiming
-  // there is a deref.   Punt for now.
-  if (!cfun->can_throw_non_call_exceptions && r.varying_p () &&
-      m_cache.m_non_null.non_null_deref_p (expr, bb))
-    r = range_nonzero (TREE_TYPE (expr));
 
   return true;
 }
@@ -430,6 +432,10 @@ gimple_ranger::range_on_entry (irange &r, basic_block bb, tree name)
   // Now see if there is any on_entry value which may refine it.
   if (m_cache.block_range (entry_range, bb, name))
     r.intersect (entry_range);
+
+  if (!cfun->can_throw_non_call_exceptions && r.varying_p () &&
+      m_cache.m_non_null.non_null_deref_p (name, bb))
+    r = range_nonzero (TREE_TYPE (name));
 }
 
 // Calculate the range for NAME at the end of block BB and return it in R.
@@ -442,14 +448,17 @@ gimple_ranger::range_on_exit (irange &r, basic_block bb, tree name)
   gcc_checking_assert (bb != EXIT_BLOCK_PTR_FOR_FN (cfun));
   gcc_checking_assert (gimple_range_ssa_p (name));
 
-  gimple *s = last_stmt (bb);
+  gimple *s = SSA_NAME_DEF_STMT (name);
+  basic_block def_bb = gimple_bb (s);
+  if (def_bb != bb)
+    s = last_stmt (bb);
   // If there is no statement in the block and this isn't the entry
   // block, go get the range_on_entry for this block.  For the entry
   // block, a NULL stmt will return the global value for NAME.
-  if (!s && bb != ENTRY_BLOCK_PTR_FOR_FN (cfun))
-    range_on_entry (r, bb, name);
-  else
+  if (s)
     range_of_expr (r, name, s);
+  else
+    range_on_entry (r, bb, name);
   gcc_checking_assert (r.undefined_p ()
 		       || range_compatible_p (r.type (), TREE_TYPE (name)));
 }
