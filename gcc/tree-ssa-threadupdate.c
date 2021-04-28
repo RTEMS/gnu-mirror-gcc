@@ -197,7 +197,8 @@ jump_thread_path_registry::allocate_thread_path ()
    edge in the path.  */
 
 void
-dump_jump_thread_path (FILE *dump_file, vec<jump_thread_edge *> path,
+dump_jump_thread_path (FILE *dump_file,
+		       const vec<jump_thread_edge *> path,
 		       bool registering)
 {
   fprintf (dump_file,
@@ -229,6 +230,12 @@ dump_jump_thread_path (FILE *dump_file, vec<jump_thread_edge *> path,
 		 path[i]->e->src->index, path[i]->e->dest->index);
     }
   fputc ('\n', dump_file);
+}
+
+DEBUG_FUNCTION void
+debug (const vec<jump_thread_edge *> &path)
+{
+  dump_jump_thread_path (stderr, path, true);
 }
 
 /* Simple hashing function.  For any given incoming edge E, we're going
