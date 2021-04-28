@@ -17,6 +17,7 @@ on:
       - 'releases/**'
       - 'develop/**'
       - 'gcc**'
+  workflow_dispatch:
 
 jobs:    
   build:
