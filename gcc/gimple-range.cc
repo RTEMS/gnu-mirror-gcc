@@ -856,3 +856,56 @@ trace_ranger::range_of_expr (irange &r, tree name, gimple *s)
 
   return trailer (idx, "range_of_expr", res, name, r);
 }
+
+// Return the legacy GCC global range for NAME if it has one, otherwise
+// return VARYING.
+
+value_range
+gimple_range_global (tree name)
+{
+  gcc_checking_assert (gimple_range_ssa_p (name));
+  tree type = TREE_TYPE (name);
+
+#if 0
+  // Reenable picking up global ranges when we are OK failing tests that look
+  // for builtin_unreachable in the code, like
+  // RUNTESTFLAGS=dg.exp=pr61034.C check-g++
+  // pre-optimizations (inlining) set a global range which causes the ranger
+  // to remove the condition which leads to builtin_unreachable.
+#endif
+
+  // ?? Adapted from vr_values::get_lattice_entry().
+  // Use a range from an SSA_NAME's available range.
+  tree sym = SSA_NAME_VAR (name);
+  if (SSA_NAME_IS_DEFAULT_DEF (name) && TREE_CODE (sym) == PARM_DECL)
+    {
+      // Try to use the "nonnull" attribute to create ~[0, 0]
+      // anti-ranges for pointers.  Note that this is only valid with
+      // default definitions of PARM_DECLs.
+      if (POINTER_TYPE_P (type)
+	  && (nonnull_arg_p (sym) || get_ptr_nonnull (name)))
+	{
+	  value_range r;
+	  r.set_nonzero (type);
+	  return r;
+	}
+      else if (INTEGRAL_TYPE_P (type))
+	{
+	  value_range r;
+	  get_range_info (name, r);
+	  if (r.undefined_p ())
+	    r.set_varying (type);
+	  return r;
+	}
+    }
+
+  // If this is a local automatic with no definition, use undefined for a
+  // starting value.
+  if (SSA_NAME_IS_DEFAULT_DEF (name)
+     && TREE_CODE (SSA_NAME_VAR (name)) != PARM_DECL
+     && TREE_CODE (SSA_NAME_VAR (name)) != RESULT_DECL)
+    return value_range ();
+
+  // Otherwise return range for the type.
+  return value_range (type);
+}
