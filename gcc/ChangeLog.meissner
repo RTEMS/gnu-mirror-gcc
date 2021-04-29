@@ -1,3 +1,11 @@
+work050.patch20:
+2021-04-29  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR bootstrap/100327
+	* config/rs6000/rs6000.c
+	(TARGET_LIBGCC_FLOATING_MODE_SUPPORTED_P): Define.
+	(rs6000_iibgcc_floating_mode_supported_p): New target hook.
+
 work050.patch18:
 2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
 
