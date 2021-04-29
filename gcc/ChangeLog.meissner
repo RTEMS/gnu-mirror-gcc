@@ -1,3 +1,71 @@
+work050.patch18:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with XXSPLTI32DX, it is easy.
+	(xxsplti32dx_operand): New predicate.
+	(easy_vector_constant): If the constant can be loaded with
+	XXSPLTI32DX, it is easy.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mxxsplti32dx.
+	(xxsplti32dx_constant_float_p): New helper function.
+	(xxsplti32dx_constant_p): New function.
+	(output_vec_const_move): If the operand can be loaded with
+	XXSPLTI32DX, split it.
+	(rs6000_opt_masks): Add -mxxsplti32dx.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat64, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New option.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(XXSPLTI32DX): New mode iterator.
+	(xxsplti32dx_<mode>): New insn and splitter for XXSPLTI32DX.
+	(xxsplti32dx_<mode>_first): New insn.
+	(xxsplti32dx_<mode>_second): New insn.
+
+work050.patch16:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the scalar constant with XXSPLTIDP, the floating point constant is
+	easy.
+	(xxspltidp_operand): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mxxspltidp support.
+	(POWERPC_MASKS): Add -mxxspltidp support.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltidp support.
+	(const_vector_element_all_same): New function.
+	(xxspltidp_constant_p): New function.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(rs6000_opt_masks): Add -mxxspltidp support.
+	(rs6000_emit_xxspltidp_v2df): Change function to implement the
+	XXSPLTIDP instruction.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add XXSPLTIDP
+	support.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Add XXSPLTIDP support.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Add XXSPLTIDP support.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIDP): Rename UNSPEC_XXSPLTID
+	to UNSPEC_XXSPLTIDP to match the instruction.
+	(xxspltidp_v2df): Use 'use' for the expand arguments, instead of
+	writing out an insn.
+	(xxspltidp_v2df_inst): Delete.
+	(XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_internal1): New define_insn_and_split.
+	(xxspltidp_<mode>_internal2): New define_insn.
+
 work050.patch14:
 2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
 

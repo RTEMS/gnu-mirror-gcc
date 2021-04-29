@@ -1,3 +1,19 @@
+work050.patch19:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn count.
+	* gcc.target/powerpc/vec-splat-constant-sf.c: Update insn count.
+	* gcc.target/powerpc/vec-splat-constant-df.c: Update insn count.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: Update insn
+	count.
+
+work050.patch17:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
+
 work050.patch15:
 2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
 
