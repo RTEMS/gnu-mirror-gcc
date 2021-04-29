@@ -1569,6 +1569,10 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P rs6000_scalar_mode_supported_p
 
+#undef TARGET_LIBGCC_FLOATING_MODE_SUPPORTED_P
+#define TARGET_LIBGCC_FLOATING_MODE_SUPPORTED_P \
+  rs6000_libgcc_floating_mode_supported_p
+
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P rs6000_vector_mode_supported_p
 
@@ -24087,6 +24091,25 @@ rs6000_scalar_mode_supported_p (scalar_mode mode)
     return true;
   else
     return default_scalar_mode_supported_p (mode);
+}
+
+/* Target hookd for libgcc_floating_mode_supported_p.  */
+
+static bool
+rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
+{
+  switch (mode)
+    {
+    case E_SFmode:
+    case E_DFmode:
+    case E_TFmode:
+    case E_KFmode:
+    case E_IFmode:
+      return true;
+
+    default:
+      return false;
+    }
 }
 
 /* Target hook for vector_mode_supported_p.  */
