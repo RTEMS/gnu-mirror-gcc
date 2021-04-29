@@ -1,3 +1,51 @@
+work050.patch12;
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (xxeval): Use register_predicate instead of
+	altivec_register_predicate.
+
+work050.patch11:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(UNSPEC_XXSPLTIW): Move to vsx.md.
+	(UNSPEC_XXSPLTID): Move to vsx.md.
+	(UNSPEC_XXSPLTI32DX): Move to vsx.md.
+	(UNSPEC_XXBLEND): Move to vsx.md.
+	(UNSPEC_XXPERMX): Move to vsx.md.
+	(VM3): Move to vsx.md.
+	(VM3_char): Move to vsx.md.
+	(xxspltiw_v4si): Move to vsx.md.
+	(xxspltiw_v4sf): Move to vsx.md.
+	(xxspltiw_v4sf_inst): Move to vsx.md.
+	(xxspltidp_v2df): Move to vsx.md.
+	(xxspltidp_v2df_inst): Move to vsx.md.
+	(xxsplti32dx_v4si_inst): Move to vsx.md.
+	(xxsplti32dx_v4sf): Move to vsx.md.
+	(xxsplti32dx_v4sf_inst): Move to vsx.md.
+	(xxblend_<mode>): Move to vsx.md.
+	(xxpermx): Move to vsx.md.
+	(xxpermx_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(UNSPEC_XXSPLTIW): Move from altivec.md.
+	(UNSPEC_XXSPLTID): Move from altivec.md.
+	(UNSPEC_XXSPLTI32DX): Move from altivec.md.
+	(UNSPEC_XXBLEND): Move from altivec.md.
+	(UNSPEC_XXPERMX): Move from altivec.md.
+	(VM3): Move from altivec.md.
+	(VM3_char): Move from altivec.md.
+	(xxspltiw_v4si): Move from altivec.md.
+	(xxspltiw_v4sf): Move from altivec.md.
+	(xxspltiw_v4sf_inst): Move from altivec.md.
+	(xxspltidp_v2df): Move from altivec.md.
+	(xxspltidp_v2df_inst): Move from altivec.md.
+	(xxsplti32dx_v4si_inst): Move from altivec.md.
+	(xxsplti32dx_v4sf): Move from altivec.md.
+	(xxsplti32dx_v4sf_inst): Move from altivec.md.
+	(xxblend_<mode>): Move from altivec.md.
+	(xxpermx): Move from altivec.md.
+	(xxpermx_inst): Move from altivec.md.
+
 work050.patch10:
 2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
 
