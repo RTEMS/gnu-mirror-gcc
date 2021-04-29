@@ -1,3 +1,9 @@
+work050.patch13:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Run test with -O2
+	optimization.  Add missing abort call in the test.
+
 work050.patch05:
 2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
 
