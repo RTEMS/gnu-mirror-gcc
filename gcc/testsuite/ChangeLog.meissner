@@ -1,3 +1,41 @@
+work050.patch05:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* c-c++-common/dfp/convert-bfp-11.c: Force using IBM 128-bit long
+	double.  Remove check for 64-bit long double.
+
+work050.patch04:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/70117
+	* gcc.target/powerpc/pr70117.c: Force the long double type to use
+	the IBM 128-bit format.
+
+work050.patch03:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* lib/target-supports.exp
+	(add_options_for_ppc_long_double_override_ibm128): New function.
+	(check_effective_target_ppc_long_double_override_ibm128): New
+	function.
+	(add_options_for_ppc_long_double_override_ieee128): New function.
+	(check_effective_target_ppc_long_double_override_ieee128): New
+	function.
+	(add_options_for_ppc_long_double_override_64bit): New function.
+	(check_effective_target_ppc_long_double_override_64bit): New
+	function.
+
+work050.patch02:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+        * gcc.target/powerpc/float128-cmove.c: New test.
+        * gcc.target/powerpc/float128-minmax-3.c: New test.
+
+work050.patch01:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
 2021-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

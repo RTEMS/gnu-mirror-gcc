@@ -1,3 +1,65 @@
+work050.patch10:
+2021-04-20  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Do not set
+	LINK_OS_EXTRA_SPEC664 for the Advance Toolchain.  Continue to set
+	LINK_OS_EXTRA_SPEC32.
+
+work050.patch09:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_const_f32_to_i32): Change
+	return type to long.
+	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
+	type to long.
+
+work050.patch07:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
+work050.patch06:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE-128 map the nanq built-in functions to the long
+	double function, not the f128 function.
+
+work050.patch02:
+2021-04-28 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (rs6000_maybe_emit_fp_cmove): Add IEEE
+	128-bit floating point conditional move support.
+	(have_compare_and_set_mask): Add IEEE 128-bit floating point
+	types.
+	* config/rs6000/rs6000.md (mov<mode>cc, IEEE128 iterator): New insn.
+	(mov<mode>cc_p10, IEEE128 iterator): New insn.
+	(mov<mode>cc_invert_p10, IEEE128 iterator): New insn.
+	(fpmask<mode>, IEEE128 iterator): New insn.
+	(xxsel<mode>, IEEE128 iterator): New insn.
+
+work050.patch01:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs6000.md (s<minmax><mode>3, IEEE128 iterator):
+	New insns.
+
 2021-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

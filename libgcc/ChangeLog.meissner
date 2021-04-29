@@ -1,3 +1,9 @@
+work050.patch08:
+2021-04-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/ibm-ldouble.c (pack_ldouble): Use
+	__builtin_pack_ibm128 instead of __builtin_pack_longdouble.
+
 2021-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
