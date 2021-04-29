@@ -3423,7 +3423,7 @@ rs6000_builtin_mask_calculate (void)
 	  | ((TARGET_LONG_DOUBLE_128
 	      && TARGET_HARD_FLOAT
 	      && !TARGET_IEEEQUAD)	    ? RS6000_BTM_LDBL128   : 0)
-	  | ((TARGET_FLOAT128_TYPE)	    ? RS6000_BTM_FLOAT128  : 0)
+	  | ((TARGET_IBM128)		    ? RS6000_BTM_IBM128    : 0)
 	  | ((TARGET_FLOAT128_HW)	    ? RS6000_BTM_FLOAT128_HW : 0)
 	  | ((TARGET_MMA)		    ? RS6000_BTM_MMA	   : 0)
 	  | ((TARGET_POWER10)               ? RS6000_BTM_P10       : 0));
@@ -24085,7 +24085,7 @@ static struct rs6000_opt_mask const rs6000_builtin_mask_names[] =
   { "hard-float",	 RS6000_BTM_HARD_FLOAT,	false, false },
   { "long-double-128",	 RS6000_BTM_LDBL128,	false, false },
   { "powerpc64",	 RS6000_BTM_POWERPC64,  false, false },
-  { "float128",		 RS6000_BTM_FLOAT128,   false, false },
+  { "ibm128",		 RS6000_BTM_IBM128,     false, false },
   { "float128-hw",	 RS6000_BTM_FLOAT128_HW,false, false },
   { "mma",		 RS6000_BTM_MMA,	false, false },
   { "power10",		 RS6000_BTM_P10,	false, false },
