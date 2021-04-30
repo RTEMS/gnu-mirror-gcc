@@ -389,6 +389,7 @@
    UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTIDP
    UNSPEC_XXSPLTI32DX
+   UNSPEC_XXSPLTI32DX_CONST
    UNSPEC_XXBLEND
    UNSPEC_XXPERMX
   ])
@@ -6484,3 +6485,74 @@
   "xxspltidp %x0,%1"
  [(set_attr "type" "vecperm")
   (set_attr "prefixed" "yes")])
+
+;; XXSPLTI32DX used to create 64-bit constants or vector constants where the
+;; even elements match and the odd elements match.
+(define_mode_iterator XXSPLTI32DX [SF DF V2DF V2DI])
+
+(define_insn_and_split "*xxsplti32dx_<mode>"
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
+	(match_operand:XXSPLTI32DX 1 "xxsplti32dx_operand"))]
+  "TARGET_XXSPLTI32DX"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:XXSPLTI32DX [(match_dup 2)
+			     (match_dup 3)] UNSPEC_XXSPLTI32DX_CONST))
+   (set (match_dup 0)
+	(unspec:XXSPLTI32DX [(match_dup 0)
+			     (match_dup 4)
+			     (match_dup 5)] UNSPEC_XXSPLTI32DX_CONST))]
+{
+  HOST_WIDE_INT high = 0, low = 0;
+
+  if (!xxsplti32dx_constant_p (operands[1], <MODE>mode, &high, &low))
+    gcc_unreachable ();
+
+  /* If the low bits are 0 or all 1s, initialize that word first.  This way we
+     can use a smaller XXSPLTIB instruction instead the first XXSPLTI32DX.  */
+  if (low == 0 || low ==  -1)
+    {
+      operands[2] = const1_rtx;
+      operands[3] = GEN_INT (low);
+      operands[4] = const0_rtx;
+      operands[5] = GEN_INT (high);
+    }
+  else
+    {
+      operands[2] = const0_rtx;
+      operands[3] = GEN_INT (high);
+      operands[4] = const1_rtx;
+      operands[5] = GEN_INT (low);
+    }
+}
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")
+   (set_attr "num_insns" "2")
+   (set_attr "max_prefixed_insns" "2")])
+
+;; First word of XXSPLTI32DX
+(define_insn "*xxsplti32dx_<mode>_first"
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa,wa,wa")
+	(unspec:XXSPLTI32DX [(match_operand 1 "u1bit_cint_operand" "n,n,n")
+			     (match_operand 2 "const_int_operand" "O,wM,n")]
+			    UNSPEC_XXSPLTI32DX_CONST))]
+  "TARGET_XXSPLTI32DX"
+  "@
+   xxspltib %x0,0
+   xxspltib %x0,255
+   xxsplti32dx %x0,%1,%2"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "*,*,yes")])
+
+;; Second word of XXSPLTI32DX
+(define_insn "*xxsplti32dx_<mode>_second"
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
+	(unspec:XXSPLTI32DX [(match_operand:XXSPLTI32DX 1 "vsx_register_operand" "0")
+			     (match_operand 2 "u1bit_cint_operand" "n")
+			     (match_operand 3 "const_int_operand" "n")]
+			    UNSPEC_XXSPLTI32DX_CONST))]
+  "TARGET_XXSPLTI32DX"
+  "xxsplti32dx %x0,%2,%3"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
