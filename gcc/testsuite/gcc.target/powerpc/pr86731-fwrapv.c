@@ -8,6 +8,13 @@
 /* { dg-require-effective-target lp64 } */
 /* { dg-options "-maltivec -O3 -fwrapv " } */
 
+/* If the compiler was configured to automatically generate power10 support with
+   --with-cpu=power10, turn it off.  Otherwise, it will generate XXSPLTIW
+   instructions.  */
+#ifdef _ARCH_PWR10
+#pragma GCC target ("cpu=power9")
+#endif
+
 #include <altivec.h>
 /* original test as reported.  */
 vector unsigned int splat(void)
