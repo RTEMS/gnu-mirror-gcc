@@ -1,7 +1,7 @@
 /* { dg-do run { target { power10_hw } } } */
 /* { dg-do link { target { ! power10_hw } } } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -save-temps -O2" } */
+/* { dg-options "-mdejagnu-cpu=power10 -save-temps" } */
 #include <altivec.h>
 
 #define DEBUG 0
@@ -101,7 +101,7 @@ main (int argc, char *argv [])
       printf(" vresult_d[%i] = %e, expected_vresult_d[%i] = %e\n",
 	     i, vresult_d[i], i, expected_vresult_d[i]);
 #else
-    abort();
+    ;
 #endif
   }
 
@@ -160,6 +160,8 @@ main (int argc, char *argv [])
   return 0;
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltiw\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mxxspltidp\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mxxsplti32dx\M} 3 } } */
+
+
