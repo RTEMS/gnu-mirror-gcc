@@ -1,3 +1,139 @@
+work052.patch022:
+2021-05-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/fold-vec-div-longlong.c:
+	* gcc.target/powerpc/fold-vec-mult-longlong.c: Turn off power10
+	code generation.
+
+work052.patch021:
+2021-05-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/100166
+	* gcc.target/powerpc/fold-vec-splat-floatdouble.c:
+	* gcc.target/powerpc/fold-vec-splat-longlong.c:
+	* gcc.target/powerpc/lvsl-lvsr.c:  Update insn counts if power10
+	code generation is used.
+
+work052.patch020:
+2021-05-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/100166
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-char.c:
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-double.c:
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-float.c:
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-int.c:
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-longlong.c:
+	* gcc.target/powerpc/fold-vec-load-builtin_vec_xl-short.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-char.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-double.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-float.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-int.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-longlong.c:
+	* gcc.target/powerpc/fold-vec-load-vec_vsx_ld-short.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-char.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-double.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-float.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-int.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-longlong.c:
+	* gcc.target/powerpc/fold-vec-load-vec_xl-short.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-char.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-double.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-float.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-int.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-longlong.c:
+	* gcc.target/powerpc/fold-vec-store-builtin_vec_xst-short.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-char.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-double.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-float.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-int.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-longlong.c:
+	* gcc.target/powerpc/fold-vec-store-vec_vsx_st-short.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-char.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-double.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-float.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-int.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-longlong.c:
+	* gcc.target/powerpc/fold-vec-store-vec_xst-short.c: Update
+	insn counts if power10 code generation is used.
+
+
+work052.patch019:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax.c: Turn off power10 code
+	generation.
+	* gcc.target/powerpc/pr86731-fwrapv.c: Turn off power10 code
+	generation.
+
+work052.patch018:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-sf.c: Update insn count.
+	* gcc.target/powerpc/vec-splat-constant-df.c: Update insn count.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: Update insn
+	count.
+
+work052.patch016:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
+
+work052.patch014:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+
+work052.patch012:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splati-runnable.c: Run test with -O2
+	optimization.  Do not check what XXSPLTIDP generates if the value
+	is undefined.
+
+work052.patch005:
+gcc/testsuite/
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* c-c++-common/dfp/convert-bfp-11.c: Force using IBM 128-bit long
+	double.  Remove check for 64-bit long double.
+
+work052.patch004:
+2021-05-02x  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/70117
+	* gcc.target/powerpc/pr70117.c: Force the long double type to use
+	the IBM 128-bit format.
+
+work052.patch003:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* lib/target-supports.exp
+	(add_options_for_ppc_long_double_override_ibm128): New function.
+	(check_effective_target_ppc_long_double_override_ibm128): New
+	function.
+	(add_options_for_ppc_long_double_override_ieee128): New function.
+	(check_effective_target_ppc_long_double_override_ieee128): New
+	function.
+	(add_options_for_ppc_long_double_override_64bit): New function.
+	(check_effective_target_ppc_long_double_override_64bit): New
+	function.
+
+work052.patch002:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+        * gcc.target/powerpc/float128-cmove.c: New test.
+        * gcc.target/powerpc/float128-minmax-3.c: New test.
+
+work052.patch001:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-minmax-2.c: New test.
+
 2021-05-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

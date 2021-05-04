@@ -1,3 +1,203 @@
+work052.patch017:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with XXSPLTI32DX, it is easy.
+	(xxsplti32dx_operand): New predicate.
+	(easy_vector_constant): If the constant can be loaded with
+	XXSPLTI32DX, it is easy.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mxxsplti32dx.
+	(xxsplti32dx_constant_float_p): New helper function.
+	(xxsplti32dx_constant_p): New function.
+	(output_vec_const_move): If the operand can be loaded with
+	XXSPLTI32DX, split it.
+	(rs6000_opt_masks): Add -mxxsplti32dx.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat64, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New option.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(XXSPLTI32DX): New mode iterator.
+	(xxsplti32dx_<mode>): New insn and splitter for XXSPLTI32DX.
+	(xxsplti32dx_<mode>_first): New insn.
+	(xxsplti32dx_<mode>_second): New insn.
+
+work052.patch015:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the scalar constant with XXSPLTIDP, the floating point constant is
+	easy.
+	(xxspltidp_operand): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mxxspltidp support.
+	(POWERPC_MASKS): Add -mxxspltidp support.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltidp support.
+	(const_vector_element_all_same): New function.
+	(xxspltidp_constant_p): New function.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(rs6000_opt_masks): Add -mxxspltidp support.
+	(rs6000_emit_xxspltidp_v2df): Change function to implement the
+	XXSPLTIDP instruction.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add XXSPLTIDP
+	support.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Add XXSPLTIDP support.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Add XXSPLTIDP support.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIDP): Rename UNSPEC_XXSPLTID
+	to UNSPEC_XXSPLTIDP to match the instruction.
+	(xxspltidp_v2df): Use 'use' for the expand arguments, instead of
+	writing out an insn.
+	(xxspltidp_v2df_inst): Delete.
+	(XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_internal1): New define_insn_and_split.
+	(xxspltidp_<mode>_internal2): New define_insn.
+
+work052.patch013:
+2021-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): If we can use XXSPLTIW, the vector
+	constant is easy.
+	* config/rs6000/rs6000-cpus.def (ISA_3_1_MASKS_SERVER): Add
+	-mxxspltiw support.
+	(POWERPC_MASKS): Add -mxxspltiw support.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltiw support.
+	(xxspltib_constant_p): If we can generate XXSPLTIW, don't generate
+	a XXSPLTIB and an extend instruction.
+	(output_vec_const_move): Add support for loading up vector
+	constants with XXSPLTIW.
+	(rs6000_opt_masks): Add -mxxspltiw.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v8hi): New insn.
+	(xxspltiw_v4si): Rewrite to generate a vector constant.
+	(xxspltiw_v4sf): Rewrite to generate a vector constant.
+	(xxspltiw_v4si_inst): Delete.
+	(xxspltiw_v4sf_inst): Delete.
+	(xxspltiw_v8hi_dup): New insn.
+	(xxspltiw_v4si_dup): New insn.
+	(xxspltiw_v4sf_dup): New insn.
+	(XXSPLTIW): New mode iterator.
+	(XXSPLTIW splitter): New insn splitter for XXSPLTIW.
+
+work052.patch011:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (xxeval): Use register_predicate instead of
+	altivec_register_predicate.
+
+work052.patch010:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/altivec.md (UNSPEC_XXEVAL): Move to vsx.md.
+	(UNSPEC_XXSPLTIW): Move to vsx.md.
+	(UNSPEC_XXSPLTID): Move to vsx.md.
+	(UNSPEC_XXSPLTI32DX): Move to vsx.md.
+	(UNSPEC_XXBLEND): Move to vsx.md.
+	(UNSPEC_XXPERMX): Move to vsx.md.
+	(VM3): Move to vsx.md.
+	(VM3_char): Move to vsx.md.
+	(xxspltiw_v4si): Move to vsx.md.
+	(xxspltiw_v4sf): Move to vsx.md.
+	(xxspltiw_v4sf_inst): Move to vsx.md.
+	(xxspltidp_v2df): Move to vsx.md.
+	(xxspltidp_v2df_inst): Move to vsx.md.
+	(xxsplti32dx_v4si_inst): Move to vsx.md.
+	(xxsplti32dx_v4sf): Move to vsx.md.
+	(xxsplti32dx_v4sf_inst): Move to vsx.md.
+	(xxblend_<mode>): Move to vsx.md.
+	(xxpermx): Move to vsx.md.
+	(xxpermx_inst): Move to vsx.md.
+	* config/rs6000/vsx.md (UNSPEC_XXEVAL): Move from altivec.md.
+	(UNSPEC_XXSPLTIW): Move from altivec.md.
+	(UNSPEC_XXSPLTID): Move from altivec.md.
+	(UNSPEC_XXSPLTI32DX): Move from altivec.md.
+	(UNSPEC_XXBLEND): Move from altivec.md.
+	(UNSPEC_XXPERMX): Move from altivec.md.
+	(VM3): Move from altivec.md.
+	(VM3_char): Move from altivec.md.
+	(xxspltiw_v4si): Move from altivec.md.
+	(xxspltiw_v4sf): Move from altivec.md.
+	(xxspltiw_v4sf_inst): Move from altivec.md.
+	(xxspltidp_v2df): Move from altivec.md.
+	(xxspltidp_v2df_inst): Move from altivec.md.
+	(xxsplti32dx_v4si_inst): Move from altivec.md.
+	(xxsplti32dx_v4sf): Move from altivec.md.
+	(xxsplti32dx_v4sf_inst): Move from altivec.md.
+	(xxblend_<mode>): Move from altivec.md.
+	(xxpermx): Move from altivec.md.
+	(xxpermx_inst): Move from altivec.md.
+
+work052.patch009:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Do not set
+	LINK_OS_EXTRA_SPEC664 for the Advance Toolchain.  Continue to set
+	LINK_OS_EXTRA_SPEC32.
+
+work052.patch008:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_const_f32_to_i32): Change
+	return type to long.
+	* config/rs6000/rs6000.c (rs6000_const_f32_to_i32): Change return
+	type to long.
+
+work052.patch006:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
+work052.patch002:
+2021-05-02 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (rs6000_maybe_emit_fp_cmove): Add IEEE
+	128-bit floating point conditional move support.
+	(have_compare_and_set_mask): Add IEEE 128-bit floating point
+	types.
+	* config/rs6000/rs6000.md (mov<mode>cc, IEEE128 iterator): New insn.
+	(mov<mode>cc_p10, IEEE128 iterator): New insn.
+	(mov<mode>cc_invert_p10, IEEE128 iterator): New insn.
+	(fpmask<mode>, IEEE128 iterator): New insn.
+	(xxsel<mode>, IEEE128 iterator): New insn.
+
+work052.patch001:
+2021-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_minmax): Add support for ISA
+	3.1 IEEE 128-bit floating point xsmaxcqp and xsmincqp instructions.
+	* config/rs6000/rs6000.md (s<minmax><mode>3, IEEE128 iterator):
+	New insns.
+
 2021-05-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
