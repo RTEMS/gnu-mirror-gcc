@@ -6,6 +6,13 @@
 /* { dg-require-effective-target lp64 } */
 /* { dg-options "-mvsx -O2" } */
 
+/* If the compiler was configured to automatically generate power10 support with
+   --with-cpu=power10, turn it off.  Otherwise, it will generate XXSPLTIW
+   instructions.  */
+#ifdef _ARCH_PWR10
+#pragma GCC target ("cpu=power9")
+#endif
+
 #include <altivec.h>
 
 vector signed long long
