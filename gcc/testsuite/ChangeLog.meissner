@@ -1,3 +1,12 @@
+work052.patch023:
+2021-05-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR testsuite/100170
+	* gcc.target/powerpc/ppc-eq0-1.c: Adjust insn count if power10
+	code is selected.
+	* gcc.target/powerpc/ppc-ne0-1.c: Turn off power10 code
+	generation.
+
 work052.patch022:
 2021-05-04  Michael Meissner  <meissner@linux.ibm.com>
 
