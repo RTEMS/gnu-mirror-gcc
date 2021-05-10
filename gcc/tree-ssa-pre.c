@@ -1067,45 +1067,8 @@ print_pre_expr (FILE *outfile, const pre_expr expr)
 
     case REFERENCE:
       {
-	vn_reference_op_t vro;
-	unsigned int i;
 	vn_reference_t ref = PRE_EXPR_REFERENCE (expr);
-	fprintf (outfile, "{");
-	for (i = 0;
-	     ref->operands.iterate (i, &vro);
-	     i++)
-	  {
-	    bool closebrace = false;
-	    if (vro->opcode != SSA_NAME
-		&& TREE_CODE_CLASS (vro->opcode) != tcc_declaration)
-	      {
-		fprintf (outfile, "%s", get_tree_code_name (vro->opcode));
-		if (vro->op0)
-		  {
-		    fprintf (outfile, "<");
-		    closebrace = true;
-		  }
-	      }
-	    if (vro->op0)
-	      {
-		print_generic_expr (outfile, vro->op0);
-		if (vro->op1)
-		  {
-		    fprintf (outfile, ",");
-		    print_generic_expr (outfile, vro->op1);
-		  }
-		if (vro->op2)
-		  {
-		    fprintf (outfile, ",");
-		    print_generic_expr (outfile, vro->op2);
-		  }
-	      }
-	    if (closebrace)
-		fprintf (outfile, ">");
-	    if (i != ref->operands.length () - 1)
-	      fprintf (outfile, ",");
-	  }
-	fprintf (outfile, "}");
+	print_vn_reference_ops (outfile, ref->operands);
 	if (ref->vuse)
 	  {
 	    fprintf (outfile, "@");
@@ -4075,11 +4038,10 @@ compute_avail (void)
 		      enum tree_code code = gimple_assign_rhs_code (stmt);
 		      vn_nary_op_t nary;
 
-		      /* COND_EXPR and VEC_COND_EXPR are awkward in
-			 that they contain an embedded complex expression.
-			 Don't even try to shove those through PRE.  */
-		      if (code == COND_EXPR
-			  || code == VEC_COND_EXPR)
+		      /* COND_EXPR is awkward in that it contains an
+			 embedded complex expression.
+			 Don't even try to shove it through PRE.  */
+		      if (code == COND_EXPR)
 			continue;
 
 		      vn_nary_op_lookup_stmt (stmt, &nary);
@@ -4189,6 +4151,16 @@ compute_avail (void)
 		      if (ref->set == set
 			  || alias_set_subset_of (set, ref->set))
 			;
+		      else if (ref1->opcode != ref2->opcode
+			       || (ref1->opcode != MEM_REF
+				   && ref1->opcode != TARGET_MEM_REF))
+			{
+			  /* With mismatching base opcodes or bases
+			     other than MEM_REF or TARGET_MEM_REF we
+			     can't do any easy TBAA adjustment.  */
+			  operands.release ();
+			  continue;
+			}
 		      else if (alias_set_subset_of (ref->set, set))
 			{
 			  ref->set = set;

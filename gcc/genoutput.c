@@ -841,7 +841,7 @@ validate_optab_operands (class data *d)
     return;
 
   /* Miscellaneous tests.  */
-  if (strncmp (d->name, "cstore", 6) == 0
+  if (startswith (d->name, "cstore")
       && d->name[strlen (d->name) - 1] == '4'
       && d->operand[0].mode == VOIDmode)
     {
@@ -1024,6 +1024,7 @@ main (int argc, const char **argv)
       case DEFINE_ADDRESS_CONSTRAINT:
       case DEFINE_MEMORY_CONSTRAINT:
       case DEFINE_SPECIAL_MEMORY_CONSTRAINT:
+      case DEFINE_RELAXED_MEMORY_CONSTRAINT:
 	note_constraint (&info);
 	break;
 

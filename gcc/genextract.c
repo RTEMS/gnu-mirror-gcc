@@ -237,7 +237,6 @@ walk_rtx (md_rtx_info *info, rtx x, class accum_extract *acc)
   switch (code)
     {
     case PC:
-    case CC0:
     case CONST_INT:
     case SYMBOL_REF:
       return;
@@ -365,8 +364,6 @@ print_header (void)
 #define IN_TARGET_CODE 1\n\
 #include \"config.h\"\n\
 #include \"system.h\"\n\
-#undef ENABLE_RTL_CHECKING\n\
-#undef ENABLE_RTL_FLAG_CHECKING\n\
 #include \"coretypes.h\"\n\
 #include \"tm.h\"\n\
 #include \"rtl.h\"\n\

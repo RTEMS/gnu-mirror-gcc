@@ -333,7 +333,7 @@ init_symbolic_number (struct symbolic_number *n, tree src)
 {
   int size;
 
-  if (! INTEGRAL_TYPE_P (TREE_TYPE (src)))
+  if (!INTEGRAL_TYPE_P (TREE_TYPE (src)) && !POINTER_TYPE_P (TREE_TYPE (src)))
     return false;
 
   n->base_addr = n->offset = n->alias_set = n->vuse = NULL_TREE;
@@ -985,10 +985,19 @@ public:
 static tree
 bswap_view_convert (gimple_stmt_iterator *gsi, tree type, tree val)
 {
-  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (val)));
+  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (val))
+	      || POINTER_TYPE_P (TREE_TYPE (val)));
   if (TYPE_SIZE (type) != TYPE_SIZE (TREE_TYPE (val)))
     {
       HOST_WIDE_INT prec = TREE_INT_CST_LOW (TYPE_SIZE (type));
+      if (POINTER_TYPE_P (TREE_TYPE (val)))
+	{
+	  gimple *g
+	    = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				   NOP_EXPR, val);
+	  gsi_insert_before (gsi, g, GSI_SAME_STMT);
+	  val = gimple_assign_lhs (g);
+	}
       tree itype = build_nonstandard_integer_type (prec, 1);
       gimple *g = gimple_build_assign (make_ssa_name (itype), NOP_EXPR, val);
       gsi_insert_before (gsi, g, GSI_SAME_STMT);
@@ -1586,17 +1595,9 @@ store_immediate_info::store_immediate_info (unsigned HOST_WIDE_INT bs,
   : bitsize (bs), bitpos (bp), bitregion_start (brs), bitregion_end (bre),
     stmt (st), order (ord), rhs_code (rhscode), n (nr),
     ins_stmt (ins_stmtp), bit_not_p (bitnotp), ops_swapped_p (false),
-    lp_nr (nr2)
-#if __cplusplus >= 201103L
-    , ops { op0r, op1r }
+    lp_nr (nr2), ops { op0r, op1r }
 {
 }
-#else
-{
-  ops[0] = op0r;
-  ops[1] = op1r;
-}
-#endif
 
 /* Struct representing a group of stores to contiguous memory locations.
    These are produced by the second phase (coalescing) and consumed in the
@@ -5230,7 +5231,7 @@ pass_store_merging::process_store (gimple *stmt)
 	  if (idx >= (unsigned)param_max_store_chains_to_track
 	      || (n_stores + (*e)->m_store_info.length ()
 		  > (unsigned)param_max_stores_to_track))
-	    terminate_and_process_chain (*e);
+	    ret |= terminate_and_process_chain (*e);
 	  else
 	    {
 	      n_stores += (*e)->m_store_info.length ();

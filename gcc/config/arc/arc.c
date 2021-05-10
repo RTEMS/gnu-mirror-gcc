@@ -8433,7 +8433,7 @@ arc_reorg (void)
 
       if (!INSN_ADDRESSES_SET_P())
 	  fatal_error (input_location,
-		       "insn addresses not set after shorten_branches");
+		       "insn addresses not set after shorten branches");
 
       for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
 	{
@@ -10283,23 +10283,6 @@ arc_regno_use_in (unsigned int regno, rtx x)
     }
 
   return NULL_RTX;
-}
-
-/* Return the integer value of the "type" attribute for INSN, or -1 if
-   INSN can't have attributes.  */
-
-static int
-arc_attr_type (rtx_insn *insn)
-{
-  if (NONJUMP_INSN_P (insn)
-      ? (GET_CODE (PATTERN (insn)) == USE
-	 || GET_CODE (PATTERN (insn)) == CLOBBER)
-      : JUMP_P (insn)
-      ? (GET_CODE (PATTERN (insn)) == ADDR_VEC
-	 || GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC)
-      : !CALL_P (insn))
-    return -1;
-  return get_attr_type (insn);
 }
 
 /* Code has a minimum p2 alignment of 1, which we must restore after

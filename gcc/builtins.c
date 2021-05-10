@@ -128,7 +128,6 @@ static rtx expand_builtin_va_copy (tree);
 static rtx inline_expand_builtin_bytecmp (tree, rtx);
 static rtx expand_builtin_strcmp (tree, rtx);
 static rtx expand_builtin_strncmp (tree, rtx, machine_mode);
-static rtx builtin_memcpy_read_str (void *, HOST_WIDE_INT, scalar_int_mode);
 static rtx expand_builtin_memchr (tree, rtx);
 static rtx expand_builtin_memcpy (tree, rtx);
 static rtx expand_builtin_memory_copy_args (tree dest, tree src, tree len,
@@ -145,7 +144,6 @@ static rtx expand_builtin_stpcpy (tree, rtx, machine_mode);
 static rtx expand_builtin_stpncpy (tree, rtx);
 static rtx expand_builtin_strncat (tree, rtx);
 static rtx expand_builtin_strncpy (tree, rtx);
-static rtx builtin_memset_gen_str (void *, HOST_WIDE_INT, scalar_int_mode);
 static rtx expand_builtin_memset (tree, rtx, machine_mode);
 static rtx expand_builtin_memset_args (tree, tree, tree, rtx, machine_mode, tree);
 static rtx expand_builtin_bzero (tree);
@@ -740,13 +738,9 @@ pointer_query::flush_cache ()
 static bool
 is_builtin_name (const char *name)
 {
-  if (strncmp (name, "__builtin_", 10) == 0)
-    return true;
-  if (strncmp (name, "__sync_", 7) == 0)
-    return true;
-  if (strncmp (name, "__atomic_", 9) == 0)
-    return true;
-  return false;
+  return (startswith (name, "__builtin_")
+	  || startswith (name, "__sync_")
+	  || startswith (name, "__atomic_"));
 }
 
 /* Return true if NODE should be considered for inline expansion regardless
@@ -1178,7 +1172,7 @@ warn_string_no_nul (location_t loc, tree expr, const char *fname,
 	}
       else
 	warned = warning_at (loc, OPT_Wstringop_overread,
-			     "%qsargument missing terminating nul",
+			     "%qs argument missing terminating nul",
 			     fname);
     }
 
@@ -2490,8 +2484,12 @@ expand_builtin_apply (rtx function, rtx arguments, rtx argsize)
   if (targetm.have_untyped_call ())
     {
       rtx mem = gen_rtx_MEM (FUNCTION_MODE, function);
-      emit_call_insn (targetm.gen_untyped_call (mem, result,
-						result_vector (1, result)));
+      rtx_insn *seq = targetm.gen_untyped_call (mem, result,
+						result_vector (1, result));
+      for (rtx_insn *insn = seq; insn; insn = NEXT_INSN (insn))
+	if (CALL_P (insn))
+	  add_reg_note (insn, REG_UNTYPED_CALL, NULL_RTX);
+      emit_insn (seq);
     }
   else if (targetm.have_call_value ())
     {
@@ -3856,7 +3854,7 @@ expand_builtin_strnlen (tree exp, rtx target, machine_mode target_mode)
    a target constant.  */
 
 static rtx
-builtin_memcpy_read_str (void *data, HOST_WIDE_INT offset,
+builtin_memcpy_read_str (void *data, void *, HOST_WIDE_INT offset,
 			 scalar_int_mode mode)
 {
   /* The REPresentation pointed to by DATA need not be a nul-terminated
@@ -4237,8 +4235,7 @@ warn_for_access (location_t loc, tree func, tree exp, int opt, tree range[2],
 		    ? warning_at (loc, opt,
 				  (maybe
 				   ? G_("%K%qD may write %E or more bytes "
-					"into a region of size %E "
-					"the destination")
+					"into a region of size %E")
 				   : G_("%K%qD writing %E or more bytes "
 					"into a region of size %E overflows "
 					"the destination")),
@@ -4282,7 +4279,7 @@ warn_for_access (location_t loc, tree func, tree exp, int opt, tree range[2],
 		  ? warning_n (loc, OPT_Wstringop_overread,
 			       tree_to_uhwi (range[0]),
 			       (maybe
-				? G_("%K%qD may reade %E byte from a region "
+				? G_("%K%qD may read %E byte from a region "
 				     "of size %E")
 				: G_("%K%qD reading %E byte from a region "
 				     "of size %E")),
@@ -4352,7 +4349,7 @@ warn_for_access (location_t loc, tree func, tree exp, int opt, tree range[2],
     warned = (func
 	      ? warning_n (loc, OPT_Wstringop_overread,
 			   tree_to_uhwi (range[0]),
-			   "%K%qD epecting %E byte in a region of size %E",
+			   "%K%qD expecting %E byte in a region of size %E",
 			   "%K%qD expecting %E bytes in a region of size %E",
 			   exp, func, range[0], size)
 	      : warning_n (loc, OPT_Wstringop_overread,
@@ -4380,7 +4377,7 @@ warn_for_access (location_t loc, tree func, tree exp, int opt, tree range[2],
 			    "a region of size %E",
 			    exp, func, range[0], range[1], size)
 	      : warning_at (loc, OPT_Wstringop_overread,
-			    "%Kexpectting between %E and %E bytes in "
+			    "%Kexpecting between %E and %E bytes in "
 			    "a region of size %E",
 			    exp, range[0], range[1], size));
 
@@ -4925,7 +4922,7 @@ tree
 gimple_call_alloc_size (gimple *stmt, wide_int rng1[2] /* = NULL */,
 			range_query * /* = NULL */)
 {
-  if (!stmt)
+  if (!stmt || !is_gimple_call (stmt))
     return NULL_TREE;
 
   tree allocfntype;
@@ -5210,7 +5207,7 @@ gimple_call_return_array (gimple *stmt, offset_int offrng[2],
   return NULL_TREE;
 }
 
-/* A helper of compute_objsize() to determine the size from an assignment
+/* A helper of compute_objsize_r() to determine the size from an assignment
    statement STMT with the RHS of either MIN_EXPR or MAX_EXPR.  */
 
 static bool
@@ -5288,6 +5285,129 @@ handle_min_max_size (gimple *stmt, int ostype, access_ref *pref,
   return true;
 }
 
+/* A helper of compute_objsize_r() to determine the size from ARRAY_REF
+   AREF.  ADDR is true if PTR is the operand of ADDR_EXPR.  Return true
+   on success and false on failure.  */
+
+static bool
+handle_array_ref (tree aref, bool addr, int ostype, access_ref *pref,
+		  ssa_name_limit_t &snlim, pointer_query *qry)
+{
+  gcc_assert (TREE_CODE (aref) == ARRAY_REF);
+
+  ++pref->deref;
+
+  tree arefop = TREE_OPERAND (aref, 0);
+  tree reftype = TREE_TYPE (arefop);
+  if (!addr && TREE_CODE (TREE_TYPE (reftype)) == POINTER_TYPE)
+    /* Avoid arrays of pointers.  FIXME: Hande pointers to arrays
+       of known bound.  */
+    return false;
+
+  if (!compute_objsize_r (arefop, ostype, pref, snlim, qry))
+    return false;
+
+  offset_int orng[2];
+  tree off = pref->eval (TREE_OPERAND (aref, 1));
+  range_query *const rvals = qry ? qry->rvals : NULL;
+  if (!get_offset_range (off, NULL, orng, rvals))
+    {
+      /* Set ORNG to the maximum offset representable in ptrdiff_t.  */
+      orng[1] = wi::to_offset (TYPE_MAX_VALUE (ptrdiff_type_node));
+      orng[0] = -orng[1] - 1;
+    }
+
+  /* Convert the array index range determined above to a byte
+     offset.  */
+  tree lowbnd = array_ref_low_bound (aref);
+  if (!integer_zerop (lowbnd) && tree_fits_uhwi_p (lowbnd))
+    {
+      /* Adjust the index by the low bound of the array domain
+	 (normally zero but 1 in Fortran).  */
+      unsigned HOST_WIDE_INT lb = tree_to_uhwi (lowbnd);
+      orng[0] -= lb;
+      orng[1] -= lb;
+    }
+
+  tree eltype = TREE_TYPE (aref);
+  tree tpsize = TYPE_SIZE_UNIT (eltype);
+  if (!tpsize || TREE_CODE (tpsize) != INTEGER_CST)
+    {
+      pref->add_max_offset ();
+      return true;
+    }
+
+  offset_int sz = wi::to_offset (tpsize);
+  orng[0] *= sz;
+  orng[1] *= sz;
+
+  if (ostype && TREE_CODE (eltype) == ARRAY_TYPE)
+    {
+      /* Except for the permissive raw memory functions which use
+	 the size of the whole object determined above, use the size
+	 of the referenced array.  Because the overall offset is from
+	 the beginning of the complete array object add this overall
+	 offset to the size of array.  */
+      offset_int sizrng[2] =
+	{
+	 pref->offrng[0] + orng[0] + sz,
+	 pref->offrng[1] + orng[1] + sz
+	};
+      if (sizrng[1] < sizrng[0])
+	std::swap (sizrng[0], sizrng[1]);
+      if (sizrng[0] >= 0 && sizrng[0] <= pref->sizrng[0])
+	pref->sizrng[0] = sizrng[0];
+      if (sizrng[1] >= 0 && sizrng[1] <= pref->sizrng[1])
+	pref->sizrng[1] = sizrng[1];
+    }
+
+  pref->add_offset (orng[0], orng[1]);
+  return true;
+}
+
+/* A helper of compute_objsize_r() to determine the size from MEM_REF
+   MREF.  Return true on success and false on failure.  */
+
+static bool
+handle_mem_ref (tree mref, int ostype, access_ref *pref,
+		ssa_name_limit_t &snlim, pointer_query *qry)
+{
+  gcc_assert (TREE_CODE (mref) == MEM_REF);
+
+  ++pref->deref;
+
+  if (VECTOR_TYPE_P (TREE_TYPE (mref)))
+    {
+      /* Hack: Give up for MEM_REFs of vector types; those may be
+	 synthesized from multiple assignments to consecutive data
+	 members (see PR 93200 and 96963).
+	 FIXME: Vectorized assignments should only be present after
+	 vectorization so this hack is only necessary after it has
+	 run and could be avoided in calls from prior passes (e.g.,
+	 tree-ssa-strlen.c).
+	 FIXME: Deal with this more generally, e.g., by marking up
+	 such MEM_REFs at the time they're created.  */
+      return false;
+    }
+
+  tree mrefop = TREE_OPERAND (mref, 0);
+  if (!compute_objsize_r (mrefop, ostype, pref, snlim, qry))
+    return false;
+
+  offset_int orng[2];
+  tree off = pref->eval (TREE_OPERAND (mref, 1));
+  range_query *const rvals = qry ? qry->rvals : NULL;
+  if (!get_offset_range (off, NULL, orng, rvals))
+    {
+      /* Set ORNG to the maximum offset representable in ptrdiff_t.  */
+      orng[1] = wi::to_offset (TYPE_MAX_VALUE (ptrdiff_type_node));
+      orng[0] = -orng[1] - 1;
+    }
+
+  pref->add_offset (orng[0], orng[1]);
+  return true;
+}
+
 /* Helper to compute the size of the object referenced by the PTR
    expression which must have pointer type, using Object Size type
    OSTYPE (only the least significant 2 bits are used).
@@ -5323,8 +5443,10 @@ compute_objsize_r (tree ptr, int ostype, access_ref *pref,
       if (!addr && POINTER_TYPE_P (TREE_TYPE (ptr)))
 	{
 	  /* Set the maximum size if the reference is to the pointer
-	     itself (as opposed to what it points to).  */
+	     itself (as opposed to what it points to), and clear
+	     BASE0 since the offset isn't necessarily zero-based.  */
 	  pref->set_max_size_range ();
+	  pref->base0 = false;
 	  return true;
 	}
 
@@ -5420,92 +5542,11 @@ compute_objsize_r (tree ptr, int ostype, access_ref *pref,
       return true;
     }
 
-  if (code == ARRAY_REF || code == MEM_REF)
-    {
-      ++pref->deref;
+  if (code == ARRAY_REF)
+    return handle_array_ref (ptr, addr, ostype, pref, snlim, qry);
 
-      tree ref = TREE_OPERAND (ptr, 0);
-      tree reftype = TREE_TYPE (ref);
-      if (!addr && code == ARRAY_REF
-	  && TREE_CODE (TREE_TYPE (reftype)) == POINTER_TYPE)
-	/* Avoid arrays of pointers.  FIXME: Hande pointers to arrays
-	   of known bound.  */
-	return false;
-
-      if (code == MEM_REF && TREE_CODE (reftype) == POINTER_TYPE)
-	{
-	  /* Give up for MEM_REFs of vector types; those may be synthesized
-	     from multiple assignments to consecutive data members.  See PR
-	     93200.
-	     FIXME: Deal with this more generally, e.g., by marking up such
-	     MEM_REFs at the time they're created.  */
-	  reftype = TREE_TYPE (reftype);
-	  if (TREE_CODE (reftype) == VECTOR_TYPE)
-	    return false;
-	}
-
-      if (!compute_objsize_r (ref, ostype, pref, snlim, qry))
-	return false;
-
-      offset_int orng[2];
-      tree off = pref->eval (TREE_OPERAND (ptr, 1));
-      if (!get_offset_range (off, NULL, orng, rvals))
-	{
-	  /* Set ORNG to the maximum offset representable in ptrdiff_t.  */
-	  orng[1] = wi::to_offset (TYPE_MAX_VALUE (ptrdiff_type_node));
-	  orng[0] = -orng[1] - 1;
-	}
-
-      if (TREE_CODE (ptr) == ARRAY_REF)
-	{
-	  /* Convert the array index range determined above to a byte
-	     offset.  */
-	  tree lowbnd = array_ref_low_bound (ptr);
-	  if (!integer_zerop (lowbnd) && tree_fits_uhwi_p (lowbnd))
-	    {
-	      /* Adjust the index by the low bound of the array domain
-		 (normally zero but 1 in Fortran).  */
-	      unsigned HOST_WIDE_INT lb = tree_to_uhwi (lowbnd);
-	      orng[0] -= lb;
-	      orng[1] -= lb;
-	    }
-
-	  tree eltype = TREE_TYPE (ptr);
-	  tree tpsize = TYPE_SIZE_UNIT (eltype);
-	  if (!tpsize || TREE_CODE (tpsize) != INTEGER_CST)
-	    {
-	      pref->add_max_offset ();
-	      return true;
-	    }
-
-	  offset_int sz = wi::to_offset (tpsize);
-	  orng[0] *= sz;
-	  orng[1] *= sz;
-
-	  if (ostype && TREE_CODE (eltype) == ARRAY_TYPE)
-	    {
-	      /* Except for the permissive raw memory functions which use
-		 the size of the whole object determined above, use the size
-		 of the referenced array.  Because the overall offset is from
-		 the beginning of the complete array object add this overall
-		 offset to the size of array.  */
-	      offset_int sizrng[2] =
-		{
-		 pref->offrng[0] + orng[0] + sz,
-		 pref->offrng[1] + orng[1] + sz
-		};
-	      if (sizrng[1] < sizrng[0])
-		std::swap (sizrng[0], sizrng[1]);
-	      if (sizrng[0] >= 0 && sizrng[0] <= pref->sizrng[0])
-		pref->sizrng[0] = sizrng[0];
-	      if (sizrng[1] >= 0 && sizrng[1] <= pref->sizrng[1])
-		pref->sizrng[1] = sizrng[1];
-	    }
-	}
-
-      pref->add_offset (orng[0], orng[1]);
-      return true;
-    }
+  if (code == MEM_REF)
+    return handle_mem_ref (ptr, ostype, pref, snlim, qry);
 
   if (code == TARGET_MEM_REF)
     {
@@ -6328,7 +6369,7 @@ expand_builtin_stpncpy (tree exp, rtx)
    constant.  */
 
 rtx
-builtin_strncpy_read_str (void *data, HOST_WIDE_INT offset,
+builtin_strncpy_read_str (void *data, void *, HOST_WIDE_INT offset,
 			  scalar_int_mode mode)
 {
   const char *str = (const char *) data;
@@ -6539,12 +6580,22 @@ expand_builtin_strncpy (tree exp, rtx target)
 
 /* Callback routine for store_by_pieces.  Read GET_MODE_BITSIZE (MODE)
    bytes from constant string DATA + OFFSET and return it as target
-   constant.  */
+   constant.  If PREV isn't nullptr, it has the RTL info from the
+   previous iteration.  */
 
 rtx
-builtin_memset_read_str (void *data, HOST_WIDE_INT offset ATTRIBUTE_UNUSED,
+builtin_memset_read_str (void *data, void *prevp,
+			 HOST_WIDE_INT offset ATTRIBUTE_UNUSED,
 			 scalar_int_mode mode)
 {
+  by_pieces_prev *prev = (by_pieces_prev *) prevp;
+  if (prev != nullptr && prev->data != nullptr)
+    {
+      /* Use the previous data in the same mode.  */
+      if (prev->mode == mode)
+	return prev->data;
+    }
+
   const char *c = (const char *) data;
   char *p = XALLOCAVEC (char, GET_MODE_SIZE (mode));
 
@@ -6556,15 +6607,29 @@ builtin_memset_read_str (void *data, HOST_WIDE_INT offset ATTRIBUTE_UNUSED,
 /* Callback routine for store_by_pieces.  Return the RTL of a register
    containing GET_MODE_SIZE (MODE) consecutive copies of the unsigned
    char value given in the RTL register data.  For example, if mode is
-   4 bytes wide, return the RTL for 0x01010101*data.  */
+   4 bytes wide, return the RTL for 0x01010101*data.  If PREV isn't
+   nullptr, it has the RTL info from the previous iteration.  */
 
 static rtx
-builtin_memset_gen_str (void *data, HOST_WIDE_INT offset ATTRIBUTE_UNUSED,
+builtin_memset_gen_str (void *data, void *prevp,
+			HOST_WIDE_INT offset ATTRIBUTE_UNUSED,
 			scalar_int_mode mode)
 {
   rtx target, coeff;
   size_t size;
   char *p;
+
+  by_pieces_prev *prev = (by_pieces_prev *) prevp;
+  if (prev != nullptr && prev->data != nullptr)
+    {
+      /* Use the previous data in the same mode.  */
+      if (prev->mode == mode)
+	return prev->data;
+
+      target = simplify_gen_subreg (mode, prev->data, prev->mode, 0);
+      if (target != nullptr)
+	return target;
+    }
 
   size = GET_MODE_SIZE (mode);
   if (size == 1)
@@ -6598,6 +6663,168 @@ expand_builtin_memset (tree exp, rtx target, machine_mode mode)
   check_memop_access (exp, dest, NULL_TREE, len);
 
   return expand_builtin_memset_args (dest, val, len, target, mode, exp);
+}
+
+/* Try to store VAL (or, if NULL_RTX, VALC) in LEN bytes starting at TO.
+   Return TRUE if successful, FALSE otherwise.  TO is assumed to be
+   aligned at an ALIGN-bits boundary.  LEN must be a multiple of
+   1<<CTZ_LEN between MIN_LEN and MAX_LEN.
+
+   The strategy is to issue one store_by_pieces for each power of two,
+   from most to least significant, guarded by a test on whether there
+   are at least that many bytes left to copy in LEN.
+
+   ??? Should we skip some powers of two in favor of loops?  Maybe start
+   at the max of TO/LEN/word alignment, at least when optimizing for
+   size, instead of ensuring O(log len) dynamic compares?  */
+
+bool
+try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
+			      unsigned HOST_WIDE_INT min_len,
+			      unsigned HOST_WIDE_INT max_len,
+			      rtx val, char valc, unsigned int align)
+{
+  int max_bits = floor_log2 (max_len);
+  int min_bits = floor_log2 (min_len);
+  int sctz_len = ctz_len;
+
+  gcc_checking_assert (sctz_len >= 0);
+
+  if (val)
+    valc = 1;
+
+  /* Bits more significant than TST_BITS are part of the shared prefix
+     in the binary representation of both min_len and max_len.  Since
+     they're identical, we don't need to test them in the loop.  */
+  int tst_bits = (max_bits != min_bits ? max_bits
+		  : floor_log2 (max_len ^ min_len));
+
+  /* Check whether it's profitable to start by storing a fixed BLKSIZE
+     bytes, to lower max_bits.  In the unlikely case of a constant LEN
+     (implied by identical MAX_LEN and MIN_LEN), we want to issue a
+     single store_by_pieces, but otherwise, select the minimum multiple
+     of the ALIGN (in bytes) and of the MCD of the possible LENs, that
+     brings MAX_LEN below TST_BITS, if that's lower than min_len.  */
+  unsigned HOST_WIDE_INT blksize;
+  if (max_len > min_len)
+    {
+      unsigned HOST_WIDE_INT alrng = MAX (HOST_WIDE_INT_1U << ctz_len,
+					  align / BITS_PER_UNIT);
+      blksize = max_len - (HOST_WIDE_INT_1U << tst_bits) + alrng;
+      blksize &= ~(alrng - 1);
+    }
+  else if (max_len == min_len)
+    blksize = max_len;
+  else
+    gcc_unreachable ();
+  if (min_len >= blksize)
+    {
+      min_len -= blksize;
+      min_bits = floor_log2 (min_len);
+      max_len -= blksize;
+      max_bits = floor_log2 (max_len);
+
+      tst_bits = (max_bits != min_bits ? max_bits
+		 : floor_log2 (max_len ^ min_len));
+    }
+  else
+    blksize = 0;
+
+  /* Check that we can use store by pieces for the maximum store count
+     we may issue (initial fixed-size block, plus conditional
+     power-of-two-sized from max_bits to ctz_len.  */
+  unsigned HOST_WIDE_INT xlenest = blksize;
+  if (max_bits >= 0)
+    xlenest += ((HOST_WIDE_INT_1U << max_bits) * 2
+		- (HOST_WIDE_INT_1U << ctz_len));
+  if (!can_store_by_pieces (xlenest, builtin_memset_read_str,
+			    &valc, align, true))
+    return false;
+
+  rtx (*constfun) (void *, void *, HOST_WIDE_INT, scalar_int_mode);
+  void *constfundata;
+  if (val)
+    {
+      constfun = builtin_memset_gen_str;
+      constfundata = val = force_reg (TYPE_MODE (unsigned_char_type_node),
+				      val);
+    }
+  else
+    {
+      constfun = builtin_memset_read_str;
+      constfundata = &valc;
+    }
+
+  rtx ptr = copy_addr_to_reg (convert_to_mode (ptr_mode, XEXP (to, 0), 0));
+  rtx rem = copy_to_mode_reg (ptr_mode, convert_to_mode (ptr_mode, len, 0));
+  to = replace_equiv_address (to, ptr);
+  set_mem_align (to, align);
+
+  if (blksize)
+    {
+      to = store_by_pieces (to, blksize,
+			    constfun, constfundata,
+			    align, true,
+			    max_len != 0 ? RETURN_END : RETURN_BEGIN);
+      if (max_len == 0)
+	return true;
+
+      /* Adjust PTR, TO and REM.  Since TO's address is likely
+	 PTR+offset, we have to replace it.  */
+      emit_move_insn (ptr, force_operand (XEXP (to, 0), NULL_RTX));
+      to = replace_equiv_address (to, ptr);
+      rtx rem_minus_blksize = plus_constant (ptr_mode, rem, -blksize);
+      emit_move_insn (rem, force_operand (rem_minus_blksize, NULL_RTX));
+    }
+
+  /* Iterate over power-of-two block sizes from the maximum length to
+     the least significant bit possibly set in the length.  */
+  for (int i = max_bits; i >= sctz_len; i--)
+    {
+      rtx_code_label *label = NULL;
+      blksize = HOST_WIDE_INT_1U << i;
+
+      /* If we're past the bits shared between min_ and max_len, expand
+	 a test on the dynamic length, comparing it with the
+	 BLKSIZE.  */
+      if (i <= tst_bits)
+	{
+	  label = gen_label_rtx ();
+	  emit_cmp_and_jump_insns (rem, GEN_INT (blksize), LT, NULL,
+				   ptr_mode, 1, label,
+				   profile_probability::even ());
+	}
+      /* If we are at a bit that is in the prefix shared by min_ and
+	 max_len, skip this BLKSIZE if the bit is clear.  */
+      else if ((max_len & blksize) == 0)
+	continue;
+
+      /* Issue a store of BLKSIZE bytes.  */
+      to = store_by_pieces (to, blksize,
+			    constfun, constfundata,
+			    align, true,
+			    i != sctz_len ? RETURN_END : RETURN_BEGIN);
+
+      /* Adjust REM and PTR, unless this is the last iteration.  */
+      if (i != sctz_len)
+	{
+	  emit_move_insn (ptr, force_operand (XEXP (to, 0), NULL_RTX));
+	  to = replace_equiv_address (to, ptr);
+	  rtx rem_minus_blksize = plus_constant (ptr_mode, rem, -blksize);
+	  emit_move_insn (rem, force_operand (rem_minus_blksize, NULL_RTX));
+	}
+
+      if (label)
+	{
+	  emit_label (label);
+
+	  /* Given conditional stores, the offset can no longer be
+	     known, so clear it.  */
+	  clear_mem_offset (to);
+	}
+    }
+
+  return true;
 }
 
 /* Helper function to do the actual work for expand_builtin_memset.  The
@@ -6654,7 +6881,8 @@ expand_builtin_memset_args (tree dest, tree val, tree len,
   dest_mem = get_memory_rtx (dest, len);
   val_mode = TYPE_MODE (unsigned_char_type_node);
 
-  if (TREE_CODE (val) != INTEGER_CST)
+  if (TREE_CODE (val) != INTEGER_CST
+      || target_char_cast (val, &c))
     {
       rtx val_rtx;
 
@@ -6678,16 +6906,18 @@ expand_builtin_memset_args (tree dest, tree val, tree len,
       else if (!set_storage_via_setmem (dest_mem, len_rtx, val_rtx,
 					dest_align, expected_align,
 					expected_size, min_size, max_size,
-					probable_max_size))
+					probable_max_size)
+	       && !try_store_by_multiple_pieces (dest_mem, len_rtx,
+						 tree_ctz (len),
+						 min_size, max_size,
+						 val_rtx, 0,
+						 dest_align))
 	goto do_libcall;
 
       dest_mem = force_operand (XEXP (dest_mem, 0), NULL_RTX);
       dest_mem = convert_memory_address (ptr_mode, dest_mem);
       return dest_mem;
     }
-
-  if (target_char_cast (val, &c))
-    goto do_libcall;
 
   if (c)
     {
@@ -6702,7 +6932,12 @@ expand_builtin_memset_args (tree dest, tree val, tree len,
 					gen_int_mode (c, val_mode),
 					dest_align, expected_align,
 					expected_size, min_size, max_size,
-					probable_max_size))
+					probable_max_size)
+	       && !try_store_by_multiple_pieces (dest_mem, len_rtx,
+						 tree_ctz (len),
+						 min_size, max_size,
+						 NULL_RTX, c,
+						 dest_align))
 	goto do_libcall;
 
       dest_mem = force_operand (XEXP (dest_mem, 0), NULL_RTX);
@@ -6716,7 +6951,7 @@ expand_builtin_memset_args (tree dest, tree val, tree len,
 				   ? BLOCK_OP_TAILCALL : BLOCK_OP_NORMAL,
 				   expected_align, expected_size,
 				   min_size, max_size,
-				   probable_max_size);
+				   probable_max_size, tree_ctz (len));
 
   if (dest_addr == 0)
     {
@@ -9941,7 +10176,7 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       break;
 
     /* Expand it as BUILT_IN_MEMCMP_EQ first. If not successful, change it
-       back to a BUILT_IN_STRCMP. Remember to delete the 3rd paramater
+       back to a BUILT_IN_STRCMP. Remember to delete the 3rd parameter
        when changing it to a strcmp call.  */
     case BUILT_IN_STRCMP_EQ:
       target = expand_builtin_memcmp (exp, target, true);
@@ -12597,7 +12832,8 @@ fold_builtin_next_arg (tree exp, bool va_start_p)
       arg = CALL_EXPR_ARG (exp, 0);
     }
 
-  if (TREE_CODE (arg) == SSA_NAME)
+  if (TREE_CODE (arg) == SSA_NAME
+      && SSA_NAME_VAR (arg))
     arg = SSA_NAME_VAR (arg);
 
   /* We destructively modify the call to be __builtin_va_start (ap, 0)
@@ -14244,8 +14480,8 @@ target_char_cst_p (tree t, char *p)
 }
 
 /* Return true if the builtin DECL is implemented in a standard library.
-   Otherwise returns false which doesn't guarantee it is not (thus the list of
-   handled builtins below may be incomplete).  */
+   Otherwise return false which doesn't guarantee it is not (thus the list
+   of handled builtins below may be incomplete).  */
 
 bool
 builtin_with_linkage_p (tree decl)
@@ -14324,6 +14560,14 @@ builtin_with_linkage_p (tree decl)
       CASE_FLT_FN (BUILT_IN_TRUNC):
       CASE_FLT_FN_FLOATN_NX (BUILT_IN_TRUNC):
 	return true;
+
+      case BUILT_IN_STPCPY:
+      case BUILT_IN_STPNCPY:
+	/* stpcpy is both referenced in libiberty's pex-win32.c and provided
+	   by libiberty's stpcpy.c for MinGW targets so we need to return true
+	   in order to be able to build libiberty in LTO mode for them.  */
+	return true;
+
       default:
 	break;
     }

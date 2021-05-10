@@ -171,6 +171,14 @@ struct omp_context
 
   /* True if there is bind clause on the construct (i.e. a loop construct).  */
   bool loop_p;
+
+  /* Only used for omp target contexts.  True if a teams construct is
+     strictly nested in it.  */
+  bool teams_nested_p;
+
+  /* Only used for omp target contexts.  True if an OpenMP construct other
+     than teams is strictly nested in it.  */
+  bool nonteams_nested_p;
 };
 
 static splay_tree all_contexts;
@@ -2956,6 +2964,14 @@ scan_omp_target (gomp_target *stmt, omp_context *outer_ctx)
       if (offloaded)
 	fixup_child_record_type (ctx);
     }
+
+  if (ctx->teams_nested_p && ctx->nonteams_nested_p)
+    {
+      error_at (gimple_location (stmt),
+		"%<target%> construct with nested %<teams%> construct "
+		"contains directives outside of the %<teams%> construct");
+      gimple_omp_set_body (stmt, gimple_build_bind (NULL, NULL, NULL));
+    }
 }
 
 /* Scan an OpenMP teams directive.  */
@@ -3025,6 +3041,14 @@ check_omp_nesting_restrictions (gimple *stmt, omp_context *ctx)
 
   if (ctx != NULL)
     {
+      if (gimple_code (ctx->stmt) == GIMPLE_OMP_TARGET
+	  && gimple_omp_target_kind (ctx->stmt) == GF_OMP_TARGET_KIND_REGION)
+	{
+	  if (gimple_code (stmt) == GIMPLE_OMP_TEAMS && !ctx->teams_nested_p)
+	    ctx->teams_nested_p = true;
+	  else
+	    ctx->nonteams_nested_p = true;
+	}
       if (gimple_code (ctx->stmt) == GIMPLE_OMP_SCAN
 	  && ctx->outer
 	  && gimple_code (ctx->outer->stmt) == GIMPLE_OMP_FOR)
@@ -3762,7 +3786,7 @@ omp_runtime_api_call (const_tree fndecl)
     return false;
 
   const char *name = IDENTIFIER_POINTER (declname);
-  if (strncmp (name, "omp_", 4) != 0)
+  if (!startswith (name, "omp_"))
     return false;
 
   static const char *omp_runtime_apis[] =
@@ -4359,6 +4383,33 @@ lower_rec_simd_input_clauses (tree new_var, omp_context *ctx,
 		sctx->max_vf = 1;
 	      else
 		sctx->max_vf = lower_bound (sctx->max_vf, safe_len);
+	    }
+	}
+      if (sctx->is_simt && !known_eq (sctx->max_vf, 1U))
+	{
+	  for (tree c = gimple_omp_for_clauses (ctx->stmt); c;
+	       c = OMP_CLAUSE_CHAIN (c))
+	    {
+	      if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_REDUCTION)
+		continue;
+
+	      if (OMP_CLAUSE_REDUCTION_PLACEHOLDER (c))
+		{
+		  /* UDR reductions are not supported yet for SIMT, disable
+		     SIMT.  */
+		  sctx->max_vf = 1;
+		  break;
+		}
+
+	      if (truth_value_p (OMP_CLAUSE_REDUCTION_CODE (c))
+		  && !INTEGRAL_TYPE_P (TREE_TYPE (new_var)))
+		{
+		  /* Doing boolean operations on non-integral types is
+		     for conformance only, it's not worth supporting this
+		     for SIMT.  */
+		  sctx->max_vf = 1;
+		  break;
+	      }
 	    }
 	}
       if (maybe_gt (sctx->max_vf, 1U))
@@ -6352,6 +6403,11 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 		  if (code == MINUS_EXPR)
 		    code = PLUS_EXPR;
 
+		  /* C/C++ permits FP/complex with || and &&.  */
+		  bool is_fp_and_or
+		    = ((code == TRUTH_ANDIF_EXPR || code == TRUTH_ORIF_EXPR)
+		       && (FLOAT_TYPE_P (TREE_TYPE (new_var))
+			   || TREE_CODE (TREE_TYPE (new_var)) == COMPLEX_TYPE));
 		  tree new_vard = new_var;
 		  if (is_simd && omp_is_reference (var))
 		    {
@@ -6400,7 +6456,20 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 			  x = build2 (code, TREE_TYPE (ivar), ivar, x);
 			  gimplify_assign (ivar, x, &llist[2]);
 			}
-		      x = build2 (code, TREE_TYPE (ref), ref, ivar);
+		      tree ivar2 = ivar;
+		      tree ref2 = ref;
+		      if (is_fp_and_or)
+			{
+			  tree zero = build_zero_cst (TREE_TYPE (ivar));
+			  ivar2 = fold_build2_loc (clause_loc, NE_EXPR,
+						   integer_type_node, ivar,
+						   zero);
+			  ref2 = fold_build2_loc (clause_loc, NE_EXPR,
+						  integer_type_node, ref, zero);
+			}
+		      x = build2 (code, TREE_TYPE (ref), ref2, ivar2);
+		      if (is_fp_and_or)
+			x = fold_convert (TREE_TYPE (ref), x);
 		      ref = build_outer_var_ref (var, ctx);
 		      gimplify_assign (ref, x, &llist[1]);
 
@@ -6419,8 +6488,22 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 		      if (is_simd)
 			{
 			  tree ref = build_outer_var_ref (var, ctx);
-
-			  x = build2 (code, TREE_TYPE (ref), ref, new_var);
+			  tree new_var2 = new_var;
+			  tree ref2 = ref;
+			  if (is_fp_and_or)
+			    {
+			      tree zero = build_zero_cst (TREE_TYPE (new_var));
+			      new_var2
+				= fold_build2_loc (clause_loc, NE_EXPR,
+						   integer_type_node, new_var,
+						   zero);
+			      ref2 = fold_build2_loc (clause_loc, NE_EXPR,
+						      integer_type_node, ref,
+						      zero);
+			    }
+			  x = build2 (code, TREE_TYPE (ref2), ref2, new_var2);
+			  if (is_fp_and_or)
+			    x = fold_convert (TREE_TYPE (new_var), x);
 			  ref = build_outer_var_ref (var, ctx);
 			  gimplify_assign (ref, x, dlist);
 			}
@@ -7360,13 +7443,32 @@ lower_reduction_clauses (tree clauses, gimple_seq *stmt_seqp,
       if (code == MINUS_EXPR)
         code = PLUS_EXPR;
 
+      /* C/C++ permits FP/complex with || and &&.  */
+      bool is_fp_and_or = ((code == TRUTH_ANDIF_EXPR
+			    || code == TRUTH_ORIF_EXPR)
+			   && (FLOAT_TYPE_P (TREE_TYPE (new_var))
+			       || (TREE_CODE (TREE_TYPE (new_var))
+				   == COMPLEX_TYPE)));
       if (count == 1)
 	{
 	  tree addr = build_fold_addr_expr_loc (clause_loc, ref);
 
 	  addr = save_expr (addr);
 	  ref = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (addr)), addr);
-	  x = fold_build2_loc (clause_loc, code, TREE_TYPE (ref), ref, new_var);
+	  tree new_var2 = new_var;
+	  tree ref2 = ref;
+	  if (is_fp_and_or)
+	    {
+	      tree zero = build_zero_cst (TREE_TYPE (new_var));
+	      new_var2 = fold_build2_loc (clause_loc, NE_EXPR,
+					  integer_type_node, new_var, zero);
+	      ref2 = fold_build2_loc (clause_loc, NE_EXPR, integer_type_node,
+				      ref, zero);
+	    }
+	  x = fold_build2_loc (clause_loc, code, TREE_TYPE (new_var2), ref2,
+			       new_var2);
+	  if (is_fp_and_or)
+	    x = fold_convert (TREE_TYPE (new_var), x);
 	  x = build2 (OMP_ATOMIC, void_type_node, addr, x);
 	  OMP_ATOMIC_MEMORY_ORDER (x) = OMP_MEMORY_ORDER_RELAXED;
 	  gimplify_and_add (x, stmt_seqp);
@@ -7471,7 +7573,19 @@ lower_reduction_clauses (tree clauses, gimple_seq *stmt_seqp,
 	    }
 	  else
 	    {
-	      x = build2 (code, TREE_TYPE (out), out, priv);
+	      tree out2 = out;
+	      tree priv2 = priv;
+	      if (is_fp_and_or)
+		{
+		  tree zero = build_zero_cst (TREE_TYPE (out));
+		  out2 = fold_build2_loc (clause_loc, NE_EXPR,
+					  integer_type_node, out, zero);
+		  priv2 = fold_build2_loc (clause_loc, NE_EXPR,
+					   integer_type_node, priv, zero);
+		}
+	      x = build2 (code, TREE_TYPE (out2), out2, priv2);
+	      if (is_fp_and_or)
+		x = fold_convert (TREE_TYPE (out), x);
 	      out = unshare_expr (out);
 	      gimplify_assign (out, x, &sub_seq);
 	    }
@@ -7505,7 +7619,19 @@ lower_reduction_clauses (tree clauses, gimple_seq *stmt_seqp,
 	}
       else
 	{
-	  x = build2 (code, TREE_TYPE (ref), ref, new_var);
+	  tree new_var2 = new_var;
+	  tree ref2 = ref;
+	  if (is_fp_and_or)
+	    {
+	      tree zero = build_zero_cst (TREE_TYPE (new_var));
+	      new_var2 = fold_build2_loc (clause_loc, NE_EXPR,
+					  integer_type_node, new_var, zero);
+	      ref2 = fold_build2_loc (clause_loc, NE_EXPR, integer_type_node,
+				      ref, zero);
+	    }
+	  x = build2 (code, TREE_TYPE (ref), ref2, new_var2);
+	  if (is_fp_and_or)
+	    x = fold_convert (TREE_TYPE (new_var), x);
 	  ref = build_outer_var_ref (var, ctx);
 	  gimplify_assign (ref, x, &sub_seq);
 	}

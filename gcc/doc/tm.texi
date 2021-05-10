@@ -5880,6 +5880,15 @@ This hook returns true if @var{x} is a legitimate constant for a
 The default definition returns true.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_PRECOMPUTE_TLS_P (machine_mode @var{mode}, rtx @var{x})
+This hook returns true if @var{x} is a TLS operand on the target
+machine that should be pre-computed when used as the argument in a call.
+You can assume that @var{x} satisfies @code{CONSTANT_P}, so you need not 
+check this.
+
+The default definition returns false.
+@end deftypefn
+
 @deftypefn {Target Hook} rtx TARGET_DELEGITIMIZE_ADDRESS (rtx @var{x})
 This hook is used to undo the possibly obfuscating effects of the
 @code{LEGITIMIZE_ADDRESS} and @code{LEGITIMIZE_RELOAD_ADDRESS} target
@@ -6301,21 +6310,16 @@ or target-specific sections.
 @section Condition Code Status
 @cindex condition code status
 
-The macros in this section can be split in two families, according to the
-two ways of representing condition codes in GCC.
-
-The first representation is the so called @code{(cc0)} representation
-(@pxref{Jump Patterns}), where all instructions can have an implicit
-clobber of the condition codes.  The second is the condition code
-register representation, which provides better schedulability for
+Condition codes in GCC are represented as registers,
+which provides better schedulability for
 architectures that do have a condition code register, but on which
 most instructions do not affect it.  The latter category includes
 most RISC machines.
 
-The implicit clobbering poses a strong restriction on the placement of
+Implicit clobbering would pose a strong restriction on the placement of
 the definition and use of the condition code.  In the past the definition
 and use were always adjacent.  However, recent changes to support trapping
-arithmatic may result in the definition and user being in different blocks.
+arithmetic may result in the definition and user being in different blocks.
 Thus, there may be a @code{NOTE_INSN_BASIC_BLOCK} between them.  Additionally,
 the definition may be the source of exception handling edges.
 
@@ -6326,8 +6330,7 @@ three instructions earlier than the conditional branch.  The instruction
 scheduler cannot perform this optimization if it is not permitted to
 separate the definition and use of the condition code register.
 
-For this reason, it is possible and suggested to use a register to
-represent the condition code for new ports.  If there is a specific
+If there is a specific
 condition code register in the machine, use a hard register.  If the
 condition code or comparison result can be placed in any general register,
 or if there are multiple condition registers, use a pseudo register.
@@ -6339,77 +6342,8 @@ specified already in the compare instruction.  In this case, you are not
 interested in most macros in this section.
 
 @menu
-* CC0 Condition Codes::      Old style representation of condition codes.
 * MODE_CC Condition Codes::  Modern representation of condition codes.
 @end menu
-
-@node CC0 Condition Codes
-@subsection Representation of condition codes using @code{(cc0)}
-@findex cc0
-
-@findex cc_status
-The file @file{conditions.h} defines a variable @code{cc_status} to
-describe how the condition code was computed (in case the interpretation of
-the condition code depends on the instruction that it was set by).  This
-variable contains the RTL expressions on which the condition code is
-currently based, and several standard flags.
-
-Sometimes additional machine-specific flags must be defined in the machine
-description header file.  It can also add additional machine-specific
-information by defining @code{CC_STATUS_MDEP}.
-
-@defmac CC_STATUS_MDEP
-C code for a data type which is used for declaring the @code{mdep}
-component of @code{cc_status}.  It defaults to @code{int}.
-
-This macro is not used on machines that do not use @code{cc0}.
-@end defmac
-
-@defmac CC_STATUS_MDEP_INIT
-A C expression to initialize the @code{mdep} field to ``empty''.
-The default definition does nothing, since most machines don't use
-the field anyway.  If you want to use the field, you should probably
-define this macro to initialize it.
-
-This macro is not used on machines that do not use @code{cc0}.
-@end defmac
-
-@defmac NOTICE_UPDATE_CC (@var{exp}, @var{insn})
-A C compound statement to set the components of @code{cc_status}
-appropriately for an insn @var{insn} whose body is @var{exp}.  It is
-this macro's responsibility to recognize insns that set the condition
-code as a byproduct of other activity as well as those that explicitly
-set @code{(cc0)}.
-
-This macro is not used on machines that do not use @code{cc0}.
-
-If there are insns that do not set the condition code but do alter
-other machine registers, this macro must check to see whether they
-invalidate the expressions that the condition code is recorded as
-reflecting.  For example, on the 68000, insns that store in address
-registers do not set the condition code, which means that usually
-@code{NOTICE_UPDATE_CC} can leave @code{cc_status} unaltered for such
-insns.  But suppose that the previous insn set the condition code
-based on location @samp{a4@@(102)} and the current insn stores a new
-value in @samp{a4}.  Although the condition code is not changed by
-this, it will no longer be true that it reflects the contents of
-@samp{a4@@(102)}.  Therefore, @code{NOTICE_UPDATE_CC} must alter
-@code{cc_status} in this case to say that nothing is known about the
-condition code value.
-
-The definition of @code{NOTICE_UPDATE_CC} must be prepared to deal
-with the results of peephole optimization: insns whose patterns are
-@code{parallel} RTXs containing various @code{reg}, @code{mem} or
-constants which are just the operands.  The RTL structure of these
-insns is not sufficient to indicate what the insns actually do.  What
-@code{NOTICE_UPDATE_CC} should do when it sees one is just to run
-@code{CC_STATUS_INIT}.
-
-A possible definition of @code{NOTICE_UPDATE_CC} is to call a function
-that looks at an attribute (@pxref{Insn Attributes}) named, for example,
-@samp{cc}.  This avoids having detailed information about patterns in
-two places, the @file{md} file and in @code{NOTICE_UPDATE_CC}.
-@end defmac
 
 @node MODE_CC Condition Codes
 @subsection Representation of condition codes using registers
@@ -6525,7 +6459,7 @@ like:
 @end defmac
 
 @deftypefn {Target Hook} bool TARGET_FIXED_CONDITION_CODE_REGS (unsigned int *@var{p1}, unsigned int *@var{p2})
-On targets which do not use @code{(cc0)}, and which use a hard
+On targets which use a hard
 register rather than a pseudo-register to hold condition codes, the
 regular CSE passes are often not able to identify cases in which the
 hard register is set to a common value.  Use this hook to enable a
@@ -6756,6 +6690,13 @@ the body of the memory operation.
 Returning true for higher values of @code{size} may also cause an increase
 in code size, for example where the number of insns emitted to perform a
 move would be greater than that of a library call.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_OVERLAP_OP_BY_PIECES_P (void)
+This target hook should return true if when the @code{by_pieces}
+infrastructure is used, an offset adjusted unaligned memory operation
+in the smallest integer mode for the last piece operation of a memory
+region can be generated to avoid doing more than one smaller operations.
 @end deftypefn
 
 @deftypefn {Target Hook} int TARGET_COMPARE_BY_PIECES_BRANCH_RATIO (machine_mode @var{mode})
@@ -9551,6 +9492,10 @@ If necessary, modify personality and LSDA references to handle indirection.  The
 True if the @code{TARGET_ASM_UNWIND_EMIT} hook should be called before the assembly for @var{insn} has been emitted, false if the hook should be called afterward.
 @end deftypevr
 
+@deftypefn {Target Hook} bool TARGET_ASM_SHOULD_RESTORE_CFA_STATE (void)
+For DWARF-based unwind frames, two CFI instructions provide for save and restore of register state.  GCC maintains the current frame address (CFA) separately from the register bank but the unwinder in libgcc preserves this state along with the registers (and this is expected by the code that writes the unwind frames).  This hook allows the target to specify that the CFA data is not saved/restored along with the registers by the target unwinder so that suitable additional instructions should be emitted to restore it.
+@end deftypefn
+
 @node Exception Region Output
 @subsection Assembler Commands for Exception Regions
 
@@ -10804,6 +10749,20 @@ Similarly to @code{TARGET_D_CPU_VERSIONS}, but is used for versions
 relating to the target operating system.
 @end deftypefn
 
+@deftypefn {D Target Hook} void TARGET_D_REGISTER_CPU_TARGET_INFO (void)
+Register all target information keys relating to the target CPU using the
+function @code{d_add_target_info_handlers}, which takes a
+@samp{struct d_target_info_spec} (defined in @file{d/d-target.h}).  The keys
+added by this hook are made available at compile time by the
+@code{__traits(getTargetInfo)} extension, the result is an expression
+describing the requested target information.
+@end deftypefn
+
+@deftypefn {D Target Hook} void TARGET_D_REGISTER_OS_TARGET_INFO (void)
+Same as @code{TARGET_D_CPU_TARGET_INFO}, but is used for keys relating to
+the target operating system.
+@end deftypefn
+
 @deftypevr {D Target Hook} {const char *} TARGET_D_MINFO_SECTION
 Contains the name of the section in which module info references should be
 placed.  This section is expected to be bracketed by two symbols to indicate
@@ -10822,6 +10781,20 @@ section
 If @code{TARGET_D_MINFO_SECTION} is defined, then this must also be defined
 as the name of the symbol indicating the end address of the module info
 section
+@end deftypevr
+
+@deftypefn {D Target Hook} bool TARGET_D_HAS_STDCALL_CONVENTION (unsigned int *@var{link_system}, unsigned int *@var{link_windows})
+Returns @code{true} if the target supports the stdcall calling convention.
+The hook should also set @var{link_system} to @code{1} if the @code{stdcall}
+attribute should be applied to functions with @code{extern(System)} linkage,
+and @var{link_windows} to @code{1} to apply @code{stdcall} to functions with
+@code{extern(Windows)} linkage.
+@end deftypefn
+
+@deftypevr {D Target Hook} bool TARGET_D_TEMPLATES_ALWAYS_COMDAT
+This flag is true if instantiated functions and variables are always COMDAT
+if they have external linkage.  If this flag is false, then instantiated
+decls will be emitted as weak symbols.  The default is @code{false}.
 @end deftypevr
 
 @node Named Address Spaces
@@ -11487,15 +11460,17 @@ from shared libraries (DLLs).
 You need not define this macro if it would always evaluate to zero.
 @end defmac
 
-@deftypefn {Target Hook} {rtx_insn *} TARGET_MD_ASM_ADJUST (vec<rtx>& @var{outputs}, vec<rtx>& @var{inputs}, vec<const char *>& @var{constraints}, vec<rtx>& @var{clobbers}, HARD_REG_SET& @var{clobbered_regs})
+@deftypefn {Target Hook} {rtx_insn *} TARGET_MD_ASM_ADJUST (vec<rtx>& @var{outputs}, vec<rtx>& @var{inputs}, vec<machine_mode>& @var{input_modes}, vec<const char *>& @var{constraints}, vec<rtx>& @var{clobbers}, HARD_REG_SET& @var{clobbered_regs})
 This target hook may add @dfn{clobbers} to @var{clobbers} and
 @var{clobbered_regs} for any hard regs the port wishes to automatically
 clobber for an asm.  The @var{outputs} and @var{inputs} may be inspected
 to avoid clobbering a register that is already used by the asm.
 
-It may modify the @var{outputs}, @var{inputs}, and @var{constraints}
-as necessary for other pre-processing.  In this case the return value is
-a sequence of insns to emit after the asm.
+It may modify the @var{outputs}, @var{inputs}, @var{input_modes}, and
+@var{constraints} as necessary for other pre-processing.  In this case the
+return value is a sequence of insns to emit after the asm.  Note that
+changes to @var{inputs} must be accompanied by the corresponding changes
+to @var{input_modes}.
 @end deftypefn
 
 @defmac MATH_LIBRARY
@@ -11528,8 +11503,7 @@ for cross-profiling.
 
 A C expression for the maximum number of instructions to execute via
 conditional execution instructions instead of a branch.  A value of
-@code{BRANCH_COST}+1 is the default if the machine does not use cc0, and
-1 if it does use cc0.
+@code{BRANCH_COST}+1 is the default.
 @end defmac
 
 @defmac IFCVT_MODIFY_TESTS (@var{ce_info}, @var{true_expr}, @var{false_expr})

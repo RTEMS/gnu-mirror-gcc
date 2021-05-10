@@ -582,6 +582,7 @@ process_rtx (rtx desc, file_location loc)
     case DEFINE_REGISTER_CONSTRAINT:
     case DEFINE_MEMORY_CONSTRAINT:
     case DEFINE_SPECIAL_MEMORY_CONSTRAINT:
+    case DEFINE_RELAXED_MEMORY_CONSTRAINT:
     case DEFINE_ADDRESS_CONSTRAINT:
       queue_pattern (desc, &define_pred_tail, loc);
       break;
@@ -2319,14 +2320,6 @@ gen_reader::handle_unknown_directive (file_location loc, const char *rtx_name)
   unsigned int i;
   FOR_EACH_VEC_ELT (subrtxs, i, x)
     process_rtx (x, loc);
-}
-
-/* Comparison function for the mnemonic hash table.  */
-
-static int
-htab_eq_string (const void *s1, const void *s2)
-{
-  return strcmp ((const char*)s1, (const char*)s2) == 0;
 }
 
 /* Add mnemonic STR with length LEN to the mnemonic hash table

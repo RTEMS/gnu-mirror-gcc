@@ -295,14 +295,13 @@ copy_rtx (rtx orig)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:
       /* SCRATCH must be shared because they represent distinct values.  */
       return orig;
     case CLOBBER:
-      /* Share clobbers of hard registers (like cc0), but do not share pseudo reg
+      /* Share clobbers of hard registers, but do not share pseudo reg
          clobbers or clobbers of hard registers that originated as pseudos.
          This is needed to allow safe register renaming.  */
       if (REG_P (XEXP (orig, 0)) && REGNO (XEXP (orig, 0)) < FIRST_PSEUDO_REGISTER
@@ -388,7 +387,6 @@ shallow_copy_rtx (const_rtx orig MEM_STAT_DECL)
     case SYMBOL_REF:
     case CODE_LABEL:
     case PC:
-    case CC0:
     case RETURN:
     case SIMPLE_RETURN:
     case SCRATCH:
@@ -465,6 +463,11 @@ rtx_equal_p_cb (const_rtx x, const_rtx y, rtx_equal_p_callback_function cb)
     case SCRATCH:
     CASE_CONST_UNIQUE:
       return 0;
+
+    case CONST_VECTOR:
+      if (!same_vector_encodings_p (x, y))
+	return false;
+      break;
 
     case DEBUG_IMPLICIT_PTR:
       return DEBUG_IMPLICIT_PTR_DECL (x)
@@ -607,6 +610,11 @@ rtx_equal_p (const_rtx x, const_rtx y)
     case SCRATCH:
     CASE_CONST_UNIQUE:
       return 0;
+
+    case CONST_VECTOR:
+      if (!same_vector_encodings_p (x, y))
+	return false;
+      break;
 
     case DEBUG_IMPLICIT_PTR:
       return DEBUG_IMPLICIT_PTR_DECL (x)

@@ -3087,6 +3087,23 @@ vec_series_p (const_rtx x, rtx *base_out, rtx *step_out)
   return const_vec_series_p (x, base_out, step_out);
 }
 
+/* Return true if CONST_VECTORs X and Y, which are known to have the same mode,
+   also have the same encoding.  This means that they are equal whenever their
+   operands are equal.  */
+
+inline bool
+same_vector_encodings_p (const_rtx x, const_rtx y)
+{
+  /* Don't be fussy about the encoding of constant-length vectors,
+     since XVECEXP (X, 0) and XVECEXP (Y, 0) list all the elements anyway.  */
+  if (poly_uint64 (CONST_VECTOR_NUNITS (x)).is_constant ())
+    return true;
+
+  return (CONST_VECTOR_NPATTERNS (x) == CONST_VECTOR_NPATTERNS (y)
+	  && (CONST_VECTOR_NELTS_PER_PATTERN (x)
+	      == CONST_VECTOR_NELTS_PER_PATTERN (y)));
+}
+
 /* Return the unpromoted (outer) mode of SUBREG_PROMOTED_VAR_P subreg X.  */
 
 inline scalar_int_mode
@@ -3335,8 +3352,6 @@ extern rtx_insn *next_real_nondebug_insn (rtx);
 extern rtx_insn *prev_active_insn (rtx_insn *);
 extern rtx_insn *next_active_insn (rtx_insn *);
 extern int active_insn_p (const rtx_insn *);
-extern rtx_insn *next_cc0_user (rtx_insn *);
-extern rtx_insn *prev_cc0_setter (rtx_insn *);
 
 /* In emit-rtl.c  */
 extern int insn_line (const rtx_insn *);
@@ -3773,7 +3788,6 @@ extern GTY(()) rtx const_tiny_rtx[4][(int) MAX_MACHINE_MODE];
 #define CONSTM1_RTX(MODE) (const_tiny_rtx[3][(int) (MODE)])
 
 extern GTY(()) rtx pc_rtx;
-extern GTY(()) rtx cc0_rtx;
 extern GTY(()) rtx ret_rtx;
 extern GTY(()) rtx simple_return_rtx;
 extern GTY(()) rtx_insn *invalid_insn_rtx;
@@ -4109,8 +4123,6 @@ extern int simplejump_p (const rtx_insn *);
 extern int returnjump_p (const rtx_insn *);
 extern int eh_returnjump_p (rtx_insn *);
 extern int onlyjump_p (const rtx_insn *);
-extern int only_sets_cc0_p (const_rtx);
-extern int sets_cc0_p (const_rtx);
 extern int invert_jump_1 (rtx_jump_insn *, rtx);
 extern int invert_jump (rtx_jump_insn *, rtx, int);
 extern int rtx_renumbered_equal_p (const_rtx, const_rtx);

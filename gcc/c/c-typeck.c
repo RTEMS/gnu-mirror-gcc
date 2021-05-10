@@ -740,10 +740,16 @@ c_common_type (tree t1, tree t2)
     t2 = TYPE_MAIN_VARIANT (t2);
 
   if (TYPE_ATTRIBUTES (t1) != NULL_TREE)
-    t1 = build_type_attribute_variant (t1, NULL_TREE);
+    {
+      tree attrs = affects_type_identity_attributes (TYPE_ATTRIBUTES (t1));
+      t1 = build_type_attribute_variant (t1, attrs);
+    }
 
   if (TYPE_ATTRIBUTES (t2) != NULL_TREE)
-    t2 = build_type_attribute_variant (t2, NULL_TREE);
+    {
+      tree attrs = affects_type_identity_attributes (TYPE_ATTRIBUTES (t2));
+      t2 = build_type_attribute_variant (t2, attrs);
+    }
 
   /* Save time if the two types are the same.  */
 
@@ -1686,7 +1692,7 @@ function_types_compatible_p (const_tree f1, const_tree f2,
 
   if (args1 == NULL_TREE)
     {
-      if (!self_promoting_args_p (args2))
+      if (flag_isoc2x ? stdarg_p (f2) : !self_promoting_args_p (args2))
 	return 0;
       /* If one of these types comes from a non-prototype fn definition,
 	 compare that with the other type's arglist.
@@ -1699,7 +1705,7 @@ function_types_compatible_p (const_tree f1, const_tree f2,
     }
   if (args2 == NULL_TREE)
     {
-      if (!self_promoting_args_p (args1))
+      if (flag_isoc2x ? stdarg_p (f1) : !self_promoting_args_p (args1))
 	return 0;
       if (TYPE_ACTUAL_ARG_TYPES (f2)
 	  && type_lists_compatible_p (args1, TYPE_ACTUAL_ARG_TYPES (f2),
@@ -1968,6 +1974,50 @@ mark_exp_read (tree exp)
       mark_exp_read (TREE_OPERAND (exp, 0));
       break;
     case COMPOUND_EXPR:
+      /* Pattern match what build_atomic_assign produces with modifycode
+	 NOP_EXPR.  */
+      if (VAR_P (TREE_OPERAND (exp, 1))
+	  && DECL_ARTIFICIAL (TREE_OPERAND (exp, 1))
+	  && TREE_CODE (TREE_OPERAND (exp, 0)) == COMPOUND_EXPR)
+	{
+	  tree t1 = TREE_OPERAND (TREE_OPERAND (exp, 0), 0);
+	  tree t2 = TREE_OPERAND (TREE_OPERAND (exp, 0), 1);
+	  if (TREE_CODE (t1) == TARGET_EXPR
+	      && TARGET_EXPR_SLOT (t1) == TREE_OPERAND (exp, 1)
+	      && TREE_CODE (t2) == CALL_EXPR)
+	    {
+	      tree fndecl = get_callee_fndecl (t2);
+	      tree arg = NULL_TREE;
+	      if (fndecl
+		  && TREE_CODE (fndecl) == FUNCTION_DECL
+		  && fndecl_built_in_p (fndecl, BUILT_IN_NORMAL)
+		  && call_expr_nargs (t2) >= 2)
+		switch (DECL_FUNCTION_CODE (fndecl))
+		  {
+		  case BUILT_IN_ATOMIC_STORE:
+		    arg = CALL_EXPR_ARG (t2, 1);
+		    break;
+		  case BUILT_IN_ATOMIC_STORE_1:
+		  case BUILT_IN_ATOMIC_STORE_2:
+		  case BUILT_IN_ATOMIC_STORE_4:
+		  case BUILT_IN_ATOMIC_STORE_8:
+		  case BUILT_IN_ATOMIC_STORE_16:
+		    arg = CALL_EXPR_ARG (t2, 0);
+		    break;
+		  default:
+		    break;
+		  }
+	      if (arg)
+		{
+		  STRIP_NOPS (arg);
+		  if (TREE_CODE (arg) == ADDR_EXPR
+		      && DECL_P (TREE_OPERAND (arg, 0))
+		      && TYPE_ATOMIC (TREE_TYPE (TREE_OPERAND (arg, 0))))
+		    mark_exp_read (TREE_OPERAND (arg, 0));
+		}
+	    }
+	}
+      /* FALLTHRU */
     case C_MAYBE_CONST_EXPR:
       mark_exp_read (TREE_OPERAND (exp, 1));
       break;
@@ -3063,7 +3113,7 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
 	orig_fundecl = fundecl;
       /* Atomic functions have type checking/casting already done.  They are 
 	 often rewritten and don't match the original parameter list.  */
-      if (name && !strncmp (IDENTIFIER_POINTER (name), "__atomic_", 9))
+      if (name && startswith (IDENTIFIER_POINTER (name), "__atomic_"))
         origtypes = NULL;
     }
   if (TREE_CODE (TREE_TYPE (function)) == FUNCTION_TYPE)
@@ -3149,7 +3199,7 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
 					    nargs, argarray, &arg_loc);
 
   if (name != NULL_TREE
-      && !strncmp (IDENTIFIER_POINTER (name), "__builtin_", 10))
+      && startswith (IDENTIFIER_POINTER (name), "__builtin_"))
     {
       if (require_constant_value)
 	result
@@ -4065,7 +4115,7 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   vec<tree, va_gc> *params;
   tree val, nonatomic_lhs_type, nonatomic_rhs_type, newval, newval_addr;
   tree old, old_addr;
-  tree compound_stmt;
+  tree compound_stmt = NULL_TREE;
   tree stmt, goto_stmt;
   tree loop_label, loop_decl, done_label, done_decl;
 
@@ -4086,7 +4136,15 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
 
   /* Create a compound statement to hold the sequence of statements
      with a loop.  */
-  compound_stmt = c_begin_compound_stmt (false);
+  if (modifycode != NOP_EXPR)
+    {
+      compound_stmt = c_begin_compound_stmt (false);
+
+      /* For consistency with build_modify_expr on non-_Atomic,
+	 mark the lhs as read.  Also, it would be very hard to match
+	 such expressions in mark_exp_read.  */
+      mark_exp_read (lhs);
+    }
 
   /* Remove any excess precision (which is only present here in the
      case of compound assignments).  */
@@ -4112,13 +4170,16 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   TREE_NO_WARNING (val) = 1;
   rhs = build4 (TARGET_EXPR, nonatomic_rhs_type, val, rhs, NULL_TREE,
 		NULL_TREE);
+  TREE_SIDE_EFFECTS (rhs) = 1;
   SET_EXPR_LOCATION (rhs, loc);
-  add_stmt (rhs);
+  if (modifycode != NOP_EXPR)
+    add_stmt (rhs);
 
   /* NOP_EXPR indicates it's a straight store of the RHS. Simply issue
      an atomic_store.  */
   if (modifycode == NOP_EXPR)
     {
+      compound_stmt = rhs;
       /* Build __atomic_store (&lhs, &val, SEQ_CST)  */
       rhs = build_unary_op (loc, ADDR_EXPR, val, false);
       fndecl = builtin_decl_explicit (BUILT_IN_ATOMIC_STORE);
@@ -4126,10 +4187,9 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
       params->quick_push (rhs);
       params->quick_push (seq_cst);
       func_call = c_build_function_call_vec (loc, vNULL, fndecl, params, NULL);
-      add_stmt (func_call);
 
-      /* Finish the compound statement.  */
-      compound_stmt = c_end_compound_stmt (loc, compound_stmt, false);
+      compound_stmt = build2 (COMPOUND_EXPR, void_type_node,
+			      compound_stmt, func_call);
 
       /* VAL is the value which was stored, return a COMPOUND_STMT of
 	 the statement and that value.  */
@@ -4806,6 +4866,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	  if (TYPE_REVERSE_STORAGE_ORDER (TREE_TYPE (TREE_OPERAND (arg, 0))))
 	    {
 	      if (!AGGREGATE_TYPE_P (TREE_TYPE (arg))
+		  && !POINTER_TYPE_P (TREE_TYPE (arg))
 		  && !VECTOR_TYPE_P (TREE_TYPE (arg)))
 		{
 		  error_at (location, "cannot take address of scalar with "
@@ -5490,7 +5551,7 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
      warn here, because the COND_EXPR will be turned into OP1.  */
   if (warn_duplicated_branches
       && TREE_CODE (ret) == COND_EXPR
-      && (op1 == op2 || operand_equal_p (op1, op2, 0)))
+      && (op1 == op2 || operand_equal_p (op1, op2, OEP_ADDRESS_OF_SAME_FIELD)))
     warning_at (EXPR_LOCATION (ret), OPT_Wduplicated_branches,
 		"this condition has identical branches");
 
@@ -10740,7 +10801,9 @@ c_finish_return (location_t loc, tree retval, tree origtype)
 	  retval = TREE_OPERAND (retval, 0);
 	}
       retval = c_fully_fold (retval, false, NULL);
-      if (semantic_type)
+      if (semantic_type
+	  && valtype != NULL_TREE
+	  && TREE_CODE (valtype) != VOID_TYPE)
 	retval = build1 (EXCESS_PRECISION_EXPR, semantic_type, retval);
     }
 
@@ -14035,6 +14098,8 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		case PLUS_EXPR:
 		case MULT_EXPR:
 		case MINUS_EXPR:
+		case TRUTH_ANDIF_EXPR:
+		case TRUTH_ORIF_EXPR:
 		  break;
 		case MIN_EXPR:
 		  if (TREE_CODE (type) == COMPLEX_TYPE)
@@ -14052,14 +14117,6 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  break;
 		case BIT_IOR_EXPR:
 		  r_name = "|";
-		  break;
-		case TRUTH_ANDIF_EXPR:
-		  if (FLOAT_TYPE_P (type))
-		    r_name = "&&";
-		  break;
-		case TRUTH_ORIF_EXPR:
-		  if (FLOAT_TYPE_P (type))
-		    r_name = "||";
 		  break;
 		default:
 		  gcc_unreachable ();

@@ -186,11 +186,6 @@ namespace ranges
 	&& __convertible_to_non_slicing<_Up, tuple_element_t<0, _Tp>>
 	&& convertible_to<_Vp, tuple_element_t<1, _Tp>>;
 
-    template<typename _Tp>
-      concept __iterator_sentinel_pair
-	= !range<_Tp> && __pair_like<_Tp>
-	&& sentinel_for<tuple_element_t<1, _Tp>, tuple_element_t<0, _Tp>>;
-
   } // namespace __detail
 
   enum class subrange_kind : bool { unsized, sized };
@@ -256,7 +251,7 @@ namespace ranges
 	  && convertible_to<sentinel_t<_Rng>, _Sent>
 	constexpr
 	subrange(_Rng&& __r) requires (!_S_store_size)
-	: subrange{ranges::begin(__r), ranges::end(__r)}
+	: subrange(ranges::begin(__r), ranges::end(__r))
 	{ }
 
       template<borrowed_range _Rng>
@@ -352,16 +347,6 @@ namespace ranges
 	     __detail::__make_unsigned_like_t<iter_difference_t<_It>>)
       -> subrange<_It, _Sent, subrange_kind::sized>;
 
-  template<__detail::__iterator_sentinel_pair _Pr>
-    subrange(_Pr)
-      -> subrange<tuple_element_t<0, _Pr>, tuple_element_t<1, _Pr>>;
-
-  template<__detail::__iterator_sentinel_pair _Pr>
-    subrange(_Pr, __detail::__make_unsigned_like_t<iter_difference_t<
-						     tuple_element_t<0, _Pr>>>)
-      -> subrange<tuple_element_t<0, _Pr>, tuple_element_t<1, _Pr>,
-		  subrange_kind::sized>;
-
   template<borrowed_range _Rng>
     subrange(_Rng&&)
       -> subrange<iterator_t<_Rng>, sentinel_t<_Rng>,
@@ -396,8 +381,7 @@ namespace ranges
 	return __r.end();
     }
 
-  template<input_or_output_iterator _It, sentinel_for<_It> _Sent,
-	   subrange_kind _Kind>
+  template<typename _It, typename _Sent, subrange_kind _Kind>
     inline constexpr bool
       enable_borrowed_range<subrange<_It, _Sent, _Kind>> = true;
 

@@ -125,9 +125,6 @@
 ;; VQ without 2 element modes.
 (define_mode_iterator VQ_NO2E [V16QI V8HI V4SI V8HF V4SF V8BF])
 
-;; Quad vector with only 2 element modes.
-(define_mode_iterator VQ_2E [V2DI V2DF])
-
 ;; BFmode vector modes.
 (define_mode_iterator VBF [V4BF V8BF])
 
@@ -152,6 +149,7 @@
 			     V2SF V4SF V2DF])
 
 ;; Advanced SIMD Float modes, and DF.
+(define_mode_iterator VDQF_DF [V2SF V4SF V2DF DF])
 (define_mode_iterator VHSDF_DF [(V4HF "TARGET_SIMD_F16INST")
 				(V8HF "TARGET_SIMD_F16INST")
 				V2SF V4SF V2DF DF])
@@ -205,6 +203,9 @@
 ;; All Advanced SIMD modes, plus DI and DF.
 (define_mode_iterator VALLDIF [V8QI V16QI V4HI V8HI V2SI V4SI V4BF V8BF
 			       V2DI V4HF V8HF V2SF V4SF V2DF DI DF])
+
+;; All Advanced SIMD polynomial modes and DI.
+(define_mode_iterator VALLP [V8QI V16QI V4HI V8HI V2DI DI])
 
 ;; Advanced SIMD modes for Integer reduction across lanes.
 (define_mode_iterator VDQV [V8QI V16QI V4HI V8HI V4SI V2DI])
@@ -523,8 +524,6 @@
     UNSPEC_SUQADD	; Used in aarch64-simd.md.
     UNSPEC_SQXTUN	; Used in aarch64-simd.md.
     UNSPEC_SQXTUN2	; Used in aarch64-simd.md.
-    UNSPEC_SQXTN	; Used in aarch64-simd.md.
-    UNSPEC_UQXTN	; Used in aarch64-simd.md.
     UNSPEC_SSRA		; Used in aarch64-simd.md.
     UNSPEC_USRA		; Used in aarch64-simd.md.
     UNSPEC_SRSRA	; Used in aarch64-simd.md.
@@ -553,6 +552,8 @@
     UNSPEC_SSHLL	; Used in aarch64-simd.md.
     UNSPEC_USHLL	; Used in aarch64-simd.md.
     UNSPEC_ADDP		; Used in aarch64-simd.md.
+    UNSPEC_SADDLP	; Used in aarch64-simd.md.
+    UNSPEC_UADDLP	; Used in aarch64-simd.md.
     UNSPEC_TBL		; Used in vector permute patterns.
     UNSPEC_TBX		; Used in vector permute patterns.
     UNSPEC_CONCAT	; Used in vector permute patterns.
@@ -652,6 +653,7 @@
     UNSPEC_UZP2Q	; Used in aarch64-sve.md.
     UNSPEC_ZIP1Q	; Used in aarch64-sve.md.
     UNSPEC_ZIP2Q	; Used in aarch64-sve.md.
+    UNSPEC_TRN1_CONV	; Used in aarch64-sve.md.
     UNSPEC_COND_CMPEQ_WIDE ; Used in aarch64-sve.md.
     UNSPEC_COND_CMPGE_WIDE ; Used in aarch64-sve.md.
     UNSPEC_COND_CMPGT_WIDE ; Used in aarch64-sve.md.
@@ -858,6 +860,7 @@
     UNSPEC_BFCVTN      ; Used in aarch64-simd.md.
     UNSPEC_BFCVTN2     ; Used in aarch64-simd.md.
     UNSPEC_BFCVT       ; Used in aarch64-simd.md.
+    UNSPEC_FCVTXN	; Used in aarch64-simd.md.
 ])
 
 ;; ------------------------------------------------------------------
@@ -1366,6 +1369,7 @@
 			  (V2SI "w") (V4SI "w")
 			  (DI   "x") (V2DI "x")
 			  (V4HF "w") (V8HF "w")
+			  (V4BF "w") (V8BF "w")
 			  (V2SF "w") (V4SF "w")
 			  (V2DF "x")
 			  (VNx16QI "w") (VNx8QI "w") (VNx4QI "w") (VNx2QI "w")
@@ -2210,6 +2214,8 @@
 
 (define_int_iterator SVE_INT_ADDV [UNSPEC_SADDV UNSPEC_UADDV])
 
+(define_int_iterator USADDLP [UNSPEC_SADDLP UNSPEC_UADDLP])
+
 (define_int_iterator USADDLV [UNSPEC_SADDLV UNSPEC_UADDLV])
 
 (define_int_iterator LOGICALF [UNSPEC_ANDF UNSPEC_IORF UNSPEC_XORF])
@@ -2250,8 +2256,6 @@
                              UNSPEC_SMULHRS UNSPEC_UMULHRS])
 
 (define_int_iterator USSUQADD [UNSPEC_SUQADD UNSPEC_USQADD])
-
-(define_int_iterator SUQMOVN [UNSPEC_SQXTN UNSPEC_UQXTN])
 
 (define_int_iterator VSHL [UNSPEC_SSHL UNSPEC_USHL
 		           UNSPEC_SRSHL UNSPEC_URSHL])
@@ -2962,6 +2966,8 @@
 ;; "s" for signed operations and "u" for unsigned ones.
 (define_int_attr su [(UNSPEC_SADDV "s")
 		     (UNSPEC_UADDV "u")
+		     (UNSPEC_SADDLP "s")
+		     (UNSPEC_UADDLP "u")
 		     (UNSPEC_SADDLV "s")
 		     (UNSPEC_UADDLV "u")
 		     (UNSPEC_UNPACKSHI "s")
@@ -2989,7 +2995,6 @@
 		      (UNSPEC_SUBHN "") (UNSPEC_RSUBHN "r")
 		      (UNSPEC_ADDHN2 "") (UNSPEC_RADDHN2 "r")
 		      (UNSPEC_SUBHN2 "") (UNSPEC_RSUBHN2 "r")
-		      (UNSPEC_SQXTN "s") (UNSPEC_UQXTN "u")
 		      (UNSPEC_USQADD "us") (UNSPEC_SUQADD "su")
 		      (UNSPEC_SSLI  "s") (UNSPEC_USLI  "u")
 		      (UNSPEC_SSRI  "s") (UNSPEC_USRI  "u")

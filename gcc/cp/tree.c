@@ -940,7 +940,12 @@ rvalue (tree expr)
   /* We need to do this for rvalue refs as well to get the right answer
      from decltype; see c++/36628.  */
   if (!processing_template_decl && glvalue_p (expr))
-    expr = build1 (NON_LVALUE_EXPR, type, expr);
+    {
+      /* But don't use this function for class lvalues; use move (to treat an
+	 lvalue as an xvalue) or force_rvalue (to make a prvalue copy).  */
+      gcc_checking_assert (!CLASS_TYPE_P (type));
+      expr = build1 (NON_LVALUE_EXPR, type, expr);
+    }
   else if (type != TREE_TYPE (expr))
     expr = build_nop (type, expr);
 
@@ -1721,6 +1726,15 @@ strip_typedefs (tree t, bool *remove_attributes, unsigned int flags)
       type = strip_typedefs (UNDERLYING_TYPE_TYPE (t),
 			     remove_attributes, flags);
       result = finish_underlying_type (type);
+      break;
+    case TYPE_PACK_EXPANSION:
+      type = strip_typedefs (PACK_EXPANSION_PATTERN (t),
+			     remove_attributes, flags);
+      if (type != PACK_EXPANSION_PATTERN (t))
+	{
+	  result = copy_node (t);
+	  PACK_EXPANSION_PATTERN (result) = type;
+	}
       break;
     default:
       break;
@@ -3128,6 +3142,48 @@ bot_manip (tree* tp, int* walk_subtrees, void* data_)
 	}
       return NULL_TREE;
     }
+  if (TREE_CODE (*tp) == DECL_EXPR
+      && VAR_P (DECL_EXPR_DECL (*tp))
+      && DECL_ARTIFICIAL (DECL_EXPR_DECL (*tp))
+      && !TREE_STATIC (DECL_EXPR_DECL (*tp)))
+    {
+      tree t;
+      splay_tree_node n
+	= splay_tree_lookup (target_remap,
+			     (splay_tree_key) DECL_EXPR_DECL (*tp));
+      if (n)
+	t = (tree) n->value;
+      else
+	{
+	  t = create_temporary_var (TREE_TYPE (DECL_EXPR_DECL (*tp)));
+	  DECL_INITIAL (t) = DECL_INITIAL (DECL_EXPR_DECL (*tp));
+	  splay_tree_insert (target_remap,
+			     (splay_tree_key) DECL_EXPR_DECL (*tp),
+			     (splay_tree_value) t);
+	}
+      copy_tree_r (tp, walk_subtrees, NULL);
+      DECL_EXPR_DECL (*tp) = t;
+      if (data.clear_location && EXPR_HAS_LOCATION (*tp))
+	SET_EXPR_LOCATION (*tp, input_location);
+      return NULL_TREE;
+    }
+  if (TREE_CODE (*tp) == BIND_EXPR && BIND_EXPR_VARS (*tp))
+    {
+      copy_tree_r (tp, walk_subtrees, NULL);
+      for (tree *p = &BIND_EXPR_VARS (*tp); *p; p = &DECL_CHAIN (*p))
+	{
+	  gcc_assert (VAR_P (*p) && DECL_ARTIFICIAL (*p) && !TREE_STATIC (*p));
+	  tree t = create_temporary_var (TREE_TYPE (*p));
+	  DECL_INITIAL (t) = DECL_INITIAL (*p);
+	  DECL_CHAIN (t) = DECL_CHAIN (*p);
+	  splay_tree_insert (target_remap, (splay_tree_key) *p,
+			     (splay_tree_value) t);
+	  *p = t;
+	}
+      if (data.clear_location && EXPR_HAS_LOCATION (*tp))
+	SET_EXPR_LOCATION (*tp, input_location);
+      return NULL_TREE;
+    }
 
   /* Make a copy of this node.  */
   t = copy_tree_r (tp, walk_subtrees, NULL);
@@ -3740,7 +3796,7 @@ cp_tree_equal (tree t1, tree t2)
       return tree_int_cst_equal (t1, t2);
 
     case REAL_CST:
-      return real_equal (&TREE_REAL_CST (t1), &TREE_REAL_CST (t2));
+      return real_identical (&TREE_REAL_CST (t1), &TREE_REAL_CST (t2));
 
     case STRING_CST:
       return TREE_STRING_LENGTH (t1) == TREE_STRING_LENGTH (t2)
@@ -4124,7 +4180,8 @@ member_p (const_tree decl)
 }
 
 /* Create a placeholder for member access where we don't actually have an
-   object that the access is against.  */
+   object that the access is against.  For a general declval<T> equivalent,
+   use build_stub_object instead.  */
 
 tree
 build_dummy_object (tree type)
@@ -4629,20 +4686,26 @@ zero_init_expr_p (tree t)
   tree type = TREE_TYPE (t);
   if (!type || uses_template_parms (type))
     return false;
-  if (zero_init_p (type))
-    return initializer_zerop (t);
   if (TYPE_PTRMEM_P (type))
     return null_member_pointer_value_p (t);
-  if (TREE_CODE (t) == CONSTRUCTOR
-      && CP_AGGREGATE_TYPE_P (type))
+  if (TREE_CODE (t) == CONSTRUCTOR)
     {
-      tree elt_init;
-      unsigned HOST_WIDE_INT i;
-      FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (t), i, elt_init)
-	if (!zero_init_expr_p (elt_init))
-	  return false;
+      if (COMPOUND_LITERAL_P (t)
+	  || BRACE_ENCLOSED_INITIALIZER_P (t))
+	/* Undigested, conversions might change the zeroness.  */
+	return false;
+      for (constructor_elt &elt : CONSTRUCTOR_ELTS (t))
+	{
+	  if (TREE_CODE (type) == UNION_TYPE
+	      && elt.index != first_field (type))
+	    return false;
+	  if (!zero_init_expr_p (elt.value))
+	    return false;
+	}
       return true;
     }
+  if (zero_init_p (type))
+    return initializer_zerop (t);
   return false;
 }
 

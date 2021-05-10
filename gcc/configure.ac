@@ -1139,6 +1139,11 @@ else
     [Define this to enable support for offloading.])
 fi
 
+if test "x$enable_offload_defaulted" = xyes; then
+  AC_DEFINE(OFFLOAD_DEFAULTED, 1,
+    [Define to 1 to if -foffload is defaulted])
+fi
+
 AC_ARG_WITH(multilib-list,
 [AS_HELP_STRING([--with-multilib-list], [select multilibs (AArch64, SH and x86-64 only)])],
 :,
@@ -1252,7 +1257,7 @@ AC_HEADER_SYS_WAIT
 AC_HEADER_TIOCGWINSZ
 AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h time.h iconv.h \
 		 fcntl.h ftw.h unistd.h sys/file.h sys/time.h sys/mman.h \
-		 sys/resource.h sys/param.h sys/times.h sys/stat.h \
+		 sys/resource.h sys/param.h sys/times.h sys/stat.h sys/locking.h \
 		 direct.h malloc.h langinfo.h ldfcn.h locale.h wchar.h)
 
 # Check for thread headers.
@@ -1704,6 +1709,19 @@ connect (fd, (sockaddr *)&in6, sizeof (in6));]])],
 if test $ac_cv_af_inet6 = yes; then
   AC_DEFINE(HAVE_AF_INET6, 1,
   [Define if AF_INET6 supported.])
+fi
+
+# Check if _LK_LOCK is supported by _locking
+AC_CACHE_CHECK(for _LK_LOCK, ac_cv_lk_lock, [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <io.h>
+#include <sys/locking.h>]], [[
+  int fd;
+  return _locking (fd, _LK_LOCK, 0);]])],
+[ac_cv_lk_lock=yes],[ac_cv_lk_lock=no])])
+if test $ac_cv_lk_lock = yes; then
+  AC_DEFINE(HOST_HAS_LK_LOCK, 1,
+  [Define if _LK_LOC supported by _locking.])
 fi
 
 # Restore CFLAGS, CXXFLAGS from before the gcc_AC_NEED_DECLARATIONS tests.
@@ -6189,6 +6207,31 @@ if test x"$ld64_flag" = x"yes"; then
   AC_DEFINE_UNQUOTED(LD64_HAS_EXPORT_DYNAMIC, $gcc_cv_ld64_export_dynamic,
   [Define to 1 if ld64 supports '-export_dynamic'.])
 fi
+
+case $target_os in
+  win32 | pe | cygwin* | mingw32*)
+    AC_MSG_CHECKING(broken PE linker dwarf5 support)
+    gcc_cv_ld_broken_pe_dwarf5=yes
+    if test $in_tree_ld = yes ; then
+      if grep -q '\.debug_loclists.*BLOCK.*__section_alignment__.*NOLOAD.*:' \
+	   $gcc_cv_ld_gld_srcdir/scripttempl/pe*.sc \
+	 && grep -q '\.debug_rnglists.*BLOCK.*__section_alignment__.*NOLOAD.*:' \
+	      $gcc_cv_ld_gld_srcdir/scripttempl/pe*.sc; then
+	gcc_cv_ld_broken_pe_dwarf5=no
+      fi
+    else
+      if $gcc_cv_ld --verbose 2>&1 | grep -q '\.debug_loclists.*BLOCK.*__section_alignment__.*NOLOAD.*:' \
+	 && $gcc_cv_ld --verbose 2>&1 | grep -q '\.debug_rnglists.*BLOCK.*__section_alignment__.*NOLOAD.*:'; then
+	gcc_cv_ld_broken_pe_dwarf5=no
+      fi
+    fi
+    if test x$gcc_cv_ld_broken_pe_dwarf5 = xyes; then
+      AC_DEFINE(HAVE_LD_BROKEN_PE_DWARF5, 1,
+	        [Define if the PE linker has broken DWARF 5 support.])
+    fi
+    AC_MSG_RESULT($gcc_cv_ld_broken_pe_dwarf5)
+    ;;
+esac
 
 # --------
 # UNSORTED

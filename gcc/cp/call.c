@@ -1449,7 +1449,9 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
       tree fbase = class_of_this_parm (fromfn);
       tree tbase = class_of_this_parm (tofn);
 
-      if (!DERIVED_FROM_P (fbase, tbase))
+      /* If FBASE and TBASE are equivalent but incomplete, DERIVED_FROM_P
+	 yields false.  But a pointer to member of incomplete class is OK.  */
+      if (!same_type_p (fbase, tbase) && !DERIVED_FROM_P (fbase, tbase))
 	return NULL;
 
       tree fstat = static_fn_type (fromfn);
@@ -4482,6 +4484,9 @@ build_converted_constant_expr_internal (tree type, tree expr,
 	  && processing_template_decl)
 	conv = next_conversion (conv);
 
+      /* Issuing conversion warnings for value-dependent expressions is
+	 likely too noisy.  */
+      warning_sentinel w (warn_conversion);
       conv->check_narrowing = true;
       conv->check_narrowing_const_only = true;
       expr = convert_like (conv, expr, complain);
@@ -4909,10 +4914,8 @@ build_op_call_1 (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
 	  || TYPE_REFFN_P (totype)
 	  || (TYPE_REF_P (totype)
 	      && TYPE_PTRFN_P (TREE_TYPE (totype))))
-	for (ovl_iterator iter (TREE_VALUE (convs)); iter; ++iter)
+	for (tree fn : ovl_range (TREE_VALUE (convs)))
 	  {
-	    tree fn = *iter;
-
 	    if (DECL_NONCONVERTING_P (fn))
 	      continue;
 
@@ -5796,7 +5799,8 @@ build_conditional_expr_1 (const op_location_t &loc,
      warn here, because the COND_EXPR will be turned into ARG2.  */
   if (warn_duplicated_branches
       && (complain & tf_warning)
-      && (arg2 == arg3 || operand_equal_p (arg2, arg3, 0)))
+      && (arg2 == arg3 || operand_equal_p (arg2, arg3,
+					   OEP_ADDRESS_OF_SAME_FIELD)))
     warning_at (EXPR_LOCATION (result), OPT_Wduplicated_branches,
 		"this condition has identical branches");
 
@@ -5851,6 +5855,49 @@ prep_operand (tree operand)
     }
 
   return operand;
+}
+
+/* True iff CONV represents a conversion sequence which no other can be better
+   than under [over.ics.rank]: in other words, a "conversion" to the exact same
+   type (including binding to a reference to the same type).  This is stronger
+   than the standard's "identity" category, which also includes reference
+   bindings that add cv-qualifiers or change rvalueness.  */
+
+static bool
+perfect_conversion_p (conversion *conv)
+{
+  if (CONVERSION_RANK (conv) != cr_identity)
+    return false;
+  if (conv->kind == ck_ref_bind)
+    {
+      if (!conv->rvaluedness_matches_p)
+	return false;
+      if (!same_type_p (TREE_TYPE (conv->type),
+			next_conversion (conv)->type))
+	return false;
+    }
+  return true;
+}
+
+/* True if CAND represents a perfect match, i.e. all perfect conversions, so no
+   other candidate can be a better match.  Since the template/non-template
+   tiebreaker comes immediately after the conversion comparison in
+   [over.match.best], a perfect non-template candidate is better than all
+   templates.  */
+
+static bool
+perfect_candidate_p (z_candidate *cand)
+{
+  if (cand->viable < 1)
+    return false;
+  int len = cand->num_convs;
+  for (int i = 0; i < len; ++i)
+    if (!perfect_conversion_p (cand->convs[i]))
+      return false;
+  if (conversion *conv = cand->second_conv)
+    if (!perfect_conversion_p (conv))
+      return false;
+  return true;
 }
 
 /* Add each of the viable functions in FNS (a FUNCTION_DECL or
@@ -5920,13 +5967,27 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
     /* Delay creating the implicit this parameter until it is needed.  */
     non_static_args = NULL;
 
-  for (lkp_iterator iter (fns); iter; ++iter)
-    {
-      fn = *iter;
+  /* If there's a non-template perfect match, we don't need to consider
+     templates.  So check non-templates first.  This optimization is only
+     really needed for the defaulted copy constructor of tuple and the like
+     (96926), but it seems like we might as well enable it more generally.  */
+  bool seen_perfect = false;
+  enum { templates, non_templates, either } which = either;
+  if (template_only)
+    which = templates;
+  else /*if (flags & LOOKUP_DEFAULTED)*/
+    which = non_templates;
 
+ again:
+  for (tree fn : lkp_range (fns))
+    {
       if (check_converting && DECL_NONCONVERTING_P (fn))
 	continue;
       if (check_list_ctor && !is_list_ctor (fn))
+	continue;
+      if (which == templates && TREE_CODE (fn) != TEMPLATE_DECL)
+	continue;
+      if (which == non_templates && TREE_CODE (fn) == TEMPLATE_DECL)
 	continue;
 
       tree fn_first_arg = NULL_TREE;
@@ -5967,7 +6028,7 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
 				fn,
 				ctype,
 				explicit_targs,
-				fn_first_arg, 
+				fn_first_arg,
 				fn_args,
 				return_type,
 				access_path,
@@ -5975,17 +6036,26 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
 				flags,
 				strict,
 				complain);
-      else if (!template_only)
-	add_function_candidate (candidates,
-				fn,
-				ctype,
-				fn_first_arg,
-				fn_args,
-				access_path,
-				conversion_path,
-				flags,
-				NULL,
-				complain);
+      else
+	{
+	  add_function_candidate (candidates,
+				  fn,
+				  ctype,
+				  fn_first_arg,
+				  fn_args,
+				  access_path,
+				  conversion_path,
+				  flags,
+				  NULL,
+				  complain);
+	  if (perfect_candidate_p (*candidates))
+	    seen_perfect = true;
+	}
+    }
+  if (which == non_templates && !seen_perfect)
+    {
+      which = templates;
+      goto again;
     }
 }
 
@@ -6015,6 +6085,15 @@ op_is_ordered (tree_code code)
     case LSHIFT_EXPR:
       // 8. a >> b
     case RSHIFT_EXPR:
+      // a && b
+      // Predates P0145R3.
+    case TRUTH_ANDIF_EXPR:
+      // a || b
+      // Predates P0145R3.
+    case TRUTH_ORIF_EXPR:
+      // a , b
+      // Predates P0145R3.
+    case COMPOUND_EXPR:
       return (flag_strong_eval_order ? 1 : 0);
 
     default:
@@ -6933,10 +7012,8 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 	     the usual deallocation function, so we shouldn't complain
 	     about using the operator delete (void *, size_t).  */
 	  if (DECL_CLASS_SCOPE_P (fn))
-	    for (lkp_iterator iter (MAYBE_BASELINK_FUNCTIONS (fns));
-		 iter; ++iter)
+	    for (tree elt : lkp_range (MAYBE_BASELINK_FUNCTIONS (fns)))
 	      {
-		tree elt = *iter;
 		if (usual_deallocation_fn_p (elt)
 		    && FUNCTION_ARG_CHAIN (elt) == void_list_node)
 		  goto ok;
@@ -6979,9 +7056,8 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
        allocation function. If the lookup finds a single matching
        deallocation function, that function will be called; otherwise, no
        deallocation function will be called."  */
-    for (lkp_iterator iter (MAYBE_BASELINK_FUNCTIONS (fns)); iter; ++iter)
+    for (tree elt : lkp_range (MAYBE_BASELINK_FUNCTIONS (fns)))
       {
-	tree elt = *iter;
 	dealloc_info di_elt;
 	if (usual_deallocation_fn_p (elt, &di_elt))
 	  {
@@ -7222,6 +7298,14 @@ build_temp (tree expr, tree type, int flags,
       && CLASS_TYPE_P (TREE_TYPE (expr))
       && !type_has_nontrivial_copy_init (TREE_TYPE (expr)))
     return get_target_expr_sfinae (expr, complain);
+
+  /* In decltype, we might have decided not to wrap this call in a TARGET_EXPR.
+     But it turns out to be a subexpression, so perform temporary
+     materialization now.  */
+  if (TREE_CODE (expr) == CALL_EXPR
+      && CLASS_TYPE_P (type)
+      && same_type_ignoring_top_level_qualifiers_p (type, TREE_TYPE (expr)))
+    expr = build_cplus_new (type, expr, complain);
 
   savew = warningcount + werrorcount, savee = errorcount;
   releasing_vec args (make_tree_vector_single (expr));
@@ -7807,8 +7891,19 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
                         "lvalue of type %qI", totype, extype);
 	    else if (!TYPE_REF_IS_RVALUE (ref_type) && !lvalue_p (expr)
 		     && !CP_TYPE_CONST_NON_VOLATILE_P (TREE_TYPE (ref_type)))
-	      error_at (loc, "cannot bind non-const lvalue reference of "
-			"type %qH to an rvalue of type %qI", totype, extype);
+	      {
+		conversion *next = next_conversion (convs);
+		if (next->kind == ck_std)
+		  {
+		    next = next_conversion (next);
+		    error_at (loc, "cannot bind non-const lvalue reference of "
+			      "type %qH to a value of type %qI",
+			      totype, next->type);
+		  }
+		else
+		  error_at (loc, "cannot bind non-const lvalue reference of "
+			    "type %qH to an rvalue of type %qI", totype, extype);
+	      }
 	    else if (!reference_compatible_p (TREE_TYPE (totype), extype))
 	      {
 		/* If we're converting from T[] to T[N], don't talk
@@ -7961,6 +8056,27 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
   return expr;
 }
 
+/* Return true if converting FROM to TO is unsafe in a template.  */
+
+static bool
+conv_unsafe_in_template_p (tree to, tree from)
+{
+  /* Converting classes involves TARGET_EXPR.  */
+  if (CLASS_TYPE_P (to) || CLASS_TYPE_P (from))
+    return true;
+
+  /* Converting real to integer produces FIX_TRUNC_EXPR which tsubst
+     doesn't handle.  */
+  if (SCALAR_FLOAT_TYPE_P (from) && INTEGRAL_OR_ENUMERATION_TYPE_P (to))
+    return true;
+
+  /* Converting integer to real isn't a trivial conversion, either.  */
+  if (INTEGRAL_OR_ENUMERATION_TYPE_P (from) && SCALAR_FLOAT_TYPE_P (to))
+    return true;
+
+  return false;
+}
+
 /* Wrapper for convert_like_internal that handles creating
    IMPLICIT_CONV_EXPR.  */
 
@@ -7977,7 +8093,7 @@ convert_like (conversion *convs, tree expr, tree fn, int argnum,
   tree conv_expr = NULL_TREE;
   if (processing_template_decl
       && convs->kind != ck_identity
-      && (CLASS_TYPE_P (convs->type) || CLASS_TYPE_P (TREE_TYPE (expr))))
+      && conv_unsafe_in_template_p (convs->type, TREE_TYPE (expr)))
     {
       conv_expr = build1 (IMPLICIT_CONV_EXPR, convs->type, expr);
       if (convs->kind != ck_ref_bind)
@@ -8381,6 +8497,9 @@ tree
 get_function_version_dispatcher (tree fn)
 {
   tree dispatcher_decl = NULL;
+
+  if (DECL_LOCAL_DECL_P (fn))
+    fn = DECL_LOCAL_DECL_ALIAS (fn);
 
   gcc_assert (TREE_CODE (fn) == FUNCTION_DECL
 	      && DECL_FUNCTION_VERSIONED (fn));
@@ -8832,8 +8951,13 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
   /* OK, we're actually calling this inherited constructor; set its deletedness
      appropriately.  We can get away with doing this here because calling is
      the only way to refer to a constructor.  */
-  if (DECL_INHERITED_CTOR (fn))
-    deduce_inheriting_ctor (fn);
+  if (DECL_INHERITED_CTOR (fn)
+      && !deduce_inheriting_ctor (fn))
+    {
+      if (complain & tf_error)
+	mark_used (fn);
+      return error_mark_node;
+    }
 
   /* Make =delete work with SFINAE.  */
   if (DECL_DELETED_FN (fn))
@@ -9417,6 +9541,9 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       if (immediate_invocation_p (fndecl, nargs))
 	{
 	  tree obj_arg = NULL_TREE;
+	  /* Undo convert_from_reference called by build_cxx_call.  */
+	  if (REFERENCE_REF_P (call))
+	    call = TREE_OPERAND (call, 0);
 	  if (DECL_CONSTRUCTOR_P (fndecl))
 	    obj_arg = cand->first_arg ? cand->first_arg : (*args)[0];
 	  if (obj_arg && is_dummy_object (obj_arg))
@@ -9440,6 +9567,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	  call = cxx_constant_value (call, obj_arg);
 	  if (obj_arg && !error_operand_p (call))
 	    call = build2 (INIT_EXPR, void_type_node, obj_arg, call);
+	  call = convert_from_reference (call);
 	}
     }
   return call;
@@ -9534,10 +9662,8 @@ has_trivial_copy_assign_p (tree type, bool access, bool *hasassign)
   /* Iterate over overloads of the assignment operator, checking
      accessible copy assignments for triviality.  */
 
-  for (ovl_iterator oi (fns); oi; ++oi)
+  for (tree f : ovl_range (fns))
     {
-      tree f = *oi;
-
       /* Skip operators that aren't copy assignments.  */
       if (!copy_fn_p (f))
 	continue;
@@ -9580,10 +9706,8 @@ has_trivial_copy_p (tree type, bool access, bool hasctor[2])
   tree fns = get_class_binding (type, complete_ctor_identifier);
   bool all_trivial = true;
 
-  for (ovl_iterator oi (fns); oi; ++oi)
+  for (tree f : ovl_range (fns))
     {
-      tree f = *oi;
-
       /* Skip template constructors.  */
       if (TREE_CODE (f) != FUNCTION_DECL)
 	continue;
@@ -10658,7 +10782,8 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 		  tree a = instance;
 		  if (TREE_THIS_VOLATILE (a))
 		    a = build_this (a);
-		  call = build2 (COMPOUND_EXPR, TREE_TYPE (call), a, call);
+		  if (TREE_SIDE_EFFECTS (a))
+		    call = build2 (COMPOUND_EXPR, TREE_TYPE (call), a, call);
 		}
 	      else if (call != error_mark_node
 		       && DECL_DESTRUCTOR_P (cand->fn)
@@ -12052,7 +12177,7 @@ can_convert (tree to, tree from, tsubst_flags_t complain)
   /* implicit_conversion only considers user-defined conversions
      if it has an expression for the call argument list.  */
   if (CLASS_TYPE_P (from) || CLASS_TYPE_P (to))
-    arg = build1 (CAST_EXPR, from, NULL_TREE);
+    arg = build_stub_object (from);
   return can_convert_arg (to, from, arg, LOOKUP_IMPLICIT, complain);
 }
 

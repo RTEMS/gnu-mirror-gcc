@@ -152,30 +152,6 @@ insert_decl_map (copy_body_data *id, tree key, tree value)
     id->decl_map->put (value, value);
 }
 
-/* Insert a tree->tree mapping for ID.  This is only used for
-   variables.  */
-
-static void
-insert_debug_decl_map (copy_body_data *id, tree key, tree value)
-{
-  if (!gimple_in_ssa_p (id->src_cfun))
-    return;
-
-  if (!opt_for_fn (id->dst_fn, flag_var_tracking_assignments))
-    return;
-
-  if (!target_for_debug_bind (key))
-    return;
-
-  gcc_assert (TREE_CODE (key) == PARM_DECL);
-  gcc_assert (VAR_P (value));
-
-  if (!id->debug_map)
-    id->debug_map = new hash_map<tree, tree>;
-
-  id->debug_map->put (key, value);
-}
-
 /* If nonzero, we're remapping the contents of inlined debug
    statements.  If negative, an error has occurred, such as a
    reference to a variable that isn't available in the inlined
@@ -3190,7 +3166,8 @@ copy_debug_stmt (gdebug *stmt, copy_body_data *id)
   else
     gcc_unreachable ();
 
-  if (TREE_CODE (t) == PARM_DECL && id->debug_map
+  if (TREE_CODE (t) == PARM_DECL
+      && id->debug_map
       && (n = id->debug_map->get (t)))
     {
       gcc_assert (VAR_P (*n));
@@ -3352,7 +3329,10 @@ insert_init_debug_bind (copy_body_data *id,
 	base_stmt = gsi_stmt (gsi);
     }
 
-  note = gimple_build_debug_bind (tracked_var, unshare_expr (value), base_stmt);
+  note = gimple_build_debug_bind (tracked_var,
+				  value == error_mark_node
+				  ? NULL_TREE : unshare_expr (value),
+				  base_stmt);
 
   if (bb)
     {
@@ -3418,7 +3398,9 @@ force_value_to_type (tree type, tree value)
      Still if we end up with truly mismatched types here, fall back
      to using a VIEW_CONVERT_EXPR or a literal zero to not leak invalid
      GIMPLE to the following passes.  */
-  if (!is_gimple_reg_type (TREE_TYPE (value))
+  if (TREE_CODE (value) == WITH_SIZE_EXPR)
+    return error_mark_node;
+  else if (!is_gimple_reg_type (TREE_TYPE (value))
 	   || TYPE_SIZE (type) == TYPE_SIZE (TREE_TYPE (value)))
     return fold_build1 (VIEW_CONVERT_EXPR, type, value);
   else
@@ -3434,14 +3416,8 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
 {
   gimple *init_stmt = NULL;
   tree var;
-  tree rhs = value;
   tree def = (gimple_in_ssa_p (cfun)
 	      ? ssa_default_def (id->src_cfun, p) : NULL);
-
-  if (value
-      && value != error_mark_node
-      && !useless_type_conversion_p (TREE_TYPE (p), TREE_TYPE (value)))
-    rhs = force_value_to_type (TREE_TYPE (p), value);
 
   /* Make an equivalent VAR_DECL.  Note that we must NOT remap the type
      here since the type of this decl must be visible to the calling
@@ -3461,16 +3437,18 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
      value.  */
   if (TREE_READONLY (p)
       && !TREE_ADDRESSABLE (p)
-      && value && !TREE_SIDE_EFFECTS (value)
+      && value
+      && !TREE_SIDE_EFFECTS (value)
       && !def)
     {
-      /* We may produce non-gimple trees by adding NOPs or introduce
-	 invalid sharing when operand is not really constant.
-	 It is not big deal to prohibit constant propagation here as
-	 we will constant propagate in DOM1 pass anyway.  */
-      if (is_gimple_min_invariant (value)
-	  && useless_type_conversion_p (TREE_TYPE (p),
-						 TREE_TYPE (value))
+      /* We may produce non-gimple trees by adding NOPs or introduce invalid
+	 sharing when the value is not constant or DECL.  And we need to make
+	 sure that it cannot be modified from another path in the callee.  */
+      if ((is_gimple_min_invariant (value)
+	   || (DECL_P (value) && TREE_READONLY (value))
+	   || (auto_var_in_fn_p (value, id->src_fn)
+	       && !TREE_ADDRESSABLE (value)))
+	  && useless_type_conversion_p (TREE_TYPE (p), TREE_TYPE (value))
 	  /* We have to be very careful about ADDR_EXPR.  Make sure
 	     the base variable isn't a local variable of the inlined
 	     function, e.g., when doing recursive inlining, direct or
@@ -3479,7 +3457,9 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
 	  && ! self_inlining_addr_expr (value, fn))
 	{
 	  insert_decl_map (id, p, value);
-	  insert_debug_decl_map (id, p, var);
+	  if (!id->debug_map)
+	    id->debug_map = new hash_map<tree, tree>;
+	  id->debug_map->put (p, var);
 	  return insert_init_debug_bind (id, bb, var, value, NULL);
 	}
     }
@@ -3500,6 +3480,12 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
      assigned to only once.  */
   if (TYPE_NEEDS_CONSTRUCTING (TREE_TYPE (p)))
     TREE_READONLY (var) = 0;
+
+  tree rhs = value;
+  if (value
+      && value != error_mark_node
+      && !useless_type_conversion_p (TREE_TYPE (p), TREE_TYPE (value)))
+    rhs = force_value_to_type (TREE_TYPE (p), value);
 
   /* If there is no setup required and we are in SSA, take the easy route
      replacing all SSA names representing the function parameter by the
@@ -4016,6 +4002,26 @@ inline_forbidden_p (tree fndecl)
   memset (&wi, 0, sizeof (wi));
   wi.info = (void *) fndecl;
   wi.pset = &visited_nodes;
+
+  /* We cannot inline a function with a VLA typed argument or result since
+     we have no implementation materializing a variable of such type in
+     the caller.  */
+  if (COMPLETE_TYPE_P (TREE_TYPE (TREE_TYPE (fndecl)))
+      && !poly_int_tree_p (TYPE_SIZE (TREE_TYPE (TREE_TYPE (fndecl)))))
+    {
+      inline_forbidden_reason
+	= G_("function %q+F can never be inlined because "
+	     "it has a VLA return argument");
+      return true;
+    }
+  for (tree parm = DECL_ARGUMENTS (fndecl); parm; parm = DECL_CHAIN (parm))
+    if (!poly_int_tree_p (DECL_SIZE (parm)))
+      {
+	inline_forbidden_reason
+	  = G_("function %q+F can never be inlined because "
+	       "it has a VLA argument");
+	return true;
+      }
 
   FOR_EACH_BB_FN (bb, fun)
     {
@@ -5103,8 +5109,13 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
     for (tree p = DECL_ARGUMENTS (id->src_fn); p; p = DECL_CHAIN (p))
       if (!TREE_THIS_VOLATILE (p))
 	{
+	  /* The value associated with P is a local temporary only if
+	     there is no value associated with P in the debug map.  */
 	  tree *varp = id->decl_map->get (p);
-	  if (varp && VAR_P (*varp) && !is_gimple_reg (*varp))
+	  if (varp
+	      && VAR_P (*varp)
+	      && !is_gimple_reg (*varp)
+	      && !(id->debug_map && id->debug_map->get (p)))
 	    {
 	      tree clobber = build_clobber (TREE_TYPE (*varp));
 	      gimple *clobber_stmt;
@@ -6356,6 +6367,8 @@ tree_function_versioning (tree old_decl, tree new_decl,
       tree resdecl_repl = copy_result_decl_to_var (DECL_RESULT (old_decl),
 						   &id);
       declare_inline_vars (NULL, resdecl_repl);
+      if (DECL_BY_REFERENCE (DECL_RESULT (old_decl)))
+	resdecl_repl = build_fold_addr_expr (resdecl_repl);
       insert_decl_map (&id, DECL_RESULT (old_decl), resdecl_repl);
 
       DECL_RESULT (new_decl)

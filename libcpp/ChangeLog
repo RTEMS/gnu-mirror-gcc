@@ -1,3 +1,75 @@
+2021-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/100450
+	* lex.c (cpp_avoid_paste): Handle token1 CPP_PRAGMA like CPP_NAME.
+
+2021-05-06  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c++/83873
+	PR preprocessor/97604
+	* lex.c (lex_number): Reject adjacent digit separators here.  Do
+	not allow digit separators before '.' or an exponent with sign.
+	* expr.c (cpp_classify_number): Do not check for adjacent digit
+	separators here.
+
+2021-05-03  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR bootstrap/99703
+	* configure: Regenerated.
+
+2021-04-29  Joseph Myers  <joseph@codesourcery.com>
+
+	PR preprocessor/82359
+	* directives.c (strtolinenum): Handle digit separators.
+
+2021-04-19  Richard Biener  <rguenther@suse.de>
+
+	PR preprocessor/100142
+	* line-map.c (linemap_position_for_loc_and_offset): Revert
+	unintended s/column_offset/column/ change.
+
+2021-04-13  Nathan Sidwell  <nathan@acm.org>
+
+	PR preprocessor/99446
+	* line-map.c (line-map.c): Do not advance to linemaps for
+	different files.
+
+2021-04-13  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* include/line-map.h (IS_MACRO_LOC): Delete.
+	* line-map.c (linemap_location_from_macro_expansion_p): Test
+	LINEMAPS_MACRO_LOWEST_LOCATION of the linemap.
+
+2021-03-02  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/99323
+	* line-map.c (rich_location::maybe_add_fixit): Reject fix-it hints
+	at column 0.
+
+2021-02-24  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/98718
+	* include/line-map.h
+	* line-map.c
+
+2021-02-24  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99072
+	* init.c (read_original_filename): Expunge all evidence of the
+	original filename.
+
+2021-02-18  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99023
+	* include/cpplib.h (cpp_find_header_unit): Rename to ...
+	(cpp_probe_header_unit): ... this.
+	* internal.h (_cp_find_header_unit): Declare.
+	* files.c (cpp_find_header_unit): Break apart to ..
+	(test_header_unit): ... this, and ...
+	(_cpp_find_header_unit): ... and, or and ...
+	(cpp_probe_header_unit): ... this.
+	* macro.c (cpp_get_token_1): Call _cpp_find_header_unit.
+
 2021-02-16  Nathan Sidwell  <nathan@acm.org>
 
 	* files.c (_cpp_stack_file): Make buffers end in unread \n.

@@ -1829,7 +1829,10 @@ ira_setup_alts (rtx_insn *insn)
 		  case '0':  case '1':  case '2':  case '3':  case '4':
 		  case '5':  case '6':  case '7':  case '8':  case '9':
 		    {
-		      rtx other = recog_data.operand[c - '0'];
+		      char *end;
+		      unsigned long dup = strtoul (p, &end, 10);
+		      rtx other = recog_data.operand[dup];
+		      len = end - p;
 		      if (MEM_P (other)
 			  ? rtx_equal_p (other, op)
 			  : REG_P (op) || SUBREG_P (op))
@@ -1868,6 +1871,7 @@ ira_setup_alts (rtx_insn *insn)
 			  goto op_success;
 
 			case CT_MEMORY:
+			case CT_RELAXED_MEMORY:
 			  mem = op;
 			  /* Fall through.  */
 			case CT_SPECIAL_MEMORY:
@@ -1922,7 +1926,7 @@ ira_setup_alts (rtx_insn *insn)
 int
 ira_get_dup_out_num (int op_num, alternative_mask alts)
 {
-  int curr_alt, c, original, dup;
+  int curr_alt, c, original;
   bool ignore_p, use_commut_op_p;
   const char *str;
 
@@ -1969,18 +1973,22 @@ ira_get_dup_out_num (int op_num, alternative_mask alts)
 		
 	      case '0': case '1': case '2': case '3': case '4':
 	      case '5': case '6': case '7': case '8': case '9':
-		if (original != -1 && original != c)
-		  goto fail;
-		original = c;
-		break;
+		{
+		  char *end;
+		  int n = (int) strtoul (str, &end, 10);
+		  str = end;
+		  if (original != -1 && original != n)
+		    goto fail;
+		  original = n;
+		  continue;
+		}
 	      }
 	  str += CONSTRAINT_LEN (c, str);
 	}
       if (original == -1)
 	goto fail;
-      dup = original - '0';
-      if (recog_data.operand_type[dup] == OP_OUT)
-	return dup;
+      if (recog_data.operand_type[original] == OP_OUT)
+	return original;
     fail:
       if (use_commut_op_p)
 	break;
@@ -3077,7 +3085,6 @@ equiv_init_movable_p (rtx x, int regno)
     case SET:
       return equiv_init_movable_p (SET_SRC (x), regno);
 
-    case CC0:
     case CLOBBER:
       return 0;
 
@@ -3162,7 +3169,6 @@ memref_referenced_p (rtx memref, rtx x, bool read_p)
     case SYMBOL_REF:
     CASE_CONST_ANY:
     case PC:
-    case CC0:
     case HIGH:
     case LO_SUM:
       return false;
@@ -4440,9 +4446,6 @@ rtx_moveable_p (rtx *loc, enum op_type type)
     case PC:
       return type == OP_IN;
 
-    case CC0:
-      return false;
-
     case REG:
       if (x == frame_pointer_rtx)
 	return true;
@@ -4733,13 +4736,6 @@ find_moveable_pseudos (void)
 			   ? " (no unique first use)" : "");
 		continue;
 	      }
-	    if (HAVE_cc0 && reg_referenced_p (cc0_rtx, PATTERN (closest_use)))
-	      {
-		if (dump_file)
-		  fprintf (dump_file, "Reg %d: closest user uses cc0\n",
-			   regno);
-		continue;
-	      }
 
 	    bitmap_set_bit (interesting, regno);
 	    /* If we get here, we know closest_use is a non-NULL insn
@@ -4814,8 +4810,7 @@ find_moveable_pseudos (void)
 	  if (!bitmap_bit_p (def_bb_transp, regno))
 	    {
 	      if (bitmap_bit_p (def_bb_moveable, regno)
-		  && !control_flow_insn_p (use_insn)
-		  && (!HAVE_cc0 || !sets_cc0_p (use_insn)))
+		  && !control_flow_insn_p (use_insn))
 		{
 		  if (modified_between_p (DF_REF_REG (use), def_insn, use_insn))
 		    {

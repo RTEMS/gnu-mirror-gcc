@@ -1111,7 +1111,7 @@ aliasing_component_refs_walk (tree ref1, tree type1, tree base1,
    REF1_ALIAS_SET is the alias set of REF1.
 
    BASE_TYPE2 is type of base2.  END_STRUCT_REF2 is non-NULL if there is
-   a traling array access in the TBAA part of access path2.
+   a trailing array access in the TBAA part of access path2.
    BASE2_ALIAS_SET is the alias set of base2.  */
 
 bool
@@ -1183,8 +1183,8 @@ aliasing_component_refs_p (tree ref1,
      trailing array.
 
      We generally discard the segment after end_of_tbaa_ref however
-     we need to be careful in case it contains zero sized or traling array.
-     These may happen after refernce to union and in this case we need to
+     we need to be careful in case it contains zero sized or trailing array.
+     These may happen after reference to union and in this case we need to
      not disambiguate type puning scenarios.
 
      We set:
@@ -1195,7 +1195,7 @@ aliasing_component_refs_p (tree ref1,
 	end_struct_ref1 to point the trailing reference (if it exists
  	in range base....end_of_tbaa_ref
 
-	end_struct_past_end1 is true if this traling refernece occurs in
+	end_struct_past_end1 is true if this trailing reference occurs in
 	end_of_tbaa_ref...actual_ref.  */
   base1 = ref1;
   while (handled_component_p (base1))
@@ -1674,7 +1674,7 @@ nonoverlapping_refs_since_match_p (tree match1, tree ref1,
 		  seen_unmatched_ref_p = true;
 		  /* We can not maintain the invariant that bases are either
 		     same or completely disjoint.  However we can still recover
-		     from type based alias analysis if we reach referneces to
+		     from type based alias analysis if we reach references to
 		     same sizes.  We do not attempt to match array sizes, so
 		     just finish array walking and look for component refs.  */
 		  if (ntbaa1 < 0 || ntbaa2 < 0)
@@ -2034,6 +2034,17 @@ indirect_ref_may_alias_decl_p (tree ref1 ATTRIBUTE_UNUSED, tree base1,
   if (TREE_CODE (base1) != TARGET_MEM_REF
       && !ranges_maybe_overlap_p (offset1 + moff, -1, offset2, max_size2))
     return false;
+
+  /* If the pointer based access is bigger than the variable they cannot
+     alias.  This is similar to the check below where we use TBAA to
+     increase the size of the pointer based access based on the dynamic
+     type of a containing object we can infer from it.  */
+  poly_int64 dsize2;
+  if (known_size_p (size1)
+      && poly_int_tree_p (DECL_SIZE (base2), &dsize2)
+      && known_lt (dsize2, size1))
+    return false;
+
   /* They also cannot alias if the pointer may not point to the decl.  */
   if (!ptr_deref_may_alias_decl_p (ptr1, base2))
     return false;

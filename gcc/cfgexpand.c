@@ -2795,7 +2795,10 @@ expand_call_stmt (gcall *stmt)
       CALL_EXPR_ARG (exp, i) = arg;
     }
 
-  if (gimple_has_side_effects (stmt))
+  if (gimple_has_side_effects (stmt)
+      /* ???  Downstream in expand_expr_real_1 we assume that expressions
+	 w/o side-effects do not throw so work around this here.  */
+      || stmt_could_throw_p (cfun, stmt))
     TREE_SIDE_EFFECTS (exp) = 1;
 
   if (gimple_call_nothrow_p (stmt))
@@ -2880,6 +2883,7 @@ expand_asm_loc (tree string, int vol, location_t locus)
       rtx asm_op, clob;
       unsigned i, nclobbers;
       auto_vec<rtx> input_rvec, output_rvec;
+      auto_vec<machine_mode> input_mode;
       auto_vec<const char *> constraints;
       auto_vec<rtx> clobber_rvec;
       HARD_REG_SET clobbered_regs;
@@ -2889,9 +2893,8 @@ expand_asm_loc (tree string, int vol, location_t locus)
       clobber_rvec.safe_push (clob);
 
       if (targetm.md_asm_adjust)
-	targetm.md_asm_adjust (output_rvec, input_rvec,
-			       constraints, clobber_rvec,
-			       clobbered_regs);
+	targetm.md_asm_adjust (output_rvec, input_rvec, input_mode,
+			       constraints, clobber_rvec, clobbered_regs);
 
       asm_op = body;
       nclobbers = clobber_rvec.length ();
@@ -3068,8 +3071,8 @@ expand_asm_stmt (gasm *stmt)
       return;
     }
 
-  /* There are some legacy diagnostics in here, and also avoids a
-     sixth parameger to targetm.md_asm_adjust.  */
+  /* There are some legacy diagnostics in here, and also avoids an extra
+     parameter to targetm.md_asm_adjust.  */
   save_input_location s_i_l(locus);
 
   unsigned noutputs = gimple_asm_noutputs (stmt);
@@ -3420,9 +3423,9 @@ expand_asm_stmt (gasm *stmt)
      the flags register.  */
   rtx_insn *after_md_seq = NULL;
   if (targetm.md_asm_adjust)
-    after_md_seq = targetm.md_asm_adjust (output_rvec, input_rvec,
-					  constraints, clobber_rvec,
-					  clobbered_regs);
+    after_md_seq
+	= targetm.md_asm_adjust (output_rvec, input_rvec, input_mode,
+				 constraints, clobber_rvec, clobbered_regs);
 
   /* Do not allow the hook to change the output and input count,
      lest it mess up the operand numbering.  */
@@ -6053,7 +6056,7 @@ expand_gimple_basic_block (basic_block bb, bool disable_tail_calls)
   /* Expand implicit goto and convert goto_locus.  */
   FOR_EACH_EDGE (e, ei, bb->succs)
     {
-      if (e->goto_locus != UNKNOWN_LOCATION)
+      if (e->goto_locus != UNKNOWN_LOCATION || !stmt)
 	set_curr_insn_location (e->goto_locus);
       if ((e->flags & EDGE_FALLTHRU) && e->dest != bb->next_bb)
 	{

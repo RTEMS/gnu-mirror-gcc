@@ -243,9 +243,7 @@ dump_scope (cxx_pretty_printer *pp, tree scope, int flags)
     }
   else if ((flags & TFF_SCOPE) && TREE_CODE (scope) == FUNCTION_DECL)
     {
-      if (DECL_USE_TEMPLATE (scope))
-	f |= TFF_NO_FUNCTION_ARGUMENTS;
-      dump_function_decl (pp, scope, f);
+      dump_function_decl (pp, scope, f | TFF_NO_TEMPLATE_BINDINGS);
       pp_cxx_colon_colon (pp);
     }
 }
@@ -1140,7 +1138,7 @@ dump_decl_name (cxx_pretty_printer *pp, tree t, int flags)
     }
 
   const char *str = IDENTIFIER_POINTER (t);
-  if (!strncmp (str, "_ZGR", 4))
+  if (startswith (str, "_ZGR"))
     {
       pp_cxx_ws_string (pp, "<temporary>");
       return;
@@ -1364,7 +1362,10 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case LABEL_DECL:
-      pp_cxx_tree_identifier (pp, DECL_NAME (t));
+      if (DECL_NAME (t))
+	pp_cxx_tree_identifier (pp, DECL_NAME (t));
+      else
+	dump_generic_node (pp, t, 0, TDF_SLIM, false);
       break;
 
     case CONST_DECL:

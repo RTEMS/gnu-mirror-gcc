@@ -25,11 +25,6 @@ along with GCC; see the file COPYING3.  If not see
 #undef DARWIN_X86
 #define DARWIN_X86 1
 
-#undef TARGET_64BIT
-#define TARGET_64BIT TARGET_ISA_64BIT
-#undef TARGET_64BIT_P
-#define TARGET_64BIT_P(x) TARGET_ISA_64BIT_P(x)
-
 #ifdef IN_LIBGCC2
 #undef TARGET_64BIT
 #ifdef __x86_64__
@@ -221,18 +216,6 @@ along with GCC; see the file COPYING3.  If not see
 	  fprintf (FILE, "\t%s %d\n", ALIGN_ASM_OP, (LOG));	   \
       }								   \
   } while (0)
-
-#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
-#define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE,LOG,MAX_SKIP)                    \
-  do {                                                                  \
-    if ((LOG) != 0) {                                                   \
-      if ((MAX_SKIP) == 0 || (MAX_SKIP) >= (1 << (LOG)) - 1)            \
-        fprintf ((FILE), "\t.p2align %d\n", (LOG));                     \
-      else                                                              \
-        fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP));     \
-    }                                                                   \
-  } while (0)
-#endif
 
 /* Darwin x86 assemblers support the .ident directive.  */
 

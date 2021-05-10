@@ -303,13 +303,11 @@ get_symbol_constant_value (tree sym)
 
 
 
-/* Subroutine of fold_stmt.  We perform several simplifications of the
-   memory reference tree EXPR and make sure to re-gimplify them properly
-   after propagation of constant addresses.  IS_LHS is true if the
-   reference is supposed to be an lvalue.  */
+/* Subroutine of fold_stmt.  We perform constant folding of the
+   memory reference tree EXPR.  */
 
 static tree
-maybe_fold_reference (tree expr, bool is_lhs)
+maybe_fold_reference (tree expr)
 {
   tree result;
 
@@ -330,12 +328,128 @@ maybe_fold_reference (tree expr, bool is_lhs)
 			     TREE_OPERAND (expr, 1),
 			     TREE_OPERAND (expr, 2));
 
-  if (!is_lhs
-      && (result = fold_const_aggregate_ref (expr))
+  if ((result = fold_const_aggregate_ref (expr))
       && is_gimple_min_invariant (result))
     return result;
 
   return NULL_TREE;
+}
+
+/* Return true if EXPR is an acceptable right-hand-side for a
+   GIMPLE assignment.  We validate the entire tree, not just
+   the root node, thus catching expressions that embed complex
+   operands that are not permitted in GIMPLE.  This function
+   is needed because the folding routines in fold-const.c
+   may return such expressions in some cases, e.g., an array
+   access with an embedded index addition.  It may make more
+   sense to have folding routines that are sensitive to the
+   constraints on GIMPLE operands, rather than abandoning any
+   any attempt to fold if the usual folding turns out to be too
+   aggressive.  */
+
+bool
+valid_gimple_rhs_p (tree expr)
+{
+  enum tree_code code = TREE_CODE (expr);
+
+  switch (TREE_CODE_CLASS (code))
+    {
+    case tcc_declaration:
+      if (!is_gimple_variable (expr))
+	return false;
+      break;
+
+    case tcc_constant:
+      /* All constants are ok.  */
+      break;
+
+    case tcc_comparison:
+      /* GENERIC allows comparisons with non-boolean types, reject
+	 those for GIMPLE.  Let vector-typed comparisons pass - rules
+	 for GENERIC and GIMPLE are the same here.  */
+      if (!(INTEGRAL_TYPE_P (TREE_TYPE (expr))
+	    && (TREE_CODE (TREE_TYPE (expr)) == BOOLEAN_TYPE
+		|| TYPE_PRECISION (TREE_TYPE (expr)) == 1))
+	  && ! VECTOR_TYPE_P (TREE_TYPE (expr)))
+	return false;
+
+      /* Fallthru.  */
+    case tcc_binary:
+      if (!is_gimple_val (TREE_OPERAND (expr, 0))
+	  || !is_gimple_val (TREE_OPERAND (expr, 1)))
+	return false;
+      break;
+
+    case tcc_unary:
+      if (!is_gimple_val (TREE_OPERAND (expr, 0)))
+	return false;
+      break;
+
+    case tcc_expression:
+      switch (code)
+	{
+	case ADDR_EXPR:
+	  {
+	    tree t;
+	    if (is_gimple_min_invariant (expr))
+	      return true;
+	    t = TREE_OPERAND (expr, 0);
+	    while (handled_component_p (t))
+	      {
+		/* ??? More checks needed, see the GIMPLE verifier.  */
+		if ((TREE_CODE (t) == ARRAY_REF
+		     || TREE_CODE (t) == ARRAY_RANGE_REF)
+		    && !is_gimple_val (TREE_OPERAND (t, 1)))
+		  return false;
+		t = TREE_OPERAND (t, 0);
+	      }
+	    if (!is_gimple_id (t))
+	      return false;
+	  }
+	  break;
+
+	default:
+	  if (get_gimple_rhs_class (code) == GIMPLE_TERNARY_RHS)
+	    {
+	      if ((code == COND_EXPR
+		   ? !is_gimple_condexpr (TREE_OPERAND (expr, 0))
+		   : !is_gimple_val (TREE_OPERAND (expr, 0)))
+		  || !is_gimple_val (TREE_OPERAND (expr, 1))
+		  || !is_gimple_val (TREE_OPERAND (expr, 2)))
+		return false;
+	      break;
+	    }
+	  return false;
+	}
+      break;
+
+    case tcc_vl_exp:
+      return false;
+
+    case tcc_exceptional:
+      if (code == CONSTRUCTOR)
+	{
+	  unsigned i;
+	  tree elt;
+	  FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (expr), i, elt)
+	    if (!is_gimple_val (elt))
+	      return false;
+	  return true;
+	}
+      if (code != SSA_NAME)
+	return false;
+      break;
+
+    case tcc_reference:
+      if (code == BIT_FIELD_REF)
+	return is_gimple_val (TREE_OPERAND (expr, 0));
+      return false;
+
+    default:
+      return false;
+    }
+
+  return true;
 }
 
 
@@ -363,7 +477,7 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 	  return NULL_TREE;
 
 	if (REFERENCE_CLASS_P (rhs))
-	  return maybe_fold_reference (rhs, false);
+	  return maybe_fold_reference (rhs);
 
 	else if (TREE_CODE (rhs) == OBJ_TYPE_REF)
 	  {
@@ -405,28 +519,14 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 	else if (TREE_CODE (rhs) == ADDR_EXPR)
 	  {
 	    tree ref = TREE_OPERAND (rhs, 0);
-	    tree tem = maybe_fold_reference (ref, true);
-	    if (tem
-		&& TREE_CODE (tem) == MEM_REF
-		&& integer_zerop (TREE_OPERAND (tem, 1)))
-	      result = fold_convert (TREE_TYPE (rhs), TREE_OPERAND (tem, 0));
-	    else if (tem)
-	      result = fold_convert (TREE_TYPE (rhs),
-				     build_fold_addr_expr_loc (loc, tem));
-	    else if (TREE_CODE (ref) == MEM_REF
-		     && integer_zerop (TREE_OPERAND (ref, 1)))
-	      result = fold_convert (TREE_TYPE (rhs), TREE_OPERAND (ref, 0));
-
-	    if (result)
+	    if (TREE_CODE (ref) == MEM_REF
+		&& integer_zerop (TREE_OPERAND (ref, 1)))
 	      {
-		/* Strip away useless type conversions.  Both the
-		   NON_LVALUE_EXPR that may have been added by fold, and
-		   "useless" type conversions that might now be apparent
-		   due to propagation.  */
-		STRIP_USELESS_TYPE_CONVERSION (result);
-
-		if (result != rhs && valid_gimple_rhs_p (result))
-		  return result;
+		result = TREE_OPERAND (ref, 0);
+		if (!useless_type_conversion_p (TREE_TYPE (rhs),
+						TREE_TYPE (result)))
+		  result = build1 (NOP_EXPR, TREE_TYPE (rhs), result);
+		return result;
 	      }
 	  }
 
@@ -551,6 +651,72 @@ gsi_replace_with_seq_vops (gimple_stmt_iterator *si_p, gimple_seq stmts)
   gsi_replace_with_seq (si_p, stmts, false);
 }
 
+/* Helper function for update_gimple_call and
+   gimplify_and_update_call_from_tree.  A GIMPLE_CALL STMT is being replaced
+   with GIMPLE_CALL NEW_STMT.  */
+
+static void
+finish_update_gimple_call (gimple_stmt_iterator *si_p, gimple *new_stmt,
+			   gimple *stmt)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  gimple_call_set_lhs (new_stmt, lhs);
+  if (lhs && TREE_CODE (lhs) == SSA_NAME)
+    SSA_NAME_DEF_STMT (lhs) = new_stmt;
+  gimple_move_vops (new_stmt, stmt);
+  gimple_set_location (new_stmt, gimple_location (stmt));
+  if (gimple_block (new_stmt) == NULL_TREE)
+    gimple_set_block (new_stmt, gimple_block (stmt));
+  gsi_replace (si_p, new_stmt, false);
+}
+
+/* Update a GIMPLE_CALL statement at iterator *SI_P to call to FN
+   with number of arguments NARGS, where the arguments in GIMPLE form
+   follow NARGS argument.  */
+
+bool
+update_gimple_call (gimple_stmt_iterator *si_p, tree fn, int nargs, ...)
+{
+  va_list ap;
+  gcall *new_stmt, *stmt = as_a <gcall *> (gsi_stmt (*si_p));
+
+  gcc_assert (is_gimple_call (stmt));
+  va_start (ap, nargs);
+  new_stmt = gimple_build_call_valist (fn, nargs, ap);
+  finish_update_gimple_call (si_p, new_stmt, stmt);
+  va_end (ap);
+  return true;
+}
+
+/* Return true if EXPR is a CALL_EXPR suitable for representation
+   as a single GIMPLE_CALL statement.  If the arguments require
+   further gimplification, return false.  */
+
+static bool
+valid_gimple_call_p (tree expr)
+{
+  unsigned i, nargs;
+
+  if (TREE_CODE (expr) != CALL_EXPR)
+    return false;
+
+  nargs = call_expr_nargs (expr);
+  for (i = 0; i < nargs; i++)
+    {
+      tree arg = CALL_EXPR_ARG (expr, i);
+      if (is_gimple_reg_type (TREE_TYPE (arg)))
+	{
+	  if (!is_gimple_val (arg))
+	    return false;
+	}
+      else
+	if (!is_gimple_lvalue (arg))
+	  return false;
+    }
+
+  return true;
+}
+
 /* Convert EXPR into a GIMPLE value suitable for substitution on the
    RHS of an assignment.  Insert the necessary statements before
    iterator *SI_P.  The statement at *SI_P, which must be a GIMPLE_CALL
@@ -573,17 +739,41 @@ gimplify_and_update_call_from_tree (gimple_stmt_iterator *si_p, tree expr)
 
   gcc_assert (is_gimple_call (stmt));
 
-  push_gimplify_context (gimple_in_ssa_p (cfun));
+  if (valid_gimple_call_p (expr))
+    {
+      /* The call has simplified to another call.  */
+      tree fn = CALL_EXPR_FN (expr);
+      unsigned i;
+      unsigned nargs = call_expr_nargs (expr);
+      vec<tree> args = vNULL;
+      gcall *new_stmt;
+
+      if (nargs > 0)
+	{
+	  args.create (nargs);
+	  args.safe_grow_cleared (nargs, true);
+
+	  for (i = 0; i < nargs; i++)
+	    args[i] = CALL_EXPR_ARG (expr, i);
+	}
+
+      new_stmt = gimple_build_call_vec (fn, args);
+      finish_update_gimple_call (si_p, new_stmt, stmt);
+      args.release ();
+      return;
+    }
 
   lhs = gimple_call_lhs (stmt);
   if (lhs == NULL_TREE)
     {
+      push_gimplify_context (gimple_in_ssa_p (cfun));
       gimplify_and_add (expr, &stmts);
+      pop_gimplify_context (NULL);
+
       /* We can end up with folding a memcpy of an empty class assignment
 	 which gets optimized away by C++ gimplification.  */
       if (gimple_seq_empty_p (stmts))
 	{
-	  pop_gimplify_context (NULL);
 	  if (gimple_in_ssa_p (cfun))
 	    {
 	      unlink_stmt_vdef (stmt);
@@ -601,8 +791,6 @@ gimplify_and_update_call_from_tree (gimple_stmt_iterator *si_p, tree expr)
       gsi_insert_after_without_update (&i, new_stmt,
 				       GSI_CONTINUE_LINKING);
     }
-
-  pop_gimplify_context (NULL);
 
   gsi_replace_with_seq_vops (si_p, stmts);
 }
@@ -4972,8 +5160,7 @@ gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	STRIP_NOPS (result);
       else
 	result = fold_convert (gimple_call_return_type (stmt), result);
-      if (!update_call_from_tree (gsi, result))
-	gimplify_and_update_call_from_tree (gsi, result);
+      gimplify_and_update_call_from_tree (gsi, result);
       return true;
     }
 
@@ -5262,7 +5449,7 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
   for (i = 0; i < gimple_call_num_args (stmt); ++i)
     if (REFERENCE_CLASS_P (gimple_call_arg (stmt, i)))
       {
-	tree tmp = maybe_fold_reference (gimple_call_arg (stmt, i), false);
+	tree tmp = maybe_fold_reference (gimple_call_arg (stmt, i));
 	if (tmp)
 	  {
 	    gimple_call_set_arg (stmt, i, tmp);
@@ -5373,7 +5560,7 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
 	}
       else
 	{
-	  tree tmp = maybe_fold_reference (gimple_call_chain (stmt), false);
+	  tree tmp = maybe_fold_reference (gimple_call_chain (stmt));
 	  if (tmp)
 	    {
 	      gimple_call_set_chain (stmt, tmp);
@@ -5569,8 +5756,7 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
 		result = build2_loc (gimple_location (stmt), COMPLEX_EXPR,
 				     ctype, result, overflow);
 	    }
-	  if (!update_call_from_tree (gsi, result))
-	    gimplify_and_update_call_from_tree (gsi, result);
+	  gimplify_and_update_call_from_tree (gsi, result);
 	  changed = true;
 	}
     }
@@ -5877,6 +6063,8 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
       if (tem)
 	{
 	  *t = tem;
+	  if (TREE_CODE (*orig_t) == ADDR_EXPR)
+	    recompute_tree_invariant_for_addr_expr (*orig_t);
 	  res = true;
 	}
     }
@@ -6105,18 +6293,11 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	noutputs = gimple_asm_noutputs (asm_stmt);
 	oconstraints = XALLOCAVEC (const char *, noutputs);
 
-	for (i = 0; i < gimple_asm_noutputs (asm_stmt); ++i)
+	for (i = 0; i < noutputs; ++i)
 	  {
 	    tree link = gimple_asm_output_op (asm_stmt, i);
-	    tree op = TREE_VALUE (link);
 	    oconstraints[i]
 	      = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (link)));
-	    if (REFERENCE_CLASS_P (op)
-		&& (op = maybe_fold_reference (op, true)) != NULL_TREE)
-	      {
-		TREE_VALUE (link) = op;
-		changed = true;
-	      }
 	  }
 	for (i = 0; i < gimple_asm_ninputs (asm_stmt); ++i)
 	  {
@@ -6127,8 +6308,8 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	    parse_input_constraint (&constraint, 0, 0, noutputs, 0,
 				    oconstraints, &allows_mem, &allows_reg);
 	    if (REFERENCE_CLASS_P (op)
-		&& (op = maybe_fold_reference (op, !allows_reg && allows_mem))
-		   != NULL_TREE)
+		&& (allows_reg || !allows_mem)
+		&& (op = maybe_fold_reference (op)) != NULL_TREE)
 	      {
 		TREE_VALUE (link) = op;
 		changed = true;
@@ -6144,7 +6325,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	  if (val
 	      && REFERENCE_CLASS_P (val))
 	    {
-	      tree tem = maybe_fold_reference (val, false);
+	      tree tem = maybe_fold_reference (val);
 	      if (tem)
 		{
 		  gimple_debug_bind_set_value (stmt, tem);
@@ -6155,7 +6336,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 		   && TREE_CODE (val) == ADDR_EXPR)
 	    {
 	      tree ref = TREE_OPERAND (val, 0);
-	      tree tem = maybe_fold_reference (ref, false);
+	      tree tem = maybe_fold_reference (ref);
 	      if (tem)
 		{
 		  tem = build_fold_addr_expr_with_type (tem, TREE_TYPE (val));
@@ -6188,21 +6369,6 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
     }
 
   stmt = gsi_stmt (*gsi);
-
-  /* Fold *& on the lhs.  */
-  if (gimple_has_lhs (stmt))
-    {
-      tree lhs = gimple_get_lhs (stmt);
-      if (lhs && REFERENCE_CLASS_P (lhs))
-	{
-	  tree new_lhs = maybe_fold_reference (lhs, true);
-	  if (new_lhs)
-	    {
-	      gimple_set_lhs (stmt, new_lhs);
-	      changed = true;
-	    }
-	}
-    }
 
   fold_undefer_overflow_warnings (changed && !nowarning, stmt, 0);
   return changed;

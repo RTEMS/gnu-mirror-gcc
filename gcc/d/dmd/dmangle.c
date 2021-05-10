@@ -82,6 +82,8 @@ void initTypeMangle()
     mangleChar[Treturn] = "@";
     mangleChar[Tvector] = "@";
     mangleChar[Ttraits] = "@";
+    mangleChar[Tmixin] = "@";
+    mangleChar[Tnoreturn] = "@";    // becomes 'Nn'
 
     mangleChar[Tnull] = "n";    // same as TypeNone
 
@@ -150,7 +152,7 @@ public:
     *  using upper case letters for all digits but the last digit which uses
     *  a lower case letter.
     * The decoder has to look up the referenced position to determine
-    *  whether the back reference is an identifer (starts with a digit)
+    *  whether the back reference is an identifier (starts with a digit)
     *  or a type (starts with a letter).
     *
     * Params:
@@ -414,6 +416,11 @@ public:
         visit((Type *)t);
     }
 
+    void visit(TypeNoreturn *)
+    {
+        buf->writestring("Nn");
+    }
+
     ////////////////////////////////////////////////////////////////////////////
 
     void mangleDecl(Declaration *sthis)
@@ -666,7 +673,7 @@ public:
                 cd == ClassDeclaration::object ||
                 cd == Type::typeinfoclass ||
                 cd == Module::moduleinfo ||
-                strncmp(cd->ident->toChars(), "TypeInfo_", 9) == 0)
+                startswith (cd->ident->toChars(), "TypeInfo_"))
             {
                 // Don't mangle parent
                 ad->parent = NULL;
@@ -1084,4 +1091,32 @@ void mangleToBuffer(TemplateInstance *ti, OutBuffer *buf)
 {
     Mangler v(buf);
     v.mangleTemplateInstance(ti);
+}
+
+/**********************************************
+ * Convert a string representing a type (the deco) and
+ * return its equivalent Type.
+ * Params:
+ *      deco = string containing the deco
+ * Returns:
+ *      null for failed to convert
+ *      Type for succeeded
+ */
+
+Type *decoToType(const char *deco)
+{
+    if (!deco)
+        return NULL;
+
+    //printf("decoToType(): %s\n", deco)
+    if (StringValue *sv = Type::stringtable.lookup(deco, strlen(deco)))
+    {
+        if (sv->ptrvalue)
+        {
+            Type *t = (Type *)sv->ptrvalue;
+            assert(t->deco);
+            return t;
+        }
+    }
+    return NULL;
 }
