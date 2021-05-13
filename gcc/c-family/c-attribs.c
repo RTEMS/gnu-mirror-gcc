@@ -5300,6 +5300,12 @@ handle_target_clones_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 		   "with %qs attribute", name, "target");
 	  *no_add_attrs = true;
 	}
+      else if (TREE_CODE (TREE_VALUE (args)) != STRING_CST)
+	{
+	  error ("%qE attribute argument not a string constant", name);
+	  *no_add_attrs = true;
+	}
+
       else
       /* Do not inline functions with multiple clone targets.  */
 	DECL_UNINLINABLE (*node) = 1;
