@@ -1666,13 +1666,6 @@ get_ne_cond_branch (struct loop *loop)
       if (TREE_CODE (iv.base) == INTEGER_CST)
 	continue;
 
-      /* If no overflow/wrap happen, no need to split.  */
-      class tree_niter_desc niter;
-      if (!number_of_iterations_exit (loop, e, &niter, false, false, NULL))
-	continue;
-      if (niter.control.no_overflow)
-	return NULL;
-
       /* Check loop is simple to split.  */
       gcc_assert (bb != loop->latch);
 
