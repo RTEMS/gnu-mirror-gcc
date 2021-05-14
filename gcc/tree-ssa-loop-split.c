@@ -1629,42 +1629,14 @@ get_ne_cond_branch (struct loop *loop)
       else if (!expr_invariant_in_loop_p (loop, bnd))
 	continue;
 
-      /* By default, unsigned type conversion could cause overflow.  */
-      tree type = TREE_TYPE (idx);
-      if (!INTEGRAL_TYPE_P (type) || TREE_CODE (idx) != SSA_NAME
-	  || !TYPE_UNSIGNED (type)
-	  || TYPE_PRECISION (type) == TYPE_PRECISION (sizetype))
+      /* If no overflow/wrap happen, no need to split.  */
+      if (nowrap_type_p (TREE_TYPE (idx)))
 	continue;
-
-      /* Avoid to split if bound is MAX/MIN val.  */
-      tree bound_type = TREE_TYPE (bnd);
-      if (TREE_CODE (bnd) == INTEGER_CST && INTEGRAL_TYPE_P (bound_type)
-	  && (bnd == TYPE_MAX_VALUE (bound_type)
-	      || bnd == TYPE_MIN_VALUE (bound_type)))
+      class tree_niter_desc niter;
+      if (!number_of_iterations_exit (loop, e, &niter, false, false, NULL))
 	continue;
-
-      /* Extract conversion from idx.  */
-      if (TREE_CODE (idx) == SSA_NAME)
-	{
-	  gimple *stmt = SSA_NAME_DEF_STMT (idx);
-	  if (is_gimple_assign (stmt)
-	      && CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt))
-	      && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
-	    idx = gimple_assign_rhs1 (stmt);
-	}
-
-      /* Check if idx is simple iv with possible overflow/wrap.  */
-      class loop *useloop = loop_containing_stmt (cond);
-      affine_iv iv;
-      if (!simple_iv (loop, useloop, idx, &iv, false))
-	continue;
-      if (iv.no_overflow)
+      if (niter.control.no_overflow)
 	return NULL;
-
-      /* If base is know value (esplically 0/1), other optimizations may be
-	 able to analyze "idx != bnd" as "idx < bnd" or "idx > bnd".  */
-      if (TREE_CODE (iv.base) == INTEGER_CST)
-	continue;
 
       /* Check loop is simple to split.  */
       gcc_assert (bb != loop->latch);
