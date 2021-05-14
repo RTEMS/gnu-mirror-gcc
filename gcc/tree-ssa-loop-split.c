@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "gimple-fold.h"
 #include "gimplify-me.h"
+#include "tree-ssa-loop-ivopts.h"
 
 /* This file implements two kinds of loop splitting.
 
@@ -233,7 +234,8 @@ easy_exit_values (class loop *loop)
    this.  The loops need to fulfill easy_exit_values().  */
 
 static void
-connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
+connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e,
+		   bool use_prev = false)
 {
   basic_block rest = loop_preheader_edge (loop2)->src;
   gcc_assert (new_e->dest == rest);
@@ -248,13 +250,14 @@ connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
        !gsi_end_p (psi_first);
        gsi_next (&psi_first), gsi_next (&psi_second))
     {
-      tree init, next, new_init;
+      tree init, next, new_init, prev;
       use_operand_p op;
       gphi *phi_first = psi_first.phi ();
       gphi *phi_second = psi_second.phi ();
 
       init = PHI_ARG_DEF_FROM_EDGE (phi_first, firste);
       next = PHI_ARG_DEF_FROM_EDGE (phi_first, firstn);
+      prev = PHI_RESULT (phi_first);
       op = PHI_ARG_DEF_PTR_FROM_EDGE (phi_second, seconde);
       gcc_assert (operand_equal_for_phi_arg_p (init, USE_FROM_PTR (op)));
 
@@ -279,7 +282,7 @@ connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
 
       gphi * newphi = create_phi_node (new_init, rest);
       add_phi_arg (newphi, init, skip_first, UNKNOWN_LOCATION);
-      add_phi_arg (newphi, next, new_e, UNKNOWN_LOCATION);
+      add_phi_arg (newphi, use_prev ? prev : next, new_e, UNKNOWN_LOCATION);
       SET_USE (op, new_init);
     }
 }
@@ -1593,6 +1596,213 @@ split_loop_on_cond (struct loop *loop)
   return do_split;
 }
 
+/* Check if the LOOP exit branch likes "if (idx != bound)".
+   if INV is not NULL and the branch is "if (bound != idx)", set *INV to true.
+   return the branch edge which exit loop.  */
+
+static edge
+get_ne_cond_branch (struct loop *loop, bool *inv)
+{
+  int i;
+  edge e;
+
+  auto_vec<edge> edges = get_loop_exit_edges (loop);
+  FOR_EACH_VEC_ELT (edges, i, e)
+    {
+      basic_block bb = e->src;
+
+      /* Check gcond.  */
+      gimple *last = last_stmt (bb);
+      if (!last || gimple_code (last) != GIMPLE_COND)
+	continue;
+      gcond *cond = as_a<gcond *> (last);
+      enum tree_code code = gimple_cond_code (cond);
+      if (code != NE_EXPR)
+	continue;
+
+      /* Make sure idx and bound.  */
+      tree idx = gimple_cond_lhs (cond);
+      tree bnd = gimple_cond_rhs (cond);
+      if (expr_invariant_in_loop_p (loop, idx))
+	{
+	  std::swap (idx, bnd);
+	  if (inv)
+	    *inv = true;
+	}
+      else if (!expr_invariant_in_loop_p (loop, bnd))
+	continue;
+
+      /* Extract conversion.  */
+      if (TREE_CODE (idx) == SSA_NAME)
+	{
+	  gimple *stmt = SSA_NAME_DEF_STMT (idx);
+	  if (is_gimple_assign (stmt)
+	      && CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt))
+	      && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
+	    idx = gimple_assign_rhs1 (stmt);
+	}
+
+      /* Make sure idx is iv.  */
+      class loop *useloop = loop_containing_stmt (cond);
+      affine_iv iv;
+      if (!simple_iv (loop, useloop, idx, &iv, false))
+	continue;
+
+      /* No need to split loop, if base is know value.
+	 Or check range info.  */
+      if (TREE_CODE (iv.base) == INTEGER_CST)
+	continue;
+
+      /* There is type conversion on idx(or rhs of idx's def).
+	 And there is converting shorter to longer type. */
+      tree type = TREE_TYPE (idx);
+      if (!INTEGRAL_TYPE_P (type) || TREE_CODE (idx) != SSA_NAME
+	  || !TYPE_UNSIGNED (type)
+	  || TYPE_PRECISION (type) == TYPE_PRECISION (sizetype))
+	continue;
+
+      /* Check loop is simple to split.  */
+      gcc_assert (bb != loop->latch);
+
+      if (single_pred_p (loop->latch)
+	  && single_pred_edge (loop->latch)->src == bb
+	  && empty_block_p (loop->latch))
+	return e;
+
+      /* Splitting is cheap for idx increase header.  */
+      if (bb == loop->header)
+	{
+	  if (get_virtual_phi (loop->header))
+	    continue;
+
+	  /* In loop header: i++ or ++i.  */
+	  gimple_stmt_iterator gsi = gsi_start_bb (bb);
+	  if (gsi_end_p (gsi))
+	    return e;
+
+	  gimple *s1 = gsi_stmt (gsi);
+	  if (!(is_gimple_assign (s1)
+		&& (idx == gimple_assign_lhs (s1)
+		    || idx == gimple_assign_rhs1 (s1))))
+	    continue;
+
+	  gsi_next (&gsi);
+	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == cond)
+	    return e;
+	}
+    }
+
+  return NULL;
+}
+
+/* Split the LOOP with NE_EXPR into two loops with GT_EXPR and LT_EXPR.  */
+
+static bool
+split_ne_loop (struct loop *loop, edge cond_e)
+{
+  initialize_original_copy_tables ();
+
+  struct loop *loop2 = loop_version (loop, boolean_true_node, NULL,
+				     profile_probability::always (),
+				     profile_probability::never (),
+				     profile_probability::always (),
+				     profile_probability::always (), true);
+
+  gcc_assert (loop2);
+  update_ssa (TODO_update_ssa);
+
+  free_original_copy_tables ();
+
+  /* Change if (i != n) to LOOP1:if (i > n) and LOOP2:if (i < n) */
+  bool inv = false;
+  edge dup_cond = get_ne_cond_branch (loop2, &inv);
+  enum tree_code up_code = inv ? LT_EXPR : GT_EXPR;
+  enum tree_code down_code = inv ? GT_EXPR : LT_EXPR;
+
+  gcond *gc = as_a<gcond *> (last_stmt (cond_e->src));
+  gimple_cond_set_code (gc, up_code);
+
+  gcond *dup_gc = as_a<gcond *> (last_stmt (dup_cond->src));
+  gimple_cond_set_code (dup_gc, down_code);
+
+  /* Link the exit cond edge to new loop.  */
+  gcond *break_cond = as_a<gcond *> (gimple_copy (gc));
+  edge pred_e = single_pred_edge (loop->latch);
+  gcc_assert (pred_e);
+  bool simple_loop = pred_e->src == cond_e->src && empty_block_p (loop->latch);
+  if (simple_loop)
+    gimple_cond_set_code (break_cond, down_code);
+  else
+    gimple_cond_make_true (break_cond);
+
+  basic_block break_bb = split_edge (cond_e);
+  gimple_stmt_iterator gsi = gsi_last_bb (break_bb);
+  gsi_insert_after (&gsi, break_cond, GSI_NEW_STMT);
+
+  edge to_exit = single_succ_edge (break_bb);
+  edge to_new_loop = make_edge (break_bb, loop_preheader_edge (loop2)->src, 0);
+  to_new_loop->flags |= EDGE_TRUE_VALUE;
+  to_exit->flags |= EDGE_FALSE_VALUE;
+  to_exit->flags &= ~EDGE_FALLTHRU;
+  to_exit->probability = cond_e->probability;
+  to_new_loop->probability = to_exit->probability.invert ();
+
+  update_ssa (TODO_update_ssa);
+
+  connect_loop_phis (loop, loop2, to_new_loop, !simple_loop);
+
+  rewrite_into_loop_closed_ssa_1 (NULL, 0, SSA_OP_USE, loop);
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, ";; Loop split.\n");
+
+  return true;
+}
+
+/* Checks if LOOP contains a suitable NE_EXPR conditional block to split.
+L_H:
+ if (i!=N)
+   S;
+ i++;
+ goto L_H;
+
+The "i!=N" is like "i>N || i<N", then it could be transform to:
+
+L_H:
+ if (i>N)
+   S;
+ i++;
+ goto L_H;
+L1_H:
+ if (i<N)
+   S;
+ i++;
+ goto L1_H;
+
+The loop with "i<N" is in favor both GIMPLE and RTL passes.  */
+
+static bool
+split_loop_on_ne_cond (class loop *loop)
+{
+  if (!can_duplicate_loop_p (loop))
+    return false;
+
+  int num = 0;
+  basic_block *bbs = get_loop_body (loop);
+
+  for (unsigned i = 0; i < loop->num_nodes; i++)
+    num += estimate_num_insns_seq (bb_seq (bbs[i]), &eni_size_weights);
+  free (bbs);
+
+  if (num > param_max_insn_ne_cond_split)
+    return false;
+
+  edge branch_edge = get_ne_cond_branch (loop, NULL);
+  if (branch_edge && split_ne_loop (loop, branch_edge))
+    return true;
+
+  return false;
+}
+
 /* Main entry point.  Perform loop splitting on all suitable loops.  */
 
 static unsigned int
@@ -1622,7 +1832,8 @@ tree_ssa_split_loops (void)
       if (optimize_loop_for_size_p (loop))
 	continue;
 
-      if (split_loop (loop) || split_loop_on_cond (loop))
+      if (split_loop (loop) || split_loop_on_cond (loop)
+	  || split_loop_on_ne_cond (loop))
 	{
 	  /* Mark our containing loop as having had some split inner loops.  */
 	  loop_outer (loop)->aux = loop;
