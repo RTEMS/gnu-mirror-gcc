@@ -1597,12 +1597,11 @@ split_loop_on_cond (struct loop *loop)
 }
 
 /* Check if the LOOP exit branch likes "if (idx != bound)",
-   and if overflow/wrap may happen on "idx".
-   If INV is not NULL and the branch is "if (bound != idx)", set *INV to true.
-   Return the branch edge which exit loop.  */
+   Return the branch edge which exit loop, if overflow/wrap
+   may happen on "idx".  */
 
 static edge
-get_ne_cond_branch (struct loop *loop, bool *inv)
+get_ne_cond_branch (struct loop *loop)
 {
   int i;
   edge e;
@@ -1622,21 +1621,15 @@ get_ne_cond_branch (struct loop *loop, bool *inv)
 	    || (code == EQ_EXPR && (e->flags & EDGE_TRUE_VALUE))))
 	continue;
 
-      /* Make sure bound is invarant.  */
+      /* Check if bound is invarant.  */
       tree idx = gimple_cond_lhs (cond);
       tree bnd = gimple_cond_rhs (cond);
       if (expr_invariant_in_loop_p (loop, idx))
-	{
-	  std::swap (idx, bnd);
-	  if (inv)
-	    *inv = true;
-	}
+	std::swap (idx, bnd);
       else if (!expr_invariant_in_loop_p (loop, bnd))
 	continue;
 
-
-      /* There is type conversion on idx(or rhs of idx's def).
-	 And there is converting shorter to longer type. */
+      /* By default, unsigned type conversion could cause overflow.  */
       tree type = TREE_TYPE (idx);
       if (!INTEGRAL_TYPE_P (type) || TREE_CODE (idx) != SSA_NAME
 	  || !TYPE_UNSIGNED (type)
@@ -1673,23 +1666,39 @@ get_ne_cond_branch (struct loop *loop, bool *inv)
       if (TREE_CODE (iv.base) == INTEGER_CST)
 	continue;
 
+      /* If no overflow/wrap happen, no need to split.  */
+      class tree_niter_desc niter;
+      if (!number_of_iterations_exit (loop, e, &niter, false, false, NULL))
+	continue;
+      if (niter.control.no_overflow)
+	return NULL;
+
       /* Check loop is simple to split.  */
       gcc_assert (bb != loop->latch);
 
       if (single_pred_p (loop->latch)
 	  && single_pred_edge (loop->latch)->src == bb
-	  && empty_block_p (loop->latch))
+	  && (gsi_end_p (gsi_start_nondebug_bb (loop->latch))))
 	return e;
 
-      /* Splitting is cheap for idx increase header (only i++ or ++I).  */
+      /* Cheap header.  */
       if (bb == loop->header)
 	{
-	  if (get_virtual_phi (loop->header))
+	  if (get_virtual_phi (bb))
 	    continue;
 
+	  /* Only one phi.  */
+	  gphi_iterator psi = gsi_start_phis (bb);
+	  if (gsi_end_p (psi))
+	    continue;
+	  gsi_next (&psi);
+	  if (!gsi_end_p (psi))
+	    continue;
+
+	  /* ++i or ++i */
 	  gimple_stmt_iterator gsi = gsi_start_bb (bb);
 	  if (gsi_end_p (gsi))
-	    return e;
+	    continue;
 
 	  gimple *s1 = gsi_stmt (gsi);
 	  if (!(is_gimple_assign (s1)
@@ -1725,22 +1734,22 @@ split_ne_loop (struct loop *loop, edge cond_e)
   basic_block loop2_cond_exit_bb = get_bb_copy (cond_e->src);
   free_original_copy_tables ();
 
+  gcond *gc = as_a<gcond *> (last_stmt (cond_e->src));
+  gcond *dup_gc = as_a<gcond *> (last_stmt (loop2_cond_exit_bb));
+
   /* Change if (i != n) to LOOP1:if (i > n) and LOOP2:if (i < n) */
-  bool inv = false;
+  bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
   enum tree_code up_code = inv ? LT_EXPR : GT_EXPR;
   enum tree_code down_code = inv ? GT_EXPR : LT_EXPR;
 
-  gcond *gc = as_a<gcond *> (last_stmt (cond_e->src));
   gimple_cond_set_code (gc, up_code);
-
-  gcond *dup_gc = as_a<gcond *> (last_stmt (loop2_cond_exit_bb));
   gimple_cond_set_code (dup_gc, down_code);
 
   /* Link the exit cond edge to new loop.  */
   gcond *break_cond = as_a<gcond *> (gimple_copy (gc));
   edge pred_e = single_pred_edge (loop->latch);
-  gcc_assert (pred_e);
-  bool simple_loop = pred_e->src == cond_e->src && empty_block_p (loop->latch);
+  bool simple_loop = pred_e && pred_e->src == cond_e->src
+		     && (gsi_end_p (gsi_start_nondebug_bb (loop->latch)));
   if (simple_loop)
     gimple_cond_set_code (break_cond, down_code);
   else
@@ -1764,7 +1773,7 @@ split_ne_loop (struct loop *loop, edge cond_e)
 
   rewrite_into_loop_closed_ssa_1 (NULL, 0, SSA_OP_USE, loop);
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, ";; Loop split on wrap.\n");
+    fprintf (dump_file, ";; Loop split on wrap index.\n");
 
   return true;
 }
@@ -1810,7 +1819,7 @@ split_loop_on_ne_cond (class loop *loop)
   if (num > param_max_peeled_insns)
     return false;
 
-  edge branch_edge = get_ne_cond_branch (loop, NULL);
+  edge branch_edge = get_ne_cond_branch (loop);
   if (branch_edge && split_ne_loop (loop, branch_edge))
     return true;
 
