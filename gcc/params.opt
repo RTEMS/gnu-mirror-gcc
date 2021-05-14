@@ -766,10 +766,6 @@ Min. ratio of insns to prefetches to enable prefetching for a loop with an unkno
 Common Joined UInteger Var(param_min_loop_cond_split_prob) Init(30) IntegerRange(0, 100) Param Optimization
 The minimum threshold for probability of semi-invariant condition statement to trigger loop split.
 
--param=max-insns-ne-cond-split=
-Common Joined UInteger Var(param_max_insn_ne_cond_split) Init(64) Param Optimization
-The maximum threshold for insnstructions number of a loop with ne condition to split.
-
 -param=min-nondebug-insn-uid=
 Common Joined UInteger Var(param_min_nondebug_insn_uid) Param
 The minimum UID to be used for a nondebug insn.
