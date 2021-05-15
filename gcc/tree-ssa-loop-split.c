@@ -1609,51 +1609,29 @@ get_ne_cond_branch (struct loop *loop)
   auto_vec<edge> edges = get_loop_exit_edges (loop);
   FOR_EACH_VEC_ELT (edges, i, e)
     {
-      basic_block bb = e->src;
-
-      /* Check gcond.  */
-      gimple *last = last_stmt (bb);
-      if (!last || gimple_code (last) != GIMPLE_COND)
-	continue;
-      gcond *cond = as_a<gcond *> (last);
-      enum tree_code code = gimple_cond_code (cond);
-      if (!(code == NE_EXPR
-	    || (code == EQ_EXPR && (e->flags & EDGE_TRUE_VALUE))))
-	continue;
-
-      /* Check if bound is invarant.  */
-      tree idx = gimple_cond_lhs (cond);
-      tree bnd = gimple_cond_rhs (cond);
-      if (expr_invariant_in_loop_p (loop, idx))
-	std::swap (idx, bnd);
-      else if (!expr_invariant_in_loop_p (loop, bnd))
-	continue;
-
-      /* If no overflow/wrap happen, no need to split.  */
-      if (nowrap_type_p (TREE_TYPE (idx)))
-	continue;
+      /* Check if there is possible wrap/overflow.  */
       class tree_niter_desc niter;
-      if (!number_of_iterations_exit (loop, e, &niter, false, false, NULL))
+      if (!number_of_iterations_exit (loop, e, &niter, false, false))
 	continue;
       if (niter.control.no_overflow)
 	return NULL;
+      if (niter.cmp != NE_EXPR)
+	continue;
 
       /* Check loop is simple to split.  */
-      gcc_assert (bb != loop->latch);
-
       if (single_pred_p (loop->latch)
-	  && single_pred_edge (loop->latch)->src == bb
+	  && single_pred_edge (loop->latch)->src == e->src
 	  && (gsi_end_p (gsi_start_nondebug_bb (loop->latch))))
 	return e;
 
-      /* Cheap header.  */
-      if (bb == loop->header)
+      /* Simple header.  */
+      if (e->src == loop->header)
 	{
-	  if (get_virtual_phi (bb))
+	  if (get_virtual_phi (e->src))
 	    continue;
 
 	  /* Only one phi.  */
-	  gphi_iterator psi = gsi_start_phis (bb);
+	  gphi_iterator psi = gsi_start_phis (e->src);
 	  if (gsi_end_p (psi))
 	    continue;
 	  gsi_next (&psi);
@@ -1661,18 +1639,23 @@ get_ne_cond_branch (struct loop *loop)
 	    continue;
 
 	  /* ++i or ++i */
-	  gimple_stmt_iterator gsi = gsi_start_bb (bb);
+	  gimple_stmt_iterator gsi = gsi_start_bb (e->src);
 	  if (gsi_end_p (gsi))
 	    continue;
 
+	  gimple *gc = last_stmt (e->src);
+	  tree idx = gimple_cond_lhs (gc);
+	  if (expr_invariant_in_loop_p (loop, idx))
+	    idx = gimple_cond_rhs (gc);
+
 	  gimple *s1 = gsi_stmt (gsi);
-	  if (!(is_gimple_assign (s1)
+	  if (!(is_gimple_assign (s1) && idx
 		&& (idx == gimple_assign_lhs (s1)
 		    || idx == gimple_assign_rhs1 (s1))))
 	    continue;
 
 	  gsi_next (&gsi);
-	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == cond)
+	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == gc)
 	    return e;
 	}
     }

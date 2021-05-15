@@ -1,5 +1,7 @@
 // { dg-do compile }
-// { dg-additional-options "-O3" }
+// { dg-additional-options "-O3 -Wno-stringop-overflow" }
+/* There is warning message when "short g = var_8; g; g++"
+   is optimized/analyzed as string operation,e.g. memset.  */
 
 const long long &min(const long long &__a, long long &__b) {
   if (__b < __a)
