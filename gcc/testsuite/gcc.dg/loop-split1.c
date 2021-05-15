@@ -105,4 +105,4 @@ find_skip_diff (char *p, char *q, unsigned n, unsigned i)
   return i;
 }
 
-/* { dg-final { scan-tree-dump-times "Loop split" 7 "lsplit" } } */
+/* { dg-final { scan-tree-dump-times "Loop split" 9 "lsplit" } } */
