@@ -1,2 +1,2 @@
  - mainline
- - mainline + disabled ipa modref
+ - mainline + very cheap vectorization O2 and O3
