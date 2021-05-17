@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "gimple-fold.h"
 #include "gimplify-me.h"
+#include "tree-ssa-loop-ivopts.h"
 
 /* This file implements two kinds of loop splitting.
 
@@ -233,7 +234,8 @@ easy_exit_values (class loop *loop)
    this.  The loops need to fulfill easy_exit_values().  */
 
 static void
-connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
+connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e,
+		   bool use_prev = false)
 {
   basic_block rest = loop_preheader_edge (loop2)->src;
   gcc_assert (new_e->dest == rest);
@@ -279,7 +281,8 @@ connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
 
       gphi * newphi = create_phi_node (new_init, rest);
       add_phi_arg (newphi, init, skip_first, UNKNOWN_LOCATION);
-      add_phi_arg (newphi, next, new_e, UNKNOWN_LOCATION);
+      add_phi_arg (newphi, use_prev ? PHI_RESULT (phi_first) : next, new_e,
+		   UNKNOWN_LOCATION);
       SET_USE (op, new_init);
     }
 }
@@ -1593,6 +1596,82 @@ split_loop_on_cond (struct loop *loop)
   return do_split;
 }
 
+/* Check if the loop is possible to wrap at index.
+   Return the assumption under which the wrap would happen.
+   Return NULL_TREE, if overflow/wrap will not happen.  */
+
+static tree
+get_wrap_assumption (class loop *loop)
+{
+  int i;
+  edge e;
+  auto_vec<edge> edges = get_loop_exit_edges (loop);
+  FOR_EACH_VEC_ELT (edges, i, e)
+    {
+      
+    }
+
+  return NULL_TREE;
+}
+
+/* Split out a new loop which would not wrap/overflow,
+   under the guard that WRAP_ASSUMPTION will not be true. */
+
+static bool
+split_wrap_boundary (class loop *loop, tree wrap_assumption)
+{
+  
+  return false;
+}
+
+/* Split loop if there is possible wrap.
+   For example: transform
+
+  void
+  foo (int *a, int *b, unsigned l, unsigned u_n)
+  {
+    while (++l != u_n)
+      a[l] = b[l]  + 1;
+  }
+
+  to:
+    if (l < u_n)
+    {
+      int li = l;
+      int n = u_n;
+      while (++li < n)
+	a[li] = b[li]  + 1;
+      l = li;
+    }
+    else
+      while (++l != n)
+	a[l] = b[l]  + 1;
+  */
+static bool
+split_loop_on_wrap (class loop *loop)
+{
+  basic_block *bbs = get_loop_body (loop);
+
+  if (!can_copy_bbs_p (bbs, loop->num_nodes))
+    {
+      free (bbs);
+      return false;
+    }
+
+  int num = 0;
+  for (unsigned i = 0; i < loop->num_nodes; i++)
+    num += estimate_num_insns_seq (bb_seq (bbs[i]), &eni_size_weights);
+
+  if (num > param_max_peeled_insns)
+    {
+      free (bbs);
+      return false;
+    }
+
+  free (bbs);
+  return false;
+}
+
 /* Main entry point.  Perform loop splitting on all suitable loops.  */
 
 static unsigned int
@@ -1622,7 +1701,8 @@ tree_ssa_split_loops (void)
       if (optimize_loop_for_size_p (loop))
 	continue;
 
-      if (split_loop (loop) || split_loop_on_cond (loop))
+      if (split_loop (loop) || split_loop_on_cond (loop)
+	  || split_loop_on_wrap (loop))
 	{
 	  /* Mark our containing loop as having had some split inner loops.  */
 	  loop_outer (loop)->aux = loop;
