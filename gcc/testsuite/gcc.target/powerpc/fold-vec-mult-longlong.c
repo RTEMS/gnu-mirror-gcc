@@ -6,13 +6,6 @@
 /* { dg-options "-maltivec -mvsx -mpower8-vector" } */
 /* { dg-additional-options "-maix64" { target powerpc-ibm-aix* } } */
 
-/* If the compiler was configured to automatically generate power10 support with
-   --with-cpu=power10, turn it off.  Otherwise, it will generate VMULLD
-   instructions.  */
-#ifdef _ARCH_PWR10
-#pragma GCC target ("cpu=power9")
-#endif
-
 #include <altivec.h>
 
 vector signed long long
