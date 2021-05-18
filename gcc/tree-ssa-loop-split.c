@@ -234,8 +234,7 @@ easy_exit_values (class loop *loop)
    this.  The loops need to fulfill easy_exit_values().  */
 
 static void
-connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e,
-		   bool use_prev = false)
+connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e)
 {
   basic_block rest = loop_preheader_edge (loop2)->src;
   gcc_assert (new_e->dest == rest);
@@ -281,8 +280,7 @@ connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e,
 
       gphi * newphi = create_phi_node (new_init, rest);
       add_phi_arg (newphi, init, skip_first, UNKNOWN_LOCATION);
-      add_phi_arg (newphi, use_prev ? PHI_RESULT (phi_first) : next, new_e,
-		   UNKNOWN_LOCATION);
+      add_phi_arg (newphi, next, new_e, UNKNOWN_LOCATION);
       SET_USE (op, new_init);
     }
 }
@@ -1597,18 +1595,122 @@ split_loop_on_cond (struct loop *loop)
 }
 
 /* Check if the loop is possible to wrap at index.
-   Return the assumption under which the wrap would happen.
+   Return the assumption under which the wrap will not happen.
    Return NULL_TREE, if overflow/wrap will not happen.  */
 
 static tree
-get_wrap_assumption (class loop *loop)
+get_wrap_assumption (class loop *loop, edge *exit)
 {
   int i;
   edge e;
   auto_vec<edge> edges = get_loop_exit_edges (loop);
   FOR_EACH_VEC_ELT (edges, i, e)
     {
+      if (e->flags & EDGE_FAKE)
+	continue;
+
+      basic_block bb = e->src;
+
+      /* Check gcond.  */
+      gimple *last = last_stmt (bb);
+      if (!last || gimple_code (last) != GIMPLE_COND)
+	continue;
+      gcond *gc = as_a<gcond *> (last);
+
+      /* Check if bound is invarant.  */
+      tree bnd = gimple_cond_rhs (gc);
+      tree idx = gimple_cond_lhs (gc);
+      enum tree_code code = gimple_cond_code (gc);      
+      if (expr_invariant_in_loop_p (loop, idx))
+	{
+	  std::swap (idx, bnd);
+	  code = swap_tree_comparison (code);
+	}
+      else if (!expr_invariant_in_loop_p (loop, bnd))
+	continue;
+
+      /* Check if bound is MAX/MIN val of a integral type.  */
+      tree bnd_type = TREE_TYPE (bnd);
+      if (!(INTEGRAL_TYPE_P (bnd_type)))
+	continue;
+      if (TREE_CODE (bnd) == INTEGER_CST
+	  && (bnd == TYPE_MAX_VALUE (bnd_type)
+	      || bnd == TYPE_MIN_VALUE (bnd_type)))
+	continue;
       
+      /* Check if it is "idx != bnd" or "idx < bnd".  */
+      if (e->flags & EDGE_TRUE_VALUE)
+	code = invert_tree_comparison (code, false);
+      if (code != NE_EXPR && code != LT_EXPR && code != LE_EXPR)
+	continue;
+
+      /* Filter conversion from idx.  */
+      tree cmp_idx = idx;
+      tree small_type = TREE_TYPE (idx);
+      tree large_type = small_type;
+      gimple *stmt = NULL;
+      if (TREE_CODE (idx) == SSA_NAME)
+	stmt = SSA_NAME_DEF_STMT (idx);
+      while (stmt && is_gimple_assign (stmt)
+	     && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
+	{
+	  enum tree_code code = gimple_assign_rhs_code (stmt);
+	  if (CONVERT_EXPR_CODE_P (code))
+	    {
+	      idx = gimple_assign_rhs1 (stmt);
+	      tree type = TREE_TYPE (idx);
+	      if (TYPE_PRECISION (small_type) > TYPE_PRECISION (type)
+		  || (TYPE_PRECISION (small_type) == TYPE_PRECISION (type)
+		      && TYPE_UNSIGNED (small_type) && !TYPE_UNSIGNED (type)))
+		small_type = type;
+	      if (TYPE_PRECISION (large_type) < TYPE_PRECISION (type)
+		  || (TYPE_PRECISION (large_type) == TYPE_PRECISION (type)
+		      && !TYPE_UNSIGNED (large_type) && TYPE_UNSIGNED (type)))
+		large_type = type;
+	    }
+	  else if (PLUS_EXPR == code
+		   && integer_onep (gimple_assign_rhs2 (stmt)))
+	    idx = gimple_assign_rhs1 (stmt);
+	  else
+	    break;
+
+	  if (TREE_CODE (idx) != SSA_NAME)
+	    break;
+	  stmt = SSA_NAME_DEF_STMT (idx);
+	}
+
+      /* Check if idx is iv with base and step.  */
+      affine_iv iv;
+      tree iv_niters = NULL_TREE;
+      if (!simple_iv_with_niters (loop, loop_containing_stmt (gc), idx, &iv,
+				  &iv_niters, false))
+	continue;
+      if (!iv.base || !iv.step || !integer_onep (iv.step))
+	continue;
+
+      tree base = iv.base;
+      tree maxv = TYPE_MAX_VALUE (small_type);
+      if (large_type != TREE_TYPE (base))
+	base = fold_convert (large_type, base);
+      if (large_type != TREE_TYPE (bnd))
+	bnd = fold_convert (large_type, bnd);
+      if (large_type != small_type)
+	maxv = fold_convert (large_type, maxv);
+
+      /* for "< or <=", only check if bnd <= max value of idx type.  */
+      tree no_wrap = fold_build2 (LE_EXPR, boolean_type_node, bnd, maxv);
+      /* for "!=", and check if base <= bnd.  */
+      if (code == NE_EXPR)
+	no_wrap
+	  = fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap,
+			 fold_build2 (LE_EXPR, boolean_type_node, base, bnd));
+
+      /* Check if it is sure wrap or no wrap.  */
+      if (integer_zerop (no_wrap) || integer_onep (no_wrap))
+	continue;
+
+      *exit = e;
+      return no_wrap;
     }
 
   return NULL_TREE;
@@ -1618,10 +1720,42 @@ get_wrap_assumption (class loop *loop)
    under the guard that WRAP_ASSUMPTION will not be true. */
 
 static bool
-split_wrap_boundary (class loop *loop, tree wrap_assumption)
+split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
 {
-  
-  return false;
+  /* Convert the condition into a suitable gcond.  */
+  gimple_seq stmts = NULL;
+  no_wrap_cond = force_gimple_operand_1 (no_wrap_cond, &stmts,
+					 is_gimple_condexpr, NULL_TREE);
+
+  /* Version the loop.  */
+  initialize_original_copy_tables ();
+  basic_block cond_bb;
+  loop_version (loop, no_wrap_cond, &cond_bb,
+		profile_probability::very_likely (),
+		profile_probability::very_unlikely (),
+		profile_probability::very_likely (),
+		profile_probability::very_unlikely (), true);
+  free_original_copy_tables ();
+
+  /* Insert the statements that feed COND.  */
+  if (stmts)
+    {
+      gimple_stmt_iterator gsi = gsi_last_bb (cond_bb);
+      gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
+    }
+
+  gcond *gc = as_a<gcond *> (last_stmt (e->src));
+  enum tree_code code = gimple_cond_code (gc);
+  enum tree_code new_code;
+  bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
+  new_code = inv ? GT_EXPR : LT_EXPR;
+  if (code == EQ_EXPR)
+    new_code = invert_tree_comparison (new_code, false);
+
+  if (code == NE_EXPR || code == EQ_EXPR)
+    gimple_cond_set_code (gc, new_code);
+
+  return true;
 }
 
 /* Split loop if there is possible wrap.
@@ -1667,8 +1801,13 @@ split_loop_on_wrap (class loop *loop)
       free (bbs);
       return false;
     }
-
   free (bbs);
+
+  edge e;
+  tree nowrap_assumption = get_wrap_assumption (loop, &e);
+  if (nowrap_assumption && split_wrap_boundary (loop, e, nowrap_assumption))
+    return true;
+
   return false;
 }
 
