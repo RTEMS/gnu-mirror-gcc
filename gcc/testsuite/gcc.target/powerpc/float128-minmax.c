@@ -3,6 +3,13 @@
 /* { dg-require-effective-target float128 } */
 /* { dg-options "-mpower9-vector -O2 -ffast-math" } */
 
+/* If the compiler was configured to automatically generate power10 support with
+   --with-cpu=power10, turn it off.  Otherwise, it will generate XXMAXCQP and
+   XXMINCQP instructions.  */
+#ifdef _ARCH_PWR10
+#pragma GCC target ("cpu=power9")
+#endif
+
 #ifndef TYPE
 #define TYPE _Float128
 #endif
