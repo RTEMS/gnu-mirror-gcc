@@ -386,6 +386,7 @@
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
    UNSPEC_XXEVAL
+   UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
@@ -6238,6 +6239,36 @@
   "vmulld %0,%1,%2"
   [(set_attr "type" "veccomplex")])
 
+;; XXSPLTIW built-in function support
+(define_insn "xxspltiw_v4si"
+  [(set (match_operand:V4SI 0 "register_operand" "=wa")
+	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
+ "xxspltiw %x0,%1"
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "yes")])
+
+(define_expand "xxspltiw_v4sf"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SF 1 "const_double_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
+{
+  long long value = rs6000_const_f32_to_i32 (operands[1]);
+  emit_insn (gen_xxspltiw_v4sf_inst (operands[0], GEN_INT (value)));
+  DONE;
+})
+
+(define_insn "xxspltiw_v4sf_inst"
+  [(set (match_operand:V4SF 0 "register_operand" "=wa")
+	(unspec:V4SF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTIW))]
+ "TARGET_POWER10"
+ "xxspltiw %x0,%1"
+ [(set_attr "type" "vecsimple")
+  (set_attr "prefixed" "yes")])
+
 ;; XXSPLTIDP built-in function support
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )
@@ -6389,123 +6420,3 @@
    [(set_attr "type" "vecsimple")
     (set_attr "prefixed" "yes")])
 
-;; XXSPLTIW built-in function support.  Convert to a vector constant, which
-;; will then be optimized to the XXSPLTIW instruction.
-(define_expand "xxspltiw_v4si"
-  [(use (match_operand:V4SI 0 "register_operand"))
-   (use (match_operand:SI 1 "s32bit_cint_operand"))]
-  "TARGET_POWER10"
-{
-  rtx op1 = operands[1];
-  rtvec rv = gen_rtvec (4, op1, op1, op1, op1);
-  rtx vec_constant = gen_rtx_CONST_VECTOR (V4SImode, rv);
-  emit_move_insn (operands[0], vec_constant);
-})
-
-(define_expand "xxspltiw_v4sf"
-  [(use (match_operand:V4SF 0 "register_operand"))
-   (use (match_operand:SF 1 "const_double_operand"))]
-  "TARGET_POWER10"
-{
-  rtx op1 = operands[1];
-  rtvec rv = gen_rtvec (4, op1, op1, op1, op1);
-  rtx vec_constant = gen_rtx_CONST_VECTOR (V4SFmode, rv);
-  emit_move_insn (operands[0], vec_constant);
-})
-
-;; XXSPLTIW support.  Add support for the XXSPLTIW built-in functions, and to
-;; use XXSPLTIW to load up vector V8HImode, V4SImode, and V4SFmode vector
-;; constants where all elements are the the same.  We special case loading up
-;; integer -16..15 and floating point 0.0f, since we can use the shorter
-;; XXSPLTIB, VSPLTISH, and VSPLTISW instructions.
-
-(define_insn "*xxspltiw_v8hi_dup"
-  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
-	(vec_duplicate:V8HI
-	 (match_operand 1 "const_int_operand" "O,wM,wB,n")))]
- "TARGET_XXSPLTIW"
-{
-  HOST_WIDE_INT value = INTVAL (operands[1]);
-  unsigned HOST_WIDE_INT uns_value = zero_extend_mode_constant (HImode, value);
-  HOST_WIDE_INT sign_value = sign_extend_mode_constant (HImode, uns_value);
-
-  if (sign_value == 0)
-    return "xxspltib %x0,0";
-
-  if (sign_value == -1)
-    return "xxspltib %x0,255";
-
-  int r = reg_or_subregno (operands[0]);
-  if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
-    {
-      operands[2] = GEN_INT (sign_value);
-      return "vspltish %0,%1";
-    }
-
-  /* The assembler doesn't like negative values.  */
-  HOST_WIDE_INT new_value = (uns_value << 16) | uns_value;
-  operands[2] = GEN_INT (zero_extend_mode_constant (SImode, new_value));
-  return "xxspltiw %x0,%2";
-}
- [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "*,*,*,yes")])
-
-(define_insn "*xxspltiw_v4si_dup"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
-	(vec_duplicate:V4SI
-	 (match_operand 1 "const_int_operand" "O,wM,wB,n")))]
- "TARGET_XXSPLTIW"
-{
-  HOST_WIDE_INT value = INTVAL (operands[1]);
-  unsigned HOST_WIDE_INT uns_value = zero_extend_mode_constant (SImode, value);
-  HOST_WIDE_INT sign_value = sign_extend_mode_constant (SImode, uns_value);
-
-  if (sign_value == 0)
-    return "xxspltib %x0,0";
-
-  if (sign_value == -1)
-    return "xxspltib %x0,255";
-
-  int r = reg_or_subregno (operands[0]);
-  if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
-    {
-      operands[2] = GEN_INT (sign_value);
-      return "vspltisw %0,%2";
-    }
-
-  /* The assembler doesn't like negative values.  */
-  operands[2] = GEN_INT (uns_value);
-  return "xxspltiw %x0,%2";
-}
- [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "*,*,*,yes")])
-
-(define_insn "xxspltiw_v4sf_dup"
-  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa")
-	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "const_double_operand" "O,F")))]
- "TARGET_XXSPLTIW"
-{
-  if (operands[1] == CONST0_RTX (SFmode))
-    return "xxspltib %x0,0";
-
-  /* The assembler doesn't like negative values.  */
-  long value = rs6000_const_f32_to_i32 (operands[1]);
-  operands[2] = GEN_INT (zero_extend_mode_constant (SImode, value));
-  return "xxspltiw %x0,%2";
-}
- [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "*,yes")])
-
-;; Convert vector constant to vec_duplicate.
-(define_mode_iterator XXSPLTIW [V8HI V4SI V4SF])
-
-(define_split
-  [(set (match_operand:XXSPLTIW 0 "vsx_register_operand")
-	(match_operand:XXSPLTIW 1 "xxspltiw_operand"))]
-  "TARGET_XXSPLTIW && GET_CODE (operands[1]) == CONST_VECTOR"
-  [(set (match_dup 0)
-	(vec_duplicate:<MODE> (match_dup 2)))]
-{
-  operands[2] = CONST_VECTOR_ELT (operands[1], 0);
-})

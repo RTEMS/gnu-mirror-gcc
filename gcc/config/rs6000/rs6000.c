@@ -4487,12 +4487,6 @@ rs6000_option_override_internal (bool global_init_p)
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
-  if (TARGET_POWER10 && TARGET_VSX
-      && (rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
-    rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
-  else if (!TARGET_POWER10 || !TARGET_VSX)
-    rs6000_isa_flags &= ~OPTION_MASK_XXSPLTIW;
-
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -6470,11 +6464,9 @@ xxspltib_constant_p (rtx op,
 
   /* See if we could generate vspltisw/vspltish directly instead of xxspltib +
      sign extend.  Special case 0/-1 to allow getting any VSX register instead
-     of an Altivec register.  Also if we can generate a XXSPLTIW instruction,
-     don't emit a XXSPLTIB and an extend instruction.  */
-  if ((mode == V4SImode || mode == V8HImode)
-      && !IN_RANGE (value, -1, 0)
-      && (EASY_VECTOR_15 (value) || TARGET_XXSPLTIW))
+     of an Altivec register.  */
+  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0)
+      && EASY_VECTOR_15 (value))
     return false;
 
   /* Return # of instructions and the constant byte for XXSPLTIB.  */
@@ -6534,9 +6526,6 @@ output_vec_const_move (rtx *operands)
 	  else
 	    gcc_unreachable ();
 	}
-
-      if (xxspltiw_operand (vec, mode))
-	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -24129,7 +24118,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
-  { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
   { "aix64",			OPTION_MASK_64BIT,		false, false },
@@ -27990,61 +27978,6 @@ rs6000_output_addr_vec_elt (FILE *file, int value)
   ASM_GENERATE_INTERNAL_LABEL (buf, "L", value);
   assemble_name (file, buf);
   fprintf (file, "\n");
-}
-
-/* Sign extend integer values to a given mode.  */
-HOST_WIDE_INT
-sign_extend_mode_constant (machine_mode mode, HOST_WIDE_INT value)
-{
-  HOST_WIDE_INT mask;
-
-  switch (mode)
-    {
-    default:
-      gcc_unreachable ();
-
-    case E_QImode:
-      mask = HOST_WIDE_INT_C (0x80);
-      break;
-
-    case E_HImode:
-      mask = HOST_WIDE_INT_C (0x8000);
-      break;
-
-    case E_SImode:
-      mask = HOST_WIDE_INT_C (0x80000000);
-      break;
-    }
-
-  return ((value ^ mask) - mask);
-}
-
-/* Zero extend integer values to a given mode.  */
-unsigned HOST_WIDE_INT
-zero_extend_mode_constant (machine_mode mode, HOST_WIDE_INT value)
-{
-  unsigned HOST_WIDE_INT uvalue = (unsigned HOST_WIDE_INT) value;
-  unsigned HOST_WIDE_INT mask;
-
-  switch (mode)
-    {
-    default:
-      gcc_unreachable ();
-
-    case E_QImode:
-      mask = HOST_WIDE_INT_UC (0xff);
-      break;
-
-    case E_HImode:
-      mask = HOST_WIDE_INT_UC (0xffff);
-      break;
-
-    case E_SImode:
-      mask = HOST_WIDE_INT_UC (0xffffffff);
-      break;
-    }
-
-  return uvalue & mask;
 }
 
 struct gcc_target targetm = TARGET_INITIALIZER;

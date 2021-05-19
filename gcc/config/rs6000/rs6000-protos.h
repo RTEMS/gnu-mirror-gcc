@@ -283,9 +283,6 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
 extern long rs6000_const_f32_to_i32 (rtx operand);
-extern HOST_WIDE_INT sign_extend_mode_constant (machine_mode, HOST_WIDE_INT);
-extern unsigned HOST_WIDE_INT zero_extend_mode_constant (machine_mode,
-							 HOST_WIDE_INT);
 
 /* Declare functions in rs6000-c.c */
 
