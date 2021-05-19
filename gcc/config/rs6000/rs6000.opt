@@ -627,7 +627,3 @@ Enable instructions that guard against return-oriented programming attacks.
 mprivileged
 Target Var(rs6000_privileged) Init(0)
 Generate code that will run in privileged state.
-
-mxxspltiw
-Target Undocumented Mask(XXSPLTIW) Var(rs6000_isa_flags)
-Generate (do not generate) XXSPLTIW instructions.
