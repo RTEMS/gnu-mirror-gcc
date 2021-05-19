@@ -2641,7 +2641,7 @@ zero_extend_n_bit (int n_bits, HOST_WIDE_INT value)
 {
   unsigned HOST_WIDE_INT uvalue = (unsigned HOST_WIDE_INT) value;
   unsigned HOST_WIDE_INT mask
-    = (HOST_WIDE_INT_1U << (n_bits + 1)) - HOST_WIDE_INT_1U;
+    = (HOST_WIDE_INT_1U << n_bits) - HOST_WIDE_INT_1U;
 
   return uvalue & mask;
 }
