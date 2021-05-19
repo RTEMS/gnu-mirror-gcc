@@ -2623,3 +2623,24 @@ while (0)
        rs6000_asm_output_opcode (STREAM);				\
     }									\
   while (0)
+
+/* Sign extend integer values to a given bit size.  */
+static inline HOST_WIDE_INT
+sign_extend_n_bit (int n_bits, HOST_WIDE_INT value)
+{
+  unsigned HOST_WIDE_INT uvalue = (unsigned HOST_WIDE_INT) value;
+  unsigned HOST_WIDE_INT mask = HOST_WIDE_INT_1U << (n_bits - 1);
+
+  return (HOST_WIDE_INT) ((uvalue ^ mask) - mask);
+}
+
+/* Zero extend integer values to a given bit size.  */
+static inline unsigned HOST_WIDE_INT
+zero_extend_n_bit (int n_bits, HOST_WIDE_INT value)
+{
+  unsigned HOST_WIDE_INT uvalue = (unsigned HOST_WIDE_INT) value;
+  unsigned HOST_WIDE_INT mask
+    = (HOST_WIDE_INT_1U << (n_bits + 1)) - HOST_WIDE_INT_1U;
+
+  return uvalue & mask;
+}
