@@ -386,9 +386,8 @@
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
    UNSPEC_XXEVAL
-   UNSPEC_XXSPLTIDP
+   UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
-   UNSPEC_XXSPLTI32DX_CONST
    UNSPEC_XXBLEND
    UNSPEC_XXPERMX
   ])
@@ -6241,14 +6240,24 @@
 
 ;; XXSPLTIDP built-in function support
 (define_expand "xxspltidp_v2df"
-  [(use (match_operand:V2DF 0 "register_operand" ))
-   (use (match_operand:SF 1 "const_double_operand"))]
+  [(set (match_operand:V2DF 0 "register_operand" )
+	(unspec:V2DF [(match_operand:SF 1 "const_double_operand")]
+		     UNSPEC_XXSPLTID))]
  "TARGET_POWER10"
 {
   long value = rs6000_const_f32_to_i32 (operands[1]);
   rs6000_emit_xxspltidp_v2df (operands[0], value);
   DONE;
 })
+
+(define_insn "xxspltidp_v2df_inst"
+  [(set (match_operand:V2DF 0 "register_operand" "=wa")
+	(unspec:V2DF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+		     UNSPEC_XXSPLTID))]
+  "TARGET_POWER10"
+  "xxspltidp %x0,%1"
+  [(set_attr "type" "vecsimple")
+   (set_attr "prefixed" "yes")])
 
 ;; XXSPLTI32DX built-in function support
 (define_expand "xxsplti32dx_v4si"
@@ -6475,110 +6484,3 @@
 {
   operands[2] = CONST_VECTOR_ELT (operands[1], 0);
 })
-
-;; Generate the XXSPLTIDP instruction to support SFmode and DFmode scalar
-;; constants and V2DF vector constants where both elements are the same.  The
-;; constant has be expressible as a SFmode constant that is not a SFmode
-;; denormal value.
-(define_mode_iterator XXSPLTIDP [SF DF V2DF])
-
-(define_insn_and_split "*xxspltidp_<mode>_internal1"
-  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand" "=wa")
-	(match_operand:XXSPLTIDP 1 "xxspltidp_operand"))]
-  "TARGET_XXSPLTIDP"
-  "#"
-  "&& 1"
-  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand")
-	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
-{
-  HOST_WIDE_INT value = 0;
-
-  if (!xxspltidp_constant_p (operands[1], <MODE>mode, &value))
-    gcc_unreachable ();
-
-  operands[2] = GEN_INT (value);
-}
- [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "yes")])
-
-;; Just in case the user issued -mno-xxspltidp, allow the built-in function
-;; even if the compiler does not automatically generate XXSPLTIDP.
-(define_insn "xxspltidp_<mode>_internal2"
-  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand" "=wa")
-	(unspec:XXSPLTIDP [(match_operand 1 "const_int_operand" "n")]
-			  UNSPEC_XXSPLTIDP))]
-  "TARGET_POWER10"
-  "xxspltidp %x0,%1"
- [(set_attr "type" "vecperm")
-  (set_attr "prefixed" "yes")])
-
-;; XXSPLTI32DX used to create 64-bit constants or vector constants where the
-;; even elements match and the odd elements match.
-(define_mode_iterator XXSPLTI32DX [SF DF V2DF V2DI])
-
-(define_insn_and_split "*xxsplti32dx_<mode>"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
-	(match_operand:XXSPLTI32DX 1 "xxsplti32dx_operand"))]
-  "TARGET_XXSPLTI32DX"
-  "#"
-  "&& 1"
-  [(set (match_dup 0)
-	(unspec:XXSPLTI32DX [(match_dup 2)
-			     (match_dup 3)] UNSPEC_XXSPLTI32DX_CONST))
-   (set (match_dup 0)
-	(unspec:XXSPLTI32DX [(match_dup 0)
-			     (match_dup 4)
-			     (match_dup 5)] UNSPEC_XXSPLTI32DX_CONST))]
-{
-  HOST_WIDE_INT high = 0, low = 0;
-
-  if (!xxsplti32dx_constant_p (operands[1], <MODE>mode, &high, &low))
-    gcc_unreachable ();
-
-  /* If the low bits are 0 or all 1s, initialize that word first.  This way we
-     can use a smaller XXSPLTIB instruction instead the first XXSPLTI32DX.  */
-  if (low == 0 || low ==  -1)
-    {
-      operands[2] = const1_rtx;
-      operands[3] = GEN_INT (low);
-      operands[4] = const0_rtx;
-      operands[5] = GEN_INT (high);
-    }
-  else
-    {
-      operands[2] = const0_rtx;
-      operands[3] = GEN_INT (high);
-      operands[4] = const1_rtx;
-      operands[5] = GEN_INT (low);
-    }
-}
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")
-   (set_attr "num_insns" "2")
-   (set_attr "max_prefixed_insns" "2")])
-
-;; First word of XXSPLTI32DX
-(define_insn "*xxsplti32dx_<mode>_first"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa,wa,wa")
-	(unspec:XXSPLTI32DX [(match_operand 1 "u1bit_cint_operand" "n,n,n")
-			     (match_operand 2 "const_int_operand" "O,wM,n")]
-			    UNSPEC_XXSPLTI32DX_CONST))]
-  "TARGET_XXSPLTI32DX"
-  "@
-   xxspltib %x0,0
-   xxspltib %x0,255
-   xxsplti32dx %x0,%1,%2"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "*,*,yes")])
-
-;; Second word of XXSPLTI32DX
-(define_insn "*xxsplti32dx_<mode>_second"
-  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
-	(unspec:XXSPLTI32DX [(match_operand:XXSPLTI32DX 1 "vsx_register_operand" "0")
-			     (match_operand 2 "u1bit_cint_operand" "n")
-			     (match_operand 3 "const_int_operand" "n")]
-			    UNSPEC_XXSPLTI32DX_CONST))]
-  "TARGET_XXSPLTI32DX"
-  "xxsplti32dx %x0,%2,%3"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
