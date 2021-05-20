@@ -220,7 +220,9 @@ libgcov-util.o-warn = -Wno-error
 libgcov-driver-tool.o-warn = -Wno-error
 libgcov-merge-tool.o-warn = -Wno-error
 gimple-match.o-warn = -Wno-unused
+gimple-match-lto.o-warn = -Wno-unused
 generic-match.o-warn = -Wno-unused
+generic-match-lto.o-warn = -Wno-unused
 dfp.o-warn = -Wno-strict-aliasing
 
 # All warnings have to be shut off in stage1 if the compiler used then
@@ -1282,12 +1284,10 @@ ANALYZER_OBJS = \
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
 OBJS = \
-	gimple-match.o \
-	generic-match.o \
+	common-base.a \
 	insn-attrtab.o \
 	insn-automata.o \
 	insn-dfatab.o \
-	insn-emit.o \
 	insn-extract.o \
 	insn-latencytab.o \
 	insn-modes.o \
@@ -1295,7 +1295,6 @@ OBJS = \
 	insn-output.o \
 	insn-peep.o \
 	insn-preds.o \
-	insn-recog.o \
 	insn-enums.o \
 	ggc-page.o \
 	adjust-alignment.o \
@@ -2626,6 +2625,32 @@ s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
 	$(SHELL) $(srcdir)/../move-if-change tmp-generic-match.c \
 	    					generic-match.c
 	$(STAMP) s-match
+
+gimple-match.o: gimple-match.c $(generated_files)
+generic-match.o: generic-match.c $(generated_files)
+
+ifdef PARTIAL_LTO
+LTO_LINKER_FLAGS = -flto=auto --param=lto-partitions=16 -flinker-output=nolto-rel -r
+LTO_FLAGS = -flto
+
+gimple-match-lto.o: gimple-match.c
+	$(COMPILE) $< $(LTO_FLAGS)
+generic-match-lto.o: generic-match.c
+	$(COMPILE) $< $(LTO_FLAGS)
+insn-recog-lto.o: insn-recog.c
+	$(COMPILE) $< $(LTO_FLAGS)
+insn-emit-lto.o: insn-emit.c
+	$(COMPILE) $< $(LTO_FLAGS)
+
+common-base.a: gimple-match-lto.o generic-match-lto.o insn-recog-lto.o insn-emit-lto.o
+	-rm -rf $@
+	$(LINKER) $^ $(LTO_LINKER_FLAGS) -o common-base.o
+	$(AR) $(AR_FLAGS)T $@ common-base.o
+else
+common-base.a: gimple-match.o generic-match.o insn-recog.o insn-emit.o
+	-rm -rf $@
+	$(AR) $(AR_FLAGS)T $@ $^
+endif
 
 GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(host_xm_file_list) \
