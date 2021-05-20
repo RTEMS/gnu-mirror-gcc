@@ -32,9 +32,6 @@ extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int, int,
 
 extern bool easy_altivec_constant (rtx, machine_mode);
 extern bool xxspltib_constant_p (rtx, machine_mode, int *, int *);
-extern bool xxspltidp_constant_p (rtx, machine_mode, HOST_WIDE_INT *);
-extern bool xxsplti32dx_constant_p (rtx, machine_mode, HOST_WIDE_INT *,
-				    HOST_WIDE_INT *);
 extern int vspltis_shifted (rtx);
 extern HOST_WIDE_INT const_vector_elt_as_int (rtx, unsigned int);
 extern bool macho_lo_sum_memory_operand (rtx, machine_mode);
@@ -286,9 +283,6 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
 extern long rs6000_const_f32_to_i32 (rtx operand);
-extern HOST_WIDE_INT sign_extend_mode_constant (machine_mode, HOST_WIDE_INT);
-extern unsigned HOST_WIDE_INT zero_extend_mode_constant (machine_mode,
-							 HOST_WIDE_INT);
 
 /* Declare functions in rs6000-c.c */
 

@@ -85,9 +85,7 @@
 				 | OTHER_POWER10_MASKS			\
 				 | OPTION_MASK_P10_FUSION		\
 				 | OPTION_MASK_P10_FUSION_LD_CMPI	\
-				 | OPTION_MASK_P10_FUSION_2LOGICAL	\
-				 | OPTION_MASK_XXSPLTIDP		\
-				 | OPTION_MASK_XXSPLTIW)
+				 | OPTION_MASK_P10_FUSION_2LOGICAL)
 
 /* Flags that need to be turned off if -mno-power9-vector.  */
 #define OTHER_P9_VECTOR_MASKS	(OPTION_MASK_FLOAT128_HW		\
@@ -162,9 +160,8 @@
 				 | OPTION_MASK_RECIP_PRECISION		\
 				 | OPTION_MASK_SOFT_FLOAT		\
 				 | OPTION_MASK_STRICT_ALIGN_OPTIONAL	\
-				 | OPTION_MASK_VSX			\
-				 | OPTION_MASK_XXSPLTIDP		\
-				 | OPTION_MASK_XXSPLTIW)
+				 | OPTION_MASK_VSX)
+
 #endif
 
 /* This table occasionally claims that a processor does not support a

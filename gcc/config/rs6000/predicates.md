@@ -601,16 +601,6 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
-  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
-     be loaded with that instruction.  */
-  if (xxspltidp_operand (op, mode))
-    return 1;
-
-  /* If we have the ISA 3.1 XXSPLTI32DX instruction, see if the constant can
-     be loaded with a pair of those instructions.  */
-  if (xxsplti32dx_operand (op, mode))
-    return 1;
-
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -650,55 +640,6 @@
   return num_insns == 1;
 })
 
-;; Return 1 if the operand is a CONST_VECTOR that can be loaded with the
-;; XXSPLTIW instruction.  Do not return 1 if the constant can be generated with
-;; XXSPLTIB or VSPLTIS{H,W}
-(define_predicate "xxspltiw_operand"
-  (match_code "const_vector")
-{
-  if (!TARGET_XXSPLTIW)
-    return false;
-
-  if (mode != V8HImode && mode != V4SImode && mode != V4SFmode)
-    return false;
-
-  rtx element = CONST_VECTOR_ELT (op, 0);
-  for (size_t i = 1; i < GET_MODE_NUNITS (mode); i++)
-    if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-      return false;
-
-  if (element == CONST0_RTX (GET_MODE_INNER (mode)))
-    return false;
-
-  if (CONST_INT_P (element) && EASY_VECTOR_15 (INTVAL (element)))
-    return false;
-
-  return true;
-})
-
-;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
-;; loaded via the ISA 3.1 XXSPLTIDP instruction.  Do not return true if the
-;; value is 0.0, since that is easy to generate without using XXSPLTIDP.
-(define_predicate "xxspltidp_operand"
-  (match_code "const_double,const_vector,vec_duplicate")
-{
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  HOST_WIDE_INT value = 0;
-  return xxspltidp_constant_p (op, mode, &value);
-})
-
-;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
-;; loaded via a pair f ISA 3.1 XXSPLTI32DX instructions.  Do not return true if
-;; the value can be loaded with the XXSPLTIDP instruction or XXSPLTIB to load 0.
-(define_predicate "xxsplti32dx_operand"
-  (match_code "const_double,const_vector,vec_duplicate")
-{
-  HOST_WIDE_INT high = 0, low = 0;
-  return xxsplti32dx_constant_p (op, mode, &high, &low);
-})
-
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
 ;; vector register without using memory.
 (define_predicate "easy_vector_constant"
@@ -710,15 +651,6 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
-	return true;
-
-      if (xxspltiw_operand (op, mode))
-	return true;
-
-      if (xxspltidp_operand (op, mode))
-	return true;
-
-      if (xxsplti32dx_operand (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
