@@ -1599,7 +1599,7 @@ split_loop_on_cond (struct loop *loop)
    Return NULL_TREE, if overflow/wrap will not happen.  */
 
 static tree
-get_wrap_assumption (class loop *loop, edge *exit)
+get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 {
   int i;
   edge e;
@@ -1644,14 +1644,16 @@ get_wrap_assumption (class loop *loop, edge *exit)
       if (code != NE_EXPR && code != LT_EXPR && code != LE_EXPR)
 	continue;
 
+      /* Check if idx is a valid SSA. */
+      if (TREE_CODE (idx) != SSA_NAME)
+	continue;
+      
       /* Filter conversion from idx.  */
-      tree cmp_idx = idx;
+      int inc_cnt = 0;
       tree small_type = TREE_TYPE (idx);
       tree large_type = small_type;
-      gimple *stmt = NULL;
-      if (TREE_CODE (idx) == SSA_NAME)
-	stmt = SSA_NAME_DEF_STMT (idx);
-      while (stmt && is_gimple_assign (stmt)
+      gimple *stmt = SSA_NAME_DEF_STMT (idx);
+      while (is_gimple_assign (stmt)
 	     && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
 	{
 	  enum tree_code code = gimple_assign_rhs_code (stmt);
@@ -1670,7 +1672,14 @@ get_wrap_assumption (class loop *loop, edge *exit)
 	    }
 	  else if (PLUS_EXPR == code
 		   && integer_onep (gimple_assign_rhs2 (stmt)))
-	    idx = gimple_assign_rhs1 (stmt);
+	    {
+	      idx = gimple_assign_rhs1 (stmt);
+
+	      /* At most one increament stmt. */
+	      inc_cnt++;
+	      if (inc_cnt > 1)
+		break;
+	    }
 	  else
 	    break;
 
@@ -1678,6 +1687,11 @@ get_wrap_assumption (class loop *loop, edge *exit)
 	    break;
 	  stmt = SSA_NAME_DEF_STMT (idx);
 	}
+
+      /* At last it should a PHI which is iv.  */
+      if (gimple_code (stmt) != GIMPLE_PHI)
+	continue;
+      *idx_phi = as_a<gphi *> (stmt);
 
       /* Check if idx is iv with base and step.  */
       affine_iv iv;
@@ -1716,6 +1730,121 @@ get_wrap_assumption (class loop *loop, edge *exit)
   return NULL_TREE;
 }
 
+/*  Update the idx and bnd with faster type for no wrap/oveflow loop.  */
+
+static bool
+update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
+{
+  /* Filter type conversion
+    i = phi (b, n)
+    ..
+    n0 = ik + 1
+    n1 = (type)n0
+    if (i != bnd) or if (n != bnd)
+    ..
+    n = ()nl */
+  auto convert_src = [&loop](tree idx) -> gimple * {
+    gimple *stmt = SSA_NAME_DEF_STMT (idx);
+    while (is_gimple_assign (stmt)
+	   && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
+      {
+	if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt)))
+	  idx = gimple_assign_rhs1 (stmt);
+	else
+	  break;
+
+	if (TREE_CODE (idx) != SSA_NAME)
+	  break;
+	stmt = SSA_NAME_DEF_STMT (idx);
+      }
+    return stmt;
+  };
+
+  /* Get increase statement.  */
+  edge latch_e = loop_latch_edge (loop);
+  tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
+  gimple *inc_stmt = convert_src (next);
+  if (!is_gimple_assign (inc_stmt)
+      || gimple_assign_rhs_code (inc_stmt) != PLUS_EXPR
+      || !flow_bb_inside_loop_p (loop, gimple_bb (inc_stmt)))
+    return false;
+
+  /* Check gcond stmt for bnd and idx/next.  */
+  gcond *gc = as_a<gcond *> (last);
+  tree bnd = gimple_cond_rhs (gc);
+  tree idx = gimple_cond_lhs (gc);
+  bool inv = false;
+  if (expr_invariant_in_loop_p (loop, idx))
+    {
+      inv = true;
+      std::swap (idx, bnd);
+    }
+
+  gimple *stmt = convert_src (idx);
+  bool cmp_next = stmt == inc_stmt;
+  
+  /* Use sizetype as machine fast type, ok for all targets?  */
+  tree fast_type = sizetype;
+
+  /* New base and new bound.  */
+  edge pre_e = loop_preheader_edge (loop);
+  tree base = PHI_ARG_DEF_FROM_EDGE (idx_phi, pre_e);
+  tree new_base = fold_convert (fast_type, base);
+  tree new_bnd = fold_convert (fast_type, bnd);
+  gimple_seq seq = NULL;
+  new_base = force_gimple_operand (new_base, &seq, true, NULL_TREE);
+  if (seq)
+    gsi_insert_seq_on_edge_immediate (pre_e, seq);
+  seq = NULL;
+  new_bnd = force_gimple_operand (new_bnd, &seq, true, NULL_TREE);
+  if (seq)
+    gsi_insert_seq_on_edge_immediate (pre_e, seq);
+
+  /* new_i = phi (new_b, new_n)
+     new_n = new_i + 1   */
+  basic_block bb = gimple_bb (idx_phi);
+  const char *name = "idx";
+  tree new_idx = make_temp_ssa_name (fast_type, NULL, name);
+  tree new_next = make_temp_ssa_name (fast_type, NULL, name);
+  gphi *newphi = create_phi_node (new_idx, bb);
+  add_phi_arg (newphi, new_base, pre_e, UNKNOWN_LOCATION);
+  add_phi_arg (newphi, new_next, latch_e, UNKNOWN_LOCATION);
+
+  /* New increase stmt.  */
+  tree step = gimple_assign_rhs2 (inc_stmt);
+  gcc_assert (TREE_CODE (step) == INTEGER_CST);
+  step = fold_convert (fast_type, step);
+  new_idx = PHI_RESULT (newphi);
+  gimple *new_inc = gimple_build_assign (new_next, PLUS_EXPR, new_idx, step);
+  gimple_stmt_iterator gsi = gsi_for_stmt (inc_stmt);
+  gsi_insert_before (&gsi, new_inc, GSI_SAME_STMT);
+
+  /* Update gcond.  */
+  tree cmp_idx = cmp_next ? new_next : new_idx;
+  gimple_cond_set_lhs (gc, inv ? new_bnd : cmp_idx);
+  gimple_cond_set_rhs (gc, inv ? cmp_idx : new_bnd);
+  update_stmt (gc);
+
+  tree type = TREE_TYPE (next);
+  stmt = gimple_build_assign (next, fold_convert (type, new_next));
+  gsi = gsi_for_stmt (inc_stmt);
+  gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
+
+  gsi = gsi_for_stmt (inc_stmt);
+  gsi_remove (&gsi, true);
+
+  idx = PHI_RESULT (idx_phi);
+  type = TREE_TYPE (idx);
+  stmt = gimple_build_assign (idx, fold_convert (type, new_idx));
+  gsi = gsi_start_bb (bb);
+  gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
+
+  gsi = gsi_for_stmt (idx_phi);
+  gsi_remove (&gsi, true);
+
+  return true;
+}
+
 /* Split out a new loop which would not wrap/overflow,
    under the guard that WRAP_ASSUMPTION will not be true. */
 
@@ -1730,11 +1859,12 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
   /* Version the loop.  */
   initialize_original_copy_tables ();
   basic_block cond_bb;
-  loop_version (loop, no_wrap_cond, &cond_bb,
-		profile_probability::very_likely (),
-		profile_probability::very_unlikely (),
-		profile_probability::very_likely (),
-		profile_probability::very_unlikely (), true);
+  class loop *loop1
+    = loop_version (loop, no_wrap_cond, &cond_bb,
+		    profile_probability::very_likely (),
+		    profile_probability::very_unlikely (),
+		    profile_probability::very_likely (),
+		    profile_probability::very_unlikely (), true);
   free_original_copy_tables ();
 
   /* Insert the statements that feed COND.  */
@@ -1804,9 +1934,15 @@ split_loop_on_wrap (class loop *loop)
   free (bbs);
 
   edge e;
-  tree nowrap_assumption = get_wrap_assumption (loop, &e);
-  if (nowrap_assumption && split_wrap_boundary (loop, e, nowrap_assumption))
-    return true;
+  gphi *idx_phi;
+  tree assumption = get_wrap_assumption (loop, &e, &idx_phi);
+
+  if (assumption && split_wrap_boundary (loop, e, assumption))
+    {
+      //      rewrite_into_loop_closed_ssa (NULL, TODO_update_ssa);      
+      update_idx_bnd_type (loop, last_stmt (e->src), idx_phi);
+      return true;
+    }
 
   return false;
 }
