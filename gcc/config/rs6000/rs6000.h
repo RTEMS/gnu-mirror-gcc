@@ -2623,3 +2623,22 @@ while (0)
        rs6000_asm_output_opcode (STREAM);				\
     }									\
   while (0)
+
+/* Provide macros for sign-extending values.  */
+#if HOST_BITS_PER_CHAR == 8
+#define SIGN_EXTEND_8BIT(X) ((HOST_WIDE_INT)(signed char)(X))
+#else
+#define SIGN_EXTEND_8BIT(X) ((((X) & 0xff) ^ 0x80) - 0x80)
+#endif
+
+#if HOST_BITS_PER_SHORT == 16
+#define SIGN_EXTEND_16BIT(X) ((HOST_WIDE_INT)(short)(X))
+#else
+#define SIGN_EXTEND_16BIT(X) ((((X) & 0xffff) ^ 0x8000) - 0x8000)
+#endif
+
+#if HOST_BITS_PER_INT == 32
+#define SIGN_EXTEND_32BIT(X) ((HOST_WIDE_INT)(int)(X))
+#else
+#define SIGN_EXTEND_32BIT(X) ((((X) & 0xffffffff) ^ 0x80000000) - 0x80000000)
+#endif
