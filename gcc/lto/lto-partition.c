@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-fnsummary.h"
 #include "lto-partition.h"
 #include "sreal.h"
+#include "toplev.h"
 
 vec<ltrans_partition> ltrans_partitions;
 
@@ -941,9 +942,23 @@ privatize_symbol_name_1 (symtab_node *node, tree decl)
 
   name = maybe_rewrite_identifier (name);
   unsigned &clone_number = lto_clone_numbers->get_or_insert (name);
-  symtab->change_decl_assembler_name (decl,
-				      clone_function_name (
-					  name, "lto_priv", clone_number));
+
+  char *suffix = NULL;
+  if (flag_lto_linker_output == LTO_LINKER_OUTPUT_NOLTOREL)
+    {
+      hashval_t fnhash = 0;
+      if (node->lto_file_data != NULL)
+	fnhash = htab_hash_string (node->lto_file_data->file_name);
+      suffix = XNEWVEC (char, 128);
+      char sep = symbol_table::symbol_suffix_separator ();
+      sprintf (suffix, "lto_priv%c%u%c%" PRIu64, sep, fnhash, sep,
+	       (unsigned HOST_WIDE_INT)get_random_seed (false));
+    }
+
+  tree clone
+    = clone_function_name (name, suffix ? suffix : "lto_priv", clone_number);
+  symtab->change_decl_assembler_name (decl, clone);
+  free (suffix);
   clone_number++;
 
   if (node->lto_file_data)
