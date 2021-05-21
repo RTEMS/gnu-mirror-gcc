@@ -8,12 +8,14 @@ This repository is not meant to be another mechanism for GCC developers to check
 
 We intend to work with the GCC community to integrate any changes we make in our vendor branches back upstream to the corresponding GCC release branches and master where appropriate.
 
+[Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct)
+
 ## Mirrored Branches: 
 
 | Branch | Status | Description |
 | --- | --- | --- |
-| current | [![current Status](https://github.com/microsoft/gcc/actions/workflows/build/badge.svg?branch=current)](https://github.com/microsoft/gcc/actions?query=workflow%3Abuild+branch%3Acurrent) | Mirrors the *vendors/microsoft/main branch* in the upstream GCC repository. That vendor branch is based off the [GCC master branch](https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=refs/heads/master).
-| gcc-9.1.0 | [![gcc-9.1.0 Status](https://github.com/microsoft/gcc/actions/workflows/build/badge.svg?branch=gcc-9.1.0)](https://github.com/microsoft/gcc/actions?query=workflow%3Abuild+branch%3Agcc-9.1.0) | Mirrors the *vendors/microsoft/9.1.0 branch* in the upstream GCC repository. That vendor branch is based off the [releases/gcc-9.1.0 tag](https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=releases/gcc-9.1.0).
+| current | [ [![build](https://github.com/microsoft/gcc/actions/workflows/build.yaml/badge.svg?branch=current)](https://github.com/microsoft/gcc/actions/workflows/build.yaml) [![test-gcc](https://github.com/microsoft/gcc/actions/workflows/test-gcc.yaml/badge.svg?branch=current)](https://github.com/microsoft/gcc/actions/workflows/test-gcc.yaml) | Mirrors the *vendors/microsoft/main branch* in the upstream GCC repository. That vendor branch is based off the [GCC master branch](https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=refs/heads/master).
+| gcc-9.1.0 | [![build](https://github.com/microsoft/gcc/actions/workflows/build.yaml/badge.svg?branch=gcc-9.1.0)](https://github.com/microsoft/gcc/actions/workflows/build.yaml) [![test-gcc](https://github.com/microsoft/gcc/actions/workflows/test-gcc.yaml/badge.svg?branch=gcc-9.1.0)](https://github.com/microsoft/gcc/actions/workflows/test-gcc.yaml) | Mirrors the *vendors/microsoft/9.1.0 branch* in the upstream GCC repository. That vendor branch is based off the [releases/gcc-9.1.0 tag](https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=releases/gcc-9.1.0).
 
 ## Scripts and Workflows:
 
