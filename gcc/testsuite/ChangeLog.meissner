@@ -1,3 +1,8 @@
+work053.patch015:
+2021-05-20  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-lxvkq.c: New test.
+
 work053.patch014:
 2021-05-20  Michael Meissner  <meissner@linux.ibm.com>
 

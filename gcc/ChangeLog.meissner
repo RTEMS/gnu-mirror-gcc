@@ -1,3 +1,24 @@
+work053.patch015:
+2021-05-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eQ): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with LXVKQ, it is easy.
+	(lxvkq_operand): New predicate.
+	* config/rs6000/rs6000-protos.h (lxvkq_constant_p): New
+	declaration.
+	* config/rs6000/rs6000-cpus.h (ISA_3_1_MASKS_SERVER): Add -mlxvkq.
+	(POWERPC_MASKS): Add -mlxvkq.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mlxvkq.
+	(lxvkq_constant_p): New function.
+	(rs6000_output_move_128bit): Add support for generating lxvkq.
+	(rs6000_opt_masks): Add -mlxvkq.
+	* config/rs6000/rs6000.opt (-mlxvkq): New option.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support to
+	generate lxvkq.
+	(vsx_mov<mode>_32bit): Add support to generate lxvkq.
+
 work053.patch014:
 2021-05-20  Michael Meissner  <meissner@linux.ibm.com>
 
