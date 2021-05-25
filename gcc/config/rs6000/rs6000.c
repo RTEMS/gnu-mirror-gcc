@@ -4489,23 +4489,14 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (TARGET_POWER10 && TARGET_VSX)
     {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTI32DX) == 0)
-	rs6000_isa_flags |= OPTION_MASK_XXSPLTI32DX;
-
       if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIW) == 0)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIW;
 
       if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
-
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_LXVKQ) == 0)
-	rs6000_isa_flags |= OPTION_MASK_LXVKQ;
     }
   else
-    rs6000_isa_flags &= ~(OPTION_MASK_LXVKQ
-			  | OPTION_MASK_XXSPLTIW
-			  | OPTION_MASK_XXSPLTIDP
-			  | OPTION_MASK_XXSPLTI32DX);
+    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW | OPTION_MASK_XXSPLTIDP);
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
@@ -6595,199 +6586,6 @@ xxspltidp_constant_p (rtx op,
   return true;
 }
 
-/* Return true if OP is a floating point constant that can be loaded with the
-   XXSPLTI32DX instruction.  If the constant can be loaded with the simpler
-   XXSPLTIDP (constants that can fit as SFmode constants) or XXSPLTIB (0.0)
-   instructions, return false.
-
-   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
-   via HIGH_PTR and LOW_PTR.  */
-
-static bool
-xxsplti32dx_constant_float_p (rtx op,
-			      machine_mode mode,
-			      HOST_WIDE_INT *high_ptr,
-			      HOST_WIDE_INT *low_ptr)
-{
-  HOST_WIDE_INT xxspltidp_value = 0;
-
-  if (!CONST_DOUBLE_P (op))
-    return false;
-
-  if (mode != SFmode && mode != DFmode)
-    return false;
-
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  if (xxspltidp_constant_p (op, mode, &xxspltidp_value))
-    return false;
-
-  long high_low[2];
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
-
-  /* The double precision value is laid out in memory order.  We need to undo
-     this for XXSPLTI32DX.  */
-  if (!BYTES_BIG_ENDIAN)
-    std::swap (high_low[0], high_low[1]);
-
-  *high_ptr = high_low[0];
-  *low_ptr = high_low[1];
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTI32DX instruction.  If the instruction can be synthesized with
-   XXSPLTIDP or is 0/-1, return false.
-
-   We handle the following types of constants:
-
-     1) vector double constants where each element is the same and you can't
-        load the constant with XXSPLTIDP;
-
-     2) vector long long constants where each element is the same;
-
-     3) Scalar floating point constants that can't be loaded with XXSPLTIDP.
-
-   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
-   via HIGH_PTR and LOW_PTR.  */
-
-bool
-xxsplti32dx_constant_p (rtx op,
-			machine_mode mode,
-			HOST_WIDE_INT *high_ptr,
-			HOST_WIDE_INT *low_ptr)
-{
-  *high_ptr = *low_ptr = 0;
-
-  if (!TARGET_XXSPLTI32DX)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  switch (mode)
-    {
-    default:
-      break;
-
-    case E_V2DFmode:
-      {
-	rtx ele = const_vector_element_all_same (op);
-	if (!ele)
-	  return false;
-
-	return xxsplti32dx_constant_float_p (ele, DFmode, high_ptr, low_ptr);
-      }
-
-    case E_SFmode:
-    case E_DFmode:
-      return xxsplti32dx_constant_float_p (op, mode, high_ptr, low_ptr);
-
-    case E_V2DImode:
-      {
-	rtx ele = const_vector_element_all_same (op);
-	if (!ele)
-	  return false;
-
-	/* If we can generate XXSPLTIB and VEXTSB2D, don't return true.  */
-	HOST_WIDE_INT value = INTVAL (ele);
-	if (IN_RANGE (value, -128, 127))
-	  return false;
-
-	*high_ptr = value >> 32;
-	*low_ptr = value & 0xffffffff;
-	return true;
-      }
-    }
-
-  return false;
-}
-
-/* Return true if OP is of the given MODE is one of the 18 special values that
-   can be generated with the LXVKQ instruction.
-
-   Return the constant that will go in the LXVKQ instruction.
-
-   The LXVKQ immediates are:
-	1 - 7:		1.0 .. 7.0.
-	8:		Positive infinity.
-	9:		Default quiet NaN.
-	16:		-0.0.
-	17 - 23:	-1.0 .. 7.0.
-	24:		Negative infinity.  */
-
-bool
-lxvkq_constant_p (rtx op,
-		  machine_mode mode,
-		  int *imm_p)
-{
-  *imm_p = -1;
-
-  if (!TARGET_LXVKQ)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IEEE_P (mode))
-    return false;
-
-  if (!CONST_DOUBLE_P (op))
-    return false;
-
-  /* All of the values generated can be expressed as SFmode values, so if it
-     doesn't fit in SFmode, exit.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  /* +/- Inifinity  is 8/24.  */
-  if (REAL_VALUE_ISINF (*rv))
-    {
-      *imm_p = real_isneg (rv) ? 24 : 8;
-      return true;
-    }
-
-  /* NaN is 9.  */
-  if (REAL_VALUE_ISNAN (*rv) && !REAL_VALUE_NEGATIVE (*rv))
-    {
-      *imm_p = 9;
-      return true;
-    }
-
-  /* -0.0 is 16.  */
-  if (REAL_VALUE_MINUS_ZERO (*rv))
-    {
-      *imm_p = 16;
-      return true;
-    }
-
-  /* The other values are all integers 1..7, and -1..-7.  */
-  if (!real_isinteger (rv, mode))
-    return false;
-
-  HOST_WIDE_INT value = real_to_integer (rv);
-  if (value >= 1 && value <= 7)
-    {
-      *imm_p = value;
-      return true;
-    }
-  else if (value >= -7 && value <= -1)
-    {
-      /* Subtraction is used because value is negative.  */
-      *imm_p = 16 - value;
-      return true;
-    }
-
-  /* We can't load the value with LXVKQ.  */
-  return false;
-}
-
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6834,9 +6632,6 @@ output_vec_const_move (rtx *operands)
 
       if (xxspltiw_operand (vec, mode)
 	  || xxspltidp_operand (vec, mode))
-	return "#";
-
-      if (xxsplti32dx_operand (vec, mode))
 	return "#";
 
       if (TARGET_P9_VECTOR
@@ -13560,7 +13355,6 @@ rs6000_output_move_128bit (rtx operands[])
   int src_regno;
   bool dest_gpr_p, dest_fp_p, dest_vmx_p, dest_vsx_p;
   bool src_gpr_p, src_fp_p, src_vmx_p, src_vsx_p;
-  int lxvkq_immediate = 0;
 
   if (REG_P (dest))
     {
@@ -13705,14 +13499,6 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
-  else if (dest_vmx_p
-	   && CONST_DOUBLE_P (src)
-	   && lxvkq_constant_p (src, mode, &lxvkq_immediate))
-    {
-      operands[2] = GEN_INT (lxvkq_immediate);
-      return "lxvkq %x0,%2";
-    }
-
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
@@ -24412,7 +24198,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
-  { "lxvkq",			OPTION_MASK_LXVKQ,		false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
@@ -24440,7 +24225,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
-  { "xxsplti32dx",		OPTION_MASK_XXSPLTI32DX,	false, true  },
   { "xxspltiw",			OPTION_MASK_XXSPLTIW,		false, true  },
   { "xxspltidp",		OPTION_MASK_XXSPLTIDP,		false, true  },
 #ifdef OPTION_MASK_64BIT
