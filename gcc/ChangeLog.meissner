@@ -20,7 +20,7 @@ work053.patch015:
 	(vsx_mov<mode>_32bit): Add support to generate lxvkq.
 
 work053.patch014:
-2021-05-20  Michael Meissner  <meissner@linux.ibm.com>
+2021-05-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraint.md (eD): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): If the constant
@@ -30,6 +30,9 @@ work053.patch014:
 	XXSPLTI32DX, it is easy.
 	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
 	declaration.
+	* config/rs6000/rs6000-cpus.h (ISA_3_1_MASKS_SERVER): Add
+	-mxxsplti32dx.
+	(POWERPC_MASKS): Add -mxxsplti32dx.
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
 	support for -mxxsplti32dx.
 	(xxsplti32dx_constant_float_p): New helper function.
