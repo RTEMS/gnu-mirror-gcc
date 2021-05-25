@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-18.04
     outputs:
       config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
+      matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -30,7 +31,12 @@ jobs:
         run: |
           python -m pip install requests
         shell: bash
-        
+
+      # Print the chunked set of GCC tests we'd like to run in a matrix later
+      - name: Print GCC test set
+        id: printGCCTestSet
+        uses: ./.github/actions/print-gcc-testset
+
       - uses: ./.github/actions/rebase-gcc-master
       
         # Setup config
@@ -48,7 +54,8 @@ jobs:
           GITHUB_CONTEXT: ${{ toJson(github) }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
-      - uses: ./.github/actions/build-composite
+      - name: Build GCC
+        uses: ./.github/actions/build-composite
         with: 
           configjson: ${{ steps.setupconfig.outputs.configJson }}
 
@@ -67,7 +74,7 @@ jobs:
         run: |
           chmod +x .github/scripts/config.py
           export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
-          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJson(sys.argv[1])' "${CONFIG_JSON}"
+          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJsonFromJson(sys.argv[1])' "${CONFIG_JSON}"
         shell: bash
         env:
           CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
@@ -75,9 +82,7 @@ jobs:
   fetch-rebase-test: 
     needs: fetch-rebase-build
     strategy:
-      matrix:
-        # If this test is updated, make sure you update the duplicate line in test-gcc.yaml
-        testSet: [check-target-libstdc++-v3, check-gcc-c++, check-gcc-c, check-target-libgomp, check-target-libitm, check-target-libatomic]
+      matrix: ${{fromJSON(needs.fetch-rebase-build.outputs.matrixTestSet)}}
       # Avoid cancelling other matrix chunks even if one fails
       fail-fast: false        
     runs-on: ubuntu-18.04
@@ -101,7 +106,8 @@ jobs:
           python -m pip install requests
         shell: bash
         
-      - uses: ./.github/actions/rebase-gcc-master
+      - name: Rebase to latest upstream GCC master
+        uses: ./.github/actions/rebase-gcc-master
 
       - name: Download gccBuild from fetch-rebase-build step
         uses: actions/download-artifact@v2
@@ -113,7 +119,8 @@ jobs:
         run: mv objdir ../objdir
         
       # build.yaml creates the gccBuild artifact
-      - uses: ./.github/actions/test-composite
+      - name: Run GCC tests
+        uses: ./.github/actions/test-composite
         with: 
           configjson: ${{needs.fetch-rebase-build.outputs.config}}
           testSet: ${{ matrix.testSet }}

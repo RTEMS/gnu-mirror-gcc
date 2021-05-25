@@ -1,0 +1,61 @@
+# This workflow mirrors our vendor branches into our GitHub repository to trigger the CI workflow if any new changes are present.
+# The workflow will automatically push these changes and will not require manual intervention
+name: update-mirror-branches
+
+# Run this workflow every 10 minutes
+on:
+  schedule:
+    - cron: "0,10,20,30,40,50 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        upstreamBranch: [""]
+        githubBranch: [""]
+
+        # upstream vendor/microsoft/main maps to current
+        # upstream vendor/microsoft/9.1.0 maps to gcc-9.1.0
+        include:
+          - upstreamBranch: main
+            githubBranch: current-temp #TODO: Change this when we have everything in current in the upstream vendor branch
+          - upstreamBranch: '9.1.0'
+            githubBranch: gcc-9.1.0
+
+        # Exclude the default case because we can't have empty matricies
+        exclude:
+          - upstreamBranch: ""
+            githubBranch: ""
+
+      # Avoid cancelling other matrix chunks even if one fails
+      fail-fast: false    
+    steps:
+      - name: Checkout  
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+          token: ${{ secrets.VICTORPAT }} # The basic ${{ github.token }} doesn't include "workflows" write permission access to modify workflows in the .github directory
+
+      # Add upstream gcc as remote, setup vendor branches and checkout matrix vendor branch
+      - name: Setup and checkout vendors/microsoft/${{ matrix.upstreamBranch }}
+        uses: ./.github/actions/setup-vendor-branches
+        with:
+          scriptsRef: ${{ github.sha }}
+          vendorRef: vendors/microsoft/${{ matrix.upstreamBranch }}
+
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H-%M-%S')"
+
+      - name: Push to branch in GitHub repo
+        run: |
+          git checkout -b ${newBranchName}
+          git push origin -f ${newBranchName}:${githubBranch}
+        shell: bash
+        env:
+          newBranchName: update-mirror-${{ matrix.githubBranch }}-${{ steps.date.outputs.date }}
+          githubBranch: ${{ matrix.githubBranch }}

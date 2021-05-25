@@ -16,10 +16,15 @@ inputs:
     description: 'Whether the build is already available on the machine this composite action is running on'
     required: true
     default: true
+outputs:
+  configJson:
+    description: 'Config object that may have been updated'
+    value: ${{ steps.runTests.outputs.noSecretConfigJson }}
 runs:
   using: "composite"
-  steps: 
+  steps:
     - name: Download build and run tests
+      id: runTests
       run: | 
         chmod +x .github/scripts/gccWorkflow.py
         echo "$PYTHONPATH"

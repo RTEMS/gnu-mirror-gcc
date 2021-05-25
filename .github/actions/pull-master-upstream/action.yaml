@@ -1,0 +1,25 @@
+# Composite yaml to add the upstream gcc remote and checkout from their master branch
+inputs:
+  masterRef:
+    description: 'Reference off of gcc/master to sync to'
+    required: false
+    default: 'gcc/master'
+  scriptsRef:
+    description: 'Commit reference to checkout .github scripts from'
+    required: true
+    default: ''
+
+runs:
+  using: "composite"
+  steps: 
+    - name: Add remote and checkout from ${{ inputs.masterRef }}
+      run: |
+        git remote add gcc git://gcc.gnu.org/git/gcc.git
+        git fetch gcc master
+        chmod +x .github/scripts/checkout-refs.sh
+        .github/scripts/checkout-refs.sh ${MASTER_REF} ${SCRIPTS_REF}
+        git log -1
+      shell: bash
+      env:
+        SCRIPTS_REF: ${{ inputs.scriptsRef }}
+        MASTER_REF: ${{ inputs.masterRef }}

@@ -8,17 +8,13 @@ on:
   push:
     branches:
       - current
-      - test
       - 'releases/**'
-      - 'develop/**'
-      - 'gcc**'
+      - gcc-9.1.0
   pull_request:
     branches:
       - current
-      - test
       - 'releases/**'
-      - 'develop/**'
-      - 'gcc**'
+      - gcc-9.1.0
   # the problem with workflow_run is that the run isn't associated with a PR and won't show up in a PR
   #workflow_run:
   #  workflows: ["build"]
@@ -31,6 +27,7 @@ jobs:
     runs-on: ubuntu-18.04
     outputs:
       config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
+      matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -50,6 +47,11 @@ jobs:
           python -m pip install requests
         shell: bash
 
+      # Print the chunked set of GCC tests we'd like to run in a matrix later
+      - name: Print GCC test set
+        id: printGCCTestSet
+        uses: ./.github/actions/print-gcc-testset
+
       # Setup config
       - name: Setup config
         id: setupconfig
@@ -68,16 +70,14 @@ jobs:
         run: |
           chmod +x .github/scripts/config.py
           export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
-          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJson(sys.argv[1])' "${CONFIG_JSON}"
+          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJsonFromJson(sys.argv[1])' "${CONFIG_JSON}"
         shell: bash
         env:
           CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
   test:
     needs: init
     strategy:
-      matrix:
-        # If this test is updated, make sure you update the duplicate line in fetch-rebase-test.yaml
-        testSet: [check-target-libstdc++-v3, check-gcc-c++, check-gcc-c, check-target-libgomp, check-target-libitm, check-target-libatomic]
+      matrix: ${{fromJSON(needs.init.outputs.matrixTestSet)}}
       # Avoid cancelling other matrix chunks even if one fails
       fail-fast: false        
     runs-on: ubuntu-18.04
@@ -100,19 +100,20 @@ jobs:
         
     # Install requests package which is used in downloadBuildArtifact.py 
       - name: Pip Install Requests
-        run: |
-          python -m pip install requests
+        run: python -m pip install requests
         shell: bash
 
       # build.yaml creates the gccBuild artifact
-      - uses: ./.github/actions/test-composite
+      - name: Run GCC tests
+        uses: ./.github/actions/test-composite
+        id: test-composite
         with: 
           configjson: ${{needs.init.outputs.config}}
           testSet: ${{ matrix.testSet }}
           githubtoken: ${{ secrets.GITHUB_TOKEN }}
           buildDownloaded: False
 
-      - name: Move objdir to be in repo so logs inside can be uploaded
+      - name: Move objdir to be in repo so logs inside can be uploaded 
         run: mv ../objdir objdir
 
       - name: Upload build output
@@ -121,3 +122,17 @@ jobs:
           name: ${{ matrix.testSet }}_logs
           path: objdir/logs
       
+      # We have to do this after because there's no REST API to upload build artifacts so we need to use the yaml one
+      - name: Fail workflow if there was a failure earlier
+        run: |
+          chmod +x .github/scripts/common.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from gccWorkflow import *; Config.Reload(sys.argv[1], sys.argv[2]); Config.RaiseErrorIfWorkflowFailed()' "${GITHUB_CONTEXT}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{steps.test-composite.outputs.configJson}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        

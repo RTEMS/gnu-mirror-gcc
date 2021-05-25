@@ -17,6 +17,3 @@ sudo update-alternatives --set c++ /usr/bin/g++
 sudo apt install -y texinfo
 sudo apt-get install -y dejagnu
 ./contrib/download_prerequisites
-
-cd ..
-mkdir objdir

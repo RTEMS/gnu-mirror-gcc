@@ -1,0 +1,354 @@
+# This workflow does the following things:
+# 1. Takes the latest SHA from the upstream GCC master branch and starts a build and GCC test run
+# 2. Any new failures encountered during the run and not in the .xfail file in vendors/microsoft/main will get added to a the .xfail file.
+# 3. A new branch will be created in the GitHub repository with the gcc/master SHA we used earlier merged into vendors/microsoft/main and the newly added .xfail failures (if any)
+# 4. A build and test-gcc workflow will then get kicked off against this new branch
+# 5. This workflow will wait until the build and test-gcc workflows are done.
+# 6. If the build and test-gcc steps are successful, it will print the set of Git commands for someone to run manually to actually push the changes to our vendor branch
+name: update-main
+
+# Run this workflow every day at 3 am UTC
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  gcc-master-build:
+    name: Build the latest gcc/master toolchain
+    runs-on: ubuntu-18.04
+    outputs:
+      config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
+      masterSHA: ${{ steps.printCurrentSHA.outputs.currentSHA }}
+      matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+    
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+        
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: python -m pip install requests
+        shell: bash
+
+      # Add upstream gcc as remote and checkout from their master branch
+      - name: Add upstream remote and checkout upstream gcc master branch
+        uses: ./.github/actions/pull-master-upstream
+        with:
+          scriptsRef: ${{ github.sha }}
+
+      # Print the current SHA so we know what master SHA we synced to and can sync to it later
+      - name: Print current SHA
+        id: printCurrentSHA
+        run: |
+          chmod +x .github/scripts/common.py
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          python -c 'from common import *; GetandPrintCurrentSHA()'
+        shell: bash
+      
+      # Print the chunked set of GCC tests we'd like to run in a matrix later
+      - name: Print GCC test set
+        id: printGCCTestSet
+        uses: ./.github/actions/print-gcc-testset
+
+        # Setup config
+      - name: Setup config
+        id: setupconfig
+        run: |
+          chmod +x .github/scripts/gccWorkflow.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.Init(sys.argv[1], sys.argv[2], True)' "${GITHUB_CONTEXT}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Build GCC
+        uses: ./.github/actions/build-composite
+        with: 
+          configjson: ${{ steps.setupconfig.outputs.configJson }}
+
+      - name: Move objdir to be in repo so it can be uploaded
+        run: mv ../objdir objdir
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v2
+        with:
+          name: gccBuild
+          path: objdir
+
+      # This should be the last step on this machine since it will clear out fields in the config json
+      - name: Print No Secret Json
+        id: printNoSecretJson
+        run: |
+          chmod +x .github/scripts/config.py
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          python -c 'import sys; from config import *; Config.PrintNoSecretConfigJsonFromJson(sys.argv[1])' "${CONFIG_JSON}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{ steps.setupconfig.outputs.configJson }}
+          
+  gcc-master-test: 
+    name: Run tests against gcc/master bits built in the previous step
+    needs: gcc-master-build
+    strategy:
+      matrix: ${{fromJSON(needs.gcc-master-build.outputs.matrixTestSet)}}
+      # Avoid cancelling other matrix chunks even if one fails
+      fail-fast: false
+
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+        
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: python -m pip install requests
+        shell: bash
+        
+      # Add upstream gcc as remote and checkout the SHA we used in the master build
+      - name: Add upstream remote and checkout SHA used in build step
+        uses: ./.github/actions/pull-master-upstream
+        with:
+          scriptsRef: ${{ github.sha }}
+          masterRef: ${{ needs.gcc-master-build.outputs.masterSHA }}
+        
+      # We need to download the build artifact here instead of in DownloadBuildArtifact() because artifacts are not available
+      # for download through the REST API until after the workflow has completed. We can only get the workflows from the
+      # previous steps through the download-artifact action.
+      - name: Download gccBuild artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: gccBuild
+          path: objdir
+
+      - name: Move objdir outisde repo
+        run: mv objdir ../
+
+      # build.yaml creates the gccBuild artifact
+      - name: Run GCC tests
+        uses: ./.github/actions/test-composite
+        with: 
+          configjson: ${{needs.gcc-master-build.outputs.config}}
+          testSet: ${{ matrix.testSet }}
+          githubtoken: ${{ secrets.GITHUB_TOKEN }}
+          buildDownloaded: True 
+      
+      - name: Move objdir to be in repo so logs inside can be uploaded
+        run: mv ../objdir objdir
+
+      - name: Upload test logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: master_${{ matrix.testSet }}_logs
+          path: objdir/logs
+
+  parse-failures:
+    name: Parse failures and start build and test runs with gcc/master merged into vendor/microsoft/main
+    needs: [gcc-master-test, gcc-master-build]
+    runs-on: ubuntu-18.04
+    outputs:
+      newBranchName: ${{ steps.setBranchName.outputs.newBranchName }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+          token: ${{ secrets.VICTORPAT }} # The basic ${{ github.token }} doesn't include "workflows" write permission access to modify workflows in the .github directory
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+          
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+
+      # Add upstream gcc as remote, setup vendor branches and checkout vendors/microsoft/main
+      - name: Setup and checkout vendors/microsoft/main
+        uses: ./.github/actions/setup-vendor-branches
+        with:
+          scriptsRef: ${{ github.sha }}
+          vendorRef: vendors/microsoft/main
+
+      - name: Parse failures
+        run: | 
+          chmod +x .github/scripts/gccWorkflow.py
+          echo "$PYTHONPATH"
+          echo "$CONFIG_JSON"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "$BUILD_DOWNLOADED"
+          python -c 'import sys; from gccWorkflow import *; GccWorkflow.ParseTestLogs(sys.argv[1], sys.argv[2])' "${CONFIG_JSON}" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          CONFIG_JSON: ${{needs.gcc-master-build.outputs.config}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # newFailures.patch is created in ParseTestLogs IFF there were failures in master run that aren't in the .xfail file
+      - name: Check if failures patch exists
+        id: check_failures_patch
+        uses: andstor/file-existence-action@v1
+        with:
+          files: "newFailures.patch"
+
+      - name: Upload failures patch
+        if: ${{ steps.check_failures_patch.outputs.files_exists }} == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: newFailures.patch
+          path: newFailures.patch
+
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H-%M-%S')"
+
+      - name: Set new branch name
+        id: setBranchName
+        run: echo "::set-output name=newBranchName::${name}"
+        env:
+          name: merge-master-${{ needs.gcc-master-build.outputs.masterSHA }}-${{ steps.date.outputs.date }}
+
+      # Use .github scripts in this branch in case the workflow is testing infrastructure changes
+      - name: Merge master SHA and push to our GitHub repo to start run
+        run: |
+          git checkout -b ${newBranchName}
+          git add .github/*
+          git commit -m "Bring latest scripts from ${BRANCH_REF}"
+          git fetch gcc master
+          git branch -a
+          git merge ${masterSHA}
+          git push origin HEAD -f
+        shell: bash
+        env:
+          newBranchName: ${{ steps.setBranchName.outputs.newBranchName }}
+          masterSHA: ${{ needs.gcc-master-build.outputs.masterSHA }}
+          BRANCH_REF: ${{ github.sha }}
+
+      - name: Invoke build workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: build
+          token: ${{ secrets.VICTORPAT }}
+          ref: ${{ steps.setBranchName.outputs.newBranchName }}
+
+      - name: Invoke test-gcc workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: test-gcc
+          token: ${{ secrets.VICTORPAT }}
+          ref: ${{ steps.setBranchName.outputs.newBranchName }}
+
+      - name: Sleep before waiting on build and test runs
+        run: |
+          sleep 3m
+        shell: bash
+
+  wait-build:
+    name: Waiting on build with gcc/master merged into vendor/microsoft/main
+    needs: [parse-failures]
+    runs-on: ubuntu-18.04
+    outputs: 
+      newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+      
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+        
+      - name: Wait for build
+        run: | 
+          chmod +x .github/scripts/downloadBuildArtifact.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from downloadBuildArtifact import *; WaitOnLatestWorkflow(sys.argv[1], sys.argv[2], sys.argv[3], True)' "${mergeBranch}" "build" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  wait-test:
+    name: Waiting on tests with gcc/master merged into vendor/microsoft/main
+    needs: [parse-failures, wait-build, gcc-master-build]
+    runs-on: ubuntu-18.04
+    outputs: 
+      newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: true
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+          
+      # Install requests package which is used in downloadBuildArtifact.py 
+      - name: Pip Install Requests
+        run: |
+          python -m pip install requests
+        shell: bash
+
+      - name: Wait for test-gcc
+        run: |
+          chmod +x .github/scripts/downloadBuildArtifact.py
+          echo "$PYTHONPATH"
+          export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+          echo "$PYTHONPATH"
+          echo "${GITHUB_CONTEXT}"
+          python -c 'import sys; from downloadBuildArtifact import *; WaitOnLatestWorkflow(sys.argv[1], sys.argv[2], sys.argv[3], True)' "${mergeBranch}" "test-gcc" "${GITHUB_TOKEN}"
+        shell: bash
+        env:
+          mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Print git commands to use to merge and push manually.
+        run: |
+          printf "Run the following command. It assumes that you have the microsoft/gcc repository at origin and the upstream GCC Microsoft vendor branches set up at gcc"
+          printf "git fetch gcc \ngit checkout gcc vendors/microsoft/main \ngit merge origin ${mergeBranch} \ngit push gcc vendors/microsoft/main \n"
+        env:
+          masterSHA: ${{ needs.gcc-master-build.outputs.masterSHA }}
+          mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}

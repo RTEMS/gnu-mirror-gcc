@@ -1,0 +1,15 @@
+# Composite yaml that prints the GCC test set so it can be used as a YAML matrix variable for running tests
+outputs:
+  testSet:
+    description: 'GCC test set in JSON representation'
+    value: ${{ steps.printGCCTestSet.outputs.testSet }}
+runs:
+  using: "composite"
+  steps:
+    - name: Print GCC test set
+      id: printGCCTestSet
+      run: | 
+        chmod +x .github/scripts/gccWorkflow.py
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        python -c 'import sys; from gccWorkflow import *; GccWorkflow.PrintTestSet()'
+      shell: bash
