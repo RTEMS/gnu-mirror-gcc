@@ -2811,7 +2811,7 @@ expand_block_move (rtx operands[], bool might_overlap)
 	  gen_func.mov = gen_vsx_movv2di_64bit;
 	}
       else if (TARGET_BLOCK_OPS_UNALIGNED_VSX
-	       && TARGET_POWER10 && bytes < 16
+	       && TARGET_POWER10 && bytes < 16 && TARGET_POWERPC64
 	       && orig_bytes > 16
 	       && !(bytes == 1 || bytes == 2
 		    || bytes == 4 || bytes == 8)
