@@ -43,7 +43,7 @@ jobs:
         # upstream vendor/microsoft/9.1.0 maps to gcc-9.1.0
         include:
           - upstreamBranch: main
-            githubBranch: current-temp #TODO: Change this when we have everything in current in the upstream vendor branch
+            githubBranch: current
           - upstreamBranch: '9.1.0'
             githubBranch: gcc-9.1.0
 
