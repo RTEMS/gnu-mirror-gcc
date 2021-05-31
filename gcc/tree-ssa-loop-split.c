@@ -230,8 +230,10 @@ easy_exit_values (class loop *loop)
    conditional).  I.e. the second loop can now be entered either
    via the original entry or via NEW_E, so the entry values of LOOP2
    phi nodes are either the original ones or those at the exit
-   of LOOP1.  Insert new phi nodes in LOOP2 pre-header reflecting
-   this.  The loops need to fulfill easy_exit_values().  */
+   of LOOP1.  Selecting the previous value instead next value as the
+   exit value of LOOP1 if USE_PREV is true.  Insert new phi nodes in
+   LOOP2 pre-header reflecting this.  The loops need to fulfill
+   easy_exit_values().  */
 
 static void
 connect_loop_phis (class loop *loop1, class loop *loop2, edge new_e,
@@ -1596,9 +1598,8 @@ split_loop_on_cond (struct loop *loop)
   return do_split;
 }
 
-/* Check if the LOOP exit branch likes "if (idx != bound)",
-   Return the branch edge which exit loop, if overflow/wrap
-   may happen on "idx".  */
+/* Check if the LOOP exit branch is like "if (idx != bound)",
+   Return the branch edge which exit loop, if wrap may happen on "idx".  */
 
 static edge
 get_ne_cond_branch (struct loop *loop)
@@ -1609,7 +1610,7 @@ get_ne_cond_branch (struct loop *loop)
   auto_vec<edge> edges = get_loop_exit_edges (loop);
   FOR_EACH_VEC_ELT (edges, i, e)
     {
-      /* Check if there is possible wrap/overflow.  */
+      /* Check if there is possible wrap.  */
       class tree_niter_desc niter;
       if (!number_of_iterations_exit (loop, e, &niter, false, false))
 	continue;
@@ -1618,40 +1619,50 @@ get_ne_cond_branch (struct loop *loop)
       if (niter.cmp != NE_EXPR)
 	continue;
 
-      /* Check loop is simple to split.  */
+      /* If exit edge is just before the empty latch, it is easy to link
+	 the split loops: just jump from the exit edge of one loop to the
+	 header of new loop.  */
       if (single_pred_p (loop->latch)
 	  && single_pred_edge (loop->latch)->src == e->src
-	  && (gsi_end_p (gsi_start_nondebug_bb (loop->latch))))
+	  && empty_block_p (loop->latch))
 	return e;
 
-      /* Simple header.  */
+      /* If exit edge is at end of header, and header contains i++ or ++i,
+	 only, it is simple to link the split loops:  jump from the end of
+	 one loop header to the new loop header, and use unchanged PHI
+	 result of first loop as the entry PHI value of the second loop.  */
       if (e->src == loop->header)
 	{
-	  if (get_virtual_phi (e->src))
-	    continue;
-
 	  /* Only one phi.  */
 	  gphi_iterator psi = gsi_start_phis (e->src);
 	  if (gsi_end_p (psi))
 	    continue;
+	  gphi *phi = psi.phi ();
 	  gsi_next (&psi);
 	  if (!gsi_end_p (psi))
 	    continue;
 
-	  /* ++i or ++i */
-	  gimple_stmt_iterator gsi = gsi_start_bb (e->src);
-	  if (gsi_end_p (gsi))
-	    continue;
-
+	  /* Get the idx from last stmt (the gcond) of e->src.  */
 	  gimple *gc = last_stmt (e->src);
+	  gcc_assert (gimple_code (gc) == GIMPLE_COND);
 	  tree idx = gimple_cond_lhs (gc);
 	  if (expr_invariant_in_loop_p (loop, idx))
 	    idx = gimple_cond_rhs (gc);
 
+	  tree next = PHI_ARG_DEF_FROM_EDGE (phi, loop_latch_edge (loop));
+	  tree prev = PHI_RESULT (phi);
+	  if (idx != prev && idx != next)
+	    continue;
+
+	  /* ++i or ++i */
+	  gimple_stmt_iterator gsi
+	    = gsi_start_nondebug_after_labels_bb (e->src);
+	  if (gsi_end_p (gsi))
+	    continue;
+
 	  gimple *s1 = gsi_stmt (gsi);
-	  if (!(is_gimple_assign (s1) && idx
-		&& (idx == gimple_assign_lhs (s1)
-		    || idx == gimple_assign_rhs1 (s1))))
+	  if (!is_gimple_assign (s1) || gimple_assign_lhs (s1) != next
+	      || gimple_assign_rhs1 (s1) != prev)
 	    continue;
 
 	  gsi_next (&gsi);
@@ -1730,6 +1741,8 @@ split_ne_loop (struct loop *loop, edge cond_e)
 L_H:
  if (i!=N)
    S;
+ else
+   goto EXIT;
  i++;
  goto L_H;
 
@@ -1738,11 +1751,15 @@ The "i!=N" is like "i>N || i<N", then it could be transform to:
 L_H:
  if (i>N)
    S;
+ else
+   goto EXIT;
  i++;
  goto L_H;
 L1_H:
  if (i<N)
    S;
+ else
+   goto EXIT;
  i++;
  goto L1_H;
 
