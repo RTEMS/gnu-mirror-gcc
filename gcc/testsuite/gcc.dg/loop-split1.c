@@ -88,15 +88,6 @@ void foo4(unsigned n,  unsigned i)
 }
 
 unsigned
-foo5 (double *a, unsigned n, unsigned i)
-{
-  while (a[i] > 0 && i != n)
-    i++;
-
-  return i;
-}
-
-unsigned
 find_skip_diff (char *p, char *q, unsigned n, unsigned i)
 {
   while (p[i] == q[i] && ++i != n)
@@ -105,4 +96,4 @@ find_skip_diff (char *p, char *q, unsigned n, unsigned i)
   return i;
 }
 
-/* { dg-final { scan-tree-dump-times "Loop split" 9 "lsplit" } } */
+/* { dg-final { scan-tree-dump-times "Loop split" 8 "lsplit" } } */
