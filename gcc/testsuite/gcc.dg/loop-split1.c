@@ -5,21 +5,21 @@ void
 foo (int *a, int *b, unsigned l, unsigned n)
 {
   while (++l != n)
-    a[l] = b[l]  + 1;
+    a[l] = b[l] + 1;
 }
 void
 foo_1 (int *a, int *b, unsigned n)
 {
   unsigned l = 0;
   while (++l != n)
-    a[l] = b[l]  + 1;
+    a[l] = b[l] + 1;
 }
 
 void
 foo1 (int *a, int *b, unsigned l, unsigned n)
 {
   while (l++ != n)
-    a[l] = b[l]  + 1;
+    a[l] = b[l] + 1;
 }
 
 /* No wrap.  */
@@ -28,7 +28,7 @@ foo1_1 (int *a, int *b, unsigned n)
 {
   unsigned l = 0;
   while (l++ != n)
-    a[l] = b[l]  + 1;
+    a[l] = b[l] + 1;
 }
 
 unsigned
@@ -74,14 +74,16 @@ foo3_1 (char *a, char *b, unsigned l, unsigned n)
   return l;
 }
 
-void bar();
-void foo4(unsigned n,  unsigned i)
+void
+bar ();
+void
+foo4 (unsigned n, unsigned i)
 {
   do
     {
       if (i == n)
-        return;
-      bar();
+	return;
+      bar ();
       ++i;
     }
   while (1);
@@ -91,7 +93,7 @@ unsigned
 find_skip_diff (char *p, char *q, unsigned n, unsigned i)
 {
   while (p[i] == q[i] && ++i != n)
-    p++,q++;
+    p++, q++;
 
   return i;
 }
