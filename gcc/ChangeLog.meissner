@@ -1,3 +1,11 @@
+work053.patch016:
+2021-06-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (udivti3): New insn.
+	(divti3): New insn.
+	(umodti3): New insn.
+	(modti3): New insn.
+
 work053.patch015:
 2021-05-25  Michael Meissner  <meissner@linux.ibm.com>
 
