@@ -3765,6 +3765,8 @@ arm_option_reconfigure_globals (void)
 	error ("selected fp16 options are incompatible");
       arm_fp16_format = ARM_FP16_FORMAT_IEEE;
     }
+  else
+    arm_fp16_format = ARM_FP16_FORMAT_NONE;
 
   arm_arch_cde = 0;
   arm_arch_cde_coproc = 0;
