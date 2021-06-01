@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-options "-O3 -fdump-tree-lsplit-details" } */
+/* { dg-options "-O3" } */
 
 extern void abort (void);
 extern void exit (int);
@@ -45,7 +45,7 @@ int main()
 
   foo (a, b, 99, 99);
   a[99] = b[99] + 1;
-  for (int i = 0; i < 127; i++)
+  for (int i = 0; i < 256; i++)
     if (a[i] != b[i] + 1)
       abort();
 
