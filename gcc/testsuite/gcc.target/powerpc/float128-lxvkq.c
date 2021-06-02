@@ -1,6 +1,6 @@
 /* { dg-require-effective-target ppc_float128_hw } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -O2" } */
+/* { dg-options "-mdejagnu-cpu=power10 -O2 -fno-ident" } */
 
 /* Test whether the LXVKQ instruction is generated to load special IEEE 128-bit
    constants.  */
