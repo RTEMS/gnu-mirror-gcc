@@ -1,3 +1,66 @@
+work053.patch017:
+2021-06-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/93230
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Remove
+	support for handling MEM, users call rs6000_adjust_vec_address
+	directly.
+	* config/rs6000/vsx.md (VSX_EX_FL): New mode attribute.
+	(vsx_extract_v4sf_<mode>_load): Rename to vsx_extract_v4sf_load.
+	(vsx_extract_v4sf_to_df_load): New insn to combine vec_extract of
+	SFmode from memory being converted to DFmode.
+	(vsx_extract_v4si_<su><mode>_load): New insn to support V4SI
+	vec_extract from memory being converted to DImode directly without
+	an extra sign/zero extension.
+	(vsx_extract_v8hi_<su><mode>_load): New insn to support V8HI
+	vec_extract from memory being converted to DImode directly without
+	an extra sign/zero extension.
+	(vsx_extract_v16qi_u<mode>_load): New insn to support V16QI
+	vec_extract from memory being converted to DImode directly without
+	an extra zero extension.
+	(vsx_extract_v4si_var_load): Split V4SI extract from other small
+	integers, and add support for loading up vector registers with
+	sign/zero extension directly.
+	(vsx_extract_<mode>_var_load, VSX_EXTRACT_I2 iterator): Split
+	V8HI/V16QI vector extract from memory to handle loading vector
+	registers in addition to GPR registers.
+	(vsx_extract_<mode>_uns_di_var): New insn to optimize extracting a
+	small integer from a vector in a register and zero extending it to
+	DImode.
+	(vsx_extract_v4si_<su><mode>_var_load): New insns to support
+	combining a V4SI variable vector extract from memory with sign or
+	zero extension.
+	(vsx_extract_v8hi_<su><mode>_var_load): New insns to support
+	combining a V8HI variable vector extract from memory with sign or
+	zero extension.
+	(vsx_extract_v4si_u<mode>_var_load): New insns to support
+	combining a V16QI variable vector extract from memory with zero
+	extension.
+	(vsx_ext_v4si_fl_<mode>_load): New insn to support a V4SI vector
+	extract that is converted to floating point to avoid doing a
+	direct move.
+	(vsx_ext_v4si_ufl_<mode>_load):  New insn to support an unsigned
+	V4SI vector extract that is converted to floating point to avoid
+	doing a direct move.
+	(vsx_ext_v4si_fl_<mode>_var_load): New insn to support a V4SI
+	variable vector extract that is converted to floating point to
+	avoid doing a direct move.
+	(vsx_ext_v4si_ufl_<mode>_var_load): New insn to support an
+	unsigned V4SI variable vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_load): New insns
+	to support a V8HI/V16QI vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_load): New insns
+	to support an unsigned V8HI/V16QI vector extract that is converted
+	to floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_vl): New insns to
+	support a variable V8HI/V16QI vector extract that is converted to
+	floating point to avoid doing a direct move.
+	(vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_vl): New insns
+	to support an unsigned variable V8HI/V16QI vector extract that is
+	converted to floating point to avoid doing a direct move.
+
 work053.patch016:
 2021-06-01  Michael Meissner  <meissner@linux.ibm.com>
 
