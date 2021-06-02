@@ -1610,6 +1610,39 @@ get_ne_cond_branch (struct loop *loop)
   auto_vec<edge> edges = get_loop_exit_edges (loop);
   FOR_EACH_VEC_ELT (edges, i, e)
     {
+      basic_block bb = e->src;
+
+      /* Check if exit at gcond.  */
+      gimple *last = last_stmt (bb);
+      if (!last || gimple_code (last) != GIMPLE_COND)
+	continue;
+      gcond *cond = as_a<gcond *> (last);
+      enum tree_code code = gimple_cond_code (cond);
+      if (!(code == NE_EXPR
+	    || (code == EQ_EXPR && (e->flags & EDGE_TRUE_VALUE))))
+	continue;
+
+      /* Check if bound is invarant.  */
+      tree idx = gimple_cond_lhs (cond);
+      tree bnd = gimple_cond_rhs (cond);
+      if (expr_invariant_in_loop_p (loop, idx))
+	std::swap (idx, bnd);
+      else if (!expr_invariant_in_loop_p (loop, bnd))
+	continue;
+
+      /* Only unsigned type conversion could cause wrap.  */
+      tree type = TREE_TYPE (idx);
+      if (!INTEGRAL_TYPE_P (type) || TREE_CODE (idx) != SSA_NAME
+	  || !TYPE_UNSIGNED (type))
+	continue;
+
+      /* Avoid to split if bound is MAX/MIN val.  */
+      tree bound_type = TREE_TYPE (bnd);
+      if (TREE_CODE (bnd) == INTEGER_CST && INTEGRAL_TYPE_P (bound_type)
+	  && (bnd == TYPE_MAX_VALUE (bound_type)
+	      || bnd == TYPE_MIN_VALUE (bound_type)))
+	continue;
+
       /* Check if there is possible wrap.  */
       class tree_niter_desc niter;
       if (!number_of_iterations_exit (loop, e, &niter, false, false))
@@ -1623,7 +1656,7 @@ get_ne_cond_branch (struct loop *loop)
 	 the split loops: just jump from the exit edge of one loop to the
 	 header of new loop.  */
       if (single_pred_p (loop->latch)
-	  && single_pred_edge (loop->latch)->src == e->src
+	  && single_pred_edge (loop->latch)->src == bb
 	  && empty_block_p (loop->latch))
 	return e;
 
@@ -1631,10 +1664,10 @@ get_ne_cond_branch (struct loop *loop)
 	 only, it is simple to link the split loops:  jump from the end of
 	 one loop header to the new loop header, and use unchanged PHI
 	 result of first loop as the entry PHI value of the second loop.  */
-      if (e->src == loop->header)
+      if (bb == loop->header)
 	{
 	  /* Only one phi.  */
-	  gphi_iterator psi = gsi_start_phis (e->src);
+	  gphi_iterator psi = gsi_start_phis (bb);
 	  if (gsi_end_p (psi))
 	    continue;
 	  gphi *phi = psi.phi ();
@@ -1642,8 +1675,8 @@ get_ne_cond_branch (struct loop *loop)
 	  if (!gsi_end_p (psi))
 	    continue;
 
-	  /* Get the idx from last stmt (the gcond) of e->src.  */
-	  gimple *gc = last_stmt (e->src);
+	  /* Get the idx from last stmt (the gcond) of bb.  */
+	  gimple *gc = last_stmt (bb);
 	  gcc_assert (gimple_code (gc) == GIMPLE_COND);
 	  tree idx = gimple_cond_lhs (gc);
 	  if (expr_invariant_in_loop_p (loop, idx))
@@ -1656,7 +1689,7 @@ get_ne_cond_branch (struct loop *loop)
 
 	  /* ++i or ++i */
 	  gimple_stmt_iterator gsi
-	    = gsi_start_nondebug_after_labels_bb (e->src);
+	    = gsi_start_nondebug_after_labels_bb (bb);
 	  if (gsi_end_p (gsi))
 	    continue;
 
