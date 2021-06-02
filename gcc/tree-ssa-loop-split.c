@@ -1675,31 +1675,23 @@ get_ne_cond_branch (struct loop *loop)
 	  if (!gsi_end_p (psi))
 	    continue;
 
-	  /* Get the idx from last stmt (the gcond) of bb.  */
-	  gimple *gc = last_stmt (bb);
-	  gcc_assert (gimple_code (gc) == GIMPLE_COND);
-	  tree idx = gimple_cond_lhs (gc);
-	  if (expr_invariant_in_loop_p (loop, idx))
-	    idx = gimple_cond_rhs (gc);
-
+	  /* Check it is ++i or ++i */
 	  tree next = PHI_ARG_DEF_FROM_EDGE (phi, loop_latch_edge (loop));
 	  tree prev = PHI_RESULT (phi);
 	  if (idx != prev && idx != next)
 	    continue;
 
-	  /* ++i or ++i */
 	  gimple_stmt_iterator gsi
 	    = gsi_start_nondebug_after_labels_bb (bb);
 	  if (gsi_end_p (gsi))
 	    continue;
-
 	  gimple *s1 = gsi_stmt (gsi);
 	  if (!is_gimple_assign (s1) || gimple_assign_lhs (s1) != next
 	      || gimple_assign_rhs1 (s1) != prev)
 	    continue;
 
 	  gsi_next (&gsi);
-	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == gc)
+	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == cond)
 	    return e;
 	}
     }
@@ -1741,7 +1733,7 @@ split_ne_loop (struct loop *loop, edge cond_e)
   gcond *break_cond = as_a<gcond *> (gimple_copy (gc));
   edge pred_e = single_pred_edge (loop->latch);
   bool simple_loop = pred_e && pred_e->src == cond_e->src
-		     && (gsi_end_p (gsi_start_nondebug_bb (loop->latch)));
+		     && empty_block_p (loop->latch);
   if (simple_loop)
     gimple_cond_set_code (break_cond, down_code);
   else
