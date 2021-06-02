@@ -5057,6 +5057,11 @@ case "${target}" in
 			      "\"%(link_os_new_dtags)" \
 			      "-rpath $prefix/lib -rpath $at/lib\""
 			 echo
+			 echo "#undef  LINK_OS_EXTRA_SPEC64"
+			 echo "#define LINK_OS_EXTRA_SPEC64" \
+			      "\"%(link_os_new_dtags)" \
+			      "-rpath $prefix/lib64 -rpath $at/lib64\""
+			 echo
 			 echo "#undef  LINK_OS_NEW_DTAGS_SPEC"
 			 echo "#define LINK_OS_NEW_DTAGS_SPEC" \
 			      "\"--enable-new-dtags\""
