@@ -1594,9 +1594,63 @@ split_loop_on_cond (struct loop *loop)
   return do_split;
 }
 
+/* Filter out type conversions on IDX.
+
+    i = phi (b, n)
+    ...
+    n0 = ik + 1
+    n1 = (type)n0
+    ...
+    if (i != bnd) or if (n != bnd)
+    ...
+    n = ()nl 
+
+   IDX is the i' or n'.
+
+   Store the shortest type during conversion to SMALL_TYPE.
+   Store the longest type during conversion to LARGE_TYPE.  */
+
+static gimple *
+filter_conversions (class loop *loop, tree idx, tree *small_type = NULL,
+		    tree *large_type = NULL)
+{
+  gimple *stmt = SSA_NAME_DEF_STMT (idx);
+  while (is_gimple_assign (stmt)
+	 && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
+    {
+      if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt)))
+	{
+	  idx = gimple_assign_rhs1 (stmt);
+	  if (small_type)
+	    {
+	      tree type = TREE_TYPE (idx);
+	      if (TYPE_PRECISION (*small_type) > TYPE_PRECISION (type)
+		  || (TYPE_PRECISION (*small_type) == TYPE_PRECISION (type)
+		      && TYPE_UNSIGNED (*small_type) && !TYPE_UNSIGNED (type)))
+		*small_type = type;
+	    }
+	  if (large_type)
+	    {
+	      tree type = TREE_TYPE (idx);
+	      if (TYPE_PRECISION (*large_type) < TYPE_PRECISION (type)
+		  || (TYPE_PRECISION (*large_type) == TYPE_PRECISION (type)
+		      && !TYPE_UNSIGNED (*large_type) && TYPE_UNSIGNED (type)))
+		*large_type = type;
+	    }
+	}
+      else
+	break;
+
+      if (TREE_CODE (idx) != SSA_NAME)
+	break;
+      stmt = SSA_NAME_DEF_STMT (idx);
+    }
+  return stmt;
+}
+
 /* Check if the loop is possible to wrap at index.
    Return the assumption under which the wrap will not happen.
-   Return NULL_TREE, if overflow/wrap will not happen.  */
+   Return NULL_TREE, if wrap will not happen.  */
 
 static tree
 get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
@@ -1648,60 +1702,38 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
       if (TREE_CODE (idx) != SSA_NAME)
 	continue;
       
-      /* Filter conversion from idx.  */
-      int inc_cnt = 0;
-      tree small_type = TREE_TYPE (idx);
-      tree large_type = small_type;
-      gimple *stmt = SSA_NAME_DEF_STMT (idx);
-      while (is_gimple_assign (stmt)
-	     && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
-	{
-	  enum tree_code code = gimple_assign_rhs_code (stmt);
-	  if (CONVERT_EXPR_CODE_P (code))
-	    {
-	      idx = gimple_assign_rhs1 (stmt);
-	      tree type = TREE_TYPE (idx);
-	      if (TYPE_PRECISION (small_type) > TYPE_PRECISION (type)
-		  || (TYPE_PRECISION (small_type) == TYPE_PRECISION (type)
-		      && TYPE_UNSIGNED (small_type) && !TYPE_UNSIGNED (type)))
-		small_type = type;
-	      if (TYPE_PRECISION (large_type) < TYPE_PRECISION (type)
-		  || (TYPE_PRECISION (large_type) == TYPE_PRECISION (type)
-		      && !TYPE_UNSIGNED (large_type) && TYPE_UNSIGNED (type)))
-		large_type = type;
-	    }
-	  else if (PLUS_EXPR == code
-		   && integer_onep (gimple_assign_rhs2 (stmt)))
-	    {
-	      idx = gimple_assign_rhs1 (stmt);
-
-	      /* At most one increament stmt. */
-	      inc_cnt++;
-	      if (inc_cnt > 1)
-		break;
-	    }
-	  else
-	    break;
-
-	  if (TREE_CODE (idx) != SSA_NAME)
-	    break;
-	  stmt = SSA_NAME_DEF_STMT (idx);
-	}
-
-      /* At last it should a PHI which is iv.  */
+      /* Get the phi for idx.  */
+      gimple *stmt = filter_conversions (loop, idx);
+      if (is_gimple_assign (stmt))
+	stmt = filter_conversions (loop, gimple_assign_rhs1 (stmt));
       if (gimple_code (stmt) != GIMPLE_PHI)
 	continue;
-      *idx_phi = as_a<gphi *> (stmt);
+      *idx_phi = as_a <gphi *> (stmt);
 
       /* Check if idx is iv with base and step.  */
       affine_iv iv;
       tree iv_niters = NULL_TREE;
+      idx = PHI_RESULT (*idx_phi);
       if (!simple_iv_with_niters (loop, loop_containing_stmt (gc), idx, &iv,
 				  &iv_niters, false))
 	continue;
       if (!iv.base || !iv.step || !integer_onep (iv.step))
 	continue;
 
+      /* If there is conversions on idx,
+	 Get the longest and shortest type during converting.  */
+      tree next = PHI_ARG_DEF_FROM_EDGE (*idx_phi, loop_latch_edge (loop));
+      tree small_type = TREE_TYPE (next);
+      tree large_type = small_type;
+      stmt = filter_conversions (loop, next, &small_type, &large_type);
+      if (!is_gimple_assign (stmt)
+	  || gimple_assign_rhs_code (stmt) != PLUS_EXPR
+	  || !flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
+	continue;
+      tree prev = gimple_assign_rhs1 (stmt);
+      stmt = filter_conversions (loop, prev, &small_type, &large_type);
+
+      /* Update the type of bae, bound and the max value of boundary.  */
       tree base = iv.base;
       tree maxv = TYPE_MAX_VALUE (small_type);
       if (large_type != TREE_TYPE (base))
@@ -1711,20 +1743,22 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
       if (large_type != small_type)
 	maxv = fold_convert (large_type, maxv);
 
-      /* for "< or <=", only check if bnd <= max value of idx type.  */
-      tree no_wrap = fold_build2 (LE_EXPR, boolean_type_node, bnd, maxv);
-      /* for "!=", and check if base <= bnd.  */
+      /* for "< or <=", there is no wrap if bnd <= max value.  */
+      tree no_wrap_assump = fold_build2 (LE_EXPR, boolean_type_node, bnd, maxv);
+
+      /* for "!=", to make sure there is no wrap, beside bnd <= max,
+	 base <= bnd is also required.  */
       if (code == NE_EXPR)
-	no_wrap
-	  = fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap,
+	no_wrap_assump
+	  = fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap_assump,
 			 fold_build2 (LE_EXPR, boolean_type_node, base, bnd));
 
-      /* Check if it is sure wrap or no wrap.  */
-      if (integer_zerop (no_wrap) || integer_onep (no_wrap))
+      /* Check if 100% sure wrap or no wrap.  */
+      if (integer_zerop (no_wrap_assump) || integer_onep (no_wrap_assump))
 	continue;
 
       *exit = e;
-      return no_wrap;
+      return no_wrap_assump;
     }
 
   return NULL_TREE;
@@ -1735,41 +1769,7 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 static bool
 update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
 {
-  /* Filter type conversion
-    i = phi (b, n)
-    ..
-    n0 = ik + 1
-    n1 = (type)n0
-    if (i != bnd) or if (n != bnd)
-    ..
-    n = ()nl */
-  auto convert_src = [&loop](tree idx) -> gimple * {
-    gimple *stmt = SSA_NAME_DEF_STMT (idx);
-    while (is_gimple_assign (stmt)
-	   && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
-      {
-	if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt)))
-	  idx = gimple_assign_rhs1 (stmt);
-	else
-	  break;
-
-	if (TREE_CODE (idx) != SSA_NAME)
-	  break;
-	stmt = SSA_NAME_DEF_STMT (idx);
-      }
-    return stmt;
-  };
-
-  /* Get increase statement.  */
-  edge latch_e = loop_latch_edge (loop);
-  tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
-  gimple *inc_stmt = convert_src (next);
-  if (!is_gimple_assign (inc_stmt)
-      || gimple_assign_rhs_code (inc_stmt) != PLUS_EXPR
-      || !flow_bb_inside_loop_p (loop, gimple_bb (inc_stmt)))
-    return false;
-
-  /* Check gcond stmt for bnd and idx/next.  */
+  /* Get bnd and idx from gcond.  */
   gcond *gc = as_a<gcond *> (last);
   tree bnd = gimple_cond_rhs (gc);
   tree idx = gimple_cond_lhs (gc);
@@ -1780,10 +1780,32 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
       std::swap (idx, bnd);
     }
 
-  gimple *stmt = convert_src (idx);
-  bool cmp_next = stmt == inc_stmt;
+  edge latch_e = loop_latch_edge (loop);
+  tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
+
+  /* Get increasement stmt: next = prev + 1.
+     And check the exit gcond is comparing on the prev or next.  */
+  gimple *inc_stmt = NULL;
+  bool cmp_next = false;
+  gimple *stmt = filter_conversions (loop, idx);
+  if (gimple_code (stmt) == GIMPLE_PHI)
+    {
+      inc_stmt = filter_conversions (loop, next);
+      cmp_next = false;
+    }
+  else
+    {
+      inc_stmt = stmt;
+      cmp_next = true;
+    }
+
+  if (!is_gimple_assign (inc_stmt)
+      || gimple_assign_rhs_code (inc_stmt) != PLUS_EXPR
+      || !flow_bb_inside_loop_p (loop, gimple_bb (inc_stmt)))
+    return false;
+
   
-  /* Use sizetype as machine fast type, ok for all targets?  */
+  /* Use sizetype as machine fast type, ok for most targets?  */
   tree fast_type = sizetype;
 
   /* New base and new bound.  */
@@ -1825,6 +1847,8 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
   gimple_cond_set_rhs (gc, inv ? cmp_idx : new_bnd);
   update_stmt (gc);
 
+  /* next = (next type)new_next
+     And remove next = prev + 1.  */
   tree type = TREE_TYPE (next);
   stmt = gimple_build_assign (next, fold_convert (type, new_next));
   gsi = gsi_for_stmt (inc_stmt);
@@ -1833,6 +1857,8 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
   gsi = gsi_for_stmt (inc_stmt);
   gsi_remove (&gsi, true);
 
+  /* prev = (prev type)new_prev
+     And remove prev = phi.  */
   idx = PHI_RESULT (idx_phi);
   type = TREE_TYPE (idx);
   stmt = gimple_build_assign (idx, fold_convert (type, new_idx));
@@ -1845,8 +1871,8 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
   return true;
 }
 
-/* Split out a new loop which would not wrap/overflow,
-   under the guard that WRAP_ASSUMPTION will not be true. */
+/* Split out a new loop which would not wrap,
+   under the guard that NO_WRAP_COND will not be true. */
 
 static bool
 split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
@@ -1889,16 +1915,17 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
 }
 
 /* Split loop if there is possible wrap.
-   For example: transform
+   For example:
+   transform
 
-  void
-  foo (int *a, int *b, unsigned l, unsigned u_n)
-  {
-    while (++l != u_n)
-      a[l] = b[l]  + 1;
-  }
+    void
+    foo (int *a, int *b, unsigned l, unsigned u_n)
+    {
+      while (++l != u_n)
+        a[l] = b[l]  + 1;
+    }
 
-  to:
+   to:
     if (l < u_n)
     {
       int li = l;
