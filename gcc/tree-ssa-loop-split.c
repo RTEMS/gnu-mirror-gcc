@@ -1681,8 +1681,7 @@ get_ne_cond_branch (struct loop *loop)
 	  if (idx != prev && idx != next)
 	    continue;
 
-	  gimple_stmt_iterator gsi
-	    = gsi_start_nondebug_after_labels_bb (bb);
+	  gimple_stmt_iterator gsi = gsi_start_nondebug_after_labels_bb (bb);
 	  if (gsi_end_p (gsi))
 	    continue;
 	  gimple *s1 = gsi_stmt (gsi);
@@ -1732,8 +1731,8 @@ split_ne_loop (struct loop *loop, edge cond_e)
   /* Link the exit cond edge to new loop.  */
   gcond *break_cond = as_a<gcond *> (gimple_copy (gc));
   edge pred_e = single_pred_edge (loop->latch);
-  bool simple_loop = pred_e && pred_e->src == cond_e->src
-		     && empty_block_p (loop->latch);
+  bool simple_loop
+    = pred_e && pred_e->src == cond_e->src && empty_block_p (loop->latch);
   if (simple_loop)
     gimple_cond_set_code (break_cond, down_code);
   else
