@@ -1653,7 +1653,7 @@ filter_conversions (class loop *loop, tree idx, tree *small_type = NULL,
    Return NULL_TREE, if wrap will not happen.  */
 
 static tree
-get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
+get_wrap_assumption (class loop *loop, edge *exit)
 {
   int i;
   edge e;
@@ -1708,12 +1708,12 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 	stmt = filter_conversions (loop, gimple_assign_rhs1 (stmt));
       if (gimple_code (stmt) != GIMPLE_PHI)
 	continue;
-      *idx_phi = as_a <gphi *> (stmt);
+      gphi *idx_phi = as_a<gphi *> (stmt);
 
       /* Check if idx is iv with base and step.  */
       affine_iv iv;
       tree iv_niters = NULL_TREE;
-      idx = PHI_RESULT (*idx_phi);
+      idx = PHI_RESULT (idx_phi);
       if (!simple_iv_with_niters (loop, loop_containing_stmt (gc), idx, &iv,
 				  &iv_niters, false))
 	continue;
@@ -1722,7 +1722,7 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 
       /* If there is conversions on idx,
 	 Get the longest and shortest type during converting.  */
-      tree next = PHI_ARG_DEF_FROM_EDGE (*idx_phi, loop_latch_edge (loop));
+      tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, loop_latch_edge (loop));
       tree small_type = TREE_TYPE (next);
       tree large_type = small_type;
       stmt = filter_conversions (loop, next, &small_type, &large_type);
@@ -1753,8 +1753,7 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 	  = fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap_assump,
 			 fold_build2 (LE_EXPR, boolean_type_node, base, bnd));
 
-      /* Check if 100% sure wrap or no wrap.  */
-      if (integer_zerop (no_wrap_assump) || integer_onep (no_wrap_assump))
+      if (integer_zerop (no_wrap_assump))
 	continue;
 
       *exit = e;
@@ -1767,9 +1766,12 @@ get_wrap_assumption (class loop *loop, edge *exit, gphi **idx_phi)
 /*  Update the idx and bnd with faster type for no wrap/oveflow loop.  */
 
 static bool
-update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
+update_idx_bnd_type (class loop *loop, edge e)
 {
   /* Get bnd and idx from gcond.  */
+  gimple *last = last_stmt (e->src);
+  if (!last || gimple_code (last) != GIMPLE_COND)
+    return false;
   gcond *gc = as_a<gcond *> (last);
   tree bnd = gimple_cond_rhs (gc);
   tree idx = gimple_cond_lhs (gc);
@@ -1780,8 +1782,9 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
       std::swap (idx, bnd);
     }
 
+  gphi *idx_phi;
+  tree next;
   edge latch_e = loop_latch_edge (loop);
-  tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
 
   /* Get increasement stmt: next = prev + 1.
      And check the exit gcond is comparing on the prev or next.  */
@@ -1790,21 +1793,29 @@ update_idx_bnd_type (class loop *loop, gimple *last, gphi *idx_phi)
   gimple *stmt = filter_conversions (loop, idx);
   if (gimple_code (stmt) == GIMPLE_PHI)
     {
+      idx_phi = as_a <gphi *> (stmt);
+      next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
       inc_stmt = filter_conversions (loop, next);
       cmp_next = false;
     }
   else
     {
       inc_stmt = stmt;
+      if (!is_gimple_assign (inc_stmt))
+	return false;
+      stmt = filter_conversions (loop, gimple_assign_rhs1 (stmt));
+      if (gimple_code (stmt) != GIMPLE_PHI)
+	return false;
+      idx_phi = as_a<gphi *> (stmt);
       cmp_next = true;
     }
 
   if (!is_gimple_assign (inc_stmt)
       || gimple_assign_rhs_code (inc_stmt) != PLUS_EXPR
-      || !flow_bb_inside_loop_p (loop, gimple_bb (inc_stmt)))
-    return false;
+      || !flow_bb_inside_loop_p (loop, gimple_bb (inc_stmt))
+      || gimple_bb (idx_phi) != loop->header)
+    return false;  
 
-  
   /* Use sizetype as machine fast type, ok for most targets?  */
   tree fast_type = sizetype;
 
@@ -1961,13 +1972,13 @@ split_loop_on_wrap (class loop *loop)
   free (bbs);
 
   edge e;
-  gphi *idx_phi;
-  tree assumption = get_wrap_assumption (loop, &e, &idx_phi);
+  tree no_wrap_assumption = get_wrap_assumption (loop, &e);
 
-  if (assumption && split_wrap_boundary (loop, e, assumption))
+  if (no_wrap_assumption
+      && (integer_onep (no_wrap_assumption)
+	  || split_wrap_boundary (loop, e, no_wrap_assumption)))
     {
-      //      rewrite_into_loop_closed_ssa (NULL, TODO_update_ssa);      
-      update_idx_bnd_type (loop, last_stmt (e->src), idx_phi);
+      update_idx_bnd_type (loop, e);
       return true;
     }
 
