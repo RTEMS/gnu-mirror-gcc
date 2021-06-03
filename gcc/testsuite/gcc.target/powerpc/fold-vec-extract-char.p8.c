@@ -21,7 +21,7 @@
 /* { dg-final { scan-assembler-times {\msrdi\M} 3 { target lp64 } } } */
 /* { dg-final { scan-assembler-times "extsb" 2 } } */
 /* { dg-final { scan-assembler-times {\mvspltb\M} 3 { target lp64 } } } */
-/* { dg-final { scan-assembler-times {\mrlwinm\M} 4 { target lp64 } } } */
+/* { dg-final { scan-assembler-times {\mrlwinm\M} 2 { target lp64 } } } */
 
 /* multiple codegen variations for -m32. */
 /* { dg-final { scan-assembler-times {\mrlwinm\M} 3 { target ilp32 } } } */
