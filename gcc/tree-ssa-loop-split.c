@@ -1614,6 +1614,7 @@ static gimple *
 filter_conversions (class loop *loop, tree idx, tree *small_type = NULL,
 		    tree *large_type = NULL)
 {
+  gcc_assert (TREE_CODE (idx) == SSA_NAME);
   gimple *stmt = SSA_NAME_DEF_STMT (idx);
   while (is_gimple_assign (stmt)
 	 && flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
@@ -1705,10 +1706,18 @@ get_wrap_assumption (class loop *loop, edge *exit)
       /* Get the phi for idx.  */
       gimple *stmt = filter_conversions (loop, idx);
       if (is_gimple_assign (stmt))
-	stmt = filter_conversions (loop, gimple_assign_rhs1 (stmt));
-      if (gimple_code (stmt) != GIMPLE_PHI)
+	{
+	  tree rhs = gimple_assign_rhs1 (stmt);
+	  if (TREE_CODE (rhs) != SSA_NAME)
+	    continue;
+	  stmt = filter_conversions (loop, rhs);
+	}
+      if (gimple_code (stmt) != GIMPLE_PHI || gimple_bb (stmt) != loop->header)
 	continue;
       gphi *idx_phi = as_a<gphi *> (stmt);
+      tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, loop_latch_edge (loop));
+      if (TREE_CODE (next) != SSA_NAME)
+	continue;
 
       /* Check if idx is iv with base and step.  */
       affine_iv iv;
@@ -1722,7 +1731,6 @@ get_wrap_assumption (class loop *loop, edge *exit)
 
       /* If there is conversions on idx,
 	 Get the longest and shortest type during converting.  */
-      tree next = PHI_ARG_DEF_FROM_EDGE (idx_phi, loop_latch_edge (loop));
       tree small_type = TREE_TYPE (next);
       tree large_type = small_type;
       stmt = filter_conversions (loop, next, &small_type, &large_type);
@@ -1731,6 +1739,8 @@ get_wrap_assumption (class loop *loop, edge *exit)
 	  || !flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
 	continue;
       tree prev = gimple_assign_rhs1 (stmt);
+      if (TREE_CODE (prev) != SSA_NAME)
+	continue;
       stmt = filter_conversions (loop, prev, &small_type, &large_type);
 
       /* Update the type of bae, bound and the max value of boundary.  */
@@ -1768,6 +1778,7 @@ get_wrap_assumption (class loop *loop, edge *exit)
 static bool
 update_idx_bnd_type (class loop *loop, edge e)
 {
+  return false;
   /* Get bnd and idx from gcond.  */
   gimple *last = last_stmt (e->src);
   if (!last || gimple_code (last) != GIMPLE_COND)
@@ -1790,11 +1801,13 @@ update_idx_bnd_type (class loop *loop, edge e)
      And check the exit gcond is comparing on the prev or next.  */
   gimple *inc_stmt = NULL;
   bool cmp_next = false;
+  gcc_assert (TREE_CODE (idx) == SSA_NAME);  
   gimple *stmt = filter_conversions (loop, idx);
   if (gimple_code (stmt) == GIMPLE_PHI)
     {
       idx_phi = as_a <gphi *> (stmt);
       next = PHI_ARG_DEF_FROM_EDGE (idx_phi, latch_e);
+      gcc_assert (TREE_CODE (next) == SSA_NAME);
       inc_stmt = filter_conversions (loop, next);
       cmp_next = false;
     }
@@ -1803,7 +1816,9 @@ update_idx_bnd_type (class loop *loop, edge e)
       inc_stmt = stmt;
       if (!is_gimple_assign (inc_stmt))
 	return false;
-      stmt = filter_conversions (loop, gimple_assign_rhs1 (stmt));
+      tree rhs =  gimple_assign_rhs1 (stmt);
+      gcc_assert (TREE_CODE (rhs) == SSA_NAME);
+      stmt = filter_conversions (loop, rhs);
       if (gimple_code (stmt) != GIMPLE_PHI)
 	return false;
       idx_phi = as_a<gphi *> (stmt);
