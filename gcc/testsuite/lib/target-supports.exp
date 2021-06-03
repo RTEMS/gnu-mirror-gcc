@@ -3520,6 +3520,7 @@ proc check_effective_target_vect_int { } {
 	 || [istarget ia64-*-*]
 	 || [istarget aarch64*-*-*]
 	 || [is-effective-target arm_neon]
+	 || [is-effective-target arm_v8_1m_mve_ok]
 	 || ([istarget mips*-*-*]
 	     && ([et-is-effective-target mips_loongson_mmi]
 	     || [et-is-effective-target mips_msa]))
