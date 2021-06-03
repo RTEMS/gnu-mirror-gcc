@@ -1639,8 +1639,8 @@ get_ne_cond_branch (struct loop *loop)
       /* Avoid to split if bound is MAX/MIN val.  */
       tree bound_type = TREE_TYPE (bnd);
       if (TREE_CODE (bnd) == INTEGER_CST && INTEGRAL_TYPE_P (bound_type)
-	  && (bnd == TYPE_MAX_VALUE (bound_type)
-	      || bnd == TYPE_MIN_VALUE (bound_type)))
+	  && (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bound_type))
+	      || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bound_type))))
 	continue;
 
       /* Check if there is possible wrap.  */
