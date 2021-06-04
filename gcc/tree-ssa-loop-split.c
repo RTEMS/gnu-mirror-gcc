@@ -1719,6 +1719,7 @@ split_ne_loop (struct loop *loop, edge cond_e)
 
   gcond *gc = as_a<gcond *> (last_stmt (cond_e->src));
   gcond *dup_gc = as_a<gcond *> (last_stmt (loop2_cond_exit_bb));
+
   /* Invert edges for gcond.  */
   if (gimple_cond_code (gc) == EQ_EXPR)
     {
@@ -1734,9 +1735,8 @@ split_ne_loop (struct loop *loop, edge cond_e)
       };
 
       invert_edge (gimple_bb (gc));
-      invert_edge (gimple_bb (dup_gc));      
+      invert_edge (gimple_bb (dup_gc));
     }
-  
 
   /* Change if (i != n) to LOOP1:if (i > n) and LOOP2:if (i < n) */
   bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
