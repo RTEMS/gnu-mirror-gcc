@@ -1,3 +1,9 @@
+work054.patch017:
+2021-06-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/99293
+	* config/rs6000/vsx.md (vsx_splat_extract_<mode): New insn.
+
 work054.patch016:
 2021-06-03  Michael Meissner  <meissner@linux.ibm.com>
 
