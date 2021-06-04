@@ -1689,7 +1689,7 @@ get_ne_cond_branch (struct loop *loop)
 	      || gimple_assign_rhs1 (s1) != prev)
 	    continue;
 
-	  gsi_next (&gsi);
+	  gsi_next_nondebug (&gsi);
 	  if (!gsi_end_p (gsi) && gsi_stmt (gsi) == cond)
 	    return e;
 	}
