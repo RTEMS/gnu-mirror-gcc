@@ -84,6 +84,7 @@ work054.patch014:
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
 	support for -mlxvkq.
 	(lxvkq_constant_p): New function.
+	(output_vec_const_move): Add support for generating lxvkq.
 	(rs6000_output_move_128bit): Add support for generating lxvkq.
 	(rs6000_opt_masks): Add -mlxvkq.
 	* config/rs6000/rs6000.opt (-mlxvkq): New option.
