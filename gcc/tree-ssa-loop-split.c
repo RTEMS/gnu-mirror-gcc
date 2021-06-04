@@ -1719,6 +1719,24 @@ split_ne_loop (struct loop *loop, edge cond_e)
 
   gcond *gc = as_a<gcond *> (last_stmt (cond_e->src));
   gcond *dup_gc = as_a<gcond *> (last_stmt (loop2_cond_exit_bb));
+  /* Invert edges for gcond.  */
+  if (gimple_cond_code (gc) == EQ_EXPR)
+    {
+      auto invert_edge = [](basic_block bb) {
+	edge out = EDGE_SUCC (bb, 0);
+	edge in = EDGE_SUCC (bb, 1);
+	if (in->flags & EDGE_TRUE_VALUE)
+	  std::swap (in, out);
+	in->flags |= EDGE_TRUE_VALUE;
+	in->flags &= ~EDGE_FALSE_VALUE;
+	out->flags |= EDGE_FALSE_VALUE;
+	out->flags &= ~EDGE_TRUE_VALUE;
+      };
+
+      invert_edge (gimple_bb (gc));
+      invert_edge (gimple_bb (dup_gc));      
+    }
+  
 
   /* Change if (i != n) to LOOP1:if (i > n) and LOOP2:if (i < n) */
   bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
