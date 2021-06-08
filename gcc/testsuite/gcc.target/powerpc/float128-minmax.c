@@ -1,7 +1,10 @@
 /* { dg-do compile { target lp64 } } */
-/* { dg-require-effective-target powerpc_p9vector_ok } */
+/* { dg-require-effective-target powerpc_p9vector_ok && ! has_arch_pwr10 } */
 /* { dg-require-effective-target float128 } */
-/* { dg-options "-mpower9-vector -O2 -ffast-math" } */
+/* { dg-options "-O2 -ffast-math" } */
+
+/* We don't run this test on power10 because power10 has instructions to
+   implement min/max directly.  */
 
 #ifndef TYPE
 #define TYPE _Float128
