@@ -1,5 +1,5 @@
 /* { dg-require-effective-target powerpc_p9vector_ok } */
-/* { dg-require-effective-target powerpc_float128_hw } */
+/* { dg-require-effective-target ppc_float128_hw } */
 /* { dg-options "-mpower9-vector -O2 -ffast-math" } */
 
 #ifndef TYPE
