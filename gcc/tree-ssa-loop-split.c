@@ -1667,9 +1667,15 @@ struct idx_elements
 bool
 analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
 {
+  /* Avoid complicated edge.  */
   if (e->flags & EDGE_FAKE)
     return false;
+  if (e->src != loop->header && e->src != single_pred (loop->latch))
+    return false;
+  if (!dominated_by_p (CDI_DOMINATORS, loop->latch, e->src))
+    return false;
 
+  /* Check gcond.  */
   gimple *last = last_stmt (e->src);
   if (!last || gimple_code (last) != GIMPLE_COND)
     return false;
@@ -1746,6 +1752,9 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 {
   int i;
   edge e;
+  if (!single_pred_p(loop->latch) || !empty_block_p (loop->latch))
+    return NULL_TREE;
+
   auto_vec<edge> edges = get_loop_exit_edges (loop);
   FOR_EACH_VEC_ELT (edges, i, e)
     {
@@ -1767,7 +1776,9 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
       enum tree_code code = gimple_cond_code (gc);
       if (bnd == gimple_cond_lhs (gc))
 	code = swap_tree_comparison (code);
-      if (code != NE_EXPR)
+      if ((e->flags & EDGE_TRUE_VALUE) && code == EQ_EXPR)
+	code = NE_EXPR;
+      if (code != NE_EXPR && code != LT_EXPR)
 	continue;
 
       /* Check if idx is iv with base and step.  */
@@ -1849,7 +1860,6 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
   new_code = inv ? GT_EXPR : LT_EXPR;
   if (code == EQ_EXPR)
     {
-      new_code = invert_tree_comparison (new_code, false);
       edge out = EDGE_SUCC (e->src, 0);
       edge in = EDGE_SUCC (e->src, 1);
       if (in->flags & EDGE_TRUE_VALUE)
@@ -1916,7 +1926,7 @@ split_loop_on_wrap (class loop *loop)
   tree no_wrap_assumption = get_wrap_assumption (loop, &e, data);
 
   if (no_wrap_assumption && split_wrap_boundary (loop, e, no_wrap_assumption))
-    return true;
+	return true;
 
   return false;
 }
