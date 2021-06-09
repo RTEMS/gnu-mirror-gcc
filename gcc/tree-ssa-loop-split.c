@@ -1602,7 +1602,7 @@ split_loop_on_cond (struct loop *loop)
    Return the branch edge which exit loop, if wrap may happen on "idx".  */
 
 static edge
-get_ne_cond_branch (struct loop *loop)
+get_ne_cond_branch (struct loop *loop, tree *step)
 {
   int i;
   edge e;
@@ -1638,9 +1638,8 @@ get_ne_cond_branch (struct loop *loop)
 
       /* Avoid to split if bound is MAX/MIN val.  */
       tree bound_type = TREE_TYPE (bnd);
-      if (TREE_CODE (bnd) == INTEGER_CST && INTEGRAL_TYPE_P (bound_type)
-	  && (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bound_type))
-	      || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bound_type))))
+      if (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bound_type))
+	  || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bound_type)))
 	continue;
 
       /* Check if there is possible wrap.  */
@@ -1651,6 +1650,10 @@ get_ne_cond_branch (struct loop *loop)
 	return NULL;
       if (niter.cmp != NE_EXPR)
 	continue;
+      if (!integer_onep (niter.control.step)
+	  && !integer_minus_onep (niter.control.step))
+	continue;
+      *step = niter.control.step;
 
       /* If exit edge is just before the empty latch, it is easy to link
 	 the split loops: just jump from the exit edge of one loop to the
@@ -1701,7 +1704,7 @@ get_ne_cond_branch (struct loop *loop)
 /* Split the LOOP with NE_EXPR into two loops with GT_EXPR and LT_EXPR.  */
 
 static bool
-split_ne_loop (struct loop *loop, edge cond_e)
+split_ne_loop (struct loop *loop, edge cond_e, tree step)
 {
   initialize_original_copy_tables ();
 
@@ -1740,11 +1743,13 @@ split_ne_loop (struct loop *loop, edge cond_e)
 
   /* Change if (i != n) to LOOP1:if (i > n) and LOOP2:if (i < n) */
   bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
-  enum tree_code up_code = inv ? LT_EXPR : GT_EXPR;
-  enum tree_code down_code = inv ? GT_EXPR : LT_EXPR;
+  if (tree_int_cst_sign_bit (step))
+    inv = !inv;
+  enum tree_code first_loop_code = inv ? LT_EXPR : GT_EXPR;
+  enum tree_code second_loop_code = inv ? GT_EXPR : LT_EXPR;
 
-  gimple_cond_set_code (gc, up_code);
-  gimple_cond_set_code (dup_gc, down_code);
+  gimple_cond_set_code (gc, first_loop_code);
+  gimple_cond_set_code (dup_gc, second_loop_code);
 
   /* Link the exit cond edge to new loop.  */
   gcond *break_cond = as_a<gcond *> (gimple_copy (gc));
@@ -1752,7 +1757,7 @@ split_ne_loop (struct loop *loop, edge cond_e)
   bool simple_loop
     = pred_e && pred_e->src == cond_e->src && empty_block_p (loop->latch);
   if (simple_loop)
-    gimple_cond_set_code (break_cond, down_code);
+    gimple_cond_set_code (break_cond, second_loop_code);
   else
     gimple_cond_make_true (break_cond);
 
@@ -1810,7 +1815,8 @@ The loop with "i<N" is in favor both GIMPLE and RTL passes.  */
 static bool
 split_loop_on_ne_cond (class loop *loop)
 {
-  edge branch_edge = get_ne_cond_branch (loop);
+  tree step;
+  edge branch_edge = get_ne_cond_branch (loop, &step);
   if (!branch_edge)
     return false;
 
@@ -1832,7 +1838,7 @@ split_loop_on_ne_cond (class loop *loop)
     }
   free (bbs);
 
-  if (split_ne_loop (loop, branch_edge))
+  if (split_ne_loop (loop, branch_edge, step))
     return true;
 
   return false;
