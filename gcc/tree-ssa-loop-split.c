@@ -1642,16 +1642,15 @@ struct idx_elements
 {
   gcond *gc;
   gphi *phi;
+  gimple *inc_stmt;
   tree idx;
   tree bnd;
-  tree next;
   tree large_type;
   tree small_type;
-  gimple *inc_stmt;
   bool cmp_on_next;
 };
 
-/*  Analyze and get the idx related elements: bnd, next,
+/*  Analyze and get the idx related elements: bnd,
     phi, increase stmt from exit edge E, etc.
 
     i = phi (b, n)
@@ -1741,7 +1740,6 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   data.phi = phi;
   data.idx = idx;
   data.bnd = bnd;
-  data.next = next;
   data.large_type = large_type;
   data.small_type = small_type;
   data.inc_stmt = inc_stmt;
@@ -1887,7 +1885,7 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
 
   /* next = (next type)new_next
      And remove next = prev + 1.  */
-  tree next = data.next;
+  tree next = gimple_assign_lhs (inc_stmt); 
   tree type = TREE_TYPE (next);
   gimple *stmt = gimple_build_assign (next, fold_convert (type, new_next));
   gsi = gsi_for_stmt (inc_stmt);
