@@ -95,7 +95,7 @@ main ()
     abort ();
 
   reset ();
-  if (bar (a, b, 253, 255) != 0 || !check_c (c, 254, 255, 255, 256, -1, -1))
+  if (bar (a, b, 253, 255) != 0 || !check_c (c, 254, 255, 255, 256, 0, 0))
     abort ();
 
   reset ();
@@ -107,7 +107,7 @@ main ()
     abort ();
 
   reset ();
-  if (bar_1 (a, b, 5, 3) != 2 || !check_c (c, 4, 5, 3, 4, -1, -1))
+  if (bar_1 (a, b, 5, 3) != 2 || !check_c (c, 4, 5, 3, 4, 0, 0))
     abort ();
 
   reset ();
