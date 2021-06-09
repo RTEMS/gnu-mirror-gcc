@@ -1637,6 +1637,7 @@ filter_conversions (class loop *loop, tree idx, tree *small_type = NULL,
   return stmt;
 }
 
+/* Collection of loop index related elements.  */
 struct idx_elements
 {
   gcond *gc;
@@ -1651,8 +1652,8 @@ struct idx_elements
 };
 
 /*  Analyze and get the idx related elements: bnd, next,
-    phi, increase stmt from exit edge E.
-    
+    phi, increase stmt from exit edge E, etc.
+
     i = phi (b, n)
     ...
     n0 = ik + 1
@@ -1660,7 +1661,7 @@ struct idx_elements
     ...
     if (i != bnd) or if (n != bnd)
     ...
-    n = ()nl 
+    n = ()nl
 
    IDX is the i' or n'.  */
 
@@ -1699,7 +1700,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   /* The idx on gcond is not PHI, it would be next. */
   if (is_gimple_assign (stmt))
     {
-      tree rhs =  gimple_assign_rhs1 (stmt);
+      tree rhs = gimple_assign_rhs1 (stmt);
       if (TREE_CODE (rhs) != SSA_NAME)
 	return false;
 
@@ -1729,7 +1730,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   if (TREE_CODE (gimple_assign_rhs2 (stmt)) != INTEGER_CST)
     return false;
   inc_stmt = stmt;
-  
+
   data.gc = gc;
   data.phi = phi;
   data.idx = idx;
@@ -1740,7 +1741,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   data.inc_stmt = inc_stmt;
   data.cmp_on_next = cmp_next;
 
-  return true;  
+  return true;
 }
 
 /* Check if the loop is possible to wrap at index.
@@ -1752,7 +1753,7 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 {
   int i;
   edge e;
-  if (!single_pred_p(loop->latch) || !empty_block_p (loop->latch))
+  if (!single_pred_p (loop->latch) || !empty_block_p (loop->latch))
     return NULL_TREE;
 
   auto_vec<edge> edges = get_loop_exit_edges (loop);
@@ -1770,7 +1771,7 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 	  && (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bnd_type))
 	      || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bnd_type))))
 	continue;
-      
+
       /* Check if it is "idx != bnd" or "idx < bnd".  */
       gcond *gc = data.gc;
       enum tree_code code = gimple_cond_code (gc);
@@ -1898,6 +1899,9 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   gsi = gsi_for_stmt (phi);
   gsi_remove (&gsi, true);
 
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, ";; Loop index type is updated to use faster type.\n");
+
   return true;
 }
 
@@ -1950,6 +1954,9 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
   if (code == NE_EXPR || code == EQ_EXPR)
     gimple_cond_set_code (gc, new_code);
 
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, ";; Loop split on wrap index.\n");
+
   return true;
 }
 
@@ -1961,7 +1968,7 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
     foo (int *a, int *b, unsigned l, unsigned u_n)
     {
       while (++l != u_n)
-        a[l] = b[l]  + 1;
+	a[l] = b[l]  + 1;
     }
 
    to:
@@ -1980,15 +1987,15 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
 static bool
 split_loop_on_wrap (class loop *loop)
 {
-  basic_block *bbs = get_loop_body (loop);
+  edge e;
+  idx_elements data;
+  tree no_wrap_assumption = get_wrap_assumption (loop, &e, data);
 
-  if (!can_copy_bbs_p (bbs, loop->num_nodes))
-    {
-      free (bbs);
-      return false;
-    }
+  if (!no_wrap_assumption)
+    return false;
 
   int num = 0;
+  basic_block *bbs = get_loop_body (loop);
   for (unsigned i = 0; i < loop->num_nodes; i++)
     num += estimate_num_insns_seq (bb_seq (bbs[i]), &eni_size_weights);
 
@@ -1997,15 +2004,17 @@ split_loop_on_wrap (class loop *loop)
       free (bbs);
       return false;
     }
+
+  if (!can_copy_bbs_p (bbs, loop->num_nodes))
+    {
+      free (bbs);
+      return false;
+    }
+
   free (bbs);
 
-  edge e;
-  idx_elements data;
-  tree no_wrap_assumption = get_wrap_assumption (loop, &e, data);
-
-  if (no_wrap_assumption
-      && (integer_onep (no_wrap_assumption)
-	  || split_wrap_boundary (loop, e, no_wrap_assumption)))
+  if (integer_onep (no_wrap_assumption)
+      || split_wrap_boundary (loop, e, no_wrap_assumption)))
     {
       update_idx_bnd_type (loop, data);
       return true;
