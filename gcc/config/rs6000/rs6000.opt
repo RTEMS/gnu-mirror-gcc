@@ -647,3 +647,7 @@ Generate (do not generate) XXSPLTIW instructions.
 mxxspltidp
 Target Undocumented Mask(XXSPLTIDP) Var(rs6000_isa_flags)
 Generate (do not generate) XXSPLTIDP instructions.
+
+mxxsplti32dx
+Target Undocumented Mask(XXSPLTI32DX) Var(rs6000_isa_flags)
+Generate (do not generate) XXSPLTI32DX instructions.
