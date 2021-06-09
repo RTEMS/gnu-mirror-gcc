@@ -1824,22 +1824,24 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
   return NULL_TREE;
 }
 
-/*  Update the idx and bnd with faster type for no wrap/oveflow loop.  */
+/*  Update the idx and bnd with a suitable type for no wrap/oveflow loop.
+    Suitable type would be the largest type of the type conversion which
+    occur on index, if the largest type is unsigned, using sizetype.  */
 
 static bool
 update_idx_bnd_type (class loop *loop, idx_elements &data)
 {
-  return false;
-  /* Use sizetype as machine fast type, ok for most targets?  */
-  tree fast_type = sizetype;
+  tree suitable_type = data.large_type;
+  if (TYPE_UNSIGNED (suitable_type))
+    suitable_type = sizetype;
 
   /* New base and new bound.  */
   gphi *phi = data.phi;
   tree bnd = data.bnd;
   edge pre_e = loop_preheader_edge (loop);
   tree base = PHI_ARG_DEF_FROM_EDGE (phi, pre_e);
-  tree new_base = fold_convert (fast_type, base);
-  tree new_bnd = fold_convert (fast_type, bnd);
+  tree new_base = fold_convert (suitable_type, base);
+  tree new_bnd = fold_convert (suitable_type, bnd);
   gimple_seq seq = NULL;
   new_base = force_gimple_operand (new_base, &seq, true, NULL_TREE);
   if (seq)
@@ -1853,8 +1855,8 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
      new_n = new_i + 1   */
   edge latch_e = loop_latch_edge (loop);
   const char *name = "idx";
-  tree new_idx = make_temp_ssa_name (fast_type, NULL, name);
-  tree new_next = make_temp_ssa_name (fast_type, NULL, name);
+  tree new_idx = make_temp_ssa_name (suitable_type, NULL, name);
+  tree new_next = make_temp_ssa_name (suitable_type, NULL, name);
   gphi *newphi = create_phi_node (new_idx, loop->header);
   add_phi_arg (newphi, new_base, pre_e, UNKNOWN_LOCATION);
   add_phi_arg (newphi, new_next, latch_e, UNKNOWN_LOCATION);
@@ -1862,7 +1864,7 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   /* New increase stmt.  */
   gimple *inc_stmt = data.inc_stmt;
   tree step = gimple_assign_rhs2 (inc_stmt);
-  step = fold_convert (fast_type, step);
+  step = fold_convert (suitable_type, step);
   new_idx = PHI_RESULT (newphi);
   tree_code inc_code = gimple_assign_rhs_code (inc_stmt);
   gimple *new_inc = gimple_build_assign (new_next, inc_code, new_idx, step);
@@ -2014,7 +2016,7 @@ split_loop_on_wrap (class loop *loop)
   free (bbs);
 
   if (integer_onep (no_wrap_assumption)
-      || split_wrap_boundary (loop, e, no_wrap_assumption)))
+      || split_wrap_boundary (loop, e, no_wrap_assumption))
     {
       update_idx_bnd_type (loop, data);
       return true;
