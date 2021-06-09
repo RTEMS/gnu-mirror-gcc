@@ -1664,9 +1664,9 @@ get_ne_cond_branch (struct loop *loop, tree *step)
 	return e;
 
       /* If exit edge is at end of header, and header contains i++ or ++i,
-	 only, it is simple to link the split loops:  jump from the end of
-	 one loop header to the new loop header, and use unchanged PHI
-	 result of first loop as the entry PHI value of the second loop.  */
+	 only, it is simple to link the split loops: jump from the end of
+	 one loop header to the new loop header, and use unchanged PHI result
+	 of the first loop as the entry PHI value of the second loop.  */
       if (bb == loop->header)
 	{
 	  /* Only one phi.  */
@@ -1793,7 +1793,7 @@ L_H:
  i++;
  goto L_H;
 
-The "i!=N" is like "i>N || i<N", then it could be transform to:
+The "i!=N" is like "i>N || i<N", then it could be transformed to:
 
 L_H:
  if (i>N)
@@ -1810,7 +1810,7 @@ L1_H:
  i++;
  goto L1_H;
 
-The loop with "i<N" is in favor both GIMPLE and RTL passes.  */
+The loop with "i<N" is in favor of both GIMPLE and RTL passes.  */
 
 static bool
 split_loop_on_ne_cond (class loop *loop)
