@@ -640,32 +640,6 @@
   return num_insns == 1;
 })
 
-;; Return 1 if the operand is a CONST_VECTOR that can be loaded with the
-;; XXSPLTIW instruction.  Do not return 1 if the constant can be generated with
-;; XXSPLTIB or VSPLTIS{H,W}
-(define_predicate "xxspltiw_operand"
-  (match_code "const_vector")
-{
-  if (!TARGET_XXSPLTIW)
-    return false;
-
-  if (mode != V8HImode && mode != V4SImode && mode != V4SFmode)
-    return false;
-
-  rtx element = CONST_VECTOR_ELT (op, 0);
-  for (size_t i = 1; i < GET_MODE_NUNITS (mode); i++)
-    if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-      return false;
-
-  if (element == CONST0_RTX (GET_MODE_INNER (mode)))
-    return false;
-
-  if (CONST_INT_P (element) && EASY_VECTOR_15 (INTVAL (element)))
-    return false;
-
-  return true;
-})
-
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
 ;; vector register without using memory.
 (define_predicate "easy_vector_constant"
@@ -677,9 +651,6 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
-	return true;
-
-      if (xxspltiw_operand (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
