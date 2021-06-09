@@ -20,5 +20,6 @@ test6 (vector unsigned long long x, vector unsigned long long y)
   return vec_mul (x, y);
 }
 
-/* { dg-final { scan-assembler-times "\[ \t\]mulld " 4 { target lp64 } } } */
+/* { dg-final { scan-assembler-times {\mmulld\M}  4 { target { lp64 && { ! has_arch_pwr10 } } } } } */
+/* { dg-final { scan-assembler-times {\mvmulld\M} 1 { target { has_arch_pwr10             } } } } */
 
