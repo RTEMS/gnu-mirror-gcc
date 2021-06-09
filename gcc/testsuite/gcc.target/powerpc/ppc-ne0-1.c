@@ -2,9 +2,12 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -mno-isel" } */
 
-/* { dg-final { scan-assembler-times "addic" 4 } } */
-/* { dg-final { scan-assembler-times "subfe" 1 } } */
-/* { dg-final { scan-assembler-times "addze" 3 } } */
+/* { dg-final { scan-assembler-times {\maddic\M}  4 { target { ! has_arch_pwr10 } } } } */
+/* { dg-final { scan-assembler-times {\msubfe\M}  1 { target { ! has_arch_pwr10 } } } } */
+/* { dg-final { scan-assembler-times {\maddic\M}  3 { target {   has_arch_pwr10 } } } } */
+/* { dg-final { scan-assembler-not   {\msubfe\M}    { target {   has_arch_pwr10 } } } } */
+/* { dg-final { scan-assembler-times {\msetbcr\M} 1 { target {   has_arch_pwr10 } } } } */
+/* { dg-final { scan-assembler-times {\maddze\M}  3 } } */
 
 long ne0(long a)
 {
