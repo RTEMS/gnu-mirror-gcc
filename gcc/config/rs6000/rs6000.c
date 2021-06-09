@@ -8033,18 +8033,7 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
 
   gcc_assert (byte_shift >= 0);
 
-  /* If we are given a memory address, optimize to load just the element.  We
-     don't have to adjust the vector element number on little endian
-     systems.  */
-  if (MEM_P (src))
-    {
-      emit_move_insn (dest,
-		      rs6000_adjust_vec_address (dest, src, element, tmp_gpr,
-						 scalar_mode));
-      return;
-    }
-
-  else if (REG_P (src) || SUBREG_P (src))
+  if (REG_P (src) || SUBREG_P (src))
     {
       int num_elements = GET_MODE_NUNITS (mode);
       int bits_in_element = mode_to_bits (GET_MODE_INNER (mode));

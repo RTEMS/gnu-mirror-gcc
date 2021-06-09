@@ -253,6 +253,13 @@
 			       (TF "TARGET_FLOAT128_HW
 				    && FLOAT128_IEEE_P (TFmode)")])
 
+;; Mode attribute to give the constraint for the floating point type for vector
+;; extract and convert to floating point operations.
+(define_mode_attr VSX_EX_FL [(SF "wa")
+			     (DF "wa")
+			     (KF "v")
+			     (TF "v")])
+
 ;; Iterator for the 2 short vector types to do a splat from an integer
 (define_mode_iterator VSX_SPLAT_I [V16QI V8HI])
 
@@ -3443,7 +3450,9 @@
   DONE;
 })
 
-;; Variable V2DI/V2DF extract from memory
+;; Variable V2DI/V2DF extract from memory.  We separate these insns, because
+;; the compiler will sometimes have the vector value in a register, but then
+;; decide the best way to do this is to do a store and then a load.
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=wa,r")
 	(unspec:<VS_scalar> [(match_operand:VSX_D 1 "memory_operand" "Q,Q")
@@ -3494,7 +3503,7 @@
   [(set_attr "length" "8")
    (set_attr "type" "fp")])
 
-(define_insn_and_split "*vsx_extract_v4sf_<mode>_load"
+(define_insn_and_split "*vsx_extract_v4sf_load"
   [(set (match_operand:SF 0 "register_operand" "=f,v,v,?r")
 	(vec_select:SF
 	 (match_operand:V4SF 1 "memory_operand" "m,Z,m,m")
@@ -3512,7 +3521,29 @@
    (set_attr "length" "8")
    (set_attr "isa" "*,p7v,p9v,*")])
 
-;; Variable V4SF extract from a register
+;; V4SF extract to DFmode
+(define_insn_and_split "*vsx_extract_v4sf_to_df_load"
+  [(set (match_operand:DF 0 "register_operand" "=f,v")
+	(float_extend:DF
+	 (vec_select:SF
+	  (match_operand:V4SF 1 "memory_operand" "m,m")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,n")]))))
+   (clobber (match_scratch:P 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SFmode)"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(float_extend:DF (match_dup 4)))]
+{
+  rtx reg_sf = gen_rtx_REG (SFmode, reg_or_subregno (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_sf, operands[1], operands[2],
+					   operands[3], SFmode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p8v")])
+
+;; Variable V4SF extract
 (define_insn_and_split "vsx_extract_v4sf_var"
   [(set (match_operand:SF 0 "gpc_reg_operand" "=wa")
 	(unspec:SF [(match_operand:V4SF 1 "gpc_reg_operand" "v")
@@ -3546,6 +3577,26 @@
 					   operands[3], SFmode);
 }
   [(set_attr "type" "fpload,load")])
+
+(define_insn_and_split "*vsx_extract_v4sf_to_df_var_load"
+  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
+	(float_extend:DF
+	 (unspec:SF [(match_operand:V4SF 1 "memory_operand" "Q")
+		     (match_operand:DI 2 "gpc_reg_operand" "r")]
+		    UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(float_extend:DF (match_dup 4)))]
+{
+  rtx reg_sf = gen_rtx_REG (SFmode, reg_or_subregno (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_sf, operands[1], operands[2],
+					   operands[3], SFmode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")])
 
 ;; Expand the builtin form of xxpermdi to canonical rtl.
 (define_expand "vsx_xxpermdi_<mode>"
@@ -3891,7 +3942,94 @@
   [(set_attr "type" "load")
    (set_attr "length" "8")])
 
-;; Variable V16QI/V8HI/V4SI extract from a register
+;; Optimize extracting and extending a single SI element from memory.  GPRs
+;; take any address.  If the element number is 0, we can use normal X-FORM
+;; (reg+reg) addressing to load up the vector register.  Otherwise use Q to get
+;; a single register, so we can load the offset into the scratch register.
+(define_insn_and_split "*vsx_extract_v4si_<su><mode>_load"
+  [(set (match_operand:EXTSI 0 "gpc_reg_operand" "=r,wa,wa")
+	(any_extend:EXTSI
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:EXTSI (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, reg_or_subregno (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load,fpload,fpload")
+   (set_attr "length" "8")])
+
+;; Optimize extracting and extending a single HI element from memory.  GPRs
+;; take any address.  If the element number is 0, we can use normal X-FORM
+;; (reg+reg) addressing to load up the vector register.  Otherwise use Q to get
+;; a single register, so we can load the offset into the scratch register.
+(define_insn_and_split "*vsx_extract_v8hi_<su><mode>_load"
+  [(set (match_operand:EXTHI 0 "gpc_reg_operand" "=r,v,v")
+	(any_extend:EXTHI
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "m,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b,&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:EXTHI (match_dup 4)))]
+{
+  rtx reg_hi = gen_rtx_REG (HImode, reg_or_subregno (operands[0]));
+  rtx mem = rs6000_adjust_vec_address (reg_hi, operands[1], operands[2],
+				       operands[3], HImode);
+
+  /* We don't have a sign extend to a vector register, so we have to do
+     the load first and then a sign extend operation.  */
+  if (int_reg_operand (operands[0], <MODE>mode) || <CODE> == ZERO_EXTEND)
+    operands[4] = mem;
+
+  else
+    {
+      emit_move_insn (reg_hi, mem);
+      operands[4] = reg_hi;
+    }
+}
+  [(set_attr "type" "load,fpload,fpload")
+   (set_attr "length" "8,12,12")
+   (set_attr "isa" "*,p9v,p9v")])
+
+;; Optimize extracting and zero extending a single QI element from memory.
+;; GPRs take any address.  If the element number is 0, we can use normal X-FORM
+;; (reg+reg) addressing to load up the vector register.  Otherwise use Q to get
+;; a single register, so we can load the offset into the scratch register.  We
+;; don't have eiter a GPR load or a vector load that does sign extension, so
+;; only do the zero_extend case.
+(define_insn_and_split "*vsx_extract_v16qi_u<mode>_load"
+  [(set (match_operand:EXTQI 0 "gpc_reg_operand" "=r,v,v")
+	(zero_extend:EXTQI
+	 (vec_select:QI
+	  (match_operand:V16QI 1 "memory_operand" "m,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_15_operand" "n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b,&b"))]
+  "VECTOR_MEM_VSX_P (V16QImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:EXTQI (match_dup 4)))]
+{
+  rtx reg_qi = gen_rtx_REG (QImode, reg_or_subregno (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_qi, operands[1], operands[2],
+					   operands[3], QImode);
+}
+  [(set_attr "type" "load,fpload,fpload")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p9v,p9v")])
+
+;; Variable V16QI/V8HI/V4SI extract
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,r")
 	(unspec:<VS_scalar>
@@ -3911,14 +4049,33 @@
 }
   [(set_attr "isa" "p9v,*")])
 
-;; Variable V16QI/V8HI/V4SI extract from memory
-(define_insn_and_split "*vsx_extract_<mode>_var_load"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r")
-	(unspec:<VS_scalar>
-	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
-	  (match_operand:DI 2 "gpc_reg_operand" "r")]
+;; Variable V4SI extract when the vector is in memory
+(define_insn_and_split "*vsx_extract_v4si_var_load"
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r,wa")
+	(unspec:SI
+	 [(match_operand:V4SI 1 "memory_operand" "Q,Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b"))]
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 4))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "8")])
+
+;; Variable V8HI/V16QI extract when the vector is in memory
+(define_insn_and_split "*vsx_extract_<mode>_var_load"
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,v")
+	(unspec:<VS_scalar>
+	 [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q,Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	 UNSPEC_VSX_EXTRACT))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
@@ -3927,7 +4084,113 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VS_scalar>mode);
 }
-  [(set_attr "type" "load")])
+  [(set_attr "type" "load")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p9v")])
+
+;; Variable V4SI/V8HI/V16QI vector extract when the vector is in a register and
+;; combine with zero extend
+(define_insn_and_split "*vsx_extract_<mode>_uns_di_var"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,r")
+	(zero_extend:DI
+	 (unspec:<VSX_EXTRACT_I:VS_scalar>
+	  [(match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "v,v")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=r,r"))
+   (clobber (match_scratch:V2DI 4 "=X,&v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  machine_mode smode = <VS_scalar>mode;
+  rtx reg_small = gen_rtx_REG (smode, REGNO (operands[0]));
+  rs6000_split_vec_extract_var (reg_small, operands[1], operands[2],
+				operands[3], operands[4]);
+  DONE;
+}
+  [(set_attr "isa" "p9v,*")])
+
+;; Variable V4SI vector extract when the vector is in memory, and combine with
+;; a sign or zero extend.
+(define_insn_and_split "*vsx_extract_v4si_<su><mode>_var_load"
+  [(set (match_operand:EXTSI 0 "gpc_reg_operand" "=r,wa")
+	(any_extend:EXTSI
+	 (unspec:V4SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:EXTSI (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, REGNO (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "8")])
+
+;; Variable V8HI vector extract when the vector is in memory, and combine with
+;; a sign or zero extend.
+(define_insn_and_split "*vsx_extract_v8hi_<su><mode>_var_load"
+  [(set (match_operand:EXTHI 0 "gpc_reg_operand" "=r,v")
+	(any_extend:EXTHI
+	 (unspec:V8HI
+	  [(match_operand:V8HI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:EXTHI (match_dup 4)))]
+{
+  rtx reg_hi = gen_rtx_REG (HImode, REGNO (operands[0]));
+  rtx mem = rs6000_adjust_vec_address (reg_hi, operands[1], operands[2],
+				       operands[3], HImode);
+
+  /* Altivec load HImode does not have a sign extend version.  */
+  if (int_reg_operand (operands[0], HImode) || <CODE> == ZERO_EXTEND)
+    operands[4] = mem;
+  else
+    {
+      emit_move_insn (reg_hi, mem);
+      operands[4] = reg_hi;
+    }
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p9v")])
+
+;; Variable V16QI vector extract when the vector is in memory, and combine with
+;; a zero extend.  There is no sign extend version of load byte.
+(define_insn_and_split "*vsx_extract_v4si_u<mode>_var_load"
+  [(set (match_operand:EXTQI 0 "gpc_reg_operand" "=r,wa")
+	(any_extend:EXTQI
+	 (unspec:V16QI
+	  [(match_operand:V16QI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V16QImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:EXTQI (match_dup 4)))]
+{
+  rtx reg_qi = gen_rtx_REG (QImode, REGNO (operands[0]));
+  operands[4] = rs6000_adjust_vec_address (reg_qi, operands[1], operands[2],
+					   operands[3], QImode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p9v")])
 
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
@@ -4299,6 +4562,248 @@
   operands[4] = gen_rtx_REG (DImode, REGNO (operands[3]));
 }
   [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize <type> f = (<ftype>) vec_extract (V4SI, <n>).
+;;
+;; <ftype> is a hardware floating point type that conversions are directly
+;; supported (SFmode, DFmode, KFmode, maybe TFmode).
+;;
+;; The element number (<n>) is constant.
+;;
+;; The vector is in memory, and we convert the vector extraction to a load to
+;; the VSX registers and then convert, avoiding a direct move.
+;;
+;; For SFmode/DFmode, we can use all vector registers.  For KFmode/TFmode, we
+;; have to use only the Altivec regsiters.
+(define_insn_and_split "*vsx_ext_v4si_fl_<mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<VSX_EX_FL>,<VSX_EX_FL>")
+	(float:FL_CONV
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+(define_insn_and_split "*vsx_ext_v4si_ufl_<mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<VSX_EX_FL>,<VSX_EX_FL>")
+	(unsigned_float:FL_CONV
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(unsigned_float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize <type> f = (<ftype>) vec_extract (V4SI, <n>).
+;;
+;; <ftype> is a hardware floating point type that conversions are directly
+;; supported (SFmode, DFmode, KFmode, maybe TFmode).
+;;
+;; The element number (<n>) is variable.
+;;
+;; The vector is in memory, and we convert the vector extraction to a load to
+;; the VSX registers and then convert, avoiding a direct move.
+;;
+;; For SFmode/DFmode, we can use all vector registers.  For KFmode/TFmode, we
+;; have to use only the Altivec regsiters.
+(define_insn_and_split "*vsx_ext_v4si_fl_<mode>_var_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<VSX_EX_FL>")
+	(float:FL_CONV
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+(define_insn_and_split "*vsx_ext_v4si_ufl_<mode>_var_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<VSX_EX_FL>")
+	(unsigned_float:FL_CONV
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(unsigned_float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  rtx reg_si = gen_rtx_REG (SImode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_si, operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "isa" "<FL_CONV:VSisa>")])
+
+;; Optimize <type> f = (<ftype>) vec_extract (V8HI/V16QI, <n>).
+;;
+;; <ftype> is a hardware floating point type that conversions are directly
+;; supported (SFmode, DFmode, KFmode, maybe TFmode).
+;;
+;; The element number (<n>) is constant.
+;;
+;; The vector is in memory, and we convert the vector extraction to a load to
+;; the VSX registers and then convert, avoiding a direct move.
+;;
+;; For SFmode/DFmode, we can use all vector registers.  For KFmode/TFmode, we
+;; have to use only the Altivec regsiters.
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand"
+				"=<FL_CONV:VSX_EX_FL>,<FL_CONV:VSX_EX_FL>")
+	(float:FL_CONV
+	 (vec_select:<VSX_EXTRACT_I2:VS_scalar>
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Z,Q")
+	  (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b"))
+   (clobber (match_scratch:DI 4 "=v,v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_POWERPC64
+   && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 5)
+	(match_dup 6))
+   (set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I2:VS_scalar>mode;
+  operands[5] = gen_rtx_REG (smode, reg_or_subregno (operands[4]));
+  operands[6] = rs6000_adjust_vec_address (operands[5], operands[1],
+					   operands[2], operands[3],
+					   smode);
+})
+
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_load"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand"
+				"=<FL_CONV:VSX_EX_FL>,<FL_CONV:VSX_EX_FL>")
+	(unsigned_float:FL_CONV
+	 (vec_select:<VSX_EXTRACT_I2:VS_scalar>
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Z,Q")
+	  (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_POWERPC64
+   && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(unsigned_float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I2:VS_scalar>mode;
+  rtx reg_small = gen_rtx_REG (smode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_small, operands[1],
+					   operands[2], operands[3],
+					   smode);
+})
+
+;; Optimize <type> f = (<ftype>) vec_extract (V8HI/V16QI, <n>).
+;;
+;; <ftype> is a hardware floating point type that conversions are directly
+;; supported (SFmode, DFmode, KFmode, maybe TFmode).
+;;
+;; The element number (<n>) is variable.
+;;
+;; The vector is in memory, and we convert the vector extraction to a load to
+;; the VSX registers and then convert, avoiding a direct move.
+;;
+;; For SFmode/DFmode, we can use all vector registers.  For KFmode/TFmode, we
+;; have to use only the Altivec regsiters.
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I2:mode>_fl_<FL_CONV:mode>_vl"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:VSX_EX_FL>")
+	(float:FL_CONV
+	 (unspec:<VSX_EXTRACT_I2:VS_scalar>
+	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_POWERPC64
+   && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 5)
+	(match_dup 6))
+   (set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I2:VS_scalar>mode;
+  operands[5] = gen_rtx_REG (smode, reg_or_subregno (operands[4]));
+  operands[6] = rs6000_adjust_vec_address (operands[5], operands[1],
+					   operands[2], operands[3],
+					   smode);
+})
+
+(define_insn_and_split "*vsx_ext_<VSX_EXTRACT_I2:mode>_ufl_<FL_CONV:mode>_vl"
+  [(set (match_operand:FL_CONV 0 "gpc_reg_operand" "=<FL_CONV:VSX_EX_FL>")
+	(unsigned_float:FL_CONV
+	 (unspec:<VSX_EXTRACT_I2:VS_scalar>
+	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_POWERPC64
+   && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(unsigned_float:<FL_CONV:MODE> (match_dup 4)))]
+{
+  machine_mode smode = <VSX_EXTRACT_I2:VS_scalar>mode;
+  rtx reg_small = gen_rtx_REG (smode, reg_or_subregno (operands[0]));
+  operands[4] = gen_rtx_REG (DImode, reg_or_subregno (operands[0]));
+  operands[5] = rs6000_adjust_vec_address (reg_small, operands[1],
+					   operands[2], operands[3],
+					   smode);
+})
 
 ;; V4SI/V8HI/V16QI set operation on ISA 3.0
 (define_insn "vsx_set_<mode>_p9"
