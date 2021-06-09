@@ -11515,8 +11515,8 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
     error ("%qs requires the %qs option", name, "-mhard-float");
   else if ((fnmask & RS6000_BTM_FLOAT128_HW) != 0)
     error ("%qs requires ISA 3.0 IEEE 128-bit floating point", name);
-  else if ((fnmask & RS6000_BTM_FLOAT128) != 0)
-    error ("%qs requires the %qs option", name, "%<-mfloat128%>");
+  else if ((fnmask & RS6000_BTM_IBM128) != 0)
+    error ("%qs requires the IBM 128-bit floating point", name);
   else if ((fnmask & (RS6000_BTM_POPCNTD | RS6000_BTM_POWERPC64))
 	   == (RS6000_BTM_POPCNTD | RS6000_BTM_POWERPC64))
     error ("%qs requires the %qs (or newer), and %qs or %qs options",
@@ -13211,7 +13211,7 @@ rs6000_init_builtins (void)
      For IEEE 128-bit floating point, always create the type __ieee128.  If the
      user used -mfloat128, rs6000-c.c will create a define from __float128 to
      __ieee128.  */
-  if (TARGET_FLOAT128_TYPE)
+  if (TARGET_IBM128)
     {
       if (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
 	ibm128_float_type_node = long_double_type_node;
@@ -13225,7 +13225,13 @@ rs6000_init_builtins (void)
 
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
+    }
 
+  else
+    ibm128_float_type_node = long_double_type_node;
+
+  if (TARGET_FLOAT128_TYPE)
+    {
       if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
 	ieee128_float_type_node = long_double_type_node;
       else
@@ -13236,7 +13242,7 @@ rs6000_init_builtins (void)
     }
 
   else
-    ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
+    ieee128_float_type_node = long_double_type_node;
 
   /* Vector pair and vector quad support.  */
   if (TARGET_EXTRA_BUILTINS)
