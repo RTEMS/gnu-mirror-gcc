@@ -1730,6 +1730,12 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   if (TREE_CODE (gimple_assign_rhs2 (stmt)) != INTEGER_CST)
     return false;
   inc_stmt = stmt;
+  tree prev = gimple_assign_rhs1 (stmt);
+  if (TREE_CODE (prev) != SSA_NAME)
+    return false;
+  stmt = filter_conversions (loop, prev, &small_type, &large_type);
+  if (stmt != phi)
+    return false;
 
   data.gc = gc;
   data.phi = phi;
@@ -1921,12 +1927,11 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
   /* Version the loop.  */
   initialize_original_copy_tables ();
   basic_block cond_bb;
-  class loop *loop1
-    = loop_version (loop, no_wrap_cond, &cond_bb,
-		    profile_probability::very_likely (),
-		    profile_probability::very_unlikely (),
-		    profile_probability::very_likely (),
-		    profile_probability::very_unlikely (), true);
+  loop_version (loop, no_wrap_cond, &cond_bb,
+		profile_probability::very_likely (),
+		profile_probability::very_unlikely (),
+		profile_probability::very_likely (),
+		profile_probability::very_unlikely (), true);
   free_original_copy_tables ();
 
   /* Insert the statements that feed COND.  */
