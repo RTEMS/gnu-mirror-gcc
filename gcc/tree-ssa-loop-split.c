@@ -1618,7 +1618,7 @@ get_ne_cond_branch (struct loop *loop)
 	continue;
       gcond *cond = as_a<gcond *> (last);
       enum tree_code code = gimple_cond_code (cond);
-      if (!(code == NE_EXPR
+      if (!((code == NE_EXPR && (e->flags & EDGE_FALSE_VALUE))
 	    || (code == EQ_EXPR && (e->flags & EDGE_TRUE_VALUE))))
 	continue;
 
@@ -1810,24 +1810,29 @@ The loop with "i<N" is in favor both GIMPLE and RTL passes.  */
 static bool
 split_loop_on_ne_cond (class loop *loop)
 {
+  edge branch_edge = get_ne_cond_branch (loop);
+  if (!branch_edge)
+    return false;
+
   int num = 0;
   basic_block *bbs = get_loop_body (loop);
+  for (unsigned i = 0; i < loop->num_nodes; i++)
+    num += estimate_num_insns_seq (bb_seq (bbs[i]), &eni_size_weights);
+
+  if (num > param_max_peeled_insns)
+    {
+      free (bbs);
+      return false;
+    }
 
   if (!can_copy_bbs_p (bbs, loop->num_nodes))
     {
       free (bbs);
       return false;
     }
-
-  for (unsigned i = 0; i < loop->num_nodes; i++)
-    num += estimate_num_insns_seq (bb_seq (bbs[i]), &eni_size_weights);
   free (bbs);
 
-  if (num > param_max_peeled_insns)
-    return false;
-
-  edge branch_edge = get_ne_cond_branch (loop);
-  if (branch_edge && split_ne_loop (loop, branch_edge))
+  if (split_ne_loop (loop, branch_edge))
     return true;
 
   return false;
