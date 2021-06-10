@@ -4489,6 +4489,12 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2ADD) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2ADD;
 
+  if (TARGET_PREFIXED
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_LARGE_CONSTS) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_LARGE_CONSTS;
+  else if (!TARGET_PREFIXED)
+    rs6000_isa_flags &= ~OPTION_MASK_P10_LARGE_CONSTS;
+
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
@@ -5959,9 +5965,20 @@ num_insns_constant_gpr (HOST_WIDE_INT value)
 	   && (value >> 31 == -1 || value >> 31 == 0))
     return 1;
 
-  /* PADDI can support up to 34 bit signed integers.  */
-  else if (TARGET_PREFIXED && SIGNED_INTEGER_34BIT_P (value))
-    return 1;
+  /* PADDI can support up to 34 bit signed integers, or using a combination of
+     PADDI and shift left.  */
+  else if (TARGET_P10_LARGE_CONSTS)
+    {
+      if (SIGNED_INTEGER_34BIT_P (value))
+	return 1;
+
+      /* PLI and SLDI.  */
+      if ((value & 0xffffffff) == 0)
+	return 2;
+
+      /* PLI, SLDI, PADDI.  */
+      return 3;
+    }
 
   else if (TARGET_POWERPC64)
     {
@@ -10415,7 +10432,22 @@ rs6000_emit_set_long_const (rtx dest, HOST_WIDE_INT c)
       rtx two = gen_rtx_ASHIFT (DImode, temp, GEN_INT (32));
       emit_move_insn (dest, gen_rtx_IOR (DImode, one, two));
     }
-  else if ((ud4 == 0xffff && (ud3 & 0x8000))
+  else if (TARGET_P10_LARGE_CONSTS)
+    {
+      HOST_WIDE_INT low_32bit = ud1 | (ud2 << 16);
+      HOST_WIDE_INT high_32bit = ud3 | (ud4 << 16);
+
+      temp = !can_create_pseudo_p () ? dest : gen_reg_rtx (DImode);
+      emit_move_insn (copy_rtx (temp), GEN_INT (high_32bit));
+
+      rtx temp2 = ((low_32bit == 0 || !can_create_pseudo_p ())
+		   ? dest
+		   : gen_reg_rtx (DImode));
+      emit_insn (gen_ashldi3 (temp2, temp, GEN_INT (32)));
+      if (low_32bit)
+	emit_insn (gen_adddi3 (dest, temp2, GEN_INT (low_32bit)));
+    }
+  else if ((ud4 == 0xaffff && (ud3 & 0x8000))
 	   || (ud4 == 0 && ! (ud3 & 0x8000)))
     {
       temp = !can_create_pseudo_p () ? dest : gen_reg_rtx (DImode);
@@ -24424,6 +24456,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },
   { "power9-vector",		OPTION_MASK_P9_VECTOR,		false, true  },
   { "power10-fusion",		OPTION_MASK_P10_FUSION,		false, true  },
+  { "power10-large-consts",	OPTION_MASK_P10_LARGE_CONSTS,	false, true  },
   { "powerpc-gfxopt",		OPTION_MASK_PPC_GFXOPT,		false, true  },
   { "powerpc-gpopt",		OPTION_MASK_PPC_GPOPT,		false, true  },
   { "prefixed",			OPTION_MASK_PREFIXED,		false, true  },
