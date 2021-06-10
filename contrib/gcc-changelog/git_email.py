@@ -40,7 +40,7 @@ class GitEmail(GitCommit):
         diff = PatchSet.from_filename(filename)
         date = None
         author = None
-        subject = ""
+        subject = ''
 
         subject_last = False
         with open(self.filename, 'r') as f:
