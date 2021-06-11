@@ -655,3 +655,7 @@ Generate (do not generate) XXSPLTI32DX instructions.
 mlxvkq
 Target Undocumented Mask(LXVKQ) Var(rs6000_isa_flags)
 Generate (do not generate) LXVKQ instructions.
+
+mpower10-large-consts
+Target Undocumented Mask(P10_LARGE_CONSTS) Var(rs6000_isa_flags)
+Generate (do not generate) PLI/SLDI/PADDI to load large constants.
