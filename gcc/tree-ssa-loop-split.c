@@ -1724,9 +1724,10 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
       || !flow_bb_inside_loop_p (loop, gimple_bb (stmt)))
     return false;
   tree_code rhs_code = gimple_assign_rhs_code (stmt);
-  if (rhs_code != PLUS_EXPR && rhs_code != MINUS_EXPR)
+  if (rhs_code != PLUS_EXPR)
     return false;
-  if (TREE_CODE (gimple_assign_rhs2 (stmt)) != INTEGER_CST)
+  tree step = gimple_assign_rhs2 (stmt);
+  if (!integer_onep (step))
     return false;
   inc_stmt = stmt;
   tree prev = gimple_assign_rhs1 (stmt);
@@ -1835,12 +1836,20 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 static bool
 update_idx_bnd_type (class loop *loop, idx_elements &data)
 {
+  gphi *phi = data.phi;
+  tree type = TREE_TYPE (PHI_RESULT (phi));
   tree suitable_type = data.large_type;
+  if (TYPE_PRECISION (type) == TYPE_PRECISION (suitable_type)
+      && (TYPE_UNSIGNED (suitable_type) == TYPE_UNSIGNED (type)))
+    return false;
   if (TYPE_UNSIGNED (suitable_type))
-    suitable_type = sizetype;
+    {
+      if (TYPE_PRECISION (suitable_type) == TYPE_PRECISION (sizetype))
+	return false;
+      suitable_type = sizetype;
+    }
 
   /* New base and new bound.  */
-  gphi *phi = data.phi;
   tree bnd = data.bnd;
   edge pre_e = loop_preheader_edge (loop);
   tree base = PHI_ARG_DEF_FROM_EDGE (phi, pre_e);
@@ -1885,8 +1894,8 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
 
   /* next = (next type)new_next
      And remove next = prev + 1.  */
-  tree next = gimple_assign_lhs (inc_stmt); 
-  tree type = TREE_TYPE (next);
+  tree next = gimple_assign_lhs (inc_stmt);
+  type = TREE_TYPE (next);
   gimple *stmt = gimple_build_assign (next, fold_convert (type, new_next));
   gsi = gsi_for_stmt (inc_stmt);
   gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
@@ -2018,8 +2027,10 @@ split_loop_on_wrap (class loop *loop)
 
   free (bbs);
 
-  if (integer_onep (no_wrap_assumption)
-      || split_wrap_boundary (loop, e, no_wrap_assumption))
+  if (integer_onep (no_wrap_assumption))
+    return update_idx_bnd_type (loop, data);
+
+  if (split_wrap_boundary (loop, e, no_wrap_assumption))
     {
       update_idx_bnd_type (loop, data);
       return true;
