@@ -1645,6 +1645,7 @@ struct idx_elements
   gimple *inc_stmt;
   tree idx;
   tree bnd;
+  tree step;
   tree large_type;
   tree small_type;
   bool cmp_on_next;
@@ -1727,7 +1728,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   if (rhs_code != PLUS_EXPR)
     return false;
   tree step = gimple_assign_rhs2 (stmt);
-  if (!integer_onep (step))
+  if (TREE_CODE (step) != INTEGER_CST)
     return false;
   inc_stmt = stmt;
   tree prev = gimple_assign_rhs1 (stmt);
@@ -1741,6 +1742,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   data.phi = phi;
   data.idx = idx;
   data.bnd = bnd;
+  data.step = step;
   data.large_type = large_type;
   data.small_type = small_type;
   data.inc_stmt = inc_stmt;
@@ -1784,7 +1786,7 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 	code = swap_tree_comparison (code);
       if ((e->flags & EDGE_TRUE_VALUE) && code == EQ_EXPR)
 	code = NE_EXPR;
-      if (code != NE_EXPR && code != LT_EXPR && code != LE_EXPR)
+      if (code != NE_EXPR && code != LT_EXPR && code != GT_EXPR)
 	continue;
 
       /* Check if idx is iv with base and step.  */
@@ -1794,36 +1796,39 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
       if (!simple_iv_with_niters (loop, loop_containing_stmt (gc), idx, &iv,
 				  &iv_niters, false))
 	continue;
-      if (!iv.base || !iv.step)
+      if (!iv.base || !iv.step || !tree_int_cst_equal (iv.step, data.step))
+	continue;
+
+      bool is_negative = tree_int_cst_sign_bit (iv.step);
+      enum tree_code expect_code = is_negative ? GT_EXPR : LT_EXPR;
+      if (code != NE_EXPR && code != expect_code)
 	continue;
 
       /* Update the type for base, bound and the max value of boundary.  */
       tree base = iv.base;
       tree small_type = data.small_type;
       tree large_type = data.large_type;
-      tree maxv = TYPE_MAX_VALUE (small_type);
+      tree max_min_bnd = is_negative ? TYPE_MIN_VALUE (small_type)
+				     : TYPE_MAX_VALUE (small_type);
       if (large_type != TREE_TYPE (base))
 	base = fold_convert (large_type, base);
       if (large_type != TREE_TYPE (bnd))
 	bnd = fold_convert (large_type, bnd);
       if (large_type != small_type)
-	maxv = fold_convert (large_type, maxv);
+	max_min_bnd = fold_convert (large_type, max_min_bnd);
 
-      /* for "< or <=", there is no wrap if bnd <= max value.  */
-      tree no_wrap_assump = fold_build2 (LE_EXPR, boolean_type_node, bnd, maxv);
+      /* There is no wrap if bnd <= max value && base <= bnd.  */
+      tree no_wrap
+	= fold_build2 (expect_code, boolean_type_node, bnd, max_min_bnd);
+      no_wrap
+	= fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap,
+		       fold_build2 (expect_code, boolean_type_node, base, bnd));
 
-      /* for "!=", to make sure there is no wrap, beside bnd <= max,
-	 base <= bnd is also required.  */
-      if (code == NE_EXPR)
-	no_wrap_assump
-	  = fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap_assump,
-			 fold_build2 (LE_EXPR, boolean_type_node, base, bnd));
-
-      if (integer_zerop (no_wrap_assump))
+      if (integer_zerop (no_wrap))
 	continue;
 
       *exit = e;
-      return no_wrap_assump;
+      return no_wrap;
     }
 
   return NULL_TREE;
@@ -1839,9 +1844,6 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   gphi *phi = data.phi;
   tree type = TREE_TYPE (PHI_RESULT (phi));
   tree suitable_type = data.large_type;
-  if (TYPE_PRECISION (type) == TYPE_PRECISION (suitable_type)
-      && (TYPE_UNSIGNED (suitable_type) == TYPE_UNSIGNED (type)))
-    return false;
   if (TYPE_UNSIGNED (suitable_type))
     {
       if (TYPE_PRECISION (suitable_type) == TYPE_PRECISION (sizetype))
@@ -1877,7 +1879,16 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   /* New increase stmt.  */
   gimple *inc_stmt = data.inc_stmt;
   tree step = gimple_assign_rhs2 (inc_stmt);
-  step = fold_convert (suitable_type, step);
+  if (tree_int_cst_sign_bit(step))
+    {
+      wide_int v = wi::to_wide (step);
+      v = wide_int::from (v, TYPE_PRECISION (suitable_type),
+			  SIGNED);
+
+      step = wide_int_to_tree (suitable_type, v);
+    }
+  else
+    step = fold_convert (suitable_type, step);
   new_idx = PHI_RESULT (newphi);
   tree_code inc_code = gimple_assign_rhs_code (inc_stmt);
   gimple *new_inc = gimple_build_assign (new_next, inc_code, new_idx, step);
@@ -1908,7 +1919,7 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   tree idx = PHI_RESULT (phi);
   type = TREE_TYPE (idx);
   stmt = gimple_build_assign (idx, fold_convert (type, new_idx));
-  gsi = gsi_start_bb (loop->header);
+  gsi = gsi_start_nondebug_after_labels_bb (loop->header);
   gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
 
   gsi = gsi_for_stmt (phi);
@@ -1924,7 +1935,8 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
    under the guard that NO_WRAP_COND will not be true. */
 
 static bool
-split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
+split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond,
+		     bool is_negative_step)
 {
   /* Convert the condition into a suitable gcond.  */
   gimple_seq stmts = NULL;
@@ -1948,12 +1960,19 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
       gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
     }
 
-  /* Update gcond code and edge.  */
+  /* Update gcond code.  */
   gcond *gc = as_a<gcond *> (last_stmt (e->src));
   enum tree_code code = gimple_cond_code (gc);
   enum tree_code new_code;
   bool inv = expr_invariant_in_loop_p (loop, gimple_cond_lhs (gc));
-  new_code = inv ? GT_EXPR : LT_EXPR;
+  if (is_negative_step)
+    new_code = inv ? LT_EXPR : GT_EXPR;
+  else
+    new_code = inv ? GT_EXPR : LT_EXPR;
+  if (code == NE_EXPR || code == EQ_EXPR)
+    gimple_cond_set_code (gc, new_code);
+
+  /* Swap edge.  */
   if (code == EQ_EXPR)
     {
       edge out = EDGE_SUCC (e->src, 0);
@@ -1965,9 +1984,7 @@ split_wrap_boundary (class loop *loop, edge e, tree no_wrap_cond)
       out->flags |= EDGE_FALSE_VALUE;
       out->flags &= ~EDGE_TRUE_VALUE;
     }
-  if (code == NE_EXPR || code == EQ_EXPR)
-    gimple_cond_set_code (gc, new_code);
-
+  
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, ";; Loop split on wrap index.\n");
 
@@ -2003,9 +2020,9 @@ split_loop_on_wrap (class loop *loop)
 {
   edge e;
   idx_elements data;
-  tree no_wrap_assumption = get_wrap_assumption (loop, &e, data);
+  tree no_wrap = get_wrap_assumption (loop, &e, data);
 
-  if (!no_wrap_assumption)
+  if (!no_wrap)
     return false;
 
   int num = 0;
@@ -2027,10 +2044,10 @@ split_loop_on_wrap (class loop *loop)
 
   free (bbs);
 
-  if (integer_onep (no_wrap_assumption))
+  if (integer_onep (no_wrap))
     return update_idx_bnd_type (loop, data);
 
-  if (split_wrap_boundary (loop, e, no_wrap_assumption))
+  if (split_wrap_boundary (loop, e, no_wrap, tree_int_cst_sign_bit (data.step)))
     {
       update_idx_bnd_type (loop, data);
       return true;
