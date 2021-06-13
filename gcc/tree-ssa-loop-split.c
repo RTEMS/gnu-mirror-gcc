@@ -1919,7 +1919,7 @@ update_idx_bnd_type (class loop *loop, idx_elements &data)
   tree idx = PHI_RESULT (phi);
   type = TREE_TYPE (idx);
   stmt = gimple_build_assign (idx, fold_convert (type, new_idx));
-  gsi = gsi_start_nondebug_after_labels_bb (loop->header);
+  gsi = gsi_after_labels (loop->header);
   gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
 
   gsi = gsi_for_stmt (phi);
