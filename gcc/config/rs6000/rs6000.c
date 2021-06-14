@@ -4517,15 +4517,19 @@ rs6000_option_override_internal (bool global_init_p)
 
       if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTIDP) == 0)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
+    }
+  else
+    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW
+			  | OPTION_MASK_XXSPLTIDP
+			  | OPTION_MASK_XXSPLTI32DX);
 
+  if (TARGET_POWER10 && TARGET_FLOAT128_HW)
+    {
       if ((rs6000_isa_flags_explicit & OPTION_MASK_LXVKQ) == 0)
 	rs6000_isa_flags |= OPTION_MASK_LXVKQ;
     }
   else
-    rs6000_isa_flags &= ~(OPTION_MASK_LXVKQ
-			  | OPTION_MASK_XXSPLTIW
-			  | OPTION_MASK_XXSPLTIDP
-			  | OPTION_MASK_XXSPLTI32DX);
+    rs6000_isa_flags &= ~OPTION_MASK_LXVKQ;
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
