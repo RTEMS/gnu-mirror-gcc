@@ -1728,7 +1728,7 @@ analyze_idx_elements (class loop *loop, edge e, idx_elements &data)
   if (rhs_code != PLUS_EXPR)
     return false;
   tree step = gimple_assign_rhs2 (stmt);
-  if (TREE_CODE (step) != INTEGER_CST)
+  if (!integer_minus_onep (step) && !integer_onep (step))
     return false;
   inc_stmt = stmt;
   tree prev = gimple_assign_rhs1 (stmt);
