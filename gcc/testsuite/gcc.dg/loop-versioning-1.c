@@ -93,5 +93,5 @@ g6 (int stepx, unsigned int limit)
     *y = 100;
 }
 
-/* { dg-final { scan-tree-dump-times {want to version containing loop} 12 "lversion" } } */
-/* { dg-final { scan-tree-dump-times {versioned this loop} 12 "lversion" } } */
+/* { dg-final { scan-tree-dump-times {want to version containing loop} 14 "lversion" } } */
+/* { dg-final { scan-tree-dump-times {versioned this loop} 14 "lversion" } } */
