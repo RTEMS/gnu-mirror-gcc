@@ -220,6 +220,16 @@ jobs:
           scriptsRef: ${{ github.sha }}
           vendorRef: vendors/microsoft/main
 
+      # Download all artifacts from the previous jobs. This is not ideal but we have to use download-artifact
+      # since the artifacts aren't available to the REST API calls until after the workflow completes
+      # There's also no way to specify a regular expression for the artifact names we're interested in
+      # so we'll have to download the GCC build earlier, which isn't necessary for this step since we only
+      # care about the test logs.
+      # To make this faster, we can avoid downloading the GCC build in the future
+      - uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+
       - name: Parse failures
         run: | 
           chmod +x .github/scripts/gccWorkflow.py

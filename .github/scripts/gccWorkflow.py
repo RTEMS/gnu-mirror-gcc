@@ -28,6 +28,7 @@ import globals
 from common import *
 import os
 import json
+import glob
 
 class GccWorkflow(object):
     # Setup the config object and wait for any runs necessary to finish before proceeding onto the next job section
@@ -137,29 +138,27 @@ class GccWorkflow(object):
 
         Config.Reload(configJson, accessToken)
 
-        # Download all logs
-        logDirs = set()
-        artifacts = GetArtifactObjsInRun(globals.configObj.runID, '.*_logs$')
-        for artifact in artifacts:
-            DownloadArtifact(artifact['id'])
-            logDirs.add(artifact['name'])
-
-            # Each directory should have a failures.txt file
-            assert os.path.exists(artifact['name'] + '/failures.txt')
-
         # Load in the tests known to fail in our vendor branch
         with open('contrib/testsuite-management/x86_64-pc-linux-gnu.xfail') as xFailFile:
             linesFailFile = {line.rstrip('\n') for line in xFailFile}
 
-        newFailuresToAdd = set()
+        newFailuresToAdd = []
+
+        # Look for logs in the artifacts directory that were downloaded in the yaml via download-artifact
+        logDirs = glob.glob('artifacts/master_*_logs')
 
         for logDir in logDirs:
             logger.info ("Parsing log directory: " + logDir)
-            # Create a rawFailures.txt file with just the unexpected failure lines
+
+            # Each directory should have a failures.txt file
+            assert os.path.exists(logDir + '/failures.txt')
+
+            # Create a rawFailures.txt file with just the unexpected failure lines which are between the
+            # "Unexpected results in this build" and "Expected results not present in this build" markers in the file
             res = subprocess.run('cd ' + logDir                
                 + '''
-                sed -n '/^Unexpected results in this build/,${p;/^Expected results not present in this build/q}' failures.txt > rawFailures.txt
-                sed -e '1d' -e '$d' -i rawFailures.txt 
+                sed '0,/^Unexpected results in this build/d' failures.txt > afterUnexpected.txt
+                sed '/^Expected results not present in this build/q' afterUnexpected.txt > rawFailures.txt
                 sed -r '/^\s*$/d' -i rawFailures.txt
                 ''',
                 shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -169,11 +168,15 @@ class GccWorkflow(object):
                 failsInThisDir = {line.rstrip('\n') for line in rawFailuresFile}
             newFails = failsInThisDir - linesFailFile
 
-            newFailuresToAdd = newFailuresToAdd | newFails
+            for newFail in newFails:
+                newFailuresToAdd.append(newFail)
 
         if len(newFailuresToAdd) == 0:
             logger.info("No new failures detected")
             return
+
+        # Sort the list of failures so that they're in a predictable order
+        newFailuresToAdd.sort()
 
         with open('contrib/testsuite-management/x86_64-pc-linux-gnu.xfail', 'a') as xFailFile:
             logger.info("New failures found:")
@@ -182,8 +185,7 @@ class GccWorkflow(object):
                 xFailFile.write("\n")
                 xFailFile.write(newFail)
 
-
-        # Create a patch file 
+        # Create a patch file
         res = subprocess.run('''
                 git diff contrib/testsuite-management/x86_64-pc-linux-gnu.xfail > newFailures.patch
                 ''',
