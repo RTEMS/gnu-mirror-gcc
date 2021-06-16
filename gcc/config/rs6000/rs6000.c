@@ -4489,12 +4489,6 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2ADD) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2ADD;
 
-  if (TARGET_PREFIXED
-      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_LARGE_CONSTS) == 0)
-    rs6000_isa_flags |= OPTION_MASK_P10_LARGE_CONSTS;
-  else if (!TARGET_PREFIXED)
-    rs6000_isa_flags &= ~OPTION_MASK_P10_LARGE_CONSTS;
-
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
@@ -4507,8 +4501,11 @@ rs6000_option_override_internal (bool global_init_p)
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
-  if (TARGET_POWER10 && TARGET_VSX)
+  if (TARGET_POWER10 && TARGET_VSX && TARGET_PREFIXED)
     {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_P10_LARGE_CONSTS) == 0)
+	rs6000_isa_flags |= OPTION_MASK_P10_LARGE_CONSTS;
+
       if ((rs6000_isa_flags_explicit & OPTION_MASK_XXSPLTI32DX) == 0)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTI32DX;
 
@@ -4519,7 +4516,8 @@ rs6000_option_override_internal (bool global_init_p)
 	rs6000_isa_flags |= OPTION_MASK_XXSPLTIDP;
     }
   else
-    rs6000_isa_flags &= ~(OPTION_MASK_XXSPLTIW
+    rs6000_isa_flags &= ~(OPTION_MASK_P10_LARGE_CONSTS
+			  | OPTION_MASK_XXSPLTIW
 			  | OPTION_MASK_XXSPLTIDP
 			  | OPTION_MASK_XXSPLTI32DX);
 
