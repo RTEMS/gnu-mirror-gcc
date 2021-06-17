@@ -15024,6 +15024,109 @@ static rtx
 new_mma_expand_builtin (tree exp, rtx target, insn_code icode,
 			rs6000_gen_builtins fcode)
 {
+  tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+  tree arg;
+  call_expr_arg_iterator iter;
+  const struct insn_operand_data *insn_op;
+  rtx op[MAX_MMA_OPERANDS];
+  unsigned nopnds = 0;
+  bool void_func = TREE_TYPE (TREE_TYPE (fndecl)) == void_type_node;
+  machine_mode tmode = VOIDmode;
+
+  if (!void_func)
+    {
+      tmode = insn_data[icode].operand[0].mode;
+      if (!target
+	  || GET_MODE (target) != tmode
+	  || !(*insn_data[icode].operand[0].predicate) (target, tmode))
+	target = gen_reg_rtx (tmode);
+      op[nopnds++] = target;
+    }
+  else
+    target = const0_rtx;
+
+  FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
+    {
+      if (arg == error_mark_node)
+	return const0_rtx;
+
+      rtx opnd;
+      insn_op = &insn_data[icode].operand[nopnds];
+      if (TREE_CODE (arg) == ADDR_EXPR
+	  && MEM_P (DECL_RTL (TREE_OPERAND (arg, 0))))
+	opnd = DECL_RTL (TREE_OPERAND (arg, 0));
+      else
+	opnd = expand_normal (arg);
+
+      if (!(*insn_op->predicate) (opnd, insn_op->mode))
+	{
+	  if (!strcmp (insn_op->constraint, "n"))
+	    {
+	      if (!CONST_INT_P (opnd))
+		error ("argument %d must be an unsigned literal", nopnds);
+	      else
+		error ("argument %d is an unsigned literal that is "
+		       "out of range", nopnds);
+	      return const0_rtx;
+	    }
+	  opnd = copy_to_mode_reg (insn_op->mode, opnd);
+	}
+
+      /* Some MMA instructions have INOUT accumulator operands, so force
+	 their target register to be the same as their input register.  */
+      if (!void_func
+	  && nopnds == 1
+	  && !strcmp (insn_op->constraint, "0")
+	  && insn_op->mode == tmode
+	  && REG_P (opnd)
+	  && (*insn_data[icode].operand[0].predicate) (opnd, tmode))
+	target = op[0] = opnd;
+
+      op[nopnds++] = opnd;
+    }
+
+  rtx pat;
+  switch (nopnds)
+    {
+    case 1:
+      pat = GEN_FCN (icode) (op[0]);
+      break;
+    case 2:
+      pat = GEN_FCN (icode) (op[0], op[1]);
+      break;
+    case 3:
+      /* The ASSEMBLE builtin source operands are reversed in little-endian
+	 mode, so reorder them.  */
+      if (fcode == RS6000_BIF_ASSEMBLE_PAIR_V_INTERNAL && !WORDS_BIG_ENDIAN)
+	std::swap (op[1], op[2]);
+      pat = GEN_FCN (icode) (op[0], op[1], op[2]);
+      break;
+    case 4:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3]);
+      break;
+    case 5:
+      /* The ASSEMBLE builtin source operands are reversed in little-endian
+	 mode, so reorder them.  */
+      if (fcode == RS6000_BIF_ASSEMBLE_ACC_INTERNAL && !WORDS_BIG_ENDIAN)
+	{
+	  std::swap (op[1], op[4]);
+	  std::swap (op[2], op[3]);
+	}
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4]);
+      break;
+    case 6:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4], op[5]);
+      break;
+    case 7:
+      pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4], op[5], op[6]);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  if (!pat)
+    return NULL_RTX;
+  emit_insn (pat);
+
   return target;
 }
 
