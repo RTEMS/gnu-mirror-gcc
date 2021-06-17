@@ -34,8 +34,9 @@ gcc_DEVPHASE = __read_file('DEV-PHASE')
 gcc_DATESTAMP = __read_file('DATESTAMP')
 gcc_REVISION = __read_file('REVISION')
 
-VERSION_PACKAGE = os.getenv('VERSION_PACKAGE', '(GCC)')
-BUGURL = os.getenv('BUGURL', 'https://gcc.gnu.org/bugs/')
+VERSION_PACKAGE = os.getenv('VERSION_PACKAGE')
+BUGURL = os.getenv('BUGURL')
+assert VERSION_PACKAGE and BUGURL
 
 # The short X.Y version.
 version = gcc_BASEVER

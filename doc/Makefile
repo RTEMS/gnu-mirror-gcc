@@ -3,7 +3,8 @@
 
 # You can set these variables from the command line.
 SPHINXOPTS   ?= -j auto -q
-SPHINXBUILD  ?= sphinx-build
+# FIXME
+SPHINXBUILD  ?= /tmp/venv/bin/sphinx-build
 PAPER        ?=
 SOURCEDIR     = .
 BUILDDIR      = _build
