@@ -1,5 +1,6 @@
 # Configuration file for the Sphinx documentation builder.
 
+import os
 import sys
 sys.path.append('../../..//doc')
 
@@ -28,6 +29,12 @@ man_pages = [
     ('gnu-free-documentation-license', 'gfdl', 'GNU Free Documentation License', [], 7),
     ('funding', 'fsf-funding', 'Funding Free Software', [], 7)
 ]
+
+ENABLE_LTO = os.getenv('ENABLE_LTO')
+assert ENABLE_LTO
+
+if ENABLE_LTO  == 'yes':
+    man_pages += [('lto-dump', 'lto-dump', 'Tool for dumping LTO object files', [authors], 1)]
 
 texinfo_documents = [
   ('index', 'gcc', project, authors, None, None, None, True)

@@ -109,15 +109,17 @@ fortran.all.cross: gfortran-cross$(exeext)
 fortran.start.encap: gfortran$(exeext)
 fortran.rest.encap:
 
-fortran.srcinfo: doc/gfortran.info
-	-cp -p $^ $(srcdir)/fortran
-
 fortran.tags: force
 	cd $(srcdir)/fortran; etags -o TAGS.sub *.c *.h; \
 	etags --include TAGS.sub --include ../TAGS.sub
 
-fortran.info: doc/gfortran.info doc/gfc-internals.info
+fortran.info: info-gfortran info-gfc-internals
 fortran.dvi: doc/gfortran.dvi doc/gfc-internals.dvi
+
+info-gfortran:
+	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
+	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/info; \
+	else true; fi
 
 F95_HTMLFILES = $(build_htmldir)/gfortran
 
@@ -154,9 +156,10 @@ fortran.install-pdf: $(F95_PDFFILES)
 	  $(INSTALL_DATA) "$$d$$p" "$(DESTDIR)$(pdfdir)/gcc/$$f"; \
 	done
 
-F95_MANFILES = doc/gfortran.1
+man-fortran:
+	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/man
 
-fortran.man: $(F95_MANFILES)
+fortran.man: man-fortran
 
 fortran.srcman: $(F95_MANFILES)
 	-cp -p $^ $(srcdir)/doc
@@ -186,13 +189,6 @@ GFORTRAN_TEXI = \
   $(srcdir)/doc/include/gcc-common.texi \
   gcc-vers.texi
 
-doc/gfortran.info: $(GFORTRAN_TEXI)
-	if [ x$(BUILD_INFO) = xinfo ]; then \
-	  rm -f doc/gfortran.info-*; \
-	  $(MAKEINFO) -I $(srcdir)/doc/include -I $(srcdir)/fortran \
-	    -o $@ $<; \
-	else true; fi
-
 doc/gfortran.dvi: $(GFORTRAN_TEXI)
 	$(TEXI2DVI) -I $(srcdir)/fortran -I $(abs_docdir)/include -o $@ $<
 
@@ -217,11 +213,9 @@ GFC_INTERNALS_TEXI = \
   $(srcdir)/doc/include/gcc-common.texi \
   gcc-vers.texi
 
-doc/gfc-internals.info: $(GFC_INTERNALS_TEXI)
-	if [ x$(BUILD_INFO) = xinfo ]; then \
-	  rm -f doc/gfc-internals.info-*; \
-	  $(MAKEINFO) -I $(srcdir)/doc/include -I $(srcdir)/fortran \
-	    -o $@ $<; \
+info-gfc-internals:
+	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
+	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/info; \
 	else true; fi
 
 doc/gfc-internals.dvi: $(GFC_INTERNALS_TEXI)
@@ -256,9 +250,13 @@ fortran.install-plugin:
 
 fortran.install-info: $(DESTDIR)$(infodir)/gfortran.info
 
+$(DESTDIR)$(infodir)/gfortran.info: doc/fortran/info/texinfo/gfortran.info installdirs
+	-rm -f $@
+	-$(INSTALL_DATA) $< $@
+
 fortran.install-man: $(DESTDIR)$(man1dir)/$(GFORTRAN_INSTALL_NAME)$(man1ext)
 
-$(DESTDIR)$(man1dir)/$(GFORTRAN_INSTALL_NAME)$(man1ext): doc/gfortran.1 \
+$(DESTDIR)$(man1dir)/$(GFORTRAN_INSTALL_NAME)$(man1ext): doc/fortran/man/man/gfortran.1 \
 		installdirs
 	-rm -f $@
 	-$(INSTALL_DATA) $< $@
@@ -286,12 +284,6 @@ fortran.mostlyclean:
 fortran.clean:
 fortran.distclean:
 	-rm -f fortran/config.status fortran/Makefile
-
-fortran.extraclean:
-fortran.maintainer-clean:
-	-rm -f doc/gfortran.info* fortran/gfortran.*aux
-	-rm -f $(docobjdir)/gfortran.1
-
 #
 # Stage hooks:
 # The toplevel makefile has already created stage?/fortran at this point.
