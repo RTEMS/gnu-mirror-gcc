@@ -19,9 +19,8 @@ import os
 
 # The full version, including alpha/beta/rc tags
 
-# FIXME
 folder = os.path.dirname(os.path.realpath(__file__))
-gcc_srcdir = os.path.join(folder, './objdir')
+gcc_srcdir = os.path.join(folder, '..', 'gcc')
 
 def __read_file(name):
     path = os.path.join(gcc_srcdir, name)
