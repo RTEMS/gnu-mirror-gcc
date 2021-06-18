@@ -4517,6 +4517,15 @@ rs6000_option_override_internal (bool global_init_p)
 			  | OPTION_MASK_XXSPLTIDP
 			  | OPTION_MASK_XXSPLTIW);
 
+  if (TARGET_POWER10 && TARGET_FLOAT128_HW)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_LXVKQ) == 0)
+	rs6000_isa_flags |= OPTION_MASK_LXVKQ;
+    }
+  else
+    rs6000_isa_flags &= ~OPTION_MASK_LXVKQ;
+      
+
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -6722,6 +6731,86 @@ xxsplti32dx_constant_p (rtx op,
   return false;
 }
 
+/* Return true if OP is of the given MODE is one of the 18 special values that
+   can be generated with the LXVKQ instruction.
+
+   Return the constant that will go in the LXVKQ instruction.
+
+   The LXVKQ immediates are:
+	1 - 7:		1.0 .. 7.0.
+	8:		Positive infinity.
+	9:		Default quiet NaN.
+	16:		-0.0.
+	17 - 23:	-1.0 .. 7.0.
+	24:		Negative infinity.  */
+
+bool
+lxvkq_constant_p (rtx op,
+		  machine_mode mode,
+		  int *imm_p)
+{
+  *imm_p = -1;
+
+  if (!TARGET_LXVKQ)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (!FLOAT128_IEEE_P (mode))
+    return false;
+
+  if (!CONST_DOUBLE_P (op))
+    return false;
+
+  /* All of the values generated can be expressed as SFmode values, so if it
+     doesn't fit in SFmode, exit.  */
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  if (!exact_real_truncate (SFmode, rv))
+    return 0;
+
+  /* +/- Inifinity  is 8/24.  */
+  if (REAL_VALUE_ISINF (*rv))
+    {
+      *imm_p = real_isneg (rv) ? 24 : 8;
+      return true;
+    }
+
+  /* NaN is 9.  */
+  if (REAL_VALUE_ISNAN (*rv) && !REAL_VALUE_NEGATIVE (*rv))
+    {
+      *imm_p = 9;
+      return true;
+    }
+
+  /* -0.0 is 16.  */
+  if (REAL_VALUE_MINUS_ZERO (*rv))
+    {
+      *imm_p = 16;
+      return true;
+    }
+
+  /* The other values are all integers 1..7, and -1..-7.  */
+  if (!real_isinteger (rv, mode))
+    return false;
+
+  HOST_WIDE_INT value = real_to_integer (rv);
+  if (value >= 1 && value <= 7)
+    {
+      *imm_p = value;
+      return true;
+    }
+  else if (value >= -7 && value <= -1)
+    {
+      /* Subtraction is used because value is negative.  */
+      *imm_p = 16 - value;
+      return true;
+    }
+
+  /* We can't load the value with LXVKQ.  */
+  return false;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6738,6 +6827,7 @@ output_vec_const_move (rtx *operands)
       bool dest_vmx_p = ALTIVEC_REGNO_P (REGNO (dest));
       int xxspltib_value = 256;
       int num_insns = -1;
+      int lxvkq_immediate = 0;
 
       if (zero_constant (vec, mode))
 	{
@@ -6772,6 +6862,12 @@ output_vec_const_move (rtx *operands)
 
       if (xxsplti32dx_operand (vec, mode))
 	return "#";
+
+      if (lxvkq_constant_p (vec, mode, &lxvkq_immediate))
+	{
+	  operands[2] = GEN_INT (lxvkq_immediate);
+	  return "lxvkq %x0,%2";
+	}
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -13468,6 +13564,7 @@ rs6000_output_move_128bit (rtx operands[])
   int src_regno;
   bool dest_gpr_p, dest_fp_p, dest_vmx_p, dest_vsx_p;
   bool src_gpr_p, src_fp_p, src_vmx_p, src_vsx_p;
+  int lxvkq_immediate = 0;
 
   if (REG_P (dest))
     {
@@ -13612,6 +13709,14 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
+  else if (dest_vmx_p
+	   && CONST_DOUBLE_P (src)
+	   && lxvkq_constant_p (src, mode, &lxvkq_immediate))
+    {
+      operands[2] = GEN_INT (lxvkq_immediate);
+      return "lxvkq %x0,%2";
+    }
+
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
@@ -24320,6 +24425,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
+  { "lxvkq",			OPTION_MASK_LXVKQ,		false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
