@@ -79,6 +79,7 @@ TEXISRC = $(objdir)/m2/images/gnu.eps \
 # Define the names for selecting GNU Modula-2 in LANGUAGES.
 m2 modula-2 modula2: gm2$(exeext) xgcc$(exeext) cc1gm2$(exeext) \
                  $(GCC_TOOLS_FOR_GM2)
+m2.serial = cc1gm2$(exeext)
 
 # Tell GNU make to ignore these if they exist.
 .PHONY: m2 modula-2 modula2
@@ -531,7 +532,7 @@ GM2_LIBS_PARANOID = m2/gm2-compiler-paranoid/gm2.a \
 
 gm2.paranoid: stage3/m2/cc1gm2$(exeext) gm2.verifyparanoid
 
-cc1gm2$(exeext): stage1/m2/cc1gm2$(exeext)
+cc1gm2$(exeext): stage1/m2/cc1gm2$(exeext) $(m2.prev)
 	cp -p $< $@
 
 gm2lcc$(exeext): stage1/m2/gm2lcc$(exeext)
@@ -552,29 +553,35 @@ gm2m$(exeext): stage1/m2/gm2m$(exeext)
 stage3/m2/cc1gm2$(exeext): stage2/m2/cc1gm2$(exeext) m2/gm2-compiler-paranoid/m2flex.o \
                             $(P) $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) $(GM2_LIBS_PARANOID) \
                             m2/gm2-gcc/rtegraph.o plugin/m2rte$(exeext).so
-	$(LINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler-paranoid/m2flex.o \
+	@$(call LINK_PROGRESS,$(INDEX.m2),start)
+	+$(LLINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler-paranoid/m2flex.o \
                             attribs.o \
                               $(GM2_LIBS_PARANOID) \
                               $(BACKEND) $(LIBS) m2/gm2-gcc/rtegraph.o \
                               $(BACKENDLIBS) $(LIBSTDCXX) -lm
+	@$(call LINK_PROGRESS,$(INDEX.m2),end)
 
 stage2/m2/cc1gm2$(exeext): stage1/m2/cc1gm2$(exeext) m2/gm2-compiler/m2flex.o $(P) \
                             $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) $(GM2_LIBS) \
                             m2/gm2-gcc/rtegraph.o plugin/m2rte$(exeext).so
-	$(LINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler/m2flex.o \
+	@$(call LINK_PROGRESS,$(INDEX.m2),start)
+	+$(LLINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler/m2flex.o \
                             attribs.o \
                               $(GM2_LIBS) \
                               $(BACKEND) $(LIBS) m2/gm2-gcc/rtegraph.o \
                               $(BACKENDLIBS) $(LIBSTDCXX) -lm
+	@$(call LINK_PROGRESS,$(INDEX.m2),end)
 
 stage1/m2/cc1gm2$(exeext): gm2$(exeext) m2/gm2-compiler-boot/m2flex.o \
                             $(P) $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) \
                             $(GM2_LIBS_BOOT) $(MC_LIBS) \
-                            m2/gm2-gcc/rtegraph.o plugin/m2rte$(exeext).so
-	$(LINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler-boot/m2flex.o \
+                            m2/gm2-gcc/rtegraph.o plugin/m2rte$(exeext).so $(m2.prev)
+	@$(call LINK_PROGRESS,$(INDEX.m2),start)
+	+$(LLINKER) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(GM2_C_OBJS) m2/gm2-compiler-boot/m2flex.o \
                             attribs.o \
                              $(GM2_LIBS_BOOT) $(MC_LIBS) m2/gm2-gcc/rtegraph.o \
                              $(BACKEND) $(LIBS) $(BACKENDLIBS)
+	@$(call LINK_PROGRESS,$(INDEX.m2),end)
 
 # Compiling object files from source files.
 
