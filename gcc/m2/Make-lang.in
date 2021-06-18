@@ -1180,8 +1180,8 @@ m2/gm2-libs-iso/%.o: $(srcdir)/m2/gm2-libs-iso/%.mod
 m2/gm2-libs/gm2-libs-host.h:
 	echo "Configuring to build libraries using native compiler" ; \
         cd m2/gm2-libs ; \
-        $(SHELL) -c '../../$(srcdir)/m2/gm2-libs/config-host \
-               --srcdir=../../$(srcdir)/m2/gm2-libs \
+        $(SHELL) -c '$(srcdir)/m2/gm2-libs/config-host \
+               --srcdir=$(srcdir)/m2/gm2-libs \
                --target=$(target) \
                --program-suffix=$(exeext)'
 
@@ -1195,9 +1195,9 @@ m2/gm2config.h:
             export AR ; \
             RANLIB=`echo $(RANLIB_FOR_TARGET) | sed -e "s/^ //"` ; \
             export RANLIB ; \
-            $(SHELL) -c '../$(srcdir)/m2/configure --srcdir=../$(srcdir)/m2 --target=$(target) --program-suffix=$(exeext) --includedir=$(SYSTEM_HEADER_DIR) --libdir=$(libdir) --libexecdir=$(libexecdir)' ; \
+            $(SHELL) -c '$(srcdir)/m2/configure --srcdir=$(srcdir)/m2 --target=$(target) --program-suffix=$(exeext) --includedir=$(SYSTEM_HEADER_DIR) --libdir=$(libdir) --libexecdir=$(libexecdir)' ; \
         else \
-            $(SHELL) -c '../$(srcdir)/m2/configure --srcdir=../$(srcdir)/m2 --target=$(target) --program-suffix=$(exeext)' ; \
+            $(SHELL) -c '$(srcdir)/m2/configure --srcdir=$(srcdir)/m2 --target=$(target) --program-suffix=$(exeext)' ; \
         fi
 
 $(objdir)/m2/gm2-libs-min/SYSTEM.def: $(GM2_PROG_DEP)
