@@ -10143,12 +10143,23 @@ mma_expand_builtin (tree exp, rtx target, bool *expandedp)
       pat = GEN_FCN (icode) (op[0], op[1]);
       break;
     case 3:
+      /* The ASSEMBLE builtin source operands are reversed in little-endian
+	 mode, so reorder them.  */
+      if (fcode == VSX_BUILTIN_ASSEMBLE_PAIR_INTERNAL && !WORDS_BIG_ENDIAN)
+	std::swap (op[1], op[2]);
       pat = GEN_FCN (icode) (op[0], op[1], op[2]);
       break;
     case 4:
       pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3]);
       break;
     case 5:
+      /* The ASSEMBLE builtin source operands are reversed in little-endian
+	 mode, so reorder them.  */
+      if (fcode == MMA_BUILTIN_ASSEMBLE_ACC_INTERNAL && !WORDS_BIG_ENDIAN)
+	{
+	  std::swap (op[1], op[4]);
+	  std::swap (op[2], op[3]);
+	}
       pat = GEN_FCN (icode) (op[0], op[1], op[2], op[3], op[4]);
       break;
     case 6:
@@ -11751,7 +11762,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
       tree dst_ptr = gimple_call_arg (stmt, 0);
       tree src_ptr = gimple_call_arg (stmt, 1);
       tree src_type = TREE_TYPE (src_ptr);
-      tree src = make_ssa_name (TREE_TYPE (src_type));
+      tree src = create_tmp_reg_or_ssa_name (TREE_TYPE (src_type));
       gimplify_assign (src, build_simple_mem_ref (src_ptr), &new_seq);
 
       /* If we are not disassembling an accumulator/pair or our destination is
@@ -11775,7 +11786,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
 	{
 	  new_decl = rs6000_builtin_decls[MMA_BUILTIN_XXMFACC_INTERNAL];
 	  new_call = gimple_build_call (new_decl, 1, src);
-	  src = make_ssa_name (vector_quad_type_node);
+	  src = create_tmp_reg_or_ssa_name (vector_quad_type_node);
 	  gimple_call_set_lhs (new_call, src);
 	  gimple_seq_add_stmt (&new_seq, new_call);
 	}
@@ -11790,7 +11801,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
 	  unsigned index = WORDS_BIG_ENDIAN ? i : nvec - 1 - i;
 	  tree dst = build2 (MEM_REF, unsigned_V16QI_type_node, dst_base,
 			     build_int_cst (dst_type, index * 16));
-	  tree dstssa = make_ssa_name (unsigned_V16QI_type_node);
+	  tree dstssa = create_tmp_reg_or_ssa_name (unsigned_V16QI_type_node);
 	  new_call = gimple_build_call (new_decl, 2, src,
 					build_int_cstu (uint16_type_node, i));
 	  gimple_call_set_lhs (new_call, dstssa);
@@ -11813,7 +11824,7 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
     {
       /* This built-in has a pass-by-reference accumulator input, so load it
 	 into a temporary accumulator for use as a pass-by-value input.  */
-      op[0] = make_ssa_name (vector_quad_type_node);
+      op[0] = create_tmp_reg_or_ssa_name (vector_quad_type_node);
       for (unsigned i = 1; i < nopnds; i++)
 	op[i] = gimple_call_arg (stmt, i);
       gimplify_assign (op[0], build_simple_mem_ref (acc), &new_seq);
@@ -11860,10 +11871,10 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
       gcc_unreachable ();
     }
 
-  if (fncode == VSX_BUILTIN_ASSEMBLE_PAIR)
-    lhs = make_ssa_name (vector_pair_type_node);
+  if (fncode == VSX_BUILTIN_BUILD_PAIR || fncode == VSX_BUILTIN_ASSEMBLE_PAIR)
+    lhs = create_tmp_reg_or_ssa_name (vector_pair_type_node);
   else
-    lhs = make_ssa_name (vector_quad_type_node);
+    lhs = create_tmp_reg_or_ssa_name (vector_quad_type_node);
   gimple_call_set_lhs (new_call, lhs);
   gimple_seq_add_stmt (&new_seq, new_call);
   gimplify_assign (build_simple_mem_ref (acc), lhs, &new_seq);
@@ -14175,8 +14186,10 @@ mma_init_builtins (void)
 	      machine_mode mode = insn_data[icode].operand[j].mode;
 	      if (gimple_func && mode == XOmode)
 		op[nopnds++] = build_pointer_type (vector_quad_type_node);
-	      else if (gimple_func && mode == OOmode
-		       && d->code == VSX_BUILTIN_ASSEMBLE_PAIR)
+	      else if (gimple_func
+		       && mode == OOmode
+		       && (d->code == VSX_BUILTIN_BUILD_PAIR
+			   || d->code == VSX_BUILTIN_ASSEMBLE_PAIR))
 		op[nopnds++] = build_pointer_type (vector_pair_type_node);
 	      else
 		/* MMA uses unsigned types.  */

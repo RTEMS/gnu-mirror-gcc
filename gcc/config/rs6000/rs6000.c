@@ -4461,15 +4461,29 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_MMA) == 0)
     rs6000_isa_flags |= OPTION_MASK_MMA;
 
-  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION) == 0)
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION;
 
   if (TARGET_POWER10 &&
       (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
 
-  if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2LOGICAL) == 0)
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2LOGICAL) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2LOGICAL;
+
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LOGADD) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LOGADD;
+
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_ADDLOG) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_ADDLOG;
+
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2ADD) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2ADD;
 
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
@@ -9612,7 +9626,8 @@ rs6000_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
       && SYMBOL_REF_TLS_MODEL (XEXP (XEXP (x, 0), 0)) != 0)
     return true;
 
-  /* Do not place an ELF TLS symbol in the constant pool.  */
+  /* Allow AIX TOC TLS symbols in the constant pool,
+     but not ELF TLS symbols.  */
   return TARGET_ELF && tls_referenced_p (x);
 }
 
@@ -16819,9 +16834,11 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    gcc_assert (VSX_REGNO_P (REGNO (dst)));
 
 	  reg_mode = GET_MODE (XVECEXP (src, 0, 0));
-	  for (int i = 0; i < XVECLEN (src, 0); i++)
+	  int nvecs = XVECLEN (src, 0);
+	  for (int i = 0; i < nvecs; i++)
 	    {
-	      rtx dst_i = gen_rtx_REG (reg_mode, reg + i);
+	      int index = WORDS_BIG_ENDIAN ? i : nvecs - 1 - i;
+	      rtx dst_i = gen_rtx_REG (reg_mode, reg + index);
 	      emit_insn (gen_rtx_SET (dst_i, XVECEXP (src, 0, i)));
 	    }
 
@@ -25373,6 +25390,20 @@ rs6000_legitimate_constant_p (machine_mode mode, rtx x)
 
   return true;
 }
+
+#if TARGET_AIX_OS
+/* Implement TARGET_PRECOMPUTE_TLS_P.
+
+   On the AIX, TLS symbols are in the TOC, which is maintained in the
+   constant pool.  AIX TOC TLS symbols need to be pre-computed, but
+   must be considered legitimate constants.  */
+
+static bool
+rs6000_aix_precompute_tls_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
+{
+  return tls_referenced_p (x);
+}
+#endif
 
 
 /* Return TRUE iff the sequence ending in LAST sets the static chain.  */
