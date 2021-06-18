@@ -8415,6 +8415,7 @@ maybe_set_vectorized_backedge_value (loop_vec_info loop_vinfo,
     if (gphi *phi = dyn_cast <gphi *> (USE_STMT (use_p)))
       if (gimple_bb (phi)->loop_father->header == gimple_bb (phi)
 	  && (phi_info = loop_vinfo->lookup_stmt (phi))
+	  && STMT_VINFO_RELEVANT_P (phi_info)
 	  && VECTORIZABLE_CYCLE_DEF (STMT_VINFO_DEF_TYPE (phi_info))
 	  && STMT_VINFO_REDUC_TYPE (phi_info) != FOLD_LEFT_REDUCTION
 	  && STMT_VINFO_REDUC_TYPE (phi_info) != EXTRACT_LAST_REDUCTION)
@@ -8936,13 +8937,27 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 	   !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gcall *call = dyn_cast <gcall *> (gsi_stmt (gsi));
-	  if (call && gimple_call_internal_p (call, IFN_MASK_LOAD))
+	  if (!call || !gimple_call_internal_p (call))
+	    continue;
+	  internal_fn ifn = gimple_call_internal_fn (call);
+	  if (ifn == IFN_MASK_LOAD)
 	    {
 	      tree lhs = gimple_get_lhs (call);
 	      if (!VECTOR_TYPE_P (TREE_TYPE (lhs)))
 		{
 		  tree zero = build_zero_cst (TREE_TYPE (lhs));
 		  gimple *new_stmt = gimple_build_assign (lhs, zero);
+		  gsi_replace (&gsi, new_stmt, true);
+		}
+	    }
+	  else if (conditional_internal_fn_code (ifn) != ERROR_MARK)
+	    {
+	      tree lhs = gimple_get_lhs (call);
+	      if (!VECTOR_TYPE_P (TREE_TYPE (lhs)))
+		{
+		  tree else_arg
+		    = gimple_call_arg (call, gimple_call_num_args (call) - 1);
+		  gimple *new_stmt = gimple_build_assign (lhs, else_arg);
 		  gsi_replace (&gsi, new_stmt, true);
 		}
 	    }

@@ -1,3 +1,497 @@
+2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/scoped_allocator/69293_neg.cc: Add dg-error
+	for additional errors in C++20.
+	* testsuite/20_util/uses_allocator/69293_neg.cc: Likewise.
+	* testsuite/20_util/uses_allocator/cons_neg.cc: Likewise.
+
+2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100982
+	* include/std/optional (optional::operator=(const optional<U>&)):
+	Fix value category used in is_assignable check.
+	* testsuite/20_util/optional/assignment/100982.cc: New test.
+
+2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101034
+	* include/std/any (any(in_place_t<T>, initializer_list<U>, A&&...))
+	(any::emplace<T>(initializer_list<U>, A&&...)): Fix constraint
+	to use lvalue.
+	* testsuite/20_util/any/cons/101034.cc: New test.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-06-03  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100770
+	* include/bits/ranges_algo.h (__detail::__can_reread_output):
+	Factor out this concept from ...
+	(__unique_copy_fn::operator()): ... here.  Use the concept
+	throughout.
+	* testsuite/std/ranges/range.cc: Remove now ill-formed use
+	of range_value_t on an output_range.
+	* testsuite/util/testsuite_iterators.h (output_iterator_wrapper):
+	Define value_type, pointer and reference member types to void.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-21  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100690
+	* include/std/ranges (iota_view::_Sentinel::_M_distance_from):
+	Split out this member function from ...
+	(iota_view::_Sentinel::operator-): ... here, for sake of access
+	control.
+	* testsuite/std/ranges/iota/iota_view.cc (test05): New test.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-06  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (filter_view::_Iterator::base): Make the
+	const& overload unconstrained and return a const reference as
+	per LWG 3533.  Make unconditionally noexcept.
+	(transform_view::_Iterator::base): Likewise.
+	(elements_view::_Iterator::base): Likewise.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-06  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_iterator.h (move_iterator::base): Make the
+	const& overload unconstrained and return a const reference as
+	per LWG 3391.  Make unconditionally noexcept.
+	(counted_iterator::base): Likewise.
+	* testsuite/24_iterators/move_iterator/lwg3391.cc: New test.
+	* testsuite/24_iterators/move_iterator/move_only.cc: Adjust
+	has_member_base concept to decay-copy the result of base().
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100631
+	* include/std/ranges (elements_view::_Sentinel::operator-): Use
+	_M_distance_from in the other operator- overload too.
+	* testsuite/std/ranges/adaptors/elements.cc (test06): Augment test.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100631
+	* include/std/ranges (elements_view::_Iterator): Also befriend
+	_Sentinel<!_Const>.
+	(elements_view::_Sentinel::_M_equal): Templatize.
+	(elements_view::_Sentinel::_M_distance_from): Split out from ...
+	(elements_view::_Sentinel::operator-): ... here.  Depend on
+	_Base2 instead of _Base in the return type.
+	* testsuite/std/ranges/adaptors/elements.cc (test06, test07):
+	New tests.
+
+2021-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-20  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100639
+	* include/bits/stl_iterator.h (reverse_iterator::difference_type):
+	In C++20 mode, define in terms of iter_difference_t as per P0896R4.
+	(reverse_iterator::reference): Likewise, but with iter_reference_t.
+	(reverse_iterator::value_type): Likewise, but with iter_value_t.
+	* testsuite/std/ranges/adaptors/reverse.cc (test08): New test.
+	* testsuite/24_iterators/reverse_iterator/100639.cc: New test.
+
+2021-06-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100833
+	* include/bits/range_access.h (ranges::advance(iter, n, sentinel)):
+	Fix return value for no-op case.
+	* testsuite/24_iterators/range_operations/advance.cc: Test
+	return values of three-argument overload.
+
+2021-06-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100768
+	* include/bits/range_access.h (ranges::advance)
+	(ranges::distance, ranges::next, ranges::prev): Replace
+	function templates with function objects.
+	* testsuite/24_iterators/headers/iterator/synopsis_c++20.cc:
+	Adjust for changes to function objects.
+	* testsuite/std/ranges/adaptors/elements.cc: Add using
+	declarations for names from namespace ranges.
+	* testsuite/std/ranges/adaptors/transform.cc: Likewise.
+	* testsuite/24_iterators/range_operations/100768.cc: New test.
+
+2021-06-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99453
+	* python/Makefile.am: Use archive name for printer hook if no
+	dynamic library name is available.
+	* python/Makefile.in: Regenerate.
+
+2021-06-03  Philippe Blain  <levraiphilippeblain@gmail.com>
+
+	Backported from master:
+	2021-04-21  Philippe Blain  <levraiphilippeblain@gmail.com>
+		    Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99453
+	* python/Makefile.am: Install libstdc++*-gdb.py more robustly.
+	* python/Makefile.in: Regenerate.
+
+2021-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100630
+	* include/bits/fs_path.h (__is_constructible_from): Test
+	construction from a const lvalue, not an rvalue.
+	* include/experimental/bits/fs_path.h (__is_constructible_from):
+	Likewise.
+	* testsuite/27_io/filesystem/path/construct/100630.cc: New test.
+	* testsuite/experimental/filesystem/path/construct/100630.cc:
+	New test.
+
+2021-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-03-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (find_type): Use tag attribute
+	instead of unqualified() method.
+
+2021-05-05  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-05-05  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (transform_view::_Iterator::iter_swap):
+	Remove as per LWG 3520.
+	(join_view::_Iterator::iter_swap): Add indirectly_swappable
+	constraint as per LWG 3517.
+
+2021-05-04  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (split_view::_InnerIter::operator++):
+	Depend on _Base instead of _Vp directly, as per LWG 3532.
+
+2021-05-04  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-20  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/95983
+	* include/bits/stl_iterator.h (__detail::__move_iter_cat):
+	Define.
+	(move_iterator): Derive from the above in C++20 in order to
+	conditionally define iterator_category as per P2259.
+	(move_iterator::__base_cat): No longer used, so remove.
+	(move_iterator::iterator_category): Remove in C++20.
+	(__detail::__common_iter_use_postfix_proxy): Define.
+	(common_iterator::_Proxy): Rename to ...
+	(common_iterator:__arrow_proxy): ... this.
+	(common_iterator::__postfix_proxy): Define as per P2259.
+	(common_iterator::operator->): Adjust.
+	(common_iterator::operator++): Adjust as per P2259.
+	(iterator_traits<common_iterator>::_S_iter_cat): Define.
+	(iterator_traits<common_iterator>::iterator_category): Change as
+	per P2259.
+	(__detail::__counted_iter_value_type): Define.
+	(__detail::__counted_iter_concept): Define.
+	(__detail::__counted_iter_cat): Define.
+	(counted_iterator): Derive from the above three classes in order
+	to conditionally define value_type, iterator_concept and
+	iterator category respectively as per P2259.
+	(counted_iterator::operator->): Define as per P2259.
+	(incrementable_traits<counted_iterator>): Remove as per P2259.
+	(iterator_traits<counted_iterator>): Adjust as per P2259.
+	* include/std/ranges (__detail::__iota_view_iter_cat): Define.
+	(iota_view::_Iterator): Derive from the above in order to
+	conditionally define iterator_category as per P2259.
+	(iota_view::_S_iter_cat): Rename to ...
+	(iota_view::_S_iter_concept): ... this.
+	(iota_view::iterator_concept): Use it to apply LWG 3291 changes.
+	(iota_view::iterator_category): Remove.
+	(__detail::__filter_view_iter_cat): Define.
+	(filter_view::_Iterator): Derive from the above in order to
+	conditionally define iterator_category as per P2259.
+	(filter_view::_Iterator): Move to struct __filter_view_iter_cat.
+	(filter_view::_Iterator::iterator_category): Remove.
+	(transform_view::_Base): Define.
+	(transform_view::__iter_cat): Define.
+	(transform_view::_Iterator): Derive from the above in order to
+	conditionally define iterator_category as per P2259.
+	(transform_view::_Iterator::_Base): Just alias
+	transform_view::_Base.
+	(transform_view::_Iterator::_S_iter_cat): Move to struct
+	transform_view::__iter_cat.
+	(transform_view::_Iterator::iterator_category): Remove.
+	(transform_view::_Sentinel::_Base): Just alias
+	transform_view::_Base.
+	(join_view::_Base): Define.
+	(join_view::_Outer_iter): Define.
+	(join_view::_Inner_iter): Define.
+	(join_view::_S_ref_is_glvalue): Define.
+	(join_view::__iter_cat): Define.
+	(join_view::_Iterator): Derive from it in order to conditionally
+	define iterator_category as per P2259.
+	(join_view::_Iterator::_Base): Just alias join_view::_Base.
+	(join_view::_Iterator::_S_ref_is_glvalue): Just alias
+	join_view::_S_ref_is_glvalue.
+	(join_view::_Iterator::_S_iter_cat): Move to struct
+	transform_view::__iter_cat.
+	(join_view::_Iterator::_Outer_iter): Just alias
+	join_view::_Outer_iter.
+	(join_view::_Iterator::_Inner_iter): Just alias
+	join_view::_Inner_iter.
+	(join_view::_Iterator::iterator_category): Remove.
+	(join_view::_Sentinel::_Base): Just alias join_view::_Base.
+	(__detail::__split_view_outer_iter_cat): Define.
+	(__detail::__split_view_inner_iter_cat): Define.
+	(split_view::_Base): Define.
+	(split_view::_Outer_iter): Derive from __split_view_outer_iter_cat
+	in order to conditionally define iterator_category as per P2259.
+	(split_view::_Outer_iter::iterator_category): Remove.
+	(split_view::_Inner_iter): Derive from __split_view_inner_iter_cat
+	in order to conditionally define iterator_category as per P2259.
+	(split_view::_Inner_iter::_S_iter_cat): Move to
+	__split_view_inner_iter_cat.
+	(split_view::_Inner_iter::iterator_category): Remove.
+	(elements_view::_Base): Define.
+	(elements_view::__iter_cat): Define.
+	(elements_view::_Iterator): Derive from the above in order to
+	conditionall define iterator_category as per P2259.
+	(elements_view::_Iterator::_Base): Just alias
+	elements_view::_Base.
+	(elements_view::_Iterator::_S_iter_concept)
+	(elements_view::_Iterator::iterator_concept): Define as per
+	P2259.
+	(elements_view::_Iterator::iterator_category): Remove.
+	(elements_view::_Sentinel::_Base): Just alias
+	elements_view::_Base.
+	* testsuite/24_iterators/headers/iterator/synopsis_c++20.cc:
+	Adjust constraints on iterator_traits<counted_iterator>.
+	* testsuite/std/ranges/p2259.cc: New test.
+
+2021-05-03  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-27  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/100290
+	* include/std/ranges (join_view::_Iterator::operator++): Correct
+	the return type of the lambda to avoid returning a copy of
+	_M_parent->_M_inner.
+	* testsuite/std/ranges/adaptors/join.cc (test10): New test.
+
+2021-04-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h (__cpp_lib_constexpr_string):
+	Only define for C++17 and later.
+
+2021-04-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100259
+	* include/experimental/internet (net::ip::make_error_code)
+	(net::ip::make_error_condition, net::ip::make_network_v4)
+	(net::ip::operator==(const udp&, const udp&)): Add 'inline'.
+
+2021-04-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h (__cpp_lib_constexpr_string): Define.
+	* include/std/version (__cpp_lib_constexpr_string): Define.
+	* testsuite/21_strings/char_traits/requirements/constexpr_functions_c++17.cc:
+	Check for __cpp_lib_constexpr_string.
+	* testsuite/21_strings/char_traits/requirements/constexpr_functions_c++20.cc:
+	Likewise.
+	* testsuite/21_strings/char_traits/requirements/version.cc: New test.
+
+2021-04-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100180
+	* testsuite/experimental/net/internet/address/v6/members.cc:
+	Require gthreads.
+
+2021-04-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-08  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (__detail::find): Define.
+	(split_view::_OuterIter::operator++): Apply proposed resolution
+	of LWG 3505.
+	* testsuite/std/ranges/adaptors/split.cc (test10): New test.
+
+2021-04-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-08  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (__detail::find_if): Simplify.
+	(__detail::find_if_not): Likewise.
+	(__detail::min): Remove.
+	(__detail::mismatch): Simplify.
+	(take_view::size): Use std::min instead of __detail::min.
+
+2021-04-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-04-08  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (__detail::__returnable_element): New
+	concept.
+	(elements_view): Use this concept in its constraints.  Add
+	missing private access specifier.
+	(elements_view::_S_get_element): Define as per LWG 3502.
+	(elements_view::operator*, elements_view::operator[]): Use
+	_S_get_element.
+	(elements_view::operator++): Remove unnecessary constraint
+	as per LWG 3492.
+	* testsuite/std/ranges/adaptors/elements.cc (test05): New test.
+
+2021-04-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2020-10-31  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/97600
+	* include/std/ranges (basic_istream_view::begin): Initialize
+	_Iterator from 'this' instead of '*this'.
+	(basic_istream_view::_Iterator::_Iterator): Adjust constructor
+	accordingly.
+	(filter_view::_Iterator::_Iterator): Take a filter_view*
+	argument instead of a filter_view& argument.
+	(filter_view::_Sentinel::_Sentinel): Likewise.
+	(filter_view::begin): Initialize _Iterator from 'this' instead
+	of '*this'.
+	(filter_view::end): Likewise.
+	(transform_view::_Iterator::_Iterator): Take a _Parent* instead
+	of a _Parent&.
+	(filter_view::_Iterator::operator+): Adjust accordingly.
+	(filter_view::_Iterator::operator-): Likewise.
+	(filter_view::begin): Initialize _Iterator from 'this' instead
+	of '*this'.
+	(filter_view::end): Likewise.
+	(join_view::_Iterator): Take a _Parent* instead of a _Parent&.
+	(join_view::_Sentinel): Likewise.
+	(join_view::begin): Initialize _Iterator from 'this' instead of
+	'*this'.
+	(join_view::end): Initialize _Sentinel from 'this' instead of
+	'*this'.
+	(split_view::_OuterIter): Take a _Parent& instead of a _Parent*.
+	(split_view::begin): Initialize _OuterIter from 'this' instead
+	of '*this'.
+	(split_view::end): Likewise.
+	* testsuite/std/ranges/97600.cc: New test.
+
+2021-04-19  François Dumont  <fdumont@gcc.gnu.org>
+
+	PR libstdc++/99402
+	* include/debug/helper_functions.h (__can_advance(_InputIterator,
+	const std::pair<_Diff, _Distance_precision>&, int)): New.
+	(__can_advance(const _Safe_iterator<>&,
+	const std::pair<_Diff, _Distance_precision>&, int)): New.
+	* include/debug/macros.h (__glibcxx_check_can_increment_dist): New,
+	use latter.
+	(__glibcxx_check_can_increment_range): Adapt to use latter.
+	(__glibcxx_check_can_decrement_range): Likewise.
+	* include/debug/safe_iterator.h
+	(_Safe_iterator<>::_M_can_advance(const std::pair<_Diff, _Distance_precision>&,
+	int)): New.
+	(__can_advance(const _Safe_iterator<>&,
+	const std::pair<_Diff, _Distance_precision>&, int)): New.
+	* include/debug/safe_iterator.tcc
+	(_Safe_iterator<>::_M_can_advance(const std::pair<_Diff, _Distance_precision>&,
+	int)): New.
+	(_Safe_iterator<>::_M_valid_range(const _Safe_iterator<>&,
+	std::pair<difference_type, _Distance_precision>&, bool)): Adapt for
+	__dp_sign_max_size.
+	(__copy_move_a): Adapt to use __glibcxx_check_can_increment_dist.
+	(__copy_move_backward_a): Likewise.
+	(__equal_aux): Likewise.
+	* include/debug/stl_iterator.h (__can_advance(const std::reverse_iterator<>&,
+	const std::pair<_Diff, _Distance_precision>&, int)): New.
+	(__can_advance(const std::move_iterator<>&,
+	const std::pair<_Diff, _Distance_precision>&, int)): New.
+	* testsuite/25_algorithms/copy/debug/99402.cc: New test.
+
+2021-04-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-10-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/97570
+	* libsupc++/new_opa.cc: Declare size_t in global namespace.
+	Remove unused header.
+
+2021-04-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100060
+	* include/std/bit: Only include <ext/numeric_traits.h> for
+	hosted build, use <limits> otherwise.
+
+2021-04-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100044
+	* include/std/ranges (__detail::__iterator_sentinel_pair):
+	Remove helper concept.
+	(subrange(_Pr), subrange(Pr, __make_unsigned_like<...>)): Remove
+	deduction guides, as per LWG 3404.
+	* testsuite/std/ranges/subrange/lwg3282_neg.cc: Check that class
+	template argument deduction fails.
+
+2021-04-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2020-08-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/iterator_concepts.h (indirectly_readable): Add
+	partial specializations to resolve ambiguities (LWG 3446).
+	* testsuite/24_iterators/associated_types/readable.traits.cc:
+	Check types with both value_type and element_type.
+
 2021-04-09  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR bootstrap/99983

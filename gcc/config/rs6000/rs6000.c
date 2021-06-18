@@ -5550,7 +5550,7 @@ rs6000_machine_from_flags (void)
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
   /* Disable the flags that should never influence the .machine selection.  */
-  flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT);
+  flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL);
 
   if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
     return "power10";
@@ -16023,9 +16023,11 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 		      && XINT (src, 1) == UNSPEC_MMA_ASSEMBLE_ACC);
 
 	  reg_mode = GET_MODE (XVECEXP (src, 0, 0));
-	  for (int i = 0; i < XVECLEN (src, 0); i++)
+	  int nvecs = XVECLEN (src, 0);
+	  for (int i = 0; i < nvecs; i++)
 	    {
-	      rtx dst_i = gen_rtx_REG (reg_mode, reg + i);
+	      int index = WORDS_BIG_ENDIAN ? i : nvecs - 1 - i;
+	      rtx dst_i = gen_rtx_REG (reg_mode, reg + index);
 	      emit_insn (gen_rtx_SET (dst_i, XVECEXP (src, 0, i)));
 	    }
 

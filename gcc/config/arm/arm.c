@@ -3850,7 +3850,7 @@ arm_options_perform_arch_sanity_checks (void)
 
   /* We don't clear D16-D31 VFP registers for cmse_nonsecure_call functions
      and ARMv8-M Baseline and Mainline do not allow such configuration.  */
-  if (use_cmse && LAST_VFP_REGNUM > LAST_LO_VFP_REGNUM)
+  if (use_cmse && TARGET_HARD_FLOAT && LAST_VFP_REGNUM > LAST_LO_VFP_REGNUM)
     error ("ARMv8-M Security Extensions incompatible with selected FPU");
 
 
@@ -5567,9 +5567,20 @@ arm_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
 			return;
 		      *op1 = GEN_INT (i + 1);
 		      *code = *code == GT ? GE : LT;
-		      return;
 		    }
-		  break;
+		  else
+		    {
+		      /* GT maxval is always false, LE maxval is always true.
+			 We can't fold that away here as we must make a
+			 comparison, but we can fold them to comparisons
+			 with the same result that can be handled:
+			   op0 GT maxval -> op0 LT minval
+			   op0 LE maxval -> op0 GE minval
+			 where minval = (-maxval - 1).  */
+		      *op1 = GEN_INT (-maxval - 1);
+		      *code = *code == GT ? LT : GE;
+		    }
+		  return;
 
 		case GTU:
 		case LEU:
@@ -5582,9 +5593,19 @@ arm_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
 			return;
 		      *op1 = GEN_INT (i + 1);
 		      *code = *code == GTU ? GEU : LTU;
-		      return;
 		    }
-		  break;
+		  else
+		    {
+		      /* GTU ~0 is always false, LEU ~0 is always true.
+			 We can't fold that away here as we must make a
+			 comparison, but we can fold them to comparisons
+			 with the same result that can be handled:
+			   op0 GTU ~0 -> op0 LTU 0
+			   op0 LEU ~0 -> op0 GEU 0.  */
+		      *op1 = const0_rtx;
+		      *code = *code == GTU ? LTU : GEU;
+		    }
+		  return;
 
 		default:
 		  gcc_unreachable ();
@@ -5786,6 +5807,10 @@ arm_libcall_uses_aapcs_base (const_rtx libcall)
 		   convert_optab_libfunc (sfix_optab, DImode, SFmode));
       add_libcall (libcall_htab,
 		   convert_optab_libfunc (ufix_optab, DImode, SFmode));
+      add_libcall (libcall_htab,
+		   convert_optab_libfunc (sfix_optab, SImode, SFmode));
+      add_libcall (libcall_htab,
+		   convert_optab_libfunc (ufix_optab, SImode, SFmode));
 
       /* Values from double-precision helper functions are returned in core
 	 registers if the selected core only supports single-precision
@@ -18740,10 +18765,14 @@ cmse_nonsecure_call_inline_register_clear (void)
 		  imm = gen_int_mode (- lazy_store_stack_frame_size, SImode);
 		  add_insn = emit_insn (gen_addsi3 (stack_pointer_rtx,
 						    stack_pointer_rtx, imm));
-		  arm_add_cfa_adjust_cfa_note (add_insn,
-					       - lazy_store_stack_frame_size,
-					       stack_pointer_rtx,
-					       stack_pointer_rtx);
+		  /* If we have the frame pointer, then it will be the
+		     CFA reg.  Otherwise, the stack pointer is the CFA
+		     reg, so we need to emit a CFA adjust.  */
+		  if (!frame_pointer_needed)
+		    arm_add_cfa_adjust_cfa_note (add_insn,
+						 - lazy_store_stack_frame_size,
+						 stack_pointer_rtx,
+						 stack_pointer_rtx);
 		  emit_insn (gen_lazy_store_multiple_insn (stack_pointer_rtx));
 		}
 	      /* Save VFP callee-saved registers.  */
@@ -18781,10 +18810,11 @@ cmse_nonsecure_call_inline_register_clear (void)
 		  rtx_insn *add_insn =
 		    emit_insn (gen_addsi3 (stack_pointer_rtx,
 					   stack_pointer_rtx, imm));
-		  arm_add_cfa_adjust_cfa_note (add_insn,
-					       lazy_store_stack_frame_size,
-					       stack_pointer_rtx,
-					       stack_pointer_rtx);
+		  if (!frame_pointer_needed)
+		    arm_add_cfa_adjust_cfa_note (add_insn,
+						 lazy_store_stack_frame_size,
+						 stack_pointer_rtx,
+						 stack_pointer_rtx);
 		}
 	      /* Restore VFP callee-saved registers.  */
 	      else
@@ -25242,7 +25272,7 @@ arm_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
     return false;
 
   if (IS_VPR_REGNUM (regno))
-    return true;
+    return mode == HImode;
 
   if (TARGET_THUMB1)
     /* For the Thumb we only allow values bigger than SImode in
@@ -27007,7 +27037,7 @@ cmse_nonsecure_entry_clear_before_return (void)
 	continue;
       if (IN_RANGE (regno, IP_REGNUM, PC_REGNUM))
 	continue;
-      if (call_used_or_fixed_reg_p (regno)
+      if (!callee_saved_reg_p (regno)
 	  && (!IN_RANGE (regno, FIRST_VFP_REGNUM, LAST_VFP_REGNUM)
 	      || TARGET_HARD_FLOAT))
 	bitmap_set_bit (to_clear_bitmap, regno);
@@ -30470,13 +30500,31 @@ arm_split_compare_and_swap (rtx operands[])
     }
   else
     {
-      emit_move_insn (neg_bval, const1_rtx);
       cond = gen_rtx_NE (VOIDmode, rval, oldval);
       if (thumb1_cmpneg_operand (oldval, SImode))
-	emit_unlikely_jump (gen_cbranchsi4_scratch (neg_bval, rval, oldval,
-						    label2, cond));
+	{
+	  rtx src = rval;
+	  if (!satisfies_constraint_L (oldval))
+	    {
+	      gcc_assert (satisfies_constraint_J (oldval));
+
+	      /* For such immediates, ADDS needs the source and destination regs
+		 to be the same.
+
+		 Normally this would be handled by RA, but this is all happening
+		 after RA.  */
+	      emit_move_insn (neg_bval, rval);
+	      src = neg_bval;
+	    }
+
+	  emit_unlikely_jump (gen_cbranchsi4_neg_late (neg_bval, src, oldval,
+						       label2, cond));
+	}
       else
-	emit_unlikely_jump (gen_cbranchsi4_insn (cond, rval, oldval, label2));
+	{
+	  emit_move_insn (neg_bval, const1_rtx);
+	  emit_unlikely_jump (gen_cbranchsi4_insn (cond, rval, oldval, label2));
+	}
     }
 
   arm_emit_store_exclusive (mode, neg_bval, mem, newval, use_release);

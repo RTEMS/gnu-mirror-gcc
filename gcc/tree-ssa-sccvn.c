@@ -4105,7 +4105,7 @@ vn_nary_op_insert_pieces_predicated (unsigned int length, enum tree_code code,
 }
 
 static bool
-dominated_by_p_w_unex (basic_block bb1, basic_block bb2);
+dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool);
 
 static tree
 vn_nary_op_get_predicated_value (vn_nary_op_t vno, basic_block bb)
@@ -4114,9 +4114,12 @@ vn_nary_op_get_predicated_value (vn_nary_op_t vno, basic_block bb)
     return vno->u.result;
   for (vn_pval *val = vno->u.values; val; val = val->next)
     for (unsigned i = 0; i < val->n; ++i)
-      if (dominated_by_p_w_unex (bb,
-			  BASIC_BLOCK_FOR_FN
-			    (cfun, val->valid_dominated_by_p[i])))
+      /* Do not handle backedge executability optimistically since
+	 when figuring out whether to iterate we do not consider
+	 changed predication.  */
+      if (dominated_by_p_w_unex
+	    (bb, BASIC_BLOCK_FOR_FN (cfun, val->valid_dominated_by_p[i]),
+	     false))
 	return val->result;
   return NULL_TREE;
 }
@@ -4401,10 +4404,11 @@ vn_phi_insert (gimple *phi, tree result, bool backedges_varying_p)
 
 
 /* Return true if BB1 is dominated by BB2 taking into account edges
-   that are not executable.  */
+   that are not executable.  When ALLOW_BACK is false consider not
+   executable backedges as executable.  */
 
 static bool
-dominated_by_p_w_unex (basic_block bb1, basic_block bb2)
+dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool allow_back)
 {
   edge_iterator ei;
   edge e;
@@ -4421,7 +4425,8 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2)
     {
       edge prede = NULL;
       FOR_EACH_EDGE (e, ei, bb1->preds)
-	if (e->flags & EDGE_EXECUTABLE)
+	if ((e->flags & EDGE_EXECUTABLE)
+	    || (!allow_back && (e->flags & EDGE_DFS_BACK)))
 	  {
 	    if (prede)
 	      {
@@ -4443,7 +4448,8 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2)
   /* Iterate to the single executable bb2 successor.  */
   edge succe = NULL;
   FOR_EACH_EDGE (e, ei, bb2->succs)
-    if (e->flags & EDGE_EXECUTABLE)
+    if ((e->flags & EDGE_EXECUTABLE)
+	|| (!allow_back && (e->flags & EDGE_DFS_BACK)))
       {
 	if (succe)
 	  {
@@ -4461,7 +4467,8 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2)
 	{
 	  FOR_EACH_EDGE (e, ei, succe->dest->preds)
 	    if (e != succe
-		&& (e->flags & EDGE_EXECUTABLE))
+		&& ((e->flags & EDGE_EXECUTABLE)
+		    || (!allow_back && (e->flags & EDGE_DFS_BACK))))
 	      {
 		succe = NULL;
 		break;
@@ -6758,7 +6765,7 @@ rpo_elim::eliminate_avail (basic_block bb, tree op)
 	     may also be able to "pre-compute" (bits of) the next immediate
 	     (non-)dominator during the RPO walk when marking edges as
 	     executable.  */
-	  if (dominated_by_p_w_unex (bb, abb))
+	  if (dominated_by_p_w_unex (bb, abb, true))
 	    {
 	      tree leader = ssa_name (av->leader);
 	      /* Prevent eliminations that break loop-closed SSA.  */
@@ -7351,11 +7358,9 @@ do_rpo_vn (function *fn, edge entry, bitmap exit_bbs,
     e->flags &= ~EDGE_DFS_BACK;
 
   int *rpo = XNEWVEC (int, n_basic_blocks_for_fn (fn) - NUM_FIXED_BLOCKS);
+  auto_vec<std::pair<int, int> > toplevel_scc_extents;
   int n = rev_post_order_and_mark_dfs_back_seme
-    (fn, entry, exit_bbs, !loops_state_satisfies_p (LOOPS_NEED_FIXUP), rpo);
-  /* rev_post_order_and_mark_dfs_back_seme fills RPO in reverse order.  */
-  for (int i = 0; i < n / 2; ++i)
-    std::swap (rpo[i], rpo[n-i-1]);
+    (fn, entry, exit_bbs, true, rpo, !iterate ? &toplevel_scc_extents : NULL);
 
   if (!do_region)
     BITMAP_FREE (exit_bbs);
@@ -7433,12 +7438,20 @@ do_rpo_vn (function *fn, edge entry, bitmap exit_bbs,
   vn_valueize = rpo_vn_valueize;
 
   /* Initialize the unwind state and edge/BB executable state.  */
-  bool need_max_rpo_iterate = false;
+  unsigned curr_scc = 0;
   for (int i = 0; i < n; ++i)
     {
       basic_block bb = BASIC_BLOCK_FOR_FN (fn, rpo[i]);
       rpo_state[i].visited = 0;
       rpo_state[i].max_rpo = i;
+      if (!iterate && curr_scc < toplevel_scc_extents.length ())
+	{
+	  if (i >= toplevel_scc_extents[curr_scc].first
+	      && i <= toplevel_scc_extents[curr_scc].second)
+	    rpo_state[i].max_rpo = toplevel_scc_extents[curr_scc].second;
+	  if (i == toplevel_scc_extents[curr_scc].second)
+	    curr_scc++;
+	}
       bb->flags &= ~BB_EXECUTABLE;
       bool has_backedges = false;
       edge e;
@@ -7450,50 +7463,11 @@ do_rpo_vn (function *fn, edge entry, bitmap exit_bbs,
 	  e->flags &= ~EDGE_EXECUTABLE;
 	  if (iterate || e == entry || (skip_entry_phis && bb == entry->dest))
 	    continue;
-	  if (bb_to_rpo[e->src->index] > i)
-	    {
-	      rpo_state[i].max_rpo = MAX (rpo_state[i].max_rpo,
-					  bb_to_rpo[e->src->index]);
-	      need_max_rpo_iterate = true;
-	    }
-	  else
-	    rpo_state[i].max_rpo
-	      = MAX (rpo_state[i].max_rpo,
-		     rpo_state[bb_to_rpo[e->src->index]].max_rpo);
 	}
       rpo_state[i].iterate = iterate && has_backedges;
     }
   entry->flags |= EDGE_EXECUTABLE;
   entry->dest->flags |= BB_EXECUTABLE;
-
-  /* When there are irreducible regions the simplistic max_rpo computation
-     above for the case of backedges doesn't work and we need to iterate
-     until there are no more changes.  */
-  unsigned nit = 0;
-  while (need_max_rpo_iterate)
-    {
-      nit++;
-      need_max_rpo_iterate = false;
-      for (int i = 0; i < n; ++i)
-	{
-	  basic_block bb = BASIC_BLOCK_FOR_FN (fn, rpo[i]);
-	  edge e;
-	  edge_iterator ei;
-	  FOR_EACH_EDGE (e, ei, bb->preds)
-	    {
-	      if (e == entry || (skip_entry_phis && bb == entry->dest))
-		continue;
-	      int max_rpo = MAX (rpo_state[i].max_rpo,
-				 rpo_state[bb_to_rpo[e->src->index]].max_rpo);
-	      if (rpo_state[i].max_rpo != max_rpo)
-		{
-		  rpo_state[i].max_rpo = max_rpo;
-		  need_max_rpo_iterate = true;
-		}
-	    }
-	}
-    }
-  statistics_histogram_event (cfun, "RPO max_rpo iterations", nit);
 
   /* As heuristic to improve compile-time we handle only the N innermost
      loops and the outermost one optimistically.  */

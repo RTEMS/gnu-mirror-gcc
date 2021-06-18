@@ -19,8 +19,9 @@
 import difflib
 import os
 import re
+import sys
 
-changelog_locations = {
+default_changelog_locations = {
     'c++tools',
     'config',
     'contrib',
@@ -200,7 +201,7 @@ class Error:
     def __repr__(self):
         s = self.message
         if self.line:
-            s += ':"%s"' % self.line
+            s += ': "%s"' % self.line
         return s
 
 
@@ -214,6 +215,7 @@ class ChangeLogEntry:
         self.lines = []
         self.files = []
         self.file_patterns = []
+        self.opened_parentheses = 0
 
     def parse_file_names(self):
         # Whether the content currently processed is between a star prefix the
@@ -223,8 +225,14 @@ class ChangeLogEntry:
         for line in self.lines:
             # If this line matches the star prefix, start the location
             # processing on the information that follows the star.
+            # Note that we need to skip macro names that can be in form of:
+            #
+            # * config/i386/i386.md (*fix_trunc<mode>_i387_1,
+            # *add<mode>3_ne, *add<mode>3_eq_0, *add<mode>3_ne_0,
+            # *fist<mode>2_<rounding>_1, *<code><mode>3_1):
+            #
             m = star_prefix_regex.match(line)
-            if m:
+            if m and len(m.group('spaces')) == 1:
                 in_location = True
                 line = m.group('content')
 
@@ -280,7 +288,7 @@ class GitInfo:
 
 
 class GitCommit:
-    def __init__(self, info, strict=True, commit_to_info_hook=None):
+    def __init__(self, info, commit_to_info_hook=None, ref_name=None):
         self.original_info = info
         self.info = info
         self.message = None
@@ -293,6 +301,7 @@ class GitCommit:
         self.cherry_pick_commit = None
         self.revert_commit = None
         self.commit_to_info_hook = commit_to_info_hook
+        self.init_changelog_locations(ref_name)
 
         # Skip Update copyright years commits
         if self.info.lines and self.info.lines[0] == 'Update copyright years.':
@@ -307,15 +316,16 @@ class GitCommit:
         if self.revert_commit:
             self.info = self.commit_to_info_hook(self.revert_commit)
 
+        # Allow complete deletion of ChangeLog files in a commit
         project_files = [f for f in self.info.modified_files
-                         if self.is_changelog_filename(f[0])
+                         if (self.is_changelog_filename(f[0], allow_suffix=True) and f[1] != 'D')
                          or f[0] in misc_files]
         ignored_files = [f for f in self.info.modified_files
                          if self.in_ignored_location(f[0])]
         if len(project_files) == len(self.info.modified_files):
             # All modified files are only MISC files
             return
-        elif project_files and strict:
+        elif project_files:
             self.errors.append(Error('ChangeLog, DATESTAMP, BASE-VER and '
                                      'DEV-PHASE updates should be done '
                                      'separately from normal commits'))
@@ -328,6 +338,7 @@ class GitCommit:
             self.parse_changelog()
             self.parse_file_names()
             self.check_for_empty_description()
+            self.check_for_broken_parentheses()
             self.deduce_changelog_locations()
             self.check_file_patterns()
             if not self.errors:
@@ -343,18 +354,23 @@ class GitCommit:
         return [x[0] for x in self.info.modified_files if x[1] == 'A']
 
     @classmethod
-    def is_changelog_filename(cls, path):
-        return path.endswith('/ChangeLog') or path == 'ChangeLog'
+    def is_changelog_filename(cls, path, allow_suffix=False):
+        basename = os.path.basename(path)
+        if basename == 'ChangeLog':
+            return True
+        elif allow_suffix and basename.startswith('ChangeLog'):
+            return True
+        else:
+            return False
 
-    @classmethod
-    def find_changelog_location(cls, name):
+    def find_changelog_location(self, name):
         if name.startswith('\t'):
             name = name[1:]
         if name.endswith(':'):
             name = name[:-1]
         if name.endswith('/'):
             name = name[:-1]
-        return name if name in changelog_locations else None
+        return name if name in self.changelog_locations else None
 
     @classmethod
     def format_git_author(cls, author):
@@ -374,6 +390,17 @@ class GitCommit:
                 modified_files.append((parts[2], 'A'))
         return modified_files
 
+    def init_changelog_locations(self, ref_name):
+        self.changelog_locations = list(default_changelog_locations)
+        if ref_name:
+            version = sys.maxsize
+            if 'releases/gcc-' in ref_name:
+                version = int(ref_name.split('-')[-1])
+            if version >= 12:
+                # HSA and BRIG were removed in GCC 12
+                self.changelog_locations.remove('gcc/brig')
+                self.changelog_locations.remove('libhsail-rt')
+
     def parse_lines(self, all_are_ignored):
         body = self.info.lines
 
@@ -382,7 +409,8 @@ class GitCommit:
                 continue
             if (changelog_regex.match(b) or self.find_changelog_location(b)
                     or star_prefix_regex.match(b) or pr_regex.match(b)
-                    or dr_regex.match(b) or author_line_regex.match(b)):
+                    or dr_regex.match(b) or author_line_regex.match(b)
+                    or b.lower().startswith(CO_AUTHORED_BY_PREFIX)):
                 self.changes = body[i:]
                 return
         if not all_are_ignored:
@@ -400,8 +428,10 @@ class GitCommit:
             if line != line.rstrip():
                 self.errors.append(Error('trailing whitespace', line))
             if len(line.replace('\t', ' ' * TAB_WIDTH)) > LINE_LIMIT:
-                self.errors.append(Error('line exceeds %d character limit'
-                                         % LINE_LIMIT, line))
+                # support long filenames
+                if not line.startswith('\t* ') or not line.endswith(':') or ' ' in line[3:-1]:
+                    self.errors.append(Error('line exceeds %d character limit'
+                                             % LINE_LIMIT, line))
             m = changelog_regex.match(line)
             if m:
                 last_entry = ChangeLogEntry(m.group(1).rstrip('/'),
@@ -490,7 +520,8 @@ class GitCommit:
                 else:
                     m = star_prefix_regex.match(line)
                     if m:
-                        if len(m.group('spaces')) != 1:
+                        if (len(m.group('spaces')) != 1 and
+                                last_entry.opened_parentheses == 0):
                             msg = 'one space should follow asterisk'
                             self.errors.append(Error(msg, line))
                         else:
@@ -502,6 +533,7 @@ class GitCommit:
                                         msg = f'empty group "{needle}" found'
                                         self.errors.append(Error(msg, line))
                             last_entry.lines.append(line)
+                            self.process_parentheses(last_entry, line)
                     else:
                         if last_entry.is_empty:
                             msg = 'first line should start with a tab, ' \
@@ -509,6 +541,18 @@ class GitCommit:
                             self.errors.append(Error(msg, line))
                         else:
                             last_entry.lines.append(line)
+                            self.process_parentheses(last_entry, line)
+
+    def process_parentheses(self, last_entry, line):
+        for c in line:
+            if c == '(':
+                last_entry.opened_parentheses += 1
+            elif c == ')':
+                if last_entry.opened_parentheses == 0:
+                    msg = 'bad wrapping of parenthesis'
+                    self.errors.append(Error(msg, line))
+                else:
+                    last_entry.opened_parentheses -= 1
 
     def parse_file_names(self):
         for entry in self.changelog_entries:
@@ -532,6 +576,12 @@ class GitCommit:
                     msg = 'missing description of a change'
                     self.errors.append(Error(msg, line))
 
+    def check_for_broken_parentheses(self):
+        for entry in self.changelog_entries:
+            if entry.opened_parentheses != 0:
+                msg = 'bad parentheses wrapping'
+                self.errors.append(Error(msg, entry.lines[0]))
+
     def get_file_changelog_location(self, changelog_file):
         for file in self.info.modified_files:
             if file[0] == changelog_file:
@@ -549,7 +599,7 @@ class GitCommit:
                 for file in entry.files:
                     location = self.get_file_changelog_location(file)
                     if (location == ''
-                       or (location and location in changelog_locations)):
+                       or (location and location in self.changelog_locations)):
                         if changelog and changelog != location:
                             msg = 'could not deduce ChangeLog file, ' \
                                   'not unique location'
@@ -569,11 +619,10 @@ class GitCommit:
                 return True
         return False
 
-    @classmethod
-    def get_changelog_by_path(cls, path):
+    def get_changelog_by_path(self, path):
         components = path.split('/')
         while components:
-            if '/'.join(components) in changelog_locations:
+            if '/'.join(components) in self.changelog_locations:
                 break
             components = components[:-1]
         return '/'.join(components)
@@ -592,7 +641,12 @@ class GitCommit:
             assert not entry.folder.endswith('/')
             for file in entry.files:
                 if not self.is_changelog_filename(file):
-                    mentioned_files.add(os.path.join(entry.folder, file))
+                    item = os.path.join(entry.folder, file)
+                    if item in mentioned_files:
+                        msg = 'same file specified multiple times'
+                        self.errors.append(Error(msg, file))
+                    else:
+                        mentioned_files.add(item)
             for pattern in entry.file_patterns:
                 mentioned_patterns.append(os.path.join(entry.folder, pattern))
 

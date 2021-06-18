@@ -1,3 +1,709 @@
+2021-06-17  Marius Hillenbrand  <mhillen@linux.ibm.com>
+
+	Backported from master:
+	2021-06-17  Marius Hillenbrand  <mhillen@linux.ibm.com>
+
+	PR target/100871
+	* config/s390/vecintrin.h (vec_doublee): Fix to use
+	  __builtin_s390_vflls.
+	(vec_floate): Fix to use __builtin_s390_vflrd.
+
+2021-06-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100934
+	* tree-ssa-dom.c (pass_dominator::execute): Properly
+	mark irreducible regions.
+
+2021-06-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-28  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/100791
+	* tree-inline.c (copy_bb): When processing __builtin_va_arg_pack
+	copy fntype from original call.
+
+2021-06-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/100513
+	* ipa-param-manipulation.c
+	(ipa_param_body_adjustments::modify_call_stmt): Avoid
+	altering SSA_NAME_DEF_STMT by adjusting the calls LHS
+	via gimple_call_lhs_ptr.
+
+2021-06-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/100509
+	* gimple-fold.c (fold_gimple_assign): Only call
+	get_symbol_constant_value on register type symbols.
+
+2021-06-16  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100492
+	* tree-loop-distribution.c (find_seed_stmts_for_distribution):
+	Find nothing when the loop contains an irreducible region.
+
+2021-06-04  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-05-19  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/100333
+	* config/arm/arm.md (nonsecure_call_internal): Always ensure
+	callee's address is in a register.
+
+2021-06-02  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2021-01-21  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/98777
+	* lra-int.h (lra_pmode_pseudo): New extern.
+	* lra.c (lra_pmode_pseudo): New global.
+	(lra): Set it up.
+	* lra-eliminations.c (eliminate_regs_in_insn): Use it.
+
+2021-06-02  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2021-01-20  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/98722
+	* lra-eliminations.c (eliminate_regs_in_insn): Check that target
+	has no 3-op add insn to transform insns containing two pluses.
+
+2021-06-02  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2021-01-12  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/97969
+	* lra-eliminations.c (eliminate_regs_in_insn): Add transformation
+	of pattern 'plus (plus (hard reg, const), pseudo)'.
+
+2021-06-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2021-06-02  Uroš Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/sse.md (abs<MMXMODEI:mode>2):
+	Change define_insn to define_expand.
+
+2021-06-01  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-05-11  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99725
+	* config/arm/arm.c (cmse_nonsecure_call_inline_register_clear):
+	Avoid emitting CFA adjusts on the sp if we have the fp.
+
+2021-05-25  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-05-10  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99960
+	* config/arm/mve.md (*mve_mov<mode>): Simplify output code. Use
+	vldrw.u32 and vstrw.32 for V2D[IF]mode loads and stores.
+
+2021-05-20  Alex Coplan  <alex.coplan@arm.com>
+	    Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/99977
+	* config/arm/arm.c (arm_split_compare_and_swap): Fix up codegen
+	with negative immediates: ensure we expand cbranchsi4_scratch
+	correctly and ensure we satisfy its constraints.
+	* config/arm/sync.md
+	(@atomic_compare_and_swap<CCSI:arch><NARROW:mode>_1): Don't
+	attempt to tie two output operands together with constraints;
+	collapse two alternatives.
+	(@atomic_compare_and_swap<CCSI:arch><SIDI:mode>_1): Likewise.
+	* config/arm/thumb1.md (cbranchsi4_neg_late): New.
+
+2021-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/cpp.texi (Common Predefined Macros): Update documentation
+	for the __GXX_EXPERIMENTAL_CXX0X__ macro.
+
+2021-05-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-28  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/80960
+	* dse.c (check_mem_read_rtx): Call get_addr on the
+	offsetted address.
+
+2021-05-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100566
+	* tree-ssa-sccvn.c (dominated_by_p_w_unex): Properly handle
+	allow_back for all edge queries.
+
+2021-05-13  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2021-05-11  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+		    Joe Ramsay   <joe.ramsay@arm.com>
+
+	PR target/100419
+	* config/arm/arm_mve.h (__arm_vstrwq_scatter_offset): Fix wrong arguments.
+	(__arm_vcmpneq): Remove duplicate definition.
+	(__arm_vstrwq_scatter_offset_p): Likewise.
+	(__arm_vmaxq_x): Likewise.
+	(__arm_vmlsdavaq): Likewise.
+	(__arm_vmlsdavaxq): Likewise.
+	(__arm_vmlsdavq_p): Likewise.
+	(__arm_vmlsdavxq_p): Likewise.
+	(__arm_vrmlaldavhaq): Likewise.
+	(__arm_vstrbq_p): Likewise.
+	(__arm_vstrbq_scatter_offset): Likewise.
+	(__arm_vstrbq_scatter_offset_p): Likewise.
+	(__arm_vstrdq_scatter_offset): Likewise.
+	(__arm_vstrdq_scatter_offset_p): Likewise.
+	(__arm_vstrdq_scatter_shifted_offset): Likewise.
+	(__arm_vstrdq_scatter_shifted_offset_p): Likewise.
+
+2021-05-13  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/100563
+	* config/arm/arm.c (arm_canonicalize_comparison): Correctly
+	canonicalize DImode inequality comparisons against the
+	maximum integral value.
+
+2021-05-12  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/100571
+	* calls.c (maybe_warn_rdwr_sizes): Clear object size if it can't
+	be determined.
+
+2021-05-12  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-05-11  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99988
+	* config/aarch64/aarch64-bti-insert.c (aarch64_bti_j_insn_p): New.
+	(rest_of_insert_bti): Avoid inserting duplicate bti j insns for
+	jump table targets.
+
+2021-05-11  Geng Qi  <gengqi@linux.alibaba.com>
+
+	Backported from master:
+	2021-04-30  Geng Qi  <gengqi@linux.alibaba.com>
+
+	* config/riscv/riscv.opt (march=,mabi=): Negative itself.
+
+2021-05-10  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backported from master:
+	2021-04-20  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/100108
+	* config/rs6000/rs6000.c (rs6000_machine_from_flags): Do not consider
+	OPTION_MASK_ISEL.
+
+2021-05-06  Roman Zhuykov  <zhroma@ispras.ru>
+
+	Backported from master:
+	2021-04-30  Roman Zhuykov  <zhroma@ispras.ru>
+
+	PR rtl-optimization/100225
+	PR rtl-optimization/84878
+	* modulo-sched.c (sms_schedule): Use note_stores to skip loops
+	where we have an instruction which touches (writes) any hard
+	register from df->regular_block_artificial_uses set.
+	Allow not-single-set instruction only right before basic block
+	tail.
+
+2021-05-06  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	Backported from master:
+	2020-09-15  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* config/arm/arm.c (arm_options_perform_arch_sanity_checks): Do not
+	check +D32 for CMSE if -mfloat-abi=soft
+
+2021-05-06  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2020-06-23  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	PR target/95646
+	* config/arm/arm.c: (cmse_nonsecure_entry_clear_before_return): Use
+	'callee_saved_reg_p' instead of 'calL_used_or_fixed_reg_p'.
+
+2021-05-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/100402
+	* config/i386/i386.c (ix86_compute_frame_layout): For a SEH target,
+	always return the establisher frame for __builtin_frame_address (0).
+
+2021-05-05  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2021-05-05  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	PR rtl-optimization/100263
+	* postreload.c (move2add_valid_value_p): Ensure register can
+	change mode.
+
+2021-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/98786
+	* tree-ssa-phiopt.c (factor_out_conditional_conversion): Avoid
+	adding new uses of abnormals.
+
+2021-05-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-04-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100278
+	* tree-ssa-pre.c (compute_avail): Give up when we cannot
+	adjust TBAA beacuse of mismatching bases.
+
+2021-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/100375
+	* config/nvptx/nvptx.c (nvptx_sese_pseudo): Use NULL instead of 0
+	as first argument of pseudo_node_t constructors.
+
+2021-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/100302
+	* config/aarch64/aarch64.c (aarch64_add_offset_1_temporaries): Use
+	absu_hwi instead of abs_hwi.
+
+2021-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/100254
+	* cfgcleanup.c (outgoing_edges_match): Check REG_EH_REGION on
+	last1 and last2 insns rather than BB_END (bb1) and BB_END (bb2) insns.
+
+2021-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/100255
+	* vmsdbgout.c (ASM_OUTPUT_DEBUG_STRING, vmsdbgout_begin_block,
+	vmsdbgout_end_block, lookup_filename, vmsdbgout_source_line): Remove
+	register keywords.
+
+2021-05-04  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-04-23  Alex Coplan  <alex.coplan@arm.com>
+
+	PR rtl-optimization/100230
+	* early-remat.c (early_remat::sort_candidates): Use delete[]
+	instead of delete for array allocated with new[].
+
+2021-04-30  David Edelsohn  <dje.gcc@gmail.com>
+
+	Backported from master:
+	2021-04-27  David Edelsohn  <dje.gcc@gmail.com>
+
+	* config/rs6000/aix.h (SUBTARGET_DRIVER_SELF_SPECS): New.
+	* config/rs6000/aix64.opt (m64): New.
+	(m32): New.
+
+2021-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/96513
+	* tree-vect-slp.c (struct vdhs_data): New.
+	(vect_detect_hybrid_slp): New walker.
+	(vect_detect_hybrid_slp): Rewrite.
+
+2021-04-29  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-04-28  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/100311
+	* config/arm/arm.c (arm_hard_regno_mode_ok): Only allow VPR to be
+	used in HImode.
+
+2021-04-28  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2021-04-23  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/100182
+	* config/i386/sync.md (FILD_ATOMIC/FIST_ATOMIC FP load peephole2):
+	Copy operand 3 to operand 4.  Use sse_reg_operand
+	as operand 3 predicate.
+	(FILD_ATOMIC/FIST_ATOMIC FP load peephole2 with mem blockage): Ditto.
+	(LDX_ATOMIC/STX_ATOMIC FP load peephole2): Ditto.
+	(LDX_ATOMIC/LDX_ATOMIC FP load peephole2 with mem blockage): Ditto.
+	(FILD_ATOMIC/FIST_ATOMIC FP store peephole2):
+	Copy operand 1 to operand 0.
+	(FILD_ATOMIC/FIST_ATOMIC FP store peephole2 with mem blockage): Ditto.
+	(LDX_ATOMIC/STX_ATOMIC FP store peephole2): Ditto.
+	(LDX_ATOMIC/LDX_ATOMIC FP store peephole2 with mem blockage): Ditto.
+
+2021-04-26  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-04-08  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99647
+	* config/arm/iterators.md (MVE_vecs): New.
+	(V_elem): Also handle V2DF.
+	* config/arm/mve.md (*mve_mov<mode>): Rename to ...
+	(*mve_vdup<mode>): ... this. Remove second alternative since
+	vec_duplicate of const_int is not canonical RTL, and we don't
+	want to match symbol_refs.
+	(*mve_vec_duplicate<mode>): Delete (pattern is redundant).
+
+2021-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-04-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100053
+	* tree-ssa-sccvn.c (vn_nary_op_get_predicated_value): Do
+	not use optimistic dominance queries for backedges to validate
+	predicated values.
+	(dominated_by_p_w_unex): Add parameter to ignore executable
+	state on backedges.
+	(rpo_elim::eliminate_avail): Adjust.
+
+2021-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-04-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/99954
+	* tree-loop-distribution.c: Include tree-affine.h.
+	(generate_memcpy_builtin): Try using tree-affine to prove
+	non-overlap.
+	(loop_distribution::classify_builtin_ldst): Always classify
+	as PKIND_MEMMOVE.
+
+2021-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-04-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/99880
+	* tree-vect-loop.c (maybe_set_vectorized_backedge_value): Only
+	set vectorized defs of relevant PHIs.
+
+2021-04-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/96796
+	* lra-constraints.c (in_class_p): Add a default-false
+	allow_all_reload_class_changes_p parameter.  Do not treat
+	reload moves specially when the parameter is true.
+	(get_reload_reg): Try to narrow the class of an existing OP_OUT
+	reload if we're reloading a reload pseudo in a reload instruction.
+
+2021-04-23  YiFei Zhu  <zhuyifei1999@gmail.com>
+
+	Backported from master:
+	2021-04-23  YiFei Zhu  <zhuyifei1999@gmail.com>
+
+	* config/bpf/bpf.h (ASM_OUTPUT_ALIGNED_BSS): Use .type and .lcomm.
+
+2021-04-23  YiFei Zhu  <zhuyifei1999@gmail.com>
+
+	Backported from master:
+	2021-04-23  YiFei Zhu  <zhuyifei1999@gmail.com>
+
+	* config/bpf/bpf.h (FUNCTION_BOUNDARY): Set to 64.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-04-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/99929
+	* rtl.h (same_vector_encodings_p): New function.
+	* cse.c (exp_equiv_p): Check that CONST_VECTORs have the same encoding.
+	* cselib.c (rtx_equal_for_cselib_1): Likewise.
+	* jump.c (rtx_renumbered_equal_p): Likewise.
+	* lra-constraints.c (operands_match_p): Likewise.
+	* reload.c (operands_match_p): Likewise.
+	* rtl.c (rtx_equal_p_cb, rtx_equal_p): Likewise.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-03-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/98119
+	* config/aarch64/aarch64.c
+	(aarch64_vectorize_preferred_vector_alignment): Query the size
+	of the provided SVE vector; do not assume that all SVE vectors
+	have the same size.
+
+2021-04-23  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	Backported from master:
+	2021-04-07  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	PR tree-optimization/98736
+	* tree-loop-distribution.c
+	* (loop_distribution::bb_top_order_init):
+	Compute RPO with programing order preserved by calling function
+	rev_post_order_and_mark_dfs_back_seme.
+
+2021-04-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-31  Richard Biener  <rguenther@suse.de>
+
+	* cfganal.h (rev_post_order_and_mark_dfs_back_seme): Adjust
+	prototype.
+	* cfganal.c (rpoamdbs_bb_data): New struct with pre BB data.
+	(tag_header): New helper.
+	(cmp_edge_dest_pre): Likewise.
+	(rev_post_order_and_mark_dfs_back_seme): Compute SCCs,
+	find SCC exits and perform a DFS walk with extra edges to
+	compute a RPO with adjacent SCC members when requesting an
+	iteration optimized order and populate the toplevel SCC array.
+	* tree-ssa-sccvn.c (do_rpo_vn): Remove ad-hoc computation
+	of max_rpo and fill it in from SCC extent info instead.
+
+2021-04-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-07-20  Richard Biener  <rguenther@suse.de>
+
+	* cfganal.c (rev_post_order_and_mark_dfs_back_seme): Remove
+	write-only post array.
+
+2021-04-23  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2021-04-06  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99748
+	* config/arm/arm.c (arm_libcall_uses_aapcs_base): Also use base
+	PCS for [su]fix_optab.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-04-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/99249
+	* config/aarch64/aarch64.c (aarch64_expand_sve_const_vector_sel):
+	New function.
+	(aarch64_expand_sve_const_vector): Use it for nelts_per_pattern==2.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-03-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/97141
+	PR rtl-optimization/98726
+	* emit-rtl.c (valid_for_const_vector_p): Return true for
+	CONST_POLY_INT_P.
+	* rtx-vector-builder.h (rtx_vector_builder::step): Return a
+	poly_wide_int instead of a wide_int.
+	(rtx_vector_builder::apply_set): Take a poly_wide_int instead
+	of a wide_int.
+	* rtx-vector-builder.c (rtx_vector_builder::apply_set): Likewise.
+	* config/aarch64/aarch64.c (aarch64_legitimate_constant_p): Return
+	false for CONST_VECTORs that cannot be forced to memory.
+	* config/aarch64/aarch64-simd.md (mov<mode>): If a CONST_VECTOR
+	is too complex to force to memory, build it up from individual
+	elements instead.
+
+2021-04-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-01-26  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/98726
+	* tree.h (vector_cst_int_elt): Remove.
+	* tree.c (vector_cst_int_elt): Use poly_wide_int for computations,
+	make static.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-03-30  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/98136
+	* config/aarch64/aarch64.md (mov<mode>): Pass multi-instruction
+	CONST_INTs to aarch64_expand_mov_immediate when called after RA.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-03-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/98268
+	* gimple-fold.c (maybe_canonicalize_mem_ref_addr): Call
+	recompute_tree_invariant_for_addr_expr after successfully
+	folding a TARGET_MEM_REF that occurs inside an ADDR_EXPR.
+
+2021-04-23  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-03-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/99726
+	* tree-data-ref.c (create_intersect_range_checks_index): Bail
+	out if there is more than one access function SCEV for the loop
+	being versioned.
+
+2021-04-22  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/99216
+	* config/aarch64/aarch64-sve-builtins.cc
+	(function_builder::add_function): Add placeholder_p argument, use
+	placeholder decls if this is set.
+	(function_builder::add_unique_function): Instead of conditionally adding
+	direct overloads, unconditionally add either a direct overload or a
+	placeholder.
+	(function_builder::add_overloaded_function): Set placeholder_p if we're
+	using C++ overloads. Use the obstack for string storage instead
+	of relying on the tree nodes.
+	(function_builder::add_overloaded_functions): Don't return early for
+	m_direct_overloads: we need to add placeholders.
+	* config/aarch64/aarch64-sve-builtins.h
+	(function_builder::add_function): Add placeholder_p argument.
+	* lto-streamer.h (LTO_minor_version): Bump.
+
+2021-04-21  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/100148
+	* cprop.c (constprop_register): Use next_nondebug_insn instead of
+	NEXT_INSN.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/99767
+	* tree-vect-loop.c (vect_transform_loop): Don't remove just
+	dead scalar .MASK_LOAD calls, but also dead .COND_* calls - replace
+	them by their last argument.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/99905
+	* combine.c (expand_compound_operation): If pos + len > modewidth,
+	perform the right shift by pos in inner_mode and then convert to mode,
+	instead of trying to simplify a shift of rtx with inner_mode by pos
+	as if it was a shift in mode.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/99830
+	* combine.c (simplify_and_const_int_1): Don't optimize varop
+	away if it has side-effects.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR lto/99849
+	* expr.c (expand_expr_addr_expr_1): Test is_global_var rather than
+	just TREE_STATIC on COMPOUND_LITERAL_EXPR_DECLs.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/98601
+	* rtlanal.c (rtx_addr_can_trap_p_1): Allow in assert unknown size
+	not just for BLKmode, but also for VOIDmode.  For STRICT_ALIGNMENT
+	unaligned_mems handle VOIDmode like BLKmode.
+
+2021-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-04-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/99863
+	* dse.c (replace_read): Drop regs_live argument.  Instead of
+	regs_live, use store_insn->fixed_regs_live if non-NULL,
+	otherwise punt if insns sequence clobbers or sets any hard
+	registers.
+
+2021-04-19  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2020-11-27  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR c/97880
+	* omp-expand.c (expand_oacc_collapse_init, expand_oacc_collapse_vars):
+	Use now passed diff_type.
+	(expand_oacc_for): Take largest type for diff_type, taking tiling
+	and collapsing into account.
+
+2021-04-19  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/i386/winnt.c (i386_pe_seh_cold_init): Properly deal with
+	frames larger than the SEH maximum frame size.
+
+2021-04-18  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	Backported from master:
+	2021-04-11  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	PR middle-end/98088
+	* omp-expand.c (expand_oacc_collapse_init): Update condition in
+	a gcc_assert.
+
+2021-04-16  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2021-04-16  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/100048
+	* config/aarch64/aarch64-sve.md (@aarch64_sve_trn1_conv<mode>): New.
+	* config/aarch64/aarch64.c (aarch64_expand_sve_const_pred_trn): Use new
+	TRN optab.
+	* config/aarch64/iterators.md (UNSPEC_TRN1_CONV): New.
+
 2021-04-08  Richard Biener  <rguenther@suse.de>
 
 	PR lto/99898

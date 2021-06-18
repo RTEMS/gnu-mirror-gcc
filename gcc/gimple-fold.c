@@ -445,7 +445,8 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 					   CONSTRUCTOR_ELTS (rhs));
 	  }
 
-	else if (DECL_P (rhs))
+	else if (DECL_P (rhs)
+		 && is_gimple_reg_type (TREE_TYPE (rhs)))
 	  return get_symbol_constant_value (rhs);
       }
       break;
@@ -4840,6 +4841,7 @@ static bool
 maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
 {
   bool res = false;
+  tree *orig_t = t;
 
   if (TREE_CODE (*t) == ADDR_EXPR)
     t = &TREE_OPERAND (*t, 0);
@@ -4952,6 +4954,8 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
       if (tem)
 	{
 	  *t = tem;
+	  if (TREE_CODE (*orig_t) == ADDR_EXPR)
+	    recompute_tree_invariant_for_addr_expr (*orig_t);
 	  res = true;
 	}
     }

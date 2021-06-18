@@ -5958,11 +5958,8 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 			    || (!e->value.function.esym
 				&& e->symtree->n.sym->attr.pointer))
 			&& fsym && fsym->attr.target)
-		{
-		  gfc_conv_expr (&parmse, e);
-		  parmse.expr = gfc_build_addr_expr (NULL_TREE, parmse.expr);
-		}
-
+		/* Make sure the function only gets called once.  */
+		gfc_conv_expr_reference (&parmse, e, false);
 	      else if (e->expr_type == EXPR_FUNCTION
 		       && e->symtree->n.sym->result
 		       && e->symtree->n.sym->result != e->symtree->n.sym
@@ -6072,6 +6069,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		      bool add_clobber;
 		      add_clobber = fsym && fsym->attr.intent == INTENT_OUT
 			&& !fsym->attr.allocatable && !fsym->attr.pointer
+			&& e->symtree && e->symtree->n.sym
 			&& !e->symtree->n.sym->attr.dimension
 			&& !e->symtree->n.sym->attr.pointer
 			&& !e->symtree->n.sym->attr.allocatable
