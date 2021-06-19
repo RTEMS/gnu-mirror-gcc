@@ -88,8 +88,15 @@ Boston, MA 02110-1301, USA@*
 @menu
 * What is GNU Modula-2::  Brief description of GNU Modula-2.
 * Why use GNU Modula-2::  Advantages of GNU Modula-2.
+* Release map::           Release map
 * News::                  Latest news about GNU Modula-2.
-* Features::              GNU Modula-2 Features
+* Features::              GNU Modula-2 features
+* Documentation::         Documentation
+* Regression tests::      Regression tests for gm2 in the repository
+* Limitations::           Limitations
+* Objectives::            Objectives
+* FAQ::                   FAQ
+* Community::             Community
 @end menu
 
 @node What is GNU Modula-2, Why use GNU Modula-2, , Using
@@ -118,7 +125,7 @@ technology - programming languages - part 1: Modula-2 Language,
 ISO/IEC 10514-1 (1996)'
 }
 
-@node Why use GNU Modula-2, Release map, What is GNU Modula-2, Using
+@node Why use GNU Modula-2, Release map, What is GNU Modula-2, Overview
 @section Why use GNU Modula-2
 
 There are a number of advantages of using GNU Modula-2 rather than
@@ -143,7 +150,7 @@ ISO dialects of Modula-2, work is underway to implement M2R10.  Many
 of the GCC builtins are available and access to assembly programming
 is achieved using the same syntax as that used by GCC.
 
-@node Release map, News, Why use GNU Modula-2, Using
+@node Release map, News, Why use GNU Modula-2, Overview
 @section Release map
 
 GNU Modula-2 is now part of GCC and therefore will adopt the GCC
@@ -155,7 +162,7 @@ There is an intention to implement the M2R10 dialect of Modula-2 and
 any of the language changes.  If you wish to see something different
 please email @email{gaius.mulley@@southwales.ac.uk} with your ideas.
 
-@node News, Features, Release map, Using
+@node News, Features, Release map, Overview
 @section News
 
 @table @code
@@ -245,8 +252,8 @@ was released on September 30 2011.  This is a bug fix release.
 was released on December 11 2010.
 @end table
 
-@node Features, Documentation, News, Using
-@section GNU Modula-2 Features
+@node Features, Documentation, News, Overview
+@section GNU Modula-2 features
 
 @itemize @bullet
 
@@ -308,13 +315,13 @@ such as the AVR and the ARM).
 
 @end itemize
 
-@node Documentation, Regression tests, Features, Using
+@node Documentation, Regression tests, Features, Overview
 @section Documentation
 
 The GNU Modula-2 documentation is available on line or as a
 pdf @url{gm2.pdf}.
 
-@node Regression tests, Limitations, Documentation, Using
+@node Regression tests, Limitations, Documentation, Overview
 @section Regression tests for gm2 in the repository
 
 The result of the GNU Modula-2 regression tests for the current
@@ -330,7 +337,7 @@ GNU Modula-2
 mailing list. You will need to subscribe to send email to
 the mailing list.
 
-@node Limitations, Objectives, Regression tests, Using
+@node Limitations, Objectives, Regression tests, Overview
 @section Limitations
 
 Logitech compatibility library is incomplete.  The principle modules
@@ -338,7 +345,7 @@ for this platform exist however for a comprehensive list of completed
 modules please check the documentation
 @url{gm2.html}.
 
-@node Objectives, FAQ, , Using
+@node Objectives, FAQ, , Overview
 @section Objectives
 
 @itemize @bullet
@@ -361,7 +368,7 @@ Exploit the features of GCC.
 Listen to the requests of the users.
 @end itemize
 
-@node FAQ, Community, Objectives, Using
+@node FAQ, Community, Objectives, Overview
 @section FAQ
 
 @subsection Why use the C++ exception mechanism in GCC, rather than a bespoke Modula-2 mechanism?
@@ -370,7 +377,7 @@ The C++ mechanism is tried and tested, it also provides GNU Modula-2
 with the ability to link with C++ modules and via swig it can raise
 Python exceptions.
 
-@node Community, Other languages, FAQ, Using
+@node Community, Other languages, FAQ, Overview
 @section Community
 
 You can subscribe to the GNU Modula-2 mailing by sending an
