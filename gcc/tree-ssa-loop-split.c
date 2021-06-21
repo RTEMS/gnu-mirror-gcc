@@ -1774,9 +1774,8 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
       tree bnd_type = TREE_TYPE (bnd);
       if (!INTEGRAL_TYPE_P (bnd_type) || !TYPE_UNSIGNED (bnd_type))
 	continue;
-      if (TREE_CODE (bnd) == INTEGER_CST
-	  && (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bnd_type))
-	      || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bnd_type))))
+      if (tree_int_cst_equal (bnd, TYPE_MAX_VALUE (bnd_type))
+	  || tree_int_cst_equal (bnd, TYPE_MIN_VALUE (bnd_type)))
 	continue;
 
       /* Check if it is "idx != bnd" or "idx < bnd".  */
@@ -1823,7 +1822,7 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 	= fold_build2 (expect_code1, boolean_type_node, bnd, max_min_bnd);
       no_wrap
 	= fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap,
-		       fold_build2 (expect_code, boolean_type_node, base, bnd));
+		       fold_build2 (expect_code1, boolean_type_node, base, bnd));
 
       if (integer_zerop (no_wrap))
 	continue;
