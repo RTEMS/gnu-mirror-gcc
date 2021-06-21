@@ -1818,8 +1818,9 @@ get_wrap_assumption (class loop *loop, edge *exit, idx_elements &data)
 	max_min_bnd = fold_convert (large_type, max_min_bnd);
 
       /* There is no wrap if bnd <= max value && base <= bnd.  */
+      enum tree_code expect_code1 = is_negative ? GE_EXPR : LE_EXPR;      
       tree no_wrap
-	= fold_build2 (expect_code, boolean_type_node, bnd, max_min_bnd);
+	= fold_build2 (expect_code1, boolean_type_node, bnd, max_min_bnd);
       no_wrap
 	= fold_build2 (TRUTH_AND_EXPR, boolean_type_node, no_wrap,
 		       fold_build2 (expect_code, boolean_type_node, base, bnd));
