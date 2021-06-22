@@ -320,11 +320,11 @@ Here are macros for DWARF output.
   :end-before: [TARGET_DWARF_CALLING_CONVENTION]
 
 
-  To support optional call frame debugging information, you must also
-  define ``INCOMING_RETURN_ADDR_RTX`` and either set
-  ``RTX_FRAME_RELATED_P`` on the prologue insns if you use RTL for the
-  prologue, or call ``dwarf2out_def_cfa`` and ``dwarf2out_reg_save``
-  as appropriate from ``TARGET_ASM_FUNCTION_PROLOGUE`` if you don't.
+To support optional call frame debugging information, you must also
+define ``INCOMING_RETURN_ADDR_RTX`` and either set
+``RTX_FRAME_RELATED_P`` on the prologue insns if you use RTL for the
+prologue, or call ``dwarf2out_def_cfa`` and ``dwarf2out_reg_save``
+as appropriate from ``TARGET_ASM_FUNCTION_PROLOGUE`` if you don't.
 
 .. c:macro:: DWARF2_FRAME_INFO
 

@@ -59,38 +59,38 @@ region.
   :end-before: [TARGET_EXCEPT_UNWIND_INFO]
 
 
-  This hook defines the mechanism that will be used for exception handling
-  by the target.  If the target has ABI specified unwind tables, the hook
-  should return ``UI_TARGET``.  If the target is to use the
-  ``setjmp`` / ``longjmp`` -based exception handling scheme, the hook
-  should return ``UI_SJLJ``.  If the target supports DWARF 2 frame unwind
-  information, the hook should return ``UI_DWARF2``.
+This hook defines the mechanism that will be used for exception handling
+by the target.  If the target has ABI specified unwind tables, the hook
+should return ``UI_TARGET``.  If the target is to use the
+``setjmp`` / ``longjmp`` -based exception handling scheme, the hook
+should return ``UI_SJLJ``.  If the target supports DWARF 2 frame unwind
+information, the hook should return ``UI_DWARF2``.
 
-  A target may, if exceptions are disabled, choose to return ``UI_NONE``.
-  This may end up simplifying other parts of target-specific code.  The
-  default implementation of this hook never returns ``UI_NONE``.
+A target may, if exceptions are disabled, choose to return ``UI_NONE``.
+This may end up simplifying other parts of target-specific code.  The
+default implementation of this hook never returns ``UI_NONE``.
 
-  Note that the value returned by this hook should be constant.  It should
-  not depend on anything except the command-line switches described by
-  :samp:`{opts}`.  In particular, the
-  setting ``UI_SJLJ`` must be fixed at compiler start-up as C pre-processor
-  macros and builtin functions related to exception handling are set up
-  depending on this setting.
+Note that the value returned by this hook should be constant.  It should
+not depend on anything except the command-line switches described by
+:samp:`{opts}`.  In particular, the
+setting ``UI_SJLJ`` must be fixed at compiler start-up as C pre-processor
+macros and builtin functions related to exception handling are set up
+depending on this setting.
 
-  The default implementation of the hook first honors the
-  :option:`--enable-sjlj-exceptions` configure option, then
-  ``DWARF2_UNWIND_INFO``, and finally defaults to ``UI_SJLJ``.  If
-  ``DWARF2_UNWIND_INFO`` depends on command-line options, the target
-  must define this hook so that :samp:`{opts}` is used correctly.
+The default implementation of the hook first honors the
+:option:`--enable-sjlj-exceptions` configure option, then
+``DWARF2_UNWIND_INFO``, and finally defaults to ``UI_SJLJ``.  If
+``DWARF2_UNWIND_INFO`` depends on command-line options, the target
+must define this hook so that :samp:`{opts}` is used correctly.
 
 .. include:: ../tm.rst.in
   :start-after: [TARGET_UNWIND_TABLES_DEFAULT]
   :end-before: [TARGET_UNWIND_TABLES_DEFAULT]
 
 
-  This variable should be set to ``true`` if the target ABI requires unwinding
-  tables even when exceptions are not used.  It must not be modified by
-  command-line option processing.
+This variable should be set to ``true`` if the target ABI requires unwinding
+tables even when exceptions are not used.  It must not be modified by
+command-line option processing.
 
 .. c:macro:: DONT_USE_BUILTIN_SETJMP
 

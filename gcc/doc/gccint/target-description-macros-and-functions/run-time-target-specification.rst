@@ -76,8 +76,8 @@ any target-specific headers.
   :end-before: [TARGET_DEFAULT_TARGET_FLAGS]
 
 
-  This variable specifies the initial value of ``target_flags``.
-  Its default setting is 0.
+This variable specifies the initial value of ``target_flags``.
+Its default setting is 0.
 
 .. index:: optional hardware or system features
 
@@ -88,34 +88,34 @@ any target-specific headers.
   :end-before: [TARGET_HANDLE_OPTION]
 
 
-  This hook is called whenever the user specifies one of the
-  target-specific options described by the :samp:`.opt` definition files
-  (see :ref:`options`).  It has the opportunity to do some option-specific
-  processing and should return true if the option is valid.  The default
-  definition does nothing but return true.
+This hook is called whenever the user specifies one of the
+target-specific options described by the :samp:`.opt` definition files
+(see :ref:`options`).  It has the opportunity to do some option-specific
+processing and should return true if the option is valid.  The default
+definition does nothing but return true.
 
-  :samp:`{decoded}` specifies the option and its arguments.  :samp:`{opts}` and
-  :samp:`{opts_set}` are the ``gcc_options`` structures to be used for
-  storing option state, and :samp:`{loc}` is the location at which the
-  option was passed ( ``UNKNOWN_LOCATION`` except for options passed
-  via attributes).
+:samp:`{decoded}` specifies the option and its arguments.  :samp:`{opts}` and
+:samp:`{opts_set}` are the ``gcc_options`` structures to be used for
+storing option state, and :samp:`{loc}` is the location at which the
+option was passed ( ``UNKNOWN_LOCATION`` except for options passed
+via attributes).
 
 .. include:: tm.rst.in
   :start-after: [TARGET_HANDLE_C_OPTION]
   :end-before: [TARGET_HANDLE_C_OPTION]
 
 
-  This target hook is called whenever the user specifies one of the
-  target-specific C language family options described by the :samp:`.opt`
-  definition files(see :ref:`options`).  It has the opportunity to do some
-  option-specific processing and should return true if the option is
-  valid.  The arguments are like for ``TARGET_HANDLE_OPTION``.  The
-  default definition does nothing but return false.
+This target hook is called whenever the user specifies one of the
+target-specific C language family options described by the :samp:`.opt`
+definition files(see :ref:`options`).  It has the opportunity to do some
+option-specific processing and should return true if the option is
+valid.  The arguments are like for ``TARGET_HANDLE_OPTION``.  The
+default definition does nothing but return false.
 
-  In general, you should use ``TARGET_HANDLE_OPTION`` to handle
-  options.  However, if processing an option requires routines that are
-  only available in the C (and related language) front ends, then you
-  should use ``TARGET_HANDLE_C_OPTION`` instead.
+In general, you should use ``TARGET_HANDLE_OPTION`` to handle
+options.  However, if processing an option requires routines that are
+only available in the C (and related language) front ends, then you
+should use ``TARGET_HANDLE_C_OPTION`` instead.
 
 .. include:: tm.rst.in
   :start-after: [TARGET_OBJC_CONSTRUCT_STRING_OBJECT]
@@ -160,17 +160,17 @@ any target-specific headers.
   :end-before: [TARGET_OPTION_OPTIMIZATION_TABLE]
 
 
-  Some machines may desire to change what optimizations are performed for
-  various optimization levels.   This variable, if defined, describes
-  options to enable at particular sets of optimization levels.  These
-  options are processed once
-  just after the optimization level is determined and before the remainder
-  of the command options have been parsed, so may be overridden by other
-  options passed explicitly.
+Some machines may desire to change what optimizations are performed for
+various optimization levels.   This variable, if defined, describes
+options to enable at particular sets of optimization levels.  These
+options are processed once
+just after the optimization level is determined and before the remainder
+of the command options have been parsed, so may be overridden by other
+options passed explicitly.
 
-  This processing is run once at program startup and when the optimization
-  options are changed via ``#pragma GCC optimize`` or by using the
-  ``optimize`` attribute.
+This processing is run once at program startup and when the optimization
+options are changed via ``#pragma GCC optimize`` or by using the
+``optimize`` attribute.
 
 .. include:: tm.rst.in
   :start-after: [TARGET_OPTION_INIT_STRUCT]
