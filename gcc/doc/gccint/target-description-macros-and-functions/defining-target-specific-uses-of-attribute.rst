@@ -20,13 +20,19 @@ be documented in :samp:`extend.texi`.
 
 .. c:var:: const struct attribute_spec * TARGET_ATTRIBUTE_TABLE
 
+  .. hook-start:TARGET_ATTRIBUTE_TABLE
+
   If defined, this target hook points to an array of :samp:`struct
   attribute_spec` (defined in :samp:`tree-core.h`) specifying the machine
   specific attributes for this target and some of the restrictions on the
   entities to which these attributes are applied and the arguments they
   take.
 
+.. hook-end
+
 .. function:: bool TARGET_ATTRIBUTE_TAKES_IDENTIFIER_P (const_tree name)
+
+  .. hook-start:TARGET_ATTRIBUTE_TAKES_IDENTIFIER_P
 
   If defined, this target hook is a function which returns true if the
   machine-specific attribute named :samp:`{name}` expects an identifier
@@ -34,7 +40,11 @@ be documented in :samp:`extend.texi`.
   subjected to name lookup.  If this is not defined, the default is
   false for all machine-specific attributes.
 
+.. hook-end
+
 .. function:: int TARGET_COMP_TYPE_ATTRIBUTES (const_tree type1, const_tree type2)
+
+  .. hook-start:TARGET_COMP_TYPE_ATTRIBUTES
 
   If defined, this target hook is a function which returns zero if the attributes on
   :samp:`{type1}` and :samp:`{type2}` are incompatible, one if they are compatible,
@@ -42,12 +52,20 @@ be documented in :samp:`extend.texi`.
   generated).  If this is not defined, machine-specific attributes are
   supposed always to be compatible.
 
+.. hook-end
+
 .. function:: void TARGET_SET_DEFAULT_TYPE_ATTRIBUTES (tree type)
+
+  .. hook-start:TARGET_SET_DEFAULT_TYPE_ATTRIBUTES
 
   If defined, this target hook is a function which assigns default attributes to
   the newly defined :samp:`{type}`.
 
+.. hook-end
+
 .. function:: tree TARGET_MERGE_TYPE_ATTRIBUTES (tree type1, tree type2)
+
+  .. hook-start:TARGET_MERGE_TYPE_ATTRIBUTES
 
   Define this target hook if the merging of type attributes needs special
   handling.  If defined, the result is a list of the combined
@@ -56,7 +74,11 @@ be documented in :samp:`extend.texi`.
   function may call ``merge_attributes`` to handle machine-independent
   merging.
 
+.. hook-end
+
 .. function:: tree TARGET_MERGE_DECL_ATTRIBUTES (tree olddecl, tree newdecl)
+
+  .. hook-start:TARGET_MERGE_DECL_ATTRIBUTES
 
   Define this target hook if the merging of decl attributes needs special
   handling.  If defined, the result is a list of the combined
@@ -79,11 +101,17 @@ be documented in :samp:`extend.texi`.
   :samp:`dllexport` attributes.  This is done in :samp:`i386/cygwin.h` and
   :samp:`i386/i386.c`, for example.
 
+.. hook-end
+
 .. function:: bool TARGET_VALID_DLLIMPORT_ATTRIBUTE_P (const_tree decl)
+
+  .. hook-start:TARGET_VALID_DLLIMPORT_ATTRIBUTE_P
 
   :samp:`{decl}` is a variable or function with ``__attribute__((dllimport))``
   specified.  Use this hook if the target needs to add extra validation
   checks to ``handle_dll_attribute``.
+
+.. hook-end
 
 .. c:macro:: TARGET_DECLSPEC
 
@@ -96,6 +124,8 @@ be documented in :samp:`extend.texi`.
 
 .. function:: void TARGET_INSERT_ATTRIBUTES (tree node, tree *attr_ptr)
 
+  .. hook-start:TARGET_INSERT_ATTRIBUTES
+
   Define this target hook if you want to be able to add attributes to a decl
   when it is being created.  This is normally useful for back ends which
   wish to implement a pragma by using the attributes which correspond to
@@ -107,7 +137,11 @@ be documented in :samp:`extend.texi`.
   attributes, or a copy of the list may be made if further changes are
   needed.
 
+.. hook-end
+
 .. function:: tree TARGET_HANDLE_GENERIC_ATTRIBUTE (tree *node, tree name, tree args, int flags, bool *no_add_attrs)
+
+  .. hook-start:TARGET_HANDLE_GENERIC_ATTRIBUTE
 
   Define this target hook if you want to be able to perform additional
   target-specific processing of an attribute which is handled generically
@@ -115,7 +149,11 @@ be documented in :samp:`extend.texi`.
   attribute handlers.  So far this only affects the :samp:`{noinit}` and
   :samp:`{section}` attribute.
 
+.. hook-end
+
 .. function:: bool TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P (const_tree fndecl)
+
+  .. hook-start:TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P
 
   .. index:: inlining
 
@@ -124,7 +162,11 @@ be documented in :samp:`extend.texi`.
   attributes, ``false`` otherwise.  By default, if a function has a
   target specific attribute attached to it, it will not be inlined.
 
+.. hook-end
+
 .. function:: bool TARGET_OPTION_VALID_ATTRIBUTE_P (tree fndecl, tree name, tree args, int flags)
+
+  .. hook-start:TARGET_OPTION_VALID_ATTRIBUTE_P
 
   This hook is called to parse ``attribute(target("..."))``, which
   allows setting target-specific options on individual functions.
@@ -136,39 +178,63 @@ be documented in :samp:`extend.texi`.
   the function declaration to hold a pointer to a target-specific
   ``struct cl_target_option`` structure.
 
+.. hook-end
+
 .. function:: void TARGET_OPTION_SAVE (struct cl_target_option *ptr, struct gcc_options *opts, struct gcc_options *opts_set)
+
+  .. hook-start:TARGET_OPTION_SAVE
 
   This hook is called to save any additional target-specific information
   in the ``struct cl_target_option`` structure for function-specific
   options from the ``struct gcc_options`` structure.
   See :ref:`option-file-format`.
 
+.. hook-end
+
 .. function:: void TARGET_OPTION_RESTORE (struct gcc_options *opts, struct gcc_options *opts_set, struct cl_target_option *ptr)
+
+  .. hook-start:TARGET_OPTION_RESTORE
 
   This hook is called to restore any additional target-specific
   information in the ``struct cl_target_option`` structure for
   function-specific options to the ``struct gcc_options`` structure.
 
+.. hook-end
+
 .. function:: void TARGET_OPTION_POST_STREAM_IN (struct cl_target_option *ptr)
+
+  .. hook-start:TARGET_OPTION_POST_STREAM_IN
 
   This hook is called to update target-specific information in the
   ``struct cl_target_option`` structure after it is streamed in from
   LTO bytecode.
 
+.. hook-end
+
 .. function:: void TARGET_OPTION_PRINT (FILE *file, int indent, struct cl_target_option *ptr)
+
+  .. hook-start:TARGET_OPTION_PRINT
 
   This hook is called to print any additional target-specific
   information in the ``struct cl_target_option`` structure for
   function-specific options.
 
+.. hook-end
+
 .. function:: bool TARGET_OPTION_PRAGMA_PARSE (tree args, tree pop_target)
+
+  .. hook-start:TARGET_OPTION_PRAGMA_PARSE
 
   This target hook parses the options for ``#pragma GCC target``, which
   sets the target-specific options for functions that occur later in the
   input stream.  The options accepted should be the same as those handled by the
   ``TARGET_OPTION_VALID_ATTRIBUTE_P`` hook.
 
+.. hook-end
+
 .. function:: void TARGET_OPTION_OVERRIDE (void)
+
+  .. hook-start:TARGET_OPTION_OVERRIDE
 
   Sometimes certain combinations of command options do not make sense on
   a particular target machine.  You can override the hook
@@ -182,7 +248,11 @@ be documented in :samp:`extend.texi`.
   changed via the optimize attribute or pragma, see
   ``TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE``
 
+.. hook-end
+
 .. function:: bool TARGET_OPTION_FUNCTION_VERSIONS (tree decl1, tree decl2)
+
+  .. hook-start:TARGET_OPTION_FUNCTION_VERSIONS
 
   This target hook returns ``true`` if :samp:`{DECL1}` and :samp:`{DECL2}` are
   versions of the same function.  :samp:`{DECL1}` and :samp:`{DECL2}` are function
@@ -190,15 +260,25 @@ be documented in :samp:`extend.texi`.
   different target specific attributes, that is, they are compiled for
   different target machines.
 
+.. hook-end
+
 .. function:: bool TARGET_CAN_INLINE_P (tree caller, tree callee)
+
+  .. hook-start:TARGET_CAN_INLINE_P
 
   This target hook returns ``false`` if the :samp:`{caller}` function
   cannot inline :samp:`{callee}`, based on target specific information.  By
   default, inlining is not allowed if the callee function has function
   specific target options and the caller does not use the same options.
 
+.. hook-end
+
 .. function:: void TARGET_RELAYOUT_FUNCTION (tree fndecl)
+
+  .. hook-start:TARGET_RELAYOUT_FUNCTION
 
   This target hook fixes function :samp:`{fndecl}` after attributes are processed.
   Default does nothing. On ARM, the default function's alignment is updated
   with the attribute target.
+
+.. hook-end

@@ -49,13 +49,19 @@ The following macros control mode switching optimizations:
 
 .. function:: void TARGET_MODE_EMIT (int entity, int mode, int prev_mode, HARD_REG_SET regs_live)
 
+  .. hook-start:TARGET_MODE_EMIT
+
   Generate one or more insns to set :samp:`{entity}` to :samp:`{mode}`.
   :samp:`{hard_reg_live}` is the set of hard registers live at the point where
   the insn(s) are to be inserted. :samp:`{prev_moxde}` indicates the mode
   to switch from. Sets of a lower numbered entity will be emitted before
   sets of a higher numbered entity to a mode of the same or lower priority.
 
+.. hook-end
+
 .. function:: int TARGET_MODE_NEEDED (int entity, rtx_insn *insn)
+
+  .. hook-start:TARGET_MODE_NEEDED
 
   :samp:`{entity}` is an integer specifying a mode-switched entity.
   If ``OPTIMIZE_MODE_SWITCHING`` is defined, you must define this macro
@@ -63,14 +69,22 @@ The following macros control mode switching optimizations:
   in ``NUM_MODES_FOR_MODE_SWITCHING``, to denote the mode that :samp:`{entity}`
   must be switched into prior to the execution of :samp:`{insn}`.
 
+.. hook-end
+
 .. function:: int TARGET_MODE_AFTER (int entity, int mode, rtx_insn *insn)
+
+  .. hook-start:TARGET_MODE_AFTER
 
   :samp:`{entity}` is an integer specifying a mode-switched entity.
   If this macro is defined, it is evaluated for every :samp:`{insn}` during mode
   switching.  It determines the mode that an insn results
   in (if different from the incoming mode).
 
+.. hook-end
+
 .. function:: int TARGET_MODE_ENTRY (int entity)
+
+  .. hook-start:TARGET_MODE_ENTRY
 
   If this macro is defined, it is evaluated for every :samp:`{entity}` that
   needs mode switching.  It should evaluate to an integer, which is a mode
@@ -78,7 +92,11 @@ The following macros control mode switching optimizations:
   If ``TARGET_MODE_ENTRY`` is defined then ``TARGET_MODE_EXIT``
   must be defined.
 
+.. hook-end
+
 .. function:: int TARGET_MODE_EXIT (int entity)
+
+  .. hook-start:TARGET_MODE_EXIT
 
   If this macro is defined, it is evaluated for every :samp:`{entity}` that
   needs mode switching.  It should evaluate to an integer, which is a mode
@@ -86,7 +104,11 @@ The following macros control mode switching optimizations:
   If ``TARGET_MODE_EXIT`` is defined then ``TARGET_MODE_ENTRY``
   must be defined.
 
+.. hook-end
+
 .. function:: int TARGET_MODE_PRIORITY (int entity, int n)
+
+  .. hook-start:TARGET_MODE_PRIORITY
 
   This macro specifies the order in which modes for :samp:`{entity}`
   are processed. 0 is the highest priority,
@@ -95,3 +117,5 @@ The following macros control mode switching optimizations:
   for :samp:`{entity}`.  For any fixed :samp:`{entity}`, ``mode_priority``
   ( :samp:`{entity}`, :samp:`{n}` ) shall be a bijection in 0 ...
   ``num_modes_for_mode_switching[entity] - 1``.
+
+.. hook-end

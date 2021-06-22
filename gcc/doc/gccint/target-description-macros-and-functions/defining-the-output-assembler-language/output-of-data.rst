@@ -10,33 +10,7 @@ Output of Data
 
 .. c:var:: const char * TARGET_ASM_BYTE_OP
 
-.. c:var:: const char * TARGET_ASM_ALIGNED_HI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_PSI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_SI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_PDI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_DI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_PTI_OP
-
-.. c:var:: const char * TARGET_ASM_ALIGNED_TI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_HI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_PSI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_SI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_PDI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_DI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_PTI_OP
-
-.. c:var:: const char * TARGET_ASM_UNALIGNED_TI_OP
+  .. hook-start:TARGET_ASM_BYTE_OP
 
   These hooks specify assembly directives for creating certain kinds
   of integer object.  The ``TARGET_ASM_BYTE_OP`` directive creates a
@@ -48,7 +22,11 @@ Output of Data
   followed immediately by the object's initial value.  In most cases,
   the string should contain a tab, a pseudo-op, and then another tab.
 
+.. hook-end
+
 .. function:: bool TARGET_ASM_INTEGER (rtx x, unsigned int size, int aligned_p)
+
+  .. hook-start:TARGET_ASM_INTEGER
 
   The ``assemble_integer`` function uses this hook to output an
   integer object.  :samp:`{x}` is the object's value, :samp:`{size}` is its size
@@ -61,12 +39,20 @@ Output of Data
   ``TARGET_ASM_BYTE_OP`` family of strings, returning ``false``
   when the relevant string is ``NULL``.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_DECL_END (void)
+
+  .. hook-start:TARGET_ASM_DECL_END
 
   Define this hook if the target assembler requires a special marker to
   terminate an initialized variable declaration.
 
+.. hook-end
+
 .. function:: bool TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA (FILE *file, rtx x)
+
+  .. hook-start:TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
 
   A target hook to recognize :samp:`{rtx}` patterns that ``output_addr_const``
   can't deal with, and output assembly code to :samp:`{file}` corresponding to
@@ -77,6 +63,8 @@ Output of Data
   so that a standard error message is printed.  If it prints an error message
   itself, by calling, for example, ``output_operand_lossage``, it may just
   return ``true``.
+
+.. hook-end
 
 .. c:macro:: ASM_OUTPUT_ASCII (stream, ptr, len)
 
@@ -169,9 +157,13 @@ Output of Data
 
 .. c:var:: const char * TARGET_ASM_CLOSE_PAREN
 
+  .. hook-start:TARGET_ASM_OPEN_PAREN
+
   These target hooks are C string constants, describing the syntax in the
   assembler for grouping arithmetic expressions.  If not overridden, they
   default to normal parentheses, which is correct for most assemblers.
+
+.. hook-end
 
 These macros are provided by :samp:`real.h` for writing the definitions
 of ``ASM_OUTPUT_DOUBLE`` and the like:

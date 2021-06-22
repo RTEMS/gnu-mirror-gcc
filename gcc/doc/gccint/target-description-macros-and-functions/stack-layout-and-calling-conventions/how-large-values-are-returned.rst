@@ -28,6 +28,8 @@ memory.
 
 .. function:: bool TARGET_RETURN_IN_MEMORY (const_tree type, const_tree fntype)
 
+  .. hook-start:TARGET_RETURN_IN_MEMORY
+
   This target hook should return a nonzero value to say to return the
   function value in memory, just as large structures are always returned.
   Here :samp:`{type}` will be the data type of the value, and :samp:`{fntype}`
@@ -45,6 +47,8 @@ memory.
   be returned in memory.  You should instead use ``DEFAULT_PCC_STRUCT_RETURN``
   to indicate this.
 
+.. hook-end
+
 .. c:macro:: DEFAULT_PCC_STRUCT_RETURN
 
   Define this macro to be 1 if all structure and union return values must be
@@ -57,6 +61,8 @@ memory.
   If not defined, this defaults to the value 1.
 
 .. function:: rtx TARGET_STRUCT_VALUE_RTX (tree fndecl, int incoming)
+
+  .. hook-start:TARGET_STRUCT_VALUE_RTX
 
   This target hook should return the location of the structure value
   address (normally a ``mem`` or ``reg`` ), or 0 if the address is
@@ -79,6 +85,8 @@ memory.
   structure value address at the beginning of a function.  If you need
   to emit adjusting code, you should do it at this point.
 
+.. hook-end
+
 .. c:macro:: PCC_STATIC_STRUCT_RETURN
 
   Define this macro if the usual system convention on the target machine
@@ -93,22 +101,38 @@ memory.
 
 .. function:: fixed_size_mode TARGET_GET_RAW_RESULT_MODE (int regno)
 
+  .. hook-start:TARGET_GET_RAW_RESULT_MODE
+
   This target hook returns the mode to be used when accessing raw return
   registers in ``__builtin_return``.  Define this macro if the value
   in :samp:`{reg_raw_mode}` is not correct.
 
+.. hook-end
+
 .. function:: fixed_size_mode TARGET_GET_RAW_ARG_MODE (int regno)
+
+  .. hook-start:TARGET_GET_RAW_ARG_MODE
 
   This target hook returns the mode to be used when accessing raw argument
   registers in ``__builtin_apply_args``.  Define this macro if the value
   in :samp:`{reg_raw_mode}` is not correct.
 
+.. hook-end
+
 .. function:: bool TARGET_EMPTY_RECORD_P (const_tree type)
+
+  .. hook-start:TARGET_EMPTY_RECORD_P
 
   This target hook returns true if the type is an empty record.  The default
   is to return ``false``.
 
+.. hook-end
+
 .. function:: void TARGET_WARN_PARAMETER_PASSING_ABI (cumulative_args_t ca, tree type)
+
+  .. hook-start:TARGET_WARN_PARAMETER_PASSING_ABI
 
   This target hook warns about the change in empty class parameter passing
   ABI.
+
+.. hook-end

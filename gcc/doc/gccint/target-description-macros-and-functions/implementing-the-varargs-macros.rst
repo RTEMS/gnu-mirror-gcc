@@ -78,13 +78,19 @@ These machine description macros help implement varargs:
 
 .. function:: rtx TARGET_EXPAND_BUILTIN_SAVEREGS (void)
 
+  .. hook-start:TARGET_EXPAND_BUILTIN_SAVEREGS
+
   If defined, this hook produces the machine-specific code for a call to
   ``__builtin_saveregs``.  This code will be moved to the very
   beginning of the function, before any parameter access are made.  The
   return value of this function should be an RTX that contains the value
   to use as the return of ``__builtin_saveregs``.
 
+.. hook-end
+
 .. function:: void TARGET_SETUP_INCOMING_VARARGS (cumulative_args_t args_so_far, const function_arg_info &arg, int *pretend_args_size, int second_time)
+
+  .. hook-start:TARGET_SETUP_INCOMING_VARARGS
 
   This target hook offers an alternative to using
   ``__builtin_saveregs`` and defining the hook
@@ -118,7 +124,11 @@ These machine description macros help implement varargs:
   end of the source file.  The hook ``TARGET_SETUP_INCOMING_VARARGS`` should
   not generate any instructions in this case.
 
+.. hook-end
+
 .. function:: bool TARGET_STRICT_ARGUMENT_NAMING (cumulative_args_t ca)
+
+  .. hook-start:TARGET_STRICT_ARGUMENT_NAMING
 
   Define this hook to return ``true`` if the location where a function
   argument is passed depends on whether or not it is a named argument.
@@ -133,7 +143,11 @@ These machine description macros help implement varargs:
 
   You need not define this hook if it always returns ``false``.
 
+.. hook-end
+
 .. function:: void TARGET_CALL_ARGS (rtx, tree)
+
+  .. hook-start:TARGET_CALL_ARGS
 
   While generating RTL for a function call, this target hook is invoked once
   for each argument passed to the function, either a register returned by
@@ -148,7 +162,11 @@ These machine description macros help implement varargs:
   passed instead of an argument register.
   Most ports do not need to implement anything for this hook.
 
+.. hook-end
+
 .. function:: void TARGET_END_CALL_ARGS (void)
+
+  .. hook-start:TARGET_END_CALL_ARGS
 
   This target hook is invoked while generating RTL for a function call,
   just after the point where the return reg is copied into a pseudo.  It
@@ -156,7 +174,11 @@ These machine description macros help implement varargs:
   emitted call are now no longer in use.
   Most ports do not need to implement anything for this hook.
 
+.. hook-end
+
 .. function:: bool TARGET_PRETEND_OUTGOING_VARARGS_NAMED (cumulative_args_t ca)
+
+  .. hook-start:TARGET_PRETEND_OUTGOING_VARARGS_NAMED
 
   If you need to conditionally change ABIs so that one works with
   ``TARGET_SETUP_INCOMING_VARARGS``, but the other works like neither
@@ -165,7 +187,11 @@ These machine description macros help implement varargs:
   ``TARGET_SETUP_INCOMING_VARARGS`` is used, ``false`` otherwise.
   Otherwise, you should not define this hook.
 
+.. hook-end
+
 .. function:: rtx TARGET_LOAD_BOUNDS_FOR_ARG (rtx slot, rtx arg, rtx slot_no)
+
+  .. hook-start:TARGET_LOAD_BOUNDS_FOR_ARG
 
   This hook is used by expand pass to emit insn to load bounds of
   :samp:`{arg}` passed in :samp:`{slot}`.  Expand pass uses this hook in case
@@ -175,7 +201,11 @@ These machine description macros help implement varargs:
   constant holding number of the target dependent special slot which
   should be used to obtain bounds.  Hook returns RTX holding loaded bounds.
 
+.. hook-end
+
 .. function:: void TARGET_STORE_BOUNDS_FOR_ARG (rtx arg, rtx slot, rtx bounds, rtx slot_no)
+
+  .. hook-start:TARGET_STORE_BOUNDS_FOR_ARG
 
   This hook is used by expand pass to emit insns to store :samp:`{bounds}` of
   :samp:`{arg}` passed in :samp:`{slot}`.  Expand pass uses this hook in case
@@ -185,13 +215,23 @@ These machine description macros help implement varargs:
   constant holding number of the target dependent special slot which
   should be used to store :samp:`{bounds}`.
 
+.. hook-end
+
 .. function:: rtx TARGET_LOAD_RETURNED_BOUNDS (rtx slot)
+
+  .. hook-start:TARGET_LOAD_RETURNED_BOUNDS
 
   This hook is used by expand pass to emit insn to load bounds
   returned by function call in :samp:`{slot}`.  Hook returns RTX holding
   loaded bounds.
 
+.. hook-end
+
 .. function:: void TARGET_STORE_RETURNED_BOUNDS (rtx slot, rtx bounds)
+
+  .. hook-start:TARGET_STORE_RETURNED_BOUNDS
 
   This hook is used by expand pass to emit insn to store :samp:`{bounds}`
   returned by function call into :samp:`{slot}`.
+
+.. hook-end

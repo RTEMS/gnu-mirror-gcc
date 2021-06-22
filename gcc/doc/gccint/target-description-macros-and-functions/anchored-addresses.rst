@@ -44,18 +44,28 @@ or ``TARGET_MAX_ANCHOR_OFFSET`` is set to a nonzero value.
 
 .. c:var:: HOST_WIDE_INT TARGET_MIN_ANCHOR_OFFSET
 
+  .. hook-start:TARGET_MIN_ANCHOR_OFFSET
+
   The minimum offset that should be applied to a section anchor.
   On most targets, it should be the smallest offset that can be
   applied to a base register while still giving a legitimate address
   for every mode.  The default value is 0.
 
+.. hook-end
+
 .. c:var:: HOST_WIDE_INT TARGET_MAX_ANCHOR_OFFSET
+
+  .. hook-start:TARGET_MAX_ANCHOR_OFFSET
 
   Like ``TARGET_MIN_ANCHOR_OFFSET``, but the maximum (inclusive)
   offset that should be applied to section anchors.  The default
   value is 0.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_OUTPUT_ANCHOR (rtx x)
+
+  .. hook-start:TARGET_ASM_OUTPUT_ANCHOR
 
   Write the assembly code to define section anchor :samp:`{x}`, which is a
   ``SYMBOL_REF`` for which :samp:`SYMBOL_REF_ANCHOR_P ({x})` is true.
@@ -67,7 +77,11 @@ or ``TARGET_MAX_ANCHOR_OFFSET`` is set to a nonzero value.
   If ``ASM_OUTPUT_DEF`` is not available, the hook's default definition
   is ``NULL``, which disables the use of section anchors altogether.
 
+.. hook-end
+
 .. function:: bool TARGET_USE_ANCHORS_FOR_SYMBOL_P (const_rtx x)
+
+  .. hook-start:TARGET_USE_ANCHORS_FOR_SYMBOL_P
 
   Return true if GCC should attempt to use anchors to access ``SYMBOL_REF``
   :samp:`{x}`.  You can assume :samp:`SYMBOL_REF_HAS_BLOCK_INFO_P ({x})` and
@@ -76,3 +90,5 @@ or ``TARGET_MAX_ANCHOR_OFFSET`` is set to a nonzero value.
   The default version is correct for most targets, but you might need to
   intercept this hook to handle things like target-specific attributes
   or target-specific sections.
+
+.. hook-end

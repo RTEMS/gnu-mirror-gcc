@@ -104,6 +104,8 @@ This discusses registers that address the stack frame.
 
 .. function:: rtx TARGET_STATIC_CHAIN (const_tree fndecl_or_type, bool incoming_p)
 
+  .. hook-start:TARGET_STATIC_CHAIN
+
   This hook replaces the use of ``STATIC_CHAIN_REGNUM`` et al for
   targets that may use different static chain locations for different
   nested functions.  This may be required if the target has function
@@ -127,6 +129,8 @@ This discusses registers that address the stack frame.
   The variables ``stack_pointer_rtx``, ``frame_pointer_rtx``, and
   ``arg_pointer_rtx`` will have been initialized and should be used
   to refer to those items.
+
+.. hook-end
 
 .. c:macro:: DWARF_FRAME_REGISTERS
 

@@ -77,6 +77,8 @@ This concerns dispatch tables.
 
 .. function:: void TARGET_ASM_POST_CFI_STARTPROC (FILE *, tree)
 
+  .. hook-start:TARGET_ASM_POST_CFI_STARTPROC
+
   This target hook is used to emit assembly strings required by the target
   after the .cfi_startproc directive.  The first argument is the file stream to
   write the strings to and the second argument is the function's declaration.  The
@@ -84,7 +86,11 @@ This concerns dispatch tables.
 
   The default is to not output any assembly strings.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_EMIT_UNWIND_LABEL (FILE *stream, tree decl, int for_eh, int empty)
+
+  .. hook-start:TARGET_ASM_EMIT_UNWIND_LABEL
 
   This target hook emits a label at the beginning of each FDE.  It
   should be defined on targets where FDEs need special labels, and it
@@ -96,7 +102,11 @@ This concerns dispatch tables.
 
   The default is that FDEs are not given nonlocal labels.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_EMIT_EXCEPT_TABLE_LABEL (FILE *stream)
+
+  .. hook-start:TARGET_ASM_EMIT_EXCEPT_TABLE_LABEL
 
   This target hook emits a label at the beginning of the exception table.
   It should be defined on targets where it is desirable for the table
@@ -104,31 +114,51 @@ This concerns dispatch tables.
 
   The default is that no label is emitted.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_EMIT_EXCEPT_PERSONALITY (rtx personality)
+
+  .. hook-start:TARGET_ASM_EMIT_EXCEPT_PERSONALITY
 
   If the target implements ``TARGET_ASM_UNWIND_EMIT``, this hook may be
   used to emit a directive to install a personality hook into the unwind
   info.  This hook should not be used if dwarf2 unwind info is used.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_UNWIND_EMIT (FILE *stream, rtx_insn *insn)
+
+  .. hook-start:TARGET_ASM_UNWIND_EMIT
 
   This target hook emits assembly directives required to unwind the
   given instruction.  This is only used when ``TARGET_EXCEPT_UNWIND_INFO``
   returns ``UI_TARGET``.
 
+.. hook-end
+
 .. function:: rtx TARGET_ASM_MAKE_EH_SYMBOL_INDIRECT (rtx origsymbol, bool pubvis)
+
+  .. hook-start:TARGET_ASM_MAKE_EH_SYMBOL_INDIRECT
 
   If necessary, modify personality and LSDA references to handle indirection.
   The original symbol is in ``origsymbol`` and if ``pubvis`` is true
   the symbol is visible outside the TU.
 
+.. hook-end
+
 .. c:var:: bool TARGET_ASM_UNWIND_EMIT_BEFORE_INSN
+
+  .. hook-start:TARGET_ASM_UNWIND_EMIT_BEFORE_INSN
 
   True if the ``TARGET_ASM_UNWIND_EMIT`` hook should be called before
   the assembly for :samp:`{insn}` has been emitted, false if the hook should
   be called afterward.
 
+.. hook-end
+
 .. function:: bool TARGET_ASM_SHOULD_RESTORE_CFA_STATE (void)
+
+  .. hook-start:TARGET_ASM_SHOULD_RESTORE_CFA_STATE
 
   For DWARF-based unwind frames, two CFI instructions provide for save and
   restore of register state.  GCC maintains the current frame address (CFA)
@@ -137,3 +167,5 @@ This concerns dispatch tables.
   the unwind frames).  This hook allows the target to specify that the CFA data
   is not saved/restored along with the registers by the target unwinder so that
   suitable additional instructions should be emitted to restore it.
+
+.. hook-end

@@ -148,12 +148,16 @@ languages, rather than to fundamental aspects of storage layout.
 
 .. function:: bool TARGET_DEFAULT_SHORT_ENUMS (void)
 
+  .. hook-start:TARGET_DEFAULT_SHORT_ENUMS
+
   This target hook should return true if the compiler should give an
   ``enum`` type only as many bytes as it takes to represent the range
   of possible values of that type.  It should return false if all
   ``enum`` types should be allocated like ``int``.
 
   The default is to return false.
+
+.. hook-end
 
 .. c:macro:: SIZE_TYPE
 

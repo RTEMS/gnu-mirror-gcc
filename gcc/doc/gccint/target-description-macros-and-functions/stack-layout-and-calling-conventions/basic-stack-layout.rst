@@ -49,11 +49,15 @@ Here is the basic stack layout.
 
 .. function:: HOST_WIDE_INT TARGET_STARTING_FRAME_OFFSET (void)
 
+  .. hook-start:TARGET_STARTING_FRAME_OFFSET
+
   This hook returns the offset from the frame pointer to the first local
   variable slot to be allocated.  If ``FRAME_GROWS_DOWNWARD``, it is the
   offset to *end* of the first slot allocated, otherwise it is the
   offset to *beginning* of the first slot allocated.  The default
   implementation returns 0.
+
+.. hook-end
 
 .. c:macro:: STACK_ALIGNMENT_NEEDED
 
@@ -122,11 +126,15 @@ Here is the basic stack layout.
 
 .. function:: rtx TARGET_BUILTIN_SETJMP_FRAME_VALUE (void)
 
+  .. hook-start:TARGET_BUILTIN_SETJMP_FRAME_VALUE
+
   This target hook should return an rtx that is used to store
   the address of the current frame into the built in ``setjmp`` buffer.
   The default value, ``virtual_stack_vars_rtx``, is correct for most
   machines.  One reason you may need to define this target hook is if
   ``hard_frame_pointer_rtx`` is the appropriate value on your machine.
+
+.. hook-end
 
 .. c:macro:: FRAME_ADDR_RTX (frameaddr)
 
@@ -190,6 +198,8 @@ Here is the basic stack layout.
 
 .. function:: void TARGET_DWARF_HANDLE_FRAME_UNSPEC (const char *label, rtx pattern, int index)
 
+  .. hook-start:TARGET_DWARF_HANDLE_FRAME_UNSPEC
+
   This target hook allows the backend to emit frame-related insns that
   contain UNSPECs or UNSPEC_VOLATILEs.  The DWARF 2 call frame debugging
   info engine will invoke it on insns of the form
@@ -208,7 +218,11 @@ Here is the basic stack layout.
   the CFI label attached to the insn, :samp:`{pattern}` is the pattern of
   the insn and :samp:`{index}` is ``UNSPEC_INDEX`` or ``UNSPECV_INDEX``.
 
+.. hook-end
+
 .. function:: unsigned int TARGET_DWARF_POLY_INDETERMINATE_VALUE (unsigned int i, unsigned int *factor, int *offset)
+
+  .. hook-start:TARGET_DWARF_POLY_INDETERMINATE_VALUE
 
   Express the value of ``poly_int`` indeterminate :samp:`{i}` as a DWARF
   expression, with :samp:`{i}` counting from 1.  Return the number of a DWARF
@@ -221,6 +235,8 @@ Here is the basic stack layout.
 
   A target only needs to define this hook if it sets
   :samp:`NUM_POLY_INT_COEFFS` to a value greater than 1.
+
+.. hook-end
 
 .. c:macro:: INCOMING_FRAME_SP_OFFSET
 

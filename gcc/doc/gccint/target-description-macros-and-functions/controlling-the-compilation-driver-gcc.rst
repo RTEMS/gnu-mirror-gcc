@@ -295,10 +295,14 @@ You can control the compilation driver.
 
 .. c:var:: bool TARGET_ALWAYS_STRIP_DOTDOT
 
+  .. hook-start:TARGET_ALWAYS_STRIP_DOTDOT
+
   True if :samp:`..` components should always be removed from directory names
   computed relative to GCC's internal directories, false (default) if such
   components should be preserved and directory names containing them passed
   to other tools such as the linker.
+
+.. hook-end
 
 .. c:macro:: MULTILIB_DEFAULTS
 

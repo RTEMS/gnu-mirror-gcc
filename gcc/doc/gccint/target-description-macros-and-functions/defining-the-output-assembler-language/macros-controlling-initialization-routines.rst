@@ -73,11 +73,17 @@ and termination functions:
 
 .. c:var:: bool TARGET_HAVE_CTORS_DTORS
 
+  .. hook-start:TARGET_HAVE_CTORS_DTORS
+
   This value is true if the target supports some 'native' method of
   collecting constructors and destructors to be run at startup and exit.
   It is false if we must use :command:`collect2`.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_CONSTRUCTOR (rtx symbol, int priority)
+
+  .. hook-start:TARGET_ASM_CONSTRUCTOR
 
   If defined, a function that outputs assembler code to arrange to call
   the function referenced by :samp:`{symbol}` at initialization time.
@@ -92,10 +98,16 @@ and termination functions:
   target defines ``CTORS_SECTION_ASM_OP``, or (3) ``USE_COLLECT2``
   is not defined.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_DESTRUCTOR (rtx symbol, int priority)
+
+  .. hook-start:TARGET_ASM_DESTRUCTOR
 
   This is like ``TARGET_ASM_CONSTRUCTOR`` but used for termination
   functions rather than initialization functions.
+
+.. hook-end
 
 If ``TARGET_HAVE_CTORS_DTORS`` is true, the initialization routine
 generated for the generated object file will have static linkage.

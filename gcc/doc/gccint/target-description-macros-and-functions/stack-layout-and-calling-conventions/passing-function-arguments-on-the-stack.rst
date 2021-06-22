@@ -18,13 +18,19 @@ control passing certain arguments in registers.
 
 .. function:: bool TARGET_PROMOTE_PROTOTYPES (const_tree fntype)
 
+  .. hook-start:TARGET_PROMOTE_PROTOTYPES
+
   This target hook returns ``true`` if an argument declared in a
   prototype as an integral type smaller than ``int`` should actually be
   passed as an ``int``.  In addition to avoiding errors in certain
   cases of mismatch, it also makes for better code on certain machines.
   The default is to not promote prototypes.
 
+.. hook-end
+
 .. function:: bool TARGET_PUSH_ARGUMENT (unsigned int npush)
+
+  .. hook-start:TARGET_PUSH_ARGUMENT
 
   This target hook returns ``true`` if push instructions will be
   used to pass outgoing arguments.  When the push instruction usage is
@@ -35,6 +41,8 @@ control passing certain arguments in registers.
   strategy: to allocate the entire argument block and then store the
   arguments into it.  If this target hook may return ``true``,
   ``PUSH_ROUNDING`` must be defined.
+
+.. hook-end
 
 .. c:macro:: PUSH_ARGS_REVERSED
 
@@ -96,7 +104,8 @@ control passing certain arguments in registers.
   which.
 
 .. above is overfull.  not sure what to do.  -mew 5feb93  did
-   something, not sure if it looks good.  -mew 10feb93
+
+.. something, not sure if it looks good.  -mew 10feb93
 
 .. c:macro:: INCOMING_REG_PARM_STACK_SPACE (fndecl)
 
@@ -131,6 +140,8 @@ control passing certain arguments in registers.
   stack in its natural location.
 
 .. function:: poly_int64 TARGET_RETURN_POPS_ARGS (tree fundecl, tree funtype, poly_int64 size)
+
+  .. hook-start:TARGET_RETURN_POPS_ARGS
 
   This target hook returns the number of bytes of its own arguments that
   a function pops on returning, or 0 if the function pops no arguments
@@ -167,6 +178,8 @@ control passing certain arguments in registers.
   nothing (the caller pops all).  When this convention is in use,
   :samp:`{funtype}` is examined to determine whether a function takes a fixed
   number of arguments.
+
+.. hook-end
 
 .. c:macro:: CALL_POPS_ARGS (cum)
 

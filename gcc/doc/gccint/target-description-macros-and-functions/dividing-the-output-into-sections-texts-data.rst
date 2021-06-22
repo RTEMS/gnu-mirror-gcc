@@ -11,6 +11,8 @@ Dividing the Output into Sections (Texts, Data, ...)
 .. the above section title is WAY too long.  maybe cut the part between
    the (...)?  -mew 10feb93
 
+.. the (...)?  -mew 10feb93
+
 An object file is divided into sections containing different types of
 data.  In the most common case, there are three sections: the :dfn:`text
 section`, which holds instructions and read-only data; the :dfn:`data
@@ -189,6 +191,8 @@ if the target does not provide them.
 
 .. function:: void TARGET_ASM_INIT_SECTIONS (void)
 
+  .. hook-start:TARGET_ASM_INIT_SECTIONS
+
   Define this hook if you need to do something special to set up the
   :samp:`varasm.c` sections, or if your target has some special sections
   of its own that you need to create.
@@ -197,7 +201,11 @@ if the target does not provide them.
   any assembly code, and before calling any of the section-returning hooks
   described below.
 
+.. hook-end
+
 .. function:: int TARGET_ASM_RELOC_RW_MASK (void)
+
+  .. hook-start:TARGET_ASM_RELOC_RW_MASK
 
   Return a mask describing how relocations should be treated when
   selecting sections.  Bit 1 should be set if global relocations
@@ -209,7 +217,11 @@ if the target does not provide them.
   when the target cannot support (some kinds of) dynamic relocations
   in read-only sections even in executables.
 
+.. hook-end
+
 .. function:: bool TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC (void)
+
+  .. hook-start:TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC
 
   Return true to generate ADDR_DIF_VEC table
   or false to generate ADDR_VEC table for jumps in case of -fPIC.
@@ -217,7 +229,11 @@ if the target does not provide them.
   The default version of this function returns true if flag_pic
   equals true and false otherwise
 
+.. hook-end
+
 .. function:: section * TARGET_ASM_SELECT_SECTION (tree exp, int reloc, unsigned HOST_WIDE_INT align)
+
+  .. hook-start:TARGET_ASM_SELECT_SECTION
 
   Return the section into which :samp:`{exp}` should be placed.  You can
   assume that :samp:`{exp}` is either a ``VAR_DECL`` node or a constant of
@@ -231,6 +247,8 @@ if the target does not provide them.
 
   See also :samp:`{USE_SELECT_SECTION_FOR_FUNCTIONS}`.
 
+.. hook-end
+
 .. c:macro:: USE_SELECT_SECTION_FOR_FUNCTIONS
 
   Define this macro if you wish TARGET_ASM_SELECT_SECTION to be called
@@ -242,6 +260,8 @@ if the target does not provide them.
 
 .. function:: void TARGET_ASM_UNIQUE_SECTION (tree decl, int reloc)
 
+  .. hook-start:TARGET_ASM_UNIQUE_SECTION
+
   Build up a unique section name, expressed as a ``STRING_CST`` node,
   and assign it to :samp:`DECL_SECTION_NAME ({decl})`.
   As with ``TARGET_ASM_SELECT_SECTION``, :samp:`{reloc}` indicates whether
@@ -252,7 +272,11 @@ if the target does not provide them.
   example, the function ``foo`` would be placed in ``.text.foo``.
   Whatever the actual target object format, this is often good enough.
 
+.. hook-end
+
 .. function:: section * TARGET_ASM_FUNCTION_RODATA_SECTION (tree decl, bool relocatable)
+
+  .. hook-start:TARGET_ASM_FUNCTION_RODATA_SECTION
 
   Return the readonly data or reloc readonly data section associated with
   :samp:`DECL_SECTION_NAME ({decl})`. :samp:`{relocatable}` selects the latter
@@ -262,18 +286,30 @@ if the target does not provide them.
   or ``.data.rel.ro.name`` if function is in ``.text.name``, and
   the normal readonly-data or reloc readonly data section otherwise.
 
+.. hook-end
+
 .. c:var:: const char * TARGET_ASM_MERGEABLE_RODATA_PREFIX
+
+  .. hook-start:TARGET_ASM_MERGEABLE_RODATA_PREFIX
 
   Usually, the compiler uses the prefix ``".rodata"`` to construct
   section names for mergeable constant data.  Define this macro to override
   the string if a different section name should be used.
 
+.. hook-end
+
 .. function:: section * TARGET_ASM_TM_CLONE_TABLE_SECTION (void)
+
+  .. hook-start:TARGET_ASM_TM_CLONE_TABLE_SECTION
 
   Return the section that should be used for transactional memory clone
   tables.
 
+.. hook-end
+
 .. function:: section * TARGET_ASM_SELECT_RTX_SECTION (machine_mode mode, rtx x, unsigned HOST_WIDE_INT align)
+
+  .. hook-start:TARGET_ASM_SELECT_RTX_SECTION
 
   Return the section into which a constant :samp:`{x}`, of mode :samp:`{mode}`,
   should be placed.  You can assume that :samp:`{x}` is some kind of
@@ -285,7 +321,11 @@ if the target does not provide them.
   constants in ``flag_pic`` mode in ``data_section`` and everything
   else in ``readonly_data_section``.
 
+.. hook-end
+
 .. function:: tree TARGET_MANGLE_DECL_ASSEMBLER_NAME (tree decl, tree id)
+
+  .. hook-start:TARGET_MANGLE_DECL_ASSEMBLER_NAME
 
   Define this hook if you need to postprocess the assembler name generated
   by target-independent code.  The :samp:`{id}` provided to this hook will be
@@ -295,7 +335,11 @@ if the target does not provide them.
   your target system.  The default implementation of this hook just
   returns the :samp:`{id}` provided.
 
+.. hook-end
+
 .. function:: void TARGET_ENCODE_SECTION_INFO (tree decl, rtx rtl, int new_decl_p)
+
+  .. hook-start:TARGET_ENCODE_SECTION_INFO
 
   Define this hook if references to a symbol or a constant must be
   treated differently depending on something about the variable or
@@ -334,30 +378,50 @@ if the target does not provide them.
   ``SYMBOL_REF_FLAGS``.  Check whether the default does what you need
   before overriding it.
 
+.. hook-end
+
 .. function:: const char * TARGET_STRIP_NAME_ENCODING (const char *name)
+
+  .. hook-start:TARGET_STRIP_NAME_ENCODING
 
   Decode :samp:`{name}` and return the real name part, sans
   the characters that ``TARGET_ENCODE_SECTION_INFO``
   may have added.
 
+.. hook-end
+
 .. function:: bool TARGET_IN_SMALL_DATA_P (const_tree exp)
+
+  .. hook-start:TARGET_IN_SMALL_DATA_P
 
   Returns true if :samp:`{exp}` should be placed into a 'small data' section.
   The default version of this hook always returns false.
 
+.. hook-end
+
 .. c:var:: bool TARGET_HAVE_SRODATA_SECTION
+
+  .. hook-start:TARGET_HAVE_SRODATA_SECTION
 
   Contains the value true if the target places read-only
   'small data' into a separate section.  The default value is false.
 
+.. hook-end
+
 .. function:: bool TARGET_PROFILE_BEFORE_PROLOGUE (void)
+
+  .. hook-start:TARGET_PROFILE_BEFORE_PROLOGUE
 
   It returns true if target wants profile code emitted before prologue.
 
   The default version of this hook use the target macro
   ``PROFILE_BEFORE_PROLOGUE``.
 
+.. hook-end
+
 .. function:: bool TARGET_BINDS_LOCAL_P (const_tree exp)
+
+  .. hook-start:TARGET_BINDS_LOCAL_P
 
   Returns true if :samp:`{exp}` names an object for which name resolution
   rules must resolve to the current 'module' (dynamic shared library
@@ -367,7 +431,13 @@ if the target does not provide them.
   for ELF, which has a looser model of global name binding than other
   currently supported object file formats.
 
+.. hook-end
+
 .. c:var:: bool TARGET_HAVE_TLS
+
+  .. hook-start:TARGET_HAVE_TLS
 
   Contains the value true if the target supports thread-local storage.
   The default value is false.
+
+.. hook-end

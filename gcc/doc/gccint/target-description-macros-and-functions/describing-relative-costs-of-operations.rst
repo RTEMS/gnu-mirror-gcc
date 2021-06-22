@@ -41,6 +41,8 @@ on the target machine.
 
 .. function:: int TARGET_REGISTER_MOVE_COST (machine_mode mode, reg_class_t from, reg_class_t to)
 
+  .. hook-start:TARGET_REGISTER_MOVE_COST
+
   This target hook should return the cost of moving data of mode :samp:`{mode}`
   from a register in class :samp:`{from}` to one in class :samp:`{to}`.  The classes
   are expressed using the enumeration values such as ``GENERAL_REGS``.
@@ -59,6 +61,8 @@ on the target machine.
   if the :samp:`mov{m}` pattern's constraints do not allow such copying.
 
   The default version of this function returns 2.
+
+.. hook-end
 
 .. c:macro:: MEMORY_MOVE_COST (mode, class, in)
 
@@ -89,6 +93,8 @@ on the target machine.
 
 .. function:: int TARGET_MEMORY_MOVE_COST (machine_mode mode, reg_class_t rclass, bool in)
 
+  .. hook-start:TARGET_MEMORY_MOVE_COST
+
   This target hook should return the cost of moving data of mode :samp:`{mode}`
   between a register of class :samp:`{rclass}` and memory; :samp:`{in}` is ``false``
   if the value is to be written to memory, ``true`` if it is to be read in.
@@ -110,6 +116,8 @@ on the target machine.
   4 is not correct for your machine, use this target hook to add some other
   value to the result of that function.  The arguments to that function
   are the same as to this target hook.
+
+.. hook-end
 
 .. c:macro:: BRANCH_COST (speed_p, predictable_p)
 
@@ -142,6 +150,8 @@ ordinarily expect.
 
 .. function:: bool TARGET_SLOW_UNALIGNED_ACCESS (machine_mode mode, unsigned int align)
 
+  .. hook-start:TARGET_SLOW_UNALIGNED_ACCESS
+
   This hook returns true if memory accesses described by the
   :samp:`{mode}` and :samp:`{alignment}` parameters have a cost many times greater
   than aligned accesses, for example if they are emulated in a trap handler.
@@ -156,6 +166,8 @@ ordinarily expect.
 
   The hook must return true whenever ``STRICT_ALIGNMENT`` is true.
   The default implementation returns ``STRICT_ALIGNMENT``.
+
+.. hook-end
 
 .. c:macro:: MOVE_RATIO (speed)
 
@@ -174,6 +186,8 @@ ordinarily expect.
   If you don't define this, a reasonable default is used.
 
 .. function:: bool TARGET_USE_BY_PIECES_INFRASTRUCTURE_P (unsigned HOST_WIDE_INT size, unsigned int alignment, enum by_pieces_operation op, bool speed_p)
+
+  .. hook-start:TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
 
   GCC will attempt several strategies when asked to copy between
   two areas of memory, or to set, clear or store to memory, for example
@@ -208,14 +222,22 @@ ordinarily expect.
   in code size, for example where the number of insns emitted to perform a
   move would be greater than that of a library call.
 
+.. hook-end
+
 .. function:: bool TARGET_OVERLAP_OP_BY_PIECES_P (void)
+
+  .. hook-start:TARGET_OVERLAP_OP_BY_PIECES_P
 
   This target hook should return true if when the ``by_pieces``
   infrastructure is used, an offset adjusted unaligned memory operation
   in the smallest integer mode for the last piece operation of a memory
   region can be generated to avoid doing more than one smaller operations.
 
+.. hook-end
+
 .. function:: int TARGET_COMPARE_BY_PIECES_BRANCH_RATIO (machine_mode mode)
+
+  .. hook-start:TARGET_COMPARE_BY_PIECES_BRANCH_RATIO
 
   When expanding a block comparison in MODE, gcc can try to reduce the
   number of branches at the expense of more memory operations.  This hook
@@ -224,6 +246,8 @@ ordinarily expect.
   one comparison per :samp:`{mode}` -sized piece.  A port can also prevent a
   particular mode from being used for block comparisons by returning a
   negative number from this hook.
+
+.. hook-end
 
 .. c:macro:: MOVE_MAX_PIECES
 
@@ -328,6 +352,8 @@ ordinarily expect.
 
 .. function:: bool TARGET_OPTAB_SUPPORTED_P (int op, machine_mode mode1, machine_mode mode2, optimization_type opt_type)
 
+  .. hook-start:TARGET_OPTAB_SUPPORTED_P
+
   Return true if the optimizers should use optab :samp:`{op}` with
   modes :samp:`{mode1}` and :samp:`{mode2}` for optimization type :samp:`{opt_type}`.
   The optab is known to have an associated :samp:`.md` instruction
@@ -340,7 +366,11 @@ ordinarily expect.
 
   The default hook returns true for all inputs.
 
+.. hook-end
+
 .. function:: bool TARGET_RTX_COSTS (rtx x, machine_mode mode, int outer_code, int opno, int *total, bool speed)
+
+  .. hook-start:TARGET_RTX_COSTS
 
   This target hook describes the relative costs of RTL expressions.
 
@@ -372,7 +402,11 @@ ordinarily expect.
   The hook returns true when all subexpressions of :samp:`{x}` have been
   processed, and false when ``rtx_cost`` should recurse.
 
+.. hook-end
+
 .. function:: int TARGET_ADDRESS_COST (rtx address, machine_mode mode, addr_space_t as, bool speed)
+
+  .. hook-start:TARGET_ADDRESS_COST
 
   This hook computes the cost of an addressing mode that contains
   :samp:`{address}`.  If not defined, the cost is computed from
@@ -407,7 +441,11 @@ ordinarily expect.
   should probably only be given to addresses with different numbers of
   registers on machines with lots of registers.
 
+.. hook-end
+
 .. function:: int TARGET_INSN_COST (rtx_insn *insn, bool speed)
+
+  .. hook-start:TARGET_INSN_COST
 
   This target hook describes the relative costs of RTL instructions.
 
@@ -419,7 +457,11 @@ ordinarily expect.
   false, this target hook should be used to estimate the relative
   size cost of an expression, again relative to ``COSTS_N_INSNS``.
 
+.. hook-end
+
 .. function:: unsigned int TARGET_MAX_NOCE_IFCVT_SEQ_COST (edge e)
+
+  .. hook-start:TARGET_MAX_NOCE_IFCVT_SEQ_COST
 
   This hook returns a value in the same units as ``TARGET_RTX_COSTS``,
   giving the maximum acceptable cost for a sequence generated by the RTL
@@ -439,20 +481,32 @@ ordinarily expect.
   ``max-rtl-if-conversion-[un]predictable`` parameters if they are set,
   and uses a multiple of ``BRANCH_COST`` otherwise.
 
+.. hook-end
+
 .. function:: bool TARGET_NOCE_CONVERSION_PROFITABLE_P (rtx_insn *seq, struct noce_if_info *if_info)
+
+  .. hook-start:TARGET_NOCE_CONVERSION_PROFITABLE_P
 
   This hook returns true if the instruction sequence ``seq`` is a good
   candidate as a replacement for the if-convertible sequence described in
   ``if_info``.
 
+.. hook-end
+
 .. function:: bool TARGET_NEW_ADDRESS_PROFITABLE_P (rtx memref, rtx_insn * insn, rtx new_addr)
+
+  .. hook-start:TARGET_NEW_ADDRESS_PROFITABLE_P
 
   Return ``true`` if it is profitable to replace the address in
   :samp:`{memref}` with :samp:`{new_addr}`.  This allows targets to prevent the
   scheduler from undoing address optimizations.  The instruction containing the
   memref is :samp:`{insn}`.  The default implementation returns ``true``.
 
+.. hook-end
+
 .. function:: bool TARGET_NO_SPECULATION_IN_DELAY_SLOTS_P (void)
+
+  .. hook-start:TARGET_NO_SPECULATION_IN_DELAY_SLOTS_P
 
   This predicate controls the use of the eager delay slot filler to disallow
   speculatively executed instructions being placed in delay slots.  Targets
@@ -462,7 +516,11 @@ ordinarily expect.
   delay slot branches filled using the basic filler is often still desirable
   as the delay slot can hide a pipeline bubble.
 
+.. hook-end
+
 .. function:: HOST_WIDE_INT TARGET_ESTIMATED_POLY_VALUE (poly_int64 val, poly_value_estimate_kind kind)
+
+  .. hook-start:TARGET_ESTIMATED_POLY_VALUE
 
   Return an estimate of the runtime value of :samp:`{val}`, for use in
   things like cost calculations or profiling frequencies.  :samp:`{kind}` is used
@@ -470,3 +528,5 @@ ordinarily expect.
   the ``POLY_VALUE_MIN``, ``POLY_VALUE_MAX`` and
   ``POLY_VALUE_LIKELY`` values.  The default
   implementation returns the lowest possible value of :samp:`{val}`.
+
+.. hook-end

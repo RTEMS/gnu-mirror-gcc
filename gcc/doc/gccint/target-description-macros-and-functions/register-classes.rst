@@ -227,6 +227,8 @@ in many of the tables described below.
 
 .. function:: reg_class_t TARGET_PREFERRED_RENAME_CLASS (reg_class_t rclass)
 
+  .. hook-start:TARGET_PREFERRED_RENAME_CLASS
+
   A target hook that places additional preference on the register
   class to use when it is necessary to rename a register in class
   :samp:`{rclass}` to another class, or perhaps :samp:`{NO_REGS}`, if no
@@ -238,7 +240,11 @@ in many of the tables described below.
   ``LO_REGS`` from ``preferred_rename_class``, code size can
   be reduced.
 
+.. hook-end
+
 .. function:: reg_class_t TARGET_PREFERRED_RELOAD_CLASS (rtx x, reg_class_t rclass)
+
+  .. hook-start:TARGET_PREFERRED_RELOAD_CLASS
 
   A target hook that places additional restrictions on the register class
   to use when it is necessary to copy value :samp:`{x}` into a register in class
@@ -271,6 +277,8 @@ in many of the tables described below.
   reload add a ``!`` in front of the constraint: the x86 back-end uses
   this feature to discourage usage of 387 registers when math is done in
   the SSE registers (and vice versa).
+
+.. hook-end
 
 .. c:macro:: PREFERRED_RELOAD_CLASS (x, class)
 
@@ -311,6 +319,8 @@ in many of the tables described below.
 
 .. function:: reg_class_t TARGET_PREFERRED_OUTPUT_RELOAD_CLASS (rtx x, reg_class_t rclass)
 
+  .. hook-start:TARGET_PREFERRED_OUTPUT_RELOAD_CLASS
+
   Like ``TARGET_PREFERRED_RELOAD_CLASS``, but for output reloads instead of
   input reloads.
 
@@ -319,6 +329,8 @@ in many of the tables described below.
 
   You can also use ``TARGET_PREFERRED_OUTPUT_RELOAD_CLASS`` to discourage
   reload from using some alternatives, like ``TARGET_PREFERRED_RELOAD_CLASS``.
+
+.. hook-end
 
 .. c:macro:: LIMIT_RELOAD_CLASS (mode, class)
 
@@ -337,6 +349,8 @@ in many of the tables described below.
   require the macro to do something nontrivial.
 
 .. function:: reg_class_t TARGET_SECONDARY_RELOAD (bool in_p, rtx x, reg_class_t reload_class, machine_mode reload_mode, secondary_reload_info *sri)
+
+  .. hook-start:TARGET_SECONDARY_RELOAD
 
   Many machines have some registers that cannot be copied directly to or
   from memory or even from other types of registers.  An example is the
@@ -399,13 +413,20 @@ in many of the tables described below.
   have code to handle the register class of the intermediate operand.
 
   .. [For later: maybe we'll allow multi-alternative reload patterns -
-       the port maintainer could name a mov<mode> pattern that has clobbers -
-       and match the constraints of input and output to determine the required
-       alternative.  A restriction would be that constraints used to match
-       against reloads registers would have to be written as register class
-       constraints, or we need a new target macro / hook that tells us if an
-       arbitrary constraint can match an unknown register of a given class.
-       Such a macro / hook would also be useful in other places.]
+
+  ..   the port maintainer could name a mov<mode> pattern that has clobbers -
+
+  ..   and match the constraints of input and output to determine the required
+
+  ..   alternative.  A restriction would be that constraints used to match
+
+  ..   against reloads registers would have to be written as register class
+
+  ..   constraints, or we need a new target macro / hook that tells us if an
+
+  ..   arbitrary constraint can match an unknown register of a given class.
+
+  ..   Such a macro / hook would also be useful in other places.]
 
   :samp:`{x}` might be a pseudo-register or a ``subreg`` of a
   pseudo-register, which could either be in a hard register or in memory.
@@ -422,6 +443,8 @@ in many of the tables described below.
   Or if two dependent moves are supposed to have a lower cost than the sum
   of the individual moves due to expected fortuitous scheduling and/or special
   forwarding logic, you can set ``sri->extra_cost`` to a negative amount.
+
+.. hook-end
 
 .. c:macro:: SECONDARY_RELOAD_CLASS (class, mode, x)
 
@@ -487,6 +510,8 @@ in many of the tables described below.
 
 .. function:: bool TARGET_SECONDARY_MEMORY_NEEDED (machine_mode mode, reg_class_t class1, reg_class_t class2)
 
+  .. hook-start:TARGET_SECONDARY_MEMORY_NEEDED
+
   Certain machines have the property that some registers cannot be copied
   to some other registers without using memory.  Define this hook on
   those machines to return true if objects of mode :samp:`{m}` in registers
@@ -494,6 +519,8 @@ in many of the tables described below.
   storing a register of :samp:`{class1}` into memory and loading that memory
   location into a register of :samp:`{class2}`.  The default definition returns
   false for all inputs.
+
+.. hook-end
 
 .. c:macro:: SECONDARY_MEMORY_NEEDED_RTX (mode)
 
@@ -506,6 +533,8 @@ in many of the tables described below.
   ``TARGET_SECONDARY_MEMORY_NEEDED``.
 
 .. function:: machine_mode TARGET_SECONDARY_MEMORY_NEEDED_MODE (machine_mode mode)
+
+  .. hook-start:TARGET_SECONDARY_MEMORY_NEEDED_MODE
 
   If ``TARGET_SECONDARY_MEMORY_NEEDED`` tells the compiler to use memory
   when moving between two particular registers of mode :samp:`{mode}`,
@@ -527,7 +556,11 @@ in many of the tables described below.
 
   With LRA, the default is to use :samp:`{mode}` unmodified.
 
+.. hook-end
+
 .. function:: void TARGET_SELECT_EARLY_REMAT_MODES (sbitmap modes)
+
+  .. hook-start:TARGET_SELECT_EARLY_REMAT_MODES
 
   On some targets, certain modes cannot be held in registers around a
   standard ABI call and are relatively expensive to spill to the stack.
@@ -538,7 +571,11 @@ in many of the tables described below.
   in :samp:`{modes}`.  The default implementation selects no modes, which has
   the effect of disabling the early rematerialization pass.
 
+.. hook-end
+
 .. function:: bool TARGET_CLASS_LIKELY_SPILLED_P (reg_class_t rclass)
+
+  .. hook-start:TARGET_CLASS_LIKELY_SPILLED_P
 
   A target hook which returns ``true`` if pseudos that have been assigned
   to registers of class :samp:`{rclass}` would likely be spilled because
@@ -554,7 +591,11 @@ in many of the tables described below.
   transformations to throtle code motion, to avoid increasing register
   pressure.
 
+.. hook-end
+
 .. function:: unsigned char TARGET_CLASS_MAX_NREGS (reg_class_t rclass, machine_mode mode)
+
+  .. hook-start:TARGET_CLASS_MAX_NREGS
 
   A target hook returns the maximum number of consecutive registers
   of class :samp:`{rclass}` needed to hold a value of mode :samp:`{mode}`.
@@ -571,6 +612,8 @@ in many of the tables described below.
   The default version of this target hook returns the size of :samp:`{mode}`
   in words.
 
+.. hook-end
+
 .. c:macro:: CLASS_MAX_NREGS (class, mode)
 
   A C expression for the maximum number of consecutive registers
@@ -585,6 +628,8 @@ in many of the tables described below.
   in the reload pass.
 
 .. function:: bool TARGET_CAN_CHANGE_MODE_CLASS (machine_mode from, machine_mode to, reg_class_t rclass)
+
+  .. hook-start:TARGET_CAN_CHANGE_MODE_CLASS
 
   This hook returns true if it is possible to bitcast values held in
   registers of class :samp:`{rclass}` from mode :samp:`{from}` to mode :samp:`{to}`
@@ -614,21 +659,33 @@ in many of the tables described below.
   entire ``raw_reg_mode`` being modified instead of the partial
   value that the middle-end intended.
 
+.. hook-end
+
 .. function:: reg_class_t TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS (int, reg_class_t, reg_class_t)
+
+  .. hook-start:TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS
 
   A target hook which can change allocno class for given pseudo from
     allocno and best class calculated by IRA.
 
   The default version of this target hook always returns given class.
 
+.. hook-end
+
 .. function:: bool TARGET_LRA_P (void)
+
+  .. hook-start:TARGET_LRA_P
 
   A target hook which returns true if we use LRA instead of reload pass.
 
   The default version of this target hook returns true.  New ports
   should use LRA, and existing ports are encouraged to convert.
 
+.. hook-end
+
 .. function:: int TARGET_REGISTER_PRIORITY (int)
+
+  .. hook-start:TARGET_REGISTER_PRIORITY
 
   A target hook which returns the register priority number to which the
   register :samp:`{hard_regno}` belongs to.  The bigger the number, the
@@ -641,7 +698,11 @@ in many of the tables described below.
 
   The default version of this target hook returns always zero.
 
+.. hook-end
+
 .. function:: bool TARGET_REGISTER_USAGE_LEVELING_P (void)
+
+  .. hook-start:TARGET_REGISTER_USAGE_LEVELING_P
 
   A target hook which returns true if we need register usage leveling.
   That means if a few hard registers are equally good for the
@@ -653,7 +714,11 @@ in many of the tables described below.
 
   The default version of this target hook returns always false.
 
+.. hook-end
+
 .. function:: bool TARGET_DIFFERENT_ADDR_DISPLACEMENT_P (void)
+
+  .. hook-start:TARGET_DIFFERENT_ADDR_DISPLACEMENT_P
 
   A target hook which returns true if an address with the same structure
   can have different maximal legitimate displacement.  For example, the
@@ -662,7 +727,11 @@ in many of the tables described below.
 
   The default version of this target hook returns always false.
 
+.. hook-end
+
 .. function:: bool TARGET_CANNOT_SUBSTITUTE_MEM_EQUIV_P (rtx subst)
+
+  .. hook-start:TARGET_CANNOT_SUBSTITUTE_MEM_EQUIV_P
 
   A target hook which returns ``true`` if :samp:`{subst}` can't
   substitute safely pseudos with equivalent memory values during
@@ -672,7 +741,11 @@ in many of the tables described below.
   machines with non orthogonal register usage for addressing, such
   as SH, this hook can be used to avoid excessive spilling.
 
+.. hook-end
+
 .. function:: bool TARGET_LEGITIMIZE_ADDRESS_DISPLACEMENT (rtx *offset1, rtx *offset2, poly_int64 orig_offset, machine_mode mode)
+
+  .. hook-start:TARGET_LEGITIMIZE_ADDRESS_DISPLACEMENT
 
   This hook tries to split address offset :samp:`{orig_offset}` into
   two parts: one that should be added to the base address to create
@@ -684,14 +757,22 @@ in many of the tables described below.
   anchor from the base in :samp:`{offset1}` and the offset of the final address
   from the anchor in :samp:`{offset2}`.  The default implementation returns false.
 
+.. hook-end
+
 .. function:: reg_class_t TARGET_SPILL_CLASS (reg_class_t, machine_mode)
+
+  .. hook-start:TARGET_SPILL_CLASS
 
   This hook defines a class of registers which could be used for spilling
   pseudos of the given mode and class, or ``NO_REGS`` if only memory
   should be used.  Not defining this hook is equivalent to returning
   ``NO_REGS`` for all inputs.
 
+.. hook-end
+
 .. function:: bool TARGET_ADDITIONAL_ALLOCNO_CLASS_P (reg_class_t)
+
+  .. hook-start:TARGET_ADDITIONAL_ALLOCNO_CLASS_P
 
   This hook should return ``true`` if given class of registers should
   be an allocno class in any way.  Usually RA uses only one register
@@ -700,7 +781,11 @@ in many of the tables described below.
   allocno ones for RA correct work.  Not defining this hook is
   equivalent to returning ``false`` for all inputs.
 
+.. hook-end
+
 .. function:: scalar_int_mode TARGET_CSTORE_MODE (enum insn_code icode)
+
+  .. hook-start:TARGET_CSTORE_MODE
 
   This hook defines the machine mode to use for the boolean result of
   conditional store patterns.  The ICODE argument is the instruction code
@@ -708,9 +793,15 @@ in many of the tables described below.
   as accepting the mode encoded into operand 0 of the cstore expander
   patterns.
 
+.. hook-end
+
 .. function:: int TARGET_COMPUTE_PRESSURE_CLASSES (enum reg_class *pressure_classes)
+
+  .. hook-start:TARGET_COMPUTE_PRESSURE_CLASSES
 
   A target hook which lets a backend compute the set of pressure classes to
   be used by those optimization passes which take register pressure into
   account, as opposed to letting IRA compute them.  It returns the number of
   register classes stored in the array :samp:`{pressure_classes}`.
+
+.. hook-end

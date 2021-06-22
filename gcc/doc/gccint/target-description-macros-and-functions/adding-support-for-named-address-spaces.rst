@@ -47,17 +47,27 @@ named address space #1:
 
 .. function:: scalar_int_mode TARGET_ADDR_SPACE_POINTER_MODE (addr_space_t address_space)
 
+  .. hook-start:TARGET_ADDR_SPACE_POINTER_MODE
+
   Define this to return the machine mode to use for pointers to
   :samp:`{address_space}` if the target supports named address spaces.
   The default version of this hook returns ``ptr_mode``.
 
+.. hook-end
+
 .. function:: scalar_int_mode TARGET_ADDR_SPACE_ADDRESS_MODE (addr_space_t address_space)
+
+  .. hook-start:TARGET_ADDR_SPACE_ADDRESS_MODE
 
   Define this to return the machine mode to use for addresses in
   :samp:`{address_space}` if the target supports named address spaces.
   The default version of this hook returns ``Pmode``.
 
+.. hook-end
+
 .. function:: bool TARGET_ADDR_SPACE_VALID_POINTER_MODE (scalar_int_mode mode, addr_space_t as)
+
+  .. hook-start:TARGET_ADDR_SPACE_VALID_POINTER_MODE
 
   Define this to return nonzero if the port can handle pointers
   with machine mode :samp:`{mode}` to address space :samp:`{as}`.  This target
@@ -67,7 +77,11 @@ named address space #1:
   ``TARGET_ADDR_SPACE_POINTER_MODE`` or ``TARGET_ADDR_SPACE_ADDRESS_MODE``
   target hooks for the given address space.
 
+.. hook-end
+
 .. function:: bool TARGET_ADDR_SPACE_LEGITIMATE_ADDRESS_P (machine_mode mode, rtx exp, bool strict, addr_space_t as)
+
+  .. hook-start:TARGET_ADDR_SPACE_LEGITIMATE_ADDRESS_P
 
   Define this to return true if :samp:`{exp}` is a valid address for mode
   :samp:`{mode}` in the named address space :samp:`{as}`.  The :samp:`{strict}`
@@ -76,14 +90,22 @@ named address space #1:
   ``TARGET_LEGITIMATE_ADDRESS_P`` target hook, except that it includes
   explicit named address space support.
 
+.. hook-end
+
 .. function:: rtx TARGET_ADDR_SPACE_LEGITIMIZE_ADDRESS (rtx x, rtx oldx, machine_mode mode, addr_space_t as)
+
+  .. hook-start:TARGET_ADDR_SPACE_LEGITIMIZE_ADDRESS
 
   Define this to modify an invalid address :samp:`{x}` to be a valid address
   with mode :samp:`{mode}` in the named address space :samp:`{as}`.  This target
   hook is the same as the ``TARGET_LEGITIMIZE_ADDRESS`` target hook,
   except that it includes explicit named address space support.
 
+.. hook-end
+
 .. function:: bool TARGET_ADDR_SPACE_SUBSET_P (addr_space_t subset, addr_space_t superset)
+
+  .. hook-start:TARGET_ADDR_SPACE_SUBSET_P
 
   Define this to return whether the :samp:`{subset}` named address space is
   contained within the :samp:`{superset}` named address space.  Pointers to
@@ -92,12 +114,20 @@ named address space #1:
   arithmetic operations.  Pointers to a superset address space can be
   converted to pointers to a subset address space via explicit casts.
 
+.. hook-end
+
 .. function:: bool TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID (addr_space_t as)
+
+  .. hook-start:TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID
 
   Define this to modify the default handling of address 0 for the
   address space.  Return true if 0 should be considered a valid address.
 
+.. hook-end
+
 .. function:: rtx TARGET_ADDR_SPACE_CONVERT (rtx op, tree from_type, tree to_type)
+
+  .. hook-start:TARGET_ADDR_SPACE_CONVERT
 
   Define this to convert the pointer expression represented by the RTL
   :samp:`{op}` with type :samp:`{from_type}` that points to a named address
@@ -106,12 +136,20 @@ named address space #1:
   guaranteed that one of the two address spaces is a subset of the other,
   as determined by the ``TARGET_ADDR_SPACE_SUBSET_P`` target hook.
 
+.. hook-end
+
 .. function:: int TARGET_ADDR_SPACE_DEBUG (addr_space_t as)
+
+  .. hook-start:TARGET_ADDR_SPACE_DEBUG
 
   Define this to define how the address space is encoded in dwarf.
   The result is the value to be used with ``DW_AT_address_class``.
 
+.. hook-end
+
 .. function:: void TARGET_ADDR_SPACE_DIAGNOSE_USAGE (addr_space_t as, location_t loc)
+
+  .. hook-start:TARGET_ADDR_SPACE_DIAGNOSE_USAGE
 
   Define this hook if the availability of an address space depends on
   command line options and some diagnostics should be printed when the
@@ -121,3 +159,5 @@ named address space #1:
   the address space as registered with ``c_register_addr_space``.
   :samp:`{loc}` is the location of the address space qualifier token.
   The default implementation does nothing.
+
+.. hook-end

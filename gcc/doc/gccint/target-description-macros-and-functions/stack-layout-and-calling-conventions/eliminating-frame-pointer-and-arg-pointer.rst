@@ -14,6 +14,8 @@ This is about eliminating the frame pointer and arg pointer.
 
 .. function:: bool TARGET_FRAME_POINTER_REQUIRED (void)
 
+  .. hook-start:TARGET_FRAME_POINTER_REQUIRED
+
   This target hook should return ``true`` if a function must have and use
   a frame pointer.  This target hook is called in the reload pass.  If its return
   value is ``true`` the function will have a frame pointer.
@@ -36,6 +38,8 @@ This is about eliminating the frame pointer and arg pointer.
   fixed register.  See ``FIXED_REGISTERS`` for more information.
 
   Default return value is ``false``.
+
+.. hook-end
 
 .. c:macro:: ELIMINABLE_REGS
 
@@ -65,6 +69,8 @@ This is about eliminating the frame pointer and arg pointer.
 
 .. function:: bool TARGET_CAN_ELIMINATE (const int from_reg, const int to_reg)
 
+  .. hook-start:TARGET_CAN_ELIMINATE
+
   This target hook should return ``true`` if the compiler is allowed to
   try to replace register number :samp:`{from_reg}` with register number
   :samp:`{to_reg}`.  This target hook will usually be ``true``, since most of the
@@ -72,6 +78,8 @@ This is about eliminating the frame pointer and arg pointer.
   knows about.
 
   Default return value is ``true``.
+
+.. hook-end
 
 .. c:macro:: INITIAL_ELIMINATION_OFFSET (from_reg, to_reg, offset_var)
 
@@ -82,9 +90,13 @@ This is about eliminating the frame pointer and arg pointer.
 
 .. function:: void TARGET_COMPUTE_FRAME_LAYOUT (void)
 
+  .. hook-start:TARGET_COMPUTE_FRAME_LAYOUT
+
   This target hook is called once each time the frame layout needs to be
   recalculated.  The calculations can be cached by the target and can then
   be used by ``INITIAL_ELIMINATION_OFFSET`` instead of re-computing the
   layout on every invocation of that hook.  This is particularly useful
   for targets that have an expensive frame layout function.  Implementing
   this callback is optional.
+
+.. hook-end

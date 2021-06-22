@@ -19,6 +19,8 @@ This section describes the macros that output function entry
 
 .. function:: void TARGET_ASM_PRINT_PATCHABLE_FUNCTION_ENTRY (FILE *file, unsigned HOST_WIDE_INT patch_area_size, bool record_p)
 
+  .. hook-start:TARGET_ASM_PRINT_PATCHABLE_FUNCTION_ENTRY
+
   Generate a patchable area at the function start, consisting of
   :samp:`{patch_area_size}` NOP instructions.  If the target supports named
   sections and if :samp:`{record_p}` is true, insert a pointer to the current
@@ -26,7 +28,11 @@ This section describes the macros that output function entry
   of the hook places the table of pointers in the special section named
   ``__patchable_function_entries``.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_FUNCTION_PROLOGUE (FILE *file)
+
+  .. hook-start:TARGET_ASM_FUNCTION_PROLOGUE
 
   If defined, a function that outputs the assembler code for entry to a
   function.  The prologue is responsible for setting up the stack frame,
@@ -73,21 +79,33 @@ This section describes the macros that output function entry
   or by a debugger, there is no reason why the stack layout used by GCC
   need agree with that used by other compilers for a machine.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_FUNCTION_END_PROLOGUE (FILE *file)
+
+  .. hook-start:TARGET_ASM_FUNCTION_END_PROLOGUE
 
   If defined, a function that outputs assembler code at the end of a
   prologue.  This should be used when the function prologue is being
   emitted as RTL, and you have some extra assembler that needs to be
   emitted.  See :ref:`prologue-instruction-pattern`.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_FUNCTION_BEGIN_EPILOGUE (FILE *file)
+
+  .. hook-start:TARGET_ASM_FUNCTION_BEGIN_EPILOGUE
 
   If defined, a function that outputs assembler code at the start of an
   epilogue.  This should be used when the function epilogue is being
   emitted as RTL, and you have some extra assembler that needs to be
   emitted.  See :ref:`epilogue-instruction-pattern`.
 
+.. hook-end
+
 .. function:: void TARGET_ASM_FUNCTION_EPILOGUE (FILE *file)
+
+  .. hook-start:TARGET_ASM_FUNCTION_EPILOGUE
 
   If defined, a function that outputs the assembler code for exit from a
   function.  The epilogue is responsible for restoring the saved
@@ -135,6 +153,8 @@ This section describes the macros that output function entry
   needs to know what was decided.  The number of bytes of the current
   function's arguments that this function should pop is available in
   ``crtl->args.pops_args``.  See :ref:`scalar-return`.
+
+.. hook-end
 
 *
   .. index:: pretend_args_size
@@ -197,6 +217,8 @@ This section describes the macros that output function entry
 
 .. function:: void TARGET_ASM_OUTPUT_MI_THUNK (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta, HOST_WIDE_INT vcall_offset, tree function)
 
+  .. hook-start:TARGET_ASM_OUTPUT_MI_THUNK
+
   A function that outputs the assembler code for a thunk
   function, used to implement C++ virtual function calls with multiple
   inheritance.  The thunk acts as a wrapper around a virtual function,
@@ -237,10 +259,16 @@ This section describes the macros that output function entry
   :samp:`{function}` instead of jumping to it.  The generic approach does
   not support varargs.
 
+.. hook-end
+
 .. function:: bool TARGET_ASM_CAN_OUTPUT_MI_THUNK (const_tree thunk_fndecl, HOST_WIDE_INT delta, HOST_WIDE_INT vcall_offset, const_tree function)
+
+  .. hook-start:TARGET_ASM_CAN_OUTPUT_MI_THUNK
 
   A function that returns true if TARGET_ASM_OUTPUT_MI_THUNK would be able
   to output the assembler code for the thunk function specified by the
   arguments it is passed, and false otherwise.  In the latter case, the
   generic approach will be used by the C++ front end, with the limitations
   previously exposed.
+
+.. hook-end
