@@ -396,6 +396,16 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
       e->inline_failed = CIF_SANITIZE_ATTRIBUTE_MISMATCH;
       inlinable = false;
     }
+  else if (profile_arc_flag
+	   && lookup_attribute ("no_profile_instrument_function",
+				DECL_ATTRIBUTES (caller->decl))
+	      != lookup_attribute ("no_profile_instrument_function",
+				   DECL_ATTRIBUTES (callee->decl)))
+    {
+      e->inline_failed = CIF_UNSPECIFIED;
+      inlinable = false;
+    }
+
   if (!inlinable && report)
     report_inline_failed_reason (e);
   return inlinable;
