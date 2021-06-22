@@ -3399,6 +3399,9 @@ info-cppinternals:
 info-install:
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/install BUILDDIR=$(objdir)/doc/install/info
 
+html-gccint:
+	+ make -C $(srcdir)/../doc html SOURCEDIR=$(srcdir)/doc/gccint BUILDDIR=$(objdir)/doc/gccint/html
+
 #
 # Deletion of files made during compilation.
 # There are four levels of this:
