@@ -8,6 +8,21 @@
 Output of Data
 ^^^^^^^^^^^^^^
 
+.. c:var:: const char * TARGET_ASM_ALIGNED_HI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_PSI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_SI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_PDI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_DI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_PTI_OP
+.. c:var:: const char * TARGET_ASM_ALIGNED_TI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_HI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_PSI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_SI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_PDI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_DI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_PTI_OP
+.. c:var:: const char * TARGET_ASM_UNALIGNED_TI_OP
+
 .. include:: ../tm.rst.in
   :start-after: [TARGET_ASM_BYTE_OP]
   :end-before: [TARGET_ASM_BYTE_OP]
