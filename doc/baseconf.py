@@ -36,7 +36,7 @@ gcc_REVISION = __read_file('REVISION')
 
 VERSION_PACKAGE = os.getenv('VERSION_PACKAGE')
 BUGURL = os.getenv('BUGURL')
-assert VERSION_PACKAGE and BUGURL
+assert VERSION_PACKAGE is not None and BUGURL is not None
 
 # The short X.Y version.
 version = gcc_BASEVER

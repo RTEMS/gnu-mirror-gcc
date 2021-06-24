@@ -273,7 +273,7 @@ $(TESTLIB): $(REQUIRED_OFILES) $(CONFIGURED_OFILES)
 	  $(REQUIRED_OFILES) $(CONFIGURED_OFILES)
 	$(RANLIB) $(TESTLIB)
 
-info: libiberty.info info-subdir
+info: doc/texinfo/libiberty.info info-subdir
 install-info: install-info-subdir
 clean-info: clean-info-subdir
 dvi: libiberty.dvi dvi-subdir
@@ -337,6 +337,16 @@ TEXISRC = \
 # and sorted.  Some are here because the sources are imported from
 # elsewhere.  Others represent headers in ../include.
 TEXIFILES = fnmatch.txh pexecute.txh simple-object.txh
+
+export VERSION_PACKAGE=
+export BUGURL=
+
+RST_FILES:=$(shell find $(srcdir) -name *.rst)
+SPHINX_CONFIG_FILES:=$(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
+SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
+
+doc/texinfo/libiberty.info: $(SPHINX_CONFIG_FILES)
+	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc BUILDDIR=doc/info
 
 libiberty.info : $(srcdir)/libiberty.texi $(TEXISRC)
 	$(MAKEINFO) -I$(srcdir) $(srcdir)/libiberty.texi
