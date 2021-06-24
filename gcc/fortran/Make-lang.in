@@ -145,9 +145,9 @@ fortran.install-html: $(F95_HTMLFILES)
 	  fi; \
 	done
 
-F95_PDFFILES = doc/gfortran.pdf
+F95_PDFFILES = doc/fortran/pdf/latex/gfortran.pdf
 
-fortran.pdf: $(F95_PDFFILES) doc/gfc-internals.pdf
+fortran.pdf: $(F95_PDFFILES) doc/gfc-internals/pdf/latex/gfc-internals.pdf
 
 fortran.install-pdf: $(F95_PDFFILES)
 	@$(NORMAL_INSTALL)
@@ -162,7 +162,7 @@ fortran.install-pdf: $(F95_PDFFILES)
 F95_MANFILES = doc/fortran/man/man/gfortran.1
 
 doc/fortran/man/man/gfortran.1: $(SPHINX_FILES)
-	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/man
+	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/info
 
 fortran.man: $(F95_MANFILES)
 
@@ -194,11 +194,8 @@ GFORTRAN_TEXI = \
   $(srcdir)/doc/include/gcc-common.texi \
   gcc-vers.texi
 
-doc/gfortran.dvi: $(GFORTRAN_TEXI)
-	$(TEXI2DVI) -I $(srcdir)/fortran -I $(abs_docdir)/include -o $@ $<
-
-doc/gfortran.pdf: $(GFORTRAN_TEXI)
-	$(TEXI2PDF) -I $(srcdir)/fortran -I $(abs_docdir)/include -o $@ $<
+doc/fortran/pdf/latex/gfortran.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/pdf
 
 $(build_htmldir)/gfortran/index.html: $(GFORTRAN_TEXI)
 	$(mkinstalldirs) $(@D)
@@ -223,11 +220,8 @@ doc/gfc-internals/info/texinfo/gfc-internals.info: $(SPHINX_FILES)
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/info; \
 	else true; fi
 
-doc/gfc-internals.dvi: $(GFC_INTERNALS_TEXI)
-	$(TEXI2DVI) -I $(srcdir)/fortran -I $(abs_docdir)/include -o $@ $<
-
-doc/gfc-internals.pdf: $(GFC_INTERNALS_TEXI)
-	$(TEXI2PDF) -I $(srcdir)/fortran -I $(abs_docdir)/include -o $@ $<
+doc/gfc-internals/pdf/latex/gfc-internals.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/pdf
 
 # Create or recreate the gfortran private include file directory.
 install-finclude-dir: installdirs

@@ -2540,8 +2540,6 @@ s-cfn-operators: build/gencfn-macros$(build_exeext)
 cfn-operators.pd: s-cfn-operators; @true
 
 target-hooks-def.h: s-target-hooks-def-h; @true
-# make sure that when we build info files, the used tm.texi is up to date.
-$(srcdir)/doc/tm.texi: s-tm-texi; @true
 
 s-target-hooks-def-h: build/genhooks$(build_exeext)
 	$(RUN_GEN) build/genhooks$(build_exeext) "Target Hook" \
@@ -3344,17 +3342,25 @@ doc/%.dvi: %.texi
 doc/gccinstall.dvi: $(TEXI_GCCINSTALL_FILES)
 	$(TEXI2DVI) -I . -I $(abs_docdir) -I $(abs_docdir)/include -o $@ $<
 
-PDFFILES = doc/gcc.pdf doc/gccint.pdf doc/gccinstall.pdf doc/cpp.pdf \
-           doc/cppinternals.pdf
+PDFFILES = doc/gcc/pdf/latex/gcc.pdf doc/gccint/pdf/latex/gccint.pdf doc/install/pdf/latex/install.pdf \
+	   doc/cpp/pdf/latex/cpp.pdf doc/cppinternals/pdf/latex/cppinternals.pdf
 
 pdf:: $(PDFFILES) lang.pdf
 
-doc/%.pdf: %.texi
-	$(TEXI2PDF) -I . -I $(abs_docdir) -I $(abs_docdir)/include -o $@ $<
+doc/gcc/pdf/latex/gcc.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc/gcc BUILDDIR=$(objdir)/doc/gcc/pdf
 
-# Duplicate entry to handle renaming of gccinstall.pdf
-doc/gccinstall.pdf: $(TEXI_GCCINSTALL_FILES)
-	$(TEXI2PDF) -I . -I $(abs_docdir) -I $(abs_docdir)/include -o $@ $<
+doc/gccint/pdf/latex/gccint.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc/gccint BUILDDIR=$(objdir)/doc/gccint/pdf
+
+doc/install/pdf/latex/install.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc/install BUILDDIR=$(objdir)/doc/install/pdf
+
+doc/cpp/pdf/latex/cpp.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc/cpp BUILDDIR=$(objdir)/doc/cpp/pdf
+
+doc/cppinternals/pdf/latex/cppinternals.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc/cppinternals BUILDDIR=$(objdir)/doc/cppinternals/pdf
 
 # List the directories or single hmtl files which are installed by
 # install-html. The lang.html file triggers language fragments to build

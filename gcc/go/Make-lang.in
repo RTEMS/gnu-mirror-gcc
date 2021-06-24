@@ -100,11 +100,8 @@ doc/gccgo/info/texinfo/gccgo.info: $(SPHINX_FILES)
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/go/doc/ BUILDDIR=$(objdir)/doc/gccgo/info; \
 	else true; fi
 
-doc/gccgo.dvi: $(GO_TEXI_FILES)
-	$(TEXI2DVI) -I $(abs_docdir) -I $(abs_docdir)/include -o $@ $<
-
-doc/gccgo.pdf: $(GO_TEXI_FILES)
-	$(TEXI2PDF) -I $(abs_docdir) -I $(abs_docdir)/include -o $@ $<
+doc/gccgo/pdf/latex/gccgo.pdf: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/go/doc/ BUILDDIR=$(objdir)/doc/gccgo/pdf
 
 $(build_htmldir)/go/index.html: $(GO_TEXI_FILES)
 	$(mkinstalldirs) $(@D)
@@ -125,8 +122,8 @@ go.rest.encap:
 
 go.info: doc/gccgo/info/texinfo/gccgo.info
 
-go.dvi: doc/gccgo.dvi
-go.pdf: doc/gccgo.pdf
+go.pdf: doc/gccgo/pdf/latex/gccgo.pdf
+
 go.html: $(build_htmldir)/go/index.html
 
 go.srcinfo: doc/gccgo/info/texinfo/gccgo.info
