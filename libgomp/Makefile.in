@@ -298,7 +298,7 @@ AM_V_texidevnull = $(am__v_texidevnull_@AM_V@)
 am__v_texidevnull_ = $(am__v_texidevnull_@AM_DEFAULT_V@)
 am__v_texidevnull_0 = > /dev/null
 am__v_texidevnull_1 = 
-INFO_DEPS = libgomp.info
+INFO_DEPS = doc/info/texinfo/libgomp.info
 am__TEXINFO_TEX_DIR = $(srcdir)/../gcc/doc/include
 DVIS = libgomp.dvi
 PDFS = libgomp.pdf
@@ -1390,11 +1390,15 @@ env.o: libgomp_f.h
 
 all-local: $(STAMP_GENINSRC)
 
-stamp-geninsrc: libgomp.info
+export VERSION_PACKAGE=$(PACKAGE_VERSION)
+export BUGURL=$(PACKAGE_BUGURL)
+
+stamp-geninsrc: doc/info/texinfo/libgomp.info
 	cp -p $(top_builddir)/libgomp.info $(srcdir)/libgomp.info
 	@touch $@
 
-libgomp.info: $(STAMP_BUILD_INFO)
+doc/info/texinfo/libgomp.info: $(SPHINX_CONFIG_FILES)
+	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc BUILDDIR=`pwd`/doc/info
 
 stamp-build-info: libgomp.texi
 	$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS) -I $(srcdir) -o libgomp.info $(srcdir)/libgomp.texi
