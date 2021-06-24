@@ -109,6 +109,9 @@ fortran.all.cross: gfortran-cross$(exeext)
 fortran.start.encap: gfortran$(exeext)
 fortran.rest.encap:
 
+fortran.srcinfo: doc/fortran/info/texinfo/gfortran.info
+	-cp -p $^ $(srcdir)/fortran
+
 fortran.tags: force
 	cd $(srcdir)/fortran; etags -o TAGS.sub *.c *.h; \
 	etags --include TAGS.sub --include ../TAGS.sub
@@ -156,10 +159,12 @@ fortran.install-pdf: $(F95_PDFFILES)
 	  $(INSTALL_DATA) "$$d$$p" "$(DESTDIR)$(pdfdir)/gcc/$$f"; \
 	done
 
+F95_MANFILES = doc/fortran/man/man/gfortran.1
+
 doc/fortran/man/man/gfortran.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/man
 
-fortran.man: doc/fortran/man/man/gfortran.1
+fortran.man: $(F95_MANFILES)
 
 fortran.srcman: $(F95_MANFILES)
 	-cp -p $^ $(srcdir)/doc
