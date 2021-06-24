@@ -3408,6 +3408,12 @@ doc/gcc/man/man/gcc.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/doc/gcc BUILDDIR=$(objdir)/doc/gcc/man
 
 doc/gcc/man/man/gcov.1: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/gcov-tool.1: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/gcov-dump.1: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/lto-dump.1: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/gfdl.7: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/gpl.7: doc/gcc/man/man/gcc.1
+doc/gcc/man/man/fsf-funding.7: doc/gcc/man/man/gcc.1
 
 doc/cpp/man/man/cpp.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/doc/cpp BUILDDIR=$(objdir)/doc/cpp/man
