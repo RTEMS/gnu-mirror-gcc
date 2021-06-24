@@ -113,10 +113,10 @@ fortran.tags: force
 	cd $(srcdir)/fortran; etags -o TAGS.sub *.c *.h; \
 	etags --include TAGS.sub --include ../TAGS.sub
 
-fortran.info: info-gfortran info-gfc-internals
+fortran.info: doc/fortran/info/texinfo/gfortran.info doc/gfc-internals/info/texinfo/gfc-internals.info
 fortran.dvi: doc/gfortran.dvi doc/gfc-internals.dvi
 
-info-gfortran:
+doc/fortran/info/texinfo/gfortran.info: $(SPHINX_FILES)
 	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/info; \
 	else true; fi
@@ -156,10 +156,10 @@ fortran.install-pdf: $(F95_PDFFILES)
 	  $(INSTALL_DATA) "$$d$$p" "$(DESTDIR)$(pdfdir)/gcc/$$f"; \
 	done
 
-man-fortran:
+doc/fortran/man/man/gfortran.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/man
 
-fortran.man: man-fortran
+fortran.man: doc/fortran/man/man/gfortran.1
 
 fortran.srcman: $(F95_MANFILES)
 	-cp -p $^ $(srcdir)/doc
@@ -213,7 +213,7 @@ GFC_INTERNALS_TEXI = \
   $(srcdir)/doc/include/gcc-common.texi \
   gcc-vers.texi
 
-info-gfc-internals:
+doc/gfc-internals/info/texinfo/gfc-internals.info: $(SPHINX_FILES)
 	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/info; \
 	else true; fi

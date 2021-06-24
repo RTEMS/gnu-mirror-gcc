@@ -3378,33 +3378,40 @@ export VERSION_PACKAGE="$(PKGVERSION)"
 export ENABLE_LTO=$(enable_lto)
 export BUGURL="$(BUGURL_s)"
 
-man: man-gcc man-cpp lang.man @GENINSRC@
+man: doc/gcc/man/man/gcc.1 doc/cpp/man/man/cpp.1 lang.man @GENINSRC@
 
-info: info-gcc info-gccint info-cpp info-cppinternals info-install lang.info @GENINSRC@
+info: doc/gcc/info/texinfo/gcc.info \
+      doc/gccint/info/texinfo/gccint.info \
+      doc/cpp/info/texinfo/cpp.info \
+      doc/cppinternals/info/texinfo/cppinternals.info \
+      doc/install/info/texinfo/install.info \
+      lang.info @GENINSRC@
 
 sphinx-build: man info
 
-man-gcc: doc/gcc/man/man/gcc.1
+RST_FILES:=$(shell find $(srcdir) -name *.rst -or -name *.rst.in)
+SPHINX_CONFIG_FILES:=$(shell find $(srcdir)/.. -name conf.py) $(srcdir)/../doc/baseconf.py
+SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
 
-doc/gcc/man/man/gcc.1:
+doc/gcc/man/man/gcc.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/doc/gcc BUILDDIR=$(objdir)/doc/gcc/man
 
-man-cpp:
+doc/cpp/man/man/cpp.1: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/doc/cpp BUILDDIR=$(objdir)/doc/cpp/man
 
-info-gcc:
+doc/gcc/info/texinfo/gcc.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/gcc BUILDDIR=$(objdir)/doc/gcc/info
 
-info-gccint: s-tm-rst-in
+doc/gccint/info/texinfo/gccint.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/gccint BUILDDIR=$(objdir)/doc/gccint/info
 
-info-cpp:
+doc/cpp/info/texinfo/cpp.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/cpp BUILDDIR=$(objdir)/doc/cpp/info
 
-info-cppinternals:
+doc/cppinternals/info/texinfo/cppinternals.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/cppinternals BUILDDIR=$(objdir)/doc/cppinternals/info
 
-info-install:
+doc/install/info/texinfo/install.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc/install BUILDDIR=$(objdir)/doc/install/info
 
 html-gccint: s-tm-rst-in
