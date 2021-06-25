@@ -22,12 +22,14 @@ import os
 folder = os.path.dirname(os.path.realpath(__file__))
 gcc_srcdir = os.path.join(folder, '..', 'gcc')
 
+
 def __read_file(name):
     path = os.path.join(gcc_srcdir, name)
     if os.path.exists(path):
         return open(path).read().strip()
     else:
         return ''
+
 
 gcc_BASEVER = __read_file('BASE-VER')
 gcc_DEVPHASE = __read_file('DEV-PHASE')
@@ -36,7 +38,7 @@ gcc_REVISION = __read_file('REVISION')
 
 VERSION_PACKAGE = os.getenv('VERSION_PACKAGE')
 BUGURL = os.getenv('BUGURL')
-assert VERSION_PACKAGE is not None and BUGURL is not None
+assert VERSION_PACKAGE is not None
 
 # The short X.Y version.
 version = gcc_BASEVER
@@ -46,11 +48,13 @@ release = ('%s (%s %s%s)'
            % (gcc_BASEVER, gcc_DEVPHASE, gcc_DATESTAMP,
               (' %s' % gcc_REVISION) if gcc_REVISION else ''))
 
-rst_epilog = '''
+rst_epilog = """
 .. |gcc_version| replace:: %s
 .. |package_version| replace:: %s
-.. |bugurl| replace:: %s
-''' % (gcc_BASEVER, VERSION_PACKAGE, BUGURL)
+""" % (gcc_BASEVER, VERSION_PACKAGE)
+
+if BUGURL:
+    rst_epilog += '.. |bugurl| replace:: %s' % BUGURL
 
 # -- General configuration ---------------------------------------------------
 
