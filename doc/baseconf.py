@@ -24,7 +24,7 @@ folder = os.path.dirname(os.path.realpath(__file__))
 gcc_srcdir = os.path.join(folder, '..', 'gcc')
 
 
-def __read_file(name):
+def read_file(name):
     path = os.path.join(gcc_srcdir, name)
     if os.path.exists(path):
         return open(path).read().strip()
@@ -32,10 +32,10 @@ def __read_file(name):
         return ''
 
 
-gcc_BASEVER = __read_file('BASE-VER')
-gcc_DEVPHASE = __read_file('DEV-PHASE')
-gcc_DATESTAMP = __read_file('DATESTAMP')
-gcc_REVISION = __read_file('REVISION')
+gcc_BASEVER = read_file('BASE-VER')
+gcc_DEVPHASE = read_file('DEV-PHASE')
+gcc_DATESTAMP = read_file('DATESTAMP')
+gcc_REVISION = read_file('REVISION')
 
 VERSION_PACKAGE = os.getenv('VERSION_PACKAGE')
 BUGURL = os.getenv('BUGURL')
