@@ -821,10 +821,10 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool config.lt
 
-doc/pdf/latex/libgomp.pdf: $(SPHINX_CONFIG_FILES)
+doc/pdf/latex/libgomp.pdf: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/doc BUILDDIR=`pwd`/doc/pdf
 
-doc/html/html/index.html: $(SPHINX_CONFIG_FILES)
+doc/html/html/index.html: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc html SOURCEDIR=$(srcdir)/doc BUILDDIR=`pwd`/doc/html
 
 uninstall-info-am:
@@ -1321,6 +1321,10 @@ env.o: libgomp_f.h
 
 all-local: $(STAMP_GENINSRC)
 
+RST_FILES:=$(shell find $(srcdir) -name *.rst)
+SPHINX_CONFIG_FILES:=$(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
+SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
+
 export VERSION_PACKAGE=$(PACKAGE_VERSION)
 export BUGURL=$(PACKAGE_BUGURL)
 
@@ -1328,7 +1332,7 @@ stamp-geninsrc: doc/info/texinfo/libgomp.info
 	cp -p $(top_builddir)/libgomp.info $(srcdir)/libgomp.info
 	@touch $@
 
-doc/info/texinfo/libgomp.info: $(SPHINX_CONFIG_FILES)
+doc/info/texinfo/libgomp.info: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/doc BUILDDIR=`pwd`/doc/info
 
 # target overrides
