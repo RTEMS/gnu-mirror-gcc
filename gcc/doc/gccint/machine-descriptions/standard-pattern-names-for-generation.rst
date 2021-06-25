@@ -1080,6 +1080,15 @@ vec_pack_sbool_trunc_m
   1 and widen the resulting elements. Put the N/2 results of size 2\*S in the
   output vector (operand 0).
 
+  .. index:: vec_addsubm3 instruction pattern
+
+vec_addsubm3
+  Alternating subtract, add with even lanes doing subtract and odd
+  lanes doing addition.  Operands 1 and 2 and the outout operand are vectors
+  with mode :samp:`{m}`.
+
+  These instructions are not allowed to ``FAIL``.
+
   .. index:: mulhisi3 instruction pattern
 
 mulhisi3
