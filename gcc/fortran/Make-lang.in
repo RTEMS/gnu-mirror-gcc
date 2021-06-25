@@ -117,16 +117,15 @@ fortran.tags: force
 	etags --include TAGS.sub --include ../TAGS.sub
 
 fortran.info: doc/fortran/info/texinfo/gfortran.info doc/gfc-internals/info/texinfo/gfc-internals.info
-fortran.dvi: doc/gfortran.dvi doc/gfc-internals.dvi
 
 doc/fortran/info/texinfo/gfortran.info: $(SPHINX_FILES)
 	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/info; \
 	else true; fi
 
-F95_HTMLFILES = $(build_htmldir)/gfortran
+F95_HTMLFILES = doc/fortran/html/html/index.html
 
-fortran.html: $(F95_HTMLFILES)/index.html
+fortran.html: $(F95_HTMLFILES) doc/gfc-internals/html/html/index.html
 
 fortran.install-html: $(F95_HTMLFILES)
 	@$(NORMAL_INSTALL)
@@ -162,7 +161,7 @@ fortran.install-pdf: $(F95_PDFFILES)
 F95_MANFILES = doc/fortran/man/man/gfortran.1
 
 doc/fortran/man/man/gfortran.1: $(SPHINX_FILES)
-	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/info
+	+ make -C $(srcdir)/../doc man SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/man
 
 fortran.man: $(F95_MANFILES)
 
@@ -183,38 +182,13 @@ check_gfortran_parallelize = 10000
 # No fortran-specific selftests
 selftest-fortran:
 
-# GFORTRAN documentation.
-GFORTRAN_TEXI = \
-  $(srcdir)/fortran/gfortran.texi \
-  $(srcdir)/fortran/intrinsic.texi \
-  $(srcdir)/fortran/invoke.texi \
-  $(srcdir)/doc/include/fdl.texi \
-  $(srcdir)/doc/include/gpl_v3.texi \
-  $(srcdir)/doc/include/funding.texi \
-  $(srcdir)/doc/include/gcc-common.texi \
-  gcc-vers.texi
-
 doc/fortran/pdf/latex/gfortran.pdf: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/pdf
 
-$(build_htmldir)/gfortran/index.html: $(GFORTRAN_TEXI)
-	$(mkinstalldirs) $(@D)
-	rm -f $(@D)/*
-	$(TEXI2HTML) -I $(gcc_docdir)/include -I $(srcdir)/fortran -o $(@D) $<
-
-.INTERMEDIATE: gfortran.pod
-
-gfortran.pod: $(GFORTRAN_TEXI)
-	-$(TEXI2POD) -DBUGURL="$(BUGURL_TEXI)" \
-	  < $(srcdir)/fortran/invoke.texi > $@
+doc/fortran/html/html/index.html: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc html SOURCEDIR=$(srcdir)/fortran/doc/gfortran BUILDDIR=$(objdir)/doc/fortran/html
 
 # GFORTRAN internals documentation.
-GFC_INTERNALS_TEXI = \
-  $(srcdir)/fortran/gfc-internals.texi \
-  $(srcdir)/doc/include/fdl.texi \
-  $(srcdir)/doc/include/gcc-common.texi \
-  gcc-vers.texi
-
 doc/gfc-internals/info/texinfo/gfc-internals.info: $(SPHINX_FILES)
 	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/info; \
@@ -222,6 +196,9 @@ doc/gfc-internals/info/texinfo/gfc-internals.info: $(SPHINX_FILES)
 
 doc/gfc-internals/pdf/latex/gfc-internals.pdf: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/pdf
+
+doc/gfc-internals/html/html/index.html: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc html SOURCEDIR=$(srcdir)/fortran/doc/gfc-internals BUILDDIR=$(objdir)/doc/gfc-internals/html
 
 # Create or recreate the gfortran private include file directory.
 install-finclude-dir: installdirs

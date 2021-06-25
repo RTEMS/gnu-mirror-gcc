@@ -88,13 +88,6 @@ go1$(exeext): $(GO_OBJS) attribs.o $(BACKEND) $(LIBDEPS) $(go.prev)
 
 # Documentation.
 
-GO_TEXI_FILES = \
-	go/gccgo.texi \
-	$(gcc_docdir)/include/fdl.texi \
-	$(gcc_docdir)/include/gpl_v3.texi \
-	$(gcc_docdir)/include/gcc-common.texi \
-	gcc-vers.texi
-
 doc/gccgo/info/texinfo/gccgo.info: $(SPHINX_FILES)
 	+ if [ x$(SPHINX_BUILD) = xsphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(srcdir)/go/doc/ BUILDDIR=$(objdir)/doc/gccgo/info; \
@@ -103,16 +96,8 @@ doc/gccgo/info/texinfo/gccgo.info: $(SPHINX_FILES)
 doc/gccgo/pdf/latex/gccgo.pdf: $(SPHINX_FILES)
 	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(srcdir)/go/doc/ BUILDDIR=$(objdir)/doc/gccgo/pdf
 
-$(build_htmldir)/go/index.html: $(GO_TEXI_FILES)
-	$(mkinstalldirs) $(@D)
-	rm -f $(@D)/*
-	$(TEXI2HTML) -I $(gcc_docdir) -I $(gcc_docdir)/include \
-		-I $(srcdir)/go -o $(@D) $<
-
-.INTERMEDIATE: gccgo.pod
-
-gccgo.pod: go/gccgo.texi
-	-$(TEXI2POD) -D gccgo < $< > $@
+doc/gccgo/html/html/index.html: $(SPHINX_FILES)
+	+ make -C $(srcdir)/../doc html SOURCEDIR=$(srcdir)/go/doc/ BUILDDIR=$(objdir)/doc/gccgo/html
 
 # Build hooks.
 
@@ -124,7 +109,7 @@ go.info: doc/gccgo/info/texinfo/gccgo.info
 
 go.pdf: doc/gccgo/pdf/latex/gccgo.pdf
 
-go.html: $(build_htmldir)/go/index.html
+go.html: doc/gccgo/html/html/index.html
 
 go.srcinfo: doc/gccgo/info/texinfo/gccgo.info
 	-cp -p $^ $(srcdir)/doc
