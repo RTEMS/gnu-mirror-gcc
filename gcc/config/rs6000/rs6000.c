@@ -2215,6 +2215,7 @@ rs6000_debug_print_mode (ssize_t m)
 
 #define DEBUG_FMT_ID "%-32s= "
 #define DEBUG_FMT_D   DEBUG_FMT_ID "%d\n"
+#define DEBUG_FMT_W   DEBUG_FMT_ID HOST_WIDE_INT_PRINT_HEX "\n"
 #define DEBUG_FMT_WX  DEBUG_FMT_ID "%#.12" HOST_WIDE_INT_PRINT "x: "
 #define DEBUG_FMT_S   DEBUG_FMT_ID "%s\n"
 
@@ -2597,6 +2598,8 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  fprintf (stderr, DEBUG_FMT_W, "const_anchor", targetm.const_anchor);
 }
 
 
@@ -4430,6 +4433,10 @@ rs6000_option_override_internal (bool global_init_p)
   if (flag_section_anchors
       && !global_options_set.x_TARGET_NO_FP_IN_TOC)
     TARGET_NO_FP_IN_TOC = 1;
+
+  /* Set the constant anchor.  */
+  if (rs6000_const_anchor)
+    targetm.const_anchor = strtoul (rs6000_const_anchor, (char **)0, 0);
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "before subtarget", rs6000_isa_flags);
