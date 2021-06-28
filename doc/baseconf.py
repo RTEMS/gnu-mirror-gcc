@@ -23,7 +23,6 @@ import time
 folder = os.path.dirname(os.path.realpath(__file__))
 gcc_srcdir = os.path.join(folder, '..', 'gcc')
 
-
 def read_file(name):
     path = os.path.join(gcc_srcdir, name)
     if os.path.exists(path):
