@@ -639,3 +639,7 @@ Enable instructions that guard against return-oriented programming attacks.
 mprivileged
 Target Var(rs6000_privileged) Init(0)
 Generate code that will run in privileged state.
+
+mconst-anchor
+Target Undocumented Var(TARGET_CONST_ANCHOR) Save
+Set targetm.const_anchor

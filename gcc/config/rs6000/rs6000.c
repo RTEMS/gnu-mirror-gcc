@@ -4501,6 +4501,11 @@ rs6000_option_override_internal (bool global_init_p)
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
+  /* Possibly set the const_anchor to the maximum value, based on whether we
+     have prefixed addressing.  */
+  if (TARGET_CONST_ANCHOR)
+    targetm.const_anchor = HOST_WIDE_INT_1 << (TARGET_PREFIXED ? 33 : 15);
+
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
