@@ -1,3 +1,35 @@
+work058.patch003:
+2021-07-01 Michael Meissner  <meissner@linux.ibm.com>
+
+        * config/rs6000/rs6000.c (rs6000_maybe_emit_fp_cmove): Add IEEE
+	128-bit floating point conditional move support.
+	(have_compare_and_set_mask): Add IEEE 128-bit floating point
+	types.
+	* config/rs6000/rs6000.md (mov<mode>cc, IEEE128 iterator): New insn.
+	(mov<mode>cc_p10, IEEE128 iterator): New insn.
+	(mov<mode>cc_invert_p10, IEEE128 iterator): New insn.
+	(fpmask<mode>, IEEE128 iterator): New insn.
+	(xxsel<mode>, IEEE128 iterator): New insn.
+
+work058.patch002:
+2021-06-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/101019
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mprefixed-large-consts support.
+	(num_insns_constant_gpr): Add -mprefixed-large-consts support.
+	(rs6000_emit_set_long_const): Add -mprefixed-large-consts
+	support.
+	* config/rs6000/rs6000.opt (-mprefixed-large-consts): New switch.
+
+work058.patch001:
+2021-06-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If
+	-mconst-anchor, set the const anchor size to the maximum,
+	depending on the maximum address size.
+	* config/rs6000/rs6000.opt (-mconst-anchor): New switch.
+
 2021-06-30   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
