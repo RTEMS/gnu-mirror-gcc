@@ -601,6 +601,11 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
+  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
+     be loaded with that instruction.  */
+  if (xxspltidp_operand (op, mode))
+    return 1;
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -666,6 +671,19 @@
   return true;
 })
 
+;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
+;; loaded via the ISA 3.1 XXSPLTIDP instruction.  Do not return true if the
+;; value is 0.0, since that is easy to generate without using XXSPLTIDP.
+(define_predicate "xxspltidp_operand"
+  (match_code "const_double,const_vector,vec_duplicate")
+{
+  if (op == CONST0_RTX (mode))
+    return false;
+
+  HOST_WIDE_INT value = 0;
+  return xxspltidp_constant_p (op, mode, &value);
+})
+
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
 ;; vector register without using memory.
 (define_predicate "easy_vector_constant"
@@ -680,6 +698,9 @@
 	return true;
 
       if (xxspltiw_operand (op, mode))
+	return true;
+
+      if (xxspltidp_operand (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
