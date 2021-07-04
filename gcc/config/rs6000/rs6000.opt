@@ -659,3 +659,7 @@ Generate (do not generate) XXSPLTIDP instructions.
 mxxsplti32dx
 Target Undocumented Var(TARGET_XXSPLTI32DX) Init(-1) Save
 Generate (do not generate) XXSPLTI32DX instructions.
+
+mlxvkq
+Target Undocumented Var(TARGET_LXVKQ) Init(-1) Save
+Generate (do not generate) LXVKQ instructions.
