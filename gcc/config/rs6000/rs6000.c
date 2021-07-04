@@ -4510,11 +4510,6 @@ rs6000_option_override_internal (bool global_init_p)
       TARGET_PREFIXED_LARGE_CONSTS = 0;
     }
 
-  if (TARGET_XXSPLTIDP < 0)
-    TARGET_XXSPLTIDP = TARGET_PREFIXED;
-  else if (TARGET_XXSPLTIDP > 0 && !TARGET_PREFIXED)
-    error ("%qs requires %qs", "-mxxsplidp", "-mprefixed");
-
   if (TARGET_XXSPLTIW < 0)
     TARGET_XXSPLTIW = TARGET_PREFIXED;
   else if (TARGET_XXSPLTIW > 0 && !TARGET_PREFIXED)
@@ -6541,96 +6536,6 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
-/* Return the element of a constant vector whose elements are all the same.  In
-   addition if VEC_DUPLICATE is used, return the element being duplicated.  If
-   neither is true, return NULL_RTX.  */
-
-static rtx
-const_vector_element_all_same (rtx op)
-{
-  if (GET_CODE (op) == VEC_DUPLICATE)
-    {
-      rtx element = XEXP (op, 0);
-      return (CONST_INT_P (element) || CONST_DOUBLE_P (element)
-	       ? element
-	       : NULL_RTX);
-    }
-
-  else if (GET_CODE (op) == CONST_VECTOR)
-    {
-      machine_mode mode = GET_MODE (op);
-      size_t n_elts = GET_MODE_NUNITS (mode);
-      rtx element = CONST_VECTOR_ELT (op, 0);
-
-      for (size_t i = 1; i < n_elts; i++)
-	if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
-	  return NULL_RTX;
-
-      return element;
-    }
-
-  return NULL_RTX;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIDP instruction.
-
-   Return the constant that is being split via CONSTANT_PTR to use in the
-   XXSPLTIDP instruction.  */
-
-bool
-xxspltidp_constant_p (rtx op,
-		      machine_mode mode,
-		      HOST_WIDE_INT *constant_ptr)
-{
-  *constant_ptr = 0;
-
-  if (!TARGET_XXSPLTIDP)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  rtx element = op;
-  if (mode == V2DFmode)
-    {
-      element = const_vector_element_all_same (op);
-      if (!element)
-	return false;
-
-      mode = DFmode;
-    }
-
-  if (mode != SFmode && mode != DFmode)
-    return false;
-
-  if (GET_MODE (element) != mode)
-    return false;
-
-  if (!CONST_DOUBLE_P (element))
-    return false;
-
-  /* Don't return true for 0.0 since that is easy to create without
-     XXSPLTIDP.  */
-  if (element == CONST0_RTX (mode))
-    return false;
-
-  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  long value;
-  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
-
-  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
-  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
-    return false;
-
-  *constant_ptr = value;
-  return true;
-}
-
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6675,8 +6580,7 @@ output_vec_const_move (rtx *operands)
 	    gcc_unreachable ();
 	}
 
-      if (xxspltiw_operand (vec, mode)
-	  || xxspltidp_operand (vec, mode))
+      if (xxspltiw_operand (vec, mode))
 	return "#";
 
       if (TARGET_P9_VECTOR
@@ -28130,7 +28034,7 @@ rs6000_emit_xxspltidp_v2df (rtx dst, long value)
     inform (input_location,
 	    "the result for the xxspltidp instruction "
 	    "is undefined for subnormal input values");
-  emit_insn (gen_xxspltidp_v2df_internal2 (dst, GEN_INT (value)));
+  emit_insn( gen_xxspltidp_v2df_inst (dst, GEN_INT (value)));
 }
 
 /* Implement TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC.  */
