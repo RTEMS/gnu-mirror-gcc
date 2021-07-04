@@ -643,3 +643,7 @@ Generate code that will run in privileged state.
 mconst-anchor
 Target Undocumented Var(TARGET_CONST_ANCHOR) Save
 Set targetm.const_anchor
+
+mprefixed-large-consts
+Target Undocumented Var(TARGET_PREFIXED_LARGE_CONSTS) Init(-1) Save
+Generate (do not generate) PLI/SLDI/PADDI to load large constants.
