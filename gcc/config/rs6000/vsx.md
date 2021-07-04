@@ -6577,9 +6577,9 @@
 ;; XXEVAL built-in function support
 (define_insn "xxeval"
   [(set (match_operand:V2DI 0 "register_operand" "=wa")
-	(unspec:V2DI [(match_operand:V2DI 1 "altivec_register_operand" "wa")
-		      (match_operand:V2DI 2 "altivec_register_operand" "wa")
-		      (match_operand:V2DI 3 "altivec_register_operand" "wa")
+	(unspec:V2DI [(match_operand:V2DI 1 "register_operand" "wa")
+		      (match_operand:V2DI 2 "register_operand" "wa")
+		      (match_operand:V2DI 3 "register_operand" "wa")
 		      (match_operand:QI 4 "u8bit_cint_operand" "n")]
 		     UNSPEC_XXEVAL))]
    "TARGET_POWER10"
