@@ -647,3 +647,7 @@ Set targetm.const_anchor
 mprefixed-large-consts
 Target Undocumented Var(TARGET_PREFIXED_LARGE_CONSTS) Init(-1) Save
 Generate (do not generate) PLI/SLDI/PADDI to load large constants.
+
+mxxspltiw
+Target Undocumented Var(TARGET_XXSPLTIW) Init(-1) Save
+Generate (do not generate) XXSPLTIW instructions.
