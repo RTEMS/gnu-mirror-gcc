@@ -644,6 +644,10 @@ mconst-anchor
 Target Undocumented Var(TARGET_CONST_ANCHOR) Save
 Set targetm.const_anchor
 
+msection-anchor-offset
+Target Undocumented Var(TARGET_SECTION_ANCHOR_OFFSET) Save
+Set targetm.{min,max}_anchor_offset
+
 mprefixed-large-consts
 Target Undocumented Var(TARGET_PREFIXED_LARGE_CONSTS) Init(-1) Save
 Generate (do not generate) PLI/SLDI/PADDI to load large constants.
