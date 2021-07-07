@@ -4545,18 +4545,23 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mlxvkq", "-mfloat128-hardware");
     }
 
-  /* Possibly set the const_anchor to the maximum value, based on whether we
-     have prefixed addressing.  */
-  if (TARGET_CONST_ANCHOR)
-    targetm.const_anchor = HOST_WIDE_INT_1 << (TARGET_PREFIXED ? 33 : 15);
-
-  /* Possibly set the minimum/maximum section anchor offset to the maximum
-     value, based on whether we have prefixed addressing.  */
-  if (TARGET_SECTION_ANCHOR_OFFSET)
+  /* Possibly set the const_anchor and min/max anchor values to the maximum
+     value, based on whether we have prefixed addressing.  Note both of these
+     options need -fsection-anchors enabled.  */
+  if (TARGET_SECTION_ANCHOR_OFFSET || TARGET_CONST_ANCHOR)
     {
       HOST_WIDE_INT shift_amount = TARGET_PREFIXED ? 33 : 15;
-      targetm.min_anchor_offset = -(HOST_WIDE_INT_1 << shift_amount);
-      targetm.max_anchor_offset = (HOST_WIDE_INT_1 << shift_amount) - 1;
+      HOST_WIDE_INT max_bits_plus_1 = HOST_WIDE_INT_1 << shift_amount;
+
+      if (TARGET_CONST_ANCHOR)
+	targetm.const_anchor = max_bits_plus_1;
+
+      if (TARGET_SECTION_ANCHOR_OFFSET)
+	{
+	  targetm.min_anchor_offset = -max_bits_plus_1;
+	  targetm.max_anchor_offset = max_bits_plus_1 - 1;
+	}
+
       if (!global_options_set.x_flag_section_anchors)
 	flag_section_anchors = true;
     }
