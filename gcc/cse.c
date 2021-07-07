@@ -1314,10 +1314,7 @@ try_const_anchors (rtx src_const, machine_mode mode)
   if (GET_MODE_CLASS (mode) == MODE_CC)
     return NULL_RTX;
 
-  /* If it isn't an int, don't try to use it.  */
-  if (!SCALAR_INT_MODE_P (mode))
-    return NULL_RTX;
-
+  gcc_assert (SCALAR_INT_MODE_P (mode));
   if (!compute_const_anchors (src_const, &lower_base, &lower_offs,
 			      &upper_base, &upper_offs))
     return NULL_RTX;
