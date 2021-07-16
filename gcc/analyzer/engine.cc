@@ -3174,10 +3174,13 @@ exploded_graph::process_node (exploded_node *node)
       break;
     case PK_AFTER_SUPERNODE:
       {
+        bool found_a_superedge = false;
+        bool is_an_exit_block = false;
 	/* If this is an EXIT BB, detect leaks, and potentially
 	   create a function summary.  */
 	if (point.get_supernode ()->return_p ())
 	  {
+	    is_an_exit_block = true;
 	    node->detect_leaks (*this);
 	    if (flag_analyzer_call_summaries
 		&& point.get_call_string ().empty_p ())
@@ -3205,6 +3208,7 @@ exploded_graph::process_node (exploded_node *node)
 	superedge *succ;
 	FOR_EACH_VEC_ELT (point.get_supernode ()->m_succs, i, succ)
 	  {
+	    found_a_superedge = true;
 	    if (logger)
 	      logger->log ("considering SN: %i -> SN: %i",
 			   succ->m_src->m_index, succ->m_dest->m_index);
@@ -3214,19 +3218,100 @@ exploded_graph::process_node (exploded_node *node)
 						 point.get_call_string ());
 	    program_state next_state (state);
 	    uncertainty_t uncertainty;
+
+	    /* Check if now the analyzer know about the call via 
+               function pointer or not. */
+            if (succ->m_kind == SUPEREDGE_INTRAPROCEDURAL_CALL && 
+                !(succ->get_any_callgraph_edge()))
+              {    
+                const program_point *this_point = &node->get_point();
+                const program_state *this_state = &node->get_state ();
+                const gcall *call 
+                  = this_point->get_supernode ()->get_final_call ();
+
+                impl_region_model_context ctxt (*this,
+                  node, 
+                  this_state, 
+                  &next_state, 
+                  &uncertainty,
+                  this_point->get_stmt());
+
+                region_model *model = this_state->m_region_model;
+                tree fn_decl = model->get_fndecl_for_call(call,&ctxt);
+                function *fun = DECL_STRUCT_FUNCTION(fn_decl);
+                if(fun)
+                {
+                  const supergraph *sg = &(this->get_supergraph());
+                  supernode * sn_entry = sg->get_node_for_function_entry (fun);
+                  supernode * sn_exit = sg->get_node_for_function_exit (fun);
+
+                  program_point new_point 
+                    = program_point::before_supernode (sn_entry,
+            				               NULL,
+            				               point.get_call_string ());
+
+                  new_point.push_to_call_stack (sn_exit,
+                  				next_point.get_supernode());
+
+                  next_state.push_call(*this, node, call, &uncertainty);
+
+                  if (next_state.m_valid)
+                  {
+                    exploded_node *enode = get_or_create_node (new_point,
+            					               next_state,
+            					               node);
+                    if (enode)
+                      add_edge (node,enode, NULL);
+                  }
+                }
+              }
+
 	    if (!node->on_edge (*this, succ, &next_point, &next_state,
-				&uncertainty))
+			        &uncertainty))
 	      {
-		if (logger)
-		  logger->log ("skipping impossible edge to SN: %i",
-			       succ->m_dest->m_index);
-		continue;
+	        if (logger)
+	          logger->log ("skipping impossible edge to SN: %i",
+		               succ->m_dest->m_index);
+	        continue;
 	      }
-	    exploded_node *next = get_or_create_node (next_point, next_state,
-						      node);
+	    exploded_node *next = get_or_create_node (next_point, 
+	    					      next_state,
+					              node);
 	    if (next)
 	      add_edge (node, next, succ);
 	  }
+
+    /* Return from the calls which doesn't have a return superedge.
+    	Such case occurs when GCC's middle end didn't knew which function to
+    	call but analyzer did */
+    if((is_an_exit_block && !found_a_superedge) && 
+       (!point.get_call_string().empty_p()))
+    {
+      const call_string cs = point.get_call_string();
+      program_point next_point 
+        = program_point::before_supernode (cs.get_caller_node (),
+        				   NULL,
+        				   cs);
+
+      program_state next_state (state);
+      uncertainty_t uncertainty;
+
+      const gcall *call = next_point.get_supernode ()->get_returning_call (); 
+      if(call)
+      {
+        next_state.returning_call(*this, node, call, &uncertainty);
+      }
+
+      if (next_state.m_valid)
+      {
+        next_point.pop_from_call_stack();
+        exploded_node *enode = get_or_create_node (next_point, 
+        					   next_state, 
+        					   node);
+        if (enode)
+          add_edge (node,enode, NULL);
+      }
+    }
       }
       break;
     }

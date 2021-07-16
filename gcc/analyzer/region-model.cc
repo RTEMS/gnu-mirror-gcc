@@ -3156,6 +3156,30 @@ region_model::update_for_call_superedge (const call_superedge &call_edge,
   push_frame (call_edge.get_callee_function (), &arg_svals, ctxt);
 }
 
+/* Push a new frame_region on to the stack region.
+   works in similar manner of that of region_model::update_for_call_superedge()
+   but it get the call info from CALL_STMT instead from a suerpedge and 
+   is availabe publicically   */
+void
+region_model::update_for_gcall (const gcall *call_stmt,
+				region_model_context *ctxt)
+{
+  /* Build a vec of argument svalues, using the current top
+     frame for resolving tree expressions.  */
+  auto_vec<const svalue *> arg_svals (gimple_call_num_args (call_stmt));
+
+  for (unsigned i = 0; i < gimple_call_num_args (call_stmt); i++)
+    {
+      tree arg = gimple_call_arg (call_stmt, i);
+      arg_svals.quick_push (get_rvalue (arg, ctxt));
+    }
+
+  /* get the function * from the call */
+  tree fn_decl = get_fndecl_for_call(call_stmt,ctxt);
+  function *fun = DECL_STRUCT_FUNCTION(fn_decl);
+  push_frame (fun, &arg_svals, ctxt);
+}
+
 /* Pop the top-most frame_region from the stack, and copy the return
    region's values (if any) into the region for the lvalue of the LHS of
    the call (if any).  */
@@ -3179,6 +3203,30 @@ region_model::update_for_return_superedge (const return_superedge &return_edge,
 
   pop_frame (result_dst_reg, NULL, ctxt);
 }
+
+/* do exatly what region_model::update_for_return_superedge() do
+   but get the call info from CALL_STMT instead from a suerpedge and 
+   is availabe publicically   */
+void
+region_model::update_for_return_gcall (const gcall *call_stmt,
+             			       region_model_context *ctxt)
+{
+  /* Get the region for the result of the call, within the caller frame.  */
+  const region *result_dst_reg = NULL;
+  tree lhs = gimple_call_lhs (call_stmt);
+  if (lhs)
+    {
+      /* Normally we access the top-level frame, which is:
+         path_var (expr, get_stack_depth () - 1)
+         whereas here we need the caller frame, hence "- 2" here.  */
+      gcc_assert (get_stack_depth () >= 2);
+      result_dst_reg = get_lvalue (path_var (lhs, get_stack_depth () - 2),
+           			   ctxt);
+    }
+
+  pop_frame (result_dst_reg, NULL, ctxt);
+}
+
 
 /* Update this region_model with a summary of the effect of calling
    and returning from CG_SEDGE.
