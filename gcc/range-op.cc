@@ -3772,11 +3772,14 @@ range_tests ()
   // Make sure NULL and non-NULL of pointer types work, and that
   // inverses of them are consistent.
   tree voidp = build_pointer_type (void_type_node);
-  r0 = range_zero (voidp);
-  r1 = r0;
-  r0.invert ();
-  r0.invert ();
-  ASSERT_TRUE (r0 == r1);
+  if (!capability_type_p (voidp))
+    {
+      r0 = range_zero (voidp);
+      r1 = r0;
+      r0.invert ();
+      r0.invert ();
+      ASSERT_TRUE (r0 == r1);
+    }
 
   // [10,20] U [15, 30] => [10, 30].
   r0 = int_range<1> (INT (10), INT (20));
