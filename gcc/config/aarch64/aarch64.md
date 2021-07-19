@@ -766,8 +766,8 @@
   [(parallel
     [(set (pc) (match_operand:ADDR 0 ""))
      (clobber (reg:CC CC_REGNUM))
-     (clobber (match_scratch:DI 2))
-     (clobber (match_scratch:DI 3))
+     (clobber (match_scratch:ADDR 2))
+     (clobber (match_scratch:ADDR 3))
      (use (label_ref:ADDR (match_operand 1 "")))])]
   "")
 
@@ -778,8 +778,8 @@
 			     (match_operand:SI 1 "register_operand" "r")]
 			UNSPEC_CASESI)))
      (clobber (reg:CC CC_REGNUM))
-     (clobber (match_scratch:DI 3 "=r"))
-     (clobber (match_scratch:DI 4 "=r"))
+     (clobber (match_scratch:ADDR 3 "=r"))
+     (clobber (match_scratch:ADDR 4 "=r"))
      (use (label_ref:ADDR (match_operand 2 "" "")))])]
   ""
   "*
