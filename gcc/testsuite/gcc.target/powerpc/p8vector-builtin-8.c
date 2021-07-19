@@ -126,6 +126,7 @@ void foo (vector signed char *vscr,
 /* { dg-final { scan-assembler-times "vsubcuw" 4 } } */
 /* { dg-final { scan-assembler-times "vsubuwm" 4 } } */
 /* { dg-final { scan-assembler-times "vbpermq" 2 } } */
+/* { dg-final { scan-assembler-times "vbpermd" 0 } } */
 /* { dg-final { scan-assembler-times "xxleqv" 4 } } */
 /* { dg-final { scan-assembler-times "vgbbd" 1 } } */
 /* { dg-final { scan-assembler-times "xxlnand" 4 } } */
