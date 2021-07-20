@@ -15788,7 +15788,9 @@ aarch64_handle_attr_isa_flags (char *str)
      features if the user wants to handpick specific features.  */
   if (strncmp ("+nothing", str, 8) == 0)
     {
-      isa_flags = 0;
+      /* For Morello, don't disable C64 as this will break any code compiled
+	 with -mabi=purecap.  */
+      isa_flags &= AARCH64_FL_C64;
       str += 8;
     }
 

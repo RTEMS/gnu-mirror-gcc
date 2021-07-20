@@ -32212,7 +32212,12 @@ __INTERLEAVE_LIST (zip)
 #include "arm_fp16.h"
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64+fp16")
+#else
 #pragma GCC target ("arch=armv8.2-a+fp16")
+#endif
 
 /* ARMv8.2-A FP16 one operand vector intrinsics.  */
 
@@ -33375,7 +33380,12 @@ vminnmvq_f16 (float16x8_t __a)
 /* AdvSIMD Dot Product intrinsics.  */
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64")
+#else
 #pragma GCC target ("arch=armv8.2-a+dotprod")
+#endif
 
 __extension__ extern __inline uint32x2_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -33466,7 +33476,12 @@ vdotq_laneq_s32 (int32x4_t __r, int8x16_t __a, int8x16_t __b, const int __index)
 #pragma GCC pop_options
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64+sm4")
+#else
 #pragma GCC target ("arch=armv8.2-a+sm4")
+#endif
 
 __extension__ extern __inline uint32x4_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -33533,7 +33548,12 @@ vsm4ekeyq_u32 (uint32x4_t __a, uint32x4_t __b)
 #pragma GCC pop_options
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64+sha3")
+#else
 #pragma GCC target ("arch=armv8.2-a+sha3")
+#endif
 
 __extension__ extern __inline uint64x2_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -33695,7 +33715,12 @@ vbcaxq_s64 (int64x2_t __a, int64x2_t __b, int64x2_t __c)
 /* AdvSIMD Complex numbers intrinsics.  */
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=armv8.3-a+c64")
+#else
 #pragma GCC target ("arch=armv8.3-a")
+#endif
 
 #pragma GCC push_options
 #pragma GCC target ("+fp16")
@@ -34169,7 +34194,12 @@ vcmlaq_rot270_laneq_f32 (float32x4_t __r, float32x4_t __a, float32x4_t __b,
 #pragma GCC pop_options
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64")
+#else
 #pragma GCC target ("arch=armv8.2-a+fp16fml")
+#endif
 
 __extension__ extern __inline float32x2_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -34358,7 +34388,12 @@ vfmlslq_laneq_high_f16 (float32x4_t __r, float16x8_t __a, float16x8_t __b,
 #pragma GCC pop_options
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=armv8.5-a+c64")
+#else
 #pragma GCC target ("arch=armv8.5-a")
+#endif
 
 __extension__ extern __inline float32x2_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -34478,7 +34513,12 @@ vrnd64xq_f64 (float64x2_t __a)
 #include "arm_bf16.h"
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64+bf16")
+#else
 #pragma GCC target ("arch=armv8.2-a+bf16")
+#endif
 
 __extension__ extern __inline bfloat16x4_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
@@ -35556,7 +35596,12 @@ vcvtq_high_bf16_f32 (bfloat16x8_t __inactive, float32x4_t __a)
 /* AdvSIMD 8-bit Integer Matrix Multiply (I8MM) intrinsics.  */
 
 #pragma GCC push_options
+
+#ifdef __ARM_FEATURE_C64
+#pragma GCC target ("arch=morello+c64+i8mm")
+#else
 #pragma GCC target ("arch=armv8.2-a+i8mm")
+#endif
 
 __extension__ extern __inline int32x2_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
