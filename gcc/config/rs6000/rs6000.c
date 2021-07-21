@@ -4312,6 +4312,17 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
     }
 
+  /* Validate -mxxspltiw, which is a prefixed instruction.  We also check for
+     VSX because you need the basic VSX infrastruction for this
+     instruction.  */
+  if (TARGET_XXSPLTIW < 0)
+    TARGET_XXSPLTIW = TARGET_PREFIXED && TARGET_VSX;
+  else if (TARGET_XXSPLTIW > 0 && (!TARGET_PREFIXED || !TARGET_VSX))
+    {
+      error ("%qs requires %qs and %qs", "-mxxspliw", "-mprefixed", "-mvsx");
+      TARGET_XXSPLTIW = 0;
+    }
+
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags);
@@ -6506,9 +6517,11 @@ xxspltib_constant_p (rtx op,
 
   /* See if we could generate vspltisw/vspltish directly instead of xxspltib +
      sign extend.  Special case 0/-1 to allow getting any VSX register instead
-     of an Altivec register.  */
-  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0)
-      && EASY_VECTOR_15 (value))
+     of an Altivec register.  Also if we can generate a XXSPLTIW instruction,
+     don't emit a XXSPLTIB and an extend instruction.  */
+  if ((mode == V4SImode || mode == V8HImode)
+      && !IN_RANGE (value, -1, 0)
+      && (EASY_VECTOR_15 (value) || TARGET_XXSPLTIW))
     return false;
 
   /* Return # of instructions and the constant byte for XXSPLTIB.  */
@@ -6568,6 +6581,9 @@ output_vec_const_move (rtx *operands)
 	  else
 	    gcc_unreachable ();
 	}
+
+      if (xxspltiw_operand (vec, mode))
+	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
