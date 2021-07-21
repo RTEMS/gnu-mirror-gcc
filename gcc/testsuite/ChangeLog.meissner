@@ -1,10 +1,12 @@
 work061.patch005:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
 	PR testsuite/100168
 	* gcc.dg/pr56727-2.c: Add support for PC-relative calls.
 
 work061.patch004:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
 	PR testsuite/100170
 	* gcc.target/powerpc/ppc-eq0-1.c: Add support for the setbc
 	instruction.
@@ -13,6 +15,7 @@ work061.patch004:
 
 work061.patch001:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
 	PR target/70117
 	* gcc.target/powerpc/pr70117.c: Force the long double type to use
 	the IBM 128-bit format.
