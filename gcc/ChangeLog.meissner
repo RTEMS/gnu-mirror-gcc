@@ -1,3 +1,27 @@
+work061.patch003:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+	PR target/99921
+	* config/rs6000/altivec.md (xxeval): Use register_predicate
+	instead of altivec_register_predicate.
+
+work061.patch002:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000-call.c (rs6000_invalid_builtin): Update
+	error message for __ibm128 built-in functions.
+	(rs6000_init_builtins): Create the __ibm128 keyword on older
+	systems where long double uses the IBM extended double format,
+	even if they don't support IEEE 128-bit floating point.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Rename
+	RS6000_BTM_IBM128 from RS6000_BTM_FLOAT128.
+	(rs6000_builtin_mask_names): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	(RS6000_BTM_IBM128): Rename from RS6000_BTM_FLOAT128.
+	(RS6000_BTM_COMMON): Rename RS6000_BTM_IBM128 from
+	RS6000_BTM_FLOAT128.
+
 2021-07-21   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

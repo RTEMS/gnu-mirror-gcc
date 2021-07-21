@@ -1,3 +1,34 @@
+work061.patch005:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+	PR testsuite/100168
+	* gcc.dg/pr56727-2.c: Add support for PC-relative calls.
+
+work061.patch004:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+	PR testsuite/100170
+	* gcc.target/powerpc/ppc-eq0-1.c: Add support for the setbc
+	instruction.
+	* gcc.target/powerpc/ppc-ne0-1.c: Update instruction counts on
+	power10.
+
+work061.patch001:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+	PR target/70117
+	* gcc.target/powerpc/pr70117.c: Force the long double type to use
+	the IBM 128-bit format.
+	* c-c++-common/dfp/convert-bfp-11.c: Force using IBM 128-bit long
+	double.  Remove check for 64-bit long double.
+	* lib/target-supports.exp
+	(add_options_for_ppc_long_double_override_ibm128): New function.
+	(check_effective_target_ppc_long_double_override_ibm128): New
+	function.
+	(add_options_for_ppc_long_double_override_ieee128): New function.
+	(check_effective_target_ppc_long_double_override_ieee128): New
+	function.
+	(add_options_for_ppc_long_double_override_64bit): New function.
+	(check_effective_target_ppc_long_double_override_64bit): New
+	function.
+
 2021-07-21   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
