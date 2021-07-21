@@ -349,6 +349,9 @@ extern tree last_assemble_variable_decl;
 
 extern bool first_function_block_is_cold;
 
+/* RELOC flags as for SELECT_SECTION.  */
+#define RELOC_CAPABILITY 4
+
 /* Decide whether DECL needs to be in a writable section.
    RELOC is the same as for SELECT_SECTION.  */
 extern bool decl_readonly_section (const_tree, int);

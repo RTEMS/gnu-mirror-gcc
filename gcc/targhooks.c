@@ -1178,7 +1178,7 @@ default_secondary_memory_needed_mode (machine_mode mode)
 int
 default_reloc_rw_mask (void)
 {
-  return flag_pic ? 3 : 0;
+  return (flag_pic ? 3 : 0) | RELOC_CAPABILITY;
 }
 
 /* By default, address diff vectors are generated

@@ -4319,6 +4319,9 @@ compute_reloc_for_constant (tree exp)
 	  break;
 	}
 
+      if (capability_type_p (TREE_TYPE (exp)))
+	reloc |= RELOC_CAPABILITY;
+
       if (!targetm.binds_local_p (tem))
 	reloc |= 2;
       else
@@ -6792,12 +6795,12 @@ categorize_decl_for_section (const_tree decl, int reloc)
 	     do something.  If so, we wish to segregate the data in order to
 	     minimize cache misses inside the dynamic linker.  */
 	  if (reloc & targetm.asm_out.reloc_rw_mask ())
-	    ret = reloc == 1 ? SECCAT_DATA_REL_LOCAL : SECCAT_DATA_REL;
+	    ret = reloc & 1 ? SECCAT_DATA_REL_LOCAL : SECCAT_DATA_REL;
 	  else
 	    ret = SECCAT_DATA;
 	}
       else if (reloc & targetm.asm_out.reloc_rw_mask ())
-	ret = reloc == 1 ? SECCAT_DATA_REL_RO_LOCAL : SECCAT_DATA_REL_RO;
+	ret = reloc & 1 ? SECCAT_DATA_REL_RO_LOCAL : SECCAT_DATA_REL_RO;
       else if (reloc || flag_merge_constants < 2
 	       || ((flag_sanitize & SANITIZE_ADDRESS)
 		   /* PR 81697: for architectures that use section anchors we
@@ -7049,24 +7052,31 @@ compute_reloc_for_rtx_1 (const_rtx x)
 static int
 compute_reloc_for_rtx (const_rtx x)
 {
+  int reloc = 0;
+
   switch (GET_CODE (x))
     {
     case SYMBOL_REF:
     case LABEL_REF:
-      return compute_reloc_for_rtx_1 (x);
+      reloc = compute_reloc_for_rtx_1 (x);
+      break;
 
     case CONST:
       {
-	int reloc = 0;
 	subrtx_iterator::array_type array;
 	FOR_EACH_SUBRTX (iter, array, x, ALL)
 	  reloc |= compute_reloc_for_rtx_1 (*iter);
-	return reloc;
       }
+      break;
 
     default:
       return 0;
     }
+
+  if (CAPABILITY_MODE_P (GET_MODE (x)))
+    reloc |= RELOC_CAPABILITY;
+
+  return reloc;
 }
 
 section *
@@ -7090,7 +7100,7 @@ default_elf_select_rtx_section (machine_mode mode, rtx x,
 
   if (reloc & targetm.asm_out.reloc_rw_mask ())
     {
-      if (reloc == 1)
+      if (reloc & 1)
 	return get_named_section (NULL, ".data.rel.ro.local", 1);
       else
 	return get_named_section (NULL, ".data.rel.ro", 3);
