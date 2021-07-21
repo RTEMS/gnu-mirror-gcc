@@ -83,6 +83,8 @@ along with GCC; see the file COPYING3.  If not see
 #define LANG_HOOKS_TYPE_FOR_MODE c_common_type_for_mode
 #undef LANG_HOOKS_TYPE_FOR_SIZE
 #define LANG_HOOKS_TYPE_FOR_SIZE c_common_type_for_size
+#undef LANG_HOOKS_CAP_TYPE_FOR_SIZE
+#define LANG_HOOKS_CAP_TYPE_FOR_SIZE c_common_cap_type_for_size
 #undef LANG_HOOKS_INCOMPLETE_TYPE_ERROR
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR c_incomplete_type_error
 #undef LANG_HOOKS_TYPE_PROMOTES_TO

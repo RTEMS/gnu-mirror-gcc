@@ -925,7 +925,7 @@ split_const (rtx x, rtx *base_out, rtx *offset_out)
   if (GET_CODE (x) == CONST)
     {
       x = XEXP (x, 0);
-      if (GET_CODE (x) == PLUS && CONST_INT_P (XEXP (x, 1)))
+      if (any_plus_p (x) && CONST_INT_P (XEXP (x, 1)))
 	{
 	  *base_out = XEXP (x, 0);
 	  *offset_out = XEXP (x, 1);
@@ -947,7 +947,7 @@ strip_offset (rtx x, poly_int64_pod *offset_out)
   rtx test = x;
   if (GET_CODE (test) == CONST)
     test = XEXP (test, 0);
-  if (GET_CODE (test) == PLUS)
+  if (any_plus_p (test))
     {
       base = XEXP (test, 0);
       test = XEXP (test, 1);
@@ -2420,7 +2420,7 @@ void
 add_args_size_note (rtx_insn *insn, poly_int64 value)
 {
   gcc_checking_assert (!find_reg_note (insn, REG_ARGS_SIZE, NULL_RTX));
-  add_reg_note (insn, REG_ARGS_SIZE, gen_int_mode (value, Pmode));
+  add_reg_note (insn, REG_ARGS_SIZE, gen_int_mode (value, POmode));
 }
 
 /* Add a register note like NOTE to INSN.  */
@@ -5946,7 +5946,7 @@ low_bitmask_len (machine_mode mode, unsigned HOST_WIDE_INT m)
 
 /* Return the mode of MEM's address.  */
 
-scalar_int_mode
+scalar_addr_mode
 get_address_mode (rtx mem)
 {
   machine_mode mode;
@@ -5954,7 +5954,7 @@ get_address_mode (rtx mem)
   gcc_assert (MEM_P (mem));
   mode = GET_MODE (XEXP (mem, 0));
   if (mode != VOIDmode)
-    return as_a <scalar_int_mode> (mode);
+    return as_a <scalar_addr_mode> (mode);
   return targetm.addr_space.address_mode (MEM_ADDR_SPACE (mem));
 }
 
@@ -6295,7 +6295,7 @@ decompose_automod_address (struct address_info *info)
   gcc_checking_assert (info->base == info->base_term);
 
   rtx plus = XEXP (*info->inner, 1);
-  gcc_assert (GET_CODE (plus) == PLUS);
+  gcc_assert (any_plus_p (plus));
 
   info->base_term2 = &XEXP (plus, 0);
   gcc_checking_assert (rtx_equal_p (*info->base_term, *info->base_term2));
@@ -6315,7 +6315,7 @@ static rtx **
 extract_plus_operands (rtx *loc, rtx **ptr, rtx **end)
 {
   rtx x = *loc;
-  if (GET_CODE (x) == PLUS)
+  if (any_plus_p (x))
     {
       ptr = extract_plus_operands (&XEXP (x, 0), ptr, end);
       ptr = extract_plus_operands (&XEXP (x, 1), ptr, end);

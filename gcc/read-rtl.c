@@ -1552,7 +1552,13 @@ rtx_reader::rtx_alloc_for_name (const char *name)
       /* Find the attribute itself.  */
       mapping *m = (mapping *) htab_find (codes.attrs, &attr);
       if (!m)
-	fatal_with_file_and_line ("unknown code attribute `%s'", attr);
+	{
+	  const char *tmp = attr + 1;
+	  m = (mapping *) htab_find (modes.attrs, &tmp);
+	}
+
+      if (!m)
+	fatal_with_file_and_line ("unknown attribute `%s'", attr);
 
       /* Pick the first possible code for now, and record the attribute
 	 use for later.  */

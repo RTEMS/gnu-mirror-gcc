@@ -27,9 +27,11 @@ extern CONST_MODE_PRECISION poly_uint16_pod mode_precision[NUM_MACHINE_MODES];
 extern const unsigned char mode_inner[NUM_MACHINE_MODES];
 extern CONST_MODE_NUNITS poly_uint16_pod mode_nunits[NUM_MACHINE_MODES];
 extern CONST_MODE_UNIT_SIZE unsigned char mode_unit_size[NUM_MACHINE_MODES];
-extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];
+extern CONST_MODE_UNIT_PRECISION
+  unsigned short mode_unit_precision[NUM_MACHINE_MODES];
 extern const unsigned char mode_wider[NUM_MACHINE_MODES];
 extern const unsigned char mode_2xwider[NUM_MACHINE_MODES];
+extern const unsigned char mode_offsetmode[NUM_MACHINE_MODES];
 
 template<typename T>
 struct mode_traits
@@ -133,10 +135,19 @@ extern const unsigned char mode_class[NUM_MACHINE_MODES];
    || GET_MODE_CLASS (MODE) == MODE_VECTOR_ACCUM	\
    || GET_MODE_CLASS (MODE) == MODE_VECTOR_UACCUM)
 
+/* Nonzero if MODE is a capability mode.  */
+#define CAPABILITY_MODE_P(MODE)			\
+  (GET_MODE_CLASS (MODE) == MODE_CAPABILITY)
+
 /* Nonzero if MODE is a scalar integral mode.  */
 #define SCALAR_INT_MODE_P(MODE)			\
   (GET_MODE_CLASS (MODE) == MODE_INT		\
    || GET_MODE_CLASS (MODE) == MODE_PARTIAL_INT)
+
+/* Nonzero if MODE is a scalar address mode.  */
+#define SCALAR_ADDR_MODE_P(MODE)		\
+  (SCALAR_INT_MODE_P (MODE)			\
+   || CAPABILITY_MODE_P (MODE))
 
 /* Nonzero if MODE is a scalar floating point mode.  */
 #define SCALAR_FLOAT_MODE_P(MODE)		\
@@ -430,6 +441,37 @@ scalar_int_mode::includes_p (machine_mode m)
   return SCALAR_INT_MODE_P (m);
 }
 
+/* Represents a machine mode that is known to be either a SCALAR_INT_MODE_P or
+   a CAPABILITY_MODE_P.  */
+class scalar_addr_mode
+{
+public:
+  typedef mode_traits<scalar_addr_mode>::from_int from_int;
+  typedef unsigned short measurement_type;
+
+  ALWAYS_INLINE scalar_addr_mode () {}
+
+  ALWAYS_INLINE CONSTEXPR
+  scalar_addr_mode (from_int m) : m_mode (machine_mode (m)) {}
+
+  ALWAYS_INLINE CONSTEXPR
+  scalar_addr_mode (const scalar_int_mode &m) : m_mode (m) {}
+
+  ALWAYS_INLINE CONSTEXPR operator machine_mode () const { return m_mode; }
+
+  static bool includes_p (machine_mode);
+
+protected:
+  machine_mode m_mode;
+};
+
+/* Return true if M is a scalar_addr_mode.  */
+inline bool
+scalar_addr_mode::includes_p (machine_mode m)
+{
+  return SCALAR_INT_MODE_P (m) || CAPABILITY_MODE_P (m);
+}
+
 /* Represents a machine mode that is known to be a SCALAR_FLOAT_MODE_P.  */
 class scalar_float_mode
 {
@@ -474,6 +516,9 @@ public:
   scalar_mode (const scalar_int_mode &m) : m_mode (m) {}
 
   ALWAYS_INLINE CONSTEXPR
+  scalar_mode (const scalar_addr_mode &m) : m_mode (m) {}
+
+  ALWAYS_INLINE CONSTEXPR
   scalar_mode (const scalar_float_mode &m) : m_mode (m) {}
 
   ALWAYS_INLINE CONSTEXPR
@@ -496,6 +541,7 @@ scalar_mode::includes_p (machine_mode m)
     {
     case MODE_INT:
     case MODE_PARTIAL_INT:
+    case MODE_CAPABILITY:
     case MODE_FRACT:
     case MODE_UFRACT:
     case MODE_ACCUM:
@@ -615,6 +661,20 @@ mode_to_nunits (machine_mode mode)
 	  ? mode_nunits_inline (mode) : mode_nunits[mode]);
 #else
   return mode_nunits[mode];
+#endif
+}
+
+/* Return the offset_mode value for MODE.  */
+
+ALWAYS_INLINE scalar_int_mode
+mode_to_offsetmode (machine_mode mode)
+{
+#if GCC_VERSION >= 4001
+  return scalar_int_mode::from_int (__builtin_constant_p (mode)
+				    ? mode_offsetmode_inline (mode)
+				    : mode_offsetmode[mode]);
+#else
+  return scalar_int_mode::from_int (mode_offsetmode[mode]);
 #endif
 }
 
@@ -778,6 +838,27 @@ GET_MODE_2XWIDER_MODE (const T &m)
 extern const unsigned char mode_complex[NUM_MACHINE_MODES];
 #define GET_MODE_COMPLEX_MODE(MODE) ((machine_mode) mode_complex[MODE])
 
+/* Get the offset mode of a MODE (is MODE unless MODE is a capability mode).  */
+extern CONST_MODE_FBIT unsigned char mode_fbit[NUM_MACHINE_MODES];
+
+ALWAYS_INLINE scalar_int_mode
+offset_mode (scalar_int_mode mode)
+{
+  return mode;
+}
+
+ALWAYS_INLINE scalar_int_mode
+offset_mode (scalar_addr_mode mode)
+{
+  return mode_to_offsetmode (mode);
+}
+
+ALWAYS_INLINE machine_mode
+noncapability_mode (machine_mode mode)
+{
+  return mode_to_offsetmode (mode);
+}
+
 /* Represents a machine mode that must have a fixed size.  The main
    use of this class is to represent the modes of objects that always
    have static storage duration, such as constant pool entries.
@@ -800,6 +881,9 @@ public:
   fixed_size_mode (const scalar_int_mode &m) : m_mode (m) {}
 
   ALWAYS_INLINE CONSTEXPR
+  fixed_size_mode (const scalar_addr_mode &m) : m_mode (m) {}
+
+  ALWAYS_INLINE CONSTEXPR
   fixed_size_mode (const scalar_float_mode &m) : m_mode (m) {}
 
   ALWAYS_INLINE CONSTEXPR
@@ -807,6 +891,9 @@ public:
 
   ALWAYS_INLINE CONSTEXPR
   fixed_size_mode (const scalar_int_mode_pod &m) : m_mode (m) {}
+
+  ALWAYS_INLINE CONSTEXPR
+  fixed_size_mode (const scalar_addr_mode_pod &m) : m_mode (m) {}
 
   ALWAYS_INLINE CONSTEXPR
   fixed_size_mode (const complex_mode &m) : m_mode (m) {}
@@ -949,7 +1036,7 @@ get_narrowest_mode (T mode)
 
 extern scalar_int_mode byte_mode;
 extern scalar_int_mode word_mode;
-extern scalar_int_mode ptr_mode;
+extern scalar_addr_mode ptr_mode;
 
 /* Target-dependent machine mode initialization - in insn-modes.c.  */
 extern void init_adjust_machine_modes (void);

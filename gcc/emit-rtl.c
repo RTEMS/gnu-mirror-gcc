@@ -75,7 +75,7 @@ struct target_rtl *this_target_rtl = &default_target_rtl;
 
 scalar_int_mode byte_mode;	/* Mode whose width is BITS_PER_UNIT.  */
 scalar_int_mode word_mode;	/* Mode whose width is BITS_PER_WORD.  */
-scalar_int_mode ptr_mode;	/* Mode whose width is POINTER_SIZE.  */
+scalar_addr_mode ptr_mode;	/* Mode whose width is POINTER_SIZE.  */
 
 /* Datastructures maintained for currently processed function in RTL form.  */
 
@@ -488,6 +488,47 @@ gen_raw_REG (machine_mode mode, unsigned int regno)
   return x;
 }
 
+/* Helper function for generating pointer plus offset expressions.
+   Checks that the mode of the base and offsets match.  Ensure the base is in
+   the correct mode, and that OFFSET has a mode of `offset_mode (MODE)`.  */
+void
+check_pointer_offset_modes (scalar_addr_mode mode, rtx base, rtx offset)
+{
+  gcc_assert (GET_MODE (base) == mode
+	   || (CONST_INT_P (base) && !CAPABILITY_MODE_P (mode)));
+  gcc_assert (GET_MODE (offset) == offset_mode (mode)
+	      || GET_MODE (offset) == VOIDmode);
+}
+
+/* Generate a new rtx representing a pointer plus an offset.  Generate either a
+   PLUS rtx or POINTER_PLUS rtx depending on whether the mode is a capability
+   mode rtx or not.  */
+rtx
+gen_raw_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset)
+{
+  check_pointer_offset_modes (mode, base, offset);
+  if (CAPABILITY_MODE_P (mode))
+    return gen_rtx_POINTER_PLUS (mode, base, offset);
+  return gen_rtx_PLUS (offset_mode (mode), base, offset);
+}
+
+/* Return an RTX representing the non-capability part of the argument X.
+   If X is a capability then this returns the address, otherwise this returns X
+   itself.  */
+rtx
+drop_capability (rtx x)
+{
+  if (x == NULL_RTX)
+    return x;
+  machine_mode orig_mode = GET_MODE (x);
+  if (CAPABILITY_MODE_P (orig_mode))
+    {
+      machine_mode new_mode = noncapability_mode (orig_mode);
+      return lowpart_subreg (new_mode, x, orig_mode);
+    }
+  return x;
+}
+
 /* There are some RTL codes that require special attention; the generation
    functions do the raw handling.  If you add to this list, modify
    special_rtx in gengenrtl.c as well.  */
@@ -538,13 +579,19 @@ gen_rtx_CONST_INT (machine_mode mode ATTRIBUTE_UNUSED, HOST_WIDE_INT arg)
 }
 
 rtx
-gen_int_mode (poly_int64 c, machine_mode mode)
+gen_int_mode (poly_int64 c, scalar_int_mode mode)
 {
   c = trunc_int_for_mode (c, mode);
   if (c.is_constant ())
     return GEN_INT (c.coeffs[0]);
   unsigned int prec = GET_MODE_PRECISION (as_a <scalar_mode> (mode));
   return immed_wide_int_const (poly_wide_int::from (c, prec, SIGNED), mode);
+}
+
+rtx
+gen_int_mode (poly_int64 c, machine_mode mode)
+{
+  return gen_int_mode (c, as_a <scalar_int_mode> (mode));
 }
 
 /* CONST_DOUBLEs might be created from pairs of integers, or from
@@ -741,6 +788,7 @@ immed_double_const (HOST_WIDE_INT i0, HOST_WIDE_INT i1, machine_mode mode)
 rtx
 immed_wide_int_const (const poly_wide_int_ref &c, machine_mode mode)
 {
+  gcc_assert (! CAPABILITY_MODE_P (mode));
   if (c.is_constant ())
     return immed_wide_int_const_1 (c.coeffs[0], mode);
 
@@ -2342,11 +2390,11 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
 {
   rtx addr = XEXP (memref, 0);
   rtx new_rtx;
-  scalar_int_mode address_mode;
+  scalar_addr_mode address_mode;
   class mem_attrs attrs (*get_mem_attrs (memref)), *defattrs;
   unsigned HOST_WIDE_INT max_align;
 #ifdef POINTERS_EXTEND_UNSIGNED
-  scalar_int_mode pointer_mode
+  scalar_addr_mode pointer_mode
     = targetm.addr_space.pointer_mode (attrs.addrspace);
 #endif
 
@@ -2376,7 +2424,7 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
   /* Convert a possibly large offset to a signed value within the
      range of the target address space.  */
   address_mode = get_address_mode (memref);
-  offset = trunc_int_for_mode (offset, address_mode);
+  offset = trunc_int_for_mode (offset, offset_mode (address_mode));
 
   if (adjust_address)
     {
@@ -2397,7 +2445,9 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
       else if (POINTERS_EXTEND_UNSIGNED > 0
 	       && GET_CODE (addr) == ZERO_EXTEND
 	       && GET_MODE (XEXP (addr, 0)) == pointer_mode
-	       && known_eq (trunc_int_for_mode (offset, pointer_mode), offset))
+	       && known_eq (trunc_int_for_mode
+			      (offset, offset_mode (pointer_mode)),
+			    offset))
 	addr = gen_rtx_ZERO_EXTEND (address_mode,
 				    plus_constant (pointer_mode,
 						   XEXP (addr, 0), offset));
@@ -2488,12 +2538,12 @@ rtx
 offset_address (rtx memref, rtx offset, unsigned HOST_WIDE_INT pow2)
 {
   rtx new_rtx, addr = XEXP (memref, 0);
-  machine_mode address_mode;
+  scalar_addr_mode address_mode;
   class mem_attrs *defattrs;
 
   mem_attrs attrs (*get_mem_attrs (memref));
   address_mode = get_address_mode (memref);
-  new_rtx = simplify_gen_binary (PLUS, address_mode, addr, offset);
+  new_rtx = gen_pointer_plus (address_mode, addr, offset);
 
   /* At this point we don't know _why_ the address is invalid.  It
      could have secondary memory references, multiplies or anything.
@@ -2504,11 +2554,11 @@ offset_address (rtx memref, rtx offset, unsigned HOST_WIDE_INT pow2)
      bad to expose PIC machinery too early.  */
   if (! memory_address_addr_space_p (GET_MODE (memref), new_rtx,
 				     attrs.addrspace)
-      && GET_CODE (addr) == PLUS
+      && any_plus_p (addr)
       && XEXP (addr, 0) == pic_offset_table_rtx)
     {
       addr = force_reg (GET_MODE (addr), addr);
-      new_rtx = simplify_gen_binary (PLUS, address_mode, addr, offset);
+      new_rtx = gen_pointer_plus (address_mode, addr, offset);
     }
 
   update_temp_slot_address (XEXP (memref, 0), new_rtx);
@@ -6175,7 +6225,7 @@ init_derived_machine_modes (void)
 
   byte_mode = opt_byte_mode.require ();
   word_mode = opt_word_mode.require ();
-  ptr_mode = as_a <scalar_int_mode>
+  ptr_mode = as_a <scalar_addr_mode>
     (mode_for_size (POINTER_SIZE, GET_MODE_CLASS (Pmode), 0).require ());
 }
 
@@ -6274,6 +6324,9 @@ init_emit_once (void)
 
   FOR_EACH_MODE_IN_CLASS (mode, MODE_INT)
     const_tiny_rtx[3][(int) mode] = constm1_rtx;
+
+  FOR_EACH_MODE_IN_CLASS (mode, MODE_CAPABILITY)
+    const_tiny_rtx[0][(int) mode] = gen_rtx_CONST_NULL (mode);
 
   /* For BImode, 1 and -1 are unsigned and signed interpretations
      of the same value.  */

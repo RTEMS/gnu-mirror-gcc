@@ -5327,23 +5327,39 @@ rtx
 form_sum (machine_mode mode, rtx x, rtx y)
 {
   rtx tem;
-
-  gcc_assert (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode);
-  gcc_assert (GET_MODE (y) == mode || GET_MODE (y) == VOIDmode);
+  if (CAPABILITY_MODE_P (mode))
+    {
+      gcc_assert (GET_MODE (x) == mode);
+      gcc_assert (GET_MODE (y) == noncapability_mode (mode)
+		  || GET_MODE (y) == VOIDmode);
+    }
+  else
+    {
+      gcc_assert (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode);
+      gcc_assert (GET_MODE (y) == mode || GET_MODE (y) == VOIDmode);
+    }
 
   if (CONST_INT_P (x))
     return plus_constant (mode, y, INTVAL (x));
   else if (CONST_INT_P (y))
     return plus_constant (mode, x, INTVAL (y));
-  else if (CONSTANT_P (x))
+  else if (CONSTANT_P (x) && !CAPABILITY_MODE_P (mode))
     tem = x, x = y, y = tem;
 
-  if (GET_CODE (x) == PLUS && CONSTANT_P (XEXP (x, 1)))
-    return form_sum (mode, XEXP (x, 0), form_sum (mode, XEXP (x, 1), y));
+  /* If X is a PLUS or POINTER_PLUS with a constant, move the constant out
+     and into y.  */
+  if (any_plus_p (x) && CONSTANT_P (XEXP (x, 1)))
+    return form_sum (mode, XEXP (x, 0), form_sum (noncapability_mode (mode),
+						  XEXP (x, 1), y));
 
-  /* Note that if the operands of Y are specified in the opposite
+  /* For Capability targets we have already asserted that y is in VOIDmode or
+     in noncapability_mode (mode), so this manipulation is not needed and
+     could result in invalid RTL of a POINTER_PLUS containing a POINTER_PLUS.
+
+     Note that if the operands of Y are specified in the opposite
      order in the recursive calls below, infinite recursion will occur.  */
-  if (GET_CODE (y) == PLUS && CONSTANT_P (XEXP (y, 1)))
+  if (GET_CODE (y) == PLUS && CONSTANT_P (XEXP (y, 1))
+      && !CAPABILITY_MODE_P (mode))
     return form_sum (mode, form_sum (mode, x, XEXP (y, 0)), XEXP (y, 1));
 
   /* If both constant, encapsulate sum.  Otherwise, just form sum.  A
@@ -5355,10 +5371,12 @@ form_sum (machine_mode mode, rtx x, rtx y)
       if (GET_CODE (y) == CONST)
 	y = XEXP (y, 0);
 
-      return gen_rtx_CONST (VOIDmode, gen_rtx_PLUS (mode, x, y));
+      return gen_rtx_CONST (VOIDmode,
+			    gen_pointer_plus (as_a <scalar_addr_mode> (mode),
+					      x, y));
     }
 
-  return gen_rtx_PLUS (mode, x, y);
+  return gen_pointer_plus (as_a <scalar_addr_mode> (mode), x, y);
 }
 
 /* If ADDR is a sum containing a pseudo register that should be

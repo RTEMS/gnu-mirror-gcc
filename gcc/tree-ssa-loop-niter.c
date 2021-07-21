@@ -3525,7 +3525,7 @@ record_nonwrapping_iv (class loop *loop, tree base, tree step, gimple *stmt,
       fprintf (dump_file, " in loop %d.\n", loop->num);
     }
 
-  unsigned_type = unsigned_type_for (type);
+  unsigned_type = unsigned_type_for (noncapability_type (type));
   base = fold_convert (unsigned_type, base);
   step = fold_convert (unsigned_type, step);
 
@@ -3752,7 +3752,7 @@ infer_loop_bounds_from_pointer_arith (class loop *loop, gimple *stmt)
     return;
 
   var = gimple_assign_rhs2 (stmt);
-  if (TYPE_PRECISION (type) != TYPE_PRECISION (TREE_TYPE (var)))
+  if (TYPE_CAP_PRECISION (type) != TYPE_CAP_PRECISION (TREE_TYPE (var)))
     return;
 
   class loop *uloop = loop_containing_stmt (stmt);
@@ -3769,8 +3769,9 @@ infer_loop_bounds_from_pointer_arith (class loop *loop, gimple *stmt)
       || chrec_contains_symbols_defined_in_loop (base, loop->num))
     return;
 
-  low = lower_bound_in_type (type, type);
-  high = upper_bound_in_type (type, type);
+  tree noncap_type = noncapability_type (type);
+  low = lower_bound_in_type (noncap_type, noncap_type);
+  high = upper_bound_in_type (noncap_type, noncap_type);
 
   /* In C, pointer arithmetic p + 1 cannot use a NULL pointer, and p - 1 cannot
      produce a NULL pointer.  The contrary would mean NULL points to an object,

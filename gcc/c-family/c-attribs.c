@@ -1773,6 +1773,13 @@ handle_mode_attribute (tree *node, tree name, tree args,
 	    = targetm.scalar_mode_supported_p (as_a <scalar_mode> (mode));
 	  break;
 
+	case MODE_CAPABILITY:
+	  /* MORELLO TODO Should think about this a little.
+	     Is there any benefit to having capability modes that are not the
+	     mode of pointers?  */
+	  valid_mode = (mode == ptr_mode);
+	  break;
+
 	case MODE_COMPLEX_INT:
 	case MODE_COMPLEX_FLOAT:
 	  valid_mode = targetm.scalar_mode_supported_p (GET_MODE_INNER (mode));
@@ -1802,11 +1809,11 @@ handle_mode_attribute (tree *node, tree name, tree args,
 
       if (POINTER_TYPE_P (type))
 	{
-	  scalar_int_mode addr_mode;
+	  scalar_addr_mode addr_mode;
 	  addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (type));
 	  tree (*fn)(tree, machine_mode, bool);
 
-	  if (!is_a <scalar_int_mode> (mode, &addr_mode)
+	  if (!is_a <scalar_addr_mode> (mode, &addr_mode)
 	      || !targetm.addr_space.valid_pointer_mode (addr_mode, as))
 	    {
 	      error ("invalid pointer mode %qs", p);

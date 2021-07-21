@@ -422,6 +422,8 @@ set_range_info (tree name, const value_range &vr)
 enum value_range_kind
 get_range_info (const_tree name, wide_int *min, wide_int *max)
 {
+  /* MORELLO TODO
+     Should we assert not an INTCAP_TYPE too?  */
   gcc_assert (!POINTER_TYPE_P (TREE_TYPE (name)));
   gcc_assert (min && max);
   range_info_def *ri = SSA_NAME_RANGE_INFO (name);

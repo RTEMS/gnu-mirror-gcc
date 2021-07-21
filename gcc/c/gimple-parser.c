@@ -1461,7 +1461,7 @@ c_parser_gimple_postfix_expression (gimple_parser &parser)
 		      c_parser_consume_token (parser);
 		      alias_off
 			= c_parser_gimple_postfix_expression (parser).value;
-		      alias_off = fold_convert (alias_type, alias_off);
+		      alias_off = fold_convert_for_mem_ref (alias_type, alias_off);
 		    }
 		  if (! alias_off)
 		    alias_off = build_int_cst (alias_type, 0);
@@ -1635,7 +1635,7 @@ c_parser_gimple_postfix_expression (gimple_parser &parser)
 			  return expr;
 			}
 		    }
-		  expr.value = fold_convert (type, val);
+		  expr.value = fold_convert_MORELLO_TODO_getout_clause (type, val);
 		}
 	      return expr;
 	    }

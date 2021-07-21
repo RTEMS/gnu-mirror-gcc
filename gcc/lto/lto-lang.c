@@ -1004,14 +1004,26 @@ lto_type_for_mode (machine_mode mode, int unsigned_p)
   if (mode == TYPE_MODE (void_type_node))
     return void_type_node;
 
+  /* MORELLO TODO This uses a temporary change.
+     Look at c_common_type_for_mode for details of what we eventually want to
+     do. */
   if (mode == TYPE_MODE (build_pointer_type (char_type_node))
       || mode == TYPE_MODE (build_pointer_type (integer_type_node)))
     {
-      unsigned int precision
-	= GET_MODE_PRECISION (as_a <scalar_int_mode> (mode));
-      return (unsigned_p
-	      ? make_unsigned_type (precision)
-	      : make_signed_type (precision));
+      scalar_int_mode temp;
+      if (is_a <scalar_int_mode> (mode, &temp))
+	{
+	  unsigned int precision = GET_MODE_PRECISION (temp);
+	  return (unsigned_p
+		  ? make_unsigned_type (precision)
+		  : make_signed_type (precision));
+	}
+      else
+	{
+	  scalar_addr_mode temp2;
+	  gcc_assert (is_a <scalar_addr_mode> (mode, &temp2));
+	  return build_pointer_type (void_type_node);
+	}
     }
 
   if (COMPLEX_MODE_P (mode))

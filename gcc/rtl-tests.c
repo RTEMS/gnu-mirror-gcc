@@ -265,13 +265,13 @@ const_poly_int_tests<N>::run ()
 
   /* Test plus_constant of a symbol.  */
   rtx symbol = gen_rtx_SYMBOL_REF (Pmode, "foo");
-  rtx offset1 = gen_int_mode (poly_int64 (9, 11), Pmode);
-  rtx sum1 = gen_rtx_CONST (Pmode, gen_rtx_PLUS (Pmode, symbol, offset1));
+  rtx offset1 = gen_int_mode (poly_int64 (9, 11), POmode);
+  rtx sum1 = gen_rtx_CONST (Pmode, gen_raw_pointer_plus (Pmode, symbol, offset1));
   ASSERT_RTX_EQ (plus_constant (Pmode, symbol, poly_int64 (9, 11)), sum1);
 
   /* Test plus_constant of a CONST.  */
-  rtx offset2 = gen_int_mode (poly_int64 (12, 20), Pmode);
-  rtx sum2 = gen_rtx_CONST (Pmode, gen_rtx_PLUS (Pmode, symbol, offset2));
+  rtx offset2 = gen_int_mode (poly_int64 (12, 20), POmode);
+  rtx sum2 = gen_rtx_CONST (Pmode, gen_raw_pointer_plus (Pmode, symbol, offset2));
   ASSERT_RTX_EQ (plus_constant (Pmode, sum1, poly_int64 (3, 9)), sum2);
 
   /* Test a cancelling plus_constant.  */

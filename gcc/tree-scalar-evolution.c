@@ -621,7 +621,7 @@ add_to_evolution_1 (unsigned loop_nb, tree chrec_before, tree to_add,
 	      right = CHREC_RIGHT (chrec_before);
 	    }
 
-	  to_add = chrec_convert (type, to_add, at_stmt);
+	  to_add = chrec_convert_rhs (type, to_add, at_stmt);
 	  right = chrec_convert_rhs (type, right, at_stmt);
 	  right = chrec_fold_plus (chrec_type (right), right, to_add);
 	  return build_polynomial_chrec (var, left, right);
@@ -1234,6 +1234,15 @@ tail_recurse:
     {
     CASE_CONVERT:
       {
+	/* MORELLO TODO (OPTIMISATION)
+	   If we were casting from a capability, then stop here.
+	   Trying to avoid capabilities since there seems to be a lot of work
+	   to get this analysis working for them.  */
+	if (capability_type_p (type) || tree_is_capability_value (rhs0))
+	  {
+	    *evolution_of_loop = chrec_dont_know;
+	    return t_dont_know;
+	  }
 	/* This assignment is under the form "a_1 = (cast) rhs.  */
 	t_bool res = follow_ssa_edge_expr (loop, at_stmt, rhs0, halting_phi,
 					   evolution_of_loop, limit);
@@ -1334,6 +1343,9 @@ simplify_peeled_chrec (class loop *loop, tree arg, tree init_cond)
   /* The affine code only deals with pointer and integer types.  */
   if (!POINTER_TYPE_P (type)
       && !INTEGRAL_TYPE_P (type))
+    return chrec_dont_know;
+  /* MORELLO TODO (OPTIMISATION): Would like to re-enable later if we can.  */
+  if (capability_type_p (type))
     return chrec_dont_know;
 
   /* Try harder to check if they are equal.  */
@@ -1554,6 +1566,9 @@ interpret_loop_phi (class loop *loop, gphi *loop_phi_node)
   tree init_cond;
 
   gcc_assert (phi_loop == loop);
+  /* MORELLO TODO (OPTIMISATION): Just disabling for now.  */
+  if (tree_is_capability_value (gimple_phi_result (loop_phi_node)))
+    return chrec_dont_know;
 
   /* Otherwise really interpret the loop phi.  */
   init_cond = analyze_initial_condition (loop_phi_node);
@@ -1623,6 +1638,10 @@ interpret_rhs_expr (class loop *loop, gimple *at_stmt,
 {
   tree res, chrec1, chrec2, ctype;
   gimple *def;
+
+  /* MORELLO TODO (OPTIMISATION): Just disabling for now.  */
+  if (capability_type_p (type))
+    return chrec_dont_know;
 
   if (get_gimple_rhs_class (code) == GIMPLE_SINGLE_RHS)
     {
@@ -3213,6 +3232,13 @@ simple_iv_with_niters (class loop *wrto_loop, class loop *use_loop,
   type = TREE_TYPE (op);
   if (!POINTER_TYPE_P (type)
       && !INTEGRAL_TYPE_P (type))
+    return false;
+
+  /* MORELLO TODO (OPTIMISATION)
+       Currently returning false whenever the base type is a capability.
+       This avoids the entire set of induction variable optimisations for
+       capabilities.  Eventually it would be nice to implement them.  */
+  if (capability_type_p (type))
     return false;
 
   ev = analyze_scalar_evolution_in_loop (wrto_loop, use_loop, op,

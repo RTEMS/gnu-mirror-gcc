@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "langhooks.h"
 #include "tree-vector-builder.h"
+#include "selftest.h"
 
 struct target_expmed default_target_expmed;
 #if SWITCHABLE_TARGET
@@ -2460,6 +2461,7 @@ static rtx
 expand_shift_1 (enum tree_code code, machine_mode mode, rtx shifted,
 		rtx amount, rtx target, int unsignedp, bool may_fail = false)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
   rtx op1, temp = 0;
   int left = (code == LSHIFT_EXPR || code == LROTATE_EXPR);
   int rotate = (code == LROTATE_EXPR || code == RROTATE_EXPR);
@@ -3269,6 +3271,7 @@ expand_mult_const (machine_mode mode, rtx op0, HOST_WIDE_INT val,
 		   rtx target, const struct algorithm *alg,
 		   enum mult_variant variant)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
   unsigned HOST_WIDE_INT val_so_far;
   rtx_insn *insn;
   rtx accum, tem;
@@ -3428,6 +3431,7 @@ rtx
 expand_mult (machine_mode mode, rtx op0, rtx op1, rtx target,
 	     int unsignedp, bool no_libcall)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
   enum mult_variant variant;
   struct algorithm algorithm;
   rtx scalar_op1;
@@ -3581,6 +3585,7 @@ expand_mult (machine_mode mode, rtx op0, rtx op1, rtx target,
 int
 mult_by_coeff_cost (HOST_WIDE_INT coeff, machine_mode mode, bool speed)
 {
+  gcc_assert (! CAPABILITY_MODE_P (mode));
   int max_cost;
   struct algorithm algorithm;
   enum mult_variant variant;
@@ -3764,6 +3769,7 @@ rtx
 expand_mult_highpart_adjust (scalar_int_mode mode, rtx adj_operand, rtx op0,
 			     rtx op1, rtx target, int unsignedp)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
   rtx tem;
   enum rtx_code adj_code = unsignedp ? PLUS : MINUS;
 
@@ -5418,7 +5424,7 @@ make_tree (tree type, rtx x)
 	 address mode to pointer mode.  */
       if (POINTER_TYPE_P (type))
 	x = convert_memory_address_addr_space
-	  (SCALAR_INT_TYPE_MODE (type), x, TYPE_ADDR_SPACE (TREE_TYPE (type)));
+	  (SCALAR_ADDR_TYPE_MODE (type), x, TYPE_ADDR_SPACE (TREE_TYPE (type)));
 
       /* Note that we do *not* use SET_DECL_RTL here, because we do not
 	 want set_decl_rtl to go adjusting REG_ATTRS for this temporary.  */
@@ -6322,3 +6328,131 @@ do_cmp_and_jump (rtx arg1, rtx arg2, enum rtx_code op, machine_mode mode,
   do_compare_rtx_and_jump (arg1, arg2, op, unsignedp, mode, NULL_RTX,
 			   NULL, label, profile_probability::uninitialized ());
 }
+
+#if CHECKING_P
+namespace selftest {
+
+static rtx
+make_test_reg (machine_mode mode)
+{
+  static int test_reg_num = LAST_VIRTUAL_REGISTER + 1;
+
+  return gen_rtx_REG (mode, test_reg_num++);
+}
+
+/* TODO Add a function that expands something while recording a sequence.
+        Would like to */
+static rtx_insn *
+with_recorded_insn_emits (rtx *ret, void *arg, rtx (*callback)(void *))
+{
+  rtx_insn *seq;
+  start_sequence ();
+  *ret = callback (arg);
+  seq = get_insns ();
+  end_sequence ();
+  return seq;
+}
+
+struct callback_args {
+    scalar_addr_mode mode;
+    rtx arg1;
+    rtx arg2;
+    rtx arg3;
+    int arg4;
+    enum optab_methods arg5;
+};
+
+static rtx
+replace_address_value_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_replace_address_value (ca->mode, ca->arg1, ca->arg2, ca->arg3);
+}
+
+static rtx
+pointer_plus_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_pointer_plus (ca->mode, ca->arg1, ca->arg2, ca->arg3,
+			      ca->arg4, ca->arg5);
+}
+
+static rtx
+pointer_minus_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_pointer_minus (ca->mode, ca->arg1, ca->arg2, ca->arg3,
+			       ca->arg4, ca->arg5);
+}
+
+static rtx
+align_up_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_align_up (ca->mode, ca->arg1, ca->arg2, ca->arg3,
+			  ca->arg4, ca->arg5);
+}
+
+static rtx
+align_down_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_align_down (ca->mode, ca->arg1, ca->arg2, ca->arg3,
+			    ca->arg4, ca->arg5);
+}
+
+static void
+test_capability_expand ()
+{
+  /* Check if movcadi is available.
+     If not then this selftest can't be run.
+     The test can still be run manually if the availability of the insn depends
+     on command line arguments.  */
+  enum insn_code icode = optab_handler (mov_optab, CADImode);
+  if (icode == CODE_FOR_nothing)
+    return;
+  rtx x0 = make_test_reg (CADImode);
+  rtx_insn * __attribute__ ((__unused__)) basic_move
+    = gen_move_insn (x0, CONST0_RTX (CADImode));
+
+  /* N.B. The below doesn't actually have any automatic checking.
+     I've just used GDB to attach to the compiler when it's running the
+     selftests and viewed the data directly to ensure everything makes sense.
+
+     In the future we would want actual checking done in this function.  */
+  rtx x1 = make_test_reg (CADImode);
+  rtx x2 = make_test_reg (DImode);
+  rtx x3;
+  struct callback_args ca
+    = { CADImode, x1, x2, NULL_RTX, 0, OPTAB_DIRECT };
+  rtx_insn * __attribute__ ((__unused__)) basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &replace_address_value_optab);
+   //if (basic_move)
+   // ::selftest::fail ((SELFTEST_LOCATION), "Failed for some reason");
+  basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &pointer_plus_optab);
+  basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &pointer_minus_optab);
+  basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &align_up_optab);
+  basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &align_down_optab);
+}
+
+/*
+Note: This set of tests may not even be used in the end, but testing using
+these enables someone to work without the rest of the pipeline implemented
+(i.e. without needing the entire backend written to handle capability modes).
+
+Hence we're using tests here for now, so we can implement the spread later.
+  */
+/* Run all of the selftests above.   */
+void
+expand_c_tests ()
+{
+  test_capability_expand ();
+}
+
+
+}
+#endif /* CHECKING_P */

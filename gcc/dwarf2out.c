@@ -12981,6 +12981,7 @@ is_base_type (tree type)
     case METHOD_TYPE:
     case POINTER_TYPE:
     case REFERENCE_TYPE:
+    case INTCAP_TYPE:
     case NULLPTR_TYPE:
     case OFFSET_TYPE:
     case LANG_TYPE:
@@ -14429,7 +14430,7 @@ based_loc_descr (rtx reg, poly_int64 offset,
 static inline int
 is_based_loc (const_rtx rtl)
 {
-  return (GET_CODE (rtl) == PLUS
+  return (any_plus_p (rtl)
 	  && ((REG_P (XEXP (rtl, 0))
 	       && REGNO (XEXP (rtl, 0)) < FIRST_PSEUDO_REGISTER
 	       && CONST_INT_P (XEXP (rtl, 1)))));
@@ -15466,6 +15467,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
   if (mode != GET_MODE (rtl) && GET_MODE (rtl) != VOIDmode)
     return NULL;
 
+  scalar_addr_mode addr_mode;
   scalar_int_mode int_mode = BImode, inner_mode, op1_mode;
   switch (GET_CODE (rtl))
     {
@@ -15872,21 +15874,22 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 
     case PRE_INC:
     case PRE_DEC:
-      /* Turn these into a PLUS expression and fall into the PLUS code
-	 below.  */
-      rtl = gen_rtx_PLUS (mode, XEXP (rtl, 0),
+      /* Turn these into a PLUS or POINTER_PLUS depending on the mode and fall
+	 into the PLUS code below.  */
+      rtl = gen_pointer_plus (as_a <scalar_addr_mode> (mode), XEXP (rtl, 0),
 			  gen_int_mode (GET_CODE (rtl) == PRE_INC
 					? GET_MODE_UNIT_SIZE (mem_mode)
 					: -GET_MODE_UNIT_SIZE (mem_mode),
-					mode));
+					noncapability_mode (mode)));
 
       /* fall through */
 
     case PLUS:
+    case POINTER_PLUS:
     plus:
       if (is_based_loc (rtl)
-	  && is_a <scalar_int_mode> (mode, &int_mode)
-	  && (GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
+	  && is_a <scalar_addr_mode> (mode, &addr_mode)
+	  && (GET_MODE_SIZE (offset_mode (addr_mode)) <= DWARF2_ADDR_SIZE
 	      || XEXP (rtl, 0) == arg_pointer_rtx
 	      || XEXP (rtl, 0) == frame_pointer_rtx))
 	mem_loc_result = based_loc_descr (XEXP (rtl, 0),
@@ -15900,7 +15903,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	    break;
 
 	  if (CONST_INT_P (XEXP (rtl, 1))
-	      && (GET_MODE_SIZE (as_a <scalar_int_mode> (mode))
+	      && (GET_MODE_SIZE (offset_mode (as_a <scalar_addr_mode> (mode)))
 		  <= DWARF2_ADDR_SIZE))
 	    loc_descr_plus_const (&mem_loc_result, INTVAL (XEXP (rtl, 1)));
 	  else
@@ -16075,7 +16078,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 #ifdef POINTERS_EXTEND_UNSIGNED
 	  || (int_mode == Pmode
 	      && mem_mode != VOIDmode
-	      && trunc_int_for_mode (INTVAL (rtl), ptr_mode) == INTVAL (rtl))
+	      && trunc_int_for_mode (INTVAL (rtl), offset_mode (ptr_mode))
+		    == INTVAL (rtl))
 #endif
 	  )
 	{
@@ -16431,8 +16435,11 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case STRICT_LOW_PART:
     case CONST_VECTOR:
     case CONST_FIXED:
+    case CONST_NULL:
     case CLRSB:
     case CLOBBER:
+    case REPLACE_ADDRESS_VALUE:
+    case ALIGN_ADDRESS_DOWN:
       break;
 
     case CONST_STRING:
@@ -16608,6 +16615,16 @@ static dw_loc_descr_ref
 loc_descriptor (rtx rtl, machine_mode mode,
 		enum var_init_status initialized)
 {
+  /* MORELLO TODO temporarily just using noncapability_mode (mode) here.
+     Eventually, we will need to represent constant addresses as
+     (const:CM (pointer_plus:CM (const_null:CM) (const_int <something>)))
+     but this is not done just yet.
+     When that happens this function will need to handle those patterns, but
+     right now what it gets is a `const_int` with capability mode.
+     To avoid that pattern causing errors we just use the noncapability_mode,
+     since we don't want to change const_int handling here given that it should
+     stay the same when capabilities are around.  */
+  mode = noncapability_mode (mode);
   dw_loc_descr_ref loc_result = NULL;
   scalar_int_mode int_mode;
 
@@ -18400,7 +18417,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
 		&& (INTEGRAL_TYPE_P (TREE_TYPE (loc))
 		    || POINTER_TYPE_P (TREE_TYPE (loc)))
 		&& DECL_CONTEXT (loc) == current_function_decl
-		&& (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (loc)))
+		&& (GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (TREE_TYPE (loc)))
 		    <= DWARF2_ADDR_SIZE))
 	      {
 		dw_die_ref ref = lookup_decl_die (loc);
@@ -19702,6 +19719,7 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
       return false;
 
     case PLUS:
+    case POINTER_PLUS:
       /* In cases where an inlined instance of an inline function is passed
 	 the address of an `auto' variable (which is local to the caller) we
 	 can get a situation where the DECL_RTL of the artificial local
@@ -19720,6 +19738,7 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
     case MINUS:
     case SIGN_EXTEND:
     case ZERO_EXTEND:
+    case CONST_NULL:
     case CONST_POLY_INT:
       return false;
 
@@ -25628,6 +25647,8 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
 	 statement.  */
       TREE_ASM_WRITTEN (type) = 1;
 
+      /* fallthrough */
+    case INTCAP_TYPE:
       /* For these types, all that is required is that we output a DIE (or a
 	 set of DIEs) to represent the "basis" type.  */
       gen_type_die_with_usage (TREE_TYPE (type), context_die,

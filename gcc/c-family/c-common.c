@@ -409,6 +409,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__imag__",		RID_IMAGPART,	0 },
   { "__inline",		RID_INLINE,	0 },
   { "__inline__",	RID_INLINE,	0 },
+  { "__intcap_t",	RID_INTCAP,	0 /* MORELLO TODO D_CAP_ONLY */ },
   { "__is_abstract",	RID_IS_ABSTRACT, D_CXXONLY },
   { "__is_aggregate",	RID_IS_AGGREGATE, D_CXXONLY },
   { "__is_base_of",	RID_IS_BASE_OF, D_CXXONLY },
@@ -441,6 +442,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__transaction_cancel", RID_TRANSACTION_CANCEL, 0 },
   { "__typeof",		RID_TYPEOF,	0 },
   { "__typeof__",	RID_TYPEOF,	0 },
+  { "__uintcap_t",	RID_UINTCAP,	0 /* MORELLO TODO D_CAP_ONLY */ },
   { "__underlying_type", RID_UNDERLYING_TYPE, D_CXXONLY },
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
@@ -2131,6 +2133,20 @@ c_common_type_for_size (unsigned int bits, int unsignedp)
   return NULL_TREE;
 }
 
+tree
+c_common_cap_type_for_size (unsigned int bits, int unsignedp ATTRIBUTE_UNUSED)
+{
+  /* MORELLO TODO Will want to look at whether different sizes of capability
+   * types is something that we're concerned about.  If so will want to think
+   * about having an array of differently sized capabilities in global_trees.
+   * */
+  if (! intcap_type_node)
+    return NULL_TREE;
+  return (bits == TYPE_CAP_PRECISION (intcap_type_node)
+	    ? (unsignedp ? uintcap_type_node : intcap_type_node)
+	    : NULL_TREE);
+}
+
 /* Return a fixed-point type that has at least IBIT ibits and FBIT fbits
    that is unsigned if UNSIGNEDP is nonzero, otherwise signed;
    and saturating if SATP is nonzero, otherwise not saturating.  */
@@ -2239,11 +2255,19 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
   if (mode == TYPE_MODE (build_pointer_type (char_type_node))
       || mode == TYPE_MODE (build_pointer_type (integer_type_node)))
     {
-      unsigned int precision
-	= GET_MODE_PRECISION (as_a <scalar_int_mode> (mode));
-      return (unsignedp
-	      ? make_unsigned_type (precision)
-	      : make_signed_type (precision));
+      scalar_int_mode temp;
+      if (is_a <scalar_int_mode> (mode, &temp))
+	{
+	  unsigned int precision = GET_MODE_PRECISION (temp);
+	  return (unsignedp
+		  ? make_unsigned_type (precision)
+		  : make_signed_type (precision));
+	}
+      else
+	{
+	  gcc_assert (is_a <scalar_addr_mode> (mode));
+	  return build_intcap_type_for_mode (mode, unsignedp);
+	}
     }
 
   if (COMPLEX_MODE_P (mode))
@@ -2580,7 +2604,51 @@ c_common_signed_or_unsigned_type (int unsignedp, tree type)
     return unsignedp ? unsigned_intQI_type_node : intQI_type_node;
 #undef TYPE_OK
 
+  if (type1 == intcap_type_node)
+    {
+      gcc_assert (unsignedp);
+      return uintcap_type_node;
+    }
+  if (type1 == uintcap_type_node)
+    {
+      gcc_assert (!unsignedp);
+      return intcap_type_node;
+    }
+
   return build_nonstandard_integer_type (TYPE_PRECISION (type), unsignedp);
+}
+
+/* Return a tree representing the value from a capability without the metadata
+   of bounds and permissions.  If given an expression that does not represent
+   a capability return the expression unchanged.  */
+
+tree
+drop_capability (tree t)
+{
+  if (! capability_type_p (TREE_TYPE (t)))
+    return t;
+  return convert (noncapability_type (TREE_TYPE (t)), t);
+}
+
+/* Generate a cast from an integer to a capability.
+   This cast will necessarily produce a capability that cannot be accessed, but
+   that is fitting with the C semantics of casting an integer to a capability.  */
+
+tree
+c_common_cap_from_int (tree type, tree int_expr)
+{
+  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (int_expr))
+	      && capability_type_p (type));
+  /* Ensure that this integer is in the correct precision and sign for the
+     capability we want.  */
+  int_expr = convert (noncapability_type (type), int_expr);
+
+  if (!c_dialect_cxx ())
+    int_expr = c_fully_fold (int_expr, false, NULL);
+  location_t loc = EXPR_LOCATION (int_expr);
+  tree ret = fold_build_replace_address_value_loc (loc, build_int_cst (type, 0),
+						   int_expr);
+  return ret;
 }
 
 /* Build a bit-field integer type for the given WIDTH and UNSIGNEDP.  */
@@ -3144,7 +3212,7 @@ pointer_int_sum (location_t loc, enum tree_code resultcode,
 	 an overflow error if the constant is negative but INTOP is not.  */
       && (TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (intop))
 	  || (TYPE_PRECISION (TREE_TYPE (intop))
-	      == TYPE_PRECISION (TREE_TYPE (ptrop)))))
+	      == TYPE_NONCAP_PRECISION (TREE_TYPE (ptrop)))))
     {
       enum tree_code subcode = resultcode;
       tree int_type = TREE_TYPE (intop);
@@ -3447,8 +3515,10 @@ c_common_truthvalue_conversion (location_t location, tree expr)
 	if (TREE_CODE (fromtype) == ENUMERAL_TYPE
 	    && ENUM_IS_SCOPED (fromtype))
 	  break;
-	/* If this isn't narrowing the argument, we can ignore it.  */
-	if (TYPE_PRECISION (totype) >= TYPE_PRECISION (fromtype))
+	/* If this isn't narrowing the argument, we can ignore it.
+	   We can ignore anything w.r.t. capability metadata since that is not
+	   used in conditionals.  */
+	if (TYPE_NONCAP_PRECISION (totype) >= TYPE_NONCAP_PRECISION (fromtype))
 	  return c_common_truthvalue_conversion (location,
 						 TREE_OPERAND (expr, 0));
       }
@@ -3500,7 +3570,8 @@ c_common_truthvalue_conversion (location_t location, tree expr)
       return build_binary_op (location, NE_EXPR, expr, fixed_zero_node, true);
     }
   else
-    return build_binary_op (location, NE_EXPR, expr, integer_zero_node, true);
+    return build_binary_op (location, NE_EXPR, fold_drop_capability (expr),
+			    integer_zero_node, true);
 
  ret:
   protected_set_expr_location (expr, location);
@@ -4017,6 +4088,12 @@ c_common_nodes_and_builtins (void)
   record_builtin_type (RID_MAX, "long unsigned int",
 		       long_unsigned_type_node);
 
+  if (intcap_type_node)
+    {
+      record_builtin_type (RID_INTCAP, NULL, intcap_type_node);
+      record_builtin_type (RID_UINTCAP, NULL, uintcap_type_node);
+    }
+
   for (i = 0; i < NUM_INT_N_ENTS; i ++)
     {
       char name[25];
@@ -4464,8 +4541,13 @@ c_common_nodes_and_builtins (void)
 
   /* Create the built-in __null node.  It is important that this is
      not shared.  */
+  /* MORELLO TODO null_node is only used in the C++ frontend, and that's so
+   * messed up at the moment that it is difficult to tell whether changing this
+   * worked.  This previously used type_for_size, which returns an *integer*
+   * type for the relevant size.  We're using type_for_mode (ptr_mode), but as
+   * mentioned above, this is not tested.  */
   null_node = make_int_cst (1, 1);
-  TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
+  TREE_TYPE (null_node) = c_common_type_for_mode (ptr_mode, 0);
 
   /* Since builtin_types isn't gc'ed, don't export these nodes.  */
   memset (builtin_types, 0, sizeof (builtin_types));
@@ -5826,8 +5908,8 @@ check_function_arguments_recurse (void (*callback)
     return;
 
   if (CONVERT_EXPR_P (param)
-      && (TYPE_PRECISION (TREE_TYPE (param))
-	  == TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (param, 0)))))
+      && (TYPE_CAP_PRECISION (TREE_TYPE (param))
+	  == TYPE_CAP_PRECISION (TREE_TYPE (TREE_OPERAND (param, 0)))))
     {
       /* Strip coercion.  */
       check_function_arguments_recurse (callback, ctx,
@@ -6912,6 +6994,23 @@ sync_resolve_params (location_t loc, tree orig_function, tree function,
 	     so that we get warnings for anything that doesn't match the pointer
 	     type.  This isn't portable across the C and C++ front ends atm.  */
 	  val = (*params)[parmnum];
+	  /* MORELLO TODO Try and allow NULL pointers by allowing
+	   * integer_zero_p.  Would be nice to use null_pointer_constant_p, but
+	   * that's only available in the C frontend.
+	   *
+	   * Will need to generate atomic functions which take and return
+	   * capability types in order to act atomically on capabilities in
+	   * memory without invalidating them.  */
+	  if (capability_type_p (ptype) && ! tree_is_capability_value (val)
+	      /* && ! INTCAP_TYPE_P (TREE_TYPE (val)) */ && ! integer_zerop (val))
+	  {
+	    /* MORELLO TODO As mentioned above, ideally we would use
+	       `convert_for_assignment`, but it's not portable across the front
+	       ends.  This check is required to avoid an ICE, so we include it
+	       manually here.  Would be very nice to find a proper solution.  */
+	    error_at (loc, "MORELLO TODO implicit cast to capability type from non-capability type (sync builtin)");
+	    return false;
+	  }
 	  val = convert (ptype, val);
 	  val = convert (arg_type, val);
 	  (*params)[parmnum] = val;
@@ -6949,7 +7048,14 @@ sync_resolve_return (tree first_param, tree result, bool orig_format)
 
   /* New format doesn't require casting unless the types are the same size.  */
   if (orig_format || tree_int_cst_equal (TYPE_SIZE (ptype), TYPE_SIZE (rtype)))
-    return convert (ptype, result);
+    if (capability_type_p (rtype) && !capability_type_p (ptype)
+	&& !integer_zerop (result))
+      {
+	error ("MORELLO TODO implicit cast to capability type from non-capability type (sync builtin return value)");
+	return error_mark_node;
+      }
+    else
+      return convert (ptype, result);
   else
     return result;
 }
@@ -7688,6 +7794,11 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	if (new_return)
 	  {
 	    /* Cast function result from I{1,2,4,8,16} to the required type.  */
+	    if (tree_is_capability_value (new_return) && ! tree_is_capability_value (result))
+	      {
+		error_at (loc, "MORELLO TODO implicit conversion from non capability type to capability type (atomic builtin return values)");
+		return error_mark_node;
+	      }
 	    result = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (new_return), result);
 	    result = build2 (MODIFY_EXPR, TREE_TYPE (new_return), new_return,
 			     result);

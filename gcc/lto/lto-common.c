@@ -263,7 +263,7 @@ hash_canonical_type (tree type)
       || TREE_CODE (type) == OFFSET_TYPE
       || POINTER_TYPE_P (type))
     {
-      hstate.add_int (TYPE_PRECISION (type));
+      hstate.add_int (TYPE_CAP_PRECISION (type));
       if (!type_with_interoperable_signedness (type))
 	hstate.add_int (TYPE_UNSIGNED (type));
     }
@@ -1272,7 +1272,7 @@ compare_tree_sccs_1 (tree t1, tree t2, tree **map)
       compare_values (TYPE_RESTRICT);
       compare_values (TYPE_USER_ALIGN);
       compare_values (TYPE_READONLY);
-      compare_values (TYPE_PRECISION);
+      compare_values (TYPE_CAP_PRECISION);
       compare_values (TYPE_ALIGN);
       /* Do not compare TYPE_ALIAS_SET.  Doing so introduce ordering issues
 	 with calls to get_alias_set which may initialize it for streamed

@@ -4503,10 +4503,10 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
 
   if (retmode != RETURN_BEGIN && target != const0_rtx)
     {
-      dest_addr = gen_rtx_PLUS (ptr_mode, dest_addr, len_rtx);
+      dest_addr = gen_pointer_plus (ptr_mode, dest_addr, len_rtx);
       /* stpcpy pointer to last byte.  */
       if (retmode == RETURN_END_MINUS_ONE)
-	dest_addr = gen_rtx_MINUS (ptr_mode, dest_addr, const1_rtx);
+	dest_addr = gen_pointer_minus (ptr_mode, dest_addr, const1_rtx);
     }
 
   return dest_addr;
@@ -5675,8 +5675,7 @@ expand_builtin_next_arg (void)
 {
   /* Checking arguments is already done in fold_builtin_next_arg
      that must be called before this function.  */
-  return expand_binop (ptr_mode, add_optab,
-		       crtl->args.internal_arg_pointer,
+  return expand_pointer_plus (ptr_mode, crtl->args.internal_arg_pointer,
 		       crtl->args.arg_offset_rtx,
 		       NULL_RTX, 0, OPTAB_LIB_WIDEN);
 }
@@ -6014,15 +6013,17 @@ expand_asan_emit_allocas_unpoison (tree exp)
   tree arg1 = CALL_EXPR_ARG (exp, 1);
   rtx top = expand_expr (arg0, NULL_RTX, ptr_mode, EXPAND_NORMAL);
   rtx bot = expand_expr (arg1, NULL_RTX, ptr_mode, EXPAND_NORMAL);
-  rtx off = expand_simple_binop (Pmode, MINUS, virtual_stack_dynamic_rtx,
+  /* MORELLO TODO: This functions has to do with asan, so its correctness
+     is not tested. This should be exercised by asan test pr80168.  */
+  rtx off = expand_simple_binop (POmode, MINUS, virtual_stack_dynamic_rtx,
 				 stack_pointer_rtx, NULL_RTX, 0,
 				 OPTAB_LIB_WIDEN);
-  off = convert_modes (ptr_mode, Pmode, off, 0);
-  bot = expand_simple_binop (ptr_mode, PLUS, bot, off, NULL_RTX, 0,
+  bot = expand_pointer_plus (ptr_mode, bot, off, NULL_RTX, 0,
 			     OPTAB_LIB_WIDEN);
   rtx ret = init_one_libfunc ("__asan_allocas_unpoison");
-  ret = emit_library_call_value (ret, NULL_RTX, LCT_NORMAL, ptr_mode,
-				 top, ptr_mode, bot, ptr_mode);
+  ret = emit_library_call_value (ret, NULL_RTX, LCT_NORMAL,
+				 ptr_mode, top, ptr_mode,
+				 bot, ptr_mode);
   return ret;
 }
 
@@ -6286,8 +6287,8 @@ round_trampoline_addr (rtx tramp)
 
   /* Round address up to desired boundary.  */
   temp = gen_reg_rtx (Pmode);
-  addend = gen_int_mode (TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT - 1, Pmode);
-  mask = gen_int_mode (-TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT, Pmode);
+  addend = gen_int_mode (TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT - 1, POmode);
+  mask = gen_int_mode (-TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT, POmode);
 
   temp  = expand_simple_binop (Pmode, PLUS, tramp, addend,
 			       temp, 0, OPTAB_LIB_WIDEN);
@@ -6644,7 +6645,7 @@ get_builtin_sync_mem (tree loc, machine_mode mode)
   int addr_space = TYPE_ADDR_SPACE (POINTER_TYPE_P (TREE_TYPE (loc))
 				    ? TREE_TYPE (TREE_TYPE (loc))
 				    : TREE_TYPE (loc));
-  scalar_int_mode addr_mode = targetm.addr_space.address_mode (addr_space);
+  scalar_addr_mode addr_mode = targetm.addr_space.address_mode (addr_space);
 
   addr = expand_expr (loc, NULL_RTX, addr_mode, EXPAND_SUM);
   addr = convert_memory_address (addr_mode, addr);
@@ -7888,7 +7889,8 @@ expand_speculation_safe_value (machine_mode mode, tree exp, rtx target,
   if (mode == VOIDmode)
     {
       mode = TYPE_MODE (TREE_TYPE (arg0));
-      gcc_assert (GET_MODE_CLASS (mode) == MODE_INT);
+      gcc_assert (GET_MODE_CLASS (mode) == MODE_INT
+		  || GET_MODE_CLASS (mode) == MODE_CAPABILITY);
     }
 
   val = expand_expr (arg0, NULL_RTX, mode, EXPAND_NORMAL);
@@ -10856,7 +10858,7 @@ fold_builtin_strpbrk (location_t loc, tree expr, tree s1, tree s2, tree type)
   if (p2[0] == '\0')
     /* strpbrk(x, "") == NULL.
        Evaluate and ignore s1 in case it had side-effects.  */
-    return omit_one_operand_loc (loc, type, integer_zero_node, s1);
+    return omit_one_operand_loc (loc, type, build_int_cst (type, 0), s1);
 
   if (p2[1] != '\0')
     return NULL_TREE;  /* Really call strpbrk.  */

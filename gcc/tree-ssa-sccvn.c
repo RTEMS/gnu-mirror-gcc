@@ -3144,7 +3144,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	      || known_eq (rhs[ix].off, -1))
 	    return (void *)-1;
 	  rhs[ix].off += extra_off;
-	  rhs[ix].op0 = int_const_binop (PLUS_EXPR, rhs[ix].op0,
+	  rhs[ix].op0 = maybe_cap_int_const_binop (PLUS_EXPR, rhs[ix].op0,
 					 build_int_cst (TREE_TYPE (rhs[ix].op0),
 							extra_off));
 	}
@@ -4719,6 +4719,7 @@ visit_nary_op (tree lhs, gassign *stmt)
          substitute the result from some earlier sign-changed or widened
 	 operation.  */
       if (INTEGRAL_TYPE_P (type)
+	  && !capability_type_p (TREE_TYPE (rhs1))
 	  && TREE_CODE (rhs1) == SSA_NAME
 	  /* We only handle sign-changes, zero-extension -> & mask or
 	     sign-extension if we know the inner operation doesn't
@@ -4938,6 +4939,13 @@ visit_reference_op_load (tree lhs, tree op, gimple *stmt)
 	 the op we lookup has not.  */
       if (maybe_lt (GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (result))),
 		    GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (op)))))
+	result = NULL_TREE;
+      /* Also avoid type punning when the result mode is a capability and the
+	 op we lookup is not.  The values should be viewed as different since
+	 when stored in a non-capability type we have no guarantee of avoiding
+	 all operations that would clear the tag.  */
+      else if (! tree_is_capability_value (result)
+	       && tree_is_capability_value (op))
 	result = NULL_TREE;
       else
 	{

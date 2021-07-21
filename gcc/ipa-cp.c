@@ -2299,7 +2299,8 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
      transform for these cases.  Similarly, we can have bad type mismatches
      with LTO, avoid doing anything with those too.  */
   if (!parm_type
-      || (!INTEGRAL_TYPE_P (parm_type) && !POINTER_TYPE_P (parm_type)))
+      || (!INTEGRAL_TYPE_P (parm_type) && !POINTER_TYPE_P (parm_type))
+      || capability_type_p (parm_type))
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "Setting dest_lattice to bottom, because type of "
@@ -2438,7 +2439,33 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
       tree val = ipa_get_jf_constant (jfunc);
       if (TREE_CODE (val) == INTEGER_CST)
 	{
-	  val = fold_convert (param_type, val);
+	  /* MORELLO TODO
+	   * It is a matter of opinion whether it's better to disallow calls to
+	   * `fold_convert` to try and convert an INTEGER_CST to a capability
+	   * type or net.
+	   *
+	   * It has some nice use cases, but could indicate that something
+	   * "wrong" is being done.
+	   * At the moment I'm disallowing it so that we can find everywhere
+	   * which is trying to make such "bad" folding and check if they're
+	   * doing things correctly.
+	   *
+	   * This just looks to be converting a constant integer into a
+	   * capability so that it can generate a value-range in the
+	   * capabilities type in order to update the value range of the called
+	   * function.
+	   * That's all fine (apart from the fact we haven't dealt with value
+	   * ranges and capabilities).  Hence using
+	   * `fold_convert_MORELLO_TODO_getout_clause` here is not a nice
+	   * change.
+	   *
+	   * In the future we should probably change that back to fold_convert.
+	   * Unless we want to disallow such calls.
+	   * Note: I use fold_convert_MORELLO_TODO_getout_clause rather than
+	   * fold_convert_for_mem_ref since the latter requires a known pointer
+	   * type, and here we would also want to allow this for INTCAP_TYPE's.
+	   * */
+	  val = fold_convert_MORELLO_TODO_getout_clause (param_type, val);
 	  if (TREE_OVERFLOW_P (val))
 	    val = drop_tree_overflow (val);
 

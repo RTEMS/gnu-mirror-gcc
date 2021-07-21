@@ -12896,7 +12896,7 @@ avr_case_values_threshold (void)
 
 /* Implement `TARGET_ADDR_SPACE_ADDRESS_MODE'.  */
 
-static scalar_int_mode
+static scalar_addr_mode
 avr_addr_space_address_mode (addr_space_t as)
 {
   return avr_addrspace[as].pointer_size == 3 ? PSImode : HImode;
@@ -12905,7 +12905,7 @@ avr_addr_space_address_mode (addr_space_t as)
 
 /* Implement `TARGET_ADDR_SPACE_POINTER_MODE'.  */
 
-static scalar_int_mode
+static scalar_addr_mode
 avr_addr_space_pointer_mode (addr_space_t as)
 {
   return avr_addr_space_address_mode (as);

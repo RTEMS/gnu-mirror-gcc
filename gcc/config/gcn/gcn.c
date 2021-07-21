@@ -1419,7 +1419,7 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
    
    Return the appropriate mode for a named address pointer.  */
 
-static scalar_int_mode
+static scalar_addr_mode
 gcn_addr_space_pointer_mode (addr_space_t addrspace)
 {
   switch (addrspace)
@@ -1442,7 +1442,7 @@ gcn_addr_space_pointer_mode (addr_space_t addrspace)
    
    Return the appropriate mode for a named address space address.  */
 
-static scalar_int_mode
+static scalar_addr_mode
 gcn_addr_space_address_mode (addr_space_t addrspace)
 {
   return gcn_addr_space_pointer_mode (addrspace);

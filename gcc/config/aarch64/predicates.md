@@ -284,7 +284,7 @@
     {
     case CONST:
       op = XEXP (op, 0);
-      if (GET_CODE (op) != PLUS
+      if (!any_plus_p (op)
 	  || GET_CODE (XEXP (op, 0)) != SYMBOL_REF
 	  || GET_CODE (XEXP (op, 1)) != CONST_INT)
 	return false;
@@ -306,7 +306,7 @@
     {
     case CONST:
       op = XEXP (op, 0);
-      if (GET_CODE (op) != PLUS
+      if (!any_plus_p (op)
 	  || GET_CODE (XEXP (op, 0)) != SYMBOL_REF
 	  || GET_CODE (XEXP (op, 1)) != CONST_INT)
 	return false;
@@ -323,7 +323,7 @@
 
 (define_predicate "aarch64_mov_operand"
   (and (match_code "reg,subreg,mem,const,const_int,symbol_ref,label_ref,high,
-		    const_poly_int,const_vector")
+		    const_poly_int,const_vector,const_null")
        (ior (match_operand 0 "register_operand")
 	    (ior (match_operand 0 "memory_operand")
 		 (match_test "aarch64_mov_operand_p (op, mode)")))))

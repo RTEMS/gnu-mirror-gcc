@@ -280,9 +280,15 @@ static tree
 prepare_instrumented_value (gimple_stmt_iterator *gsi, histogram_value value)
 {
   tree val = value->hvalue.value;
+  /* MORELLO TODO
+   *   We have not thought too hard about this, for capabilities it seems that
+   *   the metadata would not be useful in profiling, but trying it out could
+   *   proove this wrong.
+   *   For now we ignore it, at some point, if someone cares, this should be
+   *   thought about harder.  */
   if (POINTER_TYPE_P (TREE_TYPE (val)))
     val = fold_convert (build_nonstandard_integer_type
-			  (TYPE_PRECISION (TREE_TYPE (val)), 1), val);
+			  (TYPE_NONCAP_PRECISION (TREE_TYPE (val)), 1), val);
   return force_gimple_operand_gsi (gsi, fold_convert (gcov_type_node, val),
 				   true, NULL_TREE, true, GSI_SAME_STMT);
 }
@@ -451,12 +457,14 @@ gimple_gen_ic_func_profiler (void)
      resetting __gcov_indirect_call.callee to NULL.  */
 
   gimple_stmt_iterator gsi = gsi_start_bb (cond_bb);
-  void0 = build_int_cst (ptr_type_node, 0);
+  void0 = build_int_cst (noncapability_type (ptr_type_node), 0);
 
   tree callee_ref = build3 (COMPONENT_REF, ptr_type_node,
 			    ic_tuple_var, ic_tuple_callee_field, NULL_TREE);
+  tree noncap_ref = fold_convert (noncapability_type (ptr_type_node),
+				  callee_ref);
 
-  tree ref = force_gimple_operand_gsi (&gsi, callee_ref, true, NULL_TREE,
+  tree ref = force_gimple_operand_gsi (&gsi, noncap_ref, true, NULL_TREE,
 				       true, GSI_SAME_STMT);
 
   gcond *cond = gimple_build_cond (NE_EXPR, ref,

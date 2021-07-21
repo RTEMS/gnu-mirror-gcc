@@ -751,7 +751,9 @@ split_constant_offset_1 (tree type, tree op0, enum tree_code code, tree op1,
 	tree itype = TREE_TYPE (op0);
 	if ((POINTER_TYPE_P (itype)
 	     || (INTEGRAL_TYPE_P (itype) && !TYPE_OVERFLOW_TRAPS (itype)))
-	    && TYPE_PRECISION (type) >= TYPE_PRECISION (itype)
+	    && ((!capability_type_p (type)
+		    && (TYPE_PRECISION (type) >= TYPE_NONCAP_PRECISION (itype)))
+		 || (TYPE_CAP_PRECISION (type) >= TYPE_CAP_PRECISION (itype)))
 	    && (POINTER_TYPE_P (type) || INTEGRAL_TYPE_P (type)))
 	  {
 	    if (INTEGRAL_TYPE_P (itype) && TYPE_OVERFLOW_WRAPS (itype))

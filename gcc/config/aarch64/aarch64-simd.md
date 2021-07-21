@@ -5337,7 +5337,7 @@
 
 (define_expand "aarch64_ld1x3<VALLDIF:mode>"
   [(match_operand:CI 0 "register_operand")
-   (match_operand:DI 1 "register_operand")
+   (match_operand 1 "pmode_register_operand")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5358,7 +5358,7 @@
 
 (define_expand "aarch64_ld1x4<VALLDIF:mode>"
   [(match_operand:XI 0 "register_operand" "=w")
-   (match_operand:DI 1 "register_operand" "r")
+   (match_operand 1 "pmode_register_operand" "r")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5379,7 +5379,7 @@
 )
 
 (define_expand "aarch64_st1x2<VALLDIF:mode>"
-  [(match_operand:DI 0 "register_operand")
+  [(match_operand 0 "pmode_register_operand")
    (match_operand:OI 1 "register_operand")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
@@ -5400,7 +5400,7 @@
 )
 
 (define_expand "aarch64_st1x3<VALLDIF:mode>"
-  [(match_operand:DI 0 "register_operand")
+  [(match_operand 0 "pmode_register_operand")
    (match_operand:CI 1 "register_operand")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
@@ -5421,7 +5421,7 @@
 )
 
 (define_expand "aarch64_st1x4<VALLDIF:mode>"
-  [(match_operand:DI 0 "register_operand" "")
+  [(match_operand 0 "pmode_register_operand" "")
    (match_operand:XI 1 "register_operand" "")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
@@ -5576,7 +5576,7 @@
 
 (define_expand "aarch64_ld<VSTRUCT:nregs>r<VALLDIF:mode>"
   [(match_operand:VSTRUCT 0 "register_operand")
-   (match_operand:DI 1 "register_operand")
+   (match_operand 1 "pmode_register_operand")
    (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5651,7 +5651,7 @@
 
 (define_expand "aarch64_ld<VSTRUCT:nregs><VDC:mode>"
  [(match_operand:VSTRUCT 0 "register_operand")
-  (match_operand:DI 1 "register_operand")
+  (match_operand 1 "pmode_register_operand")
   (unspec:VDC [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5664,7 +5664,7 @@
 
 (define_expand "aarch64_ld1<VALL_F16:mode>"
  [(match_operand:VALL_F16 0 "register_operand")
-  (match_operand:DI 1 "register_operand")]
+  (match_operand 1 "pmode_register_operand")]
   "TARGET_SIMD"
 {
   machine_mode mode = <VALL_F16:MODE>mode;
@@ -5679,7 +5679,7 @@
 
 (define_expand "aarch64_ld<VSTRUCT:nregs><VQ:mode>"
  [(match_operand:VSTRUCT 0 "register_operand")
-  (match_operand:DI 1 "register_operand")
+  (match_operand 1 "pmode_register_operand")
   (unspec:VQ [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5692,7 +5692,7 @@
 
 (define_expand "aarch64_ld1x2<VQ:mode>"
  [(match_operand:OI 0 "register_operand")
-  (match_operand:DI 1 "register_operand")
+  (match_operand 1 "pmode_register_operand")
   (unspec:VQ [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5705,7 +5705,7 @@
 
 (define_expand "aarch64_ld1x2<VDC:mode>"
  [(match_operand:OI 0 "register_operand")
-  (match_operand:DI 1 "register_operand")
+  (match_operand 1 "pmode_register_operand")
   (unspec:VDC [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
 {
@@ -5719,7 +5719,7 @@
 
 (define_expand "aarch64_ld<VSTRUCT:nregs>_lane<VALLDIF:mode>"
   [(match_operand:VSTRUCT 0 "register_operand")
-	(match_operand:DI 1 "register_operand")
+	(match_operand 1 "pmode_register_operand")
 	(match_operand:VSTRUCT 2 "register_operand")
 	(match_operand:SI 3 "immediate_operand")
 	(unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
@@ -5999,7 +5999,7 @@
 )
 
 (define_expand "aarch64_st<VSTRUCT:nregs><VDC:mode>"
- [(match_operand:DI 0 "register_operand")
+ [(match_operand 0 "pmode_register_operand")
   (match_operand:VSTRUCT 1 "register_operand")
   (unspec:VDC [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
@@ -6012,7 +6012,7 @@
 })
 
 (define_expand "aarch64_st<VSTRUCT:nregs><VQ:mode>"
- [(match_operand:DI 0 "register_operand")
+ [(match_operand 0 "pmode_register_operand")
   (match_operand:VSTRUCT 1 "register_operand")
   (unspec:VQ [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
   "TARGET_SIMD"
@@ -6025,7 +6025,7 @@
 })
 
 (define_expand "aarch64_st<VSTRUCT:nregs>_lane<VALLDIF:mode>"
- [(match_operand:DI 0 "register_operand")
+ [(match_operand 0 "pmode_register_operand")
   (match_operand:VSTRUCT 1 "register_operand")
   (unspec:VALLDIF [(const_int 0)] UNSPEC_VSTRUCTDUMMY)
   (match_operand:SI 2 "immediate_operand")]
@@ -6041,7 +6041,7 @@
 })
 
 (define_expand "aarch64_st1<VALL_F16:mode>"
- [(match_operand:DI 0 "register_operand")
+ [(match_operand 0 "pmode_register_operand")
   (match_operand:VALL_F16 1 "register_operand")]
   "TARGET_SIMD"
 {

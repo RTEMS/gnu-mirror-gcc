@@ -81,6 +81,10 @@ struct lang_hooks_for_types
      integer type with at least that precision.  */
   tree (*type_for_size) (unsigned, int);
 
+  /* Similar to above but return a capability type, will return NULL if none is
+     available.  */
+  tree (*cap_type_for_size) (unsigned, int);
+
   /* True if the type is an instantiation of a generic type,
      e.g. C++ template implicit specializations.  */
   bool (*generic_p) (const_tree);

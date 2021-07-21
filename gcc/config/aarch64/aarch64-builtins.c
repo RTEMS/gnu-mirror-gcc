@@ -1097,6 +1097,9 @@ aarch64_init_simd_builtins (void)
 	  if (qualifiers & qualifier_internal)
 	    continue;
 
+	  if (op_mode == VOIDmode && (qualifiers & qualifier_pointer))
+	    op_mode = Pmode;
+
 	  /* Some builtins have different user-facing types
 	     for certain arguments, encoded in d->mode.  */
 	  if (qualifiers & qualifier_map_mode)
@@ -1478,7 +1481,8 @@ typedef enum
 static rtx
 aarch64_simd_expand_args (rtx target, int icode, int have_retval,
 			  tree exp, builtin_simd_arg *args,
-			  machine_mode builtin_mode)
+			  machine_mode builtin_mode,
+			  aarch64_type_qualifiers *qual)
 {
   rtx pat;
   rtx op[SIMD_MAX_BUILTIN_ARGS + 1]; /* First element for result operand.  */
@@ -1504,6 +1508,9 @@ aarch64_simd_expand_args (rtx target, int icode, int have_retval,
 	{
 	  tree arg = CALL_EXPR_ARG (exp, opc - have_retval);
 	  machine_mode mode = insn_data[icode].operand[opc].mode;
+	  if (mode == VOIDmode && (qual[opc + !have_retval] & qualifier_pointer))
+	    mode = Pmode;
+
 	  op[opc] = expand_normal (arg);
 
 	  switch (thisarg)
@@ -1718,7 +1725,7 @@ aarch64_simd_expand_builtin (int fcode, tree exp, rtx target)
   /* The interface to aarch64_simd_expand_args expects a 0 if
      the function is void, and a 1 if it is not.  */
   return aarch64_simd_expand_args
-	  (target, icode, !is_void, exp, &args[1], d->mode);
+	  (target, icode, !is_void, exp, &args[1], d->mode, d->qualifiers);
 }
 
 rtx

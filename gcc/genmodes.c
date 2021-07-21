@@ -62,6 +62,7 @@ struct mode_data
 
   struct mode_data *component;	/* mode of components */
   struct mode_data *wider;	/* next wider mode */
+  struct mode_data *offsetmode; /* mode of a capability offset.  */
 
   struct mode_data *contained;  /* Pointer to list of modes that have
 				   this mode as a component.  */
@@ -77,6 +78,8 @@ struct mode_data
 				   adjustment */
   bool need_bytesize_adj;	/* true if this mode needs dynamic size
 				   adjustment */
+  bool need_precision_adj;	/* true if this mode needs dynamic precision
+				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
 };
 
@@ -87,8 +90,8 @@ static struct mode_data *void_mode;
 static const struct mode_data blank_mode = {
   0, "<unknown>", MAX_MODE_CLASS,
   0, -1U, -1U, -1U, -1U,
-  0, 0, 0, 0, 0, 0,
-  "<unknown>", 0, 0, 0, 0, false, false, 0
+  0, 0, 0, 0, 0, 0, 0,
+  "<unknown>", 0, 0, 0, 0, false, false, false, 0
 };
 
 static htab_t modes_by_name;
@@ -109,6 +112,7 @@ struct mode_adjust
 static struct mode_adjust *adj_nunits;
 static struct mode_adjust *adj_bytesize;
 static struct mode_adjust *adj_alignment;
+static struct mode_adjust *adj_precision;
 static struct mode_adjust *adj_format;
 static struct mode_adjust *adj_ibit;
 static struct mode_adjust *adj_fbit;
@@ -286,13 +290,15 @@ validate_mode (struct mode_data *m,
 	       enum requirement r_bytesize,
 	       enum requirement r_component,
 	       enum requirement r_ncomponents,
-	       enum requirement r_format)
+	       enum requirement r_format,
+	       enum requirement r_offsetmode)
 {
   validate_field (m, precision);
   validate_field (m, bytesize);
   validate_field (m, component);
   validate_field (m, ncomponents);
   validate_field (m, format);
+  validate_field (m, offsetmode);
 }
 #undef validate_field
 #undef validate_field_
@@ -322,7 +328,7 @@ complete_mode (struct mode_data *m)
       if (!strcmp (m->name, "VOID"))
 	void_mode = m;
 
-      validate_mode (m, UNSET, UNSET, UNSET, UNSET, UNSET);
+      validate_mode (m, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
 
       m->precision = 0;
       m->bytesize = 0;
@@ -333,13 +339,14 @@ complete_mode (struct mode_data *m)
     case MODE_CC:
       /* Again, nothing more need be said.  For historical reasons,
 	 the size of a CC mode is four units.  */
-      validate_mode (m, UNSET, UNSET, UNSET, UNSET, UNSET);
+      validate_mode (m, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
 
       m->bytesize = 4;
       m->ncomponents = 1;
       m->component = 0;
       break;
 
+    case MODE_CAPABILITY:
     case MODE_INT:
     case MODE_FLOAT:
     case MODE_DECIMAL_FLOAT:
@@ -349,10 +356,11 @@ complete_mode (struct mode_data *m)
     case MODE_UACCUM:
       /* A scalar mode must have a byte size, may have a bit size,
 	 and must not have components.   A float mode must have a
-         format.  */
+	 format.  A capability mode must have an offsetmode.  */
       validate_mode (m, OPTIONAL, SET, UNSET, UNSET,
 		     (m->cl == MODE_FLOAT || m->cl == MODE_DECIMAL_FLOAT)
-		     ? SET : UNSET);
+		     ? SET : UNSET,
+		     (m->cl == MODE_CAPABILITY) ? SET : UNSET);
 
       m->ncomponents = 1;
       m->component = 0;
@@ -362,7 +370,7 @@ complete_mode (struct mode_data *m)
       /* A partial integer mode uses ->component to say what the
 	 corresponding full-size integer mode is, and may also
 	 specify a bit size.  */
-      validate_mode (m, OPTIONAL, UNSET, SET, UNSET, UNSET);
+      validate_mode (m, OPTIONAL, UNSET, SET, UNSET, UNSET, UNSET);
 
       m->bytesize = m->component->bytesize;
 
@@ -372,7 +380,7 @@ complete_mode (struct mode_data *m)
     case MODE_COMPLEX_INT:
     case MODE_COMPLEX_FLOAT:
       /* Complex modes should have a component indicated, but no more.  */
-      validate_mode (m, UNSET, UNSET, SET, UNSET, UNSET);
+      validate_mode (m, UNSET, UNSET, SET, UNSET, UNSET, UNSET);
       m->ncomponents = 2;
       if (m->component->precision != (unsigned int)-1)
 	m->precision = 2 * m->component->precision;
@@ -380,7 +388,7 @@ complete_mode (struct mode_data *m)
       break;
 
     case MODE_VECTOR_BOOL:
-      validate_mode (m, UNSET, SET, SET, SET, UNSET);
+      validate_mode (m, UNSET, SET, SET, SET, UNSET, UNSET);
       break;
 
     case MODE_VECTOR_INT:
@@ -390,7 +398,7 @@ complete_mode (struct mode_data *m)
     case MODE_VECTOR_ACCUM:
     case MODE_VECTOR_UACCUM:
       /* Vector modes should have a component and a number of components.  */
-      validate_mode (m, UNSET, UNSET, SET, SET, UNSET);
+      validate_mode (m, UNSET, UNSET, SET, SET, UNSET, UNSET);
       if (m->component->precision != (unsigned int)-1)
 	m->precision = m->ncomponents * m->component->precision;
       m->bytesize = m->ncomponents * m->component->bytesize;
@@ -588,6 +596,27 @@ make_int_mode (const char *name,
   m->precision = precision;
 }
 
+#define CAPABILITY_MODE(N, Y) _CAPABILITY_MODE (CA ## N, N, Y)
+#define _CAPABILITY_MODE(CAN, N, Y) \
+  make_capability_mode(#CAN, #N, Y, __FILE__, __LINE__)
+
+static void
+make_capability_mode (const char *name, const char *offsetname,
+		      unsigned int bytesize,
+		      const char *file, unsigned int line)
+{
+  struct mode_data *offsetmode = find_mode (offsetname);
+  if (!offsetmode || offsetmode->cl != MODE_INT)
+    {
+      error ("%s:%d: capability mode expected existing MODE_INT \"%s\"",
+	     offsetmode->file, offsetmode->line, offsetname);
+      return;
+    }
+  struct mode_data *m = new_mode (MODE_CAPABILITY, name, file, line);
+  m->offsetmode = offsetmode;
+  m->bytesize = bytesize;
+}
+
 #define FRACT_MODE(N, Y, F) \
 	make_fixed_point_mode (MODE_FRACT, #N, Y, 0, F, __FILE__, __LINE__)
 
@@ -776,6 +805,7 @@ make_vector_mode (enum mode_class bclass,
 #define ADJUST_NUNITS(M, X)    _ADD_ADJUST (nunits, M, X, RANDOM, RANDOM)
 #define ADJUST_BYTESIZE(M, X)  _ADD_ADJUST (bytesize, M, X, RANDOM, RANDOM)
 #define ADJUST_ALIGNMENT(M, X) _ADD_ADJUST (alignment, M, X, RANDOM, RANDOM)
+#define ADJUST_PRECISION(M, X) _ADD_ADJUST (precision, M, X, RANDOM, RANDOM)
 #define ADJUST_FLOAT_FORMAT(M, X)    _ADD_ADJUST (format, M, X, FLOAT, FLOAT)
 #define ADJUST_IBIT(M, X)  _ADD_ADJUST (ibit, M, X, ACCUM, UACCUM)
 #define ADJUST_FBIT(M, X)  _ADD_ADJUST (fbit, M, X, FRACT, UACCUM)
@@ -1158,9 +1188,13 @@ static void
 emit_mode_unit_precision_inline (void)
 {
   int c;
+  struct mode_adjust *a;
   struct mode_data *m;
 
-  puts ("\
+  for (a = adj_precision; a; a = a->next)
+    a->mode->need_precision_adj = true;
+
+  printf ("\
 #ifdef __cplusplus\n\
 inline __attribute__((__always_inline__))\n\
 #else\n\
@@ -1169,24 +1203,58 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 unsigned short\n\
 mode_unit_precision_inline (machine_mode mode)\n\
 {\n\
-  extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];\n\
+  extern %sunsigned short mode_unit_precision[NUM_MACHINE_MODES];\n\
+  gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
+  switch (mode)\n\
+    {", adj_precision ? "" : "const ");
+
+  for_all_modes (c, m)
+    if (! m->need_precision_adj)
+      {
+	struct mode_data *m2
+	  = (c != MODE_PARTIAL_INT && m->component) ? m->component : m;
+	if (m2->precision != (unsigned int)-1)
+	  printf ("    case E_%smode: return %u;\n", m->name, m2->precision);
+	else
+	  printf ("    case E_%smode: return %u*BITS_PER_UNIT;\n",
+		  m->name, m2->bytesize);
+      }
+
+  puts ("\
+    default: return mode_unit_precision[mode];\n\
+    }\n\
+}\n");
+}
+
+/* Emit mode_offsetmode_inline routine into insn-modes.h header.  */
+static void
+emit_mode_offsetmode_inline (void)
+{
+  int c;
+  struct mode_data *m;
+
+  puts ("\
+#ifdef __cplusplus\n\
+inline __attribute__((__always_inline__))\n\
+#else\n\
+extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
+#endif\n\
+unsigned char\n\
+mode_offsetmode_inline (machine_mode mode)\n\
+{\n\
+  extern const unsigned char mode_offsetmode[NUM_MACHINE_MODES];\n\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
 
   for_all_modes (c, m)
     {
-      struct mode_data *m2
-	= (c != MODE_PARTIAL_INT && m->component) ? m->component : m;
-      if (m2->precision != (unsigned int)-1)
-	printf ("    case E_%smode: return %u;\n", m->name, m2->precision);
-      else
-	printf ("    case E_%smode: return %u*BITS_PER_UNIT;\n",
-		m->name, m2->bytesize);
+      struct mode_data *m2 = (c == MODE_CAPABILITY) ? m->offsetmode : m;
+      printf ("    case E_%smode: return E_%smode;\n", m->name, m2->name);
     }
 
   puts ("\
-    default: return mode_unit_precision[mode];\n\
+    default: return mode_offsetmode[mode];\n\
     }\n\
 }\n");
 }
@@ -1199,6 +1267,9 @@ get_mode_class (struct mode_data *mode)
 {
   switch (mode->cl)
     {
+    case MODE_CAPABILITY:
+      return "scalar_addr_mode";
+
     case MODE_INT:
     case MODE_PARTIAL_INT:
       return "scalar_int_mode";
@@ -1292,7 +1363,10 @@ enum machine_mode\n{");
 
   /* I can't think of a better idea, can you?  */
   printf ("#define CONST_MODE_NUNITS%s\n", adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_PRECISION%s\n", adj_nunits ? "" : " const");
+  printf ("#define CONST_MODE_PRECISION%s\n",
+	  adj_nunits || adj_precision ? "" : " const");
+  printf ("#define CONST_MODE_UNIT_PRECISION%s\n",
+	  adj_precision ? "" : " const");
   printf ("#define CONST_MODE_SIZE%s\n",
 	  adj_bytesize || adj_nunits ? "" : " const");
   printf ("#define CONST_MODE_UNIT_SIZE%s\n", adj_bytesize ? "" : " const");
@@ -1336,6 +1410,7 @@ emit_insn_modes_inline_h (void)
   emit_mode_inner_inline ();
   emit_mode_unit_size_inline ();
   emit_mode_unit_precision_inline ();
+  emit_mode_offsetmode_inline ();
   puts ("#endif /* GCC_VERSION >= 4001 */");
 
   puts ("\
@@ -1410,7 +1485,7 @@ emit_mode_precision (void)
   struct mode_data *m;
 
   print_maybe_const_decl ("%spoly_uint16_pod", "mode_precision",
-			  "NUM_MACHINE_MODES", adj_nunits);
+			  "NUM_MACHINE_MODES", adj_nunits || adj_precision);
 
   for_all_modes (c, m)
     if (m->precision != (unsigned int)-1)
@@ -1599,7 +1674,8 @@ emit_mode_unit_precision (void)
   int c;
   struct mode_data *m;
 
-  print_decl ("unsigned short", "mode_unit_precision", "NUM_MACHINE_MODES");
+  print_maybe_const_decl ("%sunsigned short", "mode_unit_precision",
+			  "NUM_MACHINE_MODES", adj_precision);
 
   for_all_modes (c, m)
     {
@@ -1827,6 +1903,32 @@ emit_mode_adjustments (void)
 	}
     }
 
+  /* Precision adjustments must be made internally consistent manually -- hence
+     we don't propagate.  MORELLO TODO Maybe we should figure something out
+     here?
+
+     What exactly does it mean to adjust the precision of a vector or complex
+     type?  Should we disallow it in `new_adjust`?
+
+     Should there be any propagation upwards?  If I change the precision of a
+     mode which has a corresponding vector mode, should the vector mode
+     precision automatically change?  If GET_MODE_PRECISION determines which
+     bits are significant in a mode then it could only change by losing the
+     very last bits of the last element ... this would mean that the equation
+     `vector_precision = n_components * component_precision` would no longer
+     hold.
+
+     For now we just say "the user should not ADJUST_PRECISION on a mode that
+     is a vector/complex mode, nor on a mode that is a component of one".
+     This is unsatisfactory, but we can at least get working with this.  */
+  for (a = adj_precision; a; a = a->next)
+    {
+      printf ("\n /* %s:%d */\n ps = s = %s;\n",
+	      a->file, a->line, a->adjustment);
+      printf("   mode_unit_precision[E_%smode] = s;\n", a->mode->name);
+      printf("   mode_precision[E_%smode] = ps;\n", a->mode->name);
+    }
+
   /* Ibit adjustments don't have to propagate.  */
   for (a = adj_ibit; a; a = a->next)
     {
@@ -1930,6 +2032,22 @@ emit_mode_int_n (void)
   print_closer ();
 }
 
+/* Emit mode_offsetmode array into insn-modes.c file.  */
+static void
+emit_mode_offsetmode (void)
+{
+  int c;
+  struct mode_data *m;
+
+  print_decl ("unsigned char", "mode_offsetmode", "NUM_MACHINE_MODES");
+
+  for_all_modes (c, m)
+    tagged_printf ("E_%smode",
+		   c == MODE_CAPABILITY ? m->offsetmode->name : m->name,
+		   m->name);
+
+  print_closer ();
+}
 
 static void
 emit_insn_modes_c (void)
@@ -1953,6 +2071,7 @@ emit_insn_modes_c (void)
   emit_mode_ibit ();
   emit_mode_fbit ();
   emit_mode_int_n ();
+  emit_mode_offsetmode ();
 }
 
 static void

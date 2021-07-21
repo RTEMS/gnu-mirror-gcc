@@ -92,7 +92,7 @@ do_pending_stack_adjust (void)
   if (inhibit_defer_pop == 0)
     {
       if (maybe_ne (pending_stack_adjust, 0))
-	adjust_stack (gen_int_mode (pending_stack_adjust, Pmode));
+	adjust_stack (gen_int_mode (pending_stack_adjust, POmode));
       pending_stack_adjust = 0;
     }
 }
@@ -967,6 +967,18 @@ do_compare_rtx_and_jump (rtx op0, rtx op1, enum rtx_code code, int unsignedp,
 {
   rtx tem;
   rtx_code_label *dummy_label = NULL;
+
+  /* MORELLO TODO: revisit this.
+     It would be more work to ensure all callers of this function only ever
+     pass non-capability arguments, but that would mean we can also check they
+     don't make invalid assumptions about what they can do based on the
+     comparison this implements.
+
+     Those assumptions are pretty unlikely, but it would be nice to make
+     certain.  */
+  op0 = drop_capability(op0);
+  op1 = drop_capability(op1);
+  mode = noncapability_mode(mode);
 
   /* Reverse the comparison if that is safe and we want to jump if it is
      false.  Also convert to the reverse comparison if the target can

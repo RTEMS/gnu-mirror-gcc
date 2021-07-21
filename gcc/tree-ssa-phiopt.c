@@ -765,8 +765,8 @@ conditional_replacement (basic_block cond_bb, basic_block middle_bb,
   if ((integer_zerop (arg0) && integer_onep (arg1))
       || (integer_zerop (arg1) && integer_onep (arg0)))
     neg = false;
-  else if ((integer_zerop (arg0) && integer_all_onesp (arg1))
-	   || (integer_zerop (arg1) && integer_all_onesp (arg0)))
+  else if ((integer_zerop (arg0) && maybe_cap_all_onesp (arg1))
+	   || (integer_zerop (arg1) && maybe_cap_all_onesp (arg0)))
     neg = true;
   else
     return false;
@@ -814,10 +814,27 @@ conditional_replacement (basic_block cond_bb, basic_block middle_bb,
 
   if (neg)
     {
+      /* We need to negate in the type of the result since negation of a
+	 boolean does not produce a -1.
+	 However, negation of a capability does not make sense.
+	 Hence, if working with capabilities we cast to the value of the
+	 capability, negate that, then cast to the capability type itself.
+	 If this is not a capability value then the final cast would be to the
+	 original type and everything should fold away.  */
       cond = fold_convert_loc (gimple_location (stmt),
-                               TREE_TYPE (result), cond);
+			       noncapability_type (TREE_TYPE (result)), cond);
       cond = fold_build1_loc (gimple_location (stmt),
-                              NEGATE_EXPR, TREE_TYPE (cond), cond);
+			      NEGATE_EXPR, TREE_TYPE (cond), cond);
+      cond = fold_convert_loc (gimple_location (stmt),
+			       TREE_TYPE (result), cond);
+    }
+
+  if (capability_type_p (TREE_TYPE (result)))
+    {
+      cond = fold_convert_loc (gimple_location (stmt),
+			       noncapability_type (TREE_TYPE (result)), cond);
+      cond = fold_build_replace_address_value_loc (gimple_location (stmt),
+			build_int_cst (TREE_TYPE (result), 0), cond);
     }
 
   /* Insert our new statements at the end of conditional block before the

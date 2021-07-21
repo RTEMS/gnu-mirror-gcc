@@ -237,6 +237,7 @@ enum c_storage_class {
 
 /* A type specifier keyword "void", "_Bool", "char", "int", "float",
    "double", "_Decimal32", "_Decimal64", "_Decimal128", "_Fract", "_Accum",
+   "__intcap_t", "__uintcap_t",
    or none of these.  */
 enum c_typespec_keyword {
   cts_none,
@@ -244,6 +245,8 @@ enum c_typespec_keyword {
   cts_bool,
   cts_char,
   cts_int,
+  cts_intcap,
+  cts_uintcap,
   cts_float,
   cts_int_n,
   cts_double,

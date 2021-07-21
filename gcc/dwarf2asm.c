@@ -139,9 +139,9 @@ dw2_asm_output_delta (int size, const char *lab1, const char *lab2,
   ASM_OUTPUT_DWARF_DELTA (asm_out_file, size, lab1, lab2);
 #else
   dw2_assemble_integer (size,
-			gen_rtx_MINUS (Pmode,
-				       gen_rtx_SYMBOL_REF (Pmode, lab1),
-				       gen_rtx_SYMBOL_REF (Pmode, lab2)));
+			gen_rtx_MINUS (POmode,
+				       gen_rtx_SYMBOL_REF (POmode, lab1),
+				       gen_rtx_SYMBOL_REF (POmode, lab2)));
 #endif
   if (flag_debug_asm && comment)
     {
@@ -222,9 +222,11 @@ dw2_asm_output_offset (int size, const char *label, HOST_WIDE_INT offset,
 #ifdef ASM_OUTPUT_DWARF_OFFSET
   ASM_OUTPUT_DWARF_OFFSET (asm_out_file, size, label, offset, base);
 #else
-  dw2_assemble_integer (size, gen_rtx_PLUS (Pmode,
-					    gen_rtx_SYMBOL_REF (Pmode, label),
-					    gen_int_mode (offset, Pmode)));
+  /* MORELLO TODO should this gen_rtx_SYMBOL_REF be in POmode, or should we
+     have a conversion around a Pmode value?  */
+  dw2_assemble_integer (size, gen_rtx_PLUS (POmode,
+					    gen_rtx_SYMBOL_REF (POmode, label),
+					    gen_int_mode (offset, POmode)));
 #endif
 
   if (flag_debug_asm && comment)
@@ -1088,7 +1090,7 @@ dw2_asm_output_encoded_addr_rtx (int encoding, rtx addr, bool is_public,
 #ifdef ASM_OUTPUT_DWARF_PCREL
 	  ASM_OUTPUT_DWARF_PCREL (asm_out_file, size, XSTR (addr, 0));
 #else
-	  dw2_assemble_integer (size, gen_rtx_MINUS (Pmode, addr, pc_rtx));
+	  dw2_assemble_integer (size, gen_rtx_MINUS (POmode, addr, pc_rtx));
 #endif
 	  break;
 

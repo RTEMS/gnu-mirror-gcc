@@ -376,6 +376,7 @@ int_mode_for_mode (machine_mode mode)
     case MODE_PARTIAL_INT:
       return as_a <scalar_int_mode> (mode);
 
+    case MODE_CAPABILITY:
     case MODE_COMPLEX_INT:
     case MODE_COMPLEX_FLOAT:
     case MODE_FLOAT:
@@ -2440,12 +2441,12 @@ layout_type (tree type)
       break;
 
     case OFFSET_TYPE:
-      TYPE_SIZE (type) = bitsize_int (POINTER_SIZE);
-      TYPE_SIZE_UNIT (type) = size_int (POINTER_SIZE_UNITS);
+      TYPE_SIZE (type) = bitsize_int (POINTER_OFFSET_SIZE);
+      TYPE_SIZE_UNIT (type) = size_int (POINTER_OFFSET_SIZE_UNITS);
       /* A pointer might be MODE_PARTIAL_INT, but ptrdiff_t must be
 	 integral, which may be an __intN.  */
-      SET_TYPE_MODE (type, int_mode_for_size (POINTER_SIZE, 0).require ());
-      TYPE_PRECISION (type) = POINTER_SIZE;
+      SET_TYPE_MODE (type, int_mode_for_size (POINTER_OFFSET_SIZE, 0).require ());
+      TYPE_PRECISION (type) = POINTER_OFFSET_SIZE;
       break;
 
     case FUNCTION_TYPE:
@@ -2461,12 +2462,14 @@ layout_type (tree type)
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
+      TYPE_UNSIGNED (type) = 1;
+      /* fall through */
+    case INTCAP_TYPE:
       {
-	scalar_int_mode mode = SCALAR_INT_TYPE_MODE (type);
+	scalar_addr_mode mode = SCALAR_ADDR_TYPE_MODE (type);
 	TYPE_SIZE (type) = bitsize_int (GET_MODE_BITSIZE (mode));
 	TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (mode));
-	TYPE_UNSIGNED (type) = 1;
-	TYPE_PRECISION (type) = GET_MODE_PRECISION (mode);
+	TYPE_CAP_PRECISION (type) = GET_MODE_PRECISION (mode);
       }
       break;
 

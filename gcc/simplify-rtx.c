@@ -64,6 +64,24 @@ neg_poly_int_rtx (machine_mode mode, const_rtx i)
   return immed_wide_int_const (-wi::to_poly_wide (i, mode), mode);
 }
 
+/* Return true if X and Y are lowparts of each other.  */
+static bool
+lowparts_p (rtx x, machine_mode mx, rtx y, machine_mode my)
+{
+  rtx left, right, tem;
+
+  tem = simplify_subreg (my, x, mx, subreg_lowpart_offset (my, mx));
+  left = tem ? tem : x;
+
+  tem = simplify_subreg (mx, y, my, subreg_lowpart_offset (mx, my));
+  right = tem ? tem : y;
+
+  if (CONST_INT_P (left))
+    return CONST_INT_P (right) && INTVAL (left) == INTVAL (right);
+
+  return REG_P (left) && REG_P (right) && REGNO (left) == REGNO (right);
+}
+
 /* Test whether expression, X, is an immediate constant that represents
    the most significant bit of machine mode MODE.  */
 
@@ -861,6 +879,7 @@ rtx
 simplify_unary_operation (enum rtx_code code, machine_mode mode,
 			  rtx op, machine_mode op_mode)
 {
+  check_code_and_mode (code, mode);
   rtx trueop, tem;
 
   trueop = avoid_constant_pool_reference (op);
@@ -1751,6 +1770,7 @@ rtx
 simplify_const_unary_operation (enum rtx_code code, machine_mode mode,
 				rtx op, machine_mode op_mode)
 {
+  check_code_and_mode (code, mode);
   scalar_int_mode result_mode;
 
   if (code == VEC_DUPLICATE)
@@ -2297,7 +2317,7 @@ comparison_code_valid_for_mode (enum rtx_code code, enum machine_mode mode)
 	gcc_unreachable ();
     }
 }
-				       
+
 /* Simplify a logical operation CODE with result mode MODE, operating on OP0
    and OP1, which should be both relational operations.  Return 0 if no such
    simplification is possible.  */
@@ -2305,6 +2325,7 @@ rtx
 simplify_logical_relational_operation (enum rtx_code code, machine_mode mode,
 				       rtx op0, rtx op1)
 {
+  check_code_and_mode (code, mode);
   /* We only handle IOR of two relational operations.  */
   if (code != IOR)
     return 0;
@@ -2354,6 +2375,7 @@ rtx
 simplify_binary_operation (enum rtx_code code, machine_mode mode,
 			   rtx op0, rtx op1)
 {
+  check_code_and_mode (code, mode);
   rtx trueop0, trueop1;
   rtx tem;
 
@@ -4348,6 +4370,124 @@ simplify_binary_operation_1 (enum rtx_code code, machine_mode mode,
       }
       return 0;
 
+    case POINTER_PLUS:
+    {
+      if (is_a <scalar_int_mode> (mode))
+	return simplify_gen_binary (PLUS, mode, op0, op1);
+
+      const auto om = noncapability_mode (mode);
+
+      if (op1 == const0_rtx)
+	return op0;
+
+      if (GET_CODE (op1) == MINUS)
+	{
+	  if (lowparts_p (XEXP (op1, 1), om, op0, mode))
+	    return simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+					mode, op0, XEXP (op1, 0));
+	}
+      else if (GET_CODE (op1) == NEG)
+	{
+	  rtx inner = XEXP (op1, 0);
+	  if (GET_CODE (inner) == AND
+	      && lowparts_p (XEXP (inner, 0), om, op0, mode)
+	      && CONST_INT_P (XEXP (inner, 1)))
+	    {
+	      const auto ci = INTVAL (XEXP (inner, 1));
+	      if (exact_log2 (ci+1) >= 0)
+		return simplify_gen_binary (ALIGN_ADDRESS_DOWN,
+					    mode, op0, GEN_INT (ci+1));
+	    }
+	}
+      else if (CONST_INT_P (op1))
+	switch (GET_CODE (op0))
+	  {
+	  case CONST:
+	  case SYMBOL_REF:
+	  case LABEL_REF:
+	  case CONST_NULL:
+	    return plus_constant (mode, op0, INTVAL (op1));
+	  default:
+	    break;
+	  }
+
+      if (GET_CODE (op0) == REPLACE_ADDRESS_VALUE)
+	return simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+				    mode, XEXP (op0, 0),
+				    simplify_gen_binary (PLUS, om,
+							 XEXP (op0, 1), op1));
+      else if (GET_CODE (op0) == POINTER_PLUS)
+	return simplify_gen_binary (POINTER_PLUS, mode,
+				    XEXP (op0, 0),
+				    simplify_gen_binary (PLUS, om,
+							 XEXP (op0, 1), op1));
+
+
+      return 0;
+    }
+
+    case REPLACE_ADDRESS_VALUE:
+    {
+      if (is_a <scalar_int_mode> (mode))
+	return op1;
+
+      const auto om = noncapability_mode (mode);
+
+      if (lowparts_p (op0, mode, op1, om))
+	return op0;
+
+      if (GET_CODE (op0) == CONST_NULL)
+	return simplify_gen_binary (POINTER_PLUS, mode, op0, op1);
+      else if (GET_CODE (op0) == REPLACE_ADDRESS_VALUE
+	    || GET_CODE (op0) == POINTER_PLUS
+	    || GET_CODE (op0) == ALIGN_ADDRESS_DOWN)
+	{
+	  if (!side_effects_p (XEXP (op0, 1)))
+	    return simplify_gen_binary (REPLACE_ADDRESS_VALUE, mode,
+					XEXP (op0, 0), op1);
+	}
+
+      if (GET_CODE (op1) == AND
+	  && CONST_INT_P (XEXP (op1, 1))
+	  && lowparts_p (op0, mode, XEXP (op1, 0), om))
+	{
+	  const int align_const = - INTVAL (XEXP (op1, 1));
+	  if (exact_log2 (align_const) > 0)
+	    return simplify_gen_binary (ALIGN_ADDRESS_DOWN,
+					mode, op0, GEN_INT (align_const));
+	}
+
+      return 0;
+    }
+
+    case ALIGN_ADDRESS_DOWN:
+    {
+      if (is_a <scalar_int_mode> (mode))
+	return simplify_gen_binary (AND, mode, op0,
+				    simplify_gen_unary (NEG, mode, op1, mode));
+
+      const auto om = noncapability_mode (mode);
+
+      if (op1 == const1_rtx)
+	return op0;
+
+      if (GET_CODE (op0) == CONST_NULL && !side_effects_p (op1))
+	return op0;
+      else if (GET_CODE (op0) == REPLACE_ADDRESS_VALUE)
+	return simplify_gen_binary (REPLACE_ADDRESS_VALUE, mode, XEXP (op0, 0),
+				    simplify_gen_binary (AND, om, XEXP (op0, 1),
+							 simplify_gen_unary
+							 (NEG, om, op1, om)));
+      else if (GET_CODE (op0) == ALIGN_ADDRESS_DOWN
+	       && CONST_INT_P (op1)
+	       && CONST_INT_P (XEXP (op0, 1)))
+	return simplify_gen_binary (ALIGN_ADDRESS_DOWN, mode, XEXP (op0, 0),
+				    GEN_INT (MAX (INTVAL (op1),
+						  INTVAL (XEXP (op0, 1)))));
+
+      return 0;
+    }
+
     default:
       gcc_unreachable ();
     }
@@ -4406,6 +4546,7 @@ rtx
 simplify_const_binary_operation (enum rtx_code code, machine_mode mode,
 				 rtx op0, rtx op1)
 {
+  check_code_and_mode (code, mode);
   if (VECTOR_MODE_P (mode)
       && code != VEC_CONCAT
       && GET_CODE (op0) == CONST_VECTOR
@@ -5196,6 +5337,7 @@ rtx
 simplify_relational_operation (enum rtx_code code, machine_mode mode,
 			       machine_mode cmp_mode, rtx op0, rtx op1)
 {
+  check_code_and_mode (code, mode);
   rtx tem, trueop0, trueop1;
 
   if (cmp_mode == VOIDmode)
@@ -5603,6 +5745,7 @@ simplify_const_relational_operation (enum rtx_code code,
 				     machine_mode mode,
 				     rtx op0, rtx op1)
 {
+  check_code_and_mode (code, mode);
   rtx tem;
   rtx trueop0;
   rtx trueop1;
@@ -6065,6 +6208,7 @@ simplify_ternary_operation (enum rtx_code code, machine_mode mode,
 			    machine_mode op0_mode, rtx op0, rtx op1,
 			    rtx op2)
 {
+  check_code_and_mode (code, mode);
   bool any_change = false;
   rtx tem, trueop2;
   scalar_int_mode int_mode, int_op0_mode;
@@ -7335,6 +7479,30 @@ simplify_rtx (const_rtx x)
   return NULL;
 }
 
+/* Generate RTXes expressing a pointer plus an offset.  */
+rtx
+gen_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset)
+{
+  check_pointer_offset_modes (mode, base, offset);
+  if (CAPABILITY_MODE_P (mode))
+    return simplify_gen_binary (POINTER_PLUS, mode, base, offset);
+  return simplify_gen_binary (PLUS, offset_mode (mode), base, offset);
+}
+
+/* Generate RTXes expressing a pointer minus an offset.  */
+rtx
+gen_pointer_minus (scalar_addr_mode mode, rtx base, rtx offset)
+{
+  check_pointer_offset_modes (mode, base, offset);
+  if (CAPABILITY_MODE_P (mode))
+    {
+      machine_mode om = noncapability_mode (mode);
+      rtx neg_offset = simplify_gen_unary (NEG, om, offset, om);
+      return gen_pointer_plus (mode, base, neg_offset);
+    }
+  return simplify_gen_binary (MINUS, mode, base, offset);
+}
+
 #if CHECKING_P
 
 namespace selftest {
@@ -7936,6 +8104,252 @@ simplify_const_poly_int_tests<N>::run ()
   ASSERT_EQ (simplify_subreg (QImode, x8, HImode, offset), x5);
 }
 
+static bool constant_cap_p (rtx x, HOST_WIDE_INT cv)
+{
+  const auto cm = GET_MODE (x);
+  if (!is_a <scalar_addr_mode> (cm) || GET_CODE (x) != CONST)
+    return false;
+
+  x = XEXP (x, 0);
+  return GET_CODE (x) == POINTER_PLUS
+    && XEXP (x, 0) == CONST0_RTX (cm)
+    && CONST_INT_P (XEXP (x, 1))
+    && INTVAL (XEXP (x, 1)) == cv;
+}
+
+static void
+test_capability_plus_constant ()
+{
+  rtx nullcap = CONST0_RTX (CADImode);
+
+  ASSERT_EQ (GET_CODE (nullcap), CONST_NULL);
+
+  rtx x = plus_constant (CADImode, nullcap, 42);
+  ASSERT_TRUE (constant_cap_p (x, 42));
+}
+
+static void
+test_pointer_plus_simplifications ()
+{
+  rtx r0 = gen_rtx_REG (DImode, 0);
+  rtx r1 = gen_rtx_REG (DImode, 1);
+  rtx r2 = gen_rtx_REG (DImode, 2);
+  rtx c0 = gen_rtx_REG (CADImode, 0);
+
+  /* Simplify to PLUS: no further folding possible.  */
+  rtx x = simplify_binary_operation (POINTER_PLUS,
+				     DImode,
+				     r0, r1);
+
+  ASSERT_EQ (GET_CODE (x), PLUS);
+  ASSERT_EQ (GET_MODE (x), DImode);
+  ASSERT_EQ (XEXP (x, 0), r0);
+  ASSERT_EQ (XEXP (x, 1), r1);
+
+
+  /* Simplify to PLUS and then fold the PLUS.  */
+  ASSERT_EQ (simplify_binary_operation (POINTER_PLUS,
+					DImode,
+					const0_rtx,
+					const0_rtx), const0_rtx);
+
+
+  /* (pointer_plus:M B 0) -> B */
+  ASSERT_EQ (simplify_binary_operation (POINTER_PLUS,
+					CADImode,
+					c0, const0_rtx), c0);
+
+  /* (pointer_plus:M B (minus:OM CV B.CV))
+       -> (replace_address_value:M B CV)
+
+     first for hard regs...  */
+  x = simplify_binary_operation (POINTER_PLUS,
+				 CADImode, c0,
+				 gen_rtx_MINUS (DImode, r1, r0));
+  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_EQ (XEXP (x, 1), r1);
+
+  /* ... and now for pseudos.  */
+  rtx p_r1 = gen_rtx_REG (DImode, FIRST_PSEUDO_REGISTER+1);
+  rtx p_c0 = gen_rtx_REG (CADImode, FIRST_PSEUDO_REGISTER);
+  rtx p_c0_di = gen_lowpart_SUBREG (DImode, p_c0);
+
+  x = simplify_binary_operation (POINTER_PLUS,
+				 CADImode, p_c0,
+				 gen_rtx_MINUS (DImode, p_r1, p_c0_di));
+  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), p_c0);
+  ASSERT_EQ (XEXP (x, 1), p_r1);
+
+  // TODO: test recursive simplification for the above rule.
+
+  /* pointer_plus -> align_address_down.  */
+  x = simplify_gen_binary (POINTER_PLUS, CADImode, c0,
+			   gen_rtx_NEG (DImode,
+					gen_rtx_AND (DImode, r0,
+						     GEN_INT (3))));
+  ASSERT_EQ (GET_CODE (x), ALIGN_ADDRESS_DOWN);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_TRUE (CONST_INT_P (XEXP (x, 1)));
+  ASSERT_EQ (INTVAL (XEXP (x, 1)), 4);
+
+  /* (pointer_plus:M (replace_address_value:M B CV) OFF)
+       --> (replace_address_value:M B (plus:OM CV OFF)).  */
+  x = simplify_gen_binary (POINTER_PLUS, CADImode,
+			   gen_rtx_REPLACE_ADDRESS_VALUE (CADImode, c0, r1),
+			   r2);
+  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_EQ (GET_CODE (XEXP (x, 1)), PLUS);
+
+  x = XEXP (x, 1);
+  ASSERT_EQ (XEXP (x, 0), r1);
+  ASSERT_EQ (XEXP (x, 1), r2);
+
+  /* (pointer_plus:M (pointer_plus:M B OFF1) OFF2)
+     --> (pointer_plus:M B (plus:OM OFF1 OFF2)).  */
+  x = simplify_gen_binary (POINTER_PLUS, CADImode,
+			   gen_rtx_POINTER_PLUS (CADImode, c0, r1),
+			   r2);
+  ASSERT_EQ (GET_CODE (x), POINTER_PLUS);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  x = XEXP (x, 1);
+  ASSERT_EQ (GET_CODE (x), PLUS);
+  ASSERT_EQ (XEXP (x, 0), r1);
+  ASSERT_EQ (XEXP (x, 1), r2);
+
+  /* (pointer_plus:M B (const_int OFF)) --> plus_constant (M, B, OFF).  */
+  rtx ptr_42 = gen_rtx_CONST (CADImode,
+			      gen_rtx_POINTER_PLUS (CADImode,
+						    CONST0_RTX (CADImode),
+						    GEN_INT (42)));
+
+  x = simplify_gen_binary (POINTER_PLUS, CADImode, ptr_42, GEN_INT (8));
+  ASSERT_TRUE (constant_cap_p (x, 50));
+}
+
+static void
+test_replace_address_value_simplifications ()
+{
+  machine_mode cm, om;
+  cm = CADImode;
+  om = DImode;
+
+  rtx c0 = gen_rtx_REG (cm, 0);
+  rtx r0 = gen_rtx_REG (om, 0);
+  rtx r1 = gen_rtx_REG (om, 1);
+
+  /* Collapse to RHS if mode is a scalar_int_mode.  */
+  ASSERT_EQ (simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+				  om, r0, r1), r1);
+
+  /* (replace_address_value:M B B.CV) --> B.  */
+  ASSERT_EQ (simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+				  cm, c0, r0), c0);
+
+  /* (replace_address_value:M (const_null:M) CV)
+     --> (pointer_plus:M (const_null:M) CV).  */
+  rtx x = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+			       cm, CONST0_RTX (cm),
+			       GEN_INT (42));
+  ASSERT_TRUE (constant_cap_p (x, 42));
+
+  /* (replace_address_value:M B (and:OM B.CV (const_int C)))
+     --> (align_address_down:M B (const_int -C))
+
+     when -C is a power of 2.  */
+  x = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+			   cm, c0,
+			   gen_rtx_AND (om, r0, GEN_INT (-16)));
+
+  ASSERT_EQ (GET_CODE (x), ALIGN_ADDRESS_DOWN);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_TRUE (CONST_INT_P (XEXP (x, 1)));
+  ASSERT_EQ (INTVAL (XEXP (x, 1)), 16);
+
+  /* (replace_address_value:M (CODE:M B X) CV2)
+     --> (replace_address_value:M B CV2)
+
+     for any capability code CODE provided X has no side effects.  */
+  const enum rtx_code codes[] = {
+      REPLACE_ADDRESS_VALUE,
+      POINTER_PLUS,
+      ALIGN_ADDRESS_DOWN
+  };
+  for (unsigned i = 0; i < ARRAY_SIZE (codes); i++)
+    {
+      x = simplify_gen_binary (REPLACE_ADDRESS_VALUE, cm,
+			       gen_rtx_fmt_ee (codes[i], cm, c0, GEN_INT (32)),
+			       r1);
+      ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+      ASSERT_EQ (XEXP (x, 0), c0);
+      ASSERT_EQ (XEXP (x, 1), r1);
+
+      /* TODO: test case with side effects?  */
+    }
+}
+
+static void
+test_align_address_down_simplifications ()
+{
+  machine_mode cm = CADImode, om = DImode;
+
+  rtx c0 = gen_rtx_REG (cm, 0);
+  rtx r0 = gen_rtx_REG (om, 0);
+
+  rtx x = simplify_gen_binary (ALIGN_ADDRESS_DOWN, om, r0, GEN_INT (16));
+  ASSERT_EQ (GET_CODE (x), AND);
+  ASSERT_EQ (XEXP (x, 0), r0);
+  ASSERT_TRUE (CONST_INT_P (XEXP (x, 1)));
+  ASSERT_EQ (INTVAL (XEXP (x, 1)), -16L);
+
+  /* (align_address_down:M B (const_int 1)) --> B.  */
+  ASSERT_EQ (simplify_gen_binary (ALIGN_ADDRESS_DOWN, cm, c0, GEN_INT (1)),
+	     c0);
+
+  /* (align_address_down:M (const_null:M) ALIGN) --> (const_null:M)
+
+     provided ALIGN is free of side effects.  */
+  ASSERT_EQ (simplify_gen_binary (ALIGN_ADDRESS_DOWN, cm, CONST0_RTX (cm),
+				  GEN_INT (8)), CONST0_RTX (cm));
+
+  /* (align_address_down:M (replace_address_value:M B CV) ALIGN))
+     --> (replace_address_value:M B (and:OM CV (neg:OM ALIGN))).  */
+  x = simplify_gen_binary (ALIGN_ADDRESS_DOWN, cm,
+			   gen_rtx_REPLACE_ADDRESS_VALUE (cm, c0, GEN_INT (17)),
+			   GEN_INT (2));
+  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_TRUE (CONST_INT_P (XEXP (x, 1)));
+  ASSERT_EQ (INTVAL (XEXP (x, 1)), 16);
+
+  /* (align_address_down:M
+       (align_address_down:M B (const_int C2))
+      (const_int C1)) --> (align_address_down:M B (const_int max(C1,C2))).  */
+  x = simplify_gen_binary (ALIGN_ADDRESS_DOWN, cm,
+			   gen_rtx_ALIGN_ADDRESS_DOWN (cm, c0, GEN_INT (4)),
+			   GEN_INT (8));
+  ASSERT_EQ (GET_CODE (x), ALIGN_ADDRESS_DOWN);
+  ASSERT_EQ (XEXP (x, 0), c0);
+  ASSERT_TRUE (CONST_INT_P (XEXP (x, 1)));
+  ASSERT_EQ (INTVAL (XEXP (x, 1)), 8);
+}
+
+static void
+test_capability_simplifications ()
+{
+  test_capability_plus_constant ();
+  test_pointer_plus_simplifications ();
+  test_replace_address_value_simplifications ();
+  test_align_address_down_simplifications ();
+}
+
 /* Run all of the selftests within this file.  */
 
 void
@@ -7943,6 +8357,7 @@ simplify_rtx_c_tests ()
 {
   test_scalar_ops ();
   test_vector_ops ();
+  test_capability_simplifications ();
   simplify_const_poly_int_tests<NUM_POLY_INT_COEFFS>::run ();
 }
 

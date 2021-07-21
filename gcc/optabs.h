@@ -341,6 +341,12 @@ rtx expand_atomic_store (rtx, rtx, enum memmodel, bool);
 rtx expand_atomic_fetch_op (rtx, rtx, rtx, enum rtx_code, enum memmodel, 
 			      bool);
 
+rtx expand_replace_address_value (scalar_addr_mode, rtx, rtx, rtx);
+rtx expand_pointer_plus (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
+rtx expand_pointer_minus (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
+rtx expand_align_down (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
+rtx expand_align_up (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
+
 extern bool insn_operand_matches (enum insn_code icode, unsigned int opno,
 				  rtx operand);
 extern bool valid_multiword_target_p (rtx);

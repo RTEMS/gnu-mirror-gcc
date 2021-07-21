@@ -949,6 +949,8 @@ int_binop_types_match_p (enum tree_code code, const_tree type1, const_tree type2
     return false;
   if (!INTEGRAL_TYPE_P (type2) && !POINTER_TYPE_P (type2))
     return false;
+  if (capability_type_p (type1) || capability_type_p (type2))
+    return false;
 
   switch (code)
     {
@@ -1178,6 +1180,8 @@ int_const_binop (enum tree_code code, const_tree arg1, const_tree arg2,
   tree type = TREE_TYPE (arg1);
   signop sign = TYPE_SIGN (type);
   wi::overflow_type overflow = wi::OVF_NONE;
+  gcc_assert (!tree_is_capability_value (arg1)
+	      && ! tree_is_capability_value (arg2));
 
   if (TREE_CODE (arg1) == INTEGER_CST && TREE_CODE (arg2) == INTEGER_CST)
     {
@@ -1235,6 +1239,23 @@ const_binop (enum tree_code code, tree arg1, tree arg2)
 
   if (poly_int_tree_p (arg1) && poly_int_tree_p (arg2))
     {
+      /* A POINTER_PLUS_EXPR on an INTEGER_CST capability can not be treated in
+	 the same way.  The capability will hold metadata bits that should not
+	 be included in the operation.
+
+	 Instead we calculate the new capability value in the noncapability
+	 type (which also means in the precision of this noncapability type as
+	 the calculation should be) and then generate a capability that has the
+	 metadata from the original capability and the new address.  */
+      if (tree_is_capability_value (arg1))
+	{
+	  tree new_value
+		  = int_const_binop (PLUS_EXPR, fold_drop_capability (arg1),
+				     arg2,
+				     POINTER_TYPE_P (TREE_TYPE (arg1)) ? 0 : -1);
+	  tree ret = fold_build_replace_address_value (arg1, new_value);
+	  return ret ? ret : NULL_TREE;
+	}
       if (code == POINTER_PLUS_EXPR)
 	return int_const_binop (PLUS_EXPR,
 				arg1, fold_convert (TREE_TYPE (arg1), arg2));
@@ -2261,6 +2282,7 @@ fold_convert_const_fixed_from_real (tree type, const_tree arg1)
 static tree
 fold_convert_const (enum tree_code code, tree type, tree arg1)
 {
+  gcc_assert (capability_args_valid (type, code, arg1));
   tree arg_type = TREE_TYPE (arg1);
   if (arg_type == type)
     return arg1;
@@ -2366,12 +2388,14 @@ fold_convertible_p (const_tree type, const_tree arg)
   switch (TREE_CODE (type))
     {
     case INTEGER_TYPE: case ENUMERAL_TYPE: case BOOLEAN_TYPE:
-    case POINTER_TYPE: case REFERENCE_TYPE:
+    case POINTER_TYPE: case REFERENCE_TYPE: case INTCAP_TYPE:
     case OFFSET_TYPE:
-      return (INTEGRAL_TYPE_P (orig)
-	      || (POINTER_TYPE_P (orig)
-		  && TYPE_PRECISION (type) <= TYPE_PRECISION (orig))
-	      || TREE_CODE (orig) == OFFSET_TYPE);
+      return capability_args_valid (type, NOP_EXPR, arg)
+	      && (INTEGRAL_TYPE_P (orig)
+		  || (POINTER_TYPE_P (orig)
+		      && TYPE_NONCAP_PRECISION (type)
+			 <= TYPE_NONCAP_PRECISION (orig))
+		  || TREE_CODE (orig) == OFFSET_TYPE);
 
     case REAL_TYPE:
     case FIXED_POINT_TYPE:
@@ -2418,7 +2442,7 @@ fold_convert_loc (location_t loc, tree type, tree arg)
       /* fall through */
 
     case INTEGER_TYPE: case ENUMERAL_TYPE: case BOOLEAN_TYPE:
-    case OFFSET_TYPE:
+    case OFFSET_TYPE: case INTCAP_TYPE:
       if (TREE_CODE (arg) == INTEGER_CST)
 	{
 	  tem = fold_convert_const (NOP_EXPR, type, arg);
@@ -2426,7 +2450,7 @@ fold_convert_loc (location_t loc, tree type, tree arg)
 	    return tem;
 	}
       if (INTEGRAL_TYPE_P (orig) || POINTER_TYPE_P (orig)
-	  || TREE_CODE (orig) == OFFSET_TYPE)
+	  || TREE_CODE (orig) == OFFSET_TYPE || INTCAP_TYPE_P (orig))
 	return fold_build1_loc (loc, NOP_EXPR, type, arg);
       if (TREE_CODE (orig) == COMPLEX_TYPE)
 	return fold_convert_loc (loc, type,
@@ -2560,6 +2584,33 @@ fold_convert_loc (location_t loc, tree type, tree arg)
  fold_convert_exit:
   protected_set_expr_location_unshare (tem, loc);
   return tem;
+}
+
+/* Force conversion for integer constants to a capability.
+   This is a special function designed specifically for use casting MEM_REF
+   offsets to pointer types.  In general such casts of integer values to
+   pointer types is not allowed in order to avoid introducing capability
+   validity losing operations.  For MEM_REF offsets, the type is only used for
+   type based alias analysis of the memory access, hence such a loss of
+   "validity" is not a concern.  */
+tree
+fold_convert_for_mem_ref (tree type, tree arg)
+{
+  gcc_assert (POINTER_TYPE_P (type) && TREE_CODE (arg) == INTEGER_CST);
+  tree ret = fold_convert_const_int_from_int (type, arg);
+  gcc_assert (ret);
+  return ret;
+}
+tree
+fold_convert_MORELLO_TODO_getout_clause (tree type, tree arg)
+{
+  if (capability_type_p (type) && (TREE_CODE (arg) == INTEGER_CST))
+    {
+      tree ret = fold_convert_const_int_from_int (type, arg);
+      gcc_assert (ret);
+      return ret;
+    }
+  return fold_convert(type, arg);
 }
 
 /* Return false if expr can be assumed not to be an lvalue, true
@@ -2976,6 +3027,10 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
   /* Bitwise identity makes no sense if the values have different layouts.  */
   if ((flags & OEP_BITWISE)
       && !tree_nop_conversion_p (TREE_TYPE (arg0), TREE_TYPE (arg1)))
+    return false;
+
+  if (capability_type_p (TREE_TYPE (arg0))
+      != capability_type_p (TREE_TYPE (arg1)))
     return false;
 
   /* We cannot consider pointers to different address space equal.  */
@@ -5091,12 +5146,12 @@ make_range_step (location_t loc, enum tree_code code, tree arg0, tree arg1,
 
     CASE_CONVERT:
     case NON_LVALUE_EXPR:
-      if (TYPE_PRECISION (arg0_type) > TYPE_PRECISION (exp_type))
-	return NULL_TREE;
-
       if (! INTEGRAL_TYPE_P (arg0_type)
 	  || (low != 0 && ! int_fits_type_p (low, arg0_type))
 	  || (high != 0 && ! int_fits_type_p (high, arg0_type)))
+	return NULL_TREE;
+
+      if (TYPE_PRECISION (arg0_type) > TYPE_PRECISION (exp_type))
 	return NULL_TREE;
 
       n_low = low, n_high = high;
@@ -5199,6 +5254,7 @@ make_range (tree exp, int *pin_p, tree *plow, tree *phigh,
   int in_p;
   tree low, high;
   location_t loc = EXPR_LOCATION (exp);
+  gcc_assert (! tree_is_capability_value (exp));
 
   /* Start with simply saying "EXP != 0" and then look at the code of EXP
      and see if we can refine the range.  Some of the cases below may not
@@ -6658,6 +6714,15 @@ extract_muldiv_1 (tree t, tree c, enum tree_code code, tree wide_type,
       break;
 
     CASE_CONVERT: case NON_LVALUE_EXPR:
+      /* If this conversion removes a capability (op0 is a capability type),
+	 then we cannot pass through this capability removal (especially since
+	 looking at multiplications and divisions on a capability type value is
+	 not valid).
+	 (OPTIMISATION) From what I can tell it seems the only optimisation
+	 missed is optimisations on NULL.  */
+      if (capability_type_p (TREE_TYPE (op0)))
+	break;
+
       /* If op0 is an expression ...  */
       if ((COMPARISON_CLASS_P (op0)
 	   || UNARY_CLASS_P (op0)
@@ -7590,7 +7655,7 @@ static int
 native_encode_int (const_tree expr, unsigned char *ptr, int len, int off)
 {
   tree type = TREE_TYPE (expr);
-  int total_bytes = GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type));
+  int total_bytes = GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (type));
   int byte, offset, word, words;
   unsigned char value;
 
@@ -8238,7 +8303,7 @@ native_encode_initializer (tree init, unsigned char *ptr, int len,
 static tree
 native_interpret_int (tree type, const unsigned char *ptr, int len)
 {
-  int total_bytes = GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type));
+  int total_bytes = GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (type));
 
   if (total_bytes > len
       || total_bytes * BITS_PER_UNIT > HOST_BITS_PER_DOUBLE_INT)
@@ -10241,6 +10306,7 @@ tree
 fold_binary_loc (location_t loc, enum tree_code code, tree type,
 		 tree op0, tree op1)
 {
+  gcc_assert (capability_args_valid (type, code, op0, op1));
   enum tree_code_class kind = TREE_CODE_CLASS (code);
   tree arg0, arg1, tem;
   tree t1 = NULL_TREE;
@@ -10400,10 +10466,8 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	  && TREE_CODE (TREE_OPERAND (arg0, 0)) == MEM_REF)
 	{
 	  tree iref = TREE_OPERAND (arg0, 0);
-	  return fold_build2 (MEM_REF, type,
-			      TREE_OPERAND (iref, 0),
-			      int_const_binop (PLUS_EXPR, arg1,
-					       TREE_OPERAND (iref, 1)));
+	  return fold_build2 (MEM_REF, type, TREE_OPERAND (iref, 0),
+			      maybe_cap_int_const_binop (PLUS_EXPR, arg1, TREE_OPERAND (iref, 1)));
 	}
 
       /* MEM[&a.b, CST2] -> MEM[&a, offsetof (a, b) + CST2].  */
@@ -10418,8 +10482,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	    return NULL_TREE;
 	  return fold_build2 (MEM_REF, type,
 			      build1 (ADDR_EXPR, TREE_TYPE (arg0), base),
-			      int_const_binop (PLUS_EXPR, arg1,
-					       size_int (coffset)));
+			      maybe_cap_int_const_binop (PLUS_EXPR, arg1, size_int (coffset)));
 	}
 
       return NULL_TREE;
@@ -10428,12 +10491,18 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
       /* INT +p INT -> (PTR)(INT + INT).  Stripping types allows for this. */
       if (INTEGRAL_TYPE_P (TREE_TYPE (arg1))
 	   && INTEGRAL_TYPE_P (TREE_TYPE (arg0)))
-        return fold_convert_loc (loc, type,
-				 fold_build2_loc (loc, PLUS_EXPR, sizetype,
+	{
+	  /* Can't have a NOP_EXPR converting an integer to a capability.
+	     Hence we should never enter this clause when the end type is a
+	     capability.  */
+	  gcc_assert (! capability_type_p (type));
+	  return fold_convert_loc (loc, type,
+				   fold_build2_loc (loc, PLUS_EXPR, sizetype,
 					      fold_convert_loc (loc, sizetype,
 								arg1),
 					      fold_convert_loc (loc, sizetype,
 								arg0)));
+	}
 
       return NULL_TREE;
 
@@ -13193,6 +13262,7 @@ tree
 fold_build1_loc (location_t loc,
 		 enum tree_code code, tree type, tree op0 MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (type, code, op0));
   tree tem;
 #ifdef ENABLE_FOLD_CHECKING
   unsigned char checksum_before[16], checksum_after[16];
@@ -13231,6 +13301,7 @@ fold_build2_loc (location_t loc,
 		      enum tree_code code, tree type, tree op0, tree op1
 		      MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (type, code, op0, op1));
   tree tem;
 #ifdef ENABLE_FOLD_CHECKING
   unsigned char checksum_before_op0[16],
@@ -13283,6 +13354,7 @@ tree
 fold_build3_loc (location_t loc, enum tree_code code, tree type,
 		      tree op0, tree op1, tree op2 MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (type, code, op0, op1, op2));
   tree tem;
 #ifdef ENABLE_FOLD_CHECKING
   unsigned char checksum_before_op0[16],
@@ -13461,6 +13533,50 @@ fold_build_call_array_initializer_loc (location_t loc, tree type, tree fn,
 
 #undef START_FOLD_INIT
 #undef END_FOLD_INIT
+
+/* Build REPLACE_ADDRESS_VALUE internal function, folding away constant
+   assignments if possible.
+
+   We currently only fold away assignments to a constant 0 capability to make
+   constant integer initialisation work nicely, but this could be made to work
+   on assignments to any integer_cst capability.  */
+
+tree
+fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
+{
+  if (! tree_is_capability_value (c))
+    return fold_convert (TREE_TYPE (c), cv);
+  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (cv))
+	      && TYPE_PRECISION (TREE_TYPE (cv))
+		<= TYPE_PRECISION (noncapability_type (TREE_TYPE (c))));
+  if (TREE_CODE (c) == INTEGER_CST && TREE_CODE (cv) == INTEGER_CST)
+    {
+      tree cap_type = TREE_TYPE (c);
+      unsigned HOST_WIDE_INT prec = TYPE_NONCAP_PRECISION (cap_type);
+      wide_int cap_orig = wi::to_wide (c);
+      wide_int new_value = wi::to_wide (cv, prec);
+      wide_int mask = wi::uhwi (-1, prec);
+      wide_int masked_cap = wi::bit_and_not (cap_orig, mask);
+      wide_int res = wi::bit_or (masked_cap, new_value);
+      /* Replacing address value.  Only want something marked as overflow if
+	 the original value was overflowed.  No way to cause an overflow here.
+       */
+      return force_fit_type (cap_type, res,
+			     !POINTER_TYPE_P (cap_type),
+			     TREE_OVERFLOW (cv));
+    }
+
+  return build_replace_address_value_loc (loc, c, cv);
+}
+
+tree
+maybe_cap_int_const_binop (tree_code op, tree arg1, tree arg2)
+{
+  tree offset = int_const_binop (op, fold_drop_capability (arg1),
+				 fold_drop_capability (arg2));
+  return fold_build_replace_address_value (arg1, offset);
+}
+
 
 /* Determine if first argument is a multiple of second argument.  Return 0 if
    it is not, or we cannot easily determined it to be.
@@ -14228,7 +14344,8 @@ tree_unary_nonzero_warnv_p (enum tree_code code, tree type, tree op0,
 	tree inner_type = TREE_TYPE (op0);
 	tree outer_type = type;
 
-	return (TYPE_PRECISION (outer_type) >= TYPE_PRECISION (inner_type)
+	return (TYPE_NONCAP_PRECISION (outer_type)
+		  >= TYPE_NONCAP_PRECISION (inner_type)
 		&& tree_expr_nonzero_warnv_p (op0,
 					      strict_overflow_p));
       }

@@ -337,6 +337,7 @@ c_pretty_printer::simple_type_specifier (tree t)
       pp_c_identifier (this, IDENTIFIER_POINTER (t));
       break;
 
+    case INTCAP_TYPE:
     case VOID_TYPE:
     case BOOLEAN_TYPE:
     case INTEGER_TYPE:
@@ -380,6 +381,9 @@ c_pretty_printer::simple_type_specifier (tree t)
 		  break;
 		case FIXED_POINT_TYPE:
 		  translate_string ("<unnamed-fixed:");
+		  break;
+		case INTCAP_TYPE:
+		  translate_string ("<unnamed-intcap:");
 		  break;
 		default:
 		  gcc_unreachable ();
@@ -606,6 +610,7 @@ c_pretty_printer::direct_abstract_declarator (tree t)
       direct_abstract_declarator (TREE_TYPE (t));
       break;
 
+    case INTCAP_TYPE:
     case IDENTIFIER_NODE:
     case VOID_TYPE:
     case BOOLEAN_TYPE:

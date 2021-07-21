@@ -106,7 +106,7 @@ static GTY(()) vec<mem_addr_template, va_gc> *mem_addr_template_list;
    to where step is placed to *STEP_P and offset to *OFFSET_P.  */
 
 static void
-gen_addr_rtx (machine_mode address_mode,
+gen_addr_rtx (scalar_addr_mode address_mode,
 	      rtx symbol, rtx base, rtx index, rtx step, rtx offset,
 	      rtx *addr, rtx **step_p, rtx **offset_p)
 {
@@ -123,7 +123,8 @@ gen_addr_rtx (machine_mode address_mode,
       act_elem = index;
       if (step)
 	{
-	  act_elem = gen_rtx_MULT (address_mode, act_elem, step);
+	  act_elem = gen_rtx_MULT (offset_mode (address_mode),
+				   act_elem, step);
 
 	  if (step_p)
 	    *step_p = &XEXP (act_elem, 1);
@@ -135,7 +136,7 @@ gen_addr_rtx (machine_mode address_mode,
   if (base && base != const0_rtx)
     {
       if (*addr)
-	*addr = simplify_gen_binary (PLUS, address_mode, base, *addr);
+	*addr = gen_pointer_plus (address_mode, base, *addr);
       else
 	*addr = base;
     }
@@ -145,7 +146,7 @@ gen_addr_rtx (machine_mode address_mode,
       act_elem = symbol;
       if (offset)
 	{
-	  act_elem = gen_rtx_PLUS (address_mode, act_elem, offset);
+	  act_elem = gen_raw_pointer_plus (address_mode, act_elem, offset);
 
 	  if (offset_p)
 	    *offset_p = &XEXP (act_elem, 1);
@@ -157,7 +158,7 @@ gen_addr_rtx (machine_mode address_mode,
 	}
 
       if (*addr)
-	*addr = gen_rtx_PLUS (address_mode, *addr, act_elem);
+	*addr = gen_raw_pointer_plus (address_mode, *addr, act_elem);
       else
 	*addr = act_elem;
     }
@@ -165,7 +166,7 @@ gen_addr_rtx (machine_mode address_mode,
     {
       if (*addr)
 	{
-	  *addr = gen_rtx_PLUS (address_mode, *addr, offset);
+	  *addr = gen_raw_pointer_plus (address_mode, *addr, offset);
 	  if (offset_p)
 	    *offset_p = &XEXP (*addr, 1);
 	}
@@ -191,13 +192,13 @@ rtx
 addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
 		  bool really_expand)
 {
-  scalar_int_mode address_mode = targetm.addr_space.address_mode (as);
-  scalar_int_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as);
+  scalar_addr_mode pointer_mode = targetm.addr_space.pointer_mode (as);
   rtx address, sym, bse, idx, st, off;
   struct mem_addr_template *templ;
 
   if (addr->step && !integer_onep (addr->step))
-    st = immed_wide_int_const (wi::to_wide (addr->step), pointer_mode);
+    st = immed_wide_int_const (wi::to_wide (addr->step), offset_mode (pointer_mode));
   else
     st = NULL_RTX;
 
@@ -205,7 +206,7 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
     {
       poly_offset_int dc
 	= poly_offset_int::from (wi::to_poly_wide (addr->offset), SIGNED);
-      off = immed_wide_int_const (dc, pointer_mode);
+      off = immed_wide_int_const (dc, offset_mode (pointer_mode));
     }
   else
     off = NULL_RTX;
@@ -229,7 +230,8 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
 		 gen_raw_REG (pointer_mode, LAST_VIRTUAL_REGISTER + 1)
 		 : NULL_RTX);
 	  idx = (addr->index ?
-		 gen_raw_REG (pointer_mode, LAST_VIRTUAL_REGISTER + 2)
+		 gen_raw_REG (offset_mode (pointer_mode),
+			      LAST_VIRTUAL_REGISTER + 2)
 		 : NULL_RTX);
 
 	  gen_addr_rtx (pointer_mode, sym, bse, idx,
@@ -256,7 +258,8 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
 	 ? expand_expr (addr->base, NULL_RTX, pointer_mode, EXPAND_NORMAL)
 	 : NULL_RTX);
   idx = (addr->index
-	 ? expand_expr (addr->index, NULL_RTX, pointer_mode, EXPAND_NORMAL)
+	 ? expand_expr (addr->index, NULL_RTX,
+			offset_mode (pointer_mode), EXPAND_NORMAL)
 	 : NULL_RTX);
 
   /* addr->base could be an SSA_NAME that was set to a constant value.  The
@@ -576,18 +579,28 @@ multiplier_allowed_in_address_p (HOST_WIDE_INT ratio, machine_mode mode,
   if (!valid_mult)
     {
       machine_mode address_mode = targetm.addr_space.address_mode (as);
-      rtx reg1 = gen_raw_REG (address_mode, LAST_VIRTUAL_REGISTER + 1);
+      machine_mode addr_mode = noncapability_mode (address_mode);
+      rtx reg1 = gen_raw_REG (addr_mode, LAST_VIRTUAL_REGISTER + 1);
       rtx reg2 = gen_raw_REG (address_mode, LAST_VIRTUAL_REGISTER + 2);
       rtx addr, scaled;
       HOST_WIDE_INT i;
 
       valid_mult = sbitmap_alloc (2 * MAX_RATIO + 1);
       bitmap_clear (valid_mult);
-      scaled = gen_rtx_fmt_ee (MULT, address_mode, reg1, NULL_RTX);
-      addr = gen_rtx_fmt_ee (PLUS, address_mode, scaled, reg2);
+      scaled = gen_rtx_fmt_ee (MULT, addr_mode, reg1, NULL_RTX);
+      /* MORELLO TODO  Just need to double check if the RTX for capabilities we
+	 form here are of the correct canonicalisation.  */
+      addr = gen_raw_pointer_plus (as_a <scalar_addr_mode> (address_mode),
+				   reg2, scaled);
       for (i = -MAX_RATIO; i <= MAX_RATIO; i++)
 	{
-	  XEXP (scaled, 1) = gen_int_mode (i, address_mode);
+	  XEXP (scaled, 1) = gen_int_mode (i, addr_mode);
+	  if (/* CAPABILITY_MODE_P (address_mode) */false)
+	    {
+	      rtx reg3 = gen_raw_REG (address_mode, LAST_VIRTUAL_REGISTER + 3);
+	      scaled = gen_rtx_fmt_ee (REPLACE_ADDRESS_VALUE, address_mode,
+				       reg3, scaled);
+	    }
 	  if (memory_address_addr_space_p (mode, addr, as)
 	      || memory_address_addr_space_p (mode, scaled, as))
 	    bitmap_set_bit (valid_mult, i + MAX_RATIO);
@@ -620,8 +633,22 @@ static void
 most_expensive_mult_to_index (tree type, struct mem_address *parts,
 			      aff_tree *addr, bool speed)
 {
+  /* MORELLO TODO.
+     This function doesn't break on using capabilities, but we haven't yet
+     checked whether it gives results that do what it's trying to do.
+
+     It appears (though this requires work to check) that this function is
+     trying to figure out the best way of creating an address by splitting a
+     multiplication into some multiplications done manually and one done in the
+     actual addressing.
+
+     We switch the test from checking whether a multiplication of an address is
+     costly to checking whether a multiplication of an address offset is costly.
+     That may mean we do exactly what this function wants to do, but it would
+     be nice to check.
+     */
   addr_space_t as = TYPE_ADDR_SPACE (type);
-  machine_mode address_mode = targetm.addr_space.address_mode (as);
+  machine_mode address_mode = offset_mode (targetm.addr_space.address_mode (as));
   HOST_WIDE_INT coef;
   unsigned best_mult_cost = 0, acost;
   tree mult_elt = NULL_TREE, elt;
@@ -1065,6 +1092,22 @@ copy_ref_info (tree new_ref, tree old_ref)
     }
 }
 
+/* Apply FOLD_BINARY_TO_CONSTANT on the given arguments, but ensure
+   all arguments are cast to an integer type where needed (e.g. when needed
+   because the pointer type is a capability and we want to apply integer
+   arithmetic to it).  */
+tree
+fold_cap_binary_to_constant (enum tree_code code, tree type, tree op0,
+			     tree op1)
+{
+  tree tem = fold_binary (code, noncapability_type (type),
+			  fold_drop_capability (op0),
+			  fold_drop_capability (op1));
+  if (tem)
+    return fold_convert (type, tem);
+  return NULL_TREE;
+}
+
 /* Move constants in target_mem_ref REF to offset.  Returns the new target
    mem ref if anything changes, NULL_TREE otherwise.  */
 
@@ -1081,9 +1124,9 @@ maybe_fold_tmr (tree ref)
       && TREE_CODE (addr.base) == INTEGER_CST
       && !integer_zerop (addr.base))
     {
-      addr.offset = fold_binary_to_constant (PLUS_EXPR,
-					     TREE_TYPE (addr.offset),
-					     addr.offset, addr.base);
+      addr.offset = fold_cap_binary_to_constant (PLUS_EXPR,
+						 TREE_TYPE (addr.offset),
+						 addr.offset, addr.base);
       addr.base = NULL_TREE;
       changed = true;
     }
@@ -1091,7 +1134,7 @@ maybe_fold_tmr (tree ref)
   if (addr.symbol
       && TREE_CODE (TREE_OPERAND (addr.symbol, 0)) == MEM_REF)
     {
-      addr.offset = fold_binary_to_constant
+      addr.offset = fold_cap_binary_to_constant
 			(PLUS_EXPR, TREE_TYPE (addr.offset),
 			 addr.offset,
 			 TREE_OPERAND (TREE_OPERAND (addr.symbol, 0), 1));
@@ -1120,9 +1163,9 @@ maybe_fold_tmr (tree ref)
 	  addr.step = NULL_TREE;
 	}
 
-      addr.offset = fold_binary_to_constant (PLUS_EXPR,
-					     TREE_TYPE (addr.offset),
-					     addr.offset, off);
+      addr.offset = fold_cap_binary_to_constant (PLUS_EXPR,
+						 TREE_TYPE (addr.offset),
+						 addr.offset, off);
       addr.index = NULL_TREE;
       changed = true;
     }

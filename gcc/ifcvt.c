@@ -1121,7 +1121,8 @@ noce_try_ifelse_collapse (struct noce_if_info * if_info)
     return FALSE;
 
   machine_mode mode = GET_MODE (if_info->x);
-  rtx if_then_else = simplify_gen_ternary (IF_THEN_ELSE, mode, mode,
+  rtx if_then_else = simplify_gen_ternary (IF_THEN_ELSE, mode,
+					   GET_MODE (if_info->cond),
 					    if_info->cond, if_info->b,
 					    if_info->a);
 

@@ -301,8 +301,9 @@ emit_add3_insn (rtx x, rtx y, rtx z)
       return insn;
     }
 
-  rtx_insn *insn = emit_insn (gen_rtx_SET (x, gen_rtx_PLUS (GET_MODE (y),
-							    y, z)));
+  const auto sa = as_a <scalar_addr_mode> (GET_MODE (y));
+  rtx_insn *insn = emit_insn (gen_rtx_SET (x, gen_raw_pointer_plus (sa, y, z)));
+
   if (recog_memoized (insn) < 0)
     {
       delete_insns_since (last);
@@ -417,15 +418,17 @@ lra_emit_add (rtx x, rtx y, rtx z)
 	      /* Try x = base + disp.  */
 	      lra_assert (base != NULL_RTX);
 	      last = get_last_insn ();
+	      const auto sa = as_a <scalar_addr_mode> (GET_MODE (base));
 	      rtx_insn *move_insn =
-		emit_move_insn (x, gen_rtx_PLUS (GET_MODE (base), base, disp));
+		emit_move_insn (x, gen_raw_pointer_plus (sa, base, disp));
 	      if (recog_memoized (move_insn) < 0)
 		{
 		  delete_insns_since (last);
-		  /* Generate x = disp; x = x + base.  */
-		  emit_move_insn (x, disp);
-		  rtx_insn *add2_insn = emit_add2_insn (x, base);
-		  lra_assert (add2_insn != NULL_RTX);
+		  /* Generate x = disp; x = base + x.  */
+		  rtx x_nocap = drop_capability (x);
+		  emit_move_insn (x_nocap, disp);
+		  rtx_insn *add3_insn = emit_add3_insn (x, base, x_nocap);
+		  lra_assert (add3_insn != NULL_RTX);
 		}
 	      /* Generate x = x + index.  */
 	      if (index != NULL_RTX)
@@ -491,8 +494,8 @@ lra_emit_move (rtx x, rtx y)
 {
   int old;
   rtx_insn *insn;
-  
-  if (GET_CODE (y) != PLUS)
+
+  if (!any_plus_p (y))
     {
       if (rtx_equal_p (x, y))
 	return;

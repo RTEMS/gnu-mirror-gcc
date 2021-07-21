@@ -2992,6 +2992,37 @@ expand_DIVMOD (internal_fn, gcall *call_stmt)
 	       target, VOIDmode, EXPAND_NORMAL);
 }
 
+/* Expand REPLACE_ADDRESS_VALUE internal function.
+   Returns the result of replacing the value of the capability in the first
+   argument with the value in the second.  */
+static void
+expand_REPLACE_ADDRESS_VALUE (internal_fn, gcall *gc)
+{
+  tree result = gimple_call_lhs (gc);
+  if (! result)
+    /* Has no side-effects, hence if return value not used just return now.  */
+    return;
+  tree orig_capability = gimple_call_arg (gc, 0);
+  tree new_value = gimple_call_arg (gc, 1);
+
+  tree res_type = TREE_TYPE (result);
+  tree cap_type = TREE_TYPE (orig_capability);
+  tree val_type = TREE_TYPE (new_value);
+  gcc_assert (capability_type_p (cap_type));
+  gcc_assert (types_compatible_p (cap_type, res_type));
+  gcc_assert (types_compatible_p (val_type, noncapability_type (cap_type)));
+
+  scalar_addr_mode cap_mode
+    = scalar_addr_mode::from_int (TYPE_MODE (TREE_TYPE (orig_capability)));
+  rtx target = expand_normal (result);
+  rtx ret = expand_replace_address_value (cap_mode,
+					  expand_normal (orig_capability),
+					  expand_normal (new_value),
+					  target);
+  if (!rtx_equal_p (target, ret))
+    emit_move_insn (target, ret);
+}
+
 /* Expand a NOP.  */
 
 static void

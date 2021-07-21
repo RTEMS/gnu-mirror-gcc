@@ -383,6 +383,19 @@ DEF_INTERNAL_FN (CO_YIELD, ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (CO_SUSPN, ECF_NOTHROW, NULL)
 DEF_INTERNAL_FN (CO_FRAME, ECF_PURE | ECF_NOTHROW | ECF_LEAF, NULL)
 
+/* For handling capabilities.  */
+/* MORELLO TODO ... I mark the incoming argument as DIRECT | NOCLOBBER |
+   NOESCAPE since all those are true.  However, it's also true to say that the
+   argument is not dereferenced *at all* and that doesn"t seem to be
+   reprasentable.
+
+   There is an EAF_UNUSED flag, which tells the compiler that the argument is
+   not used.  I expect that this would indicate that the argument doesn"t
+   actually have to be properly passed to the function (which is *not* valid)
+   -- but it would be worth checking if it only means that the argument is not
+   dereferenced.  */
+DEF_INTERNAL_FN (REPLACE_ADDRESS_VALUE, ECF_CONST | ECF_LEAF, ".RR")
+
 /* A NOP function with arbitrary arguments and return value.  */
 DEF_INTERNAL_FN (NOP, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 

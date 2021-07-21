@@ -581,7 +581,7 @@ do {								\
 
 /* Convert the implicit sum in a `struct args_size' into an rtx.  */
 #define ARGS_SIZE_RTX(SIZE)					\
-((SIZE).var == 0 ? gen_int_mode ((SIZE).constant, Pmode)	\
+((SIZE).var == 0 ? gen_int_mode ((SIZE).constant, POmode)	\
  : expand_normal (ARGS_SIZE_TREE (SIZE)))
 
 #define ASLK_REDUCE_ALIGN 1

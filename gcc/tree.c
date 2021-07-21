@@ -833,6 +833,7 @@ tree_code_size (enum tree_code code)
 	case OFFSET_TYPE:
 	case ENUMERAL_TYPE:
 	case BOOLEAN_TYPE:
+	case INTCAP_TYPE:
 	case INTEGER_TYPE:
 	case REAL_TYPE:
 	case POINTER_TYPE:
@@ -1293,7 +1294,7 @@ copy_list (tree list)
 static unsigned int
 get_int_cst_ext_nunits (tree type, const wide_int &cst)
 {
-  gcc_checking_assert (cst.get_precision () == TYPE_PRECISION (type));
+  gcc_checking_assert (cst.get_precision () == TYPE_CAP_PRECISION (type));
   /* We need extra HWIs if CST is an unsigned integer with its
      upper bit set.  */
   if (TYPE_UNSIGNED (type) && wi::neg_p (cst))
@@ -1352,7 +1353,12 @@ build_new_poly_int_cst (tree type, tree (&coeffs)[NUM_POLY_INT_COEFFS]
   return t;
 }
 
-/* Create a constant tree that contains CST sign-extended to TYPE.  */
+/* Create a constant tree that contains CST sign-extended to TYPE.
+   Note: be careful using this with signed INTCAP_TYPE values, since the sign
+   extension will carry over into the metadata.
+   For capabilities in general this is unavoidable using the existing
+   interface, since for 64 bit capabilities (with 32 bit values) simply passing
+   in an argument of -1 would have already sign extended into the metadata.  */
 
 tree
 build_int_cst (tree type, poly_int64 cst)
@@ -1361,7 +1367,7 @@ build_int_cst (tree type, poly_int64 cst)
   if (!type)
     type = integer_type_node;
 
-  return wide_int_to_tree (type, wi::shwi (cst, TYPE_PRECISION (type)));
+  return wide_int_to_tree (type, wi::shwi (cst, TYPE_CAP_PRECISION (type)));
 }
 
 /* Create a constant tree that contains CST zero-extended to TYPE.  */
@@ -1369,7 +1375,7 @@ build_int_cst (tree type, poly_int64 cst)
 tree
 build_int_cstu (tree type, poly_uint64 cst)
 {
-  return wide_int_to_tree (type, wi::uhwi (cst, TYPE_PRECISION (type)));
+  return wide_int_to_tree (type, wi::uhwi (cst, TYPE_CAP_PRECISION (type)));
 }
 
 /* Create a constant tree that contains CST sign-extended to TYPE.  */
@@ -1378,7 +1384,7 @@ tree
 build_int_cst_type (tree type, poly_int64 cst)
 {
   gcc_assert (type);
-  return wide_int_to_tree (type, wi::shwi (cst, TYPE_PRECISION (type)));
+  return wide_int_to_tree (type, wi::shwi (cst, TYPE_CAP_PRECISION (type)));
 }
 
 /* Constructs tree in type TYPE from with value given by CST.  Signedness
@@ -1522,7 +1528,7 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
   int limit = 0;
 
   gcc_assert (type);
-  unsigned int prec = TYPE_PRECISION (type);
+  unsigned int prec = TYPE_CAP_PRECISION (type);
   signop sgn = TYPE_SIGN (type);
 
   /* Verify that everything is canonical.  */
@@ -1539,7 +1545,7 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
   unsigned int ext_len = get_int_cst_ext_nunits (type, cst);
 
   enum tree_code code = TREE_CODE (type);
-  if (code == POINTER_TYPE || code == REFERENCE_TYPE)
+  if (code == POINTER_TYPE || code == REFERENCE_TYPE || code == INTCAP_TYPE)
     {
       /* Cache NULL pointer and zero bounds.  */
       if (cst == 0)
@@ -1575,6 +1581,7 @@ wide_int_to_tree_1 (tree type, const wide_int_ref &pcst)
 	  gcc_assert (hwi == 0);
 	  /* Fallthru.  */
 
+	case INTCAP_TYPE:
 	case POINTER_TYPE:
 	case REFERENCE_TYPE:
 	  /* Ignore pointers, as they were already handled above.  */
@@ -2446,6 +2453,25 @@ build_zero_cst (tree type)
 }
 
 
+/* Build a TREE expression setting the value of the pointer LHS to RHS.
+   The difference between build2 (MODIFY_EXPR ...) and this is that this
+   function emits REPLACE_ADDRESS_VALUE when the LHS is a capability.  */
+
+tree
+build_pointer_set_value (tree type, tree lhs, tree rhs)
+{
+  if (capability_type_p (type))
+    {
+      gcc_assert (! capability_type_p (TREE_TYPE (rhs)));
+      gcc_assert (TREE_TYPE (lhs) == type);
+      /* Here we create a new TREE value, which is the result of replacing the
+	capability value of LHS with the value of RHS.  This actual capability
+	value is the value that we want to replace LHS with.  */
+      rhs = build_replace_address_value_loc (UNKNOWN_LOCATION, lhs, rhs);
+    }
+  return build2 (MODIFY_EXPR, type, lhs, rhs);
+}
+
 /* Build a BINFO with LEN language slots.  */
 
 tree
@@ -2640,6 +2666,7 @@ integer_each_onep (const_tree expr)
 bool
 integer_all_onesp (const_tree expr)
 {
+  gcc_assert (! tree_is_capability_value (expr));
   STRIP_ANY_LOCATION_WRAPPER (expr);
 
   if (TREE_CODE (expr) == COMPLEX_CST
@@ -2657,6 +2684,32 @@ integer_all_onesp (const_tree expr)
 
   return (wi::max_value (TYPE_PRECISION (TREE_TYPE (expr)), UNSIGNED)
 	  == wi::to_wide (expr));
+}
+
+/* Return 1 if EXPR is either INTEGER_ALL_ONESP, or a constant capability
+   containing all 1's in the bits of its value and all 0 in the bits of its
+   metadata.
+   Logically this is checking for a -1 in twos complement in a capability type
+   *without metadata*.  */
+bool
+maybe_cap_all_onesp (const_tree expr)
+{
+  if (tree_is_capability_value (expr))
+    {
+      if (TREE_CODE (expr) != INTEGER_CST)
+	return false;
+      tree cap_type = TREE_TYPE (expr);
+      unsigned HOST_WIDE_INT prec = TYPE_NONCAP_PRECISION (cap_type);
+      wide_int cap_orig = wi::to_wide (expr);
+      wide_int mask = wi::uhwi (-1, prec);
+      wide_int metadata = wi::bit_and_not (cap_orig, mask);
+      if (metadata != 0)
+	return false;
+      wide_int value = wi::bit_and_not (cap_orig, mask);
+      tree noncap_type = noncapability_type (cap_type);
+      return integer_all_onesp (force_fit_type (noncap_type, value, 0, 0));
+    }
+  return integer_all_onesp (expr);
 }
 
 /* Return 1 if EXPR is the integer constant minus one, or a location wrapper
@@ -2761,7 +2814,11 @@ tree_floor_log2 (const_tree expr)
 }
 
 /* Return number of known trailing zero bits in EXPR, or, if the value of
-   EXPR is known to be zero, the precision of it's type.  */
+   EXPR is known to be zero, the precision of it's type.
+
+   For capabilities this function returns the number of trailing zeros of the
+   capability value and ignores the metadata.  This essentially puts a maximum
+   on the return value for capabilities.  */
 
 unsigned int
 tree_ctz (const_tree expr)
@@ -2770,7 +2827,7 @@ tree_ctz (const_tree expr)
       && !POINTER_TYPE_P (TREE_TYPE (expr)))
     return 0;
 
-  unsigned int ret1, ret2, prec = TYPE_PRECISION (TREE_TYPE (expr));
+  unsigned int ret1, ret2, prec = TYPE_NONCAP_PRECISION (TREE_TYPE (expr));
   switch (TREE_CODE (expr))
     {
     case INTEGER_CST:
@@ -2845,7 +2902,8 @@ tree_ctz (const_tree expr)
       return 0;
     CASE_CONVERT:
       ret1 = tree_ctz (TREE_OPERAND (expr, 0));
-      if (ret1 && ret1 == TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (expr, 0))))
+      if (ret1
+	  && ret1 == TYPE_NONCAP_PRECISION (TREE_TYPE (TREE_OPERAND (expr, 0))))
 	ret1 = prec;
       return MIN (ret1, prec);
     case SAVE_EXPR:
@@ -4679,6 +4737,7 @@ build0 (enum tree_code code, tree tt MEM_STAT_DECL)
 tree
 build1 (enum tree_code code, tree type, tree node MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (type, code, node));
   int length = sizeof (struct tree_exp);
   tree t;
 
@@ -4758,6 +4817,7 @@ build1 (enum tree_code code, tree type, tree node MEM_STAT_DECL)
 tree
 build2 (enum tree_code code, tree tt, tree arg0, tree arg1 MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (tt, code, arg0, arg1));
   bool constant, read_only, side_effects, div_by_zero;
   tree t;
 
@@ -4839,6 +4899,7 @@ tree
 build3 (enum tree_code code, tree tt, tree arg0, tree arg1,
 	tree arg2 MEM_STAT_DECL)
 {
+  gcc_assert (capability_args_valid (tt, code, arg0, arg1, arg2));
   bool constant, read_only, side_effects;
   tree t;
 
@@ -7678,7 +7739,7 @@ element_precision (const_tree type)
   if (code == COMPLEX_TYPE || code == VECTOR_TYPE)
     type = TREE_TYPE (type);
 
-  return TYPE_PRECISION (type);
+  return TYPE_CAP_PRECISION (type);
 }
 
 /* Return true if CODE represents an associative tree code.  Otherwise
@@ -7827,9 +7888,37 @@ operation_no_trapping_overflow (tree type, enum tree_code code)
     }
 }
 
-/* Constructors for pointer, array and function types.
+/* Constructors for pointer, array, function, and intcap types.
    (RECORD_TYPE, UNION_TYPE and ENUMERAL_TYPE nodes are
    constructed by language-dependent code, not here.)  */
+
+/* Construct, lay out, and return an intcap type for a given mode.  */
+tree
+build_intcap_type_for_mode (machine_mode mode, int unsignedp)
+{
+  gcc_assert (CAPABILITY_MODE_P (mode));
+  tree t = make_node (INTCAP_TYPE);
+  SET_TYPE_MODE (t, mode);
+  TYPE_UNSIGNED (t) = !!unsignedp;
+
+  machine_mode offset_mode = noncapability_mode (mode);
+  TREE_TYPE (t) = lang_hooks.types.type_for_mode (offset_mode, unsignedp);
+
+  /* MORELLO TODO Would be interesting to try and propagate the alias
+     information through intcap_type's so that conversions to pointer types
+     work nicely.
+
+     I don't know how the alias analyses of GCC works at the moment, so
+     something handling conversions to ints and back might already exist.  */
+  layout_type (t);
+
+  /* Use the mode precision to define the precision of the type.
+     Then later use the type precision to set the min and max values.  */
+  set_min_and_max_values_for_integral_type
+	  (t, TYPE_CAP_PRECISION (t), unsignedp ? UNSIGNED : SIGNED);
+
+  return t;
+}
 
 /* Construct, lay out and return the type of pointers to TO_TYPE with
    mode MODE.  If CAN_ALIAS_ALL is TRUE, indicate this type can
@@ -7901,6 +7990,24 @@ build_pointer_type (tree to_type)
 					      : TYPE_ADDR_SPACE (to_type);
   machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
   return build_pointer_type_for_mode (to_type, pointer_mode, false);
+}
+
+/* Build REPLACE_ADDRESS_VALUE internal function.  This represents replacing
+   the value of a pointer with something else.  It is different to a simple
+   assignment since it works with pointers represented by capabilities and not
+   pointers represented by integers.  */
+
+tree
+build_replace_address_value_loc (location_t loc, tree c, tree cv)
+{
+  gcc_assert (tree_is_capability_value (c)
+	      && INTEGRAL_TYPE_P (TREE_TYPE (cv))
+	      && TYPE_PRECISION (TREE_TYPE (cv))
+		<= TYPE_PRECISION (noncapability_type (TREE_TYPE (c))));
+  return build_call_expr_internal_loc (loc,
+				       IFN_REPLACE_ADDRESS_VALUE,
+				       TREE_TYPE (c),
+				       2, c, cv);
 }
 
 /* Same as build_pointer_type_for_mode, but for REFERENCE_TYPE.  */
@@ -8793,6 +8900,9 @@ get_unwidened (tree op, tree for_type)
       if (TREE_CODE (TREE_TYPE (TREE_OPERAND (op, 0))) == VECTOR_TYPE)
 	break;
 
+      if (capability_type_p (TREE_TYPE (TREE_OPERAND (op, 0))))
+	break;
+
       bitschange = TYPE_PRECISION (TREE_TYPE (op))
 		   - TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op, 0)));
 
@@ -8885,10 +8995,12 @@ get_narrower (tree op, int *unsignedp_ptr)
     {
       int bitschange
 	= (TYPE_PRECISION (TREE_TYPE (op))
-	   - TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op, 0))));
+	   - TYPE_CAP_PRECISION (TREE_TYPE (TREE_OPERAND (op, 0))));
 
       /* Truncations are many-one so cannot be removed.  */
-      if (bitschange < 0)
+      if (bitschange < 0
+	  || (capability_type_p (TREE_TYPE (TREE_OPERAND (op, 0)))
+		!= capability_type_p (TREE_TYPE (op))))
 	break;
 
       /* See what's inside this conversion.  If we decide to strip it,
@@ -9028,6 +9140,13 @@ retry:
   /* Third, unsigned integers with top bit set never fit signed types.  */
   if (!TYPE_UNSIGNED (type) && sgn_c == UNSIGNED)
     {
+      /* MORELLO TODO
+	  On first blush this looks like somewhere that a pointer can't be
+	  passed to, and hence that SCALAR_INT_TYPE_MODE is fine and does not
+	  need to be replaced with SCALAR_ADDR_TYPE_MODE.
+	  That has not been checked fully, and INTCAP_TYPEs have not been
+	  checked.  I'm leaving this for now, since that way we'll trigger an
+	  assertion if this is indeed somewhere we need to change.  */
       int prec = GET_MODE_PRECISION (SCALAR_INT_TYPE_MODE (TREE_TYPE (c))) - 1;
       if (prec < TYPE_PRECISION (TREE_TYPE (c)))
 	{
@@ -9767,6 +9886,14 @@ tree_class_check_failed (const_tree node, const enum tree_code_class cl,
      get_tree_code_name (TREE_CODE (node)), function, trim_filename (file), line);
 }
 
+void
+noncap_type_check_failed (const_tree node, const char *file, int line, const char *function)
+{
+  internal_error
+    ("tree check: expected noncap type, got type (%s) in %s, at %s:%d",
+     get_tree_code_name (TREE_CODE (node)), function, trim_filename (file), line);
+}
+
 /* Similar to tree_check_failed, except that instead of specifying a
    dozen codes, use the knowledge that they're all sequential.  */
 
@@ -9954,6 +10081,7 @@ make_vector_type (tree innertype, poly_int64 nunits, machine_mode mode)
 {
   tree t;
   tree mv_innertype = TYPE_MAIN_VARIANT (innertype);
+  gcc_assert (! capability_type_p (mv_innertype));
 
   t = make_node (VECTOR_TYPE);
   TREE_TYPE (t) = mv_innertype;
@@ -10238,6 +10366,14 @@ build_common_tree_nodes (bool signed_char)
 	  }
       if (ptrdiff_type_node == NULL_TREE)
 	gcc_unreachable ();
+    }
+
+  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode();
+  if (opt_cap_mode.exists())
+    {
+      scalar_addr_mode cap_mode = opt_cap_mode.require();
+      intcap_type_node = build_intcap_type_for_mode (cap_mode, 0);
+      uintcap_type_node = build_intcap_type_for_mode (cap_mode, 1);
     }
 
   /* Fill in the rest of the sized types.  Reuse existing type nodes
@@ -11676,6 +11812,7 @@ int_cst_value (const_tree x)
 tree
 signed_or_unsigned_type_for (int unsignedp, tree type)
 {
+  gcc_assert (!capability_type_p (type));
   if (ANY_INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type) == unsignedp)
     return type;
 
@@ -11758,6 +11895,7 @@ truth_type_for (tree type)
 tree
 upper_bound_in_type (tree outer, tree inner)
 {
+  gcc_assert (!capability_type_p (outer) && !capability_type_p (inner));
   unsigned int det = 0;
   unsigned oprec = TYPE_PRECISION (outer);
   unsigned iprec = TYPE_PRECISION (inner);
@@ -11811,6 +11949,7 @@ upper_bound_in_type (tree outer, tree inner)
 tree
 lower_bound_in_type (tree outer, tree inner)
 {
+  gcc_assert (!capability_type_p (outer) && !capability_type_p (inner));
   unsigned oprec = TYPE_PRECISION (outer);
   unsigned iprec = TYPE_PRECISION (inner);
 
@@ -12666,6 +12805,13 @@ tree_nop_conversion_p (const_tree outer_type, const_tree inner_type)
       return false;
     }
 
+  /* MORELLO TODO
+     I *think* this clause is now superfluous.
+     However it might be nice to use the precision in the case that there are
+     no capability modes involved (since then the precision is the correct
+     thing to use).
+     Will change it sometime later (once in the "neatening up" rather than
+     "getting things working" stage).  */
   /* Use precision rather then machine mode when we can, which gives
      the correct answer even for submode (bit-field) types.  */
   if ((INTEGRAL_TYPE_P (outer_type)
@@ -12673,8 +12819,9 @@ tree_nop_conversion_p (const_tree outer_type, const_tree inner_type)
        || TREE_CODE (outer_type) == OFFSET_TYPE)
       && (INTEGRAL_TYPE_P (inner_type)
 	  || POINTER_TYPE_P (inner_type)
-	  || TREE_CODE (inner_type) == OFFSET_TYPE))
-    return TYPE_PRECISION (outer_type) == TYPE_PRECISION (inner_type);
+	  || TREE_CODE (inner_type) == OFFSET_TYPE)
+      && (TYPE_CAP_PRECISION (outer_type) != TYPE_CAP_PRECISION (inner_type)))
+    return false;
 
   /* Otherwise fall back on comparing machine modes (e.g. for
      aggregate types, floats).  */
@@ -13798,6 +13945,120 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
 	  ? NULL_TREE : size_zero_node);
 }
 
+/* Indicate whether the given tree T is a TYPE that is represented as a
+   capability in the machine description.  I.e. identify whether values with
+   the type T need to be handled in such a way that would not invalidate
+   capabilities.  */
+
+bool
+capability_type_p (const_tree t)
+{
+  if (t == NULL_TREE)
+    return false;
+  if (! CAPABILITY_MODE_P (TYPE_MODE (t)))
+    return false;
+  /* We should only be seeing pointers as capabilities at the moment.  */
+  gcc_assert (POINTER_TYPE_P (t) || TREE_CODE (t) == NULLPTR_TYPE
+	      || INTCAP_TYPE_P (t) || AGGREGATE_TYPE_P (t));
+  return (POINTER_TYPE_P (t) || TREE_CODE (t) == NULLPTR_TYPE
+	  || INTCAP_TYPE_P (t));
+}
+
+/* Return the type which is the same as type T but with any capability metadata
+   removed.  That is; if T is a capability type return a type representing the
+   value part of it, and if T is not a capability type return T as it is.  */
+
+tree
+noncapability_type (tree t)
+{
+  if (! capability_type_p (t))
+    return t;
+  if (INTCAP_TYPE_P (t))
+    return TREE_TYPE (t);
+  machine_mode newmode = noncapability_mode (TYPE_MODE (t));
+  unsigned precision = GET_MODE_PRECISION (newmode).to_constant ();
+  return make_or_reuse_type (precision, TYPE_UNSIGNED (t));
+}
+
+const_tree
+noncapability_type (const_tree t)
+{
+  if (! capability_type_p (t))
+    return t;
+  if (INTCAP_TYPE_P (t))
+    return TREE_TYPE (t);
+  machine_mode newmode = noncapability_mode (TYPE_MODE (t));
+  unsigned precision = GET_MODE_PRECISION (newmode).to_constant ();
+  return make_or_reuse_type (precision, TYPE_UNSIGNED (t));
+}
+
+/* Return a tree representing the value from a capability without the metadata
+   of bounds and permissions.  If given an expression that does not represent
+   a capability return the expression unchanged.  */
+
+tree
+fold_drop_capability (tree t)
+{
+  if (! tree_is_capability_value (t))
+    return t;
+  return fold_convert (noncapability_type (TREE_TYPE (t)), t);
+}
+
+/* Indicate whether this tree code can be used on a capability type.  Since
+   capability types are by nature invalidated by certain operations there will
+   be a large number of operations we should not apply to them.  */
+
+bool
+valid_capability_code_p (tree_code tc)
+{
+  if (TREE_CODE_CLASS (tc) == tcc_comparison)
+    return false;
+  switch (tc)
+    {
+      case ABS_EXPR:
+      case ABSU_EXPR:
+      case BIT_AND_EXPR:
+      case BIT_INSERT_EXPR:
+      case BIT_IOR_EXPR:
+      case BIT_NOT_EXPR:
+      case BIT_XOR_EXPR:
+      case CEIL_DIV_EXPR:
+      case CEIL_MOD_EXPR:
+      case EXACT_DIV_EXPR:
+      case FIXED_CONVERT_EXPR:
+      case FIX_TRUNC_EXPR:
+      case FLOAT_EXPR:
+      case FLOOR_DIV_EXPR:
+      case FLOOR_MOD_EXPR:
+      case LROTATE_EXPR:
+      case LSHIFT_EXPR:
+      case MAX_EXPR:
+      case MINUS_EXPR:
+      case MIN_EXPR:
+      case MULT_EXPR:
+      case MULT_HIGHPART_EXPR:
+      case NEGATE_EXPR:
+      case PLUS_EXPR:
+      case RANGE_EXPR:
+      case RDIV_EXPR:
+      case ROUND_DIV_EXPR:
+      case ROUND_MOD_EXPR:
+      case RROTATE_EXPR:
+      case RSHIFT_EXPR:
+      case TRUNC_DIV_EXPR:
+      case TRUNC_MOD_EXPR:
+      case TRUTH_ANDIF_EXPR:
+      case TRUTH_AND_EXPR:
+      case TRUTH_NOT_EXPR:
+      case TRUTH_ORIF_EXPR:
+      case TRUTH_OR_EXPR:
+      case TRUTH_XOR_EXPR:
+	return false;
+      default:
+	return true;
+    }
+}
+
 /* Return the machine mode of T.  For vectors, returns the mode of the
    inner type.  The main use case is to feed the result to HONOR_NANS,
    avoiding the BLKmode that a direct TYPE_MODE (T) might return.  */
@@ -13958,7 +14219,7 @@ verify_type_variant (const_tree t, tree tv)
 	}
       verify_variant_match (TYPE_NEEDS_CONSTRUCTING);
     }
-  verify_variant_match (TYPE_PRECISION);
+  verify_variant_match (TYPE_CAP_PRECISION);
   if (RECORD_OR_UNION_TYPE_P (t))
     verify_variant_match (TYPE_TRANSPARENT_AGGR);
   else if (TREE_CODE (t) == ARRAY_TYPE)
@@ -14232,10 +14493,11 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
       || TREE_CODE (t1) == VECTOR_TYPE
       || TREE_CODE (t1) == COMPLEX_TYPE
       || TREE_CODE (t1) == OFFSET_TYPE
+      || INTCAP_TYPE_P (t1)
       || POINTER_TYPE_P (t1))
     {
       /* Can't be the same type if they have different recision.  */
-      if (TYPE_PRECISION (t1) != TYPE_PRECISION (t2))
+      if (TYPE_CAP_PRECISION (t1) != TYPE_CAP_PRECISION (t2))
 	return false;
 
       /* In some cases the signed and unsigned types are required to be
@@ -14552,7 +14814,7 @@ verify_type (const_tree t)
 	}
     }
   else if (INTEGRAL_TYPE_P (t) || TREE_CODE (t) == REAL_TYPE
-	   || TREE_CODE (t) == FIXED_POINT_TYPE)
+	   || TREE_CODE (t) == FIXED_POINT_TYPE || INTCAP_TYPE_P (t))
     {
       /* FIXME: The following check should pass:
 	  useless_type_conversion_p (const_cast <tree> (t),
@@ -14662,6 +14924,7 @@ verify_type (const_tree t)
 	   || TREE_CODE (t) == OFFSET_TYPE
 	   || TREE_CODE (t) == REFERENCE_TYPE
 	   || TREE_CODE (t) == NULLPTR_TYPE
+	   || TREE_CODE (t) == INTCAP_TYPE
 	   || TREE_CODE (t) == POINTER_TYPE)
     {
       if (TYPE_CACHED_VALUES_P (t) != (TYPE_CACHED_VALUES (t) != NULL))
@@ -14722,6 +14985,7 @@ verify_type (const_tree t)
       && TREE_CODE (t) != REFERENCE_TYPE
       && TREE_CODE (t) != NULLPTR_TYPE
       && TREE_CODE (t) != POINTER_TYPE
+      && TREE_CODE (t) != INTCAP_TYPE
       && TYPE_CACHED_VALUES_P (t))
     {
       error ("%<TYPE_CACHED_VALUES_P%> is set while it should not be");
@@ -15887,11 +16151,141 @@ test_escaped_strings (void)
   pp_line_cutoff (global_dc->printer) = saved_cutoff;
 }
 
+static void
+test_fold_drop_capability (void)
+{
+  /* MORELLO TODO
+      Create some tree type with the type `cap_pointer`.
+      Test that `fold_convert_loc` returns something.
+      Should we assert that something is a NOP_EXPR, or is that an
+      implementation detail?
+
+      Putting a lot of different tree formulations here would be nice just to
+      check that the `fold_convert` function can handle many different
+      capability forms.
+
+      Forms to check:
+	- POINTER_PLUS
+	- Raw pointer
+
+	There are a lot more things that it would be nice to check.
+	Categories are below, not all are filled out.
+	tcc_expression codes
+	- COMPOUND_EXPR
+	- MODIFY_EXPR
+	- INIT_EXPR
+	- TARGET_EXPR
+	- COND_EXPR
+	- ADDR_EXPR
+	- PREDECREMENT_EXPR
+	- PREINCREMENT_EXPR
+	- POSTDECREMENT_EXPR
+	- POSTINCREMENT_EXPR
+	- ASSERT_EXPR
+
+	tcc_references ??
+	tcc_unary ??
+	tcc_binary ??
+	tcc_statement ??
+	*/
+  tree cap_pointer_type
+    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+  tree cap_pointer_cst = build_int_cst (cap_pointer_type, 0);
+  tree pointer_offset_type = noncapability_type (TREE_TYPE (cap_pointer_cst));
+  tree pointer_offset_type2 = noncapability_type (cap_pointer_type);
+  tree pointer_value = fold_drop_capability (cap_pointer_cst);
+  ASSERT_EQ (TREE_TYPE (pointer_value), pointer_offset_type);
+  ASSERT_EQ (pointer_offset_type2, pointer_offset_type);
+
+  tree pointer_plus_1 = fold_build_pointer_plus_hwi (cap_pointer_cst, 10);
+  ASSERT_EQ (TREE_CODE (pointer_plus_1), INTEGER_CST);
+  ASSERT_EQ (tree_to_shwi (pointer_plus_1), 10);
+
+  tree cap_pointer = build_decl (UNKNOWN_LOCATION, VAR_DECL,
+				 get_identifier ("some_pointer"),
+				 cap_pointer_type);
+  tree pointer_plus_2 = fold_build_pointer_plus_hwi (cap_pointer, 10);
+  ASSERT_EQ (TREE_CODE (pointer_plus_2), POINTER_PLUS_EXPR);
+
+  tree dropped_cap = fold_drop_capability (pointer_plus_2);
+  ASSERT_EQ (TREE_CODE (dropped_cap), NOP_EXPR);
+  ASSERT_FALSE (capability_type_p (TREE_TYPE (dropped_cap)));
+
+  tree dropped_raw = fold_drop_capability (cap_pointer);
+  ASSERT_EQ (TREE_CODE (dropped_raw), NOP_EXPR);
+  ASSERT_FALSE (capability_type_p (TREE_TYPE (dropped_raw)));
+
+  tree dropped_cst = fold_drop_capability (cap_pointer_cst);
+  ASSERT_EQ (TREE_CODE (dropped_cst), INTEGER_CST);
+  ASSERT_FALSE (capability_type_p (TREE_TYPE (dropped_cst)));
+  ASSERT_EQ (tree_to_shwi (dropped_cst), 0);
+
+  /* Should (and does) raise an assertion error.
+     Would be nice to be able to check this, but still better to keep the
+     call here than not have it since I can at least add and remove it every so
+     often to check things are still working.  */
+  /* tree neg_cap = build1 (NEGATE_EXPR, cap_pointer_type, cap_pointer); */
+  /* tree neg_cap = build3 (TODO); */
+}
+
+/* Check that noncapability_type indeed returns a type representing the offset
+   of a capability type.  */
+
+static void
+test_capability_type_manipulation (void)
+{
+  tree cap_pointer_type
+    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+  ASSERT_EQ (true, capability_type_p (cap_pointer_type));
+  ASSERT_EQ (false, capability_type_p (integer_type_node));
+  ASSERT_EQ (false, capability_type_p (NULL_TREE));
+
+  tree cap_offset_type = noncapability_type (cap_pointer_type);
+  ASSERT_EQ (integer_type_node, noncapability_type (integer_type_node));
+  ASSERT_EQ (TYPE_MODE (cap_offset_type), DImode);
+  ASSERT_EQ (TREE_CODE (cap_offset_type), INTEGER_TYPE);
+
+  test_fold_drop_capability ();
+}
+
+/* Testing that the internal function actually generates RTL that makes sense
+ * is for somewhere else.  */
+static void
+test_fold_build_replace_address_value (void)
+{
+  tree cap_pointer_type
+    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+  /* BASE_TEST is designed to test only values (and not metadata bits).  */
+#define BASE_TEST(CV, NEW) \
+  { \
+    tree base_cap = build_int_cst (cap_pointer_type, CV); \
+    unsigned HOST_WIDE_INT v = NEW; \
+    tree new_val = build_int_cst (noncapability_type (cap_pointer_type), v); \
+    tree res = fold_build_replace_address_value (base_cap, new_val); \
+    ASSERT_TRUE (tree_fits_uhwi_p (res)); \
+    ASSERT_EQ (tree_to_uhwi (res), v); \
+    ASSERT_EQ (TREE_TYPE (res), TREE_TYPE (base_cap)); \
+    ASSERT_TRUE (TREE_CODE (res) == INTEGER_CST); \
+  }
+  BASE_TEST (0, 100);
+  BASE_TEST (100, 101);
+  BASE_TEST (100, 0);
+#undef BASE_TEST
+
+  /* Replace address value with something where the original value is not a
+     capability just returns the new value.  */
+  tree left = build_int_cst (integer_type_node, 0);
+  tree right = build_int_cst (integer_type_node, 100);
+  ASSERT_EQ (fold_build_replace_address_value (left, right), right);
+}
+
 /* Run all of the selftests within this file.  */
 
 void
 tree_c_tests ()
 {
+  test_fold_build_replace_address_value ();
+  test_capability_type_manipulation ();
   test_integer_constants ();
   test_identifiers ();
   test_labels ();

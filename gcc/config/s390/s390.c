@@ -13459,7 +13459,7 @@ s390_indirect_branch_via_inline_thunk (rtx execute_target)
 }
 
 static bool
-s390_valid_pointer_mode (scalar_int_mode mode)
+s390_valid_pointer_mode (scalar_addr_mode mode)
 {
   return (mode == SImode || (TARGET_64BIT && mode == DImode));
 }

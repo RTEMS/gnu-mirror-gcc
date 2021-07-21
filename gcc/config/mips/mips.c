@@ -13378,7 +13378,7 @@ mips_mode_rep_extended (scalar_int_mode mode, scalar_int_mode mode_rep)
 /* Implement TARGET_VALID_POINTER_MODE.  */
 
 static bool
-mips_valid_pointer_mode (scalar_int_mode mode)
+mips_valid_pointer_mode (scalar_addr_mode mode)
 {
   return mode == SImode || (TARGET_64BIT && mode == DImode);
 }

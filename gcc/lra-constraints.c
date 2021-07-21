@@ -1668,7 +1668,7 @@ simplify_operand_subreg (int nop, machine_mode reg_mode)
        /* Don't reload subreg for matching reload.  It is actually
 	  valid subreg in LRA.  */
        && ! LRA_SUBREG_P (operand))
-      || CONSTANT_P (reg) || GET_CODE (reg) == PLUS || MEM_P (reg))
+      || CONSTANT_P (reg) || any_plus_p (reg) || MEM_P (reg))
     {
       enum reg_class rclass;
 
@@ -3150,10 +3150,11 @@ base_to_reg (struct address_info *ad)
                        get_index_code (ad));
   new_reg = lra_create_new_reg (GET_MODE (*ad->base), NULL_RTX,
                                 cl, "base");
-  new_inner = simplify_gen_binary (PLUS, GET_MODE (new_reg), new_reg,
-                                   ad->disp_term == NULL
-                                   ? const0_rtx
-                                   : *ad->disp_term);
+  new_inner = gen_pointer_plus (as_a <scalar_addr_mode> (GET_MODE (new_reg)),
+				new_reg,
+				ad->disp_term == NULL
+				? const0_rtx
+				: *ad->disp_term);
   if (!valid_address_p (ad->mode, new_inner, ad->as))
     return NULL_RTX;
   insn = emit_insn (gen_rtx_SET (new_reg, *ad->base));
@@ -3515,8 +3516,7 @@ process_address_1 (int nop, bool check_only_p,
 	  lra_assert (INDEX_REG_CLASS != NO_REGS);
 	  new_reg = lra_create_new_reg (Pmode, NULL_RTX, cl, "disp");
 	  lra_emit_move (new_reg, *ad.disp);
-	  *ad.inner = simplify_gen_binary (PLUS, GET_MODE (new_reg),
-					   new_reg, *ad.index);
+	  *ad.inner = gen_pointer_plus (Pmode, new_reg, *ad.index);
 	}
     }
   else if (ad.index == NULL)
@@ -3549,7 +3549,9 @@ process_address_1 (int nop, bool check_only_p,
 							  ad.mode))
 	    {
 	      new_reg = base_plus_disp_to_reg (&ad, offset1);
-	      new_reg = gen_rtx_PLUS (GET_MODE (new_reg), new_reg, offset2);
+	      new_reg =
+		gen_raw_pointer_plus (as_a <scalar_addr_mode> (GET_MODE (new_reg)),
+				      new_reg, offset2);
 	    }
 	  else
 	    new_reg = base_plus_disp_to_reg (&ad, *ad.disp);
@@ -3590,8 +3592,8 @@ process_address_1 (int nop, bool check_only_p,
 	 case (1) above.  */
       gcc_assert (ad.disp == ad.disp_term);
       new_reg = base_plus_disp_to_reg (&ad, *ad.disp);
-      *ad.inner = simplify_gen_binary (PLUS, GET_MODE (new_reg),
-				       new_reg, *ad.index);
+      *ad.inner = gen_pointer_plus (as_a <scalar_addr_mode> (GET_MODE (new_reg)),
+				    new_reg, *ad.index);
     }
   else if ((scale = get_index_scale (&ad)) == 1)
     {
@@ -3609,8 +3611,8 @@ process_address_1 (int nop, bool check_only_p,
       pseudo onto the memory of different mode for which the scale is
       prohibitted.  */
       new_reg = index_part_to_reg (&ad);
-      *ad.inner = simplify_gen_binary (PLUS, GET_MODE (new_reg),
-				       *ad.base_term, new_reg);
+      *ad.inner = gen_pointer_plus (as_a <scalar_addr_mode> (GET_MODE (new_reg)),
+				    *ad.base_term, new_reg);
     }
   else
     {

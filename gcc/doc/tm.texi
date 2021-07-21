@@ -2468,7 +2468,8 @@ define the context in which the base register occurs.  @var{outer_code} is
 the code of the immediately enclosing expression (@code{MEM} for the top level
 of an address, @code{ADDRESS} for something that occurs in an
 @code{address_operand}).  @var{index_code} is the code of the corresponding
-index expression if @var{outer_code} is @code{PLUS}; @code{SCRATCH} otherwise.
+index expression if @var{outer_code} is @code{PLUS} or @code{POINTER_PLUS};
+@code{SCRATCH} otherwise.
 @end defmac
 
 @defmac INDEX_REG_CLASS
@@ -2516,9 +2517,10 @@ appears in the memory reference.  @var{outer_code} is the code of the
 immediately enclosing expression (@code{MEM} if at the top level of the
 address, @code{ADDRESS} for something that occurs in an
 @code{address_operand}).  @var{index_code} is the code of the
-corresponding index expression if @var{outer_code} is @code{PLUS};
-@code{SCRATCH} otherwise.  The mode may be @code{VOIDmode} for addresses
-that appear outside a @code{MEM}, i.e., as an @code{address_operand}.
+corresponding index expression if @var{outer_code} is @code{PLUS}
+or @code{POINTER_PLUS}; @code{SCRATCH} otherwise.  The mode may be
+@code{VOIDmode} for addresses that appear outside a @code{MEM}, i.e.,
+as an @code{address_operand}.
 @end defmac
 
 @defmac REGNO_OK_FOR_INDEX_P (@var{num})
@@ -2968,7 +2970,7 @@ This hook should return @code{true} if given class of registers should  be an al
 @end deftypefn
 
 @deftypefn {Target Hook} scalar_int_mode TARGET_CSTORE_MODE (enum insn_code @var{icode})
-This hook defines the machine mode to use for the boolean result of  conditional store patterns.  The ICODE argument is the instruction code  for the cstore being performed.  Not definiting this hook is the same  as accepting the mode encoded into operand 0 of the cstore expander  patterns.
+This hook defines the machine mode to use for the boolean result of  conditional store patterns.  The ICODE argument is the instruction code  for the cstore being performed.  Not defining this hook is the same  as accepting the mode encoded into operand 0 of the cstore expander  patterns.
 @end deftypefn
 
 @deftypefn {Target Hook} int TARGET_COMPUTE_PRESSURE_CLASSES (enum reg_class *@var{pressure_classes})
@@ -4293,7 +4295,7 @@ arguments to @code{va_arg}; the latter two are as in
 @code{gimplify.c:gimplify_expr}.
 @end deftypefn
 
-@deftypefn {Target Hook} bool TARGET_VALID_POINTER_MODE (scalar_int_mode @var{mode})
+@deftypefn {Target Hook} bool TARGET_VALID_POINTER_MODE (scalar_addr_mode @var{mode})
 Define this to return nonzero if the port can handle pointers
 with machine mode @var{mode}.  The default version of this
 hook returns true for both @code{ptr_mode} and @code{Pmode}.
@@ -4301,6 +4303,14 @@ hook returns true for both @code{ptr_mode} and @code{Pmode}.
 
 @deftypefn {Target Hook} bool TARGET_REF_MAY_ALIAS_ERRNO (ao_ref *@var{ref})
 Define this to return nonzero if the memory reference @var{ref}  may alias with the system C library errno location.  The default  version of this hook assumes the system C library errno location  is either a declaration of type int or accessed by dereferencing  a pointer to int.
+@end deftypefn
+
+@deftypefn {Target Hook} opt_scalar_addr_mode TARGET_CAPABILITY_MODE ()
+Defines the mode for @code{__intcap_t} and @code{__uintcap_t}.
+ This function does not take an argument, and returns a opt_scalar_addr_mode
+ describing the mode that these variables should be in.  If the target does
+ not support capabilities then this should return an empty
+ opt_scalar_addr_mode.  This is the default.
 @end deftypefn
 
 @deftypefn {Target Hook} machine_mode TARGET_TRANSLATE_MODE_ATTRIBUTE (machine_mode @var{mode})
@@ -10859,26 +10869,25 @@ named address space #1:
 c_register_addr_space ("__ea", ADDR_SPACE_EA);
 @end smallexample
 
-@deftypefn {Target Hook} scalar_int_mode TARGET_ADDR_SPACE_POINTER_MODE (addr_space_t @var{address_space})
+@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_POINTER_MODE (addr_space_t @var{address_space})
 Define this to return the machine mode to use for pointers to
 @var{address_space} if the target supports named address spaces.
 The default version of this hook returns @code{ptr_mode}.
 @end deftypefn
 
-@deftypefn {Target Hook} scalar_int_mode TARGET_ADDR_SPACE_ADDRESS_MODE (addr_space_t @var{address_space})
+@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_ADDRESS_MODE (addr_space_t @var{address_space})
 Define this to return the machine mode to use for addresses in
 @var{address_space} if the target supports named address spaces.
 The default version of this hook returns @code{Pmode}.
 @end deftypefn
 
-@deftypefn {Target Hook} bool TARGET_ADDR_SPACE_VALID_POINTER_MODE (scalar_int_mode @var{mode}, addr_space_t @var{as})
+@deftypefn {Target Hook} bool TARGET_ADDR_SPACE_VALID_POINTER_MODE (scalar_addr_mode @var{mode}, addr_space_t @var{as})
 Define this to return nonzero if the port can handle pointers
 with machine mode @var{mode} to address space @var{as}.  This target
 hook is the same as the @code{TARGET_VALID_POINTER_MODE} target hook,
 except that it includes explicit named address space support.  The default
-version of this hook returns true for the modes returned by either the
-@code{TARGET_ADDR_SPACE_POINTER_MODE} or @code{TARGET_ADDR_SPACE_ADDRESS_MODE}
-target hooks for the given address space.
+version of this hook ignores the address space and delegates to
+@code{TARGET_VALID_POINTER_MODE}.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_ADDR_SPACE_LEGITIMATE_ADDRESS_P (machine_mode @var{mode}, rtx @var{exp}, bool @var{strict}, addr_space_t @var{as})

@@ -1193,7 +1193,7 @@ asan_clear_shadow (rtx shadow_mem, HOST_WIDE_INT len)
   emit_label (top_label);
 
   emit_move_insn (shadow_mem, const0_rtx);
-  tmp = expand_simple_binop (Pmode, PLUS, addr, gen_int_mode (4, Pmode), addr,
+  tmp = expand_pointer_plus (Pmode, addr, gen_int_mode (4, POmode), addr,
 			     true, OPTAB_LIB_WIDEN);
   if (tmp != addr)
     emit_move_insn (addr, tmp);
@@ -1454,15 +1454,15 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
     {
       const HOST_WIDE_INT align
 	= (GET_MODE_ALIGNMENT (SImode) / BITS_PER_UNIT) << ASAN_SHADOW_SHIFT;
-      base = expand_binop (Pmode, and_optab, base, gen_int_mode (-align, Pmode),
+      base = expand_binop (Pmode, and_optab, base, gen_int_mode (-align, POmode),
 			   NULL_RTX, 1, OPTAB_DIRECT);
     }
 
   if (use_after_return_class == -1 && pbase)
     emit_move_insn (pbase, base);
 
-  base = expand_binop (Pmode, add_optab, base,
-		       gen_int_mode (base_offset - base_align_bias, Pmode),
+  base = expand_pointer_plus (Pmode, base,
+		       gen_int_mode (base_offset - base_align_bias, POmode),
 		       NULL_RTX, 1, OPTAB_DIRECT);
   orig_base = NULL_RTX;
   if (use_after_return_class != -1)
@@ -1505,15 +1505,36 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       ret = convert_memory_address (Pmode, ret);
       emit_move_insn (base, ret);
       emit_label (lab);
-      emit_move_insn (pbase, expand_binop (Pmode, add_optab, base,
+      emit_move_insn (pbase, expand_pointer_plus (Pmode, base,
 					   gen_int_mode (base_align_bias
-							 - base_offset, Pmode),
+							 - base_offset, POmode),
 					   NULL_RTX, 1, OPTAB_DIRECT));
     }
   mem = gen_rtx_MEM (ptr_mode, base);
   mem = adjust_address (mem, VOIDmode, base_align_bias);
-  emit_move_insn (mem, gen_int_mode (ASAN_STACK_FRAME_MAGIC, ptr_mode));
-  mem = adjust_address (mem, VOIDmode, GET_MODE_SIZE (ptr_mode));
+  /* MORELLO TODO.
+     The original code used `gen_int_mode (ASAN_STACK_FRAME_MAGIC, ptr_mode)`.
+     The only difference between this and GEN_INT in the case of being given a
+     constant (like ASAN_STACK_FRAME_MAGIC) is that it truncates to ptr_mode.
+
+     The emit_move_insn takes the mode from the `mem`, since the gen_int_mode
+     produces something in VOIDmode.  That is ptr_mode, as can be seen from the
+     two lines above (adjust_address with VOIDmode is requesting that the mode
+     is not changed).
+
+     Hence it seems the reason to use `ptr_mode` here is to enforce the correct
+     truncation *to a size of ptr_mode* rather than to the size of a given
+     address.
+
+     This means that the ideal approach would be to use an integer mode of the
+     same size as ptr_mode.  Here we use offset_mode (ptr_mode), which is not
+     the same thing at all when ptr_mode is a capability mode.
+
+     This is something we should fix in the future, but we're not doing it
+     right now ...  */
+  scalar_int_mode ptr_o_mode = offset_mode (ptr_mode);
+  emit_move_insn (mem, gen_int_mode (ASAN_STACK_FRAME_MAGIC, ptr_o_mode));
+  mem = adjust_address (mem, VOIDmode, GET_MODE_SIZE (ptr_o_mode));
   emit_move_insn (mem, expand_normal (str_cst));
   mem = adjust_address (mem, VOIDmode, GET_MODE_SIZE (ptr_mode));
   ASM_GENERATE_INTERNAL_LABEL (buf, "LASANPC", current_function_funcdef_no);
@@ -1532,11 +1553,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   TREE_ASM_WRITTEN (decl) = 1;
   TREE_ASM_WRITTEN (id) = 1;
   emit_move_insn (mem, expand_normal (build_fold_addr_expr (decl)));
-  shadow_base = expand_binop (Pmode, lshr_optab, base,
-			      gen_int_shift_amount (Pmode, ASAN_SHADOW_SHIFT),
+  shadow_base = expand_binop (POmode, lshr_optab, base,
+			      gen_int_shift_amount (POmode, ASAN_SHADOW_SHIFT),
 			      NULL_RTX, 1, OPTAB_DIRECT);
   shadow_base
-    = plus_constant (Pmode, shadow_base,
+    = plus_constant (POmode, shadow_base,
 		     asan_shadow_offset ()
 		     + (base_align_bias >> ASAN_SHADOW_SHIFT));
   gcc_assert (asan_shadow_set != -1
@@ -1600,7 +1621,9 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       set_mem_alias_set (shadow_mem, asan_shadow_set);
       mem = gen_rtx_MEM (ptr_mode, base);
       mem = adjust_address (mem, VOIDmode, base_align_bias);
-      emit_move_insn (mem, gen_int_mode (ASAN_STACK_RETIRED_MAGIC, ptr_mode));
+      /* MORELLO TODO ... see above comment about a similar case with
+	 ASAN_STACK_FRAME_MAGIC. */
+      emit_move_insn (mem, gen_int_mode (ASAN_STACK_RETIRED_MAGIC, ptr_o_mode));
       unsigned HOST_WIDE_INT sz = asan_frame_size >> ASAN_SHADOW_SHIFT;
       if (use_after_return_class < 5
 	  && can_store_by_pieces (sz, builtin_memset_read_str, &c,

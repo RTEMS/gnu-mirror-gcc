@@ -374,6 +374,17 @@ add_cost (bool speed, machine_mode mode)
   return *add_cost_ptr (speed, mode);
 }
 
+/* Return the cost of computing a pointer_plus in MODE when optimising for
+   SPEED.  */
+
+static inline int
+pointer_add_cost (bool speed, machine_mode mode)
+{
+  /* MORELLO TODO In the future we should actually find the cost of
+     POINTER_PLUS and return that.  This is not the aim for now.  */
+  return add_cost (speed, noncapability_mode (mode));
+}
+
 /* Subroutine of {set_,}neg_cost.  Not to be used otherwise.  */
 
 static inline int *
@@ -674,6 +685,12 @@ static inline int
 convert_cost (machine_mode to_mode, machine_mode from_mode,
 	      bool speed)
 {
+  /* MORELLO TODO
+       In the future we should actually find the cost of
+       converting between offsets and capability modes and return that.  This
+       is not the aim for now.  */
+  to_mode = noncapability_mode (to_mode);
+  from_mode = noncapability_mode (from_mode);
   return *convert_cost_ptr (to_mode, from_mode, speed);
 }
 

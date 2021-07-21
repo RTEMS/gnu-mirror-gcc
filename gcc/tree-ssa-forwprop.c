@@ -703,6 +703,8 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
       /* Else recurse if the conversion preserves the address value.  */
       if ((INTEGRAL_TYPE_P (TREE_TYPE (lhs))
 	   || POINTER_TYPE_P (TREE_TYPE (lhs)))
+	  && (capability_type_p (TREE_TYPE (lhs))
+	      == capability_type_p (TREE_TYPE (def_rhs)))
 	  && (TYPE_PRECISION (TREE_TYPE (lhs))
 	      >= TYPE_PRECISION (TREE_TYPE (def_rhs))))
 	return forward_propagate_addr_expr (lhs, def_rhs, single_use_p);
@@ -728,8 +730,8 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	 and check after the fact.  */
       new_def_rhs = fold_build2 (MEM_REF, TREE_TYPE (TREE_TYPE (rhs)),
 				 def_rhs,
-				 fold_convert (ptr_type_node,
-					       gimple_assign_rhs2 (use_stmt)));
+				 fold_convert_for_mem_ref
+				   (ptr_type_node, gimple_assign_rhs2 (use_stmt)));
       if (TREE_CODE (new_def_rhs) == MEM_REF
 	  && !is_gimple_mem_ref_addr (TREE_OPERAND (new_def_rhs, 0)))
 	return false;
@@ -2808,8 +2810,9 @@ pass_forwprop::execute (function *fun)
 				    fold_build2 (MEM_REF,
 						 TREE_TYPE (TREE_TYPE (rhs)),
 						 rhs,
-						 fold_convert (ptr_type_node,
-							       off))), true))
+						 fold_convert_for_mem_ref
+						   (ptr_type_node, off))),
+			true))
 		{
 		  fwprop_invalidate_lattice (gimple_get_lhs (stmt));
 		  release_defs (stmt);

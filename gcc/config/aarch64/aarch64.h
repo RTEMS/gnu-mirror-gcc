@@ -77,7 +77,9 @@
 
 #define LONG_TYPE_SIZE		(TARGET_ILP32 ? 32 : 64)
 
-#define POINTER_SIZE		(TARGET_ILP32 ? 32 : 64)
+#define POINTER_SIZE		(TARGET_CAPABILITY_PURE ? 128 : LONG_TYPE_SIZE)
+
+#define POINTER_OFFSET_SIZE	(TARGET_CAPABILITY_PURE ? 64 : POINTER_SIZE)
 
 #define LONG_LONG_TYPE_SIZE	64
 
@@ -222,6 +224,9 @@ extern unsigned aarch64_architecture_version;
 /* 64-bit Floating-point Matrix Multiply (F64MM) extensions.  */
 #define AARCH64_FL_F64MM      (1ULL << 38)
 
+/* Morello extension.  */
+#define AARCH64_FL_MORELLO    (1ULL << 39)
+
 /* Has FP and SIMD.  */
 #define AARCH64_FL_FPSIMD     (AARCH64_FL_FP | AARCH64_FL_SIMD)
 
@@ -246,6 +251,8 @@ extern unsigned aarch64_architecture_version;
 #define AARCH64_FL_FOR_ARCH8_6			\
   (AARCH64_FL_FOR_ARCH8_5 | AARCH64_FL_V8_6 | AARCH64_FL_FPSIMD \
    | AARCH64_FL_I8MM | AARCH64_FL_BF16)
+#define AARCH64_FL_FOR_MORELLO			\
+  (AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_MORELLO)
 
 /* Macros to test ISA flags.  */
 
@@ -622,7 +629,7 @@ extern unsigned aarch64_architecture_version;
 #define ASM_POST_CFI_STARTPROC  aarch64_post_cfi_startproc
 
 /* For EH returns X4 contains the stack adjustment.  */
-#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, R4_REGNUM)
+#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (POmode, R4_REGNUM)
 #define EH_RETURN_HANDLER_RTX  aarch64_eh_return_handler_rtx ()
 
 /* Don't use __builtin_setjmp until we've defined it.  */
@@ -902,7 +909,15 @@ typedef struct GTY (()) machine_function
 enum aarch64_abi_type
 {
   AARCH64_ABI_LP64 = 0,
-  AARCH64_ABI_ILP32 = 1
+  AARCH64_ABI_ILP32 = 1,
+  /* Morello ABI's are passed from the command line using this enum, but are
+     used in the backend via the aarch64_capability enum.  This maintains
+     compatibility in the command line parsing with LLVM using `-mabi=purecap`
+     etc, but allows us to use a more convenient separation of ideas in the
+     backend.  */
+  AARCH64_ABI_MORELLO_PURECAP = 2,
+  AARCH64_ABI_MORELLO_HYBRID = 3,
+  AARCH64_ABI_MORELLO_FAKE = 4
 };
 
 #ifndef AARCH64_ABI_DEFAULT
@@ -910,6 +925,21 @@ enum aarch64_abi_type
 #endif
 
 #define TARGET_ILP32	(aarch64_abi & AARCH64_ABI_ILP32)
+
+enum aarch64_capability {
+    AARCH64_CAPABILITY_NONE,
+    AARCH64_CAPABILITY_FAKE,
+    AARCH64_CAPABILITY_HYBRID,
+    AARCH64_CAPABILITY_PURE
+};
+extern enum aarch64_capability aarch64_cap;
+#define TARGET_CAPABILITY_NONE (aarch64_cap == AARCH64_CAPABILITY_NONE)
+#define TARGET_CAPABILITY_FAKE (aarch64_cap == AARCH64_CAPABILITY_FAKE)
+#define TARGET_CAPABILITY_HYBRID (aarch64_cap == AARCH64_CAPABILITY_HYBRID)
+#define TARGET_CAPABILITY_PURE (aarch64_cap == AARCH64_CAPABILITY_PURE)
+
+#define TARGET_MORELLO (TARGET_CAPABILITY_HYBRID || TARGET_CAPABILITY_PURE)
+#define TARGET_CAPABILITY_ANY (!TARGET_CAPABILITY_NONE)
 
 enum arm_pcs
 {
@@ -1067,7 +1097,9 @@ typedef struct
 /* Specify the machine mode that the hardware addresses have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode		DImode
+#define Pmode		\
+   as_a <scalar_addr_mode> \
+    ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) ? CADImode : DImode)
 
 /* A C expression whose value is zero if pointers that need to be extended
    from being `POINTER_SIZE' bits wide to `Pmode' are sign-extended and
@@ -1076,7 +1108,7 @@ typedef struct
 #define POINTERS_EXTEND_UNSIGNED 1
 
 /* Mode of a function address in a call instruction (for indexing purposes).  */
-#define FUNCTION_MODE	Pmode
+#define FUNCTION_MODE	POmode
 
 #define SELECT_CC_MODE(OP, X, Y)	aarch64_select_cc_mode (OP, X, Y)
 

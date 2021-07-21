@@ -1309,13 +1309,14 @@ gimple_ic (gcall *icall_stmt, struct cgraph_node *direct_call,
   cond_bb = gimple_bb (icall_stmt);
   gsi = gsi_for_stmt (icall_stmt);
 
-  tmp0 = make_temp_ssa_name (ptr_type_node, NULL, "PROF");
-  tmp1 = make_temp_ssa_name (ptr_type_node, NULL, "PROF");
-  tmp = unshare_expr (gimple_call_fn (icall_stmt));
+  tree ptr_address_type = noncapability_type (ptr_type_node);
+  tmp0 = make_temp_ssa_name (ptr_address_type, NULL, "PROF");
+  tmp1 = make_temp_ssa_name (ptr_address_type, NULL, "PROF");
+  tmp = fold_drop_capability (unshare_expr (gimple_call_fn (icall_stmt)));
   load_stmt = gimple_build_assign (tmp0, tmp);
   gsi_insert_before (&gsi, load_stmt, GSI_SAME_STMT);
 
-  tmp = fold_convert (ptr_type_node, build_addr (direct_call->decl));
+  tmp = fold_convert (ptr_address_type, build_addr (direct_call->decl));
   load_stmt = gimple_build_assign (tmp1, tmp);
   gsi_insert_before (&gsi, load_stmt, GSI_SAME_STMT);
 

@@ -815,18 +815,34 @@ c_finish_omp_for (location_t locus, enum tree_code code, tree declv,
 	      if (TREE_CODE (op0) == NOP_EXPR
 		  && decl == TREE_OPERAND (op0, 0))
 		{
-		  TREE_OPERAND (cond, 0) = TREE_OPERAND (op0, 0);
-		  TREE_OPERAND (cond, 1)
-		    = fold_build1_loc (elocus, NOP_EXPR, TREE_TYPE (decl),
-				   TREE_OPERAND (cond, 1));
+		  if (tree_is_capability_value (decl) && ! tree_is_capability_value (op0))
+		    {
+		      error_at (elocus, "MORELLO TODO implicit cast (OMP)");
+		      fail = true;
+		    }
+		  else
+		    {
+		      TREE_OPERAND (cond, 0) = TREE_OPERAND (op0, 0);
+		      TREE_OPERAND (cond, 1)
+			= fold_build1_loc (elocus, NOP_EXPR, TREE_TYPE (decl),
+					   TREE_OPERAND (cond, 1));
+		    }
 		}
 	      else if (TREE_CODE (op1) == NOP_EXPR
 		       && decl == TREE_OPERAND (op1, 0))
 		{
-		  TREE_OPERAND (cond, 1) = TREE_OPERAND (op1, 0);
-		  TREE_OPERAND (cond, 0)
-		    = fold_build1_loc (elocus, NOP_EXPR, TREE_TYPE (decl),
-				   TREE_OPERAND (cond, 0));
+		  if (tree_is_capability_value (decl) && ! tree_is_capability_value (op1))
+		    {
+		      error_at (elocus, "MORELLO TODO implicit cast (OMP)");
+		      fail = true;
+		    }
+		  else
+		    {
+		      TREE_OPERAND (cond, 1) = TREE_OPERAND (op1, 0);
+		      TREE_OPERAND (cond, 0)
+			= fold_build1_loc (elocus, NOP_EXPR, TREE_TYPE (decl),
+					   TREE_OPERAND (cond, 0));
+		    }
 		}
 
 	      if (decl == TREE_OPERAND (cond, 0))

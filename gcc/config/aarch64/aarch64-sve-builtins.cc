@@ -2727,7 +2727,7 @@ function_expander::get_contiguous_base (machine_mode mem_mode)
 	 and non-truncating stores (including svld[234] and svst[234]).  */
       poly_int64 size = ordered_min (GET_MODE_SIZE (mem_mode),
 				     BYTES_PER_SVE_VECTOR);
-      rtx offset = gen_int_mode (size, Pmode);
+      rtx offset = gen_int_mode (size, POmode);
       offset = simplify_gen_binary (MULT, Pmode, args[2], offset);
       base = simplify_gen_binary (PLUS, Pmode, base, offset);
     }

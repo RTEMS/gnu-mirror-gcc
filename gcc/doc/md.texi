@@ -7666,6 +7666,42 @@ inclusive and operand 1 exclusive.
 If this pattern is not defined, a call to the library function
 @code{__clear_cache} is used.
 
+@cindex @code{pointer_plus_@var{m}} instruction pattern
+@item @samp{pointer_plus_@var{m}}
+Add the offset in operand 2 to the pointer in operand 1 storing the result in
+operand 0.  Operands 0 and 1 must have the capability mode @var{m}, and operand
+2 must be in the corresponding offset mode.
+
+This pattern is not allowed to @code{FAIL}.
+
+@cindex @code{pointer_minus_@var{m}} instruction pattern
+@item @samp{pointer_minus_@var{m}}
+Subtract the offset in operand 2 from the pointer in operand 1 storing the
+result in operand 0.  Operands 0 and 1 must have the capability mode @var{m},
+and operand 2 must be in the corresponding offset mode.
+
+@cindex @code{replace_address_value_@var{m}} instruction pattern
+@item @samp{replace_address_value_@var{m}}
+Create a capability from the metadata of operand 1 and the address value of
+operand 2 and store the result in operand 0.  Operands 0 and 1 must be in
+capability mode @var{m}, and operand 2 must be in the corresponding offset
+mode.
+
+@cindex @code{align_down_@var{m}} instruction pattern
+@item @samp{align_down_@var{m}}
+Align the address in operand 1 down to a multiple of operand 2 and store
+the result in operand 0.  Operands 0 and 1 must be in mode @var{m} and operand
+2 must be in mode @code{offset_mode(@var{m})}.  If @var{m} is a capability mode
+then this pattern aligns the address value of operand 1, if @var{m} is an
+integer mode this pattern aligns the entire value.
+
+Operand 2 must be a power of two.
+
+@cindex @code{align_up_@var{m}} instruction pattern
+@item @samp{align_up_@var{m}}
+Similar to @samp{align_up_@var{m}}, except that this pattern aligns the address
+up rather than down to the power of two provided in operand 2.
+
 @end table
 
 @end ifset

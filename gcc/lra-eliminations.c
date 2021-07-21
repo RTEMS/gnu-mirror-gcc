@@ -188,6 +188,18 @@ setup_elimination_map (void)
 
 
 
+/* A plus routine that also handles floating-point modes.  */
+static rtx
+gen_maybe_pointer_plus (machine_mode mode, rtx x, rtx y)
+{
+  scalar_addr_mode sa;
+
+  if (is_a <scalar_addr_mode> (mode, &sa))
+    return gen_raw_pointer_plus (sa, x, y);
+
+  return gen_rtx_PLUS (mode, x, y);
+}
+
 /* Compute the sum of X and Y, making canonicalizations assumed in an
    address, namely: sum constant integers, surround the sum of two
    constants with a CONST, put the constant as the second operand, and
@@ -210,10 +222,10 @@ form_sum (rtx x, rtx y)
     return plus_constant (mode, y, offset);
   else if (poly_int_rtx_p (y, &offset))
     return plus_constant (mode, x, offset);
-  else if (CONSTANT_P (x))
+  else if (CONSTANT_P (x) && GET_MODE (x) == GET_MODE (y))
     std::swap (x, y);
 
-  if (GET_CODE (x) == PLUS && CONSTANT_P (XEXP (x, 1)))
+  if (any_plus_p (x) && CONSTANT_P (XEXP (x, 1)))
     return form_sum (XEXP (x, 0), form_sum (XEXP (x, 1), y));
 
   /* Note that if the operands of Y are specified in the opposite
@@ -231,10 +243,10 @@ form_sum (rtx x, rtx y)
       if (GET_CODE (y) == CONST)
 	y = XEXP (y, 0);
 
-      return gen_rtx_CONST (VOIDmode, gen_rtx_PLUS (mode, x, y));
+      return gen_rtx_CONST (VOIDmode, gen_maybe_pointer_plus (mode, x, y));
     }
 
-  return gen_rtx_PLUS (mode, x, y);
+  return gen_maybe_pointer_plus (mode, x, y);
 }
 
 /* Return the current substitution hard register of the elimination of
@@ -278,6 +290,12 @@ get_elimination (rtx reg)
   return &self_elim_table;
 }
 
+static bool addr_mode_class_p (machine_mode mode)
+{
+  return GET_MODE_CLASS (mode) == MODE_INT
+      || GET_MODE_CLASS (mode) == MODE_CAPABILITY;
+}
+
 /* Transform (subreg (plus reg const)) to (plus (subreg reg) const)
    when it is possible.  Return X or the transformation result if the
    transformation is done.  */
@@ -286,23 +304,24 @@ move_plus_up (rtx x)
 {
   rtx subreg_reg;
   machine_mode x_mode, subreg_reg_mode;
-  
+
   if (GET_CODE (x) != SUBREG || !subreg_lowpart_p (x))
     return x;
   subreg_reg = SUBREG_REG (x);
   x_mode = GET_MODE (x);
   subreg_reg_mode = GET_MODE (subreg_reg);
   if (!paradoxical_subreg_p (x)
-      && GET_CODE (subreg_reg) == PLUS
+      && any_plus_p (subreg_reg)
       && CONSTANT_P (XEXP (subreg_reg, 1))
-      && GET_MODE_CLASS (x_mode) == MODE_INT
-      && GET_MODE_CLASS (subreg_reg_mode) == MODE_INT)
+      && addr_mode_class_p (x_mode)
+      && addr_mode_class_p (subreg_reg_mode))
     {
       rtx cst = simplify_subreg (x_mode, XEXP (subreg_reg, 1), subreg_reg_mode,
 				 subreg_lowpart_offset (x_mode,
 							subreg_reg_mode));
       if (cst && CONSTANT_P (cst))
-	return gen_rtx_PLUS (x_mode, lowpart_subreg (x_mode,
+	return gen_raw_pointer_plus (as_a <scalar_addr_mode> (x_mode),
+				     lowpart_subreg (x_mode,
 						     XEXP (subreg_reg, 0),
 						     subreg_reg_mode), cst);
     }
@@ -388,6 +407,7 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
       return x;
 
     case PLUS:
+    case POINTER_PLUS:
       /* If this is the sum of an eliminable register and a constant, rework
 	 the sum.  */
       if (REG_P (XEXP (x, 0)) && CONSTANT_P (XEXP (x, 1)))
@@ -398,8 +418,8 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
 	      rtx to = subst_p ? ep->to_rtx : ep->from_rtx;
 
 	      if (! update_p && ! full_p)
-		return gen_rtx_PLUS (Pmode, to, XEXP (x, 1));
-	      
+		return gen_pointer_plus (Pmode, to, XEXP (x, 1));
+
 	      if (maybe_ne (update_sp_offset, 0))
 		offset = ep->to_rtx == stack_pointer_rtx ? update_sp_offset : 0;
 	      else
@@ -411,9 +431,9 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
 		  && known_eq (curr_offset, -offset))
 		return to;
 	      else
-		return gen_rtx_PLUS (Pmode, to,
-				     plus_constant (Pmode,
-						    XEXP (x, 1), offset));
+		return gen_pointer_plus (Pmode, to,
+					 plus_constant (POmode,
+							XEXP (x, 1), offset));
 	    }
 
 	  /* If the hard register is not eliminable, we are done since

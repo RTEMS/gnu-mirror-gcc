@@ -1380,7 +1380,8 @@ maybe_rewrite_mem_ref_base (tree *tp, bitmap suitable_for_renaming)
 			TYPE_SIZE (TREE_TYPE (*tp)),
 			int_const_binop (MULT_EXPR,
 					 bitsize_int (BITS_PER_UNIT),
-					 TREE_OPERAND (*tp, 1)));
+					 fold_drop_capability
+						(TREE_OPERAND (*tp, 1))));
 	}
       else if (TREE_CODE (TREE_TYPE (sym)) == COMPLEX_TYPE
 	       && useless_type_conversion_p (TREE_TYPE (*tp),
@@ -1527,6 +1528,14 @@ non_rewritable_lvalue_p (tree lhs)
 	      || (INTEGRAL_TYPE_P (TREE_TYPE (lhs))
 		  && (TYPE_PRECISION (TREE_TYPE (decl))
 		      >= TYPE_PRECISION (TREE_TYPE (lhs)))))
+	  /* If the decl is a capability, and the MEM is not then disallow SSA
+	     rewriting.  Writing to memory will definitely clear the tag, while
+	     writing to an SSA variable may not.  While we do not guarantee
+	     that we never convert invalid sequences to valid ones, this
+	     particular transformation will be easy to forbid and avoid some
+	     surprising behaviour.  */
+	  && (!tree_is_capability_value (decl)
+	       || tree_is_capability_value (lhs))
 	  /* Make sure we are not re-writing non-float copying into float
 	     copying as that can incur normalization.  */
 	  && (! FLOAT_TYPE_P (TREE_TYPE (decl))

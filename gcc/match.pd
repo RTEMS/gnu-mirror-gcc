@@ -138,10 +138,19 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     (op @0 integer_zerop)
     (non_lvalue @0)))
 
-/* 0 +p index -> (type)index */
+/* 0 +p index -> (type)index
+   Only valid if the pointer type is not a capability, since we can not cast
+   integers to capabilities.  */
 (simplify
  (pointer_plus integer_zerop @1)
- (non_lvalue (convert @1)))
+ (if (fold_convertible_p (type, @1))
+   (non_lvalue (convert @1))))
+
+/* MORELLO TODO (OPTIMISATION)
+   Would be nice to add the check that
+   0 +p some-constant -> pointer-constant
+   Hopefully that could catch some of the simplifications that the above
+   pattern can no longer catch in the presence of capabilities.  */
 
 /* ptr - 0 -> (type)ptr */
 (simplify
@@ -1373,6 +1382,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	  in c).  This folds extension into the BIT_AND_EXPR.
 	  Restrict it to GIMPLE to avoid endless recursions.  */
        && (bitop != BIT_AND_EXPR || GIMPLE)
+       && !capability_type_p (TREE_TYPE (@0))
        && (/* That's a good idea if the conversion widens the operand, thus
 	      after hoisting the conversion the operation will be narrower.  */
 	   TYPE_PRECISION (TREE_TYPE (@0)) < TYPE_PRECISION (type)
@@ -1900,8 +1910,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
      ... = ptr & ~algn;  */
 (simplify
   (pointer_plus @0 (negate (bit_and (convert @0) INTEGER_CST@1)))
-  (with { tree algn = wide_int_to_tree (TREE_TYPE (@0), ~wi::to_wide (@1)); }
-   (bit_and @0 { algn; })))
+  (if (!capability_type_p (TREE_TYPE (@0)))
+   (with { tree algn = wide_int_to_tree (TREE_TYPE (@0), ~wi::to_wide (@1)); }
+    (bit_and @0 { algn; }))))
 
 /* Try folding difference of addresses.  */
 (simplify
@@ -3014,9 +3025,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	     {
 	       tree inner_type = TREE_TYPE (@0);
 	       if (type_has_mode_precision_p (inner_type)
-		   && TYPE_PRECISION (inner_type) < prec)
+		   && TYPE_NONCAP_PRECISION (inner_type) < prec)
 		 {
-		   prec = TYPE_PRECISION (inner_type);
+		   prec = TYPE_NONCAP_PRECISION (inner_type);
 		   /* See if we can shorten the right shift.  */
 		   if (shiftc < prec)
 		     shift_type = inner_type;
@@ -3124,18 +3135,22 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (view_convert @0)
   (if ((INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type))
        && (INTEGRAL_TYPE_P (TREE_TYPE (@0)) || POINTER_TYPE_P (TREE_TYPE (@0)))
+       && (!capability_type_p (type) && !capability_type_p (TREE_TYPE (@0)))
        && TYPE_PRECISION (type) == TYPE_PRECISION (TREE_TYPE (@0)))
    (convert @0)))
 
 /* Strip inner integral conversions that do not change precision or size, or
-   zero-extend while keeping the same size (for bool-to-char).  */
+   zero-extend while keeping the same size (for bool-to-char).
+   For handling capabilities we rely on invalid conversions never having been
+   generated in the first place.  */
 (simplify
   (view_convert (convert@0 @1))
   (if ((INTEGRAL_TYPE_P (TREE_TYPE (@0)) || POINTER_TYPE_P (TREE_TYPE (@0)))
        && (INTEGRAL_TYPE_P (TREE_TYPE (@1)) || POINTER_TYPE_P (TREE_TYPE (@1)))
        && TYPE_SIZE (TREE_TYPE (@0)) == TYPE_SIZE (TREE_TYPE (@1))
-       && (TYPE_PRECISION (TREE_TYPE (@0)) == TYPE_PRECISION (TREE_TYPE (@1))
-	   || (TYPE_PRECISION (TREE_TYPE (@0)) > TYPE_PRECISION (TREE_TYPE (@1))
+       && (capability_type_p (TREE_TYPE (@0)) == capability_type_p (TREE_TYPE (@1)))
+       && (TYPE_CAP_PRECISION (TREE_TYPE (@0)) == TYPE_CAP_PRECISION (TREE_TYPE (@1))
+	   || (TYPE_CAP_PRECISION (TREE_TYPE (@0)) > TYPE_CAP_PRECISION (TREE_TYPE (@1))
 	       && TYPE_UNSIGNED (TREE_TYPE (@1)))))
    (view_convert @1)))
 
@@ -3168,19 +3183,19 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       int inside_ptr = POINTER_TYPE_P (inside_type);
       int inside_float = FLOAT_TYPE_P (inside_type);
       int inside_vec = VECTOR_TYPE_P (inside_type);
-      unsigned int inside_prec = TYPE_PRECISION (inside_type);
+      unsigned int inside_prec = TYPE_NONCAP_PRECISION (inside_type);
       int inside_unsignedp = TYPE_UNSIGNED (inside_type);
       int inter_int = INTEGRAL_TYPE_P (inter_type);
       int inter_ptr = POINTER_TYPE_P (inter_type);
       int inter_float = FLOAT_TYPE_P (inter_type);
       int inter_vec = VECTOR_TYPE_P (inter_type);
-      unsigned int inter_prec = TYPE_PRECISION (inter_type);
+      unsigned int inter_prec = TYPE_NONCAP_PRECISION (inter_type);
       int inter_unsignedp = TYPE_UNSIGNED (inter_type);
       int final_int = INTEGRAL_TYPE_P (type);
       int final_ptr = POINTER_TYPE_P (type);
       int final_float = FLOAT_TYPE_P (type);
       int final_vec = VECTOR_TYPE_P (type);
-      unsigned int final_prec = TYPE_PRECISION (type);
+      unsigned int final_prec = TYPE_NONCAP_PRECISION (type);
       int final_unsignedp = TYPE_UNSIGNED (type);
     }
    (switch
@@ -4424,13 +4439,14 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 		|| (POINTER_TYPE_P (TREE_TYPE (@10))
 		    && FUNC_OR_METHOD_TYPE_P (TREE_TYPE (TREE_TYPE (@10))))))
        && single_use (@0))
-   (if (TYPE_PRECISION (TREE_TYPE (@00)) == TYPE_PRECISION (TREE_TYPE (@0))
+   (if (TYPE_CAP_PRECISION (TREE_TYPE (@00)) == TYPE_CAP_PRECISION (TREE_TYPE (@0))
 	&& (TREE_CODE (@10) == INTEGER_CST
 	    || @1 != @10)
 	&& (TYPE_UNSIGNED (TREE_TYPE (@00)) == TYPE_UNSIGNED (TREE_TYPE (@0))
 	    || cmp == NE_EXPR
 	    || cmp == EQ_EXPR)
-	&& !POINTER_TYPE_P (TREE_TYPE (@00)))
+	&& !(POINTER_TYPE_P (TREE_TYPE (@00))
+	     || INTCAP_TYPE_P (TREE_TYPE (@00))))
     /* ???  The special-casing of INTEGER_CST conversion was in the original
        code and here to avoid a spurious overflow flag on the resulting
        constant which fold_convert produces.  */
@@ -4439,12 +4455,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 				TREE_OVERFLOW (@1)); })
      (cmp @00 (convert @1)))
 
-    (if (TYPE_PRECISION (TREE_TYPE (@0)) > TYPE_PRECISION (TREE_TYPE (@00)))
+    (if (TYPE_CAP_PRECISION (TREE_TYPE (@0)) > TYPE_CAP_PRECISION (TREE_TYPE (@00)))
      /* If possible, express the comparison in the shorter mode.  */
      (if ((cmp == EQ_EXPR || cmp == NE_EXPR
 	   || TYPE_UNSIGNED (TREE_TYPE (@0)) == TYPE_UNSIGNED (TREE_TYPE (@00))
 	   || (!TYPE_UNSIGNED (TREE_TYPE (@0))
 	       && TYPE_UNSIGNED (TREE_TYPE (@00))))
+	  && !capability_type_p (TREE_TYPE (@10))
 	  && (types_match (TREE_TYPE (@10), TREE_TYPE (@00))
 	      || ((TYPE_PRECISION (TREE_TYPE (@00))
 		   >= TYPE_PRECISION (TREE_TYPE (@10)))
@@ -4755,6 +4772,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	 (if (cmp == NE_EXPR)
 	  { constant_boolean_node (true, type); })))))))))
 
+/* MORELLO TODO (OPTIMISATION)  */
 /* Simplify pointer equality compares using PTA.  */
 (for neeq (ne eq)
  (simplify
@@ -4769,6 +4787,17 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    This broke pr22051-2.c for arm where function pointer
    canonicalizaion is not wanted.  */
 
+/* MORELLO TODO  (OPTIMISATION)
+   The below transformation can't happen on capabilities, since we need to
+   convert to capability values on both sides before creating a test.
+   This is caught by the check for useless_type_conversion_p, so we avoid
+   creating invalid simplifications, but I would guess the optimisation is
+   lost.
+   The very fact we were converting to pointers on both sides before seems to
+   indicate that this form will be what the optimisers are looking for.
+   Hence this indicates a switch in the optimisers will be necessary (similar
+   to the problem of generating ASSERT's for NULL pointers).  */
+
 (for cmp (ne eq)
  (simplify
   (cmp (convert @0) INTEGER_CST@1)
@@ -4778,7 +4807,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	|| (INTEGRAL_TYPE_P (TREE_TYPE (@0))
 	    && POINTER_TYPE_P (TREE_TYPE (@1))
 	    && !FUNC_OR_METHOD_TYPE_P (TREE_TYPE (TREE_TYPE (@1)))))
-       && TYPE_PRECISION (TREE_TYPE (@0)) == TYPE_PRECISION (TREE_TYPE (@1)))
+       && tree_nop_conversion_p (TREE_TYPE (@0), TREE_TYPE (@1)))
    (cmp @0 (convert @1)))))
 
 /* Non-equality compare simplifications from fold_binary  */
@@ -5662,6 +5691,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	   so there's no need to check that @2/@4 are integral types.  */
 	&& INTEGRAL_TYPE_P (TREE_TYPE (@1))
 	&& INTEGRAL_TYPE_P (TREE_TYPE (@3))
+	&& !capability_type_p (TREE_TYPE (@2))
 	/* The precision of the type of each operand must match the
 	   precision of the mode of each operand, similarly for the
 	   result.  */

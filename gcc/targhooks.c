@@ -436,6 +436,7 @@ default_scalar_mode_supported_p (scalar_mode mode)
 	return true;
       return false;
 
+    case MODE_CAPABILITY:
     case MODE_DECIMAL_FLOAT:
     case MODE_FRACT:
     case MODE_UFRACT:
@@ -1394,7 +1395,7 @@ default_destroy_cost_data (void *data)
 /* Determine whether or not a pointer mode is valid. Assume defaults
    of ptr_mode or Pmode - can be overridden.  */
 bool
-default_valid_pointer_mode (scalar_int_mode mode)
+default_valid_pointer_mode (scalar_addr_mode mode)
 {
   return (mode == ptr_mode || mode == Pmode);
 }
@@ -1428,10 +1429,16 @@ default_ref_may_alias_errno (ao_ref *ref)
   return false;
 }
 
+opt_scalar_addr_mode
+default_capability_mode ()
+{
+  return opt_scalar_addr_mode ();
+}
+
 /* Return the mode for a pointer to a given ADDRSPACE,
    defaulting to ptr_mode for all address spaces.  */
 
-scalar_int_mode
+scalar_addr_mode
 default_addr_space_pointer_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
 {
   return ptr_mode;
@@ -1440,7 +1447,7 @@ default_addr_space_pointer_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
 /* Return the mode for an address in a given ADDRSPACE,
    defaulting to Pmode for all address spaces.  */
 
-scalar_int_mode
+scalar_addr_mode
 default_addr_space_address_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
 {
   return Pmode;
@@ -1450,7 +1457,7 @@ default_addr_space_address_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
    To match the above, the same modes apply to all address spaces.  */
 
 bool
-default_addr_space_valid_pointer_mode (scalar_int_mode mode,
+default_addr_space_valid_pointer_mode (scalar_addr_mode mode,
 				       addr_space_t as ATTRIBUTE_UNUSED)
 {
   return targetm.valid_pointer_mode (mode);

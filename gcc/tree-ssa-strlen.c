@@ -450,7 +450,7 @@ get_stridx (tree exp, wide_int offrng[2] = NULL, const vr_values *rvals = NULL)
 	        return 0;
 
 	      /* Add the MEM_REF byte offset.  */
-	      tree mem_off = TREE_OPERAND (ptr, 1);
+	      tree mem_off = fold_drop_capability (TREE_OPERAND (ptr, 1));
 	      off = fold_build2 (PLUS_EXPR, TREE_TYPE (off), off, mem_off);
 	      ptr = TREE_OPERAND (ptr, 0);
 	    }

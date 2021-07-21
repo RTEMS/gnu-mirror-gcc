@@ -282,6 +282,11 @@ as_internal_fn (combined_fn code)
 (tree_not_check5 ((T), __FILE__, __LINE__, __FUNCTION__, \
                                (CODE1), (CODE2), (CODE3), (CODE4), (CODE5)))
 
+#define TREE_CHECK6(T, CODE1, CODE2, CODE3, CODE4, CODE5, CODE6) \
+(tree_check6 ((T), __FILE__, __LINE__, __FUNCTION__, \
+                           (CODE1), (CODE2), (CODE3), (CODE4), (CODE5), \
+			   (CODE6)))
+
 #define CONTAINS_STRUCT_CHECK(T, STRUCT) \
 (contains_struct_check ((T), (STRUCT), __FILE__, __LINE__, __FUNCTION__))
 
@@ -359,6 +364,8 @@ extern void tree_not_check_failed (const_tree, const char *, int, const char *,
 				   ...) ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
 extern void tree_class_check_failed (const_tree, const enum tree_code_class,
 				     const char *, int, const char *)
+    ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
+extern void noncap_type_check_failed (const_tree, const char *, int, const char *)
     ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
 extern void tree_range_check_failed (const_tree, const char *, int,
 				     const char *, enum tree_code,
@@ -447,8 +454,8 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
   TREE_CHECK2 (T, ARRAY_TYPE, INTEGER_TYPE)
 
 #define NUMERICAL_TYPE_CHECK(T)					\
-  TREE_CHECK5 (T, INTEGER_TYPE, ENUMERAL_TYPE, BOOLEAN_TYPE, REAL_TYPE,	\
-	       FIXED_POINT_TYPE)
+  TREE_CHECK6 (T, INTEGER_TYPE, ENUMERAL_TYPE, BOOLEAN_TYPE, REAL_TYPE,	\
+	       FIXED_POINT_TYPE, INTCAP_TYPE)
 
 /* Here is how primitive or already-canonicalized types' hash codes
    are made.  */
@@ -607,6 +614,9 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 /* Nonzero if TYPE represents a pointer to function.  */
 #define FUNCTION_POINTER_TYPE_P(TYPE) \
   (POINTER_TYPE_P (TYPE) && TREE_CODE (TREE_TYPE (TYPE)) == FUNCTION_TYPE)
+
+/* Nonzero if TYPE is an INTCAP_TYPE.  */
+#define INTCAP_TYPE_P(TYPE) (TREE_CODE (TYPE) == INTCAP_TYPE)
 
 /* Nonzero if this type is a complete type.  */
 #define COMPLETE_TYPE_P(NODE) (TYPE_SIZE (NODE) != NULL_TREE)
@@ -1974,7 +1984,10 @@ class auto_suppress_location_wrappers
 #define TYPE_SIZE_UNIT(NODE) (TYPE_CHECK (NODE)->type_common.size_unit)
 #define TYPE_POINTER_TO(NODE) (TYPE_CHECK (NODE)->type_common.pointer_to)
 #define TYPE_REFERENCE_TO(NODE) (TYPE_CHECK (NODE)->type_common.reference_to)
-#define TYPE_PRECISION(NODE) (TYPE_CHECK (NODE)->type_common.precision)
+#define NONCAP_TYPE_CHECK(NODE) (noncap_type_check ((NODE), __FILE__, __LINE__, __FUNCTION__))
+#define TYPE_PRECISION(NODE) (NONCAP_TYPE_CHECK (NODE)->type_common.precision)
+#define TYPE_CAP_PRECISION(NODE) (TYPE_CHECK (NODE)->type_common.precision)
+#define TYPE_NONCAP_PRECISION(NODE) (TYPE_CHECK (noncapability_type (NODE))->type_common.precision)
 #define TYPE_NAME(NODE) (TYPE_CHECK (NODE)->type_common.name)
 #define TYPE_NEXT_VARIANT(NODE) (TYPE_CHECK (NODE)->type_common.next_variant)
 #define TYPE_MAIN_VARIANT(NODE) (TYPE_CHECK (NODE)->type_common.main_variant)
@@ -1988,10 +2001,19 @@ class auto_suppress_location_wrappers
   (as_a <scalar_mode> (TYPE_CHECK (NODE)->type_common.mode))
 #define SCALAR_INT_TYPE_MODE(NODE) \
   (as_a <scalar_int_mode> (TYPE_CHECK (NODE)->type_common.mode))
+#define SCALAR_ADDR_TYPE_MODE(NODE) \
+  (as_a <scalar_addr_mode> (TYPE_CHECK (NODE)->type_common.mode))
 #define SCALAR_FLOAT_TYPE_MODE(NODE) \
   (as_a <scalar_float_mode> (TYPE_CHECK (NODE)->type_common.mode))
 #define SET_TYPE_MODE(NODE, MODE) \
   (TYPE_CHECK (NODE)->type_common.mode = (MODE))
+
+extern bool capability_type_p (const_tree);
+extern tree noncapability_type (tree);
+extern const_tree noncapability_type (const_tree);
+extern tree fold_drop_capability (tree);
+extern tree build_replace_address_value_loc (location_t, tree, tree);
+extern bool valid_capability_code_p (tree_code);
 
 extern machine_mode element_mode (const_tree);
 extern machine_mode vector_type_mode (const_tree);
@@ -3402,6 +3424,22 @@ tree_not_check5 (tree __t, const char *__f, int __l, const char *__g,
 }
 
 inline tree
+tree_check6 (tree __t, const char *__f, int __l, const char *__g,
+             enum tree_code __c1, enum tree_code __c2, enum tree_code __c3,
+             enum tree_code __c4, enum tree_code __c5, enum tree_code __c6)
+{
+  if (TREE_CODE (__t) != __c1
+      && TREE_CODE (__t) != __c2
+      && TREE_CODE (__t) != __c3
+      && TREE_CODE (__t) != __c4
+      && TREE_CODE (__t) != __c5
+      && TREE_CODE (__t) != __c6)
+    tree_check_failed (__t, __f, __l, __g, __c1, __c2,
+		       __c3, __c4, __c5, __c6, 0);
+  return __t;
+}
+
+inline tree
 contains_struct_check (tree __t, const enum tree_node_structure_enum __s,
                        const char *__f, int __l, const char *__g)
 {
@@ -3418,6 +3456,18 @@ tree_class_check (tree __t, const enum tree_code_class __class,
     tree_class_check_failed (__t, __class, __f, __l, __g);
   return __t;
 }
+
+
+inline tree
+noncap_type_check (tree __t, const char *__f, int __l, const char *__g)
+{
+  if (TREE_CODE_CLASS (TREE_CODE (__t)) != tcc_type)
+    tree_class_check_failed (__t, tcc_type, __f, __l, __g);
+  if (capability_type_p (__t))
+    noncap_type_check_failed (__t, __f, __l, __g);
+  return __t;
+}
+
 
 inline tree
 tree_range_check (tree __t,
@@ -3658,11 +3708,37 @@ tree_not_check5 (const_tree __t, const char *__f, int __l, const char *__g,
 }
 
 inline const_tree
+tree_check6 (const_tree __t, const char *__f, int __l, const char *__g,
+             enum tree_code __c1, enum tree_code __c2, enum tree_code __c3,
+             enum tree_code __c4, enum tree_code __c5, enum tree_code __c6)
+{
+  if (TREE_CODE (__t) != __c1
+      && TREE_CODE (__t) != __c2
+      && TREE_CODE (__t) != __c3
+      && TREE_CODE (__t) != __c4
+      && TREE_CODE (__t) != __c5
+      && TREE_CODE (__t) != __c6)
+    tree_check_failed (__t, __f, __l, __g, __c1, __c2,
+		       __c3, __c4, __c5, __c6, 0);
+  return __t;
+}
+
+inline const_tree
 contains_struct_check (const_tree __t, const enum tree_node_structure_enum __s,
                        const char *__f, int __l, const char *__g)
 {
   if (tree_contains_struct[TREE_CODE (__t)][__s] != 1)
       tree_contains_struct_check_failed (__t, __s, __f, __l, __g);
+  return __t;
+}
+
+inline const_tree
+noncap_type_check (const_tree __t, const char *__f, int __l, const char *__g)
+{
+  if (TREE_CODE_CLASS (TREE_CODE (__t)) != tcc_type)
+    tree_class_check_failed (__t, tcc_type, __f, __l, __g);
+  if (capability_type_p (__t))
+    noncap_type_check_failed (__t, __f, __l, __g);
   return __t;
 }
 
@@ -4094,6 +4170,9 @@ tree_strip_any_location_wrapper (tree exp)
 #define ptr_type_node			global_trees[TI_PTR_TYPE]
 /* The C type `const void *'.  */
 #define const_ptr_type_node		global_trees[TI_CONST_PTR_TYPE]
+/* Capability integer types.  */
+#define intcap_type_node		global_trees[TI_INTCAP_TYPE]
+#define uintcap_type_node		global_trees[TI_UINTCAP_TYPE]
 /* The C type `size_t'.  */
 #define size_type_node                  global_trees[TI_SIZE_TYPE]
 #define pid_type_node                   global_trees[TI_PID_TYPE]
@@ -4417,6 +4496,7 @@ extern tree build_one_cst (tree);
 extern tree build_minus_one_cst (tree);
 extern tree build_all_ones_cst (tree);
 extern tree build_zero_cst (tree);
+extern tree build_pointer_set_value (tree, tree, tree);
 extern tree build_string (unsigned, const char * = NULL);
 extern tree build_poly_int_cst (tree, const poly_wide_int_ref &);
 extern tree build_tree_list (tree, tree CXX_MEM_STAT_INFO);
@@ -4460,6 +4540,7 @@ extern tree unsigned_type_for (tree);
 extern tree truth_type_for (tree);
 extern tree build_pointer_type_for_mode (tree, machine_mode, bool);
 extern tree build_pointer_type (tree);
+extern tree build_intcap_type_for_mode (machine_mode, int);
 extern tree build_reference_type_for_mode (tree, machine_mode, bool);
 extern tree build_reference_type (tree);
 extern tree build_vector_type_for_mode (tree, machine_mode);
@@ -4754,9 +4835,15 @@ extern bool integer_onep (const_tree);
 extern bool integer_each_onep (const_tree);
 
 /* integer_all_onesp (tree x) is nonzero if X is an integer constant
-   all of whose significant bits are 1.  */
+   all of whose significant bits are 1.  This does not accept capabilities.  */
 
 extern bool integer_all_onesp (const_tree);
+
+/* maybe_cap_all_onesp (tree x) is nonzero if X is an integer constant
+   all of whose bits representing a value are 1.
+   For capabilities this requires that all metadata bits are zero.  */
+
+extern bool maybe_cap_all_onesp (const_tree);
 
 /* integer_minus_onep (tree x) is nonzero if X is an integer constant of
    value -1.  */
@@ -5902,7 +5989,7 @@ inline wi::tree_to_wide_ref
 wi::to_wide (const_tree t)
 {
   return wi::storage_ref (&TREE_INT_CST_ELT (t, 0), TREE_INT_CST_NUNITS (t),
-			  TYPE_PRECISION (TREE_TYPE (t)));
+			  TYPE_CAP_PRECISION (TREE_TYPE (t)));
 }
 
 /* Convert INTEGER_CST T to a wide_int of precision PREC, extending or
@@ -5919,7 +6006,7 @@ template <int N>
 inline wi::extended_tree <N>::extended_tree (const_tree t)
   : m_t (t)
 {
-  gcc_checking_assert (TYPE_PRECISION (TREE_TYPE (t)) <= N);
+  gcc_checking_assert (TYPE_CAP_PRECISION (TREE_TYPE (t)) <= N);
 }
 
 template <int N>
@@ -5954,7 +6041,7 @@ wi::extended_tree <N>::get_len () const
 inline unsigned int
 wi::unextended_tree::get_precision () const
 {
-  return TYPE_PRECISION (TREE_TYPE (m_t));
+  return TYPE_CAP_PRECISION (TREE_TYPE (m_t));
 }
 
 inline const HOST_WIDE_INT *
@@ -6072,9 +6159,9 @@ wi::fits_to_tree_p (const T &x, const_tree type)
     return fits_to_boolean_p (x, type);
 
   if (TYPE_UNSIGNED (type))
-    return known_eq (x, zext (x, TYPE_PRECISION (type)));
+    return known_eq (x, zext (x, TYPE_CAP_PRECISION (type)));
   else
-    return known_eq (x, sext (x, TYPE_PRECISION (type)));
+    return known_eq (x, sext (x, TYPE_CAP_PRECISION (type)));
 }
 
 /* Produce the smallest number that is represented in TYPE.  The precision
@@ -6228,7 +6315,7 @@ extern const builtin_structptr_type builtin_structptr_types[6];
 inline bool
 type_has_mode_precision_p (const_tree t)
 {
-  return known_eq (TYPE_PRECISION (t), GET_MODE_PRECISION (TYPE_MODE (t)));
+  return known_eq (TYPE_CAP_PRECISION (t), GET_MODE_PRECISION (TYPE_MODE (t)));
 }
 
 /* Return true if a FUNCTION_DECL NODE is a GCC built-in function.
@@ -6270,6 +6357,82 @@ fndecl_built_in_p (const_tree node, built_in_function name)
 {
   return (fndecl_built_in_p (node, BUILT_IN_NORMAL)
 	  && DECL_FUNCTION_CODE (node) == name);
+}
+
+static inline bool
+tree_is_capability_value (const_tree t)
+{
+  return t && t != error_mark_node && capability_type_p (TREE_TYPE (t));
+}
+
+static inline bool
+capability_args_valid (__attribute__ ((unused)) const_tree type,
+		       tree_code code, const_tree op0)
+{
+  if (op0 == error_mark_node)
+    return true;
+  if (! tree_is_capability_value (op0) && ! capability_type_p (type))
+    return true;
+  if (! valid_capability_code_p (code) && tree_is_capability_value (op0))
+    return false;
+  tree rhs_type = op0 ? TREE_TYPE (op0) : NULL_TREE;
+  switch (code)
+    {
+    CASE_CONVERT:
+      {
+	gcc_assert (type && rhs_type);
+	/* Any conversions *to* a capability type must be from some type with
+	   the same capability mode.  There is no valid method to convert from
+	   a given hardware capability mode to another.  */
+	if (capability_type_p (type)
+	    && (!capability_type_p (rhs_type)
+		|| (TYPE_MODE (type) != TYPE_MODE (rhs_type))))
+	  return false;
+
+	/* Any conversions *from* a capability type must be either to another
+	   capability type of the same machine mode, to an integral type with a
+	   precision less than or equal to the precision of the value of a
+	   given capability, or to void_type_node.  The first case is handled
+	   by the above clause, while we handle the other cases here.  */
+	if (capability_type_p (rhs_type)
+	    && !capability_type_p (type)
+	    && (!INTEGRAL_TYPE_P (type)
+		|| (TYPE_PRECISION (type)
+		    < TYPE_PRECISION (noncapability_type (rhs_type))))
+	    && type != void_type_node)
+	  return false;
+
+	return true;
+      }
+    default:
+      return true;
+    }
+}
+
+static inline bool
+capability_args_valid (__attribute__ ((unused)) const_tree type,
+		       tree_code code, const_tree op0, const_tree op1)
+{
+  switch (code)
+    {
+      case POINTER_PLUS_EXPR:
+	return !tree_is_capability_value (op1);
+      case POINTER_DIFF_EXPR:
+	return (tree_is_capability_value (op0) == tree_is_capability_value (op1))
+	       && !capability_type_p (type);
+      default:
+	return valid_capability_code_p (code)
+		|| (! tree_is_capability_value (op0) && ! tree_is_capability_value (op1));
+    }
+}
+
+static inline bool
+capability_args_valid (__attribute__ ((unused)) const_tree type, tree_code code,
+		       const_tree op0, const_tree op1, const_tree op2)
+{
+  return valid_capability_code_p (code)
+    || (! tree_is_capability_value (op0) && ! tree_is_capability_value (op1)
+	&& ! tree_is_capability_value (op2));
 }
 
 /* A struct for encapsulating location information about an operator

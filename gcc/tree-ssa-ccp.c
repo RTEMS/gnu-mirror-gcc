@@ -603,11 +603,11 @@ get_value_from_alignment (tree expr)
   get_pointer_alignment_1 (expr, &align, &bitpos);
   val.mask = wi::bit_and_not
     (POINTER_TYPE_P (type) || TYPE_UNSIGNED (type)
-     ? wi::mask <widest_int> (TYPE_PRECISION (type), false)
+     ? wi::mask <widest_int> (TYPE_CAP_PRECISION (type), false)
      : -1,
      align / BITS_PER_UNIT - 1);
   val.lattice_val
-    = wi::sext (val.mask, TYPE_PRECISION (type)) == -1 ? VARYING : CONSTANT;
+    = wi::sext (val.mask, TYPE_CAP_PRECISION (type)) == -1 ? VARYING : CONSTANT;
   if (val.lattice_val == CONSTANT)
     val.value = build_int_cstu (type, bitpos / BITS_PER_UNIT);
   else
@@ -677,7 +677,7 @@ get_value_for_expr (tree expr, bool for_bits_p)
 
   if (val.lattice_val == VARYING
       && TYPE_UNSIGNED (TREE_TYPE (expr)))
-    val.mask = wi::zext (val.mask, TYPE_PRECISION (TREE_TYPE (expr)));
+    val.mask = wi::zext (val.mask, TYPE_CAP_PRECISION (TREE_TYPE (expr)));
 
   return val;
 }
@@ -1079,7 +1079,7 @@ ccp_lattice_meet (ccp_prop_value_t *val1, ccp_prop_value_t *val2)
       val1->mask = (val1->mask | val2->mask
 		    | (wi::to_widest (val1->value)
 		       ^ wi::to_widest (val2->value)));
-      if (wi::sext (val1->mask, TYPE_PRECISION (TREE_TYPE (val1->value))) == -1)
+      if (wi::sext (val1->mask, TYPE_CAP_PRECISION (TREE_TYPE (val1->value))) == -1)
 	{
 	  val1->lattice_val = VARYING;
 	  val1->value = NULL_TREE;
@@ -1599,11 +1599,11 @@ bit_value_unop (enum tree_code code, tree type, tree rhs)
 
   gcc_assert ((rval.lattice_val == CONSTANT
 	       && TREE_CODE (rval.value) == INTEGER_CST)
-	      || wi::sext (rval.mask, TYPE_PRECISION (TREE_TYPE (rhs))) == -1);
-  bit_value_unop (code, TYPE_SIGN (type), TYPE_PRECISION (type), &value, &mask,
-		  TYPE_SIGN (TREE_TYPE (rhs)), TYPE_PRECISION (TREE_TYPE (rhs)),
+	      || wi::sext (rval.mask, TYPE_CAP_PRECISION (TREE_TYPE (rhs))) == -1);
+  bit_value_unop (code, TYPE_SIGN (type), TYPE_CAP_PRECISION (type), &value, &mask,
+		  TYPE_SIGN (TREE_TYPE (rhs)), TYPE_CAP_PRECISION (TREE_TYPE (rhs)),
 		  value_to_wide_int (rval), rval.mask);
-  if (wi::sext (mask, TYPE_PRECISION (type)) != -1)
+  if (wi::sext (mask, TYPE_CAP_PRECISION (type)) != -1)
     {
       val.lattice_val = CONSTANT;
       val.mask = mask;
@@ -1631,7 +1631,12 @@ bit_value_binop (enum tree_code code, tree type, tree rhs1, tree rhs2)
   ccp_prop_value_t val;
 
   if (r1val.lattice_val == UNDEFINED
-      || r2val.lattice_val == UNDEFINED)
+      || r2val.lattice_val == UNDEFINED
+      /* MORELLO TODO (OPTIMISATION)  Would be nice to handle this case.
+	 At the moment we early exit because the existing code doesn't handle
+	 overflow into the metadata bits of a capability.  Nothing fundamental
+	 stopping introducing such handling and allowing this case.  */
+      || (code == POINTER_PLUS_EXPR && capability_type_p (type)))
     {
       val.lattice_val = VARYING;
       val.value = NULL_TREE;
@@ -1713,7 +1718,7 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
     return ptrval;
   gcc_assert ((ptrval.lattice_val == CONSTANT
 	       && TREE_CODE (ptrval.value) == INTEGER_CST)
-	      || wi::sext (ptrval.mask, TYPE_PRECISION (type)) == -1);
+	      || wi::sext (ptrval.mask, TYPE_CAP_PRECISION (type)) == -1);
   if (attr == NULL_TREE)
     {
       /* Get aligni and misaligni from __builtin_assume_aligned.  */
@@ -1762,11 +1767,20 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
 
   align = build_int_cst_type (type, -aligni);
   alignval = get_value_for_expr (align, true);
-  bit_value_binop (BIT_AND_EXPR, TYPE_SIGN (type), TYPE_PRECISION (type), &value, &mask,
-		   TYPE_SIGN (type), TYPE_PRECISION (type), value_to_wide_int (ptrval), ptrval.mask,
-		   TYPE_SIGN (type), TYPE_PRECISION (type), value_to_wide_int (alignval), alignval.mask);
+  /* Masking the constant value works for capabilities, but we need to ensure
+     that we don't apply it so that it modifies the metadata.
+     If this ever gets hit, then the frontend is apparently requesting
+     alignment to larger than the addressable space, since NULL is not a valid
+     pointer that isn't possible.
+     (N.b. the initial check is to avoid UB in this test by shifting by more
+     than the number of bits in ALIGNI).  */
+  gcc_assert (TYPE_NONCAP_PRECISION (type) >= HOST_BITS_PER_WIDE_INT
+	      || (aligni >> TYPE_NONCAP_PRECISION (type)) == 0);
+  bit_value_binop (BIT_AND_EXPR, TYPE_SIGN (type), TYPE_CAP_PRECISION (type), &value, &mask,
+		   TYPE_SIGN (type), TYPE_CAP_PRECISION (type), value_to_wide_int (ptrval), ptrval.mask,
+		   TYPE_SIGN (type), TYPE_CAP_PRECISION (type), value_to_wide_int (alignval), alignval.mask);
 
-  if (wi::sext (mask, TYPE_PRECISION (type)) != -1)
+  if (wi::sext (mask, TYPE_CAP_PRECISION (type)) != -1)
     {
       val.lattice_val = CONSTANT;
       val.mask = mask;
@@ -1936,6 +1950,8 @@ evaluate_stmt (gimple *stmt)
 	  enum tree_code code = gimple_cond_code (stmt);
 	  tree rhs1 = gimple_cond_lhs (stmt);
 	  tree rhs2 = gimple_cond_rhs (stmt);
+	  gcc_assert (!capability_type_p (TREE_TYPE (rhs1))
+			&& !capability_type_p (TREE_TYPE (rhs2)));
 	  if (INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
 	      || POINTER_TYPE_P (TREE_TYPE (rhs1)))
 	    val = bit_value_binop (code, TREE_TYPE (rhs1), rhs1, rhs2);

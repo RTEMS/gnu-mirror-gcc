@@ -786,4 +786,6 @@ const char *aarch64_indirect_call_asm (rtx);
 extern bool aarch64_harden_sls_retbr_p (void);
 extern bool aarch64_harden_sls_blr_p (void);
 
+bool aarch64_lowpart_regs_p (rtx x, rtx y);
+
 #endif /* GCC_AARCH64_PROTOS_H */

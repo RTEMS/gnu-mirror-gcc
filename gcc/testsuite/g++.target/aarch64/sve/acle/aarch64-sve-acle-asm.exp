@@ -24,6 +24,11 @@ if { ![istarget aarch64*-*-*] } {
     return
 }
 
+# SVE is not supported for capability targets.
+if { [check_effective_target_aarch64_capability_any] } then {
+  return
+}
+
 # Load support procs.
 load_lib g++-dg.exp
 

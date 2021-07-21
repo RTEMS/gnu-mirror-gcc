@@ -232,6 +232,7 @@ extern void digraph_cc_tests ();
 extern void dumpfile_c_tests ();
 extern void edit_context_c_tests ();
 extern void et_forest_c_tests ();
+extern void expand_c_tests ();
 extern void fibonacci_heap_c_tests ();
 extern void fold_const_c_tests ();
 extern void function_tests_c_tests ();

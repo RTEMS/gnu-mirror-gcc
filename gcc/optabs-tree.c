@@ -230,6 +230,9 @@ optab_for_tree_code (enum tree_code code, const_tree type,
   switch (code)
     {
     case POINTER_PLUS_EXPR:
+      if (capability_type_p (type))
+	return pointer_plus_optab;
+      /* FALLTHRU */
     case PLUS_EXPR:
       if (TYPE_SATURATING (type))
 	return TYPE_UNSIGNED (type) ? usadd_optab : ssadd_optab;

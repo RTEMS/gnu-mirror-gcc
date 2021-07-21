@@ -325,7 +325,8 @@ irange::nonzero_p () const
 inline bool
 irange::supports_type_p (tree type)
 {
-  if (type && (INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type)))
+  if (type && (INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type))
+      && !capability_type_p (type))
     return type;
   return false;
 }

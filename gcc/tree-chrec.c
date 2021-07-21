@@ -363,9 +363,9 @@ chrec_fold_plus (tree type,
       || automatically_generated_chrec_p (op1))
     return chrec_fold_automatically_generated_operands (op0, op1);
 
-  if (integer_zerop (op0))
+  if (integer_zerop (op0) && fold_convertible_p (type, op1))
     return chrec_convert (type, op1, NULL);
-  if (integer_zerop (op1))
+  if (integer_zerop (op1) && fold_convertible_p (type, op0))
     return chrec_convert (type, op0, NULL);
 
   if (POINTER_TYPE_P (type))
@@ -1478,6 +1478,8 @@ keep_cast:
 						  CHREC_RIGHT (chrec)));
       res = chrec_convert_1 (type, res, at_stmt, use_overflow_semantics, from);
     }
+  else if (capability_type_p (ct) || capability_type_p (type))
+    res = chrec_dont_know;
   else
     res = fold_convert (type, chrec);
 
@@ -1553,7 +1555,8 @@ chrec_convert_aggressive (tree type, tree chrec, bool *fold_conversions)
     return NULL_TREE;
 
   inner_type = TREE_TYPE (chrec);
-  if (TYPE_PRECISION (type) > TYPE_PRECISION (inner_type))
+  if (capability_type_p (type) || capability_type_p (inner_type)
+      || TYPE_PRECISION (type) > TYPE_PRECISION (inner_type))
     return NULL_TREE;
 
   if (useless_type_conversion_p (type, inner_type))

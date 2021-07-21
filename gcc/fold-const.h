@@ -76,10 +76,16 @@ extern tree fold_build_call_array_loc (location_t, tree, tree, int, tree *);
 extern tree fold_build_call_array_initializer_loc (location_t, tree, tree, int, tree *);
 extern tree get_array_ctor_element_at_index (tree, offset_int,
 					     unsigned * = NULL);
+#define fold_build_replace_address_value(T1, T2)\
+   fold_build_replace_address_value_loc (UNKNOWN_LOCATION, T1, T2)
+extern tree fold_build_replace_address_value_loc (location_t, tree, tree);
+extern tree maybe_cap_int_const_binop (tree_code, tree, tree);
 extern bool fold_convertible_p (const_tree, const_tree);
 #define fold_convert(T1,T2)\
    fold_convert_loc (UNKNOWN_LOCATION, T1, T2)
 extern tree fold_convert_loc (location_t, tree, tree);
+extern tree fold_convert_for_mem_ref (tree, tree);
+extern tree fold_convert_MORELLO_TODO_getout_clause (tree, tree);
 extern tree fold_single_bit_test (location_t, enum tree_code, tree, tree, tree);
 extern tree fold_ignored_result (tree);
 extern tree fold_abs_const (tree, tree);

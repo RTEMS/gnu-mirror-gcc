@@ -3483,6 +3483,7 @@ verify_gimple_call (gcall *stmt)
 static bool
 verify_gimple_comparison (tree type, tree op0, tree op1, enum tree_code code)
 {
+  gcc_assert (capability_args_valid (type, code, op0, op1));
   tree op0_type = TREE_TYPE (op0);
   tree op1_type = TREE_TYPE (op1);
 
@@ -3572,6 +3573,8 @@ verify_gimple_assign_unary (gassign *stmt)
   tree rhs1 = gimple_assign_rhs1 (stmt);
   tree rhs1_type = TREE_TYPE (rhs1);
 
+  gcc_assert (capability_args_valid (lhs_type, rhs_code, rhs1));
+
   if (!is_gimple_reg (lhs))
     {
       error ("non-register as LHS of unary operation");
@@ -3618,13 +3621,13 @@ verify_gimple_assign_unary (gassign *stmt)
 	     && INTEGRAL_TYPE_P (rhs1_type))
 	    || (POINTER_TYPE_P (rhs1_type)
 		&& INTEGRAL_TYPE_P (lhs_type)
-		&& (TYPE_PRECISION (rhs1_type) >= TYPE_PRECISION (lhs_type)
+		&& (TYPE_NONCAP_PRECISION (rhs1_type) >= TYPE_PRECISION (lhs_type)
 #if defined(POINTERS_EXTEND_UNSIGNED)
 		    || (TYPE_MODE (rhs1_type) == ptr_mode
 			&& (TYPE_PRECISION (lhs_type)
 			      == BITS_PER_WORD /* word_mode */
 			    || (TYPE_PRECISION (lhs_type)
-				  == GET_MODE_PRECISION (Pmode))))
+				  == GET_MODE_PRECISION (POmode))))
 #endif
 		   )))
 	  return false;
@@ -3635,6 +3638,23 @@ verify_gimple_assign_unary (gassign *stmt)
 	    || (INTEGRAL_TYPE_P (lhs_type)
 		&& TREE_CODE (rhs1_type) == OFFSET_TYPE))
 	  return false;
+
+	/* Only allow conversions from INTCAP_TYPE to integral type if there is
+	   no sign or zero extension involved.  */
+	if ((INTCAP_TYPE_P (lhs_type)
+	     && INTEGRAL_TYPE_P (rhs1_type))
+	    || (INTCAP_TYPE_P (rhs1_type)
+		&& INTEGRAL_TYPE_P (lhs_type)
+		&& (TYPE_NONCAP_PRECISION (rhs1_type) >= TYPE_PRECISION (lhs_type))))
+	  return false;
+
+	/* Allow conversions from INTCAP_TYPE to POINTER_TYPE if the precisions
+	   are the same.  */
+	if (((INTCAP_TYPE_P (lhs_type) && POINTER_TYPE_P (rhs1_type))
+	     || (INTCAP_TYPE_P (rhs1_type) && POINTER_TYPE_P (lhs_type)))
+	    && TYPE_CAP_PRECISION (rhs1_type) == TYPE_CAP_PRECISION (lhs_type))
+	  return false;
+
 
 	/* Otherwise assert we are converting between types of the
 	   same kind.  */
@@ -3808,6 +3828,8 @@ verify_gimple_assign_binary (gassign *stmt)
   tree rhs1_type = TREE_TYPE (rhs1);
   tree rhs2 = gimple_assign_rhs2 (stmt);
   tree rhs2_type = TREE_TYPE (rhs2);
+
+  gcc_assert (capability_args_valid (lhs_type, rhs_code, rhs1, rhs2));
 
   if (!is_gimple_reg (lhs))
     {
@@ -4178,6 +4200,8 @@ verify_gimple_assign_ternary (gassign *stmt)
   tree rhs2_type = TREE_TYPE (rhs2);
   tree rhs3 = gimple_assign_rhs3 (stmt);
   tree rhs3_type = TREE_TYPE (rhs3);
+
+  gcc_assert (capability_args_valid (lhs_type, rhs_code, rhs1, rhs2, rhs3));
 
   if (!is_gimple_reg (lhs))
     {

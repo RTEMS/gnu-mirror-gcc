@@ -2547,7 +2547,7 @@ init_range_entry (struct range_entry *r, tree exp, gimple *stmt)
 		  && TYPE_PRECISION (TREE_TYPE (arg0)) > 1)
 		return;
 	    }
-	  else if (TYPE_PRECISION (TREE_TYPE (arg0)) == 1)
+	  else if (TYPE_CAP_PRECISION (TREE_TYPE (arg0)) == 1)
 	    {
 	      if (TYPE_UNSIGNED (TREE_TYPE (arg0)))
 		is_bool = true;

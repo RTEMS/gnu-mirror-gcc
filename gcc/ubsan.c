@@ -1945,6 +1945,8 @@ instrument_nonnull_arg (gimple_stmt_iterator *gsi)
 	  && infer_nonnull_range_by_attribute (stmt, arg))
 	{
 	  gimple *g;
+	  tree noncap_argtype = noncapability_type (TREE_TYPE (arg));
+	  arg = fold_convert (noncap_argtype, arg);
 	  if (!is_gimple_val (arg))
 	    {
 	      g = gimple_build_assign (make_ssa_name (TREE_TYPE (arg)), arg);

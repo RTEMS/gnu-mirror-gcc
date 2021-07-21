@@ -273,6 +273,9 @@ private:
 /* The current code model.  */
 enum aarch64_code_model aarch64_cmodel;
 
+/* The capability target.  */
+enum aarch64_capability aarch64_cap;
+
 /* The number of 64-bit elements in an SVE vector.  */
 poly_uint16 aarch64_sve_vg;
 
@@ -1682,7 +1685,7 @@ pure_scalable_type_info::get_rtx (machine_mode mode,
   for (unsigned int i = 0; i < pieces.length (); ++i)
     {
       rtx reg = pieces[i].get_rtx (first_zr, first_pr);
-      rtx offset = gen_int_mode (pieces[i].offset, Pmode);
+      rtx offset = gen_int_mode (pieces[i].offset, POmode);
       RTVEC_ELT (rtxes, i) = gen_rtx_EXPR_LIST (VOIDmode, reg, offset);
       first_zr += pieces[i].num_zr;
       first_pr += pieces[i].num_pr;
@@ -2504,6 +2507,9 @@ aarch64_hard_regno_nregs (unsigned regno, machine_mode mode)
 static bool
 aarch64_hard_regno_mode_ok (unsigned regno, machine_mode mode)
 {
+  if (mode == CADImode)
+    return GP_REGNUM_P (regno);
+
   if (GET_MODE_CLASS (mode) == MODE_CC)
     return regno == CC_REGNUM;
 
@@ -2646,6 +2652,14 @@ aarch64_emit_cfi_for_reg_p (unsigned int regno)
 static machine_mode
 aarch64_reg_save_mode (unsigned int regno)
 {
+  /* MORELLO TODO This needs to be given something for CADImode.
+     The value it would need will be determined based on the ABI, which we'll
+     have to get from any ABI documents and ensure our behaviour matches LLVM.
+
+     I believe that we'll be saving CADImode values in CADImode, however I
+     wonder whether spills of e.g. r0 will *always* have to be done in
+     CADImode, or whether we'll be able to distinguish (elsewhere in the
+     code) if we can spill&restore in DImode.  */
   if (GP_REGNUM_P (regno))
     return DImode;
 
@@ -2945,6 +2959,12 @@ tls_symbolic_operand_type (rtx addr)
   return tls_kind;
 }
 
+static rtx_insn *check_emit_insn (rtx x)
+{
+  gcc_assert (x);
+  return emit_insn (x);
+}
+
 /* We'll allow lo_sum's in addresses in our legitimate addresses
    so that combine would take care of combining addresses where
    necessary, but for generation purposes, we'll generate the address
@@ -3005,12 +3025,12 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	  tmp_reg = gen_reg_rtx (mode);
 
 	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
-	emit_insn (gen_add_losym (dest, tmp_reg, imm));
+	check_emit_insn (gen_add_losym (dest, tmp_reg, imm));
 	return;
       }
 
     case SYMBOL_TINY_ABSOLUTE:
-      emit_insn (gen_rtx_SET (dest, imm));
+      check_emit_insn (gen_rtx_SET (dest, imm));
       return;
 
     case SYMBOL_SMALL_GOT_28K:
@@ -3062,11 +3082,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 
 	if (mode == ptr_mode)
 	  {
-	    if (mode == DImode)
-	      insn = gen_ldr_got_small_28k_di (dest, gp_rtx, imm);
-	    else
-	      insn = gen_ldr_got_small_28k_si (dest, gp_rtx, imm);
-
+	    insn = gen_ldr_got_small_28k (mode, dest, gp_rtx, imm);
 	    mem = XVECEXP (SET_SRC (insn), 0, 0);
 	  }
 	else
@@ -3083,7 +3099,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	gcc_assert (GET_CODE (mem) == MEM);
 	MEM_READONLY_P (mem) = 1;
 	MEM_NOTRAP_P (mem) = 1;
-	emit_insn (insn);
+	check_emit_insn (insn);
 	return;
       }
 
@@ -3108,11 +3124,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
 	if (mode == ptr_mode)
 	  {
-	    if (mode == DImode)
-	      insn = gen_ldr_got_small_di (dest, tmp_reg, imm);
-	    else
-	      insn = gen_ldr_got_small_si (dest, tmp_reg, imm);
-
+	    insn = gen_ldr_got_small (mode, dest, tmp_reg, imm);
 	    mem = XVECEXP (SET_SRC (insn), 0, 0);
 	  }
 	else
@@ -3126,7 +3138,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	gcc_assert (GET_CODE (mem) == MEM);
 	MEM_READONLY_P (mem) = 1;
 	MEM_NOTRAP_P (mem) = 1;
-	emit_insn (insn);
+	check_emit_insn (insn);
 	return;
       }
 
@@ -3161,23 +3173,22 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
     case SYMBOL_SMALL_TLSDESC:
       {
 	machine_mode mode = GET_MODE (dest);
-	rtx x0 = gen_rtx_REG (mode, R0_REGNUM);
-	rtx tp;
-
 	gcc_assert (mode == Pmode || mode == ptr_mode);
+	const auto sa = as_a <scalar_addr_mode> (mode);
+
+	rtx x0 = gen_rtx_REG (offset_mode (sa), R0_REGNUM);
+	rtx tp;
 
 	/* In ILP32, the got entry is always of SImode size.  Unlike
 	   small GOT, the dest is fixed at reg 0.  */
-	if (TARGET_ILP32)
-	  emit_insn (gen_tlsdesc_small_si (imm));
-	else
-	  emit_insn (gen_tlsdesc_small_di (imm));
+	check_emit_insn (gen_tlsdesc_small (ptr_mode, imm));
+
 	tp = aarch64_load_tp (NULL);
 
 	if (mode != Pmode)
 	  tp = gen_lowpart (mode, tp);
 
-	emit_insn (gen_rtx_SET (dest, gen_rtx_PLUS (mode, tp, x0)));
+	check_emit_insn (gen_rtx_SET (dest, gen_raw_pointer_plus (sa, tp, x0)));
 	if (REG_P (dest))
 	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
 	return;
@@ -3193,26 +3204,26 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	   This is why we have to handle three different tlsie_small
 	   patterns here (two patterns for ILP32).  */
 	machine_mode mode = GET_MODE (dest);
+	const auto sa = as_a <scalar_addr_mode> (mode);
 	rtx tmp_reg = gen_reg_rtx (mode);
+	rtx om_reg = drop_capability (tmp_reg);
+
 	rtx tp = aarch64_load_tp (NULL);
 
 	if (mode == ptr_mode)
 	  {
-	    if (mode == DImode)
-	      emit_insn (gen_tlsie_small_di (tmp_reg, imm));
-	    else
-	      {
-		emit_insn (gen_tlsie_small_si (tmp_reg, imm));
-		tp = gen_lowpart (mode, tp);
-	      }
+	    check_emit_insn (gen_tlsie_small (mode, om_reg, imm, tmp_reg));
+	    if (mode == SImode)
+	      tp = gen_lowpart (mode, tp);
 	  }
 	else
 	  {
 	    gcc_assert (mode == Pmode);
-	    emit_insn (gen_tlsie_small_sidi (tmp_reg, imm));
+	    check_emit_insn (gen_tlsie_small_sidi (tmp_reg, imm));
 	  }
 
-	emit_insn (gen_rtx_SET (dest, gen_rtx_PLUS (mode, tp, tmp_reg)));
+	check_emit_insn (gen_rtx_SET (dest,
+				gen_raw_pointer_plus (sa, tp, om_reg)));
 	if (REG_P (dest))
 	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
 	return;
@@ -3229,27 +3240,23 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	if (mode != Pmode)
 	  tp = gen_lowpart (mode, tp);
 
+	rtx dest_om = drop_capability (dest);
+
 	switch (type)
 	  {
 	  case SYMBOL_TLSLE12:
-	    emit_insn ((mode == DImode ? gen_tlsle12_di : gen_tlsle12_si)
-			(dest, tp, imm));
+	    check_emit_insn (gen_tlsle12 (mode, dest, tp, imm));
 	    break;
 	  case SYMBOL_TLSLE24:
-	    emit_insn ((mode == DImode ? gen_tlsle24_di : gen_tlsle24_si)
-			(dest, tp, imm));
-	  break;
+	    check_emit_insn (gen_tlsle24 (mode, dest, tp, imm));
+	    break;
 	  case SYMBOL_TLSLE32:
-	    emit_insn ((mode == DImode ? gen_tlsle32_di : gen_tlsle32_si)
-			(dest, imm));
-	    emit_insn ((mode == DImode ? gen_adddi3 : gen_addsi3)
-			(dest, dest, tp));
-	  break;
+	    check_emit_insn (gen_tlsle32 (mode, dest, imm));
+	    check_emit_insn (gen_add3_insn (dest, tp, dest_om));
+	    break;
 	  case SYMBOL_TLSLE48:
-	    emit_insn ((mode == DImode ? gen_tlsle48_di : gen_tlsle48_si)
-			(dest, imm));
-	    emit_insn ((mode == DImode ? gen_adddi3 : gen_addsi3)
-			(dest, dest, tp));
+	    check_emit_insn (gen_tlsle48 (mode, dest, imm));
+	    check_emit_insn (gen_add3_insn (dest, tp, dest_om));
 	    break;
 	  default:
 	    gcc_unreachable ();
@@ -3273,7 +3280,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	    insn = gen_ldr_got_tiny_sidi (dest, imm);
 	  }
 
-	emit_insn (insn);
+	check_emit_insn (insn);
 	return;
       }
 
@@ -3284,18 +3291,14 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 
 	if (mode == ptr_mode)
 	  {
-	    if (mode == DImode)
-	      emit_insn (gen_tlsie_tiny_di (dest, imm, tp));
-	    else
-	      {
-		tp = gen_lowpart (mode, tp);
-		emit_insn (gen_tlsie_tiny_si (dest, imm, tp));
-	      }
+	    check_emit_insn (gen_tlsie_tiny (mode, dest, imm, tp));
+	    if (mode == SImode)
+	      tp = gen_lowpart (mode, tp);
 	  }
 	else
 	  {
 	    gcc_assert (mode == Pmode);
-	    emit_insn (gen_tlsie_tiny_sidi (dest, imm, tp));
+	    check_emit_insn (gen_tlsie_tiny_sidi (dest, imm, tp));
 	  }
 
 	if (REG_P (dest))
@@ -4225,7 +4228,7 @@ aarch64_add_offset_1_temporaries (HOST_WIDE_INT offset)
 }
 
 /* A subroutine of aarch64_add_offset.  Set DEST to SRC + OFFSET for
-   a non-polynomial OFFSET.  MODE is the mode of the addition.
+   a non-polynomial OFFSET.  MODE is the mode of the result of the addition.
    FRAME_RELATED_P is true if the RTX_FRAME_RELATED flag should
    be set and CFA adjustments added to the generated instructions.
 
@@ -4241,12 +4244,21 @@ aarch64_add_offset_1_temporaries (HOST_WIDE_INT offset)
    large immediate).  */
 
 static void
-aarch64_add_offset_1 (scalar_int_mode mode, rtx dest,
+aarch64_add_offset_1 (scalar_addr_mode mode, rtx dest,
 		      rtx src, HOST_WIDE_INT offset, rtx temp1,
 		      bool frame_related_p, bool emit_move_imm)
 {
   gcc_assert (emit_move_imm || temp1 != NULL_RTX);
   gcc_assert (temp1 == NULL_RTX || !reg_overlap_mentioned_p (temp1, src));
+  gcc_assert (temp1 == NULL_RTX || mode == GET_MODE (temp1));
+  scalar_int_mode o_mode = offset_mode (mode);
+
+  /* TEMP1 is "just a register".  As such it may be given in a capability mode
+     (in fact when SRC is a pointer and we're targetting morello this will have
+     to be the case).  The register is only ever used to store integer offset
+     values in this function.  Hence we drop the capability part of the
+     register here and use the offset part throughout.  */
+  rtx o_temp1 = drop_capability (temp1);
 
   unsigned HOST_WIDE_INT moffset = absu_hwi (offset);
   rtx_insn *insn;
@@ -4276,7 +4288,7 @@ aarch64_add_offset_1 (scalar_int_mode mode, rtx dest,
      b) there is no spare register into which we can move it.  */
   if (moffset < 0x1000000
       && ((!temp1 && !can_create_pseudo_p ())
-	  || !aarch64_move_imm (moffset, mode)))
+	  || !aarch64_move_imm (moffset, o_mode)))
     {
       HOST_WIDE_INT low_off = moffset & 0xfff;
 
@@ -4289,15 +4301,33 @@ aarch64_add_offset_1 (scalar_int_mode mode, rtx dest,
     }
 
   /* Emit a move immediate if required and an addition/subtraction.  */
-  if (emit_move_imm)
+
+  /* MORELLO TODO: once we have pointer_minus_cadi back, we should remove
+     CAPABILITY_MODE_P from the condition below. It's needed for now because we
+     emit different immediates for the prologue/epilogue (since we're using add
+     instructions for both).  */
+  if (emit_move_imm || CAPABILITY_MODE_P (mode))
     {
-      gcc_assert (temp1 != NULL_RTX || can_create_pseudo_p ());
-      temp1 = aarch64_force_temporary (mode, temp1,
-				       gen_int_mode (moffset, mode));
+      gcc_assert (o_temp1 != NULL_RTX || can_create_pseudo_p ());
+      /* MORELLO TODO: for capabilities we're emitting the original (possibly
+	 negative) constant here to avoid having to use gen_sub3_insn since we
+	 don't want to implement poniter_minus_cadi at this stage in order to
+	 get proper testing of the fallback mechanism for the optab.
+
+	 Later on, when we implement pointer_minus_cadi, we should go back and
+	 revert the change here back to making use of gen_sub3_insn.  */
+      const HOST_WIDE_INT tmp_offset =
+	CAPABILITY_MODE_P (mode) ? offset : moffset;
+      o_temp1 = aarch64_force_temporary (o_mode, o_temp1,
+					 gen_int_mode (tmp_offset, o_mode));
     }
-  insn = emit_insn (offset < 0
-		    ? gen_sub3_insn (dest, src, temp1)
-		    : gen_add3_insn (dest, src, temp1));
+  /* MORELLO TODO: as above, when adding back support for pointer_minus_cadi,
+     remove CAPABILITY_MODE_P from the condition below.  */
+  rtx to_emit = offset < 0 && !CAPABILITY_MODE_P (mode)
+		? gen_sub3_insn (dest, src, o_temp1)
+		: gen_add3_insn (dest, src, o_temp1);
+  gcc_assert (to_emit);
+  insn = emit_insn (to_emit);
   if (frame_related_p)
     {
       RTX_FRAME_RELATED_P (insn) = frame_related_p;
@@ -4352,7 +4382,7 @@ aarch64_add_offset_temporaries (rtx x)
   return aarch64_offset_temporaries (true, offset);
 }
 
-/* Set DEST to SRC + OFFSET.  MODE is the mode of the addition.
+/* Set DEST to SRC + OFFSET.  MODE is the mode of the result of the addition.
    FRAME_RELATED_P is true if the RTX_FRAME_RELATED flag should
    be set and CFA adjustments added to the generated instructions.
 
@@ -4371,10 +4401,20 @@ aarch64_add_offset_temporaries (rtx x)
    large immediate).  */
 
 static void
-aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
+aarch64_add_offset (scalar_addr_mode mode, rtx dest, rtx src,
 		    poly_int64 offset, rtx temp1, rtx temp2,
 		    bool frame_related_p, bool emit_move_imm = true)
 {
+  /* One awkward thing about this function is that `temp1` and `temp2` are
+     "just registers" here. 
+     Sometimes they're used to store a pointer and other times they're used to
+     store an offset.
+     The whole point of this function is to work under limited resource
+     constraints, hence we should be careful about how we use those registers.
+     We *should* be fine just working with a SUBREG on the temporaries when
+     working with offsets and using the entire register when the temporary is
+     supposed to store a pointer.  */
+  scalar_int_mode o_mode = offset_mode (mode);
   gcc_assert (emit_move_imm || temp1 != NULL_RTX);
   gcc_assert (temp1 == NULL_RTX || !reg_overlap_mentioned_p (temp1, src));
   gcc_assert (temp1 == NULL_RTX
@@ -4385,7 +4425,7 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
   /* Try using ADDVL or ADDPL to add the whole value.  */
   if (src != const0_rtx && aarch64_sve_addvl_addpl_immediate_p (offset))
     {
-      rtx offset_rtx = gen_int_mode (offset, mode);
+      rtx offset_rtx = gen_int_mode (offset, o_mode);
       rtx_insn *insn = emit_insn (gen_add3_insn (dest, src, offset_rtx));
       RTX_FRAME_RELATED_P (insn) = frame_related_p;
       return;
@@ -4403,7 +4443,7 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
   if (src != const0_rtx
       && aarch64_sve_addvl_addpl_immediate_p (poly_offset))
     {
-      rtx offset_rtx = gen_int_mode (poly_offset, mode);
+      rtx offset_rtx = gen_int_mode (poly_offset, o_mode);
       if (frame_related_p)
 	{
 	  rtx_insn *insn = emit_insn (gen_add3_insn (dest, src, offset_rtx));
@@ -4412,7 +4452,8 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 	}
       else
 	{
-	  rtx addr = gen_rtx_PLUS (mode, src, offset_rtx);
+	  /* Here `temp1` is a pointer. */
+	  rtx addr = gen_raw_pointer_plus (mode, src, offset_rtx);
 	  src = aarch64_force_temporary (mode, temp1, addr);
 	  temp1 = temp2;
 	  temp2 = NULL_RTX;
@@ -4421,7 +4462,16 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
   /* Otherwise use a CNT-based sequence.  */
   else if (factor != 0)
     {
+      /* Since TEMP1 and TEMP2 are "just registers" they may be given in a
+	 capability mode (in fact when SRC is a pointer and we're targetting
+	 morello this will have to be the case).  The registers are used below
+	 to hold address offset values, so we generate o_temp{1,2} values to
+	 represent these registers address offset parts.  */
+      rtx o_temp1 = drop_capability (temp1);
+      rtx o_temp2 = drop_capability (temp2);
+
       /* Use a subtraction if we have a negative factor.  */
+      /* MORELLO TODO Look into this bit, expect will need a lot of work.  */
       rtx_code code = PLUS;
       if (factor < 0)
 	{
@@ -4450,7 +4500,7 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 	      shift += extra_shift;
 	      factor >>= extra_shift;
 	    }
-	  val = gen_int_mode (poly_int64 (factor * 2, factor * 2), mode);
+	  val = gen_int_mode (poly_int64 (factor * 2, factor * 2), o_mode);
 	}
       else
 	{
@@ -4463,13 +4513,13 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 	  else
 	    low_bit = 1;
 
-	  val = gen_int_mode (poly_int64 (low_bit * 2, low_bit * 2), mode);
-	  val = aarch64_force_temporary (mode, temp1, val);
+	  val = gen_int_mode (poly_int64 (low_bit * 2, low_bit * 2), o_mode);
+	  val = aarch64_force_temporary (o_mode, o_temp1, val);
 
 	  if (can_create_pseudo_p ())
 	    {
-	      rtx coeff1 = gen_int_mode (factor, mode);
-	      val = expand_mult (mode, val, coeff1, NULL_RTX, false, true);
+	      rtx coeff1 = gen_int_mode (factor, o_mode);
+	      val = expand_mult (o_mode, val, coeff1, NULL_RTX, false, true);
 	    }
 	  else
 	    {
@@ -4480,36 +4530,58 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 		  factor = -factor;
 		  code = PLUS;
 		}
-	      rtx coeff1 = gen_int_mode (factor, mode);
-	      coeff1 = aarch64_force_temporary (mode, temp2, coeff1);
-	      val = gen_rtx_MULT (mode, val, coeff1);
+	      rtx coeff1 = gen_int_mode (factor, o_mode);
+	      coeff1 = aarch64_force_temporary (o_mode, o_temp2, coeff1);
+	      val = gen_rtx_MULT (o_mode, val, coeff1);
 	    }
 	}
 
       if (shift > 0)
 	{
 	  /* Multiply by 1 << SHIFT.  */
-	  val = aarch64_force_temporary (mode, temp1, val);
-	  val = gen_rtx_ASHIFT (mode, val, GEN_INT (shift));
+	  val = aarch64_force_temporary (o_mode, o_temp1, val);
+	  val = gen_rtx_ASHIFT (o_mode, val, GEN_INT (shift));
 	}
       else if (shift == -1)
 	{
 	  /* Divide by 2.  */
-	  val = aarch64_force_temporary (mode, temp1, val);
-	  val = gen_rtx_ASHIFTRT (mode, val, const1_rtx);
+	  val = aarch64_force_temporary (o_mode, o_temp1, val);
+	  val = gen_rtx_ASHIFTRT (o_mode, val, const1_rtx);
 	}
 
-      /* Calculate SRC +/- CNTD * FACTOR / 2.  */
-      if (src != const0_rtx)
+      /* Calculate SRC +/- CNTD * FACTOR / 2.
+
+	 We predicate on CAPABILITY_MODE_P to reduce complexity later on.
+	 If SRC is a NULL capability pointer, then always using a modification
+	 of the original value means that `val` will always hold a capability
+	 value in the last if/else clause.  That means that we don't need to
+	 manage extending the offset mode into a capability mode based on which
+	 clause would have been triggered up here.  */
+      if (src != const0_rtx || CAPABILITY_MODE_P (mode))
 	{
-	  val = aarch64_force_temporary (mode, temp1, val);
+	  val = aarch64_force_temporary (o_mode, o_temp1, val);
+	  /* MORELLO TODO using code of PLUS or MINUS, would be better to use
+	     the convenience functions to choose between POINTER_PLUS, PLUS,
+	     POINTER_MINUS, or MINUS depending on availability and need.
+	     It seems this function tries to get a very specific pattern of
+	     insns, and I guess that's because we only have two temporaries and
+	     we want to be certain we know what's happening to ensure we can
+	     perform the operation with those temporaries.  
+
+	     It would be interesting to see if there are any places we can use
+	     the higher-level convenience functions.  */
 	  val = gen_rtx_fmt_ee (code, mode, src, val);
 	}
       else if (code == MINUS)
 	{
-	  val = aarch64_force_temporary (mode, temp1, val);
-	  val = gen_rtx_NEG (mode, val);
+	  val = aarch64_force_temporary (o_mode, o_temp1, val);
+	  val = gen_rtx_NEG (o_mode, val);
 	}
+      /* MORELLO TODO
+	 VAL represents something that is a pointer if SRC was a pointer, and
+	 is an integer otherwise.
+	 TEMP1 and TEMP2 represent something that will always be an integer
+	 (i.e. either an offset or just pure int).  */
 
       if (constant == 0 || frame_related_p)
 	{
@@ -4527,6 +4599,9 @@ aarch64_add_offset (scalar_int_mode mode, rtx dest, rtx src,
 	}
       else
 	{
+	  /* Using the entire mode for both TEMP1 and SRC.
+	     When SRC is a pointer, then VAL and TEMP1 will be in the same
+	     mode.  */
 	  src = aarch64_force_temporary (mode, temp1, val);
 	  temp1 = temp2;
 	  temp2 = NULL_RTX;
@@ -5065,12 +5140,12 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
   machine_mode mode = GET_MODE (dest);
 
   /* Check on what type of symbol it is.  */
-  scalar_int_mode int_mode;
+  scalar_addr_mode addr_mode;
   if ((GET_CODE (imm) == SYMBOL_REF
        || GET_CODE (imm) == LABEL_REF
        || GET_CODE (imm) == CONST
        || GET_CODE (imm) == CONST_POLY_INT)
-      && is_a <scalar_int_mode> (mode, &int_mode))
+      && is_a <scalar_addr_mode> (mode, &addr_mode))
     {
       rtx mem;
       poly_int64 offset;
@@ -5090,28 +5165,28 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	      aarch64_report_sve_required ();
 	      return;
 	    }
-	  if (base == const0_rtx && aarch64_sve_cnt_immediate_p (offset))
+	  if (base == CONST0_RTX (addr_mode) && aarch64_sve_cnt_immediate_p (offset))
 	    emit_insn (gen_rtx_SET (dest, imm));
 	  else
 	    {
 	      /* Do arithmetic on 32-bit values if the result is smaller
 		 than that.  */
-	      if (partial_subreg_p (int_mode, SImode))
+	      if (partial_subreg_p (addr_mode, SImode))
 		{
 		  /* It is invalid to do symbol calculations in modes
 		     narrower than SImode.  */
 		  gcc_assert (base == const0_rtx);
 		  dest = gen_lowpart (SImode, dest);
-		  int_mode = SImode;
+		  addr_mode = SImode;
 		}
-	      if (base != const0_rtx)
+	      if (base != CONST0_RTX (addr_mode))
 		{
-		  base = aarch64_force_temporary (int_mode, dest, base);
-		  aarch64_add_offset (int_mode, dest, base, offset,
+		  base = aarch64_force_temporary (addr_mode, dest, base);
+		  aarch64_add_offset (addr_mode, dest, base, offset,
 				      NULL_RTX, NULL_RTX, false);
 		}
 	      else
-		aarch64_add_offset (int_mode, dest, base, offset,
+		aarch64_add_offset (addr_mode, dest, base, offset,
 				    dest, NULL_RTX, false);
 	    }
 	  return;
@@ -5122,11 +5197,11 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	{
 	case SYMBOL_FORCE_TO_MEM:
 	  if (const_offset != 0
-	      && targetm.cannot_force_const_mem (int_mode, imm))
+	      && targetm.cannot_force_const_mem (addr_mode, imm))
 	    {
 	      gcc_assert (can_create_pseudo_p ());
-	      base = aarch64_force_temporary (int_mode, dest, base);
-	      aarch64_add_offset (int_mode, dest, base, const_offset,
+	      base = aarch64_force_temporary (addr_mode, dest, base);
+	      aarch64_add_offset (addr_mode, dest, base, const_offset,
 				  NULL_RTX, NULL_RTX, false);
 	      return;
 	    }
@@ -5148,8 +5223,8 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	      mem = gen_rtx_MEM (ptr_mode, base);
 	    }
 
-	  if (int_mode != ptr_mode)
-	    mem = gen_rtx_ZERO_EXTEND (int_mode, mem);
+	  if (addr_mode != ptr_mode)
+	    mem = gen_rtx_ZERO_EXTEND (addr_mode, mem);
 
 	  emit_insn (gen_rtx_SET (dest, mem));
 
@@ -5165,8 +5240,8 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	  if (const_offset != 0)
 	    {
 	      gcc_assert(can_create_pseudo_p ());
-	      base = aarch64_force_temporary (int_mode, dest, base);
-	      aarch64_add_offset (int_mode, dest, base, const_offset,
+	      base = aarch64_force_temporary (addr_mode, dest, base);
+	      aarch64_add_offset (addr_mode, dest, base, const_offset,
 				  NULL_RTX, NULL_RTX, false);
 	      return;
 	    }
@@ -5229,12 +5304,20 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	    return;
 	  }
 
+      /* Handle CONST_NULL.  */
+      if (CAPABILITY_MODE_P (mode) && imm == CONST0_RTX (mode))
+	{
+	  emit_insn (gen_rtx_SET (dest, imm));
+	  return;
+	}
+
       rtx mem = force_const_mem (mode, imm);
       gcc_assert (mem);
       emit_move_insn (dest, mem);
       return;
     }
 
+  /* MORELLO TODO: scalar_addr_mode here?  */
   aarch64_internal_mov_immediate (dest, imm, true,
 				  as_a <scalar_int_mode> (mode));
 }
@@ -5569,7 +5652,7 @@ aarch64_function_value (const_tree type, const_tree func,
 	  for (i = 0; i < count; i++)
 	    {
 	      rtx tmp = gen_rtx_REG (ag_mode, V0_REGNUM + i);
-	      rtx offset = gen_int_mode (i * GET_MODE_SIZE (ag_mode), Pmode);
+	      rtx offset = gen_int_mode (i * GET_MODE_SIZE (ag_mode), POmode);
 	      tmp = gen_rtx_EXPR_LIST (VOIDmode, tmp, offset);
 	      XVECEXP (par, 0, i) = tmp;
 	    }
@@ -5699,6 +5782,9 @@ static unsigned int
 aarch64_function_arg_alignment (machine_mode mode, const_tree type,
 				bool *abi_break)
 {
+  /* MORELLO TODO Account for CADImode here.
+     Will need to return 128 bits for TARGET_MORELLO and 64 bits for
+     TARGET_CAPABILITY_FAKE.  */
   *abi_break = false;
   if (!type)
     return GET_MODE_ALIGNMENT (mode);
@@ -5865,7 +5951,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 		  rtx tmp = gen_rtx_REG (pcum->aapcs_vfp_rmode,
 					 V0_REGNUM + nvrn + i);
 		  rtx offset = gen_int_mode
-		    (i * GET_MODE_SIZE (pcum->aapcs_vfp_rmode), Pmode);
+		    (i * GET_MODE_SIZE (pcum->aapcs_vfp_rmode), POmode);
 		  tmp = gen_rtx_EXPR_LIST (VOIDmode, tmp, offset);
 		  XVECEXP (par, 0, i) = tmp;
 		}
@@ -5883,6 +5969,9 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 
   ncrn = pcum->aapcs_ncrn;
   nregs = size / UNITS_PER_WORD;
+  /* MORELLO TODO special case: CADImode will have a size of 16 bytes,
+     UNITS_PER_WORD will stay at 8 bytes.  However, for a CADImode value we
+     will still use just one register.  */
 
   /* C6 - C9.  though the sign and zero extension semantics are
      handled elsewhere.  This is the case where the argument fits
@@ -6275,7 +6364,8 @@ aarch64_emit_probe_stack_range (HOST_WIDE_INT first, poly_int64 poly_size)
      equality test for the loop condition.  */
   else
     {
-      rtx reg2 = gen_rtx_REG (Pmode, PROBE_STACK_SECOND_REG);
+      rtx reg2 = gen_rtx_REG (POmode, PROBE_STACK_SECOND_REG);
+      rtx p_reg2 = gen_rtx_REG (Pmode, PROBE_STACK_SECOND_REG);
 
       /* Step 1: round SIZE to the previous multiple of the interval.  */
 
@@ -6293,11 +6383,14 @@ aarch64_emit_probe_stack_range (HOST_WIDE_INT first, poly_int64 poly_size)
       if (! aarch64_uimm12_shift (adjustment))
 	{
 	  aarch64_internal_mov_immediate (reg2, GEN_INT (adjustment),
-					  true, Pmode);
-	  emit_set_insn (reg2, gen_rtx_PLUS (Pmode, stack_pointer_rtx, reg2));
+					  true, POmode);
+	  /* MORELLO TODO expect can use `gen_pointer_plus` but would like to
+	     check.  */
+	  emit_set_insn (p_reg2,
+			 gen_raw_pointer_plus (Pmode, stack_pointer_rtx, reg2));
 	}
       else
-	emit_set_insn (reg2,
+	emit_set_insn (p_reg2,
 		       plus_constant (Pmode, stack_pointer_rtx, adjustment));
 
       /* Step 3: the loop
@@ -6312,7 +6405,12 @@ aarch64_emit_probe_stack_range (HOST_WIDE_INT first, poly_int64 poly_size)
 	 probes at FIRST + N * PROBE_INTERVAL for values of N from 1
 	 until it is equal to ROUNDED_SIZE.  */
 
-      emit_insn (gen_probe_stack_range (reg1, reg1, reg2));
+      if (Pmode == CADImode)
+	emit_insn (gen_probe_stack_range_cadi (reg1, reg1, p_reg2));
+      else if (Pmode == DImode)
+	emit_insn (gen_probe_stack_range_di (reg1, reg1, p_reg2));
+      else
+	gcc_unreachable ();
 
 
       /* Step 4: probe at FIRST + SIZE if we cannot assert at compile-time
@@ -6326,11 +6424,11 @@ aarch64_emit_probe_stack_range (HOST_WIDE_INT first, poly_int64 poly_size)
 	    {
 	      const HOST_WIDE_INT base = ROUND_UP (rem, ARITH_FACTOR);
 
-	      emit_set_insn (reg2, plus_constant (Pmode, reg2, -base));
-	      emit_stack_probe (plus_constant (Pmode, reg2, base - rem));
+	      emit_set_insn (p_reg2, plus_constant (Pmode, p_reg2, -base));
+	      emit_stack_probe (plus_constant (Pmode, p_reg2, base - rem));
 	    }
 	  else
-	    emit_stack_probe (plus_constant (Pmode, reg2, -rem));
+	    emit_stack_probe (plus_constant (Pmode, p_reg2, -rem));
 	}
     }
 
@@ -6416,7 +6514,7 @@ aarch64_output_probe_sve_stack_clash (rtx base, rtx adjustment,
 
   /* Clamp the value down to the nearest value that can be used with a cmp.  */
   residual_probe_guard = aarch64_clamp_to_uimm12_shift (residual_probe_guard);
-  rtx probe_offset_value_rtx = gen_int_mode (residual_probe_guard, Pmode);
+  rtx probe_offset_value_rtx = gen_int_mode (residual_probe_guard, POmode);
 
   gcc_assert (INTVAL (min_probe_threshold) >= residual_probe_guard);
   gcc_assert (aarch64_uimm12_shift (residual_probe_guard));
@@ -6431,6 +6529,10 @@ aarch64_output_probe_sve_stack_clash (rtx base, rtx adjustment,
 
   /* Emit loop start label.  */
   ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, loop_start_lab);
+
+  /* MORELLO TODO If `base` could ever be in CADImode the below output may need
+    to change (depending on how we adjust printing operands).
+    Just something to look into at some point.  */
 
   /* ADJUSTMENT < RESIDUAL_PROBE_GUARD.  */
   xops[0] = adjustment;
@@ -6838,6 +6940,24 @@ aarch64_pushwb_single_reg (machine_mode mode, unsigned regno,
   RTX_FRAME_RELATED_P (insn) = 1;
 }
 
+
+static rtx
+aarch64_wb_pair (machine_mode mode,
+		 rtx base, rtx reg, rtx reg2, HOST_WIDE_INT adjustment,
+		 bool store)
+{
+  HOST_WIDE_INT c1, c2;
+
+  c1 = (store ? -1 : 1) * adjustment;
+  c2 = (mode == E_TFmode) ? UNITS_PER_VREG : UNITS_PER_WORD;
+  if (store)
+    c2 -= adjustment;
+
+  auto fn = store ? gen_storewb_pair : gen_loadwb_pair;
+  return fn (mode, GET_MODE (base),
+	     base, base, reg, reg2, GEN_INT (c1), GEN_INT (c2));
+}
+
 /* Generate and return an instruction to store the pair of registers
    REG and REG2 of mode MODE to location BASE with write-back adjusting
    the stack location BASE by ADJUSTMENT.  */
@@ -6846,23 +6966,7 @@ static rtx
 aarch64_gen_storewb_pair (machine_mode mode, rtx base, rtx reg, rtx reg2,
 			  HOST_WIDE_INT adjustment)
 {
-  switch (mode)
-    {
-    case E_DImode:
-      return gen_storewb_pairdi_di (base, base, reg, reg2,
-				    GEN_INT (-adjustment),
-				    GEN_INT (UNITS_PER_WORD - adjustment));
-    case E_DFmode:
-      return gen_storewb_pairdf_di (base, base, reg, reg2,
-				    GEN_INT (-adjustment),
-				    GEN_INT (UNITS_PER_WORD - adjustment));
-    case E_TFmode:
-      return gen_storewb_pairtf_di (base, base, reg, reg2,
-				    GEN_INT (-adjustment),
-				    GEN_INT (UNITS_PER_VREG - adjustment));
-    default:
-      gcc_unreachable ();
-    }
+  return aarch64_wb_pair (mode, base, reg, reg2, adjustment, true);
 }
 
 /* Push registers numbered REGNO1 and REGNO2 to the stack, adjusting the
@@ -6894,20 +6998,7 @@ static rtx
 aarch64_gen_loadwb_pair (machine_mode mode, rtx base, rtx reg, rtx reg2,
 			 HOST_WIDE_INT adjustment)
 {
-  switch (mode)
-    {
-    case E_DImode:
-      return gen_loadwb_pairdi_di (base, base, reg, reg2, GEN_INT (adjustment),
-				   GEN_INT (UNITS_PER_WORD));
-    case E_DFmode:
-      return gen_loadwb_pairdf_di (base, base, reg, reg2, GEN_INT (adjustment),
-				   GEN_INT (UNITS_PER_WORD));
-    case E_TFmode:
-      return gen_loadwb_pairtf_di (base, base, reg, reg2, GEN_INT (adjustment),
-				   GEN_INT (UNITS_PER_VREG));
-    default:
-      gcc_unreachable ();
-    }
+  return aarch64_wb_pair (mode, base, reg, reg2, adjustment, false);
 }
 
 /* Pop the two registers numbered REGNO1, REGNO2 from the stack, adjusting it
@@ -7051,9 +7142,12 @@ aarch64_adjust_sve_callee_save_base (machine_mode mode, rtx &base_rtx,
       poly_int64 anchor_offset = 16 * GET_MODE_SIZE (mode);
       if (!anchor_reg)
 	{
+	  /* MORELLO TODO emitting an add insn directly will need to be changed
+	     to emitting an insn generated by some convenience functions that
+	     distinguish between capability and integer modes.  */
 	  anchor_reg = gen_rtx_REG (Pmode, STACK_CLASH_SVE_CFA_REGNUM);
 	  emit_insn (gen_add3_insn (anchor_reg, base_rtx,
-				    gen_int_mode (anchor_offset, Pmode)));
+				    gen_int_mode (anchor_offset, POmode)));
 	}
       base_rtx = anchor_reg;
       offset -= anchor_offset;
@@ -7133,8 +7227,12 @@ aarch64_save_callee_saves (poly_int64 start_offset,
 	      if (!anchor_reg)
 		{
 		  anchor_reg = gen_rtx_REG (Pmode, STACK_CLASH_SVE_CFA_REGNUM);
+		  /* MORELLO TODO emitting an add insn directly will need to be
+		     changed to emitting an insn generated by some convenience
+		     functions that distinguish between capability and integer
+		     modes.  */
 		  emit_insn (gen_add3_insn (anchor_reg, base_rtx,
-					    gen_int_mode (fp_offset, Pmode)));
+					    gen_int_mode (fp_offset, POmode)));
 		}
 	      base_rtx = anchor_reg;
 	    }
@@ -7723,7 +7821,7 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
       }
 
       /* First calculate the amount of bytes we're actually spilling.  */
-      aarch64_add_offset (Pmode, temp1, CONST0_RTX (Pmode),
+      aarch64_add_offset (POmode, temp1, CONST0_RTX (POmode),
 			  poly_size, temp1, temp2, false, true);
 
       rtx_insn *insn = get_last_insn ();
@@ -7746,9 +7844,12 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
 	  RTX_FRAME_RELATED_P (insn) = 1;
 	}
 
-      rtx probe_const = gen_int_mode (min_probe_threshold, Pmode);
-      rtx guard_const = gen_int_mode (guard_size, Pmode);
+      rtx probe_const = gen_int_mode (min_probe_threshold, POmode);
+      rtx guard_const = gen_int_mode (guard_size, POmode);
 
+      /* MORELLO TODO will need to inspect this pattern and the associated
+	 aarch64_output_probe_sve_stack_clash function to ensure the Pmode vs
+	 POmode stuff is working correctly.  */
       insn = emit_insn (gen_probe_sve_stack_clash (Pmode, stack_pointer_rtx,
 						   stack_pointer_rtx, temp1,
 						   probe_const, guard_const));
@@ -7756,9 +7857,12 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
       /* Now reset the CFA register if needed.  */
       if (frame_related_p)
 	{
+	  /* MORELLO TODO 
+	     Expect this can be changed to not use `gen_int_mode` and use
+	     `plus_constant` instead of `gen_raw_pointer_plus`.  */
+	  rtx off = gen_int_mode (poly_size, POmode);
 	  add_reg_note (insn, REG_CFA_DEF_CFA,
-			gen_rtx_PLUS (Pmode, stack_pointer_rtx,
-				      gen_int_mode (poly_size, Pmode)));
+			gen_raw_pointer_plus (Pmode, stack_pointer_rtx, off));
 	  RTX_FRAME_RELATED_P (insn) = 1;
 	}
 
@@ -7824,8 +7928,16 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
 	 the allocation size.  The residual will always be 0.  As such, the only
 	 part we are actually using from that code is the loop setup.  The
 	 actual probing is done in aarch64_output_probe_stack_range.  */
-      insn = emit_insn (gen_probe_stack_range (stack_pointer_rtx,
-					       stack_pointer_rtx, temp1));
+      if (Pmode == CADImode)
+	insn = emit_insn (gen_probe_stack_range_cadi (stack_pointer_rtx,
+						      stack_pointer_rtx,
+						      temp1));
+      else if (Pmode == DImode)
+	insn = emit_insn (gen_probe_stack_range_di (stack_pointer_rtx,
+						    stack_pointer_rtx,
+						    temp1));
+      else
+	gcc_unreachable ();
 
       /* Now reset the CFA register if needed.  */
       if (frame_related_p)
@@ -8366,12 +8478,12 @@ aarch64_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
 			 HOST_WIDE_INT vcall_offset,
 			 tree function)
 {
-  /* The this pointer is always in x0.  Note that this differs from
+  /* The this pointer is always in x0/c0.  Note that this differs from
      Arm where the this pointer maybe bumped to r1 if r0 is required
      to return a pointer to an aggregate.  On AArch64 a result value
-     pointer will be in x8.  */
+     pointer will be in x8/c8.  */
   int this_regno = R0_REGNUM;
-  rtx this_rtx, temp0, temp1, addr, funexp;
+  rtx this_rtx, temp0, temp1, p_temp0, p_temp1, addr, funexp;
   rtx_insn *insn;
   const char *fnname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunk));
 
@@ -8382,8 +8494,10 @@ aarch64_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
   emit_note (NOTE_INSN_PROLOGUE_END);
 
   this_rtx = gen_rtx_REG (Pmode, this_regno);
-  temp0 = gen_rtx_REG (Pmode, EP0_REGNUM);
-  temp1 = gen_rtx_REG (Pmode, EP1_REGNUM);
+  temp0 = gen_rtx_REG (POmode, EP0_REGNUM);
+  temp1 = gen_rtx_REG (POmode, EP1_REGNUM);
+  p_temp0 = gen_rtx_REG (Pmode, EP0_REGNUM);
+  p_temp1 = gen_rtx_REG (Pmode, EP1_REGNUM);
 
   if (vcall_offset == 0)
     aarch64_add_offset (Pmode, this_rtx, this_rtx, delta, temp1, temp0, false);
@@ -8402,30 +8516,38 @@ aarch64_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
 				temp1, temp0, false);
 	}
 
+      /* MORELLO TODO Need to understand what's happening in this function.
+         It *appears* that `addr` is a pointer that points to another pointer
+	 in memory, and that new pointer (p2) with the offset of vcall_offset
+	 points to a third pointer in memory.  */
       if (Pmode == ptr_mode)
-	aarch64_emit_move (temp0, gen_rtx_MEM (ptr_mode, addr));
+	aarch64_emit_move (p_temp0, gen_rtx_MEM (ptr_mode, addr));
       else
-	aarch64_emit_move (temp0,
+	aarch64_emit_move (p_temp0,
 			   gen_rtx_ZERO_EXTEND (Pmode,
 						gen_rtx_MEM (ptr_mode, addr)));
 
       if (vcall_offset >= -256 && vcall_offset < 4096 * POINTER_BYTES)
-	  addr = plus_constant (Pmode, temp0, vcall_offset);
+	  addr = plus_constant (Pmode, p_temp0, vcall_offset);
       else
 	{
 	  aarch64_internal_mov_immediate (temp1, GEN_INT (vcall_offset), true,
-					  Pmode);
-	  addr = gen_rtx_PLUS (Pmode, temp0, temp1);
+					  POmode);
+	  addr = gen_raw_pointer_plus (Pmode, p_temp0, temp1);
 	}
 
       if (Pmode == ptr_mode)
-	aarch64_emit_move (temp1, gen_rtx_MEM (ptr_mode,addr));
+	aarch64_emit_move (p_temp1, gen_rtx_MEM (ptr_mode,addr));
       else
-	aarch64_emit_move (temp1,
+	aarch64_emit_move (p_temp1,
 			   gen_rtx_SIGN_EXTEND (Pmode,
 						gen_rtx_MEM (ptr_mode, addr)));
 
-      emit_insn (gen_add2_insn (this_rtx, temp1));
+      /* MORELLO TODO emitting an add insn directly will need to be
+	 changed to emitting an insn generated by some convenience
+	 functions that distinguish between capability and integer
+	 modes.  */
+      emit_insn (gen_add2_insn (this_rtx, p_temp1));
     }
 
   /* Generate a tail call to the target function.  */
@@ -8794,7 +8916,7 @@ aarch64_classify_index (struct aarch64_address_info *info, rtx x,
 
   /* (reg:P) */
   if ((REG_P (x) || GET_CODE (x) == SUBREG)
-      && GET_MODE (x) == Pmode)
+      && (GET_MODE (x) == Pmode || GET_MODE (x) == POmode))
     {
       type = ADDRESS_REG_REG;
       index = x;
@@ -8901,8 +9023,9 @@ aarch64_classify_index (struct aarch64_address_info *info, rtx x,
     }
   /* (mult:P (reg:P) (const_int scale)) */
   else if (GET_CODE (x) == MULT
-	   && GET_MODE (x) == Pmode
-	   && GET_MODE (XEXP (x, 0)) == Pmode
+	   && (GET_MODE (x) == Pmode || GET_MODE (x) == POmode)
+	   && (GET_MODE (XEXP (x, 0)) == Pmode
+	       || GET_MODE (XEXP (x, 0)) == POmode)
 	   && CONST_INT_P (XEXP (x, 1)))
     {
       type = ADDRESS_REG_REG;
@@ -8911,8 +9034,9 @@ aarch64_classify_index (struct aarch64_address_info *info, rtx x,
     }
   /* (ashift:P (reg:P) (const_int shift)) */
   else if (GET_CODE (x) == ASHIFT
-	   && GET_MODE (x) == Pmode
-	   && GET_MODE (XEXP (x, 0)) == Pmode
+	   && (GET_MODE (x) == Pmode || GET_MODE (x) == POmode)
+	   && (GET_MODE (XEXP (x, 0)) == Pmode
+	       || GET_MODE (XEXP (x, 0)) == POmode)
 	   && CONST_INT_P (XEXP (x, 1)))
     {
       type = ADDRESS_REG_REG;
@@ -9036,8 +9160,13 @@ aarch64_classify_address (struct aarch64_address_info *info,
       && (code != POST_INC && code != REG))
     return false;
 
+  /* For Morello: Exit early if the address is not in Pmode. This blocks all
+  CONST_INTs and other non-capability SCALAR_ADDR_MODE_P types.  */
+  if (aarch64_cap != AARCH64_CAPABILITY_NONE && GET_MODE (x) != Pmode)
+    return false;
+
   gcc_checking_assert (GET_MODE (x) == VOIDmode
-		       || SCALAR_INT_MODE_P (GET_MODE (x)));
+		       || SCALAR_ADDR_MODE_P (GET_MODE (x)));
 
   switch (code)
     {
@@ -9050,6 +9179,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
       return aarch64_base_register_rtx_p (x, strict_p);
 
     case PLUS:
+    case POINTER_PLUS:
       op0 = XEXP (x, 0);
       op1 = XEXP (x, 1);
 
@@ -9177,7 +9307,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
     case PRE_MODIFY:
       info->type = ADDRESS_REG_WB;
       info->base = XEXP (x, 0);
-      if (GET_CODE (XEXP (x, 1)) == PLUS
+      if (any_plus_p (XEXP (x, 1))
 	  && poly_int_rtx_p (XEXP (XEXP (x, 1), 1), &offset)
 	  && rtx_equal_p (XEXP (XEXP (x, 1), 0), info->base)
 	  && aarch64_base_register_rtx_p (info->base, strict_p))
@@ -9341,6 +9471,11 @@ aarch64_legitimize_address_displacement (rtx *offset1, rtx *offset2,
 					 poly_int64 orig_offset,
 					 machine_mode mode)
 {
+  /* MORELLO TODO Is this where we disable anchoring when targetting MORELLO?
+     Even if it isn't this seems like a good place to add an assertion that
+     we're not trying to do anchoring if targetting MORELLO.  (assuming that's
+     what this function is for ... I'm just pattern matching on a few words in
+     the documentation).  */
   HOST_WIDE_INT size;
   if (GET_MODE_SIZE (mode).is_constant (&size))
     {
@@ -9367,8 +9502,8 @@ aarch64_legitimize_address_displacement (rtx *offset1, rtx *offset2,
 	return false;
 
       /* Split the offset into second_offset and the rest.  */
-      *offset1 = gen_int_mode (orig_offset - second_offset, Pmode);
-      *offset2 = gen_int_mode (second_offset, Pmode);
+      *offset1 = gen_int_mode (orig_offset - second_offset, POmode);
+      *offset2 = gen_int_mode (second_offset, POmode);
       return true;
     }
   else
@@ -9402,8 +9537,8 @@ aarch64_legitimize_address_displacement (rtx *offset1, rtx *offset2,
 	return false;
 
       /* Split the offset into second_offset and the rest.  */
-      *offset1 = gen_int_mode (orig_offset - second_offset, Pmode);
-      *offset2 = gen_int_mode (second_offset, Pmode);
+      *offset1 = gen_int_mode (orig_offset - second_offset, POmode);
+      *offset2 = gen_int_mode (second_offset, POmode);
       return true;
     }
 }
@@ -10039,7 +10174,7 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 	  break;
 
 	case CONST:
-	  if (GET_CODE (XEXP (x, 0)) == PLUS
+	  if (any_plus_p (XEXP (x, 0))
 	      && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF)
 	    {
 	      output_addr_const (f, x);
@@ -10512,8 +10647,9 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
 
   /* Check all addresses are Pmode - including ILP32.  */
   if (GET_MODE (x) != Pmode
-      && (!CONST_INT_P (x)
-	  || trunc_int_for_mode (INTVAL (x), Pmode) != INTVAL (x)))
+      && (TARGET_CAPABILITY_ANY
+	  || !CONST_INT_P (x)
+	  || trunc_int_for_mode (INTVAL (x), POmode) != INTVAL (x)))
     {
       output_operand_lossage ("invalid address mode");
       return false;
@@ -10732,20 +10868,23 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
      not to split a CONST for some forms of address expression, otherwise
      it will generate sub-optimal code.  */
 
-  if (GET_CODE (x) == PLUS && CONST_INT_P (XEXP (x, 1)))
+  if (any_plus_p (x) && CONST_INT_P (XEXP (x, 1)))
     {
       rtx base = XEXP (x, 0);
       rtx offset_rtx = XEXP (x, 1);
       HOST_WIDE_INT offset = INTVAL (offset_rtx);
 
+      /* We know here that BASE cannot be a POINTER_PLUS since a POINTER_PLUS
+	 cannot have a POINTER_PLUS as its left operand (the offsets should be
+	 combined with a PLUS).  */
       if (GET_CODE (base) == PLUS)
 	{
 	  rtx op0 = XEXP (base, 0);
 	  rtx op1 = XEXP (base, 1);
 
 	  /* Force any scaling into a temp for CSE.  */
-	  op0 = force_reg (Pmode, op0);
-	  op1 = force_reg (Pmode, op1);
+	  op0 = force_reg (POmode, op0);
+	  op1 = force_reg (POmode, op1);
 
 	  /* Let the pointer register be in op0.  */
 	  if (REG_POINTER (op1))
@@ -10757,16 +10896,16 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
 	     together easily.  Therefore, emit as (OP0 + CONST) + OP1.  */
 	  if (virt_or_elim_regno_p (REGNO (op0)))
 	    {
-	      base = expand_binop (Pmode, add_optab, op0, offset_rtx,
+	      base = expand_binop (POmode, add_optab, op0, offset_rtx,
 				   NULL_RTX, true, OPTAB_DIRECT);
-	      return gen_rtx_PLUS (Pmode, base, op1);
+	      return gen_rtx_PLUS (POmode, base, op1);
 	    }
 
 	  /* Otherwise, in order to encourage CSE (and thence loop strength
 	     reduce) scaled addresses, emit as (OP0 + OP1) + CONST.  */
-	  base = expand_binop (Pmode, add_optab, op0, op1,
+	  base = expand_binop (POmode, add_optab, op0, op1,
 			       NULL_RTX, true, OPTAB_DIRECT);
-	  x = gen_rtx_PLUS (Pmode, base, offset_rtx);
+	  x = gen_rtx_PLUS (POmode, base, offset_rtx);
 	}
 
       HOST_WIDE_INT size;
@@ -11036,7 +11175,9 @@ aarch64_preferred_reload_class (rtx x, reg_class_t regclass)
   /* Register eliminiation can result in a request for
      SP+constant->FP_REGS.  We cannot support such operations which
      use SP as source and an FP_REG as destination, so reject out
-     right now.  */
+     right now.
+
+     MORELLO TODO: any_plus_p here?  */
   if (! reg_class_subset_p (regclass, GENERAL_REGS) && GET_CODE (x) == PLUS)
     {
       rtx lhs = XEXP (x, 0);
@@ -14335,6 +14476,48 @@ aarch64_override_options_internal (struct gcc_options *opts)
   aarch64_tune_params = *(selected_tune->tune);
   aarch64_architecture_version = selected_arch->architecture_version;
 
+  /* MORELLO TODO.
+     Currently just using the standard LP64 ABI rather than propogating the
+     alternate ABI's across the backend.  */
+  if (opts->x_aarch64_abi > AARCH64_ABI_ILP32)
+    {
+      if (selected_arch->arch != AARCH64_ARCH_MORELLO)
+	error ("must use %<-march=morello%> when selecting a morello ABI");
+      switch (opts->x_aarch64_abi)
+	{
+	case AARCH64_ABI_MORELLO_HYBRID:
+	  aarch64_cap = AARCH64_CAPABILITY_HYBRID;
+	  break;
+	case AARCH64_ABI_MORELLO_PURECAP:
+	  aarch64_cap = AARCH64_CAPABILITY_PURE;
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
+      opts->x_aarch64_abi = AARCH64_ABI_LP64;
+    }
+  if (aarch64_using_fake_capability)
+    aarch64_cap = AARCH64_CAPABILITY_FAKE;
+  if (aarch64_using_fake_capability
+      && opts->x_aarch64_abi == AARCH64_ABI_ILP32)
+    error ("Can not use fake_capability and %<-mabi=ilp32%> together");
+  if (aarch64_using_fake_capability && opts->x_flag_sanitize)
+    /* At the moment we're disabling this.
+     * Sanitizers are a feature that are non-essential, can not be required by
+     * source code, have their functionality partially superseded by Morello,
+     * and the implementation of e.g. ASAN will have some serious difficulties
+     * in combination with Morello (shadow memory and pointer bounds).  Hence
+     * just disable it for now, get something working for unsanitized code and
+     * come back to it later.  */
+    error ("MORELLO TODO Disabling sanitizers and fake_capability for now");
+  if (opts->x_flag_openmp && aarch64_using_fake_capability)
+	  error ("MORELLO TODO OpenMP has not been implemented for Morello");
+  if (opts->x_flag_openacc && aarch64_using_fake_capability)
+	  error ("MORELLO TODO OpenACC has not been implemented for Morello");
+
+  if (aarch64_cap != AARCH64_CAPABILITY_NONE && TARGET_SVE)
+    error ("SVE is not supported with capabilities");
+
   if (opts->x_aarch64_override_tune_string)
     aarch64_parse_override_string (opts->x_aarch64_override_tune_string,
 				  &aarch64_tune_params);
@@ -16099,6 +16282,10 @@ aarch64_legitimate_constant_p (machine_mode mode, rtx x)
       || GET_CODE (x) == CONST_VECTOR)
     return true;
 
+  /* Morello: support CONST_NULL.  */
+  if (CAPABILITY_MODE_P (mode) && CONST0_RTX (mode) == x)
+    return true;
+
   /* Do not allow vector struct mode constants for Advanced SIMD.
      We could support 0 and -1 easily, but they need support in
      aarch64-simd.md.  */
@@ -16157,7 +16344,7 @@ aarch64_load_tp (rtx target)
     target = gen_reg_rtx (Pmode);
 
   /* Can return in any reg.  */
-  emit_insn (gen_aarch64_load_tp_hard (target));
+  emit_insn (gen_aarch64_load_tp_hard (Pmode, target));
   return target;
 }
 
@@ -16465,18 +16652,22 @@ aarch64_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
   if (align > 8)
     {
       /* if (alignof(type) > 8) (arg = arg + 15) & -16;  */
-      t = fold_build_pointer_plus_hwi (arg, 15);
+      t = convert_to_ptrofftype (arg);
+      t = fold_build2 (PLUS_EXPR, TREE_TYPE (t), t,
+		       build_int_cst (TREE_TYPE (t), 15));
       t = build2 (BIT_AND_EXPR, TREE_TYPE (t), t,
 		  build_int_cst (TREE_TYPE (t), -16));
-      roundup = build2 (MODIFY_EXPR, TREE_TYPE (arg), arg, t);
+      roundup = build_pointer_set_value (TREE_TYPE (arg), arg, t);
     }
   else
     roundup = NULL;
   /* Advance ap.__stack  */
-  t = fold_build_pointer_plus_hwi (arg, size + 7);
+  t = convert_to_ptrofftype (arg);
+  t = fold_build2 (PLUS_EXPR, TREE_TYPE (t), t,
+		   build_int_cst (TREE_TYPE (t), size + 7));
   t = build2 (BIT_AND_EXPR, TREE_TYPE (t), t,
 	      build_int_cst (TREE_TYPE (t), -8));
-  t = build2 (MODIFY_EXPR, TREE_TYPE (stack), unshare_expr (stack), t);
+  t = build_pointer_set_value (TREE_TYPE (stack), unshare_expr (stack), t);
   /* String up roundup and advance.  */
   if (roundup)
     t = build2 (COMPOUND_EXPR, TREE_TYPE (t), roundup, t);
@@ -18012,6 +18203,9 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
     return true;
 
   if (CONST_INT_P (x))
+    return true;
+
+  if (CONST_NULL_P (x))
     return true;
 
   if (VECTOR_MODE_P (GET_MODE (x)))
@@ -22675,6 +22869,33 @@ aarch64_libgcc_floating_mode_supported_p (scalar_float_mode mode)
 /* Implement TARGET_SCALAR_MODE_SUPPORTED_P - return TRUE
    if MODE is HFmode, and punt to the generic implementation otherwise.  */
 
+/* MORELLO TODO
+   I believe it makes sense to return `false` from this hook for
+   CADImode, however it's not very clear-cut, hence I"m adding this note to
+   remind ourselves to look at it harder later on.
+   The documentation says 'For a scalar mode to be considered supported, all
+   the basic arithmetic and comparisons must work".  That leans towards not
+   supporting.
+   However, it also says "The default version of this hook returns true for any
+   mode required to handle the basic C types" which I would expect to contain
+   the mode for C pointers.
+
+   Looking at the use of this hook around the codebase we don't get much of a
+   clue as to what the logical meaning of this hook is either.  Plus everywhere
+   it's used we could use a different check to distinguish between capability
+   modes for which this hook returns true and other modes.
+   The 'idea" of the places it"s used are (as far as I can tell):
+   To store a few mode/type conversions for caching (through the
+   int_n_enabled_p array),
+   To determine whether a type exists or can be emulated (e.g. D frontend
+   Target::isVectorTypeSupported, Fortran frontend on gfc_init_kinds).
+   Something about trying to find a MODE_INT class mode which can be used to
+   "mask" induction variables.
+   Various things specific to MODE_INT or MODE_FLOAT class modes (i.e. that
+   don"t really apply to capability modes).
+
+   Either choice, we don't have to change much, but we should update the
+   documentation TODO (update the documentation).  */
 static bool
 aarch64_scalar_mode_supported_p (scalar_mode mode)
 {
@@ -23389,6 +23610,22 @@ aarch64_sls_emit_shared_blr_thunks (FILE *out_file)
     }
 }
 
+/* Are X and Y registers that are lowparts of each other? */
+bool
+aarch64_lowpart_regs_p (rtx x, rtx y)
+{
+  if (REG_P (x) && REG_P (y))
+    return REGNO (x) == REGNO (y);
+
+  if (SUBREG_P (x) && REG_P (y))
+    return REGNO (SUBREG_REG (x)) == REGNO (y);
+
+  if (REG_P (x) && SUBREG_P (y))
+    return REGNO (x) == REGNO (SUBREG_REG (y));
+
+  return false;
+}
+
 /* Implement TARGET_ASM_FILE_END.  */
 void
 aarch64_asm_file_end ()
@@ -23414,6 +23651,15 @@ aarch64_indirect_call_asm (rtx addr)
   else
    output_asm_insn ("blr\t%0", &addr);
   return "";
+}
+
+/* Implement TARGET_CAPABILITY_MODE hook.  */
+opt_scalar_addr_mode
+aarch64_target_capability_mode ()
+{
+  if (TARGET_CAPABILITY_ANY)
+    return CADImode;
+  return opt_scalar_addr_mode ();
 }
 
 /* Target-specific selftests.  */
@@ -23974,6 +24220,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_ASM_FUNCTION_EPILOGUE
 #define TARGET_ASM_FUNCTION_EPILOGUE aarch64_sls_emit_blr_function_thunks
+
+#undef TARGET_CAPABILITY_MODE
+#define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

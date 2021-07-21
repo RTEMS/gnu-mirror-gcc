@@ -4109,6 +4109,10 @@ output_addr_const (FILE *file, rtx x)
       fprintf (file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
       break;
 
+    case CONST_NULL:
+      fprintf (file, "0");
+      break;
+
     case CONST:
       /* This used to output parentheses around the expression,
 	 but that does not work on the 386 (either ATT or BSD assembler).  */
@@ -4153,6 +4157,7 @@ output_addr_const (FILE *file, rtx x)
       break;
 
     case PLUS:
+    case POINTER_PLUS:
       /* Some assemblers need integer constants to appear last (eg masm).  */
       if (CONST_INT_P (XEXP (x, 0)))
 	{

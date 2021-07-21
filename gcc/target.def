@@ -3214,7 +3214,7 @@ DEFHOOK
  "Define this to return nonzero if the port can handle pointers\n\
 with machine mode @var{mode}.  The default version of this\n\
 hook returns true for both @code{ptr_mode} and @code{Pmode}.",
- bool, (scalar_int_mode mode),
+ bool, (scalar_addr_mode mode),
  default_valid_pointer_mode)
 
 /* Disambiguate with errno.  */
@@ -3228,6 +3228,17 @@ DEFHOOK
  bool, (ao_ref *ref),
  default_ref_may_alias_errno)
 
+/* Inform the rest of the compiler what mode __intcap_t and __uintcap_t should be in.  */
+DEFHOOK
+(capability_mode,
+ "Defines the mode for @code{__intcap_t} and @code{__uintcap_t}.\n\
+\
+ This function does not take an argument, and returns a opt_scalar_addr_mode\n\
+ describing the mode that these variables should be in.  If the target does\n\
+ not support capabilities then this should return an empty\n\
+ opt_scalar_addr_mode.  This is the default.",
+ opt_scalar_addr_mode, (), default_capability_mode)
+
 /* Support for named address spaces.  */
 #undef HOOK_PREFIX
 #define HOOK_PREFIX "TARGET_ADDR_SPACE_"
@@ -3239,7 +3250,7 @@ DEFHOOK
  "Define this to return the machine mode to use for pointers to\n\
 @var{address_space} if the target supports named address spaces.\n\
 The default version of this hook returns @code{ptr_mode}.",
- scalar_int_mode, (addr_space_t address_space),
+ scalar_addr_mode, (addr_space_t address_space),
  default_addr_space_pointer_mode)
 
 /* MODE to use for an address in another address space.  */
@@ -3248,7 +3259,7 @@ DEFHOOK
  "Define this to return the machine mode to use for addresses in\n\
 @var{address_space} if the target supports named address spaces.\n\
 The default version of this hook returns @code{Pmode}.",
- scalar_int_mode, (addr_space_t address_space),
+ scalar_addr_mode, (addr_space_t address_space),
  default_addr_space_address_mode)
 
 /* True if MODE is valid for a pointer in __attribute__((mode("MODE")))
@@ -3259,10 +3270,9 @@ DEFHOOK
 with machine mode @var{mode} to address space @var{as}.  This target\n\
 hook is the same as the @code{TARGET_VALID_POINTER_MODE} target hook,\n\
 except that it includes explicit named address space support.  The default\n\
-version of this hook returns true for the modes returned by either the\n\
-@code{TARGET_ADDR_SPACE_POINTER_MODE} or @code{TARGET_ADDR_SPACE_ADDRESS_MODE}\n\
-target hooks for the given address space.",
- bool, (scalar_int_mode mode, addr_space_t as),
+version of this hook ignores the address space and delegates to\n\
+@code{TARGET_VALID_POINTER_MODE}.",
+ bool, (scalar_addr_mode mode, addr_space_t as),
  default_addr_space_valid_pointer_mode)
 
 /* True if an address is a valid memory address to a given named address
@@ -5467,7 +5477,7 @@ DEFHOOK
 (cstore_mode,
  "This hook defines the machine mode to use for the boolean result of\
   conditional store patterns.  The ICODE argument is the instruction code\
-  for the cstore being performed.  Not definiting this hook is the same\
+  for the cstore being performed.  Not defining this hook is the same\
   as accepting the mode encoded into operand 0 of the cstore expander\
   patterns.",
   scalar_int_mode, (enum insn_code icode),

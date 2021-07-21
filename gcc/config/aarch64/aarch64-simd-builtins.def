@@ -480,7 +480,6 @@
 
   /* Implemented by aarch64_ld1<VALL_F16:mode>.  */
   BUILTIN_VALL_F16 (LOAD1, ld1, 0, ALL)
-  VAR1(STORE1P, ld1, 0, ALL, v2di)
 
   /* Implemented by aarch64_st1<VALL_F16:mode>.  */
   BUILTIN_VALL_F16 (STORE1, st1, 0, ALL)

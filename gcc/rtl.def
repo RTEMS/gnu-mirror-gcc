@@ -374,6 +374,10 @@ DEF_RTL_EXPR(CONST_STRING, "const_string", "s", RTX_OBJ)
 
 DEF_RTL_EXPR(CONST, "const", "e", RTX_CONST_OBJ)
 
+/* This represents a nullptr constant on machines which use capabilities for
+   pointers.  */
+DEF_RTL_EXPR(CONST_NULL, "const_null", "", RTX_CONST_OBJ)
+
 /* program counter.  Ordinary jumps are represented
    by a SET whose first operand is (PC).  */
 DEF_RTL_EXPR(PC, "pc", "", RTX_OBJ)
@@ -773,6 +777,21 @@ DEF_RTL_EXPR(DEBUG_PARAMETER_REF, "debug_parameter_ref", "t", RTX_OBJ)
 
 /* Used in marker DEBUG_INSNs to avoid being recognized as an insn.  */
 DEF_RTL_EXPR(DEBUG_MARKER, "debug_marker", "", RTX_EXTRA)
+
+/* The below expressions are used to handle pointers as capabilities (rather
+   than integer pointers).  */
+
+/* Represents a pointer plus some integer.
+   The first argument must be in a capability mode, while the second must be in
+   the corresponding offset_mode.  */
+DEF_RTL_EXPR(POINTER_PLUS, "pointer_plus", "ee", RTX_BIN_ARITH)
+
+/* Represents the original capability with address replaced.  */
+DEF_RTL_EXPR(REPLACE_ADDRESS_VALUE, "replace_address_value", "ee",
+	     RTX_BIN_ARITH)
+
+/* Represents a capability aligned to a given value.  */
+DEF_RTL_EXPR(ALIGN_ADDRESS_DOWN, "align_address_down", "ee", RTX_BIN_ARITH)
 
 /* All expressions from this point forward appear only in machine
    descriptions.  */

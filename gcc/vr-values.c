@@ -102,6 +102,26 @@ vr_values::get_lattice_entry (const_tree var)
       return vr;
     }
 
+  /* MORELLO TODO (OPTIMISATION)
+     Here we completely give up on generating a relevant value range for any
+     capability types.
+     This is not a fundamental requirement, but the current implementation
+     relies on representing things using operations that are disallowed for
+     pointers.  Given comparisons on pointers are now represented by
+     comparisons on the integer cast of those pointers we will need to have
+     some sort of translation in the algorithm.
+     Here we disable generating information to represent ranges since it uses
+     TREE codes that are invalid for capabilities.  We don"t simply change the
+     code generation to use integer casts because it wouldn"t do anything given
+     that optimisations are looking for pointer value checks in the code for
+     their optimisations.  */
+  if (capability_type_p (TREE_TYPE (var)))
+    {
+      vr->set_varying (TREE_TYPE (var));
+      return vr;
+    }
+
+
   vr->set_undefined ();
 
   /* If VAR is a default definition of a parameter, the variable can
@@ -479,6 +499,18 @@ vr_values::extract_range_for_var_from_comparison_expr (tree var,
       return;
     }
 
+  /* MORELLO TODO
+   * 	There are outstanding questions about how the value ranges for
+   * 	capabilities should be expressed (in capability type or in capability
+   * 	value type, given that the metadata is not part of the value range).
+   * 	This question should be answered taking into account the consuming code
+   * 	as well (are value ranges propagated through dropping a capability?).
+   */
+  /* MORELLO TODO
+   *   Asserting that we don't have INTCAP_TYPE_P just to avoid surprises, it
+   *   may be useful to allow them and to use them in the future.  */
+  gcc_assert (!INTCAP_TYPE_P (type));
+
   /* If LIMIT is another SSA name and LIMIT has a range of its own,
      try to use LIMIT's range to avoid creating symbolic ranges
      unnecessarily. */
@@ -710,6 +742,7 @@ void
 vr_values::extract_range_from_assert (value_range_equiv *vr_p, tree expr)
 {
   tree var = ASSERT_EXPR_VAR (expr);
+  gcc_assert (!capability_type_p (TREE_TYPE (expr)));
   tree cond = ASSERT_EXPR_COND (expr);
   tree limit, op;
   enum tree_code cond_code;
@@ -756,6 +789,13 @@ void
 vr_values::extract_range_from_ssa_name (value_range_equiv *vr, tree var)
 {
   const value_range_equiv *var_vr = get_value_range (var);
+  /* MORELLO TODO (OPTIMISATION)
+     Should always come back as varying since we're disabling this right now. */
+  if (capability_type_p (TREE_TYPE (var)))
+    {
+      vr->set_varying (TREE_TYPE (var));
+      return;
+    }
 
   if (!var_vr->varying_p ())
     vr->deep_copy (var_vr);
@@ -775,6 +815,24 @@ vr_values::extract_range_from_binary_expr (value_range_equiv *vr,
 					   enum tree_code code,
 					   tree expr_type, tree op0, tree op1)
 {
+  /* MORELLO TODO (OPTIMISATION)
+     Disabling operation for now since it does a lot of work through
+     generating invalid TREE tcc_comparison codes.  Will eventually need to
+     figure out how to implement this in another way.
+      
+     Would expect that this function would only ever be called on a
+     POINTER_DIFF_EXPR, POINTER_PLUS_EXPR for capability types, since those
+     are the only standard binary expressions on capability types we allow.
+
+     Frontends can create any binary expression they want, so I"m not certain
+     this is a strong guarantee.  */
+  if (capability_type_p (TREE_TYPE (op0))
+      || capability_type_p (TREE_TYPE (op1)))
+    {
+      vr->set_varying (expr_type);
+      return;
+    }
+
   /* Get value ranges for each operand.  For constant operands, create
      a new value range with the operand to simplify processing.  */
   value_range vr0, vr1;
@@ -919,6 +977,13 @@ vr_values::extract_range_from_unary_expr (value_range_equiv *vr,
 					  enum tree_code code,
 					  tree type, tree op0)
 {
+  /* MORELLO TODO (OPTIMISATION)
+      Again, disable acting on any capability modes.  */
+  if (capability_type_p (type) || capability_type_p (TREE_TYPE (op0)))
+    {
+      vr->set_varying (type);
+      return;
+    }
   value_range vr0;
 
   /* Get value ranges for the operand.  For constant operands, create
@@ -943,6 +1008,12 @@ vr_values::extract_range_from_cond_expr (value_range_equiv *vr, gassign *stmt)
   /* Get value ranges for each operand.  For constant operands, create
      a new value range with the operand to simplify processing.  */
   tree op0 = gimple_assign_rhs2 (stmt);
+  /* MORELLO TODO (OPTIMISATION) */
+  if (capability_type_p (TREE_TYPE (op0)))
+    {
+      vr->set_varying (TREE_TYPE (op0));
+      return;
+    }
   value_range_equiv tem0;
   const value_range_equiv *vr0 = &tem0;
   if (TREE_CODE (op0) == SSA_NAME)
@@ -979,6 +1050,13 @@ vr_values::extract_range_from_comparison (value_range_equiv *vr,
   tree type = gimple_expr_type (stmt);
   tree op0 = gimple_assign_rhs1 (stmt);
   tree op1 = gimple_assign_rhs2 (stmt);
+  /* MORELLO TODO (OPTIMISATION) */
+  if (capability_type_p (TREE_TYPE (op0)) || capability_type_p (TREE_TYPE (op1))
+      || capability_type_p (type))
+    {
+      vr->set_varying (type);
+      return;
+    }
   bool sop;
   tree val
     = simplifier.vrp_evaluate_conditional_warnv_with_ops (stmt, code, op0, op1,
@@ -1117,6 +1195,11 @@ vr_values::extract_range_basic (value_range_equiv *vr, gimple *stmt)
 {
   bool sop;
   tree type = gimple_expr_type (stmt);
+  if (capability_type_p (type))
+    {
+      vr->set_varying (type);
+      return;
+    }
 
   if (is_gimple_call (stmt))
     {
@@ -1895,6 +1978,15 @@ vr_values::adjust_range_with_scev (value_range_equiv *vr, class loop *loop,
 				   gimple *stmt, tree var)
 {
   tree min, max;
+  /* MORELLO TODO (OPTIMISATION)
+     Essentially remove this optimisation for now since it entirely revolves
+     around comparison operations on pointers directly.
+     When later reenabling it we would need to adjust the way that information
+     is stored so we don't generate any invalid operations on capabilities.
+     This also would make sense given that what we're trying to represent is
+     that the *value* of the capability is within a given range.  */
+  if (capability_type_p (TREE_TYPE (var)))
+    return;
   if (bounds_of_var_in_loop (&min, &max, this, loop, stmt, var))
     {
       if (vr->undefined_p () || vr->varying_p ())
@@ -2027,6 +2119,7 @@ get_output_for_vrp (gimple *stmt)
   if (!is_gimple_assign (stmt) && !is_gimple_call (stmt))
     return NULL_TREE;
 
+
   /* We only keep track of ranges in integral and pointer types.  */
   tree lhs = gimple_get_lhs (stmt);
   if (TREE_CODE (lhs) == SSA_NAME
@@ -2035,7 +2128,9 @@ get_output_for_vrp (gimple *stmt)
 	      build_range_type.  */
 	   && TYPE_MIN_VALUE (TREE_TYPE (lhs))
 	   && TYPE_MAX_VALUE (TREE_TYPE (lhs)))
-	  || POINTER_TYPE_P (TREE_TYPE (lhs))))
+	  || POINTER_TYPE_P (TREE_TYPE (lhs)))
+      /* MORELLO TODO (OPTIMISATION)  */
+      && ! capability_type_p (TREE_TYPE (lhs)))
     return lhs;
 
   return NULL_TREE;
@@ -2342,6 +2437,9 @@ simplify_using_ranges::vrp_evaluate_conditional_warnv_with_ops
   /* We only deal with integral and pointer types.  */
   if (!INTEGRAL_TYPE_P (TREE_TYPE (op0))
       && !POINTER_TYPE_P (TREE_TYPE (op0)))
+    return NULL_TREE;
+  /* MORELLO TODO (OPTIMISATION)  */
+  if (capability_type_p (TREE_TYPE (op0)))
     return NULL_TREE;
 
   /* If OP0 CODE OP1 is an overflow comparison, if it can be expressed
@@ -2832,6 +2930,10 @@ vr_values::extract_range_from_phi_node (gphi *phi,
 
   bool may_simulate_backedge_again = false;
   int edges = 0;
+  /* MORELLO TODO (OPTIMISATION)
+   * Ignoring any capability type -- marking as varying.  */
+  if (capability_type_p (TREE_TYPE (lhs)))
+    goto varying;
   for (size_t i = 0; i < gimple_phi_num_args (phi); i++)
     {
       edge e = gimple_phi_arg_edge (phi, i);
@@ -3699,6 +3801,7 @@ simplify_cond_using_ranges_2 (vr_values *store, gcond *stmt)
 
       if (TREE_CODE (innerop) == SSA_NAME
 	  && !POINTER_TYPE_P (TREE_TYPE (innerop))
+	  && !INTCAP_TYPE_P (TREE_TYPE (innerop))
 	  && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (innerop)
 	  && desired_pro_or_demotion_p (TREE_TYPE (innerop), TREE_TYPE (op0)))
 	{
@@ -4048,6 +4151,9 @@ simplify_using_ranges::simplify_float_conversion_using_ranges
     return false;
 
   /* First check if we can use a signed type in place of an unsigned.  */
+  /* MORELLO TODO just need to double check whether this needs
+     SCALAR_ADDR_TYPE_MODE, I don"t believe so but would like to know for
+     certain.  */
   scalar_int_mode rhs_mode = SCALAR_INT_TYPE_MODE (TREE_TYPE (rhs1));
   if (TYPE_UNSIGNED (TREE_TYPE (rhs1))
       && can_float_p (fltmode, rhs_mode, 0) != CODE_FOR_nothing

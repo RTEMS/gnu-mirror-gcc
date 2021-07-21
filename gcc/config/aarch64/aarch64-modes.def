@@ -159,6 +159,18 @@ ADJUST_ALIGNMENT (VNx2SF, 4);
 /* Quad float: 128-bit floating mode for long doubles.  */
 FLOAT_MODE (TF, 16, ieee_quad_format);
 
+/* This mode is already defined if we're compiling for CHECKING_P.
+   It is defined in the machmode.def global scope to enable writing selftests.
+   Hence when compiling for CHECKING_P we don't need to define it ourselves.  */
+#if !CHECKING_P
+/* Capability mode for Morello.  */
+CAPABILITY_MODE (DI, 16);
+#endif
+
+/* N.b. ADJUST_BYTESIZE automatically adjusts the alignment too.  */
+ADJUST_BYTESIZE (CADI, TARGET_MORELLO ? 16 : 8);
+ADJUST_PRECISION (CADI, TARGET_MORELLO ? 128 : 64);
+
 /* A 4-tuple of SVE vectors with the maximum -msve-vector-bits= setting.
    Note that this is a limit only on the compile-time sizes of modes;
    it is not a limit on the runtime sizes, since VL-agnostic code

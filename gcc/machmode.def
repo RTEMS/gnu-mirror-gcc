@@ -163,12 +163,13 @@ along with GCC; see the file COPYING3.  If not see
 
      ADJUST_BYTESIZE (MODE, EXPR);
      ADJUST_ALIGNMENT (MODE, EXPR);
+     ADJUST_PRECISION (MODE, EXPR);
      ADJUST_FLOAT_FORMAT (MODE, EXPR);
      ADJUST_IBIT (MODE, EXPR);
      ADJUST_FBIT (MODE, EXPR);
-	Arrange for the byte size, alignment, floating point format, ibit,
-	or fbit of MODE to be adjustable at run time.  EXPR will be executed
-	once after processing all command line options, and should
+	Arrange for the byte size, alignment, precision, floating point format,
+	ibit, or fbit of MODE to be adjustable at run time.  EXPR will be
+	executed once after processing all command line options, and should
 	evaluate to the desired byte size, alignment, format, ibit or fbit.
 
 	Unlike a FORMAT argument, if you are adjusting a float format
@@ -252,6 +253,11 @@ UACCUM_MODE (UHA, 2, 8, 8); /* 8.8 */
 UACCUM_MODE (USA, 4, 16, 16); /* 16.16 */
 UACCUM_MODE (UDA, 8, 32, 32); /* 32.32 */
 UACCUM_MODE (UTA, 16, 64, 64); /* 64.64 */
+
+#if CHECKING_P
+/* Capability mode for DI (in the general case only used for selftests).  */
+CAPABILITY_MODE (DI, 16);
+#endif
 
 /* Allow the target to specify additional modes of various kinds.  */
 #if HAVE_EXTRA_MODES

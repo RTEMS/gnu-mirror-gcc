@@ -266,7 +266,7 @@ shared_const_p (const_rtx orig)
   /* CONST can be shared if it contains a SYMBOL_REF.  If it contains
      a LABEL_REF, it isn't sharable.  */
   poly_int64 offset;
-  return (GET_CODE (XEXP (orig, 0)) == PLUS
+  return (any_plus_p (XEXP (orig, 0))
 	  && GET_CODE (XEXP (XEXP (orig, 0), 0)) == SYMBOL_REF
 	  && poly_int_rtx_p (XEXP (XEXP (orig, 0), 1), &offset));
 }

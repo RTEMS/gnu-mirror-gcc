@@ -479,8 +479,9 @@ invariant_or_equiv_p (cselib_val *v)
 	  || GET_CODE (v->locs->loc) == DEBUG_PARAMETER_REF)
 	return true;
 
-      /* (plus (value V) (const_int C)) is invariant iff V is invariant.  */
-      if (GET_CODE (v->locs->loc) == PLUS
+      /* (plus (value V) (const_int C)), (pointer_plus (value V) (const_int C))
+	  are invariant iff V is invariant.  */
+      if (any_plus_p (v->locs->loc)
 	  && CONST_INT_P (XEXP (v->locs->loc, 1))
 	  && GET_CODE (XEXP (v->locs->loc, 0)) == VALUE
 	  && invariant_or_equiv_p (CSELIB_VAL_PTR (XEXP (v->locs->loc, 0))))
@@ -548,7 +549,7 @@ cselib_reset_table (unsigned int num)
 	 SP_DERIVED_VALUE_P value.  */
       for (struct elt_loc_list *l = cfa_base_preserved_val->locs;
 	   l; l = l->next)
-	if (GET_CODE (l->loc) == PLUS
+	if (any_plus_p (l->loc)
 	    && GET_CODE (XEXP (l->loc, 0)) == VALUE
 	    && SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
 	    && CONST_INT_P (XEXP (l->loc, 1)))
@@ -839,6 +840,7 @@ autoinc_split (rtx x, rtx *off, machine_mode memmode)
 {
   switch (GET_CODE (x))
     {
+    case POINTER_PLUS:
     case PLUS:
       *off = XEXP (x, 1);
       x = XEXP (x, 0);
@@ -848,7 +850,8 @@ autoinc_split (rtx x, rtx *off, machine_mode memmode)
       if (memmode == VOIDmode)
 	return x;
 
-      *off = gen_int_mode (-GET_MODE_SIZE (memmode), GET_MODE (x));
+      *off = gen_int_mode (-GET_MODE_SIZE (memmode),
+			   noncapability_mode (GET_MODE (x)));
       x = XEXP (x, 0);
       break;
 
@@ -856,7 +859,8 @@ autoinc_split (rtx x, rtx *off, machine_mode memmode)
       if (memmode == VOIDmode)
 	return x;
 
-      *off = gen_int_mode (GET_MODE_SIZE (memmode), GET_MODE (x));
+      *off = gen_int_mode (GET_MODE_SIZE (memmode),
+			   noncapability_mode (GET_MODE (x)));
       x = XEXP (x, 0);
       break;
 
@@ -892,7 +896,7 @@ autoinc_split (rtx x, rtx *off, machine_mode memmode)
 	      return e->val_rtx;
 	    }
 	  for (struct elt_loc_list *l = e->locs; l; l = l->next)
-	    if (GET_CODE (l->loc) == PLUS
+	    if (any_plus_p (l->loc)
 		&& GET_CODE (XEXP (l->loc, 0)) == VALUE
 		&& SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
 		&& CONST_INT_P (XEXP (l->loc, 1)))
@@ -900,7 +904,7 @@ autoinc_split (rtx x, rtx *off, machine_mode memmode)
 		if (*off == NULL_RTX)
 		  *off = XEXP (l->loc, 1);
 		else
-		  *off = plus_constant (Pmode, *off,
+		  *off = plus_constant (POmode, *off,
 					INTVAL (XEXP (l->loc, 1)));
 		if (*off == const0_rtx)
 		  *off = NULL_RTX;
@@ -1014,7 +1018,7 @@ rtx_equal_for_cselib_1 (rtx x, rtx y, machine_mode memmode, int depth)
     return 0;
 
   if (GET_CODE (x) != GET_CODE (y)
-      || (GET_CODE (x) == PLUS
+      || (any_plus_p (x)
 	  && GET_MODE (x) == Pmode
 	  && CONST_INT_P (XEXP (x, 1))
 	  && CONST_INT_P (XEXP (y, 1))))
@@ -1159,6 +1163,7 @@ static unsigned int
 cselib_hash_plus_const_int (rtx x, HOST_WIDE_INT c, int create,
 			    machine_mode memmode)
 {
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
   cselib_val *e = cselib_lookup (x, GET_MODE (x), create, memmode);
   if (! e)
     return 0;
@@ -1171,7 +1176,7 @@ cselib_hash_plus_const_int (rtx x, HOST_WIDE_INT c, int create,
 	  && CONST_INT_P (XEXP (l->loc, 1)))
 	{
 	  e = CSELIB_VAL_PTR (XEXP (l->loc, 0));
-	  c = trunc_int_for_mode (c + UINTVAL (XEXP (l->loc, 1)), Pmode);
+	  c = trunc_int_for_mode (c + UINTVAL (XEXP (l->loc, 1)), POmode);
 	  break;
 	}
   if (c == 0)
@@ -1185,6 +1190,47 @@ cselib_hash_plus_const_int (rtx x, HOST_WIDE_INT c, int create,
     tem_hash = (unsigned int) CONST_INT;
   hash += tem_hash;
   return hash ? hash : 1 + (unsigned int) PLUS;
+}
+
+/* Helper function for cselib_hash_rtx.  Arguments like for cselib_hash_rtx,
+   except that it hashes (pointer_plus:P x c).  */
+
+static unsigned int
+cselib_hash_pointer_plus_const_int (rtx x ATTRIBUTE_UNUSED,
+				    HOST_WIDE_INT c ATTRIBUTE_UNUSED,
+				    int create ATTRIBUTE_UNUSED,
+				    machine_mode memmode ATTRIBUTE_UNUSED)
+{
+  gcc_assert (CAPABILITY_MODE_P (GET_MODE (x)));
+  check_pointer_offset_modes (as_a <scalar_addr_mode> GET_MODE (x),
+			      x, gen_int_mode (c, POmode));
+
+  cselib_val *e = cselib_lookup (x, GET_MODE (x), create, memmode);
+  if (! e)
+    return 0;
+
+  if (! SP_DERIVED_VALUE_P (e->val_rtx))
+    for (struct elt_loc_list *l = e->locs; l; l = l->next)
+      if (GET_CODE (l->loc) == POINTER_PLUS
+	  && GET_CODE (XEXP (l->loc, 0)) == VALUE
+	  && SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
+	  && CONST_INT_P (XEXP (l->loc, 1)))
+	{
+	  e = CSELIB_VAL_PTR (XEXP (l->loc, 0));
+	  c = trunc_int_for_mode (c + UINTVAL (XEXP (l->loc, 1)), POmode);
+	  break;
+	}
+  if (c == 0)
+    return e->hash;
+
+  unsigned hash = (unsigned) POINTER_PLUS + (unsigned) GET_MODE (x);
+  hash += e->hash;
+  unsigned int tem_hash = (unsigned) CONST_INT + (unsigned) VOIDmode;
+  tem_hash += ((unsigned) CONST_INT << 7) + (unsigned HOST_WIDE_INT) c;
+  if (tem_hash == 0)
+    tem_hash = (unsigned int) CONST_INT;
+  hash += tem_hash;
+  return hash ? hash : 1 + (unsigned int) POINTER_PLUS;
 }
 
 /* Hash an rtx.  Return 0 if we couldn't hash the rtx.
@@ -1218,6 +1264,8 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
   enum rtx_code code;
   const char *fmt;
   unsigned int hash = 0;
+  unsigned int temp_plus_value;
+  rtx co;
 
   code = GET_CODE (x);
   hash += (unsigned) code + (unsigned) GET_MODE (x);
@@ -1353,23 +1401,37 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
       if (code == PRE_DEC)
 	offset = -offset;
       /* Adjust the hash so that (mem:MEMMODE (pre_* (reg))) hashes
-	 like (mem:MEMMODE (plus (reg) (const_int I))).  */
+	 like (mem:MEMMODE (plus (reg) (const_int I))) for non-capability modes
+	 and  (mem:MEMMODE (pointer_plus (reg) (const_int I))) for capability
+	 modes.  */
       if (GET_MODE (x) == Pmode
 	  && (REG_P (XEXP (x, 0))
 	      || MEM_P (XEXP (x, 0))
 	      || GET_CODE (XEXP (x, 0)) == VALUE))
 	{
 	  HOST_WIDE_INT c;
+	  rtx inner = XEXP (x, 0);
 	  if (offset.is_constant (&c))
-	    return cselib_hash_plus_const_int (XEXP (x, 0),
-					       trunc_int_for_mode (c, Pmode),
-					       create, memmode);
+	    {
+	      HOST_WIDE_INT off = trunc_int_for_mode (c, POmode);
+	      if (CAPABILITY_MODE_P (Pmode))
+		return cselib_hash_pointer_plus_const_int (inner, off,
+							   create, memmode);
+	      else
+		return cselib_hash_plus_const_int (inner, off, create,
+						   memmode);
+	    }
 	}
-      hash = ((unsigned) PLUS + (unsigned) GET_MODE (x)
-	      + cselib_hash_rtx (XEXP (x, 0), create, memmode)
-	      + cselib_hash_rtx (gen_int_mode (offset, GET_MODE (x)),
-				 create, memmode));
-      return hash ? hash : 1 + (unsigned) PLUS;
+	co = gen_int_mode (offset, noncapability_mode (GET_MODE (x)));
+	check_pointer_offset_modes (as_a <scalar_addr_mode> GET_MODE (x),
+				    XEXP (x, 0), co);
+	temp_plus_value = CAPABILITY_MODE_P (GET_MODE (x))
+				       ? (unsigned) POINTER_PLUS
+				       : (unsigned) PLUS;
+	hash = (temp_plus_value + (unsigned) GET_MODE (x)
+		+ cselib_hash_rtx (XEXP (x, 0), create, memmode)
+		+ cselib_hash_rtx (co, create, memmode));
+	return hash ? hash : 1 + temp_plus_value;
 
     case PRE_MODIFY:
       gcc_assert (memmode != VOIDmode);
@@ -1385,6 +1447,9 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
     case CC0:
     case CALL:
     case UNSPEC_VOLATILE:
+    case ALIGN_ADDRESS_DOWN:
+    case REPLACE_ADDRESS_VALUE:
+    case CONST_NULL:
       return 0;
 
     case ASM_OPERANDS:
@@ -1393,14 +1458,23 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
 
       break;
 
+    case POINTER_PLUS:
     case PLUS:
       if (GET_MODE (x) == Pmode
 	  && (REG_P (XEXP (x, 0))
 	      || MEM_P (XEXP (x, 0))
 	      || GET_CODE (XEXP (x, 0)) == VALUE)
 	  && CONST_INT_P (XEXP (x, 1)))
-	return cselib_hash_plus_const_int (XEXP (x, 0), INTVAL (XEXP (x, 1)),
-					   create, memmode);
+	{
+	  if (GET_CODE (x) == POINTER_PLUS)
+	    return cselib_hash_pointer_plus_const_int (XEXP (x, 0),
+						       INTVAL (XEXP (x, 1)),
+						       create, memmode);
+	  else
+	    return cselib_hash_plus_const_int (XEXP (x, 0),
+					       INTVAL (XEXP (x, 1)), create,
+					       memmode);
+	}
       break;
 
     default:
@@ -2093,6 +2167,7 @@ cselib_subst_to_values (rtx x, machine_mode memmode)
       gcc_assert (memmode != VOIDmode);
       return cselib_subst_to_values (XEXP (x, 0), memmode);
 
+    case POINTER_PLUS:
     case PLUS:
       if (GET_MODE (x) == Pmode && CONST_INT_P (XEXP (x, 1)))
 	{
@@ -2103,7 +2178,7 @@ cselib_subst_to_values (rtx x, machine_mode memmode)
 		return t;
 	      for (struct elt_loc_list *l = CSELIB_VAL_PTR (t)->locs;
 		   l; l = l->next)
-		if (GET_CODE (l->loc) == PLUS
+		if (any_plus_p (l->loc)
 		    && GET_CODE (XEXP (l->loc, 0)) == VALUE
 		    && SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
 		    && CONST_INT_P (XEXP (l->loc, 1)))
@@ -2667,7 +2742,9 @@ cselib_have_permanent_equivalences (void)
 
 /* Record stack_pointer_rtx to be equal to
    (plus:P cfa_base_preserved_val offset).  Used by var-tracking
-   at the start of basic blocks for !frame_pointer_needed functions.  */
+   at the start of basic blocks for !frame_pointer_needed functions.
+   For Capability targets the same applies for
+   (pointer_plus:P cfa_base_preserved_val offset)  */
 
 void
 cselib_record_sp_cfa_base_equiv (HOST_WIDE_INT offset, rtx_insn *insn)
@@ -2680,7 +2757,7 @@ cselib_record_sp_cfa_base_equiv (HOST_WIDE_INT offset, rtx_insn *insn)
 	sp_derived_value = l->loc;
 	break;
       }
-    else if (GET_CODE (l->loc) == PLUS
+    else if (any_plus_p (l->loc)
 	     && GET_CODE (XEXP (l->loc, 0)) == VALUE
 	     && SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
 	     && CONST_INT_P (XEXP (l->loc, 1)))
@@ -2709,7 +2786,7 @@ cselib_sp_derived_value_p (cselib_val *v)
 {
   if (!SP_DERIVED_VALUE_P (v->val_rtx))
     for (struct elt_loc_list *l = v->locs; l; l = l->next)
-      if (GET_CODE (l->loc) == PLUS
+      if (any_plus_p (l->loc)
 	  && GET_CODE (XEXP (l->loc, 0)) == VALUE
 	  && SP_DERIVED_VALUE_P (XEXP (l->loc, 0))
 	  && CONST_INT_P (XEXP (l->loc, 1)))
@@ -2719,7 +2796,7 @@ cselib_sp_derived_value_p (cselib_val *v)
   for (struct elt_loc_list *l = v->locs; l; l = l->next)
     if (l->loc == cfa_base_preserved_val->val_rtx)
       return true;
-    else if (GET_CODE (l->loc) == PLUS
+    else if (any_plus_p (l->loc)
 	     && XEXP (l->loc, 0) == cfa_base_preserved_val->val_rtx
 	     && CONST_INT_P (XEXP (l->loc, 1)))
       return true;
@@ -2747,9 +2824,9 @@ cselib_record_autoinc_cb (rtx mem ATTRIBUTE_UNUSED, rtx op ATTRIBUTE_UNUSED,
   data = (struct cselib_record_autoinc_data *)arg;
 
   data->sets[data->n_sets].dest = dest;
-
+  scalar_addr_mode am = as_a <scalar_addr_mode> (GET_MODE (src));
   if (srcoff)
-    data->sets[data->n_sets].src = gen_rtx_PLUS (GET_MODE (src), src, srcoff);
+    data->sets[data->n_sets].src = gen_pointer_plus (am, src, srcoff);
   else
     data->sets[data->n_sets].src = src;
 

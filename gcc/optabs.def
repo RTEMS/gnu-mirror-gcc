@@ -437,3 +437,15 @@ OPTAB_DC (vec_series_optab, "vec_series$a", VEC_SERIES)
 OPTAB_D (vec_shl_insert_optab, "vec_shl_insert_$a")
 OPTAB_D (len_load_optab, "len_load_$a")
 OPTAB_D (len_store_optab, "len_store_$a")
+
+/* Capability optabs */
+OPTAB_DC (replace_address_value_optab, "replace_address_value_$a",
+	  REPLACE_ADDRESS_VALUE)
+
+OPTAB_DC (pointer_plus_optab, "pointer_plus_$a", POINTER_PLUS)
+
+OPTAB_D (pointer_minus_optab, "pointer_minus_$a")
+
+OPTAB_D (align_down_optab, "align_down_$a")
+
+OPTAB_D (align_up_optab, "align_up_$a")

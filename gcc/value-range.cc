@@ -253,6 +253,19 @@ irange::set (tree min, tree max, value_range_kind kind)
     }
 
   tree type = TREE_TYPE (min);
+  /* MORELLO TODO completely bail out when requesting a range on a capability type.
+   * Representing the range in the capability value could indicate to an
+   * optimisation that two values are the same when they're not (if the range
+   * is min and max being the same).
+   *
+   * Representing the range in the type of the capability will not do anything
+   * right now and would require investigation to determine what the best
+   * representation of the metadata would be.  */
+  if (capability_type_p (type))
+    {
+      set_varying (type);
+      return;
+    }
   // Nothing to canonicalize for symbolic ranges.
   if (TREE_CODE (min) != INTEGER_CST
       || TREE_CODE (max) != INTEGER_CST)

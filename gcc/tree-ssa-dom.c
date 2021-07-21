@@ -1726,8 +1726,8 @@ record_equivalences_from_stmt (gimple *stmt, int may_optimize_p,
       tree new_rhs
 	= build1 (ADDR_EXPR, TREE_TYPE (op0),
 		  fold_build2 (MEM_REF, TREE_TYPE (TREE_TYPE (op0)),
-			       unshare_expr (op0), fold_convert (ptr_type_node,
-								 op1)));
+			       unshare_expr (op0),
+			       fold_convert_for_mem_ref (ptr_type_node, op1)));
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "==== ASGN ");

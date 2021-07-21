@@ -726,7 +726,71 @@ struct GTY(()) rtx_note : public rtx_insn
 #define PUT_CODE(RTX, CODE) ((RTX)->code = (CODE))
 
 #define GET_MODE(RTX)		((machine_mode) (RTX)->mode)
-#define PUT_MODE_RAW(RTX, MODE)	((RTX)->mode = (MODE))
+
+/* Assert than the provided CODE is suitable for the given MODE.
+   At the moment this only provides checks for MODE_CAPABILITY modes.  */
+static inline void
+check_code_and_mode (enum rtx_code code ATTRIBUTE_UNUSED,
+		     machine_mode mode ATTRIBUTE_UNUSED)
+{
+#if CHECKING_P
+  if (CAPABILITY_MODE_P (mode))
+    switch (code)
+      {
+	case ADDR_VEC:
+	case ADDRESS:
+	case ASM_INPUT:
+	case ASM_OPERANDS:
+	case CLOBBER:
+	case CONCAT:
+	case CONST:
+	case CONST_NULL:
+	case CONST_STRING:
+	case DEBUG_EXPR:
+	case DEBUG_IMPLICIT_PTR:
+	case DEBUG_PARAMETER_REF:
+	case ENTRY_VALUE:
+	case EXPR_LIST:
+	case HIGH:
+	case IF_THEN_ELSE:
+	case LABEL_REF:
+	case LO_SUM:
+	case MEM:
+	case POINTER_PLUS:
+	case POST_DEC:
+	case POST_INC:
+	case POST_MODIFY:
+	case PRE_DEC:
+	case PRE_INC:
+	case PRE_MODIFY:
+	case REG:
+	case SCRATCH:
+	case SUBREG:
+	case SYMBOL_REF:
+	case UNSPEC:
+	case UNSPEC_VOLATILE:
+	case VALUE:
+	case VAR_LOCATION:
+	case REPLACE_ADDRESS_VALUE:
+	case ALIGN_ADDRESS_DOWN:
+#  ifdef GENERATOR_FILE
+	  /* We do not yet know all codes that should go here.  */
+	case MATCH_OPERAND:
+#  endif
+	  return;
+	default:
+	  gcc_unreachable ();
+      }
+#endif
+}
+
+#define PUT_MODE_RAW(RTX, MODE)	\
+  do  {\
+      check_code_and_mode (GET_CODE (RTX), MODE); \
+      ((RTX)->mode = (MODE)); \
+  } while (0)
+
+#define PUT_MODE_NO_CHECK(RTX, MODE) ((RTX)->mode = (MODE));
 
 /* RTL vector.  These appear inside RTX's when there is a need
    for a variable number of things.  The principle use is inside
@@ -761,6 +825,7 @@ struct GTY(()) rtvec_def {
    case CONST_INT: \
    case CONST_WIDE_INT: \
    case CONST_POLY_INT: \
+   case CONST_NULL: \
    case CONST_DOUBLE: \
    case CONST_FIXED
 
@@ -769,6 +834,7 @@ struct GTY(()) rtvec_def {
    case CONST_INT: \
    case CONST_WIDE_INT: \
    case CONST_POLY_INT: \
+   case CONST_NULL: \
    case CONST_DOUBLE: \
    case CONST_FIXED: \
    case CONST_VECTOR
@@ -829,6 +895,9 @@ struct GTY(()) rtvec_def {
 /* Predicate yielding true iff X is an rtx for a double-int.  */
 #define CONST_DOUBLE_AS_FLOAT_P(X) \
   (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) != VOIDmode)
+
+/* Predicate yielding true iff X is an rtx for a const_null capability.  */
+#define CONST_NULL_P(X) (GET_CODE (X) == CONST_NULL)
 
 /* Predicate yielding nonzero iff X is a label insn.  */
 #define LABEL_P(X) (GET_CODE (X) == CODE_LABEL)
@@ -1065,6 +1134,18 @@ is_a_helper <rtx_note *>::test (rtx_insn *insn)
 /* 1 if X can be used to represent an object.  */
 #define OBJECT_P(X)							\
   ((GET_RTX_CLASS (GET_CODE (X)) & RTX_OBJ_MASK) == RTX_OBJ_RESULT)
+
+/* 1 if X is a POINTER_PLUS expression.  */
+#define POINTER_PLUS_P(X) \
+  (GET_CODE (X) == POINTER_PLUS)
+
+/* 1 if X is a REPLACE_ADDRESS_VALUE expression.  */
+#define REPLACE_ADDRESS_VALUE_P(X) \
+  (GET_CODE (X) == REPLACE_ADDRESS_VALUE)
+
+/* 1 if X is a ALIGN_ADDRESS_DOWN expression.  */
+#define ALIGN_ADDRESS_DOWN_P(X) \
+  (GET_CODE (X) == ALIGN_ADDRESS_DOWN)
 
 /* General accessor macros for accessing the fields of an rtx.  */
 
@@ -2954,7 +3035,12 @@ get_full_set_src_cost (rtx x, machine_mode mode, struct full_rtx_costs *c)
 
 /* In explow.c */
 extern HOST_WIDE_INT trunc_int_for_mode	(HOST_WIDE_INT, machine_mode);
+extern HOST_WIDE_INT trunc_int_for_mode	(HOST_WIDE_INT, scalar_int_mode);
+extern HOST_WIDE_INT
+trunc_int_for_mode	(HOST_WIDE_INT, scalar_addr_mode) = delete;
 extern poly_int64 trunc_int_for_mode (poly_int64, machine_mode);
+extern poly_int64 trunc_int_for_mode (poly_int64, scalar_int_mode);
+extern poly_int64 trunc_int_for_mode (poly_int64, scalar_addr_mode) = delete;
 extern rtx plus_constant (machine_mode, rtx, poly_int64, bool = false);
 extern HOST_WIDE_INT get_stack_check_protect (void);
 
@@ -3234,10 +3320,25 @@ extern poly_int64 subreg_memory_offset (machine_mode, machine_mode,
 					poly_uint64);
 extern poly_int64 subreg_memory_offset (const_rtx);
 extern rtx make_safe_from (rtx, rtx);
-extern rtx convert_memory_address_addr_space_1 (scalar_int_mode, rtx,
+extern rtx convert_memory_address_addr_space_1 (scalar_addr_mode, rtx,
 						addr_space_t, bool, bool);
-extern rtx convert_memory_address_addr_space (scalar_int_mode, rtx,
+extern rtx convert_memory_address_addr_space (scalar_addr_mode, rtx,
 					      addr_space_t);
+/* MORELLO TODO
+   We should change this predication such that we only keep these versions if
+   *both* of the below hold.
+     - IN_TARGET_CODE
+     - POmode is used by this target
+
+   If the target uses Pmode then it is expected to use these functions with
+   full knowledge of the distinction between addresses and integers.
+*/
+#if !defined(IN_TARGET_CODE)
+extern rtx convert_memory_address_addr_space_1
+		(scalar_int_mode, rtx, addr_space_t, bool, bool) = delete;
+extern rtx convert_memory_address_addr_space
+		(scalar_int_mode, rtx, addr_space_t) = delete;
+#endif
 #define convert_memory_address(to_mode,x) \
 	convert_memory_address_addr_space ((to_mode), (x), ADDR_SPACE_GENERIC)
 extern const char *get_insn_name (int);
@@ -3370,6 +3471,8 @@ extern rtx *find_constant_term_loc (rtx *);
 
 /* In emit-rtl.c  */
 extern rtx_insn *try_split (rtx, rtx_insn *, int);
+extern rtx gen_raw_pointer_plus (scalar_addr_mode, rtx, rtx);
+extern rtx drop_capability (rtx);
 
 /* In insn-recog.c (generated by genrecog).  */
 extern rtx_insn *split_insns (rtx, rtx_insn *);
@@ -3403,6 +3506,8 @@ extern rtx simplify_replace_fn_rtx (rtx, const_rtx,
 				    rtx (*fn) (rtx, const_rtx, void *), void *);
 extern rtx simplify_replace_rtx (rtx, const_rtx, rtx);
 extern rtx simplify_rtx (const_rtx);
+extern rtx gen_pointer_plus (scalar_addr_mode, rtx, rtx);
+extern rtx gen_pointer_minus (scalar_addr_mode, rtx, rtx);
 extern rtx avoid_constant_pool_reference (rtx);
 extern rtx delegitimize_mem_from_attrs (rtx);
 extern bool mode_signbit_p (machine_mode, const_rtx);
@@ -3422,6 +3527,7 @@ extern rtx set_for_reg_notes (rtx);
 extern rtx set_unique_reg_note (rtx, enum reg_note, rtx);
 extern rtx set_dst_reg_note (rtx, enum reg_note, rtx, rtx);
 extern void set_insn_deleted (rtx_insn *);
+extern void check_pointer_offset_modes (scalar_addr_mode, rtx, rtx offset);
 
 /* Functions in rtlanal.c */
 
@@ -3445,7 +3551,12 @@ inline rtx single_set (const rtx_insn *insn)
   return single_set_2 (insn, PATTERN (insn));
 }
 
-extern scalar_int_mode get_address_mode (rtx mem);
+inline bool any_plus_p (const_rtx x)
+{
+  return GET_CODE (x) == PLUS || GET_CODE (x) == POINTER_PLUS;
+}
+
+extern scalar_addr_mode get_address_mode (rtx mem);
 extern int rtx_addr_can_trap_p (const_rtx);
 extern bool nonzero_address_p (const_rtx);
 extern int rtx_unstable_p (const_rtx);
@@ -3838,7 +3949,9 @@ extern rtx gen_rtx_VAR_LOCATION (machine_mode, tree, rtx,
 				 enum var_init_status);
 
 #ifdef GENERATOR_FILE
-#define PUT_MODE(RTX, MODE) PUT_MODE_RAW (RTX, MODE)
+/* Generator files will produce transient invalid mode/code combinations as a
+   result of how mode iterators work, so disabling checking there.  */
+#define PUT_MODE(RTX, MODE) PUT_MODE_NO_CHECK (RTX, MODE)
 #else
 static inline void
 PUT_MODE (rtx x, machine_mode mode)
@@ -4422,7 +4535,7 @@ load_extend_op (machine_mode mode)
 inline rtx
 strip_offset_and_add (rtx x, poly_int64_pod *offset)
 {
-  if (GET_CODE (x) == PLUS)
+  if (any_plus_p (x))
     {
       poly_int64 suboffset;
       x = strip_offset (x, &suboffset);

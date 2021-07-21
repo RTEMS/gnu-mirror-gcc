@@ -1455,6 +1455,32 @@ c_cpp_builtins (cpp_reader *pfile)
   builtin_define_type_sizeof ("__SIZEOF_PTRDIFF_T__",
 			      unsigned_ptrdiff_type_node);
 
+  /* MORELLO TODO
+     For the moment we're going to predefine these macros when compiling for
+     fake-capability.
+     This should not stay for very long.
+     It's just here to help Carlos test the glibc build system in the time
+     before we have pure capability codegen.
+     Once we're getting pure-capability code running we should make these
+     predefined macros only available for that.  */
+  if (targetm.capability_mode().exists())
+    {
+      /* N.b. I've not found these values defined in a document anywhere.
+	 The values were found by looking at the assembly after using them in
+	 the CUCL CHERI compiler explorer.  */
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_GLOBAL__", 1);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_CCALL__", 256);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__", 512);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_UNSEAL__", 1024);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_SEAL__", 2048);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__", 4096);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__", 8192);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__", 16384);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__", 32768);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE__", 65536);
+      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_LOAD__", 131072);
+    }
+
   /* A straightforward target hook doesn't work, because of problems
      linking that hook's body when part of non-C front ends.  */
 # define preprocessing_asm_p() (cpp_get_options (pfile)->lang == CLK_ASM)
@@ -1724,7 +1750,7 @@ type_suffix (tree type)
   static const char *const suffixes[] = { "", "U", "L", "UL", "LL", "ULL" };
   int unsigned_suffix;
   int is_long;
-  int tp = TYPE_PRECISION (type);
+  int tp = TYPE_NONCAP_PRECISION (type);
 
   if (type == long_long_integer_type_node
       || type == long_long_unsigned_type_node
@@ -1749,7 +1775,7 @@ type_suffix (tree type)
     gcc_unreachable ();
 
   unsigned_suffix = TYPE_UNSIGNED (type);
-  if (TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node))
+  if (TYPE_NONCAP_PRECISION (type) < TYPE_PRECISION (integer_type_node))
     unsigned_suffix = 0;
   return suffixes[is_long * 2 + unsigned_suffix];
 }
@@ -1843,7 +1869,7 @@ builtin_define_type_minmax (const char *min_macro, const char *max_macro,
   char *buf;
   int bits;
 
-  bits = TYPE_PRECISION (type) + (TYPE_UNSIGNED (type) ? 0 : -1);
+  bits = TYPE_NONCAP_PRECISION (type) + (TYPE_UNSIGNED (type) ? 0 : -1);
 
   print_bits_of_hex (value, PBOH_SZ, bits);
 
@@ -1879,8 +1905,8 @@ static void
 builtin_define_type_width (const char *width_macro, tree type, tree type2)
 {
   if (type2 != NULL_TREE)
-    gcc_assert (TYPE_PRECISION (type) == TYPE_PRECISION (type2));
-  builtin_define_with_int_value (width_macro, TYPE_PRECISION (type));
+    gcc_assert (TYPE_CAP_PRECISION (type) == TYPE_CAP_PRECISION (type2));
+  builtin_define_with_int_value (width_macro, TYPE_CAP_PRECISION (type));
 }
 
 #include "gt-c-family-c-cppbuiltin.h"

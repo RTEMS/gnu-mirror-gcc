@@ -2110,7 +2110,7 @@ register_edge_assert_for_2 (tree name, edge e,
 	  || (CONVERT_EXPR_CODE_P (rhs_code)
 	      && INTEGRAL_TYPE_P (TREE_TYPE (val))
 	      && TYPE_UNSIGNED (TREE_TYPE (val))
-	      && TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
+	      && TYPE_NONCAP_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
 		 > prec))
 	{
 	  name2 = gimple_assign_rhs1 (def_stmt);
@@ -2119,7 +2119,7 @@ register_edge_assert_for_2 (tree name, edge e,
 	  else
 	    {
 	      cst2 = TYPE_MAX_VALUE (TREE_TYPE (val));
-	      nprec = TYPE_PRECISION (TREE_TYPE (name2));
+	      nprec = TYPE_NONCAP_PRECISION (TREE_TYPE (name2));
 	    }
 	  if (TREE_CODE (name2) == SSA_NAME
 	      && INTEGRAL_TYPE_P (TREE_TYPE (name2))
@@ -2926,6 +2926,8 @@ vrp_insert::find_assert_locations_in_bb (basic_block bb)
       /* See if we can derive an assertion for any of STMT's operands.  */
       FOR_EACH_SSA_TREE_OPERAND (op, stmt, i, SSA_OP_USE)
 	{
+	  if (capability_type_p (TREE_TYPE (op)))
+	    continue;
 	  tree value;
 	  enum tree_code comp_code;
 
@@ -3100,6 +3102,35 @@ vrp_insert::process_assert_insertions_for (tree name, assert_locus *loc)
   /* If we have X <=> X do not insert an assert expr for that.  */
   if (loc->expr == loc->val)
     return false;
+
+  /* MORELLO TODO (OPTIMISATION) This can create a comparison between
+   * pointers (e.g. pointer not equal NULL).
+   * Since this is a comparison between pointers we need to compare pointer
+   * values.
+   *   - To compare pointer values we would need to convert the expression to
+   *     an integer.
+   *   - This would emit a NOP_EXPR in the general case.
+   *   - NOP_EXPR's in cases like comparing a value to zero (NULL) are not
+   *     expected by the ASSERT_EXPR consuming code.
+   *   - In fact, ASSERT_EXPR's have pretty strict requirements on what
+   *     conditional we're allowed to express.
+   *
+   * I doubt we could just emit a comparison using the pointer itself, since
+   * the code we're using these ASSERT_EXPR to understand would always use the
+   * pointer value.
+   * Hence it seems that the best approach would be to emit the NOP_EXPR here
+   * (by using `fold_drop_capability` on the arguments) and updating everywhere
+   * that ASSERT_EXPR's are used to be able to handle such a pattern.
+   *
+   * From a quick look, it doesn't seem that it would be a huge amount of work
+   * to do this, but I'm still leaving it for now since we're trying to get the
+   * compiler working at all rather than trying to get all passes working.
+   *
+   * At the moment I'm approaching this by avoiding generating value ranges for
+   * any capability typed values.  This means that there should be no
+   * ASSERT_EXPR's ready to be used.
+   */
+  gcc_assert (!capability_type_p (TREE_TYPE (loc->expr)));
 
   cond = build2 (loc->comp_code, boolean_type_node, loc->expr, loc->val);
   assert_stmt = build_assert_expr_for (cond, name);

@@ -29,6 +29,9 @@
 ;; Iterator for General Purpose Integer registers (32- and 64-bit modes)
 (define_mode_iterator GPI [SI DI])
 
+;; Iterator for General Purpose Integer and Capability modes.
+(define_mode_iterator GPIC [SI DI (CADI "TARGET_CAPABILITY_ANY")])
+
 ;; Iterator for HI, SI, DI, some instructions can only work on these modes.
 (define_mode_iterator GPI_I16 [(HI "AARCH64_ISA_F16") SI DI])
 
@@ -135,11 +138,18 @@
 ;; addresses in different modes.  In LP64, only DI will match, while in
 ;; ILP32, either can match.
 (define_mode_iterator P [(SI "ptr_mode == SImode || Pmode == SImode")
-			 (DI "ptr_mode == DImode || Pmode == DImode")])
+			 (DI "ptr_mode == DImode || Pmode == DImode")
+			 (CADI "Pmode == CADImode")])
 
 ;; This mode iterator allows :PTR to be used for patterns that operate on
 ;; pointer-sized quantities.  Exactly one of the two alternatives will match.
-(define_mode_iterator PTR [(SI "ptr_mode == SImode") (DI "ptr_mode == DImode")])
+(define_mode_iterator PTR [(SI "ptr_mode == SImode")
+			   (DI "ptr_mode == DImode")
+			   (CADI "ptr_mode == CADImode")])
+
+; TODO: work out when we need DImode here.
+; Possibly it's TARGET_CAPABILITY_NONE || TARGET_CAPABILITY_HYBRID?
+(define_mode_iterator ADDR [DI (CADI "TARGET_CAPABILITY_ANY")])
 
 ;; Advanced SIMD Float modes suitable for moving, loading and storing.
 (define_mode_iterator VDQF_F16 [V4HF V8HF V2SF V4SF V2DF
@@ -865,15 +875,29 @@
 ;; Mode attributes
 ;; -------------------------------------------------------------------
 
+; Morello: map pointer modes onto the correct code for plus.
+(define_mode_attr PLUS [(DI "plus") (CADI "pointer_plus")])
+
+; Morello: map PTR -> P
+(define_mode_attr P_OF_PTR [(SI "DI") (DI "DI") (CADI "CADI")])
+
+; Morello: offset_mode of PTR iterator
+(define_mode_attr PTR_OFF [(SI "SI") (DI "DI") (CADI "DI")])
+
 ;; "e" for signaling operations, "" for quiet operations.
 (define_mode_attr e [(CCFP "") (CCFPE "e")])
 
 ;; In GPI templates, a string like "%<w>0" will expand to "%w0" in the
 ;; 32-bit version and "%x0" in the 64-bit version.
-(define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")])
+;;
+;; MORELLO TODO: revisit this for PURECAP.
+(define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")
+		     (CADI "x")])
 
 ;; The size of access, in bytes.
-(define_mode_attr ldst_sz [(SI "4") (DI "8")])
+;; MORELLO TODO: revisit this for PURECAP.
+;; (right for fake-capability, wrong for purecap).
+(define_mode_attr ldst_sz [(SI "4") (DI "8") (CADI "8")])
 ;; Likewise for load/store pair.
 (define_mode_attr ldpstp_sz [(SI "8") (DI "16")])
 
@@ -1526,7 +1550,9 @@
 
 ;; -fpic small model GOT reloc modifers: gotpage_lo15/lo14 for ILP64/32.
 ;; No need of iterator for -fPIC as it use got_lo12 for both modes.
-(define_mode_attr got_modifier [(SI "gotpage_lo14") (DI "gotpage_lo15")])
+;; MORELLO TODO: revisit this for PURECAP.
+(define_mode_attr got_modifier [(SI "gotpage_lo14") (DI "gotpage_lo15")
+				(CADI "gotpage_lo15")])
 
 ;; Width of 2nd and 3rd arguments to fp16 vector multiply add/sub
 (define_mode_attr VFMLA_W [(V2SF "V4HF") (V4SF "V8HF")])

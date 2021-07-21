@@ -462,6 +462,13 @@ gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
       gimple_assign_set_rhs3 (p, op3);
     }
 
+  tree lhs_type = lhs ? TREE_TYPE (lhs) : NULL_TREE;
+  gcc_assert (op3
+	      ? capability_args_valid (lhs_type, subcode, op1, op2, op3)
+	      : op2
+		? capability_args_valid (lhs_type, subcode, op1, op2)
+		: capability_args_valid (lhs_type, subcode, op1));
+
   return p;
 }
 
@@ -508,6 +515,8 @@ gimple_build_cond (enum tree_code pred_code, tree lhs, tree rhs,
 {
   gcond *p;
 
+  gcc_assert (! capability_type_p (TREE_TYPE (lhs))
+	      && !capability_type_p (TREE_TYPE (rhs)));
   gcc_assert (TREE_CODE_CLASS (pred_code) == tcc_comparison);
   p = as_a <gcond *> (gimple_build_with_ops (GIMPLE_COND, pred_code, 4));
   gimple_cond_set_lhs (p, lhs);

@@ -1611,7 +1611,7 @@ build_ref_for_offset (location_t loc, tree base, poly_int64 offset,
     {
       off = build_int_cst (TREE_TYPE (TREE_OPERAND (base, 1)),
 			   base_offset + byte_offset);
-      off = int_const_binop (PLUS_EXPR, TREE_OPERAND (base, 1), off);
+      off = maybe_cap_int_const_binop (PLUS_EXPR, TREE_OPERAND (base, 1), off);
       base = unshare_expr (TREE_OPERAND (base, 0));
     }
   else
@@ -2113,6 +2113,28 @@ sort_and_splice_var_accesses (tree var)
 		  fprintf (dump_file, "Cannot scalarize the following access "
 			   "because insufficient precision integer type was "
 			   "selected.\n  ");
+		  dump_access (dump_file, access, false);
+		}
+	      unscalarizable_region = true;
+	    }
+
+	  /* We conservatively disallow any scalarizing of a region which has
+	     type-punning between a capability and non-capability type.
+
+	     We only do this if the current function has accesses to both
+	     types, since converting a non-capability access to a scalar
+	     non-capability access does not change any behaviour.
+
+	     The difficulty is in converting a set of scalar accesses where
+	     some are capability types and others are not.  Here we avoid this
+	     case to ensure that we are conservatively correct.  */
+	  if (capability_type_p (access->type) != capability_type_p (ac2->type))
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  fprintf (dump_file, "Cannot scalarize the following access "
+			   "because the data is accessed both as a capability "
+			   "and an integer\n  ");
 		  dump_access (dump_file, access, false);
 		}
 	      unscalarizable_region = true;

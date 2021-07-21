@@ -511,8 +511,8 @@ iv_common_cand_hasher::equal (const iv_common_cand *ccand1,
   return (ccand1->hash == ccand2->hash
 	  && operand_equal_p (ccand1->base, ccand2->base, 0)
 	  && operand_equal_p (ccand1->step, ccand2->step, 0)
-	  && (TYPE_PRECISION (TREE_TYPE (ccand1->base))
-	      == TYPE_PRECISION (TREE_TYPE (ccand2->base))));
+	  && (TYPE_CAP_PRECISION (TREE_TYPE (ccand1->base))
+	      == TYPE_CAP_PRECISION (TREE_TYPE (ccand2->base))));
 }
 
 /* Loop invariant expression hashtable entry.  */
@@ -2594,6 +2594,8 @@ static GTY (()) vec<rtx, va_gc> *addr_list;
 static bool
 addr_offset_valid_p (struct iv_use *use, poly_int64 offset)
 {
+  /* MORELLO TODO Will need to account for capabilities.
+     I think this should be fine, but it needs closer inspection.  */
   rtx reg, addr;
   unsigned list_index;
   addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (use->iv->base));
@@ -2608,13 +2610,14 @@ addr_offset_valid_p (struct iv_use *use, poly_int64 offset)
     {
       addr_mode = targetm.addr_space.address_mode (as);
       reg = gen_raw_REG (addr_mode, LAST_VIRTUAL_REGISTER + 1);
-      addr = gen_rtx_fmt_ee (PLUS, addr_mode, reg, NULL_RTX);
+      rtx_code code = CAPABILITY_MODE_P (addr_mode) ? POINTER_PLUS : PLUS;
+      addr = gen_rtx_fmt_ee (code, addr_mode, reg, NULL_RTX);
       (*addr_list)[list_index] = addr;
     }
   else
     addr_mode = GET_MODE (addr);
 
-  XEXP (addr, 1) = gen_int_mode (offset, addr_mode);
+  XEXP (addr, 1) = gen_int_mode (offset, noncapability_mode (addr_mode));
   return (memory_address_addr_space_p (mem_mode, addr, as));
 }
 
@@ -3105,7 +3108,7 @@ add_candidate_1 (struct ivopts_data *data, tree base, tree step, bool important,
   if (pos != IP_ORIGINAL)
     {
       orig_type = TREE_TYPE (base);
-      type = generic_type_for (orig_type);
+      type = generic_type_for (noncapability_type (orig_type));
       if (type != orig_type)
 	{
 	  base = fold_convert (type, base);
@@ -3490,6 +3493,12 @@ add_iv_candidate_for_use (struct ivopts_data *data, struct iv_use *use)
   /* Don't add candidate for iv_use with non integer, pointer or non-mode
      precision types, instead, add candidate for the corresponding scev in
      unsigned type with the same precision.  See PR93674 for more info.  */
+  /* MORELLO TODO
+   * Investigate what doing this for capabilities would mean.
+   * At the moment there are a bunch of ways we handle capabilities across this
+   * pass, can we just use an unsigned integer that can store the same number
+   * of bits as the noncapability_mode of such a type and avoid all those
+   * workarounds?  */
   if ((TREE_CODE (basetype) != INTEGER_TYPE && !POINTER_TYPE_P (basetype))
       || !type_has_mode_precision_p (basetype))
     {
@@ -3918,7 +3927,11 @@ var_at_stmt (class loop *loop, struct iv_cand *cand, gimple *stmt)
 /* If A is (TYPE) BA and B is (TYPE) BB, and the types of BA and BB have the
    same precision that is at least as wide as the precision of TYPE, stores
    BA to A and BB to B, and returns the type of BA.  Otherwise, returns the
-   type of A and B.  */
+   type of A and B.
+   MORELLO TODO (OPTIMISATION)
+   Disallow such a conversion if a conversion from TYPE to the type of BA is
+   not allowed in general.  This is because we often have steps in TYPE and
+   will need to convert them to this new type.  */
 
 static tree
 determine_common_wider_type (tree *a, tree *b)
@@ -3931,7 +3944,8 @@ determine_common_wider_type (tree *a, tree *b)
     {
       suba = TREE_OPERAND (*a, 0);
       wider_type = TREE_TYPE (suba);
-      if (TYPE_PRECISION (wider_type) < TYPE_PRECISION (atype))
+      if (! fold_convertible_p (wider_type, *a)
+	  || TYPE_PRECISION (wider_type) < TYPE_PRECISION (atype))
 	return atype;
     }
   else
@@ -3940,7 +3954,11 @@ determine_common_wider_type (tree *a, tree *b)
   if (CONVERT_EXPR_P (*b))
     {
       subb = TREE_OPERAND (*b, 0);
-      if (TYPE_PRECISION (wider_type) != TYPE_PRECISION (TREE_TYPE (subb)))
+      if (! fold_convertible_p (wider_type, subb)
+	  || ! fold_convertible_p (wider_type, *b)
+	  || capability_type_p (TREE_TYPE (subb))
+		!= capability_type_p (wider_type)
+	  || TYPE_PRECISION (wider_type) != TYPE_PRECISION (TREE_TYPE (subb)))
 	return atype;
     }
   else
@@ -3969,8 +3987,17 @@ get_computation_aff_1 (class loop *loop, gimple *at, struct iv_use *use,
   aff_tree aff_cbase;
   widest_int rat;
 
-  /* We must have a precision to express the values of use.  */
-  if (TYPE_PRECISION (utype) > TYPE_PRECISION (ctype))
+  /* We must have a precision to express the values of use (and the conversion
+     must be valid including other things like capabilities).
+     MORELLO TODO (OPTIMISATION) There is a comment in rewrite_use_address
+     below about using unsigned integer types to avoid overflow problems.
+     This means that if an induction variable has a base of a pointer all
+     candidates that we will get will use unsigned int values, which will never
+     match.
+     Handling types other than unsigned integer (maybe using pointers all the
+     time?) would avoid the problem and enable these optimisations for
+     pointers.    */
+  if (! fold_convertible_p (utype, cbase))
     return false;
 
   var = var_at_stmt (loop, cand, at);
@@ -4416,6 +4443,12 @@ force_expr_to_var_cost (tree expr, bool speed)
   switch (TREE_CODE (expr))
     {
     case POINTER_PLUS_EXPR:
+      if (CAPABILITY_MODE_P (mode))
+	{
+	  cost = comp_cost (pointer_add_cost (speed, mode), 0);
+	  break;
+	}
+      /* FALLTHRU */
     case PLUS_EXPR:
     case MINUS_EXPR:
     case NEGATE_EXPR:
@@ -4848,6 +4881,14 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
     *can_autoinc = false;
   if (inv_expr)
     *inv_expr = NULL;
+
+  /* MORELLO TODO
+     Was trying to get these induction variables working for capabilities.
+     This function should eventually be modified to handle them (especially how
+     we should use TYPE_PRECISION here).
+     However, skipping for now (would like to do in the future).  */
+  if (capability_type_p (ctype) || capability_type_p (utype))
+    return infinite_cost;
 
   /* Check if we have enough precision to express the values of use.  */
   if (TYPE_PRECISION (utype) > TYPE_PRECISION (ctype))
@@ -5886,10 +5927,13 @@ determine_iv_cost (struct ivopts_data *data, struct iv_cand *cand)
   if (cost_base.cost == 0)
     cost_base.cost = COSTS_N_INSNS (1);
   /* Doloop decrement should be considered as zero cost.  */
+  tree base_type = TREE_TYPE (base);
   if (cand->doloop_p)
     cost_step = 0;
+  else if (capability_type_p (base_type))
+    cost_step = pointer_add_cost (data->speed, TYPE_MODE (base_type));
   else
-    cost_step = add_cost (data->speed, TYPE_MODE (TREE_TYPE (base)));
+    cost_step = add_cost (data->speed, TYPE_MODE (base_type));
   cost = cost_step + adjust_setup_cost (data, cost_base.cost);
 
   /* Prefer the original ivs unless we may gain something by replacing it.

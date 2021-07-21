@@ -3933,8 +3933,10 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
   /* Determine integer type result of the subtraction.  This will usually
      be the same as the result type (ptrdiff_t), but may need to be a wider
      type if pointers for the address space are wider than ptrdiff_t.  */
-  if (TYPE_PRECISION (restype) < TYPE_PRECISION (TREE_TYPE (op0)))
-    inttype = c_common_type_for_size (TYPE_PRECISION (TREE_TYPE (op0)), 0);
+  unsigned int calc_precision
+    = TYPE_PRECISION (noncapability_type (TREE_TYPE (op0)));
+  if (TYPE_PRECISION (restype) < calc_precision)
+    inttype = c_common_type_for_size (calc_precision, 0);
   else
     inttype = restype;
 
@@ -3964,8 +3966,15 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
      pointers.  If some platform cannot provide that, or has a larger
      ptrdiff_type to support differences larger than half the address
      space, cast the pointers to some larger integer type and do the
-     computations in that type.  */
-  if (TYPE_PRECISION (inttype) > TYPE_PRECISION (TREE_TYPE (op0)))
+     computations in that type.
+
+     When pointers are capabilities, we never use POINTER_DIFF_EXPR.  The
+     semantics of a subtraction of two pointers in capability-aware C is to
+     return the difference of the two capability values.  Hence we *always*
+     convert  */
+  if (TYPE_PRECISION (inttype) > calc_precision
+      || capability_type_p (TREE_TYPE (op0))
+      || capability_type_p (TREE_TYPE (op1)))
     op0 = build_binary_op (loc, MINUS_EXPR, convert (inttype, op0),
 			   convert (inttype, op1), false);
   else
@@ -5389,7 +5398,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	{
 	  op2 = null_pointer_node;
 	}
-      result_type = type1;
+      if (capability_type_p (type1))
+	error_at (colon_loc, "MORELLO TODO conditional expression implicit cast from integer to pointer");
+      else
+	result_type = type1;
     }
   else if (code2 == POINTER_TYPE && code1 == INTEGER_TYPE)
     {
@@ -5400,7 +5412,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	{
 	  op1 = null_pointer_node;
 	}
-      result_type = type2;
+      if (capability_type_p (type1))
+	error_at (colon_loc, "MORELLO TODO conditional expression implicit cast from integer to pointer");
+      else
+	result_type = type2;
     }
 
   if (!result_type)
@@ -5875,7 +5890,7 @@ build_c_cast (location_t loc, tree type, tree expr)
 
       if (TREE_CODE (type) == INTEGER_TYPE
 	  && TREE_CODE (otype) == POINTER_TYPE
-	  && TYPE_PRECISION (type) != TYPE_PRECISION (otype))
+	  && TYPE_PRECISION (type) != TYPE_NONCAP_PRECISION (otype))
       /* Unlike conversion of integers to pointers, where the
          warning is disabled for converting constants because
          of cases such as SIG_*, warn about converting constant
@@ -5892,7 +5907,7 @@ build_c_cast (location_t loc, tree type, tree expr)
 
       if (TREE_CODE (type) == POINTER_TYPE
 	  && TREE_CODE (otype) == INTEGER_TYPE
-	  && TYPE_PRECISION (type) != TYPE_PRECISION (otype)
+	  && TYPE_NONCAP_PRECISION (type) != TYPE_PRECISION (otype)
 	  /* Don't warn about converting any constant.  */
 	  && !TREE_CONSTANT (value))
 	warning_at (loc,
@@ -5931,6 +5946,14 @@ build_c_cast (location_t loc, tree type, tree expr)
 	warning_at (loc, OPT_Wcast_function_type,
 		    "cast between incompatible function types"
 		    " from %qT to %qT", otype, type);
+
+      if (capability_type_p (type) && INTEGRAL_TYPE_P (TREE_TYPE (value)))
+	{
+	  warning_at (loc, OPT_Wint_to_pointer_cast,
+	    "cast from provenance-free integer type to pointer type will give "
+	    "pointer that can not be dereferenced");
+	  inform (loc, "insert cast to intptr_t to silence this warning");
+	}
 
       ovalue = value;
       value = convert (type, value);
@@ -6794,6 +6817,16 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       return rhs;
     }
 
+  if (capability_type_p (type) && ! tree_is_capability_value (rhs)
+      /* && ! INTCAP_TYPE_P (type) */ && ! null_pointer_constant)
+  {
+	  /* MORELLO TODO make this error message nice, give error messages
+	   * describing what is exactly happening, ensure all error messages
+	   * match close-enough the LLVM error messages etc.  */
+    error_at (location, "MORELLO TODO implicit cast to capability type from non-capability type");
+    return error_mark_node;
+  }
+
   if (coder == VOID_TYPE)
     {
       /* Except for passing an argument to an unprototyped function,
@@ -7437,6 +7470,21 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    gcc_unreachable ();
 	  }
 
+      /* MORELLO TODO
+	 At the moment, for `null_pointer_constant` we remove the check of
+	 arguments from fold_build1_loc to allow conversions of integers to
+	 capabilities when that conversion can be folded away.
+
+	 Eventually I believe i would like to emit the null pointer here
+	 directly rather than requiring the fold_build1_loc routines to ignore
+	 it.
+
+	 That would mean we find a few more places where the folding routines
+	 are passed invalid expressions to generate, but where they can fold
+	 away the invalidness.
+	 We're leaving that change for later in order to focus on those places
+	 that are definitely problems (i.e. that always generate invalid
+	 expressions).  */
       return convert (type, rhs);
     }
   else if (codel == INTEGER_TYPE && coder == POINTER_TYPE)
@@ -10628,6 +10676,15 @@ c_finish_goto_ptr (location_t loc, tree expr)
   tree t;
   pedwarn (loc, OPT_Wpedantic, "ISO C forbids %<goto *expr;%>");
   expr = c_fully_fold (expr, false, NULL);
+  /* MORELLO TODO
+   * Need to implement actual casting here, probably through a convenience function.
+   * Would need to use ifn_REPLACE_ADDRESS_VALUE etc.  */
+  if (! tree_is_capability_value (expr) && ! null_pointer_constant_p (expr)
+      && capability_type_p (ptr_type_node))
+    {
+      error_at (loc, "MORELLO TODO implicit cast to capability type in computed goto");
+      return error_mark_node;
+    }
   expr = convert (ptr_type_node, expr);
   t = build1 (GOTO_EXPR, void_type_node, expr);
   SET_EXPR_LOCATION (t, loc);
@@ -12117,7 +12174,7 @@ build_binary_op (location_t location, enum tree_code code,
 			    "for the address of %qD will never be NULL",
 			    TREE_OPERAND (op0, 0));
 	    }
-	  result_type = type0;
+	  result_type = noncapability_type (type0);
 	}
       else if (code1 == POINTER_TYPE && null_pointer_constant_p (orig_op0))
 	{
@@ -12138,7 +12195,7 @@ build_binary_op (location_t location, enum tree_code code,
 			    "for the address of %qD will never be NULL",
 			    TREE_OPERAND (op1, 0));
 	    }
-	  result_type = type1;
+	  result_type = noncapability_type (type1);
 	}
       else if (code0 == POINTER_TYPE && code1 == POINTER_TYPE)
 	{
@@ -12152,7 +12209,8 @@ build_binary_op (location_t location, enum tree_code code,
 	     Otherwise, the targets must be compatible
 	     and both must be object or both incomplete.  */
 	  if (comp_target_types (location, type0, type1))
-	    result_type = common_pointer_type (type0, type1);
+	    result_type
+	      = noncapability_type (common_pointer_type (type0, type1));
 	  else if (!addr_space_superset (as0, as1, &as_common))
 	    {
 	      error_at (location, "comparison of pointers to "
@@ -12180,18 +12238,20 @@ build_binary_op (location_t location, enum tree_code code,
 	  if (result_type == NULL_TREE)
 	    {
 	      int qual = ENCODE_QUAL_ADDR_SPACE (as_common);
-	      result_type = build_pointer_type
-			      (build_qualified_type (void_type_node, qual));
+	      result_type
+		= noncapability_type
+		    (build_pointer_type
+		      (build_qualified_type (void_type_node, qual)));
 	    }
 	}
       else if (code0 == POINTER_TYPE && code1 == INTEGER_TYPE)
 	{
-	  result_type = type0;
+	  result_type = noncapability_type (type0);
 	  pedwarn (location, 0, "comparison between pointer and integer");
 	}
       else if (code0 == INTEGER_TYPE && code1 == POINTER_TYPE)
 	{
-	  result_type = type1;
+	  result_type = noncapability_type (type1);
 	  pedwarn (location, 0, "comparison between pointer and integer");
 	}
       if ((TREE_CODE (TREE_TYPE (orig_op0)) == BOOLEAN_TYPE
@@ -12268,7 +12328,8 @@ build_binary_op (location_t location, enum tree_code code,
 
 	  if (comp_target_types (location, type0, type1))
 	    {
-	      result_type = common_pointer_type (type0, type1);
+	      result_type
+		= noncapability_type (common_pointer_type (type0, type1));
 	      if (!COMPLETE_TYPE_P (TREE_TYPE (type0))
 		  != !COMPLETE_TYPE_P (TREE_TYPE (type1)))
 		pedwarn (location, 0,
@@ -12291,15 +12352,17 @@ build_binary_op (location_t location, enum tree_code code,
 	  else
 	    {
 	      int qual = ENCODE_QUAL_ADDR_SPACE (as_common);
-	      result_type = build_pointer_type
-			      (build_qualified_type (void_type_node, qual));
+	      result_type
+		= noncapability_type
+		    (build_pointer_type
+		     (build_qualified_type (void_type_node, qual)));
 	      pedwarn (location, 0,
 		       "comparison of distinct pointer types lacks a cast");
 	    }
 	}
       else if (code0 == POINTER_TYPE && null_pointer_constant_p (orig_op1))
 	{
-	  result_type = type0;
+	  result_type = noncapability_type (type0);
 	  if (pedantic)
 	    pedwarn (location, OPT_Wpedantic,
 		     "ordered comparison of pointer with integer zero");
@@ -12309,7 +12372,7 @@ build_binary_op (location_t location, enum tree_code code,
 	}
       else if (code1 == POINTER_TYPE && null_pointer_constant_p (orig_op0))
 	{
-	  result_type = type1;
+	  result_type = noncapability_type (type1);
 	  if (pedantic)
 	    pedwarn (location, OPT_Wpedantic,
 		     "ordered comparison of pointer with integer zero");
@@ -12319,12 +12382,12 @@ build_binary_op (location_t location, enum tree_code code,
 	}
       else if (code0 == POINTER_TYPE && code1 == INTEGER_TYPE)
 	{
-	  result_type = type0;
+	  result_type = noncapability_type (type0);
 	  pedwarn (location, 0, "comparison between pointer and integer");
 	}
       else if (code0 == INTEGER_TYPE && code1 == POINTER_TYPE)
 	{
-	  result_type = type1;
+	  result_type = noncapability_type (type1);
 	  pedwarn (location, 0, "comparison between pointer and integer");
 	}
 

@@ -50,9 +50,9 @@ typedef signed _Unwind_Sword __attribute__((__mode__(__unwind_word__)));
 #if defined(__ia64__) && defined(__hpux__)
 typedef unsigned _Unwind_Ptr __attribute__((__mode__(__word__)));
 #else
-typedef unsigned _Unwind_Ptr __attribute__((__mode__(__pointer__)));
+typedef __UINTPTR_TYPE__ _Unwind_Ptr;
 #endif
-typedef unsigned _Unwind_Internal_Ptr __attribute__((__mode__(__pointer__)));
+typedef __UINTPTR_TYPE__ _Unwind_Internal_Ptr;
 
 /* @@@ The IA-64 ABI uses a 64-bit word to identify the producer and
    consumer of an exception.  We'll go along with this for now even on

@@ -523,6 +523,7 @@ replace_oldest_value_addr (rtx *loc, enum reg_class cl,
 
   switch (code)
     {
+    case POINTER_PLUS:
     case PLUS:
       if (DEBUG_INSN_P (insn))
 	break;
@@ -582,15 +583,23 @@ replace_oldest_value_addr (rtx *loc, enum reg_class cl,
 	    unsigned regno0 = REGNO (op0), regno1 = REGNO (op1);
 
 	    if (REGNO_OK_FOR_INDEX_P (regno1)
-		&& regno_ok_for_base_p (regno0, mode, as, PLUS, REG))
+		&& regno_ok_for_base_p (regno0, mode, as,
+					CAPABILITY_MODE_P (mode) ?
+					  POINTER_PLUS : PLUS, REG))
 	      index_op = 1;
 	    else if (REGNO_OK_FOR_INDEX_P (regno0)
-		     && regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
+		     && regno_ok_for_base_p (regno1, mode, as,
+					     CAPABILITY_MODE_P (mode) ?
+					       POINTER_PLUS : PLUS, REG))
 	      index_op = 0;
-	    else if (regno_ok_for_base_p (regno0, mode, as, PLUS, REG)
+	    else if (regno_ok_for_base_p (regno0, mode, as,
+					  CAPABILITY_MODE_P (mode) ?
+					    POINTER_PLUS : PLUS, REG)
 		     || REGNO_OK_FOR_INDEX_P (regno1))
 	      index_op = 1;
-	    else if (regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
+	    else if (regno_ok_for_base_p (regno1, mode, as,
+					  CAPABILITY_MODE_P (mode) ?
+					    POINTER_PLUS : PLUS, REG))
 	      index_op = 0;
 	    else
 	      index_op = 1;
@@ -617,8 +626,10 @@ replace_oldest_value_addr (rtx *loc, enum reg_class cl,
 						mode, as, insn, vd);
 	if (locB)
 	  changed |= replace_oldest_value_addr (locB,
-						base_reg_class (mode, as, PLUS,
-								index_code),
+					base_reg_class (mode, as,
+						CAPABILITY_MODE_P (mode) ?
+						       POINTER_PLUS : PLUS,
+						index_code),
 						mode, as, insn, vd);
 	return changed;
       }

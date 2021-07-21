@@ -164,6 +164,13 @@ DEFTREECODE (REFERENCE_TYPE, "reference_type", tcc_type, 0)
 /* The C++ decltype(nullptr) type.  */
 DEFTREECODE (NULLPTR_TYPE, "nullptr_type", tcc_type, 0)
 
+/* The type representing intptr_t and uintptr_t values when they are
+   capabilities.
+   These are only for use with capabilities where an intptr_t that can contain
+   a pointer must also store the extra permissions/bounds/tags associated with
+   that pointer.  */
+DEFTREECODE (INTCAP_TYPE, "intcap_type", tcc_type, 0)
+
 /* _Fract and _Accum types in Embedded-C.  Different fixed-point types
    are distinguished by machine mode and by the TYPE_SIZE and the
    TYPE_PRECISION.  */

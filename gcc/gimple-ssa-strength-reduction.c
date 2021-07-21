@@ -465,6 +465,8 @@ get_alternative_base (tree base)
 
   if (result == NULL)
     {
+      if (tree_is_capability_value (base))
+	return NULL;
       tree expr;
       aff_tree aff;
 
@@ -742,8 +744,11 @@ stmt_cost (gimple *gs, bool speed)
       gcc_assert (TREE_CODE (rhs1) != INTEGER_CST);
       return mul_cost (speed, lhs_mode);
 
-    case PLUS_EXPR:
     case POINTER_PLUS_EXPR:
+      if (CAPABILITY_MODE_P (lhs_mode))
+	return pointer_add_cost (speed, lhs_mode);
+      gcc_fallthrough ();
+    case PLUS_EXPR:
     case MINUS_EXPR:
       return add_cost (speed, lhs_mode);
 
@@ -1530,6 +1535,9 @@ legal_cast_p_1 (tree lhs_type, tree rhs_type)
   unsigned lhs_size, rhs_size;
   bool lhs_wraps, rhs_wraps;
 
+  if (capability_type_p (rhs_type))
+    return false;
+
   lhs_size = TYPE_PRECISION (lhs_type);
   rhs_size = TYPE_PRECISION (rhs_type);
   lhs_wraps = ANY_INTEGRAL_TYPE_P (lhs_type) && TYPE_OVERFLOW_WRAPS (lhs_type);
@@ -1757,7 +1765,8 @@ find_candidates_dom_walker::before_dom_children (basic_block bb)
 
       else if (is_gimple_assign (gs)
 	       && (INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_lhs (gs)))
-		   || POINTER_TYPE_P (TREE_TYPE (gimple_assign_lhs (gs)))))
+		   || POINTER_TYPE_P (TREE_TYPE (gimple_assign_lhs (gs))))
+	       && (! capability_type_p (TREE_TYPE (gimple_assign_lhs (gs)))))
 	{
 	  tree rhs1 = NULL_TREE, rhs2 = NULL_TREE;
 

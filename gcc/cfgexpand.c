@@ -994,7 +994,7 @@ expand_one_stack_var_at (tree decl, rtx base, unsigned base_align,
   rtx x;
 
   /* If this fails, we've overflowed the stack frame.  Error nicely?  */
-  gcc_assert (known_eq (offset, trunc_int_for_mode (offset, Pmode)));
+  gcc_assert (known_eq (offset, trunc_int_for_mode (offset, POmode)));
 
   x = plus_constant (Pmode, base, offset);
   x = gen_rtx_MEM (TREE_CODE (decl) == SSA_NAME
@@ -1220,7 +1220,7 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 	      poly_int64 loffset;
 	      rtx large_allocsize;
 
-	      large_allocsize = gen_int_mode (large_size, Pmode);
+	      large_allocsize = gen_int_mode (large_size, POmode);
 	      get_dynamic_stack_size (&large_allocsize, 0, large_align, NULL);
 	      loffset = alloc_stack_frame_space
 		(rtx_to_poly_int64 (large_allocsize),
@@ -4050,7 +4050,7 @@ round_udiv_adjust (machine_mode mode, rtx mod, rtx op1)
    any rtl.  */
 
 static rtx
-convert_debug_memory_address (scalar_int_mode mode, rtx x,
+convert_debug_memory_address (scalar_addr_mode mode, rtx x,
 			      addr_space_t as)
 {
 #ifndef POINTERS_EXTEND_UNSIGNED
@@ -4065,8 +4065,18 @@ convert_debug_memory_address (scalar_int_mode mode, rtx x,
   if (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode)
     return x;
 
+  /* We can't convert a mode to a capability mode.
+     However, in debug expressions this doesn't really matter since the
+     pointer will not actually be used for dereferencing.
+     MORELLO TODO
+      We're adding this line here just to alert us when we try and convert to a
+      capability mode, but it's probably better to do something like just use
+      the noncapability_mode since I guess that will be all the debugger can
+      use.  */
+  gcc_assert (! CAPABILITY_MODE_P (mode));
+
   /* X must have some form of address mode already.  */
-  scalar_int_mode xmode = as_a <scalar_int_mode> (GET_MODE (x));
+  scalar_addr_mode xmode = as_a <scalar_addr_mode> (GET_MODE (x));
   if (GET_MODE_PRECISION (mode) < GET_MODE_PRECISION (xmode))
     x = lowpart_subreg (mode, x, xmode);
   else if (POINTERS_EXTEND_UNSIGNED > 0)
@@ -4227,7 +4237,7 @@ expand_debug_expr (tree exp)
   machine_mode inner_mode = VOIDmode;
   int unsignedp = TYPE_UNSIGNED (TREE_TYPE (exp));
   addr_space_t as;
-  scalar_int_mode op0_mode, op1_mode, addr_mode;
+  scalar_addr_mode op0_mode, op1_mode, addr_mode;
 
   switch (TREE_CODE_CLASS (TREE_CODE (exp)))
     {
@@ -4564,7 +4574,7 @@ expand_debug_expr (tree exp)
 
 	if (offset)
 	  {
-	    machine_mode addrmode, offmode;
+	    machine_mode addrmode, om, op1_mode;
 
 	    if (!MEM_P (op0))
 	      return NULL;
@@ -4574,22 +4584,25 @@ expand_debug_expr (tree exp)
 	    if (addrmode == VOIDmode)
 	      addrmode = Pmode;
 
+	    om = noncapability_mode (addrmode);
+
 	    op1 = expand_debug_expr (offset);
 	    if (!op1)
 	      return NULL;
 
-	    offmode = GET_MODE (op1);
-	    if (offmode == VOIDmode)
-	      offmode = TYPE_MODE (TREE_TYPE (offset));
+	    op1_mode = GET_MODE (op1);
+	    if (op1_mode == VOIDmode)
+	      op1_mode = TYPE_MODE (TREE_TYPE (offset));
 
-	    if (addrmode != offmode)
-	      op1 = lowpart_subreg (addrmode, op1, offmode);
+	    if (om != op1_mode)
+	      op1 = lowpart_subreg (om, op1, op1_mode);
 
 	    /* Don't use offset_address here, we don't need a
 	       recognizable address, and we don't want to generate
 	       code.  */
-	    op0 = gen_rtx_MEM (mode, simplify_gen_binary (PLUS, addrmode,
-							  op0, op1));
+	    op0 = gen_rtx_MEM (mode,
+			       gen_pointer_plus (as_a <scalar_addr_mode> (addrmode),
+						 op0, op1));
 	  }
 
 	if (MEM_P (op0))
@@ -4683,31 +4696,39 @@ expand_debug_expr (tree exp)
 				 inner_mode);
 
     case POINTER_PLUS_EXPR:
-      /* For the rare target where pointers are not the same size as
-	 size_t, we need to check for mis-matched modes and correct
-	 the addend.  */
+      /* For the rare target where address offsets are not the same size as
+	 size_t, we need to check for mis-matched modes and correct the addend.  */
       if (op0 && op1
-	  && is_a <scalar_int_mode> (GET_MODE (op0), &op0_mode)
+	  && is_a <scalar_addr_mode> (GET_MODE (op0), &op0_mode)
 	  && is_a <scalar_int_mode> (GET_MODE (op1), &op1_mode)
-	  && op0_mode != op1_mode)
+	  && offset_mode (op0_mode) != op1_mode)
 	{
-	  if (GET_MODE_BITSIZE (op0_mode) < GET_MODE_BITSIZE (op1_mode)
+	  /* We ultimately require offset_mode (op0_mode) == op1_mode.  */
+	  const scalar_int_mode op0_om = offset_mode (op0_mode);
+	  if (GET_MODE_BITSIZE (op0_om) < GET_MODE_BITSIZE (op1_mode)
 	      /* If OP0 is a partial mode, then we must truncate, even
 		 if it has the same bitsize as OP1 as GCC's
 		 representation of partial modes is opaque.  */
-	      || (GET_MODE_CLASS (op0_mode) == MODE_PARTIAL_INT
-		  && (GET_MODE_BITSIZE (op0_mode)
-		      == GET_MODE_BITSIZE (op1_mode))))
-	    op1 = simplify_gen_unary (TRUNCATE, op0_mode, op1, op1_mode);
+	      || (GET_MODE_CLASS (op0_om) == MODE_PARTIAL_INT
+		  && (GET_MODE_BITSIZE (op0_om) == GET_MODE_BITSIZE (op1_mode))))
+	    op1 = simplify_gen_unary (TRUNCATE, op0_om, op1, op1_mode);
 	  else
 	    /* We always sign-extend, regardless of the signedness of
 	       the operand, because the operand is always unsigned
 	       here even if the original C expression is signed.  */
-	    op1 = simplify_gen_unary (SIGN_EXTEND, op0_mode, op1, op1_mode);
+	    op1 = simplify_gen_unary (SIGN_EXTEND, op0_om, op1, op1_mode);
 	}
-      /* Fall through.  */
+
+      return gen_pointer_plus (as_a <scalar_addr_mode> (mode), op0, op1);
+
     case PLUS_EXPR:
+    {
+      // MORELLO TODO : remove these asserts later
+      gcc_assert(!(CAPABILITY_MODE_P(mode)));
+      gcc_assert(!(CAPABILITY_MODE_P(GET_MODE (op0))));
+      gcc_assert(!(CAPABILITY_MODE_P(GET_MODE (op1))));
       return simplify_gen_binary (PLUS, mode, op0, op1);
+    }
 
     case MINUS_EXPR:
     case POINTER_DIFF_EXPR:
@@ -5004,7 +5025,7 @@ expand_debug_expr (tree exp)
 						     0));
 	      if (op0 != NULL
 		  && (GET_CODE (op0) == DEBUG_IMPLICIT_PTR
-		      || (GET_CODE (op0) == PLUS
+		      || (any_plus_p (op0)
 			  && GET_CODE (XEXP (op0, 0)) == DEBUG_IMPLICIT_PTR
 			  && CONST_INT_P (XEXP (op0, 1)))))
 		{
@@ -5022,7 +5043,7 @@ expand_debug_expr (tree exp)
 	}
 
       as = TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (exp)));
-      addr_mode = SCALAR_INT_TYPE_MODE (TREE_TYPE (exp));
+      addr_mode = SCALAR_ADDR_TYPE_MODE (TREE_TYPE (exp));
       op0 = convert_debug_memory_address (addr_mode, XEXP (op0, 0), as);
 
       return op0;

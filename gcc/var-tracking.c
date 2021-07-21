@@ -739,7 +739,7 @@ stack_adjust_offset_pre_post_cb (rtx, rtx op, rtx dest, rtx src, rtx srcoff,
     case PRE_MODIFY:
     case POST_MODIFY:
       /* We handle only adjustments by constant amount.  */
-      gcc_assert (GET_CODE (src) == PLUS
+      gcc_assert (any_plus_p (src)
 		  && CONST_INT_P (XEXP (src, 1))
 		  && XEXP (src, 0) == stack_pointer_rtx);
       ((HOST_WIDE_INT *)arg)[GET_CODE (op) == POST_MODIFY]
@@ -766,7 +766,7 @@ stack_adjust_offset_pre_post (rtx pattern, HOST_WIDE_INT *pre,
     {
       /* (set (reg sp) (plus (reg sp) (const_int))) */
       code = GET_CODE (src);
-      if (! (code == PLUS || code == MINUS)
+      if (! (code == PLUS || code == POINTER_PLUS || code == MINUS)
 	  || XEXP (src, 0) != stack_pointer_rtx
 	  || !CONST_INT_P (XEXP (src, 1)))
 	return;
@@ -952,6 +952,7 @@ public:
 static bool
 use_narrower_mode_test (rtx x, const_rtx subreg)
 {
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
   subrtx_var_iterator::array_type array;
   FOR_EACH_SUBRTX_VAR (iter, array, x, NONCONST)
     {
@@ -1006,6 +1007,7 @@ use_narrower_mode_test (rtx x, const_rtx subreg)
 static rtx
 use_narrower_mode (rtx x, scalar_int_mode mode, scalar_int_mode wmode)
 {
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
   rtx op0, op1;
   if (CONSTANT_P (x))
     return lowpart_subreg (mode, x, wmode);
@@ -1149,6 +1151,8 @@ adjust_mems (rtx loc, const_rtx old_rtx, void *data)
       if (tem == NULL_RTX)
 	tem = gen_rtx_raw_SUBREG (GET_MODE (loc), addr, SUBREG_BYTE (loc));
     finish_subreg:
+    /* For Capability targets with POINTER_PLUS this is deliberately left
+       unmodified, because we don't want to try to use a narrower mode.  */
       if (MAY_HAVE_DEBUG_BIND_INSNS
 	  && GET_CODE (tem) == SUBREG
 	  && (GET_CODE (SUBREG_REG (tem)) == PLUS
@@ -2049,7 +2053,7 @@ negative_power_of_two_p (HOST_WIDE_INT i)
 static rtx
 vt_get_canonicalize_base (rtx loc)
 {
-  while ((GET_CODE (loc) == PLUS
+  while ((any_plus_p (loc)
 	  || GET_CODE (loc) == AND)
 	 && GET_CODE (XEXP (loc, 1)) == CONST_INT
 	 && (GET_CODE (loc) != AND
@@ -2192,7 +2196,7 @@ vt_canonicalize_addr (dataflow_set *set, rtx oloc)
 
   while (retry)
     {
-      while (GET_CODE (loc) == PLUS
+      while (any_plus_p (loc)
 	     && poly_int_rtx_p (XEXP (loc, 1), &term))
 	{
 	  ofst += term;
@@ -2221,7 +2225,7 @@ vt_canonicalize_addr (dataflow_set *set, rtx oloc)
 
 	  /* Consolidate plus_constants.  */
 	  while (maybe_ne (ofst, 0)
-		 && GET_CODE (loc) == PLUS
+		 && any_plus_p (loc)
 		 && poly_int_rtx_p (XEXP (loc, 1), &term))
 	    {
 	      ofst += term;
@@ -8843,7 +8847,7 @@ emit_note_insn_var_location (variable **varp, emit_note_data *data)
 		}
 	    }
 	  else if (MEM_P (loc[n_var_parts])
-		   && GET_CODE (XEXP (loc2, 0)) == PLUS
+		   && any_plus_p (XEXP (loc2, 0))
 		   && REG_P (XEXP (XEXP (loc2, 0), 0))
 		   && poly_int_rtx_p (XEXP (XEXP (loc2, 0), 1), &offset2))
 	    {
@@ -10137,7 +10141,7 @@ vt_initialize (void)
       elim = eliminate_regs (reg, VOIDmode, NULL_RTX);
       if (elim != reg)
 	{
-	  if (GET_CODE (elim) == PLUS)
+	  if (any_plus_p (elim))
 	    elim = XEXP (elim, 0);
 	  if (elim == stack_pointer_rtx)
 	    vt_init_cfa_base ();
@@ -10157,7 +10161,7 @@ vt_initialize (void)
       elim = eliminate_regs (reg, VOIDmode, NULL_RTX);
       if (elim != reg)
 	{
-	  if (GET_CODE (elim) == PLUS)
+	  if (any_plus_p (elim))
 	    {
 	      fp_cfa_offset -= rtx_to_poly_int64 (XEXP (elim, 1));
 	      elim = XEXP (elim, 0);
@@ -10189,7 +10193,7 @@ vt_initialize (void)
       elim = eliminate_regs (reg, VOIDmode, NULL_RTX);
       if (elim != reg)
 	{
-	  if (GET_CODE (elim) == PLUS)
+	  if (any_plus_p (elim))
 	    elim = XEXP (elim, 0);
 	  if (elim == hard_frame_pointer_rtx)
 	    vt_init_cfa_base ();

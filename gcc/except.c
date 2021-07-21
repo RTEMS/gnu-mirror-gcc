@@ -2230,6 +2230,16 @@ expand_builtin_frob_return_addr (tree addr_tree)
   return addr;
 }
 
+static rtx
+convert_to_offset_mode (rtx x)
+{
+#ifndef POINTERS_EXTEND_UNSIGNED
+  gcc_assert (GET_MODE (x) == POmode || GET_MODE (x) == VOIDmode);
+  return x;
+#endif
+  return convert_to_mode (POmode, x, POINTERS_EXTEND_UNSIGNED);
+}
+
 /* Set up the epilogue with the magic bits we'll need to return to the
    exception handler.  */
 
@@ -2242,9 +2252,9 @@ expand_builtin_eh_return (tree stackadj_tree ATTRIBUTE_UNUSED,
 #ifdef EH_RETURN_STACKADJ_RTX
   tmp = expand_expr (stackadj_tree, crtl->eh.ehr_stackadj,
 		     VOIDmode, EXPAND_NORMAL);
-  tmp = convert_memory_address (Pmode, tmp);
+  tmp = convert_to_offset_mode (tmp);
   if (!crtl->eh.ehr_stackadj)
-    crtl->eh.ehr_stackadj = copy_addr_to_reg (tmp);
+    crtl->eh.ehr_stackadj = copy_to_mode_reg (POmode, tmp);
   else if (tmp != crtl->eh.ehr_stackadj)
     emit_move_insn (crtl->eh.ehr_stackadj, tmp);
 #endif

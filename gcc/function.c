@@ -516,12 +516,12 @@ assign_stack_local_1 (machine_mode mode, poly_int64 size,
     addr = plus_constant (Pmode, frame_pointer_rtx,
 			  trunc_int_for_mode
 			  (slot_offset + bigend_correction
-			   + targetm.starting_frame_offset (), Pmode));
+			   + targetm.starting_frame_offset (), POmode));
   else
     addr = plus_constant (Pmode, virtual_stack_vars_rtx,
 			  trunc_int_for_mode
 			  (slot_offset + bigend_correction,
-			   Pmode));
+			   POmode));
 
   x = gen_rtx_MEM (mode, addr);
   set_mem_align (x, alignment_in_bits);
@@ -753,10 +753,10 @@ find_temp_slot_from_address (rtx x)
 
   /* If we have a sum involving a register, see if it points to a temp
      slot.  */
-  if (GET_CODE (x) == PLUS && REG_P (XEXP (x, 0))
+  if (any_plus_p (x) && REG_P (XEXP (x, 0))
       && (p = find_temp_slot_from_address (XEXP (x, 0))) != 0)
     return p;
-  else if (GET_CODE (x) == PLUS && REG_P (XEXP (x, 1))
+  else if (any_plus_p (x) && REG_P (XEXP (x, 1))
 	   && (p = find_temp_slot_from_address (XEXP (x, 1))) != 0)
     return p;
 
@@ -1111,7 +1111,7 @@ update_temp_slot_address (rtx old_rtx, rtx new_rtx)
      values.  */
   if (p == 0)
     {
-      if (GET_CODE (old_rtx) != PLUS)
+      if (!any_plus_p (old_rtx))
 	return;
 
       if (REG_P (new_rtx))
@@ -1120,7 +1120,7 @@ update_temp_slot_address (rtx old_rtx, rtx new_rtx)
 	  update_temp_slot_address (XEXP (old_rtx, 1), new_rtx);
 	  return;
 	}
-      else if (GET_CODE (new_rtx) != PLUS)
+      else if (!any_plus_p (new_rtx))
 	return;
 
       if (rtx_equal_p (XEXP (old_rtx, 0), XEXP (new_rtx, 0)))
@@ -1562,6 +1562,7 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	{
 	  start_sequence ();
 
+	  /* MORELLO TODO: do we need to update this for capabilities?  */
 	  instantiate_virtual_regs_in_rtx (&SET_SRC (set));
 	  x = simplify_gen_binary (PLUS, GET_MODE (new_rtx), SET_SRC (set),
 				   gen_int_mode (-offset, GET_MODE (new_rtx)));
@@ -1589,9 +1590,9 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	{
 	  start_sequence ();
 
-	  x = expand_simple_binop (GET_MODE (SET_DEST (set)), PLUS, new_rtx,
-				   gen_int_mode (offset,
-						 GET_MODE (SET_DEST (set))),
+	  const auto sa = as_a <scalar_addr_mode> (GET_MODE (SET_DEST (set)));
+	  x = expand_pointer_plus (sa, new_rtx,
+				   gen_int_mode (offset, offset_mode (sa)),
 				   SET_DEST (set), 1, OPTAB_LIB_WIDEN);
 	  if (x != SET_DEST (set))
 	    emit_move_insn (SET_DEST (set), x);
@@ -1608,7 +1609,9 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
       insn_code = INSN_CODE (insn);
 
       /* Handle a plus involving a virtual register by determining if the
-	 operands remain valid if they're modified in place.  */
+	 operands remain valid if they're modified in place.
+
+	 MORELLO TODO: any_plus_p?  */
       poly_int64 delta;
       if (GET_CODE (SET_SRC (set)) == PLUS
 	  && recog_data.n_operands >= 3
@@ -1710,6 +1713,7 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	      /* ??? Recognize address_operand and/or "p" constraints
 		 to see if (plus new offset) is a valid before we put
 		 this through expand_simple_binop.  */
+	      /* MORELLO TODO: update for capabilities?  */
 	      x = expand_simple_binop (GET_MODE (x), PLUS, new_rtx,
 				       gen_int_mode (offset, GET_MODE (x)),
 				       NULL_RTX, 1, OPTAB_LIB_WIDEN);
@@ -1726,6 +1730,7 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	  if (maybe_ne (offset, 0))
 	    {
 	      start_sequence ();
+	      /* MORELLO TODO: expand_pointer_plus?  */
 	      new_rtx = expand_simple_binop
 		(GET_MODE (new_rtx), PLUS, new_rtx,
 		 gen_int_mode (offset, GET_MODE (new_rtx)),
@@ -2663,7 +2668,7 @@ assign_parm_find_stack_rtl (tree parm, struct assign_parm_data_one *data)
 
   stack_parm = crtl->args.internal_arg_pointer;
   if (offset_rtx != const0_rtx)
-    stack_parm = gen_rtx_PLUS (Pmode, stack_parm, offset_rtx);
+    stack_parm = gen_pointer_plus (Pmode, stack_parm, offset_rtx);
   stack_parm = gen_rtx_MEM (data->arg.mode, stack_parm);
 
   if (!data->arg.pass_by_reference)
@@ -2931,7 +2936,7 @@ assign_parm_setup_block (struct assign_parm_data_all *all,
       SET_DECL_ALIGN (parm, parm_align);
       if (DECL_ALIGN (parm) > MAX_SUPPORTED_STACK_ALIGNMENT)
 	{
-	  rtx allocsize = gen_int_mode (size_stored, Pmode);
+	  rtx allocsize = gen_int_mode (size_stored, POmode);
 	  get_dynamic_stack_size (&allocsize, 0, DECL_ALIGN (parm), NULL);
 	  stack_parm = assign_stack_local (BLKmode, UINTVAL (allocsize),
 					   MAX_SUPPORTED_STACK_ALIGNMENT);
@@ -3768,7 +3773,7 @@ assign_parms (tree fndecl)
     {
       crtl->args.arg_offset_rtx
 	= (all.stack_args_size.var == 0
-	   ? gen_int_mode (-all.stack_args_size.constant, Pmode)
+	   ? gen_int_mode (-all.stack_args_size.constant, POmode)
 	   : expand_expr (size_diffop (all.stack_args_size.var,
 				       size_int (-all.stack_args_size.constant)),
 			  NULL_RTX, VOIDmode, EXPAND_NORMAL));
@@ -5491,7 +5496,7 @@ expand_function_end (void)
       REG_FUNCTION_VALUE_P (outgoing) = 1;
 
       /* The address may be ptr_mode and OUTGOING may be Pmode.  */
-      scalar_int_mode mode = as_a <scalar_int_mode> (GET_MODE (outgoing));
+      scalar_addr_mode mode = as_a <scalar_addr_mode> (GET_MODE (outgoing));
       value_address = convert_memory_address (mode, value_address);
 
       emit_move_insn (outgoing, value_address);

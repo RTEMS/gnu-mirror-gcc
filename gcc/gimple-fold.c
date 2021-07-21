@@ -222,7 +222,7 @@ canonicalize_constructor_val (tree cval, tree from_decl)
 			   ADDR_EXPR, TREE_TYPE (ptr),
 			   fold_build2 (MEM_REF, TREE_TYPE (TREE_TYPE (ptr)),
 					ptr,
-					fold_convert (ptr_type_node,
+					fold_convert_for_mem_ref (ptr_type_node,
 						      TREE_OPERAND (cval, 1))));
     }
   if (TREE_CODE (cval) == ADDR_EXPR)
@@ -686,6 +686,19 @@ size_must_be_zero_p (tree size)
   return vr.zero_p ();
 }
 
+/* Return a type that can be used to copy a BITS sized area around in memory.
+   This is an integer unless there are capabilities of that size.
+   When there are capability types of that size we use them to ensure that
+   hidden validity bits are not lost.  */
+tree
+bucket_type_for_size (unsigned int bits, int unsignedp)
+{
+  tree ret = lang_hooks.types.cap_type_for_size (bits, unsignedp);
+  return ret && (TYPE_CAP_PRECISION (ret) == bits)
+	  ? ret
+	  : lang_hooks.types.type_for_size (bits, unsignedp);
+}
+
 /* Fold function call to builtin mem{{,p}cpy,move}.  Try to detect and
    diagnose (otherwise undefined) overlapping copies without preventing
    folding.  When folded, GCC guarantees that overlapping memcpy has
@@ -798,7 +811,7 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 		  return false;
 
 	      scalar_int_mode mode;
-	      tree type = lang_hooks.types.type_for_size (ilen * 8, 1);
+	      tree type = bucket_type_for_size (ilen * 8, 1);
 	      if (type
 		  && is_a <scalar_int_mode> (TYPE_MODE (type), &mode)
 		  && GET_MODE_SIZE (mode) * BITS_PER_UNIT == ilen * 8
@@ -1272,9 +1285,9 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
     return NULL_TREE;
 
   length = tree_to_uhwi (len);
-  if (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (etype)) != length
-      || (GET_MODE_PRECISION (SCALAR_INT_TYPE_MODE (etype))
-	  != GET_MODE_BITSIZE (SCALAR_INT_TYPE_MODE (etype)))
+  if (GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (etype)) != length
+      || (GET_MODE_PRECISION (SCALAR_ADDR_TYPE_MODE (etype))
+	  != GET_MODE_BITSIZE (SCALAR_ADDR_TYPE_MODE (etype)))
       || get_pointer_alignment (dest) / BITS_PER_UNIT < length)
     return NULL_TREE;
 
@@ -1282,7 +1295,7 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
     return NULL_TREE;
 
   if (!type_has_mode_precision_p (etype))
-    etype = lang_hooks.types.type_for_mode (SCALAR_INT_TYPE_MODE (etype),
+    etype = lang_hooks.types.type_for_mode (SCALAR_ADDR_TYPE_MODE (etype),
 					    TYPE_UNSIGNED (etype));
 
   if (integer_zerop (c))
@@ -4946,9 +4959,9 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
 	    }
 
 	  TREE_OPERAND (*t, 0) = build_fold_addr_expr (base);
-	  TREE_OPERAND (*t, 1) = int_const_binop (PLUS_EXPR,
-						  TREE_OPERAND (*t, 1),
-						  size_int (coffset));
+	  TREE_OPERAND (*t, 1) = maybe_cap_int_const_binop (PLUS_EXPR,
+							   TREE_OPERAND (*t, 1),
+							   size_int (coffset));
 	  res = true;
 	}
       gcc_checking_assert (TREE_CODE (TREE_OPERAND (*t, 0)) == DEBUG_EXPR_DECL
@@ -6492,7 +6505,7 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 		if (TREE_CODE (op0) == ADDR_EXPR
 		    && TREE_CODE (op1) == INTEGER_CST)
 		  {
-		    tree off = fold_convert (ptr_type_node, op1);
+		    tree off = fold_convert_for_mem_ref (ptr_type_node, op1);
 		    return build1_loc
 			(loc, ADDR_EXPR, TREE_TYPE (op0),
 			 fold_build2 (MEM_REF,

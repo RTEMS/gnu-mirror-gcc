@@ -58,16 +58,19 @@ typedef struct rtx_def *rtx;
 typedef const struct rtx_def *const_rtx;
 class scalar_mode;
 class scalar_int_mode;
+class scalar_addr_mode;
 class scalar_float_mode;
 class complex_mode;
 class fixed_size_mode;
 template<typename> class opt_mode;
 typedef opt_mode<scalar_mode> opt_scalar_mode;
 typedef opt_mode<scalar_int_mode> opt_scalar_int_mode;
+typedef opt_mode<scalar_addr_mode> opt_scalar_addr_mode;
 typedef opt_mode<scalar_float_mode> opt_scalar_float_mode;
 template<typename> struct pod_mode;
 typedef pod_mode<scalar_mode> scalar_mode_pod;
 typedef pod_mode<scalar_int_mode> scalar_int_mode_pod;
+typedef pod_mode<scalar_addr_mode> scalar_addr_mode_pod;
 typedef pod_mode<fixed_size_mode> fixed_size_mode_pod;
 
 /* Subclasses of rtx_def, using indentation to show the class

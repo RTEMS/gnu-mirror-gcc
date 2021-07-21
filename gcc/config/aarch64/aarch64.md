@@ -460,7 +460,7 @@
 ;; -------------------------------------------------------------------
 
 (define_insn "indirect_jump"
-  [(set (pc) (match_operand:DI 0 "register_operand" "r"))]
+  [(set (pc) (match_operand 0 "pmode_register_operand" "r"))]
   ""
   {
     output_asm_insn ("br\\t%0", operands);
@@ -749,37 +749,38 @@
 						 const0_rtx),
 				    operands[0], operands[2], operands[4]));
 
-    operands[2] = force_reg (DImode, gen_rtx_LABEL_REF (DImode, operands[3]));
+    operands[2] = force_reg (Pmode, gen_rtx_LABEL_REF (Pmode, operands[3]));
     operands[2]
       = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, operands[2], operands[0]),
 			UNSPEC_CASESI);
-    operands[2] = gen_rtx_MEM (DImode, operands[2]);
+    operands[2] = gen_rtx_MEM (Pmode, operands[2]);
     MEM_READONLY_P (operands[2]) = 1;
     MEM_NOTRAP_P (operands[2]) = 1;
-    emit_jump_insn (gen_casesi_dispatch (operands[2], operands[3]));
+
+    emit_jump_insn (gen_casesi_dispatch (Pmode, operands[2], operands[3]));
     DONE;
   }
 )
 
-(define_expand "casesi_dispatch"
+(define_expand "@casesi_dispatch<mode>"
   [(parallel
-    [(set (pc) (match_operand:DI 0 ""))
+    [(set (pc) (match_operand:ADDR 0 ""))
      (clobber (reg:CC CC_REGNUM))
      (clobber (match_scratch:DI 2))
      (clobber (match_scratch:DI 3))
-     (use (label_ref:DI (match_operand 1 "")))])]
+     (use (label_ref:ADDR (match_operand 1 "")))])]
   "")
 
 (define_insn "*casesi_dispatch"
   [(parallel
     [(set (pc)
-	  (mem:DI (unspec [(match_operand:DI 0 "register_operand" "r")
-			   (match_operand:SI 1 "register_operand" "r")]
+	  (mem:ADDR (unspec [(match_operand:ADDR 0 "register_operand" "r")
+			     (match_operand:SI 1 "register_operand" "r")]
 			UNSPEC_CASESI)))
      (clobber (reg:CC CC_REGNUM))
      (clobber (match_scratch:DI 3 "=r"))
      (clobber (match_scratch:DI 4 "=r"))
-     (use (label_ref:DI (match_operand 2 "" "")))])]
+     (use (label_ref:ADDR (match_operand 2 "" "")))])]
   ""
   "*
   return aarch64_output_casesi (operands);
@@ -1022,10 +1023,10 @@
 )
 
 (define_insn "*call_insn"
-  [(call (mem:DI (match_operand:DI 0 "aarch64_call_insn_operand" "Ucr, Usf"))
+  [(call (mem:DI (match_operand:ADDR 0 "aarch64_call_insn_operand" "Ucr, Usf"))
 	 (match_operand 1 "" ""))
    (unspec:DI [(match_operand:DI 2 "const_int_operand")] UNSPEC_CALLEE_ABI)
-   (clobber (reg:DI LR_REGNUM))]
+   (clobber (reg:ADDR LR_REGNUM))]
   ""
   "@
   * return aarch64_indirect_call_asm (operands[0]);
@@ -1049,10 +1050,10 @@
 
 (define_insn "*call_value_insn"
   [(set (match_operand 0 "" "")
-	(call (mem:DI (match_operand:DI 1 "aarch64_call_insn_operand" "Ucr, Usf"))
+	(call (mem:DI (match_operand:ADDR 1 "aarch64_call_insn_operand" "Ucr, Usf"))
 		      (match_operand 2 "" "")))
    (unspec:DI [(match_operand:DI 3 "const_int_operand")] UNSPEC_CALLEE_ABI)
-   (clobber (reg:DI LR_REGNUM))]
+   (clobber (reg:ADDR LR_REGNUM))]
   ""
   "@
   * return aarch64_indirect_call_asm (operands[1]);
@@ -1088,7 +1089,7 @@
 )
 
 (define_insn "*sibcall_insn"
-  [(call (mem:DI (match_operand:DI 0 "aarch64_call_insn_operand" "Ucs, Usf"))
+  [(call (mem:DI (match_operand:ADDR 0 "aarch64_call_insn_operand" "Ucs, Usf"))
 	 (match_operand 1 ""))
    (unspec:DI [(match_operand:DI 2 "const_int_operand")] UNSPEC_CALLEE_ABI)
    (return)]
@@ -1108,7 +1109,7 @@
 (define_insn "*sibcall_value_insn"
   [(set (match_operand 0 "")
 	(call (mem:DI
-		(match_operand:DI 1 "aarch64_call_insn_operand" "Ucs, Usf"))
+		(match_operand:ADDR 1 "aarch64_call_insn_operand" "Ucs, Usf"))
 	      (match_operand 2 "")))
    (unspec:DI [(match_operand:DI 3 "const_int_operand")] UNSPEC_CALLEE_ABI)
    (return)]
@@ -1216,8 +1217,8 @@
 )
 
 (define_expand "mov<mode>"
-  [(set (match_operand:GPI 0 "nonimmediate_operand")
-	(match_operand:GPI 1 "general_operand"))]
+  [(set (match_operand:GPIC 0 "nonimmediate_operand")
+	(match_operand:GPIC 1 "general_operand"))]
   ""
   "
     if (MEM_P (operands[0]) && !MEM_VOLATILE_P (operands[0])
@@ -1664,46 +1665,54 @@
 
 ;; Load pair with post-index writeback.  This is primarily used in function
 ;; epilogues.
-(define_insn "loadwb_pair<GPI:mode>_<P:mode>"
+;;
+;; MORELLO TODO: pure-cap.
+(define_insn "@loadwb_pair<GPI:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
+    [(set (match_operand:ADDR 0 "register_operand" "=k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
      (set (match_operand:GPI 2 "register_operand" "=r")
           (mem:GPI (match_dup 1)))
      (set (match_operand:GPI 3 "register_operand" "=r")
-          (mem:GPI (plus:P (match_dup 1)
-                   (match_operand:P 5 "const_int_operand" "n"))))])]
+          (mem:GPI (<ADDR:PLUS>:ADDR
+		     (match_dup 1)
+		     (match_operand:DI 5 "const_int_operand" "n"))))])]
   "INTVAL (operands[5]) == GET_MODE_SIZE (<GPI:MODE>mode)"
   "ldp\\t%<GPI:w>2, %<GPI:w>3, [%1], %4"
   [(set_attr "type" "load_<GPI:ldpstp_sz>")]
 )
 
-(define_insn "loadwb_pair<GPF:mode>_<P:mode>"
+(define_insn "@loadwb_pair<GPF:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
+    [(set (match_operand:ADDR 0 "register_operand" "=k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+            (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
      (set (match_operand:GPF 2 "register_operand" "=w")
           (mem:GPF (match_dup 1)))
      (set (match_operand:GPF 3 "register_operand" "=w")
-          (mem:GPF (plus:P (match_dup 1)
-                   (match_operand:P 5 "const_int_operand" "n"))))])]
+          (mem:GPF (<ADDR:PLUS>:ADDR
+		     (match_dup 1)
+		     (match_operand:DI 5 "const_int_operand" "n"))))])]
   "INTVAL (operands[5]) == GET_MODE_SIZE (<GPF:MODE>mode)"
   "ldp\\t%<GPF:w>2, %<GPF:w>3, [%1], %4"
   [(set_attr "type" "neon_load1_2reg")]
 )
 
-(define_insn "loadwb_pair<TX:mode>_<P:mode>"
+(define_insn "@loadwb_pair<TX:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
+    [(set (match_operand:ADDR 0 "register_operand" "=k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
      (set (match_operand:TX 2 "register_operand" "=w")
           (mem:TX (match_dup 1)))
      (set (match_operand:TX 3 "register_operand" "=w")
-          (mem:TX (plus:P (match_dup 1)
-			  (match_operand:P 5 "const_int_operand" "n"))))])]
+          (mem:TX (<ADDR:PLUS>:ADDR
+		    (match_dup 1)
+		    (match_operand:DI 5 "const_int_operand" "n"))))])]
   "TARGET_SIMD && INTVAL (operands[5]) == GET_MODE_SIZE (<TX:MODE>mode)"
   "ldp\\t%q2, %q3, [%1], %4"
   [(set_attr "type" "neon_ldp_q")]
@@ -1711,48 +1720,53 @@
 
 ;; Store pair with pre-index writeback.  This is primarily used in function
 ;; prologues.
-(define_insn "storewb_pair<GPI:mode>_<P:mode>"
+;;
+;; MORELLO TODO: pure-cap.
+(define_insn "@storewb_pair<GPI:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=&k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
-     (set (mem:GPI (plus:P (match_dup 0)
-                   (match_dup 4)))
+    [(set (match_operand:ADDR 0 "register_operand" "=&k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
+     (set (mem:GPI (<ADDR:PLUS>:ADDR (match_dup 0) (match_dup 4)))
           (match_operand:GPI 2 "register_operand" "r"))
-     (set (mem:GPI (plus:P (match_dup 0)
-                   (match_operand:P 5 "const_int_operand" "n")))
+     (set (mem:GPI (<ADDR:PLUS>:ADDR
+		     (match_dup 0)
+		     (match_operand:DI 5 "const_int_operand" "n")))
           (match_operand:GPI 3 "register_operand" "r"))])]
   "INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
   "stp\\t%<GPI:w>2, %<GPI:w>3, [%0, %4]!"
   [(set_attr "type" "store_<GPI:ldpstp_sz>")]
 )
 
-(define_insn "storewb_pair<GPF:mode>_<P:mode>"
+(define_insn "@storewb_pair<GPF:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=&k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
-     (set (mem:GPF (plus:P (match_dup 0)
-                   (match_dup 4)))
+    [(set (match_operand:ADDR 0 "register_operand" "=&k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
+     (set (mem:GPF (<ADDR:PLUS>:ADDR (match_dup 0) (match_dup 4)))
           (match_operand:GPF 2 "register_operand" "w"))
-     (set (mem:GPF (plus:P (match_dup 0)
-                   (match_operand:P 5 "const_int_operand" "n")))
+     (set (mem:GPF (<ADDR:PLUS>:ADDR
+		     (match_dup 0)
+		     (match_operand:DI 5 "const_int_operand" "n")))
           (match_operand:GPF 3 "register_operand" "w"))])]
   "INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPF:MODE>mode)"
   "stp\\t%<GPF:w>2, %<GPF:w>3, [%0, %4]!"
   [(set_attr "type" "neon_store1_2reg<q>")]
 )
 
-(define_insn "storewb_pair<TX:mode>_<P:mode>"
+(define_insn "@storewb_pair<TX:mode>_<ADDR:mode>"
   [(parallel
-    [(set (match_operand:P 0 "register_operand" "=&k")
-          (plus:P (match_operand:P 1 "register_operand" "0")
-                  (match_operand:P 4 "aarch64_mem_pair_offset" "n")))
-     (set (mem:TX (plus:P (match_dup 0)
-			  (match_dup 4)))
+    [(set (match_operand:ADDR 0 "register_operand" "=&k")
+          (<ADDR:PLUS>:ADDR
+	    (match_operand:ADDR 1 "register_operand" "0")
+            (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
+     (set (mem:TX (<ADDR:PLUS>:ADDR (match_dup 0) (match_dup 4)))
           (match_operand:TX 2 "register_operand" "w"))
-     (set (mem:TX (plus:P (match_dup 0)
-			  (match_operand:P 5 "const_int_operand" "n")))
+     (set (mem:TX (<ADDR:PLUS>:ADDR
+		    (match_dup 0)
+		    (match_operand:DI 5 "const_int_operand" "n")))
           (match_operand:TX 3 "register_operand" "w"))])]
   "TARGET_SIMD
    && INTVAL (operands[5])
@@ -6793,16 +6807,11 @@
   ""
 {
   machine_mode mode = GET_MODE (operands[0]);
-
-  emit_insn ((mode == DImode
-	      ? gen_add_losym_di
-	      : gen_add_losym_si) (operands[0],
-				   operands[1],
-				   operands[2]));
+  emit_insn (gen_add_losym (mode, operands[0], operands[1], operands[2]));
   DONE;
 })
 
-(define_insn "add_losym_<mode>"
+(define_insn "@add_losym_<mode>"
   [(set (match_operand:P 0 "register_operand" "=r")
 	(lo_sum:P (match_operand:P 1 "register_operand" "r")
 		  (match_operand 2 "aarch64_valid_symref" "S")))]
@@ -6811,7 +6820,7 @@
   [(set_attr "type" "alu_imm")]
 )
 
-(define_insn "ldr_got_small_<mode>"
+(define_insn "@ldr_got_small_<mode>"
   [(set (match_operand:PTR 0 "register_operand" "=r")
 	(unspec:PTR [(mem:PTR (lo_sum:PTR
 			      (match_operand:PTR 1 "register_operand" "r")
@@ -6834,7 +6843,7 @@
   [(set_attr "type" "load_4")]
 )
 
-(define_insn "ldr_got_small_28k_<mode>"
+(define_insn "@ldr_got_small_28k_<mode>"
   [(set (match_operand:PTR 0 "register_operand" "=r")
 	(unspec:PTR [(mem:PTR (lo_sum:PTR
 			      (match_operand:PTR 1 "register_operand" "r")
@@ -6876,9 +6885,9 @@
   [(set_attr "type" "load_4")]
 )
 
-(define_insn "aarch64_load_tp_hard"
-  [(set (match_operand:DI 0 "register_operand" "=r")
-	(unspec:DI [(const_int 0)] UNSPEC_TLS))]
+(define_insn "@aarch64_load_tp_hard_<mode>"
+  [(set (match_operand:ADDR 0 "register_operand" "=r")
+	(unspec:ADDR [(const_int 0)] UNSPEC_TLS))]
   ""
   "mrs\\t%0, tpidr_el0"
   [(set_attr "type" "mrs")]
@@ -6910,11 +6919,13 @@
   [(set_attr "type" "call")
    (set_attr "length" "16")])
 
-(define_insn "tlsie_small_<mode>"
-  [(set (match_operand:PTR 0 "register_operand" "=r")
-        (unspec:PTR [(match_operand 1 "aarch64_tls_ie_symref" "S")]
+(define_insn "@tlsie_small_<mode>"
+  [(set (match_operand:<PTR_OFF> 0 "register_operand" "=r")
+        (unspec:<PTR_OFF>
+	  [(match_operand 1 "aarch64_tls_ie_symref" "S")
+	   (match_operand:PTR 2 "register_operand" "r")]
 		   UNSPEC_GOTSMALLTLS))]
-  ""
+  "aarch64_lowpart_regs_p (operands[0], operands[2])"
   "adrp\\t%0, %A1\;ldr\\t%<w>0, [%0, #%L1]"
   [(set_attr "type" "load_4")
    (set_attr "length" "8")]
@@ -6931,7 +6942,7 @@
    (set_attr "length" "8")]
 )
 
-(define_insn "tlsie_tiny_<mode>"
+(define_insn "@tlsie_tiny_<mode>"
   [(set (match_operand:PTR 0 "register_operand" "=&r")
 	(unspec:PTR [(match_operand 1 "aarch64_tls_ie_symref" "S")
 		     (match_operand:PTR 2 "register_operand" "r")]
@@ -6955,7 +6966,7 @@
    (set_attr "length" "8")]
 )
 
-(define_insn "tlsle12_<mode>"
+(define_insn "@tlsle12_<mode>"
   [(set (match_operand:P 0 "register_operand" "=r")
 	(unspec:P [(match_operand:P 1 "register_operand" "r")
 		   (match_operand 2 "aarch64_tls_le_symref" "S")]
@@ -6966,7 +6977,7 @@
    (set_attr "length" "4")]
 )
 
-(define_insn "tlsle24_<mode>"
+(define_insn "@tlsle24_<mode>"
   [(set (match_operand:P 0 "register_operand" "=r")
 	(unspec:P [(match_operand:P 1 "register_operand" "r")
 		   (match_operand 2 "aarch64_tls_le_symref" "S")]
@@ -6977,7 +6988,7 @@
    (set_attr "length" "8")]
 )
 
-(define_insn "tlsle32_<mode>"
+(define_insn "@tlsle32_<mode>"
   [(set (match_operand:P 0 "register_operand" "=r")
 	(unspec:P [(match_operand 1 "aarch64_tls_le_symref" "S")]
 		   UNSPEC_TLSLE32))]
@@ -6987,7 +6998,7 @@
    (set_attr "length" "8")]
 )
 
-(define_insn "tlsle48_<mode>"
+(define_insn "@tlsle48_<mode>"
   [(set (match_operand:P 0 "register_operand" "=r")
 	(unspec:P [(match_operand 1 "aarch64_tls_le_symref" "S")]
 		   UNSPEC_TLSLE48))]
@@ -6997,7 +7008,7 @@
    (set_attr "length" "12")]
 )
 
-(define_expand "tlsdesc_small_<mode>"
+(define_expand "@tlsdesc_small_<mode>"
   [(unspec:PTR [(match_operand 0 "aarch64_valid_symref")] UNSPEC_TLSDESC)]
   "TARGET_TLS_DESC"
   {
@@ -7020,10 +7031,10 @@
   [(set (reg:PTR R0_REGNUM)
         (unspec:PTR [(match_operand 0 "aarch64_valid_symref" "S")]
 		    UNSPEC_TLSDESC))
-   (clobber (reg:DI LR_REGNUM))
+   (clobber (reg:<P_OF_PTR> LR_REGNUM))
    (clobber (reg:CC CC_REGNUM))
-   (clobber (match_scratch:DI 1 "=r"))
-   (use (reg:DI FP_REGNUM))]
+   (clobber (match_scratch:<P_OF_PTR> 1 "=r"))
+   (use (reg:<P_OF_PTR> FP_REGNUM))]
   "TARGET_TLS_DESC && !TARGET_SVE"
   "adrp\\tx0, %A0\;ldr\\t%<w>1, [x0, #%L0]\;add\\t<w>0, <w>0, %L0\;.tlsdesccall\\t%0\;blr\\t%1"
   [(set_attr "type" "call")
@@ -7048,8 +7059,8 @@
 
 (define_insn "stack_tie"
   [(set (mem:BLK (scratch))
-	(unspec:BLK [(match_operand:DI 0 "register_operand" "rk")
-		     (match_operand:DI 1 "register_operand" "rk")]
+	(unspec:BLK [(match_operand 0 "pmode_register_operand" "rk")
+		     (match_operand 1 "pmode_register_operand" "rk")]
 		    UNSPEC_PRLG_STK))]
   ""
   ""
@@ -7110,10 +7121,10 @@
    (set_attr "type" "block")]
 )
 
-(define_insn "probe_stack_range"
-  [(set (match_operand:DI 0 "register_operand" "=rk")
-	(unspec_volatile:DI [(match_operand:DI 1 "register_operand" "0")
-			     (match_operand:DI 2 "register_operand" "r")]
+(define_insn "probe_stack_range_<mode>"
+  [(set (match_operand:ADDR 0 "register_operand" "=rk")
+	(unspec_volatile:ADDR [(match_operand:ADDR 1 "register_operand" "0")
+			       (match_operand:ADDR 2 "register_operand" "r")]
 			      UNSPECV_PROBE_STACK_RANGE))]
   ""
 {
@@ -7126,6 +7137,8 @@
 ;; probing loop.  We can't change the control flow during prologue and epilogue
 ;; code generation.  So we must emit a volatile unspec and expand it later on.
 
+;; MORELLO TODO The pattern here uses Pmode for everything, but the
+;; min_probe_threshold, adjustment, and guard_size should all be in POmode.
 (define_insn "@probe_sve_stack_clash_<mode>"
   [(set (match_operand:P 0 "register_operand" "=rk")
 	(unspec_volatile:P [(match_operand:P 1 "register_operand" "0")
@@ -7163,29 +7176,17 @@
   {
     /* Generate access through the system register.  */
     rtx tmp_reg = gen_reg_rtx (mode);
-    if (mode == DImode)
-    {
-        emit_insn (gen_reg_stack_protect_address_di (tmp_reg));
-        emit_insn (gen_adddi3 (tmp_reg, tmp_reg,
-			       GEN_INT (aarch64_stack_protector_guard_offset)));
-    }
-    else
-    {
-	emit_insn (gen_reg_stack_protect_address_si (tmp_reg));
-	emit_insn (gen_addsi3 (tmp_reg, tmp_reg,
-			       GEN_INT (aarch64_stack_protector_guard_offset)));
-
-    }
+    emit_insn (gen_reg_stack_protect_address (mode, tmp_reg));
+    emit_insn (gen_add3_insn (tmp_reg, tmp_reg,
+			      GEN_INT (aarch64_stack_protector_guard_offset)));
     operands[1] = gen_rtx_MEM (mode, tmp_reg);
   }
-  
-  emit_insn ((mode == DImode
-	      ? gen_stack_protect_set_di
-	      : gen_stack_protect_set_si) (operands[0], operands[1]));
+
+  emit_insn (gen_stack_protect_set (mode, operands[0], operands[1]));
   DONE;
 })
 
-(define_insn "reg_stack_protect_address_<mode>"
+(define_insn "@reg_stack_protect_address_<mode>"
  [(set (match_operand:PTR 0 "register_operand" "=r")
        (unspec:PTR [(const_int 0)]
 	UNSPEC_SSP_SYSREG))]
@@ -7201,7 +7202,7 @@
 
 ;; DO NOT SPLIT THIS PATTERN.  It is important for security reasons that the
 ;; canary value does not live beyond the life of this sequence.
-(define_insn "stack_protect_set_<mode>"
+(define_insn "@stack_protect_set_<mode>"
   [(set (match_operand:PTR 0 "memory_operand" "=m")
 	(unspec:PTR [(match_operand:PTR 1 "memory_operand" "m")]
 	 UNSPEC_SP_SET))
@@ -7227,24 +7228,13 @@
        mrs scratch_reg, <system_register>
        add scratch_reg, scratch_reg, :lo12:offset. */
     rtx tmp_reg = gen_reg_rtx (mode);
-    if (mode == DImode)
-    {
-       emit_insn (gen_reg_stack_protect_address_di (tmp_reg));
-       emit_insn (gen_adddi3 (tmp_reg, tmp_reg,
-       		              GEN_INT (aarch64_stack_protector_guard_offset)));
-    }
-    else
-    {
-	emit_insn (gen_reg_stack_protect_address_si (tmp_reg));
-	emit_insn (gen_addsi3 (tmp_reg, tmp_reg,
-			       GEN_INT (aarch64_stack_protector_guard_offset)));
 
-    }
+    emit_insn (gen_reg_stack_protect_address (mode, tmp_reg));
+    emit_insn (gen_add3_insn (tmp_reg, tmp_reg,
+			      GEN_INT (aarch64_stack_protector_guard_offset)));
     operands[1] = gen_rtx_MEM (mode, tmp_reg);
   }
-  emit_insn ((mode == DImode
-	     ? gen_stack_protect_test_di
-	     : gen_stack_protect_test_si) (operands[0], operands[1]));
+  emit_insn (gen_stack_protect_test (mode, operands[0], operands[1]));
 
   rtx cc_reg = gen_rtx_REG (CCmode, CC_REGNUM);
   emit_jump_insn (gen_condjump (gen_rtx_EQ (VOIDmode, cc_reg, const0_rtx),
@@ -7254,7 +7244,7 @@
 
 ;; DO NOT SPLIT THIS PATTERN.  It is important for security reasons that the
 ;; canary value does not live beyond the end of this sequence.
-(define_insn "stack_protect_test_<mode>"
+(define_insn "@stack_protect_test_<mode>"
   [(set (reg:CC CC_REGNUM)
 	(unspec:CC [(match_operand:PTR 0 "memory_operand" "m")
 		    (match_operand:PTR 1 "memory_operand" "m")]
@@ -7651,3 +7641,6 @@
 
 ;; SVE2.
 (include "aarch64-sve2.md")
+
+;; Morello
+(include "aarch64-morello.md")

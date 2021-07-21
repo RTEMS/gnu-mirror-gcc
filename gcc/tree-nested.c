@@ -674,8 +674,8 @@ get_nl_goto_field (struct nesting_info *info)
       else
 	type = lang_hooks.types.type_for_mode (Pmode, 1);
 
-      scalar_int_mode mode
-	= as_a <scalar_int_mode> (STACK_SAVEAREA_MODE (SAVE_NONLOCAL));
+      scalar_addr_mode mode
+	= as_a <scalar_addr_mode> (STACK_SAVEAREA_MODE (SAVE_NONLOCAL));
       size = GET_MODE_SIZE (mode);
       size = size / GET_MODE_SIZE (Pmode);
       size = size + 1;

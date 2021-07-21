@@ -96,7 +96,7 @@ enum rid
   RID_ENUM,    RID_STRUCT, RID_UNION,    RID_IF,     RID_ELSE,
   RID_WHILE,   RID_DO,     RID_FOR,      RID_SWITCH, RID_CASE,
   RID_DEFAULT, RID_BREAK,  RID_CONTINUE, RID_RETURN, RID_GOTO,
-  RID_SIZEOF,
+  RID_SIZEOF,  RID_INTCAP, RID_UINTCAP,
 
   /* C extensions */
   RID_ASM,       RID_TYPEOF,   RID_ALIGNOF,  RID_ATTRIBUTE,  RID_VA_ARG,
@@ -437,6 +437,7 @@ extern machine_mode c_default_pointer_mode;
 #define D_CXX_CHAR8_T	0X1000	/* In C++, only with -fchar8_t.  */
 #define D_CXX20		0x2000  /* In C++, C++20 only.  */
 #define D_CXX_COROUTINES 0x4000  /* In C++, only with coroutines.  */
+#define D_CAP_ONLY      0x8000  /* In anything, but only with capabilities.  */
 
 #define D_CXX_CONCEPTS_FLAGS D_CXXONLY | D_CXX_CONCEPTS
 #define D_CXX_CHAR8_T_FLAGS D_CXXONLY | D_CXX_CHAR8_T
@@ -846,11 +847,13 @@ extern bool c_common_handle_option (size_t, const char *, HOST_WIDE_INT, int,
 extern bool default_handle_c_option (size_t, const char *, int);
 extern tree c_common_type_for_mode (machine_mode, int);
 extern tree c_common_type_for_size (unsigned int, int);
+extern tree c_common_cap_type_for_size (unsigned int, int);
 extern tree c_common_fixed_point_type_for_size (unsigned int, unsigned int,
 						int, int);
 extern tree c_common_unsigned_type (tree);
 extern tree c_common_signed_type (tree);
 extern tree c_common_signed_or_unsigned_type (int, tree);
+extern tree c_common_cap_from_int (tree, tree);
 extern void c_common_init_ts (void);
 extern tree c_build_bitfield_integer_type (unsigned HOST_WIDE_INT, int);
 extern enum conversion_safety unsafe_conversion_p (tree, tree, tree, bool);

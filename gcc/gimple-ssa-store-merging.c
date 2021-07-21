@@ -4659,6 +4659,12 @@ mem_valid_for_store_merging (tree mem, poly_uint64 *pbitsize,
   *pbitpos = bitpos;
   *pbitregion_start = bitregion_start;
   *pbitregion_end = bitregion_end;
+
+  /* Store merging is simply not valid for capabilities.
+     They *must* be stored with the associated capability-wise instruction as a
+     single instruction.  */
+  if (capability_type_p (TREE_TYPE (base_addr)))
+    return NULL_TREE;
   return base_addr;
 }
 

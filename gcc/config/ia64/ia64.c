@@ -10825,7 +10825,7 @@ ia64_soft_fp_init_libfuncs (void)
 }
 
 static bool
-ia64_vms_valid_pointer_mode (scalar_int_mode mode)
+ia64_vms_valid_pointer_mode (scalar_addr_mode mode)
 {
   return (mode == SImode || mode == DImode);
 }

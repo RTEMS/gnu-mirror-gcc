@@ -139,6 +139,14 @@ useless_type_conversion_p (tree outer_type, tree inner_type)
       /* Otherwise pointers/references are equivalent.  */
       return true;
     }
+  else if (INTCAP_TYPE_P (inner_type)
+	   && INTCAP_TYPE_P (outer_type))
+    return useless_type_conversion_p (TREE_TYPE (outer_type),
+				      TREE_TYPE (inner_type));
+  else if (INTCAP_TYPE_P (inner_type)
+	   && INTEGRAL_TYPE_P (outer_type)
+	   && useless_type_conversion_p (outer_type, TREE_TYPE (inner_type)))
+    return true;
 
   /* Recurse for complex types.  */
   else if (TREE_CODE (inner_type) == COMPLEX_TYPE

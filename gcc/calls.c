@@ -376,7 +376,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
 	     int old_inhibit_defer_pop, rtx call_fusage, int ecf_flags,
 	     cumulative_args_t args_so_far ATTRIBUTE_UNUSED)
 {
-  rtx rounded_stack_size_rtx = gen_int_mode (rounded_stack_size, Pmode);
+  rtx rounded_stack_size_rtx = gen_int_mode (rounded_stack_size, POmode);
   rtx call, funmem, pat;
   int already_popped = 0;
   poly_int64 n_popped = 0;
@@ -432,7 +432,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
       else
 	pat = targetm.gen_sibcall (funmem, rounded_stack_size_rtx,
 				   next_arg_reg,
-				   gen_int_mode (struct_value_size, Pmode));
+				   gen_int_mode (struct_value_size, POmode));
     }
   /* If the target has "call" or "call_value" insns, then prefer them
      if no arguments are actually popped.  If the target does not have
@@ -443,7 +443,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
 		? targetm.have_call_value ()
 		: targetm.have_call ()))
     {
-      rtx n_pop = gen_int_mode (n_popped, Pmode);
+      rtx n_pop = gen_int_mode (n_popped, POmode);
 
       /* If this subroutine pops its own args, record that in the call insn
 	 if possible, for the sake of frame pointer elimination.  */
@@ -465,7 +465,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
 				      next_arg_reg, NULL_RTX);
       else
 	pat = targetm.gen_call (funmem, rounded_stack_size_rtx, next_arg_reg,
-				gen_int_mode (struct_value_size, Pmode));
+				gen_int_mode (struct_value_size, POmode));
     }
   emit_insn (pat);
 
@@ -521,7 +521,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
 			       gen_rtx_CLOBBER (VOIDmode, stack_pointer_rtx),
 			       CALL_INSN_FUNCTION_USAGE (call_insn));
       rounded_stack_size -= n_popped;
-      rounded_stack_size_rtx = gen_int_mode (rounded_stack_size, Pmode);
+      rounded_stack_size_rtx = gen_int_mode (rounded_stack_size, POmode);
       stack_pointer_delta -= n_popped;
 
       add_args_size_note (call_insn, stack_pointer_delta);
@@ -569,7 +569,7 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
      ??? It will be worthwhile to enable combine_stack_adjustments even for
      such machines.  */
   else if (maybe_ne (n_popped, 0))
-    anti_adjust_stack (gen_int_mode (n_popped, Pmode));
+    anti_adjust_stack (gen_int_mode (n_popped, POmode));
 }
 
 /* Determine if the function identified by FNDECL is one with
@@ -2702,7 +2702,7 @@ compute_argument_addresses (struct arg_data *args, rtx argblock, int num_actuals
       int i;
       poly_int64 arg_offset = 0;
 
-      if (GET_CODE (argblock) == PLUS)
+      if (any_plus_p (argblock))
 	{
 	  arg_reg = XEXP (argblock, 0);
 	  arg_offset = rtx_to_poly_int64 (XEXP (argblock, 1));
@@ -2726,7 +2726,7 @@ compute_argument_addresses (struct arg_data *args, rtx argblock, int num_actuals
 	  if (TYPE_EMPTY_P (TREE_TYPE (args[i].tree_value)))
 	    continue;
 
-	  addr = simplify_gen_binary (PLUS, Pmode, arg_reg, offset);
+	  addr = gen_pointer_plus (Pmode, arg_reg, offset);
 	  addr = plus_constant (Pmode, addr, arg_offset);
 
 	  if (args[i].partial != 0)
@@ -2760,7 +2760,7 @@ compute_argument_addresses (struct arg_data *args, rtx argblock, int num_actuals
 	    }
 	  set_mem_align (args[i].stack, align);
 
-	  addr = simplify_gen_binary (PLUS, Pmode, arg_reg, slot_offset);
+	  addr = gen_pointer_plus (Pmode, arg_reg, slot_offset);
 	  addr = plus_constant (Pmode, addr, arg_offset);
 
 	  if (args[i].partial != 0)
@@ -4240,7 +4240,7 @@ expand_call (tree exp, rtx target, int ignore)
 		    argblock = virtual_outgoing_args_rtx;
 		  else
 		    {
-		      rtx needed_rtx = gen_int_mode (needed, Pmode);
+		      rtx needed_rtx = gen_int_mode (needed, POmode);
 		      argblock = push_block (needed_rtx, 0, 0);
 		      if (ARGS_GROW_DOWNWARD)
 			argblock = plus_constant (Pmode, argblock, needed);
@@ -4271,7 +4271,7 @@ expand_call (tree exp, rtx target, int ignore)
 		   (adjusted_args_size.constant
 		    + (OUTGOING_REG_PARM_STACK_SPACE (!fndecl ? fntype
 						      : TREE_TYPE (fndecl))
-		       ? 0 : reg_parm_stack_space), Pmode));
+		       ? 0 : reg_parm_stack_space), POmode));
 	      if (old_stack_level == 0)
 		{
 		  emit_stack_save (SAVE_BLOCK, &old_stack_level);
@@ -4342,7 +4342,7 @@ expand_call (tree exp, rtx target, int ignore)
 	  else if (argblock == 0)
 	    anti_adjust_stack (gen_int_mode (adjusted_args_size.constant
 					     - unadjusted_args_size,
-					     Pmode));
+					     POmode));
 	}
       /* Now that the stack is properly aligned, pops can't safely
 	 be deferred during the evaluation of the arguments.  */
@@ -4802,7 +4802,7 @@ expand_call (tree exp, rtx target, int ignore)
 		else
 		  emit_block_move (stack_area, args[i].save_area,
 				   (gen_int_mode
-				    (args[i].locate.size.constant, Pmode)),
+				    (args[i].locate.size.constant, POmode)),
 				   BLOCK_OP_CALL_PARM);
 	      }
 
@@ -5351,7 +5351,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
   else
     {
       if (!PUSH_ARGS)
-	argblock = push_block (gen_int_mode (args_size.constant, Pmode), 0, 0);
+	argblock = push_block (gen_int_mode (args_size.constant, POmode), 0, 0);
     }
 
   /* We push args individually in reverse order, perform stack alignment
@@ -5359,7 +5359,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
   if (argblock == 0)
     anti_adjust_stack (gen_int_mode (args_size.constant
 				     - original_args_size.constant,
-				     Pmode));
+				     POmode));
 
   argnum = nargs - 1;
 
@@ -5449,7 +5449,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 				       stack_area,
 				       (gen_int_mode
 					(argvec[argnum].locate.size.constant,
-					 Pmode)),
+					 POmode)),
 				       BLOCK_OP_CALL_PARM);
 		    }
 		  else
@@ -5464,7 +5464,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 	  emit_push_insn (val, mode, NULL_TREE, NULL_RTX, parm_align,
 			  partial, reg, 0, argblock,
 			  (gen_int_mode
-			   (argvec[argnum].locate.offset.constant, Pmode)),
+			   (argvec[argnum].locate.offset.constant, POmode)),
 			  reg_parm_stack_space,
 			  ARGS_SIZE_RTX (argvec[argnum].locate.alignment_pad), false);
 
@@ -5732,7 +5732,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 			       validize_mem
 			         (copy_rtx (argvec[count].save_area)),
 			       (gen_int_mode
-				(argvec[count].locate.size.constant, Pmode)),
+				(argvec[count].locate.size.constant, POmode)),
 			       BLOCK_OP_CALL_PARM);
 	    else
 	      emit_move_insn (stack_area, argvec[count].save_area);
@@ -5838,7 +5838,7 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
 		  emit_block_move (validize_mem (copy_rtx (arg->save_area)),
 				   stack_area,
 				   (gen_int_mode
-				    (arg->locate.size.constant, Pmode)),
+				    (arg->locate.size.constant, POmode)),
 				   BLOCK_OP_CALL_PARM);
 		}
 	      else

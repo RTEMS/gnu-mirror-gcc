@@ -1473,6 +1473,11 @@ find_base_value (rtx src)
     case PLUS:
     case MINUS:
       {
+	/* If pointers are capabilities, then a CONST/PLUS/MINUS can never be
+	   used with a pointer.  Hence this RTX is not based on an address.  */
+	if (CAPABILITY_MODE_P (Pmode))
+	  break;
+
 	rtx temp, src_0 = XEXP (src, 0), src_1 = XEXP (src, 1);
 
 	/* If either operand is a REG that is a known pointer, then it
@@ -1524,6 +1529,8 @@ find_base_value (rtx src)
       return find_base_value (XEXP (src, 1));
 
     case AND:
+      if (CAPABILITY_MODE_P (Pmode))
+	break;
       /* Look through aligning ANDs.  And AND with zero or one with
          the LSB set isn't one (see for example PR92462).  */
       if (CONST_INT_P (XEXP (src, 1))
@@ -1536,7 +1543,10 @@ find_base_value (rtx src)
       /* As we do not know which address space the pointer is referring to, we can
 	 handle this only if the target does not support different pointer or
 	 address modes depending on the address space.  */
-      if (!target_default_pointer_address_modes_p ())
+      /* TRUNCATE can not produce a valid capability mode, so even if the
+	 precisions match, we do not want to look for a `base` here.  */
+      if (!target_default_pointer_address_modes_p ()
+	  || CAPABILITY_MODE_P (Pmode))
 	break;
       if (!is_a <scalar_int_mode> (GET_MODE (src), &int_mode)
 	  || GET_MODE_PRECISION (int_mode) < GET_MODE_PRECISION (Pmode))
@@ -1555,8 +1565,12 @@ find_base_value (rtx src)
     case SIGN_EXTEND:	/* used for NT/Alpha pointers */
       /* As we do not know which address space the pointer is referring to, we can
 	 handle this only if the target does not support different pointer or
-	 address modes depending on the address space.  */
-      if (!target_default_pointer_address_modes_p ())
+	 address modes depending on the address space.
+
+	 If Pmode is a a capability, then ZERO_EXTEND and SIGN_EXTEND can not
+	 create a valid address.  */
+      if (!target_default_pointer_address_modes_p ()
+	  || CAPABILITY_MODE_P (Pmode))
 	break;
 
       {
@@ -1963,7 +1977,10 @@ find_base_term (rtx x, vec<std::pair<cselib_val *,
       /* As we do not know which address space the pointer is referring to, we can
 	 handle this only if the target does not support different pointer or
 	 address modes depending on the address space.  */
-      if (!target_default_pointer_address_modes_p ())
+      /* TRUNCATE can not produce a valid capability mode, so even if the
+	 precisions match, we do not want to look for a `base` here.  */
+      if (!target_default_pointer_address_modes_p ()
+	  || CAPABILITY_MODE_P (Pmode))
 	return 0;
       if (!is_a <scalar_int_mode> (GET_MODE (x), &int_mode)
 	  || GET_MODE_PRECISION (int_mode) < GET_MODE_PRECISION (Pmode))
@@ -1982,8 +1999,12 @@ find_base_term (rtx x, vec<std::pair<cselib_val *,
     case SIGN_EXTEND:	/* Used for Alpha/NT pointers */
       /* As we do not know which address space the pointer is referring to, we can
 	 handle this only if the target does not support different pointer or
-	 address modes depending on the address space.  */
-      if (!target_default_pointer_address_modes_p ())
+	 address modes depending on the address space.
+
+	 If Pmode is a a capability, then ZERO_EXTEND and SIGN_EXTEND can not
+	 create a valid address.  */
+      if (!target_default_pointer_address_modes_p ()
+	  || CAPABILITY_MODE_P (Pmode))
 	return 0;
 
       {
@@ -2038,6 +2059,8 @@ find_base_term (rtx x, vec<std::pair<cselib_val *,
     case PLUS:
     case MINUS:
       {
+	if (CAPABILITY_MODE_P (Pmode))
+	  return 0;
 	rtx tmp1 = XEXP (x, 0);
 	rtx tmp2 = XEXP (x, 1);
 
@@ -2089,6 +2112,8 @@ find_base_term (rtx x, vec<std::pair<cselib_val *,
       }
 
     case AND:
+      if (CAPABILITY_MODE_P (Pmode))
+	return 0;
       /* Look through aligning ANDs.  And AND with zero or one with
          the LSB set isn't one (see for example PR92462).  */
       if (CONST_INT_P (XEXP (x, 1))

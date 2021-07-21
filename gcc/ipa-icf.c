@@ -1786,7 +1786,7 @@ sem_variable::equals (tree t1, tree t2)
       return return_false_with_msg ("Declaration mismatch");
     case INTEGER_CST:
       /* Integer constants are the same only if the same width of type.  */
-      if (TYPE_PRECISION (TREE_TYPE (t1)) != TYPE_PRECISION (TREE_TYPE (t2)))
+      if (TYPE_CAP_PRECISION (TREE_TYPE (t1)) != TYPE_CAP_PRECISION (TREE_TYPE (t2)))
         return return_false_with_msg ("INTEGER_CST precision mismatch");
       if (TYPE_MODE (TREE_TYPE (t1)) != TYPE_MODE (TREE_TYPE (t2)))
         return return_false_with_msg ("INTEGER_CST mode mismatch");

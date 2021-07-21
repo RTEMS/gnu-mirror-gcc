@@ -37,7 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 static widest_int
 wide_int_ext_for_comb (const widest_int &cst, tree type)
 {
-  return wi::sext (cst, TYPE_PRECISION (type));
+  return wi::sext (cst, TYPE_NONCAP_PRECISION (type));
 }
 
 /* Likewise for polynomial offsets.  */
@@ -45,7 +45,7 @@ wide_int_ext_for_comb (const widest_int &cst, tree type)
 static poly_widest_int
 wide_int_ext_for_comb (const poly_widest_int &cst, tree type)
 {
-  return wi::sext (cst, TYPE_PRECISION (type));
+  return wi::sext (cst, TYPE_NONCAP_PRECISION (type));
 }
 
 /* Initializes affine combination COMB so that its value is zero in TYPE.  */
@@ -225,7 +225,14 @@ aff_combination_convert (aff_tree *comb, tree type)
   unsigned i, j;
   tree comb_type = comb->type;
 
-  if  (TYPE_PRECISION (type) > TYPE_PRECISION (comb_type))
+  if (capability_type_p (type) && ! capability_type_p (comb_type))
+    {
+      tree val = aff_combination_to_tree (comb);
+      tree ret = fold_build_replace_address_value (build_int_cst (type, 0), val);
+      return tree_to_aff_combination (ret, type, comb);
+    }
+
+  if  (TYPE_NONCAP_PRECISION (type) > TYPE_NONCAP_PRECISION (comb_type))
     {
       tree val = fold_convert (type, aff_combination_to_tree (comb));
       tree_to_aff_combination (val, type, comb);
@@ -236,7 +243,8 @@ aff_combination_convert (aff_tree *comb, tree type)
   if (comb->rest && !POINTER_TYPE_P (type))
     comb->rest = fold_convert (type, comb->rest);
 
-  if (TYPE_PRECISION (type) == TYPE_PRECISION (comb_type))
+  if (TYPE_NONCAP_PRECISION (type) == TYPE_NONCAP_PRECISION (comb_type)
+      && capability_type_p (type) == capability_type_p (comb_type))
     return;
 
   comb->offset = wide_int_ext_for_comb (comb->offset, comb->type);
@@ -268,6 +276,14 @@ expr_to_aff_combination (aff_tree *comb, tree_code code, tree type,
 {
   aff_tree tmp;
   poly_int64 bitpos, bitsize, bytepos;
+
+  /* MORELLO TODO (OPTIMISED):
+     Currently we bail out of splitting capabilities because there have been a
+     few difficulties attempting to cast from sizetypes to capabilities etc.
+     This is something to implement in the future.  */
+  /* Bail out of splitting capabilities into affine trees.  */
+  if (capability_type_p (type))
+    return false;
 
   switch (code)
     {
@@ -390,6 +406,11 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
   int unsignedp, reversep, volatilep;
 
   STRIP_NOPS (expr);
+
+  /* MORELLO TODO (OPTIMISED): Would like to implement this in the future.  */
+  /* Bail out of splitting capabilities into affine trees.  */
+  if (capability_type_p (type))
+    return aff_combination_elt (comb, type, expr);
 
   code = TREE_CODE (expr);
   switch (code)
@@ -733,6 +754,8 @@ aff_combination_expand (aff_tree *comb ATTRIBUTE_UNUSED,
       name = e;
       /* Look through some conversions.  */
       if (CONVERT_EXPR_P (e)
+	  && (capability_type_p (type)
+	      == capability_type_p (TREE_TYPE (TREE_OPERAND (e, 0))))
           && (TYPE_PRECISION (type)
 	      >= TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (e, 0)))))
 	name = TREE_OPERAND (e, 0);

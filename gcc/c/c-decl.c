@@ -10906,8 +10906,8 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
 	{
 	  /* "void", "_Bool", "char", "int", "float", "double",
 	     "_FloatN", "_FloatNx", "_Decimal32", "__intN",
-	     "_Decimal64", "_Decimal128", "_Fract", "_Accum" or
-	     "__auto_type".  */
+	     "_Decimal64", "_Decimal128", "_Fract", "_Accum",
+	     "__intcap_t", "__uintcap_t",  or "__auto_type".  */
 	  if (specs->typespec_word != cts_none)
 	    {
 	      error_at (loc,
@@ -11081,6 +11081,68 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
 	      else
 		{
 		  specs->typespec_word = cts_int;
+		  specs->locations[cdw_typespec] = loc;
+		}
+	      return specs;
+	    case RID_INTCAP:
+	      if (specs->long_p)
+		error_at (loc,
+			  ("both %<long%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->short_p)
+		error_at (loc,
+			  ("both %<short%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->signed_p)
+		error_at (loc,
+			  ("both %<signed%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->unsigned_p)
+		error_at (loc,
+			  ("both %<unsigned%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->complex_p)
+		error_at (loc,
+			  ("both %<complex%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->saturating_p)
+		error_at (loc,
+			  ("both %<_Sat%> and %<__intcap_t%> in "
+			   "declaration specifiers"));
+	      else
+		{
+		  specs->typespec_word = cts_intcap;
+		  specs->locations[cdw_typespec] = loc;
+		}
+	      return specs;
+	    case RID_UINTCAP:
+	      if (specs->long_p)
+		error_at (loc,
+			  ("both %<long%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->short_p)
+		error_at (loc,
+			  ("both %<short%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->signed_p)
+		error_at (loc,
+			  ("both %<signed%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->unsigned_p)
+		error_at (loc,
+			  ("both %<unsigned%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->complex_p)
+		error_at (loc,
+			  ("both %<complex%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else if (specs->saturating_p)
+		error_at (loc,
+			  ("both %<_Sat%> and %<__uintcap_t%> in "
+			   "declaration specifiers"));
+	      else
+		{
+		  specs->typespec_word = cts_uintcap;
 		  specs->locations[cdw_typespec] = loc;
 		}
 	      return specs;
@@ -11670,6 +11732,18 @@ finish_declspecs (struct c_declspecs *specs)
 		   "ISO C does not support complex integer types");
 	  specs->type = build_complex_type (specs->type);
 	}
+      break;
+    case cts_intcap:
+      gcc_assert (!specs->long_p && !specs->short_p
+		  && !specs->signed_p && !specs->unsigned_p
+		  && !specs->complex_p);
+      specs->type = intcap_type_node;
+      break;
+    case cts_uintcap:
+      gcc_assert (!specs->long_p && !specs->short_p
+		  && !specs->signed_p && !specs->unsigned_p
+		  && !specs->complex_p);
+      specs->type = uintcap_type_node;
       break;
     case cts_float:
       gcc_assert (!specs->long_p && !specs->short_p

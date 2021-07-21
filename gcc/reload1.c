@@ -418,7 +418,7 @@ init_reload (void)
 		   gen_rtx_PLUS (Pmode,
 				 gen_rtx_REG (Pmode,
 					      LAST_VIRTUAL_REGISTER + 1),
-				 gen_int_mode (4, Pmode)));
+				 gen_int_mode (4, POmode)));
   spill_indirect_levels = 0;
 
   while (memory_address_p (QImode, tem))
@@ -2588,6 +2588,7 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 
        So, please before trying to handle MINUS, consider reload as a
        whole instead of this little section as well as the backend issues.  */
+    case POINTER_PLUS:
     case PLUS:
       /* If this is the sum of an eliminable register and a constant, rework
 	 the sum.  */
@@ -2613,9 +2614,9 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 		    && known_eq (INTVAL (XEXP (x, 1)), -ep->previous_offset))
 		  return ep->to_rtx;
 		else
-		  return gen_rtx_PLUS (Pmode, ep->to_rtx,
-				       plus_constant (Pmode, XEXP (x, 1),
-						      ep->previous_offset));
+		  return gen_pointer_plus (Pmode, ep->to_rtx,
+					   plus_constant (POmode, XEXP (x, 1),
+							  ep->previous_offset));
 	      }
 
 	  /* If the register is not eliminable, we are done since the other
@@ -2644,12 +2645,17 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 	       didn't get a hard register but has a reg_equiv_constant,
 	       we must replace the constant here since it may no longer
 	       be in the position of any operand.  */
-	    if (GET_CODE (new0) == PLUS && REG_P (new1)
+	    if (any_plus_p (new0) && REG_P (new1)
 		&& REGNO (new1) >= FIRST_PSEUDO_REGISTER
 		&& reg_renumber[REGNO (new1)] < 0
 		&& reg_equivs
 		&& reg_equiv_constant (REGNO (new1)) != 0)
 	      new1 = reg_equiv_constant (REGNO (new1));
+	    /* For capability-enabled target we would never expect new1 to
+	       contain a POINTER_PLUS. This is because the recursive call
+	       above uses XEXP (x, 1), which, being a second operand to a
+	       POINTER_PLUS already, must be in noncapability_mode.
+	       Hence, this clause has been left unmodified.  */
 	    else if (GET_CODE (new1) == PLUS && REG_P (new0)
 		     && REGNO (new0) >= FIRST_PSEUDO_REGISTER
 		     && reg_renumber[REGNO (new0)] < 0
@@ -2661,8 +2667,9 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 	    /* As above, if we are not inside a MEM we do not want to
 	       turn a PLUS into something else.  We might try to do so here
 	       for an addition of 0 if we aren't optimizing.  */
-	    if (! mem_mode && GET_CODE (new_rtx) != PLUS)
-	      return gen_rtx_PLUS (GET_MODE (x), new_rtx, const0_rtx);
+	    if (! mem_mode && !any_plus_p (new_rtx))
+	      return gen_pointer_plus (as_a <scalar_addr_mode> (GET_MODE (x)),
+				       new_rtx, const0_rtx);
 	    else
 	      return new_rtx;
 	  }
@@ -2675,6 +2682,7 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 	 so that we have (plus (mult ..) ..).  This is needed in order
 	 to keep load-address insns valid.   This case is pathological.
 	 We ignore the possibility of overflow here.  */
+      gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
       if (REG_P (XEXP (x, 0))
 	  && REGNO (XEXP (x, 0)) < FIRST_PSEUDO_REGISTER
 	  && CONST_INT_P (XEXP (x, 1)))
@@ -2775,7 +2783,7 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 	 elimination_effects has already make sure that this does not
 	 happen.  The only remaining case we need to consider here is
 	 that the increment value may be an eliminable register.  */
-      if (GET_CODE (XEXP (x, 1)) == PLUS
+      if (any_plus_p (XEXP (x, 1))
 	  && XEXP (XEXP (x, 1), 0) == XEXP (x, 0))
 	{
 	  rtx new_rtx = eliminate_regs_1 (XEXP (XEXP (x, 1), 1), mem_mode,
@@ -2783,8 +2791,9 @@ eliminate_regs_1 (rtx x, machine_mode mem_mode, rtx insn,
 
 	  if (new_rtx != XEXP (XEXP (x, 1), 1))
 	    return gen_rtx_fmt_ee (code, GET_MODE (x), XEXP (x, 0),
-				   gen_rtx_PLUS (GET_MODE (x),
-						 XEXP (x, 0), new_rtx));
+				   gen_pointer_plus
+				     (as_a <scalar_addr_mode> (GET_MODE (x)),
+				      XEXP (x, 0), new_rtx));
 	}
       return x;
 
@@ -9002,7 +9011,7 @@ inc_for_reload (rtx reloadreg, rtx in, rtx value, poly_int64 inc_amount)
       if (GET_CODE (value) == PRE_DEC || GET_CODE (value) == POST_DEC)
 	inc_amount = -inc_amount;
 
-      inc = gen_int_mode (inc_amount, Pmode);
+      inc = gen_int_mode (inc_amount, POmode);
     }
 
   /* If this is post-increment, first copy the location to the reload reg.  */

@@ -5895,8 +5895,10 @@ pointer_diff (location_t loc, tree op0, tree op1, tree ptrtype,
   /* Determine integer type result of the subtraction.  This will usually
      be the same as the result type (ptrdiff_t), but may need to be a wider
      type if pointers for the address space are wider than ptrdiff_t.  */
-  if (TYPE_PRECISION (restype) < TYPE_PRECISION (TREE_TYPE (op0)))
-    inttype = c_common_type_for_size (TYPE_PRECISION (TREE_TYPE (op0)), 0);
+  unsigned int calc_precision
+    = TYPE_PRECISION (noncapability_type (TREE_TYPE (op0)));
+  if (TYPE_PRECISION (restype) < calc_precision)
+    inttype = c_common_type_for_size (calc_precision, 0);
   else
     inttype = restype;
 
@@ -5919,7 +5921,9 @@ pointer_diff (location_t loc, tree op0, tree op1, tree ptrtype,
      ptrdiff_type to support differences larger than half the address
      space, cast the pointers to some larger integer type and do the
      computations in that type.  */
-  if (TYPE_PRECISION (inttype) > TYPE_PRECISION (TREE_TYPE (op0)))
+  if (TYPE_PRECISION (inttype) > calc_precision
+      || capability_type_p (TREE_TYPE (op0))
+      || capability_type_p (TREE_TYPE (op1)))
     op0 = cp_build_binary_op (loc,
 			      MINUS_EXPR,
 			      cp_convert (inttype, op0, complain),

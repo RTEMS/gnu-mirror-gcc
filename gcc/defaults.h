@@ -450,7 +450,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    Dwarf 2 addresses need to be larger than the architecture's
    pointers.  */
 #ifndef DWARF2_ADDR_SIZE
-#define DWARF2_ADDR_SIZE ((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
+#define DWARF2_ADDR_SIZE ((POINTER_OFFSET_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
 #endif
 
 /* The size in bytes of a DWARF field indicating an offset or length
@@ -748,6 +748,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 #ifndef POINTER_SIZE_UNITS
 #define POINTER_SIZE_UNITS ((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
+#endif
+/* Only matters for targets with capabilities as their pointers.  Otherwise
+   should be left to default.  */
+#ifndef POINTER_OFFSET_SIZE
+#define POINTER_OFFSET_SIZE POINTER_SIZE
+#endif
+#ifndef POINTER_OFFSET_SIZE_UNITS
+#define POINTER_OFFSET_SIZE_UNITS ((POINTER_OFFSET_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
 #endif
 
 
@@ -1471,6 +1479,18 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #error Unknown BITS_PER_UNIT
 #endif
 typedef TARGET_UNIT target_unit;
+#endif
+
+#if defined(POmode)
+#  if defined(IN_TARGET_CODE)
+#    define Pmode POmode
+#  else
+#    define Pmode (scalar_addr_mode (POmode))
+#  endif
+#elif defined(Pmode)
+#  define POmode (offset_mode (Pmode))
+#else
+#  error "Must define either POmode or Pmode"
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

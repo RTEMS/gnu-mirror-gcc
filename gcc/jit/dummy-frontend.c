@@ -667,6 +667,7 @@ jit_langhook_type_for_mode (machine_mode mode, int unsignedp)
 	return complex_integer_type_node;
     }
 
+  /* MORELLO TODO handle capability types.  */
   /* gcc_unreachable */
   return NULL;
 }

@@ -809,7 +809,7 @@ alpha_in_small_data_p (const_tree exp)
 
 #if TARGET_ABI_OPEN_VMS
 static bool
-vms_valid_pointer_mode (scalar_int_mode mode)
+vms_valid_pointer_mode (scalar_addr_mode mode)
 {
   return (mode == SImode || mode == DImode);
 }

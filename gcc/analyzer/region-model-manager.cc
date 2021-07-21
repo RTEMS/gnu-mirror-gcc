@@ -317,6 +317,36 @@ const svalue *
 region_model_manager::maybe_fold_unaryop (tree type, enum tree_code op,
 					  const svalue *arg)
 {
+  /* MORELLO TODO
+   * This is a horrible hack.
+   * The problem is that when we see a constructor for a structure which does
+   * not specify all the fields we fill the region with integer_zero_node.
+   * Then later, we want to know the value of a pointer from that structure,
+   * and we say "give me that value but with pointer type".
+   * That request is handled as a fold_unary on a NOP_EXPR (which triggers a
+   * capability assertion failure).
+   *
+   * We have a few different possible approaches of avoiding this:
+   *  1) When zero-filling, try and use capabilities everywhere it could be needed.
+   *  2) Record when we have a constant integer from zero-filling (as opposed
+   *  to anything else) and treat that differently.
+   *  3) Just always allow folding constant integers to pointers.
+   *
+   * Frankly, this seems like it would take a few days to figure out the best
+   * approach, and the analyzer is not a critical thing for this Morello
+   * project.
+   * Hence just introducing a hack here for now.
+   *
+   * (Would use the fold_convert_MORELLO_TODO_getout_clause, except that the
+   * current code uses `fold_unary` and not `fold_convert`.  Hence just
+   * mentioning it in this comment so that a grep of the source later reminds
+   * me.  */
+  if (arg->get_type ()
+      && op == NOP_EXPR
+      && capability_type_p (type) && ! capability_type_p (arg->get_type ())
+      && arg->maybe_get_constant () == integer_zero_node)
+    return get_or_create_constant_svalue (build_int_cst (type, 0));
+
   /* Ops on "unknown" are also unknown.  */
   if (arg->get_kind () == SK_UNKNOWN)
     return get_or_create_unknown_svalue (type);

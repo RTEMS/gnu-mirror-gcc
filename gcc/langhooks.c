@@ -565,6 +565,12 @@ lhd_type_for_size (unsigned precision, int unsignedp)
   return NULL_TREE;
 }
 
+tree
+lhd_cap_type_for_size (unsigned precision ATTRIBUTE_UNUSED, int unsignedp ATTRIBUTE_UNUSED)
+{
+  return NULL_TREE;
+}
+
 HOST_WIDE_INT
 lhd_to_target_charset (HOST_WIDE_INT c)
 {

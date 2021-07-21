@@ -93,8 +93,18 @@ convert_to_pointer_1 (tree type, tree expr, bool fold_p)
       }
       return maybe_fold_build1_loc (fold_p, loc, CONVERT_EXPR, type, expr);
 
+    case INTCAP_TYPE:
+      /* MORELLO TODO What to do about address spaces here?
+       * Thinking nothing since the cast to integers does nothing.  */
+      return maybe_fold_build1_loc (fold_p, loc, NOP_EXPR, type, expr);
+
     default:
       error ("cannot convert to a pointer type");
+      if (capability_type_p (type))
+	/* There is no representation of a NULL capability pointer without
+	   folding (unless we would use the internal replace_address_value
+	   function), hence return the same thing ignoring fold_p here.  */
+	return build_int_cst (type, 0);
       return convert_to_pointer_1 (type, integer_zero_node, fold_p);
     }
 }
@@ -135,6 +145,43 @@ convert_to_pointer_maybe_fold (tree type, tree expr, bool dofold)
 {
   tree result
     = convert_to_pointer_1 (type, expr,
+			    dofold || CONSTANT_CLASS_OR_WRAPPER_P (expr));
+  return preserve_any_location_wrapper (result, expr);
+}
+
+
+/* Convert EXPR to an INTCAP_TYPE TYPE.  */
+static tree
+convert_to_intcap_1 (tree type, tree expr, bool fold_p)
+{
+  location_t loc = EXPR_LOCATION (expr);
+  if (TREE_TYPE (expr) == type)
+    return expr;
+  switch (TREE_CODE (TREE_TYPE (expr)))
+    {
+    case INTCAP_TYPE:
+    case POINTER_TYPE:
+    case REFERENCE_TYPE:
+      if (TYPE_MODE (type) == TYPE_MODE (TREE_TYPE (expr)))
+	return maybe_fold_build1_loc (fold_p, loc, NOP_EXPR, type, expr);
+    /* fallthrough */
+    default:
+      error ("Cannot convert to an intcap_type");
+      return build_int_cst (type, 0);
+    }
+}
+
+tree
+convert_to_intcap (tree type, tree expr)
+{
+  return convert_to_intcap_1 (type, expr, true);
+}
+
+tree
+convert_to_intcap_maybe_fold (tree type, tree expr, bool dofold)
+{
+  tree result
+    = convert_to_intcap_1 (type, expr,
 			    dofold || CONSTANT_CLASS_OR_WRAPPER_P (expr));
   return preserve_any_location_wrapper (result, expr);
 }
@@ -644,7 +691,7 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
 	return build1 (CONVERT_EXPR, type, expr);
       expr = fold_build1 (CONVERT_EXPR,
 			  lang_hooks.types.type_for_size
-			    (TYPE_PRECISION (intype), 0),
+			    (TYPE_NONCAP_PRECISION (intype), 0),
 			  expr);
       return fold_convert (type, expr);
 
@@ -881,6 +928,10 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
 	      if (TREE_CODE (argtype) == VECTOR_TYPE
 		  && maybe_ne (GET_MODE_SIZE (TYPE_MODE (argtype)),
 			       GET_MODE_SIZE (TYPE_MODE (type))))
+		break;
+	      /* As the comment above get_unwidened mentions, pointers are not
+		 allowed.  */
+	      if (POINTER_TYPE_P (argtype) || INTCAP_TYPE_P (argtype))
 		break;
 	    }
 	    /* If truncating after truncating, might as well do all at once.

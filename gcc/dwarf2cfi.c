@@ -1186,6 +1186,7 @@ dwarf2out_frame_debug_adjust_cfa (rtx pat)
   switch (GET_CODE (src))
     {
     case PLUS:
+    case POINTER_PLUS:
       gcc_assert (dwf_regno (XEXP (src, 0)) == cur_cfa->reg);
       cur_cfa->offset -= rtx_to_poly_int64 (XEXP (src, 1));
       break;
@@ -1223,6 +1224,7 @@ dwarf2out_frame_debug_cfa_offset (rtx set)
       offset = -cur_cfa->offset;
       break;
     case PLUS:
+    case POINTER_PLUS:
       gcc_assert (dwf_regno (XEXP (addr, 0)) == cur_cfa->reg);
       offset = rtx_to_poly_int64 (XEXP (addr, 1)) - cur_cfa->offset;
       break;
@@ -1704,6 +1706,7 @@ dwarf2out_frame_debug_expr (rtx expr)
 	  break;
 
 	case PLUS:
+	case POINTER_PLUS:
 	case MINUS:
 	case LO_SUM:
 	  if (dest == stack_pointer_rtx)
@@ -1921,6 +1924,7 @@ dwarf2out_frame_debug_expr (rtx expr)
 	  /* Rule 12 */
 	  /* With an offset.  */
 	case PLUS:
+	case POINTER_PLUS:
 	case MINUS:
 	case LO_SUM:
 	  {

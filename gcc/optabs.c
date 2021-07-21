@@ -4156,6 +4156,10 @@ emit_cmp_and_jump_insns (rtx x, rtx y, enum rtx_code comparison, rtx size,
 			 machine_mode mode, int unsignedp, rtx label,
                          profile_probability prob)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (y)));
+
   rtx op0 = x, op1 = y;
   rtx test;
 
@@ -4607,7 +4611,8 @@ emit_conditional_add (rtx target, enum rtx_code code, rtx op0, rtx op1,
 rtx_insn *
 gen_add2_insn (rtx x, rtx y)
 {
-  enum insn_code icode = optab_handler (add_optab, GET_MODE (x));
+  auto ot = CAPABILITY_MODE_P (GET_MODE (x)) ? pointer_plus_optab : add_optab;
+  enum insn_code icode = optab_handler (ot, GET_MODE (x));
 
   gcc_assert (insn_operand_matches (icode, 0, x));
   gcc_assert (insn_operand_matches (icode, 1, x));
@@ -4622,7 +4627,8 @@ gen_add2_insn (rtx x, rtx y)
 rtx_insn *
 gen_add3_insn (rtx r0, rtx r1, rtx c)
 {
-  enum insn_code icode = optab_handler (add_optab, GET_MODE (r0));
+  auto ot = CAPABILITY_MODE_P (GET_MODE (r0)) ? pointer_plus_optab : add_optab;
+  enum insn_code icode = optab_handler (ot, GET_MODE (r0));
 
   if (icode == CODE_FOR_nothing
       || !insn_operand_matches (icode, 0, r0)
@@ -4695,7 +4701,9 @@ have_addptr3_insn (rtx x, rtx y, rtx z)
 rtx_insn *
 gen_sub2_insn (rtx x, rtx y)
 {
-  enum insn_code icode = optab_handler (sub_optab, GET_MODE (x));
+  const auto ot = CAPABILITY_MODE_P (GET_MODE (x)) ?
+    pointer_minus_optab : sub_optab;
+  enum insn_code icode = optab_handler (ot, GET_MODE (x));
 
   gcc_assert (insn_operand_matches (icode, 0, x));
   gcc_assert (insn_operand_matches (icode, 1, x));
@@ -4710,7 +4718,9 @@ gen_sub2_insn (rtx x, rtx y)
 rtx_insn *
 gen_sub3_insn (rtx r0, rtx r1, rtx c)
 {
-  enum insn_code icode = optab_handler (sub_optab, GET_MODE (r0));
+  const auto ot = CAPABILITY_MODE_P (GET_MODE (r0)) ?
+    pointer_minus_optab : sub_optab;
+  enum insn_code icode = optab_handler (ot, GET_MODE (r0));
 
   if (icode == CODE_FOR_nothing
       || !insn_operand_matches (icode, 0, r0)
@@ -5876,6 +5886,7 @@ rtx
 expand_mult_highpart (machine_mode mode, rtx op0, rtx op1,
 		      rtx target, bool uns_p)
 {
+  gcc_assert (!CAPABILITY_MODE_P (mode));
   class expand_operand eops[3];
   enum insn_code icode;
   int method, i;
@@ -6640,6 +6651,108 @@ struct atomic_op_functions
   enum rtx_code reverse_code;
 };
 
+/* MORELLO TODO.
+   Our current plan is to use functions which don't take `unsignedp` and
+   `methods`.  We include those parameters here since replacing calls of
+   expand_binop and the like with a function taking the same arguments is a
+   simple mechanical refactoring that doesn't require investigation.
+   In the future we will need to inspect all uses that currently use different
+   arguments for `unsignedp` and `methods` that the default we would implement,
+   decide whether they can use the defaults, and if not document why not.  */
+rtx
+expand_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset, rtx target,
+		     int unsignedp, enum optab_methods methods)
+{
+  check_pointer_offset_modes (mode, base, offset);
+  if (CAPABILITY_MODE_P (mode))
+    return expand_binop (mode, pointer_plus_optab, base, offset, target, unsignedp, methods);
+  else
+    return expand_binop (mode, add_optab, base, offset, target, unsignedp, methods);
+}
+
+rtx
+expand_pointer_minus (scalar_addr_mode mode, rtx base, rtx offset, rtx target,
+		      int unsignedp, enum optab_methods methods)
+{
+  rtx temp;
+  check_pointer_offset_modes (mode, base, offset);
+  if (CAPABILITY_MODE_P (mode))
+    {
+      temp = expand_binop (mode, pointer_minus_optab, base, offset, target, unsignedp, methods);
+      if (temp)
+	return temp;
+      scalar_int_mode omode = offset_mode (mode);
+      offset = expand_unop (omode, neg_optab, offset, NULL_RTX, unsignedp);
+      return expand_pointer_plus (mode, base, offset, target, unsignedp, methods);
+    }
+  else
+      return expand_binop (mode, sub_optab, base, offset, target, unsignedp, methods);
+}
+
+rtx
+expand_align_down (scalar_addr_mode mode, rtx x, rtx align, rtx target,
+		   int unsignedp, enum optab_methods methods)
+{
+  rtx temp;
+  check_pointer_offset_modes (mode, x, align);
+  temp = expand_binop (mode, align_down_optab, x, align, target, unsignedp, methods);
+  if (temp)
+    return temp;
+
+  scalar_int_mode omode = offset_mode (mode);
+  rtx negalign = expand_unop (omode, neg_optab, align, NULL_RTX, unsignedp);
+  rtx retvalue = expand_binop (omode, and_optab, negalign, drop_capability (x),
+			       NULL_RTX, unsignedp, methods);
+  return expand_replace_address_value (mode, x, retvalue, target);
+}
+
+rtx
+expand_align_up (scalar_addr_mode mode, rtx x, rtx align, rtx target,
+		 int unsignedp, enum optab_methods methods)
+{
+  rtx temp;
+  check_pointer_offset_modes (mode, x, align);
+  temp = expand_binop (mode, align_up_optab, x, align, target, unsignedp, methods);
+  if (temp)
+    return temp;
+
+  scalar_int_mode omode = offset_mode (mode);
+  rtx oneminus = expand_binop (omode, sub_optab,
+			       align, gen_int_mode (1, omode),
+			       NULL_RTX, unsignedp, methods);
+  temp = expand_pointer_plus (mode, x, oneminus, NULL_RTX, unsignedp, methods);
+  return expand_align_down (mode, temp, align, target, unsignedp, methods);
+}
+
+/* Expand the replace_address_value optab:
+    Assert that CAPABILITY has no side effects.
+    If MODE is a capability mode:
+      - Try to use replace_address_value_optab
+      - If that does not work
+	- Expand the equivalent using expand_pointer_plus (which must PASS).
+    Else
+      - Ignore capability and return value.  */
+rtx
+expand_replace_address_value (scalar_addr_mode mode,
+			      rtx capability,
+			      rtx value,
+			      rtx target)
+{
+  rtx temp;
+  gcc_assert (!side_effects_p (capability));
+  if (CAPABILITY_MODE_P (mode))
+    {
+      temp = expand_binop (mode, replace_address_value_optab, capability, value, target, 0, OPTAB_DIRECT);
+      if (temp)
+	return temp;
+      scalar_int_mode omode = offset_mode (mode);
+
+      temp =  expand_binop (omode, sub_optab, value, drop_capability (capability), NULL_RTX, 0, OPTAB_DIRECT);
+      return expand_pointer_plus (mode, capability, temp, target, 0, OPTAB_DIRECT);
+    }
+  else
+    return value;
+}
 
 /* Fill in structure pointed to by OP with the various optab entries for an 
    operation of type CODE.  */
@@ -7195,7 +7308,7 @@ maybe_legitimize_operand (enum insn_code icode, unsigned int opno,
       goto input;
 
     case EXPAND_ADDRESS:
-      op->value = convert_memory_address (as_a <scalar_int_mode> (mode),
+      op->value = convert_memory_address (as_a <scalar_addr_mode> (mode),
 					  op->value);
       goto input;
 

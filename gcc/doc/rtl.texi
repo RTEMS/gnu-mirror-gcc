@@ -2744,6 +2744,35 @@ integer of mode @var{m}.  The mode of @var{x} must be @var{m} or
 Represents the value @var{x} with the order of bytes reversed, carried out
 in mode @var{m}, which must be a fixed-point machine mode.
 The mode of @var{x} must be @var{m} or @code{VOIDmode}.
+
+@findex pointer_plus
+@cindex capability addition
+@item (pointer_plus:@var{m} @var{x} @var{a})
+This expression represents the result of incrementing the address value of
+@var{x} (which must be in the capability mode @var{m}) by the amount @var{a}
+(which must be in the corresponding offset mode @code{offset_mode (@var{m})}).
+
+The result contains the same metadata as was originally in @var{x}.
+
+@findex replace_address_value
+@cindex capability set value
+@cindex capability replace address value
+@cindex capability replace value
+@item (replace_address_value:@var{m} @var{x} @var{v})
+Represents a capability in mode @var{m} with the metadata of @var{x} and the
+address value of @var{v}.  @var{v} must be an integer of mode
+@code{offset_mode (@var{m})}, and @var{x} must be in mode @var{m}.
+
+@findex align_address_down
+@cindex capability align address value
+@item (align_address_down:@var{m} @var{x} @var{v})
+Represents a capability in mode @var{m} whose metadata is the same as that of
+@var{x}, and whose address value is that of @var{x} with enough bottom bits set
+to zero so that the address value is a multiple of @var{v}.
+
+This expression is only defined for a value of @var{v} that is a power of two.
+@var{v} must be an integer of mode @code{offset_mode (@var{m})} and @var{x}
+must be in mode @var{m}.
 @end table
 
 @node Comparisons

@@ -131,7 +131,13 @@ convert (tree type, tree expr)
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-      ret = convert_to_pointer (type, e);
+    case INTCAP_TYPE:
+      if (capability_type_p (type) && INTEGRAL_TYPE_P (TREE_TYPE (e)))
+	ret = c_common_cap_from_int (type, e);
+      else
+	ret = (code == INTCAP_TYPE)
+		? convert_to_intcap (type, e)
+		: convert_to_pointer (type, e);
       goto maybe_fold;
 
     case REAL_TYPE:

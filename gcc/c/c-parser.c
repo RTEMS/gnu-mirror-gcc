@@ -555,6 +555,8 @@ c_keyword_starts_typename (enum rid keyword)
     case RID_SIGNED:
     case RID_COMPLEX:
     case RID_INT:
+    case RID_INTCAP:
+    case RID_UINTCAP:
     case RID_CHAR:
     case RID_FLOAT:
     case RID_DOUBLE:
@@ -732,6 +734,8 @@ c_token_starts_declspecs (c_token *token)
 	case RID_SIGNED:
 	case RID_COMPLEX:
 	case RID_INT:
+	case RID_INTCAP:
+	case RID_UINTCAP:
 	case RID_CHAR:
 	case RID_FLOAT:
 	case RID_DOUBLE:
@@ -2942,6 +2946,8 @@ c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
 	case RID_SIGNED:
 	case RID_COMPLEX:
 	case RID_INT:
+	case RID_INTCAP:
+	case RID_UINTCAP:
 	case RID_CHAR:
 	case RID_FLOAT:
 	case RID_DOUBLE:
@@ -4514,6 +4520,8 @@ c_parser_gnu_attribute_any_word (c_parser *parser)
 	case RID_COMPLEX:
 	case RID_THREAD:
 	case RID_INT:
+	case RID_INTCAP:
+	case RID_UINTCAP:
 	case RID_CHAR:
 	case RID_FLOAT:
 	case RID_DOUBLE:
@@ -11785,6 +11793,8 @@ c_parser_objc_selector (c_parser *parser)
     case RID_BYREF:
     case RID_ONEWAY:
     case RID_INT:
+    case RID_INTCAP:
+    case RID_UINTCAP:
     case RID_CHAR:
     case RID_FLOAT:
     case RID_DOUBLE:

@@ -3554,6 +3554,17 @@ proc check_effective_target_aarch64_sve1_only { } {
 		   && ![check_effective_target_aarch64_sve2] }]
 }
 
+proc check_effective_target_aarch64_capability_any { } {
+  if { ![istarget aarch64*-*-*] } {
+      return 0
+  }
+  return [check_no_compiler_messages aarch64_capability_any assembly {
+  #if !defined (__GCC_ARM_CAPABILITY_ANY)
+  #error foo
+  #endif
+  }]
+}
+
 # Return the size in bits of an SVE vector, or 0 if the size is variable.
 proc aarch64_sve_bits { } {
     return [check_cached_effective_target aarch64_sve_bits {

@@ -238,7 +238,7 @@ cp_convert_to_pointer (tree type, tree expr, bool dofold,
 	 is supposed to be some integral type that is the same width
 	 as a pointer.  */
       gcc_assert (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (expr)))
-		  == GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type)));
+		  == GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (type)));
 
       /* FIXME needed because convert_to_pointer_maybe_fold still folds
 	 conversion of constants.  */
