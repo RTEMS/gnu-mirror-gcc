@@ -1,3 +1,32 @@
+work061.patch007:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): If we can use XXSPLTIW, the vector
+	constant is easy.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	-mxxspltiw support.
+	(xxspltib_constant_p): If we can generate XXSPLTIW, don't generate
+	a XXSPLTIB and an extend instruction.
+	(output_vec_const_move): Add support for loading up vector
+	constants with XXSPLTIW.
+	(rs6000_opt_masks): Add -mxxspltiw.
+	* config/rs6000/rs6000.h (SIGN_EXTEND_8BIT): New macro.
+	(SIGN_EXTEND_16BIT): New macro.
+	(SIGN_EXTEND_32BIT): New macro.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIW): Delete.
+	(xxspltiw_v8hi): New insn.
+	(xxspltiw_v4si): Rewrite to generate a vector constant.
+	(xxspltiw_v4sf): Rewrite to generate a vector constant.
+	(xxspltiw_v4si_inst): Delete.
+	(xxspltiw_v4sf_inst): Delete.
+	(xxspltiw_v8hi_dup): New insn.
+	(xxspltiw_v4si_dup): New insn.
+	(xxspltiw_v4sf_dup): New insn.
+	(XXSPLTIW): New mode iterator.
+	(XXSPLTIW splitter): New insn splitter for XXSPLTIW.
+
 work061.patch006:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
 

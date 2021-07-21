@@ -1,3 +1,13 @@
+work061.patch007:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr86731-fwrapv.c: Update insn counts on
+	power10.
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+
 work061.patch005:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
 
