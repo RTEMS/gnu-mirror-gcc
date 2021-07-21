@@ -504,6 +504,12 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
+/* Whether the '__ibm128' keywork is enabled.  We enable __ibm128 either if the
+   IEEE 128-bit floating point support is enabled or if the long double support
+   uses the 128-bit IBM extended double format.  */
+#define TARGET_IBM128	(TARGET_FLOAT128_TYPE				\
+			 || (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128))
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
@@ -2294,7 +2300,7 @@ extern int frame_pointer_needed;
 #define RS6000_BTC_SAT		RS6000_BTC_MISC	/* saturate sets VSCR.  */
 
 /* Builtin targets.  For now, we reuse the masks for those options that are in
-   target flags, and pick a random bit for ldbl128, which isn't in
+   target flags, and pick a random bit for ldbl128 and ibm128, which aren't in
    target_flags.  */
 #define RS6000_BTM_ALWAYS	0		/* Always enabled.  */
 #define RS6000_BTM_ALTIVEC	MASK_ALTIVEC	/* VMX/altivec vectors.  */
@@ -2316,7 +2322,7 @@ extern int frame_pointer_needed;
 #define RS6000_BTM_LDBL128	MASK_MULTIPLE	/* 128-bit long double.  */
 #define RS6000_BTM_64BIT	MASK_64BIT	/* 64-bit addressing.  */
 #define RS6000_BTM_POWERPC64	MASK_POWERPC64	/* 64-bit registers.  */
-#define RS6000_BTM_FLOAT128	MASK_FLOAT128_KEYWORD /* IEEE 128-bit float.  */
+#define RS6000_BTM_IBM128	MASK_FLOAT128_KEYWORD /* __ibm128 keyword.  */
 #define RS6000_BTM_FLOAT128_HW	MASK_FLOAT128_HW /* IEEE 128-bit float h/w.  */
 #define RS6000_BTM_MMA		MASK_MMA	/* ISA 3.1 MMA.  */
 #define RS6000_BTM_P10		MASK_POWER10
@@ -2339,7 +2345,7 @@ extern int frame_pointer_needed;
 				 | RS6000_BTM_HARD_FLOAT		\
 				 | RS6000_BTM_LDBL128			\
 				 | RS6000_BTM_POWERPC64			\
-				 | RS6000_BTM_FLOAT128			\
+				 | RS6000_BTM_IBM128			\
 				 | RS6000_BTM_FLOAT128_HW		\
 				 | RS6000_BTM_MMA			\
 				 | RS6000_BTM_P10)
