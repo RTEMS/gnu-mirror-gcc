@@ -57,12 +57,7 @@ vector signed int splats3(void)
    If folding is enabled, the vec_sl tests using vector long long type will
    generate a lvx instead of a vspltisw+vsld pair.  */
 
-/* { dg-final { scan-assembler-times {\mvspltis[bhw]\M|\mxxspltib\M} 7 { target { ! has_arch_pwr10 } } } } */
-/* { dg-final { scan-assembler-times {\mvsl[bhwd]\M} 7                 { target { ! has_arch_pwr10 } } } } */
-
-/* { dg-final { scan-assembler-times {\mxxspltib\M}  2                 { target {   has_arch_pwr10 } } } } */
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}  5                 { target {   has_arch_pwr10 } } } } */
-/* { dg-final { scan-assembler-times {\mvsl[bhwd]\M} 2                 { target {   has_arch_pwr10 } } } } */
-
+/* { dg-final { scan-assembler-times {\mvspltis[bhw]\M|\mxxspltib\M} 7 } } */
+/* { dg-final { scan-assembler-times {\mvsl[bhwd]\M} 7 } } */
 /* { dg-final { scan-assembler-times {\mlvx\M|\mlxvd2x\M} 0 } } */
 
