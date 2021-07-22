@@ -3139,28 +3139,6 @@ region_model::maybe_update_for_edge (const superedge &edge,
    caller's frame.  */
 
 void
-region_model::update_for_call_superedge (const call_superedge &call_edge,
-					 region_model_context *ctxt)
-{
-  /* Build a vec of argument svalues, using the current top
-     frame for resolving tree expressions.  */
-  const gcall *call_stmt = call_edge.get_call_stmt ();
-  auto_vec<const svalue *> arg_svals (gimple_call_num_args (call_stmt));
-
-  for (unsigned i = 0; i < gimple_call_num_args (call_stmt); i++)
-    {
-      tree arg = gimple_call_arg (call_stmt, i);
-      arg_svals.quick_push (get_rvalue (arg, ctxt));
-    }
-
-  push_frame (call_edge.get_callee_function (), &arg_svals, ctxt);
-}
-
-/* Push a new frame_region on to the stack region.
-   works in similar manner of that of region_model::update_for_call_superedge()
-   but it get the call info from CALL_STMT instead from a suerpedge and 
-   is availabe publicically   */
-void
 region_model::update_for_gcall (const gcall *call_stmt,
 				region_model_context *ctxt)
 {
@@ -3183,30 +3161,7 @@ region_model::update_for_gcall (const gcall *call_stmt,
 /* Pop the top-most frame_region from the stack, and copy the return
    region's values (if any) into the region for the lvalue of the LHS of
    the call (if any).  */
-void
-region_model::update_for_return_superedge (const return_superedge &return_edge,
-					   region_model_context *ctxt)
-{
-  /* Get the region for the result of the call, within the caller frame.  */
-  const region *result_dst_reg = NULL;
-  const gcall *call_stmt = return_edge.get_call_stmt ();
-  tree lhs = gimple_call_lhs (call_stmt);
-  if (lhs)
-    {
-      /* Normally we access the top-level frame, which is:
-	   path_var (expr, get_stack_depth () - 1)
-	 whereas here we need the caller frame, hence "- 2" here.  */
-      gcc_assert (get_stack_depth () >= 2);
-      result_dst_reg = get_lvalue (path_var (lhs, get_stack_depth () - 2),
-				   ctxt);
-    }
 
-  pop_frame (result_dst_reg, NULL, ctxt);
-}
-
-/* do exatly what region_model::update_for_return_superedge() do
-   but get the call info from CALL_STMT instead from a suerpedge and 
-   is availabe publicically   */
 void
 region_model::update_for_return_gcall (const gcall *call_stmt,
              			       region_model_context *ctxt)
@@ -3227,6 +3182,27 @@ region_model::update_for_return_gcall (const gcall *call_stmt,
   pop_frame (result_dst_reg, NULL, ctxt);
 }
 
+/* Extract calling infromation from the superedge and update the model for the 
+   call  */
+
+void
+region_model::update_for_call_superedge (const call_superedge &call_edge,
+					 region_model_context *ctxt)
+{
+  const gcall *call_stmt = call_edge.get_call_stmt ();
+  update_for_gcall (call_stmt,ctxt);
+}
+
+/* Extract calling infromation from the return superedge and update the model 
+   for the returning call */
+
+void
+region_model::update_for_return_superedge (const return_superedge &return_edge,
+					   region_model_context *ctxt)
+{
+  const gcall *call_stmt = return_edge.get_call_stmt ();
+  update_for_return_gcall (call_stmt, ctxt);
+}
 
 /* Update this region_model with a summary of the effect of calling
    and returning from CG_SEDGE.

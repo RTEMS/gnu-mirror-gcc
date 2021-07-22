@@ -1627,6 +1627,50 @@ exploded_node::dump_succs_and_preds (FILE *outf) const
   }
 }
 
+/* class dynamic_call_info_t : public exploded_edge::custom_info_t.  */
+
+/* Implementation of exploded_edge::custom_info_t::update_model vfunc
+   for dynamic_call_info_t.
+
+   Update state for the dynamically discorverd calls */
+
+void
+dynamic_call_info_t::update_model (region_model *model,
+				   const exploded_edge &eedge)
+{
+  const program_state &dest_state = eedge.m_dest->get_state ();
+  *model = *dest_state.m_region_model;
+}
+
+/* Implementation of exploded_edge::custom_info_t::add_events_to_path vfunc
+   for dynamic_call_info_t.  */
+
+void
+dynamic_call_info_t::add_events_to_path (checker_path *emission_path,
+				   const exploded_edge &eedge)
+{
+  const exploded_node *src_node = eedge.m_src;
+  const program_point &src_point = src_node->get_point ();
+  const int src_stack_depth = src_point.get_stack_depth ();
+  const exploded_node *dest_node = eedge.m_dest;
+  const program_point &dest_point = dest_node->get_point ();
+  const int dest_stack_depth = dest_point.get_stack_depth ();
+
+  if (m_is_returning_call)
+    emission_path->add_event (new return_event (eedge, (m_dynamic_call
+	                   			        ? m_dynamic_call->location
+	           	   		                : UNKNOWN_LOCATION),
+	          	      dest_point.get_fndecl (),
+	          	      dest_stack_depth));
+  else
+    emission_path->add_event (new call_event (eedge, (m_dynamic_call
+	                   			      ? m_dynamic_call->location
+	           	   		              : UNKNOWN_LOCATION),
+	          	      src_point.get_fndecl (),
+	          	      src_stack_depth));
+
+}
+
 /* class rewind_info_t : public exploded_edge::custom_info_t.  */
 
 /* Implementation of exploded_edge::custom_info_t::update_model vfunc
@@ -3221,8 +3265,8 @@ exploded_graph::process_node (exploded_node *node)
 
 	    /* Check if now the analyzer know about the call via 
                function pointer or not. */
-            if (succ->m_kind == SUPEREDGE_INTRAPROCEDURAL_CALL && 
-                !(succ->get_any_callgraph_edge()))
+            if (succ->m_kind == SUPEREDGE_INTRAPROCEDURAL_CALL 
+            	&& !(succ->get_any_callgraph_edge ()))
               {    
                 const program_point *this_point = &node->get_point();
                 const program_state *this_state = &node->get_state ();
@@ -3241,9 +3285,9 @@ exploded_graph::process_node (exploded_node *node)
                 function *fun = DECL_STRUCT_FUNCTION(fn_decl);
                 if(fun)
                 {
-                  const supergraph *sg = &(this->get_supergraph());
-                  supernode * sn_entry = sg->get_node_for_function_entry (fun);
-                  supernode * sn_exit = sg->get_node_for_function_exit (fun);
+                  const supergraph &sg = this->get_supergraph();
+                  supernode * sn_entry = sg.get_node_for_function_entry (fun);
+                  supernode * sn_exit = sg.get_node_for_function_exit (fun);
 
                   program_point new_point 
                     = program_point::before_supernode (sn_entry,
@@ -3255,13 +3299,15 @@ exploded_graph::process_node (exploded_node *node)
 
                   next_state.push_call(*this, node, call, &uncertainty);
 
+                  // TODO: add some logging here regarding dynamic call
+
                   if (next_state.m_valid)
                   {
                     exploded_node *enode = get_or_create_node (new_point,
             					               next_state,
             					               node);
                     if (enode)
-                      add_edge (node,enode, NULL);
+                      add_edge (node,enode, NULL, new dynamic_call_info_t (call));
                   }
                 }
               }
@@ -3284,10 +3330,10 @@ exploded_graph::process_node (exploded_node *node)
     /* Return from the calls which doesn't have a return superedge.
     	Such case occurs when GCC's middle end didn't knew which function to
     	call but analyzer did */
-    if((is_an_exit_block && !found_a_superedge) && 
-       (!point.get_call_string().empty_p()))
+    if((is_an_exit_block && !found_a_superedge)
+       && (!point.get_call_string ().empty_p ()))
     {
-      const call_string cs = point.get_call_string();
+      const call_string cs = point.get_call_string ();
       program_point next_point 
         = program_point::before_supernode (cs.get_caller_node (),
         				   NULL,
@@ -3304,12 +3350,12 @@ exploded_graph::process_node (exploded_node *node)
 
       if (next_state.m_valid)
       {
-        next_point.pop_from_call_stack();
+        next_point.pop_from_call_stack ();
         exploded_node *enode = get_or_create_node (next_point, 
         					   next_state, 
         					   node);
         if (enode)
-          add_edge (node,enode, NULL);
+          add_edge (node, enode, NULL, new dynamic_call_info_t (call, true));
       }
     }
       }

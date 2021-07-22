@@ -110,7 +110,7 @@ analysis_plan::use_summary_p (const cgraph_edge *edge) const
     return false;
 
   /* Don't use call summaries if there is no callgraph edge */
-  if(!edge || !edge->callee)
+  if (!edge || !edge->callee)
     return false;
 
   /* TODO: don't count callsites each time.  */

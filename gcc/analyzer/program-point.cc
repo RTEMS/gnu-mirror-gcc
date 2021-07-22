@@ -449,8 +449,8 @@ program_point::on_edge (exploded_graph &eg,
 	    return false;
 	  }
 	const call_string::element_t top_of_stack = m_call_string.pop ();
-	call_string::element_t current_call_string_element (succ->m_src, 
-							    succ->m_dest);
+	call_string::element_t current_call_string_element (succ->m_dest, 
+							    succ->m_src);
 	if (top_of_stack != current_call_string_element)
 	  {
 	    if (logger)

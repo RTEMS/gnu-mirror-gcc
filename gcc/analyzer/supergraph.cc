@@ -189,11 +189,10 @@ supergraph::supergraph (logger *logger)
     		   			     NULL);
     		  m_cgraph_edge_to_caller_next_node.put (edge, node_for_stmts);
     		}
-	        else
+	       else
 	        {
 	          // maybe call is via a function pointer
-	          gcall *call = dyn_cast<gcall *> (stmt);
-	          if (call)
+	          if (gcall *call = dyn_cast<gcall *> (stmt))
 	          {
 	            cgraph_edge *edge 
 		      = cgraph_node::get (fun->decl)->get_edge (stmt);

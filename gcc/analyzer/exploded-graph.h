@@ -362,6 +362,34 @@ private:
   DISABLE_COPY_AND_ASSIGN (exploded_edge);
 };
 
+/* Extra data for an exploded_edge that represents a dynamic call info ( calls
+   that doesn't have a superedge representing the call ).  */
+
+class dynamic_call_info_t : public exploded_edge::custom_info_t
+{
+public:
+  dynamic_call_info_t (const gcall *dynamic_call,
+  		       const bool is_returning_call = false)
+  : m_dynamic_call (dynamic_call), 
+    m_is_returning_call (is_returning_call)
+  {}
+
+  void print (pretty_printer *pp) FINAL OVERRIDE
+  {
+    pp_string (pp, "dynamic_call");
+  }
+
+  void update_model (region_model *model,
+		     const exploded_edge &eedge) FINAL OVERRIDE;
+
+  void add_events_to_path (checker_path *emission_path,
+			   const exploded_edge &eedge) FINAL OVERRIDE;
+private:
+  const gcall *m_dynamic_call;
+  const bool m_is_returning_call;
+};
+
+
 /* Extra data for an exploded_edge that represents a rewind from a
    longjmp to a setjmp (or from a siglongjmp to a sigsetjmp).  */
 
