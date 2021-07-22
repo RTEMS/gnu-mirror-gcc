@@ -1,3 +1,9 @@
+work061.patch011:
+2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/101019
+	* gcc.target/powerpc/prefix-large-const.c: New test.
+
 work061.patch010:
 2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
 

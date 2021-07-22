@@ -1,3 +1,16 @@
+work061.patch011:
+2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/101019
+	* config/rs6000/rs6000.c (num_insns_constant_gpr): Add
+	-mprefixed-large-constant support.
+	(rs6000_emit_set_long_const): Add -mprefixed-large-constant
+	support.
+	* config/rs6000/rs6000.h (TARGET_PREFIXED_LARGE_CONSTANT): New
+	macro.
+	* config/rs6000/rs6000.opt (-mprefixed-large-constant): New
+	switch.
+
 work061.patch010:
 2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
 
