@@ -48,13 +48,16 @@ scalar_double_m_inf (void)	/* XXSPLTIDP.  */
 double
 scalar_double_pi (void)
 {
-  return M_PI;			/* PLFD.  */
+  return M_PI;			/* 2x XXSPLTI32DX.  */
 }
 
 double
 scalar_double_denorm (void)
 {
-  return 0x1p-149f;		/* PLFD.  */
+  return 0x1p-149f;		/* XXSPLTIB, XXSPLTI32DX.  */
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltidp\M} 5 } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M}   5 } } */
+/* { dg-final { scan-assembler-times {\mxxsplti32dx\M} 3 } } */
+/* { dg-final { scan-assembler-not   {\mplfd\M}          } } */
+/* { dg-final { scan-assembler-not   {\mplxsd\M}         } } */
