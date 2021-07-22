@@ -512,6 +512,8 @@ extern int rs6000_vector_align[];
 
 /* Whether we can generate the XXSPLTI* prefixed instructions.  We also need
    VSX instructions to be generated.  */
+#define TARGET_XXSPLTI32DX	(TARGET_XXSPLTI32DX_DEBUG && TARGET_PREFIXED \
+				 && TARGET_VSX)
 #define TARGET_XXSPLTIDP	(TARGET_XXSPLTIDP_DEBUG && TARGET_PREFIXED \
 				 && TARGET_VSX)
 #define TARGET_XXSPLTIW		(TARGET_XXSPLTIW_DEBUG && TARGET_PREFIXED \
