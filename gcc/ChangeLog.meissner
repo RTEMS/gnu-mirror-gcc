@@ -1,3 +1,36 @@
+work061.patch009:
+2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with XXSPLTI32DX, it is easy.
+	(xxsplti32dx_operand): New predicate.
+	(easy_vector_constant): If the constant can be loaded with
+	XXSPLTI32DX, it is easy.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_p): New
+	declaration.
+	* config/rs6000/rs6000-cpus.h (ISA_3_1_MASKS_SERVER): Add
+	-mxxsplti32dx.
+	(POWERPC_MASKS): Add -mxxsplti32dx.
+	* config/rs6000/rs6000.c (xxsplti32dx_constant_float_p): New
+	helper function.
+	(xxsplti32dx_constant_p): New function.
+	(output_vec_const_move): If the operand can be loaded with
+	XXSPLTI32DX, split it.
+	* config/rs6000/rs6000.h (TARGET_XXSPLTI32DX): New macro.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat64, FMOVE64 iterator):  Add support for
+	constants loaded with XXSPLTI32DX.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New option.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(XXSPLTI32DX): New mode iterator.
+	(xxsplti32dx_<mode>): New insn and splitter for XXSPLTI32DX.
+	(xxsplti32dx_<mode>_first): New insn.
+	(xxsplti32dx_<mode>_second): New insn.
+
 work061.patch008:
 2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
 
@@ -13,14 +46,14 @@ work061.patch008:
 	(POWERPC_MASKS): Add -mxxspltidp support.
 	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): New
 	declaration.
-	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
-	-mxxspltidp support.
-	(const_vector_element_all_same): New function.
+	* config/rs6000/rs6000.c (const_vector_element_all_same): New
+	function.
 	(xxspltidp_constant_p): New function.
 	(output_vec_const_move): Add support for XXSPLTIDP.
 	(rs6000_opt_masks): Add -mxxspltidp support.
 	(rs6000_emit_xxspltidp_v2df): Change function to implement the
 	XXSPLTIDP instruction.
+	* config/rs6000/rs6000.h (TARGET_XXSPLTIDP): New macro.
 	* config/rs6000/rs6000.md (movsf_hardfloat): Add XXSPLTIDP
 	support.
 	(mov<mode>_hardfloat32, FMOVE64 iterator): Add XXSPLTIDP support.
@@ -41,14 +74,12 @@ work061.patch007:
 	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
 	(easy_vector_constant): If we can use XXSPLTIW, the vector
 	constant is easy.
-	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
-	-mxxspltiw support.
-	(xxspltib_constant_p): If we can generate XXSPLTIW, don't generate
-	a XXSPLTIB and an extend instruction.
+	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
+	XXSPLTIW, don't generate a XXSPLTIB and an extend instruction.
 	(output_vec_const_move): Add support for loading up vector
 	constants with XXSPLTIW.
-	(rs6000_opt_masks): Add -mxxspltiw.
-	* config/rs6000/rs6000.h (SIGN_EXTEND_8BIT): New macro.
+	* config/rs6000/rs6000.h (TARGET_XXSPLTIW): New macro.
+	(SIGN_EXTEND_8BIT): New macro.
 	(SIGN_EXTEND_16BIT): New macro.
 	(SIGN_EXTEND_32BIT): New macro.
 	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
