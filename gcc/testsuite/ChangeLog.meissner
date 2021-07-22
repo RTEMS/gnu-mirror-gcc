@@ -1,6 +1,8 @@
 work061.patch009:
-2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
 
+	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
+	count.
 	* gcc.target/powerpc/vec-splat-constant-sf.c: Update insn count.
 	* gcc.target/powerpc/vec-splat-constant-df.c: Update insn count.
 	* gcc.target/powerpc/vec-splat-constant-v2df.c: Update insn

@@ -1,5 +1,5 @@
 work061.patch009:
-2021-07-21  Michael Meissner  <meissner@linux.ibm.com>
+2021-07-22  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraint.md (eD): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): If the constant
