@@ -510,6 +510,11 @@ extern int rs6000_vector_align[];
 #define TARGET_IBM128	(TARGET_FLOAT128_TYPE				\
 			 || (!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128))
 
+/* Whether we can generate the XXSPLTI* prefixed instructions.  We also need
+   VSX instructions to be generated.  */
+#define TARGET_XXSPLTIW		(TARGET_XXSPLTIW_DEBUG && TARGET_PREFIXED \
+				 && TARGET_VSX)
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
@@ -2613,3 +2618,22 @@ while (0)
        rs6000_asm_output_opcode (STREAM);				\
     }									\
   while (0)
+
+/* Provide macros for sign-extending values.  */
+#if HOST_BITS_PER_CHAR == 8
+#define SIGN_EXTEND_8BIT(X) ((HOST_WIDE_INT)(signed char)(X))
+#else
+#define SIGN_EXTEND_8BIT(X) ((((X) & 0xff) ^ 0x80) - 0x80)
+#endif
+
+#if HOST_BITS_PER_SHORT == 16
+#define SIGN_EXTEND_16BIT(X) ((HOST_WIDE_INT)(short)(X))
+#else
+#define SIGN_EXTEND_16BIT(X) ((((X) & 0xffff) ^ 0x8000) - 0x8000)
+#endif
+
+#if HOST_BITS_PER_INT == 32
+#define SIGN_EXTEND_32BIT(X) ((HOST_WIDE_INT)(int)(X))
+#else
+#define SIGN_EXTEND_32BIT(X) ((((X) & 0xffffffff) ^ 0x80000000) - 0x80000000)
+#endif
