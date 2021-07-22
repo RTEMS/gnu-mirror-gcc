@@ -5958,6 +5958,8 @@ num_insns_constant_gpr (HOST_WIDE_INT value)
 	return num_insns_constant_gpr (high) + 1;
       else if (high == 0)
 	return num_insns_constant_gpr (low) + 1;
+      else if (TARGET_PREFIXED_LARGE_CONSTANT)
+	return (low == 0) ? 2 : 3;
       else
 	return (num_insns_constant_gpr (high)
 		+ num_insns_constant_gpr (low) + 1);
@@ -10448,6 +10450,47 @@ rs6000_emit_set_long_const (rtx dest, HOST_WIDE_INT c)
 	emit_move_insn (dest,
 			gen_rtx_IOR (DImode, copy_rtx (temp),
 				     GEN_INT (ud1)));
+    }
+  else if (TARGET_PREFIXED_LARGE_CONSTANT)
+    {
+      HOST_WIDE_INT low_32bit = ud1 | (ud2 << 16);
+      HOST_WIDE_INT high_32bit = ud3 | (ud4 << 16);
+
+      temp = !can_create_pseudo_p () ? copy_rtx (dest) : gen_reg_rtx (DImode);
+      emit_move_insn (temp, GEN_INT (high_32bit));
+
+      if (!low_32bit)
+       emit_insn (gen_ashldi3 (dest, temp, GEN_INT (32)));
+      else
+       {
+         rtx temp2 = (!can_create_pseudo_p ()
+                      ? copy_rtx (dest)
+                      : gen_reg_rtx (DImode));
+
+         emit_insn (gen_ashldi3 (temp2, temp, GEN_INT (32)));
+
+         /* See if a simple ORI or ORIS will suffice to fill in the
+            constant.  */
+         if (ud2 == 0)
+           emit_insn (gen_iordi3 (dest, temp2, GEN_INT (ud1)));
+         else if (ud1 == 0)
+           emit_insn (gen_iordi3 (dest, temp2, GEN_INT (ud2 << 16)));
+         /* If the register is not r0, we can do a PADDI.  However, if the
+            register is r0, we need to do an ORI and ORIS instead of a PADDI.
+            This is because R0 as the register is interpreted as 0 and not
+            R0.  */
+         else if (REGNO (dest) != FIRST_GPR_REGNO)
+           emit_insn (gen_adddi3 (dest, temp2, GEN_INT (low_32bit)));
+         else
+           {
+             rtx temp3 = (!can_create_pseudo_p ()
+                          ? copy_rtx (dest)
+                          : gen_reg_rtx (DImode));
+
+             emit_insn (gen_iordi3 (temp3, temp2, GEN_INT (ud2 << 16)));
+             emit_insn (gen_iordi3 (dest, temp3, GEN_INT (ud1)));
+           }
+       }
     }
   else
     {

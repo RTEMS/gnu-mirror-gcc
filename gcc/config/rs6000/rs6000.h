@@ -524,6 +524,10 @@ extern int rs6000_vector_align[];
 #define TARGET_LXVKQ		(TARGET_LXVKQ_DEBUG && TARGET_POWER10	\
 				 && TARGET_FLOAT128_HW)
 
+/* Whether to use PLI/SLDI/PADDI to load large constants on 64-bit power10.  */
+#define TARGET_PREFIXED_LARGE_CONSTANT	(TARGET_PREFIXED_LARGE_CONSTANT_DEBUG \
+					 && TARGET_PREFIXED && TARGET_POWERPC64)
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
