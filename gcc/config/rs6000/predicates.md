@@ -611,6 +611,11 @@
   if (xxsplti32dx_operand (op, mode))
     return 1;
 
+  /* If we have the ISA 3.1 LXVKQ instruction, see if the constant can be loaded
+     with that instruction.  */
+  if (lxvkq_operand (op, mode))
+    return 1;
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -697,6 +702,15 @@
 {
   HOST_WIDE_INT high = 0, low = 0;
   return xxsplti32dx_constant_p (op, mode, &high, &low);
+})
+
+;; Return 1 if the operand is an IEEE 128-bit special constant that can be
+;; loaded with the LXVKQ instruction.
+(define_predicate "lxvkq_operand"
+  (match_code "const_double")
+{
+  int immediate = 0;
+  return lxvkq_constant_p (op, mode, &immediate);
 })
 
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
