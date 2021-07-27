@@ -65,6 +65,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <zlib.h>
 #include "plugin.h"
 #include "target.h"
+#include "ipa-utils.h"
 
 /* For an overview, see gcc/doc/analyzer.texi.  */
 
@@ -1240,6 +1241,17 @@ exploded_node::on_stmt (exploded_graph &eg,
       /* Allow the state_machine to handle the stmt.  */
       if (sm.on_stmt (&sm_ctxt, snode, stmt))
 	unknown_side_effects = false;
+    }
+
+    /* If the statmement is a polymorphic call then assume 
+       there are no side effects.  */
+    gimple *call_stmt = const_cast<gimple *>(stmt);
+    if (gcall *call = dyn_cast<gcall *> (call_stmt))
+    {
+      function *fun = this->get_function();
+      cgraph_edge *e = cgraph_node::get (fun->decl)->get_edge (call);
+      if (e && e->indirect_info->polymorphic)
+        unknown_side_effects = false;
     }
 
   on_stmt_post (stmt, state, unknown_side_effects, &ctxt);
@@ -3263,8 +3275,8 @@ exploded_graph::process_node (exploded_node *node)
 	    program_state next_state (state);
 	    uncertainty_t uncertainty;
 
-	    /* Check if now the analyzer know about the call via 
-               function pointer or not. */
+	    /* Check if now the analyzer know about the call withough a 
+	       superedge or not.  */
             if (succ->m_kind == SUPEREDGE_INTRAPROCEDURAL_CALL 
             	&& !(succ->get_any_callgraph_edge ()))
               {    
@@ -3272,6 +3284,7 @@ exploded_graph::process_node (exploded_node *node)
                 const program_state *this_state = &node->get_state ();
                 const gcall *call 
                   = this_point->get_supernode ()->get_final_call ();
+                /* Check if it is a plymorphic call or not.  */
 
                 impl_region_model_context ctxt (*this,
                   node, 
@@ -3281,35 +3294,84 @@ exploded_graph::process_node (exploded_node *node)
                   this_point->get_stmt());
 
                 region_model *model = this_state->m_region_model;
-                tree fn_decl = model->get_fndecl_for_call(call,&ctxt);
-                function *fun = DECL_STRUCT_FUNCTION(fn_decl);
-                if(fun)
-                {
-                  const supergraph &sg = this->get_supergraph();
-                  supernode * sn_entry = sg.get_node_for_function_entry (fun);
-                  supernode * sn_exit = sg.get_node_for_function_exit (fun);
-
-                  program_point new_point 
-                    = program_point::before_supernode (sn_entry,
-            				               NULL,
-            				               point.get_call_string ());
-
-                  new_point.push_to_call_stack (sn_exit,
-                  				next_point.get_supernode());
-
-                  next_state.push_call(*this, node, call, &uncertainty);
-
-                  // TODO: add some logging here regarding dynamic call
-
-                  if (next_state.m_valid)
+                if (tree fn_decl = model->get_fndecl_for_call(call,&ctxt))
                   {
-                    exploded_node *enode = get_or_create_node (new_point,
-            					               next_state,
-            					               node);
-                    if (enode)
-                      add_edge (node,enode, NULL, new dynamic_call_info_t (call));
+                    function *fun = DECL_STRUCT_FUNCTION(fn_decl);
+                    const supergraph &sg = this->get_supergraph();
+                    supernode *sn_entry = sg.get_node_for_function_entry (fun);
+                    supernode *sn_exit = sg.get_node_for_function_exit (fun);
+  
+                    program_point new_point 
+                      = program_point::before_supernode (sn_entry,
+            				                 NULL,
+            				                 point.get_call_string ());
+  
+                    new_point.push_to_call_stack (sn_exit,
+                  				  next_point.get_supernode());
+  
+                    next_state.push_call(*this, node, call, &uncertainty, NULL);
+  
+                    // TODO: add some logging here regarding dynamic call
+  
+                    if (next_state.m_valid)
+                      {
+                        exploded_node *enode = get_or_create_node (new_point,
+            					                   next_state,
+            					                   node);
+                        if (enode)
+                          add_edge (node,enode, NULL, 
+                          	    new dynamic_call_info_t (call));
+                      }
                   }
-                }
+
+                /* Is it a polymorphic call ?  */
+                else
+                  {
+	      	    function *fun = node->get_function();
+	      	    // cgraph_node *n = cgraph_node::get (fun->decl);
+	      	    gcall *stmt  = const_cast<gcall *>(call);
+	      	    cgraph_edge *e = cgraph_node::get (fun->decl)->get_edge (stmt);
+	      	    if (e->indirect_info->polymorphic)
+	      	    {
+	      	    	// struct cgraph_node *likely_target = NULL;
+	    		void *cache_token;
+	    		bool final;
+	    		vec <cgraph_node *>targets
+	       		   = possible_polymorphic_call_targets (e, &final, &cache_token, true);
+	       		// create enodes and eedges representing the call
+	       		for (cgraph_node *x : targets)
+	       		{
+	       		  // maybe make a function to create eenodes for such calls
+	       		  function *fun = DECL_STRUCT_FUNCTION(x->decl);
+                          const supergraph &sg = this->get_supergraph();
+                          supernode *sn_entry 
+                            = sg.get_node_for_function_entry (fun);
+                          supernode *sn_exit = sg.get_node_for_function_exit (fun);
+        
+                          program_point new_point 
+                            = program_point::before_supernode (sn_entry,
+            				                       NULL,
+            				                       point.get_call_string ());
+        
+                          new_point.push_to_call_stack (sn_exit,
+                  				        next_point.get_supernode());
+        
+                          next_state.push_call(*this, node, call, &uncertainty, x->decl);
+        
+                          // TODO: add some logging here regarding dynamic call
+        
+                          if (next_state.m_valid)
+                            {
+                              exploded_node *enode = get_or_create_node (new_point,
+            					                         next_state,
+            					                         node);
+                              if (enode)
+                                add_edge (node,enode, NULL, 
+                          	          new dynamic_call_info_t (call));
+                            }
+	       		}
+	      	    }
+                  }
               }
 
 	    if (!node->on_edge (*this, succ, &next_point, &next_state,

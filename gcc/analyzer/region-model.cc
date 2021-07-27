@@ -3140,7 +3140,8 @@ region_model::maybe_update_for_edge (const superedge &edge,
 
 void
 region_model::update_for_gcall (const gcall *call_stmt,
-				region_model_context *ctxt)
+				region_model_context *ctxt,
+				tree fn_decl = NULL)
 {
   /* Build a vec of argument svalues, using the current top
      frame for resolving tree expressions.  */
@@ -3151,10 +3152,12 @@ region_model::update_for_gcall (const gcall *call_stmt,
       tree arg = gimple_call_arg (call_stmt, i);
       arg_svals.quick_push (get_rvalue (arg, ctxt));
     }
-
-  /* get the function * from the call */
-  tree fn_decl = get_fndecl_for_call(call_stmt,ctxt);
-  function *fun = DECL_STRUCT_FUNCTION(fn_decl);
+  
+  /* Get the fn_decl from the call if not provided as argument.  */
+  if (!fn_decl)
+    fn_decl = get_fndecl_for_call (call_stmt,ctxt);
+ 
+  function *fun = DECL_STRUCT_FUNCTION (fn_decl);
   push_frame (fun, &arg_svals, ctxt);
 }
 
