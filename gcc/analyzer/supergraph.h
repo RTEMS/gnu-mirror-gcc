@@ -268,6 +268,11 @@ class supernode : public dnode<supergraph_traits>
     return i;
   }
 
+  gcall *get_returning_call () const
+  {
+    return m_returning_call;
+  }
+
   gimple *get_last_stmt () const
   {
     if (m_stmts.length () == 0)
