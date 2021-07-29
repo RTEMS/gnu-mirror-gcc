@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "attribs.h"
 #include "tree-object-size.h"
+#include "ipa-utils.h"
 
 #if ENABLE_ANALYZER
 
@@ -3140,7 +3141,8 @@ region_model::maybe_update_for_edge (const superedge &edge,
 
 void
 region_model::update_for_gcall (const gcall *call_stmt,
-				region_model_context *ctxt)
+				region_model_context *ctxt,
+				tree fn_decl)
 {
   /* Build a vec of argument svalues, using the current top
      frame for resolving tree expressions.  */
@@ -3151,9 +3153,11 @@ region_model::update_for_gcall (const gcall *call_stmt,
       tree arg = gimple_call_arg (call_stmt, i);
       arg_svals.quick_push (get_rvalue (arg, ctxt));
     }
-
-  /* Get the function * from the call.  */
-  tree fn_decl = get_fndecl_for_call (call_stmt,ctxt);
+  
+  /* Get the fn_decl from the call if not provided as argument.  */
+  if (!fn_decl)
+    fn_decl = get_fndecl_for_call (call_stmt,ctxt);
+ 
   function *fun = DECL_STRUCT_FUNCTION (fn_decl);
   push_frame (fun, &arg_svals, ctxt);
 }
@@ -3653,6 +3657,77 @@ region_model::get_fndecl_for_call (const gcall *call,
 	    return ultimate_node->decl;
 	}
     }
+
+  /* Call is possibly a polymorphic call.
+  
+     In such case, use devirtisation tools to find 
+     possible callees of this function call.  */
+  
+  function *fun = get_current_function ();
+  gcall *stmt  = const_cast<gcall *> (call);
+  cgraph_edge *e = cgraph_node::get (fun->decl)->get_edge (stmt);
+  if (e->indirect_info->polymorphic)
+  {
+    void *cache_token;
+    bool final;
+    vec <cgraph_node *> targets
+      = possible_polymorphic_call_targets (e, &final, &cache_token, true);
+    if (!targets.is_empty ())
+      {
+        tree most_propbable_taget = NULL_TREE;
+        if(targets.length () == 1)
+    	    return targets[0]->decl;
+    
+        /* From the current state, check which subclass the pointer that 
+           is being used to this polymorphic call points to, and use to
+           filter out correct function call.  */
+        tree t_val = gimple_call_arg (call, 0);
+        const svalue *sval = get_rvalue (t_val, ctxt);
+
+        const region *reg
+          = [&]()->const region *
+              {
+                switch (sval->get_kind ())
+                  {
+                    case SK_INITIAL:
+                      {
+                        const initial_svalue *initial_sval
+                          = sval->dyn_cast_initial_svalue ();
+                        return initial_sval->get_region ();
+                      }
+                      break;
+                    case SK_REGION:
+                      {
+                        const region_svalue *region_sval 
+                          = sval->dyn_cast_region_svalue ();
+                        return region_sval->get_pointee ();
+                      }
+                      break;
+
+                    default:
+                      return NULL;
+                  }
+              } ();
+
+        gcc_assert (reg);
+
+        tree known_possible_subclass_type;
+        known_possible_subclass_type = reg->get_type ();
+        if (reg->get_kind () == RK_FIELD)
+          {
+             const field_region* field_reg = reg->dyn_cast_field_region ();
+             known_possible_subclass_type 
+               = DECL_CONTEXT (field_reg->get_field ());
+          }
+
+        for (cgraph_node *x : targets)
+          {
+            if (DECL_CONTEXT (x->decl) == known_possible_subclass_type)
+              most_propbable_taget = x->decl;
+          }
+        return most_propbable_taget;
+      }
+   }
 
   return NULL_TREE;
 }

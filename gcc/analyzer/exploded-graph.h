@@ -818,7 +818,8 @@ public:
                             exploded_node *node,
                             program_state next_state,
                             program_point &next_point,
-                            uncertainty_t *uncertainty);
+                            uncertainty_t *uncertainty,
+                            logger *logger);
 
   exploded_node *get_or_create_node (const program_point &point,
 				     const program_state &state,

@@ -221,7 +221,8 @@ public:
   void push_call (exploded_graph &eg,
       		  exploded_node *enode,
       		  const gcall *call_stmt,
-      		  uncertainty_t *uncertainty);
+      		  uncertainty_t *uncertainty,
+      		  tree fn_decl = NULL);
 
   void returning_call (exploded_graph &eg,
       		       exploded_node *enode,

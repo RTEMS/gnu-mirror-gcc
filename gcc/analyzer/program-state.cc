@@ -1042,7 +1042,8 @@ void
 program_state::push_call (exploded_graph &eg,
       			  exploded_node *enode,
       			  const gcall *call_stmt,
-      			  uncertainty_t *uncertainty)
+      			  uncertainty_t *uncertainty,
+      			  tree fn_decl)
 {
   /* Update state.  */
   const program_point &point = enode->get_point ();
@@ -1053,7 +1054,7 @@ program_state::push_call (exploded_graph &eg,
           			  this,
           			  uncertainty,
           			  last_stmt);
-  m_region_model->update_for_gcall (call_stmt, &ctxt);
+  m_region_model->update_for_gcall(call_stmt, &ctxt, fn_decl);
 }
 
 /* Update this program_state to reflect a return from function

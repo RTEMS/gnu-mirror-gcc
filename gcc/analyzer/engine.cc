@@ -3037,12 +3037,14 @@ void
 exploded_graph::create_dynamic_call (const gcall *call,
                                      tree fn_decl,
                                      exploded_node *node,
-                                     program_state &next_state,
+                                     program_state next_state,
                                      program_point &next_point,
-                                     uncertainty_t *uncertainty)
+                                     uncertainty_t *uncertainty,
+                                     logger *logger)
 {
+  LOG_FUNC (logger);
+
   const program_point *this_point = &node->get_point ();
-  // assert for fn_decl ?
   function *fun = DECL_STRUCT_FUNCTION (fn_decl);
   if (fun)
     {
@@ -3057,12 +3059,16 @@ exploded_graph::create_dynamic_call (const gcall *call,
 
       new_point.push_to_call_stack (sn_exit,
   				    next_point.get_supernode());
-      next_state.push_call (*this, node, call, uncertainty);
+      next_state.push_call (*this, node, call, uncertainty, fn_decl);
 
-      // TODO: add some logging here regarding dynamic call
-      
       if (next_state.m_valid)
         {
+          if (logger)
+            logger->log ("Discovered call to %s [SN: %i -> SN: %i]",
+            		  function_name(fun),
+		          this_point->get_supernode ()->m_index,
+		          sn_entry->m_index);
+
           exploded_node *enode = get_or_create_node (new_point,
 					             next_state,
 					             node);
@@ -3312,7 +3318,10 @@ exploded_graph::process_node (exploded_node *node)
 	    program_state next_state (state);
 	    uncertainty_t uncertainty;
 
-	    /* Try to discover and analyse indirect function calls. */
+	    /* Try to discover and analyse indirect function calls.
+
+	       Some examples of such calls are virtual function calls
+	       and calls that happen via a function pointer.  */
             if (succ->m_kind == SUPEREDGE_INTRAPROCEDURAL_CALL
             	&& !(succ->get_any_callgraph_edge ()))
               {
@@ -3327,11 +3336,16 @@ exploded_graph::process_node (exploded_node *node)
                                                 point.get_stmt());
 
                 region_model *model = state.m_region_model;
-
-                /* Call is possibly happening via a function pointer.  */
-                if (tree fn_decl = model->get_fndecl_for_call(call,&ctxt))
-                  create_dynamic_call (call, fn_decl, node, next_state,
-                                       next_point, &uncertainty);
+                if (tree fn_decl = model->get_fndecl_for_call (call,&ctxt))
+                  {
+                    create_dynamic_call (call,
+                                         fn_decl,
+                                         node,
+                                         next_state,
+                                         next_point,
+                                         &uncertainty,
+                                         logger);
+                  }
               }
 
 	    if (!node->on_edge (*this, succ, &next_point, &next_state,
