@@ -61,6 +61,7 @@ proc check_effective_target_pch_supported_debug { } {
 proc dg-flags-pch { subdir test otherflags options suffix } {
     global runtests dg-do-what-default
     global pch_unsupported_debug pch_unsupported
+    global test_counts
 
     # If we're only testing specific files and this isn't one of them, skip it.
     if ![runtest_file_p $runtests $test] {
@@ -95,7 +96,13 @@ proc dg-flags-pch { subdir test otherflags options suffix } {
 	set dg-do-what-default precompile
 	catch { file_on_host delete "$bname$suffix" }
 	gcc_copy_files "[file rootname $test]${suffix}s" "$bname$suffix"
+
+	set before_unsupported $test_counts(UNSUPPORTED,count)
 	dg-test -keep-output "./$bname$suffix" "$otherflags $flags" ""
+	set after_unsupported $test_counts(UNSUPPORTED,count)
+	if { $after_unsupported > $before_unsupported } {
+	    continue
+	}
 
 	# For the rest, the default is to compile to .s.
 	set dg-do-what-default compile

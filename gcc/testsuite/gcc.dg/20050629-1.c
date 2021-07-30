@@ -159,7 +159,11 @@ __extension__ typedef __SIZE_TYPE__ size_t;
   static __inline__ void * ssa_operand_alloc (unsigned size) {
    char *ptr;
    if (operand_memory_index + size >= (2048 - sizeof (void *)))     {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+       ptr = (__intcap_t)ggc_alloc_stat (sizeof (struct ssa_operand_memory_d) );
+#else
        ptr = ggc_alloc_stat (sizeof (struct ssa_operand_memory_d) );
+#endif
      }
    ptr = &(operand_memory->mem[operand_memory_index]);
    return ptr;
@@ -241,7 +245,11 @@ __extension__ typedef __SIZE_TYPE__ size_t;
    enum tree_code code;
    tree expr = *expr_p;
      {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+       {  subvar_t svars;  if (var_can_have_subvars (expr)      && (svars = (__intcap_t)get_subvars_for_var (expr)))    {    }    {    }       }
+#else
        {  subvar_t svars;  if (var_can_have_subvars (expr)      && (svars = get_subvars_for_var (expr)))    {    }    {    }       }
+#endif
        {    {      if (code == LT_EXPR   || code == GE_EXPR)        {   swap_tree_operands (stmt,         &__extension__ (*({const tree __t = __extension__ ({ const tree __t = (expr); char const __c = tree_code_type[(int) (((enum tree_code) (__t)->common.code))]; if (!((__c) >= tcc_reference && (__c) <= tcc_expression)) tree_class_check_failed (__t, tcc_expression, "/home/cygnus/dnovillo/gcc/src.ppc64/gcc/tree-ssa-operands.c", 1435, __FUNCTION__); __t; }); const int __i = (0); if (__i < 0 || __i >= tree_code_length[(int) (((enum tree_code) (__t)->common.code))]) tree_operand_check_failed (__i, ((enum tree_code) (__t)->common.code), "/home/cygnus/dnovillo/gcc/src.ppc64/gcc/tree-ssa-operands.c", 1435, __FUNCTION__); &__t->exp.operands[__i]; })),         &__extension__ (*({const tree __t = __extension__ ({ const tree __t = (expr); char const __c = tree_code_type[(int) (((enum tree_code) (__t)->common.code))]; if (!((__c) >= tcc_reference && (__c) <= tcc_expression)) tree_class_check_failed (__t, tcc_expression, "/home/cygnus/dnovillo/gcc/src.ppc64/gcc/tree-ssa-operands.c", 1436, __FUNCTION__); __t; }); const int __i = (1); if (__i < 0 || __i >= tree_code_length[(int) (((enum tree_code) (__t)->common.code))]) tree_operand_check_failed (__i, ((enum tree_code) (__t)->common.code), "/home/cygnus/dnovillo/gcc/src.ppc64/gcc/tree-ssa-operands.c", 1436, __FUNCTION__); &__t->exp.operands[__i]; })));        }        {        }    }       }
      }
  }
@@ -283,7 +291,11 @@ const tree __t = __extension__ ({ const tree __t = (expr); char const __c = tree
   note_addressable (tree var, stmt_ann_t s_ann) {
    subvar_t svars;
      {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+       if (var_can_have_subvars (var)    && (svars = (__intcap_t)get_subvars_for_var (var)))  bitmap_set_bit (s_ann->addresses_taken, var_ann (var)->uid);
+#else
        if (var_can_have_subvars (var)    && (svars = get_subvars_for_var (var)))  bitmap_set_bit (s_ann->addresses_taken, var_ann (var)->uid);
+#endif
      }
  }
   const struct ggc_root_tab gt_ggc_r_gt_tree_ssa_operands_h[] = {

@@ -267,7 +267,8 @@ shared_const_p (const_rtx orig)
      a LABEL_REF, it isn't sharable.  */
   poly_int64 offset;
   return (any_plus_p (XEXP (orig, 0))
-	  && GET_CODE (XEXP (XEXP (orig, 0), 0)) == SYMBOL_REF
+	  && (GET_CODE (XEXP (XEXP (orig, 0), 0)) == SYMBOL_REF
+	      || GET_CODE (XEXP (XEXP (orig, 0), 0)) == CONST_NULL)
 	  && poly_int_rtx_p (XEXP (XEXP (orig, 0), 1), &offset));
 }
 

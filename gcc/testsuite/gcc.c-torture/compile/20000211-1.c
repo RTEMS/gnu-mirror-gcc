@@ -91,7 +91,11 @@ emacs_doprnt_1 (Lisp_Object stream, const  Bufbyte *format_nonreloc,
   printf_spec_dynarr *specs = 0;
   format_nonreloc = (( ((  struct Lisp_String  *) ((void *)((((     format_reloc     ) & ((1UL << ((4   * 8 )  - 4 ) ) - 1UL) ) ) | 0x40000000 )) )   )->_data + 0)  ;
   format_length = (( ((  struct Lisp_String  *) ((void *)((((     format_reloc     ) & ((1UL << ((4   * 8 )  - 4 ) ) - 1UL) ) ) | 0x40000000 )) )   )->_size)  ;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  specs = (__intcap_t)parse_doprnt_spec (format_nonreloc, format_length);
+#else
   specs = parse_doprnt_spec (format_nonreloc, format_length);
+#endif
   for (i = 0; i < (( specs )->cur) ; i++)
     {
       char ch;

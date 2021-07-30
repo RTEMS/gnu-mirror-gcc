@@ -23,10 +23,14 @@ fn0 (int *p, char *q)
 int *
 fn1 (int *p)
 {
-  p = 1; /* { dg-warning "assignment to 'int \\*' from 'int' makes pointer from integer without a cast" } */
-  int *q = 1; /* { dg-warning "initialization of 'int \\*' from 'int' makes pointer from integer without a cast" } */
-  foo2 (1); /* { dg-warning "passing argument 1 of 'foo2' makes pointer from integer without a cast" } */
-  return 1; /* { dg-warning "returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" } */
+  p = 1; /* { dg-warning "assignment to 'int \\*' from 'int' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+	 /* { dg-error "assigning to capability 'int \\*' from incompatible type 'int'" "" { target { aarch64_capability_any } } .-1 } */
+  int *q = 1; /* { dg-warning "initialization of 'int \\*' from 'int' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+	 /* { dg-error "initializing capability 'int \\*' with an expression of incompatible type 'int'" "" { target { aarch64_capability_any } } .-1 } */
+  foo2 (1); /* { dg-warning "passing argument 1 of 'foo2' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+	 /* { dg-error "passing 'int' to parameter of incompatible type capability 'int \\*' for argument 1 of 'foo2'" "" { target { aarch64_capability_any } } .-1 } */
+  return 1; /* { dg-warning "returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+	 /* { dg-error "returning 'int' from a function with incompatible result type capability 'int \\*'" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 int

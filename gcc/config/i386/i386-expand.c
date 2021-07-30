@@ -5748,7 +5748,9 @@ counter_mode (rtx count_exp)
     return GET_MODE (count_exp);
   if (!CONST_INT_P (count_exp))
     return Pmode;
-  if (TARGET_64BIT && (INTVAL (count_exp) & ~0xffffffff))
+/* MORELLO TODO: We will need to address this in the future. This is a hack to
+ * ensure that the i386 target still compiles and bootstraps successfully.  */
+  if (TARGET_64BIT)
     return DImode;
   return SImode;
 }
@@ -7205,6 +7207,14 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
   unsigned HOST_WIDE_INT probable_max_size = -1;
   bool misaligned_prologue_used = false;
   bool have_as;
+
+  /* MORELLO TODO: Same as above. This part adjusts the mode for count_exp
+   * if we get here in SImode and plan on adding it a different-mode dest
+   * address.  */
+  if (GET_MODE (XEXP (dst, 0)) != GET_MODE (count_exp)
+      && GET_MODE (count_exp) != VOIDmode)
+    count_exp = convert_to_mode (GET_MODE (XEXP (dst, 0)), count_exp, 1);
+
 
   if (CONST_INT_P (align_exp))
     align = INTVAL (align_exp);

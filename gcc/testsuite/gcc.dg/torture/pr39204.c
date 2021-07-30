@@ -94,7 +94,11 @@ void _post_process_filename (char *filename)
   if (!new_filename || strlen (new_filename) < 2)
     new_filename[strlen (filename) - 1] = 'x';
   if (!f1 || !f2)
+#ifdef __GCC_ARM_CAPABILITY_ANY
+    while ((line = (__intcap_t)m_fgets (f1)))
+#else
     while ((line = m_fgets (f1)))
+#endif
       {
 	line = _do_text_substitution (line);
 	fputs (line, f2);

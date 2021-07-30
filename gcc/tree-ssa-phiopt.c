@@ -825,8 +825,6 @@ conditional_replacement (basic_block cond_bb, basic_block middle_bb,
 			       noncapability_type (TREE_TYPE (result)), cond);
       cond = fold_build1_loc (gimple_location (stmt),
 			      NEGATE_EXPR, TREE_TYPE (cond), cond);
-      cond = fold_convert_loc (gimple_location (stmt),
-			       TREE_TYPE (result), cond);
     }
 
   if (capability_type_p (TREE_TYPE (result)))

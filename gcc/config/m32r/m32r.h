@@ -971,7 +971,7 @@ L2:     .word STATIC
 /* ??? The M32R doesn't have full 32-bit pointers, but making this PSImode has
    its own problems (you have to add extendpsisi2 and truncsipsi2).
    Try to avoid it.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* A function address in a call instruction.  */
 #define FUNCTION_MODE SImode

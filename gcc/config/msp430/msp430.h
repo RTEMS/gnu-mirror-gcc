@@ -197,7 +197,7 @@ extern const char *msp430_get_linker_devices_include_path (int, const char **);
 
 #define MAX_REGS_PER_ADDRESS 		1
 
-#define Pmode 				(TARGET_LARGE ? PSImode : HImode)
+#define POmode 				(TARGET_LARGE ? PSImode : HImode)
 #define POINTER_SIZE			(TARGET_LARGE ? 20 : 16)
 /* This is just for .eh_frame, to match bfd.  */
 #define PTR_SIZE			(TARGET_LARGE ? 4 : 2)

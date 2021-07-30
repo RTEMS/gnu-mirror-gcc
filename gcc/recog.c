@@ -1056,7 +1056,7 @@ address_operand (rtx op, machine_mode mode)
 {
   /* Wrong mode for an address expr.  */
   if (GET_MODE (op) != VOIDmode
-      && ! SCALAR_INT_MODE_P (GET_MODE (op)))
+      && ! SCALAR_ADDR_MODE_P (GET_MODE (op)))
     return false;
 
   return memory_address_p (mode, op);
@@ -1856,7 +1856,7 @@ find_constant_term_loc (rtx *p)
 
   /* Otherwise, if not a sum, it has no constant term.  */
 
-  if (GET_CODE (*p) != PLUS)
+  if (!any_plus_p (*p))
     return 0;
 
   /* If one of the summands is constant, return its location.  */
@@ -1963,7 +1963,8 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
   /* If the expression contains a constant term,
      see if it remains valid when max possible offset is added.  */
 
-  if ((ycode == PLUS) && (y2 = find_constant_term_loc (&y1)))
+  if ((ycode == PLUS || ycode == POINTER_PLUS)
+      && (y2 = find_constant_term_loc (&y1)))
     {
       int good;
 
@@ -2688,7 +2689,7 @@ constrain_operands (int strict, alternative_mask alternatives)
 		   have gotten them.  We also want to make sure we have a
 		   valid mode.  */
 		if ((GET_MODE (op) == VOIDmode
-		     || SCALAR_INT_MODE_P (GET_MODE (op)))
+		     || SCALAR_ADDR_MODE_P (GET_MODE (op)))
 		    && (strict <= 0
 			|| (strict_memory_address_p
 			     (recog_data.operand_mode[opno], op))))

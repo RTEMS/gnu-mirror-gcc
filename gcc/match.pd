@@ -1712,7 +1712,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 (for op (simple_comparison)
  (simplify
   (op (pointer_diff@3 @0 @2) (pointer_diff @1 @2))
-  (if (!TYPE_OVERFLOW_SANITIZED (TREE_TYPE (@2)))
+  (if (!TYPE_OVERFLOW_SANITIZED (TREE_TYPE (@2))
+       && !capability_type_p (TREE_TYPE (@0))
+       && !capability_type_p (TREE_TYPE (@1)))
    (op @0 @1))))
 (simplify
  (minus (pointer_diff@3 @0 @2) (pointer_diff @1 @2))
@@ -1739,7 +1741,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 (for op (simple_comparison)
  (simplify
   (op (pointer_diff@3 @2 @0) (pointer_diff @2 @1))
-  (if (!TYPE_OVERFLOW_SANITIZED (TREE_TYPE (@2)))
+  (if (!TYPE_OVERFLOW_SANITIZED (TREE_TYPE (@2))
+       && !capability_type_p (TREE_TYPE (@0))
+       && !capability_type_p (TREE_TYPE (@1)))
    (op @1 @0))))
 (simplify
  (minus (pointer_diff@3 @2 @0) (pointer_diff @2 @1))
@@ -1896,9 +1900,12 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        && ((GIMPLE && useless_type_conversion_p (type, TREE_TYPE (@1)))
 	    || (GENERIC && type == TREE_TYPE (@1))))
    @1))
+/* MORELLO Can not just convert @1 since we would then be using the metadata
+   from @1 rather than from @0.  */
 (simplify
   (pointer_plus @0 (convert?@2 (pointer_diff@3 @1 @@0)))
-  (if (TYPE_PRECISION (TREE_TYPE (@2)) >= TYPE_PRECISION (TREE_TYPE (@3)))
+  (if (TYPE_PRECISION (TREE_TYPE (@2)) >= TYPE_PRECISION (TREE_TYPE (@3))
+       && !capability_type_p (type))
    (convert @1)))
 
 /* Pattern match
@@ -3823,7 +3830,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (for sub (minus pointer_diff)
   (simplify
    (cmp (sub@2 @0 @1) integer_zerop)
-   (if (single_use (@2))
+   (if (single_use (@2)
+	&& !capability_type_p (TREE_TYPE (@0))
+	&& !capability_type_p (TREE_TYPE (@1)))
     (cmp @0 @1)))))
 
 /* Transform comparisons of the form X * C1 CMP 0 to X CMP 0 in the

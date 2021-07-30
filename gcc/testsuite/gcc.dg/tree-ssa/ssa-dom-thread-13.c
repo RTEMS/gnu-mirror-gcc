@@ -35,7 +35,11 @@ convert (tree type, tree expr)
   if (type->type_common.main_variant == expr->typed.type->type_common.main_variant
       && (expr->typed.type->base.code != 123
 	  || e->base.code == 456))
+#ifdef __GCC_ARM_CAPABILITY_ANY
+    return (__intcap_t) arf ();
+#else
     return arf ();
+#endif
   if (expr->typed.type->base.code == 42)
     error ("void value not ignored as it ought to be");
 }

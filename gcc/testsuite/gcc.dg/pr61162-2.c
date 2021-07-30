@@ -32,7 +32,8 @@ fn4 (int *a)
 int *
 fn5 (int a)
 {
-  return a; /* { dg-warning "10:returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" } */
+  return a; /* { dg-warning "10:returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+	    /* { dg-error "10:returning 'int' from a function with incompatible result type capability 'int \\*'" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 unsigned int *

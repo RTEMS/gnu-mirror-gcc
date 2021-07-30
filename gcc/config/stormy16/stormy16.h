@@ -473,6 +473,6 @@ enum reg_class
 
 #define SHIFT_COUNT_TRUNCATED 1
 
-#define Pmode HImode
+#define POmode HImode
 
 #define FUNCTION_MODE HImode

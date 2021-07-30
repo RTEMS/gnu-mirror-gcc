@@ -93,7 +93,6 @@ static rtx do_store_flag (sepops, rtx, machine_mode);
 #ifdef PUSH_ROUNDING
 static void emit_single_push_insn (machine_mode, rtx, tree);
 #endif
-static bool valid_conversion_p (machine_mode to_mode, machine_mode from_mode);
 static void do_tablejump (rtx, machine_mode, rtx, rtx, rtx,
 			  profile_probability);
 static rtx const_vector_from_tree (tree);
@@ -3840,7 +3839,8 @@ emit_move_insn (rtx x, rtx y)
   rtx set;
 
   gcc_assert (mode != BLKmode
-	      && (GET_MODE (y) == mode || GET_MODE (y) == VOIDmode));
+	      && (GET_MODE (y) == mode
+		  || (GET_MODE (y) == VOIDmode && !CAPABILITY_MODE_P (mode))));
 
   /* If we have a copy that looks like one of the following patterns:
        (set (subreg:M1 (reg:M2 ...)) (subreg:M1 (reg:M2 ...)))
@@ -4360,7 +4360,7 @@ emit_single_push_insn_1 (machine_mode mode, rtx x, tree type)
 				    STACK_GROWS_DOWNWARD ? sub_optab
 				    : add_optab,
 				    stack_pointer_rtx,
-				    gen_int_mode (rounded_size, Pmode),
+				    gen_int_mode (rounded_size, POmode),
 				    NULL_RTX, 0, OPTAB_LIB_WIDEN));
 
       poly_int64 offset = rounded_size - GET_MODE_SIZE (mode);
@@ -4586,7 +4586,7 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	      && args_addr == 0
 	      && where_pad != PAD_NONE
 	      && where_pad != stack_direction)
-	    anti_adjust_stack (gen_int_mode (extra, Pmode));
+	    anti_adjust_stack (gen_int_mode (extra, POmode));
 
 	  move_by_pieces (NULL, xinner, INTVAL (size) - used, align,
 			  RETURN_BEGIN);
@@ -10108,6 +10108,38 @@ stmt_is_replaceable_p (gimple *stmt)
 }
 
 rtx
+expand_internal_fn_call (tree exp, rtx target __attribute__ ((unused)),
+			 machine_mode tmode,
+			 enum expand_modifier modifier,
+			 rtx *alt_rtl __attribute__ ((unused)),
+			 bool inner_reference_p __attribute__ ((unused)))
+{
+  /* For now only implemented for IFN_REPLACE_ADDRESS_VALUE, but to be updated
+     as needed.  */
+  switch (CALL_EXPR_IFN (exp))
+    {
+      case IFN_REPLACE_ADDRESS_VALUE:
+	{
+	  /* For now only implemented for an initializer.  */
+	  gcc_assert (TREE_CODE (CALL_EXPR_ARG (exp, 0)) != CALL_EXPR);
+	  gcc_assert (modifier == EXPAND_INITIALIZER);
+	  /* When expanding an initializer, we need both elements to be
+	     constant since there is no-where for calculation to go.  */
+	  tree ptr_arg = CALL_EXPR_ARG (exp, 0);
+	  tree val_arg = CALL_EXPR_ARG (exp, 1);
+	  gcc_assert (initializer_constant_valid_p (ptr_arg, TREE_TYPE (ptr_arg)));
+	  gcc_assert (initializer_constant_valid_p (val_arg, TREE_TYPE (val_arg)));
+	  rtx ptr = expand_expr (ptr_arg, NULL_RTX, VOIDmode, modifier);
+	  rtx val = expand_expr (val_arg, NULL_RTX, VOIDmode, modifier);
+	  tmode = tmode == VOIDmode ? GET_MODE (ptr) : tmode;
+	  return simplify_gen_binary (REPLACE_ADDRESS_VALUE, tmode, ptr, val);
+	}
+      default:
+	gcc_unreachable ();
+    }
+}
+
+rtx
 expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 		    enum expand_modifier modifier, rtx *alt_rtl,
 		    bool inner_reference_p)
@@ -10661,8 +10693,23 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	        && !reverse
 		&& poly_int_tree_p (TYPE_SIZE (type), &type_size)
 		&& known_eq (GET_MODE_BITSIZE (DECL_MODE (base)), type_size))
-	      return expand_expr (build1 (VIEW_CONVERT_EXPR, type, base),
-				  target, tmode, modifier);
+	      {
+		if (capability_args_valid (type, VIEW_CONVERT_EXPR, base))
+		  return expand_expr (build1 (VIEW_CONVERT_EXPR, type, base),
+				      target, tmode, modifier);
+		unsigned prec = TYPE_NONCAP_PRECISION (type);
+		tree inttype
+			= lang_hooks.types.type_for_size (prec,
+							  TYPE_UNSIGNED (type));
+		tree tmp = build1 (VIEW_CONVERT_EXPR, inttype, base);
+		tree ptr_zero = build_zero_cst (type);
+		scalar_addr_mode outmode
+			= as_a <scalar_addr_mode> (TYPE_MODE (type));
+		return expand_replace_address_value (outmode,
+						     expand_normal (ptr_zero),
+						     expand_normal (tmp),
+						     target);
+	      }
 	    if (TYPE_MODE (type) == BLKmode)
 	      {
 		temp = assign_stack_temp (DECL_MODE (base),
@@ -11367,6 +11414,9 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    return expand_builtin (exp, target, subtarget, tmode, ignore);
 	  }
       }
+      if (CALL_EXPR_FN (exp) == NULL_TREE)
+	return expand_internal_fn_call (exp, target, tmode, modifier, alt_rtl,
+					inner_reference_p);
       return expand_call (exp, target, ignore);
 
     case VIEW_CONVERT_EXPR:
@@ -12722,7 +12772,7 @@ try_casesi (tree index_type, tree index_expr, tree minval, tree range,
    This corresponds to ensuring that the capability metadata either has the
    same interpretation in both modes, or is dropped. */
 
-static bool
+bool
 valid_conversion_p (machine_mode to_mode, machine_mode from_mode)
 {
   scalar_addr_mode sa;

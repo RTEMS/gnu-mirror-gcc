@@ -505,7 +505,7 @@ extern int current_first_parm_offset;
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode HImode
+#define POmode HImode
 
 /* A function address in a call instruction
    is a word address (for indexing purposes)

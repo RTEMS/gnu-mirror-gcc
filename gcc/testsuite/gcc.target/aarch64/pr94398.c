@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-O2 -ftree-loop-vectorize -funsafe-math-optimizations -march=armv8.2-a+sve -mstrict-align" } */
 
 float

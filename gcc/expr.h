@@ -326,4 +326,6 @@ extern void expand_operands (tree, tree, rtx, rtx*, rtx*,
 /* Return an rtx for the size in bytes of the value of an expr.  */
 extern rtx expr_size (tree);
 
+extern bool valid_conversion_p (machine_mode to_mode, machine_mode from_mode);
+
 #endif /* GCC_EXPR_H */

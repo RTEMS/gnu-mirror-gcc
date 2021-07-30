@@ -16,5 +16,9 @@ void
 fn1 (void)
 {
   for (; b; b++, a++)
+#ifdef __GCC_ARM_CAPABILITY_ANY
+    a->f1 = (__intcap_t)b;
+#else
     a->f1 = b;
+#endif
 }

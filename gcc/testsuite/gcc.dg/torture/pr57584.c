@@ -5,7 +5,11 @@
 
 typedef int int32_t;
 typedef unsigned char uint8_t;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINTPTR_TYPE__ uintptr_t;
+#else
 typedef unsigned long int uintptr_t;
+#endif
 typedef uint8_t scm_t_uint8;
 typedef int32_t scm_t_int32;
 typedef uintptr_t scm_t_uintptr;

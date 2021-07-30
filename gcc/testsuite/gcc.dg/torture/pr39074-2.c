@@ -3,7 +3,11 @@
 /* { dg-options "-fdump-tree-alias" } */
 /* { dg-skip-if "" { *-*-* } { "-O0" "-fno-fat-lto-objects" } { "" } } */
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINTPTR_TYPE__ uintptr_t;
+#else
 #include <stdint.h>
+#endif
 
 int i;
 uintptr_t __attribute__((noinline,const)) bar(int ***p) { return (uintptr_t)p; }

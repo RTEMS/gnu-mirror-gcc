@@ -445,7 +445,7 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* A function address in a call instruction
    is a byte address (for indexing purposes)

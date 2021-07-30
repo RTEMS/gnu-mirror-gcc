@@ -208,6 +208,12 @@ enum combined_fn {
   CFN_LAST
 };
 
+/* This is a constant for how many BUILT_IN definitions exist between a
+   BUILT_IN_x_1 and a BUILT_IN_x_CAPABILITY. All _CAPABILITY BUILT_INs must
+   be defined this way.  Currently this resolves to 5.  */
+#define CAPABILITY_BUILTIN_FCODE_DIFF BUILT_IN_ATOMIC_LOAD_CAPABILITY \
+				- BUILT_IN_ATOMIC_LOAD_1
+
 /* Tree code classes.  Each tree_code has an associated code class
    represented by a TREE_CODE_CLASS.  */
 enum tree_code_class {
@@ -858,7 +864,8 @@ enum attribute_flags {
      are not in fact compatible with the function type.  */
   ATTR_FLAG_BUILT_IN = 16,
   /* A given attribute has been parsed as a C++-11 attribute.  */
-  ATTR_FLAG_CXX11 = 32
+  ATTR_FLAG_CXX11 = 32,
+  ATTR_FLAG_CHERI_INNER_APPLY = 64
 };
 
 /* Types used to represent sizes.  */

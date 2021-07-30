@@ -1,7 +1,11 @@
 /* { dg-do run } */
 /* { dg-options "-std=c99" } */
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINTPTR_TYPE__ uintptr_t;
+#else
 #include <stdint.h>
+#endif
 
 extern void abort (void);
 

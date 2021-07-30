@@ -38,7 +38,11 @@ _cpp_parse_expr (pfile)
   for (;;)
     {
       struct op op;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      op = lex ((__intcap_t) pfile, skip_evaluation);
+#else
       op = lex (pfile, skip_evaluation);
+#endif
       switch (op.op)
 	{
 	case CPP_OR_OR:

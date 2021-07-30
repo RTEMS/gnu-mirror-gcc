@@ -1185,7 +1185,7 @@ do									\
    `POINTER_SIZE'.  If it is not equal, you must define the macro
    `POINTERS_EXTEND_UNSIGNED' to specify how pointers are extended to
    `Pmode'. */
-#define Pmode SImode
+#define POmode SImode
 
 /* `FUNCTION_MODE'
 

@@ -674,7 +674,7 @@ typedef struct {
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
 
-#define Pmode word_mode
+#define POmode word_mode
 
 /* Give call MEMs SImode since it is the "most permissive" mode
    for both 32-bit and 64-bit targets.  */

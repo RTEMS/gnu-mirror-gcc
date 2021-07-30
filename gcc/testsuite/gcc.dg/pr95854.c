@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-options "-O3 -fno-vect-cost-model -fno-tree-scev-cprop -ftracer" } */
-/* { dg-additional-options "-march=armv8.5-a+sve2" { target aarch64*-*-* } } */
+/* { dg-additional-options "-march=armv8.5-a+sve2" { target { { aarch64*-*-* } && { ! aarch64_capability_any } } } } */
 
 extern void abort (void);
 int c, d;

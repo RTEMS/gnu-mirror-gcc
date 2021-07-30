@@ -226,4 +226,16 @@ AARCH64_OPT_EXTENSION("f64mm", AARCH64_FL_F64MM, \
 AARCH64_OPT_EXTENSION("bf16", AARCH64_FL_BF16, \
 		      AARCH64_FL_SIMD | AARCH64_FL_FP, 0, false, "bf16")
 
+/* Enabling/Disabling "c64" only changes "c64".
+   N.b. C64 as an extension is a bit strange for the assembler since it not
+   only defines which instructions can be used but also defines whether
+   functions are purecap or not by default.
+   I.e. this is not quite used as the standard architecture extension, rather
+   it's used to indicate which state the processor will execute instructions
+   in.
+   That also means that it doesn't matter whether /proc/cpuinfo indicates that
+   this feature is available or not since we may or may not want this extension
+   enabled for codegen and for the assembler if it's available.  */
+AARCH64_OPT_EXTENSION("c64", AARCH64_FL_C64, 0, 0, false, "")
+
 #undef AARCH64_OPT_EXTENSION

@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-fgnu-tm -fopenmp" } */
 /* { dg-require-effective-target pthread } */
 

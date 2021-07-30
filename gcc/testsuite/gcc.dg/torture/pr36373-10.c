@@ -1,6 +1,8 @@
 /* { dg-do run } */
 
-#ifdef __SIZE_TYPE__
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINTPTR_TYPE__ uintptr_t;
+#elif defined (__SIZE_TYPE__)
 typedef __SIZE_TYPE__ uintptr_t;
 #elif (__SIZEOF_LONG_LONG__ == __SIZEOF_POINTER__)
 typedef unsigned long long uintptr_t;

@@ -69,17 +69,29 @@ static bool
 lowparts_p (rtx x, machine_mode mx, rtx y, machine_mode my)
 {
   rtx left, right, tem;
+  poly_uint64 lowpart_offset_yx = subreg_lowpart_offset (my, mx);
+  poly_uint64 lowpart_offset_xy = subreg_lowpart_offset (mx, my);
 
-  tem = simplify_subreg (my, x, mx, subreg_lowpart_offset (my, mx));
+  tem = simplify_subreg (my, x, mx, lowpart_offset_yx);
   left = tem ? tem : x;
 
-  tem = simplify_subreg (mx, y, my, subreg_lowpart_offset (mx, my));
+  tem = simplify_subreg (mx, y, my, lowpart_offset_xy);
   right = tem ? tem : y;
 
   if (CONST_INT_P (left))
     return CONST_INT_P (right) && INTVAL (left) == INTVAL (right);
 
-  return REG_P (left) && REG_P (right) && REGNO (left) == REGNO (right);
+  if (!REG_P (left) || !REG_P (right))
+    return false;
+  else if (!HARD_REGISTER_P (left) || !HARD_REGISTER_P (right))
+    return REGNO (left) == REGNO (right);
+  else
+    return REGNO (left) - subreg_regno_offset (REGNO (left), mx,
+					       lowpart_offset_yx,
+					       my)
+	   == REGNO (right) - subreg_regno_offset (REGNO (right), my,
+						   lowpart_offset_xy,
+						   mx);
 }
 
 /* Test whether expression, X, is an immediate constant that represents
@@ -7100,6 +7112,15 @@ simplify_subreg (machine_mode outermode, rtx op,
   if (GET_CODE (op) == CONST_VECTOR)
     byte = simplify_const_vector_byte_offset (op, byte);
 
+  if (CONST_NULL_P (op))
+    {
+      unsigned HOST_WIDE_INT cbyte;
+      if (byte.is_constant (&cbyte)
+	  && known_eq (cbyte, subreg_lowpart_offset (outermode, innermode))
+	  && noncapability_mode (innermode) == outermode)
+	return gen_int_mode (0, outermode);
+    }
+
   if (multiple_p (byte, GET_MODE_UNIT_SIZE (innermode)))
     {
       rtx elt;
@@ -7483,7 +7504,7 @@ simplify_rtx (const_rtx x)
 rtx
 gen_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset)
 {
-  check_pointer_offset_modes (mode, base, offset);
+  check_pointer_offset_modes (mode, base, offset, true);
   if (CAPABILITY_MODE_P (mode))
     return simplify_gen_binary (POINTER_PLUS, mode, base, offset);
   return simplify_gen_binary (PLUS, offset_mode (mode), base, offset);
@@ -7493,7 +7514,7 @@ gen_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset)
 rtx
 gen_pointer_minus (scalar_addr_mode mode, rtx base, rtx offset)
 {
-  check_pointer_offset_modes (mode, base, offset);
+  check_pointer_offset_modes (mode, base, offset, true);
   if (CAPABILITY_MODE_P (mode))
     {
       machine_mode om = noncapability_mode (mode);
@@ -8131,10 +8152,10 @@ test_capability_plus_constant ()
 static void
 test_pointer_plus_simplifications ()
 {
-  rtx r0 = gen_rtx_REG (DImode, 0);
-  rtx r1 = gen_rtx_REG (DImode, 1);
-  rtx r2 = gen_rtx_REG (DImode, 2);
-  rtx c0 = gen_rtx_REG (CADImode, 0);
+  rtx r0 = gen_rtx_REG (DImode, 4);
+  rtx r1 = gen_rtx_REG (DImode, 10);
+  rtx r2 = gen_rtx_REG (DImode, 12);
+  rtx c0 = gen_rtx_REG (CADImode, 4);
 
   /* Simplify to PLUS: no further folding possible.  */
   rtx x = simplify_binary_operation (POINTER_PLUS,
@@ -8241,9 +8262,9 @@ test_replace_address_value_simplifications ()
   cm = CADImode;
   om = DImode;
 
-  rtx c0 = gen_rtx_REG (cm, 0);
-  rtx r0 = gen_rtx_REG (om, 0);
-  rtx r1 = gen_rtx_REG (om, 1);
+  rtx c0 = gen_rtx_REG (cm, 4);
+  rtx r0 = gen_rtx_REG (om, 4);
+  rtx r1 = gen_rtx_REG (om, 8);
 
   /* Collapse to RHS if mode is a scalar_int_mode.  */
   ASSERT_EQ (simplify_gen_binary (REPLACE_ADDRESS_VALUE,
@@ -8300,8 +8321,8 @@ test_align_address_down_simplifications ()
 {
   machine_mode cm = CADImode, om = DImode;
 
-  rtx c0 = gen_rtx_REG (cm, 0);
-  rtx r0 = gen_rtx_REG (om, 0);
+  rtx c0 = gen_rtx_REG (cm, 4);
+  rtx r0 = gen_rtx_REG (om, 4);
 
   rtx x = simplify_gen_binary (ALIGN_ADDRESS_DOWN, om, r0, GEN_INT (16));
   ASSERT_EQ (GET_CODE (x), AND);
@@ -8342,12 +8363,22 @@ test_align_address_down_simplifications ()
 }
 
 static void
+test_const_null_subreg ()
+{
+  rtx inner = CONST0_RTX (CADImode);
+  rtx di_zero = CONST0_RTX (DImode);
+  ASSERT_EQ (simplify_subreg (DImode, inner, CADImode,
+			      subreg_lowpart_offset (DImode, CADImode)),
+	     di_zero);}
+
+static void
 test_capability_simplifications ()
 {
   test_capability_plus_constant ();
   test_pointer_plus_simplifications ();
   test_replace_address_value_simplifications ();
   test_align_address_down_simplifications ();
+  test_const_null_subreg ();
 }
 
 /* Run all of the selftests within this file.  */

@@ -2083,6 +2083,11 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
     case AARCH64_PAUTH_BUILTIN_AUTIB1716:
     case AARCH64_PAUTH_BUILTIN_PACIB1716:
     case AARCH64_PAUTH_BUILTIN_XPACLRI:
+      /* PAC + capabilities are not supported: expand the builtins as
+	 no-ops if we're compiling for a capability target.  */
+      if (TARGET_CAPABILITY_ANY)
+	return target;
+
       arg0 = CALL_EXPR_ARG (exp, 0);
       op0 = force_reg (Pmode, expand_normal (arg0));
 

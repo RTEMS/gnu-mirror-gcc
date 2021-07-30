@@ -2001,7 +2001,7 @@ do {							\
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode (ix86_pmode == PMODE_DI ? DImode : SImode)
+#define POmode (ix86_pmode == PMODE_DI ? DImode : SImode)
 
 /* Supply a definition of STACK_SAVEAREA_MODE for emit_stack_save.
    NONLOCAL needs space to save both shadow stack and stack pointers.

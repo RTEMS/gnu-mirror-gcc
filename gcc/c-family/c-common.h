@@ -249,6 +249,10 @@ enum rid
   RID_FIRST_INT_N = RID_INT_N_0,
   RID_LAST_INT_N = RID_INT_N_3,
 
+  /* Reserved Identifier for the __capability or cheri_capability type
+     attribute.  */
+  RID_CHERI_CAPABILITY,
+
   RID_MAX,
 
   RID_FIRST_MODIFIER = RID_STATIC,
@@ -437,7 +441,6 @@ extern machine_mode c_default_pointer_mode;
 #define D_CXX_CHAR8_T	0X1000	/* In C++, only with -fchar8_t.  */
 #define D_CXX20		0x2000  /* In C++, C++20 only.  */
 #define D_CXX_COROUTINES 0x4000  /* In C++, only with coroutines.  */
-#define D_CAP_ONLY      0x8000  /* In anything, but only with capabilities.  */
 
 #define D_CXX_CONCEPTS_FLAGS D_CXXONLY | D_CXX_CONCEPTS
 #define D_CXX_CHAR8_T_FLAGS D_CXXONLY | D_CXX_CHAR8_T
@@ -813,6 +816,8 @@ extern tree (*make_fname_decl) (location_t, tree, int);
 extern void c_register_addr_space (const char *str, addr_space_t as);
 
 /* In c-common.c.  */
+extern tree drop_capability (tree);
+extern tree drop_intcap (tree);
 extern bool in_late_binary_op;
 extern const char *c_addr_space_name (addr_space_t as);
 extern tree identifier_global_value (tree);
@@ -853,7 +858,7 @@ extern tree c_common_fixed_point_type_for_size (unsigned int, unsigned int,
 extern tree c_common_unsigned_type (tree);
 extern tree c_common_signed_type (tree);
 extern tree c_common_signed_or_unsigned_type (int, tree);
-extern tree c_common_cap_from_int (tree, tree);
+extern tree c_common_cap_from_noncap (tree, tree);
 extern void c_common_init_ts (void);
 extern tree c_build_bitfield_integer_type (unsigned HOST_WIDE_INT, int);
 extern enum conversion_safety unsafe_conversion_p (tree, tree, tree, bool);
@@ -964,7 +969,8 @@ extern void c_parse_final_cleanups (void);
 #define C_MAYBE_CONST_EXPR_NON_CONST(NODE)		\
   TREE_LANG_FLAG_1 (C_MAYBE_CONST_EXPR_CHECK (NODE))
 #define EXPR_INT_CONST_OPERANDS(EXPR)			\
-  (INTEGRAL_TYPE_P (TREE_TYPE (EXPR))			\
+  ((INTEGRAL_TYPE_P (TREE_TYPE (EXPR))			\
+    || INTCAP_TYPE_P (TREE_TYPE (EXPR)))		\
    && (TREE_CODE (EXPR) == INTEGER_CST			\
        || (TREE_CODE (EXPR) == C_MAYBE_CONST_EXPR	\
 	   && C_MAYBE_CONST_EXPR_INT_OPERANDS (EXPR))))

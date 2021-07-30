@@ -1,5 +1,5 @@
 /* PR tree-optimization/90866 - ICE in fold_binary_loc, at fold-const.c:9827
-   { dg-do compile  }
+   { dg-do compile { target { ! aarch64_capability_any } } }
    { dg-require-effective-target global_constructor }
    { dg-options "-O2 -fsanitize=thread" }
  */

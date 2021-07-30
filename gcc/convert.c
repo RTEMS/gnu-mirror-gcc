@@ -677,6 +677,7 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
 
   switch (TREE_CODE (intype))
     {
+    case INTCAP_TYPE:
     case POINTER_TYPE:
     case REFERENCE_TYPE:
       if (integer_zerop (expr)

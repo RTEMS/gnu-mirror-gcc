@@ -1,4 +1,8 @@
+#ifndef __GCC_ARM_CAPABILITY_ANY
 typedef __UINTPTR_TYPE__ uintptr_t;
+#else
+typedef unsigned uintptr_t __attribute__((mode(address)));
+#endif
 
 extern void srand (uintptr_t);
 

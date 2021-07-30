@@ -101,6 +101,32 @@ extern "C" {
     return func arglist;			\
   }
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+
+#define T1(func)				\
+  TEST_FUNC (func, ());				\
+  TEST_FUNC (func, ((__intcap_t)1));			\
+  TEST_FUNC (func, (""));			\
+  TEST_FUNC (func, ((void*)1));			\
+  TEST_FUNC (func, (iarr));			\
+  TEST_FUNC (func, (function))
+
+#define T2(func)				\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1));			\
+  TEST_FUNC (func, ((__intcap_t)1, ""));			\
+  TEST_FUNC (func, ((__intcap_t)1, (void*)1));		\
+  TEST_FUNC (func, ((__intcap_t)1, iarr));			\
+  TEST_FUNC (func, ((__intcap_t)1, function))
+
+#define T3(func)				\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1, (__intcap_t)1));			\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1, ""));			\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1, (void*)1));		\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1, iarr));		\
+  TEST_FUNC (func, ((__intcap_t)1, (__intcap_t)1, function))
+
+#else
+
 #define T1(func)				\
   TEST_FUNC (func, ());				\
   TEST_FUNC (func, (1));			\
@@ -122,6 +148,8 @@ extern "C" {
   TEST_FUNC (func, (1, 1, (void*)1));		\
   TEST_FUNC (func, (1, 1, iarr));		\
   TEST_FUNC (func, (1, 1, function))
+
+#endif
 
 extern int iarr[];
 extern void function (void);

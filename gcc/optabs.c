@@ -6663,7 +6663,7 @@ rtx
 expand_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset, rtx target,
 		     int unsignedp, enum optab_methods methods)
 {
-  check_pointer_offset_modes (mode, base, offset);
+  check_pointer_offset_modes (mode, base, offset, false);
   if (CAPABILITY_MODE_P (mode))
     return expand_binop (mode, pointer_plus_optab, base, offset, target, unsignedp, methods);
   else
@@ -6675,7 +6675,7 @@ expand_pointer_minus (scalar_addr_mode mode, rtx base, rtx offset, rtx target,
 		      int unsignedp, enum optab_methods methods)
 {
   rtx temp;
-  check_pointer_offset_modes (mode, base, offset);
+  check_pointer_offset_modes (mode, base, offset, false);
   if (CAPABILITY_MODE_P (mode))
     {
       temp = expand_binop (mode, pointer_minus_optab, base, offset, target, unsignedp, methods);
@@ -6694,7 +6694,7 @@ expand_align_down (scalar_addr_mode mode, rtx x, rtx align, rtx target,
 		   int unsignedp, enum optab_methods methods)
 {
   rtx temp;
-  check_pointer_offset_modes (mode, x, align);
+  check_pointer_offset_modes (mode, x, align, false);
   temp = expand_binop (mode, align_down_optab, x, align, target, unsignedp, methods);
   if (temp)
     return temp;
@@ -6711,7 +6711,7 @@ expand_align_up (scalar_addr_mode mode, rtx x, rtx align, rtx target,
 		 int unsignedp, enum optab_methods methods)
 {
   rtx temp;
-  check_pointer_offset_modes (mode, x, align);
+  check_pointer_offset_modes (mode, x, align, false);
   temp = expand_binop (mode, align_up_optab, x, align, target, unsignedp, methods);
   if (temp)
     return temp;

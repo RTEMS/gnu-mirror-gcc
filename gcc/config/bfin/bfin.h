@@ -230,7 +230,7 @@
 extern const char *bfin_library_id_string;
 
 #define FUNCTION_MODE    SImode
-#define Pmode            SImode
+#define POmode            SImode
 
 /* store-condition-codes instructions store 0 for false
    This is the value stored for true.  */

@@ -1825,20 +1825,17 @@ default_print_patchable_function_entry (FILE *file,
       char buf[256];
       static int patch_area_number;
       section *previous_section = in_section;
-      const char *asm_op = integer_asm_op (POINTER_SIZE_UNITS, false);
 
-      gcc_assert (asm_op != NULL);
       patch_area_number++;
       ASM_GENERATE_INTERNAL_LABEL (buf, "LPFE", patch_area_number);
+      rtx sym = gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (buf));
 
-      switch_to_section (get_section ("__patchable_function_entries",
-				      SECTION_WRITE | SECTION_RELRO, NULL));
-      assemble_align (POINTER_SIZE);
-      fputs (asm_op, file);
-      assemble_name_raw (file, buf);
-      fputc ('\n', file);
+      section *pfe_section = (get_section ("__patchable_function_entries",
+			      SECTION_WRITE | SECTION_RELRO, NULL));
 
+      assemble_addr_to_section (sym, pfe_section);
       switch_to_section (previous_section);
+
       ASM_OUTPUT_LABEL (file, buf);
     }
 

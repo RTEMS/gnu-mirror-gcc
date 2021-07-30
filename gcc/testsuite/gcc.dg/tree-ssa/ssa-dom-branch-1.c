@@ -11,9 +11,17 @@ rtx
 try_combine (rtx i1, rtx newpat)
 {
   rtx temp;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  if (i1 && (temp = (__intcap_t)((((((newpat->rt_rtx, ((((temp)->code) == 42)))))))))
+#else
   if (i1 && (temp = ((((((newpat->rt_rtx, ((((temp)->code) == 42)))))))))
+#endif
       && ((temp =
+#ifdef __GCC_ARM_CAPABILITY_ANY
+	(__intcap_t)(((((((((((newpat)->rt_rtx),
+#else
 	(((((((((((newpat)->rt_rtx),
+#endif
 		 ((((temp)->code) == 42) && arf ())))))))))))))
     ;
   else if (i1 && foo ());

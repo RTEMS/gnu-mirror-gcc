@@ -413,19 +413,20 @@
 (define_predicate "aarch64_9bit_offset_memory_operand"
   (and (match_operand 0 "memory_operand")
        (ior (match_code "reg" "0")
-	    (and (match_code "plus" "0")
+	    (and (ior (match_code "plus" "0")
+		      (match_code "pointer_plus" "0"))
 		 (match_code "reg"  "00")
 		 (match_code "const_int" "01"))))
 {
   rtx mem_op = XEXP (op, 0);
 
   if (REG_P (mem_op))
-    return GET_MODE (mem_op) == DImode;
+    return (GET_MODE (mem_op) == DImode || GET_MODE (mem_op) == Pmode);
 
   rtx plus_op0 = XEXP (mem_op, 0);
   rtx plus_op1 = XEXP (mem_op, 1);
 
-  if (GET_MODE (plus_op0) != DImode)
+  if (GET_MODE (plus_op0) != DImode && GET_MODE (plus_op0) != Pmode)
     return false;
 
   poly_int64 offset;

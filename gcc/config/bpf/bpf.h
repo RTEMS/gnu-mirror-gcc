@@ -515,7 +515,7 @@ enum reg_class
 #define MOVE_MAX 8
 
 /* An alias for the machine mode for pointers.  */
-#define Pmode DImode
+#define POmode DImode
 
 /* An alias for the machine mode used for memory references to
    functions being called, in 'call' RTL expressions.  */

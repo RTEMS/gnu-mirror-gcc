@@ -17305,6 +17305,7 @@ and the features that they enable by default:
 @item @samp{armv8.4-a} @tab Armv8.4-A @tab @samp{armv8.3-a}, @samp{+fp16fml}, @samp{+dotprod}
 @item @samp{armv8.5-a} @tab Armv8.5-A @tab @samp{armv8.4-a}, @samp{+sb}, @samp{+ssbs}, @samp{+predres}
 @item @samp{armv8.6-a} @tab Armv8.6-A @tab @samp{armv8.5-a}, @samp{+bf16}, @samp{+i8mm}
+@item @samp{morello}   @tab Morello   @tab @samp{armv8.2-a}, @samp{+a64c}, @samp{+fp16fml}, @samp{+dotprod}, @samp{+rcpc}, @samp{ssbs}
 @end multitable
 
 The value @samp{native} is available on native AArch64 GNU/Linux and
@@ -17569,6 +17570,17 @@ Enable brain half-precision floating-point instructions.  This also enables
 Advanced SIMD and floating-point instructions.  This option is enabled by
 default for @option{-march=armv8.6-a}.  Use of this option with architectures
 prior to Armv8.2-A is not supported.
+@item a64c
+Enable the use of the subset of instructions that can use capabilities in A64
+state.  This does not affect any other architecture features.  This allows the
+use of capabilities in the frontend.  This feature is enabled by default for
+@option{-march=morello}.
+@item c64
+Enable the capability extension for the Morello architecture.  This does not
+affect any other architecture features.  Large parts of the compiler are not
+updated to work in the presence of capabilities.  At the time of writing these
+are the sanitizers, openMP, openACC, MTE for AArch64, SVE for AArch64, plus
+a number of optimisations are disabled when working on capabilities.
 
 @end table
 
@@ -19035,6 +19047,16 @@ This also enables Advanced SIMD and floating-point instructions.
 @item +bf16
 Brain half-precision floating-point instructions.
 This also enables Advanced SIMD and floating-point instructions.
+@end table
+
+@item morello
+@table @samp
+@item +c64
+Enable the capability extension for the Morello architecture.  This does not
+affect any other architecture features.  Large parts of the compiler are not
+updated to work in the presence of capabilities at the time of writing these
+are, the sanitizers, openMP, openACC, MTE for AArch64, SVE for AArch64, plus
+a number of optimisations are disabled when working on capabilities.
 @end table
 
 @item armv7-r

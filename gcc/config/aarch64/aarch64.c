@@ -1901,6 +1901,102 @@ aarch64_some_values_include_pst_objects_p (const_tree type)
   return false;
 }
 
+/* Return true if at least one possible value of type TYPE contains at least
+   one capability.   This is a relatively expensive test for the same reason as
+   aarch64_some_values_include_pst_objects_p, so should be made as late as
+   possible.  */
+enum capability_composite_type {
+    CAPCOM_NONE,
+    CAPCOM_SOME,
+    CAPCOM_OVERLAP,
+    CAPCOM_LARGE,
+};
+
+static bool
+aarch64_field_overlaps_capability_metadata (const_tree field)
+{
+  tree t = DECL_FIELD_OFFSET (field);
+  /* Must know size of the field, since only ever called when the size of the
+     entire containing type is known.  */
+  gcc_assert (t && tree_fits_uhwi_p (t));
+
+  tree ty = TREE_TYPE (field);
+
+  /* Flexible array members are not passed, so they don't overlap for
+     these purposes.  */
+  if (TREE_CODE (ty) == ARRAY_TYPE && !TYPE_SIZE (ty))
+    return false;
+
+  gcc_assert (int_size_in_bytes (TREE_TYPE (field)) != -1);
+
+  unsigned HOST_WIDE_INT first = tree_to_uhwi (t);
+  unsigned HOST_WIDE_INT last
+    = first + int_size_in_bytes (TREE_TYPE (field)) - 1;
+  if ((first >= 8 && first <= 15) || (first >= 24 && first <= 31))
+    return true;
+  if ((last >= 8 && last <= 15) || (last >= 24 && last <= 31))
+    return true;
+  /* N.b. can't actually have the second case here because this function is
+     only ever called when the size of the containing type is 32 bytes or less,
+     but nice to have anyway.  */
+  return (first < 8 && last > 15) || (first < 24 && last > 31);
+}
+
+static enum capability_composite_type
+aarch64_classify_capability_contents (const_tree type)
+{
+  gcc_assert (type);
+  if (! TARGET_MORELLO)
+    return CAPCOM_NONE;
+  if (TYPE_SIZE (type) && integer_zerop (TYPE_SIZE (type)))
+    return CAPCOM_NONE;
+
+  if (int_size_in_bytes (type) == -1)
+    return CAPCOM_LARGE;
+
+  /* Can't contain a capability if it's a known size less than the number of
+     bytes in a capability.
+     If the size of the type is greater than the size of two capability
+     registers then this is the case where it should be passed in memory due to
+     its size anyway.  */
+  if (int_size_in_bytes (type) < GET_MODE_SIZE (CADImode))
+    return CAPCOM_NONE;
+  else if (int_size_in_bytes (type) > 2 * GET_MODE_SIZE (CADImode))
+    return CAPCOM_LARGE;
+
+  if (capability_type_p (type))
+    return CAPCOM_SOME;
+
+  if (TREE_CODE (type) == ARRAY_TYPE || TREE_CODE (type) == COMPLEX_TYPE)
+    return aarch64_classify_capability_contents (TREE_TYPE (type));
+
+  enum capability_composite_type subfield_status = CAPCOM_NONE;
+  if (RECORD_OR_UNION_TYPE_P (type))
+    /* CAPCOM_LARGE overrides CAPCOM_OVERLAP but has already been dealt with.
+       CAPCOM_OVERLAP overrides CAPCOM_SOME (doesn't matter if there are
+       capabilities if there are some fields that overlap their metadata).
+	 Hence as soon as we see CAPCOM_OVERLAP, we can return that.
+       CAPCOM_SOME overribes CAPCOM_NONE.
+	 Have to search through all fields for any CAPCOM_SOME or
+	 CAPCOM_OVERLAP.
+       */
+    for (tree field = TYPE_FIELDS (type); field; field = TREE_CHAIN (field))
+      if (TREE_CODE (field) == FIELD_DECL)
+	{
+	  if (!capability_type_p (TREE_TYPE (field))
+	      && aarch64_field_overlaps_capability_metadata (field))
+	    return CAPCOM_OVERLAP;
+	  else if (aarch64_classify_capability_contents (TREE_TYPE (field))
+		  == CAPCOM_OVERLAP)
+	    return CAPCOM_OVERLAP;
+	  else if (aarch64_classify_capability_contents (TREE_TYPE (field))
+		  == CAPCOM_SOME)
+	    subfield_status = CAPCOM_SOME;
+	}
+
+  return subfield_status;
+}
+
 /* Return the descriptor of the SIMD ABI.  */
 
 static const predefined_function_abi &
@@ -2497,6 +2593,11 @@ aarch64_hard_regno_nregs (unsigned regno, machine_mode mode)
     case PR_AND_FFR_REGS:
       return 1;
     default:
+      if (CAPABILITY_MODE_P (mode) && TARGET_MORELLO)
+	{
+	  gcc_assert (mode == CADImode);
+	  return 1;
+	}
       return CEIL (lowest_size, UNITS_PER_WORD);
     }
   gcc_unreachable ();
@@ -5661,6 +5762,21 @@ aarch64_function_value (const_tree type, const_tree func,
     }
   else
     {
+      /* Handle the case where we're returning a pair of capability
+	 registers.  */
+      if (mode == BLKmode
+	  && aarch64_classify_capability_contents (type) == CAPCOM_SOME
+	  && int_size_in_bytes (type) == GET_MODE_SIZE (CADImode) * 2)
+	{
+	  rtx c0 = gen_rtx_REG (CADImode, R0_REGNUM);
+	  rtx c1 = gen_rtx_REG (CADImode, R1_REGNUM);
+	  rtx e1 = gen_rtx_EXPR_LIST (VOIDmode, c0, gen_int_mode (0, POmode));
+	  rtx e2 = gen_rtx_EXPR_LIST (VOIDmode, c1,
+				      gen_int_mode (GET_MODE_SIZE (CADImode),
+						    POmode));
+	  return gen_rtx_PARALLEL (mode, gen_rtvec (2, e1, e2));
+	}
+
       if (sve_p)
 	{
 	  /* Vector types can acquire a partial SVE mode using things like
@@ -5726,9 +5842,23 @@ aarch64_return_in_memory_1 (const_tree type)
 					       &ag_mode, &count, NULL, false))
     return false;
 
+  HOST_WIDE_INT units_per_reg = UNITS_PER_WORD;
+  switch (aarch64_classify_capability_contents (type))
+    {
+    case CAPCOM_NONE:
+      break;
+    case CAPCOM_SOME:
+      units_per_reg = GET_MODE_SIZE (CADImode);
+      break;
+    case CAPCOM_LARGE:
+    case CAPCOM_OVERLAP:
+      return true;
+    default:
+      gcc_unreachable ();
+    }
   /* Types larger than 2 registers returned in memory.  */
   size = int_size_in_bytes (type);
-  return (size < 0 || size > 2 * UNITS_PER_WORD);
+  return (size < 0 || size > 2 * units_per_reg);
 }
 
 /* Implement TARGET_RETURN_IN_MEMORY.
@@ -5784,7 +5914,10 @@ aarch64_function_arg_alignment (machine_mode mode, const_tree type,
 {
   /* MORELLO TODO Account for CADImode here.
      Will need to return 128 bits for TARGET_MORELLO and 64 bits for
-     TARGET_CAPABILITY_FAKE.  */
+     TARGET_CAPABILITY_FAKE.
+     Here would need to handle `mode_base_align` definition.
+     Would also want to check that the alignment of capability typed values is
+     indeed 16.  */
   *abi_break = false;
   if (!type)
     return GET_MODE_ALIGNMENT (mode);
@@ -5850,6 +5983,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
   bool allocate_ncrn, allocate_nvrn;
   HOST_WIDE_INT size;
   bool abi_break;
+  bool in_cap_regs = false;
 
   /* We need to do this once per argument.  */
   if (pcum->aapcs_arg_processed)
@@ -5969,9 +6103,27 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 
   ncrn = pcum->aapcs_ncrn;
   nregs = size / UNITS_PER_WORD;
-  /* MORELLO TODO special case: CADImode will have a size of 16 bytes,
-     UNITS_PER_WORD will stay at 8 bytes.  However, for a CADImode value we
-     will still use just one register.  */
+  if (type)
+    switch (aarch64_classify_capability_contents (type))
+      {
+      case CAPCOM_NONE:
+	gcc_assert (!TARGET_MORELLO || mode != CADImode);
+	break;
+      case CAPCOM_SOME:
+	in_cap_regs = true;
+	nregs = ROUND_UP (nregs, 2) / 2;
+	break;
+      case CAPCOM_OVERLAP:
+	goto on_stack;
+      case CAPCOM_LARGE:
+      default:
+	gcc_unreachable ();
+      }
+  if (TARGET_MORELLO && mode == CADImode)
+    {
+      in_cap_regs = true;
+      nregs = ROUND_UP (nregs, 2) / 2;
+    }
 
   /* C6 - C9.  though the sign and zero extension semantics are
      handled elsewhere.  This is the case where the argument fits
@@ -5980,8 +6132,8 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
     {
       gcc_assert (nregs == 0 || nregs == 1 || nregs == 2);
 
-      /* C.8 if the argument has an alignment of 16 then the NGRN is
-	 rounded up to the next even number.  */
+      /* C.10/MORELLO C.9 if the argument has an alignment of 16 then the NGRN
+	 is rounded up to the next even number.  */
       if (nregs == 2
 	  && ncrn % 2
 	  /* The == 16 * BITS_PER_UNIT instead of >= 16 * BITS_PER_UNIT
@@ -6013,6 +6165,8 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
       /* NREGS can be 0 when e.g. an empty structure is to be passed.
 	 A reg is still generated for it, but the caller should be smart
 	 enough not to use it.  */
+      if (GET_MODE_CLASS (mode) == MODE_CAPABILITY)
+	gcc_assert (nregs == 1 && !sve_p);
       if (nregs == 0
 	  || (nregs == 1 && !sve_p)
 	  || GET_MODE_CLASS (mode) == MODE_INT)
@@ -6025,8 +6179,8 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	  par = gen_rtx_PARALLEL (mode, rtvec_alloc (nregs));
 	  for (i = 0; i < nregs; i++)
 	    {
-	      scalar_int_mode reg_mode = word_mode;
-	      if (nregs == 1)
+	      scalar_addr_mode reg_mode = in_cap_regs ? CADImode : word_mode;
+	      if (nregs == 1 && !in_cap_regs)
 		reg_mode = int_mode_for_mode (mode).require ();
 	      rtx tmp = gen_rtx_REG (reg_mode, R0_REGNUM + ncrn + i);
 	      tmp = gen_rtx_EXPR_LIST (VOIDmode, tmp,
@@ -10108,6 +10262,22 @@ sizetochar (int size)
     }
 }
 
+const char *cap_reg_names[32] = {
+    "c0",  "c1",  "c2",  "c3",  "c4",  "c5",  "c6",  "c7",
+    "c8",  "c9",  "c10", "c11", "c12", "c13", "c14", "c15",
+    "c16", "c17", "c18", "c19", "c20", "c21", "c22", "c23",
+    "c24", "c25", "c26", "c27", "c28", "c29", "c30", "csp"
+};
+
+static const char *
+aarch64_reg_name (rtx reg, unsigned int delta = 0)
+{
+  int regno = REGNO (reg);
+  if (REG_P (reg) && TARGET_MORELLO && GET_MODE (reg) == CADImode)
+    return cap_reg_names [regno + delta];
+  return reg_names [regno + delta];
+}
+
 /* Print operand X to file F in a target specific manner according to CODE.
    The acceptable formatting commands given by CODE are:
      'c':		An integer or symbol address without a preceding #
@@ -10248,7 +10418,7 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 	  return;
 	}
 
-      asm_fprintf (f, "%s", reg_names [REGNO (x) + 1]);
+      asm_fprintf (f, "%s", aarch64_reg_name (x, 1));
       break;
 
     case 'I':
@@ -10387,7 +10557,7 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 
     case 'w':
     case 'x':
-      if (x == const0_rtx
+      if (x == const0_rtx || CONST_NULL_P (x)
 	  || (CONST_DOUBLE_P (x) && aarch64_float_const_zero_rtx_p (x)))
 	{
 	  asm_fprintf (f, "%czr", code);
@@ -10432,7 +10602,7 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 		}
 	    }
 	  else
-	    asm_fprintf (f, "%s", reg_names [REGNO (x)]);
+	    asm_fprintf (f, "%s", aarch64_reg_name (x));
 	  break;
 
 	case MEM:
@@ -10661,7 +10831,7 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
       case ADDRESS_REG_IMM:
 	if (known_eq (addr.const_offset, 0))
 	  {
-	    asm_fprintf (f, "[%s]", reg_names[REGNO (addr.base)]);
+	    asm_fprintf (f, "[%s]", aarch64_reg_name (addr.base));
 	    return true;
 	  }
 
@@ -10672,38 +10842,38 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
 	      = exact_div (addr.const_offset,
 			   aarch64_vl_bytes (mode, vec_flags)).to_constant ();
 	    asm_fprintf (f, "[%s, #%wd, mul vl]",
-			 reg_names[REGNO (addr.base)], vnum);
+			 aarch64_reg_name (addr.base), vnum);
 	    return true;
 	  }
 
-	asm_fprintf (f, "[%s, %wd]", reg_names[REGNO (addr.base)],
+	asm_fprintf (f, "[%s, %wd]", aarch64_reg_name (addr.base),
 		     INTVAL (addr.offset));
 	return true;
 
       case ADDRESS_REG_REG:
 	if (addr.shift == 0)
-	  asm_fprintf (f, "[%s, %s]", reg_names [REGNO (addr.base)],
-		       reg_names [REGNO (addr.offset)]);
+	  asm_fprintf (f, "[%s, %s]", aarch64_reg_name (addr.base),
+		       aarch64_reg_name (addr.offset));
 	else
-	  asm_fprintf (f, "[%s, %s, lsl %u]", reg_names [REGNO (addr.base)],
-		       reg_names [REGNO (addr.offset)], addr.shift);
+	  asm_fprintf (f, "[%s, %s, lsl %u]", aarch64_reg_name (addr.base),
+		       aarch64_reg_name (addr.offset), addr.shift);
 	return true;
 
       case ADDRESS_REG_UXTW:
 	if (addr.shift == 0)
-	  asm_fprintf (f, "[%s, w%d, uxtw]", reg_names [REGNO (addr.base)],
+	  asm_fprintf (f, "[%s, w%d, uxtw]", aarch64_reg_name (addr.base),
 		       REGNO (addr.offset) - R0_REGNUM);
 	else
-	  asm_fprintf (f, "[%s, w%d, uxtw %u]", reg_names [REGNO (addr.base)],
+	  asm_fprintf (f, "[%s, w%d, uxtw %u]", aarch64_reg_name (addr.base),
 		       REGNO (addr.offset) - R0_REGNUM, addr.shift);
 	return true;
 
       case ADDRESS_REG_SXTW:
 	if (addr.shift == 0)
-	  asm_fprintf (f, "[%s, w%d, sxtw]", reg_names [REGNO (addr.base)],
+	  asm_fprintf (f, "[%s, w%d, sxtw]", aarch64_reg_name (addr.base),
 		       REGNO (addr.offset) - R0_REGNUM);
 	else
-	  asm_fprintf (f, "[%s, w%d, sxtw %u]", reg_names [REGNO (addr.base)],
+	  asm_fprintf (f, "[%s, w%d, sxtw %u]", aarch64_reg_name (addr.base),
 		       REGNO (addr.offset) - R0_REGNUM, addr.shift);
 	return true;
 
@@ -10713,23 +10883,23 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
 	switch (GET_CODE (x))
 	  {
 	  case PRE_INC:
-	    asm_fprintf (f, "[%s, %d]!", reg_names [REGNO (addr.base)], size);
+	    asm_fprintf (f, "[%s, %d]!", aarch64_reg_name (addr.base), size);
 	    return true;
 	  case POST_INC:
-	    asm_fprintf (f, "[%s], %d", reg_names [REGNO (addr.base)], size);
+	    asm_fprintf (f, "[%s], %d", aarch64_reg_name (addr.base), size);
 	    return true;
 	  case PRE_DEC:
-	    asm_fprintf (f, "[%s, -%d]!", reg_names [REGNO (addr.base)], size);
+	    asm_fprintf (f, "[%s, -%d]!", aarch64_reg_name (addr.base), size);
 	    return true;
 	  case POST_DEC:
-	    asm_fprintf (f, "[%s], -%d", reg_names [REGNO (addr.base)], size);
+	    asm_fprintf (f, "[%s], -%d", aarch64_reg_name (addr.base), size);
 	    return true;
 	  case PRE_MODIFY:
-	    asm_fprintf (f, "[%s, %wd]!", reg_names[REGNO (addr.base)],
+	    asm_fprintf (f, "[%s, %wd]!", aarch64_reg_name (addr.base),
 			 INTVAL (addr.offset));
 	    return true;
 	  case POST_MODIFY:
-	    asm_fprintf (f, "[%s], %wd", reg_names[REGNO (addr.base)],
+	    asm_fprintf (f, "[%s], %wd", aarch64_reg_name (addr.base),
 			 INTVAL (addr.offset));
 	    return true;
 	  default:
@@ -10738,7 +10908,7 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
 	break;
 
       case ADDRESS_LO_SUM:
-	asm_fprintf (f, "[%s, #:lo12:", reg_names [REGNO (addr.base)]);
+	asm_fprintf (f, "[%s, #:lo12:", aarch64_reg_name (addr.base));
 	output_addr_const (f, addr.offset);
 	asm_fprintf (f, "]");
 	return true;
@@ -11042,7 +11212,7 @@ rtx
 aarch64_return_addr (int count, rtx frame ATTRIBUTE_UNUSED)
 {
   if (count != 0)
-    return const0_rtx;
+    return CONST0_RTX (Pmode);
   return aarch64_return_addr_rtx ();
 }
 
@@ -11059,6 +11229,9 @@ aarch64_asm_trampoline_template (FILE *f)
       asm_fprintf (f, "\tldr\tw%d, .+20\n", IP1_REGNUM - R0_REGNUM);
       asm_fprintf (f, "\tldr\tw%d, .+20\n", STATIC_CHAIN_REGNUM - R0_REGNUM);
     }
+  /* MORELLO TODO
+      Need to handle the originally X registers as C registers if needed.
+      Shouldn't be too hard.  */
   else
     {
       asm_fprintf (f, "\tldr\t%s, .+20\n", reg_names [IP1_REGNUM]);
@@ -14496,12 +14669,24 @@ aarch64_override_options_internal (struct gcc_options *opts)
 	}
       opts->x_aarch64_abi = AARCH64_ABI_LP64;
     }
+  /*  We need the extension to be defined so that it gets passed down to the
+      assembler.  The assembler uses the architecture and extension to decide
+      what state the processor should be in (which also defines some parts of
+      the ABI like whether symbol values should have their lowest bit set).
+      If we want to generate purecap code we will need the processor to be in
+      the C64 state.  */
+  if (aarch64_cap == AARCH64_CAPABILITY_PURE
+      && ! AARCH64_ISA_C64)
+    error ("%<-mabi=purecap%> requires the %<+c64%> extension");
+
   if (aarch64_using_fake_capability)
     aarch64_cap = AARCH64_CAPABILITY_FAKE;
+
   if (aarch64_using_fake_capability
       && opts->x_aarch64_abi == AARCH64_ABI_ILP32)
     error ("Can not use fake_capability and %<-mabi=ilp32%> together");
-  if (aarch64_using_fake_capability && opts->x_flag_sanitize)
+
+  if (TARGET_CAPABILITY_ANY && opts->x_flag_sanitize)
     /* At the moment we're disabling this.
      * Sanitizers are a feature that are non-essential, can not be required by
      * source code, have their functionality partially superseded by Morello,
@@ -14509,14 +14694,30 @@ aarch64_override_options_internal (struct gcc_options *opts)
      * in combination with Morello (shadow memory and pointer bounds).  Hence
      * just disable it for now, get something working for unsanitized code and
      * come back to it later.  */
-    error ("MORELLO TODO Disabling sanitizers and fake_capability for now");
-  if (opts->x_flag_openmp && aarch64_using_fake_capability)
+    error ("MORELLO TODO Disabling sanitizers on Morello for now");
+  if (opts->x_flag_openmp && TARGET_CAPABILITY_ANY)
 	  error ("MORELLO TODO OpenMP has not been implemented for Morello");
-  if (opts->x_flag_openacc && aarch64_using_fake_capability)
+  if (opts->x_flag_openacc && TARGET_CAPABILITY_ANY)
 	  error ("MORELLO TODO OpenACC has not been implemented for Morello");
+  if (!flag_inline_atomics && TARGET_CAPABILITY_ANY)
+	  error ("MORELLO TODO -fno-inline-atomics has not been implemented for Morello");
 
-  if (aarch64_cap != AARCH64_CAPABILITY_NONE && TARGET_SVE)
+  if (TARGET_CAPABILITY_ANY && TARGET_SVE)
     error ("SVE is not supported with capabilities");
+
+  if ((aarch64_cap == AARCH64_CAPABILITY_PURE
+       || aarch64_cap == AARCH64_CAPABILITY_HYBRID)
+      && TARGET_OUTLINE_ATOMICS)
+    {
+      if (aarch64_flag_outline_atomics == 2)
+	/* If outline atomics was just set by default, unset it.
+	  Complain if it was explicitly requested on the command line.
+	  MORELLO TODO Maybe should think a bit harder about the user interface
+	  here, but it's not that important.  */
+	aarch64_flag_outline_atomics = 0;
+      else
+	error ("Outlined Atomics are not supported with capabilities");
+    }
 
   if (opts->x_aarch64_override_tune_string)
     aarch64_parse_override_string (opts->x_aarch64_override_tune_string,
@@ -19424,6 +19625,66 @@ aarch64_print_patchable_function_entry (FILE *file,
   default_print_patchable_function_entry (file, patch_area_size, record_p);
 }
 
+/* Implement ASM_OUTPUT_CAPABILITY.  */
+bool
+aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
+{
+  if (CONST_NULL_P (x))
+    {
+      if (size == 16)
+	{
+	  if (aligned_p)
+	    fputs ("\t.p2align\t4\n", asm_out_file);
+
+	  fputs ("\t.zero\t16\n", asm_out_file);
+	  return true;
+	}
+      return targetm.asm_out.integer (const0_rtx, size, aligned_p);
+    }
+
+  unsigned int offset_size
+	  = GET_MODE_SIZE (noncapability_mode (GET_MODE (x))).to_constant ();
+  bool ret;
+  if (GET_CODE (x) == REPLACE_ADDRESS_VALUE)
+    {
+      rtx cap_val = XEXP (x, 0);
+      rtx address_value = XEXP (x, 1);
+      if (TARGET_CAPABILITY_FAKE)
+	return targetm.asm_out.integer(address_value, size, aligned_p);
+      gcc_assert (GET_CODE (cap_val) == CONST_NULL);
+      /* MORELLO TODO aligned_p may be true for this 8 byte sized value but
+       * not for the 16 byte sized capability.  Look into it later.  */
+      ret = targetm.asm_out.integer (address_value, offset_size, aligned_p);
+      return ret && targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+    }
+
+  /* Fake capability => size is the correct size and just want to emit the
+     relevant constant integral value.  */
+  if (TARGET_CAPABILITY_FAKE)
+    return targetm.asm_out.integer (x, size, aligned_p);
+
+  if (GET_CODE (x) == CONST)
+    x = XEXP (x, 0);
+
+  /* Handle null-derived compile-time constant capabilities.  */
+  if (GET_CODE (x) == POINTER_PLUS
+      && CONST_NULL_P (XEXP (x, 0))
+      && size == 16)
+    {
+      if (aligned_p)
+	fputs ("\t.p2align\t4\n", asm_out_file);
+
+      ret = targetm.asm_out.integer (XEXP (x, 1), 8, 0);
+      return ret && targetm.asm_out.integer (const0_rtx, 8, 0);
+    }
+
+  fputs ("\t.capinit\t", asm_out_file);
+  output_addr_const (asm_out_file, x);
+  fputc ('\n', asm_out_file);
+  ret = targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+  return ret && targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+}
+
 /* Implement ASM_OUTPUT_DEF_FROM_DECLS.  Output .variant_pcs for aliases.  */
 
 void
@@ -19486,10 +19747,14 @@ static void
 aarch64_emit_load_exclusive (machine_mode mode, rtx rval,
 			     rtx mem, rtx model_rtx)
 {
+  /* MORELLO TODO: An optimisation oportunity is to enable the "load exclusive
+     pair" patterns for capabilities. For now this is left as disabled so as
+     not to get into issues with how to represent 2xCADImode.  */
   if (mode == TImode)
-    emit_insn (gen_aarch64_load_exclusive_pair (gen_lowpart (DImode, rval),
-						gen_highpart (DImode, rval),
-						mem, model_rtx));
+    emit_insn (gen_aarch64_load_exclusive_pair
+		    (gen_lowpart (DImode, rval),
+		     gen_highpart (DImode, rval),
+		     mem, model_rtx));
   else
     emit_insn (gen_aarch64_load_exclusive (mode, rval, mem, model_rtx));
 }
@@ -19500,6 +19765,9 @@ static void
 aarch64_emit_store_exclusive (machine_mode mode, rtx bval,
 			      rtx mem, rtx rval, rtx model_rtx)
 {
+  /* MORELLO TODO: An optimisation oportunity is to enable the "store exclusive
+     pair" patterns for capabilities. For now this is left as disabled so as
+     not to get into issues with how to represent 2xCADImode.  */
   if (mode == TImode)
     emit_insn (gen_aarch64_store_exclusive_pair
 	       (bval, mem, operand_subword (rval, 0, 0, TImode),
@@ -19524,6 +19792,7 @@ rtx
 aarch64_atomic_ool_func(machine_mode mode, rtx model_rtx,
 			const atomic_ool_names *names)
 {
+  gcc_assert (mode != CADImode || TARGET_CAPABILITY_FAKE);
   memmodel model = memmodel_base (INTVAL (model_rtx));
   int mode_idx, model_idx;
 
@@ -19539,6 +19808,7 @@ aarch64_atomic_ool_func(machine_mode mode, rtx model_rtx,
       mode_idx = 2;
       break;
     case E_DImode:
+    case E_CADImode:
       mode_idx = 3;
       break;
     case E_TImode:
@@ -19637,10 +19907,13 @@ aarch64_expand_compare_and_swap (rtx operands[])
 
       emit_insn (gen_aarch64_compare_and_swap_lse (mode, rval, mem,
 						   newval, mod_s));
-      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, drop_capability (rval),
+						 drop_capability (oldval),
+						 noncapability_mode (mode));
     }
   else if (TARGET_OUTLINE_ATOMICS)
     {
+      gcc_assert (mode != CADImode || TARGET_CAPABILITY_FAKE);
       /* Oldval must satisfy compare afterward.  */
       if (!aarch64_plus_operand (oldval, mode))
 	oldval = force_reg (mode, oldval);
@@ -19648,7 +19921,9 @@ aarch64_expand_compare_and_swap (rtx operands[])
       rval = emit_library_call_value (func, NULL_RTX, LCT_NORMAL, r_mode,
 				      oldval, mode, newval, mode,
 				      XEXP (mem, 0), Pmode);
-      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+      cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, drop_capability (rval),
+						 drop_capability (oldval),
+						 noncapability_mode (mode));
     }
   else
     {
@@ -19695,15 +19970,18 @@ aarch64_split_compare_and_swap (rtx operands[])
   /* Split after prolog/epilog to avoid interactions with shrinkwrapping.  */
   gcc_assert (epilogue_completed);
 
-  rtx rval, mem, oldval, newval, scratch, x, model_rtx;
+  rtx rval, mem, oldval, newval, scratch, x, model_rtx,
+      rval_value, oldval_value;
   machine_mode mode;
   bool is_weak;
   rtx_code_label *label1, *label2;
   enum memmodel model;
 
   rval = operands[0];
+  rval_value = drop_capability (rval);
   mem = operands[1];
   oldval = operands[2];
+  oldval_value = drop_capability (oldval);
   newval = operands[3];
   is_weak = (operands[4] != const0_rtx);
   model_rtx = operands[5];
@@ -19739,10 +20017,13 @@ aarch64_split_compare_and_swap (rtx operands[])
     aarch64_emit_load_exclusive (mode, rval, mem, model_rtx);
 
   if (strong_zero_p)
-    x = gen_rtx_NE (VOIDmode, rval, const0_rtx);
+    x = gen_rtx_NE (VOIDmode, rval_value, const0_rtx);
   else
     {
-      rtx cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval, oldval, mode);
+      rtx cc_reg = aarch64_gen_compare_reg_maybe_ze (NE, rval_value,
+						     oldval_value,
+						     noncapability_mode
+						     (mode));
       x = gen_rtx_NE (VOIDmode, cc_reg, const0_rtx);
     }
   x = gen_rtx_IF_THEN_ELSE (VOIDmode, x,
@@ -19776,7 +20057,7 @@ aarch64_split_compare_and_swap (rtx operands[])
      to set the condition flags.  If this is not used it will be removed by
      later passes.  */
   if (strong_zero_p)
-    aarch64_gen_compare_reg (NE, rval, const0_rtx);
+    aarch64_gen_compare_reg (NE, rval_value, const0_rtx);
 
   /* Emit any final barrier needed for a __sync operation.  */
   if (is_mm_sync (model))
@@ -19787,13 +20068,28 @@ aarch64_split_compare_and_swap (rtx operands[])
 
 void
 aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
-			 rtx value, rtx model_rtx, rtx cond)
+			 rtx value, rtx model_rtx, rtx tmp_reg, rtx cond)
 {
   /* Split after prolog/epilog to avoid interactions with shrinkwrapping.  */
   gcc_assert (epilogue_completed);
 
   machine_mode mode = GET_MODE (mem);
-  machine_mode wmode = (mode == DImode ? DImode : SImode);
+  machine_mode arith_mode, subreg_mode;
+  switch (mode)
+    {
+      case DImode:
+	arith_mode = DImode;
+	subreg_mode = DImode;
+	break;
+      case CADImode:
+	arith_mode = DImode;
+	subreg_mode = CADImode;
+	break;
+      default:
+	arith_mode = SImode;
+	subreg_mode = SImode;
+	break;
+    }
   const enum memmodel model = memmodel_from_int (INTVAL (model_rtx));
   const bool is_sync = is_mm_sync (model);
   rtx_code_label *label;
@@ -19804,12 +20100,12 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
   emit_label (label);
 
   if (new_out)
-    new_out = gen_lowpart (wmode, new_out);
+    new_out = gen_lowpart (subreg_mode, new_out);
   if (old_out)
-    old_out = gen_lowpart (wmode, old_out);
+    old_out = gen_lowpart (subreg_mode, old_out);
   else
     old_out = new_out;
-  value = simplify_gen_subreg (wmode, value, mode, 0);
+  value = simplify_gen_subreg (subreg_mode, value, mode, 0);
 
   /* The initial load can be relaxed for a __sync operation since a final
      barrier will be emitted to stop code hoisting.  */
@@ -19822,28 +20118,57 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
   switch (code)
     {
     case SET:
-      new_out = value;
+	new_out = value;
       break;
 
     case NOT:
-      x = gen_rtx_AND (wmode, old_out, value);
-      emit_insn (gen_rtx_SET (new_out, x));
-      x = gen_rtx_NOT (wmode, new_out);
-      emit_insn (gen_rtx_SET (new_out, x));
+      value = drop_capability (value);
+      if (CAPABILITY_MODE_P (mode))
+	{
+	  /* For Morello we require a temporary DImode register so that we can
+	  then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
+	  x = gen_rtx_AND (arith_mode, drop_capability (old_out), value);
+	  emit_insn (gen_rtx_SET (tmp_reg, x));
+	  x = gen_rtx_NOT (arith_mode, tmp_reg);
+	  emit_insn (gen_rtx_SET (tmp_reg, x));
+	  emit_insn (gen_replace_address_value_cadi (new_out, old_out,
+						     tmp_reg));
+	}
+      else
+	{
+	  x = gen_rtx_AND (arith_mode, old_out, value);
+	  emit_insn (gen_rtx_SET (new_out, x));
+	  x = gen_rtx_NOT (arith_mode, new_out);
+	  emit_insn (gen_rtx_SET (new_out, x));
+	}
       break;
 
     case MINUS:
+      value = drop_capability (value);
       if (CONST_INT_P (value))
 	{
 	  value = GEN_INT (-INTVAL (value));
 	  code = PLUS;
 	}
       /* Fall through.  */
-
     default:
-      x = gen_rtx_fmt_ee (code, wmode, old_out, value);
-      emit_insn (gen_rtx_SET (new_out, x));
-      break;
+      value = drop_capability (value);
+      if (CAPABILITY_MODE_P (mode))
+	{
+	  /* For Morello we require a temporary DImode register so that we can
+	  then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
+	  x = gen_rtx_fmt_ee (code, arith_mode, drop_capability (old_out),
+			      value);
+	  emit_insn (gen_rtx_SET (tmp_reg, x));
+	  emit_insn (gen_replace_address_value_cadi (new_out, old_out,
+						     tmp_reg));
+	}
+      else
+	{
+	  x = gen_rtx_fmt_ee (code, arith_mode, old_out, value);
+	  emit_insn (gen_rtx_SET (new_out, x));
+	}
+	break;
     }
 
   aarch64_emit_store_exclusive (mode, cond, mem,
@@ -23061,6 +23386,17 @@ aarch64_can_change_mode_class (machine_mode from,
       if (from_sve_p && GET_MODE_UNIT_SIZE (from) != GET_MODE_UNIT_SIZE (to))
 	return false;
     }
+
+  if (from == to)
+    return true;
+
+  if (from == CADImode)
+    return GET_MODE_CLASS (to) == MODE_INT
+      && GET_MODE_BITSIZE (to).to_constant () <= 64;
+  else if (to == CADImode)
+    return GET_MODE_CLASS (from) == MODE_INT
+      && GET_MODE_BITSIZE (from).to_constant () <= 64;
+
   return true;
 }
 
@@ -23739,6 +24075,9 @@ aarch64_run_selftests (void)
 
 #undef TARGET_ASM_OUTPUT_MI_THUNK
 #define TARGET_ASM_OUTPUT_MI_THUNK aarch64_output_mi_thunk
+
+#undef TARGET_ASM_CAPABILITY
+#define TARGET_ASM_CAPABILITY aarch64_asm_output_capability
 
 #undef TARGET_ASM_SELECT_RTX_SECTION
 #define TARGET_ASM_SELECT_RTX_SECTION aarch64_select_rtx_section

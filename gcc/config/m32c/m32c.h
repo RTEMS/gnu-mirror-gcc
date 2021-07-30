@@ -632,7 +632,7 @@ typedef struct m32c_cumulative_args
 #define STORE_FLAG_VALUE 1
 
 /* 16- or 24-bit pointers */
-#define Pmode (TARGET_A16 ? HImode : PSImode)
+#define POmode (TARGET_A16 ? HImode : PSImode)
 #define FUNCTION_MODE QImode
 
 #define REGISTER_TARGET_PRAGMAS() m32c_register_pragmas()

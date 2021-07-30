@@ -12,6 +12,7 @@ foo (__INTPTR_TYPE__ *q)
   __INTPTR_TYPE__ b = baz ();
   int i = 0;
 #define X q[i++] = a; q[i++] = b; a = a + b; b = b + a;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 #define Y X X X X X X X X X X
 #define Z Y Y Y Y Y Y Y Y Y Y
   Z Z Z Z Z Z Z Z Z Z

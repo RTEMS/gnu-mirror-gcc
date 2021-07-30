@@ -12,7 +12,11 @@ ew (unsigned short int c9, int stuff)
       int *fd = &stuff;
 
       *fd = c9;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      fd = (__intcap_t)*fd;
+#else
       fd = *fd;
+#endif
       if (*fd != 0)
 	for (*by = 0; *by < 2; ++*by)
 	  c9 *= e1;

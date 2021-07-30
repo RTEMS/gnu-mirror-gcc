@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-O2 -ftree-slp-vectorize -march=armv8.2-a+sve -msve-vector-bits=256" } */
 
 typedef short __attribute__((vector_size (8))) v4hi;

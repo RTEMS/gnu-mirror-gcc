@@ -1247,12 +1247,12 @@ const_binop (enum tree_code code, tree arg1, tree arg2)
 	 type (which also means in the precision of this noncapability type as
 	 the calculation should be) and then generate a capability that has the
 	 metadata from the original capability and the new address.  */
-      if (tree_is_capability_value (arg1))
+      if (tree_is_capability_value (arg1) && code == POINTER_PLUS_EXPR)
 	{
+	  gcc_assert (POINTER_TYPE_P (TREE_TYPE (arg1)));
 	  tree new_value
 		  = int_const_binop (PLUS_EXPR, fold_drop_capability (arg1),
-				     arg2,
-				     POINTER_TYPE_P (TREE_TYPE (arg1)) ? 0 : -1);
+				     arg2, 0);
 	  tree ret = fold_build_replace_address_value (arg1, new_value);
 	  return ret ? ret : NULL_TREE;
 	}
@@ -13552,10 +13552,15 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
   if (TREE_CODE (c) == INTEGER_CST && TREE_CODE (cv) == INTEGER_CST)
     {
       tree cap_type = TREE_TYPE (c);
-      unsigned HOST_WIDE_INT prec = TYPE_NONCAP_PRECISION (cap_type);
-      wide_int cap_orig = wi::to_wide (c);
-      wide_int new_value = wi::to_wide (cv, prec);
-      wide_int mask = wi::uhwi (-1, prec);
+      unsigned HOST_WIDE_INT cap_prec = TYPE_CAP_PRECISION (cap_type);
+      unsigned HOST_WIDE_INT noncap_prec = TYPE_NONCAP_PRECISION (cap_type);
+      wide_int cap_orig = wi::to_wide (c, cap_prec);
+      wide_int new_value = wi::to_wide (cv, cap_prec);
+
+      /* Create a mask with the precision of `c`, but with only
+	 `TYPE_NONCAP_PRECISION (cap_type)` number of bits set at the bottom
+	  of the number, with the rest being unset.  */
+      wide_int mask = wi::mask (noncap_prec, 0, cap_prec);
       wide_int masked_cap = wi::bit_and_not (cap_orig, mask);
       wide_int res = wi::bit_or (masked_cap, new_value);
       /* Replacing address value.  Only want something marked as overflow if
@@ -13565,6 +13570,10 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
 			     !POINTER_TYPE_P (cap_type),
 			     TREE_OVERFLOW (cv));
     }
+  if (TREE_CODE (c) == CALL_EXPR && CALL_EXPR_FN (c) == NULL_TREE
+      && CALL_EXPR_IFN (c) == IFN_REPLACE_ADDRESS_VALUE)
+    return fold_build_replace_address_value_loc (loc,
+						 CALL_EXPR_ARG (c, 0), cv);
 
   return build_replace_address_value_loc (loc, c, cv);
 }

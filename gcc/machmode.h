@@ -681,11 +681,29 @@ mode_to_offsetmode (machine_mode mode)
 /* Get the size in bytes of an object of mode MODE.  */
 
 #if ONLY_FIXED_SIZE_MODES
-#define GET_MODE_SIZE(MODE) ((unsigned short) mode_to_bytes (MODE).coeffs[0])
+ALWAYS_INLINE unsigned short
+GET_MODE_SIZE (machine_mode mode)
+{
+#if defined(Pmode)
+  gcc_assert (!CAPABILITY_MODE_P (mode));
+#endif
+  return mode_to_bytes (mode).coeffs[0];
+}
 #else
 ALWAYS_INLINE poly_uint16
 GET_MODE_SIZE (machine_mode mode)
 {
+  /* MORELLO TODO.
+     GET_MODE_SIZE is used in two different ways across the compiler.
+     Sometimes it's used to look for the actual size of the mode, sometimes
+     it's used to look for the size of value this mode can hold.
+     These are different for capabilities.  Hence would like to check
+     everywhere in the compiler that does such things and ensure they're
+     handling capabilities.
+
+     Can check everywhere in the compiler by following the assert failures from
+     an assert here.  */
+  /* gcc_assert (!CAPABILITY_MODE_P (mode)); */
   return mode_to_bytes (mode);
 }
 
@@ -693,6 +711,7 @@ template<typename T>
 ALWAYS_INLINE typename if_poly<typename T::measurement_type>::type
 GET_MODE_SIZE (const T &mode)
 {
+  /* gcc_assert (!CAPABILITY_MODE_P (mode)); */
   return mode_to_bytes (mode);
 }
 
@@ -700,6 +719,7 @@ template<typename T>
 ALWAYS_INLINE typename if_nonpoly<typename T::measurement_type>::type
 GET_MODE_SIZE (const T &mode)
 {
+  /* gcc_assert (!CAPABILITY_MODE_P (mode)); */
   return mode_to_bytes (mode).coeffs[0];
 }
 #endif
@@ -712,6 +732,16 @@ GET_MODE_SIZE (const T &mode)
 ALWAYS_INLINE poly_uint16
 GET_MODE_BITSIZE (machine_mode mode)
 {
+  /* MORELLO TODO.
+     GET_MODE_BITSIZE is used in two different ways across the compiler.
+     Sometimes it's used to look for the actual size of the mode, sometimes
+     it's used to look for the size of value this mode can hold.
+     These are different for capabilities.  Hence would like to check
+     everywhere in the compiler that does such things and ensure they're
+     handling capabilities.
+
+     Can check everywhere in the compiler by following the assert failures from
+     an assert here.  */
   return mode_to_bits (mode);
 }
 
@@ -739,6 +769,16 @@ GET_MODE_BITSIZE (const T &mode)
 ALWAYS_INLINE poly_uint16
 GET_MODE_PRECISION (machine_mode mode)
 {
+  /* MORELLO TODO.
+     GET_MODE_PRECISION is used in two different ways across the compiler.
+     Sometimes it's used to look for the actual size of the mode, sometimes
+     it's used to look for the size of value this mode can hold.
+     These are different for capabilities.  Hence would like to check
+     everywhere in the compiler that does such things and ensure they're
+     handling capabilities.
+
+     Can check everywhere in the compiler by following the assert failures from
+     an assert here.  */
   return mode_to_precision (mode);
 }
 

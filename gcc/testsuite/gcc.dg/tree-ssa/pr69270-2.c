@@ -31,13 +31,21 @@ insert_debug_temp_for_var_def (gimple stmt)
       if (!gimple_bb (def_stmt))
         no_value = 1;
       if (!no_value)
+#ifdef __GCC_ARM_CAPABILITY_ANY
+        value = (__intcap_t)gimple_assign_rhs_to_tree ();
+#else
         value = gimple_assign_rhs_to_tree ();
+#endif
     }
   if (value)
     {
       if ((tree_code_type[(int) (((value)->code))] == 42)
           || (usecount == 1 && (is_gimple_min_invariant (value))))
+#ifdef __GCC_ARM_CAPABILITY_ANY
+        value = (__intcap_t)unshare_expr (value);
+#else
         value = unshare_expr (value);
+#endif
     }
 }
 

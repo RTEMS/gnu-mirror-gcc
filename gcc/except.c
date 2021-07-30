@@ -2236,8 +2236,9 @@ convert_to_offset_mode (rtx x)
 #ifndef POINTERS_EXTEND_UNSIGNED
   gcc_assert (GET_MODE (x) == POmode || GET_MODE (x) == VOIDmode);
   return x;
-#endif
+#else
   return convert_to_mode (POmode, x, POINTERS_EXTEND_UNSIGNED);
+#endif
 }
 
 /* Set up the epilogue with the magic bits we'll need to return to the

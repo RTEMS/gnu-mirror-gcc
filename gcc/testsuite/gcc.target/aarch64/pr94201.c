@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-mcmodel=tiny -mabi=ilp32 -fPIC" } */
 
 extern int bar (void *);

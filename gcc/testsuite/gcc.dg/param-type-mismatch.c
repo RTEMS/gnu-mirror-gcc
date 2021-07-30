@@ -8,7 +8,7 @@ extern int callee_1 (int one, const char *two, float three); /* { dg-line callee
 
 int test_1 (int first, int second, float third)
 {
-  return callee_1 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_1' makes pointer from integer without a cast" }  */
+  return callee_1 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_1' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } }  */
   /* { dg-begin-multiline-output "" }
    return callee_1 (first, second, third);
                            ^~~~~~
@@ -21,6 +21,7 @@ int test_1 (int first, int second, float third)
                                ~~~~~~~~~~~~^~~
      { dg-end-multiline-output "" } */
 }
+/* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-13 } */
 
 /* decl, without argname.  */
 
@@ -28,7 +29,7 @@ extern int callee_2 (int, const char *, float); /* { dg-line callee_2 } */
 
 int test_2 (int first, int second, float third)
 {
-  return callee_2 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_2' makes pointer from integer without a cast" } */
+  return callee_2 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_2' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
   /* { dg-begin-multiline-output "" }
    return callee_2 (first, second, third);
                            ^~~~~~
@@ -41,6 +42,7 @@ int test_2 (int first, int second, float third)
                            ^~~~~~~~~~~~
      { dg-end-multiline-output "" } */
 }
+/* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-13 } */
 
 /* defn, with argname.  */
 
@@ -51,7 +53,7 @@ static int callee_3 (int one, const char *two, float three) /* { dg-line callee_
 
 int test_3 (int first, int second, float third)
 {
-  return callee_3 (first, second, third); // { dg-warning "passing argument 2 of 'callee_3' makes pointer from integer without a cast" }
+  return callee_3 (first, second, third); // { dg-warning "passing argument 2 of 'callee_3' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } }
   /* { dg-begin-multiline-output "" }
    return callee_3 (first, second, third);
                            ^~~~~~
@@ -64,6 +66,7 @@ int test_3 (int first, int second, float third)
                                ~~~~~~~~~~~~^~~
      { dg-end-multiline-output "" } */
 }
+/* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-13 } */
 
 /* Trivial decl, with argname.  */
 
@@ -111,7 +114,7 @@ extern int callee_6 (int one, int (*two)(int, int), float three); /* { dg-line c
 
 int test_6 (int first, int second, float third)
 {
-  return callee_6 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_6' makes pointer from integer without a cast" } */
+  return callee_6 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_6' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
   /* { dg-begin-multiline-output "" }
    return callee_6 (first, second, third);
                            ^~~~~~
@@ -124,6 +127,7 @@ int test_6 (int first, int second, float third)
                                ~~~~~~^~~~~~~~~~~~~~
      { dg-end-multiline-output "" } */
 }
+/* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-13 } */
 
 /* Callback without name.  */
 
@@ -131,7 +135,7 @@ extern int callee_7 (int one, int (*)(int, int), float three); /* { dg-line call
 
 int test_7 (int first, int second, float third)
 {
-  return callee_7 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_7' makes pointer from integer without a cast" } */
+  return callee_7 (first, second, third); /* { dg-warning "passing argument 2 of 'callee_7' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
   /* { dg-begin-multiline-output "" }
    return callee_7 (first, second, third);
                            ^~~~~~
@@ -144,6 +148,7 @@ int test_7 (int first, int second, float third)
                                ^~~~~~~~~~~~~~~~~
      { dg-end-multiline-output "" } */
 }
+/* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-13 } */
 
 /* -Wincompatible-pointer-types for a parameter.  */
 

@@ -59,7 +59,7 @@
 #define MAX_FIXED_MODE_SIZE  64
 #define MAX_REGS_PER_ADDRESS 2
 #define STACK_SIZE_MODE      DImode
-#define Pmode		     DImode
+#define POmode		     DImode
 #define CASE_VECTOR_MODE     DImode
 #define FUNCTION_MODE	     QImode
 

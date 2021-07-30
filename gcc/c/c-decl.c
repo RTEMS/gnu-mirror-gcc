@@ -5002,6 +5002,36 @@ c_decl_attributes (tree *node, tree attributes, int flags)
   return decl_attributes (node, attributes, flags, last_decl);
 }
 
+static void
+verify_cheri_capability_attribute_use (tree type,
+				       int indirection_levels_in_declarator,
+				       int capability_levels_in_declarator)
+{
+  /* Check the contents of the declspecs->type to detect the base type's level
+     of pointer indirection.  */
+  int indirection_levels_in_type = 0;
+  while (type)
+    {
+      if (TREE_CODE (type) == POINTER_TYPE)
+	indirection_levels_in_type++;
+      type = TREE_TYPE (type);
+    }
+
+  /* Error as ambigous if:
+	There are more than 2 unmatch pointer indirections to the right
+	of the __capability attribute.
+     or:
+	The actual type given contains 2 or more pointer indirections.  */
+  if ((indirection_levels_in_declarator
+	    - capability_levels_in_declarator  >= 2
+	   && indirection_levels_in_type == 0)
+	 || indirection_levels_in_type >=2)
+    error_at (input_location, "use of __capability is ambiguous");
+  else if (indirection_levels_in_type == 0)
+    warning_at (input_location, OPT_Wdeprecated_declarations,
+		"use of __capability before the pointer type "
+		"is deprecated");
+}
 
 /* Decode a declarator in an ordinary declaration or data definition.
    This is called as soon as the type information and variable name
@@ -5788,9 +5818,12 @@ check_bitfield_type_and_width (location_t loc, tree *type, tree *width,
 		      ? identifier_to_locale (IDENTIFIER_POINTER (orig_name))
 		      : _("<anonymous>"));
 
+  *width = drop_intcap (*width);
+
   /* Detect and ignore out of range field width and process valid
      field widths.  */
-  if (!INTEGRAL_TYPE_P (TREE_TYPE (*width)))
+  if (!INTEGRAL_TYPE_P (TREE_TYPE (*width))
+      && !INTCAP_TYPE_P (TREE_TYPE (*width)))
     {
       error_at (loc, "bit-field %qs width not an integer constant", name);
       *width = integer_one_node;
@@ -5800,6 +5833,10 @@ check_bitfield_type_and_width (location_t loc, tree *type, tree *width,
       if (TREE_CODE (*width) != INTEGER_CST)
 	{
 	  *width = c_fully_fold (*width, false, NULL);
+
+	  if (INTCAP_TYPE_P (TREE_TYPE (*width)))
+	    *width = drop_capability (*width);
+
 	  if (TREE_CODE (*width) == INTEGER_CST)
 	    pedwarn (loc, OPT_Wpedantic,
 		     "bit-field %qs width not an integer constant expression",
@@ -6010,6 +6047,8 @@ grokdeclarator (const struct c_declarator *declarator,
   bool expr_const_operands_dummy;
   enum c_declarator_kind first_non_attr_kind;
   unsigned int alignas_align = 0;
+  int indirection_levels_in_declarator = 0;
+  int capability_levels_in_declarator = 0;
 
   if (TREE_CODE (type) == ERROR_MARK)
     return error_mark_node;
@@ -6364,6 +6403,12 @@ grokdeclarator (const struct c_declarator *declarator,
 		else if (inner_decl->kind == cdk_array)
 		  attr_flags |= (int) ATTR_FLAG_ARRAY_NEXT;
 	      }
+
+	    if (lookup_attribute ("cheri_capability", attrs))
+	    {
+	       capability_levels_in_declarator++;
+	       attr_flags |= (int) ATTR_FLAG_CHERI_INNER_APPLY;
+	    }
 	    attrs = c_warn_type_attributes (attrs);
 	    returned_attrs = decl_attributes (&type,
 					      chainon (returned_attrs, attrs),
@@ -6429,6 +6474,8 @@ grokdeclarator (const struct c_declarator *declarator,
 
 	    if (size)
 	      {
+		size = drop_intcap (size);
+
 		bool size_maybe_const = true;
 		bool size_int_const = (TREE_CODE (size) == INTEGER_CST
 				       && !TREE_OVERFLOW (size));
@@ -6437,6 +6484,9 @@ grokdeclarator (const struct c_declarator *declarator,
 		/* Strip NON_LVALUE_EXPRs since we aren't using as an
 		   lvalue.  */
 		STRIP_TYPE_NOPS (size);
+
+		if (INTCAP_TYPE_P (TREE_TYPE (size)))
+		  size = drop_capability (size);
 
 		if (!INTEGRAL_TYPE_P (TREE_TYPE (size)))
 		  {
@@ -6848,6 +6898,7 @@ grokdeclarator (const struct c_declarator *declarator,
 	  }
 	case cdk_pointer:
 	  {
+	    indirection_levels_in_declarator++;
 	    /* Merge any constancy or volatility into the target type
 	       for the pointer.  */
 	    if ((type_quals & TYPE_QUAL_ATOMIC)
@@ -6939,6 +6990,14 @@ grokdeclarator (const struct c_declarator *declarator,
 	  gcc_unreachable ();
 	}
     }
+
+  /* If one of initial the decl_attrs given is the cheri_capability attribute,
+     verify for unambiguous use of the attribute.  */
+  if (lookup_attribute ("cheri_capability", *decl_attrs))
+    verify_cheri_capability_attribute_use (declspecs->type,
+					   indirection_levels_in_declarator,
+					   capability_levels_in_declarator);
+
   *decl_attrs = chainon (returned_attrs, *decl_attrs);
   *decl_attrs = chainon (decl_id_attrs, *decl_attrs);
 
@@ -9016,14 +9075,15 @@ build_enumerator (location_t decl_loc, location_t loc,
   tree decl, type;
 
   /* Validate and default VALUE.  */
+  if (value == error_mark_node)
+    value = NULL_TREE;
 
   if (value != NULL_TREE)
     {
-      /* Don't issue more errors for error_mark_node (i.e. an
-	 undeclared identifier) - just ignore the value expression.  */
-      if (value == error_mark_node)
-	value = NULL_TREE;
-      else if (!INTEGRAL_TYPE_P (TREE_TYPE (value)))
+      value = drop_intcap (value);
+
+      if (!INTEGRAL_TYPE_P (TREE_TYPE (value))
+	  && !INTCAP_TYPE_P (TREE_TYPE (value)))
 	{
 	  error_at (loc, "enumerator value for %qE is not an integer constant",
 		    name);
@@ -9034,6 +9094,10 @@ build_enumerator (location_t decl_loc, location_t loc,
 	  if (TREE_CODE (value) != INTEGER_CST)
 	    {
 	      value = c_fully_fold (value, false, NULL);
+
+	      if (INTCAP_TYPE_P (TREE_TYPE (value)))
+		value = drop_capability (value);
+
 	      if (TREE_CODE (value) == INTEGER_CST)
 		pedwarn (loc, OPT_Wpedantic,
 			 "enumerator value for %qE is not an integer "
@@ -11109,6 +11173,12 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
 		error_at (loc,
 			  ("both %<_Sat%> and %<__intcap_t%> in "
 			   "declaration specifiers"));
+	      else if (intcap_type_node == NULL_TREE)
+		{
+		  error_at (loc,
+			    "%<__intcap_t%> is not supported on this target");
+		  specs->typespec_word = cts_intcap;
+		}
 	      else
 		{
 		  specs->typespec_word = cts_intcap;
@@ -11140,6 +11210,12 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
 		error_at (loc,
 			  ("both %<_Sat%> and %<__uintcap_t%> in "
 			   "declaration specifiers"));
+	      else if (uintcap_type_node == NULL_TREE)
+		{
+		  error_at (loc,
+			    "%<__uintcap_t%> is not supported on this target");
+		  specs->typespec_word = cts_uintcap;
+		}
 	      else
 		{
 		  specs->typespec_word = cts_uintcap;
@@ -11737,13 +11813,19 @@ finish_declspecs (struct c_declspecs *specs)
       gcc_assert (!specs->long_p && !specs->short_p
 		  && !specs->signed_p && !specs->unsigned_p
 		  && !specs->complex_p);
-      specs->type = intcap_type_node;
+      if (intcap_type_node == NULL_TREE)
+	specs->type = integer_type_node;
+      else
+	specs->type = intcap_type_node;
       break;
     case cts_uintcap:
       gcc_assert (!specs->long_p && !specs->short_p
 		  && !specs->signed_p && !specs->unsigned_p
 		  && !specs->complex_p);
-      specs->type = uintcap_type_node;
+      if (uintcap_type_node == NULL_TREE)
+	specs->type = integer_type_node;
+      else
+	specs->type = uintcap_type_node;
       break;
     case cts_float:
       gcc_assert (!specs->long_p && !specs->short_p

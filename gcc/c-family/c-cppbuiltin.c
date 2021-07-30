@@ -1468,6 +1468,7 @@ c_cpp_builtins (cpp_reader *pfile)
       /* N.b. I've not found these values defined in a document anywhere.
 	 The values were found by looking at the assembly after using them in
 	 the CUCL CHERI compiler explorer.  */
+      cpp_define (pfile, "__CHERI__");
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_GLOBAL__", 1);
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_CCALL__", 256);
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__", 512);
@@ -1505,6 +1506,12 @@ c_cpp_builtins (cpp_reader *pfile)
      format.  */
   if (ENABLE_DECIMAL_FLOAT && ENABLE_DECIMAL_BID_FORMAT)
     cpp_define (pfile, "__DECIMAL_BID_FORMAT__");
+
+  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode();
+  if (opt_cap_mode.exists())
+    {
+      cpp_define (pfile, "__capability=__attribute__((__cheri_capability__))");
+    }
 }
 
 /* Pass an object-like macro.  If it doesn't lie in the user's

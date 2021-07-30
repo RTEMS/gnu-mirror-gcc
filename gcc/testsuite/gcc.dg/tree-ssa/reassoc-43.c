@@ -46,7 +46,11 @@ c_parser_translation_unit (c_parser * parser)
 	{
 	  if (c_parser_next_token_is_keyword (parser, RID_ATTRIBUTE))
 	    all_prefix_attrs =
+#ifdef __GCC_ARM_CAPABILITY_ANY
+	      (__intcap_t)chainon (c_parser_attributes (parser), prefix_attrs);
+#else
 	      chainon (c_parser_attributes (parser), prefix_attrs);
+#endif
 	}
     }
 }

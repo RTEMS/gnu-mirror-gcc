@@ -1728,9 +1728,12 @@ build_debug_ref_for_model (location_t loc, tree base, HOST_WIDE_INT offset,
     return NULL_TREE;
   if (TREE_CODE (base) == MEM_REF)
     {
-      off = build_int_cst (TREE_TYPE (TREE_OPERAND (base, 1)),
+      tree off_noncap = fold_drop_capability (TREE_OPERAND (base, 1));
+      off = build_int_cst (TREE_TYPE (off_noncap),
 			   base_offset + offset / BITS_PER_UNIT);
-      off = int_const_binop (PLUS_EXPR, TREE_OPERAND (base, 1), off);
+      off = int_const_binop (PLUS_EXPR, off_noncap, off);
+      off = fold_convert_for_mem_ref (TREE_TYPE (TREE_OPERAND (base, 1)),
+				      off);
       base = unshare_expr (TREE_OPERAND (base, 0));
     }
   else

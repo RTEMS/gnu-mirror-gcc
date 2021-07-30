@@ -1,5 +1,8 @@
 /* { dg-do compile } */
 /* { dg-options "-w -O3 -mcpu=cortex-a53" } */
+#ifdef __GCC_ARM_CAPABILITY_ANY
+extern void *save_calloc (char*, char*, int, int, __SIZE_TYPE__);
+#endif
 typedef struct __sFILE __FILE;
 typedef __FILE FILE;
 typedef int atom_id;

@@ -6,6 +6,7 @@ func1(const volatile void * base, __SIZE_TYPE__ byteOffset)
 {
   volatile __SIZE_TYPE__ *addr
     = (volatile __SIZE_TYPE__ *)((__SIZE_TYPE__)base + byteOffset);
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
   return *addr;
 }
 

@@ -547,6 +547,9 @@ gfc_define_builtin (const char *name, tree type, enum built_in_function code,
 {
   tree decl;
 
+  if (type == error_mark_node)
+    return;
+
   decl = add_builtin_function (name, type, code, BUILT_IN_NORMAL,
 			       library_name, NULL_TREE);
   set_call_expr_flags (decl, attr);
@@ -1009,42 +1012,68 @@ gfc_init_builtin_functions (void)
   gfc_define_builtin ("__builtin_isunordered", ftype, BUILT_IN_ISUNORDERED,
 		      "__builtin_isunordered", ATTR_CONST_NOTHROW_LEAF_LIST);
 
-
-#define DEF_PRIMITIVE_TYPE(ENUM, VALUE) \
+#define DEF_PRIMITIVE_TYPE(ENUM, VALUE)                                 \
   builtin_types[(int) ENUM] = VALUE;
-#define DEF_FUNCTION_TYPE_0(ENUM, RETURN)                       \
-  builtin_types[(int) ENUM]                                     \
-    = build_function_type_list (builtin_types[(int) RETURN],	\
+#define DEF_FUNCTION_TYPE_0(ENUM, RETURN)                               \
+  builtin_types[(int) ENUM]                                             \
+    = builtin_types[(int) RETURN] == error_mark_node                    \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 NULL_TREE);
-#define DEF_FUNCTION_TYPE_1(ENUM, RETURN, ARG1)				\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+#define DEF_FUNCTION_TYPE_1(ENUM, RETURN, ARG1)                         \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 NULL_TREE);
-#define DEF_FUNCTION_TYPE_2(ENUM, RETURN, ARG1, ARG2)           \
-  builtin_types[(int) ENUM]                                     \
-    = build_function_type_list (builtin_types[(int) RETURN],    \
-                                builtin_types[(int) ARG1],      \
-                                builtin_types[(int) ARG2],      \
+#define DEF_FUNCTION_TYPE_2(ENUM, RETURN, ARG1, ARG2)                   \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
+                                builtin_types[(int) ARG1],              \
+                                builtin_types[(int) ARG2],              \
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_3(ENUM, RETURN, ARG1, ARG2, ARG3)             \
   builtin_types[(int) ENUM]                                             \
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 builtin_types[(int) ARG2],              \
                                 builtin_types[(int) ARG3],              \
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_4(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4)	\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 builtin_types[(int) ARG2],              \
                                 builtin_types[(int) ARG3],		\
                                 builtin_types[(int) ARG4],              \
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_5(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5)	\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 builtin_types[(int) ARG2],              \
                                 builtin_types[(int) ARG3],		\
@@ -1053,8 +1082,16 @@ gfc_init_builtin_functions (void)
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_6(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 			    ARG6)					\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 builtin_types[(int) ARG2],              \
                                 builtin_types[(int) ARG3],		\
@@ -1064,8 +1101,17 @@ gfc_init_builtin_functions (void)
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_7(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 			    ARG6, ARG7)					\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],            \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],              \
                                 builtin_types[(int) ARG1],              \
                                 builtin_types[(int) ARG2],              \
                                 builtin_types[(int) ARG3],		\
@@ -1076,8 +1122,18 @@ gfc_init_builtin_functions (void)
                                 NULL_TREE);
 #define DEF_FUNCTION_TYPE_8(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 			    ARG6, ARG7, ARG8)				\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],		\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node                  \
+       || builtin_types[(int) ARG8] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],		\
 				builtin_types[(int) ARG1],		\
 				builtin_types[(int) ARG2],		\
 				builtin_types[(int) ARG3],		\
@@ -1089,8 +1145,19 @@ gfc_init_builtin_functions (void)
 				NULL_TREE);
 #define DEF_FUNCTION_TYPE_9(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 			    ARG6, ARG7, ARG8, ARG9)			\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],		\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node                  \
+       || builtin_types[(int) ARG8] == error_mark_node                  \
+       || builtin_types[(int) ARG9] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],		\
 				builtin_types[(int) ARG1],		\
 				builtin_types[(int) ARG2],		\
 				builtin_types[(int) ARG3],		\
@@ -1103,8 +1170,20 @@ gfc_init_builtin_functions (void)
 				NULL_TREE);
 #define DEF_FUNCTION_TYPE_10(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4,	\
 			     ARG5, ARG6, ARG7, ARG8, ARG9, ARG10)	\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],		\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node                  \
+       || builtin_types[(int) ARG8] == error_mark_node                  \
+       || builtin_types[(int) ARG9] == error_mark_node                  \
+       || builtin_types[(int) ARG10] == error_mark_node)                \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],		\
 				builtin_types[(int) ARG1],		\
 				builtin_types[(int) ARG2],		\
 				builtin_types[(int) ARG3],		\
@@ -1118,8 +1197,21 @@ gfc_init_builtin_functions (void)
 				NULL_TREE);
 #define DEF_FUNCTION_TYPE_11(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4,	\
 			     ARG5, ARG6, ARG7, ARG8, ARG9, ARG10, ARG11)\
-  builtin_types[(int) ENUM]						\
-    = build_function_type_list (builtin_types[(int) RETURN],		\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node                  \
+       || builtin_types[(int) ARG8] == error_mark_node                  \
+       || builtin_types[(int) ARG9] == error_mark_node                  \
+       || builtin_types[(int) ARG10] == error_mark_node                 \
+       || builtin_types[(int) ARG11] == error_mark_node)                \
+    ? error_mark_node :                                                 \
+    build_function_type_list (builtin_types[(int) RETURN],		\
 				builtin_types[(int) ARG1],		\
 				builtin_types[(int) ARG2],		\
 				builtin_types[(int) ARG3],		\
@@ -1133,24 +1225,41 @@ gfc_init_builtin_functions (void)
 				builtin_types[(int) ARG11],		\
 				NULL_TREE);
 #define DEF_FUNCTION_TYPE_VAR_0(ENUM, RETURN)				\
-  builtin_types[(int) ENUM]						\
-    = build_varargs_function_type_list (builtin_types[(int) RETURN],    \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node)                  \
+    ? error_mark_node :                                                 \
+    build_varargs_function_type_list (builtin_types[(int) RETURN],    \
                                         NULL_TREE);
 #define DEF_FUNCTION_TYPE_VAR_1(ENUM, RETURN, ARG1)			\
-  builtin_types[(int) ENUM]						\
-    = build_varargs_function_type_list (builtin_types[(int) RETURN],    \
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node)                  \
+    ? error_mark_node :                                                 \
+    build_varargs_function_type_list (builtin_types[(int) RETURN],    \
 					builtin_types[(int) ARG1],     	\
 					NULL_TREE);
 #define DEF_FUNCTION_TYPE_VAR_2(ENUM, RETURN, ARG1, ARG2)		\
-  builtin_types[(int) ENUM]						\
-    = build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
 					builtin_types[(int) ARG1],     	\
 					builtin_types[(int) ARG2],     	\
 					NULL_TREE);
 #define DEF_FUNCTION_TYPE_VAR_6(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 				ARG6)	\
-  builtin_types[(int) ENUM]						\
-    = build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
 					builtin_types[(int) ARG1],     	\
 					builtin_types[(int) ARG2],     	\
 					builtin_types[(int) ARG3],	\
@@ -1160,8 +1269,17 @@ gfc_init_builtin_functions (void)
 					NULL_TREE);
 #define DEF_FUNCTION_TYPE_VAR_7(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 				ARG6, ARG7)				\
-  builtin_types[(int) ENUM]						\
-    = build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
+  builtin_types[(int) ENUM]                                             \
+    = (builtin_types[(int) RETURN] == error_mark_node                   \
+       || builtin_types[(int) ARG1] == error_mark_node                  \
+       || builtin_types[(int) ARG2] == error_mark_node                  \
+       || builtin_types[(int) ARG3] == error_mark_node                  \
+       || builtin_types[(int) ARG4] == error_mark_node                  \
+       || builtin_types[(int) ARG5] == error_mark_node                  \
+       || builtin_types[(int) ARG6] == error_mark_node                  \
+       || builtin_types[(int) ARG7] == error_mark_node)                 \
+    ? error_mark_node :                                                 \
+    build_varargs_function_type_list (builtin_types[(int) RETURN],   	\
 					builtin_types[(int) ARG1],     	\
 					builtin_types[(int) ARG2],     	\
 					builtin_types[(int) ARG3],	\

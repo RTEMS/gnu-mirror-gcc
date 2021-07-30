@@ -634,6 +634,10 @@ diagnose_tm_1 (gimple_stmt_iterator *gsi, bool *handled_ops_p,
     {
     case GIMPLE_CALL:
       {
+	if (gimple_call_internal_p (stmt)
+	    && gimple_call_internal_fn (stmt) == IFN_REPLACE_ADDRESS_VALUE)
+	  break; /* REPLACE_ADDRESS_VALUE is transaction-safe.  */
+
 	tree fn = gimple_call_fn (stmt);
 
 	if ((d->summary_flags & DIAG_TM_OUTER) == 0
@@ -2188,6 +2192,8 @@ build_tm_load (location_t loc, tree lhs, tree rhs, gimple_stmt_iterator *gsi)
     code = BUILT_IN_TM_LOAD_LDOUBLE;
   else
     {
+      if (capability_type_p (type))
+	return NULL;
       if (TYPE_SIZE (type) == NULL || !tree_fits_uhwi_p (TYPE_SIZE (type)))
 	return NULL;
       unsigned HOST_WIDE_INT type_size = tree_to_uhwi (TYPE_SIZE (type));

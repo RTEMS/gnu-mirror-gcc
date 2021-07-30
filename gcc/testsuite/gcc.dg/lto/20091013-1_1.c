@@ -73,8 +73,11 @@ static void update_font_code_page( DC *dc )
 
     if (dc->gdiFont)
         charset = WineEngGetTextCharsetInfo( dc->gdiFont, ((void *)0), 0 );
-
+#ifdef __GCC_ARM_CAPABILITY_ANY
+    if (TranslateCharsetInfo( ((void *)(__intcap_t)(unsigned long)((unsigned long)charset)), &csi, 1) )
+#else
     if (TranslateCharsetInfo( ((void *)(unsigned long)((unsigned long)charset)), &csi, 1) )
+#endif
         dc->font_code_page = csi.ciACP;
     else {
         switch(charset) {

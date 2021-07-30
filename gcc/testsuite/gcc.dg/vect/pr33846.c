@@ -7,7 +7,11 @@ int clamp_val (int i)
   return ~i >> 31;
 }
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __INTPTR_TYPE__ intptr_t;
+#else
 typedef __PTRDIFF_TYPE__ intptr_t;
+#endif
 
 void _mix_some_samples (intptr_t buf, int *mix_buffer, int mix_size)
 {

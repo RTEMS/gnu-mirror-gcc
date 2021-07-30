@@ -329,7 +329,7 @@ enum reg_class
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
 #define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
 
-#define Pmode SImode
+#define POmode SImode
 
 #define STORE_FLAG_VALUE 1
 

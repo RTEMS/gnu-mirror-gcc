@@ -4,13 +4,17 @@
 /* { dg-options "-O2 -maltivec" { target { powerpc*-*-linux* && powerpc_altivec_ok } } } */
 /* { dg-skip-if "no vector type for PSImode" { msp430-*-* } { "-mlarge" } { "" } } */
 
-typedef __UINTPTR_TYPE__ uintptr_t;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef unsigned uintoffset_t __attribute__((__mode__(address)));
+#else
+typedef __UINTPTR_TYPE__ uintoffset_t;
+#endif
 
 #undef __vector
 #define __vector __attribute__ ((__vector_size__ (16)))
 
 typedef __vector signed char qword;
-typedef __vector uintptr_t VU;
+typedef __vector uintoffset_t VU;
 
 extern short g[192 + 16];
 
@@ -20,7 +24,7 @@ void f1 (unsigned ctr)
 {
   VU pin;
 
-  pin = (VU){(uintptr_t) &g[16]};
+  pin = (VU){(uintoffset_t) &g[16]};
   do
     {
       f ((qword) pin);

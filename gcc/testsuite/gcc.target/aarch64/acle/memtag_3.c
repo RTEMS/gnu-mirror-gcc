@@ -1,6 +1,6 @@
 /* Test the MEMTAG intrinsic expanding errors.  */
 
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-require-effective-target lp64 } */
 /* { dg-options "-O3 -march=armv8.5-a+memtag" } */
 

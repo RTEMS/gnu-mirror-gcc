@@ -1,6 +1,11 @@
 static a[];
-static b, h, m, n, o, p, q, t, u, v, t5, t6, t16, t17, t18, t25;
+static h, m, n, o, p, q, t, u, v, t5, t6, t16, t17, t18, t25;
 c;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+static __intcap_t b;
+#else
+static b;
+#endif
 static volatile d;
 static volatile e;
 static volatile f;
@@ -30,7 +35,11 @@ static volatile t19;
 static volatile t20;
 const volatile t21;
 static volatile t22;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+static volatile __intcap_t t23;
+#else
 static volatile t23;
+#endif
 const volatile t24;
 *t29;
 fn1() { b = 5; }

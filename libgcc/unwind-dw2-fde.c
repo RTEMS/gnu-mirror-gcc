@@ -835,7 +835,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, void *pc)
   for (; ! last_fde (ob, this_fde); this_fde = next_fde (this_fde))
     {
       const struct dwarf_cie *this_cie;
-      _Unwind_Ptr pc_begin, pc_range;
+      _Unwind_Address pc_begin, pc_range;
 
       /* Skip CIEs.  */
       if (this_fde->CIE_delta == 0)
@@ -856,7 +856,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, void *pc)
 
       if (encoding == DW_EH_PE_absptr)
 	{
-	  const _Unwind_Ptr *pc_array = (const _Unwind_Ptr *) this_fde->pc_begin;
+	  const _Unwind_Address *pc_array = (const _Unwind_Address *) this_fde->pc_begin;
 	  pc_begin = pc_array[0];
 	  pc_range = pc_array[1];
 	  if (pc_begin == 0)
@@ -933,16 +933,16 @@ binary_search_single_encoding_fdes (struct object *ob, void *pc)
     {
       size_t i = (lo + hi) / 2;
       const fde *f = vec->array[i];
-      _Unwind_Ptr pc_begin, pc_range;
+      _Unwind_Address pc_begin, pc_range;
       const unsigned char *p;
 
       p = read_encoded_value_with_base (encoding, base, f->pc_begin,
 					&pc_begin);
       read_encoded_value_with_base (encoding & 0x0F, 0, p, &pc_range);
 
-      if ((_Unwind_Ptr) pc < pc_begin)
+      if ((_Unwind_Address) pc < pc_begin)
 	hi = i;
-      else if ((_Unwind_Ptr) pc >= pc_begin + pc_range)
+      else if ((_Unwind_Address) pc >= pc_begin + pc_range)
 	lo = i + 1;
       else
 	return f;
@@ -961,7 +961,7 @@ binary_search_mixed_encoding_fdes (struct object *ob, void *pc)
     {
       size_t i = (lo + hi) / 2;
       const fde *f = vec->array[i];
-      _Unwind_Ptr pc_begin, pc_range;
+      _Unwind_Address pc_begin, pc_range;
       const unsigned char *p;
       int encoding;
 
@@ -971,9 +971,9 @@ binary_search_mixed_encoding_fdes (struct object *ob, void *pc)
 					f->pc_begin, &pc_begin);
       read_encoded_value_with_base (encoding & 0x0F, 0, p, &pc_range);
 
-      if ((_Unwind_Ptr) pc < pc_begin)
+      if ((_Unwind_Address) pc < pc_begin)
 	hi = i;
-      else if ((_Unwind_Ptr) pc >= pc_begin + pc_range)
+      else if ((_Unwind_Address) pc >= pc_begin + pc_range)
 	lo = i + 1;
       else
 	return f;

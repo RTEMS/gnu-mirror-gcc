@@ -36,7 +36,11 @@ Widget AddButtons(Widget Parent, Widget Top,
 	{
 		if (!Buttons[i].Label)
 			continue;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+		Buttons[i].W  = (__intcap_t)XtVaCreateManagedWidget(Buttons[i].Name,
+#else
 		Buttons[i].W  = XtVaCreateManagedWidget(Buttons[i].Name,
+#endif
 			commandWidgetClass,
 			Parent,
 			((char*)&XtStrings[429]) , Buttons[i].Label,

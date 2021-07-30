@@ -15,7 +15,11 @@ enum { i = 2 } j;
 inline int c(int k) {
   char *cp;
   if (k >= 62 && k <= 247)
+#ifdef __GCC_ARM_CAPABILITY_ANY
+    cp = (__intcap_t)b[k];
+#else
     cp = b[k];
+#endif
   if (cp)
     return 65533;
   return 2;

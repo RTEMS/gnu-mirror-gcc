@@ -10,9 +10,15 @@ foo (void **p)
   posix_memalign (p, 1);
   posix_memalign (p, "foo");
   posix_memalign ("gnu", "gcc");
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  posix_memalign ((__intcap_t) 1, p);
+  posix_memalign ((__intcap_t) 1, 2);
+  posix_memalign ((__intcap_t) 1, 2, 3);
+#else
   posix_memalign (1, p);
   posix_memalign (1, 2);
   posix_memalign (1, 2, 3);
+#endif
   posix_memalign (p, p, p);
   posix_memalign (p, "qui", 3);
   posix_memalign (p, 1, 2);

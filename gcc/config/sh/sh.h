@@ -1515,7 +1515,7 @@ extern bool current_function_interrupt;
 /*#define NO_FUNCTION_CSE 1*/
 
 /* The machine modes of pointers and functions.  */
-#define Pmode  (SImode)
+#define POmode  (SImode)
 #define FUNCTION_MODE  Pmode
 
 /* The multiply insn on the SH1 and the divide insns on the SH1 and SH2

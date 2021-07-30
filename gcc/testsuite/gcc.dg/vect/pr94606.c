@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-additional-options "-march=armv8.2-a+sve -msve-vector-bits=256" { target aarch64*-*-* } } */
+/* { dg-additional-options "-march=armv8.2-a+sve -msve-vector-bits=256" { target { { aarch64*-*-* } && { ! aarch64_capability_any } } } } */
 
 const short mask[] = { 0, 0, 0, 0, 0, 0, 0, 0,
 		       0, 0, 0, 1, 1, 1, 1, 1 };

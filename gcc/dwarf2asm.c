@@ -993,7 +993,7 @@ dw2_output_indirect_constant_1 (const char *sym, tree id)
   assemble_variable (decl, 1, 1, 1);
   flag_section_anchors = save_flag_section_anchors;
   flag_sanitize = save_flag_sanitize;
-  assemble_integer (sym_ref, POINTER_SIZE_UNITS, POINTER_SIZE, 1);
+  assemble_pointer (sym_ref);
   /* The following is a hack recognized by use_blocks_for_decl_p to disable
      section anchor handling of the decl.  */
   DECL_INITIAL (decl) = decl;
@@ -1043,6 +1043,7 @@ dw2_asm_output_encoded_addr_rtx (int encoding, rtx addr, bool is_public,
       return;
     }
 
+  gcc_assert (! CONST_NULL_P (addr));
   /* NULL is _always_ represented as a plain zero, as is 1 for Ada's
      "all others".  */
   if (addr == const0_rtx || addr == const1_rtx)

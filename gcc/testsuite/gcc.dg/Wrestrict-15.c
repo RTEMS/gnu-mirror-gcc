@@ -1,5 +1,5 @@
 /* PR 85365 - -Wrestrict false positives with -fsanitize=undefined
-   { dg-do compile }
+   { dg-do compile { target { ! aarch64_capability_any } } }
    { dg-options "-O2 -Wrestrict -fsanitize=undefined" } */
 
 typedef __SIZE_TYPE__ size_t;

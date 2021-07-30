@@ -14,7 +14,11 @@ int main(int argc,char**argv,char **envp)
  _loc1:;
 *++esp=(long)&&_loc35;
  _loc35:;
-goto *(*esp--);
+#ifdef __GCC_ARM_CAPABILITY_ANY
+ goto *(__intcap_t) (*esp--);
+#else
+ goto *(*esp--);
+#endif
 *++esp=(long)&&_loc36;
  _loc36:;
 *++esp=(long)&&_loc37;
@@ -27,5 +31,9 @@ _loc66:;
 *++esp=(long)&&_loc119;
  _loc119:;
 SetTermStruc:
+#ifdef __GCC_ARM_CAPABILITY_ANY
+ goto *(__intcap_t) (*esp--);
+#else
  goto *(*esp--);
+#endif
 }

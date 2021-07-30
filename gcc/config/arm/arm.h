@@ -2040,7 +2040,7 @@ enum arm_auto_incmodes
 #define NO_FUNCTION_CSE 1
 
 /* The machine modes of pointers and functions */
-#define Pmode  SImode
+#define POmode  SImode
 #define FUNCTION_MODE  Pmode
 
 #define ARM_FRAME_RTX(X)					\
@@ -2273,7 +2273,7 @@ extern int making_const_table;
      return address.  This does not apply to ARM6 and later processors	\
      when running in 32 bit mode.  */					\
   ((arm_arch4 || TARGET_THUMB)						\
-   ? (gen_int_mode ((unsigned long)0xffffffff, Pmode))			\
+   ? (gen_int_mode ((unsigned long)0xffffffff, POmode))			\
    : arm_gen_return_addr_mask ())
 
 

@@ -1,5 +1,5 @@
 /* PR target/87598 */
-/* { dg-do compile } */
+/* { dg-do compile  { target { ! aarch64_capability_any } } } */
 
 void
 foo (void)

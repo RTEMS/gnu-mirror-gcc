@@ -591,7 +591,7 @@ do {									\
 #define MOVE_MAX 4
 #define MOVE_RATIO(SPEED) 4
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
-#define Pmode SImode
+#define POmode SImode
 #define FUNCTION_MODE QImode
 
 #define CPU_UNITS_QUERY 1

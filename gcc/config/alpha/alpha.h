@@ -806,7 +806,7 @@ do {									     \
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode DImode
+#define POmode DImode
 
 /* Mode of a function address in a call instruction (for indexing purposes).  */
 

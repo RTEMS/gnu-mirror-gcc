@@ -124,7 +124,7 @@ void cond_succ_nowarn (struct A *p, const struct A *q)
   /* Verify that distinct but provably equivalent conditionals are
      recognized and don't trigger the warning.  */
   if (p != q)
-    strncpy (p->a, q->a, sizeof p->a - 1);
+    strncpy (p->a, q->a, sizeof p->a - 1); /* { dg-bogus "\\\[-Wstringop-truncation" "" { xfail aarch64_capability_any } } */
 
   if (p->a != q->a)
     p->a[sizeof p->a - 1] = 0;

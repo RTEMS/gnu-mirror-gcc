@@ -476,7 +476,7 @@ typedef struct avr_args
 
 #define MOVE_RATIO(speed) ((speed) ? 3 : 2)
 
-#define Pmode HImode
+#define POmode HImode
 
 #define FUNCTION_MODE HImode
 

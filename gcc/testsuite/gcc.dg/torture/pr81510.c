@@ -14,7 +14,11 @@ int e()
   for (;;)
     if (g)
       for (; b; b++) {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+	  g = (__intcap_t)c;
+#else
 	  g = c;
+#endif
 	  if (a &= c) {
 	      d *j = &b;
 	      h k;

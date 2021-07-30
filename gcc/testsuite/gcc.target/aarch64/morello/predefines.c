@@ -21,20 +21,30 @@ struct myval {
 	__intcap_t x;
 };
 
-#ifndef __ARM_FEATURE_C64
-#error "__ARM_FEATURE_C64 is not defined!"
+#ifdef __CHERI_PURE_CAPABILITY__
+#  ifndef __ARM_FEATURE_C64
+#    error "__ARM_FEATURE_C64 is not defined!"
+#  endif
 #endif
 
 #ifdef __CHERI_CAP_PERMISSION_PERMIT_CCALL__
 #error "__CHERI_CAP_PERMISSION_PERMIT_CCALL__ is defined!"
 #endif
 
+/* MORELLO TODO
+   Should test for __CHERI_PURE_CAPABILITY__ if compiling with pure capability
+   but not otherwise.  */
+#ifndef __CHERI__
+#error "__CHERI__ is not defined!"
+#endif
+
 char *myconst = "hello world";
 int main()
 {
 	assert (__INTPTR_MAX__ == __INT64_MAX__);
-	/* For fake-capability this should be 64, for pure capability this
-	 * should be 128.  */
+	/* For fake-capability this should be 64, for pure capability this should be 128
+	 * For fake-capability with full frontend stuf to test build systems this should be 128.
+	 */
 	/* assert (__INTPTR_WIDTH__ == 64); */
 	assert (__UINTPTR_MAX__ == __UINT64_MAX__);
 	assert (myconst[2] == 'l');

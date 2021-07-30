@@ -7,7 +7,11 @@
 int *
 f (int x)
 {
-  return __builtin_speculation_safe_value (x);  /* { dg-warning "returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" } */
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  return (__intcap_t) __builtin_speculation_safe_value (x);  /* { dg-warning "returning '__intcap_t' from a function with return type 'int \\*' makes pointer from integer without a cast" "" { target { aarch64_capability_any } } } */
+#else
+  return __builtin_speculation_safe_value (x);  /* { dg-warning "returning 'int' from a function with return type 'int \\*' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+#endif
 }
 
 /* { dg-prune-output "this target does not define a speculation barrier;" } */

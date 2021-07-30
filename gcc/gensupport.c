@@ -3206,7 +3206,7 @@ match_pattern (optab_pattern *p, const char *name, const char *pat)
   bool force_int = false;
   bool force_partial_int = false;
   bool force_fixed = false;
-
+  bool force_addr = false;
   if (pat == NULL)
     return false;
   for (; ; ++pat)
@@ -3233,7 +3233,9 @@ match_pattern (optab_pattern *p, const char *name, const char *pat)
 	case 'Q':
 	  force_fixed = 1;
 	  break;
-
+	case 'C':
+	  force_addr = 1;
+	  break;
 	case 'a':
 	case 'b':
 	  {
@@ -3269,7 +3271,9 @@ match_pattern (optab_pattern *p, const char *name, const char *pat)
 			|| mode_class[i] == MODE_VECTOR_FRACT
 			|| mode_class[i] == MODE_VECTOR_UFRACT
 			|| mode_class[i] == MODE_VECTOR_ACCUM
-			|| mode_class[i] == MODE_VECTOR_UACCUM))
+			|| mode_class[i] == MODE_VECTOR_UACCUM)
+		    && (! force_addr || mode_class[i] == MODE_CAPABILITY
+			|| mode_class[i] == MODE_INT))
 		  break;
 	      }
 

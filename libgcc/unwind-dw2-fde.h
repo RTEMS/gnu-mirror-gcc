@@ -105,8 +105,8 @@ extern void __deregister_frame (void *);
 
 typedef          int  sword __attribute__ ((mode (SI)));
 typedef unsigned int  uword __attribute__ ((mode (SI)));
-typedef unsigned int  uaddr __attribute__ ((mode (pointer)));
-typedef          int  saddr __attribute__ ((mode (pointer)));
+typedef unsigned int  uaddr __attribute__ ((mode (address)));
+typedef          int  saddr __attribute__ ((mode (address)));
 typedef unsigned char ubyte;
 
 /* Terminology:

@@ -793,7 +793,7 @@ typedef struct { int regs; int lib; } CUMULATIVE_ARGS;
 /* ??? MMIX allows a choice of STORE_FLAG_VALUE.  Revisit later,
    we don't have scc expanders yet.  */
 
-#define Pmode DImode
+#define POmode DImode
 
 #define FUNCTION_MODE QImode
 

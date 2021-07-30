@@ -64,13 +64,22 @@ f (char *km, char *h)
   h = w (&r);
   if (!bv)
     {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      bs = (__intcap_t)g (8);
+#else
       bs = g (8);
+#endif
       t = (struct f1 *)g (20);
     }
   else
     {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      bs = (__intcap_t) g (bs, y * 8);
+      z[bv] = (__intcap_t) cr (z[bv], (1 + y) * 20);
+#else
       bs = g (bs, y * 8);
       z[bv] = cr (z[bv], (1 + y) * 20);
+#endif
       t = &z[bv][y - 1];
     }
   bs[y - 1] = r;
@@ -78,7 +87,11 @@ f (char *km, char *h)
   t->fs[1] = 0;
   t->ic = 0;
   t->fd = 0;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  t->fn = (__intcap_t) cs (h);
+#else
   t->fn = cs (h);
+#endif
   t->ff = b;
  L:
   g (q[map], V, c);

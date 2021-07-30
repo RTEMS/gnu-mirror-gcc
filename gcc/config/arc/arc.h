@@ -1451,7 +1451,7 @@ do { \
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
 /* ARCompact has full 32-bit pointers.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* A function address in a call instruction.  */
 #define FUNCTION_MODE SImode

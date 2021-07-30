@@ -4493,13 +4493,14 @@ expand_debug_expr (tree exp)
       if (TREE_CODE (exp) == MEM_REF)
 	{
 	  if (GET_CODE (op0) == DEBUG_IMPLICIT_PTR
-	      || (GET_CODE (op0) == PLUS
+	      || (any_plus_p (op0)
 		  && GET_CODE (XEXP (op0, 0)) == DEBUG_IMPLICIT_PTR))
 	    /* (mem (debug_implicit_ptr)) might confuse aliasing.
 	       Instead just use get_inner_reference.  */
 	    goto component_ref;
 
-	  op1 = expand_debug_expr (TREE_OPERAND (exp, 1));
+	  op1
+	    = expand_debug_expr (fold_drop_capability (TREE_OPERAND (exp, 1)));
 	  poly_int64 offset;
 	  if (!op1 || !poly_int_rtx_p (op1, &offset))
 	    return NULL;
@@ -4732,7 +4733,8 @@ expand_debug_expr (tree exp)
 
     case MINUS_EXPR:
     case POINTER_DIFF_EXPR:
-      return simplify_gen_binary (MINUS, mode, op0, op1);
+      return simplify_gen_binary (MINUS, mode, drop_capability (op0),
+				  drop_capability (op1));
 
     case MULT_EXPR:
       return simplify_gen_binary (MULT, mode, op0, op1);
@@ -5029,8 +5031,9 @@ expand_debug_expr (tree exp)
 			  && GET_CODE (XEXP (op0, 0)) == DEBUG_IMPLICIT_PTR
 			  && CONST_INT_P (XEXP (op0, 1)))))
 		{
-		  op1 = expand_debug_expr (TREE_OPERAND (TREE_OPERAND (exp, 0),
-							 1));
+		  op1 = expand_debug_expr
+			(fold_drop_capability
+			  (TREE_OPERAND (TREE_OPERAND (exp, 0), 1)));
 		  poly_int64 offset;
 		  if (!op1 || !poly_int_rtx_p (op1, &offset))
 		    return NULL;

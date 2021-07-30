@@ -21,6 +21,10 @@ h: ++e;
 	 goto i;
      }
 f:
+#ifdef __GCC_ARM_CAPABILITY_ANY
+   goto *(__intcap_t) ({ d || e < 0 || e >= 2; });
+#else
    goto *({ d || e < 0 || e >= 2; });
+#endif
    &e;
 }

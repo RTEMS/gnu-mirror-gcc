@@ -15,6 +15,7 @@ f1 (char *p, size_t a, size_t b)
   T f = (T) (p + a);
   T g = (T) (p + b);
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -26,6 +27,7 @@ f2 (char *p, size_t a, size_t b)
   T f = (T) (p + a);
   T g = (T) (p + b);
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -37,6 +39,7 @@ f3 (char *p, size_t a, size_t b)
   T f = (T) (p + a);
   T g = (T) (p + b);
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -47,6 +50,7 @@ f4 (char *p, size_t a)
   T f = (T) (p + a);
   T g = (T) p;
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -57,6 +61,7 @@ f5 (char *p, size_t a)
   T f = (T) (p + a);
   T g = (T) p;
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -67,6 +72,7 @@ f6 (char *p, size_t a)
   T f = (T) p;
   T g = (T) (p + a);
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 T
@@ -77,4 +83,5 @@ f7 (char *p, size_t a)
   T f = (T) p;
   T g = (T) (p + a);
   return f - g;
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }

@@ -6,7 +6,7 @@ struct o { struct o *next; struct os *se; };
 void f(struct o *o){
   struct os *s;
   if(o) s = o->se;
-  while(o && s == o->se){
+  while(o && s == o->se){ /* { dg-bogus "may be used uninitialized in this function" "" { xfail aarch64_capability_any } } */
     s++; // here `o' is non-zero and thus s is initialized
     s == o->se  // `?' is essential, `if' does not trigger the warning
       ? (o = o->next, o ? s = o->se : 0)

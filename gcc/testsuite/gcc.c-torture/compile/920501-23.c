@@ -13,4 +13,8 @@ preinc_si(p)si*p;{si x;for(;;){x=*++p;if(x)return x;}}
 postinc_di(p)di*p;{di x;for(;;){x=*p++;if(x)return x;}}
 preinc_di(p)di*p;{di x;for(;;){x=*++p;if(x)return x;}}
 inc_overlap(p,a)di*p;{do{p=*(di**)p;p=(di*)((int)p+4);}while(*p);}
+#ifdef __GCC_ARM_CAPABILITY_ANY
+di move_di(p,p2)di*p,*p2;{di x=p;p2=(__uintcap_t)((di*)x)[1];return p2[1];}
+#else
 di move_di(p,p2)di*p,*p2;{di x=p;p2=((di*)x)[1];return p2[1];}
+#endif

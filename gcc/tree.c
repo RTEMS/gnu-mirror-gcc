@@ -2699,13 +2699,14 @@ maybe_cap_all_onesp (const_tree expr)
       if (TREE_CODE (expr) != INTEGER_CST)
 	return false;
       tree cap_type = TREE_TYPE (expr);
-      unsigned HOST_WIDE_INT prec = TYPE_NONCAP_PRECISION (cap_type);
       wide_int cap_orig = wi::to_wide (expr);
-      wide_int mask = wi::uhwi (-1, prec);
+      wide_int mask = wi::mask (TYPE_NONCAP_PRECISION (cap_type),
+				false,
+				TYPE_CAP_PRECISION (cap_type));
       wide_int metadata = wi::bit_and_not (cap_orig, mask);
       if (metadata != 0)
 	return false;
-      wide_int value = wi::bit_and_not (cap_orig, mask);
+      wide_int value = wi::bit_and (cap_orig, mask);
       tree noncap_type = noncapability_type (cap_type);
       return integer_all_onesp (force_fit_type (noncap_type, value, 0, 0));
     }
@@ -3946,6 +3947,7 @@ type_contains_placeholder_1 (const_tree type)
     case FUNCTION_TYPE:
     case VECTOR_TYPE:
     case NULLPTR_TYPE:
+    case INTCAP_TYPE:
       return false;
 
     case INTEGER_TYPE:
@@ -9319,6 +9321,7 @@ variably_modified_type_p (tree type, tree fn)
 	  return true;
       break;
 
+    case INTCAP_TYPE:
     case INTEGER_TYPE:
     case REAL_TYPE:
     case FIXED_POINT_TYPE:
@@ -11180,6 +11183,20 @@ initializer_zerop (const_tree init, bool *nonzero /* = NULL */)
 
   switch (TREE_CODE (init))
     {
+    case CALL_EXPR:
+      {
+	enum internal_fn fncall = CALL_EXPR_IFN (init);
+	if (fncall != IFN_REPLACE_ADDRESS_VALUE)
+	  return false;
+	tree ptr = CALL_EXPR_ARG (init, 0);
+	tree addr_init = CALL_EXPR_ARG (init, 1);
+	bool ret = initializer_zerop (ptr, nonzero);
+	bool tmp = *nonzero;
+	ret &= initializer_zerop (addr_init, nonzero);
+	*nonzero = tmp | *nonzero;
+	return ret;
+      }
+
     case INTEGER_CST:
       if (integer_zerop (init))
 	return true;
@@ -13953,7 +13970,7 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
 bool
 capability_type_p (const_tree t)
 {
-  if (t == NULL_TREE)
+  if (t == NULL_TREE || t == error_mark_node)
     return false;
   if (! CAPABILITY_MODE_P (TYPE_MODE (t)))
     return false;
@@ -16279,6 +16296,35 @@ test_fold_build_replace_address_value (void)
   ASSERT_EQ (fold_build_replace_address_value (left, right), right);
 }
 
+static void
+test_maybe_cap_all_onesp (void)
+{
+  tree ty = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+
+  ASSERT_FALSE (maybe_cap_all_onesp (build_int_cst (ty, 0)));
+  ASSERT_FALSE (maybe_cap_all_onesp (build_int_cst (ty, 42)));
+
+  auto wi_ones = wi::mask (TYPE_NONCAP_PRECISION (ty), false,
+			   TYPE_CAP_PRECISION (ty));
+  tree all_ones = wide_int_to_tree (ty, wi_ones);
+
+  ASSERT_TRUE (maybe_cap_all_onesp (all_ones));
+
+  if (TYPE_CAP_PRECISION (ty) > TYPE_NONCAP_PRECISION (ty))
+    {
+      /* Pick a bit in the middle of the metadata to set.  */
+      const auto bit_to_set =
+	(TYPE_NONCAP_PRECISION (ty) + TYPE_CAP_PRECISION (ty)) / 2;
+
+      auto bit = wi::uhwi (1, TYPE_CAP_PRECISION (ty));
+      auto amt = wi::uhwi (bit_to_set - 1, TYPE_CAP_PRECISION (ty));
+      auto res = wi::bit_or (wi_ones, wi::lshift (bit, amt));
+
+      tree not_quite = wide_int_to_tree (ty, res);
+      ASSERT_FALSE (maybe_cap_all_onesp (not_quite));
+    }
+}
+
 /* Run all of the selftests within this file.  */
 
 void
@@ -16286,6 +16332,7 @@ tree_c_tests ()
 {
   test_fold_build_replace_address_value ();
   test_capability_type_manipulation ();
+  test_maybe_cap_all_onesp ();
   test_integer_constants ();
   test_identifiers ();
   test_labels ();

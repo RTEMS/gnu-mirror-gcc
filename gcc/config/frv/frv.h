@@ -1800,7 +1800,7 @@ fprintf (STREAM, "\t.word .L%d\n", VALUE)
    The width of `Pmode' must be at least as large as the value of
    `POINTER_SIZE'.  If it is not equal, you must define the macro
    `POINTERS_EXTEND_UNSIGNED' to specify how pointers are extended to `Pmode'.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* An alias for the machine mode used for memory references to functions being
    called, in `call' RTL expressions.  On most machines this should be

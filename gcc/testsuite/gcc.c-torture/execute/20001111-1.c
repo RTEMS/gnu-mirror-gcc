@@ -16,7 +16,11 @@ foo (unsigned int offset)
     return i * 0xce2f;
 
   buffer = next_buffer;
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  data = (__uintcap_t)(buffer * 0xce2f);
+#else
   data = buffer * 0xce2f;
+#endif
   for (i = 0; i < 2; i++)
     bar ();
   buffer = next_buffer;

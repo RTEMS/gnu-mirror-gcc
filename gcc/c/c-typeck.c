@@ -754,10 +754,12 @@ c_common_type (tree t1, tree t2)
 
   gcc_assert (code1 == VECTOR_TYPE || code1 == COMPLEX_TYPE
 	      || code1 == FIXED_POINT_TYPE || code1 == REAL_TYPE
-	      || code1 == INTEGER_TYPE);
+	      || code1 == INTEGER_TYPE
+	      || code1 == INTCAP_TYPE);
   gcc_assert (code2 == VECTOR_TYPE || code2 == COMPLEX_TYPE
 	      || code2 == FIXED_POINT_TYPE || code2 == REAL_TYPE
-	      || code2 == INTEGER_TYPE);
+	      || code2 == INTEGER_TYPE
+	      || code2 == INTCAP_TYPE);
 
   /* When one operand is a decimal float type, the other operand cannot be
      a generic float type or a complex type.  We also disallow vector types
@@ -918,6 +920,25 @@ c_common_type (tree t1, tree t2)
       max_fbit = fbit1 >= fbit2 ?  fbit1 : fbit2;
       return c_common_fixed_point_type_for_size (max_ibit, max_fbit, unsignedp,
 						 satp);
+    }
+
+  /* INTCAP_TYPEs out-rank all other integer types.  */
+
+  if ((code1 == INTCAP_TYPE && INTEGRAL_TYPE_P (t2))
+      || (code2 == INTCAP_TYPE && INTEGRAL_TYPE_P (t1)))
+    {
+      tree t_intcap = (code1 == INTCAP_TYPE) ? t1 : t2;
+      tree t_int = (t_intcap == t1) ? t2 : t1;
+
+      /* If the signs differ, the unsigned type has conversion rank less
+	 than the signed type, and the signed type cannot represent all values
+	 of the unsigned type, then both operands are converted to the unsigned
+	 counterpart of the signed operand.  */
+      if (!TYPE_UNSIGNED (t_intcap) && TYPE_UNSIGNED (t_int)
+	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_PRECISION (t_int))
+	return uintcap_type_node;
+      else
+	return t_intcap;
     }
 
   /* Both real or both integers; use the one with greater precision.  */
@@ -2640,6 +2661,9 @@ build_array_ref (location_t loc, tree array, tree index)
       swapped = true;
     }
 
+  if (TREE_CODE (TREE_TYPE (index)) == INTCAP_TYPE)
+    index = drop_capability (index);
+
   if (!INTEGRAL_TYPE_P (TREE_TYPE (index)))
     {
       error_at (loc, "array subscript is not an integer");
@@ -3934,7 +3958,7 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
      be the same as the result type (ptrdiff_t), but may need to be a wider
      type if pointers for the address space are wider than ptrdiff_t.  */
   unsigned int calc_precision
-    = TYPE_PRECISION (noncapability_type (TREE_TYPE (op0)));
+    = TYPE_NONCAP_PRECISION (TREE_TYPE (op0));
   if (TYPE_PRECISION (restype) < calc_precision)
     inttype = c_common_type_for_size (calc_precision, 0);
   else
@@ -3966,15 +3990,8 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
      pointers.  If some platform cannot provide that, or has a larger
      ptrdiff_type to support differences larger than half the address
      space, cast the pointers to some larger integer type and do the
-     computations in that type.
-
-     When pointers are capabilities, we never use POINTER_DIFF_EXPR.  The
-     semantics of a subtraction of two pointers in capability-aware C is to
-     return the difference of the two capability values.  Hence we *always*
-     convert  */
-  if (TYPE_PRECISION (inttype) > calc_precision
-      || capability_type_p (TREE_TYPE (op0))
-      || capability_type_p (TREE_TYPE (op1)))
+     computations in that type.  */
+  if (TYPE_PRECISION (inttype) > calc_precision)
     op0 = build_binary_op (loc, MINUS_EXPR, convert (inttype, op0),
 			   convert (inttype, op1), false);
   else
@@ -4331,6 +4348,37 @@ cas_loop:
 		 return_old_p ? old : newval);
 }
 
+static tree
+intcap_increment (location_t loc, tree_code code, tree arg)
+{
+  tree t, cv;
+
+  arg = stabilize_reference (arg);
+  cv = drop_capability (arg);
+
+  int dir = (code == PREINCREMENT_EXPR || code == POSTINCREMENT_EXPR) ? 1 : -1;
+  t = build_int_cst (TREE_TYPE (cv), dir);
+  t = build2 (PLUS_EXPR, TREE_TYPE (cv), cv, t);
+
+  if (lookup_attribute ("cheri_no_provenance",
+			TYPE_ATTRIBUTES (TREE_TYPE (arg))))
+    t = c_common_cap_from_noncap (TREE_TYPE (arg), t);
+  else
+    t = build_replace_address_value_loc (loc, arg, t);
+
+  t = build2 (MODIFY_EXPR, TREE_TYPE (arg), arg, t);
+
+  if (code == POSTINCREMENT_EXPR || code == POSTDECREMENT_EXPR)
+    {
+      arg = save_expr (arg);
+      t = build2 (COMPOUND_EXPR, TREE_TYPE (arg), t, arg);
+      t = build2 (COMPOUND_EXPR, TREE_TYPE (arg), arg, t);
+    }
+
+  TREE_SIDE_EFFECTS (t) = 1;
+  return t;
+}
+
 /* Construct and perhaps optimize a tree representation
    for a unary operation.  CODE, a tree_code, specifies the operation
    and XARG is the operand.
@@ -4363,7 +4411,23 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
   if (code != ADDR_EXPR)
     arg = require_complete_type (location, arg);
 
+  if (TREE_CODE (TREE_TYPE (arg)) == INTCAP_TYPE)
+    {
+      switch (code)
+	{
+	case ADDR_EXPR:
+	case PREINCREMENT_EXPR:
+	case POSTINCREMENT_EXPR:
+	case PREDECREMENT_EXPR:
+	case POSTDECREMENT_EXPR:
+	  break;
+	default:
+	  arg = drop_capability (arg);
+	}
+    }
+
   typecode = TREE_CODE (TREE_TYPE (arg));
+
   if (typecode == ERROR_MARK)
     return error_mark_node;
   if (typecode == ENUMERAL_TYPE || typecode == BOOLEAN_TYPE)
@@ -4601,7 +4665,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 
       if (typecode != POINTER_TYPE && typecode != FIXED_POINT_TYPE
 	  && typecode != INTEGER_TYPE && typecode != REAL_TYPE
-	  && typecode != COMPLEX_TYPE
+	  && typecode != COMPLEX_TYPE && typecode != INTCAP_TYPE
 	  && !gnu_vector_type_p (TREE_TYPE (arg)))
 	{
 	  if (code == PREINCREMENT_EXPR || code == POSTINCREMENT_EXPR)
@@ -4720,6 +4784,8 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 
 	if (TREE_CODE (TREE_TYPE (arg)) == BOOLEAN_TYPE)
 	  val = boolean_increment (code, arg);
+	else if (TREE_CODE (TREE_TYPE (arg)) == INTCAP_TYPE)
+	  val = intcap_increment (location, code, arg);
 	else
 	  val = build2 (code, TREE_TYPE (arg), arg, inc);
 	TREE_SIDE_EFFECTS (val) = 1;
@@ -4861,6 +4927,17 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	   : fold_build1_loc (location, code, argtype, arg));
   else
     ret = build1 (code, argtype, arg);
+
+  if (TREE_CODE (TREE_TYPE (xarg)) == INTCAP_TYPE
+      && !capability_type_p (TREE_TYPE (ret)))
+    {
+      if (lookup_attribute ("cheri_no_provenance",
+			    TYPE_ATTRIBUTES (TREE_TYPE (xarg))))
+	ret = c_common_cap_from_noncap (TREE_TYPE (xarg), ret);
+      else
+	ret = fold_build_replace_address_value_loc (location, xarg, ret);
+    }
+
  return_build_unary_op:
   gcc_assert (ret != error_mark_node);
   if (TREE_CODE (ret) == INTEGER_CST && !TREE_OVERFLOW (ret)
@@ -5202,9 +5279,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	result_type = TYPE_MAIN_VARIANT (type1);
     }
   else if ((code1 == INTEGER_TYPE || code1 == REAL_TYPE
-	    || code1 == COMPLEX_TYPE)
+	    || code1 == COMPLEX_TYPE
+	    || code1 == INTCAP_TYPE)
 	   && (code2 == INTEGER_TYPE || code2 == REAL_TYPE
-	       || code2 == COMPLEX_TYPE))
+	       || code2 == COMPLEX_TYPE || code2 == INTCAP_TYPE))
     {
       /* In C11, a conditional expression between a floating-point
 	 type and an integer type should convert the integer type to
@@ -5389,33 +5467,44 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 			  (build_qualified_type (void_type_node, qual));
 	}
     }
-  else if (code1 == POINTER_TYPE && code2 == INTEGER_TYPE)
+  else if (code1 == POINTER_TYPE
+	   && (code2 == INTEGER_TYPE || code2 == INTCAP_TYPE))
     {
       if (!null_pointer_constant_p (orig_op2))
-	pedwarn (colon_loc, 0,
-		 "pointer/integer type mismatch in conditional expression");
-      else
 	{
-	  op2 = null_pointer_node;
+	  if (capability_type_p (type1) && code2 != INTCAP_TYPE)
+	    pedwarn (colon_loc, 0,
+		      "pointer/integer type mismatch in conditional "
+		      "expression (capability %qT and %qT)",
+		      type1, type2);
+	  else
+	    pedwarn (colon_loc, 0,
+		     "pointer/integer type mismatch in conditional expression");
 	}
-      if (capability_type_p (type1))
-	error_at (colon_loc, "MORELLO TODO conditional expression implicit cast from integer to pointer");
       else
-	result_type = type1;
+	op2 = null_pointer_node;
+
+      result_type = type1;
     }
-  else if (code2 == POINTER_TYPE && code1 == INTEGER_TYPE)
+  else if (code2 == POINTER_TYPE
+	   && (code1 == INTEGER_TYPE || code1 == INTCAP_TYPE))
+
     {
       if (!null_pointer_constant_p (orig_op1))
-	pedwarn (colon_loc, 0,
-		 "pointer/integer type mismatch in conditional expression");
-      else
 	{
-	  op1 = null_pointer_node;
+	  if (capability_type_p (type2) && code1 != INTCAP_TYPE)
+	    pedwarn (colon_loc, 0,
+		      "pointer/integer type mismatch in conditional "
+		      "expression (%qT and capability %qT)",
+		      type1, type2);
+	  else
+	    pedwarn (colon_loc, 0,
+		     "pointer/integer type mismatch in conditional expression");
 	}
-      if (capability_type_p (type1))
-	error_at (colon_loc, "MORELLO TODO conditional expression implicit cast from integer to pointer");
       else
-	result_type = type2;
+	op1 = null_pointer_node;
+
+      result_type = type2;
     }
 
   if (!result_type)
@@ -5947,12 +6036,15 @@ build_c_cast (location_t loc, tree type, tree expr)
 		    "cast between incompatible function types"
 		    " from %qT to %qT", otype, type);
 
-      if (capability_type_p (type) && INTEGRAL_TYPE_P (TREE_TYPE (value)))
+      if (capability_type_p (type)
+	  && INTEGRAL_TYPE_P (TREE_TYPE (value))
+	  && TREE_CODE (type) != INTCAP_TYPE
+	  && TREE_CODE (value) != INTEGER_CST)
 	{
-	  warning_at (loc, OPT_Wint_to_pointer_cast,
+	  if (warning_at (loc, OPT_Wint_to_pointer_cast,
 	    "cast from provenance-free integer type to pointer type will give "
-	    "pointer that can not be dereferenced");
-	  inform (loc, "insert cast to intptr_t to silence this warning");
+	    "pointer that can not be dereferenced"))
+	    inform (loc, "insert cast to intptr_t to silence this warning");
 	}
 
       ovalue = value;
@@ -6817,16 +6909,6 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       return rhs;
     }
 
-  if (capability_type_p (type) && ! tree_is_capability_value (rhs)
-      /* && ! INTCAP_TYPE_P (type) */ && ! null_pointer_constant)
-  {
-	  /* MORELLO TODO make this error message nice, give error messages
-	   * describing what is exactly happening, ensure all error messages
-	   * match close-enough the LLVM error messages etc.  */
-    error_at (location, "MORELLO TODO implicit cast to capability type from non-capability type");
-    return error_mark_node;
-  }
-
   if (coder == VOID_TYPE)
     {
       /* Except for passing an argument to an unprototyped function,
@@ -6886,11 +6968,13 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
   else if ((codel == INTEGER_TYPE || codel == REAL_TYPE
 	    || codel == FIXED_POINT_TYPE
 	    || codel == ENUMERAL_TYPE || codel == COMPLEX_TYPE
-	    || codel == BOOLEAN_TYPE)
+	    || codel == BOOLEAN_TYPE
+	    || codel == INTCAP_TYPE)
 	   && (coder == INTEGER_TYPE || coder == REAL_TYPE
 	       || coder == FIXED_POINT_TYPE
 	       || coder == ENUMERAL_TYPE || coder == COMPLEX_TYPE
-	       || coder == BOOLEAN_TYPE))
+	       || coder == BOOLEAN_TYPE
+	       || coder == INTCAP_TYPE))
     {
       if (warnopt && errtype == ic_argpass)
 	maybe_warn_builtin_no_proto_arg (expr_loc, fundecl, parmnum, type,
@@ -7445,6 +7529,15 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	      auto_diagnostic_group d;
 	      range_label_for_type_mismatch rhs_label (rhstype, type);
 	      gcc_rich_location richloc (expr_loc, &rhs_label);
+	      if (capability_type_p (type))
+		{
+		  error_at (&richloc,
+			    "passing %qT to parameter of incompatible "
+			    "type capability %qT for argument %d of %qE",
+			    rhstype, type, parmnum, rname);
+		  inform_for_arg (fundecl, expr_loc, parmnum, type, rhstype);
+		  return error_mark_node;
+		}
 	      if (pedwarn (&richloc, OPT_Wint_conversion,
 			   "passing argument %d of %qE makes pointer from "
 			   "integer without a cast", parmnum, rname))
@@ -7452,16 +7545,37 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    }
 	    break;
 	  case ic_assign:
+	    if (capability_type_p (type))
+	      {
+		error_at (expr_loc,
+			  "assigning to capability %qT from incompatible type "
+			  "%qT", type, rhstype);
+		return error_mark_node;
+	      }
 	    pedwarn (location, OPT_Wint_conversion,
 		     "assignment to %qT from %qT makes pointer from integer "
 		     "without a cast", type, rhstype);
 	    break;
 	  case ic_init:
+	    if (capability_type_p (type))
+	      {
+		error_at (location,
+			  "initializing capability %qT with an expression of "
+			  "incompatible type %qT", type, rhstype);
+		return error_mark_node;
+	      }
 	    pedwarn_init (location, OPT_Wint_conversion,
 			  "initialization of %qT from %qT makes pointer from "
 			  "integer without a cast", type, rhstype);
 	    break;
 	  case ic_return:
+	    if (capability_type_p (type))
+	      {
+		error_at (location,
+			  "returning %qT from a function with incompatible "
+			  "result type capability %qT", rhstype, type);
+		return error_mark_node;
+	      }
 	    pedwarn (location, OPT_Wint_conversion, "returning %qT from a "
 		     "function with return type %qT makes pointer from "
 		     "integer without a cast", rhstype, type);
@@ -7516,6 +7630,47 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	  pedwarn (location, OPT_Wint_conversion, "returning %qT from a "
 		   "function with return type %qT makes integer from "
 		   "pointer without a cast", rhstype, type);
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
+
+      return convert (type, rhs);
+    }
+  else if ((codel == INTCAP_TYPE && coder == POINTER_TYPE)
+	|| (codel == POINTER_TYPE && coder == INTCAP_TYPE))
+    {
+      const char *what = (codel == INTCAP_TYPE)
+	? "integer from pointer" : "pointer from integer";
+
+      switch (errtype)
+	{
+	case ic_argpass:
+	  {
+	    auto_diagnostic_group d;
+	    range_label_for_type_mismatch rhs_label (rhstype, type);
+	    gcc_rich_location richloc (expr_loc, &rhs_label);
+	    if (pedwarn (&richloc, OPT_Wint_conversion,
+			 "passing argument %d of %qE makes %s "
+			 "without a cast", parmnum, rname, what))
+	      inform_for_arg (fundecl, expr_loc, parmnum, type, rhstype);
+	  }
+	  break;
+	case ic_assign:
+	  pedwarn (location, OPT_Wint_conversion,
+		   "assignment to %qT from %qT makes %s without a cast",
+		   type, rhstype, what);
+	  break;
+	case ic_init:
+	  pedwarn_init (location, OPT_Wint_conversion,
+			"initialization of %qT from %qT makes %s "
+			"without a cast",
+			type, rhstype, what);
+	  break;
+	case ic_return:
+	  pedwarn (location, OPT_Wint_conversion, "returning %qT from a "
+		   "function with return type %qT makes %s without a cast",
+		   rhstype, type, what);
 	  break;
 	default:
 	  gcc_unreachable ();
@@ -8077,7 +8232,7 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 
   if (code == INTEGER_TYPE || code == REAL_TYPE || code == FIXED_POINT_TYPE
       || code == POINTER_TYPE || code == ENUMERAL_TYPE || code == BOOLEAN_TYPE
-      || code == COMPLEX_TYPE || code == VECTOR_TYPE)
+      || code == COMPLEX_TYPE || code == VECTOR_TYPE || code == INTCAP_TYPE)
     {
       if (TREE_CODE (TREE_TYPE (init)) == ARRAY_TYPE
 	  && (TREE_CODE (init) == STRING_CST
@@ -9030,8 +9185,15 @@ set_init_index (location_t loc, tree first, tree last,
 
   designator_erroneous = 1;
 
-  if (!INTEGRAL_TYPE_P (TREE_TYPE (first))
-      || (last && !INTEGRAL_TYPE_P (TREE_TYPE (last))))
+  first = drop_intcap (first);
+  if (last)
+    last = drop_intcap (last);
+
+  if ((!INTEGRAL_TYPE_P (TREE_TYPE (first))
+       && !INTCAP_TYPE_P (TREE_TYPE (first)))
+      || (last
+	  && !INTEGRAL_TYPE_P (TREE_TYPE (last))
+	  && !INTCAP_TYPE_P (TREE_TYPE (last))))
     {
       error_init (loc, "array index in initializer not of integer type");
       return;
@@ -9040,6 +9202,10 @@ set_init_index (location_t loc, tree first, tree last,
   if (TREE_CODE (first) != INTEGER_CST)
     {
       first = c_fully_fold (first, false, NULL);
+
+      if (INTCAP_TYPE_P (TREE_TYPE (first)))
+	first = drop_capability (first);
+
       if (TREE_CODE (first) == INTEGER_CST)
 	pedwarn_init (loc, OPT_Wpedantic,
 		      "array index in initializer is not "
@@ -9049,6 +9215,10 @@ set_init_index (location_t loc, tree first, tree last,
   if (last && TREE_CODE (last) != INTEGER_CST)
     {
       last = c_fully_fold (last, false, NULL);
+
+      if (INTCAP_TYPE_P (TREE_TYPE (last)))
+	last = drop_capability (last);
+
       if (TREE_CODE (last) == INTEGER_CST)
 	pedwarn_init (loc, OPT_Wpedantic,
 		      "array index in initializer is not "
@@ -10676,13 +10846,14 @@ c_finish_goto_ptr (location_t loc, tree expr)
   tree t;
   pedwarn (loc, OPT_Wpedantic, "ISO C forbids %<goto *expr;%>");
   expr = c_fully_fold (expr, false, NULL);
-  /* MORELLO TODO
-   * Need to implement actual casting here, probably through a convenience function.
-   * Would need to use ifn_REPLACE_ADDRESS_VALUE etc.  */
+
   if (! tree_is_capability_value (expr) && ! null_pointer_constant_p (expr)
-      && capability_type_p (ptr_type_node))
+      && capability_type_p (ptr_type_node) && expr != error_mark_node)
     {
-      error_at (loc, "MORELLO TODO implicit cast to capability type in computed goto");
+      error_at (loc,
+		"passing %qT to parameter of incompatible capability type "
+		"in %<goto *expr;%>",
+		TREE_TYPE (expr));
       return error_mark_node;
     }
   expr = convert (ptr_type_node, expr);
@@ -10978,20 +11149,38 @@ do_case (location_t loc, tree low_value, tree high_value)
 {
   tree label = NULL_TREE;
 
-  if (low_value && TREE_CODE (low_value) != INTEGER_CST)
+  if (low_value)
     {
-      low_value = c_fully_fold (low_value, false, NULL);
-      if (TREE_CODE (low_value) == INTEGER_CST)
-	pedwarn (loc, OPT_Wpedantic,
-		 "case label is not an integer constant expression");
+      low_value = drop_intcap (low_value);
+
+      if (TREE_CODE (low_value) != INTEGER_CST)
+	{
+	  low_value = c_fully_fold (low_value, false, NULL);
+
+	  if (INTCAP_TYPE_P (TREE_TYPE (low_value)))
+	    low_value = drop_capability (low_value);
+
+	  if (TREE_CODE (low_value) == INTEGER_CST)
+	    pedwarn (loc, OPT_Wpedantic,
+		     "case label is not an integer constant expression");
+	}
     }
 
-  if (high_value && TREE_CODE (high_value) != INTEGER_CST)
+  if (high_value)
     {
-      high_value = c_fully_fold (high_value, false, NULL);
-      if (TREE_CODE (high_value) == INTEGER_CST)
-	pedwarn (input_location, OPT_Wpedantic,
-		 "case label is not an integer constant expression");
+      high_value = drop_intcap (high_value);
+
+      if (TREE_CODE (high_value) != INTEGER_CST)
+	{
+	  high_value = c_fully_fold (high_value, false, NULL);
+
+	  if (INTCAP_TYPE_P (TREE_TYPE (high_value)))
+	    high_value = drop_capability (high_value);
+
+	  if (TREE_CODE (high_value) == INTEGER_CST)
+	    pedwarn (input_location, OPT_Wpedantic,
+		     "case label is not an integer constant expression");
+	}
     }
 
   if (c_switch_stack == NULL)
@@ -11542,7 +11731,7 @@ tree
 build_binary_op (location_t location, enum tree_code code,
 		 tree orig_op0, tree orig_op1, bool convert_p)
 {
-  tree type0, type1, orig_type0, orig_type1;
+  tree type0, type1, orig_type0, orig_type1, nonic_type0, nonic_type1;
   tree eptype;
   enum tree_code code0, code1;
   tree op0, op1;
@@ -11649,9 +11838,16 @@ build_binary_op (location_t location, enum tree_code code,
       op1 = default_conversion (op1);
     }
 
-  orig_type0 = type0 = TREE_TYPE (op0);
+  orig_type0 = TREE_TYPE (op0);
+  orig_type1 = TREE_TYPE (op1);
 
-  orig_type1 = type1 = TREE_TYPE (op1);
+  if (TREE_CODE (orig_type0) == INTCAP_TYPE)
+    op0 = drop_capability (op0);
+  if (TREE_CODE (orig_type1) == INTCAP_TYPE)
+    op1 = drop_capability (op1);
+
+  type0 = nonic_type0 = TREE_TYPE (op0);
+  type1 = nonic_type1 = TREE_TYPE (op1);
 
   /* The expression codes of the data types of the arguments tell us
      whether the arguments are integers, floating, pointers, etc.  */
@@ -11760,7 +11956,7 @@ build_binary_op (location_t location, enum tree_code code,
               op0 = build_vector_from_val (type1, sc);
               if (!maybe_const)
                 op0 = c_wrap_maybe_const (op0, true);
-              orig_type0 = type0 = TREE_TYPE (op0);
+	      orig_type0 = nonic_type0 = type0 = TREE_TYPE (op0);
               code0 = TREE_CODE (type0);
               converted = 1;
               break;
@@ -11775,7 +11971,7 @@ build_binary_op (location_t location, enum tree_code code,
 	      op1 = build_vector_from_val (type0, sc);
 	      if (!maybe_const)
 		op1 = c_wrap_maybe_const (op1, true);
-	      orig_type1 = type1 = TREE_TYPE (op1);
+	      orig_type1 = nonic_type1 = type1 = TREE_TYPE (op1);
 	      code1 = TREE_CODE (type1);
 	      converted = 1;
 	      break;
@@ -12677,11 +12873,11 @@ build_binary_op (location_t location, enum tree_code code,
   if (build_type == NULL_TREE)
     {
       build_type = result_type;
-      if ((type0 != orig_type0 || type1 != orig_type1)
+      if ((type0 != nonic_type0 || type1 != nonic_type1)
 	  && !boolean_op)
 	{
 	  gcc_assert (may_need_excess_precision && common);
-	  semantic_result_type = c_common_type (orig_type0, orig_type1);
+	  semantic_result_type = c_common_type (nonic_type0, nonic_type1);
 	}
     }
 
@@ -12726,6 +12922,58 @@ build_binary_op (location_t location, enum tree_code code,
     ret = build2 (resultcode, build_type, op0, op1);
   if (final_type != NULL_TREE)
     ret = convert (final_type, ret);
+
+
+  /* For INTCAP_TYPEs, we dropped the capabilities early on and now need
+     to work out where the provenance (if any) should come from.  */
+  if (!capability_type_p (result_type)
+      && TREE_CODE_CLASS (code) != tcc_comparison
+      && !boolean_op)
+    {
+      bool ic0 = TREE_CODE (orig_type0) == INTCAP_TYPE;
+      bool ic1 = TREE_CODE (orig_type1) == INTCAP_TYPE;
+
+      /* These flags are set if we need an intcap result type because of
+	 either the left or right operand respectively.  */
+      bool need_ic0 = ic0 && code1 == INTEGER_TYPE;
+      bool need_ic1 = ic1 && !doing_shift && code0 == INTEGER_TYPE;
+
+      bool prov0 = need_ic0
+		   && !lookup_attribute ("cheri_no_provenance",
+					 TYPE_ATTRIBUTES (orig_type0));
+      bool prov1 = need_ic1
+		   && !lookup_attribute ("cheri_no_provenance",
+					 TYPE_ATTRIBUTES (orig_type1));
+
+      tree intcap = NULL;
+      if (prov0)
+	intcap = orig_op0;
+      else if (prov1)
+	intcap = orig_op1;
+      else if (need_ic0)
+	intcap = build_int_cst (orig_type0, 0);
+      else if (need_ic1)
+	intcap = build_int_cst (orig_type1, 0);
+
+      if (intcap)
+	{
+	  tree ic_type = c_common_type (TREE_TYPE (intcap), result_type);
+	  gcc_assert (noncapability_type (ic_type) == result_type);
+	  intcap = convert (ic_type, intcap);
+
+	  /* We can't fold inside REPLACE_ADDRESS_VALUE calls, so ensure
+	     we've folded the address value expression.  */
+	  ret = c_fully_fold (ret, false, NULL);
+	  ret = fold_build_replace_address_value_loc (location, intcap, ret);
+	}
+
+	if (prov0 && prov1)
+	  warning_at (location, OPT_Wcheri_provenance,
+	    "binary expression on capability types %qT and %qT; "
+	    "it is not clear which should be used as the source of provenance; "
+	    "currently provenance is inherited from the left-hand side",
+	    orig_type0, orig_type1);
+    }
 
  return_build_binary_op:
   gcc_assert (ret != error_mark_node);
@@ -12797,6 +13045,7 @@ c_objc_common_truthvalue_conversion (location_t location, tree expr)
   if (int_operands && TREE_CODE (expr) != INTEGER_CST)
     {
       expr = remove_c_maybe_const_expr (expr);
+      expr = drop_capability (expr);
       expr = build2 (NE_EXPR, integer_type_node, expr,
 		     convert (TREE_TYPE (expr), integer_zero_node));
       expr = note_integer_operands (expr);

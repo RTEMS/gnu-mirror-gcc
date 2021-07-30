@@ -540,7 +540,7 @@ typedef struct microblaze_args
 
 #define SHIFT_COUNT_TRUNCATED			1
 
-#define Pmode SImode
+#define POmode SImode
 
 #define FUNCTION_MODE   SImode
 

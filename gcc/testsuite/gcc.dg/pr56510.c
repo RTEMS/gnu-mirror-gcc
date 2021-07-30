@@ -11,6 +11,7 @@ baz (intptr_t x, intptr_t y)
 {
   void **s = f;
   *f = (void **) (y << 8 | (x & 0xff));
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
   f += y + 1;
   return s;
 }

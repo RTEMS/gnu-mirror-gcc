@@ -909,7 +909,7 @@ extern const int csky_dbx_regno[];
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
 
 /* The machine modes of pointers and functions.  */
-#define Pmode  SImode
+#define POmode  SImode
 #define FUNCTION_MODE  Pmode
 
 /* Define this macro to be a C expression to indicate when jump-tables

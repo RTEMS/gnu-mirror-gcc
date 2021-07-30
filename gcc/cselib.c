@@ -1203,7 +1203,7 @@ cselib_hash_pointer_plus_const_int (rtx x ATTRIBUTE_UNUSED,
 {
   gcc_assert (CAPABILITY_MODE_P (GET_MODE (x)));
   check_pointer_offset_modes (as_a <scalar_addr_mode> GET_MODE (x),
-			      x, gen_int_mode (c, POmode));
+			      x, gen_int_mode (c, POmode), true);
 
   cselib_val *e = cselib_lookup (x, GET_MODE (x), create, memmode);
   if (! e)
@@ -1424,7 +1424,7 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
 	}
 	co = gen_int_mode (offset, noncapability_mode (GET_MODE (x)));
 	check_pointer_offset_modes (as_a <scalar_addr_mode> GET_MODE (x),
-				    XEXP (x, 0), co);
+				    XEXP (x, 0), co, true);
 	temp_plus_value = CAPABILITY_MODE_P (GET_MODE (x))
 				       ? (unsigned) POINTER_PLUS
 				       : (unsigned) PLUS;
@@ -1447,10 +1447,12 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
     case CC0:
     case CALL:
     case UNSPEC_VOLATILE:
-    case ALIGN_ADDRESS_DOWN:
-    case REPLACE_ADDRESS_VALUE:
-    case CONST_NULL:
       return 0;
+
+    case CONST_NULL:
+    case REPLACE_ADDRESS_VALUE:
+    case ALIGN_ADDRESS_DOWN:
+      break;
 
     case ASM_OPERANDS:
       if (MEM_VOLATILE_P (x))

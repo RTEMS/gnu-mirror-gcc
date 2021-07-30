@@ -3,8 +3,13 @@
 /* { dg-options "-O2" } */
 /* { dg-options "-O2 -mstrict-align" { target { powerpc*-*-linux* powerpc*-*-elf* } } } */
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINT64_TYPE__ uint64_t;
+typedef __INT64_TYPE__ int64_t;
+typedef __INTPTR_TYPE__ intptr_t;
+#else
 #include <stdint.h>
-
+#endif
 typedef struct {
   int64_t counter;
 } atomic64_t;

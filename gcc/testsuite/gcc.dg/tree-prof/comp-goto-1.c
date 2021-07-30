@@ -11,7 +11,11 @@ typedef signed int sint32;
 
 typedef uint32 reg_t;
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef __UINTPTR_TYPE__ host_addr_t;
+#else
 typedef unsigned long int host_addr_t;
+#endif
 typedef uint32 target_addr_t;
 typedef sint32 target_saddr_t;
 

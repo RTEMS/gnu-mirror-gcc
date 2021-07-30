@@ -365,7 +365,7 @@ enum reg_class
 #define TRAMPOLINE_ALIGNMENT 32
 
 /* An alias for the machine mode for pointers.  */
-#define Pmode         SImode
+#define POmode         SImode
 
 #define PROMOTE_MODE(MODE, UNSIGNEDP, TYPE) \
 do { \

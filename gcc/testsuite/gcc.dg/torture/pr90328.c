@@ -1,4 +1,6 @@
-/* { dg-do run } */
+/* XFAIL for capabilities should go away once we rebase to include the patch to
+   fix https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96812  */
+/* { dg-do run  { xfail aarch64_capability_any } } */
 
 void g(int*__restrict x, int*y)
 {

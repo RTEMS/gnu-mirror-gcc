@@ -680,7 +680,7 @@ do {									     \
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* A function address in a call instruction
    is a byte address (for indexing purposes)

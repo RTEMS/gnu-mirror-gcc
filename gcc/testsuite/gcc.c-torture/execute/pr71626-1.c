@@ -1,6 +1,11 @@
 /* PR middle-end/71626 */
 
-typedef __INTPTR_TYPE__ V __attribute__((__vector_size__(sizeof (__INTPTR_TYPE__))));
+#ifdef __GCC_ARM_CAPABILITY_ANY
+typedef int intoffset_t __attribute__((__mode__(address)));
+#else
+typedef __INTPTR_TYPE__ intoffset_t;
+#endif
+typedef intoffset_t V __attribute__((__vector_size__(sizeof (intoffset_t))));
 
 __attribute__((noinline, noclone)) V
 foo ()

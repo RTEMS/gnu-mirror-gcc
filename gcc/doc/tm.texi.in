@@ -5209,6 +5209,8 @@ It must not be modified by command-line option processing.
 
 @hook TARGET_ASM_INTEGER
 
+@hook TARGET_ASM_CAPABILITY
+
 @hook TARGET_ASM_DECL_END
 
 @hook TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA

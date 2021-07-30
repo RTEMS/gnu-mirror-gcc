@@ -545,7 +545,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define NO_FUNCTION_CSE 1
 
 /* The machine modes of pointers and functions.  */
-#define Pmode          SImode
+#define POmode          SImode
 #define FUNCTION_MODE  Pmode
 
 /* Compute extra cost of moving data between one register class

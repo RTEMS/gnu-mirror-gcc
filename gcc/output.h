@@ -271,6 +271,14 @@ extern bool default_assemble_integer (rtx, unsigned int, int);
    be outputable. */
 extern bool assemble_integer (rtx, unsigned, unsigned, int);
 
+/* Assemble the capability constant X into an object of SIZE bytes.  ALIGN is
+   the alignment of the capability in bits.  Return 1 if we were able to output
+   the constant, otherwise 0.  If FORCE is nonzero the constant must be
+   outputable. */
+extern bool assemble_capability (rtx, unsigned, unsigned, int);
+
+extern void assemble_pointer (rtx);
+
 /* Return section for TEXT_SECITON_NAME if DECL or DECL_SECTION_NAME (DECL)
    is NULL.  */
 extern section *get_named_text_section (tree, const char *, const char *);

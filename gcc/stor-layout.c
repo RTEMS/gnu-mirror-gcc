@@ -594,6 +594,10 @@ mode_for_array (tree elem_type, tree size)
       if (targetm.array_mode_supported_p (elem_mode, num_elems))
 	limit_p = false;
     }
+
+  if (CAPABILITY_MODE_P (TYPE_MODE (elem_type)))
+    return BLKmode;
+
   return mode_for_size_tree (size, MODE_INT, limit_p).else_blk ();
 }
 
@@ -1832,6 +1836,7 @@ compute_record_mode (tree type)
 {
   tree field;
   machine_mode mode = VOIDmode;
+  bool contains_capability = false;
 
   /* Most RECORD_TYPEs have BLKmode, so we start off assuming that.
      However, if possible, we use a mode that fits in a register
@@ -1862,17 +1867,47 @@ compute_record_mode (tree type)
 	  || !poly_int_tree_p (DECL_SIZE (field), &field_size))
 	return;
 
-      /* If this field is the whole struct, remember its mode so
-	 that, say, we can put a double in a class into a DF
-	 register instead of forcing it to live in the stack.  */
-      if (known_eq (field_size, type_size)
-	  /* Partial int types (e.g. __int20) may have TYPE_SIZE equal to
-	     wider types (e.g. int32), despite precision being less.  Ensure
-	     that the TYPE_MODE of the struct does not get set to the partial
-	     int mode if there is a wider type also in the struct.  */
-	  && known_gt (GET_MODE_PRECISION (DECL_MODE (field)),
-		       GET_MODE_PRECISION (mode)))
-	mode = DECL_MODE (field);
+      if (CAPABILITY_MODE_P (DECL_MODE (field)))
+	{
+	  contains_capability = true;
+	  /* If this field is the whole struct, remember its mode so
+	     that, say, we can put a pointer in a class into a CADI
+	     register instead of forcing it to live in the stack.  */
+	  if (known_eq (field_size, type_size))
+	      /* There is no concern about the precision of a capability mode
+		 not matching its size.  */
+	    mode = DECL_MODE (field);
+	  /* Capability TODO for the future:
+		If a UNION_TYPE has two types with *differing* capability
+		modes, then we probably should not choose either to represent
+		the union.
+
+		That would be because extracting a capability mode from the
+		bits of another capability mode would not give us a valid
+		capability.
+		Not done yet since at the moment we only have one capability
+		mode in the compiler.  */
+	}
+      else
+	{
+	  /* If this field is the whole struct, remember its mode so
+	     that, say, we can put a double in a class into a DF
+	     register instead of forcing it to live in the stack.
+	     However, do not do such a thing if we already have seen a
+	     capability.  A union with a capability and a TImode value can not
+	     be stored in a TImode register since we then have no guarantee
+	     that we are not performing operations to invalidate a possibly
+	     valid capability.  */
+	  if (!contains_capability
+	      && known_eq (field_size, type_size)
+	      /* Partial int types (e.g. __int20) may have TYPE_SIZE equal to
+		 wider types (e.g. int32), despite precision being less.  Ensure
+		 that the TYPE_MODE of the struct does not get set to the partial
+		 int mode if there is a wider type also in the struct.  */
+	      && (known_gt (GET_MODE_PRECISION (DECL_MODE (field)),
+			    GET_MODE_PRECISION (mode))))
+	    mode = DECL_MODE (field);
+	}
 
       /* With some targets, it is sub-optimal to access an aligned
 	 BLKmode structure as a scalar.  */
@@ -1888,6 +1923,7 @@ compute_record_mode (tree type)
   if ((TREE_CODE (type) == RECORD_TYPE
        || (TREE_CODE (type) == UNION_TYPE
 	   && (GET_MODE_CLASS (mode) == MODE_INT
+	       || GET_MODE_CLASS (mode) == MODE_CAPABILITY
 	       || (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT
 		   && (targetm.calls.pass_by_reference
 		       (pack_cumulative_args (0),
@@ -1895,6 +1931,12 @@ compute_record_mode (tree type)
       && mode != VOIDmode
       && known_eq (GET_MODE_BITSIZE (mode), type_size))
     ;
+  /* Can not store a Union or record containing a capability in an integer mode
+     register.  At this point we know that this union or record can not be
+     stored in a single capability mode register, hence we must force going
+     through memory.  */
+  else if (contains_capability)
+    mode = BLKmode;
   else
     mode = mode_for_size_tree (TYPE_SIZE (type), MODE_INT, 1).else_blk ();
 

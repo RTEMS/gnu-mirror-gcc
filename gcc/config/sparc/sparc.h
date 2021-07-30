@@ -502,7 +502,7 @@ along with GCC; see the file COPYING3.  If not see
 #define POINTER_SIZE (TARGET_PTR64 ? 64 : 32)
 
 /* This is the machine mode used for addresses.  */
-#define Pmode (TARGET_ARCH64 ? DImode : SImode)
+#define POmode (TARGET_ARCH64 ? DImode : SImode)
 
 /* If we have to extend pointers (only when TARGET_ARCH64 and not
    TARGET_PTR64), we want to do it unsigned.   This macro does nothing

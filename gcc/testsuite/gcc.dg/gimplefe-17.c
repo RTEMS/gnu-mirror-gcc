@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-fgimple -fdump-tree-fixup_cfg2" } */
 
 int 

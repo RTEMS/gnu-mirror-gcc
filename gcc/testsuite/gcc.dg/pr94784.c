@@ -1,5 +1,6 @@
 /* { dg-do compile { target aarch64*-*-* } } */
 /* { dg-options "-O2 -ftree-slp-vectorize -march=armv8.2-a+sve -msve-vector-bits=256" } */
+/* { dg-skip-if "SVE is not supported with capabilities" { aarch64_capability_any } } */
 
 typedef short __attribute__((vector_size (8))) v4hi;
 

@@ -49,7 +49,11 @@ build_access_matrix (unsigned max)
   unsigned i;
   for (i = 0; i < max; i++)
     {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      if (am_vector_index_for_loop ((__intcap_t) foo (), 0))
+#else
       if (am_vector_index_for_loop (foo (), 0))
+#endif
 	return 0;
     }
 }

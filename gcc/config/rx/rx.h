@@ -151,7 +151,7 @@
 
 #define MAX_REGS_PER_ADDRESS 		2
 
-#define Pmode 				SImode
+#define POmode 				SImode
 #define POINTER_SIZE			32
 #undef  SIZE_TYPE
 #define SIZE_TYPE			"long unsigned int"

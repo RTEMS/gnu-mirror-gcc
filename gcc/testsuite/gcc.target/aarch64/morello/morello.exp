@@ -26,12 +26,6 @@ if {![istarget aarch64*-*-*] } then {
 load_lib gcc-dg.exp
 load_lib c-torture.exp
 
-# If a testcase doesn't have special options, use these.
-global DEFAULT_CFLAGS
-if ![info exists DEFAULT_CFLAGS] then {
-    set DEFAULT_CFLAGS " -ansi -pedantic-errors"
-}
-
 # Initialize `dg'.
 dg-init
 
@@ -42,11 +36,11 @@ if { [check_effective_target_aarch64_capability_any] } {
 }
 
 torture-init
-set-torture-options $C_TORTURE_OPTIONS
+set-torture-options "$C_TORTURE_OPTIONS" [list -mno-outline-atomics -moutline-atomics]
 
 # Main loop.
 gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cCS\]]] \
-    "" "$capability_flags $DEFAULT_CFLAGS"
+    "" "$capability_flags -ansi"
 
 torture-finish
 # All done.

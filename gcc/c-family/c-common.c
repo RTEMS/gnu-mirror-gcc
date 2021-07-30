@@ -409,7 +409,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__imag__",		RID_IMAGPART,	0 },
   { "__inline",		RID_INLINE,	0 },
   { "__inline__",	RID_INLINE,	0 },
-  { "__intcap_t",	RID_INTCAP,	0 /* MORELLO TODO D_CAP_ONLY */ },
+  { "__intcap_t",	RID_INTCAP,	0 },
   { "__is_abstract",	RID_IS_ABSTRACT, D_CXXONLY },
   { "__is_aggregate",	RID_IS_AGGREGATE, D_CXXONLY },
   { "__is_base_of",	RID_IS_BASE_OF, D_CXXONLY },
@@ -442,7 +442,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__transaction_cancel", RID_TRANSACTION_CANCEL, 0 },
   { "__typeof",		RID_TYPEOF,	0 },
   { "__typeof__",	RID_TYPEOF,	0 },
-  { "__uintcap_t",	RID_UINTCAP,	0 /* MORELLO TODO D_CAP_ONLY */ },
+  { "__uintcap_t",	RID_UINTCAP,	0 },
   { "__underlying_type", RID_UNDERLYING_TYPE, D_CXXONLY },
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
@@ -461,6 +461,7 @@ const struct c_common_resword c_common_reswords[] =
   { "char8_t",		RID_CHAR8,	D_CXX_CHAR8_T_FLAGS | D_CXXWARN },
   { "char16_t",		RID_CHAR16,	D_CXXONLY | D_CXX11 | D_CXXWARN },
   { "char32_t",		RID_CHAR32,	D_CXXONLY | D_CXX11 | D_CXXWARN },
+  { "cheri_capability", RID_CHERI_CAPABILITY,	0 },
   { "class",		RID_CLASS,	D_CXX_OBJC | D_CXXWARN },
   { "const",		RID_CONST,	0 },
   { "consteval",	RID_CONSTEVAL,	D_CXXONLY | D_CXX20 | D_CXXWARN },
@@ -2625,29 +2626,57 @@ c_common_signed_or_unsigned_type (int unsignedp, tree type)
 tree
 drop_capability (tree t)
 {
+  gcc_assert (!TYPE_P (t));
+
   if (! capability_type_p (TREE_TYPE (t)))
     return t;
   return convert (noncapability_type (TREE_TYPE (t)), t);
 }
 
-/* Generate a cast from an integer to a capability.
-   This cast will necessarily produce a capability that cannot be accessed, but
-   that is fitting with the C semantics of casting an integer to a capability.  */
+/* A more lightweight version of drop_capability suitable for use on
+   candidate integer constant expressions (possibly involving
+   INTCAP_TYPEs). It aims to return an INTEGER_CST of INTEGER_TYPE
+   without stripping conversions that would be forbidden in an integer
+   constant expression (e.g. conversions to pointer type).  */
 
 tree
-c_common_cap_from_int (tree type, tree int_expr)
+drop_intcap (tree t)
 {
-  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (int_expr))
-	      && capability_type_p (type));
-  /* Ensure that this integer is in the correct precision and sign for the
-     capability we want.  */
-  int_expr = convert (noncapability_type (type), int_expr);
+  if (!INTCAP_TYPE_P (TREE_TYPE (t)))
+    return t;
+
+  if (TREE_CODE (t) == INTEGER_CST)
+    return drop_capability (t);
+
+  /* We can drop NOP_EXPRs from other integer types.  */
+  if (TREE_CODE (t) == NOP_EXPR)
+    {
+      auto ty = TREE_TYPE (TREE_OPERAND (t, 0));
+      if (INTEGRAL_TYPE_P (ty) || INTCAP_TYPE_P (ty))
+	return drop_intcap (TREE_OPERAND (t, 0));
+    }
+
+  return t;
+}
+
+/* Convert from a non-capability type to a capability.
+   This conversion will necessarily produce a capability that cannot be
+   accessed, but that is fitting with the C semantics of converting
+   non-capability types to capabilities.  */
+
+tree
+c_common_cap_from_noncap (tree type, tree expr)
+{
+  gcc_assert (capability_type_p (type)
+	      && !capability_type_p (TREE_TYPE (expr)));
+  expr = convert (noncapability_type (type), expr);
 
   if (!c_dialect_cxx ())
-    int_expr = c_fully_fold (int_expr, false, NULL);
-  location_t loc = EXPR_LOCATION (int_expr);
+    expr = c_fully_fold (expr, false, NULL);
+
+  location_t loc = EXPR_LOCATION (expr);
   tree ret = fold_build_replace_address_value_loc (loc, build_int_cst (type, 0),
-						   int_expr);
+						   expr);
   return ret;
 }
 
@@ -6904,13 +6933,9 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
   tree type;
   int size;
 
-  if (vec_safe_is_empty (params))
-    {
-      error ("too few arguments to function %qE", function);
-      return 0;
-    }
-
   argtype = type = TREE_TYPE ((*params)[0]);
+  gcc_assert (!capability_type_p (TREE_TYPE (type)));
+
   if (TREE_CODE (type) == ARRAY_TYPE && c_dialect_cxx ())
     {
       /* Force array-to-pointer decay for C++.  */
@@ -6990,27 +7015,26 @@ sync_resolve_params (location_t loc, tree orig_function, tree function,
 	 kinds).  */
       if (TREE_CODE (arg_type) == INTEGER_TYPE && TYPE_UNSIGNED (arg_type))
 	{
+	  val = (*params)[parmnum];
 	  /* Ideally for the first conversion we'd use convert_for_assignment
 	     so that we get warnings for anything that doesn't match the pointer
 	     type.  This isn't portable across the C and C++ front ends atm.  */
+	  val = convert (ptype, val);
+	  val = convert (arg_type, val);
+	  (*params)[parmnum] = val;
+	}
+
+      /* Also convert parameters if we have detected that this is an atomic
+	 that is operating on a capability and arg_type (the type of the
+	 builtin argument as per builtins-types.def) is INTCAP_TYPE.  This is
+	 to convert all capability types (INTCAP, UINTCAP, POINTER_TYPE, etc.)
+	 into one for the builtin and to distinguish capabilities being acted
+	 upon from pointer arguments being used to access memory.  */
+      else if (INTCAP_TYPE_P (arg_type))
+	{
 	  val = (*params)[parmnum];
-	  /* MORELLO TODO Try and allow NULL pointers by allowing
-	   * integer_zero_p.  Would be nice to use null_pointer_constant_p, but
-	   * that's only available in the C frontend.
-	   *
-	   * Will need to generate atomic functions which take and return
-	   * capability types in order to act atomically on capabilities in
-	   * memory without invalidating them.  */
-	  if (capability_type_p (ptype) && ! tree_is_capability_value (val)
-	      /* && ! INTCAP_TYPE_P (TREE_TYPE (val)) */ && ! integer_zerop (val))
-	  {
-	    /* MORELLO TODO As mentioned above, ideally we would use
-	       `convert_for_assignment`, but it's not portable across the front
-	       ends.  This check is required to avoid an ICE, so we include it
-	       manually here.  Would be very nice to find a proper solution.  */
-	    error_at (loc, "MORELLO TODO implicit cast to capability type from non-capability type (sync builtin)");
-	    return false;
-	  }
+	  /* This is only allowed if the argument is already a valid
+	     capability type.  */
 	  val = convert (ptype, val);
 	  val = convert (arg_type, val);
 	  (*params)[parmnum] = val;
@@ -7048,14 +7072,11 @@ sync_resolve_return (tree first_param, tree result, bool orig_format)
 
   /* New format doesn't require casting unless the types are the same size.  */
   if (orig_format || tree_int_cst_equal (TYPE_SIZE (ptype), TYPE_SIZE (rtype)))
-    if (capability_type_p (rtype) && !capability_type_p (ptype)
-	&& !integer_zerop (result))
-      {
-	error ("MORELLO TODO implicit cast to capability type from non-capability type (sync builtin return value)");
-	return error_mark_node;
-      }
-    else
+    {
+      gcc_assert (!(capability_type_p (rtype) && !capability_type_p (ptype)
+		  && !integer_zerop (result)));
       return convert (ptype, result);
+    }
   else
     return result;
 }
@@ -7329,6 +7350,7 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
 {	
   tree p0, p1, p2, p3;
   tree I_type, I_type_ptr;
+
   int n = get_atomic_generic_size (loc, function, params);
 
   /* Size of 0 is an error condition.  */
@@ -7338,35 +7360,43 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
       return true;
     }
 
-  /* If not a lock-free size, change to the library generic format.  */
-  if (!atomic_size_supported_p (n))
-    {
-      *new_return = add_atomic_size_parameter (n, loc, function, params);
-      return true;
-    }
-
-  /* Otherwise there is a lockfree match, transform the call from:
-       void fn(T* mem, T* desired, T* return, model)
-     into
-       *return = (T) (fn (In* mem, (In) *desired, model))  */
-
   p0 = (*params)[0];
   p1 = (*params)[1];
   p2 = (*params)[2];
   p3 = (*params)[3];
-  
-  /* Create pointer to appropriate size.  */
-  I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-  I_type_ptr = build_pointer_type (I_type);
 
-  /* Convert object pointer to required type.  */
-  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
-  (*params)[0] = p0; 
-  /* Convert new value to required type, and dereference it.  */
-  p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
-  p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
+  /* For capability types we do not want to do any conversions, so simply
+     dereference p1.  We also assume that the types are supported and do not
+     need to be changed to the library generic format.  */
+  if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
+    {
+      /* If not a lock-free size, change to the library generic format.  */
+      if (!atomic_size_supported_p (n))
+	{
+	  *new_return = add_atomic_size_parameter (n, loc, function, params);
+	  return true;
+	}
+
+      /* Otherwise there is a lockfree match, transform the call from:
+	  void fn(T* mem, T* desired, T* return, model)
+	into
+	  *return = (T) (fn (In* mem, (In) *desired, model))  */
+
+      /* Create pointer to appropriate size.  */
+      I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
+      I_type_ptr = build_pointer_type (I_type);
+
+      /* Convert object pointer to required type.  */
+      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+      /* Convert new value to required type, and dereference it.  */
+      p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+      p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
+    }
+  else
+    p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+
+  (*params)[0] = p0;
   (*params)[1] = p1;
-
   /* Move memory model to the 3rd position, and end param list.  */
   (*params)[2] = p3;
   params->truncate (3);
@@ -7388,12 +7418,13 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
    FALSE is returned if processing for the _N variation is required.  */
 
 static bool
-resolve_overloaded_atomic_compare_exchange (location_t loc, tree function, 
-					    vec<tree, va_gc> *params, 
+resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
+					    vec<tree, va_gc> *params,
 					    tree *new_return)
 {	
   tree p0, p1, p2;
   tree I_type, I_type_ptr;
+
   int n = get_atomic_generic_size (loc, function, params);
 
   /* Size of 0 is an error condition.  */
@@ -7403,48 +7434,57 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
       return true;
     }
 
-  /* If not a lock-free size, change to the library generic format.  */
-  if (!atomic_size_supported_p (n))
-    {
-      /* The library generic format does not have the weak parameter, so 
-	 remove it from the param list.  Since a parameter has been removed,
-	 we can be sure that there is room for the SIZE_T parameter, meaning
-	 there will not be a recursive rebuilding of the parameter list, so
-	 there is no danger this will be done twice.  */
-      if (n > 0)
-        {
-	  (*params)[3] = (*params)[4];
-	  (*params)[4] = (*params)[5];
-	  params->truncate (5);
-	}
-      *new_return = add_atomic_size_parameter (n, loc, function, params);
-      return true;
-    }
-
-  /* Otherwise, there is a match, so the call needs to be transformed from:
-       bool fn(T* mem, T* desired, T* return, weak, success, failure)
-     into
-       bool fn ((In *)mem, (In *)expected, (In) *desired, weak, succ, fail)  */
-
   p0 = (*params)[0];
   p1 = (*params)[1];
   p2 = (*params)[2];
-  
-  /* Create pointer to appropriate size.  */
-  I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-  I_type_ptr = build_pointer_type (I_type);
 
-  /* Convert object pointer to required type.  */
-  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+  /* For capability types we do not want to do any conversions, so simply
+     dereference p2.  We also assume that the types are supported and do not
+     need to be changed to the library generic format.  */
+  if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
+    {
+      /* If not a lock-free size, change to the library generic format.  */
+      if (!atomic_size_supported_p (n))
+	{
+	  /* The library generic format does not have the weak parameter, so
+	     remove it from the param list.  Since a parameter has been removed,
+	     we can be sure that there is room for the SIZE_T parameter, meaning
+	     there will not be a recursive rebuilding of the parameter list, so
+	     there is no danger this will be done twice.  */
+	  if (n > 0)
+	    {
+	       (*params)[3] = (*params)[4];
+	       (*params)[4] = (*params)[5];
+	       params->truncate (5);
+	    }
+	  *new_return = add_atomic_size_parameter (n, loc, function, params);
+	  return true;
+	}
+
+      /* Otherwise, there is a match, so the call needs to be transformed from:
+	   bool fn(T* mem, T* desired, T* return, weak, success, failure)
+	 into
+	   bool fn ((In *)mem, (In *)expected, (In) *desired, weak, succ, fail)  */
+
+      /* Create pointer to appropriate size.  */
+      I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
+      I_type_ptr = build_pointer_type (I_type);
+
+      /* Convert object pointer to required type.  */
+      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+
+      /* Convert expected pointer to required type.  */
+      p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
+
+      /* Convert desired value to required type, and dereference it.  */
+      p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
+      p2 = build1 (VIEW_CONVERT_EXPR, I_type, p2);
+    }
+  else
+    p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
+
   (*params)[0] = p0;
-
-  /* Convert expected pointer to required type.  */
-  p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
   (*params)[1] = p1;
-
-  /* Convert desired value to required type, and dereference it.  */
-  p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
-  p2 = build1 (VIEW_CONVERT_EXPR, I_type, p2);
   (*params)[2] = p2;
 
   /* The rest of the parameters are fine. NULL means no special return value
@@ -7470,6 +7510,7 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
 {	
   tree p0, p1, p2;
   tree I_type, I_type_ptr;
+
   int n = get_atomic_generic_size (loc, function, params);
 
   /* Size of 0 is an error condition.  */
@@ -7479,30 +7520,36 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
       return true;
     }
 
-  /* If not a lock-free size, change to the library generic format.  */
-  if (!atomic_size_supported_p (n))
-    {
-      *new_return = add_atomic_size_parameter (n, loc, function, params);
-      return true;
-    }
-
-  /* Otherwise, there is a match, so the call needs to be transformed from:
-       void fn(T* mem, T* return, model)
-     into
-       *return = (T) (fn ((In *) mem, model))  */
-
   p0 = (*params)[0];
   p1 = (*params)[1];
   p2 = (*params)[2];
-  
-  /* Create pointer to appropriate size.  */
-  I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-  I_type_ptr = build_pointer_type (I_type);
 
-  /* Convert object pointer to required type.  */
-  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+  /* For capability types we do not want to do any conversions.
+     We also assume that the types are supported and do not
+     need to be changed to the library generic format.  */
+  if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
+    {
+      /* If not a lock-free size, change to the library generic format.  */
+      if (!atomic_size_supported_p (n))
+	{
+	  *new_return = add_atomic_size_parameter (n, loc, function, params);
+	  return true;
+	}
+
+      /* Otherwise, there is a match, so the call needs to be transformed from:
+	   void fn(T* mem, T* return, model)
+	 into
+	   *return = (T) (fn ((In *) mem, model))  */
+
+      /* Create pointer to appropriate size.  */
+      I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
+      I_type_ptr = build_pointer_type (I_type);
+
+      /* Convert object pointer to required type.  */
+      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+    }
+
   (*params)[0] = p0;
-
   /* Move memory model to the 2nd position, and end param list.  */
   (*params)[1] = p2;
   params->truncate (2);
@@ -7530,6 +7577,7 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
 {	
   tree p0, p1;
   tree I_type, I_type_ptr;
+
   int n = get_atomic_generic_size (loc, function, params);
 
   /* Size of 0 is an error condition.  */
@@ -7539,40 +7587,79 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
       return true;
     }
 
-  /* If not a lock-free size, change to the library generic format.  */
-  if (!atomic_size_supported_p (n))
-    {
-      *new_return = add_atomic_size_parameter (n, loc, function, params);
-      return true;
-    }
-
-  /* Otherwise, there is a match, so the call needs to be transformed from:
-       void fn(T* mem, T* value, model)
-     into
-       fn ((In *) mem, (In) *value, model)  */
-
   p0 = (*params)[0];
   p1 = (*params)[1];
-  
-  /* Create pointer to appropriate size.  */
-  I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-  I_type_ptr = build_pointer_type (I_type);
 
-  /* Convert object pointer to required type.  */
-  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+  /* For capability types we do not want to do any conversions, so simply
+     dereference p1.  We also assume that the types are supported and do not
+     need to be changed to the library generic format.  */
+  if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
+    {
+      /* If not a lock-free size, change to the library generic format.  */
+      if (!atomic_size_supported_p (n))
+	{
+	  *new_return = add_atomic_size_parameter (n, loc, function, params);
+	  return true;
+	}
+
+      /* Otherwise, there is a match, so the call needs to be transformed from:
+	   void fn(T* mem, T* value, model)
+	 into
+	   fn ((In *) mem, (In) *value, model)  */
+
+      /* Create pointer to appropriate size.  */
+      I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
+      I_type_ptr = build_pointer_type (I_type);
+
+      /* Convert object pointer to required type.  */
+      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+
+      /* Convert new value to required type, and dereference it.  */
+      p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+      p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
+    }
+  else
+    p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+
   (*params)[0] = p0;
-
-  /* Convert new value to required type, and dereference it.  */
-  p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
-  p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
   (*params)[1] = p1;
-  
+
   /* The memory model is in the right spot already. Return is void.  */
   *new_return = NULL_TREE;
 
   return false;
 }
 
+tree resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
+				  built_in_function orig_code, bool fetch_op)
+{
+  enum built_in_function new_code_bt;
+  /* In all cases TREE_TYPE ((*params)[0]) is a pointer to the type being
+     acted upon.  If that type is a capability, then we need to use a
+     capability variant of the atomic.
+     Also check vec_safe_is_empty to guard agains empty parameter lists.  */
+  if (vec_safe_is_empty (params))
+    {
+      error ("too few arguments to function %qE", function);
+      return error_mark_node;
+    }
+   else if ((*params)[0] == error_mark_node)
+    return error_mark_node;
+  else if (capability_type_p (TYPE_MAIN_VARIANT (TREE_TYPE
+						 (TREE_TYPE ((*params)[0])))))
+    new_code_bt = (enum built_in_function) ((int) orig_code
+						+ CAPABILITY_BUILTIN_FCODE_DIFF
+						+ 1);
+  else
+    {
+      int n = sync_resolve_size (function, params, fetch_op);
+      if (n == 0)
+	return error_mark_node;
+      new_code_bt = (enum built_in_function)((int) orig_code
+					      + exact_log2 (n) + 1);
+    }
+  return builtin_decl_explicit (new_code_bt);
+}
 
 /* Some builtin functions are placeholders for other expressions.  This
    function should be called immediately after parsing the call expression
@@ -7761,15 +7848,12 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	     && orig_code != BUILT_IN_SYNC_LOCK_TEST_AND_SET_N
 	     && orig_code != BUILT_IN_SYNC_LOCK_RELEASE_N);
 
-	int n = sync_resolve_size (function, params, fetch_op);
 	tree new_function, first_param, result;
-	enum built_in_function fncode;
+	new_function = resolve_atomic_fncode_n (function, params,
+						    orig_code, fetch_op);
+	if (new_function == error_mark_node)
+	  return new_function;
 
-	if (n == 0)
-	  return error_mark_node;
-
-	fncode = (enum built_in_function)((int)orig_code + exact_log2 (n) + 1);
-	new_function = builtin_decl_explicit (fncode);
 	if (!sync_resolve_params (loc, function, new_function, params,
 				  orig_format))
 	  return error_mark_node;
@@ -7793,18 +7877,27 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	   result to void since the generic interface returned void.  */
 	if (new_return)
 	  {
-	    /* Cast function result from I{1,2,4,8,16} to the required type.  */
-	    if (tree_is_capability_value (new_return) && ! tree_is_capability_value (result))
+	    /* Cast function result from I{1,2,4,8,16} or INTCAP_TYPE back to
+	       the required type.  */
+	    if (tree_is_capability_value (new_return)
+		&& tree_is_capability_value (result))
 	      {
-		error_at (loc, "MORELLO TODO implicit conversion from non capability type to capability type (atomic builtin return values)");
-		return error_mark_node;
+		result = build2 (MODIFY_EXPR, TREE_TYPE (new_return),
+				 new_return, result);
+		TREE_SIDE_EFFECTS (result) = 1;
+		result = convert (void_type_node, result);
 	      }
-	    result = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (new_return), result);
-	    result = build2 (MODIFY_EXPR, TREE_TYPE (new_return), new_return,
-			     result);
-	    TREE_SIDE_EFFECTS (result) = 1;
-	    protected_set_expr_location (result, loc);
-	    result = convert (void_type_node, result);
+	    else
+	      {
+		gcc_assert (!tree_is_capability_value (result));
+		result = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (new_return),
+				 result);
+		result = build2 (MODIFY_EXPR, TREE_TYPE (new_return),
+				 new_return, result);
+		TREE_SIDE_EFFECTS (result) = 1;
+		protected_set_expr_location (result, loc);
+		result = convert (void_type_node, result);
+	      }
 	  }
 	return result;
       }

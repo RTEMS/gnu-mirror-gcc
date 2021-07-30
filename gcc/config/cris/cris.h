@@ -940,7 +940,7 @@ struct cum_args {int regs;};
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
 #define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32, 1)
 
-#define Pmode SImode
+#define POmode SImode
 
 #define FUNCTION_MODE QImode
 

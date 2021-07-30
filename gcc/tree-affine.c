@@ -756,8 +756,8 @@ aff_combination_expand (aff_tree *comb ATTRIBUTE_UNUSED,
       if (CONVERT_EXPR_P (e)
 	  && (capability_type_p (type)
 	      == capability_type_p (TREE_TYPE (TREE_OPERAND (e, 0))))
-          && (TYPE_PRECISION (type)
-	      >= TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (e, 0)))))
+	  && (TYPE_CAP_PRECISION (type)
+	      >= TYPE_CAP_PRECISION (TREE_TYPE (TREE_OPERAND (e, 0)))))
 	name = TREE_OPERAND (e, 0);
       if (TREE_CODE (name) != SSA_NAME)
 	continue;

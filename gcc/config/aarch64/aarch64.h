@@ -224,8 +224,24 @@ extern unsigned aarch64_architecture_version;
 /* 64-bit Floating-point Matrix Multiply (F64MM) extensions.  */
 #define AARCH64_FL_F64MM      (1ULL << 38)
 
-/* Morello extension.  */
-#define AARCH64_FL_MORELLO    (1ULL << 39)
+/* C64 extension defines the C64 state, while A64C extension is "always" there
+   for the architecture.
+
+   We have a little bit of a mismatch between the definitions in GCC and GAS.
+   In GAS, the architecture extension defines whether we're generating code for
+   the C64 state or for the A64 state.  Then the ABI flag defines absolutely
+   nothing.
+
+   In GCC, the ABI flag defines not only the ABI we want to use, but also the
+   processor state (C64 or A64) that the functions we generate will have to be
+   executed in.  The architecture extension (+c64 or not) does very little.
+
+   Hence in order to work with GAS, we need to ensure that if we are
+   targetting the purecap ABI we also have set the +c64 architecture extension.
+   */
+#define AARCH64_FL_A64C   (1ULL << 39)
+#define AARCH64_FL_C64    (1ULL << 40)
+
 
 /* Has FP and SIMD.  */
 #define AARCH64_FL_FPSIMD     (AARCH64_FL_FP | AARCH64_FL_SIMD)
@@ -252,7 +268,8 @@ extern unsigned aarch64_architecture_version;
   (AARCH64_FL_FOR_ARCH8_5 | AARCH64_FL_V8_6 | AARCH64_FL_FPSIMD \
    | AARCH64_FL_I8MM | AARCH64_FL_BF16)
 #define AARCH64_FL_FOR_MORELLO			\
-  (AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_MORELLO)
+  (AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_F16FML | AARCH64_FL_DOTPROD \
+   | AARCH64_FL_RCPC | AARCH64_FL_SSBS | AARCH64_FL_A64C)
 
 /* Macros to test ISA flags.  */
 
@@ -289,6 +306,8 @@ extern unsigned aarch64_architecture_version;
 #define AARCH64_ISA_F64MM	   (aarch64_isa_flags & AARCH64_FL_F64MM)
 #define AARCH64_ISA_BF16	   (aarch64_isa_flags & AARCH64_FL_BF16)
 #define AARCH64_ISA_SB		   (aarch64_isa_flags & AARCH64_FL_SB)
+#define AARCH64_ISA_A64C	   (aarch64_isa_flags & AARCH64_FL_A64C)
+#define AARCH64_ISA_C64		   (aarch64_isa_flags & AARCH64_FL_C64)
 
 /* Crypto is an optional extension to AdvSIMD.  */
 #define TARGET_CRYPTO (TARGET_SIMD && AARCH64_ISA_CRYPTO)
@@ -509,7 +528,8 @@ extern unsigned aarch64_architecture_version;
 
 /* Generate the register aliases for core register N */
 #define R_ALIASES(N) {"r" # N, R0_REGNUM + (N)}, \
-                     {"w" # N, R0_REGNUM + (N)}
+                     {"w" # N, R0_REGNUM + (N)}, \
+                     {"c" # N, R0_REGNUM + (N)}
 
 #define V_ALIASES(N) {"q" # N, V0_REGNUM + (N)}, \
                      {"d" # N, V0_REGNUM + (N)}, \
@@ -530,7 +550,8 @@ extern unsigned aarch64_architecture_version;
     R_ALIASES(16), R_ALIASES(17), R_ALIASES(18), R_ALIASES(19), \
     R_ALIASES(20), R_ALIASES(21), R_ALIASES(22), R_ALIASES(23), \
     R_ALIASES(24), R_ALIASES(25), R_ALIASES(26), R_ALIASES(27), \
-    R_ALIASES(28), R_ALIASES(29), R_ALIASES(30), {"wsp", R0_REGNUM + 31}, \
+    R_ALIASES(28), R_ALIASES(29), R_ALIASES(30), \
+    {"wsp", R0_REGNUM + 31}, {"csp", R0_REGNUM + 31}, \
     V_ALIASES(0),  V_ALIASES(1),  V_ALIASES(2),  V_ALIASES(3),  \
     V_ALIASES(4),  V_ALIASES(5),  V_ALIASES(6),  V_ALIASES(7),  \
     V_ALIASES(8),  V_ALIASES(9),  V_ALIASES(10), V_ALIASES(11), \

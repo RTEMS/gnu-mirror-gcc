@@ -1730,7 +1730,7 @@ enum reg_class
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)  ((VALUE) = 32, 1)
 
 /* An alias for the machine mode for pointers.  */
-#define Pmode SImode
+#define POmode SImode
 
 /* An alias for the machine mode used for memory references to functions
    being called, in call RTL expressions.  */

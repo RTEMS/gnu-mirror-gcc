@@ -532,7 +532,7 @@ struct cum_arg
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode								      \
+#define POmode								      \
   (!TARGET_NORMAL_MODE ? SImode : HImode)
 
 /* ANSI C types.

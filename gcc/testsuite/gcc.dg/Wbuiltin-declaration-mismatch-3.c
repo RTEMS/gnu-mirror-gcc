@@ -65,8 +65,11 @@ void test_call_memcpy (void *p, const void *q, size_t n)
 
   memcpy (q, p, n); /* { dg-warning "\\\[-Wdiscarded-qualifiers]" } */
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  memcpy (p, (__intcap_t) n, q); /* { dg-warning "\\\[-Wint-conversion]" } */
+#else
   memcpy (p, n, q); /* { dg-warning "\\\[-Wint-conversion]" } */
-
+#endif
   memcpy (p, q, n, 0); /* { dg-warning "too many arguments to built-in function 'memcpy' expecting 3" } */
 }
 

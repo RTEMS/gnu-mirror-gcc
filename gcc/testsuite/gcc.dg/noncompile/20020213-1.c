@@ -23,18 +23,22 @@ int main ()
   /* { dg-warning "passing argument 2 of" "2nd incompatible" { target *-*-* } .-1 } */
 
   fputs (21, 43);
-  /* { dg-warning "passing argument 1 of" "1st incompatible" { target *-*-* } .-1 } */
-  /* { dg-warning "passing argument 2 of" "2nd incompatible" { target *-*-* } .-2 } */
+  /* { dg-warning "passing argument 1 of" "1st incompatible" { target ! aarch64_capability_any } .-1 } */
+  /* { dg-warning "passing argument 2 of" "2nd incompatible" { target ! aarch64_capability_any } .-2 } */
+  /* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-3 } */
+  /* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-4 } */
 
   bzero (buf);			/* { dg-error "too few" } */
 
   bzero (21);			/* { dg-error "too few" } */
-  /* { dg-warning "passing argument 1 of" "1st incompatible" { target *-*-* } .-1 } */
+  /* { dg-warning "passing argument 1 of" "1st incompatible" { target ! aarch64_capability_any } .-1 } */
+  /* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-2 } */
 
   bcmp (buf, buf + 16);		/* { dg-error "too few" } */
 
   bcmp (21);			/* { dg-error "too few" } */
-  /* { dg-warning "passing argument 1 of" "1st incompatible" { target *-*-* } .-1 } */
+  /* { dg-warning "passing argument 1 of" "1st incompatible" { target ! aarch64_capability_any } .-1 } */
+  /* { dg-error "passing 'int' to parameter of incompatible type capability" "" { target { aarch64_capability_any } } .-2 } */
 
   fputs ("foo", f);
   bzero (buf, 32);

@@ -489,15 +489,32 @@ gen_raw_REG (machine_mode mode, unsigned int regno)
 }
 
 /* Helper function for generating pointer plus offset expressions.
-   Checks that the mode of the base and offsets match.  Ensure the base is in
-   the correct mode, and that OFFSET has a mode of `offset_mode (MODE)`.  */
+   Ensures that the `mode` of the operation and the `base` are compatible as
+   per their MODE_CLASS and valid_conversion_p is true if a conversion of the
+   `base` to `mode` would be needed.
+   Similarly, checks the same for the `offset`: that it is of the same
+   MODE_CLASS and can be converted to `offset_mode (mode)`.  */
 void
-check_pointer_offset_modes (scalar_addr_mode mode, rtx base, rtx offset)
+check_pointer_offset_modes (scalar_addr_mode mode, rtx base, rtx offset,
+			    bool strict)
 {
-  gcc_assert (GET_MODE (base) == mode
-	   || (CONST_INT_P (base) && !CAPABILITY_MODE_P (mode)));
-  gcc_assert (GET_MODE (offset) == offset_mode (mode)
-	      || GET_MODE (offset) == VOIDmode);
+  if (strict)
+    {
+      gcc_assert (GET_MODE (base) == mode
+		  || (CONST_INT_P (base) && !CAPABILITY_MODE_P (mode)));
+      gcc_assert (GET_MODE (offset) == offset_mode (mode)
+		  || GET_MODE (offset) == VOIDmode);
+    }
+  else
+    {
+      gcc_assert ((GET_MODE_CLASS (GET_MODE (base)) == GET_MODE_CLASS (mode)
+		   && valid_conversion_p (mode, GET_MODE (base)))
+		 || (CONST_INT_P (base) && !CAPABILITY_MODE_P (mode)));
+      gcc_assert ((GET_MODE_CLASS (GET_MODE (offset))
+		     == GET_MODE_CLASS (offset_mode (mode))
+		   && valid_conversion_p (offset_mode (mode), GET_MODE (offset)))
+		 || GET_MODE (offset) == VOIDmode);
+    }
 }
 
 /* Generate a new rtx representing a pointer plus an offset.  Generate either a
@@ -506,7 +523,7 @@ check_pointer_offset_modes (scalar_addr_mode mode, rtx base, rtx offset)
 rtx
 gen_raw_pointer_plus (scalar_addr_mode mode, rtx base, rtx offset)
 {
-  check_pointer_offset_modes (mode, base, offset);
+  check_pointer_offset_modes (mode, base, offset, true);
   if (CAPABILITY_MODE_P (mode))
     return gen_rtx_POINTER_PLUS (mode, base, offset);
   return gen_rtx_PLUS (offset_mode (mode), base, offset);
@@ -955,6 +972,14 @@ validate_subreg (machine_mode omode, machine_mode imode,
 {
   poly_uint64 isize = GET_MODE_SIZE (imode);
   poly_uint64 osize = GET_MODE_SIZE (omode);
+
+  /* Disallow extracting a capability subreg from anything for robustness.
+     We only model the value of a capability (and not the validity bit), but
+     allowing such conversion from the same number of bits in another mode to a
+     capability has masked issues in the past.  Hence we disallow it in order
+     to not have such masked issues.  */
+  if (CAPABILITY_MODE_P (omode))
+    return false;
 
   /* The sizes must be ordered, so that we know whether the subreg
      is partial, paradoxical or complete.  */

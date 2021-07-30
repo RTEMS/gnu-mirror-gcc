@@ -5,24 +5,31 @@
 /* { dg-do compile } */
 /* { dg-options "-std=iso9899:1999 -pedantic-errors" } */
 
-void *p = (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" } */
-struct s { void *a; } q = { (__SIZE_TYPE__)(void *)0 }; /* { dg-error "without a cast|near initialization" } */
+void *p = (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" "" { target { ! aarch64_capability_any } } } */
+			     /* { dg-error "expression of incompatible type" "" { target { aarch64_capability_any } } .-1 } */
+struct s { void *a; } q = { (__SIZE_TYPE__)(void *)0 }; /* { dg-error "without a cast|near initialization" "" { target { ! aarch64_capability_any } } } */
+			     /* { dg-error "expression of incompatible type" "" { target { aarch64_capability_any } } .-1 } */
 void *
 f (void)
 {
   void *r;
-  r = (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" } */
-  return (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" } */
+  r = (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" "" { target { ! aarch64_capability_any } } } */
+			 /* { dg-error "from incompatible type" "" { target { aarch64_capability_any } } .-1 } */
+  return (__SIZE_TYPE__)(void *)0; /* { dg-error "without a cast" "" { target { ! aarch64_capability_any } } } */
+			    /* { dg-error "incompatible result type" "" { target { aarch64_capability_any } } .-1 } */
 }
 void g (void *); /* { dg-message "but argument is of type" } */
 void
 h (void)
 {
-  g ((__SIZE_TYPE__)(void *)0); /* { dg-error "without a cast" } */
+  g ((__SIZE_TYPE__)(void *)0); /* { dg-error "without a cast" "" { target { ! aarch64_capability_any } } } */
+			 /* { dg-error "parameter of incompatible type" "" { target { aarch64_capability_any } } .-1 } */
 }
 void g2 (int, void *); /* { dg-message "but argument is of type" } */
 void
 h2 (void)
 {
-  g2 (0, (__SIZE_TYPE__)(void *)0); /* { dg-error "without a cast" } */
+  g2 (0, (__SIZE_TYPE__)(void *)0); /* { dg-error "without a cast" "" { target { ! aarch64_capability_any } } } */
+			     /* { dg-error "parameter of incompatible type" "" { target { aarch64_capability_any } } .-1 } */
 }
+

@@ -1,5 +1,6 @@
 /* { dg-options "-O2 -march=armv8.2-a+sve" } */
 /* { dg-prune-output "compilation terminated" } */
+/* { dg-skip-if "can not run sve with capabilities" { aarch64_capability_any } } */
 
 #include <arm_sve.h>
 

@@ -1579,7 +1579,7 @@ assemble_addr_to_section (rtx symbol, section *sec)
 {
   switch_to_section (sec);
   assemble_align (POINTER_SIZE);
-  assemble_integer (symbol, POINTER_SIZE_UNITS, POINTER_SIZE, 1);
+  assemble_pointer (symbol);
 }
 
 /* Return the numbered .ctors.N (if CONSTRUCTOR_P) or .dtors.N (if
@@ -2779,6 +2779,8 @@ assemble_integer (rtx x, unsigned int size, unsigned int align, int force)
 {
   int aligned_p;
 
+  gcc_assert (!CAPABILITY_MODE_P (GET_MODE (x)));
+
   aligned_p = (align >= MIN (size * BITS_PER_UNIT, BIGGEST_ALIGNMENT));
 
   /* See if the target hook can handle this kind of object.  */
@@ -2822,6 +2824,39 @@ assemble_integer (rtx x, unsigned int size, unsigned int align, int force)
 
   return false;
 }
+
+/* Assemble the capability constant X into an object of SIZE bytes.  ALIGN is
+   the alignment of the capability in bits.  Return 1 if we were able to output
+   the constant, otherwise 0.  We must be able to output the constant if FORCE
+   is nonzero.  */
+
+bool
+assemble_capability (rtx x, unsigned int size, unsigned int align, int force)
+{
+  int aligned_p;
+
+  aligned_p = (align >= MIN (size * BITS_PER_UNIT, BIGGEST_ALIGNMENT));
+
+  /* See if the target hook can handle this kind of object.  */
+  if (targetm.asm_out.capability (x, size, aligned_p))
+    return true;
+
+  gcc_assert (!force);
+  return false;
+}
+
+void
+assemble_pointer (rtx x)
+{
+  gcc_assert (GET_MODE (x) == Pmode
+	      || (GET_MODE (x) == VOIDmode && !CAPABILITY_MODE_P (Pmode)));
+
+  if (CAPABILITY_MODE_P (GET_MODE (x)))
+    assemble_capability (x, POINTER_SIZE_UNITS, POINTER_SIZE, 1);
+  else
+    assemble_integer (x, POINTER_SIZE_UNITS, POINTER_SIZE, 1);
+}
+
 
 /* Assemble the floating-point constant D into an object of size MODE.  ALIGN
    is the alignment of the constant in bits.  If REVERSE is true, D is output
@@ -3955,40 +3990,8 @@ output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
       }
 
     case MODE_CAPABILITY:
-      {
-	/* MORELLO TODO Not 100% sure what we're going to do here.
-	   It's certainly something to think about, but right now I'm just
-	   putting in a hack to get the compiler to stop ICE'ing so I can focus on other
-	   things.
-
-	   The hack is to simply fall into assembling the integer (since that's
-	   what the RTX will contain anyway for the hack we're using right now).
-
-	   In the future we will need to add functions for handling the
-	   insertion of capabilities.  The only valid constant capabilities I
-	   can think of would be symbol_ref's (capabilities generated from a
-	   constant number will not be valid ... unless special areas of
-	   memory will just not check capabilities?).
-	   For symbol_ref's we would just emit the symbol name and rely on the
-	   assembler and linker to do "the right thing" with that.  With
-	   capabilities that will include the assembler setting the correct
-	   relocation, and the linker ensuring that what is placed in that
-	   address will be a valid capability to the value the symbol is
-	   referencing in memory.
-
-	   The functionality the compiler needs to employ is *very* similar to
-	   what it needs to employ for integer pointers already -- simply print
-	   out the name of the symbol we want to reference.
-	   However, it would be nice to have a different name to
-	   `assemble_integer`, since what we're assembling is decidedly not an
-	   integer.  That might be as simple as changing the name, or we might
-	   want to split the thing up to avoid some code that strongly assumes
-	   we're working with integers.
-	  */
-	mode = fixed_size_mode::from_int (noncapability_mode (mode));
-      }
-    /* Fall through for now, may be different in the future.  */
-    /* FALLTHRU */
+      assemble_capability (x, GET_MODE_SIZE (mode), align, 1);
+      break;
 
     case MODE_INT:
     case MODE_PARTIAL_INT:
@@ -4369,6 +4372,16 @@ output_addressed_constants (tree exp, int defer)
 
   switch (TREE_CODE (exp))
     {
+    case CALL_EXPR:
+      {
+	enum internal_fn fncall = CALL_EXPR_IFN (exp);
+	if (fncall != IFN_REPLACE_ADDRESS_VALUE)
+	  break;
+	output_addressed_constants (CALL_EXPR_ARG (exp, 0), defer);
+	output_addressed_constants (CALL_EXPR_ARG (exp, 1), defer);
+	break;
+      }
+
     case ADDR_EXPR:
     case FDESC_EXPR:
       /* Go inside any operations that get_inner_reference can handle and see
@@ -4538,6 +4551,34 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 
   switch (TREE_CODE (value))
     {
+    case CALL_EXPR:
+      {
+	enum internal_fn fncall = CALL_EXPR_IFN (value);
+	if (fncall != IFN_REPLACE_ADDRESS_VALUE)
+	  break;
+	tree ptr = CALL_EXPR_ARG (value, 0);
+	tree addr_value = CALL_EXPR_ARG (value, 1);
+	/* Assume VALUE has been folded as much as possible.  */
+	gcc_assert (TREE_CODE (ptr) != CALL_EXPR
+		    || CALL_EXPR_IFN (ptr) != IFN_REPLACE_ADDRESS_VALUE);
+	if (TREE_CODE (ptr) == CALL_EXPR)
+	  break;
+	/* MORELLO TODO Just adding this assert in temporarily.  I would be
+	   interested to see any time that this is not the case and hence want
+	   to get alerted.  */
+	gcc_assert (TREE_CODE (ptr) == INTEGER_CST && tree_to_uhwi (ptr) == 0);
+	tree ptr_ret = initializer_constant_valid_p_1 (ptr, endtype, cache);
+	tree addrval_ret = initializer_constant_valid_p_1
+		(addr_value, noncapability_type (endtype), cache);
+	/* Return value doesn't matter beyond what the comment above mentions.
+	 * */
+	if (ptr_ret == null_pointer_node && addrval_ret == null_pointer_node)
+	  return null_pointer_node;
+	if (ptr_ret && addrval_ret)
+	  return addrval_ret;
+	break;
+      }
+
     case CONSTRUCTOR:
       if (constructor_static_from_elts_p (value))
 	{
@@ -4668,13 +4709,19 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 	    && (TYPE_UNSIGNED (src_type)
 		|| TYPE_PRECISION (dest_type) <= TYPE_PRECISION (src_type)
 		|| TYPE_PRECISION (dest_type) <= BITS_PER_WORD
-		|| TYPE_PRECISION (dest_type) <= POINTER_SIZE))
+		|| TYPE_PRECISION (dest_type) <= POINTER_OFFSET_SIZE))
 	  {
 	    tree inner = initializer_constant_valid_p_1 (src, endtype, cache);
 	    if (inner == null_pointer_node)
 	      return null_pointer_node;
 	    break;
 	  }
+
+	/* Allow initializing an intcap type with a pointer provided the
+	   modes are the same.  */
+	if (INTCAP_TYPE_P (dest_type) && POINTER_TYPE_P (src_type)
+	    && TYPE_MODE (dest_type) == TYPE_MODE (src_type))
+	  return initializer_constant_valid_p_1 (src, endtype, cache);
 
 	/* Allow (int) &foo provided int is as wide as a pointer.  */
 	if (INTEGRAL_TYPE_P (dest_type) && POINTER_TYPE_P (src_type)
@@ -5009,11 +5056,21 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
      Otherwise, break and ensure SIZE is the size written.  */
   switch (code)
     {
+    case INTCAP_TYPE:
+    case POINTER_TYPE:
+    case REFERENCE_TYPE:
+      if (capability_type_p (TREE_TYPE (exp)))
+	{
+	  rtx cap;
+	  cap = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
+	  if (!assemble_capability (cap, MIN (size, thissize), align, 0))
+	    error ("initializer for capability is too complicated");
+	  break;
+	}
+      /* FALLTHRU */
     case BOOLEAN_TYPE:
     case INTEGER_TYPE:
     case ENUMERAL_TYPE:
-    case POINTER_TYPE:
-    case REFERENCE_TYPE:
     case OFFSET_TYPE:
     case FIXED_POINT_TYPE:
     case NULLPTR_TYPE:
@@ -6189,10 +6246,8 @@ dump_tm_clone_pairs (vec<tm_alias_pair> tm_alias_pairs)
 	  switched = true;
 	}
 
-      assemble_integer (XEXP (DECL_RTL (src), 0),
-			POINTER_SIZE_UNITS, POINTER_SIZE, 1);
-      assemble_integer (XEXP (DECL_RTL (dst), 0),
-			POINTER_SIZE_UNITS, POINTER_SIZE, 1);
+      assemble_pointer (XEXP (DECL_RTL (src), 0));
+      assemble_pointer (XEXP (DECL_RTL (dst), 0));
     }
 }
 

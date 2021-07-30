@@ -333,7 +333,7 @@ enum reg_class
 #define TRAMPOLINE_ALIGNMENT 32
 
 /* An alias for the machine mode for pointers.  */
-#define Pmode         SImode
+#define POmode         SImode
 
 /* An alias for the machine mode used for memory references to
    functions being called, in `call' RTL expressions.  */

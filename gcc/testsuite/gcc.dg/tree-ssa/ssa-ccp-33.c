@@ -1,5 +1,6 @@
 /* { dg-do link } */
 /* { dg-options "-O" } */
+/* { dg-xfail-if "ccp misses alignment folding on capabilities" { aarch64_capability_any } } */
 
 extern void link_error ();
 int a[256];

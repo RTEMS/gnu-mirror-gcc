@@ -1,7 +1,7 @@
 /* { dg-do compile } */
 /* { dg-options "-O3" } */
 
-#if __SIZEOF_POINTER__ != __SIZEOF_LONG__
+#if __SIZEOF_POINTER__ != __SIZEOF_LONG__ || __GCC_ARM_CAPABILITY_ANY
 #define long __INTPTR_TYPE__
 #endif
 

@@ -64,7 +64,11 @@ main (void)
   for (i = 0; i < 2; i++)
     {
       unexpanded_var_list = malloc (sizeof (struct tree_list));
+#ifdef __GCC_ARM_CAPABILITY_ANY
+      unexpanded_var_list->list.value = (tree) (__intcap_t) (ptrdiff_t) (i & 1);
+#else
       unexpanded_var_list->list.value = (tree) (ptrdiff_t) (i & 1);
+#endif
       unexpanded_var_list->common.chain = last;
       last = unexpanded_var_list;
     }

@@ -25,7 +25,11 @@ u4:
 	  }
       }
       while (wk < 3) {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+	  av = (__intcap_t)**ptr_10;
+#else
 	  av = **ptr_10;
+#endif
 	  ++wk;
       }
   }

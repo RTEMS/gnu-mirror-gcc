@@ -20,12 +20,14 @@
 ; TODO: check syntax is OK for TARGET_MORELLO.
 ; TODO: more alternatives.
 (define_insn "pointer_plus_cadi"
-  [(set (match_operand:CADI 0 "register_operand" "=rk")
+  [(set (match_operand:CADI 0 "register_operand" "=rk,rk")
 	(pointer_plus:CADI
-	  (match_operand:CADI 1 "register_operand" "rk")
-	  (match_operand:DI 2 "aarch64_pluslong_operand" "IrJ")))]
+	  (match_operand:CADI 1 "register_operand" "rk,rk")
+	  (match_operand:DI 2 "aarch64_pluslong_operand" "Ir,J")))]
   "TARGET_CAPABILITY_ANY"
-  "add\\t%0, %1, %2"
+  "@
+  add\\t%0, %1, %2
+  sub\\t%0, %1, #%n2"
 )
 
 ; TODO: many more alternatives.
@@ -43,13 +45,24 @@
    adrp\\t%0, %A1"
 )
 
-/* MORELLO TODO (just a hack to ensure the relevant optab is doing what it
-should).  */
 (define_insn "replace_address_value_cadi"
-  [(set (match_operand:CADI 0 "register_operand" "=r")
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
         (replace_address_value:CADI
-	      (match_operand:CADI 1 "register_operand" "r")
+	      (match_operand:CADI 1 "register_operand" "rk")
 	      (match_operand:DI 2 "register_operand" "r")))]
-  ""
-  "mov\\t%0, %2"
+  "TARGET_CAPABILITY_ANY"
+{
+  return TARGET_MORELLO ? "scvalue\t%0, %1, %2" : "mov\t%0, %2";
+})
+
+(define_insn "*movcadi_aarch64"
+  [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,m,r,  r")
+	(match_operand:CADI 1 "aarch64_mov_operand" "rk, m,r,Usa,Ush"))]
+  "TARGET_CAPABILITY_PURE"
+  "@
+  mov\\t%0, %1
+  ldr\\t%0, %1
+  str\\t%1, %0
+  adr\\t%0, %c1
+  adrp\\t%0, %A1"
 )

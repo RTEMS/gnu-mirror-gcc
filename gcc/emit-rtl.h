@@ -380,7 +380,9 @@ extern rtx copy_insn (rtx);
 extern rtx_insn *copy_delay_slot_insn (rtx_insn *);
 extern rtx gen_int_mode (poly_int64, machine_mode);
 extern rtx gen_int_mode (poly_int64, scalar_int_mode);
+#if !(defined(IN_TARGET_CODE) && defined(POmode))
 extern rtx gen_int_mode (poly_int64, scalar_addr_mode) = delete;
+#endif
 extern rtx_insn *emit_copy_of_insn_after (rtx_insn *, rtx_insn *);
 extern void set_reg_attrs_from_value (rtx, rtx);
 extern void set_reg_attrs_for_parm (rtx, rtx);

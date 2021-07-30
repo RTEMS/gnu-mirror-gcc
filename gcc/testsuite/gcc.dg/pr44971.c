@@ -21,7 +21,11 @@ void _XftintInfoGet (int * dpy, FcBool createIfNecessary)
 
 void _XftCloseint (int dpy, XftintInfo * info,XftintInfo  * *prev)
 {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  _XftintInfoGet ((__intcap_t) dpy, 0);
+#else
   _XftintInfoGet (dpy, 0);
+#endif
   for (prev = &_XftintInfo; info = *prev; prev = &(*prev)->next)
     ;
 }

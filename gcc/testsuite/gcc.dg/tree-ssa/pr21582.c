@@ -1,5 +1,6 @@
 /* { dg-do link }  */
 /* { dg-options "-O2 -fdump-tree-vrp1" }  */
+/* { dg-xfail-if "fre can not see through non-NULL cast from pointer to integer for capabilities" { aarch64_capability_any } } */
 
 void link_error (void);
 

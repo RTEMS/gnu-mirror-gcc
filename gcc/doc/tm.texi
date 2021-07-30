@@ -8179,6 +8179,19 @@ The default implementation of this hook will use the
 when the relevant string is @code{NULL}.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_ASM_CAPABILITY (rtx @var{x}, unsigned int @var{size}, int @var{aligned_p})
+This hook outputs a capability.  @var{x} is the object's value, @var{size}
+is its size in bytes, and @var{aligned_p} indicates whether it is aligned.
+The function should return @code{true} if it was able to output the
+object.  If it returns false, @code{assemble_capability} will fail.
+
+There is no default implementation of this hook, and it must be implemented
+to use capabilities for a backend.
+
+Even if the current target does not use the REPLACE_ADDRESS_VALUE RTL code
+this function will be given that code, so it must be handled by this hook.
+@end deftypefn
+
 @deftypefn {Target Hook} void TARGET_ASM_DECL_END (void)
 Define this hook if the target assembler requires a special marker to
 terminate an initialized variable declaration.

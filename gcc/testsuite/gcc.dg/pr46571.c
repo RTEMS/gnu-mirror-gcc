@@ -84,7 +84,11 @@ gfc_trans_omp_reduction_list (gfc_namelist * namelist, tree list,
   for (; namelist != ((void *) 0); namelist = namelist->next)
     if (namelist->sym->attr.referenced)
       {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+	tree node = (__intcap_t) build_omp_clause (where.lb->location);
+#else
 	tree node = build_omp_clause (where.lb->location);
+#endif
 	node->omp_clause.subcode.reduction_code = reduction_code;
 	gfc_trans_omp_array_reduction (namelist->sym, where);
       }

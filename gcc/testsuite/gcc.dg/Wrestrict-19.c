@@ -24,8 +24,13 @@ char* f2 (char *s)
 
 void f3 (char *s, size_t n, const char *t)
 {
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  strncpy (s, (__intcap_t) n, t);
+  strncpy ((__intcap_t) n, s, t);
+#else
   strncpy (s, n, t);
   strncpy (n, s, t);
+#endif
 }
 
 /* { dg-prune-output "\\\[-Wbuiltin-declaration-mismatch]" }

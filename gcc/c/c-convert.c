@@ -88,6 +88,11 @@ convert (tree type, tree expr)
   if (ret)
       return ret;
 
+  if (TREE_CODE (TREE_TYPE (e)) == INTCAP_TYPE
+      && !capability_type_p (type)
+      && code != INTEGER_TYPE)
+    e = expr = convert (noncapability_type (TREE_TYPE (e)), e);
+
   STRIP_TYPE_NOPS (e);
 
   if (TYPE_MAIN_VARIANT (type) == TYPE_MAIN_VARIANT (TREE_TYPE (expr))
@@ -129,15 +134,19 @@ convert (tree type, tree expr)
       return fold_convert_loc
 	(loc, type, c_objc_common_truthvalue_conversion (input_location, expr));
 
+    case INTCAP_TYPE:
+      if (!capability_type_p (TREE_TYPE (e)))
+	ret = c_common_cap_from_noncap (type, e);
+      else
+	ret = convert_to_intcap (type, e);
+      goto maybe_fold;
+
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-    case INTCAP_TYPE:
-      if (capability_type_p (type) && INTEGRAL_TYPE_P (TREE_TYPE (e)))
-	ret = c_common_cap_from_int (type, e);
+      if (capability_type_p (type) && TREE_CODE (TREE_TYPE (e)) == INTEGER_TYPE)
+	ret = c_common_cap_from_noncap (type, e);
       else
-	ret = (code == INTCAP_TYPE)
-		? convert_to_intcap (type, e)
-		: convert_to_pointer (type, e);
+	ret = convert_to_pointer (type, e);
       goto maybe_fold;
 
     case REAL_TYPE:

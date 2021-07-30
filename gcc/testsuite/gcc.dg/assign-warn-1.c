@@ -96,11 +96,16 @@ TESTASS(icc, int *, char *); /* { dg-warning "assignment to 'int \\*' from incom
 TESTINI(icd, int *, char *); /* { dg-warning "initialization of 'int \\*' from incompatible pointer type 'char \\*'" } */
 TESTRET(ice, int *, char *); /* { dg-warning "returning 'char \\*' from a function with incompatible return type 'int \\*'" } */
 
-TESTARG(ciia, char *, int); /* { dg-warning "passing argument 1 of 'ciiaF' makes pointer from integer without a cast" } */
-TESTARP(ciib, char *, int); /* { dg-warning "passing argument 1 of 'ciibFp.x' makes pointer from integer without a cast" } */
-TESTASS(ciic, char *, int); /* { dg-warning "assignment to 'char \\*' from 'int' makes pointer from integer without a cast" } */
-TESTINI(ciid, char *, int); /* { dg-warning "initialization of 'char \\*' from 'int' makes pointer from integer without a cast" } */
-TESTRET(ciie, char *, int); /* { dg-warning "returning 'int' from a function with return type 'char \\*' makes pointer from integer without a cast" } */
+TESTARG(ciia, char *, int); /* { dg-warning "passing argument 1 of 'ciiaF' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+                            /* { dg-error "passing 'int' to parameter of incompatible type capability 'char \\*' for argument 1 of 'ciiaF'" "" { target { aarch64_capability_any } } .-1 } */                                                                                                                                
+TESTARP(ciib, char *, int); /* { dg-warning "passing argument 1 of 'ciibFp.x' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+                            /* { dg-error "passing 'int' to parameter of incompatible type capability 'char \\*' for argument 1 of 'ciibFp.x'" "" { target { aarch64_capability_any } } .-1 } */
+TESTASS(ciic, char *, int); /* { dg-warning "assignment to 'char \\*' from 'int' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+                            /* { dg-error "assigning to capability 'char \\*' from incompatible type 'int'" "" { target { aarch64_capability_any } } .-1 } */
+TESTINI(ciid, char *, int); /* { dg-warning "initialization of 'char \\*' from 'int' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+                            /* { dg-error "initializing capability 'char \\*' with an expression of incompatible type 'int'" "" { target { aarch64_capability_any } } .-1 } */
+TESTRET(ciie, char *, int); /* { dg-warning "returning 'int' from a function with return type 'char \\*' makes pointer from integer without a cast" "" { target { ! aarch64_capability_any } } } */
+                            /* { dg-error "returning 'int' from a function with incompatible result type capability 'char \\*'" "" { target { aarch64_capability_any } } .-1 } */
 
 TESTARG(iica, int, char *); /* { dg-warning "passing argument 1 of 'iicaF' makes integer from pointer without a cast" } */
 TESTARP(iicb, int, char *); /* { dg-warning "passing argument 1 of 'iicbFp.x' makes integer from pointer without a cast" } */

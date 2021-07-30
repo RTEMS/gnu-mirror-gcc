@@ -970,6 +970,11 @@ dwarf2out_do_cfi_startproc (bool second)
   int enc;
   rtx ref;
 
+  /* MORELLO TODO
+     Need to tell whether the current function is targetting purecap or not and
+     emit a `.cfi_startproc purecap` if it is.  Since we need to distinguish
+     between purecap and fake-capability in other places too this is starting
+     to look like something we need a hook for.  */
   fprintf (asm_out_file, "\t.cfi_startproc\n");
 
   targetm.asm_out.post_cfi_startproc (asm_out_file, current_function_decl);
@@ -12871,6 +12876,13 @@ base_type_die (tree type, bool reverse)
 	encoding = DW_ATE_lo_user;
       break;
 
+    case INTCAP_TYPE:
+      if (TYPE_UNSIGNED (type))
+	encoding = DW_ATE_CHERI_unsigned_intcap;
+      else
+	encoding = DW_ATE_CHERI_signed_intcap;
+      break;
+
     case BOOLEAN_TYPE:
       /* GNU FORTRAN/Ada/C++ BOOLEAN type.  */
       encoding = DW_ATE_boolean;
@@ -12964,6 +12976,13 @@ is_base_type (tree type)
 {
   switch (TREE_CODE (type))
     {
+    /* MORELLO TODO Need to say "yes" for INTCAP_TYPE if not targetting at fake-capability.
+	Looks like we may need a way to distinguish the overall target (unless
+	would never have fake-capability and pure capability functionality in the same
+	compiler).  */
+    case INTCAP_TYPE:
+      return 0;
+
     case INTEGER_TYPE:
     case REAL_TYPE:
     case FIXED_POINT_TYPE:
@@ -12981,7 +13000,6 @@ is_base_type (tree type)
     case METHOD_TYPE:
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-    case INTCAP_TYPE:
     case NULLPTR_TYPE:
     case OFFSET_TYPE:
     case LANG_TYPE:
@@ -13402,6 +13420,9 @@ modified_type_die (tree type, int cv_quals, bool reverse,
       item_type = TREE_TYPE (type);
 
       addr_space_t as = TYPE_ADDR_SPACE (item_type);
+      /* MORELLO TODO
+	 This seems to be somewhere we would want to emit the
+	 DW_AT_address_class of DW_ADDR_capability for capability pointer types.  */
       if (!ADDR_SPACE_GENERIC_P (as))
 	{
 	  int action = targetm.addr_space.debug (as);
@@ -13469,6 +13490,9 @@ modified_type_die (tree type, int cv_quals, bool reverse,
 	      return lookup_type_die (t);
 	  return lookup_type_die (type);
 	}
+      else if (TREE_CODE (type) == INTCAP_TYPE /* && MORELLO TODO is fake-capability */)
+	return modified_type_die (TREE_TYPE (type), cv_quals, reverse,
+				  context_die);
       else if (TREE_CODE (type) != VECTOR_TYPE
 	       && TREE_CODE (type) != ARRAY_TYPE)
 	return lookup_type_die (type_main_variant (type));
@@ -14343,6 +14367,10 @@ based_loc_descr (rtx reg, poly_int64 offset,
   unsigned int regno;
   dw_loc_descr_ref result;
   dw_fde_ref fde = cfun->fde;
+  /* MORELLO TODO
+     Need to handle choosing between dwarf registers based on mode.
+     Capability registers have a different number than non-capability
+     registers, and the backend does not as yet get told about that.  */
 
   /* We only use "frame base" when we're sure we're talking about the
      post-prologue local stack frame.  We do this by *not* running
@@ -14540,6 +14568,7 @@ const_ok_for_output_1 (rtx rtl)
     case NOT:
     case NEG:
       return false;
+    case POINTER_PLUS:
     case PLUS:
       {
 	/* Make sure SYMBOL_REFs/UNSPECs are at most in one of the
@@ -14563,6 +14592,8 @@ const_ok_for_output_1 (rtx rtl)
 	    return false;
 	return true;
       }
+    /* MORELLO TODO If POINTER_MINUS expression can be inside a CONST then
+       would want to handle it here.  */
     case MINUS:
       {
 	/* Disallow negation of SYMBOL_REFs or UNSPECs when they
@@ -14651,6 +14682,7 @@ base_type_for_mode (machine_mode mode, bool unsignedp)
     return NULL;
   switch (TREE_CODE (type))
     {
+    case INTCAP_TYPE:
     case INTEGER_TYPE:
     case REAL_TYPE:
       break;
@@ -15467,7 +15499,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
   if (mode != GET_MODE (rtl) && GET_MODE (rtl) != VOIDmode)
     return NULL;
 
-  scalar_addr_mode addr_mode;
+  scalar_addr_mode addr_mode, inner_addr_mode;
   scalar_int_mode int_mode = BImode, inner_mode, op1_mode;
   switch (GET_CODE (rtl))
     {
@@ -15475,6 +15507,14 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case POST_DEC:
     case POST_MODIFY:
       return mem_loc_descriptor (XEXP (rtl, 0), mode, mem_mode, initialized);
+
+    case REPLACE_ADDRESS_VALUE:
+      return mem_loc_descriptor (XEXP (rtl, 1), noncapability_mode (mode),
+				 mem_mode, initialized);
+
+    case CONST_NULL:
+      return mem_loc_descriptor (const0_rtx, noncapability_mode (mode),
+				 mem_mode, initialized);
 
     case SUBREG:
       /* The case of a subreg may arise when we have a local (register)
@@ -15489,26 +15529,27 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case TRUNCATE:
       if (inner == NULL_RTX)
         inner = XEXP (rtl, 0);
+      gcc_assert(! CAPABILITY_MODE_P (mode));
       if (is_a <scalar_int_mode> (mode, &int_mode)
-	  && is_a <scalar_int_mode> (GET_MODE (inner), &inner_mode)
+	  && is_a <scalar_addr_mode> (GET_MODE (inner), &inner_addr_mode)
 	  && (GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
 #ifdef POINTERS_EXTEND_UNSIGNED
 	      || (int_mode == Pmode && mem_mode != VOIDmode)
 #endif
 	     )
-	  && GET_MODE_SIZE (inner_mode) <= DWARF2_ADDR_SIZE)
+	  && GET_NONCAP_MODE_SIZE (inner_addr_mode) <= DWARF2_ADDR_SIZE)
 	{
 	  mem_loc_result = mem_loc_descriptor (inner,
-					       inner_mode,
+					       inner_addr_mode,
 					       mem_mode, initialized);
 	  break;
 	}
       if (dwarf_strict && dwarf_version < 5)
 	break;
       if (is_a <scalar_int_mode> (mode, &int_mode)
-	  && is_a <scalar_int_mode> (GET_MODE (inner), &inner_mode)
-	  ? GET_MODE_SIZE (int_mode) <= GET_MODE_SIZE (inner_mode)
-	  : known_eq (GET_MODE_SIZE (mode), GET_MODE_SIZE (GET_MODE (inner))))
+	  && is_a <scalar_addr_mode> (GET_MODE (inner), &inner_addr_mode)
+	  ? GET_MODE_SIZE (int_mode) <= GET_CAP_MODE_SIZE (inner_addr_mode)
+	  : known_eq (GET_MODE_SIZE (mode), GET_CAP_MODE_SIZE (GET_MODE (inner))))
 	{
 	  dw_die_ref type_die;
 	  dw_loc_descr_ref cvt;
@@ -15524,7 +15565,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	      mem_loc_result = NULL;
 	      break;
 	    }
-	  if (maybe_ne (GET_MODE_SIZE (mode), GET_MODE_SIZE (GET_MODE (inner))))
+	  if (maybe_ne (GET_MODE_SIZE (mode), GET_CAP_MODE_SIZE (GET_MODE (inner))))
 	    cvt = new_loc_descr (dwarf_OP (DW_OP_convert), 0, 0);
 	  else
 	    cvt = new_loc_descr (dwarf_OP (DW_OP_reinterpret), 0, 0);
@@ -15543,12 +15584,12 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
       break;
 
     case REG:
-      if (!is_a <scalar_int_mode> (mode, &int_mode)
-	  || (GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE
+      if (!is_a <scalar_addr_mode> (mode, &addr_mode)
+	  || (GET_NONCAP_MODE_SIZE (addr_mode) > DWARF2_ADDR_SIZE
 	      && rtl != arg_pointer_rtx
 	      && rtl != frame_pointer_rtx
 #ifdef POINTERS_EXTEND_UNSIGNED
-	      && (int_mode != Pmode || mem_mode == VOIDmode)
+	      && (addr_mode != Pmode || mem_mode == VOIDmode)
 #endif
 	      ))
 	{
@@ -15559,6 +15600,10 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	    break;
 	  if (REGNO (rtl) >= FIRST_PSEUDO_REGISTER)
 	    break;
+	  /* MORELLO TODO I believe this can theoretically be a capability, but
+	     not with the current Morello options (i.e. sometime in the future
+	     it could).  */
+	  gcc_assert (!CAPABILITY_MODE_P (mode));
 	  type_die = base_type_for_mode (mode, SCALAR_INT_MODE_P (mode));
 	  if (type_die == NULL)
 	    break;
@@ -15602,6 +15647,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 
     case SIGN_EXTEND:
     case ZERO_EXTEND:
+      gcc_assert (!CAPABILITY_MODE_P (GET_MODE (XEXP (rtl, 0))));
       if (!is_a <scalar_int_mode> (mode, &int_mode)
 	  || !is_a <scalar_int_mode> (GET_MODE (XEXP (rtl, 0)), &inner_mode))
 	break;
@@ -15680,8 +15726,13 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	mem_loc_result = tls_mem_loc_descriptor (rtl);
       if (mem_loc_result != NULL)
 	{
-	  if (!is_a <scalar_int_mode> (mode, &int_mode)
-	      || GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE)
+	  /* This depends on what the "address size" is according
+	     to the dwarf spec.  At the moment, for Morello, the "address size"
+	     is the size of the address value and not the entire size of a
+	     capability.  Hence can't load a full capability onto the address
+	     stack.  */
+	  if (!is_a <scalar_addr_mode> (mode, &addr_mode)
+	      || GET_CAP_MODE_SIZE (addr_mode) > DWARF2_ADDR_SIZE)
 	    {
 	      dw_die_ref type_die;
 	      dw_loc_descr_ref deref;
@@ -15692,7 +15743,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	      if (!GET_MODE_SIZE (mode).is_constant (&size))
 		return NULL;
 	      type_die
-		= base_type_for_mode (mode, SCALAR_INT_MODE_P (mode));
+		= base_type_for_mode (mode, SCALAR_ADDR_MODE_P (mode));
 	      if (type_die == NULL)
 		return NULL;
 	      deref = new_loc_descr (dwarf_OP (DW_OP_deref_type), size, 0);
@@ -15701,12 +15752,12 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	      deref->dw_loc_oprnd2.v.val_die_ref.external = 0;
 	      add_loc_descr (&mem_loc_result, deref);
 	    }
-	  else if (GET_MODE_SIZE (int_mode) == DWARF2_ADDR_SIZE)
+	  else if (GET_CAP_MODE_SIZE (addr_mode) == DWARF2_ADDR_SIZE)
 	    add_loc_descr (&mem_loc_result, new_loc_descr (DW_OP_deref, 0, 0));
 	  else
 	    add_loc_descr (&mem_loc_result,
 			   new_loc_descr (DW_OP_deref_size,
-					  GET_MODE_SIZE (int_mode), 0));
+					  GET_CAP_MODE_SIZE (addr_mode), 0));
 	}
       break;
 
@@ -15720,10 +15771,10 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case CONST:
     case SYMBOL_REF:
     case UNSPEC:
-      if (!is_a <scalar_int_mode> (mode, &int_mode)
-	  || (GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE
+      if (!is_a <scalar_addr_mode> (mode, &addr_mode)
+	  || (GET_NONCAP_MODE_SIZE (addr_mode) > DWARF2_ADDR_SIZE
 #ifdef POINTERS_EXTEND_UNSIGNED
-	      && (int_mode != Pmode || mem_mode == VOIDmode)
+	      && (addr_mode != Pmode || mem_mode == VOIDmode)
 #endif
 	      ))
 	break;
@@ -15758,6 +15809,15 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 
 	  rtl = gen_rtx_CONST (GET_MODE (rtl), rtl);
 	  goto symref;
+	}
+
+      if (GET_CODE (rtl) == CONST
+	  && GET_CODE (XEXP (rtl, 0)) == POINTER_PLUS
+	  && GET_CODE (XEXP (XEXP (rtl, 0), 0)) == CONST_NULL)
+	{
+	  rtx val = XEXP (XEXP (rtl, 0), 1);
+	  return mem_loc_descriptor (val, noncapability_mode (mode), mem_mode,
+				     initialized);
 	}
 
       if (GET_CODE (rtl) == SYMBOL_REF
@@ -15832,12 +15892,15 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	return NULL;
       if (REG_P (ENTRY_VALUE_EXP (rtl)))
 	{
-	  if (!is_a <scalar_int_mode> (mode, &int_mode)
-	      || GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE)
+	  if (!is_a <scalar_addr_mode> (mode, &addr_mode)
+	      || GET_NONCAP_MODE_SIZE (addr_mode) > DWARF2_ADDR_SIZE)
 	    op0 = mem_loc_descriptor (ENTRY_VALUE_EXP (rtl), mode,
 				      VOIDmode, VAR_INIT_STATUS_INITIALIZED);
 	  else
 	    {
+	      /* MORELLO TODO For purecap need to choose capability registers
+	       * when the value is a capability.  Hence dbx_regnum will need to be updated.
+	       * */
               unsigned int dbx_regnum = dbx_reg_number (ENTRY_VALUE_EXP (rtl));
 	      if (dbx_regnum == IGNORED_DWARF_REGNUM)
 		return NULL;
@@ -15908,8 +15971,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	    loc_descr_plus_const (&mem_loc_result, INTVAL (XEXP (rtl, 1)));
 	  else
 	    {
-	      op1 = mem_loc_descriptor (XEXP (rtl, 1), mode, mem_mode,
-					VAR_INIT_STATUS_INITIALIZED);
+	      op1 = mem_loc_descriptor (XEXP (rtl, 1), noncapability_mode (mode),
+					mem_mode, VAR_INIT_STATUS_INITIALIZED);
 	      if (op1 == 0)
 		return NULL;
 	      add_loc_descr (&mem_loc_result, op1);
@@ -16435,10 +16498,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case STRICT_LOW_PART:
     case CONST_VECTOR:
     case CONST_FIXED:
-    case CONST_NULL:
     case CLRSB:
     case CLOBBER:
-    case REPLACE_ADDRESS_VALUE:
     case ALIGN_ADDRESS_DOWN:
       break;
 
@@ -16615,21 +16676,31 @@ static dw_loc_descr_ref
 loc_descriptor (rtx rtl, machine_mode mode,
 		enum var_init_status initialized)
 {
-  /* MORELLO TODO temporarily just using noncapability_mode (mode) here.
-     Eventually, we will need to represent constant addresses as
-     (const:CM (pointer_plus:CM (const_null:CM) (const_int <something>)))
-     but this is not done just yet.
-     When that happens this function will need to handle those patterns, but
-     right now what it gets is a `const_int` with capability mode.
-     To avoid that pattern causing errors we just use the noncapability_mode,
-     since we don't want to change const_int handling here given that it should
-     stay the same when capabilities are around.  */
-  mode = noncapability_mode (mode);
   dw_loc_descr_ref loc_result = NULL;
   scalar_int_mode int_mode;
+  scalar_addr_mode addr_mode;
 
   switch (GET_CODE (rtl))
     {
+    case REPLACE_ADDRESS_VALUE:
+      /* MORELLO TODO In the current state of Morello DWARF we only work with
+	64bit addresses on the dwarf execution stack.  Accordingly there is no DWARF
+	extension to describe the act of having the metadata of a given capability
+	but with another address (since metadata is effectively ignored).
+
+	At some point metadata may start to be included in the DWARF execution stack,
+	and then we will need to find another way to express the REPLACE_ADDRESS_VALUE
+	rtl code.  For now the 64bit address of the result of a REPLACE_ADDRESS_VALUE
+	expression is just its second operand.  */
+      loc_result = loc_descriptor (XEXP (rtl, 1), noncapability_mode (mode),
+				   initialized);
+      break;
+
+    case CONST_NULL:
+      loc_result = loc_descriptor (const0_rtx, noncapability_mode (mode),
+				   initialized);
+      break;
+
     case SUBREG:
       /* The case of a subreg may arise when we have a local (register)
 	 variable or a formal (register) parameter which doesn't quite fill
@@ -16834,6 +16905,15 @@ loc_descriptor (rtx rtl, machine_mode mode,
       break;
 
     case CONST:
+      if (GET_CODE (XEXP (rtl, 0)) == POINTER_PLUS
+	  && GET_CODE (XEXP (XEXP (rtl, 0), 0)) == CONST_NULL)
+	{
+	  rtx val = XEXP (XEXP (rtl, 0), 1);
+	  loc_result = loc_descriptor (val, noncapability_mode (mode),
+				       initialized);
+	  break;
+	}
+
       if (mode == VOIDmode
 	  || CONST_SCALAR_INT_P (XEXP (rtl, 0))
 	  || CONST_DOUBLE_AS_FLOAT_P (XEXP (rtl, 0))
@@ -16848,8 +16928,8 @@ loc_descriptor (rtx rtl, machine_mode mode,
 	break;
       /* FALLTHROUGH */
     case LABEL_REF:
-      if (is_a <scalar_int_mode> (mode, &int_mode)
-	  && GET_MODE_SIZE (int_mode) == DWARF2_ADDR_SIZE
+      if (is_a <scalar_addr_mode> (mode, &addr_mode)
+	  && GET_NONCAP_MODE_SIZE (addr_mode) == DWARF2_ADDR_SIZE
 	  && (dwarf_version >= 4 || !dwarf_strict))
 	{
          loc_result = new_addr_loc_descr (rtl, dtprel_false);
@@ -16862,6 +16942,7 @@ loc_descriptor (rtx rtl, machine_mode mode,
       loc_result = implicit_ptr_descriptor (rtl, 0);
       break;
 
+    case POINTER_PLUS:
     case PLUS:
       if (GET_CODE (XEXP (rtl, 0)) == DEBUG_IMPLICIT_PTR
 	  && CONST_INT_P (XEXP (rtl, 1)))
@@ -16873,9 +16954,9 @@ loc_descriptor (rtx rtl, machine_mode mode,
       /* FALLTHRU */
     do_default:
     default:
-      if ((is_a <scalar_int_mode> (mode, &int_mode)
-	   && GET_MODE (rtl) == int_mode
-	   && GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
+      if ((is_a <scalar_addr_mode> (mode, &addr_mode)
+	   && GET_MODE (rtl) == addr_mode
+	   && GET_NONCAP_MODE_SIZE (addr_mode) <= DWARF2_ADDR_SIZE
 	   && dwarf_version >= 4)
 	  || (!dwarf_strict && mode != VOIDmode && mode != BLKmode))
 	{
@@ -18417,7 +18498,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
 		&& (INTEGRAL_TYPE_P (TREE_TYPE (loc))
 		    || POINTER_TYPE_P (TREE_TYPE (loc)))
 		&& DECL_CONTEXT (loc) == current_function_decl
-		&& (GET_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (TREE_TYPE (loc)))
+		&& (GET_NONCAP_MODE_SIZE (SCALAR_ADDR_TYPE_MODE (TREE_TYPE (loc)))
 		    <= DWARF2_ADDR_SIZE))
 	      {
 		dw_die_ref ref = lookup_decl_die (loc);
@@ -19604,6 +19685,9 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
 {
   switch (GET_CODE (rtl))
     {
+    case CONST_NULL:
+      return add_const_value_attribute (die, const0_rtx);
+
     case CONST_INT:
       {
 	HOST_WIDE_INT val = INTVAL (rtl);
@@ -19708,6 +19792,9 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
     case CONST:
       if (CONSTANT_P (XEXP (rtl, 0)))
 	return add_const_value_attribute (die, XEXP (rtl, 0));
+      if (GET_CODE (XEXP (rtl, 0)) == POINTER_PLUS
+	  && GET_CODE (XEXP (XEXP (rtl, 0), 0)) == CONST_NULL)
+	return add_const_value_attribute (die, XEXP (XEXP (rtl, 0), 1));
       /* FALLTHROUGH */
     case SYMBOL_REF:
       if (!const_ok_for_output (rtl))
@@ -19738,7 +19825,6 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
     case MINUS:
     case SIGN_EXTEND:
     case ZERO_EXTEND:
-    case CONST_NULL:
     case CONST_POLY_INT:
       return false;
 
@@ -25648,6 +25734,17 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
       TREE_ASM_WRITTEN (type) = 1;
 
       /* fallthrough */
+    /* MORELLO TODO
+       When emitting debug information for `fake-cap`, selecting the TREE_TYPE
+	of an INTCAP_TYPE is exactly what we want.  For pure capability we need to emit
+	a DWA_ATE_CHERI_signed_intcap or DWA_ATE_CHERI_unsigned_intcap base type node
+	instead.
+
+	That node is not available on a standard AArch64 linux distro, so we
+	want to avoid using it for `fake-capability`.  Hence this bit needs an `if:
+	(fake-capability)` clause of some sort.  See the comments in
+	dwarf2out_do_cfi_startproc and is_base_type for other places this is needed.
+	*/
     case INTCAP_TYPE:
       /* For these types, all that is required is that we output a DIE (or a
 	 set of DIEs) to represent the "basis" type.  */

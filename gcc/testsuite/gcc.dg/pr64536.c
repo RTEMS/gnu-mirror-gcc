@@ -41,6 +41,7 @@ bar (int x)
 	    }
 	  else
 	    i = (long *) (h->q = *f);
+	    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
 	  *c++ = (long) f;
 	  e += 6;
 	}
@@ -55,6 +56,7 @@ bar (int x)
 	    }
 	  else
 	    i = (long *) (h->q = *f);
+	    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
 	  *c++ = (long) f;
 	  e += 6;
 	}

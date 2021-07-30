@@ -1,4 +1,5 @@
 /* { dg-additional-options "-O0 -fsanitize=undefined" } */
+/* { dg-skip-if "Sanitizers and capabilities disabled for now" { aarch64_capability_any } } */
 
 extern char *foo (char *dest, const char *src)
   __attribute__ ((__nonnull__ (1, 2)));

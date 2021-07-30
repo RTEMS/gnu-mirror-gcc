@@ -726,6 +726,10 @@ struct GTY(()) rtx_note : public rtx_insn
 #define PUT_CODE(RTX, CODE) ((RTX)->code = (CODE))
 
 #define GET_MODE(RTX)		((machine_mode) (RTX)->mode)
+#define GET_NONCAP_MODE_SIZE(mode) GET_MODE_SIZE (offset_mode (mode))
+#define GET_CAP_MODE_SIZE(mode) (CAPABILITY_MODE_P (mode) \
+	? ((unsigned short)mode_to_bytes (mode).coeffs[0]) \
+	: GET_MODE_SIZE (mode))
 
 /* Assert than the provided CODE is suitable for the given MODE.
    At the moment this only provides checks for MODE_CAPABILITY modes.  */
@@ -3324,16 +3328,14 @@ extern rtx convert_memory_address_addr_space_1 (scalar_addr_mode, rtx,
 						addr_space_t, bool, bool);
 extern rtx convert_memory_address_addr_space (scalar_addr_mode, rtx,
 					      addr_space_t);
-/* MORELLO TODO
-   We should change this predication such that we only keep these versions if
-   *both* of the below hold.
+
+/* We keep these versions if *both* of the below hold.
      - IN_TARGET_CODE
      - POmode is used by this target
-
    If the target uses Pmode then it is expected to use these functions with
-   full knowledge of the distinction between addresses and integers.
-*/
-#if !defined(IN_TARGET_CODE)
+   full knowledge of the distinction between addresses and integers.  */
+
+#if !(defined(IN_TARGET_CODE) && defined(POmode))
 extern rtx convert_memory_address_addr_space_1
 		(scalar_int_mode, rtx, addr_space_t, bool, bool) = delete;
 extern rtx convert_memory_address_addr_space
@@ -3527,7 +3529,8 @@ extern rtx set_for_reg_notes (rtx);
 extern rtx set_unique_reg_note (rtx, enum reg_note, rtx);
 extern rtx set_dst_reg_note (rtx, enum reg_note, rtx, rtx);
 extern void set_insn_deleted (rtx_insn *);
-extern void check_pointer_offset_modes (scalar_addr_mode, rtx, rtx offset);
+extern void check_pointer_offset_modes (scalar_addr_mode, rtx, rtx offset,
+					bool strict);
 
 /* Functions in rtlanal.c */
 

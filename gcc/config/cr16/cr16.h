@@ -546,7 +546,7 @@ struct cumulative_args
 
 #define STORE_FLAG_VALUE  1
 
-#define Pmode SImode
+#define POmode SImode
 
 #define FUNCTION_MODE QImode
 

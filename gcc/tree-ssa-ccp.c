@@ -1636,6 +1636,8 @@ bit_value_binop (enum tree_code code, tree type, tree rhs1, tree rhs2)
 	 At the moment we early exit because the existing code doesn't handle
 	 overflow into the metadata bits of a capability.  Nothing fundamental
 	 stopping introducing such handling and allowing this case.  */
+      || (code == POINTER_DIFF_EXPR
+	      && (capability_type_p (TREE_TYPE (rhs1)) || capability_type_p (TREE_TYPE (rhs2))))
       || (code == POINTER_PLUS_EXPR && capability_type_p (type)))
     {
       val.lattice_val = VARYING;

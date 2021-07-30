@@ -93,6 +93,21 @@ when the relevant string is @code{NULL}.",
  bool, (rtx x, unsigned int size, int aligned_p),
  default_assemble_integer)
 
+DEFHOOK
+(capability,
+ "This hook outputs a capability.  @var{x} is the object's value, @var{size}\n\
+is its size in bytes, and @var{aligned_p} indicates whether it is aligned.\n\
+The function should return @code{true} if it was able to output the\n\
+object.  If it returns false, @code{assemble_capability} will fail.\n\
+\n\
+There is no default implementation of this hook, and it must be implemented\n\
+to use capabilities for a backend.\n\
+\n\
+Even if the current target does not use the REPLACE_ADDRESS_VALUE RTL code\n\
+this function will be given that code, so it must be handled by this hook.",
+ bool, (rtx x, unsigned int size, int aligned_p),
+ NULL)
+
 /* Assembly strings required after the .cfi_startproc label.  */
 DEFHOOK
 (post_cfi_startproc,

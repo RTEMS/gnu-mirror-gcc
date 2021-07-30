@@ -47,6 +47,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h"
 
 static tree handle_packed_attribute (tree *, tree, tree, int, bool *);
+static tree handle_cheri_capability_attribute (tree *, tree, tree, int, bool *);
+static tree handle_cheri_no_provenance_attribute (tree *,
+						  tree, tree, int, bool *);
 static tree handle_nocommon_attribute (tree *, tree, tree, int, bool *);
 static tree handle_common_attribute (tree *, tree, tree, int, bool *);
 static tree handle_hot_attribute (tree *, tree, tree, int, bool *);
@@ -255,6 +258,13 @@ const struct attribute_spec c_common_attribute_table[] =
   { "packed",                 0, 0, false, false, false, false,
 			      handle_packed_attribute,
 	                      attr_aligned_exclusions },
+  /* MORELLO TODO: The `affects_type_identity` has been set to true based on
+     what is done in `attribs.c:comp_type_attributes`, but it is also used in
+     the C++ frontend. Re-examine this when enabling C++.  */
+  { "cheri_capability",       0, 0, false, true, false, true,
+			      handle_cheri_capability_attribute, NULL },
+  { "cheri_no_provenance",    0, 0, false, true, false, false,
+			      handle_cheri_no_provenance_attribute, NULL },
   { "nocommon",               0, 0, true,  false, false, false,
 			      handle_nocommon_attribute,
 	                      attr_common_exclusions },
@@ -761,6 +771,107 @@ handle_packed_attribute (tree *node, tree name, tree ARG_UNUSED (args),
       warning (OPT_Wattributes, "%qE attribute ignored", name);
       *no_add_attrs = true;
     }
+
+  return NULL_TREE;
+}
+
+static tree
+handle_cheri_no_provenance_attribute (tree *node, tree name,
+				      tree ARG_UNUSED (args),
+				      int ARG_UNUSED (flags),
+				      bool *no_add_attrs)
+{
+  gcc_assert (TYPE_P (*node));
+
+  if (!INTCAP_TYPE_P (*node))
+    {
+      error ("%qE attribute invalid for type %qT", name, *node);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  if (lookup_attribute (IDENTIFIER_POINTER (name),
+			TYPE_ATTRIBUTES (*node)))
+    return error_mark_node;
+
+  return name;
+}
+
+static tree
+handle_cheri_capability_attribute (tree *node, tree ARG_UNUSED (name),
+				   tree ARG_UNUSED (args),
+				   int flags, bool *no_add_attrs)
+{
+  *no_add_attrs = true;
+
+  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode ();
+  if (opt_cap_mode.exists ())
+    {
+      scalar_addr_mode cap_mode = opt_cap_mode.require();
+
+      /* Scan down the tree *node and find how many
+	 POINTER_TYPE_P nodes there are in the chain.  */
+      int capability_pointer_depth = 1, c = 1;
+      tree temp_tree = *node;
+
+      bool found = false;
+      while (temp_tree)
+	{
+	  /* MORELLO TODO: Here we could also use POINTER_TYPE_P, but that also
+	     includes REFERENCE_TYPE which would then need a call to
+	     `build_reference_type_for_mode`. I have not included this for now
+	     but it may be needed in the future for C++ frontend support.  */
+	  if (TREE_CODE (temp_tree) == POINTER_TYPE)
+	    {
+	      /* Find at what pointer depth we want to apply the __capability
+		 attribute and store it in capability_pointer_depth:
+		 1) If given flag ATTR_FLAG_CHERI_INNER_APPLY, that
+		    depth is the always the deepest one in the chain (always
+		    update capability_pointer_depth from counter c).
+		 2) If no ATTR_FLAG_CHERI_INNER_APPLY flag has been given,
+		    apply to the first first POINTER_TYPE in the chain.  */
+	      if (flags & ATTR_FLAG_CHERI_INNER_APPLY)
+		{
+		  capability_pointer_depth = c;
+		  found = true;
+		}
+	      else
+		{
+		  if (found == false)
+		    capability_pointer_depth = c;
+		  found = true;
+		}
+	    }
+	  c++;
+	  temp_tree = TREE_TYPE (temp_tree);
+	}
+
+      if (!found)
+	{
+	  error_at (input_location, "__capability only applies to pointers");
+	  return NULL_TREE;
+	}
+
+      /* Now get a pointer to the tree in the *node chain given by
+	 capability_pointer_depth and assert that it is correctly a
+	 POINTER_TYPE_P.  */
+      tree *treetoedit = node;
+      for (int i = 1; i < capability_pointer_depth; i++)
+	treetoedit = &TREE_TYPE (*node);
+      gcc_assert (TREE_CODE (*treetoedit) == POINTER_TYPE);
+
+      /* Call build_pointer_type_for_mode to create a Capability Pointer
+      to whatever is being referenced by (*treetoedit).  Then use
+      build_type_attribute_qual_variant to reapply the qualifiers and
+      attributes of the original pointer type.  */
+      (*treetoedit) = build_type_attribute_qual_variant
+		      (build_pointer_type_for_mode (TREE_TYPE (*treetoedit),
+						    cap_mode, true),
+					TYPE_ATTRIBUTES (*treetoedit),
+					TYPE_QUALS (*treetoedit));
+    }
+  else
+    error ("__capability attribute is not supported for this architecture");
 
   return NULL_TREE;
 }
@@ -1734,6 +1845,8 @@ handle_mode_attribute (tree *node, tree name, tree args,
 	mode = word_mode;
       else if (!strcmp (p, "pointer"))
 	mode = ptr_mode;
+      else if (!strcmp (p, "address"))
+	mode = offset_mode (ptr_mode);
       else if (!strcmp (p, "libgcc_cmp_return"))
 	mode = targetm.libgcc_cmp_return_mode ();
       else if (!strcmp (p, "libgcc_shift_count"))

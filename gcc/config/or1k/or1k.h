@@ -293,7 +293,7 @@ do {                                                    \
 #define TRAMPOLINE_ALIGNMENT 32
 
 /* Pointer mode */
-#define Pmode SImode
+#define POmode SImode
 #define FUNCTION_MODE SImode
 #define STACK_POINTER_REGNUM SP_REGNUM
 #define FRAME_POINTER_REGNUM SFP_REGNUM

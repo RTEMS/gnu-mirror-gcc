@@ -90,7 +90,7 @@
 #define PTRDIFF_TYPE (TARGET_ABI64 ? "long int" : "int")
 
 #define POINTER_SIZE (TARGET_ABI64 ? 64 : 32)
-#define Pmode (TARGET_ABI64 ? DImode : SImode)
+#define POmode (TARGET_ABI64 ? DImode : SImode)
 #define STACK_SIZE_MODE Pmode
 
 #define TARGET_SM35 (ptx_isa_option >= PTX_ISA_SM35)

@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-O3 -fopenmp-simd -march=armv8-a+sve -fstack-clash-protection --param stack-clash-protection-guard-size=16 -funwind-tables" } */
 /* { dg-require-effective-target supports_stack_clash_protection } */
 

@@ -7036,7 +7036,12 @@
    (clobber (match_scratch:<P_OF_PTR> 1 "=r"))
    (use (reg:<P_OF_PTR> FP_REGNUM))]
   "TARGET_TLS_DESC && !TARGET_SVE"
-  "adrp\\tx0, %A0\;ldr\\t%<w>1, [x0, #%L0]\;add\\t<w>0, <w>0, %L0\;.tlsdesccall\\t%0\;blr\\t%1"
+  {
+    if (<MODE>mode == CADImode)
+      return "adrp\\tx0, %A0\;ldr\\t%<w>1, [x0, #%L0]\;add\\tx0, x0, %L0\;.tlsdesccall\\t%0\;blr\\t%1";
+    else
+      return "adrp\\tx0, %A0\;ldr\\t%<w>1, [x0, #%L0]\;add\\t<w>0, <w>0, %L0\;.tlsdesccall\\t%0\;blr\\t%1";
+  }
   [(set_attr "type" "call")
    (set_attr "length" "16")])
 

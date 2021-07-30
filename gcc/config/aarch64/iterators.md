@@ -48,8 +48,14 @@
 ;; Iterator for all integer modes (up to 64-bit)
 (define_mode_iterator ALLI [QI HI SI DI])
 
+;; Iterator for all integer modes (up to 64-bit) and Capability Mode
+(define_mode_iterator ALLIC [QI HI SI DI (CADI "TARGET_CAPABILITY_ANY")])
+
 ;; Iterator for all integer modes (up to 128-bit)
 (define_mode_iterator ALLI_TI [QI HI SI DI TI])
+
+;; Iterator for all integer modes (up to 128-bit) and Capability Mode
+(define_mode_iterator ALLI_TIC [QI HI SI DI (CADI "TARGET_CAPABILITY_ANY") TI])
 
 ;; Iterator for all integer modes that can be extended (up to 64-bit)
 (define_mode_iterator ALLX [QI HI SI])
@@ -869,6 +875,22 @@
     UNSPECV_ATOMIC_LDOP_BIC	; Represent an atomic load-bic
     UNSPECV_ATOMIC_LDOP_XOR	; Represent an atomic load-xor
     UNSPECV_ATOMIC_LDOP_PLUS	; Represent an atomic load-add
+
+    UNSPECV_ATOMIC_CAPABILITY_PLUS   ; Represent an atomic plus operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_MINUS  ; Represent an atomic minus operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_IOR    ; Represent an atomic ior operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_XOR    ; Represent an atomic xor operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_AND    ; Represent an atomic and operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_NAND   ; Represent an atomic nand operation
+				     ; on a capability type.
+    UNSPECV_ATOMIC_CAPABILITY_SET    ; Represent a special set operation on a
+				     ; capability type (for oprand 1 of
+				     ; aarch64_<op>_fetch patterns.)
 ])
 
 ;; -------------------------------------------------------------------
@@ -881,22 +903,26 @@
 ; Morello: map PTR -> P
 (define_mode_attr P_OF_PTR [(SI "DI") (DI "DI") (CADI "CADI")])
 
-; Morello: offset_mode of PTR iterator
-(define_mode_attr PTR_OFF [(SI "SI") (DI "DI") (CADI "DI")])
+; Morello: offset_mode of PTR or ALLI and ALLI_TI iterators
+(define_mode_attr PTR_OFF [(QI "QI") (HI "HI") (SI "SI") (DI "DI")
+			   (CADI "DI") (TI "TI")])
 
 ;; "e" for signaling operations, "" for quiet operations.
 (define_mode_attr e [(CCFP "") (CCFPE "e")])
 
 ;; In GPI templates, a string like "%<w>0" will expand to "%w0" in the
 ;; 32-bit version and "%x0" in the 64-bit version.
-;;
-;; MORELLO TODO: revisit this for PURECAP.
+;; MORELLO TODO Need to figure out how to handle this iterator for
+;; tlsdesc_small_advsimd_<mode> in pure capability.
+;;   First thing to check is whether that pattern is even what we want for
+;;   purecap, since there may be a different TLS approach for PureCap.
 (define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")
-		     (CADI "x")])
+		     (CADI "")])
 
 ;; The size of access, in bytes.
-;; MORELLO TODO: revisit this for PURECAP.
-;; (right for fake-capability, wrong for purecap).
+;; Morello TODO: this is right for fake capabilities but wrong for PureCap.
+;; Doesn't really matter since this iterator is only used for scheduling and
+;; that's a performance thing.
 (define_mode_attr ldst_sz [(SI "4") (DI "8") (CADI "8")])
 ;; Likewise for load/store pair.
 (define_mode_attr ldpstp_sz [(SI "8") (DI "16")])
@@ -1450,7 +1476,7 @@
 
 ;; Mode for atomic operation suffixes
 (define_mode_attr atomic_sfx
-  [(QI "b") (HI "h") (SI "") (DI "")])
+  [(QI "b") (HI "h") (SI "") (DI "") (CADI "")])
 
 (define_mode_attr fcvt_target [(V2DF "v2di") (V4SF "v4si") (V2SF "v2si")
 			       (V2DI "v2df") (V4SI "v4sf") (V2SI "v2sf")
@@ -2033,7 +2059,8 @@
   (and "<lconst_atomic>")])
 
 ;; Attribute to describe constants acceptable in atomic logical operations
-(define_mode_attr lconst_atomic [(QI "K") (HI "K") (SI "K") (DI "L")])
+(define_mode_attr lconst_atomic [(QI "K") (HI "K") (SI "K") (DI "L")
+				 (CADI "L")])
 
 ;; The integer SVE instruction that implements an rtx code.
 (define_code_attr sve_int_op [(plus "add")
@@ -2719,6 +2746,33 @@
 (define_int_attr atomic_ldoptab
  [(UNSPECV_ATOMIC_LDOP_OR "ior") (UNSPECV_ATOMIC_LDOP_BIC "bic")
   (UNSPECV_ATOMIC_LDOP_XOR "xor") (UNSPECV_ATOMIC_LDOP_PLUS "add")])
+
+(define_int_iterator ATOMIC_CAPOP
+ [UNSPECV_ATOMIC_CAPABILITY_PLUS UNSPECV_ATOMIC_CAPABILITY_MINUS
+  UNSPECV_ATOMIC_CAPABILITY_IOR UNSPECV_ATOMIC_CAPABILITY_XOR
+  UNSPECV_ATOMIC_CAPABILITY_AND])
+
+(define_int_attr atomic_capopcode
+  [(UNSPECV_ATOMIC_CAPABILITY_IOR "IOR") (UNSPECV_ATOMIC_CAPABILITY_XOR "XOR")
+   (UNSPECV_ATOMIC_CAPABILITY_AND "AND") (UNSPECV_ATOMIC_CAPABILITY_PLUS "PLUS")
+   (UNSPECV_ATOMIC_CAPABILITY_MINUS "MINUS")])
+
+(define_int_attr atomic_capopconst_operand
+  [(UNSPECV_ATOMIC_CAPABILITY_IOR "L") (UNSPECV_ATOMIC_CAPABILITY_XOR "L")
+   (UNSPECV_ATOMIC_CAPABILITY_AND "L") (UNSPECV_ATOMIC_CAPABILITY_PLUS "IJ")
+   (UNSPECV_ATOMIC_CAPABILITY_MINUS "IJ")])
+
+(define_int_attr atomic_capoptab
+  [(UNSPECV_ATOMIC_CAPABILITY_IOR "or") (UNSPECV_ATOMIC_CAPABILITY_XOR "xor")
+   (UNSPECV_ATOMIC_CAPABILITY_AND "and") (UNSPECV_ATOMIC_CAPABILITY_PLUS "add")
+   (UNSPECV_ATOMIC_CAPABILITY_MINUS "sub")])
+
+(define_int_attr atomic_capop_operand
+  [(UNSPECV_ATOMIC_CAPABILITY_IOR "aarch64_logical_operand")
+   (UNSPECV_ATOMIC_CAPABILITY_XOR "aarch64_logical_operand")
+   (UNSPECV_ATOMIC_CAPABILITY_AND "aarch64_logical_operand")
+   (UNSPECV_ATOMIC_CAPABILITY_PLUS "aarch64_plus_operand")
+   (UNSPECV_ATOMIC_CAPABILITY_MINUS "aarch64_plus_operand")])
 
 ;; -------------------------------------------------------------------
 ;; Int Iterators Attributes.

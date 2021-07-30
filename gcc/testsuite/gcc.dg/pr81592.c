@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! aarch64_capability_any } } } */
 /* { dg-options "-O2 -Wall -fno-strict-overflow  -Wstrict-overflow=2 -fsanitize=signed-integer-overflow" } */
 
 #include <stdio.h>

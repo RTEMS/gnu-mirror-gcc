@@ -3641,11 +3641,8 @@ verify_gimple_assign_unary (gassign *stmt)
 
 	/* Only allow conversions from INTCAP_TYPE to integral type if there is
 	   no sign or zero extension involved.  */
-	if ((INTCAP_TYPE_P (lhs_type)
-	     && INTEGRAL_TYPE_P (rhs1_type))
-	    || (INTCAP_TYPE_P (rhs1_type)
-		&& INTEGRAL_TYPE_P (lhs_type)
-		&& (TYPE_NONCAP_PRECISION (rhs1_type) >= TYPE_PRECISION (lhs_type))))
+	if (INTCAP_TYPE_P (rhs1_type) && INTEGRAL_TYPE_P (lhs_type)
+	    && (TYPE_PRECISION (lhs_type) <= TYPE_NONCAP_PRECISION (rhs1_type)))
 	  return false;
 
 	/* Allow conversions from INTCAP_TYPE to POINTER_TYPE if the precisions
@@ -3989,7 +3986,7 @@ verify_gimple_assign_binary (gassign *stmt)
 	    || TYPE_MODE (rhs1_type) != TYPE_MODE (rhs2_type)
 	    || TREE_CODE (lhs_type) != INTEGER_TYPE
 	    || TYPE_UNSIGNED (lhs_type)
-	    || TYPE_PRECISION (lhs_type) != TYPE_PRECISION (rhs1_type))
+	    || TYPE_NONCAP_PRECISION (lhs_type) != TYPE_NONCAP_PRECISION (rhs1_type))
 	  {
 	    error ("type mismatch in %qs", code_name);
 	    debug_generic_stmt (lhs_type);

@@ -16,6 +16,7 @@ static inline struct A* get (const struct P *p)
     return 0;
 
   return (struct A*)((uintptr_t)p + p->d);
+  /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 static inline void set (struct P *p, struct A* q)

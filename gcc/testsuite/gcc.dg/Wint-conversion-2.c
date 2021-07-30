@@ -8,5 +8,9 @@ void *a, *b;
 void f (void)
 {
   long unsigned int c = 0;
-  memcpy (a, b, c); /* { dg-warning "passing argument" } */
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  memcpy (a, b, (__intcap_t) c); /* { dg-warning "passing argument" "" { target { aarch64_capability_any } } } */
+#else
+  memcpy (a, b, c); /* { dg-warning "passing argument" "" { target { ! aarch64_capability_any } } } */
+#endif
 }

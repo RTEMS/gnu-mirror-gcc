@@ -12,6 +12,16 @@ fn1 (int *p)
   return p;
 }
 
+#ifdef __GCC_ARM_CAPABILITY_ANY
+int *
+fn2 (int i)
+{
+  int *p = (__intcap_t) i;
+  p = (__intcap_t) i;
+  fn1 ((__intcap_t) i);
+  return (__intcap_t) i;
+}
+#else
 int *
 fn2 (int i)
 {
@@ -20,3 +30,4 @@ fn2 (int i)
   fn1 (i);
   return i;
 }
+#endif

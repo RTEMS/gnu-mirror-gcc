@@ -1,4 +1,4 @@
-/* { dg-do compile { target aarch64-*-* } } */
+/* { dg-do compile { target { { aarch64-*-* } && { ! aarch64_capability_any } } } } */
 /* { dg-options "-O2" } */
 /*
    Tests are:

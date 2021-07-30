@@ -707,10 +707,12 @@ ipa_param_adjustments::modify_call (gcall *stmt,
 		  deref_base = true;
 		  deref_align = TYPE_ALIGN (TREE_TYPE (base));
 		}
-	      off = build_int_cst (apm->alias_ptr_type,
+	      off = build_int_cst (noncapability_type (apm->alias_ptr_type),
 				   base_offset + apm->unit_offset);
-	      off = int_const_binop (PLUS_EXPR, TREE_OPERAND (base, 1),
-				     off);
+	      off = int_const_binop
+		      (PLUS_EXPR,
+		       fold_drop_capability (TREE_OPERAND (base, 1)), off);
+	      off = fold_convert_for_mem_ref (apm->alias_ptr_type, off);
 	      base = TREE_OPERAND (base, 0);
 	    }
 	  else
