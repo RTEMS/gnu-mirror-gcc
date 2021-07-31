@@ -5886,17 +5886,6 @@ Using the hook is usually simpler because it limits the number of
 files that are recompiled when changes are made.
 @end deftypefn
 
-@deftypefn {Target Hook} bool TARGET_MD_ASM_OPERAND_P (rtx @var{op}, const char *@var{constraint}, const char **@var{constraints})
-This hook should return true if the operand is valid for being used in
-an asm statement.  The back end may impose additionsl constraints on
-what operands are valid for an asm statement.  The default behavior is
-to return true always.
-
-For example, the PowerPC has normal memory instructions and prefixed
-memory instructions.  Prefixed memory instructions are not valid for
-the normal @samp{%m} constraint.
-@end deftypefn
-
 @defmac TARGET_MEM_CONSTRAINT
 A single character to be used instead of the default @code{'m'}
 character for general memory addresses.  This defines the constraint
