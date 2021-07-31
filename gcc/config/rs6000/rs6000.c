@@ -1196,6 +1196,8 @@ static bool rs6000_secondary_reload_move (enum rs6000_reg_type,
 					  bool);
 rtl_opt_pass *make_pass_analyze_swaps (gcc::context*);
 
+static bool rs6000_asm_operand_p (rtx, const char *, const char **);
+
 /* Hash table stuff for keeping track of TOC entries.  */
 
 struct GTY((for_user)) toc_hash_struct
@@ -1638,6 +1640,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P rs6000_legitimate_address_p
+
+#undef TARGET_MD_ASM_OPERAND_P
+#define TARGET_MD_ASM_OPERAND_P rs6000_asm_operand_p
 
 #undef TARGET_MODE_DEPENDENT_ADDRESS_P
 #define TARGET_MODE_DEPENDENT_ADDRESS_P rs6000_mode_dependent_address_p
@@ -9919,6 +9924,29 @@ rs6000_offsettable_memref_p (rtx op, machine_mode reg_mode, bool strict)
 		|| GET_MODE_SIZE (reg_mode) == 4);
   return rs6000_legitimate_offset_address_p (GET_MODE (op), XEXP (op, 0),
 					     strict, worst_case);
+}
+
+/* Add additional constraints for asm operands.  We use it to prevent
+   prefixed loads/stores from appearing in normal asm statements.
+
+   At the moment, we just ban all prefixed loads/stores.  If we add a
+   constraint specifically for prefixed loads/stores, we might need to scan the
+   constraint string for that constraint.  */
+
+static bool
+rs6000_asm_operand_p (rtx op,
+		      const char *constraint ATTRIBUTE_UNUSED,
+		      const char **constraints ATTRIBUTE_UNUSED)
+{
+  if (TARGET_PREFIXED && MEM_P (op))
+    {
+      rtx addr = XEXP (op, 0);
+      machine_mode mode = GET_MODE (op);
+      if (address_is_prefixed (addr, mode, NON_PREFIXED_DEFAULT))
+	return false;
+    }
+
+  return true;
 }
 
 /* Determine the reassociation width to be used in reassociate_bb.
