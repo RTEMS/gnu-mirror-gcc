@@ -2174,6 +2174,10 @@ asm_operand_ok (rtx op, const char *constraint, const char **constraints)
   /* Use constrain_operands after reload.  */
   gcc_assert (!reload_completed);
 
+  /* Allow the backend to impose additional constraints.  */
+  if (!targetm.md_asm_operand_p (op, constraint, constraints))
+    return 0;
+
   /* Empty constraint string is the same as "X,...,X", i.e. X for as
      many alternatives as required to match the other operands.  */
   if (*constraint == '\0')
