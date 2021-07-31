@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_TARGHOOKS_H
 
 extern bool default_legitimate_address_p (machine_mode, rtx, bool);
-extern bool default_md_asm_operand_p (rtx, const char *, const char **);
 
 extern void default_external_libcall (rtx);
 extern rtx default_legitimize_address (rtx, rtx, machine_mode);
