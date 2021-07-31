@@ -4066,6 +4066,8 @@ accept.
 
 @hook TARGET_LEGITIMATE_ADDRESS_P
 
+@hook TARGET_MD_ASM_OPERAND_P
+
 @defmac TARGET_MEM_CONSTRAINT
 A single character to be used instead of the default @code{'m'}
 character for general memory addresses.  This defines the constraint
