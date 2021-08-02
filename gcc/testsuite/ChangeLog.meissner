@@ -1,4 +1,9 @@
+work062.patch003:
+2021-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/98519
+	* gcc.target/powerpc/pr98519.c: New test.
+
 2021-07-30   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-

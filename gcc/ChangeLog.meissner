@@ -1,3 +1,60 @@
+work062.patch003:
+2021-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/98519
+	* config/rs6000/constraints.md (top level): Adjust comment about
+	the available unused constraints.
+	(constraint "m").  New constraint.
+	* config/rs6000/rs6000.h (TARGET_MEM_CONSTRAINT): Define, making
+	'k' the new memory cosntraint.
+	* config/rs6000/rs6000.md (ptrm): Use "k" instead of "m".
+	(zero_extendqi<mode>2): Likewise.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendhi<mode>2): Likewise.
+	(signbit<mode>2_dm_mem): Likewise.
+	(floatdidf2_mem): Likewise.
+	(floatunsdidf2_mem): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatunsdisf2_mem): Likewise.
+	(movsi_internal1): Likewise.
+	(movdi_from_sf_zero_ext): Likewise.
+	(mov<mode>_internal, QHI iterator): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_64bit_dm): Likewise.
+	(movtd_64bit_nodm): Likewise.
+	(mov<mode>_32bit. FMOVE128 iterator): Likewise.
+	(extenddf<mode>2, IBM128 iterator): Likewise.
+	(extendtf<mode>2): Likewise.
+	(reload_<mode>_load): Likewise.
+	(reload_<RELOAD:mode>_<P:mptrsize>_load): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	(pltseq_tocsave_<mode>): Likewise.
+	(probe_stack_<mode>): Likewise.
+	(stack_protect_setsi): Likewise.
+	(stack_protect_testsi): Likewise.
+	(crsave): Likewise.
+	(stmw): Likewise.
+	(save_gpregs_<mode>_r11): Likewise.
+	(save_gpregs_<mode>_r12): Likewise.
+	(save_gpregs_<mode>_r1): Likewise.
+	(save_fpregs_<mode>_r11): Likewise.
+	(save_fpregs_<mode>_r12): Likewise.
+	(save_fpregs_<mode>_r1): Likewise.
+	(mtcrfsi): Likewise.
+	(restore_gpregs_<mode>_r11): Likewise.
+	(restore_gpregs_<mode>_r12): Likewise.
+	(restore_gpregs_<mode>_r1): Likewise.
+	(return_and_restore_gpregs): Likewise.
+	(return_and_restore_fpregs): Likewise.
+	(hashst): Likewise.
+	(hashchk): Likewise.
+
 2021-07-30   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
