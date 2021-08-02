@@ -110,13 +110,6 @@ default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
 #endif
 }
 
-bool default_md_asm_operand_p (rtx op ATTRIBUTE_UNUSED,
-			       const char *constraint ATTRIBUTE_UNUSED,
-			       const char **constraints ATTRIBUTE_UNUSED)
-{
-  return true;
-}
-
 void
 default_external_libcall (rtx fun ATTRIBUTE_UNUSED)
 {

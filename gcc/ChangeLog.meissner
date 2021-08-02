@@ -1,21 +1,3 @@
-work062-patch002:
-2021-07-31  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/98519
-	* config/rs6000/rs6000.c (rs6000_asm_operand_p): New function.
-	(TARGET_MD_ASM_OPERAND_P): Override md_asm_operand_p hook.
-
-work062-patch001:
-2021-07-31  Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/98519
-	* doc/tm.texi (TARGET_MD_ASM_OPERAND_P): Document.
-	* doc/tm.texi.in (TARGET_MD_ASM_OPERAND_P): Document.
-	* target.def (md_asm_operand_p): New target hook.
-	* targhooks.c (default_md_asm_operand_p): New default target
-	hook.
-	* targhooks.h (default_md_asm_operand_p): New declaration.
-
 2021-07-30   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
