@@ -271,8 +271,8 @@
 })
 
 (define_insn_and_split "*movoo"
-  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,m,wa")
-	(match_operand:OO 1 "input_operand" "m,wa,wa"))]
+  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,k,wa")
+	(match_operand:OO 1 "input_operand" "k,wa,wa"))]
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], OOmode)
        || gpc_reg_operand (operands[1], OOmode))"
@@ -303,8 +303,8 @@
 })
 
 (define_insn_and_split "*movxo"
-  [(set (match_operand:XO 0 "nonimmediate_operand" "=d,m,d")
-	(match_operand:XO 1 "input_operand" "m,d,d"))]
+  [(set (match_operand:XO 0 "nonimmediate_operand" "=d,k,d")
+	(match_operand:XO 1 "input_operand" "k,d,d"))]
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
@@ -337,8 +337,8 @@
 
 (define_insn_and_split "*vsx_assemble_pair"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
-	(unspec:OO [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
-		    (match_operand:V16QI 2 "mma_assemble_input_operand" "mwa")]
+	(unspec:OO [(match_operand:V16QI 1 "mma_assemble_input_operand" "kwa")
+		    (match_operand:V16QI 2 "mma_assemble_input_operand" "kwa")]
 		    UNSPEC_MMA_ASSEMBLE))]
   "TARGET_MMA"
   "#"
@@ -368,7 +368,7 @@
 })
 
 (define_insn_and_split "*vsx_disassemble_pair"
-  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=mwa")
+  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=kwa")
        (unspec:V16QI [(match_operand:OO 1 "vsx_register_operand" "wa")
 		      (match_operand 2 "const_0_to_1_operand")]
 		      UNSPEC_MMA_EXTRACT))]
@@ -403,10 +403,10 @@
 
 (define_insn_and_split "*mma_assemble_acc"
   [(set (match_operand:XO 0 "fpr_reg_operand" "=d")
-	(unspec:XO [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
-		    (match_operand:V16QI 2 "mma_assemble_input_operand" "mwa")
-		    (match_operand:V16QI 3 "mma_assemble_input_operand" "mwa")
-		    (match_operand:V16QI 4 "mma_assemble_input_operand" "mwa")]
+	(unspec:XO [(match_operand:V16QI 1 "mma_assemble_input_operand" "kwa")
+		    (match_operand:V16QI 2 "mma_assemble_input_operand" "kwa")
+		    (match_operand:V16QI 3 "mma_assemble_input_operand" "kwa")
+		    (match_operand:V16QI 4 "mma_assemble_input_operand" "kwa")]
 		    UNSPEC_MMA_ASSEMBLE))]
   "TARGET_MMA
    && fpr_reg_operand (operands[0], XOmode)"
@@ -438,7 +438,7 @@
 })
 
 (define_insn_and_split "*mma_disassemble_acc"
-  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=mwa")
+  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=kwa")
        (unspec:V16QI [(match_operand:XO 1 "fpr_reg_operand" "d")
 		      (match_operand 2 "const_0_to_3_operand")]
 		      UNSPEC_MMA_EXTRACT))]

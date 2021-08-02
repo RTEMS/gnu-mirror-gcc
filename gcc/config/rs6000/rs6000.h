@@ -1248,6 +1248,13 @@ enum r6000_reg_class_enum {
 
 extern enum reg_class rs6000_constraints[RS6000_CONSTRAINT_MAX];
 
+/* This definition replaces the formerly used 'm' constraint with a
+   different constraint letter in order to avoid changing semantics of
+   the 'm' constraint when accepting new address formats in
+   TARGET_LEGITIMATE_ADDRESS_P.  The constraint letter defined here
+   must not be used in insn definitions or inline assemblies.  */
+#define TARGET_MEM_CONSTRAINT 'k'
+
 /* The class value for index registers, and the one for base regs.  */
 #define INDEX_REG_CLASS GENERAL_REGS
 #define BASE_REG_CLASS BASE_REGS

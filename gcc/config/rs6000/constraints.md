@@ -17,7 +17,7 @@
 ;; along with GCC; see the file COPYING3.  If not see
 ;; <http://www.gnu.org/licenses/>.
 
-;; Available constraint letters: e k q t u A B C D S T
+;; Available constraint letters: q t u A B C D S T
 
 ;; Register constraints
 
@@ -64,6 +64,14 @@
 
 (define_register_constraint "l" "LINK_REGS"
   "The link register, @code{lr}.")
+
+; This defines 'm' as normal memory constraint.  This is only possible
+; since the standard memory constraint is re-defined in rs6000.h using
+; the TARGET_MEM_CONSTRAINT macro (to be k).
+(define_memory_constraint "m"
+  "Matches the most general non-prefixed memory address, suitable for asm."
+  (and (match_code "mem")
+       (not (match_operand 0 "prefixed_memory"))))
 
 (define_register_constraint "x" "CR0_REGS"
   "Condition register field 0, @code{cr0}.")
