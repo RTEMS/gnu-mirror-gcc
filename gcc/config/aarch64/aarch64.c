@@ -19657,11 +19657,19 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
       rtx address_value = XEXP (x, 1);
       if (TARGET_CAPABILITY_FAKE)
 	return targetm.asm_out.integer(address_value, size, aligned_p);
-      gcc_assert (GET_CODE (cap_val) == CONST_NULL);
-      /* MORELLO TODO aligned_p may be true for this 8 byte sized value but
-       * not for the 16 byte sized capability.  Look into it later.  */
-      ret = targetm.asm_out.integer (address_value, offset_size, aligned_p);
-      return ret && targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+
+      if (SYMBOL_REF_P (cap_val)
+	  && SUBREG_P (address_value)
+	  && subreg_lowpart_p (address_value)
+	  && LABEL_REF_P (SUBREG_REG (address_value)))
+	{
+	  /* For a pointer to a label, we need to set the LSB to preserve
+	     PSTATE.C64 for purecap.  */
+	  if (TARGET_CAPABILITY_PURE)
+	    XEXP (x, 1) = plus_constant (POmode, address_value, 1);
+	}
+      else
+	gcc_unreachable ();
     }
 
   /* Fake capability => size is the correct size and just want to emit the

@@ -5065,8 +5065,26 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
     case REFERENCE_TYPE:
       if (capability_type_p (TREE_TYPE (exp)))
 	{
-	  rtx cap;
-	  cap = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
+	  rtx cap = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
+
+	  if (TREE_CODE (exp) == ADDR_EXPR
+	      && TREE_CODE (TREE_OPERAND (exp, 0)) == LABEL_DECL)
+	    {
+	      /* For a pointer to a label, we need to rewrite the expression
+		 to derive the capability from the function, as the
+		 assembler needs to know the size of the object to
+		 determine capability bounds.  */
+	      tree lab = TREE_OPERAND (exp, 0);
+	      tree fn = DECL_CONTEXT (lab);
+	      rtx fn_rtl = DECL_RTL (fn);
+	      gcc_assert (fn_rtl && MEM_P (fn_rtl));
+	      rtx fn_addr = XEXP (fn_rtl, 0);
+
+	      cap = gen_rtx_REPLACE_ADDRESS_VALUE (GET_MODE (fn_addr),
+						   fn_addr,
+						   drop_capability (cap));
+	    }
+
 	  if (!assemble_capability (cap, MIN (size, thissize), align, 0))
 	    error ("initializer for capability is too complicated");
 	  break;

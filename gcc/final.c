@@ -4176,6 +4176,20 @@ output_addr_const (FILE *file, rtx x)
 	}
       break;
 
+    case REPLACE_ADDRESS_VALUE:
+      /* When assembling a capability, it may be desirable to
+	 use a certain symbol to determines the bounds, but adjust the
+	 capability value to point elsewhere.  We represent this with
+	 REPLACE_ADDRESS_VALUE and effect it by subtracting the
+	 capability value of the capability symbol in the addend.  */
+      output_addr_const (file, XEXP (x, 0));
+      fprintf (file, "+((");
+      output_addr_const (file, XEXP (x, 1));
+      fprintf (file, ")-");
+      output_addr_const (file, XEXP (x, 0));
+      fprintf (file, ")");
+      break;
+
     case MINUS:
       /* Avoid outputting things like x-x or x+5-x,
 	 since some assemblers can't handle that.  */
