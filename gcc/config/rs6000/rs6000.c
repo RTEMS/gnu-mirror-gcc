@@ -9935,22 +9935,149 @@ rs6000_offsettable_memref_p (rtx op, machine_mode reg_mode, bool strict)
 */
  
 static int
-rs6000_reassociation_width (unsigned int opc ATTRIBUTE_UNUSED,
-                            machine_mode mode)
+rs6000_reassociation_width (unsigned int opc_in, machine_mode mode)
 {
+  tree_code opc = (tree_code)opc_in;
+  int size = GET_MODE_SIZE (mode);
+  bool isPlus=false, isMult=false, isLogical=false;
+  switch (opc)
+    {
+    case PLUS_EXPR:
+      isPlus=true;
+      break;
+    case MULT_EXPR:
+      isMult=true;
+      break;
+    case BIT_IOR_EXPR:
+    case BIT_XOR_EXPR:
+    case BIT_AND_EXPR:
+      isLogical=true;
+      break;
+    default:
+      break;
+    }
   switch (rs6000_tune)
     {
     case PROCESSOR_POWER8:
+      switch (mode)
+	{
+	case E_DDmode:
+	  if (isPlus)
+	    return 2;
+	  return 1;
+	case E_TDmode:
+	  return 1;
+	case E_SFmode:
+	case E_DFmode:
+	  return 2;
+
+	case E_QImode:
+	case E_HImode:
+	case E_SImode:
+	case E_DImode:
+	  return 2;
+
+	case E_V16QImode:
+	case E_V8HImode:
+	case E_V4SImode:
+	case E_V2DImode:
+	  if (isMult)
+	    return 4;
+	  return 2;
+
+	case E_V4SFmode:
+	case E_V2DFmode:
+	  return 4;
+
+	default:
+	  break;
+	}
+      break;
     case PROCESSOR_POWER9:
+      switch (mode)
+	{
+	case E_DDmode:
+	  if (isPlus)
+	    return 2;
+	  return 1;
+	case E_TDmode:
+	  return 1;
+	case E_SFmode:
+	  return 2;
+	case E_DFmode:
+	  if (isMult)
+	    return 4;
+	  return 2;
+
+	case E_QImode:
+	case E_HImode:
+	case E_SImode:
+	  return 2;
+
+	case E_V16QImode:
+	case E_V8HImode:
+	case E_V4SImode:
+	case E_V2DImode:
+	case E_DImode:
+	  if (isMult)
+	    return 4;
+	  return 2;
+
+	case E_V4SFmode:
+	case E_V2DFmode:
+	  return 4;
+
+	default:
+	  break;
+	}
+      break;
     case PROCESSOR_POWER10:
-      if (DECIMAL_FLOAT_MODE_P (mode))
-	return 1;
-      if (VECTOR_MODE_P (mode))
-	return 4;
-      if (INTEGRAL_MODE_P (mode)) 
-	return 1;
-      if (FLOAT_MODE_P (mode))
-	return 4;
+      switch (mode)
+	{
+	case E_DDmode:
+	  if (isPlus)
+	    return 2;
+	  return 1;
+	case E_TDmode:
+	  return 1;
+	case E_SFmode:
+	  return 2;
+	case E_DFmode:
+	  if (isMult)
+	    return 4;
+	  return 2;
+
+	case E_QImode:
+	case E_HImode:
+	case E_SImode:
+	case E_DImode:
+	  if (isMult)
+	    return 2;
+	  return 1;
+	  
+	case E_V16QImode:
+	  if (isMult)
+	    return 8;
+	  if (isPlus)
+	    return 4;
+	  return 2;
+
+	case E_V8HImode:
+	case E_V4SImode:
+	  if (isMult)
+	    return 4;
+	  return 2;
+
+	case E_V2DImode:
+	  return 2;
+
+	case E_V4SFmode:
+	case E_V2DFmode:
+	  return 4;
+
+	default:
+	  break;
+	}
       break;
     default:
       break;
