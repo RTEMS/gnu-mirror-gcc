@@ -77,13 +77,4 @@
 /* Define this to be nonzero if static stack checking is supported.  */
 #define STACK_CHECK_STATIC_BUILTIN 1
 
-#undef INTPTR_TYPE
-#undef UINTPTR_TYPE
-#define INTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
-			? "__intcap_t" \
-			: (LONG_TYPE_SIZE == 64 ? "long int" : "int"))
-#define UINTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
-			? "__uintcap_t" \
-			: (LONG_TYPE_SIZE == 64 ? "long unsigned int" : "unsigned int"))
-
 #endif  /* GCC_AARCH64_LINUX_H */

@@ -147,4 +147,15 @@ ASM_MABI_SPEC
 /* Stabs debug not required.  */
 #undef DBX_DEBUGGING_INFO
 
+#undef INTPTR_TYPE
+#undef UINTPTR_TYPE
+#undef PTRADDR_TYPE
+#define INTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
+			? "__intcap_t" \
+			: (LONG_TYPE_SIZE == 64 ? "long int" : "int"))
+#define UINTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
+			? "__uintcap_t" \
+			: (LONG_TYPE_SIZE == 64 ? "long unsigned int" : "unsigned int"))
+#define PTRADDR_TYPE "long unsigned int"
+
 #endif /* GCC_AARCH64_ELF_H */
