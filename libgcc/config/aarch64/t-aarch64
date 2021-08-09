@@ -19,3 +19,20 @@
 # <http://www.gnu.org/licenses/>.
 
 LIB2ADD += $(srcdir)/config/aarch64/sync-cache.c
+
+# TODO lots of testing ;-)
+# crtbegin.o and crtend.o are compiled including -finhibit-size-directive.
+# As the name implies, this means we don't emit the .size directive.
+# For morello that's a problem, since the CAPINIT relocation should be made
+# against a symbol that has a size (otherwise the linker does not know what
+# bounds to put on the capability) and there are a few functions we need the
+# CAPINIT relocation against.
+#
+# I've looked at the emitted assembly for crtbegin.o, and AFAICS there are no
+# problems that the .size directive would cause (though this kind of manual
+# inspection is very error-prone).  So we're overriding that command line flag
+# for now.
+#
+# TODO It would be nice to only use this flag when building purecap crtstuff.c
+# Doesn't seem worth the effort to look into right now.
+CRTSTUFF_T_CFLAGS = -fno-inhibit-size-directive
