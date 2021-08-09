@@ -37,6 +37,22 @@
 #define TYPE(x)
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+
+	# Note - this macro is complemented by the FUNC_END macro
+	# in crtn.S.  If you change this macro you must also change
+	# that macro to match.
+.macro FUNC_START
+	#  Create a stack frame and save any call-preserved registers
+	stp	c29, c30, [csp, #-32]!
+	stp	c27, c28, [csp, #-32]!
+	stp	c25, c26, [csp, #-32]!
+	stp	c23, c24, [csp, #-32]!
+	stp	c21, c22, [csp, #-32]!
+	stp	c19, c20, [csp, #-32]!
+.endm
+#else
+
 	# Note - this macro is complemented by the FUNC_END macro
 	# in crtn.S.  If you change this macro you must also change
 	# that macro match.
@@ -50,6 +66,7 @@
 	stp	x19, x20, [sp, #-16]!
 .endm
 
+#endif
 	.section	".init"
 	.align 2
 	.global	_init

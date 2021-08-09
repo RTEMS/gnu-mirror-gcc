@@ -31,6 +31,24 @@
 # fact return.  Users may put any desired instructions in those sections.
 # This file is the last thing linked into any executable.
 
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+	# Note - this macro is complemented by the FUNC_START macro
+	# in crti.S.  If you change this macro you must also change
+	# that macro to match.
+.macro FUNC_END
+	#  Restore all save registers including the link register, and then
+	#  perform the correct function return instruction.
+	ldp	c19, c20, [csp], #32
+	ldp	c21, c22, [csp], #32
+	ldp	c23, c24, [csp], #32
+	ldp	c25, c26, [csp], #32
+	ldp	c27, c28, [csp], #32
+	ldp	c29, c30, [csp], #32
+	ret
+.endm
+#else
 	# Note - this macro is complemented by the FUNC_START macro
 	# in crti.S.  If you change this macro you must also change
 	# that macro match.
@@ -49,6 +67,7 @@
 	ret
 .endm
 
+#endif
 
 	.section	".init"
 	;;
