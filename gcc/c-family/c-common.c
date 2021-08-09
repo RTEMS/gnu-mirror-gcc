@@ -4528,6 +4528,9 @@ c_common_nodes_and_builtins (void)
   if (UINTPTR_TYPE)
     uintptr_type_node =
       TREE_TYPE (identifier_global_value (c_get_ident (UINTPTR_TYPE)));
+  if (PTRADDR_TYPE)
+    ptraddr_type_node =
+      TREE_TYPE (identifier_global_value (c_get_ident (PTRADDR_TYPE)));
 
   default_function_type
     = build_varargs_function_type_list (integer_type_node, NULL_TREE);
@@ -5258,6 +5261,8 @@ c_stddef_cpp_builtins(void)
     builtin_define_with_value ("__INTPTR_TYPE__", INTPTR_TYPE, 0);
   if (UINTPTR_TYPE)
     builtin_define_with_value ("__UINTPTR_TYPE__", UINTPTR_TYPE, 0);
+  if (PTRADDR_TYPE)
+    builtin_define_with_value ("__PTRADDR_TYPE__", PTRADDR_TYPE, 0);
   /* GIMPLE FE testcases need access to the GCC internal 'sizetype'.
      Expose it as __SIZETYPE__.  */
   if (flag_gimple)

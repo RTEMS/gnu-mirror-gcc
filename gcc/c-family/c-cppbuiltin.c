@@ -1090,6 +1090,8 @@ c_cpp_builtins (cpp_reader *pfile)
   builtin_define_type_width ("__WINT_WIDTH__", wint_type_node, NULL_TREE);
   builtin_define_type_width ("__PTRDIFF_WIDTH__", ptrdiff_type_node, NULL_TREE);
   builtin_define_type_width ("__SIZE_WIDTH__", size_type_node, NULL_TREE);
+  if (ptraddr_type_node)
+    builtin_define_type_width ("__PTRADDR_WIDTH__", ptraddr_type_node, NULL_TREE);
 
   if (c_dialect_cxx ())
     for (i = 0; i < NUM_INT_N_ENTS; i ++)

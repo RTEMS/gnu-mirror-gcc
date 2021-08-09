@@ -344,6 +344,7 @@ enum c_tree_index
     CTI_UINT_FAST64_TYPE,
     CTI_INTPTR_TYPE,
     CTI_UINTPTR_TYPE,
+    CTI_PTRADDR_TYPE,
 
     CTI_CHAR_ARRAY_TYPE,
     CTI_CHAR8_ARRAY_TYPE,
@@ -492,6 +493,7 @@ extern const unsigned int num_c_common_reswords;
 #define uint_fast64_type_node		c_global_trees[CTI_UINT_FAST64_TYPE]
 #define intptr_type_node		c_global_trees[CTI_INTPTR_TYPE]
 #define uintptr_type_node		c_global_trees[CTI_UINTPTR_TYPE]
+#define ptraddr_type_node		c_global_trees[CTI_PTRADDR_TYPE]
 
 #define truthvalue_type_node		c_global_trees[CTI_TRUTHVALUE_TYPE]
 #define truthvalue_true_node		c_global_trees[CTI_TRUTHVALUE_TRUE]

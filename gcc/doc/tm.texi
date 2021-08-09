@@ -1697,6 +1697,21 @@ unsigned int"} that has as much precision as @code{long long unsigned
 int}.
 @end defmac
 
+@defmac PTRADDR_TYPE
+A C expression for a string describing the name of the data type that
+can represent any address value of a pointer.  The typedef name
+@code{ptraddr_t} is defined using the contents of the string.  See
+@code{SIZE_TYPE} above for more information.
+
+If this macro evaluates to a null pointer, the corresponding type is not
+supported.  If this type is supported and GCC is configured to provide
+@code{<stddef.h>} then the typedef of @code{ptraddr_t} is provided there.
+This defaults to the the same as @code{UINTPTR_TYPE} if that is defined.
+
+Note: If your architecture has capabilities as pointers this default will need
+to be changed.
+@end defmac
+
 @defmac SIG_ATOMIC_TYPE
 @defmacx INT8_TYPE
 @defmacx INT16_TYPE

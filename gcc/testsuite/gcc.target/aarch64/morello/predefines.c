@@ -8,6 +8,9 @@ __intcap_t x(int);
 __UINTPTR_TYPE__ y(int);
 __uintcap_t y(int);
 
+/* Declare twice to ensure that the types are the same (error otherwise).  */
+__PTRADDR_TYPE__ z(int);
+long unsigned int z(int);
 
 /* Include this test for types being the same too since I like it -- probably
    should remove one later since having two is superfluous.  */
@@ -47,6 +50,7 @@ int main()
 	 */
 	/* assert (__INTPTR_WIDTH__ == 64); */
 	assert (__UINTPTR_MAX__ == __UINT64_MAX__);
+	assert (__PTRADDR_WIDTH__ == 64);
 	assert (myconst[2] == 'l');
 	assert (__CHERI_CAP_PERMISSION_GLOBAL__ == 1);
 	assert (__ARM_CAP_PERMISSION_EXECUTIVE__ == 2);

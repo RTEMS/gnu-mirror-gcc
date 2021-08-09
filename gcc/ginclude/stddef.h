@@ -28,14 +28,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
      && !defined(__STDDEF_H__)) \
     || defined(__need_wchar_t) || defined(__need_size_t) \
     || defined(__need_ptrdiff_t) || defined(__need_NULL) \
-    || defined(__need_wint_t)
+    || defined(__need_wint_t) || defined(__need_ptrdiff_t)
 
 /* Any one of these symbols __need_* means that GNU libc
    wants us just to define one data type.  So don't define
    the symbols that indicate this file's entire job has been done.  */
 #if (!defined(__need_wchar_t) && !defined(__need_size_t)	\
      && !defined(__need_ptrdiff_t) && !defined(__need_NULL)	\
-     && !defined(__need_wint_t))
+     && !defined(__need_wint_t)) && !defined(__need_ptrdiff_t)
 #define _STDDEF_H
 #define _STDDEF_H_
 /* snaroff@next.com says the NeXT needs this.  */
@@ -155,6 +155,15 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 #undef	__need_ptrdiff_t
 
 #endif /* _STDDEF_H or __need_ptrdiff_t.  */
+
+/* Type that contains an address.  */
+#if defined (_STDDEF_H) || defined (__need_ptraddr_t)
+#if defined(__PTRADDR_TYPE__)
+typedef __PTRADDR_TYPE__ ptraddr_t;
+#endif
+
+#undef __need_ptraddr_t
+#endif
 
 /* Unsigned type of `sizeof' something.  */
 

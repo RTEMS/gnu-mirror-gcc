@@ -742,6 +742,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define UINTPTR_TYPE ((const char *) NULL)
 #endif
 
+#ifndef PTRADDR_TYPE
+#define PTRADDR_TYPE UINTPTR_TYPE
+#endif
+
 /* Width in bits of a pointer.  Mind the value of the macro `Pmode'.  */
 #ifndef POINTER_SIZE
 #define POINTER_SIZE BITS_PER_WORD
