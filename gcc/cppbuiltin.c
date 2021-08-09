@@ -179,6 +179,8 @@ define_builtin_macros_for_type_sizes (cpp_reader *pfile)
      toplev calls backend_init which is not done with -E switch.  */
   cpp_define_formatted (pfile, "__SIZEOF_POINTER__=%d",
 			1 << ceil_log2 ((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT));
+  cpp_define_formatted (pfile, "__SIZEOF_POINTER_OFFSET__=%d",
+			1 << ceil_log2 ((POINTER_OFFSET_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT));
 }
 
 

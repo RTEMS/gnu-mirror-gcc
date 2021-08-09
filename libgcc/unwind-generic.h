@@ -252,8 +252,13 @@ extern void * _Unwind_FindEnclosingFunction (void *pc);
   #error "__SIZEOF_LONG__ macro not defined"
 #endif
 
-#ifndef __SIZEOF_POINTER__
-  #error "__SIZEOF_POINTER__ macro not defined"
+#ifndef __SIZEOF_POINTER_OFFSET__
+# ifndef __SIZEOF_POINTER__
+    #error "Neither __SIZEOF_POINTER__ nor __SIZEOF_POINTER_OFFSET__ macro defined"
+#  endif
+#  define __ADDRESS_SIZE __SIZEOF_POINTER__
+#else
+#  define __ADDRESS_SIZE __SIZEOF_POINTER_OFFSET__
 #endif
 
 
@@ -265,15 +270,17 @@ extern void * _Unwind_FindEnclosingFunction (void *pc);
    except when a unsigned long data type on the target machine is not
    capable of storing a pointer.  */
 
-#if __SIZEOF_LONG__ >= __SIZEOF_POINTER__
+#if __SIZEOF_LONG__ >= __ADDRESS_SIZE
   typedef long _sleb128_t;
   typedef unsigned long _uleb128_t;
-#elif __SIZEOF_LONG_LONG__ >= __SIZEOF_POINTER__
+#elif __SIZEOF_LONG_LONG__ >= __ADDRESS_SIZE
   typedef long long _sleb128_t;
   typedef unsigned long long _uleb128_t;
 #else
 # error "What type shall we use for _sleb128_t?"
 #endif
+
+#undef __ADDRESS_SIZE
 
 #if defined (__SEH__) && !defined (__USING_SJLJ_EXCEPTIONS__)
 /* Handles the mapping from SEH to GCC interfaces.  */

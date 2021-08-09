@@ -31,7 +31,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "gthr.h"
 
 typedef unsigned int word __attribute__((mode(word)));
-typedef unsigned int pointer __attribute__((mode(pointer)));
+typedef __UINTPTR_TYPE__ pointer;
 
 struct __emutls_object
 {
