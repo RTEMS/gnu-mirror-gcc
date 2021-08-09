@@ -5865,6 +5865,7 @@ get_parm_array_spec (const struct c_parm *parm, tree attrs)
 
       /* Each variable VLA bound is represented by a dollar sign.  */
       spec += "$";
+      STRIP_NOPS (nelts);
       vbchain = tree_cons (NULL_TREE, nelts, vbchain);
     }
 
@@ -9378,7 +9379,7 @@ build_enumerator (location_t decl_loc, location_t loc,
 
 tree
 c_simulate_enum_decl (location_t loc, const char *name,
-		      vec<string_int_pair> values)
+		      vec<string_int_pair> *values_ptr)
 {
   location_t saved_loc = input_location;
   input_location = loc;
@@ -9388,6 +9389,7 @@ c_simulate_enum_decl (location_t loc, const char *name,
 
   tree value_chain = NULL_TREE;
   string_int_pair *value;
+  vec<string_int_pair> values = *values_ptr;
   unsigned int i;
   FOR_EACH_VEC_ELT (values, i, value)
     {

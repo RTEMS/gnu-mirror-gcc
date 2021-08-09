@@ -2266,7 +2266,8 @@ tsubst_requires_expr (tree t, tree args, sat_info info)
   /* A requires-expression is an unevaluated context.  */
   cp_unevaluated u;
 
-  args = add_extra_args (REQUIRES_EXPR_EXTRA_ARGS (t), args);
+  args = add_extra_args (REQUIRES_EXPR_EXTRA_ARGS (t), args,
+			 info.complain, info.in_decl);
   if (processing_template_decl)
     {
       /* We're partially instantiating a generic lambda.  Substituting into
@@ -3629,6 +3630,10 @@ diagnose_trait_expr (tree expr, tree args)
       break;
     case CPTK_IS_LITERAL_TYPE:
       inform (loc, "  %qT is not a literal type", t1);
+      break;
+    case CPTK_IS_POINTER_INTERCONVERTIBLE_BASE_OF:
+      inform (loc, "  %qT is not pointer-interconvertible base of %qT",
+	      t1, t2);
       break;
     case CPTK_IS_POD:
       inform (loc, "  %qT is not a POD type", t1);

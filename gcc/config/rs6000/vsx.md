@@ -1014,7 +1014,7 @@
   [(set (match_operand:VSX_LE_128 0 "memory_operand" "=Z,Q")
         (match_operand:VSX_LE_128 1 "vsx_register_operand" "+wa,r"))]
   "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR
-   & !altivec_indexed_or_indirect_operand (operands[0], <MODE>mode)"
+   && !altivec_indexed_or_indirect_operand (operands[0], <MODE>mode)"
   "@
    #
    #"
@@ -6333,7 +6333,7 @@
   [(set_attr "type" "vecdiv")
    (set_attr "size" "<bits>")])
 
-(define_insn "mods_<mode>"
+(define_insn "mod<mode>3"
   [(set (match_operand:VIlong 0 "vsx_register_operand" "=v")
 	(mod:VIlong (match_operand:VIlong 1 "vsx_register_operand" "v")
 		    (match_operand:VIlong 2 "vsx_register_operand" "v")))]
@@ -6342,7 +6342,7 @@
   [(set_attr "type" "vecdiv")
    (set_attr "size" "<bits>")])
 
-(define_insn "modu_<mode>"
+(define_insn "umod<mode>3"
   [(set (match_operand:VIlong 0 "vsx_register_operand" "=v")
 	(umod:VIlong (match_operand:VIlong 1 "vsx_register_operand" "v")
 		     (match_operand:VIlong 2 "vsx_register_operand" "v")))]
@@ -6351,7 +6351,7 @@
   [(set_attr "type" "vecdiv")
    (set_attr "size" "<bits>")])
 
-(define_insn "mulhs_<mode>"
+(define_insn "smul<mode>3_highpart"
   [(set (match_operand:VIlong 0 "vsx_register_operand" "=v")
 	(mult:VIlong (ashiftrt
 		       (match_operand:VIlong 1 "vsx_register_operand" "v")
@@ -6363,7 +6363,7 @@
   "vmulhs<wd> %0,%1,%2"
   [(set_attr "type" "veccomplex")])
 
-(define_insn "mulhu_<mode>"
+(define_insn "umul<mode>3_highpart"
   [(set (match_operand:VIlong 0 "vsx_register_operand" "=v")
 	(us_mult:VIlong (ashiftrt
 			  (match_operand:VIlong 1 "vsx_register_operand" "v")

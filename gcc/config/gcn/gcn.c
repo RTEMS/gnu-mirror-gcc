@@ -144,6 +144,10 @@ gcn_option_override (void)
 	/* 1MB total.  */
 	stack_size_opt = 1048576;
     }
+
+  /* The xnack option is a placeholder, for now.  */
+  if (flag_xnack)
+    sorry ("XNACK support");
 }
 
 /* }}}  */
@@ -3708,8 +3712,6 @@ gcn_init_builtins (void)
       TREE_NOTHROW (gcn_builtin_decls[i]) = 1;
     }
 
-/* FIXME: remove the ifdef once OpenACC support is merged upstream.  */
-#ifdef BUILT_IN_GOACC_SINGLE_START
   /* These builtins need to take/return an LDS pointer: override the generic
      versions here.  */
 
@@ -3726,7 +3728,6 @@ gcn_init_builtins (void)
 
   set_builtin_decl (BUILT_IN_GOACC_BARRIER,
 		    gcn_builtin_decls[GCN_BUILTIN_ACC_BARRIER], false);
-#endif
 }
 
 /* Implement TARGET_INIT_LIBFUNCS.  */
@@ -5015,11 +5016,7 @@ gcn_goacc_validate_dims (tree decl, int dims[], int fn_level,
 			 unsigned /*used*/)
 {
   bool changed = false;
-
-  /* FIXME: remove -facc-experimental-workers when they're ready.  */
-  int max_workers = flag_worker_partitioning ? 16 : 1;
-
-  gcc_assert (!flag_worker_partitioning);
+  const int max_workers = 16;
 
   /* The vector size must appear to be 64, to the user, unless this is a
      SEQ routine.  The real, internal value is always 1, which means use
@@ -5056,8 +5053,7 @@ gcn_goacc_validate_dims (tree decl, int dims[], int fn_level,
     {
       dims[GOMP_DIM_VECTOR] = GCN_DEFAULT_VECTORS;
       if (dims[GOMP_DIM_WORKER] < 0)
-	dims[GOMP_DIM_WORKER] = (flag_worker_partitioning
-				 ? GCN_DEFAULT_WORKERS : 1);
+	dims[GOMP_DIM_WORKER] = GCN_DEFAULT_WORKERS;
       if (dims[GOMP_DIM_GANG] < 0)
 	dims[GOMP_DIM_GANG] = GCN_DEFAULT_GANGS;
       changed = true;
@@ -5122,8 +5118,7 @@ static bool
 gcn_fork_join (gcall *ARG_UNUSED (call), const int *ARG_UNUSED (dims),
 	       bool ARG_UNUSED (is_fork))
 {
-  /* GCN does not use the fork/join concept invented for NVPTX.
-     Instead we use standard autovectorization.  */
+  /* GCN does not need to expand fork/join markers at the RTL level.  */
   return false;
 }
 
@@ -5177,16 +5172,42 @@ static void
 output_file_start (void)
 {
   const char *cpu;
+  bool use_sram = flag_sram_ecc;
   switch (gcn_arch)
     {
-    case PROCESSOR_FIJI: cpu = "gfx803"; break;
-    case PROCESSOR_VEGA10: cpu = "gfx900"; break;
-    case PROCESSOR_VEGA20: cpu = "gfx906"; break;
-    case PROCESSOR_GFX908: cpu = "gfx908+sram-ecc"; break;
+    case PROCESSOR_FIJI:
+      cpu = "gfx803";
+#ifndef HAVE_GCN_SRAM_ECC_FIJI
+      use_sram = false;
+#endif
+      break;
+    case PROCESSOR_VEGA10:
+      cpu = "gfx900";
+#ifndef HAVE_GCN_SRAM_ECC_GFX900
+      use_sram = false;
+#endif
+      break;
+    case PROCESSOR_VEGA20:
+      cpu = "gfx906";
+#ifndef HAVE_GCN_SRAM_ECC_GFX906
+      use_sram = false;
+#endif
+      break;
+    case PROCESSOR_GFX908:
+      cpu = "gfx908";
+#ifndef HAVE_GCN_SRAM_ECC_GFX908
+      use_sram = false;
+#endif
+      break;
     default: gcc_unreachable ();
     }
 
-  fprintf(asm_out_file, "\t.amdgcn_target \"amdgcn-unknown-amdhsa--%s\"\n", cpu);
+  const char *xnack = (flag_xnack ? "+xnack" : "");
+  /* FIXME: support "any" when we move to HSACOv4.  */
+  const char *sram_ecc = (use_sram ? "+sram-ecc" : "");
+
+  fprintf(asm_out_file, "\t.amdgcn_target \"amdgcn-unknown-amdhsa--%s%s%s\"\n",
+	  cpu, xnack, sram_ecc);
 }
 
 /* Implement ASM_DECLARE_FUNCTION_NAME via gcn-hsa.h.
@@ -6483,11 +6504,11 @@ gcn_dwarf_register_span (rtx rtl)
 #define TARGET_GIMPLIFY_VA_ARG_EXPR gcn_gimplify_va_arg_expr
 #undef TARGET_OMP_DEVICE_KIND_ARCH_ISA
 #define TARGET_OMP_DEVICE_KIND_ARCH_ISA gcn_omp_device_kind_arch_isa
-#undef  TARGET_GOACC_ADJUST_PROPAGATION_RECORD
-#define TARGET_GOACC_ADJUST_PROPAGATION_RECORD \
-  gcn_goacc_adjust_propagation_record
 #undef  TARGET_GOACC_ADJUST_PRIVATE_DECL
 #define TARGET_GOACC_ADJUST_PRIVATE_DECL gcn_goacc_adjust_private_decl
+#undef  TARGET_GOACC_CREATE_WORKER_BROADCAST_RECORD
+#define TARGET_GOACC_CREATE_WORKER_BROADCAST_RECORD \
+  gcn_goacc_create_worker_broadcast_record
 #undef  TARGET_GOACC_FORK_JOIN
 #define TARGET_GOACC_FORK_JOIN gcn_fork_join
 #undef  TARGET_GOACC_REDUCTION
