@@ -3808,7 +3808,7 @@ static void add_data_member_location_attribute (dw_die_ref, tree,
 static bool add_const_value_attribute (dw_die_ref, rtx);
 static void insert_int (HOST_WIDE_INT, unsigned, unsigned char *);
 static void insert_wide_int (const wide_int &, unsigned char *, int);
-static void insert_float (const_rtx, unsigned char *);
+static unsigned insert_float (const_rtx, unsigned char *);
 static rtx rtl_for_decl_location (tree);
 static bool add_location_or_const_value_attribute (dw_die_ref, tree, bool);
 static bool tree_add_const_value_attribute (dw_die_ref, tree);
@@ -16158,11 +16158,12 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	      scalar_float_mode float_mode = as_a <scalar_float_mode> (mode);
 	      unsigned int length = GET_MODE_SIZE (float_mode);
 	      unsigned char *array = ggc_vec_alloc<unsigned char> (length);
+	      unsigned int elt_size = insert_float (rtl, array);
 
-	      insert_float (rtl, array);
 	      mem_loc_result->dw_loc_oprnd2.val_class = dw_val_class_vec;
-	      mem_loc_result->dw_loc_oprnd2.v.val_vec.length = length / 4;
-	      mem_loc_result->dw_loc_oprnd2.v.val_vec.elt_size = 4;
+	      mem_loc_result->dw_loc_oprnd2.v.val_vec.length
+		= length / elt_size;
+	      mem_loc_result->dw_loc_oprnd2.v.val_vec.elt_size = elt_size;
 	      mem_loc_result->dw_loc_oprnd2.v.val_vec.array = array;
 	    }
 	}
@@ -16733,11 +16734,11 @@ loc_descriptor (rtx rtl, machine_mode mode,
 	    {
 	      unsigned int length = GET_MODE_SIZE (smode);
 	      unsigned char *array = ggc_vec_alloc<unsigned char> (length);
+	      unsigned int elt_size = insert_float (rtl, array);
 
-	      insert_float (rtl, array);
 	      loc_result->dw_loc_oprnd2.val_class = dw_val_class_vec;
-	      loc_result->dw_loc_oprnd2.v.val_vec.length = length / 4;
-	      loc_result->dw_loc_oprnd2.v.val_vec.elt_size = 4;
+	      loc_result->dw_loc_oprnd2.v.val_vec.length = length / elt_size;
+	      loc_result->dw_loc_oprnd2.v.val_vec.elt_size = elt_size;
 	      loc_result->dw_loc_oprnd2.v.val_vec.array = array;
 	    }
 	}
@@ -19527,7 +19528,7 @@ insert_wide_int (const wide_int &val, unsigned char *dest, int elt_size)
 
 /* Writes floating point values to dw_vec_const array.  */
 
-static void
+static unsigned
 insert_float (const_rtx rtl, unsigned char *array)
 {
   long val[4];
@@ -19537,11 +19538,19 @@ insert_float (const_rtx rtl, unsigned char *array)
   real_to_target (val, CONST_DOUBLE_REAL_VALUE (rtl), mode);
 
   /* real_to_target puts 32-bit pieces in each long.  Pack them.  */
+  if (GET_MODE_SIZE (mode) < 4)
+    {
+      gcc_assert (GET_MODE_SIZE (mode) == 2);
+      insert_int (val[0], 2, array);
+      return 2;
+    }
+
   for (i = 0; i < GET_MODE_SIZE (mode) / 4; i++)
     {
       insert_int (val[i], 4, array);
       array += 4;
     }
+  return 4;
 }
 
 /* Attach a DW_AT_const_value attribute for a variable or a parameter which
@@ -19590,9 +19599,10 @@ add_const_value_attribute (dw_die_ref die, rtx rtl)
 	  scalar_float_mode mode = as_a <scalar_float_mode> (GET_MODE (rtl));
 	  unsigned int length = GET_MODE_SIZE (mode);
 	  unsigned char *array = ggc_vec_alloc<unsigned char> (length);
+	  unsigned int elt_size = insert_float (rtl, array);
 
-	  insert_float (rtl, array);
-	  add_AT_vec (die, DW_AT_const_value, length / 4, 4, array);
+	  add_AT_vec (die, DW_AT_const_value, length / elt_size, elt_size,
+		      array);
 	}
       return true;
 
@@ -20805,12 +20815,23 @@ add_scalar_info (dw_die_ref die, enum dwarf_attribute attr, tree value,
 	  else
 	    add_AT_int (die, attr, TREE_INT_CST_LOW (value));
 	}
-      else
+      else if (dwarf_version >= 5
+	       && TREE_INT_CST_LOW (TYPE_SIZE (TREE_TYPE (value))) == 128)
 	/* Otherwise represent the bound as an unsigned value with
 	   the precision of its type.  The precision and signedness
 	   of the type will be necessary to re-interpret it
 	   unambiguously.  */
 	add_AT_wide (die, attr, wi::to_wide (value));
+      else
+	{
+	  rtx v = immed_wide_int_const (wi::to_wide (value),
+					TYPE_MODE (TREE_TYPE (value)));
+	  dw_loc_descr_ref loc
+	    = loc_descriptor (v, TYPE_MODE (TREE_TYPE (value)),
+			      VAR_INIT_STATUS_INITIALIZED);
+	  if (loc)
+	    add_AT_loc (die, attr, loc);
+	}
       return;
     }
 
@@ -22795,6 +22816,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
   tree origin = decl_ultimate_origin (decl);
   dw_die_ref subr_die;
   dw_die_ref old_die = lookup_decl_die (decl);
+  bool old_die_had_no_children = false;
 
   /* This function gets called multiple times for different stages of
      the debug process.  For example, for func() in this code:
@@ -22884,6 +22906,9 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
      additional information.  */
   if (old_die && declaration)
     return;
+
+  if (in_lto_p && old_die && old_die->die_child == NULL)
+    old_die_had_no_children = true;
 
   /* Now that the C++ front end lazily declares artificial member fns, we
      might need to retrofit the declaration into its class.  */
@@ -23404,6 +23429,10 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	  else if (DECL_INITIAL (decl) == NULL_TREE)
 	    gen_unspecified_parameters_die (decl, subr_die);
 	}
+      else if ((subr_die != old_die || old_die_had_no_children)
+	       && prototype_p (TREE_TYPE (decl))
+	       && stdarg_p (TREE_TYPE (decl)))
+	gen_unspecified_parameters_die (decl, subr_die);
     }
 
   if (subr_die != old_die)
@@ -27686,11 +27715,8 @@ dwarf2out_inline_entry (tree block)
   if (cur_line_info_table)
     ied->view = cur_line_info_table->view;
 
-  char label[MAX_ARTIFICIAL_LABEL_BYTES];
-
-  ASM_GENERATE_INTERNAL_LABEL (label, BLOCK_INLINE_ENTRY_LABEL,
-			       BLOCK_NUMBER (block));
-  ASM_OUTPUT_LABEL (asm_out_file, label);
+  ASM_OUTPUT_DEBUG_LABEL (asm_out_file, BLOCK_INLINE_ENTRY_LABEL,
+			  BLOCK_NUMBER (block));
 }
 
 /* Called from finalize_size_functions for size functions so that their body

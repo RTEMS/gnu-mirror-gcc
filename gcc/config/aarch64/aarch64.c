@@ -2951,7 +2951,7 @@ aarch64_mov128_immediate (rtx imm)
 static unsigned int
 aarch64_add_offset_1_temporaries (HOST_WIDE_INT offset)
 {
-  return abs_hwi (offset) < 0x1000000 ? 0 : 1;
+  return absu_hwi (offset) < 0x1000000 ? 0 : 1;
 }
 
 /* A subroutine of aarch64_add_offset.  Set DEST to SRC + OFFSET for
@@ -9545,10 +9545,11 @@ aarch64_mask_and_shift_for_ubfiz_p (scalar_int_mode mode, rtx mask,
 				    rtx shft_amnt)
 {
   return CONST_INT_P (mask) && CONST_INT_P (shft_amnt)
-	 && INTVAL (shft_amnt) < GET_MODE_BITSIZE (mode)
-	 && exact_log2 ((INTVAL (mask) >> INTVAL (shft_amnt)) + 1) >= 0
-	 && (INTVAL (mask)
-	     & ((HOST_WIDE_INT_1U << INTVAL (shft_amnt)) - 1)) == 0;
+	 && INTVAL (mask) > 0
+	 && UINTVAL (shft_amnt) < GET_MODE_BITSIZE (mode)
+	 && exact_log2 ((UINTVAL (mask) >> UINTVAL (shft_amnt)) + 1) >= 0
+	 && (UINTVAL (mask)
+	     & ((HOST_WIDE_INT_1U << UINTVAL (shft_amnt)) - 1)) == 0;
 }
 
 /* Return true if the masks and a shift amount from an RTX of the form
@@ -19129,11 +19130,17 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
       return 0;
     }
 
-  for (t = DECL_ARGUMENTS (node->decl); t; t = DECL_CHAIN (t))
-    {
-      arg_type = TREE_TYPE (t);
+  int i;
+  tree type_arg_types = TYPE_ARG_TYPES (TREE_TYPE (node->decl));
+  bool decl_arg_p = (node->definition || type_arg_types == NULL_TREE);
 
-      if (!currently_supported_simd_type (arg_type, base_type))
+  for (t = (decl_arg_p ? DECL_ARGUMENTS (node->decl) : type_arg_types), i = 0;
+       t && t != void_list_node; t = TREE_CHAIN (t), i++)
+    {
+      tree arg_type = decl_arg_p ? TREE_TYPE (t) : TREE_VALUE (t);
+
+      if (clonei->args[i].arg_type != SIMD_CLONE_ARG_TYPE_UNIFORM
+	  && !currently_supported_simd_type (arg_type, base_type))
 	{
 	  if (TYPE_SIZE (arg_type) != TYPE_SIZE (base_type))
 	    warning_at (DECL_SOURCE_LOCATION (node->decl), 0,

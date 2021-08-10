@@ -20269,6 +20269,7 @@ cp_parser_init_declarator (cp_parser* parser,
     {
       /* Handle C++17 deduction guides.  */
       if (!decl_specifiers->type
+	  && !decl_specifiers->any_type_specifiers_p
 	  && ctor_dtor_or_conv_p <= 0
 	  && cxx_dialect >= cxx17)
 	{
@@ -36290,6 +36291,8 @@ cp_parser_omp_depobj (cp_parser *parser, cp_token *pragma_tok)
       cp_lexer_consume_token (parser->lexer);
       if (!strcmp ("depend", p))
 	{
+	  /* Don't create location wrapper nodes within the depend clause.  */
+	  auto_suppress_location_wrappers sentinel;
 	  clause = cp_parser_omp_clause_depend (parser, NULL_TREE, c_loc);
 	  if (clause)
 	    clause = finish_omp_clauses (clause, C_ORT_OMP);
@@ -37833,6 +37836,9 @@ cp_parser_omp_parallel (cp_parser *parser, cp_token *pragma_tok,
 	  cclauses = cclauses_buf;
 
 	  cp_lexer_consume_token (parser->lexer);
+	  if (!flag_openmp)  /* flag_openmp_simd  */
+	    return cp_parser_omp_master (parser, pragma_tok, p_name, mask,
+					 cclauses, if_p);
 	  block = begin_omp_parallel ();
 	  save = cp_parser_begin_omp_structured_block (parser);
 	  tree ret = cp_parser_omp_master (parser, pragma_tok, p_name, mask,

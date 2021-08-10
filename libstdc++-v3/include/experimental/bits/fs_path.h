@@ -125,7 +125,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     template<typename _Source>
       struct __constructible_from<_Source, void>
-      : decltype(__is_path_src(std::declval<_Source>(), 0))
+      : decltype(__is_path_src(std::declval<const _Source&>(), 0))
       { };
 
     template<typename _Tp1, typename _Tp2 = void,
@@ -1178,7 +1178,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     return _M_at_end == __rhs._M_at_end;
   }
 
-  // @} group filesystem-ts
+  /// @} group filesystem-ts
 _GLIBCXX_END_NAMESPACE_CXX11
 } // namespace v1
 } // namespace filesystem

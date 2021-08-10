@@ -85,8 +85,8 @@ except ImportError:
 def find_type(orig, name):
     typ = orig.strip_typedefs()
     while True:
-        # Strip cv-qualifiers.  PR 67440.
-        search = '%s::%s' % (typ.unqualified(), name)
+        # Use Type.tag to ignore cv-qualifiers.  PR 67440.
+        search = '%s::%s' % (typ.tag, name)
         try:
             return gdb.lookup_type(search)
         except RuntimeError:
@@ -422,16 +422,12 @@ class StdVectorPrinter:
             if self.bitvec:
                 if self.item == self.finish and self.so >= self.fo:
                     raise StopIteration
-                elt = self.item.dereference()
-                if elt & (1 << self.so):
-                    obit = 1
-                else:
-                    obit = 0
+                elt = bool(self.item.dereference() & (1 << self.so))
                 self.so = self.so + 1
                 if self.so >= self.isize:
                     self.item = self.item + 1
                     self.so = 0
-                return ('[%d]' % count, obit)
+                return ('[%d]' % count, elt)
             else:
                 if self.item == self.finish:
                     raise StopIteration
@@ -442,7 +438,7 @@ class StdVectorPrinter:
     def __init__(self, typename, val):
         self.typename = strip_versioned_namespace(typename)
         self.val = val
-        self.is_bool = val.type.template_argument(0).code  == gdb.TYPE_CODE_BOOL
+        self.is_bool = val.type.template_argument(0).code == gdb.TYPE_CODE_BOOL
 
     def children(self):
         return self._iterator(self.val['_M_impl']['_M_start'],
@@ -481,6 +477,8 @@ class StdVectorIteratorPrinter:
         if not self.val['_M_current']:
             return 'non-dereferenceable iterator for std::vector'
         return str(self.val['_M_current'].dereference())
+
+# TODO add printer for vector<bool>'s _Bit_iterator and _Bit_const_iterator
 
 class StdTuplePrinter:
     "Print a std::tuple"

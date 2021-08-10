@@ -3166,6 +3166,18 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
       pre_init = true;
     }
 
+  bool zeroed_out = false;
+  if (!CONSTRUCTOR_NO_CLEARING (ctx->ctor))
+    {
+      /* We're initializing an array object that had been zero-initialized
+	 earlier.  Truncate ctx->ctor, and propagate its zeroed state by
+	 clearing CONSTRUCTOR_NO_CLEARING on each of the aggregate element
+	 initializers we append to it.  */
+      gcc_checking_assert (initializer_zerop (ctx->ctor));
+      zeroed_out = true;
+      vec_safe_truncate (*p, 0);
+    }
+
   tree nelts = get_array_or_vector_nelts (ctx, atype, non_constant_p,
 					  overflow_p);
   unsigned HOST_WIDE_INT max = tree_to_uhwi (nelts);
@@ -3177,7 +3189,11 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
       constexpr_ctx new_ctx;
       init_subob_ctx (ctx, new_ctx, idx, pre_init ? init : elttype);
       if (new_ctx.ctor != ctx->ctor)
-	CONSTRUCTOR_APPEND_ELT (*p, idx, new_ctx.ctor);
+	{
+	  if (zeroed_out)
+	    CONSTRUCTOR_NO_CLEARING (new_ctx.ctor) = false;
+	  CONSTRUCTOR_APPEND_ELT (*p, idx, new_ctx.ctor);
+	}
       if (TREE_CODE (elttype) == ARRAY_TYPE)
 	{
 	  /* A multidimensional array; recurse.  */
@@ -5833,15 +5849,16 @@ check_automatic_or_tls (tree ref)
 struct check_for_return_continue_data {
   hash_set<tree> *pset;
   tree continue_stmt;
+  tree break_stmt;
 };
 
 /* Helper function for potential_constant_expression_1 SWITCH_STMT handling,
    called through cp_walk_tree.  Return the first RETURN_EXPR found, or note
-   the first CONTINUE_STMT if RETURN_EXPR is not found.  */
+   the first CONTINUE_STMT and/or BREAK_STMT if RETURN_EXPR is not found.  */
 static tree
 check_for_return_continue (tree *tp, int *walk_subtrees, void *data)
 {
-  tree t = *tp, s;
+  tree t = *tp, s, b;
   check_for_return_continue_data *d = (check_for_return_continue_data *) data;
   switch (TREE_CODE (t))
     {
@@ -5851,6 +5868,11 @@ check_for_return_continue (tree *tp, int *walk_subtrees, void *data)
     case CONTINUE_STMT:
       if (d->continue_stmt == NULL_TREE)
 	d->continue_stmt = t;
+      break;
+
+    case BREAK_STMT:
+      if (d->break_stmt == NULL_TREE)
+	d->break_stmt = t;
       break;
 
 #define RECUR(x) \
@@ -5864,16 +5886,20 @@ check_for_return_continue (tree *tp, int *walk_subtrees, void *data)
       *walk_subtrees = 0;
       RECUR (DO_COND (t));
       s = d->continue_stmt;
+      b = d->break_stmt;
       RECUR (DO_BODY (t));
       d->continue_stmt = s;
+      d->break_stmt = b;
       break;
 
     case WHILE_STMT:
       *walk_subtrees = 0;
       RECUR (WHILE_COND (t));
       s = d->continue_stmt;
+      b = d->break_stmt;
       RECUR (WHILE_BODY (t));
       d->continue_stmt = s;
+      d->break_stmt = b;
       break;
 
     case FOR_STMT:
@@ -5882,16 +5908,28 @@ check_for_return_continue (tree *tp, int *walk_subtrees, void *data)
       RECUR (FOR_COND (t));
       RECUR (FOR_EXPR (t));
       s = d->continue_stmt;
+      b = d->break_stmt;
       RECUR (FOR_BODY (t));
       d->continue_stmt = s;
+      d->break_stmt = b;
       break;
 
     case RANGE_FOR_STMT:
       *walk_subtrees = 0;
       RECUR (RANGE_FOR_EXPR (t));
       s = d->continue_stmt;
+      b = d->break_stmt;
       RECUR (RANGE_FOR_BODY (t));
       d->continue_stmt = s;
+      d->break_stmt = b;
+      break;
+
+    case SWITCH_STMT:
+      *walk_subtrees = 0;
+      RECUR (SWITCH_STMT_COND (t));
+      b = d->break_stmt;
+      RECUR (SWITCH_STMT_BODY (t));
+      d->break_stmt = b;
       break;
 #undef RECUR
 
@@ -6351,7 +6389,18 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  /* If we couldn't evaluate the condition, it might not ever be
 	     true.  */
 	  if (!integer_onep (tmp))
-	    return true;
+	    {
+	      /* Before returning true, check if the for body can contain
+		 a return.  */
+	      hash_set<tree> pset;
+	      check_for_return_continue_data data = { &pset, NULL_TREE,
+						      NULL_TREE };
+	      if (tree ret_expr
+		  = cp_walk_tree (&FOR_BODY (t), check_for_return_continue,
+				  &data, &pset))
+		*jump_target = ret_expr;
+	      return true;
+	    }
 	}
       if (!RECUR (FOR_EXPR (t), any))
 	return false;
@@ -6380,7 +6429,18 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	tmp = cxx_eval_outermost_constant_expr (tmp, true);
       /* If we couldn't evaluate the condition, it might not ever be true.  */
       if (!integer_onep (tmp))
-	return true;
+	{
+	  /* Before returning true, check if the while body can contain
+	     a return.  */
+	  hash_set<tree> pset;
+	  check_for_return_continue_data data = { &pset, NULL_TREE,
+						  NULL_TREE  };
+	  if (tree ret_expr
+	      = cp_walk_tree (&WHILE_BODY (t), check_for_return_continue,
+			      &data, &pset))
+	    *jump_target = ret_expr;
+	  return true;
+	}
       if (!RECUR (WHILE_BODY (t), any))
 	return false;
       if (breaks (jump_target) || continues (jump_target))
@@ -6399,7 +6459,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       else
 	{
 	  hash_set<tree> pset;
-	  check_for_return_continue_data data = { &pset, NULL_TREE };
+	  check_for_return_continue_data data = { &pset, NULL_TREE,
+						  NULL_TREE };
 	  if (tree ret_expr
 	      = cp_walk_tree (&SWITCH_STMT_BODY (t), check_for_return_continue,
 			      &data, &pset))
@@ -6800,11 +6861,46 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	return RECUR (TREE_OPERAND (t, 2), want_rval);
       else if (TREE_CODE (tmp) == INTEGER_CST)
 	return RECUR (TREE_OPERAND (t, 1), want_rval);
+      tmp = *jump_target;
       for (i = 1; i < 3; ++i)
-	if (potential_constant_expression_1 (TREE_OPERAND (t, i),
-					     want_rval, strict, now,
-					     tf_none, jump_target))
-	  return true;
+	{
+	  tree this_jump_target = tmp;
+	  if (potential_constant_expression_1 (TREE_OPERAND (t, i),
+					       want_rval, strict, now,
+					       tf_none, &this_jump_target))
+	    {
+	      if (returns (&this_jump_target))
+		*jump_target = this_jump_target;
+	      else if (!returns (jump_target))
+		{
+		  if (breaks (&this_jump_target)
+		      || continues (&this_jump_target))
+		    *jump_target = this_jump_target;
+		  if (i == 1)
+		    {
+		      /* If the then branch is potentially constant, but
+			 does not return, check if the else branch
+			 couldn't return, break or continue.  */
+		      hash_set<tree> pset;
+		      check_for_return_continue_data data = { &pset, NULL_TREE,
+							      NULL_TREE };
+		      if (tree ret_expr
+			= cp_walk_tree (&TREE_OPERAND (t, 2),
+					check_for_return_continue, &data,
+					&pset))
+			*jump_target = ret_expr;
+		      else if (*jump_target == NULL_TREE)
+			{
+			  if (data.continue_stmt)
+			    *jump_target = data.continue_stmt;
+			  else if (data.break_stmt)
+			    *jump_target = data.break_stmt;
+			}
+		    }
+		}
+	      return true;
+	    }
+	}
       if (flags & tf_error)
 	error_at (loc, "expression %qE is not a constant expression", t);
       return false;

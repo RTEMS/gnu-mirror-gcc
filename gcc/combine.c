@@ -7453,11 +7453,15 @@ expand_compound_operation (rtx x)
 				  mode, tem, modewidth - len);
     }
   else if (unsignedp && len < HOST_BITS_PER_WIDE_INT)
-    tem = simplify_and_const_int (NULL_RTX, mode,
-				  simplify_shift_const (NULL_RTX, LSHIFTRT,
-							mode, XEXP (x, 0),
-							pos),
-				  (HOST_WIDE_INT_1U << len) - 1);
+    {
+      tem = simplify_shift_const (NULL_RTX, LSHIFTRT, inner_mode,
+				  XEXP (x, 0), pos);
+      tem = gen_lowpart (mode, tem);
+      if (!tem || GET_CODE (tem) == CLOBBER)
+	return x;
+      tem = simplify_and_const_int (NULL_RTX, mode, tem,
+				    (HOST_WIDE_INT_1U << len) - 1);
+    }
   else
     /* Any other cases we can't handle.  */
     return x;
@@ -10179,7 +10183,7 @@ simplify_and_const_int_1 (scalar_int_mode mode, rtx varop,
   constop &= nonzero;
 
   /* If we don't have any bits left, return zero.  */
-  if (constop == 0)
+  if (constop == 0 && !side_effects_p (varop))
     return const0_rtx;
 
   /* If VAROP is a NEG of something known to be zero or 1 and CONSTOP is
@@ -11011,8 +11015,11 @@ simplify_shift_const_1 (enum rtx_code code, machine_mode result_mode,
 		break;
 	      /* For ((int) (cstLL >> count)) >> cst2 just give up.  Queuing
 		 up outer sign extension (often left and right shift) is
-		 hardly more efficient than the original.  See PR70429.  */
-	      if (code == ASHIFTRT && int_mode != int_result_mode)
+		 hardly more efficient than the original.  See PR70429.
+		 Similarly punt for rotates with different modes.
+		 See PR97386.  */
+	      if ((code == ASHIFTRT || code == ROTATE)
+		  && int_mode != int_result_mode)
 		break;
 
 	      rtx count_rtx = gen_int_shift_amount (int_result_mode, count);
@@ -14384,6 +14391,11 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 	     i2 or i1 for register which were both used and clobbered, so
 	     we keep notes from i2 or i1 if they will turn into REG_DEAD
 	     notes.  */
+
+	  /* If this register is set or clobbered between FROM_INSN and I3,
+	     we should not create a note for it.  */
+	  if (reg_set_between_p (XEXP (note, 0), from_insn, i3))
+	    break;
 
 	  /* If this register is set or clobbered in I3, put the note there
 	     unless there is one already.  */

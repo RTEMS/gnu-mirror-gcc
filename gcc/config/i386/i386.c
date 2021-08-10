@@ -149,8 +149,10 @@ const struct processor_costs *ix86_cost = NULL;
 #define m_ICELAKE_CLIENT (HOST_WIDE_INT_1U<<PROCESSOR_ICELAKE_CLIENT)
 #define m_ICELAKE_SERVER (HOST_WIDE_INT_1U<<PROCESSOR_ICELAKE_SERVER)
 #define m_CASCADELAKE (HOST_WIDE_INT_1U<<PROCESSOR_CASCADELAKE)
+#define m_TIGERLAKE (HOST_WIDE_INT_1U<<PROCESSOR_TIGERLAKE)
 #define m_CORE_AVX512 (m_SKYLAKE_AVX512 | m_CANNONLAKE \
-		       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER | m_CASCADELAKE)
+		       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER \
+		       | m_CASCADELAKE | m_TIGERLAKE)
 #define m_CORE_AVX2 (m_HASWELL | m_SKYLAKE | m_CORE_AVX512)
 #define m_CORE_ALL (m_CORE2 | m_NEHALEM  | m_SANDYBRIDGE | m_CORE_AVX2)
 #define m_GOLDMONT (HOST_WIDE_INT_1U<<PROCESSOR_GOLDMONT)
@@ -894,6 +896,7 @@ static const struct processor_costs *processor_cost_table[] =
   &slm_cost,
   &slm_cost,
   &slm_cost,
+  &skylake_cost,
   &skylake_cost,
   &skylake_cost,
   &skylake_cost,
@@ -11658,12 +11661,29 @@ ix86_compute_frame_layout (void)
 	 area, see the SEH code in config/i386/winnt.c for the rationale.  */
       frame->hard_frame_pointer_offset = frame->sse_reg_save_offset;
 
-      /* If we can leave the frame pointer where it is, do so.  Also, return
+      /* If we can leave the frame pointer where it is, do so; however return
 	 the establisher frame for __builtin_frame_address (0) or else if the
-	 frame overflows the SEH maximum frame size.  */
+	 frame overflows the SEH maximum frame size.
+
+	 Note that the value returned by __builtin_frame_address (0) is quite
+	 constrained, because setjmp is piggybacked on the SEH machinery with
+	 recent versions of MinGW:
+
+	  #    elif defined(__SEH__)
+	  #     if defined(__aarch64__) || defined(_ARM64_)
+	  #      define setjmp(BUF) _setjmp((BUF), __builtin_sponentry())
+	  #     elif (__MINGW_GCC_VERSION < 40702)
+	  #      define setjmp(BUF) _setjmp((BUF), mingw_getsp())
+	  #     else
+	  #      define setjmp(BUF) _setjmp((BUF), __builtin_frame_address (0))
+	  #     endif
+
+	 and the second argument passed to _setjmp, if not null, is forwarded
+	 to the TargetFrame parameter of RtlUnwindEx by longjmp (after it has
+	 built an ExceptionRecord on the fly describing the setjmp buffer).  */
       const HOST_WIDE_INT diff
 	= frame->stack_pointer_offset - frame->hard_frame_pointer_offset;
-      if (diff <= 255)
+      if (diff <= 255 && !crtl->accesses_prior_frames)
 	{
 	  /* The resulting diff will be a multiple of 16 lower than 255,
 	     i.e. at most 240 as required by the unwind data structure.  */
@@ -28459,7 +28479,17 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
 	    }
 	  else if (!TARGET_PECOFF && !TARGET_MACHO)
 	    {
-	      if (TARGET_64BIT)
+	      if (TARGET_64BIT
+		  && ix86_cmodel == CM_LARGE_PIC
+		  && DEFAULT_ABI != MS_ABI)
+		{
+		  fnaddr = gen_rtx_UNSPEC (Pmode, gen_rtvec (1, addr),
+					   UNSPEC_GOT);
+		  fnaddr = gen_rtx_CONST (Pmode, fnaddr);
+		  fnaddr = force_reg (Pmode, fnaddr);
+		  fnaddr = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, fnaddr);
+		}
+	      else if (TARGET_64BIT)
 		{
 		  fnaddr = gen_rtx_UNSPEC (Pmode,
 					   gen_rtvec (1, addr),
@@ -32012,7 +32042,8 @@ enum processor_model
   M_INTEL_COREI7_ICELAKE_CLIENT,
   M_INTEL_COREI7_ICELAKE_SERVER,
   M_AMDFAM17H_ZNVER2,
-  M_INTEL_COREI7_CASCADELAKE
+  M_INTEL_COREI7_CASCADELAKE,
+  M_INTEL_COREI7_TIGERLAKE,
 };
 
 struct _arch_names_table
@@ -32041,6 +32072,7 @@ static const _arch_names_table arch_names_table[] =
   {"icelake-client", M_INTEL_COREI7_ICELAKE_CLIENT},
   {"icelake-server", M_INTEL_COREI7_ICELAKE_SERVER},
   {"cascadelake", M_INTEL_COREI7_CASCADELAKE},
+  {"tigerlake", M_INTEL_COREI7_TIGERLAKE},
   {"bonnell", M_INTEL_BONNELL},
   {"silvermont", M_INTEL_SILVERMONT},
   {"goldmont", M_INTEL_GOLDMONT},
@@ -32231,6 +32263,9 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	      arg_str = "cascadelake";
 	      priority = P_PROC_AVX512F;
 	      break;
+	    case PROCESSOR_TIGERLAKE:
+	      arg_str = "tigerlake";
+	      priority = P_PROC_AVX512F;
 	    case PROCESSOR_BONNELL:
 	      arg_str = "bonnell";
 	      priority = P_PROC_SSSE3;

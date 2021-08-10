@@ -110,7 +110,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     template<typename _Source>
       struct __constructible_from<_Source, void>
-      : decltype(__is_path_src(std::declval<_Source>(), 0))
+      : decltype(__is_path_src(std::declval<const _Source&>(), 0))
       { };
 
     template<typename _Tp1, typename _Tp2 = void>
@@ -583,10 +583,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // All the member functions below here have a precondition !empty()
       // (and they should only be called from within the library).
 
-      iterator begin();
-      iterator end();
-      const_iterator begin() const;
-      const_iterator end() const;
+      iterator begin() noexcept;
+      iterator end() noexcept;
+      const_iterator begin() const noexcept;
+      const_iterator end() const noexcept;
 
       value_type& front() noexcept;
       value_type& back() noexcept;
@@ -1266,7 +1266,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     return _M_at_end == __rhs._M_at_end;
   }
 
-  // @} group filesystem
+  /// @} group filesystem
 _GLIBCXX_END_NAMESPACE_CXX11
 } // namespace filesystem
 

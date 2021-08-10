@@ -9040,7 +9040,7 @@ resolve_select_type (gfc_code *code, gfc_namespace *old_ns)
   gfc_code *class_is = NULL, *default_case = NULL;
   gfc_case *c;
   gfc_symtree *st;
-  char name[GFC_MAX_SYMBOL_LEN];
+  char name[GFC_MAX_SYMBOL_LEN + 12 + 1];
   gfc_namespace *ns;
   int error = 0;
   int rank = 0;
@@ -16098,6 +16098,7 @@ gfc_impure_variable (gfc_symbol *sym)
 
   proc = sym->ns->proc_name;
   if (sym->attr.dummy
+      && !sym->attr.value
       && ((proc->attr.subroutine && sym->attr.intent == INTENT_IN)
 	  || proc->attr.function))
     return 1;
