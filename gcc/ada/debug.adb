@@ -140,12 +140,12 @@ package body Debug is
    --  d.Z  Do not enable expansion in configurable run-time mode
 
    --  d_a  Stop elaboration checks on accept or select statement
-   --  d_b
+   --  d_b  Use designated type model under No_Dynamic_Accessibility_Checks
    --  d_c  CUDA compilation : compile for the host
    --  d_d
    --  d_e  Ignore entry calls and requeue statements for elaboration
    --  d_f  Issue info messages related to GNATprove usage
-   --  d_g
+   --  d_g  Disable large static aggregates
    --  d_h  Disable the use of (perfect) hash functions for enumeration Value
    --  d_i  Ignore activations and calls to instances for elaboration
    --  d_j  Read JSON files and populate Repinfo tables (opposite of -gnatRjs)
@@ -164,7 +164,7 @@ package body Debug is
    --  d_w
    --  d_x  Disable inline expansion of Image attribute for enumeration types
    --  d_y
-   --  d_z  Enable Put_Image on tagged types
+   --  d_z
 
    --  d_A  Stop generation of ALI file
    --  d_B  Warn on build-in-place function calls
@@ -186,7 +186,7 @@ package body Debug is
    --  d_R
    --  d_S
    --  d_T  Output trace information on invocation path recording
-   --  d_U
+   --  d_U  Disable prepending messages with "error:".
    --  d_V  Enable verifications on the expanded tree
    --  d_W
    --  d_X
@@ -956,6 +956,10 @@ package body Debug is
    --       behavior is similar to that of No_Entry_Calls_In_Elaboration_Code,
    --       but does not penalize actual entry calls in elaboration code.
 
+   --  d_b  When the restriction No_Dynamic_Accessibility_Checks is enabled,
+   --       use the simple "designated type" accessibility model, instead of
+   --       using the implicit level of the anonymous access type declaration.
+
    --  d_e  The compiler ignores simple entry calls, asynchronous transfer of
    --       control, conditional entry calls, timed entry calls, and requeue
    --       statements in both the static and dynamic elaboration models.
@@ -964,6 +968,10 @@ package body Debug is
    --       understand analysis results. By default these are not issued as
    --       beginners find them confusing. Set automatically by GNATprove when
    --       switch --info is used.
+
+   --  d_g  Disable large static aggregates. The maximum size for a static
+   --       aggregate will be fairly modest, which is useful if the compiler
+   --       is using too much memory and time at compile time.
 
    --  d_h  The compiler does not make use of (perfect) hash functions in the
    --       implementation of the Value attribute for enumeration types.
@@ -989,9 +997,6 @@ package body Debug is
    --  d_x  The compiler does not expand in line the Image attribute for user-
    --       defined enumeration types and the standard boolean type.
 
-   --  d_z  Enable the default Put_Image on tagged types that are not
-   --       predefined.
-
    --  d_A  Do not generate ALI files by setting Opt.Disable_ALI_File.
 
    --  d_B  Warn on build-in-place function calls. This allows users to
@@ -1012,6 +1017,9 @@ package body Debug is
 
    --  d_T  The compiler outputs trace information to standard output whenever
    --       an invocation path is recorded.
+
+   --  d_U  Disable prepending 'error:' to error messages. This used to be the
+   --       default and can be seen as the opposite of -gnatU.
 
    --  d_V  Enable verification of the expanded code before calling the backend
    --       and generate error messages on each inconsistency found.
@@ -1093,7 +1101,7 @@ package body Debug is
    --       issues (e.g., assuming that a low bound of an array parameter
    --       of an unconstrained subtype belongs to the index subtype).
 
-   --  d.9  Enable build-in-place for function calls returning some nonlimited
+   --  d.9  Disable build-in-place for function calls returning nonlimited
    --       types.
 
    ------------------------------------------

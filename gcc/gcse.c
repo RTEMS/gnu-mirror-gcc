@@ -1537,7 +1537,8 @@ compute_hash_table_work (struct gcse_hash_table_d *table)
 		record_last_reg_set_info (insn, regno);
 
 	      if (! RTL_CONST_OR_PURE_CALL_P (insn)
-		  || RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
+		  || RTL_LOOPING_CONST_OR_PURE_CALL_P (insn)
+		  || can_throw_external (insn))
 		record_last_mem_set_info (insn);
 	    }
 
@@ -3050,9 +3051,7 @@ static int
 hoist_code (void)
 {
   basic_block bb, dominated;
-  vec<basic_block> dom_tree_walk;
   unsigned int dom_tree_walk_index;
-  vec<basic_block> domby;
   unsigned int i, j, k;
   struct gcse_expr **index_map;
   struct gcse_expr *expr;
@@ -3106,15 +3105,16 @@ hoist_code (void)
   if (flag_ira_hoist_pressure)
     hoisted_bbs = BITMAP_ALLOC (NULL);
 
-  dom_tree_walk = get_all_dominated_blocks (CDI_DOMINATORS,
-					    ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
+  auto_vec<basic_block> dom_tree_walk
+  = get_all_dominated_blocks (CDI_DOMINATORS,
+			      ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb);
 
   /* Walk over each basic block looking for potentially hoistable
      expressions, nothing gets hoisted from the entry block.  */
   FOR_EACH_VEC_ELT (dom_tree_walk, dom_tree_walk_index, bb)
     {
-      domby = get_dominated_to_depth (CDI_DOMINATORS, bb,
-				      param_max_hoist_depth);
+      auto_vec<basic_block> domby
+	= get_dominated_to_depth (CDI_DOMINATORS, bb, param_max_hoist_depth);
 
       if (domby.length () == 0)
 	continue;
@@ -3315,10 +3315,8 @@ hoist_code (void)
 	      bitmap_clear (from_bbs);
 	    }
 	}
-      domby.release ();
     }
 
-  dom_tree_walk.release ();
   BITMAP_FREE (from_bbs);
   if (flag_ira_hoist_pressure)
     BITMAP_FREE (hoisted_bbs);

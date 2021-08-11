@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # GCC target-specific configuration file.
 # Copyright (C) 1997-2021 Free Software Foundation, Inc.
 
@@ -590,6 +591,8 @@ i[34567]86-*-*)
 		exit 1
 	fi
 	;;
+x86_64-*-darwin*)
+	;;
 x86_64-*-*)
 	case ${with_abi} in
 	"")
@@ -848,6 +851,8 @@ case ${target} in
   tmake_file="${tmake_file} t-glibc"
   target_has_targetcm=yes
   target_has_targetdm=yes
+  # Linux targets always support .init_array.
+  gcc_cv_initfini_array=yes
   ;;
 *-*-netbsd*)
   tm_p_file="${tm_p_file} netbsd-protos.h"
@@ -1563,11 +1568,6 @@ csky-*-*)
 		tm_file="dbxelf.h elfos.h gnu-user.h linux.h glibc-stdint.h ${tm_file} csky/csky-linux-elf.h"
 		tmake_file="${tmake_file} csky/t-csky csky/t-csky-linux"
 
-		if test "x${enable_multilib}" = xyes ; then
-		    tm_file="$tm_file ./sysroot-suffix.h"
-		    tmake_file="${tmake_file} csky/t-sysroot-suffix"
-		fi
-
 		case ${target} in
 		    csky-*-linux-gnu*)
 			tm_defines="$tm_defines DEFAULT_LIBC=LIBC_GLIBC"
@@ -1834,7 +1834,7 @@ hppa[12]*-*-hpux11*)
 		dwarf2=no
 	fi
 	;;
-i[34567]86-*-darwin1[89]*)
+i[34567]86-*-darwin1[89]* | i[34567]86-*-darwin2[0-9]*)
 	echo "Error: 32bit target is not supported after Darwin17" 1>&2
 	;;
 i[34567]86-*-darwin*)
@@ -1842,17 +1842,19 @@ i[34567]86-*-darwin*)
 	# Baseline choice for a machine that allows m64 support.
 	with_cpu=${with_cpu:-core2}
 	tmake_file="${tmake_file} ${cpu_type}/t-darwin32-biarch t-slibgcc"
-	tm_file="${tm_file} ${cpu_type}/darwin32-biarch.h"
+	tm_file="${cpu_type}/darwin32-biarch.h ${tm_file} "
 	;;
 x86_64-*-darwin1[89]* | x86_64-*-darwin2[01]*)
 	# Only 64b from now
+	tm_defines="${tm_defines} TARGET_64BIT_DEFAULT=(OPTION_MASK_ISA_64BIT|OPTION_MASK_ABI_64)"
+	tm_defines="${tm_defines} TARGET_BI_ARCH=0"
 	with_cpu=${with_cpu:-core2}
 	tmake_file="${tmake_file} t-slibgcc"
 	;;
 x86_64-*-darwin*)
 	with_cpu=${with_cpu:-core2}
 	tmake_file="${tmake_file} ${cpu_type}/t-darwin64-biarch t-slibgcc"
-	tm_file="${tm_file} ${cpu_type}/darwin64-biarch.h"
+	tm_file="${cpu_type}/darwin64-biarch.h ${tm_file} "
 	;;
 i[34567]86-*-elfiamcu)
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/iamcu.h"
@@ -3097,13 +3099,26 @@ rs6000-ibm-aix7.1.* | powerpc-ibm-aix7.1.*)
 	use_gcc_stdint=wrap
 	default_use_cxa_atexit=yes
 	;;
-rs6000-ibm-aix[789].* | powerpc-ibm-aix[789].*)
+rs6000-ibm-aix7.2.* | powerpc-ibm-aix7.2.*)
 	tmake_file="rs6000/t-aix52 t-slibgcc"
 	if test x$cpu_is_64bit = xyes; then
 	    tm_file="${tm_file} rs6000/biarch64.h"
 	    tmake_file="rs6000/t-aix64 t-slibgcc"
 	fi
 	tm_file="${tm_file} rs6000/aix.h rs6000/aix72.h rs6000/xcoff.h rs6000/aix-stdint.h"
+	extra_options="${extra_options} rs6000/aix64.opt"
+	use_collect2=yes
+	thread_file='aix'
+	use_gcc_stdint=wrap
+	default_use_cxa_atexit=yes
+	;;
+rs6000-ibm-aix[789].* | powerpc-ibm-aix[789].*)
+	tmake_file="rs6000/t-aix52 t-slibgcc"
+	if test x$cpu_is_64bit = xyes; then
+	    tm_file="${tm_file} rs6000/biarch64.h"
+	    tmake_file="rs6000/t-aix64 t-slibgcc"
+	fi
+	tm_file="${tm_file} rs6000/aix.h rs6000/aix73.h rs6000/xcoff.h rs6000/aix-stdint.h"
 	extra_options="${extra_options} rs6000/aix64.opt"
 	use_collect2=yes
 	thread_file='aix'
@@ -4258,17 +4273,51 @@ case "${target}" in
 		;;
 
 	arc*-*-*)
-		supported_defaults="cpu"
+		supported_defaults="cpu fpu"
 
+		new_cpu=hs38_linux
 		if [ x"$with_cpu" = x ] \
-		    || grep "^ARC_CPU ($with_cpu," \
-		       ${srcdir}/config/arc/arc-cpus.def \
-		       > /dev/null; then
+		    || grep -q -E "^ARC_CPU[[:blank:]]*\($with_cpu," \
+		       ${srcdir}/config/arc/arc-cpus.def
+		then
 		 # Ok
-		 true
+		 new_cpu=$with_cpu
 		else
 		 echo "Unknown cpu used in --with-cpu=$with_cpu" 1>&2
 		 exit 1
+		fi
+
+		# see if --with-fpu matches any of the supported FPUs
+		case "$with_fpu" in
+		"")
+			# OK
+			;;
+		fpus | fpus_div | fpus_fma | fpus_all)
+			# OK if em or hs
+			flags_ok="[emhs]+"
+			;;
+		fpuda | fpuda_div | fpuda_fma | fpuda_all)
+			# OK only em
+			flags_ok="em"
+			;;
+		fpud | fpud_div | fpud_fma | fpud_all)
+			# OK only hs
+			flags_ok="hs"
+			;;
+		*)
+			echo "Unknown floating point type used in "\
+			     "--with-fpu=$with_fpu" 1>&2
+			exit 1
+			;;
+		esac
+
+		if [ -n "$flags_ok" ] \
+		   && ! grep -q -E "^ARC_CPU[[:blank:]]*\($new_cpu,[[:blank:]]*$flags_ok," \
+		   ${srcdir}/config/arc/arc-cpus.def
+		then
+		   echo "Unknown floating point type used in "\
+			 "--with-fpu=$with_fpu for cpu $new_cpu" 1>&2
+			 exit 1
 		fi
 		;;
 
@@ -4605,14 +4654,7 @@ case "${target}" in
 			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=0"
 			;;
 		""|default)
-			case "${target}" in
-			riscv*-*-elf*)
-				tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
-				;;
-			*)
-				tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=0"
-				;;
-			esac
+			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
 			;;
 		*)
 			echo "--with-riscv-attribute=${with_riscv_attribute} is not supported.  The argument must begin with yes, no or default." 1>&2

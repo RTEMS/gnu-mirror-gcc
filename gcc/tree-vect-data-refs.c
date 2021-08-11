@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-hash-traits.h"
 #include "vec-perm-indices.h"
 #include "internal-fn.h"
+#include "gimple-fold.h"
 
 /* Return true if load- or store-lanes optab OPTAB is implemented for
    COUNT vectors of type VECTYPE.  NAME is the name of OPTAB.  */
@@ -115,11 +116,8 @@ vect_lanes_optab_supported_p (const char *name, convert_optab optab,
    types.  */
 
 tree
-vect_get_smallest_scalar_type (stmt_vec_info stmt_info,
-			       HOST_WIDE_INT *lhs_size_unit,
-			       HOST_WIDE_INT *rhs_size_unit)
+vect_get_smallest_scalar_type (stmt_vec_info stmt_info, tree scalar_type)
 {
-  tree scalar_type = gimple_expr_type (stmt_info->stmt);
   HOST_WIDE_INT lhs, rhs;
 
   /* During the analysis phase, this function is called on arbitrary
@@ -130,21 +128,24 @@ vect_get_smallest_scalar_type (stmt_vec_info stmt_info,
   lhs = rhs = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (scalar_type));
 
   gassign *assign = dyn_cast <gassign *> (stmt_info->stmt);
-  if (assign
-      && (gimple_assign_cast_p (assign)
+  if (assign)
+    {
+      scalar_type = TREE_TYPE (gimple_assign_lhs (assign));
+      if (gimple_assign_cast_p (assign)
 	  || gimple_assign_rhs_code (assign) == DOT_PROD_EXPR
 	  || gimple_assign_rhs_code (assign) == WIDEN_SUM_EXPR
 	  || gimple_assign_rhs_code (assign) == WIDEN_MULT_EXPR
 	  || gimple_assign_rhs_code (assign) == WIDEN_LSHIFT_EXPR
 	  || gimple_assign_rhs_code (assign) == WIDEN_PLUS_EXPR
 	  || gimple_assign_rhs_code (assign) == WIDEN_MINUS_EXPR
-	  || gimple_assign_rhs_code (assign) == FLOAT_EXPR))
-    {
-      tree rhs_type = TREE_TYPE (gimple_assign_rhs1 (assign));
+	  || gimple_assign_rhs_code (assign) == FLOAT_EXPR)
+	{
+	  tree rhs_type = TREE_TYPE (gimple_assign_rhs1 (assign));
 
-      rhs = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (rhs_type));
-      if (rhs < lhs)
-        scalar_type = rhs_type;
+	  rhs = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (rhs_type));
+	  if (rhs < lhs)
+	    scalar_type = rhs_type;
+	}
     }
   else if (gcall *call = dyn_cast <gcall *> (stmt_info->stmt))
     {
@@ -152,10 +153,16 @@ vect_get_smallest_scalar_type (stmt_vec_info stmt_info,
       if (gimple_call_internal_p (call))
 	{
 	  internal_fn ifn = gimple_call_internal_fn (call);
-	  if (internal_load_fn_p (ifn) || internal_store_fn_p (ifn))
-	    /* gimple_expr_type already picked the type of the loaded
-	       or stored data.  */
+	  if (internal_load_fn_p (ifn))
+	    /* For loads the LHS type does the trick.  */
 	    i = ~0U;
+	  else if (internal_store_fn_p (ifn))
+	    {
+	      /* For stores use the tyep of the stored value.  */
+	      i = internal_fn_stored_value_index (ifn);
+	      scalar_type = TREE_TYPE (gimple_call_arg (call, i));
+	      i = ~0U;
+	    }
 	  else if (internal_fn_mask_index (ifn) == 0)
 	    i = 1;
 	}
@@ -171,8 +178,6 @@ vect_get_smallest_scalar_type (stmt_vec_info stmt_info,
 	}
     }
 
-  *lhs_size_unit = lhs;
-  *rhs_size_unit = rhs;
   return scalar_type;
 }
 
@@ -207,7 +212,7 @@ vect_mark_for_runtime_alias_test (ddr_p ddr, loop_vec_info loop_vinfo)
 static void
 vect_check_nonzero_value (loop_vec_info loop_vinfo, tree value)
 {
-  vec<tree> checks = LOOP_VINFO_CHECK_NONZERO (loop_vinfo);
+  const vec<tree> &checks = LOOP_VINFO_CHECK_NONZERO (loop_vinfo);
   for (unsigned int i = 0; i < checks.length(); ++i)
     if (checks[i] == value)
       return;
@@ -290,9 +295,7 @@ vect_analyze_possibly_independent_ddr (data_dependence_relation *ddr,
 				       int loop_depth, unsigned int *max_vf)
 {
   class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
-  lambda_vector dist_v;
-  unsigned int i;
-  FOR_EACH_VEC_ELT (DDR_DIST_VECTS (ddr), i, dist_v)
+  for (lambda_vector &dist_v : DDR_DIST_VECTS (ddr))
     {
       int dist = dist_v[loop_depth];
       if (dist != 0 && !(dist > 0 && DDR_REVERSED_P (ddr)))
@@ -729,9 +732,8 @@ vect_slp_analyze_node_dependences (vec_info *vinfo, slp_tree node,
 		{
 		  if (stmt_info != last_store_info)
 		    continue;
-		  unsigned i;
-		  stmt_vec_info store_info;
-		  FOR_EACH_VEC_ELT (stores, i, store_info)
+
+		  for (stmt_vec_info &store_info : stores)
 		    {
 		      data_reference *store_dr
 			= STMT_VINFO_DATA_REF (store_info);
@@ -804,9 +806,8 @@ vect_slp_analyze_node_dependences (vec_info *vinfo, slp_tree node,
 		{
 		  if (stmt_info != last_store_info)
 		    continue;
-		  unsigned i;
-		  stmt_vec_info store_info;
-		  FOR_EACH_VEC_ELT (stores, i, store_info)
+
+		  for (stmt_vec_info &store_info : stores)
 		    {
 		      data_reference *store_dr
 			= STMT_VINFO_DATA_REF (store_info);
@@ -847,9 +848,9 @@ vect_slp_analyze_instance_dependence (vec_info *vinfo, slp_instance instance)
   DUMP_VECT_SCOPE ("vect_slp_analyze_instance_dependence");
 
   /* The stores of this instance are at the root of the SLP tree.  */
-  slp_tree store = SLP_INSTANCE_TREE (instance);
-  if (! STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (store)))
-    store = NULL;
+  slp_tree store = NULL;
+  if (SLP_INSTANCE_KIND (instance) == slp_inst_kind_store)
+    store = SLP_INSTANCE_TREE (instance);
 
   /* Verify we can sink stores to the vectorized stmt insert location.  */
   stmt_vec_info last_store_info = NULL;
@@ -868,9 +869,7 @@ vect_slp_analyze_instance_dependence (vec_info *vinfo, slp_instance instance)
 
   /* Verify we can sink loads to the vectorized stmt insert location,
      special-casing stores of this instance.  */
-  slp_tree load;
-  unsigned int i;
-  FOR_EACH_VEC_ELT (SLP_INSTANCE_LOADS (instance), i, load)
+  for (slp_tree &load : SLP_INSTANCE_LOADS (instance))
     if (! vect_slp_analyze_node_dependences (vinfo, load,
 					     store
 					     ? SLP_TREE_SCALAR_STMTS (store)
@@ -927,9 +926,7 @@ vect_record_base_alignments (vec_info *vinfo)
 {
   loop_vec_info loop_vinfo = dyn_cast <loop_vec_info> (vinfo);
   class loop *loop = loop_vinfo ? LOOP_VINFO_LOOP (loop_vinfo) : NULL;
-  data_reference *dr;
-  unsigned int i;
-  FOR_EACH_VEC_ELT (vinfo->shared->datarefs, i, dr)
+  for (data_reference *dr : vinfo->shared->datarefs)
     {
       dr_vec_info *dr_info = vinfo->lookup_dr (dr);
       stmt_vec_info stmt_info = dr_info->stmt;
@@ -1463,10 +1460,8 @@ vect_get_peeling_costs_all_drs (loop_vec_info loop_vinfo,
 				bool unknown_misalignment)
 {
   vec<data_reference_p> datarefs = LOOP_VINFO_DATAREFS (loop_vinfo);
-  unsigned i;
-  data_reference *dr;
 
-  FOR_EACH_VEC_ELT (datarefs, i, dr)
+  for (data_reference *dr : datarefs)
     {
       dr_vec_info *dr_info = loop_vinfo->lookup_dr (dr);
       if (!vect_relevant_for_alignment_p (dr_info))
@@ -1575,13 +1570,11 @@ static bool
 vect_peeling_supportable (loop_vec_info loop_vinfo, dr_vec_info *dr0_info,
 			  unsigned npeel)
 {
-  unsigned i;
-  struct data_reference *dr = NULL;
   vec<data_reference_p> datarefs = LOOP_VINFO_DATAREFS (loop_vinfo);
   enum dr_alignment_support supportable_dr_alignment;
 
   /* Ensure that all data refs can be vectorized after the peel.  */
-  FOR_EACH_VEC_ELT (datarefs, i, dr)
+  for (data_reference *dr : datarefs)
     {
       int save_misalignment;
 
@@ -2356,8 +2349,8 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
 
   if (do_versioning)
     {
-      vec<stmt_vec_info> may_misalign_stmts
-        = LOOP_VINFO_MAY_MISALIGN_STMTS (loop_vinfo);
+      const vec<stmt_vec_info> &may_misalign_stmts
+	= LOOP_VINFO_MAY_MISALIGN_STMTS (loop_vinfo);
       stmt_vec_info stmt_info;
 
       /* It can now be assumed that the data references in the statements
@@ -2476,8 +2469,7 @@ vect_slp_analyze_instance_alignment (vec_info *vinfo,
     if (! vect_slp_analyze_node_alignment (vinfo, node))
       return false;
 
-  node = SLP_INSTANCE_TREE (instance);
-  if (STMT_VINFO_DATA_REF (SLP_TREE_REPRESENTATIVE (node))
+  if (SLP_INSTANCE_KIND (instance) == slp_inst_kind_store
       && ! vect_slp_analyze_node_alignment
 	     (vinfo, SLP_INSTANCE_TREE (instance)))
     return false;
@@ -3372,7 +3364,8 @@ static void
 vect_check_lower_bound (loop_vec_info loop_vinfo, tree expr, bool unsigned_p,
 			poly_uint64 min_value)
 {
-  vec<vec_lower_bound> lower_bounds = LOOP_VINFO_LOWER_BOUNDS (loop_vinfo);
+  vec<vec_lower_bound> &lower_bounds
+    = LOOP_VINFO_LOWER_BOUNDS (loop_vinfo);
   for (unsigned int i = 0; i < lower_bounds.length (); ++i)
     if (operand_equal_p (lower_bounds[i].expr, expr, 0))
       {
@@ -3474,10 +3467,10 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
   typedef pair_hash <tree_operand_hash, tree_operand_hash> tree_pair_hash;
   hash_set <tree_pair_hash> compared_objects;
 
-  vec<ddr_p> may_alias_ddrs = LOOP_VINFO_MAY_ALIAS_DDRS (loop_vinfo);
+  const vec<ddr_p> &may_alias_ddrs = LOOP_VINFO_MAY_ALIAS_DDRS (loop_vinfo);
   vec<dr_with_seg_len_pair_t> &comp_alias_ddrs
     = LOOP_VINFO_COMP_ALIAS_DDRS (loop_vinfo);
-  vec<vec_object_pair> &check_unequal_addrs
+  const vec<vec_object_pair> &check_unequal_addrs
     = LOOP_VINFO_CHECK_UNEQUAL_ADDRS (loop_vinfo);
   poly_uint64 vect_factor = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
   tree scalar_loop_iters = LOOP_VINFO_NITERS (loop_vinfo);
@@ -3491,9 +3484,9 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
   /* Step values are irrelevant for aliasing if the number of vector
      iterations is equal to the number of scalar iterations (which can
      happen for fully-SLP loops).  */
-  bool ignore_step_p = known_eq (LOOP_VINFO_VECT_FACTOR (loop_vinfo), 1U);
+  bool vf_one_p = known_eq (LOOP_VINFO_VECT_FACTOR (loop_vinfo), 1U);
 
-  if (!ignore_step_p)
+  if (!vf_one_p)
     {
       /* Convert the checks for nonzero steps into bound tests.  */
       tree value;
@@ -3546,6 +3539,11 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
 
       bool preserves_scalar_order_p
 	= vect_preserves_scalar_order_p (dr_info_a, dr_info_b);
+      bool ignore_step_p
+	  = (vf_one_p
+	     && (preserves_scalar_order_p
+		 || operand_equal_p (DR_STEP (dr_info_a->dr),
+				     DR_STEP (dr_info_b->dr))));
 
       /* Skip the pair if inter-iteration dependencies are irrelevant
 	 and intra-iteration dependencies are guaranteed to be honored.  */
@@ -4010,8 +4008,24 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
 	      continue;
 	    }
 
-	  if (TYPE_PRECISION (TREE_TYPE (op0))
-	      < TYPE_PRECISION (TREE_TYPE (off)))
+	  /* Include the conversion if it is widening and we're using
+	     the IFN path or the target can handle the converted from
+	     offset or the current size is not already the same as the
+	     data vector element size.  */
+	  if ((TYPE_PRECISION (TREE_TYPE (op0))
+	       < TYPE_PRECISION (TREE_TYPE (off)))
+	      && (use_ifn_p
+		  || (DR_IS_READ (dr)
+		      ? (targetm.vectorize.builtin_gather
+			 && targetm.vectorize.builtin_gather (vectype,
+							      TREE_TYPE (op0),
+							      scale))
+		      : (targetm.vectorize.builtin_scatter
+			 && targetm.vectorize.builtin_scatter (vectype,
+							       TREE_TYPE (op0),
+							       scale)))
+		  || !operand_equal_p (TYPE_SIZE (TREE_TYPE (off)),
+				       TYPE_SIZE (TREE_TYPE (vectype)), 0)))
 	    {
 	      off = op0;
 	      offtype = TREE_TYPE (off);
@@ -4039,7 +4053,8 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
       if (!vect_gather_scatter_fn_p (loop_vinfo, DR_IS_READ (dr), masked_p,
 				     vectype, memory_type, offtype, scale,
 				     &ifn, &offset_vectype))
-	return false;
+	ifn = IFN_LAST;
+      decl = NULL_TREE;
     }
   else
     {
@@ -4053,10 +4068,6 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
 	  if (targetm.vectorize.builtin_scatter)
 	    decl = targetm.vectorize.builtin_scatter (vectype, offtype, scale);
 	}
-
-      if (!decl)
-	return false;
-
       ifn = IFN_LAST;
       /* The offset vector type will be read from DECL when needed.  */
       offset_vectype = NULL_TREE;
@@ -4286,9 +4297,7 @@ vect_analyze_data_refs (vec_info *vinfo, poly_uint64 *min_vf, bool *fatal)
         {
 	  bool maybe_gather
 	    = DR_IS_READ (dr)
-	      && !TREE_THIS_VOLATILE (DR_REF (dr))
-	      && (targetm.vectorize.builtin_gather != NULL
-		  || supports_vec_gather_load_p ());
+	      && !TREE_THIS_VOLATILE (DR_REF (dr));
 	  bool maybe_scatter
 	    = DR_IS_WRITE (dr)
 	      && !TREE_THIS_VOLATILE (DR_REF (dr))
@@ -5039,7 +5048,7 @@ bump_vector_ptr (vec_info *vinfo,
   struct data_reference *dr = STMT_VINFO_DATA_REF (stmt_info);
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
   tree update = TYPE_SIZE_UNIT (vectype);
-  gassign *incr_stmt;
+  gimple *incr_stmt;
   ssa_op_iter iter;
   use_operand_p use_p;
   tree new_dataref_ptr;
@@ -5054,6 +5063,15 @@ bump_vector_ptr (vec_info *vinfo,
   incr_stmt = gimple_build_assign (new_dataref_ptr, POINTER_PLUS_EXPR,
 				   dataref_ptr, update);
   vect_finish_stmt_generation (vinfo, stmt_info, incr_stmt, gsi);
+  /* Fold the increment, avoiding excessive chains use-def chains of
+     those, leading to compile-time issues for passes until the next
+     forwprop pass which would do this as well.  */
+  gimple_stmt_iterator fold_gsi = gsi_for_stmt (incr_stmt);
+  if (fold_stmt (&fold_gsi, follow_all_ssa_edges))
+    {
+      incr_stmt = gsi_stmt (fold_gsi);
+      update_stmt (incr_stmt);
+    }
 
   /* Copy the points-to information if it exists. */
   if (DR_PTR_INFO (dr))
@@ -5333,7 +5351,7 @@ vect_store_lanes_supported (tree vectype, unsigned HOST_WIDE_INT count,
    I4:  6 14 22 30  7 15 23 31.  */
 
 void
-vect_permute_store_chain (vec_info *vinfo, vec<tree> dr_chain,
+vect_permute_store_chain (vec_info *vinfo, vec<tree> &dr_chain,
 			  unsigned int length,
 			  stmt_vec_info stmt_info,
 			  gimple_stmt_iterator *gsi,

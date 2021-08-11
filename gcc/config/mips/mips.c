@@ -65,6 +65,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "context.h"
 #include "builtins.h"
 #include "rtl-iter.h"
+#include "flags.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -1513,14 +1514,14 @@ mips_handle_interrupt_attr (tree *node ATTRIBUTE_UNUSED, tree name, tree args,
 	  *no_add_attrs = true;
 	}
       else if (strcmp (TREE_STRING_POINTER (cst), "eic") != 0
-	       && strncmp (TREE_STRING_POINTER (cst), "vector=", 7) != 0)
+	       && !startswith (TREE_STRING_POINTER (cst), "vector="))
 	{
 	  warning (OPT_Wattributes,
 		   "argument to %qE attribute is neither eic, nor "
 		   "vector=<line>", name);
 	  *no_add_attrs = true;
 	}
-      else if (strncmp (TREE_STRING_POINTER (cst), "vector=", 7) == 0)
+      else if (startswith (TREE_STRING_POINTER (cst), "vector="))
 	{
 	  const char *arg = TREE_STRING_POINTER (cst) + 7;
 
@@ -1849,7 +1850,7 @@ static bool
 mips16_stub_function_p (const_rtx x)
 {
   return (GET_CODE (x) == SYMBOL_REF
-	  && strncmp (XSTR (x, 0), "__mips16_", 9) == 0);
+	  && startswith (XSTR (x, 0), "__mips16_"));
 }
 
 /* Return true if function X is a locally-defined and locally-binding
@@ -2878,7 +2879,7 @@ mips_const_insns (rtx x)
       return mips_build_integer (codes, INTVAL (x));
 
     case CONST_VECTOR:
-      if (ISA_HAS_MSA
+      if (MSA_SUPPORTED_MODE_P (GET_MODE (x))
 	  && mips_const_vector_same_int_p (x, GET_MODE (x), -512, 511))
 	return 1;
       /* Fall through.  */
@@ -9323,7 +9324,7 @@ mips_function_rodata_section (tree decl, bool)
   if (decl && DECL_SECTION_NAME (decl))
     {
       const char *name = DECL_SECTION_NAME (decl);
-      if (DECL_COMDAT_GROUP (decl) && strncmp (name, ".gnu.linkonce.t.", 16) == 0)
+      if (DECL_COMDAT_GROUP (decl) && startswith (name, ".gnu.linkonce.t."))
 	{
 	  char *rname = ASTRDUP (name);
 	  rname[14] = 'd';
@@ -9331,7 +9332,7 @@ mips_function_rodata_section (tree decl, bool)
 	}
       else if (flag_function_sections
 	       && flag_data_sections
-	       && strncmp (name, ".text.", 6) == 0)
+	       && startswith (name, ".text."))
 	{
 	  char *rname = ASTRDUP (name);
 	  memcpy (rname + 1, "data", 4);
@@ -9489,7 +9490,7 @@ mips_output_filename (FILE *stream, const char *name)
 {
   /* If we are emitting DWARF-2, let dwarf2out handle the ".file"
      directives.  */
-  if (write_symbols == DWARF2_DEBUG)
+  if (dwarf_debuginfo_p ())
     return;
   else if (mips_output_filename_first_time)
     {
@@ -21731,7 +21732,7 @@ mips_expand_vec_unpack (rtx operands[2], bool unsigned_p, bool high_p)
   rtx (*cmpFunc) (rtx, rtx, rtx);
   rtx tmp, dest, zero;
 
-  if (ISA_HAS_MSA)
+  if (MSA_SUPPORTED_MODE_P (imode))
     {
       switch (imode)
 	{
@@ -21993,7 +21994,7 @@ mips_expand_vector_init (rtx target, rtx vals)
 	all_same = false;
     }
 
-  if (ISA_HAS_MSA)
+  if (MSA_SUPPORTED_MODE_P (vmode))
     {
       if (all_same)
 	{
@@ -22320,6 +22321,17 @@ mips_expand_msa_cmp (rtx dest, enum rtx_code cond, rtx op0, rtx op1)
     }
 }
 
+void
+mips_expand_vec_cmp_expr (rtx *operands)
+{
+  rtx cond = operands[1];
+  rtx op0 = operands[2];
+  rtx op1 = operands[3];
+  rtx res = operands[0];
+
+  mips_expand_msa_cmp (res, GET_CODE (cond), op0, op1);
+}
+
 /* Expand VEC_COND_EXPR, where:
    MODE is mode of the result
    VIMODE equivalent integer mode
@@ -22427,12 +22439,12 @@ mips_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
   tree get_fcsr = mips_builtin_decls[MIPS_GET_FCSR];
   tree set_fcsr = mips_builtin_decls[MIPS_SET_FCSR];
   tree get_fcsr_hold_call = build_call_expr (get_fcsr, 0);
-  tree hold_assign_orig = build2 (MODIFY_EXPR, MIPS_ATYPE_USI,
-				  fcsr_orig_var, get_fcsr_hold_call);
+  tree hold_assign_orig = build4 (TARGET_EXPR, MIPS_ATYPE_USI,
+				  fcsr_orig_var, get_fcsr_hold_call, NULL, NULL);
   tree hold_mod_val = build2 (BIT_AND_EXPR, MIPS_ATYPE_USI, fcsr_orig_var,
 			      build_int_cst (MIPS_ATYPE_USI, 0xfffff003));
-  tree hold_assign_mod = build2 (MODIFY_EXPR, MIPS_ATYPE_USI,
-				 fcsr_mod_var, hold_mod_val);
+  tree hold_assign_mod = build4 (TARGET_EXPR, MIPS_ATYPE_USI,
+				 fcsr_mod_var, hold_mod_val, NULL, NULL);
   tree set_fcsr_hold_call = build_call_expr (set_fcsr, 1, fcsr_mod_var);
   tree hold_all = build2 (COMPOUND_EXPR, MIPS_ATYPE_USI,
 			  hold_assign_orig, hold_assign_mod);
@@ -22442,8 +22454,8 @@ mips_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
   *clear = build_call_expr (set_fcsr, 1, fcsr_mod_var);
 
   tree get_fcsr_update_call = build_call_expr (get_fcsr, 0);
-  *update = build2 (MODIFY_EXPR, MIPS_ATYPE_USI,
-		    exceptions_var, get_fcsr_update_call);
+  *update = build4 (TARGET_EXPR, MIPS_ATYPE_USI,
+		    exceptions_var, get_fcsr_update_call, NULL, NULL);
   tree set_fcsr_update_call = build_call_expr (set_fcsr, 1, fcsr_orig_var);
   *update = build2 (COMPOUND_EXPR, void_type_node, *update,
 		    set_fcsr_update_call);

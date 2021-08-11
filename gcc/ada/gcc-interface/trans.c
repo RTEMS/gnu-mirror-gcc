@@ -1453,17 +1453,17 @@ Pragma_to_gnu (Node_Id gnat_node)
 	{
 	case Name_Off:
 	  if (optimize)
-	    post_error ("must specify -O0?", gnat_node);
+	    post_error ("must specify -O0??", gnat_node);
 	  break;
 
 	case Name_Space:
 	  if (!optimize_size)
-	    post_error ("must specify -Os?", gnat_node);
+	    post_error ("must specify -Os??", gnat_node);
 	  break;
 
 	case Name_Time:
 	  if (!optimize)
-	    post_error ("insufficient -O value?", gnat_node);
+	    post_error ("insufficient -O value??", gnat_node);
 	  break;
 
 	default:
@@ -1473,7 +1473,7 @@ Pragma_to_gnu (Node_Id gnat_node)
 
     case Pragma_Reviewable:
       if (write_symbols == NO_DEBUG)
-	post_error ("must specify -g?", gnat_node);
+	post_error ("must specify -g??", gnat_node);
       break;
 
     case Pragma_Warning_As_Error:
@@ -1574,17 +1574,17 @@ Pragma_to_gnu (Node_Id gnat_node)
 	    option_index = find_opt (option_string + 1, lang_mask);
 	    if (option_index == OPT_SPECIAL_unknown)
 	      {
-		post_error ("?unknown -W switch", gnat_node);
+		post_error ("unknown -W switch??", gnat_node);
 		break;
 	      }
 	    else if (!(cl_options[option_index].flags & CL_WARNING))
 	      {
-		post_error ("?-W switch does not control warning", gnat_node);
+		post_error ("-W switch does not control warning??", gnat_node);
 		break;
 	      }
 	    else if (!(cl_options[option_index].flags & lang_mask))
 	      {
-		post_error ("?-W switch not valid for Ada", gnat_node);
+		post_error ("-W switch not valid for Ada??", gnat_node);
 		break;
 	      }
 	    if (cl_options[option_index].flags & CL_JOINED)
@@ -3885,7 +3885,9 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
     }
 
   /* Set the line number in the decl to correspond to that of the body.  */
-  if (!Sloc_to_locus (Sloc (gnat_node), &locus, false, gnu_subprog_decl))
+  if (DECL_IGNORED_P (gnu_subprog_decl))
+    locus = UNKNOWN_LOCATION;
+  else if (!Sloc_to_locus (Sloc (gnat_node), &locus, false, gnu_subprog_decl))
     locus = input_location;
   DECL_SOURCE_LOCATION (gnu_subprog_decl) = locus;
 
@@ -4237,7 +4239,7 @@ node_is_component (Node_Id gnat_node)
    We implement 3 different semantics of atomicity in this function:
 
      1. the Ada 95/2005/2012 semantics of the Atomic aspect/pragma,
-     2. the Ada 2020 semantics of the Atomic aspect/pragma,
+     2. the Ada 2022 semantics of the Atomic aspect/pragma,
      3. the semantics of the Volatile_Full_Access GNAT aspect/pragma.
 
   They are mutually exclusive and the FE should have rejected conflicts.  */
@@ -4284,7 +4286,7 @@ get_atomic_access (Node_Id gnat_node, atomic_acces_t *type, bool *sync)
     gnat_node = Expression (gnat_node);
 
   /* Up to Ada 2012, for Atomic itself, only reads and updates of the object as
-     a whole require atomic access (RM C.6(15)).  But, starting with Ada 2020,
+     a whole require atomic access (RM C.6(15)).  But, starting with Ada 2022,
      reads of or writes to a nonatomic subcomponent of the object also require
      atomic access (RM C.6(19)).  */
   if (node_is_atomic (gnat_node))
@@ -4295,7 +4297,7 @@ get_atomic_access (Node_Id gnat_node, atomic_acces_t *type, bool *sync)
       for (gnat_temp = gnat_node, gnat_parent = Parent (gnat_temp);
 	   node_is_component (gnat_parent) && Prefix (gnat_parent) == gnat_temp;
 	   gnat_temp = gnat_parent, gnat_parent = Parent (gnat_temp))
-	if (Ada_Version < Ada_2020 || node_is_atomic (gnat_parent))
+	if (Ada_Version < Ada_2022 || node_is_atomic (gnat_parent))
 	  goto not_atomic;
 	else
 	  as_a_whole = false;
@@ -4314,7 +4316,7 @@ get_atomic_access (Node_Id gnat_node, atomic_acces_t *type, bool *sync)
   for (gnat_temp = gnat_node;
        node_is_component (gnat_temp);
        gnat_temp = Prefix (gnat_temp))
-    if ((Ada_Version >= Ada_2020 && node_is_atomic (Prefix (gnat_temp)))
+    if ((Ada_Version >= Ada_2022 && node_is_atomic (Prefix (gnat_temp)))
 	|| node_is_volatile_full_access (Prefix (gnat_temp)))
       {
 	*type = OUTER_ATOMIC;
@@ -4471,8 +4473,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
   tree gnu_after_list = NULL_TREE;
   tree gnu_retval = NULL_TREE;
   tree gnu_call, gnu_result;
-  bool went_into_elab_proc = false;
-  bool pushed_binding_level = false;
+  bool went_into_elab_proc;
+  bool pushed_binding_level;
   bool variadic;
   bool by_descriptor;
   Entity_Id gnat_formal;
@@ -4555,6 +4557,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
       current_function_decl = get_elaboration_procedure ();
       went_into_elab_proc = true;
     }
+  else
+    went_into_elab_proc = false;
 
   /* First, create the temporary for the return value when:
 
@@ -4609,6 +4613,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 	  || (gnu_target
 	      && TREE_CODE (gnu_target) == COMPONENT_REF
 	      && DECL_BIT_FIELD (TREE_OPERAND (gnu_target, 1))
+	      && DECL_SIZE (TREE_OPERAND (gnu_target, 1))
+		 != TYPE_SIZE (TREE_TYPE (gnu_target))
 	      && type_is_padding_self_referential (gnu_result_type))))
     {
       gnu_retval = create_temporary ("R", gnu_result_type);
@@ -4624,6 +4630,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
       gnat_pushlevel ();
       pushed_binding_level = true;
     }
+  else
+    pushed_binding_level = false;
 
   /* Create the list of the actual parameters as GCC expects it, namely a
      chain of TREE_LIST nodes in which the TREE_VALUE field of each node
@@ -5357,7 +5365,7 @@ Handled_Sequence_Of_Statements_to_gnu (Node_Id gnat_node)
 	 because of the unstructured form of EH used by fe_sjlj_eh, there
 	 might be forward edges going to __builtin_setjmp receivers on which
 	 it is uninitialized, although they will never be actually taken.  */
-      TREE_NO_WARNING (gnu_jmpsave_decl) = 1;
+      suppress_warning (gnu_jmpsave_decl, OPT_Wuninitialized);
       gnu_jmpbuf_decl
 	= create_var_decl (get_identifier ("JMP_BUF"), NULL_TREE,
 			   jmpbuf_type,
@@ -6146,12 +6154,19 @@ Raise_Error_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p)
 	{
 	  if (!gnu_cond)
 	    gnu_cond = gnat_to_gnu (gnat_cond);
+	  if (integer_zerop (gnu_cond))
+	    return alloc_stmt_list ();
 	  gnu_result = build3 (COND_EXPR, void_type_node, gnu_cond, gnu_result,
 			       alloc_stmt_list ());
 	}
     }
   else
-    gnu_result = build1 (NULL_EXPR, *gnu_result_type_p, gnu_result);
+    {
+      /* The condition field must not be present when the node is used as an
+	 expression form.  */
+      gigi_checking_assert (No (gnat_cond));
+      gnu_result = build1 (NULL_EXPR, *gnu_result_type_p, gnu_result);
+    }
 
   return gnu_result;
 }
@@ -6271,12 +6286,12 @@ tree
 gnat_to_gnu (Node_Id gnat_node)
 {
   const Node_Kind kind = Nkind (gnat_node);
-  bool went_into_elab_proc = false;
   tree gnu_result = error_mark_node; /* Default to no value.  */
   tree gnu_result_type = void_type_node;
   tree gnu_expr, gnu_lhs, gnu_rhs;
   Node_Id gnat_temp;
   atomic_acces_t aa_type;
+  bool went_into_elab_proc;
   bool aa_sync;
 
   /* Save node number for error message and set location information.  */
@@ -6308,32 +6323,18 @@ gnat_to_gnu (Node_Id gnat_node)
 		   build_call_raise (CE_Range_Check_Failed, gnat_node,
 				     N_Raise_Constraint_Error));
 
-  if ((statement_node_p (gnat_node) && kind != N_Null_Statement)
-      || kind == N_Handled_Sequence_Of_Statements
-      || kind == N_Implicit_Label_Declaration)
+  /* If this is a statement and we are at top level, it must be part of the
+     elaboration procedure, so mark us as being in that procedure.  */
+  if ((statement_node_p (gnat_node)
+       || kind == N_Handled_Sequence_Of_Statements
+       || kind == N_Implicit_Label_Declaration)
+      && !current_function_decl)
     {
-      tree current_elab_proc = get_elaboration_procedure ();
-
-      /* If this is a statement and we are at top level, it must be part of
-	 the elaboration procedure, so mark us as being in that procedure.  */
-      if (!current_function_decl)
-	{
-	  current_function_decl = current_elab_proc;
-	  went_into_elab_proc = true;
-	}
-
-      /* If we are in the elaboration procedure, check if we are violating a
-	 No_Elaboration_Code restriction by having a statement there.  Don't
-	 check for a possible No_Elaboration_Code restriction violation on
-	 N_Handled_Sequence_Of_Statements, as we want to signal an error on
-	 every nested real statement instead.  This also avoids triggering
-	 spurious errors on dummy (empty) sequences created by the front-end
-	 for package bodies in some cases.  */
-      if (current_function_decl == current_elab_proc
-	  && kind != N_Handled_Sequence_Of_Statements
-	  && kind != N_Implicit_Label_Declaration)
-	Check_Elaboration_Code_Allowed (gnat_node);
+      current_function_decl = get_elaboration_procedure ();
+      went_into_elab_proc = true;
     }
+  else
+    went_into_elab_proc = false;
 
   switch (kind)
     {
@@ -6976,7 +6977,7 @@ gnat_to_gnu (Node_Id gnat_node)
 
 	  if (align != 0 && align < oalign && !TYPE_ALIGN_OK (gnu_obj_type))
 	    post_error_ne_tree_2
-	      ("?source alignment (^) '< alignment of & (^)",
+	      ("??source alignment (^) '< alignment of & (^)",
 	       gnat_node, Designated_Type (Etype (gnat_node)),
 	       size_int (align / BITS_PER_UNIT), oalign / BITS_PER_UNIT);
 	}
@@ -7624,8 +7625,10 @@ gnat_to_gnu (Node_Id gnat_node)
 	if (gnu_return_label_stack->last ())
 	  {
 	    if (gnu_ret_val)
-	      add_stmt (build_binary_op (MODIFY_EXPR, NULL_TREE, gnu_ret_obj,
-					 gnu_ret_val));
+	      add_stmt_with_node (build_binary_op (MODIFY_EXPR,
+						   NULL_TREE, gnu_ret_obj,
+						   gnu_ret_val),
+				  gnat_node);
 
 	    gnu_result = build1 (GOTO_EXPR, void_type_node,
 				 gnu_return_label_stack->last ());
@@ -8233,6 +8236,14 @@ gnat_to_gnu (Node_Id gnat_node)
       gcc_unreachable ();
     }
 
+  /* If we are in the elaboration procedure, check if we are violating the
+     No_Elaboration_Code restriction by having a non-empty statement.  */
+  if (statement_node_p (gnat_node)
+      && !(TREE_CODE (gnu_result) == STATEMENT_LIST
+	   && empty_stmt_list_p (gnu_result))
+      && current_function_decl == get_elaboration_procedure ())
+    Check_Elaboration_Code_Allowed (gnat_node);
+
   /* If we pushed the processing of the elaboration routine, pop it back.  */
   if (went_into_elab_proc)
     current_function_decl = NULL_TREE;
@@ -8281,7 +8292,7 @@ gnat_to_gnu (Node_Id gnat_node)
   /* If the result is a constant that overflowed, raise Constraint_Error.  */
   if (TREE_CODE (gnu_result) == INTEGER_CST && TREE_OVERFLOW (gnu_result))
     {
-      post_error ("?`Constraint_Error` will be raised at run time", gnat_node);
+      post_error ("??`Constraint_Error` will be raised at run time", gnat_node);
       gnu_result
 	= build1 (NULL_EXPR, gnu_result_type,
 		  build_call_raise (CE_Overflow_Check_Failed, gnat_node,
@@ -8368,7 +8379,9 @@ gnat_to_gnu (Node_Id gnat_node)
 	 much data.  But do not remove it if it is already too small.  */
       if (type_is_padding_self_referential (TREE_TYPE (gnu_result))
 	  && !(TREE_CODE (gnu_result) == COMPONENT_REF
-	       && DECL_BIT_FIELD (TREE_OPERAND (gnu_result, 1))))
+	       && DECL_BIT_FIELD (TREE_OPERAND (gnu_result, 1))
+	       && DECL_SIZE (TREE_OPERAND (gnu_result, 1))
+		  != TYPE_SIZE (TREE_TYPE (gnu_result))))
 	gnu_result = convert (TREE_TYPE (TYPE_FIELDS (TREE_TYPE (gnu_result))),
 			      gnu_result);
     }
@@ -8421,7 +8434,7 @@ tree
 gnat_to_gnu_external (Node_Id gnat_node)
 {
   const int save_force_global = force_global;
-  bool went_into_elab_proc = false;
+  bool went_into_elab_proc;
 
   /* Force the local context and create a fake scope that we zap
      at the end so declarations will not be stuck either in the
@@ -8431,6 +8444,8 @@ gnat_to_gnu_external (Node_Id gnat_node)
       current_function_decl = get_elaboration_procedure ();
       went_into_elab_proc = true;
     }
+  else
+    went_into_elab_proc = false;
   force_global = 0;
   gnat_pushlevel ();
 
@@ -8792,7 +8807,7 @@ gnat_gimplify_expr (tree *expr_p, gimple_seq *pre_p,
       else
 	{
 	  *expr_p = create_tmp_var (type, NULL);
-	  TREE_NO_WARNING (*expr_p) = 1;
+	  suppress_warning (*expr_p);
 	}
 
       gimplify_and_add (TREE_OPERAND (expr, 0), pre_p);
@@ -9260,13 +9275,13 @@ process_freeze_entity (Node_Id gnat_node)
       gnu_new = gnat_to_gnu_entity (full_view, NULL_TREE, true);
 
       /* Propagate back-annotations from full view to partial view.  */
-      if (Unknown_Alignment (gnat_entity))
-	Set_Alignment (gnat_entity, Alignment (full_view));
+      if (!Known_Alignment (gnat_entity))
+	Copy_Alignment (gnat_entity, full_view);
 
-      if (Unknown_Esize (gnat_entity))
+      if (!Known_Esize (gnat_entity))
 	Set_Esize (gnat_entity, Esize (full_view));
 
-      if (Unknown_RM_Size (gnat_entity))
+      if (!Known_RM_Size (gnat_entity))
 	Set_RM_Size (gnat_entity, RM_Size (full_view));
 
       /* The above call may have defined this entity (the simplest example
@@ -10314,7 +10329,7 @@ validate_unchecked_conversion (Node_Id gnat_node)
 	      || !alias_sets_conflict_p (get_alias_set (gnu_source_desig_type),
 					 target_alias_set)))
 	{
-	  post_error_ne ("?possible aliasing problem for type&",
+	  post_error_ne ("??possible aliasing problem for type&",
 			 gnat_node, Target_Type (gnat_node));
 	  post_error ("\\?use -fno-strict-aliasing switch for references",
 		      gnat_node);
@@ -10340,7 +10355,7 @@ validate_unchecked_conversion (Node_Id gnat_node)
 	      || !alias_sets_conflict_p (get_alias_set (gnu_source_desig_type),
 					 target_alias_set)))
 	{
-	  post_error_ne ("?possible aliasing problem for type&",
+	  post_error_ne ("??possible aliasing problem for type&",
 			 gnat_node, Target_Type (gnat_node));
 	  post_error ("\\?use -fno-strict-aliasing switch for references",
 		      gnat_node);

@@ -385,13 +385,13 @@ begin
          end if;
 
       --------------
-      -- Ada_2020 --
+      -- Ada_2022 --
       --------------
 
-      when Pragma_Ada_2020 =>
+      when Pragma_Ada_2022 =>
          if Arg_Count = 0 then
-            Ada_Version := Ada_2020;
-            Ada_Version_Explicit := Ada_2020;
+            Ada_Version := Ada_2022;
+            Ada_Version_Explicit := Ada_2022;
             Ada_Version_Pragma := Pragma_Node;
          end if;
 
@@ -443,10 +443,8 @@ begin
          Check_Arg_Is_On_Or_Off (Arg1);
 
          if Chars (Expression (Arg1)) = Name_On then
-            Extensions_Allowed := True;
-            Ada_Version := Ada_Version_Type'Last;
+            Ada_Version := Ada_With_Extensions;
          else
-            Extensions_Allowed := False;
             Ada_Version := Ada_Version_Explicit;
          end if;
 
@@ -1381,7 +1379,6 @@ begin
          | Pragma_Export_Function
          | Pragma_Export_Object
          | Pragma_Export_Procedure
-         | Pragma_Export_Value
          | Pragma_Export_Valued_Procedure
          | Pragma_Extend_System
          | Pragma_Extensions_Visible
@@ -1392,6 +1389,7 @@ begin
          | Pragma_Finalize_Storage_Only
          | Pragma_Ghost
          | Pragma_Global
+         | Pragma_GNAT_Annotate
          | Pragma_Ident
          | Pragma_Implementation_Defined
          | Pragma_Implemented
@@ -1525,7 +1523,6 @@ begin
          | Pragma_Unevaluated_Use_Of_Old
          | Pragma_Unimplemented_Unit
          | Pragma_Universal_Aliasing
-         | Pragma_Universal_Data
          | Pragma_Unmodified
          | Pragma_Unreferenced
          | Pragma_Unreferenced_Objects

@@ -1139,6 +1139,17 @@ package body Sem_Prag is
                              (State_Id => Item_Id,
                               Ref      => Item);
                         end if;
+
+                     elsif Ekind (Item_Id) in E_Constant | E_Variable
+                       and then Present (Ultimate_Overlaid_Entity (Item_Id))
+                     then
+                        SPARK_Msg_NE
+                          ("overlaying object & cannot appear in Depends",
+                           Item, Item_Id);
+                        SPARK_Msg_NE
+                          ("\use the overlaid object & instead",
+                           Item, Ultimate_Overlaid_Entity (Item_Id));
+                        return;
                      end if;
 
                      --  When the item renames an entire object, replace the
@@ -2387,6 +2398,17 @@ package body Sem_Prag is
                elsif Is_Formal_Object (Item_Id) then
                   null;
 
+               elsif Ekind (Item_Id) in E_Constant | E_Variable
+                 and then Present (Ultimate_Overlaid_Entity (Item_Id))
+               then
+                  SPARK_Msg_NE
+                    ("overlaying object & cannot appear in Global",
+                     Item, Item_Id);
+                  SPARK_Msg_NE
+                    ("\use the overlaid object & instead",
+                     Item, Ultimate_Overlaid_Entity (Item_Id));
+                  return;
+
                --  The only legal references are those to abstract states,
                --  objects and various kinds of constants (SPARK RM 6.1.4(4)).
 
@@ -2433,10 +2455,13 @@ package body Sem_Prag is
                      SPARK_Msg_N ("\use its constituents instead", Item);
                      return;
 
-                  --  An external state cannot appear as a global item of a
-                  --  nonvolatile function (SPARK RM 7.1.3(8)).
+                  --  An external state which has Async_Writers or
+                  --  Effective_Reads enabled cannot appear as a global item
+                  --  of a nonvolatile function (SPARK RM 7.1.3(8)).
 
                   elsif Is_External_State (Item_Id)
+                    and then (Async_Writers_Enabled (Item_Id)
+                               or else Effective_Reads_Enabled (Item_Id))
                     and then Ekind (Spec_Id) in E_Function | E_Generic_Function
                     and then not Is_Volatile_Function (Spec_Id)
                   then
@@ -2464,7 +2489,7 @@ package body Sem_Prag is
 
                   if Global_Mode in Name_In_Out | Name_Output then
 
-                     --  Constant of a access-to-variable type is a read-write
+                     --  Constant of an access-to-variable type is a read-write
                      --  item in procedures, generic procedures, protected
                      --  entries and tasks.
 
@@ -2981,6 +3006,16 @@ package body Sem_Prag is
                if Item_Id = Any_Id then
                   null;
 
+               elsif Ekind (Item_Id) in E_Constant | E_Variable
+                 and then Present (Ultimate_Overlaid_Entity (Item_Id))
+               then
+                  SPARK_Msg_NE
+                    ("overlaying object & cannot appear in Initializes",
+                     Item, Item_Id);
+                  SPARK_Msg_NE
+                    ("\use the overlaid object & instead",
+                     Item, Ultimate_Overlaid_Entity (Item_Id));
+
                --  The state or variable must be declared in the visible
                --  declarations of the package (SPARK RM 7.1.5(7)).
 
@@ -3121,6 +3156,18 @@ package body Sem_Prag is
                               & "state of package %", Input, Input_Id);
                            return;
                         end if;
+                     end if;
+
+                     if Ekind (Input_Id) in E_Constant | E_Variable
+                       and then Present (Ultimate_Overlaid_Entity (Input_Id))
+                     then
+                        SPARK_Msg_NE
+                          ("overlaying object & cannot appear in Initializes",
+                           Input, Input_Id);
+                        SPARK_Msg_NE
+                          ("\use the overlaid object & instead",
+                           Input, Ultimate_Overlaid_Entity (Input_Id));
+                        return;
                      end if;
 
                      --  Detect a duplicate use of the same input item
@@ -4083,9 +4130,9 @@ package body Sem_Prag is
 
       procedure Check_Static_Constraint (Constr : Node_Id);
       --  Constr is a constraint from an N_Subtype_Indication node from a
-      --  component constraint in an Unchecked_Union type. This routine checks
-      --  that the constraint is static as required by the restrictions for
-      --  Unchecked_Union.
+      --  component constraint in an Unchecked_Union type, a range, or a
+      --  discriminant association. This routine checks that the constraint
+      --  is static as required by the restrictions for Unchecked_Union.
 
       procedure Check_Valid_Configuration_Pragma;
       --  Legality checks for placement of a configuration pragma
@@ -4818,10 +4865,10 @@ package body Sem_Prag is
          then
             null;
 
-         --  For Ada 2020, pre/postconditions can appear on formal subprograms
+         --  For Ada 2022, pre/postconditions can appear on formal subprograms
 
          elsif Nkind (Subp_Decl) = N_Formal_Concrete_Subprogram_Declaration
-            and then Ada_Version >= Ada_2020
+            and then Ada_Version >= Ada_2022
          then
             null;
 
@@ -6458,11 +6505,6 @@ package body Sem_Prag is
       -- Check_Static_Constraint --
       -----------------------------
 
-      --  Note: for convenience in writing this procedure, in addition to
-      --  the officially (i.e. by spec) allowed argument which is always a
-      --  constraint, it also allows ranges and discriminant associations.
-      --  Above is not clear ???
-
       procedure Check_Static_Constraint (Constr : Node_Id) is
 
          procedure Require_Static (E : Node_Id);
@@ -6893,7 +6935,7 @@ package body Sem_Prag is
          Proc : Entity_Id := Empty;
 
       begin
-         --  The body of this procedure needs some comments ???
+         --  Perform sanity checks on Name
 
          if not Is_Entity_Name (Name) then
             Error_Pragma_Arg
@@ -6909,6 +6951,9 @@ package body Sem_Prag is
                  ("argument of pragma% must be parameterless procedure", Arg);
             end if;
 
+         --  Otherwise, search through interpretations looking for one which
+         --  has no parameters.
+
          else
             declare
                Found : Boolean := False;
@@ -6923,10 +6968,17 @@ package body Sem_Prag is
                   if Ekind (Proc) = E_Procedure
                     and then No (First_Formal (Proc))
                   then
+                     --  We found an interpretation, note it and continue
+                     --  looking looking to verify it is unique.
+
                      if not Found then
                         Found := True;
                         Set_Entity (Name, Proc);
                         Set_Is_Overloaded (Name, False);
+
+                     --  Two procedures with the same name, log an error
+                     --  since the name is ambiguous.
+
                      else
                         Error_Pragma_Arg
                           ("ambiguous handler name for pragma%", Arg);
@@ -6937,9 +6989,13 @@ package body Sem_Prag is
                end loop;
 
                if not Found then
+                  --  Issue an error if we haven't found a suitable match for
+                  --  Name.
+
                   Error_Pragma_Arg
                     ("argument of pragma% must be parameterless procedure",
                      Arg);
+
                else
                   Proc := Entity (Name);
                end if;
@@ -7258,7 +7314,7 @@ package body Sem_Prag is
       procedure Process_Atomic_Independent_Shared_Volatile is
          procedure Check_Full_Access_Only (Ent : Entity_Id);
          --  Apply legality checks to type or object Ent subject to the
-         --  Full_Access_Only aspect in Ada 2020 (RM C.6(8.2)).
+         --  Full_Access_Only aspect in Ada 2022 (RM C.6(8.2)).
 
          procedure Mark_Component_Or_Object (Ent : Entity_Id);
          --  Appropriately set flags on the given entity, either an array or
@@ -7430,7 +7486,7 @@ package body Sem_Prag is
             --  Attribute belongs on the base type. If the view of the type is
             --  currently private, it also belongs on the underlying type.
 
-            --  In Ada 2020, the pragma can apply to a formal type, for which
+            --  In Ada 2022, the pragma can apply to a formal type, for which
             --  there may be no underlying type.
 
             if Prag_Id = Pragma_Atomic
@@ -7506,7 +7562,7 @@ package body Sem_Prag is
             end if;
 
             if not Has_Alignment_Clause (Ent) then
-               Set_Alignment (Ent, Uint_0);
+               Init_Alignment (Ent);
             end if;
          end Set_Atomic_VFA;
 
@@ -7541,14 +7597,14 @@ package body Sem_Prag is
 
          Check_Duplicate_Pragma (E);
 
-         --  Check the constraints of Full_Access_Only in Ada 2020. Note that
+         --  Check the constraints of Full_Access_Only in Ada 2022. Note that
          --  they do not apply to GNAT's Volatile_Full_Access because 1) this
          --  aspect subsumes the Volatile aspect and 2) nesting is supported
          --  for this aspect and the outermost enclosing VFA object prevails.
 
          --  Note also that we used to forbid specifying both Atomic and VFA on
          --  the same type or object, but the restriction has been lifted in
-         --  light of the semantics of Full_Access_Only and Atomic in Ada 2020.
+         --  light of the semantics of Full_Access_Only and Atomic in Ada 2022.
 
          if Prag_Id = Pragma_Volatile_Full_Access
            and then From_Aspect_Specification (N)
@@ -9127,7 +9183,10 @@ package body Sem_Prag is
 
             Def_Id := Entity (Def_Id);
             Kill_Size_Check_Code (Def_Id);
-            Note_Possible_Modification (Get_Pragma_Arg (Arg1), Sure => False);
+            if Ekind (Def_Id) /= E_Constant then
+               Note_Possible_Modification
+                 (Get_Pragma_Arg (Arg1), Sure => False);
+            end if;
 
          else
             Process_Convention (C, Def_Id);
@@ -9137,7 +9196,10 @@ package body Sem_Prag is
 
             Mark_Ghost_Pragma (N, Def_Id);
             Kill_Size_Check_Code (Def_Id);
-            Note_Possible_Modification (Get_Pragma_Arg (Arg2), Sure => False);
+            if Ekind (Def_Id) /= E_Constant then
+               Note_Possible_Modification
+                 (Get_Pragma_Arg (Arg2), Sure => False);
+            end if;
          end if;
 
          --  Various error checks
@@ -9242,7 +9304,9 @@ package body Sem_Prag is
                --  just the same scope). If the pragma comes from an aspect
                --  specification we know that it is part of the declaration.
 
-               elsif Parent (Unit_Declaration_Node (Def_Id)) /= Parent (N)
+               elsif (No (Unit_Declaration_Node (Def_Id))
+                        or else Parent (Unit_Declaration_Node (Def_Id)) /=
+                                Parent (N))
                  and then Nkind (Parent (N)) /= N_Compilation_Unit_Aux
                  and then not From_Aspect_Specification (N)
                then
@@ -9833,7 +9897,7 @@ package body Sem_Prag is
             --  inlineable either.
 
             elsif Is_Generic_Instance (Subp)
-              or else Nkind (Parent (Parent (Subp))) = N_Subprogram_Declaration
+              or else Parent_Kind (Parent (Subp)) = N_Subprogram_Declaration
             then
                null;
 
@@ -9879,7 +9943,11 @@ package body Sem_Prag is
                if In_Same_Source_Unit (Subp, Inner_Subp) then
                   Set_Inline_Flags (Inner_Subp);
 
-                  Decl := Parent (Parent (Inner_Subp));
+                  if Present (Parent (Inner_Subp)) then
+                     Decl := Parent (Parent (Inner_Subp));
+                  else
+                     Decl := Empty;
+                  end if;
 
                   if Nkind (Decl) = N_Subprogram_Declaration
                     and then Present (Corresponding_Body (Decl))
@@ -10462,6 +10530,41 @@ package body Sem_Prag is
                      Add_To_Config_Boolean_Restrictions (No_Elaboration_Code);
                   end if;
 
+               --  Special processing for No_Dynamic_Accessibility_Checks to
+               --  disallow exclusive specification in a body or subunit.
+
+               elsif R_Id = No_Dynamic_Accessibility_Checks
+                 --  Check if the restriction is within configuration pragma
+                 --  in a similar way to No_Elaboration_Code.
+
+                 and then not (Current_Sem_Unit = Main_Unit
+                                or else In_Extended_Main_Source_Unit (N))
+
+                 and then Nkind (Unit (Parent (N))) = N_Compilation_Unit
+
+                 and then (Nkind (Unit (Parent (N))) = N_Package_Body
+                            or else Nkind (Unit (Parent (N))) = N_Subunit)
+
+                 and then not Restriction_Active
+                                (No_Dynamic_Accessibility_Checks)
+               then
+                  Error_Msg_N
+                    ("invalid specification of " &
+                     """No_Dynamic_Accessibility_Checks""", N);
+
+                  if Nkind (Unit (Parent (N))) = N_Package_Body then
+                     Error_Msg_N
+                       ("\restriction cannot be specified in a package " &
+                         "body", N);
+
+                  elsif Nkind (Unit (Parent (N))) = N_Subunit then
+                     Error_Msg_N
+                       ("\restriction cannot be specified in a subunit", N);
+                  end if;
+
+                  Error_Msg_N
+                    ("\unless also specified in spec", N);
+
                --  Special processing for No_Tasking restriction (not just a
                --  warning) when it appears as a configuration pragma.
 
@@ -10869,8 +10972,8 @@ package body Sem_Prag is
       procedure Record_Independence_Check (N : Node_Id; E : Entity_Id) is
          pragma Unreferenced (N, E);
       begin
-         --  For GCC back ends the validation is done a priori
-         --  ??? This code is dead, might be useful in the future
+         --  For GCC back ends the validation is done a priori. This code is
+         --  dead, but might be useful in the future.
 
          --  if not AAMP_On_Target then
          --     return;
@@ -11334,7 +11437,7 @@ package body Sem_Prag is
                Warn    => Treat_Restrictions_As_Warnings,
                Profile => Ravenscar);
 
-            --  Set the following restriction which was added to Ada 2020,
+            --  Set the following restriction which was added to Ada 2022,
             --  but as a binding interpretation:
             --     No_Dependence => Ada.Synchronous_Barriers
             --  for Ravenscar (and therefore for Ravenscar variants) but not
@@ -12529,26 +12632,65 @@ package body Sem_Prag is
          end;
 
          --------------
-         -- Ada_2020 --
+         -- Ada_2022 --
          --------------
 
-         --  pragma Ada_2020;
+         --  pragma Ada_2022;
+         --  pragma Ada_2022 (LOCAL_NAME):
 
          --  Note: this pragma also has some specific processing in Par.Prag
-         --  because we want to set the Ada 2020 version mode during parsing.
+         --  because we want to set the Ada 2022 version mode during parsing.
 
-         when Pragma_Ada_2020 =>
+         --  The one argument form is used for managing the transition from Ada
+         --  2012 to Ada 2022 in the run-time library. If an entity is marked
+         --  as Ada_2022 only, then referencing the entity in any pre-Ada_2022
+         --  mode will generate a warning;for calls to Ada_2022 only primitives
+         --  that require overriding an error will be reported. In addition, in
+         --  any pre-Ada_2022 mode, a preference rule is established which does
+         --  not choose such an entity unless it is unambiguously specified.
+         --  This avoids extra subprograms marked this way from generating
+         --  ambiguities in otherwise legal pre-Ada 2022 programs. The one
+         --  argument form is intended for exclusive use in the GNAT run-time
+         --  library.
+
+         when Pragma_Ada_2022 =>
+         declare
+            E_Id : Node_Id;
+
+         begin
             GNAT_Pragma;
 
-            Check_Arg_Count (0);
+            if Arg_Count = 1 then
+               Check_Arg_Is_Local_Name (Arg1);
+               E_Id := Get_Pragma_Arg (Arg1);
 
-            Check_Valid_Configuration_Pragma;
+               if Etype (E_Id) = Any_Type then
+                  return;
+               end if;
 
-            --  Now set appropriate Ada mode
+               Set_Is_Ada_2022_Only (Entity (E_Id));
+               Record_Rep_Item (Entity (E_Id), N);
 
-            Ada_Version          := Ada_2020;
-            Ada_Version_Explicit := Ada_2020;
-            Ada_Version_Pragma   := N;
+            else
+               Check_Arg_Count (0);
+
+               --  For Ada_2022 we unconditionally enforce the documented
+               --  configuration pragma placement, since we do not want to
+               --  tolerate mixed modes in a unit involving Ada 2022. That
+               --  would cause real difficulties for those cases where there
+               --  are incompatibilities between Ada 2012 and Ada 2022. We
+               --  could allow mixing of Ada 2012 and Ada 2022 but it's not
+               --  worth it.
+
+               Check_Valid_Configuration_Pragma;
+
+               --  Now set appropriate Ada mode
+
+               Ada_Version          := Ada_2022;
+               Ada_Version_Explicit := Ada_2022;
+               Ada_Version_Pragma   := N;
+            end if;
+         end;
 
          -------------------------------------
          -- Aggregate_Individually_Assign --
@@ -12628,7 +12770,7 @@ package body Sem_Prag is
          --  external tool and a tool-specific function. These arguments are
          --  not analyzed.
 
-         when Pragma_Annotate => Annotate : declare
+         when Pragma_Annotate | Pragma_GNAT_Annotate => Annotate : declare
             Arg     : Node_Id;
             Expr    : Node_Id;
             Nam_Arg : Node_Id;
@@ -13431,7 +13573,7 @@ package body Sem_Prag is
                     Arg1);
                end if;
 
-            --  Only other possibility is Access-to-class-wide type
+            --  Only other possibility is access-to-class-wide type
 
             elsif Is_Access_Type (Nm)
               and then Is_Class_Wide_Type (Designated_Type (Nm))
@@ -13507,7 +13649,7 @@ package body Sem_Prag is
                    and then Nkind (Object_Definition (D)) =
                                        N_Constrained_Array_Definition)
               or else
-                 (Ada_Version >= Ada_2020
+                 (Ada_Version >= Ada_2022
                    and then Nkind (D) = N_Formal_Type_Declaration)
             then
                --  The flag is set on the base type, or on the object
@@ -14596,7 +14738,6 @@ package body Sem_Prag is
          --    [, [Link_Name     =>] static_string_EXPRESSION ]);
 
          when Pragma_CPP_Constructor => CPP_Constructor : declare
-            Elmt    : Elmt_Id;
             Id      : Entity_Id;
             Def_Id  : Entity_Id;
             Tag_Typ : Entity_Id;
@@ -14663,12 +14804,7 @@ package body Sem_Prag is
                then
                   Tag_Typ := Etype (Def_Id);
 
-                  Elmt := First_Elmt (Primitive_Operations (Tag_Typ));
-                  while Present (Elmt) and then Node (Elmt) /= Def_Id loop
-                     Next_Elmt (Elmt);
-                  end loop;
-
-                  Remove_Elmt (Primitive_Operations (Tag_Typ), Elmt);
+                  Remove (Primitive_Operations (Tag_Typ), Def_Id);
                   Set_Is_Dispatching_Operation (Def_Id, False);
                end if;
 
@@ -16280,25 +16416,6 @@ package body Sem_Prag is
               Arg_Mechanism       => Mechanism);
          end Export_Procedure;
 
-         ------------------
-         -- Export_Value --
-         ------------------
-
-         --  pragma Export_Value (
-         --     [Value     =>] static_integer_EXPRESSION,
-         --     [Link_Name =>] static_string_EXPRESSION);
-
-         when Pragma_Export_Value =>
-            GNAT_Pragma;
-            Check_Arg_Order ((Name_Value, Name_Link_Name));
-            Check_Arg_Count (2);
-
-            Check_Optional_Identifier (Arg1, Name_Value);
-            Check_Arg_Is_OK_Static_Expression (Arg1, Any_Integer);
-
-            Check_Optional_Identifier (Arg2, Name_Link_Name);
-            Check_Arg_Is_OK_Static_Expression (Arg2, Standard_String);
-
          -----------------------------
          -- Export_Valued_Procedure --
          -----------------------------
@@ -16408,11 +16525,8 @@ package body Sem_Prag is
             Check_Arg_Is_One_Of (Arg1, Name_On, Name_Off);
 
             if Chars (Get_Pragma_Arg (Arg1)) = Name_On then
-               Extensions_Allowed := True;
-               Ada_Version := Ada_Version_Type'Last;
-
+               Ada_Version := Ada_With_Extensions;
             else
-               Extensions_Allowed := False;
                Ada_Version := Ada_Version_Explicit;
                Ada_Version_Pragma := Empty;
             end if;
@@ -19793,7 +19907,7 @@ package body Sem_Prag is
                   raise Pragma_Exit;
                end if;
 
-               --  Loop to find matching procedures or functions (Ada 2020)
+               --  Loop to find matching procedures or functions (Ada 2022)
 
                E := Entity (Id);
 
@@ -19801,10 +19915,10 @@ package body Sem_Prag is
                while Present (E)
                  and then Scope (E) = Current_Scope
                loop
-                  --  Ada 2020 (AI12-0269): A function can be No_Return
+                  --  Ada 2022 (AI12-0269): A function can be No_Return
 
                   if Ekind (E) in E_Generic_Procedure | E_Procedure
-                    or else (Ada_Version >= Ada_2020
+                    or else (Ada_Version >= Ada_2022
                               and then
                              Ekind (E) in E_Generic_Function | E_Function)
                   then
@@ -19896,7 +20010,7 @@ package body Sem_Prag is
                   then
                      Set_No_Return (Entity (Id));
 
-                  elsif Ada_Version >= Ada_2020 then
+                  elsif Ada_Version >= Ada_2022 then
                      Error_Pragma_Arg
                        ("no subprogram& found for pragma%", Arg);
 
@@ -20409,7 +20523,8 @@ package body Sem_Prag is
                elsif Chars (Argx) = Name_Eliminated then
                   if Ttypes.Standard_Long_Long_Integer_Size /= 64 then
                      Error_Pragma_Arg
-                       ("Eliminated not implemented on this target", Argx);
+                       ("Eliminated requires Long_Long_Integer'Size = 64",
+                        Argx);
                   else
                      return Eliminated;
                   end if;
@@ -24924,16 +25039,6 @@ package body Sem_Prag is
             Set_Universal_Aliasing (Base_Type (E));
             Record_Rep_Item (E, N);
          end Universal_Alias;
-
-         --------------------
-         -- Universal_Data --
-         --------------------
-
-         --  pragma Universal_Data [(library_unit_NAME)];
-
-         when Pragma_Universal_Data =>
-            GNAT_Pragma;
-            Error_Pragma ("??pragma% ignored (applies only to AAMP)");
 
          ----------------
          -- Unmodified --
@@ -30656,17 +30761,17 @@ package body Sem_Prag is
                elsif Present (Generic_Parent (Specification (Stmt))) then
                   return Stmt;
 
-               --  Ada 2020: contract on formal subprogram or on generated
+               --  Ada 2022: contract on formal subprogram or on generated
                --  Access_Subprogram_Wrapper, which appears after the related
                --  Access_Subprogram declaration.
 
                elsif Is_Generic_Actual_Subprogram (Defining_Entity (Stmt))
-                 and then Ada_Version >= Ada_2020
+                 and then Ada_Version >= Ada_2022
                then
                   return Stmt;
 
                elsif Is_Access_Subprogram_Wrapper (Defining_Entity (Stmt))
-                 and then Ada_Version >= Ada_2020
+                 and then Ada_Version >= Ada_2022
                then
                   return Stmt;
                end if;
@@ -30869,7 +30974,7 @@ package body Sem_Prag is
       --  Follow subprogram renaming chain
 
       if Is_Subprogram (Def_Id)
-        and then Nkind (Parent (Declaration_Node (Def_Id))) =
+        and then Parent_Kind (Declaration_Node (Def_Id)) =
                    N_Subprogram_Renaming_Declaration
         and then Present (Alias (Def_Id))
       then
@@ -31140,7 +31245,7 @@ package body Sem_Prag is
       Pragma_Ada_2005                       => -1,
       Pragma_Ada_12                         => -1,
       Pragma_Ada_2012                       => -1,
-      Pragma_Ada_2020                       => -1,
+      Pragma_Ada_2022                       => -1,
       Pragma_Aggregate_Individually_Assign  => 0,
       Pragma_All_Calls_Remote               => -1,
       Pragma_Allow_Integer_Address          => -1,
@@ -31206,7 +31311,6 @@ package body Sem_Prag is
       Pragma_Export_Function                => -1,
       Pragma_Export_Object                  => -1,
       Pragma_Export_Procedure               => -1,
-      Pragma_Export_Value                   => -1,
       Pragma_Export_Valued_Procedure        => -1,
       Pragma_Extend_System                  => -1,
       Pragma_Extensions_Allowed             =>  0,
@@ -31218,6 +31322,7 @@ package body Sem_Prag is
       Pragma_Finalize_Storage_Only          =>  0,
       Pragma_Ghost                          =>  0,
       Pragma_Global                         => -1,
+      Pragma_GNAT_Annotate                  => 93,
       Pragma_Ident                          => -1,
       Pragma_Ignore_Pragma                  =>  0,
       Pragma_Implementation_Defined         => -1,
@@ -31361,7 +31466,6 @@ package body Sem_Prag is
       Pragma_Unevaluated_Use_Of_Old         =>  0,
       Pragma_Unimplemented_Unit             =>  0,
       Pragma_Universal_Aliasing             =>  0,
-      Pragma_Universal_Data                 =>  0,
       Pragma_Unmodified                     =>  0,
       Pragma_Unreferenced                   =>  0,
       Pragma_Unreferenced_Objects           =>  0,

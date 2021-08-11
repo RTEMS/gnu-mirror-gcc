@@ -116,6 +116,13 @@ is
    -- "=" --
    ---------
 
+   function "=" (Left, Right : Cursor) return Boolean is
+   begin
+      return
+       Left.Container = Right.Container
+         and then Left.Node = Right.Node;
+   end "=";
+
    function "=" (Left, Right : Map) return Boolean is
    begin
       return Is_Equal (Left.HT, Right.HT);
@@ -636,7 +643,11 @@ is
       end if;
 
       Position.Container := Container'Unrestricted_Access;
-      Position.Position := HT_Ops.Index (HT, Position.Node);
+
+      --  Note that we do not set the Position component of the cursor,
+      --  because it may become incorrect on subsequent insertions/deletions
+      --  from the container. This will lose some optimizations but prevents
+      --  anomalies when the underlying hash-table is expanded or shrunk.
    end Insert;
 
    procedure Insert
@@ -679,7 +690,6 @@ is
       end if;
 
       Position.Container := Container'Unrestricted_Access;
-      Position.Position := HT_Ops.Index (HT, Position.Node);
    end Insert;
 
    procedure Insert
@@ -892,7 +902,7 @@ is
    ---------------
 
    procedure Put_Image
-     (S : in out Ada.Strings.Text_Output.Sink'Class; V : Map)
+     (S : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; V : Map)
    is
       First_Time : Boolean := True;
       use System.Put_Images;

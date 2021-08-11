@@ -207,6 +207,19 @@ static bool type_maybe_constexpr_default_constructor (tree);
 static bool type_maybe_constexpr_destructor (tree);
 static bool field_poverlapping_p (tree);
 
+/* Set CURRENT_ACCESS_SPECIFIER based on the protection of DECL.  */
+
+void
+set_current_access_from_decl (tree decl)
+{
+  if (TREE_PRIVATE (decl))
+    current_access_specifier = access_private_node;
+  else if (TREE_PROTECTED (decl))
+    current_access_specifier = access_protected_node;
+  else
+    current_access_specifier = access_public_node;
+}
+
 /* Return a COND_EXPR that executes TRUE_STMT if this execution of the
    'structor is in charge of 'structing virtual bases, or FALSE_STMT
    otherwise.  */
@@ -1359,6 +1372,8 @@ handle_using_decl (tree using_decl, tree t)
 	 CONST_DECL_USING_P is true.  */
       gcc_assert (TREE_CODE (decl) == CONST_DECL);
 
+      auto cas = make_temp_override (current_access_specifier);
+      set_current_access_from_decl (using_decl);
       tree copy = copy_decl (decl);
       DECL_CONTEXT (copy) = t;
       DECL_ARTIFICIAL (copy) = true;
@@ -2376,7 +2391,7 @@ struct find_final_overrider_data {
   /* The candidate overriders.  */
   tree candidates;
   /* Path to most derived.  */
-  vec<tree> path;
+  auto_vec<tree> path;
 };
 
 /* Add the overrider along the current path to FFOD->CANDIDATES.
@@ -2488,8 +2503,6 @@ find_final_overrider (tree derived, tree binfo, tree fn)
 
   dfs_walk_all (derived, dfs_find_final_overrider_pre,
 		dfs_find_final_overrider_post, &ffod);
-
-  ffod.path.release ();
 
   /* If there was no winner, issue an error message.  */
   if (!ffod.candidates || TREE_CHAIN (ffod.candidates))
@@ -3059,8 +3072,7 @@ finish_struct_anon_r (tree field)
     }
 }
 
-/* Check for things that are invalid.  There are probably plenty of other
-   things we should check for also.  */
+/* Fix up any anonymous union/struct members of T.  */
 
 static void
 finish_struct_anon (tree t)
@@ -4205,7 +4217,7 @@ field_poverlapping_p (tree decl)
 bool
 is_empty_field (tree decl)
 {
-  if (TREE_CODE (decl) != FIELD_DECL)
+  if (!decl || TREE_CODE (decl) != FIELD_DECL)
     return false;
 
   bool r = (is_empty_class (TREE_TYPE (decl))
@@ -5604,19 +5616,6 @@ classtype_has_non_deleted_move_ctor (tree t)
   return false;
 }
 
-/* True iff T has a copy constructor that is not deleted.  */
-
-bool
-classtype_has_non_deleted_copy_ctor (tree t)
-{
-  if (CLASSTYPE_LAZY_COPY_CTOR (t))
-    lazily_declare_fn (sfk_copy_constructor, t);
-  for (ovl_iterator iter (CLASSTYPE_CONSTRUCTORS (t)); iter; ++iter)
-    if (copy_fn_p (*iter) && !DECL_DELETED_FN (*iter))
-      return true;
-  return false;
-}
-
 /* If T, a class, has a user-provided copy constructor, copy assignment
    operator, or destructor, returns that function.  Otherwise, null.  */
 
@@ -6702,7 +6701,7 @@ layout_class_type (tree t, tree *virtuals_p)
 	     laying out an Objective-C class.  The ObjC ABI differs
 	     from the C++ ABI, and so we do not want a warning
 	     here.  */
-	  && !TREE_NO_WARNING (field)
+	  && !warning_suppressed_p (field, OPT_Wabi)
 	  && !last_field_was_bitfield
 	  && !integer_zerop (size_binop (TRUNC_MOD_EXPR,
 					 DECL_FIELD_BIT_OFFSET (field),

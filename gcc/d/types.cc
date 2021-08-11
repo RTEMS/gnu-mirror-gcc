@@ -469,7 +469,7 @@ layout_aggregate_type (AggregateDeclaration *decl, tree type,
 	      insert_aggregate_field (type, field, 0);
 	    }
 
-	  if (!id && !cd->isCPPclass ())
+	  if (!id && cd->hasMonitor ())
 	    {
 	      tree field = create_field_decl (ptr_type_node, "__monitor", 1,
 					      inherited_p);
@@ -874,7 +874,7 @@ public:
 	Type *underlying = NULL;
 
 	/* Skip over the prefixing `__c_'.  */
-	gcc_assert (strncmp (ident, "__c_", strlen ("__c_")) == 0);
+	gcc_assert (startswith (ident, "__c_"));
 	ident = ident + strlen ("__c_");
 
 	/* To keep things compatible within the code generation we stick to

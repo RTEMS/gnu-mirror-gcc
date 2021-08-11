@@ -414,9 +414,6 @@ cgraph_node::create_clone (tree new_decl, profile_count prof_count,
   else if (info && info->param_adjustments)
     clone_info::get_create (new_node)->param_adjustments
 	 = info->param_adjustments;
-  if (info && info->performed_splits)
-    clone_info::get_create (new_node)->performed_splits
-	 = vec_safe_copy (info->performed_splits);
   new_node->split_part = split_part;
 
   FOR_EACH_VEC_ELT (redirect_callers, i, e)
@@ -567,7 +564,7 @@ clone_function_name (tree decl, const char *suffix)
    bitmap interface.
    */
 cgraph_node *
-cgraph_node::create_virtual_clone (vec<cgraph_edge *> redirect_callers,
+cgraph_node::create_virtual_clone (const vec<cgraph_edge *> &redirect_callers,
 				   vec<ipa_replace_map *, va_gc> *tree_map,
 				   ipa_param_adjustments *param_adjustments,
 				   const char * suffix, unsigned num_suffix)
@@ -636,7 +633,15 @@ cgraph_node::create_virtual_clone (vec<cgraph_edge *> redirect_callers,
       || in_lto_p)
     new_node->unique_name = true;
   FOR_EACH_VEC_SAFE_ELT (tree_map, i, map)
-    new_node->maybe_create_reference (map->new_tree, NULL);
+    {
+      tree repl = map->new_tree;
+      if (map->force_load_ref)
+	{
+	  gcc_assert (TREE_CODE (repl) == ADDR_EXPR);
+	  repl = get_base_address (TREE_OPERAND (repl, 0));
+	}
+      new_node->maybe_create_reference (repl, NULL);
+    }
 
   if (ipa_transforms_to_apply.exists ())
     new_node->ipa_transforms_to_apply

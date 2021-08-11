@@ -274,7 +274,14 @@ static inline cpp_hashnode *cpp_node (tree id)
 
 static inline tree identifier (const cpp_hashnode *node)
 {
+  /* HT_NODE() expands to node->ident that HT_IDENT_TO_GCC_IDENT()
+     then subtracts a nonzero constant, deriving a pointer to
+     a different member than ident.  That's strictly undefined
+     and detected by -Warray-bounds.  Suppress it.  See PR 101372.  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
   return HT_IDENT_TO_GCC_IDENT (HT_NODE (const_cast<cpp_hashnode *> (node)));
+#pragma GCC diagnostic pop
 }
 
 /* Id for dumping module information.  */
@@ -2820,12 +2827,16 @@ struct merge_key {
 
 struct duplicate_hash : nodel_ptr_hash<tree_node>
 {
+#if 0
+  /* This breaks variadic bases in the xtreme_header tests.  Since ::equal is
+     the default pointer_hash::equal, let's use the default hash as well.  */
   inline static hashval_t hash (value_type decl)
   {
     if (TREE_CODE (decl) == TREE_BINFO)
       decl = TYPE_NAME (BINFO_TYPE (decl));
     return hashval_t (DECL_UID (decl));
   }
+#endif
 };
 
 /* Hashmap of merged duplicates.  Usually decls, but can contain
@@ -6094,9 +6105,8 @@ trees_out::core_vals (tree t)
       break;
 
     case STATEMENT_LIST:
-      for (tree_stmt_iterator iter = tsi_start (t);
-	   !tsi_end_p (iter); tsi_next (&iter))
-	if (tree stmt = tsi_stmt (iter))
+      for (tree stmt : tsi_range (t))
+	if (stmt)
 	  WT (stmt);
       WT (NULL_TREE);
       break;
@@ -8909,7 +8919,7 @@ trees_in::tree_value ()
 	  dump (dumper::MERGE)
 	    && dump ("Deduping binfo %N[%u]", type, ix);
 	  existing = TYPE_BINFO (type);
-	  while (existing && ix)
+	  while (existing && ix--)
 	    existing = TREE_CHAIN (existing);
 	  if (existing)
 	    register_duplicate (t, existing);

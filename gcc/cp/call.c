@@ -1731,7 +1731,8 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
 	 because A[] and A[2] are reference-related.  But we don't do it
 	 because grok_reference_init has deduced the array size (to 1), and
 	 A[1] and A[2] aren't reference-related.  */
-      if (CONSTRUCTOR_NELTS (expr) == 1)
+      if (CONSTRUCTOR_NELTS (expr) == 1
+	  && !CONSTRUCTOR_IS_DESIGNATED_INIT (expr))
 	{
 	  tree elt = CONSTRUCTOR_ELT (expr, 0)->value;
 	  if (error_operand_p (elt))
@@ -2095,6 +2096,7 @@ implicit_conversion_1 (tree to, tree from, tree expr, bool c_cast_p,
 	{
 	  if (BRACE_ENCLOSED_INITIALIZER_P (expr)
 	      && CONSTRUCTOR_NELTS (expr) == 1
+	      && !CONSTRUCTOR_IS_DESIGNATED_INIT (expr)
 	      && !is_list_ctor (cand->fn))
 	    {
 	      /* "If C is not an initializer-list constructor and the
@@ -4108,7 +4110,7 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 	{
 	  cand->second_conv = build_identity_conv (totype, NULL_TREE);
 
-	  /* If totype isn't a reference, and LOOKUP_NO_TEMP_BIND isn't
+	  /* If totype isn't a reference, and LOOKUP_ONLYCONVERTING is
 	     set, then this is copy-initialization.  In that case, "The
 	     result of the call is then used to direct-initialize the
 	     object that is the destination of the copy-initialization."
@@ -4117,6 +4119,8 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 	     We represent this in the conversion sequence with an
 	     rvalue conversion, which means a constructor call.  */
 	  if (!TYPE_REF_P (totype)
+	      && cxx_dialect < cxx17
+	      && (flags & LOOKUP_ONLYCONVERTING)
 	      && !(convflags & LOOKUP_NO_TEMP_BIND))
 	    cand->second_conv
 	      = build_conv (ck_rvalue, totype, cand->second_conv);
@@ -4625,7 +4629,7 @@ perform_overload_resolution (tree fn,
    functions.  */
 
 static void
-print_error_for_call_failure (tree fn, vec<tree, va_gc> *args,
+print_error_for_call_failure (tree fn, const vec<tree, va_gc> *args,
 			      struct z_candidate *candidates)
 {
   tree targs = NULL_TREE;
@@ -4648,6 +4652,40 @@ print_error_for_call_failure (tree fn, vec<tree, va_gc> *args,
 	      name, build_tree_list_vec (args));
   if (candidates)
     print_z_candidates (loc, candidates);
+}
+
+/* Perform overload resolution on the set of deduction guides DGUIDES
+   using ARGS.  Returns the selected deduction guide, or error_mark_node
+   if overload resolution fails.  */
+
+tree
+perform_dguide_overload_resolution (tree dguides, const vec<tree, va_gc> *args,
+				    tsubst_flags_t complain)
+{
+  z_candidate *candidates;
+  bool any_viable_p;
+  tree result;
+
+  gcc_assert (deduction_guide_p (OVL_FIRST (dguides)));
+
+  /* Get the high-water mark for the CONVERSION_OBSTACK.  */
+  void *p = conversion_obstack_alloc (0);
+
+  z_candidate *cand = perform_overload_resolution (dguides, args, &candidates,
+						   &any_viable_p, complain);
+  if (!cand)
+    {
+      if (complain & tf_error)
+	print_error_for_call_failure (dguides, args, candidates);
+      result = error_mark_node;
+    }
+  else
+    result = cand->fn;
+
+  /* Free all the conversions we allocated.  */
+  obstack_free (&conversion_obstack, p);
+
+  return result;
 }
 
 /* Return an expression for a call to FN (a namespace-scope function,
@@ -5876,6 +5914,9 @@ perfect_conversion_p (conversion *conv)
 			next_conversion (conv)->type))
 	return false;
     }
+  if (conv->check_narrowing)
+    /* Brace elision is imperfect.  */
+    return false;
   return true;
 }
 
@@ -5889,6 +5930,11 @@ static bool
 perfect_candidate_p (z_candidate *cand)
 {
   if (cand->viable < 1)
+    return false;
+  /* CWG1402 makes an implicitly deleted move op worse than other
+     candidates.  */
+  if (DECL_DELETED_FN (cand->fn) && DECL_DEFAULTED_FN (cand->fn)
+      && move_fn_p (cand->fn))
     return false;
   int len = cand->num_convs;
   for (int i = 0; i < len; ++i)
@@ -7199,8 +7245,10 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 	 treat that as an implicit delete-expression.  This is also called for
 	 the delete if the constructor throws in a new-expression, and for a
 	 deleting destructor (which implements a delete-expression).  */
+      /* But leave this flag off for destroying delete to avoid wrong
+	 assumptions in the optimizers.  */
       tree call = extract_call_expr (ret);
-      if (TREE_CODE (call) == CALL_EXPR)
+      if (TREE_CODE (call) == CALL_EXPR && !destroying_delete_p (fn))
 	CALL_FROM_NEW_OR_DELETE_P (call) = 1;
 
       return ret;
@@ -7464,8 +7512,9 @@ maybe_warn_array_conv (location_t loc, conversion *c, tree expr)
       || TYPE_DOMAIN (type) == NULL_TREE)
     return;
 
-  if (conv_binds_to_array_of_unknown_bound (c))
-    pedwarn (loc, OPT_Wpedantic, "conversions to arrays of unknown bound "
+  if (pedantic && conv_binds_to_array_of_unknown_bound (c))
+    pedwarn (loc, OPT_Wc__20_extensions,
+	     "conversions to arrays of unknown bound "
 	     "are only available with %<-std=c++20%> or %<-std=gnu++20%>");
 }
 
@@ -7790,7 +7839,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
   expr = convert_like (next_conversion (convs), expr, fn, argnum,
 		       convs->kind == ck_ref_bind
 		       ? issue_conversion_warnings : false,
-		       c_cast_p, complain);
+		       c_cast_p, complain & ~tf_no_cleanup);
   if (expr == error_mark_node)
     return error_mark_node;
 
@@ -7900,9 +7949,13 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 			      "type %qH to a value of type %qI",
 			      totype, next->type);
 		  }
-		else
+		else if (!CP_TYPE_CONST_P (TREE_TYPE (ref_type)))
 		  error_at (loc, "cannot bind non-const lvalue reference of "
 			    "type %qH to an rvalue of type %qI", totype, extype);
+		else // extype is volatile
+		  error_at (loc, "cannot bind lvalue reference of type "
+			    "%qH to an rvalue of type %qI", totype,
+			    extype);
 	      }
 	    else if (!reference_compatible_p (TREE_TYPE (totype), extype))
 	      {
@@ -8166,7 +8219,10 @@ convert_arg_to_ellipsis (tree arg, tsubst_flags_t complain)
     {
       arg = mark_rvalue_use (arg);
       if (TREE_SIDE_EFFECTS (arg))
-	arg = cp_build_compound_expr (arg, null_pointer_node, complain);
+	{
+	  warning_sentinel w(warn_unused_result);
+	  arg = cp_build_compound_expr (arg, null_pointer_node, complain);
+	}
       else
 	arg = null_pointer_node;
     }
@@ -8818,6 +8874,7 @@ immediate_invocation_p (tree fn, int nargs)
 	      || !DECL_IMMEDIATE_FUNCTION_P (current_function_decl))
 	  && (current_binding_level->kind != sk_function_parms
 	      || !current_binding_level->immediate_fn_ctx_p)
+	  && !in_consteval_if_p
 	  /* As an exception, we defer std::source_location::current ()
 	     invocations until genericization because LWG3396 mandates
 	     special behavior for it.  */
@@ -9137,17 +9194,31 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	  if (base_binfo == error_mark_node)
 	    return error_mark_node;
 	}
-      tree converted_arg = build_base_path (PLUS_EXPR, arg,
-					    base_binfo, 1, complain);
 
       /* If we know the dynamic type of the object, look up the final overrider
 	 in the BINFO.  */
       if (DECL_VINDEX (fn) && (flags & LOOKUP_NONVIRTUAL) == 0
 	  && resolves_to_fixed_type_p (arg))
 	{
-	  fn = lookup_vfn_in_binfo (DECL_VINDEX (fn), base_binfo);
-	  flags |= LOOKUP_NONVIRTUAL;
+	  tree ov = lookup_vfn_in_binfo (DECL_VINDEX (fn), base_binfo);
+
+	  /* And unwind base_binfo to match.  If we don't find the type we're
+	     looking for in BINFO_INHERITANCE_CHAIN, we're looking at diamond
+	     inheritance; for now do a normal virtual call in that case.  */
+	  tree octx = DECL_CONTEXT (ov);
+	  tree obinfo = base_binfo;
+	  while (obinfo && !SAME_BINFO_TYPE_P (BINFO_TYPE (obinfo), octx))
+	    obinfo = BINFO_INHERITANCE_CHAIN (obinfo);
+	  if (obinfo)
+	    {
+	      fn = ov;
+	      base_binfo = obinfo;
+	      flags |= LOOKUP_NONVIRTUAL;
+	    }
 	}
+
+      tree converted_arg = build_base_path (PLUS_EXPR, arg,
+					    base_binfo, 1, complain);
 
       argarray[j++] = converted_arg;
       parm = TREE_CHAIN (parm);
@@ -9428,7 +9499,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	{
 	  /* Avoid copying empty classes.  */
 	  val = build2 (COMPOUND_EXPR, type, arg, to);
-	  TREE_NO_WARNING (val) = 1;
+	  suppress_warning (val, OPT_Wunused);
 	}
       else if (tree_int_cst_equal (TYPE_SIZE (type), TYPE_SIZE (as_base)))
 	{
@@ -9459,7 +9530,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 		      build2 (MEM_REF, array_type, arg0, alias_set),
 		      build2 (MEM_REF, array_type, arg, alias_set));
 	  val = build2 (COMPOUND_EXPR, TREE_TYPE (to), t, to);
-          TREE_NO_WARNING (val) = 1;
+          suppress_warning (val, OPT_Wunused);
 	}
 
       cp_warn_deprecated_use (fn, complain);
@@ -9533,7 +9604,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
     {
       tree c = extract_call_expr (call);
       if (TREE_CODE (c) == CALL_EXPR)
-	TREE_NO_WARNING (c) = 1;
+	suppress_warning (c /* Suppress all warnings.  */);
     }
   if (TREE_CODE (fn) == ADDR_EXPR)
     {
@@ -10189,6 +10260,7 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
 
       if (BRACE_ENCLOSED_INITIALIZER_P (arg)
 	  && !TYPE_HAS_LIST_CTOR (class_type)
+	  && !CONSTRUCTOR_IS_DESIGNATED_INIT (arg)
 	  && CONSTRUCTOR_NELTS (arg) == 1)
 	arg = CONSTRUCTOR_ELT (arg, 0)->value;
 
@@ -12482,11 +12554,11 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
     TREE_ADDRESSABLE (var) = 1;
 
   if (TREE_CODE (decl) == FIELD_DECL
-      && extra_warnings && !TREE_NO_WARNING (decl))
+      && extra_warnings && !warning_suppressed_p (decl))
     {
       warning (OPT_Wextra, "a temporary bound to %qD only persists "
 	       "until the constructor exits", decl);
-      TREE_NO_WARNING (decl) = true;
+      suppress_warning (decl);
     }
 
   /* Recursively extend temps in this initializer.  */

@@ -137,6 +137,29 @@ package body Sinfo.Utils is
       Write_Eol;
    end Node_Debug_Output;
 
+   -------------------------------
+   -- Parent-related operations --
+   -------------------------------
+
+   procedure Copy_Parent (To, From : Node_Or_Entity_Id) is
+   begin
+      if Atree.Present (To) and Atree.Present (From) then
+         Atree.Set_Parent (To, Atree.Parent (From));
+      else
+         pragma Assert
+           (if Atree.Present (To) then Atree.No (Atree.Parent (To)));
+      end if;
+   end Copy_Parent;
+
+   function Parent_Kind (N : Node_Id) return Node_Kind is
+   begin
+      if Atree.No (N) then
+         return N_Empty;
+      else
+         return Nkind (Atree.Parent (N));
+      end if;
+   end Parent_Kind;
+
    -------------------------
    -- Iterator Procedures --
    -------------------------
@@ -239,7 +262,7 @@ package body Sinfo.Utils is
 
    begin
       for J in Fields'Range loop
-         if Fields (J) /= Link then -- Don't walk Parent!
+         if Fields (J) /= F_Link then -- Don't walk Parent!
             declare
                Desc : Field_Descriptor renames
                  Node_Field_Descriptors (Fields (J));
@@ -264,7 +287,7 @@ package body Sinfo.Utils is
 
    begin
       for J in Fields'Range loop
-         if Fields (J) /= Link then -- Don't walk Parent!
+         if Fields (J) /= F_Link then -- Don't walk Parent!
             declare
                Desc : Field_Descriptor renames
                  Node_Field_Descriptors (Fields (J));

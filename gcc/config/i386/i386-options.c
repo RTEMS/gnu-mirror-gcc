@@ -1904,7 +1904,7 @@ ix86_option_override_internal (bool main_args_p,
 
       /* opts->x_ix86_tune_string is set to opts->x_ix86_arch_string
 	 or defaulted.  We need to use a sensible tune option.  */
-      if (!strncmp (opts->x_ix86_tune_string, "x86-64", 6)
+      if (startswith (opts->x_ix86_tune_string, "x86-64")
 	  && (opts->x_ix86_tune_string[6] == '\0'
 	      || (!strcmp (opts->x_ix86_tune_string + 6, "-v2")
 		  || !strcmp (opts->x_ix86_tune_string + 6, "-v3")
@@ -2109,6 +2109,7 @@ ix86_option_override_internal (bool main_args_p,
 #define DEF_PTA(NAME) \
 	if (((processor_alias_table[i].flags & PTA_ ## NAME) != 0) \
 	    && PTA_ ## NAME != PTA_64BIT \
+	    && (TARGET_64BIT || PTA_ ## NAME != PTA_UINTR) \
 	    && !TARGET_EXPLICIT_ ## NAME ## _P (opts)) \
 	  SET_TARGET_ ## NAME (opts);
 #include "i386-isa.def"
@@ -2123,8 +2124,10 @@ ix86_option_override_internal (bool main_args_p,
 	if (((processor_alias_table[i].flags & PTA_ABM) != 0)
 	    && !TARGET_EXPLICIT_ABM_P (opts))
 	  {
-	    SET_TARGET_LZCNT (opts);
-	    SET_TARGET_POPCNT (opts);
+	    if (!TARGET_EXPLICIT_LZCNT_P (opts))
+	      SET_TARGET_LZCNT (opts);
+	    if (!TARGET_EXPLICIT_POPCNT_P (opts))
+	      SET_TARGET_POPCNT (opts);
 	  }
 
 	if ((processor_alias_table[i].flags
@@ -2830,6 +2833,13 @@ ix86_option_override_internal (bool main_args_p,
      The PR provides some numbers about the slowness.  */
   if (ix86_indirect_branch != indirect_branch_keep)
     SET_OPTION_IF_UNSET (opts, opts_set, flag_jump_tables, 0);
+
+  SET_OPTION_IF_UNSET (opts, opts_set, param_ira_consider_dup_in_all_alts, 0);
+
+  /* Fully masking the main or the epilogue vectorized loop is not
+     profitable generally so leave it disabled until we get more
+     fine grained control & costing.  */
+  SET_OPTION_IF_UNSET (opts, opts_set, param_vect_partial_vector_usage, 0);
 
   return true;
 }

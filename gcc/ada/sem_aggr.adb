@@ -48,6 +48,7 @@ with Restrict;       use Restrict;
 with Rident;         use Rident;
 with Sem;            use Sem;
 with Sem_Aux;        use Sem_Aux;
+with Sem_Case;       use Sem_Case;
 with Sem_Cat;        use Sem_Cat;
 with Sem_Ch3;        use Sem_Ch3;
 with Sem_Ch5;        use Sem_Ch5;
@@ -907,7 +908,7 @@ package body Sem_Aggr is
 
       elsif Present (Find_Aspect (Typ, Aspect_Aggregate))
         and then Ekind (Typ) /= E_Record_Type
-        and then Ada_Version >= Ada_2020
+        and then Ada_Version >= Ada_2022
       then
          Resolve_Container_Aggregate (N, Typ);
 
@@ -3140,7 +3141,7 @@ package body Sem_Aggr is
       Base : constant Node_Id := Expression (N);
 
    begin
-      Error_Msg_Ada_2020_Feature ("delta aggregate", Sloc (N));
+      Error_Msg_Ada_2022_Feature ("delta aggregate", Sloc (N));
 
       if not Is_Composite_Type (Typ) then
          Error_Msg_N ("not a composite type", N);
@@ -5027,12 +5028,19 @@ package body Sem_Aggr is
                Prepend_Elmt (Parent_Typ, To => Parent_Typ_List);
                Parent_Typ := Etype (Parent_Typ);
 
+               --  Check whether a private parent requires the use of
+               --  an extension aggregate. This test does not apply in
+               --  an instantiation: if the generic unit is legal so is
+               --  the instance.
+
                if Nkind (Parent (Base_Type (Parent_Typ))) =
                                         N_Private_Type_Declaration
                  or else Nkind (Parent (Base_Type (Parent_Typ))) =
                                         N_Private_Extension_Declaration
                then
-                  if Nkind (N) /= N_Extension_Aggregate then
+                  if Nkind (N) /= N_Extension_Aggregate
+                    and then not In_Instance
+                  then
                      Error_Msg_NE
                        ("type of aggregate has private ancestor&!",
                         N, Parent_Typ);
@@ -5190,7 +5198,18 @@ package body Sem_Aggr is
                --  replace the reference to the current instance by the target
                --  object of the aggregate.
 
-               if Present (Parent (Component))
+               if Is_Case_Choice_Pattern (N) then
+
+                  --  Do not transform box component values in a case-choice
+                  --  aggregate.
+
+                  Add_Association
+                   (Component      => Component,
+                    Expr       => Empty,
+                    Assoc_List => New_Assoc_List,
+                    Is_Box_Present => True);
+
+               elsif Present (Parent (Component))
                  and then Nkind (Parent (Component)) = N_Component_Declaration
                  and then Present (Expression (Parent (Component)))
                then

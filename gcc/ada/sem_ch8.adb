@@ -481,11 +481,10 @@ package body Sem_Ch8 is
    --  legality of selector given the scope denoted by prefix, and change node
    --  N into a expanded name with a properly set Entity field.
 
-   function Find_Most_Prev (Use_Clause : Node_Id) return Node_Id;
+   function Find_First_Use (Use_Clause : Node_Id) return Node_Id;
    --  Find the most previous use clause (that is, the first one to appear in
    --  the source) by traversing the previous clause chain that exists in both
    --  N_Use_Package_Clause nodes and N_Use_Type_Clause nodes.
-   --  ??? a better subprogram name is in order
 
    function Find_Renamed_Entity
      (N         : Node_Id;
@@ -529,7 +528,6 @@ package body Sem_Ch8 is
       Clause2 : Entity_Id) return Entity_Id;
    --  Determine which use clause parameter is the most descendant in terms of
    --  scope.
-   --  ??? a better subprogram name is in order
 
    procedure Premature_Usage (N : Node_Id);
    --  Diagnose usage of an entity before it is visible
@@ -1168,7 +1166,9 @@ package body Sem_Ch8 is
            and then Is_Anonymous_Access_Type (Etype (Expression (Nam)))
            and then not Is_Anonymous_Access_Type (T)
          then
-            Wrong_Type (Expression (Nam), T); -- Should we give better error???
+            Error_Msg_NE
+              ("cannot rename anonymous access object "
+                & "as a named access type", Expression (Nam), T);
          end if;
 
          --  Check that a class-wide object is not being renamed as an object
@@ -1530,7 +1530,7 @@ package body Sem_Ch8 is
       --  Ignore (accept) N_Raise_xxx_Error nodes in this context.
 
       elsif No_Raise_xxx_Error (Nam) = OK then
-         Error_Msg_Ada_2020_Feature ("value in renaming", Sloc (Nam));
+         Error_Msg_Ada_2022_Feature ("value in renaming", Sloc (Nam));
       end if;
 
       Set_Etype (Id, T2);
@@ -3278,8 +3278,8 @@ package body Sem_Ch8 is
          --  constructed later at the freeze point, so indicate that the
          --  completion has not been seen yet.
 
-         Reinit_Field_To_Zero (New_S, Has_Out_Or_In_Out_Parameter);
-         Reinit_Field_To_Zero (New_S, Needs_No_Actuals,
+         Reinit_Field_To_Zero (New_S, F_Has_Out_Or_In_Out_Parameter);
+         Reinit_Field_To_Zero (New_S, F_Needs_No_Actuals,
            Old_Ekind => (E_Function | E_Procedure => True, others => False));
          Mutate_Ekind (New_S, E_Subprogram_Body);
          New_S := Rename_Spec;
@@ -3299,7 +3299,9 @@ package body Sem_Ch8 is
                Style.Missing_Overriding (N, Rename_Spec);
             end if;
 
-         elsif Must_Override (Specification (N)) then
+         elsif Must_Override (Specification (N))
+           and then not Can_Override_Operator (Rename_Spec)
+         then
             Error_Msg_NE ("subprogram& is not overriding", N, Rename_Spec);
          end if;
 
@@ -3788,15 +3790,31 @@ package body Sem_Ch8 is
             Set_Has_Delayed_Freeze (New_S, False);
             Freeze_Before (N, New_S);
 
-            --  An abstract subprogram is only allowed as an actual in the case
-            --  where the formal subprogram is also abstract.
-
             if (Ekind (Old_S) = E_Procedure or else Ekind (Old_S) = E_Function)
-              and then Is_Abstract_Subprogram (Old_S)
               and then not Is_Abstract_Subprogram (Formal_Spec)
             then
-               Error_Msg_N
-                 ("abstract subprogram not allowed as generic actual", Nam);
+               --  An abstract subprogram is only allowed as an actual in the
+               --  case where the formal subprogram is also abstract.
+
+               if Is_Abstract_Subprogram (Old_S) then
+                  Error_Msg_N
+                    ("abstract subprogram not allowed as generic actual", Nam);
+               end if;
+
+               --  AI12-0412: A primitive of an abstract type with Pre'Class
+               --  or Post'Class aspects specified with nonstatic expressions
+               --  is not allowed as actual for a nonabstract formal subprogram
+               --  (see RM 6.1.1(18.2/5).
+
+               if Is_Dispatching_Operation (Old_S)
+                 and then
+                   Is_Prim_Of_Abst_Type_With_Nonstatic_CW_Pre_Post (Old_S)
+               then
+                  Error_Msg_N
+                    ("primitive of abstract type with nonstatic class-wide "
+                      & "pre/postconditions not allowed as actual",
+                     Nam);
+               end if;
             end if;
          end if;
 
@@ -4862,7 +4880,7 @@ package body Sem_Ch8 is
 
             Pop_Scope;
 
-            while not (Is_List_Member (Decl))
+            while not Is_List_Member (Decl)
               or else Nkind (Parent (Decl)) in N_Protected_Definition
                                              | N_Task_Definition
             loop
@@ -5314,16 +5332,6 @@ package body Sem_Ch8 is
 
          elsif not Comes_From_Source (E) then
             return False;
-
-         --  In gnat internal mode, we consider all entities known. The
-         --  historical reason behind this discrepancy is not known??? But the
-         --  only effect is to modify the error message given, so it is not
-         --  critical. Since it only affects the exact wording of error
-         --  messages in illegal programs, we do not mention this as an
-         --  effect of -gnatg, since it is not a language modification.
-
-         elsif GNAT_Mode then
-            return True;
          end if;
 
          --  Here we have an entity that is not from package Standard, and
@@ -6835,7 +6843,7 @@ package body Sem_Ch8 is
 
       case Nkind (N) is
          when N_Selected_Component =>
-            Reinit_Field_To_Zero (N, Is_Prefixed_Call);
+            Reinit_Field_To_Zero (N, F_Is_Prefixed_Call);
             Change_Selected_Component_To_Expanded_Name (N);
 
          when N_Expanded_Name =>
@@ -6989,10 +6997,10 @@ package body Sem_Ch8 is
    end Find_Expanded_Name;
 
    --------------------
-   -- Find_Most_Prev --
+   -- Find_First_Use --
    --------------------
 
-   function Find_Most_Prev (Use_Clause : Node_Id) return Node_Id is
+   function Find_First_Use (Use_Clause : Node_Id) return Node_Id is
       Curr : Node_Id;
 
    begin
@@ -7004,7 +7012,7 @@ package body Sem_Ch8 is
       end loop;
 
       return Curr;
-   end Find_Most_Prev;
+   end Find_First_Use;
 
    -------------------------
    -- Find_Renamed_Entity --
@@ -7596,10 +7604,16 @@ package body Sem_Ch8 is
             P_Type := Implicitly_Designated_Type (P_Type);
          end if;
 
-         --  First check for components of a record object (not the
-         --  result of a call, which is handled below).
+         --  First check for components of a record object (not the result of
+         --  a call, which is handled below). This also covers the case where
+         --  where the extension feature that supports the prefixed form of
+         --  calls for primitives of untagged types is enabled (excluding
+         --  concurrent cases, which are handled further below).
 
-         if Has_Components (P_Type)
+         if Is_Type (P_Type)
+           and then (Has_Components (P_Type)
+                      or else (Extensions_Allowed
+                                and then not Is_Concurrent_Type (P_Type)))
            and then not Is_Overloadable (P_Name)
            and then not Is_Type (P_Name)
          then
@@ -8997,6 +9011,28 @@ package body Sem_Ch8 is
    procedure Push_Scope (S : Entity_Id) is
       E : constant Entity_Id := Scope (S);
 
+      function Component_Alignment_Default return Component_Alignment_Kind;
+      --  Return Component_Alignment_Kind for the newly-pushed scope.
+
+      function Component_Alignment_Default return Component_Alignment_Kind is
+      begin
+         --  Each new scope pushed onto the scope stack inherits the component
+         --  alignment of the previous scope. This emulates the "visibility"
+         --  semantics of pragma Component_Alignment.
+
+         if Scope_Stack.Last > Scope_Stack.First then
+            return Scope_Stack.Table
+              (Scope_Stack.Last - 1).Component_Alignment_Default;
+
+         --  Otherwise, this is the first scope being pushed on the scope
+         --  stack. Inherit the component alignment from the configuration
+         --  form of pragma Component_Alignment (if any).
+
+         else
+            return Configuration_Component_Alignment;
+         end if;
+      end Component_Alignment_Default;
+
    begin
       if Ekind (S) = E_Void then
          null;
@@ -9025,49 +9061,27 @@ package body Sem_Ch8 is
 
       Scope_Stack.Increment_Last;
 
-      declare
-         SST : Scope_Stack_Entry renames Scope_Stack.Table (Scope_Stack.Last);
-
-      begin
-         SST.Entity                        := S;
-         SST.Save_Scope_Suppress           := Scope_Suppress;
-         SST.Save_Local_Suppress_Stack_Top := Local_Suppress_Stack_Top;
-         SST.Save_Check_Policy_List        := Check_Policy_List;
-         SST.Save_Default_Storage_Pool     := Default_Pool;
-         SST.Save_No_Tagged_Streams        := No_Tagged_Streams;
-         SST.Save_SPARK_Mode               := SPARK_Mode;
-         SST.Save_SPARK_Mode_Pragma        := SPARK_Mode_Pragma;
-         SST.Save_Default_SSO              := Default_SSO;
-         SST.Save_Uneval_Old               := Uneval_Old;
-
-         --  Each new scope pushed onto the scope stack inherits the component
-         --  alignment of the previous scope. This emulates the "visibility"
-         --  semantics of pragma Component_Alignment.
-
-         if Scope_Stack.Last > Scope_Stack.First then
-            SST.Component_Alignment_Default :=
-              Scope_Stack.Table
-                (Scope_Stack.Last - 1).Component_Alignment_Default;
-
-         --  Otherwise, this is the first scope being pushed on the scope
-         --  stack. Inherit the component alignment from the configuration
-         --  form of pragma Component_Alignment (if any).
-
-         else
-            SST.Component_Alignment_Default :=
-              Configuration_Component_Alignment;
-         end if;
-
-         SST.Last_Subprogram_Name           := null;
-         SST.Is_Transient                   := False;
-         SST.Node_To_Be_Wrapped             := Empty;
-         SST.Pending_Freeze_Actions         := No_List;
-         SST.Actions_To_Be_Wrapped          := (others => No_List);
-         SST.First_Use_Clause               := Empty;
-         SST.Is_Active_Stack_Base           := False;
-         SST.Previous_Visibility            := False;
-         SST.Locked_Shared_Objects          := No_Elist;
-      end;
+      Scope_Stack.Table (Scope_Stack.Last) :=
+        (Entity                        => S,
+         Save_Scope_Suppress           => Scope_Suppress,
+         Save_Local_Suppress_Stack_Top => Local_Suppress_Stack_Top,
+         Save_Check_Policy_List        => Check_Policy_List,
+         Save_Default_Storage_Pool     => Default_Pool,
+         Save_No_Tagged_Streams        => No_Tagged_Streams,
+         Save_SPARK_Mode               => SPARK_Mode,
+         Save_SPARK_Mode_Pragma        => SPARK_Mode_Pragma,
+         Save_Default_SSO              => Default_SSO,
+         Save_Uneval_Old               => Uneval_Old,
+         Component_Alignment_Default   => Component_Alignment_Default,
+         Last_Subprogram_Name          => null,
+         Is_Transient                  => False,
+         Node_To_Be_Wrapped            => Empty,
+         Pending_Freeze_Actions        => No_List,
+         Actions_To_Be_Wrapped         => (others => No_List),
+         First_Use_Clause              => Empty,
+         Is_Active_Stack_Base          => False,
+         Previous_Visibility           => False,
+         Locked_Shared_Objects         => No_Elist);
 
       if Debug_Flag_W then
          Write_Str ("--> new scope: ");
@@ -9804,16 +9818,16 @@ package body Sem_Ch8 is
          if Present (Redundant) and then Parent (Redundant) /= Prev_Use then
 
             --  Make sure we are looking at most-descendant use_package_clause
-            --  by traversing the chain with Find_Most_Prev and then verifying
+            --  by traversing the chain with Find_First_Use and then verifying
             --  there is no scope manipulation via Most_Descendant_Use_Clause.
 
             if Nkind (Prev_Use) = N_Use_Package_Clause
               and then
                 (Nkind (Parent (Prev_Use)) /= N_Compilation_Unit
                   or else Most_Descendant_Use_Clause
-                            (Prev_Use, Find_Most_Prev (Prev_Use)) /= Prev_Use)
+                            (Prev_Use, Find_First_Use (Prev_Use)) /= Prev_Use)
             then
-               Prev_Use := Find_Most_Prev (Prev_Use);
+               Prev_Use := Find_First_Use (Prev_Use);
             end if;
 
             Error_Msg_Sloc := Sloc (Prev_Use);
@@ -10367,7 +10381,7 @@ package body Sem_Ch8 is
             if Present (Current_Use_Clause (T)) then
                Use_Clause_Known : declare
                   Clause1 : constant Node_Id :=
-                              Find_Most_Prev (Current_Use_Clause (T));
+                              Find_First_Use (Current_Use_Clause (T));
                   Clause2 : constant Node_Id := Parent (Id);
                   Ent1    : Entity_Id;
                   Ent2    : Entity_Id;
@@ -10507,10 +10521,10 @@ package body Sem_Ch8 is
             --  a spurious warning - so verify there is a previous use clause.
 
             if Current_Use_Clause (Scope (T)) /=
-                 Find_Most_Prev (Current_Use_Clause (Scope (T)))
+                 Find_First_Use (Current_Use_Clause (Scope (T)))
             then
                Error_Msg_Sloc :=
-                 Sloc (Find_Most_Prev (Current_Use_Clause (Scope (T))));
+                 Sloc (Find_First_Use (Current_Use_Clause (Scope (T))));
                Error_Msg_NE -- CODEFIX
                  ("& is already use-visible through package use clause #??",
                   Id, T);

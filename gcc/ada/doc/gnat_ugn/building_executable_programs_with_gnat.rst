@@ -1233,6 +1233,13 @@ Alphabetical List of All Switches
   marker is specified, the callgraph is decorated with information about
   dynamically allocated objects.
 
+.. index:: -fdiagnostics-format   (gcc)
+
+:switch:`-fdiagnostics-format=json`
+  Makes GNAT emit warning and error messages as JSON. Inhibits printing of
+  text warning and errors messages except if :switch:`-gnatv` or
+  :switch:`-gnatl` are present.
+
 
 .. index:: -fdump-scos  (gcc)
 
@@ -1378,6 +1385,12 @@ Alphabetical List of All Switches
 
 :switch:`-gnat2012`
   Allow full Ada 2012 features (same as :switch:`-gnat12`)
+
+
+.. index:: -gnat2022  (gcc)
+
+:switch:`-gnat2022`
+  Allow full Ada 2022 features
 
 
 :switch:`-gnat83`
@@ -1735,8 +1748,7 @@ Alphabetical List of All Switches
   in bits.`
 
   ``Max_Unaligned_Field`` is the maximum size for unaligned bit field, which is
-  64 for the majority of GCC targets (but can be different on some targets like
-  AAMP).
+  64 for the majority of GCC targets (but can be different on some targets).
 
   ``Strict_Alignment`` is the equivalent of GCC macro ``STRICT_ALIGNMENT``
   documented as follows: `Define this macro to be the value 1 if instructions
@@ -1775,8 +1787,9 @@ Alphabetical List of All Switches
   where ``name`` is the string name of the type (which can have
   single spaces embedded in the name (e.g. long double), ``digs`` is
   the number of digits for the floating-point type, ``float_rep`` is
-  the float representation (I/V/A for IEEE-754-Binary, Vax_Native,
-  AAMP), ``size`` is the size in bits, ``alignment`` is the
+  the float representation (I for IEEE-754-Binary, which is
+  the only one supported at this time),
+  ``size`` is the size in bits, ``alignment`` is the
   alignment in bits. The name is followed by at least two blanks, fields
   are separated by at least one blank, and a LF character immediately
   follows the alignment field.
@@ -1997,8 +2010,7 @@ Alphabetical List of All Switches
   by the front end and will be visible in the
   :switch:`-gnatG` output.
 
-  When using a gcc-based back end (in practice this means using any version
-  of GNAT other than the JGNAT, .NET or GNAAMP versions), then the use of
+  When using a gcc-based back end, then the use of
   :switch:`-gnatN` is deprecated, and the use of :switch:`-gnatn` is preferred.
   Historically front end inlining was more extensive than the gcc back end
   inlining, but that is no longer the case.
@@ -3247,7 +3259,7 @@ of the pragma in the :title:`GNAT_Reference_manual`).
 :switch:`-gnatw.I`
   *Disable warnings on overlapping actuals.*
 
-  This switch disables warnings on overlapping actuals in a call..
+  This switch disables warnings on overlapping actuals in a call.
 
 
 .. index:: -gnatwj  (gcc)
@@ -4623,8 +4635,18 @@ checks to be performed. The following checks are defined:
   in the string after :switch:`-gnaty`
   then proper indentation is checked, with the digit indicating the
   indentation level required. A value of zero turns off this style check.
-  The general style of required indentation is as specified by
-  the examples in the Ada Reference Manual. Full line comments must be
+  The rule checks that the following constructs start on a column that is
+  a multiple of the alignment level:
+
+  * beginnings of declarations (except record component declarations)
+    and statements;
+
+  * beginnings of the structural components of compound statements;
+
+  * ``end`` keyword that completes the declaration of a program unit declaration
+    or body or that completes a compound statement.
+
+  Full line comments must be
   aligned with the ``--`` starting on a column that is a multiple of
   the alignment level, or they may be aligned the same way as the following
   non-blank line (this is useful when full line comments appear in the middle
@@ -5502,15 +5524,23 @@ indicate Ada 83 compatibility mode.
   for further information).
 
 
+.. index:: -gnat2022  (gcc)
+.. index:: Ada 2022 mode
+
+:switch:`-gnat2022` (Ada 2022 mode)
+  This switch directs the compiler to implement the Ada 2022 version of the
+  language.
+
+
 .. index:: -gnatX  (gcc)
 .. index:: Ada language extensions
 .. index:: GNAT extensions
 
 :switch:`-gnatX` (Enable GNAT Extensions)
   This switch directs the compiler to implement the latest version of the
-  language (currently Ada 2012) and also to enable certain GNAT implementation
+  language (currently Ada 2022) and also to enable certain GNAT implementation
   extensions that are not part of any Ada standard. For a full list of these
-  extensions, see the GNAT reference manual.
+  extensions, see the GNAT reference manual, ``Pragma Extensions_Allowed``.
 
 
 .. _Character_Set_Control:
@@ -5663,8 +5693,7 @@ Subprogram Inlining Control
   This switch activates front-end inlining which also
   generates additional dependencies.
 
-  When using a gcc-based back end (in practice this means using any version
-  of GNAT other than the JGNAT, .NET or GNAAMP versions), then the use of
+  When using a gcc-based back end, then the use of
   :switch:`-gnatN` is deprecated, and the use of :switch:`-gnatn` is preferred.
   Historically front end inlining was more extensive than the gcc back end
   inlining, but that is no longer the case.

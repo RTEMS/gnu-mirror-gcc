@@ -3725,6 +3725,7 @@ cpp_avoid_paste (cpp_reader *pfile, const cpp_token *token1,
 				|| b == CPP_NAME
 				|| b == CPP_CHAR || b == CPP_STRING); /* L */
     case CPP_NUMBER:	return (b == CPP_NUMBER || b == CPP_NAME
+				|| b == CPP_CHAR
 				|| c == '.' || c == '+' || c == '-');
 				      /* UCNs */
     case CPP_OTHER:	return ((token1->val.str.text[0] == '\\'
@@ -4479,8 +4480,9 @@ cpp_directive_only_process (cpp_reader *pfile,
 			break;
 		      }
 		  }
-		cpp_error_with_line (pfile, CPP_DL_ERROR, sloc, 0,
-				     "unterminated comment");
+		if (pos < limit || is_block)
+		  cpp_error_with_line (pfile, CPP_DL_ERROR, sloc, 0,
+				       "unterminated comment");
 	      done_comment:
 		lwm = pos;
 		break;
@@ -4767,7 +4769,18 @@ cpp_directive_only_process (cpp_reader *pfile,
 	}
 
       if (buffer->rlimit > base && !pfile->state.skipping)
-	cb (pfile, CPP_DO_print, data, line_count, base, buffer->rlimit - base);
+	{
+	  const unsigned char *limit = buffer->rlimit;
+	  /* If the file was not newline terminated, add rlimit, which is
+	     guaranteed to point to a newline, to the end of our range.  */
+	  if (limit[-1] != '\n')
+	    {
+	      limit++;
+	      CPP_INCREMENT_LINE (pfile, 0);
+	      line_count++;
+	    }
+	  cb (pfile, CPP_DO_print, data, line_count, base, limit - base);
+	}
 
       _cpp_pop_buffer (pfile);
     }

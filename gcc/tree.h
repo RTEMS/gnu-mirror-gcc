@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_TREE_H
 
 #include "tree-core.h"
+#include "options.h"
 
 /* Convert a target-independent built-in function code to a combined_fn.  */
 
@@ -937,7 +938,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 /* In a CALL_EXPR, if the function being called is DECL_IS_OPERATOR_NEW_P or
    DECL_IS_OPERATOR_DELETE_P, true for allocator calls from C++ new or delete
-   expressions.  */
+   expressions.  Not set for C++20 destroying delete operators.  */
 #define CALL_FROM_NEW_OR_DELETE_P(NODE) \
   (CALL_EXPR_CHECK (NODE)->base.protected_flag)
 
@@ -1502,6 +1503,11 @@ class auto_suppress_location_wrappers
 #define OMP_TARGET_COMBINED(NODE) \
   (OMP_TARGET_CHECK (NODE)->base.private_flag)
 
+/* True on an OMP_MASTER statement if it represents an explicit
+   combined master constructs.  */
+#define OMP_MASTER_COMBINED(NODE) \
+  (OMP_MASTER_CHECK (NODE)->base.private_flag)
+
 /* Memory order for OMP_ATOMIC*.  */
 #define OMP_ATOMIC_MEMORY_ORDER(NODE) \
   (TREE_RANGE_CHECK (NODE, OMP_ATOMIC, \
@@ -1532,6 +1538,11 @@ class auto_suppress_location_wrappers
    to should be firstprivatized.  */
 #define OMP_CLAUSE_FIRSTPRIVATE_NO_REFERENCE(NODE) \
   TREE_PRIVATE (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_FIRSTPRIVATE))
+
+/* True on a FIRSTPRIVATE clause with OMP_CLAUSE_FIRSTPRIVATE_IMPLICIT also
+   set if target construct is the only one that accepts the clause.  */
+#define OMP_CLAUSE_FIRSTPRIVATE_IMPLICIT_TARGET(NODE) \
+  TREE_PROTECTED (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_FIRSTPRIVATE))
 
 /* True on a LASTPRIVATE clause if a FIRSTPRIVATE clause for the same
    decl is present in the chain.  */
@@ -1641,9 +1652,15 @@ class auto_suppress_location_wrappers
 #define OMP_CLAUSE_MAP_MAYBE_ZERO_LENGTH_ARRAY_SECTION(NODE) \
   TREE_PROTECTED (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP))
 /* Nonzero if this map clause is for an OpenACC compute construct's reduction
-   variable.  */
+   variable or OpenMP map clause mentioned also in in_reduction clause on the
+   same construct.  */
 #define OMP_CLAUSE_MAP_IN_REDUCTION(NODE) \
   TREE_PRIVATE (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP))
+/* Nonzero on map clauses added implicitly for reduction clauses on combined
+   or composite constructs.  They shall be removed if there is an explicit
+   map clause.  */
+#define OMP_CLAUSE_MAP_IMPLICIT(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->base.default_def_flag)
 
 /* True on an OMP_CLAUSE_USE_DEVICE_PTR with an OpenACC 'if_present'
    clause.  */
@@ -3096,7 +3113,7 @@ set_function_decl_type (tree decl, function_decl_type t, bool set)
     {
       gcc_assert (FUNCTION_DECL_DECL_TYPE (decl) == NONE
 		  || FUNCTION_DECL_DECL_TYPE (decl) == t);
-      decl->function_decl.decl_type = t;
+      FUNCTION_DECL_DECL_TYPE (decl) = t;
     }
   else if (FUNCTION_DECL_DECL_TYPE (decl) == t)
     FUNCTION_DECL_DECL_TYPE (decl) = NONE;
@@ -3111,7 +3128,7 @@ set_function_decl_type (tree decl, function_decl_type t, bool set)
    C++ operator new, meaning that it returns a pointer for which we
    should not use type based aliasing.  */
 #define DECL_IS_OPERATOR_NEW_P(NODE) \
-  (FUNCTION_DECL_CHECK (NODE)->function_decl.decl_type == OPERATOR_NEW)
+  (FUNCTION_DECL_DECL_TYPE (FUNCTION_DECL_CHECK (NODE)) == OPERATOR_NEW)
 
 #define DECL_IS_REPLACEABLE_OPERATOR_NEW_P(NODE) \
   (DECL_IS_OPERATOR_NEW_P (NODE) && DECL_IS_REPLACEABLE_OPERATOR (NODE))
@@ -3122,7 +3139,7 @@ set_function_decl_type (tree decl, function_decl_type t, bool set)
 /* Nonzero in a FUNCTION_DECL means this function should be treated as
    C++ operator delete.  */
 #define DECL_IS_OPERATOR_DELETE_P(NODE) \
-  (FUNCTION_DECL_CHECK (NODE)->function_decl.decl_type == OPERATOR_DELETE)
+  (FUNCTION_DECL_DECL_TYPE (FUNCTION_DECL_CHECK (NODE)) == OPERATOR_DELETE)
 
 #define DECL_SET_IS_OPERATOR_DELETE(NODE, VAL) \
   set_function_decl_type (FUNCTION_DECL_CHECK (NODE), OPERATOR_DELETE, VAL)
@@ -3273,7 +3290,7 @@ extern vec<tree, va_gc> **decl_debug_args_insert (tree);
 
 /* In FUNCTION_DECL, this is set if this function is a lambda function.  */
 #define DECL_LAMBDA_FUNCTION_P(NODE) \
-  (FUNCTION_DECL_CHECK (NODE)->function_decl.decl_type == LAMBDA_FUNCTION)
+  (FUNCTION_DECL_DECL_TYPE (FUNCTION_DECL_CHECK (NODE)) == LAMBDA_FUNCTION)
 
 #define DECL_SET_LAMBDA_FUNCTION(NODE, VAL) \
   set_function_decl_type (FUNCTION_DECL_CHECK (NODE), LAMBDA_FUNCTION, VAL)
@@ -4458,7 +4475,7 @@ extern tree build_int_cst (tree, poly_int64);
 extern tree build_int_cstu (tree type, poly_uint64);
 extern tree build_int_cst_type (tree, poly_int64);
 extern tree make_vector (unsigned, unsigned CXX_MEM_STAT_INFO);
-extern tree build_vector_from_ctor (tree, vec<constructor_elt, va_gc> *);
+extern tree build_vector_from_ctor (tree, const vec<constructor_elt, va_gc> *);
 extern tree build_vector_from_val (tree, tree);
 extern tree build_uniform_cst (tree, tree);
 extern tree build_vec_series (tree, tree, tree);
@@ -6424,5 +6441,36 @@ public:
   /* Implicitly convert back to a location_t, using the combined location.  */
   operator location_t () const { return m_combined_loc; }
 };
+
+/* Code that doesn't refer to any warning.  Has no effect on suppression
+   functions.  */
+constexpr opt_code no_warning = opt_code ();
+/* Wildcard code that refers to all warnings.  */
+constexpr opt_code all_warnings = N_OPTS;
+
+/* Return the disposition for a warning (or all warnings by default)
+   at a location.  */
+extern bool warning_suppressed_at (location_t, opt_code = all_warnings);
+/* Set the disposition for a warning (or all warnings by default)
+   at a location to disabled by default.  */
+extern bool suppress_warning_at (location_t, opt_code = all_warnings,
+				 bool = true);
+/* Copy warning disposition from one location to another.  */
+extern void copy_warning (location_t, location_t);
+
+/* Return the disposition for a warning (or all warnings by default)
+   for an expression.  */
+extern bool warning_suppressed_p (const_tree, opt_code = all_warnings);
+/* Set the disposition for a warning (or all warnings by default)
+   at a location to disabled by default.  */
+extern void suppress_warning (tree, opt_code = all_warnings, bool = true)
+  ATTRIBUTE_NONNULL (1);
+/* Copy warning disposition from one expression to another.  */
+extern void copy_warning (tree, const_tree);
+
+/* Return the zero-based number corresponding to the argument being
+   deallocated if FNDECL is a deallocation function or an out-of-bounds
+   value if it isn't.  */
+extern unsigned fndecl_dealloc_argno (tree);
 
 #endif  /* GCC_TREE_H  */

@@ -97,8 +97,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-eh.h"
 #include "ssa.h"
 #include "internal-fn.h"
-#include "range-op.h"
 #include "vr-values.h"
+#include "range-op.h"
 
 static struct datadep_stats
 {
@@ -170,10 +170,7 @@ ref_contains_union_access_p (tree ref)
 static void
 dump_data_references (FILE *file, vec<data_reference_p> datarefs)
 {
-  unsigned int i;
-  struct data_reference *dr;
-
-  FOR_EACH_VEC_ELT (datarefs, i, dr)
+  for (data_reference *dr : datarefs)
     dump_data_reference (file, dr);
 }
 
@@ -378,10 +375,7 @@ DEBUG_FUNCTION void
 print_dir_vectors (FILE *outf, vec<lambda_vector> dir_vects,
 		   int length)
 {
-  unsigned j;
-  lambda_vector v;
-
-  FOR_EACH_VEC_ELT (dir_vects, j, v)
+  for (lambda_vector v : dir_vects)
     print_direction_vector (outf, v, length);
 }
 
@@ -403,18 +397,14 @@ DEBUG_FUNCTION void
 print_dist_vectors (FILE *outf, vec<lambda_vector> dist_vects,
 		    int length)
 {
-  unsigned j;
-  lambda_vector v;
-
-  FOR_EACH_VEC_ELT (dist_vects, j, v)
+  for (lambda_vector v : dist_vects)
     print_lambda_vector (outf, v, length);
 }
 
 /* Dump function for a DATA_DEPENDENCE_RELATION structure.  */
 
 DEBUG_FUNCTION void
-dump_data_dependence_relation (FILE *outf,
-			       struct data_dependence_relation *ddr)
+dump_data_dependence_relation (FILE *outf, const data_dependence_relation *ddr)
 {
   struct data_reference *dra, *drb;
 
@@ -488,7 +478,7 @@ dump_data_dependence_relation (FILE *outf,
 /* Debug version.  */
 
 DEBUG_FUNCTION void
-debug_data_dependence_relation (struct data_dependence_relation *ddr)
+debug_data_dependence_relation (const struct data_dependence_relation *ddr)
 {
   dump_data_dependence_relation (stderr, ddr);
 }
@@ -496,13 +486,9 @@ debug_data_dependence_relation (struct data_dependence_relation *ddr)
 /* Dump into FILE all the dependence relations from DDRS.  */
 
 DEBUG_FUNCTION void
-dump_data_dependence_relations (FILE *file,
-				vec<ddr_p> ddrs)
+dump_data_dependence_relations (FILE *file, const vec<ddr_p> &ddrs)
 {
-  unsigned int i;
-  struct data_dependence_relation *ddr;
-
-  FOR_EACH_VEC_ELT (ddrs, i, ddr)
+  for (auto ddr : ddrs)
     dump_data_dependence_relation (file, ddr);
 }
 
@@ -538,21 +524,17 @@ debug_data_dependence_relations (vec<ddr_p> ddrs)
 DEBUG_FUNCTION void
 dump_dist_dir_vectors (FILE *file, vec<ddr_p> ddrs)
 {
-  unsigned int i, j;
-  struct data_dependence_relation *ddr;
-  lambda_vector v;
-
-  FOR_EACH_VEC_ELT (ddrs, i, ddr)
+  for (data_dependence_relation *ddr : ddrs)
     if (DDR_ARE_DEPENDENT (ddr) == NULL_TREE && DDR_AFFINE_P (ddr))
       {
-	FOR_EACH_VEC_ELT (DDR_DIST_VECTS (ddr), j, v)
+	for (lambda_vector v : DDR_DIST_VECTS (ddr))
 	  {
 	    fprintf (file, "DISTANCE_V (");
 	    print_lambda_vector (file, v, DDR_NB_LOOPS (ddr));
 	    fprintf (file, ")\n");
 	  }
 
-	FOR_EACH_VEC_ELT (DDR_DIR_VECTS (ddr), j, v)
+	for (lambda_vector v : DDR_DIR_VECTS (ddr))
 	  {
 	    fprintf (file, "DIRECTION_V (");
 	    print_direction_vector (file, v, DDR_NB_LOOPS (ddr));
@@ -568,10 +550,7 @@ dump_dist_dir_vectors (FILE *file, vec<ddr_p> ddrs)
 DEBUG_FUNCTION void
 dump_ddrs (FILE *file, vec<ddr_p> ddrs)
 {
-  unsigned int i;
-  struct data_dependence_relation *ddr;
-
-  FOR_EACH_VEC_ELT (ddrs, i, ddr)
+  for (data_dependence_relation *ddr : ddrs)
     dump_data_dependence_relation (file, ddr);
 
   fprintf (file, "\n\n");
@@ -1035,14 +1014,23 @@ split_constant_offset (tree exp, tree *var, tree *off, value_range *exp_range,
       *exp_range = type;
       if (code == SSA_NAME)
 	{
-	  wide_int var_min, var_max;
-	  value_range_kind vr_kind = get_range_info (exp, &var_min, &var_max);
+	  value_range vr;
+	  get_range_query (cfun)->range_of_expr (vr, exp);
+	  if (vr.undefined_p ())
+	    vr.set_varying (TREE_TYPE (exp));
+	  wide_int var_min = wi::to_wide (vr.min ());
+	  wide_int var_max = wi::to_wide (vr.max ());
+	  value_range_kind vr_kind = vr.kind ();
 	  wide_int var_nonzero = get_nonzero_bits (exp);
 	  vr_kind = intersect_range_with_nonzero_bits (vr_kind,
 						       &var_min, &var_max,
 						       var_nonzero,
 						       TYPE_SIGN (type));
-	  if (vr_kind == VR_RANGE)
+	  /* This check for VR_VARYING is here because the old code
+	     using get_range_info would return VR_RANGE for the entire
+	     domain, instead of VR_VARYING.  The new code normalizes
+	     full-domain ranges to VR_VARYING.  */
+	  if (vr_kind == VR_RANGE || vr_kind == VR_VARYING)
 	    *exp_range = value_range (type, var_min, var_max);
 	}
     }
@@ -1060,12 +1048,12 @@ split_constant_offset (tree exp, tree *var, tree *off, value_range *exp_range,
   if (INTEGRAL_TYPE_P (type))
     *var = fold_convert (sizetype, *var);
   *off = ssize_int (0);
-  if (exp_range && code != SSA_NAME)
-    {
-      wide_int var_min, var_max;
-      if (determine_value_range (exp, &var_min, &var_max) == VR_RANGE)
-	*exp_range = value_range (type, var_min, var_max);
-    }
+
+  value_range r;
+  if (exp_range && code != SSA_NAME
+      && get_range_query (cfun)->range_of_expr (r, exp)
+      && !r.undefined_p ())
+    *exp_range = r;
 }
 
 /* Expresses EXP as VAR + OFF, where OFF is a constant.  VAR has the same
@@ -2653,25 +2641,23 @@ create_intersect_range_checks (class loop *loop, tree *cond_expr,
 
 void
 create_runtime_alias_checks (class loop *loop,
-			     vec<dr_with_seg_len_pair_t> *alias_pairs,
+			     const vec<dr_with_seg_len_pair_t> *alias_pairs,
 			     tree * cond_expr)
 {
   tree part_cond_expr;
 
   fold_defer_overflow_warnings ();
-  dr_with_seg_len_pair_t *alias_pair;
-  unsigned int i;
-  FOR_EACH_VEC_ELT (*alias_pairs, i, alias_pair)
+  for (const dr_with_seg_len_pair_t &alias_pair : alias_pairs)
     {
-      gcc_assert (alias_pair->flags);
+      gcc_assert (alias_pair.flags);
       if (dump_enabled_p ())
 	dump_printf (MSG_NOTE,
 		     "create runtime check for data references %T and %T\n",
-		     DR_REF (alias_pair->first.dr),
-		     DR_REF (alias_pair->second.dr));
+		     DR_REF (alias_pair.first.dr),
+		     DR_REF (alias_pair.second.dr));
 
       /* Create condition expression for each pair data references.  */
-      create_intersect_range_checks (loop, &part_cond_expr, *alias_pair);
+      create_intersect_range_checks (loop, &part_cond_expr, alias_pair);
       if (*cond_expr)
 	*cond_expr = fold_build2 (TRUTH_AND_EXPR, boolean_type_node,
 				  *cond_expr, part_cond_expr);
@@ -3427,10 +3413,7 @@ free_conflict_function (conflict_function *f)
 static void
 free_subscripts (vec<subscript_p> subscripts)
 {
-  unsigned i;
-  subscript_p s;
-
-  FOR_EACH_VEC_ELT (subscripts, i, s)
+  for (subscript_p s : subscripts)
     {
       free_conflict_function (s->conflicting_iterations_in_a);
       free_conflict_function (s->conflicting_iterations_in_b);
@@ -4971,10 +4954,7 @@ analyze_overlapping_iterations (tree chrec_a,
 static void
 save_dist_v (struct data_dependence_relation *ddr, lambda_vector dist_v)
 {
-  unsigned i;
-  lambda_vector v;
-
-  FOR_EACH_VEC_ELT (DDR_DIST_VECTS (ddr), i, v)
+  for (lambda_vector v : DDR_DIST_VECTS (ddr))
     if (lambda_vector_equal (v, dist_v, DDR_NB_LOOPS (ddr)))
       return;
 
@@ -4986,10 +4966,7 @@ save_dist_v (struct data_dependence_relation *ddr, lambda_vector dist_v)
 static void
 save_dir_v (struct data_dependence_relation *ddr, lambda_vector dir_v)
 {
-  unsigned i;
-  lambda_vector v;
-
-  FOR_EACH_VEC_ELT (DDR_DIR_VECTS (ddr), i, v)
+  for (lambda_vector v : DDR_DIR_VECTS (ddr))
     if (lambda_vector_equal (v, dir_v, DDR_NB_LOOPS (ddr)))
       return;
 
@@ -5112,6 +5089,8 @@ build_classic_dist_vector_1 (struct data_dependence_relation *ddr,
 	  non_affine_dependence_relation (ddr);
 	  return false;
 	}
+      else
+	*init_b = true;
     }
 
   return true;
@@ -5124,10 +5103,7 @@ static bool
 invariant_access_functions (const struct data_dependence_relation *ddr,
 			    int lnum)
 {
-  unsigned i;
-  subscript *sub;
-
-  FOR_EACH_VEC_ELT (DDR_SUBSCRIPTS (ddr), i, sub)
+  for (subscript *sub : DDR_SUBSCRIPTS (ddr))
     if (!evolution_function_is_invariant_p (SUB_ACCESS_FN (sub, 0), lnum)
 	|| !evolution_function_is_invariant_p (SUB_ACCESS_FN (sub, 1), lnum))
       return false;
@@ -5296,10 +5272,7 @@ add_distance_for_zero_overlaps (struct data_dependence_relation *ddr)
 static inline bool
 same_access_functions (const struct data_dependence_relation *ddr)
 {
-  unsigned i;
-  subscript *sub;
-
-  FOR_EACH_VEC_ELT (DDR_SUBSCRIPTS (ddr), i, sub)
+  for (subscript *sub : DDR_SUBSCRIPTS (ddr))
     if (!eq_evolutions_p (SUB_ACCESS_FN (sub, 0),
 			  SUB_ACCESS_FN (sub, 1)))
       return false;
@@ -5576,11 +5549,8 @@ static bool
 access_functions_are_affine_or_constant_p (const struct data_reference *a,
 					   const class loop *loop_nest)
 {
-  unsigned int i;
   vec<tree> fns = DR_ACCESS_FNS (a);
-  tree t;
-
-  FOR_EACH_VEC_ELT (fns, i, t)
+  for (tree t : fns)
     if (!evolution_function_is_invariant_p (t, loop_nest->num)
 	&& !evolution_function_is_affine_multivariate_p (t, loop_nest->num))
       return false;
@@ -5607,9 +5577,13 @@ compute_affine_dependence (struct data_dependence_relation *ddr,
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "(compute_affine_dependence\n");
-      fprintf (dump_file, "  stmt_a: ");
+      fprintf (dump_file, "  ref_a: ");
+      print_generic_expr (dump_file, DR_REF (dra));
+      fprintf (dump_file, ", stmt_a: ");
       print_gimple_stmt (dump_file, DR_STMT (dra), 0, TDF_SLIM);
-      fprintf (dump_file, "  stmt_b: ");
+      fprintf (dump_file, "  ref_b: ");
+      print_generic_expr (dump_file, DR_REF (drb));
+      fprintf (dump_file, ", stmt_b: ");
       print_gimple_stmt (dump_file, DR_STMT (drb), 0, TDF_SLIM);
     }
 
@@ -5659,9 +5633,9 @@ compute_affine_dependence (struct data_dependence_relation *ddr,
    is small enough to be handled.  */
 
 bool
-compute_all_dependences (vec<data_reference_p> datarefs,
+compute_all_dependences (const vec<data_reference_p> &datarefs,
 			 vec<ddr_p> *dependence_relations,
-			 vec<loop_p> loop_nest,
+			 const vec<loop_p> &loop_nest,
 			 bool compute_self_and_rr)
 {
   struct data_dependence_relation *ddr;
@@ -5887,20 +5861,18 @@ opt_result
 find_data_references_in_stmt (class loop *nest, gimple *stmt,
 			      vec<data_reference_p> *datarefs)
 {
-  unsigned i;
   auto_vec<data_ref_loc, 2> references;
-  data_ref_loc *ref;
   data_reference_p dr;
 
   if (get_references_in_stmt (stmt, &references))
     return opt_result::failure_at (stmt, "statement clobbers memory: %G",
 				   stmt);
 
-  FOR_EACH_VEC_ELT (references, i, ref)
+  for (const data_ref_loc &ref : references)
     {
       dr = create_data_ref (nest ? loop_preheader_edge (nest) : NULL,
-			    loop_containing_stmt (stmt), ref->ref,
-			    stmt, ref->is_read, ref->is_conditional_in_stmt);
+			    loop_containing_stmt (stmt), ref.ref,
+			    stmt, ref.is_read, ref.is_conditional_in_stmt);
       gcc_assert (dr != NULL);
       datarefs->safe_push (dr);
     }
@@ -5918,19 +5890,17 @@ bool
 graphite_find_data_references_in_stmt (edge nest, loop_p loop, gimple *stmt,
 				       vec<data_reference_p> *datarefs)
 {
-  unsigned i;
   auto_vec<data_ref_loc, 2> references;
-  data_ref_loc *ref;
   bool ret = true;
   data_reference_p dr;
 
   if (get_references_in_stmt (stmt, &references))
     return false;
 
-  FOR_EACH_VEC_ELT (references, i, ref)
+  for (const data_ref_loc &ref : references)
     {
-      dr = create_data_ref (nest, loop, ref->ref, stmt, ref->is_read,
-			    ref->is_conditional_in_stmt);
+      dr = create_data_ref (nest, loop, ref.ref, stmt, ref.is_read,
+			    ref.is_conditional_in_stmt);
       gcc_assert (dr != NULL);
       datarefs->safe_push (dr);
     }
@@ -6236,12 +6206,9 @@ free_dependence_relation (struct data_dependence_relation *ddr)
    DEPENDENCE_RELATIONS.  */
 
 void
-free_dependence_relations (vec<ddr_p> dependence_relations)
+free_dependence_relations (vec<ddr_p>& dependence_relations)
 {
-  unsigned int i;
-  struct data_dependence_relation *ddr;
-
-  FOR_EACH_VEC_ELT (dependence_relations, i, ddr)
+  for (data_dependence_relation *ddr : dependence_relations)
     if (ddr)
       free_dependence_relation (ddr);
 
@@ -6251,12 +6218,9 @@ free_dependence_relations (vec<ddr_p> dependence_relations)
 /* Free the memory used by the data references from DATAREFS.  */
 
 void
-free_data_refs (vec<data_reference_p> datarefs)
+free_data_refs (vec<data_reference_p>& datarefs)
 {
-  unsigned int i;
-  struct data_reference *dr;
-
-  FOR_EACH_VEC_ELT (datarefs, i, dr)
+  for (data_reference *dr : datarefs)
     free_data_ref (dr);
   datarefs.release ();
 }
@@ -6298,11 +6262,18 @@ dr_step_indicator (struct data_reference *dr, int useful_min)
 
       /* Get the range of values that the unconverted step actually has.  */
       wide_int step_min, step_max;
+      value_range vr;
       if (TREE_CODE (step) != SSA_NAME
-	  || get_range_info (step, &step_min, &step_max) != VR_RANGE)
+	  || !get_range_query (cfun)->range_of_expr (vr, step)
+	  || vr.kind () != VR_RANGE)
 	{
 	  step_min = wi::to_wide (TYPE_MIN_VALUE (type));
 	  step_max = wi::to_wide (TYPE_MAX_VALUE (type));
+	}
+      else
+	{
+	  step_min = vr.lower_bound ();
+	  step_max = vr.upper_bound ();
 	}
 
       /* Check whether the unconverted step has an acceptable range.  */

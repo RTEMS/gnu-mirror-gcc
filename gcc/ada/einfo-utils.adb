@@ -43,6 +43,24 @@ package body Einfo.Utils is
    --  Determine whether abstract state State_Id has particular option denoted
    --  by the name Option_Nam.
 
+   -----------------------------------
+   -- Renamings of Renamed_Or_Alias --
+   -----------------------------------
+
+   function Alias (N : Entity_Id) return Node_Id is
+   begin
+      pragma Assert
+        (Is_Overloadable (N) or else Ekind (N) = E_Subprogram_Type);
+      return Renamed_Or_Alias (N);
+   end Alias;
+
+   procedure Set_Alias (N : Entity_Id; Val : Node_Id) is
+   begin
+      pragma Assert
+        (Is_Overloadable (N) or else Ekind (N) = E_Subprogram_Type);
+      Set_Renamed_Or_Alias (N, Val);
+   end Set_Alias;
+
    ----------------
    -- Has_Option --
    ----------------
@@ -253,8 +271,7 @@ package body Einfo.Utils is
 
    function Is_Named_Access_Type                (Id : E) return B is
    begin
-      return Ekind (Id) in E_Access_Type .. -- ????
-                             E_Access_Protected_Subprogram_Type;
+      return Ekind (Id) in Named_Access_Kind;
    end Is_Named_Access_Type;
 
    function Is_Named_Number                     (Id : E) return B is
@@ -347,7 +364,7 @@ package body Einfo.Utils is
 
    procedure Init_Alignment (Id : E) is
    begin
-      Set_Alignment (Id, Uint_0);
+      Reinit_Field_To_Zero (Id, F_Alignment);
    end Init_Alignment;
 
    procedure Init_Alignment (Id : E; V : Int) is
@@ -435,6 +452,15 @@ package body Einfo.Utils is
       Set_RM_Size (Id, UI_From_Int (V));
    end Init_RM_Size;
 
+   procedure Copy_Alignment (To, From : E) is
+   begin
+      if Known_Alignment (From) then
+         Set_Alignment (To, Alignment (From));
+      else
+         Init_Alignment (To);
+      end if;
+   end Copy_Alignment;
+
    -----------------------------
    -- Init_Component_Location --
    -----------------------------
@@ -454,8 +480,8 @@ package body Einfo.Utils is
 
    procedure Init_Object_Size_Align (Id : E) is
    begin
-      Set_Esize (Id, Uint_0);
-      Set_Alignment (Id, Uint_0);
+      Init_Esize (Id);
+      Init_Alignment (Id);
    end Init_Object_Size_Align;
 
    ---------------
@@ -464,7 +490,13 @@ package body Einfo.Utils is
 
    procedure Init_Size (Id : E; V : Int) is
    begin
-      pragma Assert (not Is_Object (Id));
+      pragma Assert (Is_Type (Id));
+      pragma Assert
+        (not Known_Esize (Id) or else Esize (Id) = V);
+      pragma Assert
+        (RM_Size (Id) = No_Uint
+           or else RM_Size (Id) = Uint_0
+           or else RM_Size (Id) = V);
       Set_Esize (Id, UI_From_Int (V));
       Set_RM_Size (Id, UI_From_Int (V));
    end Init_Size;
@@ -475,10 +507,10 @@ package body Einfo.Utils is
 
    procedure Init_Size_Align (Id : E) is
    begin
-      pragma Assert (not Is_Object (Id));
-      Set_Esize (Id, Uint_0);
-      Set_RM_Size (Id, Uint_0);
-      Set_Alignment (Id, Uint_0);
+      pragma Assert (Ekind (Id) in Type_Kind | E_Void);
+      Init_Esize (Id);
+      Init_RM_Size (Id);
+      Init_Alignment (Id);
    end Init_Size_Align;
 
    ----------------------------------------------
@@ -486,9 +518,9 @@ package body Einfo.Utils is
    ----------------------------------------------
 
    function Known_Alignment                       (E : Entity_Id) return B is
+      Result : constant B := not Field_Is_Initial_Zero (E, F_Alignment);
    begin
-      return Alignment (E) /= Uint_0
-        and then Alignment (E) /= No_Uint;
+      return Result;
    end Known_Alignment;
 
    function Known_Component_Bit_Offset            (E : Entity_Id) return B is
@@ -498,8 +530,8 @@ package body Einfo.Utils is
 
    function Known_Component_Size                  (E : Entity_Id) return B is
    begin
-      return Component_Size (Base_Type (E)) /= Uint_0
-        and then Component_Size (Base_Type (E)) /= No_Uint;
+      return Component_Size (E) /= Uint_0
+        and then Component_Size (E) /= No_Uint;
    end Known_Component_Size;
 
    function Known_Esize                           (E : Entity_Id) return B is
@@ -539,7 +571,7 @@ package body Einfo.Utils is
 
    function Known_Static_Component_Size           (E : Entity_Id) return B is
    begin
-      return Component_Size (Base_Type (E)) > Uint_0;
+      return Component_Size (E) > Uint_0;
    end Known_Static_Component_Size;
 
    function Known_Static_Esize                    (E : Entity_Id) return B is
@@ -573,54 +605,6 @@ package body Einfo.Utils is
                 or else Is_Fixed_Point_Type (E))
         and then not Is_Generic_Type (E);
    end Known_Static_RM_Size;
-
-   function Unknown_Alignment                     (E : Entity_Id) return B is
-   begin
-      return Alignment (E) = Uint_0
-        or else Alignment (E) = No_Uint;
-   end Unknown_Alignment;
-
-   function Unknown_Component_Bit_Offset          (E : Entity_Id) return B is
-   begin
-      return Component_Bit_Offset (E) = No_Uint;
-   end Unknown_Component_Bit_Offset;
-
-   function Unknown_Component_Size                (E : Entity_Id) return B is
-   begin
-      return Component_Size (Base_Type (E)) = Uint_0
-               or else
-             Component_Size (Base_Type (E)) = No_Uint;
-   end Unknown_Component_Size;
-
-   function Unknown_Esize                         (E : Entity_Id) return B is
-   begin
-      return Esize (E) = No_Uint
-               or else
-             Esize (E) = Uint_0;
-   end Unknown_Esize;
-
-   function Unknown_Normalized_First_Bit          (E : Entity_Id) return B is
-   begin
-      return Normalized_First_Bit (E) = No_Uint;
-   end Unknown_Normalized_First_Bit;
-
-   function Unknown_Normalized_Position           (E : Entity_Id) return B is
-   begin
-      return Normalized_Position (E) = No_Uint;
-   end Unknown_Normalized_Position;
-
-   function Unknown_Normalized_Position_Max       (E : Entity_Id) return B is
-   begin
-      return Normalized_Position_Max (E) = No_Uint;
-   end Unknown_Normalized_Position_Max;
-
-   function Unknown_RM_Size                       (E : Entity_Id) return B is
-   begin
-      return (RM_Size (E) = Uint_0
-                and then not Is_Discrete_Type (E)
-                and then not Is_Fixed_Point_Type (E))
-        or else RM_Size (E) = No_Uint;
-   end Unknown_RM_Size;
 
    --------------------
    -- Address_Clause --
@@ -895,6 +879,22 @@ package body Einfo.Utils is
          end if;
       end if;
    end First_Formal_With_Extras;
+
+   ---------------
+   -- Float_Rep --
+   ---------------
+
+   function Float_Rep (N : Entity_Id) return Float_Rep_Kind is
+      pragma Unreferenced (N);
+      pragma Assert (Float_Rep_Kind'First = Float_Rep_Kind'Last);
+
+      --  There is only one value, so we don't need to store it, see types.ads.
+
+      Val : constant Float_Rep_Kind := IEEE_Binary;
+
+   begin
+      return Val;
+   end Float_Rep;
 
    -------------------------------------
    -- Get_Attribute_Definition_Clause --
@@ -1425,8 +1425,6 @@ package body Einfo.Utils is
 
    function Is_Base_Type (Id : E) return Boolean is
    begin
---  ????      pragma Assert (Is_Type (Id));
---  Apparently, Is_Base_Type is called on non-types, and returns True!
       return Entity_Is_Base_Type (Ekind (Id));
    end Is_Base_Type;
 
@@ -1820,9 +1818,6 @@ package body Einfo.Utils is
                when 16 .. 33 => return 2**14;
                when others   => return No_Uint;
             end case;
-
-         when AAMP =>
-            return Uint_2 ** Uint_7 - Uint_1;
       end case;
    end Machine_Emax_Value;
 
@@ -1834,7 +1829,6 @@ package body Einfo.Utils is
    begin
       case Float_Rep (Id) is
          when IEEE_Binary => return Uint_3 - Machine_Emax_Value (Id);
-         when AAMP        => return -Machine_Emax_Value (Id);
       end case;
    end Machine_Emin_Value;
 
@@ -1855,13 +1849,6 @@ package body Einfo.Utils is
                when 19 .. 33 => return UI_From_Int (113);
                when others   => return No_Uint;
             end case;
-
-         when AAMP =>
-            case Digs is
-               when  1 ..  6 => return Uint_24;
-               when  7 ..  9 => return UI_From_Int (40);
-               when others   => return No_Uint;
-            end case;
       end case;
    end Machine_Mantissa_Value;
 
@@ -1872,9 +1859,7 @@ package body Einfo.Utils is
    function Machine_Radix_Value (Id : E) return U is
    begin
       case Float_Rep (Id) is
-         when AAMP
-            | IEEE_Binary
-         =>
+         when IEEE_Binary =>
             return Uint_2;
       end case;
    end Machine_Radix_Value;
@@ -2477,15 +2462,15 @@ package body Einfo.Utils is
             return Direct_Primitive_Operations
               (Corresponding_Record_Type (Id));
 
-         --  If expansion is disabled the corresponding record type is absent,
-         --  but if the type has ancestors it may have primitive operations.
-
-         elsif Is_Tagged_Type (Id) then
-            return Direct_Primitive_Operations (Id);
+         --  When expansion is disabled, the corresponding record type is
+         --  absent, but if this is a tagged type with ancestors, or if the
+         --  extension of prefixed calls for untagged types is enabled, then
+         --  it may have associated primitive operations.
 
          else
-            return No_Elist;
+            return Direct_Primitive_Operations (Id);
          end if;
+
       else
          return Direct_Primitive_Operations (Id);
       end if;
@@ -2661,7 +2646,7 @@ package body Einfo.Utils is
    function Scope_Depth_Set (Id : E) return B is
    begin
       return not Is_Record_Type (Id)
-        and then not Field_Is_Initial_Zero (Id, Scope_Depth_Value);
+        and then not Field_Is_Initial_Zero (Id, F_Scope_Depth_Value);
       --  We can't call Scope_Depth_Value here, because Empty is not a valid
       --  value of type Uint.
    end Scope_Depth_Set;
@@ -2751,6 +2736,18 @@ package body Einfo.Utils is
    begin
       Set_DIC_Procedure (Id, V);
    end Set_Partial_DIC_Procedure;
+
+   -------------------
+   -- Set_Float_Rep --
+   -------------------
+
+   procedure Set_Float_Rep
+     (Ignore_N : Entity_Id; Ignore_Val : Float_Rep_Kind) is
+   begin
+      pragma Assert (Float_Rep_Kind'First = Float_Rep_Kind'Last);
+      --  There is only one value, so we don't need to store it (see
+      --  types.ads).
+   end Set_Float_Rep;
 
    -----------------------------
    -- Set_Invariant_Procedure --
@@ -2905,8 +2902,13 @@ package body Einfo.Utils is
    -----------------
 
    function Size_Clause (Id : E) return N is
+      Result : N := Get_Attribute_Definition_Clause (Id, Attribute_Size);
    begin
-      return Get_Attribute_Definition_Clause (Id, Attribute_Size);
+      if No (Result) then
+         Result := Get_Attribute_Definition_Clause (Id, Attribute_Value_Size);
+      end if;
+
+      return Result;
    end Size_Clause;
 
    ------------------------
@@ -3123,17 +3125,6 @@ package body Einfo.Utils is
 
    function Is_Volatile (Id : E) return B is
    begin
-      --  ????The old version has a comment that says:
-      --       The flag is not set reliably on private subtypes,
-      --       and is always retrieved from the base type (but this is not a
-      --       base-type-only attribute because it applies to other entities).
-      --  Perhaps it should be set reliably, and perhaps it should be
-      --  Base_Type_Only, but that doesn't work because it is currently
-      --  set on subtypes, so we have to explicitly fetch the Base_Type below.
-      --
-      --  It might be cleaner if the call sites called Is_Volatile_Type
-      --  or Is_Volatile_Object directly; surely they know which it is.
-
       pragma Assert (Nkind (Id) in N_Entity);
 
       if Is_Type (Id) then

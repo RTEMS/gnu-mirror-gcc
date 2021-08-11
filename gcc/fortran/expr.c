@@ -3815,6 +3815,9 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
   int proc_pointer;
   bool same_rank;
 
+  if (!lvalue->symtree)
+    return false;
+
   lhs_attr = gfc_expr_attr (lvalue);
   if (lvalue->ts.type == BT_UNKNOWN && !lhs_attr.proc_pointer)
     {
@@ -6195,6 +6198,16 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
 	  ptr_component = true;
 	  if (!pointer)
 	    check_intentin = false;
+	}
+      if (ref->type == REF_INQUIRY
+	  && (ref->u.i == INQUIRY_KIND || ref->u.i == INQUIRY_LEN))
+	{
+	  if (context)
+	    gfc_error ("%qs parameter inquiry for %qs in "
+		       "variable definition context (%s) at %L",
+		       ref->u.i == INQUIRY_KIND ? "KIND" : "LEN",
+		       sym->name, context, &e->where);
+	  return false;
 	}
     }
 

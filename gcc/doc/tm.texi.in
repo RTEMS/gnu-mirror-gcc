@@ -3100,14 +3100,7 @@ control passing certain arguments in registers.
 
 @hook TARGET_PROMOTE_PROTOTYPES
 
-@defmac PUSH_ARGS
-A C expression.  If nonzero, push insns will be used to pass
-outgoing arguments.
-If the target machine does not have a push instruction, set it to zero.
-That directs GCC to use an alternate strategy: to
-allocate the entire argument block and then store the arguments into
-it.  When @code{PUSH_ARGS} is nonzero, @code{PUSH_ROUNDING} must be defined too.
-@end defmac
+@hook TARGET_PUSH_ARGUMENT
 
 @defmac PUSH_ARGS_REVERSED
 A C expression.  If nonzero, function arguments will be evaluated from
@@ -3829,6 +3822,11 @@ not ABI-compliant, this option is typically used only on a
 per-language basis (notably by Ada) or when it can otherwise be
 applied to the whole program.
 
+For languages other than Ada, the @code{-ftrampolines} and
+@code{-fno-trampolines} options currently have no effect, and
+trampolines are always generated on platforms that need them
+for nested functions.
+
 Define the following hook if your backend either implements ABI-specified
 descriptor support, or can use GCC's generic descriptor implementation
 for nested functions.
@@ -4220,6 +4218,12 @@ address;  but often a machine-dependent strategy can generate better code.
 @hook TARGET_GOACC_REDUCTION
 
 @hook TARGET_PREFERRED_ELSE_VALUE
+
+@hook TARGET_GOACC_ADJUST_PRIVATE_DECL
+
+@hook TARGET_GOACC_EXPAND_VAR_DECL
+
+@hook TARGET_GOACC_CREATE_WORKER_BROADCAST_RECORD
 
 @node Anchored Addresses
 @section Anchored Addresses
@@ -6611,6 +6615,8 @@ This describes how to specify debugging information.
 * File Names and DBX:: Macros controlling output of file names in DBX format.
 * DWARF::              Macros for DWARF format.
 * VMS Debug::          Macros for VMS debug format.
+* CTF Debug::          Macros for CTF debug format.
+* BTF Debug::          Macros for BTF debug format.
 @end menu
 
 @node All Debuggers
@@ -6990,6 +6996,30 @@ is to generate minimal debug info for a traceback in the absence of
 @option{-g} unless explicitly overridden with @option{-g0}.  This
 behavior is controlled by @code{TARGET_OPTION_OPTIMIZATION} and
 @code{TARGET_OPTION_OVERRIDE}.
+@end defmac
+
+@need 2000
+@node CTF Debug
+@subsection Macros for CTF Debug Format
+
+@c prevent bad page break with this line
+Here are macros for CTF debug format.
+
+@defmac CTF_DEBUGGING_INFO
+Define this macro if GCC should produce debugging output in CTF debug
+format in response to the @option{-gctf} option.
+@end defmac
+
+@need 2000
+@node BTF Debug
+@subsection Macros for BTF Debug Format
+
+@c prevent bad page break with this line
+Here are macros for BTF debug format.
+
+@defmac BTF_DEBUGGING_INFO
+Define this macro if GCC should produce debugging output in BTF debug
+format in response to the @option{-gbtf} option.
 @end defmac
 
 @node Floating Point
@@ -7915,6 +7945,8 @@ to by @var{ce_info}.
 
 @hook TARGET_INVALID_WITHIN_DOLOOP
 
+@hook TARGET_PREFERRED_DOLOOP_MODE
+
 @hook TARGET_LEGITIMATE_COMBINED_INSN
 
 @hook TARGET_CAN_FOLLOW_JUMP
@@ -7955,6 +7987,8 @@ lists.
 @hook TARGET_GEN_CCMP_FIRST
 
 @hook TARGET_GEN_CCMP_NEXT
+
+@hook TARGET_GEN_MEMSET_SCRATCH_RTX
 
 @hook TARGET_LOOP_UNROLL_ADJUST
 

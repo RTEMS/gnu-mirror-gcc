@@ -222,6 +222,7 @@ struct GTY((for_user)) named_label_entry {
   bool in_omp_scope;
   bool in_transaction_scope;
   bool in_constexpr_if;
+  bool in_consteval_if;
 };
 
 #define named_labels cp_function_chain->x_named_labels
@@ -491,6 +492,16 @@ level_for_constexpr_if (cp_binding_level *b)
 	  && IF_STMT_CONSTEXPR_P (b->this_entity));
 }
 
+/* True if B is the level for the condition of a consteval if.  */
+
+static bool
+level_for_consteval_if (cp_binding_level *b)
+{
+  return (b->kind == sk_cond && b->this_entity
+	  && TREE_CODE (b->this_entity) == IF_STMT
+	  && IF_STMT_CONSTEVAL_P (b->this_entity));
+}
+
 /* Update data for defined and undefined labels when leaving a scope.  */
 
 int
@@ -530,6 +541,8 @@ poplevel_named_label_1 (named_label_entry **slot, cp_binding_level *bl)
 	case sk_block:
 	  if (level_for_constexpr_if (bl->level_chain))
 	    ent->in_constexpr_if = true;
+	  else if (level_for_consteval_if (bl->level_chain))
+	    ent->in_consteval_if = true;
 	  break;
 	default:
 	  break;
@@ -828,9 +841,7 @@ wrapup_namespace_globals ()
 {
   if (vec<tree, va_gc> *statics = static_decls)
     {
-      tree decl;
-      unsigned int i;
-      FOR_EACH_VEC_ELT (*statics, i, decl)
+      for (tree decl : *statics)
 	{
 	  if (warn_unused_function
 	      && TREE_CODE (decl) == FUNCTION_DECL
@@ -839,7 +850,7 @@ wrapup_namespace_globals ()
 	      && !TREE_PUBLIC (decl)
 	      && !DECL_ARTIFICIAL (decl)
 	      && !DECL_FRIEND_PSEUDO_TEMPLATE_INSTANTIATION (decl)
-	      && !TREE_NO_WARNING (decl))
+	      && !warning_suppressed_p (decl, OPT_Wunused_function))
 	    warning_at (DECL_SOURCE_LOCATION (decl),
 			OPT_Wunused_function,
 			"%qF declared %<static%> but never defined", decl);
@@ -944,7 +955,9 @@ static bool
 function_requirements_equivalent_p (tree newfn, tree oldfn)
 {
   /* In the concepts TS, the combined constraints are compared.  */
-  if (cxx_dialect < cxx20)
+  if (cxx_dialect < cxx20
+      && (DECL_TEMPLATE_SPECIALIZATION (newfn)
+	  <= DECL_TEMPLATE_SPECIALIZATION (oldfn)))
     {
       tree ci1 = get_constraints (oldfn);
       tree ci2 = get_constraints (newfn);
@@ -2159,11 +2172,10 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  if (DECL_DELETED_FN (newdecl))
 	    {
 	      auto_diagnostic_group d;
-	      pedwarn (newdecl_loc, OPT_Wpedantic,
-		       "deleted definition of %qD is not first declaration",
-		       newdecl);
-	      inform (olddecl_loc,
-		      "previous declaration of %qD", olddecl);
+	      if (pedwarn (newdecl_loc, 0, "deleted definition of %qD "
+			   "is not first declaration", newdecl))
+		inform (olddecl_loc,
+			"previous declaration of %qD", olddecl);
 	    }
 	  DECL_DELETED_FN (newdecl) |= DECL_DELETED_FN (olddecl);
 	}
@@ -2794,6 +2806,10 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
       SET_DECL_ALIGN (newdecl, DECL_ALIGN (olddecl));
       DECL_USER_ALIGN (newdecl) |= DECL_USER_ALIGN (olddecl);
     }
+  else if (DECL_ALIGN (olddecl) == DECL_ALIGN (newdecl)
+      && DECL_USER_ALIGN (olddecl) != DECL_USER_ALIGN (newdecl))
+    DECL_USER_ALIGN (newdecl) = 1;
+
   DECL_USER_ALIGN (olddecl) = DECL_USER_ALIGN (newdecl);
   if (DECL_WARN_IF_NOT_ALIGN (olddecl)
       > DECL_WARN_IF_NOT_ALIGN (newdecl))
@@ -3391,6 +3407,7 @@ check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
   bool complained = false;
   int identified = 0;
   bool saw_eh = false, saw_omp = false, saw_tm = false, saw_cxif = false;
+  bool saw_ceif = false;
 
   if (exited_omp)
     {
@@ -3469,6 +3486,12 @@ check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
 	      inf = G_("  enters %<constexpr if%> statement");
 	      loc = EXPR_LOCATION (b->level_chain->this_entity);
 	      saw_cxif = true;
+	    }
+	  else if (!saw_ceif && level_for_consteval_if (b->level_chain))
+	    {
+	      inf = G_("  enters %<consteval if%> statement");
+	      loc = EXPR_LOCATION (b->level_chain->this_entity);
+	      saw_ceif = true;
 	    }
 	  break;
 
@@ -3551,12 +3574,13 @@ check_goto (tree decl)
   unsigned ix;
 
   if (ent->in_try_scope || ent->in_catch_scope || ent->in_transaction_scope
-      || ent->in_constexpr_if
+      || ent->in_constexpr_if || ent->in_consteval_if
       || ent->in_omp_scope || !vec_safe_is_empty (ent->bad_decls))
     {
       diagnostic_t diag_kind = DK_PERMERROR;
       if (ent->in_try_scope || ent->in_catch_scope || ent->in_constexpr_if
-	  || ent->in_transaction_scope || ent->in_omp_scope)
+	  || ent->in_consteval_if || ent->in_transaction_scope
+	  || ent->in_omp_scope)
 	diag_kind = DK_ERROR;
       complained = identify_goto (decl, DECL_SOURCE_LOCATION (decl),
 				  &input_location, diag_kind);
@@ -3602,6 +3626,8 @@ check_goto (tree decl)
 	inform (input_location, "  enters synchronized or atomic statement");
       else if (ent->in_constexpr_if)
 	inform (input_location, "  enters %<constexpr if%> statement");
+      else if (ent->in_consteval_if)
+	inform (input_location, "  enters %<consteval if%> statement");
     }
 
   if (ent->in_omp_scope)
@@ -4136,10 +4162,15 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
     return error_mark_node;
 
   if (want_template)
-    return lookup_template_class (t, TREE_OPERAND (fullname, 1),
-				  NULL_TREE, context,
-				  /*entering_scope=*/0,
-				  complain | tf_user);
+    {
+      t = lookup_template_class (t, TREE_OPERAND (fullname, 1),
+				 NULL_TREE, context,
+				 /*entering_scope=*/0,
+				 complain | tf_user);
+      if (t == error_mark_node)
+	return error_mark_node;
+      t = TYPE_NAME (t);
+    }
   
   if (DECL_ARTIFICIAL (t) || !(complain & tf_keep_type_decl))
     t = TREE_TYPE (t);
@@ -4358,6 +4389,7 @@ initialize_predefined_identifiers (void)
     {"heap deleted", &heap_deleted_identifier, cik_normal},
     {"heap [] uninit", &heap_vec_uninit_identifier, cik_normal},
     {"heap []", &heap_vec_identifier, cik_normal},
+    {"omp", &omp_identifier, cik_normal},
     {NULL, NULL, cik_normal}
   };
 
@@ -4433,6 +4465,15 @@ cxx_init_decl_processing (void)
   decl = add_builtin_function ("__builtin_source_location",
 			       cptr_ftype, CP_BUILT_IN_SOURCE_LOCATION,
 			       BUILT_IN_FRONTEND, NULL, NULL_TREE);
+  set_call_expr_flags (decl, ECF_CONST | ECF_NOTHROW | ECF_LEAF);
+
+  tree bool_vaftype = build_varargs_function_type_list (boolean_type_node,
+							NULL_TREE);
+  decl
+    = add_builtin_function ("__builtin_is_pointer_interconvertible_with_class",
+			    bool_vaftype,
+			    CP_BUILT_IN_IS_POINTER_INTERCONVERTIBLE_WITH_CLASS,
+			    BUILT_IN_FRONTEND, NULL, NULL_TREE);
   set_call_expr_flags (decl, ECF_CONST | ECF_NOTHROW | ECF_LEAF);
 
   integer_two_node = build_int_cst (NULL_TREE, 2);
@@ -4963,16 +5004,6 @@ push_cp_library_fn (enum tree_code operator_code, tree type,
   return fn;
 }
 
-/* Like push_library_fn, but takes a TREE_LIST of parm types rather than
-   a FUNCTION_TYPE.  */
-
-tree
-push_void_library_fn (tree name, tree parmtypes, int ecf_flags)
-{
-  tree type = build_function_type (void_type_node, parmtypes);
-  return push_library_fn (name, type, NULL_TREE, ecf_flags);
-}
-
 /* Like push_library_fn, but also note that this function throws
    and does not return.  Used for __throw_foo and the like.  */
 
@@ -5061,6 +5092,13 @@ fixup_anonymous_aggr (tree t)
   if (TREE_CODE (t) != UNION_TYPE)
     {
       tree field, type;
+
+      if (BINFO_N_BASE_BINFOS (TYPE_BINFO (t)))
+	{
+	  error_at (location_of (t), "anonymous struct with base classes");
+	  /* Avoid ICE after error on anon-struct9.C.  */
+	  TYPE_NEEDS_CONSTRUCTING (t) = false;
+	}
 
       for (field = TYPE_FIELDS (t); field; field = DECL_CHAIN (field))
 	if (TREE_CODE (field) == FIELD_DECL)
@@ -6428,10 +6466,9 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 	      /* We already reshaped this.  */
 	      if (field != d->cur->index)
 		{
-		  tree id = DECL_NAME (d->cur->index);
-		  gcc_assert (id);
-		  gcc_checking_assert (d->cur->index
-				       == get_class_binding (type, id));
+		  if (tree id = DECL_NAME (d->cur->index))
+		    gcc_checking_assert (d->cur->index
+					 == get_class_binding (type, id));
 		  field = d->cur->index;
 		}
 	    }
@@ -6451,6 +6488,32 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 		error ("%qT has no non-static data member named %qD", type,
 		       d->cur->index);
 	      return error_mark_node;
+	    }
+
+	  /* If the element is an anonymous union object and the initializer
+	     list is a designated-initializer-list, the anonymous union object
+	     is initialized by the designated-initializer-list { D }, where D
+	     is the designated-initializer-clause naming a member of the
+	     anonymous union object.  */
+	  tree ictx = DECL_CONTEXT (field);
+	  if (!same_type_ignoring_top_level_qualifiers_p (ictx, type))
+	    {
+	      gcc_assert (ANON_AGGR_TYPE_P (ictx));
+	      /* Find the anon aggr that is a direct member of TYPE.  */
+	      while (true)
+		{
+		  tree cctx = TYPE_CONTEXT (ictx);
+		  if (same_type_ignoring_top_level_qualifiers_p (cctx, type))
+		    break;
+		  ictx = cctx;
+		}
+	      /* And then the TYPE member with that anon aggr type.  */
+	      tree aafield = TYPE_FIELDS (type);
+	      for (; aafield; aafield = TREE_CHAIN (aafield))
+		if (TREE_TYPE (aafield) == ictx)
+		  break;
+	      gcc_assert (aafield);
+	      field = aafield;
 	    }
 	}
 
@@ -6635,6 +6698,8 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
      initialized from that element."  Even if T is an aggregate.  */
   if (cxx_dialect >= cxx11 && (CLASS_TYPE_P (type) || VECTOR_TYPE_P (type))
       && first_initializer_p
+      /* But not if it's a designated init.  */
+      && !d->cur->index
       && d->end - d->cur == 1
       && reference_related_p (type, TREE_TYPE (init)))
     {
@@ -8215,8 +8280,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
      reference, insert it in the statement-tree now.  */
   if (cleanups)
     {
-      unsigned i; tree t;
-      FOR_EACH_VEC_ELT (*cleanups, i, t)
+      for (tree t : *cleanups)
 	push_cleanup (decl, t, false);
       release_tree_vector (cleanups);
     }
@@ -9994,12 +10058,6 @@ grokfndecl (tree ctype,
 
   if (deduction_guide_p (decl))
     {
-      if (!DECL_NAMESPACE_SCOPE_P (decl))
-	{
-	  error_at (location, "deduction guide %qD must be declared at "
-		    "namespace scope", decl);
-	  return NULL_TREE;
-	}
       tree type = TREE_TYPE (DECL_NAME (decl));
       if (in_namespace == NULL_TREE
 	  && CP_DECL_CONTEXT (decl) != CP_TYPE_CONTEXT (type))
@@ -10008,6 +10066,13 @@ grokfndecl (tree ctype,
 			      "same scope as %qT", decl, type);
 	  inform (location_of (type), "  declared here");
 	  return NULL_TREE;
+	}
+      if (DECL_CLASS_SCOPE_P (decl)
+	  && current_access_specifier != declared_access (TYPE_NAME (type)))
+	{
+	  error_at (location, "deduction guide %qD must have the same access "
+			      "as %qT", decl, type);
+	  inform (location_of (type), "  declared here");
 	}
       if (funcdef_flag)
 	error_at (location,
@@ -10924,17 +10989,6 @@ create_array_type_for_decl (tree name, tree type, tree size, location_t loc)
   if (type == error_mark_node || size == error_mark_node)
     return error_mark_node;
 
-  /* 8.3.4/1: If the type of the identifier of D contains the auto
-     type-specifier, the program is ill-formed.  */
-  if (type_uses_auto (type))
-    {
-      if (name)
-	error_at (loc, "%qD declared as array of %qT", name, type);
-      else
-	error ("creating array of %qT", type);
-      return error_mark_node;
-    }
-
   /* If there are some types which cannot be array elements,
      issue an error-message and return.  */
   switch (TREE_CODE (type))
@@ -11176,7 +11230,7 @@ mark_inline_variable (tree decl, location_t loc)
       inlinep = false;
     }
   else if (cxx_dialect < cxx17)
-    pedwarn (loc, 0, "inline variables are only available "
+    pedwarn (loc, OPT_Wc__17_extensions, "inline variables are only available "
 	     "with %<-std=c++17%> or %<-std=gnu++17%>");
   if (inlinep)
     {
@@ -12000,6 +12054,10 @@ grokdeclarator (const cp_declarator *declarator,
   storage_class = declspecs->storage_class;
   if (storage_class == sc_static)
     staticp = 1 + (decl_context == FIELD);
+  else if (decl_context == FIELD && sfk == sfk_deduction_guide)
+    /* Treat class-scope deduction guides as static member functions
+       so that they get a FUNCTION_TYPE instead of a METHOD_TYPE.  */
+    staticp = 2;
 
   if (virtualp)
     {
@@ -12012,13 +12070,13 @@ grokdeclarator (const cp_declarator *declarator,
 	  storage_class = sc_none;
 	  staticp = 0;
 	}
-      if (constexpr_p && cxx_dialect < cxx20)
+      if (constexpr_p && pedantic && cxx_dialect < cxx20)
 	{
 	  gcc_rich_location richloc (declspecs->locations[ds_virtual]);
 	  richloc.add_range (declspecs->locations[ds_constexpr]);
-	  pedwarn (&richloc, OPT_Wpedantic, "member %qD can be declared both "
-		   "%<virtual%> and %<constexpr%> only in %<-std=c++20%> or "
-		   "%<-std=gnu++20%>", dname);
+	  pedwarn (&richloc, OPT_Wc__20_extensions, "member %qD can be "
+		   "declared both %<virtual%> and %<constexpr%> only in "
+		   "%<-std=c++20%> or %<-std=gnu++20%>", dname);
 	}
     }
   friendp = decl_spec_seq_has_spec_p (declspecs, ds_friend);
@@ -12106,7 +12164,7 @@ grokdeclarator (const cp_declarator *declarator,
 	error_at (declspecs->locations[ds_consteval], "structured "
 		  "binding declaration cannot be %qs", "consteval");
       if (thread_p && cxx_dialect < cxx20)
-	pedwarn (declspecs->locations[ds_thread], 0,
+	pedwarn (declspecs->locations[ds_thread], OPT_Wc__20_extensions,
 		 "structured binding declaration can be %qs only in "
 		 "%<-std=c++20%> or %<-std=gnu++20%>",
 		 declspecs->gnu_thread_keyword_p
@@ -12128,7 +12186,7 @@ grokdeclarator (const cp_declarator *declarator,
 	  break;
 	case sc_static:
 	  if (cxx_dialect < cxx20)
-	    pedwarn (loc, 0,
+	    pedwarn (loc, OPT_Wc__20_extensions,
 		     "structured binding declaration can be %qs only in "
 		     "%<-std=c++20%> or %<-std=gnu++20%>", "static");
 	  break;
@@ -13741,6 +13799,15 @@ grokdeclarator (const cp_declarator *declarator,
 
 	if (friendp)
 	  {
+	    /* Packages tend to use GNU attributes on friends, so we only
+	       warn for standard attributes.  */
+	    if (attrlist && !funcdef_flag && cxx11_attribute_p (*attrlist))
+	      {
+		*attrlist = NULL_TREE;
+		if (warning_at (id_loc, OPT_Wattributes, "attribute ignored"))
+		  inform (id_loc, "an attribute that appertains to a friend "
+			  "declaration that is not a definition is ignored");
+	      }
 	    /* Friends are treated specially.  */
 	    if (ctype == current_class_type)
 	      ;  /* We already issued a permerror.  */
@@ -13852,10 +13919,7 @@ grokdeclarator (const cp_declarator *declarator,
 		decl = build_decl (id_loc, FIELD_DECL, unqualified_id, type);
 		DECL_NONADDRESSABLE_P (decl) = bitfield;
 		if (bitfield && !unqualified_id)
-		  {
-		    TREE_NO_WARNING (decl) = 1;
-		    DECL_PADDING_P (decl) = 1;
-		  }
+		  DECL_PADDING_P (decl) = 1;
 
 		if (storage_class == sc_mutable)
 		  {
@@ -14012,6 +14076,8 @@ grokdeclarator (const cp_declarator *declarator,
 		storage_class = sc_none;
 	      }
 	  }
+	if (declspecs->explicit_specifier)
+	  store_explicit_specifier (decl, declspecs->explicit_specifier);
       }
     else
       {
@@ -16307,17 +16373,9 @@ incremented enumerator value is too large for %<long%>"));
 
 	 For which case we need to make sure that the access of `S::i'
 	 matches the access of `S::E'.  */
-      tree saved_cas = current_access_specifier;
-      if (TREE_PRIVATE (TYPE_NAME (enumtype)))
-	current_access_specifier = access_private_node;
-      else if (TREE_PROTECTED (TYPE_NAME (enumtype)))
-	current_access_specifier = access_protected_node;
-      else
-	current_access_specifier = access_public_node;
-
+      auto cas = make_temp_override (current_access_specifier);
+      set_current_access_from_decl (TYPE_NAME (enumtype));
       finish_member_declaration (decl);
-
-      current_access_specifier = saved_cas;
     }
   else
     pushdecl (decl);
@@ -16350,7 +16408,7 @@ lookup_enumerator (tree enumtype, tree name)
 
 tree
 cxx_simulate_enum_decl (location_t loc, const char *name,
-			vec<string_int_pair> values)
+			vec<string_int_pair> *values)
 {
   location_t saved_loc = input_location;
   input_location = loc;
@@ -16367,11 +16425,9 @@ cxx_simulate_enum_decl (location_t loc, const char *name,
   SET_OPAQUE_ENUM_P (enumtype, false);
   DECL_SOURCE_LOCATION (TYPE_NAME (enumtype)) = loc;
 
-  string_int_pair *value;
-  unsigned int i;
-  FOR_EACH_VEC_ELT (values, i, value)
-    build_enumerator (get_identifier (value->first),
-		      build_int_cst (integer_type_node, value->second),
+  for (const string_int_pair &value : values)
+    build_enumerator (get_identifier (value.first),
+		      build_int_cst (integer_type_node, value.second),
 		      enumtype, NULL_TREE, loc);
 
   finish_enum_value_list (enumtype);
@@ -17449,7 +17505,7 @@ finish_function (bool inline_p)
       /* Don't complain if we are declared noreturn.  */
       && !TREE_THIS_VOLATILE (fndecl)
       && !DECL_NAME (DECL_RESULT (fndecl))
-      && !TREE_NO_WARNING (fndecl)
+      && !warning_suppressed_p (fndecl, OPT_Wreturn_type)
       /* Structor return values (if any) are set by the compiler.  */
       && !DECL_CONSTRUCTOR_P (fndecl)
       && !DECL_DESTRUCTOR_P (fndecl)
@@ -17477,7 +17533,7 @@ finish_function (bool inline_p)
       else if (warning_at (&richloc, OPT_Wreturn_type,
 			   "no return statement in function returning "
 			   "non-void"))
-	TREE_NO_WARNING (fndecl) = 1;
+	suppress_warning (fndecl, OPT_Wreturn_type);
     }
 
   /* Lambda closure members are implicitly constexpr if possible.  */
@@ -17551,7 +17607,7 @@ finish_function (bool inline_p)
 	    && !DECL_READ_P (decl)
 	    && DECL_NAME (decl)
 	    && !DECL_ARTIFICIAL (decl)
-	    && !TREE_NO_WARNING (decl)
+	    && !warning_suppressed_p (decl,OPT_Wunused_but_set_parameter)
 	    && !DECL_IN_SYSTEM_HEADER (decl)
 	    && TREE_TYPE (decl) != error_mark_node
 	    && !TYPE_REF_P (TREE_TYPE (decl))
@@ -18042,7 +18098,7 @@ require_deduced_type (tree decl, tsubst_flags_t complain)
 {
   if (undeduced_auto_decl (decl))
     {
-      if (TREE_NO_WARNING (decl) && seen_error ())
+      if (warning_suppressed_p (decl) && seen_error ())
 	/* We probably already complained about deduction failure.  */;
       else if (complain & tf_error)
 	error ("use of %qD before deduction of %<auto%>", decl);

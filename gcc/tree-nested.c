@@ -411,8 +411,8 @@ lookup_field_for_decl (struct nesting_info *info, tree decl,
 	  DECL_USER_ALIGN (field) = DECL_USER_ALIGN (decl);
 	  DECL_IGNORED_P (field) = DECL_IGNORED_P (decl);
 	  DECL_NONADDRESSABLE_P (field) = !TREE_ADDRESSABLE (decl);
-	  TREE_NO_WARNING (field) = TREE_NO_WARNING (decl);
 	  TREE_THIS_VOLATILE (field) = TREE_THIS_VOLATILE (decl);
+	  copy_warning (field, decl);
 
 	  /* Declare the transformation and adjust the original DECL.  For a
 	     variable or for a parameter when not optimizing, we make it point
@@ -1033,6 +1033,7 @@ get_frame_field (struct nesting_info *info, tree target_context,
     }
 
   x = build3 (COMPONENT_REF, TREE_TYPE (field), x, field, NULL_TREE);
+  TREE_THIS_VOLATILE (x) = TREE_THIS_VOLATILE (field);
   return x;
 }
 
@@ -1484,6 +1485,7 @@ convert_nonlocal_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	case OMP_CLAUSE_AUTO:
 	case OMP_CLAUSE_IF_PRESENT:
 	case OMP_CLAUSE_FINALIZE:
+	case OMP_CLAUSE_BIND:
 	case OMP_CLAUSE__CONDTEMP_:
 	case OMP_CLAUSE__SCANTEMP_:
 	  break;
@@ -1509,6 +1511,9 @@ convert_nonlocal_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	case OMP_CLAUSE__REDUCTEMP_:
 	case OMP_CLAUSE__SIMDUID_:
 	case OMP_CLAUSE__SIMT_:
+	  /* The following clauses are only allowed on OpenACC 'routine'
+	     directives, not seen here.  */
+	case OMP_CLAUSE_NOHOST:
 	  /* Anything else.  */
 	default:
 	  gcc_unreachable ();
@@ -2264,6 +2269,7 @@ convert_local_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	case OMP_CLAUSE_AUTO:
 	case OMP_CLAUSE_IF_PRESENT:
 	case OMP_CLAUSE_FINALIZE:
+	case OMP_CLAUSE_BIND:
 	case OMP_CLAUSE__CONDTEMP_:
 	case OMP_CLAUSE__SCANTEMP_:
 	  break;
@@ -2289,6 +2295,9 @@ convert_local_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	case OMP_CLAUSE__REDUCTEMP_:
 	case OMP_CLAUSE__SIMDUID_:
 	case OMP_CLAUSE__SIMT_:
+	  /* The following clauses are only allowed on OpenACC 'routine'
+	     directives, not seen here.  */
+	case OMP_CLAUSE_NOHOST:
 	  /* Anything else.  */
 	default:
 	  gcc_unreachable ();

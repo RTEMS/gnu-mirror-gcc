@@ -435,7 +435,7 @@ package body Sem_Ch11 is
       --  postcondition, since in that case there are no source references, and
       --  we need to preserve deferred references from the enclosing scope.
 
-      if ((Is_Subprogram (Current_Scope) or else Is_Entry (Current_Scope))
+      if (Is_Subprogram_Or_Entry (Current_Scope)
            and then Chars (Current_Scope) /= Name_uPostconditions)
          or else Ekind (Current_Scope) in E_Block | E_Task_Type
       then
@@ -661,6 +661,18 @@ package body Sem_Ch11 is
 
       Kill_Current_Values (Last_Assignment_Only => True);
    end Analyze_Raise_Statement;
+
+   ----------------------------------
+   -- Analyze_Raise_When_Statement --
+   ----------------------------------
+
+   procedure Analyze_Raise_When_Statement (N : Node_Id) is
+   begin
+      --  Verify the condition is a Boolean expression
+
+      Analyze_And_Resolve (Condition (N), Any_Boolean);
+      Check_Unset_Reference (Condition (N));
+   end Analyze_Raise_When_Statement;
 
    -----------------------------
    -- Analyze_Raise_xxx_Error --

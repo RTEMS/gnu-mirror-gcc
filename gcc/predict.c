@@ -1949,7 +1949,7 @@ predict_loops (void)
 
   /* Try to predict out blocks in a loop that are not part of a
      natural loop.  */
-  FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
+  for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
     {
       basic_block bb, *bbs;
       unsigned j, n_exits = 0;
@@ -4111,8 +4111,7 @@ pass_profile::execute (function *fun)
     profile_status_for_fn (fun) = PROFILE_GUESSED;
  if (dump_file && (dump_flags & TDF_DETAILS))
    {
-     class loop *loop;
-     FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
+     for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
        if (loop->header->count.initialized_p ())
          fprintf (dump_file, "Loop got predicted %d to iterate %i times.\n",
        	   loop->num,
@@ -4287,8 +4286,7 @@ rebuild_frequencies (void)
 
   if (profile_status_for_fn (cfun) == PROFILE_GUESSED)
     {
-      loop_optimizer_init (0);
-      mark_irreducible_loops ();
+      loop_optimizer_init (LOOPS_HAVE_MARKED_IRREDUCIBLE_REGIONS);
       connect_infinite_loops_to_exit ();
       estimate_bb_frequencies (true);
       remove_fake_exit_edges ();

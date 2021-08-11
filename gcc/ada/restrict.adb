@@ -66,7 +66,7 @@ package body Restrict is
 
    No_Specification_Of_Aspects : array (Aspect_Id) of Source_Ptr :=
                                    (others => No_Location);
-   --  Entries in this array are set to point to a previously occuring pragma
+   --  Entries in this array are set to point to a previously occurring pragma
    --  that activates a No_Specification_Of_Aspect check.
 
    No_Specification_Of_Aspect_Warning : array (Aspect_Id) of Boolean :=
@@ -396,10 +396,9 @@ package body Restrict is
       N : Node_Id;
       V : Uint := Uint_Minus_1)
    is
-      Msg_Issued : Boolean;
-      pragma Unreferenced (Msg_Issued);
+      Ignore_Msg_Issued : Boolean;
    begin
-      Check_Restriction (Msg_Issued, R, N, V);
+      Check_Restriction (Ignore_Msg_Issued, R, N, V);
    end Check_Restriction;
 
    procedure Check_Restriction
@@ -923,6 +922,21 @@ package body Restrict is
       return Global_Restriction_No_Tasking
         or else Targparm.Restrictions_On_Target.Set (No_Tasking);
    end Global_No_Tasking;
+
+   ---------------------------------------------
+   -- No_Dynamic_Accessibility_Checks_Enabled --
+   ---------------------------------------------
+
+   function No_Dynamic_Accessibility_Checks_Enabled
+     (N : Node_Id) return Boolean
+   is
+      pragma Unreferenced (N);
+      --  N is currently unreferenced but present for debugging purposes and
+      --  potential future use.
+
+   begin
+      return Restrictions.Set (No_Dynamic_Accessibility_Checks);
+   end No_Dynamic_Accessibility_Checks_Enabled;
 
    -------------------------------
    -- No_Exception_Handlers_Set --

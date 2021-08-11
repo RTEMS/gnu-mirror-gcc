@@ -423,7 +423,7 @@ static unsigned int vn_nary_length_from_stmt (gimple *);
 static vn_nary_op_t alloc_vn_nary_op_noinit (unsigned int, obstack *);
 static vn_nary_op_t vn_nary_op_insert_into (vn_nary_op_t,
 					    vn_nary_op_table_type *, bool);
-static void init_vn_nary_op_from_stmt (vn_nary_op_t, gimple *);
+static void init_vn_nary_op_from_stmt (vn_nary_op_t, gassign *);
 static void init_vn_nary_op_from_pieces (vn_nary_op_t, unsigned int,
 					 enum tree_code, tree, tree *);
 static tree vn_lookup_simplify_result (gimple_match_op *);
@@ -553,7 +553,7 @@ vuse_ssa_val (tree x)
   return x;
 }
 
-/* Similar to the above but used as callback for walk_non_aliases_vuses
+/* Similar to the above but used as callback for walk_non_aliased_vuses
    and thus should stop at unvisited VUSE to not walk across region
    boundaries.  */
 
@@ -764,14 +764,18 @@ vn_reference_eq (const_vn_reference_t const vr1, const_vn_reference_t const vr2)
   if (vr1->operands == vr2->operands)
     return true;
 
-  if (COMPLETE_TYPE_P (vr1->type) != COMPLETE_TYPE_P (vr2->type)
-      || (COMPLETE_TYPE_P (vr1->type)
-	  && !expressions_equal_p (TYPE_SIZE (vr1->type),
-				   TYPE_SIZE (vr2->type))))
+  if (!vr1->type || !vr2->type)
+    {
+      if (vr1->type != vr2->type)
+	return false;
+    }
+  else if (COMPLETE_TYPE_P (vr1->type) != COMPLETE_TYPE_P (vr2->type)
+	   || (COMPLETE_TYPE_P (vr1->type)
+	       && !expressions_equal_p (TYPE_SIZE (vr1->type),
+					TYPE_SIZE (vr2->type))))
     return false;
-
-  if (INTEGRAL_TYPE_P (vr1->type)
-      && INTEGRAL_TYPE_P (vr2->type))
+  else if (INTEGRAL_TYPE_P (vr1->type)
+	   && INTEGRAL_TYPE_P (vr2->type))
     {
       if (TYPE_PRECISION (vr1->type) != TYPE_PRECISION (vr2->type))
 	return false;
@@ -925,12 +929,10 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 			 + (wi::to_offset (bit_offset) >> LOG2_BITS_PER_UNIT));
 		    /* Probibit value-numbering zero offset components
 		       of addresses the same before the pass folding
-		       __builtin_object_size had a chance to run
-		       (checking cfun->after_inlining does the
-		       trick here).  */
+		       __builtin_object_size had a chance to run.  */
 		    if (TREE_CODE (orig) != ADDR_EXPR
 			|| maybe_ne (off, 0)
-			|| cfun->after_inlining)
+			|| (cfun->curr_properties & PROP_objsz))
 		      off.to_shwi (&temp.off);
 		  }
 	      }
@@ -1040,9 +1042,8 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 bool
 ao_ref_init_from_vn_reference (ao_ref *ref,
 			       alias_set_type set, alias_set_type base_set,
-			       tree type, vec<vn_reference_op_s> ops)
+			       tree type, const vec<vn_reference_op_s> &ops)
 {
-  vn_reference_op_t op;
   unsigned i;
   tree base = NULL_TREE;
   tree *op0_p = &base;
@@ -1050,6 +1051,10 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
   poly_offset_int max_size;
   poly_offset_int size = -1;
   tree size_tree = NULL_TREE;
+
+  /* We don't handle calls.  */
+  if (!type)
+    return false;
 
   machine_mode mode = TYPE_MODE (type);
   if (mode == BLKmode)
@@ -1061,7 +1066,10 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
     size = wi::to_poly_offset (size_tree);
 
   /* Lower the final access size from the outermost expression.  */
-  op = &ops[0];
+  const_vn_reference_op_t cst_op = &ops[0];
+  /* Cast away constness for the sake of the const-unsafe
+     FOR_EACH_VEC_ELT().  */
+  vn_reference_op_t op = const_cast<vn_reference_op_t>(cst_op);
   size_tree = NULL_TREE;
   if (op->opcode == COMPONENT_REF)
     size_tree = DECL_SIZE (op->op0);
@@ -1092,7 +1100,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	      && op->op0
 	      && DECL_P (TREE_OPERAND (op->op0, 0)))
 	    {
-	      vn_reference_op_t pop = &ops[i-1];
+	      const_vn_reference_op_t pop = &ops[i-1];
 	      base = TREE_OPERAND (op->op0, 0);
 	      if (known_eq (pop->off, -1))
 		{
@@ -1480,6 +1488,7 @@ fully_constant_vn_reference_p (vn_reference_t ref)
 
   /* Simplify reads from constants or constant initializers.  */
   else if (BITS_PER_UNIT == 8
+	   && ref->type
 	   && COMPLETE_TYPE_P (ref->type)
 	   && is_gimple_reg_type (ref->type))
     {
@@ -1579,8 +1588,8 @@ contains_storage_order_barrier_p (vec<vn_reference_op_s> ops)
    the vector passed in is returned.  *VALUEIZED_ANYTHING will specify
    whether any operands were valueized.  */
 
-static vec<vn_reference_op_s> 
-valueize_refs_1 (vec<vn_reference_op_s> orig, bool *valueized_anything,
+static void
+valueize_refs_1 (vec<vn_reference_op_s> *orig, bool *valueized_anything,
 		 bool with_avail = false)
 {
   vn_reference_op_t vro;
@@ -1588,7 +1597,7 @@ valueize_refs_1 (vec<vn_reference_op_s> orig, bool *valueized_anything,
 
   *valueized_anything = false;
 
-  FOR_EACH_VEC_ELT (orig, i, vro)
+  FOR_EACH_VEC_ELT (*orig, i, vro)
     {
       if (vro->opcode == SSA_NAME
 	  || (vro->op0 && TREE_CODE (vro->op0) == SSA_NAME))
@@ -1627,16 +1636,16 @@ valueize_refs_1 (vec<vn_reference_op_s> orig, bool *valueized_anything,
       if (i > 0
 	  && vro->op0
 	  && TREE_CODE (vro->op0) == ADDR_EXPR
-	  && orig[i - 1].opcode == MEM_REF)
+	  && (*orig)[i - 1].opcode == MEM_REF)
 	{
-	  if (vn_reference_fold_indirect (&orig, &i))
+	  if (vn_reference_fold_indirect (orig, &i))
 	    *valueized_anything = true;
 	}
       else if (i > 0
 	       && vro->opcode == SSA_NAME
-	       && orig[i - 1].opcode == MEM_REF)
+	       && (*orig)[i - 1].opcode == MEM_REF)
 	{
-	  if (vn_reference_maybe_forwprop_address (&orig, &i))
+	  if (vn_reference_maybe_forwprop_address (orig, &i))
 	    *valueized_anything = true;
 	}
       /* If it transforms a non-constant ARRAY_REF into a constant
@@ -1654,15 +1663,13 @@ valueize_refs_1 (vec<vn_reference_op_s> orig, bool *valueized_anything,
 	  off.to_shwi (&vro->off);
 	}
     }
-
-  return orig;
 }
 
-static vec<vn_reference_op_s> 
-valueize_refs (vec<vn_reference_op_s> orig)
+static void
+valueize_refs (vec<vn_reference_op_s> *orig)
 {
   bool tem;
-  return valueize_refs_1 (orig, &tem);
+  valueize_refs_1 (orig, &tem);
 }
 
 static vec<vn_reference_op_s> shared_lookup_references;
@@ -1679,8 +1686,7 @@ valueize_shared_reference_ops_from_ref (tree ref, bool *valueized_anything)
     return vNULL;
   shared_lookup_references.truncate (0);
   copy_reference_ops_from_ref (ref, &shared_lookup_references);
-  shared_lookup_references = valueize_refs_1 (shared_lookup_references,
-					      valueized_anything);
+  valueize_refs_1 (&shared_lookup_references, valueized_anything);
   return shared_lookup_references;
 }
 
@@ -1695,7 +1701,7 @@ valueize_shared_reference_ops_from_call (gcall *call)
     return vNULL;
   shared_lookup_references.truncate (0);
   copy_reference_ops_from_call (call, &shared_lookup_references);
-  shared_lookup_references = valueize_refs (shared_lookup_references);
+  valueize_refs (&shared_lookup_references);
   return shared_lookup_references;
 }
 
@@ -2382,7 +2388,7 @@ vn_nary_build_or_lookup_1 (gimple_match_op *res_op, bool insert)
 	  vno1->length = length;
 	  vno1->predicated_values = 0;
 	  vno1->u.result = result;
-	  init_vn_nary_op_from_stmt (vno1, new_stmt);
+	  init_vn_nary_op_from_stmt (vno1, as_a <gassign *> (new_stmt));
 	  vn_nary_op_insert_into (vno1, valid_info->nary, true);
 	  /* Also do not link it into the undo chain.  */
 	  last_inserted_nary = vno1->next;
@@ -2546,7 +2552,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
       if (*disambiguate_only <= TR_VALUEIZE_AND_DISAMBIGUATE)
 	{
 	  copy_reference_ops_from_ref (lhs, &lhs_ops);
-	  lhs_ops = valueize_refs_1 (lhs_ops, &valueized_anything, true);
+	  valueize_refs_1 (&lhs_ops, &valueized_anything, true);
 	}
       vn_context_bb = saved_rpo_bb;
       ao_ref_init (&lhs_ref, lhs);
@@ -3225,7 +3231,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	vr->operands.truncate (i + 1 + rhs.length ());
       FOR_EACH_VEC_ELT (rhs, j, vro)
 	vr->operands[i + 1 + j] = *vro;
-      vr->operands = valueize_refs (vr->operands);
+      valueize_refs (&vr->operands);
       if (old == shared_lookup_references)
 	shared_lookup_references = vr->operands;
       vr->hashcode = vn_reference_compute_hash (vr);
@@ -3526,8 +3532,9 @@ vn_reference_lookup_pieces (tree vuse, alias_set_type set,
 	  operands.address (),
 	  sizeof (vn_reference_op_s)
 	  * operands.length ());
-  vr1.operands = operands = shared_lookup_references
-    = valueize_refs (shared_lookup_references);
+  bool valueized_p;
+  valueize_refs_1 (&shared_lookup_references, &valueized_p);
+  vr1.operands = shared_lookup_references;
   vr1.type = type;
   vr1.set = set;
   vr1.base_set = base_set;
@@ -3543,13 +3550,31 @@ vn_reference_lookup_pieces (tree vuse, alias_set_type set,
       ao_ref r;
       unsigned limit = param_sccvn_max_alias_queries_per_access;
       vn_walk_cb_data data (&vr1, NULL_TREE, NULL, kind, true, NULL_TREE);
+      vec<vn_reference_op_s> ops_for_ref;
+      if (!valueized_p)
+	ops_for_ref = vr1.operands;
+      else
+	{
+	  /* For ao_ref_from_mem we have to ensure only available SSA names
+	     end up in base and the only convenient way to make this work
+	     for PRE is to re-valueize with that in mind.  */
+	  ops_for_ref.create (operands.length ());
+	  ops_for_ref.quick_grow (operands.length ());
+	  memcpy (ops_for_ref.address (),
+		  operands.address (),
+		  sizeof (vn_reference_op_s)
+		  * operands.length ());
+	  valueize_refs_1 (&ops_for_ref, &valueized_p, true);
+	}
       if (ao_ref_init_from_vn_reference (&r, set, base_set, type,
-					 vr1.operands))
+					 ops_for_ref))
 	*vnresult
 	  = ((vn_reference_t)
 	     walk_non_aliased_vuses (&r, vr1.vuse, true, vn_reference_lookup_2,
 				     vn_reference_lookup_3, vuse_valueize,
 				     limit, &data));
+      if (ops_for_ref != shared_lookup_references)
+	ops_for_ref.release ();
       gcc_checking_assert (vr1.operands == shared_lookup_references);
     }
 
@@ -3578,14 +3603,14 @@ vn_reference_lookup (tree op, tree vuse, vn_lookup_kind kind,
 {
   vec<vn_reference_op_s> operands;
   struct vn_reference_s vr1;
-  bool valuezied_anything;
+  bool valueized_anything;
 
   if (vnresult)
     *vnresult = NULL;
 
   vr1.vuse = vuse_ssa_val (vuse);
   vr1.operands = operands
-    = valueize_shared_reference_ops_from_ref (op, &valuezied_anything);
+    = valueize_shared_reference_ops_from_ref (op, &valueized_anything);
   vr1.type = TREE_TYPE (op);
   ao_ref op_ref;
   ao_ref_init (&op_ref, op);
@@ -3601,11 +3626,18 @@ vn_reference_lookup (tree op, tree vuse, vn_lookup_kind kind,
       vn_reference_t wvnresult;
       ao_ref r;
       unsigned limit = param_sccvn_max_alias_queries_per_access;
+      auto_vec<vn_reference_op_s> ops_for_ref;
+      if (valueized_anything)
+	{
+	  copy_reference_ops_from_ref (op, &ops_for_ref);
+	  bool tem;
+	  valueize_refs_1 (&ops_for_ref, &tem, true);
+	}
       /* Make sure to use a valueized reference if we valueized anything.
          Otherwise preserve the full reference for advanced TBAA.  */
-      if (!valuezied_anything
+      if (!valueized_anything
 	  || !ao_ref_init_from_vn_reference (&r, vr1.set, vr1.base_set,
-					     vr1.type, vr1.operands))
+					     vr1.type, ops_for_ref))
 	ao_ref_init (&r, op);
       vn_walk_cb_data data (&vr1, r.ref ? NULL_TREE : op,
 			    last_vuse_ptr, kind, tbaa_p, mask);
@@ -3650,7 +3682,10 @@ vn_reference_lookup_call (gcall *call, vn_reference_t *vnresult,
 
   vr->vuse = vuse ? SSA_VAL (vuse) : NULL_TREE;
   vr->operands = valueize_shared_reference_ops_from_call (call);
-  vr->type = gimple_expr_type (call);
+  tree lhs = gimple_call_lhs (call);
+  /* For non-SSA return values the referece ops contain the LHS.  */
+  vr->type = ((lhs && TREE_CODE (lhs) == SSA_NAME)
+	      ? TREE_TYPE (lhs) : NULL_TREE);
   vr->punned = false;
   vr->set = 0;
   vr->base_set = 0;
@@ -3733,7 +3768,8 @@ vn_reference_insert_pieces (tree vuse, alias_set_type set,
   vr1 = XOBNEW (&vn_tables_obstack, vn_reference_s);
   vr1->value_id = value_id;
   vr1->vuse = vuse_ssa_val (vuse);
-  vr1->operands = valueize_refs (operands);
+  vr1->operands = operands;
+  valueize_refs (&vr1->operands);
   vr1->type = type;
   vr1->punned = false;
   vr1->set = set;
@@ -3860,12 +3896,12 @@ vn_nary_length_from_stmt (gimple *stmt)
 /* Initialize VNO from STMT.  */
 
 static void
-init_vn_nary_op_from_stmt (vn_nary_op_t vno, gimple *stmt)
+init_vn_nary_op_from_stmt (vn_nary_op_t vno, gassign *stmt)
 {
   unsigned i;
 
   vno->opcode = gimple_assign_rhs_code (stmt);
-  vno->type = gimple_expr_type (stmt);
+  vno->type = TREE_TYPE (gimple_assign_lhs (stmt));
   switch (vno->opcode)
     {
     case REALPART_EXPR:
@@ -3946,7 +3982,7 @@ vn_nary_op_lookup_stmt (gimple *stmt, vn_nary_op_t *vnresult)
   vn_nary_op_t vno1
     = XALLOCAVAR (struct vn_nary_op_s,
 		  sizeof_vn_nary_op (vn_nary_length_from_stmt (stmt)));
-  init_vn_nary_op_from_stmt (vno1, stmt);
+  init_vn_nary_op_from_stmt (vno1, as_a <gassign *> (stmt));
   return vn_nary_op_lookup_1 (vno1, vnresult);
 }
 
@@ -4199,7 +4235,7 @@ vn_nary_op_insert_stmt (gimple *stmt, tree result)
   vn_nary_op_t vno1
     = alloc_vn_nary_op (vn_nary_length_from_stmt (stmt),
 			result, VN_INFO (result)->value_id);
-  init_vn_nary_op_from_stmt (vno1, stmt);
+  init_vn_nary_op_from_stmt (vno1, as_a <gassign *> (stmt));
   return vn_nary_op_insert_into (vno1, valid_info->nary, true);
 }
 
@@ -4529,7 +4565,8 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool allow_back)
   /* Iterate to the single executable bb2 successor.  */
   edge succe = NULL;
   FOR_EACH_EDGE (e, ei, bb2->succs)
-    if (e->flags & EDGE_EXECUTABLE)
+    if ((e->flags & EDGE_EXECUTABLE)
+	|| (!allow_back && (e->flags & EDGE_DFS_BACK)))
       {
 	if (succe)
 	  {
@@ -4547,7 +4584,8 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool allow_back)
 	{
 	  FOR_EACH_EDGE (e, ei, succe->dest->preds)
 	    if (e != succe
-		&& (e->flags & EDGE_EXECUTABLE))
+		&& ((e->flags & EDGE_EXECUTABLE)
+		    || (!allow_back && (e->flags & EDGE_DFS_BACK))))
 	      {
 		succe = NULL;
 		break;
@@ -7613,9 +7651,8 @@ do_rpo_vn (function *fn, edge entry, bitmap exit_bbs,
      loops and the outermost one optimistically.  */
   if (iterate)
     {
-      loop_p loop;
       unsigned max_depth = param_rpo_vn_max_loop_depth;
-      FOR_EACH_LOOP (loop, LI_ONLY_INNERMOST)
+      for (auto loop : loops_list (cfun, LI_ONLY_INNERMOST))
 	if (loop_depth (loop) > max_depth)
 	  for (unsigned i = 2;
 	       i < loop_depth (loop) - max_depth; ++i)

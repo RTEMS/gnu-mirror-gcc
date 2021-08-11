@@ -165,15 +165,12 @@ register_scoped_attributes (const struct attribute_spec *attributes,
 static scoped_attributes*
 find_attribute_namespace (const char* ns)
 {
-  unsigned ix;
-  scoped_attributes *iter;
-
-  FOR_EACH_VEC_ELT (attributes_table, ix, iter)
-    if (ns == iter->ns
-	|| (iter->ns != NULL
+  for (scoped_attributes &iter : attributes_table)
+    if (ns == iter.ns
+	|| (iter.ns != NULL
 	    && ns != NULL
-	    && !strcmp (iter->ns, ns)))
-      return iter;
+	    && !strcmp (iter.ns, ns)))
+      return &iter;
   return NULL;
 }
 
@@ -2126,13 +2123,13 @@ init_attr_rdwr_indices (rdwr_map *rwm, tree attrs)
 
       /* The (optional) list of VLA bounds.  */
       tree vblist = TREE_CHAIN (mode);
-      if (vblist)
-       vblist = TREE_VALUE (vblist);
-
       mode = TREE_VALUE (mode);
       if (TREE_CODE (mode) != STRING_CST)
 	continue;
       gcc_assert (TREE_CODE (mode) == STRING_CST);
+
+      if (vblist)
+	vblist = nreverse (copy_list (TREE_VALUE (vblist)));
 
       for (const char *m = TREE_STRING_POINTER (mode); *m; )
 	{
@@ -2308,11 +2305,18 @@ attr_access::to_external_string () const
 unsigned
 attr_access::vla_bounds (unsigned *nunspec) const
 {
+  unsigned nbounds = 0;
   *nunspec = 0;
-  for (const char* p = strrchr (str, ']'); p && *p != '['; --p)
-    if (*p == '*')
-      ++*nunspec;
-  return list_length (size);
+  /* STR points to the beginning of the specified string for the current
+     argument that may be followed by the string for the next argument.  */
+  for (const char* p = strchr (str, ']'); p && *p != '['; --p)
+    {
+      if (*p == '*')
+	++*nunspec;
+      else if (*p == '$')
+	++nbounds;
+    }
+  return nbounds;
 }
 
 /* Reset front end-specific attribute access data from ATTRS.

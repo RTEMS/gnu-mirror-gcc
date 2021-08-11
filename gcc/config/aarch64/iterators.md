@@ -282,6 +282,9 @@
 ;; Scalar 64-bit container: 16, 32-bit integer modes
 (define_mode_iterator SD_HSI [HI SI])
 
+;; Scalar 64-bit container: 16-bit, 32-bit and 64-bit integer modes.
+(define_mode_iterator SD_HSDI [HI SI DI])
+
 ;; Advanced SIMD 64-bit container: 16, 32-bit integer modes.
 (define_mode_iterator VQ_HSI [V8HI V4SI])
 
@@ -312,15 +315,17 @@
 (define_mode_iterator DSX [DF DI SF SI])
 
 
-;; Modes available for Advanced SIMD <f>mul lane operations.
+;; Modes available for Advanced SIMD <f>mul operations.
 (define_mode_iterator VMUL [V4HI V8HI V2SI V4SI
 			    (V4HF "TARGET_SIMD_F16INST")
 			    (V8HF "TARGET_SIMD_F16INST")
 			    V2SF V4SF V2DF])
 
-;; Modes available for Advanced SIMD <f>mul lane operations changing lane
-;; count.
-(define_mode_iterator VMUL_CHANGE_NLANES [V4HI V8HI V2SI V4SI V2SF V4SF])
+;; The subset of VMUL for which VCOND is a vector mode.
+(define_mode_iterator VMULD [V4HI V8HI V2SI V4SI
+			     (V4HF "TARGET_SIMD_F16INST")
+			     (V8HF "TARGET_SIMD_F16INST")
+			     V2SF V4SF])
 
 ;; Iterators for single modes, for "@" patterns.
 (define_mode_iterator VNx16QI_ONLY [VNx16QI])
@@ -512,10 +517,6 @@
     UNSPEC_RADDHN	; Used in aarch64-simd.md.
     UNSPEC_SUBHN	; Used in aarch64-simd.md.
     UNSPEC_RSUBHN	; Used in aarch64-simd.md.
-    UNSPEC_ADDHN2	; Used in aarch64-simd.md.
-    UNSPEC_RADDHN2	; Used in aarch64-simd.md.
-    UNSPEC_SUBHN2	; Used in aarch64-simd.md.
-    UNSPEC_RSUBHN2	; Used in aarch64-simd.md.
     UNSPEC_SQDMULH	; Used in aarch64-simd.md.
     UNSPEC_SQRDMULH	; Used in aarch64-simd.md.
     UNSPEC_PMUL		; Used in aarch64-simd.md.
@@ -523,7 +524,6 @@
     UNSPEC_USQADD	; Used in aarch64-simd.md.
     UNSPEC_SUQADD	; Used in aarch64-simd.md.
     UNSPEC_SQXTUN	; Used in aarch64-simd.md.
-    UNSPEC_SQXTUN2	; Used in aarch64-simd.md.
     UNSPEC_SSRA		; Used in aarch64-simd.md.
     UNSPEC_USRA		; Used in aarch64-simd.md.
     UNSPEC_SRSRA	; Used in aarch64-simd.md.
@@ -1201,6 +1201,7 @@
 			 (V4HI "V4HI") (V8HI "V4HI")
 			 (V2SI "V2SI") (V4SI "V2SI")
 			 (DI   "DI") (V2DI "DI")
+			 (V4HF "V4HF") (V8HF "V4HF")
 			 (V2SF "V2SF") (V4SF "V2SF")
 			 (V2DF "DF")])
 
@@ -1210,7 +1211,7 @@
 			 (V2SI "V4SI") (V4SI "V4SI")
 			 (DI   "V2DI") (V2DI "V2DI")
 			 (V4HF "V8HF") (V8HF "V8HF")
-			 (V2SF "V2SF") (V4SF "V4SF")
+			 (V2SF "V4SF") (V4SF "V4SF")
 			 (V2DF "V2DF") (SI   "V4SI")
 			 (HI   "V8HI") (QI   "V16QI")])
 
@@ -1256,6 +1257,8 @@
 ;; Narrowed modes for VDN.
 (define_mode_attr VNARROWD [(V4HI "V8QI") (V2SI "V4HI")
 			    (DI   "V2SI")])
+(define_mode_attr Vnarrowd [(V4HI "v8qi") (V2SI "v4hi")
+			    (DI   "v2si")])
 
 ;; Narrowed double-modes for VQN (Used for XTN).
 (define_mode_attr VNARROWQ [(V8HI "V8QI") (V4SI "V4HI")
@@ -2238,9 +2241,6 @@
 (define_int_iterator ADDSUBHN [UNSPEC_ADDHN UNSPEC_RADDHN
 			       UNSPEC_SUBHN UNSPEC_RSUBHN])
 
-(define_int_iterator ADDSUBHN2 [UNSPEC_ADDHN2 UNSPEC_RADDHN2
-			        UNSPEC_SUBHN2 UNSPEC_RSUBHN2])
-
 (define_int_iterator FMAXMIN_UNS [UNSPEC_FMAX UNSPEC_FMIN
 				  UNSPEC_FMAXNM UNSPEC_FMINNM])
 
@@ -2512,6 +2512,10 @@
 				     UNSPEC_LSHIFTRT_WIDE])
 
 (define_int_iterator SVE_LDFF1_LDNF1 [UNSPEC_LDFF1 UNSPEC_LDNF1])
+
+(define_int_iterator SVE_PRED_LOAD [UNSPEC_PRED_X UNSPEC_LD1_SVE])
+
+(define_int_attr pred_load [(UNSPEC_PRED_X "_x") (UNSPEC_LD1_SVE "")])
 
 (define_int_iterator SVE2_U32_UNARY [UNSPEC_URECPE UNSPEC_RSQRTE])
 
@@ -2993,8 +2997,6 @@
 		      (UNSPEC_SABDL2 "s") (UNSPEC_UABDL2 "u")
 		      (UNSPEC_SADALP "s") (UNSPEC_UADALP "u")
 		      (UNSPEC_SUBHN "") (UNSPEC_RSUBHN "r")
-		      (UNSPEC_ADDHN2 "") (UNSPEC_RADDHN2 "r")
-		      (UNSPEC_SUBHN2 "") (UNSPEC_RSUBHN2 "r")
 		      (UNSPEC_USQADD "us") (UNSPEC_SUQADD "su")
 		      (UNSPEC_SSLI  "s") (UNSPEC_USLI  "u")
 		      (UNSPEC_SSRI  "s") (UNSPEC_USRI  "u")
@@ -3057,11 +3059,7 @@
 			 (UNSPEC_ADDHN "add")
 			 (UNSPEC_SUBHN "sub")
 			 (UNSPEC_RADDHN "add")
-			 (UNSPEC_RSUBHN "sub")
-			 (UNSPEC_ADDHN2 "add")
-			 (UNSPEC_SUBHN2 "sub")
-			 (UNSPEC_RADDHN2 "add")
-			 (UNSPEC_RSUBHN2 "sub")])
+			 (UNSPEC_RSUBHN "sub")])
 
 ;; BSL variants: first commutative operand.
 (define_int_attr bsl_1st [(1 "w") (2 "0")])

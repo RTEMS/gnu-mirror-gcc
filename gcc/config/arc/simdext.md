@@ -1472,41 +1472,19 @@
 	(match_operand:VWH 1 "general_operand"    "i,r,m,r"))]
   "(register_operand (operands[0], <MODE>mode)
        || register_operand (operands[1], <MODE>mode))"
-  "*
-{
-  switch (which_alternative)
-    {
-     default:
-       return \"#\";
-
-     case 1:
-       if (TARGET_PLUS_QMACW
-	   && even_register_operand (operands[0], <MODE>mode)
-	   && even_register_operand (operands[1], <MODE>mode))
-	 return \"vadd2%?\\t%0,%1,0\";
-       return \"#\";
-
-     case 2:
-       if (TARGET_LL64)
-	 return \"ldd%U1%V1\\t%0,%1\";
-       return \"#\";
-
-     case 3:
-       if (TARGET_LL64)
-	   return \"std%U0%V0\\t%1,%0\";
-	 return \"#\";
-    }
-}"
-  "reload_completed"
+  "@
+   #
+   vadd2\\t%0,%1,0
+   ldd%U1%V1\\t%0,%1
+   std%U0%V0\\t%1,%0"
+  "&& reload_completed && arc_split_move_p (operands)"
   [(const_int 0)]
   {
    arc_split_move (operands);
    DONE;
   }
-  [(set_attr "type" "move,multi,load,store")
-   (set_attr "predicable" "no,no,no,no")
-   (set_attr "iscompact"  "false,false,false,false")
-   ])
+  [(set_attr "type" "move,move,load,store")
+   (set_attr "length" "16,8,16,16")])
 
 (define_expand "movmisalign<mode>"
   [(set (match_operand:VWH 0 "general_operand" "")
@@ -2056,7 +2034,7 @@
   [(set (match_operand:VCT 0 "register_operand" "=r")
 	(neg:VCT (match_operand:VCT 1 "register_operand" "r")))]
   "TARGET_PLUS_DMPY"
-  "vsub<V_suffix)>\\t%0,0,%1"
+  "vsub<V_suffix>\\t%0,0,%1"
   [(set_attr "length" "8")
    (set_attr "type" "multi")])
 

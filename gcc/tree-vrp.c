@@ -228,7 +228,7 @@ intersect_range_with_nonzero_bits (enum value_range_kind vr_type,
 	  vr_type = VR_RANGE;
 	}
     }
-  if (vr_type == VR_RANGE)
+  if (vr_type == VR_RANGE || vr_type == VR_VARYING)
     {
       *max = wi::round_down_for_mask (*max, nonzero_bits);
 
@@ -406,10 +406,10 @@ compare_values_warnv (tree val1, tree val2, bool *strict_overflow_p)
 	return -2;
 
       if (strict_overflow_p != NULL
-	  /* Symbolic range building sets TREE_NO_WARNING to declare
+	  /* Symbolic range building sets the no-warning bit to declare
 	     that overflow doesn't happen.  */
-	  && (!inv1 || !TREE_NO_WARNING (val1))
-	  && (!inv2 || !TREE_NO_WARNING (val2)))
+	  && (!inv1 || !warning_suppressed_p (val1, OPT_Woverflow))
+	  && (!inv2 || !warning_suppressed_p (val2, OPT_Woverflow)))
 	*strict_overflow_p = true;
 
       if (!inv1)
@@ -432,10 +432,10 @@ compare_values_warnv (tree val1, tree val2, bool *strict_overflow_p)
 	return -2;
 
       if (strict_overflow_p != NULL
-	  /* Symbolic range building sets TREE_NO_WARNING to declare
+	  /* Symbolic range building sets the no-warning bit to declare
 	     that overflow doesn't happen.  */
-	  && (!sym1 || !TREE_NO_WARNING (val1))
-	  && (!sym2 || !TREE_NO_WARNING (val2)))
+	  && (!sym1 || !warning_suppressed_p (val1, OPT_Woverflow))
+	  && (!sym2 || !warning_suppressed_p (val2, OPT_Woverflow)))
 	*strict_overflow_p = true;
 
       const signop sgn = TYPE_SIGN (TREE_TYPE (val1));
@@ -1484,13 +1484,13 @@ register_edge_assert_for_2 (tree name, edge e,
 	}
 
       /* Extract NAME2 from the (optional) sign-changing cast.  */
-      if (gimple_assign_cast_p (def_stmt))
+      if (gassign *ass = dyn_cast <gassign *> (def_stmt))
 	{
-	  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (def_stmt))
-	      && ! TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
-	      && (TYPE_PRECISION (gimple_expr_type (def_stmt))
-		  == TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))))
-	    name3 = gimple_assign_rhs1 (def_stmt);
+	  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (ass))
+	      && ! TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (ass)))
+	      && (TYPE_PRECISION (TREE_TYPE (gimple_assign_lhs (ass)))
+		  == TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (ass)))))
+	    name3 = gimple_assign_rhs1 (ass);
 	}
 
       /* If name3 is used later, create an ASSERT_EXPR for it.  */
@@ -1717,7 +1717,7 @@ register_edge_assert_for_2 (tree name, edge e,
          simply register the same assert for it.  */
       if (CONVERT_EXPR_CODE_P (rhs_code))
 	{
-	  wide_int rmin, rmax;
+	  value_range vr;
 	  tree rhs1 = gimple_assign_rhs1 (def_stmt);
 	  if (INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
 	      && TREE_CODE (rhs1) == SSA_NAME
@@ -1739,13 +1739,14 @@ register_edge_assert_for_2 (tree name, edge e,
 	      && int_fits_type_p (val, TREE_TYPE (rhs1))
 	      && ((TYPE_PRECISION (TREE_TYPE (name))
 		   > TYPE_PRECISION (TREE_TYPE (rhs1)))
-		  || (get_range_info (rhs1, &rmin, &rmax) == VR_RANGE
+		  || ((get_range_query (cfun)->range_of_expr (vr, rhs1)
+		       && vr.kind () == VR_RANGE)
 		      && wi::fits_to_tree_p
-			   (widest_int::from (rmin,
+			   (widest_int::from (vr.lower_bound (),
 					      TYPE_SIGN (TREE_TYPE (rhs1))),
 			    TREE_TYPE (name))
 		      && wi::fits_to_tree_p
-			   (widest_int::from (rmax,
+			   (widest_int::from (vr.upper_bound (),
 					      TYPE_SIGN (TREE_TYPE (rhs1))),
 			    TREE_TYPE (name)))))
 	    add_assert_info (asserts, rhs1, rhs1,
@@ -3336,8 +3337,7 @@ vrp_asserts::find_assert_locations (void)
   /* Pre-seed loop latch liveness from loop header PHI nodes.  Due to
      the order we compute liveness and insert asserts we otherwise
      fail to insert asserts into the loop latch.  */
-  loop_p loop;
-  FOR_EACH_LOOP (loop, 0)
+  for (auto loop : loops_list (cfun, 0))
     {
       i = loop->latch->index;
       unsigned int j = single_succ_edge (loop->latch)->dest_idx;
@@ -4044,7 +4044,7 @@ vrp_prop::finalize ()
   if (dump_file)
     {
       fprintf (dump_file, "\nValue ranges after VRP:\n\n");
-      m_vr_values->dump_all_value_ranges (dump_file);
+      m_vr_values->dump (dump_file);
       fprintf (dump_file, "\n");
     }
 
@@ -4118,7 +4118,7 @@ vrp_folder::fold_predicate_in (gimple_stmt_iterator *si)
   if (val)
     {
       if (assignment_p)
-        val = fold_convert (gimple_expr_type (stmt), val);
+	val = fold_convert (TREE_TYPE (gimple_assign_lhs (stmt)), val);
 
       if (dump_file)
 	{
@@ -4164,16 +4164,18 @@ class vrp_jump_threader_simplifier : public jump_threader_simplifier
 {
 public:
   vrp_jump_threader_simplifier (vr_values *v, avail_exprs_stack *avails)
-    : jump_threader_simplifier (v, avails) {}
+    : jump_threader_simplifier (v), m_avail_exprs_stack (avails) { }
 
 private:
-  tree simplify (gimple *, gimple *, basic_block) OVERRIDE;
+  tree simplify (gimple *, gimple *, basic_block, jt_state *) OVERRIDE;
+  avail_exprs_stack *m_avail_exprs_stack;
 };
 
 tree
 vrp_jump_threader_simplifier::simplify (gimple *stmt,
 					gimple *within_stmt,
-					basic_block bb)
+					basic_block bb,
+					jt_state *state)
 {
   /* First see if the conditional is in the hash table.  */
   tree cached_lhs = m_avail_exprs_stack->lookup_avail_expr (stmt, false, true);
@@ -4205,7 +4207,7 @@ vrp_jump_threader_simplifier::simplify (gimple *stmt,
       return find_case_label_range (switch_stmt, vr);
     }
 
-  return jump_threader_simplifier::simplify (stmt, within_stmt, bb);
+  return jump_threader_simplifier::simplify (stmt, within_stmt, bb, state);
 }
 
 /* Blocks which have more than one predecessor and more than
@@ -4256,6 +4258,7 @@ private:
   hash_table<expr_elt_hasher> *m_avail_exprs;
   vrp_jump_threader_simplifier *m_simplifier;
   jump_threader *m_threader;
+  jt_state *m_state;
 };
 
 vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
@@ -4281,11 +4284,11 @@ vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
   m_vr_values = v;
   m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
   m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
+  m_state = new jt_state (m_const_and_copies, m_avail_exprs_stack, NULL);
 
   m_simplifier = new vrp_jump_threader_simplifier (m_vr_values,
 						   m_avail_exprs_stack);
-  m_threader = new jump_threader (m_const_and_copies, m_avail_exprs_stack,
-				  m_simplifier);
+  m_threader = new jump_threader (m_simplifier, m_state);
 }
 
 vrp_jump_threader::~vrp_jump_threader ()
@@ -4298,6 +4301,7 @@ vrp_jump_threader::~vrp_jump_threader ()
   delete m_avail_exprs_stack;
   delete m_simplifier;
   delete m_threader;
+  delete m_state;
 }
 
 /* Called before processing dominator children of BB.  We want to look
@@ -4358,7 +4362,7 @@ vrp_jump_threader::after_dom_children (basic_block bb)
    subsequent passes.  */
 
 static void
-vrp_simplify_cond_using_ranges (vr_values *query, gcond *stmt)
+vrp_simplify_cond_using_ranges (range_query *query, gcond *stmt)
 {
   tree op0 = gimple_cond_lhs (stmt);
   tree op1 = gimple_cond_rhs (stmt);
@@ -4419,6 +4423,27 @@ vrp_simplify_cond_using_ranges (vr_values *query, gcond *stmt)
 		}
 	    }
 	}
+    }
+}
+
+/* A comparison of an SSA_NAME against a constant where the SSA_NAME
+   was set by a type conversion can often be rewritten to use the RHS
+   of the type conversion.  Do this optimization for all conditionals
+   in FUN.
+
+   However, doing so inhibits jump threading through the comparison.
+   So that transformation is not performed until after jump threading
+   is complete.  */
+
+static void
+simplify_casted_conds (function *fun, range_query *query)
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    {
+      gimple *last = last_stmt (bb);
+      if (last && gimple_code (last) == GIMPLE_COND)
+	vrp_simplify_cond_using_ranges (query, as_a <gcond *> (last));
     }
 }
 
@@ -4518,21 +4543,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
   vrp_jump_threader threader (fun, &vrp_vr_values);
   threader.thread_jumps ();
 
-  /* A comparison of an SSA_NAME against a constant where the SSA_NAME
-     was set by a type conversion can often be rewritten to use the
-     RHS of the type conversion.
-
-     However, doing so inhibits jump threading through the comparison.
-     So that transformation is not performed until after jump threading
-     is complete.  */
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, fun)
-    {
-      gimple *last = last_stmt (bb);
-      if (last && gimple_code (last) == GIMPLE_COND)
-	vrp_simplify_cond_using_ranges (&vrp_vr_values,
-					as_a <gcond *> (last));
-    }
+  simplify_casted_conds (fun, &vrp_vr_values);
 
   free_numbers_of_iterations_estimates (fun);
 
@@ -4604,62 +4615,4 @@ gimple_opt_pass *
 make_pass_vrp (gcc::context *ctxt)
 {
   return new pass_vrp (ctxt);
-}
-
-
-/* Worker for determine_value_range.  */
-
-static void
-determine_value_range_1 (value_range *vr, tree expr)
-{
-  if (BINARY_CLASS_P (expr))
-    {
-      value_range vr0, vr1;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
-      determine_value_range_1 (&vr1, TREE_OPERAND (expr, 1));
-      range_fold_binary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
-			      &vr0, &vr1);
-    }
-  else if (UNARY_CLASS_P (expr))
-    {
-      value_range vr0;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
-      range_fold_unary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
-			     &vr0, TREE_TYPE (TREE_OPERAND (expr, 0)));
-    }
-  else if (TREE_CODE (expr) == INTEGER_CST)
-    vr->set (expr);
-  else
-    {
-      value_range_kind kind;
-      wide_int min, max;
-      /* For SSA names try to extract range info computed by VRP.  Otherwise
-	 fall back to varying.  */
-      if (TREE_CODE (expr) == SSA_NAME
-	  && INTEGRAL_TYPE_P (TREE_TYPE (expr))
-	  && (kind = get_range_info (expr, &min, &max)) != VR_VARYING)
-	vr->set (wide_int_to_tree (TREE_TYPE (expr), min),
-		 wide_int_to_tree (TREE_TYPE (expr), max),
-		 kind);
-      else
-	vr->set_varying (TREE_TYPE (expr));
-    }
-}
-
-/* Compute a value-range for EXPR and set it in *MIN and *MAX.  Return
-   the determined range type.  */
-
-value_range_kind
-determine_value_range (tree expr, wide_int *min, wide_int *max)
-{
-  value_range vr;
-  determine_value_range_1 (&vr, expr);
-  if (!vr.varying_p () && vr.constant_p ())
-    {
-      *min = wi::to_wide (vr.min ());
-      *max = wi::to_wide (vr.max ());
-      return vr.kind ();
-    }
-
-  return VR_VARYING;
 }

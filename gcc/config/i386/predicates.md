@@ -145,16 +145,16 @@
        unsigned HOST_WIDE_INT val = TARGET_64BIT ? 0xfa1e0ff3 : 0xfb1e0ff3;
 
        if (imm == val)
-	 return 1;
+	 return true;
 
        /* NB: Encoding is byte based.  */
        if (TARGET_64BIT)
 	 for (; imm >= val; imm >>= 8)
 	   if (imm == val)
-	     return 1;
+	     return true;
       }
 
-  return 0;
+  return false;
 })
 
 ;; Return true if VALUE can be stored in a sign extended immediate field.
@@ -734,13 +734,10 @@
 
 ;; Return true if OP is a GOT memory operand.
 (define_predicate "GOT_memory_operand"
-  (match_operand 0 "memory_operand")
-{
-  op = XEXP (op, 0);
-  return (GET_CODE (op) == CONST
-	  && GET_CODE (XEXP (op, 0)) == UNSPEC
-	  && XINT (XEXP (op, 0), 1) == UNSPEC_GOTPCREL);
-})
+  (and (match_operand 0 "memory_operand")
+       (match_code "const" "0")
+       (match_code "unspec" "00")
+       (match_test "XINT (XEXP (XEXP (op, 0), 0), 1) == UNSPEC_GOTPCREL")))
 
 ;; Test for a valid operand for a call instruction.
 ;; Allow constant call address operands in Pmode only.
@@ -767,9 +764,9 @@
 
 ;; Return true if OP is a 32-bit GOT symbol operand.
 (define_predicate "GOT32_symbol_operand"
-  (match_test "GET_CODE (op) == CONST
-               && GET_CODE (XEXP (op, 0)) == UNSPEC
-               && XINT (XEXP (op, 0), 1) == UNSPEC_GOT"))
+  (and (match_code "const")
+       (match_code "unspec" "0")
+       (match_test "XINT (XEXP (op, 0), 1) == UNSPEC_GOT")))
 
 ;; Match exactly zero.
 (define_predicate "const0_operand"
@@ -1024,9 +1021,20 @@
 })
 
 ;; True for registers, or const_int_operand, used to vec_setm expander.
-(define_predicate "vec_setm_operand"
+(define_predicate "vec_setm_sse41_operand"
+  (ior (and (match_operand 0 "register_operand")
+	    (match_test "TARGET_SSE4_1"))
+       (match_code "const_int")))
+
+(define_predicate "vec_setm_avx2_operand"
   (ior (and (match_operand 0 "register_operand")
 	    (match_test "TARGET_AVX2"))
+       (match_code "const_int")))
+
+(define_predicate "vec_setm_mmx_operand"
+  (ior (and (match_operand 0 "register_operand")
+	    (match_test "TARGET_SSE4_1")
+	    (match_test "TARGET_MMX_WITH_SSE"))
        (match_code "const_int")))
 
 ;; True for registers, or 1 or -1.  Used to optimize double-word shifts.
@@ -1152,6 +1160,10 @@
 (define_predicate "nonimmediate_or_const_vector_operand"
   (ior (match_operand 0 "nonimmediate_operand")
        (match_code "const_vector")))
+
+(define_predicate "nonimmediate_or_const_vec_dup_operand"
+  (ior (match_operand 0 "nonimmediate_operand")
+       (match_test "const_vec_duplicate_p (op)")))
 
 ;; Return true when OP is either register operand, or any
 ;; CONST_VECTOR.
@@ -1535,6 +1547,38 @@
   (and (match_code "mem")
        (match_test "MEM_ALIGN (op) < GET_MODE_BITSIZE (mode)")))
 
+;; Return true if OP is a parallel for an mov{d,q,dqa,ps,pd} vec_select,
+;; where one of the two operands of the vec_concat is const0_operand.
+(define_predicate "movq_parallel"
+  (match_code "parallel")
+{
+  unsigned nelt = XVECLEN (op, 0);
+  unsigned nelt2 = nelt >> 1;
+  unsigned i;
+
+  if (nelt < 2)
+    return false;
+
+  /* Validate that all of the elements are constants,
+     lower halves of permute are lower halves of the first operand,
+     upper halves of permute come from any of the second operand.  */
+  for (i = 0; i < nelt; ++i)
+    {
+      rtx er = XVECEXP (op, 0, i);
+      unsigned HOST_WIDE_INT ei;
+
+      if (!CONST_INT_P (er))
+	return false;
+      ei = INTVAL (er);
+      if (i < nelt2 && ei != i)
+	return false;
+      if (i >= nelt2 && (ei < nelt || ei >= nelt << 1))
+	return false;
+    }
+
+  return true;
+})
+
 ;; Return true if OP is a vzeroall operation, known to be a PARALLEL.
 (define_predicate "vzeroall_operation"
   (match_code "parallel")
@@ -1567,8 +1611,9 @@
 ;; return true if OP is a vzeroupper pattern.
 (define_predicate "vzeroupper_pattern"
   (and (match_code "parallel")
-       (match_code "unspec_volatile" "a")
-       (match_test "XINT (XVECEXP (op, 0, 0), 1) == UNSPECV_VZEROUPPER")))
+       (match_code "unspec" "b")
+       (match_test "XINT (XVECEXP (op, 0, 1), 1) == UNSPEC_CALLEE_ABI")
+       (match_test "INTVAL (XVECEXP (XVECEXP (op, 0, 1), 0, 0)) == ABI_VZEROUPPER")))
 
 ;; Return true if OP is an addsub vec_merge operation
 (define_predicate "addsub_vm_operator"

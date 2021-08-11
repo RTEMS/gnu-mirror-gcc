@@ -68,6 +68,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vector-builder.h"
 #include "gimple-fold.h"
 #include "escaped_string.h"
+#include "gimple-range.h"
 
 /* Tree code classes.  */
 
@@ -288,6 +289,7 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_COPYIN  */
   1, /* OMP_CLAUSE_COPYPRIVATE  */
   3, /* OMP_CLAUSE_LINEAR  */
+  1, /* OMP_CLAUSE_AFFINITY  */
   2, /* OMP_CLAUSE_ALIGNED  */
   2, /* OMP_CLAUSE_ALLOCATE  */
   1, /* OMP_CLAUSE_DEPEND  */
@@ -359,6 +361,7 @@ unsigned const char omp_clause_num_ops[] =
   3, /* OMP_CLAUSE_TILE  */
   0, /* OMP_CLAUSE_IF_PRESENT */
   0, /* OMP_CLAUSE_FINALIZE */
+  0, /* OMP_CLAUSE_NOHOST */
 };
 
 const char * const omp_clause_code_name[] =
@@ -374,6 +377,7 @@ const char * const omp_clause_code_name[] =
   "copyin",
   "copyprivate",
   "linear",
+  "affinity",
   "aligned",
   "allocate",
   "depend",
@@ -445,6 +449,7 @@ const char * const omp_clause_code_name[] =
   "tile",
   "if_present",
   "finalize",
+  "nohost",
 };
 
 
@@ -2044,7 +2049,7 @@ make_vector (unsigned log2_npatterns,
    are extracted from V, a vector of CONSTRUCTOR_ELT.  */
 
 tree
-build_vector_from_ctor (tree type, vec<constructor_elt, va_gc> *v)
+build_vector_from_ctor (tree type, const vec<constructor_elt, va_gc> *v)
 {
   if (vec_safe_length (v) == 0)
     return build_zero_cst (type);
@@ -6792,9 +6797,10 @@ operation_no_trapping_overflow (tree type, enum tree_code code)
    constructed by language-dependent code, not here.)  */
 
 /* Construct, lay out and return the type of pointers to TO_TYPE with
-   mode MODE.  If CAN_ALIAS_ALL is TRUE, indicate this type can
-   reference all of memory. If such a type has already been
-   constructed, reuse it.  */
+   mode MODE.  If MODE is VOIDmode, a pointer mode for the address
+   space of TO_TYPE will be picked.  If CAN_ALIAS_ALL is TRUE,
+   indicate this type can reference all of memory. If such a type has
+   already been constructed, reuse it.  */
 
 tree
 build_pointer_type_for_mode (tree to_type, machine_mode mode,
@@ -6805,6 +6811,12 @@ build_pointer_type_for_mode (tree to_type, machine_mode mode,
 
   if (to_type == error_mark_node)
     return error_mark_node;
+
+  if (mode == VOIDmode)
+    {
+      addr_space_t as = TYPE_ADDR_SPACE (to_type);
+      mode = targetm.addr_space.pointer_mode (as);
+    }
 
   /* If the pointed-to type has the may_alias attribute set, force
      a TYPE_REF_CAN_ALIAS_ALL pointer to be generated.  */
@@ -6857,10 +6869,7 @@ build_pointer_type_for_mode (tree to_type, machine_mode mode,
 tree
 build_pointer_type (tree to_type)
 {
-  addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
-					      : TYPE_ADDR_SPACE (to_type);
-  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
-  return build_pointer_type_for_mode (to_type, pointer_mode, false);
+  return build_pointer_type_for_mode (to_type, VOIDmode, false);
 }
 
 /* Same as build_pointer_type_for_mode, but for REFERENCE_TYPE.  */
@@ -6874,6 +6883,12 @@ build_reference_type_for_mode (tree to_type, machine_mode mode,
 
   if (to_type == error_mark_node)
     return error_mark_node;
+
+  if (mode == VOIDmode)
+    {
+      addr_space_t as = TYPE_ADDR_SPACE (to_type);
+      mode = targetm.addr_space.pointer_mode (as);
+    }
 
   /* If the pointed-to type has the may_alias attribute set, force
      a TYPE_REF_CAN_ALIAS_ALL pointer to be generated.  */
@@ -6926,10 +6941,7 @@ build_reference_type_for_mode (tree to_type, machine_mode mode,
 tree
 build_reference_type (tree to_type)
 {
-  addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
-					      : TYPE_ADDR_SPACE (to_type);
-  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
-  return build_reference_type_for_mode (to_type, pointer_mode, false);
+  return build_reference_type_for_mode (to_type, VOIDmode, false);
 }
 
 #define MAX_INT_CACHED_PREC \
@@ -11083,6 +11095,7 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
 	  WALK_SUBTREE (OMP_CLAUSE_OPERAND (*tp, 1));
 	  /* FALLTHRU */
 
+	case OMP_CLAUSE_AFFINITY:
 	case OMP_CLAUSE_ASYNC:
 	case OMP_CLAUSE_WAIT:
 	case OMP_CLAUSE_WORKER:
@@ -11154,6 +11167,7 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
 	case OMP_CLAUSE__SIMT_:
 	case OMP_CLAUSE_IF_PRESENT:
 	case OMP_CLAUSE_FINALIZE:
+	case OMP_CLAUSE_NOHOST:
 	  WALK_SUBTREE_TAIL (OMP_CLAUSE_CHAIN (*tp));
 
 	case OMP_CLAUSE_LASTPRIVATE:
@@ -12375,6 +12389,8 @@ drop_tree_overflow (tree t)
 tree
 get_base_address (tree t)
 {
+  if (TREE_CODE (t) == WITH_SIZE_EXPR)
+    t = TREE_OPERAND (t, 0);
   while (handled_component_p (t))
     t = TREE_OPERAND (t, 0);
 
@@ -12382,11 +12398,6 @@ get_base_address (tree t)
        || TREE_CODE (t) == TARGET_MEM_REF)
       && TREE_CODE (TREE_OPERAND (t, 0)) == ADDR_EXPR)
     t = TREE_OPERAND (TREE_OPERAND (t, 0), 0);
-
-  /* ???  Either the alias oracle or all callers need to properly deal
-     with WITH_SIZE_EXPRs before we can look through those.  */
-  if (TREE_CODE (t) == WITH_SIZE_EXPR)
-    return NULL_TREE;
 
   return t;
 }
@@ -12550,13 +12561,11 @@ array_at_struct_end_p (tree ref)
       || ! TYPE_MAX_VALUE (TYPE_DOMAIN (atype)))
     return true;
 
-  if (TREE_CODE (ref) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (ref, 0)) == ADDR_EXPR)
-    ref = TREE_OPERAND (TREE_OPERAND (ref, 0), 0);
-
   /* If the reference is based on a declared entity, the size of the array
      is constrained by its given domain.  (Do not trust commons PR/69368).  */
-  if (DECL_P (ref)
+  ref = get_base_address (ref);
+  if (ref
+      && DECL_P (ref)
       && !(flag_unconstrained_commons
 	   && VAR_P (ref) && DECL_COMMON (ref))
       && DECL_SIZE_UNIT (ref)
@@ -13829,8 +13838,8 @@ get_range_pos_neg (tree arg)
 
   if (TREE_CODE (arg) != SSA_NAME)
     return 3;
-  wide_int arg_min, arg_max;
-  while (get_range_info (arg, &arg_min, &arg_max) != VR_RANGE)
+  value_range r;
+  while (!get_global_range_query ()->range_of_expr (r, arg) || r.kind () != VR_RANGE)
     {
       gimple *g = SSA_NAME_DEF_STMT (arg);
       if (is_gimple_assign (g)
@@ -13856,16 +13865,16 @@ get_range_pos_neg (tree arg)
     {
       /* For unsigned values, the "positive" range comes
 	 below the "negative" range.  */
-      if (!wi::neg_p (wi::sext (arg_max, prec), SIGNED))
+      if (!wi::neg_p (wi::sext (r.upper_bound (), prec), SIGNED))
 	return 1;
-      if (wi::neg_p (wi::sext (arg_min, prec), SIGNED))
+      if (wi::neg_p (wi::sext (r.lower_bound (), prec), SIGNED))
 	return 2;
     }
   else
     {
-      if (!wi::neg_p (wi::sext (arg_min, prec), SIGNED))
+      if (!wi::neg_p (wi::sext (r.lower_bound (), prec), SIGNED))
 	return 1;
-      if (wi::neg_p (wi::sext (arg_max, prec), SIGNED))
+      if (wi::neg_p (wi::sext (r.upper_bound (), prec), SIGNED))
 	return 2;
     }
   return 3;
@@ -14371,6 +14380,65 @@ valid_new_delete_pair_p (tree new_asm, tree delete_asm)
   return false;
 }
 
+/* Return the zero-based number corresponding to the argument being
+   deallocated if FNDECL is a deallocation function or an out-of-bounds
+   value if it isn't.  */
+
+unsigned
+fndecl_dealloc_argno (tree fndecl)
+{
+  /* A call to operator delete isn't recognized as one to a built-in.  */
+  if (DECL_IS_OPERATOR_DELETE_P (fndecl))
+    {
+      if (DECL_IS_REPLACEABLE_OPERATOR (fndecl))
+	return 0;
+
+      /* Avoid placement delete that's not been inlined.  */
+      tree fname = DECL_ASSEMBLER_NAME (fndecl);
+      if (id_equal (fname, "_ZdlPvS_")       // ordinary form
+	  || id_equal (fname, "_ZdaPvS_"))   // array form
+	return UINT_MAX;
+      return 0;
+    }
+
+  /* TODO: Handle user-defined functions with attribute malloc?  Handle
+     known non-built-ins like fopen?  */
+  if (fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
+    {
+      switch (DECL_FUNCTION_CODE (fndecl))
+	{
+	case BUILT_IN_FREE:
+	case BUILT_IN_REALLOC:
+	  return 0;
+	default:
+	  break;
+	}
+      return UINT_MAX;
+    }
+
+  tree attrs = DECL_ATTRIBUTES (fndecl);
+  if (!attrs)
+    return UINT_MAX;
+
+  for (tree atfree = attrs;
+       (atfree = lookup_attribute ("*dealloc", atfree));
+       atfree = TREE_CHAIN (atfree))
+    {
+      tree alloc = TREE_VALUE (atfree);
+      if (!alloc)
+	continue;
+
+      tree pos = TREE_CHAIN (alloc);
+      if (!pos)
+	return 0;
+
+      pos = TREE_VALUE (pos);
+      return TREE_INT_CST_LOW (pos) - 1;
+    }
+
+  return UINT_MAX;
+}
+
 #if CHECKING_P
 
 namespace selftest {
@@ -14422,7 +14490,7 @@ test_labels ()
    are given by VALS.  */
 
 static tree
-build_vector (tree type, vec<tree> vals MEM_STAT_DECL)
+build_vector (tree type, const vec<tree> &vals MEM_STAT_DECL)
 {
   gcc_assert (known_eq (vals.length (), TYPE_VECTOR_SUBPARTS (type)));
   tree_vector_builder builder (type, vals.length (), 1);
@@ -14433,7 +14501,7 @@ build_vector (tree type, vec<tree> vals MEM_STAT_DECL)
 /* Check that VECTOR_CST ACTUAL contains the elements in EXPECTED.  */
 
 static void
-check_vector_cst (vec<tree> expected, tree actual)
+check_vector_cst (const vec<tree> &expected, tree actual)
 {
   ASSERT_KNOWN_EQ (expected.length (),
 		   TYPE_VECTOR_SUBPARTS (TREE_TYPE (actual)));
@@ -14446,7 +14514,7 @@ check_vector_cst (vec<tree> expected, tree actual)
    and that its elements match EXPECTED.  */
 
 static void
-check_vector_cst_duplicate (vec<tree> expected, tree actual,
+check_vector_cst_duplicate (const vec<tree> &expected, tree actual,
 			    unsigned int npatterns)
 {
   ASSERT_EQ (npatterns, VECTOR_CST_NPATTERNS (actual));
@@ -14462,7 +14530,7 @@ check_vector_cst_duplicate (vec<tree> expected, tree actual,
    EXPECTED.  */
 
 static void
-check_vector_cst_fill (vec<tree> expected, tree actual,
+check_vector_cst_fill (const vec<tree> &expected, tree actual,
 		       unsigned int npatterns)
 {
   ASSERT_EQ (npatterns, VECTOR_CST_NPATTERNS (actual));
@@ -14477,7 +14545,7 @@ check_vector_cst_fill (vec<tree> expected, tree actual,
    and that its elements match EXPECTED.  */
 
 static void
-check_vector_cst_stepped (vec<tree> expected, tree actual,
+check_vector_cst_stepped (const vec<tree> &expected, tree actual,
 			  unsigned int npatterns)
 {
   ASSERT_EQ (npatterns, VECTOR_CST_NPATTERNS (actual));

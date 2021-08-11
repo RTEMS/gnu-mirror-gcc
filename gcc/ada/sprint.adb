@@ -1065,16 +1065,12 @@ package body Sprint is
                if Present (Expressions (Node)) then
                   Sprint_Comma_List (Expressions (Node));
 
-                  if Present (Component_Associations (Node))
-                    and then not Is_Empty_List (Component_Associations (Node))
-                  then
+                  if not Is_Empty_List (Component_Associations (Node)) then
                      Write_Str (", ");
                   end if;
                end if;
 
-               if Present (Component_Associations (Node))
-                 and then not Is_Empty_List (Component_Associations (Node))
-               then
+               if not Is_Empty_List (Component_Associations (Node)) then
                   Indent_Begin;
 
                   declare
@@ -2118,6 +2114,13 @@ package body Sprint is
                Write_Indent;
             end if;
 
+         when N_Goto_When_Statement =>
+            Write_Indent_Str_Sloc ("goto ");
+            Sprint_Node (Name (Node));
+            Write_Str (" when ");
+            Sprint_Node (Condition (Node));
+            Write_Char (';');
+
          when N_Handled_Sequence_Of_Statements =>
             Set_Debug_Sloc;
             Sprint_Indented_List (Statements (Node));
@@ -2493,7 +2496,7 @@ package body Sprint is
 
             --  AI12-0275: Object_Renaming_Declaration without explicit subtype
 
-            elsif Ada_Version >= Ada_2020 then
+            elsif Ada_Version >= Ada_2022 then
                null;
 
             else
@@ -3069,10 +3072,29 @@ package body Sprint is
 
             Write_Char (';');
 
+         when N_Raise_When_Statement =>
+            Write_Indent_Str_Sloc ("raise ");
+            Sprint_Node (Name (Node));
+            Write_Str (" when ");
+            Sprint_Node (Condition (Node));
+
+            if Present (Expression (Node)) then
+               Write_Str_With_Col_Check_Sloc (" with ");
+               Sprint_Node (Expression (Node));
+            end if;
+
+            Write_Char (';');
+
          when N_Range =>
             Sprint_Node (Low_Bound (Node));
             Write_Str_Sloc (" .. ");
-            Sprint_Node (High_Bound (Node));
+            if Present (Etype (Node))
+              and then Is_Fixed_Lower_Bound_Index_Subtype (Etype (Node))
+            then
+               Write_Str ("<>");
+            else
+               Sprint_Node (High_Bound (Node));
+            end if;
             Update_Itype (Node);
 
          when N_Range_Constraint =>
@@ -3134,6 +3156,13 @@ package body Sprint is
                Write_Str_With_Col_Check (" with abort");
             end if;
 
+            Write_Char (';');
+
+         when N_Return_When_Statement =>
+            Write_Indent_Str_Sloc ("return ");
+            Sprint_Node (Expression (Node));
+            Write_Str (" when ");
+            Sprint_Node (Condition (Node));
             Write_Char (';');
 
          when N_SCIL_Dispatch_Table_Tag_Init =>
@@ -4841,7 +4870,10 @@ package body Sprint is
          Write_Int (Int (L));
          Write_Str (": ");
 
-         while Src (Loc) not in Line_Terminator loop
+         --  We need to check for EOF here, in case the last line of the source
+         --  file does not have a Line_Terminator.
+
+         while Src (Loc) not in Line_Terminator | EOF loop
             Write_Char (Src (Loc));
             Loc := Loc + 1;
          end loop;

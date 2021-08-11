@@ -1330,6 +1330,7 @@ component_ref (tree object, tree field)
 tree
 build_assign (tree_code code, tree lhs, tree rhs)
 {
+  tree result;
   tree init = stabilize_expr (&lhs);
   init = compound_expr (init, stabilize_expr (&rhs));
 
@@ -1343,27 +1344,39 @@ build_assign (tree_code code, tree lhs, tree rhs)
       d_mark_addressable (lhs);
       CALL_EXPR_RETURN_SLOT_OPT (rhs) = true;
     }
+  /* If modifying an LHS whose type is marked TREE_ADDRESSABLE.  */
+  else if (code == MODIFY_EXPR && TREE_ADDRESSABLE (TREE_TYPE (lhs))
+	   && TREE_SIDE_EFFECTS (rhs) && TREE_CODE (rhs) != TARGET_EXPR)
+    {
+      /* LHS may be referenced by the RHS expression, so force a temporary.  */
+      rhs = force_target_expr (rhs);
+    }
 
   /* The LHS assignment replaces the temporary in TARGET_EXPR_SLOT.  */
   if (TREE_CODE (rhs) == TARGET_EXPR)
     {
       /* If CODE is not INIT_EXPR, can't initialize LHS directly,
-	 since that would cause the LHS to be constructed twice.
-	 So we force the TARGET_EXPR to be expanded without a target.  */
+	 since that would cause the LHS to be constructed twice.  */
       if (code != INIT_EXPR)
 	{
 	  init = compound_expr (init, rhs);
-	  rhs = TARGET_EXPR_SLOT (rhs);
+	  result = build_assign (code, lhs, TARGET_EXPR_SLOT (rhs));
 	}
       else
 	{
 	  d_mark_addressable (lhs);
-	  rhs = TARGET_EXPR_INITIAL (rhs);
+	  TARGET_EXPR_INITIAL (rhs) = build_assign (code, lhs,
+						    TARGET_EXPR_INITIAL (rhs));
+	  result = rhs;
 	}
     }
+  else
+    {
+      /* Simple assignment.  */
+      result = fold_build2_loc (input_location, code,
+				TREE_TYPE (lhs), lhs, rhs);
+    }
 
-  tree result = fold_build2_loc (input_location, code,
-				 TREE_TYPE (lhs), lhs, rhs);
   return compound_expr (init, result);
 }
 
@@ -1485,6 +1498,11 @@ compound_expr (tree arg0, tree arg1)
   if (arg0 == NULL_TREE || !TREE_SIDE_EFFECTS (arg0))
     return arg1;
 
+  /* Remove intermediate expressions that have no side-effects.  */
+  while (TREE_CODE (arg0) == COMPOUND_EXPR
+	 && !TREE_SIDE_EFFECTS (TREE_OPERAND (arg0, 1)))
+    arg0 = TREE_OPERAND (arg0, 0);
+
   if (TREE_CODE (arg1) == TARGET_EXPR)
     {
       /* If the rhs is a TARGET_EXPR, then build the compound expression
@@ -1505,6 +1523,19 @@ compound_expr (tree arg0, tree arg1)
 tree
 return_expr (tree ret)
 {
+  /* Same as build_assign, the DECL_RESULT assignment replaces the temporary
+     in TARGET_EXPR_SLOT.  */
+  if (ret != NULL_TREE && TREE_CODE (ret) == TARGET_EXPR)
+    {
+      tree exp = TARGET_EXPR_INITIAL (ret);
+      tree init = stabilize_expr (&exp);
+
+      exp = fold_build1_loc (input_location, RETURN_EXPR, void_type_node, exp);
+      TARGET_EXPR_INITIAL (ret) = compound_expr (init, exp);
+
+      return ret;
+    }
+
   return fold_build1_loc (input_location, RETURN_EXPR,
 			  void_type_node, ret);
 }
@@ -1608,21 +1639,9 @@ build_array_index (tree ptr, tree index)
   /* Array element size.  */
   tree size_exp = size_in_bytes (target_type);
 
-  if (integer_zerop (size_exp))
+  if (integer_zerop (size_exp) || integer_onep (size_exp))
     {
-      /* Test for array of void.  */
-      if (TYPE_MODE (target_type) == TYPE_MODE (void_type_node))
-	index = fold_convert (type, index);
-      else
-	{
-	  /* Should catch this earlier.  */
-	  error ("invalid use of incomplete type %qD", TYPE_NAME (target_type));
-	  ptr_type = error_mark_node;
-	}
-    }
-  else if (integer_onep (size_exp))
-    {
-      /* Array of bytes -- No need to multiply.  */
+      /* Array of void or bytes -- No need to multiply.  */
       index = fold_convert (type, index);
     }
   else
@@ -2335,40 +2354,23 @@ get_frame_for_symbol (Dsymbol *sym)
   return null_pointer_node;
 }
 
-/* Return the parent function of a nested class CD.  */
+/* Return the parent function of a nested class or struct AD.  */
 
 static FuncDeclaration *
-d_nested_class (ClassDeclaration *cd)
+get_outer_function (AggregateDeclaration *ad)
 {
   FuncDeclaration *fd = NULL;
-  while (cd && cd->isNested ())
+  while (ad && ad->isNested ())
     {
-      Dsymbol *dsym = cd->toParent2 ();
+      Dsymbol *dsym = ad->toParent2 ();
       if ((fd = dsym->isFuncDeclaration ()))
 	return fd;
       else
-	cd = dsym->isClassDeclaration ();
+	ad = dsym->isAggregateDeclaration ();
     }
+
   return NULL;
 }
-
-/* Return the parent function of a nested struct SD.  */
-
-static FuncDeclaration *
-d_nested_struct (StructDeclaration *sd)
-{
-  FuncDeclaration *fd = NULL;
-  while (sd && sd->isNested ())
-    {
-      Dsymbol *dsym = sd->toParent2 ();
-      if ((fd = dsym->isFuncDeclaration ()))
-	return fd;
-      else
-	sd = dsym->isStructDeclaration ();
-    }
-  return NULL;
-}
-
 
 /* Starting from the current function FD, try to find a suitable value of
    `this' in nested function instances.  A suitable `this' value is an
@@ -2392,18 +2394,17 @@ find_this_tree (ClassDeclaration *ocd)
 	    return convert_expr (get_decl_tree (fd->vthis),
 				 cd->type, ocd->type);
 
-	  fd = d_nested_class (cd);
+	  fd = get_outer_function (cd);
+	  continue;
 	}
-      else
-	{
-	  if (fd->isNested ())
-	    {
-	      fd = fd->toParent2 ()->isFuncDeclaration ();
-	      continue;
-	    }
 
-	  fd = NULL;
+      if (fd->isNested ())
+	{
+	  fd = fd->toParent2 ()->isFuncDeclaration ();
+	  continue;
 	}
+
+      fd = NULL;
     }
 
   return NULL_TREE;
@@ -2741,10 +2742,6 @@ get_framedecl (FuncDeclaration *inner, FuncDeclaration *outer)
 
   while (fd && fd != outer)
     {
-      AggregateDeclaration *ad;
-      ClassDeclaration *cd;
-      StructDeclaration *sd;
-
       /* Parent frame link is the first field.  */
       if (FRAMEINFO_CREATES_FRAME (get_frameinfo (fd)))
 	result = indirect_ref (ptr_type_node, result);
@@ -2754,12 +2751,8 @@ get_framedecl (FuncDeclaration *inner, FuncDeclaration *outer)
       /* The frame/closure record always points to the outer function's
 	 frame, even if there are intervening nested classes or structs.
 	 So, we can just skip over these.  */
-      else if ((ad = fd->isThis ()) && (cd = ad->isClassDeclaration ()))
-	fd = d_nested_class (cd);
-      else if ((ad = fd->isThis ()) && (sd = ad->isStructDeclaration ()))
-	fd = d_nested_struct (sd);
       else
-	break;
+	fd = get_outer_function (fd->isThis ());
     }
 
   if (fd != outer)

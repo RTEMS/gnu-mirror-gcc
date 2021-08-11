@@ -615,6 +615,7 @@ package body Exp_Ch4 is
            and then Is_Class_Wide_Type (DesigT)
            and then Tagged_Type_Expansion
            and then not Scope_Suppress.Suppress (Accessibility_Check)
+           and then not No_Dynamic_Accessibility_Checks_Enabled (Ref)
            and then
              (Type_Access_Level (Etype (Exp)) > Type_Access_Level (PtrT)
                or else
@@ -1165,6 +1166,9 @@ package body Exp_Ch4 is
          --  secondary stack). In that case, the object will be moved, so we do
          --  want to Adjust. However, if it's a nonlimited build-in-place
          --  function call, Adjust is not wanted.
+         --
+         --  Needs_Finalization (DesigT) can differ from Needs_Finalization (T)
+         --  if one of the two types is class-wide, and the other is not.
 
          if Needs_Finalization (DesigT)
            and then Needs_Finalization (T)
@@ -5193,8 +5197,8 @@ package body Exp_Ch4 is
                   end if;
 
                   if Restriction_Active (No_Task_Hierarchy) then
-                     Append_To (Args,
-                       New_Occurrence_Of (RTE (RE_Library_Task_Level), Loc));
+                     Append_To
+                       (Args, Make_Integer_Literal (Loc, Library_Task_Level));
                   else
                      Append_To (Args,
                        New_Occurrence_Of
@@ -5277,6 +5281,8 @@ package body Exp_Ch4 is
                         if Ada_Version >= Ada_2005
                           and then
                             Ekind (Etype (Nod)) = E_Anonymous_Access_Type
+                          and then not
+                            No_Dynamic_Accessibility_Checks_Enabled (Nod)
                         then
                            Apply_Accessibility_Check
                              (Nod, Typ, Insert_Node => Nod);
@@ -5780,15 +5786,14 @@ package body Exp_Ch4 is
 
          --  Avoid processing temporary function results multiple times when
          --  dealing with nested expression_with_actions.
+         --  Similarly, do not process temporary function results in loops.
+         --  This is done by Expand_N_Loop_Statement and Build_Finalizer.
+         --  Note that we used to wrongly return Abandon instead of Skip here:
+         --  this is wrong since it means that we were ignoring lots of
+         --  relevant subsequent statements.
 
-         elsif Nkind (Act) = N_Expression_With_Actions then
-            return Abandon;
-
-         --  Do not process temporary function results in loops. This is done
-         --  by Expand_N_Loop_Statement and Build_Finalizer.
-
-         elsif Nkind (Act) = N_Loop_Statement then
-            return Abandon;
+         elsif Nkind (Act) in N_Expression_With_Actions | N_Loop_Statement then
+            return Skip;
          end if;
 
          return OK;
@@ -6866,6 +6871,7 @@ package body Exp_Ch4 is
             if Ada_Version >= Ada_2012
               and then Is_Acc
               and then Ekind (Ltyp) = E_Anonymous_Access_Type
+              and then not No_Dynamic_Accessibility_Checks_Enabled (Lop)
             then
                declare
                   Expr_Entity : Entity_Id := Empty;
@@ -9627,6 +9633,7 @@ package body Exp_Ch4 is
 
             if ((not ROK) or else (Rlo <= (-1) and then (-1) <= Rhi))
               and then ((not LOK) or else (Llo = LLB))
+              and then not CodePeer_Mode
             then
                Rewrite (N,
                  Make_If_Expression (Loc,
@@ -10393,7 +10400,9 @@ package body Exp_Ch4 is
       --  types and this is really marginal). We will just assume that we need
       --  the test if the left operand can be negative at all.
 
-      if Lneg and Rneg then
+      if (Lneg and Rneg)
+         and then not CodePeer_Mode
+      then
          Rewrite (N,
            Make_If_Expression (Loc,
              Expressions => New_List (
@@ -10852,10 +10861,11 @@ package body Exp_Ch4 is
       Var       : Entity_Id;
 
    begin
-      --  Ensure that the bound variable is properly frozen. We must do
-      --  this before expansion because the expression is about to be
-      --  converted into a loop, and resulting freeze nodes may end up
-      --  in the wrong place in the tree.
+      --  Ensure that the bound variable as well as the type of Name of the
+      --  Iter_Spec if present are properly frozen. We must do this before
+      --  expansion because the expression is about to be converted into a
+      --  loop, and resulting freeze nodes may end up in the wrong place in the
+      --  tree.
 
       if Present (Iter_Spec) then
          Var := Defining_Identifier (Iter_Spec);
@@ -10869,6 +10879,10 @@ package body Exp_Ch4 is
          while Nkind (P) in N_Subexpr loop
             P := Parent (P);
          end loop;
+
+         if Present (Iter_Spec) then
+            Freeze_Before (P, Etype (Name (Iter_Spec)));
+         end if;
 
          Freeze_Before (P, Etype (Var));
       end;
@@ -11981,9 +11995,8 @@ package body Exp_Ch4 is
                --  unchecked conversion to the target fixed-point type.
 
                Conv :=
-                 Make_Unchecked_Type_Conversion (Loc,
-                   Subtype_Mark => New_Occurrence_Of (Target_Type, Loc),
-                   Expression   => New_Occurrence_Of (Expr_Id, Loc));
+                 Unchecked_Convert_To
+                   (Target_Type, New_Occurrence_Of (Expr_Id, Loc));
             end;
 
          --  All other conversions
@@ -12326,6 +12339,7 @@ package body Exp_Ch4 is
            and then Ekind (Etype (Operand_Acc)) = E_Anonymous_Access_Type
            and then (Nkind (Original_Node (N)) /= N_Attribute_Reference
                       or else Attribute_Name (Original_Node (N)) = Name_Access)
+           and then not No_Dynamic_Accessibility_Checks_Enabled (N)
          then
             if not Comes_From_Source (N)
               and then Nkind (Parent (N)) in N_Function_Call
@@ -12503,10 +12517,7 @@ package body Exp_Ch4 is
                   Conv : Node_Id;
                begin
                   Make_Tag_Check (Class_Wide_Type (Actual_Targ_Typ));
-                  Conv :=
-                    Make_Unchecked_Type_Conversion (Loc,
-                      Subtype_Mark => New_Occurrence_Of (Target_Type, Loc),
-                      Expression   => Relocate_Node (Expression (N)));
+                  Conv := Unchecked_Convert_To (Target_Type, Expression (N));
                   Rewrite (N, Conv);
                   Analyze_And_Resolve (N, Target_Type);
                end;
@@ -12586,6 +12597,13 @@ package body Exp_Ch4 is
          if Is_Constrained (Target_Type) then
             Apply_Length_Check (Operand, Target_Type);
          else
+            --  If the object has an unconstrained array subtype with fixed
+            --  lower bound, then sliding to that bound may be needed.
+
+            if Is_Fixed_Lower_Bound_Array_Subtype (Target_Type) then
+               Expand_Sliding_Conversion (Operand, Target_Type);
+            end if;
+
             Apply_Range_Check (Operand, Target_Type);
          end if;
 
@@ -12729,7 +12747,16 @@ package body Exp_Ch4 is
       --  guard is necessary to prevent infinite recursions when we generate
       --  internal conversions for the purpose of checking predicates.
 
-      if Predicate_Enabled (Target_Type)
+      --  A view conversion of a tagged object is an object and can appear
+      --  in an assignment context, in which case no predicate check applies
+      --  to the now-dead value.
+
+      if Nkind (Parent (N)) = N_Assignment_Statement
+        and then N = Name (Parent (N))
+      then
+         null;
+
+      elsif Predicate_Enabled (Target_Type)
         and then Target_Type /= Operand_Type
         and then Comes_From_Source (N)
       then
@@ -14924,7 +14951,17 @@ package body Exp_Ch4 is
       --       Hook := null;
       --    end if;
 
+      --  Note that the value returned by Find_Hook_Context may be an operator
+      --  node, which is not a list member. We must locate the proper node in
+      --  in the tree after which to insert the finalization code.
+
       else
+         while not Is_List_Member (Fin_Context) loop
+            Fin_Context := Parent (Fin_Context);
+         end loop;
+
+         pragma Assert (Present (Fin_Context));
+
          Insert_Action_After (Fin_Context,
            Make_Implicit_If_Statement (Obj_Decl,
              Condition =>

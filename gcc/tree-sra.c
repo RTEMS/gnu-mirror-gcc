@@ -915,6 +915,12 @@ create_access (tree expr, gimple *stmt, bool write)
   if (!DECL_P (base) || !bitmap_bit_p (candidate_bitmap, DECL_UID (base)))
     return NULL;
 
+  if (write && TREE_READONLY (base))
+    {
+      disqualify_candidate (base, "Encountered a store to a read-only decl.");
+      return NULL;
+    }
+
   HOST_WIDE_INT offset, size, max_size;
   if (!poffset.is_constant (&offset)
       || !psize.is_constant (&size)
@@ -2240,12 +2246,12 @@ create_access_replacement (struct access *access, tree reg_type = NULL_TREE)
 	  DECL_HAS_DEBUG_EXPR_P (repl) = 1;
 	}
       if (access->grp_no_warning)
-	TREE_NO_WARNING (repl) = 1;
+	suppress_warning (repl /* Be more selective! */);
       else
-	TREE_NO_WARNING (repl) = TREE_NO_WARNING (access->base);
+	copy_warning (repl, access->base);
     }
   else
-    TREE_NO_WARNING (repl) = 1;
+    suppress_warning (repl /* Be more selective! */);
 
   if (dump_file)
     {
@@ -2784,7 +2790,10 @@ propagate_subaccesses_from_rhs (struct access *lacc, struct access *racc)
 	{
 	  /* We are about to change the access type from aggregate to scalar,
 	     so we need to put the reverse flag onto the access, if any.  */
-	  const bool reverse = TYPE_REVERSE_STORAGE_ORDER (lacc->type);
+	  const bool reverse
+	    = TYPE_REVERSE_STORAGE_ORDER (lacc->type)
+	      && !POINTER_TYPE_P (racc->type)
+	      && !VECTOR_TYPE_P (racc->type);
 	  tree t = lacc->base;
 
 	  lacc->type = racc->type;
@@ -3556,7 +3565,7 @@ generate_subtree_copies (struct access *access, tree agg,
 	    }
 	  else
 	    {
-	      TREE_NO_WARNING (repl) = 1;
+	      suppress_warning (repl /* Be more selective! */);
 	      if (access->grp_partial_lhs)
 		repl = force_gimple_operand_gsi (gsi, repl, true, NULL_TREE,
 						 !insert_after,
@@ -3826,7 +3835,7 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
       gsi_insert_after (gsi, ds, GSI_NEW_STMT);
     }
 
-  if (access->first_child)
+  if (access->first_child && !TREE_READONLY (access->base))
     {
       HOST_WIDE_INT start_offset, chunk_size;
       if (bfr
@@ -3890,6 +3899,13 @@ static void
 handle_unscalarized_data_in_subtree (struct subreplacement_assignment_data *sad)
 {
   tree src;
+  /* If the RHS is a load from a constant, we do not need to (and must not)
+     flush replacements to it and can use it directly as if we did.  */
+  if (TREE_READONLY (sad->top_racc->base))
+    {
+      sad->refreshed = SRA_UDH_RIGHT;
+      return;
+    }
   if (sad->top_racc->grp_unscalarized_data)
     {
       src = sad->assignment_rhs;
@@ -4243,8 +4259,8 @@ sra_modify_assign (gimple *stmt, gimple_stmt_iterator *gsi)
       || contains_vce_or_bfcref_p (lhs)
       || stmt_ends_bb_p (stmt))
     {
-      /* No need to copy into a constant-pool, it comes pre-initialized.  */
-      if (access_has_children_p (racc) && !constant_decl_p (racc->base))
+      /* No need to copy into a constant, it comes pre-initialized.  */
+      if (access_has_children_p (racc) && !TREE_READONLY (racc->base))
 	generate_subtree_copies (racc->first_child, rhs, racc->offset, 0, 0,
 				 gsi, false, false, loc);
       if (access_has_children_p (lacc))
@@ -4333,7 +4349,7 @@ sra_modify_assign (gimple *stmt, gimple_stmt_iterator *gsi)
 	    }
 	  /* Restore the aggregate RHS from its components so the
 	     prevailing aggregate copy does the right thing.  */
-	  if (access_has_children_p (racc))
+	  if (access_has_children_p (racc) && !TREE_READONLY (racc->base))
 	    generate_subtree_copies (racc->first_child, rhs, racc->offset, 0, 0,
 				     gsi, false, false, loc);
 	  /* Re-load the components of the aggregate copy destination.

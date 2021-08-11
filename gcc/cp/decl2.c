@@ -1584,6 +1584,31 @@ cplus_decl_attributes (tree *decl, tree attributes, int flags)
 
   cp_check_const_attributes (attributes);
 
+  if ((flag_openmp || flag_openmp_simd) && attributes != error_mark_node)
+    {
+      bool diagnosed = false;
+      for (tree *pa = &attributes; *pa; )
+	{
+	  if (get_attribute_namespace (*pa) == omp_identifier)
+	    {
+	      tree name = get_attribute_name (*pa);
+	      if (is_attribute_p ("directive", name)
+		  || is_attribute_p ("sequence", name))
+		{
+		  if (!diagnosed)
+		    {
+		      error ("%<omp::%E%> not allowed to be specified in this "
+			     "context", name);
+		      diagnosed = true;
+		    }
+		  *pa = TREE_CHAIN (*pa);
+		  continue;
+		}
+	    }
+	  pa = &TREE_CHAIN (*pa);
+	}
+    }
+
   if (TREE_CODE (*decl) == TEMPLATE_DECL)
     decl = &DECL_TEMPLATE_RESULT (*decl);
 
@@ -4529,7 +4554,7 @@ no_linkage_error (tree decl)
 	  || (errorcount + sorrycount > 0
 	      && DECL_LANG_SPECIFIC (decl)
 	      && DECL_TEMPLATE_INFO (decl)
-	      && TREE_NO_WARNING (decl))))
+	      && warning_suppressed_p (decl /* What warning? */))))
     /* In C++11 it's ok if the decl is defined.  */
     return;
 
@@ -5204,7 +5229,7 @@ c_parse_final_cleanups (void)
 	  && warning_at (DECL_SOURCE_LOCATION (decl), 0,
 			 "inline function %qD used but never defined", decl))
 	/* Avoid a duplicate warning from check_global_declaration.  */
-	TREE_NO_WARNING (decl) = 1;
+	suppress_warning (decl, OPT_Wunused);
     }
 
   /* So must decls that use a type with no linkage.  */
@@ -5499,10 +5524,10 @@ cp_warn_deprecated_use (tree decl, tsubst_flags_t complain)
       && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
       && copy_fn_p (decl))
     {
-      if (warn_deprecated_copy
-	  /* Don't warn about system library classes (c++/86342).  */
-	  && (!DECL_IN_SYSTEM_HEADER (decl)
-	      || global_dc->dc_warn_system_headers))
+      /* Don't warn if the flag was disabled around the class definition
+	 (c++/94492).  */
+      if (warning_enabled_at (DECL_SOURCE_LOCATION (decl),
+			      OPT_Wdeprecated_copy))
 	{
 	  auto_diagnostic_group d;
 	  tree ctx = DECL_CONTEXT (decl);

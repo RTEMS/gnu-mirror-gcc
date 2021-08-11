@@ -643,7 +643,16 @@ Expression *ctfeInterpret(Expression *e)
     case TOKfloat64:
     case TOKcomplex80:
     case TOKnull:
+    case TOKvoid:
     case TOKstring:
+    case TOKthis:
+    case TOKsuper:
+    case TOKtype:
+    case TOKtypeid:
+    case TOKtemplate:   // non-eponymous template/instance
+    case TOKscope:      // ditto
+    case TOKdottd:      // ditto, e.e1 doesn't matter here
+    case TOKdot:        // ditto
         if (e->type->ty == Terror)
             return new ErrorExp();
         /* fall through */
@@ -6881,7 +6890,7 @@ Expression *evaluateIfBuiltin(UnionExp *pue, InterState *istate, Loc loc,
         const char *id = fd->ident->toChars();
         size_t idlen = strlen(id);
         if (nargs == 2 && (idlen == 10 || idlen == 11) &&
-            startswith (id, "_aApply"))
+            !strncmp(id, "_aApply", 7))
         {
             // Functions from aApply.d and aApplyR.d in the runtime
             bool rvs = (idlen == 11);   // true if foreach_reverse

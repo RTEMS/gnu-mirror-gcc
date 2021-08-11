@@ -22,14 +22,33 @@
 		      (pc)))]
   ""
   "#"
-  "reload_completed"
-  [(set (reg:H8cc CC_REG)
-	(compare:H8cc (match_dup 1) (match_dup 2)))
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(match_dup 5))
    (set (pc)
 	(if_then_else (match_op_dup 0
-		       [(reg:H8cc CC_REG) (const_int 0)])
+		       [(match_dup 4) (const_int 0)])
 		      (label_ref (match_dup 3)) (pc)))]
-  "")
+  "
+{
+  machine_mode mode;
+
+  if (REG_P (operands[1])
+      && operands[2] == const0_rtx
+      && (GET_CODE (operands[0]) == EQ
+	  || GET_CODE (operands[0]) == NE
+	  || GET_CODE (operands[0]) == LT
+	  || GET_CODE (operands[0]) == GE
+	  /* Our tstxx insns will set ZN and clear V, so we can handle
+	     a couple additional cases.  */
+	  || GET_CODE (operands[0]) == LE
+	  || GET_CODE (operands[0]) == GT))
+    mode = E_CCZNmode;
+  else
+    mode = E_CCmode;
+  operands[4] = gen_rtx_REG (mode, CC_REG);
+  operands[5] = gen_rtx_COMPARE (mode, operands[1], operands[2]);
+}")
 
 (define_insn "*branch_1"
   [(set (pc)
@@ -123,6 +142,52 @@
 }
   [(set_attr "type" "bitbranch")
    (set_attr "length_table" "bitbranch")])
+
+(define_insn_and_split ""
+  [(set (pc)
+	(if_then_else (match_operator 3 "eqne_operator"
+			[(zero_extract:QHSI (match_operand:QHSI 1 "register_operand" "r")
+					    (const_int 1)
+					    (match_operand 2 "const_int_operand" "n"))
+			 (const_int 0)])
+		      (label_ref (match_operand 0 "" ""))
+		      (pc)))]
+  "INTVAL (operands[2]) < 16"
+  "#"
+  "&& reload_completed"
+  [(set (reg:CCZ CC_REG)
+	(eq (zero_extract:QHSI (match_dup 1) (const_int 1) (match_dup 2))
+	    (const_int 0)))
+   (set (pc)
+	(if_then_else (match_op_dup 3 [(reg:CCZ CC_REG) (const_int 0)])
+		      (label_ref (match_dup 0))
+		      (pc)))])
+
+(define_insn_and_split ""
+  [(set (pc)
+	(if_then_else (match_operator 3 "eqne_operator"
+			[(zero_extract:SI (match_operand:SI 1 "register_operand" "r")
+					  (const_int 1)
+					  (match_operand 2 "const_int_operand" "n"))
+			 (const_int 0)])
+		      (label_ref (match_operand 0 "" ""))
+		      (pc)))
+   (clobber (match_scratch:SI 4 "=&r"))]
+  "INTVAL (operands[2]) >= 16"
+  "#"
+  "&& reload_completed"
+  [(parallel [(set (match_dup 4)
+		   (ior:SI (and:SI (match_dup 4) (const_int -65536))
+			   (lshiftrt:SI (match_dup 1) (const_int 16))))
+	      (clobber (reg:CC CC_REG))])
+   (set (reg:CCZ CC_REG)
+	(eq (zero_extract:SI (match_dup 4) (const_int 1) (match_dup 2))
+	    (const_int 0)))
+   (set (pc)
+	(if_then_else (match_op_dup 3 [(reg:CCZ CC_REG) (const_int 0)])
+		      (label_ref (match_dup 0))
+		      (pc)))]
+  "operands[2] = GEN_INT (INTVAL (operands[2]) - 16);")
 
 ;; Unconditional and other jump instructions.
 

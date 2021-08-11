@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "selftest.h"
 #include "selftest-rtl.h"
 #include "rtx-vector-builder.h"
+#include "rtlanal.h"
 
 /* Simplification and canonicalization of RTL.  */
 
@@ -1716,22 +1717,35 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
       && vec_duplicate_p (op, &elt)
       && code != VEC_DUPLICATE)
     {
-      /* Try applying the operator to ELT and see if that simplifies.
-	 We can duplicate the result if so.
+      if (code == SIGN_EXTEND || code == ZERO_EXTEND)
+	/* Enforce a canonical order of VEC_DUPLICATE wrt other unary
+	   operations by promoting VEC_DUPLICATE to the root of the expression
+	   (as far as possible).  */
+	temp = simplify_gen_unary (code, GET_MODE_INNER (mode),
+				   elt, GET_MODE_INNER (GET_MODE (op)));
+      else
+	/* Try applying the operator to ELT and see if that simplifies.
+	   We can duplicate the result if so.
 
-	 The reason we don't use simplify_gen_unary is that it isn't
-	 necessarily a win to convert things like:
+	   The reason we traditionally haven't used simplify_gen_unary
+	   for these codes is that it didn't necessarily seem to be a
+	   win to convert things like:
 
-	   (neg:V (vec_duplicate:V (reg:S R)))
+	     (neg:V (vec_duplicate:V (reg:S R)))
 
-	 to:
+	   to:
 
-	   (vec_duplicate:V (neg:S (reg:S R)))
+	     (vec_duplicate:V (neg:S (reg:S R)))
 
-	 The first might be done entirely in vector registers while the
-	 second might need a move between register files.  */
-      temp = simplify_unary_operation (code, GET_MODE_INNER (mode),
-				       elt, GET_MODE_INNER (GET_MODE (op)));
+	   The first might be done entirely in vector registers while the
+	   second might need a move between register files.
+
+	   However, there also cases where promoting the vec_duplicate is
+	   more efficient, and there is definite value in having a canonical
+	   form when matching instruction patterns.  We should consider
+	   extending the simplify_gen_unary code above to more cases.  */
+	temp = simplify_unary_operation (code, GET_MODE_INNER (mode),
+					 elt, GET_MODE_INNER (GET_MODE (op)));
       if (temp)
 	return gen_vec_duplicate (mode, temp);
     }
@@ -2294,6 +2308,53 @@ comparison_code_valid_for_mode (enum rtx_code code, enum machine_mode mode)
 	gcc_unreachable ();
     }
 }
+
+/* Canonicalize RES, a scalar const0_rtx/const_true_rtx to the right
+   false/true value of comparison with MODE where comparison operands
+   have CMP_MODE.  */
+
+static rtx
+relational_result (machine_mode mode, machine_mode cmp_mode, rtx res)
+{
+  if (SCALAR_FLOAT_MODE_P (mode))
+    {
+      if (res == const0_rtx)
+        return CONST0_RTX (mode);
+#ifdef FLOAT_STORE_FLAG_VALUE
+      REAL_VALUE_TYPE val = FLOAT_STORE_FLAG_VALUE (mode);
+      return const_double_from_real_value (val, mode);
+#else
+      return NULL_RTX;
+#endif
+    }
+  if (VECTOR_MODE_P (mode))
+    {
+      if (res == const0_rtx)
+	return CONST0_RTX (mode);
+#ifdef VECTOR_STORE_FLAG_VALUE
+      rtx val = VECTOR_STORE_FLAG_VALUE (mode);
+      if (val == NULL_RTX)
+	return NULL_RTX;
+      if (val == const1_rtx)
+	return CONST1_RTX (mode);
+
+      return gen_const_vec_duplicate (mode, val);
+#else
+      return NULL_RTX;
+#endif
+    }
+  /* For vector comparison with scalar int result, it is unknown
+     if the target means here a comparison into an integral bitmask,
+     or comparison where all comparisons true mean const_true_rtx
+     whole result, or where any comparisons true mean const_true_rtx
+     whole result.  For const0_rtx all the cases are the same.  */
+  if (VECTOR_MODE_P (cmp_mode)
+      && SCALAR_INT_MODE_P (mode)
+      && res == const_true_rtx)
+    return NULL_RTX;
+
+  return res;
+}
 				       
 /* Simplify a logical operation CODE with result mode MODE, operating on OP0
    and OP1, which should be both relational operations.  Return 0 if no such
@@ -2329,7 +2390,7 @@ simplify_context::simplify_logical_relational_operation (rtx_code code,
   int mask = mask0 | mask1;
 
   if (mask == 15)
-    return const_true_rtx;
+    return relational_result (mode, GET_MODE (op0), const_true_rtx);
 
   code = mask_to_comparison (mask);
 
@@ -4154,6 +4215,15 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
 		return trueop0;
 	    }
 
+	  /* If we select a low-part subreg, return that.  */
+	  if (vec_series_lowpart_p (mode, GET_MODE (trueop0), trueop1))
+	    {
+	      rtx new_rtx = lowpart_subreg (mode, trueop0,
+					    GET_MODE (trueop0));
+	      if (new_rtx != NULL_RTX)
+		return new_rtx;
+	    }
+
 	  /* If we build {a,b} then permute it, build the result directly.  */
 	  if (XVECLEN (trueop1, 0) == 2
 	      && CONST_INT_P (XVECEXP (trueop1, 0, 0))
@@ -5315,51 +5385,7 @@ simplify_context::simplify_relational_operation (rtx_code code,
 
   tem = simplify_const_relational_operation (code, cmp_mode, op0, op1);
   if (tem)
-    {
-      if (SCALAR_FLOAT_MODE_P (mode))
-	{
-          if (tem == const0_rtx)
-            return CONST0_RTX (mode);
-#ifdef FLOAT_STORE_FLAG_VALUE
-	  {
-	    REAL_VALUE_TYPE val;
-	    val = FLOAT_STORE_FLAG_VALUE (mode);
-	    return const_double_from_real_value (val, mode);
-	  }
-#else
-	  return NULL_RTX;
-#endif
-	}
-      if (VECTOR_MODE_P (mode))
-	{
-	  if (tem == const0_rtx)
-	    return CONST0_RTX (mode);
-#ifdef VECTOR_STORE_FLAG_VALUE
-	  {
-	    rtx val = VECTOR_STORE_FLAG_VALUE (mode);
-	    if (val == NULL_RTX)
-	      return NULL_RTX;
-	    if (val == const1_rtx)
-	      return CONST1_RTX (mode);
-
-	    return gen_const_vec_duplicate (mode, val);
-	  }
-#else
-	  return NULL_RTX;
-#endif
-	}
-      /* For vector comparison with scalar int result, it is unknown
-	 if the target means here a comparison into an integral bitmask,
-	 or comparison where all comparisons true mean const_true_rtx
-	 whole result, or where any comparisons true mean const_true_rtx
-	 whole result.  For const0_rtx all the cases are the same.  */
-      if (VECTOR_MODE_P (cmp_mode)
-	  && SCALAR_INT_MODE_P (mode)
-	  && tem == const_true_rtx)
-	return NULL_RTX;
-
-      return tem;
-    }
+    return relational_result (mode, cmp_mode, tem);
 
   /* For the following tests, ensure const0_rtx is op1.  */
   if (swap_commutative_operands_p (op0, op1)
@@ -6739,7 +6765,7 @@ native_encode_rtx (machine_mode mode, rtx x, vec<target_unit> &bytes,
    Return the vector on success, otherwise return NULL_RTX.  */
 
 rtx
-native_decode_vector_rtx (machine_mode mode, vec<target_unit> bytes,
+native_decode_vector_rtx (machine_mode mode, const vec<target_unit> &bytes,
 			  unsigned int first_byte, unsigned int npatterns,
 			  unsigned int nelts_per_pattern)
 {
@@ -6784,7 +6810,7 @@ native_decode_vector_rtx (machine_mode mode, vec<target_unit> bytes,
    Return the rtx on success, otherwise return NULL_RTX.  */
 
 rtx
-native_decode_rtx (machine_mode mode, vec<target_unit> bytes,
+native_decode_rtx (machine_mode mode, const vec<target_unit> &bytes,
 		   unsigned int first_byte)
 {
   if (VECTOR_MODE_P (mode))

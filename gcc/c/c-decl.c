@@ -1295,7 +1295,7 @@ pop_scope (void)
 	case VAR_DECL:
 	  /* Warnings for unused variables.  */
 	  if ((!TREE_USED (p) || !DECL_READ_P (p))
-	      && !TREE_NO_WARNING (p)
+	      && !warning_suppressed_p (p, OPT_Wunused_but_set_variable)
 	      && !DECL_IN_SYSTEM_HEADER (p)
 	      && DECL_NAME (p)
 	      && !DECL_ARTIFICIAL (p)
@@ -2159,8 +2159,8 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 
       if (DECL_IN_SYSTEM_HEADER (newdecl)
 	  || DECL_IN_SYSTEM_HEADER (olddecl)
-	  || TREE_NO_WARNING (newdecl)
-	  || TREE_NO_WARNING (olddecl))
+	  || warning_suppressed_p (newdecl, OPT_Wpedantic)
+	  || warning_suppressed_p (olddecl, OPT_Wpedantic))
 	return true;  /* Allow OLDDECL to continue in use.  */
 
       if (variably_modified_type_p (newtype, NULL))
@@ -2620,6 +2620,9 @@ merge_decls (tree newdecl, tree olddecl, tree newtype, tree oldtype)
 	  SET_DECL_ALIGN (newdecl, DECL_ALIGN (olddecl));
 	  DECL_USER_ALIGN (newdecl) |= DECL_USER_ALIGN (olddecl);
 	}
+      else if (DECL_ALIGN (olddecl) == DECL_ALIGN (newdecl)
+	       && DECL_USER_ALIGN (olddecl) != DECL_USER_ALIGN (newdecl))
+	DECL_USER_ALIGN (newdecl) = 1;
       if (DECL_WARN_IF_NOT_ALIGN (olddecl)
 	  > DECL_WARN_IF_NOT_ALIGN (newdecl))
 	SET_DECL_WARN_IF_NOT_ALIGN (newdecl,
@@ -2953,7 +2956,7 @@ duplicate_decls (tree newdecl, tree olddecl)
   if (!diagnose_mismatched_decls (newdecl, olddecl, &newtype, &oldtype))
     {
       /* Avoid `unused variable' and other warnings for OLDDECL.  */
-      TREE_NO_WARNING (olddecl) = 1;
+      suppress_warning (olddecl, OPT_Wunused);
       return false;
     }
 
@@ -5856,9 +5859,13 @@ get_parm_array_spec (const struct c_parm *parm, tree attrs)
 	  spec += buf;
 	  break;
 	}
+      else if (!INTEGRAL_TYPE_P (TREE_TYPE (nelts)))
+	/* Avoid invalid NELTS.  */
+	return attrs;
 
       /* Each variable VLA bound is represented by a dollar sign.  */
       spec += "$";
+      STRIP_NOPS (nelts);
       vbchain = tree_cons (NULL_TREE, nelts, vbchain);
     }
 
@@ -7537,10 +7544,7 @@ grokdeclarator (const struct c_declarator *declarator,
 			   FIELD_DECL, declarator->u.id.id, type);
 	DECL_NONADDRESSABLE_P (decl) = bitfield;
 	if (bitfield && !declarator->u.id.id)
-	  {
-	    TREE_NO_WARNING (decl) = 1;
-	    DECL_PADDING_P (decl) = 1;
-	  }
+	  DECL_PADDING_P (decl) = 1;
 
 	if (size_varies)
 	  C_DECL_VARIABLE_SIZE (decl) = 1;
@@ -8850,6 +8854,22 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 		= c_build_qualified_type (fmain_type, TYPE_QUALS (ftype));
 	    }
 	}
+
+      /* Warn on problematic type punning for storage order purposes.  */
+      if (TREE_CODE (t) == UNION_TYPE
+	  && TREE_CODE (field) == FIELD_DECL
+	  && AGGREGATE_TYPE_P (TREE_TYPE (field)))
+	{
+	  tree ftype = TREE_TYPE (field);
+	  if (TREE_CODE (ftype) == ARRAY_TYPE)
+	    ftype = strip_array_types (ftype);
+	  if (RECORD_OR_UNION_TYPE_P (ftype)
+	      && TYPE_REVERSE_STORAGE_ORDER (ftype)
+		 != TYPE_REVERSE_STORAGE_ORDER (t))
+	    warning_at (DECL_SOURCE_LOCATION (field),
+			OPT_Wscalar_storage_order,
+			"type punning toggles scalar storage order");
+	}
     }
 
   /* Now we have the truly final field list.
@@ -9359,7 +9379,7 @@ build_enumerator (location_t decl_loc, location_t loc,
 
 tree
 c_simulate_enum_decl (location_t loc, const char *name,
-		      vec<string_int_pair> values)
+		      vec<string_int_pair> *values_ptr)
 {
   location_t saved_loc = input_location;
   input_location = loc;
@@ -9369,6 +9389,7 @@ c_simulate_enum_decl (location_t loc, const char *name,
 
   tree value_chain = NULL_TREE;
   string_int_pair *value;
+  vec<string_int_pair> values = *values_ptr;
   unsigned int i;
   FOR_EACH_VEC_ELT (values, i, value)
     {
@@ -10222,7 +10243,7 @@ finish_function (location_t end_loc)
       && targetm.warn_func_return (fndecl)
       && warning (OPT_Wreturn_type,
 		  "no return statement in function returning non-void"))
-    TREE_NO_WARNING (fndecl) = 1;
+    suppress_warning (fndecl, OPT_Wreturn_type);
 
   /* Complain about parameters that are only set, but never otherwise used.  */
   if (warn_unused_but_set_parameter)
@@ -10237,7 +10258,7 @@ finish_function (location_t end_loc)
 	    && !DECL_READ_P (decl)
 	    && DECL_NAME (decl)
 	    && !DECL_ARTIFICIAL (decl)
-	    && !TREE_NO_WARNING (decl))
+	    && !warning_suppressed_p (decl, OPT_Wunused_but_set_parameter))
 	  warning_at (DECL_SOURCE_LOCATION (decl),
 		      OPT_Wunused_but_set_parameter,
 		      "parameter %qD set but not used", decl);
@@ -10537,6 +10558,7 @@ names_builtin_p (const char *name)
     case RID_BUILTIN_CONVERTVECTOR:
     case RID_BUILTIN_HAS_ATTRIBUTE:
     case RID_BUILTIN_SHUFFLE:
+    case RID_BUILTIN_SHUFFLEVECTOR:
     case RID_CHOOSE_EXPR:
     case RID_OFFSETOF:
     case RID_TYPES_COMPATIBLE_P:
@@ -12103,19 +12125,20 @@ c_write_global_declarations_1 (tree globals)
 	{
 	  if (C_DECL_USED (decl))
 	    {
+	      /* TODO: Add OPT_Wundefined-inline.  */
 	      if (pedwarn (input_location, 0, "%q+F used but never defined",
 			   decl))
-		TREE_NO_WARNING (decl) = 1;
+		suppress_warning (decl /* OPT_Wundefined-inline.  */);
 	    }
 	  /* For -Wunused-function warn about unused static prototypes.  */
 	  else if (warn_unused_function
 		   && ! DECL_ARTIFICIAL (decl)
-		   && ! TREE_NO_WARNING (decl))
+		   && ! warning_suppressed_p (decl, OPT_Wunused_function))
 	    {
 	      if (warning (OPT_Wunused_function,
 			   "%q+F declared %<static%> but never defined",
 			   decl))
-		TREE_NO_WARNING (decl) = 1;
+		suppress_warning (decl, OPT_Wunused_function);
 	    }
 	}
 

@@ -832,10 +832,22 @@ write_encoding (const tree decl)
       write_bare_function_type (fn_type,
 				mangle_return_type_p (decl),
 				d);
+
+      /* If this is a coroutine helper, then append an appropriate string to
+	 identify which.  */
+      if (tree ramp = DECL_RAMP_FN (decl))
+	{
+	  if (DECL_ACTOR_FN (ramp) == decl)
+	    write_string (JOIN_STR "actor");
+	  else if (DECL_DESTROY_FN (ramp) == decl)
+	    write_string (JOIN_STR "destroy");
+	  else
+	    gcc_unreachable ();
+	}
     }
 }
 
-/* Interface to substitution and identifer mangling, used by the
+/* Interface to substitution and identifier mangling, used by the
    module name mangler.  */
 
 void
@@ -1423,9 +1435,12 @@ write_unqualified_name (tree decl)
 	}
       else if (DECL_OVERLOADED_OPERATOR_P (decl))
 	{
+	  tree t;
+	  if (!(t = DECL_RAMP_FN (decl)))
+	    t = decl;
 	  const char *mangled_name
-	    = (ovl_op_info[DECL_ASSIGNMENT_OPERATOR_P (decl)]
-	       [DECL_OVERLOADED_OPERATOR_CODE_RAW (decl)].mangled_name);
+	    = (ovl_op_info[DECL_ASSIGNMENT_OPERATOR_P (t)]
+	       [DECL_OVERLOADED_OPERATOR_CODE_RAW (t)].mangled_name);
 	  write_string (mangled_name);
 	}
       else if (UDLIT_OPER_P (DECL_NAME (decl)))

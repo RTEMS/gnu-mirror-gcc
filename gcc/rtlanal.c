@@ -3261,6 +3261,7 @@ may_trap_p_1 (const_rtx x, unsigned flags)
       break;
 
     case FIX:
+    case UNSIGNED_FIX:
       /* Conversion of floating point might trap.  */
       if (flag_trapping_math && HONOR_NANS (XEXP (x, 0)))
 	return 1;
@@ -4325,6 +4326,17 @@ simplify_subreg_regno (unsigned int xregno, machine_mode xmode,
   return (int) yregno;
 }
 
+/* A wrapper around simplify_subreg_regno that uses subreg_lowpart_offset
+   (xmode, ymode) as the offset.  */
+
+int
+lowpart_subreg_regno (unsigned int regno, machine_mode xmode,
+		      machine_mode ymode)
+{
+  poly_uint64 offset = subreg_lowpart_offset (xmode, ymode);
+  return simplify_subreg_regno (regno, xmode, offset, ymode);
+}
+
 /* Return the final regno that a subreg expression refers to.  */
 unsigned int
 subreg_regno (const_rtx x)
@@ -4870,7 +4882,7 @@ nonzero_bits1 (const_rtx x, scalar_int_mode mode, const_rtx known_x,
 	  /* If PUSH_ROUNDING is defined, it is possible for the
 	     stack to be momentarily aligned only to that amount,
 	     so we pick the least alignment.  */
-	  if (x == stack_pointer_rtx && PUSH_ARGS)
+	  if (x == stack_pointer_rtx && targetm.calls.push_argument (0))
 	    {
 	      poly_uint64 rounded_1 = PUSH_ROUNDING (poly_int64 (1));
 	      alignment = MIN (known_alignment (rounded_1), alignment);
@@ -6939,4 +6951,42 @@ register_asm_p (const_rtx x)
 	  && HAS_DECL_ASSEMBLER_NAME_P (REG_EXPR (x))
 	  && DECL_ASSEMBLER_NAME_SET_P (REG_EXPR (x))
 	  && DECL_REGISTER (REG_EXPR (x)));
+}
+
+/* Return true if, for all OP of mode OP_MODE:
+
+     (vec_select:RESULT_MODE OP SEL)
+
+   is equivalent to the highpart RESULT_MODE of OP.  */
+
+bool
+vec_series_highpart_p (machine_mode result_mode, machine_mode op_mode, rtx sel)
+{
+  int nunits;
+  if (GET_MODE_NUNITS (op_mode).is_constant (&nunits)
+      && targetm.can_change_mode_class (op_mode, result_mode, ALL_REGS))
+    {
+      int offset = BYTES_BIG_ENDIAN ? 0 : nunits - XVECLEN (sel, 0);
+      return rtvec_series_p (XVEC (sel, 0), offset);
+    }
+  return false;
+}
+
+/* Return true if, for all OP of mode OP_MODE:
+
+     (vec_select:RESULT_MODE OP SEL)
+
+   is equivalent to the lowpart RESULT_MODE of OP.  */
+
+bool
+vec_series_lowpart_p (machine_mode result_mode, machine_mode op_mode, rtx sel)
+{
+  int nunits;
+  if (GET_MODE_NUNITS (op_mode).is_constant (&nunits)
+      && targetm.can_change_mode_class (op_mode, result_mode, ALL_REGS))
+    {
+      int offset = BYTES_BIG_ENDIAN ? nunits - XVECLEN (sel, 0) : 0;
+      return rtvec_series_p (XVEC (sel, 0), offset);
+    }
+  return false;
 }

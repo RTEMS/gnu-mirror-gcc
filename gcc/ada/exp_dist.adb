@@ -1424,6 +1424,7 @@ package body Exp_Dist is
               and then Chars (Current_Primitive) /= Name_uAlignment
               and then not
                 (Is_TSS (Current_Primitive, TSS_Deep_Finalize) or else
+                 Is_TSS (Current_Primitive, TSS_Put_Image)     or else
                  Is_TSS (Current_Primitive, TSS_Stream_Input)  or else
                  Is_TSS (Current_Primitive, TSS_Stream_Output) or else
                  Is_TSS (Current_Primitive, TSS_Stream_Read)   or else
@@ -2859,9 +2860,9 @@ package body Exp_Dist is
       if E_Calling_Stubs = Empty then
          RCI_Locator := RCI_Locator_Table.Get (RCI_Package);
 
-         --  The RCI_Locator package and calling stub are is inserted at the
-         --  top level in the current unit, and must appear in the proper scope
-         --  so that it is not prematurely removed by the GCC back end.
+         --  The RCI_Locator package and calling stub are inserted at the top
+         --  level in the current unit, and must appear in the proper scope so
+         --  that it is not prematurely removed by the GCC back end.
 
          declare
             Scop : constant Entity_Id := Cunit_Entity (Current_Sem_Unit);
@@ -10906,8 +10907,8 @@ package body Exp_Dist is
                raise Program_Error;
             end if;
 
-            --  TBD: fixed point types???
-            --  TBverified numeric types with a biased representation???
+            --  What about fixed point types and numeric types with a biased
+            --  representation???
 
          end Find_Numeric_Representation;
 

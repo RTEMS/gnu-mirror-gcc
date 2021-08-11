@@ -162,7 +162,7 @@ package Exp_Util is
    --
    --  Implementation limitation: Assoc_Node must be a statement. We can
    --  generalize to expressions if there is a need but this is tricky to
-   --  implement because of short-circuits (among other things).???
+   --  implement because of short-circuits (among other things).
 
    procedure Insert_Declaration (N : Node_Id; Decl : Node_Id);
    --  N must be a subexpression (Nkind in N_Subexpr). This is similar to
@@ -560,6 +560,12 @@ package Exp_Util is
    --  indicating that no checks were required). The Sloc field of the
    --  constructed N_Or_Else node is copied from Cond1.
 
+   procedure Expand_Sliding_Conversion (N : Node_Id; Arr_Typ : Entity_Id);
+   --  When sliding is needed for an array object N in the context of an
+   --  unconstrained array type Arr_Typ with fixed lower bound (FLB), create
+   --  a subtype with appropriate index constraint (FLB .. N'Length + FLB - 1)
+   --  and apply a conversion from N to that subtype.
+
    procedure Expand_Static_Predicates_In_Choices (N : Node_Id);
    --  N is either a case alternative or a variant. The Discrete_Choices field
    --  of N points to a list of choices. If any of these choices is the name
@@ -909,7 +915,7 @@ package Exp_Util is
    --  Establish the following mapping between the attributes of tagged parent
    --  type Parent_Type and tagged derived type Derived_Type.
    --
-   --    * Map each discriminant of Parent_Type to ether the corresponding
+   --    * Map each discriminant of Parent_Type to either the corresponding
    --      discriminant of Derived_Type or come constraint.
 
    --    * Map each primitive operation of Parent_Type to the corresponding

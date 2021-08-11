@@ -600,7 +600,7 @@ is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Constant_Reference_Type :=
-           (Element => Container.Elements (Position.Node)'Access,
+           (Element => Container.Elements (Position.Node)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);
@@ -2328,7 +2328,7 @@ is
    ---------------
 
    procedure Put_Image
-     (S : in out Ada.Strings.Text_Output.Sink'Class; V : Tree)
+     (S : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; V : Tree)
    is
       use System.Put_Images;
 
@@ -2533,7 +2533,7 @@ is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Reference_Type :=
-           (Element => Container.Elements (Position.Node)'Access,
+           (Element => Container.Elements (Position.Node)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);

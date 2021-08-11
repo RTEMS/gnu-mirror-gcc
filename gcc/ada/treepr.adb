@@ -76,7 +76,7 @@ package body Treepr is
    -- Global Variables --
    ----------------------
 
-   Include_Low_Level : Boolean := False with Warnings => Off;
+   Print_Low_Level_Info : Boolean := False with Warnings => Off;
    --  Set True to print low-level information useful for debugging Atree and
    --  the like.
 
@@ -126,8 +126,6 @@ package body Treepr is
    function From_Union is new Unchecked_Conversion (Union_Id, Uint);
    function From_Union is new Unchecked_Conversion (Union_Id, Ureal);
 
-   --  Print_End_Span is gone. Should be restored????
-
    function Capitalize (S : String) return String;
    procedure Capitalize (S : in out String);
    --  Turns an identifier into Mixed_Case
@@ -138,6 +136,10 @@ package body Treepr is
 
    procedure Print_Init;
    --  Initialize for printing of tree with descendants
+
+   procedure Print_End_Span (N : Node_Id);
+   --  Print contents of End_Span field of node N. The format includes the
+   --  implicit source location as well as the value of the field.
 
    procedure Print_Term;
    --  Clean up after printing of tree with descendants
@@ -185,27 +187,26 @@ package body Treepr is
    procedure Print_Field (Val : Union_Id; Format : UI_Format := Auto);
    procedure Print_Field
      (Prefix : String;
-      Field : String;
-      N : Node_Or_Entity_Id;
-      FD : Field_Descriptor;
+      Field  : String;
+      N      : Node_Or_Entity_Id;
+      FD     : Field_Descriptor;
       Format : UI_Format);
    --  Print representation of Field value (name, tree, string, uint, charcode)
    --  The format parameter controls the format of printing in the case of an
-   --  integer value (see UI_Write for details).????
-   --  Do we really need two of these???
+   --  integer value (see UI_Write for details).
 
    procedure Print_Node_Field
      (Prefix : String;
-      Field : Node_Field;
-      N : Node_Id;
-      FD : Field_Descriptor;
+      Field  : Node_Field;
+      N      : Node_Id;
+      FD     : Field_Descriptor;
       Format : UI_Format := Auto);
 
    procedure Print_Entity_Field
      (Prefix : String;
-      Field : Entity_Field;
-      N : Entity_Id;
-      FD : Field_Descriptor;
+      Field  : Entity_Field;
+      N      : Entity_Id;
+      FD     : Field_Descriptor;
       Format : UI_Format := Auto);
 
    procedure Print_Flag (F : Boolean);
@@ -283,110 +284,120 @@ package body Treepr is
    function Image (F : Node_Field) return String is
    begin
       case F is
-         when Alloc_For_BIP_Return =>
+         when F_Alloc_For_BIP_Return =>
             return "Alloc_For_BIP_Return";
-         when Assignment_OK =>
+         when F_Assignment_OK =>
             return "Assignment_OK";
-         when Backwards_OK =>
+         when F_Backwards_OK =>
             return "Backwards_OK";
-         when Conversion_OK =>
+         when F_Conversion_OK =>
             return "Conversion_OK";
-         when Forwards_OK =>
+         when F_Forwards_OK =>
             return "Forwards_OK";
-         when Has_SP_Choice =>
+         when F_Has_SP_Choice =>
             return "Has_SP_Choice";
-         when Is_Elaboration_Checks_OK_Node =>
+         when F_Is_Elaboration_Checks_OK_Node =>
             return "Is_Elaboration_Checks_OK_Node";
-         when Is_Elaboration_Warnings_OK_Node =>
+         when F_Is_Elaboration_Warnings_OK_Node =>
             return "Is_Elaboration_Warnings_OK_Node";
-         when Is_Known_Guaranteed_ABE =>
+         when F_Is_Known_Guaranteed_ABE =>
             return "Is_Known_Guaranteed_ABE";
-         when Is_SPARK_Mode_On_Node =>
+         when F_Is_SPARK_Mode_On_Node =>
             return "Is_SPARK_Mode_On_Node";
-         when Local_Raise_Not_OK =>
+         when F_Local_Raise_Not_OK =>
             return "Local_Raise_Not_OK";
-         when SCIL_Controlling_Tag =>
+         when F_SCIL_Controlling_Tag =>
             return "SCIL_Controlling_Tag";
-         when SCIL_Entity =>
+         when F_SCIL_Entity =>
             return "SCIL_Entity";
-         when SCIL_Tag_Value =>
+         when F_SCIL_Tag_Value =>
             return "SCIL_Tag_Value";
-         when SCIL_Target_Prim =>
+         when F_SCIL_Target_Prim =>
             return "SCIL_Target_Prim";
-         when Shift_Count_OK =>
+         when F_Shift_Count_OK =>
             return "Shift_Count_OK";
-         when Split_PPC =>
+         when F_Split_PPC =>
             return "Split_PPC";
-         when TSS_Elist =>
+         when F_TSS_Elist =>
             return "TSS_Elist";
 
          when others =>
-            return Capitalize (F'Img);
+            declare
+               Result : constant String := Capitalize (F'Img);
+            begin
+               return Result (3 .. Result'Last); -- Remove "F_"
+            end;
       end case;
    end Image;
 
    function Image (F : Entity_Field) return String is
    begin
       case F is
-         when BIP_Initialization_Call =>
+         when F_BIP_Initialization_Call =>
             return "BIP_Initialization_Call";
-         when Body_Needed_For_SAL =>
+         when F_Body_Needed_For_SAL =>
             return "Body_Needed_For_SAL";
-         when CR_Discriminant =>
+         when F_CR_Discriminant =>
             return "CR_Discriminant";
-         when DT_Entry_Count =>
+         when F_DT_Entry_Count =>
             return "DT_Entry_Count";
-         when DT_Offset_To_Top_Func =>
+         when F_DT_Offset_To_Top_Func =>
             return "DT_Offset_To_Top_Func";
-         when DT_Position =>
+         when F_DT_Position =>
             return "DT_Position";
-         when DTC_Entity =>
+         when F_DTC_Entity =>
             return "DTC_Entity";
-         when Has_Inherited_DIC =>
+         when F_Has_Inherited_DIC =>
             return "Has_Inherited_DIC";
-         when Has_Own_DIC =>
+         when F_Has_Own_DIC =>
             return "Has_Own_DIC";
-         when Has_RACW =>
+         when F_Has_RACW =>
             return "Has_RACW";
-         when Ignore_SPARK_Mode_Pragmas =>
+         when F_Ignore_SPARK_Mode_Pragmas =>
             return "Ignore_SPARK_Mode_Pragmas";
-         when Is_Constr_Subt_For_UN_Aliased =>
+         when F_Is_Constr_Subt_For_UN_Aliased =>
             return "Is_Constr_Subt_For_UN_Aliased";
-         when Is_CPP_Class =>
+         when F_Is_CPP_Class =>
             return "Is_CPP_Class";
-         when Is_CUDA_Kernel =>
+         when F_Is_CUDA_Kernel =>
             return "Is_CUDA_Kernel";
-         when Is_DIC_Procedure =>
+         when F_Is_DIC_Procedure =>
             return "Is_DIC_Procedure";
-         when Is_Discrim_SO_Function =>
+         when F_Is_Discrim_SO_Function =>
             return "Is_Discrim_SO_Function";
-         when Is_Elaboration_Checks_OK_Id =>
+         when F_Is_Elaboration_Checks_OK_Id =>
             return "Is_Elaboration_Checks_OK_Id";
-         when Is_Elaboration_Warnings_OK_Id =>
+         when F_Is_Elaboration_Warnings_OK_Id =>
             return "Is_Elaboration_Warnings_OK_Id";
-         when Is_RACW_Stub_Type =>
+         when F_Is_RACW_Stub_Type =>
             return "Is_RACW_Stub_Type";
-         when OK_To_Rename =>
+         when F_LSP_Subprogram =>
+            return "LSP_Subprogram";
+         when F_OK_To_Rename =>
             return "OK_To_Rename";
-         when Referenced_As_LHS =>
+         when F_Referenced_As_LHS =>
             return "Referenced_As_LHS";
-         when RM_Size =>
+         when F_RM_Size =>
             return "RM_Size";
-         when SPARK_Aux_Pragma =>
+         when F_SPARK_Aux_Pragma =>
             return "SPARK_Aux_Pragma";
-         when SPARK_Aux_Pragma_Inherited =>
+         when F_SPARK_Aux_Pragma_Inherited =>
             return "SPARK_Aux_Pragma_Inherited";
-         when SPARK_Pragma =>
+         when F_SPARK_Pragma =>
             return "SPARK_Pragma";
-         when SPARK_Pragma_Inherited =>
+         when F_SPARK_Pragma_Inherited =>
             return "SPARK_Pragma_Inherited";
-         when SSO_Set_High_By_Default =>
+         when F_SSO_Set_High_By_Default =>
             return "SSO_Set_High_By_Default";
-         when SSO_Set_Low_By_Default =>
+         when F_SSO_Set_Low_By_Default =>
             return "SSO_Set_Low_By_Default";
 
          when others =>
-            return Capitalize (F'Img);
+            declare
+               Result : constant String := Capitalize (F'Img);
+            begin
+               return Result (3 .. Result'Last); -- Remove "F_"
+            end;
       end case;
    end Image;
 
@@ -401,7 +412,7 @@ package body Treepr is
             return Nlists.Parent (List_Id (N));
 
          when Node_Range =>
-            return Atree.Parent (Node_Or_Entity_Id (N));
+            return Parent (Node_Or_Entity_Id (N));
 
          when others =>
             Write_Int (Int (N));
@@ -590,6 +601,24 @@ package body Treepr is
       Print_Term;
    end Print_Elist_Subtree;
 
+   --------------------
+   -- Print_End_Span --
+   --------------------
+
+   procedure Print_End_Span (N : Node_Id) is
+      Val : constant Uint := End_Span (N);
+
+   begin
+      UI_Write (Val);
+      Write_Str (" (Uint = ");
+      Write_Str (UI_Image (Val));
+      Write_Str (")  ");
+
+      if Val /= No_Uint then
+         Write_Location (End_Location (N));
+      end if;
+   end Print_End_Span;
+
    -----------------------
    -- Print_Entity_Info --
    -----------------------
@@ -622,26 +651,28 @@ package body Treepr is
       end if;
 
       declare
-         A : Entity_Field_Array renames Entity_Field_Table (Ekind (Ent)).all;
-         Already_Printed_Above : constant Entity_Field_Set :=
-           (Ekind
-              | Basic_Convention => True, -- Convention was printed
-            others => False);
+         Fields : Entity_Field_Array renames
+           Entity_Field_Table (Ekind (Ent)).all;
+         Should_Print : constant Entity_Field_Set :=
+           --  Set of fields that should be printed. False for fields that were
+           --  already printed above.
+           (F_Ekind
+            | F_Basic_Convention => False, -- Convention was printed
+            others => True);
       begin
          --  Outer loop makes flags come out last
 
          for Print_Flags in Boolean loop
-            for Field_Index in A'Range loop
+            for Field_Index in Fields'Range loop
                declare
                   FD : Field_Descriptor renames
-                    Entity_Field_Descriptors (A (Field_Index));
+                    Entity_Field_Descriptors (Fields (Field_Index));
                begin
-                  if Already_Printed_Above (A (Field_Index))  then
-                     null; -- Skip the ones already printed
-
-                  elsif (FD.Kind = Flag_Field) = Print_Flags then
+                  if Should_Print (Fields (Field_Index))
+                    and then (FD.Kind = Flag_Field) = Print_Flags
+                  then
                      Print_Entity_Field
-                       (Prefix, A (Field_Index), Ent, FD);
+                       (Prefix, Fields (Field_Index), Ent, FD);
                   end if;
                end;
             end loop;
@@ -690,13 +721,19 @@ package body Treepr is
    function Get_Uint is new Get_32_Bit_Field_With_Default
      (Uint, Uint_0) with Inline;
 
+   function Get_Valid_Uint is new Get_32_Bit_Field
+     (Uint) with Inline;
+   --  Used for both Valid_Uint and other subtypes of Uint. Note that we don't
+   --  instantiate Get_Valid_32_Bit_Field; we don't want to blow up if the
+   --  value is wrong.
+
    function Get_Ureal is new Get_32_Bit_Field
      (Ureal) with Inline;
 
-   function Get_Nkind_Type is new Get_8_Bit_Field
+   function Get_Node_Kind_Type is new Get_8_Bit_Field
      (Node_Kind) with Inline;
 
-   function Get_Ekind_Type is new Get_8_Bit_Field
+   function Get_Entity_Kind_Type is new Get_8_Bit_Field
      (Entity_Kind) with Inline;
 
    function Get_Source_Ptr is new Get_32_Bit_Field
@@ -761,11 +798,11 @@ package body Treepr is
 
    procedure Print_Field
      (Prefix : String;
-      Field : String;
-      N : Node_Or_Entity_Id;
-      FD : Field_Descriptor;
-      Format : UI_Format) is
-
+      Field  : String;
+      N      : Node_Or_Entity_Id;
+      FD     : Field_Descriptor;
+      Format : UI_Format)
+   is
       Printed : Boolean := False;
 
       procedure Print_Initial;
@@ -777,7 +814,7 @@ package body Treepr is
          Print_Str (Prefix);
          Print_Str (Field);
 
-         if Include_Low_Level then
+         if Print_Low_Level_Info then
             Write_Str (" at ");
             Write_Int (Int (FD.Offset));
          end if;
@@ -862,13 +899,36 @@ package body Treepr is
                Val : constant Uint := Get_Uint (N, FD.Offset);
                function Cast is new Unchecked_Conversion (Uint, Int);
             begin
-               if Val /= No_Uint then
-                  Print_Initial;
-                  UI_Write (Val, Format);
-                  Write_Str (" (Uint = ");
-                  Write_Int (Cast (Val));
-                  Write_Char (')');
-               end if;
+               --  Do this even if Val = No_Uint, because Uint fields default
+               --  to Uint_0.
+
+               Print_Initial;
+               UI_Write (Val, Format);
+               Write_Str (" (Uint = ");
+               Write_Int (Cast (Val));
+               Write_Char (')');
+            end;
+
+         when Valid_Uint_Field | Unat_Field | Upos_Field
+            | Nonzero_Uint_Field =>
+            declare
+               Val : constant Uint := Get_Valid_Uint (N, FD.Offset);
+               function Cast is new Unchecked_Conversion (Uint, Int);
+            begin
+               Print_Initial;
+               UI_Write (Val, Format);
+
+               case FD.Kind is
+                  when Valid_Uint_Field => Write_Str (" v");
+                  when Unat_Field => Write_Str (" n");
+                  when Upos_Field => Write_Str (" p");
+                  when Nonzero_Uint_Field => Write_Str (" nz");
+                  when others => raise Program_Error;
+               end case;
+
+               Write_Str (" (Uint = ");
+               Write_Int (Cast (Val));
+               Write_Char (')');
             end;
 
          when Ureal_Field =>
@@ -885,23 +945,22 @@ package body Treepr is
                end if;
             end;
 
-         when Nkind_Type_Field =>
+         when Node_Kind_Type_Field =>
             declare
-               Val : constant Node_Kind := Get_Nkind_Type (N, FD.Offset);
+               Val : constant Node_Kind := Get_Node_Kind_Type (N, FD.Offset);
             begin
                Print_Initial;
                Print_Str_Mixed_Case (Node_Kind'Image (Val));
             end;
 
-         when Ekind_Type_Field =>
+         when Entity_Kind_Type_Field =>
             declare
-               Val : constant Entity_Kind := Get_Ekind_Type (N, FD.Offset);
+               Val : constant Entity_Kind :=
+                 Get_Entity_Kind_Type (N, FD.Offset);
             begin
                Print_Initial;
                Print_Str_Mixed_Case (Entity_Kind'Image (Val));
             end;
-
-            pragma Style_Checks ("M200");
 
          when Union_Id_Field =>
             declare
@@ -917,25 +976,29 @@ package body Treepr is
                      Print_List_Ref (List_Id (Val));
 
                   else
-                     Print_Str ("????union id out of range");
+                     Print_Str ("<invalid union id>");
                   end if;
                end if;
             end;
-            pragma Style_Checks ("M79");
 
          when others =>
             Print_Initial;
-            Print_Str ("????");
+            Print_Str ("<unknown ");
+            Print_Str (Field_Kind'Image (FD.Kind));
+            Print_Str (">");
       end case;
 
       if Printed then
          Print_Eol;
       end if;
 
+   --  If an exception is raised while printing, we try to print some low-level
+   --  information that is useful for debugging.
+
    exception
       when others =>
          declare
-            function Cast is new Unchecked_Conversion (Field_32_Bit, Int);
+            function Cast is new Unchecked_Conversion (Field_Size_32_Bit, Int);
          begin
             Write_Eol;
             Print_Initial;
@@ -965,24 +1028,34 @@ package body Treepr is
          end;
    end Print_Field;
 
+   ----------------------
+   -- Print_Node_Field --
+   ----------------------
+
    procedure Print_Node_Field
      (Prefix : String;
-      Field : Node_Field;
-      N : Node_Id;
-      FD : Field_Descriptor;
-      Format : UI_Format := Auto) is
+      Field  : Node_Field;
+      N      : Node_Id;
+      FD     : Field_Descriptor;
+      Format : UI_Format := Auto)
+   is
    begin
       if not Field_Is_Initial_Zero (N, Field) then
          Print_Field (Prefix, Image (Field), N, FD, Format);
       end if;
    end Print_Node_Field;
 
+   ------------------------
+   -- Print_Entity_Field --
+   ------------------------
+
    procedure Print_Entity_Field
      (Prefix : String;
-      Field : Entity_Field;
-      N : Entity_Id;
-      FD : Field_Descriptor;
-      Format : UI_Format := Auto) is
+      Field  : Entity_Field;
+      N      : Entity_Id;
+      FD     : Field_Descriptor;
+      Format : UI_Format := Auto)
+   is
    begin
       if not Field_Is_Initial_Zero (N, Field) then
          Print_Field (Prefix, Image (Field), N, FD, Format);
@@ -1108,7 +1181,7 @@ package body Treepr is
             Print_Char ('"');
 
          else
-            Print_Str ("<invalid name ???>");
+            Print_Str ("<invalid name>");
          end if;
       end if;
    end Print_Name;
@@ -1154,7 +1227,7 @@ package body Treepr is
          Print_Eol;
       end if;
 
-      if Include_Low_Level then
+      if Print_Low_Level_Info then
          Print_Atree_Info (N);
       end if;
 
@@ -1230,13 +1303,21 @@ package body Treepr is
             Print_Eol;
          end if;
 
-         --  Print Entity field if operator (other cases of Entity
-         --  are in the table, so are handled in the normal circuit)
+         --  Deal with Entity_Or_Associated_Node. If N has both, then just
+         --  print Entity; they are the same thing.
 
-         if Nkind (N) in N_Op and then Present (Entity (N)) then
+         if N in N_Inclusive_Has_Entity and then Present (Entity (N)) then
             Print_Str (Prefix);
             Print_Str ("Entity = ");
             Print_Node_Ref (Entity (N));
+            Print_Eol;
+
+         elsif N in N_Has_Associated_Node
+           and then Present (Associated_Node (N))
+         then
+            Print_Str (Prefix);
+            Print_Str ("Associated_Node = ");
+            Print_Node_Ref (Associated_Node (N));
             Print_Eol;
          end if;
 
@@ -1325,8 +1406,6 @@ package body Treepr is
             Print_Eol;
          end if;
       end if;
-      --  ????Can some of the above be handled by the
-      --  loop below, or by calling Print_Field directly?
 
       if Nkind (N) = N_Integer_Literal and then Print_In_Hex (N) then
          Fmt := Hex;
@@ -1335,51 +1414,61 @@ package body Treepr is
       end if;
 
       declare
-         A : Node_Field_Array renames Node_Field_Table (Nkind (N)).all;
-         Already_Printed_Above : constant Node_Field_Set :=
-           (Nkind
-            | Chars
-            | Comes_From_Source
-            | Analyzed
-            | Error_Posted
-            | Is_Ignored_Ghost_Node
-            | Check_Actuals
-            | Link -- Parent was printed
-            | Sloc
-            | Left_Opnd
-            | Right_Opnd
-            | Entity
-            | Assignment_OK
-            | Do_Range_Check
-            | Has_Dynamic_Length_Check
-            | Has_Aspects
-            | Is_Controlling_Actual
-            | Is_Overloaded
-            | Is_Static_Expression
-            | Must_Not_Freeze
-            | Small_Paren_Count -- Paren_Count was printed
-            | Raises_Constraint_Error
-            | Do_Overflow_Check
-            | Etype
-            | In_List -- ????wasn't printed by old version
-              => True,
+         Fields : Node_Field_Array renames Node_Field_Table (Nkind (N)).all;
+         Should_Print : constant Node_Field_Set :=
+           --  Set of fields that should be printed. False for fields that were
+           --  already printed above, and for In_List, which we don't bother
+           --  printing.
+           (F_Nkind
+            | F_Chars
+            | F_Comes_From_Source
+            | F_Analyzed
+            | F_Error_Posted
+            | F_Is_Ignored_Ghost_Node
+            | F_Check_Actuals
+            | F_Link -- Parent was printed
+            | F_Sloc
+            | F_Left_Opnd
+            | F_Right_Opnd
+            | F_Entity_Or_Associated_Node -- one of them was printed
+            | F_Assignment_OK
+            | F_Do_Range_Check
+            | F_Has_Dynamic_Length_Check
+            | F_Has_Aspects
+            | F_Is_Controlling_Actual
+            | F_Is_Overloaded
+            | F_Is_Static_Expression
+            | F_Must_Not_Freeze
+            | F_Small_Paren_Count -- Paren_Count was printed
+            | F_Raises_Constraint_Error
+            | F_Do_Overflow_Check
+            | F_Etype
+            | F_In_List
+              => False,
 
-            others => False);
+            others => True);
       begin
          --  Outer loop makes flags come out last
 
          for Print_Flags in Boolean loop
-            for Field_Index in A'Range loop --  Use Walk_Sinfo_Fields????
+            for Field_Index in Fields'Range loop
                declare
                   FD : Field_Descriptor renames
-                    Node_Field_Descriptors (A (Field_Index));
+                    Node_Field_Descriptors (Fields (Field_Index));
                begin
-                  if Already_Printed_Above (A (Field_Index))  then
-                     null; -- Skip the ones already printed
+                  if Should_Print (Fields (Field_Index))
+                    and then (FD.Kind = Flag_Field) = Print_Flags
+                  then
+                     --  Special case for End_Span, which also prints the
+                     --  End_Location.
 
-                  elsif (FD.Kind = Flag_Field) = Print_Flags then
-                     Print_Node_Field
-                       (Prefix, A (Field_Index), N, FD, Fmt);
+                     if Fields (Field_Index) = F_End_Span then
+                        Print_End_Span (N);
+
+                     else
+                        Print_Node_Field
+                          (Prefix, Fields (Field_Index), N, FD, Fmt);
+                     end if;
                   end if;
                end;
             end loop;
@@ -1495,27 +1584,9 @@ package body Treepr is
    ---------------------
 
    procedure Print_Node_Kind (N : Node_Id) is
-      Ucase : Boolean;
-      S     : constant String := Node_Kind'Image (Nkind (N));
-
    begin
       if Phase = Printing then
-         Ucase := True;
-
-         --  Note: the call to Fold_Upper in this loop is to get past the GNAT
-         --  bug of 'Image returning lower case instead of upper case.
-         --  ????I'm sure that bug has long been fixed. This code was written
-         --  in 2001. It should call Print_Str_Mixed_Case?
-
-         for J in S'Range loop
-            if Ucase then
-               Write_Char (Fold_Upper (S (J)));
-            else
-               Write_Char (Fold_Lower (S (J)));
-            end if;
-
-            Ucase := (S (J) = '_');
-         end loop;
+         Print_Str_Mixed_Case (Node_Kind'Image (Nkind (N)));
       end if;
    end Print_Node_Kind;
 
@@ -2203,7 +2274,7 @@ package body Treepr is
                   --  but what concerns us now is looking for descendants in
                   --  the tree.
 
-                 and then F /= Next_Entity -- See below for why we skip this
+                 and then F /= F_Next_Entity -- See below for why we skip this
                then
                   Visit_Descendant (Get_Union_Id (N, FD.Offset));
                end if;

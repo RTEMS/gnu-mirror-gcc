@@ -655,10 +655,10 @@ package body Exp_Dbug is
 
       Has_Suffix := True;
 
-      --  Fixed-point case: generate GNAT encodings when asked to
+      --  Generate GNAT encodings when asked to for fixed-point case
 
-      if Is_Fixed_Point_Type (E)
-        and then GNAT_Encodings = DWARF_GNAT_Encodings_All
+      if GNAT_Encodings = DWARF_GNAT_Encodings_All
+        and then Is_Fixed_Point_Type (E)
       then
          Get_External_Name (E, True, "XF_");
          Add_Real_To_Buffer (Delta_Value (E));
@@ -668,10 +668,9 @@ package body Exp_Dbug is
             Add_Real_To_Buffer (Small_Value (E));
          end if;
 
-      --  Discrete case where bounds do not match size. Not necessary if we can
-      --  emit standard DWARF.
+      --  Likewise for discrete case where bounds do not match size
 
-      elsif GNAT_Encodings /= DWARF_GNAT_Encodings_Minimal
+      elsif GNAT_Encodings = DWARF_GNAT_Encodings_All
         and then Is_Discrete_Type (E)
         and then not Bounds_Match_Size (E)
       then
@@ -1557,7 +1556,7 @@ package body Exp_Dbug is
       then
          Set_BNPE_Suffix (Ent);
 
-         --  Strip trailing n's and last trailing b as required. note that
+         --  Strip trailing n's and last trailing b as required. Note that
          --  we know there is at least one b, or no suffix would be generated.
 
          while Name_Buffer (Name_Len) = 'n' loop

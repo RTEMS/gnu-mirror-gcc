@@ -263,14 +263,18 @@
   BUILTIN_VQ_HSI (TERNOP, smlal_hi_n, 0, NONE)
   BUILTIN_VQ_HSI (TERNOPU, umlal_hi_n, 0, NONE)
 
-  BUILTIN_VSQN_HSDI (UNOPUS, sqmovun, 0, NONE)
+  /* Implemented by aarch64_sqmovun<mode>.  */
+  BUILTIN_VQN (UNOPUS, sqmovun, 0, NONE)
+  BUILTIN_SD_HSDI (UNOPUS, sqmovun, 0, NONE)
 
   /* Implemented by aarch64_sqxtun2<mode>.  */
   BUILTIN_VQN (BINOP_UUS, sqxtun2, 0, NONE)
 
   /* Implemented by aarch64_<su>qmovn<mode>.  */
-  BUILTIN_VSQN_HSDI (UNOP, sqmovn, 0, NONE)
-  BUILTIN_VSQN_HSDI (UNOP, uqmovn, 0, NONE)
+  BUILTIN_VQN (UNOP, sqmovn, 0, NONE)
+  BUILTIN_SD_HSDI (UNOP, sqmovn, 0, NONE)
+  BUILTIN_VQN (UNOP, uqmovn, 0, NONE)
+  BUILTIN_SD_HSDI (UNOP, uqmovn, 0, NONE)
 
   /* Implemented by aarch64_<su>qxtn2<mode>.  */
   BUILTIN_VQN (BINOP, sqxtn2, 0, NONE)
@@ -370,10 +374,11 @@
   BUILTIN_VSDQ_I_DI (BINOP, srshl, 0, NONE)
   BUILTIN_VSDQ_I_DI (BINOP_UUS, urshl, 0, NONE)
 
-  /* Implemented by aarch64_<sur><dotprod>{_lane}{q}<dot_mode>.  */
-  BUILTIN_VB (TERNOP, sdot, 0, NONE)
-  BUILTIN_VB (TERNOPU, udot, 0, NONE)
-  BUILTIN_VB (TERNOP_SSUS, usdot, 0, NONE)
+  /* Implemented by <sur><dotprod>_prod<dot_mode>.  */
+  BUILTIN_VB (TERNOP, sdot_prod, 10, NONE)
+  BUILTIN_VB (TERNOPU, udot_prod, 10, NONE)
+  BUILTIN_VB (TERNOP_SUSS, usdot_prod, 10, NONE)
+  /* Implemented by aarch64_<sur><dotprod>_lane{q}<dot_mode>.  */
   BUILTIN_VB (QUADOP_LANE, sdot_lane, 0, NONE)
   BUILTIN_VB (QUADOPU_LANE, udot_lane, 0, NONE)
   BUILTIN_VB (QUADOP_LANE, sdot_laneq, 0, NONE)
@@ -421,12 +426,18 @@
   BUILTIN_VQW (SHIFTIMM, sshll2_n, 0, NONE)
   BUILTIN_VQW (SHIFTIMM, ushll2_n, 0, NONE)
   /* Implemented by aarch64_<sur>q<r>shr<u>n_n<mode>.  */
-  BUILTIN_VSQN_HSDI (SHIFTIMM, sqshrun_n, 0, NONE)
-  BUILTIN_VSQN_HSDI (SHIFTIMM, sqrshrun_n, 0, NONE)
-  BUILTIN_VSQN_HSDI (SHIFTIMM, sqshrn_n, 0, NONE)
-  BUILTIN_VSQN_HSDI (USHIFTIMM, uqshrn_n, 0, NONE)
-  BUILTIN_VSQN_HSDI (SHIFTIMM, sqrshrn_n, 0, NONE)
-  BUILTIN_VSQN_HSDI (USHIFTIMM, uqrshrn_n, 0, NONE)
+  BUILTIN_VQN (SHIFTIMM, sqshrun_n, 0, NONE)
+  BUILTIN_VQN (SHIFTIMM, sqrshrun_n, 0, NONE)
+  BUILTIN_VQN (SHIFTIMM, sqshrn_n, 0, NONE)
+  BUILTIN_VQN (USHIFTIMM, uqshrn_n, 0, NONE)
+  BUILTIN_VQN (SHIFTIMM, sqrshrn_n, 0, NONE)
+  BUILTIN_VQN (USHIFTIMM, uqrshrn_n, 0, NONE)
+  BUILTIN_SD_HSDI (SHIFTIMM, sqshrun_n, 0, NONE)
+  BUILTIN_SD_HSDI (SHIFTIMM, sqrshrun_n, 0, NONE)
+  BUILTIN_SD_HSDI (SHIFTIMM, sqshrn_n, 0, NONE)
+  BUILTIN_SD_HSDI (USHIFTIMM, uqshrn_n, 0, NONE)
+  BUILTIN_SD_HSDI (SHIFTIMM, sqrshrn_n, 0, NONE)
+  BUILTIN_SD_HSDI (USHIFTIMM, uqrshrn_n, 0, NONE)
   /* Implemented by aarch64_<sur>q<r>shr<u>n2_n<mode>.  */
   BUILTIN_VQN (SHIFT2IMM_UUSS, sqshrun2_n, 0, NONE)
   BUILTIN_VQN (SHIFT2IMM_UUSS, sqrshrun2_n, 0, NONE)
@@ -707,37 +718,31 @@
   VAR1 (BINOPP, crypto_pmull, 0, NONE, di)
   VAR1 (BINOPP, crypto_pmull, 0, NONE, v2di)
 
-  /* Implemented by aarch64_tbl3<mode>.  */
-  VAR1 (BINOP, tbl3, 0, NONE, v8qi)
-  VAR1 (BINOP, tbl3, 0, NONE, v16qi)
+  /* Implemented by aarch64_qtbl1<mode>.  */
+  VAR2 (BINOP, qtbl1, 0, NONE, v8qi, v16qi)
+  VAR2 (BINOPU, qtbl1, 0, NONE, v8qi, v16qi)
 
-  /* Implemented by aarch64_tbl1<mode>.  */
-  VAR2 (BINOP, tbl1, 0, NONE, v8qi, v16qi)
-  VAR2 (BINOPU, tbl1, 0, NONE, v8qi, v16qi)
+  /* Implemented by aarch64_qtbl2<mode>.  */
+  VAR2 (BINOP, qtbl2, 0, NONE, v8qi, v16qi)
 
   /* Implemented by aarch64_qtbl3<mode>.  */
-  VAR1 (BINOP, qtbl3, 0, NONE, v8qi)
-  VAR1 (BINOP, qtbl3, 0, NONE, v16qi)
+  VAR2 (BINOP, qtbl3, 0, NONE, v8qi, v16qi)
 
   /* Implemented by aarch64_qtbl4<mode>.  */
-  VAR1 (BINOP, qtbl4, 0, NONE, v8qi)
-  VAR1 (BINOP, qtbl4, 0, NONE, v16qi)
+  VAR2 (BINOP, qtbl4, 0, NONE, v8qi, v16qi)
 
-  /* Implemented by aarch64_tbx1<mode>.  */
-  VAR2 (TERNOP, tbx1, 0, NONE, v8qi, v16qi)
-  VAR2 (TERNOPU, tbx1, 0, NONE, v8qi, v16qi)
+  /* Implemented by aarch64_qtbx1<mode>.  */
+  VAR2 (TERNOP, qtbx1, 0, NONE, v8qi, v16qi)
+  VAR2 (TERNOPU, qtbx1, 0, NONE, v8qi, v16qi)
 
-  /* Implemented by aarch64_tbx4<mode>.  */
-  VAR1 (TERNOP, tbx4, 0, NONE, v8qi)
-  VAR1 (TERNOP, tbx4, 0, NONE, v16qi)
+  /* Implemented by aarch64_qtbx2<mode>.  */
+  VAR2 (TERNOP, qtbx2, 0, NONE, v8qi, v16qi)
 
   /* Implemented by aarch64_qtbx3<mode>.  */
-  VAR1 (TERNOP, qtbx3, 0, NONE, v8qi)
-  VAR1 (TERNOP, qtbx3, 0, NONE, v16qi)
+  VAR2 (TERNOP, qtbx3, 0, NONE, v8qi, v16qi)
 
   /* Implemented by aarch64_qtbx4<mode>.  */
-  VAR1 (TERNOP, qtbx4, 0, NONE, v8qi)
-  VAR1 (TERNOP, qtbx4, 0, NONE, v16qi)
+  VAR2 (TERNOP, qtbx4, 0, NONE, v8qi, v16qi)
 
   /* Builtins for ARMv8.1-A Adv.SIMD instructions.  */
 

@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/region-model.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "analyzer/function-set.h"
 
 #if ENABLE_ANALYZER
 
@@ -374,15 +375,17 @@ public:
   void on_condition (sm_context *sm_ctxt,
 		     const supernode *node,
 		     const gimple *stmt,
-		     tree lhs,
+		     const svalue *lhs,
 		     enum tree_code op,
-		     tree rhs) const FINAL OVERRIDE;
+		     const svalue *rhs) const FINAL OVERRIDE;
 
   bool can_purge_p (state_t s) const FINAL OVERRIDE;
   pending_diagnostic *on_leak (tree var) const FINAL OVERRIDE;
 
   bool reset_when_passed_to_unknown_fn_p (state_t s,
 					  bool is_mutable) const FINAL OVERRIDE;
+
+  static bool unaffected_by_call_p (tree fndecl);
 
   standard_deallocator_set m_free;
   standard_deallocator_set m_scalar_delete;
@@ -1195,6 +1198,25 @@ public:
 				 funcname, ev.m_expr);
   }
 
+  /* Implementation of pending_diagnostic::supercedes_p for
+     use_after_free.
+
+     We want use-after-free to supercede use-of-unitialized-value,
+     so that if we have these at the same stmt, we don't emit
+     a use-of-uninitialized, just the use-after-free.
+     (this is because we fully purge information about freed
+     buffers when we free them to avoid state explosions, so
+     that if they are accessed after the free, it looks like
+     they are uninitialized).  */
+
+  bool supercedes_p (const pending_diagnostic &other) const FINAL OVERRIDE
+  {
+    if (other.use_of_uninit_p ())
+      return true;
+
+    return false;
+  }
+
 private:
   diagnostic_event_id_t m_free_event;
   const deallocator *m_deallocator;
@@ -1489,7 +1511,8 @@ malloc_state_machine::get_or_create_deallocator (tree deallocator_fndecl)
   /* Reuse "free".  */
   deallocator *d;
   if (is_named_call_p (deallocator_fndecl, "free")
-      || is_std_named_call_p (deallocator_fndecl, "free"))
+      || is_std_named_call_p (deallocator_fndecl, "free")
+      || is_named_call_p (deallocator_fndecl, "__builtin_free"))
     d = &m_free.m_deallocator;
   else
     {
@@ -1503,6 +1526,38 @@ malloc_state_machine::get_or_create_deallocator (tree deallocator_fndecl)
   return d;
 }
 
+/* Try to identify the function declaration either by name or as a known malloc
+   builtin.  */
+
+static bool
+known_allocator_p (const_tree fndecl, const gcall *call)
+{
+  /* Either it is a function we know by name and number of arguments... */
+  if (is_named_call_p (fndecl, "malloc", call, 1)
+      || is_named_call_p (fndecl, "calloc", call, 2)
+      || is_std_named_call_p (fndecl, "malloc", call, 1)
+      || is_std_named_call_p (fndecl, "calloc", call, 2)
+      || is_named_call_p (fndecl, "strdup", call, 1)
+      || is_named_call_p (fndecl, "strndup", call, 2))
+    return true;
+
+  /* ... or it is a builtin allocator that allocates objects freed with
+     __builtin_free.  */
+  if (fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
+    switch (DECL_FUNCTION_CODE (fndecl))
+      {
+      case BUILT_IN_MALLOC:
+      case BUILT_IN_CALLOC:
+      case BUILT_IN_STRDUP:
+      case BUILT_IN_STRNDUP:
+	return true;
+      default:
+	break;
+      }
+
+  return false;
+}
+
 /* Implementation of state_machine::on_stmt vfunc for malloc_state_machine.  */
 
 bool
@@ -1513,14 +1568,7 @@ malloc_state_machine::on_stmt (sm_context *sm_ctxt,
   if (const gcall *call = dyn_cast <const gcall *> (stmt))
     if (tree callee_fndecl = sm_ctxt->get_fndecl_for_call (call))
       {
-	if (is_named_call_p (callee_fndecl, "malloc", call, 1)
-	    || is_named_call_p (callee_fndecl, "calloc", call, 2)
-	    || is_std_named_call_p (callee_fndecl, "malloc", call, 1)
-	    || is_std_named_call_p (callee_fndecl, "calloc", call, 2)
-	    || is_named_call_p (callee_fndecl, "__builtin_malloc", call, 1)
-	    || is_named_call_p (callee_fndecl, "__builtin_calloc", call, 2)
-	    || is_named_call_p (callee_fndecl, "strdup", call, 1)
-	    || is_named_call_p (callee_fndecl, "strndup", call, 2))
+	if (known_allocator_p (callee_fndecl, call))
 	  {
 	    on_allocator_call (sm_ctxt, call, &m_free);
 	    return true;
@@ -1568,6 +1616,9 @@ malloc_state_machine::on_stmt (sm_context *sm_ctxt,
 	    on_realloc_call (sm_ctxt, node, call);
 	    return true;
 	  }
+
+	if (unaffected_by_call_p (callee_fndecl))
+	  return true;
 
 	/* Cast away const-ness for cache-like operations.  */
 	malloc_state_machine *mutable_this
@@ -1857,11 +1908,11 @@ void
 malloc_state_machine::on_condition (sm_context *sm_ctxt,
 				    const supernode *node ATTRIBUTE_UNUSED,
 				    const gimple *stmt,
-				    tree lhs,
+				    const svalue *lhs,
 				    enum tree_code op,
-				    tree rhs) const
+				    const svalue *rhs) const
 {
-  if (!zerop (rhs))
+  if (!rhs->all_zeroes_p ())
     return;
 
   if (!any_pointer_p (lhs))
@@ -1923,6 +1974,28 @@ malloc_state_machine::reset_when_passed_to_unknown_fn_p (state_t s,
 
   /* Otherwise, pointers passed as non-const can be freed.  */
   return is_mutable;
+}
+
+/* Return true if calls to FNDECL are known to not affect this sm-state.  */
+
+bool
+malloc_state_machine::unaffected_by_call_p (tree fndecl)
+{
+  /* A set of functions that are known to not affect allocation
+     status, even if we haven't fully modelled the rest of their
+     behavior yet.  */
+  static const char * const funcnames[] = {
+    /* This array must be kept sorted.  */
+    "strsep",
+  };
+  const size_t count
+    = sizeof(funcnames) / sizeof (funcnames[0]);
+  function_set fs (funcnames, count);
+
+  if (fs.contains_decl_p (fndecl))
+    return true;
+
+  return false;
 }
 
 /* Shared logic for handling GIMPLE_ASSIGNs and GIMPLE_PHIs that

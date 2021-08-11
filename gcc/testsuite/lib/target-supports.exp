@@ -626,7 +626,7 @@ proc check_effective_target_keeps_null_pointer_checks { } {
 # this allows parallelism of 16 and higher of parallel gcc-auto-profile
 proc profopt-perf-wrapper { } {
     global srcdir
-    return "$srcdir/../config/i386/gcc-auto-profile -o perf.data -m8 "
+    return "$srcdir/../config/i386/gcc-auto-profile -m8 "
 }
 
 # Return true if profiling is supported on the target.
@@ -4180,24 +4180,24 @@ proc add_options_for_arm_simd32 { flags } {
     return "$flags $et_arm_simd32_flags"
 }
 
-# Return 1 if this is an ARM target supporting the saturation intrinsics
-# from arm_acle.h.  Some multilibs may be incompatible with these options.
-# Also set et_arm_qbit_flags to the best options to add.
-# arm_acle.h includes stdint.h which can cause trouble with incompatible
-# -mfloat-abi= options.
+# Return 1 if this is an ARM target supporting the __ssat and __usat
+# saturation intrinsics from arm_acle.h.  Some multilibs may be
+# incompatible with these options.  Also set et_arm_sat_flags to the
+# best options to add.  arm_acle.h includes stdint.h which can cause
+# trouble with incompatible -mfloat-abi= options.
 
-proc check_effective_target_arm_qbit_ok_nocache { } {
-    global et_arm_qbit_flags
-    set et_arm_qbit_flags ""
-    foreach flags {"" "-march=armv5te" "-march=armv5te -mfloat-abi=softfp" "-march=armv5te -mfloat-abi=hard"} {
-      if { [check_no_compiler_messages_nocache et_arm_qbit_flags object {
+proc check_effective_target_arm_sat_ok_nocache { } {
+    global et_arm_sat_flags
+    set et_arm_sat_flags ""
+    foreach flags {"" "-march=armv6" "-march=armv6 -mfloat-abi=softfp" "-march=armv6 -mfloat-abi=hard -mfpu=vfp"} {
+      if { [check_no_compiler_messages_nocache et_arm_sat_flags object {
 	#include <arm_acle.h>
 	int dummy;
-	#ifndef __ARM_FEATURE_QBIT
-	#error not QBIT
+	#ifndef __ARM_FEATURE_SAT
+	#error not SAT
 	#endif
       } "$flags"] } {
-	set et_arm_qbit_flags $flags
+	set et_arm_sat_flags $flags
 	return 1
       }
     }
@@ -4205,17 +4205,17 @@ proc check_effective_target_arm_qbit_ok_nocache { } {
   return 0
 }
 
-proc check_effective_target_arm_qbit_ok { } {
-    return [check_cached_effective_target et_arm_qbit_flags \
-		check_effective_target_arm_qbit_ok_nocache]
+proc check_effective_target_arm_sat_ok { } {
+    return [check_cached_effective_target et_arm_sat_flags \
+		check_effective_target_arm_sat_ok_nocache]
 }
 
-proc add_options_for_arm_qbit { flags } {
-    if { ! [check_effective_target_arm_qbit_ok] } {
+proc add_options_for_arm_sat { flags } {
+    if { ! [check_effective_target_arm_sat_ok] } {
 	return "$flags"
     }
-    global et_arm_qbit_flags
-    return "$flags $et_arm_qbit_flags"
+    global et_arm_sat_flags
+    return "$flags $et_arm_sat_flags"
 }
 
 # Return 1 if this is an ARM target supporting the DSP intrinsics from
@@ -5694,6 +5694,43 @@ proc check_effective_target_arm_v8_2a_dotprod_neon_hw { } {
     } [add_options_for_arm_v8_2a_dotprod_neon ""]]
 }
 
+# Return 1 if the target supports executing AdvSIMD instructions from ARMv8.2
+# with the i8mm extension, 0 otherwise.  The test is valid for ARM and for
+# AArch64.
+
+proc check_effective_target_arm_v8_2a_i8mm_neon_hw { } {
+    if { ![check_effective_target_arm_v8_2a_i8mm_ok] } {
+        return 0;
+    }
+    return [check_runtime arm_v8_2a_i8mm_neon_hw_available {
+        #include "arm_neon.h"
+        int
+        main (void)
+        {
+
+	  uint32x2_t results = {0,0};
+	  uint8x8_t a = {1,1,1,1,2,2,2,2};
+	  int8x8_t b = {2,2,2,2,3,3,3,3};
+
+          #ifdef __ARM_ARCH_ISA_A64
+          asm ("usdot %0.2s, %1.8b, %2.8b"
+               : "=w"(results)
+               : "w"(a), "w"(b)
+               : /* No clobbers.  */);
+
+	  #else
+          asm ("vusdot.u8 %P0, %P1, %P2"
+               : "=w"(results)
+               : "w"(a), "w"(b)
+               : /* No clobbers.  */);
+          #endif
+
+          return (vget_lane_u32 (results, 0) == 8
+		  && vget_lane_u32 (results, 1) == 24) ? 1 : 0;
+        }
+    } [add_options_for_arm_v8_2a_i8mm ""]]
+}
+
 # Return 1 if this is a ARM target with NEON enabled.
 
 proc check_effective_target_arm_neon { } {
@@ -6123,6 +6160,16 @@ proc check_effective_target_has_arch_pwr9 { } {
 		#error does not have power9 support.
 		#else
 		/* "has power9 support" */
+		#endif
+	}]
+}
+
+proc check_effective_target_has_arch_pwr10 { } {
+	return [check_no_compiler_messages arch_pwr10 assembly {
+		#ifndef _ARCH_PWR10
+		#error does not have power10 support.
+		#else
+		/* "has power10 support" */
 		#endif
 	}]
 }
@@ -7050,6 +7097,19 @@ proc check_effective_target_vect_udot_qi { } {
 }
 
 # Return 1 if the target plus current options supports a vector
+# dot-product where one operand of the multiply is signed char
+# and the other unsigned chars, 0 otherwise.
+#
+# This won't change for different subtargets so cache the result.
+
+proc check_effective_target_vect_usdot_qi { } {
+    return [check_cached_effective_target_indexed vect_usdot_qi {
+      expr { [istarget aarch64*-*-*]
+	     || [istarget arm*-*-*] }}]
+}
+
+
+# Return 1 if the target plus current options supports a vector
 # dot-product of signed shorts, 0 otherwise.
 #
 # This won't change for different subtargets so cache the result.
@@ -7626,6 +7686,7 @@ proc available_vector_sizes { } {
 	if { ![is-effective-target ia32] } {
 	    lappend result 64
 	}
+	lappend result 32
     } elseif { [istarget sparc*-*-*] } {
 	lappend result 64
     } elseif { [istarget amdgcn*-*-*] } {
@@ -7653,6 +7714,12 @@ proc check_effective_target_vect_variable_length { } {
 
 proc check_effective_target_vect64 { } {
     return [expr { [lsearch -exact [available_vector_sizes] 64] >= 0 }]
+}
+
+# Return 1 if the target supports vectors of 32 bits.
+
+proc check_effective_target_vect32 { } {
+    return [expr { [lsearch -exact [available_vector_sizes] 32] >= 0 }]
 }
 
 # Return 1 if the target supports vector copysignf calls.
@@ -11103,3 +11170,13 @@ proc check_effective_target_lra { } {
     return 1
 }
 
+# Test whether optimizations are enabled ('__OPTIMIZE__') per the
+# 'current_compiler_flags' (thus don't cache).
+
+proc check_effective_target___OPTIMIZE__ {} {
+    return [check_no_compiler_messages_nocache __OPTIMIZE__ assembly {
+	#ifndef __OPTIMIZE__
+	# error nein
+	#endif
+    } [current_compiler_flags]]
+}

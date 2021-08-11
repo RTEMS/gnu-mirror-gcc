@@ -30,7 +30,7 @@
 ------------------------------------------------------------------------------
 
 --  Instantiation of System.Value_N for enumeration types whose names table
---  has a length that fits in a 8-bit integer.
+--  has a length that fits in an 8-bit integer.
 
 with Interfaces;
 with System.Value_N;
@@ -48,5 +48,14 @@ package System.Val_Enum_8 is
       Str     : String)
       return    Natural
      renames Impl.Value_Enumeration;
+
+   function Valid_Value_Enumeration_8
+     (Names   : String;
+      Indexes : System.Address;
+      Hash    : Impl.Hash_Function_Ptr;
+      Num     : Natural;
+      Str     : String)
+      return    Boolean
+     renames Impl.Valid_Value_Enumeration;
 
 end System.Val_Enum_8;

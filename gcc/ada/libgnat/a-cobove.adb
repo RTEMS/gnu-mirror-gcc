@@ -415,7 +415,7 @@ package body Ada.Containers.Bounded_Vectors is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Constant_Reference_Type :=
-           (Element => A (J)'Access,
+           (Element => A (J)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);
@@ -439,7 +439,7 @@ package body Ada.Containers.Bounded_Vectors is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Constant_Reference_Type :=
-           (Element => A (J)'Access,
+           (Element => A (J)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);
@@ -2140,7 +2140,7 @@ package body Ada.Containers.Bounded_Vectors is
    ---------------
 
    procedure Put_Image
-     (S : in out Ada.Strings.Text_Output.Sink'Class; V : Vector)
+     (S : in out Ada.Strings.Text_Buffers.Root_Buffer_Type'Class; V : Vector)
    is
       First_Time : Boolean := True;
       use System.Put_Images;
@@ -2238,7 +2238,7 @@ package body Ada.Containers.Bounded_Vectors is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Reference_Type :=
-           (Element => A (J)'Access,
+           (Element => A (J)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);
@@ -2262,7 +2262,7 @@ package body Ada.Containers.Bounded_Vectors is
            Container.TC'Unrestricted_Access;
       begin
          return R : constant Reference_Type :=
-           (Element => A (J)'Access,
+           (Element => A (J)'Unchecked_Access,
             Control => (Controlled with TC))
          do
             Busy (TC.all);

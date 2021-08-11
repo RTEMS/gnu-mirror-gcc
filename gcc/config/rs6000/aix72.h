@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* Definitions of target machine for GNU compiler,
    for IBM RS/6000 POWER running AIX V7.2.
    Copyright (C) 2002-2021 Free Software Foundation, Inc.
@@ -78,6 +79,7 @@ do {									\
 #undef ASM_CPU_SPEC
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
+  mcpu=power10: -mpwr10; \
   mcpu=power9: -mpwr9; \
   mcpu=power8: -mpwr8; \
   mcpu=power7: -mpwr7; \
@@ -123,7 +125,7 @@ do {									\
   %{mpe: -I%R/usr/lpp/ppe.poe/include}		\
   %{pthread: -D_THREAD_SAFE}"
 
-/* The GNU C++ standard library requires that these macros be 
+/* The GNU C++ standard library requires that these macros be
    defined.  Synchronize with libstdc++ os_defines.h.  */
 #define CPLUSPLUS_CPP_SPEC_COMMON		\
   "-D_ALL_SOURCE -D__COMPATMATH__		\
@@ -253,7 +255,7 @@ do {									\
 #define LD_INIT_SWITCH "-binitfini"
 
 #ifndef _AIX52
-extern long long int    atoll(const char *);  
+extern long long int    atoll(const char *);
 #endif
 
 /* This target uses the aix64.opt file.  */

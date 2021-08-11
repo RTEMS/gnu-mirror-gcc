@@ -839,6 +839,11 @@ struct GTY(()) rtvec_def {
 /* Predicate yielding nonzero iff X is a call insn.  */
 #define CALL_P(X) (GET_CODE (X) == CALL_INSN)
 
+/* 1 if RTX is a call_insn for a fake call.
+   CALL_INSN use "used" flag to indicate it's a fake call.  */
+#define FAKE_CALL_P(RTX)                                        \
+  (RTL_FLAG_CHECK1 ("FAKE_CALL_P", (RTX), CALL_INSN)->used)
+
 /* Predicate yielding nonzero iff X is an insn that cannot jump.  */
 #define NONJUMP_INSN_P(X) (GET_CODE (X) == INSN)
 
@@ -2411,9 +2416,9 @@ extern void get_full_rtx_cost (rtx, machine_mode, enum rtx_code, int,
 			       struct full_rtx_costs *);
 extern bool native_encode_rtx (machine_mode, rtx, vec<target_unit> &,
 			       unsigned int, unsigned int);
-extern rtx native_decode_rtx (machine_mode, vec<target_unit>,
+extern rtx native_decode_rtx (machine_mode, const vec<target_unit> &,
 			      unsigned int);
-extern rtx native_decode_vector_rtx (machine_mode, vec<target_unit>,
+extern rtx native_decode_vector_rtx (machine_mode, const vec<target_unit> &,
 				     unsigned int, unsigned int, unsigned int);
 extern poly_uint64 subreg_lsb (const_rtx);
 extern poly_uint64 subreg_size_lsb (poly_uint64, poly_uint64, poly_uint64);
@@ -2455,6 +2460,8 @@ extern bool subreg_offset_representable_p (unsigned int, machine_mode,
 extern unsigned int subreg_regno (const_rtx);
 extern int simplify_subreg_regno (unsigned int, machine_mode,
 				  poly_uint64, machine_mode);
+extern int lowpart_subreg_regno (unsigned int, machine_mode,
+				 machine_mode);
 extern unsigned int subreg_nregs (const_rtx);
 extern unsigned int subreg_nregs_with_regno (unsigned int, const_rtx);
 extern unsigned HOST_WIDE_INT nonzero_bits (const_rtx, machine_mode);
@@ -2976,7 +2983,7 @@ extern rtx rtx_alloc_stat_v (RTX_CODE MEM_STAT_DECL, int);
 	       (sizeof (struct hwivec_def)			\
 		+ ((NWORDS)-1) * sizeof (HOST_WIDE_INT)))	\
 
-extern rtvec rtvec_alloc (int);
+extern rtvec rtvec_alloc (size_t);
 extern rtvec shallow_copy_rtvec (rtvec);
 extern bool shared_const_p (const_rtx);
 extern rtx copy_rtx (rtx);
@@ -2991,6 +2998,7 @@ extern unsigned int rtx_size (const_rtx);
 extern rtx shallow_copy_rtx (const_rtx CXX_MEM_STAT_INFO);
 extern int rtx_equal_p (const_rtx, const_rtx);
 extern bool rtvec_all_equal_p (const_rtvec);
+extern bool rtvec_series_p (rtvec, int);
 
 /* Return true if X is a vector constant with a duplicated element value.  */
 

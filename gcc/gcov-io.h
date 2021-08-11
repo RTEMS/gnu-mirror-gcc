@@ -42,16 +42,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
    Numbers are recorded in the 32 bit unsigned binary form of the
    endianness of the machine generating the file. 64 bit numbers are
-   stored as two 32 bit numbers, the low part first.  Strings are
-   padded with 1 to 4 NUL bytes, to bring the length up to a multiple
-   of 4. The number of 4 bytes is stored, followed by the padded
+   stored as two 32 bit numbers, the low part first.
+   The number of bytes is stored, followed by the
    string. Zero length and NULL strings are simply stored as a length
-   of zero (they have no trailing NUL or padding).
+   of zero (they have no trailing NUL).
 
    	int32:  byte3 byte2 byte1 byte0 | byte0 byte1 byte2 byte3
 	int64:  int32:low int32:high
-	string: int32:0 | int32:length char* char:0 padding
-	padding: | char:0 | char:0 char:0 | char:0 char:0 char:0
+	string: int32:0 | int32:length char* char:0
 	item: int32 | int64 | string
 
    The basic format of the notes file is
@@ -243,22 +241,25 @@ typedef uint64_t gcov_type_unsigned;
 /* The record tags.  Values [1..3f] are for tags which may be in either
    file.  Values [41..9f] for those in the note file and [a1..ff] for
    the data file.  The tag value zero is used as an explicit end of
-   file marker -- it is not required to be present.  */
+   file marker -- it is not required to be present.
+   All length values are in bytes.  */
+
+#define GCOV_WORD_SIZE		4
 
 #define GCOV_TAG_FUNCTION	 ((gcov_unsigned_t)0x01000000)
-#define GCOV_TAG_FUNCTION_LENGTH (3)
+#define GCOV_TAG_FUNCTION_LENGTH (3 * GCOV_WORD_SIZE)
 #define GCOV_TAG_BLOCKS		 ((gcov_unsigned_t)0x01410000)
 #define GCOV_TAG_BLOCKS_LENGTH(NUM) (NUM)
 #define GCOV_TAG_ARCS		 ((gcov_unsigned_t)0x01430000)
-#define GCOV_TAG_ARCS_LENGTH(NUM)  (1 + (NUM) * 2)
-#define GCOV_TAG_ARCS_NUM(LENGTH)  (((LENGTH) - 1) / 2)
+#define GCOV_TAG_ARCS_LENGTH(NUM)  (1 + (NUM) * 2 * GCOV_WORD_SIZE)
+#define GCOV_TAG_ARCS_NUM(LENGTH)  (((LENGTH / GCOV_WORD_SIZE) - 1) / 2)
 #define GCOV_TAG_LINES		 ((gcov_unsigned_t)0x01450000)
 #define GCOV_TAG_COUNTER_BASE 	 ((gcov_unsigned_t)0x01a10000)
-#define GCOV_TAG_COUNTER_LENGTH(NUM) ((NUM) * 2)
-#define GCOV_TAG_COUNTER_NUM(LENGTH) ((LENGTH) / 2)
+#define GCOV_TAG_COUNTER_LENGTH(NUM) ((NUM) * 2 * GCOV_WORD_SIZE)
+#define GCOV_TAG_COUNTER_NUM(LENGTH) ((LENGTH / GCOV_WORD_SIZE) / 2)
 #define GCOV_TAG_OBJECT_SUMMARY  ((gcov_unsigned_t)0xa1000000)
 #define GCOV_TAG_PROGRAM_SUMMARY ((gcov_unsigned_t)0xa3000000) /* Obsolete */
-#define GCOV_TAG_SUMMARY_LENGTH (2)
+#define GCOV_TAG_SUMMARY_LENGTH (2 * GCOV_WORD_SIZE)
 #define GCOV_TAG_AFDO_FILE_NAMES ((gcov_unsigned_t)0xaa000000)
 #define GCOV_TAG_AFDO_FUNCTION ((gcov_unsigned_t)0xac000000)
 #define GCOV_TAG_AFDO_WORKING_SET ((gcov_unsigned_t)0xaf000000)
@@ -366,6 +367,7 @@ char *mangle_path (char const *base);
 
 #if !IN_GCOV
 /* Available outside gcov */
+GCOV_LINKAGE void gcov_write (const void *, unsigned) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_write_unsigned (gcov_unsigned_t) ATTRIBUTE_HIDDEN;
 #endif
 

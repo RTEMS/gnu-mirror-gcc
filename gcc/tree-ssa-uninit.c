@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "builtins.h"
 #include "calls.h"
+#include "gimple-range.h"
 
 /* This implements the pass that does predicate aware warning on uses of
    possibly uninitialized variables.  The pass first collects the set of
@@ -86,17 +87,33 @@ has_undefined_value_p (tree t)
 	      && possibly_undefined_names->contains (t)));
 }
 
-/* Like has_undefined_value_p, but don't return true if TREE_NO_WARNING
-   is set on SSA_NAME_VAR.  */
+/* Return true if EXPR should suppress either uninitialized warning.  */
+
+static inline bool
+get_no_uninit_warning (tree expr)
+{
+  return warning_suppressed_p (expr, OPT_Wuninitialized);
+}
+
+/* Suppress both uninitialized warnings for EXPR.  */
+
+static inline void
+set_no_uninit_warning (tree expr)
+{
+  suppress_warning (expr, OPT_Wuninitialized);
+}
+
+/* Like has_undefined_value_p, but don't return true if the no-warning
+   bit is set on SSA_NAME_VAR for either uninit warning.  */
 
 static inline bool
 uninit_undefined_value_p (tree t)
 {
   if (!has_undefined_value_p (t))
     return false;
-  if (SSA_NAME_VAR (t) && TREE_NO_WARNING (SSA_NAME_VAR (t)))
-    return false;
-  return true;
+  if (!SSA_NAME_VAR (t))
+    return true;
+  return !get_no_uninit_warning (SSA_NAME_VAR (t));
 }
 
 /* Emit warnings for uninitialized variables.  This is done in two passes.
@@ -164,10 +181,10 @@ warn_uninit (enum opt_code wc, tree t, tree expr, tree var,
   /* TREE_NO_WARNING either means we already warned, or the front end
      wishes to suppress the warning.  */
   if ((context
-       && (gimple_no_warning_p (context)
+       && (warning_suppressed_p (context, OPT_Wuninitialized)
 	   || (gimple_assign_single_p (context)
-	       && TREE_NO_WARNING (gimple_assign_rhs1 (context)))))
-      || TREE_NO_WARNING (expr))
+	       && get_no_uninit_warning (gimple_assign_rhs1 (context)))))
+      || get_no_uninit_warning (expr))
     return;
 
   if (context != NULL && gimple_has_location (context))
@@ -184,7 +201,7 @@ warn_uninit (enum opt_code wc, tree t, tree expr, tree var,
   auto_diagnostic_group d;
   if (warning_at (location, wc, gmsgid, expr))
     {
-      TREE_NO_WARNING (expr) = 1;
+      suppress_warning (expr, wc);
 
       if (location == DECL_SOURCE_LOCATION (var))
 	return;
@@ -202,6 +219,70 @@ struct check_defs_data
   bool found_may_defs;
 };
 
+/* Return true if STMT is a call to built-in function all of whose
+   by-reference arguments are const-qualified (i.e., the function can
+   be assumed not to modify them).  */
+
+static bool
+builtin_call_nomodifying_p (gimple *stmt)
+{
+  if (!gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
+    return false;
+
+  tree fndecl = gimple_call_fndecl (stmt);
+  if (!fndecl)
+    return false;
+
+  tree fntype = TREE_TYPE (fndecl);
+  if (!fntype)
+    return false;
+
+  /* Check the called function's signature for non-constc pointers.
+     If one is found, return false.  */
+  unsigned argno = 0;
+  tree argtype;
+  function_args_iterator it;
+  FOREACH_FUNCTION_ARGS (fntype, argtype, it)
+    {
+      if (VOID_TYPE_P (argtype))
+	return true;
+
+      ++argno;
+
+      if (!POINTER_TYPE_P (argtype))
+	continue;
+
+      if (TYPE_READONLY (TREE_TYPE (argtype)))
+	continue;
+
+      return false;
+    }
+
+  /* If the number of actual arguments to the call is less than or
+     equal to the number of parameters, return false.  */
+  unsigned nargs = gimple_call_num_args (stmt);
+  if (nargs <= argno)
+    return false;
+
+  /* Check arguments passed through the ellipsis in calls to variadic
+     functions for pointers.  If one is found that's a non-constant
+     pointer, return false.  */
+  for (; argno < nargs; ++argno)
+    {
+      tree arg = gimple_call_arg (stmt, argno);
+      argtype = TREE_TYPE (arg);
+      if (!POINTER_TYPE_P (argtype))
+	continue;
+
+      if (TYPE_READONLY (TREE_TYPE (argtype)))
+	continue;
+
+      return false;
+    }
+
+  return true;
+}
+
 /* Callback for walk_aliased_vdefs.  */
 
 static bool
@@ -209,6 +290,33 @@ check_defs (ao_ref *ref, tree vdef, void *data_)
 {
   check_defs_data *data = (check_defs_data *)data_;
   gimple *def_stmt = SSA_NAME_DEF_STMT (vdef);
+
+  /* The ASAN_MARK intrinsic doesn't modify the variable.  */
+  if (is_gimple_call (def_stmt))
+    {
+      if (gimple_call_internal_p (def_stmt)
+	  && gimple_call_internal_fn (def_stmt) == IFN_ASAN_MARK)
+       return false;
+
+      if (tree fndecl = gimple_call_fndecl (def_stmt))
+       {
+	 /* Some sanitizer calls pass integer arguments to built-ins
+	    that expect pointers.  Avoid using gimple_call_builtin_p()
+	    which fails for such calls.  */
+	 if (DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+	   {
+	     built_in_function fncode = DECL_FUNCTION_CODE (fndecl);
+	     if (fncode > BEGIN_SANITIZER_BUILTINS
+		 && fncode < END_SANITIZER_BUILTINS)
+	       return false;
+	   }
+       }
+    }
+
+  /* End of VLA scope is not a kill.  */
+  if (gimple_call_builtin_p (def_stmt, BUILT_IN_STACK_RESTORE))
+    return false;
+
   /* If this is a clobber then if it is not a kill walk past it.  */
   if (gimple_clobber_p (def_stmt))
     {
@@ -216,6 +324,10 @@ check_defs (ao_ref *ref, tree vdef, void *data_)
 	return true;
       return false;
     }
+
+  if (builtin_call_nomodifying_p (def_stmt))
+    return false;
+
   /* Found a may-def on this path.  */
   data->found_may_defs = true;
   return true;
@@ -248,7 +360,7 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
   use_operand_p luse_p;
   imm_use_iterator liter;
 
-  if (TREE_NO_WARNING (rhs))
+  if (get_no_uninit_warning (rhs))
     return NULL_TREE;
 
   /* Do not warn if the base was marked so or this is a
@@ -256,19 +368,23 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
   tree base = ao_ref_base (&ref);
   if ((VAR_P (base)
        && DECL_HARD_REGISTER (base))
-      || TREE_NO_WARNING (base))
+      || get_no_uninit_warning (base))
     return NULL_TREE;
 
-  /* Do not warn if the access is fully outside of the variable.  */
+  /* Do not warn if the access is zero size or if it's fully outside
+     the object.  */
   poly_int64 decl_size;
+  if (known_size_p (ref.size)
+      && known_eq (ref.max_size, ref.size)
+      && (known_eq (ref.size, 0)
+	  || known_le (ref.offset + ref.size, 0)))
+    return NULL_TREE;
+
   if (DECL_P (base)
-      && ((known_size_p (ref.size)
-	   && known_eq (ref.max_size, ref.size)
-	   && known_le (ref.offset + ref.size, 0))
-	  || (known_ge (ref.offset, 0)
-	      && DECL_SIZE (base)
-	      && poly_int_tree_p (DECL_SIZE (base), &decl_size)
-	      && known_le (decl_size, ref.offset))))
+      && known_ge (ref.offset, 0)
+      && DECL_SIZE (base)
+      && poly_int_tree_p (DECL_SIZE (base), &decl_size)
+      && known_le (decl_size, ref.offset))
     return NULL_TREE;
 
   /* Do not warn if the result of the access is then used for
@@ -395,7 +511,7 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
     rhs = TREE_OPERAND (rhs, 0);
 
   /* Check again since RHS may have changed above.  */
-  if (TREE_NO_WARNING (rhs))
+  if (get_no_uninit_warning (rhs))
     return NULL_TREE;
 
   /* Avoid warning about empty types such as structs with no members.
@@ -416,20 +532,20 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
   if (wlims.always_executed)
     {
       if (warning_at (location, OPT_Wuninitialized,
-		      "%G%qE is used uninitialized", stmt, rhs))
+		      "%qE is used uninitialized", rhs))
 	{
 	  /* ???  This is only effective for decls as in
 	     gcc.dg/uninit-B-O0.c.  Avoid doing this for maybe-uninit
 	     uses or accesses by functions as it may hide important
 	     locations.  */
 	  if (lhs)
-	    TREE_NO_WARNING (rhs) = 1;
+	    set_no_uninit_warning (rhs);
 	  warned = true;
 	}
     }
   else if (wlims.wmaybe_uninit)
     warned = warning_at (location, OPT_Wmaybe_uninitialized,
-			 "%G%qE may be used uninitialized", stmt, rhs);
+			 "%qE may be used uninitialized", rhs);
 
   return warned ? base : NULL_TREE;
 }
@@ -529,6 +645,9 @@ maybe_warn_pass_by_reference (gcall *stmt, wlimits &wlims)
 	continue;
 
       tree arg = gimple_call_arg (stmt, argno - 1);
+      if (!POINTER_TYPE_P (TREE_TYPE (arg)))
+	/* Avoid actual arguments with invalid types.  */
+	continue;
 
       ao_ref ref;
       ao_ref_init_from_ptr_and_size (&ref, arg, access_size);
@@ -590,6 +709,76 @@ maybe_warn_pass_by_reference (gcall *stmt, wlimits &wlims)
   wlims.always_executed = save_always_executed;
 }
 
+/* Warn about an uninitialized PHI argument on the fallthru path to
+   an always executed block BB.  */
+
+static void
+warn_uninit_phi_uses (basic_block bb)
+{
+  edge_iterator ei;
+  edge e, found = NULL, found_back = NULL;
+  /* Look for a fallthru and possibly a single backedge.  */
+  FOR_EACH_EDGE (e, ei, bb->preds)
+    {
+      /* Ignore backedges.  */
+      if (dominated_by_p (CDI_DOMINATORS, e->src, bb))
+	{
+	  if (found_back)
+	    {
+	      found = NULL;
+	      break;
+	    }
+	  found_back = e;
+	  continue;
+	}
+      if (found)
+	{
+	  found = NULL;
+	  break;
+	}
+      found = e;
+    }
+  if (!found)
+    return;
+
+  basic_block succ = single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+  for (gphi_iterator si = gsi_start_phis (bb); !gsi_end_p (si);
+       gsi_next (&si))
+    {
+      gphi *phi = si.phi ();
+      tree def = PHI_ARG_DEF_FROM_EDGE (phi, found);
+      if (TREE_CODE (def) != SSA_NAME
+	  || !SSA_NAME_IS_DEFAULT_DEF (def)
+	  || virtual_operand_p (def))
+	continue;
+      /* If there's a default def on the fallthru edge PHI
+	 value and there's a use that post-dominates entry
+	 then that use is uninitialized and we can warn.  */
+      imm_use_iterator iter;
+      use_operand_p use_p;
+      gimple *use_stmt = NULL;
+      FOR_EACH_IMM_USE_FAST (use_p, iter, gimple_phi_result (phi))
+	{
+	  use_stmt = USE_STMT (use_p);
+	  if (gimple_location (use_stmt) != UNKNOWN_LOCATION
+	      && dominated_by_p (CDI_POST_DOMINATORS, succ,
+				 gimple_bb (use_stmt))
+	      /* If we found a non-fallthru edge make sure the
+		 use is inside the loop, otherwise the backedge
+		 can serve as initialization.  */
+	      && (!found_back
+		  || dominated_by_p (CDI_DOMINATORS, found_back->src,
+				     gimple_bb (use_stmt))))
+	    break;
+	  use_stmt = NULL;
+	}
+      if (use_stmt)
+	warn_uninit (OPT_Wuninitialized, def, SSA_NAME_VAR (def),
+		     SSA_NAME_VAR (def),
+		     "%qD is used uninitialized", use_stmt,
+		     UNKNOWN_LOCATION);
+    }
+}
 
 static unsigned int
 warn_uninitialized_vars (bool wmaybe_uninit)
@@ -604,6 +793,10 @@ warn_uninitialized_vars (bool wmaybe_uninit)
     {
       basic_block succ = single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun));
       wlims.always_executed = dominated_by_p (CDI_POST_DOMINATORS, succ, bb);
+
+      if (wlims.always_executed)
+	warn_uninit_phi_uses (bb);
+
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *stmt = gsi_stmt (gsi);
@@ -1595,11 +1788,14 @@ find_var_cmp_const (pred_chain_union preds, gphi *phi, gimple **flag_def,
 	       flag_var <= [min, max] ->  flag_var < [min, max+1]
 	       flag_var >= [min, max] ->  flag_var > [min-1, max]
 	     if no overflow/wrap.  */
-	  wide_int min, max;
 	  tree type = TREE_TYPE (cond_lhs);
+	  value_range r;
 	  if (!INTEGRAL_TYPE_P (type)
-	      || get_range_info (cond_rhs, &min, &max) != VR_RANGE)
+	      || !get_range_query (cfun)->range_of_expr (r, cond_rhs)
+	      || r.kind () != VR_RANGE)
 	    continue;
+	  wide_int min = r.lower_bound ();
+	  wide_int max = r.upper_bound ();
 	  if (code == LE_EXPR
 	      && max != wi::max_value (TYPE_PRECISION (type), TYPE_SIGN (type)))
 	    {
@@ -3084,6 +3280,7 @@ execute_early_warn_uninitialized (void)
      optimization we want to warn about possible uninitialized as late
      as possible, thus don't do it here.  However, without
      optimization we need to warn here about "may be uninitialized".  */
+  calculate_dominance_info (CDI_DOMINATORS);
   calculate_dominance_info (CDI_POST_DOMINATORS);
 
   warn_uninitialized_vars (/*warn_maybe_uninitialized=*/!optimize);

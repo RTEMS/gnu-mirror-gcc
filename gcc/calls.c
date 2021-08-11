@@ -60,7 +60,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "attr-fnspec.h"
 #include "value-query.h"
-
+#include "pointer-query.h"
+#include "gimple-ssa-warn-access.h"
 #include "tree-pretty-print.h"
 
 /* Like PREFERRED_STACK_BOUNDARY but in units of bytes, not bits.  */
@@ -1276,19 +1277,20 @@ get_size_range (range_query *query, tree exp, gimple *stmt, tree range[2],
   wide_int min, max;
   enum value_range_kind range_type;
 
+  if (!query)
+    query = get_global_range_query ();
+
   if (integral)
     {
       value_range vr;
-      if (query && query->range_of_expr (vr, exp, stmt))
-	{
-	  if (vr.undefined_p ())
-	    vr.set_varying (TREE_TYPE (exp));
-	  range_type = vr.kind ();
-	  min = wi::to_wide (vr.min ());
-	  max = wi::to_wide (vr.max ());
-	}
-      else
-	range_type = determine_value_range (exp, &min, &max);
+
+      query->range_of_expr (vr, exp, stmt);
+
+      if (vr.undefined_p ())
+	vr.set_varying (TREE_TYPE (exp));
+      range_type = vr.kind ();
+      min = wi::to_wide (vr.min ());
+      max = wi::to_wide (vr.max ());
     }
   else
     range_type = VR_VARYING;
@@ -1434,8 +1436,8 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
 	  if (tree_int_cst_lt (args[i], integer_zero_node))
 	    {
 	      warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-				   "%Kargument %i value %qE is negative",
-				   exp, idx[i] + 1, args[i]);
+				   "argument %i value %qE is negative",
+				   idx[i] + 1, args[i]);
 	    }
 	  else if (integer_zerop (args[i]))
 	    {
@@ -1451,8 +1453,8 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
 		  : !lookup_attribute ("returns_nonnull",
 				       TYPE_ATTRIBUTES (fntype)))
 		warned = warning_at (loc, OPT_Walloc_zero,
-				     "%Kargument %i value is zero",
-				     exp, idx[i] + 1);
+				     "argument %i value is zero",
+				     idx[i] + 1);
 	    }
 	  else if (tree_int_cst_lt (maxobjsize, args[i]))
 	    {
@@ -1469,9 +1471,9 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
 		continue;
 
 	      warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-				   "%Kargument %i value %qE exceeds "
+				   "argument %i value %qE exceeds "
 				   "maximum object size %E",
-				   exp, idx[i] + 1, args[i], maxobjsize);
+				   idx[i] + 1, args[i], maxobjsize);
 	    }
 	}
       else if (TREE_CODE (args[i]) == SSA_NAME
@@ -1483,16 +1485,16 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
 	      && tree_int_cst_le (argrange[i][1], integer_zero_node))
 	    {
 	      warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-				   "%Kargument %i range [%E, %E] is negative",
-				   exp, idx[i] + 1,
+				   "argument %i range [%E, %E] is negative",
+				   idx[i] + 1,
 				   argrange[i][0], argrange[i][1]);
 	    }
 	  else if (tree_int_cst_lt (maxobjsize, argrange[i][0]))
 	    {
 	      warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-				   "%Kargument %i range [%E, %E] exceeds "
+				   "argument %i range [%E, %E] exceeds "
 				   "maximum object size %E",
-				   exp, idx[i] + 1,
+				   idx[i] + 1,
 				   argrange[i][0], argrange[i][1],
 				   maxobjsize);
 	    }
@@ -1520,15 +1522,15 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
 
       if (vflow)
 	warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-			     "%Kproduct %<%E * %E%> of arguments %i and %i "
+			     "product %<%E * %E%> of arguments %i and %i "
 			     "exceeds %<SIZE_MAX%>",
-			     exp, argrange[0][0], argrange[1][0],
+			     argrange[0][0], argrange[1][0],
 			     idx[0] + 1, idx[1] + 1);
       else if (wi::ltu_p (wi::to_wide (maxobjsize, szprec), prod))
 	warned = warning_at (loc, OPT_Walloc_size_larger_than_,
-			     "%Kproduct %<%E * %E%> of arguments %i and %i "
+			     "product %<%E * %E%> of arguments %i and %i "
 			     "exceeds maximum object size %E",
-			     exp, argrange[0][0], argrange[1][0],
+			     argrange[0][0], argrange[1][0],
 			     idx[0] + 1, idx[1] + 1,
 			     maxobjsize);
 
@@ -1612,314 +1614,6 @@ get_attr_nonstring_decl (tree expr, tree *ref)
   return NULL_TREE;
 }
 
-/* Warn about passing a non-string array/pointer to a built-in function
-   that expects a nul-terminated string argument.  Returns true if
-   a warning has been issued.*/
-
-bool
-maybe_warn_nonstring_arg (tree fndecl, tree exp)
-{
-  if (!fndecl || !fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
-    return false;
-
-  if (TREE_NO_WARNING (exp) || !warn_stringop_overread)
-    return false;
-
-  /* Avoid clearly invalid calls (more checking done below).  */
-  unsigned nargs = call_expr_nargs (exp);
-  if (!nargs)
-    return false;
-
-  /* The bound argument to a bounded string function like strncpy.  */
-  tree bound = NULL_TREE;
-
-  /* The longest known or possible string argument to one of the comparison
-     functions.  If the length is less than the bound it is used instead.
-     Since the length is only used for warning and not for code generation
-     disable strict mode in the calls to get_range_strlen below.  */
-  tree maxlen = NULL_TREE;
-
-  /* It's safe to call "bounded" string functions with a non-string
-     argument since the functions provide an explicit bound for this
-     purpose.  The exception is strncat where the bound may refer to
-     either the destination or the source.  */
-  int fncode = DECL_FUNCTION_CODE (fndecl);
-  switch (fncode)
-    {
-    case BUILT_IN_STRCMP:
-    case BUILT_IN_STRNCMP:
-    case BUILT_IN_STRNCASECMP:
-      {
-	/* For these, if one argument refers to one or more of a set
-	   of string constants or arrays of known size, determine
-	   the range of their known or possible lengths and use it
-	   conservatively as the bound for the unbounded function,
-	   and to adjust the range of the bound of the bounded ones.  */
-	for (unsigned argno = 0;
-	     argno < MIN (nargs, 2)
-	       && !(maxlen && TREE_CODE (maxlen) == INTEGER_CST); argno++)
-	  {
-	    tree arg = CALL_EXPR_ARG (exp, argno);
-	    if (!get_attr_nonstring_decl (arg))
-	      {
-		c_strlen_data lendata = { };
-		/* Set MAXBOUND to an arbitrary non-null non-integer
-		   node as a request to have it set to the length of
-		   the longest string in a PHI.  */
-		lendata.maxbound = arg;
-		get_range_strlen (arg, &lendata, /* eltsize = */ 1);
-		maxlen = lendata.maxbound;
-	      }
-	  }
-      }
-      /* Fall through.  */
-
-    case BUILT_IN_STRNCAT:
-    case BUILT_IN_STPNCPY:
-    case BUILT_IN_STRNCPY:
-      if (nargs > 2)
-	bound = CALL_EXPR_ARG (exp, 2);
-      break;
-
-    case BUILT_IN_STRNDUP:
-      if (nargs > 1)
-	bound = CALL_EXPR_ARG (exp, 1);
-      break;
-
-    case BUILT_IN_STRNLEN:
-      {
-	tree arg = CALL_EXPR_ARG (exp, 0);
-	if (!get_attr_nonstring_decl (arg))
-	  {
-	    c_strlen_data lendata = { };
-	    /* Set MAXBOUND to an arbitrary non-null non-integer
-	       node as a request to have it set to the length of
-	       the longest string in a PHI.  */
-	    lendata.maxbound = arg;
-	    get_range_strlen (arg, &lendata, /* eltsize = */ 1);
-	    maxlen = lendata.maxbound;
-	  }
-	if (nargs > 1)
-	  bound = CALL_EXPR_ARG (exp, 1);
-	break;
-      }
-
-    default:
-      break;
-    }
-
-  /* Determine the range of the bound argument (if specified).  */
-  tree bndrng[2] = { NULL_TREE, NULL_TREE };
-  if (bound)
-    {
-      STRIP_NOPS (bound);
-      get_size_range (bound, bndrng);
-    }
-
-  location_t loc = EXPR_LOCATION (exp);
-
-  if (bndrng[0])
-    {
-      /* Diagnose excessive bound prior to the adjustment below and
-	 regardless of attribute nonstring.  */
-      tree maxobjsize = max_object_size ();
-      if (tree_int_cst_lt (maxobjsize, bndrng[0]))
-	{
-	  bool warned = false;
-	  if (tree_int_cst_equal (bndrng[0], bndrng[1]))
-	    warned = warning_at (loc, OPT_Wstringop_overread,
-				 "%K%qD specified bound %E "
-				 "exceeds maximum object size %E",
-				 exp, fndecl, bndrng[0], maxobjsize);
-	  else
-	    warned = warning_at (loc, OPT_Wstringop_overread,
-				 "%K%qD specified bound [%E, %E] "
-				 "exceeds maximum object size %E",
-				 exp, fndecl, bndrng[0], bndrng[1],
-				 maxobjsize);
-	  if (warned)
-	    TREE_NO_WARNING (exp) = true;
-
-	  return warned;
-	}
-    }
-
-  if (maxlen && !integer_all_onesp (maxlen))
-    {
-      /* Add one for the nul.  */
-      maxlen = const_binop (PLUS_EXPR, TREE_TYPE (maxlen), maxlen,
-			    size_one_node);
-
-      if (!bndrng[0])
-	{
-	  /* Conservatively use the upper bound of the lengths for
-	     both the lower and the upper bound of the operation.  */
-	  bndrng[0] = maxlen;
-	  bndrng[1] = maxlen;
-	  bound = void_type_node;
-	}
-      else if (maxlen)
-	{
-	  /* Replace the bound on the operation with the upper bound
-	     of the length of the string if the latter is smaller.  */
-	  if (tree_int_cst_lt (maxlen, bndrng[0]))
-	    bndrng[0] = maxlen;
-	  else if (tree_int_cst_lt (maxlen, bndrng[1]))
-	    bndrng[1] = maxlen;
-	}
-    }
-
-  bool any_arg_warned = false;
-  /* Iterate over the built-in function's formal arguments and check
-     each const char* against the actual argument.  If the actual
-     argument is declared attribute non-string issue a warning unless
-     the argument's maximum length is bounded.  */
-  function_args_iterator it;
-  function_args_iter_init (&it, TREE_TYPE (fndecl));
-
-  for (unsigned argno = 0; ; ++argno, function_args_iter_next (&it))
-    {
-      /* Avoid iterating past the declared argument in a call
-	 to function declared without a prototype.  */
-      if (argno >= nargs)
-	break;
-
-      tree argtype = function_args_iter_cond (&it);
-      if (!argtype)
-	break;
-
-      if (TREE_CODE (argtype) != POINTER_TYPE)
-	continue;
-
-      argtype = TREE_TYPE (argtype);
-
-      if (TREE_CODE (argtype) != INTEGER_TYPE
-	  || !TYPE_READONLY (argtype))
-	continue;
-
-      argtype = TYPE_MAIN_VARIANT (argtype);
-      if (argtype != char_type_node)
-	continue;
-
-      tree callarg = CALL_EXPR_ARG (exp, argno);
-      if (TREE_CODE (callarg) == ADDR_EXPR)
-	callarg = TREE_OPERAND (callarg, 0);
-
-      /* See if the destination is declared with attribute "nonstring".  */
-      tree decl = get_attr_nonstring_decl (callarg);
-      if (!decl)
-	continue;
-
-      /* The maximum number of array elements accessed.  */
-      offset_int wibnd = 0;
-
-      if (argno && fncode == BUILT_IN_STRNCAT)
-	{
-	  /* See if the bound in strncat is derived from the length
-	     of the strlen of the destination (as it's expected to be).
-	     If so, reset BOUND and FNCODE to trigger a warning.  */
-	  tree dstarg = CALL_EXPR_ARG (exp, 0);
-	  if (is_strlen_related_p (dstarg, bound))
-	    {
-	      /* The bound applies to the destination, not to the source,
-		 so reset these to trigger a warning without mentioning
-		 the bound.  */
-	      bound = NULL;
-	      fncode = 0;
-	    }
-	  else if (bndrng[1])
-	    /* Use the upper bound of the range for strncat.  */
-	    wibnd = wi::to_offset (bndrng[1]);
-	}
-      else if (bndrng[0])
-	/* Use the lower bound of the range for functions other than
-	   strncat.  */
-	wibnd = wi::to_offset (bndrng[0]);
-
-      /* Determine the size of the argument array if it is one.  */
-      offset_int asize = wibnd;
-      bool known_size = false;
-      tree type = TREE_TYPE (decl);
-
-      /* Determine the array size.  For arrays of unknown bound and
-	 pointers reset BOUND to trigger the appropriate warning.  */
-      if (TREE_CODE (type) == ARRAY_TYPE)
-	{
-	  if (tree arrbnd = TYPE_DOMAIN (type))
-	    {
-	      if ((arrbnd = TYPE_MAX_VALUE (arrbnd)))
-		{
-		  asize = wi::to_offset (arrbnd) + 1;
-		  known_size = true;
-		}
-	    }
-	  else if (bound == void_type_node)
-	    bound = NULL_TREE;
-	}
-      else if (bound == void_type_node)
-	bound = NULL_TREE;
-
-      /* In a call to strncat with a bound in a range whose lower but
-	 not upper bound is less than the array size, reset ASIZE to
-	 be the same as the bound and the other variable to trigger
-	 the apprpriate warning below.  */
-      if (fncode == BUILT_IN_STRNCAT
-	  && bndrng[0] != bndrng[1]
-	  && wi::ltu_p (wi::to_offset (bndrng[0]), asize)
-	  && (!known_size
-	      || wi::ltu_p (asize, wibnd)))
-	{
-	  asize = wibnd;
-	  bound = NULL_TREE;
-	  fncode = 0;
-	}
-
-      bool warned = false;
-
-      auto_diagnostic_group d;
-      if (wi::ltu_p (asize, wibnd))
-	{
-	  if (bndrng[0] == bndrng[1])
-	    warned = warning_at (loc, OPT_Wstringop_overread,
-				 "%qD argument %i declared attribute "
-				 "%<nonstring%> is smaller than the specified "
-				 "bound %wu",
-				 fndecl, argno + 1, wibnd.to_uhwi ());
-	  else if (wi::ltu_p (asize, wi::to_offset (bndrng[0])))
-	    warned = warning_at (loc, OPT_Wstringop_overread,
-				 "%qD argument %i declared attribute "
-				 "%<nonstring%> is smaller than "
-				 "the specified bound [%E, %E]",
-				 fndecl, argno + 1, bndrng[0], bndrng[1]);
-	  else
-	    warned = warning_at (loc, OPT_Wstringop_overread,
-				 "%qD argument %i declared attribute "
-				 "%<nonstring%> may be smaller than "
-				 "the specified bound [%E, %E]",
-				 fndecl, argno + 1, bndrng[0], bndrng[1]);
-	}
-      else if (fncode == BUILT_IN_STRNCAT)
-	; /* Avoid warning for calls to strncat() when the bound
-	     is equal to the size of the non-string argument.  */
-      else if (!bound)
-	warned = warning_at (loc, OPT_Wstringop_overread,
-			     "%qD argument %i declared attribute %<nonstring%>",
-			     fndecl, argno + 1);
-
-      if (warned)
-	{
-	  inform (DECL_SOURCE_LOCATION (decl),
-		  "argument %qD declared here", decl);
-	  any_arg_warned = true;
-	}
-    }
-
-  if (any_arg_warned)
-    TREE_NO_WARNING (exp) = true;
-
-  return any_arg_warned;
-}
-
 /* Issue an error if CALL_EXPR was flagged as requiring
    tall-call optimization.  */
 
@@ -1978,7 +1672,7 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 
   /* Set if a warning has been issued for any argument (used to decide
      whether to emit an informational note at the end).  */
-  bool any_warned = false;
+  opt_code opt_warned = N_OPTS;
 
   /* A string describing the attributes that the warnings issued by this
      function apply to.  Used to print one informational note per function
@@ -2053,7 +1747,7 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 	*sizstr = '\0';
 
       /* Set if a warning has been issued for the current argument.  */
-      bool arg_warned = false;
+      opt_code arg_warned = no_warning;
       location_t loc = EXPR_LOCATION (exp);
       tree ptr = access.second.ptr;
       if (*sizstr
@@ -2066,24 +1760,25 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 	      const std::string argtypestr
 		= access.second.array_as_string (ptrtype);
 
-	      arg_warned = warning_at (loc, OPT_Wstringop_overflow_,
-				       "%Kbound argument %i value %s is "
-				       "negative for a variable length array "
-				       "argument %i of type %s",
-				       exp, sizidx + 1, sizstr,
-				       ptridx + 1, argtypestr.c_str ());
+	      if (warning_at (loc, OPT_Wstringop_overflow_,
+			      "bound argument %i value %s is "
+			      "negative for a variable length array "
+			      "argument %i of type %s",
+			      sizidx + 1, sizstr,
+			      ptridx + 1, argtypestr.c_str ()))
+		arg_warned = OPT_Wstringop_overflow_;
 	    }
-	  else
-	    arg_warned = warning_at (loc, OPT_Wstringop_overflow_,
-				     "%Kargument %i value %s is negative",
-				     exp, sizidx + 1, sizstr);
+	  else if (warning_at (loc, OPT_Wstringop_overflow_,
+			       "argument %i value %s is negative",
+			       sizidx + 1, sizstr))
+	    arg_warned = OPT_Wstringop_overflow_;
 
-	  if (arg_warned)
+	  if (arg_warned != no_warning)
 	    {
 	      append_attrname (access, attrstr, sizeof attrstr);
 	      /* Remember a warning has been issued and avoid warning
 		 again below for the same attribute.  */
-	      any_warned = true;
+	      opt_warned = arg_warned;
 	      continue;
 	    }
 	}
@@ -2121,39 +1816,39 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 		  const std::string argtypestr
 		    = access.second.array_as_string (ptrtype);
 
-		  arg_warned = warning_at (loc, OPT_Wnonnull,
-					   "%Kargument %i of variable length "
-					   "array %s is null but "
-					   "the corresponding bound argument "
-					   "%i value is %s",
-					   exp, sizidx + 1, argtypestr.c_str (),
-					   ptridx + 1, sizstr);
+		  if (warning_at (loc, OPT_Wnonnull,
+				  "argument %i of variable length "
+				  "array %s is null but "
+				  "the corresponding bound argument "
+				  "%i value is %s",
+				  ptridx + 1, argtypestr.c_str (),
+				  sizidx + 1, sizstr))
+		    arg_warned = OPT_Wnonnull;
 		}
-	      else
-		arg_warned = warning_at (loc, OPT_Wnonnull,
-					 "%Kargument %i is null but "
-					 "the corresponding size argument "
-					 "%i value is %s",
-					 exp, ptridx + 1, sizidx + 1,
-					 sizstr);
+	      else if (warning_at (loc, OPT_Wnonnull,
+				   "argument %i is null but "
+				   "the corresponding size argument "
+				   "%i value is %s",
+				   ptridx + 1, sizidx + 1, sizstr))
+		arg_warned = OPT_Wnonnull;
 	    }
 	  else if (access_size && access.second.static_p)
 	    {
 	      /* Warn about null pointers for [static N] array arguments
 		 but do not warn for ordinary (i.e., nonstatic) arrays.  */
-	      arg_warned = warning_at (loc, OPT_Wnonnull,
-				       "%Kargument %i to %<%T[static %E]%> "
-				       "is null where non-null expected",
-				       exp, ptridx + 1, argtype,
-				       access_size);
+	      if (warning_at (loc, OPT_Wnonnull,
+			      "argument %i to %<%T[static %E]%> "
+			      "is null where non-null expected",
+			      ptridx + 1, argtype, access_size))
+		arg_warned = OPT_Wnonnull;		
 	    }
 
-	  if (arg_warned)
+	  if (arg_warned != no_warning)
 	    {
 	      append_attrname (access, attrstr, sizeof attrstr);
 	      /* Remember a warning has been issued and avoid warning
 		 again below for the same attribute.  */
-	      any_warned = true;
+	      opt_warned = OPT_Wnonnull;
 	      continue;
 	    }
 	}
@@ -2189,17 +1884,17 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
       /* Clear the no-warning bit in case it was set by check_access
 	 in a prior iteration so that accesses via different arguments
 	 are diagnosed.  */
-      TREE_NO_WARNING (exp) = false;
+      suppress_warning (exp, OPT_Wstringop_overflow_, false);
       access_mode mode = data.mode;
       if (mode == access_deferred)
 	mode = TYPE_READONLY (argtype) ? access_read_only : access_read_write;
       check_access (exp, access_size, /*maxread=*/ NULL_TREE, srcsize,
 		    dstsize, mode, &data);
 
-      if (TREE_NO_WARNING (exp))
+      if (warning_suppressed_p (exp, OPT_Wstringop_overflow_))
+	opt_warned = OPT_Wstringop_overflow_;
+      if (opt_warned != N_OPTS)
 	{
-	  any_warned = true;
-
 	  if (access.second.internal_p)
 	    inform (loc, "referencing argument %u of type %qT",
 		    ptridx + 1, ptrtype);
@@ -2221,7 +1916,7 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 		"in a call with type %qT and attribute %qs",
 		fntype, attrstr);
     }
-  else if (any_warned)
+  else if (opt_warned != N_OPTS)
     {
       if (fndecl)
 	inform (DECL_SOURCE_LOCATION (fndecl),
@@ -2232,7 +1927,8 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
     }
 
   /* Set the bit in case if was cleared and not set above.  */
-  TREE_NO_WARNING (exp) = true;
+  if (opt_warned != N_OPTS)
+    suppress_warning (exp, opt_warned);
 }
 
 /* Fill in ARGS_SIZE and ARGS array based on the parameters found in
@@ -2397,7 +2093,8 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 	     already in memory, instead of making a copy.  Likewise if we want
 	     to make the copy in the callee instead of the caller.  */
 	  if ((call_from_thunk_p || callee_copies)
-	      && (base = get_base_address (args[i].tree_value))
+	      && TREE_CODE (args[i].tree_value) != WITH_SIZE_EXPR
+	      && ((base = get_base_address (args[i].tree_value)), true)
 	      && TREE_CODE (base) != SSA_NAME
 	      && (!DECL_P (base) || MEM_P (DECL_RTL (base))))
 	    {
@@ -2624,10 +2321,6 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
   /* Check attribute access arguments.  */
   maybe_warn_rdwr_sizes (&rdwr_idx, fndecl, fntype, exp);
-
-  /* Check calls to operator new for mismatched forms and attempts
-     to deallocate unallocated objects.  */
-  maybe_emit_free_warning (exp);
 }
 
 /* Update ARGS_SIZE to contain the total size for the argument block.
@@ -3727,7 +3420,7 @@ expand_call (tree exp, rtx target, int ignore)
      So the entire argument block must then be preallocated (i.e., we
      ignore PUSH_ROUNDING in that case).  */
 
-  int must_preallocate = !PUSH_ARGS;
+  int must_preallocate = !targetm.calls.push_argument (0);
 
   /* Size of the stack reserved for parameter registers.  */
   int reg_parm_stack_space = 0;
@@ -3836,7 +3529,7 @@ expand_call (tree exp, rtx target, int ignore)
 #endif
 
   if (! OUTGOING_REG_PARM_STACK_SPACE ((!fndecl ? fntype : TREE_TYPE (fndecl)))
-      && reg_parm_stack_space > 0 && PUSH_ARGS)
+      && reg_parm_stack_space > 0 && targetm.calls.push_argument (0))
     must_preallocate = 1;
 
   /* Set up a place to return a structure.  */
@@ -5477,7 +5170,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
     }
   else
     {
-      if (!PUSH_ARGS)
+      if (!targetm.calls.push_argument (0))
 	argblock = push_block (gen_int_mode (args_size.constant, Pmode), 0, 0);
     }
 

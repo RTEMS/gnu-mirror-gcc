@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ssa.h"
 #include "cgraph.h"
 #include "gimple-pretty-print.h"
+#include "gimple-ssa-warn-access.h"
 #include "gimple-ssa-warn-restrict.h"
 #include "fold-const.h"
 #include "stmt.h"
@@ -311,27 +312,28 @@ get_symbol_constant_value (tree sym)
 static tree
 maybe_fold_reference (tree expr)
 {
-  tree result;
+  tree result = NULL_TREE;
 
   if ((TREE_CODE (expr) == VIEW_CONVERT_EXPR
        || TREE_CODE (expr) == REALPART_EXPR
        || TREE_CODE (expr) == IMAGPART_EXPR)
       && CONSTANT_CLASS_P (TREE_OPERAND (expr, 0)))
-    return fold_unary_loc (EXPR_LOCATION (expr),
-			   TREE_CODE (expr),
-			   TREE_TYPE (expr),
-			   TREE_OPERAND (expr, 0));
-  else if (TREE_CODE (expr) == BIT_FIELD_REF
-	   && CONSTANT_CLASS_P (TREE_OPERAND (expr, 0)))
-    return fold_ternary_loc (EXPR_LOCATION (expr),
+    result = fold_unary_loc (EXPR_LOCATION (expr),
 			     TREE_CODE (expr),
 			     TREE_TYPE (expr),
-			     TREE_OPERAND (expr, 0),
-			     TREE_OPERAND (expr, 1),
-			     TREE_OPERAND (expr, 2));
+			     TREE_OPERAND (expr, 0));
+  else if (TREE_CODE (expr) == BIT_FIELD_REF
+	   && CONSTANT_CLASS_P (TREE_OPERAND (expr, 0)))
+    result = fold_ternary_loc (EXPR_LOCATION (expr),
+			       TREE_CODE (expr),
+			       TREE_TYPE (expr),
+			       TREE_OPERAND (expr, 0),
+			       TREE_OPERAND (expr, 1),
+			       TREE_OPERAND (expr, 2));
+  else
+    result = fold_const_aggregate_ref (expr);
 
-  if ((result = fold_const_aggregate_ref (expr))
-      && is_gimple_min_invariant (result))
+  if (result && is_gimple_min_invariant (result))
     return result;
 
   return NULL_TREE;
@@ -547,7 +549,8 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 					   CONSTRUCTOR_ELTS (rhs));
 	  }
 
-	else if (DECL_P (rhs))
+	else if (DECL_P (rhs)
+		 && is_gimple_reg_type (TREE_TYPE (rhs)))
 	  return get_symbol_constant_value (rhs);
       }
       break;
@@ -871,7 +874,12 @@ size_must_be_zero_p (tree size)
   value_range valid_range (build_int_cst (type, 0),
 			   wide_int_to_tree (type, ssize_max));
   value_range vr;
-  get_range_info (size, vr);
+  if (cfun)
+    get_range_query (cfun)->range_of_expr (vr, size);
+  else
+    get_global_range_query ()->range_of_expr (vr, size);
+  if (vr.undefined_p ())
+    vr.set_varying (TREE_TYPE (size));
   vr.intersect (&valid_range);
   return vr.zero_p ();
 }
@@ -2037,7 +2045,7 @@ gimple_fold_builtin_strcpy (gimple_stmt_iterator *gsi,
 	 not point to objects and so do not indicate an overlap;
 	 such calls could be the result of sanitization and jump
 	 threading).  */
-      if (!integer_zerop (dest) && !gimple_no_warning_p (stmt))
+      if (!integer_zerop (dest) && !warning_suppressed_p (stmt, OPT_Wrestrict))
 	{
 	  tree func = gimple_call_fndecl (stmt);
 
@@ -2064,9 +2072,9 @@ gimple_fold_builtin_strcpy (gimple_stmt_iterator *gsi,
   if (nonstr)
     {
       /* Avoid folding calls with unterminated arrays.  */
-      if (!gimple_no_warning_p (stmt))
-	warn_string_no_nul (loc, NULL_TREE, "strcpy", src, nonstr);
-      gimple_set_no_warning (stmt, true);
+      if (!warning_suppressed_p (stmt, OPT_Wstringop_overread))
+	warn_string_no_nul (loc, stmt, "strcpy", src, nonstr);
+      suppress_warning (stmt, OPT_Wstringop_overread);
       return false;
     }
 
@@ -2108,13 +2116,13 @@ gimple_fold_builtin_strncpy (gimple_stmt_iterator *gsi,
 	  tree slen = get_maxval_strlen (src, SRK_STRLEN);
 	  if (slen && !integer_zerop (slen))
 	    warning_at (loc, OPT_Wstringop_truncation,
-			"%G%qD destination unchanged after copying no bytes "
+			"%qD destination unchanged after copying no bytes "
 			"from a string of length %E",
-			stmt, fndecl, slen);
+			fndecl, slen);
 	  else
 	    warning_at (loc, OPT_Wstringop_truncation,
-			"%G%qD destination unchanged after copying no bytes",
-			stmt, fndecl);
+			"%qD destination unchanged after copying no bytes",
+			fndecl);
 	}
 
       replace_call_with_value (gsi, dest);
@@ -2474,7 +2482,7 @@ gimple_fold_builtin_strncat (gimple_stmt_iterator *gsi)
 
   unsigned HOST_WIDE_INT dstsize;
 
-  bool nowarn = gimple_no_warning_p (stmt);
+  bool nowarn = warning_suppressed_p (stmt, OPT_Wstringop_overflow_);
 
   if (!nowarn && compute_builtin_object_size (dst, 1, &dstsize))
     {
@@ -2491,13 +2499,13 @@ gimple_fold_builtin_strncat (gimple_stmt_iterator *gsi)
 	  location_t loc = gimple_location (stmt);
 	  nowarn = warning_at (loc, OPT_Wstringop_overflow_,
 			       cmpdst == 0
-			       ? G_("%G%qD specified bound %E equals "
+			       ? G_("%qD specified bound %E equals "
 				    "destination size")
-			       : G_("%G%qD specified bound %E exceeds "
+			       : G_("%qD specified bound %E exceeds "
 				    "destination size %wu"),
-			       stmt, fndecl, len, dstsize);
+			       fndecl, len, dstsize);
 	  if (nowarn)
-	    gimple_set_no_warning (stmt, true);
+	    suppress_warning (stmt, OPT_Wstringop_overflow_);
 	}
     }
 
@@ -2511,9 +2519,9 @@ gimple_fold_builtin_strncat (gimple_stmt_iterator *gsi)
 	 of the destination is unknown (it's not an uncommon mistake
 	 to specify as the bound to strncpy the length of the source).  */
       if (warning_at (loc, OPT_Wstringop_overflow_,
-		      "%G%qD specified bound %E equals source length",
-		      stmt, fndecl, len))
-	gimple_set_no_warning (stmt, true);
+		      "%qD specified bound %E equals source length",
+		      fndecl, len))
+	suppress_warning (stmt, OPT_Wstringop_overflow_);
     }
 
   tree fn = builtin_decl_implicit (BUILT_IN_STRCAT);
@@ -3098,7 +3106,8 @@ gimple_fold_builtin_stxcpy_chk (gimple_stmt_iterator *gsi,
 	 not point to objects and so do not indicate an overlap;
 	 such calls could be the result of sanitization and jump
 	 threading).  */
-      if (!integer_zerop (dest) && !gimple_no_warning_p (stmt))
+      if (!integer_zerop (dest)
+	  && !warning_suppressed_p (stmt, OPT_Wrestrict))
 	{
 	  tree func = gimple_call_fndecl (stmt);
 
@@ -3281,10 +3290,10 @@ gimple_fold_builtin_stpcpy (gimple_stmt_iterator *gsi)
   if (data.decl)
     {
       /* Avoid folding calls with unterminated arrays.  */
-      if (!gimple_no_warning_p (stmt))
-	warn_string_no_nul (loc, NULL_TREE, "stpcpy", src, data.decl, size,
+      if (!warning_suppressed_p (stmt, OPT_Wstringop_overread))
+	warn_string_no_nul (loc, stmt, "stpcpy", src, data.decl, size,
 			    exact);
-      gimple_set_no_warning (stmt, true);
+      suppress_warning (stmt, OPT_Wstringop_overread);
       return false;
     }
 
@@ -3507,10 +3516,6 @@ bool
 gimple_fold_builtin_sprintf (gimple_stmt_iterator *gsi)
 {
   gimple *stmt = gsi_stmt (*gsi);
-  tree dest = gimple_call_arg (stmt, 0);
-  tree fmt = gimple_call_arg (stmt, 1);
-  tree orig = NULL_TREE;
-  const char *fmt_str = NULL;
 
   /* Verify the required arguments in the original call.  We deal with two
      types of sprintf() calls: 'sprintf (str, fmt)' and
@@ -3518,25 +3523,28 @@ gimple_fold_builtin_sprintf (gimple_stmt_iterator *gsi)
   if (gimple_call_num_args (stmt) > 3)
     return false;
 
+  tree orig = NULL_TREE;
   if (gimple_call_num_args (stmt) == 3)
     orig = gimple_call_arg (stmt, 2);
 
   /* Check whether the format is a literal string constant.  */
-  fmt_str = c_getstr (fmt);
+  tree fmt = gimple_call_arg (stmt, 1);
+  const char *fmt_str = c_getstr (fmt);
   if (fmt_str == NULL)
     return false;
 
+  tree dest = gimple_call_arg (stmt, 0);
+
   if (!init_target_chars ())
+    return false;
+
+  tree fn = builtin_decl_implicit (BUILT_IN_STRCPY);
+  if (!fn)
     return false;
 
   /* If the format doesn't contain % args or %%, use strcpy.  */
   if (strchr (fmt_str, target_percent) == NULL)
     {
-      tree fn = builtin_decl_implicit (BUILT_IN_STRCPY);
-
-      if (!fn)
-	return false;
-
       /* Don't optimize sprintf (buf, "abc", ptr++).  */
       if (orig)
 	return false;
@@ -3548,8 +3556,7 @@ gimple_fold_builtin_sprintf (gimple_stmt_iterator *gsi)
 
       /* Propagate the NO_WARNING bit to avoid issuing the same
 	 warning more than once.  */
-      if (gimple_no_warning_p (stmt))
-	gimple_set_no_warning (repl, true);
+      copy_warning (repl, stmt);
 
       gimple_seq_add_stmt_without_update (&stmts, repl);
       if (tree lhs = gimple_call_lhs (stmt))
@@ -3577,14 +3584,13 @@ gimple_fold_builtin_sprintf (gimple_stmt_iterator *gsi)
   /* If the format is "%s", use strcpy if the result isn't used.  */
   else if (fmt_str && strcmp (fmt_str, target_percent_s) == 0)
     {
-      tree fn;
-      fn = builtin_decl_implicit (BUILT_IN_STRCPY);
-
-      if (!fn)
-	return false;
-
       /* Don't crash on sprintf (str1, "%s").  */
       if (!orig)
+	return false;
+
+      /* Don't fold calls with source arguments of invalid (nonpointer)
+	 types.  */
+      if (!POINTER_TYPE_P (TREE_TYPE (orig)))
 	return false;
 
       tree orig_len = NULL_TREE;
@@ -3601,8 +3607,7 @@ gimple_fold_builtin_sprintf (gimple_stmt_iterator *gsi)
 
       /* Propagate the NO_WARNING bit to avoid issuing the same
 	 warning more than once.  */
-      if (gimple_no_warning_p (stmt))
-	gimple_set_no_warning (repl, true);
+      copy_warning (repl, stmt);
 
       gimple_seq_add_stmt_without_update (&stmts, repl);
       if (tree lhs = gimple_call_lhs (stmt))
@@ -4693,6 +4698,8 @@ clear_padding_type (clear_padding_struct *buf, tree type, HOST_WIDE_INT sz)
 		if (fldsz == 0)
 		  continue;
 		HOST_WIDE_INT pos = int_byte_position (field);
+		if (pos >= sz)
+		  continue;
 		HOST_WIDE_INT bpos
 		  = tree_to_uhwi (DECL_FIELD_BIT_OFFSET (field));
 		bpos %= BITS_PER_UNIT;
@@ -4768,6 +4775,8 @@ clear_padding_type (clear_padding_struct *buf, tree type, HOST_WIDE_INT sz)
 	    else
 	      {
 		HOST_WIDE_INT pos = int_byte_position (field);
+		if (pos >= sz)
+		  continue;
 		HOST_WIDE_INT fldsz = tree_to_shwi (DECL_SIZE_UNIT (field));
 		gcc_assert (pos >= 0 && fldsz >= 0 && pos >= cur_pos);
 		clear_padding_add_padding (buf, pos - cur_pos);
@@ -5445,19 +5454,6 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
   gcall *stmt = as_a <gcall *> (gsi_stmt (*gsi));
   tree callee;
   bool changed = false;
-  unsigned i;
-
-  /* Fold *& in call arguments.  */
-  for (i = 0; i < gimple_call_num_args (stmt); ++i)
-    if (REFERENCE_CLASS_P (gimple_call_arg (stmt, i)))
-      {
-	tree tmp = maybe_fold_reference (gimple_call_arg (stmt, i));
-	if (tmp)
-	  {
-	    gimple_call_set_arg (stmt, i, tmp);
-	    changed = true;
-	  }
-      }
 
   /* Check for virtual calls that became direct calls.  */
   callee = gimple_call_fn (stmt);
@@ -5559,15 +5555,6 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
 	{
 	  gimple_call_set_chain (stmt, NULL);
 	  changed = true;
-	}
-      else
-	{
-	  tree tmp = maybe_fold_reference (gimple_call_chain (stmt));
-	  if (tmp)
-	    {
-	      gimple_call_set_chain (stmt, tmp);
-	      changed = true;
-	    }
 	}
     }
 
@@ -6082,7 +6069,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 {
   bool changed = false;
   gimple *stmt = gsi_stmt (*gsi);
-  bool nowarning = gimple_no_warning_p (stmt);
+  bool nowarning = warning_suppressed_p (stmt, OPT_Wstrict_overflow);
   unsigned i;
   fold_defer_overflow_warnings ();
 
@@ -6281,43 +6268,6 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 
     case GIMPLE_CALL:
       changed |= gimple_fold_call (gsi, inplace);
-      break;
-
-    case GIMPLE_ASM:
-      /* Fold *& in asm operands.  */
-      {
-	gasm *asm_stmt = as_a <gasm *> (stmt);
-	size_t noutputs;
-	const char **oconstraints;
-	const char *constraint;
-	bool allows_mem, allows_reg;
-
-	noutputs = gimple_asm_noutputs (asm_stmt);
-	oconstraints = XALLOCAVEC (const char *, noutputs);
-
-	for (i = 0; i < noutputs; ++i)
-	  {
-	    tree link = gimple_asm_output_op (asm_stmt, i);
-	    oconstraints[i]
-	      = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (link)));
-	  }
-	for (i = 0; i < gimple_asm_ninputs (asm_stmt); ++i)
-	  {
-	    tree link = gimple_asm_input_op (asm_stmt, i);
-	    tree op = TREE_VALUE (link);
-	    constraint
-	      = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (link)));
-	    parse_input_constraint (&constraint, 0, 0, noutputs, 0,
-				    oconstraints, &allows_mem, &allows_reg);
-	    if (REFERENCE_CLASS_P (op)
-		&& (allows_reg || !allows_mem)
-		&& (op = maybe_fold_reference (op)) != NULL_TREE)
-	      {
-		TREE_VALUE (link) = op;
-		changed = true;
-	      }
-	  }
-      }
       break;
 
     case GIMPLE_DEBUG:
@@ -7562,7 +7512,8 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
               tree op1 = (*valueize) (gimple_assign_rhs2 (stmt));
               tree op2 = (*valueize) (gimple_assign_rhs3 (stmt));
               return fold_ternary_loc (loc, subcode,
-				       gimple_expr_type (stmt), op0, op1, op2);
+				       TREE_TYPE (gimple_assign_lhs (stmt)),
+				       op0, op1, op2);
             }
 
           default:
@@ -8956,16 +8907,17 @@ gimple_assign_nonnegative_warnv_p (gimple *stmt, bool *strict_overflow_p,
 				   int depth)
 {
   enum tree_code code = gimple_assign_rhs_code (stmt);
+  tree type = TREE_TYPE (gimple_assign_lhs (stmt));
   switch (get_gimple_rhs_class (code))
     {
     case GIMPLE_UNARY_RHS:
       return tree_unary_nonnegative_warnv_p (gimple_assign_rhs_code (stmt),
-					     gimple_expr_type (stmt),
+					     type,
 					     gimple_assign_rhs1 (stmt),
 					     strict_overflow_p, depth);
     case GIMPLE_BINARY_RHS:
       return tree_binary_nonnegative_warnv_p (gimple_assign_rhs_code (stmt),
-					      gimple_expr_type (stmt),
+					      type,
 					      gimple_assign_rhs1 (stmt),
 					      gimple_assign_rhs2 (stmt),
 					      strict_overflow_p, depth);
@@ -8993,12 +8945,12 @@ gimple_call_nonnegative_warnv_p (gimple *stmt, bool *strict_overflow_p,
     gimple_call_arg (stmt, 0) : NULL_TREE;
   tree arg1 = gimple_call_num_args (stmt) > 1 ?
     gimple_call_arg (stmt, 1) : NULL_TREE;
-
-  return tree_call_nonnegative_warnv_p (gimple_expr_type (stmt),
-					gimple_call_combined_fn (stmt),
-					arg0,
-					arg1,
-					strict_overflow_p, depth);
+  tree lhs = gimple_call_lhs (stmt);
+  return (lhs
+	  && tree_call_nonnegative_warnv_p (TREE_TYPE (lhs),
+					    gimple_call_combined_fn (stmt),
+					    arg0, arg1,
+					    strict_overflow_p, depth));
 }
 
 /* Return true if return value of call STMT is known to be non-negative.

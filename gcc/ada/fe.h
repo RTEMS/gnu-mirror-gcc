@@ -190,6 +190,7 @@ extern Boolean In_Extended_Main_Code_Unit	(Entity_Id);
 /* opt: */
 
 #define Ada_Version			opt__ada_version
+#define Assume_No_Invalid_Values	opt__assume_no_invalid_values
 #define Back_End_Inlining		opt__back_end_inlining
 #define Debug_Generated_Code		opt__debug_generated_code
 #define Enable_128bit_Types		opt__enable_128bit_types
@@ -203,7 +204,7 @@ extern Boolean In_Extended_Main_Code_Unit	(Entity_Id);
 #define Suppress_Checks			opt__suppress_checks
 
 typedef enum {
-  Ada_83, Ada_95, Ada_2005, Ada_2012, Ada_2020
+  Ada_83, Ada_95, Ada_2005, Ada_2012, Ada_2022, Ada_With_Extensions
 } Ada_Version_Type;
 
 typedef enum {
@@ -211,6 +212,7 @@ typedef enum {
 } Exception_Mechanism_Type;
 
 extern Ada_Version_Type Ada_Version;
+extern Boolean Assume_No_Invalid_Values;
 extern Boolean Back_End_Inlining;
 extern Boolean Debug_Generated_Code;
 extern Boolean Enable_128bit_Types;
@@ -634,33 +636,8 @@ B Known_Static_Normalized_Position_Max  (Entity_Id E);
 #define Known_Static_RM_Size einfo__utils__known_static_rm_size
 B Known_Static_RM_Size                  (Entity_Id E);
 
-#define Unknown_Alignment einfo__utils__unknown_alignment
-B Unknown_Alignment                     (Entity_Id E);
-
-#define Unknown_Component_Bit_Offset einfo__utils__unknown_component_bit_offset
-B Unknown_Component_Bit_Offset          (Entity_Id E);
-
-#define Unknown_Component_Size einfo__utils__unknown_component_size
-B Unknown_Component_Size                (Entity_Id E);
-
-#define Unknown_Esize einfo__utils__unknown_esize
-B Unknown_Esize                         (Entity_Id E);
-
-#define Unknown_Normalized_First_Bit einfo__utils__unknown_normalized_first_bit
-B Unknown_Normalized_First_Bit          (Entity_Id E);
-
-#define Unknown_Normalized_Position einfo__utils__unknown_normalized_position
-B Unknown_Normalized_Position           (Entity_Id E);
-
-#define Unknown_Normalized_Position_Max einfo__utils__unknown_normalized_position_max
-B Unknown_Normalized_Position_Max       (Entity_Id E);
-
-#define Unknown_RM_Size einfo__utils__unknown_rm_size
-B Unknown_RM_Size                       (Entity_Id E);
-
-// The following were automatically generated as INLINE functions in the old
-// einfo.h by the spitbol program.
-// Is it important that they be inlined????
+#define Copy_Alignment einfo__utils__copy_alignment
+B Copy_Alignment(Entity_Id To, Entity_Id From);
 
 #define Is_Discrete_Or_Fixed_Point_Type einfo__utils__is_discrete_or_fixed_point_type
 B Is_Discrete_Or_Fixed_Point_Type     (E Id);

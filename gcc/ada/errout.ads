@@ -279,7 +279,7 @@ package Errout is
    --      The character ? appearing anywhere in a message makes the message
    --      warning instead of a normal error message, and the text of the
    --      message will be preceded by "warning:" in the normal case. The
-   --      handling of warnings if further controlled by the Warning_Mode
+   --      handling of warnings is further controlled by the Warning_Mode
    --      option (-w switch), see package Opt for further details, and also by
    --      the current setting from pragma Warnings. This pragma applies only
    --      to warnings issued from the semantic phase (not the parser), but
@@ -519,7 +519,7 @@ package Errout is
    --  The prefixes error and warning are supplied automatically (depending
    --  on the use of the ? insertion character), and the call to the error
    --  message routine supplies the text. The "error: " prefix is omitted
-   --  in brief error message formats.
+   --  if -gnatd_U is among the options given to gnat.
 
    --  Reserved Ada keywords in the message are in the default keyword case
    --  (determined from the given source program), surrounded by quotation
@@ -939,8 +939,13 @@ package Errout is
    --  contain error message insertion characters in the normal manner, and in
    --  particular may start with | to flag a non-serious error.
 
-   procedure Error_Msg_Ada_2020_Feature (Feature : String; Loc : Source_Ptr);
-   --  Analogous to Error_Msg_Ada_2012_Feature
+   procedure Error_Msg_Ada_2022_Feature (Feature : String; Loc : Source_Ptr);
+   --  Analogous to Error_Msg_Ada_2012_Feature, for Ada 2022
+
+   procedure Error_Msg_GNAT_Extension (Extension : String);
+   --  If not operating with extensions allowed, posts errors complaining
+   --  that Extension is only supported when the -gnatX switch is enabled,
+   --  with appropriate suggestions to fix it.
 
    procedure dmsg (Id : Error_Msg_Id) renames Erroutc.dmsg;
    --  Debugging routine to dump an error message
@@ -979,10 +984,6 @@ package Errout is
    --  source position, and if we can find a match between the name in Buf and
    --  the name at that source location, we copy the casing from the source,
    --  otherwise we set appropriate default casing.
-
-   procedure Adjust_Name_Case (Loc : Source_Ptr);
-   --  Uses Buf => Global_Name_Buffer. There are no calls to this in the
-   --  compiler, but it is called in SPARK 2014.
 
    procedure Set_Identifier_Casing
      (Identifier_Name : System.Address;

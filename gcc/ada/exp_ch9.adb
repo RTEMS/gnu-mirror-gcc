@@ -282,7 +282,11 @@ package body Exp_Ch9 is
       Concval : Node_Id;
       Ename   : Node_Id;
       Index   : Node_Id);
-   --  Some comments here would be useful ???
+   --  Build the call corresponding to the task entry call. N is the task entry
+   --  call, Concval is the concurrent object, Ename is the entry name and
+   --  Index is the entry family index.
+   --  Note that N might be expanded into an N_Block_Statement if it gets
+   --  inlined.
 
    function Build_Task_Proc_Specification (T : Entity_Id) return Node_Id;
    --  This routine constructs a specification for the procedure that we will
@@ -841,7 +845,7 @@ package body Exp_Ch9 is
       Insert_Before (Last (Statements (Stats)), Call);
       Analyze (Call);
 
-      --  Ada 2020 (AI12-0279)
+      --  Ada 2022 (AI12-0279)
 
       if Has_Yield_Aspect (Entity (Entry_Direct_Name (Astat)))
         and then RTE_Available (RE_Yield)
@@ -864,7 +868,7 @@ package body Exp_Ch9 is
             Append (Call, Statements (Hand));
             Analyze (Call);
 
-            --  Ada 2020 (AI12-0279)
+            --  Ada 2022 (AI12-0279)
 
             if Has_Yield_Aspect (Entity (Entry_Direct_Name (Astat)))
               and then RTE_Available (RE_Yield)
@@ -917,7 +921,7 @@ package body Exp_Ch9 is
 
             Statements => New_List (Call))));
 
-      --  Ada 2020 (AI12-0279)
+      --  Ada 2022 (AI12-0279)
 
       if Has_Yield_Aspect (Entity (Entry_Direct_Name (Astat)))
         and then RTE_Available (RE_Yield)
@@ -1756,34 +1760,21 @@ package body Exp_Ch9 is
       --  Generate a dummy master if tasks or tasking hierarchies are
       --  prohibited.
 
-      --    _Master : constant Master_Id := 3;
+      --    _Master : constant Integer := Library_Task_Level;
 
       if not Tasking_Allowed
         or else Restrictions.Set (No_Task_Hierarchy)
         or else not RTE_Available (RE_Current_Master)
       then
-         declare
-            Expr : Node_Id;
-
-         begin
-            --  RE_Library_Task_Level is not always available in configurable
-            --  RunTime
-
-            if not RTE_Available (RE_Library_Task_Level) then
-               Expr := Make_Integer_Literal (Loc, Uint_3);
-            else
-               Expr := New_Occurrence_Of (RTE (RE_Library_Task_Level), Loc);
-            end if;
-
-            Master_Decl :=
-              Make_Object_Declaration (Loc,
-                Defining_Identifier =>
-                  Make_Defining_Identifier (Loc, Name_uMaster),
-                Constant_Present    => True,
-                Object_Definition   =>
-                  New_Occurrence_Of (Standard_Integer, Loc),
-                Expression          => Expr);
-         end;
+         Master_Decl :=
+           Make_Object_Declaration (Loc,
+             Defining_Identifier =>
+               Make_Defining_Identifier (Loc, Name_uMaster),
+             Constant_Present    => True,
+             Object_Definition   =>
+               New_Occurrence_Of (Standard_Integer, Loc),
+             Expression          =>
+               Make_Integer_Literal (Loc, Library_Task_Level));
 
       --  Generate:
       --    _master : constant Integer := Current_Master.all;
@@ -3628,7 +3619,8 @@ package body Exp_Ch9 is
       Master_Decl :=
         Make_Object_Renaming_Declaration (Loc,
           Defining_Identifier => Master_Id,
-          Subtype_Mark        => New_Occurrence_Of (RTE (RE_Master_Id), Loc),
+          Subtype_Mark        =>
+            New_Occurrence_Of (Standard_Integer, Loc),
           Name                => Make_Identifier (Loc, Name_uMaster));
 
       Insert_Action (Context, Master_Decl);
@@ -6209,11 +6201,11 @@ package body Exp_Ch9 is
       begin
          if Is_Static_Expression (N) then
             return True;
-         elsif Ada_Version >= Ada_2020
+         elsif Ada_Version >= Ada_2022
            and then Nkind (N) in N_Selected_Component | N_Indexed_Component
            and then Statically_Names_Object (N)
          then
-            --  Restriction relaxed in Ada2020 to allow statically named
+            --  Restriction relaxed in Ada 2022 to allow statically named
             --  subcomponents.
             return Is_Simple_Barrier (Prefix (N));
          end if;
@@ -6518,14 +6510,12 @@ package body Exp_Ch9 is
 
                   --  Task_Id (Tasknm._disp_get_task_id)
 
-                  Make_Unchecked_Type_Conversion (Loc,
-                    Subtype_Mark =>
-                      New_Occurrence_Of (RTE (RO_ST_Task_Id), Loc),
-                    Expression   =>
-                      Make_Selected_Component (Loc,
-                        Prefix        => New_Copy_Tree (Tasknm),
-                        Selector_Name =>
-                          Make_Identifier (Loc, Name_uDisp_Get_Task_Id)))));
+                  Unchecked_Convert_To
+                    (RTE (RO_ST_Task_Id),
+                     Make_Selected_Component (Loc,
+                       Prefix        => New_Copy_Tree (Tasknm),
+                       Selector_Name =>
+                         Make_Identifier (Loc, Name_uDisp_Get_Task_Id)))));
 
          else
             Append_To (Component_Associations (Aggr),
@@ -6668,7 +6658,7 @@ package body Exp_Ch9 is
 
          Analyze (N);
 
-         --  Ada 2020 (AI12-0279)
+         --  Ada 2022 (AI12-0279)
 
          if Has_Yield_Aspect (Eent)
            and then RTE_Available (RE_Yield)
@@ -7250,10 +7240,9 @@ package body Exp_Ch9 is
               Make_Assignment_Statement (Loc,
                 Name       => New_Occurrence_Of (Bnn, Loc),
                 Expression =>
-                  Make_Unchecked_Type_Conversion (Loc,
-                    Subtype_Mark =>
-                      New_Occurrence_Of (RTE (RE_Communication_Block), Loc),
-                    Expression   => Make_Identifier (Loc, Name_uD))));
+                  Unchecked_Convert_To
+                    (RTE (RE_Communication_Block),
+                     Make_Identifier (Loc, Name_uD))));
 
             --  Generate:
             --    _Disp_Asynchronous_Select (<object>, S, P'Address, D, B);
@@ -7369,10 +7358,9 @@ package body Exp_Ch9 is
                 Name =>
                   New_Occurrence_Of (Bnn, Loc),
                 Expression =>
-                  Make_Unchecked_Type_Conversion (Loc,
-                    Subtype_Mark =>
-                      New_Occurrence_Of (RTE (RE_Communication_Block), Loc),
-                    Expression   => Make_Identifier (Loc, Name_uD))));
+                  Unchecked_Convert_To
+                    (RTE (RE_Communication_Block),
+                     Make_Identifier (Loc, Name_uD))));
 
             --  Generate:
             --    _Disp_Asynchronous_Select (<object>, S, P'Address, D, B);
@@ -11005,7 +10993,7 @@ package body Exp_Ch9 is
                Entry_Id : constant Entity_Id :=
                            Entity (Entry_Direct_Name (Accept_Statement (Alt)));
             begin
-               --  Ada 2020 (AI12-0279)
+               --  Ada 2022 (AI12-0279)
 
                if Has_Yield_Aspect (Entry_Id)
                  and then RTE_Available (RE_Yield)
@@ -14710,8 +14698,7 @@ package body Exp_Ch9 is
          if Restriction_Active (No_Task_Hierarchy) = False then
             Append_To (Args, Make_Identifier (Loc, Name_uMaster));
          else
-            Append_To (Args,
-              New_Occurrence_Of (RTE (RE_Library_Task_Level), Loc));
+            Append_To (Args, Make_Integer_Literal (Loc, Library_Task_Level));
          end if;
       end if;
 

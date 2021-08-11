@@ -1,3 +1,477 @@
+2021-08-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/68568
+	* primary.c (gfc_expr_attr): Variable attribute can only be
+	inquired when symtree is non-NULL.
+
+2021-07-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101564
+	* expr.c (gfc_check_vardef_context): Add check for KIND and LEN
+	parameter inquiries.
+	* match.c (gfc_match): Fix comment for %v code.
+	(gfc_match_allocate, gfc_match_deallocate): Replace use of %v code
+	by %e in gfc_match to allow for function references as STAT and
+	ERRMSG arguments.
+	* resolve.c (resolve_allocate_deallocate): Avoid NULL pointer
+	dereferences and shortcut for bad STAT and ERRMSG argument to
+	(DE)ALLOCATE.  Remove bogus parts of checks for STAT and ERRMSG.
+
+2021-07-26  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+	    Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/93308
+	PR fortran/93963
+	PR fortran/94327
+	PR fortran/94331
+	PR fortran/97046
+	* trans-decl.c (convert_CFI_desc): Only copy out the descriptor
+	if necessary.
+	* trans-expr.c (gfc_conv_gfc_desc_to_cfi_desc): Updated attribute
+	handling which reflect a previous intermediate version of the
+	standard. Only copy out the descriptor if necessary.
+
+2021-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101536
+	* check.c (array_check): Adjust check for the case of CLASS
+	arrays.
+
+2021-07-21  Thomas Schwinge  <thomas@codesourcery.com>
+	    Joseph Myers  <joseph@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+
+	* dump-parse-tree.c (show_attr): Update.
+	* gfortran.h (symbol_attribute): Add 'oacc_routine_nohost' member.
+	(gfc_omp_clauses): Add 'nohost' member.
+	* module.c (ab_attribute): Add 'AB_OACC_ROUTINE_NOHOST'.
+	(attr_bits, mio_symbol_attribute): Update.
+	* openmp.c (omp_mask2): Add 'OMP_CLAUSE_NOHOST'.
+	(gfc_match_omp_clauses): Handle 'OMP_CLAUSE_NOHOST'.
+	(OACC_ROUTINE_CLAUSES): Add 'OMP_CLAUSE_NOHOST'.
+	(gfc_match_oacc_routine): Update.
+	* trans-decl.c (add_attributes_to_decl): Update.
+	* trans-openmp.c (gfc_trans_omp_clauses): Likewise.
+
+2021-07-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101514
+	* target-memory.c (gfc_interpret_derived): Size of array component
+	of derived type can only be computed here for explicit shape.
+	* trans-types.c (gfc_get_nodesc_array_type): Do not dereference
+	NULL pointers.
+
+2021-07-21  Tobias Burnus  <tobias@codesourcery.com>
+
+	* decl.c (gfc_verify_c_interop_param): Update for F2008 + F2018
+	changes; reject unsupported bits with 'Error: Sorry,'.
+	* trans-expr.c (gfc_conv_procedure_call): Fix condition to
+	For using CFI descriptor with characters.
+
+2021-07-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101084
+	* io.c (resolve_tag_format): Extend FORMAT check to unknown type.
+
+2021-07-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100949
+	* trans-expr.c (gfc_trans_class_init_assign): Call
+	gfc_conv_expr_present only for dummy variables.
+
+2021-07-06  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/100227
+	* frontend-passes.c (traverse_io_block): Adjust test for
+	when a variable is eligible for the transformation to
+	array slice.
+
+2021-06-28  Martin Sebor  <msebor@redhat.com>
+
+	* trans-array.c (trans_array_constructor): Replace direct uses
+	of TREE_NO_WARNING with warning_suppressed_p, and suppress_warning.
+	* trans-decl.c (gfc_build_qualified_array): Same.
+	(gfc_build_dummy_array_decl): Same.
+	(generate_local_decl): Same.
+	(gfc_generate_function_code): Same.
+	* trans-openmp.c (gfc_omp_clause_default_ctor): Same.
+	(gfc_omp_clause_copy_ctor): Same.
+	* trans-types.c (get_dtype_type_node): Same.
+	(gfc_get_desc_dim_type): Same.
+	(gfc_get_array_descriptor_base): Same.
+	(gfc_get_caf_vector_type): Same.
+	(gfc_get_caf_reference_type): Same.
+	* trans.c (gfc_create_var_np): Same.
+
+2021-06-23  Tobias Burnus  <tobias@codesourcery.com>
+
+	* dump-parse-tree.c (show_omp_clauses): Fix enum type used
+	for dumping gfc_omp_defaultmap_category.
+
+2021-06-23  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/100337
+	* trans-intrinsic.c (conv_co_collective): Check stat for null ptr
+	before dereferrencing.
+
+2021-06-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100283
+	PR fortran/101123
+	* trans-intrinsic.c (gfc_conv_intrinsic_minmax): Unconditionally
+	convert result of min/max to result type.
+
+2021-06-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95501
+	PR fortran/95502
+	* expr.c (gfc_check_pointer_assign): Avoid NULL pointer
+	dereference.
+	* match.c (gfc_match_pointer_assignment): Likewise.
+	* parse.c (gfc_check_do_variable): Avoid comparison with NULL
+	symtree.
+
+2021-06-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Revert:
+	2021-06-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95501
+	PR fortran/95502
+	* expr.c (gfc_check_pointer_assign): Avoid NULL pointer
+	dereference.
+	* match.c (gfc_match_pointer_assignment): Likewise.
+	* parse.c (gfc_check_do_variable): Avoid comparison with NULL
+	symtree.
+
+2021-06-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95501
+	PR fortran/95502
+	* expr.c (gfc_check_pointer_assign): Avoid NULL pointer
+	dereference.
+	* match.c (gfc_match_pointer_assignment): Likewise.
+	* parse.c (gfc_check_do_variable): Avoid comparison with NULL
+	symtree.
+
+2021-06-15  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/92568
+	* dump-parse-tree.c (show_omp_clauses): Update for defaultmap.
+	* f95-lang.c (LANG_HOOKS_OMP_ALLOCATABLE_P,
+	LANG_HOOKS_OMP_SCALAR_TARGET_P): New.
+	* gfortran.h (enum gfc_omp_defaultmap,
+	enum gfc_omp_defaultmap_category): New.
+	* openmp.c (gfc_match_omp_clauses): Update defaultmap matching.
+	* trans-decl.c (gfc_finish_decl_attrs): Set GFC_DECL_SCALAR_TARGET.
+	* trans-openmp.c (gfc_omp_allocatable_p, gfc_omp_scalar_target_p): New.
+	(gfc_omp_scalar_p): Take 'ptr_alloc_ok' argument.
+	(gfc_trans_omp_clauses, gfc_split_omp_clauses): Update for
+	defaultmap changes.
+	* trans.h (gfc_omp_scalar_p): Update prototype.
+	(gfc_omp_allocatable_p, gfc_omp_scalar_target_p): New.
+	(struct lang_decl): Add scalar_target.
+	(GFC_DECL_SCALAR_TARGET, GFC_DECL_GET_SCALAR_TARGET): New.
+
+2021-06-14  Tobias Burnus  <tobias@codesourcery.com>
+
+	* resolve.c (resolve_variable): Remove *XCNEW used to
+	nullify nullified memory.
+
+2021-06-09  Martin Liska  <mliska@suse.cz>
+
+	* intrinsic.texi: Add missing @headitem to tables with a header.
+
+2021-06-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/100965
+	* trans-openmp.c (gfc_omp_finish_clause): Gimplify OMP_CLAUSE_SIZE.
+
+2021-06-08  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/99928
+	* trans-openmp.c (gfc_add_clause_implicitly): New.
+	(gfc_split_omp_clauses): Use it.
+	(gfc_free_split_omp_clauses): New.
+	(gfc_trans_omp_do_simd, gfc_trans_omp_parallel_do,
+	gfc_trans_omp_parallel_do_simd, gfc_trans_omp_distribute,
+	gfc_trans_omp_teams, gfc_trans_omp_target, gfc_trans_omp_taskloop,
+	gfc_trans_omp_master_taskloop, gfc_trans_omp_parallel_master): Use it.
+
+2021-06-08  Martin Liska  <mliska@suse.cz>
+
+	* intrinsic.texi: Fix typo.
+	* trans-expr.c (gfc_trans_pointer_assignment): Likewise.
+
+2021-06-05  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+
+	PR fortran/100120
+	PR fortran/100816
+	PR fortran/100818
+	PR fortran/100819
+	PR fortran/100821
+	* trans-array.c (gfc_get_array_span): rework the way character
+	array "span" was calculated.
+	(gfc_conv_expr_descriptor): improve handling of character sections
+	and unlimited polymorphic objects.
+	* trans-expr.c (gfc_get_character_len): new function to calculate
+	character string length.
+	(gfc_get_character_len_in_bytes): new function to calculate
+	character string length in bytes.
+	(gfc_conv_scalar_to_descriptor): add call to set the "span".
+	(gfc_trans_pointer_assignment): set "_len" and antecipate the
+	initialization of the deferred character length hidden argument.
+	* trans-intrinsic.c (gfc_conv_associated): set "force_no_tmp" to
+	avoid the creation of a temporary.
+	* trans-types.c (gfc_get_dtype_rank_type): rework type detection
+	so that unlimited polymorphic objects get proper type infomation,
+	also important for bind(c).
+	(gfc_get_dtype): add argument to pass the rank if necessary.
+	(gfc_get_array_type_bounds): cosmetic change to have character
+	arrays called character instead of unknown.
+	* trans-types.h (gfc_get_dtype): modify prototype.
+	* trans.c (get_array_span): rework the way character array "span"
+	was calculated.
+	* trans.h (gfc_get_character_len): new prototype.
+	(gfc_get_character_len_in_bytes): new prototype.
+	Add "unlimited_polymorphic" flag to "gfc_se" type to signal when
+	expression carries an unlimited polymorphic object.
+
+2021-06-04  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/99839
+	* frontend-passes.c (inline_matmul_assign): Do not inline matmul
+	if the assignment to the resulting array if it is not of canonical
+	type (real/integer/complex/logical).
+
+2021-06-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	* dump-parse-tree.c (show_code_node): Handle
+	EXEC_OMP_(TARGET_)(,PARALLEL_,TEAMS_)LOOP.
+
+2021-06-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	* scanner.c (skip_fixed_omp_sentinel): Set openacc_flag if
+	this is not an (OpenMP) continuation line.
+	(skip_fixed_oacc_sentinel): Likewise for openmp_flag and OpenACC.
+	(gfc_next_char_literal): gfc_error_now to force error for mixed OMP/ACC
+	continuation once per location and return '\n'.
+
+2021-06-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/99928
+	* openmp.c (gfc_match_omp_clauses): Fix typo in error message.
+
+2021-06-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/99928
+	* dump-parse-tree.c (show_omp_clauses): Handle bind clause.
+	(show_omp_node): Handle loop directive.
+	* frontend-passes.c (gfc_code_walker): Likewise.
+	* gfortran.h (enum gfc_statement): Add
+	ST_OMP_(END_)(TARGET_)(|PARALLEL_|TEAMS_)LOOP.
+	(enum gfc_omp_bind_type): New.
+	(gfc_omp_clauses): Use it.
+	(enum gfc_exec_op): Add EXEC_OMP_(TARGET_)(|PARALLEL_|TEAMS_)LOOP.
+	* match.h (gfc_match_omp_loop, gfc_match_omp_parallel_loop,
+	gfc_match_omp_target_parallel_loop, gfc_match_omp_target_teams_loop,
+	gfc_match_omp_teams_loop): New.
+	* openmp.c (enum omp_mask1): Add OMP_CLAUSE_BIND.
+	(gfc_match_omp_clauses): Handle it.
+	(OMP_LOOP_CLAUSES, gfc_match_omp_loop, gfc_match_omp_teams_loop,
+	gfc_match_omp_target_teams_loop, gfc_match_omp_parallel_loop,
+	gfc_match_omp_target_parallel_loop): New.
+	(resolve_omp_clauses, resolve_omp_do, omp_code_to_statement,
+	gfc_resolve_omp_directive): Handle omp loop.
+	* parse.c (decode_omp_directive case_exec_markers, gfc_ascii_statement,
+	parse_omp_do, parse_executable): Likewise.
+	(parse_omp_structured_block): Remove ST_ which use parse_omp_do.
+	* resolve.c (gfc_resolve_blocks): Add omp loop.
+	* st.c (gfc_free_statement): Likewise.
+	* trans-openmp.c (gfc_trans_omp_clauses): Handle bind clause.
+	(gfc_trans_omp_do, gfc_trans_omp_parallel_do, gfc_trans_omp_distribute,
+	gfc_trans_omp_teams, gfc_trans_omp_target, gfc_trans_omp_directive):
+	Handle loop directive.
+	(gfc_split_omp_clauses): Likewise; fix firstprivate/lastprivate
+	and (in_)reduction for taskloop.
+	* trans.c (trans_code): Handle omp loop directive.
+
+2021-06-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/99928
+	* dump-parse-tree.c (show_omp_node, show_code_node): Handle
+	(parallel) master taskloop (simd).
+	* frontend-passes.c (gfc_code_walker): Set in_omp_workshare
+	to false for parallel master taskloop (simd).
+	* gfortran.h (enum gfc_statement):
+	Add ST_OMP_(END_)(PARALLEL_)MASTER_TASKLOOP(_SIMD).
+	(enum gfc_exec_op): EXEC_OMP_(PARALLEL_)MASTER_TASKLOOP(_SIMD).
+	* match.h (gfc_match_omp_master_taskloop,
+	gfc_match_omp_master_taskloop_simd,
+	gfc_match_omp_parallel_master_taskloop,
+	gfc_match_omp_parallel_master_taskloop_simd): New prototype.
+	* openmp.c (gfc_match_omp_parallel_master_taskloop,
+	gfc_match_omp_parallel_master_taskloop_simd,
+	gfc_match_omp_master_taskloop,
+	gfc_match_omp_master_taskloop_simd): New.
+	(gfc_match_omp_taskloop_simd): Permit 'reduction' clause.
+	(resolve_omp_clauses): Handle new combined directives; remove
+	inscan-reduction check to reduce multiple errors; add
+	task-reduction error for 'taskloop simd'.
+	(gfc_resolve_omp_parallel_blocks,
+	resolve_omp_do, omp_code_to_statement,
+	gfc_resolve_omp_directive): Handle new combined constructs.
+	* parse.c (decode_omp_directive, next_statement,
+	gfc_ascii_statement, parse_omp_do, parse_omp_structured_block,
+	parse_executable): Likewise.
+	* resolve.c (gfc_resolve_blocks, gfc_resolve_code): Likewise.
+	* st.c (gfc_free_statement): Likewise.
+	* trans.c (trans_code): Likewise.
+	* trans-openmp.c (gfc_split_omp_clauses,
+	gfc_trans_omp_directive): Likewise.
+	(gfc_trans_omp_parallel_master): Move after gfc_trans_omp_master_taskloop;
+	handle parallel master taskloop (simd) as well.
+	(gfc_trans_omp_taskloop): Take gfc_exec_op as arg.
+	(gfc_trans_omp_master_taskloop): New.
+
+2021-05-30  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* gfortran.texi (BOZ literal constants): Fix typo.
+
+2021-05-28  Tobias Burnus  <tobias@codesourcery.com>
+
+	* dump-parse-tree.c (show_iterator): New.
+	(show_omp_namelist): Handle iterators.
+	(show_omp_clauses): Handle affinity.
+	* gfortran.h (gfc_free_omp_namelist): New union with 'udr' and new 'ns'.
+	* match.c (gfc_free_omp_namelist): Add are to choose union element.
+	* openmp.c (gfc_free_omp_clauses, gfc_match_omp_detach,
+	gfc_match_omp_clause_reduction, gfc_match_omp_flush): Update
+	call to gfc_free_omp_namelist.
+	(gfc_match_omp_variable_list): Likewise; permit preceeding whitespace.
+	(enum omp_mask1): Add OMP_CLAUSE_AFFINITY.
+	(gfc_match_iterator): New.
+	(gfc_match_omp_clauses): Use it; update call to gfc_free_omp_namelist.
+	(OMP_TASK_CLAUSES): Add OMP_CLAUSE_AFFINITY.
+	(gfc_match_omp_taskwait): Match depend clause.
+	(resolve_omp_clauses): Handle affinity; update for udr/union change.
+	(gfc_resolve_omp_directive): Resolve clauses of taskwait.
+	* st.c (gfc_free_statement): Update gfc_free_omp_namelist call.
+	* trans-openmp.c (gfc_trans_omp_array_reduction_or_udr): Likewise
+	(handle_iterator): New.
+	(gfc_trans_omp_clauses): Handle iterators for depend/affinity clause.
+	(gfc_trans_omp_taskwait): Handle depend clause.
+	(gfc_trans_omp_directive): Update call.
+
+2021-05-27  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100602
+	* trans-intrinsic.c (gfc_conv_intrinsic_size): Use CLASS data
+	attributes for CLASS arrays for generation of runtime error.
+
+2021-05-27  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100656
+	* trans-array.c (gfc_conv_ss_startstride): Do not call check for
+	presence of a dummy argument when a symbol actually refers to a
+	non-dummy.
+
+2021-05-25  Tobias Burnus  <tobias@codesourcery.com>
+	    Johannes Nendwich  <a08727063@unet.univie.ac.at>
+
+	* intrinsic.texi (GERROR, GETARGS, GETLOG, NORM2, PARITY, RANDOM_INIT,
+	RANDOM_NUMBER): Fix typos and copy'n'paste errors.
+
+2021-05-24  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/86470
+	* trans-expr.c (gfc_copy_class_to_class): Add unshare_expr.
+	* trans-openmp.c (gfc_is_polymorphic_nonptr,
+	gfc_is_unlimited_polymorphic_nonptr): New.
+	(gfc_omp_clause_copy_ctor, gfc_omp_clause_dtor): Handle
+	polymorphic scalars.
+
+2021-05-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100551
+	* trans-expr.c (gfc_conv_procedure_call): Adjust check for
+	implicit conversion of actual argument to an unlimited polymorphic
+	procedure argument.
+
+2021-05-23  Tobias Burnus  <tobias@codesourcery.com>
+
+	* intrinsic.texi (ATOMIC_ADD, ATOMIC_FETCH_ADD): Use the
+	proper variable name in the description.
+
+2021-05-22  Andre Vehreschild  <vehre@gcc.gnu.org>
+	    Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/98301
+	* trans-decl.c (gfc_build_builtin_function_decls): Move decl.
+	* trans-intrinsic.c (conv_intrinsic_random_init): Use bool for
+	lib-call of caf_random_init instead of logical (4-byte).
+	* trans.h: Add tree var for random_init.
+
+2021-05-20  Marcel Vollweiler  <marcel@codesourcery.com>
+
+	* openmp.c (gfc_match_omp_clauses): Support map-type-modifier 'close'.
+
+2021-05-18  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/100642
+	* openmp.c (omp_code_to_statement): Add missing EXEC_OMP_DEPOBJ.
+
+2021-05-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/98411
+	* trans-decl.c (gfc_finish_var_decl): Add check for explicit SAVE
+	attribute.
+
+2021-05-17  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/100633
+	* resolve.c (gfc_resolve_code): Reject nonintrinsic assignments in
+	OMP WORKSHARE.
+
+2021-05-14  Tobias Burnus  <tobias@codesourcery.com>
+
+	* dump-parse-tree.c (show_omp_node, show_code_node): Handle
+	EXEC_OMP_PARALLEL_MASTER.
+	* frontend-passes.c (gfc_code_walker): Likewise.
+	* gfortran.h (enum gfc_statement): Add ST_OMP_PARALLEL_MASTER and
+	ST_OMP_END_PARALLEL_MASTER.
+	(enum gfc_exec_op): Add EXEC_OMP_PARALLEL_MASTER..
+	* match.h (gfc_match_omp_parallel_master): Handle it.
+	* openmp.c (gfc_match_omp_parallel_master, resolve_omp_clauses,
+	omp_code_to_statement, gfc_resolve_omp_directive): Likewise.
+	* parse.c (decode_omp_directive, case_exec_markers,
+	gfc_ascii_statement, parse_omp_structured_block,
+	parse_executable): Likewise.
+	* resolve.c (gfc_resolve_blocks, gfc_resolve_code): Likewise.
+	* st.c (gfc_free_statement): Likewise.
+	* trans-openmp.c (gfc_trans_omp_parallel_master,
+	gfc_trans_omp_workshare, gfc_trans_omp_directive): Likewise.
+	* trans.c (trans_code): Likewise.
+
+2021-05-14  Tobias Burnus  <tobias@codesourcery.com>
+
+	* resolve.c (resolve_symbol): Handle implicit SAVE of main-program
+	for vars in 'omp threadprivate' and 'omp declare target'.
+
+2021-05-10  Martin Liska  <mliska@suse.cz>
+
+	* decl.c (variable_decl): Use startswith
+	function instead of strncmp.
+	(gfc_match_end): Likewise.
+	* gfortran.h (gfc_str_startswith): Likewise.
+	* module.c (load_omp_udrs): Likewise.
+	(read_module): Likewise.
+	* options.c (gfc_handle_runtime_check_option): Likewise.
+	* primary.c (match_arg_list_function): Likewise.
+	* trans-decl.c (gfc_get_symbol_decl): Likewise.
+	* trans-expr.c (gfc_conv_procedure_call): Likewise.
+	* trans-intrinsic.c (gfc_conv_ieee_arithmetic_function): Likewise.
+
 2021-05-06  Paul Thomas  <pault@gcc.gnu.org>
 
 	PR fortran/46991

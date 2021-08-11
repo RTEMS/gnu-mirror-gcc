@@ -1306,6 +1306,7 @@ lower_cond (simplify *s, vec<simplify *>& simplifiers)
     {
       simplify *ns = new simplify (s->kind, s->id, matchers[i], s->result,
 				   s->for_vec, s->capture_ids);
+      ns->for_subst_vec.safe_splice (s->for_subst_vec);
       simplifiers.safe_push (ns);
     }
 }
@@ -1543,24 +1544,27 @@ static void
 lower (vec<simplify *>& simplifiers, bool gimple)
 {
   auto_vec<simplify *> out_simplifiers;
-  for (unsigned i = 0; i < simplifiers.length (); ++i)
-    lower_opt (simplifiers[i], out_simplifiers);
+  for (auto s: simplifiers)
+    lower_opt (s, out_simplifiers);
 
   simplifiers.truncate (0);
-  for (unsigned i = 0; i < out_simplifiers.length (); ++i)
-    lower_commutative (out_simplifiers[i], simplifiers);
+  for (auto s: out_simplifiers)
+    lower_commutative (s, simplifiers);
 
+  /* Lower for needs to happen before lowering cond
+     to support (for cnd (cond vec_cond)).  This is
+     safe as substitution delay does not happen for
+     cond or vec_cond. */
   out_simplifiers.truncate (0);
-  if (gimple)
-    for (unsigned i = 0; i < simplifiers.length (); ++i)
-      lower_cond (simplifiers[i], out_simplifiers);
-  else
-    out_simplifiers.safe_splice (simplifiers);
-
+  for (auto s: simplifiers)
+    lower_for (s, out_simplifiers);
 
   simplifiers.truncate (0);
-  for (unsigned i = 0; i < out_simplifiers.length (); ++i)
-    lower_for (out_simplifiers[i], simplifiers);
+  if (gimple)
+    for (auto s: out_simplifiers)
+      lower_cond (s, simplifiers);
+  else
+    simplifiers.safe_splice (out_simplifiers);
 }
 
 
@@ -1628,8 +1632,9 @@ public:
 
   void gen_kids (FILE *, int, bool, int);
   void gen_kids_1 (FILE *, int, bool, int,
-		   vec<dt_operand *>, vec<dt_operand *>, vec<dt_operand *>,
-		   vec<dt_operand *>, vec<dt_operand *>, vec<dt_node *>);
+		   const vec<dt_operand *> &, const vec<dt_operand *> &,
+		   const vec<dt_operand *> &, const vec<dt_operand *> &,
+		   const vec<dt_operand *> &, const vec<dt_node *> &);
 
   void analyze (sinfo_map_t &);
 };
@@ -2979,12 +2984,12 @@ dt_node::gen_kids (FILE *f, int indent, bool gimple, int depth)
 
 void
 dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
-		     vec<dt_operand *> gimple_exprs,
-		     vec<dt_operand *> generic_exprs,
-		     vec<dt_operand *> fns,
-		     vec<dt_operand *> generic_fns,
-		     vec<dt_operand *> preds,
-		     vec<dt_node *> others)
+		     const vec<dt_operand *> &gimple_exprs,
+		     const vec<dt_operand *> &generic_exprs,
+		     const vec<dt_operand *> &fns,
+		     const vec<dt_operand *> &generic_fns,
+		     const vec<dt_operand *> &preds,
+		     const vec<dt_node *> &others)
 {
   char buf[128];
   char *kid_opname = buf;
@@ -5027,7 +5032,7 @@ parser::parse_pattern ()
    recursively.  */
 
 static void
-walk_captures (operand *op, vec<vec<capture *> > cpts)
+walk_captures (operand *op, vec<vec<capture *> > &cpts)
 {
   if (! op)
     return;

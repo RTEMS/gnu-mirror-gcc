@@ -117,8 +117,7 @@ package body Exp_Attr is
    procedure Compile_Stream_Body_In_Scope
      (N     : Node_Id;
       Decl  : Node_Id;
-      Arr   : Entity_Id;
-      Check : Boolean);
+      Arr   : Entity_Id);
    --  The body for a stream subprogram may be generated outside of the scope
    --  of the type. If the type is fully private, it may depend on the full
    --  view of other types (e.g. indexes) that are currently private as well.
@@ -248,7 +247,7 @@ package body Exp_Attr is
    is
       Loc      : constant Source_Ptr := Sloc (Attr);
       Comp_Typ : constant Entity_Id :=
-        Get_Fullest_View (Component_Type (Array_Typ));
+        Validated_View (Component_Type (Array_Typ));
 
       function Validate_Component
         (Obj_Id  : Entity_Id;
@@ -535,7 +534,7 @@ package body Exp_Attr is
       is
          Field_Id  : constant Entity_Id := Defining_Entity (Field);
          Field_Nam : constant Name_Id   := Chars (Field_Id);
-         Field_Typ : constant Entity_Id := Get_Fullest_View (Etype (Field_Id));
+         Field_Typ : constant Entity_Id := Validated_View (Etype (Field_Id));
          Attr_Nam  : Name_Id;
 
       begin
@@ -867,8 +866,7 @@ package body Exp_Attr is
    procedure Compile_Stream_Body_In_Scope
      (N     : Node_Id;
       Decl  : Node_Id;
-      Arr   : Entity_Id;
-      Check : Boolean)
+      Arr   : Entity_Id)
    is
       C_Type  : constant Entity_Id := Base_Type (Component_Type (Arr));
       Curr    : constant Entity_Id := Current_Scope;
@@ -922,11 +920,7 @@ package body Exp_Attr is
          Install := False;
       end if;
 
-      if Check then
-         Insert_Action (N, Decl);
-      else
-         Insert_Action (N, Decl, Suppress => All_Checks);
-      end if;
+      Insert_Action (N, Decl);
 
       if Install then
 
@@ -1851,14 +1845,13 @@ package body Exp_Attr is
       ----------------------
 
       function Get_Integer_Type (Typ : Entity_Id) return Entity_Id is
-         Siz     : constant Uint := Esize (Base_Type (Typ));
+         Siz : constant Uint := Esize (Base_Type (Typ));
 
       begin
          --  We need to accommodate invalid values of the base type since we
-         --  accept them for Enum_Rep and Pos, so we reason on the Esize. And
-         --  we use an unsigned type since the enumeration type is unsigned.
+         --  accept them for Enum_Rep and Pos, so we reason on the Esize.
 
-         return Small_Integer_Type_For (Siz, Uns => True);
+         return Small_Integer_Type_For (Siz, Uns => Is_Unsigned_Type (Typ));
       end Get_Integer_Type;
 
       ---------------------------------
@@ -2367,6 +2360,7 @@ package body Exp_Attr is
                          = E_Anonymous_Access_Type
               and then Present (Extra_Accessibility
                                 (Entity (Prefix (Enc_Object))))
+              and then not No_Dynamic_Accessibility_Checks_Enabled (Enc_Object)
             then
                Apply_Accessibility_Check (Prefix (Enc_Object), Typ, N);
 
@@ -2805,10 +2799,9 @@ package body Exp_Attr is
                 Name                   =>
                   New_Occurrence_Of (RTE (RE_Callable), Loc),
                 Parameter_Associations => New_List (
-                  Make_Unchecked_Type_Conversion (Loc,
-                    Subtype_Mark =>
-                      New_Occurrence_Of (RTE (RO_ST_Task_Id), Loc),
-                    Expression   => Build_Disp_Get_Task_Id_Call (Pref)))));
+                  Unchecked_Convert_To
+                    (RTE (RO_ST_Task_Id),
+                     Build_Disp_Get_Task_Id_Call (Pref)))));
 
          else
             Rewrite (N, Build_Call_With_Task (Pref, RTE (RE_Callable)));
@@ -4128,7 +4121,7 @@ package body Exp_Attr is
 
             elsif Is_Array_Type (U_Type) then
                Build_Array_Input_Function (Loc, U_Type, Decl, Fname);
-               Compile_Stream_Body_In_Scope (N, Decl, U_Type, Check => False);
+               Compile_Stream_Body_In_Scope (N, Decl, U_Type);
 
             --  Dispatching case with class-wide type
 
@@ -5238,7 +5231,7 @@ package body Exp_Attr is
 
             elsif Is_Array_Type (U_Type) then
                Build_Array_Output_Procedure (Loc, U_Type, Decl, Pname);
-               Compile_Stream_Body_In_Scope (N, Decl, U_Type, Check => False);
+               Compile_Stream_Body_In_Scope (N, Decl, U_Type);
 
             --  Class-wide case, first output external tag, then dispatch
             --  to the appropriate primitive Output function (RM 13.13.2(31)).
@@ -6090,7 +6083,7 @@ package body Exp_Attr is
 
             elsif Is_Array_Type (U_Type) then
                Build_Array_Read_Procedure (N, U_Type, Decl, Pname);
-               Compile_Stream_Body_In_Scope (N, Decl, U_Type, Check => False);
+               Compile_Stream_Body_In_Scope (N, Decl, U_Type);
 
             --  Tagged type case, use the primitive Read function. Note that
             --  this will dispatch in the class-wide case which is what we want
@@ -6129,11 +6122,7 @@ package body Exp_Attr is
                     (Loc, Full_Base (U_Type), Decl, Pname);
                end if;
 
-               --  Suppress checks, uninitialized or otherwise invalid
-               --  data does not cause constraint errors to be raised for
-               --  a complete record read.
-
-               Insert_Action (N, Decl, All_Checks);
+               Insert_Action (N, Decl);
             end if;
          end if;
 
@@ -6756,10 +6745,9 @@ package body Exp_Attr is
                 Name                   =>
                   New_Occurrence_Of (RTE (RE_Terminated), Loc),
                 Parameter_Associations => New_List (
-                  Make_Unchecked_Type_Conversion (Loc,
-                    Subtype_Mark =>
-                      New_Occurrence_Of (RTE (RO_ST_Task_Id), Loc),
-                    Expression   => Build_Disp_Get_Task_Id_Call (Pref)))));
+                  Unchecked_Convert_To
+                    (RTE (RO_ST_Task_Id),
+                     Build_Disp_Get_Task_Id_Call (Pref)))));
 
          elsif Restricted_Profile then
             Rewrite (N,
@@ -7092,9 +7080,9 @@ package body Exp_Attr is
             --  Start of processing for Float_Valid
 
             begin
-               --  The C and AAMP back-ends handle Valid for fpt types
+               --  The C back end handles Valid for floating-point types
 
-               if Modify_Tree_For_C or else Float_Rep (PBtyp) = AAMP then
+               if Modify_Tree_For_C then
                   Analyze_And_Resolve (Pref, Ptyp);
                   Set_Etype (N, Standard_Boolean);
                   Set_Analyzed (N);
@@ -7384,12 +7372,19 @@ package body Exp_Attr is
          Validity_Checks_On := Save_Validity_Checks_On;
       end Valid;
 
+      -----------------
+      -- Valid_Value --
+      -----------------
+
+      when Attribute_Valid_Value =>
+         Exp_Imgv.Expand_Valid_Value_Attribute (N);
+
       -------------------
       -- Valid_Scalars --
       -------------------
 
       when Attribute_Valid_Scalars => Valid_Scalars : declare
-         Val_Typ : constant Entity_Id := Get_Fullest_View (Ptyp);
+         Val_Typ : constant Entity_Id := Validated_View (Ptyp);
          Expr    : Node_Id;
 
       begin
@@ -7567,14 +7562,9 @@ package body Exp_Attr is
       --    typ'Value
       --      (Wide_Wide_String_To_String (X, Wide_Character_Encoding_Method))
 
-      --  Wide_Wide_String_To_String is a runtime function that converts its
-      --  wide string argument to String, converting any non-translatable
-      --  characters into appropriate escape sequences. This preserves the
-      --  required semantics of Wide_Wide_Value in all cases, and results in a
-      --  very simple implementation approach.
-
-      --  It's not quite right where typ = Wide_Wide_Character, because the
-      --  encoding method may not cover the whole character type ???
+      --  See Wide_Value for more information. This is not quite right where
+      --  typ = Wide_Wide_Character, because the encoding method may not cover
+      --  the whole character type.
 
       when Attribute_Wide_Wide_Value =>
          Rewrite (N,
@@ -7716,7 +7706,7 @@ package body Exp_Attr is
 
             elsif Is_Array_Type (U_Type) then
                Build_Array_Write_Procedure (N, U_Type, Decl, Pname);
-               Compile_Stream_Body_In_Scope (N, Decl, U_Type, Check => False);
+               Compile_Stream_Body_In_Scope (N, Decl, U_Type);
 
             --  Tagged type case, use the primitive Write function. Note that
             --  this will dispatch in the class-wide case which is what we want

@@ -57,7 +57,7 @@ static bool vax_rtx_costs (rtx, machine_mode, int, int, int *, bool);
 static machine_mode vax_cc_modes_compatible (machine_mode, machine_mode);
 static rtx_insn *vax_md_asm_adjust (vec<rtx> &, vec<rtx> &,
 				    vec<machine_mode> &, vec<const char *> &,
-				    vec<rtx> &, HARD_REG_SET &);
+				    vec<rtx> &, HARD_REG_SET &, location_t);
 static rtx vax_function_arg (cumulative_args_t, const function_arg_info &);
 static void vax_function_arg_advance (cumulative_args_t,
 				      const function_arg_info &);
@@ -1181,7 +1181,8 @@ vax_md_asm_adjust (vec<rtx> &outputs ATTRIBUTE_UNUSED,
 		   vec<rtx> &inputs ATTRIBUTE_UNUSED,
 		   vec<machine_mode> &input_modes ATTRIBUTE_UNUSED,
 		   vec<const char *> &constraints ATTRIBUTE_UNUSED,
-		   vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs)
+		   vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs,
+		   location_t /*loc*/)
 {
   clobbers.safe_push (gen_rtx_REG (CCmode, VAX_PSL_REGNUM));
   SET_HARD_REG_BIT (clobbered_regs, VAX_PSL_REGNUM);
@@ -1325,10 +1326,10 @@ vax_output_int_move (rtx insn ATTRIBUTE_UNUSED, rtx *operands,
 	     be shorter (1 opcode byte + 1 addrmode byte + 8 immediate value
 	     bytes .vs. 2 opcode bytes + 2 addrmode bytes + 8 immediate value
 	     value bytes.  */
-	  if ((!strncmp (pattern_lo, "movl", 4)
-	      && !strncmp (pattern_hi, "movl", 4))
-	      || (!strncmp (pattern_lo, "pushl", 5)
-		  && !strncmp (pattern_hi, "pushl", 5)))
+	  if ((startswith (pattern_lo, "movl")
+	      && startswith (pattern_hi, "movl"))
+	      || (startswith (pattern_lo, "pushl")
+		  && startswith (pattern_hi, "pushl")))
 	    return "movq %1,%0";
 
 	  if (MEM_P (operands[0])

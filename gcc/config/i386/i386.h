@@ -73,6 +73,15 @@ struct stringop_algs
 {
   const enum stringop_alg unknown_size;
   const struct stringop_strategy {
+    /* Several older compilers delete the default constructor because of the
+       const entries (see PR100246).  Manually specifying a CTOR works around
+       this issue.  Since this header is used by code compiled with the C
+       compiler we must guard the addition.  */
+#ifdef __cplusplus
+    stringop_strategy(int _max = -1, enum stringop_alg _alg = libcall,
+		      int _noalign = false)
+      : max (_max), alg (_alg), noalign (_noalign) {}
+#endif
     const int max;
     const enum stringop_alg alg;
     int noalign;
@@ -156,6 +165,7 @@ struct processor_costs {
   const int xmm_move, ymm_move, /* cost of moving XMM and YMM register.  */
 	    zmm_move;
   const int sse_to_integer;	/* cost of moving SSE register to integer.  */
+  const int integer_to_sse;	/* cost of moving integer to SSE register.  */
   const int gather_static, gather_per_elt; /* Cost of gather load is computed
 				   as static + per_item * nelts. */
   const int scatter_static, scatter_per_elt; /* Cost of gather store is
@@ -567,10 +577,11 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #ifndef HAVE_LOCAL_CPU_DETECT
 #define CC1_CPU_SPEC CC1_CPU_SPEC_1
 #else
+#define ARCH_ARG "%{" OPT_ARCH64 ":64;:32}"
 #define CC1_CPU_SPEC CC1_CPU_SPEC_1 \
-"%{march=native:%>march=native %:local_cpu_detect(arch) \
-  %{!mtune=*:%>mtune=native %:local_cpu_detect(tune)}} \
-%{mtune=native:%>mtune=native %:local_cpu_detect(tune)}"
+"%{march=native:%>march=native %:local_cpu_detect(arch " ARCH_ARG ") \
+  %{!mtune=*:%>mtune=native %:local_cpu_detect(tune " ARCH_ARG ")}} \
+%{mtune=native:%>mtune=native %:local_cpu_detect(tune " ARCH_ARG ")}"
 #endif
 #endif
 
@@ -1007,12 +1018,13 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 
 #define VALID_SSE2_REG_MODE(MODE)					\
   ((MODE) == V16QImode || (MODE) == V8HImode || (MODE) == V2DFmode	\
+   || (MODE) == V4QImode || (MODE) == V2HImode || (MODE) == V1SImode	\
    || (MODE) == V2DImode || (MODE) == DFmode)
 
 #define VALID_SSE_REG_MODE(MODE)					\
   ((MODE) == V1TImode || (MODE) == TImode				\
    || (MODE) == V4SFmode || (MODE) == V4SImode				\
-   || (MODE) == SFmode || (MODE) == TFmode)
+   || (MODE) == SFmode || (MODE) == TFmode || (MODE) == TDmode)
 
 #define VALID_MMX_REG_MODE_3DNOW(MODE) \
   ((MODE) == V2SFmode || (MODE) == SFmode)
@@ -1026,20 +1038,22 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 
 #define VALID_MASK_AVX512BW_MODE(MODE) ((MODE) == SImode || (MODE) == DImode)
 
-#define VALID_DFP_MODE_P(MODE) \
-  ((MODE) == SDmode || (MODE) == DDmode || (MODE) == TDmode)
-
 #define VALID_FP_MODE_P(MODE)						\
   ((MODE) == SFmode || (MODE) == DFmode || (MODE) == XFmode		\
    || (MODE) == SCmode || (MODE) == DCmode || (MODE) == XCmode)		\
 
 #define VALID_INT_MODE_P(MODE)						\
-  ((MODE) == QImode || (MODE) == HImode || (MODE) == SImode		\
-   || (MODE) == DImode							\
-   || (MODE) == CQImode || (MODE) == CHImode || (MODE) == CSImode	\
-   || (MODE) == CDImode							\
-   || (TARGET_64BIT && ((MODE) == TImode || (MODE) == CTImode		\
-			|| (MODE) == TFmode || (MODE) == TCmode)))
+  ((MODE) == QImode || (MODE) == HImode					\
+   || (MODE) == SImode || (MODE) == DImode				\
+   || (MODE) == CQImode || (MODE) == CHImode				\
+   || (MODE) == CSImode || (MODE) == CDImode				\
+   || (MODE) == SDmode || (MODE) == DDmode				\
+   || (MODE) == V4QImode || (MODE) == V2HImode || (MODE) == V1SImode	\
+   || (TARGET_64BIT							\
+       && ((MODE) == TImode || (MODE) == CTImode			\
+	   || (MODE) == TFmode || (MODE) == TCmode			\
+	   || (MODE) == V8QImode || (MODE) == V4HImode			\
+	   || (MODE) == V2SImode || (MODE) == TDmode)))
 
 /* Return true for modes passed in SSE registers.  */
 #define SSE_REG_MODE_P(MODE)						\
@@ -1457,13 +1471,8 @@ enum reg_class
    || TARGET_64BIT_MS_ABI \
    || (TARGET_MACHO && crtl->profile))
 
-/* If defined, a C expression whose value is nonzero when we want to use PUSH
-   instructions to pass outgoing arguments.  */
-
-#define PUSH_ARGS (TARGET_PUSH_ARGS && !ACCUMULATE_OUTGOING_ARGS)
-
 /* We want the stack and args grow in opposite directions, even if
-   PUSH_ARGS is 0.  */
+   targetm.calls.push_argument returns false.  */
 #define PUSH_ARGS_REVERSED 1
 
 /* Offset of first parameter from the argument pointer register value.  */
@@ -1748,24 +1757,45 @@ typedef struct ix86_args {
 /* Define this as 1 if `char' should by default be signed; else as 0.  */
 #define DEFAULT_SIGNED_CHAR 1
 
-/* Max number of bytes we can move from memory to memory
-   in one reasonably fast instruction.  */
-#define MOVE_MAX 16
+/* The constant maximum number of bytes that a single instruction can
+   move quickly between memory and registers or between two memory
+   locations.  */
+#define MAX_MOVE_MAX 64
 
-/* MOVE_MAX_PIECES is the number of bytes at a time which we can
-   move efficiently, as opposed to  MOVE_MAX which is the maximum
-   number of bytes we can move with a single instruction.
+/* Max number of bytes we can move from memory to memory in one
+   reasonably fast instruction, as opposed to MOVE_MAX_PIECES which
+   is the number of bytes at a time which we can move efficiently.
+   MOVE_MAX_PIECES defaults to MOVE_MAX.  */
 
-   ??? We should use TImode in 32-bit mode and use OImode or XImode
-   if they are available.  But since by_pieces_ninsns determines the
-   widest mode with MAX_FIXED_MODE_SIZE, we can only use TImode in
-   64-bit mode.  */
-#define MOVE_MAX_PIECES \
-  ((TARGET_64BIT \
-    && TARGET_SSE2 \
-    && TARGET_SSE_UNALIGNED_LOAD_OPTIMAL \
-    && TARGET_SSE_UNALIGNED_STORE_OPTIMAL) \
-   ? GET_MODE_SIZE (TImode) : UNITS_PER_WORD)
+#define MOVE_MAX \
+  ((TARGET_AVX512F && !TARGET_PREFER_AVX256) \
+   ? 64 \
+   : ((TARGET_AVX \
+       && !TARGET_PREFER_AVX128 \
+       && !TARGET_AVX256_SPLIT_UNALIGNED_LOAD \
+       && !TARGET_AVX256_SPLIT_UNALIGNED_STORE) \
+      ? 32 \
+      : ((TARGET_SSE2 \
+	  && TARGET_SSE_UNALIGNED_LOAD_OPTIMAL \
+	  && TARGET_SSE_UNALIGNED_STORE_OPTIMAL) \
+	 ? 16 : UNITS_PER_WORD)))
+
+/* STORE_MAX_PIECES is the number of bytes at a time that we can store
+   efficiently.  Allow 16/32/64 bytes only if inter-unit move is enabled
+   since vec_duplicate enabled by inter-unit move is used to implement
+   store_by_pieces of 16/32/64 bytes.  */
+#define STORE_MAX_PIECES \
+  (TARGET_INTER_UNIT_MOVES_TO_VEC \
+   ? ((TARGET_AVX512F && !TARGET_PREFER_AVX256) \
+      ? 64 \
+      : ((TARGET_AVX \
+	  && !TARGET_PREFER_AVX128 \
+	  && !TARGET_AVX256_SPLIT_UNALIGNED_STORE) \
+	  ? 32 \
+	  : ((TARGET_SSE2 \
+	      && TARGET_SSE_UNALIGNED_STORE_OPTIMAL) \
+	      ? 16 : UNITS_PER_WORD))) \
+   : UNITS_PER_WORD)
 
 /* If a memory-to-memory move would take MOVE_RATIO or more simple
    move-instruction pairs, we will do a cpymem or libcall instead.
@@ -2654,13 +2684,12 @@ struct GTY(()) machine_function {
   /* True if the function needs a stack frame.  */
   BOOL_BITFIELD stack_frame_required : 1;
 
-  /* True if __builtin_ia32_vzeroupper () has been expanded in current
-     function.  */
-  BOOL_BITFIELD has_explicit_vzeroupper : 1;
-
   /* True if we should act silently, rather than raise an error for
      invalid calls.  */
   BOOL_BITFIELD silent_p : 1;
+
+  /* True if red zone is used.  */
+  BOOL_BITFIELD red_zone_used : 1;
 
   /* The largest alignment, in bytes, of stack slot actually used.  */
   unsigned int max_used_stack_alignment;
@@ -2692,7 +2721,7 @@ extern GTY(()) tree ms_va_list_type_node;
 #define ix86_current_function_calls_tls_descriptor \
   (ix86_tls_descriptor_calls_expanded_in_cfun && df_regs_ever_live_p (SP_REG))
 #define ix86_static_chain_on_stack (cfun->machine->static_chain_on_stack)
-#define ix86_red_zone_size (cfun->machine->frame.red_zone_size)
+#define ix86_red_zone_used (cfun->machine->red_zone_used)
 
 /* Control behavior of x86_file_start.  */
 #define X86_FILE_START_VERSION_DIRECTIVE false

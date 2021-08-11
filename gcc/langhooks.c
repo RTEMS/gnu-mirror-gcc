@@ -485,7 +485,7 @@ lhd_make_node (enum tree_code code)
    might be reusable elsewhere.  */
 tree
 lhd_simulate_enum_decl (location_t loc, const char *name,
-			vec<string_int_pair> values)
+			vec<string_int_pair> *values_ptr)
 {
   tree enumtype = lang_hooks.types.make_type (ENUMERAL_TYPE);
   tree enumdecl = build_decl (loc, TYPE_DECL, get_identifier (name), enumtype);
@@ -493,6 +493,7 @@ lhd_simulate_enum_decl (location_t loc, const char *name,
 
   tree value_chain = NULL_TREE;
   string_int_pair *value;
+  vec<string_int_pair> values = *values_ptr;
   unsigned int i;
   FOR_EACH_VEC_ELT (values, i, value)
     {
@@ -615,10 +616,11 @@ lhd_omp_finish_clause (tree, gimple_seq *, bool)
 }
 
 /* Return true if DECL is a scalar variable (for the purpose of
-   implicit firstprivatization).  */
+   implicit firstprivatization & mapping). Only if alloc_ptr_ok
+   are allocatables and pointers accepted. */
 
 bool
-lhd_omp_scalar_p (tree decl)
+lhd_omp_scalar_p (tree decl, bool ptr_ok)
 {
   tree type = TREE_TYPE (decl);
   if (TREE_CODE (type) == REFERENCE_TYPE)
@@ -627,7 +629,7 @@ lhd_omp_scalar_p (tree decl)
     type = TREE_TYPE (type);
   if (INTEGRAL_TYPE_P (type)
       || SCALAR_FLOAT_TYPE_P (type)
-      || TREE_CODE (type) == POINTER_TYPE)
+      || (ptr_ok && TREE_CODE (type) == POINTER_TYPE))
     return true;
   return false;
 }
