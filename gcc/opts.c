@@ -501,6 +501,7 @@ static const struct default_options default_options_table[] =
 #ifdef INSN_SCHEDULING
     { OPT_LEVELS_2_PLUS, OPT_fschedule_insns2, NULL, 1 },
 #endif
+    { OPT_LEVELS_2_PLUS, OPT_fstrict_aliasing, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_fstore_merging, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_fthread_jumps, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_ftree_pre, NULL, 1 },
