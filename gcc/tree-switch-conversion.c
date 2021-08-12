@@ -2158,7 +2158,12 @@ switch_decision_tree::emit_cmp_and_jump_insns (basic_block bb, tree op0,
   edge false_edge = split_block (bb, cond);
   false_edge->flags = EDGE_FALSE_VALUE;
   false_edge->probability = prob.invert ();
+  if (EDGE_COUNT (false_edge->dest->preds) <= 1)
+    false_edge->dest->count
+      = false_edge->dest->count.apply_probability (prob.invert ());
 
+  if (EDGE_COUNT (label_bb->preds) <= 1)
+    label_bb->count = label_bb->count.apply_probability (prob);
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
   true_edge->probability = prob;
 
@@ -2188,7 +2193,12 @@ switch_decision_tree::do_jump_if_equal (basic_block bb, tree op0, tree op1,
   edge false_edge = split_block (bb, cond);
   false_edge->flags = EDGE_FALSE_VALUE;
   false_edge->probability = prob.invert ();
+  if (EDGE_COUNT (false_edge->dest->preds) <= 1)
+    false_edge->dest->count
+      = false_edge->dest->count.apply_probability (prob.invert ());
 
+  if (EDGE_COUNT (label_bb->preds) <= 1)
+    label_bb->count = label_bb->count.apply_probability (prob);
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
   true_edge->probability = prob;
 
@@ -2223,7 +2233,7 @@ switch_decision_tree::emit_case_nodes (basic_block bb, tree index,
 			     node->m_c->m_case_bb, p, loc);
       /* Since this case is taken at this point, reduce its weight from
 	 subtree_weight.  */
-      node->m_c->m_subtree_prob -= p;
+      node->m_c->m_subtree_prob -= node->m_c->m_prob;
 
       if (node->m_left != NULL && node->m_right != NULL)
 	{
@@ -2320,7 +2330,7 @@ switch_decision_tree::emit_case_nodes (basic_block bb, tree index,
 		   / (node->m_c->m_subtree_prob + default_prob));
 	      bb = emit_cmp_and_jump_insns (bb, index, node->m_c->get_high (),
 					    GT_EXPR, m_default_bb, p, loc);
-		  default_prob = default_prob.apply_scale (1, 2);
+	      default_prob = default_prob.apply_scale (1, 2);
 
 	      bb = emit_case_nodes (bb, index, node->m_left, default_prob,
 				    index_type, loc);
@@ -2350,14 +2360,16 @@ switch_decision_tree::emit_case_nodes (basic_block bb, tree index,
 			      single_succ_edge (bb)->dest);
 
 
-	   profile_probability right_prob = profile_probability::never ();
-	   if (node->m_right)
-	     right_prob = node->m_right->m_c->m_subtree_prob;
+	  profile_probability right_prob = profile_probability::never ();
+	  if (node->m_right)
+	    right_prob = node->m_right->m_c->m_subtree_prob;
 	  p = ((right_prob + default_prob.apply_scale (1, 2))
 	       / (node->m_c->m_subtree_prob + default_prob));
 
 	  bb = emit_cmp_and_jump_insns (bb, index, node->m_c->get_high (),
 					GT_EXPR, test_bb, p, loc);
+	  test_bb->count = bb->count;
+	  node->m_c->m_case_bb->count = bb->count;
 	  default_prob = default_prob.apply_scale (1, 2);
 
 	  /* Value belongs to this node or to the left-hand subtree.  */
