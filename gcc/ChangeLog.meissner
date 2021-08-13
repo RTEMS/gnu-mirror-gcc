@@ -1,3 +1,21 @@
+work064.patch006:
+2021-08-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eQ): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can use
+	LXVKQ, it is an easy floating point constant.
+	(lxvkq_operand): New predicate.
+	* config/rs6000/rs6000-protos.h (lxvkq_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (lxvkq_constant_p): New function.
+	(output_vec_const_move): Add support for LXVKQ.
+	(rs6000_output_move_128bit): Likewise.
+	* config/rs6000/rs6000.h (TARGET_LXVKQ): New TARGET macro.
+	* config/rs6000/rs6000.opt (-mlxvkq): New debug option.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	LXVKQ.
+	(vsx_mov<mode>_32bit): Likewise.
+
 work064.patch005:
 2021-08-12  Michael Meissner  <meissner@linux.ibm.com>
 
