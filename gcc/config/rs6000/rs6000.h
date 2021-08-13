@@ -511,6 +511,11 @@ extern int rs6000_vector_align[];
 #define TARGET_XXSPLTIW		(TARGET_XXSPLTIW_DEBUG && TARGET_PREFIXED \
 				 && TARGET_VSX)
 
+/* Whether we can generate the LXVKQ instruction to load special IEEE 128-bit
+   floating point constants.  */
+#define TARGET_LXVKQ		(TARGET_LXVKQ_DEBUG && TARGET_POWER10	\
+				 && TARGET_FLOAT128_HW)
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
