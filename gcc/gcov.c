@@ -1144,17 +1144,20 @@ output_intermediate_json_line (json::array *object,
    input: a/b/foo.cc,   output: foo.cc.gcov  */
 
 static char *
-get_gcov_intermediate_filename (const char *file_name)
+get_gcov_intermediate_filename (const char *input_file_name)
 {
   const char *gcov = ".gcov.json.gz";
   char *result;
-  const char *cptr;
+  char *cptr;
 
-  /* Find the 'basename'.  */
-  cptr = lbasename (file_name);
+  char *file_name = xstrdup (input_file_name);
+  cptr = strrchr (file_name, '.');
+  if (cptr)
+    *cptr = '\0';
 
-  result = XNEWVEC (char, strlen (cptr) + strlen (gcov) + 1);
-  sprintf (result, "%s%s", cptr, gcov);
+  result = XNEWVEC (char, strlen (file_name) + strlen (gcov) + 1);
+  sprintf (result, "%s%s", file_name, gcov);
+  free (file_name);
 
   return result;
 }
