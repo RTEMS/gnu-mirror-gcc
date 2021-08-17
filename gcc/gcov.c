@@ -1134,6 +1134,42 @@ output_intermediate_json_line (json::array *object,
   object->append (lineo);
 }
 
+/* Strip filename extension in STR.  */
+
+static string
+strip_extention (string str)
+{
+  string::size_type pos = str.rfind ('.');
+  if (pos != string::npos)
+    str = str.substr (0, pos);
+
+  return str;
+}
+
+/* Print hex representation of 16 bytes from SUM and write it to BUFFER.  */
+
+static void
+md5sum_to_hex (const char *sum, char *buffer)
+{
+  for (unsigned i = 0; i < 16; i++)
+    sprintf (buffer + (2 * i), "%02x", (unsigned char)sum[i]);
+}
+
+/* Calcualte md5sum for INPUT string and output it in hex string format
+   to MD5SUM_HEX.  */
+
+static void
+get_md5sum_for_str (const char *input, char md5sum_hex[33])
+{
+  md5_ctx ctx;
+  char md5sum[16];
+
+  md5_init_ctx (&ctx);
+  md5_process_bytes (input, strlen (input), &ctx);
+  md5_finish_ctx (&ctx, md5sum);
+  md5sum_to_hex (md5sum, md5sum_hex);
+}
+
 /* Get the name of the gcov file.  The return value must be free'd.
 
    It appends the '.gcov' extension to the *basename* of the file.
@@ -1143,20 +1179,28 @@ output_intermediate_json_line (json::array *object,
    input: foo.da,       output: foo.da.gcov
    input: a/b/foo.cc,   output: foo.cc.gcov  */
 
-static char *
-get_gcov_intermediate_filename (const char *file_name)
+static string
+get_gcov_intermediate_filename (const char *input_file_name)
 {
-  const char *gcov = ".gcov.json.gz";
-  char *result;
-  const char *cptr;
+  string base = basename (input_file_name);
+  string str = strip_extention (base);
 
-  /* Find the 'basename'.  */
-  cptr = lbasename (file_name);
+  if (flag_hash_filenames)
+    {
+      char md5sum_hex[33];
+      get_md5sum_for_str (input_file_name, md5sum_hex);
+      str += "#";
+      str += md5sum_hex;
+    }
+  else if (flag_long_names && base != input_file_name)
+    {
+      str += "#";
+      str += mangle_path (input_file_name);
+      str = strip_extention (str);
+    }
 
-  result = XNEWVEC (char, strlen (cptr) + strlen (gcov) + 1);
-  sprintf (result, "%s%s", cptr, gcov);
-
-  return result;
+  str += ".gcov.json.gz";
+  return str.c_str ();
 }
 
 /* Output the result in JSON intermediate format.
@@ -1444,7 +1488,7 @@ output_gcov_file (const char *file_name, source_info *src)
 static void
 generate_results (const char *file_name)
 {
-  char *gcov_intermediate_filename;
+  string gcov_intermediate_filename;
 
   for (vector<function_info *>::iterator it = functions.begin ();
        it != functions.end (); it++)
@@ -1547,11 +1591,13 @@ generate_results (const char *file_name)
 	  root->print (&pp);
 	  pp_formatted_text (&pp);
 
-	  gzFile output = gzopen (gcov_intermediate_filename, "w");
+	  fnotice (stdout, "Creating '%s'\n",
+		   gcov_intermediate_filename.c_str ());
+	  gzFile output = gzopen (gcov_intermediate_filename.c_str (), "w");
 	  if (output == NULL)
 	    {
 	      fnotice (stderr, "Cannot open JSON output file %s\n",
-		       gcov_intermediate_filename);
+		       gcov_intermediate_filename.c_str ());
 	      return;
 	    }
 
@@ -1559,7 +1605,7 @@ generate_results (const char *file_name)
 	      || gzclose (output))
 	    {
 	      fnotice (stderr, "Error writing JSON output file %s\n",
-		       gcov_intermediate_filename);
+		       gcov_intermediate_filename.c_str ());
 	      return;
 	    }
 	}
@@ -2546,15 +2592,6 @@ canonicalize_name (const char *name)
   return result;
 }
 
-/* Print hex representation of 16 bytes from SUM and write it to BUFFER.  */
-
-static void
-md5sum_to_hex (const char *sum, char *buffer)
-{
-  for (unsigned i = 0; i < 16; i++)
-    sprintf (buffer + (2 * i), "%02x", (unsigned char)sum[i]);
-}
-
 /* Generate an output file name. INPUT_NAME is the canonicalized main
    input file and SRC_NAME is the canonicalized file name.
    LONG_OUTPUT_NAMES and PRESERVE_PATHS affect name generation.  With
@@ -2596,14 +2633,8 @@ make_gcov_file_name (const char *input_name, const char *src_name)
      component and appending a hash of the full (mangled) pathname.  */
   if (flag_hash_filenames)
     {
-      md5_ctx ctx;
-      char md5sum[16];
       char md5sum_hex[33];
-
-      md5_init_ctx (&ctx);
-      md5_process_bytes (src_name, strlen (src_name), &ctx);
-      md5_finish_ctx (&ctx, md5sum);
-      md5sum_to_hex (md5sum, md5sum_hex);
+      get_md5sum_for_str (src_name, md5sum_hex);
       free (result);
 
       result = XNEWVEC (char, strlen (src_name) + 50);
