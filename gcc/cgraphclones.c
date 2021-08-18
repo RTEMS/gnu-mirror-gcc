@@ -572,9 +572,8 @@ cgraph_node::create_virtual_clone (const vec<cgraph_edge *> &redirect_callers,
   tree old_decl = decl;
   cgraph_node *new_node = NULL;
   tree new_decl;
-  size_t len, i;
+  size_t i;
   ipa_replace_map *map;
-  char *name;
 
   gcc_checking_assert (versionable);
   /* TODO: It would be nice if we could recognize that param_adjustments do not
@@ -599,14 +598,8 @@ cgraph_node::create_virtual_clone (const vec<cgraph_edge *> &redirect_callers,
      sometimes storing only clone decl instead of original.  */
 
   /* Generate a new name for the new version. */
-  len = IDENTIFIER_LENGTH (DECL_NAME (old_decl));
-  name = XALLOCAVEC (char, len + strlen (suffix) + 2);
-  memcpy (name, IDENTIFIER_POINTER (DECL_NAME (old_decl)), len);
-  strcpy (name + len + 1, suffix);
-  name[len] = '.';
-  DECL_NAME (new_decl) = get_identifier (name);
-  SET_DECL_ASSEMBLER_NAME (new_decl,
-			   clone_function_name (old_decl, suffix, num_suffix));
+  DECL_NAME (new_decl) = clone_function_name (old_decl, suffix, num_suffix);
+  SET_DECL_ASSEMBLER_NAME (new_decl, DECL_NAME (new_decl));
   SET_DECL_RTL (new_decl, NULL);
 
   new_node = create_clone (new_decl, count, false,
