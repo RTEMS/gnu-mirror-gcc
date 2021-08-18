@@ -640,6 +640,10 @@ mprivileged
 Target Var(rs6000_privileged) Init(0)
 Generate code that will run in privileged state.
 
+mxxspltidp
+Target Undocumented Var(TARGET_XXSPLTIDP_DEBUG) Init(-1) Save
+Generate (do not generate) XXSPLTIDP instructions.
+
 mxxspltiw
 Target Undocumented Var(TARGET_XXSPLTIW_DEBUG) Init(1) Save
 Generate (do not generate) XXSPLTIW instructions.

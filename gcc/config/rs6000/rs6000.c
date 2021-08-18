@@ -6693,6 +6693,70 @@ xxspltiw_constant_p (rtx op,
   return false;
 }
 
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTIDP instruction.
+
+   Return the constant that is being split via CONSTANT_PTR to use in the
+   XXSPLTIDP instruction.  */
+
+bool
+xxspltidp_constant_p (rtx op,
+		      machine_mode mode,
+		      HOST_WIDE_INT *constant_ptr)
+{
+  *constant_ptr = 0;
+
+  if (!TARGET_XXSPLTIDP)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  rtx element = op;
+  if (mode == V2DFmode)
+    {
+      if (const_vector_all_elements_equal_p (op, V2DFmode))
+	element = CONST_VECTOR_ELT (op, 0);
+
+      else if (GET_CODE (op) == VEC_DUPLICATE)
+	element = XEXP (op, 0);
+
+      else
+	return false;
+
+      mode = DFmode;
+    }
+
+  if (mode != SFmode && mode != DFmode)
+    return false;
+
+  if (GET_MODE (element) != mode)
+    return false;
+
+  if (!CONST_DOUBLE_P (element))
+    return false;
+
+  /* Don't return true for 0.0 since that is easy to create without
+     XXSPLTIDP.  */
+  if (element == CONST0_RTX (mode))
+    return false;
+
+  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
+  if (!exact_real_truncate (SFmode, rv))
+    return false;
+
+  long value;
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+
+  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
+  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
+    return false;
+
+  *constant_ptr = value;
+  return true;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6709,6 +6773,7 @@ output_vec_const_move (rtx *operands)
       bool dest_vmx_p = ALTIVEC_REGNO_P (REGNO (dest));
       int xxspltib_value = 256;
       HOST_WIDE_INT xxspltiw_value = 0;
+      HOST_WIDE_INT xxspltidp_value = 0;
       int num_insns = -1;
 
       if (zero_constant (vec, mode))
@@ -6742,6 +6807,12 @@ output_vec_const_move (rtx *operands)
 	{
 	  operands[2] = GEN_INT (xxspltiw_value);
 	  return "xxspltiw %x0,%2";
+	}
+
+      if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
+	{
+	  operands[2] = GEN_INT (xxspltidp_value);
+	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -26410,6 +26481,11 @@ prefixed_permute_p (rtx_insn *insn)
     case V4SFmode:
       return xxspltiw_operand (src, mode);
 
+    case DFmode:
+    case SFmode:
+    case V2DFmode:
+      return xxspltidp_operand (src, mode);
+
     default:
       break;
     }
@@ -28257,7 +28333,7 @@ rs6000_emit_xxspltidp_v2df (rtx dst, long value)
     inform (input_location,
 	    "the result for the xxspltidp instruction "
 	    "is undefined for subnormal input values");
-  emit_insn( gen_xxspltidp_v2df_inst (dst, GEN_INT (value)));
+  emit_insn (gen_xxspltidp_v2df_internal2 (dst, GEN_INT (value)));
 }
 
 /* Implement TARGET_ASM_GENERATE_PIC_ADDR_DIFF_VEC.  */
