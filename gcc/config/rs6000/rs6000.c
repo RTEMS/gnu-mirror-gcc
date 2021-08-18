@@ -6514,11 +6514,9 @@ xxspltib_constant_p (rtx op,
 
   /* See if we could generate vspltisw/vspltish directly instead of xxspltib +
      sign extend.  Special case 0/-1 to allow getting any VSX register instead
-     of an Altivec register.  Also if we can generate a XXSPLTIW instruction,
-     don't emit a XXSPLTIB and an extend instruction.  */
-  if ((mode == V4SImode || mode == V8HImode)
-      && !IN_RANGE (value, -1, 0)
-      && (EASY_VECTOR_15 (value) || TARGET_XXSPLTIW))
+     of an Altivec register.  */
+  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0)
+      && EASY_VECTOR_15 (value))
     return false;
 
   /* Return # of instructions and the constant byte for XXSPLTIB.  */
@@ -6533,164 +6531,6 @@ xxspltib_constant_p (rtx op,
 
   *constant_ptr = (int) value;
   return true;
-}
-
-/* Return true if the argument is a constant vector where all elements are the
-   same.  */
-
-static bool
-const_vector_all_elements_equal_p (rtx op, machine_mode mode)
-{
-  if (!CONST_VECTOR_P (op))
-    return false;
-
-  rtx element = CONST_VECTOR_ELT (op, 0);
-  if (!CONST_INT_P (element) && !CONST_DOUBLE_P (element))
-    return false;
-
-  for (size_t i = 1; i < GET_MODE_NUNITS (mode); i++)
-    if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-      return false;
-
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIW instruction.
-
-   Return the constant via CONSTANT_PTR to use in the XXSPLTIW instruction.
-   The assembler does not like negative numbers for XXSPLTIW, so we need to
-   return a 16-bit unsigned value.  */
-
-bool
-xxspltiw_constant_p (rtx op,
-		     machine_mode mode,
-		     HOST_WIDE_INT *constant_ptr)
-{
-  HOST_WIDE_INT value;
-
-  *constant_ptr = 0;
-
-  if (!TARGET_XXSPLTIW)
-    return false;
-
-  if (!CONST_VECTOR_P (op))
-    return true;
-
-  rtx element0 = CONST_VECTOR_ELT (op, 0);
-
-  switch (mode)
-    {
-      /* V4SImode constant vectors that have the same element are can be used
-	 with XXSPLTIW.  */
-    case V4SImode:
-      if (!const_vector_all_elements_equal_p (op, mode))
-	return false;
-
-      /* Don't return true if we can use the shorter vspltisw instruction.  */
-      value = INTVAL (element0);
-      if (EASY_VECTOR_15 (value))
-	return false;
-
-      *constant_ptr = value & 0xffffffff;
-      return true;
-
-      /* V4SFmode constant vectors that have the same element are
-	 can be used with XXSPLTIW.  */
-    case V4SFmode:
-      if (!const_vector_all_elements_equal_p (op, mode))
-	return false;
-
-      /* Don't return true for 0.0f, since that can be created with
-	 xxspltib.  */
-      if (element0 == CONST0_RTX (SFmode))
-	return false;
-
-      value = rs6000_const_f32_to_i32 (element0);
-      *constant_ptr = value & 0xffffffff;
-      return true;
-
-      /* V8Hmode constant vectors that have the same element are can be used
-	 with XXSPLTIW.  */
-    case V8HImode:
-      if (const_vector_all_elements_equal_p (op, mode))
-	{
-	  /* Don't return true if we can use the shorter vspltish instruction.  */
-	  value = INTVAL (element0);
-	  if (EASY_VECTOR_15 (value))
-	    return false;
-
-	  value &= 0xffff;
-	  *constant_ptr = (value << 16) | value;
-	  return true;
-	}
-
-      else
-	{
-	  /* Check if all even elements are the same and all odd elements are
-	     the same.  */
-	  rtx element1 = CONST_VECTOR_ELT (op, 1);
-
-	  if (!CONST_INT_P (element1))
-	    return false;
-
-	  for (size_t i = 2; i < GET_MODE_NUNITS (V8HImode); i += 2)
-	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
-		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1)))
-	      return false;
-
-	  HOST_WIDE_INT value0 = INTVAL (element0) & 0xffff;
-	  HOST_WIDE_INT value1 = INTVAL (element1) & 0xffff;
-
-	  if (!BYTES_BIG_ENDIAN)
-	    std::swap (value0, value1);
-
-	  *constant_ptr = (value0 << 16) | value1;
-	  return true;
-	}
-
-      /* V16QI constant vectors that have the first four elements identical to
-	 the next set of 4 elements, and so forth can generate XXSPLTIW.  */
-    case V16QImode:
-	{
-	  if (xxspltib_constant_nosplit (op, mode))
-	    return false;
-
-	  rtx element1 = CONST_VECTOR_ELT (op, 1);
-	  rtx element2 = CONST_VECTOR_ELT (op, 2);
-	  rtx element3 = CONST_VECTOR_ELT (op, 3);
-
-	  if (!CONST_INT_P (element0) || !CONST_INT_P (element1)
-	      || !CONST_INT_P (element2) || !CONST_INT_P (element3))
-	    return false;
-
-	  for (size_t i = 4; i < GET_MODE_NUNITS (V16QImode); i += 4)
-	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
-		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1))
-		|| !rtx_equal_p (element2, CONST_VECTOR_ELT (op, i + 2))
-		|| !rtx_equal_p (element3, CONST_VECTOR_ELT (op, i + 3)))
-	      return false;
-
-	  HOST_WIDE_INT value0 = INTVAL (element0) & 0xff;
-	  HOST_WIDE_INT value1 = INTVAL (element1) & 0xff;
-	  HOST_WIDE_INT value2 = INTVAL (element2) & 0xff;
-	  HOST_WIDE_INT value3 = INTVAL (element3) & 0xff;
-
-	  if (BYTES_BIG_ENDIAN)
-	    *constant_ptr = ((value0 << 24) | (value1 << 16) | (value2 << 8)
-			     | value3);
-	  else
-	    *constant_ptr = ((value3 << 24) | (value2 << 16) | (value1 << 8)
-			     | value0);
-
-	  return true;
-	}
-
-    default:
-      break;
-    }
-
-  return false;
 }
 
 const char *
@@ -6708,7 +6548,6 @@ output_vec_const_move (rtx *operands)
     {
       bool dest_vmx_p = ALTIVEC_REGNO_P (REGNO (dest));
       int xxspltib_value = 256;
-      HOST_WIDE_INT xxspltiw_value = 0;
       int num_insns = -1;
 
       if (zero_constant (vec, mode))
@@ -6736,12 +6575,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      if (xxspltiw_constant_p (vec, mode, &xxspltiw_value))
-	{
-	  operands[2] = GEN_INT (xxspltiw_value);
-	  return "xxspltiw %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -26384,37 +26217,6 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Whether a permute type instruction is a prefixed instruction.  This is
-   called from the prefixed attribute processing.  */
-
-bool
-prefixed_permute_p (rtx_insn *insn)
-{
-  rtx set = single_set (insn);
-  if (!set)
-    return false;
-
-  rtx dest = SET_DEST (set);
-  rtx src = SET_SRC (set);
-  machine_mode mode = GET_MODE (dest);
-
-  if (!REG_P (dest) && !SUBREG_P (dest))
-    return false;
-
-  switch (mode)
-    {
-    case V8HImode:
-    case V4SImode:
-    case V4SFmode:
-      return xxspltiw_operand (src, mode);
-
-    default:
-      break;
-    }
-
-  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
