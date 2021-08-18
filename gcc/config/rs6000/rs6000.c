@@ -9935,11 +9935,11 @@ rs6000_offsettable_memref_p (rtx op, machine_mode reg_mode, bool strict)
 */
  
 static int
-rs6000_reassociation_width (unsigned int opc_in, machine_mode mode)
+rs6000_reassociation_width (unsigned int opc_in, machine_mode mode,
+			    unsigned int num_op ATTRIBUTE_UNUSED)
 {
   tree_code opc = (tree_code)opc_in;
-  int size = GET_MODE_SIZE (mode);
-  bool isPlus=false, isMult=false, isLogical=false;
+  bool isPlus=false, isMult=false;
   switch (opc)
     {
     case PLUS_EXPR:
@@ -9948,17 +9948,18 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode)
     case MULT_EXPR:
       isMult=true;
       break;
-    case BIT_IOR_EXPR:
-    case BIT_XOR_EXPR:
-    case BIT_AND_EXPR:
-      isLogical=true;
-      break;
     default:
       break;
     }
   switch (rs6000_tune)
     {
     case PROCESSOR_POWER8:
+      /* This is used in vect_transform_grouped_load() to determine if vector
+	 instructions can be executed in parallel.  In particular it is looking
+	 to see whether it can do extract even/odd instructions in parallel so
+	 it can use vect_permute_load_chain().  */
+      if (opc == VEC_PERM_EXPR)
+	return 2;
       switch (mode)
 	{
 	case E_DDmode:
@@ -9994,6 +9995,8 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode)
 	}
       break;
     case PROCESSOR_POWER9:
+      if (opc == VEC_PERM_EXPR)
+	return 2;
       switch (mode)
 	{
 	case E_DDmode:
@@ -10032,6 +10035,8 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode)
 	}
       break;
     case PROCESSOR_POWER10:
+      if (opc == VEC_PERM_EXPR)
+	return 2;
       switch (mode)
 	{
 	case E_DDmode:

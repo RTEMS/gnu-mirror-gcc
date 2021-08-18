@@ -5291,7 +5291,7 @@ get_reassociation_width (int ops_num, enum tree_code opc,
   if (param_width > 0)
     width = param_width;
   else
-    width = targetm.sched.reassociation_width (opc, mode);
+    width = targetm.sched.reassociation_width (opc, mode, ops_num);
 
   if (width == 1)
     return width;

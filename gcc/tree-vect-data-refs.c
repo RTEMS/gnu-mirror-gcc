@@ -6463,7 +6463,7 @@ vect_transform_grouped_load (vec_info *vinfo, stmt_vec_info stmt_info,
      execute 2 or more vector instructions in parallel.  Otherwise try to
      get chain for loads group using vect_shift_permute_load_chain.  */
   mode = TYPE_MODE (STMT_VINFO_VECTYPE (stmt_info));
-  if (targetm.sched.reassociation_width (VEC_PERM_EXPR, mode) > 1
+  if (targetm.sched.reassociation_width (VEC_PERM_EXPR, mode, size) > 1
       || pow2p_hwi (size)
       || !vect_shift_permute_load_chain (vinfo, dr_chain, size, stmt_info,
 					 gsi, &result_chain))
