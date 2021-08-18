@@ -373,7 +373,6 @@
    UNSPEC_VDIVES
    UNSPEC_VDIVEU
    UNSPEC_XXEVAL
-   UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTID
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
@@ -1192,16 +1191,19 @@
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
+;;              XXSPLTIW
 ;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
+                wa,
                 ?wa,       v,         <??r>,     wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
                 wQ,        Y,         r,         r,         wE,        jwM,
+                eW,
                 ?jwM,      W,         <nW>,      v,         wZ"))]
 
   "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
@@ -1213,35 +1215,43 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
+                vecperm,
                 vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
+                *,
                 *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
+                *,
                 *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
+                *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
+                p10,
                 <VSisa>,   *,         *,         *,         *")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
+;;              XXSPLTIW
 ;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
+                wa,
                 wa,        v,         ?wa,       v,         <??r>,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
+                eW,
                 wE,        jwM,       ?jwM,      W,         <nW>,
                 v,         wZ"))]
 
@@ -1253,14 +1263,17 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
+                vecperm,
                 vecsimple, vecsimple, vecsimple, *,         *,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
+                *,
                 *,         *,         *,         20,        16,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
+                p10,
                 p9v,       *,         <VSisa>,   *,         *,
                 *,         *")])
 
@@ -6407,36 +6420,6 @@
   [(set_attr "type" "veccomplex")])
 
 
-;; XXSPLTIW built-in function support
-(define_insn "xxspltiw_v4si"
-  [(set (match_operand:V4SI 0 "register_operand" "=wa")
-	(unspec:V4SI [(match_operand:SI 1 "s32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
- "TARGET_POWER10"
- "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "yes")])
-
-(define_expand "xxspltiw_v4sf"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:SF 1 "const_double_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
- "TARGET_POWER10"
-{
-  long value = rs6000_const_f32_to_i32 (operands[1]);
-  emit_insn (gen_xxspltiw_v4sf_inst (operands[0], GEN_INT (value)));
-  DONE;
-})
-
-(define_insn "xxspltiw_v4sf_inst"
-  [(set (match_operand:V4SF 0 "register_operand" "=wa")
-	(unspec:V4SF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIW))]
- "TARGET_POWER10"
- "xxspltiw %x0,%1"
- [(set_attr "type" "vecsimple")
-  (set_attr "prefixed" "yes")])
-
 ;; XXSPLTIDP built-in function support
 (define_expand "xxspltidp_v2df"
   [(set (match_operand:V2DF 0 "register_operand" )
@@ -6589,3 +6572,105 @@
    [(set_attr "type" "vecsimple")
     (set_attr "prefixed" "yes")])
 
+;; XXSPLTIW built-in function support.  Convert to a vector constant, which
+;; will then be optimized to the XXSPLTIW instruction.
+(define_expand "xxspltiw_v4si"
+  [(use (match_operand:V4SI 0 "register_operand"))
+   (use (match_operand:SI 1 "s32bit_cint_operand"))]
+  "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1);
+  rtx vec_constant = gen_rtx_CONST_VECTOR (V4SImode, rv);
+  emit_move_insn (operands[0], vec_constant);
+})
+
+(define_expand "xxspltiw_v4sf"
+  [(use (match_operand:V4SF 0 "register_operand"))
+   (use (match_operand:SF 1 "const_double_operand"))]
+  "TARGET_POWER10"
+{
+  rtx op1 = operands[1];
+  rtvec rv = gen_rtvec (4, op1, op1, op1, op1);
+  rtx vec_constant = gen_rtx_CONST_VECTOR (V4SFmode, rv);
+  emit_move_insn (operands[0], vec_constant);
+})
+
+;; XXSPLTIW support.  Add support for the XXSPLTIW built-in functions, and to
+;; use XXSPLTIW to load up vector V8HImode, V4SImode, and V4SFmode vector
+;; constants where all elements are the the same.  We special case loading up
+;; integer -16..15 and floating point 0.0f, since we can use the shorter
+;; XXSPLTIB, VSPLTISH, and VSPLTISW instructions.
+
+(define_insn "*xxspltiw_v8hi_dup"
+  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa,wa,v,wa")
+	(vec_duplicate:V8HI
+	 (match_operand 1 "const_int_operand" "O,wM,wB,n")))]
+ "TARGET_XXSPLTIW"
+{
+  HOST_WIDE_INT sign_value = SIGN_EXTEND_16BIT (INTVAL (operands[1]));
+
+  if (sign_value == 0)
+    return "xxspltib %x0,0";
+
+  if (sign_value == -1)
+    return "xxspltib %x0,255";
+
+  int r = reg_or_subregno (operands[0]);
+  if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
+    {
+      operands[2] = GEN_INT (sign_value);
+      return "vspltish %0,%1";
+    }
+
+  HOST_WIDE_INT uns_value = sign_value & 0xffff;
+  operands[2] = GEN_INT ((uns_value << 16) | uns_value);
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,*,*,yes")])
+
+(define_insn "*xxspltiw_v4si_dup"
+  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa,v,wa")
+	(vec_duplicate:V4SI
+	 (match_operand 1 "const_int_operand" "O,wM,wB,n")))]
+ "TARGET_XXSPLTIW"
+{
+  HOST_WIDE_INT sign_value = SIGN_EXTEND_32BIT (INTVAL (operands[1]));
+
+  if (sign_value == 0)
+    return "xxspltib %x0,0";
+
+  if (sign_value == -1)
+    return "xxspltib %x0,255";
+
+  int r = reg_or_subregno (operands[0]);
+  if (ALTIVEC_REGNO_P (r) && EASY_VECTOR_15 (sign_value))
+    {
+      operands[2] = GEN_INT (sign_value);
+      return "vspltisw %0,%2";
+    }
+
+  /* The assembler doesn't like negative values.  */
+  operands[2] = GEN_INT (sign_value & 0xffffffff);
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,*,*,yes")])
+
+(define_insn "xxspltiw_v4sf_dup"
+  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa")
+	(vec_duplicate:V4SF
+	 (match_operand:SF 1 "const_double_operand" "O,F")))]
+ "TARGET_XXSPLTIW"
+{
+  if (operands[1] == CONST0_RTX (SFmode))
+    return "xxspltib %x0,0";
+
+  /* The assembler doesn't like negative values.  */
+  long value = rs6000_const_f32_to_i32 (operands[1]);
+  operands[2] = GEN_INT (value & 0xffffffff);
+  return "xxspltiw %x0,%2";
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "*,yes")])
