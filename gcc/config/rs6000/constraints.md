@@ -213,11 +213,6 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
-;; Vector constant that can be loaded with XXSPLTIW
-(define_constraint "eW"
-  "A vector constant that can be loaded with the XXSPLTIW instruction."
-  (match_operand 0 "xxspltiw_operand"))
-
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
