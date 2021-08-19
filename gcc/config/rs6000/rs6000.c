@@ -9936,7 +9936,7 @@ rs6000_offsettable_memref_p (rtx op, machine_mode reg_mode, bool strict)
  
 static int
 rs6000_reassociation_width (unsigned int opc_in, machine_mode mode,
-			    unsigned int num_op ATTRIBUTE_UNUSED)
+			    unsigned int num_op)
 {
   tree_code opc = (tree_code)opc_in;
   bool isPlus=false, isMult=false;
@@ -9944,10 +9944,19 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode,
     {
     case PLUS_EXPR:
       isPlus=true;
+      if (num_op < (unsigned int)rs6000_min_reassoc_plus)
+	return 1;
       break;
     case MULT_EXPR:
       isMult=true;
+      if (num_op < (unsigned int)rs6000_min_reassoc_mult)
+	return 1;
       break;
+    case BIT_IOR_EXPR:
+    case BIT_XOR_EXPR:
+    case BIT_AND_EXPR:
+      if (num_op < (unsigned int)rs6000_min_reassoc_plus)
+	return 1;
     default:
       break;
     }

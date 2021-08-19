@@ -320,6 +320,14 @@ mvrsave=yes
 Target RejectNegative Alias(mvrsave) Warn(%<-mvrsave=yes%> is deprecated; use %<-mvrsave%> instead)
 Deprecated option.  Use -mvrsave instead.
 
+mmin-reassoc-plus=
+Target Var(rs6000_min_reassoc_plus) Init(0) RejectNegative Joined UInteger Save
+testing .. min reassoc terms to do parallel reassociation for plus
+
+mmin-reassoc-mult=
+Target Var(rs6000_min_reassoc_mult) Init(0) RejectNegative Joined UInteger Save
+testing .. min reassoc terms to do parallel reassociation for multiply
+
 mblock-move-inline-limit=
 Target Var(rs6000_block_move_inline_limit) Init(0) RejectNegative Joined UInteger Save
 Max number of bytes to move inline.
