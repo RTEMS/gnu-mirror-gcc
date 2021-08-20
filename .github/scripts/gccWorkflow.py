@@ -50,11 +50,7 @@ class GccWorkflow(object):
     @staticmethod
     def Configure():        
         logger = GetLogger()
-        res = subprocess.run('''
-            chmod +x .github/scripts/configure-gcc.sh
-            .github/scripts/configure-gcc.sh''',
-            shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
+        res = RunScript(".github/scripts/configure-gcc.sh", False)
         logger.info("output = " + str(res.stdout, 'utf-8'))
 
     @staticmethod
@@ -78,10 +74,7 @@ class GccWorkflow(object):
         GccWorkflow.MakeObjDir()
 
         # Build
-        res = subprocess.run('''
-            chmod +x .github/scripts/build-gcc.sh
-            .github/scripts/build-gcc.sh''',
-          shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        res = RunScript(".github/scripts/build-gcc.sh", False)
         logger.info("build output = " + str(res.stdout, 'utf-8'))
 
         # TODO: Add better handling of errors to display
@@ -117,11 +110,7 @@ class GccWorkflow(object):
         # Copy over downloaded build artifact into objdir directory that was created in the configure script
         # For more details on the subprocess function and its parameters, 
         # see https://stackoverflow.com/questions/4256107/running-bash-commands-in-python
-        res = subprocess.run('''
-            chmod +x .github/scripts/test-gcc.sh
-            ''' 
-            + ".github/scripts/test-gcc.sh " + testSet,
-          shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        res = RunScript(".github/scripts/test-gcc.sh", False, testSet)
         logger.info("test output = " + str(res.stdout, 'utf-8'))
 
         # TODO: Add better handling of errors to display

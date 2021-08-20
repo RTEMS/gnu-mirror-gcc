@@ -30,7 +30,7 @@ on:
   schedule:
     - cron: "0,10,20,30,40,50 * * * *"
   workflow_dispatch:
-
+      
 jobs:
   sync:
     runs-on: ubuntu-18.04
@@ -62,6 +62,11 @@ jobs:
           submodules: recursive
           lfs: true
           token: ${{ secrets.VICTORPAT }} # The basic ${{ github.token }} doesn't include "workflows" write permission access to modify workflows in the .github directory
+
+      - name: Setup Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
 
       # Add upstream gcc as remote, setup vendor branches and checkout matrix vendor branch
       - name: Setup and checkout vendors/microsoft/${{ matrix.upstreamBranch }}

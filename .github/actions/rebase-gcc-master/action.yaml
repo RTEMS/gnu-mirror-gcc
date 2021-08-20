@@ -25,9 +25,12 @@
 runs:
   using: "composite"
   steps: 
-    - name: Add remote
+    - name: Initialize environment
       run: |
-        git remote add gcc git://gcc.gnu.org/git/gcc.git
+        python -m pip install requests
+        chmod +x .github/scripts/common.py
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        python -c 'from common import *; RunScript(".github/scripts/init.sh", True)'
       shell: bash
     - name: Fetch
       run: |

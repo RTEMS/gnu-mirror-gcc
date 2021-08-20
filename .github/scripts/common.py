@@ -68,3 +68,17 @@ def SendGetRestCmd(restCmd, restArgs, restHeader):
         retryCount = retryCount - 1
         if retryCount == 0:
             RaiseWorkflowError("Max retry count hit with " + restCmd)
+
+# Run the provided script with the provided arguments
+def RunScript(scriptPath, failOnNonZeroReturn, *args):
+    argsStr = ""
+    for a in args:
+        argsStr += " "
+        argsStr += a
+
+    res = subprocess.run('''
+        chmod +x ''' + scriptPath + '''
+        ''' + scriptPath + argsStr,
+        shell=True, check=failOnNonZeroReturn, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    return res

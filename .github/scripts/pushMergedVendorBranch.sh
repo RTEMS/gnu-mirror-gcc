@@ -1,4 +1,6 @@
-# Composite yaml to add the upstream gcc remote and checkout from their master branch
+# This script pushes the merged branch 
+# $1 is the temporary local branch to create 
+# $2 is the merge branch produced by the update-main.yaml workflow
 
 # Copyright (c) Microsoft Corporation.
 
@@ -22,29 +24,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-inputs:
-  masterRef:
-    description: 'Reference off of gcc/master to sync to'
-    required: false
-    default: 'gcc/master'
-  scriptsRef:
-    description: 'Commit reference to checkout .github scripts from'
-    required: true
-    default: ''
+BASEDIR=$(dirname $0)
 
-runs:
-  using: "composite"
-  steps: 
-    - name: Initialize environment and checkout from ${{ inputs.masterRef }}
-      run: |
-        python -m pip install requests
-        chmod +x .github/scripts/common.py
-        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
-        python -c 'from common import *; RunScript(".github/scripts/init.sh", True)'
-        git fetch gcc master        
-        python -c 'import sys; from common import *; RunScript(".github/scripts/checkout-refs.sh", True, sys.argv[1], sys.argv[2])' "${MASTER_REF}" "${SCRIPTS_REF}"
-        git log -1
-      shell: bash
-      env:
-        SCRIPTS_REF: ${{ inputs.scriptsRef }}
-        MASTER_REF: ${{ inputs.masterRef }}
+chmod +x ${BASEDIR}/init.sh
+${BASEDIR}/init.sh
+
+echo "
+---- READ THIS ---- 
+When prompted for the 'local name for upstream repository', 
+enter 'gcc'. The other fields can be the default
+---- END OF READ THIS ----
+"
+
+${BASEDIR}/../../contrib/gcc-git-customization.sh
+${BASEDIR}/../../contrib/git-fetch-vendor.sh microsoft
+git fetch
+git fetch gcc
+git fetch origin
+git fetch vendors/microsoft
+git checkout -b $1 remotes/vendors/microsoft/main
+git merge origin/$2
+git push remotes/vendors/microsoft/main

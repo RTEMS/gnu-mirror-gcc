@@ -1,4 +1,4 @@
-# Composite yaml to add the upstream gcc remote and checkout from their master branch
+# Script to run basic initialization for developers and GitHub workflows
 
 # Copyright (c) Microsoft Corporation.
 
@@ -22,29 +22,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-inputs:
-  masterRef:
-    description: 'Reference off of gcc/master to sync to'
-    required: false
-    default: 'gcc/master'
-  scriptsRef:
-    description: 'Commit reference to checkout .github scripts from'
-    required: true
-    default: ''
-
-runs:
-  using: "composite"
-  steps: 
-    - name: Initialize environment and checkout from ${{ inputs.masterRef }}
-      run: |
-        python -m pip install requests
-        chmod +x .github/scripts/common.py
-        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
-        python -c 'from common import *; RunScript(".github/scripts/init.sh", True)'
-        git fetch gcc master        
-        python -c 'import sys; from common import *; RunScript(".github/scripts/checkout-refs.sh", True, sys.argv[1], sys.argv[2])' "${MASTER_REF}" "${SCRIPTS_REF}"
-        git log -1
-      shell: bash
-      env:
-        SCRIPTS_REF: ${{ inputs.scriptsRef }}
-        MASTER_REF: ${{ inputs.masterRef }}
+# Setup upstream gcc remote
+git ls-remote --exit-code --quiet gcc > /dev/null 2>&1
+if test $? != 0; then   
+    echo "Adding gcc upstream remote"
+    git remote add gcc git://gcc.gnu.org/git/gcc.git
+else
+    # Check to make sure the gcc remote URL is the one we're expecting
+    gccUrl="$(git config remote.gcc.url)"
+    if [[ $gccUrl != "git://gcc.gnu.org/git/gcc.git" ]]; then
+        echo "ERROR: gcc upstream remote was found but it's not pointing to git://gcc.gnu.org/git/gcc.git"
+        exit -1
+    fi
+fi

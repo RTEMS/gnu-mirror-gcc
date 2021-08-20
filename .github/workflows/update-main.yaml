@@ -379,10 +379,11 @@ jobs:
           mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Print git commands to use to merge and push manually.
+      # The text below is marked with a warning header so that it's colored yellow in the logs and will stand out
+      # I couldn't find any documentation on setting text color in printf statements in a GitHub Yaml file so we're using this for now
+      - name: Run the following command to push the merge manually
         run: |
-          printf "Run the following command. It assumes that you have the microsoft/gcc repository at origin and the upstream GCC Microsoft vendor branches set up at gcc"
-          printf "git fetch gcc \ngit checkout gcc vendors/microsoft/main \ngit merge origin ${mergeBranch} \ngit push gcc vendors/microsoft/main \n"
+          printf "::warning::Run the following command to create temporary local git branch and push the changes to our vendor branch: \n"
+          printf ".github/scripts/pushMergedVendorBranch.sh <temporary branch> ${mergeBranch}"
         env:
-          masterSHA: ${{ needs.gcc-master-build.outputs.masterSHA }}
           mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}

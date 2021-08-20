@@ -35,15 +35,17 @@ inputs:
 runs:
   using: "composite"
   steps: 
-    - name: Add remote and checkout from vendor branch
+    - name: Initialize environment and checkout from vendor branch
       run: |
-          git remote add gcc git://gcc.gnu.org/git/gcc.git
-          echo -e "dummyName\ndummyEmail\ngcc\ndummyName\nme\nyes" > dummyGitCustomization.txt
-          cat "dummyGitCustomization.txt" | contrib/gcc-git-customization.sh
-          contrib/git-fetch-vendor.sh microsoft
-          git branch -a
-          chmod +x .github/scripts/checkout-refs.sh
-          .github/scripts/checkout-refs.sh ${VENDOR_REF} ${SCRIPTS_REF}
+        python -m pip install requests
+        chmod +x .github/scripts/common.py
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        python -c 'from common import *; RunScript(".github/scripts/init.sh", True)'
+        echo -e "MS Automation\ngnutools@microsoft.com\ngcc\nMSAutomation\nme\nyes" > gitCustomization.txt
+        cat "gitCustomization.txt" | contrib/gcc-git-customization.sh
+        python -c 'from common import *; RunScript("contrib/git-fetch-vendor.sh", True, "microsoft")'
+        git branch -a
+        python -c 'import sys; from common import *; RunScript(".github/scripts/checkout-refs.sh", True, sys.argv[1], sys.argv[2])' "${VENDOR_REF}" "${SCRIPTS_REF}"
       shell: bash
       env:
         SCRIPTS_REF: ${{ inputs.scriptsRef }}
