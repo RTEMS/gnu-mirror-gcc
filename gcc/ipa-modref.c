@@ -1715,6 +1715,9 @@ analyze_ssa_name_flags (tree name, vec<modref_lattice> &lattice, int depth,
 	  else if (callee && !ipa && recursive_call_p (current_function_decl,
 						  callee))
 	    lattice[index].merge (0);
+	  /* Ignore indirect calls (PR101949).  */
+	  else if (callee == NULL_TREE)
+	    lattice[index].merge (0);
 	  else
 	    {
 	      int ecf_flags = gimple_call_flags (call);
