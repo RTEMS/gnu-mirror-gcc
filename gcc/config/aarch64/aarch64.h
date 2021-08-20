@@ -1066,8 +1066,10 @@ typedef struct
    7-byte copy is a 4-byte + 2-byte + byte copy.  This proves inefficient
    for both size and speed of copy, so we will instead use the "cpymem"
    standard name to implement the copy.  This logic does not apply when
-   targeting -mstrict-align, so keep a sensible default in that case.  */
-#define MOVE_RATIO(speed) \
+   targeting -mstrict-align, so keep a sensible default in that case.
+   Disable this for ccapability-enabled architectures to avoid invalidating a
+   capability due to a move_by_pieces operation.   */
+#define MOVE_RATIO(speed) TARGET_MORELLO ? 0 : \
   (!STRICT_ALIGNMENT ? 2 : (((speed) ? 15 : AARCH64_CALL_RATIO) / 2))
 
 /* For CLEAR_RATIO, when optimizing for size, give a better estimate

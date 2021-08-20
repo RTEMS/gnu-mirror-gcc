@@ -21723,6 +21723,8 @@ aarch64_expand_cpymem (rtx *operands)
   int n, mode_bits;
   rtx dst = operands[0];
   rtx src = operands[1];
+  int align = INTVAL (operands[3]);
+
   rtx base;
   machine_mode cur_mode = BLKmode, next_mode;
   bool speed_p = !optimize_function_for_size_p (cfun);
@@ -21753,6 +21755,34 @@ aarch64_expand_cpymem (rtx *operands)
 
   /* Convert n to bits to make the rest of the code simpler.  */
   n = n * BITS_PER_UNIT;
+
+  /* For capability-enabled architectures if the block we are copying is
+     larger than GET_MODE_BITSIZE (CADImode) then it might contain
+     capabilities. If the alignment of any of the parameters is less than
+     GET_MODE_BITSIZE (CADImode) bits, do not do this operation.
+     For Morello this happens at 128 bits and for Fake-capability it is at
+     64 bits.  */
+  if (TARGET_CAPABILITY_ANY && n >= GET_MODE_BITSIZE (CADImode)
+      && (align < GET_MODE_BITSIZE (CADImode) / 8
+	  || MEM_ALIGN (dst) < GET_MODE_BITSIZE (CADImode)
+	  || MEM_ALIGN (src) < GET_MODE_BITSIZE (CADImode)))
+    return false;
+  else if (TARGET_CAPABILITY_ANY && n >= GET_MODE_BITSIZE (CADImode))
+    {
+      /* If the alignment is adequate, we still don't want to use the below
+	 generic method of finding the largest integer mode to do the copy
+	 in. Instead we simply do copies in CADImode. This is less efficient
+	 but it does not risk invalidating the capabilities. Repeat this copy
+	 for (size - size % 16) until there are fewer than
+	 GET_MODE_BITSIZE (CADImode) bits of data left. This final tail cannot
+	 contain capabilities, so allow it to fall through to the generic
+	 integer-mode handling.  */
+      while (n >= GET_MODE_BITSIZE (CADImode))
+	{
+	  aarch64_copy_one_block_and_progress_pointers (&src, &dst, CADImode);
+	  n -= GET_MODE_BITSIZE (CADImode);
+	}
+    }
 
   /* Maximum amount to copy in one go.  We allow 256-bit chunks based on the
      AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS tuning parameter and TARGET_SIMD.  */

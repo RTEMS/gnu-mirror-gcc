@@ -1718,6 +1718,15 @@ emit_block_move_hints (rtx x, rtx y, rtx size, enum block_op_methods method,
     }
   else if (might_overlap)
     *is_move_done = false;
+  else if (targetm.capability_mode().exists())
+    {
+      /* For targets that use capabilities stop here and do not attempt the
+	 below call to emit_block_move_via_loop, because it is not safe if
+	 capabilities are within the BLK data.  */
+	if (is_move_done)
+	  *is_move_done = false;
+	return retval;
+    }
   else
     emit_block_move_via_loop (x, y, size, align);
 
@@ -1915,6 +1924,11 @@ emit_block_move_via_loop (rtx x, rtx y, rtx size,
   iter_mode = GET_MODE (size);
   if (iter_mode == VOIDmode)
     iter_mode = word_mode;
+
+  gcc_assert (!CAPABILITY_MODE_P (iter_mode)
+	      && !CAPABILITY_MODE_P (x_addr_mode)
+	      && !CAPABILITY_MODE_P (y_addr_mode)
+	      && !CAPABILITY_MODE_P (GET_MODE (size)));
 
   top_label = gen_label_rtx ();
   cmp_label = gen_label_rtx ();
