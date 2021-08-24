@@ -1191,16 +1191,19 @@
 ;; instruction). But generate XXLXOR/XXLORC if it will avoid a register move.
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
+;;		XXSPLTIDP
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
 ;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
+                wa,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
                 ?wa,       v,         <??r>,     wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
+                eF,
                 wQ,        Y,         r,         r,         wE,        jwM,
                 ?jwM,      W,         <nW>,      v,         wZ"))]
 
@@ -1212,36 +1215,44 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
+                vecperm,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
+                *,
                 2,         2,         2,         2,         *,         *,
                 *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
+                *,
                 2,         2,         2,         2,         *,         *,
                 *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
+                *,
                 8,         8,         8,         8,         *,         *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
+                p10,
                 *,         *,         *,         *,         p9v,       *,
                 <VSisa>,   *,         *,         *,         *")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
+;;		XXSPLTIDP
 ;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
+                wa,
                 wa,        v,         ?wa,       v,         <??r>,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
+                eF,
                 wE,        jwM,       ?jwM,      W,         <nW>,
                 v,         wZ"))]
 
@@ -1253,14 +1264,17 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
+                vecperm,
                 vecsimple, vecsimple, vecsimple, *,         *,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
+                *,
                 *,         *,         *,         20,        16,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
+                p10,
                 p9v,       *,         <VSisa>,   *,         *,
                 *,         *")])
 
@@ -4580,6 +4594,23 @@
    mtvsrdd %x0,%1,%1"
   [(set_attr "type" "vecperm,vecmove")])
 
+(define_insn "*vsx_splat_v2df_xxspltidp"
+  [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa")
+	(vec_duplicate:V2DF
+	 (match_operand:DF 1 "xxspltidp_operand" "eF")))]
+  "TARGET_POWER10"
+{
+  HOST_WIDE_INT value;
+
+  if (!xxspltidp_constant_p (operands[1], DFmode, &value))
+    gcc_unreachable ();
+
+  operands[2] = GEN_INT (value);
+  return "xxspltidp %x0,%1";
+}
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
+
 (define_insn "vsx_splat_<mode>_mem"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_duplicate:VSX_D
@@ -6449,14 +6480,39 @@
   DONE;
 })
 
-(define_insn "xxspltidp_v2df_inst"
-  [(set (match_operand:V2DF 0 "register_operand" "=wa")
-	(unspec:V2DF [(match_operand:SI 1 "c32bit_cint_operand" "n")]
-		     UNSPEC_XXSPLTIDP))]
+(define_mode_iterator XXSPLTIDP [SF DF V2DF])
+
+(define_insn "xxspltidp_<mode>_inst"
+  [(set (match_operand:XXSPLTIDP 0 "register_operand" "=wa")
+	(unspec:XXSPLTIDP [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+			  UNSPEC_XXSPLTIDP))]
   "TARGET_POWER10"
   "xxspltidp %x0,%1"
   [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")])
+
+;; Generate the XXSPLTIDP instruction to support SFmode and DFmode scalar
+;; constants and V2DF vector constants where both elements are the same.  The
+;; constant has to be expressible as a SFmode constant that is not a SFmode
+;; denormal value.
+(define_insn_and_split "*xxspltidp_<mode>_internal"
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand" "=wa")
+	(match_operand:XXSPLTIDP 1 "xxspltidp_operand"     "eF"))]
+  "TARGET_POWER10"
+  "#"
+  "&& 1"
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand")
+	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
+{
+  HOST_WIDE_INT value = 0;
+
+  if (!xxspltidp_constant_p (operands[1], <MODE>mode, &value))
+    gcc_unreachable ();
+
+  operands[2] = GEN_INT (value);
+}
+ [(set_attr "type" "vecperm")
+  (set_attr "prefixed" "yes")])
 
 ;; XXSPLTI32DX built-in function support
 (define_expand "xxsplti32dx_v4si"
