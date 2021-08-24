@@ -10055,11 +10055,11 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode,
 	case E_TDmode:
 	  return 1;
 	case E_SFmode:
-	  return 2;
+	  return 4;
 	case E_DFmode:
 	  if (isMult)
 	    return 4;
-	  return 2;
+	  return 4;
 
 	case E_QImode:
 	case E_HImode:
@@ -10074,16 +10074,16 @@ rs6000_reassociation_width (unsigned int opc_in, machine_mode mode,
 	    return 8;
 	  if (isPlus)
 	    return 4;
-	  return 2;
+	  return 4;
 
 	case E_V8HImode:
 	case E_V4SImode:
 	  if (isMult)
 	    return 4;
-	  return 2;
+	  return 4;
 
 	case E_V2DImode:
-	  return 2;
+	  return 4;
 
 	case E_V4SFmode:
 	case E_V2DFmode:
