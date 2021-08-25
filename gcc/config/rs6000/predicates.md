@@ -650,16 +650,6 @@
   return num_insns == 1;
 })
 
-;; Return 1 if the operand is a CONST_VECTOR that can be loaded with the
-;; XXSPLTIW instruction.
-(define_predicate "xxspltiw_operand"
-  (match_code "const_vector")
-{
-  HOST_WIDE_INT xxspltiw_value = 0;
-
-  return xxspltiw_constant_p (op, mode, &xxspltiw_value);
-})
-
 ;; Return 1 if operand is a SF/DF CONST_DOUBLE or V2DF CONST_VECTOR that can be
 ;; loaded via the ISA 3.1 XXSPLTIDP instruction.
 (define_predicate "xxspltidp_operand"
@@ -689,9 +679,6 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
-	return true;
-
-      if (xxspltiw_operand (op, mode))
 	return true;
 
       if (xxspltidp_operand (op, mode))

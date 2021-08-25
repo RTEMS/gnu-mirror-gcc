@@ -1191,19 +1191,19 @@
 ;; instruction). But generate XXLXOR/XXLORC if it will avoid a register move.
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
-;;		XXSPLTIDP  LXVKQ      XXSPLTIW
+;;		XXSPLTIDP  LXVKQ
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
 ;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
-                wa,        wa,        wa,
+                wa,        wa,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
                 ?wa,       v,         <??r>,     wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
-                eF,        eQ,        eW,
+                eF,        eQ,
                 wQ,        Y,         r,         r,         wE,        jwM,
                 ?jwM,      W,         <nW>,      v,         wZ"))]
 
@@ -1215,44 +1215,44 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
-                vecperm,   vecperm,   vecperm,
+                vecperm,   vecperm,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
-                *,         *,         *,
+                *,         *,
                 2,         2,         2,         2,         *,         *,
                 *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
-                *,         *,         *,
+                *,         *,
                 2,         2,         2,         2,         *,         *,
                 *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
-                *,         *,         *,
+                *,         *,
                 8,         8,         8,         8,         *,         *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p10,       p10,       p10,
+                p10,       p10,
                 *,         *,         *,         *,         p9v,       *,
                 <VSisa>,   *,         *,         *,         *")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
-;;		XXSPLTIDP  LXVKQ      XXSPLTIW
+;;		XXSPLTIDP  LXVKQ
 ;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
-                wa,        wa,        wa,
+                wa,        wa,
                 wa,        v,         ?wa,       v,         <??r>,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
-                eF,        eQ,        eW,
+                eF,        eQ,
                 wE,        jwM,       ?jwM,      W,         <nW>,
                 v,         wZ"))]
 
@@ -1264,17 +1264,17 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
-                vecperm,   vecperm,   vecperm,
+                vecperm,   vecperm,
                 vecsimple, vecsimple, vecsimple, *,         *,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
-                *,         *,         *,
+                *,         *,
                 *,         *,         *,         20,        16,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p10,       p10,       p10,
+                p10,       p10,
                 p9v,       *,         <VSisa>,   *,         *,
                 *,         *")])
 
@@ -4665,52 +4665,6 @@
   [(set_attr "type" "vecload,vecperm,vecperm")
    (set_attr "length" "*,8,*")
    (set_attr "isa" "*,p8v,*")])
-
-;; V8HI/V4SI/V4SF splat immediate constant with XXSPLTIW.  We don't need to add
-;; V16QI since the xxspltib instruction already handles this case.
-(define_insn "*vsx_splat_v8hi_xxspltiw"
-  [(set (match_operand:V8HI 0 "vsx_register_operand" "=wa")
-	(vec_duplicate:V8HI (match_operand 1 "const_int_operand" "n")))]
-  "TARGET_PREFIXED && TARGET_VSX && TARGET_XXSPLTIW
-   && !s5bit_cint_operand (operands[1], VOIDmode)"
-{
-  HOST_WIDE_INT value = INTVAL (operands[1]) & 0xffff;
-
-  operands[2] = GEN_INT ((value << 16) | value);
-  return "xxspltiw %x0,%2";
-}
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
-
-(define_insn "*vsx_splat_v4si_xxspltiw"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa")
-	(vec_duplicate:V4SI (match_operand 1 "const_int_operand" "n")))]
-  "TARGET_PREFIXED && TARGET_VSX && TARGET_XXSPLTIW
-   && !s5bit_cint_operand (operands[1], VOIDmode)"
-{
-  /* The assembler doesn't like negative numbers.  */
-  operands[2] = GEN_INT (INTVAL (operands[1]) & 0xffffffff);
-  return "xxspltiw %x0,%2";
-}
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
-
-(define_insn "*vsx_splat_v4sf_xxspltiw"
-  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa")
-	(vec_duplicate:V4SF
-	 (match_operand 1 "const_double_operand" "j,F")))]
-  "TARGET_PREFIXED && TARGET_VSX && TARGET_XXSPLTIW"
-{
-  if (operands[1] == CONST0_RTX (V4SFmode))
-    return "xxlxor %x0,%x0,%x0";
-
-  /* The assembler doesn't like negative numbers.  */
-  long value = rs6000_const_f32_to_i32 (operands[1]);
-  operands[2] = GEN_INT (value & 0xffffffff);
-  return "xxspltiw %x0,%2";
-}
-  [(set_attr "type" "vecsimple,vecperm")
-   (set_attr "prefixed" "*,yes")])
 
 ;; V4SF/V4SI splat from a vector element
 (define_insn "vsx_xxspltw_<mode>"
