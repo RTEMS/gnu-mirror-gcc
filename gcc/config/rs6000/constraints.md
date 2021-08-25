@@ -223,6 +223,11 @@
   "A vector constant that can be loaded with the XXSPLTIW instruction."
   (match_operand 0 "xxspltiw_operand"))
 
+;; KF/TF scalar than can be loaded with LXVKQ
+(define_constraint "eQ"
+  "An IEEE 128-bit constant that can be loaded with the LXVKQ instruction."
+  (match_operand 0 "lxvkq_operand"))
+
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
