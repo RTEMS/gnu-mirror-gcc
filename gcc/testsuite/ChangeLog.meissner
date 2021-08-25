@@ -1,3 +1,9 @@
+work066.patch06:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-call.c: Fix test for IEEE 128-bit
+	long double and power10.
+
 work066.patch05:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
