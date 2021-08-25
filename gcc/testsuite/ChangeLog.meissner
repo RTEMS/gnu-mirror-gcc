@@ -1,3 +1,40 @@
+work066.patch05:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-v16qi.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
+
+work066.patch04:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-constant.c: New test.
+
+work066.patch03:
+2021-08-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
+
+work066.patch01:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/94630
+	* gcc.target/powerpc/pr70117.c: Specify that we need the long double
+	type to be IBM 128-bit.  Remove the code to use __ibm128.
+	* c-c++-common/dfp/convert-bfp-11.c: Specify that we need the long
+	double type to be IBM 128-bit.  Run the test at -O2 optimization.
+	* lib/target-supports.exp (add_options_for_long_double_ibm128): New
+	function.
+	(check_effective_target_long_double_ibm128): New function.
+	(add_options_for_long_double_ieee128): New function.
+	(check_effective_target_long_double_ieee128): New function.
+	(add_options_for_long_double_64bit): New function.
+	(check_effective_target_long_double_64bit): New function.
+
 2021-08-24   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

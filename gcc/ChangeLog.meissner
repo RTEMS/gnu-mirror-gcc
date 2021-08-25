@@ -1,3 +1,95 @@
+work066.patch05:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eW): New constraint.
+	* config/rs6000/predicates.md (xxspltiw_operand): New predicate.
+	(easy_vector_constant): If we can use XXSPLTIW, the vector
+	constant is easy.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
+	XXSPLTIW, don't generate a XXSPLTIB and an extend instruction.
+	(const_vector_all_elements_equal_p): New function.
+	(xxspltiw_constant_p): New function.
+	(output_vec_const_move): Add support for loading up vector
+	constants with XXSPLTIW.
+	(prefixed_permute_p): Recognize xxspltiw instructions as
+	prefixed.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	constants loaded with XXSPLTIW.
+	(vsx_mov<mode>_32bit): Likewise.
+	(vsx_splat_v8hi_xxspltiw): New insn.
+	(vsx_splat_v4si_xxspltiw): New insn.
+	(vsx_splat_v4sf_xxspltiw): New insn.
+
+work066.patch04:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eQ): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can use
+	LXVKQ, it is an easy floating point constant.
+	(lxvkq_operand): New predicate.
+	* config/rs6000/rs6000-protos.h (lxvkq_constant_p): New
+	declaration.
+	* config/rs6000/rs6000.c (lxvkq_constant_p): New function.
+	(output_vec_const_move): Add support for LXVKQ.
+	(rs6000_output_move_128bit): Likewise.
+	* config/rs6000/rs6000.opt (-mlxvkq): New debug option.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	LXVKQ.
+	(vsx_mov<mode>_32bit): Likewise.
+
+work066.patch03:
+2021-08-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the scalar constant with XXSPLTIDP, the floating point constant is
+	easy.
+	(xxspltidp_operand): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_p): New
+	declaration.
+	(prefixed_permute_p): Likewise.
+	* config/rs6000/rs6000.c (xxspltidp_constant_p): New function.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(prefixed_permute_p): New function.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for
+	permute prefixed instructions.
+	(movsf_hardfloat): Add XXSPLTIDP support.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New switch.
+	* config/rs6000/vsx.md (vsx_move<mode>_64bit): Add XXSPLTIDP
+	support.
+	(vsx_move<mode>_32bit): Likewise.
+	(vsx_splat_v2df_xxspltidp): New insn.
+	(XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_internal): New insn and splits.
+	(xxspltidp_<mode>_inst): Replace xxspltidp_v2df_inst with an
+	iterated form that also does SFmode, and DFmode.
+
+work066.patch02:
+2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTIDP): Rename from
+	UNSPEC_XXSPLTID.
+	(xxspltiw_v4si): Use vecperm type attribute.
+	(xxspltiw_v4si_inst): Use vecperm type attribute.
+	(xxspltiw_v4sf_inst): Likewise.
+	(xxspltidp_v2df): Use vecperm type attribute.  Use
+	UUNSPEC_XXSPLTIDP instead of UNSPEC_XXSPLTID.
+	(xxspltidp_v2df_inst): Likewise.
+	(xxsplti32dx_v4si): Use vecperm type attribute.
+	(xxsplti32dx_v4si_inst): Likewise.
+	(xxsplti32dx_v4sf_inst): Likewise.
+	(xxblend_<mode>): Likewise.
+	(xxpermx): Likewise.
+	(xxpermx_inst): Likewise.
+	(xxeval): Likewise.
+
 2021-08-24   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
