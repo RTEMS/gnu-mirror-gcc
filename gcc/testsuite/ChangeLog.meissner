@@ -1,3 +1,8 @@
+work066.patch08:
+2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-constant.c: Add -mlxvkq option.
+
 work066.patch07:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
