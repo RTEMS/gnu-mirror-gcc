@@ -1712,6 +1712,7 @@ show_omp_clauses (gfc_omp_clauses *omp_clauses)
       const char *type;
       switch (omp_clauses->proc_bind)
 	{
+	case OMP_PROC_BIND_PRIMARY: type = "PRIMARY"; break;
 	case OMP_PROC_BIND_MASTER: type = "MASTER"; break;
 	case OMP_PROC_BIND_SPREAD: type = "SPREAD"; break;
 	case OMP_PROC_BIND_CLOSE: type = "CLOSE"; break;
@@ -1804,7 +1805,15 @@ show_omp_clauses (gfc_omp_clauses *omp_clauses)
   if (omp_clauses->grainsize)
     {
       fputs (" GRAINSIZE(", dumpfile);
+      if (omp_clauses->grainsize_strict)
+	fputs ("strict: ", dumpfile);
       show_expr (omp_clauses->grainsize);
+      fputc (')', dumpfile);
+    }
+  if (omp_clauses->filter)
+    {
+      fputs (" FILTER(", dumpfile);
+      show_expr (omp_clauses->filter);
       fputc (')', dumpfile);
     }
   if (omp_clauses->hint)
@@ -1816,6 +1825,8 @@ show_omp_clauses (gfc_omp_clauses *omp_clauses)
   if (omp_clauses->num_tasks)
     {
       fputs (" NUM_TASKS(", dumpfile);
+      if (omp_clauses->num_tasks_strict)
+	fputs ("strict: ", dumpfile);
       show_expr (omp_clauses->num_tasks);
       fputc (')', dumpfile);
     }
@@ -1901,6 +1912,26 @@ show_omp_clauses (gfc_omp_clauses *omp_clauses)
       fputc (' ', dumpfile);
       fputs (memorder, dumpfile);
     }
+  if (omp_clauses->at != OMP_AT_UNSET)
+    {
+      if (omp_clauses->at != OMP_AT_COMPILATION)
+	fputs (" AT (COMPILATION)", dumpfile);
+      else
+	fputs (" AT (EXECUTION)", dumpfile);
+    }
+  if (omp_clauses->severity != OMP_SEVERITY_UNSET)
+    {
+      if (omp_clauses->severity != OMP_SEVERITY_FATAL)
+	fputs (" SEVERITY (FATAL)", dumpfile);
+      else
+	fputs (" SEVERITY (WARNING)", dumpfile);
+    }
+  if (omp_clauses->message)
+    {
+      fputs (" ERROR (", dumpfile);
+      show_expr (omp_clauses->message);
+      fputc (')', dumpfile);
+    }
 }
 
 /* Show a single OpenMP or OpenACC directive node and everything underneath it
@@ -1943,8 +1974,12 @@ show_omp_node (int level, gfc_code *c)
     case EXEC_OMP_DISTRIBUTE_SIMD: name = "DISTRIBUTE SIMD"; break;
     case EXEC_OMP_DO: name = "DO"; break;
     case EXEC_OMP_DO_SIMD: name = "DO SIMD"; break;
-    case EXEC_OMP_LOOP: name = "LOOP"; break;
+    case EXEC_OMP_ERROR: name = "ERROR"; break;
     case EXEC_OMP_FLUSH: name = "FLUSH"; break;
+    case EXEC_OMP_LOOP: name = "LOOP"; break;
+    case EXEC_OMP_MASKED: name = "MASKED"; break;
+    case EXEC_OMP_MASKED_TASKLOOP: name = "MASKED TASKLOOP"; break;
+    case EXEC_OMP_MASKED_TASKLOOP_SIMD: name = "MASKED TASKLOOP SIMD"; break;
     case EXEC_OMP_MASTER: name = "MASTER"; break;
     case EXEC_OMP_MASTER_TASKLOOP: name = "MASTER TASKLOOP"; break;
     case EXEC_OMP_MASTER_TASKLOOP_SIMD: name = "MASTER TASKLOOP SIMD"; break;
@@ -1955,6 +1990,11 @@ show_omp_node (int level, gfc_code *c)
     case EXEC_OMP_PARALLEL_DO_SIMD: name = "PARALLEL DO SIMD"; break;
     case EXEC_OMP_PARALLEL_LOOP: name = "PARALLEL LOOP"; break;
     case EXEC_OMP_PARALLEL_MASTER: name = "PARALLEL MASTER"; break;
+    case EXEC_OMP_PARALLEL_MASKED: name = "PARALLEL MASK"; break;
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP:
+      name = "PARALLEL MASK TASKLOOP"; break;
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD:
+      name = "PARALLEL MASK TASKLOOP SIMD"; break;
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP:
       name = "PARALLEL MASTER TASKLOOP"; break;
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP_SIMD:
@@ -1962,6 +2002,7 @@ show_omp_node (int level, gfc_code *c)
     case EXEC_OMP_PARALLEL_SECTIONS: name = "PARALLEL SECTIONS"; break;
     case EXEC_OMP_PARALLEL_WORKSHARE: name = "PARALLEL WORKSHARE"; break;
     case EXEC_OMP_SCAN: name = "SCAN"; break;
+    case EXEC_OMP_SCOPE: name = "SCOPE"; break;
     case EXEC_OMP_SECTIONS: name = "SECTIONS"; break;
     case EXEC_OMP_SIMD: name = "SIMD"; break;
     case EXEC_OMP_SINGLE: name = "SINGLE"; break;
@@ -2029,18 +2070,24 @@ show_omp_node (int level, gfc_code *c)
     case EXEC_OMP_DISTRIBUTE_SIMD:
     case EXEC_OMP_DO:
     case EXEC_OMP_DO_SIMD:
+    case EXEC_OMP_ERROR:
     case EXEC_OMP_LOOP:
     case EXEC_OMP_ORDERED:
+    case EXEC_OMP_MASKED:
     case EXEC_OMP_PARALLEL:
     case EXEC_OMP_PARALLEL_DO:
     case EXEC_OMP_PARALLEL_DO_SIMD:
     case EXEC_OMP_PARALLEL_LOOP:
+    case EXEC_OMP_PARALLEL_MASKED:
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP:
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD:
     case EXEC_OMP_PARALLEL_MASTER:
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP:
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP_SIMD:
     case EXEC_OMP_PARALLEL_SECTIONS:
     case EXEC_OMP_PARALLEL_WORKSHARE:
     case EXEC_OMP_SCAN:
+    case EXEC_OMP_SCOPE:
     case EXEC_OMP_SECTIONS:
     case EXEC_OMP_SIMD:
     case EXEC_OMP_SINGLE:
@@ -2114,7 +2161,7 @@ show_omp_node (int level, gfc_code *c)
       || c->op == EXEC_OACC_ENTER_DATA || c->op == EXEC_OACC_EXIT_DATA
       || c->op == EXEC_OMP_TARGET_UPDATE || c->op == EXEC_OMP_TARGET_ENTER_DATA
       || c->op == EXEC_OMP_TARGET_EXIT_DATA || c->op == EXEC_OMP_SCAN
-      || c->op == EXEC_OMP_DEPOBJ
+      || c->op == EXEC_OMP_DEPOBJ || c->op == EXEC_OMP_ERROR
       || (c->op == EXEC_OMP_ORDERED && c->block == NULL))
     return;
   if (c->op == EXEC_OMP_SECTIONS || c->op == EXEC_OMP_PARALLEL_SECTIONS)
@@ -3247,8 +3294,12 @@ show_code_node (int level, gfc_code *c)
     case EXEC_OMP_DISTRIBUTE_SIMD:
     case EXEC_OMP_DO:
     case EXEC_OMP_DO_SIMD:
+    case EXEC_OMP_ERROR:
     case EXEC_OMP_FLUSH:
     case EXEC_OMP_LOOP:
+    case EXEC_OMP_MASKED:
+    case EXEC_OMP_MASKED_TASKLOOP:
+    case EXEC_OMP_MASKED_TASKLOOP_SIMD:
     case EXEC_OMP_MASTER:
     case EXEC_OMP_MASTER_TASKLOOP:
     case EXEC_OMP_MASTER_TASKLOOP_SIMD:
@@ -3257,12 +3308,16 @@ show_code_node (int level, gfc_code *c)
     case EXEC_OMP_PARALLEL_DO:
     case EXEC_OMP_PARALLEL_DO_SIMD:
     case EXEC_OMP_PARALLEL_LOOP:
+    case EXEC_OMP_PARALLEL_MASKED:
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP:
+    case EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD:
     case EXEC_OMP_PARALLEL_MASTER:
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP:
     case EXEC_OMP_PARALLEL_MASTER_TASKLOOP_SIMD:
     case EXEC_OMP_PARALLEL_SECTIONS:
     case EXEC_OMP_PARALLEL_WORKSHARE:
     case EXEC_OMP_SCAN:
+    case EXEC_OMP_SCOPE:
     case EXEC_OMP_SECTIONS:
     case EXEC_OMP_SIMD:
     case EXEC_OMP_SINGLE:

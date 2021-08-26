@@ -22,58 +22,21 @@
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
-#include "target.h"
-#include "rtl.h"
 #include "tree.h"
-#include "memmodel.h"
 #include "gimple.h"
-#include "predict.h"
-#include "tm_p.h"
 #include "stringpool.h"
 #include "tree-vrp.h"
-#include "tree-ssanames.h"
-#include "expmed.h"
-#include "optabs.h"
-#include "emit-rtl.h"
-#include "recog.h"
 #include "diagnostic-core.h"
-#include "alias.h"
 #include "fold-const.h"
-#include "fold-const-call.h"
-#include "gimple-ssa-warn-restrict.h"
-#include "stor-layout.h"
-#include "calls.h"
-#include "varasm.h"
 #include "tree-object-size.h"
 #include "tree-ssa-strlen.h"
-#include "realmpfr.h"
-#include "cfgrtl.h"
-#include "except.h"
-#include "dojump.h"
-#include "explow.h"
-#include "stmt.h"
-#include "expr.h"
-#include "libfuncs.h"
-#include "output.h"
-#include "typeclass.h"
 #include "langhooks.h"
-#include "value-prof.h"
-#include "builtins.h"
 #include "stringpool.h"
 #include "attribs.h"
-#include "asan.h"
-#include "internal-fn.h"
-#include "case-cfn-macros.h"
 #include "gimple-fold.h"
 #include "intl.h"
-#include "tree-dfa.h"
-#include "gimple-iterator.h"
-#include "gimple-ssa.h"
-#include "tree-ssa-live.h"
-#include "tree-outof-ssa.h"
 #include "attr-fnspec.h"
 #include "gimple-range.h"
-
 #include "pointer-query.h"
 
 static bool compute_objsize_r (tree, int, access_ref *, ssa_name_limit_t &,
@@ -311,6 +274,164 @@ gimple_call_return_array (gimple *stmt, offset_int offrng[2], bool *past_end,
   return NULL_TREE;
 }
 
+/* Return true when EXP's range can be determined and set RANGE[] to it
+   after adjusting it if necessary to make EXP a represents a valid size
+   of object, or a valid size argument to an allocation function declared
+   with attribute alloc_size (whose argument may be signed), or to a string
+   manipulation function like memset.
+   When ALLOW_ZERO is set in FLAGS, allow returning a range of [0, 0] for
+   a size in an anti-range [1, N] where N > PTRDIFF_MAX.  A zero range is
+   a (nearly) invalid argument to allocation functions like malloc but it
+   is a valid argument to functions like memset.
+   When USE_LARGEST is set in FLAGS set RANGE to the largest valid subrange
+   in a multi-range, otherwise to the smallest valid subrange.  */
+
+bool
+get_size_range (range_query *query, tree exp, gimple *stmt, tree range[2],
+		int flags /* = 0 */)
+{
+  if (!exp)
+    return false;
+
+  if (tree_fits_uhwi_p (exp))
+    {
+      /* EXP is a constant.  */
+      range[0] = range[1] = exp;
+      return true;
+    }
+
+  tree exptype = TREE_TYPE (exp);
+  bool integral = INTEGRAL_TYPE_P (exptype);
+
+  wide_int min, max;
+  enum value_range_kind range_type;
+
+  if (!query)
+    query = get_global_range_query ();
+
+  if (integral)
+    {
+      value_range vr;
+
+      query->range_of_expr (vr, exp, stmt);
+
+      if (vr.undefined_p ())
+	vr.set_varying (TREE_TYPE (exp));
+      range_type = vr.kind ();
+      min = wi::to_wide (vr.min ());
+      max = wi::to_wide (vr.max ());
+    }
+  else
+    range_type = VR_VARYING;
+
+  if (range_type == VR_VARYING)
+    {
+      if (integral)
+	{	
+	  /* Use the full range of the type of the expression when
+	     no value range information is available.  */
+	  range[0] = TYPE_MIN_VALUE (exptype);
+	  range[1] = TYPE_MAX_VALUE (exptype);
+	  return true;
+	}
+
+      range[0] = NULL_TREE;
+      range[1] = NULL_TREE;
+      return false;
+    }
+
+  unsigned expprec = TYPE_PRECISION (exptype);
+
+  bool signed_p = !TYPE_UNSIGNED (exptype);
+
+  if (range_type == VR_ANTI_RANGE)
+    {
+      if (signed_p)
+	{
+	  if (wi::les_p (max, 0))
+	    {
+	      /* EXP is not in a strictly negative range.  That means
+		 it must be in some (not necessarily strictly) positive
+		 range which includes zero.  Since in signed to unsigned
+		 conversions negative values end up converted to large
+		 positive values, and otherwise they are not valid sizes,
+		 the resulting range is in both cases [0, TYPE_MAX].  */
+	      min = wi::zero (expprec);
+	      max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+	    }
+	  else if (wi::les_p (min - 1, 0))
+	    {
+	      /* EXP is not in a negative-positive range.  That means EXP
+		 is either negative, or greater than max.  Since negative
+		 sizes are invalid make the range [MAX + 1, TYPE_MAX].  */
+	      min = max + 1;
+	      max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+	    }
+	  else
+	    {
+	      max = min - 1;
+	      min = wi::zero (expprec);
+	    }
+	}
+      else
+	{
+	  wide_int maxsize = wi::to_wide (max_object_size ());
+	  min = wide_int::from (min, maxsize.get_precision (), UNSIGNED);
+	  max = wide_int::from (max, maxsize.get_precision (), UNSIGNED);
+	  if (wi::eq_p (0, min - 1))
+	    {
+	      /* EXP is unsigned and not in the range [1, MAX].  That means
+		 it's either zero or greater than MAX.  Even though 0 would
+		 normally be detected by -Walloc-zero, unless ALLOW_ZERO
+		 is set, set the range to [MAX, TYPE_MAX] so that when MAX
+		 is greater than the limit the whole range is diagnosed.  */
+	      wide_int maxsize = wi::to_wide (max_object_size ());
+	      if (flags & SR_ALLOW_ZERO)
+		{
+		  if (wi::leu_p (maxsize, max + 1)
+		      || !(flags & SR_USE_LARGEST))
+		    min = max = wi::zero (expprec);
+		  else
+		    {
+		      min = max + 1;
+		      max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+		    }
+		}
+	      else
+		{
+		  min = max + 1;
+		  max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+		}
+	    }
+	  else if ((flags & SR_USE_LARGEST)
+		   && wi::ltu_p (max + 1, maxsize))
+	    {
+	      /* When USE_LARGEST is set and the larger of the two subranges
+		 is a valid size, use it...  */
+	      min = max + 1;
+	      max = maxsize;
+	    }
+	  else
+	    {
+	      /* ...otherwise use the smaller subrange.  */
+	      max = min - 1;
+	      min = wi::zero (expprec);
+	    }
+	}
+    }
+
+  range[0] = wide_int_to_tree (exptype, min);
+  range[1] = wide_int_to_tree (exptype, max);
+
+  return true;
+}
+
+bool
+get_size_range (tree exp, tree range[2], int flags /* = 0 */)
+{
+  return get_size_range (/*query=*/NULL, exp, /*stmt=*/NULL, range, flags);
+}
+
 /* If STMT is a call to an allocation function, returns the constant
    maximum size of the object allocated by the call represented as
    sizetype.  If nonnull, sets RNG1[] to the range of the size.
@@ -513,10 +634,10 @@ access_ref::phi () const
   return as_a <gphi *> (def_stmt);
 }
 
-/* Determine and return the largest object to which *THIS.  If *THIS
-   refers to a PHI and PREF is nonnull, fill *PREF with the details
-   of the object determined by compute_objsize(ARG, OSTYPE) for each
-   PHI argument ARG.  */
+/* Determine and return the largest object to which *THIS refers.  If
+   *THIS refers to a PHI and PREF is nonnull, fill *PREF with the details
+   of the object determined by compute_objsize(ARG, OSTYPE) for each PHI
+   argument ARG.  */
 
 tree
 access_ref::get_ref (vec<access_ref> *all_refs,
@@ -538,21 +659,25 @@ access_ref::get_ref (vec<access_ref> *all_refs,
   if (!psnlim->visit_phi (ref))
     return NULL_TREE;
 
-  /* Reflects the range of offsets of all PHI arguments refer to the same
-     object (i.e., have the same REF).  */
-  access_ref same_ref;
-  /* The conservative result of the PHI reflecting the offset and size
-     of the largest PHI argument, regardless of whether or not they all
-     refer to the same object.  */
   pointer_query empty_qry;
   if (!qry)
     qry = &empty_qry;
 
+  /* The conservative result of the PHI reflecting the offset and size
+     of the largest PHI argument, regardless of whether or not they all
+     refer to the same object.  */
   access_ref phi_ref;
   if (pref)
     {
+      /* The identity of the object has not been determined yet but
+	 PREF->REF is set by the caller to the PHI for convenience.
+	 The size is negative/invalid and the offset is zero (it's
+	 updated only after the identity of the object has been
+	 established).  */
+      gcc_assert (pref->sizrng[0] < 0);
+      gcc_assert (pref->offrng[0] == 0 && pref->offrng[1] == 0);
+
       phi_ref = *pref;
-      same_ref = *pref;
     }
 
   /* Set if any argument is a function array (or VLA) parameter not
@@ -561,8 +686,6 @@ access_ref::get_ref (vec<access_ref> *all_refs,
   /* The size of the smallest object referenced by the PHI arguments.  */
   offset_int minsize = 0;
   const offset_int maxobjsize = wi::to_offset (max_object_size ());
-  /* The offset of the PHI, not reflecting those of its arguments.  */
-  const offset_int orng[2] = { phi_ref.offrng[0], phi_ref.offrng[1] };
 
   const unsigned nargs = gimple_phi_num_args (phi_stmt);
   for (unsigned i = 0; i < nargs; ++i)
@@ -574,16 +697,11 @@ access_ref::get_ref (vec<access_ref> *all_refs,
 	/* A PHI with all null pointer arguments.  */
 	return NULL_TREE;
 
-      /* Add PREF's offset to that of the argument.  */
-      phi_arg_ref.add_offset (orng[0], orng[1]);
       if (TREE_CODE (arg) == SSA_NAME)
 	qry->put_ref (arg, phi_arg_ref);
 
       if (all_refs)
 	all_refs->safe_push (phi_arg_ref);
-
-      const bool arg_known_size = (phi_arg_ref.sizrng[0] != 0
-				   || phi_arg_ref.sizrng[1] != maxobjsize);
 
       parmarray |= phi_arg_ref.parmarray;
 
@@ -591,11 +709,19 @@ access_ref::get_ref (vec<access_ref> *all_refs,
 
       if (phi_ref.sizrng[0] < 0)
 	{
+	  /* If PHI_REF doesn't contain a meaningful result yet set it
+	     to the result for the first argument.  */
 	  if (!nullp)
-	    same_ref = phi_arg_ref;
-	  phi_ref = phi_arg_ref;
+	    phi_ref = phi_arg_ref;
+
+	  /* Set if the current argument refers to one or more objects of
+	     known size (or range of sizes), as opposed to referring to
+	     one or more unknown object(s).  */
+	  const bool arg_known_size = (phi_arg_ref.sizrng[0] != 0
+				       || phi_arg_ref.sizrng[1] != maxobjsize);
 	  if (arg_known_size)
 	    minsize = phi_arg_ref.sizrng[0];
+
 	  continue;
 	}
 
@@ -619,8 +745,10 @@ access_ref::get_ref (vec<access_ref> *all_refs,
       offset_int phirem[2];
       phirem[1] = phi_ref.size_remaining (phirem);
 
-      if (phi_arg_ref.ref != same_ref.ref)
-	same_ref.ref = NULL_TREE;
+      /* Reset the PHI's BASE0 flag if any of the nonnull arguments
+	 refers to an object at an unknown offset.  */
+      if (!phi_arg_ref.base0)
+	phi_ref.base0 = false;
 
       if (phirem[1] < argrem[1]
 	  || (phirem[1] == argrem[1]
@@ -628,32 +756,13 @@ access_ref::get_ref (vec<access_ref> *all_refs,
 	/* Use the argument with the most space remaining as the result,
 	   or the larger one if the space is equal.  */
 	phi_ref = phi_arg_ref;
-
-      /* Set SAME_REF.OFFRNG to the maximum range of all arguments.  */
-      if (phi_arg_ref.offrng[0] < same_ref.offrng[0])
-	same_ref.offrng[0] = phi_arg_ref.offrng[0];
-      if (same_ref.offrng[1] < phi_arg_ref.offrng[1])
-	same_ref.offrng[1] = phi_arg_ref.offrng[1];
     }
 
-  if (!same_ref.ref && same_ref.offrng[0] != 0)
-    /* Clear BASE0 if not all the arguments refer to the same object and
-       if not all their offsets are zero-based.  This allows the final
-       PHI offset to out of bounds for some arguments but not for others
-       (or negative even of all the arguments are BASE0), which is overly
-       permissive.  */
-    phi_ref.base0 = false;
-
-  if (same_ref.ref)
-    phi_ref = same_ref;
-  else
-    {
-      /* Replace the lower bound of the largest argument with the size
-	 of the smallest argument, and set PARMARRAY if any argument
-	 was one.  */
-      phi_ref.sizrng[0] = minsize;
-      phi_ref.parmarray = parmarray;
-    }
+  /* Replace the lower bound of the largest argument with the size
+     of the smallest argument, and set PARMARRAY if any argument
+     was one.  */
+  phi_ref.sizrng[0] = minsize;
+  phi_ref.parmarray = parmarray;
 
   if (phi_ref.sizrng[0] < 0)
     {
@@ -682,6 +791,14 @@ access_ref::size_remaining (offset_int *pmin /* = NULL */) const
   offset_int minbuf;
   if (!pmin)
     pmin = &minbuf;
+
+  if (sizrng[0] < 0)
+    {
+      /* If the identity of the object hasn't been determined return
+	 the maximum size range.  */
+      *pmin = 0;
+      return wi::to_offset (max_object_size ());
+    }
 
   /* add_offset() ensures the offset range isn't inverted.  */
   gcc_checking_assert (offrng[0] <= offrng[1]);
@@ -1476,6 +1593,11 @@ compute_objsize_r (tree ptr, int ostype, access_ref *pref,
     {
       pref->ref = ptr;
 
+      /* Reset the offset in case it was set by a prior call and not
+	 cleared by the caller.  The offset is only adjusted after
+	 the identity of the object has been determined.  */
+      pref->offrng[0] = pref->offrng[1] = 0;
+
       if (!addr && POINTER_TYPE_P (TREE_TYPE (ptr)))
 	{
 	  /* Set the maximum size if the reference is to the pointer
@@ -1485,6 +1607,9 @@ compute_objsize_r (tree ptr, int ostype, access_ref *pref,
 	  pref->base0 = false;
 	  return true;
 	}
+
+      /* Valid offsets into the object are nonnegative.  */
+      pref->base0 = true;
 
       if (tree size = decl_init_size (ptr, false))
 	if (TREE_CODE (size) == INTEGER_CST)
@@ -1839,6 +1964,11 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 {
   pointer_query qry;
   qry.rvals = rvals;
+
+  /* Clear and invalidate in case *PREF is being reused.  */
+  pref->offrng[0] = pref->offrng[1] = 0;
+  pref->sizrng[0] = pref->sizrng[1] = -1;
+
   ssa_name_limit_t snlim;
   if (!compute_objsize_r (ptr, ostype, pref, snlim, &qry))
     return NULL_TREE;
@@ -1860,6 +1990,10 @@ compute_objsize (tree ptr, int ostype, access_ref *pref, pointer_query *ptr_qry)
     ptr_qry->depth = 0;
   else
     ptr_qry = &qry;
+
+  /* Clear and invalidate in case *PREF is being reused.  */
+  pref->offrng[0] = pref->offrng[1] = 0;
+  pref->sizrng[0] = pref->sizrng[1] = -1;
 
   ssa_name_limit_t snlim;
   if (!compute_objsize_r (ptr, ostype, pref, snlim, ptr_qry))

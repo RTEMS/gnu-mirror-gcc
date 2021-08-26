@@ -1,3 +1,65 @@
+2021-08-25  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR other/93067
+	* c-opts.c (c_common_input_charset_cb): New function.
+	(c_common_post_options): Call new function
+	diagnostic_initialize_input_context().
+
+2021-08-20  Tobias Burnus  <tobias@codesourcery.com>
+
+	* c-format.c (gcc_gfc_length_specs): Add 'll' and 'w'.
+	(gcc_gfc_char_table): Add T9L_LL and T9L_ULL to
+	"di" and "u", respecitively; fill with BADLEN to match
+	size of 'types'.
+	(get_init_dynamic_hwi): Split off from ...
+	(init_dynamic_diag_info): ... here. Call it.
+	(init_dynamic_gfc_info): Call it.
+
+2021-08-20  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-pragma.h (enum pragma_kind): Add PRAGMA_OMP_ERROR.
+	* c-pragma.c (omp_pragmas): Add error directive.
+	* c-omp.c (omp_directives): Uncomment error directive entry.
+
+2021-08-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-pragma.h (enum pragma_kind): Add PRAGMA_OMP_NOTHING.
+	* c-pragma.c (omp_pragmas): Add nothing directive.
+	* c-omp.c (omp_directives): Uncomment nothing directive entry.
+
+2021-08-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/101539
+	* c-common.h (enum rid): Add RID_IS_LAYOUT_COMPATIBLE.
+	* c-common.c (c_common_reswords): Add __is_layout_compatible.
+
+2021-08-17  Matt Jacobson  <mhjacobson@me.com>
+
+	* c-opts.c (c_common_post_options): Default to
+	flag_objc_sjlj_exceptions = 1 only when flag_objc_abi < 2.
+
+2021-08-17  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-pragma.h (enum pragma_kind): Add PRAGMA_OMP_SCOPE.
+	* c-pragma.c (omp_pragmas): Add scope construct.
+	* c-omp.c (omp_directives): Uncomment scope directive entry.
+
+2021-08-16  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* c-cppbuiltin.c (c_cpp_builtins): Define
+	__LIBGCC_GCOV_TYPE_SIZE if flag_building_libgcc is true.
+
+2021-08-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-pragma.h (enum pragma_kind): Add PRAGMA_OMP_MASKED.
+	(enum pragma_omp_clause): Add PRAGMA_OMP_CLAUSE_FILTER.
+	* c-pragma.c (omp_pragmas_simd): Add masked construct.
+	* c-common.h (enum c_omp_clause_split): Add C_OMP_CLAUSE_SPLIT_MASKED
+	enumerator.
+	(c_finish_omp_masked): Declare.
+	* c-omp.c (c_finish_omp_masked): New function.
+	(c_omp_split_clauses): Handle combined masked constructs.
+
 2021-07-30  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/101539

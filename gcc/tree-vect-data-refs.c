@@ -2831,12 +2831,6 @@ dr_group_sort_cmp (const void *dra_, const void *drb_)
   if (dra == drb)
     return 0;
 
-  /* DRs in different basic-blocks never belong to the same group.  */
-  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
-  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
-  if (bb_index1 != bb_index2)
-    return bb_index1 < bb_index2 ? -1 : 1;
-
   /* Different group IDs lead never belong to the same group.  */
   if (dra_pair.second != drb_pair.second)
     return dra_pair.second < drb_pair.second ? -1 : 1;
@@ -2963,7 +2957,13 @@ vect_analyze_data_ref_accesses (vec_info *vinfo,
   datarefs_copy.create (datarefs.length ());
   for (unsigned i = 0; i < datarefs.length (); i++)
     {
-      int group_id = dataref_groups ? (*dataref_groups)[i] : 0;
+      int group_id;
+      /* If the caller computed DR grouping use that, otherwise group by
+	 basic blocks.  */
+      if (dataref_groups)
+	group_id = (*dataref_groups)[i];
+      else
+	group_id = gimple_bb (DR_STMT (datarefs[i]))->index;
       datarefs_copy.quick_push (data_ref_pair (datarefs[i], group_id));
     }
   datarefs_copy.qsort (dr_group_sort_cmp);
@@ -2999,13 +2999,8 @@ vect_analyze_data_ref_accesses (vec_info *vinfo,
 	     matters we can push those to a worklist and re-iterate
 	     over them.  The we can just skip ahead to the next DR here.  */
 
-	  /* DRs in a different BBs should not be put into the same
+	  /* DRs in a different DR group should not be put into the same
 	     interleaving group.  */
-	  int bb_index1 = gimple_bb (DR_STMT (dra))->index;
-	  int bb_index2 = gimple_bb (DR_STMT (drb))->index;
-	  if (bb_index1 != bb_index2)
-	    break;
-
 	  if (dra_group_id != drb_group_id)
 	    break;
 
@@ -3735,11 +3730,17 @@ vect_gather_scatter_fn_p (vec_info *vinfo, bool read_p, bool masked_p,
     return false;
 
   /* Work out which function we need.  */
-  internal_fn ifn;
+  internal_fn ifn, alt_ifn;
   if (read_p)
-    ifn = masked_p ? IFN_MASK_GATHER_LOAD : IFN_GATHER_LOAD;
+    {
+      ifn = masked_p ? IFN_MASK_GATHER_LOAD : IFN_GATHER_LOAD;
+      alt_ifn = IFN_MASK_GATHER_LOAD;
+    }
   else
-    ifn = masked_p ? IFN_MASK_SCATTER_STORE : IFN_SCATTER_STORE;
+    {
+      ifn = masked_p ? IFN_MASK_SCATTER_STORE : IFN_SCATTER_STORE;
+      alt_ifn = IFN_MASK_SCATTER_STORE;
+    }
 
   for (;;)
     {
@@ -3752,6 +3753,16 @@ vect_gather_scatter_fn_p (vec_info *vinfo, bool read_p, bool masked_p,
 						  offset_vectype, scale))
 	{
 	  *ifn_out = ifn;
+	  *offset_vectype_out = offset_vectype;
+	  return true;
+	}
+      else if (!masked_p
+	       && internal_gather_scatter_fn_supported_p (alt_ifn, vectype,
+							  memory_type,
+							  offset_vectype,
+							  scale))
+	{
+	  *ifn_out = alt_ifn;
 	  *offset_vectype_out = offset_vectype;
 	  return true;
 	}

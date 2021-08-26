@@ -4063,8 +4063,14 @@ handle_rhs_call (gcall *stmt, vec<ce_s> *results)
       tree arg = gimple_call_arg (stmt, i);
       int flags = gimple_call_arg_flags (stmt, i);
 
-      /* If the argument is not used we can ignore it.  */
-      if (flags & EAF_UNUSED)
+      /* If the argument is not used we can ignore it.
+	 Similarly argument is invisile for us if it not clobbered, does not
+	 escape, is not read and can not be returned.  */
+      if ((flags & EAF_UNUSED)
+	  || ((flags & (EAF_NOCLOBBER | EAF_NOESCAPE | EAF_NOREAD
+			| EAF_NOT_RETURNED))
+	      == (EAF_NOCLOBBER | EAF_NOESCAPE | EAF_NOREAD
+		  | EAF_NOT_RETURNED)))
 	continue;
 
       /* As we compute ESCAPED context-insensitive we do not gain
@@ -4316,7 +4322,9 @@ handle_pure_call (gcall *stmt, vec<ce_s> *results)
       int flags = gimple_call_arg_flags (stmt, i);
 
       /* If the argument is not used we can ignore it.  */
-      if (flags & EAF_UNUSED)
+      if ((flags & EAF_UNUSED)
+	  || (flags & (EAF_NOT_RETURNED | EAF_NOREAD))
+	     == (EAF_NOT_RETURNED | EAF_NOREAD))
 	continue;
       if (!uses)
 	{
@@ -8212,10 +8220,12 @@ ipa_pta_execute (void)
   FOR_EACH_DEFINED_FUNCTION (node)
     {
       varinfo_t vi;
-      /* Nodes without a body are not interesting.  Especially do not
-         visit clones at this point for now - we get duplicate decls
-	 there for inline clones at least.  */
-      if (!node->has_gimple_body_p () || node->inlined_to)
+      /* Nodes without a body in this partition are not interesting.
+	 Especially do not visit clones at this point for now - we
+	 get duplicate decls there for inline clones at least.  */
+      if (!node->has_gimple_body_p ()
+	  || node->in_other_partition
+	  || node->inlined_to)
 	continue;
       node->get_body ();
 
@@ -8293,8 +8303,10 @@ ipa_pta_execute (void)
       struct function *func;
       basic_block bb;
 
-      /* Nodes without a body are not interesting.  */
-      if (!node->has_gimple_body_p () || node->clone_of)
+      /* Nodes without a body in this partition are not interesting.  */
+      if (!node->has_gimple_body_p ()
+	  || node->in_other_partition
+	  || node->clone_of)
 	continue;
 
       if (dump_file)
@@ -8423,8 +8435,10 @@ ipa_pta_execute (void)
       unsigned i;
       basic_block bb;
 
-      /* Nodes without a body are not interesting.  */
-      if (!node->has_gimple_body_p () || node->clone_of)
+      /* Nodes without a body in this partition are not interesting.  */
+      if (!node->has_gimple_body_p ()
+	  || node->in_other_partition
+	  || node->clone_of)
 	continue;
 
       fn = DECL_STRUCT_FUNCTION (node->decl);

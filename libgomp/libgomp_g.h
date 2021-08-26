@@ -332,6 +332,10 @@ extern bool GOMP_single_start (void);
 extern void *GOMP_single_copy_start (void);
 extern void GOMP_single_copy_end (void *);
 
+/* scope.c */
+
+extern void GOMP_scope_start (uintptr_t *);
+
 /* target.c */
 
 extern void GOMP_target (int, void (*) (void *), const void *,
@@ -361,6 +365,11 @@ extern void GOMP_teams_reg (void (*) (void *), void *, unsigned, unsigned,
 
 extern void *GOMP_alloc (size_t, size_t, uintptr_t);
 extern void GOMP_free (void *, uintptr_t);
+
+/* error.c */
+
+extern void GOMP_warning (const char *, size_t);
+extern void GOMP_error (const char *, size_t);
 
 /* oacc-async.c */
 
