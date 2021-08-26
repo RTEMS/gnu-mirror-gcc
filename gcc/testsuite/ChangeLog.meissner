@@ -1,3 +1,13 @@
+work066.patch07:
+2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
+	count.
+	* gcc.target/powerpc/vec-splat-constant-sf.c: Update insn count.
+	Add -mxxsplti32dx option.
+	* gcc.target/powerpc/vec-splat-constant-df.c: Likewise.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: Likewise.
+
 work066.patch06:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
