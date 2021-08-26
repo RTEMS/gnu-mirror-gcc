@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -msplti32dx -O2" } */
+/* { dg-options "-mdejagnu-cpu=power10 -mxxsplti32dx -O2" } */
 
 #include <math.h>
 
