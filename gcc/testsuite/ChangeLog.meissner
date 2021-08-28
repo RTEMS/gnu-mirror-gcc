@@ -1,9 +1,9 @@
-work066.patch08:
+work066.patch008:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-constant.c: Add -mlxvkq option.
 
-work066.patch07:
+work066.patch007:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
@@ -13,13 +13,13 @@ work066.patch07:
 	* gcc.target/powerpc/vec-splat-constant-df.c: Likewise.
 	* gcc.target/powerpc/vec-splat-constant-v2df.c: Likewise.
 
-work066.patch06:
+work066.patch006:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-call.c: Fix test for IEEE 128-bit
 	long double and power10.
 
-work066.patch05:
+work066.patch005:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splat-constant-v16qi.c: New test.
@@ -28,19 +28,19 @@ work066.patch05:
 	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
 	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
 
-work066.patch04:
+work066.patch004:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/float128-constant.c: New test.
 
-work066.patch03:
+work066.patch003:
 2021-08-18  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
 
-work066.patch01:
+work066.patch001:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/94630

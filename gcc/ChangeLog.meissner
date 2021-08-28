@@ -1,14 +1,19 @@
-work066.patch09:
+work066.patch010:
+2021-08-28  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.opt (-mlxvkq): Enable by default.
+
+work066.patch009:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (xxspltiw_constant_p): Fix typo.
 
-work066.patch08:
+work066.patch008:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.opt (-mlxvkq): Disable by default.
 
-work066.patch07:
+work066.patch007:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraint.md (eD): New constraint.
@@ -39,7 +44,7 @@ work066.patch07:
 	(xxsplti32dx_<mode>_first): New insn.
 	(xxsplti32dx_<mode>_second): New insn.
 
-work066.patch05:
+work066.patch005:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (eW): New constraint.
@@ -64,7 +69,7 @@ work066.patch05:
 	(vsx_splat_v4si_xxspltiw): New insn.
 	(vsx_splat_v4sf_xxspltiw): New insn.
 
-work066.patch04:
+work066.patch004:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (eQ): New constraint.
@@ -81,7 +86,7 @@ work066.patch04:
 	LXVKQ.
 	(vsx_mov<mode>_32bit): Likewise.
 
-work066.patch03:
+work066.patch003:
 2021-08-18  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (eF): New constraint.
@@ -112,7 +117,7 @@ work066.patch03:
 	(xxspltidp_<mode>_inst): Replace xxspltidp_v2df_inst with an
 	iterated form that also does SFmode, and DFmode.
 
-work066.patch02:
+work066.patch002:
 2021-08-24  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/vsx.md (UNSPEC_XXSPLTIDP): Rename from
