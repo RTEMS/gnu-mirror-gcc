@@ -1,3 +1,8 @@
+work066.patch09:
+2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): Fix typo.
+
 work066.patch08:
 2021-08-25  Michael Meissner  <meissner@linux.ibm.com>
 
