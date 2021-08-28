@@ -6577,7 +6577,7 @@ xxspltiw_constant_p (rtx op,
     return false;
 
   if (!CONST_VECTOR_P (op))
-    return true;
+    return false;
 
   rtx element0 = CONST_VECTOR_ELT (op, 0);
 
