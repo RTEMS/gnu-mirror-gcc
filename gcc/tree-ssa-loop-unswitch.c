@@ -198,30 +198,30 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
   last = last_stmt (bb);
   if (gcond *stmt = safe_dyn_cast <gcond *> (last))
     {
-  /* To keep the things simple, we do not directly remove the conditions,
-     but just replace tests with 0 != 0 resp. 1 != 0.  Prevent the infinite
-     loop where we would unswitch again on such a condition.  */
-  if (gimple_cond_true_p (stmt) || gimple_cond_false_p (stmt))
-    return NULL_TREE;
-
-  /* Condition must be invariant.  */
-  FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
-    {
-      def = SSA_NAME_DEF_STMT (use);
-      def_bb = gimple_bb (def);
-      if (def_bb
-	  && flow_bb_inside_loop_p (loop, def_bb))
+      /* To keep the things simple, we do not directly remove the conditions,
+	 but just replace tests with 0 != 0 resp. 1 != 0.  Prevent the infinite
+	 loop where we would unswitch again on such a condition.  */
+      if (gimple_cond_true_p (stmt) || gimple_cond_false_p (stmt))
 	return NULL_TREE;
-      /* Unswitching on undefined values would introduce undefined
-	 behavior that the original program might never exercise.  */
-      if (is_maybe_undefined (use, stmt, loop))
-	return NULL_TREE;
-    }
 
-  cond = build2 (gimple_cond_code (stmt), boolean_type_node,
-		 gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
+      /* Condition must be invariant.  */
+      FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
+	{
+	  def = SSA_NAME_DEF_STMT (use);
+	  def_bb = gimple_bb (def);
+	  if (def_bb
+	      && flow_bb_inside_loop_p (loop, def_bb))
+	    return NULL_TREE;
+	  /* Unswitching on undefined values would introduce undefined
+	     behavior that the original program might never exercise.  */
+	  if (is_maybe_undefined (use, stmt, loop))
+	    return NULL_TREE;
+	}
 
-  return cond;
+      cond = build2 (gimple_cond_code (stmt), boolean_type_node,
+		     gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
+
+      return cond;
     }
   else if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
     {
@@ -247,6 +247,8 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
       cond = build2 (EQ_EXPR, boolean_type_node, idx, CASE_LOW (lab));
       return cond;
     }
+  else
+    return NULL_TREE;
 }
 
 /* Simplifies COND using checks in front of the entry of the LOOP.  Just very
