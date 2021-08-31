@@ -189,7 +189,8 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
 }
 
 /* Checks whether we can unswitch LOOP on condition at end of BB -- one of its
-   basic blocks (for what it means see comments below).  */
+   basic blocks (for what it means see comments below).
+   When a gswitch case is returned, fill up COND_EDGE for it.  */
 
 static tree
 tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
@@ -333,9 +334,9 @@ tree_unswitch_single_loop (class loop *loop, int num)
       if (tree_num_loop_insns (loop, &eni_size_weights)
 	  > (unsigned) param_max_unswitch_insns)
 	{
-//	  if (dump_file && (dump_flags & TDF_DETAILS))
-//	    fprintf (dump_file, ";; Not unswitching, loop too big\n");
-//	  return false;
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, ";; Not unswitching, loop too big\n");
+	  return false;
 	}
 
       /* If the loop is not expected to iterate, there is no need
@@ -366,10 +367,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
       if (i == loop->num_nodes)
 	{
-//	  if (dump_file
-//	      && num > param_max_unswitch_level
-//	      && (dump_flags & TDF_DETAILS))
-//	    fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
+	  if (dump_file
+	      && num > param_max_unswitch_level
+	      && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
 
 	  if (found == loop->num_nodes)
 	    {
@@ -379,10 +380,6 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  break;
 	}
 
-      // likewise, using copy tables we should be able to "translate"
-      // the unswitched edge instead and adjust the code directly
-      // after the versioning rather than relying on recursion to
-      // fixup the code.
       tree orig_cond = cond;
       cond = simplify_using_entry_checks (loop, cond);
       stmt = last_stmt (bbs[i]);
@@ -405,14 +402,13 @@ tree_unswitch_single_loop (class loop *loop, int num)
 						 boolean_false_node);
 	  else
 	    {
-	      // we should know the edge already
-	      cond_edge->flags |= EDGE_IGNORE;
 	      /* Update based on the adjusted switch.  */
+	      cond_edge->flags |= EDGE_IGNORE;
 	      cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge);
 	    }
 	  changed = true;
 	}
-      // As said, it's a bit hackish to do it this way.  */
+      /* gswitch can return NULL_TREE for cases that are not supported.  */
       if (cond == NULL_TREE || TREE_CODE (cond) == INTEGER_CST)
 	;
       /* Do not unswitch too much.  */
@@ -530,8 +526,6 @@ tree_unswitch_single_loop (class loop *loop, int num)
     }
 
   /* Update the SSA form after unswitching.  */
-  // free_dominance_info (CDI_DOMINATORS);
-  // cleanup_tree_cfg (TODO_update_ssa);
   update_ssa (TODO_update_ssa);
   free_original_copy_tables ();
 
@@ -552,17 +546,14 @@ tree_unswitch_loop (class loop *loop,
 		    basic_block unswitch_on, tree cond)
 {
   profile_probability prob_true;
-  edge edge_true, edge_false;
 
   /* Some sanity checking.  */
   gcc_assert (flow_bb_inside_loop_p (loop, unswitch_on));
-  //gcc_assert (EDGE_COUNT (unswitch_on->succs) == 2);
   gcc_assert (loop->inner == NULL);
 
   // TODO: should switch on the edge rather than passing around
   // a cond tree
-  //extract_true_false_edges_from_block (unswitch_on, &edge_true, &edge_false);
-  edge_true = EDGE_SUCC (unswitch_on, 0);
+  edge edge_true = EDGE_SUCC (unswitch_on, 0);
   prob_true = edge_true->probability;
   return loop_version (loop, unshare_expr (cond),
 		       NULL, prob_true,
@@ -1040,6 +1031,8 @@ check_exit_phi (class loop *loop)
     }
   return true;
 }
+
+/* Remove all dead cases from switches that are unswitched.  */
 
 static void
 clean_up_switches (void)
