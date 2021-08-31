@@ -391,14 +391,25 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	      tree lab = gimple_switch_label (gs, 1);
 	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
 	      edge e = find_edge (gimple_bb (stmt), dest);
+	      unsigned nlabels = gimple_switch_num_labels (gs);
+	      for (unsigned i = 1; i < nlabels - 1; i++)
+		{
+		  tree next_label = gimple_switch_label (gs, i + 1);
+		  gimple_switch_set_label (gs, i, next_label);
+		  basic_block next_dest
+		    = label_to_block (cfun, CASE_LABEL (next_label));
+
+		  /* Shared edge among multiple cases.  */ 
+		  if (e != NULL && e->dest == next_dest)
+		    e = NULL;
+		}
 	      // modifying the CFG here may play havoc on things like
 	      // dominators and we really would like to prevent doing
 	      // full update_ssa for each individual unswitching as well
-	      remove_edge (e);
-	      if (gimple_switch_num_labels (gs) > 1)
-		gimple_switch_set_label (gs, 1,
-					 gimple_switch_label (gs, gimple_switch_num_labels (gs) - 1));
-	      gimple_switch_set_num_labels (gs, gimple_switch_num_labels (gs) - 1);
+	      if (e != NULL)
+		remove_edge (e);
+
+	      gimple_switch_set_num_labels (gs, nlabels  - 1);
 	      end_recording_case_labels ();
 	      /* Update based on the adjusted switch.  */
 	      cond = tree_may_unswitch_on (bbs[i], loop);
@@ -406,7 +417,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  changed = true;
 	}
       // As said, it's a bit hackish to do it this way.  */
-      if (TREE_CODE (cond) == INTEGER_CST)
+      if (cond == NULL_TREE || TREE_CODE (cond) == INTEGER_CST)
 	;
       /* Do not unswitch too much.  */
       else if (num > param_max_unswitch_level)
@@ -524,8 +535,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
   free_original_copy_tables ();
 
   /* Invoke itself on modified loops.  */
-  tree_unswitch_single_loop (nloop, num + 1);
-  tree_unswitch_single_loop (loop, num + 1);
+  if (nloop->aux != (void *)0xa5a5a5a5a5a5a5a5)
+    tree_unswitch_single_loop (nloop, num + 1);
+  if (loop->aux != (void *)0xa5a5a5a5a5a5a5a5)
+    tree_unswitch_single_loop (loop, num + 1);
   free (bbs);
   return true;
 }
