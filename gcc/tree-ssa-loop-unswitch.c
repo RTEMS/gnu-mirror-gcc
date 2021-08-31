@@ -39,6 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-loop-manip.h"
 #include "cfganal.h"
 #include "tree-cfgcleanup.h"
+#include "tree-pretty-print.h"
 
 /* This file implements the loop unswitching, i.e. transformation of loops like
 
@@ -512,7 +513,11 @@ tree_unswitch_single_loop (class loop *loop, int num)
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, ";; Unswitching loop\n");
+    {
+      fprintf (dump_file, ";; Unswitching loop with condition: ");
+      print_generic_expr (dump_file, cond);
+      fprintf (dump_file, "\n");
+    }
 
   initialize_original_copy_tables ();
   /* Unswitch the loop on this condition.  */
@@ -1040,8 +1045,6 @@ static void
 clean_up_switches (void)
 {
   basic_block bb;
-  edge_iterator ei;
-  edge e;
 
   FOR_EACH_BB_FN (bb, cfun)
     {
