@@ -86,6 +86,7 @@ static bool used_outside_loop_p (class loop *, tree);
 static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
+static void clean_up_switches (void);
 
 /* Main entry point.  Perform loop unswitching on all suitable loops.  */
 
@@ -106,22 +107,7 @@ tree_ssa_unswitch_loops (void)
 
   if (changed)
     {
-      basic_block bb;
-      edge_iterator ei;
-      edge e;
-
-      if (dump_file)
-	dump_function_to_file (cfun->decl, dump_file, dump_flags);
-
-      FOR_EACH_BB_FN (bb, cfun)
-	FOR_EACH_EDGE (e, ei, bb->succs)
-	  if (e->flags & EDGE_IGNORE)
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "%d->%d\n", e->src->index, e->dest->index);
-	    }
-
-
+      clean_up_switches ();
       return TODO_cleanup_cfg;
     }
   return 0;
@@ -1048,6 +1034,40 @@ check_exit_phi (class loop *loop)
 	return false;
     }
   return true;
+}
+
+static void
+clean_up_switches (void)
+{
+  basic_block bb;
+  edge_iterator ei;
+  edge e;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple *last = last_stmt (bb);
+      if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
+	{
+	  unsigned nlabels = gimple_switch_num_labels (stmt);
+	  unsigned index = 1;
+	  for (unsigned i = 1; i < nlabels; ++i)
+	    {
+	      tree lab = gimple_switch_label (stmt, i);
+	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+	      edge e = find_edge (gimple_bb (stmt), dest);
+	      if (e->flags & EDGE_IGNORE)
+		remove_edge (e);
+	      else
+		{
+		  gimple_switch_set_label (stmt, index, lab);
+		  ++index;
+		}
+	    }
+
+	  if (index != nlabels)
+	    gimple_switch_set_num_labels (stmt, index);
+	}
+    }
 }
 
 /* Loop unswitching pass.  */
