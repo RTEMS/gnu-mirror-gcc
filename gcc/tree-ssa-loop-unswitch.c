@@ -78,7 +78,7 @@ along with GCC; see the file COPYING3.  If not see
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
 static bool tree_unswitch_single_loop (class loop *, int);
-static tree tree_may_unswitch_on (basic_block, class loop *);
+static tree tree_may_unswitch_on (basic_block, class loop *, edge *);
 static bool tree_unswitch_outer_loop (class loop *);
 static edge find_loop_guard (class loop *);
 static bool empty_bb_without_guard_p (class loop *, basic_block);
@@ -105,7 +105,25 @@ tree_ssa_unswitch_loops (void)
     }
 
   if (changed)
-    return TODO_cleanup_cfg;
+    {
+      basic_block bb;
+      edge_iterator ei;
+      edge e;
+
+      if (dump_file)
+	dump_function_to_file (cfun->decl, dump_file, dump_flags);
+
+      FOR_EACH_BB_FN (bb, cfun)
+	FOR_EACH_EDGE (e, ei, bb->succs)
+	  if (e->flags & EDGE_IGNORE)
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "%d->%d\n", e->src->index, e->dest->index);
+	    }
+
+
+      return TODO_cleanup_cfg;
+    }
   return 0;
 }
 
@@ -187,7 +205,7 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
    basic blocks (for what it means see comments below).  */
 
 static tree
-tree_may_unswitch_on (basic_block bb, class loop *loop)
+tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
 {
   gimple *last, *def;
   tree cond, use;
@@ -225,9 +243,13 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
     }
   else if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
     {
+      // TODO: support generic switches
+      unsigned nlabels = gimple_switch_num_labels (stmt);
+
       tree idx = gimple_switch_index (stmt);
       if (TREE_CODE (idx) != SSA_NAME
-	  || gimple_switch_num_labels (stmt) < 1)
+	  || nlabels < 1
+	  || nlabels != EDGE_COUNT (gimple_bb (stmt)->succs))
 	return NULL_TREE;
       /* Index must be invariant.  */
       def = SSA_NAME_DEF_STMT (idx);
@@ -241,14 +263,24 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
 	return NULL_TREE;
       /* TODO: pick based on profile or on biggest range (TODO: implement
 	 ranges).  */
-      tree lab = gimple_switch_label (stmt, 1);
-      if (CASE_HIGH (lab))
-	return NULL_TREE;
-      cond = build2 (EQ_EXPR, boolean_type_node, idx, CASE_LOW (lab));
-      return cond;
+
+      for (unsigned i = 1; i < gimple_switch_num_labels (stmt); ++i)
+	{
+	  tree lab = gimple_switch_label (stmt, i);
+	  if (CASE_HIGH (lab))
+	    continue;
+
+	  basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+	  edge e = find_edge (gimple_bb (stmt), dest);
+	  if (!(e->flags & EDGE_IGNORE))
+	    {
+	      *cond_edge = e;
+	      return build2 (EQ_EXPR, boolean_type_node, idx, CASE_LOW (lab));
+	    }
+	}
     }
-  else
-    return NULL_TREE;
+
+  return NULL_TREE;
 }
 
 /* Simplifies COND using checks in front of the entry of the LOOP.  Just very
@@ -314,9 +346,9 @@ tree_unswitch_single_loop (class loop *loop, int num)
       if (tree_num_loop_insns (loop, &eni_size_weights)
 	  > (unsigned) param_max_unswitch_insns)
 	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, ";; Not unswitching, loop too big\n");
-	  return false;
+//	  if (dump_file && (dump_flags & TDF_DETAILS))
+//	    fprintf (dump_file, ";; Not unswitching, loop too big\n");
+//	  return false;
 	}
 
       /* If the loop is not expected to iterate, there is no need
@@ -339,17 +371,18 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
   while (1)
     {
+      edge cond_edge = NULL;
       /* Find a bb to unswitch on.  */
       for (; i < loop->num_nodes; i++)
-	if ((cond = tree_may_unswitch_on (bbs[i], loop)))
+	if ((cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge)))
 	  break;
 
       if (i == loop->num_nodes)
 	{
-	  if (dump_file
-	      && num > param_max_unswitch_level
-	      && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
+//	  if (dump_file
+//	      && num > param_max_unswitch_level
+//	      && (dump_flags & TDF_DETAILS))
+//	    fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
 
 	  if (found == loop->num_nodes)
 	    {
@@ -385,34 +418,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
 						 boolean_false_node);
 	  else
 	    {
-	      start_recording_case_labels ();
 	      // we should know the edge already
-	      gswitch *gs = as_a <gswitch *> (stmt);
-	      tree lab = gimple_switch_label (gs, 1);
-	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
-	      edge e = find_edge (gimple_bb (stmt), dest);
-	      unsigned nlabels = gimple_switch_num_labels (gs);
-	      for (unsigned i = 1; i < nlabels - 1; i++)
-		{
-		  tree next_label = gimple_switch_label (gs, i + 1);
-		  gimple_switch_set_label (gs, i, next_label);
-		  basic_block next_dest
-		    = label_to_block (cfun, CASE_LABEL (next_label));
-
-		  /* Shared edge among multiple cases.  */ 
-		  if (e != NULL && e->dest == next_dest)
-		    e = NULL;
-		}
-	      // modifying the CFG here may play havoc on things like
-	      // dominators and we really would like to prevent doing
-	      // full update_ssa for each individual unswitching as well
-	      if (e != NULL)
-		remove_edge (e);
-
-	      gimple_switch_set_num_labels (gs, nlabels  - 1);
-	      end_recording_case_labels ();
+	      cond_edge->flags |= EDGE_IGNORE;
 	      /* Update based on the adjusted switch.  */
-	      cond = tree_may_unswitch_on (bbs[i], loop);
+	      cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge);
 	    }
 	  changed = true;
 	}
@@ -503,9 +512,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
       free (worklist);
 
       /* Find a bb to unswitch on.  */
+      edge cond_edge;
       for (; found < loop->num_nodes; found++)
 	if ((bbs[found]->flags & BB_REACHABLE)
-	    && (cond = tree_may_unswitch_on (bbs[found], loop)))
+	    && (cond = tree_may_unswitch_on (bbs[found], loop, &cond_edge)))
 	  break;
 
       if (found == loop->num_nodes)
@@ -529,16 +539,14 @@ tree_unswitch_single_loop (class loop *loop, int num)
     }
 
   /* Update the SSA form after unswitching.  */
-  free_dominance_info (CDI_DOMINATORS);
-  cleanup_tree_cfg (TODO_update_ssa);
-  //update_ssa (TODO_update_ssa);
+  // free_dominance_info (CDI_DOMINATORS);
+  // cleanup_tree_cfg (TODO_update_ssa);
+  update_ssa (TODO_update_ssa);
   free_original_copy_tables ();
 
   /* Invoke itself on modified loops.  */
-  if (nloop->aux != (void *)0xa5a5a5a5a5a5a5a5)
-    tree_unswitch_single_loop (nloop, num + 1);
-  if (loop->aux != (void *)0xa5a5a5a5a5a5a5a5)
-    tree_unswitch_single_loop (loop, num + 1);
+  tree_unswitch_single_loop (nloop, num + 1);
+  tree_unswitch_single_loop (loop, num + 1);
   free (bbs);
   return true;
 }
