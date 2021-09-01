@@ -37,6 +37,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "cfghooks.h"
 #include "tree-ssa-loop-manip.h"
+#include "cfganal.h"
+#include "tree-cfgcleanup.h"
+#include "tree-pretty-print.h"
 
 /* This file implements the loop unswitching, i.e. transformation of loops like
 
@@ -76,7 +79,7 @@ along with GCC; see the file COPYING3.  If not see
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
 static bool tree_unswitch_single_loop (class loop *, int);
-static tree tree_may_unswitch_on (basic_block, class loop *);
+static tree tree_may_unswitch_on (basic_block, class loop *, edge *);
 static bool tree_unswitch_outer_loop (class loop *);
 static edge find_loop_guard (class loop *);
 static bool empty_bb_without_guard_p (class loop *, basic_block);
@@ -84,6 +87,7 @@ static bool used_outside_loop_p (class loop *, tree);
 static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
+static void clean_up_switches (void);
 
 /* Main entry point.  Perform loop unswitching on all suitable loops.  */
 
@@ -103,7 +107,10 @@ tree_ssa_unswitch_loops (void)
     }
 
   if (changed)
-    return TODO_cleanup_cfg;
+    {
+      clean_up_switches ();
+      return TODO_cleanup_cfg;
+    }
   return 0;
 }
 
@@ -182,47 +189,86 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
 }
 
 /* Checks whether we can unswitch LOOP on condition at end of BB -- one of its
-   basic blocks (for what it means see comments below).  */
+   basic blocks (for what it means see comments below).
+   When a gswitch case is returned, fill up COND_EDGE for it.  */
 
 static tree
-tree_may_unswitch_on (basic_block bb, class loop *loop)
+tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
 {
   gimple *last, *def;
-  gcond *stmt;
   tree cond, use;
   basic_block def_bb;
   ssa_op_iter iter;
 
   /* BB must end in a simple conditional jump.  */
   last = last_stmt (bb);
-  if (!last || gimple_code (last) != GIMPLE_COND)
-    return NULL_TREE;
-  stmt = as_a <gcond *> (last);
-
-  /* To keep the things simple, we do not directly remove the conditions,
-     but just replace tests with 0 != 0 resp. 1 != 0.  Prevent the infinite
-     loop where we would unswitch again on such a condition.  */
-  if (gimple_cond_true_p (stmt) || gimple_cond_false_p (stmt))
-    return NULL_TREE;
-
-  /* Condition must be invariant.  */
-  FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
+  if (gcond *stmt = safe_dyn_cast <gcond *> (last))
     {
-      def = SSA_NAME_DEF_STMT (use);
+      /* To keep the things simple, we do not directly remove the conditions,
+	 but just replace tests with 0 != 0 resp. 1 != 0.  Prevent the infinite
+	 loop where we would unswitch again on such a condition.  */
+      if (gimple_cond_true_p (stmt) || gimple_cond_false_p (stmt))
+	return NULL_TREE;
+
+      /* Condition must be invariant.  */
+      FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
+	{
+	  def = SSA_NAME_DEF_STMT (use);
+	  def_bb = gimple_bb (def);
+	  if (def_bb
+	      && flow_bb_inside_loop_p (loop, def_bb))
+	    return NULL_TREE;
+	  /* Unswitching on undefined values would introduce undefined
+	     behavior that the original program might never exercise.  */
+	  if (is_maybe_undefined (use, stmt, loop))
+	    return NULL_TREE;
+	}
+
+      cond = build2 (gimple_cond_code (stmt), boolean_type_node,
+		     gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
+
+      return cond;
+    }
+  else if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
+    {
+      // TODO: support generic switches
+      unsigned nlabels = gimple_switch_num_labels (stmt);
+
+      tree idx = gimple_switch_index (stmt);
+      if (TREE_CODE (idx) != SSA_NAME
+	  || nlabels < 1
+	  || nlabels != EDGE_COUNT (gimple_bb (stmt)->succs))
+	return NULL_TREE;
+      /* Index must be invariant.  */
+      def = SSA_NAME_DEF_STMT (idx);
       def_bb = gimple_bb (def);
       if (def_bb
 	  && flow_bb_inside_loop_p (loop, def_bb))
 	return NULL_TREE;
       /* Unswitching on undefined values would introduce undefined
 	 behavior that the original program might never exercise.  */
-      if (is_maybe_undefined (use, stmt, loop))
+      if (is_maybe_undefined (idx, stmt, loop))
 	return NULL_TREE;
+      /* TODO: pick based on profile or on biggest range (TODO: implement
+	 ranges).  */
+
+      for (unsigned i = 1; i < gimple_switch_num_labels (stmt); ++i)
+	{
+	  tree lab = gimple_switch_label (stmt, i);
+	  if (CASE_HIGH (lab))
+	    continue;
+
+	  basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+	  edge e = find_edge (gimple_bb (stmt), dest);
+	  if (!(e->flags & EDGE_IGNORE))
+	    {
+	      *cond_edge = e;
+	      return build2 (EQ_EXPR, boolean_type_node, idx, CASE_LOW (lab));
+	    }
+	}
     }
 
-  cond = build2 (gimple_cond_code (stmt), boolean_type_node,
-		 gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
-
-  return cond;
+  return NULL_TREE;
 }
 
 /* Simplifies COND using checks in front of the entry of the LOOP.  Just very
@@ -313,9 +359,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
   while (1)
     {
+      edge cond_edge = NULL;
       /* Find a bb to unswitch on.  */
       for (; i < loop->num_nodes; i++)
-	if ((cond = tree_may_unswitch_on (bbs[i], loop)))
+	if ((cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge)))
 	  break;
 
       if (i == loop->num_nodes)
@@ -333,22 +380,37 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  break;
 	}
 
+      tree orig_cond = cond;
       cond = simplify_using_entry_checks (loop, cond);
       stmt = last_stmt (bbs[i]);
       if (integer_nonzerop (cond))
 	{
 	  /* Remove false path.  */
-	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
-					       boolean_true_node);
+	  if (is_a <gcond  *> (stmt))
+	    gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
+						 boolean_true_node);
+	  else
+	    gimple_switch_set_index (as_a <gswitch *> (stmt),
+				     TREE_OPERAND (orig_cond, 1));
 	  changed = true;
 	}
       else if (integer_zerop (cond))
 	{
 	  /* Remove true path.  */
-	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
-					       boolean_false_node);
+	  if (is_a <gcond  *> (stmt))
+	    gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
+						 boolean_false_node);
+	  else
+	    {
+	      /* Update based on the adjusted switch.  */
+	      cond_edge->flags |= EDGE_IGNORE;
+	      cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge);
+	    }
 	  changed = true;
 	}
+      /* gswitch can return NULL_TREE for cases that are not supported.  */
+      if (cond == NULL_TREE || TREE_CODE (cond) == INTEGER_CST)
+	;
       /* Do not unswitch too much.  */
       else if (num > param_max_unswitch_level)
 	{
@@ -433,9 +495,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
       free (worklist);
 
       /* Find a bb to unswitch on.  */
+      edge cond_edge;
       for (; found < loop->num_nodes; found++)
 	if ((bbs[found]->flags & BB_REACHABLE)
-	    && (cond = tree_may_unswitch_on (bbs[found], loop)))
+	    && (cond = tree_may_unswitch_on (bbs[found], loop, &cond_edge)))
 	  break;
 
       if (found == loop->num_nodes)
@@ -446,7 +509,11 @@ tree_unswitch_single_loop (class loop *loop, int num)
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, ";; Unswitching loop\n");
+    {
+      fprintf (dump_file, ";; Unswitching loop with condition: ");
+      print_generic_expr (dump_file, cond);
+      fprintf (dump_file, "\n");
+    }
 
   initialize_original_copy_tables ();
   /* Unswitch the loop on this condition.  */
@@ -479,14 +546,14 @@ tree_unswitch_loop (class loop *loop,
 		    basic_block unswitch_on, tree cond)
 {
   profile_probability prob_true;
-  edge edge_true, edge_false;
 
   /* Some sanity checking.  */
   gcc_assert (flow_bb_inside_loop_p (loop, unswitch_on));
-  gcc_assert (EDGE_COUNT (unswitch_on->succs) == 2);
   gcc_assert (loop->inner == NULL);
 
-  extract_true_false_edges_from_block (unswitch_on, &edge_true, &edge_false);
+  // TODO: should switch on the edge rather than passing around
+  // a cond tree
+  edge edge_true = EDGE_SUCC (unswitch_on, 0);
   prob_true = edge_true->probability;
   return loop_version (loop, unshare_expr (cond),
 		       NULL, prob_true,
@@ -963,6 +1030,40 @@ check_exit_phi (class loop *loop)
 	return false;
     }
   return true;
+}
+
+/* Remove all dead cases from switches that are unswitched.  */
+
+static void
+clean_up_switches (void)
+{
+  basic_block bb;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple *last = last_stmt (bb);
+      if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
+	{
+	  unsigned nlabels = gimple_switch_num_labels (stmt);
+	  unsigned index = 1;
+	  for (unsigned i = 1; i < nlabels; ++i)
+	    {
+	      tree lab = gimple_switch_label (stmt, i);
+	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+	      edge e = find_edge (gimple_bb (stmt), dest);
+	      if (e->flags & EDGE_IGNORE)
+		remove_edge (e);
+	      else
+		{
+		  gimple_switch_set_label (stmt, index, lab);
+		  ++index;
+		}
+	    }
+
+	  if (index != nlabels)
+	    gimple_switch_set_num_labels (stmt, index);
+	}
+    }
 }
 
 /* Loop unswitching pass.  */
