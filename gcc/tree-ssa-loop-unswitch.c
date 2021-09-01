@@ -77,9 +77,9 @@ along with GCC; see the file COPYING3.  If not see
    tree-ssa-loop-im.c ensures that all the suitable conditions are in this
    shape.  */
 
-static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
+static class loop *tree_unswitch_loop (class loop *, basic_block, tree, edge);
 static bool tree_unswitch_single_loop (class loop *, int);
-static tree tree_may_unswitch_on (basic_block, class loop *, edge *);
+static tree tree_may_unswitch_on (basic_block, class loop *, edge *, tree *);
 static bool tree_unswitch_outer_loop (class loop *);
 static edge find_loop_guard (class loop *);
 static bool empty_bb_without_guard_p (class loop *, basic_block);
@@ -193,10 +193,11 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
    When a gswitch case is returned, fill up COND_EDGE for it.  */
 
 static tree
-tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
+tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge,
+		      tree *case_expr)
 {
   gimple *last, *def;
-  tree cond, use;
+  tree use;
   basic_block def_bb;
   ssa_op_iter iter;
 
@@ -224,20 +225,18 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
 	    return NULL_TREE;
 	}
 
-      cond = build2 (gimple_cond_code (stmt), boolean_type_node,
+      edge e1 = EDGE_SUCC (bb, 0);
+      edge e2 = EDGE_SUCC (bb, 1);
+      *cond_edge = e1->flags & EDGE_TRUE_VALUE ? e1 : e2;
+      return build2 (gimple_cond_code (stmt), boolean_type_node,
 		     gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
-
-      return cond;
     }
   else if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
     {
-      // TODO: support generic switches
       unsigned nlabels = gimple_switch_num_labels (stmt);
-
       tree idx = gimple_switch_index (stmt);
       if (TREE_CODE (idx) != SSA_NAME
-	  || nlabels < 1
-	  || nlabels != EDGE_COUNT (gimple_bb (stmt)->succs))
+	  || nlabels < 1)
 	return NULL_TREE;
       /* Index must be invariant.  */
       def = SSA_NAME_DEF_STMT (idx);
@@ -249,59 +248,59 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, edge *cond_edge)
 	 behavior that the original program might never exercise.  */
       if (is_maybe_undefined (idx, stmt, loop))
 	return NULL_TREE;
-      /* TODO: pick based on profile or on biggest range (TODO: implement
-	 ranges).  */
 
-      for (unsigned i = 1; i < gimple_switch_num_labels (stmt); ++i)
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, gimple_bb (stmt)->succs)
 	{
-	  tree lab = gimple_switch_label (stmt, i);
-	  if (CASE_HIGH (lab))
-	    continue;
-
-	  basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
-	  edge e = find_edge (gimple_bb (stmt), dest);
 	  if (!(e->flags & EDGE_IGNORE))
 	    {
-	      *cond_edge = e;
-	      return build2 (EQ_EXPR, boolean_type_node, idx, CASE_LOW (lab));
+	      /* Build compound expression for all cases leading
+		 to this edge.  */
+	      tree expr = NULL_TREE;
+	      for (unsigned i = 1; i < gimple_switch_num_labels (stmt); ++i)
+		{
+		  tree lab = gimple_switch_label (stmt, i);
+		  basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+		  edge e2 = find_edge (gimple_bb (stmt), dest);
+		  if (e == e2)
+		    {
+		      tree cmp;
+		      if (*case_expr == NULL)
+			*case_expr = CASE_LOW (lab);
+
+		      if (CASE_HIGH (lab) != NULL_TREE)
+			{
+			  tree cmp1 = build2 (GE_EXPR, boolean_type_node, idx,
+					      CASE_LOW (lab));
+			  tree cmp2 = build2 (LE_EXPR, boolean_type_node, idx,
+					      CASE_HIGH (lab));
+			  cmp = build2 (BIT_AND_EXPR, boolean_type_node, cmp1,
+					cmp2);
+			}
+		      else
+			cmp = build2 (EQ_EXPR, boolean_type_node, idx,
+				      CASE_LOW (lab));
+
+		      /* Combine the expression with the existing one.  */
+		      if (expr == NULL_TREE)
+			expr = cmp;
+		      else
+			expr = build2 (BIT_IOR_EXPR, boolean_type_node, expr,
+				       cmp);
+		    }
+		}
+
+	      if (expr != NULL_TREE)
+		{
+		  *cond_edge = e;
+		  return expr;
+		}
 	    }
 	}
     }
 
   return NULL_TREE;
-}
-
-/* Simplifies COND using checks in front of the entry of the LOOP.  Just very
-   simplish (sufficient to prevent us from duplicating loop in unswitching
-   unnecessarily).  */
-
-static tree
-simplify_using_entry_checks (class loop *loop, tree cond)
-{
-  edge e = loop_preheader_edge (loop);
-  gimple *stmt;
-
-  while (1)
-    {
-      stmt = last_stmt (e->src);
-      if (stmt
-	  && gimple_code (stmt) == GIMPLE_COND
-	  && gimple_cond_code (stmt) == TREE_CODE (cond)
-	  && operand_equal_p (gimple_cond_lhs (stmt),
-			      TREE_OPERAND (cond, 0), 0)
-	  && operand_equal_p (gimple_cond_rhs (stmt),
-			      TREE_OPERAND (cond, 1), 0))
-	return (e->flags & EDGE_TRUE_VALUE
-		? boolean_true_node
-		: boolean_false_node);
-
-      if (!single_pred_p (e->src))
-	return cond;
-
-      e = single_pred_edge (e->src);
-      if (e->src == ENTRY_BLOCK_PTR_FOR_FN (cfun))
-	return cond;
-    }
 }
 
 /* Unswitch single LOOP.  NUM is number of unswitchings done; we do not allow
@@ -315,6 +314,8 @@ tree_unswitch_single_loop (class loop *loop, int num)
   class loop *nloop;
   unsigned i, found;
   tree cond = NULL_TREE;
+  tree case_expr = NULL_TREE;
+  edge cond_edge = NULL;
   gimple *stmt;
   bool changed = false;
   HOST_WIDE_INT iterations;
@@ -359,10 +360,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
   while (1)
     {
-      edge cond_edge = NULL;
       /* Find a bb to unswitch on.  */
       for (; i < loop->num_nodes; i++)
-	if ((cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge)))
+	if ((cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge,
+					  &case_expr)))
 	  break;
 
       if (i == loop->num_nodes)
@@ -380,36 +381,9 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  break;
 	}
 
-      tree orig_cond = cond;
-      cond = simplify_using_entry_checks (loop, cond);
       stmt = last_stmt (bbs[i]);
-      if (integer_nonzerop (cond))
-	{
-	  /* Remove false path.  */
-	  if (is_a <gcond  *> (stmt))
-	    gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
-						 boolean_true_node);
-	  else
-	    gimple_switch_set_index (as_a <gswitch *> (stmt),
-				     TREE_OPERAND (orig_cond, 1));
-	  changed = true;
-	}
-      else if (integer_zerop (cond))
-	{
-	  /* Remove true path.  */
-	  if (is_a <gcond  *> (stmt))
-	    gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
-						 boolean_false_node);
-	  else
-	    {
-	      /* Update based on the adjusted switch.  */
-	      cond_edge->flags |= EDGE_IGNORE;
-	      cond = tree_may_unswitch_on (bbs[i], loop, &cond_edge);
-	    }
-	  changed = true;
-	}
       /* gswitch can return NULL_TREE for cases that are not supported.  */
-      if (cond == NULL_TREE || TREE_CODE (cond) == INTEGER_CST)
+      if (cond == NULL_TREE)
 	;
       /* Do not unswitch too much.  */
       else if (num > param_max_unswitch_level)
@@ -495,10 +469,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
       free (worklist);
 
       /* Find a bb to unswitch on.  */
-      edge cond_edge;
       for (; found < loop->num_nodes; found++)
 	if ((bbs[found]->flags & BB_REACHABLE)
-	    && (cond = tree_may_unswitch_on (bbs[found], loop, &cond_edge)))
+	    && (cond = tree_may_unswitch_on (bbs[found], loop, &cond_edge,
+					     &case_expr)))
 	  break;
 
       if (found == loop->num_nodes)
@@ -517,13 +491,53 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
   initialize_original_copy_tables ();
   /* Unswitch the loop on this condition.  */
-  nloop = tree_unswitch_loop (loop, bbs[found], cond);
+  nloop = tree_unswitch_loop (loop, bbs[found], cond, cond_edge);
   if (!nloop)
     {
       free_original_copy_tables ();
       free (bbs);
       return changed;
     }
+
+  /* Mark false edge of the newly created condition.  */
+  basic_block bb = bbs[found];
+  stmt = last_stmt (bb);
+  if (is_a <gcond  *> (stmt))
+    gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
+					 boolean_true_node);
+  else
+    gimple_switch_set_index (as_a <gswitch *> (stmt), case_expr);
+  update_stmt (stmt);
+
+  /* Mark true edge of the newly created condition.  */
+  basic_block *nbbs = get_loop_body (nloop);
+  for (unsigned i = 0; i < nloop->num_nodes; ++i)
+    {
+      basic_block nbb = nbbs[i];
+      if (bb == get_bb_original (nbb))
+	{
+	  stmt = last_stmt (nbb);
+	  if (is_a <gcond  *> (stmt))
+	    {
+	      gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
+						   boolean_false_node);
+	      update_stmt (stmt);
+	    }
+	  else
+	    {
+	      edge e2;
+	      edge_iterator ei;
+	      FOR_EACH_EDGE (e2, ei, nbb->succs)
+		if (cond_edge->dest == get_bb_original (e2->dest))
+		  {
+		    e2->flags |= EDGE_IGNORE;
+		    break;
+		  }
+	    }
+	  break;
+	}
+    }
+  free (nbbs);
 
   /* Update the SSA form after unswitching.  */
   update_ssa (TODO_update_ssa);
@@ -543,7 +557,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
 static class loop *
 tree_unswitch_loop (class loop *loop,
-		    basic_block unswitch_on, tree cond)
+		    basic_block unswitch_on, tree cond, edge cond_edge)
 {
   profile_probability prob_true;
 
@@ -551,10 +565,7 @@ tree_unswitch_loop (class loop *loop,
   gcc_assert (flow_bb_inside_loop_p (loop, unswitch_on));
   gcc_assert (loop->inner == NULL);
 
-  // TODO: should switch on the edge rather than passing around
-  // a cond tree
-  edge edge_true = EDGE_SUCC (unswitch_on, 0);
-  prob_true = edge_true->probability;
+  prob_true = cond_edge->probability;
   return loop_version (loop, unshare_expr (cond),
 		       NULL, prob_true,
 		       prob_true.invert (),
@@ -1051,7 +1062,9 @@ clean_up_switches (void)
 	      tree lab = gimple_switch_label (stmt, i);
 	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
 	      edge e = find_edge (gimple_bb (stmt), dest);
-	      if (e->flags & EDGE_IGNORE)
+	      if (e == NULL)
+		; /* The edge is already removed.  */
+	      else if (e->flags & EDGE_IGNORE)
 		remove_edge (e);
 	      else
 		{
