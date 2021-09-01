@@ -1578,7 +1578,6 @@ void
 assemble_addr_to_section (rtx symbol, section *sec)
 {
   switch_to_section (sec);
-  assemble_align (POINTER_SIZE);
   assemble_pointer (symbol);
 }
 

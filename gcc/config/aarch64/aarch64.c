@@ -11398,9 +11398,7 @@ aarch64_elf_asm_constructor (rtx symbol, int priority)
       char buf[23];
       snprintf (buf, sizeof (buf), ".init_array.%.5u", priority);
       s = get_section (buf, SECTION_WRITE | SECTION_NOTYPE, NULL);
-      switch_to_section (s);
-      assemble_align (POINTER_SIZE);
-      assemble_aligned_integer (POINTER_BYTES, symbol);
+      assemble_addr_to_section (symbol, s);
     }
 }
 
@@ -11418,9 +11416,7 @@ aarch64_elf_asm_destructor (rtx symbol, int priority)
       char buf[23];
       snprintf (buf, sizeof (buf), ".fini_array.%.5u", priority);
       s = get_section (buf, SECTION_WRITE | SECTION_NOTYPE, NULL);
-      switch_to_section (s);
-      assemble_align (POINTER_SIZE);
-      assemble_aligned_integer (POINTER_BYTES, symbol);
+      assemble_addr_to_section (symbol, s);
     }
 }
 
