@@ -6647,6 +6647,10 @@ xxspltiw_constant_p (rtx op,
 	  if (!BYTES_BIG_ENDIAN)
 	    std::swap (value0, value1);
 
+	  /* If we can do a VSPLTISW, don't do the XXSPLTIW.  */
+	  if (value0 == 0 && EASY_VECTOR_15 (value1))
+	    return false;
+
 	  *constant_ptr = (value0 << 16) | value1;
 	  return true;
 	}
@@ -6655,7 +6659,10 @@ xxspltiw_constant_p (rtx op,
 	 the next set of 4 elements, and so forth can generate XXSPLTIW.  */
     case V16QImode:
 	{
-	  if (xxspltib_constant_nosplit (op, mode))
+	  /* Can we generate a single non-prefixed instruction?  */
+	  if (xxspltib_constant_nosplit (op, mode)		/* XXSPLTIB.  */
+	      || vspltis_constant (op, 4, 2)			/* VSPLTIH.  */
+	      || vspltis_constant (op, 4, 1))			/* VSPLTIW.  */
 	    return false;
 
 	  rtx element1 = CONST_VECTOR_ELT (op, 1);
