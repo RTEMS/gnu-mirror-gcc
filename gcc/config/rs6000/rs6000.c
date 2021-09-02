@@ -6590,6 +6590,74 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTIDP instruction.
+
+   Return the constant that is being split via CONSTANT_PTR to use in the
+   XXSPLTIDP instruction.  */
+
+bool
+xxspltidp_constant_p (rtx op,
+		      machine_mode mode,
+		      HOST_WIDE_INT *constant_ptr)
+{
+  *constant_ptr = 0;
+
+  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  rtx element = op;
+  if (mode == V2DFmode)
+    {
+      if (CONST_VECTOR_P (op))
+	{
+	  element = CONST_VECTOR_ELT (op, 0);
+	  if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+	    return false;
+	}
+
+      else if (GET_CODE (op) == VEC_DUPLICATE)
+	element = XEXP (op, 0);
+
+      else
+	return false;
+
+      mode = DFmode;
+    }
+
+  if (mode != SFmode && mode != DFmode)
+    return false;
+
+  if (GET_MODE (element) != mode)
+    return false;
+
+  if (!CONST_DOUBLE_P (element))
+    return false;
+
+  /* Don't return true for 0.0 since that is easy to create without
+     XXSPLTIDP.  */
+  if (element == CONST0_RTX (mode))
+    return false;
+
+  /* If the value doesn't fit in a SFmode, exactly, we can't use XXSPLTIDP.  */
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (element);
+  if (!exact_real_truncate (SFmode, rv))
+    return false;
+
+  long value;
+  REAL_VALUE_TO_TARGET_SINGLE (*rv, value);
+
+  /* Test for SFmode denormal (exponent is 0, mantissa field is non-zero).  */
+  if (((value & 0x7F800000) == 0) && ((value & 0x7FFFFF) != 0))
+    return false;
+
+  *constant_ptr = value;
+  return true;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6605,6 +6673,7 @@ output_vec_const_move (rtx *operands)
     {
       bool dest_vmx_p = ALTIVEC_REGNO_P (REGNO (dest));
       int xxspltib_value = 256;
+      HOST_WIDE_INT xxspltidp_value = 0;
       int num_insns = -1;
 
       if (zero_constant (vec, mode))
@@ -6632,6 +6701,12 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
+	}
+
+      if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
+	{
+	  operands[2] = GEN_INT (xxspltidp_value);
+	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -26365,6 +26440,37 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
+}
+
+/* Whether a permute type instruction is a prefixed instruction.  This is
+   called from the prefixed attribute processing.  */
+
+bool
+prefixed_permute_p (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  if (!set)
+    return false;
+
+  rtx dest = SET_DEST (set);
+  rtx src = SET_SRC (set);
+  machine_mode mode = GET_MODE (dest);
+
+  if (!REG_P (dest) && !SUBREG_P (dest))
+    return false;
+
+  switch (mode)
+    {
+    case DFmode:
+    case SFmode:
+    case V2DFmode:
+      return xxspltidp_operand (src, mode);
+
+    default:
+      break;
+    }
+
+  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
