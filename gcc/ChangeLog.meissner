@@ -1,3 +1,9 @@
+work066.patch012:
+2021-09-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (xxspltiw_constant_p): Add tests for
+	being able to generate VSPLTISH or VSPLTISW.
+
 work066.patch011:
 2021-08-29  Michael Meissner  <meissner@linux.ibm.com>
 
