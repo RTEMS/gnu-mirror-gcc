@@ -1323,6 +1323,14 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
       = (opts->x_flag_unroll_loops
          || opts->x_flag_peel_loops
          || opts->x_optimize >= 3);
+
+  /* With -fcx-limited-range, we do cheap and quick complex arithmetic.  */
+  if (opts->x_flag_cx_limited_range)
+    flag_complex_method = 0;
+
+  /* With -fcx-fortran-rules, we do something in-between cheap and C99.  */
+  if (opts->x_flag_cx_fortran_rules)
+    flag_complex_method = 1;
 }
 
 #define LEFT_COLUMN	27
