@@ -10942,16 +10942,6 @@ rs6000_emit_move_si_sf_subreg (rtx dest, rtx source, machine_mode mode)
 	  return true;
 	}
 
-      if (mode == SFmode && GET_MODE_SIZE (inner_mode) > 4)
-	{
-	  rtx tmp = gen_reg_rtx (SImode);
-
-	  debug_rtx (source);
-	  emit_move_insn (tmp, gen_lowpart (SImode, source));
-	  emit_insn (gen_movsf_from_si (dest, tmp));
-	  return true;
-	}
-
       if (mode == SFmode && inner_mode == SImode)
 	{
 	  emit_insn (gen_movsf_from_si (dest, inner_source));
