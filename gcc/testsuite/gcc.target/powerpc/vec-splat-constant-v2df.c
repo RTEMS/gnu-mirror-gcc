@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -mxxsplti32dx -O2" } */
+/* { dg-options "-mdejagnu-cpu=power10 -O2" } */
 
 #include <math.h>
 
@@ -51,16 +51,14 @@ v2df_double_m_inf (void)
 vector double
 v2df_double_pi (void)
 {
-  return (vector double) { M_PI, M_PI };		/* 2x XXSPLTI32DX.  */
+  return (vector double) { M_PI, M_PI };		/* PLVX.  */
 }
 
 vector double
 v2df_double_denorm (void)
 {
   return (vector double) { (double)0x1p-149f,
-			   (double)0x1p-149f };	/* XXLXOR, XXSPLTI32DX.  */
+			   (double)0x1p-149f };		/* PLVX.  */
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltidp\M}   5 } } */
-/* { dg-final { scan-assembler-times {\mxxsplti32dx\M} 3 } } */
-/* { dg-final { scan-assembler-not   {\mplxv\M}          } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M} 5 } } */

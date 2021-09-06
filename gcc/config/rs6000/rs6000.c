@@ -6583,173 +6583,11 @@ xxspltib_constant_p (rtx op,
   else if (IN_RANGE (value, -1, 0))
     *num_insns_ptr = 1;
 
-  /* See if we could generate XXSPLTIW directly.  */
-  else if (xxspltiw_operand (op, mode))
-    return false;
-
   else
     *num_insns_ptr = 2;
 
   *constant_ptr = (int) value;
   return true;
-}
-
-/* Return true if the argument is a constant vector where all elements are the
-   same.  */
-
-static bool
-const_vector_all_elements_equal_p (rtx op, machine_mode mode)
-{
-  if (!CONST_VECTOR_P (op))
-    return false;
-
-  rtx element = CONST_VECTOR_ELT (op, 0);
-  if (!CONST_INT_P (element) && !CONST_DOUBLE_P (element))
-    return false;
-
-  for (size_t i = 1; i < GET_MODE_NUNITS (mode); i++)
-    if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, i)))
-      return false;
-
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTIW instruction.
-
-   Return the constant via CONSTANT_PTR to use in the XXSPLTIW instruction.
-   The assembler does not like negative numbers for XXSPLTIW, so we need to
-   return a 16-bit unsigned value.  */
-
-bool
-xxspltiw_constant_p (rtx op,
-		     machine_mode mode,
-		     HOST_WIDE_INT *constant_ptr)
-{
-  HOST_WIDE_INT value;
-
-  *constant_ptr = 0;
-
-  if (!TARGET_PREFIXED || !TARGET_VSX || !TARGET_XXSPLTIW)
-    return false;
-
-  if (!CONST_VECTOR_P (op))
-    return true;
-
-  rtx element0 = CONST_VECTOR_ELT (op, 0);
-
-  switch (mode)
-    {
-      /* V4SImode constant vectors that have the same element are can be used
-	 with XXSPLTIW.  */
-    case V4SImode:
-      if (!const_vector_all_elements_equal_p (op, mode))
-	return false;
-
-      /* Don't return true if we can use the shorter vspltisw instruction.  */
-      value = INTVAL (element0);
-      if (EASY_VECTOR_15 (value))
-	return false;
-
-      *constant_ptr = value & 0xffffffff;
-      return true;
-
-      /* V4SFmode constant vectors that have the same element are
-	 can be used with XXSPLTIW.  */
-    case V4SFmode:
-      if (!const_vector_all_elements_equal_p (op, mode))
-	return false;
-
-      /* Don't return true for 0.0f, since that can be created with
-	 xxspltib or xxlxor.  */
-      if (element0 == CONST0_RTX (SFmode))
-	return false;
-
-      value = rs6000_const_f32_to_i32 (element0);
-      *constant_ptr = value & 0xffffffff;
-      return true;
-
-      /* V8Hmode constant vectors that have the same element are can be used
-	 with XXSPLTIW.  */
-    case V8HImode:
-      if (const_vector_all_elements_equal_p (op, mode))
-	{
-	  /* Don't return true if we can use the shorter vspltish instruction.  */
-	  value = INTVAL (element0);
-	  if (EASY_VECTOR_15 (value))
-	    return false;
-
-	  value &= 0xffff;
-	  *constant_ptr = (value << 16) | value;
-	  return true;
-	}
-
-      else
-	{
-	  /* Check if all even elements are the same and all odd elements are
-	     the same.  */
-	  rtx element1 = CONST_VECTOR_ELT (op, 1);
-
-	  if (!CONST_INT_P (element1))
-	    return false;
-
-	  for (size_t i = 2; i < GET_MODE_NUNITS (V8HImode); i += 2)
-	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
-		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1)))
-	      return false;
-
-	  HOST_WIDE_INT value0 = INTVAL (element0) & 0xffff;
-	  HOST_WIDE_INT value1 = INTVAL (element1) & 0xffff;
-
-	  if (!BYTES_BIG_ENDIAN)
-	    std::swap (value0, value1);
-
-	  *constant_ptr = (value0 << 16) | value1;
-	  return true;
-	}
-
-      /* V16QI constant vectors that have the first four elements identical to
-	 the next set of 4 elements, and so forth can generate XXSPLTIW.  */
-    case V16QImode:
-	{
-	  if (xxspltib_constant_nosplit (op, mode))
-	    return false;
-
-	  rtx element1 = CONST_VECTOR_ELT (op, 1);
-	  rtx element2 = CONST_VECTOR_ELT (op, 2);
-	  rtx element3 = CONST_VECTOR_ELT (op, 3);
-
-	  if (!CONST_INT_P (element0) || !CONST_INT_P (element1)
-	      || !CONST_INT_P (element2) || !CONST_INT_P (element3))
-	    return false;
-
-	  for (size_t i = 4; i < GET_MODE_NUNITS (V16QImode); i += 4)
-	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
-		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1))
-		|| !rtx_equal_p (element2, CONST_VECTOR_ELT (op, i + 2))
-		|| !rtx_equal_p (element3, CONST_VECTOR_ELT (op, i + 3)))
-	      return false;
-
-	  HOST_WIDE_INT value0 = INTVAL (element0) & 0xff;
-	  HOST_WIDE_INT value1 = INTVAL (element1) & 0xff;
-	  HOST_WIDE_INT value2 = INTVAL (element2) & 0xff;
-	  HOST_WIDE_INT value3 = INTVAL (element3) & 0xff;
-
-	  if (BYTES_BIG_ENDIAN)
-	    *constant_ptr = ((value0 << 24) | (value1 << 16) | (value2 << 8)
-			     | value3);
-	  else
-	    *constant_ptr = ((value3 << 24) | (value2 << 16) | (value1 << 8)
-			     | value0);
-
-	  return true;
-	}
-
-    default:
-      break;
-    }
-
-  return false;
 }
 
 /* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
@@ -6820,225 +6658,6 @@ xxspltidp_constant_p (rtx op,
   return true;
 }
 
-/* Return true if OP is of the given MODE is one of the 18 special values that
-   can be generated with the LXVKQ instruction.
-
-   Return the constant that will go in the LXVKQ instruction.  */
-
-/* LXVKQ immediates.  */
-enum {
-  LXVKQ_ONE		= 1,
-  LXVKQ_TWO		= 2,
-  LXVKQ_THREE		= 3,
-  LXVKQ_FOUR		= 4,
-  LXVKQ_FIVE		= 5,
-  LXVKQ_SIX		= 6,
-  LXVKQ_SEVEN		= 7,
-  LXVKQ_INF		= 8,
-  LXVKQ_NAN		= 9,
-  LXVKQ_NEG_ZERO	= 16,
-  LXVKQ_NEG_ONE		= 17,
-  LXVKQ_NEG_TWO		= 18,
-  LXVKQ_NEG_THREE	= 19,
-  LXVKQ_NEG_FOUR	= 20,
-  LXVKQ_NEG_FIVE	= 21,
-  LXVKQ_NEG_SIX		= 22,
-  LXVKQ_NEG_SEVEN	= 23,
-  LXVKQ_NEG_INF		= 24
-};
-
-bool
-lxvkq_constant_p (rtx op,
-		  machine_mode mode,
-		  int *imm_p)
-{
-  *imm_p = -1;
-
-  if (!TARGET_LXVKQ || !TARGET_POWER10 || !TARGET_VSX || !TARGET_FLOAT128_HW)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IEEE_P (mode))
-    return false;
-
-  if (!CONST_DOUBLE_P (op))
-    return false;
-
-  /* All of the values generated can be expressed as SFmode values, so if it
-     doesn't fit in SFmode, exit.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  /* Special values (infinity, nan, -0.0.  */
-  if (real_isinf (rv))
-    {
-      *imm_p = real_isneg (rv) ? LXVKQ_NEG_INF : LXVKQ_INF;
-      return true;
-    }
-
-  if (real_isnan (rv) && !real_isneg (rv))
-    {
-      *imm_p = LXVKQ_NAN;
-      return true;
-    }
-
-  if (real_isnegzero (rv))
-    {
-      *imm_p = LXVKQ_NEG_ZERO;
-      return true;
-    }
-
-  /* The other values are all integers 1..7, and -1..-7.  */
-  if (!real_isinteger (rv, mode))
-    return false;
-
-  HOST_WIDE_INT value = real_to_integer (rv);
-  switch (value)
-    {
-    default:
-      break;
-
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-      *imm_p = LXVKQ_ONE + (value - 1);
-      return true;
-
-    case -1:
-    case -2:
-    case -3:
-    case -4:
-    case -5:
-    case -6:
-    case -7:
-      *imm_p = LXVKQ_NEG_ONE + (-value - 1);
-      return true;
-    }
-
-  /* We can't load the value with LXVKQ.  */
-  return false;
-}
-
-/* Return true if OP is a floating point constant that can be loaded with the
-   XXSPLTI32DX instruction.  If the constant can be loaded with the simpler
-   XXSPLTIDP (constants that can fit as SFmode constants) or XXSPLTIB (0.0)
-   instructions, return false.
-
-   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
-   via HIGH_PTR and LOW_PTR.  */
-
-static bool
-xxsplti32dx_constant_float_p (rtx op,
-			      machine_mode mode,
-			      HOST_WIDE_INT *high_ptr,
-			      HOST_WIDE_INT *low_ptr)
-{
-  HOST_WIDE_INT xxspltidp_value = 0;
-
-  if (!CONST_DOUBLE_P (op))
-    return false;
-
-  if (mode != SFmode && mode != DFmode)
-    return false;
-
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  if (xxspltidp_constant_p (op, mode, &xxspltidp_value))
-    return false;
-
-  long high_low[2];
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
-
-  /* The double precision value is laid out in memory order.  We need to undo
-     this for XXSPLTI32DX.  */
-  if (!BYTES_BIG_ENDIAN)
-    std::swap (high_low[0], high_low[1]);
-
-  *high_ptr = high_low[0];
-  *low_ptr = high_low[1];
-  return true;
-}
-
-/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
-   XXSPLTI32DX instruction.  If the instruction can be synthesized with
-   XXSPLTIDP or is 0/-1, return false.
-
-   We handle the following types of constants:
-
-     1) vector double constants where each element is the same and you can't
-        load the constant with XXSPLTIDP;
-
-     2) vector long long constants where each element is the same;
-
-     3) Scalar floating point constants that can't be loaded with XXSPLTIDP.
-
-   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
-   via HIGH_PTR and LOW_PTR.  */
-
-bool
-xxsplti32dx_constant_p (rtx op,
-			machine_mode mode,
-			HOST_WIDE_INT *high_ptr,
-			HOST_WIDE_INT *low_ptr)
-{
-  *high_ptr = *low_ptr = 0;
-
-  if (!TARGET_PREFIXED || !TARGET_VSX || !TARGET_XXSPLTI32DX)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  switch (mode)
-    {
-    default:
-      break;
-
-    case E_V2DFmode:
-      {
-	if (!const_vector_all_elements_equal_p (op, mode))
-	  return false;
-
-	rtx ele = CONST_VECTOR_ELT (op, 0);
-	return xxsplti32dx_constant_float_p (ele, DFmode, high_ptr, low_ptr);
-      }
-
-    case E_SFmode:
-    case E_DFmode:
-      return xxsplti32dx_constant_float_p (op, mode, high_ptr, low_ptr);
-
-    case E_V2DImode:
-      {
-	if (!const_vector_all_elements_equal_p (op, mode))
-	  return false;
-
-	/* If we can generate XXSPLTIB and VEXTSB2D, don't return true.  */
-	rtx ele = CONST_VECTOR_ELT (op, 0);
-	HOST_WIDE_INT value = INTVAL (ele);
-	if (IN_RANGE (value, -128, 127))
-	  return false;
-
-	*high_ptr = (value >> 32) & 0xffffffff;
-	*low_ptr = value & 0xffffffff;
-	return true;
-      }
-    }
-
-  return false;
-}
-
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -7054,10 +6673,8 @@ output_vec_const_move (rtx *operands)
     {
       bool dest_vmx_p = ALTIVEC_REGNO_P (REGNO (dest));
       int xxspltib_value = 256;
-      HOST_WIDE_INT xxspltiw_value = 0;
       HOST_WIDE_INT xxspltidp_value = 0;
       int num_insns = -1;
-      int lxvkq_immediate = 0;
 
       if (zero_constant (vec, mode))
 	{
@@ -7086,26 +6703,11 @@ output_vec_const_move (rtx *operands)
 	    gcc_unreachable ();
 	}
 
-      if (xxspltiw_constant_p (vec, mode, &xxspltiw_value))
-	{
-	  operands[2] = GEN_INT (xxspltiw_value);
-	  return "xxspltiw %x0,%2";
-	}
-
       if (xxspltidp_constant_p (vec, mode, &xxspltidp_value))
 	{
 	  operands[2] = GEN_INT (xxspltidp_value);
 	  return "xxspltidp %x0,%2";
 	}
-
-      if (lxvkq_constant_p (vec, mode, &lxvkq_immediate))
-	{
-	  operands[2] = GEN_INT (lxvkq_immediate);
-	  return "lxvkq %x0,%2";
-	}
-
-      if (xxsplti32dx_operand (vec, mode))
-	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -13815,7 +13417,6 @@ rs6000_output_move_128bit (rtx operands[])
   int src_regno;
   bool dest_gpr_p, dest_fp_p, dest_vmx_p, dest_vsx_p;
   bool src_gpr_p, src_fp_p, src_vmx_p, src_vsx_p;
-  int lxvkq_immediate = 0;
 
   if (REG_P (dest))
     {
@@ -13960,14 +13561,6 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
-  else if (dest_vmx_p
-	   && CONST_DOUBLE_P (src)
-	   && lxvkq_constant_p (src, mode, &lxvkq_immediate))
-    {
-      operands[2] = GEN_INT (lxvkq_immediate);
-      return "lxvkq %x0,%2";
-    }
-
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
@@ -26878,19 +26471,10 @@ prefixed_permute_p (rtx_insn *insn)
 
   switch (mode)
     {
-    case V8HImode:
-    case V4SImode:
-    case V4SFmode:
-      return xxspltiw_operand (src, mode);
-
     case DFmode:
     case SFmode:
     case V2DFmode:
-      return (xxspltidp_operand (src, mode)
-	      || xxsplti32dx_operand (src, mode));
-
-    case V2DImode:
-      return xxsplti32dx_operand (src, mode);
+      return xxspltidp_operand (src, mode);
 
     default:
       break;
