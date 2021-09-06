@@ -167,6 +167,8 @@ const char *user_label_prefix;
    and debugging dumps.  */
 
 FILE *asm_out_file;
+FILE *original_asm_out_file;
+FILE *asm_lto_debug_file;
 FILE *aux_info_file;
 FILE *callgraph_info_file = NULL;
 static bitmap callgraph_info_external_printed;
@@ -721,6 +723,8 @@ init_asm_output (const char *name)
 		     "cannot open %qs for writing: %m", asm_file_name);
     }
 
+  original_asm_out_file = asm_out_file;
+
   if (!flag_syntax_only && !(global_dc->lang_mask & CL_LTODump))
     {
       targetm.asm_out.file_start ();
@@ -753,6 +757,12 @@ init_asm_output (const char *name)
 	  fputc ('\n', asm_out_file);
 	}
     }
+}
+
+static void
+init_lto_debug_file (void)
+{
+  asm_lto_debug_file = fopen ("/tmp/lto-debug.s", "w");
 }
 
 /* A helper function; used as the reallocator function for cpp's line
@@ -1840,6 +1850,7 @@ lang_dependent_init (const char *name)
   if (!flag_wpa)
     {
       init_asm_output (name);
+      init_lto_debug_file ();
 
       if (!flag_generate_lto && !flag_compare_debug)
 	{
@@ -2005,6 +2016,14 @@ finalize (bool no_backend)
       if (fclose (asm_out_file) != 0)
 	fatal_error (input_location, "error closing %s: %m", asm_file_name);
       asm_out_file = NULL;
+    }
+
+  if (asm_lto_debug_file)
+    {
+      // FIXME
+      if (fclose (asm_lto_debug_file) != 0)
+	fatal_error (input_location, "error closing %s: %m", "lto debug file");
+      asm_lto_debug_file = NULL;
     }
 
   if (stack_usage_file)

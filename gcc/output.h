@@ -315,6 +315,8 @@ extern rtx_sequence *final_sequence;
 
 #ifdef BUFSIZ
 extern FILE *asm_out_file;
+extern FILE *original_asm_out_file;
+extern FILE *asm_lto_debug_file;
 #endif
 
 /* The first global object in the file.  */
@@ -412,6 +414,8 @@ enum section_flag
 
   /* subsequent bits reserved for target */
 };
+
+#define SECTION_EARLY_LTO 0x800000
 
 /* A helper function for default_elf_select_section and
    default_elf_unique_section.  Categorizes the DECL.  */

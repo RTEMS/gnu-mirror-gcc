@@ -191,6 +191,7 @@ struct section_hasher : ggc_ptr_hash<section>
 
 /* Hash table of named sections.  */
 static GTY(()) hash_table<section_hasher> *section_htab;
+static GTY(()) hash_table<section_hasher> *lto_debug_section_htab;
 
 struct object_block_hasher : ggc_ptr_hash<object_block>
 {
@@ -294,8 +295,10 @@ get_section (const char *name, unsigned int flags, tree decl,
 {
   section *sect, **slot;
 
-  slot = section_htab->find_slot_with_hash (name, htab_hash_string (name),
-					    INSERT);
+  hash_table<section_hasher> *htab
+    = flags | SECTION_EARLY_LTO ? lto_debug_section_htab : section_htab;
+  slot = htab->find_slot_with_hash (name, htab_hash_string (name),
+				    INSERT);
   flags |= SECTION_NAMED;
   if (decl != nullptr
       && DECL_P (decl)
@@ -6610,6 +6613,7 @@ void
 init_varasm_once (void)
 {
   section_htab = hash_table<section_hasher>::create_ggc (31);
+  lto_debug_section_htab = hash_table<section_hasher>::create_ggc (31);
   object_block_htab = hash_table<object_block_hasher>::create_ggc (31);
   const_desc_htab = hash_table<tree_descriptor_hasher>::create_ggc (1009);
 
@@ -7799,6 +7803,11 @@ output_section_asm_op (const char *directive)
 void
 switch_to_section (section *new_section, tree decl)
 {
+  if (new_section->common.flags & SECTION_EARLY_LTO)
+    asm_out_file = asm_lto_debug_file;
+  else
+    asm_out_file = original_asm_out_file;
+
   bool retain_p;
   if ((new_section->common.flags & SECTION_NAMED)
       && decl != nullptr
