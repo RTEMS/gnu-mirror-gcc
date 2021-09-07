@@ -399,9 +399,9 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
   do									\
     {									\
       if (TARGET_SUN_TLS						\
-	  && in_section							\
-	  && ((in_section->common.flags & SECTION_TLS) == SECTION_TLS))	\
-	switch_to_section (bss_section);				\
+	  && casm->in_section							\
+	  && ((casm->in_section->common.flags & SECTION_TLS) == SECTION_TLS))	\
+	switch_to_section (casm->sec.bss);				\
       fprintf ((FILE), "%s", COMMON_ASM_OP);				\
       assemble_name ((FILE), (NAME));					\
       fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",%u\n",		\

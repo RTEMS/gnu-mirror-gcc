@@ -216,7 +216,7 @@ along with GCC; see the file COPYING3.  If not see
   do {								   \
     if ((LOG) != 0)						   \
       {								   \
-	if (in_section == text_section)				   \
+	if (casm->in_section == casm->sec.text)				   \
 	  fprintf (FILE, "\t%s %d,0x90\n", ALIGN_ASM_OP, (LOG));   \
 	else							   \
 	  fprintf (FILE, "\t%s %d\n", ALIGN_ASM_OP, (LOG));	   \

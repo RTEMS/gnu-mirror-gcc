@@ -313,9 +313,78 @@ extern rtx_sequence *final_sequence;
 
 /* File in which assembler code is being written.  */
 
-#ifdef BUFSIZ
-extern FILE *asm_out_file;
-#endif
+struct section_hasher : ggc_ptr_hash<section>
+{
+  typedef const char *compare_type;
+
+  static hashval_t hash (section *);
+  static bool equal (section *, const char *);
+};
+
+/* Assembly output state.  */
+
+struct GTY(()) asm_out_state
+{
+  asm_out_state (): out_file (NULL), in_section (NULL),
+    sec ({}), anchor_labelno (0), in_cold_section_p (false)
+  {
+    section_htab = hash_table<section_hasher>::create_ggc (31);
+  }
+
+  /* Assembly output stream.  */
+  FILE * GTY((skip)) out_file;
+
+  /* Hash table of named sections.  */
+  hash_table<section_hasher> *section_htab;
+
+  /* asm_out_file's current section.  This is NULL if no section has yet
+     been selected or if we lose track of what the current section is.  */
+  section *in_section;
+
+  /* Well-known sections, each one associated with some sort of *_ASM_OP.  */
+  struct
+  {
+    section *text;
+    section *data;
+    section *readonly_data;
+    section *sdata;
+    section *ctors;
+    section *dtors;
+    section *bss;
+    section *sbss;
+
+    /* Various forms of common section.  All are guaranteed to be nonnull.  */
+    section *tls_comm;
+    section *comm;
+    section *lcomm;
+
+    /* A SECTION_NOSWITCH section used for declaring global BSS variables.
+       May be null.  */
+    section *bss_noswitch;
+
+    /* The section that holds the main exception table, when known.  The section
+       is set either by the target's init_sections hook or by the first call to
+       switch_to_exception_section.  */
+    section *exception;
+
+    /* The section that holds the DWARF2 frame unwind information, when known.
+       The section is set either by the target's init_sections hook or by the
+       first call to switch_to_eh_frame_section.  */
+    section *eh_frame;
+  } sec;
+
+  /* The next number to use for internal anchor labels.  */
+  int anchor_labelno;
+
+  /* True if code for the current function is currently being directed
+     at the cold section.  */
+  bool in_cold_section_p;
+};
+
+extern GTY(()) asm_out_state *casm;
+
+/* Helper macro for commonly used accesses.  */
+#define asm_out_file casm->out_file
 
 /* The first global object in the file.  */
 extern const char *first_global_object_name;
@@ -511,24 +580,6 @@ union GTY ((desc ("SECTION_STYLE (&(%h))"), for_user)) section {
 struct object_block;
 
 /* Special well-known sections.  */
-extern GTY(()) section *text_section;
-extern GTY(()) section *data_section;
-extern GTY(()) section *readonly_data_section;
-extern GTY(()) section *sdata_section;
-extern GTY(()) section *ctors_section;
-extern GTY(()) section *dtors_section;
-extern GTY(()) section *bss_section;
-extern GTY(()) section *sbss_section;
-extern GTY(()) section *exception_section;
-extern GTY(()) section *eh_frame_section;
-extern GTY(()) section *tls_comm_section;
-extern GTY(()) section *comm_section;
-extern GTY(()) section *lcomm_section;
-extern GTY(()) section *bss_noswitch_section;
-
-extern GTY(()) section *in_section;
-extern GTY(()) bool in_cold_section_p;
-
 extern section *get_unnamed_section (unsigned int, void (*) (const void *),
 				     const void *);
 extern section *get_section (const char *, unsigned int, tree,
