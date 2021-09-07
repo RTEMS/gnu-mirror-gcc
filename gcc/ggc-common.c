@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "hosthooks.h"
 #include "plugin.h"
 #include "options.h"
+#include "output.h"
 
 /* When true, protect the contents of the identifier hash table.  */
 bool ggc_protect_identifiers = true;
@@ -589,6 +590,9 @@ gt_pch_restore (FILE *f)
   struct mmap_info mmi;
   int result;
 
+  /* Hide ASM state object as we don't want it to be streamed.  */
+  FILE *saved_casm_out_file = casm != NULL ? casm->out_file : NULL;
+
   /* Delete any deletable objects.  This makes ggc_pch_read much
      faster, as it can be sure that no GCable objects remain other
      than the ones just read in.  */
@@ -629,6 +633,9 @@ gt_pch_restore (FILE *f)
   ggc_pch_read (f, mmi.preferred_base);
 
   gt_pch_restore_stringpool ();
+
+  if (casm != NULL)
+    casm->out_file = saved_casm_out_file;
 }
 
 /* Default version of HOST_HOOKS_GT_PCH_GET_ADDRESS when mmap is not present.

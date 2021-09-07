@@ -33,7 +33,7 @@ along with GCC; see the file COPYING3.  If not see
       fprintf (STREAM, "\t.section .exports\n");	\
       fprintf (STREAM, "\t.ascii \" -export:%s\"\n",	\
 	       (* targetm.strip_name_encoding) (NAME));	\
-      in_section = NULL;				\
+      casm->in_section = NULL;				\
     }							\
   while (0)
 
@@ -63,7 +63,7 @@ along with GCC; see the file COPYING3.  If not see
       HOST_WIDE_INT size;					\
       if (mcore_dllexport_name_p (NAME))			\
         {							\
-	  section *save_section = in_section;			\
+	  section *save_section = casm->in_section;			\
 	  MCORE_EXPORT_NAME (FILE, NAME);			\
 	  switch_to_section (save_section);			\
         }							\

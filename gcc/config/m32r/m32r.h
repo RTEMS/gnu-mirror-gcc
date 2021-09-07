@@ -897,7 +897,7 @@ L2:     .word STATIC
 	  && (SIZE) <= (unsigned HOST_WIDE_INT) g_switch_value)		\
         switch_to_section (get_named_section (NULL, ".sbss", 0));	\
       else								\
-        switch_to_section (bss_section);				\
+        switch_to_section (casm->sec.bss);				\
       ASM_OUTPUT_ALIGN (FILE, floor_log2 (ALIGN / BITS_PER_UNIT));	\
       last_assemble_variable_decl = DECL;				\
       ASM_DECLARE_OBJECT_NAME (FILE, NAME, DECL);			\

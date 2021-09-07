@@ -1613,7 +1613,7 @@ machine_function;
 #define ARM_GE_BITS_READ (arm_ge_bits_access ())
 
 /* As in the machine_function, a global set of call-via labels, for code 
-   that is in text_section.  */
+   that is in casm->sec.text.  */
 extern GTY(()) rtx thumb_call_via_label[14];
 
 /* The number of potential ways of assigning to a co-processor.  */

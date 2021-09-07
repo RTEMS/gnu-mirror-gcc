@@ -429,8 +429,8 @@ of its own that you need to create.\n\
 GCC calls this hook after processing the command line, but before writing\n\
 any assembly code, and before calling any of the section-returning hooks\n\
 described below.",
- void, (void),
- hook_void_void)
+ asm_out_state *, (void),
+ default_init_sections)
 
 /* Tell assembler to change to section NAME with attributes FLAGS.
    If DECL is non-NULL, it is the VAR_DECL or FUNCTION_DECL with

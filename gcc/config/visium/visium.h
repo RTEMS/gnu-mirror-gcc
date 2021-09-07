@@ -1235,8 +1235,8 @@ do									\
    `EXTRA_SECTION_FUNCTIONS'
 
    One or more functions to be defined in `varasm.c'.  These functions
-   should do jobs analogous to those of `text_section' and
-   `data_section', for your additional sections.  Do not define this
+   should do jobs analogous to those of `casm->sec.text' and
+   `casm->sec.data', for your additional sections.  Do not define this
    macro if you do not define `EXTRA_SECTIONS'.
 
    `JUMP_TABLES_IN_TEXT_SECTION' Define this macro if jump tables (for

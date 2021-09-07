@@ -189,4 +189,13 @@ extern bool rs6000_passes_vector;
 extern bool rs6000_returns_struct;
 extern bool cpu_builtin_p;
 
+struct rs6000_asm_out_state : public asm_out_state
+{
+  /* Initialize ELF sections. */
+  void init_elf_sections ();
+
+  /* Initialize XCOFF sections. */
+  void init_xcoff_sections ();
+};
+
 #endif

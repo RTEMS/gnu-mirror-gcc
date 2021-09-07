@@ -438,14 +438,14 @@ should_emit_struct_debug (tree type, enum debug_info_usage usage)
   return DUMP_GSTRUCT (type, usage, criterion, generic, false, false);
 }
 
-/* Switch [BACK] to eh_frame_section.  If we don't have an eh_frame_section,
+/* Switch [BACK] to casm->sec.eh_frame.  If we don't have an casm->sec.eh_frame,
    switch to the data section instead, and write out a synthetic start label
    for collect2 the first time around.  */
 
 static void
 switch_to_eh_frame_section (bool back ATTRIBUTE_UNUSED)
 {
-  if (eh_frame_section == 0)
+  if (casm->sec.eh_frame == 0)
     {
       int flags;
 
@@ -474,14 +474,14 @@ switch_to_eh_frame_section (bool back ATTRIBUTE_UNUSED)
 	flags = SECTION_WRITE;
 
 #ifdef EH_FRAME_SECTION_NAME
-      eh_frame_section = get_section (EH_FRAME_SECTION_NAME, flags, NULL);
+      casm->sec.eh_frame = get_section (EH_FRAME_SECTION_NAME, flags, NULL);
 #else
-      eh_frame_section = ((flags == SECTION_WRITE)
-			  ? data_section : readonly_data_section);
+      casm->sec.eh_frame = ((flags == SECTION_WRITE)
+			  ? casm->sec.data : casm->sec.readonly_data);
 #endif /* EH_FRAME_SECTION_NAME */
     }
 
-  switch_to_section (eh_frame_section);
+  switch_to_section (casm->sec.eh_frame);
 
 #ifdef EH_FRAME_THROUGH_COLLECT2
   /* We have no special eh_frame section.  Emit special labels to guide
@@ -1113,10 +1113,10 @@ dwarf2out_begin_prologue (unsigned int line ATTRIBUTE_UNUSED,
   /* Initialize the bits of CURRENT_FDE that were not available earlier.  */
   fde->dw_fde_begin = dup_label;
   fde->dw_fde_current_label = dup_label;
-  fde->in_std_section = (fnsec == text_section
+  fde->in_std_section = (fnsec == casm->sec.text
 			 || (cold_text_section && fnsec == cold_text_section));
   fde->ignored_debug = DECL_IGNORED_P (current_function_decl);
-  in_text_section_p = fnsec == text_section;
+  in_text_section_p = fnsec == casm->sec.text;
 
   /* We only want to output line number information for the genuine dwarf2
      prologue case, not the eh frame case.  */
@@ -1295,7 +1295,7 @@ dwarf2out_switch_text_section (void)
 			       current_function_funcdef_no);
 
   fde->dw_fde_second_begin = ggc_strdup (label);
-  if (!in_cold_section_p)
+  if (!casm->in_cold_section_p)
     {
       fde->dw_fde_end = crtl->subsections.cold_section_end_label;
       fde->dw_fde_second_end = crtl->subsections.hot_section_end_label;
@@ -1317,9 +1317,9 @@ dwarf2out_switch_text_section (void)
   switch_to_section (sect);
 
   fde->second_in_std_section
-    = (sect == text_section
+    = (sect == casm->sec.text
        || (cold_text_section && sect == cold_text_section));
-  in_text_section_p = sect == text_section;
+  in_text_section_p = sect == casm->sec.text;
 
   if (dwarf2out_do_cfi_asm ())
     dwarf2out_do_cfi_startproc (true);
@@ -17270,7 +17270,7 @@ secname_for_decl (const_tree decl)
     secname = DECL_SECTION_NAME (decl);
   else if (current_function_decl && DECL_SECTION_NAME (current_function_decl))
     {
-      if (in_cold_section_p)
+      if (casm->in_cold_section_p)
 	{
 	  section *sec = current_function_section ();
 	  if (sec->common.flags & SECTION_NAMED)
@@ -17278,7 +17278,7 @@ secname_for_decl (const_tree decl)
 	}
       secname = DECL_SECTION_NAME (current_function_decl);
     }
-  else if (cfun && in_cold_section_p)
+  else if (cfun && casm->in_cold_section_p)
     secname = crtl->subsections.cold_section_label;
   else
     secname = text_section_label;
@@ -17599,12 +17599,12 @@ dw_loc_list (var_loc_list *loc_list, tree decl, int want_address)
 
   if (cfun && crtl->has_bb_partition)
     {
-      bool save_in_cold_section_p = in_cold_section_p;
-      in_cold_section_p = first_function_block_is_cold;
+      bool save_in_cold_section_p = casm->in_cold_section_p;
+      casm->in_cold_section_p = first_function_block_is_cold;
       if (loc_list->last_before_switch == NULL)
-	in_cold_section_p = !in_cold_section_p;
+	casm->in_cold_section_p = !casm->in_cold_section_p;
       secname = secname_for_decl (decl);
-      in_cold_section_p = save_in_cold_section_p;
+      casm->in_cold_section_p = save_in_cold_section_p;
     }
   else
     secname = secname_for_decl (decl);
@@ -17682,10 +17682,10 @@ dw_loc_list (var_loc_list *loc_list, tree decl, int want_address)
 	  && crtl->has_bb_partition
 	  && node == loc_list->last_before_switch)
 	{
-	  bool save_in_cold_section_p = in_cold_section_p;
-	  in_cold_section_p = !first_function_block_is_cold;
+	  bool save_in_cold_section_p = casm->in_cold_section_p;
+	  casm->in_cold_section_p = !first_function_block_is_cold;
 	  secname = secname_for_decl (decl);
-	  in_cold_section_p = save_in_cold_section_p;
+	  casm->in_cold_section_p = save_in_cold_section_p;
 	}
 
       if (range_across_switch)
@@ -27853,7 +27853,7 @@ create_label:
      last_{,postcall_}label so that they are not reused this time.  */
   if (last_var_location_insn == NULL_RTX
       || last_var_location_insn != next_real
-      || last_in_cold_section_p != in_cold_section_p)
+      || last_in_cold_section_p != casm->in_cold_section_p)
     {
       last_label = NULL;
       last_postcall_label = NULL;
@@ -28024,7 +28024,7 @@ create_label:
     }
 
   last_var_location_insn = next_real;
-  last_in_cold_section_p = in_cold_section_p;
+  last_in_cold_section_p = casm->in_cold_section_p;
 }
 
 /* Check whether BLOCK, a lexical block, is nested within OUTER, or is
@@ -28192,7 +28192,7 @@ set_cur_line_info_table (section *sec)
 {
   dw_line_info_table *table;
 
-  if (sec == text_section)
+  if (sec == casm->sec.text)
     table = text_section_line_info;
   else if (sec == cold_text_section)
     {
@@ -28209,7 +28209,7 @@ set_cur_line_info_table (section *sec)
 
       if (crtl->has_bb_partition)
 	{
-	  if (in_cold_section_p)
+	  if (casm->in_cold_section_p)
 	    end_label = crtl->subsections.cold_section_end_label;
 	  else
 	    end_label = crtl->subsections.hot_section_end_label;
@@ -28246,7 +28246,7 @@ dwarf2out_begin_function (tree fun)
 {
   section *sec = function_section (fun);
 
-  if (sec != text_section)
+  if (sec != casm->sec.text)
     have_multiple_function_sections = true;
 
   if (crtl->has_bb_partition && !cold_text_section)
@@ -29375,7 +29375,7 @@ dwarf2out_assembly_start (void)
 			       COLD_TEXT_SECTION_LABEL, 0);
   ASM_GENERATE_INTERNAL_LABEL (cold_end_label, COLD_END_LABEL, 0);
 
-  switch_to_section (text_section);
+  switch_to_section (casm->sec.text);
   ASM_OUTPUT_LABEL (asm_out_file, text_section_label);
 #endif
 
@@ -32082,7 +32082,7 @@ dwarf2out_finish (const char *filename)
     main_comp_unit_die = comp_unit_die ();
 
   /* Output a terminator label for the .text section.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sec.text);
   targetm.asm_out.internal_label (asm_out_file, TEXT_END_LABEL, 0);
   if (cold_text_section)
     {
@@ -32998,7 +32998,7 @@ dwarf2out_early_finish (const char *filename)
     }
 
   /* Switch back to the text section.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sec.text);
 }
 
 /* Reset all state within dwarf2out.c so that we can rerun the compiler

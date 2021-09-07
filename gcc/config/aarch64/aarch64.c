@@ -25753,7 +25753,7 @@ aarch64_sls_emit_blr_function_thunks (FILE *out_file)
      would happen in a different section -- leaving an unmatched
      `.cfi_startproc` in the cold text section and an unmatched `.cfi_endproc`
      in the standard text section.  */
-  section *save_text_section = in_section;
+  section *save_text_section = casm->in_section;
   switch_to_section (function_section (current_function_decl));
   for (int regnum = 0; regnum < 30; ++regnum)
     {
