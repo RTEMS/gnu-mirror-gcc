@@ -15,7 +15,6 @@ work067.patch003:
 	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
-	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
 
 work067.patch002:
 2021-09-06  Michael Meissner  <meissner@linux.ibm.com>
