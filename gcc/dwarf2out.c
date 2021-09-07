@@ -445,7 +445,7 @@ should_emit_struct_debug (tree type, enum debug_info_usage usage)
 static void
 switch_to_eh_frame_section (bool back ATTRIBUTE_UNUSED)
 {
-  if (eh_frame_section == 0)
+  if (casm->sections.eh_frame == 0)
     {
       int flags;
 
@@ -474,14 +474,14 @@ switch_to_eh_frame_section (bool back ATTRIBUTE_UNUSED)
 	flags = SECTION_WRITE;
 
 #ifdef EH_FRAME_SECTION_NAME
-      eh_frame_section = get_section (EH_FRAME_SECTION_NAME, flags, NULL);
+      casm->sections.eh_frame = get_section (EH_FRAME_SECTION_NAME, flags, NULL);
 #else
       eh_frame_section = ((flags == SECTION_WRITE)
 			  ? data_section : readonly_data_section);
 #endif /* EH_FRAME_SECTION_NAME */
     }
 
-  switch_to_section (eh_frame_section);
+  switch_to_section (casm->sections.eh_frame);
 
 #ifdef EH_FRAME_THROUGH_COLLECT2
   /* We have no special eh_frame section.  Emit special labels to guide
