@@ -26,10 +26,9 @@ vector signed long long splats4(void)
 
 /* Codegen will consist of splat and shift instructions for most types.
    If folding is enabled, the vec_sl tests using vector long long type will
-   generate a lvx instead of a vspltisw+vsld pair.  On power10, it may
-   generate an xxsplti32dx instead of a load.  */
+   generate a lvx instead of a vspltisw+vsld pair.  */
 
 /* { dg-final { scan-assembler-times {\mvspltis[bhw]\M} 0 } } */
 /* { dg-final { scan-assembler-times {\mvsl[bhwd]\M} 0 } } */
-/* { dg-final { scan-assembler-times {\mp?lxv\M|\mlxv\M|\mlxvd2x\M|\mxxsplti32dx\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mp?lxv\M|\mlxv\M|\mlxvd2x\M} 2 } } */
 

@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -mxxsplti32dx -O2" } */
+/* { dg-options "-mdejagnu-cpu=power10 -O2" } */
 
 #include <math.h>
 
@@ -57,7 +57,4 @@ scalar_float_denorm (void)
   return 0x1p-149f;		/* PLFS.  */
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltidp\M}   6 } } */
-/* { dg-final { scan-assembler-times {\mxxsplti32dx\M} 1 } } */
-/* { dg-final { scan-assembler-not   {\mplfs\M}          } } */
-/* { dg-final { scan-assembler-not   {\mplxssp\M}        } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M} 6 } } */

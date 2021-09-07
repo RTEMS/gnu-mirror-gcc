@@ -649,16 +649,6 @@ Target Undocumented Var(TARGET_XXSPLTIDP) Init(1) Save
 Generate (do not generate) XXSPLTIDP instructions.
 
 ; Do not enable this by default at the present time.
-mxxspltiw
-Target Undocumented Var(TARGET_XXSPLTIW) Init(0) Save
-Generate (do not generate) XXSPLTIW instructions.
-
-; Do not enable this by default at the present time.
-mxxsplti32dx
-Target Undocumented Var(TARGET_XXSPLTI32DX) Init(0) Save
-Generate (do not generate) XXSPLTI32DX instructions.
-
-; Do not enable this by default at the present time.
 mlxvkq
 Target Undocumented Var(TARGET_LXVKQ) Init(0) Save
 Generate (do not generate) LXVKQ instructions.
