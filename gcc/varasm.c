@@ -159,14 +159,6 @@ section *exception_section;
    first call to switch_to_eh_frame_section.  */
 section *eh_frame_section;
 
-/* asm_out_file's current section.  This is NULL if no section has yet
-   been selected or if we lose track of what the current section is.  */
-section *in_section;
-
-/* True if code for the current function is currently being directed
-   at the cold section.  */
-bool in_cold_section_p;
-
 /* The following global holds the "function name" for the code in the
    cold section of a function, if hot/cold function splitting is enabled
    and there was actually code that went into the cold section.  A
