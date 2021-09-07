@@ -288,7 +288,7 @@
 #define ASM_OUTPUT_ALIGNED_LOCAL(STREAM, NAME, SIZE, ALIGN)		\
   do									\
     {									\
-      switch_to_section (bss_section);					\
+      switch_to_section (casm->sec.bss);					\
       ASM_OUTPUT_ALIGN (STREAM, floor_log2 (ALIGN / BITS_PER_UNIT));	\
       ASM_OUTPUT_LABEL (STREAM, NAME);					\
       fprintf (STREAM, "\t.space\t%d\n", (int)(SIZE));			\

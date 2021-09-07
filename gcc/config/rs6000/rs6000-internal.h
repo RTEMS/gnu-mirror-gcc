@@ -189,4 +189,31 @@ extern bool rs6000_passes_vector;
 extern bool rs6000_returns_struct;
 extern bool cpu_builtin_p;
 
+struct rs6000_asm_out_state : public asm_out_state
+{
+  /* Initialize ELF sections. */
+  void init_elf_sections ();
+
+  /* Initialize XCOFF sections. */
+  void init_xcoff_sections ();
+
+  struct
+  {
+    /* ELF sections.  */
+    section *toc;
+    section *sdata2;
+
+    /* XCOFF sections.  */
+    section *read_only_data;
+    section *private_data;
+    section *tls_data;
+    section *tls_private_data;
+    section *read_only_private_data;
+  } target_sec;
+};
+
+extern GTY(()) rs6000_asm_out_state *target_casm;
+
+#define rs6000_casm static_cast<rs6000_asm_out_state *> (casm)
+
 #endif

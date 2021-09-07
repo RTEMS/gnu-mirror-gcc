@@ -934,7 +934,7 @@ dbxout_function_end (tree decl ATTRIBUTE_UNUSED)
   if (crtl->has_bb_partition)
     {
       dbxout_begin_empty_stabs (N_FUN);
-      if (in_cold_section_p)
+      if (casm->in_cold_section_p)
 	dbxout_stab_value_label_diff (crtl->subsections.cold_section_end_label,
 				      crtl->subsections.cold_section_label);
       else
@@ -1042,7 +1042,7 @@ dbxout_init (const char *input_file_name)
 
   if (used_ltext_label_name)
     {
-      switch_to_section (text_section);
+      switch_to_section (casm->sec.text);
       targetm.asm_out.internal_label (asm_out_file, "Ltext", 0);
     }
 
@@ -1244,7 +1244,7 @@ dbxout_source_file (const char *filename)
     {
       /* Don't change section amid function.  */
       if (current_function_decl == NULL_TREE)
-	switch_to_section (text_section);
+	switch_to_section (casm->sec.text);
 
       dbxout_begin_simple_stabs (remap_debug_filename (filename), N_SOL);
       dbxout_stab_value_internal_label ("Ltext", &source_label_number);
@@ -1314,12 +1314,12 @@ dbxout_switch_text_section (void)
   /* The N_FUN tag at the end of the function is a GNU extension,
      which may be undesirable, and is unnecessary if we do not have
      named sections.  */
-  in_cold_section_p = !in_cold_section_p;
+  casm->in_cold_section_p = !casm->in_cold_section_p;
   switch_to_section (current_function_section ());
   dbxout_block (DECL_INITIAL (current_function_decl), 0,
 		DECL_ARGUMENTS (current_function_decl), -1);
   dbxout_function_end (current_function_decl);
-  in_cold_section_p = !in_cold_section_p;
+  casm->in_cold_section_p = !casm->in_cold_section_p;
 
   switch_to_section (current_function_section ());
 
@@ -1432,7 +1432,7 @@ dbxout_finish (const char *filename ATTRIBUTE_UNUSED)
   DBX_OUTPUT_MAIN_SOURCE_FILE_END (asm_out_file, filename);
 #elif defined DBX_OUTPUT_NULL_N_SO_AT_MAIN_SOURCE_FILE_END
  {
-   switch_to_section (text_section);
+   switch_to_section (casm->sec.text);
    dbxout_begin_empty_stabs (N_SO);
    dbxout_stab_value_internal_label ("Letext", 0);
  }
@@ -3114,7 +3114,7 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
 	    {
 	      /* Ultrix `as' seems to need this.  */
 #ifdef DBX_STATIC_STAB_DATA_SECTION
-	      switch_to_section (data_section);
+	      switch_to_section (casm->sec.data);
 #endif
 	      code = N_STSYM;
 	    }
@@ -3776,7 +3776,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 
   /* If called for the second partition, ignore blocks that don't have
      any children in the second partition.  */
-  if (crtl->has_bb_partition && in_cold_section_p && depth == 0)
+  if (crtl->has_bb_partition && casm->in_cold_section_p && depth == 0)
     dbx_block_with_cold_children (block);
 
   for (; block; block = BLOCK_CHAIN (block))
@@ -3801,7 +3801,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 	     the assembler symbols LBBn and LBEn
 	     that final will define around the code in this block.  */
 	  if (did_output
-	      && BLOCK_IN_COLD_SECTION_P (block) == in_cold_section_p)
+	      && BLOCK_IN_COLD_SECTION_P (block) == casm->in_cold_section_p)
 	    {
 	      char buf[20];
 	      const char *scope_start;
@@ -3829,7 +3829,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 
 	  /* Refer to the marker for the end of the block.  */
 	  if (did_output
-	      && BLOCK_IN_COLD_SECTION_P (block) == in_cold_section_p)
+	      && BLOCK_IN_COLD_SECTION_P (block) == casm->in_cold_section_p)
 	    {
 	      char buf[100];
 	      if (depth == 0)

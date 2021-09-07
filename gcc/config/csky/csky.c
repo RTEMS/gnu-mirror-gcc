@@ -959,7 +959,7 @@ get_csky_jump_table_size (rtx insn)
 {
   /* ADDR_VECs only take room if read-only data does into the text
      section.  */
-  if (JUMP_TABLES_IN_TEXT_SECTION || readonly_data_section == text_section)
+  if (JUMP_TABLES_IN_TEXT_SECTION || casm->sec.readonly_data == casm->sec.text)
     {
       rtx body = PATTERN (insn);
       int elt = GET_CODE (body) == ADDR_DIFF_VEC ? 1 : 0;
