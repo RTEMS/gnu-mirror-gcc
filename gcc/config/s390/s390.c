@@ -16612,7 +16612,7 @@ s390_output_indirect_thunk_function (unsigned int regno, bool z10_p)
     }
   else
     {
-      switch_to_section (text_section);
+      switch_to_section (casm->sec.text);
       ASM_OUTPUT_LABEL (asm_out_file, thunk_label);
     }
 

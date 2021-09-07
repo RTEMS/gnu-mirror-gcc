@@ -9718,7 +9718,7 @@ mips_output_aligned_decl_common (FILE *stream, tree decl, const char *name,
       if (TREE_PUBLIC (decl) && DECL_NAME (decl))
 	targetm.asm_out.globalize_label (stream, name);
 
-      switch_to_section (readonly_data_section);
+      switch_to_section (casm->sec.readonly_data);
       ASM_OUTPUT_ALIGN (stream, floor_log2 (align / BITS_PER_UNIT));
       mips_declare_object (stream, name, "",
 			   ":\n\t.space\t" HOST_WIDE_INT_PRINT_UNSIGNED "\n",

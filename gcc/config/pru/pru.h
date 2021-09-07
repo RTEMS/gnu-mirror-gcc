@@ -542,7 +542,7 @@ while (0)
 #undef  ASM_OUTPUT_ALIGNED_LOCAL
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
 do {									\
-  switch_to_section (bss_section);					\
+  switch_to_section (casm->sec.bss);					\
   ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
   if (!flag_inhibit_size_directive)					\
     ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, SIZE);			\

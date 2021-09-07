@@ -187,7 +187,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define drectve_section() \
   (fprintf (asm_out_file, "\t.section .drectve\n"), \
-   in_section = NULL)
+   casm->in_section = NULL)
 
 /* Older versions of gas don't handle 'r' as data.
    Explicitly set data flag with 'd'.  */  

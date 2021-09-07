@@ -10085,7 +10085,7 @@ avr_asm_asm_output_aligned_bss (FILE *file, tree decl, const char *name,
 }
 
 
-/* Unnamed section callback for data_section
+/* Unnamed section callback for casm->sec.data
    to track need of __do_copy_data.  */
 
 static void
@@ -10098,7 +10098,7 @@ avr_output_data_section_asm_op (const void *data)
 }
 
 
-/* Unnamed section callback for bss_section
+/* Unnamed section callback for casm->sec.bss
    to track need of __do_clear_bss.  */
 
 static void
@@ -10133,9 +10133,9 @@ avr_asm_init_sections (void)
 #if defined HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
   if (avr_arch->flash_pm_offset == 0)
 #endif
-    readonly_data_section->unnamed.callback = avr_output_data_section_asm_op;
-  data_section->unnamed.callback = avr_output_data_section_asm_op;
-  bss_section->unnamed.callback = avr_output_bss_section_asm_op;
+    casm->sec.readonly_data->unnamed.callback = avr_output_data_section_asm_op;
+  casm->sec.data->unnamed.callback = avr_output_data_section_asm_op;
+  casm->sec.bss->unnamed.callback = avr_output_bss_section_asm_op;
 }
 
 
@@ -12567,7 +12567,7 @@ avr_output_addr_vec (rtx_insn *labl, rtx table)
   // Switch back to original section.  As we clobbered the section above,
   // forget the current section before switching back.
 
-  in_section = NULL;
+  casm->in_section = NULL;
   switch_to_section (current_function_section ());
 }
 

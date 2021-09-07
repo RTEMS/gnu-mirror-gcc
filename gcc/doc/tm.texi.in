@@ -3862,7 +3862,7 @@ separately.
 
 @defmac TRAMPOLINE_SECTION
 Return the section into which the trampoline template is to be placed
-(@pxref{Sections}).  The default value is @code{readonly_data_section}.
+(@pxref{Sections}).  The default value is @code{casm->sec.readonly_data}.
 @end defmac
 
 @defmac TRAMPOLINE_SIZE
@@ -4758,7 +4758,7 @@ section}, which holds uninitialized data.  Some systems have other kinds
 of sections.
 
 @file{varasm.c} provides several well-known sections, such as
-@code{text_section}, @code{data_section} and @code{bss_section}.
+@code{casm->sec.text}, @code{casm->sec.data} and @code{casm->sec.bss}.
 The normal way of controlling a @code{@var{foo}_section} variable
 is to define the associated @code{@var{FOO}_SECTION_ASM_OP} macro,
 as described below.  The macros are only read once, when @file{varasm.c}
@@ -4774,12 +4774,12 @@ section is selected.  If your assembler falls into this category, you
 should define the @code{TARGET_ASM_INIT_SECTIONS} hook and use
 @code{get_unnamed_section} to set up the sections.
 
-You must always create a @code{text_section}, either by defining
-@code{TEXT_SECTION_ASM_OP} or by initializing @code{text_section}
+You must always create a @code{casm->sec.text}, either by defining
+@code{TEXT_SECTION_ASM_OP} or by initializing @code{casm->sec.text}
 in @code{TARGET_ASM_INIT_SECTIONS}.  The same is true of
-@code{data_section} and @code{DATA_SECTION_ASM_OP}.  If you do not
-create a distinct @code{readonly_data_section}, the default is to
-reuse @code{text_section}.
+@code{casm->sec.data} and @code{DATA_SECTION_ASM_OP}.  If you do not
+create a distinct @code{casm->sec.readonly_data}, the default is to
+reuse @code{casm->sec.text}.
 
 All the other @file{varasm.c} sections are optional, and are null
 if the target does not provide them.

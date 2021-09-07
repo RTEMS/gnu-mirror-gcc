@@ -470,9 +470,9 @@ while (0)
 #define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN)	\
 do {                                                                    \
  if (targetm.in_small_data_p (DECL))					\
-    switch_to_section (sbss_section);					\
+    switch_to_section (casm->sec.sbss);					\
   else                                                                  \
-    switch_to_section (bss_section);					\
+    switch_to_section (casm->sec.bss);					\
   ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");                     \
   if (!flag_inhibit_size_directive)                                     \
     ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, SIZE);                       \

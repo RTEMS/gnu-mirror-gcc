@@ -195,9 +195,9 @@ along with GCC; see the file COPYING3.  If not see
   do									\
     {									\
       if (TARGET_SUN_TLS						\
-	  && in_section							\
-	  && ((in_section->common.flags & SECTION_TLS) == SECTION_TLS))	\
-	switch_to_section (bss_section);				\
+	  && casm->in_section							\
+	  && ((casm->in_section->common.flags & SECTION_TLS) == SECTION_TLS))	\
+	switch_to_section (casm->sec.bss);				\
       x86_elf_aligned_decl_common (FILE, DECL, NAME, SIZE, ALIGN);	\
     }									\
   while  (0)
