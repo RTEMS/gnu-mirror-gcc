@@ -934,7 +934,7 @@ dbxout_function_end (tree decl ATTRIBUTE_UNUSED)
   if (crtl->has_bb_partition)
     {
       dbxout_begin_empty_stabs (N_FUN);
-      if (in_cold_section_p)
+      if (casm->in_cold_section_p)
 	dbxout_stab_value_label_diff (crtl->subsections.cold_section_end_label,
 				      crtl->subsections.cold_section_label);
       else
@@ -1314,12 +1314,12 @@ dbxout_switch_text_section (void)
   /* The N_FUN tag at the end of the function is a GNU extension,
      which may be undesirable, and is unnecessary if we do not have
      named sections.  */
-  in_cold_section_p = !in_cold_section_p;
+  casm->in_cold_section_p = !casm->in_cold_section_p;
   switch_to_section (current_function_section ());
   dbxout_block (DECL_INITIAL (current_function_decl), 0,
 		DECL_ARGUMENTS (current_function_decl), -1);
   dbxout_function_end (current_function_decl);
-  in_cold_section_p = !in_cold_section_p;
+  casm->in_cold_section_p = !casm->in_cold_section_p;
 
   switch_to_section (current_function_section ());
 
@@ -3776,7 +3776,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 
   /* If called for the second partition, ignore blocks that don't have
      any children in the second partition.  */
-  if (crtl->has_bb_partition && in_cold_section_p && depth == 0)
+  if (crtl->has_bb_partition && casm->in_cold_section_p && depth == 0)
     dbx_block_with_cold_children (block);
 
   for (; block; block = BLOCK_CHAIN (block))
@@ -3801,7 +3801,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 	     the assembler symbols LBBn and LBEn
 	     that final will define around the code in this block.  */
 	  if (did_output
-	      && BLOCK_IN_COLD_SECTION_P (block) == in_cold_section_p)
+	      && BLOCK_IN_COLD_SECTION_P (block) == casm->in_cold_section_p)
 	    {
 	      char buf[20];
 	      const char *scope_start;
@@ -3829,7 +3829,7 @@ dbxout_block (tree block, int depth, tree args, int parent_blocknum)
 
 	  /* Refer to the marker for the end of the block.  */
 	  if (did_output
-	      && BLOCK_IN_COLD_SECTION_P (block) == in_cold_section_p)
+	      && BLOCK_IN_COLD_SECTION_P (block) == casm->in_cold_section_p)
 	    {
 	      char buf[100];
 	      if (depth == 0)

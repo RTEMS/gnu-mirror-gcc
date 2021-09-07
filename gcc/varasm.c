@@ -173,17 +173,6 @@ static GTY(()) section *unnamed_sections;
 #define IN_NAMED_SECTION(DECL) \
   (VAR_OR_FUNCTION_DECL_P (DECL) && DECL_SECTION_NAME (DECL) != NULL)
 
-struct section_hasher : ggc_ptr_hash<section>
-{
-  typedef const char *compare_type;
-
-  static hashval_t hash (section *);
-  static bool equal (section *, const char *);
-};
-
-/* Hash table of named sections.  */
-static GTY(()) hash_table<section_hasher> *section_htab;
-
 struct object_block_hasher : ggc_ptr_hash<object_block>
 {
   typedef const section *compare_type;
@@ -286,8 +275,8 @@ get_section (const char *name, unsigned int flags, tree decl,
 {
   section *sect, **slot;
 
-  slot = section_htab->find_slot_with_hash (name, htab_hash_string (name),
-					    INSERT);
+  slot = casm->section_htab->find_slot_with_hash (name, htab_hash_string (name),
+						  INSERT);
   flags |= SECTION_NAMED;
   if (decl != nullptr
       && DECL_P (decl)
@@ -710,7 +699,7 @@ function_section (tree decl)
 section *
 current_function_section (void)
 {
-  return function_section_1 (current_function_decl, in_cold_section_p);
+  return function_section_1 (current_function_decl, casm->in_cold_section_p);
 }
 
 /* Tell assembler to switch to unlikely-to-be-executed text section.  */
@@ -738,7 +727,7 @@ unlikely_text_section_p (section *sect)
 void
 switch_to_other_text_partition (void)
 {
-  in_cold_section_p = !in_cold_section_p;
+  casm->in_cold_section_p = !casm->in_cold_section_p;
   switch_to_section (current_function_section ());
 }
 
@@ -1816,7 +1805,7 @@ decide_function_section (tree decl)
 				      == NODE_FREQUENCY_UNLIKELY_EXECUTED);
     }
 
-  in_cold_section_p = first_function_block_is_cold;
+  casm->in_cold_section_p = first_function_block_is_cold;
 }
 
 /* Get the function's name, as described by its RTL.  This may be
@@ -1898,7 +1887,7 @@ assemble_start_function (tree decl, const char *fnname)
 	  hot_label_written = true;
 	  first_function_block_is_cold = true;
 	}
-      in_cold_section_p = first_function_block_is_cold;
+      casm->in_cold_section_p = first_function_block_is_cold;
     }
 
 
@@ -2012,7 +2001,7 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
     {
       section *save_text_section;
 
-      save_text_section = in_section;
+      save_text_section = casm->in_section;
       switch_to_section (unlikely_text_section ());
 #ifdef ASM_DECLARE_COLD_FUNCTION_SIZE
       if (cold_function_name != NULL_TREE)
@@ -2042,7 +2031,7 @@ assemble_zeros (unsigned HOST_WIDE_INT size)
 #ifdef ASM_NO_SKIP_IN_TEXT
   /* The `space' pseudo in the text section outputs nop insns rather than 0s,
      so we must output 0s explicitly in the text section.  */
-  if (ASM_NO_SKIP_IN_TEXT && (in_section->common.flags & SECTION_CODE) != 0)
+  if (ASM_NO_SKIP_IN_TEXT && (casm->in_section->common.flags & SECTION_CODE) != 0)
     {
       unsigned HOST_WIDE_INT i;
       for (i = 0; i < size; i++)
@@ -4184,8 +4173,8 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
   /* Make sure all constants in SECTION_MERGE and not SECTION_STRINGS
      sections have proper size.  */
   if (align > GET_MODE_BITSIZE (desc->mode)
-      && in_section
-      && (in_section->common.flags & SECTION_MERGE))
+      && casm->in_section
+      && (casm->in_section->common.flags & SECTION_MERGE))
     assemble_align (align);
 
 #ifdef ASM_OUTPUT_SPECIAL_POOL_ENTRY
@@ -6588,7 +6577,6 @@ make_decl_one_only (tree decl, tree comdat_group)
 void
 init_varasm_once (void)
 {
-  section_htab = hash_table<section_hasher>::create_ggc (31);
   object_block_htab = hash_table<object_block_hasher>::create_ggc (31);
   const_desc_htab = hash_table<tree_descriptor_hasher>::create_ggc (1009);
 
@@ -7810,13 +7798,13 @@ switch_to_section (section *new_section, tree decl)
 		  "%qD was declared here", used_decl);
 	}
     }
-  else if (in_section == new_section)
+  else if (casm->in_section == new_section)
     return;
 
   if (new_section->common.flags & SECTION_FORGET)
-    in_section = NULL;
+    casm->in_section = NULL;
   else
-    in_section = new_section;
+    casm->in_section = new_section;
 
   switch (SECTION_STYLE (new_section))
     {
@@ -8461,7 +8449,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				 sect->named.common.flags
 				 | SECTION_LINKONCE,
 				 DECL_NAME (decl));
-  in_section = sect;
+  casm->in_section = sect;
 #else
   /* Neither OBJECT_FORMAT_PE, nor OBJECT_FORMAT_COFF is set here.
      Therefore the following check is used.
@@ -8487,7 +8475,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				     sect->named.common.flags
 				     | SECTION_LINKONCE,
 				     DECL_NAME (decl));
-      in_section = sect;
+      casm->in_section = sect;
     }
   else
     switch_to_section (sect);
