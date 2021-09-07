@@ -805,7 +805,7 @@ lhd_begin_section (const char *name)
   gcc_assert (!saved_section);
   saved_section = casm->in_section;
   if (!saved_section)
-    saved_section = text_section;
+    saved_section = casm->sections.text;
 
   /* Create a new section and switch to it.  */
   section = get_section (name, SECTION_DEBUG | SECTION_EXCLUDE, NULL, true);

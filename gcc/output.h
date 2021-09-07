@@ -324,7 +324,7 @@ struct section_hasher : ggc_ptr_hash<section>
 struct GTY(()) asm_out_state
 {
   asm_out_state (): out_file (NULL), in_section (NULL),
-    in_cold_section_p (false)
+    sections ({}), in_cold_section_p (false)
   {
     section_htab = hash_table<section_hasher>::create_ggc (31);
   }
@@ -338,6 +338,12 @@ struct GTY(()) asm_out_state
   /* asm_out_file's current section.  This is NULL if no section has yet
      been selected or if we lose track of what the current section is.  */
   section *in_section;
+
+  struct
+  {
+    section *text;
+    section *data;
+  } sections;
 
   /* True if code for the current function is currently being directed
      at the cold section.  */
@@ -543,8 +549,6 @@ union GTY ((desc ("SECTION_STYLE (&(%h))"), for_user)) section {
 struct object_block;
 
 /* Special well-known sections.  */
-extern GTY(()) section *text_section;
-extern GTY(()) section *data_section;
 extern GTY(()) section *readonly_data_section;
 extern GTY(()) section *sdata_section;
 extern GTY(()) section *ctors_section;

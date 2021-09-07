@@ -1113,10 +1113,10 @@ dwarf2out_begin_prologue (unsigned int line ATTRIBUTE_UNUSED,
   /* Initialize the bits of CURRENT_FDE that were not available earlier.  */
   fde->dw_fde_begin = dup_label;
   fde->dw_fde_current_label = dup_label;
-  fde->in_std_section = (fnsec == text_section
+  fde->in_std_section = (fnsec == casm->sections.text
 			 || (cold_text_section && fnsec == cold_text_section));
   fde->ignored_debug = DECL_IGNORED_P (current_function_decl);
-  in_text_section_p = fnsec == text_section;
+  in_text_section_p = fnsec == casm->sections.text;
 
   /* We only want to output line number information for the genuine dwarf2
      prologue case, not the eh frame case.  */
@@ -1317,9 +1317,9 @@ dwarf2out_switch_text_section (void)
   switch_to_section (sect);
 
   fde->second_in_std_section
-    = (sect == text_section
+    = (sect == casm->sections.text
        || (cold_text_section && sect == cold_text_section));
-  in_text_section_p = sect == text_section;
+  in_text_section_p = sect == casm->sections.text;
 
   if (dwarf2out_do_cfi_asm ())
     dwarf2out_do_cfi_startproc (true);
@@ -28190,7 +28190,7 @@ set_cur_line_info_table (section *sec)
 {
   dw_line_info_table *table;
 
-  if (sec == text_section)
+  if (sec == casm->sections.text)
     table = text_section_line_info;
   else if (sec == cold_text_section)
     {
@@ -28244,7 +28244,7 @@ dwarf2out_begin_function (tree fun)
 {
   section *sec = function_section (fun);
 
-  if (sec != text_section)
+  if (sec != casm->sections.text)
     have_multiple_function_sections = true;
 
   if (crtl->has_bb_partition && !cold_text_section)
@@ -29373,7 +29373,7 @@ dwarf2out_assembly_start (void)
 			       COLD_TEXT_SECTION_LABEL, 0);
   ASM_GENERATE_INTERNAL_LABEL (cold_end_label, COLD_END_LABEL, 0);
 
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   ASM_OUTPUT_LABEL (asm_out_file, text_section_label);
 #endif
 
@@ -32080,7 +32080,7 @@ dwarf2out_finish (const char *filename)
     main_comp_unit_die = comp_unit_die ();
 
   /* Output a terminator label for the .text section.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   targetm.asm_out.internal_label (asm_out_file, TEXT_END_LABEL, 0);
   if (cold_text_section)
     {
@@ -32996,7 +32996,7 @@ dwarf2out_early_finish (const char *filename)
     }
 
   /* Switch back to the text section.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
 }
 
 /* Reset all state within dwarf2out.c so that we can rerun the compiler

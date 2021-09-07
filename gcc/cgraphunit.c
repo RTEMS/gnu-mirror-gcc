@@ -2309,7 +2309,7 @@ symbol_table::compile (void)
   timevar_pop (TV_CGRAPHOPT);
 
   /* Output everything.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   (*debug_hooks->assembly_start) ();
   if (!quiet_flag)
     fprintf (stderr, "Assembling functions:\n");
