@@ -339,10 +339,36 @@ struct GTY(()) asm_out_state
      been selected or if we lose track of what the current section is.  */
   section *in_section;
 
+  /* Well-known sections, each one associated with some sort of *_ASM_OP.  */
   struct
   {
     section *text;
     section *data;
+    section *readonly_data;
+    section *sdata;
+    section *ctors;
+    section *dtors;
+    section *bss;
+    section *sbss;
+
+    /* Various forms of common section.  All are guaranteed to be nonnull.  */
+    section *tls_comm;
+    section *comm;
+    section *lcomm;
+
+    /* A SECTION_NOSWITCH section used for declaring global BSS variables.
+       May be null.  */
+    section *bss_noswitch;
+
+    /* The section that holds the main exception table, when known.  The section
+       is set either by the target's init_sections hook or by the first call to
+       switch_to_exception_section.  */
+    section *exception;
+
+    /* The section that holds the DWARF2 frame unwind information, when known.
+       The section is set either by the target's init_sections hook or by the
+       first call to switch_to_eh_frame_section.  */
+    section *eh_frame;
   } sections;
 
   /* The next number to use for internal anchor labels.  */
@@ -552,19 +578,6 @@ union GTY ((desc ("SECTION_STYLE (&(%h))"), for_user)) section {
 struct object_block;
 
 /* Special well-known sections.  */
-extern GTY(()) section *readonly_data_section;
-extern GTY(()) section *sdata_section;
-extern GTY(()) section *ctors_section;
-extern GTY(()) section *dtors_section;
-extern GTY(()) section *bss_section;
-extern GTY(()) section *sbss_section;
-extern GTY(()) section *exception_section;
-extern GTY(()) section *eh_frame_section;
-extern GTY(()) section *tls_comm_section;
-extern GTY(()) section *comm_section;
-extern GTY(()) section *lcomm_section;
-extern GTY(()) section *bss_noswitch_section;
-
 extern section *get_unnamed_section (unsigned int, void (*) (const void *),
 				     const void *);
 extern section *get_section (const char *, unsigned int, tree,

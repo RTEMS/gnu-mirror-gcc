@@ -2906,8 +2906,8 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 {
   section *s;
 
-  if (exception_section)
-    s = exception_section;
+  if (casm->sections.exception)
+    s = casm->sections.exception;
   else
     {
       int flags;
@@ -2943,12 +2943,12 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 	    }
 	  else
 #endif
-	    exception_section
+	    casm->sections.exception
 	      = s = get_section (".gcc_except_table", flags, NULL);
 	}
       else
-	exception_section
-	  = s = flags == SECTION_WRITE ? casm->sections.data: readonly_data_section;
+	casm->sections.exception
+	  = s = flags == SECTION_WRITE ? casm->sections.data: casm->sections.readonly_data;
     }
 
   switch_to_section (s);
