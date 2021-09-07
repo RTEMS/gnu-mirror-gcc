@@ -69,9 +69,9 @@ extern int size_directive_output;
 #define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN) \
 do {									\
   if ((DECL) && sdata_symbolic_operand (XEXP (DECL_RTL (DECL), 0), Pmode)) \
-    switch_to_section (sbss_section);					\
+    switch_to_section (casm->sec.sbss);					\
   else									\
-    switch_to_section (bss_section);					\
+    switch_to_section (casm->sec.bss);					\
   ASM_OUTPUT_ALIGN (FILE, floor_log2 ((ALIGN) / BITS_PER_UNIT));	\
   ASM_DECLARE_OBJECT_NAME (FILE, NAME, DECL);				\
   ASM_OUTPUT_SKIP (FILE, SIZE ? SIZE : 1);				\

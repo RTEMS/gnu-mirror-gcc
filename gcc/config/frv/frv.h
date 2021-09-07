@@ -1540,7 +1540,7 @@ do {                                                                   	\
   if ((SIZE) > 0 && (SIZE) <= (unsigned HOST_WIDE_INT) g_switch_value)	\
     switch_to_section (get_named_section (NULL, ".sbss", 0));           \
   else                                                                 	\
-    switch_to_section (bss_section);                                  	\
+    switch_to_section (casm->sec.bss);                                  \
   ASM_OUTPUT_ALIGN (STREAM, floor_log2 ((ALIGN) / BITS_PER_UNIT));     	\
   ASM_DECLARE_OBJECT_NAME (STREAM, NAME, DECL);                        	\
   ASM_OUTPUT_SKIP (STREAM, (SIZE) ? (SIZE) : 1);                       	\

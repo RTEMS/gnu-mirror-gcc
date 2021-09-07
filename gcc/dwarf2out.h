@@ -103,9 +103,9 @@ struct GTY(()) dw_fde_node {
   unsigned stack_realign : 1;
   /* Whether dynamic realign argument pointer register has been saved.  */
   unsigned drap_reg_saved: 1;
-  /* True iff dw_fde_begin label is in text_section or cold_text_section.  */
+  /* True iff dw_fde_begin label is in casm->sec.text or cold_text_section.  */
   unsigned in_std_section : 1;
-  /* True iff dw_fde_second_begin label is in text_section or
+  /* True iff dw_fde_second_begin label is in casm->sec.text or
      cold_text_section.  */
   unsigned second_in_std_section : 1;
   /* True if Rule 18 described in dwarf2cfi.c is in action, i.e. for dynamic

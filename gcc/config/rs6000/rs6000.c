@@ -182,15 +182,6 @@ char toc_label_name[10];
    rs6000_variable_issue hook and returned from rs6000_sched_reorder2.  */
 static short cached_can_issue_more;
 
-static GTY(()) section *read_only_data_section;
-static GTY(()) section *private_data_section;
-static GTY(()) section *tls_data_section;
-static GTY(()) section *tls_private_data_section;
-static GTY(()) section *read_only_private_data_section;
-static GTY(()) section *sdata2_section;
-
-section *toc_section = 0;
-
 /* Describe the vector unit used for modes.  */
 enum rs6000_vector rs6000_vector_unit[NUM_MACHINE_MODES];
 enum rs6000_vector rs6000_vector_mem[NUM_MACHINE_MODES];
@@ -14749,7 +14740,7 @@ rs6000_assemble_integer (rtx x, unsigned int size, int aligned_p)
 	 section.  */
       if (DEFAULT_ABI == ABI_V4
 	  && (TARGET_RELOCATABLE || flag_pic > 1)
-	  && in_section != toc_section
+	  && casm->in_section != casm->sec.toc
 	  && !recurse
 	  && !CONST_SCALAR_INT_P (x)
 	  && CONSTANT_P (x))
@@ -20632,6 +20623,7 @@ rs6000_ms_bitfield_layout_p (const_tree record_type)
     || lookup_attribute ("ms_struct", TYPE_ATTRIBUTES (record_type));
 }
 
+
 #ifdef USING_ELFOS_H
 
 /* A get_unnamed_section callback, used for switching to toc_section.  */
@@ -20688,10 +20680,10 @@ rs6000_elf_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 static void
 rs6000_elf_asm_init_sections (void)
 {
-  toc_section
+  casm->sec.toc
     = get_unnamed_section (0, rs6000_elf_output_toc_section_asm_op, NULL);
 
-  sdata2_section
+  casm->sec.sdata2
     = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
 			   SDATA2_SECTION_ASM_OP);
 }
@@ -20703,7 +20695,7 @@ rs6000_elf_select_rtx_section (machine_mode mode, rtx x,
 			       unsigned HOST_WIDE_INT align)
 {
   if (ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (x, mode))
-    return toc_section;
+    return casm->sec.toc;
   else
     return default_elf_select_rtx_section (mode, x, align);
 }
@@ -21295,7 +21287,7 @@ rs6000_elf_file_end (void)
       /* We have expanded a CPU builtin, so we need to emit a reference to
 	 the special symbol that LIBC uses to declare it supports the
 	 AT_PLATFORM and AT_HWCAP/AT_HWCAP2 in the TCB feature.  */
-      switch_to_section (data_section);
+      switch_to_section (casm->sec.data);
       fprintf (asm_out_file, "\t.align %u\n", TARGET_32BIT ? 2 : 3);
       fprintf (asm_out_file, "\t%s %s\n",
 	       TARGET_32BIT ? ".long" : ".quad", tcb_verification_symbol);
@@ -21394,33 +21386,33 @@ rs6000_xcoff_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 static void
 rs6000_xcoff_asm_init_sections (void)
 {
-  read_only_data_section
+  casm->sec.read_only_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_read_only_section_name);
 
-  private_data_section
+  casm->sec.private_data
     = get_unnamed_section (SECTION_WRITE,
 			   rs6000_xcoff_output_readwrite_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  read_only_private_data_section
+  casm->sec.read_only_private_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_private_rodata_section_name);
 
-  tls_data_section
+  casm->sec.tls_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_tls_data_section_name);
 
-  tls_private_data_section
+  casm->sec.tls_private_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  toc_section
+  casm->sec.toc
     = get_unnamed_section (0, rs6000_xcoff_output_toc_section_asm_op, NULL);
 
-  readonly_data_section = read_only_data_section;
+  casm->sec.readonly_data = casm->sec.read_only_data;
 }
 
 static int
@@ -21488,9 +21480,9 @@ rs6000_xcoff_select_section (tree decl, int reloc,
   if (decl_readonly_section (decl, reloc))
     {
       if (TREE_PUBLIC (decl))
-	return read_only_data_section;
+	return casm->sec.read_only_data;
       else
-	return read_only_private_data_section;
+	return casm->sec.read_only_private_data;
     }
   else
     {
@@ -21498,7 +21490,7 @@ rs6000_xcoff_select_section (tree decl, int reloc,
       if (TREE_CODE (decl) == VAR_DECL && DECL_THREAD_LOCAL_P (decl))
 	{
 	  if (bss_initializer_p (decl))
-	    return tls_comm_section;
+	    return casm->sec.tls_comm;
 	  else if (TREE_PUBLIC (decl))
 	    return tls_data_section;
 	  else
@@ -21507,9 +21499,9 @@ rs6000_xcoff_select_section (tree decl, int reloc,
       else
 #endif
 	if (TREE_PUBLIC (decl))
-	return data_section;
+	return casm->sec.data;
       else
-	return private_data_section;
+	return casm->sec.private_data;
     }
 }
 
@@ -21534,9 +21526,9 @@ rs6000_xcoff_select_rtx_section (machine_mode mode, rtx x,
 				 unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED)
 {
   if (ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (x, mode))
-    return toc_section;
+    return casm->sec.toc;
   else
-    return read_only_private_data_section;
+    return casm->sec.read_only_private_data;
 }
 
 /* Remove any trailing [DS] or the like from the symbol name.  */
@@ -21610,9 +21602,9 @@ rs6000_xcoff_file_start (void)
   output_quoted_string (asm_out_file, main_input_filename);
   fputc ('\n', asm_out_file);
   if (write_symbols != NO_DEBUG)
-    switch_to_section (private_data_section);
-  switch_to_section (toc_section);
-  switch_to_section (text_section);
+    switch_to_section (casm->sec.private_data);
+  switch_to_section (casm->sec.toc);
+  switch_to_section (casm->sec.text);
   if (profile_flag)
     fprintf (asm_out_file, "\t.extern %s\n", RS6000_MCOUNT);
   rs6000_file_start ();
@@ -21624,14 +21616,14 @@ rs6000_xcoff_file_start (void)
 static void
 rs6000_xcoff_file_end (void)
 {
-  switch_to_section (text_section);
+  switch_to_section (casm->sec.text);
   if (xcoff_tls_exec_model_detected)
     {
       /* Add a .ref to __tls_get_addr to force libpthread dependency.  */
       fputs ("\t.extern __tls_get_addr\n\t.ref __tls_get_addr\n", asm_out_file);
     }
   fputs ("_section_.text:\n", asm_out_file);
-  switch_to_section (data_section);
+  switch_to_section (casm->sec.data);
   fputs (TARGET_32BIT
 	 ? "\t.long _section_.text\n" : "\t.llong _section_.text\n",
 	 asm_out_file);
@@ -21746,7 +21738,7 @@ rs6000_xcoff_visibility (tree decl)
    Dollar signs are converted to underscores.
 
    The csect for the function will have already been created when
-   text_section was selected.  We do have to go back to that csect, however.
+   casm->sec.text was selected.  We do have to go back to that csect, however.
 
    The third and fourth parameters to the .function pseudo-op (16 and 044)
    are placeholders which no longer have any use.
@@ -21808,7 +21800,7 @@ rs6000_xcoff_declare_function_name (FILE *file, const char *name, tree decl)
   RS6000_OUTPUT_BASENAME (file, buffer);
   fputs (", TOC[tc0], 0\n", file);
 
-  in_section = NULL;
+  casm->in_section = NULL;
   switch_to_section (function_section (decl));
   putc ('.', file);
   ASM_OUTPUT_LABEL (file, buffer);
@@ -21868,7 +21860,7 @@ rs6000_xcoff_asm_output_aligned_decl_common (FILE *stream,
   if (! DECL_COMMON (decl))
     {
       /* Forget section.  */
-      in_section = NULL;
+      casm->in_section = NULL;
 
       /* Globalize TLS BSS.  */
       if (TREE_PUBLIC (decl) && DECL_THREAD_LOCAL_P (decl))
@@ -26898,7 +26890,7 @@ rs6000_code_end (void)
   else
 #endif
     {
-      switch_to_section (text_section);
+      switch_to_section (casm->sec.text);
       ASM_OUTPUT_LABEL (asm_out_file, name);
     }
 

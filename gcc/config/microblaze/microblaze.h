@@ -623,11 +623,11 @@ do {									\
       && (int) (SIZE) <= microblaze_section_threshold			\
       && TARGET_XLGPOPT)						\
     {                                                                   \
-      switch_to_section (sbss_section);					\
+      switch_to_section (casm->sec.sbss);					\
     }									\
   else									\
     {									\
-      switch_to_section (bss_section);					\
+      switch_to_section (casm->sec.bss);					\
     }                                                                   \
   fprintf (FILE, "%s", COMMON_ASM_OP);                                  \
   assemble_name ((FILE), (NAME));					\
@@ -643,11 +643,11 @@ do {									\
       && (int) (SIZE) <= microblaze_section_threshold			\
       && TARGET_XLGPOPT)						\
     {                                                                   \
-      switch_to_section (sbss_section);					\
+      switch_to_section (casm->sec.sbss);					\
     }									\
   else									\
     {									\
-      switch_to_section (bss_section);					\
+      switch_to_section (casm->sec.bss);					\
     }                                                                   \
   fprintf (FILE, "%s", LCOMMON_ASM_OP);                                 \
   assemble_name ((FILE), (NAME));					\

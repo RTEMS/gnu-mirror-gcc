@@ -9396,7 +9396,7 @@ frv_rtx_costs (rtx x,
 static void
 frv_asm_out_constructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 {
-  switch_to_section (ctors_section);
+  switch_to_section (casm->sec.ctors);
   assemble_align (POINTER_SIZE);
   if (TARGET_FDPIC)
     {
@@ -9411,7 +9411,7 @@ frv_asm_out_constructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 static void
 frv_asm_out_destructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 {
-  switch_to_section (dtors_section);
+  switch_to_section (casm->sec.dtors);
   assemble_align (POINTER_SIZE);
   if (TARGET_FDPIC)
     {

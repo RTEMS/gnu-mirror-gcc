@@ -8055,13 +8055,13 @@ alpha_start_function (FILE *file, const char *fnname,
 
 #ifdef TARGET_VMS_CRASH_DEBUG
   /* Support of minimal traceback info.  */
-  switch_to_section (readonly_data_section);
+  switch_to_section (casm->sec.readonly_data);
   fprintf (file, "\t.align 3\n");
   assemble_name (file, fnname); fputs ("..na:\n", file);
   fputs ("\t.ascii \"", file);
   assemble_name (file, fnname);
   fputs ("\\0\"\n", file);
-  switch_to_section (text_section);
+  switch_to_section (casm->sec.text);
 #endif
 #endif /* TARGET_ABI_OPEN_VMS */
 }
@@ -9446,7 +9446,7 @@ alpha_elf_select_rtx_section (machine_mode mode, rtx x,
 {
   if (TARGET_SMALL_DATA && GET_MODE_SIZE (mode) <= g_switch_value)
     /* ??? Consider using mergeable sdata sections.  */
-    return sdata_section;
+    return casm->sec.sdata;
   else
     return default_elf_select_rtx_section (mode, x, align);
 }
@@ -9613,7 +9613,7 @@ alpha_write_linkage (FILE *stream, const char *funname)
 {
   fprintf (stream, "\t.link\n");
   fprintf (stream, "\t.align 3\n");
-  in_section = NULL;
+  casm->in_section = NULL;
 
 #ifdef TARGET_VMS_CRASH_DEBUG
   fputs ("\t.name ", stream);
@@ -9665,7 +9665,7 @@ vms_asm_named_section (const char *name, unsigned int flags,
 static void
 vms_asm_out_constructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 {
-  switch_to_section (ctors_section);
+  switch_to_section (casm->sec.ctors);
   assemble_align (BITS_PER_WORD);
   assemble_integer (symbol, UNITS_PER_WORD, BITS_PER_WORD, 1);
 }
@@ -9673,7 +9673,7 @@ vms_asm_out_constructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 static void
 vms_asm_out_destructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 {
-  switch_to_section (dtors_section);
+  switch_to_section (casm->sec.dtors);
   assemble_align (BITS_PER_WORD);
   assemble_integer (symbol, UNITS_PER_WORD, BITS_PER_WORD, 1);
 }

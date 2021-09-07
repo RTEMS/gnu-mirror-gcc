@@ -290,7 +290,7 @@ enum reg_class
 
 #define TRAMPOLINE_SIZE (TARGET_32BIT ? 48 : 56)
 #define TRAMPOLINE_ALIGNMENT 64
-#define TRAMPOLINE_SECTION text_section
+#define TRAMPOLINE_SECTION casm->sec.text
 
 
 /* Call frame debugging information.  */

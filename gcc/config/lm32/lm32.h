@@ -385,9 +385,9 @@ enum reg_class
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
 do {									\
   if ((SIZE) <= (unsigned HOST_WIDE_INT) g_switch_value)		\
-    switch_to_section (sbss_section);					\
+    switch_to_section (casm->sec.sbss);					\
   else									\
-    switch_to_section (bss_section);					\
+    switch_to_section (casm->sec.bss);					\
   ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
   if (!flag_inhibit_size_directive)					\
     ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, SIZE);			\
@@ -403,7 +403,7 @@ do 									\
 {									\
   if ((SIZE) <= (unsigned HOST_WIDE_INT) g_switch_value)		\
     {									\
-      switch_to_section (sbss_section);					\
+      switch_to_section (casm->sec.sbss);					\
       (*targetm.asm_out.globalize_label) (FILE, NAME);			\
       ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
       if (!flag_inhibit_size_directive)					\
@@ -414,7 +414,7 @@ do 									\
     }									\
   else									\
     {									\
-      switch_to_section (bss_section);					\
+      switch_to_section (casm->sec.bss);					\
       fprintf ((FILE), "%s", COMMON_ASM_OP);				\
       assemble_name ((FILE), (NAME));					\
       fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",%u\n",          \

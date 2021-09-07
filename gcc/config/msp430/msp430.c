@@ -2398,22 +2398,22 @@ msp430_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align)
     {
     case SECCAT_TEXT:
       if (!prefix)
-	return text_section;
+	return casm->sec.text;
       base_sec_name = ".text";
       break;
     case SECCAT_DATA:
       if (!prefix)
-	return data_section;
+	return casm->sec.data;
       base_sec_name = ".data";
       break;
     case SECCAT_BSS:
       if (!prefix)
-	return bss_section;
+	return casm->sec.bss;
       base_sec_name = ".bss";
       break;
     case SECCAT_RODATA:
       if (!prefix)
-	return readonly_data_section;
+	return casm->sec.readonly_data;
       base_sec_name = ".rodata";
       break;
 

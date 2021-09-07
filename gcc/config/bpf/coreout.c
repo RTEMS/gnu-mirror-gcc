@@ -126,8 +126,6 @@ typedef bpf_core_section_t * bpf_core_section_ref;
 
 /* BTF.ext debug info section.  */
 
-static GTY (()) section * btf_ext_info_section;
-
 static int btf_ext_label_num;
 
 #ifndef BTF_EXT_INFO_SECTION_NAME
@@ -246,7 +244,7 @@ bpf_core_get_sou_member_index (ctf_container_ref ctfc, const tree node)
 static void
 output_btfext_header (void)
 {
-  switch_to_section (btf_ext_info_section);
+  switch_to_section (casm->sec.btf_ext_info);
   ASM_OUTPUT_LABEL (asm_out_file, btf_ext_info_section_label);
 
   dw2_asm_output_data (2, BTF_MAGIC, "btf_magic");
@@ -332,8 +330,8 @@ output_btfext_core_sections (void)
 void
 btf_ext_init (void)
 {
-  btf_ext_info_section = get_section (BTF_EXT_INFO_SECTION_NAME,
-				      BTF_EXT_INFO_SECTION_FLAGS, NULL);
+  casm->sec.btf_ext_info = get_section (BTF_EXT_INFO_SECTION_NAME,
+					BTF_EXT_INFO_SECTION_FLAGS, NULL);
 
   ASM_GENERATE_INTERNAL_LABEL (btf_ext_info_section_label,
 			       BTF_EXT_INFO_SECTION_LABEL,

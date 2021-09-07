@@ -5506,7 +5506,7 @@ rs6000_output_function_epilogue (FILE *file)
       need_toc_init = 0;
       if (!toc_initialized)
 	{
-	  switch_to_section (toc_section);
+	  switch_to_section (casm->sec.toc);
 	  switch_to_section (current_function_section ());
 	}
     }
