@@ -182,9 +182,6 @@ struct object_block_hasher : ggc_ptr_hash<object_block>
 /* A table of object_blocks, indexed by section.  */
 static GTY(()) hash_table<object_block_hasher> *object_block_htab;
 
-/* The next number to use for internal anchor labels.  */
-static GTY(()) int anchor_labelno;
-
 /* A pool of constants that can be shared between functions.  */
 static GTY(()) struct rtx_constant_pool *shared_constant_pool;
 
@@ -7978,7 +7975,7 @@ get_section_anchor (struct object_block *block, HOST_WIDE_INT offset,
     }
 
   /* Create a new anchor with a unique label.  */
-  ASM_GENERATE_INTERNAL_LABEL (label, "LANCHOR", anchor_labelno++);
+  ASM_GENERATE_INTERNAL_LABEL (label, "LANCHOR", casm->anchor_labelno++);
   anchor = create_block_symbol (ggc_strdup (label), block, offset);
   SYMBOL_REF_FLAGS (anchor) |= SYMBOL_FLAG_LOCAL | SYMBOL_FLAG_ANCHOR;
   SYMBOL_REF_FLAGS (anchor) |= model << SYMBOL_FLAG_TLS_SHIFT;
