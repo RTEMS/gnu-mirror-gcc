@@ -2189,10 +2189,10 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	  if (targetm.asm_out.unwind_emit)
 	    targetm.asm_out.unwind_emit (asm_out_file, insn);
 
-	  in_cold_section_p = !in_cold_section_p;
+	  casm->in_cold_section_p = !casm->in_cold_section_p;
 
-	  gcc_checking_assert (in_cold_section_p);
-	  if (in_cold_section_p)
+	  gcc_checking_assert (casm->in_cold_section_p);
+	  if (casm->in_cold_section_p)
 	    cold_function_name
 	      = clone_function_name (current_function_decl, "cold");
 
@@ -2213,10 +2213,10 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	  switch_to_section (current_function_section ());
 	  targetm.asm_out.function_switched_text_sections (asm_out_file,
 							   current_function_decl,
-							   in_cold_section_p);
+							   casm->in_cold_section_p);
 	  /* Emit a label for the split cold section.  Form label name by
 	     suffixing "cold" to the original function's name.  */
-	  if (in_cold_section_p)
+	  if (casm->in_cold_section_p)
 	    {
 #ifdef ASM_DECLARE_COLD_FUNCTION_NAME
 	      ASM_DECLARE_COLD_FUNCTION_NAME (asm_out_file,
@@ -2323,7 +2323,7 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 
 	      /* Mark this block as output.  */
 	      TREE_ASM_WRITTEN (NOTE_BLOCK (insn)) = 1;
-	      BLOCK_IN_COLD_SECTION_P (NOTE_BLOCK (insn)) = in_cold_section_p;
+	      BLOCK_IN_COLD_SECTION_P (NOTE_BLOCK (insn)) = casm->in_cold_section_p;
 	    }
 	  if (write_symbols == DBX_DEBUG)
 	    {
@@ -2358,7 +2358,7 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	      if (!DECL_IGNORED_P (current_function_decl))
 		debug_hooks->end_block (high_block_linenum, n);
 	      gcc_assert (BLOCK_IN_COLD_SECTION_P (NOTE_BLOCK (insn))
-			  == in_cold_section_p);
+			  == casm->in_cold_section_p);
 	    }
 	  if (write_symbols == DBX_DEBUG)
 	    {

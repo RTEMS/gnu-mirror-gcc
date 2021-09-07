@@ -313,25 +313,41 @@ extern rtx_sequence *final_sequence;
 
 /* File in which assembler code is being written.  */
 
+struct section_hasher : ggc_ptr_hash<section>
+{
+  typedef const char *compare_type;
+
+  static hashval_t hash (section *);
+  static bool equal (section *, const char *);
+};
+
 struct GTY(()) asm_out_state
 {
-  asm_out_state (): out_file (NULL), m_in_section (NULL),
-    m_in_cold_section_p (false)
-  {}
+  asm_out_state (): out_file (NULL), in_section (NULL),
+    in_cold_section_p (false)
+  {
+    section_htab = hash_table<section_hasher>::create_ggc (31);
+  }
 
   /* Assembly output stream.  */
   FILE * GTY((skip)) out_file;
 
-  section *m_in_section;
-  bool m_in_cold_section_p;
+  /* Hash table of named sections.  */
+  hash_table<section_hasher> *section_htab;
+
+  /* asm_out_file's current section.  This is NULL if no section has yet
+     been selected or if we lose track of what the current section is.  */
+  section *in_section;
+
+  /* True if code for the current function is currently being directed
+     at the cold section.  */
+  bool in_cold_section_p;
 };
 
 extern GTY(()) asm_out_state *casm;
 
 /* Helper macro for commonly used accesses.  */
 #define asm_out_file casm->out_file
-#define in_section casm->m_in_section
-#define in_cold_section_p casm->m_in_cold_section_p
 
 /* The first global object in the file.  */
 extern const char *first_global_object_name;

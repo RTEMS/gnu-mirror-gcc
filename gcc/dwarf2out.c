@@ -1295,7 +1295,7 @@ dwarf2out_switch_text_section (void)
 			       current_function_funcdef_no);
 
   fde->dw_fde_second_begin = ggc_strdup (label);
-  if (!in_cold_section_p)
+  if (!casm->in_cold_section_p)
     {
       fde->dw_fde_end = crtl->subsections.cold_section_end_label;
       fde->dw_fde_second_end = crtl->subsections.hot_section_end_label;
@@ -17268,7 +17268,7 @@ secname_for_decl (const_tree decl)
     secname = DECL_SECTION_NAME (decl);
   else if (current_function_decl && DECL_SECTION_NAME (current_function_decl))
     {
-      if (in_cold_section_p)
+      if (casm->in_cold_section_p)
 	{
 	  section *sec = current_function_section ();
 	  if (sec->common.flags & SECTION_NAMED)
@@ -17276,7 +17276,7 @@ secname_for_decl (const_tree decl)
 	}
       secname = DECL_SECTION_NAME (current_function_decl);
     }
-  else if (cfun && in_cold_section_p)
+  else if (cfun && casm->in_cold_section_p)
     secname = crtl->subsections.cold_section_label;
   else
     secname = text_section_label;
@@ -17597,12 +17597,12 @@ dw_loc_list (var_loc_list *loc_list, tree decl, int want_address)
 
   if (cfun && crtl->has_bb_partition)
     {
-      bool save_in_cold_section_p = in_cold_section_p;
-      in_cold_section_p = first_function_block_is_cold;
+      bool save_in_cold_section_p = casm->in_cold_section_p;
+      casm->in_cold_section_p = first_function_block_is_cold;
       if (loc_list->last_before_switch == NULL)
-	in_cold_section_p = !in_cold_section_p;
+	casm->in_cold_section_p = !casm->in_cold_section_p;
       secname = secname_for_decl (decl);
-      in_cold_section_p = save_in_cold_section_p;
+      casm->in_cold_section_p = save_in_cold_section_p;
     }
   else
     secname = secname_for_decl (decl);
@@ -17680,10 +17680,10 @@ dw_loc_list (var_loc_list *loc_list, tree decl, int want_address)
 	  && crtl->has_bb_partition
 	  && node == loc_list->last_before_switch)
 	{
-	  bool save_in_cold_section_p = in_cold_section_p;
-	  in_cold_section_p = !first_function_block_is_cold;
+	  bool save_in_cold_section_p = casm->in_cold_section_p;
+	  casm->in_cold_section_p = !first_function_block_is_cold;
 	  secname = secname_for_decl (decl);
-	  in_cold_section_p = save_in_cold_section_p;
+	  casm->in_cold_section_p = save_in_cold_section_p;
 	}
 
       if (range_across_switch)
@@ -27851,7 +27851,7 @@ create_label:
      last_{,postcall_}label so that they are not reused this time.  */
   if (last_var_location_insn == NULL_RTX
       || last_var_location_insn != next_real
-      || last_in_cold_section_p != in_cold_section_p)
+      || last_in_cold_section_p != casm->in_cold_section_p)
     {
       last_label = NULL;
       last_postcall_label = NULL;
@@ -28022,7 +28022,7 @@ create_label:
     }
 
   last_var_location_insn = next_real;
-  last_in_cold_section_p = in_cold_section_p;
+  last_in_cold_section_p = casm->in_cold_section_p;
 }
 
 /* Check whether BLOCK, a lexical block, is nested within OUTER, or is
@@ -28207,7 +28207,7 @@ set_cur_line_info_table (section *sec)
 
       if (crtl->has_bb_partition)
 	{
-	  if (in_cold_section_p)
+	  if (casm->in_cold_section_p)
 	    end_label = crtl->subsections.cold_section_end_label;
 	  else
 	    end_label = crtl->subsections.hot_section_end_label;
