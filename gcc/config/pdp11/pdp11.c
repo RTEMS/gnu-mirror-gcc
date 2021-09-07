@@ -743,7 +743,7 @@ void
 pdp11_asm_output_var (FILE *file, const char *name, int size,
 		      int align, bool global)
 {
-  switch_to_section (data_section);
+  switch_to_section (casm->sec.data);
   if (align > 8)
     fprintf (file, "\t.even\n");
   if (TARGET_DEC_ASM)
@@ -2323,11 +2323,11 @@ pdp11_asm_init_sections (void)
 {
   if (TARGET_DEC_ASM)
     {
-      bss_section = data_section;
+      casm->sec.bss = casm->sec.data;
     }
   else if (TARGET_GNU_ASM)
     {
-      bss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+      casm->sec.bss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
 					 output_section_asm_op,
 					 ".bss");
     }

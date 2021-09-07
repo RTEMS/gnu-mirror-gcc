@@ -2398,7 +2398,7 @@ v850_output_aligned_bss (FILE * file,
       break;
 
     case DATA_AREA_SDA:
-      switch_to_section (sbss_section);
+      switch_to_section (casm->sec.sbss);
       break;
 
     case DATA_AREA_TDA:
@@ -2406,7 +2406,7 @@ v850_output_aligned_bss (FILE * file,
       break;
       
     default:
-      switch_to_section (bss_section);
+      switch_to_section (casm->sec.bss);
       break;
     }
   
@@ -2882,13 +2882,13 @@ v850_select_section (tree exp,
 	  return tdata_section;
 
         case DATA_AREA_SDA:
-	  return is_const ? rosdata_section : sdata_section;
+	  return is_const ? rosdata_section : casm->sec.sdata;
 
         default:
-	  return is_const ? readonly_data_section : data_section;
+	  return is_const ? casm->sec.readonly_data : casm->sec.data;
         }
     }
-  return readonly_data_section;
+  return casm->sec.readonly_data;
 }
 
 /* Worker function for TARGET_FUNCTION_VALUE_REGNO_P.  */

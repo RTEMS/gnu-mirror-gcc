@@ -12638,7 +12638,7 @@ sparc_file_end (void)
       else
 	{
 	  const int align = floor_log2 (FUNCTION_BOUNDARY / BITS_PER_UNIT);
-          switch_to_section (text_section);
+          switch_to_section (casm->sec.text);
 	  if (align > 0)
 	    ASM_OUTPUT_ALIGN (asm_out_file, align);
 	  ASM_OUTPUT_LABEL (asm_out_file, name);

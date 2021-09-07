@@ -166,7 +166,8 @@ const char *user_label_prefix;
 /* Output files for assembler code (real compiler output)
    and debugging dumps.  */
 
-FILE *asm_out_file;
+asm_out_state *casm;
+
 FILE *aux_info_file;
 FILE *callgraph_info_file = NULL;
 static bitmap callgraph_info_external_printed;
@@ -546,13 +547,13 @@ compile_file (void)
   if (flag_generate_lto && !flag_fat_lto_objects)
     {
 #if defined ASM_OUTPUT_ALIGNED_DECL_COMMON
-      ASM_OUTPUT_ALIGNED_DECL_COMMON (asm_out_file, NULL_TREE, "__gnu_lto_slim",
+      ASM_OUTPUT_ALIGNED_DECL_COMMON (casm->out_file, NULL_TREE, "__gnu_lto_slim",
 				      HOST_WIDE_INT_1U, 8);
 #elif defined ASM_OUTPUT_ALIGNED_COMMON
-      ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, "__gnu_lto_slim",
+      ASM_OUTPUT_ALIGNED_COMMON (casm->out_file, "__gnu_lto_slim",
 				 HOST_WIDE_INT_1U, 8);
 #else
-      ASM_OUTPUT_COMMON (asm_out_file, "__gnu_lto_slim",
+      ASM_OUTPUT_COMMON (casm->out_file, "__gnu_lto_slim",
 			 HOST_WIDE_INT_1U,
 			 HOST_WIDE_INT_1U);
 #endif
@@ -690,7 +691,7 @@ static void
 init_asm_output (const char *name)
 {
   if (name == NULL && asm_file_name == 0)
-    asm_out_file = stdout;
+    casm->out_file = stdout;
   else
     {
       if (asm_file_name == 0)
@@ -704,17 +705,17 @@ init_asm_output (const char *name)
 	  asm_file_name = dumpname;
 	}
       if (!strcmp (asm_file_name, "-"))
-	asm_out_file = stdout;
+	casm->out_file = stdout;
       else if (!canonical_filename_eq (asm_file_name, name)
 	       || !strcmp (asm_file_name, HOST_BIT_BUCKET))
-	asm_out_file = fopen (asm_file_name, "w");
+	casm->out_file = fopen (asm_file_name, "w");
       else
 	/* Use UNKOWN_LOCATION to prevent gcc from printing the first
 	   line in the current file. */
 	fatal_error (UNKNOWN_LOCATION,
 		     "input file %qs is the same as output file",
 		     asm_file_name);
-      if (asm_out_file == 0)
+      if (casm->out_file == 0)
 	fatal_error (UNKNOWN_LOCATION,
 		     "cannot open %qs for writing: %m", asm_file_name);
     }
@@ -741,14 +742,14 @@ init_asm_output (const char *name)
 
       if (flag_verbose_asm)
 	{
-	  print_version (asm_out_file, ASM_COMMENT_START, true);
-	  fputs (ASM_COMMENT_START, asm_out_file);
-	  fputs (" options passed: ", asm_out_file);
+	  print_version (casm->out_file, ASM_COMMENT_START, true);
+	  fputs (ASM_COMMENT_START, casm->out_file);
+	  fputs (" options passed: ", casm->out_file);
 	  char *cmdline = gen_command_line_string (save_decoded_options,
 						   save_decoded_options_count);
-	  fputs (cmdline, asm_out_file);
+	  fputs (cmdline, casm->out_file);
 	  free (cmdline);
-	  fputc ('\n', asm_out_file);
+	  fputc ('\n', casm->out_file);
 	}
     }
 }
@@ -1895,7 +1896,8 @@ lang_dependent_init (const char *name)
 
   if (!flag_wpa)
     {
-      init_asm_output (name);
+      if (!flag_syntax_only)
+	init_asm_output (name);
 
       if (!flag_generate_lto && !flag_compare_debug)
 	{
@@ -2054,13 +2056,13 @@ finalize (bool no_backend)
      whether fclose returns an error, since the pages might still be on the
      buffer chain while the file is open.  */
 
-  if (asm_out_file)
+  if (casm != NULL && casm->out_file)
     {
-      if (ferror (asm_out_file) != 0)
+      if (ferror (casm->out_file) != 0)
 	fatal_error (input_location, "error writing to %s: %m", asm_file_name);
-      if (fclose (asm_out_file) != 0)
+      if (fclose (casm->out_file) != 0)
 	fatal_error (input_location, "error closing %s: %m", asm_file_name);
-      asm_out_file = NULL;
+      casm->out_file = NULL;
     }
 
   if (stack_usage_file)

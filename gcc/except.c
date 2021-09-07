@@ -2906,8 +2906,8 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 {
   section *s;
 
-  if (exception_section)
-    s = exception_section;
+  if (casm->sec.exception)
+    s = casm->sec.exception;
   else
     {
       int flags;
@@ -2924,7 +2924,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
       else
 	flags = SECTION_WRITE;
 
-      /* Compute the section and cache it into exception_section,
+      /* Compute the section and cache it into casm->sec.exception,
 	 unless it depends on the function name.  */
       if (targetm_common.have_named_sections)
 	{
@@ -2943,12 +2943,12 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 	    }
 	  else
 #endif
-	    exception_section
+	    casm->sec.exception
 	      = s = get_section (".gcc_except_table", flags, NULL);
 	}
       else
-	exception_section
-	  = s = flags == SECTION_WRITE ? data_section : readonly_data_section;
+	casm->sec.exception
+	  = s = flags == SECTION_WRITE ? casm->sec.data: casm->sec.readonly_data;
     }
 
   switch_to_section (s);

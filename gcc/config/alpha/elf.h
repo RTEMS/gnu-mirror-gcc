@@ -46,9 +46,9 @@ along with GCC; see the file COPYING3.  If not see
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
 do {									\
   if ((SIZE) <= (unsigned HOST_WIDE_INT) g_switch_value)		\
-    switch_to_section (sbss_section);					\
+    switch_to_section (casm->sec.sbss);					\
   else									\
-    switch_to_section (bss_section);					\
+    switch_to_section (casm->sec.bss);					\
   ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
   if (!flag_inhibit_size_directive)					\
     ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, SIZE);			\

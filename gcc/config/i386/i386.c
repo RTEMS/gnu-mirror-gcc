@@ -869,7 +869,7 @@ x86_output_aligned_bss (FILE *file, tree decl, const char *name,
       && size > (unsigned int)ix86_section_threshold)
     switch_to_section (get_named_section (decl, ".lbss", 0));
   else
-    switch_to_section (bss_section);
+    switch_to_section (casm->sec.bss);
   ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
 #ifdef ASM_DECLARE_OBJECT_NAME
   last_assemble_variable_decl = decl;
@@ -5959,7 +5959,7 @@ output_indirect_thunk_function (enum indirect_thunk_prefix need_prefix,
       }
     else
       {
-	switch_to_section (text_section);
+	switch_to_section (casm->sec.text);
 	ASM_OUTPUT_LABEL (asm_out_file, name);
       }
 
@@ -6079,7 +6079,7 @@ ix86_code_end (void)
 	}
       else
 	{
-	  switch_to_section (text_section);
+	  switch_to_section (casm->sec.text);
 	  ASM_OUTPUT_LABEL (asm_out_file, name);
 	}
 
