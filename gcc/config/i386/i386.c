@@ -869,7 +869,7 @@ x86_output_aligned_bss (FILE *file, tree decl, const char *name,
       && size > (unsigned int)ix86_section_threshold)
     switch_to_section (get_named_section (decl, ".lbss", 0));
   else
-    switch_to_section (bss_section);
+    switch_to_section (casm->sections.bss);
   ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
 #ifdef ASM_DECLARE_OBJECT_NAME
   last_assemble_variable_decl = decl;

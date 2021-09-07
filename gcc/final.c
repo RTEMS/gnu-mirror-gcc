@@ -885,7 +885,7 @@ shorten_branches (rtx_insn *first)
 	  /* ADDR_VECs only take room if read-only data goes into the text
 	     section.  */
 	  if ((JUMP_TABLES_IN_TEXT_SECTION
-	       || readonly_data_section == casm->sections.text)
+	       || casm->sections.readonly_data == casm->sections.text)
 	      && table)
 	    {
 	      align_flags alignment = align_flags (ADDR_VEC_ALIGN (table));
@@ -1051,7 +1051,7 @@ shorten_branches (rtx_insn *first)
 	  /* This only takes room if read-only data goes into the text
 	     section.  */
 	  if (JUMP_TABLES_IN_TEXT_SECTION
-	      || readonly_data_section == casm->sections.text)
+	      || casm->sections.readonly_data == casm->sections.text)
 	    insn_lengths[uid] = (XVECLEN (body,
 					  GET_CODE (body) == ADDR_DIFF_VEC)
 				 * GET_MODE_SIZE (table->get_data_mode ()));
