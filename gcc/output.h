@@ -324,7 +324,7 @@ struct section_hasher : ggc_ptr_hash<section>
 struct GTY(()) asm_out_state
 {
   asm_out_state (): out_file (NULL), in_section (NULL),
-    sections ({}), in_cold_section_p (false)
+    sections ({}), anchor_labelno (0), in_cold_section_p (false)
   {
     section_htab = hash_table<section_hasher>::create_ggc (31);
   }
@@ -344,6 +344,9 @@ struct GTY(()) asm_out_state
     section *text;
     section *data;
   } sections;
+
+  /* The next number to use for internal anchor labels.  */
+  int anchor_labelno;
 
   /* True if code for the current function is currently being directed
      at the cold section.  */
