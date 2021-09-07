@@ -427,7 +427,7 @@ do {									\
 do {									\
   if ((DECL) && rs6000_elf_in_small_data_p (DECL))			\
     {									\
-      switch_to_section (sbss_section);					\
+      switch_to_section (casm->sec.sbss);					\
       ASM_OUTPUT_ALIGN (FILE, exact_log2 (ALIGN / BITS_PER_UNIT));	\
       ASM_OUTPUT_LABEL (FILE, NAME);					\
       ASM_OUTPUT_SKIP (FILE, SIZE);					\

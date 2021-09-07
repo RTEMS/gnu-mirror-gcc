@@ -891,7 +891,7 @@ c6x_select_rtx_section (machine_mode mode, rtx x,
   if (c6x_sdata_mode == C6X_SDATA_ALL
       || (c6x_sdata_mode != C6X_SDATA_NONE && GET_MODE_SIZE (mode) <= 8))
     /* ??? Consider using mergeable sdata sections.  */
-    return sdata_section;
+    return casm->sec.sdata;
   else
     return default_elf_select_rtx_section (mode, x, align);
 }
@@ -5474,7 +5474,7 @@ c6x_asm_emit_except_personality (rtx personality)
 static void
 c6x_asm_init_sections (void)
 {
-  exception_section = get_unnamed_section (0, output_section_asm_op,
+  casm->sec.exception = get_unnamed_section (0, output_section_asm_op,
 					   "\t.handlerdata");
 }
 

@@ -3616,8 +3616,8 @@ riscv_elf_select_rtx_section (machine_mode mode, rtx x,
 	  return get_section (name, s->named.common.flags, NULL);
 	}
 
-      if (s == data_section)
-	return sdata_section;
+      if (s == casm->sec.data)
+	return casm->sec.sdata;
     }
 
   return s;

@@ -144,7 +144,7 @@ output_objc_section_asm_op (const void *directive)
      section is requested.  */
   if (darwin_symbol_stubs && ! been_here)
     {
-      section *saved_in_section = in_section;
+      section *saved_in_section = casm->in_section;
       static const enum darwin_section_enum tomark[] =
 	{
 	  /* written, cold -> hot */
@@ -237,14 +237,14 @@ darwin_init_sections (void)
 #include "config/darwin-sections.def"
 #undef DEF_SECTION
 
-  readonly_data_section = darwin_sections[const_section];
-  exception_section = darwin_sections[darwin_exception_section];
-  eh_frame_section = darwin_sections[darwin_eh_frame_section];
+  casm->sec.readonly_data = darwin_sections[const_section];
+  casm->sec.exception = darwin_sections[darwin_exception_section];
+  casm->sec.eh_frame = darwin_sections[darwin_eh_frame_section];
 
   /* If our linker is new enough to coalesce weak symbols, then we
      can just put picbase_thunks into the text section.  */
   if (! ld_uses_coal_sects )
-    darwin_sections[picbase_thunk_section] = text_section;
+    darwin_sections[picbase_thunk_section] = casm->sec.text;
 }
 
 int
@@ -1072,7 +1072,7 @@ machopic_output_data_section_indirection (machopic_indirection **slot,
   /* The name of the indirection symbol.  */
   const char *ptr_name = p->ptr_name;
 
-  switch_to_section (data_section);
+  switch_to_section (casm->sec.data);
   assemble_align (GET_MODE_ALIGNMENT (Pmode));
   assemble_label (out_file, ptr_name);
   assemble_integer (gen_rtx_SYMBOL_REF (Pmode, sym_name),
@@ -1341,7 +1341,7 @@ darwin_mergeable_string_section (tree exp,
       && TREE_STRING_LENGTH (exp) == 0)
     return darwin_sections[zobj_const_section];
 
-  return readonly_data_section;
+  return casm->sec.readonly_data;
 }
 
 #ifndef HAVE_GAS_LITERAL16
@@ -1363,7 +1363,7 @@ darwin_mergeable_constant_section (tree exp,
       || align < 8
       || align > 256
       || (align & (align -1)) != 0)
-    return readonly_data_section;
+    return casm->sec.readonly_data;
 
   /* This will ICE if the mode is not a constant size, but that is reasonable,
      since one cannot put a variable-sized thing into a constant section, we
@@ -1371,12 +1371,12 @@ darwin_mergeable_constant_section (tree exp,
   const unsigned int modesize = GET_MODE_BITSIZE (mode).to_constant ();
 
   if (modesize > align)
-    return readonly_data_section;
+    return casm->sec.readonly_data;
 
   tree size = TYPE_SIZE_UNIT (TREE_TYPE (exp));
 
   if (TREE_CODE (size) != INTEGER_CST)
-    return readonly_data_section;
+    return casm->sec.readonly_data;
 
   unsigned isize = TREE_INT_CST_LOW (size);
   if (isize == 4)
@@ -1388,7 +1388,7 @@ darwin_mergeable_constant_section (tree exp,
 	   && isize == 16)
     return darwin_sections[literal16_section];
 
-  return readonly_data_section;
+  return casm->sec.readonly_data;
 }
 
 section *
@@ -1444,7 +1444,7 @@ darwin_objc2_section (tree decl ATTRIBUTE_UNUSED, tree meta, section * base)
 
   objc_metadata_seen = 1;
 
-  if (base == data_section)
+  if (base == casm->sec.data)
     base = darwin_sections[objc2_metadata_section];
 
   /* Most of the OBJC2 META-data end up in the base section, so check it
@@ -1495,7 +1495,7 @@ darwin_objc2_section (tree decl ATTRIBUTE_UNUSED, tree meta, section * base)
 
   else if (startswith (p, "V2_EHTY"))
     return ld_uses_coal_sects ? darwin_sections[data_coal_section]
-                              : data_section;
+                              : casm->sec.data;
 
   else if (startswith (p, "V2_CSTR"))
     return darwin_sections[objc2_constant_string_object_section];
@@ -1681,7 +1681,7 @@ machopic_select_section (tree decl,
       else if (ro)
 	base_section = darwin_sections[const_data_section];
       else
-	base_section = data_section;
+	base_section = casm->sec.data;
       break;
     case SECCAT_BSS:
     case SECCAT_SBSS:
@@ -1691,11 +1691,11 @@ machopic_select_section (tree decl,
       else
 	{
 	  if (!TREE_PUBLIC (decl))
-	    base_section = lcomm_section;
-	  else if (bss_noswitch_section)
-	    base_section = bss_noswitch_section;
+	    base_section = casm->sec.lcomm;
+	  else if (casm->sec.bss_noswitch)
+	    base_section = casm->sec.bss_noswitch;
 	  else
-	    base_section = data_section;
+	    base_section = casm->sec.data;
 	}
       break;
 
@@ -2366,8 +2366,8 @@ fprintf (file, "# dadon: %s %s (%llu, %u) local %d weak %d"
       /* Check that we've correctly picked up the zero-sized item and placed it
          properly.  */
       gcc_assert ((!DARWIN_SECTION_ANCHORS || !flag_section_anchors)
-		  || (in_section
-		      && (in_section->common.flags & SECTION_NO_ANCHOR)));
+		  || (casm->in_section
+		      && (casm->in_section->common.flags & SECTION_NO_ANCHOR)));
     }
   else
     ASM_OUTPUT_LABEL (file, xname);
@@ -2387,8 +2387,8 @@ darwin_asm_declare_constant_name (FILE *file, const char *name,
       /* Check that we've correctly picked up the zero-sized item and placed it
          properly.  */
       gcc_assert ((!DARWIN_SECTION_ANCHORS || !flag_section_anchors)
-		  || (in_section
-		      && (in_section->common.flags & SECTION_NO_ANCHOR)));
+		  || (casm->in_section
+		      && (casm->in_section->common.flags & SECTION_NO_ANCHOR)));
     }
 }
 
@@ -2425,7 +2425,7 @@ darwin_emit_weak_or_comdat (FILE *fp, tree decl, const char *name,
 				: darwin_sections[const_data_section]);
   else
     switch_to_section (use_coal ? darwin_sections[data_coal_section]
-				: data_section);
+				: casm->sec.data);
 
   /* To be consistent, we'll allow darwin_asm_declare_object_name to assemble
      the align info for zero-sized items... but do it here otherwise.  */
@@ -2447,7 +2447,7 @@ darwin_emit_objc_zeroed (FILE *fp, tree decl, const char *name,
 				  unsigned HOST_WIDE_INT size,
 				  unsigned int align, tree meta)
 {
-  section *ocs = data_section;
+  section *ocs = casm->sec.data;
 
   if (TREE_PURPOSE (meta) == get_identifier("OBJC2META"))
     ocs = darwin_objc2_section (decl, meta, ocs);
@@ -2489,13 +2489,13 @@ darwin_emit_local_bss (FILE *fp, tree decl, const char *name,
       if (!size)
 	{
 	  fputs ("\t.section\t__DATA,__zobj_bss\n", fp);
-	  in_section = darwin_sections[zobj_bss_section];
+	  casm->in_section = darwin_sections[zobj_bss_section];
 	  size = 1;
 	}
       else
 	{
 	  fputs ("\t.static_data\n", fp);
-	  in_section = darwin_sections[static_data_section];
+	  casm->in_section = darwin_sections[static_data_section];
 	}
 
       if (l2align)
@@ -2513,7 +2513,7 @@ darwin_emit_local_bss (FILE *fp, tree decl, const char *name,
       char secnam[64];
       snprintf (secnam, 64, "__DATA,__bss");
       unsigned int flags = SECTION_BSS|SECTION_WRITE|SECTION_NO_ANCHOR;
-      in_section = get_section (secnam, flags, NULL);
+      casm->in_section = get_section (secnam, flags, NULL);
       fprintf (fp, "\t.zerofill %s,", secnam);
       assemble_name (fp, name);
       if (!size)
@@ -2560,7 +2560,7 @@ darwin_emit_common (FILE *fp, const char *name,
   l2align = floor_log2 (align);
   gcc_assert (l2align <= L2_MAX_OFILE_ALIGNMENT);
 
-  in_section = comm_section;
+  casm->in_section = casm->sec.comm;
   /* We mustn't allow multiple public symbols to share an address when using
      the normal OSX toolchain.  */
   if (!size)
@@ -2568,7 +2568,7 @@ darwin_emit_common (FILE *fp, const char *name,
       /* Put at least one byte.  */
       size = 1;
       /* This section can no longer participate in section anchoring.  */
-      comm_section->common.flags |= SECTION_NO_ANCHOR;
+      casm->sec.comm->common.flags |= SECTION_NO_ANCHOR;
     }
 
   fputs ("\t.comm\t", fp);
@@ -2657,13 +2657,13 @@ fprintf (fp, "# albss: %s (%lld,%d) ro %d cst %d stat %d com %d"
       if (!size)
 	{
 	  fputs ("\t.section\t__DATA,__zobj_data\n", fp);
-	  in_section = darwin_sections[zobj_data_section];
+	  casm->in_section = darwin_sections[zobj_data_section];
 	  size = 1;
 	}
       else
 	{
 	  fputs ("\t.data\n", fp);
-	  in_section = data_section;
+	  casm->in_section = casm->sec.data;
 	}
 
       if (l2align)
@@ -2678,7 +2678,7 @@ fprintf (fp, "# albss: %s (%lld,%d) ro %d cst %d stat %d com %d"
       unsigned int flags = SECTION_BSS|SECTION_WRITE|SECTION_NO_ANCHOR;
       char secnam[64];
       snprintf (secnam, 64, "__DATA,__common");
-      in_section = get_section (secnam, flags, NULL);
+      casm->in_section = get_section (secnam, flags, NULL);
       fprintf (fp, "\t.zerofill %s,", secnam);
       assemble_name (fp, name);
       if (!size)
@@ -3894,7 +3894,7 @@ darwin_function_section (tree decl, enum node_frequency freq,
   /* Otherwise, default to the 'normal' non-reordered sections.  */
 default_function_sections:
   return (use_coal) ? darwin_sections[text_coal_section]
-		    : text_section;
+		    : casm->sec.text;
 }
 
 #include "gt-darwin.h"

@@ -1138,7 +1138,7 @@ typedef struct
 
 /* Put trampolines in the text section so that mapping symbols work
    correctly.  */
-#define TRAMPOLINE_SECTION text_section
+#define TRAMPOLINE_SECTION casm->sec.text
 
 /* To start with.  */
 #define BRANCH_COST(SPEED_P, PREDICTABLE_P) \
