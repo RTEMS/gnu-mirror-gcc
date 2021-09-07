@@ -34,6 +34,8 @@ extern int easy_altivec_constant (rtx, machine_mode);
 extern bool xxspltib_constant_p (rtx, machine_mode, int *, int *);
 extern bool xxspltidp_constant_p (rtx, machine_mode, HOST_WIDE_INT *);
 extern bool xxspltiw_constant_p (rtx, machine_mode, HOST_WIDE_INT *);
+extern bool xxsplti32dx_constant_p (rtx, machine_mode, HOST_WIDE_INT *,
+				    HOST_WIDE_INT *);
 extern bool lxvkq_constant_p (rtx, machine_mode, int *);
 extern int vspltis_shifted (rtx);
 extern HOST_WIDE_INT const_vector_elt_as_int (rtx, unsigned int);
