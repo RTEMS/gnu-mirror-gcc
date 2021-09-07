@@ -313,9 +313,25 @@ extern rtx_sequence *final_sequence;
 
 /* File in which assembler code is being written.  */
 
-#ifdef BUFSIZ
-extern FILE *asm_out_file;
-#endif
+struct GTY(()) asm_out_state
+{
+  asm_out_state (): out_file (NULL), m_in_section (NULL),
+    m_in_cold_section_p (false)
+  {}
+
+  /* Assembly output stream.  */
+  FILE * GTY((skip)) out_file;
+
+  section *m_in_section;
+  bool m_in_cold_section_p;
+};
+
+extern GTY(()) asm_out_state *casm;
+
+/* Helper macro for commonly used accesses.  */
+#define asm_out_file casm->out_file
+#define in_section casm->m_in_section
+#define in_cold_section_p casm->m_in_cold_section_p
 
 /* The first global object in the file.  */
 extern const char *first_global_object_name;
@@ -525,9 +541,6 @@ extern GTY(()) section *tls_comm_section;
 extern GTY(()) section *comm_section;
 extern GTY(()) section *lcomm_section;
 extern GTY(()) section *bss_noswitch_section;
-
-extern GTY(()) section *in_section;
-extern GTY(()) bool in_cold_section_p;
 
 extern section *get_unnamed_section (unsigned int, void (*) (const void *),
 				     const void *);
