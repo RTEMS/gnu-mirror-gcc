@@ -6926,6 +6926,119 @@ lxvkq_constant_p (rtx op,
   return false;
 }
 
+/* Return true if OP is a floating point constant that can be loaded with the
+   XXSPLTI32DX instruction.  If the constant can be loaded with the simpler
+   XXSPLTIDP (constants that can fit as SFmode constants) or XXSPLTIB (0.0)
+   instructions, return false.
+
+   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
+   via HIGH_PTR and LOW_PTR.  */
+
+static bool
+xxsplti32dx_constant_float_p (rtx op,
+			      machine_mode mode,
+			      HOST_WIDE_INT *high_ptr,
+			      HOST_WIDE_INT *low_ptr)
+{
+  HOST_WIDE_INT xxspltidp_value = 0;
+
+  if (!CONST_DOUBLE_P (op))
+    return false;
+
+  if (mode != SFmode && mode != DFmode)
+    return false;
+
+  if (op == CONST0_RTX (mode))
+    return false;
+
+  if (xxspltidp_constant_p (op, mode, &xxspltidp_value))
+    return false;
+
+  long high_low[2];
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
+
+  /* The double precision value is laid out in memory order.  We need to undo
+     this for XXSPLTI32DX.  */
+  if (!BYTES_BIG_ENDIAN)
+    std::swap (high_low[0], high_low[1]);
+
+  *high_ptr = high_low[0];
+  *low_ptr = high_low[1];
+  return true;
+}
+
+/* Return true if OP is of the given MODE and can be synthesized with ISA 3.1
+   XXSPLTI32DX instruction.  If the instruction can be synthesized with
+   XXSPLTIDP or is 0/-1, return false.
+
+   We handle the following types of constants:
+
+     1) vector double constants where each element is the same and you can't
+        load the constant with XXSPLTIDP;
+
+     2) vector long long constants where each element is the same;
+
+     3) Scalar floating point constants that can't be loaded with XXSPLTIDP.
+
+   Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
+   via HIGH_PTR and LOW_PTR.  */
+
+bool
+xxsplti32dx_constant_p (rtx op,
+			machine_mode mode,
+			HOST_WIDE_INT *high_ptr,
+			HOST_WIDE_INT *low_ptr)
+{
+  *high_ptr = *low_ptr = 0;
+
+  if (!TARGET_PREFIXED || !TARGET_VSX || !TARGET_XXSPLTI32DX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (op == CONST0_RTX (mode))
+    return false;
+
+  switch (mode)
+    {
+    default:
+      break;
+
+    case E_V2DFmode:
+      {
+	if (!const_vector_all_elements_equal_p (op, mode))
+	  return false;
+
+	rtx ele = CONST_VECTOR_ELT (op, 0);
+	return xxsplti32dx_constant_float_p (ele, DFmode, high_ptr, low_ptr);
+      }
+
+    case E_SFmode:
+    case E_DFmode:
+      return xxsplti32dx_constant_float_p (op, mode, high_ptr, low_ptr);
+
+    case E_V2DImode:
+      {
+	if (!const_vector_all_elements_equal_p (op, mode))
+	  return false;
+
+	/* If we can generate XXSPLTIB and VEXTSB2D, don't return true.  */
+	rtx ele = CONST_VECTOR_ELT (op, 0);
+	HOST_WIDE_INT value = INTVAL (ele);
+	if (IN_RANGE (value, -128, 127))
+	  return false;
+
+	*high_ptr = (value >> 32) & 0xffffffff;
+	*low_ptr = value & 0xffffffff;
+	return true;
+      }
+    }
+
+  return false;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6990,6 +7103,9 @@ output_vec_const_move (rtx *operands)
 	  operands[2] = GEN_INT (lxvkq_immediate);
 	  return "lxvkq %x0,%2";
 	}
+
+      if (xxsplti32dx_operand (vec, mode))
+	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -26770,7 +26886,11 @@ prefixed_permute_p (rtx_insn *insn)
     case DFmode:
     case SFmode:
     case V2DFmode:
-      return xxspltidp_operand (src, mode);
+      return (xxspltidp_operand (src, mode)
+	      || xxsplti32dx_operand (src, mode));
+
+    case V2DImode:
+      return xxsplti32dx_operand (src, mode);
 
     default:
       break;
