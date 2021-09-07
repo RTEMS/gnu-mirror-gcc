@@ -2948,7 +2948,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 	}
       else
 	exception_section
-	  = s = flags == SECTION_WRITE ? data_section : readonly_data_section;
+	  = s = flags == SECTION_WRITE ? casm->sections.data: readonly_data_section;
     }
 
   switch_to_section (s);

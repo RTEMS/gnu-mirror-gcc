@@ -5954,7 +5954,7 @@ output_indirect_thunk_function (enum indirect_thunk_prefix need_prefix,
       }
     else
       {
-	switch_to_section (text_section);
+	switch_to_section (casm->sections.text);
 	ASM_OUTPUT_LABEL (asm_out_file, name);
       }
 
@@ -6074,7 +6074,7 @@ ix86_code_end (void)
 	}
       else
 	{
-	  switch_to_section (text_section);
+	  switch_to_section (casm->sections.text);
 	  ASM_OUTPUT_LABEL (asm_out_file, name);
 	}
 

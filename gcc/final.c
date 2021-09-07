@@ -885,7 +885,7 @@ shorten_branches (rtx_insn *first)
 	  /* ADDR_VECs only take room if read-only data goes into the text
 	     section.  */
 	  if ((JUMP_TABLES_IN_TEXT_SECTION
-	       || readonly_data_section == text_section)
+	       || readonly_data_section == casm->sections.text)
 	      && table)
 	    {
 	      align_flags alignment = align_flags (ADDR_VEC_ALIGN (table));
@@ -1051,7 +1051,7 @@ shorten_branches (rtx_insn *first)
 	  /* This only takes room if read-only data goes into the text
 	     section.  */
 	  if (JUMP_TABLES_IN_TEXT_SECTION
-	      || readonly_data_section == text_section)
+	      || readonly_data_section == casm->sections.text)
 	    insn_lengths[uid] = (XVECLEN (body,
 					  GET_CODE (body) == ADDR_DIFF_VEC)
 				 * GET_MODE_SIZE (table->get_data_mode ()));
@@ -1143,7 +1143,7 @@ shorten_branches (rtx_insn *first)
 		 may need to update the alignment of this label.  */
 
 	      if (JUMP_TABLES_IN_TEXT_SECTION
-		  || readonly_data_section == text_section)
+		  || readonly_data_section == casm->sections.text)
 		{
 		  rtx_jump_table_data *table = jump_table_for_label (label);
 		  if (table)
@@ -1284,7 +1284,7 @@ shorten_branches (rtx_insn *first)
 		      >= GET_MODE_SIZE (table->get_data_mode ())))
 		PUT_MODE (body, vec_mode);
 	      if (JUMP_TABLES_IN_TEXT_SECTION
-		  || readonly_data_section == text_section)
+		  || readonly_data_section == casm->sections.text)
 		{
 		  insn_lengths[uid]
 		    = (XVECLEN (body, 1)
@@ -1836,7 +1836,7 @@ profile_function (FILE *file ATTRIBUTE_UNUSED)
   if (! NO_PROFILE_COUNTERS)
     {
       int align = MIN (BIGGEST_ALIGNMENT, LONG_TYPE_SIZE);
-      switch_to_section (data_section);
+      switch_to_section (casm->sections.data);
       ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
       targetm.asm_out.internal_label (file, "LP", current_function_funcdef_no);
       assemble_integer (const0_rtx, LONG_TYPE_SIZE / BITS_PER_UNIT, align, 1);
