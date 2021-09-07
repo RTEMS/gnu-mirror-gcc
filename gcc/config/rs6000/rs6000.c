@@ -6658,6 +6658,112 @@ xxspltidp_constant_p (rtx op,
   return true;
 }
 
+/* Return true if OP is of the given MODE is one of the 18 special values that
+   can be generated with the LXVKQ instruction.
+
+   Return the constant that will go in the LXVKQ instruction.  */
+
+/* LXVKQ immediates.  */
+enum {
+  LXVKQ_ONE		= 1,
+  LXVKQ_TWO		= 2,
+  LXVKQ_THREE		= 3,
+  LXVKQ_FOUR		= 4,
+  LXVKQ_FIVE		= 5,
+  LXVKQ_SIX		= 6,
+  LXVKQ_SEVEN		= 7,
+  LXVKQ_INF		= 8,
+  LXVKQ_NAN		= 9,
+  LXVKQ_NEG_ZERO	= 16,
+  LXVKQ_NEG_ONE		= 17,
+  LXVKQ_NEG_TWO		= 18,
+  LXVKQ_NEG_THREE	= 19,
+  LXVKQ_NEG_FOUR	= 20,
+  LXVKQ_NEG_FIVE	= 21,
+  LXVKQ_NEG_SIX		= 22,
+  LXVKQ_NEG_SEVEN	= 23,
+  LXVKQ_NEG_INF		= 24
+};
+
+bool
+lxvkq_constant_p (rtx op,
+		  machine_mode mode,
+		  int *imm_p)
+{
+  *imm_p = -1;
+
+  if (!TARGET_LXVKQ || !TARGET_POWER10 || !TARGET_VSX || !TARGET_FLOAT128_HW)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (!FLOAT128_IEEE_P (mode))
+    return false;
+
+  if (!CONST_DOUBLE_P (op))
+    return false;
+
+  /* All of the values generated can be expressed as SFmode values, so if it
+     doesn't fit in SFmode, exit.  */
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  if (!exact_real_truncate (SFmode, rv))
+    return 0;
+
+  /* Special values (infinity, nan, -0.0.  */
+  if (real_isinf (rv))
+    {
+      *imm_p = real_isneg (rv) ? LXVKQ_NEG_INF : LXVKQ_INF;
+      return true;
+    }
+
+  if (real_isnan (rv) && !real_isneg (rv))
+    {
+      *imm_p = LXVKQ_NAN;
+      return true;
+    }
+
+  if (real_isnegzero (rv))
+    {
+      *imm_p = LXVKQ_NEG_ZERO;
+      return true;
+    }
+
+  /* The other values are all integers 1..7, and -1..-7.  */
+  if (!real_isinteger (rv, mode))
+    return false;
+
+  HOST_WIDE_INT value = real_to_integer (rv);
+  switch (value)
+    {
+    default:
+      break;
+
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+      *imm_p = LXVKQ_ONE + (value - 1);
+      return true;
+
+    case -1:
+    case -2:
+    case -3:
+    case -4:
+    case -5:
+    case -6:
+    case -7:
+      *imm_p = LXVKQ_NEG_ONE + (-value - 1);
+      return true;
+    }
+
+  /* We can't load the value with LXVKQ.  */
+  return false;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6675,6 +6781,7 @@ output_vec_const_move (rtx *operands)
       int xxspltib_value = 256;
       HOST_WIDE_INT xxspltidp_value = 0;
       int num_insns = -1;
+      int lxvkq_immediate = 0;
 
       if (zero_constant (vec, mode))
 	{
@@ -6707,6 +6814,12 @@ output_vec_const_move (rtx *operands)
 	{
 	  operands[2] = GEN_INT (xxspltidp_value);
 	  return "xxspltidp %x0,%2";
+	}
+
+      if (lxvkq_constant_p (vec, mode, &lxvkq_immediate))
+	{
+	  operands[2] = GEN_INT (lxvkq_immediate);
+	  return "lxvkq %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -13417,6 +13530,7 @@ rs6000_output_move_128bit (rtx operands[])
   int src_regno;
   bool dest_gpr_p, dest_fp_p, dest_vmx_p, dest_vsx_p;
   bool src_gpr_p, src_fp_p, src_vmx_p, src_vsx_p;
+  int lxvkq_immediate = 0;
 
   if (REG_P (dest))
     {
@@ -13561,6 +13675,14 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
+  else if (dest_vmx_p
+	   && CONST_DOUBLE_P (src)
+	   && lxvkq_constant_p (src, mode, &lxvkq_immediate))
+    {
+      operands[2] = GEN_INT (lxvkq_immediate);
+      return "lxvkq %x0,%2";
+    }
+
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
