@@ -46,7 +46,7 @@ run_rtl_passes (char *initial_pass_name)
   max_regno = max_reg_num ();
 
   /* cgraphunit.c normally handles this.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   (*debug_hooks->assembly_start) ();
 
   if (initial_pass_name)

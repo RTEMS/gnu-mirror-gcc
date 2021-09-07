@@ -131,8 +131,6 @@ static void output_constant_pool (const char *, tree);
 static void handle_vtv_comdat_section (section *, const_tree);
 
 /* Well-known sections, each one associated with some sort of *_ASM_OP.  */
-section *text_section;
-section *data_section;
 section *readonly_data_section;
 section *sdata_section;
 section *ctors_section;
@@ -508,7 +506,7 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 #endif /* BSS_SECTION_ASM_OP */
 
 #ifndef USE_SELECT_SECTION_FOR_FUNCTIONS
-/* Return the hot section for function DECL.  Return text_section for
+/* Return the hot section for function DECL.  Return casm->sections.text for
    null DECLs.  */
 
 static section *
@@ -519,7 +517,7 @@ hot_function_section (tree decl)
       && targetm_common.have_named_sections)
     return get_named_section (decl, NULL, 0);
   else
-    return text_section;
+    return casm->sections.text;
 }
 #endif
 
@@ -1881,7 +1879,7 @@ assemble_start_function (tree decl, const char *fnname)
       if (!cfun->is_thunk
 	  && BB_PARTITION (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb) == BB_COLD_PARTITION)
 	{
-	  switch_to_section (text_section);
+	  switch_to_section (casm->sections.text);
 	  assemble_align (align);
 	  ASM_OUTPUT_LABEL (asm_out_file, crtl->subsections.hot_section_label);
 	  hot_label_written = true;
@@ -2011,7 +2009,7 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
 #endif
       ASM_OUTPUT_LABEL (asm_out_file, crtl->subsections.cold_section_end_label);
       if (first_function_block_is_cold)
-	switch_to_section (text_section);
+	switch_to_section (casm->sections.text);
       else
 	switch_to_section (function_section (decl));
       ASM_OUTPUT_LABEL (asm_out_file, crtl->subsections.hot_section_end_label);
@@ -6583,13 +6581,13 @@ init_varasm_once (void)
   shared_constant_pool = create_constant_pool ();
 
 #ifdef TEXT_SECTION_ASM_OP
-  text_section = get_unnamed_section (SECTION_CODE, output_section_asm_op,
+  casm->sections.text = get_unnamed_section (SECTION_CODE, output_section_asm_op,
 				      TEXT_SECTION_ASM_OP);
 #endif
 
 #ifdef DATA_SECTION_ASM_OP
-  data_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-				      DATA_SECTION_ASM_OP);
+  casm->sections.data = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+					     DATA_SECTION_ASM_OP);
 #endif
 
 #ifdef SDATA_SECTION_ASM_OP
@@ -6639,7 +6637,7 @@ init_varasm_once (void)
   targetm.asm_out.init_sections ();
 
   if (readonly_data_section == NULL)
-    readonly_data_section = text_section;
+    readonly_data_section = casm->sections.text;
 
 #ifdef ASM_OUTPUT_EXTERNAL
   pending_assemble_externals_set = new hash_set<tree>;
@@ -6947,7 +6945,7 @@ default_select_section (tree decl, int reloc,
   else if (! (flag_pic && reloc))
     return readonly_data_section;
 
-  return data_section;
+  return casm->sections.data;
 }
 
 enum section_category
@@ -7102,7 +7100,7 @@ default_elf_select_section (tree decl, int reloc,
 	  sname = ".persistent";
 	  break;
 	}
-      return data_section;
+      return casm->sections.data;
     case SECCAT_DATA_REL:
       sname = ".data.rel";
       break;
@@ -7278,7 +7276,7 @@ default_select_rtx_section (machine_mode mode ATTRIBUTE_UNUSED,
 			    unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED)
 {
   if (compute_reloc_for_rtx (x) & targetm.asm_out.reloc_rw_mask ())
-    return data_section;
+    return casm->sections.data;
   else
     return readonly_data_section;
 }

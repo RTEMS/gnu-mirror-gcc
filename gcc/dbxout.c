@@ -1042,7 +1042,7 @@ dbxout_init (const char *input_file_name)
 
   if (used_ltext_label_name)
     {
-      switch_to_section (text_section);
+      switch_to_section (casm->sections.text);
       targetm.asm_out.internal_label (asm_out_file, "Ltext", 0);
     }
 
@@ -1244,7 +1244,7 @@ dbxout_source_file (const char *filename)
     {
       /* Don't change section amid function.  */
       if (current_function_decl == NULL_TREE)
-	switch_to_section (text_section);
+	switch_to_section (casm->sections.text);
 
       dbxout_begin_simple_stabs (remap_debug_filename (filename), N_SOL);
       dbxout_stab_value_internal_label ("Ltext", &source_label_number);
@@ -1432,7 +1432,7 @@ dbxout_finish (const char *filename ATTRIBUTE_UNUSED)
   DBX_OUTPUT_MAIN_SOURCE_FILE_END (asm_out_file, filename);
 #elif defined DBX_OUTPUT_NULL_N_SO_AT_MAIN_SOURCE_FILE_END
  {
-   switch_to_section (text_section);
+   switch_to_section (casm->sections.text);
    dbxout_begin_empty_stabs (N_SO);
    dbxout_stab_value_internal_label ("Letext", 0);
  }
