@@ -6592,8 +6592,8 @@ init_varasm_once (void)
 				      SBSS_SECTION_ASM_OP);
 #endif
 
-  casm->sections.tls_comm= get_noswitch_section (SECTION_WRITE | SECTION_BSS
-						 | SECTION_COMMON, emit_tls_common);
+  casm->sections.tls_comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
+						  | SECTION_COMMON, emit_tls_common);
   casm->sections.lcomm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
 					       | SECTION_COMMON, emit_local);
   casm->sections.comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
