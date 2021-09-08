@@ -10942,13 +10942,16 @@ rs6000_emit_move_si_sf_subreg (rtx dest, rtx source, machine_mode mode)
 	  return true;
 	}
 
-      /* In case we are given a SUBREG for a larger type, reduce it to
-	 SImode.  */
-      if (mode == SFmode && GET_MODE_SIZE (inner_mode) > 4)
+      /* Deal with subregs of SI/DI/TImode.  */
+      if (mode == SFmode && inner_mode == TImode)
 	{
-	  rtx tmp = gen_reg_rtx (SImode);
-	  emit_move_insn (tmp, gen_lowpart (SImode, source));
-	  emit_insn (gen_movsf_from_si (dest, tmp));
+	  emit_insn (gen_movsf_from_ti (dest, inner_source));
+	  return true;
+	}
+
+      if (mode == SFmode && inner_mode == DImode)
+	{
+	  emit_insn (gen_movsf_from_di (dest, inner_source));
 	  return true;
 	}
 
