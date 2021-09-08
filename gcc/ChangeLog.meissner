@@ -1,8 +1,14 @@
-work067.patch005:
-2021-09-06  Michael Meissner  <meissner@linux.ibm.com>
+work067.patch006:
+2021-09-08  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_emit_move_si_sf_subreg): Deal
 	with SUBREGs of TImode and DImode.
+	* config/rs6000/rs6000.md (SI_DI_TI): New mode iterator.
+	(movsf_from_<mode>): Replace movsf_from_si to add support for
+	subregs of DImode and TImode.
+
+work067.patch005:
+<patch reverted>
 
 work067.patch004:
 2021-09-06  Michael Meissner  <meissner@linux.ibm.com>
