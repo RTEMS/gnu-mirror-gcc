@@ -648,6 +648,8 @@ lto_main (void)
 	  debug_hooks->early_finish ("<artificial>");
 	  debuginfo_early_stop ();
 
+	  init_asm_output (main_input_filename);
+
 	  /* Let the middle end know that we have read and merged all of
 	     the input files.  */
 	  symtab->compile ();

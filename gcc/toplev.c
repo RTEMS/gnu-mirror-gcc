@@ -108,7 +108,6 @@ static void do_compile ();
 static void process_options (void);
 static void backend_init (void);
 static int lang_dependent_init (const char *);
-static void init_asm_output (const char *);
 static void finalize (bool);
 
 static void crash_signal (int) ATTRIBUTE_NORETURN;
@@ -468,6 +467,10 @@ compile_file (void)
 
   if (flag_syntax_only || flag_wpa)
     return;
+
+  /* Initialize asm output stream after PCH restore happens.  */
+  if (!in_lto_p)
+    init_asm_output (main_input_filename);
  
   /* Reset maximum_field_alignment, it can be adjusted by #pragma pack
      and this shouldn't influence any types built by the middle-end
@@ -692,7 +695,7 @@ print_version (FILE *file, const char *indent, bool show_global_state)
    on, because then the driver will have provided the name of a
    temporary file or bit bucket for us.  NAME is the file specified on
    the command line, possibly NULL.  */
-static void
+void
 init_asm_output (const char *name)
 {
   if (name == NULL && asm_file_name == 0)
@@ -1924,8 +1927,6 @@ lang_dependent_init (const char *name)
 
   if (!flag_wpa)
     {
-      init_asm_output (name);
-
       if (!flag_generate_lto && !flag_compare_debug)
 	{
 	  /* If stack usage information is desired, open the output file.  */
