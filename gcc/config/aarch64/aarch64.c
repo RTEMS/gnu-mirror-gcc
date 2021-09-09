@@ -3277,14 +3277,20 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	gcc_assert (mode == Pmode || mode == ptr_mode);
 	const auto sa = as_a <scalar_addr_mode> (mode);
 
-	rtx x0 = gen_rtx_REG (offset_mode (sa), R0_REGNUM);
-	rtx tp;
+	if (TARGET_CAPABILITY_PURE)
+	  {
+	    aarch64_load_tp (gen_rtx_REG (Pmode, R2_REGNUM));
+	    check_emit_insn (gen_tlsdesc_purecap (imm));
+	    emit_move_insn (dest, gen_rtx_REG (CADImode, R0_REGNUM));
+	    return;
+	  }
 
 	/* In ILP32, the got entry is always of SImode size.  Unlike
 	   small GOT, the dest is fixed at reg 0.  */
 	check_emit_insn (gen_tlsdesc_small (ptr_mode, imm));
 
-	tp = aarch64_load_tp (NULL);
+	rtx x0 = gen_rtx_REG (offset_mode (sa), R0_REGNUM);
+	rtx tp = aarch64_load_tp (NULL);
 
 	if (mode != Pmode)
 	  tp = gen_lowpart (mode, tp);
@@ -16325,6 +16331,10 @@ enum aarch64_symbol_type
 aarch64_classify_tls_symbol (rtx x)
 {
   enum tls_model tls_kind = tls_symbolic_operand_type (x);
+
+  /* For purecap Morello, we have to use the global dynamic model.  */
+  if (TARGET_CAPABILITY_PURE)
+    return SYMBOL_SMALL_TLSDESC;
 
   switch (tls_kind)
     {
