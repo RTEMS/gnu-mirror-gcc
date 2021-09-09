@@ -8450,4 +8450,24 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* Stack of assembly output states.  */
+static vec<asm_out_state *> casm_stack;
+
+/* Push ASM_STATE as a current casm.  */
+
+void
+push_asm (asm_out_state *asm_state)
+{
+  casm_stack.safe_push (casm);
+  casm = asm_state;
+}
+
+/* Return to previous casm state.  */
+
+void
+pop_asm ()
+{
+  casm = casm_stack.pop ();
+}
+
 #include "gt-varasm.h"

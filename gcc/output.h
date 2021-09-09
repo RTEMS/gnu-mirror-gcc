@@ -383,6 +383,11 @@ struct GTY(()) asm_out_state
 
 extern GTY(()) asm_out_state *casm;
 
+extern GTY(()) asm_out_state *lto_debug_asm;
+
+extern void push_asm (asm_out_state *asm_state);
+extern void pop_asm (void);
+
 /* Helper macro for commonly used accesses.  */
 #define asm_out_file casm->out_file
 
