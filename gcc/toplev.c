@@ -2093,6 +2093,7 @@ finalize (bool no_backend)
 	fatal_error (input_location, "error writing to %s: %m", asm_file_name);
       if (fclose (casm->out_file) != 0)
 	fatal_error (input_location, "error closing %s: %m", asm_file_name);
+      casm->out_file = NULL;
     }
 
   if (stack_usage_file)
