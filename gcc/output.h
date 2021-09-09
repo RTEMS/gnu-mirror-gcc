@@ -321,6 +321,8 @@ struct section_hasher : ggc_ptr_hash<section>
   static bool equal (section *, const char *);
 };
 
+/* Assembly output state.  */
+
 struct GTY(()) asm_out_state
 {
   asm_out_state (): out_file (NULL), in_section (NULL),

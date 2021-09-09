@@ -803,7 +803,7 @@ lhd_begin_section (const char *name)
 
   /* Save the old section so we can restore it in lto_end_asm_section.  */
   gcc_assert (!saved_section);
-  saved_section = casm->casm->in_section;
+  saved_section = casm->in_section;
   if (!saved_section)
     saved_section = casm->sections.text;
 

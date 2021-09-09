@@ -1969,7 +1969,7 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
     {
       section *save_text_section;
 
-      save_text_section = casm->casm->in_section;
+      save_text_section = casm->in_section;
       switch_to_section (unlikely_text_section ());
 #ifdef ASM_DECLARE_COLD_FUNCTION_SIZE
       if (cold_function_name != NULL_TREE)
@@ -1999,7 +1999,7 @@ assemble_zeros (unsigned HOST_WIDE_INT size)
 #ifdef ASM_NO_SKIP_IN_TEXT
   /* The `space' pseudo in the text section outputs nop insns rather than 0s,
      so we must output 0s explicitly in the text section.  */
-  if (ASM_NO_SKIP_IN_TEXT && (casm->casm->in_section->common.flags & SECTION_CODE) != 0)
+  if (ASM_NO_SKIP_IN_TEXT && (casm->in_section->common.flags & SECTION_CODE) != 0)
     {
       unsigned HOST_WIDE_INT i;
       for (i = 0; i < size; i++)
@@ -4141,8 +4141,8 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
   /* Make sure all constants in SECTION_MERGE and not SECTION_STRINGS
      sections have proper size.  */
   if (align > GET_MODE_BITSIZE (desc->mode)
-      && casm->casm->in_section
-      && (casm->casm->in_section->common.flags & SECTION_MERGE))
+      && casm->in_section
+      && (casm->in_section->common.flags & SECTION_MERGE))
     assemble_align (align);
 
 #ifdef ASM_OUTPUT_SPECIAL_POOL_ENTRY
@@ -7766,13 +7766,13 @@ switch_to_section (section *new_section, tree decl)
 		  "%qD was declared here", used_decl);
 	}
     }
-  else if (casm->casm->in_section == new_section)
+  else if (casm->in_section == new_section)
     return;
 
   if (new_section->common.flags & SECTION_FORGET)
-    casm->casm->in_section = NULL;
+    casm->in_section = NULL;
   else
-    casm->casm->in_section = new_section;
+    casm->in_section = new_section;
 
   switch (SECTION_STYLE (new_section))
     {
@@ -8417,7 +8417,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				 sect->named.common.flags
 				 | SECTION_LINKONCE,
 				 DECL_NAME (decl));
-  casm->casm->in_section = sect;
+  casm->in_section = sect;
 #else
   /* Neither OBJECT_FORMAT_PE, nor OBJECT_FORMAT_COFF is set here.
      Therefore the following check is used.
@@ -8443,7 +8443,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				     sect->named.common.flags
 				     | SECTION_LINKONCE,
 				     DECL_NAME (decl));
-      casm->casm->in_section = sect;
+      casm->in_section = sect;
     }
   else
     switch_to_section (sect);

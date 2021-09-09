@@ -1962,7 +1962,7 @@ default_print_patchable_function_entry_1 (FILE *file,
     {
       char buf[256];
       static int patch_area_number;
-      section *previous_section = casm->casm->in_section;
+      section *previous_section = casm->in_section;
       const char *asm_op = integer_asm_op (POINTER_SIZE_UNITS, false);
 
       gcc_assert (asm_op != NULL);
