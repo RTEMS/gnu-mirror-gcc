@@ -307,8 +307,8 @@ read_gcda_file (const char *filename)
     obj_info->filename = str_dup;
   }
 
-  /* Read stamp.  */
-  obj_info->stamp = gcov_read_unsigned ();
+  /* Read checksum.  */
+  obj_info->checksum = gcov_read_unsigned ();
 
   while (1)
     {
