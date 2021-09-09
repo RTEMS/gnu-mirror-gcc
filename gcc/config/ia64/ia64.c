@@ -10406,7 +10406,7 @@ ia64_asm_emit_except_personality (rtx personality)
 static void
 ia64_asm_init_sections (void)
 {
-  exception_section = get_unnamed_section (0, output_section_asm_op,
+  casm->sections.exception = get_unnamed_section (0, output_section_asm_op,
 					   "\t.handlerdata");
 }
 
@@ -10858,7 +10858,7 @@ ia64_select_rtx_section (machine_mode mode, rtx x,
   if (GET_MODE_SIZE (mode) > 0
       && GET_MODE_SIZE (mode) <= ia64_section_threshold
       && !TARGET_NO_SDATA)
-    return sdata_section;
+    return casm->sections.sdata;
   else
     return default_elf_select_rtx_section (mode, x, align);
 }

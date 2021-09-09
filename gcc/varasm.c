@@ -1682,7 +1682,7 @@ void
 default_dtor_section_asm_out_destructor (rtx symbol,
 					 int priority ATTRIBUTE_UNUSED)
 {
-  assemble_addr_to_section (symbol, dtors_section);
+  assemble_addr_to_section (symbol, casm->sections.dtors);
 }
 #endif
 
@@ -1705,7 +1705,7 @@ void
 default_ctor_section_asm_out_constructor (rtx symbol,
 					  int priority ATTRIBUTE_UNUSED)
 {
-  assemble_addr_to_section (symbol, ctors_section);
+  assemble_addr_to_section (symbol, casm->sections.ctors);
 }
 #endif
 
@@ -1969,7 +1969,7 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
     {
       section *save_text_section;
 
-      save_text_section = casm->in_section;
+      save_text_section = casm->casm->in_section;
       switch_to_section (unlikely_text_section ());
 #ifdef ASM_DECLARE_COLD_FUNCTION_SIZE
       if (cold_function_name != NULL_TREE)
@@ -1999,7 +1999,7 @@ assemble_zeros (unsigned HOST_WIDE_INT size)
 #ifdef ASM_NO_SKIP_IN_TEXT
   /* The `space' pseudo in the text section outputs nop insns rather than 0s,
      so we must output 0s explicitly in the text section.  */
-  if (ASM_NO_SKIP_IN_TEXT && (casm->in_section->common.flags & SECTION_CODE) != 0)
+  if (ASM_NO_SKIP_IN_TEXT && (casm->casm->in_section->common.flags & SECTION_CODE) != 0)
     {
       unsigned HOST_WIDE_INT i;
       for (i = 0; i < size; i++)
@@ -2046,7 +2046,7 @@ assemble_string (const char *p, int size)
 }
 
 
-/* A noswitch_section_callback for lcomm_section.  */
+/* A noswitch_section_callback for casm->sections.lcomm.  */
 
 static bool
 emit_local (tree decl ATTRIBUTE_UNUSED,
@@ -2069,7 +2069,7 @@ emit_local (tree decl ATTRIBUTE_UNUSED,
 #endif
 }
 
-/* A noswitch_section_callback for bss_noswitch_section.  */
+/* A noswitch_section_callback for casm->sections.bss_noswitch.  */
 
 #if defined ASM_OUTPUT_ALIGNED_BSS
 static bool
@@ -2084,7 +2084,7 @@ emit_bss (tree decl ATTRIBUTE_UNUSED,
 }
 #endif
 
-/* A noswitch_section_callback for comm_section.  */
+/* A noswitch_section_callback for casm->sections.comm.  */
 
 static bool
 emit_common (tree decl ATTRIBUTE_UNUSED,
@@ -2106,7 +2106,7 @@ emit_common (tree decl ATTRIBUTE_UNUSED,
 #endif
 }
 
-/* A noswitch_section_callback for tls_comm_section.  */
+/* A noswitch_section_callback for casm->sections.tls_comm.  */
 
 static bool
 emit_tls_common (tree decl ATTRIBUTE_UNUSED,
@@ -4141,8 +4141,8 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
   /* Make sure all constants in SECTION_MERGE and not SECTION_STRINGS
      sections have proper size.  */
   if (align > GET_MODE_BITSIZE (desc->mode)
-      && casm->in_section
-      && (casm->in_section->common.flags & SECTION_MERGE))
+      && casm->casm->in_section
+      && (casm->casm->in_section->common.flags & SECTION_MERGE))
     assemble_align (align);
 
 #ifdef ASM_OUTPUT_SPECIAL_POOL_ENTRY
@@ -6561,7 +6561,7 @@ init_varasm_once (void)
 #endif
 
 #ifdef SDATA_SECTION_ASM_OP
-  sdata_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+  casm->sections.sdata = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
 				       SDATA_SECTION_ASM_OP);
 #endif
 
@@ -6571,12 +6571,12 @@ init_varasm_once (void)
 #endif
 
 #ifdef CTORS_SECTION_ASM_OP
-  ctors_section = get_unnamed_section (0, output_section_asm_op,
+  casm->sections.ctors = get_unnamed_section (0, output_section_asm_op,
 				       CTORS_SECTION_ASM_OP);
 #endif
 
 #ifdef DTORS_SECTION_ASM_OP
-  dtors_section = get_unnamed_section (0, output_section_asm_op,
+  casm->sections.dtors = get_unnamed_section (0, output_section_asm_op,
 				       DTORS_SECTION_ASM_OP);
 #endif
 
@@ -6587,7 +6587,7 @@ init_varasm_once (void)
 #endif
 
 #ifdef SBSS_SECTION_ASM_OP
-  sbss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+  casm->sections.sbss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
 				      output_section_asm_op,
 				      SBSS_SECTION_ASM_OP);
 #endif
@@ -6732,7 +6732,7 @@ default_section_type_flags (tree decl, const char *name, int reloc)
 }
 
 /* Return true if the target supports some form of global BSS,
-   either through bss_noswitch_section, or by selecting a BSS
+   either through casm->sections.bss_noswitch, or by selecting a BSS
    section in TARGET_ASM_SELECT_SECTION.  */
 
 bool
@@ -7766,13 +7766,13 @@ switch_to_section (section *new_section, tree decl)
 		  "%qD was declared here", used_decl);
 	}
     }
-  else if (casm->in_section == new_section)
+  else if (casm->casm->in_section == new_section)
     return;
 
   if (new_section->common.flags & SECTION_FORGET)
-    casm->in_section = NULL;
+    casm->casm->in_section = NULL;
   else
-    casm->in_section = new_section;
+    casm->casm->in_section = new_section;
 
   switch (SECTION_STYLE (new_section))
     {
@@ -8417,7 +8417,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				 sect->named.common.flags
 				 | SECTION_LINKONCE,
 				 DECL_NAME (decl));
-  casm->in_section = sect;
+  casm->casm->in_section = sect;
 #else
   /* Neither OBJECT_FORMAT_PE, nor OBJECT_FORMAT_COFF is set here.
      Therefore the following check is used.
@@ -8443,7 +8443,7 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
 				     sect->named.common.flags
 				     | SECTION_LINKONCE,
 				     DECL_NAME (decl));
-      casm->in_section = sect;
+      casm->casm->in_section = sect;
     }
   else
     switch_to_section (sect);

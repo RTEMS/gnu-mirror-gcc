@@ -1347,7 +1347,7 @@ void
 i386_pe_seh_init_sections (void)
 {
   if (TARGET_SEH)
-    exception_section = get_unnamed_section (0, output_section_asm_op,
+    casm->sections.exception = get_unnamed_section (0, output_section_asm_op,
 					     "\t.seh_handlerdata");
 }
 

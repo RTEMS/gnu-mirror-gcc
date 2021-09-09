@@ -4644,14 +4644,14 @@ rl78_select_section (tree decl,
     }
 
   if (readonly)
-    return TARGET_ES0 ? frodata_section : readonly_data_section;
+    return TARGET_ES0 ? frodata_section : casm->sections.readonly_data;
 
   switch (categorize_decl_for_section (decl, reloc))
     {
-    case SECCAT_TEXT:   return text_section;
-    case SECCAT_DATA:   return data_section;
-    case SECCAT_BSS:    return bss_section;
-    case SECCAT_RODATA: return TARGET_ES0 ? frodata_section : readonly_data_section;
+    case SECCAT_TEXT:   return casm->sections.text;
+    case SECCAT_DATA:   return casm->sections.data;
+    case SECCAT_BSS:    return casm->sections.bss;
+    case SECCAT_RODATA: return TARGET_ES0 ? frodata_section : casm->sections.readonly_data;
     default:
       return default_select_section (decl, reloc, align);
     }
@@ -4786,7 +4786,7 @@ rl78_asm_ctor_dtor (rtx symbol, int priority, bool is_ctor)
       sec = get_section (buf, 0, NULL);
     }
   else
-    sec = is_ctor ? ctors_section : dtors_section;
+    sec = is_ctor ? casm->sections.ctors : casm->sections.dtors;
 
   assemble_addr_to_section (symbol, sec);
 }

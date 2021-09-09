@@ -2836,9 +2836,9 @@ microblaze_elf_asm_cdtor (rtx symbol, int priority, bool is_ctor)
       s = get_section (buf, SECTION_WRITE, NULL_TREE);
     }
   else if (is_ctor)
-    s = ctors_section;
+    s = casm->sections.ctors;
   else
-    s = dtors_section;
+    s = casm->sections.dtors;
 
   switch_to_section (s);
   assemble_align (POINTER_SIZE);
@@ -3261,7 +3261,7 @@ microblaze_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align)
          relaxation/relocation. Currently, turning mergeable sections 
          into regular readonly sections.  */
 
-      return readonly_data_section;
+      return casm->sections.readonly_data;
     default:
       return default_elf_select_section (decl, reloc, align);
     }

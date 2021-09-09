@@ -438,7 +438,7 @@ should_emit_struct_debug (tree type, enum debug_info_usage usage)
   return DUMP_GSTRUCT (type, usage, criterion, generic, false, false);
 }
 
-/* Switch [BACK] to eh_frame_section.  If we don't have an eh_frame_section,
+/* Switch [BACK] to casm->sections.eh_frame.  If we don't have an casm->sections.eh_frame,
    switch to the data section instead, and write out a synthetic start label
    for collect2 the first time around.  */
 
@@ -476,8 +476,8 @@ switch_to_eh_frame_section (bool back ATTRIBUTE_UNUSED)
 #ifdef EH_FRAME_SECTION_NAME
       casm->sections.eh_frame = get_section (EH_FRAME_SECTION_NAME, flags, NULL);
 #else
-      eh_frame_section = ((flags == SECTION_WRITE)
-			  ? data_section : readonly_data_section);
+      casm->sections.eh_frame = ((flags == SECTION_WRITE)
+			  ? casm->sections.data : casm->sections.readonly_data);
 #endif /* EH_FRAME_SECTION_NAME */
     }
 

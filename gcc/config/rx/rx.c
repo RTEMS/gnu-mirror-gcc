@@ -2305,7 +2305,7 @@ rx_select_rtx_section (machine_mode mode,
   if (rx_small_data_limit > 0
       && GET_MODE_SIZE (mode) <= rx_small_data_limit
       && align <= (unsigned HOST_WIDE_INT) rx_small_data_limit * BITS_PER_UNIT)
-    return sdata_section;
+    return casm->sections.sdata;
 
   return default_elf_select_rtx_section (mode, x, align);
 }
@@ -2319,8 +2319,8 @@ rx_select_section (tree decl,
     {
       switch (categorize_decl_for_section (decl, reloc))
 	{
-	case SECCAT_SDATA:	return sdata_section;
-	case SECCAT_SBSS:	return sbss_section;
+	case SECCAT_SDATA:	return casm->sections.sdata;
+	case SECCAT_SBSS:	return casm->sections.sbss;
 	case SECCAT_SRODATA:
 	  /* Fall through.  We do not put small, read only
 	     data into the C_2 section because we are not
@@ -2342,7 +2342,7 @@ rx_select_section (tree decl,
       case SECCAT_RODATA_MERGE_CONST:
       case SECCAT_RODATA_MERGE_STR_INIT:
       case SECCAT_RODATA_MERGE_STR:
-	return readonly_data_section;
+	return casm->sections.readonly_data;
 
       default:
 	break;
@@ -2690,9 +2690,9 @@ rx_elf_asm_cdtor (rtx symbol, int priority, bool is_ctor)
       s = get_section (buf, SECTION_WRITE, NULL_TREE);
     }
   else if (is_ctor)
-    s = ctors_section;
+    s = casm->sections.ctors;
   else
-    s = dtors_section;
+    s = casm->sections.dtors;
 
   switch_to_section (s);
   assemble_align (POINTER_SIZE);
