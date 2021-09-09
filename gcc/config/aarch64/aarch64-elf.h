@@ -151,10 +151,10 @@ ASM_MABI_SPEC
 #undef UINTPTR_TYPE
 #undef PTRADDR_TYPE
 #define INTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
-			? "__intcap_t" \
+			? "__intcap" \
 			: (LONG_TYPE_SIZE == 64 ? "long int" : "int"))
 #define UINTPTR_TYPE ((TARGET_CAPABILITY_FAKE || TARGET_CAPABILITY_PURE) \
-			? "__uintcap_t" \
+			? "unsigned __intcap" \
 			: (LONG_TYPE_SIZE == 64 ? "long unsigned int" : "unsigned int"))
 #define PTRADDR_TYPE "long unsigned int"
 

@@ -4120,6 +4120,7 @@ c_common_nodes_and_builtins (void)
   if (intcap_type_node)
     {
       record_builtin_type (RID_INTCAP, NULL, intcap_type_node);
+      record_builtin_type (RID_MAX, "unsigned __intcap", uintcap_type_node);
       lang_hooks.types.register_builtin_type (intcap_type_node, "__intcap_t");
       lang_hooks.types.register_builtin_type (uintcap_type_node, "__uintcap_t");
     }

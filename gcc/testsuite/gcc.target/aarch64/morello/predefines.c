@@ -2,11 +2,11 @@
 
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __INTPTR_TYPE__ x(int);
-__intcap_t x(int);
+__intcap x(int);
 
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __UINTPTR_TYPE__ y(int);
-__uintcap_t y(int);
+unsigned __intcap y(int);
 
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __PTRADDR_TYPE__ z(int);
@@ -16,8 +16,7 @@ long unsigned int z(int);
    should remove one later since having two is superfluous.  */
 #define make_func(X) func ## X
 #define wrapper(X) make_func(X)()
-int func__intcap_t () { return 0; }
-int func__uintcap_t () { return 0; }
+int func__intcap () { return 0; }
 
 #define assert(x) do {if (!(x)) { __builtin_abort (); }} while (0)
 struct myval {
@@ -66,5 +65,5 @@ int main()
 	assert (__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ == 32768);
 	assert (__CHERI_CAP_PERMISSION_PERMIT_STORE__ == 65536);
 	assert (__CHERI_CAP_PERMISSION_PERMIT_LOAD__ == 131072);
-	return wrapper(__INTPTR_TYPE__) + wrapper(__UINTPTR_TYPE__);
+	return wrapper(__INTPTR_TYPE__);
 }
