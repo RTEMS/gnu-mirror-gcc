@@ -171,8 +171,10 @@ const char *user_label_prefix;
 
 /* Output files for assembler code (real compiler output)
    and debugging dumps.  */
-
 asm_out_state *casm;
+
+/* Early LTO debug info output.  */
+asm_out_state *lto_debug_asm;
 
 FILE *aux_info_file;
 FILE *callgraph_info_file = NULL;
@@ -1115,6 +1117,7 @@ general_init (const char *argv0, bool init_signals)
 
   /* Initialize ASM out state.  */
   casm = new (ggc_alloc<asm_out_state> ()) asm_out_state ();
+  lto_debug_asm = new (ggc_alloc<asm_out_state> ()) asm_out_state ();
 
   statistics_early_init ();
   debuginfo_early_init ();
