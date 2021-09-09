@@ -17234,7 +17234,7 @@ get_jump_table_size (rtx_jump_table_data *insn)
 {
   /* ADDR_VECs only take room if read-only data does into the text
      section.  */
-  if (JUMP_TABLES_IN_TEXT_SECTION || readonly_data_section == text_section)
+  if (JUMP_TABLES_IN_TEXT_SECTION || casm->sections.readonly_data == casm->sections.text)
     {
       rtx body = PATTERN (insn);
       int elt = GET_CODE (body) == ADDR_DIFF_VEC ? 1 : 0;
@@ -24642,9 +24642,9 @@ arm_elf_asm_cdtor (rtx symbol, int priority, bool is_ctor)
       s = get_section (buf, SECTION_WRITE | SECTION_NOTYPE, NULL_TREE);
     }
   else if (is_ctor)
-    s = ctors_section;
+    s = casm->sections.ctors;
   else
-    s = dtors_section;
+    s = casm->sections.dtors;
 
   switch_to_section (s);
   assemble_align (POINTER_SIZE);
@@ -27910,7 +27910,7 @@ thumb_call_via_reg (rtx reg)
   /* If we are in the normal text section we can use a single instance
      per compilation unit.  If we are doing function sections, then we need
      an entry per section, since we can't rely on reachability.  */
-  if (in_section == text_section)
+  if (casm->in_section == casm->sections.text)
     {
       thumb_call_reg_needed = 1;
 
@@ -28302,7 +28302,7 @@ arm_file_end (void)
   if (! thumb_call_reg_needed)
     return;
 
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   asm_fprintf (asm_out_file, "\t.code 16\n");
   ASM_OUTPUT_ALIGN (asm_out_file, 1);
 
@@ -29752,13 +29752,13 @@ static void
 arm_asm_init_sections (void)
 {
 #if ARM_UNWIND_INFO
-  exception_section = get_unnamed_section (0, output_section_asm_op,
+  casm->sections.exception = get_unnamed_section (0, output_section_asm_op,
 					   "\t.handlerdata");
 #endif /* ARM_UNWIND_INFO */
 
 #ifdef OBJECT_FORMAT_ELF
   if (target_pure_code)
-    text_section->unnamed.data = "\t.section .text,\"0x20000006\",%progbits";
+    casm->sections.text->unnamed.data = "\t.section .text,\"0x20000006\",%progbits";
 #endif
 }
 

@@ -1583,7 +1583,7 @@ vmsdbgout_finish (const char *filename ATTRIBUTE_UNUSED)
     return;
 
   /* Output a terminator label for the .text section.  */
-  switch_to_section (text_section);
+  switch_to_section (casm->sections.text);
   targetm.asm_out.internal_label (asm_out_file, TEXT_END_LABEL, 0);
 
   /* Output debugging information.

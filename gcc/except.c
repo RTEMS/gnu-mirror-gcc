@@ -2924,7 +2924,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
       else
 	flags = SECTION_WRITE;
 
-      /* Compute the section and cache it into exception_section,
+      /* Compute the section and cache it into casm->sections.exception,
 	 unless it depends on the function name.  */
       if (targetm_common.have_named_sections)
 	{

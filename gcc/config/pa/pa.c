@@ -4444,7 +4444,7 @@ pa_output_function_epilogue (FILE *file)
       /* We are done with this subspace except possibly for some additional
 	 debug information.  Forget that we are in this subspace to ensure
 	 that the next function is output in its own subspace.  */
-      in_section = NULL;
+      casm->in_section = NULL;
       cfun->machine->in_nsubspa = 2;
     }
 
@@ -4693,7 +4693,7 @@ output_deferred_profile_counters (void)
   if (funcdef_nos.is_empty ())
    return;
 
-  switch_to_section (data_section);
+  switch_to_section (casm->sections.data);
   align = MIN (BIGGEST_ALIGNMENT, LONG_TYPE_SIZE);
   ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align / BITS_PER_UNIT));
 
@@ -5863,7 +5863,7 @@ output_deferred_plabels (void)
      before outputting the deferred plabels.  */
   if (n_deferred_plabels)
     {
-      switch_to_section (flag_pic ? data_section : readonly_data_section);
+      switch_to_section (flag_pic ? casm->sections.data : casm->sections.readonly_data);
       ASM_OUTPUT_ALIGN (asm_out_file, TARGET_64BIT ? 3 : 2);
     }
 
@@ -8872,7 +8872,7 @@ pa_asm_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 
   if (TARGET_SOM && flag_pic && TREE_PUBLIC (function))
     {
-      switch_to_section (data_section);
+      switch_to_section (casm->sections.data);
       output_asm_insn (".align 4", xoperands);
       ASM_OUTPUT_LABEL (file, label);
       output_asm_insn (".word P'%0", xoperands);
@@ -9047,7 +9047,7 @@ pa_asm_output_aligned_bss (FILE *stream,
 			   unsigned HOST_WIDE_INT size,
 			   unsigned int align)
 {
-  switch_to_section (bss_section);
+  switch_to_section (casm->sections.bss);
 
 #ifdef ASM_OUTPUT_TYPE_DIRECTIVE
   ASM_OUTPUT_TYPE_DIRECTIVE (stream, name, "object");
@@ -9084,7 +9084,7 @@ pa_asm_output_aligned_common (FILE *stream,
       align = max_common_align;
     }
 
-  switch_to_section (bss_section);
+  switch_to_section (casm->sections.bss);
 
   assemble_name (stream, name);
   fprintf (stream, "\t.comm " HOST_WIDE_INT_PRINT_UNSIGNED"\n",
@@ -9104,7 +9104,7 @@ pa_asm_output_aligned_local (FILE *stream,
 			     unsigned HOST_WIDE_INT size,
 			     unsigned int align)
 {
-  switch_to_section (bss_section);
+  switch_to_section (casm->sections.bss);
   fprintf (stream, "\t.align %u\n", align / BITS_PER_UNIT);
 
 #ifdef LOCAL_ASM_OP
@@ -10030,10 +10030,10 @@ som_output_text_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 	     function has been completed.  So, we are changing to the
 	     text section to output debugging information.  Thus, we
 	     need to forget that we are in the text section so that
-	     varasm.c will call us when text_section is selected again.  */
+	     varasm.c will call us when casm->sections.text is selected again.  */
 	  gcc_assert (!cfun || !cfun->machine
 		      || cfun->machine->in_nsubspa == 2);
-	  in_section = NULL;
+	  casm->in_section = NULL;
 	}
       output_section_asm_op ("\t.SPACE $TEXT$\n\t.NSUBSPA $CODE$");
       return;
@@ -10047,7 +10047,7 @@ som_output_text_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 static void
 som_output_comdat_data_section_asm_op (const void *data)
 {
-  in_section = NULL;
+  casm->in_section = NULL;
   output_section_asm_op (data);
 }
 
@@ -10056,7 +10056,7 @@ som_output_comdat_data_section_asm_op (const void *data)
 static void
 pa_som_asm_init_sections (void)
 {
-  text_section
+  casm->sections.text
     = get_unnamed_section (0, som_output_text_section_asm_op, NULL);
 
   /* SOM puts readonly data in the default $LIT$ subspace when PIC code
@@ -10104,14 +10104,14 @@ pa_som_asm_init_sections (void)
      when generating PIC code.  This reduces sharing, but it works
      correctly.  Now we rely on pa_reloc_rw_mask() for section selection.
      This puts constant data not needing relocation into the $TEXT$ space.  */
-  readonly_data_section = som_readonly_data_section;
+  casm->sections.readonly_data = som_readonly_data_section;
 
   /* We must not have a reference to an external symbol defined in a
      shared library in a readonly section, else the SOM linker will
      complain.
 
      So, we force exception information into the data section.  */
-  exception_section = data_section;
+  casm->sections.exception = casm->sections.data;
 }
 
 /* Implement TARGET_ASM_TM_CLONE_TABLE_SECTION.  */
@@ -10144,18 +10144,18 @@ pa_select_section (tree exp, int reloc,
 	  && !DECL_WEAK (exp))
 	return som_one_only_readonly_data_section;
       else
-	return readonly_data_section;
+	return casm->sections.readonly_data;
     }
   else if (CONSTANT_CLASS_P (exp)
 	   && !(reloc & pa_reloc_rw_mask ()))
-    return readonly_data_section;
+    return casm->sections.readonly_data;
   else if (TARGET_SOM
 	   && TREE_CODE (exp) == VAR_DECL
 	   && DECL_ONE_ONLY (exp)
 	   && !DECL_WEAK (exp))
     return som_one_only_data_section;
   else
-    return data_section;
+    return casm->sections.data;
 }
 
 /* Implement pa_elf_select_rtx_section.  If X is a function label operand
@@ -10648,7 +10648,7 @@ pa_function_section (tree decl, enum node_frequency freq,
 {
   /* Put functions in text section if target doesn't have named sections.  */
   if (!targetm_common.have_named_sections)
-    return text_section;
+    return casm->sections.text;
 
   /* Force nested functions into the same section as the containing
      function.  */

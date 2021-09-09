@@ -8832,7 +8832,7 @@ arc_asm_output_aligned_decl_local (FILE * stream, tree decl, const char * name,
     switch_to_section (get_named_section (NULL, ".sbss", 0));
   /*    named_section (0,".sbss",0); */
   else
-    switch_to_section (bss_section);
+    switch_to_section (casm->sections.bss);
 
   if (globalize_p)
     (*targetm.asm_out.globalize_label) (stream, name);

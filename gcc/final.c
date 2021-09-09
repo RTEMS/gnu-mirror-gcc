@@ -1143,7 +1143,7 @@ shorten_branches (rtx_insn *first)
 		 may need to update the alignment of this label.  */
 
 	      if (JUMP_TABLES_IN_TEXT_SECTION
-		  || readonly_data_section == casm->sections.text)
+		  || casm->sections.readonly_data == casm->sections.text)
 		{
 		  rtx_jump_table_data *table = jump_table_for_label (label);
 		  if (table)
@@ -1284,7 +1284,7 @@ shorten_branches (rtx_insn *first)
 		      >= GET_MODE_SIZE (table->get_data_mode ())))
 		PUT_MODE (body, vec_mode);
 	      if (JUMP_TABLES_IN_TEXT_SECTION
-		  || readonly_data_section == casm->sections.text)
+		  || casm->sections.readonly_data == casm->sections.text)
 		{
 		  insn_lengths[uid]
 		    = (XVECLEN (body, 1)

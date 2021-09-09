@@ -3114,7 +3114,7 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
 	    {
 	      /* Ultrix `as' seems to need this.  */
 #ifdef DBX_STATIC_STAB_DATA_SECTION
-	      switch_to_section (data_section);
+	      switch_to_section (casm->sections.data);
 #endif
 	      code = N_STSYM;
 	    }
