@@ -2,20 +2,25 @@
 /* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-details" } */
 
 int
-foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
+foo(double *a, double *b, double *c, double *d, double *r, int size, unsigned order)
 {
   for (int i = 0; i < size; i++)
   {
     double tmp;
 
-    if (order < 5)
-      tmp = -8 * a[i];
-    else
-      tmp = -4 * b[i];
+    switch (order)
+      {
+      case 0 ... 4:
+	tmp = -8 * a[i];
+	break;
+      default:
+	tmp = -4 * b[i];
+	break;
+      }
 
     double x = 3 * tmp + d[i] + tmp;
 
-    /* This should not be unswitched as it's mutually excluded with order < 5.  */
+    /* This should not be unswitched as it's mutually excluded with case 0 ... 4.  */
     if (order >= 5)
       x += 2;
 
@@ -26,4 +31,4 @@ foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop with condition: order.* == 1" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times ";; Unswitching loop with condition: order.* <= 4" 1 "unswitch" } } */
