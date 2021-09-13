@@ -101,10 +101,8 @@ tree_ssa_unswitch_loops (void)
   for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
     {
       if (!loop->inner)
-	{
-	  /* Unswitch innermost loop.  */
-	  changed |= tree_unswitch_single_loop (loop, 0);
-	}
+	/* Unswitch innermost loop.  */
+	changed |= tree_unswitch_single_loop (loop, 0);
       else
 	changed |= tree_unswitch_outer_loop (loop);
     }
