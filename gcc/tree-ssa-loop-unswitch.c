@@ -388,20 +388,24 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  int_range_max r;
 	  edge edge_true, edge_false;
 	  extract_true_false_edges_from_block (bbs[i], &edge_true, &edge_false);
+	  tree cond = gimple_cond_lhs (stmt);
 
-	  if (ranger.range_on_edge (r, edge_true, gimple_cond_lhs (stmt))
-	      && r.undefined_p ())
+	  if (r.supports_type_p (TREE_TYPE (cond)))
 	    {
-	      gimple_cond_set_condition_from_tree (condition,
-						   boolean_false_node);
-	      changed = true;
-	    }
-	  else if(ranger.range_on_edge (r, edge_false, gimple_cond_lhs (stmt))
-	      && r.undefined_p ())
-	    {
-	      gimple_cond_set_condition_from_tree (condition,
-						   boolean_true_node);
-	      changed = true;
+	      if (ranger.range_on_edge (r, edge_true, cond)
+		  && r.undefined_p ())
+		{
+		  gimple_cond_set_condition_from_tree (condition,
+						       boolean_false_node);
+		  changed = true;
+		}
+	      else if(ranger.range_on_edge (r, edge_false, gimple_cond_lhs (stmt))
+		      && r.undefined_p ())
+		{
+		  gimple_cond_set_condition_from_tree (condition,
+						       boolean_true_node);
+		  changed = true;
+		}
 	    }
 	}
       else if (swtch != NULL)
