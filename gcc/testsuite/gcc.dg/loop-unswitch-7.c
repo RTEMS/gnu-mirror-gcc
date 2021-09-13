@@ -2,7 +2,6 @@
 /* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-details --param=max-unswitch-insns=1000 --param=max-unswitch-level=10" } */
 
 int
-__attribute__((noipa))
 foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
 {
   for (int i = 0; i < size; i++)
@@ -40,16 +39,6 @@ foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
   return 0;
 }
 
-#define N 16 * 1024
-double aa[N], bb[N], cc[N], dd[N], rr[N];
-
-int main()
-{
-  for (int i = 0; i < 100 * 1000; i++)
-    foo (aa, bb, cc, dd, rr, N, i % 100);
-}
-
-/* Test that we actually unswitched something.  */
 /* { dg-final { scan-tree-dump ";; Unswitching loop with condition: order_.* >= 5 & order_.* <= 6 | order_.* == 9" "unswitch" } } */
 /* { dg-final { scan-tree-dump ";; Unswitching loop with condition: order.* == 1" "unswitch" } } */
 /* { dg-final { scan-tree-dump ";; Unswitching loop with condition: order.* == 2" "unswitch" } } */
