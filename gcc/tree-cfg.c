@@ -9055,13 +9055,9 @@ gimple_lv_add_condition_to_bb (basic_block first_head ATTRIBUTE_UNUSED,
   /* Build new conditional expr */
   gsi = gsi_last_bb (cond_bb);
 
-  if (COMPARISON_CLASS_P (cond_expr)
-      || TREE_CODE (cond_expr) == TRUTH_NOT_EXPR
-      || is_gimple_min_invariant (cond_expr)
-      || SSA_VAR_P (cond_expr))
-    ;
-  else
-    cond_expr = force_gimple_operand_gsi (&gsi, cond_expr, true, NULL_TREE, false,
+  cond_expr = force_gimple_operand_gsi_1 (&gsi, cond_expr,
+					  is_gimple_condexpr_for_cond,
+					  NULL_TREE, false,
 					  GSI_CONTINUE_LINKING);
   new_cond_expr = gimple_build_cond_from_tree (cond_expr,
 					       NULL_TREE, NULL_TREE);
