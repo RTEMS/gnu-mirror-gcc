@@ -397,6 +397,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
 		{
 		  gimple_cond_set_condition_from_tree (condition,
 						       boolean_false_node);
+		  update_stmt (condition);
 		  changed = true;
 		}
 	      else if(ranger.range_on_edge (r, edge_false, gimple_cond_lhs (stmt))
@@ -404,6 +405,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
 		{
 		  gimple_cond_set_condition_from_tree (condition,
 						       boolean_true_node);
+		  update_stmt (condition);
 		  changed = true;
 		}
 	    }
@@ -433,14 +435,14 @@ tree_unswitch_single_loop (class loop *loop, int num)
 
 	  if (index_candidate != NULL_TREE
 	      && ignored_edges.elements () == EDGE_COUNT (bbs[i]->succs) - 1)
-	    gimple_switch_set_index (swtch, index_candidate);
+	    {
+	      gimple_switch_set_index (swtch, index_candidate);
+	      update_stmt (swtch);
+	    }
 	}
 
-      /* gswitch can return NULL_TREE for cases that are not supported.  */
-      if (cond == NULL_TREE)
-	;
       /* Do not unswitch too much.  */
-      else if (num > param_max_unswitch_level)
+      if (num > param_max_unswitch_level)
 	{
 	  i++;
 	  continue;
@@ -461,7 +463,6 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  break;
 	}
 
-      update_stmt (stmt);
       i++;
     }
 
