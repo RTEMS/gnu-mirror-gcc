@@ -34196,7 +34196,7 @@ vcmlaq_rot270_laneq_f32 (float32x4_t __r, float32x4_t __a, float32x4_t __b,
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64")
+#pragma GCC target ("arch=morello+c64+fp16fml")
 #else
 #pragma GCC target ("arch=armv8.2-a+fp16fml")
 #endif
