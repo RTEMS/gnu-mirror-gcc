@@ -4205,27 +4205,6 @@ new_addr_loc_descr (rtx addr, enum dtprel_bool dtprel)
 #define SKELETON_COMP_DIE_ABBREV 1
 #define SKELETON_TYPE_DIE_ABBREV 2
 
-/* Definitions of defaults for formats and names of various special
-   (artificial) labels which may be generated within this file (when the -g
-   options is used and DWARF2_DEBUGGING_INFO is in effect.
-   If necessary, these may be overridden from within the tm.h file, but
-   typically, overriding these defaults is unnecessary.  */
-
-static char text_end_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char text_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char cold_text_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char cold_end_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char abbrev_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_info_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_skeleton_info_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_skeleton_abbrev_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_line_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_addr_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char debug_skeleton_line_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char macinfo_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char loc_section_label[MAX_ARTIFICIAL_LABEL_BYTES];
-static char ranges_section_label[2 * MAX_ARTIFICIAL_LABEL_BYTES];
-static char ranges_base_label[2 * MAX_ARTIFICIAL_LABEL_BYTES];
 
 #ifndef TEXT_END_LABEL
 #define TEXT_END_LABEL		"Letext"
@@ -4245,6 +4224,36 @@ static char ranges_base_label[2 * MAX_ARTIFICIAL_LABEL_BYTES];
 #ifndef LINE_CODE_LABEL
 #define LINE_CODE_LABEL		"LM"
 #endif
+
+struct dwarf_out_state
+{
+  /* Definitions of defaults for formats and names of various special
+     (artificial) labels which may be generated within this file (when the -g
+     options is used and DWARF2_DEBUGGING_INFO is in effect.
+     If necessary, these may be overridden from within the tm.h file, but
+     typically, overriding these defaults is unnecessary.  */
+
+  struct
+  {
+    char text_end[MAX_ARTIFICIAL_LABEL_BYTES];
+    char text_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char cold_text_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char cold_end[MAX_ARTIFICIAL_LABEL_BYTES];
+    char abbrev_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_info_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_skeleton_info_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_skeleton_abbrev_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_line_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_addr_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char debug_skeleton_line_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char macinfo_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char loc_section[MAX_ARTIFICIAL_LABEL_BYTES];
+    char ranges_section[2 * MAX_ARTIFICIAL_LABEL_BYTES];
+    char ranges_base[2 * MAX_ARTIFICIAL_LABEL_BYTES];
+  } labels;
+};
+
+static dwarf_out_state *dwarf_state = NULL;
 
 
 /* Return the root of the DIE's built for the current compilation unit.  */
@@ -29318,6 +29327,8 @@ init_sections_and_labels (bool early_lto_debug)
 static void
 dwarf2out_init (const char *filename ATTRIBUTE_UNUSED)
 {
+  dwarf_state = new dwarf_out_state ();
+
   /* Allocate the file_table.  */
   file_table = hash_table<dwarf_file_hasher>::create_ggc (50);
 
