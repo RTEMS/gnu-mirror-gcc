@@ -430,7 +430,7 @@ struct GTY(()) dwarf_out_state
   unsigned macinfo_label_base;
 };
 
-static GTY(()) dwarf_out_state *dwarf_state = NULL;
+static dwarf_out_state *dwarf_state = NULL;
 
 static vec<dwarf_out_state *> dwarf_stack;
 
@@ -29361,7 +29361,7 @@ init_sections_and_labels (bool early_lto_debug)
 static void
 dwarf2out_init (const char *filename ATTRIBUTE_UNUSED)
 {
-  dwarf_state = new (ggc_alloc<dwarf_out_state> ()) dwarf_out_state (casm);
+  dwarf_state = new dwarf_out_state (casm);
 
   /* Allocate the file_table.  */
   file_table = hash_table<dwarf_file_hasher>::create_ggc (50);
@@ -33056,7 +33056,7 @@ dwarf2out_early_finish (const char *filename)
 void
 dwarf2out_c_finalize (void)
 {
-  ggc_free (dwarf_state);
+  delete dwarf_state;
   dwarf_state = NULL;
 
   last_var_location_insn = NULL;
