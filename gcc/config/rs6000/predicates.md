@@ -661,21 +661,15 @@
   const REAL_VALUE_TYPE *rv;
   REAL_VALUE_TYPE rv_type;
 
-  if (CONST_INT_P (element))
+  if (CONST_INT_P (element) && 0)
     {
       HOST_WIDE_INT df_value = INTVAL (element);
       long df_words[2];
 
-#if 0
       /* Stay away from NaNs and denormal values.  */
       int exponent = (df_value >> 52) & 0x7ff;
       if (exponent == 0 || exponent == 0x7ff)
 	return false;
-#else
-      /* For now, only handle -0.0.  */
-      if (df_value != 0x80000000)
-	return false;
-#endif
 
       df_words[0] = (df_value >> 32) & 0xffffffff;
       df_words[1] = df_value & 0xffffffff;
