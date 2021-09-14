@@ -601,6 +601,11 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
+  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
+     be loaded with that instruction.  */
+  if (easy_fp_constant_float_to_v2df (op, mode))
+    return 1;
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -608,6 +613,93 @@
      use single precision loads.  */
    return 0;
 })
+
+;; Return 1 if the operand is a constant that can be loaded via the XXSPLTIDP
+;; instruction, which takes a SFmode value and produces a V2DFmode result.
+;; This predicate matches also DImode constants that can be expressed as DFmode
+;; values and vector constants produced either with CONST_VECTOR or
+;; VEC_DUPLICATE.
+(define_predicate "easy_fp_constant_float_to_v2df"
+  (match_code "const_int,const_double,const_vector,vec_duplicate")
+{
+  /* Can we do the XXSPLTIDP instruction?  */
+  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  /* Handle vector constants and duplication.  */
+  rtx element = op;
+  if (mode == V2DFmode || mode == V2DImode)
+    {
+      if (CONST_VECTOR_P (op))
+	{
+	  element = CONST_VECTOR_ELT (op, 0);
+	  if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+	    return false;
+
+	  mode = GET_MODE_INNER (mode);
+	}
+
+      else if (GET_CODE (op) == VEC_DUPLICATE)
+	{
+	  element = XEXP (op, 0);
+	  mode = GET_MODE (element);
+	}
+
+      else
+	return false;
+    }
+
+  /* Don't return true for 0.0 or 0 since that is easy to create without
+     XXSPLTIDP.  */
+  if (element == CONST0_RTX (mode))
+    return false;
+
+  /* Handle DImode/V2DImode by creating a DF value from it.  */
+  const REAL_VALUE_TYPE *rv;
+  REAL_VALUE_TYPE rv_type;
+
+  if (CONST_INT_P (element))
+    {
+      HOST_WIDE_INT df_value = INTVAL (element);
+      long df_words[2];
+
+      df_words[0] = (df_value >> 32) & 0xffffffff;
+      df_words[1] = df_value & 0xffffffff;
+
+      /* real_from_target takes the target words in little endian order.  */
+      if (BYTES_BIG_ENDIAN)
+	std::swap (df_words[0], df_words[1]);
+
+      real_from_target (&rv_type, df_words, DFmode);
+      rv = &rv_type;
+    }
+
+  /* Handle SFmode/DFmode constants.  */
+  else if (CONST_DOUBLE_P (element))
+    rv = CONST_DOUBLE_REAL_VALUE (element);
+
+  else
+    return false;  
+
+  /* Validate that the number can be stored as a SFmode value.  */
+  if (!exact_real_truncate (SFmode, rv))
+    return false;
+
+  /* Validate that the number is not a SFmode denormal (exponent is 0,
+     mantissa field is non-zero) which is undefined for the XXSPLTIDP
+     instruction.  */
+  long sf_value;
+  real_to_target (&sf_value, rv, SFmode);
+
+  if (((sf_value & 0x7F800000) == 0) && ((sf_value & 0x7FFFFF) != 0))
+    return false;
+
+  return true;
+})
+
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
 ;; instruction and then a VUPKHSB, VECSB2W or VECSB2D instruction.
@@ -651,6 +743,9 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
+	return true;
+
+      if (easy_fp_constant_float_to_v2df (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
