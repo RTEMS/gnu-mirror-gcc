@@ -4317,12 +4317,12 @@ is_tagged_type (const_tree type)
 	  || code == QUAL_UNION_TYPE || code == ENUMERAL_TYPE);
 }
 
-/* Set label to debug_info_section_label + die_offset of a DIE reference.  */
+/* Set label to dwarf_state->labels.debug_info_section + die_offset of a DIE reference.  */
 
 static void
 get_ref_die_offset_label (char *label, dw_die_ref ref)
 {
-  sprintf (label, "%s+%ld", debug_info_section_label, ref->die_offset);
+  sprintf (label, "%s+%ld", dwarf_state->labels.debug_info_section, ref->die_offset);
 }
 
 /* Return die_offset of a DIE reference to a base type.  */
@@ -8967,7 +8967,7 @@ output_loclists_offsets (dw_die_ref die)
 	if (l->offset_emitted)
 	  continue;
 	dw2_asm_output_delta (dwarf_offset_size, l->ll_symbol,
-			      loc_section_label, NULL);
+			      dwarf_state->labels.loc_section, NULL);
 	gcc_assert (l->hash == loc_list_idx);
 	loc_list_idx++;
 	l->offset_emitted = true;
@@ -10620,10 +10620,10 @@ output_range_list_offset (dw_attr_node *a)
 	}
       else
 	{
-	  char *p = strchr (ranges_section_label, '\0');
+	  char *p = strchr (dwarf_state->labels.ranges_section, '\0');
 	  sprintf (p, "+" HOST_WIDE_INT_PRINT_HEX,
 		   a->dw_attr_val.v.val_offset * 2 * DWARF2_ADDR_SIZE);
-	  dw2_asm_output_offset (dwarf_offset_size, ranges_section_label,
+	  dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.ranges_section,
 				 debug_ranges_section, "%s", name);
 	  *p = '\0';
 	}
@@ -10637,7 +10637,7 @@ output_range_list_offset (dw_attr_node *a)
   else
     dw2_asm_output_data (dwarf_offset_size,
 			 a->dw_attr_val.v.val_offset * 2 * DWARF2_ADDR_SIZE,
-                         "%s (offset from %s)", name, ranges_section_label);
+                         "%s (offset from %s)", name, dwarf_state->labels.ranges_section);
 }
 
 /* Output the offset into the debug_loc section.  */
@@ -10659,7 +10659,7 @@ output_loc_list_offset (dw_attr_node *a)
 				   sym);
     }
   else
-    dw2_asm_output_delta (dwarf_offset_size, sym, loc_section_label,
+    dw2_asm_output_delta (dwarf_offset_size, sym, dwarf_state->labels.loc_section,
 			  "%s", dwarf_attr_name (a->dw_attr));
 }
 
@@ -10672,7 +10672,7 @@ output_view_list_offset (dw_attr_node *a)
 
   gcc_assert (sym);
   if (dwarf_split_debug_info)
-    dw2_asm_output_delta (dwarf_offset_size, sym, loc_section_label,
+    dw2_asm_output_delta (dwarf_offset_size, sym, dwarf_state->labels.loc_section,
                           "%s", dwarf_attr_name (a->dw_attr));
   else
     dw2_asm_output_offset (dwarf_offset_size, sym, debug_loc_section,
@@ -11161,7 +11161,7 @@ output_compilation_unit_header (enum dwarf_unit_type ut)
       dw2_asm_output_data (1, ut, "%s", name);
       dw2_asm_output_data (1, DWARF2_ADDR_SIZE, "Pointer Size (in bytes)");
     }
-  dw2_asm_output_offset (dwarf_offset_size, abbrev_section_label,
+  dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.abbrev_section,
 			 debug_abbrev_section,
 			 "Offset Into Abbrev. Section");
   if (dwarf_version < 5)
@@ -11221,7 +11221,7 @@ output_comp_unit (dw_die_ref die, int output_if_empty,
   else
     {
       switch_to_section (debug_info_section);
-      ASM_OUTPUT_LABEL (asm_out_file, debug_info_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_info_section);
       info_section_emitted = true;
     }
 
@@ -11332,7 +11332,7 @@ add_top_level_skeleton_die_attrs (dw_die_ref die)
     add_skeleton_AT_string (die, DW_AT_comp_dir, comp_dir);
   add_AT_pubnames (die);
   if (addr_index_table != NULL && addr_index_table->size () > 0)
-    add_AT_lineptr (die, dwarf_AT (DW_AT_addr_base), debug_addr_section_label);
+    add_AT_lineptr (die, dwarf_AT (DW_AT_addr_base), dwarf_state->labels.debug_addr_section);
 }
 
 /* Output skeleton debug sections that point to the dwo file.  */
@@ -11346,7 +11346,7 @@ output_skeleton_debug_sections (dw_die_ref comp_unit,
   remove_AT (comp_unit, DW_AT_language);
 
   switch_to_section (debug_skeleton_info_section);
-  ASM_OUTPUT_LABEL (asm_out_file, debug_skeleton_info_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_skeleton_info_section);
 
   /* Produce the skeleton compilation-unit header.  This one differs enough from
      a normal CU header that it's better not to call output_compilation_unit
@@ -11367,7 +11367,7 @@ output_skeleton_debug_sections (dw_die_ref comp_unit,
       dw2_asm_output_data (1, DW_UT_skeleton, "DW_UT_skeleton");
       dw2_asm_output_data (1, DWARF2_ADDR_SIZE, "Pointer Size (in bytes)");
     }
-  dw2_asm_output_offset (dwarf_offset_size, debug_skeleton_abbrev_section_label,
+  dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.debug_skeleton_abbrev_section,
 			 debug_skeleton_abbrev_section,
                          "Offset Into Abbrev. Section");
   if (dwarf_version < 5)
@@ -11381,7 +11381,7 @@ output_skeleton_debug_sections (dw_die_ref comp_unit,
 
   /* Build the skeleton debug_abbrev section.  */
   switch_to_section (debug_skeleton_abbrev_section);
-  ASM_OUTPUT_LABEL (asm_out_file, debug_skeleton_abbrev_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_skeleton_abbrev_section);
 
   output_die_abbrevs (SKELETON_COMP_DIE_ABBREV, comp_unit);
 
@@ -11666,11 +11666,11 @@ output_pubnames (vec<pubname_entry, va_gc> *names)
   dw2_asm_output_data (2, 2, "DWARF pubnames/pubtypes version");
 
   if (dwarf_split_debug_info)
-    dw2_asm_output_offset (dwarf_offset_size, debug_skeleton_info_section_label,
+    dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.debug_skeleton_info_section,
                            debug_skeleton_info_section,
                            "Offset of Compilation Unit Info");
   else
-    dw2_asm_output_offset (dwarf_offset_size, debug_info_section_label,
+    dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.debug_info_section,
                            debug_info_section,
                            "Offset of Compilation Unit Info");
   dw2_asm_output_data (dwarf_offset_size, next_die_offset,
@@ -11747,11 +11747,11 @@ output_aranges (void)
   /* Version number for aranges is still 2, even up to DWARF5.  */
   dw2_asm_output_data (2, 2, "DWARF aranges version");
   if (dwarf_split_debug_info)
-    dw2_asm_output_offset (dwarf_offset_size, debug_skeleton_info_section_label,
+    dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.debug_skeleton_info_section,
                            debug_skeleton_info_section,
                            "Offset of Compilation Unit Info");
   else
-    dw2_asm_output_offset (dwarf_offset_size, debug_info_section_label,
+    dw2_asm_output_offset (dwarf_offset_size, dwarf_state->labels.debug_info_section,
                            debug_info_section,
                            "Offset of Compilation Unit Info");
   dw2_asm_output_data (1, DWARF2_ADDR_SIZE, "Size of Address");
@@ -11775,7 +11775,7 @@ output_aranges (void)
      confused with the terminator.  */
   if (switch_text_ranges)
     {
-      const char *prev_loc = text_section_label;
+      const char *prev_loc = dwarf_state->labels.text_section;
       const char *loc;
       unsigned idx;
 
@@ -11792,14 +11792,14 @@ output_aranges (void)
       if (prev_loc)
 	{
 	  dw2_asm_output_addr (DWARF2_ADDR_SIZE, prev_loc, "Address");
-	  dw2_asm_output_delta (DWARF2_ADDR_SIZE, text_end_label,
+	  dw2_asm_output_delta (DWARF2_ADDR_SIZE, dwarf_state->labels.text_end,
 				prev_loc, "Length");
 	}
     }
 
   if (switch_cold_ranges)
     {
-      const char *prev_loc = cold_text_section_label;
+      const char *prev_loc = dwarf_state->labels.cold_text_section;
       const char *loc;
       unsigned idx;
 
@@ -11816,7 +11816,7 @@ output_aranges (void)
       if (prev_loc)
 	{
 	  dw2_asm_output_addr (DWARF2_ADDR_SIZE, prev_loc, "Address");
-	  dw2_asm_output_delta (DWARF2_ADDR_SIZE, cold_end_label,
+	  dw2_asm_output_delta (DWARF2_ADDR_SIZE, dwarf_state->labels.cold_end,
 				prev_loc, "Length");
 	}
     }
@@ -11919,7 +11919,7 @@ output_ranges (void)
   dw_ranges *r;
 
   switch_to_section (debug_ranges_section);
-  ASM_OUTPUT_LABEL (asm_out_file, ranges_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.ranges_section);
   FOR_EACH_VEC_SAFE_ELT (ranges_table, i, r)
     {
       int block_num = r->num;
@@ -11938,10 +11938,10 @@ output_ranges (void)
 	  if (!have_multiple_function_sections)
 	    {
 	      dw2_asm_output_delta (DWARF2_ADDR_SIZE, blabel,
-				    text_section_label,
+				    dwarf_state->labels.text_section,
 				    fmt, i * 2 * DWARF2_ADDR_SIZE);
 	      dw2_asm_output_delta (DWARF2_ADDR_SIZE, elabel,
-				    text_section_label, NULL);
+				    dwarf_state->labels.text_section, NULL);
 	    }
 
 	  /* Otherwise, the compilation unit base address is zero,
@@ -11972,11 +11972,11 @@ output_ranges (void)
 		 the #if 0 above.  */
 	      dw2_asm_output_delta (DWARF2_ADDR_SIZE,
 				    (*ranges_by_label)[lab_idx].begin,
-				    text_section_label,
+				    dwarf_state->labels.text_section,
 				    fmt, i * 2 * DWARF2_ADDR_SIZE);
 	      dw2_asm_output_delta (DWARF2_ADDR_SIZE,
 				    (*ranges_by_label)[lab_idx].end,
-				    text_section_label, NULL);
+				    dwarf_state->labels.text_section, NULL);
 #endif
 	    }
 	  else
@@ -12131,7 +12131,7 @@ output_rnglists (unsigned generation, bool dwo)
   else
     {
       switch_to_section (debug_ranges_section);
-      ASM_OUTPUT_LABEL (asm_out_file, ranges_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.ranges_section);
     }
   /* There are up to 4 unique ranges labels per generation.
      See also init_sections_and_labels.  */
@@ -12159,11 +12159,11 @@ output_rnglists (unsigned generation, bool dwo)
 		       "Offset Entry Count");
   if (dwo)
     {
-      ASM_OUTPUT_LABEL (asm_out_file, ranges_base_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.ranges_base);
       FOR_EACH_VEC_SAFE_ELT (ranges_table, i, r)
 	if (r->label && r->idx != DW_RANGES_IDX_SKELETON)
 	  dw2_asm_output_delta (dwarf_offset_size, r->label,
-				ranges_base_label, NULL);
+				dwarf_state->labels.ranges_base, NULL);
     }
 
   const char *lab = "";
@@ -12211,9 +12211,9 @@ output_rnglists (unsigned generation, bool dwo)
 		{
 		  dw2_asm_output_data (1, DW_RLE_offset_pair,
 				       "DW_RLE_offset_pair (%s)", lab);
-		  dw2_asm_output_delta_uleb128 (blabel, text_section_label,
+		  dw2_asm_output_delta_uleb128 (blabel, dwarf_state->labels.text_section,
 						"Range begin address (%s)", lab);
-		  dw2_asm_output_delta_uleb128 (elabel, text_section_label,
+		  dw2_asm_output_delta_uleb128 (elabel, dwarf_state->labels.text_section,
 						"Range end address (%s)", lab);
 		  continue;
 		}
@@ -17288,7 +17288,7 @@ secname_for_decl (const_tree decl)
   else if (cfun && casm->in_cold_section_p)
     secname = crtl->subsections.cold_section_label;
   else
-    secname = text_section_label;
+    secname = dwarf_state->labels.text_section;
 
   return secname;
 }
@@ -17665,7 +17665,7 @@ dw_loc_list (var_loc_list *loc_list, tree decl, int want_address)
 	      /* If the variable has a location at the last label
 		 it keeps its location until the end of function.  */
 	      else if (!current_function_decl)
-		endname = text_end_label, endview = 0;
+		endname = dwarf_state->labels.text_end, endview = 0;
 	      else
 		{
 		  ASM_GENERATE_INTERNAL_LABEL (label_id, FUNC_END_LABEL,
@@ -28207,7 +28207,7 @@ set_cur_line_info_table (section *sec)
       if (!table)
 	{
 	  cold_text_section_line_info = table = new_line_info_table ();
-	  table->end_label = cold_end_label;
+	  table->end_label = dwarf_state->labels.cold_end;
 	}
     }
   else
@@ -28261,7 +28261,7 @@ dwarf2out_begin_function (tree fun)
       gcc_assert (current_function_decl == fun);
       cold_text_section = unlikely_text_section ();
       switch_to_section (cold_text_section);
-      ASM_OUTPUT_LABEL (asm_out_file, cold_text_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.cold_text_section);
       switch_to_section (sec);
     }
 
@@ -29149,7 +29149,7 @@ init_sections_and_labels (bool early_lto_debug)
 	  debug_skeleton_abbrev_section
 	    = get_section (DEBUG_LTO_ABBREV_SECTION,
 			   SECTION_DEBUG | SECTION_EXCLUDE, NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_abbrev_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_abbrev_section,
 				       DEBUG_SKELETON_ABBREV_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 
@@ -29159,14 +29159,14 @@ init_sections_and_labels (bool early_lto_debug)
 	  debug_skeleton_line_section
 	    = get_section (DEBUG_LTO_LINE_SECTION,
 			   SECTION_DEBUG | SECTION_EXCLUDE, NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_line_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_line_section,
 				       DEBUG_SKELETON_LINE_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 	  debug_str_offsets_section
 	    = get_section (DEBUG_LTO_DWO_STR_OFFSETS_SECTION,
 			   SECTION_DEBUG | SECTION_EXCLUDE,
 			   NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_info_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_info_section,
 				       DEBUG_SKELETON_INFO_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 	  debug_str_dwo_section = get_section (DEBUG_LTO_STR_DWO_SECTION,
@@ -29183,7 +29183,7 @@ init_sections_and_labels (bool early_lto_debug)
 	 debug_line section.  */
       debug_line_section = get_section (DEBUG_LTO_LINE_SECTION,
 					SECTION_DEBUG | SECTION_EXCLUDE, NULL);
-      ASM_GENERATE_INTERNAL_LABEL (debug_line_section_label,
+      ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_line_section,
 				   DEBUG_LINE_SECTION_LABEL,
 				   init_sections_and_labels_generation);
 
@@ -29227,7 +29227,7 @@ init_sections_and_labels (bool early_lto_debug)
 						     SECTION_DEBUG, NULL);
 	  debug_skeleton_abbrev_section = get_section (DEBUG_ABBREV_SECTION,
 						       SECTION_DEBUG, NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_abbrev_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_abbrev_section,
 				       DEBUG_SKELETON_ABBREV_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 
@@ -29237,13 +29237,13 @@ init_sections_and_labels (bool early_lto_debug)
 	  debug_skeleton_line_section
 	      = get_section (DEBUG_DWO_LINE_SECTION,
 			     SECTION_DEBUG | SECTION_EXCLUDE, NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_line_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_line_section,
 				       DEBUG_SKELETON_LINE_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 	  debug_str_offsets_section
 	    = get_section (DEBUG_DWO_STR_OFFSETS_SECTION,
 			   SECTION_DEBUG | SECTION_EXCLUDE, NULL);
-	  ASM_GENERATE_INTERNAL_LABEL (debug_skeleton_info_section_label,
+	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_info_section,
 				       DEBUG_SKELETON_INFO_SECTION_LABEL,
 				       init_sections_and_labels_generation);
 	  debug_loc_section = get_section (dwarf_version >= 5
@@ -29288,34 +29288,34 @@ init_sections_and_labels (bool early_lto_debug)
 					 SECTION_DEBUG, NULL);
     }
 
-  ASM_GENERATE_INTERNAL_LABEL (abbrev_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.abbrev_section,
 			       DEBUG_ABBREV_SECTION_LABEL,
 			       init_sections_and_labels_generation);
-  ASM_GENERATE_INTERNAL_LABEL (debug_info_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_info_section,
 			       DEBUG_INFO_SECTION_LABEL,
 			       init_sections_and_labels_generation);
   info_section_emitted = false;
-  ASM_GENERATE_INTERNAL_LABEL (debug_line_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_line_section,
 			       DEBUG_LINE_SECTION_LABEL,
 			       init_sections_and_labels_generation);
   /* There are up to 6 unique ranges labels per generation.
      See also output_rnglists.  */
-  ASM_GENERATE_INTERNAL_LABEL (ranges_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.ranges_section,
 			       DEBUG_RANGES_SECTION_LABEL,
 			       init_sections_and_labels_generation * 6);
   if (dwarf_version >= 5 && dwarf_split_debug_info)
-    ASM_GENERATE_INTERNAL_LABEL (ranges_base_label,
+    ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.ranges_base,
 				 DEBUG_RANGES_SECTION_LABEL,
 				 1 + init_sections_and_labels_generation * 6);
-  ASM_GENERATE_INTERNAL_LABEL (debug_addr_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_addr_section,
 			       DEBUG_ADDR_SECTION_LABEL,
 			       init_sections_and_labels_generation);
-  ASM_GENERATE_INTERNAL_LABEL (macinfo_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.macinfo_section,
 			       (dwarf_strict && dwarf_version < 5)
 			       ? DEBUG_MACINFO_SECTION_LABEL
 			       : DEBUG_MACRO_SECTION_LABEL,
 			       init_sections_and_labels_generation);
-  ASM_GENERATE_INTERNAL_LABEL (loc_section_label, DEBUG_LOC_SECTION_LABEL,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.loc_section, DEBUG_LOC_SECTION_LABEL,
 			       init_sections_and_labels_generation);
 
   ++init_sections_and_labels_generation;
@@ -29378,19 +29378,19 @@ dwarf2out_assembly_start (void)
     return;
 
 #ifndef DWARF2_LINENO_DEBUGGING_INFO
-  ASM_GENERATE_INTERNAL_LABEL (text_section_label, TEXT_SECTION_LABEL, 0);
-  ASM_GENERATE_INTERNAL_LABEL (text_end_label, TEXT_END_LABEL, 0);
-  ASM_GENERATE_INTERNAL_LABEL (cold_text_section_label,
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.text_section, TEXT_SECTION_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.text_end, TEXT_END_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.cold_text_section,
 			       COLD_TEXT_SECTION_LABEL, 0);
-  ASM_GENERATE_INTERNAL_LABEL (cold_end_label, COLD_END_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.cold_end, COLD_END_LABEL, 0);
 
   switch_to_section (casm->sections.text);
-  ASM_OUTPUT_LABEL (asm_out_file, text_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.text_section);
 #endif
 
   /* Make sure the line number table for .text always exists.  */
   text_section_line_info = new_line_info_table ();
-  text_section_line_info->end_label = text_end_label;
+  text_section_line_info->end_label = dwarf_state->labels.text_end;
 
 #ifdef DWARF2_LINENO_DEBUGGING_INFO
   cur_line_info_table = text_section_line_info;
@@ -29669,7 +29669,7 @@ output_addr_table (void)
       dw2_asm_output_data (1, DWARF2_ADDR_SIZE, "Size of Address");
       dw2_asm_output_data (1, 0, "Size of Segment Descriptor");
     }
-  ASM_OUTPUT_LABEL (asm_out_file, debug_addr_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_addr_section);
 
   addr_index_table
     ->traverse_noresize<unsigned int *, output_addr_table_entry> (&index);
@@ -32105,12 +32105,12 @@ dwarf2out_finish (const char *filename)
        && vec_safe_length (switch_text_ranges) < 2)
       || (dwarf_version < 3 && dwarf_strict))
     {
-      const char *end_label = text_end_label;
+      const char *end_label = dwarf_state->labels.text_end;
       if (vec_safe_length (switch_text_ranges) == 1)
 	end_label = (*switch_text_ranges)[0];
       /* Don't add if the CU has no associated code.  */
       if (switch_text_ranges)
-	add_AT_low_high_pc (main_comp_unit_die, text_section_label,
+	add_AT_low_high_pc (main_comp_unit_die, dwarf_state->labels.text_section,
 			    end_label, true);
     }
   else
@@ -32120,7 +32120,7 @@ dwarf2out_finish (const char *filename)
       bool range_list_added = false;
       if (switch_text_ranges)
 	{
-	  const char *prev_loc = text_section_label;
+	  const char *prev_loc = dwarf_state->labels.text_section;
 	  const char *loc;
 	  unsigned idx;
 
@@ -32136,12 +32136,12 @@ dwarf2out_finish (const char *filename)
 
 	  if (prev_loc)
 	    add_ranges_by_labels (main_comp_unit_die, prev_loc,
-				  text_end_label, &range_list_added, true);
+				  dwarf_state->labels.text_end, &range_list_added, true);
 	}
 
       if (switch_cold_ranges)
 	{
-	  const char *prev_loc = cold_text_section_label;
+	  const char *prev_loc = dwarf_state->labels.cold_text_section;
 	  const char *loc;
 	  unsigned idx;
 
@@ -32157,7 +32157,7 @@ dwarf2out_finish (const char *filename)
 
 	  if (prev_loc)
 	    add_ranges_by_labels (main_comp_unit_die, prev_loc,
-				  cold_end_label, &range_list_added, true);
+				  dwarf_state->labels.cold_end, &range_list_added, true);
 	}
 
       FOR_EACH_VEC_ELT (*fde_vec, fde_idx, fde)
@@ -32192,7 +32192,7 @@ dwarf2out_finish (const char *filename)
 
   /* AIX Assembler inserts the length, so adjust the reference to match the
      offset expected by debuggers.  */
-  strcpy (dl_section_ref, debug_line_section_label);
+  strcpy (dl_section_ref, dwarf_state->labels.debug_line_section);
   if (XCOFF_DEBUGGING_INFO)
     strcat (dl_section_ref, DWARF_INITIAL_LENGTH_SIZE_STR);
 
@@ -32202,7 +32202,7 @@ dwarf2out_finish (const char *filename)
 
   if (have_macinfo)
     add_AT_macptr (comp_unit_die (), DEBUG_MACRO_ATTRIBUTE,
-		   macinfo_section_label);
+		   dwarf_state->labels.macinfo_section);
 
   if (dwarf_split_debug_info)
     {
@@ -32282,7 +32282,7 @@ dwarf2out_finish (const char *filename)
         add_AT_lineptr (ctnode->root_die, DW_AT_stmt_list,
                         (!dwarf_split_debug_info
                          ? dl_section_ref
-                         : debug_skeleton_line_section_label));
+                         : dwarf_state->labels.debug_skeleton_line_section));
 
       output_comdat_type_unit (ctnode, false);
       *slot = ctnode;
@@ -32314,7 +32314,7 @@ dwarf2out_finish (const char *filename)
 	{
 	  if (dwarf_version < 5)
 	    add_AT_lineptr (main_comp_unit_die, DW_AT_GNU_ranges_base,
-			    ranges_section_label);
+			    dwarf_state->labels.ranges_section);
 	}
 
       output_addr_table ();
@@ -32332,7 +32332,7 @@ dwarf2out_finish (const char *filename)
   if (vec_safe_length (abbrev_die_table) != 1)
     {
       switch_to_section (debug_abbrev_section);
-      ASM_OUTPUT_LABEL (asm_out_file, abbrev_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.abbrev_section);
       output_abbrev_section ();
     }
 
@@ -32360,7 +32360,7 @@ dwarf2out_finish (const char *filename)
 	  dw2_asm_output_data (4, dwarf_split_debug_info ? loc_list_idx : 0,
 			       "Offset Entry Count");
 	}
-      ASM_OUTPUT_LABEL (asm_out_file, loc_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.loc_section);
       if (dwarf_version >= 5 && dwarf_split_debug_info)
 	{
 	  unsigned int save_loc_list_idx = loc_list_idx;
@@ -32414,9 +32414,9 @@ dwarf2out_finish (const char *filename)
   if (have_macinfo)
     {
       switch_to_section (debug_macinfo_section);
-      ASM_OUTPUT_LABEL (asm_out_file, macinfo_section_label);
-      output_macinfo (!dwarf_split_debug_info ? debug_line_section_label
-		      : debug_skeleton_line_section_label, false);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.macinfo_section);
+      output_macinfo (!dwarf_split_debug_info ? dwarf_state->labels.debug_line_section
+		      : dwarf_state->labels.debug_skeleton_line_section, false);
       dw2_asm_output_data (1, 0, "End compilation unit");
     }
 
@@ -32427,14 +32427,14 @@ dwarf2out_finish (const char *filename)
      examining the file.  This is done late so that any filenames
      used by the debug_info section are marked as 'used'.  */
   switch_to_section (debug_line_section);
-  ASM_OUTPUT_LABEL (asm_out_file, debug_line_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_line_section);
   if (! output_asm_line_debug_info ())
     output_line_info (false);
 
   if (dwarf_split_debug_info && info_section_emitted)
     {
       switch_to_section (debug_skeleton_line_section);
-      ASM_OUTPUT_LABEL (asm_out_file, debug_skeleton_line_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_skeleton_line_section);
       output_line_info (true);
     }
 
@@ -32912,7 +32912,7 @@ dwarf2out_early_finish (const char *filename)
 
   /* AIX Assembler inserts the length, so adjust the reference to match the
      offset expected by debuggers.  */
-  strcpy (dl_section_ref, debug_line_section_label);
+  strcpy (dl_section_ref, dwarf_state->labels.debug_line_section);
   if (XCOFF_DEBUGGING_INFO)
     strcat (dl_section_ref, DWARF_INITIAL_LENGTH_SIZE_STR);
 
@@ -32921,7 +32921,7 @@ dwarf2out_early_finish (const char *filename)
 
   if (have_macinfo)
     add_AT_macptr (comp_unit_die (), DEBUG_MACRO_ATTRIBUTE,
-		   macinfo_section_label);
+		   dwarf_state->labels.macinfo_section);
 
   save_macinfo_strings ();
 
@@ -32951,8 +32951,8 @@ dwarf2out_early_finish (const char *filename)
       if (debug_info_level >= DINFO_LEVEL_TERSE)
         add_AT_lineptr (ctnode->root_die, DW_AT_stmt_list,
                         (!dwarf_split_debug_info
-                         ? debug_line_section_label
-                         : debug_skeleton_line_section_label));
+                         ? dwarf_state->labels.debug_line_section
+                         : dwarf_state->labels.debug_skeleton_line_section));
 
       output_comdat_type_unit (ctnode, true);
       *slot = ctnode;
@@ -32969,7 +32969,7 @@ dwarf2out_early_finish (const char *filename)
   if (vec_safe_length (abbrev_die_table) != 1)
     {
       switch_to_section (debug_abbrev_section);
-      ASM_OUTPUT_LABEL (asm_out_file, abbrev_section_label);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.abbrev_section);
       output_abbrev_section ();
     }
 
@@ -32983,8 +32983,8 @@ dwarf2out_early_finish (const char *filename)
 	macinfo_table = macinfo_table->copy ();
 
       switch_to_section (debug_macinfo_section);
-      ASM_OUTPUT_LABEL (asm_out_file, macinfo_section_label);
-      output_macinfo (debug_line_section_label, true);
+      ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.macinfo_section);
+      output_macinfo (dwarf_state->labels.debug_line_section, true);
       dw2_asm_output_data (1, 0, "End compilation unit");
 
       if (flag_fat_lto_objects)
@@ -32996,7 +32996,7 @@ dwarf2out_early_finish (const char *filename)
 
   /* Emit a skeleton debug_line section.  */
   switch_to_section (debug_line_section);
-  ASM_OUTPUT_LABEL (asm_out_file, debug_line_section_label);
+  ASM_OUTPUT_LABEL (asm_out_file, dwarf_state->labels.debug_line_section);
   output_line_info (true);
 
   /* If we emitted any indirect strings, output the string table too.  */
