@@ -666,6 +666,11 @@
       HOST_WIDE_INT df_value = INTVAL (element);
       long df_words[2];
 
+      /* Stay away from NaNs and denormal values.  */
+      int exponent = (df_value >> 52) & 0x7ff;
+      if (exponent == 0 || exponent == 0x7ff)
+	return false;
+
       df_words[0] = (df_value >> 32) & 0xffffffff;
       df_words[1] = df_value & 0xffffffff;
 
