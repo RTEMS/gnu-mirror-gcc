@@ -152,32 +152,8 @@ static GTY(()) vec<rtx, va_gc> *used_rtx_array;
    it.  */
 static GTY(()) vec<tree, va_gc> *incomplete_types;
 
-/* Pointers to various DWARF2 sections.  */
-static GTY(()) section *debug_info_section;
-static GTY(()) section *debug_skeleton_info_section;
-static GTY(()) section *debug_abbrev_section;
-static GTY(()) section *debug_skeleton_abbrev_section;
-static GTY(()) section *debug_aranges_section;
-static GTY(()) section *debug_addr_section;
-static GTY(()) section *debug_macinfo_section;
-static const char *debug_macinfo_section_name;
-static unsigned macinfo_label_base = 1;
-static GTY(()) section *debug_line_section;
-static GTY(()) section *debug_skeleton_line_section;
-static GTY(()) section *debug_loc_section;
-static GTY(()) section *debug_pubnames_section;
-static GTY(()) section *debug_pubtypes_section;
-static GTY(()) section *debug_str_section;
-static GTY(()) section *debug_line_str_section;
-static GTY(()) section *debug_str_dwo_section;
-static GTY(()) section *debug_str_offsets_section;
-static GTY(()) section *debug_ranges_section;
-static GTY(()) section *debug_ranges_dwo_section;
-static GTY(()) section *debug_frame_section;
-
 /* Maximum size (in bytes) of an artificially generated label.  */
 #define MAX_ARTIFICIAL_LABEL_BYTES	40
-
 /* According to the (draft) DWARF 3 specification, the initial length
    should either be 4 or 12 bytes.  When it's 12 bytes, the first 4
    bytes are 0xffffffff, followed by the length stored in the next 8
@@ -4227,6 +4203,13 @@ new_addr_loc_descr (rtx addr, enum dtprel_bool dtprel)
 
 struct dwarf_out_state
 {
+  dwarf_out_state (asm_out_state *asm_state):
+    casm (asm_state), sections ({}), debug_macinfo_section_name (NULL),
+       macinfo_label_base (1)
+  {
+    memset (&labels, 0, sizeof (labels));
+  }
+
   /* Definitions of defaults for formats and names of various special
      (artificial) labels which may be generated within this file (when the -g
      options is used and DWARF2_DEBUGGING_INFO is in effect.
@@ -4251,9 +4234,60 @@ struct dwarf_out_state
     char ranges_section[2 * MAX_ARTIFICIAL_LABEL_BYTES];
     char ranges_base[2 * MAX_ARTIFICIAL_LABEL_BYTES];
   } labels;
+
+  /* Pointers to various DWARF2 sections.  */
+
+  struct
+  {
+    section *debug_info_section;
+    section *debug_skeleton_info_section;
+    section *debug_abbrev_section;
+    section *debug_skeleton_abbrev_section;
+    section *debug_aranges_section;
+    section *debug_addr_section;
+    section *debug_macinfo_section;
+    section *debug_line_section;
+    section *debug_skeleton_line_section;
+    section *debug_loc_section;
+    section *debug_pubnames_section;
+    section *debug_pubtypes_section;
+    section *debug_str_section;
+    section *debug_line_str_section;
+    section *debug_str_dwo_section;
+    section *debug_str_offsets_section;
+    section *debug_ranges_section;
+    section *debug_ranges_dwo_section;
+    section *debug_frame_section;
+  } sections;
+
+  const char *debug_macinfo_section_name;
+  unsigned macinfo_label_base;
+
+  asm_out_state *casm;
 };
 
 static dwarf_out_state *dwarf_state = NULL;
+
+static vec<dwarf_out_state *> dwarf_stack;
+
+/* Push ASM_STATE as a current casm.  */
+
+void
+push_dwarf_state (dwarf_out_state *state)
+{
+  push_asm (state->casm);
+  dwarf_stack.safe_push (state);
+  dwarf_state = state;
+}
+
+/* Return to previous casm state.  */
+
+void
+pop_dwarf_state ()
+{
+  dwarf_state = dwarf_stack.pop ();
+  pop_asm ();
+}
 
 
 /* Return the root of the DIE's built for the current compilation unit.  */
@@ -29156,7 +29190,7 @@ init_sections_and_labels (bool early_lto_debug)
 	  /* Somewhat confusing detail: The skeleton_[abbrev|info] sections
 	     stay in the main .o, but the skeleton_line goes into the split
 	     off dwo.  */
-	  debug_skeleton_line_section
+	  dwarf_state->sections.debug_skeleton_line
 	    = get_section (DEBUG_LTO_LINE_SECTION,
 			   SECTION_DEBUG | SECTION_EXCLUDE, NULL);
 	  ASM_GENERATE_INTERNAL_LABEL (dwarf_state->labels.debug_skeleton_line_section,
@@ -29327,7 +29361,7 @@ init_sections_and_labels (bool early_lto_debug)
 static void
 dwarf2out_init (const char *filename ATTRIBUTE_UNUSED)
 {
-  dwarf_state = new dwarf_out_state ();
+  dwarf_state = new dwarf_out_state (casm);
 
   /* Allocate the file_table.  */
   file_table = hash_table<dwarf_file_hasher>::create_ggc (50);
@@ -33022,29 +33056,13 @@ dwarf2out_early_finish (const char *filename)
 void
 dwarf2out_c_finalize (void)
 {
+  delete dwarf_state;
+  dwarf_state = NULL;
+
   last_var_location_insn = NULL;
   cached_next_real_insn = NULL;
   used_rtx_array = NULL;
   incomplete_types = NULL;
-  debug_info_section = NULL;
-  debug_skeleton_info_section = NULL;
-  debug_abbrev_section = NULL;
-  debug_skeleton_abbrev_section = NULL;
-  debug_aranges_section = NULL;
-  debug_addr_section = NULL;
-  debug_macinfo_section = NULL;
-  debug_line_section = NULL;
-  debug_skeleton_line_section = NULL;
-  debug_loc_section = NULL;
-  debug_pubnames_section = NULL;
-  debug_pubtypes_section = NULL;
-  debug_str_section = NULL;
-  debug_line_str_section = NULL;
-  debug_str_dwo_section = NULL;
-  debug_str_offsets_section = NULL;
-  debug_ranges_section = NULL;
-  debug_ranges_dwo_section = NULL;
-  debug_frame_section = NULL;
   fde_vec = NULL;
   debug_str_hash = NULL;
   debug_line_str_hash = NULL;
