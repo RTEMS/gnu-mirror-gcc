@@ -1,3 +1,10 @@
+work068.patch003:
+2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (easy_fp_constant_float_to_v2df):
+	Avoid integer values that look like NaN or denormal values in
+	XXSPLTIDP.
+
 work068.patch002:
 2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
 
