@@ -1,3 +1,9 @@
+work068.patch005:
+2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (easy_fp_constant_float_to_v2df):
+	Disable XXSPLTIDP loading up integer constants.
+
 work068.patch004:
 2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
 
