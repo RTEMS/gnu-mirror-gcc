@@ -1058,7 +1058,7 @@ machopic_legitimize_pic_address (rtx orig, machine_mode mode, rtx reg)
 
 int
 machopic_output_data_section_indirection (machopic_indirection **slot,
-					  FILE *asm_out_file)
+					  FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1073,7 +1073,7 @@ machopic_output_data_section_indirection (machopic_indirection **slot,
 
   switch_to_section (data_section);
   assemble_align (GET_MODE_ALIGNMENT (Pmode));
-  assemble_label (asm_out_file, ptr_name);
+  assemble_label (out_file, ptr_name);
   assemble_integer (gen_rtx_SYMBOL_REF (Pmode, sym_name),
 		    GET_MODE_SIZE (Pmode),
 		    GET_MODE_ALIGNMENT (Pmode), 1);
@@ -1083,7 +1083,7 @@ machopic_output_data_section_indirection (machopic_indirection **slot,
 
 int
 machopic_output_stub_indirection (machopic_indirection **slot,
-				  FILE *asm_out_file)
+				  FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1121,13 +1121,13 @@ machopic_output_stub_indirection (machopic_indirection **slot,
   else
     sprintf (stub, "%s%s", user_label_prefix, ptr_name);
 
-  machopic_output_stub (asm_out_file, sym, stub);
+  machopic_output_stub (out_file, sym, stub);
 
   return 1;
 }
 
 int
-machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
+machopic_output_indirection (machopic_indirection **slot, FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1159,18 +1159,18 @@ machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
 	     storage has been allocated.  */
 	  && !TREE_STATIC (decl))
 	{
-	  fputs ("\t.weak_reference ", asm_out_file);
-	  assemble_name (asm_out_file, sym_name);
-	  fputc ('\n', asm_out_file);
+	  fputs ("\t.weak_reference ", out_file);
+	  assemble_name (out_file, sym_name);
+	  fputc ('\n', out_file);
 	}
     }
 
-  assemble_name (asm_out_file, ptr_name);
-  fprintf (asm_out_file, ":\n");
+  assemble_name (out_file, ptr_name);
+  fprintf (out_file, ":\n");
 
-  fprintf (asm_out_file, "\t.indirect_symbol ");
-  assemble_name (asm_out_file, sym_name);
-  fprintf (asm_out_file, "\n");
+  fprintf (out_file, "\t.indirect_symbol ");
+  assemble_name (out_file, sym_name);
+  fprintf (out_file, "\n");
 
   /* Variables that are marked with MACHO_SYMBOL_FLAG_STATIC need to
      have their symbol name instead of 0 in the second entry of
@@ -1190,7 +1190,7 @@ machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
 }
 
 static void
-machopic_finish (FILE *asm_out_file)
+machopic_finish (FILE *out_file)
 {
   if (!machopic_indirections)
     return;
@@ -1198,13 +1198,13 @@ machopic_finish (FILE *asm_out_file)
   /* First output an symbol indirections that have been placed into .data
      (we don't expect these now).  */
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_data_section_indirection> (asm_out_file);
+    <FILE *, machopic_output_data_section_indirection> (out_file);
 
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_stub_indirection> (asm_out_file);
+    <FILE *, machopic_output_stub_indirection> (out_file);
 
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_indirection> (asm_out_file);
+    <FILE *, machopic_output_indirection> (out_file);
 }
 
 int
