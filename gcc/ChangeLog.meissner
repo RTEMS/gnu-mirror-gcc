@@ -1,30 +1,11 @@
-work068.patch005:
-2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/predicates.md (easy_fp_constant_float_to_v2df):
-	Disable XXSPLTIDP loading up integer constants.
-
-work068.patch004:
-2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/predicates.md (easy_fp_constant_float_to_v2df):
-	Limit XXSPLTIDP for integer constants to 0x80000000.
-
-work068.patch003:
-2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/predicates.md (easy_fp_constant_float_to_v2df):
-	Avoid integer values that look like NaN or denormal values in
-	XXSPLTIDP.
-
-work068.patch002:
-2021-09-14  Michael Meissner  <meissner@linux.ibm.com>
+work068.patch006:
+2021-09-15  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (eF): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): If we can load
 	the scalar constant with XXSPLTIDP, the floating point constant is
 	easy.
-	(easy_fp_constant_float_to_v2df): New predicate.
+	(easy_fp_constant_sfmode): New predicate.
 	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
 	vector constant as easy.
 	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate): New
@@ -46,8 +27,22 @@ work068.patch002:
 	(vsx_move<mode>_32bit): Likewise.
 	(XXSPLTIDP): New mode iterator.
 	(xxspltidp_<mode>_inst): Replace xxspltidp_v2df_inst with an
-	iterated form that also does SFmode, and DFmode.
+	iterated form that also does SFmode, DFmode, DImode, and
+	V2DImode.
 	(xxspltidp_<mode>_internal): New insn and splits.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document eF.
+
+work068.patch005:
+Patch reverted.
+
+work068.patch004:
+Patch reverted.
+
+work068.patch003:
+Patch reverted.
+
+work068.patch002:
+Patch reverted.
 
 work068.patch001:
 2021-09-10  Michael Meissner  <meissner@linux.ibm.com>
