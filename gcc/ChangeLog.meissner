@@ -1,3 +1,14 @@
+work068.patch007:
+2021-09-15  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (easy_fp_constant_sfmode):  Fix
+	endian issue for integer values.  Add comment about IEEE 32-bit
+	format.
+	* config/rs6000/rs6000.c (xxspltidp_constant_immediate): Fix
+	endian issue for integer values.
+	* config/rs6000/rs6000.md (movdi_internal64): Use ^wa instead of
+	$wa for XXSPLTIDP constants.
+
 work068.patch006:
 2021-09-15  Michael Meissner  <meissner@linux.ibm.com>
 
