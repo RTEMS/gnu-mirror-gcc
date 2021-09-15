@@ -6622,8 +6622,8 @@ xxspltidp_constant_immediate (rtx op, machine_mode mode)
       df_words[0] = (df_value >> 32) & 0xffffffff;
       df_words[1] = df_value & 0xffffffff;
 
-      /* real_to_target takes input in little-endian fasion.  */
-      if (BYTES_BIG_ENDIAN)
+      /* real_to_target takes input in target endian order.  */
+      if (!BYTES_BIG_ENDIAN)
 	std::swap (df_words[0], df_words[1]);
 
       REAL_VALUE_TYPE r;

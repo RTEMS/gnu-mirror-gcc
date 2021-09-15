@@ -684,8 +684,8 @@
       df_words[0] = (df_value >> 32) & 0xffffffff;
       df_words[1] = df_value & 0xffffffff;
 
-      /* real_from_target takes the target words in little endian order.  */
-      if (BYTES_BIG_ENDIAN)
+      /* real_from_target takes the target words in  target order.  */
+      if (!BYTES_BIG_ENDIAN)
 	std::swap (df_words[0], df_words[1]);
 
       real_from_target (&rv_type, df_words, DFmode);
@@ -709,6 +709,9 @@
   long sf_value;
   real_to_target (&sf_value, rv, SFmode);
 
+  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
+     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
+     0 bits, and the mantissa non-zero.  */
   if (((sf_value & 0x7F800000) == 0) && ((sf_value & 0x7FFFFF) != 0))
     return false;
 
