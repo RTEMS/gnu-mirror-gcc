@@ -16559,7 +16559,7 @@ aarch64_override_options_internal (struct gcc_options *opts)
 			   256);
       SET_OPTION_IF_UNSET (opts, &global_options_set,
 			   param_construct_interfere_size,
-			   64);
+			   param_l1_cache_line_size);
     }
 
   if (aarch64_tune_params.prefetch->l2_cache_size >= 0)

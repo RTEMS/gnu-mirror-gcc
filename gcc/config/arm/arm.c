@@ -3688,7 +3688,8 @@ arm_option_override (void)
       SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 			   param_destruct_interfere_size, 64);
       SET_OPTION_IF_UNSET (&global_options, &global_options_set,
-			   param_construct_interfere_size, 64);
+			   param_construct_interfere_size,
+			   param_l1_cache_line_size);
     }
 
   if (current_tune->prefetch.l1_cache_size >= 0)
