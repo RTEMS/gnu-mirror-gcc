@@ -662,6 +662,10 @@
   if (element == CONST0_RTX (mode))
     return false;
 
+  /* Don't handle 128-bit types.  */
+  if (GET_MODE_SIZE (mode) > 8)
+    return false;
+
   /* Handle DImode/V2DImode by creating a DF value from it.  */
   const REAL_VALUE_TYPE *rv;
   REAL_VALUE_TYPE rv_type;
