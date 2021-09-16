@@ -365,6 +365,8 @@ static GTY(()) vec<tree, va_gc> *incomplete_types;
 #define LINE_CODE_LABEL		"LM"
 #endif
 
+/* Dwarf output state.  */
+
 struct GTY(()) dwarf_out_state
 {
   dwarf_out_state (asm_out_state *asm_state):
@@ -445,27 +447,6 @@ struct GTY(()) dwarf_out_state
 };
 
 static GTY(()) dwarf_out_state *dw_state = NULL;
-
-static vec<dwarf_out_state *> dwarf_stack;
-
-/* Push ASM_STATE as a current casm.  */
-
-void
-push_dwarf_state (dwarf_out_state *state)
-{
-//  push_asm (state->casm);
-  dwarf_stack.safe_push (state);
-  dw_state = state;
-}
-
-/* Return to previous casm state.  */
-
-void
-pop_dwarf_state ()
-{
-  dw_state = dwarf_stack.pop ();
-//  pop_asm ();
-}
 
 /* According to the (draft) DWARF 3 specification, the initial length
    should either be 4 or 12 bytes.  When it's 12 bytes, the first 4
