@@ -6830,7 +6830,8 @@ aarch64_output_probe_stack_range (rtx reg1, rtx reg2)
   output_asm_insn ("str\txzr, [%0, %1]", xops);
 
   /* Test if TEST_ADDR == LAST_ADDR.  */
-  xops[1] = reg2;
+  xops[0] = drop_capability (xops[0]);
+  xops[1] = drop_capability (reg2);
   output_asm_insn ("cmp\t%0, %1", xops);
 
   /* Branch.  */

@@ -7241,7 +7241,14 @@
 	 UNSPEC_SP_SET))
    (set (match_scratch:PTR 2 "=&r") (const_int 0))]
   ""
-  "ldr\\t%<w>2, %1\;str\\t%<w>2, %0\;mov\t%<w>2, 0"
+  {
+    output_asm_insn ("ldr\\t%<w>2, %1", operands);
+    output_asm_insn ("str\\t%<w>2, %0", operands);
+    if (TARGET_CAPABILITY_PURE)
+      return "mov\t%x2, 0";
+    else
+      return "mov\t%<w>2, 0";
+  }
   [(set_attr "length" "12")
    (set_attr "type" "multiple")])
 
@@ -7285,7 +7292,21 @@
    (clobber (match_scratch:PTR 2 "=&r"))
    (clobber (match_scratch:PTR 3 "=&r"))]
   ""
-  "ldr\t%<w>2, %0\;ldr\t%<w>3, %1\;subs\t%<w>2, %<w>2, %<w>3\;mov\t%3, 0"
+  {
+    output_asm_insn ("ldr\t%<w>2, %0", operands);
+    output_asm_insn ("ldr\t%<w>3, %1", operands);
+    if (TARGET_CAPABILITY_PURE)
+      {
+	output_asm_insn ("subs\t%x2, %x2, %x3", operands);
+	output_asm_insn ("mov\t%x3, 0", operands);
+      }
+    else
+      {
+	output_asm_insn ("subs\t%<w>2, %<w>2, %<w>3", operands);
+	output_asm_insn ("mov\t%<w>3, 0", operands);
+      }
+    return "";
+  }
   [(set_attr "length" "16")
    (set_attr "type" "multiple")])
 
