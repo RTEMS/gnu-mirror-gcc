@@ -6027,12 +6027,6 @@ static unsigned int
 aarch64_function_arg_alignment (machine_mode mode, const_tree type,
 				bool *abi_break)
 {
-  /* MORELLO TODO Account for CADImode here.
-     Will need to return 128 bits for TARGET_MORELLO and 64 bits for
-     TARGET_CAPABILITY_FAKE.
-     Here would need to handle `mode_base_align` definition.
-     Would also want to check that the alignment of capability typed values is
-     indeed 16.  */
   *abi_break = false;
   if (!type)
     return GET_MODE_ALIGNMENT (mode);
@@ -6251,6 +6245,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	 is rounded up to the next even number.  */
       if (nregs == 2
 	  && ncrn % 2
+	  && !in_cap_regs
 	  /* The == 16 * BITS_PER_UNIT instead of >= 16 * BITS_PER_UNIT
 	     comparison is there because for > 16 * BITS_PER_UNIT
 	     alignment nregs should be > 2 and therefore it should be
