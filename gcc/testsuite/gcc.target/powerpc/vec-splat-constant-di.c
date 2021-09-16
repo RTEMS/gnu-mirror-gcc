@@ -67,4 +67,4 @@ scalar_pi (void)
   return d;
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltidp\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mxxspltidp\M} 2 } } */
