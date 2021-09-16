@@ -601,6 +601,11 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
+  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
+     be loaded with that instruction.  */
+  if (easy_fp_constant_sfmode (op, mode))
+    return 1;
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -608,6 +613,111 @@
      use single precision loads.  */
    return 0;
 })
+
+;; Return 1 if the operand is a constant that can be loaded via the XXSPLTIDP
+;; instruction, which takes a SFmode value and produces a V2DFmode result.
+;; This predicate matches also DImode constants that can be expressed as DFmode
+;; values and vector constants produced either with CONST_VECTOR or
+;; VEC_DUPLICATE.
+(define_predicate "easy_fp_constant_sfmode"
+  (match_code "const_int,const_double,const_vector,vec_duplicate")
+{
+  /* Can we do the XXSPLTIDP instruction?  */
+  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  /* Handle vector constants and duplication.  */
+  rtx element = op;
+  if (mode == V2DFmode || mode == V2DImode)
+    {
+      if (CONST_VECTOR_P (op))
+	{
+	  element = CONST_VECTOR_ELT (op, 0);
+	  if (!rtx_equal_p (element, CONST_VECTOR_ELT (op, 1)))
+	    return false;
+
+	  mode = GET_MODE_INNER (mode);
+	}
+
+      else if (GET_CODE (op) == VEC_DUPLICATE)
+	{
+	  element = XEXP (op, 0);
+	  mode = GET_MODE (element);
+	}
+
+      else
+	return false;
+    }
+
+  /* Don't return true for 0.0 or 0 since that is easy to create without
+     XXSPLTIDP.  */
+  if (element == CONST0_RTX (mode))
+    return false;
+
+  /* Handle DImode/V2DImode by creating a DF value from it.  */
+  const REAL_VALUE_TYPE *rv;
+  REAL_VALUE_TYPE rv_type;
+
+  if (CONST_INT_P (element))
+    {
+      HOST_WIDE_INT df_value = INTVAL (element);
+      long df_words[2];
+
+      /* Stay away from values that are DFmode NaNs or subnormal values.
+         The IEEE 754 64-bit floating format has 1 bit for sign, 11 bits for
+         the exponent, and 52 bits for the mantissa.  NaN values have the
+         exponent set to all 1 bits.  Subnormal numbers have the exponent
+         all 0 bits, and the mantissa non-zero.  If the value is subnormal,
+         then the hidden bit in the mantissa is not set.  */
+ 
+      int exponent = (df_value >> 52) & 0x7ff;
+      HOST_WIDE_INT mantissa = df_value & HOST_WIDE_INT_C (0x1fffffffffffff);
+      if (exponent == 0 && mantissa != 0)	/* subnormal.  */
+	return false;
+
+      if (exponent == 0x7ff)			/* NaN.  */
+	return false;
+
+      df_words[0] = (df_value >> 32) & 0xffffffff;
+      df_words[1] = df_value & 0xffffffff;
+
+      /* real_from_target takes the target words in  target order.  */
+      if (!BYTES_BIG_ENDIAN)
+	std::swap (df_words[0], df_words[1]);
+
+      real_from_target (&rv_type, df_words, DFmode);
+      rv = &rv_type;
+    }
+
+  /* Handle SFmode/DFmode constants.  */
+  else if (CONST_DOUBLE_P (element) && (mode == SFmode || mode == DFmode))
+    rv = CONST_DOUBLE_REAL_VALUE (element);
+
+  else
+    return false;  
+
+  /* Validate that the number can be stored as a SFmode value.  */
+  if (!exact_real_truncate (SFmode, rv))
+    return false;
+
+  /* Validate that the number is not a SFmode subnormal value (exponent is 0,
+     mantissa field is non-zero) which is undefined for the XXSPLTIDP
+     instruction.  */
+  long sf_value;
+  real_to_target (&sf_value, rv, SFmode);
+
+  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
+     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
+     0 bits, and the mantissa non-zero.  */
+  if (((sf_value & 0x7F800000) == 0) && ((sf_value & 0x7FFFFF) != 0))
+    return false;
+
+  return true;
+})
+
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
 ;; instruction and then a VUPKHSB, VECSB2W or VECSB2D instruction.
@@ -651,6 +761,9 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
+	return true;
+
+      if (easy_fp_constant_sfmode (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
