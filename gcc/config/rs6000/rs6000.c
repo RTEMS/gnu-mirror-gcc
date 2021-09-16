@@ -6948,8 +6948,7 @@ output_vec_const_move (rtx *operands)
 
       if (easy_fp_constant_sfmode (vec, mode))
 	{
-	  long xxspltidp_value = xxspltidp_constant_immediate (vec, mode);
-	  operands[2] = GEN_INT (xxspltidp_value);
+	  operands[2] = GEN_INT (xxspltidp_constant_immediate (vec, mode));
 	  return "xxspltidp %x0,%2";
 	}
 
