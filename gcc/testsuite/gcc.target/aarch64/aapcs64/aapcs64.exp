@@ -40,6 +40,17 @@ if { [check_weak_available] } {
 				    $additional_flags
 	}
     }
+    # Using `c-torture-execute` means that target selectors in the files are
+    # ignored.
+    if { [ check_effective_target_cheri_capability_pure ] } {
+	foreach src [lsort [glob -nocomplain $srcdir/$subdir/morello-test_*.c]] {
+	    if {[runtest_file_p $runtests $src]} {
+		c-torture-execute [list $src \
+				   $srcdir/$subdir/abitest.S] \
+				   $additional_flags
+	    }
+	}
+    }
 }
 
 # Test parameter receiving.
@@ -76,6 +87,17 @@ if { [check_weak_available] } {
 	    c-torture-execute [list $src \
 				    $srcdir/$subdir/abitest.S] \
 				    $additional_flags_for_func_ret
+	}
+    }
+    # Using `c-torture-execute` means that target selectors in the files are
+    # ignored.
+    if { [ check_effective_target_cheri_capability_pure ] } {
+	foreach src [lsort [glob -nocomplain $srcdir/$subdir/morello-func-ret-*.c]] {
+	    if {[runtest_file_p $runtests $src]} {
+		c-torture-execute [list $src \
+				   $srcdir/$subdir/abitest.S] \
+				    $additional_flags_for_func_ret
+	    }
 	}
     }
 }

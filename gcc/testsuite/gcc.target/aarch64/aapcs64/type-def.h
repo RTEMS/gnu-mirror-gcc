@@ -183,3 +183,126 @@ union non_hfa_union_t
   double a;
   float b;
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/* Structures containing capabilities.  */
+union cap_no_overlap_union_t
+{
+  __uintcap_t uic;
+  int *ip;
+  int i;
+};
+
+union cap_overlap_union_t
+{
+  __uintcap_t uic;
+  int *ip;
+  struct {
+      long long ll1;
+      long long ll2;
+  } s;
+};
+
+struct cap_no_overlap_nc_t
+{
+  long long ll1;
+  __uintcap_t uic;
+};
+
+struct cap_no_overlap_cn_t
+{
+  __uintcap_t uic;
+  long long ll1;
+};
+
+struct cap_two_cap_t
+{
+  __uintcap_t uic;
+  __intcap_t   ic;
+};
+
+struct cap_overlap_nc_t
+{
+  long long ll1;
+  long long ll2;
+  __uintcap_t uic;
+};
+
+struct cap_overlap_cn_t
+{
+  __uintcap_t uic;
+  long long ll1;
+  long long ll2;
+};
+
+struct cap_large_struct_t
+{
+  __uintcap_t uic1;
+  __uintcap_t uic2;
+  __uintcap_t uic3;
+};
+
+/* Smaller than 24, capability is in *latter* part of structure.
+   Is not really pratical to pass this while maintaining the validity of the
+   capability.  Would have to have special handling for any structure of this
+   sort that puts the structure on the stack with an alignment that allows the
+   second capability argument to be valid (i.e. whatever means that capability
+   is aligned to 16).  This decision based on the structure seems overly
+   complicated for such a rare type of structure.  */
+struct __attribute__ ((packed)) packed_struct_latter
+{ unsigned short b; __uintcap_t a; };
+
+/* Greater than 24, capability is in *latter* part of structure.
+   Overlap => Should be passed in memory.  */
+struct __attribute__ ((packed)) packed_struct_overlap_latter
+{ unsigned short b; unsigned long long c; __uintcap_t a; };
+
+/* Smaller than 24, capability is in *first* part of structure.
+   Should pass in capability registers, can do so since can just load the
+   relevant `w` or `x` register. 
+
+   MORELLO TODO Do *not* know if the capability is aligned to 16 bytes.  Hence
+   need to copy to stack using memcpy and load registers from there (since
+   capability load requires 16 byte alignment).  Should raise a warning when
+   doing this.   */
+struct __attribute__ ((packed)) packed_struct_former
+{ __uintcap_t a; unsigned short b; };
+
+/* Greater than 24, capability is in *first* part of structure.
+   Overlap on capability metadata => Should be passed in memory.  */
+struct __attribute__ ((packed)) packed_struct_overlap_former
+{ __uintcap_t a; unsigned short b; unsigned long long c; };
+
+/* Packed attribute on the member rather than the entire structure.
+   Likely want to completely disallow such structures.
+   MORELLO TODO Look into disallowing such structures and giving an error
+   similar to the warning LLVM currently gives.  */
+struct packed_member_latter
+{ unsigned short int b; __attribute__((packed)) __uintcap_t a; };
+
+
+/* Packed non-capability attribute, should be passed in capability registers.
+   Size is 32.  */
+struct packed_noncap_member_former
+{ __uintcap_t a; unsigned char c; __attribute__((packed)) unsigned short b; };
+
+/* Packed attribute on the first capability member.
+   Behaves same as if `packed` attribute was on the structure (i.e. in `c`
+   registers and should be copied to stack using memcpy if coming from
+   somewhere else).  */
+struct packed_member_former
+{ __attribute__((packed)) __uintcap_t a; unsigned short int b; };
+
+
+/* Structures which are packed *and* aligned to the correct alignment behave
+   the same as without any attribute. */
+struct __attribute__ ((packed,aligned(16))) packed_struct_aligned_latter
+{ unsigned short b; __uintcap_t a; };
+struct __attribute__ ((packed,aligned(16))) packed_struct_aligned_former
+{ __uintcap_t a; unsigned short b; };
+
+
+/* Nested structure containing a capability (should be passed in a single
+   capability register).  */
+struct nested_cap { struct { __uintcap_t a; } b; };
+#endif
