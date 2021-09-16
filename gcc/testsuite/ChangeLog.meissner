@@ -1,3 +1,9 @@
+work069.patch003:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
+	regex for power10.
+
 work069.patch002:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
