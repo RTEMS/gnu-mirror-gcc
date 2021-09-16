@@ -10269,6 +10269,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    && function != 0)
 	  LABEL_REF_NONLOCAL_P (temp) = 1;
 
+	temp = targetm.adjust_label_expansion (temp);
 	temp = gen_rtx_MEM (FUNCTION_MODE, temp);
 	return temp;
       }

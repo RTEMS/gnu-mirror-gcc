@@ -8207,6 +8207,17 @@ Even if the current target does not use the REPLACE_ADDRESS_VALUE RTL code
 this function will be given that code, so it must be handled by this hook.
 @end deftypefn
 
+@deftypefn {Target Hook} rtx TARGET_ADJUST_LABEL_EXPANSION (rtx @var{x})
+Adjusts the RTX that has come from expanding a label.  This RTX has come
+from an expansion of a label and is to be used as data (e.g. in a computed
+goto) rather than to be jumped to directly.  This hook should take @var{x}
+and return a new RTX adjusted with any machine-specific requirements.
+
+Most targets do not need to implement this hook.  The default returns
+@var{x} directly.  One target that does need to implement it is AArch64.
+AArch64 needs to set the LSB of labels depending on the processor state.
+@end deftypefn
+
 @deftypefn {Target Hook} void TARGET_ASM_DECL_END (void)
 Define this hook if the target assembler requires a special marker to
 terminate an initialized variable declaration.

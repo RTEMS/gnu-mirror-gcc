@@ -3126,6 +3126,12 @@ static void
 aarch64_load_symref_appropriately (rtx dest, rtx imm,
 				   enum aarch64_symbol_type type)
 {
+  /* Can not share an RTX of the form ({pointer_,}plus (label_ref) (const_int)),
+     but can share RTX of the form ({pointer_,}plus (symbol_ref) (const_int)).
+     This is very rarely needed, but it is at least triggered when adding the
+     LSB to a label_ref for Morello.  Checking whether we actually need to do
+     the copy or not is done inside `copy_rtx`.  */
+  rtx imm2 = copy_rtx (imm);
   /* Assert that any time we're asked to load an indirection symbol there is no
      offset.  If there were an offset that would break one of the assumptions
      we have to believe that loading symbols is safe.  (I.e. if we're ever
@@ -3148,7 +3154,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	if (can_create_pseudo_p ())
 	  tmp_reg = gen_reg_rtx (mode);
 
-	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
+	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm2));
 	check_emit_insn (gen_add_losym (dest, tmp_reg, imm));
 	return;
       }
@@ -3245,7 +3251,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	if (can_create_pseudo_p ())
 	  tmp_reg = gen_reg_rtx (mode);
 
-	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
+	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm2));
 	if (mode == ptr_mode)
 	  {
 	    insn = gen_ldr_got_small (mode, dest, tmp_reg, imm);
@@ -3320,7 +3326,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 
 	check_emit_insn (gen_rtx_SET (dest, gen_raw_pointer_plus (sa, tp, x0)));
 	if (REG_P (dest))
-	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
+	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
 	return;
       }
 
@@ -3355,7 +3361,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	check_emit_insn (gen_rtx_SET (dest,
 				gen_raw_pointer_plus (sa, tp, om_reg)));
 	if (REG_P (dest))
-	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
+	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
 	return;
       }
 
@@ -3393,7 +3399,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	  }
 
 	if (REG_P (dest))
-	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
+	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
 	return;
       }
 
@@ -3432,7 +3438,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	  }
 
 	if (REG_P (dest))
-	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm);
+	  set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
 	return;
       }
 
@@ -19888,18 +19894,15 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
       if (TARGET_CAPABILITY_FAKE)
 	return targetm.asm_out.integer(address_value, size, aligned_p);
 
-      if (SYMBOL_REF_P (cap_val)
-	  && SUBREG_P (address_value)
-	  && subreg_lowpart_p (address_value)
-	  && LABEL_REF_P (SUBREG_REG (address_value)))
-	{
-	  /* For a pointer to a label, we need to set the LSB to preserve
-	     PSTATE.C64 for purecap.  */
-	  if (TARGET_CAPABILITY_PURE)
-	    XEXP (x, 1) = plus_constant (POmode, address_value, 1);
-	}
-      else
-	gcc_unreachable ();
+      gcc_assert (SYMBOL_REF_P (cap_val)
+		  && SUBREG_P (address_value)
+		  && subreg_lowpart_p (address_value));
+      rtx sub = SUBREG_REG (address_value);
+      gcc_assert ((TARGET_CAPABILITY_PURE
+		   && GET_CODE (sub) == CONST
+		   && POINTER_PLUS_P (XEXP (sub, 0))
+		   && LABEL_REF_P (XEXP (XEXP (sub, 0), 0)))
+		  || (!TARGET_CAPABILITY_PURE && LABEL_REF_P (sub)));
     }
 
   /* Fake capability => size is the correct size and just want to emit the
@@ -24272,6 +24275,18 @@ aarch64_target_capability_mode ()
   return opt_scalar_addr_mode ();
 }
 
+/* Implement TARGET_ADJUST_LABEL_EXPANSION hook.  */
+rtx
+aarch64_adjust_label_expansion (rtx x)
+{
+  /* For a pointer to a label, we need to set the LSB to preserve PSTATE.C64
+     for purecap (jumps to a register will take PSTATE.C64 from the LSB set in
+     that register).  */
+  if (TARGET_CAPABILITY_PURE)
+    return plus_constant (GET_MODE (x), x, 1);
+  return x;
+}
+
 /* Target-specific selftests.  */
 
 #if CHECKING_P
@@ -24839,6 +24854,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CAPABILITY_MODE
 #define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
+
+#undef TARGET_ADJUST_LABEL_EXPANSION
+#define TARGET_ADJUST_LABEL_EXPANSION aarch64_adjust_label_expansion
 
 #undef TARGET_ASM_DECLARE_CONSTANT_NAME
 #define TARGET_ASM_DECLARE_CONSTANT_NAME aarch64_declare_constant_name

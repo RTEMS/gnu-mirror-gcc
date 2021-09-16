@@ -3254,6 +3254,20 @@ DEFHOOK
  opt_scalar_addr_mode.  This is the default.",
  opt_scalar_addr_mode, (), default_capability_mode)
 
+/* Machine specific adjustments when expanding a label.  */
+DEFHOOK
+(adjust_label_expansion,
+ "Adjusts the RTX that has come from expanding a label.  This RTX has come\n\
+from an expansion of a label and is to be used as data (e.g. in a computed\n\
+goto) rather than to be jumped to directly.  This hook should take @var{x}\n\
+and return a new RTX adjusted with any machine-specific requirements.\n\
+\n\
+Most targets do not need to implement this hook.  The default returns\n\
+@var{x} directly.  One target that does need to implement it is AArch64.\n\
+AArch64 needs to set the LSB of labels depending on the processor state.",
+ rtx, (rtx x),
+ hook_rtx_rtx_identity)
+
 /* Support for named address spaces.  */
 #undef HOOK_PREFIX
 #define HOOK_PREFIX "TARGET_ADDR_SPACE_"
