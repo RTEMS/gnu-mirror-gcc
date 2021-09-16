@@ -3571,7 +3571,7 @@ proc check_effective_target_cheri_capability_pure { } {
   if { ![istarget aarch64*-*-*] } {
       return 0
   }
-  return [check_no_compiler_messages aarch64_capability_any assembly {
+  return [check_no_compiler_messages cheri_capability_pure assembly {
   #if !defined (__CHERI_PURE_CAPABILITY__)
   #error foo
   #endif
