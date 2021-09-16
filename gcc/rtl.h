@@ -3572,6 +3572,7 @@ extern rtx get_related_value (const_rtx);
 extern bool offset_within_block_p (const_rtx, HOST_WIDE_INT);
 extern void split_const (rtx, rtx *, rtx *);
 extern rtx strip_offset (rtx, poly_int64_pod *);
+extern const_rtx strip_offset (const_rtx, poly_int64_pod *);
 extern poly_int64 get_args_size (const_rtx);
 extern bool unsigned_reg_p (rtx);
 extern int reg_mentioned_p (const_rtx, const_rtx);

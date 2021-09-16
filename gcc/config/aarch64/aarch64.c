@@ -3066,6 +3066,20 @@ static rtx_insn *check_emit_insn (rtx x)
   return emit_insn (x);
 }
 
+static bool
+aarch64_indirection_sym_with_offset_p (const_rtx imm)
+{
+  poly_int64 offset;
+  const_rtx base = strip_offset (imm, &offset);
+  /* Not indirection symbol => not indirection sym plus offset.  */
+  if (!SYMBOL_REF_P (base) || !SYMBOL_REF_INDIRECTION_P (base))
+    return false;
+  /* Offset is zero => not indirection sym plus offset.  */
+  if (known_eq (offset, 0))
+    return false;
+  return true;
+}
+
 /* We'll allow lo_sum's in addresses in our legitimate addresses
    so that combine would take care of combining addresses where
    necessary, but for generation purposes, we'll generate the address
@@ -3112,6 +3126,15 @@ static void
 aarch64_load_symref_appropriately (rtx dest, rtx imm,
 				   enum aarch64_symbol_type type)
 {
+  /* Assert that any time we're asked to load an indirection symbol there is no
+     offset.  If there were an offset that would break one of the assumptions
+     we have to believe that loading symbols is safe.  (I.e. if we're ever
+     asked to load an indirection symbol plus offset that means something is
+     indexing into a symbol in the constant pool -- because all indirection
+     symbols just point at single capabilities -- if that's the case then we
+     will have to look into where the index is coming from).  */
+  gcc_assert (!aarch64_indirection_sym_with_offset_p (imm));
+
   switch (type)
     {
     case SYMBOL_SMALL_ABSOLUTE:
@@ -5239,6 +5262,30 @@ aarch64_expand_sve_const_pred (rtx target, rtx_vector_builder &builder)
 					   int_builder.build ());
 }
 
+/* Helper function to identify immediates that should be accessed via the
+   Morello indirection table.  Any basic constant is not directly accessed via
+   this table, but any label or symbol is.  */
+static bool
+aarch64_sym_indirectly_accessed_p (const_rtx sym)
+{
+  return TARGET_CAPABILITY_PURE && SYMBOL_REF_P (sym)
+    && !SYMBOL_REF_INDIRECTION_P (sym) && !SYMBOL_REF_ANCHOR_P (sym);
+}
+
+/* Return true if the provided symbol_ref will not get emitted as a variable
+   if it is not found in the RTL by `mark_constants_in_pattern`.  If this is
+   the case then we can not access it through an indirection table where we
+   access the indirection table using section anchors.  That would mean there
+   is no direct reference in the RTL and that the constant would not get
+   emitted.  */
+static bool
+aarch64_sym_requires_reference_in_rtl_p (const_rtx x)
+{
+  return SYMBOL_REF_P (x) && (CONSTANT_POOL_ADDRESS_P (x)
+			      || TREE_CONSTANT_POOL_ADDRESS_P (x));
+}
+
+
 /* Set DEST to immediate IMM.  */
 
 void
@@ -5254,7 +5301,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
        || GET_CODE (imm) == CONST_POLY_INT)
       && is_a <scalar_addr_mode> (mode, &addr_mode))
     {
-      rtx mem;
+      rtx mem, sym;
       poly_int64 offset;
       HOST_WIDE_INT const_offset;
       enum aarch64_symbol_type sty;
@@ -5314,6 +5361,19 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	    }
 
 	  mem = force_const_mem (ptr_mode, imm);
+	  if (TARGET_CAPABILITY_PURE && SYMBOL_REF_P (base))
+	    {
+	      /* Mark the symbol created by `force_const_mem` as one into the
+		 indirection table.  */
+	      sym = XEXP (mem, 0);
+	      /* The symbol getting forced into memory should never be an
+		 indirection symbol, we should always be given a constant pool
+		 symbol pointing to the relevant position.  */
+	      gcc_assert (SYMBOL_REF_P (sym)
+			  && CONSTANT_POOL_ADDRESS_P (sym)
+			  && !SYMBOL_REF_INDIRECTION_P (base));
+	      SYMBOL_REF_FLAGS (sym) |= SYMBOL_FLAG_INDIRECTION;
+	    }
 	  gcc_assert (mem);
 
 	  /* If we aren't generating PC relative literals, then
@@ -5323,10 +5383,38 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	  if (!aarch64_pcrelative_literal_loads)
 	    {
 	      gcc_assert (can_create_pseudo_p ());
-	      base = gen_reg_rtx (ptr_mode);
-	      aarch64_expand_mov_immediate (base, XEXP (mem, 0));
-	      if (ptr_mode != Pmode)
-		base = convert_memory_address (Pmode, base);
+	      if (TARGET_CAPABILITY_PURE && SYMBOL_REF_P (base))
+		{
+		  /* Accesses into the table of symbols pointing around the
+		     current file may be accessed using a section anchor.
+		     These can not be indirected, and accesses via a section
+		     anchor have same problems if offset by a runtime-specified
+		     index or exposed to the user code as accesses using the PCC
+		     with `adrp`.  (While we believe that the compiler
+		     generated accesses into this table will never be exposed
+		     in such a manner it's still nice to point out that using
+		     section anchors can not reduce the security properties).
+
+		     Finally, we believe that there may very well be
+		     optimisation opportunities for section anchors into this
+		     indirection table, since they should happen any time a
+		     function uses more than one locally bound global data
+		     object.  */
+		  mem = use_anchored_address (mem);
+		  /* Just another assertion to check we are not using anchor
+		     symbols for the indirection of addresses that need to be
+		     referenced in RTL for their constant to be emitted.  */
+		  if (aarch64_sym_requires_reference_in_rtl_p (base))
+		    gcc_assert (XEXP (mem, 0) == sym);
+		  base = force_reg (Pmode, XEXP (mem, 0));
+		}
+	      else
+		{
+		  base = gen_reg_rtx (ptr_mode);
+		  aarch64_expand_mov_immediate (base, XEXP (mem, 0));
+		  if (ptr_mode != Pmode)
+		    base = convert_memory_address (Pmode, base);
+		}
 	      mem = gen_rtx_MEM (ptr_mode, base);
 	    }
 
@@ -11504,11 +11592,48 @@ aarch64_can_use_per_function_literal_pools_p (void)
 }
 
 static bool
-aarch64_use_blocks_for_constant_p (machine_mode, const_rtx)
+aarch64_use_blocks_for_constant_p (machine_mode, const_rtx x)
 {
+  /* Ensure that we never try to put ANCHOR+offset as a constant into memory on
+     PureCap ABI.  If we did, then we would have no way to specify the bounds
+     and permissions needed for the associated `capinit` relocation.  */
+  gcc_assert (!(TARGET_CAPABILITY_PURE && SYMBOL_REF_P (x)
+		&& SYMBOL_REF_ANCHOR_P (x)));
   /* We can't use blocks for constants when we're using a per-function
      constant pool.  */
   return !aarch64_can_use_per_function_literal_pools_p ();
+}
+
+static bool
+aarch64_use_anchors_for_symbol_p (const_rtx x)
+{
+  /* For morello we never want to access symbols using an anchor symbol unless
+     they are special indirection symbols.  We believe the indirection symbols
+     are always accessed in bounds.
+
+     On top of that, some indirection symbols must not be accessed using
+     section anchors because the constant to which they point must be
+     referenced in RTL for it to be output.  */
+
+   /* MORELLO TODO
+     This is a conservative approach.  We believe we could allow read-only
+     artificial decls to be accessed in this way if there is no way for user
+     code to index them or find their address.  Similarly, it would be possible
+     to do the same with read-write objects and allow indexing using a section
+     anchor when we know we want an in-bounds load.  We leave such possible
+     optimisations for future work.  */
+
+  if (TARGET_CAPABILITY_PURE)
+    {
+      if (!SYMBOL_REF_INDIRECTION_P (x))
+	return false;
+      rtx constant = get_pool_constant (x);
+      poly_int64 offset;
+      rtx base = strip_offset (constant, &offset);
+      if (aarch64_sym_requires_reference_in_rtl_p (base))
+	return false;
+    }
+  return default_use_anchors_for_symbol_p (x);
 }
 
 /* Select appropriate section for constants depending
@@ -15483,6 +15608,8 @@ initialize_aarch64_code_model (struct gcc_options *opts)
 	}
       break;
     case AARCH64_CMODEL_LARGE:
+      if (TARGET_CAPABILITY_PURE)
+	sorry ("code model large with %<-mabi=purecap%>");
       if (opts->x_flag_pic)
 	sorry ("code model %qs with %<-f%s%>", "large",
 	       opts->x_flag_pic > 1 ? "PIC" : "pic");
@@ -16369,6 +16496,72 @@ aarch64_classify_tls_symbol (rtx x)
     }
 }
 
+static bool
+aarch64_symbol_public_p (const_rtx x)
+{
+  return (SYMBOL_REF_DECL (x)
+	  ? TREE_PUBLIC (SYMBOL_REF_DECL (x))
+	  : false);
+}
+
+enum aarch64_symbol_type
+aarch64_classify_capability_symbol (rtx x, HOST_WIDE_INT)
+{
+  gcc_assert (GET_CODE (x) == SYMBOL_REF);
+  gcc_assert (GET_MODE (x) == CADImode);
+  gcc_assert (TARGET_CAPABILITY_PURE);
+  gcc_assert (!SYMBOL_REF_INDIRECTION_P (x));
+
+  /* Capabilities must take their permissions from somewhere.  If loading a
+     function address then the permissions in PCC will be fine.  If fetching
+     data that the C source code can use then we will want to have narrower
+     bounds (that only span the object) and will sometimes want write
+     permissions.
+
+     In order to handle those different permissions we require the runtime to
+     give us the relevant capabilities we want.  We then have to fetch those
+     capabilities in order to use them.
+
+     There are two places that the linker can store these new intermediate
+     capabilities: the GOT, or in a constant pool that we create.  In order to
+     request a constant pool we return SYMBOL_FORCE_TO_MEM and in order to
+     request fetching them from the GOT we return SYMBOL_*_GOT*.
+
+     If a symbol can be shared between multiple translation units we want its
+     address stored in the GOT (in order to allow other translation units to
+     read it).  Otherwise we store it in a constant pool with no external
+     visibility.
+
+     We conservatively treat any SYMBOL_REF that was not created to index into
+     an indirection table as data that the C source code can use.  This is
+     likely to be overly conservative (see TODO in
+     `aarch64_use_anchors_for_symbol_p`).  */
+  switch (aarch64_cmodel)
+    {
+    case AARCH64_CMODEL_TINY_PIC:
+    case AARCH64_CMODEL_TINY:
+      /* While forcing to memory will work for any binds_local_p symbols, it
+	 would mean that the symbol can not be shared between different
+	 translation units.  LLVM tries to store things in the GOT if
+	 they can be shared across different translation units.  Hence we
+	 determine what to do based on whether the symbol is public or not.  */
+      return aarch64_symbol_public_p (x)
+	? SYMBOL_TINY_GOT
+	: SYMBOL_FORCE_TO_MEM;
+
+    case AARCH64_CMODEL_SMALL_SPIC:
+    case AARCH64_CMODEL_SMALL_PIC:
+    case AARCH64_CMODEL_SMALL:
+      return aarch64_symbol_public_p (x)
+	? SYMBOL_SMALL_GOT_4G
+	: SYMBOL_FORCE_TO_MEM;
+
+    case AARCH64_CMODEL_LARGE:
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Return the correct method for accessing X + OFFSET, where X is either
    a SYMBOL_REF or LABEL_REF.  */
 
@@ -16400,6 +16593,11 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
     {
       if (aarch64_tls_symbol_p (x))
 	return aarch64_classify_tls_symbol (x);
+
+      /* Load any non-indirected symbol either through a local indirection
+	 table or through the GOT.  */
+      if (aarch64_sym_indirectly_accessed_p (x))
+	return aarch64_classify_capability_symbol (x, offset);
 
       switch (aarch64_cmodel)
 	{
@@ -24389,6 +24587,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_USE_BLOCKS_FOR_CONSTANT_P
 #define TARGET_USE_BLOCKS_FOR_CONSTANT_P aarch64_use_blocks_for_constant_p
+
+#undef TARGET_USE_ANCHORS_FOR_SYMBOL_P
+#define TARGET_USE_ANCHORS_FOR_SYMBOL_P aarch64_use_anchors_for_symbol_p
 
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P aarch64_vector_mode_supported_p

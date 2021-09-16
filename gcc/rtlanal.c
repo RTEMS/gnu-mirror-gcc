@@ -958,6 +958,24 @@ strip_offset (rtx x, poly_int64_pod *offset_out)
   return x;
 }
 
+const_rtx
+strip_offset (const_rtx x, poly_int64_pod *offset_out)
+{
+  const_rtx base = const0_rtx;
+  const_rtx test = x;
+  if (GET_CODE (test) == CONST)
+    test = XEXP (test, 0);
+  if (any_plus_p (test))
+    {
+      base = XEXP (test, 0);
+      test = XEXP (test, 1);
+    }
+  if (poly_int_rtx_p (test, offset_out))
+    return base;
+  *offset_out = 0;
+  return x;
+}
+
 /* Return the argument size in REG_ARGS_SIZE note X.  */
 
 poly_int64

@@ -1256,6 +1256,13 @@ extern enum aarch64_code_model aarch64_cmodel;
 #define ENDIAN_LANE_N(NUNITS, N) \
   (BYTES_BIG_ENDIAN ? NUNITS - 1 - N : N)
 
+/* We use the first machine dependent symbol ref flag to record whether this
+   symbol is a symbol indexing into the local indirection table required for
+   Morello data pointers.  */
+#define SYMBOL_FLAG_INDIRECTION  SYMBOL_FLAG_MACH_DEP
+#define SYMBOL_REF_INDIRECTION_P(RTX) \
+  ((SYMBOL_REF_FLAGS (RTX) & SYMBOL_FLAG_INDIRECTION) != 0)
+
 /* Support for a configure-time default CPU, etc.  We currently support
    --with-arch and --with-cpu.  Both are ignored if either is specified
    explicitly on the command line at run time.  */
