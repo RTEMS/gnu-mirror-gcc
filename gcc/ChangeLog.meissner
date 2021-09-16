@@ -1,3 +1,37 @@
+work069.patch001:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eF): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If we can load
+	the scalar constant with XXSPLTIDP, the floating point constant is
+	easy.
+	(easy_fp_constant_sfmode): New predicate.
+	(easy_vector_constant): If we can generate XXSPLTIDP, mark the
+	vector constant as easy.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate): New
+	declaration.
+	(prefixed_xxsplti_p): Likewise.
+	* config/rs6000/rs6000.c (xxspltidp_constant_immediate): New function.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(prefixed_xxsplti_p): New function.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for
+	permute prefixed instructions.
+	(movsf_hardfloat): Add XXSPLTIDP support.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New switch.
+	* config/rs6000/vsx.md (vsx_move<mode>_64bit): Add XXSPLTIDP
+	support.
+	(vsx_move<mode>_32bit): Likewise.
+	(XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_inst): Replace xxspltidp_v2df_inst with an
+	iterated form that also does SFmode, DFmode, DImode, and
+	V2DImode.
+	(xxspltidp_<mode>_internal): New insn and splits.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document eF.
+
 2021-09-15   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
