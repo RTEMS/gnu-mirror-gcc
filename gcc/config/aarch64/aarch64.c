@@ -1951,6 +1951,11 @@ aarch64_classify_capability_contents (const_tree type)
   if (TYPE_SIZE (type) && integer_zerop (TYPE_SIZE (type)))
     return CAPCOM_NONE;
 
+  /* Flexible array members are not passed in PCS, so do not contain
+     capabilities for PCS purposes.  */
+  if (TREE_CODE (type) == ARRAY_TYPE && !TYPE_SIZE (type))
+    return CAPCOM_NONE;
+
   if (int_size_in_bytes (type) == -1)
     return CAPCOM_LARGE;
 
@@ -1971,11 +1976,14 @@ aarch64_classify_capability_contents (const_tree type)
     return aarch64_classify_capability_contents (TREE_TYPE (type));
 
   enum capability_composite_type subfield_status = CAPCOM_NONE;
+  bool has_overlap = false;
+
   if (RECORD_OR_UNION_TYPE_P (type))
     /* CAPCOM_LARGE overrides CAPCOM_OVERLAP but has already been dealt with.
        CAPCOM_OVERLAP overrides CAPCOM_SOME (doesn't matter if there are
        capabilities if there are some fields that overlap their metadata).
-	 Hence as soon as we see CAPCOM_OVERLAP, we can return that.
+	 However if we're just seeing a non-capability structure member then
+	 this does not change state from CAPCOM_NONE.
        CAPCOM_SOME overrides CAPCOM_NONE.
 	 Have to search through all fields for any CAPCOM_SOME or
 	 CAPCOM_OVERLAP.
@@ -1983,15 +1991,28 @@ aarch64_classify_capability_contents (const_tree type)
     for (tree field = TYPE_FIELDS (type); field; field = TREE_CHAIN (field))
       if (TREE_CODE (field) == FIELD_DECL)
 	{
-	  if (!capability_type_p (TREE_TYPE (field))
-	      && aarch64_field_overlaps_capability_metadata (field))
-	    return CAPCOM_OVERLAP;
-	  else if (aarch64_classify_capability_contents (TREE_TYPE (field))
-		  == CAPCOM_OVERLAP)
-	    return CAPCOM_OVERLAP;
-	  else if (aarch64_classify_capability_contents (TREE_TYPE (field))
-		  == CAPCOM_SOME)
-	    subfield_status = CAPCOM_SOME;
+	  switch (aarch64_classify_capability_contents (TREE_TYPE (field)))
+	    {
+	    case CAPCOM_NONE:
+	      if (!aarch64_field_overlaps_capability_metadata (field))
+		break;
+	      if (subfield_status == CAPCOM_SOME)
+		return CAPCOM_OVERLAP;
+	      has_overlap = true;
+	      break;
+
+	    case CAPCOM_SOME:
+	      if (has_overlap)
+		return CAPCOM_OVERLAP;
+	      subfield_status = CAPCOM_SOME;
+	      break;
+
+	    case CAPCOM_OVERLAP:
+	      return CAPCOM_OVERLAP;
+
+	    default:
+	      gcc_unreachable ();
+	    }
 	}
 
   return subfield_status;
