@@ -63,7 +63,10 @@ FUN(14)
 FUN(15)
 FUN(16)
 
-/* { dg-final { scan-assembler-times {ldr\s} 18 } } */
+/* { dg-final { scan-assembler-times {ldr\s} 18 { target { ! cheri_capability_pure } } } } */
+/* For PureCap the indirection means that every function has an extra `ldr`
+   just to get the address to load from.  18 + 16 = 34.  */
+/* { dg-final { scan-assembler-times {ldr\s} 34 { target cheri_capability_pure } } } */
 /* { dg-final { scan-assembler-times {ldrb} 4 } } */
 /* { dg-final { scan-assembler-times {ldrh} 4 } } */
 /* { dg-final { scan-assembler-times {ldp} 1 } } */
