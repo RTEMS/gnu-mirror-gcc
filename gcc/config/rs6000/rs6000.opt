@@ -647,3 +647,7 @@ Generate (do not generate) XXSPLTIDP instructions.
 mlxvkq
 Target Undocumented Var(TARGET_LXVKQ) Init(1) Save
 Generate (do not generate) LXVKQ instructions.
+
+mbuiltin-shlib
+Target Undocumented Var(TARGET_BUILTIN_SHLIB) Init(0) Save
+Assume (do not assume) built-in functions are within a shared library.
