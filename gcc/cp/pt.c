@@ -3855,6 +3855,18 @@ expand_builtin_pack_call (tree call, tree args, tsubst_flags_t complain,
   return NULL_TREE;
 }
 
+/* Return true if the tree T has the extra args mechanism for
+   avoiding partial instantiation.  */
+
+static bool
+has_extra_args_mechanism_p (const_tree t)
+{
+  return (PACK_EXPANSION_P (t) /* PACK_EXPANSION_EXTRA_ARGS  */
+	  || TREE_CODE (t) == REQUIRES_EXPR /* REQUIRES_EXPR_EXTRA_ARGS  */
+	  || (TREE_CODE (t) == IF_STMT
+	      && IF_STMT_CONSTEXPR_P (t))); /* IF_STMT_EXTRA_ARGS  */
+}
+
 /* Structure used to track the progress of find_parameter_packs_r.  */
 struct find_parameter_pack_data
 {
@@ -3867,6 +3879,9 @@ struct find_parameter_pack_data
 
   /* True iff we're making a type pack expansion.  */
   bool type_pack_expansion_p;
+
+  /* True iff we found a subtree that has the extra args mechanism.  */
+  bool found_extra_args_tree_p = false;
 };
 
 /* Identifies all of the argument packs that occur in a template
@@ -3967,6 +3982,9 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
       /* Add this parameter pack to the list.  */
       *ppd->parameter_packs = tree_cons (NULL_TREE, t, *ppd->parameter_packs);
     }
+
+  if (has_extra_args_mechanism_p (t) && !PACK_EXPANSION_P (t))
+    ppd->found_extra_args_tree_p = true;
 
   if (TYPE_P (t))
     cp_walk_tree (&TYPE_CONTEXT (t),
@@ -4229,6 +4247,14 @@ make_pack_expansion (tree arg, tsubst_flags_t complain)
   PACK_EXPANSION_PARAMETER_PACKS (result) = parameter_packs;
 
   PACK_EXPANSION_LOCAL_P (result) = at_function_scope_p ();
+  if (ppd.found_extra_args_tree_p)
+    /* If the pattern of this pack expansion contains a subtree that has
+       the extra args mechanism for avoiding partial instantiation, then
+       force this pack expansion to also use extra args.  Otherwise
+       partial instantiation of this pack expansion may not lower the
+       level of some parameter packs within the pattern, which would
+       confuse tsubst_pack_expansion later (PR101764).  */
+    PACK_EXPANSION_FORCE_EXTRA_ARGS_P (result) = true;
 
   return result;
 }
@@ -10873,7 +10899,8 @@ neglectable_inst_p (tree d)
 {
   return (d && DECL_P (d)
 	  && !undeduced_auto_decl (d)
-	  && !(TREE_CODE (d) == FUNCTION_DECL ? DECL_DECLARED_CONSTEXPR_P (d)
+	  && !(TREE_CODE (d) == FUNCTION_DECL
+	       ? FNDECL_MANIFESTLY_CONST_EVALUATED (d)
 	       : decl_maybe_constant_var_p (d)));
 }
 
@@ -10885,14 +10912,31 @@ limit_bad_template_recursion (tree decl)
 {
   struct tinst_level *lev = current_tinst_level;
   int errs = errorcount + sorrycount;
-  if (lev == NULL || errs == 0 || !neglectable_inst_p (decl))
+  if (errs == 0 || !neglectable_inst_p (decl))
     return false;
 
-  for (; lev; lev = lev->next)
-    if (neglectable_inst_p (lev->maybe_get_node ()))
-      break;
+  /* Avoid instantiating members of an ill-formed class.  */
+  bool refuse
+    = (DECL_CLASS_SCOPE_P (decl)
+       && CLASSTYPE_ERRONEOUS (DECL_CONTEXT (decl)));
 
-  return (lev && errs > lev->errors);
+  if (!refuse)
+    {
+      for (; lev; lev = lev->next)
+	if (neglectable_inst_p (lev->maybe_get_node ()))
+	  break;
+      refuse = (lev && errs > lev->errors);
+    }
+
+  if (refuse)
+    {
+      /* Don't warn about it not being defined.  */
+      suppress_warning (decl, OPT_Wunused);
+      tree clone;
+      FOR_EACH_CLONE (clone, decl)
+	suppress_warning (clone, OPT_Wunused);
+    }
+  return refuse;
 }
 
 static int tinst_depth;
@@ -12212,6 +12256,13 @@ instantiate_class_template_1 (tree type)
   finish_struct_1 (type);
   TYPE_BEING_DEFINED (type) = 0;
 
+  /* Remember if instantiating this class ran into errors, so we can avoid
+     instantiating member functions in limit_bad_template_recursion.  We set
+     this flag even if the problem was in another instantiation triggered by
+     this one, as that will likely also cause trouble for member functions.  */
+  if (errorcount + sorrycount > current_tinst_level->errors)
+    CLASSTYPE_ERRONEOUS (type) = true;
+
   /* We don't instantiate default arguments for member functions.  14.7.1:
 
      The implicit instantiation of a class template specialization causes
@@ -12380,10 +12431,15 @@ make_argument_pack_select (tree arg_pack, unsigned index)
     substitution.  */
 
 static bool
-use_pack_expansion_extra_args_p (tree parm_packs,
+use_pack_expansion_extra_args_p (tree t,
+				 tree parm_packs,
 				 int arg_pack_len,
 				 bool has_empty_arg)
 {
+  if (has_empty_arg
+      && PACK_EXPANSION_FORCE_EXTRA_ARGS_P (t))
+    return true;
+
   /* If one pack has an expansion and another pack has a normal
      argument or if one pack has an empty argument and an another
      one hasn't then tsubst_pack_expansion cannot perform the
@@ -13136,7 +13192,7 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 
   /* We cannot expand this expansion expression, because we don't have
      all of the argument packs we need.  */
-  if (use_pack_expansion_extra_args_p (packs, len, unsubstituted_packs))
+  if (use_pack_expansion_extra_args_p (t, packs, len, unsubstituted_packs))
     {
       /* We got some full packs, but we can't substitute them in until we
 	 have values for all the packs.  So remember these until then.  */
@@ -19465,6 +19521,63 @@ out:
   return r;
 }
 
+/* Subroutine of maybe_fold_fn_template_args.  */
+
+static bool
+fold_targs_r (tree targs, tsubst_flags_t complain)
+{
+  int len = TREE_VEC_LENGTH (targs);
+  for (int i = 0; i < len; ++i)
+    {
+      tree &elt = TREE_VEC_ELT (targs, i);
+      if (!elt || TYPE_P (elt)
+	  || TREE_CODE (elt) == TEMPLATE_DECL)
+	continue;
+      if (TREE_CODE (elt) == NONTYPE_ARGUMENT_PACK)
+	{
+	  if (!fold_targs_r (ARGUMENT_PACK_ARGS (elt), complain))
+	    return false;
+	}
+      else if (/* We can only safely preevaluate scalar prvalues.  */
+	       SCALAR_TYPE_P (TREE_TYPE (elt))
+	       && !glvalue_p (elt)
+	       && !TREE_CONSTANT (elt))
+	{
+	  elt = cxx_constant_value_sfinae (elt, complain);
+	  if (elt == error_mark_node)
+	    return false;
+	}
+    }
+
+  return true;
+}
+
+/* Try to do constant evaluation of any explicit template arguments in FN
+   before overload resolution, to get any errors only once.  Return true iff
+   we didn't have any problems folding.  */
+
+static bool
+maybe_fold_fn_template_args (tree fn, tsubst_flags_t complain)
+{
+  if (processing_template_decl || fn == NULL_TREE)
+    return true;
+  if (fn == error_mark_node)
+    return false;
+  if (TREE_CODE (fn) == OFFSET_REF
+      || TREE_CODE (fn) == COMPONENT_REF)
+    fn = TREE_OPERAND (fn, 1);
+  if (BASELINK_P (fn))
+    fn = BASELINK_FUNCTIONS (fn);
+  if (TREE_CODE (fn) != TEMPLATE_ID_EXPR)
+    return true;
+  tree targs = TREE_OPERAND (fn, 1);
+  if (targs == NULL_TREE)
+    return true;
+  if (targs == error_mark_node)
+    return false;
+  return fold_targs_r (targs, complain);
+}
+
 /* Like tsubst but deals with expressions and performs semantic
    analysis.  FUNCTION_P is true if T is the "F" in "F (ARGS)" or
    "F<TARGS> (ARGS)".  */
@@ -20342,6 +20455,9 @@ tsubst_copy_and_build (tree t,
 	    && DECL_P (function)
 	    && !mark_used (function, complain) && !(complain & tf_error))
 	  RETURN (error_mark_node);
+
+	if (!maybe_fold_fn_template_args (function, complain))
+	  return error_mark_node;
 
 	/* Put back tf_decltype for the actual call.  */
 	complain |= decltype_flag;

@@ -499,9 +499,8 @@ extern GTY(()) int darwin_ms_struct;
 /* We now require C++11 to bootstrap and newer tools than those based on
    stabs, so require DWARF-2, even if stabs is supported by the assembler.  */
 
-#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
-#define DARWIN_PREFER_DWARF
 #define DWARF2_DEBUGGING_INFO 1
+#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
 #ifdef HAVE_AS_STABS_DIRECTIVE
 #define DBX_DEBUGGING_INFO 1
@@ -1103,6 +1102,9 @@ extern void darwin_driver_init (unsigned int *,struct cl_decoded_option **);
 /* From at least version 62.1, ld64 can build symbol indirection stubs as
    needed, and there is no need for the compiler to emit them.  */
 #define MIN_LD64_OMIT_STUBS "62.1"
+
+/* Emit start labels for init and term sections from this version.  */
+#define MIN_LD64_INIT_TERM_START_LABELS "136.0"
 
 /* If we have no definition for the linker version, pick the minimum version
    that will bootstrap the compiler.  */

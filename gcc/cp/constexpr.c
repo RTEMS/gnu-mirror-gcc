@@ -865,7 +865,7 @@ maybe_save_constexpr_fundef (tree fun)
   if (processing_template_decl
       || !DECL_DECLARED_CONSTEXPR_P (fun)
       || cp_function_chain->invalid_constexpr
-      || DECL_CLONED_FUNCTION_P (fun))
+      || (DECL_CLONED_FUNCTION_P (fun) && !DECL_DELETING_DESTRUCTOR_P (fun)))
     return;
 
   if (!is_valid_constexpr_fn (fun, !DECL_GENERATED_P (fun)))
@@ -942,7 +942,6 @@ explain_invalid_constexpr_fn (tree fun)
 {
   static hash_set<tree> *diagnosed;
   tree body;
-  location_t save_loc;
   /* Only diagnose defaulted functions, lambdas, or instantiations.  */
   if (!DECL_DEFAULTED_FN (fun)
       && !LAMBDA_TYPE_P (CP_DECL_CONTEXT (fun))
@@ -957,7 +956,7 @@ explain_invalid_constexpr_fn (tree fun)
     /* Already explained.  */
     return;
 
-  save_loc = input_location;
+  iloc_sentinel ils = input_location;
   if (!lambda_static_thunk_p (fun))
     {
       /* Diagnostics should completely ignore the static thunk, so leave
@@ -985,7 +984,6 @@ explain_invalid_constexpr_fn (tree fun)
 	    cx_check_missing_mem_inits (DECL_CONTEXT (fun), body, true);
 	}
     }
-  input_location = save_loc;
 }
 
 /* Objects of this type represent calls to constexpr functions
@@ -2374,7 +2372,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       *non_constant_p = true;
       return t;
     }
-  if (DECL_CLONED_FUNCTION_P (fun))
+  if (DECL_CLONED_FUNCTION_P (fun) && !DECL_DELETING_DESTRUCTOR_P (fun))
     fun = DECL_CLONED_FUNCTION (fun);
 
   if (is_ubsan_builtin_p (fun))
@@ -2572,6 +2570,8 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       location_t save_loc = input_location;
       input_location = loc;
       ++function_depth;
+      if (ctx->manifestly_const_eval)
+	FNDECL_MANIFESTLY_CONST_EVALUATED (fun) = true;
       instantiate_decl (fun, /*defer_ok*/false, /*expl_inst*/false);
       --function_depth;
       input_location = save_loc;
@@ -2787,12 +2787,34 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 					&jump_target);
 
 	  if (DECL_CONSTRUCTOR_P (fun))
-	    /* This can be null for a subobject constructor call, in
-	       which case what we care about is the initialization
-	       side-effects rather than the value.  We could get at the
-	       value by evaluating *this, but we don't bother; there's
-	       no need to put such a call in the hash table.  */
-	    result = lval ? ctx->object : ctx->ctor;
+	    {
+	      /* This can be null for a subobject constructor call, in
+		 which case what we care about is the initialization
+		 side-effects rather than the value.  We could get at the
+		 value by evaluating *this, but we don't bother; there's
+		 no need to put such a call in the hash table.  */
+	      result = lval ? ctx->object : ctx->ctor;
+
+	      /* If we've just evaluated a subobject constructor call for an
+		 empty union member, it might not have produced a side effect
+		 that actually activated the union member.  So produce such a
+		 side effect now to ensure the union appears initialized.  */
+	      if (!result && new_obj
+		  && TREE_CODE (new_obj) == COMPONENT_REF
+		  && TREE_CODE (TREE_TYPE
+				(TREE_OPERAND (new_obj, 0))) == UNION_TYPE
+		  && is_really_empty_class (TREE_TYPE (new_obj),
+					    /*ignore_vptr*/false))
+		{
+		  tree activate = build2 (MODIFY_EXPR, TREE_TYPE (new_obj),
+					  new_obj,
+					  build_constructor (TREE_TYPE (new_obj),
+							     NULL));
+		  cxx_eval_constant_expression (ctx, activate, lval,
+						non_constant_p, overflow_p);
+		  ggc_free (activate);
+		}
+	    }
 	  else if (VOID_TYPE_P (TREE_TYPE (res)))
 	    result = void_node;
 	  else
@@ -6075,6 +6097,37 @@ inline_asm_in_constexpr_error (location_t loc)
 	  "%<constexpr%> function in C++20");
 }
 
+/* We're getting the constant value of DECL in a manifestly constant-evaluated
+   context; maybe complain about that.  */
+
+static void
+maybe_warn_about_constant_value (location_t loc, tree decl)
+{
+  static bool explained = false;
+  if (cxx_dialect >= cxx17
+      && warn_interference_size
+      && !global_options_set.x_param_destruct_interfere_size
+      && DECL_CONTEXT (decl) == std_node
+      && id_equal (DECL_NAME (decl), "hardware_destructive_interference_size")
+      && (LOCATION_FILE (input_location) != main_input_filename
+	  || module_exporting_p ())
+      && warning_at (loc, OPT_Winterference_size, "use of %qD", decl)
+      && !explained)
+    {
+      explained = true;
+      inform (loc, "its value can vary between compiler versions or "
+	      "with different %<-mtune%> or %<-mcpu%> flags");
+      inform (loc, "if this use is part of a public ABI, change it to "
+	      "instead use a constant variable you define");
+      inform (loc, "the default value for the current CPU tuning "
+	      "is %d bytes", param_destruct_interfere_size);
+      inform (loc, "you can stabilize this value with %<--param "
+	      "hardware_destructive_interference_size=%d%>, or disable "
+	      "this warning with %<-Wno-interference-size%>",
+	      param_destruct_interfere_size);
+    }
+}
+
 /* Attempt to reduce the expression T to a constant value.
    On failure, issue diagnostic and return error_mark_node.  */
 /* FIXME unify with c_fully_fold */
@@ -6219,6 +6272,8 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	      r = *p;
 	      break;
 	    }
+      if (ctx->manifestly_const_eval)
+	maybe_warn_about_constant_value (loc, t);
       if (COMPLETE_TYPE_P (TREE_TYPE (t))
 	  && is_really_empty_class (TREE_TYPE (t), /*ignore_vptr*/false))
 	{
@@ -7445,6 +7500,10 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	}
     }
 
+  /* Remember the original location if that wouldn't need a wrapper.  */
+  if (location_t loc = EXPR_LOCATION (t))
+    protected_set_expr_location (r, loc);
+
   return r;
 }
 
@@ -7456,6 +7515,18 @@ tree
 cxx_constant_value (tree t, tree decl)
 {
   return cxx_eval_outermost_constant_expr (t, false, true, true, false, decl);
+}
+
+/* As above, but respect SFINAE.  */
+
+tree
+cxx_constant_value_sfinae (tree t, tsubst_flags_t complain)
+{
+  bool sfinae = !(complain & tf_error);
+  tree r = cxx_eval_outermost_constant_expr (t, sfinae, true, true);
+  if (sfinae && !TREE_CONSTANT (r))
+    r = error_mark_node;
+  return r;
 }
 
 /* Like cxx_constant_value, but used for evaluation of constexpr destructors

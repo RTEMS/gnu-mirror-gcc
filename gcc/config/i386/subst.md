@@ -24,6 +24,7 @@
    V32HI V16HI V8HI
    V16SI V8SI  V4SI
    V8DI  V4DI  V2DI
+   V32HF V16HF V8HF
    V16SF V8SF  V4SF
    V8DF  V4DF  V2DF])
 
@@ -35,6 +36,7 @@
    V32HI V16HI V8HI
    V16SI V8SI  V4SI
    V8DI  V4DI  V2DI
+   V32HF V16HF V8HF
    V16SF V8SF  V4SF
    V8DF  V4DF  V2DF
    QI HI SI DI SF DF])
@@ -151,6 +153,7 @@
 (define_subst_attr "round_mask_op4" "round" "" "<round_mask_operand4>")
 (define_subst_attr "round_sd_mask_op4" "round" "" "<round_sd_mask_operand4>")
 (define_subst_attr "round_constraint" "round" "vm" "v")
+(define_subst_attr "round_qq2phsuff" "round" "<qq2phsuff>" "")
 (define_subst_attr "bcst_round_constraint" "round" "vmBr" "v")
 (define_subst_attr "round_constraint2" "round" "m" "v")
 (define_subst_attr "round_constraint3" "round" "rm" "r")
@@ -161,7 +164,9 @@
 (define_subst_attr "round_mode512bit_condition" "round" "1" "(<MODE>mode == V16SFmode
 							      || <MODE>mode == V8DFmode
 							      || <MODE>mode == V8DImode
-							      || <MODE>mode == V16SImode)")
+							      || <MODE>mode == V16SImode
+							      || <MODE>mode == V32HFmode)")
+
 (define_subst_attr "round_modev8sf_condition" "round" "1" "(<MODE>mode == V8SFmode)")
 (define_subst_attr "round_modev4sf_condition" "round" "1" "(<MODE>mode == V4SFmode)")
 (define_subst_attr "round_codefor" "round" "*" "")
@@ -204,7 +209,9 @@
 (define_subst_attr "round_saeonly_mode512bit_condition" "round_saeonly" "1" "(<MODE>mode == V16SFmode
 									      || <MODE>mode == V8DFmode
 									      || <MODE>mode == V8DImode
-									      || <MODE>mode == V16SImode)")
+									      || <MODE>mode == V16SImode
+									      || <MODE>mode == V32HFmode)")
+
 (define_subst_attr "round_saeonly_modev8sf_condition" "round_saeonly" "1" "(<MODE>mode == V8SFmode)")
 
 (define_subst "round_saeonly"

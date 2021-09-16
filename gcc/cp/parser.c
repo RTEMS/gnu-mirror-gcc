@@ -6379,7 +6379,8 @@ cp_parser_unqualified_id (cp_parser* parser,
 
 	/* DR 2237 (C++20 only): A simple-template-id is no longer valid as the
 	   declarator-id of a constructor or destructor.  */
-	if (token->type == CPP_TEMPLATE_ID && cxx_dialect >= cxx20)
+	if (token->type == CPP_TEMPLATE_ID && declarator_p
+	    && cxx_dialect >= cxx20)
 	  {
 	    if (!cp_parser_simulate_error (parser))
 	      error_at (tilde_loc, "template-id not allowed for destructor");
@@ -12848,7 +12849,7 @@ cp_parser_selection_statement (cp_parser* parser, bool *if_p,
 	    IF_STMT_CONSTEVAL_P (statement) = true;
 	    condition = finish_if_stmt_cond (boolean_false_node, statement);
 
-	    gcc_rich_location richloc = tok->location;
+	    gcc_rich_location richloc (tok->location);
 	    bool non_compound_stmt_p = false;
 	    if (cp_lexer_next_token_is_not (parser->lexer, CPP_OPEN_BRACE))
 	      {
@@ -12876,7 +12877,7 @@ cp_parser_selection_statement (cp_parser* parser, bool *if_p,
 						RID_ELSE))
 	      {
 		cp_token *else_tok = cp_lexer_peek_token (parser->lexer);
-		gcc_rich_location else_richloc = else_tok->location;
+		gcc_rich_location else_richloc (else_tok->location);
 		guard_tinfo = get_token_indent_info (else_tok);
 		/* Consume the `else' keyword.  */
 		cp_lexer_consume_token (parser->lexer);
@@ -13474,17 +13475,15 @@ cp_parser_range_for (cp_parser *parser, tree scope, tree init, tree range_decl,
 static tree
 build_range_temp (tree range_expr)
 {
-  tree range_type, range_temp;
-
   /* Find out the type deduced by the declaration
      `auto &&__range = range_expr'.  */
-  range_type = cp_build_reference_type (make_auto (), true);
-  range_type = do_auto_deduction (range_type, range_expr,
-				  type_uses_auto (range_type));
+  tree auto_node = make_auto ();
+  tree range_type = cp_build_reference_type (auto_node, true);
+  range_type = do_auto_deduction (range_type, range_expr, auto_node);
 
   /* Create the __range variable.  */
-  range_temp = build_decl (input_location, VAR_DECL, for_range__identifier,
-			   range_type);
+  tree range_temp = build_decl (input_location, VAR_DECL,
+				for_range__identifier, range_type);
   TREE_USED (range_temp) = 1;
   DECL_ARTIFICIAL (range_temp) = 1;
 
@@ -18406,6 +18405,7 @@ cp_parser_template_name (cp_parser* parser,
 	    {
 	      /* We're optimizing away the call to cp_parser_lookup_name, but
 		 we still need to do this.  */
+	      parser->object_scope = parser->context->object_type;
 	      parser->context->object_type = NULL_TREE;
 	      return identifier;
 	    }
@@ -18430,18 +18430,26 @@ cp_parser_template_name (cp_parser* parser,
   /* If DECL is a template, then the name was a template-name.  */
   if (TREE_CODE (decl) == TEMPLATE_DECL)
     {
-      if (TREE_DEPRECATED (decl)
-	  && deprecated_state != DEPRECATED_SUPPRESS)
+      if ((TREE_DEPRECATED (decl) || TREE_UNAVAILABLE (decl))
+	  && deprecated_state != UNAVAILABLE_DEPRECATED_SUPPRESS)
 	{
 	  tree d = DECL_TEMPLATE_RESULT (decl);
 	  tree attr;
 	  if (TREE_CODE (d) == TYPE_DECL)
-	    attr = lookup_attribute ("deprecated",
-				     TYPE_ATTRIBUTES (TREE_TYPE (d)));
+	    attr = TYPE_ATTRIBUTES (TREE_TYPE (d));
 	  else
-	    attr = lookup_attribute ("deprecated",
-				     DECL_ATTRIBUTES (d));
-	  warn_deprecated_use (decl, attr);
+	    attr = DECL_ATTRIBUTES (d);
+	  if (TREE_UNAVAILABLE (decl))
+	    {
+	      attr = lookup_attribute ("unavailable", attr);
+	      error_unavailable_use (decl, attr);
+	    }
+	  else if (TREE_DEPRECATED (decl)
+		   && deprecated_state != DEPRECATED_SUPPRESS)
+	    {
+	      attr = lookup_attribute ("deprecated", attr);
+	      warn_deprecated_use (decl, attr);
+	    }
 	}
     }
   else
@@ -18692,7 +18700,9 @@ cp_parser_template_argument (cp_parser* parser)
     }
   if (cp_parser_parse_definitely (parser))
     {
-      if (TREE_DEPRECATED (argument))
+      if (TREE_UNAVAILABLE (argument))
+	error_unavailable_use (argument, NULL_TREE);
+      else if (TREE_DEPRECATED (argument))
 	warn_deprecated_use (argument, NULL_TREE);
       return argument;
     }
@@ -23097,7 +23107,7 @@ cp_parser_direct_declarator (cp_parser* parser,
 	      else if (!cp_parser_uncommitted_to_tentative_parse_p (parser))
 		/* Let compute_array_index_type diagnose this.  */;
 	      else if (!parser->in_function_body
-		       || current_binding_level->kind == sk_function_parms)
+		       || parsing_function_declarator ())
 		{
 		  /* Normally, the array bound must be an integral constant
 		     expression.  However, as an extension, we allow VLAs
@@ -23821,6 +23831,17 @@ parsing_nsdmi (void)
   return false;
 }
 
+/* True if we're parsing a function declarator.  */
+
+bool
+parsing_function_declarator ()
+{
+  /* this_entity is NULL for a function parameter scope while parsing the
+     declarator; it is set when parsing the body of the function.  */
+  return (current_binding_level->kind == sk_function_parms
+	  && !current_binding_level->this_entity);
+}
+
 /* Parse a late-specified return type, if any.  This is not a separate
    non-terminal, but part of a function declarator, which looks like
 
@@ -24353,9 +24374,9 @@ cp_parser_parameter_declaration_list (cp_parser* parser, cp_parser_flags flags)
 					   /*template_parm_p=*/false,
 					   &parenthesized_p);
 
-      /* We don't know yet if the enclosing context is deprecated, so wait
-	 and warn in grokparms if appropriate.  */
-      deprecated_state = DEPRECATED_SUPPRESS;
+      /* We don't know yet if the enclosing context is unavailable or deprecated,
+	 so wait and deal with it in grokparms if appropriate.  */
+      deprecated_state = UNAVAILABLE_DEPRECATED_SUPPRESS;
 
       if (parameter && !cp_parser_error_occurred (parser))
 	{
@@ -25910,7 +25931,8 @@ cp_parser_class_specifier_1 (cp_parser* parser)
 	     so that maybe_instantiate_noexcept can tsubst the NOEXCEPT_EXPR
 	     in the pattern.  */
 	  for (tree i : DEFPARSE_INSTANTIATIONS (def_parse))
-	    DEFERRED_NOEXCEPT_PATTERN (TREE_PURPOSE (i)) = TREE_PURPOSE (spec);
+	    DEFERRED_NOEXCEPT_PATTERN (TREE_PURPOSE (i))
+	      = spec ? TREE_PURPOSE (spec) : error_mark_node;
 
 	  /* Restore the state of local_variables_forbidden_p.  */
 	  parser->local_variables_forbidden_p = local_variables_forbidden_p;
@@ -29911,6 +29933,25 @@ cp_parser_simple_requirement (cp_parser *parser)
   if (expr.get_location() == UNKNOWN_LOCATION)
     expr.set_location (start);
 
+  for (tree t = expr; ; )
+    {
+      if (TREE_CODE (t) == TRUTH_ANDIF_EXPR
+	  || TREE_CODE (t) == TRUTH_ORIF_EXPR)
+	{
+	  t = TREE_OPERAND (t, 0);
+	  continue;
+	}
+      if (concept_check_p (t))
+	{
+	  gcc_rich_location richloc (get_start (start));
+	  richloc.add_fixit_insert_before (start, "requires ");
+	  warning_at (&richloc, OPT_Wmissing_requires, "testing "
+		      "if a concept-id is a valid expression; add "
+		      "%<requires%> to check satisfaction");
+	}
+      break;
+    }
+
   return finish_simple_requirement (expr.get_location (), expr);
 }
 
@@ -33546,7 +33587,8 @@ cp_parser_pre_parsed_nested_name_specifier (cp_parser *parser)
   /* Set the scope from the stored value.  */
   parser->scope = saved_checks_value (check_value);
   parser->qualifying_scope = check_value->qualifying_scope;
-  parser->object_scope = NULL_TREE;
+  parser->object_scope = parser->context->object_type;
+  parser->context->object_type = NULL_TREE;
 }
 
 /* Consume tokens up through a non-nested END token.  Returns TRUE if we
@@ -39030,17 +39072,56 @@ cp_parser_omp_clause_map (cp_parser *parser, tree list)
 }
 
 /* OpenMP 4.0:
-   device ( expression ) */
+   device ( expression )
+
+   OpenMP 5.0:
+   device ( [device-modifier :] integer-expression )
+
+   device-modifier:
+     ancestor | device_num */
 
 static tree
 cp_parser_omp_clause_device (cp_parser *parser, tree list,
 			     location_t location)
 {
   tree t, c;
+  bool ancestor = false;
 
   matching_parens parens;
   if (!parens.require_open (parser))
     return list;
+
+  if (cp_lexer_next_token_is (parser->lexer, CPP_NAME)
+      && cp_lexer_nth_token_is (parser->lexer, 2, CPP_COLON))
+    {
+      cp_token *tok = cp_lexer_peek_token (parser->lexer);
+      const char *p = IDENTIFIER_POINTER (tok->u.value);
+      if (strcmp ("ancestor", p) == 0)
+	{
+	  ancestor = true;
+
+	  /* A requires directive with the reverse_offload clause must be
+	  specified.  */
+	  if ((omp_requires_mask & OMP_REQUIRES_REVERSE_OFFLOAD) == 0)
+	    {
+	      error_at (tok->location, "%<ancestor%> device modifier not "
+				       "preceded by %<requires%> directive "
+				       "with %<reverse_offload%> clause");
+	      cp_parser_skip_to_closing_parenthesis (parser, true, false, true);
+	      return list;
+	    }
+	}
+      else if (strcmp ("device_num", p) == 0)
+	;
+      else
+	{
+	  error_at (tok->location, "expected %<ancestor%> or %<device_num%>");
+	  cp_parser_skip_to_closing_parenthesis (parser, true, false, true);
+	  return list;
+	}
+      cp_lexer_consume_token (parser->lexer);
+      cp_lexer_consume_token (parser->lexer);
+    }
 
   t = cp_parser_assignment_expression (parser);
 
@@ -39056,6 +39137,7 @@ cp_parser_omp_clause_device (cp_parser *parser, tree list,
   c = build_omp_clause (location, OMP_CLAUSE_DEVICE);
   OMP_CLAUSE_DEVICE_ID (c) = t;
   OMP_CLAUSE_CHAIN (c) = list;
+  OMP_CLAUSE_DEVICE_ANCESTOR (c) = ancestor;
 
   return c;
 }
@@ -40125,7 +40207,6 @@ cp_parser_omp_atomic (cp_parser *parser, cp_token *pragma_tok, bool openacc)
 	      memory_order = OMP_MEMORY_ORDER_ACQUIRE;
 	      break;
 	    case NOP_EXPR: /* atomic write */
-	    case OMP_ATOMIC:
 	      memory_order = OMP_MEMORY_ORDER_RELEASE;
 	      break;
 	    default:
@@ -40141,31 +40222,24 @@ cp_parser_omp_atomic (cp_parser *parser, cp_token *pragma_tok, bool openacc)
     switch (code)
       {
       case OMP_ATOMIC_READ:
-	if (memory_order == OMP_MEMORY_ORDER_ACQ_REL
-	    || memory_order == OMP_MEMORY_ORDER_RELEASE)
+	if (memory_order == OMP_MEMORY_ORDER_RELEASE)
 	  {
 	    error_at (loc, "%<#pragma omp atomic read%> incompatible with "
-			   "%<acq_rel%> or %<release%> clauses");
+			   "%<release%> clause");
 	    memory_order = OMP_MEMORY_ORDER_SEQ_CST;
 	  }
+	else if (memory_order == OMP_MEMORY_ORDER_ACQ_REL)
+	  memory_order = OMP_MEMORY_ORDER_ACQUIRE;
 	break;
       case NOP_EXPR: /* atomic write */
-	if (memory_order == OMP_MEMORY_ORDER_ACQ_REL
-	    || memory_order == OMP_MEMORY_ORDER_ACQUIRE)
+	if (memory_order == OMP_MEMORY_ORDER_ACQUIRE)
 	  {
 	    error_at (loc, "%<#pragma omp atomic write%> incompatible with "
-			   "%<acq_rel%> or %<acquire%> clauses");
+			   "%<acquire%> clause");
 	    memory_order = OMP_MEMORY_ORDER_SEQ_CST;
 	  }
-	break;
-      case OMP_ATOMIC:
-	if (memory_order == OMP_MEMORY_ORDER_ACQ_REL
-	    || memory_order == OMP_MEMORY_ORDER_ACQUIRE)
-	  {
-	    error_at (loc, "%<#pragma omp atomic update%> incompatible with "
-			   "%<acq_rel%> or %<acquire%> clauses");
-	    memory_order = OMP_MEMORY_ORDER_SEQ_CST;
-	  }
+	else if (memory_order == OMP_MEMORY_ORDER_ACQ_REL)
+	  memory_order = OMP_MEMORY_ORDER_RELEASE;
 	break;
       default:
 	break;
@@ -40674,7 +40748,9 @@ cp_parser_omp_flush (cp_parser *parser, cp_token *pragma_tok)
     {
       tree id = cp_lexer_peek_token (parser->lexer)->u.value;
       const char *p = IDENTIFIER_POINTER (id);
-      if (!strcmp (p, "acq_rel"))
+      if (!strcmp (p, "seq_cst"))
+	mo = MEMMODEL_SEQ_CST;
+      else if (!strcmp (p, "acq_rel"))
 	mo = MEMMODEL_ACQ_REL;
       else if (!strcmp (p, "release"))
 	mo = MEMMODEL_RELEASE;
@@ -40682,7 +40758,8 @@ cp_parser_omp_flush (cp_parser *parser, cp_token *pragma_tok)
 	mo = MEMMODEL_ACQUIRE;
       else
 	error_at (cp_lexer_peek_token (parser->lexer)->location,
-		  "expected %<acq_rel%>, %<release%> or %<acquire%>");
+		  "expected %<seq_cst%>, %<acq_rel%>, %<release%> or "
+		  "%<acquire%>");
       cp_lexer_consume_token (parser->lexer);
     }
   if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_PAREN))

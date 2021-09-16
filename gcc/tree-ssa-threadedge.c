@@ -71,7 +71,7 @@ jump_threader::jump_threader (jump_threader_simplifier *simplifier,
   dummy_cond = gimple_build_cond (NE_EXPR, integer_zero_node,
 				  integer_zero_node, NULL, NULL);
 
-  m_registry = new jump_thread_path_registry ();
+  m_registry = new fwd_jt_path_registry ();
   m_simplifier = simplifier;
   m_state = state;
 }
@@ -95,6 +95,20 @@ jump_threader::thread_through_all_blocks (bool may_peel_loop_headers)
   return m_registry->thread_through_all_blocks (may_peel_loop_headers);
 }
 
+static inline bool
+has_phis_p (basic_block bb)
+{
+  return !gsi_end_p (gsi_start_phis (bb));
+}
+
+/* Return TRUE for a block with PHIs but no statements.  */
+
+static bool
+empty_block_with_phis_p (basic_block bb)
+{
+  return gsi_end_p (gsi_start_nondebug_bb (bb)) && has_phis_p (bb);
+}
+
 /* Return TRUE if we may be able to thread an incoming edge into
    BB to an outgoing edge from BB.  Return FALSE otherwise.  */
 
@@ -107,9 +121,8 @@ potentially_threadable_block (basic_block bb)
      not optimized away because they forward from outside a loop
      to the loop header.   We want to thread through them as we can
      sometimes thread to the loop exit, which is obviously profitable.
-     the interesting case here is when the block has PHIs.  */
-  if (gsi_end_p (gsi_start_nondebug_bb (bb))
-      && !gsi_end_p (gsi_start_phis (bb)))
+     The interesting case here is when the block has PHIs.  */
+  if (empty_block_with_phis_p (bb))
     return true;
 
   /* If BB has a single successor or a single predecessor, then
@@ -443,17 +456,17 @@ jump_threader::simplify_control_stmt_condition (edge e, gimple *stmt)
 	= simplify_control_stmt_condition_1 (e, stmt, op0, cond_code, op1,
 					     recursion_limit);
 
-      /* If we were testing an integer/pointer against a constant, then
-	 we can use the FSM code to trace the value of the SSA_NAME.  If
-	 a value is found, then the condition will collapse to a constant.
+      /* If we were testing an integer/pointer against a constant,
+	 then we can trace the value of the SSA_NAME.  If a value is
+	 found, then the condition will collapse to a constant.
 
 	 Return the SSA_NAME we want to trace back rather than the full
-	 expression and give the FSM threader a chance to find its value.  */
+	 expression and give the threader a chance to find its value.  */
       if (cached_lhs == NULL)
 	{
 	  /* Recover the original operands.  They may have been simplified
 	     using context sensitive equivalences.  Those context sensitive
-	     equivalences may not be valid on paths found by the FSM optimizer.  */
+	     equivalences may not be valid on paths.  */
 	  tree op0 = gimple_cond_lhs (stmt);
 	  tree op1 = gimple_cond_rhs (stmt);
 
@@ -854,7 +867,7 @@ jump_threader::thread_around_empty_blocks (vec<jump_thread_edge *> *path,
   /* The key property of these blocks is that they need not be duplicated
      when threading.  Thus they cannot have visible side effects such
      as PHI nodes.  */
-  if (!gsi_end_p (gsi_start_phis (bb)))
+  if (has_phis_p (bb))
     return false;
 
   /* Skip over DEBUG statements at the start of the block.  */
@@ -994,8 +1007,7 @@ jump_threader::thread_through_normal_block (vec<jump_thread_edge *> *path,
     {
       /* First case.  The statement simply doesn't have any instructions, but
 	 does have PHIs.  */
-      if (gsi_end_p (gsi_start_nondebug_bb (e->dest))
-	  && !gsi_end_p (gsi_start_phis (e->dest)))
+      if (empty_block_with_phis_p (e->dest))
 	return 0;
 
       /* Second case.  */
@@ -1155,9 +1167,9 @@ jump_threader::thread_across_edge (edge e)
     {
       propagate_threaded_block_debug_into (path->last ()->e->dest,
 					   e->dest);
-      m_state->pop ();
       BITMAP_FREE (visited);
       m_registry->register_jump_thread (path);
+      m_state->pop ();
       return;
     }
   else
@@ -1323,8 +1335,10 @@ jt_state::jt_state (const_and_copies *copies,
 void
 jt_state::push (edge)
 {
-  m_copies->push_marker ();
-  m_exprs->push_marker ();
+  if (m_copies)
+    m_copies->push_marker ();
+  if (m_exprs)
+    m_exprs->push_marker ();
   if (m_evrp)
     m_evrp->push_marker ();
 }
@@ -1334,8 +1348,10 @@ jt_state::push (edge)
 void
 jt_state::pop ()
 {
-  m_copies->pop_to_marker ();
-  m_exprs->pop_to_marker ();
+  if (m_copies)
+    m_copies->pop_to_marker ();
+  if (m_exprs)
+    m_exprs->pop_to_marker ();
   if (m_evrp)
     m_evrp->pop_to_marker ();
 }
@@ -1346,7 +1362,8 @@ jt_state::pop ()
 void
 jt_state::register_equiv (tree dst, tree src, bool update_range)
 {
-  m_copies->record_const_or_copy (dst, src);
+  if (m_copies)
+    m_copies->record_const_or_copy (dst, src);
 
   /* If requested, update the value range associated with DST, using
      the range from SRC.  */
@@ -1396,7 +1413,8 @@ jt_state::record_ranges_from_stmt (gimple *stmt, bool temporary)
 void
 jt_state::register_equivs_on_edge (edge e)
 {
-  record_temporary_equivalences (e, m_copies, m_exprs);
+  if (m_copies && m_exprs)
+    record_temporary_equivalences (e, m_copies, m_exprs);
 }
 
 jump_threader_simplifier::jump_threader_simplifier (vr_values *v)

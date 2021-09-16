@@ -4498,6 +4498,10 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2ADD) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2ADD;
 
+  if (TARGET_POWER10
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2STORE) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2STORE;
+
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
@@ -5258,16 +5262,22 @@ rs6000_preferred_simd_mode (scalar_mode mode)
   return word_mode;
 }
 
-typedef struct _rs6000_cost_data
+struct rs6000_cost_data
 {
   struct loop *loop_info;
   unsigned cost[3];
+  /* Total number of vectorized stmts (loop only).  */
+  unsigned nstmts;
+  /* Total number of loads (loop only).  */
+  unsigned nloads;
+  /* Possible extra penalized cost on vector construction (loop only).  */
+  unsigned extra_ctor_cost;
   /* For each vectorized loop, this var holds TRUE iff a non-memory vector
      instruction is needed by the vectorization.  */
   bool vect_nonmem;
   /* Indicates this is costing for the scalar version of a loop or block.  */
   bool costing_for_scalar;
-} rs6000_cost_data;
+};
 
 /* Test for likely overcommitment of vector hardware resources.  If a
    loop iteration is relatively large, and too large a percentage of
@@ -5323,8 +5333,47 @@ rs6000_density_test (rs6000_cost_data *data)
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
 			 "density %d%%, cost %d exceeds threshold, penalizing "
-			 "loop body cost by %d%%", density_pct,
+			 "loop body cost by %d%%\n", density_pct,
 			 vec_cost + not_vec_cost, DENSITY_PENALTY);
+    }
+
+  /* Check whether we need to penalize the body cost to account
+     for excess strided or elementwise loads.  */
+  if (data->extra_ctor_cost > 0)
+    {
+      /* Threshold for load stmts percentage in all vectorized stmts.  */
+      const int DENSITY_LOAD_PCT_THRESHOLD = 45;
+      /* Threshold for total number of load stmts.  */
+      const int DENSITY_LOAD_NUM_THRESHOLD = 20;
+
+      gcc_assert (data->nloads <= data->nstmts);
+      unsigned int load_pct = (data->nloads * 100) / data->nstmts;
+
+      /* It's likely to be bounded by latency and execution resources
+	 from many scalar loads which are strided or elementwise loads
+	 into a vector if both conditions below are found:
+	   1. there are many loads, it's easy to result in a long wait
+	      for load units;
+	   2. load has a big proportion of all vectorized statements,
+	      it's not easy to schedule other statements to spread among
+	      the loads.
+	 One typical case is the innermost loop of the hotspot of SPEC2017
+	 503.bwaves_r without loop interchange.  */
+      if (data->nloads > DENSITY_LOAD_NUM_THRESHOLD
+	  && load_pct > DENSITY_LOAD_PCT_THRESHOLD)
+	{
+	  data->cost[vect_body] += data->extra_ctor_cost;
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_NOTE, vect_location,
+			     "Found %u loads and "
+			     "load pct. %u%% exceed "
+			     "the threshold, "
+			     "penalizing loop body "
+			     "cost by extra cost %u "
+			     "for ctor.\n",
+			     data->nloads, load_pct,
+			     data->extra_ctor_cost);
+	}
     }
 }
 
@@ -5333,12 +5382,15 @@ rs6000_density_test (rs6000_cost_data *data)
 static void *
 rs6000_init_cost (struct loop *loop_info, bool costing_for_scalar)
 {
-  rs6000_cost_data *data = XNEW (struct _rs6000_cost_data);
+  rs6000_cost_data *data = XNEW (rs6000_cost_data);
   data->loop_info = loop_info;
   data->cost[vect_prologue] = 0;
   data->cost[vect_body]     = 0;
   data->cost[vect_epilogue] = 0;
   data->vect_nonmem = false;
+  data->nstmts = 0;
+  data->nloads = 0;
+  data->extra_ctor_cost = 0;
   data->costing_for_scalar = costing_for_scalar;
   return data;
 }
@@ -5366,6 +5418,70 @@ rs6000_adjust_vect_cost_per_stmt (enum vect_cost_for_stmt kind,
   return 0;
 }
 
+/* Helper function for add_stmt_cost.  Check each statement cost
+   entry, gather information and update the target_cost fields
+   accordingly.  */
+static void
+rs6000_update_target_cost_per_stmt (rs6000_cost_data *data,
+				    enum vect_cost_for_stmt kind,
+				    struct _stmt_vec_info *stmt_info,
+				    enum vect_cost_model_location where,
+				    int stmt_cost,
+				    unsigned int orig_count)
+{
+
+  /* Check whether we're doing something other than just a copy loop.
+     Not all such loops may be profitably vectorized; see
+     rs6000_finish_cost.  */
+  if (kind == vec_to_scalar
+      || kind == vec_perm
+      || kind == vec_promote_demote
+      || kind == vec_construct
+      || kind == scalar_to_vec
+      || (where == vect_body && kind == vector_stmt))
+    data->vect_nonmem = true;
+
+  /* Gather some information when we are costing the vectorized instruction
+     for the statements located in a loop body.  */
+  if (!data->costing_for_scalar && data->loop_info && where == vect_body)
+    {
+      data->nstmts += orig_count;
+
+      if (kind == scalar_load || kind == vector_load
+	  || kind == unaligned_load || kind == vector_gather_load)
+	data->nloads += orig_count;
+
+      /* Power processors do not currently have instructions for strided
+	 and elementwise loads, and instead we must generate multiple
+	 scalar loads.  This leads to undercounting of the cost.  We
+	 account for this by scaling the construction cost by the number
+	 of elements involved, and saving this as extra cost that we may
+	 or may not need to apply.  When finalizing the cost of the loop,
+	 the extra penalty is applied when the load density heuristics
+	 are satisfied.  */
+      if (kind == vec_construct && stmt_info
+	  && STMT_VINFO_TYPE (stmt_info) == load_vec_info_type
+	  && (STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info) == VMAT_ELEMENTWISE
+	      || STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info) == VMAT_STRIDED_SLP))
+	{
+	  tree vectype = STMT_VINFO_VECTYPE (stmt_info);
+	  unsigned int nunits = vect_nunits_for_cost (vectype);
+	  unsigned int extra_cost = nunits * stmt_cost;
+	  /* As function rs6000_builtin_vectorization_cost shows, we have
+	     priced much on V16QI/V8HI vector construction as their units,
+	     if we penalize them with nunits * stmt_cost, it can result in
+	     an unreliable body cost, eg: for V16QI on Power8, stmt_cost
+	     is 20 and nunits is 16, the extra cost is 320 which looks
+	     much exaggerated.  So let's use one maximum bound for the
+	     extra penalized cost for vector construction here.  */
+	  const unsigned int MAX_PENALIZED_COST_FOR_CTOR = 12;
+	  if (extra_cost > MAX_PENALIZED_COST_FOR_CTOR)
+	    extra_cost = MAX_PENALIZED_COST_FOR_CTOR;
+	  data->extra_ctor_cost += extra_cost;
+	}
+    }
+}
+
 /* Implement targetm.vectorize.add_stmt_cost.  */
 
 static unsigned
@@ -5385,6 +5501,7 @@ rs6000_add_stmt_cost (class vec_info *vinfo, void *data, int count,
       /* Statements in an inner loop relative to the loop being
 	 vectorized are weighted more heavily.  The value here is
 	 arbitrary and could potentially be improved with analysis.  */
+      unsigned int orig_count = count;
       if (where == vect_body && stmt_info
 	  && stmt_in_inner_loop_p (vinfo, stmt_info))
 	{
@@ -5396,14 +5513,8 @@ rs6000_add_stmt_cost (class vec_info *vinfo, void *data, int count,
       retval = (unsigned) (count * stmt_cost);
       cost_data->cost[where] += retval;
 
-      /* Check whether we're doing something other than just a copy loop.
-	 Not all such loops may be profitably vectorized; see
-	 rs6000_finish_cost.  */
-      if ((kind == vec_to_scalar || kind == vec_perm
-	   || kind == vec_promote_demote || kind == vec_construct
-	   || kind == scalar_to_vec)
-	  || (where == vect_body && kind == vector_stmt))
-	cost_data->vect_nonmem = true;
+      rs6000_update_target_cost_per_stmt (cost_data, kind, stmt_info, where,
+					  stmt_cost, orig_count);
     }
 
   return retval;
@@ -5793,6 +5904,59 @@ rs6000_builtin_md_vectorized_function (tree fndecl, tree type_out,
     default:
       break;
     }
+
+  machine_mode in_vmode = TYPE_MODE (type_in);
+  machine_mode out_vmode = TYPE_MODE (type_out);
+
+  /* Power10 supported vectorized built-in functions.  */
+  if (TARGET_POWER10
+      && in_vmode == out_vmode
+      && VECTOR_UNIT_ALTIVEC_OR_VSX_P (in_vmode))
+    {
+      machine_mode exp_mode = DImode;
+      machine_mode exp_vmode = V2DImode;
+      enum rs6000_builtins bif;
+      switch (fn)
+	{
+	case MISC_BUILTIN_DIVWE:
+	case MISC_BUILTIN_DIVWEU:
+	  exp_mode = SImode;
+	  exp_vmode = V4SImode;
+	  if (fn == MISC_BUILTIN_DIVWE)
+	    bif = P10V_BUILTIN_DIVES_V4SI;
+	  else
+	    bif = P10V_BUILTIN_DIVEU_V4SI;
+	  break;
+	case MISC_BUILTIN_DIVDE:
+	case MISC_BUILTIN_DIVDEU:
+	  if (fn == MISC_BUILTIN_DIVDE)
+	    bif = P10V_BUILTIN_DIVES_V2DI;
+	  else
+	    bif = P10V_BUILTIN_DIVEU_V2DI;
+	  break;
+	case P10_BUILTIN_CFUGED:
+	  bif = P10V_BUILTIN_VCFUGED;
+	  break;
+	case P10_BUILTIN_CNTLZDM:
+	  bif = P10V_BUILTIN_VCLZDM;
+	  break;
+	case P10_BUILTIN_CNTTZDM:
+	  bif = P10V_BUILTIN_VCTZDM;
+	  break;
+	case P10_BUILTIN_PDEPD:
+	  bif = P10V_BUILTIN_VPDEPD;
+	  break;
+	case P10_BUILTIN_PEXTD:
+	  bif = P10V_BUILTIN_VPEXTD;
+	  break;
+	default:
+	  return NULL_TREE;
+	}
+
+      if (in_mode == exp_mode && in_vmode == exp_vmode)
+	return rs6000_builtin_decls[bif];
+    }
+
   return NULL_TREE;
 }
 
@@ -7955,7 +8119,7 @@ rs6000_slow_unaligned_access (machine_mode mode, unsigned int align)
 unsigned int
 rs6000_special_adjust_field_align (tree type, unsigned int computed)
 {
-  if (computed <= 32)
+  if (computed <= 32 || TYPE_PACKED (type))
     return computed;
 
   /* Strip initial arrays.  */
@@ -18880,6 +19044,89 @@ power9_sched_reorder2 (rtx_insn **ready, int lastpos)
   return cached_can_issue_more;
 }
 
+/* Determine if INSN is a store to memory that can be fused with a similar
+   adjacent store.  */
+
+static bool
+is_fusable_store (rtx_insn *insn, rtx *str_mem)
+{
+  /* Insn must be a non-prefixed base+disp form store.  */
+  if (is_store_insn (insn, str_mem)
+      && get_attr_prefixed (insn) == PREFIXED_NO
+      && get_attr_update (insn) == UPDATE_NO
+      && get_attr_indexed (insn) == INDEXED_NO)
+    {
+      /* Further restrictions by mode and size.  */
+      if (!MEM_SIZE_KNOWN_P (*str_mem))
+	return false;
+
+      machine_mode mode = GET_MODE (*str_mem);
+      HOST_WIDE_INT size = MEM_SIZE (*str_mem);
+
+      if (INTEGRAL_MODE_P (mode))
+	/* Must be word or dword size.  */
+	return (size == 4 || size == 8);
+      else if (FLOAT_MODE_P (mode))
+	/* Must be dword size.  */
+	return (size == 8);
+    }
+
+  return false;
+}
+
+/* Do Power10 specific reordering of the ready list.  */
+
+static int
+power10_sched_reorder (rtx_insn **ready, int lastpos)
+{
+  rtx mem1;
+
+  /* Do store fusion during sched2 only.  */
+  if (!reload_completed)
+    return cached_can_issue_more;
+
+  /* If the prior insn finished off a store fusion pair then simply
+     reset the counter and return, nothing more to do.  */
+  if (load_store_pendulum != 0)
+    {
+      load_store_pendulum = 0;
+      return cached_can_issue_more;
+    }
+
+  /* Try to pair certain store insns to adjacent memory locations
+     so that the hardware will fuse them to a single operation.  */
+  if (TARGET_P10_FUSION && TARGET_P10_FUSION_2STORE
+      && is_fusable_store (last_scheduled_insn, &mem1))
+    {
+
+      /* A fusable store was just scheduled.  Scan the ready list for another
+	 store that it can fuse with.  */
+      int pos = lastpos;
+      while (pos >= 0)
+	{
+	  rtx mem2;
+	  /* GPR stores can be ascending or descending offsets, FPR/VSR stores
+	     must be ascending only.  */
+	  if (is_fusable_store (ready[pos], &mem2)
+	      && ((INTEGRAL_MODE_P (GET_MODE (mem1))
+		   && adjacent_mem_locations (mem1, mem2))
+		  || (FLOAT_MODE_P (GET_MODE (mem1))
+		   && (adjacent_mem_locations (mem1, mem2) == mem1))))
+	    {
+	      /* Found a fusable store.  Move it to the end of the ready list
+		 so it is scheduled next.  */
+	      move_to_end_of_ready (ready, pos, lastpos);
+
+	      load_store_pendulum = -1;
+	      break;
+	    }
+	  pos--;
+	}
+    }
+
+  return cached_can_issue_more;
+}
+
 /* We are about to begin issuing insns for this clock cycle. */
 
 static int
@@ -18906,6 +19153,10 @@ rs6000_sched_reorder (FILE *dump ATTRIBUTE_UNUSED, int sched_verbose,
   if (rs6000_tune == PROCESSOR_POWER6)
     load_store_pendulum = 0;
 
+  /* Do Power10 dependent reordering.  */
+  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+    power10_sched_reorder (ready, n_ready - 1);
+
   return rs6000_issue_rate ();
 }
 
@@ -18926,6 +19177,10 @@ rs6000_sched_reorder2 (FILE *dump, int sched_verbose, rtx_insn **ready,
   if (rs6000_tune == PROCESSOR_POWER9 && last_scheduled_insn
       && recog_memoized (last_scheduled_insn) >= 0)
     return power9_sched_reorder2 (ready, *pn_ready - 1);
+
+  /* Do Power10 dependent reordering.  */
+  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+    return power10_sched_reorder (ready, *pn_ready - 1);
 
   return cached_can_issue_more;
 }
@@ -21473,7 +21728,8 @@ rs6000_xcoff_encode_section_info (tree decl, rtx rtl, int first)
   if (decl
       && DECL_P (decl)
       && VAR_OR_FUNCTION_DECL_P (decl)
-      && symtab_node::get (decl)->alias == 0
+      && (symtab_node::get (decl) == NULL
+	  || symtab_node::get (decl)->alias == 0)
       && symname[strlen (symname) - 1] != ']')
     {
       const char *smclass = NULL;
@@ -21919,7 +22175,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       break;
 
     case UNSPEC:
-      if (XINT (x, 1) == UNSPEC_MMA_XXSETACCZ)
+      if (XINT (x, 1) == UNSPECV_MMA_XXSETACCZ)
 	{
 	  *total = 0;
 	  return true;

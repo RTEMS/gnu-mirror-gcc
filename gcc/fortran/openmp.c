@@ -1825,11 +1825,54 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 	    continue;
 	  if ((mask & OMP_CLAUSE_DEVICE)
 	      && !openacc
-	      && (m = gfc_match_dupl_check (!c->device, "device", true,
-					    &c->device)) != MATCH_NO)
+	      && ((m = gfc_match_dupl_check (!c->device, "device", true))
+		  != MATCH_NO))
 	    {
 	      if (m == MATCH_ERROR)
 		goto error;
+	      c->ancestor = false;
+	      if (gfc_match ("device_num : ") == MATCH_YES)
+		{
+		  if (gfc_match ("%e )", &c->device) != MATCH_YES)
+		    {
+		      gfc_error ("Expected integer expression at %C");
+		      break;
+		    }
+		}
+	      else if (gfc_match ("ancestor : ") == MATCH_YES)
+		{
+		  c->ancestor = true;
+		  if (!(gfc_current_ns->omp_requires & OMP_REQ_REVERSE_OFFLOAD))
+		    {
+		      gfc_error ("%<ancestor%> device modifier not "
+				 "preceded by %<requires%> directive "
+				 "with %<reverse_offload%> clause at %C");
+		      break;
+		    }
+		  locus old_loc2 = gfc_current_locus;
+		  if (gfc_match ("%e )", &c->device) == MATCH_YES)
+		    {
+		      int device = 0;
+		      if (!gfc_extract_int (c->device, &device) && device != 1)
+		      {
+			gfc_current_locus = old_loc2;
+			gfc_error ("the %<device%> clause expression must "
+				   "evaluate to %<1%> at %C");
+			break;
+		      }
+		    }
+		  else
+		    {
+		      gfc_error ("Expected integer expression at %C");
+		      break;
+		    }
+		}
+	      else if (gfc_match ("%e )", &c->device) != MATCH_YES)
+		{
+		  gfc_error ("Expected integer expression or a single device-"
+			      "modifier %<device_num%> or %<ancestor%> at %C");
+		  break;
+		}
 	      continue;
 	    }
 	  if ((mask & OMP_CLAUSE_DEVICE)
@@ -3739,7 +3782,9 @@ gfc_match_omp_flush (void)
   enum gfc_omp_memorder mo = OMP_MEMORDER_UNSET;
   if (gfc_match_omp_eos () == MATCH_NO && gfc_peek_ascii_char () != '(')
     {
-      if (gfc_match ("acq_rel") == MATCH_YES)
+      if (gfc_match ("seq_cst") == MATCH_YES)
+	mo = OMP_MEMORDER_SEQ_CST;
+      else if (gfc_match ("acq_rel") == MATCH_YES)
 	mo = OMP_MEMORDER_ACQ_REL;
       else if (gfc_match ("release") == MATCH_YES)
 	mo = OMP_MEMORDER_RELEASE;
@@ -3747,7 +3792,7 @@ gfc_match_omp_flush (void)
 	mo = OMP_MEMORDER_ACQUIRE;
       else
 	{
-	  gfc_error ("Expected AQC_REL, RELEASE, or ACQUIRE at %C");
+	  gfc_error ("Expected SEQ_CST, AQC_REL, RELEASE, or ACQUIRE at %C");
 	  return MATCH_ERROR;
 	}
       c = gfc_get_omp_clauses ();

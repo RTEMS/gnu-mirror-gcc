@@ -264,17 +264,6 @@ along with GCC; see the file COPYING3.  If not see
       target_flags &= ~MASK_MACHO_DYNAMIC_NO_PIC;			\
   } while (0)
 
-/* Darwin on x86_64 uses dwarf-2 by default.  Pre-darwin9 32-bit
-   compiles default to stabs+.  darwin9+ defaults to dwarf-2.  */
-#ifndef DARWIN_PREFER_DWARF
-#undef PREFERRED_DEBUGGING_TYPE
-#ifdef HAVE_AS_STABS_DIRECTIVE
-#define PREFERRED_DEBUGGING_TYPE (TARGET_64BIT ? DWARF2_DEBUG : DBX_DEBUG)
-#else
-#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
-#endif
-#endif
-
 /* Darwin uses the standard DWARF register numbers but the default
    register numbers for STABS.  Fortunately for 64-bit code the
    default and the standard are the same.  */
@@ -344,3 +333,8 @@ along with GCC; see the file COPYING3.  If not see
 #undef SUBTARGET_SHADOW_OFFSET
 #define SUBTARGET_SHADOW_OFFSET	\
   (TARGET_LP64 ? HOST_WIDE_INT_1 << 44 : HOST_WIDE_INT_1 << 29)
+
+#undef CLEAR_INSN_CACHE
+#define CLEAR_INSN_CACHE(beg, end)				\
+  extern void sys_icache_invalidate(void *start, size_t len);	\
+  sys_icache_invalidate ((beg), (size_t)((end)-(beg)))

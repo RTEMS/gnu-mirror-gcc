@@ -9896,6 +9896,43 @@ mips_file_start (void)
   else
     fputs ("\t.module\tnooddspreg\n", asm_out_file);
 
+  fprintf (asm_out_file, "\t.module\tarch=%s\n", mips_arch_info->name);
+  /* FIXME: DSPR3 is not supported by GCC? gas does support it */
+  if (TARGET_DSPR2)
+    fputs ("\t.module\tdspr2\n", asm_out_file);
+  else if (TARGET_DSP)
+    fputs ("\t.module\tdsp\n", asm_out_file);
+  if (TARGET_EVA)
+    fputs ("\t.module\teva\n", asm_out_file);
+  if (TARGET_MCU)
+    fputs ("\t.module\tmcu\n", asm_out_file);
+  if (TARGET_MDMX)
+    fputs ("\t.module\tmdmx\n", asm_out_file);
+  if (TARGET_MIPS3D)
+    fputs ("\t.module\tmips3d\n", asm_out_file);
+  if (TARGET_MT)
+    fputs ("\t.module\tmt\n", asm_out_file);
+  if (TARGET_SMARTMIPS)
+    fputs ("\t.module\tsmartmips\n", asm_out_file);
+  if (TARGET_VIRT)
+    fputs ("\t.module\tvirt\n", asm_out_file);
+  if (TARGET_MSA)
+    fputs ("\t.module\tmsa\n", asm_out_file);
+  if (TARGET_XPA)
+    fputs ("\t.module\txpa\n", asm_out_file);
+  /* FIXME: MIPS16E2 is not supported by GCC? gas does support it */
+  if (TARGET_CRC)
+    fputs ("\t.module\tcrc\n", asm_out_file);
+  if (TARGET_GINV)
+    fputs ("\t.module\tginv\n", asm_out_file);
+  if (TARGET_LOONGSON_MMI)
+    fputs ("\t.module\tloongson-mmi\n", asm_out_file);
+  /* FIXME: LOONGSON-CAM is not supported by GCC? gas does support it */
+  if (TARGET_LOONGSON_EXT2)
+    fputs ("\t.module\tloongson-ext2\n", asm_out_file);
+  else if (TARGET_LOONGSON_EXT)
+    fputs ("\t.module\tloongson-ext\n", asm_out_file);
+
 #else
 #ifdef HAVE_AS_GNU_ATTRIBUTE
   {
@@ -19817,9 +19854,12 @@ mips_set_architecture (const struct mips_cpu_info *info)
       mips_arch_info = info;
       mips_arch = info->cpu;
       mips_isa = info->isa;
-      if (mips_isa < 32)
+      if (mips_isa < MIPS_ISA_MIPS32)
 	mips_isa_rev = 0;
       else
+	/* we can do this is due to the
+	 * enum of MIPS32rN is from 32 to 37
+	 * enum of MIPS64rN is from 64 to 69 */
 	mips_isa_rev = (mips_isa & 31) + 1;
     }
 }

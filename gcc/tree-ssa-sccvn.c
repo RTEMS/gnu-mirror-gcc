@@ -4105,7 +4105,7 @@ vn_nary_op_insert_into (vn_nary_op_t vno, vn_nary_op_table_type *table,
 	  bool found = false;
 	  for (vn_pval *val = (*slot)->u.values; val; val = val->next)
 	    {
-	      if (expressions_equal_p (val->result, vno->u.values->result))
+	      if (expressions_equal_p (val->result, nval->result))
 		{
 		  found = true;
 		  for (unsigned i = 0; i < val->n; ++i)
@@ -5851,6 +5851,7 @@ vn_reference_may_trap (vn_reference_t ref)
     case MODIFY_EXPR:
     case CALL_EXPR:
       /* We do not handle calls.  */
+      return true;
     case ADDR_EXPR:
       /* And toplevel address computations never trap.  */
       return false;
