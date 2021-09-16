@@ -314,6 +314,12 @@
 ;; Duplicate of the above
 (define_mode_iterator DX2 [DI DF])
 
+;; Double scalar modes + CADImode
+(define_mode_iterator DXC [DI DF CADI])
+
+;; Duplicate of the above
+(define_mode_iterator DXC2 [DI DF CADI])
+
 ;; Single scalar modes
 (define_mode_iterator SX [SI SF])
 
@@ -919,13 +925,26 @@
 (define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")
 		     (CADI "")])
 
+; Similar to the 'w' attribute, but maps DF -> x.  The domain of this
+; attribute is the DXC[2] iterator.  It is intended to be used with the
+; store_pair_dw_<DXC:mode><DXC2:mode> pattern which implements an
+; optimization whereby (const_double:DF 0.0) is stored to two
+; consecutive doubles using:
+; stp xzr, xzr [addr].  Hence, the pattern accepts (const_double 0.0) in
+; the GPR alternative.
+(define_mode_attr dxc_gpr [(DI "x") (DF "x") (CADI "")])
+
 ;; The size of access, in bytes.
 ;; Morello TODO: this is right for fake capabilities but wrong for PureCap.
 ;; Doesn't really matter since this iterator is only used for scheduling and
 ;; that's a performance thing.
 (define_mode_attr ldst_sz [(SI "4") (DI "8") (CADI "8")])
 ;; Likewise for load/store pair.
-(define_mode_attr ldpstp_sz [(SI "8") (DI "16")])
+;;
+;; MORELLO TODO: maybe add a store_32 attribute, but this is
+;; only needed for optimisation rather than correctness, so
+;; let's leave this for now.
+(define_mode_attr ldpstp_sz [(SI "8") (DI "16") (CADI "16")])
 
 ;; For inequal width int to float conversion
 (define_mode_attr w1 [(HF "w") (SF "w") (DF "x")])

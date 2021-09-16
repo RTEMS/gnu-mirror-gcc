@@ -2786,16 +2786,8 @@ aarch64_emit_cfi_for_reg_p (unsigned int regno)
 static machine_mode
 aarch64_reg_save_mode (unsigned int regno)
 {
-  /* MORELLO TODO This needs to be given something for CADImode.
-     The value it would need will be determined based on the ABI, which we'll
-     have to get from any ABI documents and ensure our behaviour matches LLVM.
-
-     I believe that we'll be saving CADImode values in CADImode, however I
-     wonder whether spills of e.g. r0 will *always* have to be done in
-     CADImode, or whether we'll be able to distinguish (elsewhere in the
-     code) if we can spill&restore in DImode.  */
   if (GP_REGNUM_P (regno))
-    return DImode;
+    return TARGET_CAPABILITY_PURE ? CADImode : DImode;
 
   if (FP_REGNUM_P (regno))
     switch (crtl->abi->id ())
@@ -6951,6 +6943,8 @@ aarch64_layout_frame (void)
 {
   poly_int64 offset = 0;
   int regno, last_fp_reg = INVALID_REGNUM;
+  const machine_mode gpr_save_mode = aarch64_reg_save_mode (R0_REGNUM);
+  const poly_int64 gpr_save_size = GET_MODE_SIZE (gpr_save_mode);
   machine_mode vector_save_mode = aarch64_reg_save_mode (V8_REGNUM);
   poly_int64 vector_save_size = GET_MODE_SIZE (vector_save_mode);
   bool frame_related_fp_reg_p = false;
@@ -7082,9 +7076,9 @@ aarch64_layout_frame (void)
       /* FP and LR are placed in the linkage record.  */
       frame.reg_offset[R29_REGNUM] = offset;
       frame.wb_candidate1 = R29_REGNUM;
-      frame.reg_offset[R30_REGNUM] = offset + UNITS_PER_WORD;
+      frame.reg_offset[R30_REGNUM] = offset + gpr_save_size;
       frame.wb_candidate2 = R30_REGNUM;
-      offset += 2 * UNITS_PER_WORD;
+      offset += 2 * gpr_save_size;
     }
 
   for (regno = R0_REGNUM; regno <= R30_REGNUM; regno++)
@@ -7095,7 +7089,7 @@ aarch64_layout_frame (void)
 	  frame.wb_candidate1 = regno;
 	else if (frame.wb_candidate2 == INVALID_REGNUM)
 	  frame.wb_candidate2 = regno;
-	offset += UNITS_PER_WORD;
+	offset += gpr_save_size;
       }
 
   poly_int64 max_int_offset = offset;
@@ -7300,7 +7294,14 @@ aarch64_wb_pair (machine_mode mode,
   HOST_WIDE_INT c1, c2;
 
   c1 = (store ? -1 : 1) * adjustment;
-  c2 = (mode == E_TFmode) ? UNITS_PER_VREG : UNITS_PER_WORD;
+
+  if (mode == E_TFmode)
+    c2 = UNITS_PER_VREG;
+  else if (mode == E_CADImode && TARGET_MORELLO)
+    c2 = GET_MODE_SIZE (CADImode);
+  else
+    c2 = UNITS_PER_WORD;
+
   if (store)
     c2 -= adjustment;
 
@@ -7387,23 +7388,12 @@ static rtx
 aarch64_gen_store_pair (machine_mode mode, rtx mem1, rtx reg1, rtx mem2,
 			rtx reg2)
 {
-  switch (mode)
-    {
-    case E_DImode:
-      return gen_store_pair_dw_didi (mem1, reg1, mem2, reg2);
-
-    case E_DFmode:
-      return gen_store_pair_dw_dfdf (mem1, reg1, mem2, reg2);
-
-    case E_TFmode:
-      return gen_store_pair_dw_tftf (mem1, reg1, mem2, reg2);
-
-    case E_V4SImode:
-      return gen_vec_store_pairv4siv4si (mem1, reg1, mem2, reg2);
-
-    default:
-      gcc_unreachable ();
-    }
+  if (mode == E_V4SImode)
+    return gen_vec_store_pairv4siv4si (mem1, reg1, mem2, reg2);
+  else if (mode == E_TFmode)
+    return gen_store_pair_dw_tftf (mem1, reg1, mem2, reg2);
+  else
+    return gen_store_pair_dw (mode, mode, mem1, reg1, mem2, reg2);
 }
 
 /* Generate and regurn a load pair isntruction of mode MODE to load register
@@ -7413,23 +7403,12 @@ static rtx
 aarch64_gen_load_pair (machine_mode mode, rtx reg1, rtx mem1, rtx reg2,
 		       rtx mem2)
 {
-  switch (mode)
-    {
-    case E_DImode:
-      return gen_load_pair_dw_didi (reg1, mem1, reg2, mem2);
-
-    case E_DFmode:
-      return gen_load_pair_dw_dfdf (reg1, mem1, reg2, mem2);
-
-    case E_TFmode:
-      return gen_load_pair_dw_tftf (reg1, mem1, reg2, mem2);
-
-    case E_V4SImode:
-      return gen_load_pairv4siv4si (reg1, mem1, reg2, mem2);
-
-    default:
-      gcc_unreachable ();
-    }
+  if (mode == E_V4SImode)
+    return gen_load_pairv4siv4si (reg1, mem1, reg2, mem2);
+  else if (mode == E_TFmode)
+    return gen_load_pair_dw_tftf (reg1, mem1, reg2, mem2);
+  else
+    return gen_load_pair_dw (mode, mode, reg1, mem1, reg2, mem2);
 }
 
 /* Return TRUE if return address signing should be enabled for the current

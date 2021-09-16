@@ -1582,17 +1582,17 @@
 )
 
 ;; Storing different modes that can still be merged
-(define_insn "load_pair_dw_<DX:mode><DX2:mode>"
-  [(set (match_operand:DX 0 "register_operand" "=r,w")
-	(match_operand:DX 1 "aarch64_mem_pair_operand" "Ump,Ump"))
-   (set (match_operand:DX2 2 "register_operand" "=r,w")
-	(match_operand:DX2 3 "memory_operand" "m,m"))]
+(define_insn "@load_pair_dw_<DXC:mode><DXC2:mode>"
+  [(set (match_operand:DXC 0 "register_operand" "=r,w")
+	(match_operand:DXC 1 "aarch64_mem_pair_operand" "Ump,Ump"))
+   (set (match_operand:DXC2 2 "register_operand" "=r,w")
+	(match_operand:DXC2 3 "memory_operand" "m,m"))]
    "rtx_equal_p (XEXP (operands[3], 0),
 		 plus_constant (Pmode,
 				XEXP (operands[1], 0),
-				GET_MODE_SIZE (<DX:MODE>mode)))"
+				GET_MODE_SIZE (<DXC:MODE>mode)))"
   "@
-   ldp\\t%x0, %x2, %z1
+   ldp\\t%0, %2, %z1
    ldp\\t%d0, %d2, %z1"
   [(set_attr "type" "load_16,neon_load1_2reg")
    (set_attr "arch" "*,fp")]
@@ -1632,17 +1632,17 @@
 )
 
 ;; Storing different modes that can still be merged
-(define_insn "store_pair_dw_<DX:mode><DX2:mode>"
-  [(set (match_operand:DX 0 "aarch64_mem_pair_operand" "=Ump,Ump")
-	(match_operand:DX 1 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))
-   (set (match_operand:DX2 2 "memory_operand" "=m,m")
-	(match_operand:DX2 3 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))]
+(define_insn "@store_pair_dw_<DXC:mode><DXC2:mode>"
+  [(set (match_operand:DXC 0 "aarch64_mem_pair_operand" "=Ump,Ump")
+	(match_operand:DXC 1 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))
+   (set (match_operand:DXC2 2 "memory_operand" "=m,m")
+	(match_operand:DXC2 3 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))]
    "rtx_equal_p (XEXP (operands[2], 0),
 		 plus_constant (Pmode,
 				XEXP (operands[0], 0),
-				GET_MODE_SIZE (<DX:MODE>mode)))"
+				GET_MODE_SIZE (<DXC:MODE>mode)))"
   "@
-   stp\\t%x1, %x3, %z0
+   stp\\t%<DXC:dxc_gpr>1, %<DXC2:dxc_gpr>3, %z0
    stp\\t%d1, %d3, %z0"
   [(set_attr "type" "store_16,neon_store1_2reg")
    (set_attr "arch" "*,fp")]
@@ -1667,21 +1667,21 @@
 ;; epilogues.
 ;;
 ;; MORELLO TODO: pure-cap.
-(define_insn "@loadwb_pair<GPI:mode>_<ADDR:mode>"
+(define_insn "@loadwb_pair<GPIC:mode>_<ADDR:mode>"
   [(parallel
     [(set (match_operand:ADDR 0 "register_operand" "=k")
-          (<ADDR:PLUS>:ADDR
+	  (<ADDR:PLUS>:ADDR
 	    (match_operand:ADDR 1 "register_operand" "0")
 	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
-     (set (match_operand:GPI 2 "register_operand" "=r")
-          (mem:GPI (match_dup 1)))
-     (set (match_operand:GPI 3 "register_operand" "=r")
-          (mem:GPI (<ADDR:PLUS>:ADDR
+     (set (match_operand:GPIC 2 "register_operand" "=r")
+	  (mem:GPIC (match_dup 1)))
+     (set (match_operand:GPIC 3 "register_operand" "=r")
+	  (mem:GPIC (<ADDR:PLUS>:ADDR
 		     (match_dup 1)
 		     (match_operand:DI 5 "const_int_operand" "n"))))])]
-  "INTVAL (operands[5]) == GET_MODE_SIZE (<GPI:MODE>mode)"
-  "ldp\\t%<GPI:w>2, %<GPI:w>3, [%1], %4"
-  [(set_attr "type" "load_<GPI:ldpstp_sz>")]
+  "INTVAL (operands[5]) == GET_MODE_SIZE (<GPIC:MODE>mode)"
+  "ldp\\t%<GPIC:w>2, %<GPIC:w>3, [%1], %4"
+  [(set_attr "type" "load_<GPIC:ldpstp_sz>")]
 )
 
 (define_insn "@loadwb_pair<GPF:mode>_<ADDR:mode>"
@@ -1722,21 +1722,21 @@
 ;; prologues.
 ;;
 ;; MORELLO TODO: pure-cap.
-(define_insn "@storewb_pair<GPI:mode>_<ADDR:mode>"
+(define_insn "@storewb_pair<GPIC:mode>_<ADDR:mode>"
   [(parallel
     [(set (match_operand:ADDR 0 "register_operand" "=&k")
-          (<ADDR:PLUS>:ADDR
+	  (<ADDR:PLUS>:ADDR
 	    (match_operand:ADDR 1 "register_operand" "0")
 	    (match_operand:DI 4 "aarch64_mem_pair_offset" "n")))
-     (set (mem:GPI (<ADDR:PLUS>:ADDR (match_dup 0) (match_dup 4)))
-          (match_operand:GPI 2 "register_operand" "r"))
-     (set (mem:GPI (<ADDR:PLUS>:ADDR
+     (set (mem:GPIC (<ADDR:PLUS>:ADDR (match_dup 0) (match_dup 4)))
+	  (match_operand:GPIC 2 "register_operand" "r"))
+     (set (mem:GPIC (<ADDR:PLUS>:ADDR
 		     (match_dup 0)
 		     (match_operand:DI 5 "const_int_operand" "n")))
-          (match_operand:GPI 3 "register_operand" "r"))])]
-  "INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
-  "stp\\t%<GPI:w>2, %<GPI:w>3, [%0, %4]!"
-  [(set_attr "type" "store_<GPI:ldpstp_sz>")]
+	  (match_operand:GPIC 3 "register_operand" "r"))])]
+  "INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPIC:MODE>mode)"
+  "stp\\t%<GPIC:w>2, %<GPIC:w>3, [%0, %4]!"
+  [(set_attr "type" "store_<GPIC:ldpstp_sz>")]
 )
 
 (define_insn "@storewb_pair<GPF:mode>_<ADDR:mode>"
