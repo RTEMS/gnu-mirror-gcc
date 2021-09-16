@@ -2383,6 +2383,16 @@ layout_type (tree type)
   if (TYPE_SIZE (type))
     return;
 
+  /* Ensure that any capability type warns if it is not aligned.
+     This should maybe get overridden in common_handle_aligned_attribute if the
+     user has provided their own request.
+     MORELLO TODO For capabilities we'll want to match the error message of
+     LLVM and have the relevant warning message under `-Wcheri-<whatever it
+     is>`.  With this temporary approach we at least have the warning.  */
+  if (CAPABILITY_MODE_P (TYPE_MODE (type)))
+    SET_TYPE_WARN_IF_NOT_ALIGN
+      (type, GET_MODE_BITSIZE (TYPE_MODE (type)).to_constant());
+
   switch (TREE_CODE (type))
     {
     case LANG_TYPE:
