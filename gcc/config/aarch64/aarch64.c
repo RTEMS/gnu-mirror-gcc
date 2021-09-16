@@ -1976,7 +1976,7 @@ aarch64_classify_capability_contents (const_tree type)
        CAPCOM_OVERLAP overrides CAPCOM_SOME (doesn't matter if there are
        capabilities if there are some fields that overlap their metadata).
 	 Hence as soon as we see CAPCOM_OVERLAP, we can return that.
-       CAPCOM_SOME overribes CAPCOM_NONE.
+       CAPCOM_SOME overrides CAPCOM_NONE.
 	 Have to search through all fields for any CAPCOM_SOME or
 	 CAPCOM_OVERLAP.
        */
@@ -5694,7 +5694,7 @@ static bool
 aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
 			     const function_arg_info &arg)
 {
-  HOST_WIDE_INT size;
+  HOST_WIDE_INT size, units_per_reg = UNITS_PER_WORD;
   machine_mode dummymode;
   int nregs;
 
@@ -5708,7 +5708,22 @@ aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
 
   /* Aggregates are passed by reference based on their size.  */
   if (arg.aggregate_type_p ())
-    size = int_size_in_bytes (arg.type);
+    {
+      size = int_size_in_bytes (arg.type);
+      switch (aarch64_classify_capability_contents (arg.type))
+	{
+	case CAPCOM_NONE:
+	case CAPCOM_LARGE:
+	  break;
+	case CAPCOM_SOME:
+	  units_per_reg = GET_MODE_SIZE (CADImode);
+	  break;
+	case CAPCOM_OVERLAP:
+	  return true;
+	default:
+	  gcc_unreachable ();
+	}
+    }
 
   /* Variable sized arguments are always returned by reference.  */
   if (size < 0)
@@ -5723,7 +5738,7 @@ aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
   /* Arguments which are variable sized or larger than 2 registers are
      passed by reference unless they are a homogenous floating point
      aggregate.  */
-  return size > 2 * UNITS_PER_WORD;
+  return size > 2 * units_per_reg;
 }
 
 /* Implement TARGET_PASS_BY_REFERENCE.  */
