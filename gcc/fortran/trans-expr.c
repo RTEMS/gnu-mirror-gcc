@@ -2589,7 +2589,9 @@ gfc_conv_substring (gfc_se * se, gfc_ref * ref, int kind,
   if (!CONSTANT_CLASS_P (tmp) && !DECL_P (tmp))
     end.expr = gfc_evaluate_now (end.expr, &se->pre);
 
-  if (gfc_option.rtcheck & GFC_RTCHECK_BOUNDS)
+  if ((gfc_option.rtcheck & GFC_RTCHECK_BOUNDS)
+      && (ref->u.ss.start->symtree
+	  && !ref->u.ss.start->symtree->n.sym->attr.implied_index))
     {
       tree nonempty = fold_build2_loc (input_location, LE_EXPR,
 				       logical_type_node, start.expr,
@@ -6420,6 +6422,15 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		gfc_conv_subref_array_arg (&parmse, e, nodesc_arg,
 				fsym ? fsym->attr.intent : INTENT_INOUT,
 				fsym && fsym->attr.pointer);
+
+	      else if (e->ts.type == BT_CLASS && CLASS_DATA (e)->as
+		       && CLASS_DATA (e)->as->type == AS_ASSUMED_SIZE
+		       && nodesc_arg && fsym->ts.type == BT_DERIVED)
+		/* An assumed size class actual argument being passed to
+		   a 'no descriptor' formal argument just requires the
+		   data pointer to be passed. For class dummy arguments
+		   this is stored in the symbol backend decl..  */
+		parmse.expr = e->symtree->n.sym->backend_decl;
 
 	      else if (gfc_is_class_array_ref (e, NULL)
 		       && fsym && fsym->ts.type == BT_DERIVED)

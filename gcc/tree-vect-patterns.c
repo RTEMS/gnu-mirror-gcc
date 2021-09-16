@@ -1223,11 +1223,31 @@ vect_recog_widen_op_pattern (vec_info *vinfo,
   /* Check target support  */
   tree vectype = get_vectype_for_scalar_type (vinfo, half_type);
   tree vecitype = get_vectype_for_scalar_type (vinfo, itype);
+  tree ctype = itype;
+  tree vecctype = vecitype;
+  if (orig_code == MINUS_EXPR
+      && TYPE_UNSIGNED (itype)
+      && TYPE_PRECISION (type) > TYPE_PRECISION (itype))
+    {
+      /* Subtraction is special, even if half_type is unsigned and no matter
+	 whether type is signed or unsigned, if type is wider than itype,
+	 we need to sign-extend from the widening operation result to the
+	 result type.
+	 Consider half_type unsigned char, operand 1 0xfe, operand 2 0xff,
+	 itype unsigned short and type either int or unsigned int.
+	 Widened (unsigned short) 0xfe - (unsigned short) 0xff is
+	 (unsigned short) 0xffff, but for type int we want the result -1
+	 and for type unsigned int 0xffffffff rather than 0xffff.  */
+      ctype = build_nonstandard_integer_type (TYPE_PRECISION (itype), 0);
+      vecctype = get_vectype_for_scalar_type (vinfo, ctype);
+    }
+
   enum tree_code dummy_code;
   int dummy_int;
   auto_vec<tree> dummy_vec;
   if (!vectype
       || !vecitype
+      || !vecctype
       || !supportable_widening_operation (vinfo, wide_code, last_stmt_info,
 					  vecitype, vectype,
 					  &dummy_code, &dummy_code,
@@ -1246,8 +1266,12 @@ vect_recog_widen_op_pattern (vec_info *vinfo,
   gimple *pattern_stmt = gimple_build_assign (var, wide_code,
 					      oprnd[0], oprnd[1]);
 
+  if (vecctype != vecitype)
+    pattern_stmt = vect_convert_output (vinfo, last_stmt_info, ctype,
+					pattern_stmt, vecitype);
+
   return vect_convert_output (vinfo, last_stmt_info,
-			      type, pattern_stmt, vecitype);
+			      type, pattern_stmt, vecctype);
 }
 
 /* Try to detect multiplication on widened inputs, converting MULT_EXPR
@@ -5198,6 +5222,13 @@ vect_determine_precisions (vec_info *vinfo)
       for (unsigned int i = 0; i < nbbs; i++)
 	{
 	  basic_block bb = bbs[i];
+	  for (auto gsi = gsi_start_phis (bb);
+	       !gsi_end_p (gsi); gsi_next (&gsi))
+	    {
+	      stmt_vec_info stmt_info = vinfo->lookup_stmt (gsi.phi ());
+	      if (stmt_info)
+		vect_determine_mask_precision (vinfo, stmt_info);
+	    }
 	  for (auto si = gsi_start_bb (bb); !gsi_end_p (si); gsi_next (&si))
 	    if (!is_gimple_debug (gsi_stmt (si)))
 	      vect_determine_mask_precision
@@ -5211,6 +5242,13 @@ vect_determine_precisions (vec_info *vinfo)
 	    if (!is_gimple_debug (gsi_stmt (si)))
 	      vect_determine_stmt_precisions
 		(vinfo, vinfo->lookup_stmt (gsi_stmt (si)));
+	  for (auto gsi = gsi_start_phis (bb);
+	       !gsi_end_p (gsi); gsi_next (&gsi))
+	    {
+	      stmt_vec_info stmt_info = vinfo->lookup_stmt (gsi.phi ());
+	      if (stmt_info)
+		vect_determine_stmt_precisions (vinfo, stmt_info);
+	    }
 	}
     }
   else

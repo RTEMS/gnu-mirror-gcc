@@ -804,6 +804,15 @@ resolve_entries (gfc_namespace *ns)
 	     the same string length, i.e. both len=*, or both len=4.
 	     Having both len=<variable> is also possible, but difficult to
 	     check at compile time.  */
+	  else if (ts->type == BT_CHARACTER
+		   && (el->sym->result->attr.allocatable
+		       != ns->entries->sym->result->attr.allocatable))
+	    {
+	      gfc_error ("Function %s at %L has entry %s with mismatched "
+			 "characteristics", ns->entries->sym->name,
+			 &ns->entries->sym->declared_at, el->sym->name);
+	      return;
+	    }
 	  else if (ts->type == BT_CHARACTER && ts->u.cl && fts->u.cl
 		   && (((ts->u.cl->length && !fts->u.cl->length)
 			||(!ts->u.cl->length && fts->u.cl->length))
@@ -7821,8 +7830,9 @@ resolve_allocate_expr (gfc_expr *e, gfc_code *code, bool *array_alloc_wo_spec)
 	}
     }
 
-  /* Check for F08:C628.  */
-  if (allocatable == 0 && pointer == 0 && !unlimited)
+  /* Check for F08:C628 (F2018:C932).  Each allocate-object shall be a data
+     pointer or an allocatable variable.  */
+  if (allocatable == 0 && pointer == 0)
     {
       gfc_error ("Allocate-object at %L must be ALLOCATABLE or a POINTER",
 		 &e->where);
@@ -8156,16 +8166,21 @@ resolve_allocate_deallocate (gfc_code *code, const char *fcn)
   /* Check the stat variable.  */
   if (stat)
     {
-      gfc_check_vardef_context (stat, false, false, false,
-				_("STAT variable"));
+      if (!gfc_check_vardef_context (stat, false, false, false,
+				     _("STAT variable")))
+	  goto done_stat;
 
-      if ((stat->ts.type != BT_INTEGER
-	   && !(stat->ref && (stat->ref->type == REF_ARRAY
-			      || stat->ref->type == REF_COMPONENT)))
+      if (stat->ts.type != BT_INTEGER
 	  || stat->rank > 0)
 	gfc_error ("Stat-variable at %L must be a scalar INTEGER "
 		   "variable", &stat->where);
 
+      if (stat->expr_type == EXPR_CONSTANT || stat->symtree == NULL)
+	goto done_stat;
+
+      /* F2018:9.7.4: The stat-variable shall not be allocated or deallocated
+       * within the ALLOCATE or DEALLOCATE statement in which it appears ...
+       */
       for (p = code->ext.alloc.list; p; p = p->next)
 	if (p->expr->symtree->n.sym->name == stat->symtree->n.sym->name)
 	  {
@@ -8193,6 +8208,8 @@ resolve_allocate_deallocate (gfc_code *code, const char *fcn)
 	  }
     }
 
+done_stat:
+
   /* Check the errmsg variable.  */
   if (errmsg)
     {
@@ -8200,22 +8217,26 @@ resolve_allocate_deallocate (gfc_code *code, const char *fcn)
 	gfc_warning (0, "ERRMSG at %L is useless without a STAT tag",
 		     &errmsg->where);
 
-      gfc_check_vardef_context (errmsg, false, false, false,
-				_("ERRMSG variable"));
+      if (!gfc_check_vardef_context (errmsg, false, false, false,
+				     _("ERRMSG variable")))
+	  goto done_errmsg;
 
       /* F18:R928  alloc-opt             is ERRMSG = errmsg-variable
 	 F18:R930  errmsg-variable       is scalar-default-char-variable
 	 F18:R906  default-char-variable is variable
 	 F18:C906  default-char-variable shall be default character.  */
-      if ((errmsg->ts.type != BT_CHARACTER
-	   && !(errmsg->ref
-		&& (errmsg->ref->type == REF_ARRAY
-		    || errmsg->ref->type == REF_COMPONENT)))
+      if (errmsg->ts.type != BT_CHARACTER
 	  || errmsg->rank > 0
 	  || errmsg->ts.kind != gfc_default_character_kind)
 	gfc_error ("ERRMSG variable at %L shall be a scalar default CHARACTER "
 		   "variable", &errmsg->where);
 
+      if (errmsg->expr_type == EXPR_CONSTANT || errmsg->symtree == NULL)
+	goto done_errmsg;
+
+      /* F2018:9.7.5: The errmsg-variable shall not be allocated or deallocated
+       * within the ALLOCATE or DEALLOCATE statement in which it appears ...
+       */
       for (p = code->ext.alloc.list; p; p = p->next)
 	if (p->expr->symtree->n.sym->name == errmsg->symtree->n.sym->name)
 	  {
@@ -8242,6 +8263,8 @@ resolve_allocate_deallocate (gfc_code *code, const char *fcn)
 	      }
 	  }
     }
+
+done_errmsg:
 
   /* Check that an allocate-object appears only once in the statement.  */
 
@@ -10224,19 +10247,27 @@ resolve_sync (gfc_code *code)
 
   /* Check STAT.  */
   gfc_resolve_expr (code->expr2);
-  if (code->expr2
-      && (code->expr2->ts.type != BT_INTEGER || code->expr2->rank != 0
-	  || code->expr2->expr_type != EXPR_VARIABLE))
-    gfc_error ("STAT= argument at %L must be a scalar INTEGER variable",
-	       &code->expr2->where);
+  if (code->expr2)
+    {
+      if (code->expr2->ts.type != BT_INTEGER || code->expr2->rank != 0)
+	gfc_error ("STAT= argument at %L must be a scalar INTEGER variable",
+		   &code->expr2->where);
+      else
+	gfc_check_vardef_context (code->expr2, false, false, false,
+				  _("STAT variable"));
+    }
 
   /* Check ERRMSG.  */
   gfc_resolve_expr (code->expr3);
-  if (code->expr3
-      && (code->expr3->ts.type != BT_CHARACTER || code->expr3->rank != 0
-	  || code->expr3->expr_type != EXPR_VARIABLE))
-    gfc_error ("ERRMSG= argument at %L must be a scalar CHARACTER variable",
-	       &code->expr3->where);
+  if (code->expr3)
+    {
+      if (code->expr3->ts.type != BT_CHARACTER || code->expr3->rank != 0)
+	gfc_error ("ERRMSG= argument at %L must be a scalar CHARACTER variable",
+		   &code->expr3->where);
+      else
+	gfc_check_vardef_context (code->expr3, false, false, false,
+				  _("ERRMSG variable"));
+    }
 }
 
 

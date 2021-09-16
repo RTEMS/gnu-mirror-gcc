@@ -36,9 +36,8 @@ namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
-  /*
-   * (Further) implementation-space details.
-   */
+  /// @cond undocumented
+  // (Further) implementation-space details.
   namespace __detail
   {
     // General case for x = (ax + c) mod m -- use Schrage's algorithm
@@ -90,6 +89,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
 
   } // namespace __detail
+  /// @endcond
 
   template<typename _UIntType, _UIntType __a, _UIntType __c, _UIntType __m>
     constexpr _UIntType
@@ -3231,7 +3231,7 @@ namespace __detail
     }
 
 
-  template<typename _IntType>
+  template<typename _IntType, typename>
     seed_seq::seed_seq(std::initializer_list<_IntType> __il)
     {
       for (auto __iter = __il.begin(); __iter != __il.end(); ++__iter)
