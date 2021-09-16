@@ -6751,6 +6751,81 @@ xxspltidp_constant_immediate (rtx op, machine_mode mode)
   return ret;
 }
 
+/* Return the constant that will go in the LXVKQ instruction.  */
+
+/* LXVKQ immediates.  */
+enum {
+  LXVKQ_ONE		= 1,
+  LXVKQ_TWO		= 2,
+  LXVKQ_THREE		= 3,
+  LXVKQ_FOUR		= 4,
+  LXVKQ_FIVE		= 5,
+  LXVKQ_SIX		= 6,
+  LXVKQ_SEVEN		= 7,
+  LXVKQ_INF		= 8,
+  LXVKQ_NAN		= 9,
+  LXVKQ_NEG_ZERO	= 16,
+  LXVKQ_NEG_ONE		= 17,
+  LXVKQ_NEG_TWO		= 18,
+  LXVKQ_NEG_THREE	= 19,
+  LXVKQ_NEG_FOUR	= 20,
+  LXVKQ_NEG_FIVE	= 21,
+  LXVKQ_NEG_SIX		= 22,
+  LXVKQ_NEG_SEVEN	= 23,
+  LXVKQ_NEG_INF		= 24
+};
+
+int
+lxvkq_constant_immediate (rtx op, machine_mode mode)
+{
+  int ret = -1;
+  gcc_assert (lxvkq_operand (op, mode));
+
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+
+  /* Special values (infinity, nan, -0.0.  */
+  if (real_isinf (rv))
+    ret = real_isneg (rv) ? LXVKQ_NEG_INF : LXVKQ_INF;
+
+  else if (real_isnan (rv) && !real_isneg (rv))
+    ret = LXVKQ_NAN;
+
+  else if (real_isnegzero (rv))
+    ret = LXVKQ_NEG_ZERO;
+
+  else
+    {
+      HOST_WIDE_INT value = real_to_integer (rv);
+      switch (value)
+	{
+	default:
+	  gcc_unreachable ();
+
+	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	  ret = LXVKQ_ONE + (value - 1);
+	  break;
+
+	case -1:
+	case -2:
+	case -3:
+	case -4:
+	case -5:
+	case -6:
+	case -7:
+	  ret = LXVKQ_NEG_ONE + (-value - 1);
+	  break;
+	}
+    }
+
+  return ret;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -6800,6 +6875,12 @@ output_vec_const_move (rtx *operands)
 	  long xxspltidp_value = xxspltidp_constant_immediate (vec, mode);
 	  operands[2] = GEN_INT (xxspltidp_value);
 	  return "xxspltidp %x0,%2";
+	}
+
+      if (lxvkq_operand (vec, mode))
+	{
+	  operands[2] = GEN_INT (lxvkq_constant_immediate (vec, mode));
+	  return "lxvkq %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -13644,6 +13725,12 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
+  else if (dest_vsx_p && lxvkq_operand (src, mode))
+    {
+      operands[2] = GEN_INT (lxvkq_constant_immediate (src, mode));
+      return "lxvkq %x0,%2";
+    }
+
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)

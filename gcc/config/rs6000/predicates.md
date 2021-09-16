@@ -606,6 +606,11 @@
   if (easy_fp_constant_sfmode (op, mode))
     return 1;
 
+  /* If we have the ISA 3.1 LXVKQ instruction, see if the constant can be loaded
+     with that instruction.  */
+  if (lxvkq_operand (op, mode))
+    return 1;
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -748,6 +753,64 @@
     return false;
 
   return num_insns == 1;
+})
+
+;; Return 1 if the operand is an IEEE 128-bit special constant that can be
+;; loaded with the LXVKQ instruction.
+(define_predicate "lxvkq_operand"
+  (match_code "const_double")
+{
+  if (!TARGET_LXVKQ || !TARGET_POWER10 || !TARGET_VSX || !TARGET_FLOAT128_HW)
+    return false;
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (!FLOAT128_IEEE_P (mode))
+    return false;
+
+  if (!CONST_DOUBLE_P (op))
+    return false;
+
+  /* All of the values generated can be expressed as SFmode values, so if it
+     doesn't fit in SFmode, exit.  */
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+  if (!exact_real_truncate (SFmode, rv))
+    return 0;
+
+  /* Special values (infinity, nan, -0.0.  */
+  if (real_isinf (rv) || real_isnegzero (rv)
+      || (real_isnan (rv) && !real_isneg (rv)))
+
+  /* The other values are all integers 1..7, and -1..-7.  */
+  if (!real_isinteger (rv, mode))
+    return false;
+
+  HOST_WIDE_INT value = real_to_integer (rv);
+  switch (value)
+    {
+    default:
+      break;
+
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case -1:
+    case -2:
+    case -3:
+    case -4:
+    case -5:
+    case -6:
+    case -7:
+      return true;
+    }
+
+  /* We can't load the value with LXVKQ.  */
+  return false;
 })
 
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
