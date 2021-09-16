@@ -1,3 +1,14 @@
+work069.patch008:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (easy_fp_constant_sfmode): Don't use
+	XXSPLTIDP to load 128-bit types.
+
+work069.patch007:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (output_vec_const_move): Code cleanup.
+
 work069.patch006:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
