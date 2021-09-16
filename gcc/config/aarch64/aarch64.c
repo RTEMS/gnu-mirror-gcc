@@ -9598,10 +9598,27 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  rtx sym, addend;
 
 	  split_const (x, &sym, &addend);
-	  return ((GET_CODE (sym) == LABEL_REF
+	  return (GET_CODE (sym) == LABEL_REF
 		   || (GET_CODE (sym) == SYMBOL_REF
 		       && CONSTANT_POOL_ADDRESS_P (sym)
-		       && aarch64_pcrelative_literal_loads)));
+		       && aarch64_pcrelative_literal_loads
+		       /* Disallow direct loading of symbols in pure capability
+			  unless that symbol is already an indirection symbol.
+			  Disallow other symbols since we always want to
+			  enforce indirection.
+
+			  Allow indirection symbols since while this function
+			  is used in many places where such a direct symbol
+			  could not be used for PureCap ABI, these are also
+			  places a direct symbol could not be used in the
+			  instruction for stock AArch64.
+
+			  The only place we belive that this would end up
+			  getting used is in the Usa alternative of
+			  movcadi_aarch64 patterns, where we would use an `adr`
+			  with it.  We believe this is valid.  */
+		       && (!TARGET_CAPABILITY_PURE
+			   || SYMBOL_REF_INDIRECTION_P (sym))));
 	}
       return false;
 
@@ -18641,7 +18658,7 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
       return aarch64_simd_valid_immediate (x, NULL);
     }
 
-  if (GET_CODE (x) == SYMBOL_REF && mode == DImode && CONSTANT_ADDRESS_P (x))
+  if (GET_CODE (x) == SYMBOL_REF && mode == Pmode && CONSTANT_ADDRESS_P (x))
     return true;
 
   if (TARGET_SVE && aarch64_sve_cnt_immediate_p (x))
