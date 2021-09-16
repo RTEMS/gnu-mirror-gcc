@@ -5,7 +5,7 @@
 #include "validate_memory.h"
 
 void (*testfunc_ptr)(char* stack);
-unsigned long long saved_return_address;
+__UINTPTR_TYPE__ saved_return_address;
 
 /* Helper macros to generate function name.  Example of the function name:
    func_return_val_1.  */
@@ -39,10 +39,12 @@ void TEST_FUNC_NAME(id)(char* stack)					\
   type __x = val;							\
   char* addr;								\
   DUMP_STATUS(type,val)							\
-  if (offset != X8)							\
+  if (offset != X8 && offset != C8)					\
     addr = stack + offset;						\
-  else									\
+  else if (offset == X8)						\
     addr = *(char **)(stack + X8);					\
+  else if (offset == C8)						\
+    addr = *(char **)(stack + C8);					\
   if (validate_memory (&__x, addr, sizeof (type), layout) != 0)		\
     abort();								\
 }
@@ -65,6 +67,15 @@ MYFUNCTYPE myfunc () PCSATTR;
    parameter list are two dummy parameters to help improve the detection
    of bugs like a short vector being returned in X0 after copied from V0.  */
 #undef FUNC_VAL_CHECK
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define GET_LR "mov %0, c30"
+#define SET_LR "mov c30, %0"
+#else
+#define GET_LR "mov %0, x30"
+#define SET_LR "mov x30, %0"
+#endif
+
 #define FUNC_VAL_CHECK(id, type, var, offset, layout)			  \
 __attribute__ ((noinline)) type FUNC_NAME (id) (int i, double d, type t)  \
   {									  \
@@ -81,11 +92,14 @@ __attribute__ ((noinline)) type FUNC_NAME (id) (int i, double d, type t)  \
        this function does not guarantee myfunc see the exact register	  \
        content, as compiler may emit code in between the two calls,	  \
        especially during the -O0 codegen.  */				  \
-    asm volatile ("mov %0, x30" : "=r" (saved_return_address));		  \
-    asm volatile ("mov x30, %0" : : "r" ((unsigned long long) myfunc));   \
+    asm volatile (GET_LR : "=r" (saved_return_address));		  \
+    asm volatile (SET_LR : : "r" ((__UINTPTR_TYPE__) myfunc));   \
     return t;								  \
   }
 #include TESTFILE
+
+#undef GET_LR
+#undef SET_LR
 
 
 /* Call the function to return value and call the checking function

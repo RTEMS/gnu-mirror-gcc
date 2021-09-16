@@ -66,8 +66,23 @@
 #define H6	348
 #define H7	350
 
+#define C0     352
+#define C1     368
+#define C2     384
+#define C3     400
+#define C4     416
+#define C5     432
+#define C6     448
+#define C7     464
+#define C8     480
+#define C9     496
 
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define STACK  512
+#else
 #define STACK  352
+#endif
 
 /* The type of test.  'myfunc' in abitest.S needs to know which kind of
    test it is running to decide what to do at the runtime.  Keep the
