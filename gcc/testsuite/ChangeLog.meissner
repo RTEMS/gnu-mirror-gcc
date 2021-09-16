@@ -1,3 +1,8 @@
+work069.patch002:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-constant.c: New test.
+
 work069.patch001:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
