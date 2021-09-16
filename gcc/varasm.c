@@ -2514,6 +2514,15 @@ assemble_label (FILE *file, const char *name)
   ASM_OUTPUT_LABEL (file, name);
 }
 
+void
+assemble_object_type_and_size (FILE *file, const char *in_name,
+			       HOST_WIDE_INT size)
+{
+  const char *name = targetm.strip_name_encoding (in_name);
+  asm_fprintf (file, "\t.type\t%s, %%object\n", name);
+  asm_fprintf (file, "\t.size\t%s, %" PRId64 "\n", name, size);
+}
+
 /* Set the symbol_referenced flag for ID.  */
 void
 mark_referenced (tree id)
@@ -2680,6 +2689,9 @@ assemble_trampoline_template (void)
   initial_trampoline = gen_const_mem (BLKmode, symbol);
   set_mem_align (initial_trampoline, TRAMPOLINE_ALIGNMENT);
   set_mem_size (initial_trampoline, TRAMPOLINE_SIZE);
+
+  /* Output the relevant size for the trampoline.  */
+  assemble_object_type_and_size (asm_out_file, label, TRAMPOLINE_SIZE);
 
   return initial_trampoline;
 }
@@ -4105,7 +4117,10 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
   assemble_align (align);
 
   /* Output the label.  */
-  targetm.asm_out.internal_label (asm_out_file, "LC", desc->labelno);
+  char buf[42];
+  ASM_GENERATE_INTERNAL_LABEL (buf, "LC", desc->labelno);
+  assemble_object_type_and_size (asm_out_file, buf, GET_MODE_SIZE (desc->mode));
+  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, buf);
 
   /* Output the data.
      Pass actual alignment value while emitting string constant to asm code

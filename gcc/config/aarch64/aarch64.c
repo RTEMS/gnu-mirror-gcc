@@ -11636,6 +11636,15 @@ aarch64_use_anchors_for_symbol_p (const_rtx x)
   return default_use_anchors_for_symbol_p (x);
 }
 
+static void
+aarch64_declare_constant_name (FILE *file, const char *name,
+			       const_tree exp ATTRIBUTE_UNUSED,
+			       HOST_WIDE_INT size)
+{
+  assemble_object_type_and_size (file, name, size);
+  return default_asm_declare_constant_name (file, name, exp, size);
+}
+
 /* Select appropriate section for constants depending
    on where we place literal pools.  */
 
@@ -24813,6 +24822,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CAPABILITY_MODE
 #define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
+
+#undef TARGET_ASM_DECLARE_CONSTANT_NAME
+#define TARGET_ASM_DECLARE_CONSTANT_NAME aarch64_declare_constant_name
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

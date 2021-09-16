@@ -231,6 +231,11 @@ extern void assemble_external_libcall (rtx);
 /* Assemble a label named NAME.  */
 extern void assemble_label (FILE *, const char *);
 
+/* Assemble the type and size directives associated with a label.
+   Assume that the label is an object (since all use cases at the moment are
+   for objects.  */
+extern void assemble_object_type_and_size (FILE *, const char *, HOST_WIDE_INT);
+
 /* Output to FILE (an assembly file) a reference to NAME.  If NAME
    starts with a *, the rest of NAME is output verbatim.  Otherwise
    NAME is transformed in a target-specific way (usually by the
