@@ -1915,11 +1915,6 @@ enum capability_composite_type {
 static bool
 aarch64_field_overlaps_capability_metadata (const_tree field)
 {
-  tree t = DECL_FIELD_OFFSET (field);
-  /* Must know size of the field, since only ever called when the size of the
-     entire containing type is known.  */
-  gcc_assert (t && tree_fits_uhwi_p (t));
-
   tree ty = TREE_TYPE (field);
 
   /* Flexible array members are not passed, so they don't overlap for
@@ -1927,11 +1922,28 @@ aarch64_field_overlaps_capability_metadata (const_tree field)
   if (TREE_CODE (ty) == ARRAY_TYPE && !TYPE_SIZE (ty))
     return false;
 
-  gcc_assert (int_size_in_bytes (TREE_TYPE (field)) != -1);
+  tree t = DECL_FIELD_OFFSET (field);
+  tree tbo = DECL_FIELD_BIT_OFFSET (field);
 
-  unsigned HOST_WIDE_INT first = tree_to_uhwi (t);
+  /* Must know starting position and size of the field, since only ever called
+     when the size of the entire containing type is known.  */
+  gcc_assert (t && tree_fits_uhwi_p (t));
+  gcc_assert (int_size_in_bytes (TREE_TYPE (field)) != -1);
+  gcc_assert (tbo && tree_fits_uhwi_p (tbo));
+
+  unsigned HOST_WIDE_INT bit_offset = tree_to_uhwi (tbo);
+  /* If the modulo is not zero then we overlap part of the first byte and part
+     of the second.  */
+  bool extra_byte_range = (bit_offset % BITS_PER_UNIT != 0);
+  /* The change in the first byte that we overlap is just the number of total
+     bytes that the extra bits move us.  */
+  unsigned HOST_WIDE_INT offset = (bit_offset / BITS_PER_UNIT);
+
+  unsigned HOST_WIDE_INT first = tree_to_uhwi (t) + offset;
   unsigned HOST_WIDE_INT last
     = first + int_size_in_bytes (TREE_TYPE (field)) - 1;
+  if (extra_byte_range)
+    last += 1;
   if ((first >= 8 && first <= 15) || (first >= 24 && first <= 31))
     return true;
   if ((last >= 8 && last <= 15) || (last >= 24 && last <= 31))
@@ -5902,10 +5914,41 @@ aarch64_function_value (const_tree type, const_tree func,
 	 registers.  */
       if (mode == BLKmode
 	  && aarch64_classify_capability_contents (type) == CAPCOM_SOME
-	  && int_size_in_bytes (type) == GET_MODE_SIZE (CADImode) * 2)
+	  && int_size_in_bytes (type) > GET_MODE_SIZE (CADImode))
 	{
+	  gcc_assert ((int_size_in_bytes (type) == GET_MODE_SIZE (CADImode) * 2)
+		      || (int_size_in_bytes (type)
+			  <= GET_MODE_SIZE (CADImode)
+			    + GET_MODE_SIZE (DImode)));
 	  rtx c0 = gen_rtx_REG (CADImode, R0_REGNUM);
-	  rtx c1 = gen_rtx_REG (CADImode, R1_REGNUM);
+	  rtx c1;
+	  if (int_size_in_bytes (type) == GET_MODE_SIZE (CADImode) * 2)
+	      c1 = gen_rtx_REG (CADImode, R1_REGNUM);
+	  else
+	    /* While the PCS calls for us to pass these structures in two
+	       CADImode registers, passing these structures in a CADImode
+	       register and a DImode register is functionally the same.
+
+	       This is because we can never need to use the metadata of the
+	       second capability register, as otherwise
+	       aarch64_classify_capability_contents would have returned
+	       CAPCOM_OVERLAP.
+
+	       On top of that, storing to a DImode register clears the metadata
+	       of a CADImode register, which means the CADImode register ends
+	       up properly specified.
+
+	       We choose to specify things differently here rather than passing
+	       in two CADImode registers because that means we avoid the need
+	       to load smaller sized values into a CADImode register.  If we
+	       passed arguments in CADImode registers then we would need to be
+	       able to load the remainder bits of a structure into a CADImode
+	       register.  This would mean allowing another vector by which we
+	       could generate invalid CADImode variables.  Removing such
+	       vectors is the way we model the validity bit (implicitly, by
+	       disallowing any method to make an invalid capability).  */
+	    c1 = gen_rtx_REG (DImode, R1_REGNUM);
+
 	  rtx e1 = gen_rtx_EXPR_LIST (VOIDmode, c0, gen_int_mode (0, POmode));
 	  rtx e2 = gen_rtx_EXPR_LIST (VOIDmode, c1,
 				      gen_int_mode (GET_MODE_SIZE (CADImode),
@@ -6176,6 +6219,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
     /* No frontends can create types with variable-sized modes, so we
        shouldn't be asked to pass or return them.  */
     size = GET_MODE_SIZE (mode).to_constant ();
+  HOST_WIDE_INT orig_size = size;
   size = ROUND_UP (size, UNITS_PER_WORD);
 
   allocate_ncrn = (type) ? !(FLOAT_TYPE_P (type)) : !FLOAT_MODE_P (mode);
@@ -6256,8 +6300,9 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
       in_cap_regs = true;
       units_per_reg = GET_MODE_SIZE (CADImode);
     }
+
   ncrn = pcum->aapcs_ncrn;
-  nregs = size / units_per_reg;
+  nregs = ROUND_UP (size, units_per_reg) / units_per_reg;
 
   /* C6 - C9.  though the sign and zero extension semantics are
      handled elsewhere.  This is the case where the argument fits
@@ -6306,6 +6351,22 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	  || (nregs == 1 && !sve_p)
 	  || GET_MODE_CLASS (mode) == MODE_INT)
 	pcum->aapcs_reg = gen_rtx_REG (mode, R0_REGNUM + ncrn);
+      else if (nregs == 2 && in_cap_regs && orig_size < 32)
+	{
+	  /* While the PCS calls for us to pass these structures in two
+	     CADImode registers, we represent passing these structures in a
+	     CADImode register and a DImode register.
+
+	     See the comment in aarch64_function_value for why.
+	     Also see that comment for why we know that `size` (having been
+	     rounded to an 8 byte boundary) must be 24.  */
+	  gcc_assert (size == 24);
+	  rtx c0 = gen_rtx_REG (CADImode, R0_REGNUM + ncrn);
+	  rtx c1 = gen_rtx_REG (DImode, R0_REGNUM + ncrn + 1);
+	  rtx e1 = gen_rtx_EXPR_LIST (VOIDmode, c0, GEN_INT (0));
+	  rtx e2 = gen_rtx_EXPR_LIST (VOIDmode, c1, GEN_INT (units_per_reg));
+	  pcum->aapcs_reg = gen_rtx_PARALLEL (mode, gen_rtvec (2, e1, e2));
+	}
       else
 	{
 	  rtx par;
