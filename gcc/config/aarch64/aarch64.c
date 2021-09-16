@@ -6090,7 +6090,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
   machine_mode mode = arg.mode;
   int ncrn, nvrn, nregs;
   bool allocate_ncrn, allocate_nvrn;
-  HOST_WIDE_INT size;
+  HOST_WIDE_INT size, units_per_reg = UNITS_PER_WORD;
   bool abi_break;
   bool in_cap_regs = false;
 
@@ -6210,8 +6210,6 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	}
     }
 
-  ncrn = pcum->aapcs_ncrn;
-  nregs = size / UNITS_PER_WORD;
   if (type)
     switch (aarch64_classify_capability_contents (type))
       {
@@ -6220,7 +6218,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	break;
       case CAPCOM_SOME:
 	in_cap_regs = true;
-	nregs = ROUND_UP (nregs, 2) / 2;
+	units_per_reg = GET_MODE_SIZE (CADImode);
 	break;
       case CAPCOM_OVERLAP:
 	goto on_stack;
@@ -6230,9 +6228,15 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
       }
   if (TARGET_MORELLO && mode == CADImode)
     {
+      /* If there was a type then it should have been identified as something
+	 that should be passed in capability registers.  May as well add an
+	 assertion here to ensure this is correct.  */
+      gcc_assert (!type || in_cap_regs == true);
       in_cap_regs = true;
-      nregs = ROUND_UP (nregs, 2) / 2;
+      units_per_reg = GET_MODE_SIZE (CADImode);
     }
+  ncrn = pcum->aapcs_ncrn;
+  nregs = size / units_per_reg;
 
   /* C6 - C9.  though the sign and zero extension semantics are
      handled elsewhere.  This is the case where the argument fits
@@ -6265,7 +6269,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	 Using the normal (parallel [...]) would suppress the shifting.  */
       if (sve_p
 	  && BYTES_BIG_ENDIAN
-	  && maybe_ne (GET_MODE_SIZE (mode), nregs * UNITS_PER_WORD)
+	  && maybe_ne (GET_MODE_SIZE (mode), nregs * units_per_reg)
 	  && aarch64_pad_reg_upward (mode, type, false))
 	{
 	  mode = int_mode_for_mode (mode).require ();
@@ -6294,7 +6298,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 		reg_mode = int_mode_for_mode (mode).require ();
 	      rtx tmp = gen_rtx_REG (reg_mode, R0_REGNUM + ncrn + i);
 	      tmp = gen_rtx_EXPR_LIST (VOIDmode, tmp,
-				       GEN_INT (i * UNITS_PER_WORD));
+				       GEN_INT (i * units_per_reg));
 	      XVECEXP (par, 0, i) = tmp;
 	    }
 	  pcum->aapcs_reg = par;
