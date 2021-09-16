@@ -1,3 +1,8 @@
+work069.patch005:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-di.c: Update insn count.
+
 work069.patch003:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
