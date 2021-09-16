@@ -1,3 +1,11 @@
+work069.patch006;
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-v16qi.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+
 work069.patch005:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 

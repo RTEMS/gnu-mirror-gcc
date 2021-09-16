@@ -1,3 +1,27 @@
+work069.patch006:
+2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eW): New constraint.
+	* config/rs6000/predicates.md (easy_vector_constant_splat_word):
+	New predicate.
+	(easy_vector_constant): If we can use XXSPLTIW, the vector
+	constant is easy.
+	* config/rs6000/rs6000-protos.h (xxspltiw_constant_immediate): New
+	declaration.
+	* config/rs6000/rs6000.c (xxspltiw_constant_immediate): New
+	function.
+	(output_vec_const_move): Add support for loading up vector
+	constants with XXSPLTIW.
+	(prefixed_xxsplti_p): Recognize xxspltiw instructions as
+	prefixed.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	constants loaded with XXSPLTIW.
+	(vsx_mov<mode>_32bit): Likewise.
+	(vsx_splat_v8hi_xxspltiw): New insn.
+	(vsx_splat_v4si_xxspltiw): New insn.
+	(vsx_splat_v4sf_xxspltiw): New insn.
+
 work069.patch004:
 2021-09-16  Michael Meissner  <meissner@linux.ibm.com>
 
