@@ -1,3 +1,11 @@
+work069.patch014:
+2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-v16qi.c: Update insn count
+	for power10.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: Likewise.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: Likewise.
+
 work069.patch013:
 2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
 
